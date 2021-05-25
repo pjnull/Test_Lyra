@@ -202,9 +202,40 @@ private:
 
 namespace UE_NETWORK_PHYSICS
 {
+	extern NETWORKPREDICTION_API int32 GBreakAtFrame;
+	extern NETWORKPREDICTION_API int32 GServerFrame;
+	extern NETWORKPREDICTION_API int32 GClientFrame;
+
 	extern NETWORKPREDICTION_API bool ConditionalFrameBreakpoint();
 	extern NETWORKPREDICTION_API void ConditionalFrameEnsure();
-	extern NETWORKPREDICTION_API bool GServer;
-	extern NETWORKPREDICTION_API int32 GFrame;
-	extern NETWORKPREDICTION_API int32 GBreakAtFrame;
+
+	// Read bIsServer and SimulationFrame from thread local storage. This is only enabled in development builds!
+	extern NETWORKPREDICTION_API int32 DebugSimulationFrame();
+	extern NETWORKPREDICTION_API bool DebugServer();
 };
+
+#ifndef NETWORK_PHSYSICS_THREAD_CONTEXT
+	#if (!UE_BUILD_SHIPPING && !UE_BUILD_TEST)
+		#define NETWORK_PHSYSICS_THREAD_CONTEXT 1
+	#else
+		#define NETWORK_PHSYSICS_THREAD_CONTEXT 0
+	#endif
+#endif
+
+#if NETWORK_PHSYSICS_THREAD_CONTEXT
+class NETWORKPREDICTION_API FNetworkPhysicsThreadContext : public TThreadSingleton<FNetworkPhysicsThreadContext>
+{
+public:
+
+	void Update(int32 InFrame, bool InServer)
+	{
+		SimulationFrame = InFrame;
+		bIsServer = InServer;
+		int32* Ptr = InServer ? &UE_NETWORK_PHYSICS::GServerFrame : &UE_NETWORK_PHYSICS::GClientFrame;
+		*Ptr = InFrame;
+	}
+
+	bool bIsServer;
+	int32 SimulationFrame;
+};
+#endif

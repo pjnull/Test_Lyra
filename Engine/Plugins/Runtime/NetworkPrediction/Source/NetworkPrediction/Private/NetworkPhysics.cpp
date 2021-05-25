@@ -71,7 +71,12 @@ namespace UE_NETWORK_PHYSICS
 	// ----------------------------------------------
 	// Debugger helpers:
 	//	See current frame anywhere with: 
-	//		{,,UE4Editor-NetworkPrediction.dll}UE_NETWORK_PHYSICS::GFrame
+	//		{,,UE4Editor-NetworkPrediction.dll}UE_NETWORK_PHYSICS::GServerFrame
+	//		{,,UE4Editor-NetworkPrediction.dll}UE_NETWORK_PHYSICS::GClientFrame
+	//		note: all bets are off here with multiple clients, this is just a debugging convenience.
+	//		Use UE_NETWORK_PHYSICS::DebugSimulationFrame() to get the correct value.
+	//
+	//
 	//	Set frame you want to break at via: 
 	//		{,,UE4Editor-NetworkPrediction.dll}UE_NETWORK_PHYSICS::GBreakAtFrame
 	//		or via console with "np2.BreakAtFrame"
@@ -86,20 +91,45 @@ namespace UE_NETWORK_PHYSICS
 	int32 GBreakAtFrame = 0;
 	FAutoConsoleVariableRef CVarConditionalBreakAtFrame(TEXT("np2.BreakAtFrame"), GBreakAtFrame, TEXT(""));
 
-	// Set by the system prior to NP subsystems ticking
-	int32 GFrame = 0;
-	bool GServer = false;
+	// These are strictly convenience variables to view in the debugger
+	int32 GServerFrame = 0;
+	int32 GClientFrame = 0;
 
 	// returns true/false so you can log or do whatever at GBreakAtFrame
 	bool ConditionalFrameBreakpoint()
 	{
-		return (GBreakAtFrame != 0 && GFrame == GBreakAtFrame);
+#if NETWORK_PHSYSICS_THREAD_CONTEXT
+		return (GBreakAtFrame != 0 && GBreakAtFrame == FNetworkPhysicsThreadContext::Get().SimulationFrame);
+#else
+		return false;
+#endif
 	}
 
 	// forces ensure failure to invoke debugger
 	void ConditionalFrameEnsure()
 	{
+#if NETWORK_PHSYSICS_THREAD_CONTEXT
 		ensureAlways(!ConditionalFrameBreakpoint());
+#endif
+	}
+
+	int32 DebugSimulationFrame()
+	{
+#if NETWORK_PHSYSICS_THREAD_CONTEXT
+		return FNetworkPhysicsThreadContext::Get().SimulationFrame;
+#else
+		return 0;
+#endif
+	}
+	
+	bool DebugServer()
+	{
+#if NETWORK_PHSYSICS_THREAD_CONTEXT
+		return FNetworkPhysicsThreadContext::Get().bIsServer;
+#else
+		return false;
+#endif
+
 	}
 }
 
@@ -347,8 +377,9 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 			DataFromPhysics.Enqueue(MoveTemp(Snapshot));
 		}
 
-		UE_NETWORK_PHYSICS::GFrame = PhysicsStep - this->LastLocalOffset;
-		UE_NETWORK_PHYSICS::GServer = this->bIsServer;
+#if NETWORK_PHSYSICS_THREAD_CONTEXT
+		FNetworkPhysicsThreadContext::Get().Update(PhysicsStep - this->LastLocalOffset, this->bIsServer);
+#endif
 
 		for (auto& SubSys : NetworkPhysicsManager->SubSystems)
 		{
