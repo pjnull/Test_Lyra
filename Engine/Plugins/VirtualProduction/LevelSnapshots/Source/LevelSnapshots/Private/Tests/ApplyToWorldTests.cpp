@@ -130,7 +130,7 @@ bool FRestoreReferenceProperties::RunTest(const FString& Parameters)
 			TestTrue(TEXT("World > External > World"), FromWorldToExternal->HasObjectReference(FirstActor));
 			TestTrue(TEXT("External > World > External"), FromExternalToWorld->HasObjectReference(FromExternalToWorld->CubeMesh));
 
-			TestEqual(TEXT("Mesh"), MaterialAndMesh->InstancedMeshComponent->GetStaticMesh(), MaterialAndMesh->CubeMesh);
+			TestEqual(TEXT("Mesh"), MaterialAndMesh->InstancedMeshComponent->GetStaticMesh().Get(), MaterialAndMesh->CubeMesh);
 			TestEqual(TEXT("Material"), MaterialAndMesh->InstancedMeshComponent->GetMaterial(0), MaterialAndMesh->GradientLinearMaterial);
 			
 		});
