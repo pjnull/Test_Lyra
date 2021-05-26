@@ -320,12 +320,14 @@ namespace ObjectTools
 			TArray<UObject*> AdditionalObjectsToExclude;
 			for (UObject* ObjectToExclude : ObjectsToExclude)
 			{
+				GetObjectsWithOuter(ObjectToExclude, AdditionalObjectsToExclude);
+
 				if (UBlueprint* BlueprintObject = Cast<UBlueprint>(ObjectToExclude))
 				{
 					if (BlueprintObject->GeneratedClass)
 					{
 						TArray<UObject*> ClassSubObjects;
-						GetObjectsWithOuter(BlueprintObject->GeneratedClass, ClassSubObjects, false);
+						GetObjectsWithOuter(BlueprintObject->GeneratedClass, ClassSubObjects, /*bIncludeNestedObjects=*/false);
 						for (UObject* ClassSubObject : ClassSubObjects)
 						{
 							if (ClassSubObject->HasAnyFlags(RF_ArchetypeObject))
@@ -346,7 +348,7 @@ namespace ObjectTools
 				TArray<UObject*> AdditionalObjects;
 				{
 					TArray<UObject*> SubObjects;
-					GetObjectsWithOuter(InObject, SubObjects, false);
+					GetObjectsWithOuter(InObject, SubObjects, /*bIncludeNestedObjects=*/false);
 					for (UObject* SubObject : SubObjects)
 					{
 						if (SubObject->HasAnyFlags(RF_ArchetypeObject)
@@ -368,7 +370,7 @@ namespace ObjectTools
 							AdditionalObjects.Remove(BlueprintObject->GeneratedClass);
 						}
 						TArray<UObject*> ClassSubObjects;
-						GetObjectsWithOuter(BlueprintObject->GeneratedClass, ClassSubObjects, false);
+						GetObjectsWithOuter(BlueprintObject->GeneratedClass, ClassSubObjects, /*bIncludeNestedObjects=*/false);
 						for (UObject* ClassSubObject : ClassSubObjects)
 						{
 							if (ClassSubObject->HasAnyFlags(RF_ArchetypeObject)
