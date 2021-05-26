@@ -1899,7 +1899,7 @@ private:
 	TStrongObjectPtr<UAudioSubsystemCollectionRoot> SubsystemCollectionRoot;
 
 	/** Subsystems tied to this device's lifecycle */
-	FSubsystemCollection<UAudioEngineSubsystem> SubsystemCollection;
+	FAudioSubsystemCollection SubsystemCollection;
 
 	/** Set of sources used to play sounds (platform will subclass these) */
 	TMap<FWaveInstance*, FSoundSource*>	WaveInstanceSourceMap;
