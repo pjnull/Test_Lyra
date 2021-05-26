@@ -12,7 +12,7 @@
 class SNiagaraDebugger : public SCompoundWidget
 {
 public:
-	NIAGARAEDITOR_API static const FName DebugWindowName;
+	static const FName DebugWindowName;
 
 public:
 	SLATE_BEGIN_ARGS(SNiagaraDebugger) {}
@@ -30,8 +30,8 @@ public:
 	static void UnregisterTabSpawner();
 	static TSharedRef<class SDockTab> SpawnNiagaraDebugger(const class FSpawnTabArgs& Args);
 
-	NIAGARAEDITOR_API void FocusDebugTab();
-	NIAGARAEDITOR_API void FocusOutlineTab();
+	void FocusDebugTab();
+	void FocusOutlineTab();
 
 private:
 	TSharedRef<SWidget> MakeToolbar();
