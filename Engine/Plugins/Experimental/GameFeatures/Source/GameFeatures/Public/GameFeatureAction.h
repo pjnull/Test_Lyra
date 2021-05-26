@@ -17,6 +17,8 @@ class GAMEFEATURES_API UGameFeatureAction : public UObject
 public:
 	virtual void OnGameFeatureRegistering() {}
 
+	virtual void OnGameFeatureUnregistering() {}
+
 	virtual void OnGameFeatureActivating() {}
 
 	virtual void OnGameFeatureLoading() {}

@@ -317,6 +317,26 @@ void UGameFeaturesSubsystem::OnGameFeatureRegistering(const UGameFeatureData* Ga
 	}
 }
 
+void UGameFeaturesSubsystem::OnGameFeatureUnregistering(const UGameFeatureData* GameFeatureData, const FString& PluginName)
+{
+	check(GameFeatureData);
+	
+	InactivePluginNames.Remove(PluginName);
+
+	for (UGameFeatureStateChangeObserver* Observer : Observers)
+	{
+		Observer->OnGameFeatureUnregistering(GameFeatureData, PluginName);
+	}
+
+	for (UGameFeatureAction* Action : GameFeatureData->GetActions())
+	{
+		if (Action != nullptr)
+		{
+			Action->OnGameFeatureUnregistering();
+		}
+	}
+}
+
 void UGameFeaturesSubsystem::OnGameFeatureLoading(const UGameFeatureData* GameFeatureData)
 {
 	check(GameFeatureData);
@@ -379,6 +399,11 @@ void UGameFeaturesSubsystem::OnGameFeatureDeactivating(const UGameFeatureData* G
 const UGameFeatureData* UGameFeaturesSubsystem::GetDataForStateMachine(UGameFeaturePluginStateMachine* GFSM) const
 {
 	return GFSM->GetGameFeatureDataForActivePlugin();
+}
+
+const UGameFeatureData* UGameFeaturesSubsystem::GetRegisteredDataForStateMachine(UGameFeaturePluginStateMachine* GFSM) const
+{
+	return GFSM->GetGameFeatureDataForRegisteredPlugin();
 }
 
 void UGameFeaturesSubsystem::GetGameFeatureDataForActivePlugins(TArray<const UGameFeatureData*>& OutActivePluginFeatureDatas)

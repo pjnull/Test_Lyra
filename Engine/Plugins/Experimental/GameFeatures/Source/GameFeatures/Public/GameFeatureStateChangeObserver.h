@@ -27,6 +27,8 @@ public:
 
 	virtual void OnGameFeatureRegistering(const UGameFeatureData* GameFeatureData, const FString& PluginName) {}
 
+	virtual void OnGameFeatureUnregistering(const UGameFeatureData* GameFeatureData, const FString& PluginName) {}
+
 	virtual void OnGameFeatureActivating(const UGameFeatureData* GameFeatureData) {}
 
 	virtual void OnGameFeatureLoading(const UGameFeatureData* GameFeatureData) {}

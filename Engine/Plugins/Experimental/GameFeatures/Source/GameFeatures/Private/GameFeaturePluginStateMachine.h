@@ -367,6 +367,9 @@ public:
 	/** If the plugin is activated already, we will retrieve its game feature data */
 	UGameFeatureData* GetGameFeatureDataForActivePlugin();
 
+	/** If the plugin is registered already, we will retrieve its game feature data */
+	UGameFeatureData* GetGameFeatureDataForRegisteredPlugin();
+
 	/** Delegate for the machine's state changed. */
 	DECLARE_EVENT_OneParam(UGameFeaturePluginStateMachine, FGameFeaturePluginStateChanged, UGameFeaturePluginStateMachine* /*Machine*/);
 	FGameFeaturePluginStateChanged& OnStateChanged() { return OnStateChangedEvent; }

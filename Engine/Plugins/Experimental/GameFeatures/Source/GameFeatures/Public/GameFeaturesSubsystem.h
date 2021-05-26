@@ -112,7 +112,7 @@ public:
 	void RemoveObserver(UGameFeatureStateChangeObserver* Observer);
 
 	/**
-	 * Calls the compile-time lambda on each loaded game feature data of the specified type
+	 * Calls the compile-time lambda on each active game feature data of the specified type
 	 * @param GameFeatureDataType       The kind of data required
 	 */
 	template<class GameFeatureDataType, typename Func>
@@ -123,6 +123,25 @@ public:
 			if (UGameFeaturePluginStateMachine* GFSM = StateMachineIt.Value())
 			{
 				if (const GameFeatureDataType* GameFeatureData = Cast<const GameFeatureDataType>(GetDataForStateMachine(GFSM)))
+				{
+					InFunc(GameFeatureData);
+				}
+			}
+		}
+	}
+
+	/**
+	 * Calls the compile-time lambda on each registered game feature data of the specified type
+	 * @param GameFeatureDataType       The kind of data required
+	 */
+	template<class GameFeatureDataType, typename Func>
+	void ForEachRegisteredGameFeature(Func InFunc) const
+	{
+		for (auto StateMachineIt = GameFeaturePluginStateMachines.CreateConstIterator(); StateMachineIt; ++StateMachineIt)
+		{
+			if (UGameFeaturePluginStateMachine* GFSM = StateMachineIt.Value())
+			{
+				if (const GameFeatureDataType* GameFeatureData = Cast<const GameFeatureDataType>(GetRegisteredDataForStateMachine(GFSM)))
 				{
 					InFunc(GameFeatureData);
 				}
@@ -229,6 +248,9 @@ private:
 	void OnGameFeatureRegistering(const UGameFeatureData* GameFeatureData, const FString& PluginName);
 	friend struct FGameFeaturePluginState_Registering;
 
+	void OnGameFeatureUnregistering(const UGameFeatureData* GameFeatureData, const FString& PluginName);
+	friend struct FGameFeaturePluginState_Unregistering;
+
 	void OnGameFeatureActivating(const UGameFeatureData* GameFeatureData, const FString& PluginName);
 	friend struct FGameFeaturePluginState_Activating;
 
@@ -247,6 +269,7 @@ private:
 
 private:
 	const UGameFeatureData* GetDataForStateMachine(UGameFeaturePluginStateMachine* GFSM) const;
+	const UGameFeatureData* GetRegisteredDataForStateMachine(UGameFeaturePluginStateMachine* GFSM) const;
 
 	/** Gets relevant properties out of a uplugin file */
 	bool GetGameFeaturePluginDetails(const FString& PluginDescriptorFilename, struct FGameFeaturePluginDetails& OutPluginDetails) const;

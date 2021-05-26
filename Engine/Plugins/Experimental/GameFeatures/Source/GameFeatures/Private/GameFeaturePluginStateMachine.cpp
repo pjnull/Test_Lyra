@@ -1059,6 +1059,9 @@ struct FGameFeaturePluginState_Unregistering : public FGameFeaturePluginState
 
 	virtual void UpdateState(FGameFeaturePluginStateStatus& StateStatus) override
 	{
+		const FString PluginName = FPaths::GetBaseFilename(StateProperties.PluginInstalledFilename);
+		UGameFeaturesSubsystem::Get().OnGameFeatureUnregistering(StateProperties.GameFeatureData, PluginName);
+
 		StateProperties.GameFeatureData = nullptr;
 		// @todo Make UnloadGameFeature in asset manager, which will call UnloadPrimaryAsset on the GameFeatureData
 
@@ -1424,6 +1427,16 @@ bool UGameFeaturePluginStateMachine::IsAvailable() const
 UGameFeatureData* UGameFeaturePluginStateMachine::GetGameFeatureDataForActivePlugin()
 {
 	if (GetCurrentState() == EGameFeaturePluginState::Active)
+	{
+		return StateProperties.GameFeatureData;
+	}
+
+	return nullptr;
+}
+
+UGameFeatureData* UGameFeaturePluginStateMachine::GetGameFeatureDataForRegisteredPlugin()
+{
+	if (GetCurrentState() >= EGameFeaturePluginState::Registered)
 	{
 		return StateProperties.GameFeatureData;
 	}
