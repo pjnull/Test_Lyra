@@ -417,7 +417,6 @@ UDisplayClusterConfigurationData* FDisplayClusterConfiguratorBlueprintEditor::Ge
 	// GetEditorData and GetConfig are basically the same.
 	if (UDisplayClusterConfigurationData* Data = GetEditorData())
 	{
-		Data->PathToConfig = LoadedBlueprint->GetConfigPath();
 		return Data;
 	}
 	
@@ -606,9 +605,11 @@ bool FDisplayClusterConfiguratorBlueprintEditor::SaveToFile(const FString& InFil
 	UDisplayClusterConfiguratorEditorSubsystem* EditorSubsystem = GEditor->GetEditorSubsystem<UDisplayClusterConfiguratorEditorSubsystem>();
 	if (EditorSubsystem != nullptr && EditorSubsystem->SaveConfig(GetEditorData(), InFilePath))
 	{
-		// Store again so updated file path saved.
-		LoadedBlueprint->SetConfigData(GetEditorData());
-		return true;
+		if (UDisplayClusterConfigurationData* Data = GetEditorData())
+		{
+			LoadedBlueprint->SetConfigPath(Data->PathToConfig);
+			return true;
+		}
 	}
 
 	return false;
