@@ -565,6 +565,10 @@ namespace Chaos
 			AsyncInternalAcceleration = GetFreeSpatialAcceleration_Internal();
 			AsyncExternalAcceleration = GetFreeSpatialAcceleration_Internal();
 			FlushInternalAccelerationQueue();
+
+			// Give game thread an empty structure to pop
+			ExternalStructuresQueue.Enqueue(AsyncExternalAcceleration);
+			AsyncExternalAcceleration = GetFreeSpatialAcceleration_Internal();
 		}
 
 		if (bBlock)
