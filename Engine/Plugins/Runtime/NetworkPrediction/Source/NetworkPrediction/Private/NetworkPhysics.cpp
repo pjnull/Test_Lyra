@@ -56,6 +56,9 @@ namespace UE_NETWORK_PHYSICS
 	bool bLogCorrections=true;
 	FAutoConsoleVariableRef CVarLogCorrections(TEXT("np2.LogCorrections"), bLogCorrections, TEXT("Logs corrections when they happen"));
 
+	bool bLogImpulses=false;
+	FAutoConsoleVariableRef CVarLogImpulses(TEXT("np2.LogImpulses"), bLogImpulses, TEXT("Logs all recorded F/T/LI/AI"));
+
 	int32 FixedLocalFrameOffset = -1;
 	FAutoConsoleVariableRef CVarFixedLocalFrameOffset(TEXT("np2.FixedLocalFrameOffset"), FixedLocalFrameOffset, TEXT("When > 0, use hardcoded frame offset on client from head"));
 
@@ -242,12 +245,23 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 					}
 					UE_LOG(LogTemp, Warning, TEXT(""));
 					*/
-					
 				}
 
 				Stats.MinFrameChecked = FMath::Min(Stats.MaxFrameChecked, Obj.Frame);
 				Stats.MaxFrameChecked = FMath::Max(Stats.MaxFrameChecked, Obj.Frame);
 				Stats.NumChecked++;
+
+
+				if (UE_NETWORK_PHYSICS::bLogImpulses)
+				{
+					for (int32 i=(int32)Chaos::FParticleHistoryEntry::EParticleHistoryPhase::PrePushData; i < (int32)Chaos::FParticleHistoryEntry::EParticleHistoryPhase::NumPhases; ++i)
+					{
+						if (Obj.DebugState[i].LinearImpulse.SizeSquared() > 0.f)
+						{
+							UE_LOG(LogNetworkPhysics, Warning, TEXT("[C] server told us they applied Linear Impulse %s on Frame [%d] in Phase [%d]"), *Obj.DebugState[i].LinearImpulse.ToString(), SimulationFrame-1, i);
+						}
+					}
+				}
 				
 				if (CompareObjState(Obj.Physics.ObjectState, P.ObjectState(), TEXT("ObjectState")) ||
 					CompareVec(Obj.Physics.Location, P.X(), UE_NETWORK_PHYSICS::X, TEXT("Location")) ||
@@ -269,6 +283,31 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 					{
 						FBasePhysicsState Auth{P.ObjectState(), P.X(), P.R(), P.V(), P.W()};
 						Stats.Corrections.Emplace(FStats::FCorrection{Proxy, Obj.Physics, Auth, Obj.Frame, Obj.Frame - Snapshot.LocalFrameOffset});
+					}
+
+					if (UE_NETWORK_PHYSICS::bLogCorrections && Obj.Frame-1 >= RewindData->GetEarliestFrame_Internal())
+					{
+						const int32 PreSimulationFrame = SimulationFrame-1;
+						for (int32 i=(int32)Chaos::FParticleHistoryEntry::EParticleHistoryPhase::PrePushData; i < (int32)Chaos::FParticleHistoryEntry::EParticleHistoryPhase::NumPhases; ++i)
+						{
+							const auto LocalPreFrameData = RewindData->GetPastStateAtFrame(*Proxy->GetHandle_LowLevel(), Obj.Frame-1, (Chaos::FParticleHistoryEntry::EParticleHistoryPhase)i);
+							if (Obj.DebugState[i].Force != LocalPreFrameData.F())
+							{
+								UE_LOG(LogNetworkPhysics, Warning, TEXT("Previous Frame [%d] Phase [%d] FORCE mismatch. Local: %s. Server: %s"), PreSimulationFrame, i, *LocalPreFrameData.F().ToString(), *Obj.DebugState[i].Force.ToString());
+							}
+							if (Obj.DebugState[i].Torque != LocalPreFrameData.Torque())
+							{
+								UE_LOG(LogNetworkPhysics, Warning, TEXT("Previous Frame [%d] Phase [%d] TORQUE mismatch. Local: %s. Server: %s"), PreSimulationFrame, i, *LocalPreFrameData.Torque().ToString(), *Obj.DebugState[i].Torque.ToString());
+							}
+							if (Obj.DebugState[i].LinearImpulse != LocalPreFrameData.LinearImpulse())
+							{
+								UE_LOG(LogNetworkPhysics, Warning, TEXT("Previous Frame [%d] Phase [%d] LINEAR IMPULSE mismatch. Local: %s. Server: %s"), PreSimulationFrame, i, *LocalPreFrameData.LinearImpulse().ToString(), *Obj.DebugState[i].LinearImpulse.ToString());
+							}
+							if (Obj.DebugState[i].AngularImpulse != LocalPreFrameData.AngularImpulse())
+							{
+								UE_LOG(LogNetworkPhysics, Warning, TEXT("Previous Frame [%d] Phase [%d] ANGULAR IMPULSE mismatch. Local: %s. Server: %s"), PreSimulationFrame, i, *LocalPreFrameData.AngularImpulse().ToString(), *Obj.DebugState[i].AngularImpulse.ToString());
+							}
+						}
 					}
 				}
 			}
@@ -339,42 +378,73 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 		}
 
 		// Marhsall data back to GT based on what was requested for networking
-		FRequest Request;
-		while (DataRequested.Dequeue(Request));
-
-		FSnapshot Snapshot;
-		Snapshot.SimulationFrame = PhysicsStep - this->LastLocalOffset;
-		Snapshot.LocalFrameOffset = this->LastLocalOffset;
-		for (FSingleParticlePhysicsProxy* Proxy : Request.Proxies)
+		if (!RewindData->IsResim())
 		{
-			if (auto* PT = Proxy->GetPhysicsThreadAPI())
+			FRequest Request;
+			while (DataRequested.Dequeue(Request));
+
+			FSnapshot Snapshot;
+			Snapshot.SimulationFrame = PhysicsStep - this->LastLocalOffset;
+			Snapshot.LocalFrameOffset = this->LastLocalOffset;
+			for (FSingleParticlePhysicsProxy* Proxy : Request.Proxies)
 			{
-				FNetworkPhysicsState& Obj = Snapshot.Objects.AddDefaulted_GetRef();
-				Obj.Proxy = Proxy;
-				Obj.Frame = PhysicsStep;
-
-				Obj.Physics.ObjectState = PT->ObjectState();
-				Obj.Physics.Location = PT->X();
-				Obj.Physics.LinearVelocity = PT->V();
-				Obj.Physics.Rotation = PT->R();
-				Obj.Physics.AngularVelocity = PT->W();
-
-				if (Obj.Physics.LinearVelocity.Size() <= 0.00f)
+				if (auto* PT = Proxy->GetPhysicsThreadAPI())
 				{
-					//UE_LOG(LogTemp, Warning, TEXT("[Server] Object zero velocity. Frame: %d"), PhysicsStep);
-				}
+					FNetworkPhysicsState& Obj = Snapshot.Objects.AddDefaulted_GetRef();
+					Obj.Proxy = Proxy;
+					Obj.Frame = PhysicsStep;
 
-				if (Obj.Physics.ObjectState == Chaos::EObjectStateType::Sleeping)
-				{
-					//UE_LOG(LogTemp, Warning, TEXT("[Server] Sleeping Frame: %d"), PhysicsStep);
+					Obj.Physics.ObjectState = PT->ObjectState();
+					Obj.Physics.Location = PT->X();
+					Obj.Physics.LinearVelocity = PT->V();
+					Obj.Physics.Rotation = PT->R();
+					Obj.Physics.AngularVelocity = PT->W();
+				
+					// Record previous frames forces/torques for debugging
+					int32 EarliestFrame = RewindData->GetEarliestFrame_Internal();
+					const int32 PreSimFrame = Snapshot.SimulationFrame - 1;
+					const int32 PreStorageFrame = PhysicsStep - 1;
+					if (EarliestFrame < PreStorageFrame)
+					{
+						for (int32 i=(int32)Chaos::FParticleHistoryEntry::EParticleHistoryPhase::PrePushData; i < (int32)Chaos::FParticleHistoryEntry::EParticleHistoryPhase::NumPhases; ++i)
+						{
+							Chaos::FGeometryParticleState State = RewindData->GetPastStateAtFrame(*Proxy->GetHandle_LowLevel(), PreStorageFrame, (Chaos::FParticleHistoryEntry::EParticleHistoryPhase)i);
+							Obj.DebugState[i].Force = State.F();
+							Obj.DebugState[i].Torque = State.Torque();
+							Obj.DebugState[i].LinearImpulse = State.LinearImpulse();
+							Obj.DebugState[i].AngularImpulse = State.AngularImpulse();
+
+							if (UE_NETWORK_PHYSICS::bLogImpulses)
+							{
+								if (Obj.DebugState[i].Force.SizeSquared() > 0.f)
+								{
+									UE_LOG(LogNetworkPhysics, Warning, TEXT("[%s] Applied Force: %s on frame %d. In Phase %d"),  this->bIsServer ? TEXT("S") : TEXT("C"), *Obj.DebugState[i].Force.ToString(), PreSimFrame, i);
+								}
+
+								if (Obj.DebugState[i].Torque.SizeSquared() > 0.f)
+								{
+									UE_LOG(LogNetworkPhysics, Warning, TEXT("[%s] Applied Force: %s on frame %d. In Phase %d"),  this->bIsServer ? TEXT("S") : TEXT("C"), *Obj.DebugState[i].Torque.ToString(), PreSimFrame, i);
+								}
+
+								if (Obj.DebugState[i].LinearImpulse.SizeSquared() > 0.f)
+								{
+									UE_LOG(LogNetworkPhysics, Warning, TEXT("[%s] Applied LinearImpulse: %s on frame %d. In Phase %d"),  this->bIsServer ? TEXT("S") : TEXT("C"), *Obj.DebugState[i].LinearImpulse.ToString(), PreSimFrame, i);
+								}
+
+								if (Obj.DebugState[i].AngularImpulse.SizeSquared() > 0.f)
+								{
+									UE_LOG(LogNetworkPhysics, Warning, TEXT("[%s] Applied AngularImpulse: %s on frame %d. In Phase %d"),  this->bIsServer ? TEXT("S") : TEXT("C"), *Obj.DebugState[i].AngularImpulse.ToString(), PreSimFrame, i);
+								}
+							}
+						}
+					}
 				}
-				//UE_LOG(LogTemp, Warning, TEXT("[Server] %d Rotation: %s"), PhysicsStep, *FRotator(Obj.Physics.Rotation).ToString());
 			}
-		}
 
-		if (Snapshot.Objects.Num() > 0)
-		{
-			DataFromPhysics.Enqueue(MoveTemp(Snapshot));
+			if (Snapshot.Objects.Num() > 0)
+			{
+				DataFromPhysics.Enqueue(MoveTemp(Snapshot));
+			}
 		}
 
 #if NETWORK_PHSYSICS_THREAD_CONTEXT
@@ -847,6 +917,10 @@ void UNetworkPhysicsManager::PreNetSend(float DeltaSeconds)
 					{
 						ManagedState->Physics = Obj.Physics;					
 						ManagedState->Frame = Obj.Frame;
+						for (int32 i=(int32)Chaos::FParticleHistoryEntry::EParticleHistoryPhase::PrePushData; i < (int32)Chaos::FParticleHistoryEntry::EParticleHistoryPhase::NumPhases; ++i)
+						{
+							ManagedState->DebugState[i] = Obj.DebugState[i];
+						}
 					}
 				}
 			}

@@ -7,6 +7,8 @@
 namespace Chaos
 {
 
+FVec3 FGeometryParticleStateBase::ZeroVector = FVec3(0);
+
 template <typename T,EParticleProperty PropName>
 template <typename LambdaWrite>
 void TParticleStateProperty<T,PropName>::SyncToParticle(const LambdaWrite& WriteFunc) const
@@ -372,6 +374,17 @@ void FGeometryParticleStateBase::RecordAnyDirty(const FGeometryParticleHandle& H
 	//question: do we need to do this for shapes?
 }
 
+void FGeometryParticleStateBase::MarkDirtyDynamicsFromPT(const FGeometryParticleHandle& Handle, FDirtyPropertiesPool& Manager)
+{
+	if (auto Rigid = Handle.CastToRigidParticle())
+	{
+		//only care about latest write
+		FParticleDynamics Data;
+		Data.CopyFrom(*Rigid);
+		Dynamics.Write(Manager, Data);
+	}
+}
+
 void FGeometryParticleStateBase::MarkAllDirty(const FGeometryParticleHandle& Handle, FDirtyPropertiesPool& Manager)
 {
 	//TODO: this function should be removed and we should use the property system instead
@@ -688,13 +701,13 @@ void FRewindData::RemoveParticle(const FUniqueIdx UniqueIdx)
 }
 
 /* Query the state of particles from the past. Once a rewind happens state captured must be queried using GetFutureStateAtFrame */
-FGeometryParticleState FRewindData::GetPastStateAtFrame(const FGeometryParticleHandle& Handle,int32 Frame) const
+FGeometryParticleState FRewindData::GetPastStateAtFrame(const FGeometryParticleHandle& Handle,int32 Frame, FParticleHistoryEntry::EParticleHistoryPhase Phase) const
 {
 	ensure(!IsResim());
 	ensure(Frame >= GetEarliestFrame_Internal());	//can't get state from before the frame we rewound to
 
 	const FDirtyParticleInfo* Info = FindParticle(Handle.UniqueIdx());
-	const FGeometryParticleStateBase* State = Info ? GetStateAtFrameImp(*Info, Frame) : nullptr;
+	const FGeometryParticleStateBase* State = Info ? GetStateAtFrameImp(*Info, Frame, Phase) : nullptr;
 	return FGeometryParticleState(State,Handle, PropertiesPool);
 }
 
@@ -711,7 +724,7 @@ EFutureQueryResult FRewindData::GetFutureStateAtFrame(FGeometryParticleState& Ou
 			return EFutureQueryResult::Desync;
 		}
 
-		if(const FGeometryParticleStateBase* State = GetStateAtFrameImp(*Info,Frame))
+		if(const FGeometryParticleStateBase* State = GetStateAtFrameImp(*Info,Frame, FParticleHistoryEntry::EParticleHistoryPhase::PostPushData))
 		{
 			OutState.SetState(State);
 			return EFutureQueryResult::Ok;
@@ -786,7 +799,7 @@ void FRewindData::AdvanceFrameImp(IResimCacheBase* ResimCache)
 
 		//Sim hasn't run yet so PostCallbacks (sim results) should be clean
 		ensure(Info.Frames[CurFrame].GetState(FParticleHistoryEntry::PostCallbacks, CurFrame, Buffer) == nullptr ||
-			Info.Frames[CurFrame].GetState(FParticleHistoryEntry::PostCallbacks, CurFrame, Buffer)->IsClean());
+			Info.Frames[CurFrame].GetState(FParticleHistoryEntry::PostCallbacks, CurFrame, Buffer)->IsCleanExcludingDynamics());
 
 		//if hasn't changed in a while stop tracking
 		if(Info.LastDirtyFrame < EarliestFrame)
@@ -812,7 +825,7 @@ void FRewindData::AdvanceFrameImp(IResimCacheBase* ResimCache)
 				else if(Rigid && Rigid->ObjectState() != EObjectStateType::Kinematic)
 				{
 					//If we have a simulated particle, make sure its sim-writable properties are still in sync
-					const FGeometryParticleStateBase* ExpectedState = GetStateAtFrameImp(Info,CurFrame);
+					const FGeometryParticleStateBase* ExpectedState = GetStateAtFrameImp(Info,CurFrame, FParticleHistoryEntry::EParticleHistoryPhase::PostPushData);
 					if(ExpectedState)
 					{
 						if(ExpectedState->IsSimWritableDesynced(*Rigid))
@@ -937,11 +950,13 @@ void FRewindData::PushGTDirtyData(const FDirtyPropertiesManager& SrcManager,cons
 		//Dynamics are not available at head (sim zeroes them out), so we have to record them as PostPushData (since they're applied as part of PushData)
 		if (auto NewData = Dirty.ParticleData.FindDynamics(SrcManager, SrcDataIdx))
 		{
+			//dynamics are not reset until after callbacks, so copy this data into both phases
 			Latest.GetStateChecked(FParticleHistoryEntry::PostPushData, CurFrame, Buffer).RecordDynamics(*NewData, PropertiesPool);
+			Latest.GetStateChecked(FParticleHistoryEntry::PostCallbacks, CurFrame, Buffer).RecordDynamics(*NewData, PropertiesPool);
 			//No need to coalesce because Dynamics are always zero in PrePushData (Solver zeros out dynamics every frame)
 		}
 
-		ensure(Latest.GetStateChecked(FParticleHistoryEntry::PostCallbacks, CurFrame, Buffer).IsClean());	//PostCallbacks must be untouched
+		ensure(Latest.GetStateChecked(FParticleHistoryEntry::PostCallbacks, CurFrame, Buffer).IsCleanExcludingDynamics());	//PostCallbacks must be untouched
 	}
 }
 
@@ -962,10 +977,17 @@ void FRewindData::MarkDirtyFromPT(FGeometryParticleHandle& Handle)
 	FDirtyParticleInfo& Info = FindOrAddParticle(Handle);
 	Info.LastDirtyFrame = CurFrame;
 	FParticleHistoryEntry& Latest = Info.AddFrame(CurFrame, Buffer, PropertiesPool);
-	ensure(Latest.GetStateChecked(FParticleHistoryEntry::PostCallbacks, CurFrame, Buffer).IsClean());	//PostCallbacks must be untouched
 	Latest.GetStateChecked(FParticleHistoryEntry::PostPushData, CurFrame, Buffer).MarkAllDirty(Handle, PropertiesPool);
 	CoalesceBack(Info.Frames, FParticleHistoryEntry::PostPushData);
-	ensure(Latest.GetStateChecked(FParticleHistoryEntry::PostCallbacks, CurFrame, Buffer).IsClean());	//PostCallbacks must be untouched
+}
+
+void FRewindData::MarkDirtyDynamicsFromPT(FGeometryParticleHandle& Handle)
+{
+	//dynamics are reset, so we mark them in PostCallbacks right away
+	FDirtyParticleInfo& Info = FindOrAddParticle(Handle);
+	Info.LastDirtyFrame = CurFrame;
+	FParticleHistoryEntry& Latest = Info.AddFrame(CurFrame, Buffer, PropertiesPool);
+	Latest.GetStateChecked(FParticleHistoryEntry::PostCallbacks, CurFrame, Buffer).MarkDirtyDynamicsFromPT(Handle, PropertiesPool);
 }
 
 template <bool bResim>
@@ -974,7 +996,7 @@ void FRewindData::PushPTDirtyData(TPBDRigidParticleHandle<FReal,3>& Handle,const
 	FDirtyParticleInfo& Info = FindOrAddParticle(Handle);
 	Info.LastDirtyFrame = CurFrame;
 	FParticleHistoryEntry& Latest = Info.AddFrame(CurFrame, Buffer, PropertiesPool);
-	ensure(Latest.GetStateChecked(FParticleHistoryEntry::PostCallbacks, CurFrame, Buffer).IsClean());	//PostCallbacks should be clean before we write sim results
+	ensure(Latest.GetStateChecked(FParticleHistoryEntry::PostCallbacks, CurFrame, Buffer).IsCleanExcludingDynamics());	//PostCallbacks should be clean before we write sim results
 	Latest.GetStateChecked(FParticleHistoryEntry::PostCallbacks, CurFrame, Buffer).RecordSimResults(Handle, PropertiesPool);
 	CoalesceBack(Info.Frames, FParticleHistoryEntry::PostCallbacks);
 #if 0
@@ -1035,11 +1057,11 @@ void FRewindData::PushPTDirtyData(TPBDRigidParticleHandle<FReal,3>& Handle,const
 #endif
 }
 
-const FGeometryParticleStateBase* FRewindData::GetStateAtFrameImp(const FDirtyParticleInfo& Info,int32 Frame) const
+const FGeometryParticleStateBase* FRewindData::GetStateAtFrameImp(const FDirtyParticleInfo& Info,int32 Frame, FParticleHistoryEntry::EParticleHistoryPhase Phase) const
 {
 	//User wants state including PushData
 	//Maybe we should make the function more explicit?
-	return Info.Frames[Frame].GetState(FParticleHistoryEntry::PostPushData, Frame, Buffer);
+	return Info.Frames[Frame].GetState(Phase, Frame, Buffer);
 }
 
 FRewindData::FDirtyParticleInfo& FRewindData::FindOrAddParticle(TGeometryParticleHandle<FReal,3>& PTParticle, const int32 InitializedOnFrame)

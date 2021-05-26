@@ -881,7 +881,11 @@ private:
 			}
 
 			Lambda(GetHandle_LowLevel());
-			//todo: write to extra buffer
+
+			if (FRewindData* RewindData = SolverBase->GetRewindData())
+			{
+				RewindData->MarkDirtyDynamicsFromPT(*GetHandle_LowLevel());
+			}
 		}
 	}
 

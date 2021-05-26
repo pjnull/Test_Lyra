@@ -226,10 +226,14 @@ public:
 
 	bool IsClean() const
 	{
+		return IsCleanExcludingDynamics() && !Dynamics.IsSet();
+	}
+
+	bool IsCleanExcludingDynamics() const
+	{
 		return !ParticlePositionRotation.IsSet() &&
 			!NonFrequentData.IsSet() &&
 			!Velocities.IsSet() &&
-			!Dynamics.IsSet() &&
 			!DynamicsMisc.IsSet() &&
 			!MassProps.IsSet() &&
 			!KinematicTarget.IsSet();
@@ -250,6 +254,7 @@ public:
 	void RecordAnyDirty(const FGeometryParticleHandle& Handle, FDirtyPropertiesPool& Manager, const FGeometryParticleStateBase& OldState);
 	void CopyToParticle(FGeometryParticleHandle& Handle, FDirtyPropertiesPool& Manager);
 	void MarkAllDirty(const FGeometryParticleHandle& Handle, FDirtyPropertiesPool& Manager);
+	void MarkDirtyDynamicsFromPT(const FGeometryParticleHandle& Handle, FDirtyPropertiesPool& Manager);
 	void RecordDynamics(const FParticleDynamics& Dynamics, FDirtyPropertiesPool& Manager);
 	void RecordSimResults(const FPBDRigidParticleHandle& Handle, FDirtyPropertiesPool& Manager);
 
@@ -389,25 +394,25 @@ public:
 	template <typename TParticle>
 	static const FVec3& F(const FGeometryParticleStateBase* State, const TParticle& Particle, const FDirtyPropertiesPool& Manager)
 	{
-		return State && State->Dynamics.IsSet() ? State->Dynamics.ReadChecked(Manager).F() : Particle.CastToRigidParticle()->F();
+		return State && State->Dynamics.IsSet() ? State->Dynamics.ReadChecked(Manager).F() : ZeroVector;	//dynamics do not use delta writes, they always write their value immediately or it's 0
 	}
 
 	template <typename TParticle>
 	static const FVec3& Torque(const FGeometryParticleStateBase* State, const TParticle& Particle, const FDirtyPropertiesPool& Manager)
 	{
-		return State && State->Dynamics.IsSet() ? State->Dynamics.ReadChecked(Manager).Torque() : Particle.CastToRigidParticle()->Torque();
+		return State && State->Dynamics.IsSet() ? State->Dynamics.ReadChecked(Manager).Torque() : ZeroVector;	//dynamics do not use delta writes, they always write their value immediately or it's 0
 	}
 
 	template <typename TParticle>
 	static const FVec3& LinearImpulse(const FGeometryParticleStateBase* State, const TParticle& Particle, const FDirtyPropertiesPool& Manager)
 	{
-		return State && State->Dynamics.IsSet() ? State->Dynamics.ReadChecked(Manager).LinearImpulse() : Particle.CastToRigidParticle()->LinearImpulse();
+		return State && State->Dynamics.IsSet() ? State->Dynamics.ReadChecked(Manager).LinearImpulse() : ZeroVector;	//dynamics do not use delta writes, they always write their value immediately or it's 0
 	}
 
 	template <typename TParticle>
 	static const FVec3& AngularImpulse(const FGeometryParticleStateBase* State, const TParticle& Particle, const FDirtyPropertiesPool& Manager)
 	{
-		return State && State->Dynamics.IsSet() ? State->Dynamics.ReadChecked(Manager).AngularImpulse() : Particle.CastToRigidParticle()->AngularImpulse();
+		return State && State->Dynamics.IsSet() ? State->Dynamics.ReadChecked(Manager).AngularImpulse() : ZeroVector;	//dynamics do not use delta writes, they always write their value immediately or it's 0
 	}
 
 	template <typename TParticle>
@@ -438,6 +443,8 @@ private:
 	TParticleStateProperty2<FKinematicTarget, EParticleProperty::KinematicTarget> KinematicTarget;
 
 	FShapesArrayStateBase ShapesArrayState;
+
+	CHAOS_API static FVec3 ZeroVector;
 };
 
 class FGeometryParticleState
@@ -761,7 +768,7 @@ public:
 	TArray<FDesyncedParticleInfo> CHAOS_API ComputeDesyncInfo() const;
 
 	/* Query the state of particles from the past. Once a rewind happens state captured must be queried using GetFutureStateAtFrame */
-	FGeometryParticleState CHAOS_API GetPastStateAtFrame(const FGeometryParticleHandle& Handle,int32 Frame) const;
+	FGeometryParticleState CHAOS_API GetPastStateAtFrame(const FGeometryParticleHandle& Handle,int32 Frame, FParticleHistoryEntry::EParticleHistoryPhase Phase = FParticleHistoryEntry::EParticleHistoryPhase::PostPushData) const;
 
 	/* Query the state of particles in the future. This operation can fail for particles that are desynced or that we have not been tracking */
 	EFutureQueryResult CHAOS_API GetFutureStateAtFrame(FGeometryParticleState& OutState,int32 Frame) const;
@@ -832,6 +839,8 @@ public:
 	void PushPTDirtyData(TPBDRigidParticleHandle<FReal,3>& Rigid,const int32 SrcDataIdx);
 
 	void CHAOS_API MarkDirtyFromPT(FGeometryParticleHandle& Handle);
+
+	void CHAOS_API MarkDirtyDynamicsFromPT(FGeometryParticleHandle& Handle);
 
 	void CHAOS_API SpawnProxyIfNeeded(FSingleParticlePhysicsProxy& Proxy);
 
@@ -948,7 +957,7 @@ private:
 	};
 
 
-	const FGeometryParticleStateBase* GetStateAtFrameImp(const FDirtyParticleInfo& Info,int32 Frame) const;
+	const FGeometryParticleStateBase* GetStateAtFrameImp(const FDirtyParticleInfo& Info,int32 Frame, FParticleHistoryEntry::EParticleHistoryPhase Phase) const;
 	
 	const FDirtyParticleInfo& FindParticleChecked(const FUniqueIdx UniqueIdx) const
 	{

@@ -998,6 +998,89 @@ namespace ChaosTest {
 			});
 	}
 
+	GTEST_TEST(AllTraits, RewindTest_RecordForcesInSimCallback)
+	{
+		//Makes sure that we record the forces applied during sim callback
+		TRewindHelper::TestDynamicSphere([](auto* Solver, FReal SimDt, int32 Optimization, auto Proxy, auto Sphere)
+			{
+				struct FRewindCallback : public IRewindCallback
+				{
+					FSingleParticlePhysicsProxy* Proxy;
+					FRewindData* RewindData;
+
+					virtual void ProcessInputs_Internal(int32 PhysicsStep, const TArray<FSimCallbackInputAndObject>& SimCallbackInputs) override
+					{
+						if (PhysicsStep == 3)
+						{
+							Proxy->GetPhysicsThreadAPI()->AddForce(FVec3(0, 0, 10));
+							Proxy->GetPhysicsThreadAPI()->AddTorque(FVec3(0, 0, 10));
+						}
+
+						for (int32 Step = 0; Step <= PhysicsStep; ++Step)	//up to and including Step because should read from head in that case
+						{
+							{
+								FGeometryParticleState State = RewindData->GetPastStateAtFrame(*Proxy->GetHandle_LowLevel(), Step, FParticleHistoryEntry::EParticleHistoryPhase::PostCallbacks);
+								if (Step == 3)
+								{
+									EXPECT_EQ(State.F()[2], 11);	//1 from GT + 10 from callback
+									EXPECT_EQ(State.Torque()[2], 10);	//10 from callback (nothing from GT)
+								}
+								else
+								{
+									EXPECT_EQ(State.F()[2], 1);	//GT always sets force of 1
+									EXPECT_EQ(State.Torque()[2], 0);	//GT never sets torque
+								}
+							}
+
+							{
+								//Before push no force or torque at all
+								FGeometryParticleState PrePushState = RewindData->GetPastStateAtFrame(*Proxy->GetHandle_LowLevel(), Step, FParticleHistoryEntry::EParticleHistoryPhase::PrePushData);
+								EXPECT_EQ(PrePushState.F()[2], 0);
+								EXPECT_EQ(PrePushState.Torque()[2], 0);
+							}
+
+							{
+								//After push (but before callback) only see GT force, and no torque
+								FGeometryParticleState PostPushState = RewindData->GetPastStateAtFrame(*Proxy->GetHandle_LowLevel(), Step, FParticleHistoryEntry::EParticleHistoryPhase::PostPushData);
+								EXPECT_EQ(PostPushState.F()[2], 1);	//GT always sets force of 1
+								EXPECT_EQ(PostPushState.Torque()[2], 0);	//GT never sets torque
+							}
+							
+						}
+					}
+
+					virtual int32 TriggerRewindIfNeeded_Internal(int32 LastCompletedStep) override
+					{
+						return INDEX_NONE;
+					}
+
+					void PostResimStep_Internal(int32 PhysicsStep) override
+					{
+					}
+				};
+
+				const int32 LastGameStep = 32;
+				const int32 NumPhysSteps = FMath::TruncToInt(LastGameStep / SimDt);
+
+				auto UniqueRewindCallback = MakeUnique<FRewindCallback>();
+				auto RewindCallback = UniqueRewindCallback.Get();
+				RewindCallback->Proxy = Proxy;
+				RewindCallback->RewindData = Solver->GetRewindData();
+
+				Solver->SetRewindCallback(MoveTemp(UniqueRewindCallback));
+
+				auto& Particle = Proxy->GetGameThreadAPI();
+				Particle.SetGravityEnabled(false);
+
+				for (int Step = 0; Step <= LastGameStep; ++Step)
+				{
+					Particle.AddForce(FVec3(0, 0, 1));
+					TickSolverHelper(Solver);
+				}
+
+			});
+	}
+
 	GTEST_TEST(AllTraits, RewindTest_AddForce)
 	{
 		TRewindHelper::TestDynamicSphere([](auto* Solver, FReal SimDt, int32 Optimization, auto Proxy, auto Sphere)

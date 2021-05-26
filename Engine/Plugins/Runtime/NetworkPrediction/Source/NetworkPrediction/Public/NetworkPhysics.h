@@ -8,6 +8,7 @@
 #include "Components/ActorComponent.h"
 #include "UObject/ObjectKey.h"
 #include "Misc/NetworkGuid.h"
+#include "RewindData.h"
 
 #include "NetworkPhysics.generated.h"
 
@@ -27,6 +28,15 @@ struct FBasePhysicsState
 	Chaos::FRotation3 Rotation;
 	Chaos::FVec3 LinearVelocity;
 	Chaos::FVec3 AngularVelocity;
+};
+
+struct FDebugPhysicsState
+{	
+	Chaos::FVec3 Force;
+	Chaos::FVec3 Torque;	
+
+	Chaos::FVec3 LinearImpulse;
+	Chaos::FVec3 AngularImpulse;
 };
 
 
@@ -69,12 +79,23 @@ struct FNetworkPhysicsState
 		Ar << Physics.Rotation;
 		Ar << Physics.LinearVelocity;
 		Ar << Physics.AngularVelocity;
+
+		for (int32 i=(int32)Chaos::FParticleHistoryEntry::EParticleHistoryPhase::PrePushData; i < (int32)Chaos::FParticleHistoryEntry::EParticleHistoryPhase::NumPhases; ++i)
+		{
+			Ar << DebugState[i].Force;
+			Ar << DebugState[i].Torque;
+			Ar << DebugState[i].LinearImpulse;
+			Ar << DebugState[i].AngularImpulse;
+		}
+
 		return true;
 	}
 
 	// LOD: should probably be moved out of this struct
 	int32 LocalLOD = 0;
 	AActor* OwningActor = nullptr;
+
+	FDebugPhysicsState	DebugState[(int32)Chaos::FParticleHistoryEntry::EParticleHistoryPhase::NumPhases];
 };
 
 template<>
