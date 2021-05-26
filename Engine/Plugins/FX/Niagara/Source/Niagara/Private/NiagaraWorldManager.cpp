@@ -1230,13 +1230,13 @@ void FNiagaraWorldManager::SortedSignificanceCull(UNiagaraEffectType* EffectType
 
 			if (ScalabilitySettings.BudgetScaling.bScaleMaxInstanceCountByGlobalBudgetUse)
 			{
-				float Scale = ScalabilitySettings.BudgetScaling.MaxInstanceCountScaleByGloablBudgetUse.Evaluate(Usage);
+				float Scale = ScalabilitySettings.BudgetScaling.MaxInstanceCountScaleByGlobalBudgetUse.Evaluate(Usage);
 				EffectTypeInstanceMax *= Scale;
 				bCull = EffectTypeInstCount >= EffectTypeInstanceMax;
 			}
 			if (ScalabilitySettings.BudgetScaling.bScaleSystemInstanceCountByGlobalBudgetUse)
 			{
-				float Scale = ScalabilitySettings.BudgetScaling.MaxSystemInstanceCountScaleByGloablBudgetUse.Evaluate(Usage);
+				float Scale = ScalabilitySettings.BudgetScaling.MaxSystemInstanceCountScaleByGlobalBudgetUse.Evaluate(Usage);
 				SystemInstanceMax *= Scale;
 				bCull |= SystemInstCount >= SystemInstanceMax;
 			}
@@ -1294,12 +1294,12 @@ void FNiagaraWorldManager::InstanceCountCull(UNiagaraEffectType* EffectType, UNi
 
 		if (ScalabilitySettings.BudgetScaling.bScaleMaxInstanceCountByGlobalBudgetUse)
 		{
-			float Scale = ScalabilitySettings.BudgetScaling.MaxInstanceCountScaleByGloablBudgetUse.Evaluate(Usage);
+			float Scale = ScalabilitySettings.BudgetScaling.MaxInstanceCountScaleByGlobalBudgetUse.Evaluate(Usage);
 			EffectTypeInstanceMax *= Scale;
 		}
 		if (ScalabilitySettings.BudgetScaling.bScaleSystemInstanceCountByGlobalBudgetUse)
 		{
-			float Scale = ScalabilitySettings.BudgetScaling.MaxSystemInstanceCountScaleByGloablBudgetUse.Evaluate(Usage);
+			float Scale = ScalabilitySettings.BudgetScaling.MaxSystemInstanceCountScaleByGlobalBudgetUse.Evaluate(Usage);
 			SystemInstanceMax *= Scale;
 		}
 		bCull = ScalabilitySettings.bCullMaxInstanceCount && EffectType->NumInstances >= EffectTypeInstanceMax;
@@ -1356,7 +1356,7 @@ void FNiagaraWorldManager::DistanceCull(UNiagaraEffectType* EffectType, const FN
 		else if (FFXBudget::Enabled() && GEnableNiagaraGlobalBudgetCulling && ScalabilitySettings.BudgetScaling.bScaleMaxDistanceByGlobalBudgetUse)
 		{
 			float Usage = FFXBudget::GetWorstAdjustedUsage();
-			float Scale = ScalabilitySettings.BudgetScaling.MaxDistanceScaleByGloablBudgetUse.Evaluate(Usage);
+			float Scale = ScalabilitySettings.BudgetScaling.MaxDistanceScaleByGlobalBudgetUse.Evaluate(Usage);
 			MaxDist *= Scale;
 
 			bCull = LODDistance > MaxDist;
@@ -1400,7 +1400,7 @@ void FNiagaraWorldManager::DistanceCull(UNiagaraEffectType* EffectType, const FN
 			else if (FFXBudget::Enabled() && GEnableNiagaraGlobalBudgetCulling && ScalabilitySettings.BudgetScaling.bScaleMaxDistanceByGlobalBudgetUse)
 			{
 				float Usage = FFXBudget::GetWorstAdjustedUsage();
-				float Scale = ScalabilitySettings.BudgetScaling.MaxDistanceScaleByGloablBudgetUse.Evaluate(Usage);
+				float Scale = ScalabilitySettings.BudgetScaling.MaxDistanceScaleByGlobalBudgetUse.Evaluate(Usage);
 				MaxDist *= Scale;
 
 				bCull = ClosestDist > MaxDist;

@@ -154,9 +154,9 @@ FNiagaraGlobalBudgetScaling::FNiagaraGlobalBudgetScaling()
 	bScaleMaxInstanceCountByGlobalBudgetUse = false;
 	bScaleSystemInstanceCountByGlobalBudgetUse = false;
 	MaxGlobalBudgetUsage = 1.0f;
-	MaxDistanceScaleByGloablBudgetUse = DefaultBudgetScaleRamp;
-	MaxInstanceCountScaleByGloablBudgetUse = DefaultBudgetScaleRamp;
-	MaxSystemInstanceCountScaleByGloablBudgetUse = DefaultBudgetScaleRamp;
+	MaxDistanceScaleByGlobalBudgetUse = DefaultBudgetScaleRamp;
+	MaxInstanceCountScaleByGlobalBudgetUse = DefaultBudgetScaleRamp;
+	MaxSystemInstanceCountScaleByGlobalBudgetUse = DefaultBudgetScaleRamp;
 }
 
 //////////////////////////////////////////////////////////////////////////

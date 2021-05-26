@@ -129,15 +129,15 @@ struct FNiagaraGlobalBudgetScaling
 
 	/** When enabled, MaxDistance is scaled down by the global budget use based on this curve. Allows us to cull more aggressively when performance is poor.	*/
 	UPROPERTY(EditAnywhere, Category = "Budget Scaling", meta = (EditCondition = "bScaleMaxDistanceByGlobalBudgetUse"))
-	FNiagaraLinearRamp MaxDistanceScaleByGloablBudgetUse;
+	FNiagaraLinearRamp MaxDistanceScaleByGlobalBudgetUse;
 	
 	/** When enabled, Max Effect Type Instances is scaled down by the global budget use based on this curve. Allows us to cull more aggressively when performance is poor.	*/
 	UPROPERTY(EditAnywhere, Category = "Budget Scaling", meta = (EditCondition = "bScaleMaxInstanceCountByGlobalBudgetUse"))
-	FNiagaraLinearRamp MaxInstanceCountScaleByGloablBudgetUse;
+	FNiagaraLinearRamp MaxInstanceCountScaleByGlobalBudgetUse;
 	
 	/** When enabled, Max System Instances is scaled down by the global budget use based on this curve. Allows us to cull more aggressively when performance is poor.	*/
 	UPROPERTY(EditAnywhere, Category = "Budget Scaling", meta = (EditCondition = "bScaleSystemInstanceCountByGlobalBudgetUse"))
-	FNiagaraLinearRamp MaxSystemInstanceCountScaleByGloablBudgetUse;
+	FNiagaraLinearRamp MaxSystemInstanceCountScaleByGlobalBudgetUse;
 };
 
 //////////////////////////////////////////////////////////////////////////
