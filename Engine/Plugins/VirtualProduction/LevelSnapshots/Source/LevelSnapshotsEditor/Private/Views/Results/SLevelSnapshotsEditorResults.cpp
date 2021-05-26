@@ -2691,7 +2691,7 @@ void SLevelSnapshotsEditorResultsRow::Construct(const FArguments& InArgs, const 
 		// Splitter Slot 0
 		int32 SlotIndex = 0;
 		{
-			SplitterPtr->SlotAt(SlotIndex).OnSlotResized_Handler.BindSP(this, &SLevelSnapshotsEditorResultsRow::SetNameColumnSize);
+			SplitterPtr->SlotAt(SlotIndex).OnSlotResized(this, &SLevelSnapshotsEditorResultsRow::SetNameColumnSize);
 			const auto SlotDelegate = TAttribute<float>::FGetter::CreateSP(this, &SLevelSnapshotsEditorResultsRow::GetNameColumnSize);;
 			SplitterPtr->SlotAt(SlotIndex).SizeValue.Bind(SlotDelegate);
 		}
@@ -2779,7 +2779,7 @@ void SLevelSnapshotsEditorResultsRow::Construct(const FArguments& InArgs, const 
 		];
 
 		{
-			SplitterPtr->SlotAt(SlotIndex).OnSlotResized_Handler.BindSP(this, &SLevelSnapshotsEditorResultsRow::SetWorldColumnSize);
+			SplitterPtr->SlotAt(SlotIndex).OnSlotResized(this, &SLevelSnapshotsEditorResultsRow::SetWorldColumnSize);
 			const auto SlotDelegate = TAttribute<float>::FGetter::CreateSP(this, &SLevelSnapshotsEditorResultsRow::GetWorldColumnSize);
 			SplitterPtr->SlotAt(SlotIndex).SizeValue.Bind(SlotDelegate);
 		}
@@ -2867,7 +2867,7 @@ void SLevelSnapshotsEditorResultsRow::Construct(const FArguments& InArgs, const 
 		];
 
 		{
-			SplitterPtr->SlotAt(SlotIndex).OnSlotResized_Handler.BindSP(this, &SLevelSnapshotsEditorResultsRow::SetSnapshotColumnSize);
+			SplitterPtr->SlotAt(SlotIndex).OnSlotResized(this, &SLevelSnapshotsEditorResultsRow::SetSnapshotColumnSize);
 			const auto SlotDelegate = TAttribute<float>::FGetter::CreateSP(this, &SLevelSnapshotsEditorResultsRow::GetSnapshotColumnSize);
 			SplitterPtr->SlotAt(SlotIndex).SizeValue.Bind(SlotDelegate);
 		}
@@ -2889,7 +2889,7 @@ SLevelSnapshotsEditorResultsRow::~SLevelSnapshotsEditorResultsRow()
 	{
 		for (int32 SplitterSlotCount = 0; SplitterSlotCount < SplitterPtr->GetChildren()->Num(); SplitterSlotCount++)
 		{
-			SplitterPtr->SlotAt(SplitterSlotCount).OnSlotResized_Handler.Unbind();
+			SplitterPtr->SlotAt(SplitterSlotCount).OnSlotResized().Unbind();
 		}
 	}
 
