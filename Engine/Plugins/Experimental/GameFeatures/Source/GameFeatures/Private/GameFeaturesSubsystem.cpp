@@ -203,15 +203,15 @@ void UGameFeaturesSubsystem::AddGameFeatureToAssetManager(const UGameFeatureData
 
 	for (FPrimaryAssetTypeInfo TypeInfo : GameFeatureToAdd->GetPrimaryAssetTypesToScan())
 	{
+		for (FDirectoryPath& Path : TypeInfo.Directories)
+		{
+			Path.Path = TEXT("/") + PluginName + TEXT("/") + Path.Path;
+		}
+
 		// This function also fills out runtime data on the copy
 		if (!LocalAssetManager.ShouldScanPrimaryAssetType(TypeInfo))
 		{
 			continue;
-		}
-
-		for (FString& Path : TypeInfo.AssetScanPaths)
-		{
-			Path = TEXT("/") + PluginName + TEXT("/") + Path;
 		}
 
 		FPrimaryAssetTypeInfo ExistingAssetTypeInfo;
