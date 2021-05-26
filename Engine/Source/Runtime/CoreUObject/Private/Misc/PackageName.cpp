@@ -466,6 +466,7 @@ void FPackageName::InternalFilenameToLongPackageName(FStringView InFilename, FSt
 		Filename = InFilename;
 		if (!FPaths::IsRelative(Filename))
 		{
+			FPaths::NormalizeFilename(Filename);
 			Result = FPathViews::GetBaseFilenameWithPath(Filename);
 			{
 				FReadScopeLock ScopeLock(ContentMountPointCriticalSection);
