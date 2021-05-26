@@ -23,6 +23,7 @@
 #include "Widgets/SNiagaraSpreadsheetView.h"
 #include "Widgets/SNiagaraGeneratedCodeView.h"
 #include "Widgets/SNiagaraScriptGraph.h"
+#include "Widgets/SNiagaraDebugger.h"
 #include "NiagaraEditorCommands.h"
 #include "NiagaraEditorStyle.h"
 #include "NiagaraEditorSettings.h"
@@ -978,6 +979,16 @@ void FNiagaraSystemToolkit::SetupCommands()
 			SystemViewModel->DisableSelectedEmitters();
 		}),
 		FCanExecuteAction());
+
+	GetToolkitCommands()->MapAction(
+		FNiagaraEditorCommands::Get().OpenDebugHUD,
+		FExecuteAction::CreateSP(this, &FNiagaraSystemToolkit::OpenDebugHUD));
+	GetToolkitCommands()->MapAction(
+		FNiagaraEditorCommands::Get().OpenDebugOutliner,
+		FExecuteAction::CreateSP(this, &FNiagaraSystemToolkit::OpenDebugOutliner));	
+	GetToolkitCommands()->MapAction(
+		FNiagaraEditorCommands::Get().OpenAttributeSpreadsheet,
+		FExecuteAction::CreateSP(this, &FNiagaraSystemToolkit::OpenAttributeSpreadsheet));
 	
 	// appending the sequencer commands will make the toolkit also check for sequencer commands (last)
 	GetToolkitCommands()->Append(SystemViewModel->GetSequencer()->GetCommandBindings(ESequencerCommandBindings::Sequencer).ToSharedRef());
@@ -1054,6 +1065,15 @@ void FNiagaraSystemToolkit::ExtendToolbar()
 			return MenuBuilder.MakeWidget();
 		}
 
+		static TSharedRef<SWidget> FillDebugOptionsMenu(FNiagaraSystemToolkit* Toolkit)
+		{
+			FMenuBuilder MenuBuilder(true, Toolkit->GetToolkitCommands());
+			MenuBuilder.AddMenuEntry(FNiagaraEditorCommands::Get().OpenDebugHUD);
+			MenuBuilder.AddMenuEntry(FNiagaraEditorCommands::Get().OpenDebugOutliner);
+			MenuBuilder.AddMenuEntry(FNiagaraEditorCommands::Get().OpenAttributeSpreadsheet);
+			return MenuBuilder.MakeWidget();
+		}
+
 		static void FillToolbar(FToolBarBuilder& ToolbarBuilder, FNiagaraSystemToolkit* Toolkit)
 		{
 			ToolbarBuilder.BeginSection("Compile");
@@ -1120,6 +1140,13 @@ void FNiagaraSystemToolkit::ExtendToolbar()
                     LOCTEXT("NiagaraShowPerformanceCombo_ToolTip", "Runtime performance options"),
 					FSlateIcon(FAppStyle::Get().GetStyleSetName(), "AssetEditor.ToggleStats"),
                     true);
+				ToolbarBuilder.AddComboButton(
+					FUIAction(),
+					FOnGetContent::CreateStatic(Local::FillDebugOptionsMenu, Toolkit),
+					LOCTEXT("DebugOptions", "Debug"),
+					LOCTEXT("DebugOptionsTooltip", "Debug options"),
+					FSlateIcon(FNiagaraEditorStyle::GetStyleSetName(), "NiagaraEditor.DebugOptions")
+				);
 			}
 			ToolbarBuilder.EndSection();
 #endif
@@ -1345,6 +1372,33 @@ bool FNiagaraSystemToolkit::IsDrawOptionEnabled(int32 Element) const
 	{
 		return false;
 	}
+}
+
+void FNiagaraSystemToolkit::OpenDebugHUD()
+{
+	TSharedPtr<SDockTab> DebugTab = FGlobalTabmanager::Get()->TryInvokeTab(SNiagaraDebugger::DebugWindowName);
+
+	if (DebugTab.IsValid())
+	{
+		TSharedRef<SNiagaraDebugger> Content = StaticCastSharedRef<SNiagaraDebugger>(DebugTab->GetContent());
+		Content->FocusDebugTab();
+	}
+}
+
+void FNiagaraSystemToolkit::OpenDebugOutliner()
+{
+	TSharedPtr<SDockTab> DebugTab = FGlobalTabmanager::Get()->TryInvokeTab(SNiagaraDebugger::DebugWindowName);
+
+	if (DebugTab.IsValid())
+	{
+		TSharedRef<SNiagaraDebugger> Content = StaticCastSharedRef<SNiagaraDebugger>(DebugTab->GetContent());
+		Content->FocusOutlineTab();
+	}
+}
+
+void FNiagaraSystemToolkit::OpenAttributeSpreadsheet()
+{
+	InvokeTab(DebugSpreadsheetTabID);
 }
 
 void FNiagaraSystemToolkit::OnToggleBoundsSetFixedBounds()
