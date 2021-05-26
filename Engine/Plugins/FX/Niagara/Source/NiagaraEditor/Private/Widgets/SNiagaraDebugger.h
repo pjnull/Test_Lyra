@@ -12,9 +12,6 @@
 class SNiagaraDebugger : public SCompoundWidget
 {
 public:
-	static const FName DebugWindowName;
-
-public:
 	SLATE_BEGIN_ARGS(SNiagaraDebugger) {}
 		SLATE_ARGUMENT(TSharedPtr<class FTabManager>, TabManager)
 		SLATE_ARGUMENT(TSharedPtr<class FNiagaraDebugger>, Debugger)
@@ -29,9 +26,6 @@ public:
 	static void RegisterTabSpawner();
 	static void UnregisterTabSpawner();
 	static TSharedRef<class SDockTab> SpawnNiagaraDebugger(const class FSpawnTabArgs& Args);
-
-	void FocusDebugTab();
-	void FocusOutlineTab();
 
 private:
 	TSharedRef<SWidget> MakeToolbar();
