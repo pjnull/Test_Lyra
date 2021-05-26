@@ -270,12 +270,20 @@ static FAutoConsoleVariableRef CVarNiagaraSystemSimulationWaitAllTaskPri(
 	ECVF_Default
 );
 
+static int32 GAllowHighPriorityForPerfTests = 1;
+static FAutoConsoleVariableRef CVarAllowHighPriorityForPerfTests(
+	TEXT("fx.Niagara.TaskPriority.AllowHighPriPerfTests"),
+	GAllowHighPriorityForPerfTests,
+	TEXT("Allow Niagara to pump up to high task priority when running performance tests. Reduces the context switching of Niagara tasks but can increase overall frame time when Niagara blocks GT work like Physics."),
+	ECVF_Default
+);
+
 ENamedThreads::Type GetNiagaraTaskPriority(int32 Priority)
 {
 #if WITH_PARTICLE_PERF_STATS
 	// If we are profiling particle performance make sure we don't get context switched due to lower priority as that will confuse the results
 	// Leave low pri if we're just gathering world stats but for per system or per component stats we should use high pri.
-	if (FParticlePerfStats::GetGatherSystemStats() || FParticlePerfStats::GetGatherComponentStats())
+	if (GAllowHighPriorityForPerfTests && (FParticlePerfStats::GetGatherSystemStats() || FParticlePerfStats::GetGatherComponentStats()))
 	{
 		return GNiagaraTaskPriorities[1].Get();
 	}

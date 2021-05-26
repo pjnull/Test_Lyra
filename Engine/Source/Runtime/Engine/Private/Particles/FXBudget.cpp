@@ -100,14 +100,17 @@ public:
 	virtual bool NeedsComponentStats()const override { return false; }
 
 	virtual void Begin() override {}
-	virtual void End() override {}
+	virtual void End() override
+	{
+		FFXBudget::SetWorstAdjustedUsage(0.0f);
+	}
 
 	virtual bool Tick() override
 	{
 		if (FFXBudget::Enabled())
 		{
 			FParticlePerfStatsManager::ForAllWorldStats(
-				[&](TWeakObjectPtr<UWorld>& WeakWorld, TUniquePtr<FParticlePerfStats>& Stats)
+				[&](TWeakObjectPtr<const UWorld>& WeakWorld, TUniquePtr<FParticlePerfStats>& Stats)
 				{
 					GTHistory.AddCycles(Stats->GetGameThreadStats().GetTotalCycles_GTOnly());
 					GTConcurrentHistory.AddCycles(Stats->GetGameThreadStats().GetTotalCycles());
@@ -162,7 +165,30 @@ public:
 			UpdateUsage(TargetUsage.GT, AdjustedUsage.GT);
 			UpdateUsage(TargetUsage.GTConcurrent, AdjustedUsage.GTConcurrent);
 			UpdateUsage(TargetUsage.RT, AdjustedUsage.RT);
+
+			FFXBudget::SetWorstAdjustedUsage(FMath::Max3(AdjustedUsage.GT, AdjustedUsage.GTConcurrent, AdjustedUsage.RT));
 		}
+
+		#if WITH_PARTICLE_PERF_CSV_STATS
+		if (FCsvProfiler* CSVProfiler = FCsvProfiler::Get())
+		{
+			if (CSVProfiler->IsCapturing())
+			{
+				static FName GTUsageStat(TEXT("Budget/GT"));
+				static FName GTCNCUsageStat(TEXT("Budget/GTCNC"));
+				static FName RTUsageStat(TEXT("Budget/RT"));
+				static FName AdjustedUsageStat(TEXT("Budget/Adjusted"));
+
+				const FFXTimeData& Usage = FFXBudget::GetUsage();
+				float WorstAdjusted = FFXBudget::GetWorstAdjustedUsage();
+
+				CSVProfiler->RecordCustomStat(GTUsageStat, CSV_CATEGORY_INDEX(Particles), Usage.GT, ECsvCustomStatOp::Set);
+				CSVProfiler->RecordCustomStat(GTCNCUsageStat, CSV_CATEGORY_INDEX(Particles), Usage.GTConcurrent, ECsvCustomStatOp::Set);
+				CSVProfiler->RecordCustomStat(RTUsageStat, CSV_CATEGORY_INDEX(Particles), Usage.RT, ECsvCustomStatOp::Set);
+				CSVProfiler->RecordCustomStat(AdjustedUsageStat, CSV_CATEGORY_INDEX(Particles), WorstAdjusted, ECsvCustomStatOp::Set);
+			}
+		}
+		#endif//WITH_PARTICLE_PERF_CSV_STATS
 
 		return true; 
 	}
@@ -170,7 +196,7 @@ public:
 	virtual void TickRT() override
 	{
 		FParticlePerfStatsManager::ForAllWorldStats(
-			[&](TWeakObjectPtr<UWorld>& WeakWorld, TUniquePtr<FParticlePerfStats>& Stats)
+			[&](TWeakObjectPtr<const UWorld>& WeakWorld, TUniquePtr<FParticlePerfStats>& Stats)
 			{
 				RTHistory.AddCycles(Stats->GetRenderThreadStats().GetTotalCycles());
 			}
@@ -240,6 +266,7 @@ public:
 TSharedPtr<FParticlePerfStatsListener_FXBudget, ESPMode::ThreadSafe> FFXBudget::StatsListener;
 bool FFXBudget::bEnabled = false;
 FFXTimeData FFXBudget::AdjustedUsage;
+float FFXBudget::WorstAdjustedUsage = 0.0f;
 
 FFXTimeData FFXBudget::GetTime()
 {
@@ -280,12 +307,6 @@ FFXTimeData FFXBudget::GetAdjustedUsage()
 	{
 		return FFXTimeData();
 	}
-}
-
-float FFXBudget::GetWorstAdjustedUsage()
-{
-	FFXTimeData Usage = GetAdjustedUsage();
-	return FMath::Max3(Usage.GT, Usage.GTConcurrent, Usage.RT);
 }
 
 void FFXBudget::OnEnabledCVarChanged(IConsoleVariable* CVar)

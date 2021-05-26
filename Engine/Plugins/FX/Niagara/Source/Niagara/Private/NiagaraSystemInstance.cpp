@@ -871,7 +871,12 @@ void FNiagaraSystemInstance::ResetInternal(bool bResetSimulations)
 	Age = 0;
 	TickCount = 0;
 	CachedDeltaSeconds = 0.0f;
-	bLODDistanceIsValid = false;
+	
+	if(!bLODDistanceIsOverridden)
+	{
+		bLODDistanceIsValid = false;
+	}
+
 	TotalGPUParamSize = 0;
 	ActiveGPUEmitterCount = 0;
 	GPUParamIncludeInterpolation = false;
@@ -2081,6 +2086,7 @@ void FNiagaraSystemInstance::WaitForConcurrentTickDoNotFinalize(bool bEnsureComp
 	{
 		ensureAlwaysMsgf(!bEnsureComplete, TEXT("FNiagaraSystemInstance::WaitForConcurrentTickDoNotFinalize - Async Work not complete and is expected to be. %s"), *GetSystem()->GetPathName());
 		SCOPE_CYCLE_COUNTER(STAT_NiagaraSystemWaitForAsyncTick);
+		PARTICLE_PERF_STAT_CYCLES_GT(FParticlePerfStatsContext(GetWorld(), GetSystem(), Cast<UFXSystemComponent>(GetAttachComponent())), Wait);
 
 		const uint64 StartCycles = FPlatformTime::Cycles64();
 		const double WarnSeconds = 5.0;
@@ -2334,7 +2340,11 @@ void FNiagaraSystemInstance::FinalizeTick_GameThread(bool bEnqueueGPUTickIfNeede
 
 	//Temporarily force FX to update their own LODDistance on frames where it is not provided by the scalability manager.
 	//TODO: Lots of FX wont need an accurate per frame value so implement a good way for FX to opt into this. FORT-248457
-	bLODDistanceIsValid = false;
+	//Don't reset if the LODDistance is overridden.
+	if(!bLODDistanceIsOverridden)
+	{
+		bLODDistanceIsValid = false;
+	}
 
 	if (!HandleCompletion())
 	{

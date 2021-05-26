@@ -24,6 +24,7 @@
 #include "UObject/NameTypes.h"
 #include "VectorVM.h"
 #include "Engine/StaticMesh.h"
+#include "NiagaraCullProxyComponent.h"
 
 DECLARE_CYCLE_STAT(TEXT("Sceneproxy create (GT)"), STAT_NiagaraCreateSceneProxy, STATGROUP_Niagara);
 DECLARE_CYCLE_STAT(TEXT("Component Tick (GT)"), STAT_NiagaraComponentTick, STATGROUP_Niagara);
@@ -151,13 +152,6 @@ FAutoConsoleCommandWithWorldAndArgs DumpNiagaraComponentsCommand(
 
 FNiagaraSceneProxy::FNiagaraSceneProxy(UNiagaraComponent* InComponent)
 	: FPrimitiveSceneProxy(InComponent, InComponent->GetAsset() ? InComponent->GetAsset()->GetFName() : FName())
-	, RuntimeCycleCount(nullptr)
-#if WITH_PARTICLE_PERF_STATS
-	, PerfStatsContext(InComponent->GetPerfStatsContext())
-#endif
-#if WITH_NIAGARA_COMPONENT_PREVIEW_DATA
-	, PreviewLODDistance(-1.0f)
-#endif
 {
 	if (FNiagaraSystemInstanceControllerConstPtr SystemInstanceController = InComponent->GetSystemInstanceController())
 	{
@@ -168,9 +162,7 @@ FNiagaraSceneProxy::FNiagaraSceneProxy(UNiagaraComponent* InComponent)
 
 		bAlwaysHasVelocity = RenderData->HasAnyMotionBlurEnabled();
 
-#if STATS
 		SystemStatID = InComponent->GetAsset()->GetStatID(false, false);
-#endif
 	}
 }
 
@@ -319,9 +311,7 @@ void FNiagaraSceneProxy::GetDynamicMeshElements(const TArray<const FSceneView*>&
 	SCOPE_CYCLE_COUNTER(STAT_NiagaraOverview_RT);
 	SCOPE_CYCLE_COUNTER(STAT_NiagaraComponentGetDynamicMeshElements);
 
-#if STATS
 	FScopeCycleCounter SystemStatCounter(SystemStatID);
-#endif
 
 	if (RenderData)
 	{
@@ -377,10 +367,9 @@ UNiagaraComponent::UNiagaraComponent(const FObjectInitializer& ObjectInitializer
 	, bIsSeeking(false)
 	, bAutoDestroy(false)
 	, MaxTimeBeforeForceUpdateTransform(5.0f)
-#if WITH_NIAGARA_COMPONENT_PREVIEW_DATA
 	, PreviewLODDistance(0.0f)
+	, PreviewMaxDistance(1.0f)
 	, bEnablePreviewLODDistance(false)
-#endif
 #if WITH_EDITORONLY_DATA
 	, bWaitForCompilationOnActivate(false)
 #endif
@@ -456,7 +445,7 @@ void UNiagaraComponent::InitForPerformanceBaseline()
 {
 	bNeverDistanceCull = true;
 	SetAllowScalability(false);
-	SetPreviewLODDistance(true, 1.0f);
+	SetPreviewLODDistance(true, 1.0f, 10000.0f);
 }
 
 void UNiagaraComponent::SetEmitterEnable(FName EmitterName, bool bNewEnableState)
@@ -792,6 +781,11 @@ bool UNiagaraComponent::InitializeSystem()
 			SystemInstanceController->SetGpuComputeDebug(bEnableGpuComputeDebug != 0);
 		}
 
+		if (bEnablePreviewLODDistance)
+		{
+			SystemInstanceController->SetLODDistance(PreviewLODDistance, PreviewMaxDistance, true);
+		}
+
 #if WITH_EDITORONLY_DATA
 		OnSystemInstanceChangedDelegate.Broadcast();
 #endif
@@ -840,6 +834,8 @@ void UNiagaraComponent::ActivateInternal(bool bReset /* = false */, bool bIsScal
 	}
 
 	SCOPE_CYCLE_COUNTER(STAT_NiagaraComponentActivate);
+	PARTICLE_PERF_STAT_CYCLES_GT(FParticlePerfStatsContext(GetWorld(), GetAsset(), this), Activation);
+
 	if (Asset == nullptr)
 	{
 		DestroyInstance();
@@ -911,10 +907,23 @@ void UNiagaraComponent::ActivateInternal(bool bReset /* = false */, bool bIsScal
 	bIsCulledByScalability = false; 
 	if (ShouldPreCull())
 	{
+		#if WITH_PARTICLE_PERF_CSV_STATS
+
+		if (FCsvProfiler* CSVProfiler = FCsvProfiler::Get())
+		{
+			if (CSVProfiler->IsCapturing())
+			{
+				static FName PreCullStatName(TEXT("NiagaraCulled/PreCull"));
+				CSVProfiler->RecordCustomStat(PreCullStatName, CSV_CATEGORY_INDEX(Particles), 1, ECsvCustomStatOp::Accumulate);
+			}
+		}
+		#endif
+
 		//We have decided to pre cull the system.
 		OnSystemComplete(true);
 		return;
 	}
+
 
 	// Early out if we're not forcing a reset, and both the component and system instance are already active.
 	if (bReset == false &&
@@ -925,6 +934,8 @@ void UNiagaraComponent::ActivateInternal(bool bReset /* = false */, bool bIsScal
 	{
 		return;
 	}
+
+	DestroyCullProxy();
 
 	// We can't call 'Super::Activate(bReset);' as this will enable the component tick
 	if (bReset || ShouldActivate() == true)
@@ -1017,6 +1028,12 @@ void UNiagaraComponent::DeactivateInternal(bool bIsScalabilityCull /* = false */
 	if (bIsScalabilityCull)
 	{
 		bIsCulledByScalability = true;
+
+		if (!Asset->NeedsSortedSignificanceCull())
+		{
+			//FX with significance handling have their cull proxies managed by the significance manager.
+			CreateCullProxy();
+		}
 	}
 	else
 	{
@@ -1222,7 +1239,9 @@ void UNiagaraComponent::OnSystemComplete(bool bExternalCompletion)
 	//We want to stop ticking but not be reclaimed by the pools etc.
 	//We also want to skip this work if we're destroying during and update context reset.
 	if (bIsCulledByScalability == false && bDuringUpdateContextReset == false)
-	{		
+	{
+		DestroyCullProxy();
+
 		//UE_LOG(LogNiagara, Log, TEXT("OnSystemFinished.Broadcast(this);: { %p -  %p - %s"), this, SystemInstance.Get(), *Asset->GetName());
 		OnSystemFinished.Broadcast(this);
 		//UE_LOG(LogNiagara, Log, TEXT("OnSystemFinished.Broadcast(this);: } %p - %s"), SystemInstance.Get(), *Asset->GetName());
@@ -1507,6 +1526,34 @@ void UNiagaraComponent::BeginDestroy()
 	Super::BeginDestroy();
 }
 
+void UNiagaraComponent::CreateCullProxy(bool bForce)
+{
+	if (Asset->GetCullProxyMode() != ENiagaraCullProxyMode::None && CullProxy == nullptr)
+	{
+		FNiagaraWorldManager* WorldMan = FNiagaraWorldManager::Get(GetWorld());
+		check(WorldMan);
+		
+		UNiagaraCullProxyComponent* SystemCullProxy = WorldMan->GetCullProxy(this);
+		if (SystemCullProxy)
+		{
+			if (SystemCullProxy->RegisterCulledComponent(this, bForce))
+			{
+				CullProxy = SystemCullProxy;
+			}
+		}
+	}
+}
+
+void UNiagaraComponent::DestroyCullProxy()
+{
+	//If we created a cull proxy then remove it now that we are activating.
+	if (CullProxy)
+	{
+		CullProxy->UnregisterCulledComponent(this);
+		CullProxy = nullptr;
+	}
+}
+
 TSharedPtr<FNiagaraSystemSimulation, ESPMode::ThreadSafe> UNiagaraComponent::GetSystemSimulation()
 {
 	if (SystemInstanceController)
@@ -1557,25 +1604,39 @@ void UNiagaraComponent::SendRenderDynamicData_Concurrent()
 	{
 		if (FNiagaraSystemRenderData* RenderData = NiagaraProxy->GetSystemRenderData())
 		{
-			FNiagaraSystemRenderData::FSetDynamicDataCommandList SetDataCommands;
-			SystemInstanceController->GenerateSetDynamicDataCommands(SetDataCommands, *RenderData, *NiagaraProxy);
-		
-			float LocalPreviewLODDistance = -1.0f;
-#if WITH_NIAGARA_COMPONENT_PREVIEW_DATA
-			LocalPreviewLODDistance = GetPreviewLODDistance();
+			FNiagaraSceneProxy::FDynamicData NewProxyDynamicData;
+			NewProxyDynamicData.LODDistanceOverride = GetPreviewLODDistance();
+
+#if WITH_PARTICLE_PERF_STATS
+			NewProxyDynamicData.PerfStatsContext = GetPerfStatsContext();
 #endif
 
+			FNiagaraSystemRenderData::FSetDynamicDataCommandList SetDataCommands;
+
+			if (bIsCulledByScalability && CullProxy)
+			{
+				//Render the cull proxy at this location instead.
+				NewProxyDynamicData.bUseCullProxy = true;
+				//Some renderers may need this transform on the GT so override here.
+				FNiagaraSystemInstanceControllerPtr CullProxyController = CullProxy->GetSystemInstanceController();
+				CullProxyController->GetSystemInstance_Unsafe()->SetWorldTransform(SystemInstanceController->GetSystemInstance_Unsafe()->GetWorldTransform());
+				CullProxyController->GenerateSetDynamicDataCommands(SetDataCommands, *RenderData, *NiagaraProxy);
+				CullProxyController->GetSystemInstance_Unsafe()->SetWorldTransform(FTransform::Identity);
+			}
+			else
+			{
+				SystemInstanceController->GenerateSetDynamicDataCommands(SetDataCommands, *RenderData, *NiagaraProxy);
+			}
+
 			ENQUEUE_RENDER_COMMAND(NiagaraSetDynamicData)(
-				[NiagaraProxy, CommandsRT = MoveTemp(SetDataCommands), PerfStatCtx=GetPerfStatsContext(), LocalPreviewLODDistance](FRHICommandListImmediate& RHICmdList)
+				[NiagaraProxy, CommandsRT = MoveTemp(SetDataCommands), NewProxyDynamicData](FRHICommandListImmediate& RHICmdList)
 				{
 					SCOPE_CYCLE_COUNTER(STAT_NiagaraSetDynamicData);
-					PARTICLE_PERF_STAT_CYCLES_WITH_COUNT_RT(PerfStatCtx, RenderUpdate, 1);
+					PARTICLE_PERF_STAT_CYCLES_WITH_COUNT_RT(NewProxyDynamicData.PerfStatsContext, RenderUpdate, 1);
 
 					FNiagaraSystemRenderData::ExecuteDynamicDataCommands_RenderThread(CommandsRT);
 
-#if WITH_NIAGARA_COMPONENT_PREVIEW_DATA
-					NiagaraProxy->PreviewLODDistance = LocalPreviewLODDistance;
-#endif
+					NiagaraProxy->SetProxyDynamicData(NewProxyDynamicData);
 				}
 			);
 		}
@@ -1600,6 +1661,12 @@ FBoxSphereBounds UNiagaraComponent::CalcBounds(const FTransform& LocalToWorld) c
 	{
 		// We use auto attachment but have detached, don't use our own bogus bounds (we're off near 0,0,0), use the usual parent's bounds.
 		return UseAutoParent->Bounds;
+	}
+
+	if (bIsCulledByScalability && CullProxy)
+	{
+		check(CullProxy->GetComponentLocation() == FVector::ZeroVector);
+		return CullProxy->CalcBounds(LocalToWorld);
 	}
 
 	FBoxSphereBounds SystemBounds;
@@ -2869,15 +2936,23 @@ void UNiagaraComponent::SetAutoDestroy(bool bInAutoDestroy)
 	}
 }
 
-#if WITH_NIAGARA_COMPONENT_PREVIEW_DATA
-void UNiagaraComponent::SetPreviewLODDistance(bool bInEnablePreviewLODDistance, float InPreviewLODDistance)
+void UNiagaraComponent::SetPreviewLODDistance(bool bInEnablePreviewLODDistance, float InPreviewLODDistance, float InPreviewMaxDistance)
 {
 	bEnablePreviewLODDistance = bInEnablePreviewLODDistance;
 	PreviewLODDistance = InPreviewLODDistance;
+
+	if(SystemInstanceController)
+	{
+		if (bEnablePreviewLODDistance)
+		{
+			SystemInstanceController->SetLODDistance(PreviewLODDistance, InPreviewLODDistance, true);
+		}
+		else
+		{
+			SystemInstanceController->ClearLODDistance();
+		}
+	}
 }
-#else
-void UNiagaraComponent::SetPreviewLODDistance(bool bInEnablePreviewLODDistance, float InPreviewLODDistance){}
-#endif
 
 void UNiagaraComponent::SetAllowScalability(bool bAllow)
 {
@@ -2931,6 +3006,7 @@ void UNiagaraComponent::SetAsset(UNiagaraSystem* InAsset, bool bResetExistingOve
 	}
 #endif
 
+	DestroyCullProxy();
 	UnregisterWithScalabilityManager();
 
 	const bool bWasActive = SystemInstanceController && SystemInstanceController->GetRequestedExecutionState() == ENiagaraExecutionState::Active;

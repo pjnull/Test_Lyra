@@ -77,6 +77,9 @@ struct FNiagaraOutlinerSystemInstanceData
 	
 	UPROPERTY(VisibleAnywhere, Category = "State")
 	uint32 bPendingKill : 1;
+
+	UPROPERTY(VisibleAnywhere, Category = "State")
+	uint32 bUsingCullProxy : 1;
 	
 	UPROPERTY(VisibleAnywhere, Category = "State")
 	ENCPoolMethod PoolMethod = ENCPoolMethod::None;
@@ -87,8 +90,9 @@ struct FNiagaraOutlinerSystemInstanceData
 	UPROPERTY(VisibleAnywhere, Category = "Performance")
 	FNiagaraOutlinerTimingData MaxTime;
 
-	FNiagaraOutlinerSystemInstanceData() :
-		bPendingKill(false)
+	FNiagaraOutlinerSystemInstanceData() 
+	: bPendingKill(false)
+	, bUsingCullProxy(false)
 	{}
 
 	//TODO:

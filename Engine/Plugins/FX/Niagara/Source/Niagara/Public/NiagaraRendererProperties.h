@@ -163,6 +163,7 @@ class NIAGARA_API UNiagaraRendererProperties : public UNiagaraMergeable
 public:
 	UNiagaraRendererProperties()		
 		: bIsEnabled(true)
+		, bAllowInCullProxies(true)
 		, bMotionBlurEnabled_DEPRECATED(true)
 	{
 	}
@@ -260,6 +261,9 @@ public:
 
 	UPROPERTY()
 	bool bIsEnabled;
+
+	UPROPERTY(EditAnywhere, Category = "Scalability")
+	bool bAllowInCullProxies;
 
 protected:
 	UPROPERTY()

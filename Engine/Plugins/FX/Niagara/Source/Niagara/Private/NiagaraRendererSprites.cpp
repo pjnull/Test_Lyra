@@ -12,6 +12,7 @@
 #include "RayTracingDynamicGeometryCollection.h"
 #include "RayTracingInstance.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "NiagaraCullProxyComponent.h"
 
 DECLARE_CYCLE_STAT(TEXT("Generate Sprite Dynamic Data [GT]"), STAT_NiagaraGenSpriteDynamicData, STATGROUP_Niagara);
 DECLARE_CYCLE_STAT(TEXT("Render Sprites [RT]"), STAT_NiagaraRenderSprites, STATGROUP_Niagara);
@@ -250,7 +251,8 @@ FNiagaraSpriteUniformBufferRef FNiagaraRendererSprites::CreatePerViewUniformBuff
 	FNiagaraSpriteUniformParameters PerViewUniformParameters;
 	FMemory::Memzero(&PerViewUniformParameters,sizeof(PerViewUniformParameters)); // Clear unset bytes
 
-	PerViewUniformParameters.bLocalSpace = bLocalSpace;
+	bool bUseLocalSpace = UseLocalSpace(SceneProxy);
+	PerViewUniformParameters.bLocalSpace = bUseLocalSpace;
 	PerViewUniformParameters.RotationBias = 0.0f;
 	PerViewUniformParameters.RotationScale = 1.0f;
 	PerViewUniformParameters.TangentSelector = FVector4(0.0f, 0.0f, 0.0f, 1.0f);
@@ -264,7 +266,7 @@ FNiagaraSpriteUniformBufferRef FNiagaraRendererSprites::CreatePerViewUniformBuff
 	PerViewUniformParameters.SubImageSize = FVector4(SubImageSize.X, SubImageSize.Y, 1.0f / SubImageSize.X, 1.0f / SubImageSize.Y);
 
 
-	PerViewUniformParameters.DefaultPos = bLocalSpace ? FVector4(0.0f, 0.0f, 0.0f, 1.0f) : FVector4(SceneProxy->GetLocalToWorld().GetOrigin());
+	PerViewUniformParameters.DefaultPos = bUseLocalSpace ? FVector4(0.0f, 0.0f, 0.0f, 1.0f) : FVector4(SceneProxy->GetLocalToWorld().GetOrigin());
 	PerViewUniformParameters.DefaultPrevPos = PerViewUniformParameters.DefaultPos;
 	PerViewUniformParameters.DefaultSize = FVector2D(50.f, 50.0f);
 	PerViewUniformParameters.DefaultPrevSize = PerViewUniformParameters.DefaultSize;
@@ -594,7 +596,7 @@ void FNiagaraRendererSprites::SetVertexFactoryParticleData(
 			SortInfo.SortAttributeOffset = bShouldSort ? SortVariable.GetGPUOffset() : INDEX_NONE;
 			SortInfo.ViewOrigin = View->ViewMatrices.GetViewOrigin();
 			SortInfo.ViewDirection = View->GetViewDirection();
-			if (bLocalSpace)
+			if (UseLocalSpace(SceneProxy))
 			{
 				SortInfo.ViewOrigin = SceneProxy->GetLocalToWorldInverse().TransformPosition(SortInfo.ViewOrigin);
 				SortInfo.ViewDirection = SceneProxy->GetLocalToWorld().GetTransposed().TransformVector(SortInfo.ViewDirection);
@@ -838,7 +840,7 @@ void FNiagaraRendererSprites::CreateMeshBatchForView(
 
 void FNiagaraRendererSprites::GetDynamicMeshElements(const TArray<const FSceneView*>& Views, const FSceneViewFamily& ViewFamily, uint32 VisibilityMap, FMeshElementCollector& Collector, const FNiagaraSceneProxy *SceneProxy) const
 {
-	PARTICLE_PERF_STAT_CYCLES_RT(SceneProxy->PerfStatsContext, GetDynamicMeshElements);
+	PARTICLE_PERF_STAT_CYCLES_RT(SceneProxy->GetProxyDynamicData().PerfStatsContext, GetDynamicMeshElements);
 	check(SceneProxy);
 
 	//check(DynamicDataRender)
@@ -905,17 +907,13 @@ void FNiagaraRendererSprites::GetDynamicMeshElements(const TArray<const FSceneVi
 				{
 					// retrieve the reference position from the parameter store
 					FMemory::Memcpy(&RefPosition, DynamicDataSprites->ParameterDataBound.GetData() + BoundPosOffset, sizeof(FVector));
-					if (bLocalSpace)
+					if (UseLocalSpace(SceneProxy))
 					{
 						RefPosition = SceneProxy->GetLocalToWorld().TransformPosition(RefPosition);
 					}
 				}
 
-				#if WITH_NIAGARA_COMPONENT_PREVIEW_DATA
-				float DistSquared = SceneProxy->PreviewLODDistance >= 0.0f ? SceneProxy->PreviewLODDistance * SceneProxy->PreviewLODDistance : FVector::DistSquared(RefPosition, ViewOrigin);
-				#else
-				float DistSquared = FVector::DistSquared(RefPosition, ViewOrigin);
-				#endif
+				float DistSquared = SceneProxy->GetProxyDynamicData().LODDistanceOverride >= 0.0f ? FMath::Square(SceneProxy->GetProxyDynamicData().LODDistanceOverride) : FVector::DistSquared(RefPosition, ViewOrigin);
 				if (DistSquared < DistanceCullRange.X * DistanceCullRange.X || DistSquared > DistanceCullRange.Y * DistanceCullRange.Y)
 				{
 					// Distance cull the whole emitter
@@ -1051,6 +1049,21 @@ FNiagaraDynamicDataBase *FNiagaraRendererSprites::GenerateDynamicData(const FNia
 
 	if (Properties)
 	{
+		if (Properties->bAllowInCullProxies == false)
+		{
+			check(Emitter);
+
+			FNiagaraSystemInstance* Inst = Emitter->GetParentSystemInstance();
+			check(Emitter->GetParentSystemInstance());
+
+			//TODO: Probably should push some state into the system instance for this?
+			bool bIsCullProxy = Cast<UNiagaraCullProxyComponent>(Inst->GetAttachComponent()) != nullptr;
+			if (bIsCullProxy)
+			{
+				return nullptr;
+			}
+		}
+
 		SCOPE_CYCLE_COUNTER(STAT_NiagaraGenSpriteDynamicData);
 
 		FNiagaraDataBuffer* DataToRender = Emitter->GetData().GetCurrentData();

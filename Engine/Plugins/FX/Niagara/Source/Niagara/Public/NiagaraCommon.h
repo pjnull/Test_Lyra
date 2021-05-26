@@ -1336,6 +1336,7 @@ struct FNiagaraScalabilityState
 
 	FNiagaraScalabilityState()
 		: Significance(1.0f)
+		, SystemDataIndex(INDEX_NONE)
 		, bCulled(0)
 		, bPreviousCulled(0)
 		, bCulledByDistance(0)
@@ -1347,6 +1348,7 @@ struct FNiagaraScalabilityState
 
 	FNiagaraScalabilityState(float InSignificance, bool InCulled, bool InPreviousCulled)
 		: Significance(InSignificance)
+		, SystemDataIndex(INDEX_NONE)
 		, bCulled(InCulled)
 		, bPreviousCulled(InPreviousCulled)
 		, bCulledByDistance(0)
@@ -1361,6 +1363,8 @@ struct FNiagaraScalabilityState
 
 	UPROPERTY(VisibleAnywhere, Category="Scalability")
 	float Significance;
+
+	int16 SystemDataIndex;
 
 	UPROPERTY(VisibleAnywhere, Category = "Scalability")
 	uint8 bCulled : 1;

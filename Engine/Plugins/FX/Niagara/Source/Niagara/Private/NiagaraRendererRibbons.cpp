@@ -11,6 +11,7 @@
 #include "RayTracingDynamicGeometryCollection.h"
 #include "RayTracingInstance.h"
 #include "Math/NumericLimits.h"
+#include "NiagaraCullProxyComponent.h"
 
 DECLARE_CYCLE_STAT(TEXT("Generate Ribbon Vertex Data [GT]"), STAT_NiagaraGenRibbonVertexData, STATGROUP_Niagara);
 DECLARE_CYCLE_STAT(TEXT("Render Ribbons [RT]"), STAT_NiagaraRenderRibbons, STATGROUP_Niagara);
@@ -414,7 +415,7 @@ void FNiagaraRendererRibbons::GenerateIndexBuffer(
 void FNiagaraRendererRibbons::GetDynamicMeshElements(const TArray<const FSceneView*>& Views, const FSceneViewFamily& ViewFamily, uint32 VisibilityMap, FMeshElementCollector& Collector, const FNiagaraSceneProxy *SceneProxy) const
 {
 	SCOPE_CYCLE_COUNTER(STAT_NiagaraRenderRibbons);
-	PARTICLE_PERF_STAT_CYCLES_RT(SceneProxy->PerfStatsContext, GetDynamicMeshElements);
+	PARTICLE_PERF_STAT_CYCLES_RT(SceneProxy->GetProxyDynamicData().PerfStatsContext, GetDynamicMeshElements);
 
 	FNiagaraDynamicDataRibbon *DynamicDataRibbon = static_cast<FNiagaraDynamicDataRibbon*>(DynamicDataRender);
 	if (!DynamicDataRibbon)
@@ -594,6 +595,24 @@ FNiagaraDynamicDataBase* FNiagaraRendererRibbons::GenerateDynamicData(const FNia
 
 	FNiagaraDataSet& Data = Emitter->GetData();
 	const UNiagaraRibbonRendererProperties* Properties = CastChecked<const UNiagaraRibbonRendererProperties>(InProperties);
+
+	if (Properties->bAllowInCullProxies == false)
+	{
+		if (Properties->bAllowInCullProxies == false)
+		{
+			check(Emitter);
+
+			FNiagaraSystemInstance* Inst = Emitter->GetParentSystemInstance();
+			check(Emitter->GetParentSystemInstance());
+
+			//TODO: Probably should push some state into the system instance for this?
+			bool bIsCullProxy = Cast<UNiagaraCullProxyComponent>(Inst->GetAttachComponent()) != nullptr;
+			if (bIsCullProxy)
+			{
+				return nullptr;
+			}
+		}
+	}
 
 	FNiagaraDataBuffer* DataToRender = Emitter->GetData().GetCurrentData();
 	if (DataToRender == nullptr || DataToRender->GetNumInstances() < 2 || !Properties->PositionDataSetAccessor.IsValid() || !Properties->SortKeyDataSetAccessor.IsValid())
@@ -1279,11 +1298,7 @@ void FNiagaraRendererRibbons::CreatePerViewResources(
 			}
 		}();
 		const float MAX_CURVATURE_FACTOR = 0.002f; // This will clamp the curvature to around 2.5 km and avoid numerical issues.
-#if WITH_NIAGARA_COMPONENT_PREVIEW_DATA
-		const float ViewDistance = SceneProxy->PreviewLODDistance >= 0.0f ? SceneProxy->PreviewLODDistance : SceneProxy->GetBounds().ComputeSquaredDistanceFromBoxToPoint(ViewOriginForDistanceCulling);
-#else
-		const float ViewDistance = SceneProxy->GetBounds().ComputeSquaredDistanceFromBoxToPoint(ViewOriginForDistanceCulling);
-#endif
+		const float ViewDistance = SceneProxy->GetProxyDynamicData().LODDistanceOverride >= 0.0f ? SceneProxy->GetProxyDynamicData().LODDistanceOverride : SceneProxy->GetBounds().ComputeSquaredDistanceFromBoxToPoint(ViewOriginForDistanceCulling);
 		const float MaxDisplacementError = FMath::Max(GNiagaraRibbonTessellationMinDisplacementError, ScreenPercentage * FMath::Sqrt(ViewDistance) / View->LODDistanceFactor);
 		float Tess = TessellationAngle / FMath::Max(MAX_CURVATURE_FACTOR, AcosFast(TessellationCurvature / (TessellationCurvature + MaxDisplacementError)));
 		// FMath::RoundUpToPowerOfTwo ? This could avoid vertices moving around as tesselation increases
@@ -1343,7 +1358,8 @@ void FNiagaraRendererRibbons::CreatePerViewResources(
 	FNiagaraRibbonUniformParameters PerViewUniformParameters;
 	FMemory::Memzero(&PerViewUniformParameters,sizeof(PerViewUniformParameters)); // Clear unset bytes
 
-	PerViewUniformParameters.bLocalSpace = bLocalSpace;
+	bool bUseLocalSpace = UseLocalSpace(SceneProxy);
+	PerViewUniformParameters.bLocalSpace = bUseLocalSpace;
 	PerViewUniformParameters.DeltaSeconds = ViewFamily.DeltaWorldTime;
 	PerViewUniformParameters.CameraUp = View->GetViewUp(); // FVector4(0.0f, 0.0f, 1.0f, 0.0f);
 	PerViewUniformParameters.CameraRight = View->GetViewRight();//	FVector4(1.0f, 0.0f, 0.0f, 0.0f);
