@@ -31,9 +31,8 @@ TArray<TWeakObjectPtr<UNiagaraMeshRendererProperties>> UNiagaraMeshRendererPrope
 
 FNiagaraMeshMaterialOverride::FNiagaraMeshMaterialOverride()
 	: ExplicitMat(nullptr)
+	, UserParamBinding(FNiagaraTypeDefinition(UMaterialInterface::StaticClass()))
 {
-	FNiagaraTypeDefinition MaterialDef(UMaterialInterface::StaticClass());
-	UserParamBinding.Parameter.SetType(MaterialDef);
 }
 
 bool FNiagaraMeshMaterialOverride::SerializeFromMismatchedTag(const struct FPropertyTag& Tag, FStructuredArchive::FSlot Slot)
@@ -51,13 +50,11 @@ bool FNiagaraMeshMaterialOverride::SerializeFromMismatchedTag(const struct FProp
 
 FNiagaraMeshRendererMeshProperties::FNiagaraMeshRendererMeshProperties()
 	: Mesh(nullptr)
+	, UserParamBinding(FNiagaraTypeDefinition(UStaticMesh::StaticClass()))
 	, Scale(1.0f, 1.0f, 1.0f)
 	, PivotOffset(ForceInitToZero)
 	, PivotOffsetSpace(ENiagaraMeshPivotOffsetSpace::Mesh)
-{	
-
-	FNiagaraTypeDefinition StaticMeshDef(UStaticMesh::StaticClass());
-	UserParamBinding.Parameter.SetType(StaticMeshDef);
+{
 }
 
 UStaticMesh* FNiagaraMeshRendererMeshProperties::ResolveStaticMesh(const FNiagaraEmitterInstance* Emitter) const
