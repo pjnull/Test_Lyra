@@ -12061,7 +12061,7 @@ ETeleportType UCharacterMovementComponent::GetTeleportType() const
 }
 
 
-void UCharacterMovementComponent::FillAsyncInput(const FVector& InputVector, FCharacterMovementAsyncInput& AsyncInput) const
+void UCharacterMovementComponent::FillAsyncInput(const FVector& InputVector, FCharacterMovementComponentAsyncInput& AsyncInput) const
 {
 	if (!CharacterOwner || !CharacterOwner->Controller)
 	{
@@ -12292,15 +12292,15 @@ void UCharacterMovementComponent::FillAsyncInput(const FVector& InputVector, FCh
 		AsyncSimState->CurrentRootMotion = CurrentRootMotion;
 
 		// Character owner data
-		TUniquePtr<FCharacterAsyncOutput>& PawnOutput = AsyncSimState->Pawn;
-		PawnOutput->Rotation = CharacterOwner->GetActorRotation();
-		PawnOutput->JumpCurrentCountPreJump = CharacterOwner->JumpCurrentCountPreJump;
-		PawnOutput->JumpCurrentCount = CharacterOwner->JumpCurrentCount;
-		PawnOutput->JumpForceTimeRemaining = CharacterOwner->JumpForceTimeRemaining;
-		PawnOutput->bWasJumping = CharacterOwner->bWasJumping;
-		PawnOutput->bPressedJump = CharacterOwner->bPressedJump;
-		PawnOutput->JumpKeyHoldTime = CharacterOwner->JumpKeyHoldTime;
-		PawnOutput->bClearJumpInput = false;
+		TUniquePtr<FCharacterAsyncOutput>& CharacterOutput = AsyncSimState->CharacterOutput;
+		CharacterOutput->Rotation = CharacterOwner->GetActorRotation();
+		CharacterOutput->JumpCurrentCountPreJump = CharacterOwner->JumpCurrentCountPreJump;
+		CharacterOutput->JumpCurrentCount = CharacterOwner->JumpCurrentCount;
+		CharacterOutput->JumpForceTimeRemaining = CharacterOwner->JumpForceTimeRemaining;
+		CharacterOutput->bWasJumping = CharacterOwner->bWasJumping;
+		CharacterOutput->bPressedJump = CharacterOwner->bPressedJump;
+		CharacterOutput->JumpKeyHoldTime = CharacterOwner->JumpKeyHoldTime;
+		CharacterOutput->bClearJumpInput = false;
 
 		AsyncSimState->bIsValid = true;
 	}
@@ -12310,15 +12310,15 @@ void UCharacterMovementComponent::BuildAsyncInput()
 {
 	if (CharacterMovementCVars::AsyncCharacterMovement == 1)
 	{
-		FCharacterMovementAsyncInput* Input = AsyncCallback->GetProducerInputData_External();
+		FCharacterMovementComponentAsyncInput* Input = AsyncCallback->GetProducerInputData_External();
 		if (Input->bInitialized == false)
 		{
-			Input->Initialize<FCharacterMovementAsyncInput::FCharacterInput, FCharacterMovementAsyncInput::FUpdatedComponentInput>();
+			Input->Initialize<FCharacterMovementComponentAsyncInput::FCharacterInput, FCharacterMovementComponentAsyncInput::FUpdatedComponentInput>();
 		}
 
 		if (AsyncSimState.IsValid() == false)
 		{
-			AsyncSimState = MakeShared<FCharacterMovementAsyncOutput, ESPMode::ThreadSafe>();
+			AsyncSimState = MakeShared<FCharacterMovementComponentAsyncOutput, ESPMode::ThreadSafe>();
 		}
 		Input->AsyncSimState = AsyncSimState;
 
@@ -12342,7 +12342,7 @@ void UCharacterMovementComponent::PostBuildAsyncInput()
 	}
 }
 
-void UCharacterMovementComponent::ApplyAsyncOutput(FCharacterMovementAsyncOutput& Output)
+void UCharacterMovementComponent::ApplyAsyncOutput(FCharacterMovementComponentAsyncOutput& Output)
 {
 	ensure(Output.DeltaTime > 0.0f);
 
@@ -12399,7 +12399,7 @@ void UCharacterMovementComponent::ApplyAsyncOutput(FCharacterMovementAsyncOutput
 
 	if (CharacterOwner)
 	{
-		TUniquePtr<FCharacterAsyncOutput>& CharacterOutput = Output.Pawn;
+		TUniquePtr<FCharacterAsyncOutput>& CharacterOutput = Output.CharacterOutput;
 		CharacterOwner->JumpCurrentCountPreJump = CharacterOutput->JumpCurrentCountPreJump;
 		CharacterOwner->JumpCurrentCount = CharacterOutput->JumpCurrentCount;
 		CharacterOwner->JumpForceTimeRemaining = CharacterOutput->JumpForceTimeRemaining;
@@ -12435,7 +12435,7 @@ void UCharacterMovementComponent::ApplyAsyncOutput(FCharacterMovementAsyncOutput
 	// TODO Should this happen before or after movement update above?
 	if (CharacterOwner)
 	{
-		CharacterOwner->FaceRotation(Output.Pawn->Rotation);
+		CharacterOwner->FaceRotation(Output.CharacterOutput->Rotation);
 	}
 
 	// TODO MovementBase
@@ -12462,7 +12462,7 @@ void UCharacterMovementComponent::RegisterAsyncCallback()
 		{
 			if (FPhysScene* PhysScene = World->GetPhysicsScene())
 			{
-				AsyncCallback = PhysScene->GetSolver()->CreateAndRegisterSimCallbackObject_External<FCharacterMovementAsyncCallback>();
+				AsyncCallback = PhysScene->GetSolver()->CreateAndRegisterSimCallbackObject_External<FCharacterMovementComponentAsyncCallback>();
 			}
 		}
 	}
