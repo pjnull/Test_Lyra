@@ -577,7 +577,7 @@ void FParticlePerfStats::Tick()
 
 void FParticlePerfStats::TickRT()
 {	
-	check(IsInActualRenderingThread());
+	check(IsInRenderingThread());
 	GetRenderThreadStats().Reset();
 }
 
