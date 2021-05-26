@@ -124,12 +124,6 @@ struct FPendingSamplerDataValue
 	GLint	Value;
 };
 
-struct FVertexBufferPair
-{
-	FOpenGLBuffer*				Source;
-	TRefCountPtr<FOpenGLBuffer>	Dest;
-};
-
 static FORCEINLINE GLint ModifyFilterByMips(GLint Filter, bool bHasMips)
 {
 	if (!bHasMips)
@@ -227,7 +221,7 @@ void FOpenGLDynamicRHI::RHISetStreamSource(uint32 StreamIndex, FRHIBuffer* Verte
 {
 	VERIFY_GL_SCOPE();
 	FOpenGLBuffer* VertexBuffer = ResourceCast(VertexBufferRHI);
-	PendingState.Streams[StreamIndex].VertexBuffer = VertexBuffer;
+	PendingState.Streams[StreamIndex].VertexBufferResource = VertexBuffer ? VertexBuffer->Resource : 0;
 	PendingState.Streams[StreamIndex].Stride = PendingState.BoundShaderState ? PendingState.BoundShaderState->StreamStrides[StreamIndex] : 0;
 	PendingState.Streams[StreamIndex].Offset = Offset;
 }
@@ -1827,19 +1821,19 @@ void FOpenGLDynamicRHI::SetupVertexArrays(FOpenGLContextState& ContextState, uin
 		{
 			FOpenGLStream &CachedStream = ContextState.VertexStreams[StreamIndex];
 			FOpenGLStream &Stream = Streams[StreamIndex];
-			if (Stream.VertexBuffer)
+			if (Stream.VertexBufferResource)
 			{
 				uint32 Offset = BaseVertexIndex * Stream.Stride + Stream.Offset;
 				bool bAnyDifferent = //bitwise ors to get rid of the branches
-					(CachedStream.VertexBuffer != Stream.VertexBuffer) |
-					(CachedStream.Stride != Stream.Stride)|
+					(CachedStream.VertexBufferResource != Stream.VertexBufferResource) ||
+					(CachedStream.Stride != Stream.Stride)||
 					(CachedStream.Offset != Offset);
 
 				if (bAnyDifferent)
 				{
-					check(Stream.VertexBuffer->Resource != 0);
-					FOpenGL::BindVertexBuffer(StreamIndex, Stream.VertexBuffer->Resource, Offset, Stream.Stride);
-					CachedStream.VertexBuffer = Stream.VertexBuffer;
+					check(Stream.VertexBufferResource != 0);
+					FOpenGL::BindVertexBuffer(StreamIndex, Stream.VertexBufferResource, Offset, Stream.Stride);
+					CachedStream.VertexBufferResource = Stream.VertexBufferResource;
 					CachedStream.Offset = Offset;
 					CachedStream.Stride = Stream.Stride;
 				}
@@ -1854,7 +1848,7 @@ void FOpenGLDynamicRHI::SetupVertexArrays(FOpenGLContextState& ContextState, uin
 				UE_LOG(LogRHI, Error, TEXT("Stream %d marked as in use, but vertex buffer provided is NULL (Mask = %x)"), StreamIndex, StreamMask);
 				
 				FOpenGL::BindVertexBuffer(StreamIndex, 0, 0, 0);
-				CachedStream.VertexBuffer = nullptr;
+				CachedStream.VertexBufferResource = 0;
 				CachedStream.Offset = 0;
 				CachedStream.Stride = 0;
 			}
@@ -1870,7 +1864,7 @@ void FOpenGLDynamicRHI::SetupVertexArrays(FOpenGLContextState& ContextState, uin
 		if (NotUsedButActiveStreamMask & 0x1)
 		{
 			FOpenGL::BindVertexBuffer(StreamIndex, 0, 0, 0);
-			ContextState.VertexStreams[StreamIndex].VertexBuffer = nullptr;
+			ContextState.VertexStreams[StreamIndex].VertexBufferResource = 0;
 			ContextState.VertexStreams[StreamIndex].Offset = 0;
 			ContextState.VertexStreams[StreamIndex].Stride = 0;
 		}
@@ -1923,11 +1917,10 @@ void FOpenGLDynamicRHI::OnBufferDeletion( GLuint BufferResource )
 	{
 		FOpenGLStream& CachedStream = SharedContextState.VertexStreams[StreamIndex];
 		if ((ActiveStreamMask & 0x1) && 
-			CachedStream.VertexBuffer && 
-			CachedStream.VertexBuffer->Resource == BufferResource)
+			CachedStream.VertexBufferResource == BufferResource)
 		{
 			FOpenGL::BindVertexBuffer(StreamIndex, 0, 0, 0); // brianh@nvidia: work around driver bug 1809000
-			CachedStream.VertexBuffer = nullptr;
+			CachedStream.VertexBufferResource = 0;
 			CachedStream.Offset = 0;
 			CachedStream.Stride = 0;
 		}
@@ -1940,11 +1933,10 @@ void FOpenGLDynamicRHI::OnBufferDeletion( GLuint BufferResource )
 	{
 		FOpenGLStream& CachedStream = RenderingContextState.VertexStreams[StreamIndex];
 		if ((ActiveStreamMask & 0x1) && 
-			CachedStream.VertexBuffer && 
-			CachedStream.VertexBuffer->Resource == BufferResource)
+			CachedStream.VertexBufferResource == BufferResource)
 		{
 			FOpenGL::BindVertexBuffer(StreamIndex, 0, 0, 0); // brianh@nvidia: work around driver bug 1809000
-			CachedStream.VertexBuffer = nullptr;
+			CachedStream.VertexBufferResource = 0;
 			CachedStream.Offset = 0;
 			CachedStream.Stride = 0;
 		}
