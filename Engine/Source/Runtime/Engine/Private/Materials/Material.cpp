@@ -2134,7 +2134,7 @@ void UMaterial::UpdateCachedExpressionData()
 	}
 
 	CachedExpressionData->Reset();
-	FMaterialCachedExpressionContext Context(nullptr); // UMaterial have no parent
+	FMaterialCachedExpressionContext Context;
 	CachedExpressionData->UpdateForExpressions(Context, Expressions, EMaterialParameterAssociation::GlobalParameter, -1);
 
 	FObjectCacheEventSink::NotifyReferencedTextureChanged_Concurrent(this);

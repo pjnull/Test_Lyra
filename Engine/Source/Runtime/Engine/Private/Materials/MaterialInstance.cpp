@@ -4085,7 +4085,7 @@ void UMaterialInstance::UpdateCachedLayerParameters()
 		bool bCachedDataValid = true;
 		for (FStaticMaterialLayersParameter& LayerParameters : StaticParameters.MaterialLayersParameters)
 		{
-			FMaterialCachedExpressionContext Context(Parent);
+			FMaterialCachedExpressionContext Context;
 			if (ParentInstance)
 			{
 				FMaterialCachedParameters_UpdateForLayerParameters(CachedExpressionData.Parameters, Context, ParentInstance, LayerParameters);
