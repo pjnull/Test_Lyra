@@ -1899,6 +1899,8 @@ public:
 
 	ENGINE_API bool HasShaders(const FMaterialShaderTypes& InTypes, const FVertexFactoryType* InVertexFactoryType) const;
 
+	ENGINE_API bool ShouldCacheShaders(const FMaterialShaderTypes& InTypes, const FVertexFactoryType* InVertexFactoryType) const;
+
 	ENGINE_API void SubmitCompileJobs(EShaderCompileJobPriority Priority) const;
 
 	/** Returns a string that describes the material's usage for debugging purposes. */
