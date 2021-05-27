@@ -1356,7 +1356,11 @@ const FNiagaraTranslateResults &FHlslNiagaraTranslator::Translate(const FNiagara
 						}
 
 						// Is this an output?
-						const bool bIsOutput = FoundHistory.PerVariableWriteHistory[iVar].ContainsByPredicate([](const UEdGraphPin* InPin) -> bool { return Cast<UNiagaraNodeParameterMapSet>(InPin->GetOwningNode()) != nullptr; });
+						const bool bIsOutput = FoundHistory.PerVariableWriteHistory[iVar].ContainsByPredicate([](const FModuleScopedPin& InPin) -> bool
+						{
+							return Cast<UNiagaraNodeParameterMapSet>(InPin.Pin->GetOwningNode()) != nullptr;
+						});
+
 						if (!bIsOutput)
 						{
 							continue;
@@ -1502,20 +1506,20 @@ const FNiagaraTranslateResults &FHlslNiagaraTranslator::Translate(const FNiagara
 					{
 						//TODO: Setup alias for current level to decouple from "Particles". Would we ever want emitter or system persistent IDs?
 						FNiagaraVariable Var = FNiagaraVariable(FNiagaraTypeDefinition::GetIDDef(), TEXT("Particles.ID"));
-						FoundHistory.AddVariable(Var, Var, nullptr);
+						FoundHistory.AddVariable(Var, Var, NAME_None, nullptr);
 					}
 					{
 						// NOTE(mv): This will explicitly expose Particles.UniqueID to the HLSL code regardless of whether it is exposed in a script or not. 
 						//           This is necessary as the script needs to know about it even when no scripts reference it. 
 						FNiagaraVariable Var = FNiagaraVariable(FNiagaraTypeDefinition::GetIntDef(), TEXT("Particles.UniqueID"));
-						FoundHistory.AddVariable(Var, Var, nullptr);
+						FoundHistory.AddVariable(Var, Var, NAME_None, nullptr);
 					}
 
 					if (UsesInterpolation)
 					{
 						for (const FNiagaraVariable& Var : InterpSpawnVariables)
 						{
-							FoundHistory.AddVariable(Var, Var, nullptr);
+							FoundHistory.AddVariable(Var, Var, NAME_None, nullptr);
 						}
 					}
 
