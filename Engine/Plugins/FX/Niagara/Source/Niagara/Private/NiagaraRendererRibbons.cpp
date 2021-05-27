@@ -598,19 +598,16 @@ FNiagaraDynamicDataBase* FNiagaraRendererRibbons::GenerateDynamicData(const FNia
 
 	if (Properties->bAllowInCullProxies == false)
 	{
-		if (Properties->bAllowInCullProxies == false)
+		check(Emitter);
+
+		FNiagaraSystemInstance* Inst = Emitter->GetParentSystemInstance();
+		check(Emitter->GetParentSystemInstance());
+
+		//TODO: Probably should push some state into the system instance for this?
+		bool bIsCullProxy = Cast<UNiagaraCullProxyComponent>(Inst->GetAttachComponent()) != nullptr;
+		if (bIsCullProxy)
 		{
-			check(Emitter);
-
-			FNiagaraSystemInstance* Inst = Emitter->GetParentSystemInstance();
-			check(Emitter->GetParentSystemInstance());
-
-			//TODO: Probably should push some state into the system instance for this?
-			bool bIsCullProxy = Cast<UNiagaraCullProxyComponent>(Inst->GetAttachComponent()) != nullptr;
-			if (bIsCullProxy)
-			{
-				return nullptr;
-			}
+			return nullptr;
 		}
 	}
 
