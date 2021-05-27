@@ -1324,8 +1324,11 @@ FORCEINLINE_DEBUGGABLE void ExportComponent(UActorComponent* Component, FRecastG
 			FGCScopeGuard GCGuard;
 			BodySetup = PrimComp->GetBodySetup();
 
-			// Async flag need to be cleared to allow garbage collection.
-			BodySetup->AtomicallyClearInternalFlags(EInternalObjectFlags::Async);
+			if (BodySetup)
+			{
+				// Async flag need to be cleared to allow garbage collection.
+				BodySetup->AtomicallyClearInternalFlags(EInternalObjectFlags::Async);
+			}
 		}
 
 		if (BodySetup)
