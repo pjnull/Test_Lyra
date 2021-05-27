@@ -2034,6 +2034,7 @@ protected:
 	
 	/* Register async callback with physics system. */
 	virtual void RegisterAsyncCallback();
+	virtual bool IsAsyncCallbackRegistered() const;
 	
 public:
 

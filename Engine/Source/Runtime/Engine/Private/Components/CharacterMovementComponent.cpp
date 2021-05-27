@@ -620,7 +620,11 @@ void UCharacterMovementComponent::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	RegisterAsyncCallback();
+	// Only register async callback for player controlled characters
+	if (CharacterOwner && CharacterOwner->IsPlayerControlled())
+	{
+		RegisterAsyncCallback();
+	}
 }
 
 void UCharacterMovementComponent::PostLoad()
@@ -1351,7 +1355,8 @@ void UCharacterMovementComponent::TickComponent(float DeltaTime, enum ELevelTick
 	CSV_SCOPED_TIMING_STAT_EXCLUSIVE(CharacterMovement);
 
 	FVector InputVector = FVector::ZeroVector;
-	if (CharacterMovementCVars::AsyncCharacterMovement != 1)
+	bool bUsingAsyncTick = (CharacterMovementCVars::AsyncCharacterMovement == 1) && IsAsyncCallbackRegistered();
+	if (!bUsingAsyncTick)
 	{
 		// Do not consume input if simulating asynchronously, we will consume input when filling out async inputs.
 		InputVector = ConsumeInputVector();
@@ -1370,7 +1375,7 @@ void UCharacterMovementComponent::TickComponent(float DeltaTime, enum ELevelTick
 		return;
 	}
 
-	if (CharacterMovementCVars::AsyncCharacterMovement == 1)
+	if (bUsingAsyncTick)
 	{
 		// We are simulating character movement on physics thread, do not tick movement.
 		return;
@@ -12308,7 +12313,7 @@ void UCharacterMovementComponent::FillAsyncInput(const FVector& InputVector, FCh
 
 void UCharacterMovementComponent::BuildAsyncInput()
 {
-	if (CharacterMovementCVars::AsyncCharacterMovement == 1)
+	if (CharacterMovementCVars::AsyncCharacterMovement == 1  && IsAsyncCallbackRegistered())
 	{
 		FCharacterMovementComponentAsyncInput* Input = AsyncCallback->GetProducerInputData_External();
 		if (Input->bInitialized == false)
@@ -12445,7 +12450,7 @@ void UCharacterMovementComponent::ApplyAsyncOutput(FCharacterMovementComponentAs
 
 void UCharacterMovementComponent::ProcessAsyncOutput()
 {
-	if (CharacterMovementCVars::AsyncCharacterMovement == 1)
+	if (CharacterMovementCVars::AsyncCharacterMovement == 1 && IsAsyncCallbackRegistered())
 	{
 		while (auto Output = AsyncCallback->PopOutputData_External())
 		{
@@ -12466,4 +12471,9 @@ void UCharacterMovementComponent::RegisterAsyncCallback()
 			}
 		}
 	}
+}
+
+bool UCharacterMovementComponent::IsAsyncCallbackRegistered() const
+{
+	return AsyncCallback != nullptr;
 }
