@@ -25,6 +25,7 @@
 #include "MeshDescription.h"
 #include "Misc/ScopeLock.h"
 #include "StaticMeshAttributes.h"
+#include "StaticMeshOperations.h"
 #include "UObject/GarbageCollection.h"
 
 #if WITH_EDITOR
@@ -366,6 +367,14 @@ namespace DatasmithRuntime
 
 		// #ue_datasmithruntime: Cleanup mesh descriptions
 		//FDatasmithStaticMeshImporter::CleanupMeshDescriptions(MeshDescriptions);
+		for (FMeshDescription& MeshDescription : MeshDescriptions)
+		{
+			if (ShouldRecomputeNormals(MeshDescription, 0))
+			{
+				FStaticMeshOperations::ComputePolygonTangentsAndNormals(MeshDescription);
+				FStaticMeshOperations::ComputeTangentsAndNormals(MeshDescription, EComputeNTBsFlags::UseMikkTSpace);
+			}
+		}
 
 		//#ue_datasmithruntime: Implement task to build better lightmap sizes - See Dataprep operation
 		int32 MinLightmapSize = FDatasmithStaticMeshImportOptions::ConvertLightmapEnumToValue(EDatasmithImportLightmapMin::LIGHTMAP_64);
