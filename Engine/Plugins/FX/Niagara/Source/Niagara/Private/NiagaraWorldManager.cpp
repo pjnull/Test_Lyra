@@ -519,6 +519,9 @@ void FNiagaraWorldManager::OnWorldCleanup(bool bSessionEnded, bool bCleanupResou
 	{
 		for (TPair<UNiagaraSystem*, TSharedRef<FNiagaraSystemSimulation, ESPMode::ThreadSafe>>& SimPair : SystemSimulations[TG])
 		{
+#if WITH_EDITOR
+			SimPair.Key->OnSystemPostEditChange().RemoveAll(this);
+#endif
 			SimPair.Value->Destroy();
 		}
 		SystemSimulations[TG].Empty();
