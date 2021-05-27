@@ -109,11 +109,8 @@ static int32 TryAddParameter(FMaterialCachedParameters& CachedParameters, EMater
 		ElementId = Entry.ParameterInfoSet.Add(ParameterInfo);
 		Index = ElementId.AsInteger();
 		Entry.ExpressionGuids.Insert(ExpressionGuid, Index);
-
 		// should be valid as long as we don't ever remove elements from ParameterInfoSet
 		check(Entry.ParameterInfoSet.Num() == Entry.ExpressionGuids.Num());
-
-		check(Entry.ExpressionGuids.Num() == Entry.Overrides.Num());
 		return Index;
 	}
 
