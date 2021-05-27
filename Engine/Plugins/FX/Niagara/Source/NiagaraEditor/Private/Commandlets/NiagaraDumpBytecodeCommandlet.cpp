@@ -241,6 +241,11 @@ void UNiagaraDumpByteCodeCommandlet::ProcessNiagaraScripts()
 
 void UNiagaraDumpByteCodeCommandlet::DumpByteCode(const UNiagaraScript* Script, const FString& FilePath)
 {
+	if (!Script)
+	{
+		return;
+	}
+
 	const auto& ExecData = Script->GetVMExecutableData();
 
 	FScriptMetaData& MetaData = ScriptMetaData.AddZeroed_GetRef();
