@@ -3652,12 +3652,13 @@ struct FSortedTexture
 	FString		Name;
 	int32		LODGroup;
 	bool		bIsStreaming;
+	bool		bIsUnknownRef;
 	bool		bIsVirtual;
 	int32		UsageCount;
 	int32		NumMips;
 
 	/** Constructor, initializing every member variable with passed in values. */
-	FSortedTexture(	int32 InMaxAllowedSizeX, int32 InMaxAllowedSizeY, EPixelFormat InFormat, int32 InCurSizeX, int32 InCurSizeY, int32 InLODBias, int32 InMaxAllowedSize, int32 InCurrentSize, const FString& InName, int32 InLODGroup, bool bInIsStreaming, bool bInIsVirtual, int32 InUsageCount, int32 InNumMips )
+	FSortedTexture(	int32 InMaxAllowedSizeX, int32 InMaxAllowedSizeY, EPixelFormat InFormat, int32 InCurSizeX, int32 InCurSizeY, int32 InLODBias, int32 InMaxAllowedSize, int32 InCurrentSize, const FString& InName, int32 InLODGroup, bool bInIsStreaming, bool bInIsUnknownRef, bool bInIsVirtual, int32 InUsageCount, int32 InNumMips )
 		:	MaxAllowedSizeX( InMaxAllowedSizeX )
 		,	MaxAllowedSizeY( InMaxAllowedSizeY )
 		,	Format( InFormat )
@@ -3669,6 +3670,7 @@ struct FSortedTexture
 		,	Name( InName )
 		,	LODGroup( InLODGroup )
 		,	bIsStreaming( bInIsStreaming )
+		,	bIsUnknownRef(bInIsUnknownRef)
 		,	bIsVirtual( bInIsVirtual )
 		,	UsageCount( InUsageCount )
 		,	NumMips( InNumMips )
@@ -5362,8 +5364,11 @@ bool UEngine::HandleListTexturesCommand( const TCHAR* Cmd, FOutputDevice& Ar )
 	const bool bShouldOnlyListForced = FParse::Command(&Cmd, TEXT("FORCED")) && !bShouldOnlyListStreaming && !bShouldOnlyListNonStreaming;
 	const bool bAlphaSort = FParse::Param( Cmd, TEXT("ALPHASORT") );
 	const bool bCSV = FParse::Param( Cmd, TEXT("CSV") );
+	const bool bUnknownRefOnly = FParse::Param(Cmd, TEXT("unknownrefonly"));
 
-	Ar.Logf( TEXT("Listing %s textures."), bShouldOnlyListForced ? TEXT("forced") : bShouldOnlyListNonStreaming ? TEXT("non streaming") : bShouldOnlyListStreaming ? TEXT("streaming") : TEXT("all")  );
+	Ar.Logf(TEXT("Listing %s%s textures."),
+		bShouldOnlyListForced ? TEXT("forced") : bShouldOnlyListNonStreaming ? TEXT("non streaming") : bShouldOnlyListStreaming ? TEXT("streaming") : TEXT("all"),
+		bUnknownRefOnly ? TEXT(" unknown-ref") : TEXT(""));
 
 	// Find out how many times a texture is referenced by primitive components.
 	TMap<UTexture2D*,int32> TextureToUsageMap;
@@ -5390,6 +5395,14 @@ bool UEngine::HandleListTexturesCommand( const TCHAR* Cmd, FOutputDevice& Ar )
 			}
 		}
 	}
+
+	FRenderAssetStreamingManager* Streamer = nullptr;
+	if (!IStreamingManager::HasShutdown() && !!CVarSetTextureStreaming.GetValueOnAnyThread())
+	{
+		Streamer = (FRenderAssetStreamingManager*)&IStreamingManager::Get().GetRenderAssetStreamingManager();
+		Streamer->UpdateResourceStreaming(0.f, true);
+	}
+
 	int32 NumApplicableToMinSize = 0;
 	// Collect textures.
 	TArray<FSortedTexture> SortedTextures;
@@ -5414,6 +5427,21 @@ bool UEngine::HandleListTexturesCommand( const TCHAR* Cmd, FOutputDevice& Ar )
 		int32				UsageCount			= 0;
 		bool				bIsForced			= false;
 		bool				bIsVirtual			= false;
+
+		bool bUnknownRef = false;
+		if (Streamer)
+		{
+			FStreamingRenderAsset* Asset = Streamer->GetStreamingRenderAsset(Texture);
+			if (Asset)
+			{
+				bUnknownRef = Asset->bUseUnkownRefHeuristic;
+			}
+		}
+
+		if (bUnknownRefOnly && !bUnknownRef)
+		{
+			continue;
+		}
 
 		if (Texture2D != nullptr)
 		{
@@ -5459,6 +5487,7 @@ bool UEngine::HandleListTexturesCommand( const TCHAR* Cmd, FOutputDevice& Ar )
 				Texture->GetPathName(), 
 				LODGroup, 
 				bIsStreamingTexture,
+				bUnknownRef,
 				bIsVirtual,
 				UsageCount,
 				NumMips);
@@ -5489,15 +5518,15 @@ bool UEngine::HandleListTexturesCommand( const TCHAR* Cmd, FOutputDevice& Ar )
 
 	if (bCSV)
 	{
-		Ar.Logf(TEXT(",Max Width,Max Height,Max Size (KB),Bias Authored,Current Width,Current Height,Current Size (KB),Format,LODGroup,Name,Streaming,VT,Usage Count,NumMips"));
+		Ar.Logf(TEXT(",Max Width,Max Height,Max Size (KB),Bias Authored,Current Width,Current Height,Current Size (KB),Format,LODGroup,Name,Streaming,UnknownRef,VT,Usage Count,NumMips"));
 	}
 	else if (!FPlatformProperties::RequiresCookedData())
 	{
-		Ar.Logf(TEXT("MaxAllowedSize: Width x Height (Size in KB, Authored Bias), Current/InMem: Width x Height (Size in KB), Format, LODGroup, Name, Streaming, VT, Usage Count, NumMips"));
+		Ar.Logf(TEXT("MaxAllowedSize: Width x Height (Size in KB, Authored Bias), Current/InMem: Width x Height (Size in KB), Format, LODGroup, Name, Streaming, UnknownRef, VT, Usage Count, NumMips"));
 	}
 	else
 	{
-		Ar.Logf(TEXT("Cooked/OnDisk: Width x Height (Size in KB, Authored Bias), Current/InMem: Width x Height (Size in KB), Format, LODGroup, Name, Streaming, VT, Usage Count, NumMips"));
+		Ar.Logf(TEXT("Cooked/OnDisk: Width x Height (Size in KB, Authored Bias), Current/InMem: Width x Height (Size in KB), Format, LODGroup, Name, Streaming, UnknownRef, VT, Usage Count, NumMips"));
 	}
 
 	for( int32 TextureIndex=0; TextureIndex<SortedTextures.Num(); TextureIndex++ )
@@ -5514,7 +5543,7 @@ bool UEngine::HandleListTexturesCommand( const TCHAR* Cmd, FOutputDevice& Ar )
 
 		if (bCSV)
 		{
-			Ar.Logf(TEXT(",%i, %i, %i, %s, %i, %i, %i, %s, %s, %s, %s, %s, %i, %i"),
+			Ar.Logf(TEXT(",%i, %i, %i, %s, %i, %i, %i, %s, %s, %s, %s, %s, %s, %i, %i"),
 				SortedTexture.MaxAllowedSizeX, SortedTexture.MaxAllowedSizeY, (SortedTexture.MaxAllowedSize + 512) / 1024,
 				*AuthoredBiasString,
 				SortedTexture.CurSizeX, SortedTexture.CurSizeY, (SortedTexture.CurrentSize + 512) / 1024,
@@ -5522,13 +5551,14 @@ bool UEngine::HandleListTexturesCommand( const TCHAR* Cmd, FOutputDevice& Ar )
 				bValidTextureGroup ? *TextureGroupNames[SortedTexture.LODGroup] : TEXT("INVALID"),
 				*SortedTexture.Name,
 				SortedTexture.bIsStreaming ? TEXT("YES") : TEXT("NO"),
+				SortedTexture.bIsUnknownRef ? TEXT("YES") : TEXT("NO"),
 				SortedTexture.bIsVirtual ? TEXT("YES") : TEXT("NO"),
 				SortedTexture.UsageCount,
 				SortedTexture.NumMips);
 		}
 		else
 		{
-			Ar.Logf(TEXT("%ix%i (%i KB, %s), %ix%i (%i KB), %s, %s, %s, %s, %s, %i, %i"),
+			Ar.Logf(TEXT("%ix%i (%i KB, %s), %ix%i (%i KB), %s, %s, %s, %s, %s, %s, %i, %i"),
 				SortedTexture.MaxAllowedSizeX, SortedTexture.MaxAllowedSizeY, (SortedTexture.MaxAllowedSize + 512) / 1024,
 				*AuthoredBiasString,
 				SortedTexture.CurSizeX, SortedTexture.CurSizeY, (SortedTexture.CurrentSize + 512) / 1024,
@@ -5536,6 +5566,7 @@ bool UEngine::HandleListTexturesCommand( const TCHAR* Cmd, FOutputDevice& Ar )
 				bValidTextureGroup ? *TextureGroupNames[SortedTexture.LODGroup] : TEXT("INVALID"),
 				*SortedTexture.Name,
 				SortedTexture.bIsStreaming ? TEXT("YES") : TEXT("NO"),
+				SortedTexture.bIsUnknownRef ? TEXT("YES") : TEXT("NO"),
 				SortedTexture.bIsVirtual ? TEXT("YES") : TEXT("NO"),
 				SortedTexture.UsageCount,
 				SortedTexture.NumMips);
