@@ -189,8 +189,6 @@ namespace UE
 			}
 
 			return base.CreateReport(GetTestResult());
-
-			Log.Info("Found valid artifacts for test");
 		}
 	}
 
