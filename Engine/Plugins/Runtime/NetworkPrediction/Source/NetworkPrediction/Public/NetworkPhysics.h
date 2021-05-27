@@ -20,6 +20,14 @@ class FSingleParticlePhysicsProxy;
 
 namespace Chaos { struct FSimCallbackInputAndObject; }
 
+#ifndef NETWORK_PHYSICS_REPLICATE_EXTRAS
+	#if (!UE_BUILD_SHIPPING && !UE_BUILD_TEST)
+		#define NETWORK_PHYSICS_REPLICATE_EXTRAS 1
+	#else
+		#define NETWORK_PHYSICS_REPLICATE_EXTRAS 0
+	#endif
+#endif
+
 // FIXME: use FRigidBodyState instead
 struct FBasePhysicsState
 {
@@ -80,6 +88,7 @@ struct FNetworkPhysicsState
 		Ar << Physics.LinearVelocity;
 		Ar << Physics.AngularVelocity;
 
+#if NETWORK_PHYSICS_REPLICATE_EXTRAS
 		for (int32 i=(int32)Chaos::FParticleHistoryEntry::EParticleHistoryPhase::PrePushData; i < (int32)Chaos::FParticleHistoryEntry::EParticleHistoryPhase::NumPhases; ++i)
 		{
 			Ar << DebugState[i].Force;
@@ -87,6 +96,7 @@ struct FNetworkPhysicsState
 			Ar << DebugState[i].LinearImpulse;
 			Ar << DebugState[i].AngularImpulse;
 		}
+#endif
 
 		return true;
 	}
@@ -95,7 +105,9 @@ struct FNetworkPhysicsState
 	int32 LocalLOD = 0;
 	AActor* OwningActor = nullptr;
 
+#if NETWORK_PHYSICS_REPLICATE_EXTRAS
 	FDebugPhysicsState	DebugState[(int32)Chaos::FParticleHistoryEntry::EParticleHistoryPhase::NumPhases];
+#endif
 };
 
 template<>
@@ -235,15 +247,15 @@ namespace UE_NETWORK_PHYSICS
 	extern NETWORKPREDICTION_API bool DebugServer();
 };
 
-#ifndef NETWORK_PHSYSICS_THREAD_CONTEXT
+#ifndef NETWORK_PHYSICS_THREAD_CONTEXT
 	#if (!UE_BUILD_SHIPPING && !UE_BUILD_TEST)
-		#define NETWORK_PHSYSICS_THREAD_CONTEXT 1
+		#define NETWORK_PHYSICS_THREAD_CONTEXT 1
 	#else
-		#define NETWORK_PHSYSICS_THREAD_CONTEXT 0
+		#define NETWORK_PHYSICS_THREAD_CONTEXT 0
 	#endif
 #endif
 
-#if NETWORK_PHSYSICS_THREAD_CONTEXT
+#if NETWORK_PHYSICS_THREAD_CONTEXT
 class NETWORKPREDICTION_API FNetworkPhysicsThreadContext : public TThreadSingleton<FNetworkPhysicsThreadContext>
 {
 public:

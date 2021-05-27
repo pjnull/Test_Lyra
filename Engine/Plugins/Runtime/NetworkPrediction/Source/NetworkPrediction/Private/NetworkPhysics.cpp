@@ -101,7 +101,7 @@ namespace UE_NETWORK_PHYSICS
 	// returns true/false so you can log or do whatever at GBreakAtFrame
 	bool ConditionalFrameBreakpoint()
 	{
-#if NETWORK_PHSYSICS_THREAD_CONTEXT
+#if NETWORK_PHYSICS_THREAD_CONTEXT
 		return (GBreakAtFrame != 0 && GBreakAtFrame == FNetworkPhysicsThreadContext::Get().SimulationFrame);
 #else
 		return false;
@@ -111,14 +111,14 @@ namespace UE_NETWORK_PHYSICS
 	// forces ensure failure to invoke debugger
 	void ConditionalFrameEnsure()
 	{
-#if NETWORK_PHSYSICS_THREAD_CONTEXT
+#if NETWORK_PHYSICS_THREAD_CONTEXT
 		ensureAlways(!ConditionalFrameBreakpoint());
 #endif
 	}
 
 	int32 DebugSimulationFrame()
 	{
-#if NETWORK_PHSYSICS_THREAD_CONTEXT
+#if NETWORK_PHYSICS_THREAD_CONTEXT
 		return FNetworkPhysicsThreadContext::Get().SimulationFrame;
 #else
 		return 0;
@@ -127,7 +127,7 @@ namespace UE_NETWORK_PHYSICS
 	
 	bool DebugServer()
 	{
-#if NETWORK_PHSYSICS_THREAD_CONTEXT
+#if NETWORK_PHYSICS_THREAD_CONTEXT
 		return FNetworkPhysicsThreadContext::Get().bIsServer;
 #else
 		return false;
@@ -252,6 +252,7 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 				Stats.NumChecked++;
 
 
+#if NETWORK_PHYSICS_REPLICATE_EXTRAS
 				if (UE_NETWORK_PHYSICS::bLogImpulses)
 				{
 					for (int32 i=(int32)Chaos::FParticleHistoryEntry::EParticleHistoryPhase::PrePushData; i < (int32)Chaos::FParticleHistoryEntry::EParticleHistoryPhase::NumPhases; ++i)
@@ -262,6 +263,7 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 						}
 					}
 				}
+#endif
 				
 				if (CompareObjState(Obj.Physics.ObjectState, P.ObjectState(), TEXT("ObjectState")) ||
 					CompareVec(Obj.Physics.Location, P.X(), UE_NETWORK_PHYSICS::X, TEXT("Location")) ||
@@ -285,6 +287,7 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 						Stats.Corrections.Emplace(FStats::FCorrection{Proxy, Obj.Physics, Auth, Obj.Frame, Obj.Frame - Snapshot.LocalFrameOffset});
 					}
 
+#if NETWORK_PHYSICS_REPLICATE_EXTRAS
 					if (UE_NETWORK_PHYSICS::bLogCorrections && Obj.Frame-1 >= RewindData->GetEarliestFrame_Internal())
 					{
 						const int32 PreSimulationFrame = SimulationFrame-1;
@@ -309,6 +312,7 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 							}
 						}
 					}
+#endif
 				}
 			}
 		}
@@ -400,6 +404,7 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 					Obj.Physics.Rotation = PT->R();
 					Obj.Physics.AngularVelocity = PT->W();
 				
+#if NETWORK_PHYSICS_REPLICATE_EXTRAS
 					// Record previous frames forces/torques for debugging
 					int32 EarliestFrame = RewindData->GetEarliestFrame_Internal();
 					const int32 PreSimFrame = Snapshot.SimulationFrame - 1;
@@ -438,6 +443,7 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 							}
 						}
 					}
+#endif
 				}
 			}
 
@@ -447,7 +453,7 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 			}
 		}
 
-#if NETWORK_PHSYSICS_THREAD_CONTEXT
+#if NETWORK_PHYSICS_THREAD_CONTEXT
 		FNetworkPhysicsThreadContext::Get().Update(PhysicsStep - this->LastLocalOffset, this->bIsServer);
 #endif
 
@@ -917,10 +923,12 @@ void UNetworkPhysicsManager::PreNetSend(float DeltaSeconds)
 					{
 						ManagedState->Physics = Obj.Physics;					
 						ManagedState->Frame = Obj.Frame;
+#if NETWORK_PHYSICS_REPLICATE_EXTRAS
 						for (int32 i=(int32)Chaos::FParticleHistoryEntry::EParticleHistoryPhase::PrePushData; i < (int32)Chaos::FParticleHistoryEntry::EParticleHistoryPhase::NumPhases; ++i)
 						{
 							ManagedState->DebugState[i] = Obj.DebugState[i];
 						}
+#endif
 					}
 				}
 			}
