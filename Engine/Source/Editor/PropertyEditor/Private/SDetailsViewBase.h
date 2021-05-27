@@ -152,7 +152,10 @@ public:
 	virtual void RegisterInstancedCustomPropertyTypeLayout(FName PropertyTypeName, FOnGetPropertyTypeCustomizationInstance PropertyTypeLayoutDelegate, TSharedPtr<IPropertyTypeIdentifier> Identifier = nullptr) override;
 	virtual void UnregisterInstancedCustomPropertyLayout(UStruct* Class) override;
 	virtual void UnregisterInstancedCustomPropertyTypeLayout(FName PropertyTypeName, TSharedPtr<IPropertyTypeIdentifier> Identifier = nullptr) override;
-
+	virtual void SetCustomValidatePropertyNodesFunction(FOnValidatePropertyRowGeneratorNodes InCustomValidatePropertyNodesFunction) override
+	{
+		CustomValidatePropertyNodesFunction = MoveTemp(InCustomValidatePropertyNodesFunction);
+	}
 	/** IDetailsViewPrivate interface */
 	virtual void RerunCurrentFilter() override;
 	void SetNodeExpansionState(TSharedRef<FDetailTreeNode> InTreeNode, bool bIsItemExpanded, bool bRecursive) override;
@@ -454,4 +457,6 @@ protected:
 
 	mutable TSharedPtr<FEditConditionParser> EditConditionParser;
 
+	/** The EnsureDataIsValid function can be skipped with this member, if set. Useful if your implementation doesn't require this kind of validation each Tick. */
+	FOnValidateDetailsViewPropertyNodes CustomValidatePropertyNodesFunction;
 };

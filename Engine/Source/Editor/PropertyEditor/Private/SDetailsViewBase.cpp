@@ -947,24 +947,31 @@ void SDetailsViewBase::Tick( const FGeometry& AllottedGeometry, const double InC
 	}
 	else
 	{
-		for(TSharedPtr<FComplexPropertyNode>& RootPropertyNode : RootPropertyNodes)
+		if (CustomValidatePropertyNodesFunction.IsBound())
 		{
-			EPropertyDataValidationResult Result = RootPropertyNode->EnsureDataIsValid();
-			if(Result == EPropertyDataValidationResult::PropertiesChanged || Result == EPropertyDataValidationResult::EditInlineNewValueChanged)
+			bool bIsValid = CustomValidatePropertyNodesFunction.Execute(RootPropertyNodes);
+		}
+		else // standard validation behavior
+		{
+			for (TSharedPtr<FComplexPropertyNode>& RootPropertyNode : RootPropertyNodes)
 			{
-				UpdatePropertyMaps();
-				bUpdateFilteredDetails = true;
-			}
-			else if(Result == EPropertyDataValidationResult::ArraySizeChanged || Result == EPropertyDataValidationResult::ChildrenRebuilt)
-			{
-				bUpdateFilteredDetails = true;
-			}
-			else if(Result == EPropertyDataValidationResult::ObjectInvalid)
-			{
-				bValidateExternalNodes = false;
+				EPropertyDataValidationResult Result = RootPropertyNode->EnsureDataIsValid();
+				if (Result == EPropertyDataValidationResult::PropertiesChanged || Result == EPropertyDataValidationResult::EditInlineNewValueChanged)
+				{
+					UpdatePropertyMaps();
+					bUpdateFilteredDetails = true;
+				}
+				else if (Result == EPropertyDataValidationResult::ArraySizeChanged || Result == EPropertyDataValidationResult::ChildrenRebuilt)
+				{
+					bUpdateFilteredDetails = true;
+				}
+				else if (Result == EPropertyDataValidationResult::ObjectInvalid)
+				{
+					bValidateExternalNodes = false;
 
-				ForceRefresh();
-				break;
+					ForceRefresh();
+					break;
+				}
 			}
 		}
 	}

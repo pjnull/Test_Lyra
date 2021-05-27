@@ -756,6 +756,13 @@ void FMaterialInstanceEditor::CreateInternalWidgets()
 	DetailsViewArgs.bShowModifiedPropertiesOption = false;
 	DetailsViewArgs.bShowCustomFilterOption = true;
 	MaterialInstanceDetails = PropertyEditorModule.CreateDetailView( DetailsViewArgs );
+	// the sizes of the parameter lists are only based on the master material and not changed out from under the details panel 
+	// When a parameter is added open MI editors are refreshed
+	// the tree should also refresh if one of the layer or blend assets is swapped
+
+	auto ValidationLambda = ([](const FRootPropertyNodeList& PropertyNodeList) { return true; });
+	MaterialInstanceDetails->SetCustomValidatePropertyNodesFunction(FOnValidateDetailsViewPropertyNodes::CreateLambda(MoveTemp(ValidationLambda)));
+
 	FOnGetDetailCustomizationInstance LayoutMICDetails = FOnGetDetailCustomizationInstance::CreateStatic( 
 		&FMaterialInstanceParameterDetails::MakeInstance, MaterialEditorInstance, FGetShowHiddenParameters::CreateSP(this, &FMaterialInstanceEditor::GetShowHiddenParameters) );
 	MaterialInstanceDetails->RegisterInstancedCustomPropertyLayout( UMaterialEditorInstanceConstant::StaticClass(), LayoutMICDetails );
