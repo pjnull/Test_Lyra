@@ -43,9 +43,9 @@ void UBinkMediaTexture::SetMediaPlayer( UBinkMediaPlayer* InMediaPlayer )
 
 void UBinkMediaTexture::Clear() 
 {
-	if (Resource) 
+	if (GetResource()) 
 	{
-		FBinkMediaTextureResource *res = (FBinkMediaTextureResource *)Resource;
+		FBinkMediaTextureResource *res = (FBinkMediaTextureResource *)GetResource();
 		res->Clear();
 	}
 }

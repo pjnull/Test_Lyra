@@ -528,11 +528,11 @@ void UBinkMediaPlayer::UpdateTexture(FRHICommandListImmediate &RHICmdList, FText
 
 void UBinkMediaPlayer::Draw(UTexture *texture, bool tonemap, int out_nits, float alpha, bool srgb_decode, bool hdr) 
 {
-	if (!texture->Resource) 
+	if (!texture->GetResource()) 
 	{
 		return;
 	}
-	FTextureRHIRef ref = texture->Resource->TextureRHI;
+	FTextureRHIRef ref = texture->GetResource()->TextureRHI;
 	if ((!IsPlaying() && !IsPaused()) || !ref) 
 	{
 		return;

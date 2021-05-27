@@ -19,7 +19,7 @@ void FBinkMediaTextureResource::InitDynamicRHI()
 
 	// Create the RHI texture. Only one mip is used and the texture is targetable or resolve.
 	ETextureCreateFlags TexCreateFlags = Owner->SRGB ? TexCreate_SRGB : TexCreate_None;
-	FRHIResourceCreateInfo CreateInfo;
+	FRHIResourceCreateInfo CreateInfo(TEXT("Bink"));
 	
 	if (bink_force_pixel_format != PF_Unknown) 
 	{
@@ -78,7 +78,7 @@ void FBinkMediaTextureResource::InitDynamicRHI()
 		RHICmdList.BeginRenderPass(RPInfo, TEXT("ClearTexture"));
 		RHICmdList.EndRenderPass();
 		RHICmdList.SetViewport(0, 0, 0, w, h, 1);
-		RHICmdList.Transition(FRHITransitionInfo(TextureRHI.GetReference(), ERHIAccess::Unknown, ERHIAccess::EReadable));
+		RHICmdList.Transition(FRHITransitionInfo(TextureRHI.GetReference(), ERHIAccess::Unknown, ERHIAccess::UAVGraphics));
 
 		// Work-around for UE4 bug when playing a chunk loaded video while also streaming a movie
 		RHICmdList.ImmediateFlush(EImmediateFlushType::FlushRHIThreadFlushResources);
@@ -138,7 +138,7 @@ void FBinkMediaTextureResource::Clear()
 		RHICmdList.BeginRenderPass(RPInfo, TEXT("ClearTexture"));
 		RHICmdList.EndRenderPass();
 		RHICmdList.SetViewport(0, 0, 0, w, h, 1);
-		RHICmdList.Transition(FRHITransitionInfo(ref2.GetReference(), ERHIAccess::Unknown, ERHIAccess::EReadable));
+		RHICmdList.Transition(FRHITransitionInfo(ref2.GetReference(), ERHIAccess::Unknown, ERHIAccess::UAVGraphics));
 	});
 }
 

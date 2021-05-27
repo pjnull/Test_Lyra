@@ -42,7 +42,7 @@ struct FBinkMediaPlayerEditorTexture : public FTickableGameObject
 			RHICmdList.SubmitCommandsHint();
 			MediaPlayer->UpdateTexture(RHICmdList, static_cast<FTextureRHIRef>(tex), nativePtr, width, height, true, true, 80, 1, false, false);
 			RHICmdList.SubmitCommandsHint();
-			RHICmdList.Transition(FRHITransitionInfo(SlateTexture->GetRHIRef(), ERHIAccess::Unknown, ERHIAccess::EReadable));
+			RHICmdList.Transition(FRHITransitionInfo(SlateTexture->GetRHIRef(), ERHIAccess::Unknown, ERHIAccess::UAVGraphics));
 			RHICmdList.EndRenderPass();
 		});
 	}

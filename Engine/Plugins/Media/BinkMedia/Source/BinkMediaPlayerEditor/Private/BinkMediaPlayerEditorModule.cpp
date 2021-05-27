@@ -151,7 +151,7 @@ struct FBinkMediaTextureActions : FAssetTypeActions_Base
 	}
 	virtual uint32 GetCategories() override 
 	{ 
-		return EAssetTypeCategories::MaterialsAndTextures; 
+		return EAssetTypeCategories::Materials | EAssetTypeCategories::Textures; 
 	}
 	virtual FText GetName() const override 
 	{ 

@@ -2995,9 +2995,9 @@ void FOpenGLDynamicRHI::RHIPostExternalCommandsReset()
 	}
 	for (uint32 Index = 0; Index < NUM_OPENGL_VERTEX_STREAMS; Index++)
 	{
-		if (RCS.VertexStreams[Index].VertexBuffer != nullptr)
+		if (RCS.VertexStreams[Index].VertexBufferResource > 0)
 		{
-			FOpenGL::BindVertexBuffer(Index, RCS.VertexStreams[Index].VertexBuffer->Resource, RCS.VertexStreams[Index].Offset, RCS.VertexStreams[Index].Stride);
+			FOpenGL::BindVertexBuffer(Index, RCS.VertexStreams[Index].VertexBufferResource, RCS.VertexStreams[Index].Offset, RCS.VertexStreams[Index].Stride);
 		}
 		else
 		{
@@ -3010,7 +3010,7 @@ void FOpenGLDynamicRHI::RHIPostExternalCommandsReset()
 		if(RCS.GetVertexAttrEnabled(Index)) 
 		{
 			FOpenGLCachedAttr& Attr = RCS.VertexAttrs[Index];
-			if (Attr.StreamIndex < NUM_OPENGL_VERTEX_STREAMS && RCS.VertexStreams[Attr.StreamIndex].VertexBuffer != nullptr)
+			if (Attr.StreamIndex < NUM_OPENGL_VERTEX_STREAMS && RCS.VertexStreams[Attr.StreamIndex].VertexBufferResource > 0)
 			{
 				if (!Attr.bShouldConvertToFloat)
 				{
