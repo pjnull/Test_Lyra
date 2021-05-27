@@ -5,7 +5,7 @@
 #include "OnlineSubsystemEOSPlus.h"
 #include "EOSSettings.h"
 
-TSharedPtr<FUniqueNetIdEOSPlus> FOnlineStatsEOSPlus::GetNetIdPlus(const FString& SourceId)
+FUniqueNetIdEOSPlusPtr FOnlineStatsEOSPlus::GetNetIdPlus(const FString& SourceId)
 {
 	return EOSPlus->UserInterfacePtr->GetNetIdPlus(SourceId);
 }
@@ -42,7 +42,7 @@ FOnlineStatsUpdateStatsComplete IgnoredStatsComplete;
 
 void FOnlineStatsEOSPlus::UpdateStats(const FUniqueNetIdRef LocalUserId, const TArray<FOnlineStatsUserUpdatedStats>& UpdatedUserStats, const FOnlineStatsUpdateStatsComplete& Delegate)
 {
-	TSharedPtr<FUniqueNetIdEOSPlus> NetIdPlus = GetNetIdPlus(LocalUserId->ToString());
+	FUniqueNetIdEOSPlusPtr NetIdPlus = GetNetIdPlus(LocalUserId->ToString());
 	if (NetIdPlus.IsValid())
 	{
 		// This one is the one that will fire the delegate upon completion
@@ -80,7 +80,7 @@ bool FOnlineStatsEOSPlus::TriggerEvent(const FUniqueNetId& PlayerId, const TCHAR
 	IOnlineEventsPtr Events = EOSPlus->BaseOSS->GetEventsInterface();
 	if (Events.IsValid())
 	{
-		TSharedPtr<FUniqueNetIdEOSPlus> NetIdPlus = GetNetIdPlus(PlayerId.ToString());
+		FUniqueNetIdEOSPlusPtr NetIdPlus = GetNetIdPlus(PlayerId.ToString());
 		if (NetIdPlus.IsValid())
 		{
 			return Events->TriggerEvent(*NetIdPlus->GetBaseNetId(), EventName, Parms);
@@ -95,7 +95,7 @@ void FOnlineStatsEOSPlus::SetPlayerSessionId(const FUniqueNetId& PlayerId, const
 	IOnlineEventsPtr Events = EOSPlus->BaseOSS->GetEventsInterface();
 	if (Events.IsValid())
 	{
-		TSharedPtr<FUniqueNetIdEOSPlus> NetIdPlus = GetNetIdPlus(PlayerId.ToString());
+		FUniqueNetIdEOSPlusPtr NetIdPlus = GetNetIdPlus(PlayerId.ToString());
 		if (NetIdPlus.IsValid())
 		{
 			Events->SetPlayerSessionId(*NetIdPlus->GetBaseNetId(), PlayerSessionId);

@@ -3,12 +3,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/CoreOnline.h"
+#include "Online/CoreOnline.h"
 #include "OnlineSubsystem.h"
 #include "Interfaces/OnlineLeaderboardInterface.h"
+#include "OnlineUserEOSPlus.h"
 
 class FOnlineSubsystemEOSPlus;
-class FUniqueNetIdEOSPlus;
 
 /**
  * Interface for mirroring platform leaderboards to EOS leaderboards
@@ -35,7 +35,7 @@ PACKAGE_SCOPE:
 	FOnlineLeaderboardsEOSPlus(FOnlineSubsystemEOSPlus* InSubsystem);
 
 private:
-	TSharedPtr<FUniqueNetIdEOSPlus> GetNetIdPlus(const FString& SourceId);
+	FUniqueNetIdEOSPlusPtr GetNetIdPlus(const FString& SourceId);
 
 	/** Reference to the owning EOS plus subsystem */
 	FOnlineSubsystemEOSPlus* EOSPlus;

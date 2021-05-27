@@ -353,7 +353,7 @@ bool FOnlineSessionEOSPlus::CreateSession(const FUniqueNetId& HostingPlayerId, F
 						FOnlineSessionSettings* Settings = EOSSessionInterface->GetSessionSettings(SessionName);
 						if (Settings != nullptr)
 						{
-							TSharedPtr<FUniqueNetIdEOSPlus> Id = GetNetIdPlus(HostingPlayerIdStr);
+							FUniqueNetIdEOSPlusPtr Id = GetNetIdPlus(HostingPlayerIdStr);
 
 							// Mirror in the base interface
 							BaseSessionInterface->CreateSession(*Id->GetBaseNetId(), SessionName, *Settings);

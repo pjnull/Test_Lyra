@@ -6,9 +6,9 @@
 #include "Online/CoreOnline.h"
 #include "Interfaces/OnlineStatsInterface.h"
 #include "Interfaces/OnlineEventsInterface.h"
+#include "OnlineUserEOSPlus.h"
 
 class FOnlineSubsystemEOSPlus;
-class FUniqueNetIdEOSPlus;
 
 /**
  * Interface that mirrors stats on both OSSes
@@ -43,7 +43,7 @@ PACKAGE_SCOPE:
 	}
 
 private:
-	TSharedPtr<FUniqueNetIdEOSPlus> GetNetIdPlus(const FString& SourceId);
+	FUniqueNetIdEOSPlusPtr GetNetIdPlus(const FString& SourceId);
 
 private:
 	/** Reference to the owning EOS plus subsystem */
