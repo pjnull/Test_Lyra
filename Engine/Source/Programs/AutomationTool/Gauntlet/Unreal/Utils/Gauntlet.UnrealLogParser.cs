@@ -351,7 +351,7 @@ namespace Gauntlet
 		/// Returns channels that signify the editor doing stuff
 		/// </summary>
 		/// <returns></returns>
-		public IEnumerable<string> GetEditorBusyChannels ()
+		public IEnumerable<string> GetEditorBusyChannels()
 		{
 			return GetLogChannels(new string[] { "Automation", "FunctionalTest", "Material", "DerivedDataCache", "ShaderCompilers", "Texture", "SkeletalMesh", "StaticMesh", "Python" }, false);
 		}
