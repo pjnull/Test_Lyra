@@ -20,6 +20,7 @@ class FOpenColorIOTransformResource;
 class FTextureResource;
 class UOpenColorIOColorTransform;
 struct FFileChangeData;
+class SNotificationItem;
 
 
 /**
@@ -66,7 +67,7 @@ public:
 
 	//~ Begin UObject interface
 	virtual void PostLoad() override;
-	virtual void PreSave(const class ITargetPlatform* TargetPlatform);
+	virtual void PreSave(FObjectPreSaveContext SaveContext) override;
 	virtual void BeginDestroy() override;
 
 #if WITH_EDITOR
