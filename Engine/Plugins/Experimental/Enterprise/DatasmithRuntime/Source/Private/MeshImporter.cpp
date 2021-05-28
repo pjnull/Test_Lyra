@@ -371,7 +371,7 @@ namespace DatasmithRuntime
 		{
 			if (ShouldRecomputeNormals(MeshDescription, 0))
 			{
-				FStaticMeshOperations::ComputePolygonTangentsAndNormals(MeshDescription);
+				FStaticMeshOperations::ComputeTriangleTangentsAndNormals(MeshDescription);
 				FStaticMeshOperations::ComputeTangentsAndNormals(MeshDescription, EComputeNTBsFlags::UseMikkTSpace);
 			}
 		}
