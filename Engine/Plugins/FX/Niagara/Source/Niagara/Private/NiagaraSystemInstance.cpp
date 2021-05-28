@@ -105,6 +105,7 @@ FNiagaraSystemInstance::FNiagaraSystemInstance(UWorld& InWorld, UNiagaraSystem& 
 	, bDataInterfacesInitialized(false)
 	, bAlreadyBound(false)
 	, bLODDistanceIsValid(false)
+	, bLODDistanceIsOverridden(false)
 	, bPooled(bInPooled)
 	, CachedDeltaSeconds(0.0f)
 	, RequestedExecutionState(ENiagaraExecutionState::Complete)
