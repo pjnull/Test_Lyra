@@ -10,7 +10,7 @@
 #define BINKPLUGIN_API BINKMEDIAPLAYER_API
 #include "binkplugin.h"
 
-#include "HAL/PlatformFilemanager.h"
+#include "HAL/PlatformFileManager.h"
 #include "Modules/ModuleManager.h"
 #include "Rendering/RenderingCommon.h"
 #include "TickableObjectRenderThread.h"
