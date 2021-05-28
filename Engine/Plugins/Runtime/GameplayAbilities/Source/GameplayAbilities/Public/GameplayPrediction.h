@@ -281,6 +281,7 @@ DECLARE_DELEGATE(FPredictionKeyEvent);
  *	
  */
 
+PRAGMA_DISABLE_DEPRECATION_WARNINGS // PredictiveConnection
 USTRUCT()
 struct GAMEPLAYABILITIES_API FPredictionKey
 {
@@ -293,7 +294,7 @@ struct GAMEPLAYABILITIES_API FPredictionKey
 	{
 
 	}
-
+	
 	/** On the server, what network connection this was serialized on. */
 	UE_DEPRECATED(5.0, "No longer used in favor of GetPredictiveConnectionKey, to avoid holding a direct object reference.")
 	UPROPERTY(NotReplicated)
@@ -412,6 +413,7 @@ private:
 	/** On the server, uniquely identifies network connection this was serialized on/from.  See NetSerialize for additional information. */
 	UPTRINT PredictiveConnectionKey = 0;
 };
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 template<>
 struct TStructOpsTypeTraits<FPredictionKey> : public TStructOpsTypeTraitsBase2<FPredictionKey>
