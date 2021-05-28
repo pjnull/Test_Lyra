@@ -1,10 +1,9 @@
-
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 using AutomationTool;
 using System;
-using System.Collections.Generic;
 using System.IO;
-using Tools.DotNETCommon;
+using System.Text;
 
 namespace Gauntlet
 {
@@ -48,10 +47,22 @@ namespace Gauntlet
 
 				string MarkdownFilename = "GauntletStepDetails.md";
 
-				string Markdown = $"Gauntlet Artifacts: [{Globals.LogDir})](file://{Globals.LogDir}";
+				string Markdown = $"Gauntlet Artifacts: [{Globals.LogDir})](file://{Globals.LogDir})";
 
 				File.WriteAllText(Path.Combine(LogFolder, MarkdownFilename), Markdown);
 
+				StringBuilder Builder = new StringBuilder();
+
+				Builder.Append("{\n");
+
+				Builder.Append("\"scope\": \"Step\",\n");
+				Builder.Append("\"name\": \"Gauntlet Step Details\",\n");
+				Builder.Append("\"placement\": \"Summary\",\n");
+				Builder.AppendFormat("\"fileName\": \"{0}\"\n", MarkdownFilename);
+
+				Builder.Append("}\n");
+
+				/*
 				using (JsonWriter Writer = new JsonWriter(new FileReference(Path.Combine(LogFolder, "GauntletStepDetails.report.json"))))
 				{
 					Writer.WriteObjectStart();
@@ -63,6 +74,7 @@ namespace Gauntlet
 
 					Writer.WriteObjectEnd();
 				}
+				*/
 			}
 			catch (Exception Ex)
 			{
