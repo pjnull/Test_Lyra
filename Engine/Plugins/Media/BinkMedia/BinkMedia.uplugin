@@ -25,8 +25,7 @@
 				"HoloLens",
 				"Lumin",
 				"tvOS",
-				"LinuxAArch64",
-				"XboxOne"
+				"LinuxAArch64"
 			]
 		},
 		{
