@@ -16,7 +16,7 @@
 #include "GenericPlatform/GenericPlatformMisc.h"
 #include "GenericPlatform/GenericPlatformProcess.h"
 #include "HAL/FileManager.h"
-#include "HAL/PlatformFilemanager.h"
+#include "HAL/PlatformFileManager.h"
 #include "Interfaces/IPv4/IPv4Endpoint.h"
 #include "IPAddress.h"
 #include "Misc/Base64.h"
