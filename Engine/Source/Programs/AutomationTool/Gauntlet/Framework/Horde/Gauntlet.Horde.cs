@@ -47,7 +47,7 @@ namespace Gauntlet
 
 				string MarkdownFilename = "GauntletStepDetails.md";
 
-				string Markdown = $"Gauntlet Artifacts: [{Globals.LogDir})](file://{Globals.LogDir})";
+				string Markdown = $"Gauntlet Artifacts: [{Globals.LogDir}](file://{Globals.LogDir})";
 
 				File.WriteAllText(Path.Combine(LogFolder, MarkdownFilename), Markdown);
 
@@ -61,6 +61,8 @@ namespace Gauntlet
 				Builder.AppendFormat("\"fileName\": \"{0}\"\n", MarkdownFilename);
 
 				Builder.Append("}\n");
+
+				File.WriteAllText(Path.Combine(LogFolder, "GauntletStepDetails.report.json"), Builder.ToString());
 
 				/*
 				using (JsonWriter Writer = new JsonWriter(new FileReference(Path.Combine(LogFolder, "GauntletStepDetails.report.json"))))
