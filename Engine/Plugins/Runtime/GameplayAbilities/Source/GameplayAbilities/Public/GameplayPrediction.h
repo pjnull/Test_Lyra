@@ -289,14 +289,15 @@ struct GAMEPLAYABILITIES_API FPredictionKey
 	typedef int16 KeyType;
 
 	FPredictionKey()
-	: PredictiveConnection(nullptr), Current(0), Base(0), bIsStale(false), bIsServerInitiated(false)
+	: Current(0), Base(0), bIsStale(false), bIsServerInitiated(false)
 	{
 
 	}
 
 	/** On the server, what network connection this was serialized on. */
+	UE_DEPRECATED(5.0, "No longer used in favor of GetPredictiveConnectionKey, to avoid holding a direct object reference.")
 	UPROPERTY(NotReplicated)
-	UPackageMap* PredictiveConnection;
+	UPackageMap* PredictiveConnection = nullptr;
 
 	/** The unique ID of this prediction key */
 	UPROPERTY()
@@ -361,12 +362,12 @@ struct GAMEPLAYABILITIES_API FPredictionKey
 	/** Was this PredictionKey received from a NetSerialize or created locally? */
 	bool WasReceived() const
 	{
-		return PredictiveConnection != nullptr;
+		return PredictiveConnectionKey != 0;
 	}
 
 	bool WasLocallyGenerated() const
 	{
-		return Current > 0 && PredictiveConnection == nullptr;
+		return (Current > 0) && (PredictiveConnectionKey == 0);
 	}
 
 	bool DependsOn(KeyType Key)
@@ -390,21 +391,26 @@ struct GAMEPLAYABILITIES_API FPredictionKey
 		return ((InKey.Current << 16) | (InKey.Base << 1) | (InKey.bIsServerInitiated & 1));
 	}
 
+	UPTRINT GetPredictiveConnectionKey() const { return PredictiveConnectionKey; }
+
 private:
 
 	void GenerateNewPredictionKey();
 
 	FPredictionKey(int32 Key)
-		: PredictiveConnection(nullptr), Current(Key), Base(0), bIsStale(false), bIsServerInitiated(false)
+		: Current(Key), Base(0), bIsStale(false), bIsServerInitiated(false)
 	{
 
 	}
 
 	FPredictionKey(int16 InKey, int16 PreviousKey)
-		: PredictiveConnection(nullptr), Current(InKey), Base(PreviousKey), bIsStale(false), bIsServerInitiated(false)
+		: Current(InKey), Base(PreviousKey), bIsStale(false), bIsServerInitiated(false)
 	{
 
 	}
+
+	/** On the server, uniquely identifies network connection this was serialized on/from.  See NetSerialize for additional information. */
+	UPTRINT PredictiveConnectionKey = 0;
 };
 
 template<>
