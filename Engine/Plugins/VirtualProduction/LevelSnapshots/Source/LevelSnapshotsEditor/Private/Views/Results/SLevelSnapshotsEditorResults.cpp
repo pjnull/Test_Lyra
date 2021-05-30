@@ -2728,7 +2728,7 @@ void SLevelSnapshotsEditorResultsRow::Construct(const FArguments& InArgs, const 
 		];
 	
 		// Splitter Slot 1
-		SlotIndex = 1;
+		int32 SlotIndex = 1;
 		
 		TSharedPtr<SWidget> WorldChildWidget;
 
