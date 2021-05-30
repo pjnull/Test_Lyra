@@ -2721,17 +2721,11 @@ void SLevelSnapshotsEditorResultsRow::Construct(const FArguments& InArgs, const 
 		.HitDetectionSplitterHandleSize(bDoesRowNeedSplitter ? 5.0f : 0.f);
 
 		SplitterPtr->AddSlot()
+		.OnSlotResized(this, &SLevelSnapshotsEditorResultsRow::SetNameColumnSize)
+		.Value(this, &SLevelSnapshotsEditorResultsRow::GetNameColumnSize)
 		[
 			BasicRowWidgets
 		];
-		
-		// Splitter Slot 0
-		int32 SlotIndex = 0;
-		{
-			SplitterPtr->SlotAt(SlotIndex).OnSlotResized(this, &SLevelSnapshotsEditorResultsRow::SetNameColumnSize);
-			const auto SlotDelegate = TAttribute<float>::FGetter::CreateSP(this, &SLevelSnapshotsEditorResultsRow::GetNameColumnSize);;
-			SplitterPtr->SlotAt(SlotIndex).SizeValue.Bind(SlotDelegate);
-		}
 	
 		// Splitter Slot 1
 		SlotIndex = 1;
@@ -2811,15 +2805,11 @@ void SLevelSnapshotsEditorResultsRow::Construct(const FArguments& InArgs, const 
 		}
 
 		SplitterPtr->AddSlot()
+		.OnSlotResized(this, &SLevelSnapshotsEditorResultsRow::SetWorldColumnSize)
+		.Value(this, &SLevelSnapshotsEditorResultsRow::GetWorldColumnSize)
 		[
 			FinalWorldWidget.ToSharedRef()
 		];
-
-		{
-			SplitterPtr->SlotAt(SlotIndex).OnSlotResized(this, &SLevelSnapshotsEditorResultsRow::SetWorldColumnSize);
-			const auto SlotDelegate = TAttribute<float>::FGetter::CreateSP(this, &SLevelSnapshotsEditorResultsRow::GetWorldColumnSize);
-			SplitterPtr->SlotAt(SlotIndex).SizeValue.Bind(SlotDelegate);
-		}
 
 		// Splitter Slot 2
 		SlotIndex = 2;
@@ -2899,15 +2889,11 @@ void SLevelSnapshotsEditorResultsRow::Construct(const FArguments& InArgs, const 
 		}
 
 		SplitterPtr->AddSlot()
+		.OnSlotResized(this, &SLevelSnapshotsEditorResultsRow::SetSnapshotColumnSize)
+		.Value(this, &SLevelSnapshotsEditorResultsRow::GetSnapshotColumnSize)
 		[
 			FinalSnapshotWidget.ToSharedRef()
 		];
-
-		{
-			SplitterPtr->SlotAt(SlotIndex).OnSlotResized(this, &SLevelSnapshotsEditorResultsRow::SetSnapshotColumnSize);
-			const auto SlotDelegate = TAttribute<float>::FGetter::CreateSP(this, &SLevelSnapshotsEditorResultsRow::GetSnapshotColumnSize);
-			SplitterPtr->SlotAt(SlotIndex).SizeValue.Bind(SlotDelegate);
-		}
 		
 		BorderPtr->SetContent(SplitterPtr.ToSharedRef());
 	}
