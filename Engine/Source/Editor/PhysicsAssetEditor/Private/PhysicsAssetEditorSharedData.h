@@ -87,6 +87,7 @@ public:
 
 	/** Set the selection state of a constraint */
 	void SetSelectedConstraint(int32 ConstraintIndex, bool bSelected);
+	void SetSelectedConstraints(const TArray<int32> ConstraintsIndices, bool bSelected);
 
 	/** Check whether the constraint at the specified index is selected */
 	bool IsConstraintSelected(int32 ConstraintIndex) const;
@@ -140,16 +141,22 @@ public:
 	/** Collision geometry editing */
 	void ClearSelectedBody();
 	void SetSelectedBody(const FSelection& Body, bool bSelected);
+	void SetSelectedBodies(const TArray<FSelection>& Bodies, bool bSelected);
 	bool IsBodySelected(const FSelection& Body) const;
 	void ToggleSelectionType();
 	void ToggleShowSelected();
 	void ShowAll();
 	void HideAll();
+	void HideAllBodies();
+	void HideAllConstraints();
 	void ToggleShowOnlyColliding();
+	void ToggleShowOnlyConstrained();
 	void ToggleShowOnlySelected();
 	void ShowSelected();
 	void HideSelected();
 	void SetSelectedBodyAnyPrim(int32 BodyIndex, bool bSelected);
+	void SetSelectedBodiesAnyPrim(const TArray<int32>& BodiesIndices, bool bSelected);
+	void SetSelectedBodiesAllPrim(const TArray<int32>& BodiesIndices, bool bSelected);
 	void DeleteCurrentPrim();
 	void DeleteBody(int32 DelBodyIndex, bool bRefreshComponent=true);
 	void RefreshPhysicsAssetChange(const UPhysicsAsset* InPhysAsset, bool bFullClothRefresh = true);

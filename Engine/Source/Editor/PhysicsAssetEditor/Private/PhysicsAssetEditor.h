@@ -202,6 +202,7 @@ private:
 	/** Toolbar/menu command methods */
 	bool HasSelectedBodyAndIsNotSimulation() const;
 	bool HasOneSelectedBodyAndIsNotSimulation() const;
+	bool HasSelectedBodyOrConstraintAndIsNotSimulation() const;
 	bool CanEditConstraintProperties() const;
 	bool HasSelectedConstraintAndIsNotSimulation() const;
 	void OnChangeDefaultMesh(USkeletalMesh* OldPreviewMesh, USkeletalMesh* NewPreviewMesh);
@@ -292,6 +293,7 @@ private:
 	void OnShowSelected();
 	void OnHideSelected();
 	void OnToggleShowOnlyColliding();
+	void OnToggleShowOnlyConstrained();
 	void OnToggleShowOnlySelected();
 	void OnShowAll();
 	void OnHideAll();
