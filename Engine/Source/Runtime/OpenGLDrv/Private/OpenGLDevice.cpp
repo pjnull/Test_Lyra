@@ -1272,7 +1272,6 @@ void FOpenGLDynamicRHI::RHIReleaseThreadOwnership()
 			CustomPresent->OnReleaseThreadOwnership();
 		}
 	}
-	FTaskTagScope Scope(ETaskTag::ERhiThread);
 	VERIFY_GL(RHIReleaseThreadOwnership);
 	bIsRenderingContextAcquired = false;
 	PlatformNULLContextSetup();
