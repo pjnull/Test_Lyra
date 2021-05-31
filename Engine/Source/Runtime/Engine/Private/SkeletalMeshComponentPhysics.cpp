@@ -2652,7 +2652,8 @@ void USkeletalMeshComponent::RecreateClothingActors()
 				TArray<UClothingAssetBase*> AssetsInUse;
 				SkeletalMesh->GetClothingAssetsInUse(AssetsInUse);
 
-				ClothingSimulation->FillContext(this, 0.f, ClothingSimulationContext);
+				const bool bIsInitialization = true;
+				ClothingSimulation->FillContext(this, 0.f, ClothingSimulationContext, bIsInitialization);
 
 				const int32 NumMeshAssets = SkeletalMesh->GetMeshClothingAssets().Num();
 				for (int32 BaseAssetIndex = 0; BaseAssetIndex < NumMeshAssets; ++BaseAssetIndex)
