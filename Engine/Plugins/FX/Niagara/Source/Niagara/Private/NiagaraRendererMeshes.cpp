@@ -205,6 +205,7 @@ void FNiagaraRendererMeshes::Initialize(const UNiagaraRendererProperties* InProp
 			FBox LocalBounds = Mesh->GetExtendedBounds().GetBox();
 			LocalBounds.Min *= MeshProperties.Scale;
 			LocalBounds.Max *= MeshProperties.Scale;
+			MeshData.LocalBounds = LocalBounds;
 			MeshData.LocalCullingSphere.Center = LocalBounds.GetCenter();
 			MeshData.LocalCullingSphere.W = LocalBounds.GetExtent().Size();
 
@@ -804,6 +805,7 @@ void FNiagaraRendererMeshes::CreateMeshBatchForSection(
 	FVertexFactory& VertexFactory,
 	FMaterialRenderProxy& MaterialProxy,
 	const FNiagaraSceneProxy& SceneProxy,
+	const FMeshData& MeshData,
 	const FStaticMeshLODResources& LODModel,
 	const FStaticMeshSection& Section,
 	const FSceneView& View,
@@ -830,7 +832,7 @@ void FNiagaraRendererMeshes::CreateMeshBatchForSection(
 	Mesh.DepthPriorityGroup = (ESceneDepthPriorityGroup)SceneProxy.GetDepthPriorityGroup(&View);
 
 	FMeshBatchElement& BatchElement = Mesh.Elements[0];
-	BatchElement.PrimitiveUniformBuffer = IsMotionBlurEnabled() ? SceneProxy.GetUniformBuffer() : SceneProxy.GetUniformBufferNoVelocity();
+	BatchElement.PrimitiveUniformBuffer = SceneProxy.GetCustomUniformBuffer(IsMotionBlurEnabled(), MeshData.LocalBounds);
 	BatchElement.FirstIndex = 0;
 	BatchElement.MinVertexIndex = 0;
 	BatchElement.MaxVertexIndex = 0;
@@ -1058,7 +1060,7 @@ void FNiagaraRendererMeshes::GetDynamicMeshElements(const TArray<const FSceneVie
 					}
 
 					const uint32 GPUCountBufferOffset = bDoGPUCulling ? SortInfo.CulledGPUParticleCountOffset : SourceParticleData->GetGPUInstanceCountBufferOffset();
-					CreateMeshBatchForSection(Collector, VertexFactory, *MaterialProxy, *SceneProxy, LODModel, Section, *View, ViewIndex, NumInstances,
+					CreateMeshBatchForSection(Collector, VertexFactory, *MaterialProxy, *SceneProxy, MeshData, LODModel, Section, *View, ViewIndex, NumInstances,
 						GPUCountBufferOffset, bIsWireframe, bIsInstancedStereo, bDoGPUCulling);
 				}
 			}
@@ -1227,7 +1229,7 @@ void FNiagaraRendererMeshes::GetDynamicRayTracingInstances(FRayTracingMaterialGa
 			MeshBatch.LCI = NULL;
 			MeshBatch.ReverseCulling = SceneProxy->IsLocalToWorldDeterminantNegative();
 
-			MeshBatchElement.PrimitiveUniformBuffer = IsMotionBlurEnabled() ? SceneProxy->GetUniformBuffer() : SceneProxy->GetUniformBufferNoVelocity();
+			MeshBatchElement.PrimitiveUniformBuffer = SceneProxy->GetCustomUniformBuffer(IsMotionBlurEnabled(), MeshData.LocalBounds);
 			MeshBatchElement.FirstIndex = 0;
 			MeshBatchElement.MinVertexIndex = 0;
 			MeshBatchElement.MaxVertexIndex = 0;
