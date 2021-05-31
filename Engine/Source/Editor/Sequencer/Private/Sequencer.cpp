@@ -1357,6 +1357,17 @@ void FSequencer::UpdateSequencerCustomizations()
 
 	// Apply customizations to our editor.
 	SequencerWidget->ApplySequencerCustomizations(Builder.GetCustomizations());
+
+	// Apply customizations to ourselves.
+	OnPaste.Reset();
+
+	for (const FSequencerCustomizationInfo& CustomizationInfo : Builder.GetCustomizations())
+	{
+		if (CustomizationInfo.OnPaste.IsBound())
+		{
+			OnPaste.Add(CustomizationInfo.OnPaste);
+		}
+	}
 }
 
 void FSequencer::RerunConstructionScripts()
@@ -8929,6 +8940,19 @@ bool FSequencer::DoPaste(bool bClearSelection)
 		// If we cancel the paste due to being read-only, count that as having handled the paste operation
 		return true;
 	}
+	
+	// Call into the active customizations.
+	ESequencerPasteSupport PasteSupport = ESequencerPasteSupport::All;
+	for (const FOnSequencerPaste& Callback : OnPaste)
+	{
+		const ESequencerPasteSupport CurSupport = Callback.Execute();
+		PasteSupport = (PasteSupport & CurSupport);
+	}
+	if (PasteSupport == ESequencerPasteSupport::None)
+	{
+		// We handled the paste operation but we didn't support doing anything.
+		return true;
+	}
 
 	// Grab the text to paste from the clipboard
 	FString TextToImport;
@@ -8944,13 +8968,25 @@ bool FSequencer::DoPaste(bool bClearSelection)
 	TArray<FNotificationInfo> PasteErrors;
 	bool bAnythingPasted = false;
 	TArray<UMovieSceneFolder*> PastedFolders;
-	bAnythingPasted |= PasteFolders(TextToImport, ParentFolder, PastedFolders, PasteErrors);
-	bAnythingPasted |= PasteObjectBindings(TextToImport, ParentFolder, PastedFolders, PasteErrors, bClearSelection);
-	bAnythingPasted |= PasteTracks(TextToImport, ParentFolder, PastedFolders, PasteErrors, bClearSelection);
-	
+	if (EnumHasAnyFlags(PasteSupport, ESequencerPasteSupport::Folders)) 
+	{
+		bAnythingPasted |= PasteFolders(TextToImport, ParentFolder, PastedFolders, PasteErrors);
+	}
+	if (EnumHasAnyFlags(PasteSupport, ESequencerPasteSupport::ObjectBindings)) 
+	{
+		bAnythingPasted |= PasteObjectBindings(TextToImport, ParentFolder, PastedFolders, PasteErrors, bClearSelection);
+	}
+	if (EnumHasAnyFlags(PasteSupport, ESequencerPasteSupport::Tracks)) 
+	{
+		bAnythingPasted |= PasteTracks(TextToImport, ParentFolder, PastedFolders, PasteErrors, bClearSelection);
+	}
+
 	if (!bAnythingPasted)
 	{
-		bAnythingPasted |= PasteSections(TextToImport, PasteErrors);
+		if (EnumHasAnyFlags(PasteSupport, ESequencerPasteSupport::Sections))
+		{
+			bAnythingPasted |= PasteSections(TextToImport, PasteErrors);
+		}
 	}
 
 	if (!bAnythingPasted)

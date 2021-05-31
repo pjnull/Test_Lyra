@@ -1224,6 +1224,9 @@ private:
 	/** Active customizations. */
 	TArray<TUniquePtr<ISequencerCustomization>> ActiveCustomizations;
 
+	/** Active customization callbacks */
+	TArray<FOnSequencerPaste> OnPaste;
+
 	TWeakObjectPtr<UMovieSceneSequence> RootSequence;
 	FMovieSceneRootEvaluationTemplateInstance RootTemplateInstance;
 
