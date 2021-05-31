@@ -112,7 +112,7 @@ static FAutoConsoleVariableRef CVarNiagaraSkipTickDeltaSeconds(
 	ECVF_Default
 );
 
-static int32 GNiagaraSystemSimulationTickTaskShouldWait = 1;
+static int32 GNiagaraSystemSimulationTickTaskShouldWait = 0;
 static FAutoConsoleVariableRef CVarNiagaraSystemSimulationTickTaskShouldWait(
 	TEXT("fx.Niagara.SystemSimulation.TickTaskShouldWait"),
 	GNiagaraSystemSimulationTickTaskShouldWait,
@@ -333,7 +333,7 @@ struct FNiagaraSystemSimulationAllWorkCompleteTask
 	}
 
 	FORCEINLINE TStatId GetStatId() const { RETURN_QUICK_DECLARE_CYCLE_STAT(FNiagaraSystemSimulationAllWorkCompleteTask, STATGROUP_TaskGraphTasks); }
-	ENamedThreads::Type GetDesiredThread() { return GetNiagaraTaskPriority(GNiagaraSystemSimulationWaitAllTaskPri); }
+	ENamedThreads::Type GetDesiredThread() { return ENamedThreads::GameThread; }
 	static ESubsequentsMode::Type GetSubsequentsMode() { return ESubsequentsMode::TrackSubsequents; }
 	void DoTask(ENamedThreads::Type CurrentThread, const FGraphEventRef& MyCompletionGraphEvent)
 	{
