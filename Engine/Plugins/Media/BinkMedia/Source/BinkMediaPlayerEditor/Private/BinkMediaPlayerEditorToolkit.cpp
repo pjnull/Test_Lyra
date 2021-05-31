@@ -4,6 +4,7 @@
 #include "BinkMediaPlayerEditorToolkit.h"
 #include "BinkMediaPlayerEditorPCH.h"
 #include "Factories.h"
+#include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "Widgets/Docking/SDockTab.h"
 
 #define LOCTEXT_NAMESPACE "FBinkMediaPlayerEditorToolkit"
