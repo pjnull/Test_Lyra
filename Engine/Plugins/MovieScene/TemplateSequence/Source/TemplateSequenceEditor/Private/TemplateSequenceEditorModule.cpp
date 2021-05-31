@@ -19,7 +19,6 @@
 #include "UObject/GCObject.h"
 
 #define LOCTEXT_NAMESPACE "TemplateSequenceEditor"
-	ESequencerDropResult OnSequencerActorsDrop(const TArray<TWeakObjectPtr<AActor>>& Actors, const FActorDragDropGraphEdOp& DragDropOp);
 
 /**
  * Implements the FTemplateSequenceEditor module.
@@ -184,7 +183,4 @@ private:
 
 IMPLEMENT_MODULE(FTemplateSequenceEditorModule, TemplateSequenceEditor);
 
-		(Operation->IsOfType<FActorDragDropGraphEdOp>() && StaticCastSharedPtr<FActorDragDropGraphEdOp>(Operation)->Actors.Num() <= 1)))
-ESequencerDropResult FTemplateSequenceCustomization::OnSequencerActorsDrop(const TArray<TWeakObjectPtr<AActor>>& Actors, const FActorDragDropGraphEdOp& DragDropOp)
-	Customization.OnActorsDrop.BindLambda([](const TArray<TWeakObjectPtr<AActor>>&, const FActorDragDropGraphEdOp&) -> ESequencerDropResult { return ESequencerDropResult::DropDenied; });
 #undef LOCTEXT_NAMESPACE
