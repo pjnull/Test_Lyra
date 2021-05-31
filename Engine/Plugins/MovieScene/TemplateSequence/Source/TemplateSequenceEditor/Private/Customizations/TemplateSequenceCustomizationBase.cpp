@@ -1,10 +1,10 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "TemplateSequenceCustomizationBase.h"
+#include "Framework/Application/SlateApplication.h"
 #include "GameFramework/Actor.h"
 #include "Misc/TemplateSequenceEditorUtil.h"
 #include "ScopedTransaction.h"
-#include "Slate.h"
 #include "TemplateSequence.h"
 
 #define LOCTEXT_NAMESPACE "TemplateSequenceCustomizationBase"
