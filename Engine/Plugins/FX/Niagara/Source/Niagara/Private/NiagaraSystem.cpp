@@ -1726,9 +1726,15 @@ bool UNiagaraSystem::IsValidInternal() const
 
 	for (const FNiagaraEmitterHandle& Handle : EmitterHandles)
 	{
-		if (Handle.GetIsEnabled() && Handle.GetInstance() && !Handle.GetInstance()->IsValid())
+		if ( Handle.GetIsEnabled())
 		{
-			return false;
+			if ( UNiagaraEmitter* NiagaraEmitter = Handle.GetInstance() )
+			{
+				if ( !NiagaraEmitter->IsValid() && NiagaraEmitter->IsAllowedByScalability() )
+				{
+					return false;
+				}
+			}
 		}
 	}
 
