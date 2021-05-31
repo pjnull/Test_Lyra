@@ -52,6 +52,16 @@ FGuid UTemplateSequence::GetRootObjectBindingID() const
 	return FGuid();
 }
 
+const UObject* UTemplateSequence::GetRootObjectSpawnableTemplate() const
+{
+	if (MovieScene != nullptr && MovieScene->GetSpawnableCount() > 0)
+	{
+		const FMovieSceneSpawnable& FirstSpawnable = MovieScene->GetSpawnable(0);
+		return FirstSpawnable.GetObjectTemplate();
+	}
+	return nullptr;
+}
+
 void UTemplateSequence::BindPossessableObject(const FGuid& ObjectId, UObject& PossessedObject, UObject* Context)
 {
 	if (UActorComponent* Component = Cast<UActorComponent>(&PossessedObject))
