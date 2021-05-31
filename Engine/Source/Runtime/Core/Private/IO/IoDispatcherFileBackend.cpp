@@ -1808,6 +1808,11 @@ TSharedRef<IIoDispatcherFileBackend> CreateIoDispatcherFileBackend()
 	return MakeShared<FFileIoStore>();
 }
 
+uint32 FFileIoStore::GetThreadId() const
+{
+	return Thread ? Thread->GetThreadID() : 0; 
+}
+
 CSV_DEFINE_CATEGORY(IoDispatcherFileBackend, true);
 
 // These stats go to both insights and csv by default
