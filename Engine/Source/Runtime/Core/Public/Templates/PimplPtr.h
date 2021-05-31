@@ -262,14 +262,17 @@ public:
 
 	TPimplPtr& operator=(const TPimplPtr& A)
 	{
-		if (IsValid())
+		if (&A != this)
 		{
-			Reset();
-		}
+			if (IsValid())
+			{
+				Reset();
+			}
 
-		if (A.IsValid())
-		{
-			this->Ptr = (T*)UE4PimplPtr_Private::CallCopier(A.Ptr);
+			if (A.IsValid())
+			{
+				this->Ptr = (T*)UE4PimplPtr_Private::CallCopier(A.Ptr);
+			}
 		}
 
 		return *this;
