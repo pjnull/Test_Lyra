@@ -24,8 +24,7 @@
 			"BlacklistPlatforms": [ 
 				"HoloLens",
 				"Lumin",
-				"tvOS",
-				"LinuxAArch64"
+				"tvOS"
 			]
 		},
 		{
