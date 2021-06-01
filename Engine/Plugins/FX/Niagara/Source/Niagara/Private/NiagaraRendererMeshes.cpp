@@ -913,9 +913,7 @@ void FNiagaraRendererMeshes::GetDynamicMeshElements(const TArray<const FSceneVie
 	if (SourceParticleData == nullptr ||
 		(SourceMode == ENiagaraRendererSourceDataMode::Particles && SourceParticleData->GetNumInstances() == 0) ||
 		Meshes.Num() == 0 ||
-		GbEnableNiagaraMeshRendering == 0 ||
-		!GSupportsResourceView  // Current shader requires SRV to draw properly in all cases.
-		)
+		GbEnableNiagaraMeshRendering == 0)
 	{
 		return;
 	}
@@ -1091,9 +1089,7 @@ void FNiagaraRendererMeshes::GetDynamicRayTracingInstances(FRayTracingMaterialGa
 		(SourceMode == ENiagaraRendererSourceDataMode::Particles && SourceParticleData->GetNumInstancesAllocated() == 0) ||
 		(SourceMode == ENiagaraRendererSourceDataMode::Particles && SourceParticleData->GetNumInstances() == 0) ||
 		Meshes.Num() == 0 ||
-		GbEnableNiagaraMeshRendering == 0 ||
-		!GSupportsResourceView  // Current shader requires SRV to draw properly in all cases.
-		)
+		GbEnableNiagaraMeshRendering == 0)
 	{
 		return;
 	}
