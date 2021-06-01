@@ -227,12 +227,6 @@ void FDefaultGameMoviePlayer::Initialize(FSlateRenderer& InSlateRenderer, TShare
 	MovieViewportWeakPtr = MovieViewport;
 	MovieViewport->SetActive(true);
 
-	// Register the movie viewport so that it can receive user input.
-	if (!FPlatformProperties::SupportsWindowedMode())
-	{
-		FSlateApplication::Get().RegisterGameViewport( MovieViewport.ToSharedRef() );
-	}
-
 	MainWindow = GameWindow;
 
 	GameWindow->GetOnWindowClosedEvent().AddRaw(this, &FDefaultGameMoviePlayer::OnMainWindowClosed);
@@ -379,7 +373,17 @@ bool FDefaultGameMoviePlayer::PlayMovie()
 			UserWidgetHolder->SetContent(LoadingScreenAttributes.WidgetLoadingScreen.IsValid() ? LoadingScreenAttributes.WidgetLoadingScreen.ToSharedRef() : SNullWidget::NullWidget);
 			VirtualRenderWindow->Resize(MainWindow.Pin()->GetClientSizeInScreen());
 			VirtualRenderWindow->SetContent(LoadingScreenContents.ToSharedRef());
-		
+
+			// Register the movie viewport so that it can receive user input.
+			if (!FPlatformProperties::SupportsWindowedMode())
+			{
+				TSharedPtr<SViewport> MovieViewport = MovieViewportWeakPtr.Pin();
+				if (MovieViewport.IsValid())
+				{
+					FSlateApplication::Get().RegisterGameViewport(MovieViewport.ToSharedRef());
+				}
+			}
+
 			{
 				FScopeLock SyncMechanismLock(&SyncMechanismCriticalSection);
 				SyncMechanism = new FSlateLoadingSynchronizationMechanism(WidgetRenderer, ActiveMovieStreamer);
