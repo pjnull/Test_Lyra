@@ -2973,6 +2973,7 @@ public:
 
 	virtual void SetPhysicsField(class FPhysicsFieldSceneProxy* PhysicsFieldSceneProxy) override;
 	virtual void ResetPhysicsField() override;
+	virtual void ShowPhysicsField() override;
 	virtual void UpdatePhysicsField(FRDGBuilder& GraphBuilder, FViewInfo& View) override;
 
 	virtual void AddVolumetricCloud(FVolumetricCloudSceneProxy* VolumetricCloudSceneProxy) override;
