@@ -84,7 +84,6 @@ public:
 
 protected:
 	/** Fills in the base data for a clothing simulation */
-	UE_DEPRECATED(4.27, "Use the version with bIsInitialization instead.")
 	virtual void FillContext(USkeletalMeshComponent* InComponent, float InDeltaTime, IClothingSimulationContext* InOutContext) override;
 
 	/** Fills in the base data for a clothing simulation */
