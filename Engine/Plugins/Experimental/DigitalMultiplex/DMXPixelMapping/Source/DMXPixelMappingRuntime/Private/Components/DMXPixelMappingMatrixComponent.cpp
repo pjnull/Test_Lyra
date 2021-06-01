@@ -194,11 +194,11 @@ TSharedRef<SWidget> UDMXPixelMappingMatrixComponent::BuildSlot(TSharedRef<SConst
 			]
 		];
 
-	Slot =
-		&InCanvas->AddSlot()
+	InCanvas->AddSlot()
 		.AutoSize(true)
 		.Alignment(FVector2D::ZeroVector)
 		.ZOrder(ZOrder)
+		.Expose(Slot)
 		[
 			SNew(SOverlay)
 			+ SOverlay::Slot()
@@ -222,7 +222,7 @@ TSharedRef<SWidget> UDMXPixelMappingMatrixComponent::BuildSlot(TSharedRef<SConst
 
 	Brush.Margin = FMargin(1.f);
 
-	Slot->Offset(FMargin(PositionX, PositionY, 0.f, 0.f));
+	Slot->SetOffset(FMargin(PositionX, PositionY, 0.f, 0.f));
 	CachedWidget->SetWidthOverride(SizeX);
 	CachedWidget->SetHeightOverride(SizeY);
 	CachedLabelBox->SetWidthOverride(SizeX);
@@ -482,7 +482,7 @@ void UDMXPixelMappingMatrixComponent::SetPositionWithChildren()
 	}, false);
 
 #if WITH_EDITOR
-	Slot->Offset(FMargin(PositionX, PositionY, 0.f, 0.f));
+	Slot->SetOffset(FMargin(PositionX, PositionY, 0.f, 0.f));
 #endif // WITH_EDITOR
 }
 
@@ -555,7 +555,7 @@ void UDMXPixelMappingMatrixComponent::SetPositionBasedOnRelativePixel(UDMXPixelM
 	}, false);
 
 #if WITH_EDITOR
-	Slot->Offset(FMargin(PositionX, PositionY, 0.f, 0.f));
+	Slot->SetOffset(FMargin(PositionX, PositionY, 0.f, 0.f));
 #endif // WITH_EDITOR
 
 	PositionXCached = PositionX;

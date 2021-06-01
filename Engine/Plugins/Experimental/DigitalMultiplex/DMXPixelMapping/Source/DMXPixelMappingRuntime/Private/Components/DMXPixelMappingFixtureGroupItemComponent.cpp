@@ -226,11 +226,11 @@ TSharedRef<SWidget> UDMXPixelMappingFixtureGroupItemComponent::BuildSlot(TShared
 			]
 		];
 
-	Slot =
-		&InCanvas->AddSlot()
+	InCanvas->AddSlot()
 		.AutoSize(true)
 		.Alignment(FVector2D::ZeroVector)
 		.ZOrder(ZOrder)
+		.Expose(Slot)
 		[
 			SNew(SOverlay)
 			
@@ -260,7 +260,7 @@ TSharedRef<SWidget> UDMXPixelMappingFixtureGroupItemComponent::BuildSlot(TShared
 	Brush.TintColor = GetEditorColor(false);
 	Brush.Margin = FMargin(1.f);
 
-	Slot->Offset(FMargin(PositionX, PositionY, 0.f, 0.f));
+	Slot->SetOffset(FMargin(PositionX, PositionY, 0.f, 0.f));
 	CachedWidget->SetWidthOverride(SizeX);
 	CachedWidget->SetHeightOverride(SizeY);
 	CachedLabelBox->SetWidthOverride(SizeX);
@@ -562,7 +562,7 @@ void UDMXPixelMappingFixtureGroupItemComponent::SetPositionInBoundaryBox(const F
 #if WITH_EDITOR
 		if (Slot != nullptr)
 		{
-			Slot->Offset(FMargin(PositionX, PositionY, 0.f, 0.f));
+			Slot->SetOffset(FMargin(PositionX, PositionY, 0.f, 0.f));
 		}
 
 		RelativePositionX = PositionX - FixtureGroupComponent->GetPosition().X;
@@ -592,7 +592,7 @@ void UDMXPixelMappingFixtureGroupItemComponent::SetPositionFromParent(const FVec
 #if WITH_EDITOR
 	if (Slot != nullptr)
 	{
-		Slot->Offset(FMargin(PositionX, PositionY, 0.f, 0.f));
+		Slot->SetOffset(FMargin(PositionX, PositionY, 0.f, 0.f));
 	}
 #endif // WITH_EDITOR
 }

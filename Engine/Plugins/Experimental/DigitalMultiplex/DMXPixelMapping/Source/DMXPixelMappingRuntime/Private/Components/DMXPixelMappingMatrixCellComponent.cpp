@@ -100,11 +100,11 @@ TSharedRef<SWidget> UDMXPixelMappingMatrixCellComponent::BuildSlot(TSharedRef<SC
 		.HeightOverride(SizeX)
 		.WidthOverride(SizeY);
 
-	Slot =
-		&InCanvas->AddSlot()
+	InCanvas->AddSlot()
 		.AutoSize(true)
 		.Alignment(FVector2D::ZeroVector)
 		.ZOrder(ZOrder)
+		.Expose(Slot)
 		[
 			CachedWidget.ToSharedRef()
 		];
@@ -114,7 +114,7 @@ TSharedRef<SWidget> UDMXPixelMappingMatrixCellComponent::BuildSlot(TSharedRef<SC
 	Brush.TintColor = GetEditorColor(false);
 	Brush.Margin = FMargin(1.f);
 
-	Slot->Offset(FMargin(PositionX, PositionY, 0.f, 0.f));
+	Slot->SetOffset(FMargin(PositionX, PositionY, 0.f, 0.f));
 	CachedWidget->SetWidthOverride(SizeX);
 	CachedWidget->SetHeightOverride(SizeY);
 
@@ -380,7 +380,7 @@ void UDMXPixelMappingMatrixCellComponent::SetPositionFromParent(const FVector2D&
 #if WITH_EDITOR
 	if (Slot != nullptr)
 	{
-		Slot->Offset(FMargin(PositionX, PositionY, 0.f, 0.f));
+		Slot->SetOffset(FMargin(PositionX, PositionY, 0.f, 0.f));
 	}
 #endif // WITH_EDITOR
 }
@@ -413,7 +413,7 @@ void UDMXPixelMappingMatrixCellComponent::SetPositionInBoundaryBox(const FVector
 #if WITH_EDITOR
 		if (Slot != nullptr)
 		{
-			Slot->Offset(FMargin(PositionX, PositionY, 0.f, 0.f));
+			Slot->SetOffset(FMargin(PositionX, PositionY, 0.f, 0.f));
 		}
 
 		RelativePositionX = PositionX - MatrixComponent->GetPosition().X;
@@ -441,7 +441,7 @@ void UDMXPixelMappingMatrixCellComponent::SetSizeWithinBoundaryBox(const FVector
 #if WITH_EDITOR
 		if (Slot != nullptr)
 		{
-			Slot->Offset(FMargin(PositionX, PositionY, 0.f, 0.f));
+			Slot->SetOffset(FMargin(PositionX, PositionY, 0.f, 0.f));
 		}
 #endif // WITH_EDITOR
 	}
