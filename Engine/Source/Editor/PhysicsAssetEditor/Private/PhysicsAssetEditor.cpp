@@ -118,8 +118,6 @@ namespace PhysicsAssetEditor
 			return HashCombine(::GetTypeHash(ShapeData.Index), ::GetTypeHash(ShapeData.PrimitiveIndex));
 		}
 	};
-
-	
 }
 
 void FPhysicsAssetEditor::RegisterTabSpawners(const TSharedRef<class FTabManager>& InTabManager)
@@ -1601,7 +1599,8 @@ void FPhysicsAssetEditor::AddNewPrimitive(EAggCollisionShape::Type InPrimitiveTy
 
 		for(int32 i=0; i<NewSelection.Num(); ++i)
 		{
-			UBodySetup* BodySetup = SharedData->PhysicsAsset->SkeletalBodySetups[NewSelection[i].Index];
+			int32 BodyIndex = NewSelection[i].Index;
+			UBodySetup* BodySetup = SharedData->PhysicsAsset->SkeletalBodySetups[BodyIndex];
 			EAggCollisionShape::Type PrimitiveType;
 			if (bCopySelected)
 			{
@@ -1611,7 +1610,6 @@ void FPhysicsAssetEditor::AddNewPrimitive(EAggCollisionShape::Type InPrimitiveTy
 			{
 				PrimitiveType = InPrimitiveType;
 			}
-
 
 			BodySetup->Modify();
 
@@ -1635,6 +1633,7 @@ void FPhysicsAssetEditor::AddNewPrimitive(EAggCollisionShape::Type InPrimitiveTy
 
 					SphereElem->Radius = BodySetup->AggGeom.SphereElems[SharedData->GetSelectedBody()->PrimitiveIndex].Radius;
 				}
+				SharedData->AutoNamePrimitive(BodyIndex, PrimitiveType);
 			}
 			else if (PrimitiveType == EAggCollisionShape::Box)
 			{
@@ -1660,6 +1659,7 @@ void FPhysicsAssetEditor::AddNewPrimitive(EAggCollisionShape::Type InPrimitiveTy
 					BoxElem->Y = BodySetup->AggGeom.BoxElems[SharedData->GetSelectedBody()->PrimitiveIndex].Y;
 					BoxElem->Z = BodySetup->AggGeom.BoxElems[SharedData->GetSelectedBody()->PrimitiveIndex].Z;
 				}
+				SharedData->AutoNamePrimitive(BodyIndex, PrimitiveType);
 			}
 			else if (PrimitiveType == EAggCollisionShape::Sphyl)
 			{
@@ -1683,6 +1683,7 @@ void FPhysicsAssetEditor::AddNewPrimitive(EAggCollisionShape::Type InPrimitiveTy
 					SphylElem->Length = BodySetup->AggGeom.SphylElems[SharedData->GetSelectedBody()->PrimitiveIndex].Length;
 					SphylElem->Radius = BodySetup->AggGeom.SphylElems[SharedData->GetSelectedBody()->PrimitiveIndex].Radius;
 				}
+				SharedData->AutoNamePrimitive(BodyIndex, PrimitiveType);
 			}
 			else if (PrimitiveType == EAggCollisionShape::Convex)
 			{
@@ -1702,6 +1703,8 @@ void FPhysicsAssetEditor::AddNewPrimitive(EAggCollisionShape::Type InPrimitiveTy
 					ConvexElem->VertexData.Add(v);
 				}
 				ConvexElem->UpdateElemBox();
+
+				SharedData->AutoNamePrimitive(BodyIndex, PrimitiveType);
 
 				BodySetup->InvalidatePhysicsData();
 				BodySetup->CreatePhysicsMeshes();
@@ -1730,6 +1733,8 @@ void FPhysicsAssetEditor::AddNewPrimitive(EAggCollisionShape::Type InPrimitiveTy
 					TaperedCapsuleElem->Radius0 = BodySetup->AggGeom.TaperedCapsuleElems[SharedData->GetSelectedBody()->PrimitiveIndex].Radius0;
 					TaperedCapsuleElem->Radius1 = BodySetup->AggGeom.TaperedCapsuleElems[SharedData->GetSelectedBody()->PrimitiveIndex].Radius1;
 				}
+
+				SharedData->AutoNamePrimitive(BodyIndex, PrimitiveType);
 			}
 			else
 			{
@@ -1902,6 +1907,7 @@ void FPhysicsAssetEditor::ResetBoneCollision()
 			const FBoneVertInfo& UseVertInfo = NewBodyData.VertWeight == EVW_DominantWeight ? SharedData->DominantWeightBoneInfos[BoneIndex] : SharedData->AnyWeightBoneInfos[BoneIndex];
 			if(FPhysicsAssetUtils::CreateCollisionFromBone(BodySetup, EditorSkelMesh, BoneIndex, NewBodyData, UseVertInfo))
 			{
+				SharedData->AutoNameAllPrimitives(SelectedBodyIndex, NewBodyData.GeomType);
 				BodyIndices.AddUnique(SelectedBodyIndex);
 			}
 			else
@@ -1958,6 +1964,12 @@ void FPhysicsAssetEditor::ResetBoneCollision()
 			FText ErrorMessage;
 			if (FPhysicsAssetUtils::CreateFromSkeletalMesh(SharedData->PhysicsAsset, EditorSkelMesh, NewBodyData, ErrorMessage, /*bSetToMesh=*/false) == false)
 			{
+				//name the resulting primitives
+				for (int32 BodyIndex = 0; BodyIndex < SharedData->PhysicsAsset->SkeletalBodySetups.Num(); BodyIndex++)
+				{
+					SharedData->AutoNameAllPrimitives(BodyIndex, NewBodyData.GeomType);
+				}
+
 				FMessageDialog::Open(EAppMsgType::Ok, ErrorMessage);
 			}
 		}

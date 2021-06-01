@@ -168,6 +168,11 @@ public:
 	bool WeldSelectedBodies(bool bWeld = true);
 	void Mirror();
 
+	/** auto name a primitive, if PrimitiveIndex is INDEX_NONE, then the last primitive of specified typed is renamed */
+	void AutoNamePrimitive(int32 BodyIndex, EAggCollisionShape::Type PrimitiveType, int32 PrimitiveIndex = INDEX_NONE);
+	void AutoNameAllPrimitives(int32 BodyIndex, EAggCollisionShape::Type PrimitiveType);
+	void AutoNameAllPrimitives(int32 BodyIndex, EPhysAssetFitGeomType PrimitiveType);
+
 	/** Toggle simulation on and off */
 	void ToggleSimulation();
 

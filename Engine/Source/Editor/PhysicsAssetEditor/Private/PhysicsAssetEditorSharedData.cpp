@@ -1221,6 +1221,133 @@ bool FPhysicsAssetEditorSharedData::GetPrimitiveContributeToMass() const
 	return false;
 }
 
+static EAggCollisionShape::Type ConvertPhysicsAssetGeomTypeToAggCollisionShapeType(EPhysAssetFitGeomType PhysicsAssetGeomType)
+{
+	switch (PhysicsAssetGeomType)
+	{
+	case EPhysAssetFitGeomType::EFG_Box:				return EAggCollisionShape::Type::Box;
+	case EPhysAssetFitGeomType::EFG_Sphyl:				return EAggCollisionShape::Type::Sphyl;
+	case EPhysAssetFitGeomType::EFG_Sphere:				return EAggCollisionShape::Type::Sphere;
+	case EPhysAssetFitGeomType::EFG_TaperedCapsule: 	return EAggCollisionShape::Type::TaperedCapsule;
+	case EPhysAssetFitGeomType::EFG_SingleConvexHull:	return EAggCollisionShape::Type::Convex;
+	case EPhysAssetFitGeomType::EFG_MultiConvexHull:	return EAggCollisionShape::Type::Convex;
+	default:											return EAggCollisionShape::Type::Unknown;
+	}
+}
+
+void FPhysicsAssetEditorSharedData::AutoNameAllPrimitives(int32 BodyIndex, EPhysAssetFitGeomType PrimitiveType)
+{
+	AutoNameAllPrimitives(BodyIndex, ConvertPhysicsAssetGeomTypeToAggCollisionShapeType(PrimitiveType));
+}
+
+void FPhysicsAssetEditorSharedData::AutoNameAllPrimitives(int32 BodyIndex, EAggCollisionShape::Type PrimitiveType)
+{
+	if (!PhysicsAsset || !PhysicsAsset->SkeletalBodySetups.IsValidIndex(BodyIndex))
+	{
+		return;
+	}
+
+	if (UBodySetup* BodySetup = PhysicsAsset->SkeletalBodySetups[BodyIndex])
+	{
+		int32 PrimitiveCount = 0;
+		switch (PrimitiveType)
+		{
+		case EAggCollisionShape::Sphere:
+			PrimitiveCount = BodySetup->AggGeom.SphereElems.Num();
+			break;
+		case EAggCollisionShape::Box:
+			PrimitiveCount = BodySetup->AggGeom.BoxElems.Num();
+			break;
+		case EAggCollisionShape::Sphyl:
+			PrimitiveCount = BodySetup->AggGeom.SphylElems.Num();
+			break;
+		case EAggCollisionShape::Convex:
+			PrimitiveCount = BodySetup->AggGeom.ConvexElems.Num();
+			break;
+		case EAggCollisionShape::TaperedCapsule:
+			PrimitiveCount = BodySetup->AggGeom.TaperedCapsuleElems.Num();
+			break;
+		}
+
+		for (int32 PrimitiveIndex = 0; PrimitiveIndex < PrimitiveCount; PrimitiveIndex++)
+		{
+			AutoNamePrimitive(BodyIndex, PrimitiveType, PrimitiveIndex);
+		}
+	}
+}
+
+void FPhysicsAssetEditorSharedData::AutoNamePrimitive(int32 BodyIndex, EAggCollisionShape::Type PrimitiveType, int32 PrimitiveIndex)
+{
+	if (!PhysicsAsset || !PhysicsAsset->SkeletalBodySetups.IsValidIndex(BodyIndex))
+	{
+		return;
+	}
+
+	if (UBodySetup* BodySetup = PhysicsAsset->SkeletalBodySetups[BodyIndex])
+	{
+		if (PrimitiveType == EAggCollisionShape::Sphere)
+		{
+			if (PrimitiveIndex == INDEX_NONE)
+			{
+				PrimitiveIndex = BodySetup->AggGeom.SphereElems.Num() - 1;
+			}
+			if (BodySetup->AggGeom.SphereElems.IsValidIndex(PrimitiveIndex))
+			{
+				FName PrimitiveName(FString::Printf(TEXT("%s_sphere"), *BodySetup->BoneName.ToString()));
+				BodySetup->AggGeom.SphereElems[PrimitiveIndex].SetName(PrimitiveName);
+			}
+		}
+		else if (PrimitiveType == EAggCollisionShape::Box)
+		{
+			if (PrimitiveIndex == INDEX_NONE)
+			{
+				PrimitiveIndex = BodySetup->AggGeom.BoxElems.Num() - 1;
+			}
+			if (BodySetup->AggGeom.BoxElems.IsValidIndex(PrimitiveIndex))
+			{
+				FName PrimitiveName(FString::Printf(TEXT("%s_box"), *BodySetup->BoneName.ToString()));
+				BodySetup->AggGeom.BoxElems[PrimitiveIndex].SetName(PrimitiveName);
+			}
+		}
+		else if (PrimitiveType == EAggCollisionShape::Sphyl)
+		{
+			if (PrimitiveIndex == INDEX_NONE)
+			{
+				PrimitiveIndex = BodySetup->AggGeom.SphylElems.Num() - 1;
+			}
+			if (BodySetup->AggGeom.SphylElems.IsValidIndex(PrimitiveIndex))
+			{
+				FName PrimitiveName(FString::Printf(TEXT("%s_capsule"), *BodySetup->BoneName.ToString()));
+				BodySetup->AggGeom.SphylElems[PrimitiveIndex].SetName(PrimitiveName);
+			}
+		}
+		else if (PrimitiveType == EAggCollisionShape::Convex)
+		{
+			if (PrimitiveIndex == INDEX_NONE)
+			{
+				PrimitiveIndex = BodySetup->AggGeom.ConvexElems.Num() - 1;
+			}
+			if (BodySetup->AggGeom.ConvexElems.IsValidIndex(PrimitiveIndex))
+			{
+				FName PrimitiveName(FString::Printf(TEXT("%s_convex"), *BodySetup->BoneName.ToString()));
+				BodySetup->AggGeom.ConvexElems[PrimitiveIndex].SetName(PrimitiveName);
+			}
+		}
+		else if (PrimitiveType == EAggCollisionShape::TaperedCapsule)
+		{
+			if (PrimitiveIndex == INDEX_NONE)
+			{
+				PrimitiveIndex = BodySetup->AggGeom.TaperedCapsuleElems.Num() - 1;
+			}
+			if (BodySetup->AggGeom.TaperedCapsuleElems.IsValidIndex(PrimitiveIndex))
+			{
+				FName PrimitiveName(FString::Printf(TEXT("%s_tapered_capsule"), *BodySetup->BoneName.ToString()));
+				BodySetup->AggGeom.TaperedCapsuleElems[PrimitiveIndex].SetName(PrimitiveName);
+			}
+		}
+	}
+}
+
 void FPhysicsAssetEditorSharedData::CopyBody()
 {
 	check(SelectedBodies.Num() == 1);
@@ -1476,6 +1603,9 @@ void FPhysicsAssetEditorSharedData::MakeNewBody(int32 NewBoneIndex, bool bAutoSe
 		FPhysicsAssetUtils::DestroyBody(PhysicsAsset, NewBodyIndex);
 		return;
 	}
+
+	// name the new created primitives
+	AutoNameAllPrimitives(NewBodyIndex, NewBodyData.GeomType);
 
 	// Check if the bone of the new body has any physical children bones
 	for (int32 i = 0; i < EditorSkelMesh->GetRefSkeleton().GetRawBoneNum(); ++i)
