@@ -58,7 +58,6 @@ protected:
 	 * @param InComponent - The component to fill the context for
 	 * @param InOutContext - The context to fill
 	 */
-	UE_DEPRECATED(4.27, "Use the version with bIsInitialization instead.")
 	virtual void FillContext(USkeletalMeshComponent* InComponent, float InDeltaTime, IClothingSimulationContext* InOutContext) = 0;
 
 	/**
