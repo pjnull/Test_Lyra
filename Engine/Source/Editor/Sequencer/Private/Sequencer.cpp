@@ -8866,6 +8866,7 @@ void FSequencer::CopySelectedTracks(TArray<TSharedPtr<FSequencerTrackNode>>& Tra
 				UMovieSceneTrack* DuplicatedTrack = Cast<UMovieSceneTrack>(StaticDuplicateObject(TrackNode->GetTrack(), CopyableTrack));
 				CopyableTrack->Track = DuplicatedTrack;
 				CopyableTrack->bIsAMasterTrack = MovieScene->IsAMasterTrack(*TrackNode->GetTrack());
+				CopyableTrack->bIsACameraCutTrack = TrackNode->GetTrack()->IsA<UMovieSceneCameraCutTrack>();
 
 				TSharedPtr<FSequencerFolderNode> FolderNode = TrackNode->FindFolderNode();
 				if (FolderNode.IsValid() && Folders.Contains(&FolderNode->GetFolder()))
@@ -9416,7 +9417,7 @@ bool FSequencer::PasteTracks(const FString& TextToImport, UMovieSceneFolder* InP
 	{
 		return false;
 	}
-	
+
 	UMovieScene* MovieScene = GetFocusedMovieSceneSequence()->GetMovieScene();
 	UObject* BindingContext = GetPlaybackContext();
 
@@ -9441,14 +9442,14 @@ bool FSequencer::PasteTracks(const FString& TextToImport, UMovieSceneFolder* InP
 		}
 	}
 
-	int32 NumMasterTracks = 0;
+	int32 NumMasterOrCameraCutTracks = 0;
 	int32 NumTracks = 0;
 
 	for (UMovieSceneCopyableTrack* CopyableTrack : ImportedTracks)
 	{
-		if (CopyableTrack->bIsAMasterTrack)
+		if (CopyableTrack->bIsAMasterTrack || CopyableTrack->bIsACameraCutTrack)
 		{
-			++NumMasterTracks;
+			++NumMasterOrCameraCutTracks;
 		}
 		else
 		{
@@ -9456,8 +9457,8 @@ bool FSequencer::PasteTracks(const FString& TextToImport, UMovieSceneFolder* InP
 		}
 	}
 
-	int32 NumMasterTracksPasted = 0;
 	int32 NumTracksPasted = 0;
+	int32 NumMasterOrCameraCutTracksPasted = 0;
 	if (ObjectNodes.Num())
 	{
 		for (TSharedPtr<FSequencerObjectBindingNode> ObjectNode : ObjectNodes)
@@ -9469,7 +9470,7 @@ bool FSequencer::PasteTracks(const FString& TextToImport, UMovieSceneFolder* InP
 
 			for (UMovieSceneCopyableTrack* CopyableTrack : NewTracks)
 			{
-				if (!CopyableTrack->bIsAMasterTrack)
+				if (!CopyableTrack->bIsAMasterTrack && !CopyableTrack->bIsACameraCutTrack)
 				{
 					UMovieSceneTrack* NewTrack = CopyableTrack->Track;
 					NewTrack->ClearFlags(RF_Transient);
@@ -9514,7 +9515,7 @@ bool FSequencer::PasteTracks(const FString& TextToImport, UMovieSceneFolder* InP
 	// Add as master track or set camera cut track
 	for (UMovieSceneCopyableTrack* CopyableTrack : ImportedTracks)
 	{
-		if (CopyableTrack->bIsAMasterTrack)
+		if (CopyableTrack->bIsAMasterTrack || CopyableTrack->bIsACameraCutTrack)
 		{
 			UMovieSceneTrack* NewTrack = CopyableTrack->Track;
 			NewTrack->ClearFlags(RF_Transient);
@@ -9540,7 +9541,7 @@ bool FSequencer::PasteTracks(const FString& TextToImport, UMovieSceneFolder* InP
 					ParentFolder->AddChildMasterTrack(NewTrack);
 				}
 
-				++NumMasterTracksPasted;
+				++NumMasterOrCameraCutTracksPasted;
 			}
 			else
 			{
@@ -9552,12 +9553,12 @@ bool FSequencer::PasteTracks(const FString& TextToImport, UMovieSceneFolder* InP
 					}
 				}
 
-				++NumMasterTracksPasted;
+				++NumMasterOrCameraCutTracksPasted;
 			}
 		}
 	}
 
-	if (NumMasterTracksPasted < NumMasterTracks)
+	if (NumMasterOrCameraCutTracksPasted < NumMasterOrCameraCutTracks)
 	{
 		FNotificationInfo Info(LOCTEXT("PasteTracks_NoMasterTracks", "Can't paste track. Master track could not be pasted"));
 		PasteErrors.Add(Info);
@@ -9569,7 +9570,7 @@ bool FSequencer::PasteTracks(const FString& TextToImport, UMovieSceneFolder* InP
 		PasteErrors.Add(Info);
 	}
 
-	if ((NumMasterTracksPasted + NumTracksPasted) > 0)
+	if ((NumMasterOrCameraCutTracksPasted + NumTracksPasted) > 0)
 	{
 		NotifyMovieSceneDataChanged(EMovieSceneDataChangeType::MovieSceneStructureItemsChanged);
 
