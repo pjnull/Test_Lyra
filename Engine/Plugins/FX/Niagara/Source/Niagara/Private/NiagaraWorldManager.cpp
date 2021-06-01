@@ -1192,13 +1192,6 @@ void FNiagaraWorldManager::CalculateScalabilityState(UNiagaraSystem* System, con
  	}
 
 	//TODO: More progressive scalability options?
-
-#if WITH_NIAGARA_DEBUGGER
-	//Tell the debugger about our scalability state.
-	//Unfortunately cannot have the debugger just read the manager state data as components are removed.
-	//To avoid extra copy in future we can have the manager keep another list of recently removed component states which is cleaned up on component destruction.
-	Component->DebugCachedScalabilityState = OutState;
-#endif
 }
 
 bool FNiagaraWorldManager::CanPreCull(UNiagaraEffectType* EffectType)
@@ -1217,8 +1210,8 @@ void FNiagaraWorldManager::SortedSignificanceCull(UNiagaraEffectType* EffectType
 		int32 SystemInstanceMax = ScalabilitySettings.MaxSystemInstances;
 		int32 EffectTypeInstanceMax = ScalabilitySettings.MaxInstances;
 
-		bCull = ScalabilitySettings.bCullMaxInstanceCount && EffectTypeInstCount >= SystemInstanceMax;
-		bCull |= ScalabilitySettings.bCullPerSystemMaxInstanceCount && SystemInstCount >= EffectTypeInstanceMax;
+		bCull = ScalabilitySettings.bCullMaxInstanceCount && EffectTypeInstCount >= EffectTypeInstanceMax;
+		bCull |= ScalabilitySettings.bCullPerSystemMaxInstanceCount && SystemInstCount >= SystemInstanceMax;
 
 		if (bCull)
 		{

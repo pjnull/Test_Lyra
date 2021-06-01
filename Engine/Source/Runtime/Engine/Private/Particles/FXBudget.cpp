@@ -75,6 +75,14 @@ static FAutoConsoleVariableRef CVarFXBudget_AdjustedUsageDecayRate(
 	ECVF_Default
 );
 
+static float GFXBudget_AdjustedUsageMax = 2.0f;
+static FAutoConsoleVariableRef CVarFXBudget_AdjustedUsageMax(
+	TEXT("fx.Budget.AdjustedUsageMax"),
+	GFXBudget_AdjustedUsageMax,
+	TEXT("Max value for FX Budget adjusted usage. Prevents one very long frame from keeping the usage above 1.0 for long periods under budget."),
+	ECVF_Default
+);
+
 static FAutoConsoleVariableRef CVarFXBudget_Enabled(
 	TEXT("fx.Budget.Enabled"),
 	FFXBudget::bEnabled,
@@ -160,7 +168,7 @@ public:
 				{
 					NewVal = Target;
 				}
-				Current = NewVal;
+				Current = FMath::Min(GFXBudget_AdjustedUsageMax, NewVal);
 			};
 			UpdateUsage(TargetUsage.GT, AdjustedUsage.GT);
 			UpdateUsage(TargetUsage.GTConcurrent, AdjustedUsage.GTConcurrent);

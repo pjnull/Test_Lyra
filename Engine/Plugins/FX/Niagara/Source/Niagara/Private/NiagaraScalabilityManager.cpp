@@ -352,6 +352,14 @@ bool FNiagaraScalabilityManager::ApplyScalabilityState(int32 ComponentIndex, ENi
 		}
 
 		CompState.Apply();
+
+#if WITH_NIAGARA_DEBUGGER
+		//Tell the debugger about our scalability state.
+		//Unfortunately cannot have the debugger just read the manager state data as components are removed.
+		//To avoid extra copy in future we can have the manager keep another list of recently removed component states which is cleaned up on component destruction.
+		Component->DebugCachedScalabilityState = CompState;
+#endif
+
 		if (CompState.bCulled)
 		{
 			switch (CullReaction)
