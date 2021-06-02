@@ -3019,7 +3019,7 @@ void FDeferredShadingSceneRenderer::Render(FRDGBuilder& GraphBuilder)
 
 	RendererModule.RenderOverlayExtensions(GraphBuilder, Views, SceneTextures);
 
-	if (ViewFamily.EngineShowFlags.PhysicsField && Scene && Scene->PhysicsField)
+	if (ViewFamily.EngineShowFlags.PhysicsField && Scene->PhysicsField)
 	{
 		RenderPhysicsField(GraphBuilder, Views, Scene->PhysicsField, SceneTextures.Color.Target);
 	}
