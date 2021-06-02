@@ -241,6 +241,7 @@ namespace Gauntlet
 				}
 
 				return UnrealResult;
+			}
 
 			/// <summary>
 			/// Override the summary report so we can insert a link to our report and the failed tests
