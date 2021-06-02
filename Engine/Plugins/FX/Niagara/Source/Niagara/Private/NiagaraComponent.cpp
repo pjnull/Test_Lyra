@@ -946,7 +946,7 @@ void UNiagaraComponent::ActivateInternal(bool bReset /* = false */, bool bIsScal
 
 		if (FCsvProfiler* CSVProfiler = FCsvProfiler::Get())
 		{
-			if (CSVProfiler->IsCapturing())
+			if (CSVProfiler->IsCapturing() && FParticlePerfStats::GetCSVStatsEnabled())
 			{
 				static FName PreCullStatName(TEXT("NiagaraCulled/PreCull"));
 				CSVProfiler->RecordCustomStat(PreCullStatName, CSV_CATEGORY_INDEX(Particles), 1, ECsvCustomStatOp::Accumulate);

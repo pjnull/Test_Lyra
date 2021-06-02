@@ -43,7 +43,7 @@ void UNiagaraCullProxyComponent::TickCullProxy()
 #if WITH_PARTICLE_PERF_CSV_STATS
 	if (FCsvProfiler* CSVProfiler = FCsvProfiler::Get())
 	{
-		if (Instances.Num())
+		if (Instances.Num() && FParticlePerfStats::GetCSVStatsEnabled())
 		{
 			check(CSVStat_NumCullProxies != NAME_None);
 			CSVProfiler->RecordCustomStat(TotalCullProxiesName, CSV_CATEGORY_INDEX(Particles), Instances.Num(), ECsvCustomStatOp::Accumulate);

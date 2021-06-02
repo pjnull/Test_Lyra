@@ -126,6 +126,7 @@ struct ENGINE_API FParticlePerfStats
 	void Tick();
 	void TickRT();
 
+	FORCEINLINE static bool GetCSVStatsEnabled() { return bCSVStatsEnabled.Load(EMemoryOrder::Relaxed); }
 	FORCEINLINE static bool GetStatsEnabled() { return bStatsEnabled.Load(EMemoryOrder::Relaxed); }
 	FORCEINLINE static bool GetGatherWorldStats() { return WorldStatsReaders.Load(EMemoryOrder::Relaxed) > 0; }
 	FORCEINLINE static bool GetGatherSystemStats() { return SystemStatsReaders.Load(EMemoryOrder::Relaxed) > 0; }
@@ -143,6 +144,8 @@ struct ENGINE_API FParticlePerfStats
 			);
 	}
 
+
+	FORCEINLINE static void SetCSVStatsEnabled(bool bEnabled) { bCSVStatsEnabled.Store(bEnabled); }
 	FORCEINLINE static void SetStatsEnabled(bool bEnabled) { bStatsEnabled.Store(bEnabled); }
 	FORCEINLINE static void AddWorldStatReader() { ++WorldStatsReaders; }
 	FORCEINLINE static void RemoveWorldStatReader() { --WorldStatsReaders; }
@@ -186,6 +189,8 @@ struct ENGINE_API FParticlePerfStats
 	static TAtomic<int32>	WorldStatsReaders;
 	static TAtomic<int32>	SystemStatsReaders;
 	static TAtomic<int32>	ComponentStatsReaders;
+
+	static TAtomic<bool>	bCSVStatsEnabled;
 
 	/** Stats on GT and GT spawned concurrent work. */
 	FParticlePerfStats_GT GameThreadStats;

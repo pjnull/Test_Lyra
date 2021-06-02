@@ -34,6 +34,7 @@ DECLARE_STATS_GROUP(TEXT("ParticleStats"), STATGROUP_ParticleStats, STATCAT_Adva
 DECLARE_CYCLE_STAT(TEXT("Particle Stats Tick [GT]"), STAT_ParticleStats_TickGT, STATGROUP_ParticleStats);
 DECLARE_CYCLE_STAT(TEXT("Particle Stats Tick [RT]"), STAT_ParticleStats_TickRT, STATGROUP_ParticleStats);
 
+TAtomic<bool> FParticlePerfStats::bCSVStatsEnabled(false);
 TAtomic<bool> FParticlePerfStats::bStatsEnabled(true);
 TAtomic<int32> FParticlePerfStats::WorldStatsReaders(0);
 TAtomic<int32> FParticlePerfStats::SystemStatsReaders(0);
@@ -1069,19 +1070,24 @@ bool FParticlePerfStatsListener_TimedTest::Tick()
 
 #if WITH_PARTICLE_PERF_CSV_STATS
 
-CSV_DEFINE_CATEGORY_MODULE(ENGINE_API, Particles, true);
+CSV_DEFINE_CATEGORY_MODULE(ENGINE_API, Particles, false);
 
-static bool bPerFrameCSVStats = false;
-void OnPerSystemCSVStatsEnabledChanged(IConsoleVariable* Variable)
-{	
-	if (bPerFrameCSVStats)
+static bool bDetailedCSVStats = false;
+void OnDetailedCSVStatsEnabledChanged(IConsoleVariable* Variable)
+{
+	FParticlePerfStats::SetCSVStatsEnabled(bDetailedCSVStats);
+	
+	FCsvProfiler* CSVProfiler = FCsvProfiler::Get();
+	if (CSVProfiler)
 	{
-		if (FCsvProfiler* CSVProfiler = FCsvProfiler::Get())
-		{
-			if (CSVProfiler->IsCapturing())
-			{
-				FParticlePerfStatsListener_CSVProfiler::OnCSVStart();
-			}
+		CSVProfiler->EnableCategoryByIndex(CSV_CATEGORY_INDEX(Particles), bDetailedCSVStats);
+	}
+
+	if (bDetailedCSVStats)
+	{
+		if (CSVProfiler && CSVProfiler->IsCapturing())
+		{			
+			FParticlePerfStatsListener_CSVProfiler::OnCSVStart();
 		}
 	}
 	else
@@ -1089,18 +1095,18 @@ void OnPerSystemCSVStatsEnabledChanged(IConsoleVariable* Variable)
 		FParticlePerfStatsListener_CSVProfiler::OnCSVEnd();
 	}
 }
-static FAutoConsoleVariableRef CVarWritePerFrameCSVStats(
-	TEXT("fx.ParticlePerfStats.PerFrameCSVStats"),
-	bPerFrameCSVStats,
-	TEXT("If true, we write system particle perf stats to the per frame CSV stats. Allows us to see the overhead of each system over time. \n"),
-	FConsoleVariableDelegate::CreateStatic(&OnPerSystemCSVStatsEnabledChanged),
+static FAutoConsoleVariableRef CVarWriteDetailedCSVStats(
+	TEXT("fx.DetailedCSVStats"),
+	bDetailedCSVStats,
+	TEXT("If true, we write detailed partilce stats to the CSV profiler. \n"),
+	FConsoleVariableDelegate::CreateStatic(&OnDetailedCSVStatsEnabledChanged),
 	ECVF_Default);
 
 
 FParticlePerfStatsListenerPtr FParticlePerfStatsListener_CSVProfiler::CSVListener;
 void FParticlePerfStatsListener_CSVProfiler::OnCSVStart()
 {
-	if (bPerFrameCSVStats && CSVListener.IsValid() == false)
+	if (bDetailedCSVStats && CSVListener.IsValid() == false)
 	{
 		CSVListener = MakeShared<FParticlePerfStatsListener_CSVProfiler, ESPMode::ThreadSafe>();
 		FParticlePerfStatsManager::AddListener(CSVListener);
@@ -1118,6 +1124,8 @@ void FParticlePerfStatsListener_CSVProfiler::OnCSVEnd()
 
 bool FParticlePerfStatsListener_CSVProfiler::Tick()
 {
+	check(FParticlePerfStats::GetCSVStatsEnabled());
+
 	FParticlePerfStatsListener_GatherAll::Tick();
 
 	if (FCsvProfiler* CSVProfiler = FCsvProfiler::Get())

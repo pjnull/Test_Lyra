@@ -647,6 +647,10 @@ CSV_DECLARE_CATEGORY_MODULE_EXTERN(ENGINE_API, Particles);
 void FNiagaraScalabilityManager::CSVProfilerUpdate(FCsvProfiler* CSVProfiler)
 {
 	check(CSVProfiler && CSVProfiler->IsCapturing());
+	if (!FParticlePerfStats::GetCSVStatsEnabled())
+	{
+		return;
+	}
 
 	static const FName Total(TEXT("NiagaraCulled/Total"));
 	static const FName Distance(TEXT("NiagaraCulled/Distance"));

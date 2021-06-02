@@ -180,7 +180,7 @@ public:
 		#if WITH_PARTICLE_PERF_CSV_STATS
 		if (FCsvProfiler* CSVProfiler = FCsvProfiler::Get())
 		{
-			if (CSVProfiler->IsCapturing())
+			if (CSVProfiler->IsCapturing() && FParticlePerfStats::GetCSVStatsEnabled())
 			{
 				static FName GTUsageStat(TEXT("Budget/GT"));
 				static FName GTCNCUsageStat(TEXT("Budget/GTCNC"));

@@ -790,7 +790,7 @@ void FNiagaraWorldManager::PostActorTick(float DeltaSeconds)
 #if WITH_PARTICLE_PERF_CSV_STATS
 	if (FCsvProfiler* CSVProfiler = FCsvProfiler::Get())
 	{
-		if (CSVProfiler->IsCapturing())
+		if (CSVProfiler->IsCapturing() && FParticlePerfStats::GetCSVStatsEnabled())
 		{
 			//Record custom events marking split times at set intervals. Allows us to generate summary tables for averages over shorter bursts.
 			if (GNiagaraCSVSplitTime > 0.0f)
