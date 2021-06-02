@@ -31,27 +31,46 @@ namespace Gauntlet
 		}
 
 		/// <summary>
-		/// Represents a line in the log
+		/// Represents an entry in an Unreal logfile with and contails the associated category, level, and message
 		/// </summary>
 		public class LogEntry
 		{
+			/// <summary>
+			/// Category of the entry. E.g for "LogNet" this will be "Net"
+			/// </summary>
 			public string Category { get; private set; }
 
+			/// <summary>
+			/// Represents the level of the entry
+			/// </summary>
 			public LogLevel Level { get; private set; }
 
+			/// <summary>
+			/// The message string from the entry
+			/// </summary>
 			public string Message { get; private set; }
 
+			/// <summary>
+			/// Format the entry as it would have appeared in the log. 
+			/// </summary>
+			/// <returns></returns>
+			public override string ToString()
+			{
+				return string.Format("Log{0}: {1}: {2}", Category, Level, Message);
+			}
+
+			/// <summary>
+			/// Constructor that requires all info
+			/// </summary>
+			/// <param name="InCategory"></param>
+			/// <param name="InLevel"></param>
+			/// <param name="InMessage"></param>
 			public LogEntry(string InCategory, LogLevel InLevel, string InMessage)
 			{
 				Category = InCategory;
 				Level = InLevel;
 				Message = InMessage;
-			}
-
-			public override string ToString()
-			{
-				return string.Format("Log{0}: {1}: {2}", Category, Level, Message);
-			}
+			}			
 		}
 
 		/// <summary>
@@ -82,6 +101,9 @@ namespace Gauntlet
 			}
 		};
 
+		/// <summary>
+		/// Information about the current platform that will exist and be extracted from the log
+		/// </summary>
 		public class PlatformInfo
 		{
 			public string OSName;
@@ -90,18 +112,25 @@ namespace Gauntlet
 			public string GPUName;
 		}
 
+		/// <summary>
+		/// Information about the current build info
+		/// </summary>
 		public class BuildInfo
 		{
 			public string BranchName;
 			public int Changelist;
 		}
 
+		/// <summary>
+		/// Represents a prepared summary of the most relevant info in a log. Generated once by a
+		/// LogParser and cached.
+		/// </summary>
 		public class LogSummary
 		{
 			public BuildInfo							BuildInfo;
 			public PlatformInfo							PlatformInfo;
-			public IEnumerable<string>					Warnings;
-			public IEnumerable<string>					Errors;
+			public IEnumerable<LogEntry>				Warnings;
+			public IEnumerable<LogEntry>				Errors;
 			public CallstackMessage						FatalError;
 			public IEnumerable<CallstackMessage>		Ensures;
 			public int									LineCount;
@@ -111,6 +140,9 @@ namespace Gauntlet
 			public bool									HasTestExitCode;
 			public int									TestExitCode;
 
+			/// <summary>
+			/// Returns true if this log indicates the Unreal instance exited abnormally
+			/// </summary>
 			public bool HasAbnormalExit
 			{
 				get
@@ -130,7 +162,7 @@ namespace Gauntlet
 		/// <summary>
 		/// All entries in the log
 		/// </summary>
-		public IEnumerable<LogEntry> Entries { get; protected set; }
+		public IEnumerable<LogEntry> LogEntries { get; protected set; }
 
 		/// <summary>
 		/// Summary of the log
@@ -179,7 +211,7 @@ namespace Gauntlet
 				ParsedEntries.Add(new LogEntry(Category, Level, Message));
 			}
 
-			Entries = ParsedEntries;
+			LogEntries = ParsedEntries;
 		}
 
 		public LogSummary GetSummary()
@@ -198,8 +230,8 @@ namespace Gauntlet
 
 			NewSummary.BuildInfo = GetBuildInfo();
 			NewSummary.PlatformInfo = GetPlatformInfo();
-			NewSummary.Warnings = GetWarnings();
-			NewSummary.Errors = GetErrors();
+			NewSummary.Warnings = GetEntriesOfLevel(LogLevel.Warning);
+			NewSummary.Errors = GetEntriesOfLevel(LogLevel.Error);
 			NewSummary.FatalError = GetFatalError();
 			NewSummary.Ensures = GetEnsures();
 			NewSummary.LineCount = Content.Split('\n').Count();
@@ -323,6 +355,50 @@ namespace Gauntlet
 		}
 
 		/// <summary>
+		/// Returns all entries from the log that have the specified level
+		/// </summary>
+		/// <param name="InChannel">Optional channel to restrict search to</param>
+		/// <returns></returns>
+		public IEnumerable<LogEntry> GetEntriesOfLevel(LogLevel InLevel)
+		{
+			IEnumerable<LogEntry> Entries = LogEntries.Where(E => E.Level == InLevel);
+			return Entries;
+		}
+
+		/// <summary>
+		/// Returns all warnings from the log
+		/// </summary>
+		/// <param name="InChannel">Optional channel to restrict search to</param>
+		/// <returns></returns>
+		public IEnumerable<LogEntry> GetEntriesOfCategories(IEnumerable<string> InCategories, bool ExactMatch = false)
+		{
+			IEnumerable<LogEntry> Entries;
+
+			if (ExactMatch)
+			{
+				Entries = LogEntries.Where(E => InCategories.Contains(E.Category, StringComparer.OrdinalIgnoreCase));
+			}
+			else
+			{
+				// check if each channel is a substring of each log entry. E.g. "Shader" should return entries
+				// with both ShaderCompiler and ShaderManager
+				Entries = LogEntries.Where(E =>
+				{
+					foreach (string Cat in InCategories)
+					{
+						if (InCategories.Contains(Cat, StringComparer.OrdinalIgnoreCase))
+						{
+							return true;
+						}
+					}
+
+					return false;
+				});
+			}
+			return Entries;
+		}
+
+		/// <summary>
 		/// Return all entries for the specified channel. E.g. "OrionGame" will
 		/// return all entries starting with LogOrionGame
 		/// </summary>
@@ -330,21 +406,7 @@ namespace Gauntlet
 		/// <returns></returns>
 		public IEnumerable<string> GetLogChannels(IEnumerable<string> Channels, bool ExactMatch = true)
 		{
-			// expand Chan1, Chan2 into Log(?:Chan1|Chan2) for a non-capturing group
-			string Match = string.Format("Log(?:{0})", string.Join("|", Channels));
-
-			string Pattern;
-
-			if (ExactMatch)
-			{
-				Pattern = string.Format(@"({0}:\s{{0,1}}.+)", Match);
-			}
-			else
-			{
-				Pattern = string.Format(@"({0}.*:\s{{0,1}}.+)", Match);
-			}
-
-			return Regex.Matches(Content, Pattern).Cast<Match>().Select(M => M.Groups[1].ToString()).ToArray();
+			return GetEntriesOfCategories(Channels, ExactMatch).Select(E => E.ToString());
 		}
 
 		/// <summary>
@@ -366,6 +428,7 @@ namespace Gauntlet
 		{
 			return GetLogChannels(new string[] { Channel }, ExactMatch);
 		}
+				
 
 		/// <summary>
 		/// Returns all warnings from the log
@@ -374,16 +437,14 @@ namespace Gauntlet
 		/// <returns></returns>
 		public IEnumerable<string> GetWarnings(string InChannel = null)
 		{
-			string WarningRegEx = @"(Log.+:\s{0,1}Warning:.+)";
+			IEnumerable<LogEntry> Entries = LogEntries.Where(E => E.Level == LogLevel.Warning);
 
-			string SearchContent = Content;
-
-			if (string.IsNullOrEmpty(InChannel) == false)
+			if (InChannel != null)
 			{
-				SearchContent = string.Join(Environment.NewLine, GetLogChannel(InChannel));
+				Entries = Entries.Where(E => E.Category.Equals(InChannel, StringComparison.OrdinalIgnoreCase));
 			}
 
-			return GetAllMatchingLines(SearchContent, WarningRegEx);
+			return Entries.Select(E => E.ToString());
 		}
 
 		/// <summary>
@@ -393,17 +454,14 @@ namespace Gauntlet
 		/// <returns></returns>
 		public IEnumerable<string> GetErrors(string InChannel = null)
 		{
-			string ErrorRegEx = @"(Log.+:\s{0,1}Error:.+)";
+			IEnumerable<LogEntry> Entries = LogEntries.Where(E => E.Level == LogLevel.Error);
 
-			string SearchContent = Content;
-
-			if (string.IsNullOrEmpty(InChannel) == false)
+			if (InChannel != null)
 			{
-				var ChannelLines = GetLogChannel(InChannel);
-				SearchContent = string.Join("\n", ChannelLines);
+				Entries = Entries.Where(E => E.Category.Equals(InChannel, StringComparison.OrdinalIgnoreCase));
 			}
 
-			return GetAllMatchingLines(SearchContent, ErrorRegEx);
+			return Entries.Select(E => E.ToString());
 		}
 
 		/// <summary>

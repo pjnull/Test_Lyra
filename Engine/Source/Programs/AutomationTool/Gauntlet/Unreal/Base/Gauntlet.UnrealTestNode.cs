@@ -14,76 +14,40 @@ using System.Security.Cryptography;
 
 namespace Gauntlet
 {
-	public class GauntletParamDescription
+
+	/// <summary>
+	/// Describes reasons an Unreal process may have exited
+	/// </summary>
+	public enum UnrealProcessResult
 	{
-		/// <summary>
-		/// The param name that is passed in on the commandline
-		/// In -PARAMNAME or -PARAMNAME=val format
-		/// </summary>
-		public string ParamName;
-
-		/// <summary>
-		/// Is this required for the test to run?
-		/// </summary>
-		public bool Required;
-
-		/// <summary>		
-		/// Very brief desc of what to pass in -
-		/// Will show up in -param=<InputFormat> format.
-		/// Ex - a value of "Map To Use" would show up as -param=<Map To use>
-		/// Leave blank for a param that is just a flag.
-		/// </summary>
-		public string InputFormat;
-
-		/// <summary>
-		/// Helpful description for what this Parameter or flag represents and what can be passed in.
-		/// </summary>
-		public string ParamDesc;
-
-		/// <summary>
-		/// If you would like to provide a sample input for this field, do so here. Will show up as (ex: SampleInput) at the end of the param description
-		/// </summary>
-		public string SampleInput;
-
-		/// <summary>
-		///  If this param has a default value, put it here. Will show ups as (default: DefaultValue)
-		/// </summary>
-		public string DefaultValue;
-
-		/// <summary>
-		/// Whether this is a Test-specific param or a generic gauntlet param.
-		/// </summary>
-		public bool TestSpecificParam;
-
-		public GauntletParamDescription()
-		{
-			TestSpecificParam = true;
-		}
-
-		public override string ToString()
-		{
-			string ParamFormat = ParamName;
-			if (!string.IsNullOrEmpty(InputFormat))
-			{
-				ParamFormat += "=" + InputFormat;
-			}
-			string DefaultFormat = "";
-			if (!string.IsNullOrEmpty(DefaultValue))
-			{
-				DefaultFormat = string.Format("(default: {0}) ", DefaultValue);
-			}
-			string SampleFormat = "";
-			if (!string.IsNullOrEmpty(SampleInput))
-			{
-				SampleFormat = string.Format(" (ex: {0})", SampleInput);
-			}
-			ParamFormat = string.Format("{0}:\t\t{1}{2}{3}{4}", ParamFormat, Required ? "*Required* " : "", DefaultFormat, ParamDesc, SampleInput);
-			return ParamFormat;
-		}
+		ExitOk,							// No known issues
+		InitializationFailure,			// Process failed to initialize (e.g. the editor or game failed to load)
+		EncounteredFatalError,			// A fatal error occured
+		EncounteredEnsure,				// An ensure occurred (will only be returned if the test considers ensures as fatal)
+		TimeOut,						// A timeout occurred
+		TestFailure,					// A test is known to have failed
+		UnrealError,					// Unreal exited with an error code unrelated to test issues
+		Unknown,						// Something not in the above
 	}
+	
+	/// <summary>
+	/// Implementation of a Gauntlet TestNode that is capable of executing tests on an Unreal "session" where multiple
+	/// Unreal instances may be involved. This class leans on UnrealSession to do the work of spinning up, monitoring, and
+	/// shutting down instances. Those operations plus basic validation of Unreal's functionality are used to provide the
+	/// required ITestNode interfaces
+	/// </summary>
+	/// <typeparam name="TConfigClass"></typeparam>
 	public abstract class UnrealTestNode<TConfigClass> : BaseTest, IDisposable
 		where TConfigClass : UnrealTestConfiguration, new()
 	{
+		[Flags]
+		public enum BehaviorFlags
+		{
+			None = 0,				
+			PromoteErrors = 1,				// Promote errors from Unreal instances to regular test errors. (By default only fatal errors are errors)
+			PromoteWarnings = 2,			// Promote warnings from Unreal instances to regular test warnings.	(By default only ensures are warnings)
+		}
+
 		/// <summary>
 		/// Returns an identifier for this test
 		/// </summary>
@@ -94,6 +58,10 @@ namespace Gauntlet
 		/// </summary>
 		public override float MaxDuration { get; protected set; }
 
+
+		/// Behavior flags for this test
+		/// </summary>
+		public BehaviorFlags Flags { get; protected set; }
 		/// <summary>
 		/// Priority of this test
 		/// </summary>
@@ -104,14 +72,23 @@ namespace Gauntlet
 		/// </summary>
 		public override IEnumerable<string> GetWarnings()
 		{
-			if (SessionArtifacts == null)
+			if (RoleResults == null)
 			{
 				return Warnings;
 			}
 
-			return SessionArtifacts.SelectMany(A => A.LogSummary.Ensures.Select(E => E.Message))
-					.Union(SessionArtifacts.Where(A => A.AppInstance.WasKilled == false && A.LogSummary.HasAbnormalExit).SelectMany(A => A.LogSummary.Warnings))
-					.Union(Warnings); 
+			IEnumerable<string> Warnings = RoleResults.SelectMany(R =>
+			{
+				return R.Artifacts.LogSummary.Ensures.Select(E => E.Message);
+			}); 
+
+			// add all warnings from from roles if desired
+			if (Flags.HasFlag(BehaviorFlags.PromoteWarnings))
+			{
+				Warnings = Warnings.Union(RoleResults.SelectMany(R => R.Artifacts.LogSummary.Warnings.Select(W => W.ToString())));
+			}
+
+			return Warnings;
 		}
 
 		/// <summary>
@@ -119,52 +96,53 @@ namespace Gauntlet
 		/// </summary>
 		public override IEnumerable<string> GetErrors()
 		{
-			if (SessionArtifacts == null)
+			if (RoleResults == null)
 			{
 				return Errors;
 			}
 
-			IEnumerable<UnrealRoleArtifacts> FailedArtifacts = GetArtifactsWithFailures();
+			var FailedRoles = GetRolesThatFailed();
 
-			IEnumerable<string> AbnormalExitErrors = FailedArtifacts.Where(A => A.AppInstance.WasKilled == false && A.LogSummary.HasAbnormalExit).SelectMany(A => A.LogSummary.Errors).Distinct();
+			IEnumerable<string> Errors = FailedRoles.Where(R => R.Artifacts.LogSummary.FatalError != null).Select(R => R.Artifacts.LogSummary.FatalError.Message);
 
-			IEnumerable<string> FatalErrors = FailedArtifacts.Where(A => A.LogSummary.FatalError != null).Select(A => A.LogSummary.FatalError.Message);
-				
-			return FatalErrors.Union(AbnormalExitErrors).Union(Errors);
+			// add all errors from from roles if desired
+			if (Flags.HasFlag(BehaviorFlags.PromoteErrors))
+			{
+				Errors = Errors.Union(RoleResults.SelectMany(R => R.Artifacts.LogSummary.Errors.Select(W => W.ToString())));
+			}
+
+			return Errors;
 		}
 
-		/// <summary>
-		/// Returns Errors found during tests. Including Abnornal Exit reasons
-		/// </summary>
-		public virtual IEnumerable<string> GetErrorsAndAbnornalExitReasons()
-		{
-			IEnumerable<string>  Errors = GetErrors();
 
-			if (SessionArtifacts == null)
+		/// <summary>
+		/// Returns Errors found during tests. Including Abnormal Exit reasons
+		/// </summary>
+		public virtual IEnumerable<string> GetErrorsAndAbnornalExits()
+		{
+			IEnumerable<string> Errors = GetErrors();
+			if (RoleResults == null)
 			{
 				return Errors;
 			}
 
-			Dictionary<UnrealRoleArtifacts, Tuple<int, string>> ErrorCodesAndReasons = new Dictionary<UnrealRoleArtifacts, Tuple<int, string>>();
+			Dictionary<UnrealRoleResult, Tuple<int, string>> ErrorCodesAndReasons = new Dictionary<UnrealRoleResult, Tuple<int, string>>();
 
-			var FailedArtifacts = SessionArtifacts.Where(
-				A => {
-					if (A.AppInstance.WasKilled)
+			var FailedRoles = RoleResults.Where(
+				R => {
+					if (R.Artifacts.AppInstance.WasKilled)
 					{
 						return false;
 					}
-					string ExitReason;
-					int ExitCode = GetExitCodeAndReason(A, out ExitReason);
-					ErrorCodesAndReasons.Add(A, new Tuple<int, string>(ExitCode, ExitReason));
-					return ExitCode != 0;
+					
+					ErrorCodesAndReasons.Add(R, new Tuple<int, string>(R.ExitCode, R.Summary));
+					return R.ExitCode != 0;
 				}
 			);
 
-			return Errors.Union(FailedArtifacts.Select(
-				A => {
-					int ExitCode = ErrorCodesAndReasons[A].Item1;
-					string ExitReason = ErrorCodesAndReasons[A].Item2;
-					return string.Format("Abnormal Exit: Reason={0}, ExitCode={1}, Log={2}", ExitReason, ExitCode, Path.GetFileName(A.LogPath));
+			return Errors.Union(FailedRoles.Select(
+				R => {
+					return string.Format("Abnormal Exit: Reason={0}, ExitCode={1}, Log={2}", R.Summary, R.ExitCode, Path.GetFileName(R.Artifacts.LogPath));
 				}
 			));
 		}
@@ -216,6 +194,38 @@ namespace Gauntlet
 		public UnrealSessionInstance TestInstance { get; private set; }
 
 		/// <summary>
+		/// Describes the post-test results for a role.
+		/// </summary>
+		public class UnrealRoleResult
+		{
+			/// <summary>
+			/// High-level description of how the process ended
+			/// </summary>
+			public UnrealProcessResult ProcessResult;
+
+			/// <summary>
+			/// Human-readable of the process result. (E.g 'process encountered a fatal error')
+			/// </summary>
+			public string Summary;
+
+			/// <summary>
+			/// Exit code for the process. Unreal makes limited use of exit codes so in most cases
+			/// this will be 0 / -1
+			/// </summary>
+			public int ExitCode;
+
+			/// <summary>
+			/// Artifacts for this role. 
+			/// </summary>
+			public UnrealRoleArtifacts Artifacts;
+		};
+
+		/// <summary>
+		/// After the test completes holds artifacts for each process (clients, servers etc).
+		/// </summary>
+		public IEnumerable<UnrealRoleResult> RoleResults { get; private set; }
+
+		/// <summary>
 		/// After the test completes holds artifacts for each process (clients, servers etc).
 		/// </summary>
 		public IEnumerable<UnrealRoleArtifacts> SessionArtifacts { get; private set; }
@@ -236,7 +246,7 @@ namespace Gauntlet
 		public virtual bool ShouldSubmitDashboardResult { get { return CommandUtils.IsBuildMachine; } }
 
 		/// <summary>
-		/// Helper class that turns our wishes into reallity
+		/// Helper class that turns our wishes into reality
 		/// </summary>
 		protected UnrealSession UnrealApp;
 
@@ -302,6 +312,11 @@ namespace Gauntlet
 		{
 			SampleCommandlines.Add(new KeyValuePair<string, string>(Commandline, Description));
 		}
+
+		/// <summary>
+		/// Constructor. A context of the correct type is required
+		/// </summary>
+		/// <param name="InContext"></param>
 		public UnrealTestNode(UnrealTestContext InContext)
 		{
 			Context = InContext;
@@ -839,13 +854,22 @@ namespace Gauntlet
 		}
 
 		/// <summary>
+		/// This class is here to provide compatiblity 
+		/// </summary>
+		/// <param name="WasCancelled"></param>
+		protected virtual void StopTest(bool WasCancelled)
+		{
+			StopTest(WasCancelled ? StopReason.MaxDuration : StopReason.Completed);
+		}
+
+		/// <summary>
 		/// Called when a test has completed. By default saves artifacts and calles CreateReport
 		/// </summary>
 		/// <param name="Result"></param>
 		/// <returns></returns>
-		public override void StopTest(bool WasCancelled)
+		public override void StopTest(StopReason InReason)
 		{
-			base.StopTest(WasCancelled);
+			base.StopTest(InReason);
 
 			// Shutdown the instance so we can access all files, but do not null it or shutdown the UnrealApp because we still need
 			// access to these objects and their resources! Final cleanup is done in CleanupTest()
@@ -877,6 +901,10 @@ namespace Gauntlet
 			{
 				Log.Warning("Failed to release devices. {0}", Ex);
 			}
+
+
+			// Create results from all roles from these artifacts
+			RoleResults = CreateRoleResultsFromArtifacts(InReason, SessionArtifacts);
 
 			string Message = string.Empty;
 			ITestReport Report = null;
@@ -1212,76 +1240,85 @@ namespace Gauntlet
 		/// <param name="Reason"></param>
 		/// <param name="WasAbnormal"></param>
 		/// <returns></returns>
-		protected virtual int GetExitCodeAndReason(UnrealRoleArtifacts InArtifacts, out string ExitReason)
+		protected virtual UnrealProcessResult GetExitCodeAndReason(StopReason InReason, UnrealRoleArtifacts InArtifacts, out string ExitReason, out int ExitCode)
 		{
 			UnrealLogParser.LogSummary LogSummary = InArtifacts.LogSummary;
 
-			// Assume failure!
-			int ExitCode = -1;
-			ExitReason = "Unknown";
+			// Gauntlet killed the process. This can be valid in many scenarios (e.g. shutting down an ancilary 
+			// process, but if there was a timeout it will be handled at a higher level
+			if (InArtifacts.AppInstance.WasKilled)
+			{
+				if (InReason == StopReason.MaxDuration)
+				{
+					ExitReason = "Process was killed by Gauntlet due to a timeout";
+					ExitCode = -1;
+					return UnrealProcessResult.TimeOut;
+				}
+				else
+				{
+					ExitReason = "Process was killed by Gauntlet";
+					ExitCode = 0;
+					return UnrealProcessResult.ExitOk;
+				}
+			}
 
+			// first check for fatal issues
 			if (LogSummary.FatalError != null)
 			{
 				ExitReason = "Process encountered fatal error";
+				ExitCode = -1;
+				return UnrealProcessResult.EncounteredFatalError;
 			}
-			else if (LogSummary.Ensures.Count() > 0 && CachedConfig.FailOnEnsures)
-			{
-				ExitReason = string.Format("Process encountered {0} Ensures", LogSummary.Ensures.Count());
-			}
-			else if (InArtifacts.AppInstance.WasKilled)
-			{
-				ExitReason = "Process was killed";
-				ExitCode = 0;
-			}
-			else if (LogSummary.HasTestExitCode)
-			{
-				if (LogSummary.TestExitCode == 0)
-				{
-					ExitReason = "Tests exited with code 0";
-				}
-				else
-				{
-					ExitReason = string.Format("Tests exited with error code {0}", LogSummary.TestExitCode);
-				}
 
-				ExitCode = LogSummary.TestExitCode;
-			}
-			else if (LogSummary.EngineInitialized == false)
+			// Catch failed engine init. Early issues can result in the engine exiting with hard to diagnose reasons
+			if (LogSummary.EngineInitialized == false)
 			{
 				ExitReason = string.Format("Engine initialization failed");
 				ExitCode = -1;
+				return UnrealProcessResult.InitializationFailure;
 			}
-			else if (LogSummary.RequestedExit)
+
+			// If the test considers ensures as fatal, fail here
+			if (CachedConfig.FailOnEnsures && LogSummary.Ensures.Count() > 0)
 			{
+				ExitReason = string.Format("Process encountered {0} Ensures", LogSummary.Ensures.Count());
+				ExitCode = -1;
+				return UnrealProcessResult.EncounteredEnsure;
+			}
+
+			// If we found a valid exit code with test markup, return it
+			if (LogSummary.HasTestExitCode)
+			{
+				ExitReason = string.Format("Tests exited with error code {0}", LogSummary.TestExitCode);
+				ExitCode = LogSummary.TestExitCode;
+				return ExitCode == 0 ? UnrealProcessResult.ExitOk : UnrealProcessResult.TestFailure;
+			}
+
+			// Engine exit was requested with no visible fatal error
+			if (LogSummary.RequestedExit)
+			{
+				// todo - need join cleanup with UE around RE due to errors
 				ExitReason = string.Format("Exit was requested: {0}", LogSummary.RequestedExitReason);
 				ExitCode = 0;
+				return UnrealProcessResult.ExitOk;
 			}
-			else
+
+			bool WasGauntletTest = InArtifacts.SessionRole.CommandLine.ToLower().Contains("-gauntlet");
+			// ok, process appears to have exited for no good reason so try to divine a result...
+			if (WasGauntletTest)
 			{
-				bool WasGauntletTest = InArtifacts.SessionRole.CommandLine.ToLower().Contains("-gauntlet");
-				// ok, process appears to have exited for no good reason so try to divine a result...
-				if (WasGauntletTest)
+				if (LogSummary.HasTestExitCode == false)
 				{
-					if (LogSummary.HasTestExitCode == false)
-					{
-						Log.Verbose("Role {0} had 0 exit code but used Gauntlet and no TestExitCode was found. Assuming failure", InArtifacts.SessionRole.RoleType);
-						ExitCode = -1;
-						ExitReason = "Process has terminated prematurely! No exit code from Gauntlet controller.";
-					}
-				}
-				else
-				{
-					// if all else fails, fall back to the exit code from the process. Not great.
-					ExitCode = InArtifacts.AppInstance.ExitCode;
-					if (ExitCode == 0)
-					{
-						ExitReason = "Process exited with code 0";
-					}
+					Log.Verbose("Role {0} had 0 exit code but used Gauntlet and no TestExitCode was found. Assuming failure", InArtifacts.SessionRole.RoleType);
+					ExitReason = "Process terminated prematurely! No test result from Gauntlet controller";
+					ExitCode = -1;
+					return UnrealProcessResult.TestFailure;
 				}
 			}
 
+			// AG TODO - do we still need this?
 			// Normal exits from server are not ok if we had clients running!
-			if (ExitCode == 0 && InArtifacts.SessionRole.RoleType.IsServer())
+			/*if (ExitCode == 0 && InArtifacts.SessionRole.RoleType.IsServer())
 			{
 				bool ClientsKilled = SessionArtifacts.Any(A => A.AppInstance.WasKilled && A.SessionRole.RoleType.IsClient());
 
@@ -1290,15 +1327,57 @@ namespace Gauntlet
 					ExitCode = -1;
 					ExitReason = "Server exited while clients were running";
 				}
-			}
-
-			if (ExitCode == -1 && string.IsNullOrEmpty(ExitReason))
-			{
-				ExitReason = "Process exited with no indication of success";
-			}
-
-			return ExitCode;
+			}*/
+			
+			// The process is gone but we don't know why. This is likely bad and signifies an unhandled or undiagnosed error
+						ExitReason = "app exited with code 0";
+			ExitCode = -1;
+			return UnrealProcessResult.Unknown;
 		}
+
+		/// <summary>
+		/// Returns a RoleResult, a representation of this roles result from the test, for the provided artifact
+		/// </summary>
+		/// <param name="InRoleArtifacts"></param>
+		/// <returns></returns>
+		protected virtual UnrealRoleResult CreateRoleResultFromArtifact(StopReason InReason, UnrealRoleArtifacts InRoleArtifacts)
+		{
+			int ExitCode;
+			string ExitReason;
+	
+			// Give ourselves (and derived classes) a chance to analyze what happened
+			UnrealProcessResult ProcessResult = GetExitCodeAndReason(InReason, InRoleArtifacts, out ExitReason, out ExitCode);
+
+			UnrealRoleResult Result = new UnrealRoleResult();
+			Result.Summary = ExitReason;
+			
+			Result.ExitCode = ExitCode;
+			Result.ProcessResult = ProcessResult;
+
+			// if the test is stopping for a reason other than completion, mark this as failing incase derived classes
+			// don't do the right thing
+			if (InReason == StopReason.MaxDuration)
+			{
+				Result.ProcessResult = UnrealProcessResult.TimeOut;
+				Result.ExitCode = -1;
+			}
+
+			Result.Artifacts = InRoleArtifacts;
+
+			return Result;
+		}
+
+		/// <summary>
+		/// Returns a list of all results for the roles involved in this test by calling CreateRoleResultFromArtifact for all
+		/// artifacts in the list
+		/// </summary>
+		/// <param name="InAllArtifacts"></param>
+		/// <returns></returns>
+		protected virtual IEnumerable<UnrealRoleResult> CreateRoleResultsFromArtifacts(StopReason InReason, IEnumerable<UnrealRoleArtifacts> InAllArtifacts)
+		{
+			return InAllArtifacts.Select(A => CreateRoleResultFromArtifact(InReason, A));
+		}
+
 
 		private void CheckHeartbeat()
 		{
@@ -1398,30 +1477,29 @@ namespace Gauntlet
 			return CombinedHash;
 		}
 
+		
 		/// <summary>
-		/// Parses the output of an application to try and determine a failure cause (if one exists). Returns
-		/// 0 for graceful shutdown
+		/// Returns a formatted summary of the role that's suitable for displaying
 		/// </summary>
-		/// <param name="Prefix"></param>
-		/// <param name="App"></param>
+		/// <param name="InRoleResult"></param>
 		/// <returns></returns>
-		protected virtual int GetRoleSummary(UnrealRoleArtifacts InArtifacts, out string Summary)
+		protected virtual string GetFormattedRoleSummary(UnrealRoleResult InRoleResult)
 		{
 
 			const int MaxLogLines = 10;
 			const int MaxCallstackLines = 20;
 
-			UnrealLogParser.LogSummary LogSummary = InArtifacts.LogSummary;
+			UnrealLogParser.LogSummary LogSummary = InRoleResult.Artifacts.LogSummary;
 						
-			string ExitReason = "Unknown";
-			int ExitCode = GetExitCodeAndReason(InArtifacts, out ExitReason);
-
 			MarkdownBuilder MB = new MarkdownBuilder();
 
-			MB.HorizontalLine();
-			MB.H3(string.Format("Role: {0} ({1} {2})", InArtifacts.SessionRole.RoleType, InArtifacts.SessionRole.Platform, InArtifacts.SessionRole.Configuration));
-		
-			MB.Paragraph(string.Format("Result: {0} (Code={1})", ExitReason, ExitCode));
+			UnrealRoleArtifacts RoleArtifacts = InRoleResult.Artifacts;
+
+			MB.H3(string.Format("Role: {0} ({1} {2})", RoleArtifacts.SessionRole.RoleType, RoleArtifacts.SessionRole.Platform, RoleArtifacts.SessionRole.Configuration));
+
+			//string RoleState = InRoleResult.ExitCode == 0 ? "Completed:" : "Error:";
+			string RoleState = "Result: ";
+			MB.Paragraph(string.Format("{0} {1} ({2}, ExitCode={3})", RoleState, InRoleResult.Summary, InRoleResult.ProcessResult, InRoleResult.ExitCode));
 
 			MB.UnorderedList(new string[] {
 				LogSummary.FatalError != null ? "Fatal Errors: 1" : null,
@@ -1433,9 +1511,9 @@ namespace Gauntlet
 			if (LogSummary.FatalError != null)
 			{
 				MB.H4(string.Format("Fatal Error: {0}", LogSummary.FatalError.Message));
-				MB.UnorderedList(InArtifacts.LogSummary.FatalError.Callstack.Take(MaxCallstackLines));
+				MB.UnorderedList(RoleArtifacts.LogSummary.FatalError.Callstack.Take(MaxCallstackLines));
 
-				if (InArtifacts.LogSummary.FatalError.Callstack.Count() > MaxCallstackLines)
+				if (RoleArtifacts.LogSummary.FatalError.Callstack.Count() > MaxCallstackLines)
 				{
 					MB.Paragraph("See log for full callstack");
 				}
@@ -1455,15 +1533,12 @@ namespace Gauntlet
 				}
 			}
 
-			// Show warnings if that option is set, or the process exited abnormally
-			bool ShouldShowErrors = GetCachedConfiguration().ShowErrorsInSummary || (InArtifacts.AppInstance.WasKilled == false && InArtifacts.LogSummary.HasAbnormalExit);
-			bool ShouldShowWarnings = GetCachedConfiguration().ShowWarningsInSummary || (InArtifacts.AppInstance.WasKilled == false && InArtifacts.LogSummary.HasAbnormalExit);
-
-			if (ShouldShowErrors)
+			// Show errors/warnings if that option is set	
+			if (GetCachedConfiguration().ShowErrorsInSummary)
 			{
-				if (InArtifacts.LogSummary.Errors.Count() > 0)
+				if (RoleArtifacts.LogSummary.Errors.Count() > 0)
 				{
-					IEnumerable<string> Errors = LogSummary.Errors.Distinct();
+					IEnumerable<UnrealLogParser.LogEntry> Errors = LogSummary.Errors.Distinct();
 
 					string TrimStatement = "";
 
@@ -1483,7 +1558,7 @@ namespace Gauntlet
 					}
 
 					MB.H4("Errors");
-					MB.UnorderedList(Errors);
+					MB.UnorderedList(Errors.Select(E => E.ToString()));
 
 					if (!string.IsNullOrEmpty(TrimStatement))
 					{
@@ -1492,11 +1567,11 @@ namespace Gauntlet
 				}
 			}
 
-			if (ShouldShowWarnings)
+			if (GetCachedConfiguration().ShowWarningsInSummary)
 			{
-				if (InArtifacts.LogSummary.Warnings.Count() > 0)
+				if (RoleArtifacts.LogSummary.Warnings.Count() > 0)
 				{
-					IEnumerable<string> Warnings = LogSummary.Warnings.Distinct();
+					IEnumerable<UnrealLogParser.LogEntry> Warnings = LogSummary.Warnings.Distinct();
 
 					string TrimStatement = "";
 
@@ -1516,7 +1591,7 @@ namespace Gauntlet
 					}
 
 					MB.H4("Warnings");
-					MB.UnorderedList(Warnings);
+					MB.UnorderedList(Warnings.Select(E => E.ToString()));
 
 					if (!string.IsNullOrEmpty(TrimStatement))
 					{
@@ -1528,13 +1603,13 @@ namespace Gauntlet
 			MB.H4("Artifacts");
 			string[] ArtifactList = new string[]
 			{
-				string.Format("Log: {0}", InArtifacts.LogPath),
-				string.Format("SavedDir: {0}", InArtifacts.ArtifactPath),
-				string.Format("Commandline: {0}", InArtifacts.AppInstance.CommandLine),
+				string.Format("Log: {0}", RoleArtifacts.LogPath),
+				string.Format("SavedDir: {0}", RoleArtifacts.ArtifactPath),
+				string.Format("Commandline: {0}", RoleArtifacts.AppInstance.CommandLine),
 			};
 			MB.UnorderedList(ArtifactList);
-			Summary = MB.ToString();
-			return ExitCode;
+
+			return MB.ToString(); 		
 		}
 
 		/// <summary>
@@ -1589,60 +1664,30 @@ namespace Gauntlet
 		/// crash, assert, or other exit that does not appear to have been caused by completion of a process
 		/// </summary>
 		/// <returns></returns>
-		protected virtual IEnumerable<UnrealRoleArtifacts> GetArtifactsThatExitedAbnormally()
+		protected virtual IEnumerable<UnrealRoleResult> GetRolesThatExitedAbnormally()
 		{
-			if (SessionArtifacts == null)
+			if (RoleResults == null)
 			{
-				Log.Warning("SessionArtifacts was null, unable to check for failures");
-				return Enumerable.Empty<UnrealRoleArtifacts>();
+				Log.Warning("RoleResults was null, unable to check for failures");
+				return Enumerable.Empty<UnrealRoleResult>();
 			}
 
-			return SessionArtifacts.Where(A => A.AppInstance.WasKilled == false && A.LogSummary.HasAbnormalExit);
+			return RoleResults.Where(R => R.ProcessResult != UnrealProcessResult.ExitOk && R.Artifacts.LogSummary.HasAbnormalExit);
 		}
 
 		/// <summary>
 		/// Return all artifacts that are considered to have caused the test to fail
 		/// </summary>
 		/// <returns></returns>
-		protected virtual IEnumerable<UnrealRoleArtifacts> GetArtifactsWithFailures()
+		protected virtual IEnumerable<UnrealRoleResult> GetRolesThatFailed()
 		{
-			if (SessionArtifacts == null)
+			if (RoleResults == null)
 			{
-				Log.Warning("SessionArtifacts was null, unable to check for failures");
-				return new UnrealRoleArtifacts[0] { };
+				Log.Warning("RoleResults was null, unable to check for failures");
+				return Enumerable.Empty<UnrealRoleResult>();
 			}
 
-			Dictionary<UnrealRoleArtifacts, int> ErrorCodes = new Dictionary<UnrealRoleArtifacts, int>();
-
-			var FailureList = SessionArtifacts.Where(A =>
-			{
-				// ignore anything we killed
-				if (A.AppInstance.WasKilled)
-				{
-					return false;
-				}
-
-				string ExitReason;
-				int ExitCode = GetExitCodeAndReason(A, out ExitReason);
-
-				ErrorCodes.Add(A, ExitCode);
-
-				return ExitCode != 0;
-			});
-
-			// Put less suspect issues at the top since the user is likely going to stare at the last lines of the log and read up
-			return FailureList.OrderBy(A =>
-			{
-				int Score = 0;
-
-				if (A.LogSummary.FatalError != null || (ErrorCodes[A] != 0 && A.AppInstance.WasKilled == false))
-				{
-					Score += 100000;
-				}
-
-				Score += A.LogSummary.Ensures.Count();
-				return Score;
-			}).ToList();
+			return RoleResults.Where(R => R.ProcessResult != UnrealProcessResult.ExitOk);	
 		}
 
 		/// <summary>
@@ -1655,14 +1700,15 @@ namespace Gauntlet
 			int ExitCode = 0;
 
 			// Let the test try and diagnose things as best it can
-			var ProblemArtifact = GetArtifactsWithFailures().FirstOrDefault();
+			IEnumerable<UnrealRoleResult> FailedRoles = GetRolesThatFailed();
 
-			if (ProblemArtifact != null)
+			if (FailedRoles.Any())
 			{
-				string ExitReason;
-
-				ExitCode = GetExitCodeAndReason(ProblemArtifact, out ExitReason);
-				Log.Info("{0} exited with {1}. ({2})", ProblemArtifact.SessionRole, ExitCode, ExitReason);
+				foreach (var Role in FailedRoles)
+				{
+					Log.Info("Failing test because {0} exited with {1}. ({2})", Role.Artifacts.SessionRole, Role.ExitCode, Role.Summary);
+				}
+				ExitCode = FailedRoles.FirstOrDefault().ExitCode;
 			}
 
 			// If it didn't find an error, overrule it as a failure if the test was cancelled
@@ -1688,66 +1734,85 @@ namespace Gauntlet
 			int Warnings = 0;
 
 			MarkdownBuilder MB = new MarkdownBuilder();
-			
-			if (GetTestResult() != TestResult.Passed)
+
+			bool TestFailed = GetTestResult() != TestResult.Passed;
+
+			// Good/Bad news upfront
+			string WarningStatement = (HasWarnings && !TestFailed)  ? " With Warnings" : "";
+			string ResultString = string.Format("*** {0}{1} ***", GetTestResult(), WarningStatement);
+			MB.H2(ResultString);
+
+			if (TestFailed)
 			{
 				// If the test didn't pass then show a brief summary of any roles that had an abnormal exit, or failing that
 				// are reported as having a failure. Tests should overload GetArtifactsWithFailures if necessary
-				IEnumerable<UnrealRoleArtifacts> RolesCausingFailure = GetArtifactsThatExitedAbnormally();
+				IEnumerable<UnrealRoleResult> RolesCausingFailure = GetRolesThatExitedAbnormally();
 				bool HadAbnormalExit = RolesCausingFailure.Any();
 
 				if (!HadAbnormalExit)
 				{
-					RolesCausingFailure = GetArtifactsWithFailures();
+					RolesCausingFailure = GetRolesThatFailed();
 				}
+
+				// get roles that didn't fail
+				IEnumerable<UnrealRoleResult> RolesWithoutFailures = RoleResults.Where(R => R.ProcessResult == UnrealProcessResult.ExitOk);
 
 				if (RolesCausingFailure.Any())
 				{
-					MB.Paragraph(string.Format("{0} failed", this.Name));
-
 					List<string> RoleItems = new List<string>();
 
-					foreach (var Artifact in RolesCausingFailure)
-					{
-						string ProcessCause = "";
-						int ExitCode = GetExitCodeAndReason(Artifact, out ProcessCause);
-						MB.H3(Artifact.SessionRole.RoleType.ToString());
+					MB.H3("Roles with Failures");
 
-						if (Artifact.LogSummary.FatalError != null)
+					foreach (var Role in RolesCausingFailure)
+					{
+						string RoleName = Role.Artifacts.SessionRole.RoleType.ToString();
+						MB.Paragraph(string.Format("Error: {0}: {1} ({2}, ExitCode {3})", RoleName, Role.Summary, Role.ProcessResult, Role.ExitCode));
+						
+						if (Role.Artifacts.LogSummary.FatalError != null)
 						{
-							MB.Paragraph(Artifact.LogSummary.FatalError.Message);
+							MB.Paragraph(Role.Artifacts.LogSummary.FatalError.Message);
+							MB.UnorderedList(Role.Artifacts.LogSummary.FatalError.Callstack.Take(15));
 						}
 
-						MB.Paragraph(string.Format("\tResult: {0} (ExitCode {1})", ProcessCause, ExitCode));
-
-						//RoleItems.Add(string.Format("{0}: {1}", Artifact.SessionRole.RoleType, ))
+						MB.Paragraph("Logs/Saved:");
+						MB.UnorderedList(new string[] { Role.Artifacts.LogPath, Role.Artifacts.ArtifactPath });
 					}
 
-					MB.Paragraph(string.Format("See Role {0} above for logs and any callstacks", RolesCausingFailure.First().SessionRole.ToString()));
+					MB.Paragraph(string.Format("(See 'Role Report' above summary for more details on each role)", RolesCausingFailure.First().Artifacts.SessionRole.ToString()));
 				}
 				else
 				{
-					MB.Paragraph(string.Format("{0} failed due to undiagnosed reasons", this.Name));
-					MB.Paragraph("See above for logs and any callstacks");
+					MB.Paragraph(string.Format("Error: {0} failed due to undiagnosed reasons", this.Name));
+					MB.Paragraph("See 'Role Report' above summary for more details on each role");
 				}
+
+				// show roles without issues incase cross-referencing is needed
+				/*if (RolesWithoutFailures.Any())
+				{
+					MB.H3("Roles with no reported failures");
+
+					foreach (var Role in RolesWithoutFailures)
+					{
+						string RoleName = Role.Artifacts.SessionRole.RoleType.ToString();
+						MB.Paragraph(string.Format("Completed: {0}: {1} ({2}, ExitCode {3})", RoleName, Role.Summary, Role.ProcessResult, Role.ExitCode));
+						MB.UnorderedList(new string[] { Role.Artifacts.LogPath, Role.Artifacts.ArtifactPath });
+					}
+				}*/
 			}
 			else
 			{
 				// create a quicck summary of total failures, ensures, errors, etc
-				foreach (var Artifact in SessionArtifacts)
+				foreach (var RoleResult in RoleResults)
 				{
-					string Summary;
-					int ExitCode = GetRoleSummary(Artifact, out Summary);
-
-					if (ExitCode != 0 && Artifact.AppInstance.WasKilled == false)
+					if (RoleResult.ExitCode != 0 && RoleResult.Artifacts.AppInstance.WasKilled == false)
 					{
 						AbnormalExits++;
 					}
 
-					FatalErrors += Artifact.LogSummary.FatalError != null ? 1 : 0;
-					Ensures += Artifact.LogSummary.Ensures.Count();
-					Errors += Artifact.LogSummary.Errors.Count();
-					Warnings += Artifact.LogSummary.Warnings.Count();
+					FatalErrors += RoleResult.Artifacts.LogSummary.FatalError != null ? 1 : 0;
+					Ensures += RoleResult.Artifacts.LogSummary.Ensures.Count();
+					Errors += RoleResult.Artifacts.LogSummary.Errors.Count();
+					Warnings += RoleResult.Artifacts.LogSummary.Warnings.Count();
 				}
 
 				MB.UnorderedList(new string[] {
@@ -1758,10 +1823,6 @@ namespace Gauntlet
 					Warnings > 0 ? string.Format("Log Warnings: {0}", Warnings) : null,
 					string.Format("Result: {0}", GetTestResult())
 				});
-
-				// Create a summary
-				string WarningStatement = HasWarnings ? " With Warnings" : "";
-				MB.H3(string.Format("{0} {1}{2}", Name, GetTestResult(), WarningStatement));
 			}
 
 			return MB.ToString();
@@ -1781,39 +1842,37 @@ namespace Gauntlet
 
 			MarkdownBuilder ReportBuilder = new MarkdownBuilder();			
 
-			StringBuilder SB = new StringBuilder();
+			// Sort roles so problem ones are at the bottom, just above the summary
+			var SortedRoles = RoleResults.OrderBy(R =>
+			{
+				int Score = 0;
 
-			// Get any artifacts with failures
-			var FailureArtifacts = GetArtifactsWithFailures();
+				if (R.ProcessResult != UnrealProcessResult.ExitOk)
+				{
+					Score += 1000000;
+				}
 
-			// Any with warnings (ensures)
-			var WarningArtifacts = SessionArtifacts.Where(A => A.LogSummary.Ensures.Count() > 0);
+				Score += R.Artifacts.LogSummary.Errors.Count() * 10;
+				Score += R.Artifacts.LogSummary.Warnings.Count();
 
-			// combine artifacts into order as Failures, Warnings, Other
-			var AllArtifacts = FailureArtifacts.Union(WarningArtifacts);
-			AllArtifacts = AllArtifacts.Union(SessionArtifacts);
+				return Score;
+			});
 
-			ReportBuilder.H1(string.Format("{0} Report", this.Name));
+			ReportBuilder.HorizontalLine();
+			ReportBuilder.H1(string.Format("Role(s) Report: {0}", this.Name));
 			ReportBuilder.HorizontalLine();
 
 			// Add a summary of each 
-			foreach ( var Artifact in AllArtifacts)
+			foreach (var Role in SortedRoles)
 			{
-				string Summary = "NoSummary";
-				int ExitCode = GetRoleSummary(Artifact, out Summary);
-
-				if (SB.Length > 0)
-				{
-					SB.AppendLine();
-				}
-				SB.Append(Summary);
+				string Summary = GetFormattedRoleSummary(Role);
+				ReportBuilder.Append(Summary);
+				ReportBuilder.HorizontalLine();
 			}
 
-			ReportBuilder.Append(SB.ToString());
-
 			// add Summary
+			ReportBuilder.H1("Test Report: " + this.Name);
 			ReportBuilder.HorizontalLine();
-			ReportBuilder.H2("Summary");
 			ReportBuilder.Append(GetTestSummaryHeader());
 
 			return ReportBuilder.ToString();

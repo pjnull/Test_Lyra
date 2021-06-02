@@ -81,7 +81,7 @@ namespace UE
 		/// <returns></returns>
 		protected virtual string GetCompletionString()
 		{
-			return "Bringing up level for play took";
+			return "Engine is initialized. Leaving FEngineLoop::Init()";
 		}
 
 		/// <summary>

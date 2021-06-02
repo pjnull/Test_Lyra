@@ -114,10 +114,9 @@ namespace UE
 			return Config;
 		}
 
-		protected override int GetExitCodeAndReason(UnrealRoleArtifacts InArtifacts, out string ExitReason)
+		protected override UnrealProcessResult GetExitCodeAndReason(StopReason InReason, UnrealRoleArtifacts InArtifacts, out string ExitReason, out int ExitCode)
 		{
-			string Reason = "";
-			int ExitCode = -1;
+			string LocalReason = "";
 
 			TestResult FinalResult = TestResult.Invalid;
 
@@ -132,22 +131,22 @@ namespace UE
 				if (EnsureCount == 0)
 				{
 					FinalResult = TestResult.Failed;
-					Reason = string.Format("No ensure error found for failure of type {0}", ErrorType);
+					LocalReason = string.Format("No ensure error found for failure of type {0}", ErrorType);
 				}
 				else if (EnsureCount != 1)
 				{
 					FinalResult = TestResult.Failed;
-					Reason = string.Format("Incorrect ensure count found for failure of type {0}", ErrorType);
+					LocalReason = string.Format("Incorrect ensure count found for failure of type {0}", ErrorType);
 				}
 				else if (CallstackLength == 0)
 				{
 					FinalResult = TestResult.Failed;
-					Reason = string.Format("No callstack error found for failure of type {0}", ErrorType);
+					LocalReason = string.Format("No callstack error found for failure of type {0}", ErrorType);
 				}
 				else
 				{
 					FinalResult = TestResult.Passed;
-					Reason = string.Format("Found {0} ensures, test result = {1}", EnsureCount, FinalResult);
+					LocalReason = string.Format("Found {0} ensures, test result = {1}", EnsureCount, FinalResult);
 				}
 			}
 			else
@@ -170,7 +169,7 @@ namespace UE
 						if (!Summary.FatalError.Message.ToLower().Contains("assertion failed"))
 						{
 							FinalResult = TestResult.Failed;
-							Reason = string.Format("Unexpected assertion message");
+							LocalReason = string.Format("Unexpected assertion message");
 						}
 						else
 						{
@@ -183,7 +182,7 @@ namespace UE
 						if (!Summary.FatalError.Message.ToLower().Contains("fatal erro"))
 						{
 							FinalResult = TestResult.Failed;
-							Reason = string.Format("Unexpected Fatal Error message");
+							LocalReason = string.Format("Unexpected Fatal Error message");
 						}
 						else
 						{
@@ -197,7 +196,7 @@ namespace UE
 						if (!Summary.FatalError.Message.ToLower().Contains("exception"))
 						{
 							FinalResult = TestResult.Failed;
-							Reason = string.Format("Unexpected exception message");
+							LocalReason = string.Format("Unexpected exception message");
 						}
 						else
 						{
@@ -212,11 +211,11 @@ namespace UE
 			if (FinalResult != TestResult.Invalid)
 			{
 				ExitCode = (FinalResult == TestResult.Passed) ? 0 : 6;
-				ExitReason = Reason;
-				return ExitCode;
+				ExitReason = LocalReason;
+				return FinalResult == TestResult.Passed ? UnrealProcessResult.ExitOk : UnrealProcessResult.TestFailure;
 			}
 			
-			return base.GetExitCodeAndReason(InArtifacts, out ExitReason);
+			return base.GetExitCodeAndReason(InReason, InArtifacts, out ExitReason, out ExitCode);
 		}
 	}
 }

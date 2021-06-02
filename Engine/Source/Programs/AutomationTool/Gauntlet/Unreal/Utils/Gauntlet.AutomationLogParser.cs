@@ -157,7 +157,7 @@ namespace Gauntlet
 				AutomationReportURL = ReportUrlMatch.First().Groups[1].ToString();
 			}
 
-			AutomationLogEntries = Parser.Entries.Where(
+			AutomationLogEntries = Parser.LogEntries.Where(
 										E => E.Category.StartsWith("Automation", StringComparison.OrdinalIgnoreCase)
 										|| E.Category.StartsWith("FunctionalTest", StringComparison.OrdinalIgnoreCase)
 										)

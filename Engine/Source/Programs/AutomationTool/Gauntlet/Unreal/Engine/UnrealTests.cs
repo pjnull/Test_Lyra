@@ -201,17 +201,18 @@ namespace Gauntlet
 			}
 
 			/// <summary>
-			/// Parses the provided artifacts to determine the cause of an exit and whether it was abnormal
+			/// Override GetExitCodeAndReason to provide additional checking of success / failure based on what occurred
 			/// </summary>
 			/// <param name="InArtifacts"></param>
-			/// <param name="Reason"></param>
-			/// <param name="WasAbnormal"></param>
+			/// <param name="ExitReason"></param>
 			/// <returns></returns>
-			protected override int GetExitCodeAndReason(UnrealRoleArtifacts InArtifacts, out string ExitReason)
+			protected override UnrealProcessResult GetExitCodeAndReason(StopReason InReason, UnrealRoleArtifacts InArtifacts, out string ExitReason, out int ExitCode)
 			{
-				int ExitCode = base.GetExitCodeAndReason(InArtifacts, out ExitReason);
+				UnrealProcessResult UnrealResult = base.GetExitCodeAndReason(InReason, InArtifacts, out ExitReason, out ExitCode);
 
-				if (InArtifacts.SessionRole.RoleType == UnrealTargetRole.Editor)
+				// The editor is an additional arbiter of success
+				if (InArtifacts.SessionRole.RoleType == UnrealTargetRole.Editor
+					&& InArtifacts.LogSummary.HasAbnormalExit == false)
 				{
 					// if no fatal errors, check test results
 					if (InArtifacts.LogParser.GetFatalError() == null)
@@ -221,23 +222,25 @@ namespace Gauntlet
 						IEnumerable<AutomationTestResult> TotalTests = Parser.GetResults();
 						IEnumerable<AutomationTestResult> FailedTests = TotalTests.Where(R => !R.Passed);
 
+						// Tests failed so list that as our primary cause of failure
 						if (FailedTests.Any())
 						{
-							ExitReason = string.Format("{0}/{1} tests failed", FailedTests.Count(), TotalTests.Count());
+							ExitReason = string.Format("{0} of {1} test(s) failed", FailedTests.Count(), TotalTests.Count());
 							ExitCode = -1;
+							return UnrealProcessResult.TestFailure;
 						}
 
-						// Warn if no tests were run
+						// If no tests were run then that's a failure (possibly a bad RunTest argument?)
 						if (!TotalTests.Any())
 						{
 							ExitReason = "No tests were executed!";
 							ExitCode = -1;
+							return UnrealProcessResult.TestFailure;
 						}
 					}
 				}
 
-				return ExitCode;
-			}
+				return UnrealResult;
 
 			/// <summary>
 			/// Override the summary report so we can insert a link to our report and the failed tests
