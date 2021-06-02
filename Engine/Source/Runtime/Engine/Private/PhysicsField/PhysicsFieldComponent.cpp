@@ -635,7 +635,7 @@ void FPhysicsFieldResource::UpdateResource(FRHICommandListImmediate& RHICmdList,
 void FPhysicsFieldInstance::InitInstance( const TArray<EFieldPhysicsType>& TargetTypes, const bool bBuildClipmap)
 {
 	FPhysicsFieldInfos::BufferOffsets VectorTargets(InPlace, -1), ScalarTargets(InPlace, -1), IntegerTargets(InPlace, -1), PhysicsTargets(InPlace, -1);
-	TStaticArray<FIntVector4, MAX_PHYSICS_FIELD_TARGETS, 16> PhysicsBounds(FIntVector4(-1,-1,-1,-1));
+	TStaticArray<FIntVector4, MAX_PHYSICS_FIELD_TARGETS, 16> PhysicsBounds(InPlace, FIntVector4(-1));
 
 	static const TArray<EFieldPhysicsType> VectorTypes = GetFieldTargetTypes(EFieldOutputType::Field_Output_Vector);
 	static const TArray<EFieldPhysicsType> ScalarTypes = GetFieldTargetTypes(EFieldOutputType::Field_Output_Scalar);
