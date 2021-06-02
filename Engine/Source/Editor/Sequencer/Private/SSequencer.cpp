@@ -3061,6 +3061,11 @@ void SSequencer::PopBreadcrumb()
 	BreadcrumbTrail->PopCrumb();
 }
 
+void SSequencer::SetSearchText(const FText& InSearchText)
+{
+	SearchBox->SetText(InSearchText);
+}
+
 void SSequencer::OnOutlinerSearchChanged( const FText& Filter )
 {
 	TSharedPtr<FSequencer> Sequencer = SequencerPtr.Pin();
