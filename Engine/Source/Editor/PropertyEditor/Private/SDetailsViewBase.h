@@ -444,6 +444,10 @@ protected:
 
 	int32 NumVisibleTopLevelObjectNodes;
 
+	/** Used to refresh the tree when the whitelist changes */
+	FDelegateHandle PropertyWhitelistedChangedDelegate;
+	FDelegateHandle PropertyWhitelistedEnabledDelegate;
+
 	/** Delegate for overriding the show modified filter */
 	FSimpleDelegate CustomFilterDelegate;
 
