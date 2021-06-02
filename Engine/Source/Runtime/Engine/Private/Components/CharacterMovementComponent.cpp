@@ -12134,7 +12134,6 @@ void UCharacterMovementComponent::FillAsyncInput(const FVector& InputVector, FCh
 	AsyncInput.FallingLateralFriction = FallingLateralFriction;
 	AsyncInput.JumpZVelocity = JumpZVelocity;
 	AsyncInput.bAllowPhysicsRotationDuringAnimRootMotion = bAllowPhysicsRotationDuringAnimRootMotion;
-	AsyncInput.RotationRate = RotationRate;
 	AsyncInput.bDeferUpdateMoveComponent = bDeferUpdateMoveComponent;
 	AsyncInput.bRequestedMoveUseAcceleration = bRequestedMoveUseAcceleration;
 	AsyncInput.PerchAdditionalHeight = PerchAdditionalHeight;
@@ -12265,6 +12264,7 @@ void UCharacterMovementComponent::FillAsyncInput(const FVector& InputVector, FCh
 		AsyncSimState->LastUpdateVelocity = LastUpdateVelocity;
 		AsyncSimState->bForceNextFloorCheck = bForceNextFloorCheck;
 		AsyncSimState->Velocity = Velocity;
+		AsyncSimState->RotationRate = RotationRate;
 		AsyncSimState->bDeferUpdateBasedMovement = bDeferUpdateBasedMovement;
 		AsyncSimState->MoveComponentFlags = MoveComponentFlags;
 		AsyncSimState->PendingForceToApply = PendingForceToApply;

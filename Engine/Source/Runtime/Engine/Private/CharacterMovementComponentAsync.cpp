@@ -1333,7 +1333,7 @@ void FCharacterMovementComponentAsyncInput::PhysicsRotation(float DeltaTime, FCh
 	FRotator CurrentRotation = FRotator(UpdatedComponentInput->GetRotation()); // Normalized
 	CurrentRotation.DiagnosticCheckNaN(TEXT("CharacterMovementComponent::PhysicsRotation(): CurrentRotation"));
 
-	FRotator DeltaRot = GetDeltaRotation(DeltaTime);
+	FRotator DeltaRot = Output.GetDeltaRotation(Output.RotationRate, DeltaTime);
 	DeltaRot.DiagnosticCheckNaN(TEXT("CharacterMovementComponent::PhysicsRotation(): GetDeltaRotation"));
 
 	FRotator DesiredRotation = CurrentRotation;
@@ -4226,17 +4226,6 @@ bool FCharacterMovementComponentAsyncInput::ShouldCheckForValidLandingSpot(float
 	return false;
 }
 
-FRotator FCharacterMovementComponentAsyncInput::GetDeltaRotation(float DeltaTime) const
-{
-	return FRotator(GetAxisDeltaRotation(RotationRate.Pitch, DeltaTime), GetAxisDeltaRotation(RotationRate.Yaw, DeltaTime), GetAxisDeltaRotation(RotationRate.Roll, DeltaTime));
-}
-
-float FCharacterMovementComponentAsyncInput::GetAxisDeltaRotation(float InAxisRotationRate, float DeltaTime) const
-{
-	// Values over 360 don't do anything, see FMath::FixedTurn. However we are trying to avoid giant floats from overflowing other calculations.
-	return (InAxisRotationRate >= 0.f) ? FMath::Min(InAxisRotationRate * DeltaTime, 360.f) : 360.f;
-}
-
 bool FCharacterMovementComponentAsyncInput::ShouldRemainVertical(FCharacterMovementComponentAsyncOutput& Output) const
 {
 	// Always remain vertical when walking or falling.
@@ -4590,3 +4579,13 @@ void FCharacterMovementComponentAsyncOutput::Copy(const FCharacterMovementCompon
 	*CharacterOutput = *Value.CharacterOutput;
 }
 
+FRotator FCharacterMovementComponentAsyncOutput::GetDeltaRotation(const FRotator& InRotationRate, float InDeltaTime)
+{
+	return FRotator(GetAxisDeltaRotation(InRotationRate.Pitch, InDeltaTime), GetAxisDeltaRotation(InRotationRate.Yaw, InDeltaTime), GetAxisDeltaRotation(InRotationRate.Roll, InDeltaTime));
+}
+
+float FCharacterMovementComponentAsyncOutput::GetAxisDeltaRotation(float InAxisRotationRate, float InDeltaTime)
+{
+	// Values over 360 don't do anything, see FMath::FixedTurn. However we are trying to avoid giant floats from overflowing other calculations.
+	return (InAxisRotationRate >= 0.f) ? FMath::Min(InAxisRotationRate * InDeltaTime, 360.f) : 360.f;
+}

@@ -175,6 +175,9 @@ public:
 	
 	bool IsValid() const { return bIsValid; }
 
+	static FRotator GetDeltaRotation(const FRotator& InRotationRate, float InDeltaTime);
+	static float GetAxisDeltaRotation(float InAxisRotationRate, float InDeltaTime);
+
 	bool bWasSimulatingRootMotion;
 	EMovementMode MovementMode;
 	EMovementMode GroundMovementMode;
@@ -187,6 +190,7 @@ public:
 	bool bForceNextFloorCheck;
 	FRootMotionSourceGroup CurrentRootMotion; //  TODO not threadsafe, has pointers in there...
 	FVector Velocity;
+	FRotator RotationRate;
 	bool bDeferUpdateBasedMovement;
 	EMoveComponentFlags MoveComponentFlags;
 	FVector PendingForceToApply;
@@ -409,7 +413,6 @@ struct ENGINE_API FCharacterMovementComponentAsyncInput : public Chaos::FSimCall
 	float FallingLateralFriction;
 	float JumpZVelocity;
 	bool bAllowPhysicsRotationDuringAnimRootMotion;
-	FRotator RotationRate;
 	bool bDeferUpdateMoveComponent;
 	bool bRequestedMoveUseAcceleration;
 	float PerchAdditionalHeight;
@@ -547,8 +550,6 @@ struct ENGINE_API FCharacterMovementComponentAsyncInput : public Chaos::FSimCall
 	virtual void SetPostLandedPhysics(const FHitResult& Hit, FCharacterMovementComponentAsyncOutput& Output) const;
 	virtual void SetDefaultMovementMode(FCharacterMovementComponentAsyncOutput& Output) const;
 	virtual bool ShouldCheckForValidLandingSpot(float DeltaTime, const FVector& Delta, const FHitResult& Hit, FCharacterMovementComponentAsyncOutput& Output) const;
-	virtual FRotator GetDeltaRotation(float DeltaTime) const;
-	virtual float GetAxisDeltaRotation(float InAxisRotationRate, float DeltaTime) const;
 	virtual FRotator ComputeOrientToMovementRotation(const FRotator& CurrentRotation, float DeltaTime, FRotator& DeltaRotation, FCharacterMovementComponentAsyncOutput& Output) const;
 	virtual bool ShouldRemainVertical(FCharacterMovementComponentAsyncOutput& Output) const;
 	virtual bool CanAttemptJump(FCharacterMovementComponentAsyncOutput& Output) const;
