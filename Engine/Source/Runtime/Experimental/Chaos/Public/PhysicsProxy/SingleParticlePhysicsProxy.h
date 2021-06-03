@@ -17,6 +17,10 @@
 #include "Math/NumericLimits.h"
 #include "RewindData.h"
 
+
+
+extern CHAOS_API int32 SyncKinematicOnGameThread;
+
 namespace Chaos
 {
 	class FPBDRigidsEvolutionGBF;
