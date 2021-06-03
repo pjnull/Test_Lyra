@@ -114,7 +114,7 @@ void InitInternalBuffer(const uint32 ElementCount, FRWBuffer& OutputBuffer)
 		if (OutputBuffer.UAV)
 		{
 			FRHICommandListExecutor::GetImmediateCommandList().Transition(FRHITransitionInfo(OutputBuffer.UAV, ERHIAccess::Unknown, ERHIAccess::UAVCompute));
-			if (PixelFormat == EPixelFormat::PF_R32_FLOAT)
+			if (PixelFormat == EPixelFormat::PF_R32_FLOAT || PixelFormat == EPixelFormat::PF_A32B32G32R32F)
 			{
 				FRHICommandListExecutor::GetImmediateCommandList().ClearUAVFloat(OutputBuffer.UAV, FVector4(ForceInitToZero));
 			}
