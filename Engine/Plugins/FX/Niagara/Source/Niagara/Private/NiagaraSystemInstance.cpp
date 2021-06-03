@@ -1179,6 +1179,10 @@ void FNiagaraSystemInstance::BindParameters()
 			OverrideParameters->Bind(&SystemSimulation->GetUpdateExecutionContext()->Parameters);
 		}
 	}
+	else
+	{
+		UE_LOG(LogNiagara, Warning, TEXT("OverrideParameters is null.  Component(%s) System(%s)"), *GetFullNameSafe(AttachComponent.Get()), *GetFullNameSafe(GetSystem()));
+	}
 
 	for (TSharedRef<FNiagaraEmitterInstance, ESPMode::ThreadSafe> Simulation : Emitters)
 	{

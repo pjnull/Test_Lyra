@@ -842,7 +842,10 @@ void FNiagaraEmitterInstance::BindParameters(bool bExternalOnly)
 	{
 		if (ParentSystemInstance)
 		{
-			ParentSystemInstance->GetOverrideParameters()->Bind(&RendererBindings);
+			if (FNiagaraUserRedirectionParameterStore* ParentOverrideParameters = ParentSystemInstance->GetOverrideParameters())
+			{
+				ParentOverrideParameters->Bind(&RendererBindings);
+			}
 			ParentSystemInstance->GetInstanceParameters().Bind(&RendererBindings);
 		}
 
