@@ -545,6 +545,113 @@ namespace ChaosTest {
 			EXPECT_EQ(Visitor.bHit, true);
 		}
 	}
+	
+	GTEST_TEST(EngineInterface, KinematicTargetsPassingGTWrongAccelBoundsBeforeHittingTarget)
+	{
+		// This test is designed to catch an edge case with kinematic targets (or other things interpolated over multiple physics steps), and acceleration structure bounds.
+		// Timestep is setup such that 1 GT frame = 10 physics steps, we have to make sure that if a non-final step gives an acceleration structure to game thread, in which
+		// kinematic has not reached target yet, that the bounds in structure representing interpolated position do not make it to game thread, otherwise game thread has
+		// position at target, but bounds that don't match.
+
+
+		// Setup solver so we can manually execute each physics step.
+		FChaosScene Scene(nullptr);
+		Scene.GetSolver()->SetThreadingMode_External(EThreadingModeTemp::SingleThread);
+		Scene.GetSolver()->SetStealAdvanceTasks_ForTesting(true);
+
+		// In this test we have a 10s Dt, split into 10 physics steps of 1s.
+		const float PhysicsTimestep = 1; // 1 second
+		const int32 PhysicsStepsInFrame = 10; 
+		float DeltaSeconds = PhysicsTimestep * PhysicsStepsInFrame;
+		FVec3 Grav(0, 0, -1);
+
+		Scene.SetUpForFrame(&Grav, DeltaSeconds, 9999, 9999, 9999, false);
+		Scene.GetSolver()->EnableAsyncMode(PhysicsTimestep);
+
+
+		// Raycast params, aimed to hit our kinematic target (10,0,0)
+		const FVector Start(10, 0, -5);
+		const FVector Dir(0, 0,1);
+		const float Length = 50;
+
+		// Init kinematic particle, sphere radius 3
+		FActorCreationParams Params;
+		Params.Scene = &Scene;
+		Params.bSimulatePhysics = false;
+		Params.bEnableGravity = true;
+		Params.bStartAwake = true;
+		FPhysicsActorHandle Proxy = nullptr;
+		FChaosEngineInterface::CreateActor(Params, Proxy);
+		auto& Particle = Proxy->GetGameThreadAPI();
+		{
+			auto Sphere = MakeUnique<TSphere<FReal, 3>>(FVec3(0), 3);
+			Particle.SetGeometry(MoveTemp(Sphere));
+		}
+		TArray<FPhysicsActorHandle> Proxys = { Proxy };
+		Scene.AddActorsToScene_AssumesLocked(Proxys);
+
+		// Execute a whole frame such that particle is initialized on physics thread
+		Scene.StartFrame();
+		for (int32 PhysicsTicks = 0; PhysicsTicks < PhysicsStepsInFrame; ++PhysicsTicks)
+		{
+			// Tick each physics step generated from game thread input
+			Scene.GetSolver()->PopAndExecuteStolenAdvanceTask_ForTesting();
+		}
+		Scene.EndFrame();
+
+		// Set kinematic target to (10,0,0) on game thread
+		FTransform Target(FVector(10, 0, 0));
+		FChaosEngineInterface::SetKinematicTarget_AssumesLocked(Proxy, Target);
+
+		// Confirm particle is at target on game thread with raycast.
+		{
+			FSimpleRaycastVisitor Visitor(Start, true);
+			Scene.GetSpacialAcceleration()->Raycast(Start, Dir, Length, Visitor);
+			EXPECT_EQ(Visitor.bHit, true);
+		}
+		
+	
+
+		// Tick game thread again, this enqueues 10 physics steps, kinematic will interpolate
+		// to target on physics thread over duration of these 10 steps.
+		Scene.StartFrame();
+
+
+
+		for (int32 PhysicsTick = 0; PhysicsTick < PhysicsStepsInFrame; ++PhysicsTick)
+		{
+
+			Scene.GetSolver()->PopAndExecuteStolenAdvanceTask_ForTesting();
+
+			if (PhysicsTick == 2)
+			{
+				// On this arbritrary tick, copy acceleration structure to game thread,
+				// at this point we have sim'd only some of the physics steps for this frame.
+				// kinematic target is still interpolating, has not reached target of (10,0,0) yet.
+				// When this was broken this would give game thread a structure with
+				// the bounds of interpolated position (which is wrong because game thread particle is at target!)
+				Scene.CopySolverAccelerationStructure();
+
+				// Verify the game thread particle can still be queried at target (verifying bounds and particle position are still correct)
+				{
+					FSimpleRaycastVisitor Visitor(Start, true);
+					Scene.GetSpacialAcceleration()->Raycast(Start, Dir, Length, Visitor);
+					EXPECT_EQ(Visitor.bHit, true);
+				}
+			}
+
+		}
+
+		// Finish frame
+		Scene.EndFrame();
+
+		// Verify can still query game thread particle at our target.
+		{
+			FSimpleRaycastVisitor Visitor(Start, true);
+			Scene.GetSpacialAcceleration()->Raycast(Start, Dir, Length, Visitor);
+			EXPECT_EQ(Visitor.bHit, true);
+		}
+	}
 
 	GTEST_TEST(EngineInterface, CreateActorPostFlush)
 	{
