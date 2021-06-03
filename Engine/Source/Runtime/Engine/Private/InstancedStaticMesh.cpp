@@ -1043,11 +1043,9 @@ void FPerInstanceRenderData::UpdateBoundsTransforms()
 	if (bTrackBounds)
 	{
 		LocalBounds = FBoxSphereBounds(InstanceLocalBounds);
-		PerInstanceBounds.Empty();
-		PerInstanceBounds.Reserve(InstanceCount);
+		PerInstanceBounds.Empty(InstanceCount);
 	}
-	PerInstanceTransforms.Empty();
-	PerInstanceTransforms.Reserve(InstanceCount);
+	PerInstanceTransforms.Empty(InstanceCount);
 
 	for (int InstanceIndex = 0; InstanceIndex < InstanceCount; InstanceIndex++)
 	{
