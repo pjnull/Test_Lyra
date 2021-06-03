@@ -2592,7 +2592,7 @@ public partial class Project : CommandUtils
 			StagedFileReference OutputRelativeLocation;
 			if (Params.HasDLCName)
 			{
-				if (Params.DLCOverrideStagedSubDir != null)
+				if (!string.IsNullOrEmpty(Params.DLCOverrideStagedSubDir))
 				{
 					OutputRelativeLocation = StagedFileReference.Combine(SC.RelativeProjectRootForStage, Params.DLCOverrideStagedSubDir, "Content", "Paks", Params.DLCFile.GetFileNameWithoutExtension() + OutputFilename + ".pak");
 				}
