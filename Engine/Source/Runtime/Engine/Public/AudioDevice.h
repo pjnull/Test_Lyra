@@ -806,6 +806,16 @@ public:
 	void GetAudioVolumeSettings(const uint32 WorldID, const FVector& Location, FAudioVolumeSettings& OutSettings) const;
 	void ResetAudioVolumeProxyChangedState();
 
+	/**
+	 * Gathers data about interior volumes affecting the active sound
+	 */
+	void GatherInteriorData(FActiveSound& ActiveSound, FSoundParseParameters& ParseParams) const;
+
+	/**
+	 * Applies interior settings from affecting volumes to the active sound
+	 */
+	void ApplyInteriorSettings(FActiveSound& ActiveSound, FSoundParseParameters& ParseParams) const;
+
 public:
 
 	void SetDefaultAudioSettings(UWorld* World, const FReverbSettings& DefaultReverbSettings, const FInteriorSettings& DefaultInteriorSettings);
