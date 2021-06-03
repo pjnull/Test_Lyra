@@ -245,7 +245,7 @@ namespace ChaosTest {
 			Scene.GetSolver()->GetEvolution()->FlushSpatialAcceleration();	//make sure we get a new tree every step
 			Scene.EndFrame();
 
-			EXPECT_EQ(Scene.GetSpacialAcceleration()->GetSyncTimestamp(), Step);
+			EXPECT_EQ(Scene.GetSpacialAcceleration()->GetSyncTimestamp(), Step - 1);
 		}
 	}
 
@@ -271,12 +271,10 @@ namespace ChaosTest {
 		Scene.GetSolver()->PopAndExecuteStolenAdvanceTask_ForTesting();
 		Scene.GetSolver()->GetEvolution()->FlushSpatialAcceleration();
 
-		// No EndFrame called after PT execution, stamp should still be 0.
-		EXPECT_EQ(Scene.GetSpacialAcceleration()->GetSyncTimestamp(), 0);
-
-		// Endframe update structure to stamp 1, as we have completed 1 frame on PT.
 		Scene.EndFrame();
-		EXPECT_EQ(Scene.GetSpacialAcceleration()->GetSyncTimestamp(), 1);
+
+		// Still timestamp 0, as we have only processed first PT step..
+		EXPECT_EQ(Scene.GetSpacialAcceleration()->GetSyncTimestamp(), 0);
 
 		Scene.StartFrame();
 
@@ -286,8 +284,8 @@ namespace ChaosTest {
 		Scene.GetSolver()->GetEvolution()->FlushSpatialAcceleration();
 		Scene.EndFrame();
 
-		// New structure should be at 3 as PT/GT are in sync.
-		EXPECT_EQ(Scene.GetSpacialAcceleration()->GetSyncTimestamp(), 3);
+		// New structure should be at 2, 3 steps have been processed, PT/GT are in sync.
+		EXPECT_EQ(Scene.GetSpacialAcceleration()->GetSyncTimestamp(), 2);
 
 	}
 
@@ -314,25 +312,29 @@ namespace ChaosTest {
 		Scene.EndFrame();
 		EXPECT_EQ(Scene.GetSpacialAcceleration()->GetSyncTimestamp(), 0);
 
-		// First PT task finished this frame, we are two behind, now at time 1.
+		// First PT task finished this frame, we are two behind, still at 0 as structure is from first GT input (timestamp 0).
 		Scene.StartFrame();
 		Scene.GetSolver()->PopAndExecuteStolenAdvanceTask_ForTesting();
 		Scene.GetSolver()->GetEvolution()->FlushSpatialAcceleration();
 		Scene.EndFrame();
-		EXPECT_EQ(Scene.GetSpacialAcceleration()->GetSyncTimestamp(), 1);
+		EXPECT_EQ(Scene.GetSpacialAcceleration()->GetSyncTimestamp(), 0);
 
-		// Remaining two PT tasks finish, we are caught up, but still time 1 as EndFrame has not updated our structure.
 		Scene.GetSolver()->PopAndExecuteStolenAdvanceTask_ForTesting();
 		Scene.GetSolver()->PopAndExecuteStolenAdvanceTask_ForTesting();
 		Scene.GetSolver()->GetEvolution()->FlushSpatialAcceleration();
-		EXPECT_EQ(Scene.GetSpacialAcceleration()->GetSyncTimestamp(), 1);
+		// Remaining two PT tasks finish, we are caught up, GT is still time 0 as EndFrame has not updated our structure.
+		EXPECT_EQ(Scene.GetSpacialAcceleration()->GetSyncTimestamp(), 0);
 
-		// PT task this frame finishes before EndFrame, putting us at 4, in sync with GT.
+		// Popping acceleration structures from physics thread will give us timestamp of 2. (3 total GT inputs processed)
+		Scene.CopySolverAccelerationStructure();
+		EXPECT_EQ(Scene.GetSpacialAcceleration()->GetSyncTimestamp(), 2);
+
+		// PT task this frame finishes before EndFrame, putting us at 3, in sync with GT.
 		Scene.StartFrame();
 		Scene.GetSolver()->PopAndExecuteStolenAdvanceTask_ForTesting();
 		Scene.GetSolver()->GetEvolution()->FlushSpatialAcceleration();
 		Scene.EndFrame();
-		EXPECT_EQ(Scene.GetSpacialAcceleration()->GetSyncTimestamp(), 4);
+		EXPECT_EQ(Scene.GetSpacialAcceleration()->GetSyncTimestamp(), 3);
 	}
 
 	GTEST_TEST(EngineInterface, PullFromPhysicsState_MultiFrameDelay)
@@ -376,40 +378,40 @@ namespace ChaosTest {
 
 		// verify external timestamps are as expected.
 		auto& MarshallingManager = Scene.GetSolver()->GetMarshallingManager();
-		EXPECT_EQ(MarshallingManager.GetExternalTimestamp_External(), 1);
+		EXPECT_EQ(MarshallingManager.GetExternalTimestamp_External(), 0);
 
 		// Execute a frame such that Proxys should be initialized in physics thread and game thread.
 		Scene.StartFrame();
-		EXPECT_EQ(MarshallingManager.GetExternalTimestamp_External(), 2);
+		EXPECT_EQ(MarshallingManager.GetExternalTimestamp_External(), 1);
 		Scene.GetSolver()->PopAndExecuteStolenAdvanceTask_ForTesting();
 		Scene.EndFrame();
 
 		// run GT frame, no PT task executed.
 		Scene.StartFrame();
-		EXPECT_EQ(MarshallingManager.GetExternalTimestamp_External(), 3);
+		EXPECT_EQ(MarshallingManager.GetExternalTimestamp_External(), 2);
 		Scene.EndFrame();
 
 		// enqueue another frame.
 		Scene.StartFrame();
-		EXPECT_EQ(MarshallingManager.GetExternalTimestamp_External(), 4);
+		EXPECT_EQ(MarshallingManager.GetExternalTimestamp_External(), 3);
 
-		// Remove Proxy, is stamped with external time 4. PT needs to run 3 frames before this will be removed,
+		// Remove Proxy, is stamped with external time 3. PT needs to run 3 frames before this will be removed,
 		// as we are two PT tasks behind, and this has not been enqueued yet.
 		auto StaleProxy = Proxy;
 		FChaosEngineInterface::ReleaseActor(Proxy, &Scene);
 		EXPECT_EQ(Proxy, nullptr);
 		EXPECT_EQ(StaleProxy->GetSyncTimestamp()->bDeleted, true);
 
-		// Run PT task for internal timestamp 2.
+		// Run PT task for internal timestamp 1.
 		Scene.GetSolver()->PopAndExecuteStolenAdvanceTask_ForTesting();
 
-		// Proxy should not get touched in Pull, as timestamp from removal should be greater than pulldata timestamp. (4 > 2).
+		// Proxy should not get touched in Pull, as timestamp from removal should be greater than pulldata timestamp.
 		// (if it was touched we'd crash as it is now deleted).
 		Scene.EndFrame();
 
 
 		Scene.StartFrame();
-		EXPECT_EQ(MarshallingManager.GetExternalTimestamp_External(), 5);
+		EXPECT_EQ(MarshallingManager.GetExternalTimestamp_External(), 4);
 		EXPECT_EQ(StaleProxy->GetSyncTimestamp()->bDeleted, true);
 
 		// run pt task for internal timestamp 3. Proxy still not removed on PT.
@@ -422,7 +424,7 @@ namespace ChaosTest {
 
 
 		Scene.StartFrame();
-		EXPECT_EQ(MarshallingManager.GetExternalTimestamp_External(), 6);
+		EXPECT_EQ(MarshallingManager.GetExternalTimestamp_External(), 5);
 		EXPECT_EQ(StaleProxy->GetSyncTimestamp()->bDeleted, true);
 		EXPECT_EQ(Scene.GetSolver()->GetEvolution()->GetParticles().GetAllParticlesView().Num(), 2); // Proxys not yet removed on pt, still 2.
 
