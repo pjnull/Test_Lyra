@@ -82,14 +82,17 @@ struct FNiagaraLinearRamp
 
 	FORCEINLINE float Evaluate(float X)const 
 	{
-		if (FMath::IsNearlyEqual(StartX, EndX))
+		if (X <= StartX)
 		{
 			return StartY;
 		}
+		else if (X >= EndX)
+		{
+			return EndY;
+		}
 
-		X = FMath::Clamp(X, StartX, EndX);
 		float Alpha = (X - StartX) / (EndX - StartX);
-		return FMath::Lerp(StartY, EndY, X);
+		return FMath::Lerp(StartY, EndY, Alpha);
 	}
 	
 	FNiagaraLinearRamp(float InStartX = 0.0f, float InStartY = 0.0f, float InEndX = 1.0f, float InEndY = 1.0f)
