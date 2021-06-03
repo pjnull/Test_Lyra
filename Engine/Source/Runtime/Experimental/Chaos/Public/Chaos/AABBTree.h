@@ -153,6 +153,11 @@ struct TAABBTreeLeafArray : public TBoundsWrapperHelper<TPayloadType, bComputeBo
 	{
 		for (const auto& Elem : Elems)
 		{
+			if (PrePreFilterHelper(Elem.Payload, Visitor.GetQueryData()))
+			{
+				continue;
+			}
+
 			if (Elem.Bounds.Intersects(QueryBounds))
 			{
 				TSpatialVisitorData<TPayloadType> VisitData(Elem.Payload, true, Elem.Bounds);
@@ -173,6 +178,11 @@ struct TAABBTreeLeafArray : public TBoundsWrapperHelper<TPayloadType, bComputeBo
 		FReal TOI;
 		for (const auto& Elem : Elems)
 		{
+			if (PrePreFilterHelper(Elem.Payload, Visitor.GetQueryData()))
+			{
+				continue;
+			}
+
 			const auto& InstanceBounds = Elem.Bounds;
 			if (TAABBTreeIntersectionHelper<TQueryFastData, bSweep ? EAABBQueryType::Sweep :
 					EAABBQueryType::Raycast>::Intersects(Start, QueryFastData, TOI, TmpPosition, InstanceBounds, FAABB3(), QueryHalfExtents, Dir, InvDir, bParallel))

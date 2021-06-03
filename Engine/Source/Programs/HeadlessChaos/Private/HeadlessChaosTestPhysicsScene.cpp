@@ -26,6 +26,114 @@ namespace ChaosTest {
 	using namespace Chaos;
 	using namespace ChaosInterface;
 
+	// Returns true on raycast if we hit payload bounds.
+	struct FSimpleRaycastVisitor: ISpatialVisitor<FAccelerationStructureHandle>
+	{
+		using FPayload = FAccelerationStructureHandle;
+		FVec3 Start;
+		bool bHit;
+		bool bQueryGameThread; // Query game thread or physics thread data?
+
+		bool bUseQueryFilter;
+		FCollisionFilterData FilterData;
+
+		FSimpleRaycastVisitor(const FVec3& InStart, bool bInQueryGameThread)
+			: Start(InStart)
+			, bHit(false)
+			, bQueryGameThread(bInQueryGameThread)
+		{
+		}
+
+		FSimpleRaycastVisitor(const FVec3& InStart, FCollisionFilterData& InFilterData, bool bInQueryGameThread)
+			: Start(InStart)
+			, bHit(false)
+			, bQueryGameThread(bInQueryGameThread)
+			, bUseQueryFilter(true)
+			, FilterData(InFilterData)
+			
+		{
+		}
+
+		virtual const void* GetQueryData() const override
+		{
+			if (bUseQueryFilter)
+			{
+				return &FilterData;
+			}
+
+			return nullptr;
+		}
+
+		enum class SQType
+		{
+			Raycast,
+			Sweep,
+			Overlap
+		};
+
+		bool VisitRaycast(const TSpatialVisitorData<FPayload>& Data, FQueryFastData& CurData)
+		{
+			float OutTime = 0;
+			FVec3 OutPos;
+			FVec3 OutNorm;
+			int32 FaceIdx;
+
+			if (Data.Bounds.Raycast(Start, CurData.Dir, CurData.CurrentLength, 0, OutTime, OutPos, OutNorm, FaceIdx))
+			{
+				if (bQueryGameThread)
+				{
+					FTransform ParticleTransform(Data.Payload.GetExternalGeometryParticle_ExternalThread()->R(), Data.Payload.GetExternalGeometryParticle_ExternalThread()->X());
+					const FVec3 DirLocal = ParticleTransform.InverseTransformVectorNoScale(CurData.Dir);
+					const FVec3 StartLocal = ParticleTransform.InverseTransformPositionNoScale(Start);
+					bHit = Data.Payload.GetExternalGeometryParticle_ExternalThread()->Geometry()->Raycast(StartLocal, DirLocal, CurData.CurrentLength, 0, OutTime, OutPos, OutNorm, FaceIdx);
+				}
+				else
+				{
+					FTransform ParticleTransform(Data.Payload.GetGeometryParticleHandle_PhysicsThread()->R(), Data.Payload.GetGeometryParticleHandle_PhysicsThread()->X());
+					const FVec3 DirLocal = ParticleTransform.InverseTransformVectorNoScale(CurData.Dir);
+					const FVec3 StartLocal = ParticleTransform.InverseTransformPositionNoScale(Start);
+					bHit = Data.Payload.GetGeometryParticleHandle_PhysicsThread()->Geometry()->Raycast(StartLocal, DirLocal, CurData.CurrentLength, 0, OutTime, OutPos, OutNorm, FaceIdx);
+				}
+
+				if (bHit)
+				{
+					return false;
+				}
+			}
+
+			return true;
+		}
+
+		bool VisitSweep(const TSpatialVisitorData<FPayload>& Data, FQueryFastData& CurData)
+		{
+			check(false);
+			return false;
+		}
+
+		bool VisitOverlap(const TSpatialVisitorData<FPayload>& Data)
+		{
+			check(false);
+			return false;
+		}
+
+		virtual bool Overlap(const TSpatialVisitorData<FPayload>& Instance) override
+		{
+			check(false);
+			return false;
+		}
+
+		virtual bool Raycast(const TSpatialVisitorData<FPayload>& Instance, FQueryFastData& CurData) override
+		{
+			return VisitRaycast(Instance, CurData);
+		}
+
+		virtual bool Sweep(const TSpatialVisitorData<FPayload>& Instance, FQueryFastData& CurData) override
+		{
+			check(false);
+			return false;
+		}
+	};
+
 	FSQHitBuffer<ChaosInterface::FOverlapHit> InSphereHelper(const FChaosScene& Scene, const FTransform& InTM, const FReal Radius)
 	{
 		FChaosSQAccelerator SQAccelerator(*Scene.GetSpacialAcceleration());
@@ -328,8 +436,115 @@ namespace ChaosTest {
 		Scene.EndFrame();
 	}
 
+	GTEST_TEST(EngineInterface, UpdatingAccelerationStructurePrePreFilterOnShapeFilterChange)
+	{
+		FChaosScene Scene(nullptr);
+		Scene.GetSolver()->SetThreadingMode_External(EThreadingModeTemp::SingleThread);
+
+		const float PhysicsTimestep = 1; // 1 second
+		float DeltaSeconds = PhysicsTimestep;
+		FVec3 Grav(0, 0, -1);
+		Scene.SetUpForFrame(&Grav, DeltaSeconds, 9999, 9999, 9999, false);
+		Scene.GetSolver()->EnableAsyncMode(PhysicsTimestep);
 
 
+		// Raycast params, aimed to hit our particle at (0,0,0)
+		const FVector Start(0, 0, -5);
+		const FVector Dir(0, 0, 1);
+		const float Length = 50;
+
+		// Init kinematic particle, sphere radius 3
+		FActorCreationParams Params;
+		Params.Scene = &Scene;
+		Params.bSimulatePhysics = false;
+		Params.bEnableGravity = true;
+		Params.bStartAwake = true;
+		FPhysicsActorHandle Proxy = nullptr;
+		FChaosEngineInterface::CreateActor(Params, Proxy);
+		auto& Particle = Proxy->GetGameThreadAPI();
+		{
+			auto Sphere = MakeUnique<TSphere<FReal, 3>>(FVec3(0), 3);
+			Particle.SetGeometry(MoveTemp(Sphere));
+		}
+		TArray<FPhysicsActorHandle> Proxys = { Proxy };
+		Scene.AddActorsToScene_AssumesLocked(Proxys);
+
+		// Execute a whole frame such that particle is initialized on physics thread
+		Scene.StartFrame();
+		Scene.EndFrame();
+
+
+		// Make query filter that will allow query against particle that blocks/touches all channels.
+		// Filter will fail against particle that has no query allowed (default query filter).
+		FCollisionFilterData QueryFilter;
+		QueryFilter.Word0 = 1; // Setting to non-zero to set query type that will filter
+
+		// This is setting a somewhat arbritrary trace channels. It's very hard to make sense of these bitfields at this level of API.
+		// Below particle uses a filter that touches/blocks anything, so these bits are enough to make filter pass.
+		QueryFilter.Word3 = 7 << 21; 
+
+
+		// Get collision data off shape
+		for (const TUniquePtr<Chaos::FPerShapeData>& Shape : Particle.ShapesArray())
+		{
+			const FCollisionData& CollisionData = Shape->GetCollisionData();
+			EXPECT_EQ(CollisionData.QueryData.Word0, 0); // ensure query filter is defaulted to 0 (no query allowed at all)
+
+			// Verify query is filtered out with default collision data on shape
+			bool bFiltered = PrePreFilterImp(QueryFilter, CollisionData.QueryData);
+			EXPECT_EQ(bFiltered, true);
+		}
+
+		// Query against particle on game thread, should fail to hit due to particle filter being defaulted, no touch/block set.
+		{
+			bool bQueryGameThread = true;
+			FSimpleRaycastVisitor Visitor(Start, QueryFilter, bQueryGameThread);
+			Scene.GetSpacialAcceleration()->Raycast(Start, Dir, Length, Visitor);
+			EXPECT_EQ(Visitor.bHit, false);
+		}
+
+		// Change filter data on game thread to contain touch/block on all channels.
+		FCollisionFilterData NewParticleQueryFilter;
+		NewParticleQueryFilter.Word1 = TNumericLimits<int32>::Max();
+		NewParticleQueryFilter.Word2 = TNumericLimits<int32>::Max();
+		for (const TUniquePtr<Chaos::FPerShapeData>& Shape : Particle.ShapesArray())
+		{
+			const FCollisionData& CollisionData = Shape->GetCollisionData();
+
+			// Update filter
+			FCollisionData NewCollisionData = CollisionData;
+			NewCollisionData.QueryData = NewParticleQueryFilter;
+			Shape->SetCollisionData(NewCollisionData);
+
+			// Filter with new data, ensuring we pass and are not filtered out.
+			bool bFiltered = PrePreFilterImp(QueryFilter, NewCollisionData.QueryData);
+			EXPECT_EQ(bFiltered, false);
+		}
+
+		// Update particle in GT accel structure so cached PrePreFilter updates
+		Scene.UpdateActorInAccelerationStructure(Proxy);
+
+		// Query against particle on game thread, should hit with new filter.
+		{
+			bool bQueryGameThread = true;
+			FSimpleRaycastVisitor Visitor(Start, QueryFilter, bQueryGameThread);
+			Scene.GetSpacialAcceleration()->Raycast(Start, Dir, Length, Visitor);
+			EXPECT_EQ(Visitor.bHit, true);
+		}
+
+		// Tick to push to physics thread
+		Scene.StartFrame();
+		Scene.EndFrame();
+
+		// Query particle on physics thread, expected to hit with new filter.
+		// If this fails it means we did not update cached filter data in acceleration structure entry.
+		{
+			bool bQueryGameThread = false;
+			FSimpleRaycastVisitor Visitor(Start, QueryFilter, bQueryGameThread);
+			Scene.GetSolver()->GetEvolution()->GetSpatialAcceleration()->Raycast(Start, Dir, Length, Visitor);
+			EXPECT_EQ(Visitor.bHit, true);
+		}
+	}
 
 	GTEST_TEST(EngineInterface, CreateActorPostFlush)
 	{
