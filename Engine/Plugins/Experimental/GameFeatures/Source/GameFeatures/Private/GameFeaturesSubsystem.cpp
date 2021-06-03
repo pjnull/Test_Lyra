@@ -296,12 +296,26 @@ FString UGameFeaturesSubsystem::GetPluginURL_InstallBundleProtocol(const FString
 	return GetPluginURL_InstallBundleProtocol(PluginName, MakeArrayView(&BundleName, 1));
 }
 
+void UGameFeaturesSubsystem::OnGameFeatureTerminating(const FString& PluginURL)
+{
+	for (UGameFeatureStateChangeObserver* Observer : Observers)
+	{
+		Observer->OnGameFeatureTerminating(PluginURL);
+	}
+}
+
+void UGameFeaturesSubsystem::OnGameFeatureCheckingStatus(const FString& PluginURL)
+{
+	for (UGameFeatureStateChangeObserver* Observer : Observers)
+	{
+		Observer->OnGameFeatureCheckingStatus(PluginURL);
+	}
+}
+
 void UGameFeaturesSubsystem::OnGameFeatureRegistering(const UGameFeatureData* GameFeatureData, const FString& PluginName)
 {
 	check(GameFeatureData);
 	AddGameFeatureToAssetManager(GameFeatureData, PluginName);
-
-	InactivePluginNames.Add(PluginName);
 
 	for (UGameFeatureStateChangeObserver* Observer : Observers)
 	{
@@ -320,8 +334,6 @@ void UGameFeaturesSubsystem::OnGameFeatureRegistering(const UGameFeatureData* Ga
 void UGameFeaturesSubsystem::OnGameFeatureUnregistering(const UGameFeatureData* GameFeatureData, const FString& PluginName)
 {
 	check(GameFeatureData);
-	
-	InactivePluginNames.Remove(PluginName);
 
 	for (UGameFeatureStateChangeObserver* Observer : Observers)
 	{
@@ -357,8 +369,6 @@ void UGameFeaturesSubsystem::OnGameFeatureLoading(const UGameFeatureData* GameFe
 void UGameFeaturesSubsystem::OnGameFeatureActivating(const UGameFeatureData* GameFeatureData, const FString& PluginName)
 {
 	check(GameFeatureData);
-	
-	InactivePluginNames.Remove(PluginName);
 
 	for (UGameFeatureStateChangeObserver* Observer : Observers)
 	{
@@ -377,8 +387,6 @@ void UGameFeaturesSubsystem::OnGameFeatureActivating(const UGameFeatureData* Gam
 void UGameFeaturesSubsystem::OnGameFeatureDeactivating(const UGameFeatureData* GameFeatureData, const FString& PluginName, FGameFeatureDeactivatingContext& Context)
 {
 	check(GameFeatureData);
-
-	InactivePluginNames.Add(PluginName);
 
 	for (UGameFeatureStateChangeObserver* Observer : Observers)
 	{
@@ -605,6 +613,41 @@ void UGameFeaturesSubsystem::UninstallGameFeaturePlugin(const FString& PluginURL
 			StateMachine->SetDestinationState(EGameFeaturePluginState::StatusKnown, FGameFeatureStateTransitionComplete::CreateUObject(this, &ThisClass::UninstallGameFeaturePluginComplete, CompleteDelegate));
 		}
 		else if (StateMachine->GetCurrentState() <= EGameFeaturePluginState::StatusKnown)
+		{
+			FTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this, [this, CompleteDelegate](float dts)
+			{
+				CompleteDelegate.ExecuteIfBound(UE::GameFeatures::FResult(MakeValue()));
+				return false;
+			}));
+		}
+	}
+	else
+	{
+		FTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this, [this, CompleteDelegate](float dts)
+		{
+			CompleteDelegate.ExecuteIfBound(UE::GameFeatures::FResult(MakeError(TEXT("GameFeaturePlugin.BadURL"))));
+			return false;
+		}));
+	}
+}
+
+void UGameFeaturesSubsystem::TerminateGameFeaturePlugin(const FString& PluginURL)
+{
+	FGameFeaturePluginUninstallComplete Callback = FGameFeaturePluginUninstallComplete();
+	TerminateGameFeaturePlugin(PluginURL, Callback);
+}
+
+void UGameFeaturesSubsystem::TerminateGameFeaturePlugin(const FString& PluginURL, const FGameFeaturePluginUninstallComplete& CompleteDelegate)
+{
+	if (UGameFeaturePluginStateMachine* StateMachine = FindGameFeaturePluginStateMachine(PluginURL))
+	{
+		ensureAlwaysMsgf(StateMachine->GetCurrentState() == StateMachine->GetDestinationState(), TEXT("Setting a new destination state while state machine is running!"));
+
+		if (StateMachine->GetCurrentState() > EGameFeaturePluginState::Terminal)
+		{
+			StateMachine->SetDestinationState(EGameFeaturePluginState::Terminal, FGameFeatureStateTransitionComplete::CreateUObject(this, &ThisClass::TerminateGameFeaturePluginComplete, CompleteDelegate));
+		}
+		else if (StateMachine->GetCurrentState() <= EGameFeaturePluginState::Terminal)
 		{
 			FTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this, [this, CompleteDelegate](float dts)
 			{
@@ -934,6 +977,16 @@ void UGameFeaturesSubsystem::UninstallGameFeaturePluginComplete(UGameFeaturePlug
 	CompleteDelegate.ExecuteIfBound(Result);
 }
 
+void UGameFeaturesSubsystem::TerminateGameFeaturePluginComplete(UGameFeaturePluginStateMachine* Machine, const UE::GameFeatures::FResult& Result, FGameFeaturePluginUninstallComplete CompleteDelegate)
+{
+	if (Result.HasValue())
+	{
+		GameFeaturePluginStateMachines.Remove(Machine->GetPluginURL());
+		Machine->MarkPendingKill();
+	}
+
+	CompleteDelegate.ExecuteIfBound(Result);
+}
 
 bool UGameFeaturesSubsystem::HandleRequestPluginDependencyStateMachines(const FString& PluginFilename, TArray<UGameFeaturePluginStateMachine*>& OutDependencyMachines)
 {
@@ -1002,35 +1055,56 @@ void UGameFeaturesSubsystem::ListGameFeaturePlugins(const TArray<FString>& Args,
 	Ar.Logf(TEXT("Total Game Feature Plugins: %d"), PluginCount);
 }
 
-bool UGameFeaturesSubsystem::IsContentWithinInactivePlugin(const FString& InObjectOrPackagePath) const
+TSet<FString> UGameFeaturesSubsystem::GetActivePluginNames() const
 {
-	// Look for the first slash beyond the first one we start with.
-	const int32 RootEndIndex = InObjectOrPackagePath.Find(TEXT("/"), ESearchCase::IgnoreCase, ESearchDir::FromStart, 1);
+	TSet<FString> ActivePluginNames;
 
-	const FString ObjectPathRootName = InObjectOrPackagePath.Mid(1, RootEndIndex - 1);
-
-	if (InactivePluginNames.Contains(ObjectPathRootName))
+	for (const TPair<FString, UGameFeaturePluginStateMachine*>& Pair : GameFeaturePluginStateMachines)
 	{
-		return true;
+		UGameFeaturePluginStateMachine* StateMachine = Pair.Value;
+		if (StateMachine->GetCurrentState() == EGameFeaturePluginState::Active &&
+			StateMachine->GetDestinationState() == EGameFeaturePluginState::Active)
+		{
+			ActivePluginNames.Add(StateMachine->GetPluginName());
+		}
 	}
-	
-	return false;
+
+	return ActivePluginNames;
+}
+
+namespace GameFeaturesSubsystem
+{ 
+	bool IsContentWithinActivePlugin(const FString& InObjectOrPackagePath, const TSet<FString>& ActivePluginNames)
+	{
+		// Look for the first slash beyond the first one we start with.
+		const int32 RootEndIndex = InObjectOrPackagePath.Find(TEXT("/"), ESearchCase::IgnoreCase, ESearchDir::FromStart, 1);
+
+		const FString ObjectPathRootName = InObjectOrPackagePath.Mid(1, RootEndIndex - 1);
+
+		if (ActivePluginNames.Contains(ObjectPathRootName))
+		{
+			return true;
+		}
+
+		return false;
+	}
 }
 
 void UGameFeaturesSubsystem::FilterInactivePluginAssets(TArray<FAssetIdentifier>& AssetsToFilter) const
 {
-	AssetsToFilter.RemoveAllSwap([&](const FAssetIdentifier& Asset) {
-		return IsContentWithinInactivePlugin(Asset.PackageName.ToString());
+	AssetsToFilter.RemoveAllSwap([ActivePluginNames = GetActivePluginNames()](const FAssetIdentifier& Asset) 
+	{
+		return !GameFeaturesSubsystem::IsContentWithinActivePlugin(Asset.PackageName.ToString(), ActivePluginNames);
 	});
 }
 
 void UGameFeaturesSubsystem::FilterInactivePluginAssets(TArray<FAssetData>& AssetsToFilter) const
 {
-	AssetsToFilter.RemoveAllSwap([&](const FAssetData& Asset) {
-		return IsContentWithinInactivePlugin(Asset.ObjectPath.ToString());
+	AssetsToFilter.RemoveAllSwap([ActivePluginNames = GetActivePluginNames()](const FAssetData& Asset) 
+	{
+		return !GameFeaturesSubsystem::IsContentWithinActivePlugin(Asset.ObjectPath.ToString(), ActivePluginNames);
 	});
 }
-
 EBuiltInAutoState UGameFeaturesSubsystem::DetermineBuiltInInitialFeatureState(TSharedPtr<FJsonObject> Descriptor, const FString& ErrorContext)
 {
 	EBuiltInAutoState InitialState = EBuiltInAutoState::Invalid;

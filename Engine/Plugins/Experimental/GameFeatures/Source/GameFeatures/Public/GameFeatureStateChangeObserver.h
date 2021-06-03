@@ -25,6 +25,10 @@ class GAMEFEATURES_API UGameFeatureStateChangeObserver : public UObject
 
 public:
 
+	virtual void OnGameFeatureCheckingStatus(const FString& PluginURL) {}
+
+	virtual void OnGameFeatureTerminating(const FString& PluginURL) {}
+
 	virtual void OnGameFeatureRegistering(const UGameFeatureData* GameFeatureData, const FString& PluginName) {}
 
 	virtual void OnGameFeatureUnregistering(const UGameFeatureData* GameFeatureData, const FString& PluginName) {}
