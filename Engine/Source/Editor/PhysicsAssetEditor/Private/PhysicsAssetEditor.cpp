@@ -1301,7 +1301,7 @@ void FPhysicsAssetEditor::BuildMenuWidgetBody(FMenuBuilder& InMenuBuilder)
 			FNewMenuDelegate::CreateStatic( &FillAddShapeMenu ) );
 		InMenuBuilder.AddSubMenu( LOCTEXT("CollisionMenu", "Collision"), LOCTEXT("CollisionMenu_ToolTip", "Adjust body/body collision"),
 			FNewMenuDelegate::CreateStatic( &FLocal::FillCollisionMenu ) );	
-
+		InMenuBuilder.AddMenuEntry(Commands.ConstrainChildBodiesToParentBody);
 		InMenuBuilder.AddSubMenu( LOCTEXT("ConstraintMenu", "Constraints"), LOCTEXT("ConstraintMenu_ToolTip", "Constraint Operations"),
 			FNewMenuDelegate::CreateSP( this, &FPhysicsAssetEditor::BuildMenuWidgetNewConstraint ) );	
 
