@@ -1024,14 +1024,14 @@ void FPerInstanceRenderData::UpdateBoundsTransforms_Concurrent()
 				UE_LOG(LogStaticMesh, Warning, TEXT("Unconsumed ISM bounds/transforms update task, we did more work than necessary"));
 			}
 
-	UpdateBoundsTask = FFunctionGraphTask::CreateAndDispatchWhenReady(
+			UpdateBoundsTask = FFunctionGraphTask::CreateAndDispatchWhenReady(
 			[this]()
 			{
-					UpdateBoundsTransforms();
+				UpdateBoundsTransforms();
 			},
 			TStatId(),
 			&Prerequisites
-				);
+			);
 		}
 	);
 }
@@ -1039,32 +1039,41 @@ void FPerInstanceRenderData::UpdateBoundsTransforms_Concurrent()
 void FPerInstanceRenderData::UpdateBoundsTransforms()
 {
 	const int32 InstanceCount = InstanceBuffer.GetNumInstances();
-	FBoxSphereBounds LocalBounds;
-	if (bTrackBounds)
-	{
-		LocalBounds = FBoxSphereBounds(InstanceLocalBounds);
-		PerInstanceBounds.Empty(InstanceCount);
-	}
 	PerInstanceTransforms.Empty(InstanceCount);
 
-	for (int InstanceIndex = 0; InstanceIndex < InstanceCount; InstanceIndex++)
+	if (bTrackBounds)
 	{
-		if( !InstanceBuffer.GetInstanceData() || !InstanceBuffer.GetInstanceData()->IsValidIndex(InstanceIndex))
+		FBoxSphereBounds LocalBounds = FBoxSphereBounds(InstanceLocalBounds);
+		PerInstanceBounds.Empty(InstanceCount);
+
+		for (int32 InstanceIndex = 0; InstanceIndex < InstanceCount; ++InstanceIndex)
 		{
-			continue;
-		}
+			if (!InstanceBuffer.GetInstanceData() || !InstanceBuffer.GetInstanceData()->IsValidIndex(InstanceIndex))
+		    {
+			    continue;
+		    }
 
-		FMatrix InstTransform;
+			FRenderTransform InstTransform;
+			InstanceBuffer.GetInstanceTransform(InstanceIndex, InstTransform);
+			PerInstanceTransforms.Add(InstTransform);
 
-		InstanceBuffer.GetInstanceTransform(InstanceIndex, InstTransform);
-		InstTransform.M[3][3] = 1.0f;
-
-		if (bTrackBounds)
-		{
-			FBoxSphereBounds TransformedBounds = LocalBounds.TransformBy(InstTransform);
+			FBoxSphereBounds TransformedBounds = LocalBounds.TransformBy(InstTransform.ToMatrix());
 			PerInstanceBounds.Add(FVector4(TransformedBounds.Origin, TransformedBounds.SphereRadius));
 		}
-		PerInstanceTransforms.Add(InstTransform);
+	}
+	else
+	{
+		for (int32 InstanceIndex = 0; InstanceIndex < InstanceCount; ++InstanceIndex)
+		{
+			if (!InstanceBuffer.GetInstanceData() || !InstanceBuffer.GetInstanceData()->IsValidIndex(InstanceIndex))
+		    {
+			    continue;
+		    }
+
+			FRenderTransform InstTransform;
+			InstanceBuffer.GetInstanceTransform(InstanceIndex, InstTransform);
+			PerInstanceTransforms.Add(InstTransform);
+		}
 	}
 }
 
@@ -1096,7 +1105,7 @@ const TArray<FVector4>& FPerInstanceRenderData::GetPerInstanceBounds()
 	return PerInstanceBounds;
 }
 
-const TArray<FMatrix>& FPerInstanceRenderData::GetPerInstanceTransforms()
+const TArray<FRenderTransform>& FPerInstanceRenderData::GetPerInstanceTransforms()
 {
 	EnsureInstanceDataUpdated();
 	return PerInstanceTransforms;
@@ -1275,8 +1284,8 @@ void FInstancedStaticMeshSceneProxy::SetupProxy(UInstancedStaticMeshComponent* I
 			// Filled in during GPU Scene update...
 			Instance.LocalToWorld.SetIdentity();
 			Instance.RenderBounds = InComponent->GetStaticMesh()->GetBounds();
-			Instance.LocalBounds = Instance.RenderBounds.TransformBy(Instance.InstanceToLocal);
-			// GPUCULL_TODO: Set up Per-Instance Random and LightMapAndShadowMapUVBias  - fix LocalVertexFactory.ush			
+			Instance.LocalBounds = Instance.RenderBounds.TransformBy(Instance.InstanceToLocal.ToMatrix());
+			// GPUCULL_TODO: Set up Per-Instance Random and LightMapAndShadowMapUVBias  - fix LocalVertexFactory.ush
 		}
 	}
 }
@@ -1426,21 +1435,21 @@ bool FInstancedStaticMeshSceneProxy::GetWireframeMeshElement(int32 LODIndex, int
 	return false;
 }
 
-void FInstancedStaticMeshSceneProxy::GetDistancefieldAtlasData(const FDistanceFieldVolumeData*& OutDistanceFieldData, float& SelfShadowBias) const
+void FInstancedStaticMeshSceneProxy::GetDistanceFieldAtlasData(const FDistanceFieldVolumeData*& OutDistanceFieldData, float& SelfShadowBias) const
 {
-	FStaticMeshSceneProxy::GetDistancefieldAtlasData(OutDistanceFieldData, SelfShadowBias);
+	FStaticMeshSceneProxy::GetDistanceFieldAtlasData(OutDistanceFieldData, SelfShadowBias);
 }
 
-void FInstancedStaticMeshSceneProxy::GetDistancefieldInstanceData(TArray<FMatrix>& ObjectLocalToWorldTransforms) const
+void FInstancedStaticMeshSceneProxy::GetDistanceFieldInstanceData(TArray<FRenderTransform>& ObjectLocalToWorldTransforms) const
 {
 	ObjectLocalToWorldTransforms.Reset();
 
-	if (ensureMsgf(InstancedRenderData.PerInstanceRenderData->InstanceBuffer.RequireCPUAccess, TEXT("GetDistancefieldInstanceData requires a CPU copy of the per-instance data to be accessible. Possible mismatch in ComponentRequestsCPUAccess / IncludePrimitiveInDistanceFieldSceneData filtering.")))
+	if (ensureMsgf(InstancedRenderData.PerInstanceRenderData->InstanceBuffer.RequireCPUAccess, TEXT("GetDistanceFieldInstanceData requires a CPU copy of the per-instance data to be accessible. Possible mismatch in ComponentRequestsCPUAccess / IncludePrimitiveInDistanceFieldSceneData filtering.")))
 	{
-		const TArray<FMatrix>& PerInstanceTransforms = InstancedRenderData.PerInstanceRenderData->GetPerInstanceTransforms();
-		for (const FMatrix& InstanceToLocal: PerInstanceTransforms)
+		const TArray<FRenderTransform>& PerInstanceTransforms = InstancedRenderData.PerInstanceRenderData->GetPerInstanceTransforms();
+		for (const FRenderTransform& InstanceToLocal : PerInstanceTransforms)
 		{
-			ObjectLocalToWorldTransforms.Add(InstanceToLocal * GetLocalToWorld());
+			ObjectLocalToWorldTransforms.Add(InstanceToLocal.ToMatrix() * GetLocalToWorld());
 		}
 	}
 }
@@ -1573,8 +1582,8 @@ void FInstancedStaticMeshSceneProxy::GetDynamicRayTracingInstances(struct FRayTr
 			float Scale = FMath::Max3(ScaleVector.X, ScaleVector.Y, ScaleVector.Z);
 			FVector LocalViewPosition = WorldToLocal.TransformPosition(Context.ReferenceView->ViewLocation);
 
-			const TArray<FMatrix>& PerInstanceTransforms = InstancedRenderData.PerInstanceRenderData->GetPerInstanceTransforms();
-			for (int InstanceIndex = 0; InstanceIndex < InstanceCount; InstanceIndex++)
+			const TArray<FRenderTransform>& PerInstanceTransforms = InstancedRenderData.PerInstanceRenderData->GetPerInstanceTransforms();
+			for (int32 InstanceIndex = 0; InstanceIndex < InstanceCount; InstanceIndex++)
 			{
 				FVector4 InstanceSphere = PerInstanceBounds[InstanceIndex];
 				FVector InstanceLocation = InstanceSphere;
@@ -1594,7 +1603,7 @@ void FInstancedStaticMeshSceneProxy::GetDynamicRayTracingInstances(struct FRayTr
 						continue;
 				}
 
-				FMatrix InstanceTransform = PerInstanceTransforms[InstanceIndex] * GetLocalToWorld();
+				const FMatrix InstanceTransform = PerInstanceTransforms[InstanceIndex].ToMatrix() * GetLocalToWorld();
 				RayTracingInstanceTemplate.InstanceTransforms.Add(InstanceTransform);
 
 			}
@@ -1614,9 +1623,9 @@ void FInstancedStaticMeshSceneProxy::GetDynamicRayTracingInstances(struct FRayTr
 			float Scale = FMath::Max3(ScaleVector.X, ScaleVector.Y, ScaleVector.Z);
 			FVector LocalViewPosition = WorldToLocal.TransformPosition(Context.ReferenceView->ViewLocation);
 
-			const TArray<FMatrix>& PerInstanceTransforms = InstancedRenderData.PerInstanceRenderData->GetPerInstanceTransforms();
-			for (int InstanceIndex = 0; InstanceIndex < InstanceCount; InstanceIndex++)
-					{
+			const TArray<FRenderTransform>& PerInstanceTransforms = InstancedRenderData.PerInstanceRenderData->GetPerInstanceTransforms();
+			for (int32 InstanceIndex = 0; InstanceIndex < InstanceCount; InstanceIndex++)
+			{
 				FVector4 LocalTransform[3];
 				FVector4 LightMapUV, Origin;
 
@@ -1627,7 +1636,7 @@ void FInstancedStaticMeshSceneProxy::GetDynamicRayTracingInstances(struct FRayTr
 
 				if (DistanceToInstanceCenter * Ratio <= InstanceSphere.W * Scale)
 				{
-					FMatrix InstanceTransform = PerInstanceTransforms[InstanceIndex] * GetLocalToWorld();
+					FMatrix InstanceTransform = PerInstanceTransforms[InstanceIndex].ToMatrix() * GetLocalToWorld();
 					const int32 DynamicInstanceIdx = InstanceIndex % SimulatedInstances;
 
 					if (bHasWorldPositionOffset && InstancedRenderData.VertexFactories[LOD].GetType()->SupportsRayTracingDynamicGeometry())
@@ -1691,14 +1700,14 @@ void FInstancedStaticMeshSceneProxy::GetDynamicRayTracingInstances(struct FRayTr
 	else
 	{
 		// No culling
-		const TArray<FMatrix>& PerInstanceTransforms = InstancedRenderData.PerInstanceRenderData->GetPerInstanceTransforms();
+		const TArray<FRenderTransform>& PerInstanceTransforms = InstancedRenderData.PerInstanceRenderData->GetPerInstanceTransforms();
 		for (int32 InstanceIdx = 0; InstanceIdx < InstanceCount; ++InstanceIdx)
 		{
-			FMatrix InstanceTransform = PerInstanceTransforms[InstanceIdx] * GetLocalToWorld();
+			FMatrix InstanceTransform = PerInstanceTransforms[InstanceIdx].ToMatrix() * GetLocalToWorld();
 
 			if (bHasWorldPositionOffset && InstancedRenderData.VertexFactories[LOD].GetType()->SupportsRayTracingDynamicGeometry())
 			{
-				FRayTracingInstance *DynamicInstance = nullptr;
+				FRayTracingInstance* DynamicInstance = nullptr;
 
 				const int32 DynamicInstanceIdx = InstanceIdx % SimulatedInstances;
 
