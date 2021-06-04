@@ -288,7 +288,7 @@ private:
 	void OnSelectSimulatedBodies();
 	void OnSelectBodies(EPhysicsType PhysicsType = EPhysicsType::PhysType_Simulated);
 	void OnSelectAllConstraints();
-	void OnToggleSelectionType();
+	void OnToggleSelectionType(bool bIgnoreUserConstraints);
 	void OnToggleShowSelected();
 	void OnShowSelected();
 	void OnHideSelected();

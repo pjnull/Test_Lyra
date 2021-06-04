@@ -92,6 +92,7 @@ public:
 	TSharedPtr<FUICommandInfo> SelectKinematicBodies;
 	TSharedPtr<FUICommandInfo> SelectAllConstraints;
 	TSharedPtr<FUICommandInfo> ToggleSelectionType;
+	TSharedPtr<FUICommandInfo> ToggleSelectionTypeWithUserConstraints;
 	TSharedPtr<FUICommandInfo> ToggleShowSelected;
 	TSharedPtr<FUICommandInfo> ShowSelected;
 	TSharedPtr<FUICommandInfo> HideSelected;

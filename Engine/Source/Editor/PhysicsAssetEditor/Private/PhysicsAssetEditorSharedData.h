@@ -143,7 +143,7 @@ public:
 	void SetSelectedBody(const FSelection& Body, bool bSelected);
 	void SetSelectedBodies(const TArray<FSelection>& Bodies, bool bSelected);
 	bool IsBodySelected(const FSelection& Body) const;
-	void ToggleSelectionType();
+	void ToggleSelectionType(bool bIgnoreUserConstraints = true);
 	void ToggleShowSelected();
 	void ShowAll();
 	void HideAll();

@@ -610,7 +610,7 @@ bool FPhysicsAssetEditorSharedData::IsBodySelected(const FSelection& Body) const
 	return SelectedBodies.Contains(Body);
 }
 
-void FPhysicsAssetEditorSharedData::ToggleSelectionType()
+void FPhysicsAssetEditorSharedData::ToggleSelectionType(bool bIgnoreUserConstraints)
 {
 	TSet<int32> NewSelectedBodies; 
 	for (const FSelection& Selection : SelectedConstraints)
@@ -621,7 +621,9 @@ void FPhysicsAssetEditorSharedData::ToggleSelectionType()
 		for (int32 BodyIdx = 0; BodyIdx < PhysicsAsset->SkeletalBodySetups.Num(); ++BodyIdx)
 		{
 			UBodySetup* BodySetup = PhysicsAsset->SkeletalBodySetups[BodyIdx];
-			if (DefaultInstance.ConstraintBone1 == BodySetup->BoneName)
+
+			// no need to account for bIgnoreUserConstraints when selecting from constraints to bodies
+			if (ConstraintTemplate->DefaultInstance.ConstraintBone1 == BodySetup->BoneName)
 			{
 				if (BodySetup->AggGeom.GetElementCount() > 0 && !NewSelectedBodies.Contains(BodyIdx))
 				{
@@ -638,7 +640,13 @@ void FPhysicsAssetEditorSharedData::ToggleSelectionType()
 		for(int32 ConstraintIdx = 0; ConstraintIdx < PhysicsAsset->ConstraintSetup.Num(); ++ConstraintIdx)
 		{
 			const UPhysicsConstraintTemplate* ConstraintTemplate = PhysicsAsset->ConstraintSetup[ConstraintIdx];
-			if (ConstraintTemplate->DefaultInstance.ConstraintBone1 == BodySetup->BoneName)
+
+			bool bConstraintIsConnectedToBone = (ConstraintTemplate->DefaultInstance.JointName == BodySetup->BoneName);
+			if (!bIgnoreUserConstraints)
+			{
+				bConstraintIsConnectedToBone |= (ConstraintTemplate->DefaultInstance.ConstraintBone1 == BodySetup->BoneName);
+			}
+			if (bConstraintIsConnectedToBone)
 			{
 				if (!NewSelectedConstraints.Contains(ConstraintIdx))
 				{

@@ -645,6 +645,7 @@ void FPhysicsAssetEditor::ExtendMenu()
 			MenuBarBuilder.AddMenuEntry(Commands.SelectKinematicBodies);
 			MenuBarBuilder.AddMenuEntry(Commands.SelectAllConstraints);
 			MenuBarBuilder.AddMenuEntry(Commands.ToggleSelectionType);
+			MenuBarBuilder.AddMenuEntry(Commands.ToggleSelectionTypeWithUserConstraints);
 			MenuBarBuilder.AddMenuEntry(Commands.ToggleShowSelected);
 			MenuBarBuilder.AddMenuEntry(Commands.ShowSelected);
 			MenuBarBuilder.AddMenuEntry(Commands.HideSelected);
@@ -937,7 +938,12 @@ void FPhysicsAssetEditor::BindCommands()
 
 	ToolkitCommands->MapAction(
 		Commands.ToggleSelectionType,
-		FExecuteAction::CreateSP(this, &FPhysicsAssetEditor::OnToggleSelectionType),
+		FExecuteAction::CreateSP(this, &FPhysicsAssetEditor::OnToggleSelectionType, true),
+		FCanExecuteAction::CreateSP(this, &FPhysicsAssetEditor::IsNotSimulation));
+	
+	ToolkitCommands->MapAction(
+		Commands.ToggleSelectionTypeWithUserConstraints,
+		FExecuteAction::CreateSP(this, &FPhysicsAssetEditor::OnToggleSelectionType, false),
 		FCanExecuteAction::CreateSP(this, &FPhysicsAssetEditor::IsNotSimulation));
 
 	ToolkitCommands->MapAction(
@@ -1403,6 +1409,7 @@ void FPhysicsAssetEditor::BuildMenuWidgetSelection(FMenuBuilder& InMenuBuilder)
 		InMenuBuilder.AddMenuEntry( Commands.SelectKinematicBodies );
 		InMenuBuilder.AddMenuEntry( Commands.SelectAllConstraints );
 		InMenuBuilder.AddMenuEntry( Commands.ToggleSelectionType );
+		InMenuBuilder.AddMenuEntry( Commands.ToggleSelectionTypeWithUserConstraints);		
 		InMenuBuilder.AddMenuEntry( Commands.ToggleShowSelected );
 		InMenuBuilder.AddMenuEntry( Commands.ShowSelected );
 		InMenuBuilder.AddMenuEntry( Commands.HideSelected );
@@ -2871,9 +2878,9 @@ void FPhysicsAssetEditor::OnSelectAllConstraints()
 
 }
 
-void FPhysicsAssetEditor::OnToggleSelectionType()
+void FPhysicsAssetEditor::OnToggleSelectionType(bool bIgnoreUserConstraints)
 {
-	SharedData->ToggleSelectionType();
+	SharedData->ToggleSelectionType(bIgnoreUserConstraints);
 }
 
 void FPhysicsAssetEditor::OnToggleShowSelected()
