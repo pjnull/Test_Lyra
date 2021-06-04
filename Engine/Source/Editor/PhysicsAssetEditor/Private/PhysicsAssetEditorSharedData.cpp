@@ -1703,33 +1703,42 @@ void FPhysicsAssetEditorSharedData::MakeNewBody(int32 NewBoneIndex, bool bAutoSe
 	RefreshPhysicsAssetChange(PhysicsAsset);
 }
 
-void FPhysicsAssetEditorSharedData::MakeNewConstraint(int32 BodyIndex0, int32 BodyIndex1)
+void FPhysicsAssetEditorSharedData::MakeNewConstraints(int32 ParentBodyIndex, const TArray<int32>& ChildBodyIndices)
 {
 	// check we have valid bodies
-	check(BodyIndex0 < PhysicsAsset->SkeletalBodySetups.Num());
-	check(BodyIndex1 < PhysicsAsset->SkeletalBodySetups.Num());
+	check(ParentBodyIndex < PhysicsAsset->SkeletalBodySetups.Num());
 
-	// Make a new unique name for this constraint
-	int32 Index = 0;
-	FString BaseConstraintName(TEXT("UserConstraint"));
-	FString ConstraintName = BaseConstraintName;
-	while(PhysicsAsset->FindConstraintIndex(*ConstraintName) != INDEX_NONE)
+	for (const int32 ChildBodyIndex : ChildBodyIndices)
 	{
-		ConstraintName = FString::Printf(TEXT("%s_%d"), *BaseConstraintName, Index++);
+		check(ChildBodyIndex < PhysicsAsset->SkeletalBodySetups.Num());
+
+		// Make a new unique name for this constraint
+		int32 Index = 0;
+		FString BaseConstraintName(TEXT("UserConstraint"));
+		FString ConstraintName = BaseConstraintName;
+		while (PhysicsAsset->FindConstraintIndex(*ConstraintName) != INDEX_NONE)
+		{
+			ConstraintName = FString::Printf(TEXT("%s_%d"), *BaseConstraintName, Index++);
+		}
+
+		// Create new constraint with a name not related to a bone, so it wont get auto managed in code that creates new bodies
+		const int32 NewConstraintIndex = FPhysicsAssetUtils::CreateNewConstraint(PhysicsAsset, *ConstraintName);
+		UPhysicsConstraintTemplate* ConstraintSetup = PhysicsAsset->ConstraintSetup[NewConstraintIndex];
+		check(ConstraintSetup);
+
+		InitConstraintSetup(ConstraintSetup, ChildBodyIndex, ParentBodyIndex);
 	}
-
-	// Create new constraint with a name not related to a bone, so it wont get auto managed in code that creates new bodies
-	const int32 NewConstraintIndex = FPhysicsAssetUtils::CreateNewConstraint(PhysicsAsset, *ConstraintName);
-	UPhysicsConstraintTemplate* ConstraintSetup = PhysicsAsset->ConstraintSetup[NewConstraintIndex];
-	check(ConstraintSetup);
-
-	InitConstraintSetup(ConstraintSetup, BodyIndex1, BodyIndex0);
 
 	// update the tree
 	BroadcastHierarchyChanged();
 	RefreshPhysicsAssetChange(PhysicsAsset);
 
 	BroadcastSelectionChanged();
+}
+
+void FPhysicsAssetEditorSharedData::MakeNewConstraint(int32 ParentBodyIndex, int32 ChildBodyIndex)
+{
+	MakeNewConstraints(ParentBodyIndex, { ChildBodyIndex });
 }
 
 void FPhysicsAssetEditorSharedData::SetConstraintRelTM(const FPhysicsAssetEditorSharedData::FSelection* Constraint, const FTransform& RelTM)

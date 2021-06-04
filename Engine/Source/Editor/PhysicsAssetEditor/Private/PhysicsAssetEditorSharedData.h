@@ -161,7 +161,8 @@ public:
 	void DeleteBody(int32 DelBodyIndex, bool bRefreshComponent=true);
 	void RefreshPhysicsAssetChange(const UPhysicsAsset* InPhysAsset, bool bFullClothRefresh = true);
 	void MakeNewBody(int32 NewBoneIndex, bool bAutoSelect = true);
-	void MakeNewConstraint(int32 BodyIndex0, int32 BodyIndex1);
+	void MakeNewConstraints(int32 ParentBodyIndex, const TArray<int32>& ChildBodyIndices);
+	void MakeNewConstraint(int32 ParentBodyIndex, int32 ChildBodyIndex);
 	void CopyBody();
 	void CopyConstraint();
 	void PasteBodyProperties();

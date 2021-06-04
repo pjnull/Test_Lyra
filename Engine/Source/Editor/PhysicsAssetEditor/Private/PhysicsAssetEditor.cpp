@@ -806,6 +806,11 @@ void FPhysicsAssetEditor::BindCommands()
 		FCanExecuteAction::CreateSP(this, &FPhysicsAssetEditor::CanDuplicatePrimitive));
 
 	ToolkitCommands->MapAction(
+		Commands.ConstrainChildBodiesToParentBody,
+		FExecuteAction::CreateSP(this, &FPhysicsAssetEditor::OnConstrainChildBodiesToParentBody),
+		FCanExecuteAction::CreateSP(this, &FPhysicsAssetEditor::HasMoreThanOneSelectedBodyAndIsNotSimulation));
+
+	ToolkitCommands->MapAction(
 		Commands.ResetConstraint,
 		FExecuteAction::CreateSP(this, &FPhysicsAssetEditor::OnResetConstraint),
 		FCanExecuteAction::CreateSP(this, &FPhysicsAssetEditor::HasSelectedConstraintAndIsNotSimulation));
@@ -1828,6 +1833,11 @@ bool FPhysicsAssetEditor::HasOneSelectedBodyAndIsNotSimulation() const
 	return IsNotSimulation() && (SharedData->SelectedBodies.Num() == 1);
 }
 
+bool FPhysicsAssetEditor::HasMoreThanOneSelectedBodyAndIsNotSimulation() const
+{
+	return IsNotSimulation() && (SharedData->SelectedBodies.Num() > 1);
+}
+
 bool FPhysicsAssetEditor::HasSelectedBodyOrConstraintAndIsNotSimulation() const
 {
 	return IsNotSimulation() && (SharedData->SelectedBodies.Num() > 0 || SharedData->SelectedConstraints.Num() > 0);
@@ -2415,6 +2425,23 @@ void FPhysicsAssetEditor::OnDuplicatePrimitive()
 bool FPhysicsAssetEditor::CanDuplicatePrimitive() const
 {
 	return HasSelectedBodyAndIsNotSimulation() && SharedData->SelectedBodies.Num() == 1;
+}
+
+void FPhysicsAssetEditor::OnConstrainChildBodiesToParentBody()
+{
+	if (SharedData->SelectedBodies.Num() > 1)
+	{
+		int32 ParentBodyIndex = SharedData->SelectedBodies.Last().Index;
+		TArray<int32> ChildBodyIndices; // needed as the selection may contain multiple time the same body with different primitive index
+		for (const FPhysicsAssetEditorSharedData::FSelection& Selection : SharedData->SelectedBodies)
+		{
+			if (Selection.Index != ParentBodyIndex)
+			{
+				ChildBodyIndices.AddUnique(Selection.Index);
+			}
+		}
+		SharedData->MakeNewConstraints(ParentBodyIndex, ChildBodyIndices);
+	}
 }
 
 void FPhysicsAssetEditor::OnResetConstraint()

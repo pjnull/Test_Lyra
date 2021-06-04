@@ -202,6 +202,7 @@ private:
 	/** Toolbar/menu command methods */
 	bool HasSelectedBodyAndIsNotSimulation() const;
 	bool HasOneSelectedBodyAndIsNotSimulation() const;
+	bool HasMoreThanOneSelectedBodyAndIsNotSimulation() const;
 	bool HasSelectedBodyOrConstraintAndIsNotSimulation() const;
 	bool CanEditConstraintProperties() const;
 	bool HasSelectedConstraintAndIsNotSimulation() const;
@@ -259,6 +260,7 @@ private:
 	void OnDuplicatePrimitive();
 	bool CanDuplicatePrimitive() const;
 	void OnResetConstraint();
+	void OnConstrainChildBodiesToParentBody();
 	void OnSnapConstraint();
 	void OnConvertToBallAndSocket();
 	void OnConvertToHinge();

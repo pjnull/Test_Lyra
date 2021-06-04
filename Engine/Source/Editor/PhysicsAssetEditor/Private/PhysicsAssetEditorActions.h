@@ -71,6 +71,7 @@ public:
 	TSharedPtr<FUICommandInfo> AddTaperedCapsule;
 	TSharedPtr<FUICommandInfo> DeletePrimitive;
 	TSharedPtr<FUICommandInfo> DuplicatePrimitive;
+	TSharedPtr<FUICommandInfo> ConstrainChildBodiesToParentBody;
 	TSharedPtr<FUICommandInfo> ResetConstraint;
 	TSharedPtr<FUICommandInfo> SnapConstraint;
 	TSharedPtr<FUICommandInfo> ConvertToBallAndSocket;
