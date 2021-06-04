@@ -117,6 +117,7 @@ public:
 	TSharedPtr<FUICommandInfo> ShowSimulatedBodies;
 	TSharedPtr<FUICommandInfo> ShowKinematicBodies;
 	TSharedPtr<FUICommandInfo> ShowConstraints;
+	TSharedPtr<FUICommandInfo> ShowConstraintsOnParentBodies;
 	TSharedPtr<FUICommandInfo> ShowPrimitives;
 
 	/** Hotkey only commands */

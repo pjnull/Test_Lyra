@@ -107,6 +107,7 @@ void FPhysicsAssetEditorCommands::RegisterCommands()
 	UI_COMMAND(ShowSimulatedBodies, "Show Simulated Bodies", "Display simulated bodies in the tree view. Bodies are a collection of primitive shapes used for collision.", EUserInterfaceActionType::ToggleButton, FInputChord());
 	UI_COMMAND(ShowKinematicBodies, "Show Kinematic Bodies", "Display kinematic bodies in the tree view. Bodies are a collection of primitive shapes used for collision.", EUserInterfaceActionType::ToggleButton, FInputChord());
 	UI_COMMAND(ShowConstraints, "Show Constraints", "Display constraints in the tree view. Constraints are used to control how bodies can move in relation to one another.", EUserInterfaceActionType::ToggleButton, FInputChord());
+	UI_COMMAND(ShowConstraintsOnParentBodies, "Show Constraints on Parent Bodies", "When showing constraints, display them on bothe the parent and the child body.", EUserInterfaceActionType::ToggleButton, FInputChord());
 	UI_COMMAND(ShowPrimitives, "Show Primitives", "Display primitive shapes (sphere, boxes, capsules etc.) in the tree view", EUserInterfaceActionType::ToggleButton, FInputChord());
 
 	/** As two commands cannot have the same key; this command wraps both 

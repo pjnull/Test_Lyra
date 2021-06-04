@@ -1198,6 +1198,13 @@ void FPhysicsAssetEditor::BindCommands()
 	);
 
 	SkeletonTreeCommandList->MapAction(
+		Commands.ShowConstraintsOnParentBodies,
+		FExecuteAction::CreateSP(this, &FPhysicsAssetEditor::HandleToggleShowConstraintsOnParentBodies),
+		FCanExecuteAction::CreateSP(this, &FPhysicsAssetEditor::IsShowConstraintsChecked),
+		FGetActionCheckState::CreateSP(this, &FPhysicsAssetEditor::GetShowConstraintsOnParentBodiesChecked)
+	);
+
+	SkeletonTreeCommandList->MapAction(
 		Commands.ShowPrimitives,
 		FExecuteAction::CreateSP(this, &FPhysicsAssetEditor::HandleToggleShowPrimitives),
 		FCanExecuteAction(),
@@ -3234,6 +3241,8 @@ void FPhysicsAssetEditor::HandleExtendFilterMenu(FMenuBuilder& InMenuBuilder)
 		InMenuBuilder.AddMenuEntry(Commands.ShowKinematicBodies);
 		InMenuBuilder.AddMenuEntry(Commands.ShowConstraints);
 		InMenuBuilder.AddMenuEntry(Commands.ShowPrimitives);
+		InMenuBuilder.AddSeparator();
+		InMenuBuilder.AddMenuEntry(Commands.ShowConstraintsOnParentBodies);
 	}
 	InMenuBuilder.EndSection();
 	InMenuBuilder.PopCommandList();
@@ -3263,6 +3272,12 @@ void FPhysicsAssetEditor::HandleToggleShowConstraints()
 	RefreshFilter();
 }
 
+void FPhysicsAssetEditor::HandleToggleShowConstraintsOnParentBodies()
+{
+	SkeletonTreeBuilder->bShowConstraintsOnParentBodies = !SkeletonTreeBuilder->bShowConstraintsOnParentBodies;
+	RefreshFilter();
+}
+
 void FPhysicsAssetEditor::HandleToggleShowPrimitives()
 {
 	SkeletonTreeBuilder->bShowPrimitives = !SkeletonTreeBuilder->bShowPrimitives;
@@ -3287,6 +3302,16 @@ ECheckBoxState FPhysicsAssetEditor::GetShowKinematicBodiesChecked() const
 ECheckBoxState FPhysicsAssetEditor::GetShowConstraintsChecked() const
 {
 	return SkeletonTreeBuilder->bShowConstraints ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+}
+
+bool FPhysicsAssetEditor::IsShowConstraintsChecked() const
+{
+	return SkeletonTreeBuilder->bShowConstraints;
+}
+
+ECheckBoxState FPhysicsAssetEditor::GetShowConstraintsOnParentBodiesChecked() const
+{
+	return SkeletonTreeBuilder->bShowConstraintsOnParentBodies ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 }
 
 ECheckBoxState FPhysicsAssetEditor::GetShowPrimitivesChecked() const

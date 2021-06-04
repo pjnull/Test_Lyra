@@ -316,12 +316,15 @@ private:
 	void HandleToggleShowSimulatedBodies();
 	void HandleToggleShowKinematicBodies();
 	void HandleToggleShowConstraints();
+	void HandleToggleShowConstraintsOnParentBodies();
 	void HandleToggleShowPrimitives();
 	ECheckBoxState GetShowBodiesChecked() const;
 	ECheckBoxState GetShowSimulatedBodiesChecked() const;
 	ECheckBoxState GetShowKinematicBodiesChecked() const;
 	ECheckBoxState GetShowConstraintsChecked() const;
+	ECheckBoxState GetShowConstraintsOnParentBodiesChecked() const;
 	ECheckBoxState GetShowPrimitivesChecked() const;
+	bool IsShowConstraintsChecked() const;
 
 	/** Customize the filter label */
 	void HandleGetFilterLabel(TArray<FText>& InOutItems) const;
