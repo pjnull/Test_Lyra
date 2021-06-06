@@ -70,11 +70,11 @@ namespace Gauntlet
 			{
 				List<string> AllErrors = base.GetErrors().ToList();
 
-				foreach (var Artifact in GetArtifactsWithFailures())
+				foreach (var Role in GetRolesThatFailed())
 				{
-					if (Artifact.SessionRole.RoleType == UnrealTargetRole.Editor)
+					if (Role.Artifacts.SessionRole.RoleType == UnrealTargetRole.Editor)
 					{
-						AutomationLogParser Parser = new AutomationLogParser(Artifact.LogParser);
+						AutomationLogParser Parser = new AutomationLogParser(Role.Artifacts.LogParser);
 						AllErrors.AddRange(
 							Parser.GetResults().Where(R => !R.Passed)
 							.SelectMany(R => R.Events

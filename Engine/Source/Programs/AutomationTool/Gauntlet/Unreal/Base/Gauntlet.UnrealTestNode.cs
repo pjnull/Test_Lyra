@@ -77,15 +77,15 @@ namespace Gauntlet
 				return Warnings;
 			}
 
-			IEnumerable<string> Warnings = RoleResults.SelectMany(R =>
+			Warnings = RoleResults.SelectMany(R =>
 			{
 				return R.Artifacts.LogSummary.Ensures.Select(E => E.Message);
-			}); 
+			}).ToList(); 
 
 			// add all warnings from from roles if desired
 			if (Flags.HasFlag(BehaviorFlags.PromoteWarnings))
 			{
-				Warnings = Warnings.Union(RoleResults.SelectMany(R => R.Artifacts.LogSummary.Warnings.Select(W => W.ToString())));
+				Warnings = Warnings.Union(RoleResults.SelectMany(R => R.Artifacts.LogSummary.Warnings.Select(W => W.ToString()))).ToList();
 			}
 
 			return Warnings;
@@ -103,12 +103,12 @@ namespace Gauntlet
 
 			var FailedRoles = GetRolesThatFailed();
 
-			IEnumerable<string> Errors = FailedRoles.Where(R => R.Artifacts.LogSummary.FatalError != null).Select(R => R.Artifacts.LogSummary.FatalError.Message);
+			Errors = FailedRoles.Where(R => R.Artifacts.LogSummary.FatalError != null).Select(R => R.Artifacts.LogSummary.FatalError.Message).ToList();
 
 			// add all errors from from roles if desired
 			if (Flags.HasFlag(BehaviorFlags.PromoteErrors))
 			{
-				Errors = Errors.Union(RoleResults.SelectMany(R => R.Artifacts.LogSummary.Errors.Select(W => W.ToString())));
+				Errors = Errors.Union(RoleResults.SelectMany(R => R.Artifacts.LogSummary.Errors.Select(W => W.ToString()))).ToList();
 			}
 
 			return Errors;
@@ -1074,7 +1074,7 @@ namespace Gauntlet
 			HordeTestReport.TotalDurationSeconds = (float) (DateTime.Now - SessionStartTime).TotalSeconds;
 			HordeTestReport.Description = Context.ToString();
 			HordeTestReport.URLLink = GetURLLink();
-			HordeTestReport.Errors.AddRange(GetErrorsAndAbnornalExitReasons());
+			HordeTestReport.Errors.AddRange(GetErrorsAndAbnornalExits());
 			if (!string.IsNullOrEmpty(CancellationReason))
 			{
 				HordeTestReport.Errors.Add(CancellationReason);
