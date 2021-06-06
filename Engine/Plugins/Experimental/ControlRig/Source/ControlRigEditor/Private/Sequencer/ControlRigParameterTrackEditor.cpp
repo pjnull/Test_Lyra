@@ -2067,7 +2067,7 @@ void FControlRigParameterTrackEditor::GetControlRigKeys(UControlRig* InControlRi
 		}
 
 		bool bMaskKeyOut = (ControlIndex >= ControlsMask.Num() || ControlsMask[ControlIndex] == false);
-		bool bSetKey = RigControl.Name == ParameterName && !bMaskKeyOut;
+		bool bSetKey = ControlElement->GetName() == ParameterName && !bMaskKeyOut;
 
 		FRigControlValue ControlValue = InControlRig->GetHierarchy()->GetControlValue(ControlElement, ERigControlValueType::Current);
 		
