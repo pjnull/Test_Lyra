@@ -4,6 +4,7 @@ using UnrealBuildTool;
 using System.IO;
 using System;
 
+[SupportedPlatforms("Win64", "Linux")]
 public class AVEncoder : ModuleRules
 {
 	public AVEncoder(ReadOnlyTargetRules Target) : base(Target)
