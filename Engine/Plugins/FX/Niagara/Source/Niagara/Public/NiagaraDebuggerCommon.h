@@ -55,11 +55,9 @@ struct FNiagaraOutlinerEmitterInstanceData
 
 /** Outliner information on a specific system instance. */
 USTRUCT()
-struct NIAGARA_API FNiagaraOutlinerSystemInstanceData
+struct FNiagaraOutlinerSystemInstanceData
 {
 	GENERATED_BODY()
-
-	FNiagaraOutlinerSystemInstanceData();
 
 	/** Name of the component object for this instance, if there is one. */
 	UPROPERTY(VisibleAnywhere, Category = "System")
