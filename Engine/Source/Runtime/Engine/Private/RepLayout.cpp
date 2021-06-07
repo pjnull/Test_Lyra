@@ -1170,7 +1170,7 @@ FRepChangelistState::~FRepChangelistState()
 #if WITH_PUSH_MODEL
 bool FRepChangelistState::HasAnyDirtyProperties() const
 {
-	return UE4PushModelPrivate::DoesHaveDirtyPropertiesOrRecentlyCollectedGarbage(PushModelObjectHandle);
+	return UEPushModelPrivate::DoesHaveDirtyPropertiesOrRecentlyCollectedGarbage(PushModelObjectHandle);
 }
 #endif
 
