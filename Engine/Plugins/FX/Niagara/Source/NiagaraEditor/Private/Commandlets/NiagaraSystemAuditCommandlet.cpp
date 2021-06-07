@@ -73,7 +73,7 @@ int32 UNiagaraSystemAuditCommandlet::Main(const FString& Params)
 			for (FString DeviceString : DeviceNamesArray)
 			{
 				FName DeviceName(DeviceString);
-				UObject** DeviceProfile = UDeviceProfileManager::Get().Profiles.FindByPredicate([&](UObject* Device) {return Device->GetFName() == DeviceName; });
+				TObjectPtr<UObject>* DeviceProfile = UDeviceProfileManager::Get().Profiles.FindByPredicate([&](UObject* Device) {return Device->GetFName() == DeviceName; });
 				if (DeviceProfile)
 				{
 					DeviceProfilesToDisableGpu.Add(CastChecked<UDeviceProfile>(*DeviceProfile));
