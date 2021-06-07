@@ -630,6 +630,13 @@ void UNetworkPhysicsManager::OnWorldPostInit(UWorld* World, const UWorld::Initia
 
 		if (ensure(Solver->GetRewindCallback()==nullptr))
 		{
+			int32 NumFrames = 64;
+			const IConsoleVariable* NumFramesCVar = IConsoleManager::Get().FindConsoleVariable(TEXT("p.RewindCaptureNumFrames"));
+			if (ensure(NumFramesCVar))
+			{
+				NumFrames = NumFramesCVar->GetInt();
+			}
+
 			Solver->EnableRewindCapture(64, true, MakeUnique<FNetworkPhysicsRewindCallback>());
 			RewindCallback = static_cast<FNetworkPhysicsRewindCallback*>(Solver->GetRewindCallback());
 			RewindCallback->RewindData = Solver->GetRewindData();
