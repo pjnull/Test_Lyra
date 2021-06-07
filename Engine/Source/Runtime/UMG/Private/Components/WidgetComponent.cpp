@@ -1172,7 +1172,7 @@ void UWidgetComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, 
 		}
 
 		// Tick Mode is Disabled, we stop here and Disable the Component Tick
-		if (TickMode == ETickMode::Disabled)
+		if (TickMode == ETickMode::Disabled && !bRedrawRequested)
 		{
 			SetComponentTickEnabled(false);
 			return;
