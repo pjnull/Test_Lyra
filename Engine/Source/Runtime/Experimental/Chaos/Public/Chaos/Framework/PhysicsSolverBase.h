@@ -10,6 +10,7 @@
 #include "Async/ParallelFor.h"
 #include "Containers/Queue.h"
 #include "Chaos/ChaosMarshallingManager.h"
+#include "Stats/Stats2.h"
 
 class FChaosSolversModule;
 
@@ -293,6 +294,7 @@ namespace Chaos
 
 		void ApplyCallbacks_Internal(const FReal SimTime, const FReal Dt)
 		{
+			QUICK_SCOPE_CYCLE_COUNTER(ApplySimCallbacks);
 			for (ISimCallbackObject* Callback : SimCallbackObjects)
 			{
 				Callback->SetSimAndDeltaTime_Internal(SimTime, Dt);

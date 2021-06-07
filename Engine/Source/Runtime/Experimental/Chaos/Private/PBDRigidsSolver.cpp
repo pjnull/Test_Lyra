@@ -1028,6 +1028,7 @@ namespace Chaos
 
 	void FPBDRigidsSolver::ProcessPushedData_Internal(FPushPhysicsData& PushData)
 	{
+		QUICK_SCOPE_CYCLE_COUNTER(ChaosPushData);
 		ensure(PushData.InternalStep == CurrentFrame);	//push data was generated for this specific frame
 
 		//update callbacks
