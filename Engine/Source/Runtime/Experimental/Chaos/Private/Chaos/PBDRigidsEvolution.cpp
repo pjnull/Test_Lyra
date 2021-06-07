@@ -582,8 +582,7 @@ namespace Chaos
 		}
 
 		bool AsyncComplete = !AccelerationStructureTaskComplete || AccelerationStructureTaskComplete->IsComplete();
-
-		if (AsyncComplete)
+		if (AsyncComplete && !IsResimming())
 		{
 			bool bNeedsReset = false;
 

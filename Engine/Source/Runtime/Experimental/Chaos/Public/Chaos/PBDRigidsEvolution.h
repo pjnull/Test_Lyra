@@ -769,6 +769,9 @@ public:
 	CHAOS_API const FPBDConstraintGraph& GetConstraintGraph() const { return ConstraintGraph; }
 	CHAOS_API FPBDConstraintGraph& GetConstraintGraph() { return ConstraintGraph; }
 
+	void SetResim(bool bInResim) { bIsResim = bInResim; }
+	const bool IsResimming() const { return bIsResim; }
+
 	void Serialize(FChaosArchive& Ar);
 
 	FUniqueIdx GenerateUniqueIdx()
@@ -992,6 +995,7 @@ protected:
 	void ReleasePendingIndices();
 
 	TArray<FUniqueIdx> PendingReleaseIndices;	//for now just assume a one frame delay, but may need something more general
+	bool bIsResim = false;
 };
 
 

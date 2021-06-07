@@ -1100,8 +1100,10 @@ namespace Chaos
 			const int32 ResimStep = MRewindCallback->TriggerRewindIfNeeded_Internal(LastStep);
 			if(ResimStep != INDEX_NONE)
 			{
+				QUICK_SCOPE_CYCLE_COUNTER(ChaosRewindAndResim);
 				if(ensure(MRewindData->RewindToFrame(ResimStep)))
 				{
+					GetEvolution()->SetResim(true);
 					MRewindData->FlipBufferIfNeeded();
 					CurrentFrame = ResimStep;
 					const int32 NumResimSteps = LastStep - ResimStep + 1;
@@ -1123,6 +1125,8 @@ namespace Chaos
 
 						bFirst = false;
 					}
+
+					GetEvolution()->SetResim(false);
 				}
 			}
 		}
