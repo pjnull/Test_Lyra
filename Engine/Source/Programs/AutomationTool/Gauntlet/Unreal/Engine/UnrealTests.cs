@@ -74,7 +74,7 @@ namespace Gauntlet
 				{
 					if (Role.Artifacts.SessionRole.RoleType == UnrealTargetRole.Editor)
 					{
-						AutomationLogParser Parser = new AutomationLogParser(Role.Artifacts.LogParser);
+						AutomationLogParser Parser = new AutomationLogParser(Role.LogSummary.FullLogContent);
 						AllErrors.AddRange(
 							Parser.GetResults().Where(R => !R.Passed)
 							.SelectMany(R => R.Events
@@ -206,18 +206,18 @@ namespace Gauntlet
 			/// <param name="InArtifacts"></param>
 			/// <param name="ExitReason"></param>
 			/// <returns></returns>
-			protected override UnrealProcessResult GetExitCodeAndReason(StopReason InReason, UnrealRoleArtifacts InArtifacts, out string ExitReason, out int ExitCode)
+			protected override UnrealProcessResult GetExitCodeAndReason(StopReason InReason, UnrealLog InLog, UnrealRoleArtifacts InArtifacts, out string ExitReason, out int ExitCode)
 			{
-				UnrealProcessResult UnrealResult = base.GetExitCodeAndReason(InReason, InArtifacts, out ExitReason, out ExitCode);
+				UnrealProcessResult UnrealResult = base.GetExitCodeAndReason(InReason, InLog, InArtifacts, out ExitReason, out ExitCode);
 
 				// The editor is an additional arbiter of success
 				if (InArtifacts.SessionRole.RoleType == UnrealTargetRole.Editor
-					&& InArtifacts.LogSummary.HasAbnormalExit == false)
+					&& InLog.HasAbnormalExit == false)
 				{
 					// if no fatal errors, check test results
-					if (InArtifacts.LogParser.GetFatalError() == null)
+					if (InLog.FatalError == null)
 					{
-						AutomationLogParser Parser = new AutomationLogParser(InArtifacts.LogParser);
+						AutomationLogParser Parser = new AutomationLogParser(InLog.FullLogContent);
 
 						IEnumerable<AutomationTestResult> TotalTests = Parser.GetResults();
 						IEnumerable<AutomationTestResult> FailedTests = TotalTests.Where(R => !R.Passed);
@@ -251,11 +251,11 @@ namespace Gauntlet
 			{
 				MarkdownBuilder MB = new MarkdownBuilder(base.GetTestSummaryHeader());
 
-				var EditorArtifacts = SessionArtifacts.Where(A => A.SessionRole.RoleType == UnrealTargetRole.Editor).FirstOrDefault();
+				var EditorRole = RoleResults.Where(R => R.Artifacts.SessionRole.RoleType == UnrealTargetRole.Editor).FirstOrDefault();
 
-				if (EditorArtifacts != null)
+				if (EditorRole != null)
 				{
-					AutomationLogParser Parser = new AutomationLogParser(EditorArtifacts.LogParser);
+					AutomationLogParser Parser = new AutomationLogParser(EditorRole.LogSummary.FullLogContent);
 
 					IEnumerable<AutomationTestResult> AllTests = Parser.GetResults();
 					IEnumerable<AutomationTestResult> FailedTests = AllTests.Where(R => R.Completed && !R.Passed);

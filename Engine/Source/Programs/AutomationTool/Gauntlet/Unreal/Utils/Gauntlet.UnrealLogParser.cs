@@ -13,9 +13,10 @@ using System.Linq;
 namespace Gauntlet
 {
 	/// <summary>
-	/// Helper class for parsing logs
+	/// Represents a prepared summary of the most relevant info in a log. Generated once by a
+	/// LogParser and cached.
 	/// </summary>
-	public class UnrealLogParser
+	public class UnrealLog
 	{
 		/// <summary>
 		/// Represents the level
@@ -70,7 +71,7 @@ namespace Gauntlet
 				Category = InCategory;
 				Level = InLevel;
 				Message = InMessage;
-			}			
+			}
 		}
 
 		/// <summary>
@@ -78,12 +79,12 @@ namespace Gauntlet
 		/// </summary>
 		public class CallstackMessage
 		{
-			public int				Position;
-			public string			Message;
-			public string[]			Callstack;
-			public bool				IsEnsure;
-			public bool				IsPostMortem;
-			
+			public int Position;
+			public string Message;
+			public string[] Callstack;
+			public bool IsEnsure;
+			public bool IsPostMortem;
+
 			/// <summary>
 			/// Generate a string that represents a CallstackMessage formatted to be inserted into a log file.
 			/// </summary>
@@ -122,38 +123,80 @@ namespace Gauntlet
 		}
 
 		/// <summary>
-		/// Represents a prepared summary of the most relevant info in a log. Generated once by a
-		/// LogParser and cached.
+		/// Build info from the log
 		/// </summary>
-		public class LogSummary
-		{
-			public BuildInfo							BuildInfo;
-			public PlatformInfo							PlatformInfo;
-			public IEnumerable<LogEntry>				Warnings;
-			public IEnumerable<LogEntry>				Errors;
-			public CallstackMessage						FatalError;
-			public IEnumerable<CallstackMessage>		Ensures;
-			public int									LineCount;
-			public bool									EngineInitialized;
-			public bool									RequestedExit;
-			public string								RequestedExitReason;
-			public bool									HasTestExitCode;
-			public int									TestExitCode;
+		public BuildInfo LoggedBuildInfo;
 
-			/// <summary>
-			/// Returns true if this log indicates the Unreal instance exited abnormally
-			/// </summary>
-			public bool HasAbnormalExit
+		/// <summary>
+		/// Platform info from the log
+		/// </summary>
+		public PlatformInfo LoggedPlatformInfo;
+
+		/// <summary>
+		/// Entries in the log
+		/// </summary>
+		public IEnumerable<LogEntry> LogEntries = Enumerable.Empty<LogEntry>();
+
+		/// <summary>
+		/// Warnings for this role
+		/// </summary>
+		public IEnumerable<LogEntry> Warnings { get { return LogEntries.Where(E => E.Level == LogLevel.Warning); } }
+
+		/// <summary>
+		/// Errors for this role
+		/// </summary>
+		public IEnumerable<LogEntry> Errors { get { return LogEntries.Where(E => E.Level == LogLevel.Error); } }
+
+		/// <summary>
+		/// Fatal error instance if one occurred
+		/// </summary>
+		public CallstackMessage FatalError;
+
+		/// <summary>
+		/// A list of ensures if any occurred
+		/// </summary>
+		public IEnumerable<CallstackMessage> Ensures = Enumerable.Empty<CallstackMessage>();
+
+		/// <summary>
+		/// Number of lines in the log
+		/// </summary>
+		public int LineCount;
+
+		/// <summary>
+		/// True if the engine reached initialization
+		/// </summary>
+		public bool EngineInitialized;
+
+		/// <summary>
+		/// True if the instance requested exit
+		/// </summary>
+		public bool RequestedExit;
+		public string RequestedExitReason;
+		public bool HasTestExitCode;
+		public int TestExitCode;
+
+		// Temp for migrating some code
+		public string FullLogContent;
+
+		/// <summary>
+		/// Returns true if this log indicates the Unreal instance exited abnormally
+		/// </summary>
+		public bool HasAbnormalExit
+		{
+			get
 			{
-				get
-				{
-					return FatalError != null
-						|| EngineInitialized == false
-						|| (RequestedExit == false && HasTestExitCode == false);
-				}
+				return FatalError != null
+					|| EngineInitialized == false
+					|| (RequestedExit == false && HasTestExitCode == false);
 			}
 		}
+	}
 
+	/// <summary>
+	/// Helper class for parsing logs
+	/// </summary>
+	public class UnrealLogParser
+	{
 		/// <summary>
 		/// Our current content
 		/// </summary>
@@ -162,12 +205,12 @@ namespace Gauntlet
 		/// <summary>
 		/// All entries in the log
 		/// </summary>
-		public IEnumerable<LogEntry> LogEntries { get; protected set; }
+		public IEnumerable<UnrealLog.LogEntry> LogEntries { get; protected set; }
 
 		/// <summary>
 		/// Summary of the log
 		/// </summary>
-		private LogSummary Summary;
+		private UnrealLog Summary;
 
 		// Track log levels we couldn't identify
 		protected static HashSet<string> UnidentifiedLogLevels = new HashSet<string>();
@@ -185,7 +228,7 @@ namespace Gauntlet
 			// Search for LogFoo:< optional Display|Error etc:> Message
 			MatchCollection MC = Regex.Matches(Content, @"Log(?<category>[\w\d]+):\s*(?:(?<level>Display|Verbose|VeryVerbose|Warning|Error|Fatal):\s)?(?<message>.*)");
 
-			List<LogEntry> ParsedEntries = new List<LogEntry>();
+			List<UnrealLog.LogEntry> ParsedEntries = new List<UnrealLog.LogEntry>();
 
 			foreach (Match M in MC)
 			{
@@ -193,7 +236,7 @@ namespace Gauntlet
 				string LevelStr = M.Groups["level"].ToString();
 				string Message = M.Groups["message"].ToString();
 
-				LogLevel Level = LogLevel.Log;
+				UnrealLog.LogLevel Level = UnrealLog.LogLevel.Log;
 
 				if (!string.IsNullOrEmpty(LevelStr))
 				{
@@ -208,13 +251,13 @@ namespace Gauntlet
 					}
 				}
 
-				ParsedEntries.Add(new LogEntry(Category, Level, Message));
+				ParsedEntries.Add(new UnrealLog.LogEntry(Category, Level, Message));
 			}
 
 			LogEntries = ParsedEntries;
 		}
 
-		public LogSummary GetSummary()
+		public UnrealLog GetSummary()
 		{
 			if (Summary == null)
 			{
@@ -224,20 +267,20 @@ namespace Gauntlet
 			return Summary;
 		}
 
-		protected LogSummary CreateSummary()
+		protected UnrealLog CreateSummary()
 		{
-			LogSummary NewSummary = new LogSummary();
+			UnrealLog NewSummary = new UnrealLog();
 
-			NewSummary.BuildInfo = GetBuildInfo();
-			NewSummary.PlatformInfo = GetPlatformInfo();
-			NewSummary.Warnings = GetEntriesOfLevel(LogLevel.Warning);
-			NewSummary.Errors = GetEntriesOfLevel(LogLevel.Error);
+			NewSummary.LoggedBuildInfo = GetBuildInfo();
+			NewSummary.LoggedPlatformInfo = GetPlatformInfo();
+			NewSummary.LogEntries = LogEntries;
 			NewSummary.FatalError = GetFatalError();
 			NewSummary.Ensures = GetEnsures();
 			NewSummary.LineCount = Content.Split('\n').Count();
 			NewSummary.HasTestExitCode = GetTestExitCode(out NewSummary.TestExitCode);
 
 			NewSummary.EngineInitialized = GetAllMatches(@"LogInit.+Engine is initialized\.").Any();
+			NewSummary.FullLogContent = this.Content;
 
 			// Check request exit and reason
 			RegexUtil.MatchAndApplyGroups(Content, @"Engine exit requested \(reason:\s*(.+)\)", (Groups) =>
@@ -310,9 +353,9 @@ namespace Gauntlet
 		/// Returns a structure containing platform information extracted from the log
 		/// </summary>
 		/// <returns></returns>
-		public PlatformInfo GetPlatformInfo()
+		public UnrealLog.PlatformInfo GetPlatformInfo()
 		{
-			var Info = new PlatformInfo();
+			var Info = new UnrealLog.PlatformInfo();
 
 			var InfoRegEx = @"LogInit.+OS:\s*(.+?)\s*(\((.+)\))?,\s*CPU:\s*(.+)\s*,\s*GPU:\s*(.+)";
 
@@ -331,9 +374,9 @@ namespace Gauntlet
 		/// Returns a structure containing build information extracted from the log
 		/// </summary>
 		/// <returns></returns>
-		public BuildInfo GetBuildInfo()
+		public UnrealLog.BuildInfo GetBuildInfo()
 		{
-			var Info = new BuildInfo();
+			var Info = new UnrealLog.BuildInfo();
 
 			// pull from Branch Name: UE4
 			Match M = Regex.Match(Content, @"LogInit.+Name:\s*(.*)", RegexOptions.IgnoreCase);
@@ -359,9 +402,9 @@ namespace Gauntlet
 		/// </summary>
 		/// <param name="InChannel">Optional channel to restrict search to</param>
 		/// <returns></returns>
-		public IEnumerable<LogEntry> GetEntriesOfLevel(LogLevel InLevel)
+		public IEnumerable<UnrealLog.LogEntry> GetEntriesOfLevel(UnrealLog.LogLevel InLevel)
 		{
-			IEnumerable<LogEntry> Entries = LogEntries.Where(E => E.Level == InLevel);
+			IEnumerable<UnrealLog.LogEntry> Entries = LogEntries.Where(E => E.Level == InLevel);
 			return Entries;
 		}
 
@@ -370,9 +413,9 @@ namespace Gauntlet
 		/// </summary>
 		/// <param name="InChannel">Optional channel to restrict search to</param>
 		/// <returns></returns>
-		public IEnumerable<LogEntry> GetEntriesOfCategories(IEnumerable<string> InCategories, bool ExactMatch = false)
+		public IEnumerable<UnrealLog.LogEntry> GetEntriesOfCategories(IEnumerable<string> InCategories, bool ExactMatch = false)
 		{
-			IEnumerable<LogEntry> Entries;
+			IEnumerable<UnrealLog.LogEntry> Entries;
 
 			if (ExactMatch)
 			{
@@ -424,11 +467,11 @@ namespace Gauntlet
 		/// </summary>
 		/// <param name="Channel"></param>
 		/// <returns></returns>
-		public IEnumerable<string> GetLogChannel(string Channel, bool ExactMatch=true)
+		public IEnumerable<string> GetLogChannel(string Channel, bool ExactMatch = true)
 		{
 			return GetLogChannels(new string[] { Channel }, ExactMatch);
 		}
-				
+
 
 		/// <summary>
 		/// Returns all warnings from the log
@@ -437,7 +480,7 @@ namespace Gauntlet
 		/// <returns></returns>
 		public IEnumerable<string> GetWarnings(string InChannel = null)
 		{
-			IEnumerable<LogEntry> Entries = LogEntries.Where(E => E.Level == LogLevel.Warning);
+			IEnumerable<UnrealLog.LogEntry> Entries = LogEntries.Where(E => E.Level == UnrealLog.LogLevel.Warning);
 
 			if (InChannel != null)
 			{
@@ -454,7 +497,7 @@ namespace Gauntlet
 		/// <returns></returns>
 		public IEnumerable<string> GetErrors(string InChannel = null)
 		{
-			IEnumerable<LogEntry> Entries = LogEntries.Where(E => E.Level == LogLevel.Error);
+			IEnumerable<UnrealLog.LogEntry> Entries = LogEntries.Where(E => E.Level == UnrealLog.LogLevel.Error);
 
 			if (InChannel != null)
 			{
@@ -468,11 +511,11 @@ namespace Gauntlet
 		/// Returns all ensures from the log
 		/// </summary>
 		/// <returns></returns>
-		public IEnumerable<CallstackMessage> GetEnsures()
+		public IEnumerable<UnrealLog.CallstackMessage> GetEnsures()
 		{
-			IEnumerable<CallstackMessage> Ensures = ParseTracedErrors(new[] { @"Log.+:\s{0,1}Error:\s{0,1}(Ensure condition failed:.+)" }, false);
+			IEnumerable<UnrealLog.CallstackMessage> Ensures = ParseTracedErrors(new[] { @"Log.+:\s{0,1}Error:\s{0,1}(Ensure condition failed:.+)" }, false);
 
-			foreach (CallstackMessage Error in Ensures)
+			foreach (UnrealLog.CallstackMessage Error in Ensures)
 			{
 				Error.IsEnsure = true;
 			}
@@ -485,7 +528,7 @@ namespace Gauntlet
 		/// </summary>
 		/// <param name="ErrorInfo"></param>
 		/// <returns></returns>
-		public CallstackMessage GetFatalError()
+		public UnrealLog.CallstackMessage GetFatalError()
 		{
 			string[] ErrorMsgMatches = new string[] { "(Fatal Error:.+)", "(Assertion Failed:.+)", "(Unhandled Exception:.+)", "(LowLevelFatalError.+)" };
 
@@ -584,9 +627,9 @@ namespace Gauntlet
 		/// </summary>
 		/// <param name="Patterns"></param>
 		/// <returns></returns>
-		protected IEnumerable<CallstackMessage> ParseTracedErrors(string[] Patterns, bool IncludePostmortem = true)
+		protected IEnumerable<UnrealLog.CallstackMessage> ParseTracedErrors(string[] Patterns, bool IncludePostmortem = true)
 		{
-			List<CallstackMessage> Traces = new List<CallstackMessage>();
+			List<UnrealLog.CallstackMessage> Traces = new List<UnrealLog.CallstackMessage>();
 
 			// As well as what was requested, search for a postmortem stack...
 			IEnumerable<string> AllPatterns = IncludePostmortem ? Patterns.Concat(new[] { "(Postmortem Cause:.*)" }) : Patterns;
@@ -597,14 +640,14 @@ namespace Gauntlet
 				MatchCollection Matches = Regex.Matches(Content, Pattern, RegexOptions.IgnoreCase);
 
 				foreach (Match TraceMatch in Matches)
-				{ 
-					CallstackMessage NewTrace = new CallstackMessage();
+				{
+					UnrealLog.CallstackMessage NewTrace = new UnrealLog.CallstackMessage();
 
 					NewTrace.Position = TraceMatch.Index;
 					NewTrace.Message = TraceMatch.Groups[1].Value;
 
 					// If the regex matches the very end of the string, the substring will get an invalid range.
-					string ErrorContent = Content.Length <= TraceMatch.Index + TraceMatch.Length 
+					string ErrorContent = Content.Length <= TraceMatch.Index + TraceMatch.Length
 						? string.Empty : Content.Substring(TraceMatch.Index + TraceMatch.Length + 1);
 
 					Match MsgMatch = Regex.Match(ErrorContent, @".+:\s*Error:\s*(.+)");
@@ -696,7 +739,7 @@ namespace Gauntlet
 
 							if (string.IsNullOrEmpty(File))
 							{
-								 File = "[Unknown File]";
+								File = "[Unknown File]";
 							}
 
 							// Remove any exe
@@ -739,10 +782,10 @@ namespace Gauntlet
 			// longest callstack. If we have a post-mortem error, overwrite the previous trace with its info (on PS4 the post-mortem
 			// info is way more informative).
 
-			List<CallstackMessage> FilteredTraces = new List<CallstackMessage>();
+			List<UnrealLog.CallstackMessage> FilteredTraces = new List<UnrealLog.CallstackMessage>();
 
-			
-			for (int i = 0; i < Traces.Count ; i++)
+
+			for (int i = 0; i < Traces.Count; i++)
 			{
 				var Trace = Traces[i];
 
@@ -774,7 +817,7 @@ namespace Gauntlet
 
 			// If we have a post mortem crash, sort it to the front
 			if (FilteredTraces.FirstOrDefault((Trace) => { return Trace.IsPostMortem; }) != null)
-			{				
+			{
 				FilteredTraces.Sort((Trace1, Trace2) => { if (!Trace1.IsPostMortem && !Trace2.IsPostMortem) return 0; return Trace1.IsPostMortem ? -1 : 1; });
 			}
 
@@ -816,7 +859,7 @@ namespace Gauntlet
 			}
 
 			ExitCode = -1;
-			return false; 
+			return false;
 		}
 	}
 }
