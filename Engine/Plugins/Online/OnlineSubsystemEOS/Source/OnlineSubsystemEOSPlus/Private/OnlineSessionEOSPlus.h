@@ -9,7 +9,6 @@
 #include "OnlineUserEOSPlus.h"
 
 class FOnlineSubsystemEOSPlus;
-class FUniqueNetIdEOSPlus;
 
 /**
  * Interface for interacting with EOS sessions
