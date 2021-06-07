@@ -777,6 +777,340 @@ namespace ChaosTest {
 			});
 	}
 
+
+	GTEST_TEST(AllTraits, RewindTest_ResimInSync)
+	{
+		//apply forces in the same way until resim step 4 which should trigger a desync
+		TRewindHelper::TestDynamicSphere([](auto* Solver, FReal SimDt, int32 Optimization, auto Proxy, auto Sphere)
+			{
+				struct FRewindCallback : public IRewindCallback
+				{
+					FSingleParticlePhysicsProxy* Proxy;
+					FRewindData* RewindData;
+
+					virtual void ProcessInputs_Internal(int32 PhysicsStep, const TArray<FSimCallbackInputAndObject>& SimCallbackInputs) override
+					{
+						if(PhysicsStep == 2)
+						{
+							Proxy->GetPhysicsThreadAPI()->AddForce(FVec3(1, 0, 0));
+						}
+
+						if(bIsResimming && PhysicsStep == 4)
+						{
+							Proxy->GetPhysicsThreadAPI()->AddForce(FVec3(1, 0, 0));	//cause a desync
+						}
+
+						if(bIsResimming)
+						{
+							if(PhysicsStep <= 4)
+							{
+								EXPECT_EQ(Proxy->GetHandle_LowLevel()->SyncState(), ESyncState::InSync);
+							}
+							else
+							{
+								EXPECT_EQ(Proxy->GetHandle_LowLevel()->SyncState(), ESyncState::HardDesync);
+							}
+						}
+						else
+						{
+							EXPECT_EQ(Proxy->GetHandle_LowLevel()->SyncState(), ESyncState::InSync);
+						}
+					}
+
+					virtual int32 TriggerRewindIfNeeded_Internal(int32 LastCompletedStep) override
+					{
+						if (!bIsResimming && LastCompletedStep == ResimEndFrame)
+						{
+							bIsResimming = true;
+							return ResimStartFrame;
+						}
+
+						if (LastCompletedStep == ResimEndFrame)
+						{
+							bIsResimming = false;
+						}
+
+						return INDEX_NONE;
+					}
+
+					int32 ResimStartFrame = 1;
+					int32 ResimEndFrame = 10;
+					bool bIsResimming = false;
+
+				};
+
+				const int32 LastGameStep = 32;
+				const int32 NumPhysSteps = FMath::TruncToInt(LastGameStep / SimDt);
+
+				auto UniqueRewindCallback = MakeUnique<FRewindCallback>();
+				auto RewindCallback = UniqueRewindCallback.Get();
+				RewindCallback->Proxy = Proxy;
+				RewindCallback->RewindData = Solver->GetRewindData();
+
+				Solver->SetRewindCallback(MoveTemp(UniqueRewindCallback));
+
+				auto& Particle = Proxy->GetGameThreadAPI();
+				Particle.SetGravityEnabled(false);
+				Particle.SetV(FVec3(0, 0, 1));
+
+				for (int Step = 0; Step <= LastGameStep; ++Step)
+				{
+					if(Step == 3)
+					{
+						Particle.AddForce(FVec3(0, 0, -10));
+					}
+					TickSolverHelper(Solver);
+				}
+
+			});
+	}
+
+	GTEST_TEST(AllTraits, RewindTest_ResimInSync2)
+	{
+		//different velocity during resim step 5 which should cause a desync
+		TRewindHelper::TestDynamicSphere([](auto* Solver, FReal SimDt, int32 Optimization, auto Proxy, auto Sphere)
+			{
+				struct FRewindCallback : public IRewindCallback
+				{
+					FSingleParticlePhysicsProxy* Proxy;
+					FRewindData* RewindData;
+
+					virtual void ProcessInputs_Internal(int32 PhysicsStep, const TArray<FSimCallbackInputAndObject>& SimCallbackInputs) override
+					{
+						if (PhysicsStep == 2)
+						{
+							Proxy->GetPhysicsThreadAPI()->SetV(FVec3(0,0,2));
+						}
+
+						if (bIsResimming)
+						{
+							if(PhysicsStep == 3)
+							{
+								//only setting velocity during resim, but exact same value so should still be in sync
+								Proxy->GetPhysicsThreadAPI()->SetV(FVec3(0, 0, 2));
+							}
+
+							if(PhysicsStep == 5)
+							{
+								Proxy->GetPhysicsThreadAPI()->SetV(FVec3(0, 0, 5));
+							}
+						}
+
+						if (bIsResimming)
+						{
+							EXPECT_EQ(Proxy->GetHandle_LowLevel()->SyncState(), PhysicsStep <= 5 ? ESyncState::InSync : ESyncState::HardDesync);
+						}
+						else
+						{
+							EXPECT_EQ(Proxy->GetHandle_LowLevel()->SyncState(), ESyncState::InSync);
+						}
+					}
+
+					virtual int32 TriggerRewindIfNeeded_Internal(int32 LastCompletedStep) override
+					{
+						if (!bIsResimming && LastCompletedStep == ResimEndFrame)
+						{
+							bIsResimming = true;
+							return ResimStartFrame;
+						}
+
+						if (LastCompletedStep == ResimEndFrame)
+						{
+							bIsResimming = false;
+						}
+
+						return INDEX_NONE;
+					}
+
+					int32 ResimStartFrame = 1;
+					int32 ResimEndFrame = 10;
+					bool bIsResimming = false;
+
+				};
+
+				const int32 LastGameStep = 32;
+				const int32 NumPhysSteps = FMath::TruncToInt(LastGameStep / SimDt);
+
+				auto UniqueRewindCallback = MakeUnique<FRewindCallback>();
+				auto RewindCallback = UniqueRewindCallback.Get();
+				RewindCallback->Proxy = Proxy;
+				RewindCallback->RewindData = Solver->GetRewindData();
+
+				Solver->SetRewindCallback(MoveTemp(UniqueRewindCallback));
+
+				auto& Particle = Proxy->GetGameThreadAPI();
+				Particle.SetGravityEnabled(false);
+				Particle.SetV(FVec3(0, 0, 1));
+
+				for (int Step = 0; Step <= LastGameStep; ++Step)
+				{
+					TickSolverHelper(Solver);
+				}
+
+			});
+	}
+
+	GTEST_TEST(AllTraits, RewindTest_ResimInSync3)
+	{
+		//different position during resim step 5 which should cause a desync
+		//want a completely clean property to make sure we properly update resim buffer when property is dirtied only on second run
+		TRewindHelper::TestEmpty([](auto* Solver, FReal SimDt, int32 Optimization)
+			{
+				struct FRewindCallback : public IRewindCallback
+				{
+					FSingleParticlePhysicsProxy* Proxy;
+					FRewindData* RewindData;
+
+					virtual void ProcessInputs_Internal(int32 PhysicsStep, const TArray<FSimCallbackInputAndObject>& SimCallbackInputs) override
+					{
+						if (bIsResimming)
+						{
+							if (PhysicsStep == 5)
+							{
+								Proxy->GetPhysicsThreadAPI()->SetX(FVec3(0, 0, 5));
+							}
+						}
+
+						if (bIsResimming)
+						{
+							EXPECT_EQ(Proxy->GetHandle_LowLevel()->SyncState(), PhysicsStep <= 5 ? ESyncState::InSync : ESyncState::HardDesync);
+						}
+						else
+						{
+							EXPECT_EQ(Proxy->GetHandle_LowLevel()->SyncState(), ESyncState::InSync);
+						}
+					}
+
+					virtual int32 TriggerRewindIfNeeded_Internal(int32 LastCompletedStep) override
+					{
+						if (!bIsResimming && LastCompletedStep == ResimEndFrame)
+						{
+							bIsResimming = true;
+							return ResimStartFrame;
+						}
+
+						if (LastCompletedStep == ResimEndFrame)
+						{
+							bIsResimming = false;
+						}
+
+						return INDEX_NONE;
+					}
+
+					int32 ResimStartFrame = 1;
+					int32 ResimEndFrame = 10;
+					bool bIsResimming = false;
+
+				};
+
+				auto Sphere = TSharedPtr<FImplicitObject, ESPMode::ThreadSafe>(new TSphere<FReal, 3>(FVec3(0), 10));
+				auto Proxy = FSingleParticlePhysicsProxy::Create(Chaos::FKinematicGeometryParticle::CreateParticle());
+				Proxy->GetGameThreadAPI().SetGeometry(MoveTemp(Sphere));
+				Solver->RegisterObject(Proxy);
+
+				const int32 LastGameStep = 32;
+				const int32 NumPhysSteps = FMath::TruncToInt(LastGameStep / SimDt);
+
+				auto UniqueRewindCallback = MakeUnique<FRewindCallback>();
+				auto RewindCallback = UniqueRewindCallback.Get();
+				RewindCallback->Proxy = Proxy;
+				RewindCallback->RewindData = Solver->GetRewindData();
+
+				Solver->SetRewindCallback(MoveTemp(UniqueRewindCallback));
+
+				for (int Step = 0; Step <= LastGameStep; ++Step)
+				{
+					TickSolverHelper(Solver);
+				}
+
+			});
+	}
+
+	GTEST_TEST(AllTraits, RewindTest_ResimInSync4)
+	{
+		//different position during resim step 5 which should cause a desync
+		//want a completely clean property to make sure we properly update resim buffer when property is dirtied only on second run
+		//add a dirty property every frame to make sure we are getting an entry in the original sim, but with a clean property
+		//unrelated property must be dirtied on GT because simcallback dirty just copies all properties at the moment
+		TRewindHelper::TestEmpty([](auto* Solver, FReal SimDt, int32 Optimization)
+			{
+				//this test requires dirty writes from GT
+				//we want those to line up with PT tick 1 to 1
+				if (SimDt != 1) { return; }
+
+				struct FRewindCallback : public IRewindCallback
+				{
+					FSingleParticlePhysicsProxy* Proxy;
+					FRewindData* RewindData;
+
+					virtual void ProcessInputs_Internal(int32 PhysicsStep, const TArray<FSimCallbackInputAndObject>& SimCallbackInputs) override
+					{
+						if (bIsResimming)
+						{
+							if (PhysicsStep == 5)
+							{
+								Proxy->GetPhysicsThreadAPI()->SetX(FVec3(0, 0, 5));
+							}
+						}
+
+						if(bIsResimming)
+						{
+							EXPECT_EQ(Proxy->GetHandle_LowLevel()->SyncState(), PhysicsStep <= 5 ? ESyncState::InSync : ESyncState::HardDesync);
+						}
+						else
+						{
+							EXPECT_EQ(Proxy->GetHandle_LowLevel()->SyncState(), ESyncState::InSync);
+						}
+					}
+
+					virtual int32 TriggerRewindIfNeeded_Internal(int32 LastCompletedStep) override
+					{
+						if (!bIsResimming && LastCompletedStep == ResimEndFrame)
+						{
+							bIsResimming = true;
+							return ResimStartFrame;
+						}
+
+						if (LastCompletedStep == ResimEndFrame)
+						{
+							bIsResimming = false;
+						}
+
+						return INDEX_NONE;
+					}
+
+					int32 ResimStartFrame = 1;
+					int32 ResimEndFrame = 10;
+					bool bIsResimming = false;
+
+				};
+
+				auto Sphere = TSharedPtr<FImplicitObject, ESPMode::ThreadSafe>(new TSphere<FReal, 3>(FVec3(0), 10));
+				auto Proxy = FSingleParticlePhysicsProxy::Create(Chaos::FKinematicGeometryParticle::CreateParticle());
+				Proxy->GetGameThreadAPI().SetGeometry(MoveTemp(Sphere));
+				Solver->RegisterObject(Proxy);
+
+
+				const int32 LastGameStep = 32;
+				const int32 NumPhysSteps = FMath::TruncToInt(LastGameStep / SimDt);
+
+				auto UniqueRewindCallback = MakeUnique<FRewindCallback>();
+				auto RewindCallback = UniqueRewindCallback.Get();
+				RewindCallback->Proxy = Proxy;
+				RewindCallback->RewindData = Solver->GetRewindData();
+
+				Solver->SetRewindCallback(MoveTemp(UniqueRewindCallback));
+
+				for (int Step = 0; Step <= LastGameStep; ++Step)
+				{
+					Proxy->GetGameThreadAPI().SetV(FVec3(0, 0, Step));	//dirty an unrelated property to still get an entry in the history buffer
+
+					TickSolverHelper(Solver);
+				}
+
+			});
+	}
+
 	GTEST_TEST(AllTraits, RewindTest_ResimSleepChangeRewind)
 	{
 		// Test puting object to sleep during Resim
@@ -1707,7 +2041,6 @@ namespace ChaosTest {
 			});
 	}
 
-
 	GTEST_TEST(AllTraits, RewindTest_ResimFallingObjectWithTeleport)
 	{
 		TRewindHelper::TestDynamicSphere([](auto* Solver, FReal SimDt, int32 Optimization, auto Proxy, auto Sphere)
@@ -2408,6 +2741,8 @@ namespace ChaosTest {
 
 	GTEST_TEST(AllTraits, RewindTest_DesyncFromPT)
 	{
+#if REWIND_DESYNC
+
 		for (int Optimization = 0; Optimization < 2; ++Optimization)
 		{
 			//We want to detect when sim results change
@@ -2474,7 +2809,6 @@ namespace ChaosTest {
 
 			for (int Step = RewindStep; Step <= LastStep; ++Step)
 			{
-#if REWIND_DESYNC
 				//at the end of frame 6 a desync occurs because velocity is no longer clamped (kinematic moved)
 				//because of this desync will happen for any step after 6
 				if (Step <= 6)
@@ -2489,19 +2823,16 @@ namespace ChaosTest {
 					FGeometryParticleState FutureState(*DynamicProxy->GetHandle_LowLevel());
 					EXPECT_EQ(RewindData->GetFutureStateAtFrame(FutureState, Step), EFutureQueryResult::Desync);
 				}
-#endif
 
 
 				TickSolverHelper(Solver);
 			}
 
-#if REWIND_DESYNC
 			//both kinematic and simulated are desynced
 			const TArray<FDesyncedParticleInfo> DesyncedParticles = RewindData->ComputeDesyncInfo();
 			EXPECT_EQ(DesyncedParticles.Num(), 2);
 			EXPECT_EQ(DesyncedParticles[0].MostDesynced, ESyncState::HardDesync);
 			EXPECT_EQ(DesyncedParticles[1].MostDesynced, ESyncState::HardDesync);
-#endif
 
 			// We may end up a bit away from the surface (dt * V), due to solving for 0 velocity and not 0 position error
 			EXPECT_GE(Dynamic.X()[2], 9);
@@ -2509,6 +2840,7 @@ namespace ChaosTest {
 
 			Module->DestroySolver(Solver);
 		}
+#endif
 	}
 
 	GTEST_TEST(AllTraits, RewindTest_DeltaTimeRecord)
@@ -2561,7 +2893,7 @@ namespace ChaosTest {
 		}
 	}
 
-	GTEST_TEST(AllTraits, RewindTest_ResimDesyncFromChangeForce)
+	GTEST_TEST(AllTraits, DISABLED_RewindTest_ResimDesyncFromChangeForce)
 	{
 		for (int Optimization = 0; Optimization < 2; ++Optimization)
 		{
@@ -2743,7 +3075,7 @@ namespace ChaosTest {
 #endif
 	}
 
-	GTEST_TEST(AllTraits, RewindTest_FullResimFallSeeCollisionCorrection)
+	GTEST_TEST(AllTraits, DISABLED_RewindTest_FullResimFallSeeCollisionCorrection)
 	{
 		for (int Optimization = 0; Optimization < 2; ++Optimization)
 		{
@@ -2835,7 +3167,7 @@ namespace ChaosTest {
 		}
 	}
 
-	GTEST_TEST(AllTraits, RewindTest_ResimAsSlaveFallIgnoreCollision)
+	GTEST_TEST(AllTraits, DISABLED_RewindTest_ResimAsSlaveFallIgnoreCollision)
 	{
 		for (int Optimization = 0; Optimization < 2; ++Optimization)
 		{
@@ -2923,7 +3255,7 @@ namespace ChaosTest {
 		}
 	}
 
-	GTEST_TEST(AllTraits, RewindTest_ResimAsSlaveWithForces)
+	GTEST_TEST(AllTraits, DISABLED_RewindTest_ResimAsSlaveWithForces)
 	{
 #if REWIND_DESYNC
 		for (int Optimization = 0; Optimization < 2; ++Optimization)
@@ -3184,7 +3516,7 @@ namespace ChaosTest {
 #endif
 	}
 
-	GTEST_TEST(AllTraits, RewindTest_DesyncSimOutOfCollision)
+	GTEST_TEST(AllTraits, DISABLED_RewindTest_DesyncSimOutOfCollision)
 	{
 		for (int Optimization = 0; Optimization < 2; ++Optimization)
 		{
@@ -3293,7 +3625,7 @@ namespace ChaosTest {
 		}
 	}
 
-	GTEST_TEST(AllTraits, RewindTest_SoftDesyncFromSameIsland)
+	GTEST_TEST(AllTraits, DISABLED_RewindTest_SoftDesyncFromSameIsland)
 	{
 		auto Sphere = TSharedPtr<FImplicitObject, ESPMode::ThreadSafe>(new TSphere<FReal, 3>(FVec3(0), 10));
 		auto Box = TSharedPtr<FImplicitObject, ESPMode::ThreadSafe>(new TBox<FReal, 3>(FVec3(-100, -100, -100), FVec3(100, 100, 0)));
@@ -3404,7 +3736,7 @@ namespace ChaosTest {
 		Module->DestroySolver(Solver);
 	}
 
-	GTEST_TEST(AllTraits, RewindTest_SoftDesyncFromSameIslandThenBackToInSync)
+	GTEST_TEST(AllTraits, DISABLED_RewindTest_SoftDesyncFromSameIslandThenBackToInSync)
 	{
 		auto Sphere = TSharedPtr<FImplicitObject, ESPMode::ThreadSafe>(new TSphere<FReal, 3>(FVec3(0), 10));
 		auto Box = TSharedPtr<FImplicitObject, ESPMode::ThreadSafe>(new TBox<FReal, 3>(FVec3(-100, -100, -10), FVec3(100, 100, 0)));
