@@ -1147,6 +1147,12 @@ public:
 	}
 	FLinearColor GetEffectiveLightColor() const;
 
+#if WITH_EDITOR
+	bool bCubemapSkyLightWaitingForCubeMapTexture;
+	bool bCaptureSkyLightWaitingForShaders;
+	bool bCaptureSkyLightWaitingForMeshesOrTextures;
+#endif
+
 private:
 	FLinearColor LightColor;
 	const uint8 bMovable : 1;
