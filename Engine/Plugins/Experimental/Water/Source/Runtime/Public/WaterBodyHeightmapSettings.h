@@ -43,5 +43,5 @@ struct FWaterBodyHeightmapSettings
 	FWaterBrushEffects Effects;
 
 	UPROPERTY()
-	int32 Priority_DEPRECATED;
+	int32 Priority_DEPRECATED = 0;
 };
