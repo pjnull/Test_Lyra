@@ -768,6 +768,9 @@ void FRewindData::FinishFrame()
 	LatestFrame = FMath::Max(LatestFrame,CurFrame);
 }
 
+int32 SkipDesyncTest = 0;
+FAutoConsoleVariableRef CVarSkipDesyncTest(TEXT("p.SkipDesyncTest"), SkipDesyncTest, TEXT("Skips hard desync test, this means all particles will assume to be clean except spawning at different times. This is useful for a perf lower bound, not actually correct"));
+
 void FRewindData::AdvanceFrameImp(IResimCacheBase* ResimCache)
 {
 	FlipBufferIfNeeded();
@@ -811,7 +814,7 @@ void FRewindData::AdvanceFrameImp(IResimCacheBase* ResimCache)
 				}
 			}
 
-			if(!bInSync)
+			if(!bInSync && !SkipDesyncTest)
 			{
 				Info.GetPTParticle()->SetSyncState(ESyncState::HardDesync);
 				DesyncedParticles.Add(Info.GetPTParticle());
