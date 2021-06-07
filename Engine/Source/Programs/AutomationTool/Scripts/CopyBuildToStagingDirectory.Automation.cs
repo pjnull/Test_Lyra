@@ -625,7 +625,7 @@ public partial class Project : CommandUtils
 		{
 			// Making a plugin
 			DirectoryReference DLCRoot = Params.DLCFile.Directory;
-			string RelativeDLCRootPath = (Params.DLCOverrideCookedSubDir != null) ? DLCRoot.MakeRelativeTo(SC.LocalRoot) : Params.DLCOverrideCookedSubDir;
+			string RelativeDLCRootPath = (Params.DLCOverrideCookedSubDir == null) ? DLCRoot.MakeRelativeTo(SC.LocalRoot) : Params.DLCOverrideCookedSubDir;
 
 			// Put all of the cooked dir into the staged dir
 			if (String.IsNullOrEmpty(Params.CookOutputDir))
