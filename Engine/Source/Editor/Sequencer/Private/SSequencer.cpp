@@ -3322,9 +3322,12 @@ void SSequencer::OnAssetsDropped( const FAssetDragDropOp& DragDropOp )
 				{
 					FMovieSceneSpawnable* Spawnable = MovieScene->FindSpawnable(NewGuid);
 
-					if (Spawnable && Spawnable->GetObjectTemplate()->IsA<ACameraActor>())
+					if (Spawnable)
 					{
-						SequencerRef.NewCameraAdded(NewGuid);
+						if (ACameraActor* CameraActor = Cast<ACameraActor>(Spawnable->GetObjectTemplate()))
+						{
+							SequencerRef.NewCameraAdded(CameraActor, NewGuid);
+						}
 					}
 				}
 			}
