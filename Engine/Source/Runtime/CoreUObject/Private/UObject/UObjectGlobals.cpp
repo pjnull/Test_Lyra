@@ -2197,7 +2197,7 @@ UObject* StaticDuplicateObjectEx( FObjectDuplicationParameters& Parameters )
 		FDuplicatedObject ObjectInfo = DuplicatedObjectAnnotation.GetAnnotation( SerializedObject );
 		checkSlow( !ObjectInfo.IsDefault() );
 
-		TGuardValue<UObject*> SerializedObjectGuard(LoadContext->SerializedObject, ObjectInfo.DuplicatedObject);
+		TGuardValue<UObject*> SerializedObjectGuard(LoadContext->SerializedObject, ObjectInfo.DuplicatedObject.Get());
 		if ( !SerializedObject->HasAnyFlags(RF_ClassDefaultObject) )
 		{
 			ObjectInfo.DuplicatedObject->Serialize(Reader);
@@ -2263,7 +2263,10 @@ UObject* StaticDuplicateObjectEx( FObjectDuplicationParameters& Parameters )
 			if ( Parameters.DuplicationSeed.Find(OrigObject) == nullptr )
 			{
 				FDuplicatedObject DupObjectInfo = DuplicatedObjectAnnotation.GetAnnotation( OrigObject );
-				Parameters.CreatedObjects->Add(OrigObject, DupObjectInfo.DuplicatedObject);
+				if (UObject* DuplicatedObject = DupObjectInfo.DuplicatedObject.Get())
+				{
+					Parameters.CreatedObjects->Add(OrigObject, DuplicatedObject);
+				}
 			}
 		}
 	}
