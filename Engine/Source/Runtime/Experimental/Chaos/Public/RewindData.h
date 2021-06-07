@@ -1018,7 +1018,7 @@ private:
 	bool bNeedsSave;	//Indicates that some data is pointing at head and requires saving before a rewind
 	bool bResimOptimization;
 
-	int32 OriginalBufferIdx() const { return 1 - Buffer; }
+	uint8 OriginalBufferIdx() const { return 1 - Buffer; }
 };
 
 /** Used by user code to determine when rewind should occur and gives it the opportunity to record any additional data */
