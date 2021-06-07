@@ -355,10 +355,8 @@ FLinearColor USkyAtmosphereComponent::GetAtmosphereTransmitanceOnGroundAtPlanetT
 	if(DirectionalLight != nullptr)
 	{
 		FAtmosphereSetup AtmosphereSetup(*this);
-		const FLinearColor TransmittanceAtZenith = AtmosphereSetup.GetTransmittanceAtGroundLevel(FVector(0.0f, 0.0f, 1.0f));
 		const FLinearColor TransmittanceAtDirLight = AtmosphereSetup.GetTransmittanceAtGroundLevel(-DirectionalLight->GetDirection());
-		// In 4.27, transmittance is the ratio of transmittance at zenith and current position (for the sun illuminance to be what artist species when at zenith).
-		return TransmittanceAtDirLight / TransmittanceAtZenith;
+		return TransmittanceAtDirLight;
 	}
 	return FLinearColor::White;
 }
