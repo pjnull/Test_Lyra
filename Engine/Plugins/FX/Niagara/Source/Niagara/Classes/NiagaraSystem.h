@@ -523,6 +523,7 @@ public:
 	const TArray<FName>& GetUserDINamesReadInSystemScripts() const;
 
 	FBox GetFixedBounds() const;
+	FORCEINLINE void SetFixedBounds(const FBox& Box) { FixedBounds = Box;  }
 
 #if WITH_EDITOR
 	void SetEffectType(UNiagaraEffectType* EffectType);
