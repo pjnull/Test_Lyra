@@ -1267,7 +1267,7 @@ TSharedRef<SWidget> FNiagaraSystemToolkit::CreateAddEmitterMenuContent()
 	ViewOptions.SetCategorizeLibraryAssets(true);
 	ViewOptions.SetAddLibraryOnlyCheckbox(true);
 
-	FNiagaraAssetPickerTabOptions TabOptions;
+	SNiagaraTemplateTabBox::FNiagaraTemplateTabOptions TabOptions;
 	TabOptions.ChangeTabState(ENiagaraScriptTemplateSpecification::Template, true);
 	TabOptions.ChangeTabState(ENiagaraScriptTemplateSpecification::None, true);
 	TabOptions.ChangeTabState(ENiagaraScriptTemplateSpecification::Behavior, true);
