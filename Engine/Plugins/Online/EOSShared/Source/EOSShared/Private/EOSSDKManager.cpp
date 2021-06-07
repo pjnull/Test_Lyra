@@ -163,6 +163,7 @@ EOS_EResult FEOSSDKManager::Initialize()
 
 		EOS_EResult EosResult = EOSInitialize(InitializeOptions);
 
+#if !NO_LOGGING
 		if (EosResult == EOS_EResult::EOS_Success)
 		{
 			bInitialized = true;
@@ -186,7 +187,7 @@ EOS_EResult FEOSSDKManager::Initialize()
 		{
 			UE_LOG(LogEOSSDK, Warning, TEXT("EOS_Initialize failed error:%s"), *LexToString(EosResult));
 		}
-
+#endif
 		return EosResult;
 	}
 }
@@ -235,6 +236,7 @@ bool FEOSSDKManager::Tick(float)
 
 void FEOSSDKManager::OnLogVerbosityChanged(const FLogCategoryName& CategoryName, ELogVerbosity::Type OldVerbosity, ELogVerbosity::Type NewVerbosity)
 {
+#if !NO_LOGGING
 	if (IsInitialized() &&
 		CategoryName == LogEOSSDK.GetCategoryName())
 	{
@@ -244,6 +246,7 @@ void FEOSSDKManager::OnLogVerbosityChanged(const FLogCategoryName& CategoryName,
 			UE_LOG(LogEOSSDK, Warning, TEXT("EOS_Logging_SetLogLevel failed Verbosity=%s error=[%s]"), ToString(NewVerbosity), *LexToString(EosResult));
 		}
 	}
+#endif
 }
 
 FString FEOSSDKManager::GetProductName() const
