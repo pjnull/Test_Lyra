@@ -11,15 +11,18 @@
 struct FDuplicatedObject
 {
 	/** The duplicated object */
-	TWeakObjectPtr<UObject> DuplicatedObject;
+	UObject* DuplicatedObject;
 
 	FDuplicatedObject()
+		: DuplicatedObject(NULL)
 	{
+
 	}
 
 	FDuplicatedObject( UObject* InDuplicatedObject )
 		: DuplicatedObject( InDuplicatedObject )
 	{
+
 	}
 
 	/**
@@ -27,7 +30,7 @@ struct FDuplicatedObject
 	 */
 	FORCEINLINE bool IsDefault()
 	{
-		return DuplicatedObject.IsExplicitlyNull();
+		return DuplicatedObject == NULL;
 	}
 };
 
