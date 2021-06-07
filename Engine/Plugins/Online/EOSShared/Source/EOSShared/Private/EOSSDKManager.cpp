@@ -42,6 +42,7 @@ namespace
 		FMemory::Free(Ptr);
 	}
 
+#if !NO_LOGGING
 	void EOS_CALL EOSLogMessageReceived(const EOS_LogMessage* Message)
 	{
 #define EOSLOG(Level) UE_LOG(LogEOSSDK, Level, TEXT("%s: %s"), ANSI_TO_TCHAR(Message->Category), *MessageStr)
@@ -80,6 +81,7 @@ namespace
 		case ELogVerbosity::VeryVerbose:	return EOS_ELogLevel::EOS_LOG_VeryVerbose;
 		}
 	}
+#endif // !NO_LOGGING
 }
 
 
@@ -163,14 +165,13 @@ EOS_EResult FEOSSDKManager::Initialize()
 
 		EOS_EResult EosResult = EOSInitialize(InitializeOptions);
 
-#if !NO_LOGGING
 		if (EosResult == EOS_EResult::EOS_Success)
 		{
 			bInitialized = true;
 
+#if !NO_LOGGING
 			FCoreDelegates::OnLogVerbosityChanged.AddRaw(this, &FEOSSDKManager::OnLogVerbosityChanged);
 
-			// Enable logging
 			EosResult = EOS_Logging_SetCallback(&EOSLogMessageReceived);
 			if (EosResult != EOS_EResult::EOS_Success)
 			{
@@ -182,12 +183,13 @@ EOS_EResult FEOSSDKManager::Initialize()
 			{
 				UE_LOG(LogEOSSDK, Warning, TEXT("EOS_Logging_SetLogLevel failed Verbosity=%s error=[%s]"), ToString(LogEOSSDK.GetVerbosity()), *LexToString(EosResult));
 			}
+#endif // !NO_LOGGING
 		}
 		else
 		{
 			UE_LOG(LogEOSSDK, Warning, TEXT("EOS_Initialize failed error:%s"), *LexToString(EosResult));
 		}
-#endif
+
 		return EosResult;
 	}
 }
@@ -246,7 +248,7 @@ void FEOSSDKManager::OnLogVerbosityChanged(const FLogCategoryName& CategoryName,
 			UE_LOG(LogEOSSDK, Warning, TEXT("EOS_Logging_SetLogLevel failed Verbosity=%s error=[%s]"), ToString(NewVerbosity), *LexToString(EosResult));
 		}
 	}
-#endif
+#endif // !NO_LOGGING
 }
 
 FString FEOSSDKManager::GetProductName() const
@@ -300,7 +302,9 @@ void FEOSSDKManager::Shutdown()
 			}
 		}
 
+#if !NO_LOGGING
 		FCoreDelegates::OnLogVerbosityChanged.RemoveAll(this);
+#endif // !NO_LOGGING
 
 		const EOS_EResult Result = EOS_Shutdown();
 		UE_LOG(LogEOSSDK, Log, TEXT("FEOSSDKManager::Shutdown EOS_Shutdown Result=[%s]"), *LexToString(Result));
