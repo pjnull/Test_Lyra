@@ -2126,12 +2126,16 @@ namespace Chaos
 		{
 			CONDITIONAL_SCOPE_CYCLE_COUNTER(STAT_Collisions_UpdateConstraintFromGeometryInternal, ConstraintsDetailedStats);
 
-			const FImplicitObject& Implicit0 = *Constraint.Manifold.Implicit[0];
-			const FImplicitObject& Implicit1 = *Constraint.Manifold.Implicit[1];
-
 			// @todo(chaos): remove
 			//const FVec3 OriginalContactPositionLocal0 = WorldTransform0.InverseTransformPosition(Constraint.Manifold.Location);
 			//const FVec3 OriginalContactPositionLocal1 = WorldTransform1.InverseTransformPosition(Constraint.Manifold.Location);
+			if (!Constraint.Manifold.Implicit[0] || !Constraint.Manifold.Implicit[1])
+			{
+				return;
+			}
+
+			const FImplicitObject& Implicit0 = *Constraint.Manifold.Implicit[0];
+			const FImplicitObject& Implicit1 = *Constraint.Manifold.Implicit[1];
 
 			if (Implicit0.HasBoundingBox() && Implicit1.HasBoundingBox())
 			{
