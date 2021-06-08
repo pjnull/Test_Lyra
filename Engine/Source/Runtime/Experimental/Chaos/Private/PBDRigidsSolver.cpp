@@ -891,8 +891,9 @@ namespace Chaos
 		FDirtySet* DirtyProxiesData = &PushData.DirtyProxiesDataBuffer;
 		FDirtyPropertiesManager* Manager = &PushData.DirtyPropertiesManager;
 		FShapeDirtyData* ShapeDirtyData = DirtyProxiesData->GetShapesDirtyData();
+		FReal ExternalDt = PushData.ExternalDt;
 
-		auto ProcessProxyPT = [Manager,ShapeDirtyData,RewindData, this](auto& Proxy,int32 DataIdx,FDirtyProxy& Dirty,const auto& CreateHandleFunc)
+		auto ProcessProxyPT = [Manager,ShapeDirtyData,RewindData, ExternalDt, this](auto& Proxy,int32 DataIdx,FDirtyProxy& Dirty,const auto& CreateHandleFunc)
 		{
 			const bool bIsNew = !Proxy->IsInitialized();
 			if(bIsNew)
@@ -919,8 +920,7 @@ namespace Chaos
 						RewindData->PushGTDirtyData<false>(*Manager, DataIdx, Dirty, ShapeDirtyData);
 					}
 				}
-
-				Proxy->PushToPhysicsState(*Manager, DataIdx, Dirty, ShapeDirtyData, *GetEvolution());
+				Proxy->PushToPhysicsState(*Manager, DataIdx, Dirty, ShapeDirtyData, *GetEvolution(), ExternalDt);
 			}
 			else
 			{

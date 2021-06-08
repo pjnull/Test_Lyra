@@ -41,7 +41,7 @@ CHAOS_API int32 ForceNoCollisionIntoSQ = 0;
 FAutoConsoleVariableRef CVarForceNoCollisionIntoSQ(TEXT("p.ForceNoCollisionIntoSQ"), ForceNoCollisionIntoSQ, TEXT("When enabled, all particles end up in sq structure, even ones with no collision"));
 
 template <Chaos::EParticleType ParticleType, typename TEvolution>
-void PushToPhysicsStateImp(const Chaos::FDirtyPropertiesManager& Manager, Chaos::FGeometryParticleHandle* Handle, int32 DataIdx, const Chaos::FDirtyProxy& Dirty, Chaos::FShapeDirtyData* ShapesData, TEvolution& Evolution, bool bResimInitialized)
+void PushToPhysicsStateImp(const Chaos::FDirtyPropertiesManager& Manager, Chaos::FGeometryParticleHandle* Handle, int32 DataIdx, const Chaos::FDirtyProxy& Dirty, Chaos::FShapeDirtyData* ShapesData, TEvolution& Evolution, bool bResimInitialized, Chaos::FReal ExternalDt)
 {
 	using namespace Chaos;
 	constexpr bool bHasKinematicData = ParticleType != EParticleType::Static;
@@ -97,7 +97,7 @@ void PushToPhysicsStateImp(const Chaos::FDirtyPropertiesManager& Manager, Chaos:
 				}
 				if (bHasKinematicData)
 				{
-					WorldSpaceBounds.ThickenSymmetrically(KinematicHandle->V());
+					WorldSpaceBounds.ThickenSymmetrically(KinematicHandle->V() * ExternalDt);
 				}
 				Handle->SetWorldSpaceInflatedBounds(WorldSpaceBounds);
 			}
@@ -204,7 +204,7 @@ void PushToPhysicsStateImp(const Chaos::FDirtyPropertiesManager& Manager, Chaos:
 // TGeometryParticle<FReal, 3> template specialization 
 //
 
-void FSingleParticlePhysicsProxy::PushToPhysicsState(const Chaos::FDirtyPropertiesManager& Manager, int32 DataIdx, const Chaos::FDirtyProxy& Dirty, Chaos::FShapeDirtyData* ShapesData, Chaos::FPBDRigidsEvolutionGBF& Evolution)
+void FSingleParticlePhysicsProxy::PushToPhysicsState(const Chaos::FDirtyPropertiesManager& Manager, int32 DataIdx, const Chaos::FDirtyProxy& Dirty, Chaos::FShapeDirtyData* ShapesData, Chaos::FPBDRigidsEvolutionGBF& Evolution, Chaos::FReal ExternalDt)
 {
 	using namespace Chaos;
 	const int32 CurFrame = static_cast<FPBDRigidsSolver*>(Solver)->GetCurrentFrame();
@@ -213,9 +213,9 @@ void FSingleParticlePhysicsProxy::PushToPhysicsState(const Chaos::FDirtyProperti
 	switch(Dirty.ParticleData.GetParticleBufferType())
 	{
 		
-	case EParticleType::Static: PushToPhysicsStateImp<EParticleType::Static>(Manager, Handle, DataIdx, Dirty, ShapesData, Evolution, bResimInitialized); break;
-	case EParticleType::Kinematic: PushToPhysicsStateImp<EParticleType::Kinematic>(Manager, Handle, DataIdx, Dirty, ShapesData, Evolution, bResimInitialized); break;
-	case EParticleType::Rigid: PushToPhysicsStateImp<EParticleType::Rigid>(Manager, Handle, DataIdx, Dirty, ShapesData, Evolution, bResimInitialized); break;
+	case EParticleType::Static: PushToPhysicsStateImp<EParticleType::Static>(Manager, Handle, DataIdx, Dirty, ShapesData, Evolution, bResimInitialized, ExternalDt); break;
+	case EParticleType::Kinematic: PushToPhysicsStateImp<EParticleType::Kinematic>(Manager, Handle, DataIdx, Dirty, ShapesData, Evolution, bResimInitialized, ExternalDt); break;
+	case EParticleType::Rigid: PushToPhysicsStateImp<EParticleType::Rigid>(Manager, Handle, DataIdx, Dirty, ShapesData, Evolution, bResimInitialized, ExternalDt); break;
 	default: check(false); //unexpected path
 	}
 }
