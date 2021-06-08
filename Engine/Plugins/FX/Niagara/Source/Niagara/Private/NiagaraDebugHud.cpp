@@ -170,7 +170,7 @@ namespace NiagaraDebugLocal
 			[](const TArray<FString>& Args, UWorld* World)
 			{
 				// While it works, not sure this makes sense for anything other than PIE
-				if ( !World->IsPlayInEditor() )
+				if (!World->IsGameWorld() && !World->IsPlayInEditor())
 				{
 					return;
 				}

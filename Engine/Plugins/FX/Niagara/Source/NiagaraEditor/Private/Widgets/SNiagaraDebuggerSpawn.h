@@ -78,9 +78,9 @@ public:
 	void SpawnSystems(TConstArrayView<FString> SystemNames);
 
 	// FTickableEditorObject Impl
-	virtual void Tick(float DeltaTime);
-	virtual bool IsTickable() const;
-	virtual TStatId GetStatId() const;
+	virtual void Tick(float DeltaTime) override;
+	virtual bool IsTickable() const override;
+	virtual TStatId GetStatId() const override;
 	// FTickableEditorObject Impl
 
 private:
