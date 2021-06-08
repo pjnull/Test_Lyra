@@ -2309,10 +2309,14 @@ int32 UShaderPipelineCacheToolsCommandlet::StaticMain(const FString& Params)
 			Tokens.RemoveAt(0);
 			return ExpandPSOSC(Tokens);
 		}
-		else if (Tokens[0] == TEXT("Build") && Tokens.Num() >= 4)
+		else if (Tokens[0] == TEXT("Build"))
 		{
-			Tokens.RemoveAt(0);
-			return BuildPSOSC(Tokens);
+			// 3 tokens at a minimum, as stablepc is optional: build [stablepc] stablekey outputfile
+			if (Tokens.Num() >= 3)
+			{
+				Tokens.RemoveAt(0);
+				return BuildPSOSC(Tokens);
+			}
 		}
 		else if (Tokens[0] == TEXT("Diff") && Tokens.Num() >= 3)
 		{
@@ -2349,7 +2353,7 @@ int32 UShaderPipelineCacheToolsCommandlet::StaticMain(const FString& Params)
 	
 	UE_LOG(LogShaderPipelineCacheTools, Warning, TEXT("Usage: Dump ShaderCache1.upipelinecache SCLInfo2%s [...]]\n"), ShaderStableKeysFileExt);
 	UE_LOG(LogShaderPipelineCacheTools, Warning, TEXT("Usage: Diff ShaderCache1.stablepc.csv ShaderCache1.stablepc.csv [...]]\n"));
-	UE_LOG(LogShaderPipelineCacheTools, Warning, TEXT("Usage: Expand Input1.upipelinecache Dir2/*.upipelinecache InputSCLInfo1%s Dir2/*%s InputSCLInfo3%s [...] Output.stablepc.csv\n"), ShaderStableKeysFileExt, ShaderStableKeysFileExt, ShaderStableKeysFileExt);
+	UE_LOG(LogShaderPipelineCacheTools, Warning, TEXT("Usage: Expand Input1.upipelinecache Dir2/*.upipelinecache InputSCLInfo1.%s Dir2/*.%s InputSCLInfo3.%s [...] Output.stablepc.csv\n"), ShaderStableKeysFileExt, ShaderStableKeysFileExt, ShaderStableKeysFileExt);
 	UE_LOG(LogShaderPipelineCacheTools, Warning, TEXT("Usage: Build Input.stablepc.csv InputDir2/*.stablepc.csv InputSCLInfo1.%s Dir2/*.%s InputSCLInfo3.%s [...] Output.upipelinecache\n"), ShaderStableKeysFileExt, ShaderStableKeysFileExt, ShaderStableKeysFileExt);
 	UE_LOG(LogShaderPipelineCacheTools, Warning, TEXT("Usage: Decompress Input1.stablepc.csv.compressed Input2.stablepc.csv.compressed [...]\n"));
 	UE_LOG(LogShaderPipelineCacheTools, Warning, TEXT("Usage: All commands accept stablepc.csv.compressed instead of stablepc.csv for compressing output\n"));
