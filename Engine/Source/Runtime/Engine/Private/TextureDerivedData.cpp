@@ -2105,7 +2105,7 @@ void UTexture::SerializeCookedPlatformData(FArchive& Ar)
 #if WITH_EDITOR
 	if (Ar.IsCooking() && Ar.IsPersistent())
 	{
-		if (!Ar.CookingTarget()->IsServerOnly())
+		if (Ar.CookingTarget()->AllowAudioVisualData())
 		{
 			FTextureBuildSettings BuildSettings;
 			GetTextureBuildSettings(*this, Ar.CookingTarget()->GetTextureLODSettings(), *Ar.CookingTarget(), BuildSettings);

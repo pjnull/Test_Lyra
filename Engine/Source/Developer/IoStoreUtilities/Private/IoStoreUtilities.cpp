@@ -1686,7 +1686,7 @@ int32 CreateTarget(const FIoStoreArguments& Arguments, const FIoStoreWriterSetti
 			HeaderAr << ContainerTarget->Header;
 			int64 DataSize = HeaderAr.TotalSize();
 			FIoBuffer ContainerHeaderBuffer(FIoBuffer::AssumeOwnership, HeaderAr.ReleaseOwnership(), DataSize);
-			
+
 			FIoWriteOptions WriteOptions;
 			WriteOptions.DebugName = TEXT("ContainerHeader");
 			ContainerTarget->IoStoreWriter->Append(
@@ -1755,7 +1755,7 @@ int32 CreateTarget(const FIoStoreArguments& Arguments, const FIoStoreWriterSetti
 	uint64 ImportedPackagesCount = 0;
 	uint64 NoImportedPackagesCount = 0;
 	uint64 NameMapCount = 0;
-	
+
 	for (const FLegacyCookedPackage* Package : Packages)
 	{
 		UExpSize += Package->UExpSize;
