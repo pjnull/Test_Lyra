@@ -77,7 +77,7 @@ GfnRuntimeError GeForceNOWWrapper::Initialize()
 	FString GFNDllPath = FPaths::Combine(FPaths::EngineDir(), TEXT("Binaries/ThirdParty/NVIDIA/GeForceNOW"), FPlatformProcess::GetBinariesSubdirectory(), TEXT("GfnRuntimeSdk.dll"));
 	FString GFNDllFullPath = IFileManager::Get().ConvertToAbsolutePathForExternalAppForRead(*GFNDllPath);
 	GFNDllFullPath.ReplaceInline(TEXT("/"), TEXT("\\"), ESearchCase::CaseSensitive);
- 	const GfnRuntimeError ErrorCode = GfnInitializeSdk(gfnDefaultLanguage, *GFNDllFullPath);
+ 	const GfnRuntimeError ErrorCode = GfnInitializeSdkFromPath(gfnDefaultLanguage, *GFNDllFullPath);
 	bIsInitialized = ErrorCode == gfnSuccess || ErrorCode == gfnInitSuccessClientOnly;
 
 	return ErrorCode;
@@ -153,6 +153,11 @@ GfnRuntimeError GeForceNOWWrapper::StopStream() const
 GfnRuntimeError GeForceNOWWrapper::StopStreamAsync(StopStreamCallbackSig StopStreamCallback, void* Context, unsigned int TimeoutMs) const
 {
 	return GfnStopStreamAsync(StopStreamCallback, Context, TimeoutMs);
+}
+
+GfnRuntimeError GeForceNOWWrapper::SetActionZone(GfnActionType ActionType, unsigned int Id, GfnRect* Zone)
+{
+	return GfnSetActionZone(ActionType, Id, Zone);
 }
 
 GfnRuntimeError GeForceNOWWrapper::RegisterStreamStatusCallback(StreamStatusCallbackSig StreamStatusCallback, void* Context) const

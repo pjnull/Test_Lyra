@@ -52,6 +52,9 @@ public:
 	/** Request GeforceNOW client to stop a streaming session of an application in an asynchronous fashion. */
 	GfnRuntimeError StopStreamAsync(StopStreamCallbackSig StopStreamCallback, void* Context, unsigned int TimeoutMs) const;
 
+	/** Use to invoke special events on the client from the GFN cloud environment */
+	GfnRuntimeError SetActionZone(GfnActionType ActionType, unsigned int Id, GfnRect* Zone);
+
 	/** Registers a callback that gets called on the user's PC when the streaming session state changes. */
 	GfnRuntimeError RegisterStreamStatusCallback(StreamStatusCallbackSig StreamStatusCallback, void* Context) const;
 	/** Registers an application function to call when GeforceNOW needs to exit the game. */
