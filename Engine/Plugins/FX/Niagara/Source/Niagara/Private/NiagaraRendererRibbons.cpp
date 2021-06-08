@@ -1157,7 +1157,7 @@ void FNiagaraRendererRibbons::SetupMeshBatchAndCollectorResourceForView(
 #endif
 	MeshBatch.bUseAsOccluder = false;
 	MeshBatch.ReverseCulling = SceneProxy->IsLocalToWorldDeterminantNegative();
-	MeshBatch.bDisableBackfaceCulling = Shape != ENiagaraRibbonShapeMode::MultiPlane || !bEnableAccurateGeometry;
+	MeshBatch.bDisableBackfaceCulling = Shape == ENiagaraRibbonShapeMode::Plane || !bEnableAccurateGeometry;
 	MeshBatch.Type = PT_TriangleList;
 	MeshBatch.DepthPriorityGroup = SceneProxy->GetDepthPriorityGroup(View);
 	MeshBatch.bCanApplyViewModeOverrides = true;
