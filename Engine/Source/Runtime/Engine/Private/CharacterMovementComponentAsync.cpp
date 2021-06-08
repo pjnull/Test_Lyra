@@ -2077,6 +2077,8 @@ bool FCharacterMovementComponentAsyncInput::IsWithinEdgeTolerance(const FVector&
 
 bool FCharacterMovementComponentAsyncInput::IsWalkable(const FHitResult& Hit) const
 {
+	// TODO: Possibly handle an override for this with UFortMovementComp_CharacterAthena_Ostrich.
+
 	if (!Hit.IsValidBlockingHit())
 	{
 		// No hit, or starting in penetration
