@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 
 #include "GameFramework/GameState.h"
+#include "Engine/Engine.h"
 #include "NetworkPredictionExtrasGameState.generated.h"
 
 UCLASS(BlueprintType)
