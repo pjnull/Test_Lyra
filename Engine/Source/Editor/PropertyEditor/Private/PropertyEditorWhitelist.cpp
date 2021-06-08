@@ -2,6 +2,8 @@
 
 #include "PropertyEditorWhitelist.h"
 
+#include "UObject/UnrealType.h"
+
 namespace
 {
 	const FName PropertyEditorWhitelistOwner = "PropertyEditorWhitelist";
