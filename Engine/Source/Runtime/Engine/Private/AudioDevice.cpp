@@ -6413,6 +6413,12 @@ bool FAudioDevice::IsAudioDeviceMuted() const
 		{
 			return false;
 		}
+
+		// If we have one active device, ignore device muting
+		if (DeviceManager->GetNumActiveAudioDevices() == 1)
+		{
+			return false;
+		}
 	}
 
 	return bIsDeviceMuted;
