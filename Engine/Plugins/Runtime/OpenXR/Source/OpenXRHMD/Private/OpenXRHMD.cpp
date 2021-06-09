@@ -1519,6 +1519,7 @@ FOpenXRHMD::FOpenXRHMD(const FAutoRegister& AutoRegister, XrInstance InInstance,
 		SelectedViewConfigurationType = ViewConfigTypes[0];
 	}
 
+	// Enumerate the views we will be simulating with.
 	EnumerateViews(PipelinedFrameStateGame);
 
 	// Enumerate environment blend modes and select the best one.
@@ -2309,6 +2310,10 @@ void FOpenXRHMD::OnBeginRendering_RenderThread(FRHICommandListImmediate& RHICmdL
 		BuildOcclusionMeshes();
 	}
 #endif
+
+	// Enumerate the views we will actually be rendering for.
+	// This is required to support late-updating the field-of-view.
+	EnumerateViews(PipelinedFrameStateRendering);
 
 	if (bIsRunning)
 	{
