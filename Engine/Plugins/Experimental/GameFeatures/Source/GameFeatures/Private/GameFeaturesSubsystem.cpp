@@ -326,7 +326,7 @@ void UGameFeaturesSubsystem::OnGameFeatureRegistering(const UGameFeatureData* Ga
 	{
 		if (Action != nullptr)
 		{
-			Action->OnGameFeatureRegistering(PluginName);
+			Action->OnGameFeatureRegistering();
 		}
 	}
 }
@@ -344,7 +344,7 @@ void UGameFeaturesSubsystem::OnGameFeatureUnregistering(const UGameFeatureData* 
 	{
 		if (Action != nullptr)
 		{
-			Action->OnGameFeatureUnregistering(PluginName);
+			Action->OnGameFeatureUnregistering();
 		}
 	}
 }
