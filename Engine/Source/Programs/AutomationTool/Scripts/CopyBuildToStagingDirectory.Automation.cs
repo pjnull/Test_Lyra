@@ -2130,7 +2130,7 @@ public partial class Project : CommandUtils
 				string SubFolder = Pair.Key.Name.Replace('/', Path.DirectorySeparatorChar);
 				FileReference NewIniFilename = FileReference.Combine(SC.ProjectRoot, "Saved", "Temp", SC.PlatformDir, SubFolder);
 				InternalUtils.SafeCreateDirectory(NewIniFilename.Directory.FullName, true);
-				InternalUtils.SafeCopyFile(Src.FullName, NewIniFilename.FullName, IniKeyBlacklist:SC.IniKeyBlacklist, IniSectionBlacklist:SC.IniSectionBlacklist);
+				InternalUtils.SafeCopyFile(Src.FullName, NewIniFilename.FullName, IniKeyBlacklist:SC.IniKeyBlacklist, IniSectionBlacklist:SC.IniSectionBlacklist, IniKeyOverride: SC.IniKeyOverride);
 				Src = NewIniFilename;
 			}
 
@@ -4268,6 +4268,7 @@ public partial class Project : CommandUtils
 				InDedicatedServer,
 				Params.Cook || Params.CookOnTheFly,
 				Params.CrashReporter,
+				Params.CrashReporterUrl,
 				Params.Stage,
 				Params.CookOnTheFly,
 				Params.Archive,
