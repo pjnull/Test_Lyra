@@ -876,7 +876,7 @@ void FNiagaraRendererMeshes::CreateMeshBatchForSection(
 		BatchElement.NumPrimitives = Section.NumTriangles;
 	}
 
-	if (GPUCountBufferOffset != INDEX_NONE)
+	if ((SourceMode == ENiagaraRendererSourceDataMode::Particles) && (GPUCountBufferOffset != INDEX_NONE))
 	{
 		// We need to use indirect draw args, because the number of actual instances is coming from the GPU
 		auto Batcher = SceneProxy.GetBatcher();
