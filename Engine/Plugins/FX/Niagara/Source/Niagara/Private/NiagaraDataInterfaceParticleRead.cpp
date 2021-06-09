@@ -119,7 +119,6 @@ struct FNDIParticleRead_GameToRenderData
 	FNDIParticleRead_GameToRenderData() : SourceEmitterGPUContext(nullptr) {}
 
 	FNiagaraComputeExecutionContext* SourceEmitterGPUContext;
-	FString SourceEmitterName;
 };
 
 struct FNDIParticleRead_RenderInstanceData
@@ -131,7 +130,7 @@ struct FNDIParticleRead_RenderInstanceData
 	}
 
 	FNiagaraComputeExecutionContext* SourceEmitterGPUContext = nullptr;
-	FString SourceEmitterName;
+	FString DebugSourceName;
 	const FNiagaraDataSet* CachedDataSet = nullptr;
 	TArray<int32> AttributeIndices;
 	TArray<int32> AttributeCompressed;
@@ -154,12 +153,10 @@ struct FNiagaraDataInterfaceProxyParticleRead : public FNiagaraDataInterfaceProx
 		if (IncomingData)
 		{
 			InstanceData->SourceEmitterGPUContext = IncomingData->SourceEmitterGPUContext;
-			InstanceData->SourceEmitterName = IncomingData->SourceEmitterName;
 		}
 		else
 		{
 			InstanceData->SourceEmitterGPUContext = nullptr;
-			InstanceData->SourceEmitterName = TEXT("");
 		}
 	}
 	
@@ -168,11 +165,12 @@ struct FNiagaraDataInterfaceProxyParticleRead : public FNiagaraDataInterfaceProx
 		return sizeof(FNDIParticleRead_GameToRenderData);
 	}
 
-	void CreateRenderThreadSystemData(const FNiagaraSystemInstanceID& InstanceID)
+	void CreateRenderThreadSystemData(const FNiagaraSystemInstanceID& InstanceID, FString InDebugSourceName)
 	{
 		check(IsInRenderingThread());
 		check(!SystemsRenderData.Contains(InstanceID));
-		SystemsRenderData.Add(InstanceID);
+		FNDIParticleRead_RenderInstanceData& RTInstanceData = SystemsRenderData.Add(InstanceID);
+		RTInstanceData.DebugSourceName = InDebugSourceName;
 	}
 
 	void DestroyRenderThreadSystemData(const FNiagaraSystemInstanceID& InstanceID)
@@ -399,7 +397,7 @@ struct FNiagaraDataInterfaceParametersCS_ParticleRead : public FNiagaraDataInter
 					else
 					{
 						UE_LOG(LogNiagara, Error, TEXT("Variable '%s' in emitter '%s' has type '%s', but particle read DI tried to access it as '%s'."),
-							*Var.GetName().ToString(), *InstanceData->SourceEmitterName, *Var.GetType().GetName(), NiagaraParticleDataValueTypeName(AttributeType)
+							*Var.GetName().ToString(), *InstanceData->DebugSourceName, *Var.GetType().GetName(), NiagaraParticleDataValueTypeName(AttributeType)
 						);
 						InstanceData->AttributeIndices[AttrNameIdx] = -1;
 						InstanceData->AttributeCompressed[AttrNameIdx] = 0;
@@ -411,7 +409,7 @@ struct FNiagaraDataInterfaceParametersCS_ParticleRead : public FNiagaraDataInter
 
 			if (!FoundVariable)
 			{
-				UE_LOG(LogNiagara, Error, TEXT("Particle read DI is trying to access inexistent variable '%s' in emitter '%s'."), *AttrName.ToString(), *InstanceData->SourceEmitterName);
+				UE_LOG(LogNiagara, Error, TEXT("Particle read DI is trying to access inexistent variable '%s' in emitter '%s'."), *AttrName.ToString(), *InstanceData->DebugSourceName);
 				InstanceData->AttributeIndices[AttrNameIdx] = -1;
 				InstanceData->AttributeCompressed[AttrNameIdx] = 0;
 			}
@@ -477,7 +475,7 @@ struct FNiagaraDataInterfaceParametersCS_ParticleRead : public FNiagaraDataInter
 			// This means the source emitter isn't running on GPU.
 			if (!InstanceData->bSourceEmitterNotGPUErrorShown)
 			{
-				UE_LOG(LogNiagara, Error, TEXT("GPU particle read DI is set to access CPU emitter '%s'."), *InstanceData->SourceEmitterName);
+				UE_LOG(LogNiagara, Error, TEXT("GPU particle read DI is set to access CPU emitter '%s'."), *InstanceData->DebugSourceName);
 				InstanceData->bSourceEmitterNotGPUErrorShown = true;
 			}
 			SetErrorParams(RHICmdList, ComputeShader, false);
@@ -513,7 +511,7 @@ struct FNiagaraDataInterfaceParametersCS_ParticleRead : public FNiagaraDataInter
 			{
 				if ( StageMetaData->bPartialParticleUpdate )
 				{
-					UE_LOG(LogNiagara, Error, TEXT("Particle read DI reading self '%s' on stage '%s' is unsafe, please disable partial writes on the stage."), *InstanceData->SourceEmitterName, *StageMetaData->SimulationStageName.ToString());
+					UE_LOG(LogNiagara, Error, TEXT("Particle read DI reading self '%s' on stage '%s' is unsafe, please disable partial writes on the stage."), *InstanceData->DebugSourceName, *StageMetaData->SimulationStageName.ToString());
 					SetErrorParams(RHICmdList, ComputeShader, true);
 					return;
 				}
@@ -584,7 +582,7 @@ struct FNiagaraDataInterfaceParametersCS_ParticleRead : public FNiagaraDataInter
 		if (InstanceData->bWarnFailedToFindAcquireTag && AcquireTagRegisterIndexParam.IsBound() && (InstanceData->AcquireTagRegisterIndex == -1))
 		{
 			InstanceData->bWarnFailedToFindAcquireTag = false;
-			UE_LOG(LogNiagara, Error, TEXT("Particle read DI cannot find ID variable in emitter '%s'."), *InstanceData->SourceEmitterName);
+			UE_LOG(LogNiagara, Error, TEXT("Particle read DI cannot find ID variable in emitter '%s'."), *InstanceData->DebugSourceName);
 		}
 	}
 	
@@ -671,11 +669,17 @@ bool UNiagaraDataInterfaceParticleRead::InitPerInstanceData(void* PerInstanceDat
 		UE_LOG(LogNiagara, Warning, TEXT("Source emitter '%s' not found. System: %s"), *EmitterName, *GetFullNameSafe(SystemInstance->GetSystem()));
 	}
 
+	FString DebugSourceName;
+	if ( UNiagaraSystem* NiagaraSystem = PIData->SystemInstance->GetSystem() )
+	{
+		DebugSourceName = FString::Printf(TEXT("%s.%s"), *NiagaraSystem->GetName(), *EmitterName);
+	}
+
 	FNiagaraDataInterfaceProxyParticleRead* ThisProxy = GetProxyAs<FNiagaraDataInterfaceProxyParticleRead>();
 	ENQUEUE_RENDER_COMMAND(FNDIParticleReadCreateRTInstance)(
-		[ThisProxy, InstanceID = SystemInstance->GetId()](FRHICommandList& CmdList)
+		[ThisProxy, InstanceID = SystemInstance->GetId(), RT_DebugSourceName=MoveTemp(DebugSourceName)](FRHICommandList& CmdList)
 		{
-			ThisProxy->CreateRenderThreadSystemData(InstanceID);
+			ThisProxy->CreateRenderThreadSystemData(InstanceID, RT_DebugSourceName);
 		}
 	);
 
@@ -2174,7 +2178,6 @@ void UNiagaraDataInterfaceParticleRead::ProvidePerInstanceDataForRenderThread(vo
 	if (PIData && PIData->EmitterInstance)
 	{
 		RTData->SourceEmitterGPUContext = PIData->EmitterInstance->GetGPUContext();
-		RTData->SourceEmitterName = PIData->EmitterInstance->GetCachedEmitter()->GetUniqueEmitterName();
 	}
 }
 
