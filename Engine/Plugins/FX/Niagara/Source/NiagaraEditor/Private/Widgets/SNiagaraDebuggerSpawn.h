@@ -78,6 +78,8 @@ public:
 
 	void SpawnSystems(TConstArrayView<FString> SystemNames);
 
+	virtual void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override { SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime); }
+
 	// FTickableEditorObject Impl
 	virtual void Tick(float DeltaTime) override;
 	virtual bool IsTickable() const override;
