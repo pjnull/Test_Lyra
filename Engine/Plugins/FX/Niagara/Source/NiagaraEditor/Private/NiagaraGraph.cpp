@@ -1479,6 +1479,18 @@ void UNiagaraGraph::RemoveParameter(const FNiagaraVariable& Parameter, bool bAll
 	}
 }
 
+void CopyScriptVariableDataForRename(const UNiagaraScriptVariable& OldScriptVariable, UNiagaraScriptVariable& NewScriptVariable)
+{
+	NewScriptVariable.Variable = OldScriptVariable.Variable;
+	NewScriptVariable.DefaultMode = OldScriptVariable.DefaultMode;
+	NewScriptVariable.DefaultBinding = OldScriptVariable.DefaultBinding;
+	if(OldScriptVariable.GetDefaultValueData() != nullptr)
+	{
+		NewScriptVariable.SetDefaultValueData(OldScriptVariable.GetDefaultValueData());
+	}
+	NewScriptVariable.Metadata = OldScriptVariable.Metadata;
+}
+
 bool UNiagaraGraph::RenameParameterFromPin(const FNiagaraVariable& Parameter, FName NewName, UEdGraphPin* InPin)
 {
 	if (Parameter.GetName() == NewName)
@@ -1545,8 +1557,8 @@ bool UNiagaraGraph::RenameParameterFromPin(const FNiagaraVariable& Parameter, FN
 			// Replace the script variable data
 			UNiagaraScriptVariable* NewScriptVariable = CastChecked<UNiagaraScriptVariable>(StaticDuplicateObject(FoundOldScriptVariable, this, FName()));
 			NewScriptVariable->SetFlags(RF_Transactional);
-			NewScriptVariable->Variable = NewParameter;
-			NewScriptVariable->Metadata = OldMetaData;
+			CopyScriptVariableDataForRename(*FoundOldScriptVariable, *NewScriptVariable);
+			NewScriptVariable->Variable.SetName(NewName);
 			VariableToScriptVariable.Add(NewParameter, NewScriptVariable);
 		}
 
@@ -1641,9 +1653,8 @@ bool UNiagaraGraph::RenameParameter(const FNiagaraVariable& Parameter, FName New
 			// Replace the script variable data
 			UNiagaraScriptVariable* NewScriptVariable = CastChecked<UNiagaraScriptVariable>(StaticDuplicateObject(OldScriptVariable, this, FName()));
 			NewScriptVariable->SetFlags(RF_Transactional);
-			//UNiagaraScriptVariable* NewScriptVariable = NewObject<UNiagaraScriptVariable>(this, FName(), RF_Transactional);
-			//NewScriptVariable->SynchronizeWithSource(OldScriptVariable);
-			NewScriptVariable->Variable = NewParameter;
+			CopyScriptVariableDataForRename(*OldScriptVariable, *NewScriptVariable);
+			NewScriptVariable->Variable.SetName(NewName);
 			VariableToScriptVariable.Add(NewParameter, NewScriptVariable);
 		}
 
