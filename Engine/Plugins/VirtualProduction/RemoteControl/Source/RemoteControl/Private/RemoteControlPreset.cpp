@@ -1807,6 +1807,11 @@ void URemoteControlPreset::OnReplaceObjects(const TMap<UObject*, UObject*>& Repl
 	{
 		for (TWeakObjectPtr<URemoteControlBinding> Binding : Entity->Bindings)
 		{
+			if (!Binding.IsValid())
+			{
+				continue;
+			}
+				
 			if (ModifiedBindings.Contains(Binding.Get()) || ReplacementObjectMap.FindKey(Binding->Resolve()))
 			{
 				PerFrameUpdatedEntities.Add(Entity->GetId());
