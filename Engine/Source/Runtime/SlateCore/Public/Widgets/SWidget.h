@@ -1338,6 +1338,8 @@ protected:
 
 public:
 
+	const TArray<TSharedRef<ISlateMetaData>>& GetAllMetaDataInterfaces() const;
+
 	/**
 	 * Get the metadata of the type provided.
 	 * @return the first metadata of the type supplied that we encounter
@@ -1404,6 +1406,7 @@ public:
 
 		checkf(Index != 0 || !HasRegisteredSlateAttribute(), TEXT("The first slot is reserved for SlateAttribute"));
 		MetaData.RemoveAtSwap(Index, 1);
+		NotifyMetaDataRemoved(RemoveMe);
 		return 1;
 	}
 
@@ -1422,6 +1425,7 @@ private:
 			{
 				checkf(Index != 0 || !HasRegisteredSlateAttribute(), TEXT("The first slot is reserved for SlateAttribute"));
 				MetaData.RemoveAtSwap(Index);
+				NotifyMetaDataRemoved(MetaDataEntry);
 			}
 		}
 		return NumBefore - MetaData.Num();
@@ -1437,11 +1441,14 @@ private:
 			{
 				checkf(Index != 0 || !HasRegisteredSlateAttribute(), TEXT("The first slot is reserved for SlateAttribute"));
 				MetaData.RemoveAtSwap(Index);
+				NotifyMetaDataRemoved(MetaDataEntry);
 				return true;
 			}
 		}
 		return false;
 	}
+
+	void NotifyMetaDataRemoved(const TSharedRef<ISlateMetaData>& RemovedMetaData);
 
 public:
 
