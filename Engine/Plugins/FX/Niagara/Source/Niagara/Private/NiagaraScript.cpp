@@ -716,6 +716,12 @@ void UNiagaraScript::ComputeVMCompilationId(FNiagaraVMExecutableDataId& Id, FGui
 						break;
 					}
 				}
+
+				// disable attribute trimming if shader stages are enabled
+				if (OuterEmitter->bDeprecatedShaderStagesEnabled)
+				{
+					TrimAttributes = false;
+				}
 			}
 
 			if (TrimAttributes)
