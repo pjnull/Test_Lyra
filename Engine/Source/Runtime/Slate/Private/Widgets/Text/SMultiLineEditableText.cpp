@@ -15,7 +15,7 @@
 #if WITH_SLATE_WIDGET_TRACKING
 #include "Widgets/Accessibility/SlateWidgetTracker.h"
 #include "Widgets/Input/EditableTextMetaData.h"
-#endif WITH_SLATE_WIDGET_TRACKING
+#endif //WITH_SLATE_WIDGET_TRACKING
 
 SMultiLineEditableText::SMultiLineEditableText()
 	: bSelectAllTextWhenFocused(false)
