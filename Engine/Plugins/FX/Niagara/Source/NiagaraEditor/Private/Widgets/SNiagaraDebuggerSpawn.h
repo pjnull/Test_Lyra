@@ -97,5 +97,4 @@ private:
 	FString			SpawnCommandArgs;
 	TArray<FString>	SystemsToSpwan;
 };
-#endif WITH_NIAGARA_DEBUGGER
-
+#endif //WITH_NIAGARA_DEBUGGER
