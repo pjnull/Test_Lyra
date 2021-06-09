@@ -712,7 +712,7 @@ namespace Gauntlet
 						{
 							ReportTestSummary(TestInfo);
 						}
-
+						TestInfo.TestNode.SetTestResult(TestInfo.FinalResult);
 						// now cleanup
 						try
 						{
@@ -791,7 +791,6 @@ namespace Gauntlet
 						{
 							AllTestsPassed = false;
 						}
-
 						Log.Info("Test {0} Result: {1}", Process.TestNode.Name, Result);
 					}
 				}

@@ -1674,6 +1674,14 @@ namespace Gauntlet
 		}
 
 		/// <summary>
+		/// Result of the test once completed. Nodes inheriting from us should override
+		/// </summary>
+		public override void SetTestResult(TestResult testResult)
+		{
+			UnrealTestResult = testResult;
+		}
+
+		/// <summary>
 		/// Allows tests to set this at anytime. If not called then GetUnrealTestResult() will be called when
 		/// the framework first calls GetTestResult()
 		/// </summary>
