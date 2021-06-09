@@ -54,6 +54,7 @@ struct FNiagaraDebuggerSpawnData
 	bool bDoPreCullCheck = true;
 };
 
+#if WITH_NIAGARA_DEBUGGER
 class SNiagaraDebuggerSpawn : public SCompoundWidget, FTickableEditorObject
 {
 public:
@@ -94,3 +95,5 @@ private:
 	FString			SpawnCommandArgs;
 	TArray<FString>	SystemsToSpwan;
 };
+#endif WITH_NIAGARA_DEBUGGER
+

@@ -12,6 +12,7 @@
 #include "IStructureDetailsView.h"
 #include "PropertyEditorModule.h"
 
+#if WITH_NIAGARA_DEBUGGER
 #define LOCTEXT_NAMESPACE "SNiagaraDebuggerSpawn"
 
 void SNiagaraDebuggerSpawn::Construct(const FArguments& InArgs)
@@ -201,7 +202,7 @@ void SNiagaraDebuggerSpawn::Tick(float DeltaTime)
 		{
 			Debugger->ExecConsoleCommand(TEXT("fx.Niagara.Debug.KillSpawned"), true);
 		}
-		for ( const FString SystemName : SystemsToSpwan )
+		for ( const FString& SystemName : SystemsToSpwan )
 		{
 			FString Cmd = FString::Printf(TEXT("fx.Niagara.Debug.SpawnComponent %s %s"), *SystemsToSpwan[0], *SpawnCommandArgs);
 			Debugger->ExecConsoleCommand(*Cmd, true);
@@ -239,3 +240,4 @@ TStatId SNiagaraDebuggerSpawn::GetStatId() const
 }
 
 #undef LOCTEXT_NAMESPACE
+#endif //WITH_NIAGARA_DEBUGGER
