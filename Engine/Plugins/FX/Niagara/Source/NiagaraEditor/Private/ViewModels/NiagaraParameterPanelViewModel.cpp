@@ -1888,10 +1888,15 @@ void FNiagaraScriptToolkitParameterPanelViewModel::DeleteParameter(const FNiagar
 	{
 		return;
 	}
-	
+
 	FScopedTransaction RemoveParametersWithPins(LOCTEXT("RemoveParametersWithPins", "Remove parameter and referenced pins"));
 	for (UNiagaraGraph* Graph : GetEditableGraphs())
 	{
+		UNiagaraScriptVariable* SelectedScriptVariable = Graph->GetScriptVariable(ItemToDelete.GetVariable());
+		if (SelectedScriptVariable && VariableObjectSelection->GetSelectedObjects().Contains(SelectedScriptVariable))
+		{
+			VariableObjectSelection->ClearSelectedObjects();
+		}
 		Graph->RemoveParameter(ItemToDelete.GetVariable());
 	}
 
