@@ -71,6 +71,9 @@ namespace UE_NETWORK_PHYSICS
 	float LODDistance = 2400.f;
 	FAutoConsoleVariableRef CVarLODDistance(TEXT("np2.LODDistance"), LODDistance, TEXT("Simple distance based LOD"));
 
+	bool bResimForSleep = false;
+	FAutoConsoleVariableRef CVarResimForSleep(TEXT("np2.bResimForSleep"), bResimForSleep, TEXT("Triggers resim if only sleep state differs. Otherwise we only match server sleep state if XRVW differ."));
+
 	// ----------------------------------------------
 	// Debugger helpers:
 	//	See current frame anywhere with: 
@@ -228,24 +231,6 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 
 				const auto P = RewindData->GetPastStateAtFrame(*Proxy->GetHandle_LowLevel(), Obj.Frame);
 				const int32 SimulationFrame = Obj.Frame - Snapshot.LocalFrameOffset;
-				
-				if (CompareObjState(Obj.Physics.ObjectState, P.ObjectState(), TEXT("DEBUG ObjectState")))
-				//if (CompareVec(Obj.Physics.Location, P.X(), UE_NETWORK_PHYSICS::X, TEXT("Location")))
-				{
-					/*
-					UE_LOG(LogTemp, Warning, TEXT("ObjectState Correction. Obj.Frame: %d. CurrentFramE: %d"), Obj.Frame, RewindData->CurrentFrame());
-					//UE_LOG(LogTemp, Warning, TEXT("Location Correction. Obj.Frame: %d. CurrentFrame: %d"), Obj.Frame, RewindData->CurrentFrame());
-					
-					for (int32 F = Obj.Frame-1; F <= RewindData->CurrentFrame(); ++F)
-					{
-						const auto PP = RewindData->GetPastStateAtFrame(*Proxy->GetHandle_LowLevel(), F);
-						////UE_LOG(LogTemp, Warning, TEXT("    [%d/%d] --> %s"), F, F-Snapshot.LocalFrameOffset, *FRotator(PP.R()).ToString());
-						//UE_LOG(LogTemp, Warning, TEXT("    [%d/%d] --> %s"), F, F-Snapshot.LocalFrameOffset, *FVector(PP.X()).ToString());
-						UE_LOG(LogTemp, Warning, TEXT("    [%d/%d] --> %d"), F, F-Snapshot.LocalFrameOffset, (int32)PP.ObjectState());
-					}
-					UE_LOG(LogTemp, Warning, TEXT(""));
-					*/
-				}
 
 				Stats.MinFrameChecked = FMath::Min(Stats.MaxFrameChecked, Obj.Frame);
 				Stats.MaxFrameChecked = FMath::Max(Stats.MaxFrameChecked, Obj.Frame);
@@ -265,7 +250,7 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 				}
 #endif
 				
-				if (CompareObjState(Obj.Physics.ObjectState, P.ObjectState(), TEXT("ObjectState")) ||
+				if ((UE_NETWORK_PHYSICS::bResimForSleep && CompareObjState(Obj.Physics.ObjectState, P.ObjectState(), TEXT("ObjectState"))) ||
 					CompareVec(Obj.Physics.Location, P.X(), UE_NETWORK_PHYSICS::X, TEXT("Location")) ||
 					CompareVec(Obj.Physics.LinearVelocity, P.V(), UE_NETWORK_PHYSICS::V, TEXT("Velocity")) ||
 					CompareVec(Obj.Physics.AngularVelocity, P.W(), UE_NETWORK_PHYSICS::V, TEXT("Angular Velocity")) ||
@@ -1264,7 +1249,8 @@ void UNetworkPhysicsManager::TickDrawDebug()
 
 				if (APlayerState* PS = LocalPC->GetPlayerState<APlayerState>())
 				{
-					YPos += Canvas->DrawText(GEngine->GetMediumFont(), FString::Printf(TEXT("Ping: %d"), PS->GetPing()), XPos, YPos);
+					int32 ActualPing = PS->GetPing() * 4;
+					YPos += Canvas->DrawText(GEngine->GetMediumFont(), FString::Printf(TEXT("Ping: %d"), ActualPing), XPos, YPos);
 				}
 
 				
