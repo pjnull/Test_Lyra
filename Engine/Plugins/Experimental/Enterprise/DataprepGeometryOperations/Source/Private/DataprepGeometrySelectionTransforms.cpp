@@ -8,7 +8,6 @@
 #include "DataprepOperationsLibraryUtil.h"
 #include "DataprepGeometryOperations.h"
 #include "Materials/MaterialInstance.h"
-#include "MeshProcessingLibrary.h"
 #include "MeshDescriptionAdapter.h"
 #include "MeshMergeModule.h"
 #include "MeshAttributes.h"
