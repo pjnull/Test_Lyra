@@ -96,6 +96,11 @@ public:
 		SetMargin(Other.GetMargin());
 	}
 
+	virtual FImplicitObject* Duplicate() const override
+	{
+		return new TImplicitObjectInstanced<TConcrete>(this->MObject, this->OuterMargin);
+	}
+
 	static constexpr EImplicitObjectType StaticType()
 	{
 		return TConcrete::StaticType() | ImplicitObjectType::IsInstanced;
@@ -448,6 +453,20 @@ public:
         SetMargin(Other.GetMargin());
 	}
 	~TImplicitObjectScaled() {}
+
+	virtual FImplicitObject* Duplicate() const override
+	{
+		if (MSharedPtrForRefCount)
+		{
+			check(bInstanced == true);
+			return new TImplicitObjectScaled<TConcrete, true>(this->MSharedPtrForRefCount, this->MScale, this->OuterMargin);
+		}
+		else
+		{
+			check(false);	//duplicate only supported instanced scaled objects
+			return nullptr;
+		}
+	}
 
 	static constexpr EImplicitObjectType StaticType()
 	{
