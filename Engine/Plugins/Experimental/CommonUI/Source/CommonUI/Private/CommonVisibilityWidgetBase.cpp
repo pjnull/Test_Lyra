@@ -9,7 +9,7 @@
 #include "Styling/CoreStyle.h"
 #include "CommonInputBaseTypes.h"
 
-UCommonVisibilityWidgetBase::UCommonVisibilityWidgetBase(const FObjectInitializer& ObjectInitializer)
+UDEPRECATED_UCommonVisibilityWidgetBase::UDEPRECATED_UCommonVisibilityWidgetBase(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 	, bShowForGamepad(true)
 	, bShowForMouseAndKeyboard(true)
@@ -24,14 +24,14 @@ UCommonVisibilityWidgetBase::UCommonVisibilityWidgetBase(const FObjectInitialize
 	}
 }
 
-void UCommonVisibilityWidgetBase::OnWidgetRebuilt()
+void UDEPRECATED_UCommonVisibilityWidgetBase::OnWidgetRebuilt()
 {
 	Super::OnWidgetRebuilt();
 	UpdateVisibility();
 	ListenToInputMethodChanged();
 }
 
-void UCommonVisibilityWidgetBase::UpdateVisibility()
+void UDEPRECATED_UCommonVisibilityWidgetBase::UpdateVisibility()
 {
 	if (!IsDesignTime())
 	{
@@ -63,7 +63,7 @@ void UCommonVisibilityWidgetBase::UpdateVisibility()
 	}
 }
 
-void UCommonVisibilityWidgetBase::ListenToInputMethodChanged(bool bListen)
+void UDEPRECATED_UCommonVisibilityWidgetBase::ListenToInputMethodChanged(bool bListen)
 {
 	if (IsDesignTime())
 	{
@@ -80,12 +80,12 @@ void UCommonVisibilityWidgetBase::ListenToInputMethodChanged(bool bListen)
 	}
 }
 
-void UCommonVisibilityWidgetBase::HandleInputMethodChanged(ECommonInputType input)
+void UDEPRECATED_UCommonVisibilityWidgetBase::HandleInputMethodChanged(ECommonInputType input)
 {
 	UpdateVisibility();
 }
 
-const TArray<FName>& UCommonVisibilityWidgetBase::GetRegisteredPlatforms()
+const TArray<FName>& UDEPRECATED_UCommonVisibilityWidgetBase::GetRegisteredPlatforms()
 {
 	return FCommonInputPlatformBaseData::GetRegisteredPlatforms();
 }
