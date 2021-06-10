@@ -3211,9 +3211,6 @@ void FLevelOfDetailSettingsLayout::AddToDetailsPanel( IDetailLayoutBuilder& Deta
 	int32 PlatformNumber = PlatformInfo::GetAllPlatformGroupNames().Num();
 
 	bool bDisablePerPlatformMinLod = GEngine->UseStaticMeshMinLODPerQualityLevels;
-
-	bool bDisablePerPlatformMinLod = GEngine->UsePerQualityLevelProperty && StaticMesh->GetQualityLevelMinLOD().bIsEnabled;
-	
 	{
 		TAttribute<TArray<FName>> PlatformOverrideNames = TAttribute<TArray<FName>>::Create(TAttribute<TArray<FName>>::FGetter::CreateSP(this, &FLevelOfDetailSettingsLayout::GetMinLODPlatformOverrideNames));
 		FPerPlatformPropertyCustomNodeBuilderArgs Args;
