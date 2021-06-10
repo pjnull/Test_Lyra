@@ -21,6 +21,7 @@
 #include "Windows/AllowWindowsPlatformTypes.h"
 #include "Windows/WindowsHWrapper.h"
 #include "HAL/LowLevelMemTracker.h"
+#include "Misc/CoreDelegates.h"
 
 THIRD_PARTY_INCLUDES_START
 #include "mftransform.h"
@@ -1145,7 +1146,6 @@ bool FVideoDecoderH264::Decode(FAccessUnit* AccessUnit, bool bResolutionChanged)
 		else if (SUCCEEDED(res))
 		{
 			TRefCountPtr<IMFSample> DecodedOutputSample = CurrentDecoderOutputBuffer->DetachOutputSample();
-			//LogMessage(IInfoLog::ELevel::Info, StringHelpers::SPrintf(TEXT("OUT: %p"), DecodedOutputSample.Get()));
 			CurrentDecoderOutputBuffer.Reset();
 
 			if (DecodedOutputSample)
@@ -1277,6 +1277,22 @@ void FVideoDecoderH264::TestHardwareDecoding()
 }
 
 
+
+void FVideoDecoderH264::HandleApplicationHasEnteredForeground()
+{
+	ApplicationRunningSignal.Signal();
+}
+
+void FVideoDecoderH264::HandleApplicationWillEnterBackground()
+{
+	ApplicationSuspendConfirmedSignal.Reset();
+	ApplicationRunningSignal.Reset();
+	if (!ApplicationSuspendConfirmedSignal.WaitTimeoutAndReset(1000 * 500))
+	{
+		UE_LOG(LogElectraPlayer, Log, TEXT("FVideoDecoderH264(%p): Did not suspend in time"), this);
+	}
+}
+
 //-----------------------------------------------------------------------------
 /**
  * H264 video decoder main threaded decode loop
@@ -1284,6 +1300,11 @@ void FVideoDecoderH264::TestHardwareDecoding()
 void FVideoDecoderH264::WorkerThread()
 {
 	LLM_SCOPE(ELLMTag::ElectraPlayer);
+
+	ApplicationRunningSignal.Signal();
+	ApplicationSuspendConfirmedSignal.Reset();
+	ApplicationSuspendedDelegate = FCoreDelegates::ApplicationWillEnterBackgroundDelegate.AddRaw(this, &FVideoDecoderH264::HandleApplicationWillEnterBackground);
+	ApplicationResumeDelegate = FCoreDelegates::ApplicationHasEnteredForegroundDelegate.AddRaw(this, &FVideoDecoderH264::HandleApplicationHasEnteredForeground);
 
 	CurrentRenderOutputBuffer     = nullptr;
 	CurrentAccessUnit   		  = nullptr;
@@ -1315,6 +1336,18 @@ void FVideoDecoderH264::WorkerThread()
 	bool bNeedInitialReconfig = true;
 	while(!TerminateThreadSignal.IsSignaled())
 	{
+		if (!ApplicationRunningSignal.IsSignaled())
+		{
+			UE_LOG(LogElectraPlayer, Log, TEXT("FVideoDecoderH264(%p): OnSuspending"), this);
+			ApplicationSuspendConfirmedSignal.Signal();
+			while(!ApplicationRunningSignal.WaitTimeout(100 * 1000) && !TerminateThreadSignal.IsSignaled())
+			{
+			}
+			UE_LOG(LogElectraPlayer, Log, TEXT("FVideoDecoderH264(%p): OnResuming"), this);
+			continue;
+		}
+
+
 		// Notify optional buffer listener that we will now be needing an AU for our input buffer.
 		if (!bError && InputBufferListener && AccessUnits.Num() == 0)
 		{
@@ -1480,6 +1513,17 @@ void FVideoDecoderH264::WorkerThread()
 	DestroyDecodedImagePool();
 	AccessUnits.Flush();
 	AccessUnits.CapacitySet(0);
+
+	if (ApplicationSuspendedDelegate.IsValid())
+	{
+		FCoreDelegates::ApplicationWillEnterBackgroundDelegate.Remove(ApplicationSuspendedDelegate);
+		ApplicationSuspendedDelegate.Reset();
+	}
+	if (ApplicationResumeDelegate.IsValid())
+	{
+		FCoreDelegates::ApplicationHasEnteredForegroundDelegate.Remove(ApplicationResumeDelegate);
+		ApplicationResumeDelegate.Reset();
+	}
 }
 
 } // namespace Electra

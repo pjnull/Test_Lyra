@@ -123,6 +123,9 @@ namespace Electra {
 		bool Configure();
 		bool StartStreaming();
 
+		void HandleApplicationHasEnteredForeground();
+		void HandleApplicationWillEnterBackground();
+
 		// Per platform specialization
 		virtual bool InternalDecoderCreate() = 0;
 		virtual bool CreateDecoderOutputBuffer() = 0;
@@ -131,6 +134,11 @@ namespace Electra {
 		virtual void PlatformTick() {}
 
 		FInstanceConfiguration								Config;
+
+		FDelegateHandle										ApplicationSuspendedDelegate;
+		FDelegateHandle										ApplicationResumeDelegate;
+		FMediaEvent											ApplicationRunningSignal;
+		FMediaEvent											ApplicationSuspendConfirmedSignal;
 
 		FMediaEvent											TerminateThreadSignal;
 		FMediaEvent											FlushDecoderSignal;
