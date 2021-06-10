@@ -49,8 +49,16 @@ void UCommonVisibilityWidgetBase::UpdateVisibility()
 				bVisibleForInput = bShowForTouch;
 			}
 
-			bool bVisibleForPlatform = VisibilityControls[FCommonInputBase::GetCurrentPlatformName()];
-			SetVisibility(bVisibleForPlatform && bVisibleForInput ? VisibleType : HiddenType);
+			if (bool* bVisibleForPlatform = VisibilityControls.Find(FCommonInputBase::GetCurrentPlatformName()))
+			{
+				SetVisibility(*bVisibleForPlatform && bVisibleForInput ? VisibleType : HiddenType);
+			}
+			else
+			{
+				// Current setup assumes all platforms should have a value, so log if we didn't get a hit.
+				UE_LOG(LogCommonUI, Warning, TEXT("Invalid platform: '%s' used to control visibility."), *FCommonInputBase::GetCurrentPlatformName().ToString())
+				SetVisibility(bVisibleForInput ? VisibleType : HiddenType);
+			}
 		}
 	}
 }
