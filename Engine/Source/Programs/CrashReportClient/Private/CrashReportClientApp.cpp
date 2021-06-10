@@ -52,6 +52,9 @@ class FRecoveryService;
 /** Default main window size */
 const FVector2D InitialWindowDimensions(740, 560);
 
+/** Simple dialog window size */
+const FVector2D InitialSimpleWindowDimensions(740, 300);
+
 /** Average tick rate the app aims for */
 const float IdealTickRate = 30.f;
 
@@ -246,7 +249,7 @@ static void OnRequestExit()
 }
 
 #if !CRASH_REPORT_UNATTENDED_ONLY
-SubmitCrashReportResult RunWithUI(FPlatformErrorReport ErrorReport)
+SubmitCrashReportResult RunWithUI(FPlatformErrorReport ErrorReport, bool bImplicitSend)
 {
 	// create the platform slate application (what FSlateApplication::Get() returns)
 	TSharedRef<FSlateApplication> Slate = FSlateApplication::Create(MakeShareable(FPlatformApplicationMisc::CreateApplication()));
@@ -301,20 +304,32 @@ SubmitCrashReportResult RunWithUI(FPlatformErrorReport ErrorReport)
 	FCrashReportClientStyle::Initialize();
 
 	// Create the main implementation object
-	TSharedRef<FCrashReportClient> CrashReportClient = MakeShared<FCrashReportClient>(ErrorReport);
+	TSharedRef<FCrashReportClient> CrashReportClient = MakeShared<FCrashReportClient>(ErrorReport, bImplicitSend);
 
 	// Open up the app window
-	TSharedRef<SCrashReportClient> ClientControl = SNew(SCrashReportClient, CrashReportClient);
+	// bImplicitSend now implies bSimpleDialog i.e. immediately send the report and notify the user without requesting input
+	TSharedRef<SCrashReportClient> ClientControl = SNew(SCrashReportClient, CrashReportClient, bImplicitSend);
+
+	FString CrashedAppName = FPrimaryCrashProperties::Get()->IsValid() ? FPrimaryCrashProperties::Get()->GameName : TEXT("");
+	CrashedAppName.RemoveFromStart(TEXT("UE4-"));
+	CrashedAppName.RemoveFromEnd(TEXT("Game"));
+
+	const FString CrashedAppString = NSLOCTEXT("CrashReportClient", "CrashReporterTitle", "Crash Reporter").ToString();
+	const FText CrashedAppText = FText::FromString(FString::Printf(TEXT("%s %s"), *CrashedAppName, *CrashedAppString));
 
 	// Get the engine major version to display in title.
 	FBuildVersion BuildVersion;
 	uint16 MajorEngineVersion = FBuildVersion::TryRead(FBuildVersion::GetDefaultFileName(), BuildVersion) ? BuildVersion.GetEngineVersion().GetMajor() : 5;
 
+	FText WindowTitle = CrashedAppName.IsEmpty() ?
+		FText::Format(NSLOCTEXT("CrashReportClient", "CrashReportClientAppName", "Unreal Engine {0} Crash Reporter"), MajorEngineVersion) :
+		CrashedAppText;
+
 	TSharedRef<SWindow> Window = FSlateApplication::Get().AddWindow(
 		SNew(SWindow)
-		.Title(FText::Format(NSLOCTEXT("CrashReportClient", "CrashReportClientAppName", "Unreal Engine {0} Crash Reporter"), MajorEngineVersion))
+		.Title(WindowTitle)
 		.HasCloseButton(FCrashReportCoreConfig::Get().IsAllowedToCloseWithoutSending())
-		.ClientSize(InitialWindowDimensions)
+		.ClientSize(bImplicitSend ? InitialSimpleWindowDimensions : InitialWindowDimensions)
 		[
 			ClientControl
 		]);
@@ -347,7 +362,7 @@ SubmitCrashReportResult RunWithUI(FPlatformErrorReport ErrorReport)
 	Window->BringToFront(bForceBringToFront);
 
 	// loop until the app is ready to quit
-	while (!(IsEngineExitRequested() || CrashReportClient->IsUploadComplete()))
+	while (!(IsEngineExitRequested() || ClientControl->IsFinished()))
 	{
 		MainLoop.Tick();
 
@@ -391,8 +406,14 @@ class FMessageBoxThread : public FRunnable
 		// We will not have any GUI for the crash reporter if we are sending implicitly, so pop a message box up at least
 		if (FApp::CanEverRender() && !FApp::IsUnattended())
 		{
+			FString Body = *NSLOCTEXT("MessageDialog", "ReportCrash_Body", "The application has crashed and will now close. We apologize for the inconvenience.").ToString();
+			if (FPrimaryCrashProperties::Get()->IsValid())
+			{
+				Body = FPrimaryCrashProperties::Get()->CrashReporterMessage.AsString();
+			}
+
 			FPlatformMisc::MessageBoxExt(EAppMsgType::Ok,
-				*NSLOCTEXT("MessageDialog", "ReportCrash_Body", "The application has crashed and will now close. We apologize for the inconvenience.").ToString(),
+				*Body,
 				*NSLOCTEXT("MessageDialog", "ReportCrash_Title", "Application Crash Detected").ToString());
 		}
 
@@ -640,12 +661,7 @@ SubmitCrashReportResult SendErrorReport(FPlatformErrorReport& ErrorReport,
 	if (!IsEngineExitRequested() && ErrorReport.HasFilesToUpload() && FPrimaryCrashProperties::Get() != nullptr)
 	{
 		const bool bImplicitSend = bImplicitSendOpt.Get(false);
-		const bool bUnattended =
-#if CRASH_REPORT_UNATTENDED_ONLY
-			true;
-#else
-			bNoDialogOpt.Get(FApp::IsUnattended()) || bImplicitSend;
-#endif // CRASH_REPORT_UNATTENDED_ONLY
+		const bool bUnattended = CRASH_REPORT_UNATTENDED_ONLY ? true : bNoDialogOpt.Get(FApp::IsUnattended());
 
 		ErrorReport.SetCrashReportClientVersion(FCrashReportCoreConfig::Get().GetVersion());
 
@@ -656,7 +672,7 @@ SubmitCrashReportResult SendErrorReport(FPlatformErrorReport& ErrorReport,
 #if !CRASH_REPORT_UNATTENDED_ONLY
 		else
 		{
-			const SubmitCrashReportResult Result = RunWithUI(ErrorReport);
+			const SubmitCrashReportResult Result = RunWithUI(ErrorReport, bImplicitSend);
 			if (Result == Failed)
 			{
 				// UI failed to initialize, probably due to driver crash. Send in unattended mode if allowed.
@@ -938,6 +954,15 @@ void RunCrashReportClient(const TCHAR* CommandLine)
 {
 #if !PLATFORM_MAC
 	FTaskTagScope ThreadScope(ETaskTag::EGameThread); // Main thread is the game thread.
+#if !(UE_BUILD_SHIPPING)
+
+	// If "-waitforattach" or "-WaitForDebugger" was specified, halt startup and wait for a debugger to attach before continuing
+	if (FParse::Param(CommandLine, TEXT("waitforattach")) || FParse::Param(CommandLine, TEXT("WaitForDebugger")))
+	{
+		while (!FPlatformMisc::IsDebuggerPresent());
+		UE_DEBUG_BREAK();
+	}
+
 #endif
 
 	// Override the stack size for the thread pool.

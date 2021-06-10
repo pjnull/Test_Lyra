@@ -952,9 +952,10 @@ int32 ReportCrashUsingCrashReportClient(FWindowsPlatformCrashContext& InContext,
 
 			if (bImplicitSend)
 			{
-				CrashReportClientArguments += TEXT(" -Unattended -ImplicitSend");
+				CrashReportClientArguments += TEXT(" -ImplicitSend");
 			}
-			else if (bNoDialog || bNullRHI)
+
+			if (bNoDialog || bNullRHI)
 			{
 				CrashReportClientArguments += TEXT(" -Unattended");
 			}
@@ -997,6 +998,12 @@ int32 ReportCrashUsingCrashReportClient(FWindowsPlatformCrashContext& InContext,
 
 			if (CreateCrashReportClientPath(CrashReporterClientPath, CR_CLIENT_MAX_PATH_LEN))
 			{
+#if !(UE_BUILD_SHIPPING)
+				if (FParse::Param(FCommandLine::Get(), TEXT("waitforattachcrc")))
+				{
+					CrashReportClientArguments += TEXT(" -waitforattach");
+				}
+#endif
 				bCrashReporterRan = FPlatformProcess::CreateProc(CrashReporterClientPath, *CrashReportClientArguments, true, false, false, NULL, 0, NULL, NULL).IsValid();
 			}
 
