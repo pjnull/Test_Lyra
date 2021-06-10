@@ -156,7 +156,7 @@ void FNiagaraDataInterfaceMeshRendererInfoDetails::SetSelectedRenderer(TRenderer
 			DataInterface->Modify();
 			MeshRendererProperty->NotifyPreChange();
 			MeshRendererProperty->SetValue(Selection.Get());
-			MeshRendererProperty->NotifyPostChange();
+			MeshRendererProperty->NotifyPostChange(EPropertyChangeType::ValueSet);
 		}
 		bSettingSelection = false;
 	}	
