@@ -54,6 +54,11 @@ namespace Gauntlet
 		public override string Name { get { return this.GetType().FullName; } }
 
 		/// <summary>
+		/// This class will log its own warnings and errors as part of its summary
+		/// </summary>
+		public override bool LogWarningsAndErrorsAfterSummary { get; protected set; } = false;
+
+		/// <summary>
 		/// How long this test should run for, set during LaunchTest based on results of GetConfiguration
 		/// </summary>
 		public override float MaxDuration { get; protected set; }
@@ -1551,9 +1556,9 @@ namespace Gauntlet
 
 			if (LogSummary.Ensures.Count() > 0)
 			{
-				foreach (var Ensure in LogSummary.Ensures)
+				foreach (var Ensure in LogSummary.Ensures.Distinct())
 				{
-					MB.H4(string.Format("Ensure: {0}", Ensure.Message));
+					MB.H4(string.Format("Warning: Ensure: {0}", Ensure.Message));
 					MB.UnorderedList(Ensure.Callstack.Take(MaxCallstackLines));
 
 					if (Ensure.Callstack.Count() > MaxCallstackLines)
