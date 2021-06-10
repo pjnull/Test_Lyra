@@ -122,6 +122,7 @@ void FCrashReportCoreConfig::SetProjectConfigOverrides(const FConfigFile& InConf
 
 	// Default to false (show the option) when config is missing.
 	bHideLogFilesOption = false;
+	bHideRestartOption = false;
 
 	// Default to true (Allow the user to close without sending) when config is missing.
 	bIsAllowedToCloseWithoutSending = true;
@@ -133,6 +134,12 @@ void FCrashReportCoreConfig::SetProjectConfigOverrides(const FConfigFile& InConf
 		if (HideLogFilesOptionValue != nullptr)
 		{
 			bHideLogFilesOption = FCString::ToBool(*HideLogFilesOptionValue->GetValue());
+		}
+
+		const FConfigValue* HideRestartOptionValue = Section->Find(TEXT("bHideRestartOption"));
+		if (HideRestartOptionValue != nullptr)
+		{
+			bHideRestartOption = FCString::ToBool(*HideRestartOptionValue->GetValue());
 		}
 
 		const FConfigValue* IsAllowedToCloseWithoutSendingValue = Section->Find(TEXT("bIsAllowedToCloseWithoutSending"));
