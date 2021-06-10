@@ -622,7 +622,7 @@ void UNetworkPhysicsManager::OnWorldPostInit(UWorld* World, const UWorld::Initia
 				NumFrames = NumFramesCVar->GetInt();
 			}
 
-			Solver->EnableRewindCapture(64, true, MakeUnique<FNetworkPhysicsRewindCallback>());
+			Solver->EnableRewindCapture(NumFrames, true, MakeUnique<FNetworkPhysicsRewindCallback>());
 			RewindCallback = static_cast<FNetworkPhysicsRewindCallback*>(Solver->GetRewindCallback());
 			RewindCallback->RewindData = Solver->GetRewindData();
 			RewindCallback->Solver = Solver;
