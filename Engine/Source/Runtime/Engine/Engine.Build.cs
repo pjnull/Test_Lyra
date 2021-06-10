@@ -313,11 +313,7 @@ public class Engine : ModuleRules
 		{
 			PrivateDependencyModuleNames.Add("DeveloperToolSettings");
 
-			DynamicallyLoadedModuleNames.AddRange(
-				new string[] {
-					"DesktopPlatform",
-				}
-			);
+
 		}
 
 		if (Target.bBuildEditor == true)
@@ -370,6 +366,7 @@ public class Engine : ModuleRules
 		{
 			PrivateDependencyModuleNames.Add("ClothingSystemEditorInterface");
 			PrivateIncludePathModuleNames.Add("ClothingSystemEditorInterface");
+			PrivateDependencyModuleNames.Add("DesktopPlatform");
 		}
 
 		if (Target.Platform == UnrealTargetPlatform.Win64)

@@ -1420,7 +1420,7 @@ public:
 	FDirectoryPath GameScreenshotSaveDirectory;
 
 	UPROPERTY(config, EditAnywhere, Category = PerQualityLevelProperty, AdvancedDisplay)
-	bool UsePerQualityLevelProperty;
+	bool UseStaticMeshMinLODPerQualityLevels;
 
 	/** The state of the current map transition.  */
 	UPROPERTY()

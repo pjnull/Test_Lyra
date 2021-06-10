@@ -5698,7 +5698,7 @@ bool UEngine::HandleListStaticMeshesCommand(const TCHAR* Cmd, FOutputDevice& Ar)
 		int32		MobileMinLOD = -1;
 
 #if WITH_EDITORONLY_DATA 
-		if (Mesh->GetQualityLevelMinLOD().bIsEnabled && Mesh->GetQualityLevelMinLOD().PerQuality.Find(0/*Low*/) != nullptr)
+		if (Mesh->IsMinLodQualityLevelEnable() && Mesh->GetQualityLevelMinLOD().PerQuality.Find(0/*Low*/) != nullptr)
 		{
 			MobileMinLOD = *Mesh->GetQualityLevelMinLOD().PerQuality.Find(0);
 		}
@@ -5949,7 +5949,11 @@ bool UEngine::HandleListSkeletalMeshesCommand(const TCHAR* Cmd, FOutputDevice& A
 		int32 MaxNumStreamedLODs = -1;
 		int32 MaxNumOptionalLODs = -1;
 #if WITH_EDITORONLY_DATA
-		if (Mesh->GetMinLod().PerPlatform.Find(("Mobile")) != nullptr)
+		if (Mesh->IsMinLodQualityLevelEnable() && Mesh->GetQualityLevelMinLod().PerQuality.Find(0) != nullptr)
+		{
+			MobileMinLOD = *Mesh->GetQualityLevelMinLod().PerQuality.Find(0);
+		}
+		else if(Mesh->GetMinLod().PerPlatform.Find(("Mobile")) != nullptr)
 		{
 			MobileMinLOD = *Mesh->GetMinLod().PerPlatform.Find(("Mobile"));
 		}

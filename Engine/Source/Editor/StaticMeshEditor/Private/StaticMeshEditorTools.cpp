@@ -3209,6 +3209,9 @@ void FLevelOfDetailSettingsLayout::AddToDetailsPanel( IDetailLayoutBuilder& Deta
 		];
 
 	int32 PlatformNumber = PlatformInfo::GetAllPlatformGroupNames().Num();
+
+	bool bDisablePerPlatformMinLod = GEngine->UseStaticMeshMinLODPerQualityLevels;
+
 	bool bDisablePerPlatformMinLod = GEngine->UsePerQualityLevelProperty && StaticMesh->GetQualityLevelMinLOD().bIsEnabled;
 	
 	{
@@ -3248,20 +3251,6 @@ void FLevelOfDetailSettingsLayout::AddToDetailsPanel( IDetailLayoutBuilder& Deta
 		.EntryNames(this, &FLevelOfDetailSettingsLayout::GetMinQualityLevelLODOverrideNames)
 		];
 
-	LODSettingsCategory.AddCustomRow(LOCTEXT("QualityLevelMinLODEnable", "Enable"))
-		[
-			SNew(SCheckBox)
-			.IsChecked(this, &FLevelOfDetailSettingsLayout::IsMinLODQualityLevelChecked)
-			.OnCheckStateChanged(this, &FLevelOfDetailSettingsLayout::OnMinLODQualityLevelChecked)
-		.HAlign(HAlign_Right)
-			.Padding(FMargin(4.0f, 0.0f, 0.0f, 0.0f))
-			.Content()
-			[
-				SNew(STextBlock)
-				.Font(IDetailLayoutBuilder::GetDetailFont())
-				.Text(LOCTEXT("QualityLevelMinLODEnable", "Enable"))
-			]
-		];
 	{
 		TAttribute<TArray<FName>> PlatformOverrideNames = TAttribute<TArray<FName>>::Create(TAttribute<TArray<FName>>::FGetter::CreateSP(this, &FLevelOfDetailSettingsLayout::GetNumStreamedLODsPlatformOverrideNames));
 		FPerPlatformPropertyCustomNodeBuilderArgs Args;
@@ -3949,29 +3938,6 @@ void FLevelOfDetailSettingsLayout::OnLODGroupChanged(TSharedPtr<FString> NewValu
 			StaticMeshEditor.RefreshTool();
 		}
 	}
-}
-
-bool FLevelOfDetailSettingsLayout::IsMinLODQualityLevelEnabled() const
-{
-	UStaticMesh* StaticMesh = StaticMeshEditor.GetStaticMesh();
-	check(StaticMesh);
-	return StaticMesh->GetQualityLevelMinLOD().bIsEnabled;
-}
-
-ECheckBoxState FLevelOfDetailSettingsLayout::IsMinLODQualityLevelChecked() const
-{
-	return IsMinLODQualityLevelEnabled() ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
-}
-
-void FLevelOfDetailSettingsLayout::OnMinLODQualityLevelChecked(ECheckBoxState NewState)
-{
-	UStaticMesh* StaticMesh = StaticMeshEditor.GetStaticMesh();
-	check(StaticMesh);
-
-	FPerQualityLevelInt PerQualityLevel = StaticMesh->GetQualityLevelMinLOD();
-	PerQualityLevel.bIsEnabled = (NewState == ECheckBoxState::Checked) ? true : false;
-	StaticMesh->SetQualityLevelMinLOD(PerQualityLevel);
-	StaticMeshEditor.RefreshTool();
 }
 
 bool FLevelOfDetailSettingsLayout::IsAutoLODEnabled() const
