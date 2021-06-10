@@ -307,7 +307,7 @@ int32 FStaticMeshLODResources::GetPlatformMinLODIdx(const ITargetPlatform* Targe
 	if (StaticMesh->IsMinLodQualityLevelEnable())
 	{
 		// get all supported quality level from scalability + engine ini files
-		FSupportedQualityLevelArray SupportedQualityLevels = StaticMesh->GetQualityLevelMinLOD().GetSupportedQualityLevels(*TargetPlatform->GetPlatformInfo().VanillaPlatformName.ToString());
+		FSupportedQualityLevelArray SupportedQualityLevels = StaticMesh->GetQualityLevelMinLOD().GetSupportedQualityLevels(*TargetPlatform->GetPlatformInfo().IniPlatformName.ToString());
 		
 		// loop through all the supported quality level to find the min lod index
 		int32 MinLodIdx = MAX_int32;

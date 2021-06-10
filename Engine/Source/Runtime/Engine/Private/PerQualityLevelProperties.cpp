@@ -68,9 +68,9 @@ FSupportedQualityLevelArray FPerQualityLevelProperty<_StructType, _ValueType, _B
 				}
 			}
 
-			if (const PlatformInfo::FPlatformInfo* PlatformInfo = PlatformInfo::FindPlatformInfo(PlatformName))
+			if (const PlatformInfo::FTargetPlatformInfo* PlatformInfo = PlatformInfo::FindPlatformInfo(PlatformName))
 			{
-				GroupToPlatform.AddUnique(PlatformInfo->PlatformGroupName, PlatformName);
+				GroupToPlatform.AddUnique(PlatformInfo->DataDrivenPlatformInfo->PlatformGroupName, PlatformName);
 			}
 			return true;
 		});
@@ -205,8 +205,8 @@ ENGINE_API FArchive& operator<<(FArchive& Ar, FPerQualityLevelProperty<_StructTy
 	if (Ar.IsCooking())
 	{
 		bCooked = true;
-		const PlatformInfo::FPlatformInfo& PlatformInfo = Ar.CookingTarget()->GetPlatformInfo();
-		This->StripQualtiyLevelForCooking(*PlatformInfo.VanillaPlatformName.ToString());
+		const FDataDrivenPlatformInfo& PlatformInfo = Ar.CookingTarget()->GetPlatformInfo();
+		This->StripQualtiyLevelForCooking(*(PlatformInfo.PlatformGroupName.ToString()));
 	}
 #endif
 	{
