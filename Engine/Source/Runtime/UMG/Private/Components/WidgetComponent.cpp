@@ -1086,9 +1086,14 @@ void UWidgetComponent::DestroyComponent(bool bPromoteChildren/*= false*/)
 
 void UWidgetComponent::ReleaseResources()
 {
-	if ( Widget )
+	if (Widget)
 	{
 		RemoveWidgetFromScreen();
+		if (bOnWidgetVisibilityChangedRegistered)
+		{
+			Widget->OnNativeVisibilityChanged.RemoveAll(this);
+			bOnWidgetVisibilityChangedRegistered = false;
+		}
 		Widget = nullptr;
 	}
 
