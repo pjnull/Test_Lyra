@@ -284,6 +284,18 @@ void InitParameterMapView(TSharedRef< FSlateStyleSet > Style)
 	// Parameter Map View
 	Style->Set("NiagaraEditor.Stack.DepressedHighlightedButtonBrush", new BOX_CORE_BRUSH("Common/ButtonHoverHint", FMargin(4 / 16.0f), FStyleColors::PrimaryPress));
 	Style->Set("NiagaraEditor.Stack.FlatButtonColor", FLinearColor(FColor(205, 205, 205)));
+
+	//Parameters panel
+	const FTableRowStyle TreeViewStyle = FEditorStyle::GetWidgetStyle<FTableRowStyle>("DetailsView.TreeView.TableRow");
+	FTableRowStyle ParameterPanelRowStyle = FTableRowStyle(TreeViewStyle)
+		.SetTextColor(FLinearColor::White)
+		.SetSelectedTextColor(FLinearColor::White);
+	Style->Set("NiagaraEditor.Parameters.TableRow", ParameterPanelRowStyle);
+	
+	const FTextBlockStyle CategoryTextStyle = FEditorStyle::GetWidgetStyle<FTextBlockStyle>("DetailsView.CategoryTextStyle");
+	FTextBlockStyle ParameterSectionStyle = FTextBlockStyle(CategoryTextStyle)
+		.SetColorAndOpacity(FLinearColor::White);
+	Style->Set("NiagaraEditor.Parameters.HeaderText", ParameterSectionStyle);
 }
 
 void InitCodeView(TSharedRef< FSlateStyleSet > Style)
