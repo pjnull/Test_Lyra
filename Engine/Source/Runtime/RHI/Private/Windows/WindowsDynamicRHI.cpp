@@ -154,7 +154,7 @@ static WindowsRHI ChooseDefaultRHI()
 		FName ShaderFormatName(*TargetedShaderFormats[0]);
 		EShaderPlatform TargetedPlatform = ShaderFormatToLegacyShaderPlatform(ShaderFormatName);
 
-		if (IsD3DPlatform(TargetedPlatform, false))
+		if (IsD3DPlatform(TargetedPlatform))
 		{
 			DefaultRHI = WindowsRHI::D3D11;
 		}
