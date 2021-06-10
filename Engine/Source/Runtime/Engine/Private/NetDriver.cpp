@@ -358,6 +358,7 @@ UNetDriver::UNetDriver(const FObjectInitializer& ObjectInitializer)
 ,	Time( 0.f )
 ,	ElapsedTime( 0.0 )
 ,	bInTick(false)
+,	bPendingDestruction(false)
 ,	LastTickDispatchRealtime( 0.f )
 ,   bIsPeer(false)
 ,	bSkipLocalStats(false)
@@ -1475,6 +1476,19 @@ void UNetDriver::PostTickFlush()
 	{
 		UOnlineEngineInterface::Get()->ClearVoicePackets(World);
 	}
+
+	if (bPendingDestruction)
+	{
+		if (World)
+		{
+			GEngine->DestroyNamedNetDriver(World, NetDriverName);
+		}
+		else
+		{
+			UE_LOG(LogNet, Error, TEXT("NetDriver %s pending destruction without valid world."), *NetDriverName.ToString());
+		}
+		bPendingDestruction = false;
+	}
 }
 
 bool UNetDriver::InitConnectionClass(void)
@@ -1951,6 +1965,19 @@ void UNetDriver::PostTickDispatch()
 	{
 		GRPCCSVTracker.EndTickDispatch();
 		GReceiveRPCTimingEnabled = false;
+	}
+
+	if (bPendingDestruction)
+	{
+		if (World)
+		{ 
+			GEngine->DestroyNamedNetDriver(World, NetDriverName);
+		}
+		else
+		{
+			UE_LOG(LogNet, Error, TEXT("NetDriver %s pending destruction without valid world."), *NetDriverName.ToString());
+		}
+		bPendingDestruction = false;
 	}
 }
 
