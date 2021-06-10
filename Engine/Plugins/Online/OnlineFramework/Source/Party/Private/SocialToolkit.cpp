@@ -1039,7 +1039,7 @@ void USocialToolkit::HandlePartyInviteReceived(const FUniqueNetId& LocalUserId, 
 					CanReceiveInviteFrom(User, Invite, [this, Invite, UserId = User.GetUserId(ESocialSubsystem::Primary)](const bool bResult)
 					{
 						// Check whether the invitation was removed while the async check was completing.
-						if (PartyInvitations.Find(Invite.AsShared()) == nullptr)
+						if (PartyInvitations.Find(Invite) == nullptr)
 						{
 							UE_LOG(LogParty, Log, TEXT("USocialToolkit::HandlePartyInviteReceived Invitation is no longer valid. LocalUser=[%s] Inviter=[%s]"),
 								*GetLocalUserNetId(ESocialSubsystem::Primary).ToDebugString(), *UserId.ToDebugString());
