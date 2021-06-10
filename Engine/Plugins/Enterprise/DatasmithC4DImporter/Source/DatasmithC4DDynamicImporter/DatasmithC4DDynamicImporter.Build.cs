@@ -1,7 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 using System.IO;
-using Tools.DotNETCommon;
+using EpicGames.Core;
 
 namespace UnrealBuildTool.Rules
 {
@@ -97,7 +97,7 @@ namespace UnrealBuildTool.Rules
 				PublicIncludePaths.Add(Path.Combine(CinewareSDKLocation, "includes", "generated", "image.framework", "hxx"));
 				PublicIncludePaths.Add(Path.Combine(CinewareSDKLocation, "includes", "generated", "exchange.framework", "hxx"));
 
-				if (Target.Platform == UnrealTargetPlatform.Win64 || Target.Platform == UnrealTargetPlatform.Win32)
+				if (Target.Platform == UnrealTargetPlatform.Win64)
 				{
 					PublicDefinitions.Add("__PC");
 					PublicDefinitions.Add("_WIN64");
