@@ -2642,6 +2642,7 @@ public:
 		bool bReplaceObjectClassReferences;
 		bool bCopyDeprecatedProperties;
 		bool bPreserveRootComponent;
+		bool bPerformDuplication;
 
 		/** Skips copying properties with BlueprintCompilerGeneratedDefaults metadata */
 		bool bSkipCompilerGeneratedDefaults;
@@ -2654,6 +2655,7 @@ public:
 			, bReplaceObjectClassReferences(true)
 			, bCopyDeprecatedProperties(false)
 			, bPreserveRootComponent(true)
+			, bPerformDuplication(false)
 			, bSkipCompilerGeneratedDefaults(false)
 			, bNotifyObjectReplacement(false)
 			, bClearReferences(true)

@@ -487,6 +487,7 @@ UObject* MovieSceneHelpers::MakeSpawnableTemplateFromInstance(UObject& InSourceO
 	UEngine::FCopyPropertiesForUnrelatedObjectsParams CopyParams;
 	CopyParams.bNotifyObjectReplacement = false;
 	CopyParams.bPreserveRootComponent = false;
+	CopyParams.bPerformDuplication = true;
 	UEngine::CopyPropertiesForUnrelatedObjects(&InSourceObject, NewInstance, CopyParams);
 
 	AActor* Actor = CastChecked<AActor>(NewInstance);

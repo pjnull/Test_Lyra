@@ -14760,7 +14760,15 @@ public:
 		ArIgnoreArchetypeRef = true;
 		ArNoDelta = !Params.bDoDelta;
 		ArIgnoreClassRef = true;
-		ArPortFlags |= Params.bCopyDeprecatedProperties ? PPF_UseDeprecatedProperties : PPF_None;
+		ArPortFlags = PPF_None;
+		if (Params.bCopyDeprecatedProperties)
+		{
+			ArPortFlags |=  PPF_UseDeprecatedProperties;
+		}
+		if (Params.bPerformDuplication)
+		{
+			ArPortFlags |= PPF_Duplicate;
+		}
 
 #if USE_STABLE_LOCALIZATION_KEYS
 		if (GIsEditor && !(ArPortFlags & (PPF_DuplicateVerbatim | PPF_DuplicateForPIE)))
