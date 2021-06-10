@@ -2233,6 +2233,11 @@ namespace AutomationTool
 				DirectoryReference.CreateDirectory(OutputFile.Directory);
 			}
 
+			if (FileReference.Exists(OutputFile))
+			{
+				FileUtils.ForceDeleteFile(OutputFile);
+			}
+
 			using (ZipArchive ZipArchive = ZipFile.Open(OutputFile.FullName, ZipArchiveMode.Create))
 			{
 				foreach (FileReference File in Files)
