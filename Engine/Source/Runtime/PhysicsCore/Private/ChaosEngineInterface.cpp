@@ -690,14 +690,23 @@ FBox FChaosEngineInterface::GetBounds_AssumesLocked(const FPhysicsActorHandle& I
 {
 	using namespace Chaos;
 	const Chaos::FRigidBodyHandle_External& Body_External = InActorReference->GetGameThreadAPI();
-	if(const FImplicitObject* Geometry = Body_External.Geometry().Get())
+
+	const FTransform WorldTM(Body_External.R(), Body_External.X());
+	return GetBounds_AssumesLocked(InActorReference, WorldTM);
+}
+
+FBox FChaosEngineInterface::GetBounds_AssumesLocked(const FPhysicsActorHandle& InActorReference, const FTransform& InTransform)
+{
+	using namespace Chaos;
+	const Chaos::FRigidBodyHandle_External& Body_External = InActorReference->GetGameThreadAPI();
+	if (const FImplicitObject* Geometry = Body_External.Geometry().Get())
 	{
-		if(Geometry->HasBoundingBox())
+		if (Geometry->HasBoundingBox())
 		{
 			const FAABB3 LocalBounds = Geometry->BoundingBox();
-			const FRigidTransform3 WorldTM(Body_External.X(), Body_External.R());
+			const FRigidTransform3 WorldTM(InTransform);
 			const FAABB3 WorldBounds = LocalBounds.TransformedAABB(WorldTM);
-			return FBox(WorldBounds.Min(),WorldBounds.Max());
+			return FBox(WorldBounds.Min(), WorldBounds.Max());
 		}
 	}
 
