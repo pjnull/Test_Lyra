@@ -2518,6 +2518,7 @@ void FNiagaraParameterDefinitionsToolkitParameterPanelViewModel::DeleteParameter
 {
 	FScopedTransaction RemoveParameter(LOCTEXT("ParameterDefinitionsToolkitParameterPanelViewModel_RemoveParameter", "Remove Parameter"));
 	ParameterDefinitionsWeak.Get()->RemoveParameter(ItemToDelete.GetVariable());
+	VariableObjectSelection->ClearSelectedObjects();
 	UIContext.RefreshSelectionDetailsViewPanel();
 }
 
