@@ -109,6 +109,7 @@ void FCameraCalibrationCoreEditorModule::RegisterPlacementModeItems()
 				*UActorFactory::StaticClass(),
 				CheckerboardAssetData,
 				NAME_None,
+				NAME_None,
 				TOptional<FLinearColor>(),
 				TOptional<int32>(),
 				NSLOCTEXT("PlacementMode", "Checkerboard", "Checkerboard")
