@@ -14932,7 +14932,12 @@ void UEngine::CopyPropertiesForUnrelatedObjects(UObject* OldObject, UObject* New
 
 	TArray<UObject*> ComponentsOnNewObject;
 	{
-		TArray<UObject*> EditInlineSubobjectsOfComponents;
+		// Serialize in the modified properties from the old CDO to the new CDO
+		if (Writer.SavedPropertyData.Num() > 0)
+		{
+			FCPFUOReader Reader(Writer, NewObject);
+		}
+
 		CollectAllSubobjects( NewObject, ComponentsOnNewObject );
 
 		// populate the ReferenceReplacementMap 
@@ -14987,15 +14992,9 @@ void UEngine::CopyPropertiesForUnrelatedObjects(UObject* OldObject, UObject* New
 			}
 		}
 
-		// Serialize in the modified properties from the old CDO to the new CDO
-		if (Writer.SavedPropertyData.Num() > 0)
+		TArray<UObject*> EditInlineSubobjectsOfComponents;
+		for (UObject* NewInstance : ComponentsOnNewObject)
 		{
-			FCPFUOReader Reader(Writer, NewObject);
-		}
-
-		for (int32 Index = 0; Index < ComponentsOnNewObject.Num(); Index++)
-		{
-			UObject* NewInstance = ComponentsOnNewObject[Index];
 			if (int32* pOldInstanceIndex = OldInstanceMap.Find(NewInstance->GetPathName(NewObject)))
 			{
 				// Restore modified properties into the new instance
@@ -15004,7 +15003,7 @@ void UEngine::CopyPropertiesForUnrelatedObjects(UObject* OldObject, UObject* New
 				FFindInstancedReferenceSubobjectHelper::Duplicate(Record.OldInstance, NewInstance, ReferenceReplacementMap, EditInlineSubobjectsOfComponents);
 			}
 		}
-		ComponentsOnNewObject.Append(EditInlineSubobjectsOfComponents);
+		ComponentsOnNewObject.Append(MoveTemp(EditInlineSubobjectsOfComponents));
 	}
 
 	FFindInstancedReferenceSubobjectHelper::Duplicate(OldObject, NewObject, ReferenceReplacementMap, ComponentsOnNewObject);
