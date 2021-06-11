@@ -3749,6 +3749,27 @@ FReferenceCollector::~FReferenceCollector()
 	delete PersistentFrameReferenceCollectorArchive;
 }
 
+void FReferenceCollector::AddReferencedObjects(const UScriptStruct*& ScriptStruct, void* StructMemory, const UObject* ReferencingObject /*= nullptr*/, const FProperty* ReferencingProperty /*= nullptr*/)
+{
+	check(ScriptStruct != nullptr);
+	check(StructMemory != nullptr);
+
+	AddReferencedObject(ScriptStruct, ReferencingObject, ReferencingProperty);
+
+	// If the script struct explicitly provided an implementation of AddReferencedObjects, make sure to capture its referenced objects
+	if (ScriptStruct->StructFlags & STRUCT_AddStructReferencedObjects)
+	{
+		ScriptStruct->GetCppStructOps()->AddStructReferencedObjects()(StructMemory, *this);
+	}
+
+	// Iterate through all object properties within the struct (will also search through structs within the struct)
+	for (TPropertyValueIterator<const FObjectProperty> ObjectPropertyIter(ScriptStruct, StructMemory); ObjectPropertyIter; ++ObjectPropertyIter)
+	{
+		UObject** ObjectPtr = static_cast<UObject**>(const_cast<void*>(ObjectPropertyIter.Value()));
+		AddReferencedObject(*ObjectPtr, ReferencingObject, ReferencingProperty);
+	}
+}
+
 void FReferenceCollector::HandleObjectReferences(FObjectPtr* InObjects, const int32 ObjectNum, const UObject* InReferencingObject, const FProperty* InReferencingProperty)
 {
 	for (int32 ObjectIndex = 0; ObjectIndex < ObjectNum; ++ObjectIndex)
