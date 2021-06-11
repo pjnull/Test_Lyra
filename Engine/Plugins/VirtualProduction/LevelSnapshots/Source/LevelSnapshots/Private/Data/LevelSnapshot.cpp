@@ -14,6 +14,8 @@
 #include "Engine/Engine.h"
 #include "GameFramework/Actor.h"
 #include "SnapshotRestorability.h"
+#include "CustomSerialization/CustomObjectSerializationWrapper.h"
+#include "CustomSerialization/CustomSerializationDataManager.h"
 #include "UObject/Package.h"
 #include "UObject/TextProperty.h"
 #include "UObject/UnrealType.h"
@@ -39,8 +41,17 @@ namespace
 		UObject* WorldObject = ObjectProperty->GetObjectPropertyValue(WorldValuePtr);
 		return SnapshotData.AreReferencesEquivalent(SnapshotObject, WorldObject, SnapshotActor, WorldActor);
 	}
+
+	void EnqueueMatchingCustomSubobjects(TInlineComponentArray<TPair<UObject*, UObject*>>& SnapshotOriginalPairsToProcess, const FWorldSnapshotData& WorldData, UObject* SnapshotObject, UObject* WorldObject)
+	{
+		FCustomObjectSerializationWrapper::ForEachMatchingCustomSubobjectPair(WorldData, SnapshotObject, WorldObject, [&SnapshotOriginalPairsToProcess, &WorldData](UObject* SnapshotSubobject, UObject* WorldSubobject)
+		{
+			SnapshotOriginalPairsToProcess.Add(TPair<UObject*, UObject*>(SnapshotSubobject, WorldSubobject));
+			EnqueueMatchingCustomSubobjects(SnapshotOriginalPairsToProcess, WorldData, SnapshotSubobject, WorldSubobject);
+		});
+	}
 	
-	void EnqueueMatchingComponents(TInlineComponentArray<TPair<UObject*, UObject*>>& SnapshotOriginalPairsToProcess, AActor* SnapshotActor, AActor* WorldActor)
+	void EnqueueMatchingComponents(TInlineComponentArray<TPair<UObject*, UObject*>>& SnapshotOriginalPairsToProcess, const FWorldSnapshotData& WorldData, AActor* SnapshotActor, AActor* WorldActor)
 	{
 		TInlineComponentArray<UActorComponent*> SnapshotComponents;
 		TInlineComponentArray<UActorComponent*> WorldComponents;
@@ -73,7 +84,8 @@ namespace
                     *WorldComponent->GetName(), *WorldActor->GetName(), *WorldCompClass->GetName(), *SnapshotCompClass->GetName());
 				continue;
 			}
-		
+
+			EnqueueMatchingCustomSubobjects(SnapshotOriginalPairsToProcess, WorldData, *SnapshotComponent, WorldComponent);
 			SnapshotOriginalPairsToProcess.Add(TPair<UObject*, UObject*>(*SnapshotComponent, WorldComponent));
 		}
 	}
@@ -157,7 +169,8 @@ bool ULevelSnapshot::HasOriginalChangedPropertiesSinceSnapshotWasTaken(AActor* S
 
 	TInlineComponentArray<TPair<UObject*, UObject*>> SnapshotOriginalPairsToProcess;
 	SnapshotOriginalPairsToProcess.Add(TPair<UObject*, UObject*>(SnapshotActor, WorldActor));
-	EnqueueMatchingComponents(SnapshotOriginalPairsToProcess, SnapshotActor, WorldActor);
+	EnqueueMatchingCustomSubobjects(SnapshotOriginalPairsToProcess, SerializedData,SnapshotActor, WorldActor);
+	EnqueueMatchingComponents(SnapshotOriginalPairsToProcess, SerializedData,SnapshotActor, WorldActor);
 
 	FLevelSnapshotsModule& Module = FModuleManager::Get().GetModuleChecked<FLevelSnapshotsModule>("LevelSnapshots");
 	for (const TPair<UObject*, UObject*>& NextPair : SnapshotOriginalPairsToProcess)
@@ -346,21 +359,6 @@ void ULevelSnapshot::SetSnapshotName(const FName& InSnapshotName)
 void ULevelSnapshot::SetSnapshotDescription(const FString& InSnapshotDescription)
 {
 	SnapshotDescription = InSnapshotDescription;
-}
-
-FDateTime ULevelSnapshot::GetCaptureTime() const
-{
-	return CaptureTime;
-}
-
-FName ULevelSnapshot::GetSnapshotName() const
-{
-	return SnapshotName;
-}
-
-FString ULevelSnapshot::GetSnapshotDescription() const
-{
-	return SnapshotDescription;
 }
 
 void ULevelSnapshot::BeginDestroy()
