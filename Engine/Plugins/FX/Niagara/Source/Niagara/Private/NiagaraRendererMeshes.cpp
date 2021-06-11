@@ -558,6 +558,8 @@ uint32 FNiagaraRendererMeshes::PerformSortAndCull(FParticleMeshRenderData& Parti
 {
 	if ( SourceMode == ENiagaraRendererSourceDataMode::Emitter )
 	{
+		ParticleMeshRenderData.ParticleSortedIndicesSRV = GFNiagaraNullSortedIndicesVertexBuffer.VertexBufferSRV.GetReference();
+		ParticleMeshRenderData.ParticleSortedIndicesOffset = 0xffffffff;
 		return 1;
 	}
 
