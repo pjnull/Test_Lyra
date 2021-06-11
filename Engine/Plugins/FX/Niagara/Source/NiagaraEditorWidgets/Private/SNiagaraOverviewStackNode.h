@@ -68,5 +68,6 @@ private:
 	TSharedPtr<SHorizontalBox> ThumbnailBar;
 	TArray<UNiagaraStackEntry*> PreviewStackEntries;
 	bool bIsHoveringThumbnail;
+	bool bThumbnailBarRefreshPending;
 	int32 CurrentIssueIndex;
 };
