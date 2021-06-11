@@ -1008,7 +1008,7 @@ void FNiagaraRendererMeshes::GetDynamicMeshElements(const TArray<const FSceneVie
 					VertexFactory.SetUniformBuffer(PerViewUniformBuffer);
 					CollectorResources->UniformBuffer = PerViewUniformBuffer;
 
-					const bool bIsWireframe = AllowDebugViewmodes() && View && ViewFamily.EngineShowFlags.Wireframe;
+					const bool bIsWireframe = AllowDebugViewmodes() && ViewFamily.EngineShowFlags.Wireframe;
 					for (int32 SectionIndex = 0; SectionIndex < SectionCount; SectionIndex++)
 					{
 						const FStaticMeshSection& Section = LODModel.Sections[SectionIndex];
