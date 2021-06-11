@@ -1489,7 +1489,7 @@ namespace UnrealBuildTool
 				{
 					return TargetBuildEnvironment.Unique;
 				}
-				else if (UnrealBuildTool.IsEngineInstalled() || LinkType != TargetLinkType.Monolithic)
+				else if (UnrealBuild.IsEngineInstalled() || LinkType != TargetLinkType.Monolithic)
 				{
 					return TargetBuildEnvironment.Shared;
 				}
@@ -1863,7 +1863,7 @@ namespace UnrealBuildTool
 		/// <returns>Flag for whether the engine is installed</returns>
 		public bool bIsEngineInstalled
 		{
-			get { return UnrealBuildTool.IsEngineInstalled(); }
+			get { return UnrealBuild.IsEngineInstalled(); }
 		}
 
 		/// <summary>
