@@ -138,7 +138,7 @@ namespace Gauntlet
 
 			for (CurrentTestPass = 0; CurrentTestPass < Options.TestIterations; CurrentTestPass++)
 			{
-				// do not start a pass if cancelled
+				// do not start a pass if canceled
 				if (IsCancelled)
 				{
 					break;
@@ -153,7 +153,7 @@ namespace Gauntlet
 
 				DateTime StartPassTime = DateTime.Now;
 
-				Log.Info("Starting test pass {0} of {1}", CurrentTestPass + 1, Options.TestIterations);
+				Log.Info("Starting test iteration {0} of {1}", CurrentTestPass + 1, Options.TestIterations);
 
 				// Tests that we want to run
 				List<TestExecutionInfo> PendingTests = RequiredTests.Select(N => new TestExecutionInfo(N)).ToList();
@@ -483,7 +483,7 @@ namespace Gauntlet
 
 				MB.HorizontalLine();					
 
-				MB.Paragraph(string.Format("All passes completed. {0} of {1} executed tests completed without error", TotalTests - FailedTestCount, TotalTests));
+				MB.Paragraph(string.Format("All iterations completed. {0} of {1} executed tests completed without error", TotalTests - FailedTestCount, TotalTests));
 
 				List<string> Lines = new List<string>();
 				foreach (ITestNode Test in RequiredTests)

@@ -647,10 +647,19 @@ namespace Gauntlet
 				throw new AutomationException("Node already has a null UnrealApp, was PrepareUnrealSession or IsReadyToStart called?");
 			}
 
-			TConfigClass Config = GetCachedConfiguration();
-
+			// ensure we reset things
+			SessionArtifacts = Enumerable.Empty<UnrealRoleArtifacts>();
+			RoleResults = Enumerable.Empty<UnrealRoleResult>();
+			UnrealTestResult = TestResult.Invalid;
+			MissingProcesses = new List<IAppInstance>();
 			CurrentPass = Pass;
 			NumPasses = InNumPasses;
+			LastLogCount = 0;
+			LastHeartbeatTime = DateTime.MinValue;
+			LastActiveHeartbeatTime = DateTime.MinValue;
+			
+
+			TConfigClass Config = GetCachedConfiguration();
 
 			// Either use the ArtifactName param or name of this test
 			string TestFolder = string.IsNullOrEmpty(Context.Options.ArtifactName) ? this.ToString() : Context.Options.ArtifactName;
@@ -1409,7 +1418,7 @@ namespace Gauntlet
 		/// <returns></returns>
 		protected virtual IEnumerable<UnrealRoleResult> CreateRoleResultsFromArtifacts(StopReason InReason, IEnumerable<UnrealRoleArtifacts> InAllArtifacts)
 		{
-			return InAllArtifacts.Select(A => CreateRoleResultFromArtifact(InReason, A));
+			return InAllArtifacts.Select(A => CreateRoleResultFromArtifact(InReason, A)).ToArray();
 		}
 
 
