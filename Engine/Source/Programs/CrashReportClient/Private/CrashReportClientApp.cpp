@@ -954,6 +954,8 @@ void RunCrashReportClient(const TCHAR* CommandLine)
 {
 #if !PLATFORM_MAC
 	FTaskTagScope ThreadScope(ETaskTag::EGameThread); // Main thread is the game thread.
+#endif
+
 #if !(UE_BUILD_SHIPPING)
 
 	// If "-waitforattach" or "-WaitForDebugger" was specified, halt startup and wait for a debugger to attach before continuing
