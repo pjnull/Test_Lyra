@@ -1,4 +1,4 @@
-﻿// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "SRCProtocolBinding.h"
 
@@ -151,7 +151,7 @@ void SRCProtocolBinding::Construct(const FArguments& InArgs, const TSharedRef<ST
 FReply SRCProtocolBinding::OnDelete()
 {
 	ViewModel->Remove();
-	Visibility = EVisibility::Collapsed;
+	SetVisibility(EVisibility::Collapsed);
 	return FReply::Handled();
 }
 
