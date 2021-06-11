@@ -84,7 +84,7 @@ void FCharacterMovementComponentAsyncInput::ControlledCharacterMove(const float 
 		CharacterInput->CheckJumpInput(DeltaSeconds, *this, Output);
 
 		// apply input to acceleration
-		Output.Acceleration = ScaleInputAcceleration(ConstrainInputAcceleration(InputVector, Output));
+		Output.Acceleration = ScaleInputAcceleration(ConstrainInputAcceleration(InputVector, Output), Output);
 		Output.AnalogInputModifier = ComputeAnalogInputModifier(Output.Acceleration);
 	}
 
@@ -1518,7 +1518,7 @@ FVector FCharacterMovementComponentAsyncInput::ConstrainInputAcceleration(FVecto
 	return InputAcceleration;
 }
 
-FVector FCharacterMovementComponentAsyncInput::ScaleInputAcceleration(FVector InputAcceleration) const
+FVector FCharacterMovementComponentAsyncInput::ScaleInputAcceleration(FVector InputAcceleration, FCharacterMovementComponentAsyncOutput& Output) const
 {
 	return MaxAcceleration * InputAcceleration.GetClampedToMaxSize(1.0f);
 }
