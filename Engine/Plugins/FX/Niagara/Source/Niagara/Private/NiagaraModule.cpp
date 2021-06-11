@@ -71,10 +71,11 @@ static FAutoConsoleVariableRef CVarUseGlobalFXBudget(
 
 void INiagaraModule::OnUseGlobalFXBudgetChanged(IConsoleVariable* Variable)
 {
-	//Enable the global budget tracking if needed.
+	//Warn if we're enabling Niagara's use of budgeting but the budgeting itself is disabled.
 	if (UseGlobalFXBudget() && FFXBudget::Enabled() == false)
 	{
-		FFXBudget::SetEnabled(true);
+		//FFXBudget::SetEnabled(true);
+		UE_LOG(LogNiagara, Warning, TEXT("Niagara has enabled fx.Niagara.UseGlobalFXBudget but fx.Budget.Enabled is false so global FX budgetting will still be disabled. Consider also enabling fx.Budget.Enabled."));
 	}
 }
 
