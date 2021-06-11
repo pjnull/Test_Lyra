@@ -94,12 +94,13 @@ namespace DataprepGeometryOperationsUtils
 
 		// Buil mesh tree to test intersections
 		FMeshDescriptionTriangleMeshAdapter MergedMeshAdapter( MergedMesh->GetMeshDescription(0) );
-		TMeshAABBTree3<FMeshDescriptionTriangleMeshAdapter> MergedMeshTree(&MergedMeshAdapter);
+		UE::Geometry::TMeshAABBTree3 <FMeshDescriptionTriangleMeshAdapter> MergedMeshTree(&MergedMeshAdapter);
 
 		MergedMeshTree.Build();
 
 		check( MergedMeshTree.IsValid() );
 
+		using FAxisAlignedBox3d = UE::Geometry::FAxisAlignedBox3d;
 		const FAxisAlignedBox3d MergedMeshBox = MergedMeshTree.GetBoundingBox();
 
 		TSet< AActor* > OverlappingActorSet;
