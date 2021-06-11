@@ -225,10 +225,18 @@ void FAndroidMisc::RequestExit( bool Force )
 	if (!GIsCriticalError)
 	{
 		PGO_WriteFile();
+		// exit now to avoid a possible second PGO write when AndroidMain exits.
+		Force = true;
 	}
 #endif
 
 	UE_LOG(LogAndroid, Log, TEXT("FAndroidMisc::RequestExit(%i)"), Force);
+	if(GLog)
+	{
+		GLog->FlushThreadedLogs();
+		GLog->Flush();
+	}
+
 	if (Force)
 	{
 #if USE_ANDROID_JNI
