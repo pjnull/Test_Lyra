@@ -9,20 +9,6 @@ using System.Threading.Tasks;
 namespace Gauntlet
 {
 	/// <summary>
-	/// Information that defines a device
-	/// </summary>
-	class IgnoredTestIssues
-	{
-		public string TestName = "";
-
-		public string[] IgnoredEnsures = new string[0];
-
-		public string[] IgnoredWarnings = new string[0];
-
-		public string[] IgnoredErrors = new string[0];
-	}
-		
-	/// <summary>
 	/// A class that can be serialized in from JSON and used in a TestNode to ignore specific warnings/errors if so desired
 	/// </summary>
 	public class IgnoredIssueList

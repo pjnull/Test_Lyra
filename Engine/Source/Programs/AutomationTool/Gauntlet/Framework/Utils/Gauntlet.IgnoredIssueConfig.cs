@@ -11,7 +11,7 @@ namespace Gauntlet
 	/// <summary>
 	/// Information that defines a device
 	/// </summary>
-	class IgnoredTestIssues
+	public class IgnoredTestIssues
 	{
 		public string TestName = "";
 
