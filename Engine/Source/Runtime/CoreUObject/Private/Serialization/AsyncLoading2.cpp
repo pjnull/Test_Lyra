@@ -5441,7 +5441,7 @@ void FAsyncPackage2::FinishUPackage()
 
 void FAsyncPackage2::CallCompletionCallbacks(EAsyncLoadingResult::Type LoadingResult)
 {
-	checkSlow(!IsInAsyncLoadingThread());
+	checkSlow(IsInGameThread());
 
 	UPackage* LoadedPackage = (!bLoadHasFailed) ? LinkerRoot : nullptr;
 	for (FCompletionCallback& CompletionCallback : CompletionCallbacks)
