@@ -3,16 +3,16 @@
 #pragma once
 
 #ifdef _WINDOWS
-	#ifdef UE4BLACKMAGICDESIGN_EXPORTS
-		#define UE4BLACKMAGICDESIGN_API __declspec(dllexport)
+	#ifdef UEBLACKMAGICDESIGN_EXPORTS
+		#define UEBLACKMAGICDESIGN_API __declspec(dllexport)
 	#else
-		#define UE4BLACKMAGICDESIGN_API __declspec(dllimport)
+		#define UEBLACKMAGICDESIGN_API
 	#endif
 #else // _WINDOWS
-	#ifdef UE4BLACKMAGICDESIGN_EXPORTS
+	#ifdef UEBLACKMAGICDESIGN_EXPORTS
 		#define UE4BLACKMAGICDESIGN_API __attribute__ ((visibility ("default")))
 	#else
-		#define UE4BLACKMAGICDESIGN_API
+		#define UEBLACKMAGICDESIGN_API
 	#endif
 #endif // _WINDOWS
 
