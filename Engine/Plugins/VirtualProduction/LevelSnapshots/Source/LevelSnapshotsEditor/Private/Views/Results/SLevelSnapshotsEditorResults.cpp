@@ -3023,7 +3023,7 @@ SLevelSnapshotsEditorResultsRow::~SLevelSnapshotsEditorResultsRow()
 	{
 		for (int32 SplitterSlotCount = 0; SplitterSlotCount < SplitterPtr->GetChildren()->Num(); SplitterSlotCount++)
 		{
-			SplitterPtr->SlotAt(SplitterSlotCount).OnSlotResized_Handler.Unbind();
+			SplitterPtr->SlotAt(SplitterSlotCount).OnSlotResized().Unbind();
 		}
 	}
 
