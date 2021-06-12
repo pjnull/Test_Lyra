@@ -1,4 +1,6 @@
-﻿using Newtonsoft.Json;
+﻿// Copyright Epic Games, Inc. All Rights Reserved.
+
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
