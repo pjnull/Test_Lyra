@@ -19,8 +19,10 @@
 #include "UObject/Package.h"
 #include "UObject/TextProperty.h"
 #include "UObject/UnrealType.h"
-#if WITH_EDITOR
+#if WITH_EDITOR && !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
 #include "Logging/MessageLog.h"
+#endif
+#if WITH_EDITOR
 #include "ScopedTransaction.h"
 #endif
 
@@ -100,7 +102,7 @@ void ULevelSnapshot::ApplySnapshotToWorld(UWorld* TargetWorld, const FPropertySe
 	
 	if (MapPath != FSoftObjectPath(TargetWorld))
 	{
-#if WITH_EDITOR
+#if WITH_EDITOR && !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
 		if (TargetWorld->IsPlayInEditor())
 		{
 			FMessageLog("PIE").Warning(
@@ -134,7 +136,7 @@ void ULevelSnapshot::SnapshotWorld(UWorld* TargetWorld)
 	if (TargetWorld->WorldType != EWorldType::Editor
 		&& TargetWorld->WorldType != EWorldType::EditorPreview) // To suppor tests in editor preview maps
 	{
-#if WITH_EDITOR
+#if WITH_EDITOR && !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
 		if (TargetWorld->IsPlayInEditor())
 		{
 			FMessageLog("PIE").Warning(
