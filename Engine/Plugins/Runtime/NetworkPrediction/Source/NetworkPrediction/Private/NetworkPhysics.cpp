@@ -28,7 +28,7 @@ DEFINE_LOG_CATEGORY(LogNetworkPhysics);
 
 namespace UE_NETWORK_PHYSICS
 {
-	NETSIM_DEVCVAR_INT(Enable, 1, "np2.bEnable", "Enabled rollback physics. Must be set before starting game");
+	NETSIM_DEVCVAR_INT(Enable, 0, "np2.bEnable", "Enabled rollback physics. Must be set before starting game");
 	NETSIM_DEVCVAR_INT(LogCorrections, 1, "np2.LogCorrections", "Logs corrections when they happen");		
 	NETSIM_DEVCVAR_INT(LogImpulses, -1, "np2.LogImpulses", "Logs all recorded F/T/LI/AI");
 
