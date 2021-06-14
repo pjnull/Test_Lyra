@@ -10,7 +10,7 @@
 #include "RayTracing/RayTracingMaterialHitShaders.h"
 #include "IrradianceCaching.h"
 #include "RayTracingTypes.h"
-#include "PathTracingDefinitions.h"
+#include "PathTracingLightParameters.inl"
 
 #if RHI_RAYTRACING
 
@@ -71,6 +71,7 @@ class FLightmapPathTracingRGS : public FGlobalShader
 		SHADER_PARAMETER_RDG_BUFFER_SRV(StructuredBuffer<FPathTracingLight>, SceneLights)
 		SHADER_PARAMETER(uint32, SceneLightCount)
 		SHADER_PARAMETER(uint32, SceneVisibleLightCount)
+		SHADER_PARAMETER_STRUCT_INCLUDE(FPathTracingLightGrid, LightGridParameters)
 		// Skylight
 		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, SkylightTexture)
 		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, SkylightPdf)
@@ -134,6 +135,7 @@ class FVolumetricLightmapPathTracingRGS : public FGlobalShader
 		SHADER_PARAMETER_RDG_BUFFER_SRV(StructuredBuffer<FPathTracingLight>, SceneLights)
 		SHADER_PARAMETER(uint32, SceneLightCount)
 		SHADER_PARAMETER(uint32, SceneVisibleLightCount)
+		SHADER_PARAMETER_STRUCT_INCLUDE(FPathTracingLightGrid, LightGridParameters)
 		// Skylight
 		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, SkylightTexture)
 		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, SkylightPdf)
@@ -182,6 +184,7 @@ class FStationaryLightShadowTracingRGS : public FGlobalShader
 		SHADER_PARAMETER_RDG_BUFFER_SRV(StructuredBuffer<FPathTracingLight>, SceneLights)
 		SHADER_PARAMETER(uint32, SceneLightCount)
 		SHADER_PARAMETER(uint32, SceneVisibleLightCount)
+		SHADER_PARAMETER_STRUCT_INCLUDE(FPathTracingLightGrid, LightGridParameters)
 	END_SHADER_PARAMETER_STRUCT()
 };
 
