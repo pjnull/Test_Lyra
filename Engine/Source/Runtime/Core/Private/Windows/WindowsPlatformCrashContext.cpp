@@ -1445,7 +1445,11 @@ private:
 			FCString::Strncpy(GErrorExceptionDescription, ErrorMessageLocal, UE_ARRAY_COUNT(GErrorExceptionDescription));
 		}
 
-#if USE_CRASH_REPORTER_MONITOR
+// Workaround for non-Editor build. When remote debugging was enabled (CRC generating the minidump + callstack) in games, several crashes
+// were emitted with no call stack and zero-sized minidump. Until this issue is resolved, games bypass the remote debugging and fallback to
+// in-process callstack/minidump generation, then spawn a new instance of CRC to send that crash. The CRC spanwed at startup will keep running in
+// background with the only purpose to capture the monitored process exit code and send the analytic summary event once the process died.
+#if USE_CRASH_REPORTER_MONITOR && WITH_EDITOR
 		if (CrashClientHandle.IsValid() && FPlatformProcess::IsProcRunning(CrashClientHandle))
 		{
 			// If possible use the crash monitor helper class to report the error. This will do most of the analysis
