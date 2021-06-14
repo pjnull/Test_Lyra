@@ -623,8 +623,14 @@ const TCHAR* FAndroidMisc::GetSystemErrorMessage(TCHAR* OutBuffer, int32 BufferC
 		Error = errno;
 	}
 	char ErrorBuffer[1024];
-	strerror_r(Error, ErrorBuffer, 1024);
-	FCString::Strcpy(OutBuffer, BufferCount, UTF8_TO_TCHAR((const ANSICHAR*)ErrorBuffer));
+	if (strerror_r(Error, ErrorBuffer, 1024) == 0)
+	{
+		FCString::Strcpy(OutBuffer, BufferCount, UTF8_TO_TCHAR((const ANSICHAR*)ErrorBuffer));
+	}
+	else
+	{
+		*OutBuffer = TEXT('\0');
+	}
 	return OutBuffer;
 }
 
