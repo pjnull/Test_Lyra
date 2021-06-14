@@ -298,10 +298,9 @@ struct ENGINE_API FUpdatedComponentAsyncInput
 	static bool ShouldIgnoreHitResult(const UWorld* InWorld, FHitResult const& TestHit, FVector const& MovementDirDenormalized, const AActor* MovingActor, EMoveComponentFlags MoveFlags);
 	static bool ShouldIgnoreOverlapResult(const UWorld* World, const AActor* ThisActor, const UPrimitiveComponent& ThisComponent, const AActor* OtherActor, const UPrimitiveComponent& OtherComponent);
 
-	FVector GetForwardVector() const
-	{
-		return GetRotation().GetAxisX();
-	}
+	FVector GetForwardVector() const { return GetRotation().GetAxisX(); }
+	FVector GetRightVector() const { return GetRotation().GetAxisY(); }
+	FVector GetUpVector() const { return GetRotation().GetAxisZ(); }
 
 	// Async API, physics thread only.
 	void SetPosition(const FVector& Position) const;
@@ -411,7 +410,7 @@ struct ENGINE_API FCharacterMovementComponentAsyncInput : public Chaos::FSimCall
 	int32 MaxJumpApexAttemptsPerSimulation;
 	EMovementMode DefaultLandMovementMode;
 	float FallingLateralFriction;
-	float JumpZVelocity;
+	mutable float JumpZVelocity;
 	bool bAllowPhysicsRotationDuringAnimRootMotion;
 	bool bDeferUpdateMoveComponent;
 	bool bRequestedMoveUseAcceleration;
@@ -485,7 +484,7 @@ struct ENGINE_API FCharacterMovementComponentAsyncInput : public Chaos::FSimCall
 	virtual FVector ComputeGroundMovementDelta(const FVector& Delta, const FHitResult& RampHit, const bool bHitFromLineTrace, FCharacterMovementComponentAsyncOutput& Output) const;
 	virtual bool CanCrouchInCurrentState(FCharacterMovementComponentAsyncOutput& Output) const;
 	virtual FVector ConstrainInputAcceleration(FVector InputAcceleration, const FCharacterMovementComponentAsyncOutput& Output) const;
-	virtual FVector ScaleInputAcceleration(FVector InputAcceleration) const;
+	virtual FVector ScaleInputAcceleration(FVector InputAcceleration, FCharacterMovementComponentAsyncOutput& Output) const;
 	virtual float ComputeAnalogInputModifier(FVector Acceleration) const;
 	virtual FVector ConstrainLocationToPlane(FVector Location) const;
 	virtual FVector ConstrainDirectionToPlane(FVector Direction) const;
