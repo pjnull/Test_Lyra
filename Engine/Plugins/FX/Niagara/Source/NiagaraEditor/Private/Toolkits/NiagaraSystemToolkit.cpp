@@ -979,6 +979,11 @@ void FNiagaraSystemToolkit::SetupCommands()
 		FCanExecuteAction::CreateSP(this, &FNiagaraSystemToolkit::OnApplyEnabled));
 
 	GetToolkitCommands()->MapAction(
+		FNiagaraEditorCommands::Get().ApplyScratchPadChanges,
+		FExecuteAction::CreateSP(this, &FNiagaraSystemToolkit::OnApplyScratchPadChanges),
+		FCanExecuteAction::CreateSP(this, &FNiagaraSystemToolkit::OnApplyScratchPadChangesEnabled));
+
+	GetToolkitCommands()->MapAction(
 		FNiagaraEditorCommands::Get().ToggleAutoPlay,
 		FExecuteAction::CreateLambda([]()
 		{
@@ -1145,7 +1150,12 @@ void FNiagaraSystemToolkit::ExtendToolbar()
 							FName(TEXT("ApplyNiagaraEmitter")));
 					}
 				}
-		
+				ToolbarBuilder.AddToolBarButton(FNiagaraEditorCommands::Get().ApplyScratchPadChanges,
+					NAME_None,
+					TAttribute<FText>(),
+					TAttribute<FText>(),
+					FSlateIcon(FNiagaraEditorStyle::GetStyleSetName(), "NiagaraEditor.ApplyScratchPadChanges"),
+					FName(TEXT("ApplyScratchPadChanges")));
 				ToolbarBuilder.AddToolBarButton(FNiagaraEditorCommands::Get().Compile,
 					NAME_None,
 					TAttribute<FText>(),
@@ -1877,6 +1887,25 @@ bool FNiagaraSystemToolkit::OnApplyEnabled() const
 		return EmitterViewModel->GetEmitter()->GetChangeId() != LastSyncedEmitterChangeId || bEmitterThumbnailUpdated;
 	}
 	return false;
+}
+
+void FNiagaraSystemToolkit::OnApplyScratchPadChanges()
+{
+	if (SystemViewModel.IsValid() && SystemViewModel->GetScriptScratchPadViewModel() != nullptr)
+	{
+		for (TSharedRef<FNiagaraScratchPadScriptViewModel> ScratchPadScriptViewModel : SystemViewModel->GetScriptScratchPadViewModel()->GetScriptViewModels())
+		{
+			if(ScratchPadScriptViewModel->HasUnappliedChanges())
+			{
+				ScratchPadScriptViewModel->ApplyChanges();
+			}
+		}
+	}
+}
+
+bool FNiagaraSystemToolkit::OnApplyScratchPadChangesEnabled() const
+{
+	return SystemViewModel.IsValid() && SystemViewModel->GetScriptScratchPadViewModel() != nullptr && SystemViewModel->GetScriptScratchPadViewModel()->HasUnappliedChanges();
 }
 
 void FNiagaraSystemToolkit::OnPinnedCurvesChanged()
