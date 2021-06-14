@@ -869,6 +869,10 @@ namespace Electra
 	}
 
 
+	//-----------------------------------------------------------------------------
+	/**
+	 * Application has entered foreground.
+	 */
 	void FAudioDecoderAAC::HandleApplicationHasEnteredForeground()
 	{
 		ApplicationRunningSignal.Signal();
@@ -882,6 +886,19 @@ namespace Electra
 	}
 
 
+	
+	//-----------------------------------------------------------------------------
+	/**
+	 * Application goes into background.
+	 */
+	void FAudioDecoderAAC::HandleApplicationWillEnterBackground()
+	{
+		ApplicationSuspendConfirmedSignal.Reset();
+		ApplicationRunningSignal.Reset();
+		ApplicationSuspendConfirmedSignal.WaitTimeoutAndReset(1000 * 500);
+	}
+
+	
 	//-----------------------------------------------------------------------------
 	/**
 	 * AAC audio decoder main threaded decode loop
@@ -909,6 +926,7 @@ namespace Electra
 
 		while (!TerminateThreadEvent.IsSignaled())
 		{
+			// If in background, wait until we get activated again.
 			if (!ApplicationRunningSignal.IsSignaled())
 			{
 				ApplicationSuspendConfirmedSignal.Signal();
