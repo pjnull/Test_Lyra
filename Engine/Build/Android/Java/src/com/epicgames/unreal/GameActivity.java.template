@@ -305,7 +305,7 @@ public class GameActivity extends $${gameActivitySuperClass}$$ implements Surfac
 	public static final int checkLastVirtualKeyboardCommandDelay = 500;
 	public static final boolean bSamsungDevice = android.os.Build.MANUFACTURER.equals("samsung");
 	
-	static GameActivity _activity;
+	static GameActivity _activity = null;
 	static Bundle _bundle;
 	static Bundle _extrasBundle;
 
