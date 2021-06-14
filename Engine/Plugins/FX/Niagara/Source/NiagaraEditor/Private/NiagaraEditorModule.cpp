@@ -1351,8 +1351,14 @@ UObject* FNiagaraEditorModule::GetPooledDuplicateObject(UObject* Source, EFieldI
 	}
 	else
 	{
+		bool bIsTransactionalSource = Source->HasAllFlags(RF_Transactional);
+		Source->ClearFlags(RF_Transactional);
 		OutPooledObj = DuplicateObject(Source, GetTransientPackage());
 		OutPooledObj->AddToRoot();
+		if (bIsTransactionalSource)
+		{
+			Source->SetFlags(RF_Transactional);
+		}
 	}
 	return OutPooledObj;
 }

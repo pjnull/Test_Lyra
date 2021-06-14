@@ -977,7 +977,9 @@ UNiagaraGraph* UNiagaraGraph::CreateCompilationCopy()
 	TArray<UEdGraphNode*> NewNodes;
 	for (UEdGraphNode* Node : Result->Nodes)
 	{
+		Node->ClearFlags(RF_Transactional);
 		UEdGraphNode* DupNode = NewNodes.Add_GetRef(DuplicateObject(Node, Result));
+		Node->SetFlags(RF_Transactional);
 		DuplicationMapping.Add(Node, DupNode);
 	}
 	for (UEdGraphNode* Node : NewNodes)
