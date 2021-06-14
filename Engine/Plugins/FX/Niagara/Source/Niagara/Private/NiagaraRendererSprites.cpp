@@ -448,6 +448,8 @@ void FNiagaraRendererSprites::SetupVertexFactory(FParticleSpriteRenderData& Part
 			VertexFactory.SetVertexBufferOverride(&CutoutVertexBuffer);
 		}
 	}
+	
+	// The InitResource needs to happen at the end here as SetVertexBufferOverride will set the UV buffers.
 	VertexFactory.InitResource();
 }
 
