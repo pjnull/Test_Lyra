@@ -878,15 +878,7 @@ namespace Electra
 		ApplicationRunningSignal.Signal();
 	}
 
-	void FAudioDecoderAAC::HandleApplicationWillEnterBackground()
-	{
-		ApplicationSuspendConfirmedSignal.Reset();
-		ApplicationRunningSignal.Reset();
-		ApplicationSuspendConfirmedSignal.WaitTimeoutAndReset(1000 * 500);
-	}
 
-
-	
 	//-----------------------------------------------------------------------------
 	/**
 	 * Application goes into background.
