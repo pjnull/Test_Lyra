@@ -997,7 +997,8 @@ bool FOpenXRHMD::EnumerateTrackedDevices(TArray<int32>& OutDevices, EXRTrackedDe
 	}
 	if (Type == EXRTrackedDeviceType::Any || Type == EXRTrackedDeviceType::Controller)
 	{
-		for (int32 i = 0; i < DeviceSpaces.Num(); i++)
+		// Skip the HMD, we already added it to the list
+		for (int32 i = 1; i < DeviceSpaces.Num(); i++)
 		{
 			OutDevices.Add(i);
 		}
@@ -1470,6 +1471,7 @@ bool CheckPlatformDepthExtensionSupport(const XrInstanceProperties& InstanceProp
 FOpenXRHMD::FOpenXRHMD(const FAutoRegister& AutoRegister, XrInstance InInstance, XrSystemId InSystem, TRefCountPtr<FOpenXRRenderBridge>& InRenderBridge, TArray<const char*> InEnabledExtensions, TArray<IOpenXRExtensionPlugin*> InExtensionPlugins, IARSystemSupport* ARSystemSupport)
 	: FHeadMountedDisplayBase(ARSystemSupport)
 	, FSceneViewExtensionBase(AutoRegister)
+	, FOpenXRAssetManager(InInstance, this)
 	, bStereoEnabled(false)
 	, bIsRunning(false)
 	, bIsReady(false)
@@ -1600,7 +1602,9 @@ FOpenXRHMD::FOpenXRHMD(const FAutoRegister& AutoRegister, XrInstance InInstance,
 #endif
 
 	// Add a device space for the HMD without an action handle and ensure it has the correct index
-	ensure(DeviceSpaces.Emplace(XR_NULL_HANDLE) == HMDDeviceId);
+	XrPath UserHead = XR_NULL_PATH;
+	XR_ENSURE(xrStringToPath(Instance, "/user/head", &UserHead));
+	ensure(DeviceSpaces.Emplace(XR_NULL_HANDLE, UserHead) == HMDDeviceId);
 
 	// Give the all frame states the same initial values.
 	PipelinedFrameStateRHI = PipelinedFrameStateRendering = PipelinedFrameStateGame;
@@ -2059,12 +2063,12 @@ void FOpenXRHMD::DestroySession()
 	}
 }
 
-int32 FOpenXRHMD::AddActionDevice(XrAction Action)
+int32 FOpenXRHMD::AddActionDevice(XrAction Action, XrPath Path)
 {
 	// Ensure the HMD device is already emplaced
 	ensure(DeviceSpaces.Num() > 0);
 
-	int32 DeviceId = DeviceSpaces.Emplace(Action);
+	int32 DeviceId = DeviceSpaces.Emplace(Action, Path);
 
 	FReadScopeLock Lock(SessionHandleMutex);
 	if (Session)
@@ -2082,6 +2086,15 @@ void FOpenXRHMD::ResetActionDevices()
 	{
 		DeviceSpaces.RemoveAt(HMDDeviceId + 1, DeviceSpaces.Num() - 1);
 	}
+}
+
+XrPath FOpenXRHMD::GetTrackedDevicePath(const int32 DeviceId)
+{
+	if (DeviceSpaces.IsValidIndex(DeviceId))
+	{
+		return DeviceSpaces[DeviceId].Path;
+	}
+	return XR_NULL_PATH;
 }
 
 XrTime FOpenXRHMD::GetDisplayTime() const
@@ -2994,9 +3007,10 @@ void FOpenXRHMD::UpdateLayer(FOpenXRLayer& Layer, uint32 LayerId, bool bIsValid)
 // OpenXR Action Space Implementation
 //---------------------------------------------------
 
-FOpenXRHMD::FDeviceSpace::FDeviceSpace(XrAction InAction)
+FOpenXRHMD::FDeviceSpace::FDeviceSpace(XrAction InAction, XrPath InPath)
 	: Action(InAction)
 	, Space(XR_NULL_HANDLE)
+	, Path(InPath)
 {
 }
 
