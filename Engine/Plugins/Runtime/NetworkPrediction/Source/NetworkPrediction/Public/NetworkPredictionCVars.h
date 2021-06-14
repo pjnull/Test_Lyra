@@ -17,7 +17,9 @@ inline IConsoleVariable* FindConsoleVarHelper(const TCHAR* VarName)
 }
 
 // Whether to treat these cvars as consts
-#define NETSIM_CONST_CVARS (UE_BUILD_SHIPPING || UE_BUILD_TEST)
+#ifndef NETSIM_CONST_CVARS
+	#define NETSIM_CONST_CVARS (UE_BUILD_SHIPPING || UE_BUILD_TEST)
+#endif
 
 // This is required because these cvars live in header files that will be included across different compilation units
 // Just using standard FAutoConsoleVariableRef will cause multiple registrations of the same variable
@@ -40,13 +42,7 @@ struct FConditionalAutoConsoleRegister
 	}
 };
 
-
-#if NETSIM_CONST_CVARS
-#define NETSIM_DEVCVAR_SHIPCONST_INT(Var,Value,VarName,Help) \
-	inline int32 Var() { return Value; } \
-	inline void Set##Var(int32 V) { }
-#else
-#define NETSIM_DEVCVAR_SHIPCONST_INT(Var,Value,VarName,Help) \
+#define NETSIM_DEVCVAR_INT(Var,Value,VarName,Help) \
 	static FConditionalAutoConsoleRegister Var##Auto(TEXT(VarName),(int32)Value,TEXT(Help)); \
 	inline int32 Var() \
 	{ \
@@ -60,14 +56,17 @@ struct FConditionalAutoConsoleRegister
 		check(Existing); \
 		Existing->Set(V, ECVF_SetByConsole); \
 	}
-#endif
 
 #if NETSIM_CONST_CVARS
-#define NETSIM_DEVCVAR_SHIPCONST_FLOAT(Var,Value,VarName,Help) \
-	inline float Var() { return Value; } \
-	inline void Set##Var() { }
+#define NETSIM_DEVCVAR_SHIPCONST_INT(Var,Value,VarName,Help) \
+	inline int32 Var() { return Value; } \
+	inline void Set##Var(int32 V) { }
 #else
-#define NETSIM_DEVCVAR_SHIPCONST_FLOAT(Var,Value,VarName,Help) \
+#define NETSIM_DEVCVAR_SHIPCONST_INT(Var,Value,VarName,Help) NETSIM_DEVCVAR_INT(Var,Value,VarName,Help)
+#endif
+
+
+#define NETSIM_DEVCVAR_FLOAT(Var,Value,VarName,Help) \
 	static FConditionalAutoConsoleRegister Var##Auto(TEXT(VarName),(float)Value,TEXT(Help)); \
 	inline float Var() \
 	{ \
@@ -81,4 +80,11 @@ struct FConditionalAutoConsoleRegister
 		check(Existing); \
 		Existing->Set(V, ECVF_SetByConsole); \
 	}
+
+#if NETSIM_CONST_CVARS
+#define NETSIM_DEVCVAR_SHIPCONST_FLOAT(Var,Value,VarName,Help) \
+	inline float Var() { return Value; } \
+	inline void Set##Var() { }
+#else
+#define NETSIM_DEVCVAR_SHIPCONST_FLOAT(Var,Value,VarName,Help) NETSIM_DEVCVAR_FLOAT(Var,Value,VarName,Help)
 #endif

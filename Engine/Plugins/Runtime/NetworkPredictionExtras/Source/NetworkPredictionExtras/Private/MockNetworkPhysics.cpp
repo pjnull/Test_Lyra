@@ -148,6 +148,9 @@ namespace UE_NETWORK_PHYSICS
 	bool JumpHack=false;
 	FAutoConsoleVariableRef CVarJumpHack(TEXT("np2.Mock.JumpHack"), JumpHack, TEXT("Make jump not rely on trace which currently causes non determinism"));
 
+	bool JumpMisPredict=false;
+	FAutoConsoleVariableRef CVarJumpMisPredict(TEXT("np2.Mock.JumpMisPredict"), JumpMisPredict, TEXT("Make jump do random impulse which will cause a misprediction"));
+
 	bool MockImpulse=true;
 	FAutoConsoleVariableRef CVarMockImpulse(TEXT("np2.Mock.BallImpulse"), MockImpulse, TEXT("Make jump not rely on trace which currently causes non determinism"));
 
@@ -160,11 +163,20 @@ namespace UE_NETWORK_PHYSICS
 
 void FMockManagedState::AsyncTick(UWorld* World, Chaos::FPhysicsSolver* Solver, const float DeltaSeconds, const int32 SimulationFrame, const int32 LocalStorageFrame, const TArray<FSingleParticlePhysicsProxy*>& BallProxies)
 {
+	//ensureAlways(UE_NETWORK_PHYSICS::GClientFrame == SimulationFrame || UE_NETWORK_PHYSICS::GServerFrame == SimulationFrame); // DNC
+	
+
 	// FIXME: PT_State is the only thing that should be writable here
 	if (ensure(Proxy))
 	{
 		if (auto* PT = Proxy->GetPhysicsThreadAPI())
 		{
+			UE_NETWORK_PHYSICS::ConditionalFrameEnsure();
+			if (UE_NETWORK_PHYSICS::ConditionalFrameBreakpoint())
+			{
+				UE_LOG(LogTemp, Warning, TEXT("[%d][%d] Location: %s"), UE_NETWORK_PHYSICS::DebugSimulationFrame(), UE_NETWORK_PHYSICS::DebugServer(), *PT->X().ToString());
+			}
+
 			FVector TracePosition = PT->X();
 			FVector EndPosition = TracePosition + FVector(0.f, 0.f, -100.f);
 			FCollisionShape Shape = FCollisionShape::MakeSphere(250.f);
@@ -179,6 +191,16 @@ void FMockManagedState::AsyncTick(UWorld* World, Chaos::FPhysicsSolver* Solver, 
 			FHitResult OutHit;
 			const bool bInAir = !UE_NETWORK_PHYSICS::JumpHack && !World->LineTraceSingleByChannel(OutHit, TracePosition, EndPosition, ECollisionChannel::ECC_WorldStatic, QueryParams, ResponseParams);
 			const float UpDot = FVector::DotProduct(PT->R().GetUpVector(), FVector::UpVector);
+
+			if (UE_NETWORK_PHYSICS::JumpMisPredict)
+			{
+				if (InputCmd.bJumpedPressed && PT_State.JumpStartFrame + 10 < SimulationFrame)
+				{
+					PT_State.JumpStartFrame = SimulationFrame;
+					PT->SetLinearImpulse(FVector(0.f, 0.f, 60000.f + (FMath::FRand() * 50000.f)));
+				}
+				return;
+			}
 
 			if (UE_NETWORK_PHYSICS::MockImpulse && PT_State.KickFrame + 10 < SimulationFrame)
 			{
@@ -582,7 +604,7 @@ public:
 	void ApplyCorrections_Internal(int32 PhysicsStep, Chaos::FSimCallbackInput* Input) override
 	{
 		// Note: this can't work like FNetworkPhysicsRewindCallback::PreResimStep_Internal because even after we apply
-		// a correction on the frame it occured on, we still need to apply GT data to all subsequent frames. This seems
+		// a correction on the frame it occurred on, we still need to apply GT data to all subsequent frames. This seems
 		// bad and it would be better if we had a better way of storing the GT data on the PT? 
 
 		FMockAsyncObjectManagerInput* AsyncInput = (FMockAsyncObjectManagerInput*)Input;
@@ -1216,6 +1238,12 @@ AActor* ANetworkPredictionSpawner::Spawn(FName StreamName)
 	if (!SourceSpawner)
 	{
 		UE_LOG(LogNetworkPhysics, Warning, TEXT("Could not find spawner named %s"), *StreamName.ToString());
+		return nullptr;
+	}
+
+	if (SourceSpawner->RecordedInputs.Num() == 0)
+	{
+		UE_LOG(LogNetworkPhysics, Warning, TEXT("Spawner %s has no recorded input"), *SourceSpawner->GetName());
 		return nullptr;
 	}
 

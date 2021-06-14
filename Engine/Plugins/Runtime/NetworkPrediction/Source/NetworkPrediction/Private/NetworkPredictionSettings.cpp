@@ -65,7 +65,7 @@ namespace UE_NETWORK_PREDICTION
 			return;
 		}
 
-		float YPos = Canvas->SizeY * 0.25f; //455.f; //16;
+		float YPos = Canvas->SizeY * 0.45f; //455.f; //16;
 		float XPos = 24.f;
 		float Pad = 4.f;
 
@@ -158,7 +158,7 @@ namespace UE_NETWORK_PREDICTION
 						continue;
 					}
 					
-					FString CommandStr = FString::Printf(TEXT("ServerExec \"ce %s"), *Func->GetName());
+					FString CommandStr = FString::Printf(TEXT("ServerExec \"ce \\\"%s\\\""), *Func->GetName());
 					for (TFieldIterator<FProperty> It(Func); It && It->HasAnyPropertyFlags(CPF_Parm); ++It)
 					{
 						CommandStr += TEXT(" 0");
