@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "ProtocolRangeViewModel.h"
 
@@ -66,7 +66,7 @@ void FProtocolRangeViewModel::Initialize()
 						}
 						else
 						{
-							const uint64 ClampMax = FMath::Pow(2.0f, RangeTypeSize * 8) - 1;
+							const uint64 ClampMax = (1 << (RangeTypeSize * 8)) - 1;
 							FString ClampMaxStr;
 							ClampMaxStr.AppendInt(ClampMax);
 							PropertyInContainer->SetMetaData(RemoteControlTypeUtilities::ClampMaxKey, *ClampMaxStr);
