@@ -7,7 +7,7 @@
 #include "Interfaces/IPluginManager.h"
 #include "GenericPlatform/GenericPlatformFile.h"
 #include "GenericPlatform/GenericPlatformProcess.h"
-#include "HAL/PlatformFilemanager.h"
+#include "HAL/PlatformFileManager.h"
 #include "Misc/CommandLine.h"
 
 
