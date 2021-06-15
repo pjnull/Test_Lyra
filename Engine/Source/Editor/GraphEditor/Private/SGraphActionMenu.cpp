@@ -279,6 +279,7 @@ void SGraphActionMenu::Construct( const FArguments& InArgs, bool bIsReadOnly/* =
 	this->SelectedSuggestion = INDEX_NONE;
 	this->bIgnoreUIUpdate = false;
 	this->bUseSectionStyling = InArgs._UseSectionStyling;
+	this->bAllowPreselectedItemActivation = InArgs._bAllowPreselectedItemActivation;
 
 	this->bAutoExpandActionMenu = InArgs._AutoExpandActionMenu;
 	this->bShowFilterTextBox = InArgs._ShowFilterTextBox;
@@ -911,7 +912,8 @@ TSharedRef<ITableRow> SGraphActionMenu::MakeWidget( TSharedPtr<FGraphActionNode>
 	{
 		TableRow = SNew(STableRow< TSharedPtr<FGraphActionNode> >, OwnerTable)
 			.OnDragDetected(this, &SGraphActionMenu::OnItemDragDetected)
-			.ShowSelection(!InItem->IsSeparator());
+			.ShowSelection(!InItem->IsSeparator())
+			.bAllowPreselectedItemActivation(bAllowPreselectedItemActivation);
 	}
 
 	TSharedPtr<SHorizontalBox> RowContainer;

@@ -120,6 +120,7 @@ public:
 		, _SortItemsRecursively(true)
 		, _ShowFilterTextBox(true)
 		, _UseSectionStyling(false)
+		, _bAllowPreselectedItemActivation(false)
 		, _GraphObj(nullptr)
 		{ }
 
@@ -144,6 +145,7 @@ public:
 		SLATE_ARGUMENT( bool, SortItemsRecursively )
 		SLATE_ARGUMENT( bool, ShowFilterTextBox )
 		SLATE_ARGUMENT( bool, UseSectionStyling )
+		SLATE_ARGUMENT( bool, bAllowPreselectedItemActivation )
 		SLATE_ARGUMENT( TArray<UEdGraphPin*>, DraggedFromPins )
 		SLATE_ARGUMENT( UEdGraph*, GraphObj )
 
@@ -197,6 +199,8 @@ protected:
 	bool bSortItemsRecursively;
 	/** Should the rows and sections be styled like the details panel? */
 	bool bUseSectionStyling;
+	/** Whether we allow pre-selected items to be activated with a left-click */
+	bool bAllowPreselectedItemActivation;
 	
 	/** Delegate to call when action is selected */
 	FOnActionSelected OnActionSelected;
