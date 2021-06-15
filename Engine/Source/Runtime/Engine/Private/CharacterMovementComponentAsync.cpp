@@ -4238,6 +4238,11 @@ bool FCharacterMovementComponentAsyncInput::IsFalling(const FCharacterMovementCo
 	return (Output.MovementMode == MOVE_Falling);// && UpdatedComponent;
 }
 
+bool FCharacterMovementComponentAsyncInput::IsFlying(const FCharacterMovementComponentAsyncOutput& Output) const
+{
+	return (Output.MovementMode == MOVE_Flying);// && UpdatedComponent;
+}
+
 bool FCharacterMovementComponentAsyncInput::IsMovingOnGround(const FCharacterMovementComponentAsyncOutput& Output) const
 {
 	return ((Output.MovementMode == MOVE_Walking) || (Output.MovementMode == MOVE_NavWalking));//&& UpdatedComponent;
@@ -4569,6 +4574,8 @@ void FCharacterMovementComponentAsyncOutput::Copy(const FCharacterMovementCompon
 	LastUpdateVelocity = Value.LastUpdateVelocity;
 	bForceNextFloorCheck = Value.bForceNextFloorCheck;
 	Velocity = Value.Velocity;
+	LastPreAdditiveVelocity = Value.LastPreAdditiveVelocity;
+	bIsAdditiveVelocityApplied = Value.bIsAdditiveVelocityApplied;
 	bDeferUpdateBasedMovement = Value.bDeferUpdateBasedMovement;
 	MoveComponentFlags = Value.MoveComponentFlags;
 	PendingForceToApply = Value.PendingForceToApply;
@@ -4586,6 +4593,7 @@ void FCharacterMovementComponentAsyncOutput::Copy(const FCharacterMovementCompon
 	bRequestedMoveWithMaxSpeed = Value.bRequestedMoveWithMaxSpeed;
 	RequestedVelocity = Value.RequestedVelocity;
 	NumJumpApexAttempts = Value.NumJumpApexAttempts;
+	AnimRootMotionVelocity = Value.AnimRootMotionVelocity;
 	bShouldApplyDeltaToMeshPhysicsTransforms = Value.bShouldApplyDeltaToMeshPhysicsTransforms;
 	DeltaPosition = Value.DeltaPosition;
 	DeltaQuat = Value.DeltaQuat;

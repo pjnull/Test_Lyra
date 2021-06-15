@@ -594,6 +594,7 @@ struct ENGINE_API FCharacterMovementComponentAsyncInput : public Chaos::FSimCall
 	virtual float GetMaxSpeed(FCharacterMovementComponentAsyncOutput& Output) const;
 	virtual bool IsCrouching(const FCharacterMovementComponentAsyncOutput& Output) const;
 	virtual bool IsFalling(const FCharacterMovementComponentAsyncOutput& Output) const;
+	virtual bool IsFlying(const FCharacterMovementComponentAsyncOutput& Output) const;
 	virtual bool IsMovingOnGround(const FCharacterMovementComponentAsyncOutput& Output) const;
 	virtual bool IsExceedingMaxSpeed(float MaxSpeed, const FCharacterMovementComponentAsyncOutput& Output) const;
 
