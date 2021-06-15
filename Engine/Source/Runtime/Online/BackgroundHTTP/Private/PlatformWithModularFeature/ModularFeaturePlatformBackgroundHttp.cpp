@@ -9,6 +9,8 @@
 #include "Misc/ConfigCacheIni.h"
 #include "Modules/ModuleManager.h"
 
+DEFINE_LOG_CATEGORY(LogBackgroundHttpModularFeature);
+
 IBackgroundHttpModularFeature* FModularFeaturePlatformBackgroundHttp::CachedModularFeature = nullptr;
 bool FModularFeaturePlatformBackgroundHttp::bHasCheckedForModularFeature = false;
 
@@ -106,20 +108,35 @@ void FModularFeaturePlatformBackgroundHttp::CacheModularFeature()
 			GConfig->GetString(TEXT("BackgroundHttp"), TEXT("PlatformModularFeatureName"), ModuleName, GEngineIni);
 		}
 
-		FModuleManager& ModuleManager = FModuleManager::Get();
-		if (ModuleManager.ModuleExists(*ModuleName) && (false == ModuleManager.IsModuleLoaded(*ModuleName)))
+		//If we don't have any expected module then we don't want to cache any modular features
+		if (ModuleName.IsEmpty())
 		{
-			ModuleManager.LoadModule(*ModuleName);
+			//Should still be nullptr but explicitly setting it here as a sanity check
+			CachedModularFeature = nullptr;
+			UE_LOG(LogBackgroundHttpModularFeature, Display, TEXT("BackgroundHttpModularFeature module not set, falling back to generic implementation."));
+			return;
 		}
 
-		const bool bIsModularFeatureAvailable = (IModularFeatures::Get().IsModularFeatureAvailable(GetModularFeatureName()));
-		if (bIsModularFeatureAvailable)
+		FModuleManager& ModuleManager = FModuleManager::Get();
+		const bool bDesiredModuleExists = ModuleName.IsEmpty() ? false : ModuleManager.ModuleExists(*ModuleName);
+		if (bDesiredModuleExists)
 		{
-			CachedModularFeature = &(IModularFeatures::Get().GetModularFeature<IBackgroundHttpModularFeature>(GetModularFeatureName()));
+			if (false == ModuleManager.IsModuleLoaded(*ModuleName))
+			{
+				ModuleManager.LoadModule(*ModuleName);
+			}
+		
+			if (IModularFeatures::Get().IsModularFeatureAvailable(GetModularFeatureName()))
+			{
+				CachedModularFeature = &(IModularFeatures::Get().GetModularFeature<IBackgroundHttpModularFeature>(GetModularFeatureName()));
+				UE_LOG(LogBackgroundHttpModularFeature, Display, TEXT("Using BackgroundHTTPModularFeature module: %s for ModularFeatureName: %s"), *CachedModularFeature->GetDebugModuleName(), *(GetModularFeatureName().ToString()));
+			}
+			else
+			{
+				UE_LOG(LogBackgroundHttpModularFeature, Error, TEXT("Module %s exists but is not available for ModularFeatureName: %s! Make sure it correctly registers itself as a modular feature when loaded!"), *ModuleName, *(GetModularFeatureName().ToString()));
+			}
 		}
-		else
-		{
-			ensureAlwaysMsgf((ModuleName.IsEmpty()), TEXT("Unable to load expected Module %s! BackgroundHttp will fallback to generic implementation!"));
-		}
+		
+		ensureAlwaysMsgf((CachedModularFeature != nullptr), TEXT("Unable to load expected BackgroundHttp ModularFeature module %s for ModularFeatureName: %s ! BackgroundHttp will fallback to generic implementation!"), *ModuleName, *(GetModularFeatureName().ToString()));
 	}
 }

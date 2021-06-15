@@ -26,6 +26,7 @@ public:
 	virtual FBackgroundHttpManagerPtr CreatePlatformBackgroundHttpManager() override;
 	virtual FBackgroundHttpRequestPtr ConstructBackgroundRequest() override;
 	virtual FBackgroundHttpResponsePtr ConstructBackgroundResponse(int32 ResponseCode, const FString& TempFilePath) override;
+	virtual FString GetDebugModuleName() const override;
 
 public:
 	//Handles registering / unregistering as a modular feature when appropriate

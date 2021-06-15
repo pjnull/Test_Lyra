@@ -34,12 +34,6 @@
 		<insertNewline/>
 	</minimumSDKAPI>
 	
-	<!-- optional additions to the GameActivity imports in GameActivity.java -->
-	<gameActivityImportAdditions>
-		<insert>
-		</insert>
-	</gameActivityImportAdditions>
-	
 	<!-- optional additions to the GameActivity class in GameActivity.java -->
 	<gameActivityClassAdditions>
 		<insert>

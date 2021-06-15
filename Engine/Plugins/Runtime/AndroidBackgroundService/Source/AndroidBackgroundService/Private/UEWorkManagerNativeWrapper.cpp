@@ -2,6 +2,19 @@
 
 #include "UEWorkManagerNativeWrapper.h"
 
+#include "Async/TaskGraphInterfaces.h"
+#include "Misc/CoreDelegates.h"
+#include "Misc/ConfigCacheIni.h"
+
+#include "Android/AndroidJNI.h"
+#include "Android/AndroidApplication.h"
+#include "Android/AndroidEventManager.h"
+
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+
+#include "HAL/PlatformFile.h"
+
 #include "UnrealEngine.h"
 
 #if USE_ANDROID_JNI

@@ -49,6 +49,11 @@ void FAndroidPlatformBackgroundHttpModularFeatureWrapper::UnregisterAsModularFea
 	}
 }
 
+FString FAndroidPlatformBackgroundHttpModularFeatureWrapper::GetDebugModuleName() const
+{
+	return TEXT("FAndroidPlatformBackgroundHttp");
+}
+
 bool FAndroidPlatformBackgroundHttpModularFeatureWrapper::AreRequirementsSupported()
 {
 #if USE_ANDROID_JNI

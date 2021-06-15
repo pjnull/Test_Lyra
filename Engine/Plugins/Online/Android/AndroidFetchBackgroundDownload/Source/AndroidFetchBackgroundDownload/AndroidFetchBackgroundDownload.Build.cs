@@ -8,13 +8,6 @@ namespace UnrealBuildTool.Rules
 	{
 		public AndroidFetchBackgroundDownload(ReadOnlyTargetRules Target) : base(Target)
 		{
-			//Can not depend on BackgroundHTTP module as our Startup needs to run before it's startup.
-			//This way we can still include the Android version of these interfaces
-			//PublicIncludePaths.AddRange(new string[]
-				//{
-				//	"Runtime/Online/BackgroundHTTP/Public/",
-				//});
-
 			PrivateDependencyModuleNames.AddRange(new string[]
 				{
 					"Core",

@@ -9,7 +9,11 @@
 
 #include "Interfaces/IBackgroundHttpRequest.h"
 
+#include "Logging/LogMacros.h"
+
 class IBackgroundHttpManager;
+
+DECLARE_LOG_CATEGORY_EXTERN(LogBackgroundHttpModularFeature, Log, All)
 
 /**
  * This version of BackgroundHttp is designed to be used by any platform that relies on a ModularFeature to override the BackgroundHttp behavior. 
@@ -24,4 +28,7 @@ public:
 	virtual FBackgroundHttpManagerPtr CreatePlatformBackgroundHttpManager() = 0;
 	virtual FBackgroundHttpRequestPtr ConstructBackgroundRequest() = 0;
 	virtual FBackgroundHttpResponsePtr ConstructBackgroundResponse(int32 ResponseCode, const FString& TempFilePath) = 0;
+	
+	//Should return the name of the Plugin/Module that causes this ModularFeature to be registered.
+	virtual FString GetDebugModuleName() const = 0;
 };

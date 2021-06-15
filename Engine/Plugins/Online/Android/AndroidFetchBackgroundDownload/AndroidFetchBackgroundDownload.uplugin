@@ -16,7 +16,7 @@
 		{
 			"Name": "AndroidFetchBackgroundDownload",
 			"Type": "RuntimeNoCommandlet",
-			"LoadingPhase": "PreEarlyLoadingScreen",
+			"LoadingPhase": "None",
 			"WhitelistPlatforms": [
 				"Android"
 			]
