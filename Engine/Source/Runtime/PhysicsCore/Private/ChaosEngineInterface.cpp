@@ -1006,6 +1006,16 @@ FPhysicsConstraintHandle FChaosEngineInterface::CreateConstraint(const FPhysicsA
 				JointConstraint->SetKinematicEndPoint(KinematicEndPoint, Scene->GetSolver());
 				ConstraintRef.Constraint = JointConstraint;
 
+			// Disable collision on shape to ensure it is not added to acceleration structure.
+			for (const TUniquePtr<Chaos::FPerShapeData>& Shape : KinematicEndPoint->ShapesArray())
+			{
+				Chaos::FCollisionData CollisionData = Shape->GetCollisionData();
+				CollisionData.bQueryCollision = false;
+				CollisionData.bSimCollision = false;
+				Shape->SetCollisionData(CollisionData);
+			}
+
+
 				JointConstraint->SetParticleProxies({ ValidParticle, KinematicEndPoint });
 
 				Chaos::FJointConstraint::FTransformPair TransformPair = { InLocalFrame1, InLocalFrame2 };
