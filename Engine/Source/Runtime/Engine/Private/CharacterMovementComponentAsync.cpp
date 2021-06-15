@@ -300,7 +300,7 @@ void FCharacterMovementComponentAsyncInput::PerformMovement(float DeltaSeconds, 
 					, *RootMotionParams.GetRootMotionTransform().GetRotation().Rotator().ToCompactString()
 					, *CharacterOwner->GetActorForwardVector().ToCompactString()
 					, *Velocity.ToCompactString()
-				);/**/
+				);*/
 			}
 			else
 			{
@@ -805,7 +805,7 @@ void FCharacterMovementComponentAsyncInput::PhysWalking(float deltaTime, int32 I
 		{
 			FString DebugMsg = FString::Printf(TEXT("Vel: %s"), *Output.Velocity.ToString());
 			GEngine->AddOnScreenDebugMessage(198907, 1.f, FColor::Blue, DebugMsg);
-		}/**/
+		}*/
 
 		if (bZeroDelta)
 		{
