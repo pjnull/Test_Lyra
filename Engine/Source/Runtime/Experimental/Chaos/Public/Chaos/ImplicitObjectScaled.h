@@ -629,8 +629,13 @@ public:
 	{
 		TRigidTransform<T, d> AToBTMNoScale(AToBTM.GetLocation() * MInvScale, AToBTM.GetRotation());
 
+		// Thickness is a culling distance which cannot be non-uniformly scaled. This gets passed into the ImplicitObject API unscaled so that
+		// if can do the right thing internally if possible, but it makes the API a little confusing. (This is only exists used TriMesh and Heightfield.)
+		// See FTriangleMeshImplicitObject::GJKContactPointImp
+		const FReal UnscaledThickness = Thickness;
+
 		auto ScaledA = MakeScaledHelper(A, MInvScale);
-		return MObject->GJKContactPoint(ScaledA, AToBTMNoScale, Thickness, Location, Normal, Penetration, MScale);
+		return MObject->GJKContactPoint(ScaledA, AToBTMNoScale, UnscaledThickness, Location, Normal, Penetration, MScale);
 	}
 
 	/** This is a low level function and assumes the internal object has a OverlapGeom function. Should not be called directly. See GeometryQueries.h : OverlapQuery */
