@@ -1458,7 +1458,7 @@ void FPackageStoreOptimizer::FindScriptObjects(const ITargetPlatform* TargetPlat
 	const EObjectMark ExcludedObjectMarks = GetExcludedObjectMarksForTargetPlatform(TargetPlatform);
 
 	TArray<UPackage*> ScriptPackages;
-	FindAllRuntimeScriptPackages(ScriptPackages, true);
+	FindAllRuntimeScriptPackages(ScriptPackages, TargetPlatform->AllowsEditorObjects());
 
 	TArray<UObject*> InnerObjects;
 	for (UPackage* Package : ScriptPackages)
