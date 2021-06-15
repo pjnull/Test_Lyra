@@ -10,6 +10,7 @@
 #include "Components/DMXPixelMappingMatrixCellComponent.h"
 #include "Components/DMXPixelMappingRootComponent.h"
 #include "Library/DMXEntityFixturePatch.h"
+#include "Modules/ModuleManager.h"
 #include "Toolkits/DMXPixelMappingToolkit.h"
 
 #include "DetailWidgetRow.h"
@@ -320,11 +321,14 @@ void FDMXPixelMappingDetailCustomization_Matrix::CreateModulatorDetails(IDetailL
 				{
 					FPropertyEditorModule& PropertyEditorModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>("PropertyEditor");
 
-					const bool bUpdateFromSelection = false;
-					const bool bLockable			= true;
-					const bool bAllowSearch			= false;
-					const bool bHidSelectionTip		= false;
-					const FDetailsViewArgs DetailsViewArgs(bUpdateFromSelection, bLockable, bAllowSearch, FDetailsViewArgs::HideNameArea, false);
+					FDetailsViewArgs DetailsViewArgs;
+					DetailsViewArgs.bUpdatesFromSelection = false;
+					DetailsViewArgs.bLockable = true;
+					DetailsViewArgs.bAllowSearch = false;
+					DetailsViewArgs.bHideSelectionTip = false;
+					DetailsViewArgs.NameAreaSettings = FDetailsViewArgs::HideNameArea;
+					DetailsViewArgs.bHideSelectionTip = false;
+					
 					TSharedRef<IDetailsView> DetailsView = PropertyEditorModule.CreateDetailView(DetailsViewArgs);
 					DetailsView->SetObjects(ModulatorsToEdit);
 

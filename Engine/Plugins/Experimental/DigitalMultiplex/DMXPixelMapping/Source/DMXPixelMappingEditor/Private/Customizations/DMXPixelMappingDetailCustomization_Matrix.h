@@ -12,6 +12,7 @@ class FDMXPixelMappingToolkit;
 class IPropertyHandle;
 class UDMXPixelMappingMatrixComponent;
 class UDMXEntityFixturePatch;
+class IPropertyUtilities;
 class ITableRow;
 class STableViewBase;
 struct FDMXCellAttributeGroup;
