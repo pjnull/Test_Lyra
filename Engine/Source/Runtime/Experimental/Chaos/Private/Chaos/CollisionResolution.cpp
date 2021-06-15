@@ -94,6 +94,9 @@ FAutoConsoleVariableRef CVarConstraintsDetailedStats(TEXT("p.Chaos.Constraints.D
 int32 AlwaysAddSweptConstraints = 0;
 FAutoConsoleVariableRef CVarAlwaysAddSweptConstraints(TEXT("p.Chaos.Constraints.AlwaysAddSweptConstraints"), AlwaysAddSweptConstraints, TEXT("Since GJKContactPointSwept returns infinity for it's contact data when not hitting anything, some contacts are discarded prematurely. This flag will cause contact points considered for sweeps to never be discarded."));
 
+int32 CCDAllowForceDisable = 1;
+FAutoConsoleVariableRef CVarCCDAllowForceDisable(TEXT("p.Chaos.CCD.AllowForceDisable"), CCDAllowForceDisable, TEXT("Allow force disable CCD."));
+
 bool bChaos_Collision_AllowLevelsetManifolds = false;
 FAutoConsoleVariableRef CVarChaosCollisionAllowLevelsetManifolds(TEXT("p.Chaos.Collision.AllowLevelsetManifolds"), bChaos_Collision_AllowLevelsetManifolds, TEXT("Use incremental manifolds for levelset-levelset collision. This does not work well atm - too much rotation in the small pieces"));
 
@@ -148,8 +151,13 @@ namespace Chaos
 		}
 
 		// Determines if body should use CCD. If using CCD, computes Dir and Length of sweep.
-		bool UseCCD(const TGeometryParticleHandle<FReal, 3>* SweptParticle, const TGeometryParticleHandle<FReal, 3>* OtherParticle, const FImplicitObject* Implicit, FVec3& Dir, FReal& Length)
+		bool UseCCD(const TGeometryParticleHandle<FReal, 3>* SweptParticle, const TGeometryParticleHandle<FReal, 3>* OtherParticle, const FImplicitObject* Implicit, FVec3& Dir, FReal& Length, const bool bForceDisableCCD)
 		{
+			if (CCDAllowForceDisable > 0 && bForceDisableCCD)
+			{
+				return false;
+			}
+
 			if (CCDOnlyConsiderDynamicStatic > 0 && OtherParticle->ObjectState() != EObjectStateType::Static)
 			{
 				return false;
@@ -2391,7 +2399,7 @@ namespace Chaos
 
 			FReal LengthCCD = 0.0f;
 			FVec3 DirCCD(0.0f);
-			bool bUseCCD = UseCCD(Particle0, Particle1, Implicit0, DirCCD, LengthCCD);
+			bool bUseCCD = UseCCD(Particle0, Particle1, Implicit0, DirCCD, LengthCCD, Context.bForceDisableCCD);
 			const bool bUseGenericSweptConstraints = bUseCCD && (CCDUseGenericSweptConvexConstraints > 0) && bIsConvex0 && bIsConvex1;
 #if CHAOS_COLLISION_CREATE_BOUNDSCHECK
 			if ((Implicit0 != nullptr) && (Implicit1 != nullptr))
