@@ -5,6 +5,10 @@
 #include "CoreMinimal.h"
 #include "Modules/ModuleManager.h"
 
+class FExtender;
+class FUICommandList;
+class AActor;
+
 class FLightWeightInstancesEditorModule : public IModuleInterface
 {
 public:
