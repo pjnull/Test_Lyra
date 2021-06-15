@@ -225,20 +225,28 @@ TSharedRef<SWidget> FNiagaraVariableAttributeBindingCustomization::OnGetMenuCont
 {
 	FGraphActionMenuBuilder MenuBuilder;
 
-	return SNew(SBorder)
+	TSharedPtr<SGraphActionMenu> GraphActionMenu;
+	
+	TSharedPtr<SWidget> Widget = SNew(SBorder)
 		.BorderImage(FEditorStyle::GetBrush("Menu.Background"))
 		.Padding(5)
 		[
 			SNew(SBox)
 			[
-				SNew(SGraphActionMenu)
+				SAssignNew(GraphActionMenu, SGraphActionMenu)
 				.OnActionSelected(const_cast<FNiagaraVariableAttributeBindingCustomization*>(this), &FNiagaraVariableAttributeBindingCustomization::OnActionSelected)
 				.OnCreateWidgetForAction(SGraphActionMenu::FOnCreateWidgetForAction::CreateSP(const_cast<FNiagaraVariableAttributeBindingCustomization*>(this), &FNiagaraVariableAttributeBindingCustomization::OnCreateWidgetForAction))
 				.OnCollectAllActions(const_cast<FNiagaraVariableAttributeBindingCustomization*>(this), &FNiagaraVariableAttributeBindingCustomization::CollectAllActions)
 				.AutoExpandActionMenu(false)
+				.bAllowPreselectedItemActivation(true)
 				.ShowFilterTextBox(true)
 			]
 		];
+
+	// the widget to focus is retrieved after this function is called via delegate, so setting it here works
+	ComboButton->SetMenuContentWidgetToFocus(GraphActionMenu->GetFilterTextBox());
+	
+	return Widget.ToSharedRef(); 
 }
 
 TArray<FName> FNiagaraVariableAttributeBindingCustomization::GetNames(UNiagaraEmitter* InEmitter) const
@@ -385,7 +393,7 @@ void FNiagaraVariableAttributeBindingCustomization::CustomizeHeader(TSharedRef<I
 
 	PropertyRow.OverrideResetToDefault(ResetOverride); */
 	InPropertyHandle->MarkResetToDefaultCustomized(true);
-
+	
 	if (Objects.Num() == 1)
 	{
 		RenderProps = Cast<UNiagaraRendererProperties>(Objects[0]);
@@ -410,7 +418,7 @@ void FNiagaraVariableAttributeBindingCustomization::CustomizeHeader(TSharedRef<I
 						.AutoWidth()
 						.Padding(0.0f, 0.0f, 4.0f, 0.0f)
 						[
-							SNew(SComboButton)
+							SAssignNew(ComboButton, SComboButton)					
 							.OnGetMenuContent(this, &FNiagaraVariableAttributeBindingCustomization::OnGetMenuContent)
 							.ContentPadding(1)
 							.ToolTipText(this, &FNiagaraVariableAttributeBindingCustomization::GetTooltipText)
