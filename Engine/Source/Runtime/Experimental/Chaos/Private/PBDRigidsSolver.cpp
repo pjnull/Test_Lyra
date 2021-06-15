@@ -886,6 +886,8 @@ namespace Chaos
 
 	void FPBDRigidsSolver::ProcessSinglePushedData_Internal(FPushPhysicsData& PushData)
 	{
+		QUICK_SCOPE_CYCLE_COUNTER(STAT_ProcessSinglePushedData_Internal);
+
 		FRewindData* RewindData = GetRewindData();
 
 		FDirtySet* DirtyProxiesData = &PushData.DirtyProxiesDataBuffer;
