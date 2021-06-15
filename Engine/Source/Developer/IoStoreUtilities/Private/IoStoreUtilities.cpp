@@ -1053,7 +1053,7 @@ void ProcessShaderLibraries(const FIoStoreArguments& Arguments, TArray<FContaine
 							ShaderTargetFile.ChunkId = ShaderChunkId;
 							ShaderTargetFile.ChunkType = EContainerChunkType::ShaderCode;
 							ShaderTargetFile.bForceUncompressed = true;
-							
+
 							FShaderInfo& ShaderInfo = Shaders.AddDefaulted_GetRef();
 							ShaderInfo.ChunkId = ShaderChunkId;
 							ShaderInfo.LibraryChunkId = TargetFile.ChunkId;
@@ -1065,7 +1065,7 @@ void ProcessShaderLibraries(const FIoStoreArguments& Arguments, TArray<FContaine
 							ShaderTargetFile.SourceBuffer.Emplace(*FindCodeIoBuffer);
 							ShaderTargetFile.SourceSize = FindCodeIoBuffer->DataSize();
 							ShaderInfo.Size = FindCodeIoBuffer->DataSize();
-							
+
 							AddedShaderChunkIds.Add(ShaderChunkId);
 						}
 					}
@@ -1075,9 +1075,9 @@ void ProcessShaderLibraries(const FIoStoreArguments& Arguments, TArray<FContaine
 		}
 
 		check(ShaderTargetFiles.Num() == Shaders.Num());
-		
+
 		if (ShaderTargetFiles.Num() == 0)
-		{
+		{ 
 			continue;
 		}
 
@@ -2038,7 +2038,7 @@ int32 CreateTarget(const FIoStoreArguments& Arguments, const FIoStoreWriterSetti
 		ImportedPackagesCount += PackageImportedPackagesCount;
 		NoImportedPackagesCount += PackageImportedPackagesCount == 0;
 	}
-	
+
 	uint64 GlobalShaderSize = 0;
 	uint64 SharedShaderSize = 0;
 	uint64 UniqueShaderSize = 0;

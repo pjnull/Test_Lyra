@@ -19,8 +19,8 @@ DEFINE_LOG_CATEGORY_STATIC(LogPackageStoreOptimizer, Log, All);
 // modified copy from SavePackage
 EObjectMark GetExcludedObjectMarksForTargetPlatform(const ITargetPlatform* TargetPlatform)
 {
-	EObjectMark Marks = OBJECTMARK_NOMARKS;
-	if (!TargetPlatform->HasEditorOnlyData())
+	EObjectMark Marks = OBJECTMARK_NotForTargetPlatform;
+	if (!TargetPlatform->AllowEditorOnlyObjects())
 	{
 		Marks = (EObjectMark)(Marks | OBJECTMARK_EditorOnly);
 	}
@@ -47,10 +47,12 @@ EObjectMark GetExcludedObjectMarksForObject(const UObject* Object, const ITarget
 	{
 		Marks = (EObjectMark)(Marks | OBJECTMARK_NotForServer);
 	}
-	if (!Object->NeedsLoadForTargetPlatform(TargetPlatform))
+#if WITH_ENGINE
+	if (!Object->NeedsLoadForTargetPlatform(TargetPlatform) || !TargetPlatform->AllowObject(Object))
 	{
-		Marks = (EObjectMark)(Marks | OBJECTMARK_NotForClient | OBJECTMARK_NotForServer);
+		Marks = (EObjectMark)(Marks | OBJECTMARK_NotForTargetPlatform);
 	}
+#endif
 	if (Object->IsEditorOnly())
 	{
 		Marks = (EObjectMark)(Marks | OBJECTMARK_EditorOnly);

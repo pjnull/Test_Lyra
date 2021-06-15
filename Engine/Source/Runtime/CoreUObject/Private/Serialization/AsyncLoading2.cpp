@@ -173,18 +173,21 @@ uint64 FPackageObjectIndex::GenerateImportHashFromObjectPath(const FStringView& 
 	return Hash;
 }
 
-void FindAllRuntimeScriptPackages(TArray<UPackage*>& OutPackages)
+void FindAllRuntimeScriptPackages(TArray<UPackage*>& OutPackages, bool bAllowEditorOnlyPackages)
 {
 	OutPackages.Empty(256);
-	ForEachObjectOfClass(UPackage::StaticClass(), [&OutPackages](UObject* InPackageObj)
+	ForEachObjectOfClass(UPackage::StaticClass(), [&OutPackages, bAllowEditorOnlyPackages](UObject* InPackageObj)
 	{
 		UPackage* Package = CastChecked<UPackage>(InPackageObj);
-		if (Package->HasAnyPackageFlags(PKG_CompiledIn) && !Package->HasAnyPackageFlags(PKG_EditorOnly))
+		if (Package->HasAnyPackageFlags(PKG_CompiledIn))
 		{
-			TCHAR Buffer[FName::StringBufferSize];
-			if (FStringView(Buffer, Package->GetFName().ToString(Buffer)).StartsWith(TEXT("/Script/"), ESearchCase::CaseSensitive))
+			if (!Package->HasAnyPackageFlags(PKG_EditorOnly) || bAllowEditorOnlyPackages)
 			{
-				OutPackages.Add(Package);
+				TCHAR Buffer[FName::StringBufferSize];
+				if (FStringView(Buffer, Package->GetFName().ToString(Buffer)).StartsWith(TEXT("/Script/"), ESearchCase::CaseSensitive))
+				{
+					OutPackages.Add(Package);
+				}
 			}
 		}
 	}, /*bIncludeDerivedClasses*/false);
@@ -3115,7 +3118,7 @@ void FGlobalImportStore::FindAllScriptObjects()
 	TStringBuilder<FName::StringBufferSize> Name;
 	TArray<UPackage*> ScriptPackages;
 	TArray<UObject*> Objects;
-	FindAllRuntimeScriptPackages(ScriptPackages);
+	FindAllRuntimeScriptPackages(ScriptPackages, WITH_IOSTORE_IN_EDITOR);
 
 	for (UPackage* Package : ScriptPackages)
 	{

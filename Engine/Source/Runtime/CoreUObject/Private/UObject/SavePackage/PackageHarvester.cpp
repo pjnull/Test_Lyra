@@ -7,6 +7,7 @@
 #include "UObject/SavePackage/SavePackageUtilities.h"
 #include "UObject/UObjectGlobals.h"
 #include "UObject/UObjectHash.h"
+#include "Interfaces/ITargetPlatform.h"
 
 // bring the UObectGlobal declaration visible to non editor
 bool IsEditorOnlyObject(const UObject* InObject, bool bCheckRecursive, bool bCheckMarks);
@@ -30,11 +31,13 @@ EObjectMark GenerateMarksForObject(const UObject* InObject, const ITargetPlatfor
 	{
 		Marks = (EObjectMark)(Marks | OBJECTMARK_NotForServer);
 	}
-
-	if ((!(Marks & OBJECTMARK_NotForServer) || !(Marks & OBJECTMARK_NotForClient)) && TargetPlatform && !InObject->NeedsLoadForTargetPlatform(TargetPlatform))
+#if WITH_ENGINE
+	if (TargetPlatform && (!InObject->NeedsLoadForTargetPlatform(TargetPlatform) || !TargetPlatform->AllowObject(InObject)))
 	{
-		Marks = (EObjectMark)(Marks | OBJECTMARK_NotForClient | OBJECTMARK_NotForServer);
+		Marks = (EObjectMark)(Marks | OBJECTMARK_NotForTargetPlatform);
 	}
+#endif
+	
 	// CDOs must be included if their class is so only inherit marks, for everything else we check the native overrides as well
 	if (IsEditorOnlyObject(InObject, false, false))
 	{

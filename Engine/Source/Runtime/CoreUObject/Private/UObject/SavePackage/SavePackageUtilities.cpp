@@ -396,7 +396,10 @@ void CheckObjectPriorToSave(FArchiveUObject& Ar, UObject* InObj, UPackage* InSav
  */
 EObjectMark GetExcludedObjectMarksForTargetPlatform(const class ITargetPlatform* TargetPlatform)
 {
-	EObjectMark ObjectMarks = OBJECTMARK_NOMARKS;
+	// we always want to exclude NotForTargetPlatform (in other words, later on, the target platform
+	// can mark an object as NotForTargetPlatform, and then this will exlude that object and anything
+	// inside it, from being saved out)
+	EObjectMark ObjectMarks = OBJECTMARK_NotForTargetPlatform;
 
 	if (TargetPlatform)
 	{
@@ -441,7 +444,7 @@ void ConditionallyExcludeObjectForTarget(UObject* Obj, EObjectMark ExcludedObjec
 	};
 
 	// MarksToProcess is a superset of marks retrieved from UPackage::GetExcludedObjectMarksForTargetPlatform
-	const uint32 MarksToProcess = OBJECTMARK_EditorOnly | OBJECTMARK_NotForClient | OBJECTMARK_NotForServer | OBJECTMARK_KeepForTargetPlatform;
+	const uint32 MarksToProcess = OBJECTMARK_INHERITEDMARKS;
 	check((ExcludedObjectMarks & ~MarksToProcess) == 0);
 
 	EObjectMark CurrentMarks = OBJECTMARK_NOMARKS;
@@ -460,12 +463,12 @@ void ConditionallyExcludeObjectForTarget(UObject* Obj, EObjectMark ExcludedObjec
 
 	// Recurse into parents, then compute inherited marks
 	ConditionallyExcludeObjectForTarget(ObjClass, ExcludedObjectMarks, TargetPlatform);
-	InheritMarks(NewMarks, ObjClass, OBJECTMARK_EditorOnly | OBJECTMARK_NotForClient | OBJECTMARK_NotForServer);
+	InheritMarks(NewMarks, ObjClass, OBJECTMARK_INHERITEDMARKS);
 
 	if (ObjOuter)
 	{
 		ConditionallyExcludeObjectForTarget(ObjOuter, ExcludedObjectMarks, TargetPlatform);
-		InheritMarks(NewMarks, ObjOuter, OBJECTMARK_EditorOnly | OBJECTMARK_NotForClient | OBJECTMARK_NotForServer);
+		InheritMarks(NewMarks, ObjOuter, OBJECTMARK_INHERITEDMARKS);
 	}
 
 	// Check parent struct if we have one
@@ -474,7 +477,7 @@ void ConditionallyExcludeObjectForTarget(UObject* Obj, EObjectMark ExcludedObjec
 	{
 		UObject* SuperStruct = ThisStruct->GetSuperStruct();
 		ConditionallyExcludeObjectForTarget(SuperStruct, ExcludedObjectMarks, TargetPlatform);
-		InheritMarks(NewMarks, SuperStruct, OBJECTMARK_EditorOnly | OBJECTMARK_NotForClient | OBJECTMARK_NotForServer);
+		InheritMarks(NewMarks, SuperStruct, OBJECTMARK_INHERITEDMARKS);
 	}
 
 	// Check archetype, this may not have been covered in the case of components
@@ -482,7 +485,7 @@ void ConditionallyExcludeObjectForTarget(UObject* Obj, EObjectMark ExcludedObjec
 	if (Archetype)
 	{
 		ConditionallyExcludeObjectForTarget(Archetype, ExcludedObjectMarks, TargetPlatform);
-		InheritMarks(NewMarks, Archetype, OBJECTMARK_EditorOnly | OBJECTMARK_NotForClient | OBJECTMARK_NotForServer);
+		InheritMarks(NewMarks, Archetype, OBJECTMARK_INHERITEDMARKS);
 	}
 
 	if (!Obj->HasAnyFlags(RF_ClassDefaultObject))
@@ -503,9 +506,9 @@ void ConditionallyExcludeObjectForTarget(UObject* Obj, EObjectMark ExcludedObjec
 			NewMarks = (EObjectMark)(NewMarks | OBJECTMARK_NotForServer);
 		}
 
-		if ((!(NewMarks & OBJECTMARK_NotForServer) || !(NewMarks & OBJECTMARK_NotForClient)) && TargetPlatform && !Obj->NeedsLoadForTargetPlatform(TargetPlatform))
+		if (TargetPlatform != nullptr && (!Obj->NeedsLoadForTargetPlatform(TargetPlatform) || !TargetPlatform->AllowObject(Obj)))
 		{
-			NewMarks = (EObjectMark)(NewMarks | OBJECTMARK_NotForClient | OBJECTMARK_NotForServer);
+			NewMarks = (EObjectMark)(NewMarks | OBJECTMARK_NotForTargetPlatform);
 		}
 	}
 
@@ -513,12 +516,6 @@ void ConditionallyExcludeObjectForTarget(UObject* Obj, EObjectMark ExcludedObjec
 	if ((NewMarks & OBJECTMARK_NotForClient) && (NewMarks & OBJECTMARK_NotForServer))
 	{
 		NewMarks = (EObjectMark)(NewMarks | OBJECTMARK_EditorOnly);
-	}
-
-	// If not excluded after a full set of tests, it is implicitly a keep
-	if (NewMarks == 0)
-	{
-		NewMarks = OBJECTMARK_KeepForTargetPlatform;
 	}
 
 	// If our marks are different than original, set them on the object

@@ -2175,6 +2175,12 @@ bool FBlueprintEditorUtils::IsCompileOnLoadDisabled(UBlueprint* Blueprint)
 	{
 		bCompilationDisabled = (Blueprint->GetLinker()->LoadFlags & LOAD_DisableCompileOnLoad) != LOAD_None;
 	}
+	// if the blueprint's package was cooked for editor builds we cannot recompile it as duplication will crash and since
+	// it's already cooked, if will already be up to date (likely they shouldn't exist, but in case they do we need to make them work)
+	if (Blueprint->GetOutermost()->bIsCookedForEditor)
+	{
+		return true;
+	}
 	return bCompilationDisabled;
 }
 
