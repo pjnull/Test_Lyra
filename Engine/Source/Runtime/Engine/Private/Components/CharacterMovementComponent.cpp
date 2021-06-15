@@ -12165,7 +12165,7 @@ void UCharacterMovementComponent::AccumulateRootMotionForAsync(float DeltaSecond
 				if (SkelMeshComp)
 				{
 					// Convert Local Space Root Motion to world space. Do it right before used by physics to make sure we use up to date transforms, as translation is relative to rotation.
-					RootMotionParams.Set(ConvertLocalRootMotionToWorld(RootMotionParams.GetRootMotionTransform()));
+					RootMotionParams.Set(ConvertLocalRootMotionToWorld(RootMotionParams.GetRootMotionTransform(), DeltaSeconds));
 					RootMotion.AnimTransform.Accumulate(RootMotionParams.GetRootMotionTransform());
 				}
 			}
