@@ -73,7 +73,11 @@ DECLARE_CYCLE_STAT(TEXT("Collisions::UpdateCapsuleTriangleMeshConstraintSwept"),
 DECLARE_CYCLE_STAT(TEXT("Collisions::UpdateConvexHeightFieldConstraintSwept"), STAT_Collisions_UpdateConvexHeightFieldConstraintSwept, STATGROUP_ChaosCollision);
 DECLARE_CYCLE_STAT(TEXT("Collisions::UpdateLevelsetLevelsetConstraint"), STAT_UpdateLevelsetLevelsetConstraint, STATGROUP_ChaosCollision);
 
-
+// Stat Collision counters (need to be reset every advance)
+DECLARE_DWORD_ACCUMULATOR_STAT(TEXT("NumParticlePairs"), STAT_ChaosCollisionCounter_NumParticlePairs, STATGROUP_ChaosCollisionCounters);
+DECLARE_DWORD_ACCUMULATOR_STAT(TEXT("NumShapePairs"), STAT_ChaosCollisionCounter_NumShapePairs, STATGROUP_ChaosCollisionCounters);
+DECLARE_DWORD_ACCUMULATOR_STAT(TEXT("NumContactsCreated"), STAT_ChaosCollisionCounter_NumContactsCreated, STATGROUP_ChaosCollisionCounters);
+DECLARE_DWORD_ACCUMULATOR_STAT(TEXT("NumContactUpdates"), STAT_ChaosCollisionCounter_NumContactUpdates, STATGROUP_ChaosCollisionCounters);
 
 
 Chaos::FRealSingle CCDEnableThresholdBoundsScale = 0.4f;
@@ -122,6 +126,13 @@ namespace Chaos
 {
 	namespace Collisions
 	{
+		void ResetChaosCollisionCounters()
+		{
+			SET_DWORD_STAT(STAT_ChaosCollisionCounter_NumParticlePairs, 0);
+			SET_DWORD_STAT(STAT_ChaosCollisionCounter_NumShapePairs, 0);
+			SET_DWORD_STAT(STAT_ChaosCollisionCounter_NumContactsCreated, 0);
+			SET_DWORD_STAT(STAT_ChaosCollisionCounter_NumContactUpdates, 0);
+		}
 
 		// Traits to control how contacts are generated
 		template<bool B_IMMEDIATEUPDATE>
@@ -2171,6 +2182,7 @@ namespace Chaos
 				}
 			}
 
+			INC_DWORD_STAT(STAT_ChaosCollisionCounter_NumContactUpdates);
 
 			switch (Constraint.Manifold.ShapesType)
 			{
@@ -2303,6 +2315,8 @@ namespace Chaos
 
 			TGeometryParticleHandle<FReal, 3>* Particle0 = Constraint.Particle[0];
 
+			INC_DWORD_STAT(STAT_ChaosCollisionCounter_NumContactUpdates);
+
 			if (bUseCCD)
 			{
 				switch (Constraint.Manifold.ShapesType)
@@ -2390,6 +2404,7 @@ namespace Chaos
 		void ConstructConstraintsImpl(TGeometryParticleHandle<FReal, 3>* Particle0, TGeometryParticleHandle<FReal, 3>* Particle1, const FImplicitObject* Implicit0, const FBVHParticles* Simplicial0, const FImplicitObject* Implicit1, const FBVHParticles* Simplicial1, const FRigidTransform3& LocalTransform0, const FRigidTransform3& LocalTransform1, const FReal CullDistance, const FReal Dt, const FCollisionContext& Context, FCollisionConstraintsArray& NewConstraints)
 		{
 			CONDITIONAL_SCOPE_CYCLE_COUNTER(STAT_Collisions_ConstructConstraintsInternal, ConstraintsDetailedStats);
+			INC_DWORD_STAT(STAT_ChaosCollisionCounter_NumShapePairs);
 
 			// @todo(chaos): We use GetInnerType here because TriMeshes are left with their "Instanced" wrapper, unlike all other instanced implicits. Should we strip the instance on Tri Mesh too?
 			EImplicitObjectType Implicit0Type = Implicit0 ? GetInnerType(Implicit0->GetCollisionType()) : ImplicitObjectType::Unknown;
@@ -2434,6 +2449,8 @@ namespace Chaos
 				}
 			}
 #endif
+
+			INC_DWORD_STAT(STAT_ChaosCollisionCounter_NumContactsCreated);
 
 			if (Implicit0Type == TBox<FReal, 3>::StaticType() && Implicit1Type == TBox<FReal, 3>::StaticType() && !bUseGenericSweptConstraints)
 			{
@@ -2944,15 +2961,13 @@ namespace Chaos
 
 		void ConstructConstraints(TGeometryParticleHandle<FReal, 3>* Particle0, TGeometryParticleHandle<FReal, 3>* Particle1, const FImplicitObject* Implicit0, const FBVHParticles* Simplicial0, const FImplicitObject* Implicit1, const FBVHParticles* Simplicial1, const FRigidTransform3& LocalTransform0, const FRigidTransform3& LocalTransform1, const FReal CullDistance, const FReal dT, const FCollisionContext& Context, FCollisionConstraintsArray& NewConstraints)
 		{
+			INC_DWORD_STAT(STAT_ChaosCollisionCounter_NumParticlePairs);
+
 			bool bDeferUpdate = Context.bDeferUpdate;
 			// Skip constraint update for sleeping particles
 			if(Particle0 && Particle1)
 			{
-				TPBDRigidParticleHandle<FReal, 3>* RigidParticle0 = Particle0->CastToRigidParticle(), *RigidParticle1 = Particle1->CastToRigidParticle();
-				if(RigidParticle0 && RigidParticle1)
-				{
-					bDeferUpdate |= (RigidParticle0->ObjectState() == EObjectStateType::Sleeping) || (RigidParticle1->ObjectState() == EObjectStateType::Sleeping);
-				}
+				bDeferUpdate |= (Particle0->ObjectState() == EObjectStateType::Sleeping) || (Particle1->ObjectState() == EObjectStateType::Sleeping);
 			}
 			if (bDeferUpdate)
 			{
