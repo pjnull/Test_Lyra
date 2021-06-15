@@ -2296,7 +2296,7 @@ namespace Chaos
 		{
 			FReal LengthCCD = 0.0f;
 			FVec3 DirCCD(0.0f);
-			bool bUseCCD = UseCCD(Constraint.Particle[0], Constraint.Particle[1], Constraint.GetManifold().Implicit[0], DirCCD, LengthCCD);
+			bool bUseCCD = UseCCD(Constraint.Particle[0], Constraint.Particle[1], Constraint.GetManifold().Implicit[0], DirCCD, LengthCCD, false);
 
 			const FImplicitObject& Implicit0 = *Constraint.Manifold.Implicit[0];
 			const FImplicitObject& Implicit1 = *Constraint.Manifold.Implicit[1];
