@@ -246,14 +246,17 @@ static TOptional<WindowsRHI> ChooseForcedRHI()
 		if (ForcedRHI == WindowsRHI::OpenGL)
 		{
 			FMessageDialog::Open(EAppMsgType::Ok, NSLOCTEXT("WindowsDynamicRHI", "RHIPerformanceOpenGL", "OpenGL is not supported for Performance Mode."));
+			UE_LOG(LogRHI, Fatal, TEXT("OpenGL is not supported for Performance Mode."));
 		}
 		else if (ForcedRHI == WindowsRHI::Vulkan)
 		{
 			FMessageDialog::Open(EAppMsgType::Ok, NSLOCTEXT("WindowsDynamicRHI", "RHIPerformanceVulkan", "Vulkan is not supported for Performance Mode."));
+			UE_LOG(LogRHI, Fatal, TEXT("Vulkan is not supported for Performance Mode."));
 		}
 		else if (ForcedRHI == WindowsRHI::D3D12 && !AllowD3D12FeatureLevelES31())
 		{
 			FMessageDialog::Open(EAppMsgType::Ok, NSLOCTEXT("WindowsDynamicRHI", "RHIPerformanceDX12", "DirectX 12 is not supported for Performance Mode."));
+			UE_LOG(LogRHI, Fatal, TEXT("DirectX 12 is not supported for Performance Mode."));
 		}
 	}
 
