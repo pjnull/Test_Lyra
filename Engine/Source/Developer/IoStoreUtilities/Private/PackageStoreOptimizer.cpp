@@ -20,7 +20,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogPackageStoreOptimizer, Log, All);
 EObjectMark GetExcludedObjectMarksForTargetPlatform(const ITargetPlatform* TargetPlatform)
 {
 	EObjectMark Marks = OBJECTMARK_NotForTargetPlatform;
-	if (!TargetPlatform->AllowEditorOnlyObjects())
+	if (!TargetPlatform->AllowsEditorObjects())
 	{
 		Marks = (EObjectMark)(Marks | OBJECTMARK_EditorOnly);
 	}
@@ -1458,7 +1458,7 @@ void FPackageStoreOptimizer::FindScriptObjects(const ITargetPlatform* TargetPlat
 	const EObjectMark ExcludedObjectMarks = GetExcludedObjectMarksForTargetPlatform(TargetPlatform);
 
 	TArray<UPackage*> ScriptPackages;
-	FindAllRuntimeScriptPackages(ScriptPackages);
+	FindAllRuntimeScriptPackages(ScriptPackages, true);
 
 	TArray<UObject*> InnerObjects;
 	for (UPackage* Package : ScriptPackages)
