@@ -2108,7 +2108,17 @@ int32 BuildPSOSC(const TArray<FString>& Tokens)
 
 	if (PSOs.Num() < 1)
 	{
-		UE_LOG(LogShaderPipelineCacheTools, Warning, TEXT("No PSOs were created!"));
+		// Previously, this commandlet was run only when we had stable cache files, so not creating any PSO was definitely a warning.
+		// Now, we add some PSOs cook-time, so it is run pretty much always, including when there are no recorded stable files. Do not
+		// issue a warning if cook-time addition resulted in no PSOs, and continue to issue in the case we had recorded files.
+		if (StablePipelineCacheFiles.Num() > 0)
+		{
+			UE_LOG(LogShaderPipelineCacheTools, Warning, TEXT("No PSOs were created!"));
+		}
+		else
+		{
+			UE_LOG(LogShaderPipelineCacheTools, Display, TEXT("No PSOs were created."));
+		}
 		return 0;
 	}
 
