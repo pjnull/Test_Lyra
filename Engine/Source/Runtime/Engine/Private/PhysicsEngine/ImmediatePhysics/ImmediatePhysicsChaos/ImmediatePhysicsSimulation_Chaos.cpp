@@ -308,6 +308,7 @@ namespace ImmediatePhysics_Chaos
 		// RBAN collision customization
 		Implementation->Collisions.DisableHandles();
 		Implementation->Collisions.SetSolverType(EConstraintSolverType::StandardPbd);
+		Implementation->Joints.SetSolverType(EConstraintSolverType::StandardPbd);
 		Implementation->NarrowPhase.GetContext().bFilteringEnabled = false;
 		Implementation->NarrowPhase.GetContext().bDeferUpdate = true;
 		Implementation->NarrowPhase.GetContext().bAllowManifolds = false;
@@ -807,8 +808,7 @@ namespace ImmediatePhysics_Chaos
 			Implementation->NarrowPhase.GetContext().bAllowManifolds = (ChaosImmediate_Collision_UseManifolds != 0);
 
 			Implementation->Collisions.SetSolverType((EConstraintSolverType)ChaosImmediate_SolverType);
-			// @todo(chaos): implement solver type switching for joints
-			//Implementation->Joints.SetSolverType((EConstraintSolverType)ChaosImmediate_SolverType);
+			Implementation->Joints.SetSolverType((EConstraintSolverType)ChaosImmediate_SolverType);
 
 			if (ChaosImmediate_Evolution_StepTime > 0)
 			{

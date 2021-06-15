@@ -333,6 +333,7 @@ namespace Chaos
 		, bUpdateVelocityInApplyConstraints(false)
 		, PreApplyCallback(nullptr)
 		, PostApplyCallback(nullptr)
+		, SolverType(EConstraintSolverType::GbfPbd)
 	{
 	}
 
@@ -1365,6 +1366,7 @@ namespace Chaos
 		{
 			UE_LOG(LogChaosJoint, VeryVerbose, TEXT("  Pair Iteration %d / %d"), PairIt, NumPairIts);
 
+			// This is the same for all SolverType settings (which makes it wrong for the GbfPbd version)
 			Solver.ApplyConstraints(Dt, Settings, JointSettings);
 
 			if (!Solver.GetIsActive() && bChaos_Joint_EarlyOut_Enabled)
@@ -1434,7 +1436,18 @@ namespace Chaos
 
 		for (int32 PairIt = 0; PairIt < NumPairIts; ++PairIt)
 		{
-			Solver.ApplyProjections(Dt, Settings, JointSettings);
+			switch(SolverType)
+			{
+			case EConstraintSolverType::None:
+				break;
+			case EConstraintSolverType::GbfPbd:
+			case EConstraintSolverType::StandardPbd:
+				Solver.ApplyProjections(Dt, Settings, JointSettings);
+				break;
+			case EConstraintSolverType::QuasiPbd:
+				Solver.ApplyVelocityConstraints(Dt, Settings, JointSettings);
+				break;
+			}
 
 			if (!Solver.GetIsActive() && bChaos_Joint_EarlyOut_Enabled)
 			{

@@ -754,8 +754,7 @@ namespace Chaos
 		// Apply CVAR overrides if set
 		{
 			GetEvolution()->GetCollisionConstraints().SetSolverType((EConstraintSolverType)ChaosSolver_SolverType);
-			// @todo(chaos): implement solver type switching for joints
-			//GetJointConstraints().SetSolverType((EConstraintSolverType)ChaosImmediate_SolverType);
+			GetJointConstraints().SetSolverType((EConstraintSolverType)ChaosSolver_SolverType);
 
 			if (ChaosSolverIterations >= 0)
 			{

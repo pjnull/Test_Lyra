@@ -123,6 +123,11 @@ namespace Chaos
 			const FPBDJointSolverSettings& SolverSettings,
 			const FPBDJointSettings& JointSettings);
 
+		void ApplyVelocityConstraints(
+			const FReal Dt,
+			const FPBDJointSolverSettings& SolverSettings,
+			const FPBDJointSettings& JointSettings);
+
 		void ApplyProjections(
 			const FReal Dt,
 			const FPBDJointSolverSettings& SolverSettings,
@@ -158,6 +163,16 @@ namespace Chaos
 			const FPBDJointSettings& JointSettings);
 
 		void ApplyRotationDrives(
+			const FReal Dt,
+			const FPBDJointSolverSettings& SolverSettings,
+			const FPBDJointSettings& JointSettings);
+
+		void ApplyLinearVelocityConstraints(
+			const FReal Dt,
+			const FPBDJointSolverSettings& SolverSettings,
+			const FPBDJointSettings& JointSettings);
+
+		void ApplyAngularVelocityConstraints(
 			const FReal Dt,
 			const FPBDJointSolverSettings& SolverSettings,
 			const FPBDJointSettings& JointSettings);
@@ -445,6 +460,12 @@ namespace Chaos
 			const FReal Alpha,
 			const FVec3& DP1,
 			const FVec3& DR1);
+
+		void ApplyPointVelocityConstraint(
+			const FReal Dt,
+			const FPBDJointSolverSettings& SolverSettings,
+			const FPBDJointSettings& JointSettings);
+
 
 		void CalculateLinearConstraintPadding(
 			const FReal Dt,
