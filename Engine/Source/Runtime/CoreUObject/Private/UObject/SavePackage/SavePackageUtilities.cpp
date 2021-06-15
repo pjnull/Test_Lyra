@@ -506,7 +506,19 @@ void ConditionallyExcludeObjectForTarget(UObject* Obj, EObjectMark ExcludedObjec
 			NewMarks = (EObjectMark)(NewMarks | OBJECTMARK_NotForServer);
 		}
 
-		if (TargetPlatform != nullptr && (!Obj->NeedsLoadForTargetPlatform(TargetPlatform) || !TargetPlatform->AllowObject(Obj)))
+		bool bCheckTargetPlatform = false;
+		if (TargetPlatform != nullptr)
+		{
+			// NotForServer && NotForClient implies EditorOnly
+			const bool bIsEditorOnlyObject = (NewMarks & OBJECTMARK_NotForServer) && (NewMarks & OBJECTMARK_NotForClient);
+			const bool bTargetAllowsEditorObjects = TargetPlatform->AllowsEditorObjects();
+
+			// no need to query the target platform if the object is editoronly and the targetplatform doesn't allow editor objects 
+			// @note: this was done in large part fo avoid a warning in SceneComponentNeedsLoadForTarget() caused by editor only object
+			// that contains non-editoronly inners, but that warning should probably allow for this valid setup
+			bCheckTargetPlatform = !bIsEditorOnlyObject || bTargetAllowsEditorObjects;
+		}
+		if (bCheckTargetPlatform && (!Obj->NeedsLoadForTargetPlatform(TargetPlatform) || !TargetPlatform->AllowObject(Obj)))
 		{
 			NewMarks = (EObjectMark)(NewMarks | OBJECTMARK_NotForTargetPlatform);
 		}

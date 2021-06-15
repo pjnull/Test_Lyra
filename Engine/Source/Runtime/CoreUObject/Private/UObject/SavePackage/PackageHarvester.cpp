@@ -32,7 +32,17 @@ EObjectMark GenerateMarksForObject(const UObject* InObject, const ITargetPlatfor
 		Marks = (EObjectMark)(Marks | OBJECTMARK_NotForServer);
 	}
 #if WITH_ENGINE
-	if (TargetPlatform && (!InObject->NeedsLoadForTargetPlatform(TargetPlatform) || !TargetPlatform->AllowObject(InObject)))
+	bool bCheckTargetPlatform = false;
+	if (TargetPlatform != nullptr)
+	{
+		// NotForServer && NotForClient implies EditorOnly
+		const bool bIsEditorOnlyObject = (Marks & OBJECTMARK_NotForServer) && (Marks & OBJECTMARK_NotForClient);
+		const bool bTargetAllowsEditorObjects = TargetPlatform->AllowsEditorObjects();
+		
+		// no need to query the target platform if the object is editoronly and the targetplatform doesn't allow editor objects 
+		bCheckTargetPlatform = !bIsEditorOnlyObject || bTargetAllowsEditorObjects;
+	}
+	if (bCheckTargetPlatform && (!InObject->NeedsLoadForTargetPlatform(TargetPlatform) || !TargetPlatform->AllowObject(InObject)))
 	{
 		Marks = (EObjectMark)(Marks | OBJECTMARK_NotForTargetPlatform);
 	}

@@ -48,7 +48,13 @@ EObjectMark GetExcludedObjectMarksForObject(const UObject* Object, const ITarget
 		Marks = (EObjectMark)(Marks | OBJECTMARK_NotForServer);
 	}
 #if WITH_ENGINE
-	if (!Object->NeedsLoadForTargetPlatform(TargetPlatform) || !TargetPlatform->AllowObject(Object))
+	// NotForServer && NotForClient implies EditorOnly
+	const bool bIsEditorOnlyObject = (Marks & OBJECTMARK_NotForServer) && (Marks & OBJECTMARK_NotForClient);
+	const bool bTargetAllowsEditorObjects = TargetPlatform->AllowsEditorObjects();
+
+	// no need to query the target platform if the object is editoronly and the targetplatform doesn't allow editor objects 
+	const bool bCheckTargetPlatform = !bIsEditorOnlyObject || bTargetAllowsEditorObjects;
+	if (bCheckTargetPlatform && (!Object->NeedsLoadForTargetPlatform(TargetPlatform) || !TargetPlatform->AllowObject(Object)))
 	{
 		Marks = (EObjectMark)(Marks | OBJECTMARK_NotForTargetPlatform);
 	}
