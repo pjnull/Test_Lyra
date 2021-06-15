@@ -188,9 +188,9 @@ public:
 	FQuat LastUpdateRotation;
 	FVector LastUpdateVelocity;
 	bool bForceNextFloorCheck;
-	FRootMotionSourceGroup CurrentRootMotion; //  TODO not threadsafe, has pointers in there...
 	FVector Velocity;
-	FRotator RotationRate;
+	FVector LastPreAdditiveVelocity;
+	bool bIsAdditiveVelocityApplied;
 	bool bDeferUpdateBasedMovement;
 	EMoveComponentFlags MoveComponentFlags;
 	FVector PendingForceToApply;
@@ -208,7 +208,7 @@ public:
 	bool bRequestedMoveWithMaxSpeed;
 	FVector RequestedVelocity;
 	int32 NumJumpApexAttempts;
-	FRootMotionMovementParams RootMotionParams;
+	FVector AnimRootMotionVelocity;
 	bool bShouldApplyDeltaToMeshPhysicsTransforms; // See UpdateBasedMovement
 	FVector DeltaPosition;
 	FQuat DeltaQuat;
@@ -258,6 +258,39 @@ struct FCachedMovementBaseAsyncData
 	}
 };
 
+struct FRootMotionAsyncData
+{
+	bool bHasAnimRootMotion;
+	bool bHasOverrideRootMotion;
+	bool bHasOverrideWithIgnoreZAccumulate;
+	bool bHasAdditiveRootMotion;
+	bool bUseSensitiveLiftoff;
+	FVector AdditiveVelocity;
+	FVector OverrideVelocity;
+	FQuat OverrideRotation;
+	FTransform AnimTransform;
+	float TimeAccumulated;
+
+	void Clear()
+	{
+		TimeAccumulated = 0.f;
+		bHasAnimRootMotion = false;
+		bHasOverrideRootMotion = false;
+		bHasOverrideWithIgnoreZAccumulate = false;
+		bHasAdditiveRootMotion = false;
+		bUseSensitiveLiftoff = false;
+		AdditiveVelocity = FVector::ZeroVector;
+		OverrideVelocity = FVector::ZeroVector;
+		OverrideRotation = FQuat::Identity;
+		AnimTransform = FTransform::Identity;
+	}
+
+	FRootMotionAsyncData()
+	{
+		Clear();
+	}
+};
+
 // Data and implementation that lives on movement component's character owner
 struct ENGINE_API FCharacterAsyncInput
 {
@@ -274,6 +307,7 @@ struct ENGINE_API FCharacterAsyncInput
 	bool bUseControllerRotationYaw;
 	bool bUseControllerRotationRoll;
 	FRotator ControllerDesiredRotation;
+	FRotator RotationRate;
 
 	virtual void FaceRotation(FRotator NewControlRotation, float DeltaTime, const FCharacterMovementComponentAsyncInput& Input, FCharacterMovementComponentAsyncOutput& Output) const;
 	virtual void CheckJumpInput(float DeltaSeconds, const FCharacterMovementComponentAsyncInput& Input, FCharacterMovementComponentAsyncOutput& Output) const;
@@ -422,7 +456,7 @@ struct ENGINE_API FCharacterMovementComponentAsyncInput : public Chaos::FSimCall
 	float MaxSwimSpeed;
 	float MaxFlySpeed;
 	float MaxCustomMovementSpeed;
-
+	FRootMotionAsyncData RootMotion;
 
 	FCachedMovementBaseAsyncData MovementBaseAsyncData;
 	TUniquePtr<FUpdatedComponentAsyncInput> UpdatedComponentInput;
@@ -501,7 +535,6 @@ struct ENGINE_API FCharacterMovementComponentAsyncInput : public Chaos::FSimCall
 	virtual bool FloorSweepTest(struct FHitResult& OutHit, const FVector& Start, const FVector& End, ECollisionChannel TraceChannel, const struct FCollisionShape& CollisionShape, const struct FCollisionQueryParams& Params, const struct FCollisionResponseParams& ResponseParam, FCharacterMovementComponentAsyncOutput& Output) const;
 	virtual bool IsWithinEdgeTolerance(const FVector& CapsuleLocation, const FVector& TestImpactPoint, const float CapsuleRadius) const;
 	virtual bool IsWalkable(const FHitResult& Hit) const;
-	virtual void UpdateCharacterStateBeforeMovement(float DeltaSeconds, FCharacterMovementComponentAsyncOutput& Output) const;
 	virtual void UpdateCharacterStateAfterMovement(float DeltaSeconds, FCharacterMovementComponentAsyncOutput& Output) const;
 	virtual float GetSimulationTimeStep(float RemainingTime, int32 Iterations) const;
 	virtual void CalcVelocity(float DeltaTime, float Friction, bool bFluid, float BrakingDeceleration, FCharacterMovementComponentAsyncOutput& Output) const;
@@ -543,6 +576,7 @@ struct ENGINE_API FCharacterMovementComponentAsyncInput : public Chaos::FSimCall
 	virtual bool ShouldLimitAirControl(float DeltaTime, const FVector& FallAcceleration) const;
 	virtual FVector LimitAirControl(float DeltaTime, const FVector& FallAcceleration, const FHitResult& HitResult, bool bCheckForValidLandingSpot, FCharacterMovementComponentAsyncOutput& Output) const;
 	void RestorePreAdditiveRootMotionVelocity(FCharacterMovementComponentAsyncOutput& Output) const;
+	void ApplyRootMotionToVelocity(float deltaTime, FCharacterMovementComponentAsyncOutput& Output) const;
 	virtual FVector NewFallVelocity(const FVector& InitialVelocity, const FVector& Gravity, float DeltaTime, FCharacterMovementComponentAsyncOutput& Output) const;
 	virtual bool IsValidLandingSpot(const FVector& CapsuleLocation, const FHitResult& Hit, FCharacterMovementComponentAsyncOutput& Output) const;
 	virtual void ProcessLanded(const FHitResult& Hit, float remainingTime, int32 Iterations, FCharacterMovementComponentAsyncOutput& Output) const;
@@ -568,6 +602,10 @@ struct ENGINE_API FCharacterMovementComponentAsyncInput : public Chaos::FSimCall
 	FVector MoveComponent_GetPenetrationAdjustment(FHitResult& HitResult) const;
 	float MoveComponent_SlideAlongSurface(const FVector& Delta, float Time, const FVector& Normal, FHitResult& Hit, FCharacterMovementComponentAsyncOutput& Output, bool bHandleImpact = false) const;
 	FVector MoveComponent_ComputeSlideVector(const FVector& Delta, const float Time, const FVector& Normal, const FHitResult& Hit, FCharacterMovementComponentAsyncOutput& Output) const;
+
+	// Root Motion Stuff
+	FVector ConstrainAnimRootMotionVelocity(const FVector& RootMotionVelocity, const FVector& CurrentVelocity, FCharacterMovementComponentAsyncOutput& Output) const;
+	FVector CalcAnimRootMotionVelocity(const FVector& RootMotionDeltaMove, float DeltaSeconds, const FVector& CurrentVelocity) const;
 };
 
 class FCharacterMovementComponentAsyncCallback : public Chaos::TSimCallbackObject<FCharacterMovementComponentAsyncInput, FCharacterMovementComponentAsyncOutput>
