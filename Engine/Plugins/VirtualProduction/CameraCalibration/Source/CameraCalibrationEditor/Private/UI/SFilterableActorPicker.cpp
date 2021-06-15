@@ -27,15 +27,15 @@ void SFilterableActorPicker::Construct( const FArguments& InArgs )
 	[
 		// Allow drag and dropping valid actors onto the widget
 		SNew(SAssetDropTarget)
-		.OnIsAssetAcceptableForDropWithReason_Lambda([&](const UObject* InObject, FText& OutReason) -> bool
+		.OnAreAssetsAcceptableForDropWithReason_Lambda([&](TArrayView<FAssetData> InAssets, FText& OutReason) -> bool
 		{
-			return OnShouldFilterAsset.IsBound() && OnShouldFilterAsset.Execute(FAssetData(InObject));
+			return OnShouldFilterAsset.IsBound() && OnShouldFilterAsset.Execute(InAssets[0]);
 		})
-		.OnAssetDropped_Lambda([&](UObject* InObject) -> void
+		.OnAssetsDropped_Lambda([&](const FDragDropEvent& Event, TArrayView<FAssetData> InAssets) -> void
 		{
 			AssetComboButton->SetIsOpen(false);
 
-			OnSetObject.ExecuteIfBound(FAssetData(InObject));
+			OnSetObject.ExecuteIfBound(InAssets[0]);
 		})
 		[
 			SAssignNew(ValueContentBox, SHorizontalBox)
