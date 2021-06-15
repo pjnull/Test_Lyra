@@ -1700,7 +1700,7 @@ void USoundWave::FinishCachePlatformData()
 
 #if DO_CHECK
 	// If we're allowing cooked data to be loaded then the derived data key will not have been serialized, so won't match and that's fine
-	if (!GAllowCookedDataInEditorBuilds)
+	if (!GAllowCookedDataInEditorBuilds && RunningPlatformData != nullptr)
 	{
 		FString DerivedDataKey;
 		FName AudioFormat = GetWaveFormatForRunningPlatform(*this);
