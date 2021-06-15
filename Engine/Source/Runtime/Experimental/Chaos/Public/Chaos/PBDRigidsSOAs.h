@@ -316,6 +316,7 @@ public:
 		if(PBDRigid)
 		{
 			RemoveFromActiveArray(PBDRigid, /*bStillDirty=*/ false);
+			RemoveFromMapAndArray(PBDRigid->CastToKinematicParticle(), MovingKinematicsToIndex, MovingKinematicsArray);
 
 			if (auto PBDRigidClustered = Particle->CastToClustered())
 			{
@@ -609,6 +610,17 @@ public:
 		UpdateViews();
 	}
 
+	void MarkMovingKinematic(FKinematicGeometryParticleHandle* Particle)
+	{
+		InsertToMapAndArray(Particle, MovingKinematicsToIndex, MovingKinematicsArray);
+	}
+
+	void ClearAllMovingKinematic()
+	{
+		MovingKinematicsArray.Empty();
+		MovingKinematicsToIndex.Empty();
+	}
+
 	void Serialize(FChaosArchive& Ar)
 	{
 		static const FName SOAsName = TEXT("PBDRigidsSOAs");
@@ -690,8 +702,12 @@ public:
 	const TParticleView<FKinematicGeometryParticles>& GetActiveKinematicParticlesView() const { return ActiveKinematicParticlesView; }
 	TParticleView<FKinematicGeometryParticles>& GetActiveKinematicParticlesView() { return ActiveKinematicParticlesView; }
 
+	const TParticleView<FKinematicGeometryParticles>& GetActiveMovingKinematicParticlesView() const { return ActiveMovingKinematicParticlesView; }
+	TParticleView<FKinematicGeometryParticles>& GetActiveMovingKinematicParticlesView() { return ActiveMovingKinematicParticlesView; }
+
 	const TParticleView<FGeometryParticles>& GetActiveStaticParticlesView() const { return ActiveStaticParticlesView; }
 	TParticleView<FGeometryParticles>& GetActiveStaticParticlesView() { return ActiveStaticParticlesView; }
+
 
 	const TGeometryParticleHandles<FReal, 3>& GetParticleHandles() const { return ParticleHandles; }
 	TGeometryParticleHandles<FReal, 3>& GetParticleHandles() { return ParticleHandles; }
@@ -984,6 +1000,13 @@ private:
 			ActiveKinematicParticlesView = MakeParticleView(MoveTemp(TmpArray));
 		}
 		{
+			TArray<TSOAView<FKinematicGeometryParticles>> TmpArray =
+			{
+				{&MovingKinematicsArray},
+			};
+			ActiveMovingKinematicParticlesView = MakeParticleView(MoveTemp(TmpArray));
+		}
+		{
 			TArray<TSOAView<FGeometryParticles>> TmpArray =
 			{
 				StaticParticles.Get(),
@@ -1078,10 +1101,15 @@ private:
 	TParticleMapArray<FPBDRigidParticleHandle> ActiveParticlesMapArray;
 	TParticleMapArray<FPBDRigidParticleHandle> TransientDirtyMapArray;
 
+	// keep track of kinematic that have their kinematic target set for this current frame
+	TArray<FKinematicGeometryParticleHandle*> MovingKinematicsArray;
+	TMap<FKinematicGeometryParticleHandle*, int32> MovingKinematicsToIndex;
+
 	// NonDisabled clustered particle arrays
 	TParticleMapArray<FPBDRigidClusteredParticleHandle> StaticClusteredMapArray;
 	TParticleMapArray<FPBDRigidClusteredParticleHandle> KinematicClusteredMapArray;
 	TParticleMapArray<FPBDRigidClusteredParticleHandle> DynamicClusteredMapArray;
+
 
 	//Particle Views
 	TParticleView<FGeometryParticles> NonDisabledView;							//all particles that are not disabled
@@ -1091,6 +1119,7 @@ private:
 	TParticleView<FPBDRigidParticles> DirtyParticlesView;							//all particles that are active + any that were put to sleep this frame
 	TParticleView<FGeometryParticles> AllParticlesView;							//all particles
 	TParticleView<FKinematicGeometryParticles> ActiveKinematicParticlesView;		//all kinematic particles that are not disabled
+	TParticleView<FKinematicGeometryParticles> ActiveMovingKinematicParticlesView;//all moving kinematic particles that are not disabled	
 	TParticleView<FGeometryParticles> ActiveStaticParticlesView;					//all static particles that are not disabled
 	TParticleView<TPBDGeometryCollectionParticles<FReal, 3>> ActiveGeometryCollectionParticlesView; // all geom collection particles that are not disabled
 
