@@ -244,7 +244,8 @@ TSharedRef<SWidget> FNiagaraVariableAttributeBindingCustomization::OnGetMenuCont
 		];
 
 	// the widget to focus is retrieved after this function is called via delegate, so setting it here works
-	ComboButton->SetMenuContentWidgetToFocus(GraphActionMenu->GetFilterTextBox());
+	TSharedPtr<SWidget> SearchBoxToFocus = GraphActionMenu->GetFilterTextBox();
+	ComboButton->SetMenuContentWidgetToFocus(SearchBoxToFocus);
 	
 	return Widget.ToSharedRef(); 
 }
