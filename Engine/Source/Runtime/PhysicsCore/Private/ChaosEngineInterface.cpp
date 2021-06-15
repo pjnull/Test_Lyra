@@ -1007,7 +1007,7 @@ FPhysicsConstraintHandle FChaosEngineInterface::CreateConstraint(const FPhysicsA
 				ConstraintRef.Constraint = JointConstraint;
 
 			// Disable collision on shape to ensure it is not added to acceleration structure.
-			for (const TUniquePtr<Chaos::FPerShapeData>& Shape : KinematicEndPoint->ShapesArray())
+			for (const TUniquePtr<Chaos::FPerShapeData>& Shape : KinematicEndPoint->GetGameThreadAPI().ShapesArray())
 			{
 				Chaos::FCollisionData CollisionData = Shape->GetCollisionData();
 				CollisionData.bQueryCollision = false;
