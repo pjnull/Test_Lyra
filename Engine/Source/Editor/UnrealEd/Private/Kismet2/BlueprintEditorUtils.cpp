@@ -8383,6 +8383,18 @@ TSharedRef<SWidget> FBlueprintEditorUtils::ConstructBlueprintParentClassPicker( 
 	for ( UBlueprint* Blueprint : Blueprints )
 	{
 		Blueprint->GetReparentingRules(Filter->AllowedChildrenOfClasses, Filter->DisallowedChildrenOfClasses);
+
+		// Include a class viewer filter for imported namespaces if the class picker is being hosted in an editor context.
+		TSharedPtr<IToolkit> AssetEditor = FToolkitManager::Get().FindEditorForAsset(Blueprint);
+		if (AssetEditor.IsValid() && AssetEditor->IsBlueprintEditor())
+		{
+			TSharedPtr<IBlueprintEditor> BlueprintEditor = StaticCastSharedPtr<IBlueprintEditor>(AssetEditor);
+			TSharedPtr<IClassViewerFilter> ImportedClassViewerFilter = BlueprintEditor->GetImportedClassViewerFilter();
+			if (ImportedClassViewerFilter.IsValid())
+			{
+				Options.ClassFilters.AddUnique(ImportedClassViewerFilter.ToSharedRef());
+			}
+		}
 	}
 
 	if(bIsActor)
@@ -8564,6 +8576,18 @@ TSharedRef<SWidget> FBlueprintEditorUtils::ConstructBlueprintInterfaceClassPicke
 		{
 			const FBPInterfaceDescription& CurrentInterface = *it;
 			Filter->DisallowedClasses.Add(CurrentInterface.Interface);
+		}
+
+		// Include a class viewer filter for imported namespaces if the class picker is being hosted in an editor context
+		TSharedPtr<IToolkit> AssetEditor = FToolkitManager::Get().FindEditorForAsset(Blueprint);
+		if (AssetEditor.IsValid() && AssetEditor->IsBlueprintEditor())
+		{
+			TSharedPtr<IBlueprintEditor> BlueprintEditor = StaticCastSharedPtr<IBlueprintEditor>(AssetEditor);
+			TSharedPtr<IClassViewerFilter> ImportedClassViewerFilter = BlueprintEditor->GetImportedClassViewerFilter();
+			if (ImportedClassViewerFilter.IsValid())
+			{
+				Options.ClassFilters.AddUnique(ImportedClassViewerFilter.ToSharedRef());
+			}
 		}
 	}
 
