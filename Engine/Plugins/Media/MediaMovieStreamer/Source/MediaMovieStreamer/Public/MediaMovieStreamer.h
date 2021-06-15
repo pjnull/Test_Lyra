@@ -8,7 +8,6 @@
 DECLARE_LOG_CATEGORY_EXTERN(LogMediaMovieStreamer, Log, All);
 
 class IMediaModule;
-class IMediaTimeSource;
 class UMediaPlayer;
 class UMediaSource;
 class UMediaTexture;
@@ -85,7 +84,4 @@ private:
 
 	/** True if the media is still playing. */
 	bool bIsPlaying;
-
-	/** Stores the previous time source so we can restore it when we are done. */
-	TSharedPtr<IMediaTimeSource, ESPMode::ThreadSafe> PreviousTimeSource;
 };
