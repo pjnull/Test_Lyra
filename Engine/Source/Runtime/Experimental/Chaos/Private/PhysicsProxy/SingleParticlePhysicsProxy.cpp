@@ -78,7 +78,7 @@ void PushToPhysicsStateImp(const Chaos::FDirtyPropertiesManager& Manager, Chaos:
 		auto NewKinematicTargetGT = bHasKinematicData ? ParticleData.FindKinematicTarget(Manager, DataIdx) : nullptr;
 		if (NewKinematicTargetGT)
 		{
-			Evolution.SetParticleKinematicTarget(RigidHandle, NewKinematicTargetGT);
+			KinematicHandle->SetKinematicTarget(*NewKinematicTargetGT);
 		}
 
 		if(NewXR || NewNonFrequentData || NewVelocities || NewKinematicTargetGT)
