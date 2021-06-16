@@ -1140,7 +1140,7 @@ namespace Gauntlet
 				}
 				catch (Exception Ex)
 				{
-					Log.Info("Failed to downsize and gif-ify images! {0}", Ex);
+					Log.Info("Failed to downsize and gif-ify images! {0}", Ex.Message);
 				}
 			}
 
