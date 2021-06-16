@@ -9,6 +9,7 @@
 
 #include "FilterListData.h"
 #include "Data/LevelSnapshotsEditorData.h"
+#include "PropertySelection.h"
 
 class SLevelSnapshotsEditorResults;
 class ULevelSnapshot;
