@@ -375,7 +375,8 @@ static void UpdateSceneCaptureContent_RenderThread(
 	const FResolveParams& ResolveParams,
 	bool bGenerateMips,
 	const FGenerateMipsParams& GenerateMipsParams,
-	const bool bDisableFlipCopyLDRGLES)
+	const bool bDisableFlipCopyLDRGLES, 
+	bool bClearRenderTarget)
 {
 	FMaterialRenderProxy::UpdateDeferredCachedUniformExpressions();
 
@@ -405,7 +406,8 @@ static void UpdateSceneCaptureContent_RenderThread(
 				EventName,
 				ResolveParams,
 				bGenerateMips,
-				GenerateMipsParams);
+				GenerateMipsParams,
+				bClearRenderTarget);
 			break;
 		}
 		default:
@@ -961,7 +963,7 @@ void FScene::UpdateSceneCaptureContents(USceneCaptureComponentCube* CaptureCompo
 				}
 				FIntPoint CaptureSize(TextureTarget->GetSurfaceWidth(), TextureTarget->GetSurfaceHeight());
 				FMatrix ProjectionMatrix;
-				BuildProjectionMatrix(CaptureSize, ECameraProjectionMode::Perspective, FOV, 1.0f, GNearClippingPlane, ProjectionMatrix);
+				BuildProjectionMatrix(CaptureSize, FOV, GNearClippingPlane, ProjectionMatrix);
 				FPostProcessSettings PostProcessSettings;
 
 				float StereoIPD = 0.0f;

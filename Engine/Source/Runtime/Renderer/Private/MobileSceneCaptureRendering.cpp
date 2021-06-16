@@ -142,6 +142,46 @@ static void CopyCaptureToTarget(
 		CaptureSource = SCS_SceneColorHDR;
 	}
 
+	const bool bEnableTiling = ResolveParams.DestRect.IsValid();
+
+	auto SetViewportIfTiled = [](bool bEnableTiling, bool bNeedsFlippedRenderTarget, const FIntRect& ViewRect, FRDGTextureRef Target, const FResolveParams& ResolveParams, FRHICommandListImmediate& RHICmdList)
+	{
+		if (!bEnableTiling)
+		{
+			return;
+		}
+
+		if (bNeedsFlippedRenderTarget)
+		{
+			FResolveRect DestRect = ResolveParams.DestRect;
+			int32 TileYID = DestRect.Y1 / ViewRect.Height();
+			int32 TileYCount = (Target->Desc.GetSize().Y / ViewRect.Height()) - 1;
+			DestRect.Y1 = (TileYCount - TileYID) * ViewRect.Height();
+			DestRect.Y2 = DestRect.Y1 + ViewRect.Height();
+			RHICmdList.SetViewport
+			(
+				float(DestRect.X1),
+				float(DestRect.Y1),
+				0.0f,
+				float(DestRect.X2),
+				float(DestRect.Y2),
+				1.0f
+			);
+		}
+		else
+		{
+			RHICmdList.SetViewport
+			(
+				float(ResolveParams.DestRect.X1),
+				float(ResolveParams.DestRect.Y1),
+				0.0f,
+				float(ResolveParams.DestRect.X2),
+				float(ResolveParams.DestRect.Y2),
+				1.0f
+			);
+		}
+	};
+
 	ESceneCaptureCompositeMode CaptureCompositeMode = View.Family->SceneCaptureCompositeMode;
 	{
 		ERenderTargetLoadAction RTLoadAction;
@@ -175,48 +215,6 @@ static void CopyCaptureToTarget(
 
 		TShaderMapRef<FMobileSceneCaptureCopyPS> PixelShader(View.ShaderMap, ShaderPermutationVector);
 
-		const bool bEnableTiling = ResolveParams.DestRect.IsValid();
-
-		auto SetViewportIfTiled = [&]()
-		{
-			if (!bEnableTiling)
-			{
-				return;
-			}
-
-			if (bNeedsFlippedRenderTarget)
-			{
-				FResolveRect DestRect = ResolveParams.DestRect;
-				int32 TileYID = DestRect.Y1 / ViewRect.Height();
-				int32 TileYCount = (Target->GetSizeXY().Y / ViewRect.Height()) - 1;
-				DestRect.Y1 = (TileYCount - TileYID) * ViewRect.Height();
-				DestRect.Y2 = DestRect.Y1 + ViewRect.Height();
-				RHICmdList.SetViewport
-				(
-					float(DestRect.X1),
-					float(DestRect.Y1),
-					0.0f,
-					float(DestRect.X2),
-					float(DestRect.Y2),
-					1.0f
-				);
-			}
-			else
-			{
-				RHICmdList.SetViewport
-				(
-					float(ResolveParams.DestRect.X1),
-					float(ResolveParams.DestRect.Y1),
-					0.0f,
-					float(ResolveParams.DestRect.X2),
-					float(ResolveParams.DestRect.Y2),
-					1.0f
-				);
-			}
-		};
-
-
-
 		FMobileSceneCaptureCopyPS::FParameters* PSShaderParameters = GraphBuilder.AllocParameters<FMobileSceneCaptureCopyPS::FParameters>();
 		PSShaderParameters->View = View.ViewUniformBuffer;
 		PSShaderParameters->InTexture = SourceTexture;
@@ -227,7 +225,7 @@ static void CopyCaptureToTarget(
 			RDG_EVENT_NAME("CaptureToTarget"),
 			PSShaderParameters,
 			ERDGPassFlags::Raster,
-			[VertexShader, VSShaderParameters, PixelShader, PSShaderParameters, BlendState, bNeedsFlippedRenderTarget, &ViewRect, &TargetSize, SourceTexSize](FRHICommandListImmediate& RHICmdList)
+			[VertexShader, VSShaderParameters, PixelShader, PSShaderParameters, BlendState, bNeedsFlippedRenderTarget, &ViewRect, &TargetSize, SourceTexSize, SetViewportIfTiled, bEnableTiling, Target, ResolveParams](FRHICommandListImmediate& RHICmdList)
 		{
 			RHICmdList.SetViewport(ViewRect.Min.X, ViewRect.Min.Y, 0.0f, ViewRect.Max.X, ViewRect.Max.Y, 1.0f);
 
@@ -249,7 +247,7 @@ static void CopyCaptureToTarget(
 
 			if (bNeedsFlippedRenderTarget)
 			{
-				SetViewportIfTiled();
+				SetViewportIfTiled(bEnableTiling, bNeedsFlippedRenderTarget, ViewRect, Target, ResolveParams, RHICmdList);
 
 				DrawRectangle(
 					RHICmdList,
@@ -264,7 +262,7 @@ static void CopyCaptureToTarget(
 			}
 			else
 			{
-				SetViewportIfTiled();
+				SetViewportIfTiled(bEnableTiling, bNeedsFlippedRenderTarget, ViewRect, Target, ResolveParams, RHICmdList);
 
 				DrawRectangle(
 					RHICmdList,
@@ -301,7 +299,7 @@ static void CopyCaptureToTarget(
 		TShaderMapRef<FCopyRectPS> PixelShader(View.ShaderMap);
 
 		GraphBuilder.AddPass(RDG_EVENT_NAME("OpacitySceneCapturePass"), PSShaderParameters, ERDGPassFlags::Raster,
-			[&View, ScreenVertexShader, PixelShader, bNeedsFlippedRenderTarget, PSShaderParameters, &ViewRect, &TargetSize, SourceTexSize](FRHICommandListImmediate& RHICmdList)
+			[&View, ScreenVertexShader, PixelShader, bNeedsFlippedRenderTarget, PSShaderParameters, &ViewRect, &TargetSize, SourceTexSize, SetViewportIfTiled, bEnableTiling, Target, ResolveParams](FRHICommandListImmediate& RHICmdList)
 		{
 			FGraphicsPipelineStateInitializer GraphicsPSOInit;
 			RHICmdList.ApplyCachedRenderTargets(GraphicsPSOInit);
@@ -325,7 +323,7 @@ static void CopyCaptureToTarget(
 			int32 TargetPosY = ViewRect.Min.Y;
 			int32 TargetHeight = ViewRect.Height();
 
-			SetViewportIfTiled(); 
+			SetViewportIfTiled(bEnableTiling, bNeedsFlippedRenderTarget, ViewRect, Target, ResolveParams, RHICmdList);
 
 			if (bNeedsFlippedRenderTarget)
 			{
