@@ -12540,7 +12540,7 @@ void UCharacterMovementComponent::ApplyAsyncOutput(FCharacterMovementComponentAs
 	uint8 PrevCustomMode = CustomMovementMode;
 	MovementMode = Output.MovementMode;
 	CustomMovementMode = Output.CustomMovementMode;
-	if (MovementMode != PrevMovementMode || CustomMovementMode != PrevCustomMode)
+	if (CharacterOwner && (MovementMode != PrevMovementMode || CustomMovementMode != PrevCustomMode))
 	{
 		CharacterOwner->OnMovementModeChanged(PrevMovementMode, PrevCustomMode);
 	}
