@@ -28,37 +28,41 @@ DEFINE_LOG_CATEGORY(LogNetworkPhysics);
 
 namespace UE_NETWORK_PHYSICS
 {
-	NETSIM_DEVCVAR_INT(Enable, 0, "np2.bEnable", "Enabled rollback physics. Must be set before starting game");
-	NETSIM_DEVCVAR_INT(LogCorrections, 1, "np2.LogCorrections", "Logs corrections when they happen");		
-	NETSIM_DEVCVAR_INT(LogImpulses, -1, "np2.LogImpulses", "Logs all recorded F/T/LI/AI");
+	bool Enable=false;
+	FAutoConsoleVariableRef CVarEnable(TEXT("np2.bEnable"), Enable, TEXT("Enabled rollback physics. Must be set before starting game"));
 
-	NETSIM_DEVCVAR_FLOAT(X, 1.0f, "np2.Tolerance.X", "Location Tolerance");
-	NETSIM_DEVCVAR_FLOAT(R, 0.1f, "np2.Tolerance.R", "Rotation Tolerance");
-	NETSIM_DEVCVAR_FLOAT(V, 1.0f, "np2.Tolerance.V", "Velocity Tolerance");
-	NETSIM_DEVCVAR_FLOAT(W, 1.0f, "np2.Tolerance.W", "Rotational Velocity Tolerance");
+	//NP_DEVCVAR_INT(Enable, 0, "np2.bEnable", "Enabled rollback physics. Must be set before starting game");
+	NP_DEVCVAR_INT(LogCorrections, 1, "np2.LogCorrections", "Logs corrections when they happen");		
+	NP_DEVCVAR_INT(LogImpulses, -1, "np2.LogImpulses", "Logs all recorded F/T/LI/AI");
 
-	NETSIM_DEVCVAR_INT(Debug, 0, "np2.Debug", "Debug mode for in world drawing");
-	NETSIM_DEVCVAR_INT(DebugTolerance, 0, "np2.Debug.Tolerance", "If enabled, only draw large corrections in world.");
-	NETSIM_DEVCVAR_FLOAT(DebugDrawTolerance_X, 5.0, "np2.Debug.Tolerance.X",  "Location Debug Drawing Toleration");
-	NETSIM_DEVCVAR_FLOAT(DebugDrawTolerance_R, 2.0, "np2.Debug.Tolerance.R",  "Simple distance based LOD");
+	NP_DEVCVAR_FLOAT(X, 1.0f, "np2.Tolerance.X", "Location Tolerance");
+	NP_DEVCVAR_FLOAT(R, 0.1f, "np2.Tolerance.R", "Rotation Tolerance");
+	NP_DEVCVAR_FLOAT(V, 1.0f, "np2.Tolerance.V", "Velocity Tolerance");
+	NP_DEVCVAR_FLOAT(W, 1.0f, "np2.Tolerance.W", "Rotational Velocity Tolerance");
+
+	NP_DEVCVAR_INT(Debug, 0, "np2.Debug", "Debug mode for in world drawing");
+	NP_DEVCVAR_INT(DebugTolerance, 0, "np2.Debug.Tolerance", "If enabled, only draw large corrections in world.");
+	NP_DEVCVAR_FLOAT(DebugDrawTolerance_X, 5.0, "np2.Debug.Tolerance.X",  "Location Debug Drawing Toleration");
+	NP_DEVCVAR_FLOAT(DebugDrawTolerance_R, 2.0, "np2.Debug.Tolerance.R",  "Simple distance based LOD");
 		
-	NETSIM_DEVCVAR_INT(ForceResim, 0, "np2.ForceResim", "Forces near constant resimming");		
-	NETSIM_DEVCVAR_INT(ForceResimWithoutCorrection, 0, "np2.ForceResimWithoutCorrection", "Forces near constant resimming WITHOUT applying server data");
+	NP_DEVCVAR_INT(ForceResim, 0, "np2.ForceResim", "Forces near constant resimming");		
+	NP_DEVCVAR_INT(ForceResimWithoutCorrection, 0, "np2.ForceResimWithoutCorrection", "Forces near constant resimming WITHOUT applying server data");
 	
-	NETSIM_DEVCVAR_INT(FixedLocalFrameOffset, -1, "np2.FixedLocalFrameOffset", "When > 0, use hardcoded frame offset on client from head");	
-	NETSIM_DEVCVAR_INT(FixedLocalFrameOffsetTolerance, 3, "np2.FixedLocalFrameOffsetTolerance", "Tolerance when using np2.FixedLocalFrameOffset");
+	NP_DEVCVAR_INT(FixedLocalFrameOffset, -1, "np2.FixedLocalFrameOffset", "When > 0, use hardcoded frame offset on client from head");	
+	NP_DEVCVAR_INT(FixedLocalFrameOffsetTolerance, 3, "np2.FixedLocalFrameOffsetTolerance", "Tolerance when using np2.FixedLocalFrameOffset");
 
-	NETSIM_DEVCVAR_INT(EnableLOD, 0, "np2.EnableLOD", "Enable local LOD mode");
-	NETSIM_DEVCVAR_FLOAT(LODDistance, 2400.f, "np2.LODDistance", "Simple distance based LOD");
+	NP_DEVCVAR_INT(EnableLOD, 0, "np2.EnableLOD", "Enable local LOD mode");
+	NP_DEVCVAR_FLOAT(LODDistance, 2400.f, "np2.LODDistance", "Simple distance based LOD");
 
-	NETSIM_DEVCVAR_INT(ResimForSleep, 0, "np2.ResimForSleep", "Triggers resim if only sleep state differs. Otherwise we only match server sleep state if XRVW differ.");
+	NP_DEVCVAR_INT(ResimForSleep, 0, "np2.ResimForSleep", "Triggers resim if only sleep state differs. Otherwise we only match server sleep state if XRVW differ.");
 		
 	// Time dilation CVars
-	NETSIM_DEVCVAR_FLOAT(MaxTargetNumBufferedCmds, 5.0, "np2.MaxTargetNumBufferedCmds", "");
-	NETSIM_DEVCVAR_FLOAT(MaxTimeDilationMag, 0.01f, "np2.MaxTimeDilationMag", "Maximum time dilation that client will use to slow down / catch up with server");
-	NETSIM_DEVCVAR_FLOAT(TimeDilationAlpha, 0.1f, "np2.TimeDilationAlpha", "");
-	NETSIM_DEVCVAR_FLOAT(TargetNumBufferedCmds, 1.5f, "np2.TargetNumBufferedCmds", "");
-	NETSIM_DEVCVAR_FLOAT(TargetNumBufferedCmdsAlpha, 0.0005f, "np2.TargetNumBufferedCmdsAlpha", "");
+	NP_DEVCVAR_FLOAT(MaxTargetNumBufferedCmds, 5.0, "np2.MaxTargetNumBufferedCmds", "");
+	NP_DEVCVAR_FLOAT(MaxTimeDilationMag, 0.01f, "np2.MaxTimeDilationMag", "Maximum time dilation that client will use to slow down / catch up with server");
+	NP_DEVCVAR_FLOAT(TimeDilationAlpha, 0.1f, "np2.TimeDilationAlpha", "");
+	NP_DEVCVAR_FLOAT(TargetNumBufferedCmds, 1.9f, "np2.TargetNumBufferedCmds", "");
+	NP_DEVCVAR_FLOAT(TargetNumBufferedCmdsAlpha, 0.005f, "np2.TargetNumBufferedCmdsAlpha", "");
+	NP_DEVCVAR_INT(LerpTargetNumBufferedCmdsAggresively, 0, "np2.LerpTargetNumBufferedCmdsAggresively", "Aggresively lerp towards TargetNumBufferedCmds");
 
 	// ----------------------------------------------
 	// Debugger helpers:
@@ -130,7 +134,7 @@ namespace UE_NETWORK_PHYSICS
 			return 0;
 		}
 
-		float Normalized = FMath::Clamp<float>((F - 1.f) / MaxTimeDilationMag(), -1.f, 1.f);
+		float Normalized = FMath::Clamp<float>((F - 1.f) / MaxTimeDilationMag, -1.f, 1.f);
 		return (int8)(Normalized* 128.f);
 	}
 
@@ -143,7 +147,7 @@ namespace UE_NETWORK_PHYSICS
 		}
 
 		float Normalized = (float)i / 128.f;
-		float Uncompressed = 1.f + (Normalized * MaxTimeDilationMag());
+		float Uncompressed = 1.f + (Normalized * MaxTimeDilationMag);
 		return Uncompressed;
 	}
 }
@@ -153,19 +157,19 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 	bool CompareVec(const FVector& A, const FVector& B, const float D, const TCHAR* Str)
 	{
 		const bool b = D == 0 ? A != B : FVector::DistSquared(A, B) > D * D;
-		UE_CLOG(UE_NETWORK_PHYSICS::LogCorrections() > 0 && b && Str, LogNetworkPhysics, Log, TEXT("%s correction. Server: %s. Local: %s. Delta: %s (%.4f)"), Str, *A.ToString(), *B.ToString(), *(A-B).ToString(), (A-B).Size());
+		UE_CLOG(UE_NETWORK_PHYSICS::LogCorrections > 0 && b && Str, LogNetworkPhysics, Log, TEXT("%s correction. Server: %s. Local: %s. Delta: %s (%.4f)"), Str, *A.ToString(), *B.ToString(), *(A-B).ToString(), (A-B).Size());
 		return  b;
 	}
 	bool CompareQuat(const FQuat& A, const FQuat& B, const float D, const TCHAR* Str)
 	{
 		const bool b = D == 0 ? A != B : FQuat::ErrorAutoNormalize(A, B) > D;
-		UE_CLOG(UE_NETWORK_PHYSICS::LogCorrections() > 0 && b && Str, LogNetworkPhysics, Log, TEXT("%s correction. Server: %s. Local: %s. Delta: %f"), Str, *A.ToString(), *B.ToString(), FQuat::ErrorAutoNormalize(A, B));
+		UE_CLOG(UE_NETWORK_PHYSICS::LogCorrections > 0 && b && Str, LogNetworkPhysics, Log, TEXT("%s correction. Server: %s. Local: %s. Delta: %f"), Str, *A.ToString(), *B.ToString(), FQuat::ErrorAutoNormalize(A, B));
 		return b;
 	}
 	bool CompareObjState(Chaos::EObjectStateType A, Chaos::EObjectStateType B, const TCHAR* Str)
 	{
 		const bool b = A != B;
-		UE_CLOG(UE_NETWORK_PHYSICS::LogCorrections() > 0 && b && Str, LogNetworkPhysics, Log, TEXT("%s correction. Server: %d. Local: %d."), Str, A, B);
+		UE_CLOG(UE_NETWORK_PHYSICS::LogCorrections > 0 && b && Str, LogNetworkPhysics, Log, TEXT("%s correction. Server: %d. Local: %d."), Str, A, B);
 		return b;
 	}
 
@@ -184,7 +188,7 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 
 		PendingCorrections.Reset();
 
-		if (UE_NETWORK_PHYSICS::ForceResimWithoutCorrection() > 0)
+		if (UE_NETWORK_PHYSICS::ForceResimWithoutCorrection > 0)
 		{
 			//const int32 ForceRewindFrame = RewindData->GetEarliestFrame_Internal()+1; // This was causing us to back > 64 frames?
 			const int32 ForceRewindFrame = LastCompletedStep - 9;
@@ -200,7 +204,7 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 
 		ON_SCOPE_EXIT
 		{
-			if (UE_NETWORK_PHYSICS::Debug() > 0)
+			if (UE_NETWORK_PHYSICS::Debug > 0)
 			{
 				StatsForGT.Enqueue(MoveTemp(Stats));
 			}
@@ -247,7 +251,7 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 
 
 #if NETWORK_PHYSICS_REPLICATE_EXTRAS
-				if (UE_NETWORK_PHYSICS::LogImpulses() > 0)
+				if (UE_NETWORK_PHYSICS::LogImpulses > 0)
 				{
 					for (int32 i=(int32)Chaos::FParticleHistoryEntry::EParticleHistoryPhase::PrePushData; i < (int32)Chaos::FParticleHistoryEntry::EParticleHistoryPhase::NumPhases; ++i)
 					{
@@ -259,14 +263,14 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 				}
 #endif
 				
-				if ((UE_NETWORK_PHYSICS::ResimForSleep() && CompareObjState(Obj.Physics.ObjectState, P.ObjectState(), TEXT("ObjectState"))) ||
-					CompareVec(Obj.Physics.Location, P.X(), UE_NETWORK_PHYSICS::X(), TEXT("Location")) ||
-					CompareVec(Obj.Physics.LinearVelocity, P.V(), UE_NETWORK_PHYSICS::V(), TEXT("Velocity")) ||
-					CompareVec(Obj.Physics.AngularVelocity, P.W(), UE_NETWORK_PHYSICS::W(), TEXT("Angular Velocity")) ||
-					CompareQuat(Obj.Physics.Rotation, P.R(), UE_NETWORK_PHYSICS::R(), TEXT("Rotation")) || UE_NETWORK_PHYSICS::ForceResim() > 0)
+				if ((UE_NETWORK_PHYSICS::ResimForSleep && CompareObjState(Obj.Physics.ObjectState, P.ObjectState(), TEXT("ObjectState"))) ||
+					CompareVec(Obj.Physics.Location, P.X(), UE_NETWORK_PHYSICS::X, TEXT("Location")) ||
+					CompareVec(Obj.Physics.LinearVelocity, P.V(), UE_NETWORK_PHYSICS::V, TEXT("Velocity")) ||
+					CompareVec(Obj.Physics.AngularVelocity, P.W(), UE_NETWORK_PHYSICS::W, TEXT("Angular Velocity")) ||
+					CompareQuat(Obj.Physics.Rotation, P.R(), UE_NETWORK_PHYSICS::R, TEXT("Rotation")) || UE_NETWORK_PHYSICS::ForceResim > 0)
 				{
 
-					UE_CLOG(UE_NETWORK_PHYSICS::LogCorrections() > 0, LogNetworkPhysics, Log, TEXT("Rewind Needed. SimFrame: %d. Obj.Frame: %d. LastCompletedStep: %d."), SimulationFrame, Obj.Frame, LastCompletedStep);
+					UE_CLOG(UE_NETWORK_PHYSICS::LogCorrections > 0, LogNetworkPhysics, Log, TEXT("Rewind Needed. SimFrame: %d. Obj.Frame: %d. LastCompletedStep: %d."), SimulationFrame, Obj.Frame, LastCompletedStep);
 
 					RewindToFrame = RewindToFrame == INDEX_NONE ? Obj.Frame : FMath::Min(RewindToFrame, Obj.Frame);
 					ensure(RewindToFrame >= 0);
@@ -275,14 +279,14 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 					PendingCorrectionIdx = 0;
 
 					// Send this correction back to GT for debugging
-					if (UE_NETWORK_PHYSICS::Debug() > 0)
+					if (UE_NETWORK_PHYSICS::Debug > 0)
 					{
 						FBasePhysicsState Auth{P.ObjectState(), P.X(), P.R(), P.V(), P.W()};
 						Stats.Corrections.Emplace(FStats::FCorrection{Proxy, Obj.Physics, Auth, Obj.Frame, Obj.Frame - Snapshot.LocalFrameOffset});
 					}
 
 #if NETWORK_PHYSICS_REPLICATE_EXTRAS
-					if (UE_NETWORK_PHYSICS::LogCorrections() > 0 && Obj.Frame-1 >= RewindData->GetEarliestFrame_Internal())
+					if (UE_NETWORK_PHYSICS::LogCorrections > 0 && Obj.Frame-1 >= RewindData->GetEarliestFrame_Internal())
 					{
 						const int32 PreSimulationFrame = SimulationFrame-1;
 						for (int32 i=(int32)Chaos::FParticleHistoryEntry::EParticleHistoryPhase::PrePushData; i < (int32)Chaos::FParticleHistoryEntry::EParticleHistoryPhase::NumPhases; ++i)
@@ -336,7 +340,7 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 		// Calling code will ensure if we return a bad frame
 		if (!(RewindToFrame > INDEX_NONE && RewindToFrame < LastCompletedStep-1))
 		{
-			UE_CLOG(UE_NETWORK_PHYSICS::LogCorrections() > 0 && RewindToFrame != INDEX_NONE, LogNetworkPhysics, Warning, TEXT("Trying to rewind to invalid frame %d (LastCompletedStep: %d)"), RewindToFrame, LastCompletedStep);
+			UE_CLOG(UE_NETWORK_PHYSICS::LogCorrections > 0 && RewindToFrame != INDEX_NONE, LogNetworkPhysics, Warning, TEXT("Trying to rewind to invalid frame %d (LastCompletedStep: %d)"), RewindToFrame, LastCompletedStep);
 			return INDEX_NONE;
 		}
 		
@@ -358,7 +362,7 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 
 				if (auto* PT = CorrectionState.Proxy->GetPhysicsThreadAPI())
 				{
-					UE_CLOG(UE_NETWORK_PHYSICS::LogCorrections() > 0, LogNetworkPhysics, Log, TEXT("Applying Correction from frame %d (actual step: %d). Location: %s"), CorrectionState.Frame, PhysicsStep, *FVector(CorrectionState.Physics.Location).ToString());
+					UE_CLOG(UE_NETWORK_PHYSICS::LogCorrections > 0, LogNetworkPhysics, Log, TEXT("Applying Correction from frame %d (actual step: %d). Location: %s"), CorrectionState.Frame, PhysicsStep, *FVector(CorrectionState.Physics.Location).ToString());
 				
 					PT->SetX(CorrectionState.Physics.Location, false);
 					PT->SetV(CorrectionState.Physics.LinearVelocity, false);
@@ -368,7 +372,7 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 					//if (PT->ObjectState() != CorrectionState.Physics.ObjectState)
 					{
 						ensure(CorrectionState.Physics.ObjectState != Chaos::EObjectStateType::Uninitialized);
-						UE_CLOG(UE_NETWORK_PHYSICS::LogCorrections() > 0, LogNetworkPhysics, Log, TEXT("Applying Correction State %d"), CorrectionState.Physics.ObjectState);
+						UE_CLOG(UE_NETWORK_PHYSICS::LogCorrections > 0, LogNetworkPhysics, Log, TEXT("Applying Correction State %d"), CorrectionState.Physics.ObjectState);
 						PT->SetObjectState(CorrectionState.Physics.ObjectState);
 					}
 				}
@@ -413,7 +417,7 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 							Obj.DebugState[i].LinearImpulse = State.LinearImpulse();
 							Obj.DebugState[i].AngularImpulse = State.AngularImpulse();
 
-							if (UE_NETWORK_PHYSICS::LogImpulses() > 0)
+							if (UE_NETWORK_PHYSICS::LogImpulses > 0)
 							{
 								if (Obj.DebugState[i].Force.SizeSquared() > 0.f)
 								{
@@ -584,7 +588,7 @@ void UNetworkPhysicsManager::Initialize(FSubsystemCollectionBase& Collection)
 
 	if (World->WorldType == EWorldType::PIE || World->WorldType == EWorldType::Game)
 	{
-		if (UE_NETWORK_PHYSICS::Enable() > 0)
+		if (UE_NETWORK_PHYSICS::Enable)
 		{
 			PostTickDispatchHandle = World->OnPostTickDispatch().AddUObject(this, &UNetworkPhysicsManager::PostNetRecv); // Should be safe. We want to marshal GT->PT as soon as possible
 			TickFlushHandle = World->OnTickFlush().AddUObject(this, &UNetworkPhysicsManager::PreNetSend); // Who wins, Subsystems or net drivers? We need to go first. Probably a dumb game to play (but we want to marshal PT->GT at last possible second)
@@ -689,7 +693,7 @@ void UNetworkPhysicsManager::PostNetRecv()
 		int32 MaxFrameSeen = INDEX_NONE;
 		
 		// Calculate themost accurate LocalOffset so that we can coorelate ServerFrames with our local frames
-		if (UE_NETWORK_PHYSICS::FixedLocalFrameOffset() == INDEX_NONE)
+		if (UE_NETWORK_PHYSICS::FixedLocalFrameOffset == INDEX_NONE)
 		{
 			// The server tells us what the latest InputCmd frame he processed from us when he did this tick (TODO)
 			// There are N InputCmds in flight. This is precisely how many steps behind we should take this server frame number at.	
@@ -708,7 +712,7 @@ void UNetworkPhysicsManager::PostNetRecv()
 					const int32 FrameOffset = LatestAckdClientFrame - LatestAckdServerFrame;
 					if (FrameOffset != LocalOffset)
 					{
-						UE_CLOG(UE_NETWORK_PHYSICS::LogCorrections() > 0, LogNetworkPhysics, Log, TEXT("LocalOFfset Changed: %d -> %d"), LocalOffset, FrameOffset);
+						UE_CLOG(UE_NETWORK_PHYSICS::LogCorrections > 0, LogNetworkPhysics, Log, TEXT("LocalOFfset Changed: %d -> %d"), LocalOffset, FrameOffset);
 						LocalOffset = FrameOffset;
 					}
 				}
@@ -729,19 +733,19 @@ void UNetworkPhysicsManager::PostNetRecv()
 			}
 
 			// LocalFrame = ServerFrame + Offset
-			FrameOffset = Solver->GetCurrentFrame() - UE_NETWORK_PHYSICS::FixedLocalFrameOffset() - MaxFrameFromServer;
+			FrameOffset = Solver->GetCurrentFrame() - UE_NETWORK_PHYSICS::FixedLocalFrameOffset - MaxFrameFromServer;
 
-			if (FMath::Abs( LocalOffset - FrameOffset) > UE_NETWORK_PHYSICS::FixedLocalFrameOffsetTolerance())
+			if (FMath::Abs( LocalOffset - FrameOffset) > UE_NETWORK_PHYSICS::FixedLocalFrameOffsetTolerance)
 			{
-				UE_CLOG(UE_NETWORK_PHYSICS::LogCorrections() > 0, LogNetworkPhysics, Warning, TEXT("LocalOFfset Changed: %d -> %d"), LocalOffset, FrameOffset);
+				UE_CLOG(UE_NETWORK_PHYSICS::LogCorrections > 0, LogNetworkPhysics, Warning, TEXT("LocalOFfset Changed: %d -> %d"), LocalOffset, FrameOffset);
 				LocalOffset = FrameOffset;
 			}
 		}
 
 		FVector LocalViewLoc;
 		FRotator LocalViewRot;
-		const float LODDistSq = UE_NETWORK_PHYSICS::LODDistance() * UE_NETWORK_PHYSICS::LODDistance();
-		if (UE_NETWORK_PHYSICS::EnableLOD() > 0)
+		const float LODDistSq = UE_NETWORK_PHYSICS::LODDistance * UE_NETWORK_PHYSICS::LODDistance;
+		if (UE_NETWORK_PHYSICS::EnableLOD > 0)
 		{
 			if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
 			{
@@ -766,7 +770,7 @@ void UNetworkPhysicsManager::PostNetRecv()
 					}
 				};
 
-				if (UE_NETWORK_PHYSICS::EnableLOD() > 0)
+				if (UE_NETWORK_PHYSICS::EnableLOD > 0)
 				{
 					if (PhysicsState->Proxy)
 					{
@@ -1054,7 +1058,7 @@ void UNetworkPhysicsManager::ProcessClientInputBuffers_External(int32 PhysicsSte
 					// No Cmds to process, enter fault state. Increment TargetNumBufferedCmds each time this happens.
 					// TODO: We should have something to bring this back down (which means skipping frames) we don't want temporary poor conditions to cause permanent high input buffering
 					FrameInfo.bFault = true;
-					FrameInfo.TargetNumBufferedCmds = FMath::Min(FrameInfo.TargetNumBufferedCmds+1.f, UE_NETWORK_PHYSICS::MaxTargetNumBufferedCmds());
+					FrameInfo.TargetNumBufferedCmds = FMath::Min(FrameInfo.TargetNumBufferedCmds+1.f, UE_NETWORK_PHYSICS::MaxTargetNumBufferedCmds);
 
 					UE_CLOG(FrameInfo.LastProcessedInputFrame != INDEX_NONE, LogNetworkPhysics, Warning, TEXT("[Remote.Input] ENTERING fault. New Target: %.2f. (Client) Input: %d. (Server) Local Frame:"), FrameInfo.TargetNumBufferedCmds, FrameInfo.LastProcessedInputFrame, FrameInfo.LastLocalFrame);
 					return;
@@ -1063,16 +1067,27 @@ void UNetworkPhysicsManager::ProcessClientInputBuffers_External(int32 PhysicsSte
 				float TargetTimeDilation = 1.f;
 				if (NumBufferedInputCmds < (int32)FrameInfo.TargetNumBufferedCmds)
 				{
-					TargetTimeDilation += UE_NETWORK_PHYSICS::MaxTimeDilationMag(); // Tell client to speed up, we are starved on cmds
+					TargetTimeDilation += UE_NETWORK_PHYSICS::MaxTimeDilationMag; // Tell client to speed up, we are starved on cmds
 				}
 				else if (NumBufferedInputCmds > (int32)FrameInfo.TargetNumBufferedCmds)
 				{
-					TargetTimeDilation -= UE_NETWORK_PHYSICS::MaxTimeDilationMag(); // Tell client to slow down, we have too many buffered cmds
+					TargetTimeDilation -= UE_NETWORK_PHYSICS::MaxTimeDilationMag; // Tell client to slow down, we have too many buffered cmds
+
+					if (UE_NETWORK_PHYSICS::LerpTargetNumBufferedCmdsAggresively == 0)
+					{
+						// When non gaggressive, only lerp when we are above our limit
+						FrameInfo.TargetNumBufferedCmds = FMath::Lerp(FrameInfo.TargetNumBufferedCmds, UE_NETWORK_PHYSICS::TargetNumBufferedCmds, UE_NETWORK_PHYSICS::TargetNumBufferedCmdsAlpha);
+					}
 				}
 				
-				FrameInfo.TargetTimeDilation = FMath::Lerp(FrameInfo.TargetTimeDilation, TargetTimeDilation, UE_NETWORK_PHYSICS::TimeDilationAlpha());
+				FrameInfo.TargetTimeDilation = FMath::Lerp(FrameInfo.TargetTimeDilation, TargetTimeDilation, UE_NETWORK_PHYSICS::TimeDilationAlpha);
 				FrameInfo.QuantizedTimeDilation = UE_NETWORK_PHYSICS::QuantizeTimeDilation(TargetTimeDilation);
-				FrameInfo.TargetNumBufferedCmds = FMath::Lerp(FrameInfo.TargetNumBufferedCmds, UE_NETWORK_PHYSICS::TargetNumBufferedCmds(), UE_NETWORK_PHYSICS::TargetNumBufferedCmdsAlpha());
+
+				if (UE_NETWORK_PHYSICS::LerpTargetNumBufferedCmdsAggresively != 0)
+				{
+					// When gaggressive, always lerp towards target
+					FrameInfo.TargetNumBufferedCmds = FMath::Lerp(FrameInfo.TargetNumBufferedCmds, UE_NETWORK_PHYSICS::TargetNumBufferedCmds, UE_NETWORK_PHYSICS::TargetNumBufferedCmdsAlpha);
+				}
 
 				FrameInfo.LastProcessedInputFrame++;
 				FrameInfo.LastLocalFrame = PhysicsStep;
@@ -1142,7 +1157,7 @@ void UNetworkPhysicsManager::RegisterPhysicsProxyDebugDraw(FNetworkPhysicsState*
 
 void UNetworkPhysicsManager::TickDrawDebug()
 {
-	if (UE_NETWORK_PHYSICS::Debug() <= 0)
+	if (UE_NETWORK_PHYSICS::Debug <= 0)
 	{
 		if (RewindCallback)
 		{
@@ -1200,14 +1215,14 @@ void UNetworkPhysicsManager::TickDrawDebug()
 
 			for (auto& Correction : Stats.Corrections)
 			{
-				if (UE_NETWORK_PHYSICS::DebugTolerance() > 0)
+				if (UE_NETWORK_PHYSICS::DebugTolerance > 0)
 				{
-					if (FVector::Distance(Correction.LocalState.Location, Correction.AuthorityState.Location) < UE_NETWORK_PHYSICS::DebugDrawTolerance_X())
+					if (FVector::Distance(Correction.LocalState.Location, Correction.AuthorityState.Location) < UE_NETWORK_PHYSICS::DebugDrawTolerance_X)
 					{
 						continue;
 					}
 
-					if (FQuat::ErrorAutoNormalize(Correction.LocalState.Rotation, Correction.AuthorityState.Rotation) < UE_NETWORK_PHYSICS::DebugDrawTolerance_R())
+					if (FQuat::ErrorAutoNormalize(Correction.LocalState.Rotation, Correction.AuthorityState.Rotation) < UE_NETWORK_PHYSICS::DebugDrawTolerance_R)
 					{
 						continue;
 					}
@@ -1228,7 +1243,7 @@ void UNetworkPhysicsManager::TickDrawDebug()
 			}
 		}
 
-		if (UE_NETWORK_PHYSICS::Debug() > 1)
+		if (UE_NETWORK_PHYSICS::Debug > 1)
 		{
 			// Draw last recv state in blue
 			// (This ends up being pretty noisey so is only enabled in debug mode > 1)
@@ -1367,7 +1382,7 @@ void UNetworkPhysicsManager::TickDrawDebug()
 		//OnShowDebugInfoHandle = AHUD::OnHUDPostRender.AddLambda([this](AHUD* HUD, UCanvas* Canvas, const FDebugDisplayInfo& DisplayInfo, float& YL, float& YPos)
 		OnShowDebugInfoHandle = AHUD::OnHUDPostRender.AddLambda([this](AHUD* HUD, UCanvas* Canvas)
 		{
-			if (UE_NETWORK_PHYSICS::Debug() <= 0)
+			if (UE_NETWORK_PHYSICS::Debug <= 0)
 			{
 				return;
 			}

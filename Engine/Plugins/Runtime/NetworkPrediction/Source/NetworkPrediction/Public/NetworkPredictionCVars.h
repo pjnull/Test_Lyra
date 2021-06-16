@@ -42,6 +42,10 @@ struct FConditionalAutoConsoleRegister
 	}
 };
 
+#define NP_DEVCVAR_INT(Var,Value,VarName,Help) \
+	int32 Var = Value; \
+	static FAutoConsoleVariableRef Var##CVar(TEXT(VarName), Var, TEXT(Help), ECVF_Cheat );
+
 #define NETSIM_DEVCVAR_INT(Var,Value,VarName,Help) \
 	static FConditionalAutoConsoleRegister Var##Auto(TEXT(VarName),(int32)Value,TEXT(Help)); \
 	inline int32 Var() \
@@ -65,6 +69,11 @@ struct FConditionalAutoConsoleRegister
 #define NETSIM_DEVCVAR_SHIPCONST_INT(Var,Value,VarName,Help) NETSIM_DEVCVAR_INT(Var,Value,VarName,Help)
 #endif
 
+
+
+#define NP_DEVCVAR_FLOAT(Var,Value,VarName,Help) \
+	float Var = Value; \
+	static FAutoConsoleVariableRef Var##CVar(TEXT(VarName), Var, TEXT(Help), ECVF_Cheat );
 
 #define NETSIM_DEVCVAR_FLOAT(Var,Value,VarName,Help) \
 	static FConditionalAutoConsoleRegister Var##Auto(TEXT(VarName),(float)Value,TEXT(Help)); \
