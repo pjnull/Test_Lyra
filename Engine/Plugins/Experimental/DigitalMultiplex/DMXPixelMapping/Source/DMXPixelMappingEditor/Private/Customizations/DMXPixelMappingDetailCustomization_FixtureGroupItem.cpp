@@ -12,6 +12,7 @@
 #include "DetailWidgetRow.h"
 #include "IDetailChildrenBuilder.h"
 #include "IPropertyUtilities.h"
+#include "PropertyEditorModule.h"
 #include "Layout/Visibility.h"
 #include "Modules/ModuleManager.h"
 
