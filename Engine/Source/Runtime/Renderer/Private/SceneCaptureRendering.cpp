@@ -416,14 +416,12 @@ static void UpdateSceneCaptureContent_RenderThread(
 	RHICmdList.Transition(FRHITransitionInfo(RenderTargetTexture->TextureRHI, ERHIAccess::Unknown, ERHIAccess::SRVMask));
 }
 
-void BuildProjectionMatrix(FIntPoint RenderTargetSize, ECameraProjectionMode::Type ProjectionType, float FOV, float InOrthoWidth, float InNearClippingPlane, FMatrix& ProjectionMatrix)
+static void BuildOrthoMatrix(FIntPoint InRenderTargetSize, float InOrthoWidth, int32 InTileID, int32 InNumXTiles, int32 InNumYTiles, FMatrix& OutProjectionMatrix)
 {
+	check((int32)ERHIZBuffer::IsInverted);
 	float const XAxisMultiplier = 1.0f;
-	float const YAxisMultiplier = RenderTargetSize.X / (float)RenderTargetSize.Y;
+	float const YAxisMultiplier = InRenderTargetSize.X / float(InRenderTargetSize.Y);
 
-	if (ProjectionType == ECameraProjectionMode::Orthographic)
-	{
-		check((int32)ERHIZBuffer::IsInverted);
 		const float OrthoWidth = InOrthoWidth / 2.0f;
 		const float OrthoHeight = InOrthoWidth / 2.0f * XAxisMultiplier / YAxisMultiplier;
 
@@ -433,20 +431,47 @@ void BuildProjectionMatrix(FIntPoint RenderTargetSize, ECameraProjectionMode::Ty
 		const float ZScale = 1.0f / (FarPlane - NearPlane);
 		const float ZOffset = -NearPlane;
 
-		ProjectionMatrix = FReversedZOrthoMatrix(
+	if (InTileID == -1)
+	{
+		OutProjectionMatrix = FReversedZOrthoMatrix(
 			OrthoWidth,
 			OrthoHeight,
 			ZScale,
 			ZOffset
 			);
+		
+		return;
 	}
-	else
-	{
+
+	const float XTileDividerRcp = 1.0f / float(InNumXTiles);
+	const float YTileDividerRcp = 1.0f / float(InNumYTiles);
+
+	const float TileX = float(InTileID % InNumXTiles);
+	const float TileY = float(InTileID / InNumXTiles);
+
+	float l = -OrthoWidth + TileX * InOrthoWidth * XTileDividerRcp;
+	float r = l + InOrthoWidth * XTileDividerRcp;
+	float t = OrthoHeight - TileY * InOrthoWidth * YTileDividerRcp;
+	float b = t - InOrthoWidth * YTileDividerRcp;
+
+	OutProjectionMatrix = FMatrix(
+		FPlane(2.0f / (r-l), 0.0f, 0.0f, 0.0f),
+		FPlane(0.0f, 2.0f / (t-b), 0.0f, 0.0f),
+		FPlane(0.0f, 0.0f, -ZScale, 0.0f),
+		FPlane(-((r+l)/(r-l)), -((t+b)/(t-b)), 1.0f - ZOffset * ZScale, 1.0f)
+	);
+}
+
+void BuildProjectionMatrix(FIntPoint InRenderTargetSize, float InFOV, float InNearClippingPlane, FMatrix& OutProjectionMatrix)
+{
+	float const XAxisMultiplier = 1.0f;
+	float const YAxisMultiplier = InRenderTargetSize.X / float(InRenderTargetSize.Y);
+
 		if ((int32)ERHIZBuffer::IsInverted)
 		{
-			ProjectionMatrix = FReversedZPerspectiveMatrix(
-				FOV,
-				FOV,
+		OutProjectionMatrix = FReversedZPerspectiveMatrix(
+			InFOV,
+			InFOV,
 				XAxisMultiplier,
 				YAxisMultiplier,
 				InNearClippingPlane,
@@ -455,16 +480,15 @@ void BuildProjectionMatrix(FIntPoint RenderTargetSize, ECameraProjectionMode::Ty
 		}
 		else
 		{
-			ProjectionMatrix = FPerspectiveMatrix(
-				FOV,
-				FOV,
+		OutProjectionMatrix = FPerspectiveMatrix(
+			InFOV,
+			InFOV,
 				XAxisMultiplier,
 				YAxisMultiplier,
 				InNearClippingPlane,
 				InNearClippingPlane
 				);
 		}
-	}
 }
 
 void SetupViewFamilyForSceneCapture(
