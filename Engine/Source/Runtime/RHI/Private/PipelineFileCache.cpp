@@ -551,9 +551,9 @@ void FPipelineCacheFileFormatPSO::GraphicsDescriptor::AddStateToReadableString(T
 	OutBuilder << TEXT(" MSAA:");
 	OutBuilder << MSAASamples;
 	OutBuilder << TEXT(" DSfmt:");
-	OutBuilder << DepthStencilFormat;
+	OutBuilder << uint32(DepthStencilFormat);
 	OutBuilder << TEXT(" DSflags:");
-	OutBuilder << DepthStencilFlags;
+	OutBuilder << uint32(DepthStencilFlags);
 	OutBuilder << TEXT("\n");
 
 	OutBuilder << TEXT(" DL:");
@@ -582,7 +582,7 @@ void FPipelineCacheFileFormatPSO::GraphicsDescriptor::AddStateToReadableString(T
 			OutBuilder << TEXT(":fmt=");
 			OutBuilder << uint32(RenderTargetFormats[Index]);
 			OutBuilder << TEXT(" flg=");
-			OutBuilder << RenderTargetFlags[Index];
+			OutBuilder << uint32(RenderTargetFlags[Index]);
 		}
 		OutBuilder << TEXT("\n");
 	}
