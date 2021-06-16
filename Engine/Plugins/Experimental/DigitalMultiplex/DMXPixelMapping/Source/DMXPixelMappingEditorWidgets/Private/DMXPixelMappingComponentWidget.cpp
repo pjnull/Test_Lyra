@@ -34,7 +34,7 @@ void FDMXPixelMappingComponentWidget::AddToCanvas(const TSharedRef<SConstraintCa
 
 	OuterCanvas = Canvas;
 		
-	&OuterCanvas->AddSlot()
+	OuterCanvas->AddSlot()
 	.AutoSize(true)
 	.Alignment(FVector2D::ZeroVector)
 	.ZOrder(ZOrder)
@@ -43,7 +43,7 @@ void FDMXPixelMappingComponentWidget::AddToCanvas(const TSharedRef<SConstraintCa
 		ComponentBox.ToSharedRef()
 	];
 
-	 &OuterCanvas->AddSlot()
+	OuterCanvas->AddSlot()
 	.AutoSize(true)
 	.Expose(LabelSlot)
 	.Alignment(FVector2D::ZeroVector)
