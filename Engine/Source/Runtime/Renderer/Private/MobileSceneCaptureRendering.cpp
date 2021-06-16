@@ -129,7 +129,8 @@ static void CopyCaptureToTarget(
 	const FIntRect& ViewRect, 
 	FRDGTextureRef SourceTexture,
 	bool bNeedsFlippedRenderTarget,
-	FSceneRenderer* SceneRenderer)
+	FSceneRenderer* SceneRenderer,
+	const FResolveParams& ResolveParams)
 {
 	FIntPoint SourceTexSize = SourceTexture->Desc.Extent;
 
@@ -174,6 +175,48 @@ static void CopyCaptureToTarget(
 
 		TShaderMapRef<FMobileSceneCaptureCopyPS> PixelShader(View.ShaderMap, ShaderPermutationVector);
 
+		const bool bEnableTiling = ResolveParams.DestRect.IsValid();
+
+		auto SetViewportIfTiled = [&]()
+		{
+			if (!bEnableTiling)
+			{
+				return;
+			}
+
+			if (bNeedsFlippedRenderTarget)
+			{
+				FResolveRect DestRect = ResolveParams.DestRect;
+				int32 TileYID = DestRect.Y1 / ViewRect.Height();
+				int32 TileYCount = (Target->GetSizeXY().Y / ViewRect.Height()) - 1;
+				DestRect.Y1 = (TileYCount - TileYID) * ViewRect.Height();
+				DestRect.Y2 = DestRect.Y1 + ViewRect.Height();
+				RHICmdList.SetViewport
+				(
+					float(DestRect.X1),
+					float(DestRect.Y1),
+					0.0f,
+					float(DestRect.X2),
+					float(DestRect.Y2),
+					1.0f
+				);
+			}
+			else
+			{
+				RHICmdList.SetViewport
+				(
+					float(ResolveParams.DestRect.X1),
+					float(ResolveParams.DestRect.Y1),
+					0.0f,
+					float(ResolveParams.DestRect.X2),
+					float(ResolveParams.DestRect.Y2),
+					1.0f
+				);
+			}
+		};
+
+
+
 		FMobileSceneCaptureCopyPS::FParameters* PSShaderParameters = GraphBuilder.AllocParameters<FMobileSceneCaptureCopyPS::FParameters>();
 		PSShaderParameters->View = View.ViewUniformBuffer;
 		PSShaderParameters->InTexture = SourceTexture;
@@ -206,6 +249,8 @@ static void CopyCaptureToTarget(
 
 			if (bNeedsFlippedRenderTarget)
 			{
+				SetViewportIfTiled();
+
 				DrawRectangle(
 					RHICmdList,
 					ViewRect.Min.X, ViewRect.Min.Y,
@@ -219,6 +264,8 @@ static void CopyCaptureToTarget(
 			}
 			else
 			{
+				SetViewportIfTiled();
+
 				DrawRectangle(
 					RHICmdList,
 					ViewRect.Min.X, ViewRect.Min.Y,
@@ -277,6 +324,8 @@ static void CopyCaptureToTarget(
 
 			int32 TargetPosY = ViewRect.Min.Y;
 			int32 TargetHeight = ViewRect.Height();
+
+			SetViewportIfTiled(); 
 
 			if (bNeedsFlippedRenderTarget)
 			{
@@ -408,7 +457,7 @@ void UpdateSceneCaptureContentMobile_RenderThread(
 		{
 			// We need to flip this texture upside down (since we depended on tonemapping to fix this on the hdr path)
 			RDG_EVENT_SCOPE(GraphBuilder, "FlipCapture");
-			CopyCaptureToTarget(GraphBuilder, OutputTexture, TargetSize, View, ViewRect, FlippedOutputTexture, bNeedsFlippedCopy, SceneRenderer);
+			CopyCaptureToTarget(GraphBuilder, OutputTexture, TargetSize, View, ViewRect, FlippedOutputTexture, bNeedsFlippedCopy, SceneRenderer, ResolveParams);
 		}
 		else if(bUseSceneTextures)
 		{
@@ -416,7 +465,7 @@ void UpdateSceneCaptureContentMobile_RenderThread(
 
 			// Copy the captured scene into the destination texture
 			RDG_EVENT_SCOPE(GraphBuilder, "CaptureSceneColor");
-			CopyCaptureToTarget(GraphBuilder, OutputTexture, TargetSize, View, ViewRect, SceneTextures.Color.Target, bNeedsFlippedCopy, SceneRenderer);
+			CopyCaptureToTarget(GraphBuilder, OutputTexture, TargetSize, View, ViewRect, SceneTextures.Color.Target, bNeedsFlippedCopy, SceneRenderer, ResolveParams);
 		}
 
 		if (bGenerateMips)
