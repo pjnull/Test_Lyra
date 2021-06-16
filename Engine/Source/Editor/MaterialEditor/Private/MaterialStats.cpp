@@ -439,6 +439,7 @@ void FMaterialStats::BuildShaderPlatformDB()
 #if PLATFORM_WINDOWS
 	// DirectX
 	AddShaderPlatform(EPlatformCategoryType::Desktop, SP_PCD3D_SM5, TEXT("DirectX SM5"), true, true, TEXT("Desktop, DirectX, Shader Model 5"));
+	AddShaderPlatform(EPlatformCategoryType::Desktop, SP_PCD3D_ES3_1, TEXT("DirectX ES 3.1"), true, true, TEXT("Desktop, DirectX, ES 3.1"));
 #endif
 
 	// Vulkan
