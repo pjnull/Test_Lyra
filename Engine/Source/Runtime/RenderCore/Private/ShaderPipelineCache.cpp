@@ -1026,8 +1026,10 @@ void FShaderPipelineCache::PrecompilePipelineBatch()
 		
 		FRHICommandListImmediate& RHICmdList = GRHICommandList.GetImmediateCommandList();
 		
+		uint32 PSOHash = GetTypeHash(CompileTask.PSO);
+		UE_LOG(LogRHI, Verbose, TEXT("Precompiling PSO %u (%d/%d)"), PSOHash, i, NumToPrecompile);
 		Precompile(RHICmdList, GMaxRHIShaderPlatform, CompileTask.PSO);
-		CompiledHashes.Add(GetTypeHash(CompileTask.PSO));
+		CompiledHashes.Add(PSOHash);
 		
 		delete CompileTask.ReadRequests;
 		CompileTask.ReadRequests = nullptr;

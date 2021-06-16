@@ -401,6 +401,12 @@ FString FPipelineCacheFileFormatPSO::ComputeDescriptor::ToString() const
 	return ComputeShader.ToString();
 }
 
+void FPipelineCacheFileFormatPSO::ComputeDescriptor::AddToReadableString(TReadableStringBuilder& OutBuilder) const
+{
+	OutBuilder << TEXT(" CS:");
+	OutBuilder << ComputeShader.ToString();
+}
+
 void FPipelineCacheFileFormatPSO::ComputeDescriptor::FromString(const FStringView& Src)
 {
 	ComputeShader.FromString(Src.TrimStartAndEnd());
@@ -424,6 +430,25 @@ FString FPipelineCacheFileFormatPSO::GraphicsDescriptor::ShadersToString() const
 	);
 
 	return Result;
+}
+
+void FPipelineCacheFileFormatPSO::GraphicsDescriptor::AddShadersToReadableString(TReadableStringBuilder& OutBuilder) const
+{
+	if (VertexShader != FSHAHash())
+	{
+		OutBuilder << TEXT(" VS:");
+		OutBuilder << VertexShader;
+	}
+	if (FragmentShader != FSHAHash())
+	{
+		OutBuilder << TEXT(" PS:");
+		OutBuilder << FragmentShader;
+	}
+	if (GeometryShader != FSHAHash())
+	{
+		OutBuilder << TEXT(" GS:");
+		OutBuilder << GeometryShader;
+	}
 }
 
 void FPipelineCacheFileFormatPSO::GraphicsDescriptor::ShadersFromString(const FStringView& Src)
@@ -511,6 +536,74 @@ FString FPipelineCacheFileFormatPSO::GraphicsDescriptor::StateToString() const
 		}
 	}
 	return Result.Left(Result.Len() - 1); // remove trailing comma
+}
+
+void FPipelineCacheFileFormatPSO::GraphicsDescriptor::AddStateToReadableString(TReadableStringBuilder& OutBuilder) const
+{
+	OutBuilder << TEXT(" BS:");
+	OutBuilder << BlendState.ToString();
+	OutBuilder << TEXT(" RS:");
+	OutBuilder << RasterizerState.ToString();
+	OutBuilder << TEXT(" DSS:");
+	OutBuilder << DepthStencilState.ToString();
+	OutBuilder << TEXT("\n");
+
+	OutBuilder << TEXT(" MSAA:");
+	OutBuilder << MSAASamples;
+	OutBuilder << TEXT(" DSfmt:");
+	OutBuilder << DepthStencilFormat;
+	OutBuilder << TEXT(" DSflags:");
+	OutBuilder << DepthStencilFlags;
+	OutBuilder << TEXT("\n");
+
+	OutBuilder << TEXT(" DL:");
+	OutBuilder << uint32(DepthLoad);
+	OutBuilder << TEXT(" SL:");
+	OutBuilder << uint32(StencilLoad);
+	OutBuilder << TEXT(" DS:");
+	OutBuilder << uint32(DepthStore);
+	OutBuilder << TEXT(" SS:");
+	OutBuilder << uint32(StencilStore);
+	OutBuilder << TEXT(" PT:");
+	OutBuilder << uint32(PrimitiveType);
+	OutBuilder << TEXT("\n");
+
+	OutBuilder << TEXT(" RTA ");
+	OutBuilder << RenderTargetsActive;
+	OutBuilder << TEXT("\n");
+
+	if (RenderTargetsActive)
+	{
+		OutBuilder << TEXT("    ");
+		for (uint32 Index = 0; Index < RenderTargetsActive; Index++)
+		{
+			OutBuilder << TEXT(" RT");
+			OutBuilder << Index,
+			OutBuilder << TEXT(":fmt=");
+			OutBuilder << uint32(RenderTargetFormats[Index]);
+			OutBuilder << TEXT(" flg=");
+			OutBuilder << RenderTargetFlags[Index];
+		}
+		OutBuilder << TEXT("\n");
+	}
+
+	OutBuilder << TEXT(" SuH:");
+	OutBuilder << uint32(SubpassHint);
+	OutBuilder << TEXT(" SuI:");
+	OutBuilder << uint32(SubpassIndex);
+	OutBuilder << TEXT("\n");
+
+	OutBuilder << TEXT(" NumVE ");
+	OutBuilder << VertexDescriptor.Num();
+	OutBuilder << TEXT("\n");
+
+	for (int32 Index = 0; Index < VertexDescriptor.Num(); Index++)
+	{
+		OutBuilder << TEXT(" ");
+		OutBuilder << Index;
+		OutBuilder << TEXT(":");
+		OutBuilder << VertexDescriptor[Index].ToString();
+	}
 }
 
 bool FPipelineCacheFileFormatPSO::GraphicsDescriptor::StateFromString(const FStringView& Src)
@@ -676,6 +769,14 @@ FString FPipelineCacheFileFormatPSO::GraphicsDescriptor::ToString() const
 	return FString::Printf(TEXT("%s,%s"), *ShadersToString(), *StateToString());
 }
 
+void FPipelineCacheFileFormatPSO::GraphicsDescriptor::AddToReadableString(TReadableStringBuilder& OutBuilder) const
+{
+	AddShadersToReadableString(OutBuilder);
+	OutBuilder << TEXT("\n");
+	AddStateToReadableString(OutBuilder);
+	OutBuilder << TEXT("\n");
+}
+
 bool FPipelineCacheFileFormatPSO::GraphicsDescriptor::FromString(const FStringView& Src)
 {
 	constexpr int32 NumShaderParts = 5;
@@ -714,6 +815,42 @@ FString FPipelineCacheFileFormatPSO::CommonToString() const
 #endif
 	return FString::Printf(TEXT("\"%d,%llu\""), Count, Mask);
 }
+
+FStringView FPipelineCacheFileFormatPSO::ToStringReadable()
+{
+	TReadableStringBuilder Builder;
+
+	Builder << TEXT("PSO hash ");
+	Builder << GetTypeHash(*this);
+#if PSO_COOKONLY_DATA
+	Builder << TEXT(" mask ");
+	Builder << UsageMask;
+	Builder << TEXT(" bindc ");
+	Builder << BindCount;
+#endif
+	Builder << TEXT("\n");
+
+	if (Type == DescriptorType::Graphics)
+	{
+		GraphicsDesc.AddToReadableString(Builder);
+	}
+	else if (Type == DescriptorType::Compute)
+	{
+		ComputeDesc.AddToReadableString(Builder);
+	}
+	else if (Type == DescriptorType::RayTracing)
+	{
+		RayTracingDesc.AddToReadableString(Builder);
+	}
+	else
+	{
+		Builder << TEXT(" Unknown PSO type ");
+		Builder << static_cast<int32>(Type);
+	}
+
+	return FStringView(Builder);
+}
+
 
 void FPipelineCacheFileFormatPSO::CommonFromString(const FStringView& Src)
 {
@@ -1248,7 +1385,7 @@ FPipelineCacheFileFormatPSO::FPipelineCacheFileFormatPSO()
 		bOK &= Init.DepthStencilState->GetInitializer(PSO.GraphicsDesc.DepthStencilState);
 		check(bOK);
 	}
-	
+
 	for (uint32 i = 0; i < MaxSimultaneousRenderTargets; i++)
 	{
 		PSO.GraphicsDesc.RenderTargetFormats[i] = (EPixelFormat)Init.RenderTargetFormats[i];
@@ -1577,6 +1714,19 @@ public:
 				{
 					UE_LOG(LogRHI, Log, TEXT("FPipelineCacheFile: %s is corrupt reading TOC"), *FilePath);
 				}
+			}
+			else
+			{
+				bool bMagicMatch = (Header.Magic == FPipelineCacheFileFormatMagic);
+				bool bVersionMatch = (Header.Version == FPipelineCacheFileFormatCurrentVersion);
+				bool bGameVersionMatch = (Header.GameVersion == GameVersion);
+				bool bSPMatch = (Header.Platform == ShaderPlatform);
+				UE_LOG(LogRHI, Log, TEXT("FPipelineCacheFile: skipping %s (different %s%s%s%s)"), *FilePath,
+					bMagicMatch ? TEXT("") : TEXT(" magic"),
+					bVersionMatch ? TEXT("") : TEXT(" version"),
+					bGameVersionMatch ? TEXT("") : TEXT(" gameversion"),
+					bSPMatch ? TEXT("") : TEXT(" shaderplatform")
+					);
 			}
 			
 			if(!FileReader->Close())
@@ -3108,7 +3258,11 @@ void FPipelineFileCache::CacheGraphicsPSO(uint32 RunTimeHash, FGraphicsPipelineS
 							UE_LOG(LogRHI, Display, TEXT("Encountered a new graphics PSO: %u"), PSOHash);
 							if (GPSOFileCachePrintNewPSODescriptors > 0)
 							{
-								UE_LOG(LogRHI, Display, TEXT("New Graphics PSO (%u) Description: %s"), PSOHash, *NewEntry.GraphicsDesc.ToString());
+								UE_LOG(LogRHI, Display, TEXT("New Graphics PSO (%u)"), PSOHash);
+#if !UE_BUILD_SHIPPING
+								FStringView ReadablePSODesc = NewEntry.ToStringReadable();
+								UE_LOG(LogRHI, Display, TEXT("%.*s"), PSOHash, ReadablePSODesc.Len(), ReadablePSODesc.GetData());
+#endif
 							}
 							if (LogPSOtoFileCache())
 							{
@@ -3249,7 +3403,7 @@ void FPipelineFileCache::CacheRayTracingPSO(const FRayTracingPipelineStateInitia
 	{
 		for (FRHIRayTracingShader* Shader : Table)
 		{
-			FPipelineFileCacheRayTracingDesc Desc(Initializer, Shader);
+			FPipelineCacheFileFormatPSO::FPipelineFileCacheRayTracingDesc Desc(Initializer, Shader);
 			uint32 RunTimeHash = GetTypeHash(Desc);
 
 			FPSOUsageData* PSOUsage = RunTimeToPSOUsage.Find(RunTimeHash);
@@ -3874,7 +4028,7 @@ bool FPipelineFileCache::MergePipelineFileCaches(FString const& PathA, FString c
 	return bOK;
 }
 
-FPipelineFileCacheRayTracingDesc::FPipelineFileCacheRayTracingDesc(const FRayTracingPipelineStateInitializer& Initializer, const FRHIRayTracingShader* ShaderRHI)
+FPipelineCacheFileFormatPSO::FPipelineFileCacheRayTracingDesc::FPipelineFileCacheRayTracingDesc(const FRayTracingPipelineStateInitializer& Initializer, const FRHIRayTracingShader* ShaderRHI)
 : ShaderHash(ShaderRHI->GetHash())
 , MaxPayloadSizeInBytes(Initializer.MaxPayloadSizeInBytes)
 , Frequency(ShaderRHI->GetFrequency())
@@ -3882,12 +4036,12 @@ FPipelineFileCacheRayTracingDesc::FPipelineFileCacheRayTracingDesc(const FRayTra
 {
 }
 
-FString FPipelineFileCacheRayTracingDesc::HeaderLine() const
+FString FPipelineCacheFileFormatPSO::FPipelineFileCacheRayTracingDesc::HeaderLine() const
 {
 	return FString(TEXT("RayTracingShader,MaxPayloadSizeInBytes,Frequency,bAllowHitGroupIndexing"));
 }
 
-FString FPipelineFileCacheRayTracingDesc::ToString() const
+FString FPipelineCacheFileFormatPSO::FPipelineFileCacheRayTracingDesc::ToString() const
 {
 	return FString::Printf(TEXT("%s,%d,%d,%d")
 		, *ShaderHash.ToString()
@@ -3897,7 +4051,32 @@ FString FPipelineFileCacheRayTracingDesc::ToString() const
 	);
 }
 
-void FPipelineFileCacheRayTracingDesc::FromString(const FString& Src)
+void FPipelineCacheFileFormatPSO::FPipelineFileCacheRayTracingDesc::AddToReadableString(TReadableStringBuilder& OutBuilder) const
+{
+	// TODO: probably needs a better implementation once we get to this
+	switch (Frequency)
+	{
+		case SF_RayGen:
+			OutBuilder << TEXT(" RGS:");
+			break;
+		case SF_RayCallable:
+			OutBuilder << TEXT(" RCS:");
+			break;
+		case SF_RayHitGroup:
+			OutBuilder << TEXT(" RHGS:");
+			break;
+		case SF_RayMiss:
+			OutBuilder << TEXT(" RMS:");
+			break;
+	}
+	OutBuilder << ShaderHash.ToString();
+	OutBuilder << TEXT(" MPSIB ");
+	OutBuilder << MaxPayloadSizeInBytes;
+	OutBuilder << TEXT(" AHGI ");
+	OutBuilder << bAllowHitGroupIndexing;
+}
+
+void FPipelineCacheFileFormatPSO::FPipelineFileCacheRayTracingDesc::FromString(const FString& Src)
 {
 	TArray<FString> Parts;
 	Src.TrimStartAndEnd().ParseIntoArray(Parts, TEXT(","));
@@ -3919,7 +4098,7 @@ void FPipelineFileCacheRayTracingDesc::FromString(const FString& Src)
 	}
 }
 
-bool FPipelineCacheFileFormatPSO::Init(FPipelineCacheFileFormatPSO& PSO, FPipelineFileCacheRayTracingDesc const& Desc)
+bool FPipelineCacheFileFormatPSO::Init(FPipelineCacheFileFormatPSO& PSO, FPipelineCacheFileFormatPSO::FPipelineFileCacheRayTracingDesc const& Desc)
 {
 	PSO.Hash = 0;
 	PSO.Type = DescriptorType::RayTracing;
