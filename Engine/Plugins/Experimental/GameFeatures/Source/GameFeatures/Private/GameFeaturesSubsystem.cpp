@@ -491,6 +491,7 @@ bool UGameFeaturesSubsystem::GetGameFeaturePluginInstallPercent(const FString& P
 			{
 				Install_Percent = 0.0f;
 			}
+			return true;
 		}
 	}
 	return false;
