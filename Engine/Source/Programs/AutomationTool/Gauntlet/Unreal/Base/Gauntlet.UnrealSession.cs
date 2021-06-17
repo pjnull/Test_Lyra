@@ -1108,6 +1108,14 @@ namespace Gauntlet
 			LogOut.Append(InRunningRole.AppInstance.StdOut);
 
 			File.WriteAllText(ArtifactLogPath, LogOut.ToString());
+
+			// On build machines, copy all role logs to Horde.
+			if (CommandUtils.IsBuildMachine)
+			{
+				string HordeLogFileName = Path.Combine(CommandUtils.CmdEnv.LogFolder, RoleName + "Output.log");
+				File.WriteAllText(HordeLogFileName, LogOut.ToString());
+			}
+
 			Log.Info("Wrote Log to {0}", ArtifactLogPath);
 
 			if (IsServer == false)
