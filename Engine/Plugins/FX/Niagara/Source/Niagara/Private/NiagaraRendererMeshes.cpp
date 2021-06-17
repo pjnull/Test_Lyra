@@ -1134,11 +1134,6 @@ void FNiagaraRendererMeshes::GetDynamicRayTracingInstances(FRayTracingMaterialGa
 		VertexFactory.InitResource();
 		SetupVertexFactory(VertexFactory, LODModel);
 
-		if (!VertexFactory.GetType()->SupportsRayTracingDynamicGeometry())
-		{
-			continue;
-		}
-
 		PreparePerMeshData(ParticleMeshRenderData, *SceneProxy, MeshData);
 
 		// Sort/Cull particles if needed.
