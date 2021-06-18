@@ -1004,11 +1004,14 @@ FFileIoStore::FFileIoStore()
 FFileIoStore::~FFileIoStore()
 {
 	delete Thread;
+	FFileIoStats::Shutdown();
 }
 
 void FFileIoStore::Initialize(TSharedRef<const FIoDispatcherBackendContext> InContext)
 {
 	check(!Thread);
+
+	FFileIoStats::Init();
 	BackendContext = InContext;
 	bIsMultithreaded = InContext->bIsMultiThreaded;
 
@@ -1783,13 +1786,11 @@ void FFileIoStore::UpdateAsyncIOMinimumPriority()
 
 bool FFileIoStore::Init()
 {
-	FFileIoStats::Init();
 	return true;
 }
 
 void FFileIoStore::Stop()
 {
-	FFileIoStats::Shutdown();
 	bStopRequested = true;
 	EventQueue.ServiceNotify();
 }
