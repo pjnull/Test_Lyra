@@ -107,6 +107,8 @@ struct FPropertyHandleHierarchy
 	TWeakPtr<FPropertyHandleHierarchy> ParentHierarchy;
 	// This chain is only used to identify counterparts. It may not accurately reflect the property chain used to apply this property the world.
 	FLevelSnapshotPropertyChain TempIdentifierChain;
+	// Used as a fallback for identifying counterparts for collection members
+	FText DisplayName;
 };
 
 struct FLevelSnapshotsEditorResultsRow final : TSharedFromThis<FLevelSnapshotsEditorResultsRow>
@@ -173,7 +175,7 @@ struct FLevelSnapshotsEditorResultsRow final : TSharedFromThis<FLevelSnapshotsEd
 	ELevelSnapshotsEditorResultsRowType GetRowType() const;
 
 	/* Returns the ELevelSnapshotsEditorResultsRowType of a given property. Will never return ActorGroup or TreeViewHeader. Returns None on error. */
-	static ELevelSnapshotsEditorResultsRowType DetermineRowTypeFromProperty(FProperty* InProperty, const bool bIsCustomized);
+	static ELevelSnapshotsEditorResultsRowType DetermineRowTypeFromProperty(FProperty* InProperty, const bool bIsCustomized, const bool bHasChildProperties);
 
 	const TArray<FText>& GetHeaderColumns() const;
 
