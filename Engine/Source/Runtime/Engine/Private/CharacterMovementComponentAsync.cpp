@@ -981,7 +981,7 @@ void FCharacterMovementComponentAsyncInput::PhysFalling(float deltaTime, int32 I
 
 	FVector FallAcceleration = GetFallingLateralAcceleration(deltaTime, Output);
 	FallAcceleration.Z = 0.f;
-	const bool bHasLimitedAirControl = ShouldLimitAirControl(deltaTime, FallAcceleration);
+	const bool bHasLimitedAirControl = ShouldLimitAirControl(deltaTime, FallAcceleration, Output);
 
 	float remainingTime = deltaTime;
 	while ((remainingTime >= MIN_TICK_TIME) && (Iterations < MaxSimulationIterations))
@@ -1293,7 +1293,7 @@ void FCharacterMovementComponentAsyncInput::PhysicsRotation(float DeltaTime, FCh
 	FRotator CurrentRotation = FRotator(UpdatedComponentInput->GetRotation()); // Normalized
 	CurrentRotation.DiagnosticCheckNaN(TEXT("CharacterMovementComponent::PhysicsRotation(): CurrentRotation"));
 
-	FRotator DeltaRot = Output.GetDeltaRotation(CharacterInput->RotationRate, DeltaTime);
+	FRotator DeltaRot = Output.GetDeltaRotation(GetRotationRate(Output), DeltaTime);
 	DeltaRot.DiagnosticCheckNaN(TEXT("CharacterMovementComponent::PhysicsRotation(): GetDeltaRotation"));
 
 	FRotator DesiredRotation = CurrentRotation;
@@ -3953,7 +3953,7 @@ float FCharacterMovementComponentAsyncInput::BoostAirControl(float DeltaTime, fl
 	return TickAirControl;
 }
 
-bool FCharacterMovementComponentAsyncInput::ShouldLimitAirControl(float DeltaTime, const FVector& FallAcceleration) const
+bool FCharacterMovementComponentAsyncInput::ShouldLimitAirControl(float DeltaTime, const FVector& FallAcceleration, FCharacterMovementComponentAsyncOutput& Output) const
 {
 	return (FallAcceleration.SizeSquared2D() > 0.f);
 }
@@ -4600,6 +4600,8 @@ void FCharacterMovementComponentAsyncOutput::Copy(const FCharacterMovementCompon
 	DeltaTime = Value.DeltaTime;
 	OldVelocity = Value.OldVelocity;
 	OldLocation = Value.OldLocation;
+	ModifiedRotationRate = Value.ModifiedRotationRate;
+	bUsingModifiedRotationRate = Value.bUsingModifiedRotationRate;
 
 	// See MaybeUpdateBasedMovement
 	// TODO MovementBase, handle tick group changes properly

@@ -12302,6 +12302,7 @@ void UCharacterMovementComponent::FillAsyncInput(const FVector& InputVector, FCh
 	AsyncInput.MaxSwimSpeed = MaxSwimSpeed;
 	AsyncInput.MaxFlySpeed = MaxFlySpeed;
 	AsyncInput.MaxCustomMovementSpeed = MaxCustomMovementSpeed;
+	AsyncInput.RotationRate = RotationRate;
 	
 	AsyncInput.RootMotion = AsyncRootMotion;
 	AsyncRootMotion.Clear();
@@ -12336,17 +12337,7 @@ void UCharacterMovementComponent::FillAsyncInput(const FVector& InputVector, FCh
 	// Character owner inputs
 	TUniquePtr<FCharacterAsyncInput>& CharacterInput = AsyncInput.CharacterInput;
 	ensure(CharacterInput.IsValid());
-	CharacterInput->JumpMaxHoldTime = CharacterOwner->GetJumpMaxHoldTime();
-	CharacterInput->JumpMaxCount = CharacterOwner->JumpMaxCount;
-	CharacterInput->LocalRole = ENetRole::ROLE_Authority;//CharacterOwner->GetLocalRole(); Override as we aren't currently replicating to server. TODO NetRole
-	CharacterInput->RemoteRole = CharacterOwner->GetRemoteRole();
-	CharacterInput->bIsLocallyControlled = true;// CharacterOwner->IsLocallyControlled(); TODO NetRole
-	CharacterInput->bIsPlayingNetworkedRootMontage = CharacterOwner->IsPlayingNetworkedRootMotionMontage();
-	CharacterInput->bUseControllerRotationPitch = CharacterOwner->bUseControllerRotationPitch;
-	CharacterInput->bUseControllerRotationYaw = CharacterOwner->bUseControllerRotationYaw;
-	CharacterInput->bUseControllerRotationRoll = CharacterOwner->bUseControllerRotationRoll;
-	CharacterInput->ControllerDesiredRotation = CharacterOwner->Controller->GetDesiredRotation();
-	CharacterInput->RotationRate = RotationRate;
+	CharacterOwner->FillAsyncInput(*CharacterInput.Get());
 
 	AsyncInput.World = GetWorld();
 
@@ -12459,14 +12450,8 @@ void UCharacterMovementComponent::FillAsyncInput(const FVector& InputVector, FCh
 
 		// Character owner data
 		TUniquePtr<FCharacterAsyncOutput>& CharacterOutput = AsyncSimState->CharacterOutput;
-		CharacterOutput->Rotation = CharacterOwner->GetActorRotation();
-		CharacterOutput->JumpCurrentCountPreJump = CharacterOwner->JumpCurrentCountPreJump;
-		CharacterOutput->JumpCurrentCount = CharacterOwner->JumpCurrentCount;
-		CharacterOutput->JumpForceTimeRemaining = CharacterOwner->JumpForceTimeRemaining;
-		CharacterOutput->bWasJumping = CharacterOwner->bWasJumping;
-		CharacterOutput->bPressedJump = CharacterOwner->bPressedJump;
-		CharacterOutput->JumpKeyHoldTime = CharacterOwner->JumpKeyHoldTime;
-		CharacterOutput->bClearJumpInput = false;
+		ensure(CharacterOutput.IsValid());
+		CharacterOwner->InitializeAsyncOutput(*CharacterOutput.Get());
 
 		AsyncSimState->bIsValid = true;
 	}
@@ -12572,16 +12557,8 @@ void UCharacterMovementComponent::ApplyAsyncOutput(FCharacterMovementComponentAs
 	if (CharacterOwner)
 	{
 		TUniquePtr<FCharacterAsyncOutput>& CharacterOutput = Output.CharacterOutput;
-		CharacterOwner->JumpCurrentCountPreJump = CharacterOutput->JumpCurrentCountPreJump;
-		CharacterOwner->JumpCurrentCount = CharacterOutput->JumpCurrentCount;
-		CharacterOwner->JumpForceTimeRemaining = CharacterOutput->JumpForceTimeRemaining;
-		CharacterOwner->bWasJumping = CharacterOutput->bWasJumping;
-		CharacterOwner->JumpKeyHoldTime = CharacterOutput->JumpKeyHoldTime;
-
-		if (CharacterOutput->bClearJumpInput)
-		{
-			CharacterOwner->bPressedJump = false;
-		}
+		ensure(CharacterOutput.IsValid());
+		CharacterOwner->ApplyAsyncOutput(*CharacterOutput.Get());
 	}
 
 	NumJumpApexAttempts = Output.NumJumpApexAttempts;

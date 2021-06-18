@@ -216,6 +216,10 @@ public:
 	FVector OldVelocity; // Cached for CallMovementUpdateDelegate
 	FVector OldLocation;
 
+	// Used to override the rotation rate in the presence of a velocity-based turn curve.
+	FRotator ModifiedRotationRate;
+	bool bUsingModifiedRotationRate = false;
+
 	// See MaybeUpdateBasedMovement
 	// TODO MovementBase, handle tick group changes properly
 	bool bShouldDisablePostPhysicsTick;
@@ -307,7 +311,6 @@ struct ENGINE_API FCharacterAsyncInput
 	bool bUseControllerRotationYaw;
 	bool bUseControllerRotationRoll;
 	FRotator ControllerDesiredRotation;
-	FRotator RotationRate;
 
 	virtual void FaceRotation(FRotator NewControlRotation, float DeltaTime, const FCharacterMovementComponentAsyncInput& Input, FCharacterMovementComponentAsyncOutput& Output) const;
 	virtual void CheckJumpInput(float DeltaSeconds, const FCharacterMovementComponentAsyncInput& Input, FCharacterMovementComponentAsyncOutput& Output) const;
@@ -456,6 +459,7 @@ struct ENGINE_API FCharacterMovementComponentAsyncInput : public Chaos::FSimCall
 	float MaxSwimSpeed;
 	float MaxFlySpeed;
 	float MaxCustomMovementSpeed;
+	FRotator RotationRate;
 	FRootMotionAsyncData RootMotion;
 
 	FCachedMovementBaseAsyncData MovementBaseAsyncData;
@@ -573,7 +577,7 @@ struct ENGINE_API FCharacterMovementComponentAsyncInput : public Chaos::FSimCall
 	virtual FVector GetFallingLateralAcceleration(float DeltaTime, FCharacterMovementComponentAsyncOutput& Output) const;
 	virtual FVector GetAirControl(float DeltaTime, float TickAirControl, const FVector& FallAcceleration, FCharacterMovementComponentAsyncOutput& Output) const;
 	virtual float BoostAirControl(float DeltaTime, float TickAirControl, const FVector& FallAcceleration, FCharacterMovementComponentAsyncOutput& Output) const;
-	virtual bool ShouldLimitAirControl(float DeltaTime, const FVector& FallAcceleration) const;
+	virtual bool ShouldLimitAirControl(float DeltaTime, const FVector& FallAcceleration, FCharacterMovementComponentAsyncOutput& Output) const;
 	virtual FVector LimitAirControl(float DeltaTime, const FVector& FallAcceleration, const FHitResult& HitResult, bool bCheckForValidLandingSpot, FCharacterMovementComponentAsyncOutput& Output) const;
 	void RestorePreAdditiveRootMotionVelocity(FCharacterMovementComponentAsyncOutput& Output) const;
 	void ApplyRootMotionToVelocity(float deltaTime, FCharacterMovementComponentAsyncOutput& Output) const;
@@ -607,6 +611,8 @@ struct ENGINE_API FCharacterMovementComponentAsyncInput : public Chaos::FSimCall
 	// Root Motion Stuff
 	FVector ConstrainAnimRootMotionVelocity(const FVector& RootMotionVelocity, const FVector& CurrentVelocity, FCharacterMovementComponentAsyncOutput& Output) const;
 	FVector CalcAnimRootMotionVelocity(const FVector& RootMotionDeltaMove, float DeltaSeconds, const FVector& CurrentVelocity) const;
+
+	const FRotator& GetRotationRate(const FCharacterMovementComponentAsyncOutput& Output) const { return Output.bUsingModifiedRotationRate ? Output.ModifiedRotationRate : RotationRate; }
 };
 
 class FCharacterMovementComponentAsyncCallback : public Chaos::TSimCallbackObject<FCharacterMovementComponentAsyncInput, FCharacterMovementComponentAsyncOutput>
