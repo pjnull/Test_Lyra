@@ -13,6 +13,16 @@ namespace Chaos
 	{
 #if CHAOS_DEBUG_DRAW
 
+		struct CHAOS_API FChaosDebugDrawColorsByState
+		{
+			FColor DynamicColor;
+			FColor SleepingColor;
+			FColor KinematicColor;
+			FColor StaticColor;
+
+			FColor GetColorFromState(EObjectStateType State) const;
+		};
+
 		struct CHAOS_API FChaosDebugDrawSettings
 		{
 		public:
@@ -40,7 +50,15 @@ namespace Chaos
 				uint8 InDrawPriority,
 				bool bInShowSimpleCollision,
 				bool bInShowComplexCollision,
-				bool bInShowLevelSetCollision
+				bool bInShowLevelSetCollision,
+				FColor InDynamicShapesColor,
+				FColor InSleepingShapesColor,
+				FColor InKinematicShapesColor,
+				FColor InStaticShapesColor,
+				FColor InDynamicBoundsColor,
+				FColor InSleepingBoundsColor,
+				FColor InKinematicBoundsColor,
+				FColor InStaticBoundsColor
 				)
 				: ArrowSize(InArrowSize)
 				, BodyAxisLen(InBodyAxisLen)
@@ -64,7 +82,17 @@ namespace Chaos
 				, bShowSimpleCollision(bInShowSimpleCollision)
 				, bShowComplexCollision(bInShowComplexCollision)
 				, bShowLevelSetCollision(bInShowLevelSetCollision)
-			{}
+			{
+				ShapeColors.DynamicColor = InDynamicShapesColor;
+				ShapeColors.SleepingColor = InSleepingShapesColor;
+				ShapeColors.KinematicColor = InKinematicShapesColor;
+				ShapeColors.StaticColor = InStaticShapesColor;
+
+				BoundsColors.DynamicColor = InDynamicBoundsColor;
+				BoundsColors.SleepingColor = InSleepingBoundsColor;
+				BoundsColors.KinematicColor = InKinematicBoundsColor;
+				BoundsColors.StaticColor = InStaticBoundsColor;
+			}
 
 			FRealSingle ArrowSize;
 			FRealSingle BodyAxisLen;
@@ -88,6 +116,8 @@ namespace Chaos
 			bool bShowSimpleCollision;
 			bool bShowComplexCollision;
 			bool bShowLevelSetCollision;
+			FChaosDebugDrawColorsByState ShapeColors;
+			FChaosDebugDrawColorsByState BoundsColors;
 		};
 
 		// A bitmask of features to show when drawing joints
@@ -130,9 +160,9 @@ namespace Chaos
 			bool bIsland;
 		};
 
-		CHAOS_API void DrawParticleShapes(const FRigidTransform3& SpaceTransform, const TParticleView<FGeometryParticles>& ParticlesView, const FColor& Color, const FChaosDebugDrawSettings* Settings = nullptr);
-		CHAOS_API void DrawParticleShapes(const FRigidTransform3& SpaceTransform, const TParticleView<FKinematicGeometryParticles>& ParticlesView, const FColor& Color, const FChaosDebugDrawSettings* Settings = nullptr);
-		CHAOS_API void DrawParticleShapes(const FRigidTransform3& SpaceTransform, const TParticleView<FPBDRigidParticles>& ParticlesView, const FColor& Color, const FChaosDebugDrawSettings* Settings = nullptr);
+		CHAOS_API void DrawParticleShapes(const FRigidTransform3& SpaceTransform, const TParticleView<FGeometryParticles>& ParticlesView,  FReal ColorScale, const FChaosDebugDrawSettings* Settings = nullptr);
+		CHAOS_API void DrawParticleShapes(const FRigidTransform3& SpaceTransform, const TParticleView<FKinematicGeometryParticles>& ParticlesView,  FReal ColorScale, const FChaosDebugDrawSettings* Settings = nullptr);
+		CHAOS_API void DrawParticleShapes(const FRigidTransform3& SpaceTransform, const TParticleView<FPBDRigidParticles>& ParticlesView,  FReal ColorScale, const FChaosDebugDrawSettings* Settings = nullptr);
 		CHAOS_API void DrawParticleShapes(const FRigidTransform3& SpaceTransform, const FGeometryParticleHandle* Particle, const FColor& Color, const FChaosDebugDrawSettings* Settings = nullptr);
 		CHAOS_API void DrawParticleShapes(const FRigidTransform3& SpaceTransform, const FGeometryParticle* Particle, const FColor& Color, const FChaosDebugDrawSettings* Settings = nullptr);
 		CHAOS_API void DrawParticleBounds(const FRigidTransform3& SpaceTransform, const TParticleView<FGeometryParticles>& ParticlesView, const FReal Dt, const FReal BoundsThickness, const FReal BoundsThicknessVelocityInflation, const FChaosDebugDrawSettings* Settings = nullptr);

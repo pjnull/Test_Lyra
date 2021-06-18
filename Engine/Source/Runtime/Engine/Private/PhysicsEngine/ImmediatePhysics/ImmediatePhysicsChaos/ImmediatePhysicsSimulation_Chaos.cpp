@@ -192,7 +192,15 @@ Chaos::DebugDraw::FChaosDebugDrawSettings ChaosImmPhysDebugDebugDrawSettings(
 	/* DrawPriority =				*/ 10.0f,
 	/* bShowSimple =				*/ true,
 	/* bShowComplex =				*/ false,
-	/* bInShowLevelSetCollision =	*/ false
+	/* bInShowLevelSetCollision =	*/ false,
+	/* InDynamicShapesColor =		*/ FColor(255, 255, 0),
+	/* InSleepingShapesColor =		*/ FColor(128, 128, 128),
+	/* InKinematicShapesColor =		*/ FColor(0, 128, 255),
+	/* InStaticShapesColor =		*/ FColor(255, 0, 0),
+	/* InDynamicBoundsColor =		*/ FColor(128, 128, 0),
+	/* InSleepingBoundsColor =		*/ FColor(64, 64, 64),
+	/* InKinematicBoundsColor =		*/ FColor(0, 64, 128),
+	/* InStaticBoundsColor =		*/ FColor(128, 0, 0)
 	);
 
 FAutoConsoleVariableRef CVarChaosImmPhysArrowSize(TEXT("p.Chaos.ImmPhys.DebugDraw.ArrowSize"), ChaosImmPhysDebugDebugDrawSettings.ArrowSize, TEXT("ArrowSize."));
@@ -318,19 +326,19 @@ namespace ImmediatePhysics_Chaos
 		Implementation->Evolution.SetPostIntegrateCallback(
 			[this]()
 			{
-				DebugDrawDynamicParticles(3, 4, FColor(32, 32, 0));
-				DebugDrawConstraints(3, 4, 0.3f);
+				DebugDrawDynamicParticles(3, 4, 0.25f);
+				DebugDrawConstraints(3, 4, 0.25f);
 			});
 		Implementation->Evolution.SetPostApplyCallback(
 			[this]()
 			{
-				DebugDrawDynamicParticles(3, 3, FColor(128, 128, 0));
-				DebugDrawConstraints(3, 3, 0.6f);
+				DebugDrawDynamicParticles(3, 3, 0.5f);
+				DebugDrawConstraints(3, 3, 0.5f);
 			});
 		Implementation->Evolution.SetPostApplyPushOutCallback(
 			[this]()
 			{
-				DebugDrawDynamicParticles(3, 3, FColor(255, 255, 0));
+				DebugDrawDynamicParticles(3, 3, 1.0f);
 				DebugDrawConstraints(3, 3, 1.0f);
 			});
 		Implementation->Collisions.SetPostApplyCallback(
@@ -340,7 +348,7 @@ namespace ImmediatePhysics_Chaos
 				{
 					DebugDraw::DrawCollisions(Implementation->SimulationSpace.Transform, Implementation->Collisions, 0.3f, &ChaosImmPhysDebugDebugDrawSettings);
 				}
-				DebugDrawDynamicParticles(4, 4, FColor(128, 128, 0));
+				DebugDrawDynamicParticles(4, 4, 0.5f);
 			});
 		Implementation->Collisions.SetPostApplyPushOutCallback(
 			[this](const FReal Dt, const TArray<FPBDCollisionConstraintHandle*>& InConstraintHandles, bool bRequiresAnotherIteration)
@@ -365,7 +373,7 @@ namespace ImmediatePhysics_Chaos
 				{
 					DebugDraw::DrawJointConstraints(Implementation->SimulationSpace.Transform, InConstraintHandles, 0.6f, DebugDraw::FChaosDebugDrawJointFeatures::MakeDefault(), &ChaosImmPhysDebugDebugDrawSettings);
 				}
-				DebugDrawDynamicParticles(4, 4, FColor(0, 128, 0));
+				DebugDrawDynamicParticles(4, 4, 0.5f);
 			});
 		Implementation->Joints.SetPostProjectCallback(
 			[this](const FReal Dt, const TArray<FPBDJointConstraintHandle*>& InConstraintHandles)
@@ -829,9 +837,9 @@ namespace ImmediatePhysics_Chaos
 				ChaosImmediate_Collision_PushOutPairIterations);
 		}
 
-		DebugDrawKinematicParticles(2, 2, FColor(128, 0, 0));
-		DebugDrawDynamicParticles(2, 2, FColor(192, 192, 0));
-		DebugDrawConstraints(2, 2, 0.7f);
+		DebugDrawKinematicParticles(2, 2, 0.75f);
+		DebugDrawDynamicParticles(2, 2, 0.75f);
+		DebugDrawConstraints(2, 2, 0.75f);
 
 		// Fixed timestep mode DT (Only used if > 0.0f)
 		FReal FixedStepTime = Implementation->FixedStepTime;
@@ -871,14 +879,14 @@ namespace ImmediatePhysics_Chaos
 		Implementation->Evolution.SetSimulationSpace(Implementation->SimulationSpace);
 		Implementation->Evolution.Advance(StepTime, NumSteps, RewindTime);
 
-		DebugDrawStaticParticles(1, 4, FColor(128, 0, 0));
-		DebugDrawKinematicParticles(1, 4, FColor(64, 32, 0));
-		DebugDrawDynamicParticles(1, 3, FColor(255, 255, 0));
+		DebugDrawStaticParticles(1, 4, 1.0f);
+		DebugDrawKinematicParticles(1, 4, 1.0f);
+		DebugDrawDynamicParticles(1, 3, 1.0f);
 		DebugDrawConstraints(1, 2, 1.0f);
 		DebugDrawSimulationSpace();
 	}
 
-	void FSimulation::DebugDrawStaticParticles(const int32 MinDebugLevel, const int32 MaxDebugLevel, const FColor& Color)
+	void FSimulation::DebugDrawStaticParticles(const int32 MinDebugLevel, const int32 MaxDebugLevel, const float ColorScale)
 	{
 #if CHAOS_DEBUG_DRAW
 		using namespace Chaos;
@@ -894,7 +902,7 @@ namespace ImmediatePhysics_Chaos
 			}
 			if ((ChaosImmediate_DebugDrawShapes >= MinDebugLevel) && (ChaosImmediate_DebugDrawShapes <= MaxDebugLevel))
 			{
-				DebugDraw::DrawParticleShapes(Implementation->SimulationSpace.Transform, Implementation->Particles.GetActiveStaticParticlesView(), Color, &ChaosImmPhysDebugDebugDrawSettings);
+				DebugDraw::DrawParticleShapes(Implementation->SimulationSpace.Transform, Implementation->Particles.GetActiveStaticParticlesView(), ColorScale, &ChaosImmPhysDebugDebugDrawSettings);
 			}
 			if ((ChaosImmediate_DebugDrawBounds >= MinDebugLevel) && (ChaosImmediate_DebugDrawBounds <= MaxDebugLevel))
 			{
@@ -904,7 +912,7 @@ namespace ImmediatePhysics_Chaos
 #endif
 	}
 
-	void FSimulation::DebugDrawKinematicParticles(const int32 MinDebugLevel, const int32 MaxDebugLevel, const FColor& Color)
+	void FSimulation::DebugDrawKinematicParticles(const int32 MinDebugLevel, const int32 MaxDebugLevel, const float ColorScale)
 	{
 #if CHAOS_DEBUG_DRAW
 		using namespace Chaos;
@@ -920,7 +928,7 @@ namespace ImmediatePhysics_Chaos
 			}
 			if ((ChaosImmediate_DebugDrawShapes >= MinDebugLevel) && (ChaosImmediate_DebugDrawShapes <= MaxDebugLevel))
 			{
-				DebugDraw::DrawParticleShapes(Implementation->SimulationSpace.Transform, Implementation->Particles.GetActiveKinematicParticlesView(), Color, &ChaosImmPhysDebugDebugDrawSettings);
+				DebugDraw::DrawParticleShapes(Implementation->SimulationSpace.Transform, Implementation->Particles.GetActiveKinematicParticlesView(), ColorScale, &ChaosImmPhysDebugDebugDrawSettings);
 			}
 			if ((ChaosImmediate_DebugDrawBounds >= MinDebugLevel) && (ChaosImmediate_DebugDrawBounds <= MaxDebugLevel))
 			{
@@ -930,7 +938,7 @@ namespace ImmediatePhysics_Chaos
 #endif
 	}
 
-	void FSimulation::DebugDrawDynamicParticles(const int32 MinDebugLevel, const int32 MaxDebugLevel, const FColor& Color)
+	void FSimulation::DebugDrawDynamicParticles(const int32 MinDebugLevel, const int32 MaxDebugLevel, const float ColorScale)
 	{
 #if CHAOS_DEBUG_DRAW
 		using namespace Chaos;
@@ -946,7 +954,7 @@ namespace ImmediatePhysics_Chaos
 			}
 			if ((ChaosImmediate_DebugDrawShapes >= MinDebugLevel) && (ChaosImmediate_DebugDrawShapes <= MaxDebugLevel))
 			{
-				DebugDraw::DrawParticleShapes(Implementation->SimulationSpace.Transform, Implementation->Particles.GetActiveParticlesView(), Color, &ChaosImmPhysDebugDebugDrawSettings);
+				DebugDraw::DrawParticleShapes(Implementation->SimulationSpace.Transform, Implementation->Particles.GetActiveParticlesView(), ColorScale, &ChaosImmPhysDebugDebugDrawSettings);
 			}
 			if ((ChaosImmediate_DebugDrawBounds >= MinDebugLevel) && (ChaosImmediate_DebugDrawBounds <= MaxDebugLevel))
 			{

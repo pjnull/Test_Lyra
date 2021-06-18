@@ -112,8 +112,17 @@ Chaos::DebugDraw::FChaosDebugDrawSettings ChaosSolverDebugDebugDrawSettings(
 	/* DrawPriority =				*/ 10,
 	/* bShowSimple =				*/ true,
 	/* bShowComplex =				*/ false,
-	/* bInShowLevelSetCollision =	*/ true
+	/* bInShowLevelSetCollision =	*/ true,
+	/* InDynamicShapesColor =		*/ FColor(255, 255, 0),
+	/* InSleepingShapesColor =		*/ FColor(128, 128, 128),
+	/* InKinematicShapesColor =		*/ FColor(0, 128, 255),
+	/* InStaticShapesColor =		*/ FColor(255, 0, 0),
+	/* InDynamicBoundsColor =		*/ FColor(128, 128, 0),
+	/* InSleepingBoundsColor =		*/ FColor(64, 64, 64),
+	/* InKinematicBoundsColor =		*/ FColor(0, 64, 128),
+	/* InStaticBoundsColor =		*/ FColor(128, 0, 0)
 );
+
 FAutoConsoleVariableRef CVarChaosSolverArrowSize(TEXT("p.Chaos.Solver.DebugDraw.ArrowSize"), ChaosSolverDebugDebugDrawSettings.ArrowSize, TEXT("ArrowSize."));
 FAutoConsoleVariableRef CVarChaosSolverBodyAxisLen(TEXT("p.Chaos.Solver.DebugDraw.BodyAxisLen"), ChaosSolverDebugDebugDrawSettings.BodyAxisLen, TEXT("BodyAxisLen."));
 FAutoConsoleVariableRef CVarChaosSolverContactLen(TEXT("p.Chaos.Solver.DebugDraw.ContactLen"), ChaosSolverDebugDebugDrawSettings.ContactLen, TEXT("ContactLen."));
@@ -1309,16 +1318,16 @@ namespace Chaos
 		{
 			if (ChaosSolverDrawShapesShowStatic)
 			{
-			DebugDraw::DrawParticleShapes(FRigidTransform3(), Particles.GetActiveStaticParticlesView(), FColor(128, 0, 0), &ChaosSolverDebugDebugDrawSettings);
+				DebugDraw::DrawParticleShapes(FRigidTransform3(), Particles.GetActiveStaticParticlesView(), 1.0f, &ChaosSolverDebugDebugDrawSettings);
 			}
 			if (ChaosSolverDrawShapesShowKinematic)
 			{
-			DebugDraw::DrawParticleShapes(FRigidTransform3(), Particles.GetActiveKinematicParticlesView(), FColor(64, 32, 0), &ChaosSolverDebugDebugDrawSettings);
+				DebugDraw::DrawParticleShapes(FRigidTransform3(), Particles.GetActiveKinematicParticlesView(), 1.0f, &ChaosSolverDebugDebugDrawSettings);
 			}
 			if (ChaosSolverDrawShapesShowDynamic)
 			{
-			DebugDraw::DrawParticleShapes(FRigidTransform3(), Particles.GetNonDisabledDynamicView(), FColor(255, 255, 0), &ChaosSolverDebugDebugDrawSettings);
-		}
+				DebugDraw::DrawParticleShapes(FRigidTransform3(), Particles.GetNonDisabledDynamicView(), 1.0f, &ChaosSolverDebugDebugDrawSettings);
+			}
 		}
 		if (ChaosSolverDebugDrawCollisions == 1) 
 		{
