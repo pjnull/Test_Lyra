@@ -213,7 +213,8 @@ namespace Chaos
 		void ApplyPositionConstraint(
 			const FReal JointStiffness,
 			const FVec3& Axis,
-			const FReal Delta);
+			const FReal Delta,
+			const int32 LinearHardLambdaIndex = -1);
 
 		void ApplyPositionConstraintSoft(
 			const FReal Dt,
@@ -461,11 +462,34 @@ namespace Chaos
 			const FVec3& DP1,
 			const FVec3& DR1);
 
+		void ApplyVelocityConstraint(
+			const FReal Stiffness,
+			const FVec3& DeltaV);
+
 		void ApplyPointVelocityConstraint(
 			const FReal Dt,
 			const FPBDJointSolverSettings& SolverSettings,
 			const FPBDJointSettings& JointSettings);
 
+		void ApplySphericalVelocityConstraint(
+			const FReal Dt,
+			const FPBDJointSolverSettings& SolverSettings,
+			const FPBDJointSettings& JointSettings);
+
+		void ApplyCylindricalVelocityConstraint(
+			const FReal Dt,
+			const int32 AxisIndex,
+			const EJointMotionType AxialMotion,
+			const EJointMotionType RadialMotion,
+			const FPBDJointSolverSettings& SolverSettings,
+			const FPBDJointSettings& JointSettings);
+
+		void ApplyPlanarVelocityConstraint(
+			const FReal Dt,
+			const int32 AxisIndex,
+			const EJointMotionType AxialMotion,
+			const FPBDJointSolverSettings& SolverSettings,
+			const FPBDJointSettings& JointSettings);
 
 		void CalculateLinearConstraintPadding(
 			const FReal Dt,
@@ -584,6 +608,10 @@ namespace Chaos
 		// Accumulated Impulse and AngularImpulse (Impulse * Dt since they are mass multiplied position corrections)
 		FVec3 NetLinearImpulse;
 		FVec3 NetAngularImpulse;
+
+		// Lagrange multiplers of the position constraints.
+		// Currently these are only used in ApplyCylindricalVelocityConstraints
+		FVec3 LinearHardLambda;
 
 		// XPBD Accumulators (net impulse for each soft constraint/drive)
 		FReal LinearSoftLambda;

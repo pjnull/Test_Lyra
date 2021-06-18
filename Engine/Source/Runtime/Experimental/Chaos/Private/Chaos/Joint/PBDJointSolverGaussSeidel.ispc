@@ -43,6 +43,8 @@ struct FJointSolverGaussSeidel
 	FVector NetLinearImpulse;
 	FVector NetAngularImpulse;
 
+	FVector LinearHardLambda;
+
 	// XPBD Accumulators (net impulse for each soft constraint/drive)
 	float LinearSoftLambda;
 	float TwistSoftLambda;
