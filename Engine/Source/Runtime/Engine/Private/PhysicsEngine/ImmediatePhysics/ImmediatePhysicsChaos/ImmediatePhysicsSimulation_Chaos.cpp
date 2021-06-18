@@ -192,15 +192,11 @@ Chaos::DebugDraw::FChaosDebugDrawSettings ChaosImmPhysDebugDebugDrawSettings(
 	/* bShowSimple =				*/ true,
 	/* bShowComplex =				*/ false,
 	/* bInShowLevelSetCollision =	*/ false,
-	/* InDynamicShapesColor =		*/ FColor(255, 255, 0),
-	/* InSleepingShapesColor =		*/ FColor(128, 128, 128),
-	/* InKinematicShapesColor =		*/ FColor(0, 128, 255),
-	/* InStaticShapesColor =		*/ FColor(255, 0, 0),
-	/* InDynamicBoundsColor =		*/ FColor(128, 128, 0),
-	/* InSleepingBoundsColor =		*/ FColor(64, 64, 64),
-	/* InKinematicBoundsColor =		*/ FColor(0, 64, 128),
-	/* InStaticBoundsColor =		*/ FColor(128, 0, 0)
-	);
+	/* InShapesColorsPerState =     */ Chaos::DebugDraw::GetDefaultShapesColorsByState(),
+	/* InShapesColorsPerShaepType=  */ Chaos::DebugDraw::GetDefaultShapesColorsByShapeType(),
+	/* InBoundsColorsPerState =     */ Chaos::DebugDraw::GetDefaultBoundsColorsByState(),
+	/* InBoundsColorsPerShapeType=  */ Chaos::DebugDraw::GetDefaultBoundsColorsByShapeType()
+);
 
 FAutoConsoleVariableRef CVarChaosImmPhysArrowSize(TEXT("p.Chaos.ImmPhys.DebugDraw.ArrowSize"), ChaosImmPhysDebugDebugDrawSettings.ArrowSize, TEXT("ArrowSize."));
 FAutoConsoleVariableRef CVarChaosImmPhysBodyAxisLen(TEXT("p.Chaos.ImmPhys.DebugDraw.BodyAxisLen"), ChaosImmPhysDebugDebugDrawSettings.BodyAxisLen, TEXT("BodyAxisLen."));

@@ -15,12 +15,39 @@ namespace Chaos
 
 		struct CHAOS_API FChaosDebugDrawColorsByState
 		{
+			FChaosDebugDrawColorsByState(
+				FColor InDynamicColor,
+				FColor InSleepingColor,
+				FColor InKinematicColor,
+				FColor InStaticColor
+			);
+
 			FColor DynamicColor;
 			FColor SleepingColor;
 			FColor KinematicColor;
 			FColor StaticColor;
 
 			FColor GetColorFromState(EObjectStateType State) const;
+		};
+
+		struct CHAOS_API FChaosDebugDrawColorsByShapeType
+		{
+			FChaosDebugDrawColorsByShapeType(
+				FColor InSimpleTypeColor,
+				FColor InConvexColor,
+				FColor InHeightFieldColor,
+				FColor InTriangleMeshColor,
+				FColor InLevelSetColor
+			);
+
+			//Note: add entries in order to avoid serialization issues (but before IsInstanced)
+			FColor SimpleTypeColor; // Sphere, Plane, Cube. Capsule, Cylinder, tapered shapes
+			FColor ConvexColor;
+			FColor HeightFieldColor;
+			FColor TriangleMeshColor;
+			FColor LevelSetColor;
+
+			FColor GetColorFromShapeType(EImplicitObjectType ShapeType) const;
 		};
 
 		struct CHAOS_API FChaosDebugDrawSettings
@@ -51,14 +78,10 @@ namespace Chaos
 				bool bInShowSimpleCollision,
 				bool bInShowComplexCollision,
 				bool bInShowLevelSetCollision,
-				FColor InDynamicShapesColor,
-				FColor InSleepingShapesColor,
-				FColor InKinematicShapesColor,
-				FColor InStaticShapesColor,
-				FColor InDynamicBoundsColor,
-				FColor InSleepingBoundsColor,
-				FColor InKinematicBoundsColor,
-				FColor InStaticBoundsColor
+				const FChaosDebugDrawColorsByState& InShapesColorsPerState,
+				const FChaosDebugDrawColorsByShapeType& InShapesColorsPerShapeType,
+				const FChaosDebugDrawColorsByState& InBoundsColorsPerState,
+				const FChaosDebugDrawColorsByShapeType& InBoundsColorsPerShapeType
 				)
 				: ArrowSize(InArrowSize)
 				, BodyAxisLen(InBodyAxisLen)
@@ -82,16 +105,11 @@ namespace Chaos
 				, bShowSimpleCollision(bInShowSimpleCollision)
 				, bShowComplexCollision(bInShowComplexCollision)
 				, bShowLevelSetCollision(bInShowLevelSetCollision)
+				, ShapesColorsPerState(InShapesColorsPerState)
+				, ShapesColorsPerShapeType(InShapesColorsPerShapeType)
+				, BoundsColorsPerState(InBoundsColorsPerState)
+				, BoundsColorsPerShapeType(InBoundsColorsPerShapeType)
 			{
-				ShapeColors.DynamicColor = InDynamicShapesColor;
-				ShapeColors.SleepingColor = InSleepingShapesColor;
-				ShapeColors.KinematicColor = InKinematicShapesColor;
-				ShapeColors.StaticColor = InStaticShapesColor;
-
-				BoundsColors.DynamicColor = InDynamicBoundsColor;
-				BoundsColors.SleepingColor = InSleepingBoundsColor;
-				BoundsColors.KinematicColor = InKinematicBoundsColor;
-				BoundsColors.StaticColor = InStaticBoundsColor;
 			}
 
 			FRealSingle ArrowSize;
@@ -116,8 +134,10 @@ namespace Chaos
 			bool bShowSimpleCollision;
 			bool bShowComplexCollision;
 			bool bShowLevelSetCollision;
-			FChaosDebugDrawColorsByState ShapeColors;
-			FChaosDebugDrawColorsByState BoundsColors;
+			FChaosDebugDrawColorsByState ShapesColorsPerState;
+			FChaosDebugDrawColorsByShapeType ShapesColorsPerShapeType;
+			FChaosDebugDrawColorsByState BoundsColorsPerState;
+			FChaosDebugDrawColorsByShapeType BoundsColorsPerShapeType;
 		};
 
 		// A bitmask of features to show when drawing joints
@@ -157,6 +177,12 @@ namespace Chaos
 			bool bColor;
 			bool bIsland;
 		};
+
+		CHAOS_API const FChaosDebugDrawColorsByState& GetDefaultShapesColorsByState();
+		CHAOS_API const FChaosDebugDrawColorsByState& GetDefaultBoundsColorsByState();
+
+		CHAOS_API const FChaosDebugDrawColorsByShapeType& GetDefaultShapesColorsByShapeType();
+		CHAOS_API const FChaosDebugDrawColorsByShapeType& GetDefaultBoundsColorsByShapeType();
 
 		CHAOS_API void DrawParticleShapes(const FRigidTransform3& SpaceTransform, const TParticleView<FGeometryParticles>& ParticlesView,  FReal ColorScale, const FChaosDebugDrawSettings* Settings = nullptr);
 		CHAOS_API void DrawParticleShapes(const FRigidTransform3& SpaceTransform, const TParticleView<FKinematicGeometryParticles>& ParticlesView,  FReal ColorScale, const FChaosDebugDrawSettings* Settings = nullptr);
