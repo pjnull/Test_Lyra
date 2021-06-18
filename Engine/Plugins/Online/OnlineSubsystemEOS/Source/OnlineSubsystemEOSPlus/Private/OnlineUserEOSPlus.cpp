@@ -749,6 +749,11 @@ TSharedRef<FOnlineFriendPlus> FOnlineUserEOSPlus::AddFriend(TSharedRef<FOnlineFr
 		{
 			NetIdPlus = FUniqueNetIdEOSPlus::Create(nullptr, NetId);
 			EOSNetIdToNetIdPlus.Add(NetId->ToString(), NetIdPlus);
+
+			if (!NetIdPlusToNetIdPlus.Contains(NetIdPlus->ToString()))
+			{
+				NetIdPlusToNetIdPlus.Add(NetIdPlus->ToString(), NetIdPlus);
+			}
 		}
 		// Build a new friend plus and map them in
 		TSharedRef<FOnlineFriendPlus> FriendPlus = MakeShared<FOnlineFriendPlus>(nullptr, Friend);
@@ -764,6 +769,11 @@ TSharedRef<FOnlineFriendPlus> FOnlineUserEOSPlus::AddFriend(TSharedRef<FOnlineFr
 	{
 		NetIdPlus = FUniqueNetIdEOSPlus::Create(NetId, nullptr);
 		BaseNetIdToNetIdPlus.Add(NetId->ToString(), NetIdPlus);
+
+		if (!NetIdPlusToNetIdPlus.Contains(NetIdPlus->ToString()))
+		{
+			NetIdPlusToNetIdPlus.Add(NetIdPlus->ToString(), NetIdPlus);
+		}
 	}
 	// Build a new friend plus and map them in
 	TSharedRef<FOnlineFriendPlus> FriendPlus = MakeShared<FOnlineFriendPlus>(Friend, nullptr);
