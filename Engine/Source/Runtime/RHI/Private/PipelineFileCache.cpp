@@ -816,7 +816,7 @@ FString FPipelineCacheFileFormatPSO::CommonToString() const
 	return FString::Printf(TEXT("\"%d,%llu\""), Count, Mask);
 }
 
-FStringView FPipelineCacheFileFormatPSO::ToStringReadable()
+FString FPipelineCacheFileFormatPSO::ToStringReadable()
 {
 	TReadableStringBuilder Builder;
 
@@ -848,7 +848,7 @@ FStringView FPipelineCacheFileFormatPSO::ToStringReadable()
 		Builder << static_cast<int32>(Type);
 	}
 
-	return FStringView(Builder);
+	return FString(FStringView(Builder));
 }
 
 
@@ -3260,8 +3260,7 @@ void FPipelineFileCache::CacheGraphicsPSO(uint32 RunTimeHash, FGraphicsPipelineS
 							{
 								UE_LOG(LogRHI, Display, TEXT("New Graphics PSO (%u)"), PSOHash);
 #if !UE_BUILD_SHIPPING
-								FStringView ReadablePSODesc = NewEntry.ToStringReadable();
-								UE_LOG(LogRHI, Display, TEXT("%.*s"), PSOHash, ReadablePSODesc.Len(), ReadablePSODesc.GetData());
+								UE_LOG(LogRHI, Display, TEXT("%s"), *NewEntry.ToStringReadable());
 #endif
 							}
 							if (LogPSOtoFileCache())

@@ -237,7 +237,7 @@ struct RHI_API FPipelineCacheFileFormatPSO
 	void CommonFromString(const FStringView& Src);
 
 	/** Prints out human-readable representation of the PSO, for any type */
-	FStringView ToStringReadable();
+	FString ToStringReadable();
 	
 	// Potential cases for seperating verify logic if requiired: RunTime-Logging, RunTime-UserCaching, RunTime-PreCompile, CommandLet-Cooking
 	bool Verify() const;
