@@ -544,11 +544,6 @@ namespace Chaos
 		using FDenseMatrix66 = TDenseMatrix<6 * 6>;
 		using FDenseMatrix61 = TDenseMatrix<6 * 1>;
 
-		void ApplyConstraintsMatrix(
-			const FReal Dt,
-			const FPBDJointSolverSettings& SolverSettings,
-			const FPBDJointSettings& JointSettings);
-
 		int32 AddLinear(
 			const FReal Dt,
 			const FVec3& Axis,

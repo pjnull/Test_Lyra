@@ -38,7 +38,6 @@ namespace Chaos
 		int32 GetConstraintIsland() const;
 		int32 GetConstraintLevel() const;
 		int32 GetConstraintColor() const;
-		int32 GetConstraintBatch() const;
 
 		bool IsConstraintEnabled() const;
 		FVec3 GetLinearImpulse() const;
@@ -59,7 +58,6 @@ namespace Chaos
 	public:
 		FPBDJointState();
 
-		int32 Batch;
 		int32 Island;
 		int32 Level;
 		int32 Color;
@@ -191,7 +189,6 @@ namespace Chaos
 		int32 GetConstraintIsland(int32 ConstraintIndex) const;
 		int32 GetConstraintLevel(int32 ConstraintIndex) const;
 		int32 GetConstraintColor(int32 ConstraintIndex) const;
-		int32 GetConstraintBatch(int32 ConstraintIndex) const;
 
 		FVec3 GetConstraintLinearImpulse(int32 ConstraintIndex) const;
 		FVec3 GetConstraintAngularImpulse(int32 ConstraintIndex) const;
@@ -246,19 +243,11 @@ namespace Chaos
 		void UpdateParticleState(TPBDRigidParticleHandle<FReal, 3>* Rigid, const FReal Dt, const FVec3& PrevP, const FRotation3& PrevQ, const FVec3& P, const FRotation3& Q, const bool bUpdateVelocity = true);
 		void UpdateParticleStateExplicit(TPBDRigidParticleHandle<FReal, 3>* Rigid, const FReal Dt, const FVec3& P, const FRotation3& Q, const FVec3& V, const FVec3& W);
 		
-		void InitSolverJointData();
-		void DeinitSolverJointData();
-		void GatherSolverJointState(int32 ConstraintIndex);
-		void ScatterSolverJointState(const FReal Dt, int32 ConstraintIndex);
-
 		void ColorConstraints();
 		void SortConstraints();
-		void BatchConstraints();
-		void CheckBatches();
 
 		bool CanEvaluate(const int32 ConstraintIndex) const;
 
-		bool ApplyBatch(const FReal Dt, const int32 BatchIndex, const int32 NumPairIts, const int32 It, const int32 NumIts);
 		bool ApplySingle(const FReal Dt, const int32 ConstraintIndex, const int32 NumPairIts, const int32 It, const int32 NumIts);
 		bool ApplyPushOutSingle(const FReal Dt, const int32 ConstraintIndex, const int32 NumPairIts, const int32 It, const int32 NumIts);
 		void ApplyBreakThreshold(const FReal Dt, int32 ConstraintIndex, const FVec3& LinearImpulse, const FVec3& AngularImpulse);
@@ -273,7 +262,6 @@ namespace Chaos
 		FHandles Handles;
 		FConstraintHandleAllocator HandleAllocator;
 		bool bJointsDirty;
-		bool bIsBatched;
 		bool bUpdateVelocityInApplyConstraints;
 
 		FJointPreApplyCallback PreApplyCallback;
@@ -283,12 +271,6 @@ namespace Chaos
 
 		// @todo(ccaulfield): optimize storage for joint solver
 		TArray<FJointSolverGaussSeidel> ConstraintSolvers;
-
-		TArray<FJointSolverConstraints> SolverConstraints;
-		TArray<TVector<int32, 2>> JointBatches;
-		TArray< FJointSolverJointState> SolverConstraintStates;
-		TArray<FJointSolverConstraintRowData> SolverConstraintRowDatas;
-		TArray<FJointSolverConstraintRowState> SolverConstraintRowStates;
 
 		EConstraintSolverType SolverType;
 	};

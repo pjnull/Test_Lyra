@@ -132,7 +132,6 @@ namespace Chaos
 				, bLevel(false)
 				, bIndex(false)
 				, bColor(false)
-				, bBatch(false)
 				, bIsland(false)
 			{}
 
@@ -156,7 +155,6 @@ namespace Chaos
 			bool bLevel;
 			bool bIndex;
 			bool bColor;
-			bool bBatch;
 			bool bIsland;
 		};
 
