@@ -433,10 +433,6 @@ public:
 			if (PackagingSettings->IncludeCrashReporter && PlatformInfo->DataDrivenPlatformInfo->bCanUseCrashReporter)
 			{
 				BuildCookRunParams += TEXT(" -CrashReporter");
-				if (!PackagingSettings->CrashReporterUrl.IsEmpty())
-				{
-					BuildCookRunParams += FString::Printf(TEXT(" -CrashReporterUrl=\"%s\""), *PackagingSettings->CrashReporterUrl);
-				}
 			}
 
 			if (PackagingSettings->bBuildHttpChunkInstallData)
