@@ -680,7 +680,7 @@ namespace Chaos
 
 			const FPBDJointSettings& JointSettings = ConstraintSettings[JointIndex];
 
-			const FTransformPair& JointFrames = ConstraintFrames[JointIndex];
+			const FTransformPair& JointFrames = JointSettings.ConnectorTransforms;
 			FJointSolverGaussSeidel& Solver = ConstraintSolvers[JointIndex];
 
 			int32 Index0, Index1;
