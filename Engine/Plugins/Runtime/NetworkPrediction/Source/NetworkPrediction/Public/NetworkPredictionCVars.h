@@ -97,3 +97,32 @@ struct FConditionalAutoConsoleRegister
 #else
 #define NETSIM_DEVCVAR_SHIPCONST_FLOAT(Var,Value,VarName,Help) NETSIM_DEVCVAR_FLOAT(Var,Value,VarName,Help)
 #endif
+
+
+
+// Temp
+
+namespace UE_NETWORK_PHYSICS
+{
+	NETSIM_DEVCVAR_SHIPCONST_INT(MockDebug, 0, "np2.Mock.MockDebug", "Enabled spammy log debugging of mock physics object state");
+
+	NETSIM_DEVCVAR_SHIPCONST_INT(bFutureInputs, 0, "np2.FutureInputs", "Enable FutureInputs feature");		 // Not reimplemented yet
+		
+	NETSIM_DEVCVAR_SHIPCONST_INT(bInputDecay, 0, "np2.InputDecay", "Enable Input Decay Feature");		
+	NETSIM_DEVCVAR_SHIPCONST_FLOAT(InputDecayRate, 0.99f, "np2.InputDecayRate", "Rate of input decay");
+
+	NETSIM_DEVCVAR_SHIPCONST_FLOAT(DragK, 200.f, "np2.Mock.DragK", "Drag Coefficient (higher=more drag)");
+	NETSIM_DEVCVAR_SHIPCONST_FLOAT(MovementK, 1.25, "np2.Mock.MovementK", "Movement Coefficient (higher=faster movement)");
+	NETSIM_DEVCVAR_SHIPCONST_FLOAT(TurnK, 100000.f, "np2.Mock.TurnK", "Coefficient for automatic turning (higher=quicker turning)");
+	NETSIM_DEVCVAR_SHIPCONST_FLOAT(TurnDampK, 20.f, "np2.Mock.TurnDampK", "Coefficient for damping portion of turn. Higher=more damping but too higher will lead to instability.");
+
+	NETSIM_DEVCVAR_SHIPCONST_FLOAT(JumpForce, 1000000.0f, "np2.Mock.JumpForce", "Per-Frame force to apply while jumping.");	
+	NETSIM_DEVCVAR_SHIPCONST_INT(JumpFrameDuration, 4, "np2.Mock.JumpFrameDuration", "How many frames to apply jump force for");
+	NETSIM_DEVCVAR_SHIPCONST_INT(JumpFudgeFrames, 10, "np2.Mock.JumpFudgeFrames", "How many frames after being in air do we still allow a jump to begin");
+	NETSIM_DEVCVAR_SHIPCONST_INT(JumpHack, 0, "np2.Mock.JumpHack", "Make jump not rely on trace which currently causes non determinism");
+	NETSIM_DEVCVAR_SHIPCONST_INT(JumpMisPredict, 0, "np2.Mock.JumpMisPredict", "Make jump do random impulse which will cause a misprediction");
+	
+	NETSIM_DEVCVAR_SHIPCONST_INT(MockImpulse, 1, "np2.Mock.BallImpulse", "Make jump not rely on trace which currently causes non determinism");
+	NETSIM_DEVCVAR_SHIPCONST_FLOAT(MockImpulseX, 500.0f, "np2.Mock.BallImpulse.X", "X magnitude");
+	NETSIM_DEVCVAR_SHIPCONST_FLOAT(MockImpulseZ, 300.0f, "np2.Mock.BallImpulse.Z", "Z magnitude");
+}
