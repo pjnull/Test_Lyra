@@ -10,6 +10,8 @@ THIRD_PARTY_INCLUDES_START
 #include "GfnRuntimeSdk_CAPI.h"
 THIRD_PARTY_INCLUDES_END
 
+class GeForceNOWActionZoneProcessor;
+
 /**
  * Singleton wrapper to manage the GeForceNow SDK
  */
@@ -102,6 +104,9 @@ private:
 
 	/** Is the DLL running in the GeForce Now environment. */
 	TOptional<bool> bIsRunningInCloud;
+
+	/** Keeps track of actions zones for GeForce NOW. Action Zones are used for things like keyboard invocation within the GeForce NOW app.*/
+	TSharedPtr<GeForceNOWActionZoneProcessor> ActionZoneProcessor;
 };
 
 #endif // NV_GEFORCENOW

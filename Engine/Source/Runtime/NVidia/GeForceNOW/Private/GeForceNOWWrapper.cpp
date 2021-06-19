@@ -4,6 +4,7 @@
 
 #include "GeForceNOWWrapper.h"
 #include "GeForceNOWWrapperPrivate.h"
+#include "GeForceNOWActionZoneProcessor.h"
 #include "HAL/PlatformProcess.h"
 #include "Misc/CommandLine.h"
 #include "HAL/FileManager.h"
@@ -80,12 +81,23 @@ GfnRuntimeError GeForceNOWWrapper::Initialize()
  	const GfnRuntimeError ErrorCode = GfnInitializeSdkFromPath(gfnDefaultLanguage, *GFNDllFullPath);
 	bIsInitialized = ErrorCode == gfnSuccess || ErrorCode == gfnInitSuccessClientOnly;
 
+	if (bIsInitialized)
+	{
+		ActionZoneProcessor = MakeShared<GeForceNOWActionZoneProcessor>();
+		ActionZoneProcessor->Initialize();
+	}
+
 	return ErrorCode;
 }
 
 GfnRuntimeError GeForceNOWWrapper::Shutdown()
 {
 	bIsInitialized = false;
+	if (ActionZoneProcessor.IsValid())
+	{
+		ActionZoneProcessor->Terminate();
+		ActionZoneProcessor.Reset();
+	}
 	return GfnShutdownSdk();
 }
 
