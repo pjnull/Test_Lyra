@@ -1209,6 +1209,7 @@ void FMeshReductionSettingsLayout::GenerateChildContent( IDetailChildrenBuilder&
 
 	{
 		ChildrenBuilder.AddCustomRow( LOCTEXT("PercentTriangles", "Percent Triangles") )
+		.RowTag("PercentTriangles")
 		.NameContent()
 		[
 			SNew(STextBlock)
@@ -2406,6 +2407,7 @@ UStaticMesh& FMeshMaterialsLayout::GetStaticMesh() const
 void FMeshMaterialsLayout::AddToCategory(IDetailCategoryBuilder& CategoryBuilder, const TArray<FAssetData>& AssetDataArray)
 {
 	CategoryBuilder.AddCustomRow(LOCTEXT("AddLODLevelCategories_MaterialArrayOperationAdd", "Add Material Slot"))
+		.RowTag("MaterialSlots")
 		.CopyAction(FUIAction(FExecuteAction::CreateSP(this, &FMeshMaterialsLayout::OnCopyMaterialList), FCanExecuteAction::CreateSP(this, &FMeshMaterialsLayout::OnCanCopyMaterialList)))
 		.PasteAction(FUIAction(FExecuteAction::CreateSP(this, &FMeshMaterialsLayout::OnPasteMaterialList)))
 		.NameContent()
@@ -3230,7 +3232,8 @@ void FLevelOfDetailSettingsLayout::AddToDetailsPanel( IDetailLayoutBuilder& Deta
 	}
 
 	LODSettingsCategory.AddCustomRow(LOCTEXT("QualityLevelMinLOD", "Quality Level Min LOD"))
-		.NameContent()
+	.RowTag("QualityLevelMinLOD")
+	.NameContent()
 		[
 			SNew(STextBlock)
 			.Font(IDetailLayoutBuilder::GetDetailFont())
@@ -3290,6 +3293,7 @@ void FLevelOfDetailSettingsLayout::AddToDetailsPanel( IDetailLayoutBuilder& Deta
 
 	// Auto LOD distance check box.
 	LODSettingsCategory.AddCustomRow( LOCTEXT("AutoComputeLOD", "Auto Compute LOD Distances") )
+	.RowTag("AutoComputeLOD")
 	.NameContent()
 	[
 		SNew(STextBlock)
@@ -3400,6 +3404,7 @@ void FLevelOfDetailSettingsLayout::AddLODLevelCategories( IDetailLayoutBuilder& 
 		LodCustomCategory = &LODCustomModeCategory;
 
 		LODCustomModeCategory.AddCustomRow((LOCTEXT("LODCustomModeSelect", "Select LOD")))
+		.RowTag("SelectLOD")
 		.NameContent()
 		[
 			SNew(STextBlock)
@@ -3413,6 +3418,7 @@ void FLevelOfDetailSettingsLayout::AddLODLevelCategories( IDetailLayoutBuilder& 
 		];
 
 		LODCustomModeCategory.AddCustomRow((LOCTEXT("LODCustomModeFirstRowName", "LODCustomMode")))
+		.RowTag("LODCustomMode")
 		.NameContent()
 		[
 			SNew(STextBlock)
@@ -3434,6 +3440,7 @@ void FLevelOfDetailSettingsLayout::AddLODLevelCategories( IDetailLayoutBuilder& 
 			bool IsViewportLOD = (CurrentLodIndex == 0 ? 0 : CurrentLodIndex - 1) == LODIndex;
 			DetailDisplayLODs[LODIndex] = true; //enable all LOD in custom mode
 			LODCustomModeCategory.AddCustomRow((LOCTEXT("LODCustomModeRowName", "LODCheckBoxRowName")), true)
+			.RowTag("LODCheckBoxRowName")
 			.NameContent()
 			[
 				SNew(STextBlock)
