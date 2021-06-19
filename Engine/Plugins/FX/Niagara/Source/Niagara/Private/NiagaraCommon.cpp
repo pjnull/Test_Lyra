@@ -1496,5 +1496,6 @@ FSynchronizeWithParameterDefinitionsArgs::FSynchronizeWithParameterDefinitionsAr
 	, SpecificDestScriptVarIds(TArray<FGuid>())
 	, bForceSynchronizeDefinitions(false)
 	, bSubscribeAllNameMatchParameters(false)
+	, AdditionalOldToNewNames()
 {
 }

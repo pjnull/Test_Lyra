@@ -596,7 +596,7 @@ int32 FNiagaraScriptVariableDetails::GetLibrarySourcedDefaultModeInitialValue() 
 		return static_cast<int32>(ENiagaraLibrarySourceDefaultMode::FailIfPreviouslyNotSet);
 
 	default:
-		ensureMsgf(false, TEXT("Encountered invalid ENiagaraDefaultMode for library sourced script variable!"));
+		ensureMsgf(false, TEXT("Encountered invalid ENiagaraDefaultMode for definition sourced script variable!"));
 		return 0;
 	}
 }
@@ -622,7 +622,7 @@ int32 FNiagaraScriptVariableDetails::GetLibrarySynchronizedDefaultModeInitialVal
 		return static_cast<int32>(ENiagaraLibrarySynchronizedDefaultMode::FailIfPreviouslyNotSet);
 
 	default:
-		ensureMsgf(false, TEXT("Encountered invalid ENiagaraDefaultMode for library synchronized script variable!"));
+		ensureMsgf(false, TEXT("Encountered invalid ENiagaraDefaultMode for definition linked script variable!"));
 		return 0;
 	}
 }
