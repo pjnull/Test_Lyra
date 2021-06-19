@@ -54,17 +54,17 @@ struct FConditionalAutoConsoleRegister
 		check(Existing); \
 		return Existing->GetInt(); \
 	} \
-	inline void Set##Var(int32 V) \
+	inline void Set##Var(int32 _V) \
 	{ \
 		static auto* Existing = FindConsoleVarHelper(TEXT(VarName)); \
 		check(Existing); \
-		Existing->Set(V, ECVF_SetByConsole); \
+		Existing->Set(_V, ECVF_SetByConsole); \
 	}
 
 #if NETSIM_CONST_CVARS
 #define NETSIM_DEVCVAR_SHIPCONST_INT(Var,Value,VarName,Help) \
 	inline int32 Var() { return Value; } \
-	inline void Set##Var(int32 V) { }
+	inline void Set##Var(int32 _V) { }
 #else
 #define NETSIM_DEVCVAR_SHIPCONST_INT(Var,Value,VarName,Help) NETSIM_DEVCVAR_INT(Var,Value,VarName,Help)
 #endif
@@ -83,17 +83,17 @@ struct FConditionalAutoConsoleRegister
 		check(Existing); \
 		return Existing->GetFloat(); \
 	} \
-	inline void Set##Var(float V) \
+	inline void Set##Var(float _V) \
 	{ \
 		static auto* Existing = FindConsoleVarHelper(TEXT(VarName)); \
 		check(Existing); \
-		Existing->Set(V, ECVF_SetByConsole); \
+		Existing->Set(_V, ECVF_SetByConsole); \
 	}
 
 #if NETSIM_CONST_CVARS
 #define NETSIM_DEVCVAR_SHIPCONST_FLOAT(Var,Value,VarName,Help) \
 	inline float Var() { return Value; } \
-	inline void Set##Var() { }
+	inline void Set##Var(float _V) { }
 #else
 #define NETSIM_DEVCVAR_SHIPCONST_FLOAT(Var,Value,VarName,Help) NETSIM_DEVCVAR_FLOAT(Var,Value,VarName,Help)
 #endif
