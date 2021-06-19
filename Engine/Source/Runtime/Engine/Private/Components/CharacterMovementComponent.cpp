@@ -1377,8 +1377,6 @@ void UCharacterMovementComponent::TickComponent(float DeltaTime, enum ELevelTick
 
 	if (bUsingAsyncTick)
 	{
-		AccumulateRootMotionForAsync(DeltaTime, AsyncRootMotion);
-
 		check(CharacterOwner && CharacterOwner->GetMesh());
 		USkeletalMeshComponent* CharacterMesh = CharacterOwner->GetMesh();
 		if (CharacterMesh->ShouldTickPose())
@@ -1398,6 +1396,8 @@ void UCharacterMovementComponent::TickComponent(float DeltaTime, enum ELevelTick
 				}
 			}
 		}
+
+		AccumulateRootMotionForAsync(DeltaTime, AsyncRootMotion);
 
 		return;
 	}

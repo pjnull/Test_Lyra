@@ -289,9 +289,9 @@ void FCharacterMovementComponentAsyncInput::PerformMovement(float DeltaSeconds, 
 			if (RootMotion.bHasAnimRootMotion)
 			{
 				// Turn root motion to velocity to be used by various physics modes.
-				if (DeltaSeconds > 0.f)
+				if (RootMotion.TimeAccumulated > 0.f)
 				{
-					Output.AnimRootMotionVelocity = CalcAnimRootMotionVelocity(RootMotion.AnimTransform.GetTranslation(), DeltaSeconds, Velocity);
+					Output.AnimRootMotionVelocity = CalcAnimRootMotionVelocity(RootMotion.AnimTransform.GetTranslation(), RootMotion.TimeAccumulated, Velocity);
 					Output.Velocity = ConstrainAnimRootMotionVelocity(Output.AnimRootMotionVelocity, Output.Velocity, Output);
 				}
 
