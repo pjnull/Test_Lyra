@@ -63,9 +63,11 @@ PACKAGE_SCOPE:
 	TArray<uint8> RawBytes;
 
 private:
+	PRAGMA_DISABLE_DEPRECATION_WARNINGS
 	FUniqueNetIdEOSPlus()
 	{
 	}
+	PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 	explicit FUniqueNetIdEOSPlus(FUniqueNetIdPtr InBaseUniqueNetId, FUniqueNetIdPtr InEOSUniqueNetId);
 };
