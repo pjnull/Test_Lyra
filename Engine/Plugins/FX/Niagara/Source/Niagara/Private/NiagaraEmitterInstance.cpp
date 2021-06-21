@@ -85,14 +85,6 @@ static FAutoConsoleVariableRef CVarMaxNiagaraGPUParticlesSpawnPerFrame(
 	ECVF_Default
 );
 
-static int32 GNiagaraUseSuppressEmitterList = 0;
-static FAutoConsoleVariableRef CVarNiagaraUseEmitterSupressList(
-	TEXT("fx.Niagara.UseEmitterSuppressList"),
-	GNiagaraUseSuppressEmitterList,
-	TEXT("When an emitter is activated we will check the surpession list."),
-	ECVF_Default
-);
-
 //////////////////////////////////////////////////////////////////////////
 
 template<bool bAccumulate>
@@ -237,23 +229,6 @@ bool FNiagaraEmitterInstance::IsAllowedToExecute() const
 		return false;
 	}
 
-	if (GNiagaraUseSuppressEmitterList != 0)
-	{
-		if (const UNiagaraComponentSettings* ComponentSettings = GetDefault<UNiagaraComponentSettings>())
-		{
-			FNiagaraEmitterNameSettingsRef Ref;
-			if (const UNiagaraSystem* ParentSystem = ParentSystemInstance->GetSystem())
-			{
-				Ref.SystemName = ParentSystem->GetFName();
-			}
-			Ref.EmitterName = CachedEmitter->GetUniqueEmitterName();
-			if (ComponentSettings->SuppressEmitterList.Contains(Ref))
-			{
-				return false;
-			}
-		}
-	}
-
 	if (CachedEmitter->SimTarget == ENiagaraSimTarget::GPUComputeSim)
 	{
 		//-TODO: Could replace with CPU side sim in some cases
@@ -267,6 +242,11 @@ bool FNiagaraEmitterInstance::IsAllowedToExecute() const
 		{
 			return false;
 		}
+	}
+
+	if (UNiagaraComponentSettings::ShouldSuppressEmitterActivation(this))
+	{
+		return false;
 	}
 
 	return true;
