@@ -1263,7 +1263,7 @@ void FKismetCompilerContext::CopyTermDefaultsToDefaultObject(UObject* DefaultObj
 		int32 PropertiesAssigned = 0;
 
 		// Assign all default object values from the map to the new CDO
-		for (TFieldIterator<FProperty> It(DefaultObject->GetClass(), EFieldIteratorFlags::ExcludeSuper); It && PropertiesAssigned < (DefaultPropertyValueMap.Num(); ++It)
+		for (TFieldIterator<FProperty> It(DefaultObject->GetClass(), EFieldIteratorFlags::ExcludeSuper); It && PropertiesAssigned < DefaultPropertyValueMap.Num(); ++It)
 		{
 			FProperty* Property = *It;
 			if (const FString* ValuePtr = DefaultPropertyValueMap.Find(Property->GetFName()))
