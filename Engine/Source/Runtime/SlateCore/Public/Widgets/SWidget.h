@@ -1405,8 +1405,8 @@ public:
 		}
 
 		checkf(Index != 0 || !HasRegisteredSlateAttribute(), TEXT("The first slot is reserved for SlateAttribute"));
-		MetaData.RemoveAtSwap(Index, 1);
 		NotifyMetaDataRemoved(RemoveMe);
+		MetaData.RemoveAtSwap(Index, 1);
 		return 1;
 	}
 
@@ -1424,8 +1424,8 @@ private:
 			if (MetaDataEntry->IsOfType<MetaDataType>())
 			{
 				checkf(Index != 0 || !HasRegisteredSlateAttribute(), TEXT("The first slot is reserved for SlateAttribute"));
-				MetaData.RemoveAtSwap(Index);
 				NotifyMetaDataRemoved(MetaDataEntry);
+				MetaData.RemoveAtSwap(Index);
 			}
 		}
 		return NumBefore - MetaData.Num();
@@ -1440,8 +1440,8 @@ private:
 			if (MetaDataEntry->IsOfType<MetaDataType>())
 			{
 				checkf(Index != 0 || !HasRegisteredSlateAttribute(), TEXT("The first slot is reserved for SlateAttribute"));
-				MetaData.RemoveAtSwap(Index);
 				NotifyMetaDataRemoved(MetaDataEntry);
+				MetaData.RemoveAtSwap(Index);
 				return true;
 			}
 		}
