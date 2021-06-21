@@ -5,9 +5,11 @@
 #include "CoreMinimal.h"
 #include "Modules/ModuleManager.h"
 
+#if WITH_EDITOR
+class AActor;
 class FExtender;
 class FUICommandList;
-class AActor;
+#endif
 
 class FLightWeightInstancesEditorModule : public IModuleInterface
 {
@@ -24,6 +26,7 @@ protected:
 	// Cleanup menu options related to LWIs
 	void RemoveLevelViewportMenuExtender();
 
+#if WITH_EDITOR
 	TSharedRef<FExtender> CreateLevelViewportContextMenuExtender(const TSharedRef<FUICommandList> CommandList, const TArray<AActor*> InActors);
 
 	// Converts InActors to light weight instances. InActors must all be the same type or conversion won't occur
@@ -31,4 +34,5 @@ protected:
 
 	// Delegates
 	FDelegateHandle LevelViewportExtenderHandle;
+#endif
 };
