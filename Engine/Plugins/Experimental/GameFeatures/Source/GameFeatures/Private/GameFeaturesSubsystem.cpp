@@ -438,6 +438,16 @@ const UGameFeatureData* UGameFeaturesSubsystem::GetGameFeatureDataForActivePlugi
 	return nullptr;
 }
 
+const UGameFeatureData* UGameFeaturesSubsystem::GetGameFeatureDataForRegisteredPluginByURL(const FString& PluginURL)
+{
+	if (UGameFeaturePluginStateMachine* GFSM = FindGameFeaturePluginStateMachine(PluginURL))
+	{
+		return GFSM->GetGameFeatureDataForRegisteredPlugin();
+	}
+
+	return nullptr;
+}
+
 void UGameFeaturesSubsystem::LoadGameFeaturePlugin(const FString& PluginURL, const FGameFeaturePluginLoadComplete& CompleteDelegate)
 {
 	if (GameSpecificPolicies->IsPluginAllowed(PluginURL))
