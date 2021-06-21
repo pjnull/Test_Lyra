@@ -2030,7 +2030,7 @@ void FNiagaraScriptToolkitParameterPanelViewModel::RenameParameter(const FNiagar
 	{
 		return;
 	}
-	else if (ItemToRename.GetVariable().GetName() != NewName)
+	else if (ItemToRename.GetVariable().GetName() == NewName)
 	{
 		return;
 	}
