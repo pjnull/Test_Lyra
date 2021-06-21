@@ -647,7 +647,10 @@ bool FPipelineCacheFileFormatPSO::GraphicsDescriptor::StateFromString(const FStr
 	{
 		check(PartEnd - PartIt >= 4 && sizeof(ERenderTargetLoadAction) == 1 && sizeof(ERenderTargetStoreAction) == 1 && sizeof(EPixelFormat) == sizeof(uint32)); //not a very robust parser
 		LexFromString((uint32&)(RenderTargetFormats[Index]), *PartIt++);
-		LexFromString(RenderTargetFlags[Index], *PartIt++);
+		ETextureCreateFlags RTFlags;
+		LexFromString(RTFlags, *PartIt++);
+		// going forward, the flags will already be reduced when logging the PSOs to disk. However as of 2021-06-17 there are still old stable cache files in existence that have flags recorded as is
+		RenderTargetFlags[Index] = ReduceRTFlags(RTFlags);
 		uint8 Load, Store;
 		LexFromString(Load, *PartIt++);
 		LexFromString(Store, *PartIt++);
@@ -710,6 +713,13 @@ bool FPipelineCacheFileFormatPSO::GraphicsDescriptor::StateFromString(const FStr
 	  });
 
 	return true;
+}
+
+ETextureCreateFlags FPipelineCacheFileFormatPSO::GraphicsDescriptor::ReduceRTFlags(ETextureCreateFlags InFlags)
+{
+	// We care about flags that influence RT formats (which is the only thing the underlying API cares about).
+	// In most RHIs, the format is only influenced by TexCreate_SRGB. D3D12 additionally uses TexCreate_Shared in its format selection logic.
+	return (InFlags & (TexCreate_SRGB | TexCreate_Shared));
 }
 
 FString FPipelineCacheFileFormatPSO::GraphicsDescriptor::StateHeaderLine()
@@ -1191,14 +1201,15 @@ bool FPipelineCacheFileFormatPSO::Verify() const
 				{
 					uint32 RTFlags = 0;
 					Ar << RTFlags;
-					Info.GraphicsDesc.RenderTargetFlags[i] = static_cast<ETextureCreateFlags>(RTFlags);
+					// going forward, the flags will already be reduced when logging the PSOs to disk. However as of 2021-06-17 there still exist cache files (e.g. user ones) that have flags recorded as is
+					Info.GraphicsDesc.RenderTargetFlags[i] = FPipelineCacheFileFormatPSO::GraphicsDescriptor::ReduceRTFlags(static_cast<ETextureCreateFlags>(RTFlags));
 				}
 				else
 				{
 					static_assert(sizeof(uint64) == sizeof(Info.GraphicsDesc.RenderTargetFlags[i]), "ETextureCreateFlags size changed, please change serialization");
 					uint64 RTFlags = static_cast<uint64>(Info.GraphicsDesc.RenderTargetFlags[i]);
 					Ar << RTFlags;
-					Info.GraphicsDesc.RenderTargetFlags[i] = static_cast<ETextureCreateFlags>(RTFlags);
+					Info.GraphicsDesc.RenderTargetFlags[i] = FPipelineCacheFileFormatPSO::GraphicsDescriptor::ReduceRTFlags(static_cast<ETextureCreateFlags>(RTFlags));
 				}
 				uint8 LoadStore = 0;
 				Ar << LoadStore;
@@ -1390,7 +1401,7 @@ FPipelineCacheFileFormatPSO::FPipelineCacheFileFormatPSO()
 	for (uint32 i = 0; i < MaxSimultaneousRenderTargets; i++)
 	{
 		PSO.GraphicsDesc.RenderTargetFormats[i] = (EPixelFormat)Init.RenderTargetFormats[i];
-		PSO.GraphicsDesc.RenderTargetFlags[i] = Init.RenderTargetFlags[i];
+		PSO.GraphicsDesc.RenderTargetFlags[i] = FPipelineCacheFileFormatPSO::GraphicsDescriptor::ReduceRTFlags(Init.RenderTargetFlags[i]);
 	}
 	
 	PSO.GraphicsDesc.RenderTargetsActive = Init.RenderTargetsEnabled;

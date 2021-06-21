@@ -7045,10 +7045,10 @@ void UCookOnTheFlyServer::CreatePipelineCache(const ITargetPlatform* TargetPlatf
 				}
 				if (!NumMatched)
 				{
-					UE_LOG(LogCook, Warning, TEXT("Shader format %s for platform %s had this file %s, but no .scl.csv files."), *ShaderFormat.ToString(), *TargetPlatformName, *StablePCPath);
+					UE_LOG(LogCook, Warning, TEXT("Shader format %s for platform %s had this file %s, but no stable keys files."), *ShaderFormat.ToString(), *TargetPlatformName, *StablePCPath);
 					for (int32 Index = 0; Index < SCLCSVPaths->Num(); Index++)
 					{
-						UE_LOG(LogCook, Warning, TEXT("    .scl.csv file: %s"), *((*SCLCSVPaths)[Index]));
+						UE_LOG(LogCook, Warning, TEXT("    stable keys file: %s"), *((*SCLCSVPaths)[Index]));
 					}							
 					continue;
 				}
@@ -7068,6 +7068,21 @@ void UCookOnTheFlyServer::CreatePipelineCache(const ITargetPlatform* TargetPlatf
 				else
 				{
 					UE_LOG(LogCook, Display, TEXT("---- Done running UShaderPipelineCacheToolsCommandlet for platform %s"), *TargetPlatformName);
+
+					// copy the resulting file to metadata for easier examination later
+					if (IFileManager::Get().FileExists(*PCPath))
+					{
+						const FString RootPipelineCacheMetadataPath = FPaths::ProjectDir() / TEXT("Metadata") / TEXT("PipelineCaches");
+						const FString PipelineCacheMetadataPathSB = ConvertToFullSandboxPath(*RootPipelineCacheMetadataPath, true);
+						const FString PipelineCacheMetadataPath = PipelineCacheMetadataPathSB.Replace(TEXT("[Platform]"), *TargetPlatform->PlatformName());
+						const FString PipelineCacheMetadataFileName = PipelineCacheMetadataPath / OutFilename;
+
+						UE_LOG(LogCook, Display, TEXT("Copying the binary PSO cache file %s to %s."), *PCPath, *PipelineCacheMetadataFileName);
+						if (IFileManager::Get().Copy(*PipelineCacheMetadataFileName, *PCPath) != COPY_OK)
+						{
+							UE_LOG(LogCook, Warning, TEXT("Failed to copy the binary PSO cache file %s to %s."), *PCPath, *PipelineCacheMetadataFileName);
+						}
+					}
 				}
 			}
 		}

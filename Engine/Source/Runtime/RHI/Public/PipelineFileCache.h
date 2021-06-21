@@ -166,6 +166,9 @@ struct RHI_API FPipelineCacheFileFormatPSO
 		void AddStateToReadableString(TReadableStringBuilder& OutBuilder) const;
 		static FString StateHeaderLine();
 		bool StateFromString(const FStringView& Src);
+
+		/** Not all RT flags make sense for the replayed PSO, only those that can influence the RT formats */
+		static ETextureCreateFlags ReduceRTFlags(ETextureCreateFlags InFlags);
 	};
 	struct RHI_API FPipelineFileCacheRayTracingDesc
 	{
