@@ -245,6 +245,7 @@
 #include "DeviceProfiles/DeviceProfile.h"
 #include "DeviceProfiles/DeviceProfileManager.h"
 #include "Rendering/StaticLightingSystemInterface.h"
+#include "LevelEditorDragDropHandler.h"
 
 
 DEFINE_LOG_CATEGORY_STATIC(LogEditor, Log, All);
@@ -7571,6 +7572,21 @@ bool UEditorEngine::GetPreviewPlatformName(FName& PlatformName) const
 	}
 
 	return false;
+}
+
+ULevelEditorDragDropHandler* UEditorEngine::GetLevelEditorDragDropHandler() const
+{
+	if (DragDropHandler == nullptr)
+	{
+		DragDropHandler = const_cast<UEditorEngine*>(this)->CreateLevelEditorDragDropHandler();
+	}
+
+	return DragDropHandler;
+}
+
+ULevelEditorDragDropHandler* UEditorEngine::CreateLevelEditorDragDropHandler()
+{
+	return NewObject<ULevelEditorDragDropHandler>(this);
 }
 
 #undef LOCTEXT_NAMESPACE 
