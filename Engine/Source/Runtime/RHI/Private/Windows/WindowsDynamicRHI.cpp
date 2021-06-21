@@ -241,6 +241,7 @@ static TOptional<WindowsRHI> ChooseForcedRHI()
 		UE_LOG(LogRHI, Fatal, TEXT("-d3d12, -d3d11, -vulkan, and -opengl are mutually exclusive options, but more than one was specified on the command-line."));
 	}
 
+	// FeatureLevelES31 is also a command line override, so it will determine the underlying RHI unless one is specified
 	if (FParse::Param(FCommandLine::Get(), TEXT("FeatureLevelES31")) || FParse::Param(FCommandLine::Get(), TEXT("FeatureLevelES3_1")))
 	{
 		if (ForcedRHI == WindowsRHI::OpenGL)
@@ -253,10 +254,17 @@ static TOptional<WindowsRHI> ChooseForcedRHI()
 			FMessageDialog::Open(EAppMsgType::Ok, NSLOCTEXT("WindowsDynamicRHI", "RHIPerformanceVulkan", "Vulkan is not supported for Performance Mode."));
 			UE_LOG(LogRHI, Fatal, TEXT("Vulkan is not supported for Performance Mode."));
 		}
-		else if (ForcedRHI == WindowsRHI::D3D12 && !AllowD3D12FeatureLevelES31())
+		else if (ForcedRHI == WindowsRHI::D3D12)
 		{
-			FMessageDialog::Open(EAppMsgType::Ok, NSLOCTEXT("WindowsDynamicRHI", "RHIPerformanceDX12", "DirectX 12 is not supported for Performance Mode."));
-			UE_LOG(LogRHI, Fatal, TEXT("DirectX 12 is not supported for Performance Mode."));
+			if (!AllowD3D12FeatureLevelES31())
+			{
+				FMessageDialog::Open(EAppMsgType::Ok, NSLOCTEXT("WindowsDynamicRHI", "RHIPerformanceDX12", "DirectX 12 is not supported for Performance Mode."));
+				UE_LOG(LogRHI, Fatal, TEXT("DirectX 12 is not supported for Performance Mode."));
+			}
+		}
+		else
+		{
+			ForcedRHI = WindowsRHI::D3D11;
 		}
 	}
 
