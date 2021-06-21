@@ -256,7 +256,7 @@ static FAutoConsoleCommand SwitchModePipelineCacheCmd(
                                                 FConsoleCommandWithArgsDelegate::CreateStatic(ConsoleCommandSwitchModePipelineCacheCmd)
                                                 );
  
-int32 GShaderPipelineCacheDoNotPrecompileComputePSO = 0;
+int32 GShaderPipelineCacheDoNotPrecompileComputePSO = PLATFORM_ANDROID;	// temporarily (as of 2021-06-21) disable compute PSO precompilation on Android
 static FAutoConsoleVariableRef CVarShaderPipelineCacheDoNotPrecompileComputePSO(
 												TEXT("r.ShaderPipelineCache.DoNotPrecompileComputePSO"),
 												GShaderPipelineCacheDoNotPrecompileComputePSO,
