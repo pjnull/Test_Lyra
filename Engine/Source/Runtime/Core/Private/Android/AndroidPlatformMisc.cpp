@@ -203,11 +203,12 @@ static void InitCpuThermalSensor()
 
 	for (uint32 i = 0; i < SensorLocations.Num(); ++i)
 	{
-		const char* SensorFilePath = TCHAR_TO_ANSI(*SensorLocations[i]);
+		auto ConvertedStr = StringCast<ANSICHAR>(*SensorLocations[i]);
+		const char* SensorFilePath = ConvertedStr.Get();
 		if (FILE* File = fopen(SensorFilePath, "r"))
 		{
 			FCStringAnsi::Strcpy(AndroidCpuThermalSensorFileBuf, SensorFilePath);
-			UE_LOG(LogAndroid, Display, TEXT("Selecting thermal sensor located at `%s`"), ANSI_TO_TCHAR(AndroidCpuThermalSensorFileBuf));
+			UE_LOG(LogAndroid, Display, TEXT("Selecting thermal sensor located at `%s`"), *SensorLocations[i]);
 			fclose(File);
 			return;
 		}
