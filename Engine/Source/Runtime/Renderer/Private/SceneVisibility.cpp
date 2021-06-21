@@ -1834,8 +1834,7 @@ struct FDrawCommandRelevancePacket
 
 				NewVisibleMeshDrawCommand.Setup(
 					MeshDrawCommand,
-					PrimitiveIndex,
-					PrimitiveIndex,
+					FMeshDrawCommandPrimitiveIdInfo(PrimitiveIndex, InPrimitiveSceneInfo->GetInstanceSceneDataOffset()),
 					CachedMeshDrawCommand.StateBucketId,
 					CachedMeshDrawCommand.MeshFillMode,
 					CachedMeshDrawCommand.MeshCullMode,
@@ -3796,8 +3795,8 @@ void FSceneRenderer::DumpPrimitives(const FViewCommands& ViewCommands)
 
 		for (const FVisibleMeshDrawCommand& Mesh : ViewCommands.MeshCommands[EMeshPass::BasePass])
 		{
-			int32 PrimitiveId = Mesh.DrawPrimitiveId;
-			if (PrimitiveId < Scene->Primitives.Num())
+			int32 PrimitiveId = Mesh.PrimitiveIdInfo.ScenePrimitiveId;
+			if (PrimitiveId >= 0 && PrimitiveId < Scene->Primitives.Num())
 			{
 				const FPrimitiveSceneInfo* PrimitiveSceneInfo = Scene->Primitives[PrimitiveId];
 				FString FullName = PrimitiveSceneInfo->ComponentForDebuggingOnly->GetFullName();
