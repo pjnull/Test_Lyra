@@ -590,28 +590,12 @@ bool UGameplayCueManager::ShouldSyncScanRuntimeObjectLibraries() const
 }
 bool UGameplayCueManager::ShouldSyncLoadRuntimeObjectLibraries() const
 {
-	// 
-#if WITH_EDITOR
-	//Sync load cues in editor to speed up startup times.
-	if (GIsEditor)
-	{
-		return true;
-	}
-#endif
-
 	// No real need to sync load it anymore
 	return false;
 }
 bool UGameplayCueManager::ShouldAsyncLoadRuntimeObjectLibraries() const
 {
-	// Async load the run time library at startup except in the editor.
-#if WITH_EDITOR
-	if (GIsEditor)
-	{
-		return false;
-	}
-#endif
-
+	// Async load the run time library at startup
 	return true;
 }
 
