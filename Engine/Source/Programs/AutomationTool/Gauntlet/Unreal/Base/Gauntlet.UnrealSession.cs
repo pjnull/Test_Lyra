@@ -379,7 +379,7 @@ namespace Gauntlet
 					{
 						App.Kill();
 						// Apps that are still running have timed out => fail
-						IDeviceUsageReporter.RecordEnd(App.Device.Name, (UnrealTargetPlatform)App.Device.Platform, IDeviceUsageReporter.EventType.Test, bSuccess: false);
+						IDeviceUsageReporter.RecordEnd(App.Device.Name, (UnrealTargetPlatform)App.Device.Platform, IDeviceUsageReporter.EventType.Test, IDeviceUsageReporter.EventState.Success);
 					});
 				}
 
@@ -389,7 +389,7 @@ namespace Gauntlet
 					ClosedApps.ForEach(App =>
 					{
 						// Apps that have already exited have 'succeeded'
-						IDeviceUsageReporter.RecordEnd(App.Device.Name, (UnrealTargetPlatform)App.Device.Platform, IDeviceUsageReporter.EventType.Test, bSuccess: true);
+						IDeviceUsageReporter.RecordEnd(App.Device.Name, (UnrealTargetPlatform)App.Device.Platform, IDeviceUsageReporter.EventType.Test, IDeviceUsageReporter.EventState.Failure);
 					});
 				}
 			}
@@ -928,7 +928,7 @@ namespace Gauntlet
 					try
 					{
 						Install = Device.InstallApplication(AppConfig);
-						IDeviceUsageReporter.RecordEnd(Device.Name, (UnrealTargetPlatform)Device.Platform, IDeviceUsageReporter.EventType.Install, bSuccess: true);
+						IDeviceUsageReporter.RecordEnd(Device.Name, (UnrealTargetPlatform)Device.Platform, IDeviceUsageReporter.EventType.Install, IDeviceUsageReporter.EventState.Success);
 					}
 					catch (System.Exception Ex)
 					{
@@ -936,7 +936,7 @@ namespace Gauntlet
 						Log.Info("Failed to install app onto device {0} for role {1}. {2}. Will retry with new device", Device, Role, Ex);
 						MarkProblemDevice(Device);
 						InstallSuccess = false;
-						IDeviceUsageReporter.RecordEnd(Device.Name, (UnrealTargetPlatform)Device.Platform, IDeviceUsageReporter.EventType.Install, bSuccess: false);
+						IDeviceUsageReporter.RecordEnd(Device.Name, (UnrealTargetPlatform)Device.Platform, IDeviceUsageReporter.EventType.Install, IDeviceUsageReporter.EventState.Failure);
 						break;
 					}
 					
@@ -1362,12 +1362,12 @@ namespace Gauntlet
 					catch (Exception)
 					{
 						// Caught an exception -> report failure
-						IDeviceUsageReporter.RecordEnd(device.Name, (UnrealTargetPlatform)device.Platform, IDeviceUsageReporter.EventType.SavingArtifacts, bSuccess: false);
+						IDeviceUsageReporter.RecordEnd(device.Name, (UnrealTargetPlatform)device.Platform, IDeviceUsageReporter.EventType.SavingArtifacts, IDeviceUsageReporter.EventState.Failure);
 						// Pass exception to the surrounding try/catch in UnrealTestNode while preserving the original callstack
 						throw;
 					}
 					// Did not catch -> successful reporting
-					IDeviceUsageReporter.RecordEnd(device.Name, (UnrealTargetPlatform)device.Platform, IDeviceUsageReporter.EventType.SavingArtifacts, bSuccess: true);
+					IDeviceUsageReporter.RecordEnd(device.Name, (UnrealTargetPlatform)device.Platform, IDeviceUsageReporter.EventType.SavingArtifacts, IDeviceUsageReporter.EventState.Success);
 
 					if (Artifacts != null)
 					{

@@ -15,17 +15,23 @@ namespace Gauntlet
 			, SavingArtifacts
 		};
 
-		public static void RecordStart(string deviceName, UnrealTargetPlatform platform, EventType et)
+		public enum EventState : int
 		{
-			RecordToAll(deviceName, platform, et, true, true);
+			  Failure = 0
+			, Success = 1
+		};
+
+		public static void RecordStart(string deviceName, UnrealTargetPlatform platform, EventType et, EventState state = EventState.Success)
+		{
+			RecordToAll(deviceName, platform, et, true, state);
 		}
 
-		public static void RecordEnd(string deviceName, UnrealTargetPlatform platform, EventType et, bool bSuccess = true)
+		public static void RecordEnd(string deviceName, UnrealTargetPlatform platform, EventType et, EventState state = EventState.Success)
 		{
-			RecordToAll(deviceName, platform, et, false, bSuccess);
+			RecordToAll(deviceName, platform, et, false, state);
 		}
 
-		private static void RecordToAll(string deviceName, UnrealTargetPlatform platform, EventType ev, bool bStarting, bool bSuccess)
+		private static void RecordToAll(string deviceName, UnrealTargetPlatform platform, EventType ev, bool bStarting, EventState state)
 		{
 			bool bFoundAnyReporters = false;
 			bool bFoundEnabledReporters = false;
@@ -44,7 +50,7 @@ namespace Gauntlet
 				{
 					bFoundEnabledReporters = true;
 					Gauntlet.Log.Verbose("Reporting DeviceUsage event {0} via reporter {1}", ev.ToString(), reporter.GetType().Name);
-					reporter.RecordEvent(deviceName, platform, ev, bStarting, bSuccess);
+					reporter.RecordEvent(deviceName, platform, ev, bStarting, state);
 				}
 			}
 			if(!bFoundAnyReporters)
@@ -57,7 +63,7 @@ namespace Gauntlet
 			}
 		}
 
-		public abstract void RecordEvent(string deviceName, UnrealTargetPlatform platform, EventType ev, bool bStarting, bool bSuccess = true);
+		public abstract void RecordEvent(string deviceName, UnrealTargetPlatform platform, EventType ev, bool bStarting, EventState state = EventState.Success);
 
 		public abstract bool IsEnabled();
 	}
