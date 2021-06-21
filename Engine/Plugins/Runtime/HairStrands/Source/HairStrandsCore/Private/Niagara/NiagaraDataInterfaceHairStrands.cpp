@@ -1000,7 +1000,7 @@ void UNiagaraDataInterfaceHairStrands::ExtractDatasAndResources(
 	{
 		OutGroupIndex = 0;
 		OutLODIndex = 0;
-		OutLocalToWorld = SystemInstance->GetWorldTransform();
+		OutLocalToWorld = SystemInstance ? SystemInstance->GetWorldTransform() : FTransform::Identity;
 		if (OutGroupIndex < DefaultSource->GetNumHairGroups())
 		{
 			OutStrandsRestResource = DefaultSource->HairGroupsData[OutGroupIndex].Strands.RestResource;
