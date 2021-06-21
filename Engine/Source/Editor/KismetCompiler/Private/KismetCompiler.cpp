@@ -1258,17 +1258,19 @@ void FKismetCompilerContext::SetPropertyDefaultValue(const FProperty* PropertyTo
 /** Copies default values cached for the terms in the DefaultPropertyValueMap to the final CDO */
 void FKismetCompilerContext::CopyTermDefaultsToDefaultObject(UObject* DefaultObject)
 {
-	// Assign all default object values from the map to the new CDO
-	for( TMap<FName, FString>::TIterator PropIt(DefaultPropertyValueMap); PropIt; ++PropIt )
+	if (DefaultPropertyValueMap.Num() > 0)
 	{
-		FName TargetPropName = PropIt.Key();
-		FString Value = PropIt.Value();
+		int32 PropertiesAssigned = 0;
 
-		for (TFieldIterator<FProperty> It(DefaultObject->GetClass(), EFieldIteratorFlags::ExcludeSuper); It; ++It)
+		// Assign all default object values from the map to the new CDO
+		for (TFieldIterator<FProperty> It(DefaultObject->GetClass(), EFieldIteratorFlags::ExcludeSuper); It && PropertiesAssigned < (DefaultPropertyValueMap.Num(); ++It)
 		{
 			FProperty* Property = *It;
-			if (Property->GetFName() == TargetPropName)
+			if (const FString* ValuePtr = DefaultPropertyValueMap.Find(Property->GetFName()))
 			{
+				++PropertiesAssigned;
+
+				const FString& Value = *ValuePtr;
 				if(FObjectProperty* AsObjectProperty = CastField<FObjectProperty>(Property))
 				{
 					// Value is the fully qualified name, so just search for it:
@@ -1306,8 +1308,6 @@ void FKismetCompilerContext::CopyTermDefaultsToDefaultObject(UObject* DefaultObj
 						MessageLog.Warning(*ErrorMessage, InstigatorPin);
 					}
 				}
-
-				break;
 			}
 		}			
 	}
