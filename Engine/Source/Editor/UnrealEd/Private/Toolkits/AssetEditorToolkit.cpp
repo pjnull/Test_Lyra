@@ -251,6 +251,9 @@ void FAssetEditorToolkit::InitAssetEditor( const EToolkitMode::Type Mode, const 
 		}
 	}
 
+	// Give a chance to customize tab manager and other UI before widgets are created
+	GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->NotifyEditorOpeningPreWidgets(EditingObjects, this);
+
 	// Create menus
 	if (ToolkitMode == EToolkitMode::Standalone)
 	{
