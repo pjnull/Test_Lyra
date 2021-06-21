@@ -19,7 +19,7 @@ struct FAutomatedTestFilter
 public:
 
 	FAutomatedTestFilter(FString InContains, bool InMatchFromStart = false, bool InMatchFromEnd = false)
-		: Contains(InContains), MatchFromStart(InMatchFromStart), MatchFromEnd(MatchFromEnd)
+		: Contains(InContains), MatchFromStart(InMatchFromStart), MatchFromEnd(InMatchFromEnd)
 	{
 	}
 
