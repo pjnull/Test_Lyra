@@ -567,9 +567,7 @@ void UK2Node_AddComponent::MakeNewComponentTemplate()
 			// Copy the old template data over to the new template if it's compatible
 			if ((SourceTemplate != nullptr) && (SourceTemplate->GetClass()->IsChildOf(ComponentClass)))
 			{
-				TArray<uint8> SavedProperties;
-				FObjectWriter Writer(SourceTemplate, SavedProperties);
-				FObjectReader(NewTemplate, SavedProperties);
+				UEngine::CopyPropertiesForUnrelatedObjects(SourceTemplate, NewTemplate);
 			}
 			else if (TemplateBlueprint.Len() > 0)
 			{
@@ -580,9 +578,7 @@ void UK2Node_AddComponent::MakeNewComponentTemplate()
 					SourceTemplate = SourceBlueprint->FindTemplateByName(TemplateName);
 					if ((SourceTemplate != nullptr) && (SourceTemplate->GetClass()->IsChildOf(ComponentClass)))
 					{
-						TArray<uint8> SavedProperties;
-						FObjectWriter Writer(SourceTemplate, SavedProperties);
-						FObjectReader(NewTemplate, SavedProperties);
+						UEngine::CopyPropertiesForUnrelatedObjects(SourceTemplate, NewTemplate);
 					}
 				}
 
