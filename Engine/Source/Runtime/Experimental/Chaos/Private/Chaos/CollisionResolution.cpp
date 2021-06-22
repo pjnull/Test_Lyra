@@ -191,7 +191,12 @@ namespace Chaos
 				if (Length > 0.0f && CCDEnableThresholdBoundsScale >= 0.0f && Length >= LengthCCDThreshold)
 				{
 					Dir /= Length;
-					return true;
+
+					// Do not perform CCD if the vector is not close to unit length to prevent getting caught in a large or infinite loop when raycasting.
+					if (FMath::IsNearlyEqual(Dir.SizeSquared(), 1.f, KINDA_SMALL_NUMBER))
+					{
+						return true;
+					}
 				}
 			}
 
