@@ -1718,7 +1718,7 @@ TSharedPtr<IPlugin> FPluginManager::FindPluginFromPath(const FString& PluginPath
 	FString PluginName = PluginPath;
 	FPaths::NormalizeFilename(PluginName);
 
-	if (PluginName.StartsWith(TEXT("/")))
+	if (PluginName.StartsWith(TEXT("/"), ESearchCase::CaseSensitive))
 	{
 		PluginName.RightChopInline(1);
 	}
