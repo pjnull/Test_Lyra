@@ -2,9 +2,9 @@
 
 namespace UnrealBuildTool.Rules
 {
-	public class GameFeatures : ModuleRules
+	public class AbilitySystemGameFeatureActions : ModuleRules
 	{
-        public GameFeatures(ReadOnlyTargetRules Target) : base(Target)
+        public AbilitySystemGameFeatureActions(ReadOnlyTargetRules Target) : base(Target)
 		{
 			PublicDependencyModuleNames.AddRange(
 				new string[]
@@ -22,6 +22,8 @@ namespace UnrealBuildTool.Rules
 				new string[]
 				{
 					"AssetRegistry",
+					"GameFeatures",
+					"GameplayAbilities",
 					"GameplayTags",
 					"InstallBundleManager",
 					"Json",

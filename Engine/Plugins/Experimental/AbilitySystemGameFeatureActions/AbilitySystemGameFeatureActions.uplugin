@@ -2,8 +2,8 @@
 	"FileVersion": 3,
 	"Version": 1,
 	"VersionName": "0.1",
-	"FriendlyName": "Game Features",
-	"Description": "Support for modular Game Feature Plugins",
+	"FriendlyName": "Ability System Game Feature Actions",
+	"Description": "Ability System Game Feature Actions",
 	"Category": "Gameplay",
 	"CreatedBy": "Epic Games, Inc.",
 	"CreatedByURL": "http://epicgames.com",
@@ -16,27 +16,18 @@
 	"Installed": false,
 	"Modules": [
 		{
-			"Name": "GameFeatures",
+			"Name": "AbilitySystemGameFeatureActions",
 			"Type": "Runtime",
-			"LoadingPhase": "Default"
-		},
-		{
-			"Name": "GameFeaturesEditor",
-			"Type": "Editor",
 			"LoadingPhase": "Default"
 		}
 	],
 	"Plugins": [
 		{
-			"Name": "ModularGameplay",
+			"Name": "GameFeatures",
 			"Enabled": true
 		},
 		{
-			"Name": "DataRegistry",
-			"Enabled": true
-		},
-		{
-			"Name": "AssetReferenceRestrictions",
+			"Name": "GameplayAbilities",
 			"Enabled": true
 		}
 	]
