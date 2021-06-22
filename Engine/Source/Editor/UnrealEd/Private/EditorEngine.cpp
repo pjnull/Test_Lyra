@@ -2880,6 +2880,11 @@ void UEditorEngine::GetObjectsToSyncToContentBrowser( TArray<UObject*>& Objects 
 			{
 				Objects.Add(GeneratingBP);
 			}
+			// Cooked editor sometimes only contains UBlueprintGeneratedClass with no UBlueprint
+			else if (UBlueprintGeneratedClass* BlueprintGeneratedClass = Cast<UBlueprintGeneratedClass>(It->GetClass()))
+			{
+				Objects.Add(BlueprintGeneratedClass);
+			}
 			// Otherwise, add the results of the GetReferencedContentObjects call
 			else
 			{
