@@ -812,14 +812,19 @@ public:
 	void ResetAudioVolumeProxyChangedState();
 
 	/**
-	 * Gathers data about interior volumes affecting the active sound
+	 * Gathers data about interior volumes affecting the active sound (called on audio thread)
 	 */
 	void GatherInteriorData(FActiveSound& ActiveSound, FSoundParseParameters& ParseParams) const;
 
 	/**
-	 * Applies interior settings from affecting volumes to the active sound
+	 * Applies interior settings from affecting volumes to the active sound (called on audio thread)
 	 */
 	void ApplyInteriorSettings(FActiveSound& ActiveSound, FSoundParseParameters& ParseParams) const;
+
+	/**
+	 * Notifies subsystems an active sound is about to be deleted (called on audio thread)
+	 */
+	void NotifyPendingDelete(FActiveSound& ActiveSound) const;
 
 public:
 

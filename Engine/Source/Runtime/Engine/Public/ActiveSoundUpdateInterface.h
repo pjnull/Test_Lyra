@@ -37,4 +37,11 @@ public:
 	 * @param ParseParams	The parameters to apply to the wave instances
 	 */
 	virtual void ApplyInteriorSettings(FActiveSound& ActiveSound, FSoundParseParameters& ParseParams) const = 0;
+
+	/**
+	 * Called when the active sound is being removed from the audio engine
+	 *
+	 * @param ActiveSound	The active sound
+	 */
+	virtual void OnNotifyPendingDelete(FActiveSound& ActiveSound) = 0;
 };
