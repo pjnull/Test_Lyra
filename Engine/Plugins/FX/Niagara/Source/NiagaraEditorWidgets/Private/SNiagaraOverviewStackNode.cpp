@@ -28,6 +28,7 @@
 #include "ViewModels/Stack/NiagaraStackRendererItem.h"
 #include "Materials/MaterialInterface.h"
 #include "Materials/Material.h"
+#include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "Styling/StyleColors.h"
 
 #define LOCTEXT_NAMESPACE "NiagaraOverviewStackNode"
