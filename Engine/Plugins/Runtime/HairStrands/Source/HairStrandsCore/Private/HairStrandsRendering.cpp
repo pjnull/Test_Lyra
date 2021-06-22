@@ -1778,6 +1778,8 @@ void ComputeHairStrandsInterpolation(
 						ERDGPassFlags::NeverCull,
 					[Instance, bNeedUpdate](FRHICommandList& RHICmdList)
 					{
+						SCOPED_GPU_MASK(RHICmdList, FRHIGPUMask::All());
+
 						const bool bLocalNeedBuild = !Instance->Strands.RenRaytracingResource->bIsRTGeometryInitialized;
 						if (bLocalNeedBuild)
 						{
@@ -1904,6 +1906,8 @@ void ComputeHairStrandsInterpolation(
 						ERDGPassFlags::NeverCull,
 						[Instance, HairLODIndex, bNeedUpdate](FRHICommandList& RHICmdList)
 					{
+						SCOPED_GPU_MASK(RHICmdList, FRHIGPUMask::All());
+
 						FHairGroupInstance::FCards::FLOD& LocalLOD = Instance->Cards.LODs[HairLODIndex];
 
 						const bool bLocalNeedBuild = !LocalLOD.RaytracingResource->bIsRTGeometryInitialized;
@@ -1967,6 +1971,8 @@ void ComputeHairStrandsInterpolation(
 						ERDGPassFlags::NeverCull,
 						[Instance, HairLODIndex, bNeedUpdate](FRHICommandList& RHICmdList)
 					{
+						SCOPED_GPU_MASK(RHICmdList, FRHIGPUMask::All());
+
 						FHairGroupInstance::FMeshes::FLOD& LocalLOD = Instance->Meshes.LODs[HairLODIndex];				
 						const bool bLocalNeedBuild = !LocalLOD.RaytracingResource->bIsRTGeometryInitialized;
 						if (bLocalNeedBuild)
