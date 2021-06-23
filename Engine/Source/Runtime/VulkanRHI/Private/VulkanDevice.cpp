@@ -1485,6 +1485,11 @@ void FVulkanDevice::NotifyDeletedComputePipeline(class FVulkanComputePipeline* P
 	{
 		ImmediateContext->PendingComputeState->NotifyDeletedPipeline(Pipeline);
 	}
+
+	if (PipelineStateCache)
+	{
+		PipelineStateCache->NotifyDeletedComputePipeline(Pipeline);
+	}
 }
 
 static FCriticalSection GContextCS;
