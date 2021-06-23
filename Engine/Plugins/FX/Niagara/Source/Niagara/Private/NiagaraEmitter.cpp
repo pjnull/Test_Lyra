@@ -972,7 +972,14 @@ TArray<UNiagaraScriptSourceBase*> UNiagaraEmitter::GetAllSourceScripts()
 	GetScripts(Scripts, false);
 	for (UNiagaraScript* Script : Scripts)
 	{
-		OutScriptSources.Add(Script->GetLatestSource());
+		if (Script != nullptr)
+		{
+			UNiagaraScriptSourceBase* LatestSource = Script->GetLatestSource();
+			if (LatestSource != nullptr)
+			{
+				OutScriptSources.Add(LatestSource);
+			}
+		}
 	}
 	return OutScriptSources;
 }
