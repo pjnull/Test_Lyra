@@ -1290,7 +1290,7 @@ bool UCookOnTheFlyServer::IsCookByTheBookMode() const
 
 bool UCookOnTheFlyServer::IsUsingShaderCodeLibrary() const
 {
-	return IsCookByTheBookMode();
+	return IsCookByTheBookMode() && AllowShaderCompiling();
 }
 
 bool UCookOnTheFlyServer::IsUsingIoStore() const
@@ -5195,6 +5195,7 @@ void GetAdditionalCurrentIniVersionStrings( const ITargetPlatform* TargetPlatfor
 		GetVersionFormatNumbersForIniVersionStrings(IniVersionMap, TEXT("TextureFormat"), SupportedTextureFormats);
 	}
 
+	if (AllowShaderCompiling())
 	{
 		TArray<FName> AllFormatNames;
 		TargetPlatform->GetAllTargetedShaderFormats(AllFormatNames);
@@ -7200,6 +7201,7 @@ void UCookOnTheFlyServer::CookByTheBookFinished()
 			}
 		}
 
+		if (!FParse::Param(FCommandLine::Get(), TEXT("SkipSaveAssetRegistry")))
 		{
 			UE_SCOPED_HIERARCHICAL_COOKTIMER(SavingAssetRegistry);
 			for (const ITargetPlatform* TargetPlatform : PlatformManager->GetSessionPlatforms())
@@ -8196,7 +8198,7 @@ void UCookOnTheFlyServer::StartCookByTheBook( const FCookByTheBookStartupOptions
 	}
 	
 	// add shader library chunkers
-	if (PackagingSettings->bShareMaterialShaderCode)
+	if (PackagingSettings->bShareMaterialShaderCode && IsUsingShaderCodeLibrary())
 	{
 		for (const ITargetPlatform* TargetPlatform : TargetPlatforms)
 		{
