@@ -61,6 +61,7 @@
 #include "HairStrands/HairStrandsVisibility.h"
 #include "SystemTextures.h"
 #include "VirtualShadowMaps/VirtualShadowMapClipmap.h"
+#include "Misc/AutomationTest.h"
 #if WITH_EDITOR
 #include "Rendering/StaticLightingSystemInterface.h"
 #endif
