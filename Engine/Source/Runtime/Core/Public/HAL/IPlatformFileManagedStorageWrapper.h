@@ -531,6 +531,7 @@ private:
 						DirectoryNames.LeftChopInline(1, false);
 					}
 
+
 					TArray<FString> Directories;
 					DirectoryNames.ParseIntoArray(Directories, TEXT(","));
 					TMap<FString, FString> CustomDirectoryReplace;
@@ -552,6 +553,17 @@ private:
 							DirectoryName = FPaths::ProjectPersistentDownloadDir() / DirectoryName.Replace(TEXT("\""), TEXT(""));
 						}
 					}
+
+					// see if there are any commandline config overrides
+					
+					int64 QuotaInMBOverride = -1;
+					FString CommandLineOptionName = FString::Printf(TEXT("persistentstoragequota%s="), *CategoryName);
+					if (FParse::Value(FCommandLine::Get(), *CommandLineOptionName, QuotaInMBOverride))
+					{
+						QuotaInMB = QuotaInMBOverride;
+					}
+
+
 
 					int64 Quota = (QuotaInMB >= 0) ? QuotaInMB * 1024 * 1024 : -1;	// Quota being negative means infinite quota
 					int64 OptionalQuota = (OptionalQuotaMB >= 0) ? OptionalQuotaMB * 1024 * 1024 : 0;
