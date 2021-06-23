@@ -12,11 +12,17 @@ DECLARE_CYCLE_STAT(TEXT("Event Emission"), STAT_NiagaraEventWrite, STATGROUP_Nia
 
 const FName FNiagaraDICollisionQueryBatch::CollisionTagName = FName("Niagara");
 
+static int32 GNiagaraCollisionCPUEnabled = 1;
+static FAutoConsoleVariableRef CVarNiagaraCollisionEnabled(
+	TEXT("fx.Niagara.Collision.CPUEnabled"),
+	GNiagaraCollisionCPUEnabled,
+	TEXT("Controls if CPU collisions are enabled or not."),
+	ECVF_Default
+);
+
 void FNiagaraDICollisionQueryBatch::DispatchQueries()
 {
 	check(IsInGameThread());
-
-	SCOPE_CYCLE_COUNTER(STAT_NiagaraCollision);
 
 	// swap the buffers, and use our new read buffer for issuing all of our accumulated queries now that we're on the main thread
 	FlipBuffers();
@@ -26,20 +32,24 @@ void FNiagaraDICollisionQueryBatch::DispatchQueries()
 	{
 		const int32 ReadBufferIdx = GetReadBufferIdx();
 		const int32 TraceCount = CollisionTraces[ReadBufferIdx].Num();
-
-		for (int32 TraceIt = 0; TraceIt < TraceCount; ++TraceIt)
+		if (TraceCount > 0)
 		{
-			FNiagaraCollisionTrace& CollisionTrace = CollisionTraces[ReadBufferIdx][TraceIt];
+			SCOPE_CYCLE_COUNTER(STAT_NiagaraCollision);
 
-			CollisionTrace.CollisionTraceHandle = CollisionWorld->AsyncLineTraceByChannel(
-				EAsyncTraceType::Single,
-				CollisionTrace.StartPos,
-				CollisionTrace.EndPos,
-				CollisionTrace.Channel,
-				CollisionTrace.CollisionQueryParams,
-				FCollisionResponseParams::DefaultResponseParam,
-				nullptr,
-				TraceIt);
+			for (int32 TraceIt = 0; TraceIt < TraceCount; ++TraceIt)
+			{
+				FNiagaraCollisionTrace& CollisionTrace = CollisionTraces[ReadBufferIdx][TraceIt];
+
+				CollisionTrace.CollisionTraceHandle = CollisionWorld->AsyncLineTraceByChannel(
+					EAsyncTraceType::Single,
+					CollisionTrace.StartPos,
+					CollisionTrace.EndPos,
+					CollisionTrace.Channel,
+					CollisionTrace.CollisionQueryParams,
+					FCollisionResponseParams::DefaultResponseParam,
+					nullptr,
+					TraceIt);
+			}
 		}
 	}
 }
@@ -48,45 +58,47 @@ void FNiagaraDICollisionQueryBatch::CollectResults()
 {
 	check(IsInGameThread());
 
-	SCOPE_CYCLE_COUNTER(STAT_NiagaraCollision);
-
 	// locks are not used here because we assume that the per instance ticking is done from the main thread
 	if (CollisionWorld)
 	{
 		const int32 ReadBufferIdx = GetReadBufferIdx();
 		const int32 TraceCount = CollisionTraces[ReadBufferIdx].Num();
-
-		CollisionResults.Reset(TraceCount);
-
-		for (int32 TraceIt = 0; TraceIt < TraceCount; ++TraceIt)
+		if (TraceCount > 0 )
 		{
-			FNiagaraCollisionTrace& CollisionTrace = CollisionTraces[ReadBufferIdx][TraceIt];
+			SCOPE_CYCLE_COUNTER(STAT_NiagaraCollision);
 
-			FTraceDatum TraceResult;
-			const bool TraceReady = CollisionWorld->QueryTraceData(CollisionTrace.CollisionTraceHandle, TraceResult);
+			CollisionResults.Reset(TraceCount);
 
-			if (TraceReady && TraceResult.OutHits.Num())
+			for (int32 TraceIt = 0; TraceIt < TraceCount; ++TraceIt)
 			{
-				FHitResult* Hit = FHitResult::GetFirstBlockingHit(TraceResult.OutHits);
-				if (Hit && Hit->bBlockingHit)
-				{
-					CollisionTrace.HitIndex = CollisionResults.AddUninitialized();
-					FNiagaraDICollsionQueryResult& Result = CollisionResults[CollisionTrace.HitIndex];
+				FNiagaraCollisionTrace& CollisionTrace = CollisionTraces[ReadBufferIdx][TraceIt];
 
-					Result.IsInsideMesh = Hit->bStartPenetrating;
-					Result.CollisionPos = Hit->ImpactPoint;// -NormVel*(CurTrace.CollisionSize / 2);
-					Result.CollisionNormal = Hit->ImpactNormal;
-					if (Hit->PhysMaterial.IsValid())
+				FTraceDatum TraceResult;
+				const bool TraceReady = CollisionWorld->QueryTraceData(CollisionTrace.CollisionTraceHandle, TraceResult);
+
+				if (TraceReady && TraceResult.OutHits.Num())
+				{
+					FHitResult* Hit = FHitResult::GetFirstBlockingHit(TraceResult.OutHits);
+					if (Hit && Hit->bBlockingHit)
 					{
-						Result.PhysicalMaterialIdx = Hit->PhysMaterial->SurfaceType.GetValue();
-						Result.Friction = Hit->PhysMaterial->Friction;
-						Result.Restitution = Hit->PhysMaterial->Restitution;
-					}
-					else
-					{
-						Result.PhysicalMaterialIdx = 0;
-						Result.Friction = 0.0f;
-						Result.Restitution = 0.0f;
+						CollisionTrace.HitIndex = CollisionResults.AddUninitialized();
+						FNiagaraDICollsionQueryResult& Result = CollisionResults[CollisionTrace.HitIndex];
+
+						Result.IsInsideMesh = Hit->bStartPenetrating;
+						Result.CollisionPos = Hit->ImpactPoint;// -NormVel*(CurTrace.CollisionSize / 2);
+						Result.CollisionNormal = Hit->ImpactNormal;
+						if (Hit->PhysMaterial.IsValid())
+						{
+							Result.PhysicalMaterialIdx = Hit->PhysMaterial->SurfaceType.GetValue();
+							Result.Friction = Hit->PhysMaterial->Friction;
+							Result.Restitution = Hit->PhysMaterial->Restitution;
+						}
+						else
+						{
+							Result.PhysicalMaterialIdx = 0;
+							Result.Friction = 0.0f;
+							Result.Restitution = 0.0f;
+						}
 					}
 				}
 			}
@@ -96,7 +108,10 @@ void FNiagaraDICollisionQueryBatch::CollectResults()
 
 int32 FNiagaraDICollisionQueryBatch::SubmitQuery(FVector StartPos, FVector Direction, float CollisionSize, float DeltaSeconds)
 {
-	SCOPE_CYCLE_COUNTER(STAT_NiagaraCollision);
+	if ( !GNiagaraCollisionCPUEnabled)
+	{
+		return INDEX_NONE;
+	}
 
 	FVector EndPos = StartPos + Direction * DeltaSeconds;
 
@@ -106,12 +121,11 @@ int32 FNiagaraDICollisionQueryBatch::SubmitQuery(FVector StartPos, FVector Direc
 	StartPos -= NormDir * (CollisionSize / 2);
 	EndPos += NormDir * (CollisionSize / 2);
 
-	FCollisionQueryParams CollisionQueryParams;
+	FCollisionQueryParams CollisionQueryParams(SCENE_QUERY_STAT(NiagaraCollision), false);
 	CollisionQueryParams.OwnerTag = CollisionTagName;
 	CollisionQueryParams.bFindInitialOverlaps = false;
 	CollisionQueryParams.bReturnFaceIndex = false;
 	CollisionQueryParams.bReturnPhysicalMaterial = true;
-	CollisionQueryParams.bTraceComplex = false;
 	CollisionQueryParams.bIgnoreTouches = true;
 
 	int32 TraceIdx = INDEX_NONE;
@@ -130,14 +144,16 @@ int32 FNiagaraDICollisionQueryBatch::SubmitQuery(FVector StartPos, FVector Direc
 
 int32 FNiagaraDICollisionQueryBatch::SubmitQuery(FVector StartPos, FVector EndPos, ECollisionChannel TraceChannel)
 {
-	SCOPE_CYCLE_COUNTER(STAT_NiagaraCollision);
-	
-	FCollisionQueryParams CollisionQueryParams;
+	if (!GNiagaraCollisionCPUEnabled)
+	{
+		return INDEX_NONE;
+	}
+
+	FCollisionQueryParams CollisionQueryParams(SCENE_QUERY_STAT(NiagaraCollision), false);
 	CollisionQueryParams.OwnerTag = CollisionTagName;
 	CollisionQueryParams.bFindInitialOverlaps = false;
 	CollisionQueryParams.bReturnFaceIndex = false;
 	CollisionQueryParams.bReturnPhysicalMaterial = true;
-	CollisionQueryParams.bTraceComplex = false;
 	CollisionQueryParams.bIgnoreTouches = true;
 
 	int32 TraceIdx = INDEX_NONE;
@@ -157,18 +173,17 @@ int32 FNiagaraDICollisionQueryBatch::SubmitQuery(FVector StartPos, FVector EndPo
 // Work has been done on the collision world side of things to support synchronous queries from multiple threads
 bool FNiagaraDICollisionQueryBatch::PerformQuery(FVector StartPos, FVector EndPos, FNiagaraDICollsionQueryResult &Result, ECollisionChannel TraceChannel)
 {
-	SCOPE_CYCLE_COUNTER(STAT_NiagaraCollision);
-	if (!CollisionWorld)
+	if (!CollisionWorld || !GNiagaraCollisionCPUEnabled)
 	{
 		return false;
 	}
 
-	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(NiagaraSync));
+	SCOPE_CYCLE_COUNTER(STAT_NiagaraCollision);
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(NiagaraCollision), false);
 	QueryParams.OwnerTag = CollisionTagName;
 	QueryParams.bFindInitialOverlaps = false;
 	QueryParams.bReturnFaceIndex = false;
 	QueryParams.bReturnPhysicalMaterial = true;
-	QueryParams.bTraceComplex = false;
 	QueryParams.bIgnoreTouches = true;
 	FHitResult TraceResult;
 	bool ValidHit = CollisionWorld->LineTraceSingleByChannel(TraceResult, StartPos, EndPos, TraceChannel, QueryParams);

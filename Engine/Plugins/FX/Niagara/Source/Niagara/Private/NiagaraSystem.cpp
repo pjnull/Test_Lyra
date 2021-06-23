@@ -2789,7 +2789,7 @@ TStatId UNiagaraSystem::GetStatID(bool bGameThread, bool bConcurrent)const
 		}
 	}
 #endif
-	return TStatId();
+	return static_cast<const UObjectBaseUtility*>(this)->GetStatID();
 }
 
 void UNiagaraSystem::AddToInstanceCountStat(int32 NumInstances, bool bSolo)const
