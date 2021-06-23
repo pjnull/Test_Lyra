@@ -96,6 +96,7 @@
 #include "Scalability.h"
 #include "PlatformInfo.h"
 #include "Interfaces/ITargetPlatform.h"
+#include "Misc/AutomationTest.h"
 
 // needed for the RemotePropagator
 #include "AudioDevice.h"
@@ -911,7 +912,7 @@ void UEditorEngine::InitializeObjectReferences()
 		PlayFromHerePlayerStartClass = LoadClass<ANavigationObjectBase>(NULL, *GetDefault<ULevelEditorPlaySettings>()->PlayFromHerePlayerStartClassName, NULL, LOAD_None, NULL);
 	}
 
-#if !UE_BUILD_SHIPPING
+#if WITH_AUTOMATION_TESTS
 	if (!AutomationCommon::OnEditorAutomationMapLoadDelegate().IsBound())
 	{
 		AutomationCommon::OnEditorAutomationMapLoadDelegate().AddUObject(this, &UEditorEngine::AutomationLoadMap);
@@ -7236,7 +7237,7 @@ void UEditorEngine::HandleTravelFailure(UWorld* InWorld, ETravelFailure::Type Fa
 
 void UEditorEngine::AutomationLoadMap(const FString& MapName, FString* OutError)
 {
-#if !UE_BUILD_SHIPPING
+#if WITH_AUTOMATION_TESTS
 	struct FFailedGameStartHandler
 	{
 		bool bCanProceed;

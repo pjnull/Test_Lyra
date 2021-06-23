@@ -833,6 +833,11 @@ namespace UnrealBuildTool
 		public bool bForceCompilePerformanceAutomationTests = false;
 
 		/// <summary>
+		/// Whether to override the defaults for automation tests (Debug/Development configs)
+		/// </summary>
+		public bool bForceDisableAutomationTests = false;
+
+		/// <summary>
 		/// If true, event driven loader will be used in cooked builds. @todoio This needs to be replaced by a runtime solution after async loading refactor.
 		/// </summary>
 		[RequiresUniqueBuildEnvironment]
@@ -2357,6 +2362,10 @@ namespace UnrealBuildTool
 		public bool bForceCompilePerformanceAutomationTests
 		{
 			get { return Inner.bForceCompilePerformanceAutomationTests; }
+		}
+		public bool bForceDisableAutomationTests
+		{
+			get { return Inner.bForceDisableAutomationTests; }
 		}
 
 		public bool bUseXGEController

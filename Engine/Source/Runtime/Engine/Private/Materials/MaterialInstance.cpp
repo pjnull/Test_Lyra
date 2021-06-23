@@ -47,6 +47,7 @@
 #include "MaterialShaderQualitySettings.h"
 #include "UObject/ObjectSaveContext.h"
 #include "UObject/UE5MainStreamObjectVersion.h"
+#include "ShaderCompilerCore.h"
 
 #if ENABLE_COOK_STATS
 #include "ProfilingDebugging/ScopedTimers.h"
@@ -920,9 +921,9 @@ bool UMaterialInstance::IsScalarParameterUsedAsAtlasPosition(const FHashedMateri
 
 	// Instance-included default
 	if (ParameterInfo.Association != EMaterialParameterAssociation::GlobalParameter && CachedData)
-	{
-		if (CachedData->Parameters.IsScalarParameterUsedAsAtlasPosition(ParameterInfo, OutValue, OutCurve, OutAtlas))
 		{
+		if (CachedData->Parameters.IsScalarParameterUsedAsAtlasPosition(ParameterInfo, OutValue, OutCurve, OutAtlas))
+			{
 			return true;
 		}
 	}
@@ -2587,13 +2588,13 @@ bool UMaterialInstance::GetStaticSwitchParameterDefaultValue(const FHashedMateri
 		for (const FStaticSwitchParameter& SwitchParam : StaticParameters.StaticSwitchParameters)
 		{
 			if (SwitchParam.bOverride && SwitchParam.ParameterInfo == ParameterInfo)
-			{
+				{
 				OutValue = SwitchParam.Value;
 				OutExpressionGuid = SwitchParam.ExpressionGUID;
-				return true;
-			}
-		}
-	}
+					return true;
+				}
+					}
+				}
 
 	if (ParameterInfo.Association != EMaterialParameterAssociation::GlobalParameter)
 	{
@@ -2602,9 +2603,9 @@ bool UMaterialInstance::GetStaticSwitchParameterDefaultValue(const FHashedMateri
 		{
 			OutExpressionGuid = CachedData->Parameters.GetExpressionGuid(EMaterialParameterType::StaticSwitch, ParameterIndex);
 			OutValue = CachedData->Parameters.StaticSwitchValues[ParameterIndex];
-			return true;
+				return true;
+			}
 		}
-	}
 	
 	if (Parent)
 	{
@@ -2640,7 +2641,7 @@ bool UMaterialInstance:: GetStaticComponentMaskParameterDefaultValue(const FHash
 			}
 		}
 	}
-
+	
 	if (ParameterInfo.Association != EMaterialParameterAssociation::GlobalParameter)
 	{
 		const int32 ParameterIndex = CachedData->Parameters.FindParameterIndex(EMaterialParameterType::StaticComponentMask, ParameterInfo);
@@ -3023,26 +3024,26 @@ bool UMaterialInstance::GetStaticSwitchParameterValue(const FHashedMaterialParam
 
 	// Instance override
 	for (const FStaticSwitchParameter& Param : StaticParameters.StaticSwitchParameters)
-	{
-		if (Param.ParameterInfo == ParameterInfo)
-		{
+				{
+					if (Param.ParameterInfo == ParameterInfo)
+					{
 			OutExpressionGuid = Param.ExpressionGUID;
 			OutValue = Param.Value;
-			return true;
+				return true;
+			}
 		}
-	}
 
 	// Instance-included default
 	if (!bOveriddenOnly && ParameterInfo.Association != EMaterialParameterAssociation::GlobalParameter && CachedData)
 	{
 		const int32 ParameterIndex = CachedData->Parameters.FindParameterIndex(EMaterialParameterType::StaticSwitch, ParameterInfo);
 		if (ParameterIndex != INDEX_NONE)
-		{
+			{
 			OutExpressionGuid = CachedData->Parameters.GetExpressionGuid(EMaterialParameterType::StaticSwitch, ParameterIndex);
 			OutValue = CachedData->Parameters.StaticSwitchValues[ParameterIndex];
-			return true;
+				return true;
+			}
 		}
-	}
 
 	// Next material in hierarchy
 	if (Parent && bCheckParent)
@@ -3063,15 +3064,15 @@ bool UMaterialInstance::GetStaticComponentMaskParameterValue(const FHashedMateri
 
 	// Instance override
 	for (const FStaticComponentMaskParameter& Param : StaticParameters.StaticComponentMaskParameters)
-	{
-		if (Param.ParameterInfo == ParameterInfo)
-		{
+				{
+					if (Param.ParameterInfo == ParameterInfo)
+					{
 			OutExpressionGuid = Param.ExpressionGUID;
 			R = Param.R;
 			G = Param.G;
 			B = Param.B;
 			A = Param.A;
-			return true;
+					return true;
 		}
 	}
 
@@ -3080,15 +3081,15 @@ bool UMaterialInstance::GetStaticComponentMaskParameterValue(const FHashedMateri
 	{
 		const int32 ParameterIndex = CachedData->Parameters.FindParameterIndex(EMaterialParameterType::StaticComponentMask, ParameterInfo);
 		if (ParameterIndex != INDEX_NONE)
-		{
+			{
 			OutExpressionGuid = CachedData->Parameters.GetExpressionGuid(EMaterialParameterType::StaticComponentMask, ParameterIndex);
 			R = CachedData->Parameters.StaticComponentMaskValues[ParameterIndex].R;
 			G = CachedData->Parameters.StaticComponentMaskValues[ParameterIndex].G;
 			B = CachedData->Parameters.StaticComponentMaskValues[ParameterIndex].B;
 			A = CachedData->Parameters.StaticComponentMaskValues[ParameterIndex].A;
-			return true;
+				return true;
+			}
 		}
-	}
 
 	// Next material in hierarchy
 	if (Parent && bCheckParent)
@@ -3249,7 +3250,7 @@ bool UMaterialInstance::IsCachedCookedPlatformDataLoaded( const ITargetPlatform*
 
 void UMaterialInstance::ClearCachedCookedPlatformData( const ITargetPlatform *TargetPlatform )
 {
-	TArray<FMaterialResource*>* CachedMaterialResourcesForPlatform = CachedMaterialResourcesForCooking.Find( TargetPlatform );
+	TArray<FMaterialResource*> *CachedMaterialResourcesForPlatform = CachedMaterialResourcesForCooking.Find( TargetPlatform );
 	if ( CachedMaterialResourcesForPlatform != nullptr )
 	{
 		FMaterial::DeferredDeleteArray(*CachedMaterialResourcesForPlatform);
@@ -3262,7 +3263,7 @@ void UMaterialInstance::ClearAllCachedCookedPlatformData()
 {
 	for ( auto& It : CachedMaterialResourcesForCooking )
 	{
-		TArray<FMaterialResource*>& CachedMaterialResourcesForPlatform = It.Value;
+		TArray<FMaterialResource*> &CachedMaterialResourcesForPlatform = It.Value;
 		FMaterial::DeferredDeleteArray(CachedMaterialResourcesForPlatform);
 	}
 
@@ -3574,7 +3575,7 @@ void UMaterialInstance::PostLoad()
 #if WITH_EDITOR && 1
 		// enable caching in postload for derived data cache commandlet and cook by the book
 		ITargetPlatformManagerModule* TPM = GetTargetPlatformManager();
-		if (TPM && (TPM->RestrictFormatsToRuntimeOnly() == false)) 
+		if (TPM && (TPM->RestrictFormatsToRuntimeOnly() == false) && AllowShaderCompiling()) 
 		{
 			TArray<ITargetPlatform*> Platforms = TPM->GetActiveTargetPlatforms();
 			// Cache for all the shader formats that the cooking target requires
@@ -4057,12 +4058,12 @@ void UMaterialInstance::GetReferencedTexturesAndOverrides(TSet<const UTexture*>&
 	if (CachedData)
 	{
 		for (UObject* UsedObject : CachedData->ReferencedTextures)
+	{
+		if (const UTexture* UsedTexture = Cast<UTexture>(UsedObject))
 		{
-			if (const UTexture* UsedTexture = Cast<UTexture>(UsedObject))
-			{
-				InOutTextures.Add(UsedTexture);
-			}
+			InOutTextures.Add(UsedTexture);
 		}
+	}
 	}
 
 	// Loop on all override parameters, since child MICs might not override some parameters of parent MICs.
@@ -4090,34 +4091,34 @@ void UMaterialInstance::UpdateCachedLayerParameters()
 	// Don't need to rebuild cached data if it was serialized
 	if (!bLoadedCachedData)
 	{
-		UMaterialInstance* ParentInstance = nullptr;
-		FMaterialCachedExpressionData CachedExpressionData;
-		CachedExpressionData.Reset();
-		if (Parent)
-		{
-			CachedExpressionData.ReferencedTextures = Parent->GetReferencedTextures();
-			ParentInstance = Cast<UMaterialInstance>(Parent);
-		}
-	  
-		bool bCachedDataValid = true;
-		for (FStaticMaterialLayersParameter& LayerParameters : StaticParameters.MaterialLayersParameters)
-		{
+	UMaterialInstance* ParentInstance = nullptr;
+	FMaterialCachedExpressionData CachedExpressionData;
+	CachedExpressionData.Reset();
+	if (Parent)
+	{
+		CachedExpressionData.ReferencedTextures = Parent->GetReferencedTextures();
+		ParentInstance = Cast<UMaterialInstance>(Parent);
+	}
+	
+	bool bCachedDataValid = true;
+	for (FStaticMaterialLayersParameter& LayerParameters : StaticParameters.MaterialLayersParameters)
+	{
 			FMaterialCachedExpressionContext Context;
-			if (ParentInstance)
-			{
-				FMaterialCachedParameters_UpdateForLayerParameters(CachedExpressionData.Parameters, Context, ParentInstance, LayerParameters);
-			}
-  
-			if (!CachedExpressionData.UpdateForLayerFunctions(Context, LayerParameters.Value))
-			{
-				bCachedDataValid = false;
-			}
-		}
-  
-		if (!CachedData)
+		if (ParentInstance)
 		{
-			CachedData = new FMaterialInstanceCachedData();
+			FMaterialCachedParameters_UpdateForLayerParameters(CachedExpressionData.Parameters, Context, ParentInstance, LayerParameters);
 		}
+
+		if (!CachedExpressionData.UpdateForLayerFunctions(Context, LayerParameters.Value))
+		{
+			bCachedDataValid = false;
+		}
+	}
+
+		if (!CachedData)
+	{
+			CachedData = new FMaterialInstanceCachedData();
+	}
 		CachedData->Initialize(MoveTemp(CachedExpressionData));
 	}
 
@@ -5057,7 +5058,7 @@ void FindCollectionExpressionRecursive(TArray<FGuid>& OutGuidList, const TArray<
 				OutGuidList.Add(CollectionPtr->Collection->StateId);
 			}
 			return;
-		}
+}
 		else if (const UMaterialExpressionMaterialFunctionCall* MaterialFunctionCall = Cast<UMaterialExpressionMaterialFunctionCall>(InMaterialExpression[ExpressionIndex]))
 		{
 			if (const TArray<TObjectPtr<UMaterialExpression>>* FunctionExpressions = MaterialFunctionCall->MaterialFunction ? MaterialFunctionCall->MaterialFunction->GetFunctionExpressions() : nullptr)

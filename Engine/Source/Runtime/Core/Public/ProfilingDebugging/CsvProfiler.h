@@ -15,7 +15,6 @@
 #include "Async/TaskGraphInterfaces.h"
 #include "Misc/EnumClassFlags.h"
 #include "ProfilingDebugging/MiscTrace.h"
-#include "ProfilingDebugging/CsvProfilerTrace.h"
 
 #include <atomic>
 
@@ -45,6 +44,8 @@
 #endif
 
 #if CSV_PROFILER
+// this needs CSV_PROFILER to be set up
+#include "ProfilingDebugging/CsvProfilerTrace.h"
 
 #define CSV_TIMING_STATS_EMIT_NAMED_EVENTS 0
 #define CSV_EXCLUSIVE_TIMING_STATS_EMIT_NAMED_EVENTS 0

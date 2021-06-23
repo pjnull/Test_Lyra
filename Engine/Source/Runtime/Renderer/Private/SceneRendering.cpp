@@ -417,7 +417,7 @@ FASTVRAM_CVAR(Distortion, 1);
 FASTVRAM_CVAR(ScreenSpaceShadowMask, 1);
 FASTVRAM_CVAR(VolumetricFog, 1);
 FASTVRAM_CVAR(SeparateTranslucency, 0); 
-FASTVRAM_CVAR(SeparateTranslucencyModulate, 0);
+FASTVRAM_CVAR(SeparateTranslucencyModulate, 0); 
 FASTVRAM_CVAR(ScreenSpaceAO,0);
 FASTVRAM_CVAR(SSR, 0);
 FASTVRAM_CVAR(DBufferA, 0);
@@ -1013,7 +1013,7 @@ FViewInfo::~FViewInfo()
 		It->~FDynamicRayTracingMeshCommandStorage();
 	}
 #endif // RHI_RAYTRACING
-}
+	}
 
 #if RHI_RAYTRACING
 bool FViewInfo::HasRayTracingScene() const
@@ -1319,14 +1319,14 @@ void FViewInfo::SetupUniformBufferParameters(
 		FLightSceneInfo* SunLight = Scene->AtmosphereLights[0];	// Atmospheric fog only takes into account the a single sun light with index 0.
 		const float SunLightDiskHalfApexAngleRadian = SunLight ? SunLight->Proxy->GetSunLightHalfApexAngleRadian() : FLightSceneProxy::GetSunOnEarthHalfApexAngleRadian();
 
-		ViewUniformShaderParameters.AtmosphereLightDiscCosHalfApexAngle[0] = FVector4(FMath::Cos(SunLightDiskHalfApexAngleRadian));
-		//Added check so atmospheric light color and vector can use a directional light without needing an atmospheric fog actor in the scene
-		ViewUniformShaderParameters.AtmosphereLightDiscLuminance[0] = SunLight ? SunLight->Proxy->GetOuterSpaceLuminance() : FLinearColor::Black;
+			ViewUniformShaderParameters.AtmosphereLightDiscCosHalfApexAngle[0] = FVector4(FMath::Cos(SunLightDiskHalfApexAngleRadian));
+			//Added check so atmospheric light color and vector can use a directional light without needing an atmospheric fog actor in the scene
+			ViewUniformShaderParameters.AtmosphereLightDiscLuminance[0] = SunLight ? SunLight->Proxy->GetOuterSpaceLuminance() : FLinearColor::Black;
 		ViewUniformShaderParameters.AtmosphereLightIlluminanceOnGroundPostTransmittance[0] = SunLight ? SunLight->Proxy->GetColor() : FLinearColor::Black;
 		ViewUniformShaderParameters.AtmosphereLightIlluminanceOnGroundPostTransmittance[0].A = 0.0f;
 		ViewUniformShaderParameters.AtmosphereLightIlluminanceOuterSpace[0] = ViewUniformShaderParameters.AtmosphereLightIlluminanceOnGroundPostTransmittance[0];
 		ViewUniformShaderParameters.AtmosphereLightIlluminanceOuterSpace[0].A = 0.0f;
-		ViewUniformShaderParameters.AtmosphereLightDirection[0] = SunLight ? -SunLight->Proxy->GetDirection() : DefaultSunDirection;
+			ViewUniformShaderParameters.AtmosphereLightDirection[0] = SunLight ? -SunLight->Proxy->GetDirection() : DefaultSunDirection;
 
 		// Do not clear the first AtmosphereLight data, it has been setup above
 		for (uint8 Index = 1; Index < NUM_ATMOSPHERE_LIGHTS; ++Index)
@@ -1572,7 +1572,7 @@ void FViewInfo::SetupUniformBufferParameters(
 			CVarBasePassForceOutputsVelocity.GetValueOnRenderThread() ||
 			MainTAAPass != EMainTAAPassConfig::TAA);
 	}
-
+		
 	uint32 FrameIndex = 0;
 	if (ViewState)
 	{
@@ -1810,7 +1810,7 @@ void FViewInfo::SetupUniformBufferParameters(
 	// Offset the selected sample index for each frame and add an additional offset each time we iterate over a full virtual texture feedback tile to ensure we get full coverage of sample indices over time.
 	const uint32 NumPixelsInTile = FMath::Square(GetVirtualTextureFeedbackScale());
 	ViewUniformShaderParameters.VirtualTextureFeedbackSampleOffset = (FrameIndex % NumPixelsInTile) + (FrameIndex / NumPixelsInTile);
-	
+
 	ViewUniformShaderParameters.RuntimeVirtualTextureMipLevel = FVector4(ForceInitToZero);
 	ViewUniformShaderParameters.RuntimeVirtualTexturePackHeight = FVector2D(ForceInitToZero);
 	ViewUniformShaderParameters.RuntimeVirtualTextureDebugParams = FVector4(ForceInitToZero);
@@ -1827,16 +1827,16 @@ void FViewInfo::SetupUniformBufferParameters(
 		}
 
 		if (InstanceSceneDataOverrideSRV)
-		{
+			{
 			ViewUniformShaderParameters.InstanceSceneData = InstanceSceneDataOverrideSRV;
 			ViewUniformShaderParameters.InstanceSceneDataSOAStride = 1;
-		}
+			}
 		else if (Scene && Scene->GPUScene.InstanceSceneDataBuffer.SRV)
-		{
+			{
 			ViewUniformShaderParameters.InstanceSceneData = Scene->GPUScene.InstanceSceneDataBuffer.SRV;
 			ViewUniformShaderParameters.InstanceSceneDataSOAStride = Scene->GPUScene.InstanceSceneDataSOAStride;
 		}
-
+		
 		if (LightmapSceneDataOverrideSRV)
 		{
 			ViewUniformShaderParameters.LightmapSceneData = LightmapSceneDataOverrideSRV;
@@ -1984,7 +1984,7 @@ FViewInfo* FViewInfo::CreateSnapshot() const
 
 	// we want these to start null without a reference count, since we clear a ref later
 	TUniformBufferRef<FViewUniformShaderParameters> NullViewUniformBuffer;
-	FMemory::Memcpy(Result->ViewUniformBuffer, NullViewUniformBuffer);
+	FMemory::Memcpy(Result->ViewUniformBuffer, NullViewUniformBuffer); 
 	TUniformBufferRef<FInstancedViewUniformShaderParameters> NullInstancedViewUniformBuffer;
 	FMemory::Memcpy(Result->InstancedViewUniformBuffer, NullInstancedViewUniformBuffer);
 
@@ -2213,8 +2213,11 @@ void FDisplayInternalsData::Setup(UWorld *World)
 
 	if(IsValid())
 	{
+#if WITH_AUTOMATION_TESTS
+		// this variable is defined inside WITH_AUTOMATION_TESTS, 
 		extern ENGINE_API uint32 GStreamAllResourcesStillInFlight;
 		NumPendingStreamingRequests = GStreamAllResourcesStillInFlight;
+#endif
 	}
 #endif
 }
@@ -2656,7 +2659,7 @@ FRHIGPUMask FSceneRenderer::ComputeGPUMasks(FRHICommandListImmediate& RHICmdList
 	FRHIGPUMask RenderTargetGPUMask = FRHIGPUMask::GPU0();
 	
 	if (GNumExplicitGPUsForRendering > 1 && ViewFamily.RenderTarget)
-	{
+{
 		RenderTargetGPUMask = ViewFamily.RenderTarget->GetGPUMask(RHICmdList);
 	}
 
@@ -2856,11 +2859,11 @@ bool FSceneRenderer::DoOcclusionQueries() const
 }
 
 FSceneRenderer::~FSceneRenderer()
-{
+{	
 	for (FProjectedShadowInfo* ProjectedShadow : MemStackProjectedShadows)
-	{
-		// FProjectedShadowInfo's in MemStackProjectedShadows were allocated on the rendering thread mem stack, 
-		// Their memory will be freed when the stack is freed with no destructor call, so invoke the destructor explicitly
+				{
+					// FProjectedShadowInfo's in MemStackProjectedShadows were allocated on the rendering thread mem stack, 
+					// Their memory will be freed when the stack is freed with no destructor call, so invoke the destructor explicitly
 		ProjectedShadow->~FProjectedShadowInfo();
 	}
 
@@ -3136,7 +3139,7 @@ void FSceneRenderer::RenderFinish(FRDGBuilder& GraphBuilder, FRDGTextureRef View
 							Canvas.DrawShadowedText(10, Y, Message, GetStatsFont(), FLinearColor(1.0, 0.05, 0.05, 1.0));
 							Y += 14;
 						}
-						
+
 						if (bMobileMissingSkyMaterial)
 						{
 							static const FText Message = NSLOCTEXT("Renderer", "MobileMissingSkyMaterial", "On mobile the SkyAtmosphere component needs a mesh with a material tagged as IsSky and using the SkyAtmosphere nodes to visualize the Atmosphere.");
@@ -3433,15 +3436,15 @@ void FSceneRenderer::OnStartRender(FRHICommandListImmediate& RHICmdList)
 }
 
 bool FSceneRenderer::ShouldCompositeEditorPrimitives(const FViewInfo& View)
-{
+{		
 	if (View.Family->EngineShowFlags.VisualizeHDR || View.Family->EngineShowFlags.VisualizeStrataMaterial || View.Family->UseDebugViewPS())
 	{
 		// certain visualize modes get obstructed too much
 		return false;
-	}
+}
 
 	if (View.Family->EngineShowFlags.Wireframe)
-	{
+{
 		// We want wireframe view use MSAA if possible.
 		return true;
 	}
@@ -3454,58 +3457,58 @@ bool FSceneRenderer::ShouldCompositeEditorPrimitives(const FViewInfo& View)
 		    || View.TopBatchedViewElements.HasPrimsToDraw() 
 		    || View.NumVisibleDynamicEditorPrimitives > 0
 			|| IsMobileColorsRGB())
-	    {
+		{
 		    return true;
-	    }
-	}
+			}
+		}
 
 	return false;
-}
+	}
 
 void FSceneRenderer::UpdatePrimitiveIndirectLightingCacheBuffers()
-{
+	{
 	// Use a bit array to prevent primitives from being updated more than once.
 	FSceneBitArray UpdatedPrimitiveMap;
 	UpdatedPrimitiveMap.Init(false, Scene->Primitives.Num());
 
-	for (int32 ViewIndex = 0; ViewIndex < Views.Num(); ViewIndex++)
-	{		
-		FViewInfo& View = Views[ViewIndex];
+		for (int32 ViewIndex = 0; ViewIndex < Views.Num(); ViewIndex++)
+		{
+			FViewInfo& View = Views[ViewIndex];
 
 		for (int32 Index = 0; Index < View.DirtyIndirectLightingCacheBufferPrimitives.Num(); ++Index)
-		{
+			{
 			FPrimitiveSceneInfo* PrimitiveSceneInfo = View.DirtyIndirectLightingCacheBufferPrimitives[Index];
 
 			FBitReference bInserted = UpdatedPrimitiveMap[PrimitiveSceneInfo->GetIndex()];
 			if (!bInserted)
-			{
+				{
 				PrimitiveSceneInfo->UpdateIndirectLightingCacheBuffer();
 				bInserted = true;
-			}
-			else
-			{
+				}
+				else
+				{
 				// This will prevent clearing it twice.
 				View.DirtyIndirectLightingCacheBufferPrimitives[Index] = nullptr;
 			}
 		}
-	}
+				}
 
 	const uint32 CurrentSceneFrameNumber = Scene->GetFrameNumber();
 
 	// Trim old CPUInterpolationCache entries occasionally
 	if (CurrentSceneFrameNumber % 10 == 0)
-	{
+				{
 		for (TMap<FVector, FVolumetricLightmapInterpolation>::TIterator It(Scene->VolumetricLightmapSceneData.CPUInterpolationCache); It; ++It)
-		{
+					{
 			FVolumetricLightmapInterpolation& Interpolation = It.Value();
 
 			if (Interpolation.LastUsedSceneFrameNumber < CurrentSceneFrameNumber - 100)
-			{
+					{
 				It.RemoveCurrent();
-			}
-		}
-	}
-}
+						}
+					}
+						}
+					}
 
 /*-----------------------------------------------------------------------------
 	FRendererModule
@@ -3519,32 +3522,32 @@ void FSceneRenderer::UpdatePrimitiveIndirectLightingCacheBuffers()
 void FSceneRenderer::ViewExtensionPreRender_RenderThread(FRHICommandListImmediate& RHICmdList, FSceneRenderer* SceneRenderer)
 {
 	if (SceneRenderer->ViewFamily.ViewExtensions.IsEmpty())
-	{
+					{
 		return;
-	}
+					}
 
 	FMemMark MemStackMark(FMemStack::Get());
 
-	{
+{
 		FRDGBuilder GraphBuilder(RHICmdList);
 		CSV_SCOPED_TIMING_STAT_EXCLUSIVE(PreRender);
 		SCOPE_CYCLE_COUNTER(STAT_FDeferredShadingSceneRenderer_ViewExtensionPreRenderView);
 
 		for (int ViewExt = 0; ViewExt < SceneRenderer->ViewFamily.ViewExtensions.Num(); ViewExt++)
-		{
+	{
 			SceneRenderer->ViewFamily.ViewExtensions[ViewExt]->PreRenderViewFamily_RenderThread(GraphBuilder, SceneRenderer->ViewFamily);
 			for (int ViewIndex = 0; ViewIndex < SceneRenderer->ViewFamily.Views.Num(); ViewIndex++)
-			{
+		{
 				SceneRenderer->ViewFamily.ViewExtensions[ViewExt]->PreRenderView_RenderThread(GraphBuilder, SceneRenderer->Views[ViewIndex]);
-			}
 		}
+	}
 
 		GraphBuilder.Execute();
-	}
-	
+}
+
 	// update any resources that needed a deferred update
 	FDeferredUpdateResource::UpdateResources(RHICmdList);
-}
+	}
 
 static int32 GSceneRenderCleanUpMode = 2;
 static FAutoConsoleVariableRef CVarSceneRenderCleanUpMode(
@@ -3558,16 +3561,16 @@ static FAutoConsoleVariableRef CVarSceneRenderCleanUpMode(
 );
 
 enum class ESceneRenderCleanUpMode
-{
+	{
 	Immediate,
 	Deferred,
 	DeferredAndAsync
 };
 
 inline ESceneRenderCleanUpMode GetSceneRenderCleanUpMode()
-{
-	if (GSceneRenderCleanUpMode != 1 && GSceneRenderCleanUpMode != 2)
 	{
+	if (GSceneRenderCleanUpMode != 1 && GSceneRenderCleanUpMode != 2)
+	    {
 		return ESceneRenderCleanUpMode::Immediate;
 	}
 
@@ -3579,11 +3582,11 @@ inline ESceneRenderCleanUpMode GetSceneRenderCleanUpMode()
 	}
 
 	return (ESceneRenderCleanUpMode)GSceneRenderCleanUpMode;
-}
+	}
 
 static void DeleteSceneRenderer(FRHICommandListImmediate& RHICmdList, FSceneRenderer* SceneRenderer, FMemMark* MemStackMark)
 {
-	static const IConsoleVariable* AsyncDispatch = IConsoleManager::Get().FindConsoleVariable(TEXT("r.RHICmdAsyncRHIThreadDispatch"));
+	static const IConsoleVariable* AsyncDispatch	= IConsoleManager::Get().FindConsoleVariable(TEXT("r.RHICmdAsyncRHIThreadDispatch"));
 
 	if (AsyncDispatch->GetInt() == 0)
 	{
@@ -3592,7 +3595,7 @@ static void DeleteSceneRenderer(FRHICommandListImmediate& RHICmdList, FSceneRend
 	}
 
 	TRACE_CPUPROFILER_EVENT_SCOPE(DeleteSceneRenderer);
-	delete SceneRenderer;
+		delete SceneRenderer;
 	delete MemStackMark;
 
 	// Can release only after all mesh pass tasks are finished.
@@ -3609,17 +3612,17 @@ static void ReleaseSceneRenderer(FRHICommandListImmediate& RHICmdList, FSceneRen
 
 	SceneRenderer->WaitForTasksAndClearSnapshots(FParallelMeshDrawCommandPass::EWaitThread::Render);
 	DeleteSceneRenderer(RHICmdList, SceneRenderer, MemStackMark);
-}
+	}
 
 void FSceneRenderer::RenderThreadBegin(FRHICommandListImmediate& RHICmdList)
-{
+	{
 	CleanUp(RHICmdList);
 
 	MemStackMark = new FMemMark(FMemStack::Get());
-}
+	}
 
 struct FSceneRenderCleanUpState
-{
+	{
 	FSceneRenderer* Renderer{};
 	FMemMark* MemStackMark{};
 	FGraphEventRef Task;
@@ -3639,7 +3642,7 @@ void FSceneRenderer::RenderThreadEnd(FRHICommandListImmediate& RHICmdList)
 	if (GSceneRenderCleanUpState.CompletionMode == ESceneRenderCleanUpMode::Immediate)
 	{
 		ReleaseSceneRenderer(RHICmdList, this, MemStackMark);
-	}
+}
 	else
 	{
 		GPUSceneDynamicContext.Release();
@@ -3648,29 +3651,29 @@ void FSceneRenderer::RenderThreadEnd(FRHICommandListImmediate& RHICmdList)
 		GSceneRenderCleanUpState.MemStackMark = MemStackMark;
 
 		if (SceneRenderCleanUpMode == ESceneRenderCleanUpMode::DeferredAndAsync)
-		{
+{
 			FGraphEventArray& WaitOutstandingTasks = RHICmdList.GetRenderThreadTaskArray();
 
 			GSceneRenderCleanUpState.Task = FFunctionGraphTask::CreateAndDispatchWhenReady([this]
-			{
+	{		
 				WaitForTasksAndClearSnapshots(FParallelMeshDrawCommandPass::EWaitThread::Task);
 
 			}, TStatId(), &WaitOutstandingTasks);
 
 			WaitOutstandingTasks.Empty();
+			}
 		}
 	}
-}
 
 void FSceneRenderer::CleanUp(FRHICommandListImmediate& RHICmdList)
-{
-	if (GSceneRenderCleanUpState.CompletionMode == ESceneRenderCleanUpMode::Immediate)
 	{
+	if (GSceneRenderCleanUpState.CompletionMode == ESceneRenderCleanUpMode::Immediate)
+		{
 		return;
 	}
 
 	switch (GSceneRenderCleanUpState.CompletionMode)
-	{
+			{
 	case ESceneRenderCleanUpMode::Deferred:
 		ReleaseSceneRenderer(RHICmdList, GSceneRenderCleanUpState.Renderer, GSceneRenderCleanUpState.MemStackMark);
 		break;
@@ -3689,7 +3692,7 @@ void FSceneRenderer::WaitForTasksAndClearSnapshots(FParallelMeshDrawCommandPass:
 
 	// Wait for all dispatched shadow mesh draw tasks.
 	for (int32 PassIndex = 0; PassIndex < DispatchedShadowDepthPasses.Num(); ++PassIndex)
-	{
+{
 		DispatchedShadowDepthPasses[PassIndex]->WaitForTasksAndEmpty(WaitThread);
 	}
 
@@ -3702,14 +3705,14 @@ void FSceneRenderer::WaitForTasksAndClearSnapshots(FParallelMeshDrawCommandPass:
 }
 
 void ResetAndShrinkModifiedBounds(TArray<FRenderBounds>& Bounds)
-{
+		{
 	const int32 MaxAllocatedSize = FMath::RoundUpToPowerOfTwo(FMath::Max<uint32>(DistanceField::MinPrimitiveModifiedBoundsAllocation, Bounds.Num()));
 
 	if (Bounds.Max() > MaxAllocatedSize)
-	{
+			{
 		Bounds.Empty(MaxAllocatedSize);
 	}
-
+	
 	Bounds.Reset();
 }
 
@@ -3736,7 +3739,7 @@ static void RenderViewFamily_RenderThread(FRHICommandListImmediate& RHICmdList, 
 
 	{
 		SCOPE_CYCLE_COUNTER(STAT_TotalSceneRenderingTime);
-
+	
 		{
 			FRDGBuilder GraphBuilder(
 				RHICmdList,
@@ -3747,18 +3750,18 @@ static void RenderViewFamily_RenderThread(FRHICommandListImmediate& RHICmdList, 
 			);
 
 			if (ViewFamily.EngineShowFlags.HitProxies)
-			{
-				// Render the scene's hit proxies.
+		{
+			// Render the scene's hit proxies.
 				SceneRenderer->RenderHitProxies(GraphBuilder);
-			}
-			else
-			{
-				// Render the scene.
+		}
+		else
+		{
+			// Render the scene.
 				SceneRenderer->Render(GraphBuilder);
-			}
+		}
 			GraphBuilder.Execute();
 
-			CSV_SCOPED_TIMING_STAT_EXCLUSIVE(PostRenderCleanUp);
+		CSV_SCOPED_TIMING_STAT_EXCLUSIVE(PostRenderCleanUp);
 
 			if (IsHairStrandsEnabled(EHairStrandsShaderType::All, SceneRenderer->Scene->GetShaderPlatform()) && SceneRenderer->Views.Num() > 0 && !ViewFamily.EngineShowFlags.HitProxies)
 			{
@@ -3769,24 +3772,24 @@ static void RenderViewFamily_RenderThread(FRHICommandListImmediate& RHICmdList, 
 				}
 			}
 
-			// Only reset per-frame scene state once all views have processed their frame, including those in planar reflections
-			for (int32 CacheType = 0; CacheType < UE_ARRAY_COUNT(SceneRenderer->Scene->DistanceFieldSceneData.PrimitiveModifiedBounds); CacheType++)
-			{
+		// Only reset per-frame scene state once all views have processed their frame, including those in planar reflections
+		for (int32 CacheType = 0; CacheType < UE_ARRAY_COUNT(SceneRenderer->Scene->DistanceFieldSceneData.PrimitiveModifiedBounds); CacheType++)
+		{
 				ResetAndShrinkModifiedBounds(SceneRenderer->Scene->DistanceFieldSceneData.PrimitiveModifiedBounds[CacheType]);
-			}
+		}
 
 			if (SceneRenderer->Scene->LumenSceneData)
 			{
 				ResetAndShrinkModifiedBounds(SceneRenderer->Scene->LumenSceneData->PrimitiveModifiedBounds);
-			}
+		}
 
-			// Immediately issue EndFrame() for all extensions in case any of the outstanding tasks they issued getting out of this frame
-			extern TSet<IPersistentViewUniformBufferExtension*> PersistentViewUniformBufferExtensions;
+		// Immediately issue EndFrame() for all extensions in case any of the outstanding tasks they issued getting out of this frame
+		extern TSet<IPersistentViewUniformBufferExtension*> PersistentViewUniformBufferExtensions;
 
-			for (IPersistentViewUniformBufferExtension* Extension : PersistentViewUniformBufferExtensions)
-			{
-				Extension->EndFrame();
-			}
+		for (IPersistentViewUniformBufferExtension* Extension : PersistentViewUniformBufferExtensions)
+		{
+			Extension->EndFrame();
+		}
 		}
 
 #if STATS
@@ -3809,7 +3812,7 @@ static void RenderViewFamily_RenderThread(FRHICommandListImmediate& RHICmdList, 
 			SET_MEMORY_STAT(STAT_LightInteractionMemory, FLightPrimitiveInteraction::GetMemoryPoolSize());
 		}
 #endif
-
+		
 		GRenderTargetPool.SetEventRecordingActive(false);
 	}
 
@@ -4099,25 +4102,25 @@ void FRendererModule::RenderPostOpaqueExtensions(
 			RDG_EVENT_SCOPE_CONDITIONAL(GraphBuilder, Views.Num() > 1, "View%d", ViewIndex);
 			RDG_GPU_MASK_SCOPE(GraphBuilder, View.GPUMask);
 
-			check(IsInRenderingThread());
-			FPostOpaqueRenderParameters RenderParameters;
-			RenderParameters.ViewMatrix = View.ViewMatrices.GetViewMatrix();
-			RenderParameters.ProjMatrix = View.ViewMatrices.GetProjectionMatrix();
+				check(IsInRenderingThread());
+				FPostOpaqueRenderParameters RenderParameters;
+				RenderParameters.ViewMatrix = View.ViewMatrices.GetViewMatrix();
+				RenderParameters.ProjMatrix = View.ViewMatrices.GetProjectionMatrix();
 			RenderParameters.ColorTexture = SceneTextures.Color.Target;
 			RenderParameters.DepthTexture = SceneTextures.Depth.Target;
 			RenderParameters.NormalTexture = SceneTextures.GBufferA;
 			RenderParameters.VelocityTexture = SceneTextures.Velocity;
 			RenderParameters.SmallDepthTexture = SceneTextures.SmallDepth;
-			RenderParameters.ViewUniformBuffer = View.ViewUniformBuffer;
+				RenderParameters.ViewUniformBuffer = View.ViewUniformBuffer;
 			RenderParameters.SceneTexturesUniformParams = SceneTextures.UniformBuffer;
 			RenderParameters.MobileSceneTexturesUniformParams = SceneTextures.MobileUniformBuffer;
-			RenderParameters.GlobalDistanceFieldParams = &View.GlobalDistanceFieldInfo.ParameterData;
+				RenderParameters.GlobalDistanceFieldParams = &View.GlobalDistanceFieldInfo.ParameterData;
 
-			RenderParameters.ViewportRect = View.ViewRect;
+				RenderParameters.ViewportRect = View.ViewRect;
 			RenderParameters.GraphBuilder = &GraphBuilder;
 
-			RenderParameters.Uid = (void*)(&View);
-			PostOpaqueRenderDelegate.Broadcast(RenderParameters);
+				RenderParameters.Uid = (void*)(&View);
+				PostOpaqueRenderDelegate.Broadcast(RenderParameters);
 		}
 	}
 }
@@ -4137,18 +4140,18 @@ void FRendererModule::RenderOverlayExtensions(
 			RDG_EVENT_SCOPE_CONDITIONAL(GraphBuilder, Views.Num() > 1, "View%d", ViewIndex);
 			RDG_GPU_MASK_SCOPE(GraphBuilder, View.GPUMask);
 
-			FPostOpaqueRenderParameters RenderParameters;
-			RenderParameters.ViewMatrix = View.ViewMatrices.GetViewMatrix();
-			RenderParameters.ProjMatrix = View.ViewMatrices.GetProjectionMatrix();
+				FPostOpaqueRenderParameters RenderParameters;
+				RenderParameters.ViewMatrix = View.ViewMatrices.GetViewMatrix();
+				RenderParameters.ProjMatrix = View.ViewMatrices.GetProjectionMatrix();
 			RenderParameters.ColorTexture = SceneTextures.Color.Target;
 			RenderParameters.DepthTexture = SceneTextures.Depth.Target;
 			RenderParameters.SmallDepthTexture = SceneTextures.SmallDepth;
 
-			RenderParameters.ViewportRect = View.ViewRect;
+				RenderParameters.ViewportRect = View.ViewRect;
 			RenderParameters.GraphBuilder = &GraphBuilder;
 
-			RenderParameters.Uid = (void*)(&View);
-			OverlayRenderDelegate.Broadcast(RenderParameters);
+				RenderParameters.Uid = (void*)(&View);
+				OverlayRenderDelegate.Broadcast(RenderParameters);
 		}
 	}
 }
@@ -4168,7 +4171,7 @@ public:
 	FScenePrimitiveRenderingContext(FRDGBuilder& GraphBuilder, FScene& Scene) :
 		GPUScene(Scene.GPUScene),
 		GPUSceneDynamicContext(GPUScene)
-	{
+		{
 		Scene.UpdateAllPrimitiveSceneInfos(GraphBuilder, false);
 		GPUScene.BeginRender(&Scene, GPUSceneDynamicContext);
 		Scene.GPUScene.Update(GraphBuilder, Scene);
@@ -4177,7 +4180,7 @@ public:
 	virtual ~FScenePrimitiveRenderingContext()
 	{
 		GPUScene.EndRender();
-	}
+}
 
 	FGPUScene& GPUScene;
 	FGPUSceneDynamicContext GPUSceneDynamicContext;
@@ -4651,9 +4654,9 @@ void AddResolveSceneColorPass(FRDGBuilder& GraphBuilder, TArrayView<const FViewI
 		const FViewInfo& View = Views[ViewIndex];
 		if (View.ShouldRenderView())
 		{
-			AddResolveSceneColorPass(GraphBuilder, View, SceneColor);
-		}
+		AddResolveSceneColorPass(GraphBuilder, View, SceneColor);
 	}
+}
 }
 
 BEGIN_SHADER_PARAMETER_STRUCT(FResolveSceneDepthParameters, )

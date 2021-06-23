@@ -3524,40 +3524,23 @@ namespace UnrealBuildTool
 				}
 			}
 
+			bool bCompileDevTests = (Configuration != UnrealTargetConfiguration.Test && Configuration != UnrealTargetConfiguration.Shipping);
+			bool bCompilePerfTests = bCompileDevTests;
 			if (Rules.bForceCompileDevelopmentAutomationTests)
 			{
-				GlobalCompileEnvironment.Definitions.Add("WITH_DEV_AUTOMATION_TESTS=1");
+				bCompileDevTests = true;
 			}
-			else
-			{
-				switch(Configuration)
-				{
-					case UnrealTargetConfiguration.Test:
-					case UnrealTargetConfiguration.Shipping:
-						GlobalCompileEnvironment.Definitions.Add("WITH_DEV_AUTOMATION_TESTS=0");
-						break;
-					default:
-						GlobalCompileEnvironment.Definitions.Add("WITH_DEV_AUTOMATION_TESTS=1");
-						break;
-				}
-			}
-
 			if (Rules.bForceCompilePerformanceAutomationTests)
 			{
-				GlobalCompileEnvironment.Definitions.Add("WITH_PERF_AUTOMATION_TESTS=1");
+				bCompilePerfTests = true;
 			}
-			else
+			if (Rules.bForceDisableAutomationTests)
 			{
-				switch (Configuration)
-				{
-					case UnrealTargetConfiguration.Shipping:
-						GlobalCompileEnvironment.Definitions.Add("WITH_PERF_AUTOMATION_TESTS=0");
-						break;
-					default:
-						GlobalCompileEnvironment.Definitions.Add("WITH_PERF_AUTOMATION_TESTS=1");
-						break;
-				}
+				bCompileDevTests = bCompilePerfTests = false;
 			}
+
+			GlobalCompileEnvironment.Definitions.Add("WITH_DEV_AUTOMATION_TESTS=" + (bCompileDevTests ? "1" : "0"));
+			GlobalCompileEnvironment.Definitions.Add("WITH_PERF_AUTOMATION_TESTS=" + (bCompilePerfTests ? "1" : "0"));
 
 			GlobalCompileEnvironment.Definitions.Add("UNICODE");
 			GlobalCompileEnvironment.Definitions.Add("_UNICODE");
