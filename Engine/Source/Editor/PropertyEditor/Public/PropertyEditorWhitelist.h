@@ -7,7 +7,8 @@
 #include "UObject/WeakObjectPtr.h"
 #include "Misc/BlacklistNames.h"
 
-DECLARE_MULTICAST_DELEGATE(FWhitelistUpdated);
+/** Struct, OwnerName */
+DECLARE_MULTICAST_DELEGATE_TwoParams(FWhitelistUpdated, TSoftObjectPtr<UStruct>, FName);
 
 /**
  * A hierarchical set of rules that can be used to whitelist all properties of specific Structs without
@@ -69,7 +70,7 @@ public:
     FWhitelistUpdated WhitelistUpdatedDelegate;
     
 	/** When the entire whitelist is enabled or disabled */
-	FWhitelistUpdated WhitelistEnabledDelegate;
+	FSimpleMulticastDelegate WhitelistEnabledDelegate;
 
 	/** Controls whether DoesPropertyPassFilter always returns true or performs property-based filtering. */
 	bool IsEnabled() const { return bEnablePropertyEditorWhitelist; }

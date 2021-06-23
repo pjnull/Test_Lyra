@@ -17,7 +17,7 @@ void FPropertyEditorWhitelist::AddWhitelist(TSoftObjectPtr<UStruct> Struct, cons
 	// The cache isn't too expensive to recompute, so it is cleared
 	// and lazily repopulated any time the raw whitelist changes.
 	CachedPropertyEditorWhitelist.Reset();
-	WhitelistUpdatedDelegate.Broadcast();
+	WhitelistUpdatedDelegate.Broadcast(Struct, NAME_None);
 }
 
 void FPropertyEditorWhitelist::RemoveWhitelist(TSoftObjectPtr<UStruct> Struct)
@@ -25,7 +25,7 @@ void FPropertyEditorWhitelist::RemoveWhitelist(TSoftObjectPtr<UStruct> Struct)
 	if (RawPropertyEditorWhitelist.Remove(Struct) > 0)
 	{
 		CachedPropertyEditorWhitelist.Reset();
-		WhitelistUpdatedDelegate.Broadcast();
+		WhitelistUpdatedDelegate.Broadcast(Struct, NAME_None);
 	}
 }
 
@@ -33,15 +33,17 @@ void FPropertyEditorWhitelist::ClearWhitelist()
 {
 	TArray<TSoftObjectPtr<UStruct>> Keys;
 	RawPropertyEditorWhitelist.Reset();
-	WhitelistUpdatedDelegate.Broadcast();
+	WhitelistUpdatedDelegate.Broadcast(nullptr, NAME_None);
 }
 
 void FPropertyEditorWhitelist::AddToWhitelist(TSoftObjectPtr<UStruct> Struct, const FName PropertyName, const FName Owner)
 {
 	FPropertyEditorWhitelistEntry& Entry = RawPropertyEditorWhitelist.FindOrAdd(Struct);
-	Entry.Whitelist.AddWhitelistItem(Owner, PropertyName);
-	CachedPropertyEditorWhitelist.Reset();
-	WhitelistUpdatedDelegate.Broadcast();
+	if (Entry.Whitelist.AddWhitelistItem(Owner, PropertyName))
+	{
+		CachedPropertyEditorWhitelist.Reset();
+		WhitelistUpdatedDelegate.Broadcast(Struct, Owner);
+	}
 }
 
 void FPropertyEditorWhitelist::RemoveFromWhitelist(TSoftObjectPtr<UStruct> Struct, const FName PropertyName, const FName Owner)
@@ -50,16 +52,18 @@ void FPropertyEditorWhitelist::RemoveFromWhitelist(TSoftObjectPtr<UStruct> Struc
 	if (Entry.Whitelist.RemoveWhitelistItem(Owner, PropertyName))
 	{
 		CachedPropertyEditorWhitelist.Reset();
-		WhitelistUpdatedDelegate.Broadcast();
+		WhitelistUpdatedDelegate.Broadcast(Struct, Owner);
 	}
 }
 
 void FPropertyEditorWhitelist::AddToBlacklist(TSoftObjectPtr<UStruct> Struct, const FName PropertyName, const FName Owner)
 {
 	FPropertyEditorWhitelistEntry& Entry = RawPropertyEditorWhitelist.FindOrAdd(Struct);
-	Entry.Whitelist.AddBlacklistItem(Owner, PropertyName);
-	CachedPropertyEditorWhitelist.Reset();
-	WhitelistUpdatedDelegate.Broadcast();
+	if (Entry.Whitelist.AddBlacklistItem(Owner, PropertyName))
+	{
+		CachedPropertyEditorWhitelist.Reset();
+		WhitelistUpdatedDelegate.Broadcast(Struct, Owner);
+	}
 }
 
 void FPropertyEditorWhitelist::RemoveFromBlacklist(TSoftObjectPtr<UStruct> Struct, const FName PropertyName, const FName Owner)
@@ -68,7 +72,7 @@ void FPropertyEditorWhitelist::RemoveFromBlacklist(TSoftObjectPtr<UStruct> Struc
 	if (Entry.Whitelist.RemoveBlacklistItem(Owner, PropertyName))
 	{
 		CachedPropertyEditorWhitelist.Reset();
-		WhitelistUpdatedDelegate.Broadcast();
+		WhitelistUpdatedDelegate.Broadcast(Struct, Owner);
 	}
 }
 
@@ -89,6 +93,12 @@ bool FPropertyEditorWhitelist::DoesPropertyPassFilter(const UStruct* ObjectStruc
 
 const FBlacklistNames& FPropertyEditorWhitelist::GetCachedWhitelistForStruct(const UStruct* Struct) const
 {
+	const FBlacklistNames* CachedWhitelist = CachedPropertyEditorWhitelist.Find(Struct);
+	if (CachedWhitelist)
+	{
+		return *CachedWhitelist;
+	}
+
 	// Default value doesn't matter since it's a no-op until the first whitelist is encountered, at which
 	// point the rules will re-assign the value.
 	bool bShouldWhitelistAllProperties = true;
@@ -99,10 +109,19 @@ const FBlacklistNames& FPropertyEditorWhitelist::GetCachedWhitelistForStructHelp
 {
 	check(Struct);
 
-	const FBlacklistNames* CachedWhitelist = CachedPropertyEditorWhitelist.Find(Struct);
-	if (CachedWhitelist)
+	const FPropertyEditorWhitelistEntry* Entry = RawPropertyEditorWhitelist.Find(Struct);
+	bool bIsThisWhitelistEmpty = Entry ? Entry->Whitelist.GetWhitelist().Num() == 0 : true;
+
+	// Normally this case would be caught in GetCachedWhitelistForStruct, but when being called recursively from a subclass
+	// we still need to update bInOutShouldWhitelistAllProperties so that new whitelists cache properly.
+	FBlacklistNames* Whitelist = CachedPropertyEditorWhitelist.Find(Struct);
+	if (Whitelist)
 	{
-		return *CachedWhitelist;
+		// Same check as below, but it specifically has to come after the recursive call so we have to duplicate the code here
+		if (Entry && Entry->Rules == EPropertyEditorWhitelistRules::WhitelistAllProperties)
+		{
+			bInOutShouldWhitelistAllProperties = true;
+		}
 	}
 	else
 	{
@@ -116,12 +135,9 @@ const FBlacklistNames& FPropertyEditorWhitelist::GetCachedWhitelistForStructHelp
 		}
 
 		// Append this struct's whitelist on top of the parent's whitelist
-		const FPropertyEditorWhitelistEntry* Entry = RawPropertyEditorWhitelist.Find(Struct);
-		bool bIsThisWhitelistEmpty = true;
 		if (Entry)
 		{
 			NewWhitelist.Append(Entry->Whitelist);
-			bIsThisWhitelistEmpty = Entry->Whitelist.GetWhitelist().Num() == 0;
 
 			if (Entry->Rules == EPropertyEditorWhitelistRules::WhitelistAllProperties)
 			{
@@ -140,16 +156,18 @@ const FBlacklistNames& FPropertyEditorWhitelist::GetCachedWhitelistForStructHelp
 			}
 		}
 
-		// If this Struct has no whitelist, then the ShouldWhitelistAllProperties rule just forwards its current value on to the next subclass.
-		// This causes an issue in the case where a Struct should have no whitelisted properties but wants to whitelist all subclass properties.
-		// In this case, simply add a dummy entry to the Struct's whitelist that (likely) won't ever collide with a real property name
-		if (!bIsThisWhitelistEmpty)
-		{
-			bInOutShouldWhitelistAllProperties = Entry->Rules == EPropertyEditorWhitelistRules::WhitelistAllSubclassProperties;
-		}
-
-		return CachedPropertyEditorWhitelist.Add(Struct, NewWhitelist);
+		Whitelist = &CachedPropertyEditorWhitelist.Add(Struct, NewWhitelist);
 	}
+
+	// If this Struct has no whitelist, then the ShouldWhitelistAllProperties rule just forwards its current value on to the next subclass.
+	// This causes an issue in the case where a Struct should have no whitelisted properties but wants to whitelist all subclass properties.
+	// In this case, simply add a dummy entry to the Struct's whitelist that (likely) won't ever collide with a real property name
+	if (!bIsThisWhitelistEmpty)
+	{
+		bInOutShouldWhitelistAllProperties = Entry->Rules == EPropertyEditorWhitelistRules::WhitelistAllSubclassProperties;
+	}
+
+	return *Whitelist;
 }
 
 bool FPropertyEditorWhitelist::IsSpecificPropertyWhitelisted(const UStruct* ObjectStruct, FName PropertyName) const
