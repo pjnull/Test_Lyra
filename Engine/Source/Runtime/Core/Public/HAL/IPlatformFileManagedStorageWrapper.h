@@ -14,6 +14,7 @@
 #include "Misc/Paths.h"
 #include "Misc/DateTime.h"
 #include "Misc/ConfigCacheIni.h"
+#include "Misc/Commandline.h"
 #include "GenericPlatform/GenericPlatformFile.h"
 #include "Templates/UniquePtr.h"
 #include "HAL/FileManager.h"
