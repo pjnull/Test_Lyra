@@ -16,6 +16,10 @@
 #include "UObject/UE5MainStreamObjectVersion.h"
 #include "UObject/UE5ReleaseStreamObjectVersion.h"
 
+#ifndef CHAOS_DEBUG_NAME
+#define CHAOS_DEBUG_NAME 0
+#endif
+
 class FName;
 
 namespace Chaos
@@ -430,7 +434,7 @@ public:
 		SetGeometry(Other.SharedGeometryLowLevel());
 		SetUniqueIdx(Other.UniqueIdx());
 		SetSpatialIdx(Other.SpatialIdx());
-#if CHAOS_CHECKED
+#if CHAOS_DEBUG_NAME
 		SetDebugName(Other.DebugName());
 #endif
 	}
@@ -440,11 +444,7 @@ public:
 	{
 		return Geometry() == Other.Geometry()
 			&& UniqueIdx() == Other.UniqueIdx()
-			&& SpatialIdx() == Other.SpatialIdx()
-#if CHAOS_CHECKED
-			&& DebugName() == Other.DebugName()
-#endif
-			;
+			&& SpatialIdx() == Other.SpatialIdx();
 	}
 
 	bool operator==(const FParticleNonFrequentData& Other) const
@@ -466,17 +466,17 @@ public:
 	FSpatialAccelerationIdx SpatialIdx() const { return MSpatialIdx; }
 	void SetSpatialIdx(FSpatialAccelerationIdx InIdx){ MSpatialIdx = InIdx; }
 
-#if CHAOS_CHECKED
-	FName DebugName() const { return MDebugName; }
-	void SetDebugName(FName InName) { MDebugName = InName; }
+#if CHAOS_DEBUG_NAME
+	const TSharedPtr<FString, ESPMode::ThreadSafe>& DebugName() const { return MDebugName; }
+	void SetDebugName(const TSharedPtr<FString, ESPMode::ThreadSafe>& InName) { MDebugName = InName; }
 #endif
 private:
 	TSharedPtr<const FImplicitObject,ESPMode::ThreadSafe> MGeometry;
 	FUniqueIdx MUniqueIdx;
 	FSpatialAccelerationIdx MSpatialIdx;
 
-#if CHAOS_CHECKED
-	FName MDebugName;
+#if CHAOS_DEBUG_NAME
+	TSharedPtr<FString, ESPMode::ThreadSafe> MDebugName;
 #endif
 };
 

@@ -821,6 +821,9 @@ namespace Chaos
 		GetEventManager()->DispatchEvents();
 	}
 
+	int32 LogDirtyParticles = 0;
+	FAutoConsoleVariableRef CVarLogDirtyParticles(TEXT("p.LogDirtyParticles"), LogDirtyParticles, TEXT("Logs out which particles are dirty every frame"));
+
 	void FPBDRigidsSolver::PushPhysicsState(const FReal DeltaTime, const int32 NumSteps, const int32 NumExternalSteps)
 	{
 		QUICK_SCOPE_CYCLE_COUNTER(STAT_PushPhysicsState);
@@ -883,6 +886,44 @@ namespace Chaos
 			ensure(0 && TEXT("Unknown proxy type in physics solver."));
 			}
 		});
+
+		if(!!LogDirtyParticles)
+		{
+			int32 NumJoints = 0;
+			int32 NumSuspension = 0;
+			int32 NumParticles = 0;
+			UE_LOG(LogChaos, Warning, TEXT("LogDirtyParticles:"));
+			DirtyProxiesData->ForEachProxy([&NumJoints, &NumSuspension, &NumParticles](int32 DataIdx, FDirtyProxy& Dirty)
+			{
+				switch (Dirty.Proxy->GetType())
+				{
+					case EPhysicsProxyType::SingleParticleProxy:
+					{
+						auto Proxy = static_cast<FSingleParticlePhysicsProxy*>(Dirty.Proxy);
+#if CHAOS_DEBUG_NAME
+						UE_LOG(LogChaos, Warning, TEXT("\t%s"), **Proxy->GetParticle_LowLevel()->DebugName());
+#endif
+						++NumParticles;
+						break;
+					}
+					case EPhysicsProxyType::JointConstraintType:
+					{
+						auto Proxy = static_cast<FJointConstraintPhysicsProxy*>(Dirty.Proxy);
+						++NumJoints;
+						break;
+					}
+					case EPhysicsProxyType::SuspensionConstraintType:
+					{
+						++NumSuspension;
+						break;
+					}
+
+					default: break;
+				}
+			});
+
+			UE_LOG(LogChaos, Warning, TEXT("Num Particles:%d Num Shapes:%d Num Joints:%d Num Suspensions:%d"), NumParticles, DirtyProxiesData->NumDirtyShapes(), NumJoints, NumSuspension);
+		}
 
 		GetEvolution()->GetBroadPhase().GetIgnoreCollisionManager().PushProducerStorageData_External(MarshallingManager.GetExternalTimestamp_External());
 

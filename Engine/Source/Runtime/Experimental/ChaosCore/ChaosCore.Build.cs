@@ -35,7 +35,11 @@ namespace UnrealBuildTool.Rules
                 PublicDefinitions.Add("CHAOS_CHECKED=0");
             }
 
+			if(Target.Configuration != UnrealTargetConfiguration.Shipping && Target.Configuration != UnrealTargetConfiguration.Test)
+			{
+				PublicDefinitions.Add("CHAOS_DEBUG_NAME=1");
+			}
 			UnsafeTypeCastWarningLevel = WarningLevel.Warning;
-		}
+        }
     }
 }
