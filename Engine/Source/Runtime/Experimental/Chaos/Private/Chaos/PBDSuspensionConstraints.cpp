@@ -61,7 +61,7 @@ namespace Chaos
 		if (ConstraintHandle != nullptr)
 		{
 			if (ConstraintEnabledStates[ConstraintIndex] && ConstrainedParticles[ConstraintIndex])
-			{				
+			{
 				ConstrainedParticles[ConstraintIndex]->RemoveConstraintHandle(ConstraintHandle);
 			}
 
