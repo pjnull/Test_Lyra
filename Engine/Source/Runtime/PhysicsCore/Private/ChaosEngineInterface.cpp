@@ -1637,7 +1637,7 @@ void FChaosEngineInterface::CreateActor(const FActorCreationParams& InParams,FPh
 	Body_External.SetX(InParams.InitialTM.GetLocation(), /*bInvalidate=*/false);	//do not generate wake event since this is part of initialization
 	Body_External.SetR(InParams.InitialTM.GetRotation(), /*bInvalidate=*/false);
 #if CHAOS_CHECKED
-	Body_External.SetDebugName(InParams.DebugName);
+	Body_External.SetDebugName(MakeShareable(new FString(InParams.DebugName)));
 #endif
 }
 
