@@ -1218,7 +1218,7 @@ void UWidgetComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, 
 
 void UWidgetComponent::UpdateWidgetOnScreen()
 {
-	if (GetUserWidgetObject() || (GetSlateWidget().IsValid() && Space == EWidgetSpace::Screen))
+	if ((GetUserWidgetObject() || GetSlateWidget().IsValid()) && Space == EWidgetSpace::Screen)
 	{
 		UWorld* ThisWorld = GetWorld();
 		if (ThisWorld && ThisWorld->IsGameWorld())
