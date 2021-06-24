@@ -274,6 +274,15 @@ public:
 	FSystemInterrogator();
 	~FSystemInterrogator();
 
+	
+	/**
+	 * Allocate a new interrogation channel that relates to a specific object
+	 */
+	FInterrogationChannel AllocateChannel(UObject* Object, const FMovieScenePropertyBinding& PropertyBinding)
+	{
+		return Channels.AllocateChannel(Object, PropertyBinding);
+	}
+
 
 	/**
 	 * Import a track into this linker. This will add the track to the linker's evaluation field and

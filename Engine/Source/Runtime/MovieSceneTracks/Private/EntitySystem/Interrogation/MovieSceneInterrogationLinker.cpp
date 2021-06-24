@@ -113,7 +113,7 @@ FInterrogationChannel FInterrogationChannels::AllocateChannel(FInterrogationChan
 	return Channel;
 }
 
-FInterrogationChannel FSystemInterrogator::AllocateChannel(UObject* Object, const FMovieScenePropertyBinding& PropertyBinding)
+FInterrogationChannel FInterrogationChannels::AllocateChannel(UObject* Object, const FMovieScenePropertyBinding& PropertyBinding)
 {
 	return AllocateChannel(Object, FInterrogationChannel::Invalid(), PropertyBinding);
 }
