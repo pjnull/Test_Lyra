@@ -299,16 +299,6 @@ void FDMXPixelMappingDetailCustomization_Matrix::CreateModulatorDetails(IDetailL
 				{
 					FPropertyEditorModule& PropertyEditorModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>("PropertyEditor");
 
-					const bool bUpdateFromSelection = false;
-					const bool bLockable			= true;
-					const bool bAllowSearch			= false;
-					const bool bHidSelectionTip		= false;
-					const FDetailsViewArgs DetailsViewArgs(bUpdateFromSelection, bLockable, bAllowSearch, FDetailsViewArgs::HideNameArea, false);
-					const bool bUpdateFromSelection = false;
-					const bool bLockable = true;
-					const bool bAllowSearch = false;
-					const bool bHidSelectionTip = false;
-					const FDetailsViewArgs DetailsViewArgs(bUpdateFromSelection, bLockable, bAllowSearch, FDetailsViewArgs::HideNameArea, false);
 					FDetailsViewArgs DetailsViewArgs;
 					DetailsViewArgs.bUpdatesFromSelection = false;
 					DetailsViewArgs.bLockable = true;
@@ -332,7 +322,7 @@ void FDMXPixelMappingDetailCustomization_Matrix::CreateModulatorDetails(IDetailL
 						[
 							SNew(STextBlock)
 							.Text(LOCTEXT("ModulatorMultipleValues", "Multiple Values"))
-						.Font(IDetailLayoutBuilder::GetDetailFont())
+							.Font(IDetailLayoutBuilder::GetDetailFont())
 						];
 
 					break;
