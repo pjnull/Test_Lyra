@@ -275,9 +275,11 @@ bool FNDI_Landscape_SharedResource::CanBeDestroyed() const
 {
 	const bool ReadyForRemoval = !IsUsed() && GpuDataReleasedByRt && CpuDataReleasedByRt;
 
-	checkf(!ReadyForRemoval || !LandscapeTextures.IsInitialized(),
-		TEXT("FNDI_Landscape_SharedResource::CanBeDestroyed returning true, but the LandscpaeTextures is still initialized! Source[%s] MinRegion[%d,%d] MaxRegion[%d,%d]"),
-		*GetNameSafe(ResourceKey.Source.Get()), ResourceKey.MinCaptureRegion.X, ResourceKey.MinCaptureRegion.Y, ResourceKey.MaxCaptureRegion.X, ResourceKey.MaxCaptureRegion.Y);
+	if (ReadyForRemoval && LandscapeTextures.IsInitialized())
+	{
+		UE_LOG(LogNiagara, Error, TEXT("FNDI_Landscape_SharedResource::CanBeDestroyed returning true, but the LandscpaeTextures is still initialized! Source[%s] MinRegion[%d,%d] MaxRegion[%d,%d]"),
+			*GetNameSafe(ResourceKey.Source.Get()), ResourceKey.MinCaptureRegion.X, ResourceKey.MinCaptureRegion.Y, ResourceKey.MaxCaptureRegion.X, ResourceKey.MaxCaptureRegion.Y);
+	}
 
 	return ReadyForRemoval;
 }
