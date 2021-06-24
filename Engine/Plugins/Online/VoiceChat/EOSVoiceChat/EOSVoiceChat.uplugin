@@ -17,7 +17,6 @@
 			"WhitelistPlatforms": [
 				"Android",
 				"Mac",
-				"Win32",
 				"Win64"
 			]
 		}
