@@ -33,7 +33,6 @@ half4 OverlayColor;
 
 uint bUseMobileTonemapper;
 uint bIsTemperatureWhiteBalance;
-uint bUseMobileTonemapper;
 
 static const float LUTSize = 32;
 
