@@ -1524,6 +1524,9 @@ private:
 
 	bool bAutoFlush;
 
+	/** Used to limit logging when we detect QueuedBits overflow */
+	bool bLoggedFlushNetQueuedBitsOverflow = false;
+
 	/** RPC/Replication code DoS detection */
 	FRPCDoSDetection RPCDoS;
 

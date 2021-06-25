@@ -376,6 +376,7 @@ void UNetConnection::InitBase(UNetDriver* InDriver,class FSocket* InSocket, cons
 
 	check(MaxPacket > 0 && PacketOverhead > 0);
 
+	bLoggedFlushNetQueuedBitsOverflow = false;
 
 	// Reset Handler
 	Handler.Reset(NULL);
@@ -1635,7 +1636,11 @@ void UNetConnection::FlushNet(bool bIgnoreSimulation)
 		int32 NewQueuedBits = 0;
 		const bool bWouldOverflow = UE_NetConnectionPrivate::Add_DetectOverflow_Clamp(QueuedBits, PacketBytes * 8, NewQueuedBits);
 		
-		ensureMsgf(!bWouldOverflow, TEXT("UNetConnection::FlushNet: QueuedBits overflow detected! QueuedBits: %d, PacketBytes: %d"), QueuedBits, PacketBytes);
+		if (bWouldOverflow && !bLoggedFlushNetQueuedBitsOverflow)
+		{
+			UE_LOG(LogNet, Log, TEXT("UNetConnection::FlushNet: QueuedBits overflow detected! QueuedBits: %d, PacketBytes: %d. %s"), QueuedBits, PacketBytes, *Describe());
+			bLoggedFlushNetQueuedBitsOverflow = true;
+		}
 
 		QueuedBits = NewQueuedBits;
 
