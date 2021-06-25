@@ -4,6 +4,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Misc/QueuedThreadPool.h"
 /** 
  * Interface for data deriving backends
  * This API will not be called concurrently, except that Build might be called on different instances if IsBuildThreadsafe.
