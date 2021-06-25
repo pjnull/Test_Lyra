@@ -470,6 +470,9 @@ void FNiagaraWorldManager::DestroySystemSimulation(UNiagaraSystem* System)
 		TSharedRef<FNiagaraSystemSimulation, ESPMode::ThreadSafe>* Simulation = SystemSimulations[TG].Find(System);
 		if (Simulation != nullptr)
 		{
+			SimulationsWithPostActorWork.Remove(*Simulation);
+			SimulationsWithEndOfFrameWait.Remove(*Simulation);
+
 			(*Simulation)->Destroy();
 			SystemSimulations[TG].Remove(System);
 		}
@@ -527,6 +530,9 @@ void FNiagaraWorldManager::OnWorldCleanup(bool bSessionEnded, bool bCleanupResou
 		SystemSimulations[TG].Empty();
 	}
 	CleanupParameterCollections();
+
+	SimulationsWithPostActorWork.Empty();
+	SimulationsWithEndOfFrameWait.Empty();
 
 	DeferredDeletionQueue.Empty();
 
@@ -846,6 +852,7 @@ void FNiagaraWorldManager::PreSendAllEndOfFrameUpdates()
 void FNiagaraWorldManager::MarkSimulationForPostActorWork(FNiagaraSystemSimulation* SystemSimulation)
 {
 	check(SystemSimulation != nullptr);
+	check(!SystemSimulation->GetIsSolo());
 	if ( !SimulationsWithPostActorWork.ContainsByPredicate([&](const TSharedRef<FNiagaraSystemSimulation, ESPMode::ThreadSafe>& Existing) { return &Existing.Get() == SystemSimulation; }) )
 	{
 		SimulationsWithPostActorWork.Add(SystemSimulation->AsShared());
@@ -855,6 +862,7 @@ void FNiagaraWorldManager::MarkSimulationForPostActorWork(FNiagaraSystemSimulati
 void FNiagaraWorldManager::MarkSimulationsForEndOfFrameWait(FNiagaraSystemSimulation* SystemSimulation)
 {
 	check(SystemSimulation);
+	check(!SystemSimulation->GetIsSolo());
 	if (!SimulationsWithEndOfFrameWait.ContainsByPredicate([&](const TSharedRef<FNiagaraSystemSimulation, ESPMode::ThreadSafe>& Existing) { return &Existing.Get() == SystemSimulation; }))
 	{
 		SimulationsWithEndOfFrameWait.Add(SystemSimulation->AsShared());
