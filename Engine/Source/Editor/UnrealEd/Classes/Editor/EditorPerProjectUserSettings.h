@@ -158,9 +158,6 @@ public:
 	UPROPERTY(config)
 	FString AssetViewerProfileName;
 
-	UPROPERTY(config)
-	int32 MaterialQualityLevel;
-
 	/** The feature level we should use when loading or creating a new world */
 	UPROPERTY(config)
 	int32 PreviewFeatureLevel;
@@ -193,7 +190,6 @@ public:
 #if WITH_EDITOR
 	virtual void PostEditChangeProperty( FPropertyChangedEvent& PropertyChangedEvent ) override;
 #endif
-	virtual void PostInitProperties() override;
 	//~ End UObject Interface
 
 private:
