@@ -28,7 +28,7 @@ public:
 protected:
 
 	FColorStructCustomization()
-		, bIgnoreAlpha(false)
+		: bIgnoreAlpha(false)
 		, bIsInlineColorPickerVisible(false)
 		, bIsInteractive(false)
 		, bDontUpdateWhileEditing(false)
