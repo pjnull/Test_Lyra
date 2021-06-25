@@ -393,7 +393,7 @@ public:
 		AddToAsyncCompletionCounter(1);
 		if (!bSync)
 		{
-			AsyncTask->StartBackgroundTask();
+			AsyncTask->StartBackgroundTask(DataDeriver->GetCustomThreadPool());
 		}
 		else
 		{
