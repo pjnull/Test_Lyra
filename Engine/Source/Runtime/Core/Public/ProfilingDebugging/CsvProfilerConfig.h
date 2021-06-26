@@ -20,10 +20,6 @@
 
 // CSV_PROFILER default enabling rules, if not specified explicitly in <Program>.Target.cs GlobalDefinitions
 #ifndef CSV_PROFILER
-	#if WITH_SERVER_CODE
-	  #define CSV_PROFILER (WITH_ENGINE && 1)
-	#else
-	  #define CSV_PROFILER (WITH_ENGINE && (!UE_BUILD_SHIPPING || CSV_PROFILER_ENABLE_IN_SHIPPING))
-	#endif
+	#define CSV_PROFILER (WITH_ENGINE && (!UE_BUILD_SHIPPING || CSV_PROFILER_ENABLE_IN_SHIPPING))
 #endif
 

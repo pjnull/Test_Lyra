@@ -1750,6 +1750,8 @@ public:
 
 	void FlushResults(TArray<FCsvTimingMarker>& OutMarkers, TArray<FCsvCustomStat>& OutCustomStats, TArray<FCsvEvent>& OutEvents)
 	{
+		QUICK_SCOPE_CYCLE_COUNTER(STAT_FCsvProfilerThreadData_FlushResults);
+		
 		check(IsInCsvProcessingThread());
 
 		TimingMarkers.PopAll(OutMarkers);
@@ -2707,12 +2709,12 @@ void FCsvProfiler::EndFrame()
 {
 	LLM_SCOPE(ELLMTag::CsvProfiler);
 
-	QUICK_SCOPE_CYCLE_COUNTER(STAT_FCsvProfiler_EndFrame);
 	CSV_SCOPED_TIMING_STAT_EXCLUSIVE(CsvProfiler);
 
 	check(IsInGameThread());
 	if (GCsvProfilerIsCapturing)
 	{
+		QUICK_SCOPE_CYCLE_COUNTER(STAT_FCsvProfiler_EndFrame_Capturing);
 		if (NumFramesToCapture >= 0)
 		{
 			NumFramesToCapture--;
@@ -2755,6 +2757,7 @@ void FCsvProfiler::EndFrame()
 	FCsvCaptureCommand CurrentCommand;
 	if (CommandQueue.Peek(CurrentCommand) && CurrentCommand.CommandType == ECsvCommandType::Stop)
 	{
+		QUICK_SCOPE_CYCLE_COUNTER(STAT_FCsvProfiler_EndFrame_Stop);
 		bool bCaptureComplete = false;
 
 		if (!GCsvProfilerIsCapturing && !GCsvProfilerIsWritingFile)
@@ -2857,29 +2860,11 @@ void FCsvProfiler::EndFrame()
 
 void FCsvProfiler::OnEndFramePostFork()
 {
-	if (FForkProcessHelper::IsForkedMultithreadInstance())
-	{
-		if (FParse::Param(FCommandLine::Get(), TEXT("csvNoProcessingThread")))
-		{
-			GCsvUseProcessingThread = false;
-		}
-		else 
-		{
-			if (ProcessingThread == nullptr)
-			{
-				GCsvUseProcessingThread = true;
-				// Lazily create the CSV processing thread
-				ProcessingThread = new FCsvProfilerProcessingThread(*this);
-				if (ProcessingThread->IsValid() == false)
-				{
-					UE_LOG(LogCsvProfiler, Error, TEXT("CSV Processing Thread could not be created due to being in a single-thread environment "));
-					delete ProcessingThread;
-					ProcessingThread = nullptr;
-					GCsvUseProcessingThread = false;
-				}
-			}
-		}
-	}
+	// Reinitialize commandline-based configuration
+	GCsvUseProcessingThread = FForkProcessHelper::IsForkedMultithreadInstance() && !FParse::Param(FCommandLine::Get(), TEXT("csvNoProcessingThread"));
+	GGameThreadIsCsvProcessingThread = !GCsvUseProcessingThread;
+	// Make sure no one called BeginCapture() before forking, as the runnable doesn't fully support the transition
+	checkf(ProcessingThread == nullptr, TEXT("CSV profiling should not be started pre-fork"));
 }
 
 /** Per-frame update */
@@ -3445,6 +3430,8 @@ bool FCsvProfiler::IsCapturing_Renderthread()
 float FCsvProfiler::ProcessStatData()
 {
 	check(IsInCsvProcessingThread());
+
+	QUICK_SCOPE_CYCLE_COUNTER(STAT_FCsvProfiler_ProcessStatData);
 
 	float ElapsedMS = 0.0f;
 	if (!IsShuttingDown.GetValue())
