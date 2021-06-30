@@ -566,7 +566,7 @@ void FOnlineUserEOSPlus::OnBaseLoginComplete(int32 LocalUserNum, bool bWasSucces
 	else
 	{
 		AddPlayer(LocalUserNum);
-		TriggerOnLoginCompleteDelegates(LocalUserNum);
+		TriggerOnLoginCompleteDelegates(LocalUserNum, bWasSuccessful, UserId, ErrorStr);
 	}
 }
 
