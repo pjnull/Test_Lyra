@@ -1067,7 +1067,7 @@ void USkeletalMesh::UpdateUVChannelData(bool bRebuildAll)
 			for (int32 LODIndex = 0; LODIndex < Resource->LODRenderData.Num(); ++LODIndex)
 			{
 				const FSkeletalMeshLODRenderData& LODData = Resource->LODRenderData[LODIndex];
-				const TArray<int32>& RemappedMaterialIndices = LODInfo[LODIndex].LODMaterialMap;
+				const TArray<int32>& RemappedMaterialIndices = GetLODInfoArray()[LODIndex].LODMaterialMap;
 
 				for (int32 SectionIndex = 0; SectionIndex < LODData.RenderSections.Num(); ++SectionIndex)
 				{
@@ -4982,15 +4982,17 @@ bool USkeletalMesh::IsMaterialUsed(int32 MaterialIndex) const
 		return true;
 	}
 
-	if (SkeletalMeshRenderData)
+	const FSkeletalMeshRenderData* RenderData = GetSkeletalMeshRenderData();
+
+	if (RenderData)
 	{
-		for (int32 LODIndex = 0; LODIndex < SkeletalMeshRenderData->LODRenderData.Num(); ++LODIndex)
+		for (int32 LODIndex = 0; LODIndex < RenderData->LODRenderData.Num(); ++LODIndex)
 		{
-			const FSkeletalMeshLODRenderData& LODData = SkeletalMeshRenderData->LODRenderData[LODIndex];
+			const FSkeletalMeshLODRenderData& LODData = RenderData->LODRenderData[LODIndex];
 
 			if (LODData.BuffersSize > 0)
 			{
-				const TArray<int32>& RemappedMaterialIndices = LODInfo[LODIndex].LODMaterialMap;
+				const TArray<int32>& RemappedMaterialIndices = GetLODInfoArray()[LODIndex].LODMaterialMap;
 
 				for (int32 SectionIndex = 0; SectionIndex < LODData.RenderSections.Num(); ++SectionIndex)
 				{
