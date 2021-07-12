@@ -108,7 +108,7 @@ FMockState_PT
 
 namespace UE_NETWORK_PHYSICS
 {
-	NETSIM_DEVCVAR_SHIPCONST_INT(bEnableMock, 0, "np2.Mock.Enable", "Enable Mock implementation");
+	NETSIM_DEVCVAR_SHIPCONST_INT(bEnableMock, 1, "np2.Mock.Enable", "Enable Mock implementation");
 }
 
 void FMockManagedState::AsyncTick(UWorld* World, Chaos::FPhysicsSolver* Solver, const float DeltaSeconds, const int32 SimulationFrame, const int32 LocalStorageFrame, const TArray<FSingleParticlePhysicsProxy*>& BallProxies)

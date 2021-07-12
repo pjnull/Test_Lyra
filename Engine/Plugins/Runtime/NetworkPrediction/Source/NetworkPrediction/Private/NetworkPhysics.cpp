@@ -36,7 +36,7 @@ namespace UE_NETWORK_PHYSICS
 	NP_DEVCVAR_INT(LogImpulses, -1, "np2.LogImpulses", "Logs all recorded F/T/LI/AI");
 
 	NP_DEVCVAR_FLOAT(X, 1.0f, "np2.Tolerance.X", "Location Tolerance");
-	NP_DEVCVAR_FLOAT(R, 0.1f, "np2.Tolerance.R", "Rotation Tolerance");
+	NP_DEVCVAR_FLOAT(R, 0.001f, "np2.Tolerance.R", "Rotation Tolerance");
 	NP_DEVCVAR_FLOAT(V, 1.0f, "np2.Tolerance.V", "Velocity Tolerance");
 	NP_DEVCVAR_FLOAT(W, 1.0f, "np2.Tolerance.W", "Rotational Velocity Tolerance");
 
@@ -57,6 +57,7 @@ namespace UE_NETWORK_PHYSICS
 	NP_DEVCVAR_INT(ResimForSleep, 0, "np2.ResimForSleep", "Triggers resim if only sleep state differs. Otherwise we only match server sleep state if XRVW differ.");
 		
 	// Time dilation CVars
+	NP_DEVCVAR_INT(TimeDilationEnabled, 1, "np2.TimeDilationEnabled", "Enable clientside TimeDilation");
 	NP_DEVCVAR_FLOAT(MaxTargetNumBufferedCmds, 5.0, "np2.MaxTargetNumBufferedCmds", "");
 	NP_DEVCVAR_FLOAT(MaxTimeDilationMag, 0.01f, "np2.MaxTimeDilationMag", "Maximum time dilation that client will use to slow down / catch up with server");
 	NP_DEVCVAR_FLOAT(TimeDilationAlpha, 0.1f, "np2.TimeDilationAlpha", "");
@@ -162,7 +163,11 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 	}
 	bool CompareQuat(const FQuat& A, const FQuat& B, const float D, const TCHAR* Str)
 	{
-		const bool b = D == 0 ? A != B : FQuat::ErrorAutoNormalize(A, B) > D;
+		const float Error = FQuat::ErrorAutoNormalize(A, B);
+		const bool b = D == 0 ? A != B : Error > D;
+
+		//UE_LOG(LogTemp, Warning, TEXT("Error: %f"), Error);
+
 		UE_CLOG(UE_NETWORK_PHYSICS::LogCorrections > 0 && b && Str, LogNetworkPhysics, Log, TEXT("%s correction. Server: %s. Local: %s. Delta: %f"), Str, *A.ToString(), *B.ToString(), FQuat::ErrorAutoNormalize(A, B));
 		return b;
 	}
@@ -249,6 +254,8 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 				Stats.MaxFrameChecked = FMath::Max(Stats.MaxFrameChecked, Obj.Frame);
 				Stats.NumChecked++;
 
+				//UE_LOG(LogTemp, Warning, TEXT("Reconcile Obj 0x%X at frame %d"), (int64)Proxy, Obj.Frame);
+
 
 #if NETWORK_PHYSICS_REPLICATE_EXTRAS
 				if (UE_NETWORK_PHYSICS::LogImpulses > 0)
@@ -262,6 +269,10 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 					}
 				}
 #endif
+
+				//UE_LOG(LogTemp, Warning, TEXT("0x%X P.ObjectState(): %d. R: %s [%s]"), (int64)Proxy,  P.ObjectState(), *P.R().ToString(), *Obj.Physics.Rotation.ToString());
+				//UE_LOG(LogTemp, Warning, TEXT("			R: %s [%s]"), *FRotator(P.R()).ToString(), *FRotator(Obj.Physics.Rotation).ToString());
+
 				
 				if ((UE_NETWORK_PHYSICS::ResimForSleep && CompareObjState(Obj.Physics.ObjectState, P.ObjectState(), TEXT("ObjectState"))) ||
 					CompareVec(Obj.Physics.Location, P.X(), UE_NETWORK_PHYSICS::X, TEXT("Location")) ||
@@ -363,16 +374,17 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 				if (auto* PT = CorrectionState.Proxy->GetPhysicsThreadAPI())
 				{
 					UE_CLOG(UE_NETWORK_PHYSICS::LogCorrections > 0, LogNetworkPhysics, Log, TEXT("Applying Correction from frame %d (actual step: %d). Location: %s"), CorrectionState.Frame, PhysicsStep, *FVector(CorrectionState.Physics.Location).ToString());
-				
+
+					
 					PT->SetX(CorrectionState.Physics.Location, false);
 					PT->SetV(CorrectionState.Physics.LinearVelocity, false);
 					PT->SetR(CorrectionState.Physics.Rotation, false);
 					PT->SetW(CorrectionState.Physics.AngularVelocity, false);
-					
+
 					//if (PT->ObjectState() != CorrectionState.Physics.ObjectState)
 					{
 						ensure(CorrectionState.Physics.ObjectState != Chaos::EObjectStateType::Uninitialized);
-						UE_CLOG(UE_NETWORK_PHYSICS::LogCorrections > 0, LogNetworkPhysics, Log, TEXT("Applying Correction State %d"), CorrectionState.Physics.ObjectState);
+						UE_CLOG(UE_NETWORK_PHYSICS::LogCorrections > 0 && PT->ObjectState() != CorrectionState.Physics.ObjectState, LogNetworkPhysics, Log, TEXT("Applying Correction State %d"), CorrectionState.Physics.ObjectState);
 						PT->SetObjectState(CorrectionState.Physics.ObjectState);
 					}
 				}
@@ -705,7 +717,10 @@ void UNetworkPhysicsManager::PostNetRecv()
 
 				float RealTimeDilation = UE_NETWORK_PHYSICS::DeQuantizeTimeDilation(ClientFrameInfo.QuantizedTimeDilation);
 
-				PhysScene->SetNetworkDeltaTimeScale(RealTimeDilation);
+				if (UE_NETWORK_PHYSICS::TimeDilationEnabled > 0)
+				{
+					PhysScene->SetNetworkDeltaTimeScale(RealTimeDilation);
+				}
 
 				if (LatestAckdClientFrame != INDEX_NONE)
 				{
@@ -1199,7 +1214,7 @@ void UNetworkPhysicsManager::TickDrawDebug()
 				{
 					(*Func)(P);
 				}
-			}
+			}			
 		}
 	}
 
@@ -1258,6 +1273,9 @@ void UNetworkPhysicsManager::TickDrawDebug()
 				{
 					(*Func)(P);
 				}
+
+
+				DrawDebugString(ThisWorld, P.Loc + FVector(0.f, 0.f, 100.f), LexToString(State->Frame), nullptr, FColor::White, 0.f);
 			}
 		}
 	}
