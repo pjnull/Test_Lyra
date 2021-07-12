@@ -2,6 +2,7 @@
 
 #include "ToolMenus.h"
 #include "IToolMenusModule.h"
+#include "ToolMenusLog.h"
 
 #include "Textures/SlateIcon.h"
 #include "Framework/Commands/UIAction.h"
