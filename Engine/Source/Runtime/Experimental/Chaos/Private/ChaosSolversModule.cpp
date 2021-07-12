@@ -181,7 +181,7 @@ void FChaosSolversModule::SyncTask(bool bForceBlockingSync /*= false*/)
 }
 
 Chaos::FPBDRigidsSolver* FChaosSolversModule::CreateSolver(UObject* InOwner, Chaos::FReal InAsyncDt, Chaos::EThreadingMode InThreadingMode
-#if CHAOS_CHECKED
+#if CHAOS_DEBUG_NAME
 	, const FName& DebugName
 #endif
 )
