@@ -244,7 +244,7 @@ public partial class Project : CommandUtils
 	{
 		StringBuilder CmdLine = new StringBuilder();
 		CmdLine.AppendFormat("-Output={0}", MakePathSafeToUseWithCommandLine(Path.ChangeExtension(PakOutputLocation.FullName, ".utoc")));
-		CmdLine.AppendFormat("-ContainerName={0}", ContainerName);
+		CmdLine.AppendFormat(" -ContainerName={0}", ContainerName);
 		if (!bIsDLC && !String.IsNullOrEmpty(PatchSourceContentPath))
 		{
 			CmdLine.AppendFormat(" -PatchSource={0}", CommandUtils.MakePathSafeToUseWithCommandLine(PatchSourceContentPath));
@@ -2843,7 +2843,7 @@ public partial class Project : CommandUtils
 
 						IoStoreCommands.Add(GetIoStoreCommandArguments(
 							IoStoreResponseFile,
-							PakParams.PakName,
+							OutputLocation.GetFileNameWithoutAnyExtensions(),
 							OutputLocation,
 							bCompressContainers,
 							CryptoSettings,
