@@ -126,6 +126,11 @@ static TAutoConsoleVariable<int32> CVarRayTracingSkeletalMeshes(
 	1,
 	TEXT("Include skeletal meshes in ray tracing effects (default = 1 (skeletal meshes enabled in ray tracing))"));
 
+static TAutoConsoleVariable<int32> CVarSkeletalMeshLODMaterialReference(
+	TEXT("r.SkeletalMesh.LODMaterialReference"),
+	1,
+	TEXT("Whether a material needs to be referenced by at least one unstripped mesh LOD to be considered as used."));
+
 static TAutoConsoleVariable<int32> CVarRayTracingSupportSkeletalMeshes(
 	TEXT("r.RayTracing.Geometry.SupportSkeletalMeshes"),
 	1,
@@ -1059,11 +1064,20 @@ void USkeletalMesh::UpdateUVChannelData(bool bRebuildAll)
 			float WeightedUVDensities[TEXSTREAM_MAX_NUM_UVCHANNELS] = {0, 0, 0, 0};
 			float Weights[TEXSTREAM_MAX_NUM_UVCHANNELS] = {0, 0, 0, 0};
 
-			for (const FSkeletalMeshLODRenderData& LODData : Resource->LODRenderData)
+			for (int32 LODIndex = 0; LODIndex < Resource->LODRenderData.Num(); ++LODIndex)
 			{
-				for (const FSkelMeshRenderSection& SectionInfo : LODData.RenderSections)
+				const FSkeletalMeshLODRenderData& LODData = Resource->LODRenderData[LODIndex];
+				const TArray<int32>& RemappedMaterialIndices = LODInfo[LODIndex].LODMaterialMap;
+
+				for (int32 SectionIndex = 0; SectionIndex < LODData.RenderSections.Num(); ++SectionIndex)
 				{
-					if (SectionInfo.MaterialIndex != MaterialIndex)
+					const FSkelMeshRenderSection& SectionInfo = LODData.RenderSections[SectionIndex];
+					const int32 UsedMaterialIndex =
+						SectionIndex < RemappedMaterialIndices.Num() && MeshMaterials.IsValidIndex(RemappedMaterialIndices[SectionIndex]) ?
+						RemappedMaterialIndices[SectionIndex] :
+						SectionInfo.MaterialIndex;
+
+					if (UsedMaterialIndex != MaterialIndex)
 							continue;
 
 					AccumulateUVDensities(WeightedUVDensities, Weights, LODData, SectionInfo);
@@ -4959,6 +4973,43 @@ const USkeletalMeshLODSettings* USkeletalMesh::GetDefaultLODSetting() const
 #endif // WITH_EDITORONLY_DATA
 
 	return GetDefault<USkeletalMeshLODSettings>();
+}
+
+bool USkeletalMesh::IsMaterialUsed(int32 MaterialIndex) const
+{
+	if (GIsEditor || !CVarSkeletalMeshLODMaterialReference.GetValueOnAnyThread())
+	{
+		return true;
+	}
+
+	if (SkeletalMeshRenderData)
+	{
+		for (int32 LODIndex = 0; LODIndex < SkeletalMeshRenderData->LODRenderData.Num(); ++LODIndex)
+		{
+			const FSkeletalMeshLODRenderData& LODData = SkeletalMeshRenderData->LODRenderData[LODIndex];
+
+			if (LODData.BuffersSize > 0)
+			{
+				const TArray<int32>& RemappedMaterialIndices = LODInfo[LODIndex].LODMaterialMap;
+
+				for (int32 SectionIndex = 0; SectionIndex < LODData.RenderSections.Num(); ++SectionIndex)
+				{
+					const FSkelMeshRenderSection& Section = LODData.RenderSections[SectionIndex];
+					const int32 UsedMaterialIndex =
+						SectionIndex < RemappedMaterialIndices.Num() && GetMaterials().IsValidIndex(RemappedMaterialIndices[SectionIndex]) ?
+						RemappedMaterialIndices[SectionIndex] :
+						Section.MaterialIndex;
+					
+					if (UsedMaterialIndex == MaterialIndex)
+					{
+						return true;
+					}
+				}
+			}
+		}
+	}
+
+	return false;
 }
 
 void USkeletalMesh::ReleaseSkinWeightProfileResources()
