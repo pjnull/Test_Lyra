@@ -170,6 +170,9 @@ struct CORE_API FFortniteMainBranchObjectVersion
 		// Added bShowCurve for movie scene float channel serialization
 		SerializeFloatChannelShowCurve,
 
+		// Minimize slack waste by using a single array for grass data
+		LandscapeGrassSingleArray,
+
 		// -----<new versions can be added above this line>-------------------------------------------------
 		VersionPlusOne,
 		LatestVersion = VersionPlusOne - 1
