@@ -541,23 +541,32 @@ void USceneCaptureComponent2D::TickComponent(float DeltaTime, enum ELevelTick Ti
 	UpdateOrthographicTilingSettings();
 
 	const int32 NumTiles = NumXTiles * NumYTiles;
+	check(NumTiles >= 0);
+
 	if (bCaptureEveryFrame || (bEnableOrthographicTiling && TileID < NumTiles))
 	{
 		CaptureSceneDeferred();
 	}
 
-	if (bEnableOrthographicTiling)
+	if (!bEnableOrthographicTiling)
 	{
-		if (bCaptureEveryFrame)
-		{
-			TileID++;
-			TileID %= NumTiles;
-		}
-		else if (TileID < (NumTiles-1))
-		{
-			TileID++;
-		}
+		return;
 	}
+
+	if (bCaptureEveryFrame)
+	{
+		TileID++;
+		TileID %= NumTiles;
+	} 
+	else if (TileID < NumTiles)
+	{
+		TileID++;
+	}
+}
+
+void USceneCaptureComponent2D::ResetOrthographicTilingCounter()
+{
+	TileID = 0;
 }
 
 void USceneCaptureComponent2D::SetCameraView(const FMinimalViewInfo& DesiredView)
@@ -745,7 +754,6 @@ void USceneCaptureComponent2D::Serialize(FArchive& Ar)
 
 void USceneCaptureComponent2D::UpdateSceneCaptureContents(FSceneInterface* Scene)
 {
-	UpdateOrthographicTilingSettings();
 	Scene->UpdateSceneCaptureContents(this);
 }
 

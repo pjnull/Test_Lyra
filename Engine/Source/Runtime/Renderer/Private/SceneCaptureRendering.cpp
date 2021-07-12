@@ -297,10 +297,10 @@ static void UpdateSceneCaptureContentDeferred_RenderThread(
 			SceneRenderer->Render(GraphBuilder);
 		}
 
-		if (bGenerateMips)
-		{
+			if (bGenerateMips)
+			{
 			FGenerateMips::Execute(GraphBuilder, TargetTexture, GenerateMipsParams);
-		}
+			}
 
 		FRDGTextureRef ResolveTexture = RegisterExternalTexture(GraphBuilder, RenderTargetTexture->TextureRHI, TEXT("SceneCaptureResolve"));
 		AddCopyToResolveTargetPass(GraphBuilder, TargetTexture, ResolveTexture, ResolveParams);
@@ -424,14 +424,14 @@ static void BuildOrthoMatrix(FIntPoint InRenderTargetSize, float InOrthoWidth, i
 	float const XAxisMultiplier = 1.0f;
 	float const YAxisMultiplier = InRenderTargetSize.X / float(InRenderTargetSize.Y);
 
-		const float OrthoWidth = InOrthoWidth / 2.0f;
-		const float OrthoHeight = InOrthoWidth / 2.0f * XAxisMultiplier / YAxisMultiplier;
+	const float OrthoWidth = InOrthoWidth / 2.0f;
+	const float OrthoHeight = InOrthoWidth / 2.0f * XAxisMultiplier / YAxisMultiplier;
 
-		const float NearPlane = 0;
-		const float FarPlane = WORLD_MAX / 8.0f;
+	const float NearPlane = 0;
+	const float FarPlane = WORLD_MAX / 8.0f;
 
-		const float ZScale = 1.0f / (FarPlane - NearPlane);
-		const float ZOffset = -NearPlane;
+	const float ZScale = 1.0f / (FarPlane - NearPlane);
+	const float ZOffset = -NearPlane;
 
 	if (InTileID == -1)
 	{
@@ -440,7 +440,7 @@ static void BuildOrthoMatrix(FIntPoint InRenderTargetSize, float InOrthoWidth, i
 			OrthoHeight,
 			ZScale,
 			ZOffset
-			);
+		);
 		
 		return;
 	}
@@ -478,28 +478,28 @@ void BuildProjectionMatrix(FIntPoint InRenderTargetSize, float InFOV, float InNe
 	float const XAxisMultiplier = 1.0f;
 	float const YAxisMultiplier = InRenderTargetSize.X / float(InRenderTargetSize.Y);
 
-		if ((int32)ERHIZBuffer::IsInverted)
-		{
+	if ((int32)ERHIZBuffer::IsInverted)
+	{
 		OutProjectionMatrix = FReversedZPerspectiveMatrix(
 			InFOV,
 			InFOV,
-				XAxisMultiplier,
-				YAxisMultiplier,
-				InNearClippingPlane,
-				InNearClippingPlane
-				);
-		}
-		else
-		{
+			XAxisMultiplier,
+			YAxisMultiplier,
+			InNearClippingPlane,
+			InNearClippingPlane
+			);
+	}
+	else
+	{
 		OutProjectionMatrix = FPerspectiveMatrix(
 			InFOV,
 			InFOV,
-				XAxisMultiplier,
-				YAxisMultiplier,
-				InNearClippingPlane,
-				InNearClippingPlane
-				);
-		}
+			XAxisMultiplier,
+			YAxisMultiplier,
+			InNearClippingPlane,
+			InNearClippingPlane
+			);
+	}
 }
 
 void SetupViewFamilyForSceneCapture(
@@ -582,7 +582,7 @@ void SetupViewFamilyForSceneCapture(
 
 		if (SceneCaptureComponent->PrimitiveRenderMode == ESceneCapturePrimitiveRenderMode::PRM_UseShowOnlyList)
 		{
-			View->ShowOnlyPrimitives.Emplace();
+				View->ShowOnlyPrimitives.Emplace();
 
 			for (auto It = SceneCaptureComponent->ShowOnlyComponents.CreateConstIterator(); It; ++It)
 			{
@@ -703,7 +703,14 @@ void FScene::UpdateSceneCaptureContents(USceneCaptureComponent2D* CaptureCompone
 		const float FOV = CaptureComponent->FOVAngle * (float)PI / 360.0f;
 		FIntPoint CaptureSize(TextureRenderTarget->GetSurfaceWidth(), TextureRenderTarget->GetSurfaceHeight());
 
-		const bool bEnableOrthographicTiling = CaptureComponent->bEnableOrthographicTiling && CaptureComponent->ProjectionType == ECameraProjectionMode::Orthographic;
+		const bool bUseSceneColorTexture = CaptureNeedsSceneColor(CaptureComponent->CaptureSource);
+		const bool bEnableOrthographicTiling = (CaptureComponent->bEnableOrthographicTiling && CaptureComponent->ProjectionType == ECameraProjectionMode::Orthographic && bUseSceneColorTexture);
+		
+		if (CaptureComponent->bEnableOrthographicTiling && CaptureComponent->ProjectionType == ECameraProjectionMode::Orthographic && !bUseSceneColorTexture)
+		{
+			UE_LOG(LogRenderer, Warning, TEXT("SceneCapture - Orthographic and tiling with CaptureSource not using SceneColor (i.e FinalColor) not compatible. SceneCapture render will not be tiled"));
+		}
+		
 		const int32 TileID = CaptureComponent->TileID;
 		const int32 NumXTiles = CaptureComponent->NumXTiles;
 		const int32 NumYTiles = CaptureComponent->NumYTiles;
@@ -717,7 +724,7 @@ void FScene::UpdateSceneCaptureContents(USceneCaptureComponent2D* CaptureCompone
 		{
 			if (CaptureComponent->ProjectionType == ECameraProjectionMode::Perspective)
 			{
-			const float ClippingPlane = (CaptureComponent->bOverride_CustomNearClippingPlane) ? CaptureComponent->CustomNearClippingPlane : GNearClippingPlane;
+				const float ClippingPlane = (CaptureComponent->bOverride_CustomNearClippingPlane) ? CaptureComponent->CustomNearClippingPlane : GNearClippingPlane;
 				BuildProjectionMatrix(CaptureSize, FOV, ClippingPlane, ProjectionMatrix);
 			}
 			else
@@ -733,8 +740,6 @@ void FScene::UpdateSceneCaptureContents(USceneCaptureComponent2D* CaptureCompone
 				}
 			}
 		}
-
-		const bool bUseSceneColorTexture = CaptureNeedsSceneColor(CaptureComponent->CaptureSource);
 
 		FSceneRenderer* SceneRenderer = CreateSceneRendererForSceneCapture(
 			this, 
@@ -850,7 +855,7 @@ void FScene::UpdateSceneCaptureContents(USceneCaptureComponent2D* CaptureCompone
 			[SceneRenderer, TextureRenderTargetResource, EventName, bGenerateMips, GenerateMipsParams, bDisableFlipCopyGLES, GameViewportRT, bEnableOrthographicTiling, NumXTiles, NumYTiles, TileID](FRHICommandListImmediate& RHICmdList)
 			{
 				if (GameViewportRT != nullptr)
-				{
+			{
 					const FRHIGPUMask GPUMask = AFRUtils::GetGPUMaskForGroup(GameViewportRT->GetGPUMask(RHICmdList));
 					TextureRenderTargetResource->SetActiveGPUMask(GPUMask);
 				}
