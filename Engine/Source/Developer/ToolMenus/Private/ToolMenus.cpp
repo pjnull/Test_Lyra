@@ -760,6 +760,12 @@ void UToolMenus::AssembleMenu(UToolMenu* GeneratedMenu, const UToolMenu* Other)
 				{
 					Section->Label = RemainingSection.Label;
 				}
+
+				// Let child menu override dynamic legacy section
+				if (!RemainingSection.IsNonLegacyDynamic())
+				{
+					Section->Construct = RemainingSection.Construct;
+				}
 			}
 
 			AssembleMenuSection(GeneratedMenu, Other, Section, RemainingSection);
