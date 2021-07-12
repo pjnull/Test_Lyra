@@ -7,6 +7,7 @@
 #include "Kismet/BlueprintAsyncActionBase.h"
 #include "EditorUtilityTask.h"
 #include "Templates/UniquePtr.h"
+#include "Templates/SubclassOf.h"
 
 #include "AsyncCaptureScene.generated.h"
 
