@@ -81,7 +81,7 @@ public:
 	FChaosScene(
 		UObject* OwnerPtr
 		, Chaos::FReal InAsyncDt
-#if CHAOS_CHECKED
+#if CHAOS_DEBUG_NAME
 	, const FName& DebugName=NAME_None
 #endif
 );

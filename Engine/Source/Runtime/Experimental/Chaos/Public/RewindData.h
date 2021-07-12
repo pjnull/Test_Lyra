@@ -415,9 +415,9 @@ public:
 		return State && State->NonFrequentData.IsSet() ? State->NonFrequentData.ReadChecked(Manager).SpatialIdx() : Particle.SpatialIdx();
 	}
 
-#if CHAOS_CHECKED
+#if CHAOS_DEBUG_NAME
 	template <typename TParticle>
-	static const TSharedPtr<FString, ESPMode::ThreadSafe> DebugName(const FGeometryParticleStateBase* State, const TParticle& Particle, const FDirtyPropertiesPool& Manager)
+	static const TSharedPtr<FString, ESPMode::ThreadSafe>& DebugName(const FGeometryParticleStateBase* State, const TParticle& Particle, const FDirtyPropertiesPool& Manager)
 	{
 		return State && State->NonFrequentData.IsSet() ? State->NonFrequentData.ReadChecked(Manager).DebugName() : Particle.DebugName();
 	}
@@ -601,8 +601,8 @@ public:
 		return FGeometryParticleStateBase::SpatialIdx(State, Particle, Pool);
 	}
 
-#if CHAOS_CHECKED
-	const TSharedPtr<FString, ESPMode::ThreadSafe> DebugName() const
+#if CHAOS_DEBUG_NAME
+	const TSharedPtr<FString, ESPMode::ThreadSafe>& DebugName() const
 	{
 		return FGeometryParticleStateBase::DebugName(State, Particle, Pool);
 	}

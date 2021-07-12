@@ -258,8 +258,8 @@ public:
 
 	const TSharedPtr<FImplicitObject, ESPMode::ThreadSafe>& SharedGeometryLowLevel() const { return ReadRef([](auto* Ptr) -> const auto& { return Ptr->SharedGeometryLowLevel(); });}
 
-#if CHAOS_CHECKED
-	const TSharedPtr<FString, ESPMode::ThreadSafe> DebugName() const { return Read([](auto* Ptr) { return Ptr->DebugName(); }); }
+#if CHAOS_DEBUG_NAME
+	const TSharedPtr<FString, ESPMode::ThreadSafe>& DebugName() const { return Read([](auto* Ptr) { return Ptr->DebugName(); }); }
 	void SetDebugName(const TSharedPtr<FString, ESPMode::ThreadSafe>& InDebugName) { Write([&InDebugName](auto* Ptr) { Ptr->SetDebugName(InDebugName); }); }
 #endif
 
