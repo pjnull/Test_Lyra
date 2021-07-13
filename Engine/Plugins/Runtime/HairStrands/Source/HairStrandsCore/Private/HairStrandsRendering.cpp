@@ -1959,7 +1959,7 @@ void ComputeHairStrandsInterpolation(
 					GraphBuilder.AddPass(
 						RDG_EVENT_NAME("HairUpdateBLAS(Cards)"),
 						ERDGPassFlags::NeverCull,
-						[Instance, HairLODIndex, bNeedUpdate](FRHICommandList& RHICmdList)
+						[Instance, HairLODIndex, bNeedUpdate](FRHICommandListImmediate& RHICmdList)
 					{
 						SCOPED_GPU_MASK(RHICmdList, FRHIGPUMask::All());
 
@@ -2024,7 +2024,7 @@ void ComputeHairStrandsInterpolation(
 					GraphBuilder.AddPass(
 						RDG_EVENT_NAME("HairUpdateBLAS(Meshes)"),
 						ERDGPassFlags::NeverCull,
-						[Instance, HairLODIndex, bNeedUpdate](FRHICommandList& RHICmdList)
+						[Instance, HairLODIndex, bNeedUpdate](FRHICommandListImmediate& RHICmdList)
 					{
 						SCOPED_GPU_MASK(RHICmdList, FRHIGPUMask::All());
 
