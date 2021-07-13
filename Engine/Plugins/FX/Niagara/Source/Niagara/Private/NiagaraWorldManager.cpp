@@ -25,6 +25,11 @@
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraCullProxyComponent.h"
 
+#if WITH_EDITORONLY_DATA
+#include "EditorViewportClient.h"
+#include "LevelEditorViewport.h"
+#endif
+
 DECLARE_CYCLE_STAT(TEXT("Niagara Manager Update Scalability Managers [GT]"), STAT_UpdateScalabilityManagers, STATGROUP_Niagara);
 DECLARE_CYCLE_STAT(TEXT("Niagara Manager Tick [GT]"), STAT_NiagaraWorldManTick, STATGROUP_Niagara);
 DECLARE_CYCLE_STAT(TEXT("Niagara Manager Wait On Render [GT]"), STAT_NiagaraWorldManWaitOnRender, STATGROUP_Niagara);
@@ -958,6 +963,14 @@ void FNiagaraWorldManager::Tick(ETickingGroup TickGroup, float DeltaSeconds, ELe
 		{
 			bCachedPlayerViewLocationsValid = false;
 		}
+
+#if WITH_EDITORONLY_DATA
+		if (GCurrentLevelEditingViewportClient && (GCurrentLevelEditingViewportClient->GetWorld() == World))
+		{
+			const FViewportCameraTransform& ViewTransform = GCurrentLevelEditingViewportClient->GetViewTransform();
+			CachedPlayerViewLocations.Add(ViewTransform.GetLocation());
+		}
+#endif
 
 		UpdateScalabilityManagers(DeltaSeconds, false);
 
