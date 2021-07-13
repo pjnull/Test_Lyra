@@ -2143,7 +2143,7 @@ void FNiagaraScriptToolkitParameterPanelViewModel::RenameParameter(const FNiagar
 {
 	for (UNiagaraGraph* Graph : GetEditableGraphs())
 	{
-		if (const UNiagaraScriptVariable* const* FoundScriptVarToRenamePtr = Graph->GetAllMetaData().Find(VariableToRename))
+		if (TObjectPtr<UNiagaraScriptVariable> const* FoundScriptVarToRenamePtr = Graph->GetAllMetaData().Find(VariableToRename))
 		{
 			RenameParameter(*FoundScriptVarToRenamePtr, NewName);
 			return;

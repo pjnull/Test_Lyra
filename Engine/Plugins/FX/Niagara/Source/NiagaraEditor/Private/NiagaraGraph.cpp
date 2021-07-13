@@ -1521,7 +1521,7 @@ bool UNiagaraGraph::RenameParameterFromPin(const FNiagaraVariable& Parameter, FN
 
 			if (RenameParameter(Parameter, NewName, bRenameRequestedFromStaticSwitch, &bMerged))
 			{
-				if (const UNiagaraScriptVariable* const* RenamedScriptVarPtr = VariableToScriptVariable.Find(FNiagaraVariable(Parameter.GetType(), NewName)))
+				if (TObjectPtr<UNiagaraScriptVariable> const* RenamedScriptVarPtr = VariableToScriptVariable.Find(FNiagaraVariable(Parameter.GetType(), NewName)))
 				{
 					ParameterPanelViewModel->SubscribeParameterToLibraryIfMatchingDefinition(*RenamedScriptVarPtr, NewName);
 				}
@@ -2613,11 +2613,11 @@ void UNiagaraGraph::GatherExternalDependencyData(ENiagaraScriptUsage InUsage, co
 		{
 			if (GNiagaraUseGraphHash == 1)
 			{
-				InReferencedCompileHashes.Add(CachedUsageInfo[i].CompileHashFromGraph);
+				InReferencedCompileHashes.AddUnique(CachedUsageInfo[i].CompileHashFromGraph);
 			}
 			else
 			{
-				InReferencedCompileHashes.Add(CachedUsageInfo[i].CompileHash);
+				InReferencedCompileHashes.AddUnique(CachedUsageInfo[i].CompileHash);
 			}
 			InReferencedObjs.Add(CachedUsageInfo[i].Traversal.Last()->GetPathName());
 
