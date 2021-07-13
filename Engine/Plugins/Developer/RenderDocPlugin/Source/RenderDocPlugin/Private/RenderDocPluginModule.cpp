@@ -303,11 +303,6 @@ void FRenderDocPluginModule::StartupModule()
 		TEXT("Starts a PIE session and captures the specified number of frames from the start."),
 		FConsoleCommandWithArgsDelegate::CreateRaw(this, &FRenderDocPluginModule::CapturePIE)
 	);
-
-	if (!IsRunningCommandlet())
-	{
-		EditorExtensions = new FRenderDocPluginEditorExtension(this);
-	}
 #endif // WITH_EDITOR
 
 	FCoreDelegates::OnPostEngineInit.AddRaw(this, &FRenderDocPluginModule::OnPostEngineInit);
