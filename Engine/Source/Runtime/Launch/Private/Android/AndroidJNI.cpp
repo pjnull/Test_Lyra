@@ -2099,12 +2099,6 @@ JNI_METHOD void Java_com_epicgames_unreal_GameActivity_nativeOnTrimMemory(JNIEnv
 	FAndroidStats::OnTrimMemory(MemoryTrimValue);
 }
 
-JNI_METHOD void Java_com_epicgames_unreal_GameActivity_nativeSetMemoryAdvisorState(JNIEnv* jenv, jobject thiz, jint State, jint EstimateAvailableMB, jint OOMScore)
-{
-	FAndroidStats::SetMemoryWarningState(State);
-	FAndroidMisc::UpdateMemoryAdvisorState(State, EstimateAvailableMB, OOMScore);
-}
-
 
 class FAndroidEmbeddedExec : public FSelfRegisteringExec
 {
