@@ -248,7 +248,8 @@ static void UpdateSceneCaptureContentDeferred_RenderThread(
 	const FResolveParams& ResolveParams,
 	bool bGenerateMips,
 	const FGenerateMipsParams& GenerateMipsParams,
-	bool bClearRenderTarget
+	bool bClearRenderTarget,
+	bool bOrthographicCamera
 	)
 {
 	SceneRenderer->RenderThreadBegin(RHICmdList);
@@ -289,6 +290,15 @@ static void UpdateSceneCaptureContentDeferred_RenderThread(
 		else
 		{
 			CopyCaptureToTargetSetViewportFn = [](FRHICommandListImmediate& RHICmdList) {};
+		}
+
+
+		// Disable occlusion queries when in orthographic mode
+		if (bOrthographicCamera)
+		{
+			FViewInfo& View = SceneRenderer->Views[0];
+			View.bDisableQuerySubmissions = true;
+			View.bIgnoreExistingQueries = true;
 		}
 
 		// Render the scene normally
@@ -375,8 +385,9 @@ static void UpdateSceneCaptureContent_RenderThread(
 	const FResolveParams& ResolveParams,
 	bool bGenerateMips,
 	const FGenerateMipsParams& GenerateMipsParams,
-	const bool bDisableFlipCopyLDRGLES, 
-	bool bClearRenderTarget)
+	const bool bDisableFlipCopyLDRGLES,
+	bool bClearRenderTarget,
+	bool bOrthographicCamera)
 {
 	FMaterialRenderProxy::UpdateDeferredCachedUniformExpressions();
 
@@ -407,7 +418,8 @@ static void UpdateSceneCaptureContent_RenderThread(
 				ResolveParams,
 				bGenerateMips,
 				GenerateMipsParams,
-				bClearRenderTarget);
+				bClearRenderTarget,
+				bOrthographicCamera);
 			break;
 		}
 		default:
@@ -704,16 +716,16 @@ void FScene::UpdateSceneCaptureContents(USceneCaptureComponent2D* CaptureCompone
 		FIntPoint CaptureSize(TextureRenderTarget->GetSurfaceWidth(), TextureRenderTarget->GetSurfaceHeight());
 
 		const bool bUseSceneColorTexture = CaptureNeedsSceneColor(CaptureComponent->CaptureSource);
-		const bool bEnableOrthographicTiling = (CaptureComponent->bEnableOrthographicTiling && CaptureComponent->ProjectionType == ECameraProjectionMode::Orthographic && bUseSceneColorTexture);
+		const bool bEnableOrthographicTiling = (CaptureComponent->GetEnableOrthographicTiling() && CaptureComponent->ProjectionType == ECameraProjectionMode::Orthographic && bUseSceneColorTexture);
 		
-		if (CaptureComponent->bEnableOrthographicTiling && CaptureComponent->ProjectionType == ECameraProjectionMode::Orthographic && !bUseSceneColorTexture)
+		if (CaptureComponent->GetEnableOrthographicTiling() && CaptureComponent->ProjectionType == ECameraProjectionMode::Orthographic && !bUseSceneColorTexture)
 		{
 			UE_LOG(LogRenderer, Warning, TEXT("SceneCapture - Orthographic and tiling with CaptureSource not using SceneColor (i.e FinalColor) not compatible. SceneCapture render will not be tiled"));
 		}
 		
 		const int32 TileID = CaptureComponent->TileID;
-		const int32 NumXTiles = CaptureComponent->NumXTiles;
-		const int32 NumYTiles = CaptureComponent->NumYTiles;
+		const int32 NumXTiles = CaptureComponent->GetNumXTiles();
+		const int32 NumYTiles = CaptureComponent->GetNumYTiles();
 
 		FMatrix ProjectionMatrix;
 		if (CaptureComponent->bUseCustomProjectionMatrix)
@@ -837,6 +849,8 @@ void FScene::UpdateSceneCaptureContents(USceneCaptureComponent2D* CaptureCompone
 			TextureRenderTarget->MipsAddressV == TA_Wrap ? AM_Wrap : (TextureRenderTarget->MipsAddressV == TA_Mirror ? AM_Mirror : AM_Clamp)};
 
 		const bool bDisableFlipCopyGLES = CaptureComponent->bDisableFlipCopyGLES;
+		const bool bOrthographicCamera = CaptureComponent->ProjectionType == ECameraProjectionMode::Orthographic;
+
 
 		// If capturing every frame, only render to the GPUs that are actually being used
 		// this frame. Otherwise we will get poor performance in AFR. We can only determine
@@ -852,7 +866,7 @@ void FScene::UpdateSceneCaptureContents(USceneCaptureComponent2D* CaptureCompone
 		}
 
 		ENQUEUE_RENDER_COMMAND(CaptureCommand)(
-			[SceneRenderer, TextureRenderTargetResource, EventName, bGenerateMips, GenerateMipsParams, bDisableFlipCopyGLES, GameViewportRT, bEnableOrthographicTiling, NumXTiles, NumYTiles, TileID](FRHICommandListImmediate& RHICmdList)
+			[SceneRenderer, TextureRenderTargetResource, EventName, bGenerateMips, GenerateMipsParams, bDisableFlipCopyGLES, GameViewportRT, bEnableOrthographicTiling, bOrthographicCamera, NumXTiles, NumYTiles, TileID](FRHICommandListImmediate& RHICmdList)
 			{
 				if (GameViewportRT != nullptr)
 			{
@@ -881,7 +895,7 @@ void FScene::UpdateSceneCaptureContents(USceneCaptureComponent2D* CaptureCompone
 					ResolveParams.DestRect.Y2 = ResolveParams.DestRect.Y1 + RTSizeY;
 				}
 
-				UpdateSceneCaptureContent_RenderThread(RHICmdList, SceneRenderer, TextureRenderTargetResource, TextureRenderTargetResource, EventName, ResolveParams, bGenerateMips, GenerateMipsParams, bDisableFlipCopyGLES, !bEnableOrthographicTiling);
+				UpdateSceneCaptureContent_RenderThread(RHICmdList, SceneRenderer, TextureRenderTargetResource, TextureRenderTargetResource, EventName, ResolveParams, bGenerateMips, GenerateMipsParams, bDisableFlipCopyGLES, !bEnableOrthographicTiling, bOrthographicCamera);
 			}
 		);
 	}
@@ -1008,7 +1022,7 @@ void FScene::UpdateSceneCaptureContents(USceneCaptureComponentCube* CaptureCompo
 				ENQUEUE_RENDER_COMMAND(CaptureCommand)(
 					[SceneRenderer, TextureRenderTarget, EventName, TargetFace](FRHICommandListImmediate& RHICmdList)
 				{
-					UpdateSceneCaptureContent_RenderThread(RHICmdList, SceneRenderer, TextureRenderTarget, TextureRenderTarget, EventName, FResolveParams(FResolveRect(), TargetFace), false, FGenerateMipsParams(), false, true);
+						UpdateSceneCaptureContent_RenderThread(RHICmdList, SceneRenderer, TextureRenderTarget, TextureRenderTarget, EventName, FResolveParams(FResolveRect(), TargetFace), false, FGenerateMipsParams(), false, true, false);
 				}
 				);
 			}

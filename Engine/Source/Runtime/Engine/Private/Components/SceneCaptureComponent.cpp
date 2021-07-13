@@ -42,25 +42,25 @@ static TAutoConsoleVariable<bool> CVarSCOverrideOrthographicTilingValues(
 	TEXT("r.SceneCapture.OverrideOrthographicTilingValues"),
 	false,
 	TEXT("Override defined orthographic values from SceneCaptureComponent2D - Ignored in Perspective mode."),
-	ECVF_Default);
+	ECVF_Scalability);
 
 static TAutoConsoleVariable<bool> CVarSCEnableOrthographicTiling(
 	TEXT("r.SceneCapture.EnableOrthographicTiling"),
 	false,
 	TEXT("Render the scene in n frames (i.e TileCount) - Ignored in Perspective mode, works only in Orthographic mode and when r.SceneCapture.OverrideOrthographicTilingValues is on."),
-	ECVF_Default);
+	ECVF_Scalability);
 
 static TAutoConsoleVariable<int32> CVarSCOrthographicNumXTiles(
 	TEXT("r.SceneCapture.OrthographicNumXTiles"),
 	4,
 	TEXT("Number of X tiles to render. Ignored in Perspective mode, works only in Orthographic mode and when r.SceneCapture.OverrideOrthographicTilingValues is on."),
-	ECVF_Default);
+	ECVF_Scalability);
 
 static TAutoConsoleVariable<int32> CVarSCOrthographicNumYTiles(
 	TEXT("r.SceneCapture.OrthographicNumYTiles"),
 	4,
 	TEXT("Number of Y tiles to render. Ignored in Perspective mode, works only in Orthographic mode and when r.SceneCapture.OverrideOrthographicTilingValues is on."),
-	ECVF_Default);
+	ECVF_Scalability);
 
 ASceneCapture::ASceneCapture(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -472,7 +472,6 @@ USceneCaptureComponent2D::USceneCaptureComponent2D(const FObjectInitializer& Obj
 	bConsiderUnrenderedOpaquePixelAsFullyTranslucent = false;
 	bDisableFlipCopyGLES = false;
 	
-	UpdateOrthographicTilingSettings();
 	TileID = 0;
 
 	// Legacy initialization.
@@ -538,17 +537,15 @@ void USceneCaptureComponent2D::TickComponent(float DeltaTime, enum ELevelTick Ti
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	UpdateOrthographicTilingSettings();
-
-	const int32 NumTiles = NumXTiles * NumYTiles;
+	const int32 NumTiles = GetNumXTiles() * GetNumYTiles();
 	check(NumTiles >= 0);
 
-	if (bCaptureEveryFrame || (bEnableOrthographicTiling && TileID < NumTiles))
+	if (bCaptureEveryFrame || (GetEnableOrthographicTiling() && TileID < NumTiles))
 	{
 		CaptureSceneDeferred();
 	}
 
-	if (!bEnableOrthographicTiling)
+	if (!GetEnableOrthographicTiling())
 	{
 		return;
 	}
@@ -726,7 +723,6 @@ void USceneCaptureComponent2D::PostEditChangeProperty(FPropertyChangedEvent& Pro
 	// AActor::PostEditChange will ForceUpdateComponents()
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 
-	UpdateOrthographicTilingSettings();
 	TileID = 0;
 	CaptureSceneDeferred();
 
@@ -757,41 +753,36 @@ void USceneCaptureComponent2D::UpdateSceneCaptureContents(FSceneInterface* Scene
 	Scene->UpdateSceneCaptureContents(this);
 }
 
-void USceneCaptureComponent2D::UpdateOrthographicTilingSettings()
+bool USceneCaptureComponent2D::GetEnableOrthographicTiling() const
 {
 	if (!CVarSCOverrideOrthographicTilingValues->GetBool())
 	{
-		return;
+		return bEnableOrthographicTiling;
 	}
 
-	bool bEnableOrthographicTilingLocal = CVarSCEnableOrthographicTiling->GetBool();
-	int32 NumXTilesLocal = CVarSCOrthographicNumXTiles->GetInt();
-	int32 NumYTilesLocal = CVarSCOrthographicNumYTiles->GetInt();
+	return CVarSCEnableOrthographicTiling->GetBool();
+}
 
-	bool bModified = false;
-
-	if (bEnableOrthographicTilingLocal != bEnableOrthographicTiling)
+int32 USceneCaptureComponent2D::GetNumXTiles() const
+{
+	if (!CVarSCOverrideOrthographicTilingValues->GetBool())
 	{
-		bEnableOrthographicTiling = bEnableOrthographicTilingLocal;
-		bModified = true;
-	}
-
-	if (NumXTilesLocal != NumXTiles)
-	{
-		NumXTiles = FMath::Clamp(NumXTilesLocal, 1, 64);
-		bModified = true;
-	}
-
-	if (NumYTilesLocal != NumYTiles)
-	{
-		NumYTiles = FMath::Clamp(NumYTilesLocal, 1, 64);
-		bModified = true;
+		return NumXTiles;
 	}
 	
-	if (bModified)
+	int32 NumXTilesLocal = CVarSCOrthographicNumXTiles->GetInt();
+	return FMath::Clamp(NumXTilesLocal, 1, 64);
+}
+
+int32 USceneCaptureComponent2D::GetNumYTiles() const
+{
+	if (!CVarSCOverrideOrthographicTilingValues->GetBool())
 	{
-		TileID = 0;
+		return NumYTiles;
 	}
+
+	int32 NumYTilesLocal = CVarSCOrthographicNumYTiles->GetInt();
+	return FMath::Clamp(NumYTilesLocal, 1, 64);
 }
 
 // -----------------------------------------------

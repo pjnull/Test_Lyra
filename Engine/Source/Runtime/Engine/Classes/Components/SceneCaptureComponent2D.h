@@ -174,7 +174,14 @@ public:
 
 	void UpdateSceneCaptureContents(FSceneInterface* Scene) override;
 
-	void UpdateOrthographicTilingSettings();
+	/* Return if orthographic tiling rendering is enabled or not */
+	bool GetEnableOrthographicTiling() const;
+
+	/* Return number of X tiles to render (to be used when orthographic tiling rendering is enabled) */
+	int32 GetNumXTiles() const;
+
+	/* Return number of Y tiles to render (to be used when orthographic tiling rendering is enabled) */
+	int32 GetNumYTiles() const;
 
 #if WITH_EDITORONLY_DATA
 	void UpdateDrawFrustum();
