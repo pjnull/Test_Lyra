@@ -29,6 +29,7 @@
 #include "Interfaces/ITargetPlatformManagerModule.h"
 #include "Misc/CoreMisc.h"
 #include "Animation/AnimSequence.h"
+#include "Animation/AnimSequenceHelpers.h"
 #include "Async/Async.h"
 
 #define LOCTEXT_NAMESPACE "SkeletalMeshReduction"
@@ -1980,7 +1981,9 @@ void FQuadricSkeletalMeshReduction::ReduceSkeletalMesh(USkeletalMesh& SkeletalMe
 
 	// if it has bake pose, gets ref to local matrices using bake pose
 	if (const UAnimSequence* BakePoseAnim = SkeletalMesh.GetLODInfo(LODIndex)->BakePose)
-	{	
+	{
+		FMemMark Mark(FMemStack::Get());
+		
 		const FReferenceSkeleton& RefSkeleton = SkeletalMesh.GetRefSkeleton();
 		const TArray<FTransform>& RefPoseInLocal = RefSkeleton.GetRefBonePose();
 
@@ -2009,7 +2012,9 @@ void FQuadricSkeletalMeshReduction::ReduceSkeletalMesh(USkeletalMesh& SkeletalMe
 		Pose.SetBoneContainer(&RequiredBones);
 
 		// Retrieve animated pose from anim sequence (including retargeting)
-		BuildPoseFromRawData(BakePoseAnim->GetRawAnimationData(), BakePoseAnim->GetRawTrackToSkeletonMapTable(), Pose, 0.f, EAnimInterpolationType::Step, BakePoseAnim->GetNumberOfFrames(), BakePoseAnim->SequenceLength, SkeletalMesh.GetSkeleton()->GetRetargetSourceForMesh(&SkeletalMesh));
+		const USkeleton* Skeleton = SkeletalMesh.GetSkeleton();
+		const FName RetargetSource = Skeleton->GetRetargetSourceForMesh(&SkeletalMesh);
+		UE::Anim::BuildPoseFromModel(BakePoseAnim->GetDataModel(), Pose, 0.f, EAnimInterpolationType::Step, RetargetSource, Skeleton->GetRefLocalPoses(RetargetSource));
 		
 		// Calculate component space animated pose matrices
 		TArray<FMatrix> ComponentSpaceAnimatedPose;
