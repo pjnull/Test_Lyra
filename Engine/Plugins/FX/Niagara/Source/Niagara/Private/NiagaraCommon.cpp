@@ -294,6 +294,16 @@ void FNiagaraSystemUpdateContext::AddInternal(UNiagaraComponent* Comp, bool bReI
 
 	Comp->BeginUpdateContextReset();
 
+	// Ensure we wait for any concurrent work to complete
+	if (FNiagaraSystemInstanceControllerPtr SystemInstanceController = Comp->GetSystemInstanceController())
+	{
+		SystemInstanceController->WaitForConcurrentTickAndFinalize();
+		if (Comp->IsPendingKill())
+		{
+			return;
+		}
+	}
+
 	if (bReInit && bDestroySystemSim)
 	{
 		//Always destroy the system sims on a reinit, even if we're not reactivating the component.
