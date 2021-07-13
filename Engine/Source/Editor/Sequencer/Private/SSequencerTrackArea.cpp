@@ -538,6 +538,13 @@ FReply SSequencerTrackArea::OnDragOver(const FGeometry& MyGeometry, const FDragD
 		{
 			DropFrameNumber = FFrameRate::Snap(DropFrameNumber, Sequencer.Pin()->GetFocusedTickResolution(), Sequencer.Pin()->GetFocusedDisplayRate()).FrameNumber;
 		}
+
+		// If shift is pressed, drop onto the current time
+		if (FSlateApplication::Get().GetModifierKeys().IsShiftDown())
+		{
+			DropFrameNumber = Sequencer.Pin()->GetLocalTime().Time.FrameNumber;
+		}
+
 		FSequencerDragDropParams DragDropParams(Track, RowIndex, ObjectBinding, DropFrameNumber, TRange<FFrameNumber>());
 
 		for (const auto& TrackEditor : TrackEditors)
@@ -584,6 +591,13 @@ FReply SSequencerTrackArea::OnDrop(const FGeometry& MyGeometry, const FDragDropE
 		{
 			DropFrameNumber = FFrameRate::Snap(DropFrameNumber, Sequencer.Pin()->GetFocusedTickResolution(), Sequencer.Pin()->GetFocusedDisplayRate()).FrameNumber;
 		}
+
+		// If shift is pressed, drop onto the current time
+		if (FSlateApplication::Get().GetModifierKeys().IsShiftDown())
+		{
+			DropFrameNumber = Sequencer.Pin()->GetLocalTime().Time.FrameNumber;
+		}
+
 		FSequencerDragDropParams DragDropParams(Track, RowIndex, ObjectBinding, DropFrameNumber, TRange<FFrameNumber>());
 
 		for (const auto& TrackEditor : TrackEditors)
