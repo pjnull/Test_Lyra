@@ -17,6 +17,7 @@
 #include "DisplayNodes/SequencerTrackNode.h"
 #include "DisplayNodes/SequencerObjectBindingNode.h"
 #include "CommonMovieSceneTools.h"
+#include "Framework/Application/SlateApplication.h"
 #include "Styling/StyleColors.h"
 
 FTrackAreaSlot::FTrackAreaSlot(const TSharedPtr<SSequencerTrackLane>& InSlotContent)
