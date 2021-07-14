@@ -2792,8 +2792,6 @@ void FNativeClassHeaderGenerator::ExportClassFromSourceFileInner(
 		APIArg = TEXT("NO");
 	}
 
-	FString PPOMacroName;
-
 	ClassDef.ValidateDefinitionRange();
 
 	FString GeneratedSerializeFunctionCPP;
