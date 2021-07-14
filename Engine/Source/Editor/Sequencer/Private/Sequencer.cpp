@@ -13161,11 +13161,6 @@ void FSequencer::BindCommands()
 	);
 
 	SequencerCommandBindings->MapAction(
-		FGenericCommands::Get().Delete,
-		FExecuteAction::CreateSP( this, &FSequencer::DeleteSelectedItems ),
-		FCanExecuteAction::CreateLambda(CanDelete));
-
-	SequencerCommandBindings->MapAction(
 		Commands.TogglePlaybackRangeLocked,
 		FExecuteAction::CreateSP( this, &FSequencer::TogglePlaybackRangeLocked ),
 		FCanExecuteAction::CreateLambda( [this] { return GetFocusedMovieSceneSequence() != nullptr;	} ),
@@ -13307,6 +13302,11 @@ void FSequencer::BindCommands()
 	*SequencerSharedBindings = *SequencerCommandBindings;
 
 	// Sequencer-only bindings
+	SequencerCommandBindings->MapAction(
+		FGenericCommands::Get().Delete,
+		FExecuteAction::CreateSP( this, &FSequencer::DeleteSelectedItems ),
+		FCanExecuteAction::CreateLambda(CanDelete));
+
 	SequencerCommandBindings->MapAction(
 		Commands.TogglePlay,
 		FExecuteAction::CreateSP(this, &FSequencer::TogglePlay));
