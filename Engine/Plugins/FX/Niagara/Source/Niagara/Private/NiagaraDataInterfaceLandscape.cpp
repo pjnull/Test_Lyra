@@ -240,6 +240,7 @@ void FLandscapeTextureResource::InitRHI()
 	if (PhysMatBulkData.DataSize > 0)
 	{
 		PhysMatTexture.Initialize(TEXT("FLandscapeTextureResource_PhysMatTexture"), sizeof(uint8), CellCount.X, CellCount.Y, EPixelFormat::PF_R8_UINT, FTextureReadBuffer2D::DefaultTextureInitFlag, &PhysMatBulkData);
+	}
 
 	ReleaseSourceData();
 
