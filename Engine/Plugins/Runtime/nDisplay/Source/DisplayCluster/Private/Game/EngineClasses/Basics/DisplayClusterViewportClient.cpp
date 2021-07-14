@@ -478,7 +478,6 @@ void UDisplayClusterViewportClient::Draw(FViewport* InViewport, FCanvas* SceneCa
 						ViewFamily.SetScreenPercentageInterface(new FLegacyScreenPercentageDriver(
 							ViewFamily,
 							DynamicResolutionStateInfos.ResolutionFractionApproximation,
-							false,
 							DynamicResolutionStateInfos.ResolutionFractionUpperBound));
 					}
 
@@ -497,15 +496,11 @@ void UDisplayClusterViewportClient::Draw(FViewport* InViewport, FCanvas* SceneCa
 					// In case of stereo, we set the same buffer ratio for both left and right views (taken from left)
 					float CustomBufferRatio = DCViewFamily.CustomBufferRatio;
 
-					bool AllowPostProcessSettingsScreenPercentage = false;
 					float GlobalResolutionFraction = 1.0f;
 					float SecondaryScreenPercentage = 1.0f;
 
 					if (ViewFamily.EngineShowFlags.ScreenPercentage)
 					{
-						// Allow FPostProcessSettings::ScreenPercentage.
-						AllowPostProcessSettingsScreenPercentage = true;
-
 						// Get global view fraction set by r.ScreenPercentage.
 						GlobalResolutionFraction = FLegacyScreenPercentageDriver::GetCVarResolutionFraction() * CustomBufferRatio;
 
@@ -518,7 +513,7 @@ void UDisplayClusterViewportClient::Draw(FViewport* InViewport, FCanvas* SceneCa
 					}
 
 					ViewFamily.SetScreenPercentageInterface(new FLegacyScreenPercentageDriver(
-						ViewFamily, GlobalResolutionFraction, AllowPostProcessSettingsScreenPercentage));
+						ViewFamily, GlobalResolutionFraction));
 
 					ViewFamily.SecondaryViewFraction = SecondaryScreenPercentage;
 				}
