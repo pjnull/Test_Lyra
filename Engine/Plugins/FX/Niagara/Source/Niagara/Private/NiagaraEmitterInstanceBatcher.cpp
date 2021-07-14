@@ -494,6 +494,7 @@ void NiagaraEmitterInstanceBatcher::ProcessPendingTicksFlush(FRHICommandListImme
 			FRDGBuilder GraphBuilder(RHICmdList);
 			CreateSystemTextures(GraphBuilder);
 			PreInitViews(GraphBuilder, AllowGPUParticleUpdate);
+			GPUInstanceCounterManager.UpdateDrawIndirectBuffers(*this, RHICmdList, FeatureLevel);
 			PostInitViews(GraphBuilder, DummyViews, AllowGPUParticleUpdate);
 			PostRenderOpaque(GraphBuilder, DummyViews, AllowGPUParticleUpdate);
 			GraphBuilder.Execute();
