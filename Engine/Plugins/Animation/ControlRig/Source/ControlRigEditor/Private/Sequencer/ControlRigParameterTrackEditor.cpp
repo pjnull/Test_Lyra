@@ -1970,6 +1970,7 @@ void FControlRigParameterTrackEditor::HandleControlSelected(UControlRig* Subject
 }
 
 
+
 void FControlRigParameterTrackEditor::HandleOnInitialized(UControlRig* ControlRig, const EControlRigState InState, const FName& InEventName)
 {
 	if (GetSequencer().IsValid())
