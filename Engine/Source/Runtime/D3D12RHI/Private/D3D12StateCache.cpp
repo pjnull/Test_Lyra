@@ -1070,7 +1070,7 @@ void FD3D12StateCacheBase::SetUAVs(uint32 UAVStartSlot, uint32 NumSimultaneousUA
 				*CounterUploadHeapData = (!UAV->IsCounterResourceInitialized() && UAVInitialCountArray[i] == -1) ? 0 : UAVInitialCountArray[i];
 
 				// Transition to copy dest
-				FD3D12DynamicRHI::TransitionResource(CmdContext->CommandListHandle, CounterResource, D3D12_RESOURCE_STATE_COPY_DEST, 0);
+				FD3D12DynamicRHI::TransitionResource(CmdContext->CommandListHandle, CounterResource, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST, 0, FD3D12DynamicRHI::ETransitionMode::Apply);
 
 				Device->GetDefaultCommandContext().numCopies++;
 				CmdContext->CommandListHandle.FlushResourceBarriers();
@@ -1083,7 +1083,7 @@ void FD3D12StateCacheBase::SetUAVs(uint32 UAVStartSlot, uint32 NumSimultaneousUA
 					4);
 
 				// Restore UAV state
-				FD3D12DynamicRHI::TransitionResource(CmdContext->CommandListHandle, CounterResource, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0);
+				FD3D12DynamicRHI::TransitionResource(CmdContext->CommandListHandle, CounterResource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0, FD3D12DynamicRHI::ETransitionMode::Apply);
 
 				CmdContext->CommandListHandle.UpdateResidency(CounterResource);
 
