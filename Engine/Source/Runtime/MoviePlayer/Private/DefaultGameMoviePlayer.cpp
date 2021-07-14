@@ -608,6 +608,17 @@ bool FDefaultGameMoviePlayer::IsMovieStreamingFinished() const
 	return MovieStreamingIsDone.GetValue() != 0;
 }
 
+bool FDefaultGameMoviePlayer::BlockingStarted()
+{
+	bool bIsPlaying = PlayMovie();
+	return bIsPlaying;
+}
+
+void FDefaultGameMoviePlayer::BlockingFinished()
+{
+	WaitForMovieToFinish();
+}
+
 void FDefaultGameMoviePlayer::Tick( float DeltaTime )
 {
 	check(IsInRenderingThread());

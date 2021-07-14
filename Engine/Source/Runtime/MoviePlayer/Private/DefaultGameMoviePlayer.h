@@ -98,6 +98,9 @@ public:
 	virtual FOnMoviePlaybackFinished& OnMoviePlaybackFinished() override { return OnMoviePlaybackFinishedDelegate; }
 	virtual FOnMovieClipFinished& OnMovieClipFinished() override { return OnMovieClipFinishedDelegate; }
 
+	virtual bool BlockingStarted() override;
+	virtual void BlockingFinished() override;
+
 	/** FTickableObjectRenderThread interface */
 	virtual void Tick( float DeltaTime ) override;
 	virtual TStatId GetStatId() const override;

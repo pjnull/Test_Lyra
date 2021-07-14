@@ -127,3 +127,13 @@ bool IsMoviePlayerEnabled()
 
 	return bEnabled;
 }
+
+void BlockingStartedForMoviePlayer()
+{
+	GetMoviePlayer()->BlockingStarted();
+}
+
+void BlockingFinishedForMoviePlayer()
+{
+	GetMoviePlayer()->BlockingFinished();
+}
