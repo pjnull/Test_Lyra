@@ -138,6 +138,7 @@ void FCameraCalibrationEditorModule::RegisterPlacementModeItems()
 				*UActorFactoryBlueprint::StaticClass(),
 				TrackerAssetDataV3,
 				NAME_None,
+				NAME_None,
 				TOptional<FLinearColor>(),
 				TOptional<int32>(),
 				NSLOCTEXT("PlacementMode", "TrackerV3", "TrackerV3")
