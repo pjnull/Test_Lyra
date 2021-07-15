@@ -616,7 +616,13 @@ bool FDefaultGameMoviePlayer::BlockingStarted()
 
 void FDefaultGameMoviePlayer::BlockingFinished()
 {
-	WaitForMovieToFinish();
+	// Only call WaitForMovieToFinish if we are playing a movie,
+	// as WaitForMovieToFinish has side effects if a movie is not playing,
+	// and this can cause a hang.
+	if (LoadingScreenIsPrepared() && IsMovieCurrentlyPlaying())
+	{
+		WaitForMovieToFinish();
+	}
 }
 
 void FDefaultGameMoviePlayer::Tick( float DeltaTime )
