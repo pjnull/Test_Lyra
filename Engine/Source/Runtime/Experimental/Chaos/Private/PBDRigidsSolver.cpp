@@ -426,8 +426,6 @@ namespace Chaos
 				}
 				NewParticle->SetPhysicsProxy(Proxy);
 			});
-		
-		JointConstraints.SetUpdateVelocityInApplyConstraints(true);
 	}
 
 	FRealSingle MaxBoundsForTree = (FRealSingle)10000;
