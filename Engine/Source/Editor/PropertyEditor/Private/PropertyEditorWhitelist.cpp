@@ -2,6 +2,8 @@
 
 #include "PropertyEditorWhitelist.h"
 
+#include "Editor.h"
+#include "Misc/CoreDelegates.h"
 #include "UObject/UnrealType.h"
 
 namespace
