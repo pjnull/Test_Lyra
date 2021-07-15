@@ -9,6 +9,34 @@ namespace
 	const FName PropertyEditorWhitelistOwner = "PropertyEditorWhitelist";
 }
 
+FPropertyEditorWhitelist::FPropertyEditorWhitelist()
+{
+	if (GEditor)
+	{
+		RegisterOnBlueprintCompiled();
+	}
+	else
+	{
+		FCoreDelegates::OnPostEngineInit.AddRaw(this, &FPropertyEditorWhitelist::RegisterOnBlueprintCompiled);
+	}
+}
+
+void FPropertyEditorWhitelist::RegisterOnBlueprintCompiled()
+{
+	if (ensure(GEditor))
+	{
+		GEditor->OnBlueprintCompiled().AddRaw(this, &FPropertyEditorWhitelist::ClearCache);
+	}
+}
+
+FPropertyEditorWhitelist::~FPropertyEditorWhitelist()
+{
+	if (GEditor)
+	{
+		GEditor->OnBlueprintCompiled().RemoveAll(this);
+	}
+}
+
 void FPropertyEditorWhitelist::AddWhitelist(TSoftObjectPtr<UStruct> Struct, const FBlacklistNames& Whitelist, EPropertyEditorWhitelistRules Rules)
 {
 	FPropertyEditorWhitelistEntry& Entry = RawPropertyEditorWhitelist.FindOrAdd(Struct);
@@ -16,7 +44,7 @@ void FPropertyEditorWhitelist::AddWhitelist(TSoftObjectPtr<UStruct> Struct, cons
 	Entry.Rules = Rules;
 	// The cache isn't too expensive to recompute, so it is cleared
 	// and lazily repopulated any time the raw whitelist changes.
-	CachedPropertyEditorWhitelist.Reset();
+	ClearCache();
 	WhitelistUpdatedDelegate.Broadcast(Struct, NAME_None);
 }
 
@@ -24,7 +52,7 @@ void FPropertyEditorWhitelist::RemoveWhitelist(TSoftObjectPtr<UStruct> Struct)
 {
 	if (RawPropertyEditorWhitelist.Remove(Struct) > 0)
 	{
-		CachedPropertyEditorWhitelist.Reset();
+		ClearCache();
 		WhitelistUpdatedDelegate.Broadcast(Struct, NAME_None);
 	}
 }
@@ -41,7 +69,7 @@ void FPropertyEditorWhitelist::AddToWhitelist(TSoftObjectPtr<UStruct> Struct, co
 	FPropertyEditorWhitelistEntry& Entry = RawPropertyEditorWhitelist.FindOrAdd(Struct);
 	if (Entry.Whitelist.AddWhitelistItem(Owner, PropertyName))
 	{
-		CachedPropertyEditorWhitelist.Reset();
+		ClearCache();
 		WhitelistUpdatedDelegate.Broadcast(Struct, Owner);
 	}
 }
@@ -51,7 +79,7 @@ void FPropertyEditorWhitelist::RemoveFromWhitelist(TSoftObjectPtr<UStruct> Struc
 	FPropertyEditorWhitelistEntry& Entry = RawPropertyEditorWhitelist.FindOrAdd(Struct);
 	if (Entry.Whitelist.RemoveWhitelistItem(Owner, PropertyName))
 	{
-		CachedPropertyEditorWhitelist.Reset();
+		ClearCache();
 		WhitelistUpdatedDelegate.Broadcast(Struct, Owner);
 	}
 }
@@ -61,7 +89,7 @@ void FPropertyEditorWhitelist::AddToBlacklist(TSoftObjectPtr<UStruct> Struct, co
 	FPropertyEditorWhitelistEntry& Entry = RawPropertyEditorWhitelist.FindOrAdd(Struct);
 	if (Entry.Whitelist.AddBlacklistItem(Owner, PropertyName))
 	{
-		CachedPropertyEditorWhitelist.Reset();
+		ClearCache();
 		WhitelistUpdatedDelegate.Broadcast(Struct, Owner);
 	}
 }
@@ -71,7 +99,7 @@ void FPropertyEditorWhitelist::RemoveFromBlacklist(TSoftObjectPtr<UStruct> Struc
 	FPropertyEditorWhitelistEntry& Entry = RawPropertyEditorWhitelist.FindOrAdd(Struct);
 	if (Entry.Whitelist.RemoveBlacklistItem(Owner, PropertyName))
 	{
-		CachedPropertyEditorWhitelist.Reset();
+		ClearCache();
 		WhitelistUpdatedDelegate.Broadcast(Struct, Owner);
 	}
 }
@@ -80,6 +108,11 @@ void FPropertyEditorWhitelist::SetEnabled(bool bEnable)
 {
 	bEnablePropertyEditorWhitelist = bEnable;
 	WhitelistEnabledDelegate.Broadcast();
+}
+
+void FPropertyEditorWhitelist::ClearCache()
+{
+	CachedPropertyEditorWhitelist.Reset();
 }
 
 bool FPropertyEditorWhitelist::DoesPropertyPassFilter(const UStruct* ObjectStruct, FName PropertyName) const
