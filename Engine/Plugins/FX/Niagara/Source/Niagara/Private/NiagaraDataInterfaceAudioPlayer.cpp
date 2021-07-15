@@ -106,7 +106,9 @@ bool UNiagaraDataInterfaceAudioPlayer::InitPerInstanceData(void* PerInstanceData
 		PIData->MaxPlaysPerTick = MaxPlaysPerTick;
 	}
 	PIData->bStopWhenComponentIsDestroyed = bStopWhenComponentIsDestroyed;
+#if WITH_EDITORONLY_DATA
 	PIData->bOnlyActiveDuringGameplay = bOnlyActiveDuringGameplay;
+#endif
 	return true;
 }
 

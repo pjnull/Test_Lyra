@@ -43,8 +43,10 @@ struct FAudioPlayerInterface_InstanceData
 
 	int32 MaxPlaysPerTick = 0;
 	bool bStopWhenComponentIsDestroyed = true;
+#if WITH_EDITORONLY_DATA
 	bool bOnlyActiveDuringGameplay = false;
-
+#endif
+	
 	// we track if at least one particle played a sound to prevent problems where sounds keep on playing when scalability culls an emitter (which the DI does not notice otherwise)
 	bool bHadPersistentAudioUpdateThisTick = false;
 };
