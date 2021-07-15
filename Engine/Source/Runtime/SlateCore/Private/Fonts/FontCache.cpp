@@ -149,6 +149,7 @@ FShapedGlyphSequence::FShapedGlyphSequence(TArray<FShapedGlyphEntry> InGlyphsToR
 				CurrentGlyph.NumGraphemeClustersInGlyph,
 				CurrentGlyph.TextDirection);
 
+#if WITH_FREETYPE
 			// Track font info if possible
 			if (CurrentGlyph.FontFaceData.IsValid())
 			{
@@ -164,7 +165,8 @@ FShapedGlyphSequence::FShapedGlyphSequence(TArray<FShapedGlyphEntry> InGlyphsToR
 						FontFace->style_name);
 				}
 			}
-
+#endif // WITH_FREETYPE
+			
 			if (!CurrentGlyph.HasValidGlyph() || !CurrentGlyph.bIsVisible)
 			{
 				continue;
