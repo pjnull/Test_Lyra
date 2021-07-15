@@ -844,6 +844,8 @@ bool UNiagaraDataInterfaceAudioPlayer::CopyToInternal(UNiagaraDataInterface* Des
 	OtherTyped->MaxPlaysPerTick = MaxPlaysPerTick;
 	OtherTyped->ParameterNames = ParameterNames;
 	OtherTyped->bStopWhenComponentIsDestroyed = bStopWhenComponentIsDestroyed;
+#if WITH_EDITORONLY_DATA
 	OtherTyped->bOnlyActiveDuringGameplay = bOnlyActiveDuringGameplay;
+#endif
 	return true;
 }
