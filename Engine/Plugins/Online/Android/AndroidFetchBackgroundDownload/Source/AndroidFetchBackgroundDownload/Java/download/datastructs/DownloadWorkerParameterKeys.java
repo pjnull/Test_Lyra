@@ -26,6 +26,10 @@ public class DownloadWorkerParameterKeys
 	public final static String NOTIFICATION_CHANNEL_NAME_KEY = "NotificationChannelName";
 	public final static String NOTIFICATION_CHANNEL_IMPORTANCE_KEY = "NotificationChannelImportance";
 	
+	public final static String NOTIFICATION_ID_KEY = "NotificationId";
+	//random value that our NOTIFICATION_ID is set to if not provided using the above key
+	public final static int NOTIFICATION_DEFAULT_ID_KEY = 1923901283;
+	
 	public final static String NOTIFICATION_CONTENT_TITLE_KEY = "NotificationContentTitle";
 	public final static String NOTIFICATION_CONTENT_TEXT_KEY = "NotificationContentText";
 	public final static String NOTIFICATION_CONTENT_CANCEL_DOWNLOAD_TEXT_KEY = "NotificationContentCancelDownloadText";

@@ -52,6 +52,11 @@ const FString FAndroidNativeDownloadWorkerParameterKeys::NOTIFICATION_CHANNEL_ID
 const FString FAndroidNativeDownloadWorkerParameterKeys::NOTIFICATION_CHANNEL_NAME_KEY = TEXT("NotificationChannelName");
 const FString FAndroidNativeDownloadWorkerParameterKeys::NOTIFICATION_CHANNEL_IMPORTANCE_KEY = TEXT("NotificationChannelImportance");
 
+const FString FAndroidNativeDownloadWorkerParameterKeys::NOTIFICATION_ID_KEY = TEXT("NotificationId");
+
+//random value that our NOTIFICATION_ID is set to if not provided using the above key. KEEP IN SYNC WITH DownloadWorkerParameterKeys.java
+const int FAndroidNativeDownloadWorkerParameterKeys::NOTIFICATION_DEFAULT_ID_KEY = 1923901283;
+
 const FString FAndroidNativeDownloadWorkerParameterKeys::NOTIFICATION_CONTENT_TITLE_KEY = TEXT("NotificationContentTitle");
 const FString FAndroidNativeDownloadWorkerParameterKeys::NOTIFICATION_CONTENT_TEXT_KEY = TEXT("NotificationContentText");
 const FString FAndroidNativeDownloadWorkerParameterKeys::NOTIFICATION_CONTENT_CANCEL_DOWNLOAD_TEXT_KEY = TEXT("NotificationContentCancelDownloadText");
@@ -179,7 +184,7 @@ void FAndroidPlatformBackgroundHttpManager::ActivatePendingRequests()
 
 					//Make sure we pass in localized notification text bits for the important worker keys
 					WorkParams.AddDataToWorkerParameters(FAndroidNativeDownloadWorkerParameterKeys::NOTIFICATION_CONTENT_TITLE_KEY, LOCTEXT("AndroidBackgroundHttpManager.Notification.Title", "Downloading"));
-					WorkParams.AddDataToWorkerParameters(FAndroidNativeDownloadWorkerParameterKeys::NOTIFICATION_CONTENT_TEXT_KEY, LOCTEXT("AndroidBackgroundHttpManager.Notification.ContentText", "Download in Progress"));
+					WorkParams.AddDataToWorkerParameters(FAndroidNativeDownloadWorkerParameterKeys::NOTIFICATION_CONTENT_TEXT_KEY, LOCTEXT("AndroidBackgroundHttpManager.Notification.ContentText", "Download in Progress %02d%%"));
 					WorkParams.AddDataToWorkerParameters(FAndroidNativeDownloadWorkerParameterKeys::NOTIFICATION_CONTENT_COMPLETE_TEXT_KEY, LOCTEXT("AndroidBackgroundHttpManager.Notification.CompletedContentText", "Download Complete"));
 					WorkParams.AddDataToWorkerParameters(FAndroidNativeDownloadWorkerParameterKeys::NOTIFICATION_CONTENT_CANCEL_DOWNLOAD_TEXT_KEY, LOCTEXT("AndroidBackgroundHttpManager.Notification.CancelText", "Cancel"));
 
@@ -536,6 +541,9 @@ void FAndroidPlatformBackgroundHttpManager::Java_OnDownloadComplete(jobject Unde
 		
 		//Mark as pending completes so we know to process completed requests at the manager level during our next tick
 		FPlatformAtomics::InterlockedExchange(&bHasPendingCompletes, true);
+
+		//Notify object of our complete so that we can send completion notification when all downloads finish.
+		CompletedRequest->NotifyNotificationObjectOfComplete(bWasSuccess);
 	}
 }
 
@@ -543,6 +551,29 @@ void FAndroidPlatformBackgroundHttpManager::Java_OnAllDownloadsComplete(jobject 
 {
 	UE_LOG(LogBackgroundHttpManager, Log, TEXT("OnAllDownloadComplete... bWasSuccess:%d"), (int)bDidAllRequestsSucceed);
 	
+	JNIEnv* Env = FAndroidApplication::GetJavaEnv();
+	if (ensureAlwaysMsgf((Env != nullptr), TEXT("Unexpected invalid JNI environment found! Can not respond to UnderlyingWorker!")))
+	{
+		bool bIsOptional = false;
+		jclass JavaDownloadWorkerClass = Env->GetObjectClass(UnderlyingWorker);
+		CHECK_JNI_RESULT(JavaDownloadWorkerClass);
+
+		//Mark the worker as Sucess or Failure now so that the worker terminates work instead of retrying.
+		//NOTE: We don't want to auto-retry as we have an FAndroidPlatformBackgroundHttpManager spun up if we get this far
+		//thus, we want to intelligently create a new worker that will only attempt to redownload failed downloads appropriately
+		//instead of retrying and potentially redownloading everything.
+		if (bDidAllRequestsSucceed)
+		{
+			jmethodID WorkerMethod_SetWorkResult_Success = FJavaWrapper::FindMethod(Env, JavaDownloadWorkerClass, "SetWorkResult_Success", "()V", bIsOptional);
+			FJavaWrapper::CallVoidMethod(Env, UnderlyingWorker, WorkerMethod_SetWorkResult_Success);
+		}
+		else
+		{
+			jmethodID WorkerMethod_SetWorkResult_Failure = FJavaWrapper::FindMethod(Env, JavaDownloadWorkerClass, "SetWorkResult_Failure", "()V", bIsOptional);
+			FJavaWrapper::CallVoidMethod(Env, UnderlyingWorker, WorkerMethod_SetWorkResult_Failure);
+		}
+	}
+
 	//Mark as pending completes so we know to process completed requests at the manager level during our next tick
 	FPlatformAtomics::InterlockedExchange(&bUnderlyingJavaAllDownloadsComplete, true);
 }

@@ -1,6 +1,8 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 package com.epicgames.ue4.download;
 
+import android.content.Intent;
+
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -19,6 +21,8 @@ import androidx.work.WorkManager;
 import androidx.work.WorkerParameters;
 
 import java.io.File;
+
+import com.epicgames.ue4.GameActivity;
 
 import com.epicgames.ue4.Logger;
 import com.epicgames.ue4.workmanager.UEWorker;
@@ -188,27 +192,44 @@ public class UEDownloadWorker extends UEWorker implements DownloadProgressListen
 		NotificationManager notificationManager = GetNotificationManager(context);
 		
 		CreateNotificationChannel(context, notificationManager, Description);
-		
+
+		//Setup Notification Text Values (ContentText and ContentInfo)
+		boolean bIsComplete = (Description.CurrentProgress >= Description.MAX_PROGRESS);
 		String NotificationTextToUse = null;
-		if (Description.CurrentProgress < Description.MAX_PROGRESS)
+		if (!bIsComplete)
 		{
-			NotificationTextToUse = Description.ContentText;
+			NotificationTextToUse = String.format(Description.ContentText, Description.CurrentProgress);
 		}
 		else
 		{
 			NotificationTextToUse = Description.ContentCompleteText;
 		}
 		
+		//Setup Opening UE app if clicked
+		PendingIntent pendingNotificationIntent = null;
+		{
+			Intent notificationIntent = new Intent(context, GameActivity.class);
+			
+			// launch if closed but resume if running
+			notificationIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+
+			notificationIntent.putExtra("localNotificationID" , Description.NotificationID);
+			notificationIntent.putExtra("localNotificationAppLaunched" , true);
+
+			pendingNotificationIntent = PendingIntent.getActivity(context, Description.NotificationID, notificationIntent, 0);
+		}
+
 		Notification notification = new NotificationCompat.Builder(context, Description.NotificationChannelID)
 			.setContentTitle(Description.TitleText)
 			.setTicker(Description.TitleText)
 			.setContentText(NotificationTextToUse)
+			.setContentIntent(pendingNotificationIntent)
 			.setProgress(Description.MAX_PROGRESS,Description.CurrentProgress, Description.Indeterminate)
 			.setOngoing(true)
 			.setOnlyAlertOnce (true)
 			.setSmallIcon(Description.SmallIconResourceID)
 			.addAction(Description.CancelIconResourceID, Description.CancelText, CancelIntent)
-			.build();	
+			.build();
 		
 		return new ForegroundInfo(Description.NotificationID,notification);
 	}

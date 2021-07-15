@@ -43,6 +43,21 @@ public class DownloadNotificationDescription
 			NotificationChannelImportance = data.getInt(DownloadWorkerParameterKeys.NOTIFICATION_CHANNEL_IMPORTANCE_KEY, NotificationManager.IMPORTANCE_DEFAULT);
 		}
 		
+		//Load notification base information
+		{
+			//Loads from data or defaults to a random number (that is hopefully unique) as this can NOT be set to 0 for SetForeground notifications!
+
+			NotificationID = data.getInt(DownloadWorkerParameterKeys.NOTIFICATION_ID_KEY, DownloadWorkerParameterKeys.NOTIFICATION_DEFAULT_ID_KEY);
+
+			if (NotificationID == 0)
+			{
+				if (null != Log) 
+				{
+					Log.error("Invalid NotificationID for notification! Will not be able to activate as a foreground service correctly!");
+				}
+			}
+		}
+
 		//Load notification content information
 		{
 			TitleText = data.getString(DownloadWorkerParameterKeys.NOTIFICATION_CONTENT_TITLE_KEY);
@@ -204,7 +219,9 @@ public class DownloadNotificationDescription
 	public String NotificationChannelID = null;
 	public String NotificationChannelName = null;
 	public int NotificationChannelImportance = NotificationManager.IMPORTANCE_DEFAULT;
-			
+	
+	public int NotificationID = 0;
+
 	public String TitleText = null;
 	public String ContentText = null;
 	public String ContentCompleteText = null;
@@ -212,10 +229,6 @@ public class DownloadNotificationDescription
 	
 	public int CancelIconResourceID = 0;
 	public int SmallIconResourceID = 0;
-
-	//We are just using a static NotificationID. This should work since we should only ever have 1 of these notifications
-	//but if we run into problems we will want to look at saving this off in user settings and constantly incrementing it for best results
-	public final int NotificationID = 1;
 
 	//We just care about our progress being between 0->100 as a % so this is always 100
 	public final int MAX_PROGRESS = 100;

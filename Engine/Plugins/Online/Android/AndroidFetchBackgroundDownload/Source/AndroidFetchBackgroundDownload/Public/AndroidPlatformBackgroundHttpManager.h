@@ -96,6 +96,9 @@ public:
 	static const FString NOTIFICATION_CHANNEL_ID_KEY;
 	static const FString NOTIFICATION_CHANNEL_NAME_KEY;
 	static const FString NOTIFICATION_CHANNEL_IMPORTANCE_KEY;
+	
+	static const FString NOTIFICATION_ID_KEY;
+	static const int NOTIFICATION_DEFAULT_ID_KEY;
 
 	static const FString NOTIFICATION_CONTENT_TITLE_KEY;
 	static const FString NOTIFICATION_CONTENT_TEXT_KEY;
