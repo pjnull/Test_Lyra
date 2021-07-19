@@ -440,7 +440,7 @@ void FD3D12Adapter::CreateRootDevice(bool bWithDebug)
 
 	// QI for the Adapter
 	TRefCountPtr<IDXGIAdapter> TempAdapter;
-	DxgiFactory->EnumAdapters(Desc.AdapterIndex, TempAdapter.GetInitReference());
+	Desc.EnumAdapters(DxgiFactory, DxgiFactory6, TempAdapter.GetInitReference());
 	VERIFYD3D12RESULT(TempAdapter->QueryInterface(IID_PPV_ARGS(DxgiAdapter.GetInitReference())));
 
 	bool bDeviceCreated = false;
@@ -1228,6 +1228,8 @@ void FD3D12Adapter::CreateDXGIFactory(bool bWithDebug)
 	FPlatformProcess::FreeDllHandle(DxgiDLL);
 
 	VERIFYD3D12RESULT(CreateDXGIFactory2FnPtr(Flags, IID_PPV_ARGS(DxgiFactory.GetInitReference())));
+
+	DxgiFactory->QueryInterface(IID_PPV_ARGS(DxgiFactory6.GetInitReference()));
 #elif PLATFORM_HOLOLENS
 	VERIFYD3D12RESULT(::CreateDXGIFactory2(Flags, IID_PPV_ARGS(DxgiFactory.GetInitReference())));
 #endif
