@@ -32,6 +32,9 @@
 #include "Animation/AnimSequenceHelpers.h"
 #include "Async/Async.h"
 
+#include "Animation/AnimSequence.h"
+#include "BonePose.h"
+
 #define LOCTEXT_NAMESPACE "SkeletalMeshReduction"
 
 
