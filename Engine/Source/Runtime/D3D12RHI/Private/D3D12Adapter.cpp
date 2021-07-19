@@ -440,7 +440,11 @@ void FD3D12Adapter::CreateRootDevice(bool bWithDebug)
 
 	// QI for the Adapter
 	TRefCountPtr<IDXGIAdapter> TempAdapter;
+#if PLATFORM_WINDOWS
 	Desc.EnumAdapters(DxgiFactory, DxgiFactory6, TempAdapter.GetInitReference());
+#else
+	DxgiFactory->EnumAdapters(Desc.AdapterIndex, TempAdapter.GetInitReference());
+#endif
 	VERIFYD3D12RESULT(TempAdapter->QueryInterface(IID_PPV_ARGS(DxgiAdapter.GetInitReference())));
 
 	bool bDeviceCreated = false;

@@ -47,19 +47,26 @@ struct FD3D12AdapterDesc
 {
 	FD3D12AdapterDesc() = default;
 
-	FD3D12AdapterDesc(const DXGI_ADAPTER_DESC& DescIn , int32 InAdapterIndex, D3D_FEATURE_LEVEL InMaxSupportedFeatureLevel, D3D_SHADER_MODEL InMaxSupportedShaderModel, uint32 NumNodes, bool InIsIntegrated, DXGI_GPU_PREFERENCE InGpuPreference)
+	FD3D12AdapterDesc(const DXGI_ADAPTER_DESC& DescIn , int32 InAdapterIndex, D3D_FEATURE_LEVEL InMaxSupportedFeatureLevel, D3D_SHADER_MODEL InMaxSupportedShaderModel, uint32 NumNodes, bool InIsIntegrated
+#if PLATFORM_WINDOWS
+		, DXGI_GPU_PREFERENCE InGpuPreference
+#endif
+	)
 		: AdapterIndex(InAdapterIndex)
 		, MaxSupportedFeatureLevel(InMaxSupportedFeatureLevel)
 		, MaxSupportedShaderModel(InMaxSupportedShaderModel)
 		, Desc(DescIn)
 		, NumDeviceNodes(NumNodes)
 		, bIsIntegrated(InIsIntegrated)
+#if PLATFORM_WINDOWS
 		, GpuPreference(InGpuPreference)
+#endif
 	{
 	}
 
 	bool IsValid() const { return MaxSupportedFeatureLevel != (D3D_FEATURE_LEVEL)0 && AdapterIndex >= 0; }
 
+#if PLATFORM_WINDOWS
 	static HRESULT EnumAdapters(int32 AdapterIndex, DXGI_GPU_PREFERENCE GpuPreference, IDXGIFactory* DxgiFactory, IDXGIFactory6* DxgiFactory6, IDXGIAdapter** TempAdapter)
 	{
 		if (!DxgiFactory6 || GpuPreference == DXGI_GPU_PREFERENCE_UNSPECIFIED)
@@ -76,6 +83,7 @@ struct FD3D12AdapterDesc
 	{
 		return EnumAdapters(AdapterIndex, GpuPreference, DxgiFactory, DxgiFactory6, TempAdapter);
 	}
+#endif
 
 	/** -1 if not supported or FindAdpater() wasn't called. Ideally we would store a pointer to IDXGIAdapter but it's unlikely the adpaters change during engine init. */
 	int32 AdapterIndex{ -1 };
@@ -92,7 +100,9 @@ struct FD3D12AdapterDesc
 	/** Whether the GPU is integrated or discrete. */
 	bool bIsIntegrated = false;
 
+#if PLATFORM_WINDOWS
 	DXGI_GPU_PREFERENCE GpuPreference = DXGI_GPU_PREFERENCE_UNSPECIFIED;
+#endif
 };
 
 struct FD3D12MemoryInfo
@@ -241,7 +251,9 @@ public:
 	void CreateDXGIFactory(bool bWithDebug);
 	FORCEINLINE IDXGIFactory* GetDXGIFactory() const { return DxgiFactory; }
 	FORCEINLINE IDXGIFactory2* GetDXGIFactory2() const { return DxgiFactory2; }
+#if PLATFORM_WINDOWS
 	FORCEINLINE IDXGIFactory6* GetDXGIFactory6() const { return DxgiFactory6; }
+#endif
 
 	FORCEINLINE FD3D12UploadHeapAllocator& GetUploadHeapAllocator(uint32 GPUIndex)
 	{ 
@@ -506,7 +518,9 @@ protected:
 
 	TRefCountPtr<IDXGIFactory> DxgiFactory;
 	TRefCountPtr<IDXGIFactory2> DxgiFactory2;
+#if PLATFORM_WINDOWS
 	TRefCountPtr<IDXGIFactory6> DxgiFactory6;
+#endif
 
 	/** A Fence whos value increases every frame*/
 	TRefCountPtr<FD3D12ManualFence> FrameFence;
