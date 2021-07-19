@@ -2487,7 +2487,8 @@ bool UNiagaraSystem::QueryCompileComplete(bool bWait, bool bDoPost, bool bDoNotA
 				}
 				else
 				{
-					ObjectNameMap = EmitterCompiledScriptPair.CompiledScript->GetLatestSource()->ComputeObjectNameMap(AsyncTask->UniqueEmitterName);
+					UNiagaraScript* CompiledScript = EmitterCompiledScriptPair.CompiledScript;
+					ObjectNameMap = CompiledScript->GetLatestSource()->ComputeObjectNameMap(*this, CompiledScript->GetUsage(), CompiledScript->GetUsageId(), AsyncTask->UniqueEmitterName);
 				}
 				EmitterCompiledScriptPair.CompiledScript->SetVMCompilationResults(EmitterCompiledScriptPair.CompileId, *ExeData, AsyncTask->UniqueEmitterName, ObjectNameMap);
 			}
