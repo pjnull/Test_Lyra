@@ -1852,6 +1852,9 @@ void SAssetView::RefreshSourceItems()
 		const TArrayView<const FName> DataSourcePaths = SourcesData.HasVirtualPaths() ? MakeArrayView(SourcesData.VirtualPaths) : MakeArrayView(&RootPath, 1);
 		for (const FName& DataSourcePath : DataSourcePaths)
 		{
+			// Ensure paths do not contain trailing slash
+			ensure(DataSourcePath == RootPath || !FStringView(FNameBuilder(DataSourcePath)).EndsWith(TEXT('/')));
+
 			ContentBrowserData->EnumerateItemsUnderPath(DataSourcePath, DataFilter, [this, &PreviousAvailableBackendItems](FContentBrowserItemData&& InItemData)
 			{
 				const FContentBrowserItemKey ItemDataKey(InItemData);

@@ -556,7 +556,7 @@ UObject* UAssetToolsImpl::CreateAssetWithDialog(UClass* AssetClass, UFactory* Fa
 }
 
 
-UObject* UAssetToolsImpl::CreateAssetWithDialog(const FString& AssetName, const FString& PackagePath, UClass* AssetClass, UFactory* Factory, FName CallingContext)
+UObject* UAssetToolsImpl::CreateAssetWithDialog(const FString& AssetName, const FString& PackagePath, UClass* AssetClass, UFactory* Factory, FName CallingContext, const bool bCallConfigureProperties)
 {
 	FGCObjectScopeGuard DontGCFactory(Factory);
 	if(Factory)
@@ -571,8 +571,14 @@ UObject* UAssetToolsImpl::CreateAssetWithDialog(const FString& AssetName, const 
 		FString SaveObjectPath = ContentBrowserModule.Get().CreateModalSaveAssetDialog(SaveAssetDialogConfig);
 		if (!SaveObjectPath.IsEmpty())
 		{
-			FEditorDelegates::OnConfigureNewAssetProperties.Broadcast(Factory);
-			if (Factory->ConfigureProperties())
+			bool bCreateAsset = true;
+			if (bCallConfigureProperties)
+			{
+				FEditorDelegates::OnConfigureNewAssetProperties.Broadcast(Factory);
+				bCreateAsset = Factory->ConfigureProperties();
+			}
+
+			if (bCreateAsset)
 			{
 				const FString SavePackageName = FPackageName::ObjectPathToPackageName(SaveObjectPath);
 				const FString SavePackagePath = FPaths::GetPath(SavePackageName);
