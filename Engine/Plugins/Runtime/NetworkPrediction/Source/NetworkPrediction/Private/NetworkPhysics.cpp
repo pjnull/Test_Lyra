@@ -52,6 +52,7 @@ namespace UE_NETWORK_PHYSICS
 	NP_DEVCVAR_INT(FixedLocalFrameOffsetTolerance, 3, "np2.FixedLocalFrameOffsetTolerance", "Tolerance when using np2.FixedLocalFrameOffset");
 
 	NP_DEVCVAR_INT(EnableLOD, 0, "np2.EnableLOD", "Enable local LOD mode");
+	NP_DEVCVAR_INT(MinLODForNonLocal, 1, "np2.MinLODForNonLocal", "Force LOD to 1 for actors who are not locally controlled");
 	NP_DEVCVAR_FLOAT(LODDistance, 2400.f, "np2.LODDistance", "Simple distance based LOD");
 
 	NP_DEVCVAR_INT(ResimForSleep, 0, "np2.ResimForSleep", "Triggers resim if only sleep state differs. Otherwise we only match server sleep state if XRVW differ.");
@@ -790,12 +791,24 @@ void UNetworkPhysicsManager::PostNetRecv()
 					if (PhysicsState->Proxy)
 					{
 						int32 CalculatedLOD = 0;
-						const FVector Location = PhysicsState->Proxy->GetGameThreadAPI().X();
-						if (FVector::DistSquared(Location, LocalViewLoc) > LODDistSq)
+
+						if (UE_NETWORK_PHYSICS::MinLODForNonLocal != 0)
 						{
-							CalculatedLOD = 1;
+							if (ensure(PhysicsState->OwningActor))
+							{
+								if (PhysicsState->OwningActor->GetLocalRole() == ROLE_SimulatedProxy)
+								{
+									CalculatedLOD = FMath::Max(CalculatedLOD, UE_NETWORK_PHYSICS::MinLODForNonLocal);
+								}
+							}
 						}
-					
+
+						const FVector Location = PhysicsState->Proxy->GetGameThreadAPI().X();
+						if (LODDistSq > 0.f && FVector::DistSquared(Location, LocalViewLoc) > LODDistSq)
+						{
+							CalculatedLOD = FMath::Max(CalculatedLOD, 1);
+						}
+
 						if (PhysicsState->LocalLOD != CalculatedLOD)
 						{
 							PhysicsState->LocalLOD = CalculatedLOD;
