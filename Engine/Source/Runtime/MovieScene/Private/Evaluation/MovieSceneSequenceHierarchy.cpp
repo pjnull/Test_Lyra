@@ -6,6 +6,7 @@
 #include "MovieScene.h"
 #include "MovieSceneTimeHelpers.h"
 #include "UObject/ReleaseObjectVersion.h"
+#include "UObject/FortniteMainBranchObjectVersion.h"
 
 FMovieSceneSubSequenceData::FMovieSceneSubSequenceData()
 	: Sequence(nullptr)
@@ -188,10 +189,12 @@ void FMovieSceneSequenceHierarchy::AddRange(const TRange<FFrameNumber>& RootSpac
 FArchive& operator<<(FArchive& Ar, FMovieSceneSubSequenceTreeEntry& InOutEntry)
 {
 	Ar.UsingCustomVersion(FReleaseObjectVersion::GUID);
+	Ar.UsingCustomVersion(FFortniteMainBranchObjectVersion::GUID);
 
 	Ar << InOutEntry.SequenceID << InOutEntry.Flags;
 
-	if (Ar.CustomVer(FReleaseObjectVersion::GUID) >= FReleaseObjectVersion::AddedSubSequenceEntryWarpCounter)
+	if (Ar.CustomVer(FReleaseObjectVersion::GUID) >= FReleaseObjectVersion::AddedSubSequenceEntryWarpCounter ||
+		Ar.CustomVer(FFortniteMainBranchObjectVersion::GUID) >= FFortniteMainBranchObjectVersion::AddedSubSequenceEntryWarpCounter)
 	{
 		FMovieSceneWarpCounter::StaticStruct()->SerializeTaggedProperties(
 				Ar, (uint8*)&InOutEntry.RootToSequenceWarpCounter, FMovieSceneWarpCounter::StaticStruct(), nullptr);

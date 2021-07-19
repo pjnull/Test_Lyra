@@ -173,6 +173,9 @@ struct CORE_API FFortniteMainBranchObjectVersion
 		// Minimize slack waste by using a single array for grass data
 		LandscapeGrassSingleArray,
 
+		// Add loop counters to sequencer's compiled sub-sequence data
+		AddedSubSequenceEntryWarpCounter,
+
 		// -----<new versions can be added above this line>-------------------------------------------------
 		VersionPlusOne,
 		LatestVersion = VersionPlusOne - 1
