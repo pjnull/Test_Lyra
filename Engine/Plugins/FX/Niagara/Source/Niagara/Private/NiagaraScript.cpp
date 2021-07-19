@@ -700,16 +700,23 @@ void UNiagaraScript::ComputeVMCompilationId(FNiagaraVMExecutableDataId& Id, FGui
 				auto TrimAttributesSupported = [=](const UNiagaraEmitter* OtherEmitter)
 				{
 					TArray<const UNiagaraDataInterfaceBase*> DataInterfaces;
-					OtherEmitter->GraphSource->CollectDataInterfaces(DataInterfaces);
-
-					for (const UNiagaraDataInterfaceBase* DataInterface : DataInterfaces)
+					if (OtherEmitter && OtherEmitter->GraphSource)
 					{
-						if (DataInterface->HasInternalAttributeReads(OtherEmitter, Emitter))
+						OtherEmitter->GraphSource->CollectDataInterfaces(DataInterfaces);
+
+						for (const UNiagaraDataInterfaceBase* DataInterface : DataInterfaces)
 						{
-							return false;
+							if (DataInterface->HasInternalAttributeReads(OtherEmitter, Emitter))
+							{
+								return false;
+							}
 						}
+						return true;
 					}
-					return true;
+					else
+					{
+						return false;
+					}
 				};
 
 				// if this emitter is being referenced by another emitter (PartilceRead) then don't worry about trimming attributes
@@ -903,7 +910,10 @@ void UNiagaraScript::ComputeVMCompilationId(FNiagaraVMExecutableDataId& Id, FGui
 
 	if (const FVersionedNiagaraScriptData* ScriptData = GetScriptData(Id.ScriptVersionID))
 	{
-		ScriptData->Source->ComputeVMCompilationId(Id, Usage, UsageId);
+		if (ScriptData->Source)
+		{
+			ScriptData->Source->ComputeVMCompilationId(Id, Usage, UsageId);
+		}
 	}
 
 	FNiagaraVMExecutableDataId& LastGeneratedVMId = GetLastGeneratedVMId(VersionGuid);
