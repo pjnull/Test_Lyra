@@ -969,17 +969,62 @@ void UNetworkPhysicsComponent::InitializeComponent()
 	{
 		return;
 	}
+
+	// Test is component is valid for Network Physics. Needs a valid physics ActorHandle
+	auto ValidComponent = [](UActorComponent* Component)
+	{
+		bool bValid = false;
+		if (UPrimitiveComponent* PrimComp = Cast<UPrimitiveComponent>(Component))
+		{
+			bValid = FPhysicsInterface::IsValid(PrimComp->BodyInstance.ActorHandle);
+		}
+		return bValid;
+	};
+
+	auto SelectComponent = [&ValidComponent](const TArray<UActorComponent*>& Components)
+	{
+		UPrimitiveComponent* Pc = nullptr;
+		for (UActorComponent* Ac : Components)
+		{
+			if (ValidComponent(Ac))
+			{
+				Pc = (UPrimitiveComponent*)Ac;
+				break;
+			}
+
+		}
+		return Pc;
+	};
 	
 	UPrimitiveComponent* PrimitiveComponent = nullptr;
 	if (AActor* MyActor = GetOwner())
 	{
-		if (UPrimitiveComponent* RootPrimitive = Cast<UPrimitiveComponent>(MyActor->GetRootComponent()))
+		// Explicitly tagged component
+		if (ManagedComponentTag != NAME_None)
 		{
-			PrimitiveComponent = RootPrimitive;
+			if (UPrimitiveComponent* FoundComponent = SelectComponent(MyActor->GetComponentsByTag(UPrimitiveComponent::StaticClass(), ManagedComponentTag)))
+			{
+				PrimitiveComponent = FoundComponent;
+			}
+			else
+			{
+				UE_LOG(LogNetworkPhysics, Warning, TEXT("Actor %s: could not find a valid Primitive Component with Tag %s"), *MyActor->GetPathName(), *ManagedComponentTag.ToString());
+			}
 		}
-		else if (UPrimitiveComponent* FoundPrimitive = MyActor->FindComponentByClass<UPrimitiveComponent>())
+
+		// Root component
+		if (!PrimitiveComponent && ValidComponent(MyActor->GetRootComponent()))
 		{
-			PrimitiveComponent = FoundPrimitive;
+			PrimitiveComponent = CastChecked<UPrimitiveComponent>(MyActor->GetRootComponent());
+		}
+
+		// Any other valid primitive component?
+		if (!PrimitiveComponent)
+		{
+			if (UPrimitiveComponent* FoundComponent = SelectComponent(MyActor->K2_GetComponentsByClass(UPrimitiveComponent::StaticClass())))
+			{
+				PrimitiveComponent = FoundComponent;
+			}
 		}
 	}
 

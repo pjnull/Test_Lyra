@@ -384,6 +384,10 @@ public:
 
 protected:
 
+	// Which component's physics body to manage if there are multiple PrimitiveComponent and not the root component.
+	UPROPERTY(EditDefaultsOnly, Category = "Network Physics")
+	FName ManagedComponentTag=NAME_None;
+
 	// Managed state should not be publically exposed
 	UPROPERTY(Replicated, transient)
 	FMockManagedState ReplicatedManagedState;

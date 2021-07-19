@@ -36,12 +36,12 @@ namespace UE_NETWORK_PHYSICS
 	NP_DEVCVAR_INT(LogImpulses, -1, "np2.LogImpulses", "Logs all recorded F/T/LI/AI");
 
 	NP_DEVCVAR_FLOAT(X, 1.0f, "np2.Tolerance.X", "Location Tolerance");
-	NP_DEVCVAR_FLOAT(R, 0.001f, "np2.Tolerance.R", "Rotation Tolerance");
+	NP_DEVCVAR_FLOAT(R, 0.00f, "np2.Tolerance.R", "Rotation Tolerance");
 	NP_DEVCVAR_FLOAT(V, 1.0f, "np2.Tolerance.V", "Velocity Tolerance");
 	NP_DEVCVAR_FLOAT(W, 1.0f, "np2.Tolerance.W", "Rotational Velocity Tolerance");
 
 	NP_DEVCVAR_INT(Debug, 0, "np2.Debug", "Debug mode for in world drawing");
-	NP_DEVCVAR_INT(DebugTolerance, 0, "np2.Debug.Tolerance", "If enabled, only draw large corrections in world.");
+	NP_DEVCVAR_INT(DebugTolerance, 1, "np2.Debug.Tolerance", "If enabled, only draw large corrections in world.");
 	NP_DEVCVAR_FLOAT(DebugDrawTolerance_X, 5.0, "np2.Debug.Tolerance.X",  "Location Debug Drawing Toleration");
 	NP_DEVCVAR_FLOAT(DebugDrawTolerance_R, 2.0, "np2.Debug.Tolerance.R",  "Simple distance based LOD");
 		
@@ -381,6 +381,8 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 					PT->SetV(CorrectionState.Physics.LinearVelocity, false);
 					PT->SetR(CorrectionState.Physics.Rotation, false);
 					PT->SetW(CorrectionState.Physics.AngularVelocity, false);
+
+					//Solver->GetParticles().MarkTransientDirtyParticle(PT->GetProxy()->GetHandle_LowLevel());
 
 					//if (PT->ObjectState() != CorrectionState.Physics.ObjectState)
 					{
@@ -1154,6 +1156,12 @@ void UNetworkPhysicsManager::ProcessClientInputBuffers_External(int32 PhysicsSte
 void UNetworkPhysicsManager::RegisterPhysicsProxy(FNetworkPhysicsState* State)
 {
 	checkSlow(State);
+
+	if (!ensureMsgf(State->Proxy, TEXT("No proxy set on FNetworkPhysicsState")))
+	{
+		return;
+	}
+
 	State->LocalManagedHandle = ++UniqueHandleCounter;
 	ManagedHandleToIndexMap.Add(UniqueHandleCounter) = ManagedPhysicsStates.EmplaceAtLowestFreeIndex(LastFreeIndex, State);
 }
