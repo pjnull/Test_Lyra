@@ -28,10 +28,15 @@
 
 namespace RemoteControlUIModule
 {
-	const TArray<FName> CustomizedStructNames = {
-		FRemoteControlProperty::StaticStruct()->GetFName(),
-		FRemoteControlFunction::StaticStruct()->GetFName(),
-		FRemoteControlActor::StaticStruct()->GetFName()
+	const TArray<FName>& GetCustomizedStructNames()
+	{
+		static TArray<FName> CustomizedStructNames =
+		{
+			FRemoteControlProperty::StaticStruct()->GetFName(),
+			FRemoteControlFunction::StaticStruct()->GetFName(),
+			FRemoteControlActor::StaticStruct()->GetFName()
+		};
+		return CustomizedStructNames;
 	};
 }
 
@@ -351,7 +356,7 @@ void FRemoteControlUIModule::RegisterStructCustomizations()
 {
 	FPropertyEditorModule& PropertyEditorModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>("PropertyEditor");
 	
-	for (FName Name : RemoteControlUIModule::CustomizedStructNames)
+	for (FName Name : RemoteControlUIModule::GetCustomizedStructNames())
 	{
 		PropertyEditorModule.RegisterCustomClassLayout(Name, FOnGetDetailCustomizationInstance::CreateStatic(&FRemoteControlEntityCustomization::MakeInstance));
 	}
@@ -362,9 +367,9 @@ void FRemoteControlUIModule::UnregisterStructCustomizations()
 	FPropertyEditorModule& PropertyEditorModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>("PropertyEditor");
 	
 	// Unregister delegates in reverse order.
-	for (int8 NameIndex = RemoteControlUIModule::CustomizedStructNames.Num() - 1; NameIndex >= 0; NameIndex--)
+	for (int8 NameIndex = RemoteControlUIModule::GetCustomizedStructNames().Num() - 1; NameIndex >= 0; NameIndex--)
 	{
-		PropertyEditorModule.UnregisterCustomClassLayout(RemoteControlUIModule::CustomizedStructNames[NameIndex]);
+		PropertyEditorModule.UnregisterCustomClassLayout(RemoteControlUIModule::GetCustomizedStructNames()[NameIndex]);
 	}
 }
 
