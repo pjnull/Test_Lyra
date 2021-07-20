@@ -21,6 +21,7 @@ public class MoviePlayer : ModuleRules
                     "InputCore",
                     "RenderCore",
                     "CoreUObject",
+					"HTTP",
                     "RHI",
                     "Slate",
 					"SlateCore",

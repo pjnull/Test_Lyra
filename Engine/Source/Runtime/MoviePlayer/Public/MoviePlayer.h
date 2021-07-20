@@ -264,6 +264,9 @@ public:
 	 */
 	virtual bool BlockingStarted() { return false; }
 
+	/**Call this periodically during a blocking operation on the game thread. */
+	virtual void BlockingTick() {}
+
 	/** Call this once the blocking operation is done to shut down the movie player. */
 	virtual void BlockingFinished() {}
 };
@@ -284,6 +287,9 @@ bool MOVIEPLAYER_API IsMoviePlayerEnabled();
 
 /** Call this before doing a blockiing operation on the game thread to start the movie player. */
 MOVIEPLAYER_API void BlockingStartedForMoviePlayer();
+
+/** Call this periodically during a blocking operation on the game thread. */
+MOVIEPLAYER_API void BlockingTickForMoviePlayer();
 
 /**
  * Call this after a blocking operation on the game thread to stop the movie player.

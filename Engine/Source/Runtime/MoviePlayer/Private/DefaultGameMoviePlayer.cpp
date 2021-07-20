@@ -22,6 +22,8 @@
 #include "Widgets/SVirtualWindow.h"
 #include "Rendering/SlateDrawBuffer.h"
 #include "HAL/PlatformApplicationMisc.h"
+#include "Http.h"
+#include "HttpManager.h"
 #include "Widgets/Layout/SDPIScaler.h"
 #include "Engine/UserInterfaceSettings.h"
 
@@ -114,6 +116,7 @@ FDefaultGameMoviePlayer::FDefaultGameMoviePlayer()
 	, LastPlayTime(0.0)
 	, bInitialized(false)
 	, ViewportDPIScale(1.0f)
+	, LastBlockingTickTime(0.0)
 {
 	FCoreDelegates::IsLoadingMovieCurrentlyPlaying.BindRaw(this, &FDefaultGameMoviePlayer::IsMovieCurrentlyPlaying);
     FCoreDelegates::RegisterMovieStreamerDelegate.AddRaw(this, &FDefaultGameMoviePlayer::RegisterMovieStreamer);
@@ -393,6 +396,8 @@ bool FDefaultGameMoviePlayer::PlayMovie()
 			}
 
 			bBeganPlaying = true;
+			LastBlockingTickTime = FPlatformTime::Seconds();
+			OnAsyncLoadingFlushUpdateDelegateHandle = FCoreDelegates::OnAsyncLoadingFlushUpdate.AddRaw(this, &FDefaultGameMoviePlayer::BlockingTick);
 		}
 
 		//Allow anything that set up this LoadingScreenAttribute to know the loading screen is now displaying
@@ -552,6 +557,8 @@ void FDefaultGameMoviePlayer::WaitForMovieToFinish(bool bAllowEngineTick)
 
 		LoadingIsDone.Set(1);
 		IsMoviePlaying = false;
+		FCoreDelegates::OnAsyncLoadingFlushUpdate.Remove(OnAsyncLoadingFlushUpdateDelegateHandle);
+		OnAsyncLoadingFlushUpdateDelegateHandle.Reset();
 
 		IXRLoadingScreen* LoadingScreen;
 		if (GEngine && GEngine->XRSystem.IsValid() && (LoadingScreen = GEngine->XRSystem->GetLoadingScreen()) != nullptr && SyncMechanism == nullptr)
@@ -612,6 +619,25 @@ bool FDefaultGameMoviePlayer::BlockingStarted()
 {
 	bool bIsPlaying = PlayMovie();
 	return bIsPlaying;
+}
+
+void FDefaultGameMoviePlayer::BlockingTick()
+{
+	check(IsInGameThread());
+	if (IsMovieCurrentlyPlaying())
+	{
+		// Has enough time passed since the last tick?
+		double Time = FPlatformTime::Seconds();
+		double DeltaTime = Time - LastBlockingTickTime;
+		if (DeltaTime > 0.1f)
+		{
+			// Yes. Time for another tick.
+			LastBlockingTickTime = Time;
+			FHttpManager& HttpManager = FHttpModule::Get().GetHttpManager();
+			HttpManager.Tick(0.0f);
+			UE_LOG(LogMoviePlayer, Verbose, TEXT("BlockingTick deltatime:%f"), DeltaTime);
+		}
+	}
 }
 
 void FDefaultGameMoviePlayer::BlockingFinished()

@@ -99,6 +99,7 @@ public:
 	virtual FOnMovieClipFinished& OnMovieClipFinished() override { return OnMovieClipFinishedDelegate; }
 
 	virtual bool BlockingStarted() override;
+	virtual void BlockingTick() override;
 	virtual void BlockingFinished() override;
 
 	/** FTickableObjectRenderThread interface */
@@ -218,6 +219,11 @@ private:
 
 	/** Scale used by UserWidgetDPIScaler. */
 	float ViewportDPIScale;
+
+	/** Last time we were able to tick during blocking. */
+	double LastBlockingTickTime;
+	/** Handle to our async loading update function. */
+	FDelegateHandle OnAsyncLoadingFlushUpdateDelegateHandle;
 
 private:
 	/** Singleton handle */

@@ -133,6 +133,11 @@ void BlockingStartedForMoviePlayer()
 	GetMoviePlayer()->BlockingStarted();
 }
 
+void BlockingTickForMoviePlayer()
+{
+	GetMoviePlayer()->BlockingTick();
+}
+
 void BlockingFinishedForMoviePlayer()
 {
 	GetMoviePlayer()->BlockingFinished();
