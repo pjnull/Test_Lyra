@@ -245,8 +245,18 @@ bool FNiagaraScriptExecutionContext::Tick(FNiagaraSystemInstance* ParentSystemIn
 					int32 UserPtrIdx = ScriptExecutableData.DataInterfaceInfo[i].UserPtrIdx;
 					if (UserPtrIdx != INDEX_NONE)
 					{
-						void* InstData = ParentSystemInstance->FindDataInterfaceInstanceData(Interface);
-						UserPtrTable[UserPtrIdx] = InstData;
+						if (void* InstData = ParentSystemInstance->FindDataInterfaceInstanceData(Interface))
+						{
+							UserPtrTable[UserPtrIdx] = InstData;
+						}
+						else
+						{
+							UE_LOG(LogNiagara, Warning, TEXT("Failed to resolve User Pointer for UserPtrTable[%d] looking for DI: %s for system: %s"),
+								UserPtrIdx,
+								*Interface->GetName(),
+								*ParentSystemInstance->GetSystem()->GetName());
+							return false;
+						}
 					}
 				}
 			}
