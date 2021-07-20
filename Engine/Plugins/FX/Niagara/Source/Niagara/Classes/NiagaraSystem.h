@@ -743,7 +743,7 @@ protected:
 
 	/** Wrapper for editor only parameters. */
 	UPROPERTY()
-	UNiagaraEditorParametersAdapterBase* EditorParameters;
+	TObjectPtr<UNiagaraEditorParametersAdapterBase> EditorParameters;
 
 	bool bIsolateEnabled;
 
@@ -776,11 +776,11 @@ protected:
 #if WITH_EDITORONLY_DATA
 	/** Settings used inside the baker */
 	UPROPERTY(Export)
-	UNiagaraBakerSettings* BakerSettings;
+	TObjectPtr<UNiagaraBakerSettings> BakerSettings;
 
 	/** Generated data baker settings, will be null until we have generated at least once. */
 	UPROPERTY(Export)
-	UNiagaraBakerSettings* BakerGeneratedSettings;
+	TObjectPtr<UNiagaraBakerSettings> BakerGeneratedSettings;
 #endif
 
 	UPROPERTY()
