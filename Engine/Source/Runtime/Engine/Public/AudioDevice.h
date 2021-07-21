@@ -521,6 +521,11 @@ public:
 	bool Init(Audio::FDeviceId InDeviceID, int32 InMaxSources);
 
 	/**
+	 * Called after FAudioDevice creation and init
+	 */
+	void OnDeviceCreated(Audio::FDeviceId InDeviceID);
+
+	/**
 	 * Tears down the audio device
 	 */
 	void Teardown();
@@ -857,8 +862,11 @@ protected:
 	 */
 	void InitSoundSources();
 
-	/** Create our subsystem collection root object and initailize subsystems */
+	/** Create our subsystem collection root object and initialize subsystems */
 	void InitializeSubsystemCollection();
+
+	// Handle for our device created delegate
+	FDelegateHandle DeviceCreatedHandle;
 
 public:
 	/**

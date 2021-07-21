@@ -350,7 +350,7 @@ bool FAudioDevice::Init(Audio::FDeviceId InDeviceID, int32 InMaxSources)
 
 	DeviceID = InDeviceID;
 
-	InitializeSubsystemCollection();
+	DeviceCreatedHandle = FAudioDeviceManagerDelegates::OnAudioDeviceCreated.AddRaw(this, &FAudioDevice::OnDeviceCreated);
 
 	bool bDeferStartupPrecache = false;
 
@@ -555,6 +555,15 @@ bool FAudioDevice::Init(Audio::FDeviceId InDeviceID, int32 InMaxSources)
 	UE_LOG(LogInit, Log, TEXT("FAudioDevice initialized."));
 
 	return true;
+}
+
+void FAudioDevice::OnDeviceCreated(Audio::FDeviceId InDeviceID)
+{
+	if (InDeviceID == DeviceID)
+	{
+		InitializeSubsystemCollection();
+		FAudioDeviceManagerDelegates::OnAudioDeviceCreated.Remove(DeviceCreatedHandle);
+	}
 }
 
 void FAudioDevice::OnPreGarbageCollect()
