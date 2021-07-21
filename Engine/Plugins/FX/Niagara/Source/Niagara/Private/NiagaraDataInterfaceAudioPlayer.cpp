@@ -449,7 +449,7 @@ void UNiagaraDataInterfaceAudioPlayer::GetVMExternalFunction(const FVMExternalFu
 	}
 }
 
-void UNiagaraDataInterfaceAudioPlayer::SetParameterBool(FVectorVMContext& Context)
+void UNiagaraDataInterfaceAudioPlayer::SetParameterBool(FVectorVMExternalFunctionContext& Context)
 {
 	VectorVM::FUserPtrHandler<FAudioPlayerInterface_InstanceData> InstData(Context);
 
@@ -459,7 +459,7 @@ void UNiagaraDataInterfaceAudioPlayer::SetParameterBool(FVectorVMContext& Contex
 	checkfSlow(InstData.Get(), TEXT("Audio player interface has invalid instance data. %s"), *GetPathName());
 
 	InstData->bHadPersistentAudioUpdateThisTick = true;
-	for (int32 i = 0; i < Context.NumInstances; ++i)
+	for (int32 i = 0; i < Context.GetNumInstances(); ++i)
 	{
 		int32 Handle = AudioHandleInParam.GetAndAdvance();
 		int32 NameIndex = NameIndexParam.GetAndAdvance();
@@ -482,7 +482,7 @@ void UNiagaraDataInterfaceAudioPlayer::SetParameterBool(FVectorVMContext& Contex
 	}
 }
 
-void UNiagaraDataInterfaceAudioPlayer::SetParameterInteger(FVectorVMContext& Context)
+void UNiagaraDataInterfaceAudioPlayer::SetParameterInteger(FVectorVMExternalFunctionContext& Context)
 {
 	VectorVM::FUserPtrHandler<FAudioPlayerInterface_InstanceData> InstData(Context);
 
@@ -492,7 +492,7 @@ void UNiagaraDataInterfaceAudioPlayer::SetParameterInteger(FVectorVMContext& Con
 	checkfSlow(InstData.Get(), TEXT("Audio player interface has invalid instance data. %s"), *GetPathName());
 
 	InstData->bHadPersistentAudioUpdateThisTick = true;
-	for (int32 i = 0; i < Context.NumInstances; ++i)
+	for (int32 i = 0; i < Context.GetNumInstances(); ++i)
 	{
 		int32 Handle = AudioHandleInParam.GetAndAdvance();
 		int32 NameIndex = NameIndexParam.GetAndAdvance();
@@ -515,7 +515,7 @@ void UNiagaraDataInterfaceAudioPlayer::SetParameterInteger(FVectorVMContext& Con
 	}
 }
 
-void UNiagaraDataInterfaceAudioPlayer::SetParameterFloat(FVectorVMContext& Context)
+void UNiagaraDataInterfaceAudioPlayer::SetParameterFloat(FVectorVMExternalFunctionContext& Context)
 {
 	VectorVM::FUserPtrHandler<FAudioPlayerInterface_InstanceData> InstData(Context);
 
@@ -525,7 +525,7 @@ void UNiagaraDataInterfaceAudioPlayer::SetParameterFloat(FVectorVMContext& Conte
 	checkfSlow(InstData.Get(), TEXT("Audio player interface has invalid instance data. %s"), *GetPathName());
 
 	InstData->bHadPersistentAudioUpdateThisTick = true;
-	for (int32 i = 0; i < Context.NumInstances; ++i)
+	for (int32 i = 0; i < Context.GetNumInstances(); ++i)
 	{
 		int32 Handle = AudioHandleInParam.GetAndAdvance();
 		int32 NameIndex = NameIndexParam.GetAndAdvance();
@@ -548,7 +548,7 @@ void UNiagaraDataInterfaceAudioPlayer::SetParameterFloat(FVectorVMContext& Conte
 	}
 }
 
-void UNiagaraDataInterfaceAudioPlayer::UpdateVolume(FVectorVMContext& Context)
+void UNiagaraDataInterfaceAudioPlayer::UpdateVolume(FVectorVMExternalFunctionContext& Context)
 {
 	VectorVM::FUserPtrHandler<FAudioPlayerInterface_InstanceData> InstData(Context);
 
@@ -557,7 +557,7 @@ void UNiagaraDataInterfaceAudioPlayer::UpdateVolume(FVectorVMContext& Context)
 	checkfSlow(InstData.Get(), TEXT("Audio player interface has invalid instance data. %s"), *GetPathName());
 
 	InstData->bHadPersistentAudioUpdateThisTick = true;
-	for (int32 i = 0; i < Context.NumInstances; ++i)
+	for (int32 i = 0; i < Context.GetNumInstances(); ++i)
 	{
 		int32 Handle = AudioHandleInParam.GetAndAdvance();
 		float Volume = VolumeParam.GetAndAdvance();
@@ -578,7 +578,7 @@ void UNiagaraDataInterfaceAudioPlayer::UpdateVolume(FVectorVMContext& Context)
 	}
 }
 
-void UNiagaraDataInterfaceAudioPlayer::UpdatePitch(FVectorVMContext& Context)
+void UNiagaraDataInterfaceAudioPlayer::UpdatePitch(FVectorVMExternalFunctionContext& Context)
 {
 	VectorVM::FUserPtrHandler<FAudioPlayerInterface_InstanceData> InstData(Context);
 
@@ -587,7 +587,7 @@ void UNiagaraDataInterfaceAudioPlayer::UpdatePitch(FVectorVMContext& Context)
 	checkfSlow(InstData.Get(), TEXT("Audio player interface has invalid instance data. %s"), *GetPathName());
 
 	InstData->bHadPersistentAudioUpdateThisTick = true;
-	for (int32 i = 0; i < Context.NumInstances; ++i)
+	for (int32 i = 0; i < Context.GetNumInstances(); ++i)
 	{
 		int32 Handle = AudioHandleInParam.GetAndAdvance();
 		float Pitch = PitchParam.GetAndAdvance();
@@ -608,7 +608,7 @@ void UNiagaraDataInterfaceAudioPlayer::UpdatePitch(FVectorVMContext& Context)
 	}
 }
 
-void UNiagaraDataInterfaceAudioPlayer::UpdateLocation(FVectorVMContext& Context)
+void UNiagaraDataInterfaceAudioPlayer::UpdateLocation(FVectorVMExternalFunctionContext& Context)
 {
 	VectorVM::FUserPtrHandler<FAudioPlayerInterface_InstanceData> InstData(Context);
 
@@ -617,7 +617,7 @@ void UNiagaraDataInterfaceAudioPlayer::UpdateLocation(FVectorVMContext& Context)
 	checkfSlow(InstData.Get(), TEXT("Audio player interface has invalid instance data. %s"), *GetPathName());
 
 	InstData->bHadPersistentAudioUpdateThisTick = true;
-	for (int32 i = 0; i < Context.NumInstances; ++i)
+	for (int32 i = 0; i < Context.GetNumInstances(); ++i)
 	{
 		int32 Handle = AudioHandleInParam.GetAndAdvance();
 		FVector Location = LocationParam.GetAndAdvance();
@@ -638,7 +638,7 @@ void UNiagaraDataInterfaceAudioPlayer::UpdateLocation(FVectorVMContext& Context)
 	}
 }
 
-void UNiagaraDataInterfaceAudioPlayer::UpdateRotation(FVectorVMContext& Context)
+void UNiagaraDataInterfaceAudioPlayer::UpdateRotation(FVectorVMExternalFunctionContext& Context)
 {
 	VectorVM::FUserPtrHandler<FAudioPlayerInterface_InstanceData> InstData(Context);
 
@@ -647,7 +647,7 @@ void UNiagaraDataInterfaceAudioPlayer::UpdateRotation(FVectorVMContext& Context)
 	checkfSlow(InstData.Get(), TEXT("Audio player interface has invalid instance data. %s"), *GetPathName());
 
 	InstData->bHadPersistentAudioUpdateThisTick = true;
-	for (int32 i = 0; i < Context.NumInstances; ++i)
+	for (int32 i = 0; i < Context.GetNumInstances(); ++i)
 	{
 		int32 Handle = AudioHandleInParam.GetAndAdvance();
 		FVector Rotation = RotationParam.GetAndAdvance();
@@ -669,7 +669,7 @@ void UNiagaraDataInterfaceAudioPlayer::UpdateRotation(FVectorVMContext& Context)
 	}
 }
 
-void UNiagaraDataInterfaceAudioPlayer::SetPausedState(FVectorVMContext& Context)
+void UNiagaraDataInterfaceAudioPlayer::SetPausedState(FVectorVMExternalFunctionContext& Context)
 {
 	VectorVM::FUserPtrHandler<FAudioPlayerInterface_InstanceData> InstData(Context);
 
@@ -678,7 +678,7 @@ void UNiagaraDataInterfaceAudioPlayer::SetPausedState(FVectorVMContext& Context)
 	checkfSlow(InstData.Get(), TEXT("Audio player interface has invalid instance data. %s"), *GetPathName());
 
 	InstData->bHadPersistentAudioUpdateThisTick = true;
-	for (int32 i = 0; i < Context.NumInstances; ++i)
+	for (int32 i = 0; i < Context.GetNumInstances(); ++i)
 	{
 		int32 Handle = AudioHandleInParam.GetAndAdvance();
 		bool IsPaused = PausedParam.GetAndAdvance();
@@ -699,7 +699,7 @@ void UNiagaraDataInterfaceAudioPlayer::SetPausedState(FVectorVMContext& Context)
 	}
 }
 
-void UNiagaraDataInterfaceAudioPlayer::PlayOneShotAudio(FVectorVMContext& Context)
+void UNiagaraDataInterfaceAudioPlayer::PlayOneShotAudio(FVectorVMExternalFunctionContext& Context)
 {
 	VectorVM::FUserPtrHandler<FAudioPlayerInterface_InstanceData> InstData(Context);
 
@@ -722,7 +722,7 @@ void UNiagaraDataInterfaceAudioPlayer::PlayOneShotAudio(FVectorVMContext& Contex
 	checkfSlow(InstData.Get(), TEXT("Audio player interface has invalid instance data. %s"), *GetPathName());
 	bool ValidSoundData = InstData->SoundToPlay.IsValid();
 
-	for (int32 i = 0; i < Context.NumInstances; ++i)
+	for (int32 i = 0; i < Context.GetNumInstances(); ++i)
 	{
 		FNiagaraBool ShouldPlay = PlayDataParam.GetAndAdvance();
 		FAudioParticleData Data;
@@ -741,7 +741,7 @@ void UNiagaraDataInterfaceAudioPlayer::PlayOneShotAudio(FVectorVMContext& Contex
 	}
 }
 
-void UNiagaraDataInterfaceAudioPlayer::PlayPersistentAudio(FVectorVMContext& Context)
+void UNiagaraDataInterfaceAudioPlayer::PlayPersistentAudio(FVectorVMExternalFunctionContext& Context)
 {
 	VectorVM::FUserPtrHandler<FAudioPlayerInterface_InstanceData> InstData(Context);
 
@@ -760,7 +760,7 @@ void UNiagaraDataInterfaceAudioPlayer::PlayPersistentAudio(FVectorVMContext& Con
 	checkfSlow(InstData.Get(), TEXT("Audio player interface has invalid instance data. %s"), *GetPathName());
 
 	InstData->bHadPersistentAudioUpdateThisTick = true;
-	for (int32 i = 0; i < Context.NumInstances; ++i)
+	for (int32 i = 0; i < Context.GetNumInstances(); ++i)
 	{
 		bool ShouldPlay = PlayAudioParam.GetAndAdvance();
 		int32 Handle = AudioHandleInParam.GetAndAdvance();
