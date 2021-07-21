@@ -289,7 +289,7 @@ void FSocialUserList::TryAddUserFast(USocialUser& User)
 		else if (!bCanAdd && ListConfig.RelevantSubsystems.Contains(RelationshipSubsystem))
 		{
 			// Even if the user does not qualify for the list now due to presence filters, we still want to know about any changes to their presence to reevaluate
-			if (HasPresenceFilters() && !User.OnUserPresenceChanged().IsBoundToObject(this))
+			if ((HasPresenceFilters() || ListConfig.OnCustomFilterUser.IsBound()) && !User.OnUserPresenceChanged().IsBoundToObject(this))
 			{
 				User.OnUserPresenceChanged().AddSP(this, &FSocialUserList::HandleUserPresenceChanged, &User);
 			}
