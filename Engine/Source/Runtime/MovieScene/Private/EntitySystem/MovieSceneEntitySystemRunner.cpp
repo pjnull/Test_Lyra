@@ -599,7 +599,8 @@ void FMovieSceneEntitySystemRunner::OnLinkerGarbageCleaned(UMovieSceneEntitySyst
 
 void FMovieSceneEntitySystemRunner::OnLinkerAbandon(UMovieSceneEntitySystemLinker* InLinker)
 {
-	UMovieSceneEntitySystemLinker* Linker = GetLinker();
+	const bool bEvenIfPendingKill = true; // OnLinkerAbandon may be called while the GC is tearing down our linker.
+	UMovieSceneEntitySystemLinker* Linker = WeakLinker.Get(bEvenIfPendingKill);
 	if (ensure(Linker))
 	{
 		check(Linker == InLinker);
