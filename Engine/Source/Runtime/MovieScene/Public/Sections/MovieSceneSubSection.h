@@ -192,11 +192,7 @@ private:
 
 protected:
 
-	/**
-	 * Movie scene being played by this section.
-	 *
-	 * @todo Sequencer: Should this be lazy loaded?
-	 */
+	/** Movie scene being played by this section */
 	UPROPERTY(EditAnywhere, Category="Sequence")
 	TObjectPtr<UMovieSceneSequence> SubSequence;
 
