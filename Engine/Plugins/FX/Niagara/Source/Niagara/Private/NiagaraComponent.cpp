@@ -979,6 +979,7 @@ void UNiagaraComponent::ActivateInternal(bool bReset /* = false */, bool bIsScal
 	}
 
 	DestroyCullProxy();
+	UNiagaraScript::AsyncOptimizeAllScriptsForComponent(this);
 
 	// We can't call 'Super::Activate(bReset);' as this will enable the component tick
 	if (bReset || ShouldActivate() == true)
