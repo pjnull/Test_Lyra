@@ -190,7 +190,7 @@ private:
 
 	void TickDrawDebug();
 
-	FNetworkPhysicsRewindCallback* RewindCallback;
+	FNetworkPhysicsRewindCallback* RewindCallback=nullptr;
 
 	FDelegateHandle PostTickDispatchHandle; // NetRecv
 	FDelegateHandle TickFlushHandle; // NetSend
