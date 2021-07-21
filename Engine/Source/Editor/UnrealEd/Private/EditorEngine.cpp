@@ -238,6 +238,7 @@
 #include "Misc/PackageAccessTracking.h"
 #include "Misc/PackageAccessTrackingOps.h"
 #include "DerivedDataBuildRemoteExecutor.h"
+#include "DerivedDataBuildWorkers.h"
 
 #if WITH_CHAOS
 #include "ChaosSolversModule.h"
@@ -633,6 +634,7 @@ void UEditorEngine::InitEditor(IEngineLoop* InEngineLoop)
 	// Allow remote execution of derived data builds from this point
 	// TODO: This needs to be enabled earlier to allow early data builds to be remote executed.
 	InitDerivedDataBuildRemoteExecutor();
+	InitDerivedDataBuildWorkers();
 
 	// Call base.
 	UEngine::Init(InEngineLoop);
