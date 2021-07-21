@@ -59,8 +59,10 @@ class GEFORCENOWWRAPPER_API GeForceNOWActionZoneProcessor : public TSharedFromTh
 {
 public:
 
-	/** Initializes the Action Zone Processor by hooking onto the Slate Widget Tracker and requesting the tracked widgets we are interested in. */
-	void Initialize();
+	/** Initializes the Action Zone Processor by hooking onto the Slate Widget Tracker and requesting the tracked widgets we are interested in. 
+	 * Return true if initialization was successful.
+	 */
+	bool Initialize();
 	/** Terminates the action Zone Processor by unhooking from the Slate Widget Tracker and clearing all action zones. */
 	void Terminate();
 

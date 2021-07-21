@@ -2,8 +2,6 @@
 
 #pragma once
 
-#if WITH_SLATE_WIDGET_TRACKING
-
 #include "CoreMinimal.h"
 
 class SWidget;
@@ -28,6 +26,9 @@ public:
 
 	/** Get the Singleton instance of the Slate Widget Tracker. */
 	static FSlateWidgetTracker& Get();
+
+	/** Return true if Slate.EnableSlateWidgetTracker was set to true via config files or C++. */
+	bool IsEnabled() const;
 
 	/** Adds a tracked Widget for the specified tags. */
 	void AddTrackedWidget(const SWidget* WidgetToTrack, const TArray<FName>& Tags);
@@ -62,5 +63,3 @@ private:
 	TMap<FName, FTrackedWidgetsChangedEvent> TrackedWidgetsChangedEvents;
 
 };
-
-#endif //WITH_SLATE_WIDGET_TRACKING

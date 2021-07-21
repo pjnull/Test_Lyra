@@ -10,6 +10,8 @@
 #include "Widgets/SWindow.h"
 #include "Widgets/SWidget.h"
 
+DEFINE_LOG_CATEGORY_STATIC(LogGFNActionZoneProcessor, Display, All);
+
 static bool bForceProcessGFNWidgetActionZones = false;
 FAutoConsoleVariableRef CVarForceProcessGFNWidgetActionZones(
 	TEXT("GFN.ForceProcessGFNWidgetActionZones"),
@@ -47,7 +49,7 @@ void FWidgetGFNActionZone::UpdateActionZone(TArray<TSharedRef<SWindow>>& SlateWi
 			if (ActionZoneRect.IsValid() && !ActionZoneRect.IsEmpty())
 			{
 				//Our Widget is interactable; let GFN know.
-				UE_LOG(LogTemp, Display, TEXT("[GFNWidgetActionZone::UpdateActionZone] Updating Widget %p GFN Action Zone | ActionZoneRect : L: %f , T: %f , R: %f , B: %f"), Widget, ActionZoneRect.Left, ActionZoneRect.Top, ActionZoneRect.Right, ActionZoneRect.Bottom);
+				UE_LOG(LogGFNActionZoneProcessor, Display, TEXT("[GFNWidgetActionZone::UpdateActionZone] Updating Widget %p GFN Action Zone | ActionZoneRect : L: %f , T: %f , R: %f , B: %f"), Widget, ActionZoneRect.Left, ActionZoneRect.Top, ActionZoneRect.Right, ActionZoneRect.Bottom);
 
 				bWasInteractable = true;
 				GfnRect ActionZoneGFNRect;
@@ -63,12 +65,12 @@ void FWidgetGFNActionZone::UpdateActionZone(TArray<TSharedRef<SWindow>>& SlateWi
 				if (GfnResult != GfnError::gfnSuccess)
 				{
 					bHasActionZone = false;
-					UE_LOG(LogTemp, Warning, TEXT("[GFNWidgetActionZone::UpdateActionZone] Failed to set Action Zone.  | Error Code : %i"), GfnResult);
+					UE_LOG(LogGFNActionZoneProcessor, Warning, TEXT("[GFNWidgetActionZone::UpdateActionZone] Failed to set Action Zone.  | Error Code : %i"), GfnResult);
 				}
 			}
 			else
 			{
-				UE_LOG(LogTemp, Display, TEXT("[GFNWidgetActionZone::UpdateActionZone] Updating Widget %p GFN Action Zone | No longer interactable"), Widget);
+				UE_LOG(LogGFNActionZoneProcessor, Display, TEXT("[GFNWidgetActionZone::UpdateActionZone] Updating Widget %p GFN Action Zone | No longer interactable"), Widget);
 				//Our Widget has an invalid Rect and is no longer interactable; let GFN know.
 				bWasInteractable = false;
 				ClearActionZone();
@@ -77,7 +79,7 @@ void FWidgetGFNActionZone::UpdateActionZone(TArray<TSharedRef<SWindow>>& SlateWi
 	}
 	else if (bWasInteractable)
 	{
-		UE_LOG(LogTemp, Display, TEXT("[GFNWidgetActionZone::UpdateActionZone] Updating Widget %p GFN Action Zone | No longer interactable"), Widget);
+		UE_LOG(LogGFNActionZoneProcessor, Display, TEXT("[GFNWidgetActionZone::UpdateActionZone] Updating Widget %p GFN Action Zone | No longer interactable"), Widget);
 		//Our Widget was interactable but no longer is; let GFN know.
 		bWasInteractable = false;
 		ClearActionZone();
@@ -93,7 +95,7 @@ void FWidgetGFNActionZone::ClearActionZone()
 		if (GfnResult != GfnError::gfnSuccess)
 		{
 			bHasActionZone = true;
-			UE_LOG(LogTemp, Warning, TEXT("[GFNWidgetActionZone::ClearActionZone] Failed to Remove Action Zone. | Error Code : %i"), GfnResult);
+			UE_LOG(LogGFNActionZoneProcessor, Warning, TEXT("[GFNWidgetActionZone::ClearActionZone] Failed to Remove Action Zone. | Error Code : %i"), GfnResult);
 		}
 	}
 }
@@ -106,46 +108,48 @@ unsigned int FWidgetGFNActionZone::GetID() const
 
 //--------------------------GeForceNOWActionZoneProcessor--------------------------
 
-void GeForceNOWActionZoneProcessor::Initialize()
+bool GeForceNOWActionZoneProcessor::Initialize()
 {
-#if WITH_SLATE_WIDGET_TRACKING
-
-	if (GeForceNOWWrapper::Get().IsRunningInGFN() || bForceProcessGFNWidgetActionZones)
+	if (FSlateWidgetTracker::Get().IsEnabled())
 	{
-		FSlateWidgetTracker::Get().OnTrackedWidgetsChanged(GeForceNowTrackedWidgetTags::EditableTextTag).AddSP(this, &GeForceNOWActionZoneProcessor::HandleTrackedWidgetChanges);
+		if (GeForceNOWWrapper::Get().IsRunningInGFN() || bForceProcessGFNWidgetActionZones)
+		{
+			FSlateWidgetTracker::Get().OnTrackedWidgetsChanged(GeForceNowTrackedWidgetTags::EditableTextTag).AddSP(this, &GeForceNOWActionZoneProcessor::HandleTrackedWidgetChanges);
 
-		FSlateWidgetTracker::Get().ForEachTrackedWidget(GeForceNowTrackedWidgetTags::EditableTextTag, [this](const SWidget* Widget)
-														{
-															HandleEditableTextWidgetRegistered(Widget);
-														});
+			FSlateWidgetTracker::Get().ForEachTrackedWidget(GeForceNowTrackedWidgetTags::EditableTextTag, [this](const SWidget* Widget)
+															{
+																HandleEditableTextWidgetRegistered(Widget);
+															});
+			return true;
+		}
 	}
-
-#endif //WITH_SLATE_WIDGET_TRACKING
+	else
+	{
+		UE_LOG(LogGFNActionZoneProcessor, Warning, TEXT("SlateWidgetTracker is not initialized. GeForceNOWActionZoneProcessor will not function."));
+	}
+	return false;
 }
 
 void GeForceNOWActionZoneProcessor::Terminate()
 {
-#if WITH_SLATE_WIDGET_TRACKING
-
-	if (GeForceNOWWrapper::Get().IsRunningInGFN() || bForceProcessGFNWidgetActionZones)
+	if (FSlateWidgetTracker::Get().IsEnabled())
 	{
-		FSlateWidgetTracker::Get().OnTrackedWidgetsChanged(GeForceNowTrackedWidgetTags::EditableTextTag).RemoveAll(this);
-		StopProcess();
-
-		for (int32 i = GFNWidgetActionZones.Num() - 1; i >= 0; i--)
+		if (GeForceNOWWrapper::Get().IsRunningInGFN() || bForceProcessGFNWidgetActionZones)
 		{
-			GFNWidgetActionZones[i].ClearActionZone();
-			GFNWidgetActionZones.RemoveAt(i);
+			FSlateWidgetTracker::Get().OnTrackedWidgetsChanged(GeForceNowTrackedWidgetTags::EditableTextTag).RemoveAll(this);
+			StopProcess();
+
+			for (int32 i = GFNWidgetActionZones.Num() - 1; i >= 0; i--)
+			{
+				GFNWidgetActionZones[i].ClearActionZone();
+				GFNWidgetActionZones.RemoveAt(i);
+			}
 		}
 	}
-
-#endif //WITH_SLATE_WIDGET_TRACKING
 }
 
 void GeForceNOWActionZoneProcessor::HandleTrackedWidgetChanges(const SWidget* Widget, const FName& Tag, ETrackedSlateWidgetOperations Operation)
 {
-#if WITH_SLATE_WIDGET_TRACKING
-
 	switch (Operation)
 	{
 		case ETrackedSlateWidgetOperations::AddedTrackedWidget :
@@ -155,8 +159,6 @@ void GeForceNOWActionZoneProcessor::HandleTrackedWidgetChanges(const SWidget* Wi
 			HandleEditableTextWidgetUnregistered(Widget);
 			break;
 	}
-
-#endif //WITH_SLATE_WIDGET_TRACKING
 }
 
 void GeForceNOWActionZoneProcessor::HandleEditableTextWidgetRegistered(const SWidget* Widget)

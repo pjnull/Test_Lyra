@@ -16,7 +16,7 @@ public:
 
 	SLATE_METADATA_TYPE(FTrackedMetaData, ISlateMetaData)
 
-	FTrackedMetaData(const SWidget* InTrackedWidget, TArray<FName> InTags);
+	FTrackedMetaData(const SWidget* InTrackedWidget, TArray<FName>&& InTags);
 	FTrackedMetaData(const SWidget* InTrackedWidget, FName InTags);
 	~FTrackedMetaData();
 

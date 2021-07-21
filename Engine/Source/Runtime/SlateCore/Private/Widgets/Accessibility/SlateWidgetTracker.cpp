@@ -1,11 +1,17 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#if WITH_SLATE_WIDGET_TRACKING
-
 #include "Widgets/Accessibility/SlateWidgetTracker.h"
 #include "Types/ISlateMetaData.h"
 #include "Widgets/SWidget.h"
 #include "Misc/MemStack.h"
+
+bool GIsSlateWidgetTrackerEnabled = false;
+FAutoConsoleVariableRef CVarEnableSlateWidgetTracker(
+	TEXT("Slate.EnableSlateWidgetTracker"),
+	GIsSlateWidgetTrackerEnabled,
+	TEXT("Whether or not we enable the tracking of widgets via the Slate Widget Tracker."),
+	ECVF_ReadOnly
+);
 
 FSlateWidgetTracker& FSlateWidgetTracker::Get()
 {
@@ -13,9 +19,14 @@ FSlateWidgetTracker& FSlateWidgetTracker::Get()
 	return Singleton;
 }
 
+bool FSlateWidgetTracker::IsEnabled() const
+{
+	return GIsSlateWidgetTrackerEnabled;
+}
+
 void FSlateWidgetTracker::AddTrackedWidget(const SWidget* WidgetToTrack, const TArray<FName>& Tags)
 {
-	if (WidgetToTrack != nullptr)
+	if (IsEnabled() && WidgetToTrack != nullptr)
 	{
 		for (const FName& Tag : Tags)
 		{
@@ -26,7 +37,7 @@ void FSlateWidgetTracker::AddTrackedWidget(const SWidget* WidgetToTrack, const T
 
 void FSlateWidgetTracker::AddTrackedWidget(const SWidget* WidgetToTrack, FName Tag)
 {
-	if (WidgetToTrack != nullptr)
+	if (IsEnabled() && WidgetToTrack != nullptr)
 	{
 		TrackedWidgets.FindOrAdd(Tag).Add(WidgetToTrack);
 		if (FTrackedWidgetsChangedEvent* TrackedWidgetsChangedEvent = TrackedWidgetsChangedEvents.Find(Tag))
@@ -38,7 +49,7 @@ void FSlateWidgetTracker::AddTrackedWidget(const SWidget* WidgetToTrack, FName T
 
 void FSlateWidgetTracker::RemoveTrackedWidget(const SWidget* WidgetToStopTracking)
 {
-	if (WidgetToStopTracking != nullptr)
+	if (IsEnabled() && WidgetToStopTracking != nullptr)
 	{
 		FMemMark Mark(FMemStack::Get());
 		TArray<FName, TMemStackAllocator<>> AllTags;
@@ -67,5 +78,3 @@ FTrackedWidgetsChangedEvent& FSlateWidgetTracker::OnTrackedWidgetsChanged(const 
 {
 	return TrackedWidgetsChangedEvents.FindOrAdd(Tag);
 }
-
-#endif //WITH_SLATE_WIDGET_TRACKING
