@@ -35,6 +35,7 @@ public class Engine : ModuleRules
 				"Advertising",
 				"MovieSceneCapture",
 				"AutomationWorker",
+				"MoviePlayer",
 				"MovieSceneCapture",
 				"DesktopPlatform"
 			}
