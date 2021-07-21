@@ -538,6 +538,7 @@ UObject* USoundFactory::CreateObject
 		}
 
 		Sound->Duration = (float)NumFrames / *WaveInfo.pSamplesPerSec;
+		Sound->SetImportedSampleRate(*WaveInfo.pSamplesPerSec);
 		Sound->SetSampleRate(*WaveInfo.pSamplesPerSec);
 		Sound->NumChannels = ChannelCount;
 		Sound->TotalSamples = *WaveInfo.pSamplesPerSec * Sound->Duration;
