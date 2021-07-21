@@ -503,7 +503,16 @@ void FMovieSceneEntitySystemRunner::GameThread_EvaluationFinalizationPhase()
 	// The events are actually executed a bit later, in GameThread_PostEvaluationPhase.
 	bCanQueueEventTriggers = true;
 	{
-		GetInstanceRegistry()->FinalizeFrame();
+		FInstanceRegistry* InstanceRegistry = GetInstanceRegistry();
+
+		for (FInstanceHandle UpdatedInstance : CurrentInstances)
+		{
+			FSequenceInstance& Instance = InstanceRegistry->MutateInstance(UpdatedInstance);
+			if (Instance.IsRootSequence())
+			{
+				Instance.RunLegacyTrackTemplates();
+			}
+		}
 
 		FGraphEventArray Tasks;
 		Linker->SystemGraph.ExecutePhase(ESystemPhase::Finalization, Linker, Tasks);
