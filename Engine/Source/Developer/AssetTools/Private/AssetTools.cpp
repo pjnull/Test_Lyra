@@ -583,7 +583,7 @@ UObject* UAssetToolsImpl::CreateAssetWithDialog(const FString& AssetName, const 
 				const FString SavePackageName = FPackageName::ObjectPathToPackageName(SaveObjectPath);
 				const FString SavePackagePath = FPaths::GetPath(SavePackageName);
 				const FString SaveAssetName = FPaths::GetBaseFilename(SavePackageName);
-				FEditorDirectories::Get().SetLastDirectory(ELastDirectory::NEW_ASSET, PackagePath);
+				FEditorDirectories::Get().SetLastDirectory(ELastDirectory::NEW_ASSET, SavePackagePath);
 
 				return CreateAsset(SaveAssetName, SavePackagePath, AssetClass, Factory, CallingContext);
 			}
