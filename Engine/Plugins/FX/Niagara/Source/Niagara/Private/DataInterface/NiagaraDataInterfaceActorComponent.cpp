@@ -187,11 +187,11 @@ void UNiagaraDataInterfaceActorComponent::GetVMExternalFunction(const FVMExterna
 	using namespace NDIActorComponentLocal;
 	if (BindingInfo.Name == GetMatrixName)
 	{
-		OutFunc = FVMExternalFunction::CreateLambda([this](FVectorVMContext& Context) { this->VMGetMatrix(Context); });
+		OutFunc = FVMExternalFunction::CreateLambda([this](FVectorVMExternalFunctionContext& Context) { this->VMGetMatrix(Context); });
 	}
 	else if (BindingInfo.Name == GetTransformName)
 	{
-		OutFunc = FVMExternalFunction::CreateLambda([this](FVectorVMContext& Context) { this->VMGetTransform(Context); });
+		OutFunc = FVMExternalFunction::CreateLambda([this](FVectorVMExternalFunctionContext& Context) { this->VMGetTransform(Context); });
 	}
 }
 
@@ -338,7 +338,7 @@ bool UNiagaraDataInterfaceActorComponent::CopyToInternal(UNiagaraDataInterface* 
 	return true;
 }
 
-void UNiagaraDataInterfaceActorComponent::VMGetMatrix(FVectorVMContext& Context)
+void UNiagaraDataInterfaceActorComponent::VMGetMatrix(FVectorVMExternalFunctionContext& Context)
 {
 	using namespace NDIActorComponentLocal;
 
@@ -347,14 +347,14 @@ void UNiagaraDataInterfaceActorComponent::VMGetMatrix(FVectorVMContext& Context)
 	FNDIOutputParam<FMatrix>	OutMatrix(Context);
 
 	const FMatrix& InstanceMatrix = InstanceData->CachedTransform.ToMatrixWithScale();
-	for (int32 i = 0; i < Context.NumInstances; ++i)
+	for (int32 i = 0; i < Context.GetNumInstances(); ++i)
 	{
 		OutValid.SetAndAdvance(InstanceData->bCachedValid);
 		OutMatrix.SetAndAdvance(InstanceMatrix);
 	}
 }
 
-void UNiagaraDataInterfaceActorComponent::VMGetTransform(FVectorVMContext& Context)
+void UNiagaraDataInterfaceActorComponent::VMGetTransform(FVectorVMExternalFunctionContext& Context)
 {
 	using namespace NDIActorComponentLocal;
 
@@ -364,7 +364,7 @@ void UNiagaraDataInterfaceActorComponent::VMGetTransform(FVectorVMContext& Conte
 	FNDIOutputParam<FQuat>		OutRotation(Context);
 	FNDIOutputParam<FVector>	OutScale(Context);
 
-	for (int32 i=0; i < Context.NumInstances; ++i)
+	for (int32 i=0; i < Context.GetNumInstances(); ++i)
 	{
 		OutValid.SetAndAdvance(InstanceData->bCachedValid);
 		OutPosition.SetAndAdvance(InstanceData->CachedTransform.GetLocation());

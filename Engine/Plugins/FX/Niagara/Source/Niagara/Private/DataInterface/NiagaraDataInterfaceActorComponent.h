@@ -65,6 +65,6 @@ public:
 	//UNiagaraDataInterface Interface
 
 private:
-	void VMGetMatrix(FVectorVMContext& Context);
-	void VMGetTransform(FVectorVMContext& Context);
+	void VMGetMatrix(FVectorVMExternalFunctionContext& Context);
+	void VMGetTransform(FVectorVMExternalFunctionContext& Context);
 };
