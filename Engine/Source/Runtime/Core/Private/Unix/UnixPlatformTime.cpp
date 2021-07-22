@@ -49,8 +49,10 @@ double FUnixTime::InitTiming()
 		// Only ever set this ClockSource once
 		ClockSource = FUnixTime::CalibrateAndSelectClock();
 	}
+	SecondsPerCycle = 1e-6;
+	SecondsPerCycle64 = 1e-7;
 
-	return FGenericPlatformTime::InitTiming();
+	return FPlatformTime::Seconds();
 }
 
 FCPUTime FUnixTime::GetCPUTime()
