@@ -613,7 +613,7 @@ UObject* UAssetToolsImpl::DuplicateAssetWithDialogAndTitle(const FString& AssetN
 		const FString SavePackageName = FPackageName::ObjectPathToPackageName(SaveObjectPath);
 		const FString SavePackagePath = FPaths::GetPath(SavePackageName);
 		const FString SaveAssetName = FPaths::GetBaseFilename(SavePackageName);
-		FEditorDirectories::Get().SetLastDirectory(ELastDirectory::NEW_ASSET, PackagePath);
+		FEditorDirectories::Get().SetLastDirectory(ELastDirectory::NEW_ASSET, SavePackagePath);
 
 		return PerformDuplicateAsset(SaveAssetName, SavePackagePath, OriginalObject, true);
 	}
