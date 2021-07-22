@@ -143,8 +143,6 @@ bool FNiagaraScriptExecutionContextBase::Execute(uint32 NumInstances, const FScr
 		FNiagaraVMExecutableData& ExecData = Script->GetVMExecutableData();
 		ExecData.WaitOnOptimizeCompletion();
 
-		UE_LOG(LogTemp, Warning, TEXT("ThreadId: %d"), FPlatformTLS::GetCurrentThreadId());
-
 		check(ExecData.ByteCode.HasByteCode() || ExecData.OptimizedByteCode.HasByteCode());
 
 		VectorVM::FVectorVMExecArgs ExecArgs;
