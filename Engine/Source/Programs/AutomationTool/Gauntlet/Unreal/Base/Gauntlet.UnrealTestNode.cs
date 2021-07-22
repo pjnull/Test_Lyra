@@ -29,7 +29,7 @@ namespace Gauntlet
 		UnrealError,					// Unreal exited with an error code unrelated to test issues
 		Unknown,						// Something not in the above
 	}
-	
+
 	/// <summary>
 	/// Implementation of a Gauntlet TestNode that is capable of executing tests on an Unreal "session" where multiple
 	/// Unreal instances may be involved. This class leans on UnrealSession to do the work of spinning up, monitoring, and
@@ -43,9 +43,9 @@ namespace Gauntlet
 		[Flags]
 		public enum BehaviorFlags
 		{
-			None = 0,				
-			PromoteErrors = 1,				// Promote errors from Unreal instances to regular test errors. (By default only fatal errors are errors)
-			PromoteWarnings = 2,			// Promote warnings from Unreal instances to regular test warnings.	(By default only ensures are warnings)
+			None = 0,
+			PromoteErrors = 1,              // Promote errors from Unreal instances to regular test errors. (By default only fatal errors are errors)
+			PromoteWarnings = 2,            // Promote warnings from Unreal instances to regular test warnings.	(By default only ensures are warnings)
 		}
 
 		/// <summary>
@@ -71,6 +71,16 @@ namespace Gauntlet
 		/// Priority of this test
 		/// </summary>
 		public override TestPriority Priority { get { return GetPriority(); } }
+
+		/// <summary>
+		/// Returns a list of all log channels the heartbeat tick should look for.
+		/// </summary>
+		public virtual List<string> GetAdditionalLogChannels()
+		{
+			List<string> ReturnList = new List<string>();
+			ReturnList.Add("OrionTest");
+			return ReturnList;
+		}
 
 		/// <summary>
 		/// Returns Warnings found during tests. By default only ensures and warnings in case of abnormal exit are considered
@@ -850,11 +860,14 @@ namespace Gauntlet
 			{
 				UnrealLogParser Parser = new UnrealLogParser(App.StdOut);
 				
-				// TODO - hardcoded for Orion
 				List<string> TestLines = Parser.GetLogChannel("Gauntlet").ToList();
 
-				TestLines.AddRange(Parser.GetLogChannel("OrionTest"));
-
+				List<string> AdditionalLogCategories = GetAdditionalLogChannels();
+				foreach (string Category in AdditionalLogCategories)
+				{
+					TestLines.AddRange(Parser.GetLogChannel(Category));
+				}
+				
 				for (int i = LastLogCount; i < TestLines.Count; i++)
 				{
 					Log.Info(TestLines[i]);
