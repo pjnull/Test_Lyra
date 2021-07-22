@@ -119,9 +119,11 @@ void SAssetDialog::Construct(const FArguments& InArgs, const FSharedAssetDialogC
 	{
 		const FSaveAssetDialogConfig& SaveAssetConfig = static_cast<const FSaveAssetDialogConfig&>(InConfig);
 		PathPickerConfig.bAllowContextMenu = true;
+		PathPickerConfig.bAllowReadOnlyFolders = false;
 		ConfirmButtonText = LOCTEXT("AssetDialogSaveButton", "Save");
 		AssetPickerConfig.SelectionMode = ESelectionMode::Single;
 		AssetPickerConfig.bFocusSearchBoxWhenOpened = false;
+		AssetPickerConfig.bCanShowReadOnlyFolders = false;
 		bIncludeNameBox = true;
 		ExistingAssetPolicy = SaveAssetConfig.ExistingAssetPolicy;
 		SetCurrentlyEnteredAssetName(SaveAssetConfig.DefaultAssetName);
