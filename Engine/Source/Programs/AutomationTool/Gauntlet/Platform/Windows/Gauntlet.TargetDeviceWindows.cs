@@ -492,6 +492,11 @@ namespace Gauntlet
 			WinApp.ArtifactPath = Path.Combine(UserDir, @"Saved");
 			WinApp.ExecutablePath = EditorBuild.ExecutablePath;
 
+			if (LocalDirectoryMappings.Count == 0)
+			{
+				PopulateDirectoryMappings(AppConfig.ProjectFile.Directory.FullName, AppConfig.ProjectFile.Directory.FullName);
+			}
+
 			return WinApp;
 		}
 		
