@@ -146,7 +146,32 @@ bool UNiagaraNodeWithDynamicPins::CanRemovePin(const UEdGraphPin* Pin) const
 
 bool UNiagaraNodeWithDynamicPins::CanMovePin(const UEdGraphPin* Pin, int32 DirectionToMove) const
 {
-	return IsAddPin(Pin) == false;
+	if(IsAddPin(Pin) || IsParameterMapPin(Pin) || Pin->bOrphanedPin)
+	{
+		return false;
+	}
+	
+	TArray<const UEdGraphPin*> PinArray;
+	if(Pin->Direction == EGPD_Output)
+	{
+		GetOutputPins(PinArray);
+	}
+	else
+	{
+		GetInputPins(PinArray);
+	}
+
+	int32 Index = PinArray.Find(Pin);
+	if(PinArray.IsValidIndex(Index + DirectionToMove))
+	{
+		const UEdGraphPin* PinToMoveTo = PinArray[Index + DirectionToMove];
+		if(IsAddPin(PinToMoveTo) || IsParameterMapPin(PinToMoveTo) || PinToMoveTo->bOrphanedPin)
+		{
+			return false;
+		}
+	}	
+	
+	return true;
 }
 
 void UNiagaraNodeWithDynamicPins::MoveDynamicPin(UEdGraphPin* Pin, int32 DirectionToMove)
