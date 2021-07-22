@@ -39,7 +39,7 @@
 
 #define LOCTEXT_NAMESPACE "AndroidBackgroundHttpManager"
 
-volatile int32 FAndroidBackgroundDownloadDelegates::bHasManagerInitialized = false;
+volatile int32 FAndroidBackgroundDownloadDelegates::bHasManagerScheduledBGWork = false;
 FAndroidBackgroundDownloadDelegates::FAndroidBackgroundDownload_OnProgress FAndroidBackgroundDownloadDelegates::AndroidBackgroundDownload_OnProgress;
 FAndroidBackgroundDownloadDelegates::FAndroidBackgroundDownload_OnComplete FAndroidBackgroundDownloadDelegates::AndroidBackgroundDownload_OnComplete;
 FAndroidBackgroundDownloadDelegates::FAndroidBackgroundDownload_OnAllComplete FAndroidBackgroundDownloadDelegates::AndroidBackgroundDownload_OnAllComplete;
@@ -78,9 +78,7 @@ FAndroidPlatformBackgroundHttpManager::FAndroidPlatformBackgroundHttpManager()
 }
 
 void FAndroidPlatformBackgroundHttpManager::Initialize()
-{
-	FPlatformAtomics::InterlockedExchange(&FAndroidBackgroundDownloadDelegates::bHasManagerInitialized, true);
-	
+{	
 	Java_OnDownloadProgressHandle = FAndroidBackgroundDownloadDelegates::AndroidBackgroundDownload_OnProgress.AddRaw(this, &FAndroidPlatformBackgroundHttpManager::Java_OnDownloadProgress);
 	Java_OnDownloadCompleteHandle = FAndroidBackgroundDownloadDelegates::AndroidBackgroundDownload_OnComplete.AddRaw(this, &FAndroidPlatformBackgroundHttpManager::Java_OnDownloadComplete);
 	Java_OnAllDownloadsCompleteHandle = FAndroidBackgroundDownloadDelegates::AndroidBackgroundDownload_OnAllComplete.AddRaw(this, &FAndroidPlatformBackgroundHttpManager::Java_OnAllDownloadsComplete);
@@ -189,6 +187,9 @@ void FAndroidPlatformBackgroundHttpManager::ActivatePendingRequests()
 					WorkParams.AddDataToWorkerParameters(FAndroidNativeDownloadWorkerParameterKeys::NOTIFICATION_CONTENT_CANCEL_DOWNLOAD_TEXT_KEY, LOCTEXT("AndroidBackgroundHttpManager.Notification.CancelText", "Cancel"));
 
 					FUEWorkManagerNativeWrapper::ScheduleBackgroundWork("BackgroundHttpDownload", WorkParams);
+
+					//We have now scheduled some BG work so make sure we know its safe to call delegates
+					FPlatformAtomics::InterlockedExchange(&FAndroidBackgroundDownloadDelegates::bHasManagerScheduledBGWork, true);
 				}				
 			}
 		}
@@ -672,7 +673,7 @@ void FAndroidPlatformBackgroundHttpManager::Java_OnTick(JNIEnv* Env, jobject Und
 
 JNI_METHOD void Java_com_epicgames_ue4_download_UEDownloadWorker_nativeAndroidBackgroundDownloadOnProgress(JNIEnv* jenv, jobject thiz, jstring TaskID, jlong BytesWrittenSinceLastCall, jlong TotalBytesWritten)
 {
-	const bool bIsSafeToCallDelegates = FPlatformAtomics::AtomicRead(&(FAndroidBackgroundDownloadDelegates::bHasManagerInitialized));
+	const bool bIsSafeToCallDelegates = FPlatformAtomics::AtomicRead(&(FAndroidBackgroundDownloadDelegates::bHasManagerScheduledBGWork));
 	if (bIsSafeToCallDelegates)
 	{
 		FString RequestID = FJavaHelper::FStringFromParam(jenv, TaskID);
@@ -685,7 +686,7 @@ JNI_METHOD void Java_com_epicgames_ue4_download_UEDownloadWorker_nativeAndroidBa
 
 JNI_METHOD void Java_com_epicgames_ue4_download_UEDownloadWorker_nativeAndroidBackgroundDownloadOnComplete(JNIEnv* jenv, jobject thiz, jstring TaskID, jstring CompleteLocation, jboolean bWasSuccess)
 {
-	const bool bIsSafeToCallDelegates = FPlatformAtomics::AtomicRead(&(FAndroidBackgroundDownloadDelegates::bHasManagerInitialized));
+	const bool bIsSafeToCallDelegates = FPlatformAtomics::AtomicRead(&(FAndroidBackgroundDownloadDelegates::bHasManagerScheduledBGWork));
 	if (bIsSafeToCallDelegates)
 	{
 		FString RequestID = FJavaHelper::FStringFromParam(jenv, TaskID);
@@ -698,7 +699,7 @@ JNI_METHOD void Java_com_epicgames_ue4_download_UEDownloadWorker_nativeAndroidBa
 
 JNI_METHOD void Java_com_epicgames_ue4_download_UEDownloadWorker_nativeAndroidBackgroundDownloadOnAllComplete(JNIEnv* jenv, jobject thiz, jboolean bDidAllRequestsSucceed)
 {
-	const bool bIsSafeToCallDelegates = FPlatformAtomics::AtomicRead(&(FAndroidBackgroundDownloadDelegates::bHasManagerInitialized));
+	const bool bIsSafeToCallDelegates = FPlatformAtomics::AtomicRead(&(FAndroidBackgroundDownloadDelegates::bHasManagerScheduledBGWork));
 	if (bIsSafeToCallDelegates)
 	{
 		bool ConvertedbDidAllRequestsSucceed = static_cast<bool>(bDidAllRequestsSucceed);
@@ -708,7 +709,7 @@ JNI_METHOD void Java_com_epicgames_ue4_download_UEDownloadWorker_nativeAndroidBa
 
 JNI_METHOD void Java_com_epicgames_ue4_download_UEDownloadWorker_nativeAndroidBackgroundDownloadOnTick(JNIEnv* jenv, jobject thiz)
 {
-	const bool bIsSafeToCallDelegates = FPlatformAtomics::AtomicRead(&(FAndroidBackgroundDownloadDelegates::bHasManagerInitialized));
+	const bool bIsSafeToCallDelegates = FPlatformAtomics::AtomicRead(&(FAndroidBackgroundDownloadDelegates::bHasManagerScheduledBGWork));
 	if (bIsSafeToCallDelegates)
 	{
 		FAndroidBackgroundDownloadDelegates::AndroidBackgroundDownload_OnTickWorkerThread.Broadcast(jenv, thiz);

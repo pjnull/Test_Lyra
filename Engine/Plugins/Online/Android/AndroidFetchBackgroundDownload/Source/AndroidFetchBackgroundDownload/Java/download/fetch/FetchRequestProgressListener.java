@@ -165,14 +165,12 @@ final class FetchRequestProgressListener implements FetchListener
 	public void onAdded(@NonNull Download download)
 	{
 		//For now don't need to do anything in OnAdded, just wait for OnQueued
-		Log.verbose("onAdded -- Empty Implementation");
 	}
 
 	@Override
 	public void onDownloadBlockUpdated(@NonNull Download download, @NonNull DownloadBlock downloadBlock, int i)
 	{
 		//Not currently using this for anything useful
-		Log.verbose("onDownloadBlockUpdated -- Empty Implementation");
 	}
 	
 	FetchRequestProgressListener(@NonNull FetchDownloadProgressOwner Owner)

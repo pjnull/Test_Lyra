@@ -123,11 +123,10 @@ public:
 	DECLARE_MULTICAST_DELEGATE_TwoParams(FAndroidBackgroundDownload_OnAllComplete, jobject /*UnderlyingWorker*/, bool /*bDidAllRequestsSucceed*/);
 	DECLARE_MULTICAST_DELEGATE_TwoParams(FAndroidBackgroundDownload_OnTickWorkerThread, JNIEnv*, jobject /*UnderlyingWorker*/);
 
-	//We use this bool to ensure it is safe to try and broadcast to these static delegates.
-	//This may not be needed and we might be able to fall back to the normal behavior of just broadcasting
-	//but this is a safety measure as we can end up in the calling JNI functions before the engine has begun ANY loading
-	//and we aren't even guaranteed the engine WILL load depending on how WorkManager calls our process to handle the background work.
-	static volatile int32 bHasManagerInitialized;
+	//We use this bool to check if we need to actually route work done on the BG java side to UE, if we haven't scheduled any BGWork
+	//then we don't need to try and respond to results as its from a previous worker that we didn't schedule yet, and thus have no
+	//matching BG Download Requests. We should associate with those downloads once we request BG work if they are requested and still active
+	static volatile int32 bHasManagerScheduledBGWork;
 
 	//Delegates called by JNI functions to bubble up underlying java work to the manager
 	static FAndroidBackgroundDownload_OnProgress AndroidBackgroundDownload_OnProgress;
