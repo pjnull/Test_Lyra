@@ -40,6 +40,7 @@ private:
 	void HandleOwnerToolkitReset();
 
 	void HandlePartyInviteReceived(USocialUser& InvitingUser);
+	void HandlePartyInviteRemoved(USocialUser& InvitingUser);
 	void HandlePartyInviteHandled(USocialUser* InvitingUser);
 
 	void HandleFriendInviteReceived(USocialUser& User, ESocialSubsystem SubsystemType);

@@ -1057,7 +1057,7 @@ void USocialUser::HandlePartyInviteReceived(const IOnlinePartyJoinInfo& Invite)
 void USocialUser::HandlePartyInviteRemoved(const IOnlinePartyJoinInfo& Invite, EPartyInvitationRemovedReason Reason)
 {
 	ReceivedPartyInvites.Remove(Invite.AsShared());
-	// TODO? GetOwningToolkit().OnPartyInviteRemoved().Broadcast(*this);
+	GetOwningToolkit().NotifyPartyInviteRemoved(*this, Invite);
 }
 
 void USocialUser::HandleRequestToJoinSent(const FDateTime& ExpiresAt)

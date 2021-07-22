@@ -46,6 +46,7 @@ void FSocialUserList::InitializeList()
 		break;
 	case ESocialRelationship::PartyInvite:
 		OwnerToolkit->OnPartyInviteReceived().AddSP(this, &FSocialUserList::HandlePartyInviteReceived);
+		OwnerToolkit->OnPartyInviteRemoved().AddSP(this, &FSocialUserList::HandlePartyInviteRemoved);
 		break;
 	case ESocialRelationship::Friend:
 		OwnerToolkit->OnFriendshipEstablished().AddSP(this, &FSocialUserList::HandleFriendshipEstablished);
@@ -153,6 +154,12 @@ void FSocialUserList::HandleOwnerToolkitReset()
 void FSocialUserList::HandlePartyInviteReceived(USocialUser& InvitingUser)
 {
 	TryAddUser(InvitingUser);
+	UpdateListInternal();
+}
+
+void FSocialUserList::HandlePartyInviteRemoved(USocialUser& InvitingUser)
+{
+	TryRemoveUser(InvitingUser);
 	UpdateListInternal();
 }
 
