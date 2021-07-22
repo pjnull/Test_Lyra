@@ -73,7 +73,7 @@ FTargetPlatformInfo::FTargetPlatformInfo(const FString& InIniPlatformName, EBuil
 
 	// now append the build type (game type has no type suffix, all others do)
 	if (PlatformType != EBuildTargetType::Game)
-{
+	{
 		TPName += LexToString(PlatformType);
 
 		// put the type in parens
@@ -109,6 +109,7 @@ FTargetPlatformInfo::FTargetPlatformInfo(const FString& InIniPlatformName, EBuil
 		// add preview platform menu items from DDPI
 		PreviewPlatformMenuItems.Append(DataDrivenPlatformInfo->PreviewPlatformMenuItems);
 	}
+}
 
 
 const FTargetPlatformInfo* FindPlatformInfo(const FName& InPlatformName)
@@ -116,9 +117,9 @@ const FTargetPlatformInfo* FindPlatformInfo(const FName& InPlatformName)
 	checkf(AllPlatformInfoArray.Num() > 0, TEXT("Querying for TargetPlatformInfo objects before they are ready!"));
 
 	for(const FTargetPlatformInfo* PlatformInfo : AllPlatformInfoArray)
-{
-		if(PlatformInfo->Name == InPlatformName)
 	{
+		if(PlatformInfo->Name == InPlatformName)
+		{
 			return PlatformInfo;
 		}
 	}
@@ -159,6 +160,7 @@ const TArray<FTargetPlatformInfo*>& GetPlatformInfoArray()
 const TArray<FTargetPlatformInfo*>& GetVanillaPlatformInfoArray()
 {
 	checkf(AllPlatformInfoArray.Num() > 0, TEXT("Querying for TargetPlatformInfo objects before they are ready!"));
+
 	return VanillaPlatformInfoArray;
 }
 
@@ -183,7 +185,7 @@ const TArray<FPreviewPlatformMenuItem>& GetPreviewPlatformMenuItems()
 
 } // namespace PlatformInfo
 
-#endif 
+#endif
 
 
 #undef LOCTEXT_NAMESPACE
