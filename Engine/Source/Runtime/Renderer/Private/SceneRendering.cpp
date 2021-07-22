@@ -3788,8 +3788,7 @@ static void RenderViewFamily_RenderThread(FRHICommandListImmediate& RHICmdList, 
 				RDG_EVENT_NAME("SceneRenderer_%s(ViewFamily=%s)",
 					ViewFamily.EngineShowFlags.HitProxies ? TEXT("RenderHitProxies") : TEXT("Render"),
 					ViewFamily.bResolveScene ? TEXT("Primary") : TEXT("Auxiliary")
-				),
-				ERDGBuilderFlags::AllowParallelExecute
+				)
 			);
 
 			if (ViewFamily.EngineShowFlags.HitProxies)
