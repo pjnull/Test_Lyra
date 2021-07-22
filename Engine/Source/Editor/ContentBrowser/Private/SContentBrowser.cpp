@@ -112,7 +112,7 @@ SContentBrowser::~SContentBrowser()
 		{
 			EditorSelection->DeselectAll();
 		}
-	}
+}
 }
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
@@ -377,8 +377,6 @@ void SContentBrowser::Construct( const FArguments& InArgs, const FName& InInstan
 					SNew(SBorder)
 					.Padding(FMargin(0))
 					.BorderImage(FEditorStyle::GetBrush("Brushes.Recessed"))
-
-					[
 						// Note: If adding more widgets here, fix ContentBrowserSourcesWidgetSwitcherIndex and the code that uses it!
 						SAssignNew(SourcesWidgetSwitcher, SWidgetSwitcher)
 
@@ -411,8 +409,8 @@ void SContentBrowser::Construct( const FArguments& InArgs, const FName& InInstan
 							.Value(0.4f)
 							[
 								CreateDockedCollectionsView(Config)
+								]
 							]
-						]
 
 						// Collections View
 						+SWidgetSwitcher::Slot()
@@ -2152,7 +2150,7 @@ void SContentBrowser::AppendNewMenuContextObjects(const EContentBrowserDataMenuC
 		Menu->AddDynamicSection("DynamicSection_Common", FNewToolMenuDelegate::CreateLambda([](UToolMenu* InMenu)
 		{
 			TSharedPtr<SContentBrowser> ContentBrowser;
-			const UContentBrowserMenuContext* MenuContext = InMenu->FindContext<UContentBrowserMenuContext>();
+			const UContentBrowserMenuContext* MenuContext = InMenu->FindContext<UContentBrowserMenuContext>(); 
 			if (MenuContext)
 			{
 				ContentBrowser = MenuContext->ContentBrowser.Pin();
@@ -3401,7 +3399,7 @@ void SContentBrowser::OnAssetSearchSuggestionFilter(const FText& SearchText, TAr
 					PossibleSuggestions.Add(FAssetSearchBoxSuggestion{ TagNameStr, FText::FromString(TagNameStr), MetaDataCategoryName });
 				}
 			});
-	}
+		}
 
 	SuggestionHighlightText = FText::FromString(FilterValue);
 }

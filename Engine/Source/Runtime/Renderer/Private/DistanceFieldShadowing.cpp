@@ -172,7 +172,7 @@ IMPLEMENT_GLOBAL_SHADER(FCullObjectsForShadowCS, "/Engine/Private/DistanceFieldS
 
 /**  */
 class FShadowObjectCullVS : public FGlobalShader
-{
+	{
 	DECLARE_GLOBAL_SHADER(FShadowObjectCullVS);
 	SHADER_USE_PARAMETER_STRUCT(FShadowObjectCullVS, FGlobalShader);
 
@@ -195,7 +195,7 @@ class FShadowObjectCullVS : public FGlobalShader
 IMPLEMENT_GLOBAL_SHADER(FShadowObjectCullVS, "/Engine/Private/DistanceFieldShadowing.usf", "ShadowObjectCullVS", SF_Vertex);
 
 class FShadowObjectCullPS : public FGlobalShader
-{
+	{
 	DECLARE_GLOBAL_SHADER(FShadowObjectCullPS);
 	SHADER_USE_PARAMETER_STRUCT(FShadowObjectCullPS, FGlobalShader);
 
@@ -290,7 +290,7 @@ class FDistanceFieldShadowingCS : public FGlobalShader
 IMPLEMENT_GLOBAL_SHADER(FDistanceFieldShadowingCS, "/Engine/Private/DistanceFieldShadowing.usf", "DistanceFieldShadowingCS", SF_Compute);
 
 class FDistanceFieldShadowingUpsamplePS : public FGlobalShader
-{
+	{
 	DECLARE_GLOBAL_SHADER(FDistanceFieldShadowingUpsamplePS);
 	SHADER_USE_PARAMETER_STRUCT(FDistanceFieldShadowingUpsamplePS, FGlobalShader);
 
@@ -937,7 +937,7 @@ void FProjectedShadowInfo::RenderRayTracedDistanceFieldProjection(
 {
 	check(ScissorRect.Area() > 0);
 
-	BeginRenderRayTracedDistanceFieldProjection(GraphBuilder, SceneTextures, View);
+	BeginRenderRayTracedDistanceFieldProjection(GraphBuilder, SceneTextures, View); 
 
 	if (RayTracedShadowsTexture)
 	{

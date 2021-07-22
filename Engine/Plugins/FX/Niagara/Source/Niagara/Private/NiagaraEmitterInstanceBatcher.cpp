@@ -1198,7 +1198,7 @@ void NiagaraEmitterInstanceBatcher::PrepareTicksForProxy(FRHICommandListImmediat
 				StageToWaitForTemporalEffect = static_cast<ENiagaraGpuComputeTickStage::Type>(static_cast<int32>(StageToWaitForTemporalEffect) + 1);
 			}
 		}
-	}
+}
 #endif // WITH_MGPU
 }
 
@@ -1426,7 +1426,7 @@ void NiagaraEmitterInstanceBatcher::ExecuteTicks(FRHICommandList& RHICmdList, FR
 	// Clear dispatch groups
 	// We do not release the counts as we won't do that until we finish the dispatches
 	DispatchList.DispatchGroups.Empty();
-}
+	}
 
 void NiagaraEmitterInstanceBatcher::DispatchStage(FRHICommandList& RHICmdList, FRHIUniformBuffer* ViewUniformBuffer, const FNiagaraGPUSystemTick& Tick, const FNiagaraComputeInstanceData& InstanceData, const FNiagaraSimStageData& SimStageData)
 {

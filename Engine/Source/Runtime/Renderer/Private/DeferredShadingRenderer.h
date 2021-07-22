@@ -666,7 +666,6 @@ private:
 		FRDGBuilder& GraphBuilder,
 		TRDGUniformBufferRef<FSceneTextureUniformParameters> SceneTexturesUniformBuffer,
 		FRDGTextureRef& BentNormalOutput) const;
-
 	void RenderDeferredShadowProjections(
 		FRDGBuilder& GraphBuilder,
 		const FMinimalSceneTextures& SceneTextures,
@@ -811,6 +810,7 @@ private:
 
 	bool IsNaniteEnabled() const;
 
+
 	void SetupImaginaryReflectionTextureParameters(
 		FRDGBuilder& GraphBuilder,
 		const FViewInfo& View,
@@ -845,7 +845,6 @@ private:
 		FRDGTextureUAV* OutShadowMaskUAV,
 		FRDGTextureUAV* OutRayHitDistanceUAV,
 		FRDGTextureUAV* SubPixelRayTracingShadowMaskUAV);
-
 	void CompositeRayTracingSkyLight(
 		FRDGBuilder& GraphBuilder,
 		const FMinimalSceneTextures& SceneTextures,

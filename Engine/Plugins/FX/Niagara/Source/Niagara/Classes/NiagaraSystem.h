@@ -845,7 +845,6 @@ protected:
 	/** Total active instances of this system. */
 	int32 ActiveInstances;
 };
-
 FORCEINLINE void UNiagaraSystem::RegisterActiveInstance()
 {
 	++ActiveInstances;

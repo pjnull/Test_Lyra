@@ -111,7 +111,7 @@ void FRigVMRegisterOffset::Save(FArchive& Ar)
 	Ar << ParentScriptStruct;
 	Ar << CachedSegmentPath;
 	Ar << ArrayIndex;
-}
+	}
 
 void FRigVMRegisterOffset::Load(FArchive& Ar)
 {
@@ -335,6 +335,16 @@ FRigVMRegisterOffset::FRigVMRegisterOffset(UScriptStruct* InScriptStruct, const 
 			{
 				Type = ERigVMRegisterType::String;
 			}
+		}
+	}
+	else
+	{
+		// if segment path is empty, it implies that the register offset refers to an element in a struct array
+		if (ParentScriptStruct)
+		{
+			ScriptStruct = ParentScriptStruct;
+			Type = ERigVMRegisterType::Struct;
+			CPPType = *ScriptStruct->GetStructCPPName();
 		}
 	}
 	else
@@ -753,7 +763,20 @@ void FRigVMMemoryContainer::Save(FArchive& Ar)
 					}
 					case ERigVMRegisterType::Struct:
 					{
+						uint8* DataPtr = ArrayStorage.GetData();
+						uint16 NumElements = (uint16)(ArrayStorage.Num() / Register.ElementSize);
+						ensure(NumElements * Register.ElementSize == ArrayStorage.Num());
+						UScriptStruct* ScriptStruct = GetScriptStruct(Register);
+
 						TArray<FString> View;
+						for (uint16 ElementIndex = 0; ElementIndex < NumElements; ElementIndex++)
+						{
+							FString Value;
+							ScriptStruct->ExportText(Value, DataPtr, nullptr, nullptr, PPF_None, nullptr);
+							View.Add(Value);
+							DataPtr += Register.ElementSize;
+						}
+
 						Ar << View;
 						break;
 					}
@@ -1037,12 +1060,39 @@ void FRigVMMemoryContainer::Load(FArchive& Ar)
 					{
 						TArray<FString> View;
 						Ar << View;
+
+						if (ArrayStorage)
+						{
+							FRigVMDynamicArray<FString> ValueArray(*ArrayStorage);
+							ValueArray.CopyFrom(View);
+						}
 						break;
 					}
 					case ERigVMRegisterType::Struct:
 					{
 						TArray<FString> View;
 						Ar << View;
+
+						UScriptStruct* ScriptStruct = GetScriptStruct(Register);
+						if (ScriptStruct && !bEncounteredErrorDuringLoad && ArrayStorage)
+						{
+							ensure(ScriptStruct->GetStructureSize() == Register.ElementSize);
+
+							ArrayStorage->SetNumZeroed(View.Num() * Register.ElementSize);
+							uint8* DataPtr = ArrayStorage->GetData();
+
+							for (uint16 ElementIndex = 0; ElementIndex < View.Num(); ElementIndex++)
+							{
+								FRigVMMemoryContainerImportErrorContext ErrorPipe;
+								ScriptStruct->ImportText(*View[ElementIndex], DataPtr, nullptr, PPF_None, &ErrorPipe, ScriptStruct->GetName());
+								if (ErrorPipe.NumErrors > 0)
+								{
+									bEncounteredErrorDuringLoad = true;
+									break;
+								}
+								DataPtr += Register.ElementSize;
+							}
+						}
 						break;
 					}
 				}

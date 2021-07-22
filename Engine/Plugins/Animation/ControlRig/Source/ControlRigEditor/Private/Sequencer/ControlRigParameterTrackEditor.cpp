@@ -85,7 +85,7 @@ static USkeletalMeshComponent* AcquireSkeletalMeshFromObject(UObject* BoundObjec
 	{
 		TArray<USkeletalMeshComponent*> SkeletalMeshComponents;
 		Actor->GetComponents(SkeletalMeshComponents);
-		
+
 		if (SkeletalMeshComponents.Num() == 1)
 		{
 			return SkeletalMeshComponents[0];
@@ -196,57 +196,57 @@ FControlRigParameterTrackEditor::FControlRigParameterTrackEditor(TSharedRef<ISeq
 		//we check for two things, one if the control rig has been replaced if so we need to switch.
 		//the other is if bound object on the edit mode is null we request a re-evaluate which will reset it up.
 		FDelegateHandle OnObjectsReplacedHandle = FCoreUObjectDelegates::OnObjectsReplaced.AddLambda([&](const TMap<UObject*, UObject*>& ReplacementMap)
-		{
-			if (GetSequencer().IsValid())
 			{
-				TMap<UControlRig*, UControlRig*> OldToNewControlRigs;
-				FControlRigEditMode* ControlRigEditMode = GetEditMode();
-				if (ControlRigEditMode && ControlRigEditMode->GetControlRig(true) && ControlRigEditMode->GetControlRig(true)->GetObjectBinding())
+				if (GetSequencer().IsValid())
 				{
-					if (ControlRigEditMode->GetControlRig(true)->GetObjectBinding()->GetBoundObject() == nullptr)
+					TMap<UControlRig*, UControlRig*> OldToNewControlRigs;
+					FControlRigEditMode* ControlRigEditMode = GetEditMode();
+					if (ControlRigEditMode && ControlRigEditMode->GetControlRig(true) && ControlRigEditMode->GetControlRig(true)->GetObjectBinding())
 					{
-						GetSequencer()->RequestEvaluate();
-					}
-				}
-				//Reset Bindings for replaced objects.
-				for (TPair<UObject*, UObject*> ReplacedObject : ReplacementMap)
-				{
-					if (UControlRigComponent* OldControlRigComponent = Cast<UControlRigComponent>(ReplacedObject.Key))
-					{
-						UControlRigComponent* NewControlRigComponent = Cast<UControlRigComponent>(ReplacedObject.Value);
-						if (OldControlRigComponent->GetControlRig())
+						if (ControlRigEditMode->GetControlRig(true)->GetObjectBinding()->GetBoundObject() == nullptr)
 						{
-							UControlRig* NewControlRig = nullptr;
-							if(NewControlRigComponent)
-							{
-								NewControlRig = NewControlRigComponent->GetControlRig();
-							}
-							OldToNewControlRigs.Emplace(OldControlRigComponent->GetControlRig(), NewControlRig);
+							GetSequencer()->RequestEvaluate();
 						}
 					}
-					else if (UControlRig* OldControlRig = Cast<UControlRig>(ReplacedObject.Key))
+					//Reset Bindings for replaced objects.
+					for (TPair<UObject*, UObject*> ReplacedObject : ReplacementMap)
 					{
-						UControlRig* NewControlRig = Cast<UControlRig>(ReplacedObject.Value);
-						OldToNewControlRigs.Emplace(OldControlRig, NewControlRig);
-					}
-				}
-				UMovieScene* MovieScene = GetSequencer()->GetFocusedMovieSceneSequence()->GetMovieScene();
-				const TArray<FMovieSceneBinding>& Bindings = MovieScene->GetBindings();
-				for (const FMovieSceneBinding& Binding : Bindings)
-				{
-					UMovieSceneControlRigParameterTrack* Track = Cast<UMovieSceneControlRigParameterTrack>(MovieScene->FindTrack(UMovieSceneControlRigParameterTrack::StaticClass(), Binding.GetObjectGuid(), NAME_None));
-					if (Track && Track->GetControlRig())
-					{
-						UControlRig* OldControlRig = Track->GetControlRig();
-						UControlRig** NewControlRig = OldToNewControlRigs.Find(OldControlRig);
-						if (NewControlRig)
-						{  
-							OldControlRig->ClearControlSelection();
-							UnbindControlRig(OldControlRig);
-							if (*NewControlRig)
+						if (UControlRigComponent* OldControlRigComponent = Cast<UControlRigComponent>(ReplacedObject.Key))
+						{
+							UControlRigComponent* NewControlRigComponent = Cast<UControlRigComponent>(ReplacedObject.Value);
+							if (OldControlRigComponent->GetControlRig())
 							{
-								Track->ReplaceControlRig(*NewControlRig, OldControlRig->GetClass() != (*NewControlRig)->GetClass());
-								BindControlRig(*NewControlRig);
+								UControlRig* NewControlRig = nullptr;
+								if (NewControlRigComponent)
+								{
+									NewControlRig = NewControlRigComponent->GetControlRig();
+								}
+								OldToNewControlRigs.Emplace(OldControlRigComponent->GetControlRig(), NewControlRig);
+							}
+						}
+						else if (UControlRig* OldControlRig = Cast<UControlRig>(ReplacedObject.Key))
+						{
+							UControlRig* NewControlRig = Cast<UControlRig>(ReplacedObject.Value);
+							OldToNewControlRigs.Emplace(OldControlRig, NewControlRig);
+						}
+					}
+					UMovieScene* MovieScene = GetSequencer()->GetFocusedMovieSceneSequence()->GetMovieScene();
+					const TArray<FMovieSceneBinding>& Bindings = MovieScene->GetBindings();
+					for (const FMovieSceneBinding& Binding : Bindings)
+					{
+						UMovieSceneControlRigParameterTrack* Track = Cast<UMovieSceneControlRigParameterTrack>(MovieScene->FindTrack(UMovieSceneControlRigParameterTrack::StaticClass(), Binding.GetObjectGuid(), NAME_None));
+						if (Track && Track->GetControlRig())
+						{
+							UControlRig* OldControlRig = Track->GetControlRig();
+							UControlRig** NewControlRig = OldToNewControlRigs.Find(OldControlRig);
+							if (NewControlRig)
+							{
+								OldControlRig->ClearControlSelection();
+								UnbindControlRig(OldControlRig);
+								if (*NewControlRig)
+								{
+									Track->ReplaceControlRig(*NewControlRig, OldControlRig->GetClass() != (*NewControlRig)->GetClass());
+									BindControlRig(*NewControlRig);
 
 								GetSequencer()->NotifyMovieSceneDataChanged(EMovieSceneDataChangeType::MovieSceneStructureItemsChanged);
 							}
@@ -340,7 +340,7 @@ void FControlRigParameterTrackEditor::UnbindControlRig(UControlRig* ControlRig)
 }
 void FControlRigParameterTrackEditor::UnbindAllControlRigs()
 {
-	for(TWeakObjectPtr<UControlRig>& ObjectPtr: BoundControlRigs)
+	for (TWeakObjectPtr<UControlRig>& ObjectPtr : BoundControlRigs)
 	{
 		if (ObjectPtr.IsValid())
 		{
@@ -401,7 +401,7 @@ void FControlRigParameterTrackEditor::OnRelease()
 		{
 			GetSequencer()->OnChannelChanged().Remove(OnChannelChangedHandle);
 		}
-		
+
 		if (GetSequencer()->GetFocusedMovieSceneSequence() && GetSequencer()->GetFocusedMovieSceneSequence()->GetMovieScene())
 		{
 			UMovieScene* MovieScene = GetSequencer()->GetFocusedMovieSceneSequence()->GetMovieScene();
@@ -452,7 +452,7 @@ void FControlRigParameterTrackEditor::BuildObjectBindingContextMenu(FMenuBuilder
 		const TSharedPtr<ISequencer> ParentSequencer = GetSequencer();
 		UObject* BoundObject = nullptr;
 		USkeleton* Skeleton = AcquireSkeletonFromObjectGuid(ObjectBindings[0], &BoundObject, ParentSequencer);
-		USkeletalMeshComponent*  SkelMeshComp = AcquireSkeletalMeshFromObject(BoundObject, ParentSequencer);
+		USkeletalMeshComponent* SkelMeshComp = AcquireSkeletalMeshFromObject(BoundObject, ParentSequencer);
 
 		if (Skeleton && SkelMeshComp)
 		{
@@ -492,9 +492,9 @@ void FControlRigParameterTrackEditor::BuildObjectBindingContextMenu(FMenuBuilder
 class FControlRigClassFilter : public IClassViewerFilter
 {
 public:
-	FControlRigClassFilter(bool bInCheckSkeleton, bool bInCheckAnimatable, bool bInCheckInversion, USkeleton* InSkeleton) : 
+	FControlRigClassFilter(bool bInCheckSkeleton, bool bInCheckAnimatable, bool bInCheckInversion, USkeleton* InSkeleton) :
 		bFilterAssetBySkeleton(bInCheckSkeleton),
-		bFilterExposesAnimatableControls(bInCheckAnimatable), 
+		bFilterExposesAnimatableControls(bInCheckAnimatable),
 		bFilterInversion(bInCheckInversion),
 		AssetRegistry(FModuleManager::GetModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry")).Get())
 	{
@@ -526,7 +526,7 @@ public:
 				FString EventString = FRigUnit_InverseExecution::EventName.ToString();
 				TArray<FString> SupportedEventNames;
 				Tag.GetValue().ParseIntoArray(SupportedEventNames, TEXT(","), true);
-	
+
 				for (const FString& Name : SupportedEventNames)
 				{
 					if (Name.Contains(EventString))
@@ -619,7 +619,7 @@ void FControlRigParameterTrackEditor::BakeToControlRigSubMenu(FMenuBuilder& Menu
 		FClassViewerInitializationOptions Options;
 		Options.bShowUnloadedBlueprints = true;
 		Options.NameTypeToDisplay = EClassViewerNameTypeToDisplay::DisplayName;
-		TSharedPtr<FControlRigClassFilter> ClassFilter = MakeShareable(new FControlRigClassFilter(bFilterAssetBySkeleton,true, true, Skeleton));
+		TSharedPtr<FControlRigClassFilter> ClassFilter = MakeShareable(new FControlRigClassFilter(bFilterAssetBySkeleton, true, true, Skeleton));
 		Options.ClassFilters.Add(ClassFilter.ToSharedRef());
 		Options.bShowNoneOption = false;
 
@@ -640,9 +640,9 @@ public:
 	{}
 
 	SLATE_ARGUMENT(UAnimSeqExportOption*, ExportOptions)
-	SLATE_ARGUMENT(UBakeToControlRigSettings*, BakeSettings)
-	SLATE_ARGUMENT(TSharedPtr<SWindow>, WidgetWindow)
-	SLATE_END_ARGS()
+		SLATE_ARGUMENT(UBakeToControlRigSettings*, BakeSettings)
+		SLATE_ARGUMENT(TSharedPtr<SWindow>, WidgetWindow)
+		SLATE_END_ARGS()
 
 public:
 	void Construct(const FArguments& InArgs);
@@ -1007,7 +1007,7 @@ void FControlRigParameterTrackEditor::BuildObjectBindingTrackMenu(FMenuBuilder& 
 	if (ObjectClass->IsChildOf(USkeletalMeshComponent::StaticClass()) || ObjectClass->IsChildOf(AActor::StaticClass()) || ObjectClass->IsChildOf(UChildActorComponent::StaticClass()))
 	{
 		const TSharedPtr<ISequencer> ParentSequencer = GetSequencer();
-		UObject *BoundObject = nullptr;
+		UObject* BoundObject = nullptr;
 		USkeleton* Skeleton = AcquireSkeletonFromObjectGuid(ObjectBindings[0], &BoundObject, ParentSequencer);
 
 		if (AActor* BoundActor = Cast<AActor>(BoundObject))
@@ -1140,7 +1140,7 @@ void FControlRigParameterTrackEditor::HandleAddControlRigSubMenu(FMenuBuilder& M
 
 
 	const TSharedPtr<ISequencer> ParentSequencer = GetSequencer();
-	UObject *BoundObject = nullptr;
+	UObject* BoundObject = nullptr;
 	//todo support multiple bindings?
 	USkeleton* Skeleton = AcquireSkeletonFromObjectGuid(ObjectBindings[0], &BoundObject, GetSequencer());
 
@@ -1262,7 +1262,7 @@ void FControlRigParameterTrackEditor::AddControlRig(UClass* InClass, UObject* Bo
 			ControlRig->GetDataSourceRegistry()->RegisterDataSource(UControlRig::OwnerComponent, ControlRig->GetObjectBinding()->GetBoundObject());
 			// Do not re-initialize existing control rig
 			if (!InExistingControlRig)
-			{ 
+			{
 				ControlRig->Initialize();
 			}
 			ControlRig->Evaluate_AnyThread();
@@ -1324,7 +1324,7 @@ void FControlRigParameterTrackEditor::AddFKControlRig(TArray<FGuid> ObjectBindin
 {
 	for (const FGuid& ObjectBinding : ObjectBindings)
 	{
-		UObject *BoundObject = nullptr;
+		UObject* BoundObject = nullptr;
 		AcquireSkeletonFromObjectGuid(ObjectBinding, &BoundObject, GetSequencer());
 		if (BoundObject)
 		{
@@ -1391,7 +1391,7 @@ void FControlRigParameterTrackEditor::OnAddTransformKeysForSelectedObjects(EMovi
 				USceneComponent* Component = Cast<USceneComponent>(ObjectBinding->GetBoundObject());
 				if (Component)
 				{
-					AddControlKeys(Component, ControlRig, Name, ControlName, (EControlRigContextChannelToKey) Channel, ESequencerKeyMode::ManualKeyForced, FLT_MAX);
+					AddControlKeys(Component, ControlRig, Name, ControlName, (EControlRigContextChannelToKey)Channel, ESequencerKeyMode::ManualKeyForced, FLT_MAX);
 				}
 			}
 		}
@@ -1662,7 +1662,7 @@ void FControlRigParameterTrackEditor::OnSelectionChanged(TArray<UMovieSceneTrack
 	{
 		return;
 	}
-	
+
 	TGuardValue<bool> Guard(bIsDoingSelection, true);
 
 	TArray<FString> StringArray;
@@ -1717,7 +1717,7 @@ void FControlRigParameterTrackEditor::OnSelectionChanged(TArray<UMovieSceneTrack
 		return;
 	}
 
-	TMap<UControlRig *, TSet<FName>> RigsAndControls;
+	TMap<UControlRig*, TSet<FName>> RigsAndControls;
 	for (const IKeyArea* KeyArea : KeyAreas)
 	{
 		UMovieSceneControlRigParameterSection* MovieSection = Cast<UMovieSceneControlRigParameterSection>(KeyArea->GetOwningSection());
@@ -1778,7 +1778,7 @@ void FControlRigParameterTrackEditor::OnSelectionChanged(TArray<UMovieSceneTrack
 			ControlRig->ClearControlSelection();
 		}
 	}
-	for (TPair<UControlRig *, TSet<FName>> Pair : RigsAndControls)
+	for (TPair<UControlRig*, TSet<FName>> Pair : RigsAndControls)
 	{
 		if (Pair.Key != ControlRig)
 		{
@@ -1910,7 +1910,7 @@ void FControlRigParameterTrackEditor::HandleControlSelected(UControlRig* Subject
 	TArray<FRigControl> Controls;
 
 	URigHierarchy* Hierarchy = Subject->GetHierarchy();
-	if(URigHierarchyController* Controller = Hierarchy->GetController())
+	if (URigHierarchyController* Controller = Hierarchy->GetController())
 	{
 		Hierarchy->ForEach<FRigControlElement>([ControlElement, Controller, bSelected](FRigControlElement* OtherControlElement) -> bool
 		{
@@ -1941,7 +1941,7 @@ void FControlRigParameterTrackEditor::HandleControlSelected(UControlRig* Subject
 	FName ControlRigName(*Subject->GetName());
 	if (TSharedPtr<IControlRigObjectBinding> ObjectBinding = Subject->GetObjectBinding())
 	{
-		UObject *ActorObject = nullptr;
+		UObject* ActorObject = nullptr;
 		USceneComponent* Component = Cast<USceneComponent>(ObjectBinding->GetBoundObject());
 		if (!Component)
 		{
@@ -1964,7 +1964,7 @@ void FControlRigParameterTrackEditor::HandleControlSelected(UControlRig* Subject
 			for (UMovieSceneSection* Section : Track->GetAllSections())
 			{
 				UMovieSceneControlRigParameterSection* ParamSection = Cast<UMovieSceneControlRigParameterSection>(Section);
-				SelectSequencerNodeInSection(ParamSection,ControlElement->GetName(), bSelected);	
+				SelectSequencerNodeInSection(ParamSection, ControlElement->GetName(), bSelected);
 			}
 			GetSequencer()->ResumeSelectionBroadcast();
 
@@ -1996,7 +1996,7 @@ void FControlRigParameterTrackEditor::HandleControlModified(UControlRig* Control
 	{
 		return;
 	}
-	FTransform  Transform = ControlRig->GetControlLocalTransform(ControlElement->GetName());	
+	FTransform  Transform = ControlRig->GetControlLocalTransform(ControlElement->GetName());
 	UMovieScene* MovieScene = GetSequencer()->GetFocusedMovieSceneSequence()->GetMovieScene();
 	const TArray<FMovieSceneBinding>& Bindings = MovieScene->GetBindings();
 	for (const FMovieSceneBinding& Binding : Bindings)
@@ -2022,7 +2022,7 @@ void FControlRigParameterTrackEditor::HandleControlModified(UControlRig* Control
 	}
 }
 
-void FControlRigParameterTrackEditor::GetControlRigKeys(UControlRig* InControlRig, FName ParameterName, EControlRigContextChannelToKey ChannelsToKey,  ESequencerKeyMode KeyMode, UMovieSceneControlRigParameterSection* SectionToKey,FGeneratedTrackKeys& OutGeneratedKeys)
+void FControlRigParameterTrackEditor::GetControlRigKeys(UControlRig* InControlRig, FName ParameterName, EControlRigContextChannelToKey ChannelsToKey, ESequencerKeyMode KeyMode, UMovieSceneControlRigParameterSection* SectionToKey, FGeneratedTrackKeys& OutGeneratedKeys)
 {
 	const TArray<bool>& ControlsMask = SectionToKey->GetControlsMask();
 	EMovieSceneTransformChannel TransformMask = SectionToKey->GetTransformMask().GetChannels();
@@ -2221,7 +2221,7 @@ void FControlRigParameterTrackEditor::GetControlRigKeys(UControlRig* InControlRi
 	}
 }
 
-FKeyPropertyResult FControlRigParameterTrackEditor::AddKeysToControlRigHandle(USceneComponent *InSceneComp, UControlRig* InControlRig,
+FKeyPropertyResult FControlRigParameterTrackEditor::AddKeysToControlRigHandle(USceneComponent* InSceneComp, UControlRig* InControlRig,
 	FGuid ObjectHandle, FFrameNumber KeyTime, FGeneratedTrackKeys& GeneratedKeys,
 	ESequencerKeyMode KeyMode, TSubclassOf<UMovieSceneTrack> TrackClass, FName ControlRigName, FName RigControlName)
 {
@@ -2308,7 +2308,7 @@ FKeyPropertyResult FControlRigParameterTrackEditor::AddKeysToControlRig(
 	return KeyPropertyResult;
 }
 
-void FControlRigParameterTrackEditor::AddControlKeys(USceneComponent *InSceneComp, UControlRig* InControlRig, FName ControlRigName, FName RigControlName, EControlRigContextChannelToKey ChannelsToKey, ESequencerKeyMode KeyMode, float InLocalTime)
+void FControlRigParameterTrackEditor::AddControlKeys(USceneComponent* InSceneComp, UControlRig* InControlRig, FName ControlRigName, FName RigControlName, EControlRigContextChannelToKey ChannelsToKey, ESequencerKeyMode KeyMode, float InLocalTime)
 {
 	if (KeyMode == ESequencerKeyMode::ManualKey || (GetSequencer().IsValid() && !GetSequencer()->IsAllowedToChange()))
 	{
@@ -2364,7 +2364,7 @@ void FControlRigParameterTrackEditor::AddControlKeys(USceneComponent *InSceneCom
 }
 
 
-bool FControlRigParameterTrackEditor::ModifyOurGeneratedKeysByCurrentAndWeight(UObject *Object, UControlRig* InControlRig, FName RigControlName, UMovieSceneTrack *Track, UMovieSceneSection* SectionToKey, FFrameNumber KeyTime, FGeneratedTrackKeys& GeneratedTotalKeys, float Weight) const
+bool FControlRigParameterTrackEditor::ModifyOurGeneratedKeysByCurrentAndWeight(UObject* Object, UControlRig* InControlRig, FName RigControlName, UMovieSceneTrack* Track, UMovieSceneSection* SectionToKey, FFrameNumber KeyTime, FGeneratedTrackKeys& GeneratedTotalKeys, float Weight) const
 {
 	FFrameRate TickResolution = GetSequencer()->GetFocusedTickResolution();
 	FMovieSceneEvaluationTrack EvalTrack = CastChecked<UMovieSceneControlRigParameterTrack>(Track)->GenerateTrackTemplate(Track);
@@ -2397,7 +2397,7 @@ bool FControlRigParameterTrackEditor::ModifyOurGeneratedKeysByCurrentAndWeight(U
 					if (pChannelIndex)
 					{
 						ChannelIndex = pChannelIndex->TotalChannelIndex;
-						GeneratedTotalKeys[ChannelIndex]->ModifyByCurrentAndWeight(Proxy, KeyTime, (void *)&Val.Val, Weight);
+						GeneratedTotalKeys[ChannelIndex]->ModifyByCurrentAndWeight(Proxy, KeyTime, (void*)&Val.Val, Weight);
 					}
 					break;
 				}
@@ -2421,8 +2421,8 @@ bool FControlRigParameterTrackEditor::ModifyOurGeneratedKeysByCurrentAndWeight(U
 					if (pChannelIndex)
 					{
 						ChannelIndex = pChannelIndex->TotalChannelIndex;
-						GeneratedTotalKeys[ChannelIndex]->ModifyByCurrentAndWeight(Proxy, KeyTime, (void *)&Val.Val.X, Weight);
-						GeneratedTotalKeys[ChannelIndex + 1]->ModifyByCurrentAndWeight(Proxy, KeyTime, (void *)&Val.Val.Y, Weight);
+						GeneratedTotalKeys[ChannelIndex]->ModifyByCurrentAndWeight(Proxy, KeyTime, (void*)&Val.Val.X, Weight);
+						GeneratedTotalKeys[ChannelIndex + 1]->ModifyByCurrentAndWeight(Proxy, KeyTime, (void*)&Val.Val.Y, Weight);
 					}
 					break;
 				}
@@ -2472,20 +2472,20 @@ bool FControlRigParameterTrackEditor::ModifyOurGeneratedKeysByCurrentAndWeight(U
 						ChannelIndex = pChannelIndex->TotalChannelIndex;
 						FVector3f CurrentPos = Val.Val.GetTranslation();
 						FRotator CurrentRot = Val.Val.GetRotation().Rotator();
-						GeneratedTotalKeys[ChannelIndex]->ModifyByCurrentAndWeight(Proxy, KeyTime, (void *)&CurrentPos.X, Weight);
-						GeneratedTotalKeys[ChannelIndex + 1]->ModifyByCurrentAndWeight(Proxy, KeyTime, (void *)&CurrentPos.Y, Weight);
-						GeneratedTotalKeys[ChannelIndex + 2]->ModifyByCurrentAndWeight(Proxy, KeyTime, (void *)&CurrentPos.Z, Weight);
+						GeneratedTotalKeys[ChannelIndex]->ModifyByCurrentAndWeight(Proxy, KeyTime, (void*)&CurrentPos.X, Weight);
+						GeneratedTotalKeys[ChannelIndex + 1]->ModifyByCurrentAndWeight(Proxy, KeyTime, (void*)&CurrentPos.Y, Weight);
+						GeneratedTotalKeys[ChannelIndex + 2]->ModifyByCurrentAndWeight(Proxy, KeyTime, (void*)&CurrentPos.Z, Weight);
 
-						GeneratedTotalKeys[ChannelIndex + 3]->ModifyByCurrentAndWeight(Proxy, KeyTime, (void *)&CurrentRot.Roll, Weight);
-						GeneratedTotalKeys[ChannelIndex + 4]->ModifyByCurrentAndWeight(Proxy, KeyTime, (void *)&CurrentRot.Pitch, Weight);
-						GeneratedTotalKeys[ChannelIndex + 5]->ModifyByCurrentAndWeight(Proxy, KeyTime, (void *)&CurrentRot.Yaw, Weight);
+						GeneratedTotalKeys[ChannelIndex + 3]->ModifyByCurrentAndWeight(Proxy, KeyTime, (void*)&CurrentRot.Roll, Weight);
+						GeneratedTotalKeys[ChannelIndex + 4]->ModifyByCurrentAndWeight(Proxy, KeyTime, (void*)&CurrentRot.Pitch, Weight);
+						GeneratedTotalKeys[ChannelIndex + 5]->ModifyByCurrentAndWeight(Proxy, KeyTime, (void*)&CurrentRot.Yaw, Weight);
 
 						if (ControlElement->Settings.ControlType == ERigControlType::Transform || ControlElement->Settings.ControlType == ERigControlType::EulerTransform)
 						{
 							FVector3f CurrentScale = Val.Val.GetScale3D();
-							GeneratedTotalKeys[ChannelIndex + 6]->ModifyByCurrentAndWeight(Proxy, KeyTime, (void *)&CurrentScale.X, Weight);
-							GeneratedTotalKeys[ChannelIndex + 7]->ModifyByCurrentAndWeight(Proxy, KeyTime, (void *)&CurrentScale.Y, Weight);
-							GeneratedTotalKeys[ChannelIndex + 8]->ModifyByCurrentAndWeight(Proxy, KeyTime, (void *)&CurrentScale.Z, Weight);
+							GeneratedTotalKeys[ChannelIndex + 6]->ModifyByCurrentAndWeight(Proxy, KeyTime, (void*)&CurrentScale.X, Weight);
+							GeneratedTotalKeys[ChannelIndex + 7]->ModifyByCurrentAndWeight(Proxy, KeyTime, (void*)&CurrentScale.Y, Weight);
+							GeneratedTotalKeys[ChannelIndex + 8]->ModifyByCurrentAndWeight(Proxy, KeyTime, (void*)&CurrentScale.Z, Weight);
 						}
 					}
 					break;
@@ -2538,7 +2538,7 @@ void FControlRigParameterTrackEditor::BuildTrackContextMenu(FMenuBuilder& MenuBu
 				NSLOCTEXT("Sequencer", "SelectBonesToAnimateToolTip", "Select which bones or curves you want to directly animate"),
 				FSlateIcon(),
 				FUIAction(
-					FExecuteAction::CreateRaw(this, &FControlRigParameterTrackEditor::SelectFKBonesToAnimate, AutoRig,Track)));
+					FExecuteAction::CreateRaw(this, &FControlRigParameterTrackEditor::SelectFKBonesToAnimate, AutoRig, Track)));
 
 			MenuBuilder.AddMenuEntry(
 				NSLOCTEXT("Sequencer", "FKRigApplyMode", "Additive"),
@@ -2565,7 +2565,7 @@ bool FControlRigParameterTrackEditor::HandleAssetAdded(UObject* Asset, const FGu
 	{
 		return false;
 	}
-	
+
 	UControlRigBlueprint* ControlRigBlueprint = Cast<UControlRigBlueprint>(Asset);
 	UControlRigBlueprintGeneratedClass* RigClass = ControlRigBlueprint->GetControlRigBlueprintGeneratedClass();
 	if (!RigClass)
@@ -2655,8 +2655,8 @@ public:
 
 	SLATE_BEGIN_ARGS(SFKControlRigBoneSelect) {}
 	SLATE_ATTRIBUTE(UFKControlRig*, AutoRig)
-	SLATE_ATTRIBUTE(UMovieSceneControlRigParameterTrack*,Track)
-	SLATE_ATTRIBUTE(ISequencer*, Sequencer)
+		SLATE_ATTRIBUTE(UMovieSceneControlRigParameterTrack*, Track)
+		SLATE_ATTRIBUTE(ISequencer*, Sequencer)
 	SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs)
@@ -2868,7 +2868,7 @@ private:
 				BoneCheckArray[Index++] = Info;
 			
 			}
-			if (Track  && Sequencer)
+			if (Track && Sequencer)
 			{
 				TArray<bool> Mask;
 				Mask.SetNum(BoneCheckArray.Num());
@@ -2978,184 +2978,184 @@ void FControlRigParameterSection::BuildSectionContextMenu(FMenuBuilder& MenuBuil
 				}
 			}
 		}
-	    TArray<FRigControlElement*> Controls;
-	    ControlRig->GetControlsInOrder(Controls);
+		TArray<FRigControlElement*> Controls;
+		ControlRig->GetControlsInOrder(Controls);
 
 		auto MakeUIAction = [=](EMovieSceneTransformChannel ChannelsToToggle)
 		{
 			return FUIAction(
 				FExecuteAction::CreateLambda([=]
-			{
-				FScopedTransaction Transaction(LOCTEXT("SetActiveChannelsTransaction", "Set Active Channels"));
-				ParameterSection->Modify();
-				EMovieSceneTransformChannel Channels = ParameterSection->GetTransformMask().GetChannels();
-
-				if (EnumHasAllFlags(Channels, ChannelsToToggle) || (Channels & ChannelsToToggle) == EMovieSceneTransformChannel::None)
-				{
-					ParameterSection->SetTransformMask(ParameterSection->GetTransformMask().GetChannels() ^ ChannelsToToggle);
-				}
-				else
-				{
-					ParameterSection->SetTransformMask(ParameterSection->GetTransformMask().GetChannels() | ChannelsToToggle);
-				}
-
-				// Restore pre-animated state for the bound objects so that inactive channels will return to their default values.
-				for (TWeakObjectPtr<> WeakObject : SequencerPtr->FindBoundObjects(InObjectBinding, SequencerPtr->GetFocusedTemplateID()))
-				{
-					if (UObject* Object = WeakObject.Get())
 					{
-						SequencerPtr->RestorePreAnimatedState();
-					}
-				}
+						FScopedTransaction Transaction(LOCTEXT("SetActiveChannelsTransaction", "Set Active Channels"));
+						ParameterSection->Modify();
+						EMovieSceneTransformChannel Channels = ParameterSection->GetTransformMask().GetChannels();
 
-				SequencerPtr->NotifyMovieSceneDataChanged(EMovieSceneDataChangeType::MovieSceneStructureItemsChanged);
-			}
+						if (EnumHasAllFlags(Channels, ChannelsToToggle) || (Channels & ChannelsToToggle) == EMovieSceneTransformChannel::None)
+						{
+							ParameterSection->SetTransformMask(ParameterSection->GetTransformMask().GetChannels() ^ ChannelsToToggle);
+						}
+						else
+						{
+							ParameterSection->SetTransformMask(ParameterSection->GetTransformMask().GetChannels() | ChannelsToToggle);
+						}
+
+						// Restore pre-animated state for the bound objects so that inactive channels will return to their default values.
+						for (TWeakObjectPtr<> WeakObject : SequencerPtr->FindBoundObjects(InObjectBinding, SequencerPtr->GetFocusedTemplateID()))
+						{
+							if (UObject* Object = WeakObject.Get())
+							{
+								SequencerPtr->RestorePreAnimatedState();
+							}
+						}
+
+						SequencerPtr->NotifyMovieSceneDataChanged(EMovieSceneDataChangeType::MovieSceneStructureItemsChanged);
+					}
 				),
 				FCanExecuteAction(),
-				FGetActionCheckState::CreateLambda([=]
-			{
-				EMovieSceneTransformChannel Channels = ParameterSection->GetTransformMask().GetChannels();
-				if (EnumHasAllFlags(Channels, ChannelsToToggle))
-				{
-					return ECheckBoxState::Checked;
-				}
-				else if (EnumHasAnyFlags(Channels, ChannelsToToggle))
-				{
-					return ECheckBoxState::Undetermined;
-				}
-				return ECheckBoxState::Unchecked;
-			})
-				);
+						FGetActionCheckState::CreateLambda([=]
+							{
+								EMovieSceneTransformChannel Channels = ParameterSection->GetTransformMask().GetChannels();
+								if (EnumHasAllFlags(Channels, ChannelsToToggle))
+								{
+									return ECheckBoxState::Checked;
+								}
+								else if (EnumHasAnyFlags(Channels, ChannelsToToggle))
+								{
+									return ECheckBoxState::Undetermined;
+								}
+								return ECheckBoxState::Unchecked;
+							})
+						);
 		};
 		auto ToggleControls = [=](int32 Index)
 		{
 			return FUIAction(
 				FExecuteAction::CreateLambda([=]
-			{
-				FScopedTransaction Transaction(LOCTEXT("ToggleRigControlFiltersTransaction", "Toggle Rig Control Filters"));
-				ParameterSection->Modify();
-				if (Index >= 0)
-				{
-					ParameterSection->SetControlsMask(Index, !ParameterSection->GetControlsMask(Index));
-				}
-				else
-				{
-					ParameterSection->FillControlsMask(!ParameterSection->GetControlsMask(0));
-				}
-				SequencerPtr->NotifyMovieSceneDataChanged(EMovieSceneDataChangeType::MovieSceneStructureItemsChanged);
-
-			}
-				),
-				FCanExecuteAction(),
-				FGetActionCheckState::CreateLambda([=]
-			{
-				TArray<bool> ControlBool = ParameterSection->GetControlsMask();
-				if (Index >= 0)
-				{
-					if (ControlBool[Index])
 					{
-						return ECheckBoxState::Checked;
-
-					}
-					else
-					{
-						return ECheckBoxState::Unchecked;
-					}
-				}
-				else
-				{
-					TOptional<bool> FirstVal;
-					for (bool Val : ControlBool)
-					{
-						if (FirstVal.IsSet())
+						FScopedTransaction Transaction(LOCTEXT("ToggleRigControlFiltersTransaction", "Toggle Rig Control Filters"));
+						ParameterSection->Modify();
+						if (Index >= 0)
 						{
-							if (Val != FirstVal)
-							{
-								return ECheckBoxState::Undetermined;
-							}
+							ParameterSection->SetControlsMask(Index, !ParameterSection->GetControlsMask(Index));
 						}
 						else
 						{
-							FirstVal = Val;
+							ParameterSection->FillControlsMask(!ParameterSection->GetControlsMask(0));
 						}
+						SequencerPtr->NotifyMovieSceneDataChanged(EMovieSceneDataChangeType::MovieSceneStructureItemsChanged);
 
 					}
-					return (FirstVal.IsSet() && FirstVal.GetValue()) ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
-				}
-			})
-				);
+				),
+				FCanExecuteAction(),
+						FGetActionCheckState::CreateLambda([=]
+							{
+								TArray<bool> ControlBool = ParameterSection->GetControlsMask();
+								if (Index >= 0)
+								{
+									if (ControlBool[Index])
+									{
+										return ECheckBoxState::Checked;
+
+									}
+									else
+									{
+										return ECheckBoxState::Unchecked;
+									}
+								}
+								else
+								{
+									TOptional<bool> FirstVal;
+									for (bool Val : ControlBool)
+									{
+										if (FirstVal.IsSet())
+										{
+											if (Val != FirstVal)
+											{
+												return ECheckBoxState::Undetermined;
+											}
+										}
+										else
+										{
+											FirstVal = Val;
+										}
+
+									}
+									return (FirstVal.IsSet() && FirstVal.GetValue()) ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+								}
+							})
+						);
 		};
 		MenuBuilder.BeginSection(NAME_None, LOCTEXT("RigSectionActiveChannels", "Active Channels"));
 		{
 			MenuBuilder.AddSubMenu(
 				LOCTEXT("ToggleRigControlsText", "Rig Controls"), LOCTEXT("ToggleRigControlsText_Tooltip", "Causes this section to affect all rig controls"),
 				FNewMenuDelegate::CreateLambda([=](FMenuBuilder& SubMenuBuilder) {
-				int32 Index = 0;
-				for (FRigControlElement* ControlElement : Controls)
-				{
-					const FName RigName = ControlElement->GetName();
-					FText Name = FText::FromName(RigName);
-					FText Text = FText::Format(LOCTEXT("RigControlToggle", "{0}"), Name);
-					FText TooltipText = FText::Format(LOCTEXT("RigControlToggleTooltip", "Causes this section to affect rig control {0}"), Name);
-					SubMenuBuilder.AddMenuEntry(
-						Text, TooltipText,
-						FSlateIcon(), ToggleControls(Index++), NAME_None, EUserInterfaceActionType::ToggleButton);
-				}
-			}),
+					int32 Index = 0;
+					for (FRigControlElement* ControlElement : Controls)
+					{
+						const FName RigName = ControlElement->GetName();
+						FText Name = FText::FromName(RigName);
+						FText Text = FText::Format(LOCTEXT("RigControlToggle", "{0}"), Name);
+						FText TooltipText = FText::Format(LOCTEXT("RigControlToggleTooltip", "Causes this section to affect rig control {0}"), Name);
+						SubMenuBuilder.AddMenuEntry(
+							Text, TooltipText,
+							FSlateIcon(), ToggleControls(Index++), NAME_None, EUserInterfaceActionType::ToggleButton);
+					}
+					}),
 				ToggleControls(-1),
-				NAME_None,
-				EUserInterfaceActionType::ToggleButton);
+						NAME_None,
+						EUserInterfaceActionType::ToggleButton);
 
 			MenuBuilder.AddSubMenu(
 				LOCTEXT("AllTranslation", "Translation"), LOCTEXT("AllTranslation_ToolTip", "Causes this section to affect the translation of rig control transforms"),
 				FNewMenuDelegate::CreateLambda([=](FMenuBuilder& SubMenuBuilder) {
-				SubMenuBuilder.AddMenuEntry(
-					LOCTEXT("TranslationX", "X"), LOCTEXT("TranslationX_ToolTip", "Causes this section to affect the X channel of the transform's translation"),
-					FSlateIcon(), MakeUIAction(EMovieSceneTransformChannel::TranslationX), NAME_None, EUserInterfaceActionType::ToggleButton);
-				SubMenuBuilder.AddMenuEntry(
-					LOCTEXT("TranslationY", "Y"), LOCTEXT("TranslationY_ToolTip", "Causes this section to affect the Y channel of the transform's translation"),
-					FSlateIcon(), MakeUIAction(EMovieSceneTransformChannel::TranslationY), NAME_None, EUserInterfaceActionType::ToggleButton);
-				SubMenuBuilder.AddMenuEntry(
-					LOCTEXT("TranslationZ", "Z"), LOCTEXT("TranslationZ_ToolTip", "Causes this section to affect the Z channel of the transform's translation"),
-					FSlateIcon(), MakeUIAction(EMovieSceneTransformChannel::TranslationZ), NAME_None, EUserInterfaceActionType::ToggleButton);
-			}),
+					SubMenuBuilder.AddMenuEntry(
+						LOCTEXT("TranslationX", "X"), LOCTEXT("TranslationX_ToolTip", "Causes this section to affect the X channel of the transform's translation"),
+						FSlateIcon(), MakeUIAction(EMovieSceneTransformChannel::TranslationX), NAME_None, EUserInterfaceActionType::ToggleButton);
+					SubMenuBuilder.AddMenuEntry(
+						LOCTEXT("TranslationY", "Y"), LOCTEXT("TranslationY_ToolTip", "Causes this section to affect the Y channel of the transform's translation"),
+						FSlateIcon(), MakeUIAction(EMovieSceneTransformChannel::TranslationY), NAME_None, EUserInterfaceActionType::ToggleButton);
+					SubMenuBuilder.AddMenuEntry(
+						LOCTEXT("TranslationZ", "Z"), LOCTEXT("TranslationZ_ToolTip", "Causes this section to affect the Z channel of the transform's translation"),
+						FSlateIcon(), MakeUIAction(EMovieSceneTransformChannel::TranslationZ), NAME_None, EUserInterfaceActionType::ToggleButton);
+					}),
 				MakeUIAction(EMovieSceneTransformChannel::Translation),
-				NAME_None,
-				EUserInterfaceActionType::ToggleButton);
+						NAME_None,
+						EUserInterfaceActionType::ToggleButton);
 
 			MenuBuilder.AddSubMenu(
 				LOCTEXT("AllRotation", "Rotation"), LOCTEXT("AllRotation_ToolTip", "Causes this section to affect the rotation of the rig control transform"),
 				FNewMenuDelegate::CreateLambda([=](FMenuBuilder& SubMenuBuilder) {
-				SubMenuBuilder.AddMenuEntry(
-					LOCTEXT("RotationX", "Roll (X)"), LOCTEXT("RotationX_ToolTip", "Causes this section to affect the roll (X) channel the transform's rotation"),
-					FSlateIcon(), MakeUIAction(EMovieSceneTransformChannel::RotationX), NAME_None, EUserInterfaceActionType::ToggleButton);
-				SubMenuBuilder.AddMenuEntry(
-					LOCTEXT("RotationY", "Pitch (Y)"), LOCTEXT("RotationY_ToolTip", "Causes this section to affect the pitch (Y) channel the transform's rotation"),
-					FSlateIcon(), MakeUIAction(EMovieSceneTransformChannel::RotationY), NAME_None, EUserInterfaceActionType::ToggleButton);
-				SubMenuBuilder.AddMenuEntry(
-					LOCTEXT("RotationZ", "Yaw (Z)"), LOCTEXT("RotationZ_ToolTip", "Causes this section to affect the yaw (Z) channel the transform's rotation"),
-					FSlateIcon(), MakeUIAction(EMovieSceneTransformChannel::RotationZ), NAME_None, EUserInterfaceActionType::ToggleButton);
-			}),
+					SubMenuBuilder.AddMenuEntry(
+						LOCTEXT("RotationX", "Roll (X)"), LOCTEXT("RotationX_ToolTip", "Causes this section to affect the roll (X) channel the transform's rotation"),
+						FSlateIcon(), MakeUIAction(EMovieSceneTransformChannel::RotationX), NAME_None, EUserInterfaceActionType::ToggleButton);
+					SubMenuBuilder.AddMenuEntry(
+						LOCTEXT("RotationY", "Pitch (Y)"), LOCTEXT("RotationY_ToolTip", "Causes this section to affect the pitch (Y) channel the transform's rotation"),
+						FSlateIcon(), MakeUIAction(EMovieSceneTransformChannel::RotationY), NAME_None, EUserInterfaceActionType::ToggleButton);
+					SubMenuBuilder.AddMenuEntry(
+						LOCTEXT("RotationZ", "Yaw (Z)"), LOCTEXT("RotationZ_ToolTip", "Causes this section to affect the yaw (Z) channel the transform's rotation"),
+						FSlateIcon(), MakeUIAction(EMovieSceneTransformChannel::RotationZ), NAME_None, EUserInterfaceActionType::ToggleButton);
+					}),
 				MakeUIAction(EMovieSceneTransformChannel::Rotation),
-				NAME_None,
-				EUserInterfaceActionType::ToggleButton);
+						NAME_None,
+						EUserInterfaceActionType::ToggleButton);
 
 			MenuBuilder.AddSubMenu(
 				LOCTEXT("AllScale", "Scale"), LOCTEXT("AllScale_ToolTip", "Causes this section to affect the scale of the rig control transform"),
 				FNewMenuDelegate::CreateLambda([=](FMenuBuilder& SubMenuBuilder) {
-				SubMenuBuilder.AddMenuEntry(
-					LOCTEXT("ScaleX", "X"), LOCTEXT("ScaleX_ToolTip", "Causes this section to affect the X channel of the transform's scale"),
-					FSlateIcon(), MakeUIAction(EMovieSceneTransformChannel::ScaleX), NAME_None, EUserInterfaceActionType::ToggleButton);
-				SubMenuBuilder.AddMenuEntry(
-					LOCTEXT("ScaleY", "Y"), LOCTEXT("ScaleY_ToolTip", "Causes this section to affect the Y channel of the transform's scale"),
-					FSlateIcon(), MakeUIAction(EMovieSceneTransformChannel::ScaleY), NAME_None, EUserInterfaceActionType::ToggleButton);
-				SubMenuBuilder.AddMenuEntry(
-					LOCTEXT("ScaleZ", "Z"), LOCTEXT("ScaleZ_ToolTip", "Causes this section to affect the Z channel of the transform's scale"),
-					FSlateIcon(), MakeUIAction(EMovieSceneTransformChannel::ScaleZ), NAME_None, EUserInterfaceActionType::ToggleButton);
-			}),
+					SubMenuBuilder.AddMenuEntry(
+						LOCTEXT("ScaleX", "X"), LOCTEXT("ScaleX_ToolTip", "Causes this section to affect the X channel of the transform's scale"),
+						FSlateIcon(), MakeUIAction(EMovieSceneTransformChannel::ScaleX), NAME_None, EUserInterfaceActionType::ToggleButton);
+					SubMenuBuilder.AddMenuEntry(
+						LOCTEXT("ScaleY", "Y"), LOCTEXT("ScaleY_ToolTip", "Causes this section to affect the Y channel of the transform's scale"),
+						FSlateIcon(), MakeUIAction(EMovieSceneTransformChannel::ScaleY), NAME_None, EUserInterfaceActionType::ToggleButton);
+					SubMenuBuilder.AddMenuEntry(
+						LOCTEXT("ScaleZ", "Z"), LOCTEXT("ScaleZ_ToolTip", "Causes this section to affect the Z channel of the transform's scale"),
+						FSlateIcon(), MakeUIAction(EMovieSceneTransformChannel::ScaleZ), NAME_None, EUserInterfaceActionType::ToggleButton);
+					}),
 				MakeUIAction(EMovieSceneTransformChannel::Scale),
-				NAME_None,
-				EUserInterfaceActionType::ToggleButton);
+						NAME_None,
+						EUserInterfaceActionType::ToggleButton);
 
 			//mz todo h
 			MenuBuilder.AddMenuEntry(
@@ -3312,7 +3312,7 @@ FEditorModeTools* FControlRigParameterTrackEditor::GetEditorModeTools() const
 	if (SharedSequencer.IsValid())
 	{
 		TSharedPtr<IToolkitHost> ToolkitHost = SharedSequencer->GetToolkitHost();
-		if(ToolkitHost.IsValid())
+		if (ToolkitHost.IsValid())
 		{
 			return &ToolkitHost->GetEditorModeManager();
 		}
@@ -3325,7 +3325,7 @@ FControlRigEditMode* FControlRigParameterTrackEditor::GetEditMode(bool bForceAct
 {
 	if (FEditorModeTools* EditorModetools = GetEditorModeTools())
 	{
-		if(bForceActivate && !EditorModetools->IsModeActive(FControlRigEditMode::ModeName))
+		if (bForceActivate && !EditorModetools->IsModeActive(FControlRigEditMode::ModeName))
 		{
 			EditorModetools->ActivateMode(FControlRigEditMode::ModeName);
 		}

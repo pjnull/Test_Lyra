@@ -1916,14 +1916,14 @@ void USkeletalMesh::FlushRenderState()
 }
 
 uint32 USkeletalMesh::GetVertexBufferFlags() const
-{
+	{
 	uint32 VertexFlags = ESkeletalMeshVertexFlags::None;
 	if (GetHasVertexColors())
-	{
+		{
 		VertexFlags |= ESkeletalMeshVertexFlags::HasVertexColors;
 	}
 	return VertexFlags;
-}
+			}
 
 #if WITH_EDITOR
 
@@ -1933,13 +1933,13 @@ FSkeletalMeshAsyncBuildScope::FSkeletalMeshAsyncBuildScope(const USkeletalMesh* 
 {
 	PreviousScope = SkeletalMeshBeingAsyncCompiled;
 	SkeletalMeshBeingAsyncCompiled = SkeletalMesh;
-}
+		}
 
 FSkeletalMeshAsyncBuildScope::~FSkeletalMeshAsyncBuildScope()
 {
 	check(SkeletalMeshBeingAsyncCompiled);
 	SkeletalMeshBeingAsyncCompiled = PreviousScope;
-}
+	}
 
 bool FSkeletalMeshAsyncBuildScope::ShouldWaitOnLockedProperties(const USkeletalMesh* SkeletalMesh)
 {
@@ -1956,13 +1956,13 @@ void USkeletalMesh::WaitUntilAsyncPropertyReleased(ESkeletalMeshAsyncProperties 
 			bool bIsLocked = true;
 			// We can remove the lock if we're accessing in read-only and there is no write-lock
 			if ((LockType & EAsyncPropertyLockType::ReadOnly) == EAsyncPropertyLockType::ReadOnly)
-			{
+{
 				// Maintain the lock if the write-lock bit is non-zero
 				bIsLocked &= (ModifiedProperties & (uint64)AsyncProperties) != 0;
 			}
 
 			if (bIsLocked)
-			{
+	{
 				FString PropertyName = StaticEnum<ESkeletalMeshAsyncProperties>()->GetNameByValue((int64)AsyncProperties).ToString();
 				TRACE_CPUPROFILER_EVENT_SCOPE_TEXT(*FString::Printf(TEXT("SkeletalMeshCompilationStall %s"), *PropertyName));
 
@@ -1980,7 +1980,7 @@ void USkeletalMesh::WaitUntilAsyncPropertyReleased(ESkeletalMeshAsyncProperties 
 					FSkeletalMeshCompilingManager::Get().FinishCompilation({ const_cast<USkeletalMesh*>(this) });
 				}
 				else
-				{
+		{
 					// Trying to access a property from another thread that cannot force finish the compilation is invalid
 					ensureMsgf(
 						false,
@@ -2025,7 +2025,7 @@ void USkeletalMesh::PrepareForAsyncCompilation()
 	FModuleManager::Get().LoadModuleChecked<IMeshReductionManagerModule>(TEXT("MeshReductionInterface"));
 	IMeshBuilderModule::GetForRunningPlatform();
 	for (const ITargetPlatform* TargetPlatform : TargetPlatformManager.GetActiveTargetPlatforms())
-	{
+{
 		IMeshBuilderModule::GetForPlatform(TargetPlatform);
 	}
 
@@ -2048,7 +2048,7 @@ void USkeletalMesh::Build()
 	if (IsCompiling())
 	{
 		FSkeletalMeshCompilingManager::Get().FinishCompilation({this});
-	}
+}
 
 	FSkeletalMeshAsyncBuildScope AsyncBuildScope(this);
 
@@ -2058,7 +2058,7 @@ void USkeletalMesh::Build()
 	// Inline reduction is not thread-safe, prevent async build until this is fixed.
 	const bool bHasInlineReductions = SkeletalMeshImpl::HasInlineReductions(this);
 	if (!bHasInlineReductions && FSkeletalMeshCompilingManager::Get().IsAsyncCompilationAllowed(this))
-	{
+{
 		PrepareForAsyncCompilation();
 
 		FQueuedThreadPool* SkeletalMeshThreadPool = FSkeletalMeshCompilingManager::Get().GetThreadPool();
@@ -2460,7 +2460,7 @@ USkeletalMeshEditorData& USkeletalMesh::GetMeshEditorData() const
 		//RF_Transactional make sure the asset can be transactional if we want to edit it
 		USkeletalMesh* NonConstSkeletalMesh = const_cast<USkeletalMesh*>(this);
 		MeshEditorDataObject = NewObject<USkeletalMeshEditorData>(NonConstSkeletalMesh, NAME_None, RF_Transactional);
-	}
+		}
 	//Make sure we have a valid pointer
 	check(MeshEditorDataObject != nullptr);
 	return *MeshEditorDataObject;
@@ -3364,6 +3364,7 @@ void USkeletalMesh::FinishPostLoadInternal(FSkeletalMeshPostLoadContext& Context
 				ClothingAsset->InvalidateAllCachedData();
 			}
 		}
+	}
 	}
 #endif
 

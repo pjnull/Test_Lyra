@@ -118,7 +118,7 @@ public:
 			for (auto Pair: FDataDrivenPlatformInfoRegistry::GetAllPlatformInfos())
 			{
 				if (Pair.Value.AutoSDKPath.Len() > 0)
-				{
+			{
 					SetupAndValidateAutoSDK(Pair.Value.AutoSDKPath);
 				}
 			}
