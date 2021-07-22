@@ -472,11 +472,12 @@ void FNDI_Landscape_SharedResource::Release()
 {
 	ENQUEUE_RENDER_COMMAND(BeginDestroyCommand)([RT_Resource = LandscapeTextures.Release()](FRHICommandListImmediate& RHICmdList)
 	{
+		RT_Resource->ReleaseResource();
+
 		// On some RHIs textures will push data on the RHI thread
 		// Therefore we are not 'released' until the RHI thread has processed all commands
 		RHICmdList.EnqueueLambda([RT_Resource](FRHICommandListImmediate& RHICmdList)
 		{
-			RT_Resource->ReleaseResource();
 			delete RT_Resource;
 		});
 	});
