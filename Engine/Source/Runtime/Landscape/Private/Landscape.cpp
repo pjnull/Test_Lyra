@@ -1159,7 +1159,7 @@ ULandscapeInfo* ALandscapeProxy::CreateLandscapeInfo(bool bMapCheck)
 ULandscapeInfo* ALandscapeProxy::GetLandscapeInfo() const
 {
 	return ULandscapeInfo::Find(GetWorld(), LandscapeGuid);
-	}
+}
 
 FTransform ALandscapeProxy::LandscapeActorToWorld() const
 {
@@ -2606,6 +2606,9 @@ void ALandscapeProxy::FixupSharedData(ALandscape* Landscape)
 	if (LOD0ScreenSize != Landscape->LOD0ScreenSize)
 	{
 		LOD0ScreenSize = Landscape->LOD0ScreenSize;
+		bUpdated = true;
+	}
+
 	if (TargetDisplayOrder != Landscape->TargetDisplayOrder)
 	{
 		TargetDisplayOrder = Landscape->TargetDisplayOrder;
@@ -3792,7 +3795,7 @@ void ALandscapeProxy::UpdateGIBakedTextureStatus(bool* bOutGenerateLandscapeGIDa
 	if (true)
 	{
 		if (bOutGenerateLandscapeGIData)
-	{
+		{
 			*bOutGenerateLandscapeGIData = false;
 		}
 
@@ -4109,7 +4112,7 @@ void ALandscapeProxy::UpdatePhysicalMaterialTasks(bool bInShouldMarkDirty)
 	if (bInShouldMarkDirty && PendingComponentsToBeSaved >0)
 	{
 		MarkPackageDirty();
-}
+	}
 }
 #endif
 
