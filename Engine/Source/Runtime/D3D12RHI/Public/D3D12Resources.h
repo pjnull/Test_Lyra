@@ -917,6 +917,10 @@ inline FName GetBufferStats(uint32 Usage)
 	{
 		return GET_STATFNAME(STAT_IndexBufferMemory);
 	}
+	else if (Usage & BUF_AccelerationStructure)
+	{
+		return GET_STATFNAME(STAT_RTAccelerationStructureMemory);
+	}
 	else
 	{
 		return GET_STATFNAME(STAT_StructuredBufferMemory);
