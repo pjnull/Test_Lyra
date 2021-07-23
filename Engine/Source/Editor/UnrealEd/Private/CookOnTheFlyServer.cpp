@@ -90,6 +90,7 @@
 #include "MeshCardRepresentation.h"
 #include "Misc/PathViews.h"
 #include "String/Find.h"
+#include "Async/Async.h"
 
 #include "AssetRegistryModule.h"
 #include "AssetRegistryState.h"
@@ -1359,6 +1360,54 @@ FString UCookOnTheFlyServer::GetContentDirectoryForDLC() const
 {
 	return GetBaseDirectoryForDLC() / TEXT("Content");
 }
+
+
+// allow for a command line to start async preloading a Development AssetRegistry if requested
+static FEventRef GPreloadAREvent(EEventMode::ManualReset);
+static FEventRef GPreloadARInfoEvent(EEventMode::ManualReset);
+static FAssetRegistryState GPreloadedARState;
+static FString GPreloadedARPath;
+static FDelayedAutoRegisterHelper GPreloadARHelper(EDelayedRegisterRunPhase::EarliestPossiblePluginsLoaded, []()
+	{
+		// if we don't want to preload, then do nothing here
+		if (!FParse::Param(FCommandLine::Get(), TEXT("PreloadDevAR")))
+		{
+			GPreloadAREvent->Trigger();
+			GPreloadARInfoEvent->Trigger();
+			return;
+		}
+
+		// kick off a thread to preload the DevelopmentAssetRegistry
+		Async(EAsyncExecution::Thread, []()
+			{
+				FString BasedOnReleaseVersion;
+				FString DevelopmentAssetRegistryPlatformOverride;
+				// some manual commandline processing - we don't have the cooker params set properly yet - but this is not a generic solution, it is opt-in
+				if (FParse::Value(FCommandLine::Get(), TEXT("BasedOnReleaseVersion="), BasedOnReleaseVersion) &&
+					FParse::Value(FCommandLine::Get(), TEXT("DevelopmentAssetRegistryPlatformOverride="), DevelopmentAssetRegistryPlatformOverride))
+				{
+					const bool bIsCookingAgainstFixedBase = FParse::Param(FCommandLine::Get(), TEXT("CookAgainstFixedBase "));
+					const bool bVerifyPackagesExist = !bIsCookingAgainstFixedBase;
+
+					// get the AR file path and see if it exists
+					GPreloadedARPath = GetBasedOnReleaseVersionAssetRegistryPath(BasedOnReleaseVersion, DevelopmentAssetRegistryPlatformOverride) / TEXT("Metadata") / GetDevelopmentAssetRegistryFilename();
+
+					// now that the info has been set, we can allow the other side of this code to check the ARPath
+					GPreloadARInfoEvent->Trigger();
+
+					TUniquePtr<FArchive> Reader(IFileManager::Get().CreateFileReader(*GPreloadedARPath));
+					if (Reader)
+					{
+						GPreloadedARState.Serialize(*Reader.Get(), FAssetRegistrySerializationOptions());
+					}
+				}
+
+				GPreloadAREvent->Trigger();
+			}
+		);
+	}
+);
+
 
 COREUOBJECT_API extern bool GOutputCookingWarnings;
 
@@ -8364,6 +8413,7 @@ void UCookOnTheFlyServer::StartCookByTheBook( const FCookByTheBookStartupOptions
 
 		for ( const ITargetPlatform* TargetPlatform: TargetPlatforms )
 		{
+			SCOPED_BOOT_TIMING("AddCookedPlatforms");
 			TArray<FName> PackageList;
 			FString PlatformNameString = TargetPlatform->PlatformName();
 			FName PlatformName(*PlatformNameString);
@@ -8383,18 +8433,8 @@ void UCookOnTheFlyServer::StartCookByTheBook( const FCookByTheBookStartupOptions
 			TArray<FName>& ActivePackageList = OverridePackageList.Num() > 0 ? OverridePackageList : PackageList;
 			if (ActivePackageList.Num() > 0)
 			{
-				TArray<const ITargetPlatform*> ResultPlatforms;
-				ResultPlatforms.Add(TargetPlatform);
-				TArray<bool> Succeeded;
-				Succeeded.Add(true);
-				for (const FName& PackageFilename : ActivePackageList)
-				{
-					UE::Cook::FPackageData* PackageData = PackageDatas->TryAddPackageDataByFileName(PackageFilename);
-					if (PackageData)
-					{
-						PackageData->AddCookedPlatforms({ TargetPlatform }, true /* Succeeded */);
-					}
-				}
+				SCOPED_BOOT_TIMING("AddPackageDataByFileNamesForPlatform");
+				PackageDatas->AddExistingPackageDatasForPlatform(ActivePackageList, TargetPlatform);
 			}
 
 			if (OverridePackageList.Num() > 0)
@@ -8559,6 +8599,19 @@ void UCookOnTheFlyServer::StartCookByTheBook( const FCookByTheBookStartupOptions
 
 TArray<FName> UCookOnTheFlyServer::GetNeverCookPackageFileNames(TArrayView<const FString> ExtraNeverCookDirectories)
 {
+	// if we are cooking with IoStore enabled, this will throw warnings and fail to find any packaged, but since we are running 
+	// with IoStore the state of files will hopefully be good
+	if (FIoDispatcher::IsInitialized())
+	{
+		static bool bShownWarning = false;
+		if (!bShownWarning)
+		{
+			UE_LOG(LogCook, Warning, TEXT("Unable to search for packages to not cook when running with IO Dispatcher active"));
+			bShownWarning = true;
+		}
+		return TArray<FName>();
+	}
+
 	TArray<FString> NeverCookDirectories(ExtraNeverCookDirectories);
 
 	auto AddDirectoryPathArray = [&NeverCookDirectories](const TArray<FDirectoryPath>& DirectoriesToNeverCook, const TCHAR* SettingName)
@@ -8743,13 +8796,34 @@ void UCookOnTheFlyServer::GetCookOnTheFlyUnsolicitedFiles(const ITargetPlatform*
 bool UCookOnTheFlyServer::GetAllPackageFilenamesFromAssetRegistry( const FString& AssetRegistryPath, bool bVerifyPackagesExist, TArray<FName>& OutPackageFilenames ) const
 {
 	UE_SCOPED_COOKTIMER(GetAllPackageFilenamesFromAssetRegistry);
+	SCOPED_BOOT_TIMING("GetAllPackageFilenamesFromAssetRegistry");
 	TUniquePtr<FArchive> Reader(IFileManager::Get().CreateFileReader(*AssetRegistryPath));
 	if (Reader)
 	{
-		FAssetRegistryState TempState;
-		TempState.Serialize(*Reader.Get(), FAssetRegistrySerializationOptions());
+		// is there a matching preloaded AR?
+		GPreloadARInfoEvent->Wait();
 
-		const TMap<FName, const FAssetData*>& RegistryDataMap = TempState.GetObjectPathToAssetDataMap();
+		bool bHadPreloadedAR = false;
+		if (AssetRegistryPath == GPreloadedARPath)
+		{
+			// make sure the Serialize call is done
+			double Start = FPlatformTime::Seconds();
+			GPreloadAREvent->Wait();
+			double TimeWaiting = FPlatformTime::Seconds() - Start;
+			UE_LOG(LogCook, Display, TEXT("Blocked %.4f ms waiting for AR to finish loading"), TimeWaiting * 1000.0);
+			
+			// if something went wrong, the num assets may be zero, in which case we do the normal load 
+			bHadPreloadedAR = GPreloadedARState.GetNumAssets() > 0;
+		}
+
+		// if we didn't preload an AR, then we need to do a blocking load now
+		if (!bHadPreloadedAR)
+		{
+			GPreloadedARState.Serialize(*Reader.Get(), FAssetRegistrySerializationOptions());
+		}
+
+		// possibly use the preloaded state
+		const TMap<FName, const FAssetData*>& RegistryDataMap = GPreloadedARState.GetObjectPathToAssetDataMap();
 
 		check(OutPackageFilenames.Num() == 0);
 		OutPackageFilenames.SetNum(RegistryDataMap.Num());
@@ -8766,9 +8840,8 @@ bool UCookOnTheFlyServer::GetAllPackageFilenamesFromAssetRegistry( const FString
 			}
 		}
 
-		TArray<TTuple<FName, FString>> PackageToStandardFileNames;
+		TArray<TTuple<FName, FPackageNameCache::FCachedPackageFilename>> PackageToStandardFileNames;
 		PackageToStandardFileNames.SetNum(RegistryDataMap.Num());
-
 		ParallelFor(Packages.Num(), [&AssetRegistryPath, &OutPackageFilenames, &PackageToStandardFileNames, &Packages, this, bVerifyPackagesExist](int32 AssetIndex)
 			{
 				if (!OutPackageFilenames[AssetIndex].IsNone())
@@ -8800,7 +8873,8 @@ bool UCookOnTheFlyServer::GetAllPackageFilenamesFromAssetRegistry( const FString
 					}
 				}
 				
-				PackageToStandardFileNames[AssetIndex] = TTuple<FName, FString>(PackageName, MoveTemp(StandardFilename));
+				FName StandardFileFName(*StandardFilename);
+				PackageToStandardFileNames[AssetIndex] = TTuple<FName, FPackageNameCache::FCachedPackageFilename>(PackageName, FPackageNameCache::FCachedPackageFilename(MoveTemp(StandardFilename), StandardFileFName));
 			});
 
 		for (int32 Idx = OutPackageFilenames.Num() - 1; Idx >= 0; --Idx)
@@ -8811,7 +8885,10 @@ bool UCookOnTheFlyServer::GetAllPackageFilenamesFromAssetRegistry( const FString
 			}
 		}
 
-		GetPackageNameCache().AppendCacheResults(MoveTemp(PackageToStandardFileNames));
+		{
+			SCOPED_BOOT_TIMING("AppendCacheResults");
+			GetPackageNameCache().AppendCacheResults(MoveTemp(PackageToStandardFileNames));
+		}
 		return true;
 	}
 
@@ -9292,10 +9369,7 @@ uint32 UCookOnTheFlyServer::FullLoadAndSave(uint32& CookedPackageCount)
 					}
 				}
 
-				for (int n = 0; n < TargetPlatforms.Num(); ++n)
-				{
-					PackageData.AddCookedPlatforms({ TargetPlatforms[n] }, SavePackageSuccessPerPlatform[n]);
-				}
+				PackageData.AddCookedPlatforms(TargetPlatforms, SavePackageSuccessPerPlatform);
 
 				if (SavePackageSuccessPerPlatform.Contains(false))
 				{
