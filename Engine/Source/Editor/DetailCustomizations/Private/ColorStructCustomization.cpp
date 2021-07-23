@@ -175,6 +175,8 @@ void FColorStructCustomization::GetSortedChildren(TSharedRef<IPropertyHandle> In
 
 void FColorStructCustomization::CreateColorPicker(bool bUseAlpha)
 {
+	GEditor->BeginTransaction(FText::Format(LOCTEXT("SetColorProperty", "Edit {0}"), StructPropertyHandle->GetPropertyDisplayName()));
+
 	int32 NumObjects = StructPropertyHandle->GetNumOuterObjects();
 
 	SavedPreColorPickerColors.Empty();
@@ -231,6 +233,8 @@ void FColorStructCustomization::CreateColorPicker(bool bUseAlpha)
 
 TSharedRef<SColorPicker> FColorStructCustomization::CreateInlineColorPicker(TWeakPtr<IPropertyHandle> StructWeakHandlePtr)
 {
+	GEditor->BeginTransaction(FText::Format(LOCTEXT("SetColorProperty", "Edit {0}"), StructPropertyHandle->GetPropertyDisplayName()));
+
 	int32 NumObjects = StructPropertyHandle->GetNumOuterObjects();
 
 	SavedPreColorPickerColors.Empty();
@@ -313,7 +317,9 @@ void FColorStructCustomization::ResetColors()
 
 	if (PerObjectColors.Num() > 0)
 	{
-		StructPropertyHandle->SetPerObjectValues(PerObjectColors);
+		// See @TODO in FColorStructCustomization::OnColorPickerWindowClosed
+		// ensure(StructPropertyHandle->SetPerObjectValues(PerObjectColors, EPropertyValueSetFlags::NotTransactable) == FPropertyAccess::Success);
+		StructPropertyHandle->SetPerObjectValues(PerObjectColors, EPropertyValueSetFlags::NotTransactable);
 	}
 }
 
@@ -321,6 +327,8 @@ void FColorStructCustomization::OnColorPickerCancelled(FLinearColor OriginalColo
 {
 	ResetColors();
 	LastPickerColorString.Reset();
+
+	GEditor->CancelTransaction(0);
 }
 
 void FColorStructCustomization::OnColorPickerWindowClosed(const TSharedRef<SWindow>& Window)
@@ -328,12 +336,16 @@ void FColorStructCustomization::OnColorPickerWindowClosed(const TSharedRef<SWind
 	// Transact only at the end to avoid opening a lingering transaction. Reset value before transacting.
 	if (!LastPickerColorString.IsEmpty())
 	{
-		ResetColors();
+		//@TODO: Not using reset & apply instant scoped transition pattern since certain property nodes are 
+		// returning nullptr when finding objects to modify on reset, so we can't reset correctly for those.
+		// ResetColors();
 		{
-			FScopedTransaction(FText::Format(LOCTEXT("SetColorProperty", "Edit {0}"), StructPropertyHandle->GetPropertyDisplayName()));
+			// FScopedTransaction Transaction(FText::Format(LOCTEXT("SetColorProperty", "Edit {0}"), StructPropertyHandle->GetPropertyDisplayName()));
 			StructPropertyHandle->SetValueFromFormattedString(LastPickerColorString);
 		}
 	}
+
+	GEditor->EndTransaction();
 }
 
 
