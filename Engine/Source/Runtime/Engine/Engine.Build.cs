@@ -60,6 +60,7 @@ public class Engine : ModuleRules
 				new string[]
 				{
 					"EditorAnalyticsSession",
+					"DerivedDataCache",
 				}
 			);
 		}
@@ -127,7 +128,6 @@ public class Engine : ModuleRules
 				"CrunchCompression",
 				"IntelISPC",
 				"TraceLog",
-				"DerivedDataCache",
 			}
 		);
 
