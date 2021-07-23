@@ -412,9 +412,9 @@ void UNetConnection::InitBase(UNetDriver* InDriver,class FSocket* InSocket, cons
 	if (Driver->IsServer() && !IsReplay())
 	{
 		RPCDoS.Init(Driver->NetDriverName, AnalyticsAggregator,
-			[Driver = InDriver]() -> UWorld*
+			[WorldPtr = TWeakObjectPtr<UWorld>(InDriver->GetWorld())]() -> UWorld*
 			{
-				return Driver->GetWorld();
+				return WorldPtr.IsValid() ? WorldPtr.Get() : nullptr;
 			},
 			[this]() -> FString
 			{
