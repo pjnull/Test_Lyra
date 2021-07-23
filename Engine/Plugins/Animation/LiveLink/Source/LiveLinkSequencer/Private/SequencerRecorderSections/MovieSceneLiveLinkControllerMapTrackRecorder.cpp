@@ -56,7 +56,7 @@ void UMovieSceneLiveLinkControllerMapTrackRecorder::CreateTrackImpl()
 	// Create a track recorder for each LiveLink controller in the controller map
 	if (ULiveLinkComponentController* LiveLinkComponent = Cast<ULiveLinkComponentController>(ObjectToRecord.Get()))
 	{
-		for (TPair<TSubclassOf<ULiveLinkRole>, ULiveLinkControllerBase*>& ControllerPair : LiveLinkComponent->ControllerMap)
+		for (TPair<TSubclassOf<ULiveLinkRole>, TObjectPtr<ULiveLinkControllerBase>>& ControllerPair : LiveLinkComponent->ControllerMap)
 		{
 			if (ULiveLinkControllerBase* Controller = ControllerPair.Value)
 			{
