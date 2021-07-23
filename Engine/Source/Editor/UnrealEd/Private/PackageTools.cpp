@@ -697,7 +697,8 @@ UPackageTools::UPackageTools(const FObjectInitializer& ObjectInitializer)
 				// Unload the current world
 				if (GIsEditor)
 				{
-					GEditor->CreateNewMapForEditing();
+					const bool bPromptForSave = InteractionMode == UPackageTools::EReloadPackagesInteractionMode::Interactive;
+					GEditor->CreateNewMapForEditing(bPromptForSave);
 				}
 				else if (UGameEngine* GameEngine = Cast<UGameEngine>(GEngine))
 				{
