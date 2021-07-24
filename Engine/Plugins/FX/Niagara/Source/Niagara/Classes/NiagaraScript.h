@@ -332,9 +332,9 @@ struct NIAGARA_API FNiagaraVMExecutableByteCodeOptimizationTaskState
 	FNiagaraVMExecutableByteCodeOptimizationTaskState(bool bIsCompleted = false)
 		: bCompleted(bIsCompleted) { }
 
-	TFuture<FNiagaraVMExecutableByteCodeOptimizationTaskResultPtr> Task;
-	FThreadSafeBool bCompleted;
-	FCriticalSection Sync;
+	TSharedFuture<FNiagaraVMExecutableByteCodeOptimizationTaskResultPtr> SharedTask;
+	bool bCompleted;
+	FRWLock RWLock;
 };
 
 /** Struct containing all of the data needed to run a Niagara VM executable script.*/

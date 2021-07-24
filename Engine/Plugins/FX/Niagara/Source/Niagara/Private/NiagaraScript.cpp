@@ -224,19 +224,34 @@ void FNiagaraVMExecutableData::WaitOnOptimizeCompletion()
 	// If we got here and this isn't valid, somethings wrong as this should have been created in Activate()
 	check(OptimizationTask.IsValid());
 
-	if (OptimizationTask->bCompleted == false)
-	{		
-		OptimizationTask->Task.Wait();
 
-		// Make sure only one thread can update this
-		FScopeLock Lock(&OptimizationTask->Sync);
+	TSharedFuture<FNiagaraVMExecutableByteCodeOptimizationTaskResultPtr> TaskFuture;
+	{
+		FReadScopeLock ReadLock(OptimizationTask->RWLock);
 
-		if (OptimizationTask->bCompleted == false && OptimizationTask->Task.IsValid())
+		// Bail if we already know it's completed
+		if (OptimizationTask->bCompleted)
 		{
-			FNiagaraVMExecutableByteCodeOptimizationTaskResultPtr Result = OptimizationTask->Task.Get();
+			check(!OptimizationTask->SharedTask.IsValid());
+			return;
+		}
+
+		TaskFuture = OptimizationTask->SharedTask;
+		check(TaskFuture.IsValid());
+	}
+
+	TaskFuture.Wait();
+
+	{
+		FWriteScopeLock WriteLock(OptimizationTask->RWLock);
+
+		// Check this still hasn't been handled by another thread
+		if (!OptimizationTask->bCompleted)
+		{
+			FNiagaraVMExecutableByteCodeOptimizationTaskResultPtr Result = OptimizationTask->SharedTask.Get();
 			ApplyFinishedOptimization(Result);
 
-			OptimizationTask->Task.Reset();
+			OptimizationTask->SharedTask = TSharedFuture<FNiagaraVMExecutableByteCodeOptimizationTaskResultPtr>();
 			OptimizationTask->bCompleted = true;
 		}
 	}
@@ -1284,7 +1299,7 @@ void UNiagaraScript::AsyncOptimizeByteCode(bool bIsInPostLoad)
 	if (!bShouldOptimizeImmediately)
 	{
 		CachedScriptVM.OptimizationTask = MakeShared<FNiagaraVMExecutableByteCodeOptimizationTaskState, ESPMode::ThreadSafe>();
-		CachedScriptVM.OptimizationTask->Task = Async(EAsyncExecution::TaskGraph, MoveTemp(Task));
+		CachedScriptVM.OptimizationTask->SharedTask = Async(EAsyncExecution::TaskGraph, MoveTemp(Task)).Share();
 	}
 	else
 	{
