@@ -3195,7 +3195,8 @@ void FLevelOfDetailSettingsLayout::AddToDetailsPanel( IDetailLayoutBuilder& Deta
 	];
 	
 	LODSettingsCategory.AddCustomRow( LOCTEXT("LODImport", "LOD Import") )
-		.NameContent()
+	.RowTag("LODImport")
+	.NameContent()
 		[
 			SNew(STextBlock)
 			.Font( IDetailLayoutBuilder::GetDetailFont() )
@@ -3272,6 +3273,7 @@ void FLevelOfDetailSettingsLayout::AddToDetailsPanel( IDetailLayoutBuilder& Deta
 	// Add Number of LODs slider.
 	const int32 MinAllowedLOD = 1;
 	LODSettingsCategory.AddCustomRow( LOCTEXT("NumberOfLODs", "Number of LODs") )
+	.RowTag("NumberOfLODs")
 	.NameContent()
 	[
 		SNew(STextBlock)
