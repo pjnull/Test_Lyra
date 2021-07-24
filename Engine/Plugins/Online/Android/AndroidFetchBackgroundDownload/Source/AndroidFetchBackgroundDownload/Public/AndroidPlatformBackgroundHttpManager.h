@@ -44,6 +44,7 @@ public :
 	void CancelRequest(FBackgroundHttpRequestPtr Request);
 
 protected:
+	void EnsureJavaClassesAreLoaded(JNIEnv* Env);
 	void UpdateRequestProgress();
 
 	FAndroidBackgroundHttpRequestPtr FindRequestByID(FString RequestID);

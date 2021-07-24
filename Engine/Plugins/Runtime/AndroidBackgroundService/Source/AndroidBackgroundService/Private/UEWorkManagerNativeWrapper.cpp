@@ -54,6 +54,8 @@ void FUEWorkManagerNativeWrapper::FJavaClassInfo::Initialize()
 
 			bool bIsOptional = false;
 
+			EnsureJavaClassesAreLoaded(Env);
+
 			//Find jclass information
 			{
 				DefaultUEWorkerJavaClass = FJavaWrapper::UEWorkerClass;
@@ -73,6 +75,33 @@ void FUEWorkManagerNativeWrapper::FJavaClassInfo::Initialize()
 				JavaInterface_Method_CancelWork = FJavaWrapper::FindStaticMethod(Env, UEWorkManagerJavaInterfaceClass, "AndroidThunkJava_CancelWork", "(Landroid/content/Context;Ljava/lang/String;)V", bIsOptional);
 			}
 		}
+	}
+}
+
+void FUEWorkManagerNativeWrapper::FJavaClassInfo::EnsureJavaClassesAreLoaded(JNIEnv* Env)
+{
+	const bool bIsOptional = false;
+
+	//If any needed needed java UEWork classes are not loaded, try and load them and error if they aren't found
+	//in the base FJavaWrapper implementation these checks are optional since this is in a plugin, but now we need them
+	//and should ensure if they aren't found
+
+	if (FJavaWrapper::UEWorkerClass == 0)
+	{
+		UE_LOG(LogEngine, Display, TEXT("Attempting to load Java class UEWorkerClass"));
+		FJavaWrapper::UEWorkerClass = FJavaWrapper::FindClassGlobalRef(Env, "com/epicgames/ue4/workmanager/UEWorker", bIsOptional);
+	}
+
+	if (FJavaWrapper::UEWorkManagerJavaInterfaceClass == 0)
+	{
+		UE_LOG(LogEngine, Display, TEXT("Attempting to load Java class UEWorkManagerJavaInterfaceClass"));
+		FJavaWrapper::UEWorkManagerJavaInterfaceClass = FJavaWrapper::FindClassGlobalRef(Env, "com/epicgames/ue4/workmanager/UEWorkManagerJavaInterface", bIsOptional);
+	}
+
+	if (FJavaWrapper::WorkRequestParametersJavaInterfaceClass == 0)
+	{
+		UE_LOG(LogEngine, Display, TEXT("Attempting to load Java class WorkRequestParametersJavaInterfaceClass"));
+		FJavaWrapper::WorkRequestParametersJavaInterfaceClass = FJavaWrapper::FindClassGlobalRef(Env, "com/epicgames/ue4/workmanager/UEWorkManagerJavaInterface$FWorkRequestParametersJavaInterface", bIsOptional);
 	}
 }
 

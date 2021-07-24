@@ -111,6 +111,10 @@ public:
 		jmethodID JavaInterface_Method_CreateWorkRequestParameters;
 
 		void Initialize();
+
+		//Our classes are all optional in the FJavaWrapper as they are plugins, but are needed here. This allows us to ensure
+		//if they are missing when the classes are actually used and needed.
+		void EnsureJavaClassesAreLoaded(JNIEnv* Env);
 	};
 
 public:

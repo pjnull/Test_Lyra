@@ -109,6 +109,27 @@ bool FAndroidPlatformBackgroundHttpManager::Tick(float DeltaTime)
 	return true;
 }
 
+void FAndroidPlatformBackgroundHttpManager::EnsureJavaClassesAreLoaded(JNIEnv* Env)
+{
+	const bool bIsOptional = false;
+
+	//If any needed needed java UEDownloadWorker classes are not loaded, try and load them and error if they aren't found
+	//in the base FJavaWrapper implementation these checks are optional since this is in a plugin, but now we need them
+	//and should ensure if they aren't found
+
+	if (FJavaWrapper::UEDownloadWorkerClass == 0)
+	{
+		UE_LOG(LogEngine, Display, TEXT("Attempting to load Java class UEDownloadWorkerClass"));
+		FJavaWrapper::UEDownloadWorkerClass = FJavaWrapper::FindClassGlobalRef(Env, "com/epicgames/ue4/download/UEDownloadWorker", bIsOptional);
+	}
+
+	if (FJavaWrapper::DownloadDescriptionClass == 0)
+	{
+		UE_LOG(LogEngine, Display, TEXT("Attempting to load Java class DownloadDescriptionClass"));
+		FJavaWrapper::DownloadDescriptionClass = FJavaWrapper::FindClassGlobalRef(Env, "com/epicgames/ue4/download/datastructs/DownloadDescription", bIsOptional);
+	}
+}
+
 void FAndroidPlatformBackgroundHttpManager::ActivatePendingRequests()
 {
 	TArray<FBackgroundHttpRequestPtr> NewlyActivatedRequests;
@@ -122,6 +143,8 @@ void FAndroidPlatformBackgroundHttpManager::ActivatePendingRequests()
 			bool bIsOptional = false;
 
 			JNIEnv* Env = FAndroidApplication::GetJavaEnv();
+			EnsureJavaClassesAreLoaded(Env);
+						
 			if (ensureAlwaysMsgf(Env, TEXT("Invalid JavaEnv! Can not activate any pending requests!")))
 			{
 				//Grab a bunch of necessary JNI methods we will need to create our DownloadDescriptions
