@@ -550,11 +550,6 @@ namespace EpicGames.Core
 			{
 				if (SDKRoot != "")
 				{
-					if ( GetAutoSDKPlatformName() == null || GetAutoSDKPlatformName() == "")
-					{
-						Debugger.Launch();
-					}
-
 					SDKPath = Path.Combine(SDKRoot, "Host" + GetAutoSDKHostPlatform(), GetAutoSDKPlatformName());
 				}
 			}
