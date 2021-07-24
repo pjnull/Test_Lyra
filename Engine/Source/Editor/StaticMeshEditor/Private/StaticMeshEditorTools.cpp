@@ -773,6 +773,7 @@ void FMeshBuildSettingsLayout::GenerateChildContent( IDetailChildrenBuilder& Chi
 
 	{
 		ChildrenBuilder.AddCustomRow( LOCTEXT("ApplyChanges", "Apply Changes") )
+		.RowTag("ApplyChanges")
 		.ValueContent()
 		.HAlign(HAlign_Left)
 		[
