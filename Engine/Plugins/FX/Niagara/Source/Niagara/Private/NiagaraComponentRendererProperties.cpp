@@ -128,6 +128,7 @@ UNiagaraComponentRendererProperties::UNiagaraComponentRendererProperties()
 	AttributeBindings.Reserve(2);
 	AttributeBindings.Add(&EnabledBinding);
 	AttributeBindings.Add(&RendererVisibilityTagBinding);
+	IsSetterMappingDirty.store(true);
 }
 
 UNiagaraComponentRendererProperties::~UNiagaraComponentRendererProperties()

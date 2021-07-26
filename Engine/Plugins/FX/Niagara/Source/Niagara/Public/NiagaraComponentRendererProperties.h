@@ -161,5 +161,5 @@ private:
 
 #endif
 
-	std::atomic_bool IsSetterMappingDirty = true;
+	std::atomic_bool IsSetterMappingDirty;
 };
