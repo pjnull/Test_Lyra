@@ -4,7 +4,7 @@
 #include "HAL/PlatformProcess.h"
 #include "HAL/IConsoleManager.h"
 #include "Stats/Stats.h"
-
+#include "Misc/LazySingleton.h"
 
 
 DEFINE_LOG_CATEGORY(LogLockFreeList);
@@ -205,16 +205,23 @@ private:
 	FLockFreePointerListLIFORoot<PLATFORM_CACHE_LINE_SIZE> GlobalFreeListBundles;
 };
 
-static LockFreeLinkAllocator_TLSCache GLockFreeLinkAllocator;
+static LockFreeLinkAllocator_TLSCache& GetLockFreeAllocator()
+{
+	return TLazySingleton<LockFreeLinkAllocator_TLSCache>::Get();
+}
 
 void FLockFreeLinkPolicy::FreeLockFreeLink(FLockFreeLinkPolicy::TLinkPtr Item)
 {
-	GLockFreeLinkAllocator.Push(Item);
+	// there is some code that will use GLockFreeLinkAllocator in static global destructors, and if this is
+	// a global object, it can be destroyed before the other objects attempt to use it. The simplest solution
+	// is to leak the object (which the OS will reclaim anyway). Linux was crashing due to this, but not
+	// Windows, since global dtor order can't be guaranteed
+	GetLockFreeAllocator().Push(Item);
 }
 
 FLockFreeLinkPolicy::TLinkPtr FLockFreeLinkPolicy::AllocLockFreeLink() TSAN_SAFE
 {
-	FLockFreeLinkPolicy::TLinkPtr Result = GLockFreeLinkAllocator.Pop();
+	FLockFreeLinkPolicy::TLinkPtr Result = GetLockFreeAllocator().Pop();
 	// this can only really be a mem stomp
 	checkLockFreePointerList(Result && !FLockFreeLinkPolicy::DerefLink(Result)->DoubleNext.GetPtr() && !FLockFreeLinkPolicy::DerefLink(Result)->Payload && !FLockFreeLinkPolicy::DerefLink(Result)->SingleNext);
 	return Result;
