@@ -9828,7 +9828,7 @@ bool FCharacterMoveResponseDataContainer::Serialize(UCharacterMovementComponent&
 		{
 			if (FRootMotionSourceGroup* RootMotionSourceGroup = GetRootMotionSourceGroup(CharacterMovement))
 			{
-				RootMotionSourceGroup->NetSerialize(Ar, PackageMap, bLocalSuccess);
+				RootMotionSourceGroup->NetSerialize(Ar, PackageMap, bLocalSuccess, 3 /*MaxNumRootMotionSourcesToSerialize*/);
 			}
 		}
 
