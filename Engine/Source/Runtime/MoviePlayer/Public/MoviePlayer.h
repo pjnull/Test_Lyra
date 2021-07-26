@@ -256,19 +256,6 @@ public:
 	virtual void ForceCompletion() {};
 	virtual void Suspend() {};
 	virtual void Resume() {};
-
-	/**
-	 * Call this before doing a blocking operation on the game thread so that the movie player can activate.
-	 * 
-	 * @return True if the movie player is active.
-	 */
-	virtual bool BlockingStarted() { return false; }
-
-	/**Call this periodically during a blocking operation on the game thread. */
-	virtual void BlockingTick() {}
-
-	/** Call this once the blocking operation is done to shut down the movie player. */
-	virtual void BlockingFinished() {}
 };
 
 /** Creates the movie player */
@@ -284,15 +271,3 @@ MOVIEPLAYER_API IGameMoviePlayer& GetMoviePlayerRef();
 
 /** Returns true if the movie player is enabled. */
 bool MOVIEPLAYER_API IsMoviePlayerEnabled();
-
-/** Call this before doing a blockiing operation on the game thread to start the movie player. */
-MOVIEPLAYER_API void BlockingStartedForMoviePlayer();
-
-/** Call this periodically during a blocking operation on the game thread. */
-MOVIEPLAYER_API void BlockingTickForMoviePlayer();
-
-/**
- * Call this after a blocking operation on the game thread to stop the movie player.
- * This will block until the player has finished.
- */
-MOVIEPLAYER_API void BlockingFinishedForMoviePlayer();

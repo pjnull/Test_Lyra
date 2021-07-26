@@ -13,6 +13,7 @@
 #include "Widgets/SWindow.h"
 #include "Widgets/Layout/SBorder.h"
 #include "MoviePlayer.h"
+#include "MoviePlayerProxyServer.h"
 #include "TickableObjectRenderThread.h"
 
 #include "Misc/CoreDelegates.h"
@@ -53,7 +54,7 @@ private:
 
 /** An implementation of the movie player/loading screen we will use */
 class FDefaultGameMoviePlayer : public FTickableObjectRenderThread, public IGameMoviePlayer,
-	public TSharedFromThis<FDefaultGameMoviePlayer>
+	public IMoviePlayerProxyServer, public TSharedFromThis<FDefaultGameMoviePlayer>
 {
 public:
 	static void Create()
@@ -97,8 +98,9 @@ public:
 	virtual FOnMoviePlaybackStarted& OnMoviePlaybackStarted() override { return OnMoviePlaybackStartedDelegate; }
 	virtual FOnMoviePlaybackFinished& OnMoviePlaybackFinished() override { return OnMoviePlaybackFinishedDelegate; }
 	virtual FOnMovieClipFinished& OnMovieClipFinished() override { return OnMovieClipFinishedDelegate; }
-
-	virtual bool BlockingStarted() override;
+	
+	/** IMoviePlayerProxyServer interface. */
+	virtual void BlockingStarted() override;
 	virtual void BlockingTick() override;
 	virtual void BlockingFinished() override;
 

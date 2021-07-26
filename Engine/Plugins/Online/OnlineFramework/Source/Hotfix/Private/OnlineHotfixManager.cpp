@@ -20,7 +20,7 @@
 #include "Misc/CoreDelegates.h"
 #include "Misc/App.h"
 
-#include "MoviePlayer.h"
+#include "MoviePlayerProxy.h"
 
 #include "Engine/CurveTable.h"
 #include "Engine/DataTable.h"
@@ -1487,7 +1487,7 @@ void UOnlineHotfixManager::PatchAssetsFromIniFiles()
 	{
 		for (FConfigSection::TIterator It(*AssetHotfixConfigSection); It; ++It)
 		{
-			BlockingTickForMoviePlayer();
+			FMoviePlayerProxy::BlockingTick();
 			++TotalPatchableAssets;
 
 			TArray<UClass*> PatchableAssetClasses;

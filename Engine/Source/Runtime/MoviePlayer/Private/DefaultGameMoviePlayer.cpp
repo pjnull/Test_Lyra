@@ -11,6 +11,7 @@
 #include "Input/HittestGrid.h"
 #include "Widgets/Layout/SBox.h"
 #include "GlobalShader.h"
+#include "MoviePlayerProxy.h"
 #include "MoviePlayerThreading.h"
 #include "MoviePlayerSettings.h"
 #include "ShaderCompiler.h"
@@ -185,6 +186,7 @@ void FDefaultGameMoviePlayer::Initialize(FSlateRenderer& InSlateRenderer, TShare
 	
 	// Shutdown the movie player if the app is exiting
 	FCoreDelegates::OnPreExit.AddRaw( this, &FDefaultGameMoviePlayer::Shutdown );
+	FMoviePlayerProxy::RegisterServer(this);
 
 	FPlatformSplash::Hide();
 
@@ -245,6 +247,7 @@ void FDefaultGameMoviePlayer::Shutdown()
 {
 	UE_LOG(LogMoviePlayer, Log, TEXT("Shutting down movie player"));
 
+	FMoviePlayerProxy::UnregisterServer();
 	TSharedPtr<SWindow> MainWindowShared = MainWindow.Pin();
 	if (MainWindowShared.IsValid())
 	{
@@ -615,10 +618,9 @@ bool FDefaultGameMoviePlayer::IsMovieStreamingFinished() const
 	return MovieStreamingIsDone.GetValue() != 0;
 }
 
-bool FDefaultGameMoviePlayer::BlockingStarted()
+void FDefaultGameMoviePlayer::BlockingStarted()
 {
-	bool bIsPlaying = PlayMovie();
-	return bIsPlaying;
+	PlayMovie();
 }
 
 void FDefaultGameMoviePlayer::BlockingTick()
