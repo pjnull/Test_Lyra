@@ -1196,6 +1196,11 @@ public:
 	/** Sets whether we handle opening channels with an index that already exists, used by replays to fast forward the packet stream */
 	void SetAllowExistingChannelIndex(bool bAllow);
 
+private:
+	void RestoreRemappedChannel(const int32 ChIndex);
+
+public:
+
 	/**
 	 * Sets whether or not we should ignore bunches for a specific set of NetGUIDs.
 	 * Should only be used with InternalAck.
