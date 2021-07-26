@@ -1403,7 +1403,10 @@ public:
 	{
 		VERIFY_GL_SCOPE();
 		// restore the source texture, do not allow the texture to become evicted, the aliasing texture cannot re-create the resource.
-		Texture->RestoreEvictedGLResource(false);
+		if (Texture->IsEvicted())
+		{
+			Texture->RestoreEvictedGLResource(false);
+		}
 		Resource = Texture->Resource;
 		SRVResource = Texture->SRVResource;
 		bIsAliased = 1;
