@@ -232,7 +232,7 @@ void SPropertyView::Refresh()
 {
 	// forces CustomPrepass to be called, recreating widgets ie. for array items. Without this array items won't add/remove.
 	// @note: that this breaks current property handle references
-	InvalidatePrepass();
+	MarkPrepassAsDirty();
 	bRefreshObjectToDisplay = true;
 }
 
