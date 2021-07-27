@@ -10,7 +10,7 @@ FAutoConsoleVariableRef CVarEnableSlateWidgetTracker(
 	TEXT("Slate.EnableSlateWidgetTracker"),
 	GIsSlateWidgetTrackerEnabled,
 	TEXT("Whether or not we enable the tracking of widgets via the Slate Widget Tracker."),
-	ECVF_ReadOnly
+	ECVF_Default
 );
 
 FSlateWidgetTracker& FSlateWidgetTracker::Get()
