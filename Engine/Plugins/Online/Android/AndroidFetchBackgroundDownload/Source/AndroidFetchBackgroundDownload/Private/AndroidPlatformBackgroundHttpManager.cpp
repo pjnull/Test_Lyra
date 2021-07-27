@@ -20,20 +20,20 @@
 
 #if UE_BUILD_SHIPPING
 // always clear any exceptions in shipping
-#define CHECK_JNI_RESULT(Id) if (ensureAlwaysMsgf((Id != 0), TEXT("Failed to find #Id")) { Env->ExceptionClear(); }
+#define CHECK_JNI_RESULT(Id) if (Id == 0) { Env->ExceptionClear(); }
 #else
-#define CHECK_JNI_RESULT(Id)											\
-	if (Id == 0)														\
-	{																	\
-		if (ensureAlwaysMsgf(bIsOptional, TEXT("Failed to find #Id")))	\
-		{																\
-			Env->ExceptionClear();										\
-		}																\
-		else															\
-		{																\
-			Env->ExceptionDescribe();									\
-			checkf(Id != 0, TEXT("Failed to find " #Id));				\
-		}																\
+#define CHECK_JNI_RESULT(Id)								\
+	if (Id == 0)											\
+	{														\
+		if (bIsOptional)									\
+		{													\
+			Env->ExceptionClear();							\
+		}													\
+		else												\
+		{													\
+			Env->ExceptionDescribe();						\
+			checkf(Id != 0, TEXT("Failed to find " #Id));	\
+		}													\
 	}
 #endif // UE_BUILD_SHIPPING
 
