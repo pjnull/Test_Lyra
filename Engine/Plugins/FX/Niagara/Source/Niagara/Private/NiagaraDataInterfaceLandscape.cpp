@@ -3,6 +3,7 @@
 #include "NiagaraDataInterfaceLandscape.h"
 
 #include "Algo/RemoveIf.h"
+#include "EngineModule.h"
 #include "EngineUtils.h"
 #include "Landscape.h"
 #include "LandscapeHeightfieldCollisionComponent.h"
@@ -181,8 +182,8 @@ struct FNDILandscapeData_GameThread
 // Landscape data used on the render thread
 struct FNDILandscapeData_RenderThread
 {
-	const URuntimeVirtualTexture* HeightVirtualTexture = nullptr;
-	const URuntimeVirtualTexture* NormalVirtualTexture = nullptr;
+	const IAllocatedVirtualTexture* HeightVirtualTexture = nullptr;
+	const IAllocatedVirtualTexture* NormalVirtualTexture = nullptr;
 	const FLandscapeTextureResource* TextureResources = nullptr;
 	FVector4 HeightVirtualTextureWorldToUvParameters[4];
 	FVector4 NormalVirtualTextureWorldToUvParameters[3];
@@ -191,6 +192,8 @@ struct FNDILandscapeData_RenderThread
 	FVector4 CachedHeightTextureUvScaleBias = FVector4(ForceInitToZero);
 	FVector2D CachedHeightTextureGridSize = FVector2D(1.0f, 1.0f);
 	ERuntimeVirtualTextureMaterialType NormalVirtualTextureMode = ERuntimeVirtualTextureMaterialType::Count;
+	FVirtualTextureProducerHandle HeightVirtualTextureProducerHandle;
+	FVirtualTextureProducerHandle NormalVirtualTextureProducerHandle;
 };
 
 class FNDI_Landscape_GeneratedData : public FNDI_GeneratedData
@@ -211,10 +214,55 @@ private:
 
 struct FNiagaraDataInterfaceProxyLandscape : public FNiagaraDataInterfaceProxy
 {
+	static void OnHeightVirtualTextureDestroyedCB(const FVirtualTextureProducerHandle& InHandle, void* Baton)
+	{
+		FNiagaraDataInterfaceProxyLandscape* Proxy = reinterpret_cast<FNiagaraDataInterfaceProxyLandscape*>(Baton);
+
+		for (auto& ProxyDataIt : Proxy->SystemInstancesToProxyData_RT)
+		{
+			if (ProxyDataIt.Value.HeightVirtualTextureProducerHandle == InHandle)
+			{
+				ProxyDataIt.Value.HeightVirtualTexture = nullptr;
+			}
+		}
+	}
+
+	static void OnNormalVirtualTextureDestroyedCB(const FVirtualTextureProducerHandle& InHandle, void* Baton)
+	{
+		FNiagaraDataInterfaceProxyLandscape* Proxy = reinterpret_cast<FNiagaraDataInterfaceProxyLandscape*>(Baton);
+
+		for (auto& ProxyDataIt : Proxy->SystemInstancesToProxyData_RT)
+		{
+			if (ProxyDataIt.Value.NormalVirtualTextureProducerHandle == InHandle)
+			{
+				ProxyDataIt.Value.NormalVirtualTexture = nullptr;
+			}
+		}
+	}
+
+	virtual ~FNiagaraDataInterfaceProxyLandscape()
+	{
+		GetRendererModule().RemoveAllVirtualTextureProducerDestroyedCallbacks(this);
+	}
+
 	virtual void ConsumePerInstanceDataFromGameThread(void* PerInstanceData, const FNiagaraSystemInstanceID& Instance) override
 	{
 		const FNDILandscapeData_RenderThread& SourceData = *reinterpret_cast<const FNDILandscapeData_RenderThread*>(PerInstanceData);
-		*SystemInstancesToProxyData_RT.Find(Instance) = SourceData;
+
+		FNDILandscapeData_RenderThread& RT_Data = SystemInstancesToProxyData_RT.FindChecked(Instance);
+		RT_Data = SourceData;
+
+		if (SourceData.HeightVirtualTexture && !CallbacksRegistered.Contains(SourceData.HeightVirtualTextureProducerHandle.PackedValue))
+		{
+			GetRendererModule().AddVirtualTextureProducerDestroyedCallback(SourceData.HeightVirtualTextureProducerHandle, &OnHeightVirtualTextureDestroyedCB, this);
+			CallbacksRegistered.Add(SourceData.HeightVirtualTextureProducerHandle.PackedValue);
+		}
+
+		if (SourceData.NormalVirtualTexture && !CallbacksRegistered.Contains(SourceData.NormalVirtualTextureProducerHandle.PackedValue))
+		{
+			GetRendererModule().AddVirtualTextureProducerDestroyedCallback(SourceData.NormalVirtualTextureProducerHandle, &OnNormalVirtualTextureDestroyedCB, this);
+			CallbacksRegistered.Add(SourceData.NormalVirtualTextureProducerHandle.PackedValue);
+		}
 	}
 
 	virtual int32 PerInstanceDataPassedToRenderThreadSize() const override
@@ -223,6 +271,7 @@ struct FNiagaraDataInterfaceProxyLandscape : public FNiagaraDataInterfaceProxy
 	}
 
 	TMap<FNiagaraSystemInstanceID, FNDILandscapeData_RenderThread> SystemInstancesToProxyData_RT;
+	TSet<uint32> CallbacksRegistered;
 };
 
 FLandscapeTextureResource::FLandscapeTextureResource(const FIntPoint& InCellCount)
@@ -815,11 +864,12 @@ void UNiagaraDataInterfaceLandscape::ProvidePerInstanceDataForRenderThread(void*
 	{
 		if (const URuntimeVirtualTexture* VirtualTexture = SourceData.Landscape->RuntimeVirtualTextures[SourceData.HeightVirtualTextureIndex])
 		{
-			TargetData->HeightVirtualTexture = VirtualTexture;
+			TargetData->HeightVirtualTexture = VirtualTexture->GetAllocatedVirtualTexture();
 			TargetData->HeightVirtualTextureWorldToUvParameters[0] = VirtualTexture->GetUniformParameter(ERuntimeVirtualTextureShaderUniform_WorldToUVTransform0);
 			TargetData->HeightVirtualTextureWorldToUvParameters[1] = VirtualTexture->GetUniformParameter(ERuntimeVirtualTextureShaderUniform_WorldToUVTransform1);
 			TargetData->HeightVirtualTextureWorldToUvParameters[2] = VirtualTexture->GetUniformParameter(ERuntimeVirtualTextureShaderUniform_WorldToUVTransform2);
 			TargetData->HeightVirtualTextureWorldToUvParameters[3] = VirtualTexture->GetUniformParameter(ERuntimeVirtualTextureShaderUniform_WorldHeightUnpack);
+			TargetData->HeightVirtualTextureProducerHandle = VirtualTexture->GetProducerHandle();
 		}
 	}
 
@@ -827,11 +877,12 @@ void UNiagaraDataInterfaceLandscape::ProvidePerInstanceDataForRenderThread(void*
 	{
 		if (const URuntimeVirtualTexture* VirtualTexture = SourceData.Landscape->RuntimeVirtualTextures[SourceData.NormalVirtualTextureIndex])
 		{
-			TargetData->NormalVirtualTexture = VirtualTexture;
+			TargetData->NormalVirtualTexture = VirtualTexture->GetAllocatedVirtualTexture();
 			TargetData->NormalVirtualTextureWorldToUvParameters[0] = VirtualTexture->GetUniformParameter(ERuntimeVirtualTextureShaderUniform_WorldToUVTransform0);
 			TargetData->NormalVirtualTextureWorldToUvParameters[1] = VirtualTexture->GetUniformParameter(ERuntimeVirtualTextureShaderUniform_WorldToUVTransform1);
 			TargetData->NormalVirtualTextureWorldToUvParameters[2] = VirtualTexture->GetUniformParameter(ERuntimeVirtualTextureShaderUniform_WorldToUVTransform2);
 			TargetData->NormalVirtualTextureMode = SourceData.NormalVirtualTextureMode;
+			TargetData->NormalVirtualTextureProducerHandle = VirtualTexture->GetProducerHandle();
 		}
 	}
 }
@@ -1127,9 +1178,7 @@ public:
 
 	bool SetHeightVirtualTextureParameters(FRHICommandList& RHICmdList, FRHIComputeShader* ComputeShaderRHI, const FNDILandscapeData_RenderThread& ProxyData) const
 	{
-		const IAllocatedVirtualTexture* HeightAllocatedTexture = ProxyData.HeightVirtualTexture
-			? ProxyData.HeightVirtualTexture->GetAllocatedVirtualTexture()
-			: nullptr;
+		const IAllocatedVirtualTexture* HeightAllocatedTexture = ProxyData.HeightVirtualTexture;
 
 		if (!HeightAllocatedTexture)
 		{
@@ -1201,9 +1250,7 @@ public:
 
 	bool SetNormalVirtualTextureParameters(FRHICommandList& RHICmdList, FRHIComputeShader* ComputeShaderRHI, const FNDILandscapeData_RenderThread& ProxyData) const
 	{
-		const IAllocatedVirtualTexture* NormalAllocatedTexture = ProxyData.NormalVirtualTexture
-			? ProxyData.NormalVirtualTexture->GetAllocatedVirtualTexture()
-			: nullptr;
+		const IAllocatedVirtualTexture* NormalAllocatedTexture = ProxyData.NormalVirtualTexture;
 
 		if (!NormalAllocatedTexture)
 		{
