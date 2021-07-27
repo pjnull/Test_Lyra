@@ -112,9 +112,15 @@ public:
 
 		void Initialize();
 
-		//Our classes are all optional in the FJavaWrapper as they are plugins, but are needed here. This allows us to ensure
-		//if they are missing when the classes are actually used and needed.
-		void EnsureJavaClassesAreLoaded(JNIEnv* Env);
+		FJavaClassInfo()
+			: DefaultUEWorkerJavaClass(0)
+			, UEWorkManagerJavaInterfaceClass(0)
+			, WorkRequestParametersJavaInterfaceClass(0)
+			, GetApplicationContextMethod(0)
+			, JavaInterface_Method_RegisterWork(0)
+			, JavaInterface_Method_CancelWork(0)
+			, JavaInterface_Method_CreateWorkRequestParameters(0)
+		{}
 	};
 
 public:

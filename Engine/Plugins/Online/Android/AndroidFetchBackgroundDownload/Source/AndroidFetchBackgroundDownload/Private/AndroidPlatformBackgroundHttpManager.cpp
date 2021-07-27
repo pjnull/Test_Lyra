@@ -20,20 +20,20 @@
 
 #if UE_BUILD_SHIPPING
 // always clear any exceptions in shipping
-#define CHECK_JNI_RESULT(Id) if (Id == 0) { Env->ExceptionClear(); }
+#define CHECK_JNI_RESULT(Id) if (ensureAlwaysMsgf((Id != 0), TEXT("Failed to find #Id")) { Env->ExceptionClear(); }
 #else
-#define CHECK_JNI_RESULT(Id)								\
-	if (Id == 0)											\
-	{														\
-		if (bIsOptional)									\
-		{													\
-			Env->ExceptionClear();							\
-		}													\
-		else												\
-		{													\
-			Env->ExceptionDescribe();						\
-			checkf(Id != 0, TEXT("Failed to find " #Id));	\
-		}													\
+#define CHECK_JNI_RESULT(Id)											\
+	if (Id == 0)														\
+	{																	\
+		if (ensureAlwaysMsgf(bIsOptional, TEXT("Failed to find #Id")))	\
+		{																\
+			Env->ExceptionClear();										\
+		}																\
+		else															\
+		{																\
+			Env->ExceptionDescribe();									\
+			checkf(Id != 0, TEXT("Failed to find " #Id));				\
+		}																\
 	}
 #endif // UE_BUILD_SHIPPING
 
@@ -69,6 +69,8 @@ const FString FAndroidNativeDownloadWorkerParameterKeys::NOTIFICATION_RESOURCE_C
 const FString FAndroidNativeDownloadWorkerParameterKeys::NOTIFICATION_RESOURCE_SMALL_ICON_NAME = TEXT("NotificationResourceSmallIconName");
 const FString FAndroidNativeDownloadWorkerParameterKeys::NOTIFICATION_RESOURCE_SMALL_ICON_TYPE = TEXT("NotificationResourceSmallIconType");
 const FString FAndroidNativeDownloadWorkerParameterKeys::NOTIFICATION_RESOURCE_SMALL_ICON_PACKAGE = TEXT("NotificationResourceSmallIconPackage");
+
+FAndroidPlatformBackgroundHttpManager::FJavaClassInfo FAndroidPlatformBackgroundHttpManager::JavaInfo = FAndroidPlatformBackgroundHttpManager::FJavaClassInfo();
 
 FAndroidPlatformBackgroundHttpManager::FAndroidPlatformBackgroundHttpManager()
 	: bHasPendingCompletes(false)
@@ -109,27 +111,6 @@ bool FAndroidPlatformBackgroundHttpManager::Tick(float DeltaTime)
 	return true;
 }
 
-void FAndroidPlatformBackgroundHttpManager::EnsureJavaClassesAreLoaded(JNIEnv* Env)
-{
-	const bool bIsOptional = false;
-
-	//If any needed needed java UEDownloadWorker classes are not loaded, try and load them and error if they aren't found
-	//in the base FJavaWrapper implementation these checks are optional since this is in a plugin, but now we need them
-	//and should ensure if they aren't found
-
-	if (FJavaWrapper::UEDownloadWorkerClass == 0)
-	{
-		UE_LOG(LogEngine, Display, TEXT("Attempting to load Java class UEDownloadWorkerClass"));
-		FJavaWrapper::UEDownloadWorkerClass = FJavaWrapper::FindClassGlobalRef(Env, "com/epicgames/ue4/download/UEDownloadWorker", bIsOptional);
-	}
-
-	if (FJavaWrapper::DownloadDescriptionClass == 0)
-	{
-		UE_LOG(LogEngine, Display, TEXT("Attempting to load Java class DownloadDescriptionClass"));
-		FJavaWrapper::DownloadDescriptionClass = FJavaWrapper::FindClassGlobalRef(Env, "com/epicgames/ue4/download/datastructs/DownloadDescription", bIsOptional);
-	}
-}
-
 void FAndroidPlatformBackgroundHttpManager::ActivatePendingRequests()
 {
 	TArray<FBackgroundHttpRequestPtr> NewlyActivatedRequests;
@@ -140,24 +121,15 @@ void FAndroidPlatformBackgroundHttpManager::ActivatePendingRequests()
 	
 		if (PendingStartRequests.Num() > 0)
 		{
-			bool bIsOptional = false;
+			const bool bIsOptional = false;
 
 			JNIEnv* Env = FAndroidApplication::GetJavaEnv();
-			EnsureJavaClassesAreLoaded(Env);
+			
+			FAndroidPlatformBackgroundHttpManager::JavaInfo.Initialize();
 						
 			if (ensureAlwaysMsgf(Env, TEXT("Invalid JavaEnv! Can not activate any pending requests!")))
-			{
-				//Grab a bunch of necessary JNI methods we will need to create our DownloadDescriptions
-				jmethodID CreateArrayStaticMethod = FJavaWrapper::FindStaticMethod(Env, FJavaWrapper::DownloadDescriptionClass, "BuildDescriptionArray", "()Ljava/util/ArrayList;", bIsOptional);
-				CHECK_JNI_RESULT(CreateArrayStaticMethod);
-
-				jmethodID WriteDownloadDescriptionListToFileMethod = FJavaWrapper::FindStaticMethod(Env, FJavaWrapper::DownloadDescriptionClass, "WriteDownloadDescriptionListToFile", "(Ljava/lang/String;Ljava/util/ArrayList;)Z", bIsOptional);
-				CHECK_JNI_RESULT(WriteDownloadDescriptionListToFileMethod);
-
-				jmethodID CreateDownloadDescriptionFromJsonMethod = FJavaWrapper::FindStaticMethod(Env, FJavaWrapper::DownloadDescriptionClass, "FromJSON", "(Ljava/lang/String;)Lcom/epicgames/ue4/download/datastructs/DownloadDescription;", bIsOptional);
-				CHECK_JNI_RESULT(CreateDownloadDescriptionFromJsonMethod);
-
-				FScopedJavaObject<jobject> DescriptionArray = NewScopedJavaObject(Env, Env->CallStaticObjectMethod(FJavaWrapper::DownloadDescriptionClass, CreateArrayStaticMethod));
+			{				
+				FScopedJavaObject<jobject> DescriptionArray = NewScopedJavaObject(Env, Env->CallStaticObjectMethod(FAndroidPlatformBackgroundHttpManager::JavaInfo.DownloadDescriptionClass, FAndroidPlatformBackgroundHttpManager::JavaInfo.CreateArrayStaticMethod));
 				check(DescriptionArray);
 
 				jclass ArrayClass = Env->GetObjectClass(*DescriptionArray);
@@ -173,7 +145,7 @@ void FAndroidPlatformBackgroundHttpManager::ActivatePendingRequests()
 					if (ensureAlwaysMsgf(AndroidRequest.IsValid(), TEXT("Unexpected illegal non-Android request in PendingStartRequests!")))
 					{
 						FScopedJavaObject<jstring> JavaJSONString = FJavaHelper::ToJavaString(Env, AndroidRequest->ToJSon());
-						FScopedJavaObject<jobject> Description = NewScopedJavaObject(Env, Env->CallStaticObjectMethod(FJavaWrapper::DownloadDescriptionClass, CreateDownloadDescriptionFromJsonMethod, *JavaJSONString));
+						FScopedJavaObject<jobject> Description = NewScopedJavaObject(Env, Env->CallStaticObjectMethod(FAndroidPlatformBackgroundHttpManager::JavaInfo.DownloadDescriptionClass, FAndroidPlatformBackgroundHttpManager::JavaInfo.CreateDownloadDescriptionFromJsonMethod, *JavaJSONString));
 
 						bool bAddedRequestAsDescription = FJavaWrapper::CallBooleanMethod(Env, *DescriptionArray, ArrayPutMethod, *Description);
 						if (ensureAlwaysMsgf(bAddedRequestAsDescription, TEXT("Failed to create and add valid DownloadDescription for request %s"), *AndroidRequest->GetRequestID()))
@@ -186,14 +158,14 @@ void FAndroidPlatformBackgroundHttpManager::ActivatePendingRequests()
 				//Call JNI function that saves our passed in ArrayList<DownloadDescription> to a file
 				const FString FileNameForDownloadDescList = GetFullFileNameForDownloadDescriptionList();
 				FScopedJavaObject<jstring> JavaFileNameString = FJavaHelper::ToJavaString(Env, FileNameForDownloadDescList);	
-				bool bDidWriteSucceed = Env->CallStaticBooleanMethod(FJavaWrapper::DownloadDescriptionClass, WriteDownloadDescriptionListToFileMethod, *JavaFileNameString, *DescriptionArray);
+				bool bDidWriteSucceed = Env->CallStaticBooleanMethod(FAndroidPlatformBackgroundHttpManager::JavaInfo.DownloadDescriptionClass, FAndroidPlatformBackgroundHttpManager::JavaInfo.WriteDownloadDescriptionListToFileMethod, *JavaFileNameString, *DescriptionArray);
 				
 				//If we successfully created the JSON DownloadDescription file, 
 				//then we can actually fill out the rest of our worker parameters and schedule the worker to begin downloading
 				if (ensureAlwaysMsgf((bDidWriteSucceed), TEXT("Failed to create download description manifest for the WorkManager UEDownloadWorker. Can not schedule download work without the file as nothing will be downloaded!")))
 				{
 					FUEWorkManagerNativeWrapper::FWorkRequestParametersNative WorkParams;
-					WorkParams.WorkerJavaClass = FJavaWrapper::UEDownloadWorkerClass;
+					WorkParams.WorkerJavaClass = FAndroidPlatformBackgroundHttpManager::JavaInfo.UEDownloadWorkerClass;
 					WorkParams.bRequireAnyInternet = true;
 					WorkParams.bStartAsForegroundService = true;
 					
@@ -578,7 +550,7 @@ void FAndroidPlatformBackgroundHttpManager::Java_OnAllDownloadsComplete(jobject 
 	JNIEnv* Env = FAndroidApplication::GetJavaEnv();
 	if (ensureAlwaysMsgf((Env != nullptr), TEXT("Unexpected invalid JNI environment found! Can not respond to UnderlyingWorker!")))
 	{
-		bool bIsOptional = false;
+		const bool bIsOptional = false;
 		jclass JavaDownloadWorkerClass = Env->GetObjectClass(UnderlyingWorker);
 		CHECK_JNI_RESULT(JavaDownloadWorkerClass);
 
@@ -685,6 +657,45 @@ void FAndroidPlatformBackgroundHttpManager::Java_OnTick(JNIEnv* Env, jobject Und
 
 				const bool bSanityCheck = FPlatformAtomics::InterlockedExchange(&bIsModifyingCancelList, false);
 				ensureAlwaysMsgf(bSanityCheck, TEXT("Error in bIsModifyingCancelList! Was false when we expected it to still be true from our lock!"));
+			}
+		}
+	}
+}
+
+void FAndroidPlatformBackgroundHttpManager::FJavaClassInfo::Initialize()
+{
+	//Should only be populating these with GameThread values! JavaENV is thread-specific so this is very important that all useages of these classes come from the same game thread!
+	check(IsInGameThread());
+
+	if (!bHasInitialized)
+	{
+		JNIEnv* Env = FAndroidApplication::GetJavaEnv();
+		if (ensureAlwaysMsgf(Env, TEXT("Invalid JNIEnv! Skipping Initialize!")))
+		{
+			bHasInitialized = true;
+
+			const bool bIsOptional = false;
+
+			//Find jclass information
+			{
+				UEDownloadWorkerClass = FAndroidApplication::FindJavaClassGlobalRef("com/epicgames/ue4/download/UEDownloadWorker");
+				CHECK_JNI_RESULT(UEDownloadWorkerClass);
+
+				DownloadDescriptionClass = FAndroidApplication::FindJavaClassGlobalRef("com/epicgames/ue4/download/datastructs/DownloadDescription");
+				CHECK_JNI_RESULT(DownloadDescriptionClass);
+			}
+
+			//find jmethodID for DownloadDescription methods
+			{
+				//Grab a bunch of necessary JNI methods we will need to create our DownloadDescriptions
+				CreateArrayStaticMethod = FJavaWrapper::FindStaticMethod(Env, DownloadDescriptionClass, "BuildDescriptionArray", "()Ljava/util/ArrayList;", bIsOptional);
+				CHECK_JNI_RESULT(CreateArrayStaticMethod);
+				
+				WriteDownloadDescriptionListToFileMethod = FJavaWrapper::FindStaticMethod(Env, DownloadDescriptionClass, "WriteDownloadDescriptionListToFile", "(Ljava/lang/String;Ljava/util/ArrayList;)Z", bIsOptional);
+				CHECK_JNI_RESULT(WriteDownloadDescriptionListToFileMethod);
+
+				CreateDownloadDescriptionFromJsonMethod = FJavaWrapper::FindStaticMethod(Env, DownloadDescriptionClass, "FromJSON", "(Ljava/lang/String;)Lcom/epicgames/ue4/download/datastructs/DownloadDescription;", bIsOptional);
+				CHECK_JNI_RESULT(CreateDownloadDescriptionFromJsonMethod);
 			}
 		}
 	}

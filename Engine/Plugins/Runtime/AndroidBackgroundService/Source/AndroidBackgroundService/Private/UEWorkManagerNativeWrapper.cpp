@@ -45,6 +45,9 @@ FUEWorkManagerNativeWrapper::FJavaClassInfo FUEWorkManagerNativeWrapper::JavaInf
 
 void FUEWorkManagerNativeWrapper::FJavaClassInfo::Initialize()
 {
+	//Should only be populating these with GameThread values! JavaENV is thread-specific so this is very important that all useages of these classes come from the same game thread!
+	check(IsInGameThread());
+
 	if (!bHasInitialized)
 	{
 		JNIEnv* Env = FAndroidApplication::GetJavaEnv();
@@ -52,15 +55,13 @@ void FUEWorkManagerNativeWrapper::FJavaClassInfo::Initialize()
 		{
 			bHasInitialized = true;
 
-			bool bIsOptional = false;
-
-			EnsureJavaClassesAreLoaded(Env);
+			const bool bIsOptional = false;
 
 			//Find jclass information
 			{
-				DefaultUEWorkerJavaClass = FJavaWrapper::UEWorkerClass;
-				UEWorkManagerJavaInterfaceClass = FJavaWrapper::UEWorkManagerJavaInterfaceClass;
-				WorkRequestParametersJavaInterfaceClass = FJavaWrapper::WorkRequestParametersJavaInterfaceClass;
+				DefaultUEWorkerJavaClass = FAndroidApplication::FindJavaClassGlobalRef("com/epicgames/ue4/workmanager/UEWorker");
+				UEWorkManagerJavaInterfaceClass = FAndroidApplication::FindJavaClassGlobalRef("com/epicgames/ue4/workmanager/UEWorkManagerJavaInterface");
+				WorkRequestParametersJavaInterfaceClass = FAndroidApplication::FindJavaClassGlobalRef("com/epicgames/ue4/workmanager/UEWorkManagerJavaInterface$FWorkRequestParametersJavaInterface");
 			}
 
 			//find general jmethodID information
@@ -78,33 +79,6 @@ void FUEWorkManagerNativeWrapper::FJavaClassInfo::Initialize()
 	}
 }
 
-void FUEWorkManagerNativeWrapper::FJavaClassInfo::EnsureJavaClassesAreLoaded(JNIEnv* Env)
-{
-	const bool bIsOptional = false;
-
-	//If any needed needed java UEWork classes are not loaded, try and load them and error if they aren't found
-	//in the base FJavaWrapper implementation these checks are optional since this is in a plugin, but now we need them
-	//and should ensure if they aren't found
-
-	if (FJavaWrapper::UEWorkerClass == 0)
-	{
-		UE_LOG(LogEngine, Display, TEXT("Attempting to load Java class UEWorkerClass"));
-		FJavaWrapper::UEWorkerClass = FJavaWrapper::FindClassGlobalRef(Env, "com/epicgames/ue4/workmanager/UEWorker", bIsOptional);
-	}
-
-	if (FJavaWrapper::UEWorkManagerJavaInterfaceClass == 0)
-	{
-		UE_LOG(LogEngine, Display, TEXT("Attempting to load Java class UEWorkManagerJavaInterfaceClass"));
-		FJavaWrapper::UEWorkManagerJavaInterfaceClass = FJavaWrapper::FindClassGlobalRef(Env, "com/epicgames/ue4/workmanager/UEWorkManagerJavaInterface", bIsOptional);
-	}
-
-	if (FJavaWrapper::WorkRequestParametersJavaInterfaceClass == 0)
-	{
-		UE_LOG(LogEngine, Display, TEXT("Attempting to load Java class WorkRequestParametersJavaInterfaceClass"));
-		FJavaWrapper::WorkRequestParametersJavaInterfaceClass = FJavaWrapper::FindClassGlobalRef(Env, "com/epicgames/ue4/workmanager/UEWorkManagerJavaInterface$FWorkRequestParametersJavaInterface", bIsOptional);
-	}
-}
-
 void FUEWorkManagerNativeWrapper::FWorkRequestParametersNative::PopulateWorkRequestParameterJavaInfo()
 {
 	JNIEnv* Env = FAndroidApplication::GetJavaEnv();
@@ -112,7 +86,7 @@ void FUEWorkManagerNativeWrapper::FWorkRequestParametersNative::PopulateWorkRequ
 	{
 		if (ensureAlwaysMsgf((nullptr != UnderlyingJavaObject), TEXT("Invalid UnderlyingJavaObject!")))
 		{
-			bool bIsOptional = false;
+			const bool bIsOptional = false;
 
 			jclass JavaInterfaceClass = Env->GetObjectClass(UnderlyingJavaObject);
 			CHECK_JNI_RESULT(JavaInterfaceClass);

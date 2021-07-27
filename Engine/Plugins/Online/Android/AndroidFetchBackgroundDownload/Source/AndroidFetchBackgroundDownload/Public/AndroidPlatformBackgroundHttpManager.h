@@ -44,7 +44,6 @@ public :
 	void CancelRequest(FBackgroundHttpRequestPtr Request);
 
 protected:
-	void EnsureJavaClassesAreLoaded(JNIEnv* Env);
 	void UpdateRequestProgress();
 
 	FAndroidBackgroundHttpRequestPtr FindRequestByID(FString RequestID);
@@ -85,6 +84,33 @@ protected:
 
 	//Rechecks any _GT lists to try and move them to _Java lists if its safe to do so
 	void HandleRequestsWaitingOnJavaThreadsafety();
+
+private:
+	//struct holding all our Java class, method, and field information in one location.
+	//Must call initialize on this before it is useful. Future calls to Initialize will not recalculate information
+	struct FJavaClassInfo
+	{
+		bool bHasInitialized = false;
+
+		jclass UEDownloadWorkerClass;
+		jclass DownloadDescriptionClass;
+
+		//Necessary JNI methods we will need to create our DownloadDescriptions
+		jmethodID CreateArrayStaticMethod;
+		jmethodID WriteDownloadDescriptionListToFileMethod;
+		jmethodID CreateDownloadDescriptionFromJsonMethod;
+
+		void Initialize();
+
+		FJavaClassInfo()
+			: UEDownloadWorkerClass(0)
+			, DownloadDescriptionClass(0)
+			, CreateArrayStaticMethod(0)
+			, WriteDownloadDescriptionListToFileMethod(0)
+		{}
+	};
+
+	static FJavaClassInfo JavaInfo;
 };
 
 //WARNING: These values MUST stay in sync with their values in DownloadWorkerParameterKeys.java!
