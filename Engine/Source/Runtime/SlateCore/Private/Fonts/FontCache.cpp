@@ -159,10 +159,6 @@ FShapedGlyphSequence::FShapedGlyphSequence(TArray<FShapedGlyphEntry> InGlyphsToR
 					UE_LOG(LogSlate, Warning, TEXT("Font missing Gylph. Valid %i, Loading %i"),
 						FontFacePtr->IsFaceValid(),
 						FontFacePtr->IsFaceLoading());
-					UE_CLOG(FontFace, LogSlate, Warning, TEXT("Font missing Gylph. Num Glyphs %l, Family %s, Style %s"),
-						FontFace->num_glyphs,
-						FontFace->family_name,
-						FontFace->style_name);
 				}
 			}
 #endif // WITH_FREETYPE
