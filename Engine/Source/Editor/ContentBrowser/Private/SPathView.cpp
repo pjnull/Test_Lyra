@@ -1908,6 +1908,21 @@ TArray<FName> SPathView::GetDefaultPathsToSelect() const
 	return VirtualPaths;
 }
 
+TArray<FName> SPathView::GetRootPathItemNames() const
+{
+	TArray<FName> RootPathItemNames;
+	RootPathItemNames.Reserve(TreeRootItems.Num());
+	for (const TSharedPtr<FTreeItem>& RootItem : TreeRootItems)
+	{
+		if (RootItem.IsValid())
+		{
+			RootPathItemNames.Add(RootItem->GetItem().GetItemName());
+		}
+	}
+
+	return RootPathItemNames;
+}
+
 TArray<FName> SPathView::GetDefaultPathsToExpand() const
 {
 	TArray<FName> VirtualPaths;
