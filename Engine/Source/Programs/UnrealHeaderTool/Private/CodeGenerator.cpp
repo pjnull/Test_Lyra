@@ -3328,11 +3328,14 @@ void FNativeClassHeaderGenerator::ExportGeneratedStructBodyMacros(FOutputDevice&
 		//RigVMStubProlog.Add(FString::Printf(TEXT("ensure(RigVMOperandMemory.Num() == %d);"), StructRigVMInfo->Members.Num()));
 
 		int32 OperandIndex = 0;
+
 		for (int32 ParameterIndex = 0; ParameterIndex < StructRigVMInfo.Members.Num(); ParameterIndex++)
 		{
 			const FRigVMParameter& Parameter = StructRigVMInfo.Members[ParameterIndex];
+
 			if(Parameter.RequiresCast())
 			{
+#if UE_RIGVM_UCLASS_BASED_STORAGE_DISABLED
 				if (Parameter.IsArray() && !Parameter.IsConst() && !Parameter.ArraySize.IsEmpty())
 				{
 					RigVMVirtualFuncProlog.Add(FString::Printf(TEXT("%s.SetNum( %s );"), *Parameter.Name, *Parameter.ArraySize));
@@ -3349,10 +3352,15 @@ void FNativeClassHeaderGenerator::ExportGeneratedStructBodyMacros(FOutputDevice&
 				{
 					RigVMVirtualFuncProlog.Add(FString::Printf(TEXT("%s %s(%s);"), *Parameter.CastType, *Parameter.CastName, *Parameter.Name));
 				}
+#else
+				RigVMVirtualFuncProlog.Add(FString::Printf(TEXT("%s %s(%s);"), *Parameter.CastType, *Parameter.CastName, *Parameter.Name));
+#endif
 			}
 
 			const FString& ParamTypeOriginal = Parameter.TypeOriginal(true);
 			const FString& ParamNameOriginal = Parameter.NameOriginal(false);
+
+#if UE_RIGVM_UCLASS_BASED_STORAGE_DISABLED
 
 			if (ParamTypeOriginal.StartsWith(FHeaderParser::FFixedArrayText, ESearchCase::CaseSensitive))
 			{
@@ -3410,6 +3418,23 @@ void FNativeClassHeaderGenerator::ExportGeneratedStructBodyMacros(FOutputDevice&
 
 				OperandIndex++;
 			}
+
+#else
+
+			if (Parameter.IsArray())
+			{
+				FString ExtendedType = Parameter.ExtendedType();
+				RigVMStubProlog.Add(FString::Printf(TEXT("TArray%s& %s = *(TArray%s*)RigVMMemoryHandles[%d].GetData();"),
+					*ExtendedType,
+					*ParamNameOriginal,
+					*ExtendedType,
+					OperandIndex));
+
+				OperandIndex++;
+			}
+			
+#endif
+			
 			else
 			{
 				FString VariableType = Parameter.TypeVariableRef(true);
@@ -3500,6 +3525,8 @@ void FNativeClassHeaderGenerator::ExportGeneratedStructBodyMacros(FOutputDevice&
 				RigVMMethodsDeclarations += FString::Printf(TEXT("\t}\r\n"));
 			}
 
+#if UE_RIGVM_UCLASS_BASED_STORAGE_DISABLED
+
 			for (const FRigVMParameter& StructMember : StructRigVMInfo.Members)
 			{
 				if (!StructMember.ArraySize.IsEmpty())
@@ -3508,6 +3535,8 @@ void FNativeClassHeaderGenerator::ExportGeneratedStructBodyMacros(FOutputDevice&
 					break;
 				}
 			}
+
+#endif
 		}
 
 		const FString SuperTypedef = BaseStructDef ? FString::Printf(TEXT("\ttypedef %s Super;\r\n"), *BaseStructDef->GetAlternateNameCPP()) : FString();
@@ -3797,6 +3826,9 @@ void FNativeClassHeaderGenerator::ExportGeneratedStructBodyMacros(FOutputDevice&
 
 			Out.Log(TEXT("\r\n"));
 
+					
+#if UE_RIGVM_UCLASS_BASED_STORAGE_DISABLED
+		
 		bool bHasGetArraySize = false;
 		for (const FRigVMParameter& StructMember : StructRigVMInfo.Members)
 			{
@@ -3824,6 +3856,8 @@ void FNativeClassHeaderGenerator::ExportGeneratedStructBodyMacros(FOutputDevice&
 			Out.Log(TEXT("\treturn INDEX_NONE;\r\n"));
 			Out.Log(TEXT("}\r\n\r\n"));
 		}
+
+#endif
 	}
 }
 

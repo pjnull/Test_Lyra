@@ -2634,6 +2634,7 @@ void UControlRigBlueprint::HandleModifiedEvent(ERigVMGraphNotifType InNotifType,
 						
 						if(!bRequiresRecompile)
 						{
+#if UE_RIGVM_UCLASS_BASED_STORAGE_DISABLED
 							TArray<FString> DefaultValues;
 							if (RootPin->IsArray())
 							{
@@ -2646,12 +2647,19 @@ void UControlRigBlueprint::HandleModifiedEvent(ERigVMGraphNotifType InNotifType,
 							{
 								DefaultValues.Add(RootPin->GetDefaultValue());
 							}
+#else
+							const FString DefaultValue = RootPin->GetDefaultValue();
+#endif
 
 							UControlRigBlueprintGeneratedClass* RigClass = GetControlRigBlueprintGeneratedClass();
 							UControlRig* CDO = Cast<UControlRig>(RigClass->GetDefaultObject(true /* create if needed */));
 							if (CDO->VM != nullptr)
 							{
+#if UE_RIGVM_UCLASS_BASED_STORAGE_DISABLED
 								CDO->VM->SetRegisterValueFromString(*Operand, RootPin->GetCPPType(), RootPin->GetCPPTypeObject(), DefaultValues);
+#else
+								CDO->VM->SetPropertyValueFromString(*Operand, DefaultValue);
+#endif
 							}
 
 							TArray<UObject*> ArchetypeInstances;
@@ -2663,7 +2671,11 @@ void UControlRigBlueprint::HandleModifiedEvent(ERigVMGraphNotifType InNotifType,
 								{
 									if (InstancedControlRig->VM)
 									{
+#if UE_RIGVM_UCLASS_BASED_STORAGE_DISABLED
 										InstancedControlRig->VM->SetRegisterValueFromString(*Operand, RootPin->GetCPPType(), RootPin->GetCPPTypeObject(), DefaultValues);
+#else
+										InstancedControlRig->VM->SetPropertyValueFromString(*Operand, DefaultValue);
+#endif
 									}
 								}
 							}
