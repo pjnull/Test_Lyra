@@ -35,7 +35,6 @@ public class Engine : ModuleRules
 				"Advertising",
 				"MovieSceneCapture",
 				"AutomationWorker",
-				"MoviePlayer",
 				"MovieSceneCapture",
 				"DesktopPlatform"
 			}
@@ -120,6 +119,7 @@ public class Engine : ModuleRules
 				"TypedElementFramework",
 				"TypedElementRuntime",
 				"MaterialShaderQualitySettings",
+				"MoviePlayerProxy",
 				"CinematicCamera",
 				"Analytics",
 				"AudioMixer",
