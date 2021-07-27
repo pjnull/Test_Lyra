@@ -405,11 +405,6 @@ static void GetTextureBuildSettings(
 		OutBuildSettings.DiffuseConvolveMipLevel = GDiffuseConvolveMipLevel;
 		const UTextureCube* Cube = CastChecked<UTextureCube>(&Texture);
 		OutBuildSettings.bLongLatSource = (Cube->Source.GetNumSlices() == 1);
-		if (OutBuildSettings.bLongLatSource && Texture.MaxTextureSize <= 0)
-		{
-			// long/lat source use 512 as default
-			OutBuildSettings.MaxTextureResolution = 512;
-		}
 	}
 	else if (Texture.IsA(UTexture2DArray::StaticClass()))
 	{
