@@ -197,6 +197,13 @@ public class UEWorkManagerJavaInterface
 
 	public static void AndroidThunkJava_CancelWork(Context AppContext, String TaskID)
 	{
-		WorkManager.getInstance(AppContext.getApplicationContext()).cancelUniqueWork(TaskID);
+		try 
+		{
+			WorkManager.getInstance(AppContext.getApplicationContext()).cancelUniqueWork(TaskID);
+		}
+		catch(Exception exp)
+		{
+			exp.printStackTrace();
+		}		
 	}
 }
