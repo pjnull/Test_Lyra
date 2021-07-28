@@ -12,7 +12,6 @@ public class AndroidDeviceDetection : ModuleRules
 			new string[]
 			{
 				"Core",
-				"CoreUObject",
 				"Json",
                 "JsonUtilities",
                 "PIEPreviewDeviceSpecification"
