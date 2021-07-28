@@ -8,6 +8,12 @@
 class UGameFeatureData;
 struct FGameFeatureDeactivatingContext;
 
+UINTERFACE(MinimalAPI)
+class UGameFeatureStateChangeObserver : public UInterface
+{
+	GENERATED_BODY()
+};
+
 /**
  * This class is meant to be overridden in your game to handle game-specific reactions to game feature plugins
  * being mounted or unmounted
@@ -18,8 +24,7 @@ struct FGameFeatureDeactivatingContext;
  * If you do use these, create them in your UGameFeaturesProjectPolicies subclass and register them via
  * AddObserver / RemoveObserver on UGameFeaturesSubsystem
  */
-UCLASS()
-class GAMEFEATURES_API UGameFeatureStateChangeObserver : public UObject
+class GAMEFEATURES_API IGameFeatureStateChangeObserver
 {
 	GENERATED_BODY()
 
