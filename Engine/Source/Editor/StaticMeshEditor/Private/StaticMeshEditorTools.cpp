@@ -1449,6 +1449,7 @@ void FMeshReductionSettingsLayout::GenerateChildContent( IDetailChildrenBuilder&
 
 	{
 		ChildrenBuilder.AddCustomRow( LOCTEXT("ApplyChanges", "Apply Changes") )
+			.RowTag("ApplyChanges")
 			.ValueContent()
 			.HAlign(HAlign_Left)
 			[
@@ -3311,6 +3312,7 @@ void FLevelOfDetailSettingsLayout::AddToDetailsPanel( IDetailLayoutBuilder& Deta
 	];
 
 	LODSettingsCategory.AddCustomRow( LOCTEXT("ApplyChanges", "Apply Changes") )
+	.RowTag("ApplyChanges")
 	.ValueContent()
 	.HAlign(HAlign_Left)
 	[
