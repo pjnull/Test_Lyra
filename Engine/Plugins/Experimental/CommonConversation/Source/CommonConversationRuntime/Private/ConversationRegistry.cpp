@@ -155,19 +155,17 @@ void UConversationRegistry::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
 
-	UGameFeaturesSubsystem::OnPluginLoadCompleteDataReady().AddUObject(this, &UConversationRegistry::HandlePluginActivationChanged);
-	UGameFeaturesSubsystem::OnPluginDeactivatedDataReady().AddUObject(this, &UConversationRegistry::HandlePluginActivationChanged);
+	UGameFeaturesSubsystem::Get().AddObserver(this);
 }
 
 void UConversationRegistry::Deinitialize()
 {
 	Super::Deinitialize();
 
-	UGameFeaturesSubsystem::OnPluginLoadCompleteDataReady().RemoveAll(this);
-	UGameFeaturesSubsystem::OnPluginDeactivatedDataReady().RemoveAll(this);
+	UGameFeaturesSubsystem::Get().RemoveObserver(this);
 }
 
-void UConversationRegistry::HandlePluginActivationChanged(const FString& GameFeatureName, const UGameFeatureData* GameFeatureData)
+void UConversationRegistry::GameFeatureStateModified()
 {
 	// If nobody has actually built the dependency graph yet, there's no reason to invalidate anything, nobody is using it yet.
 	if (bDependenciesBuilt)
@@ -175,6 +173,16 @@ void UConversationRegistry::HandlePluginActivationChanged(const FString& GameFea
 		bDependenciesBuilt = false;
 		BuildDependenciesGraph();
 	}
+}
+
+void UConversationRegistry::OnGameFeatureActivating(const UGameFeatureData* GameFeatureData)
+{
+	GameFeatureStateModified();
+}
+
+void UConversationRegistry::OnGameFeatureDeactivating(const UGameFeatureData* GameFeatureData, FGameFeatureDeactivatingContext& Context)
+{
+	GameFeatureStateModified();
 }
 
 UConversationNode* UConversationRegistry::GetRuntimeNodeFromGUID(const FGuid& NodeGUID) const
