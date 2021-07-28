@@ -1170,7 +1170,7 @@ void FRenderAssetStreamingManager::UpdateStreamingRenderAssets(int32 StageIndex,
 		// Cannot be too large or the overhead of consolidating all the arrays will take too long.  Cannot be too small or the parallel for will not have
 		// enough work.  Can be adjusted by CVarStreamingParallelRenderAssetsNumWorkgroups.
 		int32 Num = EndIndex - StartIndex;
-		int32 NumThreadTasks = FMath::Min<int32>(FTaskGraphInterface::Get().GetNumWorkerThreads() * GParallelRenderAssetsNumWorkgroups, Num - 1);
+		int32 NumThreadTasks = FMath::Min<int32>(FMath::Min<int32>(FTaskGraphInterface::Get().GetNumWorkerThreads() * GParallelRenderAssetsNumWorkgroups, Num - 1), 0);
 		TArray<FPacket> Packets;
 		Packets.Reset(NumThreadTasks); // Go ahead and reserve space up front
 		int32 Start = StartIndex;
