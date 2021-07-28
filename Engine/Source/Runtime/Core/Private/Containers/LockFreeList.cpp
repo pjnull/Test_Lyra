@@ -4,7 +4,7 @@
 #include "HAL/PlatformProcess.h"
 #include "HAL/IConsoleManager.h"
 #include "Stats/Stats.h"
-#include "Misc/LazySingleton.h"
+
 
 
 DEFINE_LOG_CATEGORY(LogLockFreeList);
@@ -207,15 +207,19 @@ private:
 
 static LockFreeLinkAllocator_TLSCache& GetLockFreeAllocator()
 {
-	return TLazySingleton<LockFreeLinkAllocator_TLSCache>::Get();
+	// make memory that will not go away, a replacement for TLazySingleton, which will still get destructed
+	alignas(LockFreeLinkAllocator_TLSCache) static unsigned char Data[sizeof(LockFreeLinkAllocator_TLSCache)];
+	static bool bIsInitialized = false;
+	if (!bIsInitialized)
+	{
+		new(Data)LockFreeLinkAllocator_TLSCache();
+		bIsInitialized = true;
+	}
+	return *(LockFreeLinkAllocator_TLSCache*)Data;
 }
 
 void FLockFreeLinkPolicy::FreeLockFreeLink(FLockFreeLinkPolicy::TLinkPtr Item)
 {
-	// there is some code that will use GLockFreeLinkAllocator in static global destructors, and if this is
-	// a global object, it can be destroyed before the other objects attempt to use it. The simplest solution
-	// is to leak the object (which the OS will reclaim anyway). Linux was crashing due to this, but not
-	// Windows, since global dtor order can't be guaranteed
 	GetLockFreeAllocator().Push(Item);
 }
 
