@@ -76,8 +76,9 @@ private:
 	void UpdateListInternal();
 
 	void HandlePartyJoined(USocialParty& Party);
+	void HandlePartyLeft(EMemberExitedReason Reason, USocialParty* LeftParty);
 	void HandlePartyMemberCreated(UPartyMember& Member);
-	void HandlePartyMemberLeft(EMemberExitedReason Reason, UPartyMember* Member);
+	void HandlePartyMemberLeft(EMemberExitedReason Reason, UPartyMember* Member, bool bUpdateNow);
 
 	USocialUser* FindOwnersRelationshipTo(UPartyMember& TargetPartyMember) const;
 	void MarkPartyMemberAsDirty(UPartyMember& PartyMember);

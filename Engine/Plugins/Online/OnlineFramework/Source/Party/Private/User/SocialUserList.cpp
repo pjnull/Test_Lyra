@@ -648,6 +648,7 @@ void FSocialUserList::UpdateListInternal()
 
 void FSocialUserList::HandlePartyJoined(USocialParty& Party)
 {
+	Party.OnPartyLeft().AddSP(this, &FSocialUserList::HandlePartyLeft, &Party);
 	Party.OnPartyMemberCreated().AddSP(this, &FSocialUserList::HandlePartyMemberCreated);
 
 	for (UPartyMember* PartyMember : Party.GetPartyMembers())
@@ -661,20 +662,40 @@ void FSocialUserList::HandlePartyJoined(USocialParty& Party)
 	UpdateNow();
 }
 
+void FSocialUserList::HandlePartyLeft(EMemberExitedReason Reason, USocialParty* LeftParty)
+{
+	if (LeftParty)
+	{
+		for (UPartyMember* ExistingMember : LeftParty->GetPartyMembers())
+		{
+			HandlePartyMemberLeft(EMemberExitedReason::Left, ExistingMember, false);
+		}
+
+		LeftParty->OnPartyLeft().RemoveAll(this);
+		LeftParty->OnPartyMemberCreated().RemoveAll(this);
+
+		UpdateNow();
+	}
+}
+
 void FSocialUserList::HandlePartyMemberCreated(UPartyMember& Member)
 {
-	Member.OnLeftParty().AddSP(this, &FSocialUserList::HandlePartyMemberLeft, &Member);
+	Member.OnLeftParty().AddSP(this, &FSocialUserList::HandlePartyMemberLeft, &Member, true);
 	MarkPartyMemberAsDirty(Member);
 	UpdateNow();
 }
 
-void FSocialUserList::HandlePartyMemberLeft(EMemberExitedReason Reason, UPartyMember* Member)
+void FSocialUserList::HandlePartyMemberLeft(EMemberExitedReason Reason, UPartyMember* Member, bool bUpdateNow)
 {
 	if (ensure(Member))
 	{
 		MarkPartyMemberAsDirty(*Member);
+
+		if (bUpdateNow)
+		{
+			UpdateNow();
+		}
 	}
-	UpdateNow();
 }
 
 USocialUser* FSocialUserList::FindOwnersRelationshipTo(UPartyMember& TargetPartyMember) const
