@@ -2362,6 +2362,8 @@ void UNetReplicationGraphConnection::Serialize(FArchive& Ar)
 		);
 
 		GRANULAR_NETWORK_MEMORY_TRACKING_TRACK("TrackedDestructionInfoPtrs", TrackedDestructionInfoPtrs.CountBytes(Ar));
+		GRANULAR_NETWORK_MEMORY_TRACKING_TRACK("PendingDormantDestructList", PendingDormantDestructList.CountBytes(Ar));
+		GRANULAR_NETWORK_MEMORY_TRACKING_TRACK("TrackedDormantDestructionInfos", TrackedDormantDestructionInfos.CountBytes(Ar));
 	}
 }
 
@@ -2542,17 +2544,36 @@ void UNetReplicationGraphConnection::NotifyAddDestructionInfo(FActorDestructionI
 
 void UNetReplicationGraphConnection::NotifyAddDormantDestructionInfo(AActor* Actor)
 {
-	if (NetConnection && NetConnection->Driver && NetConnection->Driver->GuidCache)
+	if (Actor && NetConnection && NetConnection->Driver && NetConnection->Driver->GuidCache)
 	{
+		ULevel* Level = Actor->GetLevel();
+		FName StreamingLevelName = NAME_None;
+
+		if (Level && Level->IsPersistentLevel())
+		{
+			StreamingLevelName = Level->GetOutermost()->GetFName();
+
+			if (NetConnection->ClientVisibleLevelNames.Contains(StreamingLevelName) == false)
+			{
+				UE_LOG(LogReplicationGraph, Verbose, TEXT("NotifyAddDormantDestructionInfo skipping actor [%s] because streaming level is no longer visible."), *GetNameSafe(Actor));
+				return;
+			}
+		}
+
 		FNetworkGUID NetGUID = NetConnection->Driver->GuidCache->GetNetGUID(Actor);
 		if (NetGUID.IsValid() && !NetGUID.IsDefault())
 		{
-			PendingDormantDestructList.RemoveAll([NetGUID](const FCachedDormantDestructInfo& Info) { return (Info.NetGUID == NetGUID); });
+			bool bWasAlreadyTracked = false;
+			TrackedDormantDestructionInfos.Add(NetGUID, &bWasAlreadyTracked);
+			if (bWasAlreadyTracked)
+			{
+				return;
+			}
 	
 			FCachedDormantDestructInfo& Info = PendingDormantDestructList.AddDefaulted_GetRef();
 
 			Info.NetGUID = NetGUID;
-			Info.Level = Actor->GetLevel();
+			Info.Level = Level;
 			Info.ObjOuter = Actor->GetOuter();
 			Info.PathName = Actor->GetName();
 		}
@@ -2720,7 +2741,8 @@ int64 UNetReplicationGraphConnection::ReplicateDormantDestructionInfos()
 			NumBits += NetConnection->Driver->SendDestructionInfo(NetConnection, &DestructInfo);
 		}
 
-		PendingDormantDestructList.Empty();
+		PendingDormantDestructList.Reset();
+		TrackedDormantDestructionInfos.Reset();
 	}
 
 	return NumBits;
