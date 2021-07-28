@@ -31,10 +31,17 @@ static bool bChaosClothSolverParallelClothUpdate = true;
 static bool bChaosClothSolverParallelClothPostUpdate = true;
 
 #if !UE_BUILD_SHIPPING
+static int32 ChaosClothSolverDebugHitchLength = 0;
+static int32 ChaosClothSolverDebugHitchInterval = 0;
+static bool bChaosClothSolverDisableCollision = false;
+
 FAutoConsoleVariableRef CVarChaosClothSolverMinParallelBatchSize(TEXT("p.ChaosCloth.Solver.MinParallelBatchSize"), ChaosClothSolverMinParallelBatchSize, TEXT("The minimum number of particle to process in parallel batch by the solver."));
 FAutoConsoleVariableRef CVarChaosClothSolverParallelClothPreUpdate(TEXT("p.ChaosCloth.Solver.ParallelClothPreUpdate"), bChaosClothSolverParallelClothPreUpdate, TEXT("Pre-transform the cloth particles for each cloth in parallel."));
 FAutoConsoleVariableRef CVarChaosClothSolverParallelClothUpdate(TEXT("p.ChaosCloth.Solver.ParallelClothUpdate"), bChaosClothSolverParallelClothUpdate, TEXT("Skin the physics mesh and do the other cloth update for each cloth in parallel."));
 FAutoConsoleVariableRef CVarChaosClothSolverParallelClothPostUpdate(TEXT("p.ChaosCloth.Solver.ParallelClothPostUpdate"), bChaosClothSolverParallelClothPostUpdate, TEXT("Pre-transform the cloth particles for each cloth in parallel."));
+FAutoConsoleVariableRef CVarChaosClothSolverDebugHitchLength(TEXT("p.ChaosCloth.Solver.DebugHitchLength"), ChaosClothSolverDebugHitchLength, TEXT("Hitch length in ms. Create artificial hitches to debug simulation jitter. 0 to disable"));
+FAutoConsoleVariableRef CVarChaosClothSolverDebugHitchInterval(TEXT("p.ChaosCloth.Solver.DebugHitchInterval"), ChaosClothSolverDebugHitchInterval, TEXT("Hitch interval in frames. Create artificial hitches to debug simulation jitter. 0 to disable"));
+FAutoConsoleVariableRef CVarChaosClothSolverDisableCollision(TEXT("p.ChaosCloth.Solver.DisableCollision"), bChaosClothSolverDisableCollision, TEXT("Disable all collision particles. Needs reset of the simulation (p.ChaosCloth.Reset)."));
 #endif
 
 namespace ChaosClothingSimulationSolverDefault
@@ -52,14 +59,13 @@ namespace ChaosClothingSimulationSolverDefault
 namespace ChaosClothingSimulationSolverConstant
 {
 	static const FReal WorldScale = 100.f;  // World is in cm, but values like wind speed and density are in SI unit and relates to m.
-	static const FReal StartDeltaTime = 1.f / 30.f;  // Initialize filtered timestep at 30fps
 }
 
 FClothingSimulationSolver::FClothingSimulationSolver()
 	: OldLocalSpaceLocation(0.f)
 	, LocalSpaceLocation(0.f)
 	, Time(0)
-	, DeltaTime(ChaosClothingSimulationSolverConstant::StartDeltaTime)
+	, DeltaTime((FReal)0.)
 	, NumIterations(ChaosClothingSimulationSolverDefault::NumIterations)
 	, NumSubsteps(ChaosClothingSimulationSolverDefault::NumSubsteps)
 	, CollisionParticlesOffset(0)
@@ -397,7 +403,16 @@ int32 FClothingSimulationSolver::AddCollisionParticles(int32 NumCollisionParticl
 
 void FClothingSimulationSolver::EnableCollisionParticles(int32 Offset, bool bEnable)
 {
-	Evolution->ActivateCollisionParticleRange(Offset, bEnable);
+#if !UE_BUILD_SHIPPING
+	if (bChaosClothSolverDisableCollision)
+	{
+		Evolution->ActivateCollisionParticleRange(Offset, false);
+	}
+	else
+#endif  // #if !UE_BUILD_SHIPPING
+	{
+		Evolution->ActivateCollisionParticleRange(Offset, bEnable);
+	}
 }
 
 const FVec3* FClothingSimulationSolver::GetCollisionParticleXs(int32 Offset) const
@@ -781,10 +796,22 @@ void FClothingSimulationSolver::Update(FReal InDeltaTime)
 	TRACE_CPUPROFILER_EVENT_SCOPE(FClothingSimulationSolver_Update);
 	SCOPE_CYCLE_COUNTER(STAT_ChaosClothSolverUpdate);
 
-	// Filter delta time to smoothen time variations and prevent unwanted vibrations
-	static const FReal DeltaTimeDecay = 0.1f;
-	const FReal PrevDeltaTime = DeltaTime;
-	DeltaTime = DeltaTime + (InDeltaTime - DeltaTime) * DeltaTimeDecay;
+	// Update time step
+	DeltaTime = InDeltaTime;
+
+#if !UE_BUILD_SHIPPING
+	// Introduce artificial hitches for debugging any simulation jitter
+	if (ChaosClothSolverDebugHitchLength && ChaosClothSolverDebugHitchInterval)
+	{
+		static int32 HitchCounter = 0;
+		if (--HitchCounter < 0)
+		{
+			UE_LOG(LogChaosCloth, Warning, TEXT("Hitching for %dms"), ChaosClothSolverDebugHitchLength);
+			FPlatformProcess::Sleep((float)ChaosClothSolverDebugHitchLength * 0.001f);
+			HitchCounter = ChaosClothSolverDebugHitchInterval;
+		}
+	}
+#endif  // #if !UE_BUILD_SHIPPING
 
 	// Update Cloths and cloth colliders
 	{
@@ -844,7 +871,7 @@ void FClothingSimulationSolver::Update(FReal InDeltaTime)
 		}
 
 		Time = Evolution->GetTime();
-		UE_LOG(LogChaosCloth, VeryVerbose, TEXT("DeltaTime: %.6f, FilteredDeltaTime: %.6f, Time = %.6f"), InDeltaTime, DeltaTime, Time);
+		UE_LOG(LogChaosCloth, VeryVerbose, TEXT("DeltaTime: %.6f, Time = %.6f"), DeltaTime, Time);
 	}
 
 	// Post solver step, update normals, ...etc

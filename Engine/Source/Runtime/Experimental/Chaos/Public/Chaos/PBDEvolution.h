@@ -173,5 +173,6 @@ private:
 	FReal MCoefficientOfFriction;
 	FReal MDamping;
 	FReal MTime;
+	FReal MSmoothDt;
 };
 }
