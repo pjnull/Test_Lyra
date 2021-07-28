@@ -1141,9 +1141,13 @@ bool UNiagaraNodeFunctionCall::RefreshFromExternalChanges()
 	{
 		FixupFunctionScriptVersion();
 		UNiagaraScriptSource* Source = GetFunctionScriptSource();
-		if (ensureMsgf(Source != nullptr, TEXT("No source found for FunctionScript %s in RefreshFromExternalChanges for %s"), *GetPathNameSafe(FunctionScript), *GetPathNameSafe(this)))
+		// cooked niagara can be missing source, but we shouldn't need to reload if already cooked for editor
+		if (!GetOutermost()->bIsCookedForEditor)
 		{
-			bReload = CachedChangeId != Source->NodeGraph->GetChangeID();
+			if (ensureMsgf(Source != nullptr, TEXT("No source found for FunctionScript %s in RefreshFromExternalChanges for %s"), *GetPathNameSafe(FunctionScript), *GetPathNameSafe(this)))
+			{
+				bReload = CachedChangeId != Source->NodeGraph->GetChangeID();
+			}
 		}
 	}
 	else if (Signature.IsValid())
