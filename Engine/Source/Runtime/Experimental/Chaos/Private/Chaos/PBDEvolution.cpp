@@ -249,7 +249,7 @@ void FPBDEvolution::PreIterationUpdate(
 		}, RangeSize < MinParallelBatchSize);
 }
 
-void FPBDEvolution::AdvanceOneTimeStep(const FReal Dt)
+void FPBDEvolution::AdvanceOneTimeStep(const FReal Dt, const bool bSmoothDt)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FPBDEvolution_AdvanceOneTimeStep);
 	SCOPE_CYCLE_COUNTER(STAT_ChaosPBDVAdvanceTime);
@@ -258,7 +258,7 @@ void FPBDEvolution::AdvanceOneTimeStep(const FReal Dt)
 	MTime += Dt;
 
 	// Filter delta time to smoothen time variations and prevent unwanted vibrations, works best on Forces
-	if (CVarChaosPBDEvolutionUseSmoothTimeStep.GetValueOnAnyThread())
+	if (bSmoothDt && CVarChaosPBDEvolutionUseSmoothTimeStep.GetValueOnAnyThread())
 	{
 		constexpr FReal DeltaTimeDecay = (FReal)0.1;
 		MSmoothDt += (Dt - MSmoothDt) * DeltaTimeDecay;

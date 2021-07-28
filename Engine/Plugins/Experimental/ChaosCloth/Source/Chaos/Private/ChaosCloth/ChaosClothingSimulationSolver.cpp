@@ -29,6 +29,7 @@ static int32 ChaosClothSolverMinParallelBatchSize = 1000;
 static bool bChaosClothSolverParallelClothPreUpdate = false;  // TODO: Doesn't seem to improve much here. Review this after the ISPC implementation.
 static bool bChaosClothSolverParallelClothUpdate = true;
 static bool bChaosClothSolverParallelClothPostUpdate = true;
+static bool bChaosClothSolverUseImprovedTimeStepSmoothing = true;
 
 #if !UE_BUILD_SHIPPING
 static int32 ChaosClothSolverDebugHitchLength = 0;
@@ -43,6 +44,8 @@ FAutoConsoleVariableRef CVarChaosClothSolverDebugHitchLength(TEXT("p.ChaosCloth.
 FAutoConsoleVariableRef CVarChaosClothSolverDebugHitchInterval(TEXT("p.ChaosCloth.Solver.DebugHitchInterval"), ChaosClothSolverDebugHitchInterval, TEXT("Hitch interval in frames. Create artificial hitches to debug simulation jitter. 0 to disable"));
 FAutoConsoleVariableRef CVarChaosClothSolverDisableCollision(TEXT("p.ChaosCloth.Solver.DisableCollision"), bChaosClothSolverDisableCollision, TEXT("Disable all collision particles. Needs reset of the simulation (p.ChaosCloth.Reset)."));
 #endif
+
+FAutoConsoleVariableRef CVarChaosClothSolverUseImprovedTimeStepSmoothing(TEXT("p.ChaosCloth.Solver.UseImprovedTimeStepSmoothing"), bChaosClothSolverUseImprovedTimeStepSmoothing, TEXT("Use the time step smoothing on input forces only rather than on the entire cloth solver, in order to avoid miscalculating velocities."));
 
 namespace ChaosClothingSimulationSolverDefault
 {
@@ -59,13 +62,14 @@ namespace ChaosClothingSimulationSolverDefault
 namespace ChaosClothingSimulationSolverConstant
 {
 	static const FReal WorldScale = 100.f;  // World is in cm, but values like wind speed and density are in SI unit and relates to m.
+	static const FReal StartDeltaTime = 1.f / 30.f;  // Initialize filtered timestep at 30fps
 }
 
 FClothingSimulationSolver::FClothingSimulationSolver()
 	: OldLocalSpaceLocation(0.f)
 	, LocalSpaceLocation(0.f)
 	, Time(0)
-	, DeltaTime((FReal)0.)
+	, DeltaTime(ChaosClothingSimulationSolverConstant::StartDeltaTime)
 	, NumIterations(ChaosClothingSimulationSolverDefault::NumIterations)
 	, NumSubsteps(ChaosClothingSimulationSolverDefault::NumSubsteps)
 	, CollisionParticlesOffset(0)
@@ -796,8 +800,19 @@ void FClothingSimulationSolver::Update(FReal InDeltaTime)
 	TRACE_CPUPROFILER_EVENT_SCOPE(FClothingSimulationSolver_Update);
 	SCOPE_CYCLE_COUNTER(STAT_ChaosClothSolverUpdate);
 
-	// Update time step
-	DeltaTime = InDeltaTime;
+	if (!bChaosClothSolverUseImprovedTimeStepSmoothing)
+	{
+		// Filter delta time to smoothen time variations and prevent unwanted vibrations
+		// Note: This is now deprecated and replaced by in solver input force timestep smoothing
+		static const FReal DeltaTimeDecay = 0.1f;
+		const FReal PrevDeltaTime = DeltaTime;
+		DeltaTime = DeltaTime + (InDeltaTime - DeltaTime) * DeltaTimeDecay;
+	}
+	else
+	{
+		// Update time step
+		DeltaTime = InDeltaTime;
+	}
 
 #if !UE_BUILD_SHIPPING
 	// Introduce artificial hitches for debugging any simulation jitter
@@ -867,7 +882,7 @@ void FClothingSimulationSolver::Update(FReal InDeltaTime)
 	
 		for (int32 i = 0; i < NumSubsteps; ++i)
 		{
-			Evolution->AdvanceOneTimeStep(SubstepDeltaTime);
+			Evolution->AdvanceOneTimeStep(SubstepDeltaTime, bChaosClothSolverUseImprovedTimeStepSmoothing);
 		}
 
 		Time = Evolution->GetTime();
