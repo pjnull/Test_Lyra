@@ -343,7 +343,7 @@ public:
 
 	FD3D12Buffer* CreateRHIBuffer(
 		const D3D12_RESOURCE_DESC& Desc,
-		uint32 Alignment, uint32 Stride, uint32 Size, uint32 InUsage,
+		uint32 Alignment, uint32 Stride, uint32 Size, EBufferUsageFlags InUsage,
 		ED3D12ResourceStateMode InResourceStateMode,
 		D3D12_RESOURCE_STATES InCreateState,
 		bool bHasInitialData,
@@ -429,7 +429,7 @@ protected:
 	virtual void AllocateBuffer(FD3D12Device* Device,
 		const D3D12_RESOURCE_DESC& Desc,
 		uint32 Size,
-		uint32 InUsage,
+		EBufferUsageFlags InUsage,
 		ED3D12ResourceStateMode InResourceStateMode,
 		D3D12_RESOURCE_STATES InCreateState,
 		uint32 Alignment,
