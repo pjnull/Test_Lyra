@@ -658,7 +658,7 @@ void UReplicationGraph::RemoveNetworkActor(AActor* Actor)
 		for (UNetReplicationGraphConnection* ConnectionManager : Connections)
 		{
 			ConnectionManager->ActorInfoMap.RemoveActor(Actor);
-			ConnectionManager->PrevDormantActorList.RemoveSlow(Actor);
+			ConnectionManager->PrevDormantActorList.RemoveFast(Actor);
 		}
 	}
 }
