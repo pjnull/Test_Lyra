@@ -620,6 +620,7 @@ bool FDefaultGameMoviePlayer::IsMovieStreamingFinished() const
 
 void FDefaultGameMoviePlayer::BlockingStarted()
 {
+	UE_LOG(LogMoviePlayer, Verbose, TEXT("BlockingStarted"));
 	PlayMovie();
 }
 
@@ -637,7 +638,7 @@ void FDefaultGameMoviePlayer::BlockingTick()
 			LastBlockingTickTime = Time;
 			FHttpManager& HttpManager = FHttpModule::Get().GetHttpManager();
 			HttpManager.Tick(0.0f);
-			UE_LOG(LogMoviePlayer, Verbose, TEXT("BlockingTick deltatime:%f"), DeltaTime);
+			UE_LOG(LogMoviePlayer, VeryVerbose, TEXT("BlockingTick deltatime:%f"), DeltaTime);
 		}
 	}
 }
@@ -649,7 +650,12 @@ void FDefaultGameMoviePlayer::BlockingFinished()
 	// and this can cause a hang.
 	if (LoadingScreenIsPrepared() && IsMovieCurrentlyPlaying())
 	{
+		UE_LOG(LogMoviePlayer, Verbose, TEXT("BlockingFinished"));
 		WaitForMovieToFinish();
+	}
+	else
+	{
+		UE_LOG(LogMoviePlayer, Verbose, TEXT("BlockingFinished but no movie playing."));
 	}
 }
 
