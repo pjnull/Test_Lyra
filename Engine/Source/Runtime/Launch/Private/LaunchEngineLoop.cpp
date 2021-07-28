@@ -3523,6 +3523,13 @@ int32 FEngineLoop::PreInitPostStartupScreen(const TCHAR* CmdLine)
 		if (!bIsRegularClient)
 		{
 			CommandletClass = FindObject<UClass>(ANY_PACKAGE,*Token,false);
+			int32 PeriodIdx;
+			if (!CommandletClass && Token.FindChar('.', PeriodIdx))
+			{
+				// try to load module for commandlet specified before a period.
+				FModuleManager::Get().LoadModule(*Token.Left(PeriodIdx));
+				CommandletClass = FindObject<UClass>(ANY_PACKAGE, *Token, false);
+			}
 			if (!CommandletClass)
 			{
 				if (GLogConsole && !GIsSilent)
