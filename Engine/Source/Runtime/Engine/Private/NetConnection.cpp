@@ -2967,9 +2967,9 @@ void UNetConnection::RestoreRemappedChannel(const int32 ChIndex)
 		if (UChannel* Channel = Channels[ChIndex])
 		{
 			// It is possible the index we want to swap back to wasn't cleaned up because the channel was marked broken by backwards compatibility
-			if (Channels[ChIndex]->Broken)
+			if (Channel->Broken)
 			{
-				if (UActorChannel* ActorChannel = Cast<UActorChannel>(Channels[ChIndex]))
+				if (UActorChannel* ActorChannel = Cast<UActorChannel>(Channel))
 				{
 					// look for a queued close bunch
 					for (FInBunch* InBunch : ActorChannel->QueuedBunches)
@@ -2991,7 +2991,7 @@ void UNetConnection::RestoreRemappedChannel(const int32 ChIndex)
 				}
 			}
 
-			if (Channels[ChIndex])
+			if (Channels[ChIndex] != nullptr)
 			{
 				// this map be part of a chain of remapped channel indices
 				if (const int32* Key = ChannelIndexMap.FindKey(ChIndex))
