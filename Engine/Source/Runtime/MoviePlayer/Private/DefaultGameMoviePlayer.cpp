@@ -117,6 +117,7 @@ FDefaultGameMoviePlayer::FDefaultGameMoviePlayer()
 	, LastPlayTime(0.0)
 	, bInitialized(false)
 	, ViewportDPIScale(1.0f)
+	, BlockingRefCount(0)
 	, LastBlockingTickTime(0.0)
 {
 	FCoreDelegates::IsLoadingMovieCurrentlyPlaying.BindRaw(this, &FDefaultGameMoviePlayer::IsMovieCurrentlyPlaying);
@@ -615,7 +616,8 @@ bool FDefaultGameMoviePlayer::IsMovieStreamingFinished() const
 
 void FDefaultGameMoviePlayer::BlockingStarted()
 {
-	UE_LOG(LogMoviePlayer, Verbose, TEXT("BlockingStarted"));
+	UE_LOG(LogMoviePlayer, Verbose, TEXT("BlockingStarted %d"), BlockingRefCount);
+	BlockingRefCount++;
 	PlayMovie();
 }
 
@@ -640,17 +642,20 @@ void FDefaultGameMoviePlayer::BlockingTick()
 
 void FDefaultGameMoviePlayer::BlockingFinished()
 {
-	// Only call WaitForMovieToFinish if we are playing a movie,
-	// as WaitForMovieToFinish has side effects if a movie is not playing,
-	// and this can cause a hang.
-	if (LoadingScreenIsPrepared() && IsMovieCurrentlyPlaying())
+	UE_LOG(LogMoviePlayer, Verbose, TEXT("BlockingFinished. Refcount: %d."), BlockingRefCount);
+	
+	// Uopdate ref count.
+	ensureMsgf(BlockingRefCount > 0, TEXT("MoviePlayer blockingrefcount <= 0."), BlockingRefCount);
+	BlockingRefCount--;
+	if (BlockingRefCount <= 0)
 	{
-		UE_LOG(LogMoviePlayer, Verbose, TEXT("BlockingFinished"));
-		WaitForMovieToFinish();
-	}
-	else
-	{
-		UE_LOG(LogMoviePlayer, Verbose, TEXT("BlockingFinished but no movie playing."));
+		// Only call WaitForMovieToFinish if we are playing a movie,
+		// as WaitForMovieToFinish has side effects if a movie is not playing,
+		// and this can cause a hang.
+		if (LoadingScreenIsPrepared() && IsMovieCurrentlyPlaying())
+		{
+			WaitForMovieToFinish();
+		}
 	}
 }
 

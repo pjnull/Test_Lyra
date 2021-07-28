@@ -216,6 +216,8 @@ private:
 	/** Scale used by UserWidgetDPIScaler. */
 	float ViewportDPIScale;
 
+	/** Counts blocking starts - blocking finishes. */
+	int32 BlockingRefCount;
 	/** Last time we were able to tick during blocking. */
 	double LastBlockingTickTime;
 	/** Handle to our async loading update function. */
