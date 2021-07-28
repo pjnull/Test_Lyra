@@ -474,7 +474,7 @@ void UGameFeaturesSubsystem::LoadAndActivateGameFeaturePlugin(const FString& Plu
 
 void UGameFeaturesSubsystem::ChangeGameFeatureTargetState(const FString& PluginURL, EGameFeatureTargetState TargetState, const FGameFeaturePluginChangeStateComplete& CompleteDelegate)
 {
-	EGameFeaturePluginState::Type TargetPluginState = EGameFeaturePluginState::MAX;
+	EGameFeaturePluginState TargetPluginState = EGameFeaturePluginState::MAX;
 	if (TargetState == EGameFeatureTargetState::Active)
 	{
 		TargetPluginState = EGameFeaturePluginState::Active;
