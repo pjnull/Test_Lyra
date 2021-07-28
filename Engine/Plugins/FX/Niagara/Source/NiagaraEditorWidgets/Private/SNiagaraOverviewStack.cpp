@@ -39,6 +39,7 @@
 #include "Subsystems/AssetEditorSubsystem.h"
 #include "Widgets/Colors/SColorBlock.h"
 #include "NiagaraEditorStyle.h"
+#include "ScopedTransaction.h"
 #include "Styling/StyleColors.h"
 #include "Widgets/Input/SCheckBox.h"
 
