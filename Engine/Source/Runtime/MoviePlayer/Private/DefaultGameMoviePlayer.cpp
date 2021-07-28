@@ -180,9 +180,6 @@ void FDefaultGameMoviePlayer::Initialize(FSlateRenderer& InSlateRenderer, TShare
 		ShaderMapIds.Add(GlobalShaderMapId);
 		GShaderCompilingManager->FinishCompilation(TEXT("Global"), ShaderMapIds);
 	}
-
-	// Add a delegate to start playing movies when we start loading a map
-	FCoreUObjectDelegates::PreLoadMap.AddRaw( this, &FDefaultGameMoviePlayer::OnPreLoadMap );
 	
 	// Shutdown the movie player if the app is exiting
 	FCoreDelegates::OnPreExit.AddRaw( this, &FDefaultGameMoviePlayer::Shutdown );
@@ -268,8 +265,6 @@ void FDefaultGameMoviePlayer::Shutdown()
 	bInitialized = false;
 
 	FCoreDelegates::OnPreExit.RemoveAll(this);
-	FCoreUObjectDelegates::PreLoadMap.RemoveAll( this );
-	FCoreUObjectDelegates::PostLoadMapWithWorld.RemoveAll(this);
 
 	LoadingScreenContents.Reset();
 	UserWidgetHolder.Reset();
@@ -871,25 +866,6 @@ FReply FDefaultGameMoviePlayer::OnAnyDown()
 	}
 
 	return FReply::Handled();
-}
-
-void FDefaultGameMoviePlayer::OnPreLoadMap(const FString& LevelName)
-{
-	FCoreUObjectDelegates::PostLoadMapWithWorld.RemoveAll(this);
-
-	if( PlayMovie() )
-	{
-		FCoreUObjectDelegates::PostLoadMapWithWorld.AddRaw(this, &FDefaultGameMoviePlayer::OnPostLoadMap );
-	}
-}
-
-void FDefaultGameMoviePlayer::OnPostLoadMap(UWorld* LoadedWorld)
-{
-	if (!LoadingScreenAttributes.bAllowEngineTick)
-	{
-		// If engine tick is enabled, we don't want to tick here and instead want to run from the WaitForMovieToFinish call in LaunchEngineLoop
-		WaitForMovieToFinish();
-	}
 }
 
 void FDefaultGameMoviePlayer::SetSlateOverlayWidget(TSharedPtr<SWidget> NewOverlayWidget)

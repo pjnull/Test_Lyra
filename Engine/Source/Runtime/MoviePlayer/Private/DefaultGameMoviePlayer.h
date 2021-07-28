@@ -146,12 +146,6 @@ private:
 	EVisibility GetSlateBackgroundVisibility() const;
 	EVisibility GetViewportVisibility() const;	
 	
-	/** Called via a delegate in the engine when maps start to load */
-	void OnPreLoadMap(const FString& LevelName);
-	
-	/** Called via a delegate in the engine when maps finish loading */
-	void OnPostLoadMap(UWorld* LoadedWorld);
-	
 	/** Check if the device can render on a parallel thread on the initial loading*/
 	bool CanPlayMovie() const;
 private:

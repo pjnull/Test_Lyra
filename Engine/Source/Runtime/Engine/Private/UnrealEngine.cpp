@@ -13073,6 +13073,7 @@ bool UEngine::LoadMap( FWorldContext& WorldContext, FURL URL, class UPendingNetG
 
 	NETWORK_PROFILER(GNetworkProfiler.TrackSessionChange(true,URL));
 	MALLOC_PROFILER( FMallocProfiler::SnapshotMemoryLoadMapStart( URL.Map ) );
+	FMoviePlayerProxy::BlockingStarted();
 	Error = TEXT("");
 
 	FLoadTimeTracker::Get().ResetRawLoadTimes();
@@ -13099,6 +13100,7 @@ bool UEngine::LoadMap( FWorldContext& WorldContext, FURL URL, class UPendingNetG
 			if (!bCalled)
 			{
 				FCoreUObjectDelegates::PostLoadMapWithWorld.Broadcast(nullptr);
+				FMoviePlayerProxy::BlockingFinished();
 			}
 		}
 
@@ -13108,6 +13110,7 @@ bool UEngine::LoadMap( FWorldContext& WorldContext, FURL URL, class UPendingNetG
 			{
 				bCalled = true;
 				FCoreUObjectDelegates::PostLoadMapWithWorld.Broadcast(World);
+				FMoviePlayerProxy::BlockingFinished();
 			}
 		}
 
