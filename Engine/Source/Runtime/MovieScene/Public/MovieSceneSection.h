@@ -26,6 +26,7 @@ struct FKeyHandle;
 struct FEasingComponentData;
 struct FMovieSceneChannelProxy;
 struct FMovieSceneEvalTemplatePtr;
+struct FFrameRate;
 
 class UMovieSceneEntitySystemLinker;
 
@@ -498,6 +499,9 @@ public:
 
 	/** The optional offset time of this section */
 	virtual TOptional<FFrameTime> GetOffsetTime() const { return TOptional<FFrameTime>(); }
+
+	/* Migrate the frame times of the movie scene section from the source frame rate to the destination frame rate */
+	virtual void MigrateFrameTimes(FFrameRate SourceRate, FFrameRate DestinationRate) {}
 
 	/**
 	 * When guid bindings are updated to allow this section to fix-up any internal bindings
