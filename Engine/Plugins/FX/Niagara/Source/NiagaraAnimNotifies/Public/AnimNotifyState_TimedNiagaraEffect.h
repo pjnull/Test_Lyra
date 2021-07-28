@@ -11,6 +11,7 @@ class UNiagaraSystem;
 class USkeletalMeshComponent;
 class UFXSystemAsset;
 class UFXSystemComponent;
+class UAnimInstance;
 
 // Timed Niagara Effect Notify
 // Allows a looping Niagara effect to be played in an animation that will activate
