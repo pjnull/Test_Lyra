@@ -1032,6 +1032,7 @@ public:
 			const FGroomCacheGroupData& NextGroupData = FrameB.GroupsData[GroupIndex];
 			FGroomCacheGroupData& InterpolatedGroupData = InterpolatedFrame.GroupsData[GroupIndex];
 			const int32 NumVertices = CurrentGroupData.VertexData.PointsPosition.Num();
+			const int32 NextNumVertices = NextGroupData.VertexData.PointsPosition.Num();
 
 			// Update the bounding box used for hair strands rendering computation
 			FVector InterpolatedCenter = FMath::Lerp(CurrentGroupData.BoundingBox.GetCenter(), NextGroupData.BoundingBox.GetCenter(), InterpolationFactor);
@@ -1043,31 +1044,47 @@ public:
 				InterpolatedGroupData.StrandData.MaxRadius = FMath::Lerp(CurrentGroupData.StrandData.MaxRadius, NextGroupData.StrandData.MaxRadius, InterpolationFactor);
 			}
 
-			// Parallel batched interpolation
-			const int32 BatchSize = 1024;
-			const int32 BatchCount = (NumVertices + BatchSize - 1) / BatchSize;
-
-			ParallelFor(BatchCount, [&](int32 BatchIndex)
+			if (NumVertices == NextNumVertices)
 			{
-				const int32 Start = BatchIndex * BatchSize;
-				const int32 End = FMath::Min(Start + BatchSize, NumVertices); // one-past end index
+				// In case the topology is varying, make sure the interpolated group data can hold the required number of vertices
+				InterpolatedGroupData.VertexData.PointsPosition.SetNum(NumVertices);
 
-				for (int32 VertexIndex = Start; VertexIndex < End; ++VertexIndex)
+				// Parallel batched interpolation
+				const int32 BatchSize = 1024;
+				const int32 BatchCount = (NumVertices + BatchSize - 1) / BatchSize;
+
+				ParallelFor(BatchCount, [&](int32 BatchIndex)
 				{
-					const FVector& CurrentPosition = CurrentGroupData.VertexData.PointsPosition[VertexIndex];
-					const FVector& NextPosition = NextGroupData.VertexData.PointsPosition[VertexIndex];
+					const int32 Start = BatchIndex * BatchSize;
+					const int32 End = FMath::Min(Start + BatchSize, NumVertices); // one-past end index
 
-					InterpolatedGroupData.VertexData.PointsPosition[VertexIndex] = FMath::Lerp(CurrentPosition, NextPosition, InterpolationFactor);
-
-					if (bHasRadiusData)
+					for (int32 VertexIndex = Start; VertexIndex < End; ++VertexIndex)
 					{
-						const float CurrentRadius = CurrentGroupData.VertexData.PointsRadius[VertexIndex];
-						const float NextRadius = NextGroupData.VertexData.PointsRadius[VertexIndex];
+						const FVector& CurrentPosition = CurrentGroupData.VertexData.PointsPosition[VertexIndex];
+						const FVector& NextPosition = NextGroupData.VertexData.PointsPosition[VertexIndex];
 
-						InterpolatedGroupData.VertexData.PointsRadius[VertexIndex] = FMath::Lerp(CurrentRadius, NextRadius, InterpolationFactor);
+						InterpolatedGroupData.VertexData.PointsPosition[VertexIndex] = FMath::Lerp(CurrentPosition, NextPosition, InterpolationFactor);
+
+						if (bHasRadiusData)
+						{
+							const float CurrentRadius = CurrentGroupData.VertexData.PointsRadius[VertexIndex];
+							const float NextRadius = NextGroupData.VertexData.PointsRadius[VertexIndex];
+
+							InterpolatedGroupData.VertexData.PointsRadius[VertexIndex] = FMath::Lerp(CurrentRadius, NextRadius, InterpolationFactor);
+						}
 					}
+				});
+			}
+			else
+			{
+				// Cannot interpolate, use the closest frame
+				InterpolatedGroupData.VertexData.PointsPosition = InterpolationFactor < 0.5f ? CurrentGroupData.VertexData.PointsPosition : NextGroupData.VertexData.PointsPosition;
+
+				if (bHasRadiusData)
+				{
+					InterpolatedGroupData.VertexData.PointsRadius = InterpolationFactor < 0.5f ? CurrentGroupData.VertexData.PointsRadius : NextGroupData.VertexData.PointsRadius;
 				}
-			});
+			}
 		}
 	}
 
