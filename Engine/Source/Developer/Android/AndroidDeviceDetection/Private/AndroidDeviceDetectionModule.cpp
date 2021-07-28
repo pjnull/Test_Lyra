@@ -431,15 +431,25 @@ private:
 				}
 				NewDeviceInfo.GLESVersion = FCString::Atoi(*GLESVersionString);
 
-				// parse the device model
+				// Find the device model
 				FParse::Value(*DeviceString, TEXT("model:"), NewDeviceInfo.Model);
-				if (NewDeviceInfo.Model.IsEmpty())
+				// find the product model (this must match java's android.os.build.model)
+				FString ModelCommand = FString::Printf(TEXT("-s %s %s ro.product.model"), *NewDeviceInfo.SerialNumber, *GetPropCommand);
+				FString RoProductModel;
+				if( ExecuteAdbCommand(*ModelCommand, &RoProductModel, nullptr) )
 				{
-					FString ModelCommand = FString::Printf(TEXT("-s %s %s ro.product.model"), *NewDeviceInfo.SerialNumber, *GetPropCommand);
-					FString RoProductModel;
-					ExecuteAdbCommand(*ModelCommand, &RoProductModel, nullptr);
-					const TCHAR* Ptr = *RoProductModel;
-					FParse::Line(&Ptr, NewDeviceInfo.Model);
+					if(!RoProductModel.IsEmpty())
+					{
+						NewDeviceInfo.Model = RoProductModel.TrimStartAndEnd();
+					}
+				}
+				
+				// Find the build ID
+				FString BuildNumberString;
+				const FString BuildNumberCommand = FString::Printf(TEXT("-s %s %s ro.build.display.id"), *NewDeviceInfo.SerialNumber, *GetPropCommand);
+				if (ExecuteAdbCommand(*BuildNumberCommand, &BuildNumberString, nullptr))
+				{
+					NewDeviceInfo.BuildNumber = BuildNumberString.TrimStartAndEnd();
 				}
 
 				// Scan lines looking for ContainsTerm
@@ -845,6 +855,7 @@ public:
 			DeviceSpecs.AndroidProperties.GPUFamily = DeviceInfo->GPUFamilyString;
 			DeviceSpecs.AndroidProperties.VulkanVersion = DeviceInfo->VulkanVersion;
 			DeviceSpecs.AndroidProperties.Hardware = DeviceInfo->Hardware;
+			DeviceSpecs.AndroidProperties.DeviceBuildNumber = DeviceInfo->BuildNumber;
 			DeviceSpecs.AndroidProperties.TotalPhysicalGB = FString::Printf(TEXT("%d"),(((uint64)DeviceInfo->TotalPhysicalKB + 1024 * 1024 - 1) / 1024 / 1024));
 			
 			DeviceSpecs.AndroidProperties.UsingHoudini = false;

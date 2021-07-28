@@ -63,7 +63,10 @@ struct FAndroidDeviceInfo
 	FString Hardware;
 
 	// device's total mem (as reported from /proc/meminfo)
-	uint32 TotalPhysicalKB;
+	uint32 TotalPhysicalKB = 0;
+
+	// device BuildNumber field
+	FString BuildNumber;
 
 	FAndroidDeviceInfo()
 		: SDKVersion(INDEX_NONE)
