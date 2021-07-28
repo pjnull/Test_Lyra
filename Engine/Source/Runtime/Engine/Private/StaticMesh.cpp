@@ -5545,7 +5545,7 @@ void UStaticMesh::ExecutePostLoadInternal(FStaticMeshPostLoadContext& Context)
 					[Token = MoveTemp(TokenRef), Arguments]()
 					{
 						FMessageLog("LoadErrors").Warning()
-							->AddToken(FUObjectToken::Create(this))
+							->AddToken(Token)
 							->AddToken(FTextToken::Create(FText::Format(LOCTEXT("LoadError_BadMinLOD", "Min LOD value of {MinLOD} is out of range 0..{MinAvailLOD} and has been adjusted to {MinAvailLOD}. Please verify and resave the asset."), Arguments)));
 					}
 				);
