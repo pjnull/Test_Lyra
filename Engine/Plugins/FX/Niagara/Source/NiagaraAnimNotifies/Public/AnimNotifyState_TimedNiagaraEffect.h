@@ -69,27 +69,10 @@ protected:
 /**
 Same as Timed Niagara Effect but also provides some more advanced abilities at an additional cost. 
 */
-
-USTRUCT(BlueprintType)
-struct FCurveParameterPair
-{
-	GENERATED_BODY();
-
-public:
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = AnimCurves, meta = (DisplayName = "Anim Curve Name", ToolTip = "Name of the curve in this montage."))
-	FName AnimCurveName;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = AnimCurves, meta = (DisplayName = "Niagara User Float", ToolTip = "Name of the Niagara user float variable."))
-	FName UserVariableName;
-};
-
 UCLASS(Blueprintable, meta = (DisplayName = "Advanced Timed Niagara Effect"))
 class NIAGARAANIMNOTIFIES_API UAnimNotifyState_TimedNiagaraEffectAdvanced : public UAnimNotifyState_TimedNiagaraEffect
 {
 	GENERATED_UCLASS_BODY()
-	
-
 
 public:
 	UE_DEPRECATED(5.0, "Please use the other NotifyBegin function instead")
@@ -115,9 +98,6 @@ public:
 	UPROPERTY(EditAnywhere, Category = NotifyProgress, meta = (DisplayName = "User Parameter", ToolTip = "The name of your niagara user variable you would like to send the normalized notify progress to."))
 	FName NotifyProgressUserParameter;
 
-	UPROPERTY(EditAnywhere, Category = AnimCurves, meta = (DisplayName = "Anim Curve Parameters", ToolTip = "An array of fnames used to map Anim Curve Names to Niagara float user parameters."))
-	TArray<FCurveParameterPair> AnimCurves;
-
 
 protected:
 
@@ -126,7 +106,5 @@ protected:
 		float Duration = 1.0f;
 		float Elapsed = 0.0f;
 	};
-
-
 	TMap<UMeshComponent*, FInstanceProgressInfo> ProgressInfoMap;
 };
