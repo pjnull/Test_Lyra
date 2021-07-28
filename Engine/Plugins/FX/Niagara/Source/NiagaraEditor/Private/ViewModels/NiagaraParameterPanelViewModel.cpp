@@ -1744,6 +1744,12 @@ TArray<FNiagaraEmitterHandle*> FNiagaraSystemToolkitParameterPanelViewModel::Get
 
 void FNiagaraSystemToolkitParameterPanelViewModel::AddScriptVariable(const UNiagaraScriptVariable* NewScriptVar) const
 {
+	if (NewScriptVar == nullptr)
+	{
+		ensureMsgf(false, TEXT("Encounted null script variable when adding parameter!"));
+		return;
+	}
+
 	TGuardValue<bool> AddParameterRefreshGuard(bIsAddingParameter, true);
 	bool bSuccess = false;
 	UNiagaraSystem& System = SystemViewModel->GetSystem();
