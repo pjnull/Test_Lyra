@@ -1269,7 +1269,7 @@ UPackageTools::UPackageTools(const FObjectInitializer& ObjectInitializer)
 			}
 			else if (NumberOfAssets > 1)
 			{
-				// this shouldn't happen in UE4
+				// this shouldn't happen 
 				bShouldGenerateUniquePackageName = true;
 			}
 
