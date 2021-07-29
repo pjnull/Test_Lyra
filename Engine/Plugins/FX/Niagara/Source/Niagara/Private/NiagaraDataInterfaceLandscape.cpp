@@ -1260,6 +1260,21 @@ public:
 
 		constexpr uint32 NormalVirtualTexturePageIndex = 0;
 
+		FRHITexture* PageTableTexture = nullptr;
+
+		if (FRHITexture* PageTable = NormalAllocatedTexture->GetPageTableTexture(NormalVirtualTexturePageIndex))
+		{
+			if (FRHITextureReference* TextureReference = PageTable->GetTextureReference())
+			{
+				PageTableTexture = TextureReference->GetReferencedTexture();
+			}
+		}
+
+		if (!PageTableTexture)
+		{
+			return false;
+		}
+
 		FRHIShaderResourceView* PhysicalTextureSrv[2] = { GBlackTextureWithSRV->ShaderResourceViewRHI, GBlackTextureWithSRV->ShaderResourceViewRHI };
 		FUintVector4 NormalVirtualTextureUniforms[2];
 
@@ -1307,7 +1322,7 @@ public:
 
 		SetSRVParameter(RHICmdList, ComputeShaderRHI, NormalVirtualTexture0Param, PhysicalTextureSrv[0]);
 		SetSRVParameter(RHICmdList, ComputeShaderRHI, NormalVirtualTexture1Param, PhysicalTextureSrv[1]);
-		SetTextureParameter(RHICmdList, ComputeShaderRHI, NormalVirtualTexturePageTableParam, NormalAllocatedTexture->GetPageTableTexture(NormalVirtualTexturePageIndex));
+		SetTextureParameter(RHICmdList, ComputeShaderRHI, NormalVirtualTexturePageTableParam, PageTableTexture);
 		SetShaderValue(RHICmdList, ComputeShaderRHI, NormalVirtualTextureWorldToUvTransformParam, WorldToUvTransform);
 		SetShaderValue(RHICmdList, ComputeShaderRHI, NormalVirtualTextureEnabledParam, 1 /* true */);
 
