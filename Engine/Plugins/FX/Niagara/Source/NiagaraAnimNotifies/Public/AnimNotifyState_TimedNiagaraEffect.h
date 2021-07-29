@@ -11,7 +11,6 @@ class UNiagaraSystem;
 class USkeletalMeshComponent;
 class UFXSystemAsset;
 class UFXSystemComponent;
-class UAnimInstance;
 
 // Timed Niagara Effect Notify
 // Allows a looping Niagara effect to be played in an animation that will activate
@@ -67,17 +66,6 @@ protected:
 	FORCEINLINE FName GetSpawnedComponentTag()const { return GetFName(); }
 };
 
-USTRUCT(BlueprintType)
-struct FCurveParameterPair
-{
-	GENERATED_BODY();
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = AnimCurves, meta = (DisplayName = "Anim Curve Name", ToolTip = "Name of the curve in this montage."))
-		FName AnimCurveName;
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = AnimCurves, meta = (DisplayName = "Niagara User Float", ToolTip = "Name of the Niagara user float variable."))
-		FName UserVariableName;
-};
-
 /**
 Same as Timed Niagara Effect but also provides some more advanced abilities at an additional cost. 
 */
@@ -110,8 +98,6 @@ public:
 	UPROPERTY(EditAnywhere, Category = NotifyProgress, meta = (DisplayName = "User Parameter", ToolTip = "The name of your niagara user variable you would like to send the normalized notify progress to."))
 	FName NotifyProgressUserParameter;
 
-	UPROPERTY(EditAnywhere, Category = AnimCurves, meta = (DisplayName = "Anim Curve Parameters", ToolTip = "Array of fnames to map Anim Curve names to Niagara Parameters."))
-	TArray<FCurveParameterPair> AnimCurves;
 
 protected:
 
