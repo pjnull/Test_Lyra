@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "UObject/ObjectMacros.h"
 #include "Animation/AnimNotifies/AnimNotifyState.h"
+#include "Animation/AnimInstance.h"
 #include "AnimNotifyState_TimedNiagaraEffect.generated.h"
 
 class UNiagaraSystem;
