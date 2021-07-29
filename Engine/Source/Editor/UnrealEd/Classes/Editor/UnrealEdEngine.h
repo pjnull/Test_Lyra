@@ -94,6 +94,10 @@ struct FTemplateMapInfo
 	UPROPERTY(config)
 	FString Map;
 
+	/** Optional display name override for this map template  */
+	UPROPERTY()
+	FText DisplayName;
+
 	FTemplateMapInfo()
 		: ThumbnailTexture(NULL)
 	{
