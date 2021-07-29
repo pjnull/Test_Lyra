@@ -252,10 +252,10 @@ void UChaosDebugDrawComponent::TickComponent(float DeltaTime, enum ELevelTick Ti
 					FHitResult HitResult(ForceInit);
 					FCollisionQueryParams TraceParams(SCENE_QUERY_STAT(ChaosDebugVisibilityTrace), true, Controller->GetPawn());
 					bool bHit = World->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECC_Visibility, TraceParams);
-					if (bHit && HitResult.Actor != nullptr)
+					if (bHit && HitResult.GetActor() != nullptr)
 					{
 						FVector Origin, BoxExtent;
-						HitResult.Actor->GetActorBounds(true, Origin, BoxExtent);
+						HitResult.GetActor()->GetActorBounds(true, Origin, BoxExtent);
 						const float Radius = BoxExtent.Size();
 						if (Radius <= ChaosDebugDraw_SingleActorMaxRadius)
 						{
