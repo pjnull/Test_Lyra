@@ -496,7 +496,27 @@ void UGameFeaturesSubsystem::ChangeGameFeatureTargetState(const FString& PluginU
 	{
 		if (UGameFeaturePluginStateMachine* StateMachine = FindOrCreateGameFeaturePluginStateMachine(PluginURL))
 		{
-			if (TargetPluginState > StateMachine->GetCurrentState() && !GameSpecificPolicies->IsPluginAllowed(PluginURL))
+			if (TargetState == EGameFeatureTargetState::Active
+				&& StateMachine->GetCurrentState() == TargetPluginState)
+			{
+				// TODO: Resolve the activated case here, this is needed because in a PIE environment the plugins
+				// are not sandboxed, and we need to do simulate a successful activate call in order run GFP systems 
+				// on whichever Role runs second between client and server.
+
+				// Refire the observer for Activated and do nothing else.
+				for (UObject* Observer : Observers)
+				{
+					CastChecked<IGameFeatureStateChangeObserver>(Observer)->OnGameFeatureActivating(StateMachine->GetGameFeatureDataForActivePlugin());
+				}
+
+				FTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this, [CompleteDelegate](float)
+					{
+						CompleteDelegate.ExecuteIfBound(UE::GameFeatures::FResult(MakeValue()));
+						return false;
+					}));
+			}
+			else if (TargetPluginState > CurrentState.State 
+				&& !GameSpecificPolicies->IsPluginAllowed(PluginURL))
 			{
 				FTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this, [CompleteDelegate](float)
 					{
