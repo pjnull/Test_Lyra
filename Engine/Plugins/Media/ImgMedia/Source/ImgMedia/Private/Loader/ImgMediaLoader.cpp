@@ -765,7 +765,7 @@ void FImgMediaLoader::FindFiles(const FString& SequencePath, TArray<FString>& Ou
 	TArray<FString> FoundFiles;
 	IFileManager::Get().FindFiles(FoundFiles, *SequencePath, TEXT("*"));
 
-	UE_LOG(LogImgMedia, Warning, TEXT("Loader %p: Found %i image files in %s"), this, FoundFiles.Num(), *SequencePath);
+	UE_LOG(LogImgMedia, Verbose, TEXT("Loader %p: Found %i image files in %s"), this, FoundFiles.Num(), *SequencePath);
 
 	FoundFiles.Sort();
 
@@ -977,7 +977,7 @@ void FImgMediaLoader::Update(int32 PlayHeadFrame, float PlayRate, bool Loop)
 
 		if (!FramesToLoad.Contains(FrameNumber))
 		{
-			UE_LOG(LogImgMedia, Warning, TEXT("Loader %p: Removed Frame %i"), this, FrameNumber);
+			UE_LOG(LogImgMedia, Verbose, TEXT("Loader %p: Removed Frame %i"), this, FrameNumber);
 			QueuedFrameNumbers.RemoveAtSwap(Idx);
 			Reader->CancelFrame(FrameNumber);
 		}
