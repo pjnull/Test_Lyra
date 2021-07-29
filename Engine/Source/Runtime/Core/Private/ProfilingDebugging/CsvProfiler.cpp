@@ -1677,6 +1677,7 @@ public:
 
 	static FORCENOINLINE FCsvProfilerThreadData* CreateTLSData()
 	{
+		QUICK_SCOPE_CYCLE_COUNTER(CSVProfiler_ThreadData_CreateTLSData);
 		FScopeLock Lock(&TlsCS);
 
 		FSharedPtr ProfilerThreadPtr = MakeShareable(new FCsvProfilerThreadData());
@@ -1704,6 +1705,7 @@ public:
 
 	static inline void GetTlsInstances(TArray<FSharedPtr>& OutTlsInstances)
 	{
+		QUICK_SCOPE_CYCLE_COUNTER(CSVProfiler_ThreadData_GetTlsInstances);
 		FScopeLock Lock(&TlsCS);
 		OutTlsInstances.Empty(TlsInstances.Num());
 
@@ -1735,6 +1737,8 @@ public:
 
 		// No thread data processors should have a reference to this TLS instance when we're being deleted.
 		check(DataProcessor == nullptr);
+
+		QUICK_SCOPE_CYCLE_COUNTER(CSVProfiler_ThreadData_Destructor);
 
 		// Clean up dead entries in the thread data array.
 		// This will remove both the current instance, and any others that have expired.
@@ -2153,22 +2157,31 @@ void FCsvStreamWriter::Process(FCsvProcessThreadDataStats& OutStats)
 	TArray<FCsvProfilerThreadData::FSharedPtr> TlsData;
 	FCsvProfilerThreadData::GetTlsInstances(TlsData);
 
-	for (FCsvProfilerThreadData::FSharedPtr Data : TlsData)
 	{
-		if (!Data->DataProcessor)
+		QUICK_SCOPE_CYCLE_COUNTER(CSVProfiler_Writer_GetDataProcessors);
+		for (FCsvProfilerThreadData::FSharedPtr Data : TlsData)
 		{
-			DataProcessors.Add(new FCsvProfilerThreadDataProcessor(Data, this, RenderThreadId, RHIThreadId));
+			if (!Data->DataProcessor)
+			{
+				DataProcessors.Add(new FCsvProfilerThreadDataProcessor(Data, this, RenderThreadId, RHIThreadId));
+			}
 		}
 	}
+	
 
 	int32 MinFrameNumberProcessed = MAX_int32;
-	for (FCsvProfilerThreadDataProcessor* DataProcessor : DataProcessors)
 	{
-		DataProcessor->Process(OutStats, MinFrameNumberProcessed);
+		QUICK_SCOPE_CYCLE_COUNTER(CSVProfiler_Writer_ProcessDataProcessors);
+		for (FCsvProfilerThreadDataProcessor* DataProcessor : DataProcessors)
+		{
+			DataProcessor->Process(OutStats, MinFrameNumberProcessed);
+		}
 	}
+	
 
 	if (bContinuousWrites && MinFrameNumberProcessed < MAX_int32)
 	{
+		QUICK_SCOPE_CYCLE_COUNTER(CSVProfiler_Writer_FinalizeNextRow);
 		int64 NewReadFrameIndex = MinFrameNumberProcessed - NumFramesToBuffer;
 		while (ReadFrameIndex < NewReadFrameIndex)
 		{
