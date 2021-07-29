@@ -1675,11 +1675,11 @@ public:
 		}
 	}
 
-	static FORCENOINLINE FCsvProfilerThreadData* CreateTLSData(const FString* InThreadName = nullptr)
+	static FORCENOINLINE FCsvProfilerThreadData* CreateTLSData()
 	{
 		FScopeLock Lock(&TlsCS);
 
-		FSharedPtr ProfilerThreadPtr = MakeShareable(new FCsvProfilerThreadData(InThreadName));
+		FSharedPtr ProfilerThreadPtr = MakeShareable(new FCsvProfilerThreadData());
 		FPlatformTLS::SetTlsValue(TlsSlot, ProfilerThreadPtr.Get());
 
 		// Keep a weak reference to this thread data in the global array.
@@ -1692,12 +1692,12 @@ public:
 		return ProfilerThreadPtr.Get();
 	}
 
-	static CSV_PROFILER_INLINE FCsvProfilerThreadData& Get(const FString* InThreadName = nullptr)
+	static CSV_PROFILER_INLINE FCsvProfilerThreadData& Get()
 	{
 		FCsvProfilerThreadData* ProfilerThread = (FCsvProfilerThreadData*)FPlatformTLS::GetTlsValue(TlsSlot);
 		if (UNLIKELY(!ProfilerThread))
 		{
-			ProfilerThread = CreateTLSData(InThreadName);
+			ProfilerThread = CreateTLSData();
 		}
 		return *ProfilerThread;
 	}
@@ -1718,9 +1718,9 @@ public:
 		}
 	}
 
-	FCsvProfilerThreadData(const FString* InThreadName = nullptr)
+	FCsvProfilerThreadData()
 		: ThreadId(FPlatformTLS::GetCurrentThreadId())
-		, ThreadName((InThreadName==nullptr) ? FThreadManager::GetThreadName(ThreadId) : *InThreadName)
+		, ThreadName(FThreadManager::GetThreadName(ThreadId))
 		, DataProcessor(nullptr)
 	{
 	}
@@ -3182,11 +3182,6 @@ void FCsvProfiler::SetMetadataInternal(const TCHAR* Key, const TCHAR* Value, boo
 		}
 		MetadataMap.FindOrAdd(KeyLower) = ValueStr;
 	}
-}
-
-void FCsvProfiler::SetThreadName(const FString& InThreadName)
-{
-	FCsvProfilerThreadData::Get(&InThreadName);
 }
 
 void FCsvProfiler::RecordEventAtTimestamp(int32 CategoryIndex, const FString& EventText, uint64 Cycles64)
