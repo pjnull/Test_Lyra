@@ -2662,9 +2662,9 @@ void FSequencer::SetSelectionRange(TRange<FFrameNumber> Range)
 }
 
 
-void FSequencer::SetSelectionRangeEnd()
+void FSequencer::SetSelectionRangeEnd(FFrameTime EndFrame)
 {
-	const FFrameNumber LocalTime = GetLocalTime().Time.FrameNumber;
+	const FFrameNumber LocalTime = EndFrame.FrameNumber;
 
 	if (GetSelectionRange().GetLowerBoundValue() >= LocalTime)
 	{
@@ -2677,9 +2677,9 @@ void FSequencer::SetSelectionRangeEnd()
 }
 
 
-void FSequencer::SetSelectionRangeStart()
+void FSequencer::SetSelectionRangeStart(FFrameTime StartFrame)
 {
-	const FFrameNumber LocalTime = GetLocalTime().Time.FrameNumber;
+	const FFrameNumber LocalTime = StartFrame.FrameNumber;
 
 	if (GetSelectionRange().GetUpperBoundValue() <= LocalTime)
 	{
@@ -13395,11 +13395,11 @@ void FSequencer::BindCommands()
 
 	SequencerCommandBindings->MapAction(
 		Commands.SetSelectionRangeEnd,
-		FExecuteAction::CreateLambda([this]{ SetSelectionRangeEnd(); }));
+		FExecuteAction::CreateLambda([this]{ SetSelectionRangeEnd(GetLocalTime().Time); }));
 
 	SequencerCommandBindings->MapAction(
 		Commands.SetSelectionRangeStart,
-		FExecuteAction::CreateLambda([this]{ SetSelectionRangeStart(); }));
+		FExecuteAction::CreateLambda([this]{ SetSelectionRangeStart(GetLocalTime().Time); }));
 
 	SequencerCommandBindings->MapAction(
 		Commands.ClearSelectionRange,
