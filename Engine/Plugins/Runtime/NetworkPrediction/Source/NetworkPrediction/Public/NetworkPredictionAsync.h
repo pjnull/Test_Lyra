@@ -1016,7 +1016,7 @@ struct FTempMockInputCmd
 
 	// Simple world vector force to be applied
 	UPROPERTY(BlueprintReadWrite,Category="Input")
-	FVector	Force;
+	FVector	Force = FVector::ZeroVector;
 
 	UPROPERTY(BlueprintReadWrite,Category="Input")
 	bool bJumpedPressed = false;
