@@ -515,7 +515,7 @@ void UGameFeaturesSubsystem::ChangeGameFeatureTargetState(const FString& PluginU
 						return false;
 					}));
 			}
-			else if (TargetPluginState > CurrentState.State 
+			else if (TargetPluginState > StateMachine->GetCurrentState()
 				&& !GameSpecificPolicies->IsPluginAllowed(PluginURL))
 			{
 				FTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this, [CompleteDelegate](float)
