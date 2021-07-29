@@ -469,6 +469,8 @@ int32 UGatherTextFromAssetsCommandlet::Main(const FString& Params)
 		}
 	}
 
+	UE_LOG(LogGatherTextFromAssetsCommandlet, Display, TEXT("Discovering assets to gather..."));
+
 	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"));
 	IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
 	AssetRegistry.SearchAllAssets(true);
@@ -621,6 +623,7 @@ int32 UGatherTextFromAssetsCommandlet::Main(const FString& Params)
 	TMap<FString, FName> AssignedPackageLocalizationIds;
 
 	// Process all packages that do not need to be loaded. Remove processed packages from the list.
+	UE_LOG(LogGatherTextFromAssetsCommandlet, Display, TEXT("Processing assets to gather..."));
 	PackagesPendingGather.RemoveAll([&](FPackagePendingGather& PackagePendingGather) -> bool
 	{
 		TUniquePtr<FArchive> FileReader(IFileManager::Get().CreateFileReader(*PackagePendingGather.PackageFilename));
@@ -738,15 +741,14 @@ int32 UGatherTextFromAssetsCommandlet::Main(const FString& Params)
 
 	CalculateDependenciesForPackagesPendingGather();
 
+	int32 NumPackagesGathered = 0;
+	int32 NumPackagesFailed = 0;
 	TArray<FName> PackagesWithStaleGatherCache;
 
 	// Process the packages in batches
 	TArray<FGatherableTextData> GatherableTextDataArray;
 	for (int32 BatchIndex = 0; BatchIndex < BatchCount; ++BatchIndex)
 	{
-		int32 PackagesInThisBatch = 0;
-		int32 FailuresInThisBatch = 0;
-
 		// Collect garbage before beginning to load packages for this batch
 		// This also sorts the list of packages into the best processing order
 		PurgeGarbage(/*bPurgeReferencedPackages*/false);
@@ -758,7 +760,10 @@ int32 UGatherTextFromAssetsCommandlet::Main(const FString& Params)
 			const FPackagePendingGather& PackagePendingGather = PackagesPendingGather[PackageIndex];
 			const FString PackageNameStr = PackagePendingGather.PackageName.ToString();
 
-			UE_LOG(LogGatherTextFromAssetsCommandlet, Verbose, TEXT("Loading package: '%s'."), *PackageNameStr);
+			const int32 CurrentPackageNum = NumPackagesGathered + NumPackagesFailed + 1;
+			const float PercentageComplete = (((float)CurrentPackageNum / (float)PackageCount) * 100.0f);
+
+			UE_LOG(LogGatherTextFromAssetsCommandlet, Display, TEXT("Loading package: '%s'... [%d/%d: %.2f%%]"), *PackageNameStr, CurrentPackageNum, PackageCount, PercentageComplete);
 
 			UPackage* Package = nullptr;
 			{
@@ -768,16 +773,17 @@ int32 UGatherTextFromAssetsCommandlet::Main(const FString& Params)
 
 			if (!Package)
 			{
-				++FailuresInThisBatch;
+				UE_LOG(LogGatherTextFromAssetsCommandlet, Warning, TEXT("Failed to load package: '%s'."), *PackageNameStr);
+				++NumPackagesFailed;
 				continue;
 			}
-			
-			++PackagesInThisBatch;
 
 			// Because packages may not have been resaved after this flagging was implemented, we may have added packages to load that weren't flagged - potential false positives.
 			// The loading process should have reflagged said packages so that only true positives will have this flag.
 			if (Package->RequiresLocalizationGather())
 			{
+				UE_LOG(LogGatherTextFromAssetsCommandlet, Display, TEXT("Gathering package: '%s'..."), *PackageNameStr);
+
 				// Gathers from the given package
 				EPropertyLocalizationGathererResultFlags GatherableTextResultFlags = EPropertyLocalizationGathererResultFlags::Empty;
 				FPropertyLocalizationDataGatherer(GatherableTextDataArray, Package, GatherableTextResultFlags);
@@ -810,7 +816,7 @@ int32 UGatherTextFromAssetsCommandlet::Main(const FString& Params)
 				// Re-save the package to attempt to fix it?
 				if (bSavePackage)
 				{
-					UE_LOG(LogGatherTextFromAssetsCommandlet, Display, TEXT("Resaving package: '%s'."), *PackageNameStr);
+					UE_LOG(LogGatherTextFromAssetsCommandlet, Display, TEXT("Resaving package: '%s'..."), *PackageNameStr);
 
 					bool bSavedPackage = false;
 					{
@@ -820,7 +826,7 @@ int32 UGatherTextFromAssetsCommandlet::Main(const FString& Params)
 
 					if (!bSavedPackage)
 					{
-						UE_LOG(LogGatherTextFromAssetsCommandlet, Error, TEXT("Failed to resave package: '%s'."), *PackageNameStr);
+						UE_LOG(LogGatherTextFromAssetsCommandlet, Warning, TEXT("Failed to resave package: '%s'."), *PackageNameStr);
 					}
 				}
 
@@ -834,6 +840,8 @@ int32 UGatherTextFromAssetsCommandlet::Main(const FString& Params)
 				GatherableTextDataArray.Reset();
 			}
 
+			++NumPackagesGathered;
+
 			if (HasExceededMemoryLimit())
 			{
 				// Over the memory limit, perform a full purge
@@ -841,12 +849,14 @@ int32 UGatherTextFromAssetsCommandlet::Main(const FString& Params)
 			}
 		}
 
-		UE_LOG(LogGatherTextFromAssetsCommandlet, Display, TEXT("Loaded %i packages in batch %i of %i. %i failed."), PackagesInThisBatch, BatchIndex + 1, BatchCount, FailuresInThisBatch);
-
 		// Remove the processed packages
 		PackagesPendingGather.RemoveAt(0, PackagesToProcessThisBatch, /*bAllowShrinking*/false);
 	}
 	check(PackagesPendingGather.Num() == 0);
+	if (PackageCount > 0)
+	{
+		UE_LOG(LogGatherTextFromAssetsCommandlet, Display, TEXT("Loaded %i packages. %i failed."), NumPackagesGathered, NumPackagesFailed);
+	}
 
 	PackagesWithStaleGatherCache.Sort(FNameLexicalLess());
 
