@@ -1177,7 +1177,7 @@ void FRenderAssetStreamingManager::UpdateStreamingRenderAssets(int32 StageIndex,
 		Packets.Reset(NumThreadTasks); // Go ahead and reserve space up front
 		int32 Start = StartIndex;
 		int32 NumRemaining = Num;
-		int32 NumItemsPerGroup = Num / NumThreadTasks + 1;
+		int32 NumItemsPerGroup = Num / (NumThreadTasks + 1);
 		for (int32 i = 0; i < NumThreadTasks; ++i)
 		{
 			int32 NumAssetsToProcess = FMath::Min<int32>(NumRemaining, NumItemsPerGroup);
