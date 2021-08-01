@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netcoreapp3.1</TargetFramework>
     <Configuration Condition=" '$(Configuration)' == '' ">Development</Configuration>
@@ -38,13 +38,20 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\EpicGames.Core\EpicGames.Core.csproj" />
+    <ProjectReference Include="..\EpicGames.Horde\EpicGames.Horde.csproj" />
     <ProjectReference Include="..\EpicGames.IoHash\EpicGames.IoHash.csproj" />
     <ProjectReference Include="..\EpicGames.Serialization\EpicGames.Serialization.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <Protobuf Include="Protos\horde\common\cbobject_wrapper.proto" ProtoRoot="Protos" />
-    <Protobuf Include="Protos\horde\common\iohash_wrapper.proto" ProtoRoot="Protos" />
-    <Protobuf Include="Protos\horde\storage\blob_store_messages.proto" ProtoRoot="Protos" />
-    <Protobuf Include="Protos\horde\storage\ref_table_messages.proto" ProtoRoot="Protos" />
+    <Content Include="..\EpicGames.Horde\Protos\horde\storage\blob_store.proto">
+      <Link>Protos\horde\storage\blob_store.proto</Link>
+    </Content>
+    <Content Include="..\EpicGames.Horde\Protos\horde\storage\ref_table.proto">
+      <Link>Protos\horde\storage\ref_table.proto</Link>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <Protobuf Include="..\EpicGames.Horde\Protos\horde\storage\blob_store.proto" ProtoRoot="..\EpicGames.Horde\Protos" GrpcServices="Client" />
+    <Protobuf Include="..\EpicGames.Horde\Protos\horde\storage\ref_table.proto" ProtoRoot="..\EpicGames.Horde\Protos" GrpcServices="Client" />
   </ItemGroup>
 </Project>
