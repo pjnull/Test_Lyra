@@ -126,10 +126,7 @@ void UWaterBodyLakeComponent::OnUpdateBody(bool bWithExclusionVolumes)
 			LakeCollision->SetGenerateOverlapEvents(true);
 
 			const float Depth = GetChannelDepth() / 2;
-			FVector Scale = OwnerActor->GetActorScale();
-			// Avoid dividing by 0 but keep the scale's sign :
-			Scale = Scale.GetSignVector() * FVector::Max(Scale.GetAbs(), FVector::OneVector * 0.001f);
-			FVector LakeCollisionExtent = FVector(SplineExtent.X, SplineExtent.Y, Depth) / Scale;
+			FVector LakeCollisionExtent = FVector(SplineExtent.X, SplineExtent.Y, Depth) / OwnerActor->GetActorScale();
 			LakeCollision->SetWorldLocation(WorldLoc + FVector(0, 0, -Depth));
 			LakeCollision->UpdateCollision(LakeCollisionExtent, true);
 		}
