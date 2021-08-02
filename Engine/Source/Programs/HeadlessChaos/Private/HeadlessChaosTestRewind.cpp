@@ -2572,56 +2572,6 @@ namespace ChaosTest {
 #endif
 	}
 
-	GTEST_TEST(AllTraits, RewindTest_DeltaTimeRecord)
-	{
-		for (int Optimization = 0; Optimization < 2; ++Optimization)
-		{
-			auto Sphere = TSharedPtr<FImplicitObject, ESPMode::ThreadSafe>(new TSphere<FReal, 3>(FVec3(0), 10));
-
-			FChaosSolversModule* Module = FChaosSolversModule::GetModule();
-
-			// Make a solver
-			auto* Solver = Module->CreateSolver(nullptr, /*AsyncDt=*/-1);
-			InitSolverSettings(Solver);
-			
-			Solver->EnableRewindCapture(7, !!Optimization);
-
-			// Make particles
-			auto Proxy = FSingleParticlePhysicsProxy::Create(Chaos::FPBDRigidParticle::CreateParticle());
-			auto& Particle = Proxy->GetGameThreadAPI();
-
-			Particle.SetGeometry(Sphere);
-			Solver->RegisterObject(Proxy);
-			Particle.SetGravityEnabled(true);
-
-			const int LastStep = 11;
-			TArray<FReal> DTs;
-			FReal Dt = 1;
-			for (int Step = 0; Step <= LastStep; ++Step)
-			{
-				DTs.Add(Dt);
-				TickSolverHelper(Solver, Dt);
-				Dt += 0.1;
-			}
-
-			const int RewindStep = 5;
-
-			FPhysicsThreadContextScope Scope(true);
-			FRewindData* RewindData = Solver->GetRewindData();
-			EXPECT_TRUE(RewindData->RewindToFrame(RewindStep));
-
-			for (int Step = RewindStep; Step <= LastStep; ++Step)
-			{
-				EXPECT_EQ(DTs[Step], RewindData->GetDeltaTimeForFrame(Step));
-			}
-
-			// Throw out the proxy
-			Solver->UnregisterObject(Proxy);
-
-			Module->DestroySolver(Solver);
-		}
-	}
-
 	GTEST_TEST(AllTraits, DISABLED_RewindTest_ResimDesyncFromChangeForce)
 	{
 		for (int Optimization = 0; Optimization < 2; ++Optimization)
