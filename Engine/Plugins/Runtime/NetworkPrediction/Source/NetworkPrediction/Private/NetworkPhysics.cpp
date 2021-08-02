@@ -378,23 +378,27 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 					break;
 				}
 
-				if (auto* PT = CorrectionState.Proxy->GetPhysicsThreadAPI())
+				// TODO: This nullcheck is to avoid null access crash in Editor Tests.
+				// Should re-evaluate whether/why this is occurring in the first place.
+				if (CorrectionState.Proxy)
 				{
-					UE_CLOG(UE_NETWORK_PHYSICS::LogCorrections > 0, LogNetworkPhysics, Log, TEXT("Applying Correction from frame %d (actual step: %d). Location: %s"), CorrectionState.Frame, PhysicsStep, *FVector(CorrectionState.Physics.Location).ToString());
-
-					
-					PT->SetX(CorrectionState.Physics.Location, false);
-					PT->SetV(CorrectionState.Physics.LinearVelocity, false);
-					PT->SetR(CorrectionState.Physics.Rotation, false);
-					PT->SetW(CorrectionState.Physics.AngularVelocity, false);
-
-					//Solver->GetParticles().MarkTransientDirtyParticle(PT->GetProxy()->GetHandle_LowLevel());
-
-					//if (PT->ObjectState() != CorrectionState.Physics.ObjectState)
+					if (auto* PT = CorrectionState.Proxy->GetPhysicsThreadAPI())
 					{
-						ensure(CorrectionState.Physics.ObjectState != Chaos::EObjectStateType::Uninitialized);
-						UE_CLOG(UE_NETWORK_PHYSICS::LogCorrections > 0 && PT->ObjectState() != CorrectionState.Physics.ObjectState, LogNetworkPhysics, Log, TEXT("Applying Correction State %d"), CorrectionState.Physics.ObjectState);
-						PT->SetObjectState(CorrectionState.Physics.ObjectState);
+						UE_CLOG(UE_NETWORK_PHYSICS::LogCorrections > 0, LogNetworkPhysics, Log, TEXT("Applying Correction from frame %d (actual step: %d). Location: %s"), CorrectionState.Frame, PhysicsStep, *FVector(CorrectionState.Physics.Location).ToString());
+
+						PT->SetX(CorrectionState.Physics.Location, false);
+						PT->SetV(CorrectionState.Physics.LinearVelocity, false);
+						PT->SetR(CorrectionState.Physics.Rotation, false);
+						PT->SetW(CorrectionState.Physics.AngularVelocity, false);
+
+						//Solver->GetParticles().MarkTransientDirtyParticle(PT->GetProxy()->GetHandle_LowLevel());
+
+						//if (PT->ObjectState() != CorrectionState.Physics.ObjectState)
+						{
+							ensure(CorrectionState.Physics.ObjectState != Chaos::EObjectStateType::Uninitialized);
+							UE_CLOG(UE_NETWORK_PHYSICS::LogCorrections > 0 && PT->ObjectState() != CorrectionState.Physics.ObjectState, LogNetworkPhysics, Log, TEXT("Applying Correction State %d"), CorrectionState.Physics.ObjectState);
+							PT->SetObjectState(CorrectionState.Physics.ObjectState);
+						}
 					}
 				}
 			}
