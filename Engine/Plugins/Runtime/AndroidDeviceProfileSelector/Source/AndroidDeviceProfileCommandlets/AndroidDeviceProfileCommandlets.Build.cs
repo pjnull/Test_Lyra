@@ -7,6 +7,8 @@ public class AndroidDeviceProfileCommandlets : ModuleRules
 {
 	public AndroidDeviceProfileCommandlets(ReadOnlyTargetRules Target) : base(Target)
 	{
+		PublicIncludePaths.Add("Developer/Android/AndroidDeviceDetection/Public");
+
 		PublicDependencyModuleNames.AddRange(
 			new string[]
 			{
@@ -24,7 +26,6 @@ public class AndroidDeviceProfileCommandlets : ModuleRules
 				"Json",
 				"JsonUtilities",
 				"AndroidDeviceProfileSelector",
-				"AndroidDeviceDetection",
 				"PIEPreviewDeviceSpecification"
 			}
 			);
