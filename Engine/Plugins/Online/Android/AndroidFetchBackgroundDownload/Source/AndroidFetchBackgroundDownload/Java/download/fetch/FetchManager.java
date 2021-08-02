@@ -1,19 +1,19 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
-package com.epicgames.ue4.download.fetch;
+package com.epicgames.unreal.download.fetch;
 
 import android.content.Context;
 import android.net.Uri;
 
-import com.epicgames.ue4.Logger;
-import com.epicgames.ue4.download.datastructs.DownloadDescription;
-import com.epicgames.ue4.download.datastructs.DownloadQueueDescription;
-import com.epicgames.ue4.download.fetch.FetchDownloadProgressOwner;
-import com.epicgames.ue4.download.DownloadProgressListener;
-import com.epicgames.ue4.download.fetch.FetchEnqueueResultListener;
-import com.epicgames.ue4.download.fetch.FetchRequestProgressListener;
+import com.epicgames.unreal.Logger;
+import com.epicgames.unreal.download.datastructs.DownloadDescription;
+import com.epicgames.unreal.download.datastructs.DownloadQueueDescription;
+import com.epicgames.unreal.download.fetch.FetchDownloadProgressOwner;
+import com.epicgames.unreal.download.DownloadProgressListener;
+import com.epicgames.unreal.download.fetch.FetchEnqueueResultListener;
+import com.epicgames.unreal.download.fetch.FetchRequestProgressListener;
 
-import com.epicgames.ue4.download.UEDownloadWorker.EDownloadCompleteReason;
-import com.epicgames.ue4.download.fetch.FetchRequestProgressListener.ECompleteReason;
+import com.epicgames.unreal.download.UEDownloadWorker.EDownloadCompleteReason;
+import com.epicgames.unreal.download.fetch.FetchRequestProgressListener.ECompleteReason;
 
 import com.tonyodev.fetch2.CompletedDownload;
 import com.tonyodev.fetch2.Download;
@@ -874,5 +874,5 @@ public class FetchManager implements FetchDownloadProgressOwner, FetchEnqueueRes
 
 	public String TempFileExtension = ".fetchtemp";
 	
-	public Logger Log = new Logger("UE4", "FetchManager");
+	public Logger Log = new Logger("UE", "FetchManager");
 }

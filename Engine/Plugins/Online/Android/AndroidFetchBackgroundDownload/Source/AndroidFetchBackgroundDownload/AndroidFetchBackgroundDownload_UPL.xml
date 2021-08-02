@@ -26,6 +26,6 @@
 	<!-- optional files or directories to copy or delete from Intermediate/Android/APK before ndk-build -->
 	<prebuildCopies>
 		<log text="Copying AndroidFetchBackgroundDownload files to staging"/>
-		<copyDir src="$S(PluginDir)/Java" dst="$S(BuildDir)/src/com/epicgames/ue4" />
+		<copyDir src="$S(PluginDir)/Java" dst="$S(BuildDir)/src/com/epicgames/unreal" />
 	</prebuildCopies>
 </root>

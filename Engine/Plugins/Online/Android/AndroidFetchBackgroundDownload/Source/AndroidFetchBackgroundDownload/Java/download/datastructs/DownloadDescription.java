@@ -1,5 +1,5 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
-package com.epicgames.ue4.download.datastructs;
+package com.epicgames.unreal.download.datastructs;
 
 //WARNING: We don't import org.json.JSONArray OR org.json.simple.JSONArray as we use both in this file
 import org.json.JSONException;
@@ -15,7 +15,7 @@ import java.io.FileReader;
 import java.util.List;
 import java.util.ArrayList;
 
-import com.epicgames.ue4.download.DownloadProgressListener;
+import com.epicgames.unreal.download.DownloadProgressListener;
 
 //Helper class that holds the necessary data to describe a single URL request and loading/saving that request to JSON strings.
 public class DownloadDescription

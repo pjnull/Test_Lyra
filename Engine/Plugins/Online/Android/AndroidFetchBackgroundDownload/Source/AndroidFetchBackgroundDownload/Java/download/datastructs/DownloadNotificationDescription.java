@@ -1,5 +1,5 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
-package com.epicgames.ue4.download.datastructs;
+package com.epicgames.unreal.download.datastructs;
 
 import android.app.NotificationManager;
 import android.content.Context;
@@ -10,9 +10,9 @@ import androidx.annotation.Nullable;
 import androidx.work.Data;
 import androidx.work.WorkerParameters;
 
-import com.epicgames.ue4.LocalNotificationReceiver;
-import com.epicgames.ue4.Logger;
-import com.epicgames.ue4.download.datastructs.DownloadWorkerParameterKeys;
+import com.epicgames.unreal.LocalNotificationReceiver;
+import com.epicgames.unreal.Logger;
+import com.epicgames.unreal.download.datastructs.DownloadWorkerParameterKeys;
 
 //Helper class that stores all the needed information for a Notification in one object and handles parsing and caching defaults stored in the WorkerParameters
 public class DownloadNotificationDescription

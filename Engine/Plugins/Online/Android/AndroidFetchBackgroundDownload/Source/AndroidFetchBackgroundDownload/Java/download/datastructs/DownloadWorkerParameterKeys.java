@@ -1,5 +1,5 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
-package com.epicgames.ue4.download.datastructs;
+package com.epicgames.unreal.download.datastructs;
 
 //
 // WARNING: These keys values must stay in sync with their values in FAndroidNativeDownloadWorkerParameterKeys!

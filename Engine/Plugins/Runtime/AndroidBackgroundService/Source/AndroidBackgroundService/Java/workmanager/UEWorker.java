@@ -1,5 +1,5 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
-package com.epicgames.ue4.workmanager;
+package com.epicgames.unreal.workmanager;
 
 import android.content.Context;
 import android.util.Log;
@@ -12,16 +12,16 @@ import androidx.work.WorkerParameters;
 
 import java.util.Set;
 
-import com.epicgames.ue4.Logger;
+import com.epicgames.unreal.Logger;
 
-import com.epicgames.ue4.GameActivity;
+import com.epicgames.unreal.GameActivity;
 
 import com.google.common.util.concurrent.ListenableFuture;
 
 //Base implementation for custom UE Workers
 public class UEWorker extends Worker
 {
-	public Logger Log = new Logger("UE4", "UEWorker");
+	public Logger Log = new Logger("UE", "UEWorker");
 	
 	public UEWorker(@NonNull Context context,@NonNull WorkerParameters params)
 	{

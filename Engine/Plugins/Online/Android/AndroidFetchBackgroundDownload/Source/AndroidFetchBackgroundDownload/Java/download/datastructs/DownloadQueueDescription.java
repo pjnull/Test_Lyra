@@ -1,5 +1,5 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
-package com.epicgames.ue4.download.datastructs;
+package com.epicgames.unreal.download.datastructs;
 
 import android.content.Context;
 import android.util.Log;
@@ -9,11 +9,11 @@ import androidx.annotation.Nullable;
 import androidx.work.Data;
 import androidx.work.WorkerParameters;
 
-import com.epicgames.ue4.Logger;
+import com.epicgames.unreal.Logger;
 
-import com.epicgames.ue4.download.datastructs.DownloadDescription;
-import com.epicgames.ue4.download.datastructs.DownloadWorkerParameterKeys;
-import com.epicgames.ue4.download.DownloadProgressListener;
+import com.epicgames.unreal.download.datastructs.DownloadDescription;
+import com.epicgames.unreal.download.datastructs.DownloadWorkerParameterKeys;
+import com.epicgames.unreal.download.DownloadProgressListener;
 
 import org.json.JSONArray;
 import org.json.JSONException;

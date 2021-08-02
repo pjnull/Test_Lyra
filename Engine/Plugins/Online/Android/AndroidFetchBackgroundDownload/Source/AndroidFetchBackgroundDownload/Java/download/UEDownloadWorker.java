@@ -1,5 +1,5 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
-package com.epicgames.ue4.download;
+package com.epicgames.unreal.download;
 
 import android.content.Intent;
 
@@ -22,16 +22,16 @@ import androidx.work.WorkerParameters;
 
 import java.io.File;
 
-import com.epicgames.ue4.GameActivity;
+import com.epicgames.unreal.GameActivity;
 
-import com.epicgames.ue4.Logger;
-import com.epicgames.ue4.workmanager.UEWorker;
+import com.epicgames.unreal.Logger;
+import com.epicgames.unreal.workmanager.UEWorker;
 
-import com.epicgames.ue4.download.datastructs.DownloadNotificationDescription;
-import com.epicgames.ue4.download.DownloadProgressListener;
-import com.epicgames.ue4.download.datastructs.DownloadQueueDescription;
-import com.epicgames.ue4.download.datastructs.DownloadWorkerParameterKeys;
-import com.epicgames.ue4.download.fetch.FetchManager;
+import com.epicgames.unreal.download.datastructs.DownloadNotificationDescription;
+import com.epicgames.unreal.download.DownloadProgressListener;
+import com.epicgames.unreal.download.datastructs.DownloadQueueDescription;
+import com.epicgames.unreal.download.datastructs.DownloadWorkerParameterKeys;
+import com.epicgames.unreal.download.fetch.FetchManager;
 
 import com.tonyodev.fetch2.Download;
 import com.tonyodev.fetch2.Error;
@@ -58,7 +58,7 @@ public class UEDownloadWorker extends UEWorker implements DownloadProgressListen
 		super(context,params);
 		
 		//Overwrite the default log to have a more specific log identifier tag
-		Log = new Logger("UE4", "UEDownloadWorker");
+		Log = new Logger("UE", "UEDownloadWorker");
 	}
 	
 	@Override

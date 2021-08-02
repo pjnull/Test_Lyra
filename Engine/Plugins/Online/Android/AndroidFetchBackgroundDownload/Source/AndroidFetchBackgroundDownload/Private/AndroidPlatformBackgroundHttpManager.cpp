@@ -678,10 +678,10 @@ void FAndroidPlatformBackgroundHttpManager::FJavaClassInfo::Initialize()
 
 			//Find jclass information
 			{
-				UEDownloadWorkerClass = FAndroidApplication::FindJavaClassGlobalRef("com/epicgames/ue4/download/UEDownloadWorker");
+				UEDownloadWorkerClass = FAndroidApplication::FindJavaClassGlobalRef("com/epicgames/unreal/download/UEDownloadWorker");
 				CHECK_JNI_RESULT(UEDownloadWorkerClass);
 
-				DownloadDescriptionClass = FAndroidApplication::FindJavaClassGlobalRef("com/epicgames/ue4/download/datastructs/DownloadDescription");
+				DownloadDescriptionClass = FAndroidApplication::FindJavaClassGlobalRef("com/epicgames/unreal/download/datastructs/DownloadDescription");
 				CHECK_JNI_RESULT(DownloadDescriptionClass);
 			}
 
@@ -694,7 +694,7 @@ void FAndroidPlatformBackgroundHttpManager::FJavaClassInfo::Initialize()
 				WriteDownloadDescriptionListToFileMethod = FJavaWrapper::FindStaticMethod(Env, DownloadDescriptionClass, "WriteDownloadDescriptionListToFile", "(Ljava/lang/String;Ljava/util/ArrayList;)Z", bIsOptional);
 				CHECK_JNI_RESULT(WriteDownloadDescriptionListToFileMethod);
 
-				CreateDownloadDescriptionFromJsonMethod = FJavaWrapper::FindStaticMethod(Env, DownloadDescriptionClass, "FromJSON", "(Ljava/lang/String;)Lcom/epicgames/ue4/download/datastructs/DownloadDescription;", bIsOptional);
+				CreateDownloadDescriptionFromJsonMethod = FJavaWrapper::FindStaticMethod(Env, DownloadDescriptionClass, "FromJSON", "(Ljava/lang/String;)Lcom/epicgames/unreal/download/datastructs/DownloadDescription;", bIsOptional);
 				CHECK_JNI_RESULT(CreateDownloadDescriptionFromJsonMethod);
 			}
 		}
@@ -705,7 +705,7 @@ void FAndroidPlatformBackgroundHttpManager::FJavaClassInfo::Initialize()
 //JNI methods coming from UEDownloadWorker
 //
 
-JNI_METHOD void Java_com_epicgames_ue4_download_UEDownloadWorker_nativeAndroidBackgroundDownloadOnProgress(JNIEnv* jenv, jobject thiz, jstring TaskID, jlong BytesWrittenSinceLastCall, jlong TotalBytesWritten)
+JNI_METHOD void Java_com_epicgames_unreal_download_UEDownloadWorker_nativeAndroidBackgroundDownloadOnProgress(JNIEnv* jenv, jobject thiz, jstring TaskID, jlong BytesWrittenSinceLastCall, jlong TotalBytesWritten)
 {
 	const bool bIsSafeToCallDelegates = FPlatformAtomics::AtomicRead(&(FAndroidBackgroundDownloadDelegates::bHasManagerScheduledBGWork));
 	if (bIsSafeToCallDelegates)
@@ -718,7 +718,7 @@ JNI_METHOD void Java_com_epicgames_ue4_download_UEDownloadWorker_nativeAndroidBa
 	}
 }
 
-JNI_METHOD void Java_com_epicgames_ue4_download_UEDownloadWorker_nativeAndroidBackgroundDownloadOnComplete(JNIEnv* jenv, jobject thiz, jstring TaskID, jstring CompleteLocation, jboolean bWasSuccess)
+JNI_METHOD void Java_com_epicgames_unreal_download_UEDownloadWorker_nativeAndroidBackgroundDownloadOnComplete(JNIEnv* jenv, jobject thiz, jstring TaskID, jstring CompleteLocation, jboolean bWasSuccess)
 {
 	const bool bIsSafeToCallDelegates = FPlatformAtomics::AtomicRead(&(FAndroidBackgroundDownloadDelegates::bHasManagerScheduledBGWork));
 	if (bIsSafeToCallDelegates)
@@ -731,7 +731,7 @@ JNI_METHOD void Java_com_epicgames_ue4_download_UEDownloadWorker_nativeAndroidBa
 	}
 }
 
-JNI_METHOD void Java_com_epicgames_ue4_download_UEDownloadWorker_nativeAndroidBackgroundDownloadOnAllComplete(JNIEnv* jenv, jobject thiz, jboolean bDidAllRequestsSucceed)
+JNI_METHOD void Java_com_epicgames_unreal_download_UEDownloadWorker_nativeAndroidBackgroundDownloadOnAllComplete(JNIEnv* jenv, jobject thiz, jboolean bDidAllRequestsSucceed)
 {
 	const bool bIsSafeToCallDelegates = FPlatformAtomics::AtomicRead(&(FAndroidBackgroundDownloadDelegates::bHasManagerScheduledBGWork));
 	if (bIsSafeToCallDelegates)
@@ -741,7 +741,7 @@ JNI_METHOD void Java_com_epicgames_ue4_download_UEDownloadWorker_nativeAndroidBa
 	}
 }
 
-JNI_METHOD void Java_com_epicgames_ue4_download_UEDownloadWorker_nativeAndroidBackgroundDownloadOnTick(JNIEnv* jenv, jobject thiz)
+JNI_METHOD void Java_com_epicgames_unreal_download_UEDownloadWorker_nativeAndroidBackgroundDownloadOnTick(JNIEnv* jenv, jobject thiz)
 {
 	const bool bIsSafeToCallDelegates = FPlatformAtomics::AtomicRead(&(FAndroidBackgroundDownloadDelegates::bHasManagerScheduledBGWork));
 	if (bIsSafeToCallDelegates)
