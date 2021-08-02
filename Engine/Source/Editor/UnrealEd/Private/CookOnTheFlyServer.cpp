@@ -90,6 +90,7 @@
 #include "MeshCardRepresentation.h"
 #include "Misc/PathViews.h"
 #include "String/Find.h"
+#include "TargetDomain/TargetDomainUtils.h"
 #include "Async/Async.h"
 
 #include "AssetRegistryModule.h"
@@ -4783,12 +4784,20 @@ void FSaveCookedPackageContext::FinishPlatform()
 		FAssetPackageData* AssetPackageData = Generator->GetAssetPackageData(Package->GetFName());
 		check(AssetPackageData);
 
+		FCbObject TargetDomainDependencies;
+		if (COTFS.bTargetDomainEnabled)
+		{
+			UE_SCOPED_HIERARCHICAL_COOKTIMER(TargetDomainDependencies);
+			TargetDomainDependencies = UE::TargetDomain::GetDependenciesObject(Package, TargetPlatform, nullptr /* ErrorMessage */);
+		}
+
 		IPackageStoreWriter::FCommitPackageInfo Info;
 		Info.bSucceeded = bSuccessful;
 		Info.PackageName = Package->GetFName();
 		PRAGMA_DISABLE_DEPRECATION_WARNINGS
 		Info.PackageGuid = AssetPackageData->PackageGuid;
 		PRAGMA_ENABLE_DEPRECATION_WARNINGS
+		Info.TargetDomainDependencies = TargetDomainDependencies;
 
 		PackageStoreWriter->CommitPackage(Info);
 	}
@@ -5023,6 +5032,7 @@ void UCookOnTheFlyServer::Initialize( ECookMode::Type DesiredCookMode, ECookInit
 		bPreloadingEnabled = true;
 		FLinkerLoad::SetPreloadingEnabled(true);
 	}
+	GConfig->GetBool(TEXT("CookSettings"), TEXT("TargetDomainEnabled"), bTargetDomainEnabled, GEditorIni);
 
 	{
 		const FConfigSection* CacheSettings = GConfig->GetSectionPrivate(TEXT("CookPlatformDataCacheSettings"), false, true, GEditorIni);
