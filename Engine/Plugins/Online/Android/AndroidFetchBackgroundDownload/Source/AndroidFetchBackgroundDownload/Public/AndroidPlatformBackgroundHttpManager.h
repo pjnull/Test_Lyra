@@ -48,7 +48,6 @@ protected:
 
 	FAndroidBackgroundHttpRequestPtr FindRequestByID(FString RequestID);
 	void HandlePendingCompletes();
-	void VerifyIfAllDownloadsComplete();
 
 	const FString GetFullFileNameForDownloadDescriptionList() const;
 	const FString GetBaseFileNameForDownloadDescriptionListWithAppendedInt(int IntToAppend) const;
@@ -59,13 +58,23 @@ protected:
 	void Java_OnAllDownloadsComplete(jobject UnderlyingWorker, bool bDidAllRequestsSucceed);
 	void Java_OnTick(JNIEnv* Env, jobject UnderlyingWorker);
 
+	//Helper function to determine if a background http request was completed in the underlying layer
+	//but is still in our ActiveRequests lists as its pending being a complete being sent on our game thread tick
+	bool HasUnderlyingJavaCompletedRequest(FBackgroundHttpRequestPtr Request);
+	bool HasUnderlyingJavaCompletedRequest(FAndroidBackgroundHttpRequestPtr Request);
+
+	//Flag our underlying request as completed in a thread-safe way as this needs to be able to called on the background worker thread or game thread
+	void MarkUnderlyingJavaRequestAsCompleted(FBackgroundHttpRequestPtr Request, bool bSuccess = true );
+	void MarkUnderlyingJavaRequestAsCompleted(FAndroidBackgroundHttpRequestPtr Request, bool bSuccess = true);
+
+	//returns true if this request is a valid request to send through to our underlying Java worker. Makes sure the request is not completed or paused
+	bool IsValidRequestToEnqueue(FBackgroundHttpRequestPtr Request);
+	bool IsValidRequestToEnqueue(FAndroidBackgroundHttpRequestPtr Request);
+
 	FDelegateHandle Java_OnDownloadProgressHandle;
 	FDelegateHandle Java_OnDownloadCompleteHandle;
 	FDelegateHandle Java_OnAllDownloadsCompleteHandle;
 	FDelegateHandle Java_OnTickHandle;
-
-	volatile int32 bHasPendingCompletes;
-	volatile int32 bUnderlyingJavaAllDownloadsComplete;
 
 	//Array used to store Pause/Resume/Cancel requests in a thread-safe non-locking way. This way we can utilize the _Java lists in our Java_OnTick
 	//without worrying about blocking the java thread
@@ -76,6 +85,10 @@ protected:
 	TArray<FString> RequestsToCancelByID_GT;
 	TArray<FString> RequestsToCancelByID_Java;
 
+	//Used to flag if we have any downloads completed in our ActiveRequests list that are 
+	//completed in java but waiting to send their completion handler on the GameThread
+	volatile int32 bHasPendingCompletes;
+	
 	//Used to ensure that we can skip past the Pause/Resume/Cancel sections if one of the threads is using them
 	//Don't want to just use RWLocks as we can't block the WorkerThread
 	volatile int32 bIsModifyingPauseList;

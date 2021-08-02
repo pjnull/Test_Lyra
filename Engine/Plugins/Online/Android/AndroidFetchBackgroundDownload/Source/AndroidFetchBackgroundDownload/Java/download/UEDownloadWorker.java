@@ -83,11 +83,15 @@ public class UEDownloadWorker extends UEWorker implements DownloadProgressListen
 		{
 			NotificationDescription = new DownloadNotificationDescription(getInputData(), getApplicationContext(), Log);
 		}
+
+		bHasEnqueueHappened = false;
 	}
 	
 	@Override
 	public void OnWorkerStart(String WorkID)
 	{
+		Log.debug("OnWorkerStart Beginning for " + WorkID);
+
 		super.OnWorkerStart(WorkID);
 	
 		//TODO: TRoss this should be based on some WorkerParameter and handled in UEWorker
@@ -102,7 +106,7 @@ public class UEDownloadWorker extends UEWorker implements DownloadProgressListen
 		}
 		
 		//Setup downloads in mFetchManager
-		DownloadQueueDescription QueueDescription = new DownloadQueueDescription(getInputData(), getApplicationContext(), Log);
+		QueueDescription = new DownloadQueueDescription(getInputData(), getApplicationContext(), Log);
 		QueueDescription.ProgressListener = this;
 		mFetchManager.EnqueueRequests(getApplicationContext(),QueueDescription);
 
@@ -113,8 +117,8 @@ public class UEDownloadWorker extends UEWorker implements DownloadProgressListen
 		{
 			while (bReceivedResult == false)
 			{
-				Thread.sleep(500);
 				Tick(QueueDescription);
+				Thread.sleep(500);
 			}
 		} 
 		catch (InterruptedException e) 
@@ -127,15 +131,22 @@ public class UEDownloadWorker extends UEWorker implements DownloadProgressListen
 		finally
 		{
 			CleanUp(WorkID);
+
+			Log.debug("Finishing OnWorkerStart. CachedResult:" + CachedResult + " bReceivedResult:" + bReceivedResult);
 		}
 	}
 	
 	private void Tick(DownloadQueueDescription QueueDescription)
 	{
-		mFetchManager.RequestGroupProgressUpdate(QueueDescription.DownloadGroupID,  this);
-		mFetchManager.RequestCheckDownloadsStillActive(this);
+		//Skip any tick logic if we have already gotten a result or our download is finished as that means we are just pending our worker stopping
+		//Also want to ensure enough time has passed that we have sent off our Enqueues to the FetchManager
+		if (!bReceivedResult && bHasEnqueueHappened)
+		{
+			mFetchManager.RequestGroupProgressUpdate(QueueDescription.DownloadGroupID,  this);
+			mFetchManager.RequestCheckDownloadsStillActive(this);
 
-		nativeAndroidBackgroundDownloadOnTick();
+			nativeAndroidBackgroundDownloadOnTick();
+		}
 	}
 	
 	@Override
@@ -145,6 +156,8 @@ public class UEDownloadWorker extends UEWorker implements DownloadProgressListen
 		super.OnWorkerStopped(WorkID);
 		
 		CleanUp(WorkID);
+
+		Log.debug("OnWorkerStopped Ending for " + WorkID + " CachedResult:" + CachedResult + " bReceivedResult:" + bReceivedResult);
 	}
 	
 	public void CleanUp(String WorkID)
@@ -158,16 +171,23 @@ public class UEDownloadWorker extends UEWorker implements DownloadProgressListen
 			Data data = getInputData();
 			if (null != data)
 			{
-				String DownloadDescriptionListString = data.getString(DownloadWorkerParameterKeys.DOWNLOAD_DESCRIPTION_LIST_KEY);
+				String DownloadDescriptionListString = DownloadQueueDescription.GetDownloadDescriptionListFileName(data, Log);
 				if (null != DownloadDescriptionListString)
 				{
 					File DeleteFile = new File(DownloadDescriptionListString);
 					if (DeleteFile.exists())
 					{
 						DeleteFile.delete();
+						Log.debug("Deleted DownloadDescriptorJSONFile " + DownloadDescriptionListString + " in CleanUp");
 					}
 				}
 			}
+		}
+		//If we aren't deleting our DownloadDescriptorJSONFile, we should update it to persist changes between runs
+		else if (QueueDescription != null)
+		{
+			Log.debug("Writing DownloadDescriptionList changes to disk during CleanUp");
+			QueueDescription.ResaveDownloadDescriptionListToDisk(getInputData(), Log);
 		}
 	}
 	
@@ -297,24 +317,45 @@ public class UEDownloadWorker extends UEWorker implements DownloadProgressListen
 	@Override
 	public void OnAllDownloadsComplete(boolean bDidAllRequestsSucceed)
 	{	
-		UpdateNotification(100, false);
-		
-		nativeAndroidBackgroundDownloadOnAllComplete(bDidAllRequestsSucceed);
-		
-		//If UE code didn't provide a result for the work in the above callback(IE: Engine isn't running yet, we are completely in background, etc.) 
-		//then we need to still flag this Worker as completed and shutdown now that our task is finished
+		//If UE code has already provided a resolution then we do not need to handle this OnAllDownloadsComplete notification as 
+		//this UEDownloadWorker is already in the process of stopping work
 		if (!bReceivedResult)
 		{
-			if (bDidAllRequestsSucceed)
+			UpdateNotification(100, false);
+		
+			nativeAndroidBackgroundDownloadOnAllComplete(bDidAllRequestsSucceed);
+		
+			//If UE code didn't provide a result for the work in the above callback(IE: Engine isn't running yet, we are completely in background, etc.) 
+			//then we need to still flag this Worker as completed and shutdown now that our task is finished
+			if (!bReceivedResult)
 			{
-				SetWorkResult_Success();
-			}
-			//by default if UE didn't give us a behavior, lets just retry the download through the worker if one of the downloads failed
-			else
-			{
-				SetWorkResult_Retry();
+				if (bDidAllRequestsSucceed)
+				{
+					SetWorkResult_Success();
+				}
+				//by default if UE didn't give us a behavior, lets just retry the download through the worker if one of the downloads failed
+				else
+				{
+					SetWorkResult_Retry();
+				}
 			}
 		}
+	}
+
+	@Override
+	public void OnDownloadEnqueued(String RequestID, boolean bEnqueueSuccess)
+	{
+		if (bEnqueueSuccess)
+		{
+			Log.verbose("Enqueue success:%s" + RequestID);
+		}
+		else
+		{
+			Log.debug("Enqueue failure, retrying request:" + RequestID);
+			mFetchManager.RetryDownload(RequestID);
+		}
+
+		bHasEnqueueHappened = true;
 	}
 	
 	//
@@ -341,6 +382,8 @@ public class UEDownloadWorker extends UEWorker implements DownloadProgressListen
 	public native void nativeAndroidBackgroundDownloadOnAllComplete(boolean bDidAllRequestsSucceed);
 	public native void nativeAndroidBackgroundDownloadOnTick();
 	
+	private DownloadQueueDescription QueueDescription = null;
+	private volatile boolean bHasEnqueueHappened = false;
 	static FetchManager mFetchManager;
 	private PendingIntent CancelIntent = null;
 	private DownloadNotificationDescription NotificationDescription = null;
