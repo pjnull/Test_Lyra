@@ -17,9 +17,8 @@ public class AndroidDeviceProfileSelector : ModuleRules
         {
 			PrivateDefinitions.Add("HASH_PEPPER_SECRET_GUID="+ SecretGuid);
 		}
-		PublicIncludePaths.Add("Developer/Android/AndroidDeviceDetection/Public");
 
-		PublicDependencyModuleNames.AddRange(
+        PublicDependencyModuleNames.AddRange(
 			new string[]
 			{
 				"Core",
@@ -33,9 +32,6 @@ public class AndroidDeviceProfileSelector : ModuleRules
 				"Core",
 				"CoreUObject",
 				"Engine",
-				"Json",
-				"JsonUtilities",
-				"PIEPreviewDeviceSpecification"
 			}
 			);
 	}
