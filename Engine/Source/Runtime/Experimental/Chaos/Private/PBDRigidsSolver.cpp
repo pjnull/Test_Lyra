@@ -1154,7 +1154,6 @@ namespace Chaos
 				if(ensure(MRewindData->RewindToFrame(ResimStep)))
 				{
 					GetEvolution()->SetResim(true);
-					MRewindData->FlipBufferIfNeeded();
 					CurrentFrame = ResimStep;
 					const int32 NumResimSteps = LastStep - ResimStep + 1;
 					TArray<FPushPhysicsData*> RecordedPushData = MarshallingManager.StealHistory_Internal(NumResimSteps);

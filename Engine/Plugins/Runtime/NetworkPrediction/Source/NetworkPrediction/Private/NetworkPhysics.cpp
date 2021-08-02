@@ -267,7 +267,7 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 #if NETWORK_PHYSICS_REPLICATE_EXTRAS
 				if (UE_NETWORK_PHYSICS::LogImpulses > 0)
 				{
-					for (int32 i=(int32)Chaos::FParticleHistoryEntry::EParticleHistoryPhase::PrePushData; i < (int32)Chaos::FParticleHistoryEntry::EParticleHistoryPhase::NumPhases; ++i)
+					for (int32 i=(int32)Chaos::FFrameAndPhase::EParticleHistoryPhase::PrePushData; i < (int32)Chaos::FFrameAndPhase::EParticleHistoryPhase::NumPhases; ++i)
 					{
 						if (Obj.DebugState[i].LinearImpulse.SizeSquared() > 0.f)
 						{
@@ -307,9 +307,9 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 					if (UE_NETWORK_PHYSICS::LogCorrections > 0 && Obj.Frame-1 >= RewindData->GetEarliestFrame_Internal())
 					{
 						const int32 PreSimulationFrame = SimulationFrame-1;
-						for (int32 i=(int32)Chaos::FParticleHistoryEntry::EParticleHistoryPhase::PrePushData; i < (int32)Chaos::FParticleHistoryEntry::EParticleHistoryPhase::NumPhases; ++i)
+						for (int32 i=(int32)Chaos::FFrameAndPhase::EParticleHistoryPhase::PrePushData; i < (int32)Chaos::FFrameAndPhase::EParticleHistoryPhase::NumPhases; ++i)
 						{
-							const auto LocalPreFrameData = RewindData->GetPastStateAtFrame(*Proxy->GetHandle_LowLevel(), Obj.Frame-1, (Chaos::FParticleHistoryEntry::EParticleHistoryPhase)i);
+							const auto LocalPreFrameData = RewindData->GetPastStateAtFrame(*Proxy->GetHandle_LowLevel(), Obj.Frame-1, (Chaos::FFrameAndPhase::EParticleHistoryPhase)i);
 							if (Obj.DebugState[i].Force != LocalPreFrameData.F())
 							{
 								UE_LOG(LogNetworkPhysics, Warning, TEXT("Previous Frame [%d] Phase [%d] FORCE mismatch. Local: %s. Server: %s"), PreSimulationFrame, i, *LocalPreFrameData.F().ToString(), *Obj.DebugState[i].Force.ToString());
@@ -434,9 +434,9 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 					const int32 PreStorageFrame = PhysicsStep - 1;
 					if (EarliestFrame < PreStorageFrame)
 					{
-						for (int32 i=(int32)Chaos::FParticleHistoryEntry::EParticleHistoryPhase::PrePushData; i < (int32)Chaos::FParticleHistoryEntry::EParticleHistoryPhase::NumPhases; ++i)
+						for (int32 i=(int32)Chaos::FFrameAndPhase::EParticleHistoryPhase::PrePushData; i < (int32)Chaos::FFrameAndPhase::EParticleHistoryPhase::NumPhases; ++i)
 						{
-							Chaos::FGeometryParticleState State = RewindData->GetPastStateAtFrame(*Proxy->GetHandle_LowLevel(), PreStorageFrame, (Chaos::FParticleHistoryEntry::EParticleHistoryPhase)i);
+							Chaos::FGeometryParticleState State = RewindData->GetPastStateAtFrame(*Proxy->GetHandle_LowLevel(), PreStorageFrame, (Chaos::FFrameAndPhase::EParticleHistoryPhase)i);
 							Obj.DebugState[i].Force = State.F();
 							Obj.DebugState[i].Torque = State.Torque();
 							Obj.DebugState[i].LinearImpulse = State.LinearImpulse();
@@ -970,7 +970,7 @@ void UNetworkPhysicsManager::PreNetSend(float DeltaSeconds)
 						ManagedState->Physics = Obj.Physics;					
 						ManagedState->Frame = Obj.Frame;
 #if NETWORK_PHYSICS_REPLICATE_EXTRAS
-						for (int32 i=(int32)Chaos::FParticleHistoryEntry::EParticleHistoryPhase::PrePushData; i < (int32)Chaos::FParticleHistoryEntry::EParticleHistoryPhase::NumPhases; ++i)
+						for (int32 i=(int32)Chaos::FFrameAndPhase::EParticleHistoryPhase::PrePushData; i < (int32)Chaos::FFrameAndPhase::EParticleHistoryPhase::NumPhases; ++i)
 						{
 							ManagedState->DebugState[i] = Obj.DebugState[i];
 						}

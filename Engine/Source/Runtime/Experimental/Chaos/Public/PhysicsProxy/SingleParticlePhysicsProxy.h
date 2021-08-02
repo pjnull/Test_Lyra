@@ -850,11 +850,6 @@ private:
 			}
 
 			Lambda(GetHandle_LowLevel());
-
-			if (FRewindData* RewindData = SolverBase->GetRewindData())
-			{
-				RewindData->MarkDirtyDynamicsFromPT(*GetHandle_LowLevel());
-			}
 		}
 	}
 };
