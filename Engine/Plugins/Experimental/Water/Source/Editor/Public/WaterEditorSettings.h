@@ -16,6 +16,7 @@
 class UMaterialInterface;
 class UMaterialParameterCollection;
 class UStaticMesh;
+class UWaterBodyComponent;
 class UWaterWavesBase;
 class AWaterLandscapeBrush;
 

@@ -38,10 +38,13 @@ private:
 		{
 			if (AWaterBody* WaterBody = Cast<AWaterBody>(SelectedObject.Get()))
 			{
-				if (!WaterBody->IsWaveSupported())
+				if (UWaterBodyComponent* WaterBodyComponent = WaterBody->GetWaterBodyComponent())
 				{
-					bWaveSupported = false;
-					break;
+					if (WaterBodyComponent->IsWaveSupported())
+					{
+						bWaveSupported = false;
+						break;
+					}
 				}
 			}
 		}

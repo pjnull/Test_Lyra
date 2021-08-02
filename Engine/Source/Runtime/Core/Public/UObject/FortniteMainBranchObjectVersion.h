@@ -176,6 +176,9 @@ struct CORE_API FFortniteMainBranchObjectVersion
 		// Add loop counters to sequencer's compiled sub-sequence data
 		AddedSubSequenceEntryWarpCounter,
 
+		// Water plugin is now component-based rather than actor based
+		WaterBodyComponentRefactor,
+
 		// -----<new versions can be added above this line>-------------------------------------------------
 		VersionPlusOne,
 		LatestVersion = VersionPlusOne - 1
