@@ -19,6 +19,7 @@
 #include "Operations/MeshPlaneCut.h"
 #include "Curve/PlanarComplex.h"
 #include "DynamicSubmesh3.h"
+#include "PhysicsEngine/ConvexElem.h"
 
 #include "WaterBodyExclusionVolume.h"
 #include "Model.h"

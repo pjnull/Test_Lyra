@@ -5,6 +5,8 @@
 #include "UObject/FortniteMainBranchObjectVersion.h"
 #include "EngineUtils.h"
 #include "WaterSubsystem.h"
+#include "UObject/UObjectIterator.h"
+#include "WaterBodyComponent.h"
 
 #if WITH_EDITOR
 #include "Components/BillboardComponent.h"

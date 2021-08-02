@@ -3,6 +3,7 @@
 #include "WaterBodyLakeActor.h"
 #include "WaterBodyLakeComponent.h"
 #include "LakeCollisionComponent.h"
+#include "Engine/StaticMesh.h"
 
 #if WITH_EDITOR
 #include "WaterIconHelper.h"

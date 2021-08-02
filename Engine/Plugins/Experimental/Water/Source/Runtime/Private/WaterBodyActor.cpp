@@ -27,6 +27,7 @@
 #if WITH_EDITOR
 #include "WaterIconHelper.h"
 #include "Components/BillboardComponent.h"
+#include "Editor/EditorEngine.h"
 #endif
 
 #define LOCTEXT_NAMESPACE "Water"
