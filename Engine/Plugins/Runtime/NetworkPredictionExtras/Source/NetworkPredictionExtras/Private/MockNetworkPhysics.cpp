@@ -320,13 +320,19 @@ void FMockManagedState::AsyncTick(UWorld* World, Chaos::FPhysicsSolver* Solver, 
 				{
 					PT->AddForce(InputCmd.Force * GT_State.ForceMultiplier * UE_NETWORK_PHYSICS::MovementK());
 
-					// Auto Turn
-					const float CurrentYaw = PT->R().Rotator().Yaw + (PT->W().Z * UE_NETWORK_PHYSICS::TurnDampK());
-					const float DesiredYaw = InputCmd.Force.Rotation().Yaw;
-					const float DeltaYaw = FRotator::NormalizeAxis( DesiredYaw - CurrentYaw );
-					
-					PT->AddTorque(FVector(0.f, 0.f, DeltaYaw * UE_NETWORK_PHYSICS::TurnK()));
 				}
+
+				// Rotation
+				if (InputCmd.Torque.SizeSquared() > 0.001f)
+				{
+					PT->AddTorque(InputCmd.Torque* GT_State.ForceMultiplier* UE_NETWORK_PHYSICS::RotationK());
+				}
+
+				// Auto Turn to target yaw
+				const float CurrentYaw = PT->R().Rotator().Yaw + (PT->W().Z * GT_State.AutoFaceTargetYawDamp);
+				const float DesiredYaw = FMath::DegreesToRadians(InputCmd.TargetYaw);
+				const float DeltaYaw = FRotator::NormalizeAxis(InputCmd.TargetYaw - CurrentYaw );
+				PT->AddTorque(FVector(0.f, 0.f, DeltaYaw * GT_State.AutoFaceTargetYawStrength));
 			}
 
 			// Drag force
@@ -337,7 +343,19 @@ void FMockManagedState::AsyncTick(UWorld* World, Chaos::FPhysicsSolver* Solver, 
 				FVector Drag = -1.f * V * UE_NETWORK_PHYSICS::DragK();
 				PT->AddForce(Drag);
 			}
-			
+
+
+			//  angular velocity limit
+			FVector W = PT->W();
+			{
+				const float MaxAngularVelocitySq = UE_NETWORK_PHYSICS::MaxAngularVelocity() * UE_NETWORK_PHYSICS::MaxAngularVelocity();
+				if (W.SizeSquared() > MaxAngularVelocitySq)
+				{
+					W = W.GetUnsafeNormal() * UE_NETWORK_PHYSICS::MaxAngularVelocity();
+					PT->SetW(W);
+				}
+			}
+
 			PT_State.JumpCooldownMS = FMath::Max( PT_State.JumpCooldownMS - (int32)(DeltaSeconds* 1000.f), 0);
 			if (PT_State.JumpCooldownMS != 0)
 			{
