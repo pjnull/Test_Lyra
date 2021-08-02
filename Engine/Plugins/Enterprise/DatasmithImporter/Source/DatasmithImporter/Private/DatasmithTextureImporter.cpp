@@ -293,15 +293,16 @@ UTexture* FDatasmithTextureImporter::CreateTexture(const TSharedPtr<IDatasmithTe
 		}
 
 		bool bUpdateResource = false;
-		bUpdateResource |= Texture->Filter != TexFilter;
-		bUpdateResource |= Texture->AddressX != (TextureAddress)TextureElement->GetTextureAddressX();
-		bUpdateResource |= Texture->AddressY != (TextureAddress)TextureElement->GetTextureAddressY();
 
+		bUpdateResource |= Texture->Filter != TexFilter;
 		Texture->Filter = TexFilter;
 
 		if (UTexture2D* Texture2D = Cast<UTexture2D>(Texture))
 		{
+			bUpdateResource |= Texture2D->AddressX != (TextureAddress)TextureElement->GetTextureAddressX();
 			Texture2D->AddressX = (TextureAddress)TextureElement->GetTextureAddressX();
+			
+			bUpdateResource |= Texture2D->AddressY != (TextureAddress)TextureElement->GetTextureAddressY();
 			Texture2D->AddressY = (TextureAddress)TextureElement->GetTextureAddressY();
 		}
 
