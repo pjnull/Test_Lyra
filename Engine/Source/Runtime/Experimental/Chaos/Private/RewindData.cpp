@@ -60,63 +60,6 @@ void FGeometryParticleStateBase::SyncDirtyDynamics(FDirtyPropData& DestManager,c
 #endif
 }
 
-template <typename TParticle>
-void FGeometryParticleStateBase::SyncToParticle(TParticle& Particle, const FDirtyPropertiesPool& Manager) const
-{
-	if(const auto* Data = ParticlePositionRotation.Read(Manager))
-	{
-		Particle.SetXR(*Data);
-	}
-
-	if(auto Kinematic = Particle.CastToKinematicParticle())
-	{
-		if(const auto* Data = Velocities.Read(Manager))
-		{
-			Kinematic->SetVelocities(*Data);
-
-			// If we changed the velocity, reset the smoothed velocity.
-			// This is not strictly correct but should be close. Worst case would 
-			// be a delay in sleeping after a rewind.
-			if (auto Rigid = Kinematic->CastToRigidParticle())
-			{
-				Rigid->ResetSmoothedVelocities();
-			}
-		}
-
-		if(const auto* Data = KinematicTarget.Read(Manager))
-		{
-			Kinematic->SetKinematicTarget(*Data);
-		}
-	}
-
-	if(const auto* Data = NonFrequentData.Read(Manager))
-	{
-		Particle.SetNonFrequentData(*Data);
-	}
-
-	if(auto Rigid = Particle.CastToRigidParticle())
-	{
-		if(const auto* Data = DynamicsMisc.Read(Manager))
-		{
-			Rigid->SetDynamicMisc(*Data);
-		}
-
-		if(const auto* Data = MassProps.Read(Manager))
-		{
-			Rigid->SetMassProps(*Data);
-		}
-
-		if(Rigid->ResimType() != EResimType::FullResim)
-		{
-			//Not full resim so apply dynamics automatically
-			if(const auto* Data = Dynamics.Read(Manager))
-			{
-				Rigid->SetDynamics(*Data);
-			}
-		}
-	}
-}
-
 bool SimWritablePropsMayChange(const TGeometryParticleHandle<FReal,3>& Handle)
 {
 	const auto ObjectState = Handle.ObjectState();

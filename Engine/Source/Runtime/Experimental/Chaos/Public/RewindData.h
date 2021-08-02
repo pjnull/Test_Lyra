@@ -685,13 +685,6 @@ public:
 
 	void SyncSimWritablePropsFromSim(FDirtyPropData Manager,const TPBDRigidParticleHandle<FReal,3>& Rigid);
 	void SyncDirtyDynamics(FDirtyPropData& DestManager,const FParticleDirtyData& Dirty,const FConstDirtyPropData& SrcManager);
-	
-	template <typename TParticle>
-	void SyncToParticle(TParticle& Particle, const FDirtyPropertiesPool& Manager) const;
-	void SyncPrevFrame(FDirtyPropData& Manager,const FDirtyProxy& Dirty, const FShapeDirtyData* ShapeData);
-	void SyncIfDirty(const FDirtyPropData& Manager,const FGeometryParticleHandle& InParticle,const FGeometryParticleStateBase& RewindState);
-	bool CoalesceState(const FGeometryParticleStateBase& LatestState, FDirtyPropertiesPool& Manager);
-	bool IsDesynced(const FConstDirtyPropData& SrcManager,const TGeometryParticleHandle<FReal,3>& Handle,const FParticleDirtyFlags Flags) const;
 
 private:
 
@@ -717,6 +710,7 @@ public:
 	FGeometryParticleState(const FGeometryParticleHandle& InParticle, const FDirtyPropertiesPool& InPool)
 	: Particle(InParticle)
 	, Pool(InPool)
+	, FrameAndPhase{0,0}
 	{
 	}
 
@@ -873,11 +867,6 @@ public:
 	void SetState(const FGeometryParticleStateBase* InState)
 	{
 		State = InState;
-	}
-
-	bool IsDesynced(const FConstDirtyPropData& SrcManager, const TGeometryParticleHandle<FReal,3>& Handle, const FParticleDirtyFlags Flags) const
-	{
-		return State->IsDesynced(SrcManager,Handle,Flags);
 	}
 
 private:
