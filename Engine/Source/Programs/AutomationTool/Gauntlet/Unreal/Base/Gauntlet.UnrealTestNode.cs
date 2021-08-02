@@ -731,6 +731,14 @@ namespace Gauntlet
 
 			// Launch the test
 			TestInstance = UnrealApp.LaunchSession();
+			// Add info from test context to device usage log
+			foreach(IAppInstance AppInstance in TestInstance.ClientApps)
+			{
+				IDeviceUsageReporter.RecordComment(AppInstance.Device.Name, (UnrealTargetPlatform)AppInstance.Device.Platform, IDeviceUsageReporter.EventType.Device, Context.Options.JobDetails);
+				IDeviceUsageReporter.RecordComment(AppInstance.Device.Name, (UnrealTargetPlatform)AppInstance.Device.Platform, IDeviceUsageReporter.EventType.Test, this.GetType().Name);
+			}
+			
+			
 
 			// track the overall session time
 			if (SessionStartTime == DateTime.MinValue)
