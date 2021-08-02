@@ -51,9 +51,15 @@ namespace UE_NETWORK_PHYSICS
 	NP_DEVCVAR_INT(FixedLocalFrameOffset, -1, "np2.FixedLocalFrameOffset", "When > 0, use hardcoded frame offset on client from head");	
 	NP_DEVCVAR_INT(FixedLocalFrameOffsetTolerance, 3, "np2.FixedLocalFrameOffsetTolerance", "Tolerance when using np2.FixedLocalFrameOffset");
 
-	NP_DEVCVAR_INT(EnableLOD, 0, "np2.EnableLOD", "Enable local LOD mode");
-	NP_DEVCVAR_INT(MinLODForNonLocal, 1, "np2.MinLODForNonLocal", "Force LOD to 1 for actors who are not locally controlled");
-	NP_DEVCVAR_FLOAT(LODDistance, 2400.f, "np2.LODDistance", "Simple distance based LOD");
+	// NOTE: These have temporarily been switched to regular CVar style variables, because the NP_DECVAR_* macros
+	// can only make ECVF_Cheat variables, which cannot be hotfixed with DefaultEngine.ini. Instead they use
+	// ConsoleVariables.ini, which isn't loaded in shipping.
+	int32 EnableLOD=0;
+	FAutoConsoleVariableRef CVarEnableLOD(TEXT("np2.bEnableLOD"), EnableLOD, TEXT("Enable local LOD mode"));
+	int32 MinLODForNonLocal=0;
+	FAutoConsoleVariableRef CVarMinLODForNonLocal(TEXT("np2.MinLODForNonLocal"), MinLODForNonLocal, TEXT("Force LOD to this value for actors who are not locally controlled (0 to skip)"));
+	float LODDistance=2400.f;
+	FAutoConsoleVariableRef CVarLODDistance(TEXT("np2.LODDistance"), LODDistance, TEXT("Simple distance based LOD"));
 
 	NP_DEVCVAR_INT(ResimForSleep, 0, "np2.ResimForSleep", "Triggers resim if only sleep state differs. Otherwise we only match server sleep state if XRVW differ.");
 		
@@ -796,7 +802,7 @@ void UNetworkPhysicsManager::PostNetRecv()
 
 						if (UE_NETWORK_PHYSICS::MinLODForNonLocal != 0)
 						{
-							if (ensure(PhysicsState->OwningActor))
+							if (PhysicsState->OwningActor)
 							{
 								if (PhysicsState->OwningActor->GetLocalRole() == ROLE_SimulatedProxy)
 								{
@@ -820,12 +826,15 @@ void UNetworkPhysicsManager::PostNetRecv()
 						{
 							CreateMarshalledCopy();
 
-							PhysicsState->OwningActor->GetReplicatedMovement_Mutable().bRepPhysics = false;
-							PhysicsState->OwningActor->SetReplicateMovement(false);
+							if (PhysicsState->OwningActor)
+							{
+								PhysicsState->OwningActor->GetReplicatedMovement_Mutable().bRepPhysics = false;
+								PhysicsState->OwningActor->SetReplicateMovement(false);
+							}
 						}
 						else
 						{
-							if (ensure(PhysicsState->OwningActor))
+							if (PhysicsState->OwningActor)
 							{
 								FRepMovement& RepMovement = PhysicsState->OwningActor->GetReplicatedMovement_Mutable();
 								RepMovement.Location = PhysicsState->Physics.Location;
