@@ -24,6 +24,18 @@ public:
 	~FMediaMovieStreamer();
 
 	/**
+	 * If you do not want FMediaMovieStreamer to play automatically,
+	 * but want to control the media yourself, then call this with true.
+	 * 
+	 * This also means that FMediaMovieStreamer will no longer clean up the assets when it is done.
+	 * You will have to call SetMediaPlayer, SetMediaSoundComponent, etc
+	 * with nullptr when you are done so FMediaMovieStreamer will no longer keep its hold on them.
+	 *
+	 * @param bIsMediaControlledExternally True if you want to control the media.
+	 */
+	MEDIAMOVIESTREAMER_API void SetIsMediaControlledExternally(bool bInIsMediaControlledExternally);
+
+	/**
 	 * Sets which media player should be playing.
 	 *
 	 * @param InMediaPlayer
@@ -95,6 +107,9 @@ private:
 
 	/** True if the media is still playing. */
 	bool bIsPlaying;
+
+	/** True if somethiing else is controlling the media. */
+	bool bIsMediaControlledExternally;
 
 	/** Stores the previous time source so we can restore it when we are done. */
 	TSharedPtr<IMediaTimeSource, ESPMode::ThreadSafe> PreviousTimeSource;
