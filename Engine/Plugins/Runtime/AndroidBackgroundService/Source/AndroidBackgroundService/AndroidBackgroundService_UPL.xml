@@ -33,6 +33,29 @@
 		<insertValue value="28"/>
 		<insertNewline/>
 	</minimumSDKAPI>
+
+	<!-- optional additions to proguard -->
+	<proguardAdditions>
+		<insert>
+			# AndroidBackgroundService UPL Additions -- START
+
+			# Android Background Services Classes with native calls ...
+			
+			-keep class com.epicgames.ue4.workmanager.UEWorker {
+			public *;
+			}
+
+			-keep class com.epicgames.ue4.workmanager.UEWorkManagerJavaInterface {
+			public *;
+			}
+
+			-keep class com.epicgames.ue4.workmanager.UEWorkManagerJavaInterface$FWorkRequestParametersJavaInterface {
+			public *;
+			}
+
+			# AndroidBackgroundService UPL Additions -- STOP
+		</insert>
+	</proguardAdditions>
 	
 	<!-- optional additions to the GameActivity class in GameActivity.java -->
 	<gameActivityClassAdditions>

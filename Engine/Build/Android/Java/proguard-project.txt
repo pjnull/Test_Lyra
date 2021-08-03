@@ -101,28 +101,6 @@
 	public *;
 }
 
-#Android Background HTTP Classes with native calls ...
-
--keep class com.epicgames.ue4.download.UEDownloadWorker {
-	public *;
-}
-
--keep class com.epicgames.ue4.workmanager.UEWorker {
-	public *;
-}
-
--keep class com.epicgames.ue4.download.datastructs.DownloadDescription {
-	public *;
-}
-
--keep class com.epicgames.ue4.workmanager.UEWorkManagerJavaInterface {
-	public *;
-}
-
--keep class com.epicgames.ue4.workmanager.UEWorkManagerJavaInterface$FWorkRequestParametersJavaInterface {
-	public *;
-}
-
 # If your project uses WebView with JS, uncomment the following
 # and specify the fully qualified class name to the JavaScript interface
 # class:
