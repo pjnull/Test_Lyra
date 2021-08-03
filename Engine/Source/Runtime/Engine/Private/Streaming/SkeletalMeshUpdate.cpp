@@ -462,7 +462,7 @@ void FSkeletalMeshStreamIn_IO::SetIORequest(const FContext& Context)
 #if USE_BULKDATA_STREAMING_TOKEN
 		FPackagePath PackagePath;
 		EPackageSegment PackageSegment;
-		verify(Mesh->GetMipDataPackagePath(PendingFirstLODIdx, PackagePath, PackageSegment));
+		verify(Mesh->GetMipDataPackagePath(ResourceState.AssetLODBias + PendingFirstLODIdx, PackagePath, PackageSegment));
 #endif	
 
 		SetAsyncFileCallback(Context);

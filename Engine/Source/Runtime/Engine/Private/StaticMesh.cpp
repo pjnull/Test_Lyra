@@ -375,12 +375,7 @@ bool FStaticMeshLODResources::IsLODCookedOut(const ITargetPlatform* TargetPlatfo
 	}
 	check(TargetPlatform);
 
-	static auto* VarMeshStreaming = IConsoleManager::Get().FindConsoleVariable(TEXT("r.MeshStreaming"));
-	const bool bMeshStreamingEnabled = !VarMeshStreaming || VarMeshStreaming->GetInt() != 0;
-
-	// If LOD streaming is supported, LODs below MinLOD are stored to optional paks and thus never cooked out
-	const FStaticMeshLODGroup& LODGroupSettings = TargetPlatform->GetStaticMeshLODSettings().GetLODGroup(StaticMesh->LODGroup);
-	return !bMeshStreamingEnabled || !TargetPlatform->SupportsFeature(ETargetPlatformFeatures::MeshLODStreaming) || StaticMesh->NeverStream || !LODGroupSettings.IsLODStreamingSupported();
+	return !StaticMesh->GetEnableLODStreaming(TargetPlatform);
 #else
 	return false;
 #endif
@@ -396,11 +391,7 @@ bool FStaticMeshLODResources::IsLODInlined(const ITargetPlatform* TargetPlatform
 	}
 	check(TargetPlatform);
 
-	static auto* VarMeshStreaming = IConsoleManager::Get().FindConsoleVariable(TEXT("r.MeshStreaming"));
-	const bool bMeshStreamingEnabled = !VarMeshStreaming || VarMeshStreaming->GetInt() != 0;
-
-	const FStaticMeshLODGroup& LODGroupSettings = TargetPlatform->GetStaticMeshLODSettings().GetLODGroup(StaticMesh->LODGroup);
-	if (!bMeshStreamingEnabled || !TargetPlatform->SupportsFeature(ETargetPlatformFeatures::MeshLODStreaming) || StaticMesh->NeverStream || !LODGroupSettings.IsLODStreamingSupported())
+	if (!StaticMesh->GetEnableLODStreaming(TargetPlatform))
 	{
 		return true;
 	}
@@ -418,6 +409,7 @@ bool FStaticMeshLODResources::IsLODInlined(const ITargetPlatform* TargetPlatform
 	}
 	else
 	{
+		const FStaticMeshLODGroup& LODGroupSettings = TargetPlatform->GetStaticMeshLODSettings().GetLODGroup(StaticMesh->LODGroup);
 		MaxNumStreamedLODs = LODGroupSettings.GetDefaultMaxNumStreamedLODs();
 	}
 	
@@ -2253,6 +2245,31 @@ FMeshReductionSettings UStaticMesh::GetReductionSettings(int32 LODIndex) const
 	return SMLODGroup.GetSettings(SrcModel.ReductionSettings, LODIndex);
 }
 
+bool UStaticMesh::GetEnableLODStreaming(const ITargetPlatform* TargetPlatform) const
+{
+	if (NeverStream)
+	{
+		return false;
+	}
+
+	static auto* VarMeshStreaming = IConsoleManager::Get().FindConsoleVariable(TEXT("r.MeshStreaming"));
+	if (VarMeshStreaming && VarMeshStreaming->GetInt() == 0)
+	{
+		return false;
+
+	}
+
+	check(TargetPlatform);
+	// Check whether the target platforms supports LOD streaming. 
+	// Even if it does, disable streaming if it has editor only data since most tools don't support mesh streaming.
+	if (!TargetPlatform->SupportsFeature(ETargetPlatformFeatures::MeshLODStreaming) || TargetPlatform->HasEditorOnlyData())
+	{
+		return false;
+	}
+
+	const FStaticMeshLODGroup& LODGroupSettings = TargetPlatform->GetStaticMeshLODSettings().GetLODGroup(LODGroup);
+	return LODGroupSettings.IsLODStreamingSupported();
+}
 
 void UStaticMesh::PostDuplicate(bool bDuplicateForPIE)
 {
@@ -2460,7 +2477,7 @@ static FString BuildStaticMeshDerivedDataKeySuffix(const ITargetPlatform* Target
 	}
 
 	// Mesh LOD streaming settings that need to trigger recache when changed
-	const bool bAllowLODStreaming = TargetPlatform->SupportsFeature(ETargetPlatformFeatures::MeshLODStreaming) && LODGroup.IsLODStreamingSupported();
+	const bool bAllowLODStreaming = Mesh->GetEnableLODStreaming(TargetPlatform);
 	KeySuffix += bAllowLODStreaming ? TEXT("LS1") : TEXT("LS0");
 	KeySuffix += TEXT("MNS");
 	if (bAllowLODStreaming)

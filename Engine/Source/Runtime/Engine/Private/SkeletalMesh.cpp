@@ -968,6 +968,12 @@ void USkeletalMesh::InitResources()
 
 		SkelMeshRenderData->InitResources(GetHasVertexColors(), GetMorphTargets(), this);
 		CachedSRRState.bHasPendingInitHint = true;
+
+		// For now in the editor force all LODs to stream to make sure tools have all LODs available
+		if (GIsEditor && CachedSRRState.bSupportsStreaming)
+		{
+			bForceMiplevelsToBeResident = true;
+		}
 	}
 
 	LinkStreaming();
@@ -1232,7 +1238,8 @@ bool USkeletalMesh::StreamIn(int32 NewMipCount, bool bHighPrio)
 	if (!HasPendingInitOrStreaming() && CachedSRRState.StreamIn(NewMipCount))
 	{
 #if WITH_EDITOR
-		if (FPlatformProperties::HasEditorOnlyData())
+		// If editor data is available for the current platform, and the package isn't actually cooked.
+		if (FPlatformProperties::HasEditorOnlyData() && !GetOutermost()->bIsCookedForEditor)
 		{
 			if (GRHISupportsAsyncTextureCreation)
 			{
@@ -5206,13 +5213,28 @@ void USkeletalMesh::ResetLODInfo()
 }
 
 #if WITH_EDITOR
-bool USkeletalMesh::GetSupportsLODStreaming(const ITargetPlatform* TargetPlatform) const
+bool USkeletalMesh::GetEnableLODStreaming(const ITargetPlatform* TargetPlatform) const
 {
-	check(TargetPlatform);
 	if (NeverStream)
 	{
 		return false;
 	}
+
+	static auto* VarMeshStreaming = IConsoleManager::Get().FindConsoleVariable(TEXT("r.MeshStreaming"));
+	if (VarMeshStreaming && VarMeshStreaming->GetInt() == 0)
+	{
+		return false;
+
+	}
+
+	check(TargetPlatform);
+	// Check whether the target platforms support LOD streaming. 
+	// Even if it does, disable streaming if it has editor only data since most tools don't support mesh streaming.
+	if (!TargetPlatform->SupportsFeature(ETargetPlatformFeatures::MeshLODStreaming) || TargetPlatform->HasEditorOnlyData())
+	{
+		return false;
+	}
+
 	if (GetOverrideLODStreamingSettings())
 	{
 		return GetSupportLODStreaming().GetValueForPlatform(*TargetPlatform->IniPlatformName());
