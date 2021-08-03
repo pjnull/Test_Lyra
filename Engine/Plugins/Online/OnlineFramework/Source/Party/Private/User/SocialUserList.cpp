@@ -655,6 +655,7 @@ void FSocialUserList::HandlePartyJoined(USocialParty& Party)
 	{
 		if (PartyMember)
 		{
+			PartyMember->OnLeftParty().AddSP(this, &FSocialUserList::HandlePartyMemberLeft, PartyMember, true);
 			MarkPartyMemberAsDirty(*PartyMember);
 		}
 	}
@@ -689,6 +690,7 @@ void FSocialUserList::HandlePartyMemberLeft(EMemberExitedReason Reason, UPartyMe
 {
 	if (ensure(Member))
 	{
+		Member->OnLeftParty().RemoveAll(this);
 		MarkPartyMemberAsDirty(*Member);
 
 		if (bUpdateNow)
