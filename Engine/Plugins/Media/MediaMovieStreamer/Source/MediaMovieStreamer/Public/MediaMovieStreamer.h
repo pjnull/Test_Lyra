@@ -10,6 +10,7 @@ DECLARE_LOG_CATEGORY_EXTERN(LogMediaMovieStreamer, Log, All);
 class IMediaModule;
 class IMediaTimeSource;
 class UMediaPlayer;
+class UMediaSoundComponent;
 class UMediaSource;
 class UMediaTexture;
 
@@ -28,6 +29,13 @@ public:
 	 * @param InMediaPlayer
 	 */
 	MEDIAMOVIESTREAMER_API void SetMediaPlayer(UMediaPlayer* InMediaPlayer);
+
+	/**
+	 * Sets what media sound component we are using.
+	 *
+	 * @param InMediaSoundComponent Media sound component that is being used.
+	 */
+	MEDIAMOVIESTREAMER_API void SetMediaSoundComponent(UMediaSoundComponent* InMediaSoundComponent);
 
 	/**
 	 * Sets what to play.
@@ -75,6 +83,8 @@ private:
 
 	/** Holds the player we are using. */
 	TWeakObjectPtr<UMediaPlayer> MediaPlayer;
+	/** Holds the media sound component we are using. */
+	TWeakObjectPtr<UMediaSoundComponent> MediaSoundComponent;
 	/** Holds the media source we are using. */
 	TWeakObjectPtr<UMediaSource> MediaSource;
 	/** Holds the media texture we are using. */

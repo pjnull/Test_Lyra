@@ -7,6 +7,7 @@
 #include "MediaMovieStreamerModule.h"
 #include "MediaMovieTimeSource.h"
 #include "MediaPlayer.h"
+#include "MediaSoundComponent.h"
 #include "MediaSource.h"
 #include "MediaTexture.h"
 
@@ -36,6 +37,18 @@ void FMediaMovieStreamer::SetMediaPlayer(UMediaPlayer* InMediaPlayer)
 	}
 
 	MediaPlayer = InMediaPlayer;
+}
+
+void FMediaMovieStreamer::SetMediaSoundComponent(UMediaSoundComponent* InMediaSoundComponent)
+{
+	// Tell MovieAssets about this so it does not get garbage collected.
+	UMediaMovieAssets* MovieAssets = FMediaMovieStreamerModule::GetMovieAssets();
+	if (MovieAssets != nullptr)
+	{
+		MovieAssets->SetMediaSoundComponent(InMediaSoundComponent);
+	}
+
+	MediaSoundComponent = InMediaSoundComponent;
 }
 
 void FMediaMovieStreamer::SetMediaSource(UMediaSource* InMediaSource)
@@ -161,10 +174,12 @@ void FMediaMovieStreamer::Cleanup()
 	if (MovieAssets != nullptr)
 	{
 		MovieAssets->SetMediaPlayer(nullptr, nullptr);
+		MovieAssets->SetMediaSoundComponent(nullptr);
 		MovieAssets->SetMediaSource(nullptr);
 	}
 
 	MediaPlayer.Reset();
+	MediaSoundComponent.Reset();
 	MediaSource.Reset();
 
 	MovieViewport->SetTexture(NULL);
