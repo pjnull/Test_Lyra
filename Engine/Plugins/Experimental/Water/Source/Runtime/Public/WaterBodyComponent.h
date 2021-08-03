@@ -276,6 +276,10 @@ public:
 
 	virtual ALandscapeProxy* FindLandscape() const;
 
+	/** Returns what can be considered the single base Z of the water surface.
+	Doesn't really make sense for non-flat water bodies like EWaterBodyType::Transition or EWaterBodyType::River but can still be useful when using FixedZ for post-process, for example. */
+	virtual float GetConstantSurfaceZ() const;
+
 	virtual void Reset() {}
 protected:
 
@@ -298,10 +302,6 @@ protected:
 	virtual void UpdateWaterBody(bool bWithExclusionVolumes);
 
 	virtual void OnUpdateBody(bool bWithExclusionVolumes) {}
-
-	/** Returns what can be considered the single base Z of the water surface.
-		Doesn't really make sense for non-flat water bodies like EWaterBodyType::Transition or EWaterBodyType::River but can still be useful when using FixedZ for post-process, for example. */
-	virtual float GetConstantSurfaceZ() const;
 
 	/** Returns what can be considered the single water depth of the water surface.
 	Only really make sense for EWaterBodyType::Transition water bodies for which we don't really have a way to evaluate depth. */
