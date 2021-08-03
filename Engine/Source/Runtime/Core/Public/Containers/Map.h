@@ -1229,13 +1229,30 @@ public:
 	{
 		const FSetElementId PairId = Super::Pairs.FindId(Key);
 		if (!PairId.IsValidId())
+		{
 			return false;
+		}
 
 		OutRemovedValue = MoveTempIfPossible(Super::Pairs[PairId].Value);
 		Super::Pairs.Remove(PairId);
 		return true;
 	}
 	
+	/** See RemoveAndCopyValue() and class documentation section on ByHash() functions */
+	template<typename ComparableKey>
+	FORCEINLINE bool RemoveAndCopyValueByHash(uint32 KeyHash, const ComparableKey& Key, ValueType& OutRemovedValue)
+	{
+		const FSetElementId PairId = Super::Pairs.FindIdByHash(KeyHash, Key);
+		if (!PairId.IsValidId())
+		{
+			return false;
+		}
+
+		OutRemovedValue = MoveTempIfPossible(Super::Pairs[PairId].Value);
+		Super::Pairs.Remove(PairId);
+		return true;
+	}
+
 	/**
 	 * Find a pair with the specified key, removes it from the map, and returns the value part of the pair.
 	 *
