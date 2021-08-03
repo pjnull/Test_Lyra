@@ -5404,3 +5404,11 @@ bool UDemoNetDriver::ShouldForwardFunction(AActor* Actor, UFunction* Function, v
 	// currently no need to forward replay playback RPCs on to other drivers
 	return false;
 }
+
+void UDemoNetDriver::RequestCheckpoint()
+{
+	if (IsRecording())
+	{
+		ReplayHelper.RequestCheckpoint();
+	}
+}

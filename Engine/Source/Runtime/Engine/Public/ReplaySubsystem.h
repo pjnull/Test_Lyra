@@ -94,6 +94,12 @@ public:
 	void SetCheckpointSaveMaxMSPerFrame(const float InCheckpointSaveMaxMSPerFrame);
 
 	/**
+	 * Request a checkpoint write, if currently recording.
+	 *
+	*/
+	void RequestCheckpoint();
+
+	/**
 	 * Whether to reload the default map when StopReplay is called.
 	 */
 	UPROPERTY(EditAnywhere, Category=Replay)

@@ -4209,6 +4209,23 @@ bool UWorld::HandleDemoSpeedCommand(const TCHAR* Cmd, FOutputDevice& Ar, UWorld*
 	return true;
 }
 
+bool UWorld::HandleDemoCheckpointCommand(const TCHAR* Cmd, FOutputDevice& Ar, UWorld* InWorld)
+{
+	const UGameInstance* GameInst = GetGameInstance();
+	UReplaySubsystem* ReplaySubsystem = GameInst ? GameInst->GetSubsystem<UReplaySubsystem>() : nullptr;
+
+	if (ReplaySubsystem)
+	{
+		ReplaySubsystem->RequestCheckpoint();
+	}
+	else
+	{
+		Ar.Log(TEXT("Unable to get the replay subsystem."));
+	}
+
+	return true;
+}
+
 bool UWorld::Exec( UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar )
 {
 #if !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
@@ -4254,6 +4271,10 @@ bool UWorld::Exec( UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar )
 	else if (FParse::Command(&Cmd, TEXT("DEMOSPEED")))
 	{
 		return HandleDemoSpeedCommand(Cmd, Ar, InWorld);
+	}
+	else if (FParse::Command(&Cmd, TEXT("DEMOCHECKPOINT")))
+	{
+		return HandleDemoCheckpointCommand(Cmd, Ar, InWorld);
 	}
 	else if(FPhysicsInterface::ExecPhysCommands( Cmd, &Ar, InWorld ) )
 	{

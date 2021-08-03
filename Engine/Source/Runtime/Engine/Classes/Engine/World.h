@@ -3145,6 +3145,9 @@ private:
 	/** Utility function to handle Exec/Console Command for setting the speed of a replay */
 	bool HandleDemoSpeedCommand(const TCHAR* Cmd, FOutputDevice& Ar, UWorld* InWorld);
 
+	/** Utility function to handle Exec/Console Command for requesting a replay checkpoint */
+	bool HandleDemoCheckpointCommand(const TCHAR* Cmd, FOutputDevice& Ar, UWorld* InWorld);
+
 public:
 
 	// Destroys the current demo net driver

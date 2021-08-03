@@ -336,6 +336,8 @@ public:
 	bool IsRecordingMapChanges() const { return ReplayHelper.bRecordMapChanges; }
 	PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
+	void RequestCheckpoint();
+
 private:
 	struct FDemoActorPriority
 	{
