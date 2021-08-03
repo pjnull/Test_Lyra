@@ -4461,7 +4461,7 @@ void APlayerController::GetLifetimeReplicatedProps(TArray< FLifetimeProperty > &
 
 void APlayerController::SetPlayer( UPlayer* InPlayer )
 {
-	FMoviePlayerProxy::BlockingStarted();
+	FMoviePlayerProxyBlock MoviePlayerBlock;
 
 	check(InPlayer!=NULL);
 
@@ -4512,8 +4512,6 @@ void APlayerController::SetPlayer( UPlayer* InPlayer )
 
 	// notify script that we've been assigned a valid player
 	ReceivedPlayer();
-
-	FMoviePlayerProxy::BlockingFinished();
 }
 
 ULocalPlayer* APlayerController::GetLocalPlayer() const
