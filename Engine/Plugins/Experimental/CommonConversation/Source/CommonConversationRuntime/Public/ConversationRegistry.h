@@ -79,6 +79,7 @@ public:
 
 	/** UWorldSubsystem Begin */
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+	virtual void Deinitialize() override;
 	/** UWorldSubsystem End */
 
 	UConversationNode* GetRuntimeNodeFromGUID(const FGuid& NodeGUID) const;

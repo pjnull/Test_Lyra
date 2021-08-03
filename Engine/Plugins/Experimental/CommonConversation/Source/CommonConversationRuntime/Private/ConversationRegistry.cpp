@@ -158,6 +158,14 @@ void UConversationRegistry::Initialize(FSubsystemCollectionBase& Collection)
 	UGameFeaturesSubsystem::Get().AddObserver(this);
 }
 
+void UConversationRegistry::Deinitialize()
+{
+	Super::Deinitialize();
+	if (GEngine->GetEngineSubsystem<UGameFeaturesSubsystem>()) 
+	{
+		UGameFeaturesSubsystem::Get().RemoveObserver(this);
+	}
+}
 
 void UConversationRegistry::GameFeatureStateModified()
 {
