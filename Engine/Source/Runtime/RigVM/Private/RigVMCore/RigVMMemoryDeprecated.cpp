@@ -1930,7 +1930,7 @@ void FRigVMMemoryContainer::UpdateRegisters()
 			if (ensure(Data.IsValidIndex(Register.GetWorkByteIndex())))
 			{
 				uint8* Pointer = (uint8*)(&(Data[Register.GetWorkByteIndex()]));
-
+			
 				if (Register.AlignmentBytes > 0)
 				{
 					if (!IsAligned(Pointer, Alignment))
