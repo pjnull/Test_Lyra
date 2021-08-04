@@ -12,6 +12,8 @@
 
 #include "TextureShareCoreContainers.h"
 
+#include "Blueprints/TextureShareContainers.h"
+
 #include "TextureShareStrings.h"
 
 FTextureShareModule::FTextureShareModule()
@@ -87,7 +89,7 @@ bool FTextureShareModule::LinkSceneContextToShare(const TSharedPtr<ITextureShare
 	return false;
 }
 
-bool FTextureShareModule::SetBackbufferRect(int StereoscopicPass, FIntRect* BackbufferRect)
+bool FTextureShareModule::SetBackbufferRect(int StereoscopicPass, const FIntRect* BackbufferRect)
 {
 	if (BackbufferRect == nullptr)
 	{
@@ -161,6 +163,8 @@ void FTextureShareModule::OnResolvedSceneColor_RenderThread(FRDGBuilder& GraphBu
 {
 	FScopeLock lock(&DataGuard);
 
+	if (ViewFamily.Views.Num() > 0)
+	{
 	EStereoscopicPass StereoscopicPass = ViewFamily.Views[0]->StereoPass;
 	// Send SceneContext callback for all registered shares:
 	for (auto& It : TextureShareSceneContextCallback)
@@ -171,11 +175,14 @@ void FTextureShareModule::OnResolvedSceneColor_RenderThread(FRDGBuilder& GraphBu
 		}
 	}
 }
+}
 
 void FTextureShareModule::OnPostRenderViewFamily_RenderThread(FRHICommandListImmediate& RHICmdList, class FSceneViewFamily& ViewFamily)
 {
 	FScopeLock lock(&DataGuard);
 	
+	if (ViewFamily.Views.Num() > 0)
+	{
 	EStereoscopicPass StereoscopicPass = ViewFamily.Views[0]->StereoPass;
 	// Send PostRender callback for all registered shares:
 	for (auto& It : TextureShareSceneContextCallback)
@@ -185,6 +192,7 @@ void FTextureShareModule::OnPostRenderViewFamily_RenderThread(FRHICommandListImm
 			SendPostRender_RenderThread(RHICmdList, It.Key, ViewFamily);
 		}
 	}
+}
 }
 
 bool FTextureShareModule::RegisterTexture(const TSharedPtr<ITextureShareItem>& ShareItem, const FString& InTextureName, const FIntPoint& InSize, EPixelFormat InFormat, ETextureShareSurfaceOp OperationType)
@@ -231,9 +239,12 @@ bool FTextureShareModule::SendSceneContext_RenderThread(FRDGBuilder& GraphBuilde
 #if WITH_MGPU
 			if (ViewFamily.bMultiGPUForkAndJoin)
 			{
+				if (ViewFamily.Views.Num() > 0)
+				{
 				// Setup GPU index for all shared scene textures
 				const FSceneView* SceneView = ViewFamily.Views[0];
 				ShareItem->SetDefaultGPUIndex(SceneView->GPUMask.GetFirstIndex());
+			}
 			}
 #endif
 
@@ -283,7 +294,7 @@ bool FTextureShareModule::SendPostRender_RenderThread(FRHICommandListImmediate& 
 	TSharedPtr<ITextureShareItem> ShareItem;
 	if (ShareCoreAPI.GetTextureShareItem(ShareName, ShareItem) && ShareItem.IsValid() && ShareItem->IsValid() && ShareItem->IsLocalFrameLocked())
 	{
-		if (ViewFamily.RenderTarget)
+		if (ViewFamily.RenderTarget && ViewFamily.Views.Num() > 0)
 		{
 			// Get backbuffer texture
 			FTexture2DRHIRef BackBufferTexture = ViewFamily.RenderTarget->GetRenderTargetTexture();
@@ -379,6 +390,11 @@ bool FTextureShareModule::ReadFromShare_RenderThread(FRHICommandListImmediate& R
 		}
 	}
 	return bResult;
+}
+
+void FTextureShareModule::CastTextureShareBPSyncPolicy(const FTextureShareBPSyncPolicy& InSyncPolicy, FTextureShareSyncPolicy& OutSyncPolicy)
+{
+	OutSyncPolicy = *InSyncPolicy;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
