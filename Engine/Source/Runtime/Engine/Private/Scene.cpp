@@ -117,6 +117,7 @@ void FConvolutionBloomSettings::ExportToPostProcessSettings(FPostProcessSettings
 {
 	OutPostProcessSettings->bOverride_BloomConvolutionTexture = true;
 	OutPostProcessSettings->bOverride_BloomConvolutionSize = true;
+	OutPostProcessSettings->bOverride_BloomConvolutionScatterDispersion = true;
 	OutPostProcessSettings->bOverride_BloomConvolutionCenterUV = true;
 	OutPostProcessSettings->bOverride_BloomConvolutionPreFilterMin = true;
 	OutPostProcessSettings->bOverride_BloomConvolutionPreFilterMax = true;
@@ -125,6 +126,7 @@ void FConvolutionBloomSettings::ExportToPostProcessSettings(FPostProcessSettings
 
 	OutPostProcessSettings->BloomConvolutionTexture = Texture;
 	OutPostProcessSettings->BloomConvolutionSize = Size;
+	OutPostProcessSettings->BloomConvolutionScatterDispersion = ScatterDispersion;
 	OutPostProcessSettings->BloomConvolutionCenterUV = CenterUV;
 	OutPostProcessSettings->BloomConvolutionPreFilterMin = PreFilterMin;
 	OutPostProcessSettings->BloomConvolutionPreFilterMax = PreFilterMax;
@@ -305,6 +307,7 @@ static void DoPostProcessSettingsSanityCheck()
 
 		RenameMap.Add(TEXT("BloomConvolutionTexture"), TEXT(""));
 		RenameMap.Add(TEXT("BloomConvolutionSize"), TEXT(""));
+		RenameMap.Add(TEXT("BloomConvolutionScatterDispersion"), TEXT(""));
 		RenameMap.Add(TEXT("BloomConvolutionCenterUV"), TEXT(""));
 		RenameMap.Add(TEXT("BloomConvolutionPreFilterMin"), TEXT(""));
 		RenameMap.Add(TEXT("BloomConvolutionPreFilterMax"), TEXT(""));
@@ -450,6 +453,7 @@ FPostProcessSettings::FPostProcessSettings()
 	Bloom5Size = 30.0f;
 	Bloom6Tint = FLinearColor(0.061f, 0.061f, 0.061f);
 	Bloom6Size = 64.0f;
+	BloomConvolutionScatterDispersion = 1.f;
 	BloomConvolutionSize = 1.f;
 	BloomConvolutionCenterUV = FVector2D(0.5f, 0.5f);
 #if WITH_EDITORONLY_DATA
@@ -686,6 +690,7 @@ FPostProcessSettings::FPostProcessSettings(const FPostProcessSettings& Settings)
 	, bOverride_Bloom6Size(Settings.bOverride_Bloom6Size)
 	, bOverride_BloomSizeScale(Settings.bOverride_BloomSizeScale)
 	, bOverride_BloomConvolutionTexture(Settings.bOverride_BloomConvolutionTexture)
+	, bOverride_BloomConvolutionScatterDispersion(Settings.bOverride_BloomConvolutionScatterDispersion)
 	, bOverride_BloomConvolutionSize(Settings.bOverride_BloomConvolutionSize)
 	, bOverride_BloomConvolutionCenterUV(Settings.bOverride_BloomConvolutionCenterUV)
 	//, bOverride_BloomConvolutionPreFilter_DEPRECATED(Settings.bOverride_BloomConvolutionPreFilter_DEPRECATED)
@@ -865,6 +870,7 @@ FPostProcessSettings::FPostProcessSettings(const FPostProcessSettings& Settings)
 	, Bloom4Tint(Settings.Bloom4Tint)
 	, Bloom5Tint(Settings.Bloom5Tint)
 	, Bloom6Tint(Settings.Bloom6Tint)
+	, BloomConvolutionScatterDispersion(Settings.BloomConvolutionScatterDispersion)
 	, BloomConvolutionSize(Settings.BloomConvolutionSize)
 	, BloomConvolutionTexture(Settings.BloomConvolutionTexture)
 	, BloomConvolutionCenterUV(Settings.BloomConvolutionCenterUV)
