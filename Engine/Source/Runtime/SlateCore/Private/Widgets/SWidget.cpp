@@ -1419,6 +1419,11 @@ int32 SWidget::Paint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, 
 		MutableThis->Tick(DesktopSpaceGeometry, Args.GetCurrentTime(), Args.GetDeltaTime());
 	}
 
+	if (HasRegisteredSlateAttribute() && IsAttributesUpdatesEnabled())
+	{
+		FSlateAttributeMetaData::ApplyDelayedInvalidation(*MutableThis);
+	}
+
 	// the rule our parent has set for us
 	const bool bInheritedHittestability = Args.GetInheritedHittestability();
 	const bool bOutgoingHittestability = bInheritedHittestability && GetVisibility().AreChildrenHitTestVisible();
@@ -1463,9 +1468,10 @@ int32 SWidget::Paint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, 
 	UpdatedArgs.SetInheritedHittestability(bOutgoingHittestability);
 
 #if WITH_SLATE_DEBUGGING
-	if (FastPathProxyHandle.IsValid(this) && PersistentState.CachedElementHandle.IsValid())
+	if (FastPathProxyHandle.IsValid(this) && PersistentState.CachedElementHandle.HasCachedElements())
 	{
-		ensure(FastPathProxyHandle.GetProxy().Visibility.IsVisible());
+		ensureMsgf(FastPathProxyHandle.GetProxy().Visibility.IsVisible()
+			, TEXT("The widget '%s' is collapsed or not visible. It should not have Cached Element."), *FReflectionMetaData::GetWidgetDebugInfo(this));
 	}
 #endif
 

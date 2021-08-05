@@ -273,9 +273,9 @@ void FSlateInvalidationRoot::InvalidateWidget(FWidgetProxy& Proxy, EInvalidateWi
 
 	if (bProcessingAttributeUpdate)
 	{
-		if (EnumHasAnyFlags(InvalidateReason, EInvalidateWidgetReason::AttributeRegistration | EInvalidateWidgetReason::ChildOrder | EInvalidateWidgetReason::Visibility))
+		if (ensureMsgf(FSlateAttributeBase::IsInvalidateWidgetReasonSupported(InvalidateReason)
+			, TEXT("An invalid invalidation occurred while processing the widget attributes. That may result in an infinit loop.")))
 		{
-			ensureMsgf(false, TEXT("An invalid invalidation occurred while processing the widget attributes. That may result in an infinit loop."));
 			return;
 		}
 	}
