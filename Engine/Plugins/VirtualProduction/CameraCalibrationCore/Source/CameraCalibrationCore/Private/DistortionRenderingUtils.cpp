@@ -66,14 +66,14 @@ namespace DistortionRenderingUtils
 				const uint32 BufferSize = sizeof(FVector2D) * NumPoints;
 
 				// Create an SRV for the input buffer of image points
-				FRHIResourceCreateInfo CreateInfo(&InputPointsResourceArray);
-				FStructuredBufferRHIRef InputPointsBuffer = RHICreateStructuredBuffer(sizeof(FVector2D), BufferSize, BUF_Static | BUF_ShaderResource, CreateInfo);
+				FRHIResourceCreateInfo CreateInfo(TEXT("ImagePointsInitialData"), &InputPointsResourceArray);
+				FBufferRHIRef InputPointsBuffer = RHICreateStructuredBuffer(sizeof(FVector2D), BufferSize, BUF_Static | BUF_ShaderResource, CreateInfo);
 				FShaderResourceViewRHIRef InputPointsSRV = RHICreateShaderResourceView(InputPointsBuffer);
 				Parameters.InputPoints = InputPointsSRV;
 
 				// Create a RWBuffer to use as a UAV for the output buffer of undistorted points
 				FRWBuffer UndistortedPointsBuffer;
-				UndistortedPointsBuffer.Initialize(sizeof(FVector2D), NumPoints, PF_G32R32F, ERHIAccess::UAVCompute, BUF_SourceCopy | BUF_UnorderedAccess, TEXT("UndistortedPoints"), &EmptyBuffer);
+				UndistortedPointsBuffer.Initialize(TEXT("UndistortedPointsBuffer"), sizeof(FVector2D), NumPoints, PF_G32R32F, ERHIAccess::UAVCompute, BUF_SourceCopy | BUF_UnorderedAccess, &EmptyBuffer);
 				Parameters.UndistortedPoints = UndistortedPointsBuffer.UAV;
 
 				// Dispatch compute shader
