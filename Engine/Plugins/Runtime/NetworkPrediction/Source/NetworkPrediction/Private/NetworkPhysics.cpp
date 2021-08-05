@@ -380,12 +380,15 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 
 				// TODO: This nullcheck is to avoid null access crash in Editor Tests.
 				// Should re-evaluate whether/why this is occurring in the first place.
-				if (CorrectionState.Proxy)
+				if (ensure(CorrectionState.Proxy))
 				{
 					if (auto* PT = CorrectionState.Proxy->GetPhysicsThreadAPI())
 					{
 						UE_CLOG(UE_NETWORK_PHYSICS::LogCorrections > 0, LogNetworkPhysics, Log, TEXT("Applying Correction from frame %d (actual step: %d). Location: %s"), CorrectionState.Frame, PhysicsStep, *FVector(CorrectionState.Physics.Location).ToString());
 
+						npEnsure(CorrectionState.Physics.Location.ContainsNaN() == false);
+						npEnsure(CorrectionState.Physics.LinearVelocity.ContainsNaN() == false);
+						npEnsure(CorrectionState.Physics.AngularVelocity.ContainsNaN() == false);
 						PT->SetX(CorrectionState.Physics.Location, false);
 						PT->SetV(CorrectionState.Physics.LinearVelocity, false);
 						PT->SetR(CorrectionState.Physics.Rotation, false);
@@ -657,15 +660,19 @@ void UNetworkPhysicsManager::OnWorldPostInit(UWorld* World, const UWorld::Initia
 			const IConsoleVariable* NumFramesCVar = IConsoleManager::Get().FindConsoleVariable(TEXT("p.RewindCaptureNumFrames"));
 			if (ensure(NumFramesCVar))
 			{
-				NumFrames = NumFramesCVar->GetInt();
+				// 1 frame is required to enable rewind capture. 
+				NumFrames = FMath::Max<int32>(1, NumFramesCVar->GetInt());
 			}
 
-			Solver->EnableRewindCapture(NumFrames, true, MakeUnique<FNetworkPhysicsRewindCallback>());
-			RewindCallback = static_cast<FNetworkPhysicsRewindCallback*>(Solver->GetRewindCallback());
-			RewindCallback->RewindData = Solver->GetRewindData();
-			RewindCallback->Solver = Solver;
-			RewindCallback->World = World;
-			RewindCallback->NetworkPhysicsManager = this;
+			if (ensure(NumFrames > 0))
+			{
+				Solver->EnableRewindCapture(NumFrames, true, MakeUnique<FNetworkPhysicsRewindCallback>());
+				RewindCallback = static_cast<FNetworkPhysicsRewindCallback*>(Solver->GetRewindCallback());
+				RewindCallback->RewindData = Solver->GetRewindData();
+				RewindCallback->Solver = Solver;
+				RewindCallback->World = World;
+				RewindCallback->NetworkPhysicsManager = this;
+			}
 		}
 	}
 #endif
@@ -1009,7 +1016,7 @@ void UNetworkPhysicsManager::ProcessInputs_External(int32 PhysicsStep, const TAr
 	}
 
 	// ----------------------------------------------------------------------
-	//	Call into Subsystems. This is where they will marshall input to the PT
+	//	Call into Subsystems. This is where they will marshal input to the PT
 	// ----------------------------------------------------------------------
 
 	bool bOutSentClientInput = false;
