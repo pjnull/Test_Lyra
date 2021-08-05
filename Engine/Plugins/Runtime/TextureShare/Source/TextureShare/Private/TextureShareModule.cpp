@@ -165,13 +165,15 @@ void FTextureShareModule::OnResolvedSceneColor_RenderThread(FRDGBuilder& GraphBu
 
 	if (ViewFamily.Views.Num() > 0)
 	{
-	EStereoscopicPass StereoscopicPass = ViewFamily.Views[0]->StereoPass;
-	// Send SceneContext callback for all registered shares:
-	for (auto& It : TextureShareSceneContextCallback)
 	{
-		if (It.Value == (int)StereoscopicPass)
+		EStereoscopicPass StereoscopicPass = ViewFamily.Views[0]->StereoPass;
+		// Send SceneContext callback for all registered shares:
+		for (auto& It : TextureShareSceneContextCallback)
 		{
-			SendSceneContext_RenderThread(GraphBuilder, It.Key, SceneTextures, ViewFamily);
+			if (It.Value == (int)StereoscopicPass)
+			{
+				SendSceneContext_RenderThread(GraphBuilder, It.Key, SceneTextures, ViewFamily);
+			}
 		}
 	}
 }
@@ -183,13 +185,15 @@ void FTextureShareModule::OnPostRenderViewFamily_RenderThread(FRHICommandListImm
 	
 	if (ViewFamily.Views.Num() > 0)
 	{
-	EStereoscopicPass StereoscopicPass = ViewFamily.Views[0]->StereoPass;
-	// Send PostRender callback for all registered shares:
-	for (auto& It : TextureShareSceneContextCallback)
 	{
-		if (It.Value == (int)StereoscopicPass)
+		EStereoscopicPass StereoscopicPass = ViewFamily.Views[0]->StereoPass;
+		// Send PostRender callback for all registered shares:
+		for (auto& It : TextureShareSceneContextCallback)
 		{
-			SendPostRender_RenderThread(RHICmdList, It.Key, ViewFamily);
+			if (It.Value == (int)StereoscopicPass)
+			{
+				SendPostRender_RenderThread(RHICmdList, It.Key, ViewFamily);
+			}
 		}
 	}
 }
@@ -241,9 +245,10 @@ bool FTextureShareModule::SendSceneContext_RenderThread(FRDGBuilder& GraphBuilde
 			{
 				if (ViewFamily.Views.Num() > 0)
 				{
-				// Setup GPU index for all shared scene textures
-				const FSceneView* SceneView = ViewFamily.Views[0];
-				ShareItem->SetDefaultGPUIndex(SceneView->GPUMask.GetFirstIndex());
+					// Setup GPU index for all shared scene textures
+					const FSceneView* SceneView = ViewFamily.Views[0];
+					ShareItem->SetDefaultGPUIndex(SceneView->GPUMask.GetFirstIndex());
+				}
 			}
 			}
 #endif
@@ -388,7 +393,7 @@ bool FTextureShareModule::ReadFromShare_RenderThread(FRHICommandListImmediate& R
 			bResult = FTextureShareRHI::ReadFromShareTexture_RenderThread(RHICmdList, SharedRHITexture, DstTexture, DstTextureRect, bIsFormatResampleRequired);
 			ShareItem->UnlockTexture_RenderThread(TextureName);
 		}
-	}
+	} 
 	return bResult;
 }
 

@@ -31,22 +31,26 @@ public class DisplayCluster : ModuleRules
 			});
 		}
 
-		PrivateDependencyModuleNames.AddRange(
 			new string[] {
-				"HeadMountedDisplay",
-				"InputCore",
-				"Json",
-				"JsonUtilities",
-				"Networking",
-				"OpenColorIO",
-				"Renderer",
-				"RenderCore",
-				"RHI",
-				"RHICore",
-				"Slate",
-				"SlateCore",
-				"Sockets",
+				"TextureShare"
 			});
+		}
+
+		PrivateDependencyModuleNames.AddRange(
+		new string[] {
+			"HeadMountedDisplay",
+			"InputCore",
+			"Json",
+			"JsonUtilities",
+			"Networking",
+			"OpenColorIO",
+			"Renderer",
+			"RenderCore",
+			"RHI",
+			"Slate",
+			"SlateCore",
+			"Sockets",
+		});
 
 		if (Target.bBuildEditor == true)
 		{
