@@ -344,9 +344,9 @@ void UNiagaraDataInterfaceActorComponent::VMGetMatrix(FVectorVMExternalFunctionC
 
 	VectorVM::FUserPtrHandler<FInstanceData_GameThread> InstanceData(Context);
 	FNDIOutputParam<bool>		OutValid(Context);
-	FNDIOutputParam<FMatrix>	OutMatrix(Context);
+	FNDIOutputParam<FMatrix44f>	OutMatrix(Context);
 
-	const FMatrix& InstanceMatrix = InstanceData->CachedTransform.ToMatrixWithScale();
+	const FMatrix44f InstanceMatrix = InstanceData->CachedTransform.ToMatrixWithScale();
 	for (int32 i = 0; i < Context.GetNumInstances(); ++i)
 	{
 		OutValid.SetAndAdvance(InstanceData->bCachedValid);
@@ -360,9 +360,9 @@ void UNiagaraDataInterfaceActorComponent::VMGetTransform(FVectorVMExternalFuncti
 
 	VectorVM::FUserPtrHandler<FInstanceData_GameThread> InstanceData(Context);
 	FNDIOutputParam<bool>		OutValid(Context);
-	FNDIOutputParam<FVector>	OutPosition(Context);
+	FNDIOutputParam<FVector3f>	OutPosition(Context);
 	FNDIOutputParam<FQuat>		OutRotation(Context);
-	FNDIOutputParam<FVector>	OutScale(Context);
+	FNDIOutputParam<FVector3f>	OutScale(Context);
 
 	for (int32 i=0; i < Context.GetNumInstances(); ++i)
 	{
