@@ -17,6 +17,7 @@
 #include "GameFramework/CheatManager.h"
 #include "GameDelegates.h"
 #include "GameMapsSettings.h"
+#include "MoviePlayerProxy.h"
 
 namespace MatchState
 {
@@ -329,6 +330,7 @@ void AGameMode::SetMatchState(FName NewState)
 	}
 
 	UE_LOG(LogGameMode, Display, TEXT("Match State Changed from %s to %s"), *MatchState.ToString(), *NewState.ToString());
+	FMoviePlayerProxyBlock MoviePlayerProxyBlock;
 
 	MatchState = NewState;
 
