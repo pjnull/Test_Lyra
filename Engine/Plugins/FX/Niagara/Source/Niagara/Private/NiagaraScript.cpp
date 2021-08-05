@@ -70,7 +70,7 @@ static FAutoConsoleVariableRef CVarNiagaraForceSsafeScriptAttributeTrim(
 	ECVF_Default
 );
 
-bool GNiagaraCompressScriptByteCode = true;
+bool GNiagaraCompressScriptByteCode = false;
 static FAutoConsoleVariableRef CVarNiagaraCompressScriptByteCode(
 	TEXT("fx.Niagara.CompressScriptByteCode"),
 	GNiagaraCompressScriptByteCode,
