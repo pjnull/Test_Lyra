@@ -1602,6 +1602,15 @@ void UPrimitiveComponent::SetCastInsetShadow(bool bInCastInsetShadow)
 	}
 }
 
+void UPrimitiveComponent::SetCastContactShadow(bool bInCastContactShadow)
+{
+	if (bInCastContactShadow != bCastContactShadow)
+	{
+		bCastContactShadow = bInCastContactShadow;
+		MarkRenderStateDirty();
+	}
+}
+
 void UPrimitiveComponent::SetLightAttachmentsAsGroup(bool bInLightAttachmentsAsGroup)
 {
 	if(bInLightAttachmentsAsGroup != bLightAttachmentsAsGroup)
