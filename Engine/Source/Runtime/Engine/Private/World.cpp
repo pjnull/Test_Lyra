@@ -7780,8 +7780,7 @@ void UWorld::CreateFXSystem()
 {
 	if ( !IsRunningDedicatedServer() && !IsRunningCommandlet() )
 	{
-		FXSystem = FFXSystemInterface::Create(FeatureLevel, Scene->GetShaderPlatform());
-		Scene->SetFXSystem(FXSystem);
+		FXSystem = FFXSystemInterface::Create(FeatureLevel, Scene);
 	}
 	else
 	{
