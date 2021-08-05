@@ -5,10 +5,10 @@
 #include "Widgets/SWidget.h"
 #include "Misc/MemStack.h"
 
-bool GIsSlateWidgetTrackerEnabled = false;
-FAutoConsoleVariableRef CVarEnableSlateWidgetTracker(
+static int32 bIsSlateWidgetTrackerEnabled = 0;
+static FAutoConsoleVariableRef CVarEnableSlateWidgetTracker(
 	TEXT("Slate.EnableSlateWidgetTracker"),
-	GIsSlateWidgetTrackerEnabled,
+	bIsSlateWidgetTrackerEnabled,
 	TEXT("Whether or not we enable the tracking of widgets via the Slate Widget Tracker."),
 	ECVF_Default
 );
@@ -21,7 +21,7 @@ FSlateWidgetTracker& FSlateWidgetTracker::Get()
 
 bool FSlateWidgetTracker::IsEnabled() const
 {
-	return GIsSlateWidgetTrackerEnabled;
+	return bIsSlateWidgetTrackerEnabled == 1;
 }
 
 void FSlateWidgetTracker::AddTrackedWidget(const SWidget* WidgetToTrack, const TArray<FName>& Tags)
