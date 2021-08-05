@@ -43,6 +43,16 @@ public :
 	void ResumeRequest(FBackgroundHttpRequestPtr Request);
 	void CancelRequest(FBackgroundHttpRequestPtr Request);
 
+public:
+	static bool HandleRequirementsCheck();
+	
+	// Returns true if the ConfigRules settings allow us to use this feature or false if it should be disabled based on those settings.
+	// Also cleans up work if appropriate based on settings.
+	static bool HandleConfigRulesSettings();
+
+	//Used to identify/schedule BackgroundHTTP work through our UEDownloadWorker
+	static const FString BackgroundHTTPWorkID;
+
 protected:
 	void UpdateRequestProgress();
 
@@ -98,6 +108,25 @@ protected:
 	//Rechecks any _GT lists to try and move them to _Java lists if its safe to do so
 	void HandleRequestsWaitingOnJavaThreadsafety();
 
+protected:
+	//Used to determine the state of AndroidBackgroundHTTP in our configrules
+	enum class EAndroidBackgroundDownloadConfigRulesSetting : uint8
+	{
+		Unknown,				//Either the value was not set, or was set to something besides these expected values
+		Enabled,				//Enabled in config rules
+		Disabled,				//Disabled in our config rules
+		DisabledAndStopActive,	//Disabled and we should specifically fail any cases that might still be running
+		Count					//Count of enum values
+	};
+
+	static const FString LexToString(EAndroidBackgroundDownloadConfigRulesSetting Setting);
+	static EAndroidBackgroundDownloadConfigRulesSetting LexParseString(const FString* Setting);
+
+	static EAndroidBackgroundDownloadConfigRulesSetting GetAndroidBackgroundDownloadConfigRulesSetting();
+
+	//Key in ConfigRules to use to load the value of the EAndroidBackgroundDownloadConfigRulesSetting
+	static const FString AndroidBackgroundDownloadConfigRulesSettingKey;
+
 private:
 	//struct holding all our Java class, method, and field information in one location.
 	//Must call initialize on this before it is useful. Future calls to Initialize will not recalculate information
@@ -124,6 +153,11 @@ private:
 	};
 
 	static FJavaClassInfo JavaInfo;
+
+protected:
+	//We only want to respond to certain broadcast java-side work if we have scheduled BGWork
+	//otherwise it could be stale work from a previous executables run that would look like an error state (Requests we haven't queued yet, etc)
+	static volatile int32 bHasManagerScheduledBGWork;
 };
 
 //WARNING: These values MUST stay in sync with their values in DownloadWorkerParameterKeys.java!
@@ -158,17 +192,16 @@ public:
 class FAndroidBackgroundDownloadDelegates
 {
 public:
+	DECLARE_MULTICAST_DELEGATE_TwoParams(FAndroidBackgroundDownload_OnWorkerStart, FString /*WorkID*/, jobject /*UEWorker*/);
+	DECLARE_MULTICAST_DELEGATE_TwoParams(FAndroidBackgroundDownload_OnWorkerStop, FString /*WorkID*/, jobject /*UEWorker*/);
 	DECLARE_MULTICAST_DELEGATE_FourParams(FAndroidBackgroundDownload_OnProgress, jobject /*UnderlyingWorker*/, FString /*RequestID*/, int64_t /*BytesWrittenSinceLastCall*/, int64_t /*TotalBytesWritten*/);
 	DECLARE_MULTICAST_DELEGATE_FourParams(FAndroidBackgroundDownload_OnComplete, jobject /*UnderlyingWorker*/, FString /*RequestID*/, FString /*CompleteLocation*/, bool /*bWasSuccess*/);
 	DECLARE_MULTICAST_DELEGATE_TwoParams(FAndroidBackgroundDownload_OnAllComplete, jobject /*UnderlyingWorker*/, bool /*bDidAllRequestsSucceed*/);
 	DECLARE_MULTICAST_DELEGATE_TwoParams(FAndroidBackgroundDownload_OnTickWorkerThread, JNIEnv*, jobject /*UnderlyingWorker*/);
 
-	//We use this bool to check if we need to actually route work done on the BG java side to UE, if we haven't scheduled any BGWork
-	//then we don't need to try and respond to results as its from a previous worker that we didn't schedule yet, and thus have no
-	//matching BG Download Requests. We should associate with those downloads once we request BG work if they are requested and still active
-	static volatile int32 bHasManagerScheduledBGWork;
-
 	//Delegates called by JNI functions to bubble up underlying java work to the manager
+	static FAndroidBackgroundDownload_OnWorkerStart AndroidBackgroundDownload_OnWorkerStart;
+	static FAndroidBackgroundDownload_OnWorkerStop AndroidBackgroundDownload_OnWorkerStop;
 	static FAndroidBackgroundDownload_OnProgress AndroidBackgroundDownload_OnProgress;
 	static FAndroidBackgroundDownload_OnComplete AndroidBackgroundDownload_OnComplete;
 	static FAndroidBackgroundDownload_OnAllComplete AndroidBackgroundDownload_OnAllComplete;

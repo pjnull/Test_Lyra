@@ -43,6 +43,9 @@
 
 FUEWorkManagerNativeWrapper::FJavaClassInfo FUEWorkManagerNativeWrapper::JavaInfo = FUEWorkManagerNativeWrapper::FJavaClassInfo();
 
+FAndroidBackgroundServicesDelegates::FAndroidBackgroundServices_OnWorkerStart FAndroidBackgroundServicesDelegates::AndroidBackgroundServices_OnWorkerStart;
+FAndroidBackgroundServicesDelegates::FAndroidBackgroundServices_OnWorkerStop FAndroidBackgroundServicesDelegates::AndroidBackgroundServices_OnWorkerStop;
+
 void FUEWorkManagerNativeWrapper::FJavaClassInfo::Initialize()
 {
 	//Should only be populating these with GameThread values! JavaENV is thread-specific so this is very important that all useages of these classes come from the same game thread!
@@ -128,8 +131,6 @@ void FUEWorkManagerNativeWrapper::FWorkRequestParametersNative::PopulateWorkRequ
 
 FUEWorkManagerNativeWrapper::FWorkRequestParametersNative::FWorkRequestParametersNative()
 {
-	UE_LOG(LogEngine, Display, TEXT("XXXXX Thread for FWorkRequestParametersNative(): %d , GameThreadID:%d"), FPlatformTLS::GetCurrentThreadId(), GGameThreadId);
-
 	FUEWorkManagerNativeWrapper::JavaInfo.Initialize();
 
 	// WARNING:
@@ -332,6 +333,8 @@ bool FUEWorkManagerNativeWrapper::ScheduleBackgroundWork(FString UniqueWorkName,
 	JNIEnv* Env = FAndroidApplication::GetJavaEnv();
 	if (ensureAlwaysMsgf(Env, TEXT("Invalid JNIEnv!")))
 	{
+		FUEWorkManagerNativeWrapper::JavaInfo.Initialize();
+
 		FScopedJavaObject<jobject> JavaAppContext = NewScopedJavaObject(Env, FJavaWrapper::CallObjectMethod(Env, FAndroidApplication::GetGameActivityThis(), JavaInfo.GetApplicationContextMethod));
 		FScopedJavaObject<jstring> JavaWorkName = FJavaHelper::ToJavaString(Env, UniqueWorkName);
 		
@@ -346,11 +349,68 @@ void FUEWorkManagerNativeWrapper::CancelBackgroundWork(FString UniqueWorkName)
 	JNIEnv* Env = FAndroidApplication::GetJavaEnv();
 	if (ensureAlwaysMsgf(Env, TEXT("Invalid JNIEnv!")))
 	{
+		FUEWorkManagerNativeWrapper::JavaInfo.Initialize();
+
 		FScopedJavaObject<jobject> JavaAppContext = NewScopedJavaObject(Env, FJavaWrapper::CallObjectMethod(Env, FAndroidApplication::GetGameActivityThis(), JavaInfo.GetApplicationContextMethod));
 		FScopedJavaObject<jstring> JavaWorkName = FJavaHelper::ToJavaString(Env, UniqueWorkName);
 
 		Env->CallStaticVoidMethod(FUEWorkManagerNativeWrapper::JavaInfo.UEWorkManagerJavaInterfaceClass, JavaInfo.JavaInterface_Method_CancelWork, *JavaAppContext, *JavaWorkName);
 	}
+}
+
+void FUEWorkManagerNativeWrapper::SetWorkResultOnWorker(jobject Worker, FUEWorkManagerNativeWrapper::EAndroidBackgroundWorkResult Result)
+{
+	JNIEnv* Env = FAndroidApplication::GetJavaEnv();
+	if (ensureAlwaysMsgf((Env != nullptr), TEXT("Unexpected invalid JNI environment found! Can not respond to UnderlyingWorker!")))
+	{
+		const bool bIsOptional = false;
+		jclass JavaWorkerClass = Env->GetObjectClass(Worker);
+		CHECK_JNI_RESULT(JavaWorkerClass);
+
+		if (Result == EAndroidBackgroundWorkResult::Success)
+		{
+			jmethodID WorkerMethod_SetWorkResult_Success = FJavaWrapper::FindMethod(Env, JavaWorkerClass, "SetWorkResult_Success", "()V", bIsOptional);
+			CHECK_JNI_RESULT(WorkerMethod_SetWorkResult_Success);
+			FJavaWrapper::CallVoidMethod(Env, Worker, WorkerMethod_SetWorkResult_Success);
+		}
+		else if (Result == EAndroidBackgroundWorkResult::Failure)
+		{
+			jmethodID WorkerMethod_SetWorkResult_Failure = FJavaWrapper::FindMethod(Env, JavaWorkerClass, "SetWorkResult_Failure", "()V", bIsOptional);
+			CHECK_JNI_RESULT(WorkerMethod_SetWorkResult_Failure);
+			FJavaWrapper::CallVoidMethod(Env, Worker, WorkerMethod_SetWorkResult_Failure);
+		}
+		else if (Result == EAndroidBackgroundWorkResult::Retry)
+		{
+			jmethodID WorkerMethod_SetWorkResult_Retry = FJavaWrapper::FindMethod(Env, JavaWorkerClass, "SetWorkResult_Retry", "()V", bIsOptional);
+			CHECK_JNI_RESULT(WorkerMethod_SetWorkResult_Retry);
+			FJavaWrapper::CallVoidMethod(Env, Worker, WorkerMethod_SetWorkResult_Retry);
+		}
+		else
+		{
+			//missing an implementation above for a new EAndroidBackgroundWorkResult
+			ensureAlwaysMsgf(false, TEXT("Missing implementation for EAndroidBackgroundWorkResult entry %d in SetWorkResultOnWorker"), int(Result));
+		}
+	}
+}
+
+
+
+
+JNI_METHOD void Java_com_epicgames_unreal_workmanager_UEWorker_nativeAndroidBackgroundServicesOnWorkerStart(JNIEnv* jenv, jobject thiz, jstring WorkID)
+{
+	FString UEWorkID = FJavaHelper::FStringFromParam(jenv, WorkID);
+	
+	UE_LOG(LogEngine, Display, TEXT("AndroidBackgroundServices called OnWorkerStart for %s"), *UEWorkID);
+	FAndroidBackgroundServicesDelegates::AndroidBackgroundServices_OnWorkerStart.Broadcast(UEWorkID, thiz);
+
+}
+
+JNI_METHOD void Java_com_epicgames_unreal_workmanager_UEWorker_nativeAndroidBackgroundServicesOnWorkerStop(JNIEnv* jenv, jobject thiz, jstring WorkID)
+{
+	FString UEWorkID = FJavaHelper::FStringFromParam(jenv, WorkID);
+
+	UE_LOG(LogEngine, Display, TEXT("AndroidBackgroundServices called OnWorkerStop for %s"), *UEWorkID);
+	FAndroidBackgroundServicesDelegates::AndroidBackgroundServices_OnWorkerStop.Broadcast(UEWorkID, thiz);
 }
 
 #endif //USE_ANDROID_JNI

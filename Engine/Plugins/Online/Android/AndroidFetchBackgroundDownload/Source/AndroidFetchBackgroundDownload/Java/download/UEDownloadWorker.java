@@ -92,11 +92,12 @@ public class UEDownloadWorker extends UEWorker implements DownloadProgressListen
 	{
 		Log.debug("OnWorkerStart Beginning for " + WorkID);
 
-		super.OnWorkerStart(WorkID);
-	
 		//TODO: TRoss this should be based on some WorkerParameter and handled in UEWorker
 		//Set this as an important task so that it continues even when the app closes, etc.
+		//Do this immediately as we only have limited time to call this after worker start
 		setForegroundAsync(CreateForegroundInfo(NotificationDescription));
+
+		super.OnWorkerStart(WorkID);
 		
 		if (mFetchManager == null)
 		{
@@ -358,6 +359,19 @@ public class UEDownloadWorker extends UEWorker implements DownloadProgressListen
 		bHasEnqueueHappened = true;
 	}
 	
+	//Want to call our DownloadWorker version of OnWorkerStart
+	@Override
+	public void CallNativeOnWorkerStart(String WorkID)
+	{
+		nativeAndroidBackgroundDownloadOnWorkerStart(WorkID);
+	}
+
+	@Override
+	public void CallNativeOnWorkerStop(String WorkID)
+	{
+		nativeAndroidBackgroundDownloadOnWorkerStop(WorkID);
+	}
+
 	//
 	// Functions called by our UE c++ code on this object
 	//
@@ -377,6 +391,8 @@ public class UEDownloadWorker extends UEWorker implements DownloadProgressListen
 	}
 	
 	//Native functions used to bubble up progress to native UE code
+	public native void nativeAndroidBackgroundDownloadOnWorkerStart(String WorkID);
+	public native void nativeAndroidBackgroundDownloadOnWorkerStop(String WorkID);
 	public native void nativeAndroidBackgroundDownloadOnProgress(String TaskID, long BytesWrittenSinceLastCall, long TotalBytesWritten);
 	public native void nativeAndroidBackgroundDownloadOnComplete(String TaskID, String CompleteLocation, boolean bWasSuccess);
 	public native void nativeAndroidBackgroundDownloadOnAllComplete(boolean bDidAllRequestsSucceed);
