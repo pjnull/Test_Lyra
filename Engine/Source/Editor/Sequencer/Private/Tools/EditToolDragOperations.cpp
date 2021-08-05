@@ -1344,7 +1344,7 @@ bool FMoveKeysAndSections::HandleSectionMovement(FFrameTime MouseTime, FVector2D
 		// Expand track node if it wasn't already expanded. This ensures that multi row tracks will show multiple rows if regenerated
 		for (TSharedRef<FSequencerTrackNode> TrackNode : TrackNodes)
 		{
-			if (!TrackNode->IsExpanded())
+			if (!TrackNode->IsExpanded() && TrackNode->GetSubTrackMode() == FSequencerTrackNode::ESubTrackMode::None)
 			{
 				TArray<TSharedRef<ISequencerSection> > TrackNodeSections = TrackNode->GetSections();
 				if (TrackNodeSections.Num() && TrackNodeSections[0]->GetSectionObject())
