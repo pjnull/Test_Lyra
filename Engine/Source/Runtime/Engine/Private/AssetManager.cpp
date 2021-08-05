@@ -9,6 +9,7 @@
 #include "Engine/Engine.h"
 #include "Engine/BlueprintGeneratedClass.h"
 #include "Interfaces/IPluginManager.h"
+#include "MoviePlayerProxy.h"
 #include "UObject/ConstructorHelpers.h"
 #include "UObject/ObjectSaveContext.h"
 #include "UObject/UObjectHash.h"
@@ -1511,9 +1512,18 @@ TSharedPtr<FStreamableHandle> UAssetManager::ChangeBundleStateForPrimaryAssets(c
 	TArray<TSharedPtr<FStreamableHandle> > NewHandles, ExistingHandles;
 	TArray<FPrimaryAssetId> NewAssets;
 	TSharedPtr<FStreamableHandle> ReturnHandle;
-
+	int32 MoviePlayerNumAssets = 0;
 	for (const FPrimaryAssetId& PrimaryAssetId : AssetsToChange)
 	{
+		MoviePlayerNumAssets++;
+		// Call the blocking tick every 500 assets.
+		if (MoviePlayerNumAssets >= 500)
+		{
+			MoviePlayerNumAssets = 0;
+			//UE_LOG(LogTemp, Warning, TEXT("pooo %d"), MoviePlayerNumAssets);
+			FMoviePlayerProxy::BlockingTick();
+		}
+
 		FPrimaryAssetData* NameData = GetNameData(PrimaryAssetId);
 
 		if (NameData)
