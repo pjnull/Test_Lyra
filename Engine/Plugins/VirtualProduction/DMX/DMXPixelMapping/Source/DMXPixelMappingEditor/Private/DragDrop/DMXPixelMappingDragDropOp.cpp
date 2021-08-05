@@ -117,7 +117,7 @@ void FDMXPixelMappingDragDropOp::LayoutOutputComponents(const FVector2D& GraphSp
 
 					constexpr bool bModifyChildrenRecursively = true;
 					Component->ForEachChild([](UDMXPixelMappingBaseComponent* Component)
-						{
+				{
 							Component->Modify();
 						}, bModifyChildrenRecursively);
 

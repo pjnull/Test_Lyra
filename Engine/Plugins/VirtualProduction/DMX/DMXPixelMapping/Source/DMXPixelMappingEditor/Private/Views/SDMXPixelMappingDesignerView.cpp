@@ -211,7 +211,7 @@ FReply SDMXPixelMappingDesignerView::OnMouseButtonDown(const FGeometry& MyGeomet
 							{
 								return true;
 							}
-						}
+					}
 						else if (UDMXPixelMappingFixtureGroupItemComponent* ClickedGroupItemComponent = Cast<UDMXPixelMappingFixtureGroupItemComponent>(ClickedComponent))
 						{
 							if (ClickedGroupItemComponent->GetParent() == SelectedComponentRef.GetComponent() &&
@@ -227,21 +227,21 @@ FReply SDMXPixelMappingDesignerView::OnMouseButtonDown(const FGeometry& MyGeomet
 
 				const bool bClearPreviousSelection = !MouseEvent.IsShiftDown() && !MouseEvent.IsControlDown() && !bClickedSelectedComponent;
 				ResolvePendingSelectedComponents(bClearPreviousSelection);
-				
+
 				FVector2D GraphSpaceCursorPosition;
 				if (GetGraphSpaceCursorPosition(GraphSpaceCursorPosition))
 				{
 					DragAnchor = GraphSpaceCursorPosition;
 
-					return
-						FReply::Handled()
-						.PreventThrottling()
-						.SetUserFocus(AsShared(), EFocusCause::Mouse)
-						.CaptureMouse(AsShared())
-						.DetectDrag(AsShared(), EKeys::LeftMouseButton);
-				}
+				return
+					FReply::Handled()
+					.PreventThrottling()
+					.SetUserFocus(AsShared(), EFocusCause::Mouse)
+					.CaptureMouse(AsShared())
+					.DetectDrag(AsShared(), EKeys::LeftMouseButton);
 			}
 		}
+	}
 	}
 
 	// Capture mouse for the drag handle and general mouse actions
@@ -333,8 +333,8 @@ FReply SDMXPixelMappingDesignerView::OnKeyDown(const FGeometry& MyGeometry, cons
 			ToolkitPtr->DeleteSelectedComponents();
 
 			return FReply::Handled();
+			}
 		}
-	}
 
 	return FReply::Unhandled();
 }
@@ -452,15 +452,15 @@ FReply SDMXPixelMappingDesignerView::OnDragDetected(const FGeometry& MyGeometry,
 
 			FVector2D GraphSpaceDragOffset = DragAnchor - ClickedComponent->GetPosition();
 
-			TSharedRef<FDMXPixelMappingDragDropOp> DragDropOp = FDMXPixelMappingDragDropOp::New(GraphSpaceDragOffset, DraggedComponents);
-			DragDropOp->SetDecoratorVisibility(false);
+				TSharedRef<FDMXPixelMappingDragDropOp> DragDropOp = FDMXPixelMappingDragDropOp::New(GraphSpaceDragOffset, DraggedComponents);
+				DragDropOp->SetDecoratorVisibility(false);
 
-			// Clear any pending selected widgets
-			PendingSelectedComponent = nullptr;
+				// Clear any pending selected widgets
+				PendingSelectedComponent = nullptr;
 
-			return FReply::Handled().BeginDragDrop(DragDropOp);
+				return FReply::Handled().BeginDragDrop(DragDropOp);
+			}
 		}
-	}
 
 	return FReply::Handled();
 }
@@ -527,9 +527,9 @@ FReply SDMXPixelMappingDesignerView::OnDragOver(const FGeometry& MyGeometry, con
 	const TSharedPtr<FDMXPixelMappingDragDropOp> DragDropOp = DragDropEvent.GetOperationAs<FDMXPixelMappingDragDropOp>();
 	if (DragDropOp.IsValid())
 	{
-		// Handle the drag drop op on tick
-		PendingDragDropOp = DragDropOp;
-	}
+			// Handle the drag drop op on tick
+			PendingDragDropOp = DragDropOp;
+		}
 
 	return FReply::Handled();
 }
@@ -547,8 +547,8 @@ FReply SDMXPixelMappingDesignerView::OnDrop(const FGeometry& MyGeometry, const F
 
 			CachedRendererComponent = nullptr;
 			UpdateOutput(false);
+			}
 		}
-	}
 
 	return FReply::Handled().EndDragDrop().SetUserFocus(AsShared());
 }
@@ -960,7 +960,7 @@ void SDMXPixelMappingDesignerView::HandleDragEnterFromDetailsOrPalette(const TSh
 							}
 						}
 					}
-					
+
 					// Build an array of all new componets for dragging
 					TArray<TWeakObjectPtr<UDMXPixelMappingBaseComponent>> DraggedComponents;
 					for (UDMXPixelMappingBaseComponent* Component : NewComponents)
@@ -1032,27 +1032,27 @@ void SDMXPixelMappingDesignerView::CreateExtensionWidgetsForSelection()
 	if (Selected.Num() == NumSelectedItems)
 	{
 		if (UDMXPixelMappingOutputComponent* OutputComponent = Cast<UDMXPixelMappingOutputComponent>(Selected[0].GetComponent()))
-		{
+	{
 			if (OutputComponent->IsVisible() &&	!OutputComponent->IsLockInDesigner())
 			{
-				// Add transform handles
+	// Add transform handles
 				constexpr float Offset = 10.f;
 				const TSharedPtr<SDMXPixelMappingDesignerView> Self = SharedThis(this);
 				TransformHandles.Add(SNew(SDMXPixelMappingTransformHandle, Self, EDMXPixelMappingTransformDirection::CenterRight, FVector2D(Offset, 0.f)));
 				TransformHandles.Add(SNew(SDMXPixelMappingTransformHandle, Self, EDMXPixelMappingTransformDirection::BottomCenter, FVector2D(0.f, Offset)));
-				TransformHandles.Add(SNew(SDMXPixelMappingTransformHandle, Self, EDMXPixelMappingTransformDirection::BottomRight, FVector2D(Offset, Offset)));
+	TransformHandles.Add(SNew(SDMXPixelMappingTransformHandle, Self, EDMXPixelMappingTransformDirection::BottomRight, FVector2D(Offset, Offset)));
 
-				// Add Widgets to designer surface
-				for (TSharedPtr<SDMXPixelMappingTransformHandle>& Handle : TransformHandles)
-				{
-					ExtensionWidgetCanvas->AddSlot()
-						.Position(TAttribute<FVector2D>::Create(TAttribute<FVector2D>::FGetter::CreateSP(this, &SDMXPixelMappingDesignerView::GetExtensionPosition, Handle)))
-						.Size(TAttribute<FVector2D>::Create(TAttribute<FVector2D>::FGetter::CreateSP(this, &SDMXPixelMappingDesignerView::GetExtensionSize, Handle)))
-						[
-							Handle.ToSharedRef()
-						];
-				}
-			}
+	// Add Widgets to designer surface
+	for (TSharedPtr<SDMXPixelMappingTransformHandle>& Handle : TransformHandles)
+	{
+		ExtensionWidgetCanvas->AddSlot()
+			.Position(TAttribute<FVector2D>::Create(TAttribute<FVector2D>::FGetter::CreateSP(this, &SDMXPixelMappingDesignerView::GetExtensionPosition, Handle)))
+			.Size(TAttribute<FVector2D>::Create(TAttribute<FVector2D>::FGetter::CreateSP(this, &SDMXPixelMappingDesignerView::GetExtensionSize, Handle)))
+			[
+				Handle.ToSharedRef()
+			];
+	}
+}
 		}
 	}
 }

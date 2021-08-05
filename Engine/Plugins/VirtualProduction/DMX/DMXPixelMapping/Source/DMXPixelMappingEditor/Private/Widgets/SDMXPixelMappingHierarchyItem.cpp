@@ -93,35 +93,35 @@ FReply SDMXPixelMappingHierarchyItem::OnDropWidget(const FDragDropEvent& InDragD
 		{
 			if (UDMXPixelMappingBaseComponent* Source = WeakSource.Get())
 			{
-				UDMXPixelMappingBaseComponent* Destination = Model.Pin()->GetReference().GetComponent();
+			UDMXPixelMappingBaseComponent* Destination = Model.Pin()->GetReference().GetComponent();
 
-				UDMXPixelMappingBaseComponent* NewParent = nullptr;
-				if (Source->CanBeMovedTo(Destination))
-				{
-					NewParent = Destination;
-				}
+			UDMXPixelMappingBaseComponent* NewParent = nullptr;
+			if (Source->CanBeMovedTo(Destination))
+			{
+				NewParent = Destination;
+			}
 				else if (Source->CanBeMovedTo(Destination->GetParent()))
-				{
+			{
 					NewParent = Destination->GetParent();
-				}
+			}
 
-				if (NewParent)
-				{
-					NewParent->Modify();
-					Source->Modify();
-					NewParent->AddChild(Source);
+			if (NewParent)
+			{
+				NewParent->Modify();
+				Source->Modify();
+				NewParent->AddChild(Source);
 
 					if (Source->GetParent())
-					{
+				{
 						Source->GetParent()->Modify();
 						Source->GetParent()->RemoveChild(Source);
-					}
-
-					HierarchyView->RequestComponentRedraw(NewParent);
-					HierarchyView->RequestRebuildTree();
 				}
+
+				HierarchyView->RequestComponentRedraw(NewParent);
+				HierarchyView->RequestRebuildTree();
 			}
 		}		
+	}
 	}
 	return FReply::Unhandled();
 }

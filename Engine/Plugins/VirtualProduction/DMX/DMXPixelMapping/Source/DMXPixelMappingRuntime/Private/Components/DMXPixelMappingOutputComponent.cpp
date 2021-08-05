@@ -42,10 +42,10 @@ void UDMXPixelMappingOutputComponent::PostEditChangeProperty(FPropertyChangedEve
 	{
 		const EVisibility NewVisiblity = IsVisible() ? EVisibility::Visible : EVisibility::Collapsed;
 
-		if (ComponentWidget.IsValid())
-		{
-			ComponentWidget->SetVisibility(NewVisiblity);
-		}
+				if (ComponentWidget.IsValid())
+				{
+					ComponentWidget->SetVisibility(NewVisiblity);
+				}
 
 		constexpr bool bSetVisibilityRecursive = true;
 		ForEachChildOfClass<UDMXPixelMappingOutputComponent>([NewVisiblity](UDMXPixelMappingOutputComponent* ChildComponent)
@@ -67,7 +67,7 @@ void UDMXPixelMappingOutputComponent::PostEditChangeProperty(FPropertyChangedEve
 	}
 
 	if (PropertyChangedEvent.ChangeType != EPropertyChangeType::Interactive)
-	{
+				{
 		if (PropertyChangedEvent.GetPropertyName() == GET_MEMBER_NAME_CHECKED(UDMXPixelMappingOutputComponent, PositionX) ||
 			PropertyChangedEvent.GetPropertyName() == GET_MEMBER_NAME_CHECKED(UDMXPixelMappingOutputComponent, PositionY) ||
 			PropertyChangedEvent.GetPropertyName() == GET_MEMBER_NAME_CHECKED(UDMXPixelMappingOutputComponent, SizeX) ||
@@ -90,8 +90,8 @@ void UDMXPixelMappingOutputComponent::PostEditChangeProperty(FPropertyChangedEve
 					GetParent()->RemoveChild(this);
 				}
 			}
-		}
 	}
+}
 }
 #endif // WITH_EDITOR
 
@@ -395,7 +395,7 @@ void UDMXPixelMappingOutputComponent::UpdateComponentWidget(EVisibility NewVisib
 				ChildOutputComponent->UpdateComponentWidget(NewVisibility, bWithChildrenRecursive);
 			}
 		}
-	}
+}
 }
 #endif // WITH_EDITOR
 

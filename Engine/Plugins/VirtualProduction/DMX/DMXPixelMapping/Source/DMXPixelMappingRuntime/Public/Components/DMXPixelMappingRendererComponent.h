@@ -50,7 +50,7 @@ public:
 	virtual void Render() final;
 	virtual void RenderAndSendDMX() final;
 	//~ End UDMXPixelMappingBaseComponent implementation
-			
+
 	// ~Begin UDMXPixelMappingOutputComponent interface
 	virtual void SetSize(const FVector2D& NewSize) override;
 	// ~End UDMXPixelMappingOutputComponent interface

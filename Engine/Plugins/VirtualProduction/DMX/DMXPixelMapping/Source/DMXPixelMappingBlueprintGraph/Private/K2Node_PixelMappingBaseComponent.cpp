@@ -113,17 +113,17 @@ void UK2Node_PixelMappingBaseComponent::TryModifyBlueprintOnNameChanged(UDMXPixe
 {
 	if (!HasAnyFlags(RF_ClassDefaultObject))
 	{
-		UEdGraphPin* PixelMappingPin = GetPixelMappingPin();
-		if (InDMXPixelMapping != nullptr && PixelMappingPin != nullptr && InDMXPixelMapping == PixelMappingPin->DefaultObject)
+	UEdGraphPin* PixelMappingPin = GetPixelMappingPin();
+	if (InDMXPixelMapping != nullptr && PixelMappingPin != nullptr && InDMXPixelMapping == PixelMappingPin->DefaultObject)
+	{
+		const bool TryRefresh = InPin != nullptr && !InPin->LinkedTo.Num();
+		const FName CurrentName = InPin ? FName(*InPin->GetDefaultAsString()) : NAME_None;
+		if (TryRefresh && !InDMXPixelMapping->FindComponent(CurrentName))
 		{
-			const bool TryRefresh = InPin != nullptr && !InPin->LinkedTo.Num();
-			const FName CurrentName = InPin ? FName(*InPin->GetDefaultAsString()) : NAME_None;
-			if (TryRefresh && !InDMXPixelMapping->FindComponent(CurrentName))
-			{
-				ModifyBlueprint();
-			}
+			ModifyBlueprint();
 		}
 	}
+}
 }
 
 void UK2Node_PixelMappingBaseComponent::TryRefreshGraphCheckInputPins(UEdGraphPin* TryPixelMappingPin, UEdGraphPin* TryComponentNamePin)

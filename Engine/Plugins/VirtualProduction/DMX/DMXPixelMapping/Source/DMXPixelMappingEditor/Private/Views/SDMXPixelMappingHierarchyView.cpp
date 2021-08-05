@@ -255,16 +255,16 @@ void SDMXPixelMappingHierarchyView::ConditionallyUpdateTree()
 			UDMXPixelMappingBaseComponent* Component = Model->GetReference().GetComponent();
 			if (IsValid(Component))
 			{
-				ComponentExpansionStates.Add(Component) = TreeView->IsItemExpanded(Model);
+			ComponentExpansionStates.Add(Component) = TreeView->IsItemExpanded(Model);
 
-				FDMXPixelMappingHierarchyItemWidgetModelArr Children;
-				Model->GatherChildren(Children);
+			FDMXPixelMappingHierarchyItemWidgetModelArr Children;
+			Model->GatherChildren(Children);
 
-				for (FDMXPixelMappingHierarchyItemWidgetModelPtr& ChildModel : Children)
-				{
-					RecursiveTakeSnapshot(ChildModel, TreeView);
-				}
+			for (FDMXPixelMappingHierarchyItemWidgetModelPtr& ChildModel : Children)
+			{
+				RecursiveTakeSnapshot(ChildModel, TreeView);
 			}
+		}
 		}
 
 		void RecursiveRestoreSnapshot(FDMXPixelMappingHierarchyItemWidgetModelPtr Model, TreeViewPtr TreeView)
@@ -272,32 +272,32 @@ void SDMXPixelMappingHierarchyView::ConditionallyUpdateTree()
 			UDMXPixelMappingBaseComponent* Component = Model->GetReference().GetComponent();
 			if (IsValid(Component))
 			{
-				bool* pPreviousExpansionState = ComponentExpansionStates.Find(Component);
-				if (pPreviousExpansionState == nullptr)
+			bool* pPreviousExpansionState = ComponentExpansionStates.Find(Component);
+			if(pPreviousExpansionState == nullptr)
+			{
+				// Initially collapse matrix components
+				if (Cast<UDMXPixelMappingMatrixComponent>(Component))
 				{
-					// Initially collapse matrix components
-					if (Cast<UDMXPixelMappingMatrixComponent>(Component))
-					{
-						TreeView->SetItemExpansion(Model, false);
-					}
-					else
-					{
-						TreeView->SetItemExpansion(Model, true);
-					}
+					TreeView->SetItemExpansion(Model, false);
 				}
 				else
 				{
-					TreeView->SetItemExpansion(Model, *pPreviousExpansionState);
-				}
-
-				FDMXPixelMappingHierarchyItemWidgetModelArr Children;
-				Model->GatherChildren(Children);
-
-				for (FDMXPixelMappingHierarchyItemWidgetModelPtr& ChildModel : Children)
-				{
-					RecursiveRestoreSnapshot(ChildModel, TreeView);
+					TreeView->SetItemExpansion(Model, true);
 				}
 			}
+			else
+			{
+				TreeView->SetItemExpansion(Model, *pPreviousExpansionState);
+			}
+
+			FDMXPixelMappingHierarchyItemWidgetModelArr Children;
+			Model->GatherChildren(Children);
+
+			for (FDMXPixelMappingHierarchyItemWidgetModelPtr& ChildModel : Children)
+			{
+				RecursiveRestoreSnapshot(ChildModel, TreeView);
+			}
+		}
 		}
 		
 		TMap<UDMXPixelMappingBaseComponent*, bool> ComponentExpansionStates;		

@@ -38,10 +38,10 @@ void SDMXPixelMappingScreenLayout::Construct(const FArguments& InArgs)
 		const uint32 DMXCellStep = FDMXPixelMappingUtils::GetNumChannelsPerCell(PixelFormat);
 		const uint32 UniverseMaxChannels = FDMXPixelMappingUtils::GetUniverseMaxChannels(PixelFormat, StartAddress);
 
-		// Prepare unsorted list
-		uint32 UniverseChannel = StartAddress;
-		uint32 UniverseIndex = 0;
-		const int32 TotalPixels = NumXCells * NumYCells;
+	// Prepare unsorted list
+	uint32 UniverseChannel = StartAddress;
+	uint32 UniverseIndex = 0;
+	const int32 TotalPixels = NumXCells * NumYCells;
 
 		for (int32 CellID = 0; CellID < TotalPixels; ++CellID)
 		{
@@ -67,8 +67,8 @@ void SDMXPixelMappingScreenLayout::Construct(const FArguments& InArgs)
 	uint32 XYIndex = 0;
 	for (int32 YIndex = 0; YIndex < NumYCells; ++YIndex)
 	{
-		for (int32 XIndex = 0; XIndex < NumXCells; ++XIndex)
-		{
+	for (int32 XIndex = 0; XIndex < NumXCells; ++XIndex)
+	{
 			GridPanel->AddSlot(XIndex, YIndex)
 				.HAlign(HAlign_Fill)
 				.VAlign(VAlign_Fill)

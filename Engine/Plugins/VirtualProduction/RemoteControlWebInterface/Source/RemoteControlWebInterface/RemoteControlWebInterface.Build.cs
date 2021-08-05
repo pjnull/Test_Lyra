@@ -29,7 +29,7 @@ public class RemoteControlWebInterface : ModuleRules
 		);
 
 
-        if (Target.Type == TargetType.Editor)
+		if (Target.Type == TargetType.Editor)
 		{
 			PrivateDependencyModuleNames.AddRange(
 				new string[] 

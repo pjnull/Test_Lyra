@@ -120,14 +120,14 @@ const UDMXPixelMappingRootComponent* UDMXPixelMappingBaseComponent::GetRootCompo
 		for (UDMXPixelMappingBaseComponent* Parent = GetParent(); Parent; Parent = Parent->GetParent())
 		{
 			if (const UDMXPixelMappingRootComponent* Root = Cast<UDMXPixelMappingRootComponent>(Parent))
-			{
+	{
 				return Root;
 			}
 		}
 	}
 	
-	return nullptr;
-}
+		return nullptr;
+	}
 
 const UDMXPixelMappingRootComponent* UDMXPixelMappingBaseComponent::GetRootComponentChecked() const
 {
@@ -184,7 +184,7 @@ void UDMXPixelMappingBaseComponent::AddChild(UDMXPixelMappingBaseComponent* InCo
 		InComponent->WeakParent = this;
 
 		// Allow children to be readded, this may be the case during Undo of a Remove
-		Children.AddUnique(InComponent);
+			Children.AddUnique(InComponent);
 
 		// Broadcast the change
 		GetOnComponentAdded().Broadcast(GetPixelMapping(), InComponent);
@@ -200,7 +200,7 @@ void UDMXPixelMappingBaseComponent::RemoveChild(UDMXPixelMappingBaseComponent* C
 		TArray<UDMXPixelMappingBaseComponent*> ChildComponents;
 		ChildComponent->GetChildComponentsRecursively(ChildComponents);
 		for (UDMXPixelMappingBaseComponent* ChildOfChild : ChildComponents)
-		{ 
+		{
 			// Recursively call this function here on children
 			ChildComponent->RemoveChild(ChildOfChild);
 		}

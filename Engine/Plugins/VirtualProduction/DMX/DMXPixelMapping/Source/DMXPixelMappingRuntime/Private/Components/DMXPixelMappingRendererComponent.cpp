@@ -455,7 +455,7 @@ void UDMXPixelMappingRendererComponent::Initialize()
 				SetSize(NewSize);
 			}
 		}
-	}
+}
 	else
 	{
 		bLockInDesigner = false;

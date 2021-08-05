@@ -270,25 +270,25 @@ void FDMXPixelMappingDetailCustomization_Matrix::CreateModulatorDetails(IDetailL
 					UClass* ModulatorClass = FirstMatrixComponent->Modulators[IndexModulator]->GetClass();
 
 					for (const TWeakObjectPtr<UObject>& CustomizedObject : CustomizedObjects)
-					{
+				{
 						if (UDMXPixelMappingMatrixComponent* MatrixComponent = Cast<UDMXPixelMappingMatrixComponent>(CustomizedObject.Get()))
-						{
+					{
 							const bool bMultiEditableModulator =
 								MatrixComponent->Modulators.IsValidIndex(IndexModulator) &&
 								MatrixComponent->Modulators[IndexModulator] &&
 								MatrixComponent->Modulators[IndexModulator]->GetClass() == ModulatorClass;
 
 							if (bMultiEditableModulator)
-							{
+						{
 								ModulatorsToEdit.Add(MatrixComponent->Modulators[IndexModulator]);
-							}
+						}
 							else
-							{
-								// Don't allow multi edit if not all modulators are of same class
-								ModulatorsToEdit.Reset();
-							}
+						{
+							// Don't allow multi edit if not all modulators are of same class
+							ModulatorsToEdit.Reset();
 						}
 					}
+				}
 				}
 				else if(UDMXModulator* ModulatorOfFirstMatrix = FirstMatrixComponent->Modulators[IndexModulator])
 				{

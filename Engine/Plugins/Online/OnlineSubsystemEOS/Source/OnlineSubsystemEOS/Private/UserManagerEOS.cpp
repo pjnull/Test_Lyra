@@ -9,8 +9,8 @@
 #include "SocketSubsystem.h"
 #include "OnlineError.h"
 #include "EOSSettings.h"
-#include "IEOSSDKManager.h"
 #include "CoreMinimal.h"
+#include "IEOSSDKManager.h"
 
 #include COMPILED_PLATFORM_HEADER(EOSHelpers.h)
 
@@ -144,19 +144,19 @@ FUserManagerEOS::FUserManagerEOS(FOnlineSubsystemEOS* InSubsystem)
 	// This delegate would cause a crash when running a dedicated server
 	if (!IsRunningDedicatedServer())
 	{
-		// Adding subscription to external ui display change event
-		EOS_UI_AddNotifyDisplaySettingsUpdatedOptions Options = {};
-		Options.ApiVersion = EOS_UI_ADDNOTIFYDISPLAYSETTINGSUPDATED_API_LATEST;
+	// Adding subscription to external ui display change event
+	EOS_UI_AddNotifyDisplaySettingsUpdatedOptions Options = {};
+	Options.ApiVersion = EOS_UI_ADDNOTIFYDISPLAYSETTINGSUPDATED_API_LATEST;
 
-		FOnDisplaySettingsUpdatedCallback* CallbackObj = new FOnDisplaySettingsUpdatedCallback();
-		DisplaySettingsUpdatedCallback = CallbackObj;
-		CallbackObj->CallbackLambda = [this](const EOS_UI_OnDisplaySettingsUpdatedCallbackInfo* Data)
-		{
-			TriggerOnExternalUIChangeDelegates((bool)Data->bIsVisible);
-		};
+	FOnDisplaySettingsUpdatedCallback* CallbackObj = new FOnDisplaySettingsUpdatedCallback();
+	DisplaySettingsUpdatedCallback = CallbackObj;
+	CallbackObj->CallbackLambda = [this](const EOS_UI_OnDisplaySettingsUpdatedCallbackInfo* Data)
+	{
+		TriggerOnExternalUIChangeDelegates((bool)Data->bIsVisible);
+	};
 
-		DisplaySettingsUpdatedId = EOS_UI_AddNotifyDisplaySettingsUpdated(EOSSubsystem->UIHandle, &Options, CallbackObj, CallbackObj->GetCallbackPtr());
-	}
+	DisplaySettingsUpdatedId = EOS_UI_AddNotifyDisplaySettingsUpdated(EOSSubsystem->UIHandle, &Options, CallbackObj, CallbackObj->GetCallbackPtr());
+}
 }
 
 FUserManagerEOS::~FUserManagerEOS()
@@ -2407,7 +2407,7 @@ void FUserManagerEOS::ReadUserInfo(int32 LocalUserNum, EOS_EpicAccountId EpicAcc
 	if (!IsFriendQueryUserInfoOngoingForLocalUserMap.Contains(LocalUserNum))
 	{
 		IsFriendQueryUserInfoOngoingForLocalUserMap.Emplace(LocalUserNum);
-	}
+}
 
 	IsFriendQueryUserInfoOngoingForLocalUserMap[LocalUserNum].Add(EpicAccountId);
 }

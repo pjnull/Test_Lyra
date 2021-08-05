@@ -14,7 +14,7 @@ class UMG_API UMovieSceneMarginPropertySystem : public UMovieScenePropertySystem
 public:
 
 	GENERATED_BODY()
-
+	
 	UMovieSceneMarginPropertySystem(const FObjectInitializer& ObjInit);
 
 	virtual void OnRun(FSystemTaskPrerequisites& InPrerequisites, FSystemSubsequentTasks& Subsequents) override;

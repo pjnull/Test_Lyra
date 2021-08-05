@@ -120,23 +120,23 @@ void FDMXPixelMappingDetailCustomization_FixtureGroup::OnLibraryChanged()
 					}
 				}
 				else if (UDMXPixelMappingMatrixComponent* ChildMatrix = Cast<UDMXPixelMappingMatrixComponent>(ChildComponent))
-				{
+							{
 					if (ChildMatrix->FixturePatchRef.GetFixturePatch() &&
 						ChildMatrix->FixturePatchRef.GetFixturePatch()->GetParentLibrary() != GroupComponent->DMXLibrary)
-					{
+						{
 						GroupComponent->RemoveChild(ChildMatrix);
+						}
 					}
-				}
 			};
 		}
-	}
+				}
 
 	if (!bRefreshing)
 	{
 		ForceRefresh();
 		bRefreshing = true;
 	}
-}
+			}
 
 void FDMXPixelMappingDetailCustomization_FixtureGroup::OnComponentAdded(UDMXPixelMapping* PixelMapping, UDMXPixelMappingBaseComponent* Component)
 {
@@ -144,16 +144,16 @@ void FDMXPixelMappingDetailCustomization_FixtureGroup::OnComponentAdded(UDMXPixe
 	{
 		ForceRefresh();
 		bRefreshing = true;
+		}
 	}
-}
 
 void FDMXPixelMappingDetailCustomization_FixtureGroup::OnComponentRemoved(UDMXPixelMapping* PixelMapping, UDMXPixelMappingBaseComponent* Component)
 {
 	if (!bRefreshing)
 	{
-		ForceRefresh();
+	ForceRefresh();
 		bRefreshing = true;
-	}
+}
 }
 
 void FDMXPixelMappingDetailCustomization_FixtureGroup::ForceRefresh()

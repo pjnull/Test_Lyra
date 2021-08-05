@@ -258,8 +258,8 @@ public:
 #if WITH_EDITOR
 	/** Set the components parent */
 	void SetParent(const TWeakObjectPtr<UDMXPixelMappingBaseComponent>& NewParent) { WeakParent = NewParent; }
-#endif
-	
+#endif 
+
 	/** Parent component */
 	UPROPERTY(Meta = (DeprecatedProperty, DeprecationMessage = "Leads to entangled references. Use GetParent() or WeakParent instead."))
 	UDMXPixelMappingBaseComponent* Parent_DEPRECATED;

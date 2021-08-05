@@ -119,39 +119,39 @@ void FDMXPixelMappingDetailCustomization_Renderer::CustomizeDetails(IDetailLayou
 			// Remember the selected renderer type
 			PreviousRendererType = RendererComponent->RendererType;
 
-			// Add Warning InputTexture Row
-			AddInputTextureWarning(RenderSettingsSettingsCategory);
+		// Add Warning InputTexture Row
+		AddInputTextureWarning(RenderSettingsSettingsCategory);
 
-			// Add non UI Material Warning
-			AddMaterialWarning(RenderSettingsSettingsCategory);
+		// Add non UI Material Warning
+		AddMaterialWarning(RenderSettingsSettingsCategory);
 
-			// Retister properties
-			RenderSettingsSettingsCategory.AddProperty(InputTexturePropertyHandle)
-				.Visibility(
-					TAttribute<EVisibility>::Create(
+		// Retister properties
+		RenderSettingsSettingsCategory.AddProperty(InputTexturePropertyHandle)
+			.Visibility(
+				TAttribute<EVisibility>::Create(
 						TAttribute<EVisibility>::FGetter::CreateLambda([this]
 							{
 								return IsSelectedRendererType(EDMXPixelMappingRendererType::Texture) ? EVisibility::Visible : EVisibility::Hidden;
 							}
-						)));
+					)));
 
-			RenderSettingsSettingsCategory.AddProperty(InputMaterialPropertyHandle)
-				.Visibility(
-					TAttribute<EVisibility>::Create(
+		RenderSettingsSettingsCategory.AddProperty(InputMaterialPropertyHandle)
+			.Visibility(
+				TAttribute<EVisibility>::Create(
 						TAttribute<EVisibility>::FGetter::CreateLambda([this]
 							{
 								return IsSelectedRendererType(EDMXPixelMappingRendererType::Material) ? EVisibility::Visible : EVisibility::Hidden;
 							}
-						)));
+					)));
 
-			RenderSettingsSettingsCategory.AddProperty(InputWidgetPropertyHandle)
-				.Visibility(
-					TAttribute<EVisibility>::Create(
+		RenderSettingsSettingsCategory.AddProperty(InputWidgetPropertyHandle)
+			.Visibility(
+				TAttribute<EVisibility>::Create(
 						TAttribute<EVisibility>::FGetter::CreateLambda([this]
 							{
 								return IsSelectedRendererType(EDMXPixelMappingRendererType::UMG) ? EVisibility::Visible : EVisibility::Hidden;
 							}
-						)));
+					)));
 
 		}
 	}

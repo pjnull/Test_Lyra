@@ -273,25 +273,25 @@ void FDMXPixelMappingDetailCustomization_FixtureGroupItem::CreateModulatorDetail
 					UClass* ModulatorClass = FirstGroupItemComponent->Modulators[IndexModulator]->GetClass();
 
 					for (const TWeakObjectPtr<UObject>& CustomizedObject : CustomizedObjects)
-					{
+				{
 						if (UDMXPixelMappingFixtureGroupItemComponent* GroupItemComponent = Cast<UDMXPixelMappingFixtureGroupItemComponent>(CustomizedObject.Get()))
-						{
+					{
 							const bool bMultiEditableModulator =
 								GroupItemComponent->Modulators.IsValidIndex(IndexModulator) &&
 								GroupItemComponent->Modulators[IndexModulator] &&
 								GroupItemComponent->Modulators[IndexModulator]->GetClass() == ModulatorClass;
 
 							if (bMultiEditableModulator)
-							{
+						{
 								ModulatorsToEdit.Add(GroupItemComponent->Modulators[IndexModulator]);
-							}
+						}
 							else
-							{
-								// Don't allow multi edit if not all modulators are of same class
-								ModulatorsToEdit.Reset();
-							}
+						{
+							// Don't allow multi edit if not all modulators are of same class
+							ModulatorsToEdit.Reset();
 						}
 					}
+				}
 				}
 				else if (UDMXModulator* ModulatorOfFirstGroupItem = FirstGroupItemComponent->Modulators[IndexModulator])
 				{

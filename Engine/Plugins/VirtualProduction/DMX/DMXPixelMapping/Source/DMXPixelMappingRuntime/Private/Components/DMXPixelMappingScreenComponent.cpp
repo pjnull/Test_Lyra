@@ -104,7 +104,7 @@ void UDMXPixelMappingScreenComponent::PostEditChangeChainProperty(FPropertyChang
 			if (ComponentWidget.IsValid())
 			{
 				ComponentWidget->SetSize(FVector2D(SizeX, SizeY));
-			}
+}
 		}
 	}
 }
@@ -260,9 +260,9 @@ void UDMXPixelMappingScreenComponent::ResetDMX()
 	UDMXPixelMappingRendererComponent* RendererComponent = GetRendererComponent();
 	if (ensure(RendererComponent))
 	{
-		RendererComponent->ResetColorDownsampleBufferPixels(PixelDownsamplePositionRange.Key, PixelDownsamplePositionRange.Value);
-		SendDMX();
-	}
+	RendererComponent->ResetColorDownsampleBufferPixels(PixelDownsamplePositionRange.Key, PixelDownsamplePositionRange.Value);
+	SendDMX();
+}
 }
 
 void UDMXPixelMappingScreenComponent::SendDMX()
@@ -448,8 +448,8 @@ void UDMXPixelMappingScreenComponent::ForEachPixel(ForEachPixelCallback InCallba
 	int32 IndexXY = 0;
 	for (int32 NumYIndex = 0; NumYIndex < NumYCells; ++NumYIndex)
 	{
-		for (int32 NumXIndex = 0; NumXIndex < NumXCells; ++NumXIndex)
-		{
+	for (int32 NumXIndex = 0; NumXIndex < NumXCells; ++NumXIndex)
+	{
 			InCallback(IndexXY, NumXIndex, NumYIndex);
 			IndexXY++;
 		}

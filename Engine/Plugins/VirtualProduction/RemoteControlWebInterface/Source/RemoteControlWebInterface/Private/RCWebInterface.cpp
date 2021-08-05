@@ -74,12 +74,12 @@ void FRemoteControlWebInterfaceModule::OnSettingsModified(UObject* Settings, FPr
 	{
 		return;
 	}
-	
+
 	FName PropertyName = PropertyChangedEvent.GetPropertyName();
 	if (PropertyName == GET_MEMBER_NAME_CHECKED(URemoteControlSettings, RemoteControlWebInterfacePort) || PropertyName == GET_MEMBER_NAME_CHECKED(URemoteControlSettings, bForceWebAppBuildAtStartup))
 	{
-		WebApp->Shutdown();
-		WebApp->Start();
+	WebApp->Shutdown();
+	WebApp->Start();
 	}
 }
 

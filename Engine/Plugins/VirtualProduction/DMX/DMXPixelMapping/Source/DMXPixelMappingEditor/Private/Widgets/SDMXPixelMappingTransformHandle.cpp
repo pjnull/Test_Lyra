@@ -77,22 +77,22 @@ FReply SDMXPixelMappingTransformHandle::OnMouseButtonUp(const FGeometry& MyGeome
 	if ( HasMouseCapture() && MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton )
 	{
 		Action = EDMXPixelMappingTransformAction::None;
-
+		
 		// Delete components no longer over the resized component
 		if (TSharedPtr<FDMXPixelMappingToolkit> Toolkit = DesignerViewWeakPtr.Pin()->GetToolkit())
 		{
 			const FDMXPixelMappingComponentReference& ComponentReference = DesignerViewWeakPtr.Pin()->GetSelectedComponent();
 			if (UDMXPixelMappingOutputComponent* ResizedComponent = Cast<UDMXPixelMappingOutputComponent>(ComponentReference.GetComponent()))
-			{
+				{
 				if (ResizedComponent->HasValidParent() &&
 					!ResizedComponent->IsOverParent())
-				{
+					{
 					ResizedComponent->SetFlags(RF_Transactional);
 					ResizedComponent->Modify();
 
 					ResizedComponent->GetParent()->RemoveChild(ResizedComponent);
-				}
-			}
+						}
+					}
 		}
 
 		// Set the final size transacted

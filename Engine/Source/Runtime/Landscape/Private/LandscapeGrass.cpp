@@ -1356,9 +1356,9 @@ SIZE_T FLandscapeComponentGrassData::GetAllocatedSize() const
 }
 
 bool FLandscapeComponentGrassData::HasWeightData() const
-{
+	{
 	return !!WeightOffsets.Num();
-}
+	}
 
 TArrayView<uint8> FLandscapeComponentGrassData::GetWeightData(const ULandscapeGrassType* GrassType)
 {
@@ -1564,8 +1564,8 @@ void FLandscapeComponentGrassData::ConditionalDiscardDataOnLoad()
 
 				FMemory::Memcpy(&CopyDest[CopyOffset], &CopySrc[PreviousOffset], CopySize);
 				CopyOffset += CopySize;
-			}
-		}
+	}
+}
 	}
 }
 
@@ -2589,15 +2589,15 @@ void ALandscapeProxy::UpdateGrassData(bool bInShouldMarkDirty, FScopedSlowTask* 
 	{
 		MarkPackageDirty();
 	}
-		
+
 	// In Edit Layers, bForceMiplevelsToBeResident needs to remain true
 	if (!HasLayersContent())
 	{
-	for (UTexture2D* TextureToStream : CurrentForcedStreamedTextures)
-	{
-		TextureToStream->bForceMiplevelsToBeResident = false;
+		for (UTexture2D* TextureToStream : CurrentForcedStreamedTextures)
+		{
+			TextureToStream->bForceMiplevelsToBeResident = false;
+		}
 	}
-}
 }
 #endif
 
@@ -3134,10 +3134,10 @@ void ALandscapeProxy::UpdateGrass(const TArray<FVector>& Cameras, int32& InOutNu
 				// In Edit Layers, bForceMiplevelsToBeResident needs to remain true
 				if (!HasLayersContent())
 				{
-				for (auto Texture : CurrentForcedStreamedTextures.Difference(DesiredForceStreamedTextures))
-				{
-					Texture->bForceMiplevelsToBeResident = false;
-				}
+					for (auto Texture : CurrentForcedStreamedTextures.Difference(DesiredForceStreamedTextures))
+					{
+						Texture->bForceMiplevelsToBeResident = false;
+					}
 				}
 			}
 #endif
