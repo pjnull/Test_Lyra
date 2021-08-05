@@ -15,6 +15,9 @@ struct CORE_API FFortniteReleaseBranchCustomObjectVersion
 		// Custom 14.10 File Object Version
 		DisableLevelset_v14_10 ,
 		
+		// Add the long range attachment tethers to the cloth asset to avoid a large hitch during the cloth's initialization.
+		ChaosClothAddTethersToCachedData,
+
 		// -----<new versions can be added above this line>-------------------------------------------------
 		VersionPlusOne,
 		LatestVersion = VersionPlusOne - 1
