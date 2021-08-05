@@ -6,6 +6,8 @@
 #include "Serialization/VarInt.h"
 #include "HAL/FileManagerGeneric.h"
 #include "PipelineFileCache.h"
+#include "Serialization/MemoryWriter.h"
+#include "Serialization/MemoryReader.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogPipelineCacheUtilities, Log, All);
 
@@ -193,7 +195,7 @@ namespace Private
 				// all non-graphics should be false
 				for (int32 Idx = 0; Idx < UE_ARRAY_COUNT(PermDescriptor.ActivePerSlot); ++Idx)
 				{
-					check(Idx == SF_Vertex || Idx == SF_Hull || Idx == SF_Domain || Idx == SF_Pixel || Idx == SF_Geometry || !PermDescriptor.ActivePerSlot[Idx]);
+					check(Idx == SF_Vertex || Idx == SF_Mesh || Idx == SF_Amplification || Idx == SF_Pixel || Idx == SF_Geometry || !PermDescriptor.ActivePerSlot[Idx]);
 				}
 				break;
 
@@ -496,8 +498,8 @@ bool UE::PipelineCacheUtilities::SaveStablePipelineCacheFile(const FString& Outp
 			NewPSO.GraphicsDesc.VertexShader = FSHAHash();
 			NewPSO.GraphicsDesc.FragmentShader = FSHAHash();
 			NewPSO.GraphicsDesc.GeometryShader = FSHAHash();
-			NewPSO.GraphicsDesc.HullShader = FSHAHash();
-			NewPSO.GraphicsDesc.DomainShader = FSHAHash();
+			NewPSO.GraphicsDesc.MeshShader = FSHAHash();
+			NewPSO.GraphicsDesc.AmplificationShader = FSHAHash();
 			NewPSO.RayTracingDesc.ShaderHash = FSHAHash();
 
 #if !PSO_COOKONLY_DATA
@@ -762,8 +764,8 @@ bool UE::PipelineCacheUtilities::LoadStablePipelineCacheFile(const FString& File
 				NewPSO.GraphicsDesc.VertexShader = UE_PCU_GET_SHADER_HASH_FOR_SLOT(SF_Vertex);
 				NewPSO.GraphicsDesc.FragmentShader = UE_PCU_GET_SHADER_HASH_FOR_SLOT(SF_Pixel);
 				NewPSO.GraphicsDesc.GeometryShader = UE_PCU_GET_SHADER_HASH_FOR_SLOT(SF_Geometry);
-				NewPSO.GraphicsDesc.HullShader = UE_PCU_GET_SHADER_HASH_FOR_SLOT(SF_Hull);
-				NewPSO.GraphicsDesc.DomainShader = UE_PCU_GET_SHADER_HASH_FOR_SLOT(SF_Domain);
+				NewPSO.GraphicsDesc.MeshShader = UE_PCU_GET_SHADER_HASH_FOR_SLOT(SF_Mesh);
+				NewPSO.GraphicsDesc.AmplificationShader = UE_PCU_GET_SHADER_HASH_FOR_SLOT(SF_Amplification);
 
 #undef UE_PCU_GET_SHADER_HASH_FOR_SLOT
 

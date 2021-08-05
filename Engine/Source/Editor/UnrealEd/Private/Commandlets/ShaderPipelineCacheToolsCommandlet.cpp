@@ -733,7 +733,7 @@ bool SaveStablePipelineCacheDeprecated(const FString& OutputFilename, const TArr
 				for (int32 SlotIndex = 0; SlotIndex < SF_Compute; SlotIndex++)  // SF_Compute here because the stablepc.csv file format does not have a compute slot
 				{
 					check(!Item.ActivePerSlot[SlotIndex]); // none of these should be active for a compute shader
-					if (SlotIndex == SF_Hull)
+					if (SlotIndex == SF_Mesh)
 					{
 						FStableShaderKeyAndValue ShaderKeyAndValue = StableShaderKeyIndexTable[Perm.Slots[SF_Compute]];
 						ShaderKeyAndValue.OutputHash = FSHAHash(); // Saved output hash needs to be zeroed so that BuildPSOSC can use this entry even if shaders code changes in future builds
@@ -771,7 +771,7 @@ bool SaveStablePipelineCacheDeprecated(const FString& OutputFilename, const TArr
 				// Re-purpose graphics state fields to store RT PSO properties
 				// See corresponding parsing code in ParseStableCSV().
 				Desc.MSAASamples = Item.PSO->RayTracingDesc.MaxPayloadSizeInBytes;
-				Desc.DepthStencilFlags = uint32(Item.PSO->RayTracingDesc.bAllowHitGroupIndexing);
+				Desc.DepthStencilFlags = Item.PSO->RayTracingDesc.bAllowHitGroupIndexing ? ETextureCreateFlags::SRGB : ETextureCreateFlags::None;
 
 				PSOLine += FString::Printf(TEXT("\"%s\""), *Desc.StateToString());
 
