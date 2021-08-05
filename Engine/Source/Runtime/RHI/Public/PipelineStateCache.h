@@ -46,7 +46,7 @@ namespace PipelineStateCache
 {
 	extern RHI_API uint64					RetrieveGraphicsPipelineStateSortKey(FGraphicsPipelineState* GraphicsPipelineState);
 
-	extern RHI_API FComputePipelineState*	GetAndOrCreateComputePipelineState(FRHIComputeCommandList& RHICmdList, FRHIComputeShader* ComputeShader);
+	extern RHI_API FComputePipelineState*	GetAndOrCreateComputePipelineState(FRHIComputeCommandList& RHICmdList, FRHIComputeShader* ComputeShader, bool bFromFileCache);
 
 	extern RHI_API FGraphicsPipelineState*	GetAndOrCreateGraphicsPipelineState(FRHICommandList& RHICmdList, const FGraphicsPipelineStateInitializer& OriginalInitializer, EApplyRendertargetOption ApplyFlags);
 
@@ -64,6 +64,8 @@ namespace PipelineStateCache
 
 	/* Evicts unused state entries based on r.pso.evictiontime time. Called in RHICommandList::BeginFrame */
 	extern RHI_API void FlushResources();
+
+	extern RHI_API void ReportFrameHitchToCSV();
 
 	/* Clears all pipeline cached state. Called on shutdown, calling GetAndOrCreate after this will recreate state */
 	extern RHI_API void Shutdown();
