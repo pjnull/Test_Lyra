@@ -9402,17 +9402,20 @@ TSharedPtr<SGraphEditor> FBlueprintEditor::OpenGraphAndBringToFront(UEdGraph* Gr
 
 	// This will either reuse an existing tab or spawn a new one
 	TSharedPtr<SDockTab> TabWithGraph = OpenDocument(Graph, FDocumentTracker::OpenNewDocument);
-
-	// We know that the contents of the opened tabs will be a graph editor.
-	TSharedRef<SGraphEditor> NewGraphEditor = StaticCastSharedRef<SGraphEditor>(TabWithGraph->GetContent());
-
-	// Handover the keyboard focus to the new graph editor widget.
-	if (bSetFocus)
+	if (TabWithGraph.IsValid())
 	{
-		NewGraphEditor->CaptureKeyboard();
-	}
 
-	return NewGraphEditor;
+		// We know that the contents of the opened tabs will be a graph editor.
+		TSharedRef<SGraphEditor> NewGraphEditor = StaticCastSharedRef<SGraphEditor>(TabWithGraph->GetContent());
+
+		// Handover the keyboard focus to the new graph editor widget.
+		if (bSetFocus)
+		{
+			NewGraphEditor->CaptureKeyboard();
+		}
+
+		return NewGraphEditor;
+	}
 }
 
 TSharedPtr<SDockTab> FBlueprintEditor::OpenDocument(const UObject* DocumentID, FDocumentTracker::EOpenDocumentCause Cause)
