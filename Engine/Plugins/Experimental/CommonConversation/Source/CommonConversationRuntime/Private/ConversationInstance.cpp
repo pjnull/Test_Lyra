@@ -383,7 +383,22 @@ void UConversationInstance::ServerRefreshConversationChoices()
 	}
 }
 
-#endif
+void UConversationInstance::ServerRefreshTaskChoiceData(const FConversationNodeHandle& Handle)
+{
+	FConversationContext Context = FConversationContext::CreateServerContext(this, nullptr);
+
+	// Technically we only need to do a gather for a single choice here from the current active subset, but gathering all for now (only choice data relevant to Handle will actually be sent)
+	UpdateNextChoices(Context);
+	
+	for (const FConversationParticipantEntry& KVP : GetParticipantListCopy())
+	{
+		if (UConversationParticipantComponent* ParticipantComponent = KVP.GetParticipantComponent())
+		{
+			ParticipantComponent->SendClientRefreshedTaskChoiceData(Handle, Context);
+		}
+	}
+}
+#endif // #if WITH_SERVER_CODE
 
 void UConversationInstance::ResetConversationProgress()
 {
