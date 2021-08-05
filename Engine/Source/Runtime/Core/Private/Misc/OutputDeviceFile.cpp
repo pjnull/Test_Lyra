@@ -27,6 +27,7 @@
 #include "Templates/Atomic.h"
 #include "HAL/ConsoleManager.h"
 #include "Misc/Fork.h"
+#include "Stats/Stats.h"
 
 /** Used by tools which include only core to disable log file creation. */
 #ifndef ALLOW_LOG_FILE
