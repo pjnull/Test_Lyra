@@ -1034,22 +1034,22 @@ bool UMaterialEditingLibrary::SetMaterialInstanceTextureParameterValue(UMaterial
 }
 
 
-URuntimeVirtualTexture* UMaterialEditingLibrary::GetMaterialInstanceRuntimeVirtualTextureParameterValue(UMaterialInstanceConstant* Instance, FName ParameterName)
+URuntimeVirtualTexture* UMaterialEditingLibrary::GetMaterialInstanceRuntimeVirtualTextureParameterValue(UMaterialInstanceConstant* Instance, FName ParameterName, EMaterialParameterAssociation Association)
 {
 	URuntimeVirtualTexture* Result = nullptr;
 	if (Instance)
 	{
-		Instance->GetRuntimeVirtualTextureParameterValue(ParameterName, Result);
+		Instance->GetRuntimeVirtualTextureParameterValue(FHashedMaterialParameterInfo(ParameterName, Association, Association == EMaterialParameterAssociation::LayerParameter ? 0 : INDEX_NONE), Result);
 	}
 	return Result;
 }
 
-bool UMaterialEditingLibrary::SetMaterialInstanceRuntimeVirtualTextureParameterValue(UMaterialInstanceConstant* Instance, FName ParameterName, URuntimeVirtualTexture* Value)
+bool UMaterialEditingLibrary::SetMaterialInstanceRuntimeVirtualTextureParameterValue(UMaterialInstanceConstant* Instance, FName ParameterName, URuntimeVirtualTexture* Value, EMaterialParameterAssociation Association)
 {
 	bool bResult = false;
 	if (Instance)
 	{
-		Instance->SetRuntimeVirtualTextureParameterValueEditorOnly(ParameterName, Value);
+		Instance->SetRuntimeVirtualTextureParameterValueEditorOnly(FMaterialParameterInfo(ParameterName, Association, Association == EMaterialParameterAssociation::LayerParameter ? 0 : INDEX_NONE), Value);
 	}
 	return bResult;
 }

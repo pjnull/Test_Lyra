@@ -269,11 +269,11 @@ public:
 
 	/** Get the current texture parameter value from a Material Instance */
 	UFUNCTION(BlueprintPure, Category = "MaterialEditing")
-	static URuntimeVirtualTexture* GetMaterialInstanceRuntimeVirtualTextureParameterValue(UMaterialInstanceConstant* Instance, FName ParameterName);
+	static URuntimeVirtualTexture* GetMaterialInstanceRuntimeVirtualTextureParameterValue(UMaterialInstanceConstant* Instance, FName ParameterName, EMaterialParameterAssociation Association = EMaterialParameterAssociation::GlobalParameter);
 
 	/** Set the texture parameter value for a Material Instance */
 	UFUNCTION(BlueprintCallable, Category = "MaterialEditing")
-	static bool SetMaterialInstanceRuntimeVirtualTextureParameterValue(UMaterialInstanceConstant* Instance, FName ParameterName, URuntimeVirtualTexture* Value);
+	static bool SetMaterialInstanceRuntimeVirtualTextureParameterValue(UMaterialInstanceConstant* Instance, FName ParameterName, URuntimeVirtualTexture* Value, EMaterialParameterAssociation Association = EMaterialParameterAssociation::GlobalParameter);
 
 
 	/** Get the current vector parameter value from a Material Instance */
