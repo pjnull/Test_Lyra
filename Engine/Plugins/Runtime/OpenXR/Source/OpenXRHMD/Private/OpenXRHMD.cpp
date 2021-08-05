@@ -2984,9 +2984,10 @@ void FOpenXRHMD::DrawVisibleAreaMesh_RenderThread(class FRHICommandList& RHICmdL
 	RHICmdList.DrawIndexedPrimitive(Mesh.IndexBufferRHI, 0, 0, Mesh.NumVertices, 0, Mesh.NumTriangles, 1);
 }
 
-void FOpenXRHMD::UpdateLayer(FOpenXRLayer& Layer, uint32 LayerId, bool bIsValid) const
+void FOpenXRHMD::UpdateLayer(FOpenXRLayer& Layer, uint32 LayerId, bool bIsValid)
 {
-	if (!Layer.Desc.HasShape<FQuadLayer>())
+	FReadScopeLock Lock(SessionHandleMutex);
+	if (!Session || !Layer.Desc.HasShape<FQuadLayer>())
 	{
 		return;
 	}
