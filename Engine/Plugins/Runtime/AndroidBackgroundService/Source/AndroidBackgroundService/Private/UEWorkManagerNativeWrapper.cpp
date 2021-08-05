@@ -360,37 +360,81 @@ void FUEWorkManagerNativeWrapper::CancelBackgroundWork(FString UniqueWorkName)
 
 void FUEWorkManagerNativeWrapper::SetWorkResultOnWorker(jobject Worker, FUEWorkManagerNativeWrapper::EAndroidBackgroundWorkResult Result)
 {
+	if (ensureAlwaysMsgf((Result != EAndroidBackgroundWorkResult::NotSet), TEXT("WorkResult can not be set to NotSet! Skipping invalid SetWorkResultOnWorker call!")))
+	{
+		JNIEnv* Env = FAndroidApplication::GetJavaEnv();
+		if (ensureAlwaysMsgf((Env != nullptr), TEXT("Unexpected invalid JNI environment found! Can not respond to UnderlyingWorker!")))
+		{
+			const bool bIsOptional = false;
+			jclass JavaWorkerClass = Env->GetObjectClass(Worker);
+			CHECK_JNI_RESULT(JavaWorkerClass);
+
+			if (Result == EAndroidBackgroundWorkResult::Success)
+			{
+				jmethodID WorkerMethod_SetWorkResult_Success = FJavaWrapper::FindMethod(Env, JavaWorkerClass, "SetWorkResult_Success", "()V", bIsOptional);
+				CHECK_JNI_RESULT(WorkerMethod_SetWorkResult_Success);
+				FJavaWrapper::CallVoidMethod(Env, Worker, WorkerMethod_SetWorkResult_Success);
+			}
+			else if (Result == EAndroidBackgroundWorkResult::Failure)
+			{
+				jmethodID WorkerMethod_SetWorkResult_Failure = FJavaWrapper::FindMethod(Env, JavaWorkerClass, "SetWorkResult_Failure", "()V", bIsOptional);
+				CHECK_JNI_RESULT(WorkerMethod_SetWorkResult_Failure);
+				FJavaWrapper::CallVoidMethod(Env, Worker, WorkerMethod_SetWorkResult_Failure);
+			}
+			else if (Result == EAndroidBackgroundWorkResult::Retry)
+			{
+				jmethodID WorkerMethod_SetWorkResult_Retry = FJavaWrapper::FindMethod(Env, JavaWorkerClass, "SetWorkResult_Retry", "()V", bIsOptional);
+				CHECK_JNI_RESULT(WorkerMethod_SetWorkResult_Retry);
+				FJavaWrapper::CallVoidMethod(Env, Worker, WorkerMethod_SetWorkResult_Retry);
+			}
+			else
+			{
+				//missing an implementation above for a new EAndroidBackgroundWorkResult
+				ensureAlwaysMsgf(false, TEXT("Missing implementation for EAndroidBackgroundWorkResult entry %d in SetWorkResultOnWorker"), int(Result));
+			}
+		}
+	}
+}
+
+FUEWorkManagerNativeWrapper::EAndroidBackgroundWorkResult FUEWorkManagerNativeWrapper::GetWorkResultOnWorker(jobject Worker)
+{
 	JNIEnv* Env = FAndroidApplication::GetJavaEnv();
-	if (ensureAlwaysMsgf((Env != nullptr), TEXT("Unexpected invalid JNI environment found! Can not respond to UnderlyingWorker!")))
+	if (ensureAlwaysMsgf((Env != nullptr), TEXT("Unexpected invalid JNI environment found! Can not query to UnderlyingWorker!")))
 	{
 		const bool bIsOptional = false;
 		jclass JavaWorkerClass = Env->GetObjectClass(Worker);
 		CHECK_JNI_RESULT(JavaWorkerClass);
 
-		if (Result == EAndroidBackgroundWorkResult::Success)
+		//Check if we have received a result. If not, we need to just return NotSet instead of checking for which result
+		jmethodID WorkerMethod_DidReceiveResult = FJavaWrapper::FindMethod(Env, JavaWorkerClass, "DidReceiveResult", "()Z", bIsOptional);
+		CHECK_JNI_RESULT(WorkerMethod_DidReceiveResult);
+		if (!FJavaWrapper::CallBooleanMethod(Env, Worker, WorkerMethod_DidReceiveResult))
 		{
-			jmethodID WorkerMethod_SetWorkResult_Success = FJavaWrapper::FindMethod(Env, JavaWorkerClass, "SetWorkResult_Success", "()V", bIsOptional);
-			CHECK_JNI_RESULT(WorkerMethod_SetWorkResult_Success);
-			FJavaWrapper::CallVoidMethod(Env, Worker, WorkerMethod_SetWorkResult_Success);
+			return EAndroidBackgroundWorkResult::NotSet;
 		}
-		else if (Result == EAndroidBackgroundWorkResult::Failure)
+
+		//Check for Success
+		jmethodID WorkerMethod_DidWorkEndInSuccess = FJavaWrapper::FindMethod(Env, JavaWorkerClass, "DidWorkEndInSuccess", "()Z", bIsOptional);
+		CHECK_JNI_RESULT(WorkerMethod_DidWorkEndInSuccess);
+		if (FJavaWrapper::CallBooleanMethod(Env, Worker, WorkerMethod_DidWorkEndInSuccess))
 		{
-			jmethodID WorkerMethod_SetWorkResult_Failure = FJavaWrapper::FindMethod(Env, JavaWorkerClass, "SetWorkResult_Failure", "()V", bIsOptional);
-			CHECK_JNI_RESULT(WorkerMethod_SetWorkResult_Failure);
-			FJavaWrapper::CallVoidMethod(Env, Worker, WorkerMethod_SetWorkResult_Failure);
+			return EAndroidBackgroundWorkResult::Success;
 		}
-		else if (Result == EAndroidBackgroundWorkResult::Retry)
+
+		//Check for Failure
+		jmethodID WorkerMethod_DidWorkEndInFailure = FJavaWrapper::FindMethod(Env, JavaWorkerClass, "DidWorkEndInFailure", "()Z", bIsOptional);
+		CHECK_JNI_RESULT(WorkerMethod_DidWorkEndInFailure);
+		if (FJavaWrapper::CallBooleanMethod(Env, Worker, WorkerMethod_DidWorkEndInFailure))
 		{
-			jmethodID WorkerMethod_SetWorkResult_Retry = FJavaWrapper::FindMethod(Env, JavaWorkerClass, "SetWorkResult_Retry", "()V", bIsOptional);
-			CHECK_JNI_RESULT(WorkerMethod_SetWorkResult_Retry);
-			FJavaWrapper::CallVoidMethod(Env, Worker, WorkerMethod_SetWorkResult_Retry);
+			return EAndroidBackgroundWorkResult::Failure;
 		}
-		else
-		{
-			//missing an implementation above for a new EAndroidBackgroundWorkResult
-			ensureAlwaysMsgf(false, TEXT("Missing implementation for EAndroidBackgroundWorkResult entry %d in SetWorkResultOnWorker"), int(Result));
-		}
+
+		//Since we have received a result and its not Success or Failure... it must be retry. No need to call into JNI to check
+		return EAndroidBackgroundWorkResult::Retry;
 	}
+
+	//error prevented us from checking so return NotSet
+	return EAndroidBackgroundWorkResult::NotSet;
 }
 
 

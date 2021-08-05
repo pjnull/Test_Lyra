@@ -48,7 +48,7 @@ public class UEWorker extends Worker
 			//Want to honor the UE4 result even if we hit an exception after it finished since it represents expected behavior
             if (!bReceivedResult)
             {
-                CachedResult = Result.failure();
+                SetWorkResult_Failure();
             }
 
 			//Always print stack trace for exception
@@ -134,6 +134,11 @@ public class UEWorker extends Worker
 		return ReturnedString;
 	}
 
+	public boolean DidReceiveResult()
+	{
+		return bReceivedResult;
+	}
+
 	public boolean DidWorkEndInSuccess()
 	{
 		//If we haven't received a result yet, just always return false
@@ -153,7 +158,7 @@ public class UEWorker extends Worker
 			return false;
 		}
 		
-		return (CachedResult == Result.retry());
+		return (CachedResult == Result.failure());
 	}
 	
 	public boolean DidWorkEndInRetry()

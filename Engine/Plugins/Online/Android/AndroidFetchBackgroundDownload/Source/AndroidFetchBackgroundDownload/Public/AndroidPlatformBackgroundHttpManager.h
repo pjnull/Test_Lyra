@@ -63,10 +63,16 @@ protected:
 	const FString GetBaseFileNameForDownloadDescriptionListWithAppendedInt(int IntToAppend) const;
 
 	//Handlers for our download progressing in the underlying java implementation so that we can bubble it up to UE code.
+	void Java_OnWorkerStop(FString WorkID, jobject UnderlyingWorker);
 	void Java_OnDownloadProgress(jobject UnderlyingWorker, FString RequestID, int64_t BytesWrittenSinceLastCall, int64_t TotalBytesWritten);
 	void Java_OnDownloadComplete(jobject UnderlyingWorker, FString RequestID, FString CompleteLocation, bool bWasSuccess);
 	void Java_OnAllDownloadsComplete(jobject UnderlyingWorker, bool bDidAllRequestsSucceed);
 	void Java_OnTick(JNIEnv* Env, jobject UnderlyingWorker);
+
+	//Helper function that completes any un-completed requests in the underlying java tracking layer so that they will
+	//complete on the next Tick. Mostly used to help when the underlying java error hits a failure. Ensures when any
+	//request isn't actually completed when called
+	void ForceCompleteAllUnderlyingJavaActiveRequestsWithError();
 
 	//Helper function to determine if a background http request was completed in the underlying layer
 	//but is still in our ActiveRequests lists as its pending being a complete being sent on our game thread tick
@@ -81,6 +87,7 @@ protected:
 	bool IsValidRequestToEnqueue(FBackgroundHttpRequestPtr Request);
 	bool IsValidRequestToEnqueue(FAndroidBackgroundHttpRequestPtr Request);
 
+	FDelegateHandle Java_OnWorkerStopHandle;
 	FDelegateHandle Java_OnDownloadProgressHandle;
 	FDelegateHandle Java_OnDownloadCompleteHandle;
 	FDelegateHandle Java_OnAllDownloadsCompleteHandle;
@@ -114,8 +121,7 @@ protected:
 	{
 		Unknown,				//Either the value was not set, or was set to something besides these expected values
 		Enabled,				//Enabled in config rules
-		Disabled,				//Disabled in our config rules
-		DisabledAndStopActive,	//Disabled and we should specifically fail any cases that might still be running
+		Disabled,				//Disabled in our config rules.
 		Count					//Count of enum values
 	};
 
@@ -192,8 +198,8 @@ public:
 class FAndroidBackgroundDownloadDelegates
 {
 public:
-	DECLARE_MULTICAST_DELEGATE_TwoParams(FAndroidBackgroundDownload_OnWorkerStart, FString /*WorkID*/, jobject /*UEWorker*/);
-	DECLARE_MULTICAST_DELEGATE_TwoParams(FAndroidBackgroundDownload_OnWorkerStop, FString /*WorkID*/, jobject /*UEWorker*/);
+	DECLARE_MULTICAST_DELEGATE_TwoParams(FAndroidBackgroundDownload_OnWorkerStart, FString /*WorkID*/, jobject /*UnderlyingWorker*/);
+	DECLARE_MULTICAST_DELEGATE_TwoParams(FAndroidBackgroundDownload_OnWorkerStop, FString /*WorkID*/, jobject /*UnderlyingWorker*/);
 	DECLARE_MULTICAST_DELEGATE_FourParams(FAndroidBackgroundDownload_OnProgress, jobject /*UnderlyingWorker*/, FString /*RequestID*/, int64_t /*BytesWrittenSinceLastCall*/, int64_t /*TotalBytesWritten*/);
 	DECLARE_MULTICAST_DELEGATE_FourParams(FAndroidBackgroundDownload_OnComplete, jobject /*UnderlyingWorker*/, FString /*RequestID*/, FString /*CompleteLocation*/, bool /*bWasSuccess*/);
 	DECLARE_MULTICAST_DELEGATE_TwoParams(FAndroidBackgroundDownload_OnAllComplete, jobject /*UnderlyingWorker*/, bool /*bDidAllRequestsSucceed*/);

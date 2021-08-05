@@ -40,9 +40,11 @@
 #define LOCTEXT_NAMESPACE "AndroidBackgroundHttpManager"
 
 const FString FAndroidPlatformBackgroundHttpManager::BackgroundHTTPWorkID = TEXT("BackgroundHttpDownload");
-const FString FAndroidPlatformBackgroundHttpManager::AndroidBackgroundDownloadConfigRulesSettingKey = TEXT("AndroidBackgroundDownloadingEnabled");
+const FString FAndroidPlatformBackgroundHttpManager::AndroidBackgroundDownloadConfigRulesSettingKey = TEXT("AndroidBackgroundDownloadSetting");
 volatile int32 FAndroidPlatformBackgroundHttpManager::bHasManagerScheduledBGWork = false;
 
+FAndroidBackgroundDownloadDelegates::FAndroidBackgroundDownload_OnWorkerStart FAndroidBackgroundDownloadDelegates::AndroidBackgroundDownload_OnWorkerStart;
+FAndroidBackgroundDownloadDelegates::FAndroidBackgroundDownload_OnWorkerStop FAndroidBackgroundDownloadDelegates::AndroidBackgroundDownload_OnWorkerStop;
 FAndroidBackgroundDownloadDelegates::FAndroidBackgroundDownload_OnProgress FAndroidBackgroundDownloadDelegates::AndroidBackgroundDownload_OnProgress;
 FAndroidBackgroundDownloadDelegates::FAndroidBackgroundDownload_OnComplete FAndroidBackgroundDownloadDelegates::AndroidBackgroundDownload_OnComplete;
 FAndroidBackgroundDownloadDelegates::FAndroidBackgroundDownload_OnAllComplete FAndroidBackgroundDownloadDelegates::AndroidBackgroundDownload_OnAllComplete;
@@ -101,21 +103,19 @@ bool FAndroidPlatformBackgroundHttpManager::HandleConfigRulesSettings()
 	UE_LOG(LogBackgroundHttpManager, Display, TEXT("HandleConfigRulesSettings result: %s"), *LexToString(ConfigRuleSetting));
 
 	//If we have no ConfigRulesSetting or the one we have is set to enabled, then we can turn on this feature
-	if ((ConfigRuleSetting == EAndroidBackgroundDownloadConfigRulesSetting::Enabled) || (ConfigRuleSetting == EAndroidBackgroundDownloadConfigRulesSetting::Unknown))
+	if (ConfigRuleSetting == EAndroidBackgroundDownloadConfigRulesSetting::Disabled)
 	{
-		return true;
-	}
-	else if (ConfigRuleSetting == EAndroidBackgroundDownloadConfigRulesSetting::DisabledAndStopActive)
-	{
-		//have to cancel work based on our WorkID to make sure nothing is currently queued that would cause trouble
+		//Since this is Disabled we also should explicitly try to cancel any work that may already be scheduled with our WorkID in case it was previously enabled.
 		FUEWorkManagerNativeWrapper::CancelBackgroundWork(BackgroundHTTPWorkID);
+		return false;
 	}
 
-	return false;
+	return true;
 }
 
 void FAndroidPlatformBackgroundHttpManager::Initialize()
 {	
+	Java_OnWorkerStopHandle = FAndroidBackgroundDownloadDelegates::AndroidBackgroundDownload_OnWorkerStop.AddRaw(this, &FAndroidPlatformBackgroundHttpManager::Java_OnWorkerStop);
 	Java_OnDownloadProgressHandle = FAndroidBackgroundDownloadDelegates::AndroidBackgroundDownload_OnProgress.AddRaw(this, &FAndroidPlatformBackgroundHttpManager::Java_OnDownloadProgress);
 	Java_OnDownloadCompleteHandle = FAndroidBackgroundDownloadDelegates::AndroidBackgroundDownload_OnComplete.AddRaw(this, &FAndroidPlatformBackgroundHttpManager::Java_OnDownloadComplete);
 	Java_OnAllDownloadsCompleteHandle = FAndroidBackgroundDownloadDelegates::AndroidBackgroundDownload_OnAllComplete.AddRaw(this, &FAndroidPlatformBackgroundHttpManager::Java_OnAllDownloadsComplete);
@@ -126,6 +126,7 @@ void FAndroidPlatformBackgroundHttpManager::Initialize()
 
 void FAndroidPlatformBackgroundHttpManager::Shutdown()
 {
+	FAndroidBackgroundDownloadDelegates::AndroidBackgroundDownload_OnWorkerStop.Remove(Java_OnWorkerStopHandle);
 	FAndroidBackgroundDownloadDelegates::AndroidBackgroundDownload_OnProgress.Remove(Java_OnDownloadProgressHandle);
 	FAndroidBackgroundDownloadDelegates::AndroidBackgroundDownload_OnComplete.Remove(Java_OnDownloadCompleteHandle);
 	FAndroidBackgroundDownloadDelegates::AndroidBackgroundDownload_OnAllComplete.Remove(Java_OnAllDownloadsCompleteHandle);
@@ -642,6 +643,22 @@ bool FAndroidPlatformBackgroundHttpManager::IsValidRequestToEnqueue(FAndroidBack
 	return (!bIsComplete && !bIsPaused);
 }
 
+void FAndroidPlatformBackgroundHttpManager::Java_OnWorkerStop(FString WorkID, jobject UnderlyingWorker)
+{
+	const bool bShouldRespondToDelegate = FPlatformAtomics::AtomicRead(&bHasManagerScheduledBGWork);
+	if (bShouldRespondToDelegate)
+	{
+		UE_LOG(LogBackgroundHttpManager, Log, TEXT("OnWorkerStop for %s"), *WorkID);
+
+		FUEWorkManagerNativeWrapper::EAndroidBackgroundWorkResult WorkResult = FUEWorkManagerNativeWrapper::GetWorkResultOnWorker(UnderlyingWorker);
+		if (WorkResult == FUEWorkManagerNativeWrapper::EAndroidBackgroundWorkResult::Failure)
+		{
+			UE_LOG(LogBackgroundHttpManager, Log, TEXT("Worker Ended in Failure for %s. Completing ActiveRequests remaining with failure due to error."), *WorkID);
+			ForceCompleteAllUnderlyingJavaActiveRequestsWithError();
+		}
+	}
+}
+
 void FAndroidPlatformBackgroundHttpManager::Java_OnAllDownloadsComplete(jobject UnderlyingWorker, bool bDidAllRequestsSucceed)
 {
 	//Only respond to this delegate if it is for work we have scheduled
@@ -663,18 +680,8 @@ void FAndroidPlatformBackgroundHttpManager::Java_OnAllDownloadsComplete(jobject 
 			FUEWorkManagerNativeWrapper::SetWorkResultOnWorker(UnderlyingWorker, FUEWorkManagerNativeWrapper::EAndroidBackgroundWorkResult::Failure);
 		}
 
-		//Our underlying worker has finished all work, so mark all as complete. If anything is not actually complete previously ensure with an error message as we expect these to match
-		FRWScopeLock ScopeLock(ActiveRequestLock, SLT_ReadOnly);
-		for (FBackgroundHttpRequestPtr& Request : ActiveRequests)
-		{
-			if (!HasUnderlyingJavaCompletedRequest(Request))
-			{
-				ensureAlwaysMsgf(false, TEXT("Request Still Active after OnAllDownloadsComplete sent from the Java Worker: %s"), *(Request->GetRequestID()));
-				
-				//mark complete with an error
-				MarkUnderlyingJavaRequestAsCompleted(Request, false);
-			}
-		}
+		//Our underlying worker has finished all work, so mark all as complete and error if any still were waiting on complete
+		ForceCompleteAllUnderlyingJavaActiveRequestsWithError();
 	}
 }
 
@@ -772,6 +779,21 @@ void FAndroidPlatformBackgroundHttpManager::Java_OnTick(JNIEnv* Env, jobject Und
 	}
 }
 
+void FAndroidPlatformBackgroundHttpManager::ForceCompleteAllUnderlyingJavaActiveRequestsWithError()
+{
+	FRWScopeLock ScopeLock(ActiveRequestLock, SLT_ReadOnly);
+	for (FBackgroundHttpRequestPtr& Request : ActiveRequests)
+	{
+		if (!HasUnderlyingJavaCompletedRequest(Request))
+		{
+			ensureAlwaysMsgf(false, TEXT("Request Still Active during forced error complete: %s"), *(Request->GetRequestID()));
+
+			//mark complete with an error
+			MarkUnderlyingJavaRequestAsCompleted(Request, false);
+		}
+	}
+}
+
 void FAndroidPlatformBackgroundHttpManager::FJavaClassInfo::Initialize()
 {
 	//Should only be populating these with GameThread values! JavaENV is thread-specific so this is very important that all useages of these classes come from the same game thread!
@@ -832,13 +854,11 @@ const FString FAndroidPlatformBackgroundHttpManager::LexToString(EAndroidBackgro
 		return TEXT("Enabled");
 	case EAndroidBackgroundDownloadConfigRulesSetting::Disabled:
 		return TEXT("Disabled");
-	case EAndroidBackgroundDownloadConfigRulesSetting::DisabledAndStopActive:
-		return TEXT("DisabledAndStopActive");
 	case EAndroidBackgroundDownloadConfigRulesSetting::Count:
 		return TEXT("Count");
 	}
 
-	static_assert(int(EAndroidBackgroundDownloadConfigRulesSetting::Count) == 4, "Added value to EAndroidBackgroundDownloadConfigRulesSetting without updating LexToString");
+	static_assert(int(EAndroidBackgroundDownloadConfigRulesSetting::Count) == 3, "Added value to EAndroidBackgroundDownloadConfigRulesSetting without updating LexToString");
 
 	ensureAlwaysMsgf(false, TEXT("Missing implementation in EAndroidBackgroundDownloadConfigRulesSetting LexToString!"));
 	return TEXT("Unknown");
@@ -858,16 +878,12 @@ FAndroidPlatformBackgroundHttpManager::EAndroidBackgroundDownloadConfigRulesSett
 	{
 		return EAndroidBackgroundDownloadConfigRulesSetting::Disabled;
 	}
-	else if (Setting->Equals(LexToString(EAndroidBackgroundDownloadConfigRulesSetting::DisabledAndStopActive), ESearchCase::IgnoreCase))
-	{
-		return EAndroidBackgroundDownloadConfigRulesSetting::DisabledAndStopActive;
-	}
 	else if (Setting->Equals(LexToString(EAndroidBackgroundDownloadConfigRulesSetting::Count), ESearchCase::IgnoreCase))
 	{
 		return EAndroidBackgroundDownloadConfigRulesSetting::Count;
 	}
 
-	static_assert(int(EAndroidBackgroundDownloadConfigRulesSetting::Count) == 4, "Added value to EAndroidBackgroundDownloadConfigRulesSetting without updating LexParseString");
+	static_assert(int(EAndroidBackgroundDownloadConfigRulesSetting::Count) == 3, "Added value to EAndroidBackgroundDownloadConfigRulesSetting without updating LexParseString");
 
 	ensureAlwaysMsgf(false, TEXT("Missing implementation in EAndroidBackgroundDownloadConfigRulesSetting LexParseString!"));
 	return EAndroidBackgroundDownloadConfigRulesSetting::Unknown;
@@ -886,7 +902,7 @@ JNI_METHOD void Java_com_epicgames_unreal_download_UEDownloadWorker_nativeAndroi
 	if (ensureAlwaysMsgf(bIsMatchingWorkID, TEXT("Unexpected WorkID %s sent back in OnWorkerStart! Ignoring un-related worker!"), *UEWorkID))
 	{
 		UE_LOG(LogBackgroundHttpManager, Display, TEXT("Called OnWorkerStart for %s"), *UEWorkID);
-		FAndroidBackgroundServicesDelegates::AndroidBackgroundServices_OnWorkerStart.Broadcast(UEWorkID, thiz);
+		FAndroidBackgroundDownloadDelegates::AndroidBackgroundDownload_OnWorkerStart.Broadcast(UEWorkID, thiz);
 	}
 }
 
@@ -898,7 +914,7 @@ JNI_METHOD void Java_com_epicgames_unreal_download_UEDownloadWorker_nativeAndroi
 	if (ensureAlwaysMsgf(bIsMatchingWorkID, TEXT("Unexpected WorkID %s sent back in OnWorkerStop! Ignoring un-related worker!"), *UEWorkID))
 	{
 		UE_LOG(LogBackgroundHttpManager, Display, TEXT("Called OnWorkerStop for %s"), *UEWorkID);
-		FAndroidBackgroundServicesDelegates::AndroidBackgroundServices_OnWorkerStop.Broadcast(UEWorkID, thiz);
+		FAndroidBackgroundDownloadDelegates::AndroidBackgroundDownload_OnWorkerStop.Broadcast(UEWorkID, thiz);
 	}
 }
 

@@ -85,6 +85,7 @@ public class UEDownloadWorker extends UEWorker implements DownloadProgressListen
 		}
 
 		bHasEnqueueHappened = false;
+		bForceStopped = false;
 	}
 	
 	@Override
@@ -109,9 +110,18 @@ public class UEDownloadWorker extends UEWorker implements DownloadProgressListen
 		//Setup downloads in mFetchManager
 		QueueDescription = new DownloadQueueDescription(getInputData(), getApplicationContext(), Log);
 		QueueDescription.ProgressListener = this;
+
+       //Have to have parsed some DownloadDescriptions to have any meaningful work to do
+		if ((QueueDescription == null) || (QueueDescription.DownloadDescriptions.size() == 0))
+		{
+			Log.error("Invalid QueueDescription! No DownloadDescription list for queued UEDownloadWorker!");
+			SetWorkResult_Failure();
+			return;
+		}
+
+		//Kick off our enqueue request with the FetchManager
 		mFetchManager.EnqueueRequests(getApplicationContext(),QueueDescription);
 
-       
 		//Enter actual loop until work is finished
 		Log.verbose("Entering OnWorkerStart Loop waiting for Fetch2");
 		try 
@@ -141,7 +151,7 @@ public class UEDownloadWorker extends UEWorker implements DownloadProgressListen
 	{
 		//Skip any tick logic if we have already gotten a result or our download is finished as that means we are just pending our worker stopping
 		//Also want to ensure enough time has passed that we have sent off our Enqueues to the FetchManager
-		if (!bReceivedResult && bHasEnqueueHappened)
+		if (!bReceivedResult && bHasEnqueueHappened && !bForceStopped)
 		{
 			mFetchManager.RequestGroupProgressUpdate(QueueDescription.DownloadGroupID,  this);
 			mFetchManager.RequestCheckDownloadsStillActive(this);
@@ -153,6 +163,8 @@ public class UEDownloadWorker extends UEWorker implements DownloadProgressListen
 	@Override
 	public void OnWorkerStopped(String WorkID)
 	{	
+		bForceStopped = true;
+
 		Log.debug("OnWorkerStopped called for " + WorkID);
 		super.OnWorkerStopped(WorkID);
 		
@@ -319,8 +331,9 @@ public class UEDownloadWorker extends UEWorker implements DownloadProgressListen
 	public void OnAllDownloadsComplete(boolean bDidAllRequestsSucceed)
 	{	
 		//If UE code has already provided a resolution then we do not need to handle this OnAllDownloadsComplete notification as 
-		//this UEDownloadWorker is already in the process of stopping work
-		if (!bReceivedResult)
+		//this UEDownloadWorker is already in the process of stopping work. Also if we have already been force stopped, don't send
+		//this to avoid sending this queued reply after we have already stopped work (possible to queue this during the tick before our force stop)
+		if (!bReceivedResult && !bForceStopped)
 		{
 			UpdateNotification(100, false);
 		
@@ -398,6 +411,7 @@ public class UEDownloadWorker extends UEWorker implements DownloadProgressListen
 	public native void nativeAndroidBackgroundDownloadOnAllComplete(boolean bDidAllRequestsSucceed);
 	public native void nativeAndroidBackgroundDownloadOnTick();
 	
+	private boolean bForceStopped = false;
 	private DownloadQueueDescription QueueDescription = null;
 	private volatile boolean bHasEnqueueHappened = false;
 	static FetchManager mFetchManager;

@@ -135,11 +135,15 @@ public:
 	{
 		Success,
 		Failure,
-		Retry
+		Retry,
+		NotSet
 	};
 
 	//Wrapper for setting the work result on the underlying java worker through JNI
 	static void SetWorkResultOnWorker(jobject Worker, EAndroidBackgroundWorkResult Result);
+
+	//Wrapper for getting the work result on the underlying java worker through JNI
+	static EAndroidBackgroundWorkResult GetWorkResultOnWorker(jobject Worker);
 };
 
 //call backs so that we can bubble up UEWorker callbacks to UE systems
