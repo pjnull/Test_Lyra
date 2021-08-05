@@ -74,6 +74,7 @@
 #if USE_SERVER_PERF_COUNTERS
 #include "PerfCountersModule.h"
 #endif
+#include "GenericPlatform/GenericPlatformCrashContext.h"
 
 #if WITH_EDITOR
 #include "Editor.h"
@@ -1775,6 +1776,8 @@ void UNetDriver::Shutdown()
 		AnalyticsAggregator->SendAnalytics();
 		AnalyticsAggregator.Reset();
 	}
+
+	UpdateCrashContext();
 }
 
 bool UNetDriver::IsServer() const
@@ -5453,12 +5456,12 @@ bool UNetDriver::NetObjectIsDynamic(const UObject *Object) const
 	return true;
 }
 
-void UNetDriver::AddClientConnection(UNetConnection * NewConnection)
+void UNetDriver::AddClientConnection(UNetConnection* NewConnection)
 {
 	SCOPE_CYCLE_COUNTER(Stat_NetDriverAddClientConnection);
 
 	UE_CLOG(!DDoS.CheckLogRestrictions(), LogNet, Log, TEXT("AddClientConnection: Added client connection: %s"),
-			*NewConnection->Describe());
+		*NewConnection->Describe());
 
 	ClientConnections.Add(NewConnection);
 
@@ -5508,6 +5511,27 @@ void UNetDriver::AddClientConnection(UNetConnection * NewConnection)
 	if (!bHasReplayConnection && NewConnection->IsReplay())
 	{
 		bHasReplayConnection = true;
+	}
+
+	UpdateCrashContext();
+}
+
+void UNetDriver::UpdateCrashContext()
+{
+	if (NetDriverName == NAME_GameNetDriver)
+	{
+		int32 NumClients = 0;
+
+		for (const UNetConnection* Connection : ClientConnections)
+		{
+			if (Connection && !Connection->IsReplay())
+			{
+				++NumClients;
+			}
+		}
+
+		static FString Attrib_NumClients = TEXT("NumClients");
+		FGenericCrashContext::SetEngineData(Attrib_NumClients, LexToString(NumClients));
 	}
 }
 
@@ -5629,6 +5653,8 @@ void UNetDriver::RemoveClientConnection(UNetConnection* ClientConnectionToRemove
 			break;
 		}
 	}
+
+	UpdateCrashContext();
 }
 
 void UNetDriver::SetWorld(class UWorld* InWorld)

@@ -1741,6 +1741,8 @@ private:
 	/** Used with FNetDelegates::OnSyncLoadDetected to log sync loads */
 	void ReportSyncLoad(const FNetSyncLoadReport& Report);
 
+	void UpdateCrashContext();
+
 	/** Handle to FNetDelegates::OnSyncLoadDetected delegate */
 	FDelegateHandle ReportSyncLoadDelegateHandle;
 
