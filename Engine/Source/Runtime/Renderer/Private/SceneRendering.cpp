@@ -3750,7 +3750,7 @@ void FSceneRenderer::RenderThreadEnd(FRHICommandListImmediate& RHICmdList)
 	if (GSceneRenderCleanUpState.CompletionMode == ESceneRenderCleanUpMode::Immediate)
 	{
 		ReleaseSceneRenderer(RHICmdList, this, MemStackMark);
-}
+	}
 	else
 	{
 		GPUSceneDynamicContext.Release();
@@ -3759,19 +3759,33 @@ void FSceneRenderer::RenderThreadEnd(FRHICommandListImmediate& RHICmdList)
 		GSceneRenderCleanUpState.MemStackMark = MemStackMark;
 
 		if (SceneRenderCleanUpMode == ESceneRenderCleanUpMode::DeferredAndAsync)
-{
-			FGraphEventArray& WaitOutstandingTasks = RHICmdList.GetRenderThreadTaskArray();
+		{
+			FGraphEventArray& CommandListTasks = RHICmdList.GetRenderThreadTaskArray();
+
+			FGraphEventArray Prerequisites;
+			Prerequisites.Append(CommandListTasks);
+
+			for (FParallelMeshDrawCommandPass* DispatchedShadowDepthPass : DispatchedShadowDepthPasses)
+			{
+				Prerequisites.Add(DispatchedShadowDepthPass->GetTaskEvent());
+			}
+			for (const FViewInfo& View : Views)
+			{
+				for (const FParallelMeshDrawCommandPass& Pass : View.ParallelMeshDrawCommandPasses)
+				{
+					Prerequisites.Add(Pass.GetTaskEvent());
+				}
+			}
 
 			GSceneRenderCleanUpState.Task = FFunctionGraphTask::CreateAndDispatchWhenReady([this]
-	{		
-				WaitForTasksAndClearSnapshots(FParallelMeshDrawCommandPass::EWaitThread::Task);
+			{
+				WaitForTasksAndClearSnapshots(FParallelMeshDrawCommandPass::EWaitThread::TaskAlreadyWaited);
+			}, TStatId(), & Prerequisites);
 
-			}, TStatId(), &WaitOutstandingTasks);
-
-			WaitOutstandingTasks.Empty();
-			}
+			CommandListTasks.Empty();
 		}
 	}
+}
 
 void FSceneRenderer::CleanUp(FRHICommandListImmediate& RHICmdList)
 	{
@@ -3796,11 +3810,11 @@ void FSceneRenderer::CleanUp(FRHICommandListImmediate& RHICmdList)
 
 void FSceneRenderer::WaitForTasksAndClearSnapshots(FParallelMeshDrawCommandPass::EWaitThread WaitThread)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE(FSceneRenderer::WaitForTasksAndClearSnapshots);
+	SCOPED_NAMED_EVENT_TEXT("FSceneRenderer::WaitForTasksAndClearSnapshots", FColor::Red);
 
 	// Wait for all dispatched shadow mesh draw tasks.
 	for (int32 PassIndex = 0; PassIndex < DispatchedShadowDepthPasses.Num(); ++PassIndex)
-{
+	{
 		DispatchedShadowDepthPasses[PassIndex]->WaitForTasksAndEmpty(WaitThread);
 	}
 
