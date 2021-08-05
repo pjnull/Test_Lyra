@@ -13338,6 +13338,7 @@ bool UEngine::LoadMap( FWorldContext& WorldContext, FURL URL, class UPendingNetG
 		WorldContext.SetCurrentWorld(nullptr);
 	}
 
+	FMoviePlayerProxy::BlockingTick();
 	// trim memory to clear up allocations from the previous level (also flushes rendering)
 	if (GDelayTrimMemoryDuringMapLoadMode == 0)
 	{
@@ -13679,6 +13680,7 @@ bool UEngine::LoadMap( FWorldContext& WorldContext, FURL URL, class UPendingNetG
 	}
 	WorldContext.World()->BeginPlay();
 
+	FMoviePlayerProxy::BlockingTick();
 	// send a callback message
 	PostLoadMapCaller.Broadcast(WorldContext.World());
 	MoviePlayerBlock.Finish();
