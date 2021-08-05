@@ -1507,7 +1507,8 @@ const FString FNiagaraCompileOptions::GpuScriptDefine = TEXT("GPUComputeSim");
 FSynchronizeWithParameterDefinitionsArgs::FSynchronizeWithParameterDefinitionsArgs()
 	: SpecificDefinitionsUniqueIds(TArray<FGuid>())
 	, SpecificDestScriptVarIds(TArray<FGuid>())
-	, bForceSynchronizeDefinitions(false)
+	, bForceGatherDefinitions(false)
+	, bForceSynchronizeParameters(false)
 	, bSubscribeAllNameMatchParameters(false)
 	, AdditionalOldToNewNames()
 {
