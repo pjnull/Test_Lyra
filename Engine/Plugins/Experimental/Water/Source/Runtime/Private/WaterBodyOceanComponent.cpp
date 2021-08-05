@@ -107,13 +107,12 @@ void UWaterBodyOceanComponent::OnUpdateBody(bool bWithExclusionVolumes)
 
 	if (bGenerateCollisions)
 	{
-		// Fake ocean depth for now
 		FVector OceanCollisionExtents = GetCollisionExtents();
-		OceanCollisionExtents.Z = 10000.f;
+		OceanCollisionExtents.Z += CollisionHeightOffset / 2;
 
-		// The volume's top is located on the ocean actor's height + the additional ocean level : 
+		// The volume's top is located on the ocean actor's height + the additional ocean level + the collision height offset: 
 		// and the volume's bottom is deeper by a value == OceanCollisionExtents.Z :
-		FVector OceanBoxLocation = FVector(0, 0, GetHeightOffset() - OceanCollisionExtents.Z);
+		FVector OceanBoxLocation = FVector(0, 0, GetHeightOffset() - OceanCollisionExtents.Z + CollisionHeightOffset);
 		// No matter the scale, OceanCollisionExtents is always specified in world-space : 
 		FVector OceanBoxExtent = OceanCollisionExtents; 
 
