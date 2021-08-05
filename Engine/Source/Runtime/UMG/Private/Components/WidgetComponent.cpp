@@ -1323,6 +1323,7 @@ void UWidgetComponent::DrawWidgetToRenderTarget(float DeltaTime)
 
 	const float DrawScale = 1.0f;
 
+	bool bHasValidSize = true;
 	if ( bDrawAtDesiredSize )
 	{
 		SlateWindow->SlatePrepass(DrawScale);
@@ -1333,6 +1334,11 @@ void UWidgetComponent::DrawWidgetToRenderTarget(float DeltaTime)
 		CurrentDrawSize = DesiredSize.IntPoint();
 
 		WidgetRenderer->SetIsPrepassNeeded(false);
+
+		if (DesiredSize.X <= 0 || DesiredSize.Y <= 0)
+		{
+			bHasValidSize = false;
+		}
 	}
 	else
 	{
@@ -1341,8 +1347,15 @@ void UWidgetComponent::DrawWidgetToRenderTarget(float DeltaTime)
 
 	if ( CurrentDrawSize != PreviousDrawSize )
 	{
-		UpdateBodySetup(true);
-		RecreatePhysicsState();
+		if (bHasValidSize)
+		{
+			UpdateBodySetup(true);
+			RecreatePhysicsState();
+		}
+		else
+		{
+			DestroyPhysicsState();
+		}
 	}
 
 	UpdateRenderTarget(CurrentDrawSize);
