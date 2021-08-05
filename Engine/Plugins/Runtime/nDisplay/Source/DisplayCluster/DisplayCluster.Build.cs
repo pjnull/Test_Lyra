@@ -31,11 +31,6 @@ public class DisplayCluster : ModuleRules
 			});
 		}
 
-			new string[] {
-				"TextureShare"
-			});
-		}
-
 		PrivateDependencyModuleNames.AddRange(
 		new string[] {
 			"HeadMountedDisplay",
