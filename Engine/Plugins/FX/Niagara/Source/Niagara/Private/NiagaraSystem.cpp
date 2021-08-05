@@ -115,6 +115,8 @@ UNiagaraSystem::UNiagaraSystem(const FObjectInitializer& ObjectInitializer)
 , WarmupTickDelta(1.0f / 15.0f)
 , bHasSystemScriptDIsWithPerInstanceData(false)
 , bNeedsGPUContextInitForDataInterfaces(false)
+, bHasDIsWithPostSimulateTick(false)
+, bAllDIsPostSimulateCanOverlapFrames(true)
 , bHasAnyGPUEmitters(false)
 , bNeedsSortedSignificanceCull(false)
 , ActiveInstances(0)
@@ -1944,6 +1946,7 @@ void UNiagaraSystem::UpdatePostCompileDIInfo()
 void UNiagaraSystem::UpdateDITickFlags()
 {
 	bHasDIsWithPostSimulateTick = false;
+	bAllDIsPostSimulateCanOverlapFrames = true;
 	auto CheckPostSimTick = [&](UNiagaraScript* Script)
 	{
 		if (Script)
@@ -1954,6 +1957,7 @@ void UNiagaraSystem::UpdateDITickFlags()
 				if (DefaultDataInterface && DefaultDataInterface->HasPostSimulateTick())
 				{
 					bHasDIsWithPostSimulateTick |= true;
+					bAllDIsPostSimulateCanOverlapFrames &= DefaultDataInterface->PostSimulateCanOverlapFrames();
 				}
 			}
 		}
