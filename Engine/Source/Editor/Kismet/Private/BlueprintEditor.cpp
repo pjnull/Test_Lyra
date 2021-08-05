@@ -9416,6 +9416,10 @@ TSharedPtr<SGraphEditor> FBlueprintEditor::OpenGraphAndBringToFront(UEdGraph* Gr
 
 		return NewGraphEditor;
 	}
+	else
+	{
+		return TSharedPtr<SGraphEditor>();
+	}
 }
 
 TSharedPtr<SDockTab> FBlueprintEditor::OpenDocument(const UObject* DocumentID, FDocumentTracker::EOpenDocumentCause Cause)
