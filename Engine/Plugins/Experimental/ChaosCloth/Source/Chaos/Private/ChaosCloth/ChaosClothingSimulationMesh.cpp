@@ -8,6 +8,14 @@
 #include "Containers/ArrayView.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Async/ParallelFor.h"
+#if INTEL_ISPC
+#include "ChaosClothingSimulationMesh.ispc.generated.h"
+#endif
+
+#if INTEL_ISPC && !UE_BUILD_SHIPPING
+bool bChaos_SkinPhysicsMesh_ISPC_Enabled = bChaos_SkinPhysicsMesh_ISPC_Enable;
+FAutoConsoleVariableRef CVarChaosSkinPhysicsMeshISPCEnabled(TEXT("p.Chaos.SkinPhysicsMesh.ISPC"), bChaos_SkinPhysicsMesh_ISPC_Enabled, TEXT("Whether to use ISPC optimizations on skinned physics meshes"));
+#endif
 
 DECLARE_CYCLE_STAT(TEXT("Chaos Cloth Skin Physics Mesh"), STAT_ChaosClothSkinPhysicsMesh, STATGROUP_ChaosCloth);
 DECLARE_CYCLE_STAT(TEXT("Chaos Cloth Wrap Deform Mesh"), STAT_ChaosClothWrapDeformMesh, STATGROUP_ChaosCloth);
@@ -256,42 +264,60 @@ void FClothingSimulationMesh::SkinPhysicsMesh(int32 LODIndex, const FVec3& Local
 	const int32* const RESTRICT BoneMap = Asset->UsedBoneIndices.GetData();
 	const FMatrix44f* const RESTRICT BoneMatrices = Context->RefToLocals.GetData();
 		
-	static const uint32 MinParallelVertices = 500;  // 500 seems to be the lowest threshold still giving gains even on profiled assets that are only using a small number of influences
-
-	ParallelFor(NumPoints, [&PhysicalMeshData, &ComponentToLocalSpace, BoneMap, BoneMatrices, &OutPositions, &OutNormals](uint32 VertIndex)
+	if (bChaos_SkinPhysicsMesh_ISPC_Enabled)
 	{
-		const uint16* const RESTRICT BoneIndices = PhysicalMeshData.BoneData[VertIndex].BoneIndices;
-		const FRealSingle* const RESTRICT BoneWeights = PhysicalMeshData.BoneData[VertIndex].BoneWeights;
+#if INTEL_ISPC
+		ispc::SkinPhysicsMesh(
+			(ispc::FVector*)OutPositions,
+			(ispc::FVector*)OutNormals,
+			(ispc::FVector*)PhysicalMeshData.Vertices.GetData(),
+			(ispc::FVector*)PhysicalMeshData.Normals.GetData(),
+			(ispc::FClothVertBoneData*)PhysicalMeshData.BoneData.GetData(),
+			BoneMap,
+			(ispc::FMatrix*)BoneMatrices,
+			(ispc::FTransform&)ComponentToLocalSpace,
+			NumPoints);
+#endif
+	}
+	else
+	{
+		static const uint32 MinParallelVertices = 500;  // 500 seems to be the lowest threshold still giving gains even on profiled assets that are only using a small number of influences
 
-		// WARNING - HORRIBLE UNROLLED LOOP + JUMP TABLE BELOW
-		// done this way because this is a pretty tight and performance critical loop. essentially
-		// rather than checking each influence we can just jump into this switch and fall through
-		// everything to compose the final skinned data
-		const FVec3& RefParticle = PhysicalMeshData.Vertices[VertIndex];
-		const FVec3& RefNormal = PhysicalMeshData.Normals[VertIndex];
-		FVec3& OutPosition = OutPositions[VertIndex];
-		FVec3& OutNormal = OutNormals[VertIndex];
-		switch (PhysicalMeshData.BoneData[VertIndex].NumInfluences)
+		ParallelFor(NumPoints, [&PhysicalMeshData, &ComponentToLocalSpace, BoneMap, BoneMatrices, &OutPositions, &OutNormals](uint32 VertIndex)
 		{
-		case 12: AddInfluence(OutPosition, OutNormal, RefParticle, RefNormal, BoneMatrices[BoneMap[BoneIndices[11]]], BoneWeights[11]);  // Intentional fall through
-		case 11: AddInfluence(OutPosition, OutNormal, RefParticle, RefNormal, BoneMatrices[BoneMap[BoneIndices[10]]], BoneWeights[10]);  // Intentional fall through
-		case 10: AddInfluence(OutPosition, OutNormal, RefParticle, RefNormal, BoneMatrices[BoneMap[BoneIndices[ 9]]], BoneWeights[ 9]);  // Intentional fall through
-		case  9: AddInfluence(OutPosition, OutNormal, RefParticle, RefNormal, BoneMatrices[BoneMap[BoneIndices[ 8]]], BoneWeights[ 8]);  // Intentional fall through
-		case  8: AddInfluence(OutPosition, OutNormal, RefParticle, RefNormal, BoneMatrices[BoneMap[BoneIndices[ 7]]], BoneWeights[ 7]);  // Intentional fall through
-		case  7: AddInfluence(OutPosition, OutNormal, RefParticle, RefNormal, BoneMatrices[BoneMap[BoneIndices[ 6]]], BoneWeights[ 6]);  // Intentional fall through
-		case  6: AddInfluence(OutPosition, OutNormal, RefParticle, RefNormal, BoneMatrices[BoneMap[BoneIndices[ 5]]], BoneWeights[ 5]);  // Intentional fall through
-		case  5: AddInfluence(OutPosition, OutNormal, RefParticle, RefNormal, BoneMatrices[BoneMap[BoneIndices[ 4]]], BoneWeights[ 4]);  // Intentional fall through
-		case  4: AddInfluence(OutPosition, OutNormal, RefParticle, RefNormal, BoneMatrices[BoneMap[BoneIndices[ 3]]], BoneWeights[ 3]);  // Intentional fall through
-		case  3: AddInfluence(OutPosition, OutNormal, RefParticle, RefNormal, BoneMatrices[BoneMap[BoneIndices[ 2]]], BoneWeights[ 2]);  // Intentional fall through
-		case  2: AddInfluence(OutPosition, OutNormal, RefParticle, RefNormal, BoneMatrices[BoneMap[BoneIndices[ 1]]], BoneWeights[ 1]);  // Intentional fall through
-		case  1: AddInfluence(OutPosition, OutNormal, RefParticle, RefNormal, BoneMatrices[BoneMap[BoneIndices[ 0]]], BoneWeights[ 0]);  // Intentional fall through
-		default: break;
-		}
+			const uint16* const RESTRICT BoneIndices = PhysicalMeshData.BoneData[VertIndex].BoneIndices;
+			const FRealSingle* const RESTRICT BoneWeights = PhysicalMeshData.BoneData[VertIndex].BoneWeights;
+	
+			// WARNING - HORRIBLE UNROLLED LOOP + JUMP TABLE BELOW
+			// done this way because this is a pretty tight and performance critical loop. essentially
+			// rather than checking each influence we can just jump into this switch and fall through
+			// everything to compose the final skinned data
+			const FVec3& RefParticle = PhysicalMeshData.Vertices[VertIndex];
+			const FVec3& RefNormal = PhysicalMeshData.Normals[VertIndex];
+			FVec3& OutPosition = OutPositions[VertIndex];
+			FVec3& OutNormal = OutNormals[VertIndex];
+			switch (PhysicalMeshData.BoneData[VertIndex].NumInfluences)
+			{
+			case 12: AddInfluence(OutPosition, OutNormal, RefParticle, RefNormal, BoneMatrices[BoneMap[BoneIndices[11]]], BoneWeights[11]);  // Intentional fall through
+			case 11: AddInfluence(OutPosition, OutNormal, RefParticle, RefNormal, BoneMatrices[BoneMap[BoneIndices[10]]], BoneWeights[10]);  // Intentional fall through
+			case 10: AddInfluence(OutPosition, OutNormal, RefParticle, RefNormal, BoneMatrices[BoneMap[BoneIndices[ 9]]], BoneWeights[ 9]);  // Intentional fall through
+			case  9: AddInfluence(OutPosition, OutNormal, RefParticle, RefNormal, BoneMatrices[BoneMap[BoneIndices[ 8]]], BoneWeights[ 8]);  // Intentional fall through
+			case  8: AddInfluence(OutPosition, OutNormal, RefParticle, RefNormal, BoneMatrices[BoneMap[BoneIndices[ 7]]], BoneWeights[ 7]);  // Intentional fall through
+			case  7: AddInfluence(OutPosition, OutNormal, RefParticle, RefNormal, BoneMatrices[BoneMap[BoneIndices[ 6]]], BoneWeights[ 6]);  // Intentional fall through
+			case  6: AddInfluence(OutPosition, OutNormal, RefParticle, RefNormal, BoneMatrices[BoneMap[BoneIndices[ 5]]], BoneWeights[ 5]);  // Intentional fall through
+			case  5: AddInfluence(OutPosition, OutNormal, RefParticle, RefNormal, BoneMatrices[BoneMap[BoneIndices[ 4]]], BoneWeights[ 4]);  // Intentional fall through
+			case  4: AddInfluence(OutPosition, OutNormal, RefParticle, RefNormal, BoneMatrices[BoneMap[BoneIndices[ 3]]], BoneWeights[ 3]);  // Intentional fall through
+			case  3: AddInfluence(OutPosition, OutNormal, RefParticle, RefNormal, BoneMatrices[BoneMap[BoneIndices[ 2]]], BoneWeights[ 2]);  // Intentional fall through
+			case  2: AddInfluence(OutPosition, OutNormal, RefParticle, RefNormal, BoneMatrices[BoneMap[BoneIndices[ 1]]], BoneWeights[ 1]);  // Intentional fall through
+			case  1: AddInfluence(OutPosition, OutNormal, RefParticle, RefNormal, BoneMatrices[BoneMap[BoneIndices[ 0]]], BoneWeights[ 0]);  // Intentional fall through
+			default: break;
+			}
 
-		OutPosition = ComponentToLocalSpace.TransformPosition(OutPosition);
-		OutNormal = ComponentToLocalSpace.TransformVector(OutNormal);
-		OutNormal.Normalize();
-	}, NumPoints > MinParallelVertices ? EParallelForFlags::None : EParallelForFlags::ForceSingleThread);
+			OutPosition = ComponentToLocalSpace.TransformPosition(OutPosition);
+			OutNormal = ComponentToLocalSpace.TransformVector(OutNormal);
+			OutNormal.Normalize();
+		}, NumPoints > MinParallelVertices ? EParallelForFlags::None : EParallelForFlags::ForceSingleThread);
+	}
 }
 
 void FClothingSimulationMesh::Update(
