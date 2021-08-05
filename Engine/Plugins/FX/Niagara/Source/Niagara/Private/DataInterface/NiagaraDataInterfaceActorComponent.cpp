@@ -94,10 +94,13 @@ public:
 		FInstanceData_RenderThread* InstanceData = DataInterfaceProxy->SystemInstancesToInstanceData_RT.Find(Context.SystemInstanceID);
 		check(InstanceData != nullptr);
 
+		const FMatrix44f InstanceMatrix = InstanceData->CachedTransform.ToMatrixWithScale();
+		const FQuat InstanceRotation = InstanceData->CachedTransform.GetRotation();
+		const FVector3f InstanceScale = InstanceData->CachedTransform.GetScale3D();
 		SetShaderValue(RHICmdList, ComputeShaderRHI, ValidParam, InstanceData->bCachedValid ? 1 : 0);
-		SetShaderValue(RHICmdList, ComputeShaderRHI, MatrixParam, InstanceData->CachedTransform.ToMatrixWithScale());
-		SetShaderValue(RHICmdList, ComputeShaderRHI, RotationParam, InstanceData->CachedTransform.GetRotation());
-		SetShaderValue(RHICmdList, ComputeShaderRHI, ScaleParam, InstanceData->CachedTransform.GetScale3D());
+		SetShaderValue(RHICmdList, ComputeShaderRHI, MatrixParam, InstanceMatrix);
+		SetShaderValue(RHICmdList, ComputeShaderRHI, RotationParam, InstanceRotation);
+		SetShaderValue(RHICmdList, ComputeShaderRHI, ScaleParam, InstanceScale);
 	}
 
 private:
