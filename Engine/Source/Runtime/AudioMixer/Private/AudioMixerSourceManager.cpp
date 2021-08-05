@@ -1132,6 +1132,18 @@ namespace Audio
 	void FMixerSourceManager::Stop(const int32 SourceId)
 	{
 		AUDIO_MIXER_CHECK(SourceId < NumTotalSources);
+
+		// If we are in the audio rendering thread, this is being called either before
+		// or after source generation, so it is safe (and preffered) to call StopInternal()
+		// synchronously. 
+		if (MixerDevice && MixerDevice->IsAudioRenderingThread())
+		{
+			StopInternal(SourceId);
+			return;
+		}
+
+		// otherwise, assert that we are being called from the GameThread and the
+		// source isn't busy.  Then call StopInternal() in a thread command
 		AUDIO_MIXER_CHECK(GameThreadInfo.bIsBusy[SourceId]);
 		AUDIO_MIXER_CHECK_GAME_THREAD(MixerDevice);
 
