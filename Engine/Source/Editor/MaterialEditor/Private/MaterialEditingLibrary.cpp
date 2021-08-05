@@ -1034,6 +1034,27 @@ bool UMaterialEditingLibrary::SetMaterialInstanceTextureParameterValue(UMaterial
 }
 
 
+URuntimeVirtualTexture* UMaterialEditingLibrary::GetMaterialInstanceRuntimeVirtualTextureParameterValue(UMaterialInstanceConstant* Instance, FName ParameterName)
+{
+	URuntimeVirtualTexture* Result = nullptr;
+	if (Instance)
+	{
+		Instance->GetRuntimeVirtualTextureParameterValue(ParameterName, Result);
+	}
+	return Result;
+}
+
+bool UMaterialEditingLibrary::SetMaterialInstanceRuntimeVirtualTextureParameterValue(UMaterialInstanceConstant* Instance, FName ParameterName, URuntimeVirtualTexture* Value)
+{
+	bool bResult = false;
+	if (Instance)
+	{
+		Instance->SetRuntimeVirtualTextureParameterValueEditorOnly(ParameterName, Value);
+	}
+	return bResult;
+}
+
+
 FLinearColor UMaterialEditingLibrary::GetMaterialInstanceVectorParameterValue(UMaterialInstanceConstant* Instance, FName ParameterName, EMaterialParameterAssociation Association)
 {
 	FLinearColor Result = FLinearColor::Black;
