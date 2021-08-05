@@ -16,14 +16,10 @@ namespace CommonUIUtils
 
 	bool ShouldDisplayMobileUISizes()
 	{
-#if WITH_EDITOR
-		return (Mobile_PreviewUISizes == 1);
-#endif
-
 #if PLATFORM_ANDROID || PLATFORM_IOS
 		return true;
 #endif
-		return false;
+		return (Mobile_PreviewUISizes == 1);
 	}
 
 	FString PrintAllOwningUserWidgets(const UWidget* Widget)
