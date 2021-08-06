@@ -10,6 +10,7 @@
 #include "Misc/CoreMisc.h"
 #include "Misc/CoreDelegates.h"
 #include "Misc/NetworkVersion.h"
+#include "Misc/Paths.h"
 #include "Stats/Stats.h"
 
 #include "CoreGlobals.h"
@@ -81,6 +82,24 @@ namespace
 		}
 	}
 #endif // !NO_LOGGING
+
+#if EOSSDK_RUNTIME_LOAD_REQUIRED
+	static void* GetSdkDllHandle()
+	{
+		void* Result = nullptr;
+
+		const FString SDKBinaryPath = FPaths::Combine(FPaths::ProjectDir(), TEXT("Binaries"), FPlatformProcess::GetBinariesSubdirectory(), TEXT(EOSSDK_RUNTIME_LIBRARY_NAME));
+		Result = FPlatformProcess::GetDllHandle(*SDKBinaryPath);
+
+		if (!Result)
+		{
+			// Fallback on searching by name
+			Result = FPlatformProcess::GetDllHandle(TEXT(EOSSDK_RUNTIME_LIBRARY_NAME));
+		}
+
+		return Result;
+	}
+#endif
 }
 
 
@@ -99,7 +118,7 @@ static FDelayedAutoRegisterHelper GKickoffDll(EDelayedRegisterRunPhase::EOS_DLL_
 	Async(EAsyncExecution::Thread, []
 	{
 		SCOPED_BOOT_TIMING("Preloading EOS module");
-		FPlatformProcess::GetDllHandle(TEXT(EOSSDK_RUNTIME_LIBRARY_NAME));
+		GetSdkDllHandle();
 	});
 });
 
@@ -108,8 +127,7 @@ static FDelayedAutoRegisterHelper GKickoffDll(EDelayedRegisterRunPhase::EOS_DLL_
 FEOSSDKManager::FEOSSDKManager()
 {
 #if EOSSDK_RUNTIME_LOAD_REQUIRED
-	SDKHandle = FPlatformProcess::GetDllHandle(TEXT(EOSSDK_RUNTIME_LIBRARY_NAME));
-
+	SDKHandle = GetSdkDllHandle();
 	if (SDKHandle == nullptr)
 	{
 		UE_LOG(LogEOSSDK, Warning, TEXT("Unable to load EOSSDK dynamic library"));
