@@ -55,7 +55,7 @@ namespace Private
 
 		enum class EVersion : int32
 		{
-			Current = 1
+			Current = 2
 		};
 
 		/** Magic to reject other files */
@@ -91,7 +91,7 @@ namespace Private
 	};
 #pragma pack(pop)
 
-	FName FStablePipelineCacheSerializedHeader::CompressionMethod = NAME_Zlib;
+	FName FStablePipelineCacheSerializedHeader::CompressionMethod = NAME_Oodle;
 
 	/**
 	 * Implements a proxy archive that serializes FName and FSHAHash as a verbatim data or an index (if the same value is repeated).
