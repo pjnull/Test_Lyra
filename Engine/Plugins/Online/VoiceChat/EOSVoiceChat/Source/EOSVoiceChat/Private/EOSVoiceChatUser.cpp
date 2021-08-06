@@ -77,6 +77,18 @@ namespace
 			return TEXT("Unknown");
 		}
 	}
+
+	FString ProductUserIdToString(EOS_ProductUserId value)
+	{
+		char Buffer[EOS_PRODUCTUSERID_MAX_LENGTH];
+		int32_t BufferLength = sizeof(Buffer);
+		if (EOS_EResult::EOS_Success == EOS_ProductUserId_ToString(value, Buffer, &BufferLength))
+		{
+			return UTF8_TO_TCHAR(Buffer);
+		}
+
+		return FString();
+	}
 }
 
 static TAutoConsoleVariable<bool> CVarFakeAudioInputEnabled(
@@ -488,10 +500,10 @@ void FEOSVoiceChatUser::UnblockPlayers(const TArray<FString>& PlayerNames)
 	}
 }
 
-void FEOSVoiceChatUser::JoinChannel(const FString& ChannelName, const FString& ChannelCredentialsStr, EVoiceChatChannelType ChannelType, const FOnVoiceChatChannelJoinCompleteDelegate& Delegate, TOptional<FVoiceChatChannel3dProperties> Channel3dProperties)
+void FEOSVoiceChatUser::JoinChannel(const FString& ChannelName, const FString& ChannelCredentials, EVoiceChatChannelType ChannelType, const FOnVoiceChatChannelJoinCompleteDelegate& Delegate, TOptional<FVoiceChatChannel3dProperties> Channel3dProperties)
 {
 	FVoiceChatResult Result = FVoiceChatResult::CreateSuccess();
-	FEOSVoiceChatChannelCredentials ChannelCredentials;
+	FEOSVoiceChannelConnectionInfo EOSChannelCredentials;
 
 	if (!IsInitialized())
 	{
@@ -513,7 +525,7 @@ void FEOSVoiceChatUser::JoinChannel(const FString& ChannelName, const FString& C
 	{
 		Result = VoiceChat::Errors::InvalidArgument(TEXT("ChannelName invalid characters"));
 	}
-	else if (!ChannelCredentials.FromJson(ChannelCredentialsStr))
+	else if (!EOSChannelCredentials.FromJson(ChannelCredentials))
 	{
 		Result = VoiceChat::Errors::CredentialsInvalid(TEXT("Failed to deserialize ChannelCredentials"));
 	}
@@ -536,9 +548,9 @@ void FEOSVoiceChatUser::JoinChannel(const FString& ChannelName, const FString& C
 		}
 		else
 		{
-			if (!ChannelCredentials.OverrideUserId.IsEmpty())
+			if (!EOSChannelCredentials.OverrideUserId.IsEmpty())
 			{
-				ChannelSession.PlayerName = ChannelCredentials.OverrideUserId;
+				ChannelSession.PlayerName = EOSChannelCredentials.OverrideUserId;
 			}
 			else
 			{
@@ -556,8 +568,8 @@ void FEOSVoiceChatUser::JoinChannel(const FString& ChannelName, const FString& C
 			ApplySendingOptions(ChannelSession);
 
 			const FTCHARToUTF8 Utf8RoomName(*ChannelName);
-			const FTCHARToUTF8 Utf8ClientBaseUrl(*ChannelCredentials.ClientBaseUrl);
-			const FTCHARToUTF8 Utf8ParticipantToken(*ChannelCredentials.ParticipantToken);
+			const FTCHARToUTF8 Utf8ClientBaseUrl(*EOSChannelCredentials.ClientBaseUrl);
+			const FTCHARToUTF8 Utf8ParticipantToken(*EOSChannelCredentials.ParticipantToken);
 			const FTCHARToUTF8 Utf8ParticipantId(*ChannelSession.PlayerName);
 
 			// Call UpdateReceiving once to set the default receiving state for all participants
@@ -868,14 +880,14 @@ FString FEOSVoiceChatUser::InsecureGetLoginToken(const FString& PlayerName)
 
 FString FEOSVoiceChatUser::InsecureGetJoinToken(const FString& ChannelName, EVoiceChatChannelType ChannelType, TOptional<FVoiceChatChannel3dProperties> Channel3dProperties)
 {
-	FEOSVoiceChatChannelCredentials ChannelCredentials;
-	GConfig->GetString(TEXT("EOSVoiceChat"), TEXT("InsecureClientBaseUrl"), ChannelCredentials.ClientBaseUrl, GEngineIni);
+	FEOSVoiceChannelConnectionInfo ConnectionInfo;
+	GConfig->GetString(TEXT("EOSVoiceChat"), TEXT("InsecureClientBaseUrl"), ConnectionInfo.ClientBaseUrl, GEngineIni);
 
-	ChannelCredentials.ParticipantToken = TEXT("0:EOSVoiceChatTest:`UserName:`RoomName:sss");
-	ChannelCredentials.ParticipantToken.ReplaceInline(TEXT("`UserName"), *GetLoggedInPlayerName());
-	ChannelCredentials.ParticipantToken.ReplaceInline(TEXT("`RoomName"), *ChannelName);
+	ConnectionInfo.ParticipantToken = TEXT("0:EOSVoiceChatTest:`UserName:`RoomName:sss");
+	ConnectionInfo.ParticipantToken.ReplaceInline(TEXT("`UserName"), *GetLoggedInPlayerName());
+	ConnectionInfo.ParticipantToken.ReplaceInline(TEXT("`RoomName"), *ChannelName);
 
-	return ChannelCredentials.ToJson(false);
+	return ConnectionInfo.ToJson(false);
 }
 #pragma endregion IVoiceChatUser
 
@@ -1705,7 +1717,7 @@ void FEOSVoiceChatUser::OnBlockParticipant(const EOS_RTC_BlockParticipantCallbac
 	check(IsInitialized());
 
 	const FString ChannelName = UTF8_TO_TCHAR(CallbackInfo->RoomName);
-	const FString PlayerName = LexToString(CallbackInfo->ParticipantId);
+	FString PlayerName = ProductUserIdToString(CallbackInfo->ParticipantId);
 
 	if (CallbackInfo->ResultCode == EOS_EResult::EOS_Success)
 	{
@@ -1740,8 +1752,8 @@ void FEOSVoiceChatUser::OnUpdateReceivingAudio(const EOS_RTCAudio_UpdateReceivin
 {
 	check(IsInitialized());
 
-	const FString ChannelName = UTF8_TO_TCHAR(CallbackInfo->RoomName);
-	const FString PlayerName = LexToString(CallbackInfo->ParticipantId);
+	FString ChannelName = UTF8_TO_TCHAR(CallbackInfo->RoomName);
+	FString PlayerName = ProductUserIdToString(CallbackInfo->ParticipantId);
 	const EOS_EResult& ResultCode = CallbackInfo->ResultCode;
 
 	if (ResultCode == EOS_EResult::EOS_Success)
@@ -1946,8 +1958,8 @@ void FEOSVoiceChatUser::OnChannelParticipantStatusChanged(const EOS_RTC_Particip
 {
 	check(LoginSession.State == ELoginState::LoggedIn);
 
-	const FString ChannelName = UTF8_TO_TCHAR(CallbackInfo->RoomName);
-	const FString PlayerName = LexToString(CallbackInfo->ParticipantId);
+	FString ChannelName = UTF8_TO_TCHAR(CallbackInfo->RoomName);
+	FString PlayerName = ProductUserIdToString(CallbackInfo->ParticipantId);
 
 	if (CallbackInfo->ParticipantStatus == EOS_ERTCParticipantStatus::EOS_RTCPS_Joined)
 	{
@@ -2020,8 +2032,8 @@ void FEOSVoiceChatUser::OnChannelParticipantAudioUpdated(const EOS_RTCAudio_Part
 {
 	check(LoginSession.State == ELoginState::LoggedIn);
 
-	const FString ChannelName = UTF8_TO_TCHAR(CallbackInfo->RoomName);
-	const FString PlayerName = LexToString(CallbackInfo->ParticipantId);
+	FString ChannelName = UTF8_TO_TCHAR(CallbackInfo->RoomName);
+	FString PlayerName = ProductUserIdToString(CallbackInfo->ParticipantId);
 
 	const bool bTalking = CallbackInfo->bSpeaking == EOS_TRUE;
 	const EOS_ERTCAudioStatus AudioStatus = CallbackInfo->AudioStatus;

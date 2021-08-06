@@ -7,7 +7,7 @@
 /**
  * Passed in the ChannelCredentials parameter of EOSVoiceChatUser::JoinChannel calls.
  */
-struct FEOSVoiceChatChannelCredentials
+struct FEOSVoiceChannelConnectionInfo
 	: public FJsonSerializable
 {
 	FString OverrideUserId;
@@ -20,6 +20,3 @@ struct FEOSVoiceChatChannelCredentials
 		JSON_SERIALIZE("participant_token", ParticipantToken);
 	END_JSON_SERIALIZER
 };
-
-UE_DEPRECATED(4.27, "FEOSVoiceChannelConnectionInfo renamed to FEOSVoiceChatChannelCredentials")
-typedef FEOSVoiceChatChannelCredentials FEOSVoiceChannelConnectionInfo;
