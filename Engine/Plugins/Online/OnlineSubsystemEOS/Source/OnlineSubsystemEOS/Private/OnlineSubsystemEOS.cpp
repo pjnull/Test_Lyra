@@ -13,9 +13,6 @@
 #include "EOSSettings.h"
 #include "EOSShared.h"
 #include "IEOSSDKManager.h"
-#include "EOSVoiceChatFactory.h"
-#include "EOSVoiceChatUser.h"
-#include "VoiceChatErrors.h"
 
 #include "Features/IModularFeatures.h"
 #include "Misc/App.h"
@@ -28,6 +25,13 @@
 // Missing defines
 #define EOS_ENCRYPTION_KEY_MAX_LENGTH 64
 #define EOS_ENCRYPTION_KEY_MAX_BUFFER_LEN (EOS_ENCRYPTION_KEY_MAX_LENGTH + 1)
+
+#if WITH_EOS_RTC
+
+#include "EOSVoiceChatFactory.h"
+#include "EOSVoiceChatUser.h"
+#include "VoiceChatResult.h"
+#include "VoiceChatErrors.h"
 
 /** Class that blocks login/logout for the OSS EOS managed IVoiceChatUser interfaces. */
 class FOnlineSubsystemEOSVoiceChatUserWrapper : public IVoiceChatUser
@@ -113,6 +117,8 @@ public:
 
 	FEOSVoiceChatUser& VoiceChatUser;
 };
+
+#endif // WITH_EOS_RTC
 
 /** Class that holds the strings for the call duration */
 struct FEOSPlatformOptions :
@@ -418,6 +424,7 @@ bool FOnlineSubsystemEOS::Shutdown()
 	TitleFileInterfacePtr = nullptr;
 	UserCloudInterfacePtr = nullptr;
 	
+#if WITH_EOS_RTC
 	for (TPair<FUniqueNetIdRef, FOnlineSubsystemEOSVoiceChatUserWrapperRef>& Pair : LocalVoiceChatUsers)
 	{
 		FOnlineSubsystemEOSVoiceChatUserWrapperRef& VoiceChatUserWrapper = Pair.Value;
@@ -425,6 +432,7 @@ bool FOnlineSubsystemEOS::Shutdown()
 	}
 	LocalVoiceChatUsers.Reset();
 	VoiceChatInterface = nullptr;
+#endif
 	
 	EOSPlatformHandle = nullptr;
 
@@ -636,15 +644,18 @@ IVoiceChatUser* FOnlineSubsystemEOS::GetVoiceChatUserInterface(const FUniqueNetI
 FEOSVoiceChatUser* FOnlineSubsystemEOS::GetEOSVoiceChatUserInterface(const FUniqueNetId& LocalUserId)
 {
 	FEOSVoiceChatUser* Result = nullptr;
+#if WITH_EOS_RTC
 	if (IVoiceChatUser* Wrapper = GetVoiceChatUserInterface(LocalUserId))
 	{
 		Result = &static_cast<FOnlineSubsystemEOSVoiceChatUserWrapper*>(Wrapper)->VoiceChatUser;
 	}
+#endif
 	return Result;
 }
 
 void FOnlineSubsystemEOS::ReleaseVoiceChatUserInterface(const FUniqueNetId& LocalUserId)
 {
+#if WITH_EOS_RTC
 	if (VoiceChatInterface)
 	{
 		if (FOnlineSubsystemEOSVoiceChatUserWrapperRef* WrapperPtr = LocalVoiceChatUsers.Find(LocalUserId.AsShared()))
@@ -653,6 +664,7 @@ void FOnlineSubsystemEOS::ReleaseVoiceChatUserInterface(const FUniqueNetId& Loca
 			LocalVoiceChatUsers.Remove(LocalUserId.AsShared());
 		}
 	}
+#endif
 }
 
-#endif
+#endif // WITH_EOS_SDK
