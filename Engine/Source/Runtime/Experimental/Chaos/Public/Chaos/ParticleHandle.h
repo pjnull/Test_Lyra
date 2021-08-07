@@ -63,6 +63,7 @@ void GeometryParticleDefaultConstruct(FConcrete& Concrete, const FGeometryPartic
 	Concrete.SetX(TVector<T, d>(0));
 	Concrete.SetR(TRotation<T, d>::Identity);
 	Concrete.SetSpatialIdx(FSpatialAccelerationIdx{ 0,0 });
+	Concrete.SetResimType(EResimType::FullResim);
 }
 
 template <typename T, int d, typename FConcrete>
@@ -91,7 +92,6 @@ void PBDRigidParticleDefaultConstruct(FConcrete& Concrete, const FPBDRigidPartic
 	Concrete.SetGravityEnabled(Params.bGravityEnabled);
 	Concrete.SetCCDEnabled(Params.bCCDEnabled);
 	Concrete.SetDisabled(Params.bDisabled);
-	Concrete.SetResimType(EResimType::FullResim);
 	Concrete.SetSleepType(ESleepType::MaterialSleep);
 }
 
@@ -412,6 +412,7 @@ public:
 		SetSharedGeometry(InData.SharedGeometryLowLevel());
 		SetUniqueIdx(InData.UniqueIdx());
 		SetSpatialIdx(InData.SpatialIdx());
+		SetResimType(InData.ResimType());
 
 #if CHAOS_DEBUG_NAME
 		SetDebugName(InData.DebugName());
@@ -502,6 +503,12 @@ public:
 	{
 		return AuxContainer[HandleIdx];
 	}
+
+	EResimType ResimType() const { return GeometryParticles->ResimType(ParticleIdx); }
+
+	void SetResimType(EResimType ResimType) { GeometryParticles->ResimType(ParticleIdx) = ResimType; }
+
+
 
 #if CHAOS_DETERMINISTIC
 	FParticleID ParticleID() const { return GeometryParticles->ParticleID(ParticleIdx); }
@@ -824,7 +831,6 @@ public:
 		SetGravityEnabled(DynamicMisc.GravityEnabled());
 		SetCCDEnabled(DynamicMisc.CCDEnabled());
 		SetDisabled(DynamicMisc.Disabled()); 
-		SetResimType(DynamicMisc.ResimType());
 		SetOneWayInteraction(DynamicMisc.OneWayInteraction());
 		AddCollisionConstraintFlag( (Chaos::ECollisionConstraintFlags)DynamicMisc.CollisionConstraintFlag() );
 		SetSleepType(DynamicMisc.SleepType());
@@ -911,10 +917,6 @@ public:
 	bool OneWayInteraction() const { return PBDRigidParticles->OneWayInteraction(ParticleIdx); }
 
 	void SetOneWayInteraction(bool bInOneWayInteraction) { PBDRigidParticles->OneWayInteraction(ParticleIdx) = bInOneWayInteraction; }
-
-	EResimType ResimType() const { return PBDRigidParticles->ResimType(ParticleIdx);}
-
-	void SetResimType(EResimType ResimType){ PBDRigidParticles->ResimType(ParticleIdx) = ResimType; }
 
 	ESleepType SleepType() const { return PBDRigidParticles->SleepType(ParticleIdx);}
 
@@ -1837,6 +1839,17 @@ public:
 		MNonFrequentData.Modify(true,MDirtyFlags,Proxy,[Idx](auto& Data){ Data.SetSpatialIdx(Idx);});
 	}
 
+	void SetResimType(EResimType ResimType)
+	{
+		MNonFrequentData.Modify(true, MDirtyFlags, Proxy, [ResimType](auto& Data) { Data.SetResimType(ResimType); });
+	}
+
+	EResimType ResimType() const
+	{
+		return MNonFrequentData.Read().ResimType();
+	}
+
+
 	void SetNonFrequentData(const FParticleNonFrequentData& InData)
 	{
 		MNonFrequentData.Write(InData,true,MDirtyFlags,Proxy);
@@ -2208,16 +2221,6 @@ public:
 	void SetInitialized(const bool InInitialized)
 	{
 		this->MInitialized = InInitialized;
-	}
-
-	void SetResimType(EResimType ResimType)
-	{
-		MMiscData.Modify(true,MDirtyFlags,Proxy,[ResimType](auto& Data){ Data.SetResimType(ResimType);});
-	}
-
-	EResimType ResimType() const
-	{
-		return MMiscData.Read().ResimType();
 	}
 
 	const TVector<T, d>& F() const { return MDynamics.Read().F(); }

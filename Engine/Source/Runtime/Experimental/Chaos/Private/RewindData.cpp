@@ -99,9 +99,9 @@ bool FGeometryParticleStateBase::IsInSync(const FGeometryParticleHandle& Handle,
 		if(!bSkipDynamics)
 		{
 			if (!Dynamics.IsInSync(*Rigid, FrameAndPhase, Pool))
-		{
-			return false;
-		}
+			{
+				return false;
+			}
 		}
 
 		if(!DynamicsMisc.IsInSync(*Rigid, FrameAndPhase, Pool))
@@ -150,7 +150,7 @@ bool FRewindData::RewindToFrame(int32 Frame)
 	auto RewindNoSave = [RewindFrameAndPhase, this](auto Particle, auto& Property, const auto& RewindFunc)
 	{
 		if (auto Val = Property.Read(RewindFrameAndPhase, PropertiesPool))
-	{
+		{
 			RewindFunc(Particle, *Val);
 		}
 	};
@@ -273,9 +273,9 @@ void FRewindData::FinishFrame()
 
 			auto& Handle = *Info.GetPTParticle();
 			if (auto Rigid = Handle.CastToRigidParticle())
-				{
+			{
 				if(Rigid->ResimType() == EResimType::FullResim)
-					{
+				{
 					if (IsFinalResim())
 					{
 						//Last resim so mark as in sync
@@ -289,12 +289,12 @@ void FRewindData::FinishFrame()
 						//solver doesn't affect dynamics, so no reason to test if they desynced from original sim
 						//question: should we skip all other properties? dynamics is a commonly changed one but might be worth skipping everything solver skips
 						DesyncIfNecessary</*bSkipDynamics=*/true>(Info, FutureFrame);
+					}
 				}
 			}
-			}
 		}
-		}
-		
+	}
+	
 
 	++CurFrame;
 	LatestFrame = FMath::Max(LatestFrame, CurFrame);
@@ -302,6 +302,12 @@ void FRewindData::FinishFrame()
 
 int32 SkipDesyncTest = 0;
 FAutoConsoleVariableRef CVarSkipDesyncTest(TEXT("p.SkipDesyncTest"), SkipDesyncTest, TEXT("Skips hard desync test, this means all particles will assume to be clean except spawning at different times. This is useful for a perf lower bound, not actually correct"));
+
+void FRewindData::DesyncParticle(FDirtyParticleInfo& Info, const FFrameAndPhase FrameAndPhase)
+{
+	Info.ClearPhaseAndFuture(FrameAndPhase);
+	Info.GetPTParticle()->SetSyncState(ESyncState::HardDesync);
+}
 
 template <bool bSkipDynamics>
 void FRewindData::DesyncIfNecessary(FDirtyParticleInfo& Info, const FFrameAndPhase FrameAndPhase)
@@ -314,8 +320,7 @@ void FRewindData::DesyncIfNecessary(FDirtyParticleInfo& Info, const FFrameAndPha
 		if (!SkipDesyncTest)
 		{
 			//first time desyncing so need to clear history from this point into the future
-			Info.ClearPhaseAndFuture(FrameAndPhase);
-			Info.GetPTParticle()->SetSyncState(ESyncState::HardDesync);
+			DesyncParticle(Info, FrameAndPhase);
 		}
 	}
 }
@@ -344,15 +349,18 @@ void FRewindData::AdvanceFrameImp(IResimCacheBase* ResimCache)
 			RemoveParticle(AllDirtyParticles[DirtyIdx].CachedUniqueIdx);
 		}
 		else
-			{
-			if (IsResim() && !Info.bResimAsSlave)
-				{
-				DesyncIfNecessary(Info, FrameAndPhase);
-				}
+		{
 
 			auto Handle = Info.GetPTParticle();
+			Info.bResimAsSlave = Handle->ResimType() == EResimType::ResimAsSlave;
+
+			if (IsResim() && !Info.bResimAsSlave)
+			{
+				DesyncIfNecessary(Info, FrameAndPhase);
+			}
+
 			if(IsResim() && Handle->SyncState() != ESyncState::InSync && !SkipDesyncTest)
-				{
+			{
 				DesyncedParticles.Add(Handle);
 			}
 
@@ -409,17 +417,6 @@ void FRewindData::PushGTDirtyData(const FDirtyPropertiesManager& SrcManager,cons
 		FDirtyParticleInfo& Info = FindOrAddParticle(*PTParticle, Proxy->IsInitialized() ? INDEX_NONE : CurFrame);
 		FGeometryParticleStateBase& Latest = Info.AddFrame(CurFrame);
 
-		if(PTParticle->CastToRigidParticle() == nullptr)	//non rigid is always resimming as slave (TODO: we may want to move kinematics from callback)
-		{
-			Info.bResimAsSlave = true;
-		}
-
-		if(auto NewData = Dirty.ParticleData.FindDynamicMisc(SrcManager, SrcDataIdx))
-		{
-			//question: does modifying this at runtime cause issues? For example a kinematic starting to simulate?
-			Info.bResimAsSlave = NewData->ResimType() == EResimType::ResimAsSlave;
-		}
-
 		//At this point all phases should be clean
 		ensure(Latest.IsClean(FFrameAndPhase{ CurFrame, FFrameAndPhase::PrePushData }));
 
@@ -472,12 +469,12 @@ void FRewindData::SpawnProxyIfNeeded(FSingleParticlePhysicsProxy& Proxy)
 	if(Proxy.GetInitializedStep() > CurFrame)
 	{
 		FGeometryParticleHandle* Handle = Proxy.GetHandle_LowLevel();
-		FindOrAddParticle(*Handle, CurFrame);
+		FDirtyParticleInfo& Info = FindOrAddParticle(*Handle, CurFrame);
 
 		Solver->GetEvolution()->EnableParticle(Handle, nullptr);
 		if(Proxy.GetInitializedStep() != CurFrame)
 		{
-			Handle->SetSyncState(ESyncState::HardDesync);	//spawn frame changed so desync
+			DesyncParticle(Info, FFrameAndPhase{ Proxy.GetInitializedStep(), FFrameAndPhase::PrePushData });	//Spawned earlier so mark as desynced from that first frame
 			Proxy.SetInitialized(CurFrame);
 		}
 	}
@@ -512,17 +509,17 @@ void FRewindData::MarkDirtyFromPT(FGeometryParticleHandle& Handle)
 	if (auto Kinematic = Handle.CastToKinematicParticle())
 	{
 		if (bRecordingHistory || Latest.Velocities.IsClean(FrameAndPhase))
-			{
-			if (auto Data = Latest.Velocities.WriteAccessNonDecreasing(FrameAndPhase, PropertiesPool))
 		{
+			if (auto Data = Latest.Velocities.WriteAccessNonDecreasing(FrameAndPhase, PropertiesPool))
+			{
 				Data->CopyFrom(*Kinematic);
+			}
 		}
-	}
 
 		if (auto Rigid = Kinematic->CastToRigidParticle())
 		{
 			if (bRecordingHistory || Latest.DynamicsMisc.IsClean(FrameAndPhase))
-	{
+			{
 				if (auto Data = Latest.DynamicsMisc.WriteAccessNonDecreasing(FrameAndPhase, PropertiesPool))
 				{
 					Data->CopyFrom(*Rigid);
@@ -544,17 +541,17 @@ void FRewindData::PushPTDirtyData(TPBDRigidParticleHandle<FReal,3>& Handle,const
 	ensure(!bRecordingHistory || Latest.IsCleanExcludingDynamics(FrameAndPhase));	//PostCallbacks should be clean before we write sim results
 
 	if(bRecordingHistory || Latest.ParticlePositionRotation.IsClean(FrameAndPhase))
-		{
+	{
 		Latest.ParticlePositionRotation.WriteAccessMonotonic(FrameAndPhase, PropertiesPool).CopyFrom(Handle);
 	}
 
 	if(bRecordingHistory || Latest.Velocities.IsClean(FrameAndPhase))
-			{
+	{
 		FParticleVelocities& PreVelocities = Latest.Velocities.WriteAccessMonotonic(FrameAndPhase, PropertiesPool);
 		PreVelocities.SetV(Handle.PreV());
 		PreVelocities.SetW(Handle.PreW());
-			}
-			
+	}
+	
 	if(bRecordingHistory || Latest.DynamicsMisc.IsClean(FrameAndPhase))
 	{
 		FParticleDynamicMisc& PreDynamicMisc = Latest.DynamicsMisc.WriteAccessMonotonic(FrameAndPhase, PropertiesPool);
@@ -615,7 +612,7 @@ FRewindData::FDirtyParticleInfo::~FDirtyParticleInfo()
 	if(PropertiesPool)
 	{
 		History.Release(*PropertiesPool);
-		}
+	}
 }
 
 template void FRewindData::PushGTDirtyData<true>(const FDirtyPropertiesManager& SrcManager,const int32 SrcDataIdx,const FDirtyProxy& Dirty, const FShapeDirtyData* DirtyShapesData);

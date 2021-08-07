@@ -324,6 +324,14 @@ namespace Chaos
 		};
 		TSharedPtr<FData,ESPMode::ThreadSafe> SharedData;
 	};
+
+	enum class EResimType : uint8
+	{
+		FullResim,	//fully re-run simulation and keep results (any forces must be applied again)
+		//ResimWithPrevForces, //use previous forces and keep results (UNIMPLEMENTED)
+		ResimAsSlave //use previous forces and snap to previous results regardless of variation - used to push other objects away
+		//ResimAsKinematic //treat as kinematic (UNIMPLEMENTED)
+	};
 	
 	template<class T, int d, EGeometryParticlesSimType SimType>
 	class TGeometryParticlesImp : public TParticles<T, d>
@@ -356,6 +364,8 @@ namespace Chaos
 			TArrayCollection::AddArray(&MSyncState);
 			TArrayCollection::AddArray(&MWeakParticleHandle);
 			TArrayCollection::AddArray(&MParticleConstraints);
+			TArrayCollection::AddArray(&MResimType);
+
 
 #if CHAOS_DEBUG_NAME
 			TArrayCollection::AddArray(&MDebugName);
@@ -391,6 +401,8 @@ namespace Chaos
 			, MSyncState(MoveTemp(Other.MSyncState))
 			, MWeakParticleHandle(MoveTemp(Other.MWeakParticleHandle))
 			, MParticleConstraints(MoveTemp(Other.MParticleConstraints))
+			, MResimType(MoveTemp(Other.MResimType))
+
 
 #if CHAOS_DETERMINISTIC
 			, MParticleIDs(MoveTemp(Other.MParticleIDs))
@@ -427,6 +439,8 @@ namespace Chaos
 				TArrayCollection::AddArray(&MGeometryParticle);
 				TArrayCollection::AddArray(&MPhysicsProxy);
 			}
+
+			TArrayCollection::AddArray(&MResimType);
 		}
 
 		static constexpr bool IsRigidBodySim() { return SimType == EGeometryParticlesSimType::RigidBodySim; }
@@ -465,6 +479,8 @@ namespace Chaos
 				TArrayCollection::AddArray(&MGeometryParticle);
 				TArrayCollection::AddArray(&MPhysicsProxy);
 			}
+			
+			TArrayCollection::AddArray(&MResimType);
 		}
 
 		CHAOS_API virtual ~TGeometryParticlesImp()
@@ -639,6 +655,10 @@ namespace Chaos
 			MParticleConstraints[Index].RemoveSingleSwap(InConstraintHandle);
 			CHAOS_ENSURE(!MParticleConstraints[Index].Contains(InConstraintHandle));
 		}
+
+		FORCEINLINE EResimType ResimType(const int32 Index) const { return MResimType[Index]; }
+		FORCEINLINE EResimType& ResimType(const int32 Index) { return MResimType[Index]; }
+
 private:
 		friend THandleType;
 		CHAOS_API void ResetWeakParticleHandle(const int32 Index)
@@ -775,6 +795,7 @@ public:
 		TArrayCollectionArray<FSyncState> MSyncState;
 		TArrayCollectionArray<FWeakParticleHandle> MWeakParticleHandle;
 		TArrayCollectionArray<FConstraintHandleArray> MParticleConstraints;
+		TArrayCollectionArray<EResimType> MResimType;
 
 		void UpdateShapesArray(const int32 Index)
 		{
