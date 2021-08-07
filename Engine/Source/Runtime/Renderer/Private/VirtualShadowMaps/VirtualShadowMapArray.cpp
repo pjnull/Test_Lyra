@@ -1777,7 +1777,7 @@ void FVirtualShadowMapArray::RenderVirtualShadowMapsHw(FRDGBuilder& GraphBuilder
 
 			FInstanceCullingResult InstanceCullingResult;
 			InstanceCullingResult.DrawIndirectArgsBuffer = DrawIndirectArgsRDG;
-			InstanceCullingResult.InstanceIdOffsetBuffer = InstanceIdOffsetBufferRDG;
+			InstanceCullingResult.InstanceDataBuffer = InstanceIdOffsetBufferRDG;
 
 			FInstanceCullingGlobalUniforms* InstanceCullingGlobalUniforms = GraphBuilder.AllocParameters<FInstanceCullingGlobalUniforms>();
 			InstanceCullingGlobalUniforms->InstanceIdsBuffer = GraphBuilder.CreateSRV(InstanceIdsBuffer);
