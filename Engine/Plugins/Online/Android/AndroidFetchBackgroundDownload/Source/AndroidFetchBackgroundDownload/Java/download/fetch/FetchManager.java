@@ -650,7 +650,7 @@ public class FetchManager implements FetchDownloadProgressOwner, FetchEnqueueRes
 		else
 		{
 			//Setup a callback to RetryDownload_Internal once we try and get our Download from Fetch
-			FetchInstance.getDownload(MatchingDescription.CachedFetchID, new RetryDownloadFunc());
+			FetchInstance.getDownload(MatchingDescription.CachedFetchID, new RetryDownloadFunc(MatchingDescription));
 		}
 	}
 	
@@ -672,12 +672,18 @@ public class FetchManager implements FetchDownloadProgressOwner, FetchEnqueueRes
 
 	private class RetryDownloadFunc implements Func2<Download>
 	{
+		public RetryDownloadFunc (DownloadDescription CachedDownloadDescription)
+		{
+			this.CachedDownloadDescription = CachedDownloadDescription;
+		}
+
 		@Override
 		public void call(@Nullable Download MatchingDownload)
 		{
-			DownloadDescription MatchingDescription = RequestedDownloads.get(GetRequestID(MatchingDownload));
-			RetryDownload_Internal(MatchingDescription, MatchingDownload);
+			RetryDownload_Internal(CachedDownloadDescription, MatchingDownload);
 		}
+
+		private DownloadDescription CachedDownloadDescription = null;
 	}
 
 	
@@ -872,9 +878,14 @@ public class FetchManager implements FetchDownloadProgressOwner, FetchEnqueueRes
 		ProgressListener.OnAllDownloadsComplete(bDidAllSucceed);
 	}
 	
-	private String GetRequestID(@NonNull Download download)
+	private String GetRequestID(Download download)
 	{
-		return download.getTag();
+		if (null != download)
+		{
+			return download.getTag();
+		}
+		
+		return "";
 	}
 
 	private boolean HasValidProgressCallback(DownloadDescription DownloadDesc)
