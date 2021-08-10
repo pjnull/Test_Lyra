@@ -1323,10 +1323,21 @@ void FClassHierarchy::LoadUnloadedTagData(TSharedPtr<FClassViewerNode>& InOutCla
 
 	InOutClassViewerNode->BlueprintAssetPath = InAssetData.ObjectPath;
 
-	FString ClassObjectPath;
-	if (InAssetData.GetTagValue(FBlueprintTags::GeneratedClassPath, ClassObjectPath))
 	{
-		InOutClassViewerNode->ClassPath = FName(*FPackageName::ExportTextPathToObjectPath(ClassObjectPath));
+		FString GeneratedClassPath;
+		UClass* AssetClass = InAssetData.GetClass();
+		if (AssetClass && AssetClass->IsChildOf(UBlueprintGeneratedClass::StaticClass()))
+		{
+			InOutClassViewerNode->ClassPath = InAssetData.ObjectPath;
+		}
+		else if (InAssetData.GetTagValue(FBlueprintTags::GeneratedClassPath, GeneratedClassPath))
+		{
+			InOutClassViewerNode->ClassPath = FName(*FPackageName::ExportTextPathToObjectPath(GeneratedClassPath));
+		}
+		else
+		{
+			UE_LOG(LogEditorClassViewer, Verbose, TEXT("Failed to set ClassViewerNode ClassPath for %s"), *InAssetData.ObjectPath.ToString());
+		}
 	}
 
 	FString ParentClassPathString;
