@@ -1761,26 +1761,27 @@ bool UAssetManager::GetPrimaryAssetLoadSet(TSet<FSoftObjectPath>& OutAssetLoadSe
 TSharedPtr<FStreamableHandle> UAssetManager::PreloadPrimaryAssets(const TArray<FPrimaryAssetId>& AssetsToLoad, const TArray<FName>& LoadBundles, bool bLoadRecursive, FStreamableDelegate DelegateToCall, TAsyncLoadPriority Priority)
 {
 	TSet<FSoftObjectPath> PathsToLoad;
-	FString DebugName;
+	TStringBuilder<256> DebugName;
 	TSharedPtr<FStreamableHandle> ReturnHandle;
 
 	for (const FPrimaryAssetId& PrimaryAssetId : AssetsToLoad)
 	{
 		if (GetPrimaryAssetLoadSet(PathsToLoad, PrimaryAssetId, LoadBundles, bLoadRecursive))
 		{
-			if (DebugName.IsEmpty())
+			if (DebugName.Len() == 0)
 			{
-				DebugName += TEXT("Preloading ");
+				DebugName << FStreamableHandle::HandleDebugName_Preloading;
+				DebugName << TEXT(" ");
 			}
 			else
 			{
-				DebugName += TEXT(", ");
+				DebugName << TEXT(", ");
 			}
-			DebugName += PrimaryAssetId.ToString();
+			DebugName << PrimaryAssetId.ToString();
 		}
 	}
 
-	ReturnHandle = LoadAssetList(PathsToLoad.Array(), MoveTemp(DelegateToCall), Priority, DebugName);
+	ReturnHandle = LoadAssetList(PathsToLoad.Array(), MoveTemp(DelegateToCall), Priority, FString(*DebugName));
 
 	if (!ensureMsgf(ReturnHandle.IsValid(), TEXT("Requested preload of Primary Asset with no referenced assets! DebugName:%s"), *DebugName))
 	{
