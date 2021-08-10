@@ -105,9 +105,6 @@ FTargetPlatformInfo::FTargetPlatformInfo(const FString& InIniPlatformName, EBuil
 	{
 		VanillaPlatformInfoArray.Add(this);
 		AllVanillaPlatformNames.AddUnique(Name);
-
-		// add preview platform menu items from DDPI
-		PreviewPlatformMenuItems.Append(DataDrivenPlatformInfo->PreviewPlatformMenuItems);
 	}
 }
 
@@ -176,11 +173,6 @@ const TArray<FName>& GetAllVanillaPlatformNames()
 	checkf(AllPlatformInfoArray.Num() > 0, TEXT("Querying for TargetPlatformInfo objects before they are ready!"));
 
 	return PlatformInfo::AllVanillaPlatformNames;
-}
-
-const TArray<FPreviewPlatformMenuItem>& GetPreviewPlatformMenuItems()
-{
-	return PlatformInfo::PreviewPlatformMenuItems;
 }
 
 } // namespace PlatformInfo

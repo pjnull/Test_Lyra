@@ -3535,7 +3535,7 @@ void FLevelEditorCommands::RegisterCommands()
 	UI_COMMAND(ToggleFeatureLevelPreview, "Preview Mode Toggle", "Toggles the Preview Mode on or off for the currently selected Preview target", EUserInterfaceActionType::ToggleButton, FInputChord());
 
 	// Add preview platforms
-	for (auto& Item : PlatformInfo::GetPreviewPlatformMenuItems())
+	for (const FPreviewPlatformMenuItem& Item : FDataDrivenPlatformInfoRegistry::GetAllPreviewPlatformMenuItems())
 	{
 		PreviewPlatformOverrides.Add(
 			FUICommandInfoDecl(

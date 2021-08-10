@@ -13,16 +13,10 @@ namespace
 	TMap<FName, FDataDrivenPlatformInfo> DataDrivenPlatforms;
 	TArray<FName> SortedPlatformNames;
 	TArray<const FDataDrivenPlatformInfo*> SortedPlatformInfos;
-}
-
 #if DDPI_HAS_EXTENDED_PLATFORMINFO_DATA
-// NO AUTO-KICK-OFF - let the editor request it as needed
-// delay the kick off of running UAT so we can check IsRunningCommandlet()
-// FDelayedAutoRegisterHelper GPlatformInfoInit(EDelayedRegisterRunPhase::TaskGraphSystemReady, []()
-// {
-// 	FDataDrivenPlatformInfoRegistry::UpdateSdkStatus();
-// });
+	TArray<struct FPreviewPlatformMenuItem> PreviewPlatformMenuItems;
 #endif
+}
 
 static const TArray<FString>& GetDataDrivenIniFilenames()
 {
@@ -219,7 +213,8 @@ static FString GetSectionString(const FConfigSection& Section, FName Key)
 	return Section.FindRef(Key).GetValue();
 }
 
-static void ParsePreviewPlatforms(const FConfigFile& IniFile, FDataDrivenPlatformInfo& Info)
+#if DDPI_HAS_EXTENDED_PLATFORMINFO_DATA
+static void ParsePreviewPlatforms(const FConfigFile& IniFile)
 {
 	// walk over the file looking for PreviewPlatform sections
 	for (auto Section : IniFile)
@@ -262,10 +257,11 @@ static void ParsePreviewPlatforms(const FConfigFile& IniFile, FDataDrivenPlatfor
 			FTextStringHelper::ReadFromBuffer(*GetSectionString(Section.Value, FName("MenuText")), Item.MenuText);
 			FTextStringHelper::ReadFromBuffer(*GetSectionString(Section.Value, FName("MenuTooltip")), Item.MenuTooltip);
 			FTextStringHelper::ReadFromBuffer(*GetSectionString(Section.Value, FName("IconText")), Item.IconText);
-			Info.PreviewPlatformMenuItems.Add(Item);
+			PreviewPlatformMenuItems.Add(Item);
 		}
 	}
 }
+#endif
 
 static void LoadDDPIIniSettings(const FConfigFile& IniFile, FDataDrivenPlatformInfo& Info, FName PlatformName)
 {
@@ -337,9 +333,8 @@ static void LoadDDPIIniSettings(const FConfigFile& IniFile, FDataDrivenPlatformI
 	// we could look for Platform*, but then platforms that are a substring of another one could return a false positive (Windows* would find Windows31TargetPlatform)
 	Info.bHasCompiledTargetSupport = FDataDrivenPlatformInfoRegistry::HasCompiledSupportForPlatform(PlatformName, FDataDrivenPlatformInfoRegistry::EPlatformNameType::TargetPlatform);
 
+	ParsePreviewPlatforms(IniFile);
 #endif
-
-	ParsePreviewPlatforms(IniFile, Info);
 }
 
 /**
@@ -542,6 +537,11 @@ bool FDataDrivenPlatformInfoRegistry::HasCompiledSupportForPlatform(FName Platfo
 	}
 
 	return false;
+}
+
+const TArray<struct FPreviewPlatformMenuItem>& FDataDrivenPlatformInfoRegistry::GetAllPreviewPlatformMenuItems()
+{
+	return PreviewPlatformMenuItems;
 }
 
 #endif
