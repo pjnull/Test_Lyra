@@ -107,6 +107,10 @@ struct FMockState_GT
 	UPROPERTY(BlueprintReadWrite, Category = "Mock Object")
 	float AutoFaceTargetYawDamp = 20.f;
 
+	// If enabled, input cmd should specify target yaw.
+	UPROPERTY(BlueprintReadWrite, Category = "Mock Object")
+	bool bEnableAutoFaceTargetYaw = false;
+
 	// Arbitrary data that doesn't affect sim but could still trigger rollback
 	UPROPERTY(BlueprintReadWrite, Category="Mock Object")
 	int32 RandValue = 0;
@@ -116,7 +120,8 @@ struct FMockState_GT
 		return ForceMultiplier != AuthState.ForceMultiplier
 			|| RandValue != AuthState.RandValue
 			|| AutoFaceTargetYawStrength != AuthState.AutoFaceTargetYawStrength
-			|| AutoFaceTargetYawDamp != AuthState.AutoFaceTargetYawDamp;
+			|| AutoFaceTargetYawDamp != AuthState.AutoFaceTargetYawDamp
+			|| bEnableAutoFaceTargetYaw != AuthState.bEnableAutoFaceTargetYaw;
 	}
 
 	bool NetSerialize(FArchive& Ar, class UPackageMap* Map, bool& bOutSuccess)
@@ -125,6 +130,7 @@ struct FMockState_GT
 		Ar << RandValue;
 		Ar << AutoFaceTargetYawStrength;
 		Ar << AutoFaceTargetYawDamp;
+		Ar << bEnableAutoFaceTargetYaw;
 		return true;
 	}
 };
