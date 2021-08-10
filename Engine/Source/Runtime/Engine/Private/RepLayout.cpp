@@ -1657,6 +1657,7 @@ ERepLayoutResult FRepLayout::CompareProperties(
 	const FReplicationFlags& RepFlags) const
 {
 	CONDITIONAL_SCOPE_CYCLE_COUNTER(STAT_NetReplicateDynamicPropCompareTime, CVarNetEnableDetailedScopeCounters.GetValueOnAnyThread() > 0);
+	CSV_SCOPED_TIMING_STAT_EXCLUSIVE_CONDITIONAL(CompareProperties, !RepFlags.bReplay);
 
 	if (IsEmpty())
 	{
@@ -1822,6 +1823,7 @@ bool FRepLayout::ReplicateProperties(
 	const FReplicationFlags& RepFlags) const
 {
 	CONDITIONAL_SCOPE_CYCLE_COUNTER(STAT_NetReplicateDynamicPropTime, CVarNetEnableDetailedScopeCounters.GetValueOnAnyThread() > 0);
+	CSV_SCOPED_TIMING_STAT_EXCLUSIVE_CONDITIONAL(ReplicateProperties, !RepFlags.bReplay);
 
 	check(ObjectClass == Owner);
 
@@ -2783,6 +2785,7 @@ void FRepLayout::SendProperties(
 	const FRepSerializationSharedInfo& SharedInfo) const
 {
 	SCOPE_CYCLE_COUNTER(STAT_NetReplicateDynamicPropSendTime);
+	CSV_SCOPED_TIMING_STAT_EXCLUSIVE(SendProperties);
 
 	if (IsEmpty())
 	{

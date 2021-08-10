@@ -149,6 +149,10 @@ CSV_DEFINE_CATEGORY(ReplicationGraphChannelsOpened, WITH_SERVER_CODE);
 CSV_DEFINE_CATEGORY(ReplicationGraphNumReps, WITH_SERVER_CODE);
 CSV_DEFINE_CATEGORY(ReplicationGraphVisibleLevels, WITH_SERVER_CODE);
 CSV_DEFINE_CATEGORY(ReplicationGraphForcedUpdates, WITH_SERVER_CODE);
+CSV_DEFINE_CATEGORY(ReplicationGraphCleanMS, WITH_SERVER_CODE);
+CSV_DEFINE_CATEGORY(ReplicationGraphCleanNumReps, WITH_SERVER_CODE);
+
+CSV_DEFINE_CATEGORY(ReplicationGraph, WITH_SERVER_CODE);
 
 static TAutoConsoleVariable<FString> CVarRepGraphConditionalBreakpointActorName(TEXT("Net.RepGraph.ConditionalBreakpointActorName"), TEXT(""), 
 	TEXT("Helper CVar for debugging. Set this string to conditionally log/breakpoint various points in the repgraph pipeline. Useful for bugs like 'why is this actor channel closing'"), ECVF_Default );
@@ -2330,6 +2334,21 @@ void UReplicationGraph::SetActorDestructionInfoToIgnoreDistanceCulling(AActor* D
 	{
 		(*DestructionInfoPtr)->bIgnoreDistanceCulling = true;
 	}
+}
+
+void UReplicationGraph::PostServerReplicateStats(const FFrameReplicationStats& Stats)
+{
+#if CSV_PROFILER
+	if (FCsvProfiler* Profiler = FCsvProfiler::Get())
+	{
+		if (Profiler->IsCapturing())
+		{
+			Profiler->RecordCustomStat("ReplicatedActors", CSV_CATEGORY_INDEX(ReplicationGraph), Stats.NumReplicatedActors, ECsvCustomStatOp::Set);
+			Profiler->RecordCustomStat("CleanActors", CSV_CATEGORY_INDEX(ReplicationGraph), Stats.NumReplicatedCleanActors, ECsvCustomStatOp::Set);
+			Profiler->RecordCustomStat("FastPathActors", CSV_CATEGORY_INDEX(ReplicationGraph), Stats.NumReplicatedFastPathActors, ECsvCustomStatOp::Set);
+		}
+	}
+#endif
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------
