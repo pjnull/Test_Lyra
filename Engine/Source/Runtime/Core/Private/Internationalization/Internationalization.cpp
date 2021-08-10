@@ -38,6 +38,7 @@ void FInternationalization::TearDown()
 
 FText FInternationalization::ForUseOnlyByLocMacroAndGraphNodeTextLiterals_CreateText(const TCHAR* InTextLiteral, const TCHAR* InNamespace, const TCHAR* InKey)
 {
+	LLM_SCOPE(ELLMTag::Localization);
 	return FTextCache::Get().FindOrCache(InTextLiteral, InNamespace, InKey);
 }
 
