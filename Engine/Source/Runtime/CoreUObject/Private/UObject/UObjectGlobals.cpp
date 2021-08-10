@@ -1057,7 +1057,7 @@ public:
 				UE_LOG(LogUObjectGlobals, Warning, TEXT("debug stack %s"), *DebugStackString);
 
 
-				FStackTracker TempTracker(NULL, NULL, true);
+				FStackTracker TempTracker(nullptr, nullptr, nullptr, true);
 				TempTracker.CaptureStackTrace(1);
 				TempTracker.DumpStackTraces(0, *GLog);
 				TempTracker.ResetTracking();
