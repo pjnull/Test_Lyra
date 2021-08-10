@@ -800,7 +800,7 @@ void UWaterBodyComponent::OnPostEditChangeProperty(FPropertyChangedEvent& Proper
 	}
 }
 
-EWaterBodyStatus UWaterBodyComponent::CheckWaterBodyStatus() const
+EWaterBodyStatus UWaterBodyComponent::CheckWaterBodyStatus(FText* OutError) const
 {
 	if (!IsTemplate())
 	{
@@ -810,12 +810,20 @@ EWaterBodyStatus UWaterBodyComponent::CheckWaterBodyStatus() const
 			{
 				if (AffectsWaterMesh() && (WaterSubsystem->GetWaterMeshActor() == nullptr))
 				{
+					if (OutError) 
+					{
+						*OutError = LOCTEXT("MapCheck_Message_MissingWaterMesh", "This water body requires a WaterMeshActor to be rendered. Please add one to the map. ");
+					}
 					return EWaterBodyStatus::MissingWaterMesh;
 				}
 			}
 
 			if (AffectsLandscape() && FindLandscape() == nullptr)
 			{
+				if (OutError) 
+				{
+					*OutError = LOCTEXT("MapCheck_Message_MissingLandscape", "This water body requires a Landscape to be rendered. Please add one to the map. ");
+				}
 				return EWaterBodyStatus::MissingLandscape;
 			}
 		}
@@ -828,19 +836,26 @@ void UWaterBodyComponent::CheckForErrors()
 {
 	Super::CheckForErrors();
 
-	switch (CheckWaterBodyStatus())
+	FText Error;
+	switch (CheckWaterBodyStatus(&Error))
 	{
 	case EWaterBodyStatus::MissingWaterMesh:
 		FMessageLog("MapCheck").Error()
 			->AddToken(FUObjectToken::Create(this))
-			->AddToken(FTextToken::Create(LOCTEXT("MapCheck_Message_MissingWaterMesh", "This water body requires a WaterMeshActor to be rendered. Please add one to the map. ")))
+			->AddToken(FTextToken::Create(Error))
 			->AddToken(FMapErrorToken::Create(TEXT("WaterBodyMissingWaterMesh")));
 		break;
 	case EWaterBodyStatus::MissingLandscape:
 		FMessageLog("MapCheck").Error()
 			->AddToken(FUObjectToken::Create(this))
-			->AddToken(FTextToken::Create(LOCTEXT("MapCheck_Message_MissingLandscape", "This water body requires a Landscape to be rendered. Please add one to the map. ")))
+			->AddToken(FTextToken::Create(Error))
 			->AddToken(FMapErrorToken::Create(TEXT("WaterBodyMissingLandscape")));
+		break;
+	case EWaterBodyStatus::InvalidWaveData:
+		FMessageLog("MapCheck").Error()
+			->AddToken(FUObjectToken::Create(this))
+			->AddToken(FTextToken::Create(Error))
+			->AddToken(FMapErrorToken::Create(TEXT("WaterBodyInvalidWaveData")));
 		break;
 	case EWaterBodyStatus::Valid:
 	default: break;

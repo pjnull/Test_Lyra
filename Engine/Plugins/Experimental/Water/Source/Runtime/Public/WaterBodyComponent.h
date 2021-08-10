@@ -68,7 +68,8 @@ enum class EWaterBodyStatus : uint8
 {
 	Valid,
 	MissingWaterMesh,
-	MissingLandscape
+	MissingLandscape,
+	InvalidWaveData,
 };
 
 // ----------------------------------------------------------------------------------
@@ -328,7 +329,7 @@ protected:
 	/** Validates this component's data */
 	virtual void CheckForErrors() override;
 
-	EWaterBodyStatus CheckWaterBodyStatus() const;
+	virtual EWaterBodyStatus CheckWaterBodyStatus(FText* OutError = nullptr) const;
 #endif // WITH_EDITOR
 
 	EWaterBodyQueryFlags CheckAndAjustQueryFlags(EWaterBodyQueryFlags InQueryFlags) const;
