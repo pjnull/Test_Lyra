@@ -445,7 +445,7 @@ void UTexture2D::Serialize(FArchive& Ar)
 	{
 		// The composite texture may not have been loaded yet. We have to defer caching platform
 		// data until post load.
-		if (CompositeTexture == NULL || CompositeTextureMode == CTM_Disabled || CompositeTexture->HasAnyFlags(RF_LoadCompleted))
+		if (CompositeTexture.IsNull() || CompositeTextureMode == CTM_Disabled || CompositeTexture->HasAnyFlags(RF_LoadCompleted))
 		{
 			BeginCachePlatformData();
 		}

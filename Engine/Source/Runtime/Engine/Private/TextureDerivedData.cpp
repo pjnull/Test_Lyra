@@ -201,10 +201,11 @@ static void SerializeForKey(FArchive& Ar, const FTextureBuildSettings& Settings)
 	
 	FString CompositeTextureStr;
 
-	if(IsValid(Texture.CompositeTexture) && Texture.CompositeTextureMode != CTM_Disabled)
+	UTexture* CompositeTexture = Texture.CompositeTexture.LoadSynchronous();
+	if(IsValid(CompositeTexture) && Texture.CompositeTextureMode != CTM_Disabled)
 	{
 		CompositeTextureStr += TEXT("_");
-		CompositeTextureStr += Texture.CompositeTexture->Source.GetIdString();
+		CompositeTextureStr += CompositeTexture->Source.GetIdString();
 	}
 
 	// build the key, but don't use include the version if it's 0 to be backwards compatible

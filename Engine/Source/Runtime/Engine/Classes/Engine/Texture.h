@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Containers/IndirectArray.h"
 #include "UObject/ObjectMacros.h"
+#include "UObject/SoftObjectPtr.h"
 #include "UObject/Object.h"
 #include "Misc/Guid.h"
 #include "Templates/SubclassOf.h"
@@ -913,7 +914,7 @@ public:
 	 * Make sure the normal map has at least as many mips as this texture.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Compositing)
-	TObjectPtr<class UTexture> CompositeTexture;
+	TSoftObjectPtr<class UTexture> CompositeTexture;
 
 	/* defines how the CompositeTexture is applied, e.g. CTM_RoughnessFromNormalAlpha */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Compositing, AdvancedDisplay)
