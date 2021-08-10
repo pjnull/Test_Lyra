@@ -165,7 +165,7 @@ struct FAudioComponentParam
  *	Convenience class to get audio parameters set on an active sound's playback
  */
 UCLASS(BlueprintType)
-class UInitialActiveSoundParams : public UObject
+class ENGINE_API UInitialActiveSoundParams : public UObject
 {
 	GENERATED_UCLASS_BODY()
 
