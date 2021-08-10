@@ -538,8 +538,11 @@ void ULandscapeHeightfieldCollisionComponent::OnCreatePhysicsState()
 				TArray<FPhysicsActorHandle> Actors;
 				Actors.Add(PhysHandle);
 
-				bool bImmediateAccelStructureInsertion = true;
-				PhysScene->AddActorsToScene_AssumesLocked(Actors, bImmediateAccelStructureInsertion);
+				FPhysicsCommand::ExecuteWrite(PhysScene, [&]()
+				{
+					bool bImmediateAccelStructureInsertion = true;
+					PhysScene->AddActorsToScene_AssumesLocked(Actors, bImmediateAccelStructureInsertion);
+				});
 
 				PhysScene->AddToComponentMaps(this, PhysHandle);
 				if (BodyInstance.bNotifyRigidBodyCollision)
