@@ -238,21 +238,21 @@ void FMockManagedState::AsyncTick(UWorld* World, Chaos::FPhysicsSolver* Solver, 
 					PT_State.InAirFrame = 0;
 					//PT_State.JumpStartFrame = 0;
 				}
-
-				// Check for recovery start
-				if (PT_State.RecoveryFrame == 0)
-				{
-					if (UpDot < 0.2f)
-					{
-						PT_State.RecoveryFrame = SimulationFrame;
-					}
-				}
 			}
 			else
 			{
 				if (PT_State.InAirFrame == 0)
 				{
 					PT_State.InAirFrame = SimulationFrame;
+				}
+			}
+
+			// Check for recovery start
+			if (PT_State.RecoveryFrame == 0)
+			{
+				if (UpDot < 0.95f)
+				{
+					PT_State.RecoveryFrame = SimulationFrame;
 				}
 			}
 			
@@ -285,7 +285,7 @@ void FMockManagedState::AsyncTick(UWorld* World, Chaos::FPhysicsSolver* Solver, 
 
 			if (PT_State.RecoveryFrame != 0)
 			{
-				if (UpDot > 0.7f)
+				if (UpDot > 0.95f)
 				{
 					// Recovered
 					PT_State.RecoveryFrame = 0;
@@ -294,10 +294,12 @@ void FMockManagedState::AsyncTick(UWorld* World, Chaos::FPhysicsSolver* Solver, 
 				{
 					// Doing it per-axis like this is probably wrong
 					FRotator Rot = PT->R().Rotator();
-					const float DeltaRoll = FRotator::NormalizeAxis( -1.f * (Rot.Roll + (PT->W().X * UE_NETWORK_PHYSICS::TurnDampK())));
-					const float DeltaPitch = FRotator::NormalizeAxis( -1.f * (Rot.Pitch + (PT->W().Y * UE_NETWORK_PHYSICS::TurnDampK())));
+					FVector Target(0,0,1);
+					FVector CurrentUp = Rot.RotateVector(Target);
+					FVector Torque = -FVector::CrossProduct(Target, CurrentUp);
+					FVector Damp(PT->W().X * UE_NETWORK_PHYSICS::TurnDampK(), PT->W().Y* UE_NETWORK_PHYSICS::TurnDampK(), 0);
 
-					PT->AddTorque(FVector(DeltaRoll, DeltaPitch, 0.f) * UE_NETWORK_PHYSICS::TurnK() * 1.5f);
+					PT->AddTorque(Torque * UE_NETWORK_PHYSICS::TurnK() + Damp);
 					PT->AddForce(FVector(0.f, 0.f, 600.f));
 				}
 			}
@@ -328,11 +330,14 @@ void FMockManagedState::AsyncTick(UWorld* World, Chaos::FPhysicsSolver* Solver, 
 					PT->AddTorque(InputCmd.Torque* GT_State.ForceMultiplier* UE_NETWORK_PHYSICS::RotationK());
 				}
 
-				// Auto Turn to target yaw
-				const float CurrentYaw = PT->R().Rotator().Yaw + (PT->W().Z * GT_State.AutoFaceTargetYawDamp);
-				const float DesiredYaw = FMath::DegreesToRadians(InputCmd.TargetYaw);
-				const float DeltaYaw = FRotator::NormalizeAxis(InputCmd.TargetYaw - CurrentYaw );
-				PT->AddTorque(FVector(0.f, 0.f, DeltaYaw * GT_State.AutoFaceTargetYawStrength));
+				if (GT_State.bEnableAutoFaceTargetYaw)
+				{
+					// Auto Turn to target yaw
+					const float CurrentYaw = PT->R().Rotator().Yaw + (PT->W().Z * GT_State.AutoFaceTargetYawDamp);
+					const float DesiredYaw = FMath::DegreesToRadians(InputCmd.TargetYaw);
+					const float DeltaYaw = FRotator::NormalizeAxis(InputCmd.TargetYaw - CurrentYaw );
+					PT->AddTorque(FVector(0.f, 0.f, DeltaYaw * GT_State.AutoFaceTargetYawStrength));
+				}
 			}
 
 			// Drag force
