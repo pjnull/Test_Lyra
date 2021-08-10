@@ -1524,6 +1524,19 @@ void IncrementalPurgeGarbage(bool bUseTimeLimit, float TimeLimit)
 
 #if UE_WITH_GC
 
+
+static bool GWarningTimeOutHasBeenDisplayedGC = false;
+
+static bool GEnableTimeoutOnPendingDestroyedObjectGC = true;
+#if UE_BUILD_SHIPPING
+static FAutoConsoleVariableRef CVarGCEnableTimeoutOnPendingDestroyedObjectInShipping(
+	TEXT("gc.EnableTimeoutOnPendingDestroyedObjectInShipping"),
+	GEnableTimeoutOnPendingDestroyedObjectGC,
+	TEXT("Enable time out when there are pending destroyed object (default is true, always true in non shipping build"),
+	ECVF_Default
+);
+#endif
+
 static int32 GAdditionalFinishDestroyTimeGC = 40;
 static FAutoConsoleVariableRef CVarAdditionalFinishDestroyTimeGC(
 	TEXT("gc.AdditionalFinishDestroyTimeGC"),
@@ -1723,44 +1736,53 @@ bool IncrementalDestroyGarbage(bool bUseTimeLimit, float TimeLimit)
 						if (LastLoopObjectsPendingDestructionCount == GGCObjectsPendingDestructionCount && bPollTimeLimit &&
 							((FPlatformTime::Seconds() - GCStartTime) > MaxTimeForFinishDestroy))
 						{
-							UE_LOG(LogGarbage, Warning, TEXT("Spent more than %.2fs on routing FinishDestroy to objects (objects in queue: %d)"), MaxTimeForFinishDestroy, GGCObjectsPendingDestructionCount);
-							UObject* LastObjectNotReadyForFinishDestroy = nullptr;
-							for (int32 ObjectIndex = 0; ObjectIndex < GGCObjectsPendingDestructionCount; ++ObjectIndex)
+							if (GEnableTimeoutOnPendingDestroyedObjectGC)
 							{
-								UObject* Obj = GGCObjectsPendingDestruction[ObjectIndex];
-								bool bReady = Obj->IsReadyForFinishDestroy();
-								UE_LOG(LogGarbage, Warning, TEXT("  [%d]: %s, IsReadyForFinishDestroy: %s"),
-									ObjectIndex,
-									*GetFullNameSafe(Obj),
-									bReady ? TEXT("true") : TEXT("false"));
-								if (!bReady)
+								UE_LOG(LogGarbage, Warning, TEXT("Spent more than %.2fs on routing FinishDestroy to objects (objects in queue: %d)"), MaxTimeForFinishDestroy, GGCObjectsPendingDestructionCount);
+								UObject* LastObjectNotReadyForFinishDestroy = nullptr;
+								for (int32 ObjectIndex = 0; ObjectIndex < GGCObjectsPendingDestructionCount; ++ObjectIndex)
 								{
-									LastObjectNotReadyForFinishDestroy = Obj;
+									UObject* Obj = GGCObjectsPendingDestruction[ObjectIndex];
+									bool bReady = Obj->IsReadyForFinishDestroy();
+									UE_LOG(LogGarbage, Warning, TEXT("  [%d]: %s, IsReadyForFinishDestroy: %s"),
+										ObjectIndex,
+										*GetFullNameSafe(Obj),
+										bReady ? TEXT("true") : TEXT("false"));
+									if (!bReady)
+									{
+										LastObjectNotReadyForFinishDestroy = Obj;
+									}
 								}
-							}
 
 #if PLATFORM_DESKTOP
-							ensureMsgf(0, TEXT("Spent to much time waiting for FinishDestroy for %d object(s) (last object: %s), check log for details"),
-								GGCObjectsPendingDestructionCount,
-								*GetFullNameSafe(LastObjectNotReadyForFinishDestroy));
+								ensureMsgf(0, TEXT("Spent to much time waiting for FinishDestroy for %d object(s) (last object: %s), check log for details"),
+									GGCObjectsPendingDestructionCount,
+									*GetFullNameSafe(LastObjectNotReadyForFinishDestroy));
 #else
-							//for non-desktop platforms, make this a warning so that we can die inside of an object member call.
-							//this will give us a greater chance of getting useful memory inside of the platform minidump.
-							UE_LOG(LogGarbage, Warning, TEXT("Spent to much time waiting for FinishDestroy for %d object(s) (last object: %s), check log for details"),
-								GGCObjectsPendingDestructionCount,
-								*GetFullNameSafe(LastObjectNotReadyForFinishDestroy));
-							if (LastObjectNotReadyForFinishDestroy)
-							{
-								LastObjectNotReadyForFinishDestroy->AbortInsideMemberFunction();
-							}
-							else
-							{
-								//go through the standard fatal error path if LastObjectNotReadyForFinishDestroy is null.
-								//this could happen in the current code flow, in the odd case where an object finished readying just in time for the loop above.
-								UE_LOG(LogGarbage, Fatal, TEXT("LastObjectNotReadyForFinishDestroy is NULL."));
-							}
+								//for non-desktop platforms, make this a warning so that we can die inside of an object member call.
+								//this will give us a greater chance of getting useful memory inside of the platform minidump.
+								UE_LOG(LogGarbage, Warning, TEXT("Spent to much time waiting for FinishDestroy for %d object(s) (last object: %s), check log for details"),
+									GGCObjectsPendingDestructionCount,
+									*GetFullNameSafe(LastObjectNotReadyForFinishDestroy));
+								if (LastObjectNotReadyForFinishDestroy)
+								{
+									LastObjectNotReadyForFinishDestroy->AbortInsideMemberFunction();
+								}
+								else
+								{
+									//go through the standard fatal error path if LastObjectNotReadyForFinishDestroy is null.
+									//this could happen in the current code flow, in the odd case where an object finished readying just in time for the loop above.
+									UE_LOG(LogGarbage, Fatal, TEXT("LastObjectNotReadyForFinishDestroy is NULL."));
+								}
 #endif
+							}
+							else if (!GWarningTimeOutHasBeenDisplayedGC)
+							{
+								UE_LOG(LogGarbage, Warning, TEXT("Spent more than %.2fs on routing FinishDestroy to objects (objects in queue: %d) - Skipping FATAL - GC Time out is disabled"), MaxTimeForFinishDestroy, GGCObjectsPendingDestructionCount);
+								GWarningTimeOutHasBeenDisplayedGC = true;
+							}
 						}
+
 					}
 					// Sleep before the next pass to give the render thread some time to release fences.
 					FPlatformProcess::Sleep( 0 );
@@ -1785,6 +1807,7 @@ bool IncrementalDestroyGarbage(bool bUseTimeLimit, float TimeLimit)
 				// Destroy has been routed to all objects so it's safe to delete objects now.
 				GObjFinishDestroyHasBeenRoutedToAllObjects = true;
 				GObjCurrentPurgeObjectIndexNeedsReset = true;
+				GWarningTimeOutHasBeenDisplayedGC = false;
 			}
 		}
 	}		
