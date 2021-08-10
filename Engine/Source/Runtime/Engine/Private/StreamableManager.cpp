@@ -302,7 +302,7 @@ static FStreamableDelegateDelayHelper* StreamableDelegateDelayHelper = nullptr;
 
 TStreamableHandleContextDataTypeID FStreamableHandleContextDataBase::AllocateClassTypeId()
 {
-	static std::atomic<TStreamableHandleContextDataTypeID> TypeNum = 0;
+	static std::atomic<TStreamableHandleContextDataTypeID> TypeNum{0};
 	TStreamableHandleContextDataTypeID Result = TypeNum++;
 
 	checkf(Result != TStreamableHandleContextDataTypeIDInvalid, TEXT("Overflow in TypeNum: too many TStreamableHandleContextData subclasses. Change the TStreamableHandleContextDataTypeID typedef if more subclasses are needed."));
