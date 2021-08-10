@@ -139,6 +139,13 @@ namespace DemoNetDriverRecordingPrivate
 		WarningTimeInterval,
 		TEXT("When > 0, we will wait this many seconds between logging warnings for demo recording exceeding time budgets.")
 	);	
+
+	static bool RecordUnicastRPCs = false;
+	static FAutoConsoleVariableRef CVarRecordUnicastRPCs(
+		TEXT("demo.RecordUnicastRPCs"),
+		RecordUnicastRPCs,
+		TEXT("When true, also record unicast client rpcs on actors that share a net driver name with the demo driver.")
+	);
 }
 
 struct FDemoBudgetLogHelper
@@ -1327,11 +1334,13 @@ void UDemoNetDriver::ProcessRemoteFunction(AActor* Actor, UFunction* Function, v
 	{
 		if (IsRecording())
 		{
-			if ((Function->FunctionFlags & FUNC_NetMulticast))
+			const bool bRecordRPC = DemoNetDriverRecordingPrivate::RecordUnicastRPCs ? ShouldReplicateFunction(Actor, Function) : EnumHasAnyFlags(Function->FunctionFlags, FUNC_NetMulticast);
+
+			if (bRecordRPC)
 			{
 				// Handle role swapping if this is a client-recorded replay.
 				FScopedActorRoleSwap RoleSwap(Actor);
-			
+
 				InternalProcessRemoteFunction(Actor, SubObject, ClientConnections[0], Function, Parameters, OutParms, Stack, IsServer());
 			}
 		}
@@ -5179,8 +5188,8 @@ bool UDemoNetDriver::ShouldReplicateFunction(AActor* Actor, UFunction* Function)
 	bool bShouldRecordMulticast = (Function && Function->FunctionFlags & FUNC_NetMulticast) && IsRecording();
 	if (bShouldRecordMulticast)
 	{
-		FString FuncPathName = GetPathNameSafe(Function);
-		int32 Idx = MulticastRecordOptions.IndexOfByPredicate([FuncPathName](const FMulticastRecordOptions& Options) { return (Options.FuncPathName == FuncPathName); });
+		const FString FuncPathName = GetPathNameSafe(Function);
+		const int32 Idx = MulticastRecordOptions.IndexOfByPredicate([FuncPathName](const FMulticastRecordOptions& Options) { return (Options.FuncPathName == FuncPathName); });
 		if (Idx != INDEX_NONE)
 		{
 			if (World && World->IsRecordingClientReplay())
