@@ -852,7 +852,7 @@ void UWaterBodyComponent::CheckForErrors()
 			->AddToken(FMapErrorToken::Create(TEXT("WaterBodyMissingLandscape")));
 		break;
 	case EWaterBodyStatus::InvalidWaveData:
-		FMessageLog("MapCheck").Error()
+		FMessageLog("MapCheck").Warning()
 			->AddToken(FUObjectToken::Create(this))
 			->AddToken(FTextToken::Create(Error))
 			->AddToken(FMapErrorToken::Create(TEXT("WaterBodyInvalidWaveData")));
