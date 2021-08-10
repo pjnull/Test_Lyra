@@ -9,27 +9,36 @@
 #define LOCTEXT_NAMESPACE "FMediaMovieStreamerModule"
 
 TSharedPtr<FMediaMovieStreamer, ESPMode::ThreadSafe> MovieStreamer;
-TWeakObjectPtr<UMediaMovieAssets> MovieAssets;
+UMediaMovieAssets* MovieAssets = nullptr;
+bool FMediaMovieStreamerModule::bStartedModule = false;
 
 UMediaMovieAssets* FMediaMovieStreamerModule::GetMovieAssets()
 {
-	return MovieAssets.Get();
+	if (!MovieAssets && bStartedModule)
+	{
+		// Create MovieAssets.
+		MovieAssets = NewObject<UMediaMovieAssets>();
+		MovieAssets->AddToRoot();
+	}
+
+	return MovieAssets;
 }
 
 const TSharedPtr<FMediaMovieStreamer, ESPMode::ThreadSafe> FMediaMovieStreamerModule::GetMovieStreamer()
 {
+	if (!MovieStreamer.IsValid() && bStartedModule)
+	{
+		// Create MovieStreamer.
+		MovieStreamer = MakeShareable(new FMediaMovieStreamer);
+		FCoreDelegates::RegisterMovieStreamerDelegate.Broadcast(MovieStreamer);
+	}
+
 	return MovieStreamer;
 }
 
 void FMediaMovieStreamerModule::StartupModule()
 {
-	// Create MovieAssets.
-	MovieAssets = NewObject<UMediaMovieAssets>();
-	MovieAssets->AddToRoot();
-
-	// Create MovieStreamer.
-	MovieStreamer = MakeShareable(new FMediaMovieStreamer);
-	FCoreDelegates::RegisterMovieStreamerDelegate.Broadcast(MovieStreamer);
+	bStartedModule = true;
 }
 
 void FMediaMovieStreamerModule::ShutdownModule()
@@ -42,11 +51,13 @@ void FMediaMovieStreamerModule::ShutdownModule()
 	}
 
 	// Shutdown MovieAssets.
-	if (MovieAssets.IsValid())
+	if (MovieAssets)
 	{
 		MovieAssets->RemoveFromRoot();
-		MovieAssets.Reset();
+		MovieAssets = nullptr;
 	}
+
+	bStartedModule = false;
 }
 
 #undef LOCTEXT_NAMESPACE
