@@ -351,6 +351,7 @@ bool FAudioDevice::Init(Audio::FDeviceId InDeviceID, int32 InMaxSources)
 	DeviceID = InDeviceID;
 
 	DeviceCreatedHandle = FAudioDeviceManagerDelegates::OnAudioDeviceCreated.AddRaw(this, &FAudioDevice::OnDeviceCreated);
+	DeviceDestroyedHandle = FAudioDeviceManagerDelegates::OnAudioDeviceDestroyed.AddRaw(this, &FAudioDevice::OnDeviceDestroyed);
 
 	bool bDeferStartupPrecache = false;
 
@@ -566,6 +567,15 @@ void FAudioDevice::OnDeviceCreated(Audio::FDeviceId InDeviceID)
 	}
 }
 
+void FAudioDevice::OnDeviceDestroyed(Audio::FDeviceId InDeviceID)
+{
+	if (InDeviceID == DeviceID)
+	{
+		Deinitialize();
+		FAudioDeviceManagerDelegates::OnAudioDeviceDestroyed.Remove(DeviceDestroyedHandle);
+	}
+}
+
 void FAudioDevice::OnPreGarbageCollect()
 {
 	if (FlushAudioRenderThreadOnGCCVar)
@@ -690,6 +700,11 @@ TRange<float> FAudioDevice::GetGlobalPitchRange() const
 
 void FAudioDevice::Teardown()
 {
+#if !UE_BUILD_SHIPPING
+	const bool bDidRemoveDelegate = FAudioDeviceManagerDelegates::OnAudioDeviceCreated.Remove(DeviceCreatedHandle);
+	checkf(!bDidRemoveDelegate, TEXT("DelegateHandle not removed. Should be removed during FAudioDevice::OnDeviceDestroyed(...)"));
+#endif
+
 	ShutdownDefaultAudioBuses();
 
 	// Make sure we process any pending game thread tasks before tearing down the audio device.
@@ -769,7 +784,10 @@ void FAudioDevice::Teardown()
 
 	FCoreUObjectDelegates::GetPreGarbageCollectDelegate().RemoveAll(this);
 	FCoreUObjectDelegates::PreGarbageCollectConditionalBeginDestroy.RemoveAll(this);
+}
 
+void FAudioDevice::Deinitialize()
+{
 	SubsystemCollection.Deinitialize();
 	SubsystemCollectionRoot.Reset();
 }

@@ -526,9 +526,19 @@ public:
 	void OnDeviceCreated(Audio::FDeviceId InDeviceID);
 
 	/**
+	 * Called before FAudioDevice teardown
+	 */
+	void OnDeviceDestroyed(Audio::FDeviceId InDeviceID);
+
+	/**
 	 * Tears down the audio device
 	 */
 	void Teardown();
+
+	/**
+	 * De-initialization step that occurs after device destroyed broadcast, but before removal from the device manager
+	 */
+	void Deinitialize();
 
 	/**
 	 * The audio system's main "Tick" function
@@ -867,6 +877,9 @@ protected:
 
 	// Handle for our device created delegate
 	FDelegateHandle DeviceCreatedHandle;
+
+	// Handle for our device destroyed delegate
+	FDelegateHandle DeviceDestroyedHandle;
 
 public:
 	/**
