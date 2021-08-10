@@ -11,7 +11,7 @@ class FCbObject;
 
 namespace UE {
 	namespace Zen {
-		struct FRequestPool;
+		struct FClientRequestPool;
 	}
 
 /**
@@ -46,7 +46,7 @@ public:
 private:
 	FString	HostName;
 	uint16 Port;
-	TUniquePtr<Zen::FRequestPool> RequestPool;
+	TUniquePtr<Zen::FClientRequestPool> RequestPool;
 	FString OplogPath;
 	FString OplogNewEntryPath;
 	FString OplogPrepNewEntryPath;

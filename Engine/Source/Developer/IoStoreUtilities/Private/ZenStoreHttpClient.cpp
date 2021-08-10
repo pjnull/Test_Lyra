@@ -653,9 +653,9 @@ private:
  * Pool that manages a fixed set of requests. Users are required to release requests that have been
  * acquired. Usable with \ref FScopedRequestPtr which handles this automatically.
  */
-struct FRequestPool
+struct FClientRequestPool
 {
-	FRequestPool(FStringView InServiceUrl, uint32 PoolSize)
+	FClientRequestPool(FStringView InServiceUrl, uint32 PoolSize)
 	{
 		Pool.AddUninitialized(PoolSize);
 		for (uint8 i = 0; i < Pool.Num(); ++i)
@@ -665,7 +665,7 @@ struct FRequestPool
 		}
 	}
 
-	~FRequestPool()
+	~FClientRequestPool()
 	{
 		for (uint8 i = 0; i < Pool.Num(); ++i)
 		{
@@ -762,7 +762,7 @@ private:
 
 	TArray<FEntry> Pool;
 
-	FRequestPool() = delete;
+	FClientRequestPool() = delete;
 };
 
 //----------------------------------------------------------------------------------------------------------
@@ -770,12 +770,12 @@ private:
 //----------------------------------------------------------------------------------------------------------
 
 /**
- * Utility class to manage requesting and releasing requests from the \ref FRequestPool.
+ * Utility class to manage requesting and releasing requests from the \ref FClientRequestPool.
  */
 struct FScopedRequestPtr
 {
 public:
-	FScopedRequestPtr(FRequestPool* InPool)
+	FScopedRequestPtr(FClientRequestPool* InPool)
 		: Request(InPool->WaitForFreeRequest())
 		, Pool(InPool)
 	{}
@@ -804,7 +804,7 @@ public:
 
 private:
 	FRequest* Request;
-	FRequestPool* Pool;
+	FClientRequestPool* Pool;
 };
 
 } /* Zen */ 
@@ -819,7 +819,7 @@ FZenStoreHttpClient::FZenStoreHttpClient(const FStringView InHostName, uint16 In
 	Uri.AppendAnsi(":");
 	Uri << InPort;
 
-	RequestPool = MakeUnique<Zen::FRequestPool>(Uri, 32);
+	RequestPool = MakeUnique<Zen::FClientRequestPool>(Uri, 32);
 }
 
 FZenStoreHttpClient::~FZenStoreHttpClient()
@@ -1327,7 +1327,7 @@ FZenStoreHttpClient::EndBuildPass(FCbPackage OpEntry)
 
 namespace UE {
 namespace Zen {
-	struct FRequestPool
+	struct FClientRequestPool
 	{
 	};
 }
