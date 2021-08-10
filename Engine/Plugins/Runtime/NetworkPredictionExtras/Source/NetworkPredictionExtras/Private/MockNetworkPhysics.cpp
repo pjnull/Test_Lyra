@@ -246,15 +246,6 @@ void FMockManagedState::AsyncTick(UWorld* World, Chaos::FPhysicsSolver* Solver, 
 					PT_State.InAirFrame = SimulationFrame;
 				}
 			}
-
-			// Check for recovery start
-			if (PT_State.RecoveryFrame == 0)
-			{
-				if (UpDot < 0.95f)
-				{
-					PT_State.RecoveryFrame = SimulationFrame;
-				}
-			}
 			
 			//UE_LOG(LogNetworkPhysics, Log, TEXT("[%d] AirFrame: %d. JumpFrame: %d"), SimulationFrame, PT_State.InAirFrame, PT_State.JumpStartFrame);
 			if (InputCmd.bJumpedPressed)
@@ -283,27 +274,20 @@ void FMockManagedState::AsyncTick(UWorld* World, Chaos::FPhysicsSolver* Solver, 
 				}
 			}
 
-			if (PT_State.RecoveryFrame != 0)
+			if (UpDot < 0.95f)
 			{
-				if (UpDot > 0.95f)
-				{
-					// Recovered
-					PT_State.RecoveryFrame = 0;
-				}
-				else
-				{
-					// Doing it per-axis like this is probably wrong
-					FRotator Rot = PT->R().Rotator();
-					FVector Target(0,0,1);
-					FVector CurrentUp = Rot.RotateVector(Target);
-					FVector Torque = -FVector::CrossProduct(Target, CurrentUp);
-					FVector Damp(PT->W().X * UE_NETWORK_PHYSICS::TurnDampK(), PT->W().Y* UE_NETWORK_PHYSICS::TurnDampK(), 0);
+				// Doing it per-axis like this is probably wrong
+				FRotator Rot = PT->R().Rotator();
+				FVector Target(0, 0, 1);
+				FVector CurrentUp = Rot.RotateVector(Target);
+				FVector Torque = -FVector::CrossProduct(Target, CurrentUp);
+				FVector Damp(PT->W().X* UE_NETWORK_PHYSICS::TurnDampK(), PT->W().Y* UE_NETWORK_PHYSICS::TurnDampK(), 0);
 
-					PT->AddTorque(Torque * UE_NETWORK_PHYSICS::TurnK() + Damp);
-					PT->AddForce(FVector(0.f, 0.f, 600.f));
-				}
+				PT->AddTorque(Torque* UE_NETWORK_PHYSICS::TurnK() + Damp);
+				PT->AddForce(FVector(0.f, 0.f, 600.f));
 			}
-			else if (InputCmd.bBrakesPressed)
+
+			if (InputCmd.bBrakesPressed)
 			{
 				FVector NewV = PT->V();
 				if (NewV.SizeSquared2D() < 1.f)

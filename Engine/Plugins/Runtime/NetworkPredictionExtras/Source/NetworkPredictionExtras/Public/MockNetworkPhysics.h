@@ -162,10 +162,6 @@ struct FMockState_PT
 	UPROPERTY(BlueprintReadWrite, Category="Mock Object")
 	int32 CheckSum = 0;
 
-	// Frame we started "in air recovery" on
-	UPROPERTY(BlueprintReadWrite, Category="Mock Object")
-	int32 RecoveryFrame = 0;
-
 	// Frame we started jumping on
 	UPROPERTY(BlueprintReadWrite, Category="Mock Object")
 	int32 JumpStartFrame = 0;
@@ -183,7 +179,6 @@ struct FMockState_PT
 		Ar << JumpCooldownMS;
 		Ar << JumpCount;
 		Ar << CheckSum;	
-		Ar << RecoveryFrame;
 		Ar << JumpStartFrame;
 		Ar << InAirFrame;
 		Ar << KickFrame;
@@ -192,7 +187,7 @@ struct FMockState_PT
 
 	bool ShouldReconcile(const FMockState_PT& AuthState) const
 	{
-		return JumpCooldownMS != AuthState.JumpCooldownMS || JumpCount != AuthState.JumpCount || RecoveryFrame != AuthState.RecoveryFrame || JumpStartFrame != AuthState.JumpStartFrame || InAirFrame != AuthState.InAirFrame || KickFrame!= AuthState.KickFrame;
+		return JumpCooldownMS != AuthState.JumpCooldownMS || JumpCount != AuthState.JumpCount || JumpStartFrame != AuthState.JumpStartFrame || InAirFrame != AuthState.InAirFrame || KickFrame!= AuthState.KickFrame;
 	}
 };
 
