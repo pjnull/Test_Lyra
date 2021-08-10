@@ -1681,7 +1681,10 @@ struct FMeshCollisionInitHelper
 		TArray<FPhysicsActorHandle> Actors;
 		Actors.Add(ActorHandle);
 
-		PhysScene->AddActorsToScene_AssumesLocked(Actors, true);
+		FPhysicsCommand::ExecuteWrite(PhysScene, [&]()
+		{
+			PhysScene->AddActorsToScene_AssumesLocked(Actors, true);
+		});
 		PhysScene->AddToComponentMaps(Component, ActorHandle);
 
 		if(TargetInstance->bNotifyRigidBodyCollision)
