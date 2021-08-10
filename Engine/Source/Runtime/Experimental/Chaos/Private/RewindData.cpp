@@ -173,6 +173,7 @@ bool FRewindData::RewindToFrame(int32 Frame)
 	{
 		FGeometryParticleHandle* PTParticle = DirtyParticleInfo.GetPTParticle();
 
+		//TODO: remove this once resim disable is fully working
 		if (DirtyParticleInfo.InitializedOnStep > Frame)
 		{
 			//hasn't initialized yet, so disable
@@ -216,6 +217,9 @@ bool FRewindData::RewindToFrame(int32 Frame)
 				Solver->GetEvolution()->GetParticles().MarkTransientDirtyParticle(DirtyParticleInfo.GetPTParticle());
 
 				DirtyParticleInfo.DirtyDynamics = INDEX_NONE;	//make sure to undo this as we want to record it again during resim
+
+				//for now just mark anything that changed as enabled during resim. TODO: use bubble
+				DirtyParticleInfo.GetPTParticle()->SetEnabledDuringResim(true);
 			}
 		}
 		
@@ -280,6 +284,7 @@ void FRewindData::FinishFrame()
 					{
 						//Last resim so mark as in sync
 						Handle.SetSyncState(ESyncState::InSync);
+						Handle.SetEnabledDuringResim(false);
 
 						//Anything saved on upcoming frame (was done during rewind) can be removed since we are now at head
 						Info.ClearPhaseAndFuture(FutureFrame);
@@ -361,6 +366,7 @@ void FRewindData::AdvanceFrameImp(IResimCacheBase* ResimCache)
 
 			if(IsResim() && Handle->SyncState() != ESyncState::InSync && !SkipDesyncTest)
 			{
+				Handle->SetEnabledDuringResim(true);	//for now just mark anything out of sync as resim enabled. TODO: use bubble
 				DesyncedParticles.Add(Handle);
 			}
 
@@ -413,6 +419,13 @@ void FRewindData::PushGTDirtyData(const FDirtyPropertiesManager& SrcManager,cons
 			return;
 		}
 
+		if (bResim && Proxy->GetInitializedStep() == CurFrame)
+		{
+			//Particle is reinitialized, since it's out of sync it must be at a different time
+			//So make sure it's considered during resim
+			//TODO: should check if in bubble
+			PTParticle->SetEnabledDuringResim(true);
+		}
 
 		FDirtyParticleInfo& Info = FindOrAddParticle(*PTParticle, Proxy->IsInitialized() ? INDEX_NONE : CurFrame);
 		FGeometryParticleStateBase& Latest = Info.AddFrame(CurFrame);
