@@ -123,3 +123,81 @@ private:
 	FORCEINLINE bool operator==(const TComponentIterator& Other) const { return CompIndex == Other.CompIndex; }
 	FORCEINLINE bool operator!=(const TComponentIterator& Other) const { return CompIndex != Other.CompIndex; }
 };
+
+/**
+ * Const iterator for registered components on an actor
+ */
+template <typename T>
+class TConstComponentIterator
+{
+public:
+	explicit TConstComponentIterator(const AActor* OwnerActor)
+		: CompIndex(-1)
+	{
+		if (OwnerActor && !OwnerActor->IsPendingKill())
+		{
+			OwnerActor->GetComponents<const T>(AllComponents);
+		}
+
+		Advance();
+	}
+
+	FORCEINLINE void operator++()
+	{
+		Advance();
+	}
+
+	FORCEINLINE explicit operator bool() const
+	{
+		return AllComponents.IsValidIndex(CompIndex);
+	}
+
+	FORCEINLINE bool operator!() const
+	{
+		return !(bool)*this;
+	}
+
+	FORCEINLINE const T* operator*() const
+	{
+		return GetComponent();
+	}
+
+	FORCEINLINE const T* operator->() const
+	{
+		return GetComponent();
+	}
+
+protected:
+	/** Gets the current component */
+	FORCEINLINE const T* GetComponent() const
+	{
+		return AllComponents[CompIndex];
+	}
+
+	/** Moves the iterator to the next valid component */
+	FORCEINLINE bool Advance()
+	{
+		while (++CompIndex < AllComponents.Num())
+		{
+			const T* Comp = GetComponent();
+			check(Comp);
+			if (Comp->IsRegistered())
+			{
+				checkf(!Comp->IsPendingKill(), TEXT("Registered game framework component was pending kill! Comp: %s"), *GetPathNameSafe(Comp));
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+private:
+	/** Results from GetComponents */
+	TInlineComponentArray<const T*> AllComponents;
+
+	/** Index of the current element in the componnet array */
+	int32 CompIndex;
+
+	FORCEINLINE bool operator==(const TConstComponentIterator& Other) const { return CompIndex == Other.CompIndex; }
+	FORCEINLINE bool operator!=(const TConstComponentIterator& Other) const { return CompIndex != Other.CompIndex; }
+};
