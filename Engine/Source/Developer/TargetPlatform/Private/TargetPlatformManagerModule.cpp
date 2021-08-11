@@ -31,7 +31,9 @@
 DEFINE_LOG_CATEGORY_STATIC(LogTargetPlatformManager, Log, All);
 
 // AutoSDKs needs the extra DDPI info
+#ifndef AUTOSDKS_ENABLED
 #define AUTOSDKS_ENABLED DDPI_HAS_EXTENDED_PLATFORMINFO_DATA
+#endif
 
 
 static const size_t MaxPlatformCount = 64;		// In the unlikely event that someone bumps this please note that there's
@@ -1198,6 +1200,7 @@ protected:
 	{
 		const FDataDrivenPlatformInfo& Info = FDataDrivenPlatformInfoRegistry::GetPlatformInfo(PlatformName);
 
+#if AUTOSDKS_ENABLED
 		FString AutoSDKPath = Info.AutoSDKPath;
 		FName AutoSDKName(*AutoSDKPath);
 		if (AutoSDKName != NAME_None)
@@ -1205,6 +1208,7 @@ protected:
 			// make sure we can re-do the AutoSDK setup
 			PlatformsSetup.Remove(AutoSDKName);
 		}
+#endif
 
 		// note: this assumes, along with other Turnkey code, that there is a TargetPlatform named with the IniPlatformName
 		ITargetPlatform* TargetPlatform = FindTargetPlatform(PlatformName);
@@ -1221,11 +1225,13 @@ protected:
 		}
 		else
 		{
+#if AUTOSDKS_ENABLED
 			if (AutoSDKName != NAME_None)
 			{
 				// setup AutoSDK, and then re-initialize the TP
 				SetupAndValidateAutoSDK(AutoSDKPath);
 			}
+#endif
 
 			bTPInitialized = TargetPlatform->InitializeHostPlatform();
 		}
