@@ -2,10 +2,13 @@
 
 #include "USDExporterBlueprintLibrary.h"
 
+#include "AnalyticsBlueprintLibrary.h"
+#include "AnalyticsEventAttribute.h"
 #include "CoreMinimal.h"
 #include "Editor.h"
 #include "InstancedFoliageActor.h"
 #include "UObject/ObjectMacros.h"
+#include "USDClassesModule.h"
 
 AInstancedFoliageActor* UUsdExporterBlueprintLibrary::GetInstancedFoliageActorForLevel( bool bCreateIfNone /*= false */, ULevel* Level /*= nullptr */ )
 {
@@ -96,5 +99,17 @@ TArray<FTransform> UUsdExporterBlueprintLibrary::GetInstanceTransforms( AInstanc
 	}
 
 	return Result;
+}
+
+void UUsdExporterBlueprintLibrary::SendAnalytics( const TArray<FAnalyticsEventAttr>& Attrs, const FString& EventName, bool bAutomated, double ElapsedSeconds, double NumberOfFrames, const FString& Extension )
+{
+	TArray<FAnalyticsEventAttribute> Converted;
+	Converted.Reserve( Attrs.Num() );
+	for ( const FAnalyticsEventAttr& Attr : Attrs )
+	{
+		Converted.Emplace( Attr.Name, Attr.Value );
+	}
+
+	IUsdClassesModule::SendAnalytics( MoveTemp( Converted ), EventName, bAutomated, ElapsedSeconds, NumberOfFrames, Extension );
 }
 
