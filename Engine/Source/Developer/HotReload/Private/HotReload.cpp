@@ -1,6 +1,9 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "CoreMinimal.h"
+
+#if WITH_HOT_RELOAD
+
 #include "HAL/PlatformProcess.h"
 #include "GenericPlatform/GenericPlatformFile.h"
 #include "HAL/FileManager.h"
@@ -387,8 +390,6 @@ namespace HotReloadDefs
 	// Add one minute epsilon to timestamp comparision
 	const static FTimespan TimeStampEpsilon(0, 1, 0);
 }
-
-IMPLEMENT_MODULE(FHotReloadModule, HotReload);
 
 namespace UEHotReload_Private
 {
@@ -1855,3 +1856,7 @@ void FHotReloadModule::PluginMountedCallback(IPlugin& Plugin)
 }
 
 #undef LOCTEXT_NAMESPACE
+
+#endif
+
+IMPLEMENT_MODULE(FHotReloadModule, HotReload);
