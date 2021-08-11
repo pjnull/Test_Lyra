@@ -942,7 +942,7 @@ public:
 		}
 		else
 		{
-			if (GRHISupportsMeshShaders)
+			if (GRHISupportsMeshShadersTier0)
 			{
 				if (!Initializer.BoundShaderState.VertexShaderRHI && !Initializer.BoundShaderState.MeshShaderRHI)
 				{
@@ -1483,7 +1483,7 @@ FGraphicsPipelineState* PipelineStateCache::GetAndOrCreateGraphicsPipelineState(
 	LLM_SCOPE(ELLMTag::PSO);
 
 #if PLATFORM_SUPPORTS_MESH_SHADERS
-	if (GRHISupportsMeshShaders)
+	if (GRHISupportsMeshShadersTier0)
 	{
 		checkf(OriginalInitializer.BoundShaderState.VertexShaderRHI || OriginalInitializer.BoundShaderState.MeshShaderRHI, TEXT("GraphicsPipelineState must include a vertex or mesh shader"));
 	}
