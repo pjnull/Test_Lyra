@@ -1857,6 +1857,13 @@ void FHotReloadModule::PluginMountedCallback(IPlugin& Plugin)
 
 #undef LOCTEXT_NAMESPACE
 
+#else 
+
+class FHotReloadModule : public IHotReloadModule
+{
+
+};
+
 #endif
 
 IMPLEMENT_MODULE(FHotReloadModule, HotReload);
