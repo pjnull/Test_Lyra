@@ -909,7 +909,7 @@ TSharedPtr<FStreamableHandle> FStreamableHandle::FindMatchingHandle(TFunction<bo
 {
 	if (Predicate(*this))
 	{
-		return ConstCastSharedPtr<FStreamableHandle, const FStreamableHandle, ESPMode::Fast>(AsShared());
+		return ConstCastSharedPtr<FStreamableHandle, const FStreamableHandle, ESPMode::ThreadSafe>(AsShared());
 	}
 
 	for (const TSharedPtr<FStreamableHandle>& ChildHandle : ChildHandles)
