@@ -1,9 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "CoreMinimal.h"
-
-#if WITH_HOT_RELOAD
-
 #include "HAL/PlatformProcess.h"
 #include "GenericPlatform/GenericPlatformFile.h"
 #include "HAL/FileManager.h"
@@ -376,6 +373,8 @@ private:
 	/** Current reload object */
 	TUniquePtr<FReload> Reload;
 };
+
+IMPLEMENT_MODULE(FHotReloadModule, HotReload);
 
 namespace HotReloadDefs
 {
@@ -1044,7 +1043,9 @@ void FHotReloadModule::RegisterForReinstancing(UClass* OldClass, UClass* NewClas
 	if (TempReload == nullptr)
 	{
 		Reload.Reset(new FReload(EActiveReloadType::Reinstancing, TEXT(""), *GLog));
+#if WITH_RELOAD
 		BeginReload(Reload->GetType(), *Reload);
+#endif
 		TempReload = Reload.Get();
 	}
 
@@ -1856,14 +1857,3 @@ void FHotReloadModule::PluginMountedCallback(IPlugin& Plugin)
 }
 
 #undef LOCTEXT_NAMESPACE
-
-#else 
-
-class FHotReloadModule : public IHotReloadModule
-{
-
-};
-
-#endif
-
-IMPLEMENT_MODULE(FHotReloadModule, HotReload);
