@@ -194,6 +194,7 @@ SWidget::SWidget()
 	, bNeedsPrepass(true)
 	, bHasRegisteredSlateAttribute(false)
 	, bEnabledAttributesUpdate(true)
+	, bHasPendingAttributesInvalidation(false)
 	, bIsDeclarativeSyntaxConstructionCompleted(false)
 	, bIsHoveredAttributeSet(false)
 	, bHasCustomPrepass(false)
@@ -1406,12 +1407,22 @@ int32 SWidget::Paint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, 
 
 	if (HasAnyUpdateFlags(EWidgetUpdateFlags::NeedsActiveTimerUpdate))
 	{
+		if (bHasPendingAttributesInvalidation)
+		{
+			FSlateAttributeMetaData::ApplyDelayedInvalidation(*MutableThis);
+		}
+
 		SCOPE_CYCLE_COUNTER(STAT_SlateExecuteActiveTimers);
 		MutableThis->ExecuteActiveTimers(Args.GetCurrentTime(), Args.GetDeltaTime());
 	}
 
 	if (HasAnyUpdateFlags(EWidgetUpdateFlags::NeedsTick))
 	{
+		if (bHasPendingAttributesInvalidation)
+		{
+			FSlateAttributeMetaData::ApplyDelayedInvalidation(*MutableThis);
+		}
+
 		INC_DWORD_STAT(STAT_SlateNumTickedWidgets);
 
 		SCOPE_CYCLE_COUNTER(STAT_SlateTickWidgets);
@@ -1419,7 +1430,7 @@ int32 SWidget::Paint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, 
 		MutableThis->Tick(DesktopSpaceGeometry, Args.GetCurrentTime(), Args.GetDeltaTime());
 	}
 
-	if (HasRegisteredSlateAttribute() && IsAttributesUpdatesEnabled())
+	if (bHasPendingAttributesInvalidation)
 	{
 		FSlateAttributeMetaData::ApplyDelayedInvalidation(*MutableThis);
 	}
