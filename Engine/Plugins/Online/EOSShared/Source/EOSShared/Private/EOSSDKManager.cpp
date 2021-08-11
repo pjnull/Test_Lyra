@@ -11,6 +11,7 @@
 #include "Misc/CoreDelegates.h"
 #include "Misc/NetworkVersion.h"
 #include "Misc/Paths.h"
+#include "ProfilingDebugging/CsvProfiler.h"
 #include "Stats/Stats.h"
 
 #include "CoreGlobals.h"
@@ -245,7 +246,9 @@ bool FEOSSDKManager::Tick(float)
 	//LLM_SCOPE(ELLMTag::EOSSDK); // TODO
 	for (EOS_HPlatform PlatformHandle : PlatformHandles)
 	{
+		LLM_SCOPE(ELLMTag::RealTimeCommunications);
 		QUICK_SCOPE_CYCLE_COUNTER(FEOSSDKManager_Tick);
+		CSV_SCOPED_TIMING_STAT_EXCLUSIVE(EOSSDK);
 		EOS_Platform_Tick(PlatformHandle);
 	}
 
@@ -331,6 +334,8 @@ void FEOSSDKManager::Shutdown()
 
 EOS_EResult FEOSSDKManager::EOSInitialize(EOS_InitializeOptions& Options)
 {
+	OnPreInitializeSDK.Broadcast(Options);
+
 	return EOS_Initialize(&Options);
 }
 
@@ -341,7 +346,9 @@ FEOSPlatformHandle::~FEOSPlatformHandle()
 
 void FEOSPlatformHandle::Tick()
 {
+	LLM_SCOPE(ELLMTag::RealTimeCommunications);
 	QUICK_SCOPE_CYCLE_COUNTER(FEOSPlatformHandle_Tick);
+	CSV_SCOPED_TIMING_STAT_EXCLUSIVE(EOSSDK);
 	EOS_Platform_Tick(PlatformHandle);
 }
 
