@@ -798,7 +798,7 @@ void AActor::Serialize(FArchive& Ar)
 
 		if (bIsCooked)
 		{
-#if !(WITH_EDITORONLY_DATA || (!WITH_EDITOR && ACTOR_HAS_LABELS)) // @todo temp fix until the two ActorLabels are dealt with
+#if !(WITH_EDITORONLY_DATA || (!WITH_EDITOR && ACTOR_HAS_LABELS))
 			// In non-development builds, just skip over the actor labels. We need to figure out a way to either strip that data from shipping builds,
 			// or skip over the string data without doing any memory allocations, probably with a custom FString::SerializeToNull implementation.
 			FString ActorLabel;
