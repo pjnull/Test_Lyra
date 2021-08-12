@@ -2,16 +2,15 @@
 
 #include "Widgets/Accessibility/SlateWidgetTracker.h"
 #include "Types/ISlateMetaData.h"
+#include "HAL/IConsoleManager.h"
 #include "Widgets/SWidget.h"
 #include "Misc/MemStack.h"
 
-static int32 bIsSlateWidgetTrackerEnabled = 0;
-static FAutoConsoleVariableRef CVarEnableSlateWidgetTracker(
+static TAutoConsoleVariable<int32> CVarEnableSlateWidgetTracker(
 	TEXT("Slate.EnableSlateWidgetTracker"),
-	bIsSlateWidgetTrackerEnabled,
+	0,
 	TEXT("Whether or not we enable the tracking of widgets via the Slate Widget Tracker."),
-	ECVF_Default
-);
+	ECVF_Default);
 
 FSlateWidgetTracker& FSlateWidgetTracker::Get()
 {
@@ -21,7 +20,7 @@ FSlateWidgetTracker& FSlateWidgetTracker::Get()
 
 bool FSlateWidgetTracker::IsEnabled() const
 {
-	return bIsSlateWidgetTrackerEnabled == 1;
+	return CVarEnableSlateWidgetTracker->GetInt() == 1;
 }
 
 void FSlateWidgetTracker::AddTrackedWidget(const SWidget* WidgetToTrack, const TArray<FName>& Tags)
