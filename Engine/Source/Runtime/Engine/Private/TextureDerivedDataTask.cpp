@@ -567,10 +567,9 @@ void FTextureCacheDerivedDataWorker::BuildTexture(bool bReplaceExistingDDC)
 			DefinitionBuilder.AddConstant(TEXT("Settings"_SV),
 				SaveTextureBuildSettings(KeySuffix, Texture, BuildSettingsPerLayer[0], 0, NUM_INLINE_DERIVED_MIPS));
 			DefinitionBuilder.AddInputBulkData(TEXT("Source"_SV), Texture.Source.GetPersistentId());
-			UTexture* CompositeTexture = Texture.CompositeTexture.LoadSynchronous();
-			if (CompositeTexture)
+			if (Texture.CompositeTexture)
 			{
-				DefinitionBuilder.AddInputBulkData(TEXT("CompositeSource"_SV), CompositeTexture->Source.GetPersistentId());
+				DefinitionBuilder.AddInputBulkData(TEXT("CompositeSource"_SV), Texture.CompositeTexture->Source.GetPersistentId());
 			}
 
 			TOptional<UE::TextureDerivedData::FTextureBuildInputResolver> PlaceholderResolver;
@@ -608,7 +607,7 @@ void FTextureCacheDerivedDataWorker::BuildTexture(bool bReplaceExistingDDC)
 			// Compress the texture by calling texture compressor directly.
 			TArray<FCompressedImage2D> CompressedMips;
 			if (Compressor->BuildTexture(TextureData.Blocks[0].MipsPerLayer[0],
-				(Texture.CompositeTexture.IsValid() && CompositeTextureData.Blocks.Num() && CompositeTextureData.Blocks[0].MipsPerLayer.Num()) ? CompositeTextureData.Blocks[0].MipsPerLayer[0] : TArray<FImage>(),
+				((bool)Texture.CompositeTexture && CompositeTextureData.Blocks.Num() && CompositeTextureData.Blocks[0].MipsPerLayer.Num()) ? CompositeTextureData.Blocks[0].MipsPerLayer[0] : TArray<FImage>(),
 				BuildSettingsPerLayer[0],
 				CompressedMips,
 				OptData.NumMipsInTail,
@@ -737,10 +736,9 @@ FTextureCacheDerivedDataWorker::FTextureCacheDerivedDataWorker(
 	}
 
 	TextureData.Init(Texture, BuildSettingsPerLayer.GetData(), bAllowAsyncLoading);
-	UTexture* CompositeTexture = Texture.CompositeTexture.LoadSynchronous();
-	if (CompositeTexture && Texture.CompositeTextureMode != CTM_Disabled)
+	if (Texture.CompositeTexture && Texture.CompositeTextureMode != CTM_Disabled)
 	{
-		bool bMatchingBlocks = CompositeTexture->Source.GetNumBlocks() == Texture.Source.GetNumBlocks();
+		bool bMatchingBlocks = Texture.CompositeTexture->Source.GetNumBlocks() == Texture.Source.GetNumBlocks();
 		bool bMatchingAspectRatio = true;
 		bool bOnlyPowerOfTwoSize = true;
 		if (bMatchingBlocks)
@@ -750,7 +748,7 @@ FTextureCacheDerivedDataWorker::FTextureCacheDerivedDataWorker(
 				FTextureSourceBlock TextureBlock;
 				Texture.Source.GetBlock(BlockIdx, TextureBlock);
 				FTextureSourceBlock CompositeTextureBlock;
-				CompositeTexture->Source.GetBlock(BlockIdx, CompositeTextureBlock);
+				Texture.CompositeTexture->Source.GetBlock(BlockIdx, CompositeTextureBlock);
 
 				bMatchingBlocks = bMatchingBlocks && TextureBlock.BlockX == CompositeTextureBlock.BlockX && TextureBlock.BlockY == CompositeTextureBlock.BlockY;
 				bMatchingAspectRatio = bMatchingAspectRatio && TextureBlock.SizeX * CompositeTextureBlock.SizeY == TextureBlock.SizeY * CompositeTextureBlock.SizeX;
@@ -773,7 +771,7 @@ FTextureCacheDerivedDataWorker::FTextureCacheDerivedDataWorker(
 
 		if (bMatchingBlocks && bMatchingAspectRatio && bOnlyPowerOfTwoSize)
 		{
-			CompositeTextureData.Init(*CompositeTexture, BuildSettingsPerLayer.GetData(), bAllowAsyncLoading);
+			CompositeTextureData.Init(*Texture.CompositeTexture, BuildSettingsPerLayer.GetData(), bAllowAsyncLoading);
 		}
 	}
 }
@@ -932,10 +930,9 @@ void FTextureCacheDerivedDataWorker::DoWork()
 		}
 
 		bool bHasCompositeTextureSourceMips = false;
-		UTexture* CompositeTexture = Texture.CompositeTexture.LoadSynchronous();
-		if (CompositeTextureData.IsValid() && CompositeTexture && CompositeTexture->Source.IsBulkDataLoaded())
+		if (CompositeTextureData.IsValid() && Texture.CompositeTexture && Texture.CompositeTexture->Source.IsBulkDataLoaded())
 		{
-			CompositeTextureData.GetSourceMips(CompositeTexture->Source, ImageWrapper);
+			CompositeTextureData.GetSourceMips(Texture.CompositeTexture->Source, ImageWrapper);
 			bHasCompositeTextureSourceMips = true;
 		}
 
@@ -1092,10 +1089,9 @@ public:
 		DefinitionBuilder.AddConstant(TEXT("Settings"_SV),
 			SaveTextureBuildSettings(KeySuffix, Texture, Settings, 0, NUM_INLINE_DERIVED_MIPS));
 		DefinitionBuilder.AddInputBulkData(TEXT("Source"_SV), Texture.Source.GetPersistentId());
-		UTexture* CompositeTexture = Texture.CompositeTexture.LoadSynchronous();
-		if (CompositeTexture && bUseCompositeTexture)
+		if (Texture.CompositeTexture && bUseCompositeTexture)
 		{
-			DefinitionBuilder.AddInputBulkData(TEXT("CompositeSource"_SV), CompositeTexture->Source.GetPersistentId());
+			DefinitionBuilder.AddInputBulkData(TEXT("CompositeSource"_SV), Texture.CompositeTexture->Source.GetPersistentId());
 		}
 		return DefinitionBuilder.Build();
 	}
@@ -1309,9 +1305,8 @@ private:
 			}
 		}
 
-		UTexture* CompositeTexture = Texture.CompositeTexture.LoadSynchronous();
-		const bool bCompositeTextureViable = CompositeTexture && Texture.CompositeTextureMode != CTM_Disabled;
-		bool bMatchingBlocks = bCompositeTextureViable && (CompositeTexture->Source.GetNumBlocks() == Texture.Source.GetNumBlocks());
+		const bool bCompositeTextureViable = Texture.CompositeTexture && Texture.CompositeTextureMode != CTM_Disabled;
+		bool bMatchingBlocks = bCompositeTextureViable && (Texture.CompositeTexture->Source.GetNumBlocks() == Texture.Source.GetNumBlocks());
 		bool bMatchingAspectRatio = bCompositeTextureViable;
 		bool bOnlyPowerOfTwoSize = bCompositeTextureViable;
 
@@ -1333,7 +1328,7 @@ private:
 			if (bCompositeTextureViable)
 			{
 				FTextureSourceBlock CompositeTextureBlock;
-				CompositeTexture->Source.GetBlock(BlockIndex, CompositeTextureBlock);
+				Texture.CompositeTexture->Source.GetBlock(BlockIndex, CompositeTextureBlock);
 
 				bMatchingBlocks = bMatchingBlocks && SourceBlock.BlockX == CompositeTextureBlock.BlockX && SourceBlock.BlockY == CompositeTextureBlock.BlockY;
 				bMatchingAspectRatio = bMatchingAspectRatio && SourceBlock.SizeX * CompositeTextureBlock.SizeY == SourceBlock.SizeY * CompositeTextureBlock.SizeX;
