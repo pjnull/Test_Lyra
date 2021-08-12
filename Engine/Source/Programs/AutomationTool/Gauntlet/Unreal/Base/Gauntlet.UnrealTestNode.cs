@@ -869,17 +869,14 @@ namespace Gauntlet
 
 			if (App != null)
 			{
-				UnrealLogParser Parser = new UnrealLogParser(App.StdOut);
-				
-				List<string> TestLines = Parser.GetLogChannel("Gauntlet").ToList();
+				List<string> LogCategories = GetAdditionalLogChannels();
+				LogCategories.Add("Gauntlet");
 
-				List<string> AdditionalLogCategories = GetAdditionalLogChannels();
-				foreach (string Category in AdditionalLogCategories)
-				{
-					TestLines.AddRange(Parser.GetLogChannel(Category));
-				}
-				
-				for (int i = LastLogCount; i < TestLines.Count; i++)
+				UnrealLogParser Parser = new UnrealLogParser(App.StdOut);
+				List<string> TestLines = new List<string>();
+				TestLines.AddRange(Parser.GetLogChannels(LogCategories, false));
+
+				for (int i = LastLogCount; i < TestLines.Count(); i++)
 				{
 					Log.Info(TestLines[i]);
 
@@ -894,7 +891,7 @@ namespace Gauntlet
 					}
 				}
 
-				LastLogCount = TestLines.Count;
+				LastLogCount = TestLines.Count();
 
 				// Detect missed heartbeats and fail the test
 				CheckHeartbeat();
