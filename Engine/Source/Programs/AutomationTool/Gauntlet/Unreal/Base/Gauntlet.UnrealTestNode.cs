@@ -874,7 +874,7 @@ namespace Gauntlet
 
 				UnrealLogParser Parser = new UnrealLogParser(App.StdOut);
 				List<string> TestLines = new List<string>();
-				TestLines.AddRange(Parser.GetLogChannels(LogCategories, false));
+				TestLines.AddRange(Parser.GetLogChannels(LogCategories, true));
 
 				for (int i = LastLogCount; i < TestLines.Count(); i++)
 				{
