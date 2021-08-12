@@ -507,6 +507,16 @@ namespace ObjectTools
 		TSet<UPackage*> PackagesUserRefusedToFullyLoad;
 		TArray<UPackage*> OutermostPackagesToSave;
 
+		// If any objects are cooked, show just one dialog now so user is not flooded with a large number of dialogs
+		for (UObject* Object : SelectedObjects)
+		{
+			if (Object && Object->RootPackageHasAnyFlags(PKG_FilterEditorOnly))
+			{
+				FMessageDialog::Open( EAppMsgType::Ok, FText::Format(NSLOCTEXT("UnrealEd", "CannotDuplicateCooked", "Cannot duplicate object: '{0}'\nPackage is cooked or missing editor data"), FText::FromString(Object->GetName())) );
+				return;
+			}
+		}
+
 		for( int32 ObjectIndex = 0 ; ObjectIndex < SelectedObjects.Num() ; ++ObjectIndex )
 		{
 			UObject* Object = SelectedObjects[ObjectIndex];
@@ -578,6 +588,10 @@ namespace ObjectTools
 		if ( !NewPackageName.Len() )
 		{
 			ErrorMessage += TEXT("Invalid package name supplied\n");
+		}
+		else if (Object->RootPackageHasAnyFlags(PKG_FilterEditorOnly))
+		{
+			ErrorMessage += TEXT("Package is cooked or missing editor data\n");
 		}
 		else
 		{
