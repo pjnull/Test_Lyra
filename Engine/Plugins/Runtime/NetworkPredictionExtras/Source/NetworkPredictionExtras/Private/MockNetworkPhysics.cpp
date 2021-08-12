@@ -274,17 +274,16 @@ void FMockManagedState::AsyncTick(UWorld* World, Chaos::FPhysicsSolver* Solver, 
 				}
 			}
 
+			// Keep pawn upright
 			if (UpDot < 0.95f)
 			{
-				// Doing it per-axis like this is probably wrong
 				FRotator Rot = PT->R().Rotator();
-				FVector Target(0, 0, 1);
+				FVector Target(0, 0, 1); // TODO choose up based on floor normal
 				FVector CurrentUp = Rot.RotateVector(Target);
 				FVector Torque = -FVector::CrossProduct(Target, CurrentUp);
 				FVector Damp(PT->W().X* UE_NETWORK_PHYSICS::TurnDampK(), PT->W().Y* UE_NETWORK_PHYSICS::TurnDampK(), 0);
 
 				PT->AddTorque(Torque* UE_NETWORK_PHYSICS::TurnK() + Damp);
-				PT->AddForce(FVector(0.f, 0.f, 600.f));
 			}
 
 			if (InputCmd.bBrakesPressed)
@@ -306,6 +305,20 @@ void FMockManagedState::AsyncTick(UWorld* World, Chaos::FPhysicsSolver* Solver, 
 				{
 					PT->AddForce(InputCmd.Force * GT_State.ForceMultiplier * UE_NETWORK_PHYSICS::MovementK());
 
+				}
+				else if(!bInAir)
+				{
+					// Auto brake: Applied when no input and grounded.
+					FVector NewV = PT->V();
+					if (NewV.SizeSquared2D() < 1.f)
+					{
+						PT->SetV(Chaos::FVec3(0.f, 0.f, NewV.Z));
+					}
+					else
+					{
+						const float DragFactor = FMath::Max(0.f, FMath::Min(1.f - (GT_State.AutoBrakeStrength * DeltaSeconds), 1.f));
+						PT->SetV(Chaos::FVec3(NewV.X * DragFactor, NewV.Y * DragFactor, NewV.Z));
+					}
 				}
 
 				// Rotation

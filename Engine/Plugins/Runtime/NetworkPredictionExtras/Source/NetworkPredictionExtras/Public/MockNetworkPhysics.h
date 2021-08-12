@@ -111,6 +111,10 @@ struct FMockState_GT
 	UPROPERTY(BlueprintReadWrite, Category = "Mock Object")
 	bool bEnableAutoFaceTargetYaw = false;
 
+	// Strength of auto brake force applied when no input force and on ground.
+	UPROPERTY(BlueprintReadWrite, Category = "Mock Object")
+	float AutoBrakeStrength = 5.f;
+
 	// Arbitrary data that doesn't affect sim but could still trigger rollback
 	UPROPERTY(BlueprintReadWrite, Category="Mock Object")
 	int32 RandValue = 0;
@@ -121,7 +125,8 @@ struct FMockState_GT
 			|| RandValue != AuthState.RandValue
 			|| AutoFaceTargetYawStrength != AuthState.AutoFaceTargetYawStrength
 			|| AutoFaceTargetYawDamp != AuthState.AutoFaceTargetYawDamp
-			|| bEnableAutoFaceTargetYaw != AuthState.bEnableAutoFaceTargetYaw;
+			|| bEnableAutoFaceTargetYaw != AuthState.bEnableAutoFaceTargetYaw
+			|| AutoBrakeStrength != AuthState.AutoBrakeStrength;
 	}
 
 	bool NetSerialize(FArchive& Ar, class UPackageMap* Map, bool& bOutSuccess)
@@ -131,6 +136,7 @@ struct FMockState_GT
 		Ar << AutoFaceTargetYawStrength;
 		Ar << AutoFaceTargetYawDamp;
 		Ar << bEnableAutoFaceTargetYaw;
+		Ar << AutoBrakeStrength;
 		return true;
 	}
 };
