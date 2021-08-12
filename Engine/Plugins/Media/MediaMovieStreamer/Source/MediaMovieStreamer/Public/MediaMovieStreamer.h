@@ -50,6 +50,11 @@ public:
 	MEDIAMOVIESTREAMER_API void SetMediaSoundComponent(UMediaSoundComponent* InMediaSoundComponent);
 
 	/**
+	 * Returns the current MediaSoundComponent
+	 */
+	MEDIAMOVIESTREAMER_API UMediaSoundComponent* GetMediaSoundComponent() { return MediaSoundComponent.Get(); }
+
+	/**
 	 * Sets what to play.
 	 *
 	 * @param InMediaSource Media source to play.

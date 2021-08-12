@@ -188,7 +188,7 @@ bool FMediaMovieStreamer::IsLastMovieInPlaylist()
 void FMediaMovieStreamer::Cleanup()
 {
 	// Do we control the media?
-	if (bIsMediaControlledExternally == false)
+	if (bIsMediaControlledExternally == false && !IsEngineExitRequested())
 	{
 		// Remove our hold on the assets.
 		UMediaMovieAssets* MovieAssets = FMediaMovieStreamerModule::GetMovieAssets();
