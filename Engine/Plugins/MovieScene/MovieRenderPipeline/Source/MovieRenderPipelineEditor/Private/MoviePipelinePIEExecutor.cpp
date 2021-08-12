@@ -85,16 +85,6 @@ void UMoviePipelinePIEExecutor::Start(const UMoviePipelineExecutorJob* InJob)
 		OnExecutorFinishedImpl();
 		return;
 	}
-	
-	ULevelSequence* LevelSequence = Cast<ULevelSequence>(InJob->Sequence.TryLoad());
-	if (!LevelSequence)
-	{
-		FText FailureReason = LOCTEXT("NullSequenceFailureDialog", "One or more jobs in the queue have a null level sequence. Sequence must point to a valid sequence.");
-		FMessageDialog::Open(EAppMsgType::Ok, FailureReason);
-
-		OnExecutorFinishedImpl();
-		return;
-	}
 
 	// Start capturing logging messages
 	ValidationMessageGatherer.StartGathering();
