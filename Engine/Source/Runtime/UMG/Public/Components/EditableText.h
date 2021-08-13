@@ -110,8 +110,12 @@ public:
 	bool SelectAllTextOnCommit;
 
 	/** Whether the context menu can be opened */
-	UPROPERTY(EditAnywhere, Category=Behavior, AdvancedDisplay)
+	UPROPERTY(EditAnywhere, Category = Behavior, AdvancedDisplay)
 	bool AllowContextMenu;
+
+	/** Whether to jump to the end of the text when it is set */
+	UPROPERTY(EditAnywhere, Category = Behavior, AdvancedDisplay)
+	bool JumpToEndOnTextSet;
 
 	/** If we're on a platform that requires a virtual keyboard, what kind of keyboard should this widget use? */
 	UPROPERTY(EditAnywhere, Category=Behavior, AdvancedDisplay)

@@ -74,6 +74,7 @@ void SEditableText::Construct( const FArguments& InArgs )
 	EditableTextLayout->SetDebugSourceInfo(TAttribute<FString>::Create(TAttribute<FString>::FGetter::CreateLambda([this]{ return FReflectionMetaData::GetWidgetDebugInfo(this); })));
 	EditableTextLayout->SetJustification(InArgs._Justification);
 	EditableTextLayout->SetOverflowPolicy(InArgs._OverflowPolicy);
+	EditableTextLayout->SetJumpToEndOnTextSet(InArgs._JumpToEndOnTextSet);
 
 	// build context menu extender
 	MenuExtender = MakeShareable(new FExtender());

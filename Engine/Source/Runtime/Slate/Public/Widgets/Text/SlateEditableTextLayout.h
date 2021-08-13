@@ -111,6 +111,9 @@ public:
 	/** Set the information used to help identify who owns this text layout in the case of an error */
 	void SetDebugSourceInfo(const TAttribute<FString>& InDebugSourceInfo);
 
+	/** Set whether to jump to the end of the text when it is set */
+	void SetJumpToEndOnTextSet(const TAttribute<bool>& InJumpToEndOnTextSet);
+
 	/** Get the virtual keyboard handler for this text layout */
 	TSharedRef<IVirtualKeyboardEntry> GetVirtualKeyboardEntry() const;
 
@@ -557,6 +560,9 @@ private:
 
 	/** The information used to help identify who owns this text layout in the case of an error */
 	TAttribute<FString> DebugSourceInfo;
+
+	/** True if we should jump to the end of the text when it is set */
+	TAttribute<bool> JumpToEndOnTextSet;
 
 	/** Virtual keyboard handler for this text layout */
 	TSharedPtr<FVirtualKeyboardEntry> VirtualKeyboardEntry;

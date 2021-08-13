@@ -64,6 +64,7 @@ UEditableText::UEditableText(const FObjectInitializer& ObjectInitializer)
 	ClearKeyboardFocusOnCommit = true;
 	SelectAllTextOnCommit = false;
 	AllowContextMenu = true;
+	JumpToEndOnTextSet = true;
 	VirtualKeyboardTrigger = EVirtualKeyboardTrigger::OnFocusByPointer;
 	VirtualKeyboardDismissAction = EVirtualKeyboardDismissAction::TextChangeOnDismiss;
 	Clipping = EWidgetClipping::ClipToBounds;
@@ -84,22 +85,23 @@ void UEditableText::ReleaseSlateResources(bool bReleaseChildren)
 
 TSharedRef<SWidget> UEditableText::RebuildWidget()
 {
-	MyEditableText = SNew(SEditableText)
-		.Style(&WidgetStyle)
-		.MinDesiredWidth(MinimumDesiredWidth)
-		.IsCaretMovedWhenGainFocus(IsCaretMovedWhenGainFocus)
-		.SelectAllTextWhenFocused(SelectAllTextWhenFocused)
-		.RevertTextOnEscape(RevertTextOnEscape)
-		.ClearKeyboardFocusOnCommit(ClearKeyboardFocusOnCommit)
-		.SelectAllTextOnCommit(SelectAllTextOnCommit)
-		.OnTextChanged(BIND_UOBJECT_DELEGATE(FOnTextChanged, HandleOnTextChanged))
-		.OnTextCommitted(BIND_UOBJECT_DELEGATE(FOnTextCommitted, HandleOnTextCommitted))
-		.VirtualKeyboardType(EVirtualKeyboardType::AsKeyboardType(KeyboardType.GetValue()))
+	MyEditableText = SNew( SEditableText )
+		.Style( &WidgetStyle )
+		.MinDesiredWidth( MinimumDesiredWidth )
+		.IsCaretMovedWhenGainFocus( IsCaretMovedWhenGainFocus )
+		.SelectAllTextWhenFocused( SelectAllTextWhenFocused )
+		.RevertTextOnEscape( RevertTextOnEscape )
+		.ClearKeyboardFocusOnCommit( ClearKeyboardFocusOnCommit )
+		.SelectAllTextOnCommit( SelectAllTextOnCommit )
+		.OnTextChanged( BIND_UOBJECT_DELEGATE( FOnTextChanged, HandleOnTextChanged ) )
+		.OnTextCommitted( BIND_UOBJECT_DELEGATE( FOnTextCommitted, HandleOnTextCommitted ) )
+		.VirtualKeyboardType( EVirtualKeyboardType::AsKeyboardType( KeyboardType.GetValue() ) )
 		.VirtualKeyboardOptions(VirtualKeyboardOptions)
 		.VirtualKeyboardTrigger(VirtualKeyboardTrigger)
 		.VirtualKeyboardDismissAction(VirtualKeyboardDismissAction)
 		.Justification(Justification)
 		.OverflowPolicy(OverflowPolicy);
+		.JumpToEndOnTextSet(JumpToEndOnTextSet);
 	
 	return MyEditableText.ToSharedRef();
 }
