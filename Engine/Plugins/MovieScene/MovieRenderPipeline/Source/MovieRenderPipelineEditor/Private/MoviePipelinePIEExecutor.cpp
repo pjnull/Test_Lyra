@@ -269,14 +269,6 @@ void UMoviePipelinePIEExecutor::BeginDestroy()
 	Super::BeginDestroy();
 }
 
-void UMoviePipelinePIEExecutor::BeginDestroy()
-{
-	// Ensure we're no longer gathering, otherwise it tries to call a callback on the now dead uobject.
-	ValidationMessageGatherer.StopGathering();
-
-	Super::BeginDestroy();
-}
-
 void UMoviePipelinePIEExecutor::OnPIEEnded(bool)
 {
 	FEditorDelegates::EndPIE.RemoveAll(this);
