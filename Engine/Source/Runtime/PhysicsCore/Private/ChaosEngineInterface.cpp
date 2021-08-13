@@ -1086,7 +1086,12 @@ void FChaosEngineInterface::ReleaseConstraint(FPhysicsConstraintHandle& InConstr
 				{
 					check(Proxy->GetSolver<Chaos::FPhysicsSolver>());
 					Chaos::FPhysicsSolver* Solver = Proxy->GetSolver<Chaos::FPhysicsSolver>();
-
+					// TODO: we should probably figure out a way to call this from within UnregisterObject, to match
+					// what RegisterObject does
+					if (FChaosScene* Scene = FChaosEngineInterface::GetCurrentScene(Constraint->GetKinematicEndPoint()))
+					{
+						Scene->RemoveActorFromAccelerationStructure(Constraint->GetKinematicEndPoint());
+					}
 					Solver->UnregisterObject(Constraint);
 
 					InConstraintRef.Constraint = nullptr; // freed by the joint constraint physics proxy
