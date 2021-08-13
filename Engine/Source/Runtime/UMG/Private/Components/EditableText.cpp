@@ -100,7 +100,7 @@ TSharedRef<SWidget> UEditableText::RebuildWidget()
 		.VirtualKeyboardTrigger(VirtualKeyboardTrigger)
 		.VirtualKeyboardDismissAction(VirtualKeyboardDismissAction)
 		.Justification(Justification)
-		.OverflowPolicy(OverflowPolicy);
+		.OverflowPolicy(OverflowPolicy)
 		.JumpToEndOnTextSet(JumpToEndOnTextSet);
 	
 	return MyEditableText.ToSharedRef();
