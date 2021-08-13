@@ -2,6 +2,7 @@
 #include "PerQualityLevelProperties.h"
 #include "Serialization/Archive.h"
 #include "Misc/ConfigCacheIni.h"
+#include "Misc/DataDrivenPlatformInfoRegistry.h"
 
 namespace QualityLevelProperty
 {
@@ -96,6 +97,9 @@ FSupportedQualityLevelArray FPerQualityLevelProperty<_StructType, _ValueType, _B
 template<typename _StructType, typename _ValueType, EName _BasePropertyName>
 FSupportedQualityLevelArray FPerQualityLevelProperty<_StructType, _ValueType, _BasePropertyName>::GetSupportedQualityLevels(const TCHAR* InPlatformName) const
 {
+	const FString PlatformNameStr = FDataDrivenPlatformInfoRegistry::GetPlatformInfo(FName(InPlatformName)).IniPlatformName.ToString();
+	InPlatformName = *PlatformNameStr;
+
 	FSupportedQualityLevelArray* CachedCookingQualitLevelInfo = nullptr;
 	
 	{
@@ -206,7 +210,7 @@ ENGINE_API FArchive& operator<<(FArchive& Ar, FPerQualityLevelProperty<_StructTy
 	{
 		bCooked = true;
 		const FDataDrivenPlatformInfo& PlatformInfo = Ar.CookingTarget()->GetPlatformInfo();
-		This->StripQualtiyLevelForCooking(*(PlatformInfo.PlatformGroupName.ToString()));
+		This->StripQualtiyLevelForCooking(*(PlatformInfo.IniPlatformName.ToString()));
 	}
 #endif
 	{
@@ -231,7 +235,7 @@ ENGINE_API void operator<<(FStructuredArchive::FSlot Slot, FPerQualityLevelPrope
 	if (UnderlyingArchive.IsCooking())
 	{
 		bCooked = true;
-		This->StripQualtiyLevelForCooking(*(UnderlyingArchive.CookingTarget()->GetPlatformInfo().PlatformGroupName.ToString()));
+		This->StripQualtiyLevelForCooking(*(UnderlyingArchive.CookingTarget()->GetPlatformInfo().IniPlatformName.ToString()));
 	}
 #endif
 	{

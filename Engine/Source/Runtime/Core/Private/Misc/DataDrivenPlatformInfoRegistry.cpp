@@ -11,6 +11,7 @@
 namespace 
 {
 	TMap<FName, FDataDrivenPlatformInfo> DataDrivenPlatforms;
+	TMap<FName, FName> GlobalPlatformNameAliases;
 	TArray<FName> SortedPlatformNames;
 	TArray<const FDataDrivenPlatformInfo*> SortedPlatformInfos;
 #if DDPI_HAS_EXTENDED_PLATFORMINFO_DATA
@@ -366,11 +367,22 @@ const TMap<FName, FDataDrivenPlatformInfo>& FDataDrivenPlatformInfoRegistry::Get
 				// cache info
 				FDataDrivenPlatformInfo& Info = DataDrivenPlatforms.FindOrAdd(PlatformName, FDataDrivenPlatformInfo());
 				LoadDDPIIniSettings(IniFile, Info, PlatformName);
+				Info.IniPlatformName = PlatformName;
 
 				// get the parent to build list later
 				FString IniParent;
 				IniFile.GetString(TEXT("DataDrivenPlatformInfo"), TEXT("IniParent"), IniParent);
 				IniParents.Add(PlatformString, IniParent);
+
+				// get platform name aliases
+				FString PlatformNameAliasesStr;
+				IniFile.GetString(TEXT("DataDrivenPlatformInfo"), TEXT("PlatformNameAliases"), PlatformNameAliasesStr);
+				TArray<FString> PlatformNameAliases;
+				PlatformNameAliasesStr.ParseIntoArrayWS(PlatformNameAliases, TEXT(","));
+				for (const FString& PlatformNameAlias : PlatformNameAliases)
+				{
+					GlobalPlatformNameAliases.Add(*PlatformNameAlias, PlatformName);
+				}
 			}
 		}
 
@@ -460,9 +472,9 @@ const FDataDrivenPlatformInfo& FDataDrivenPlatformInfoRegistry::GetPlatformInfo(
 {
 	const FDataDrivenPlatformInfo* Info = GetAllPlatformInfos().Find(PlatformName);
 	static FDataDrivenPlatformInfo Empty;
-	if (Info == nullptr && PlatformName == "Win64")
+	if (Info == nullptr && GlobalPlatformNameAliases.Contains(PlatformName))
 	{
-		Info = GetAllPlatformInfos().Find("Windows");
+		Info = GetAllPlatformInfos().Find(GlobalPlatformNameAliases.FindChecked(PlatformName));
 	}
 	return Info ? *Info : Empty;
 }
