@@ -330,9 +330,16 @@ public:
 
 	virtual bool IsReplayReady() const { return false; }
 
+	bool IsForceInitialDirty() const { return bForceInitialDirty; }
+	void SetForceInitialDirty(bool bValue)
+	{
+		bForceInitialDirty = bValue;
+	}
+
 private:
 	uint32 bInternalAck : 1;	// Internally ack all packets, for 100% reliable connections.
 	uint32 bReplay : 1;			// Flag to indicate a replay connection, independent of reliability
+	uint32 bForceInitialDirty : 1;	// Force all properties dirty on initial replication
 
 public:
 	struct FURL			URL;				// URL of the other side.

@@ -1684,7 +1684,7 @@ ERepLayoutResult FRepLayout::CompareProperties(
 
 	FComparePropertiesSharedParams SharedParams{
 		/*bIsInitial=*/ !!RepFlags.bNetInitial,
-		/*bForceFail=*/ false,
+		/*bForceFail=*/ !!RepFlags.bNetInitial && !!RepFlags.bForceInitialDirty,
 		Flags,
 		Parents,
 		Cmds,
