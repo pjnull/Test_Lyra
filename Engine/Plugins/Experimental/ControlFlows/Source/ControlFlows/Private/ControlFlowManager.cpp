@@ -9,8 +9,8 @@ static TArray<TSharedRef<FControlFlowContainerBase>> PersistentFlows;
 static TArray<TSharedRef<FControlFlowContainerBase>> ExecutingFlows;
 static TArray<TSharedRef<FControlFlowContainerBase>> FinishedFlows;
 
-static FDelegateHandle NextFrameCheckForExecution;
-static FDelegateHandle NextFrameCheckForFlowCleanup;
+static FTSTicker::FDelegateHandle NextFrameCheckForExecution;
+static FTSTicker::FDelegateHandle NextFrameCheckForFlowCleanup;
 
 TArray<TSharedRef<FControlFlowContainerBase>>& FControlFlowStatics::GetNewlyCreatedFlows()
 {
@@ -54,14 +54,14 @@ void FControlFlowStatics::HandleControlFlowStartedNotification(TSharedRef<const 
 
 void FControlFlowStatics::CheckNewlyCreatedFlows()
 {
-	FTicker::GetCoreTicker().RemoveTicker(NextFrameCheckForExecution);
-	NextFrameCheckForExecution = FTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateStatic(&FControlFlowStatics::IterateThroughNewlyCreatedFlows));
+	FTSTicker::GetCoreTicker().RemoveTicker(NextFrameCheckForExecution);
+	NextFrameCheckForExecution = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateStatic(&FControlFlowStatics::IterateThroughNewlyCreatedFlows));
 }
 
 void FControlFlowStatics::CheckForInvalidFlows()
 {
-	FTicker::GetCoreTicker().RemoveTicker(NextFrameCheckForFlowCleanup);
-	NextFrameCheckForFlowCleanup = FTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateStatic(&FControlFlowStatics::IterateForInvalidFlows));
+	FTSTicker::GetCoreTicker().RemoveTicker(NextFrameCheckForFlowCleanup);
+	NextFrameCheckForFlowCleanup = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateStatic(&FControlFlowStatics::IterateForInvalidFlows));
 }
 
 bool FControlFlowStatics::IterateThroughNewlyCreatedFlows(float DeltaTime)
