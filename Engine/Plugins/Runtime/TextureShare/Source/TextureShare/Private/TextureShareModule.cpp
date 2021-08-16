@@ -250,7 +250,6 @@ bool FTextureShareModule::SendSceneContext_RenderThread(FRDGBuilder& GraphBuilde
 					ShareItem->SetDefaultGPUIndex(SceneView->GPUMask.GetFirstIndex());
 				}
 			}
-			}
 #endif
 
 			const auto AddSendTexturePass = [&](const TCHAR* ShareName, FRDGTextureRef Texture)
