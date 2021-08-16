@@ -9,19 +9,19 @@
 #define LOCTEXT_NAMESPACE "FMediaMovieStreamerModule"
 
 TSharedPtr<FMediaMovieStreamer, ESPMode::ThreadSafe> MovieStreamer;
-UMediaMovieAssets* MovieAssets = nullptr;
+TWeakObjectPtr<UMediaMovieAssets> MovieAssets;
 bool FMediaMovieStreamerModule::bStartedModule = false;
 
 UMediaMovieAssets* FMediaMovieStreamerModule::GetMovieAssets()
 {
-	if (!MovieAssets && bStartedModule)
+	if ((MovieAssets.IsValid() == false) && bStartedModule)
 	{
 		// Create MovieAssets.
 		MovieAssets = NewObject<UMediaMovieAssets>();
 		MovieAssets->AddToRoot();
 	}
 
-	return MovieAssets;
+	return MovieAssets.Get();
 }
 
 const TSharedPtr<FMediaMovieStreamer, ESPMode::ThreadSafe> FMediaMovieStreamerModule::GetMovieStreamer()
@@ -43,6 +43,8 @@ void FMediaMovieStreamerModule::StartupModule()
 
 void FMediaMovieStreamerModule::ShutdownModule()
 {
+	bStartedModule = false;
+
 	// Shutdown MovieStreamer.
 	if (MovieStreamer.IsValid())
 	{
@@ -51,13 +53,11 @@ void FMediaMovieStreamerModule::ShutdownModule()
 	}
 
 	// Shutdown MovieAssets.
-	if (MovieAssets)
+	if (MovieAssets.IsValid())
 	{
 		MovieAssets->RemoveFromRoot();
-		MovieAssets = nullptr;
+		MovieAssets.Reset();
 	}
-
-	bStartedModule = false;
 }
 
 #undef LOCTEXT_NAMESPACE
