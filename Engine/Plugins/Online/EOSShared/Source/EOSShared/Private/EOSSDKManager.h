@@ -13,6 +13,7 @@
 #include "eos_init.h"
 
 #include "IEOSSDKManager.h"
+#include "Containers/Ticker.h"
 
 struct FEOSPlatformHandle;
 
@@ -56,7 +57,7 @@ private:
 	/** Contains platforms released with ReleasePlatform, which we will release on the next Tick. */
 	TArray<EOS_HPlatform> ReleasedPlatforms;
 	/** Handle to ticker delegate for Tick(), valid whenever there are ActivePlatforms to tick, or ReleasedPlatforms to release. */
-	FDelegateHandle TickerHandle;
+	FTSTicker::FDelegateHandle TickerHandle;
 };
 
 struct FEOSPlatformHandle : public IEOSPlatformHandle
