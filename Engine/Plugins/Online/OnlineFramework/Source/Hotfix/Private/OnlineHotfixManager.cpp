@@ -1500,12 +1500,17 @@ void UOnlineHotfixManager::PatchAssetsFromIniFiles()
 
 			// Make sure the entry has a valid class name that we supprt
 			UClass* AssetClass = nullptr;
+			FString PatchableAssetClassesStr;
 			for (UClass* PatchableAssetClass : PatchableAssetClasses)
 			{
-				if (PatchableAssetClass && (It.Key() == PatchableAssetClass->GetFName()))
+				if (PatchableAssetClass)
 				{
-					AssetClass = PatchableAssetClass;
-					break;
+					PatchableAssetClassesStr += PatchableAssetClass->GetFName().ToString() + TEXT(" ");
+
+					if (PatchableAssetClass->GetFName().IsEqual(It.Key()))
+					{
+						AssetClass = PatchableAssetClass;
+					}
 				}
 			}
 
@@ -1578,7 +1583,7 @@ void UOnlineHotfixManager::PatchAssetsFromIniFiles()
 						{
 							for (const FString& ProblemString : ProblemStrings)
 							{
-								UE_LOG(LogHotfixManager, Error, TEXT("%s: %s"), *GetPathNameSafe(Asset), *ProblemString);
+								UE_LOG(LogHotfixManager, Error, TEXT("[Item: %d] %s: %s"), TotalPatchableAssets, *GetPathNameSafe(Asset), *ProblemString);
 							}
 						}
 						else
@@ -1591,28 +1596,36 @@ void UOnlineHotfixManager::PatchAssetsFromIniFiles()
 					}
 					else
 					{
-						UE_LOG(LogHotfixManager, Error, TEXT("Wasn't able to parse the data with semicolon separated values. Expecting 3 or 5 arguments."));
+						UE_LOG(LogHotfixManager, Error, TEXT("[Item: %d] Wasn't able to parse the data with semicolon separated values. Expecting 3 or 5 arguments but parsed %d."), TotalPatchableAssets, Tokens.Num());
 					}
+				}
+				else
+				{
+					UE_LOG(LogHotfixManager, Warning, TEXT("[Item: %d] Empty value given for '%s' entry!"), TotalPatchableAssets, *It.Key().ToString());
 				}
 
 #if ENABLE_SHARED_MEMORY_TRACKER
 				FSharedMemoryTracker::PrintMemoryDiff(*FString::Printf(TEXT("AssetHotfix: %s"), *AssetClass->GetPathName()));
 #endif
 			}
+			else
+			{
+				UE_LOG(LogHotfixManager, Error, TEXT("[Item: %d] Invalid patchable asset type '%s' - supported types: %s"), TotalPatchableAssets, *It.Key().ToString(), *PatchableAssetClassesStr);
+			}
 		}
 	}
 
 	if (TotalPatchableAssets == 0)
 	{
-		UE_LOG(LogHotfixManager, Display, TEXT("No assets were found in the 'AssetHotfix' section in the Game .ini file.  No patching needed."));
+		UE_LOG(LogHotfixManager, Display, TEXT("No assets were found in the 'AssetHotfix' section in the Game .ini file. No patching needed."));
 	}
 	else if (TotalPatchableAssets == AssetsHotfixedFromIniFiles.Num())
 	{
-		UE_LOG(LogHotfixManager, Display, TEXT("Successfully patched all %i assets from the 'AssetHotfix' section in the Game .ini file.  These assets will be forced to remain loaded."), AssetsHotfixedFromIniFiles.Num());
+		UE_LOG(LogHotfixManager, Display, TEXT("Successfully patched all %i assets from the 'AssetHotfix' section in the Game .ini file. These assets will be forced to remain loaded."), AssetsHotfixedFromIniFiles.Num());
 	}
 	else
 	{
-		UE_LOG(LogHotfixManager, Error, TEXT("Only %i of %i assets were successfully patched from 'AssetHotfix' section in the Game .ini file.  The patched assets will be forced to remain loaded.  Any assets that failed to patch may be left in an invalid state!"), AssetsHotfixedFromIniFiles.Num(), TotalPatchableAssets);
+		UE_LOG(LogHotfixManager, Error, TEXT("Only %i of %i assets were successfully patched from 'AssetHotfix' section in the Game .ini file. The patched assets will be forced to remain loaded. Any assets that failed to patch may be left in an invalid state!"), AssetsHotfixedFromIniFiles.Num(), TotalPatchableAssets);
 	}
 }
 
