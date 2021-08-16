@@ -220,7 +220,7 @@ IEOSPlatformHandlePtr FEOSSDKManager::CreatePlatform(const EOS_Platform_Options&
 		const EOS_HPlatform PlatformHandle = EOS_Platform_Create(&PlatformOptions);
 		if (PlatformHandle)
 		{
-			PlatformHandles.Emplace(PlatformHandle);
+			ActivePlatforms.Emplace(PlatformHandle);
 			SharedPlatform = MakeShared<FEOSPlatformHandle, ESPMode::ThreadSafe>(*this, PlatformHandle);
 
 			if (!TickerHandle.IsValid())
@@ -243,8 +243,10 @@ IEOSPlatformHandlePtr FEOSSDKManager::CreatePlatform(const EOS_Platform_Options&
 
 bool FEOSSDKManager::Tick(float)
 {
+	ReleaseReleasedPlatforms();
+
 	//LLM_SCOPE(ELLMTag::EOSSDK); // TODO
-	for (EOS_HPlatform PlatformHandle : PlatformHandles)
+	for (EOS_HPlatform PlatformHandle : ActivePlatforms)
 	{
 		LLM_SCOPE(ELLMTag::RealTimeCommunications);
 		QUICK_SCOPE_CYCLE_COUNTER(FEOSSDKManager_Tick);
@@ -252,7 +254,7 @@ bool FEOSSDKManager::Tick(float)
 		EOS_Platform_Tick(PlatformHandle);
 	}
 
-	return true;
+	return ActivePlatforms.Num() > 0;
 }
 
 void FEOSSDKManager::OnLogVerbosityChanged(const FLogCategoryName& CategoryName, ELogVerbosity::Type OldVerbosity, ELogVerbosity::Type NewVerbosity)
@@ -283,17 +285,10 @@ FString FEOSSDKManager::GetProductVersion() const
 
 void FEOSSDKManager::ReleasePlatform(EOS_HPlatform PlatformHandle)
 {
-	// Only release the platform if it was actually present in PlatformHandles, as Shutdown may have already released it.
-	if (PlatformHandles.Remove(PlatformHandle))
+	if (ActivePlatforms.Contains(PlatformHandle))
 	{
-		EOS_Platform_Release(PlatformHandle);
-
-		if (ensure(TickerHandle.IsValid()) &&
-			PlatformHandles.Num() == 0)
-		{
-			FTicker::GetCoreTicker().RemoveTicker(TickerHandle);
-			TickerHandle.Reset();
-		}
+		ReleasedPlatforms.Emplace(PlatformHandle);
+		ActivePlatforms.Remove(PlatformHandle);
 	}
 	else
 	{
@@ -301,25 +296,33 @@ void FEOSSDKManager::ReleasePlatform(EOS_HPlatform PlatformHandle)
 	}
 }
 
+void FEOSSDKManager::ReleaseReleasedPlatforms()
+{
+	for (EOS_HPlatform PlatformHandle : ReleasedPlatforms)
+	{
+		EOS_Platform_Release(PlatformHandle);
+	}
+	ReleasedPlatforms.Empty();
+
+	if (TickerHandle.IsValid() &&
+		ActivePlatforms.Num() == 0)
+	{
+		FTicker::GetCoreTicker().RemoveTicker(TickerHandle);
+		TickerHandle.Reset();
+	}
+}
+
 void FEOSSDKManager::Shutdown()
 {
 	if (IsInitialized())
 	{
-		if (PlatformHandles.Num() > 0)
+		if (ActivePlatforms.Num() > 0)
 		{
-			UE_LOG(LogEOSSDK, Warning, TEXT("FEOSSDKManager::Shutdown Releasing %d remaining platforms"), PlatformHandles.Num());
-			for (EOS_HPlatform PlatformHandle : PlatformHandles)
-			{
-				EOS_Platform_Release(PlatformHandle);
-			}
-			PlatformHandles.Empty();
-
-			if (ensure(TickerHandle.IsValid()))
-			{
-				FTicker::GetCoreTicker().RemoveTicker(TickerHandle);
-				TickerHandle.Reset();
-			}
+			UE_LOG(LogEOSSDK, Warning, TEXT("FEOSSDKManager::Shutdown Releasing %d remaining platforms"), ActivePlatforms.Num());
+			ReleasedPlatforms.Append(MoveTemp(ActivePlatforms));
 		}
+
+		ReleaseReleasedPlatforms();
 
 #if !NO_LOGGING
 		FCoreDelegates::OnLogVerbosityChanged.RemoveAll(this);
