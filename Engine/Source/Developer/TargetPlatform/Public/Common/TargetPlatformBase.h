@@ -206,6 +206,23 @@ public:
 		static const FName NAME_MeshBuilder(TEXT("MeshBuilder"));
 		return NAME_MeshBuilder;
 	}
+
+	virtual void GetShaderFormatModuleHints(TArray<FName>& OutModuleNames) const override
+	{
+	}
+
+	virtual void GetTextureFormatModuleHints(TArray<FName>& OutModuleNames) const override
+	{
+		// these are the default texture format modules, since many platforms 
+		OutModuleNames.Add(TEXT("TextureFormatUncompressed"));
+		OutModuleNames.Add(TEXT("TextureFormatDXT"));
+		OutModuleNames.Add(TEXT("TextureFormatIntelISPCTexComp"));
+	}
+
+	virtual void GetWaveFormatModuleHints(TArray<FName>& OutModuleNames) const override
+	{
+	}
+
 #endif
 
 	virtual bool CopyFileToTarget(const FString& TargetAddress, const FString& HostFilename, const FString& TargetFilename, const TMap<FString,FString>& CustomPlatformData) override

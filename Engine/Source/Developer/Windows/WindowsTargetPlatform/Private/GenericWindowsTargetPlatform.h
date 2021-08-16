@@ -251,6 +251,12 @@ public:
 		OutFormats.Add(FName(TEXT("FullHDR")));
 	}
 
+	virtual void GetShaderFormatModuleHints(TArray<FName>& OutModuleNames) const override
+	{
+		OutModuleNames.Add(TEXT("ShaderFormatD3D"));
+		OutModuleNames.Add(TEXT("ShaderFormatOpenGL"));
+	}
+
 	virtual const class FStaticMeshLODSettings& GetStaticMeshLODSettings( ) const override
 	{
 		return StaticMeshLODSettings;
@@ -451,6 +457,13 @@ public:
 		OutFormats.Add(NAME_ADPCM);
 		OutFormats.Add(NAME_OGG);
 		OutFormats.Add(NAME_OPUS);
+	}
+
+	virtual void GetWaveFormatModuleHints(TArray<FName>& OutModuleNames) const override
+	{
+		OutModuleNames.Add(TEXT("AudioFormatOPUS"));
+		OutModuleNames.Add(TEXT("AudioFormatOGG"));
+		OutModuleNames.Add(TEXT("AudioFormatADPCM"));
 	}
 
 #endif //WITH_ENGINE
