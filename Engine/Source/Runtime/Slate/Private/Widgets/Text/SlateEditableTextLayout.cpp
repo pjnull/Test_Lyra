@@ -236,22 +236,10 @@ void FSlateEditableTextLayout::SetText(const TAttribute<FText>& InText)
 
 	if (RefreshImpl(&NewText, bForceRefresh))
 	{
-		// Move the cursor to the end of the new text if we had keyboard focus & option is enabled or
-		// cursor is currently in an invalid position, or else update cursor in its current position
+		// Make sure we move the cursor to the end of the new text if we had keyboard focus
 		if (OwnerWidget->GetSlateWidget()->HasAnyUserFocus().IsSet() && !bWasFocusedByLastMouseDown)
 		{
-			const FTextLocation CursorPos = CursorInfo.GetCursorInteractionLocation();
-			const TArray<FTextLayout::FLineModel>& Lines = TextLayout->GetLineModels();
-			const bool bCursorPositionInvalid = (CursorPos.GetLineIndex() >= Lines.Num() || CursorPos.GetOffset() > Lines[CursorPos.GetLineIndex()].Text->Len());
-
-			if (JumpToEndOnTextSet.Get() || bCursorPositionInvalid)
-			{
-				JumpTo(ETextLocation::EndOfDocument, ECursorAction::MoveCursor);
-			}
-			else
-			{
-				UpdateCursorHighlight();
-			}
+			JumpTo(ETextLocation::EndOfDocument, ECursorAction::MoveCursor);
 		}
 
 		// Let outsiders know that the text content has been changed
@@ -530,11 +518,6 @@ void FSlateEditableTextLayout::SetDebugSourceInfo(const TAttribute<FString>& InD
 	{
 		HintTextLayout->SetDebugSourceInfo(DebugSourceInfo);
 	}
-}
-
-void FSlateEditableTextLayout::SetJumpToEndOnTextSet(const TAttribute<bool>& InJumpToEndOnTextSet)
-{
-	JumpToEndOnTextSet = InJumpToEndOnTextSet;
 }
 
 TSharedRef<IVirtualKeyboardEntry> FSlateEditableTextLayout::GetVirtualKeyboardEntry() const

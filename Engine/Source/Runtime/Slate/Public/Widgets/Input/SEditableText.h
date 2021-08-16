@@ -123,9 +123,6 @@ public:
 		/** Whether the context menu can be opened  */
 		SLATE_ATTRIBUTE(bool, AllowContextMenu)
 
-		/** Whether to jump to the end of the text when it is set */
-		SLATE_ATTRIBUTE(bool, JumpToEndOnTextSet)
-
 		/** Delegate to call before a context menu is opened. User returns the menu content or null to the disable context menu */
 		SLATE_EVENT(FOnContextMenuOpening, OnContextMenuOpening)
 

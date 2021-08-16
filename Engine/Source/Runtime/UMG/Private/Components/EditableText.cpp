@@ -64,7 +64,6 @@ UEditableText::UEditableText(const FObjectInitializer& ObjectInitializer)
 	ClearKeyboardFocusOnCommit = true;
 	SelectAllTextOnCommit = false;
 	AllowContextMenu = true;
-	JumpToEndOnTextSet = true;
 	VirtualKeyboardTrigger = EVirtualKeyboardTrigger::OnFocusByPointer;
 	VirtualKeyboardDismissAction = EVirtualKeyboardDismissAction::TextChangeOnDismiss;
 	Clipping = EWidgetClipping::ClipToBounds;
@@ -100,8 +99,7 @@ TSharedRef<SWidget> UEditableText::RebuildWidget()
 		.VirtualKeyboardTrigger(VirtualKeyboardTrigger)
 		.VirtualKeyboardDismissAction(VirtualKeyboardDismissAction)
 		.Justification(Justification)
-		.OverflowPolicy(OverflowPolicy)
-		.JumpToEndOnTextSet(JumpToEndOnTextSet);
+		.OverflowPolicy(OverflowPolicy);
 	
 	return MyEditableText.ToSharedRef();
 }
