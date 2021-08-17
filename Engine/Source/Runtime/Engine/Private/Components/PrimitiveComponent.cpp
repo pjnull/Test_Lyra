@@ -3523,11 +3523,6 @@ bool UPrimitiveComponent::UpdateOverlapsImpl(const TOverlapArrayView* NewPending
 	return bCanSkipUpdateOverlaps;
 }
 
-bool RequiresUpdateOverlaps(bool bGenerateOverlapEvents)
-{
-	return bGenerateOverlapEvents;
-}
-
 void UPrimitiveComponent::SetGenerateOverlapEvents(bool bInGenerateOverlapEvents)
 {
 	if (bGenerateOverlapEvents != bInGenerateOverlapEvents)
