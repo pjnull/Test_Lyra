@@ -5,7 +5,9 @@
 #include "CoreMinimal.h"
 #include "Common/TargetPlatformBase.h"
 #include "Misc/ConfigCacheIni.h"
+#if PLATFORM_WINDOWS
 #include "LocalPcTargetDevice.h"
+#endif
 #include "Serialization/MemoryLayout.h"
 
 #if WITH_ENGINE
@@ -23,12 +25,10 @@
 /**
  * Template for Windows target platforms
  */
-template<bool HAS_EDITOR_DATA, bool IS_DEDICATED_SERVER, bool IS_CLIENT_ONLY>
-class TGenericWindowsTargetPlatform
-	: public TTargetPlatformBase<FWindowsPlatformProperties<HAS_EDITOR_DATA, IS_DEDICATED_SERVER, IS_CLIENT_ONLY> >
+template<typename TProperties>
+class TGenericWindowsTargetPlatform : public TTargetPlatformBase<TProperties>
 {
 public:
-	typedef FWindowsPlatformProperties<HAS_EDITOR_DATA, IS_DEDICATED_SERVER, IS_CLIENT_ONLY> TProperties;
 	typedef TTargetPlatformBase<TProperties> TSuper;
 
 	/**
@@ -136,7 +136,7 @@ public:
 	virtual bool IsRunningPlatform( ) const override
 	{
 		// Must be Windows platform as editor for this to be considered a running platform
-		return PLATFORM_WINDOWS && !UE_SERVER && !UE_GAME && WITH_EDITOR && HAS_EDITOR_DATA;
+		return PLATFORM_WINDOWS && !UE_SERVER && !UE_GAME && WITH_EDITOR && TProperties::HasEditorOnlyData();
 	}
 
 	virtual void GetShaderCompilerDependencies(TArray<FString>& OutDependencies) const override
@@ -152,12 +152,12 @@ public:
 		// we currently do not have a build target for WindowsServer
 		if (Feature == ETargetPlatformFeatures::Packaging)
 		{
-			return (HAS_EDITOR_DATA || !IS_DEDICATED_SERVER);
+			return (TProperties::HasEditorOnlyData() || !TProperties::IsServerOnly());
 		}
 
 		if ( Feature == ETargetPlatformFeatures::ShouldSplitPaksIntoSmallerSizes )
 		{
-			return IS_CLIENT_ONLY;
+			return TProperties::IsClientOnly();
 		}
 
 		if (Feature == ETargetPlatformFeatures::MobileRendering)
@@ -197,7 +197,7 @@ public:
 	virtual void GetAllPossibleShaderFormats( TArray<FName>& OutFormats ) const override
 	{
 		// no shaders needed for dedicated server target
-		if (!IS_DEDICATED_SERVER)
+		if (!TProperties::IsServerOnly())
 		{
 			static FName NAME_PCD3D_SM6(TEXT("PCD3D_SM6"));
 			static FName NAME_PCD3D_SM5(TEXT("PCD3D_SM5"));
@@ -264,7 +264,7 @@ public:
 
 	virtual void GetTextureFormats( const UTexture* InTexture, TArray< TArray<FName> >& OutFormats) const override
 	{
-		if (!IS_DEDICATED_SERVER)
+		if (!TProperties::IsServerOnly())
 		{
 			GetDefaultTextureFormatNamePerLayer(OutFormats.AddDefaulted_GetRef(), this, InTexture, bSupportDX11TextureFormats, bSupportCompressedVolumeTexture);
 		}
@@ -272,7 +272,7 @@ public:
 
 	virtual void GetAllTextureFormats(TArray<FName>& OutFormats) const override
 	{
-		if (!IS_DEDICATED_SERVER)
+		if (!TProperties::IsServerOnly())
 		{
 			GetAllDefaultTextureFormats(this, OutFormats, bSupportDX11TextureFormats);
 		}
