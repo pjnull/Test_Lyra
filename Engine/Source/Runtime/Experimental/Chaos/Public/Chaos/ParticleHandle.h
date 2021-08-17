@@ -19,6 +19,7 @@ class IPhysicsProxyBase;
 namespace Chaos
 {
 	class FConstraintHandle;
+	class FPBDRigidsEvolutionBase;
 
 struct FGeometryParticleParameters
 {
@@ -826,20 +827,7 @@ public:
 		SetInvM(Props.InvM());
 	}
 
-	void SetDynamicMisc(const FParticleDynamicMisc& DynamicMisc)
-	{
-		SetLinearEtherDrag(DynamicMisc.LinearEtherDrag());
-		SetAngularEtherDrag(DynamicMisc.AngularEtherDrag());
-		SetMaxLinearSpeedSq(DynamicMisc.MaxLinearSpeedSq());
-		SetMaxAngularSpeedSq(DynamicMisc.MaxAngularSpeedSq());
-		SetCollisionGroup(DynamicMisc.CollisionGroup());
-		SetGravityEnabled(DynamicMisc.GravityEnabled());
-		SetCCDEnabled(DynamicMisc.CCDEnabled());
-		SetDisabled(DynamicMisc.Disabled()); 
-		SetOneWayInteraction(DynamicMisc.OneWayInteraction());
-		AddCollisionConstraintFlag( (Chaos::ECollisionConstraintFlags)DynamicMisc.CollisionConstraintFlag() );
-		SetSleepType(DynamicMisc.SleepType());
-	}
+	void SetDynamicMisc(const FParticleDynamicMisc& DynamicMisc, FPBDRigidsEvolutionBase& Evolution);
 
 	void ResetSmoothedVelocities()
 	{

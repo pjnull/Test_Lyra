@@ -99,9 +99,9 @@ bool FGeometryParticleStateBase::IsInSync(const FGeometryParticleHandle& Handle,
 		if(!bSkipDynamics)
 		{
 			if (!Dynamics.IsInSync(*Rigid, FrameAndPhase, Pool))
-			{
-				return false;
-			}
+		{
+			return false;
+		}
 		}
 
 		if(!DynamicsMisc.IsInSync(*Rigid, FrameAndPhase, Pool))
@@ -150,7 +150,7 @@ bool FRewindData::RewindToFrame(int32 Frame)
 	auto RewindNoSave = [RewindFrameAndPhase, this](auto Particle, auto& Property, const auto& RewindFunc)
 	{
 		if (auto Val = Property.Read(RewindFrameAndPhase, PropertiesPool))
-		{
+	{
 			RewindFunc(Particle, *Val);
 		}
 	};
@@ -173,13 +173,6 @@ bool FRewindData::RewindToFrame(int32 Frame)
 	{
 		FGeometryParticleHandle* PTParticle = DirtyParticleInfo.GetPTParticle();
 
-		//TODO: remove this once resim disable is fully working
-		if (DirtyParticleInfo.InitializedOnStep > Frame)
-		{
-			//hasn't initialized yet, so disable
-			Solver->GetEvolution()->DisableParticle(DirtyParticleInfo.GetPTParticle());
-		}
-
 		//rewind is about to start, all particles should be in sync at this point
 		ensure(PTParticle->SyncState() == ESyncState::InSync);
 
@@ -194,7 +187,7 @@ bool FRewindData::RewindToFrame(int32 Frame)
 			RewindNoSave(PTParticle->CastToKinematicParticle(), History.Velocities, [](auto Particle, const auto& Data) {Particle->SetVelocities(Data); });
 			RewindNoSave(PTParticle->CastToKinematicParticle(), History.KinematicTarget, [](auto Particle, const auto& Data) {Particle->SetKinematicTarget(Data); });
 			RewindNoSave(PTParticle->CastToRigidParticle(), History.Dynamics, [](auto Particle, const auto& Data) {Particle->SetDynamics(Data); });
-			RewindNoSave(PTParticle->CastToRigidParticle(), History.DynamicsMisc, [](auto Particle, const auto& Data) {Particle->SetDynamicMisc(Data); });
+			RewindNoSave(PTParticle->CastToRigidParticle(), History.DynamicsMisc, [Evolution = Solver->GetEvolution()](auto Particle, const auto& Data) {Particle->SetDynamicMisc(Data, *Evolution); });
 			RewindNoSave(PTParticle->CastToRigidParticle(), History.MassProps, [](auto Particle, const auto& Data) {Particle->SetMassProps(Data); });
 		}
 		else
@@ -206,7 +199,7 @@ bool FRewindData::RewindToFrame(int32 Frame)
 			bAnyChange |= RewindAndSave(PTParticle->CastToKinematicParticle(), History.Velocities, [](auto Particle, const auto& Data) {Particle->SetVelocities(Data); });
 			bAnyChange |= RewindAndSave(PTParticle->CastToKinematicParticle(), History.KinematicTarget, [](auto Particle, const auto& Data) {Particle->SetKinematicTarget(Data); });
 			bAnyChange |= RewindAndSave(PTParticle->CastToRigidParticle(), History.Dynamics, [](auto Particle, const auto& Data) {Particle->SetDynamics(Data); });
-			bAnyChange |= RewindAndSave(PTParticle->CastToRigidParticle(), History.DynamicsMisc, [](auto Particle, const auto& Data) {Particle->SetDynamicMisc(Data); });
+			bAnyChange |= RewindAndSave(PTParticle->CastToRigidParticle(), History.DynamicsMisc, [Evolution = Solver->GetEvolution()](auto Particle, const auto& Data) {Particle->SetDynamicMisc(Data, *Evolution); });
 			bAnyChange |= RewindAndSave(PTParticle->CastToRigidParticle(), History.MassProps, [](auto Particle, const auto& Data) {Particle->SetMassProps(Data); });
 
 			if (bAnyChange)
@@ -220,8 +213,16 @@ bool FRewindData::RewindToFrame(int32 Frame)
 
 				//for now just mark anything that changed as enabled during resim. TODO: use bubble
 				DirtyParticleInfo.GetPTParticle()->SetEnabledDuringResim(true);
-			}
 		}
+
+		if (DirtyParticleInfo.InitializedOnStep > Frame)
+		{
+			//hasn't initialized yet, so disable
+			//must do this after rewind because SetDynamicsMisc will re-enable
+			//(the disable is a temp way to ignore objects not spawned yet, they weren't really disabled which is why it gets re-enabled)
+			Solver->GetEvolution()->DisableParticle(DirtyParticleInfo.GetPTParticle());
+		}
+	}
 		
 	}
 
@@ -277,9 +278,9 @@ void FRewindData::FinishFrame()
 
 			auto& Handle = *Info.GetPTParticle();
 			if (auto Rigid = Handle.CastToRigidParticle())
-			{
-				if(Rigid->ResimType() == EResimType::FullResim)
 				{
+				if(Rigid->ResimType() == EResimType::FullResim)
+					{
 					if (IsFinalResim())
 					{
 						//Last resim so mark as in sync
@@ -294,12 +295,12 @@ void FRewindData::FinishFrame()
 						//solver doesn't affect dynamics, so no reason to test if they desynced from original sim
 						//question: should we skip all other properties? dynamics is a commonly changed one but might be worth skipping everything solver skips
 						DesyncIfNecessary</*bSkipDynamics=*/true>(Info, FutureFrame);
-					}
 				}
 			}
 		}
-	}
-	
+			}
+		}
+		
 
 	++CurFrame;
 	LatestFrame = FMath::Max(LatestFrame, CurFrame);
@@ -362,10 +363,10 @@ void FRewindData::AdvanceFrameImp(IResimCacheBase* ResimCache)
 			if (IsResim() && !Info.bResimAsSlave)
 			{
 				DesyncIfNecessary(Info, FrameAndPhase);
-			}
+				}
 
 			if(IsResim() && Handle->SyncState() != ESyncState::InSync && !SkipDesyncTest)
-			{
+				{
 				Handle->SetEnabledDuringResim(true);	//for now just mark anything out of sync as resim enabled. TODO: use bubble
 				DesyncedParticles.Add(Handle);
 			}
@@ -374,7 +375,7 @@ void FRewindData::AdvanceFrameImp(IResimCacheBase* ResimCache)
 			{
 				//we only need to check the cast because right now there's no property system on PT, so any time a sim callback touches a particle we just mark it as dirty dynamics
 				if (auto Rigid = Handle->CastToRigidParticle())
-				{
+			{
 					//sim callback is finished so record the dynamics before solve starts
 					FGeometryParticleStateBase& Latest = Info.AddFrame(CurFrame);
 					Latest.Dynamics.WriteAccessMonotonic(FrameAndPhase, PropertiesPool).CopyFrom(*Rigid);
@@ -446,7 +447,7 @@ void FRewindData::PushGTDirtyData(const FDirtyPropertiesManager& SrcManager,cons
 				{
 					auto& Data = Property.WriteAccessMonotonic(FFrameAndPhase{ CurFrame, FFrameAndPhase::PrePushData }, PropertiesPool);
 					Data.CopyFrom(Particle);
-				}
+		}
 			};
 
 			DirtyPropHelper(Latest.ParticlePositionRotation, EParticleFlags::XR, *PTParticle);
@@ -522,24 +523,24 @@ void FRewindData::MarkDirtyFromPT(FGeometryParticleHandle& Handle)
 	if (auto Kinematic = Handle.CastToKinematicParticle())
 	{
 		if (bRecordingHistory || Latest.Velocities.IsClean(FrameAndPhase))
-		{
+			{
 			if (auto Data = Latest.Velocities.WriteAccessNonDecreasing(FrameAndPhase, PropertiesPool))
 			{
 				Data->CopyFrom(*Kinematic);
-			}
 		}
+	}
 
 		if (auto Rigid = Kinematic->CastToRigidParticle())
-		{
+	{
 			if (bRecordingHistory || Latest.DynamicsMisc.IsClean(FrameAndPhase))
-			{
+		{
 				if (auto Data = Latest.DynamicsMisc.WriteAccessNonDecreasing(FrameAndPhase, PropertiesPool))
-				{
+			{
 					Data->CopyFrom(*Rigid);
 				}
 			}
+			}
 		}
-	}
 }
 
 template <bool bResim>
@@ -554,16 +555,16 @@ void FRewindData::PushPTDirtyData(TPBDRigidParticleHandle<FReal,3>& Handle,const
 	ensure(!bRecordingHistory || Latest.IsCleanExcludingDynamics(FrameAndPhase));	//PostCallbacks should be clean before we write sim results
 
 	if(bRecordingHistory || Latest.ParticlePositionRotation.IsClean(FrameAndPhase))
-	{
+		{
 		Latest.ParticlePositionRotation.WriteAccessMonotonic(FrameAndPhase, PropertiesPool).CopyFrom(Handle);
-	}
+			}
 
 	if(bRecordingHistory || Latest.Velocities.IsClean(FrameAndPhase))
-	{
+			{
 		FParticleVelocities& PreVelocities = Latest.Velocities.WriteAccessMonotonic(FrameAndPhase, PropertiesPool);
 		PreVelocities.SetV(Handle.PreV());
 		PreVelocities.SetW(Handle.PreW());
-	}
+		}
 	
 	if(bRecordingHistory || Latest.DynamicsMisc.IsClean(FrameAndPhase))
 	{
