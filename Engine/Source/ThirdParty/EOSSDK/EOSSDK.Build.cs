@@ -177,6 +177,8 @@ public class EOSSDK : ModuleRules
             {
 				PublicAdditionalLibraries.Add(Path.Combine(SDKBinariesDir, LibraryLinkName));
 				RuntimeDependencies.Add(Path.Combine("$(EngineDir)/Binaries", Target.Platform.ToString(), RuntimeLibraryFileName), Path.Combine(SDKBinariesDir, RuntimeLibraryFileName));
+				// needed for linux to find the .so
+				PublicRuntimeLibraryPaths.Add(Path.Combine("$(EngineDir)/Binaries", Target.Platform.ToString()));
 
 				if (bRequiresRuntimeLoad)
 				{
