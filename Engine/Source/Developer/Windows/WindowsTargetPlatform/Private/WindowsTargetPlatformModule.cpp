@@ -48,13 +48,13 @@ public:
 	virtual void GetTargetPlatforms(TArray<ITargetPlatform*>& TargetPlatforms) override
 	{
 		// Game TP
-		TargetPlatforms.Add(new TGenericWindowsTargetPlatform<FWindowsPlatformProperties<false, false, false)>());
+		TargetPlatforms.Add(new TGenericWindowsTargetPlatform<FWindowsPlatformProperties<false, false, false>>());
 		// Editor TP
-		TargetPlatforms.Add(new TGenericWindowsTargetPlatform<FWindowsPlatformProperties<true, false, false>)());
+		TargetPlatforms.Add(new TGenericWindowsTargetPlatform<FWindowsPlatformProperties<true, false, false>>());
 		// Server TP
-		TargetPlatforms.Add(new TGenericWindowsTargetPlatform<FWindowsPlatformProperties<false, true, false>)());
+		TargetPlatforms.Add(new TGenericWindowsTargetPlatform<FWindowsPlatformProperties<false, true, false>>());
 		// Client TP
-		TargetPlatforms.Add(new TGenericWindowsTargetPlatform<FWindowsPlatformProperties<false, false, true>)());
+		TargetPlatforms.Add(new TGenericWindowsTargetPlatform<FWindowsPlatformProperties<false, false, true>>());
 	}
 
 public:
