@@ -319,23 +319,20 @@ struct TStructOpsTypeTraits<FNiagaraVMExecutableByteCode> : public TStructOpsTyp
 };
 
 // Carrier for uncompressed, and optimmized bytecode returned from optimization task
-struct NIAGARA_API FNiagaraVMExecutableByteCodeOptimizationTaskResult
-{
-	TOptional<FNiagaraVMExecutableByteCode> SourceByteCode;
-	TOptional<FNiagaraVMExecutableByteCode> OptimizedByteCode;
-};
-using FNiagaraVMExecutableByteCodeOptimizationTaskResultPtr = TSharedPtr<FNiagaraVMExecutableByteCodeOptimizationTaskResult, ESPMode::ThreadSafe>;
+struct NIAGARA_API FNiagaraScriptAsyncOptimizeTaskState
+{	
+	FNiagaraVMExecutableByteCode SourceByteCode;
+	FNiagaraVMExecutableByteCode OptimizedByteCode;
 
-// Encapsulates the task and tracking state for bytecode optimization
-struct NIAGARA_API FNiagaraVMExecutableByteCodeOptimizationTaskState
-{
-	FNiagaraVMExecutableByteCodeOptimizationTaskState(bool bIsCompleted = false)
-		: bCompleted(bIsCompleted) { }
-
-	TSharedFuture<FNiagaraVMExecutableByteCodeOptimizationTaskResultPtr> SharedTask;
-	bool bCompleted;
-	FRWLock RWLock;
+	TArray<uint8, TInlineAllocator<32>> ExternalFunctionRegisterCounts;
+	
+	bool bShouldOptimizeByteCode;
+	bool bShouldFreeSourceByteCodeOnCooked;
+		
+	void OptimizeByteCode();
 };
+using FNiagaraScriptAsyncOptimizeTaskStatePtr = TSharedPtr<FNiagaraScriptAsyncOptimizeTaskState, ESPMode::ThreadSafe>;
+
 
 /** Struct containing all of the data needed to run a Niagara VM executable script.*/
 USTRUCT()
@@ -352,9 +349,22 @@ public:
 	/** Optimized version of the byte code to execute for this system */
 	UPROPERTY(Transient)
 	FNiagaraVMExecutableByteCode OptimizedByteCode;
+	// Container for the optimization task that doesn't copy the task over when the executable data is copied
+	struct FOptimizationTask
+	{
+		FOptimizationTask() { }
+		FOptimizationTask(const FOptimizationTask&) { }
+		FOptimizationTask& operator=(const FOptimizationTask&) { return *this; }
 
-	/** Async task state for the byte code optimization */
-	TSharedPtr<FNiagaraVMExecutableByteCodeOptimizationTaskState, ESPMode::ThreadSafe> OptimizationTask;
+		operator FRWLock&() { return Lock; }
+		operator const FRWLock&() const { return Lock; }
+		
+		// Optimization task if one is pending, that should be applied before execution
+		FNiagaraScriptAsyncOptimizeTaskStatePtr State;
+
+		// RW Lock used to manage the optimization task results 
+		FRWLock Lock;
+	} OptimizationTask;
 
 	/** Number of temp registers used by this script. */
 	UPROPERTY()
@@ -476,8 +486,7 @@ public:
 	UPROPERTY()
 	uint32 bNeedsGPUContextInit : 1;
 
-	void WaitOnOptimizeCompletion();
-	void ApplyFinishedOptimization(const FNiagaraVMExecutableByteCodeOptimizationTaskResultPtr& Result);
+	void ApplyFinishedOptimization(const FNiagaraScriptAsyncOptimizeTaskStatePtr& Result);
 
 	void SerializeData(FArchive& Ar, bool bDDCData);
 	
@@ -1065,8 +1074,11 @@ private:
 	/** Return the expected SimTarget for this script. Only returns a valid target if there is valid data to run with. */
 	TOptional<ENiagaraSimTarget> GetSimTarget() const;
 
+	bool ShouldDecompressByteCode() const;
+	bool ShouldOptimizeByteCode() const;
+	bool ShouldFreeUnoptimizedByteCode() const;
 	/** Kicks off an async job to convert the ByteCode into an optimized version for the platform we are running on. */
-	void AsyncOptimizeByteCode(bool bIsInPostLoad = false);
+	FGraphEventRef HandleByteCodeOptimization(bool bShouldForceNow = false);
 
 	/** Generates all of the function bindings for DI that don't require user data */
 	void GenerateDefaultFunctionBindings();

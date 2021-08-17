@@ -836,6 +836,14 @@ protected:
 	TArray<FNiagaraDataSetAccessor<ENiagaraExecutionState>> EmitterExecutionStateAccessors;
 	TArray<TArray<FNiagaraDataSetAccessor<FNiagaraSpawnInfo>>> EmitterSpawnInfoAccessors;
 
+	FGraphEventRef ScriptOptimizationCompletionEvent;
+public:
+	void AddPendingOptimizationTask(const FGraphEventRef& NewTask);
+	FGraphEventRef GetScriptOptimizationCompletionEvent() const { return ScriptOptimizationCompletionEvent; }
+	void ResetScriptOptimizationCompletionEvent() { ScriptOptimizationCompletionEvent = nullptr; }
+
+protected:
+
 	void GenerateStatID()const;
 #if STATS
 	mutable TStatId StatID_GT;

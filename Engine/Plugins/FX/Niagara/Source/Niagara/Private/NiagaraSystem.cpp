@@ -3145,6 +3145,20 @@ void UNiagaraSystem::AddToInstanceCountStat(int32 NumInstances, bool bSolo)const
 #endif
 }
 
+void UNiagaraSystem::AddPendingOptimizationTask(const FGraphEventRef& NewTask)
+{
+	if (ScriptOptimizationCompletionEvent.IsValid() && !ScriptOptimizationCompletionEvent->IsComplete())
+	{
+		ScriptOptimizationCompletionEvent->DontCompleteUntil(NewTask);
+	}
+	else
+	{
+		ScriptOptimizationCompletionEvent = NewTask;
+	}
+}
+
+
+
 void UNiagaraSystem::GenerateStatID()const
 {
 #if STATS

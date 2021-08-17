@@ -141,9 +141,24 @@ bool FNiagaraScriptExecutionContextBase::Execute(uint32 NumInstances, const FScr
 #endif	
 
 		FNiagaraVMExecutableData& ExecData = Script->GetVMExecutableData();
-		ExecData.WaitOnOptimizeCompletion();
 
-		check(ExecData.ByteCode.HasByteCode() || ExecData.OptimizedByteCode.HasByteCode());
+		// Is there a pending optimization task?
+		ExecData.OptimizationTask.Lock.ReadLock();
+		const bool bHasOptimizationTask = ExecData.OptimizationTask.State.IsValid();
+		ExecData.OptimizationTask.Lock.ReadUnlock();
+
+		// If so take the write lock and apply it
+		if (bHasOptimizationTask)
+		{
+			FWriteScopeLock Lock(ExecData.OptimizationTask.Lock);
+			if (ExecData.OptimizationTask.State.IsValid())
+			{
+				ExecData.ApplyFinishedOptimization(ExecData.OptimizationTask.State);
+				ExecData.OptimizationTask.State.Reset();
+			}
+		}
+
+		check((ExecData.ByteCode.HasByteCode() && !ExecData.ByteCode.IsCompressed()) || (ExecData.OptimizedByteCode.HasByteCode() && !ExecData.OptimizedByteCode.IsCompressed()));
 
 		VectorVM::FVectorVMExecArgs ExecArgs;
 		ExecArgs.ByteCode = ExecData.ByteCode.GetDataPtr();
