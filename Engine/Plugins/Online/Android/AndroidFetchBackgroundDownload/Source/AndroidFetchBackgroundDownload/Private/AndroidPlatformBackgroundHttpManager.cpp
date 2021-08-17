@@ -82,6 +82,7 @@ FAndroidPlatformBackgroundHttpManager::FAndroidPlatformBackgroundHttpManager()
 	, bIsModifyingPauseList(false)
 	, bIsModifyingResumeList(false)
 	, bIsModifyingCancelList(false)
+	, AndroidBackgroundHTTPManagerDefaultLocalizedText()
 {
 }
 
@@ -121,6 +122,7 @@ void FAndroidPlatformBackgroundHttpManager::Initialize()
 	Java_OnAllDownloadsCompleteHandle = FAndroidBackgroundDownloadDelegates::AndroidBackgroundDownload_OnAllComplete.AddRaw(this, &FAndroidPlatformBackgroundHttpManager::Java_OnAllDownloadsComplete);
 	Java_OnTickHandle = FAndroidBackgroundDownloadDelegates::AndroidBackgroundDownload_OnTickWorkerThread.AddRaw(this, &FAndroidPlatformBackgroundHttpManager::Java_OnTick);
 
+	AndroidBackgroundHTTPManagerDefaultLocalizedText.InitFromIniSettings("AndroidFetchBackgroundDownload");
 	FBackgroundHttpManagerImpl::Initialize();
 }
 
@@ -274,10 +276,15 @@ void FAndroidPlatformBackgroundHttpManager::ActivatePendingRequests()
 				WorkParams.AddDataToWorkerParameters(FAndroidNativeDownloadWorkerParameterKeys::DOWNLOAD_MAX_CONCURRENT_REQUESTS_KEY, MaxActiveDownloads);
 
 				//Make sure we pass in localized notification text bits for the important worker keys
-				WorkParams.AddDataToWorkerParameters(FAndroidNativeDownloadWorkerParameterKeys::NOTIFICATION_CONTENT_TITLE_KEY, LOCTEXT("AndroidBackgroundHttpManager.Notification.Title", "Downloading"));
-				WorkParams.AddDataToWorkerParameters(FAndroidNativeDownloadWorkerParameterKeys::NOTIFICATION_CONTENT_TEXT_KEY, LOCTEXT("AndroidBackgroundHttpManager.Notification.ContentText", "Download in Progress %02d%%"));
-				WorkParams.AddDataToWorkerParameters(FAndroidNativeDownloadWorkerParameterKeys::NOTIFICATION_CONTENT_COMPLETE_TEXT_KEY, LOCTEXT("AndroidBackgroundHttpManager.Notification.CompletedContentText", "Download Complete"));
-				WorkParams.AddDataToWorkerParameters(FAndroidNativeDownloadWorkerParameterKeys::NOTIFICATION_CONTENT_CANCEL_DOWNLOAD_TEXT_KEY, LOCTEXT("AndroidBackgroundHttpManager.Notification.CancelText", "Cancel"));
+				WorkParams.AddDataToWorkerParameters(FAndroidNativeDownloadWorkerParameterKeys::NOTIFICATION_CONTENT_TITLE_KEY, AndroidBackgroundHTTPManagerDefaultLocalizedText.DefaultNotificationText_Title.GetText());
+				WorkParams.AddDataToWorkerParameters(FAndroidNativeDownloadWorkerParameterKeys::NOTIFICATION_CONTENT_COMPLETE_TEXT_KEY, AndroidBackgroundHTTPManagerDefaultLocalizedText.DefaultNotificationText_Complete.GetText());
+				WorkParams.AddDataToWorkerParameters(FAndroidNativeDownloadWorkerParameterKeys::NOTIFICATION_CONTENT_CANCEL_DOWNLOAD_TEXT_KEY, AndroidBackgroundHTTPManagerDefaultLocalizedText.DefaultNotificationText_Cancel.GetText());
+
+				//Expect our ContentText to have a {DownloadPercent} argument in it by default, so this will replace that with the Java string format argument so Java can insert the appropriate value
+				FFormatNamedArguments Arguments;
+				Arguments.Emplace(TEXT("DownloadPercent"), FText::FromString(TEXT("%02d%%")));
+				FText UpdatedContentText = FText::Format(AndroidBackgroundHTTPManagerDefaultLocalizedText.DefaultNotificationText_Content.GetText(), Arguments);
+				WorkParams.AddDataToWorkerParameters(FAndroidNativeDownloadWorkerParameterKeys::NOTIFICATION_CONTENT_TEXT_KEY, UpdatedContentText);
 
 				UE_LOG(LogBackgroundHttpManager, Display, TEXT("Attempting to schedule UEDownloadableWorker for background work"));
 				bDidSuccessfullyScheduleWork  = FUEWorkManagerNativeWrapper::ScheduleBackgroundWork(BackgroundHTTPWorkID, WorkParams);
@@ -889,6 +896,115 @@ FAndroidPlatformBackgroundHttpManager::EAndroidBackgroundDownloadConfigRulesSett
 	return EAndroidBackgroundDownloadConfigRulesSetting::Unknown;
 }
 
+FAndroidPlatformBackgroundHttpManager::FAndroidBackgroundHTTPManagerDefaultLocalizedText::FAndroidBackgroundHTTPManagerDefaultLocalizedText::FAndroidBackgroundHTTPManagerDefaultLocalizedText()
+	: DefaultNotificationText_Title()
+	, DefaultNotificationText_Content()
+	, DefaultNotificationText_Complete()
+	, DefaultNotificationText_Cancel()
+{
+}
+
+void FAndroidPlatformBackgroundHttpManager::FAndroidBackgroundHTTPManagerDefaultLocalizedText::InitFromIniSettings(const FString& ConfigFileName)
+{
+	if (ensureAlwaysMsgf(GConfig, TEXT("Invalid GConfig, can not load default localization strings for this manager!")))
+	{
+		FConfigFile* Config = GConfig->FindConfigFileWithBaseName(*ConfigFileName);
+		if (ensureAlwaysMsgf(Config, TEXT("Unable to find .ini file for %s. Can not load localized text for this manager!"), *ConfigFileName))
+		{
+			const FString TextConfigSection = TEXT("AndroidBackgroundHTTP.DefaultTextLoc");
+
+			//DefaultNotificationText_Title
+			{				
+				TArray<FString> TitleTextStrings;
+				Config->GetArray(*TextConfigSection, TEXT("DefaultNotificationText_Title"), TitleTextStrings);
+				ParsePolyglotTextItem(DefaultNotificationText_Title, TEXT("Notification.Title"),TitleTextStrings);
+			}
+
+			//DefaultNotificationText_Content
+			{
+				TArray<FString> ContentTextStrings;
+				Config->GetArray(*TextConfigSection, TEXT("DefaultNotificationText_Content"), ContentTextStrings);
+				ParsePolyglotTextItem(DefaultNotificationText_Content, TEXT("Notification.ContentText"), ContentTextStrings);
+			}
+
+			//DefaultNotificationText_Complete
+			{
+				TArray<FString> CompleteTextStrings;
+				Config->GetArray(*TextConfigSection, TEXT("DefaultNotificationText_Complete"), CompleteTextStrings);
+				ParsePolyglotTextItem(DefaultNotificationText_Complete, TEXT("Notification.CompletedContentText"), CompleteTextStrings);
+			}
+
+			//DefaultNotificationText_Cancel
+			{
+				TArray<FString> CancelTextStrings;
+				Config->GetArray(*TextConfigSection, TEXT("DefaultNotificationText_Cancel"), CancelTextStrings);
+				ParsePolyglotTextItem(DefaultNotificationText_Cancel, TEXT("Notification.CancelText"), CancelTextStrings);
+			}
+		}
+	}
+
+	//Even if the above ends up in parse errors we want to ensure here, but also generate a valid Polyglot text so we can bubble up the error into the notification without crashing
+	ForceValidPolyglotText(DefaultNotificationText_Title, TEXT("DefaultNotificationText_Title"));
+	ForceValidPolyglotText(DefaultNotificationText_Content, TEXT("DefaultNotificationText_Content"));
+	ForceValidPolyglotText(DefaultNotificationText_Complete, TEXT("DefaultNotificationText_Complete"));
+	ForceValidPolyglotText(DefaultNotificationText_Cancel, TEXT("DefaultNotificationText_Cancel"));
+}
+
+void FAndroidPlatformBackgroundHttpManager::FAndroidBackgroundHTTPManagerDefaultLocalizedText::ForceValidPolyglotText(FPolyglotTextData& TextDataOut, const FString& DebugPolyglotTextName)
+{
+	FText FailureReason;
+	if (!ensureAlwaysMsgf(TextDataOut.IsValid(&FailureReason), TEXT("Invalid .ini settings for %s! Invalid localization found! FailureReason: %s"), *DebugPolyglotTextName, *(FailureReason.ToString())))
+	{
+		TextDataOut = FPolyglotTextData(ELocalizedTextSourceCategory::Engine, TEXT("AndroidBackgroundHttpManager"), TEXT("InvalidPolyglotLocString"), TEXT("InvalidParse"), TEXT("en"));
+	}
+}
+
+void FAndroidPlatformBackgroundHttpManager::FAndroidBackgroundHTTPManagerDefaultLocalizedText::ParsePolyglotTextItem(FPolyglotTextData& TextDataOut, const FString& LocKey, TArray<FString>& TextEntryList)
+{
+	TextDataOut.ClearLocalizedStrings();
+
+	//set values that don't require parsing
+	TextDataOut.SetCategory(ELocalizedTextSourceCategory::Engine);
+	TextDataOut.SetIdentity(TEXT("AndroidBackgroundHttpManager"), LocKey);
+	TextDataOut.SetNativeCulture(TEXT("en"));
+
+	//NOTE:
+	//Assumption is that each entry will be in the form of: ("CultureString","TranslatedString")
+	//
+	for (FString& Entry : TextEntryList)
+	{
+		//Remove start/end filler since we are parsing this manually
+		Entry.TrimStartAndEndInline();
+		Entry.RemoveFromStart("(");
+		Entry.RemoveFromEnd(")");
+
+
+		TArray<FString> TextCompontents;
+		Entry.ParseIntoArray(TextCompontents, TEXT(","), true);
+
+		
+		if (ensureAlwaysMsgf((TextCompontents.Num() == 2), TEXT("Invalid entry in .ini file for %s! Expected Format is (\"CultureString\",\"TranslatedString\") . Found: %s"), *LocKey, *Entry))
+		{
+			FString CultureString;
+			FString TranslatedString;
+			FParse::QuotedString(*TextCompontents[0], CultureString);
+			FParse::QuotedString(*TextCompontents[1], TranslatedString);
+
+			const bool bParsedSuccessfully = (!CultureString.IsEmpty() && !TranslatedString.IsEmpty());
+			if (ensureAlwaysMsgf(bParsedSuccessfully, TEXT("Invalid entry for %s. Entry: %s"), *LocKey, *Entry))
+			{
+				if (CultureString.Equals("native"))
+				{
+					TextDataOut.SetNativeString(TranslatedString);
+				}
+				else
+				{
+					TextDataOut.AddLocalizedString(CultureString, TranslatedString);
+				}
+			}
+		}
+	}
+}
 
 //
 //JNI methods coming from UEDownloadWorker

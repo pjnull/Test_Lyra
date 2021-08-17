@@ -8,6 +8,8 @@
 #include "BackgroundHttpManagerImpl.h"
 #include "Interfaces/IBackgroundHttpRequest.h"
 
+#include "Internationalization/PolyglotTextData.h"
+
 #include "AndroidPlatformBackgroundHttpRequest.h"
 
 #include "Android/AndroidPlatform.h"
@@ -15,6 +17,9 @@
 #include "Android/AndroidJavaEnv.h"
 #include "Android/AndroidJNI.h"
 #include "Android/AndroidApplication.h"
+
+//Forward Declarations
+struct FPolyglotTextData;
 
 /**
  * Manages Background Http request that are currently being processed if we are on an Android Platform
@@ -132,6 +137,30 @@ protected:
 
 	//Key in ConfigRules to use to load the value of the EAndroidBackgroundDownloadConfigRulesSetting
 	static const FString AndroidBackgroundDownloadConfigRulesSettingKey;
+
+protected:
+	//Since our manager could be loaded before UObjects, we have to manually parse some default PolyglotTextData from special .ini entries
+	//This struct hold that data and handles some simple parsing for us
+	struct FAndroidBackgroundHTTPManagerDefaultLocalizedText
+	{
+		FAndroidBackgroundHTTPManagerDefaultLocalizedText();
+
+		FPolyglotTextData DefaultNotificationText_Title;
+		FPolyglotTextData DefaultNotificationText_Content;
+		FPolyglotTextData DefaultNotificationText_Complete;
+		FPolyglotTextData DefaultNotificationText_Cancel;
+
+		void InitFromIniSettings(const FString& ConfigFileName);
+
+	private:
+		//Fills out a FPolyglotTextData with data from the supplied text entry parsed from the config.ini
+		void ParsePolyglotTextItem(FPolyglotTextData& TextDataOut, const FString& LocTextKey, TArray<FString>& TextEntryList);
+		
+		//Helper that Checks for valid Polyglot text, and if it fails sets up a PolyglotText item that will pass IsValid() but represents a failed parse.
+		void ForceValidPolyglotText(FPolyglotTextData& TextDataOut, const FString& DebugPolyglotTextName);
+	};
+
+	FAndroidBackgroundHTTPManagerDefaultLocalizedText AndroidBackgroundHTTPManagerDefaultLocalizedText;
 
 private:
 	//struct holding all our Java class, method, and field information in one location.
