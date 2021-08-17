@@ -4557,6 +4557,7 @@ void USkeletalMesh::RemoveMeshSection(int32 InLodIndex, int32 InSectionIndex)
 		return;
 	}
 
+	if (!UserSectionToDisableData.bDisabled || !SectionToDisable.bDisabled)
 	{
 		//Scope a post edit change
 		FScopedSkeletalMeshPostEditChange ScopedPostEditChange(this);
