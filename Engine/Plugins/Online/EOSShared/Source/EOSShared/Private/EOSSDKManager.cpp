@@ -285,14 +285,10 @@ FString FEOSSDKManager::GetProductVersion() const
 
 void FEOSSDKManager::ReleasePlatform(EOS_HPlatform PlatformHandle)
 {
-	if (ActivePlatforms.Contains(PlatformHandle))
+	if (ensure(ActivePlatforms.Contains(PlatformHandle)
+		&& !ReleasedPlatforms.Contains(PlatformHandle)))
 	{
 		ReleasedPlatforms.Emplace(PlatformHandle);
-		ActivePlatforms.Remove(PlatformHandle);
-	}
-	else
-	{
-		UE_LOG(LogEOSSDK, Warning, TEXT("FEOSSDKManager::ReleasePlatform PlatformHandle does not exist."));
 	}
 }
 
@@ -300,7 +296,11 @@ void FEOSSDKManager::ReleaseReleasedPlatforms()
 {
 	for (EOS_HPlatform PlatformHandle : ReleasedPlatforms)
 	{
-		EOS_Platform_Release(PlatformHandle);
+		if (ensure(ActivePlatforms.Contains(PlatformHandle)))
+		{
+			EOS_Platform_Release(PlatformHandle);
+			ActivePlatforms.Remove(PlatformHandle);
+		}
 	}
 	ReleasedPlatforms.Empty();
 
@@ -316,13 +316,15 @@ void FEOSSDKManager::Shutdown()
 {
 	if (IsInitialized())
 	{
+		// Release already released platforms
+		ReleaseReleasedPlatforms();
+
 		if (ActivePlatforms.Num() > 0)
 		{
 			UE_LOG(LogEOSSDK, Warning, TEXT("FEOSSDKManager::Shutdown Releasing %d remaining platforms"), ActivePlatforms.Num());
-			ReleasedPlatforms.Append(MoveTemp(ActivePlatforms));
+			ReleasedPlatforms.Append(ActivePlatforms);
+			ReleaseReleasedPlatforms();
 		}
-
-		ReleaseReleasedPlatforms();
 
 #if !NO_LOGGING
 		FCoreDelegates::OnLogVerbosityChanged.RemoveAll(this);
