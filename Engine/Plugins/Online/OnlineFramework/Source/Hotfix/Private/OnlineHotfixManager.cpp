@@ -25,6 +25,8 @@
 #include "Engine/CurveTable.h"
 #include "Engine/DataTable.h"
 #include "Curves/CurveFloat.h"
+#include "Curves/CurveVector.h"
+#include "Curves/CurveLinearColor.h"
 #include "Engine/BlueprintGeneratedClass.h"
 
 #include "Serialization/AsyncLoadingFlushContext.h"
@@ -1496,9 +1498,11 @@ void UOnlineHotfixManager::PatchAssetsFromIniFiles()
 				PatchableAssetClasses.Add(UCurveTable::StaticClass());
 				PatchableAssetClasses.Add(UDataTable::StaticClass());
 				PatchableAssetClasses.Add(UCurveFloat::StaticClass());
+				PatchableAssetClasses.Add(UCurveVector::StaticClass());
+				PatchableAssetClasses.Add(UCurveLinearColor::StaticClass());
 			}
 
-			// Make sure the entry has a valid class name that we supprt
+			// Make sure the entry has a valid class name that we support
 			UClass* AssetClass = nullptr;
 			FString PatchableAssetClassesStr;
 			for (UClass* PatchableAssetClass : PatchableAssetClasses)
@@ -1537,6 +1541,7 @@ void UOnlineHotfixManager::PatchAssetsFromIniFiles()
 						{
 							const FString RowUpdate(TEXT("RowUpdate"));
 							const FString TableUpdate(TEXT("TableUpdate"));
+							const FString CurveUpdate(TEXT("CurveUpdate"));
 
 							if (HotfixType == RowUpdate && Tokens.Num() == 5)
 							{
@@ -1547,11 +1552,14 @@ void UOnlineHotfixManager::PatchAssetsFromIniFiles()
 								HotfixRowUpdate(Asset, AssetPath, Tokens[2], Tokens[3], Tokens[4], ProblemStrings);
 								bAddAssetToHotfixedList = ProblemStrings.Num() == 0;
 							}
-							else if (HotfixType == TableUpdate && Tokens.Num() == 3)
+							else if ((HotfixType == TableUpdate || HotfixType == CurveUpdate) && Tokens.Num() == 3)
 							{
 								// The hotfix line should be
 								//	+DataTable=<data table path>;TableUpdate;"<json data>"
 								//	+CurveTable=<curve table path>;TableUpdate;"<json data>"
+								//	+CurveFloat=<curve float path>;CurveUpdate;"<json data>"
+								//	+CurveVector=<curve vector path>;CurveUpdate;"<json data>"
+								//	+CurveLinearColor=<curve linear color path>;CurveUpdate;"<json data>"
 
 								// We have to read json data as quoted string because tokenizing it creates extra unwanted characters.
 								FString JsonData;
@@ -1567,7 +1575,7 @@ void UOnlineHotfixManager::PatchAssetsFromIniFiles()
 							}
 							else
 							{
-								ProblemStrings.Add(TEXT("Expected a hotfix type of RowUpdate with 5 tokens or TableUpdate with 3 tokens."));
+								ProblemStrings.Add(TEXT("Expected a hotfix type of RowUpdate with 5 tokens or TableUpdate/CurveUpdate with 3 tokens."));
 							}
 						}
 						else
@@ -1904,6 +1912,9 @@ void UOnlineHotfixManager::HotfixTableUpdate(UObject* Asset, const FString& Asse
 	// Let's import over the object in place.
 	UCurveTable* CurveTable = Cast<UCurveTable>(Asset);
 	UDataTable* DataTable = Cast<UDataTable>(Asset);
+	UCurveFloat* CurveFloat = Cast<UCurveFloat>(Asset);
+	UCurveVector* CurveVector = Cast<UCurveVector>(Asset);
+	UCurveLinearColor* CurveLinearColor = Cast<UCurveLinearColor>(Asset);
 	if (CurveTable != nullptr)
 	{
 		ProblemStrings.Append(CurveTable->CreateTableFromJSONString(JsonData));
@@ -1914,9 +1925,24 @@ void UOnlineHotfixManager::HotfixTableUpdate(UObject* Asset, const FString& Asse
 		ProblemStrings.Append(DataTable->CreateTableFromJSONString(JsonData));
 		UE_LOG(LogHotfixManager, Log, TEXT("Data table %s updated."), *AssetPath);
 	}
+	else if (CurveFloat != nullptr)
+	{
+		CurveFloat->ImportFromJSONString(JsonData, ProblemStrings);
+		UE_LOG(LogHotfixManager, Log, TEXT("Curve float %s updated."), *AssetPath);
+	}
+	else if (CurveVector != nullptr)
+	{
+		CurveVector->ImportFromJSONString(JsonData, ProblemStrings);
+		UE_LOG(LogHotfixManager, Log, TEXT("Curve vector %s updated."), *AssetPath);
+	}
+	else if (CurveLinearColor != nullptr)
+	{
+		CurveLinearColor->ImportFromJSONString(JsonData, ProblemStrings);
+		UE_LOG(LogHotfixManager, Log, TEXT("Curve linear color %s updated."), *AssetPath);
+	}
 	else
 	{
-		ProblemStrings.Add(TEXT("We can't do a table update on this asset (for example, Curve Float cannot be table updated)."));
+		ProblemStrings.Add(TEXT("Unable to hotfix this asset type. Only DataTables, CurveTables and Curve data types are supported."));
 	}
 }
 

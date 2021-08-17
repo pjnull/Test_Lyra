@@ -59,6 +59,8 @@ public class Engine : ModuleRules
 				new string[]
 				{
 					"EditorAnalyticsSession",
+					"Json",
+					"JsonUtilities"
 				}
 			);
 		}
