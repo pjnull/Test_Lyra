@@ -1376,8 +1376,13 @@ void UNiagaraComponent::DestroyInstance()
 
 	if (SystemInstanceController)
 	{
-		SystemInstanceController->Release();
-		SystemInstanceController = nullptr;
+		SystemInstanceController->Deactivate(true);
+
+		if (SystemInstanceController)
+		{
+			SystemInstanceController->Release();
+			SystemInstanceController = nullptr;
+		}
 	}
 
 #if WITH_EDITORONLY_DATA
