@@ -59,8 +59,6 @@ public class Engine : ModuleRules
 				new string[]
 				{
 					"EditorAnalyticsSession",
-					"Json",
-					"JsonUtilities"
 				}
 			);
 		}
@@ -73,6 +71,7 @@ public class Engine : ModuleRules
 				"NetCore",
 				"ApplicationCore",
 				"Json",
+				"JsonUtilities",
 				"SlateCore",
 				"Slate",
 				"InputCore",
