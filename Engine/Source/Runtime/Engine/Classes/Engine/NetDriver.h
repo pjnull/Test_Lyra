@@ -1428,6 +1428,9 @@ public:
 	/** Notifies the NetDriver that the desired Dormancy state for this Actor has changed. */
 	ENGINE_API void NotifyActorDormancyChange(AActor* Actor, ENetDormancy OldDormancyState);
 
+	/** Called after an actor channel is opened on a client when the actor was previously dormant. */
+	ENGINE_API virtual void NotifyActorClientDormancyChanged(AActor* Actor, ENetDormancy OldDormancyState);
+
 	/** Forces properties on this actor to do a compare for one frame (rather than share shadow state) */
 	ENGINE_API void ForcePropertyCompare( AActor* Actor );
 
@@ -1622,6 +1625,9 @@ public:
 	ENGINE_API virtual void NotifyActorChannelCleanedUp(UActorChannel* Channel, EChannelCloseReason CloseReason);
 
 	ENGINE_API virtual void NotifyActorTornOff(AActor* Actor);
+
+	/** Called on clients when an actor channel is closed because it went dormant. */
+	ENGINE_API virtual void ClientSetActorDormant(AActor* Actor);
 
 	/**
 	 * Returns the current delinquency analytics and resets them.

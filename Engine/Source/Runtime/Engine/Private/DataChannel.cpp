@@ -1896,8 +1896,7 @@ void UControlChannel::ReceiveDestructionInfo(FInBunch& Bunch)
 				}
 				else if (Dormant && (CloseReason == EChannelCloseReason::Dormancy) && !TheActor->GetTearOff())
 				{
-					TheActor->NetDormancy = DORM_DormantAll;
-
+					Connection->Driver->ClientSetActorDormant(TheActor);
 					Connection->Driver->NotifyActorFullyDormantForConnection(TheActor, Connection);
 				}
 				else if (!TheActor->bNetTemporary && TheActor->GetWorld() != nullptr && !IsEngineExitRequested() && Connection->Driver->ShouldClientDestroyActor(TheActor))
@@ -1982,10 +1981,13 @@ int64 UActorChannel::Close(EChannelCloseReason Reason)
 				{
 					if (!bIsServer)
 					{
-						Actor->NetDormancy = DORM_DormantAll;
+						Connection->Driver->ClientSetActorDormant(Actor);
+					}
+					else
+					{
+						ensureMsgf(Actor->NetDormancy > DORM_Awake, TEXT("Dormancy should have been canceled if game code changed NetDormancy: %s [%s]"), *GetFullNameSafe(Actor), *UEnum::GetValueAsString<ENetDormancy>(Actor->NetDormancy));
 					}
 
-					ensureMsgf(Actor->NetDormancy > DORM_Awake, TEXT("Dormancy should have been canceled if game code changed NetDormancy: %s [%s]"), *GetFullNameSafe(Actor), *UEnum::GetValueAsString(TEXT("/Script/Engine.ENetDormancy"), Actor->NetDormancy));
 					Connection->Driver->NotifyActorFullyDormantForConnection(Actor, Connection);
 				}
 
@@ -2172,8 +2174,7 @@ bool UActorChannel::CleanUp(const bool bForDestroy, EChannelCloseReason CloseRea
 			}
 			else if (Dormant && (CloseReason == EChannelCloseReason::Dormancy) && !Actor->GetTearOff())	
 			{
-				Actor->NetDormancy = DORM_DormantAll;
-
+				Connection->Driver->ClientSetActorDormant(Actor);
 				Connection->Driver->NotifyActorFullyDormantForConnection(Actor, Connection);
 				bWasDormant = true;
 			}
@@ -2354,7 +2355,7 @@ void UActorChannel::NotifyActorChannelOpen(AActor* InActor, FInBunch& InBunch)
 		for (FNamedNetDriver& Driver : Context->ActiveNetDrivers)
 		{
 			if (Driver.NetDriver != nullptr)
-	{
+			{
 				Driver.NetDriver->NotifyActorChannelOpen(this, InActor);
 			}
 		}
@@ -2362,26 +2363,23 @@ void UActorChannel::NotifyActorChannelOpen(AActor* InActor, FInBunch& InBunch)
 
 	Actor->OnActorChannelOpen(InBunch, Connection);
 
-	// Do not update client dormancy or the replay driver if this is a destruction info, those should be handled already in UNetDriver::NotifyActorDestroyed
+	// Do not update client dormancy or other net drivers if this is a destruction info, those should be handled already in UNetDriver::NotifyActorDestroyed
 	if (NetDriver && !NetDriver->IsServer() && !InBunch.bClose)
 	{
 		if (Actor->NetDormancy > DORM_Awake)
 		{
+			ENetDormancy OldDormancy = Actor->NetDormancy;
+
 			Actor->NetDormancy = DORM_Awake;
 
-			UDemoNetDriver* const DemoNetDriver = World ? World->GetDemoNetDriver() : nullptr;
-
-			// if recording on client, make sure the actor is marked active
-			if (World && World->IsRecordingClientReplay() && DemoNetDriver)
+			if (Context != nullptr)
 			{
-				DemoNetDriver->GetNetworkObjectList().FindOrAdd(Actor, DemoNetDriver);
-				DemoNetDriver->FlushActorDormancy(Actor);
-
-				UNetConnection* DemoClientConnection = (DemoNetDriver->ClientConnections.Num() > 0) ? ToRawPtr(DemoNetDriver->ClientConnections[0]) : nullptr;
-				if (DemoClientConnection)
+				for (FNamedNetDriver& Driver : Context->ActiveNetDrivers)
 				{
-					DemoNetDriver->GetNetworkObjectList().MarkActive(Actor, DemoClientConnection, DemoNetDriver);
-					DemoNetDriver->GetNetworkObjectList().ClearRecentlyDormantConnection(Actor, DemoClientConnection, DemoNetDriver);
+					if (Driver.NetDriver != nullptr && Driver.NetDriver != NetDriver && Driver.NetDriver->ShouldReplicateActor(InActor))
+					{
+						Driver.NetDriver->NotifyActorClientDormancyChanged(InActor, OldDormancy);
+					}
 				}
 			}
 		}
@@ -2740,8 +2738,7 @@ void UActorChannel::ProcessBunch( FInBunch & Bunch )
 			if (!bSpawnedNewActor && Bunch.bReliable && Bunch.bClose && Bunch.AtEnd())
 			{
 				// Do not log during replay, since this is a valid case
-				UDemoNetDriver* DemoNetDriver = Cast<UDemoNetDriver>(Connection->Driver);
-				if (DemoNetDriver == nullptr)
+				if (!Connection->IsReplay())
 				{
 					UE_LOG(LogNet, Verbose, TEXT("UActorChannel::ProcessBunch: SerializeNewActor received close bunch for destroyed actor. Actor: %s, Channel: %i"), *GetFullNameSafe(NewChannelActor), ChIndex);
 				}

@@ -5000,6 +5000,18 @@ void UDemoNetDriver::NotifyActorChannelOpen(UActorChannel* Channel, AActor* Acto
 	}
 }
 
+void UDemoNetDriver::NotifyActorClientDormancyChanged(AActor* Actor, ENetDormancy OldDormancyState)
+{
+	if (IsRecording() && (Actor->NetDormancy <= DORM_Awake))
+	{
+		AddNetworkActor(Actor);
+		FlushActorDormancy(Actor);
+
+		GetNetworkObjectList().MarkActive(Actor, ClientConnections[0], this);
+		GetNetworkObjectList().ClearRecentlyDormantConnection(Actor, ClientConnections[0], this);
+	}
+}
+
 void UDemoNetDriver::NotifyActorChannelCleanedUp(UActorChannel* Channel, EChannelCloseReason CloseReason)
 {
 	// channels can be cleaned up during the checkpoint record (dormancy), make sure to skip those

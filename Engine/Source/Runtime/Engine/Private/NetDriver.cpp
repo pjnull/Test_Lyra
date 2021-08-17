@@ -5607,6 +5607,41 @@ void UNetDriver::InitDestroyedStartupActors()
 	}
 }
 
+void UNetDriver::NotifyActorClientDormancyChanged(AActor* Actor, ENetDormancy OldDormancyState)
+{
+	if (IsServer())
+	{
+		AddNetworkActor(Actor);
+		NotifyActorDormancyChange(Actor, OldDormancyState);
+	}
+}
+
+void UNetDriver::ClientSetActorDormant(AActor* Actor)
+{
+	const bool bIsServer = IsServer();
+
+	if (Actor && !bIsServer)
+	{
+		ENetDormancy OldDormancy = Actor->NetDormancy;
+
+		Actor->NetDormancy = DORM_DormantAll;
+
+		if (World)
+		{
+			if (FWorldContext* const Context = GEngine->GetWorldContextFromWorld(World))
+			{
+				for (FNamedNetDriver& Driver : Context->ActiveNetDrivers)
+				{
+					if (Driver.NetDriver != nullptr && Driver.NetDriver != this && Driver.NetDriver->ShouldReplicateActor(Actor))
+					{
+						Driver.NetDriver->NotifyActorClientDormancyChanged(Actor, OldDormancy);
+					}
+				}
+			}
+		}
+	}
+}
+
 void UNetDriver::NotifyActorFullyDormantForConnection(AActor* Actor, UNetConnection* Connection)
 {
 	GetNetworkObjectList().MarkDormant(Actor, Connection, IsServer() ? ClientConnections.Num() : 1, this);
