@@ -115,6 +115,7 @@ UNiagaraSystem::UNiagaraSystem(const FObjectInitializer& ObjectInitializer)
 , WarmupTickDelta(1.0f / 15.0f)
 , bHasSystemScriptDIsWithPerInstanceData(false)
 , bNeedsGPUContextInitForDataInterfaces(false)
+, bNeedsAsyncOptimize(true)
 , bHasDIsWithPostSimulateTick(false)
 , bAllDIsPostSimulateCanOverlapFrames(true)
 , bHasAnyGPUEmitters(false)
@@ -1828,6 +1829,8 @@ void UNiagaraSystem::CacheFromCompiledData()
 {
 	const FNiagaraDataSetCompiledData& SystemDataSet = SystemCompiledData.DataSetCompiledData;
 
+	bNeedsAsyncOptimize = true;
+
 	// Cache system data accessors
 	static const FName NAME_System_ExecutionState = "System.ExecutionState";
 	SystemExecutionStateAccessor.Init(SystemDataSet, NAME_System_ExecutionState);
@@ -3145,19 +3148,40 @@ void UNiagaraSystem::AddToInstanceCountStat(int32 NumInstances, bool bSolo)const
 #endif
 }
 
-void UNiagaraSystem::AddPendingOptimizationTask(const FGraphEventRef& NewTask)
+void UNiagaraSystem::AsyncOptimizeAllScripts()
 {
-	if (ScriptOptimizationCompletionEvent.IsValid() && !ScriptOptimizationCompletionEvent->IsComplete())
+	check(IsInGameThread());
+
+	// Optimize is either in flight or done
+	if (bNeedsAsyncOptimize == false)
 	{
-		ScriptOptimizationCompletionEvent->DontCompleteUntil(NewTask);
+		return;
 	}
-	else
+
+	FGraphEventArray Prereqs;
+	ForEachScript(
+		[&](UNiagaraScript* Script)
+		{
+			// Kick off the async optimize, which we'll wait on when the script is actually needed
+			if (Script != nullptr)
+			{
+				FGraphEventRef CompletionEvent = Script->HandleByteCodeOptimization(false);
+				if (CompletionEvent.IsValid())
+				{
+					Prereqs.Add(CompletionEvent);
+				}
+			}
+		}
+	);
+
+	if ( Prereqs.Num() > 0 )
 	{
-		ScriptOptimizationCompletionEvent = NewTask;
+		DECLARE_CYCLE_STAT(TEXT("FNullGraphTask.NiagaraScriptOptimizationCompletion"), STAT_FNullGraphTask_NiagaraScriptOptimizationCompletion, STATGROUP_TaskGraphTasks);
+		ScriptOptimizationCompletionEvent = TGraphTask<FNullGraphTask>::CreateTask(&Prereqs, ENamedThreads::GameThread).ConstructAndDispatchWhenReady(GET_STATID(STAT_FNullGraphTask_NiagaraScriptOptimizationCompletion), ENamedThreads::AnyThread);
 	}
+
+	bNeedsAsyncOptimize = false;
 }
-
-
 
 void UNiagaraSystem::GenerateStatID()const
 {

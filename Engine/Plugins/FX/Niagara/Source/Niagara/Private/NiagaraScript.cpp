@@ -1086,29 +1086,6 @@ void UNiagaraScript::ComputeVMCompilationId_EmitterShared(FNiagaraVMExecutableDa
 
 #endif
 
-void UNiagaraScript::AsyncOptimizeAllScriptsForComponent(UNiagaraComponent* Component)
-{
-	if (Component)
-	{
-		if (UNiagaraSystem* System = Component->GetAsset())
-		{
-			System->ForEachScript([System](UNiagaraScript* Script)
-				{
-					if (Script)
-					{
-						// Kick off the async optimize, which we'll wait on when the script is actually needed
-						FGraphEventRef CompletionEvent = Script->HandleByteCodeOptimization(false);
-
-						if (CompletionEvent.IsValid())
-						{
-							System->AddPendingOptimizationTask(CompletionEvent);
-						}
-					}
-				});
-		}
-	}
-}
-
 bool UNiagaraScript::ContainsUsage(ENiagaraScriptUsage InUsage) const
 {
 	if (IsEquivalentUsage(InUsage))
@@ -2365,19 +2342,9 @@ void UNiagaraScript::SetVMCompilationResults(const FNiagaraVMExecutableDataId& I
 
 	InvalidateExecutionReadyParameterStores();
 
-	
-	UNiagaraSystem* ParentSystem = FindRootSystem();
-	if (ParentSystem)
+	// If we don't have a root system force optimization now as it may never get called otherwise
+	if (FindRootSystem() == nullptr)
 	{
-		auto OptimizationTask = HandleByteCodeOptimization();
-		if (OptimizationTask.IsValid())
-		{
-			ParentSystem->AddPendingOptimizationTask(OptimizationTask);
-		}
-	}
-	else
-	{
-		// Force it inline since we don't have a system to register the handle to
 		HandleByteCodeOptimization(true);
 	}
 	

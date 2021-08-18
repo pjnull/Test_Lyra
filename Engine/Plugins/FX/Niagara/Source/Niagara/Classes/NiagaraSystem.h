@@ -830,6 +830,7 @@ protected:
 
 	uint32 bIsValidCached : 1;
 	uint32 bIsReadyToRunCached : 1;
+	uint32 bNeedsAsyncOptimize : 1;
 
 	TOptional<float> MaxDeltaTime;
 	FNiagaraDataSetAccessor<ENiagaraExecutionState> SystemExecutionStateAccessor;
@@ -837,10 +838,22 @@ protected:
 	TArray<TArray<FNiagaraDataSetAccessor<FNiagaraSpawnInfo>>> EmitterSpawnInfoAccessors;
 
 	FGraphEventRef ScriptOptimizationCompletionEvent;
+
 public:
-	void AddPendingOptimizationTask(const FGraphEventRef& NewTask);
-	FGraphEventRef GetScriptOptimizationCompletionEvent() const { return ScriptOptimizationCompletionEvent; }
-	void ResetScriptOptimizationCompletionEvent() { ScriptOptimizationCompletionEvent = nullptr; }
+	void AsyncOptimizeAllScripts();
+
+	FGraphEventRef GetScriptOptimizationCompletionEvent()
+	{
+		if (ScriptOptimizationCompletionEvent.IsValid())
+		{
+			if ( !ScriptOptimizationCompletionEvent->IsComplete() )
+			{
+				return ScriptOptimizationCompletionEvent;
+			}
+			ScriptOptimizationCompletionEvent = nullptr;
+		}
+		return nullptr;
+	}
 
 protected:
 

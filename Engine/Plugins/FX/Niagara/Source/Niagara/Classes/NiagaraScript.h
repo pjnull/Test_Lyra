@@ -1077,9 +1077,12 @@ private:
 	bool ShouldDecompressByteCode() const;
 	bool ShouldOptimizeByteCode() const;
 	bool ShouldFreeUnoptimizedByteCode() const;
+
+public:
 	/** Kicks off an async job to convert the ByteCode into an optimized version for the platform we are running on. */
 	FGraphEventRef HandleByteCodeOptimization(bool bShouldForceNow = false);
 
+private:
 	/** Generates all of the function bindings for DI that don't require user data */
 	void GenerateDefaultFunctionBindings();
 
@@ -1175,9 +1178,6 @@ private:
 #if WITH_EDITORONLY_DATA
 		void ComputeVMCompilationId_EmitterShared(FNiagaraVMExecutableDataId& Id, UNiagaraEmitter* Emitter, UNiagaraSystem* EmitterOwner, ENiagaraRendererSourceDataMode InSourceMode) const;
 #endif
-
-public:
-	static void AsyncOptimizeAllScriptsForComponent(UNiagaraComponent* Component);
 };
 
 // Forward decl FVersionedNiagaraScriptWeakPtr to suport FVersionedNiagaraScript::ToWeakPtr().
