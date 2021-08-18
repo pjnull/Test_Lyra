@@ -111,6 +111,10 @@ struct FMockState_GT
 	UPROPERTY(BlueprintReadWrite, Category = "Mock Object")
 	bool bEnableAutoFaceTargetYaw = false;
 
+	// If enabled, object will attempt to keep its up vector aligned with world up.
+	UPROPERTY(BlueprintReadWrite, Category = "Mock Object")
+	bool bEnableKeepUpright = true;
+
 	// Strength of auto brake force applied when no input force and on ground.
 	UPROPERTY(BlueprintReadWrite, Category = "Mock Object")
 	float AutoBrakeStrength = 5.f;
@@ -126,7 +130,8 @@ struct FMockState_GT
 			|| AutoFaceTargetYawStrength != AuthState.AutoFaceTargetYawStrength
 			|| AutoFaceTargetYawDamp != AuthState.AutoFaceTargetYawDamp
 			|| bEnableAutoFaceTargetYaw != AuthState.bEnableAutoFaceTargetYaw
-			|| AutoBrakeStrength != AuthState.AutoBrakeStrength;
+			|| AutoBrakeStrength != AuthState.AutoBrakeStrength
+			|| bEnableKeepUpright != AuthState.bEnableKeepUpright;
 	}
 
 	bool NetSerialize(FArchive& Ar, class UPackageMap* Map, bool& bOutSuccess)
@@ -137,6 +142,7 @@ struct FMockState_GT
 		Ar << AutoFaceTargetYawDamp;
 		Ar << bEnableAutoFaceTargetYaw;
 		Ar << AutoBrakeStrength;
+		Ar << bEnableKeepUpright;
 		return true;
 	}
 };

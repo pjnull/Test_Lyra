@@ -275,7 +275,7 @@ void FMockManagedState::AsyncTick(UWorld* World, Chaos::FPhysicsSolver* Solver, 
 			}
 
 			// Keep pawn upright
-			if (UpDot < 0.95f)
+			if (GT_State.bEnableKeepUpright && UpDot < 0.95f)
 			{
 				FRotator Rot = PT->R().Rotator();
 				FVector Target(0, 0, 1); // TODO choose up based on floor normal
