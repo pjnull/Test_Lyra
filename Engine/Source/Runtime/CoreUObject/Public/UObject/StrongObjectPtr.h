@@ -144,7 +144,7 @@ public:
 	FORCEINLINE_DEBUGGABLE ObjectType* Get() const
 	{
 		return ReferenceCollector
-			? ReferenceCollector->GetAs<ObjectType>()
+			? ReferenceCollector->template GetAs<ObjectType>()
 			: nullptr;
 	}
 
