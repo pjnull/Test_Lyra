@@ -1456,7 +1456,7 @@ namespace UnrealBuildTool
 			}
 
 			// Add the descriptors for all enabled plugins
-			List<UEBuildPlugin> RuntimeDependencyPluginsList = Rules.bRuntimeDependenciesComeFromBuildPlugins ? BuildPlugins : EnabledPlugins;
+			List<UEBuildPlugin>? RuntimeDependencyPluginsList = Rules.bRuntimeDependenciesComeFromBuildPlugins ? BuildPlugins : EnabledPlugins;
 			foreach (UEBuildPlugin EnabledPlugin in RuntimeDependencyPluginsList!)
 			{
 				if(EnabledPlugin.bDescriptorNeededAtRuntime || EnabledPlugin.bDescriptorReferencedExplicitly)
