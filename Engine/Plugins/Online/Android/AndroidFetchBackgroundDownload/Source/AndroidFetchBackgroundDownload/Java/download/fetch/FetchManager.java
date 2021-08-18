@@ -52,7 +52,7 @@ public class FetchManager implements FetchDownloadProgressOwner, FetchEnqueueRes
 	{
 		Log.debug("StopWork called");
 
-		if (null != FetchInstance)
+		if (IsFetchInstanceValid())
 		{
 			//We need to purge all partially completed downloads
 			//If we don't, then on relaunching our app the BackgroundHttp system can end up assuming these downloads are finished incorrectly.
@@ -65,13 +65,13 @@ public class FetchManager implements FetchDownloadProgressOwner, FetchEnqueueRes
 	
 	private void DeleteAllInProgressRequests()
 	{
-		if (null != FetchInstance)
+		if (IsFetchInstanceValid())
 		{
 			//First we remove from Fetch management any completed downloads, this is so they aren't deleted by the next call
 			FetchInstance.removeAllWithStatus(Status.COMPLETED);
 			
 			//Deletes everything still being managed by the FetchInstance
-			FetchInstance.deleteAll();	
+			FetchInstance.deleteAll();
 		}
 	}
 
@@ -85,7 +85,7 @@ public class FetchManager implements FetchDownloadProgressOwner, FetchEnqueueRes
 		SetVariablesFromQueueDescription(QueueDescription);
 		ReconcileDownloadDescriptions(QueueDescription);
 	}
-	
+		
 	//Does any setup we need based on data in the QueueDescription
 	public void SetVariablesFromQueueDescription(DownloadQueueDescription QueueDescription)
 	{
@@ -190,13 +190,22 @@ public class FetchManager implements FetchDownloadProgressOwner, FetchEnqueueRes
 		}
 		
 		MatchedDesc.bIsPaused = bPause;
-		if (bPause)
+		
+		//Early out if we have invalidated our FetchInstance and thus would crash if trying to do work
+		if (!IsFetchInstanceValid())
 		{
-			FetchInstance.pause(MatchedDesc.CachedFetchID);
-		}
+			Log.debug("Call to PauseDownload after FetchInstance has been invalidated. Skipping as no work can be done");
+		}	
 		else
 		{
-			FetchInstance.resume(MatchedDesc.CachedFetchID);
+			if (bPause)
+			{
+				FetchInstance.pause(MatchedDesc.CachedFetchID);
+			}
+			else
+			{
+				FetchInstance.resume(MatchedDesc.CachedFetchID);
+			}
 		}
 	}
 
@@ -218,7 +227,14 @@ public class FetchManager implements FetchDownloadProgressOwner, FetchEnqueueRes
 			CompletedDownloads.put(RequestID, MatchedDesc);
 			MatchedDesc.bIsCancelled = true;
 
-			FetchInstance.delete(MatchedDesc.CachedFetchID);
+			if (!IsFetchInstanceValid())
+			{
+				Log.debug("Call to CancelDownload with an invalid fetch instance. Skipping fetch work to avoid crashing.");
+			}
+			else
+			{
+				FetchInstance.delete(MatchedDesc.CachedFetchID);
+			}
 		}
 	}
 	
@@ -247,9 +263,16 @@ public class FetchManager implements FetchDownloadProgressOwner, FetchEnqueueRes
 		Log.verbose("Updating download description as it has changed:" + OldDescription.RequestID);
 		CopyStateToNewDescription(OldDescription, NewDescription);
 		
-		//Handle the change by cancelling and recreating the fetch2 download
-		RecreateDownloadByTagFunc RecreateFunc = new RecreateDownloadByTagFunc(this, NewDescription);
-		FetchInstance.getDownloadsByTag(NewDescription.RequestID, RecreateFunc);
+		if (!IsFetchInstanceValid())
+		{
+			Log.debug("Call to HandleChangedDownloadDescription with an invalid fetch instance. Skipping fetch work to avoid crashing.");
+		}
+		else
+		{
+			//Handle the change by cancelling and recreating the fetch2 download
+			RecreateDownloadByTagFunc RecreateFunc = new RecreateDownloadByTagFunc(this, NewDescription);
+			FetchInstance.getDownloadsByTag(NewDescription.RequestID, RecreateFunc);
+		}
 	}
 	
 	//Copies over the non-serialized values that track download state from our old descrition to our new description so that changing
@@ -346,11 +369,19 @@ public class FetchManager implements FetchDownloadProgressOwner, FetchEnqueueRes
 			//if we are creating our FetchInstance, make sure our FetchListener is also recreated and attached
 			FetchListener = null;
 		}
-		
-		if (null == FetchListener)
+					
+		if (!IsFetchInstanceValid())
 		{
-			FetchListener = new FetchRequestProgressListener(this);
-			FetchInstance.addListener(FetchListener);
+			Log.error("Unexpected invalid FetchInstance after completing InitFetch!");
+		}
+		else
+		{
+			//Add our FetchListener
+			if (null == FetchListener)
+			{
+				FetchListener = new FetchRequestProgressListener(this);
+				FetchInstance.addListener(FetchListener);
+			}
 		}
 	}
 	
@@ -369,6 +400,10 @@ public class FetchManager implements FetchDownloadProgressOwner, FetchEnqueueRes
 				//Now just have the fetch manager owner recreate the download with the supplied data
 				Owner.QueueNewDownloadDescription(RecreateDescription);
 			}
+			else
+			{
+				Log.debug("Aborting RecreateDownloadByTagFunc as FetchInstance has been invalidated");
+			}
 		}
 		
 		public RecreateDownloadByTagFunc(FetchManager Owner, DownloadDescription RecreateDescription)
@@ -379,7 +414,7 @@ public class FetchManager implements FetchDownloadProgressOwner, FetchEnqueueRes
 		
 		private boolean IsValid()
 		{
-			return ((null != Owner) && (null != RecreateDescription));
+			return ((null != Owner) && (null != RecreateDescription) && IsFetchInstanceValid());
 		}
 		
 		private FetchManager Owner;
@@ -397,33 +432,19 @@ public class FetchManager implements FetchDownloadProgressOwner, FetchEnqueueRes
 			{
 				for (int DownloadIndex = 0; DownloadIndex < MatchingDownloads.size(); ++DownloadIndex)
 				{
-					Download FoundDownload = MatchingDownloads.get(DownloadIndex);
-					FetchInstance.cancel(FoundDownload.getId());
+					if (IsFetchInstanceValid())
+					{
+						Download FoundDownload = MatchingDownloads.get(DownloadIndex);
+						FetchInstance.cancel(FoundDownload.getId());
+					}
+					else
+					{
+						Log.debug("Aborting CancelDownloadByTagFunc as FetchInstance has been invalidated.");
+						break;
+					}
 				}
 			}
 		}
-	}
-	
-	//Helper Func to avoid delegates that returns a FetchGroup to the DownloadProgressOwner
-	private class ReturnDownloadGroupProgress implements Func<FetchGroup>
-	{
-		@Override
-		public void call(@NonNull FetchGroup Group)
-		{
-			if ((null != Group) && (null != Owner))
-			{
-				Owner.OnDownloadGroupProgress(Group, CachedDownloadProgressListener);
-			}
-		}
-
-		ReturnDownloadGroupProgress(FetchDownloadProgressOwner Owner, DownloadProgressListener ProgressListener)
-		{
-			this.Owner = Owner;
-			this.CachedDownloadProgressListener = ProgressListener;
-		}
-		
-		private FetchDownloadProgressOwner Owner;
-		private DownloadProgressListener CachedDownloadProgressListener;
 	}
 	
 	//Function that allows us to catch any errors where the FetchAPI has stopped all work and thus should bubble up that all downloads are complete
@@ -514,11 +535,6 @@ public class FetchManager implements FetchDownloadProgressOwner, FetchEnqueueRes
 
 			MatchedDownload.PreviousDownloadPercent = download.getProgress();
 			MatchedDownload.ProgressListener.OnDownloadProgress(GetRequestID(download), TotalDownloadedSinceLastCall, TotalDownloaded);
-			
-			//Disabled as apparently querying the fetch database during the progress listener functions is a bad idea for performance. ESPECIALLY the OnProgress
-			//Kick off request for group progress update
-			//ReturnDownloadGroupProgress GroupProgressFunc = new ReturnDownloadGroupProgress(this, MatchedDownload.ProgressListener);
-			//FetchInstance.getFetchGroup(download.getGroup(), GroupProgressFunc);
 		}
 		else
 		{
@@ -542,13 +558,22 @@ public class FetchManager implements FetchDownloadProgressOwner, FetchEnqueueRes
 		if (bIsPaused != MatchedDownload.bIsPaused)
 		{
 			Log.verbose("OnDownloadChangePauseState required Fetch action. RequestID:" + DownloadRequestID + " New bIsPaused:" + MatchedDownload.bIsPaused + " Old Fetch bIsPaused:" + bIsPaused);
-			if (MatchedDownload.bIsPaused)
+			
+			
+			if (!IsFetchInstanceValid())
 			{
-				FetchInstance.pause(download.getId());
+				Log.debug("Call to OnDownloadChangePauseState with an invalid fetch instance. Skipping fetch work to avoid crashing.");
 			}
 			else
 			{
-				FetchInstance.resume(download.getId());
+				if (MatchedDownload.bIsPaused)
+				{
+					FetchInstance.pause(download.getId());
+				}
+				else
+				{
+					FetchInstance.resume(download.getId());
+				}
 			}
 		}
 	}
@@ -596,7 +621,7 @@ public class FetchManager implements FetchDownloadProgressOwner, FetchEnqueueRes
 		DownloadDescription MatchingDescription = RequestedDownloads.get(RequestID);
 		if (null == MatchingDescription)
 		{
-			Log.error("RetryDownload called on invalid download that was never requested! RequestID:" + RequestID);
+			Log.error("OnFetchEnqueueRequestCallback called on request is missing from our RequestedDownloads list! RequestID:" + RequestID);
 			return;
 		}
 
@@ -606,12 +631,12 @@ public class FetchManager implements FetchDownloadProgressOwner, FetchEnqueueRes
 	@Override
 	public void OnFetchEnqueueErrorCallback(@NonNull String RequestID, @NonNull Error EnqueueError)
 	{
-		Log.error("Error Enqueing Request! " + RequestID);
+		Log.error("Error Enqueing Request! " + RequestID + "Error: " + EnqueueError);
 
 		DownloadDescription MatchingDescription = RequestedDownloads.get(RequestID);
 		if (null == MatchingDescription)
 		{
-			Log.error("RetryDownload called on invalid download that was never requested! RequestID:" + RequestID);
+			Log.error("OnFetchEnqueueErrorCallback called on request is missing from our RequestedDownloads list! RequestID:" + RequestID);
 			return;
 		}
 
@@ -649,8 +674,16 @@ public class FetchManager implements FetchDownloadProgressOwner, FetchEnqueueRes
 		//We don't know the associated Fetch download, so lets query Fetch for it first to see if it exists
 		else
 		{
-			//Setup a callback to RetryDownload_Internal once we try and get our Download from Fetch
-			FetchInstance.getDownload(MatchingDescription.CachedFetchID, new RetryDownloadFunc(MatchingDescription));
+			if (!IsFetchInstanceValid())
+			{
+				Log.debug("Call to RetryDownload with an invalid fetch instance. Skipping fetch work and completing to avoid crashing. RequestID:" + RequestID);
+				CompleteDownload(MatchingDescription, FetchRequestProgressListener.ECompleteReason.Error);
+			}
+			else
+			{
+				//Setup a callback to RetryDownload_Internal once we try and get our Download from Fetch
+				FetchInstance.getDownload(MatchingDescription.CachedFetchID, new RetryDownloadFunc(MatchingDescription));
+			}
 		}
 	}
 	
