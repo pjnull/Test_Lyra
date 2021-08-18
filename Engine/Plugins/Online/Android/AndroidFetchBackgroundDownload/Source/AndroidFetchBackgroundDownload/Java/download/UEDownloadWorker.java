@@ -196,12 +196,6 @@ public class UEDownloadWorker extends UEWorker implements DownloadProgressListen
 				}
 			}
 		}
-		//If we aren't deleting our DownloadDescriptorJSONFile, we should update it to persist changes between runs
-		else if (QueueDescription != null)
-		{
-			Log.debug("Writing DownloadDescriptionList changes to disk during CleanUp");
-			QueueDescription.ResaveDownloadDescriptionListToDisk(getInputData(), Log);
-		}
 	}
 	
 	public void UpdateNotification(int CurrentProgress, boolean Indeterminate)
