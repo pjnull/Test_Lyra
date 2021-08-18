@@ -4697,6 +4697,11 @@ void FAudioDevice::NotifyPluginListenersWorldChanged(UWorld* World)
 
 void FAudioDevice::AddNewActiveSound(const FActiveSound& NewActiveSound)
 {
+	if (USoundBase* Sound = NewActiveSound.GetSound())
+	{
+		Sound->InitResources();
+	}
+
 	AddNewActiveSoundInternal(NewActiveSound, nullptr);
 }
 
