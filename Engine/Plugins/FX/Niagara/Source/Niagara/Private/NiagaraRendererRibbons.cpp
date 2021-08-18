@@ -346,7 +346,7 @@ TValue* FNiagaraRendererRibbons::AppendToIndexBuffer(
 
 			int32 TriangleId = 0;
 
-			for (TriangleId; TriangleId < FlipGeometryIndex; TriangleId += 2)
+			for (; TriangleId < FlipGeometryIndex; TriangleId += 2)
 			{
 				const int32 FirstIndex = SliceTriangleToVertexIds[TriangleId];
 				const int32 SecondIndex = SliceTriangleToVertexIds[TriangleId + 1];
@@ -369,7 +369,7 @@ TValue* FNiagaraRendererRibbons::AppendToIndexBuffer(
 
 				OutIndices += 6;
 			}
-			for (TriangleId; TriangleId < SliceTriangleToVertexIds.Num(); TriangleId += 2)
+			for (; TriangleId < SliceTriangleToVertexIds.Num(); TriangleId += 2)
 			{
 				const int32 FirstIndex = SliceTriangleToVertexIds[TriangleId];
 				const int32 SecondIndex = SliceTriangleToVertexIds[TriangleId + 1];
