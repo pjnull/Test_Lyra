@@ -4654,6 +4654,11 @@ void UReplicationGraphNode_GridSpatialization2D::AddActorInternal_Static(const F
 		return;
 	}
 
+	if (CVar_RepGraph_Verify)
+	{
+		ensureMsgf(PendingStaticSpatializedActors.Contains(ActorInfo.Actor) == false, TEXT("UReplicationGraphNode_GridSpatialization2D::AddActorInternal_Static was called on %s when it was already in the PendingStaticSpatializedActors list!"), *Actor->GetPathName());
+	}
+
 	AddActorInternal_Static_Implementation(ActorInfo, ActorRepInfo, bDormancyDriven);
 }
 
@@ -4778,6 +4783,7 @@ void UReplicationGraphNode_GridSpatialization2D::NotifyResetAllNetworkActors()
 {
 	StaticSpatializedActors.Reset();
 	DynamicSpatializedActors.Reset();
+	PendingStaticSpatializedActors.Reset();
 	Super::NotifyResetAllNetworkActors();
 }
 
