@@ -850,24 +850,40 @@ TSharedRef<ITableRow> SNiagaraOverviewStack::OnGenerateRowForEntry(UNiagaraStack
 		// Debug draw 
 		UNiagaraStackModuleItem* StackModuleItem = Cast<UNiagaraStackModuleItem>(StackItem);
 			
-		if (StackModuleItem && StackModuleItem->GetModuleNode().ContainsDebugSwitch())
+		if (StackModuleItem)
 		{
-			ContentBox->AddSlot()
-				.VAlign(VAlign_Center)
-				.AutoWidth()
-				.Padding(3, 0, 0, 0)
-				[
-					SNew(SButton)
-					.ButtonColorAndOpacity(FLinearColor::Transparent)
-					.ForegroundColor(FLinearColor::Transparent)
-					.ToolTipText(LOCTEXT("EnableDebugDrawCheckBoxToolTip", "Enable or disable debug drawing for this item."))
-					.OnClicked(this, &SNiagaraOverviewStack::ToggleModuleDebugDraw, StackItem)
-					.ContentPadding(FMargin(0, 0, 0, 0))
-					[
+			if(StackModuleItem->IsScratchModule())
+			{
+				ContentBox->AddSlot()
+					.VAlign(VAlign_Center)
+					.AutoWidth()
+					.Padding(3, 0, 0, 0)
+					[					
 						SNew(SImage)
-						.Image(this, &SNiagaraOverviewStack::GetDebugIconBrush, StackItem)
-					]
-				];
+						.ToolTipText(LOCTEXT("ScratchPadOverviewTooltip", "This module is a scratch pad script."))
+						.Image(FNiagaraEditorStyle::Get().GetBrush("NiagaraEditor.Scratch"))
+					];
+			}
+			
+			if(StackModuleItem->GetModuleNode().ContainsDebugSwitch())
+			{
+				ContentBox->AddSlot()
+					.VAlign(VAlign_Center)
+					.AutoWidth()
+					.Padding(3, 0, 0, 0)
+					[
+						SNew(SButton)
+						.ButtonColorAndOpacity(FLinearColor::Transparent)
+						.ForegroundColor(FLinearColor::Transparent)
+						.ToolTipText(LOCTEXT("EnableDebugDrawCheckBoxToolTip", "Enable or disable debug drawing for this item."))
+						.OnClicked(this, &SNiagaraOverviewStack::ToggleModuleDebugDraw, StackItem)
+						.ContentPadding(FMargin(0, 0, 0, 0))
+						[
+							SNew(SImage)
+							.Image(this, &SNiagaraOverviewStack::GetDebugIconBrush, StackItem)
+						]
+					];
+			}
 		}
 
 
