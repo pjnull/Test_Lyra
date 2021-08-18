@@ -920,7 +920,7 @@ public:
 #define SCOPE_CYCLE_UOBJECT(Name, Object) \
 	FScopeCycleCounterUObject ObjCycleCount_##Name(Object);
 #elif USE_LIGHTWEIGHT_STATS_FOR_HITCH_DETECTION && USE_HITCH_DETECTION && USE_LIGHTWEIGHT_UOBJECT_STATS_FOR_HITCH_DETECTION
-extern CORE_API bool GHitchDetected;
+extern CORE_API TSAN_ATOMIC(bool) GHitchDetected;
 
 class FScopeCycleCounterUObject
 {
