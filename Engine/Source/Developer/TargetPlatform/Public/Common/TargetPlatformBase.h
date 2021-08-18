@@ -220,7 +220,7 @@ public:
 
 		// there is a possible optional format module name in the ini (alternate texture compressor)
 		FString TextureCompressionFormat;
-		if (EngineSettings.GetString(TEXT("AlternateTextureCompression"), TEXT("TextureCompressionFormat"), TextureCompressionFormat))
+		if (GetConfigSystem()->GetString(TEXT("AlternateTextureCompression"), TEXT("TextureCompressionFormat"), TextureCompressionFormat, GEngineIni))
 		{
 			OutModuleNames.Add(*TextureCompressionFormat);
 		}
