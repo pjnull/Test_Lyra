@@ -523,45 +523,48 @@ void UContentBrowserAliasDataSource::ReconcileAliasesFromMetaData(const FAssetDa
 
 void UContentBrowserAliasDataSource::ReconcileAliasesForAsset(const FAssetData& Asset, const TArray<FName>& NewAliases)
 {
-	const TArray<FName>* ExistingAliasesPtr = AliasesForObjectPath.Find(Asset.ObjectPath);
-	if (ExistingAliasesPtr)
+	if (ensure(Asset.IsValid()))
 	{
-		TArray<FName> AliasesOnlyInExisting, AliasesOnlyInNew;
-		FContentBrowserUniqueAlias UniqueAlias = TPairInitializer<FName, FName>(Asset.ObjectPath, NAME_None);
-		for (const FName Alias : *ExistingAliasesPtr)
+		const TArray<FName>* ExistingAliasesPtr = AliasesForObjectPath.Find(Asset.ObjectPath);
+		if (ExistingAliasesPtr)
 		{
-			UniqueAlias.Value = Alias;
-			if (!AllAliases[UniqueAlias].bIsFromMetaData)
+			TArray<FName> AliasesOnlyInExisting, AliasesOnlyInNew;
+			FContentBrowserUniqueAlias UniqueAlias = TPairInitializer<FName, FName>(Asset.ObjectPath, NAME_None);
+			for (const FName Alias : *ExistingAliasesPtr)
 			{
-				if (!NewAliases.Contains(Alias))
+				UniqueAlias.Value = Alias;
+				if (!AllAliases[UniqueAlias].bIsFromMetaData)
 				{
-					AliasesOnlyInExisting.Add(Alias);
+					if (!NewAliases.Contains(Alias))
+					{
+						AliasesOnlyInExisting.Add(Alias);
+					}
 				}
 			}
-		}
 
-		for (const FName Alias : NewAliases)
-		{
-			if (!ExistingAliasesPtr->Contains(Alias))
+			for (const FName Alias : NewAliases)
 			{
-				AliasesOnlyInNew.Add(Alias);
+				if (!ExistingAliasesPtr->Contains(Alias))
+				{
+					AliasesOnlyInNew.Add(Alias);
+				}
 			}
-		}
 
-		for (const FName ExistingAlias : AliasesOnlyInExisting)
-		{
-			RemoveAlias(Asset.ObjectPath, ExistingAlias);
+			for (const FName ExistingAlias : AliasesOnlyInExisting)
+			{
+				RemoveAlias(Asset.ObjectPath, ExistingAlias);
+			}
+			AddAliases(Asset, AliasesOnlyInNew);
 		}
-		AddAliases(Asset, AliasesOnlyInNew);
-	}
-	else
-	{
-		AddAliases(Asset, NewAliases);
+		else
+		{
+			AddAliases(Asset, NewAliases);
+		}
 	}
 }
 
 void UContentBrowserAliasDataSource::OnAssetUpdated(const FAssetData& InAssetData)
-{	
+{
 	ReconcileAliasesFromMetaData(InAssetData);
 }
 
