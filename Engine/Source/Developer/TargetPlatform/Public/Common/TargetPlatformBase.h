@@ -217,6 +217,13 @@ public:
 		OutModuleNames.Add(TEXT("TextureFormatUncompressed"));
 		OutModuleNames.Add(TEXT("TextureFormatDXT"));
 		OutModuleNames.Add(TEXT("TextureFormatIntelISPCTexComp"));
+
+		// there is a possible optional format module name in the ini (alternate texture compressor)
+		FString TextureCompressionFormat;
+		if (EngineSettings.GetString(TEXT("AlternateTextureCompression"), TEXT("TextureCompressionFormat"), TextureCompressionFormat))
+		{
+			OutModuleNames.Add(*TextureCompressionFormat);
+		}
 	}
 
 	virtual void GetWaveFormatModuleHints(TArray<FName>& OutModuleNames) const override

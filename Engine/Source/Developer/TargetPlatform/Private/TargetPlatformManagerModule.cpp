@@ -162,6 +162,8 @@ public:
 		//GetTargetPlatforms(); redudant with next call
 		GetActiveTargetPlatforms();
 
+		bForceCacheUpdate = false;
+
 		// If we've had an error due to an invalid target platform, don't do additional work
 		if (!bHasInitErrors)
 		{
@@ -170,7 +172,6 @@ public:
 			GetShaderFormats();
 		}
 
-		bForceCacheUpdate = false;
 		OnTargetPlatformsInvalidated.Broadcast();
 	}
 
@@ -476,14 +477,14 @@ public:
 				{
 
 					FormatType* Format = HelperType::GetFormatFromModule(Module);
-					UE_LOG(LogTargetPlatformManager, Display, TEXT("Loaded format module %s, format? %d"), *Modules[Index].ToString(), !!Format);
+					UE_LOG(LogTargetPlatformManager, Log, TEXT("Loaded format module %s"), *Modules[Index].ToString());
 					if (Format != nullptr)
 					{
 						TArray<FName> Formats;
 						Format->GetSupportedFormats(Formats);
 						for (FName Name : Formats)
 						{
-							UE_LOG(LogTargetPlatformManager, Display, TEXT("  %s"), *Name.ToString());
+							UE_LOG(LogTargetPlatformManager, Log, TEXT("  %s"), *Name.ToString());
 						}
 
 						Results.AddUnique(Format);
