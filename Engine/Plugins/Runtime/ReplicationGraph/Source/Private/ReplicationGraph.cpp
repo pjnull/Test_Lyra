@@ -746,6 +746,11 @@ void UReplicationGraph::FlushNetDormancy(AActor* Actor, bool bWasDormInitial)
 			{
 				Info->bDormantOnConnection = false;
 			}
+			// Actor is no longer going to be dormant so we're going to remove it from the prev dormant actor list
+			if (!GlobalInfo.bWantsToBeDormant)
+			{
+				ConnectionManager->PrevDormantActorList.RemoveFast(Actor);
+			}
 		}
 	}
 }
@@ -5518,23 +5523,26 @@ void UReplicationGraphNode_GridSpatialization2D::GatherActorListsForConnection(c
 
 				if (FConnectionReplicationActorInfo* ActorInfo = Params.ConnectionManager.ActorInfoMap.Find(Actor))
 				{
-					ActorInfo->bDormantOnConnection = false;
-					// Ideally, no actor info outside this list should be set to true, so we don't have to worry about resetting them.
-					// However we could consider iterating through the actor map to reset all of them.
-					ActorInfo->bGridSpatilization_AlreadyDormant = false;
-
-					// add back to connection specific dormancy nodes
-					const FActorCellInfo CellInfo = GetCellInfoForActor(Actor, Actor->GetActorLocation(), ActorInfo->GetCullDistance());
-					GetGridNodesForActor(Actor, CellInfo, GatheredNodes);
-
-					for (UReplicationGraphNode_GridCell* Node : GatheredNodes)
+					if (ensureMsgf(ActorInfo->bDormantOnConnection, TEXT("UReplicationGraphNode_GridSpatialization2D::GatherActorListsForConnection: Doing dormant actor operations on non-dormant actor (%s) in PrevDormantActorList iteration"), *Actor->GetName()))
 					{
-						if (UReplicationGraphNode_DormancyNode* DormancyNode = Node->GetDormancyNode())
+						ActorInfo->bDormantOnConnection = false;
+						// Ideally, no actor info outside this list should be set to true, so we don't have to worry about resetting them.
+						// However we could consider iterating through the actor map to reset all of them.
+						ActorInfo->bGridSpatilization_AlreadyDormant = false;
+
+						// add back to connection specific dormancy nodes
+						const FActorCellInfo CellInfo = GetCellInfoForActor(Actor, Actor->GetActorLocation(), ActorInfo->GetCullDistance());
+						GetGridNodesForActor(Actor, CellInfo, GatheredNodes);
+
+						for (UReplicationGraphNode_GridCell* Node : GatheredNodes)
 						{
-							// Only notify the connection node if this client was previously inside the cell.
-							if (UReplicationGraphNode_ConnectionDormancyNode* ConnectionDormancyNode = DormancyNode->GetExistingConnectionNode(Params))
+							if (UReplicationGraphNode_DormancyNode* DormancyNode = Node->GetDormancyNode())
 							{
-								ConnectionDormancyNode->NotifyActorDormancyFlush(Actor);
+								// Only notify the connection node if this client was previously inside the cell.
+								if (UReplicationGraphNode_ConnectionDormancyNode* ConnectionDormancyNode = DormancyNode->GetExistingConnectionNode(Params))
+								{
+									ConnectionDormancyNode->NotifyActorDormancyFlush(Actor);
+								}
 							}
 						}
 					}
