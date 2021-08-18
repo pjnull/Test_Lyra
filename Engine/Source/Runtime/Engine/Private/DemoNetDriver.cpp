@@ -3614,8 +3614,6 @@ bool UDemoNetDriver::FastForwardLevels(const FGotoResult& GotoResult)
 
 				ProcessFastForwardPackets(MakeArrayView<FPlaybackPacket>(&ReadPacketsHelper.Packets[DeltaCheckpointPacketIntervals[i].Min], DeltaCheckpointPacketIntervals[i].Size() + 1), LevelIndices);
 			}
-
-			DemoConnection->GetOpenChannelMap().Empty();
 		}
 		else
 		{
@@ -4299,11 +4297,6 @@ bool UDemoNetDriver::LoadCheckpoint(const FGotoResult& GotoResult)
 
 			PlaybackPackets.Empty();
 			ReplayHelper.PlaybackFrames.Empty();
-
-			if (DemoConnection)
-			{
-				DemoConnection->GetOpenChannelMap().Empty();
-			}
 		}
 		else
 		{
@@ -4780,6 +4773,16 @@ void UDemoNetConnection::NotifyActorNetGUID(UActorChannel* Channel)
 	if (Channel && NetDriver && NetDriver->HasDeltaCheckpoints())
 	{
 		GetOpenChannelMap().Add(Channel->ActorNetGUID, Channel);
+	}
+}
+
+void UDemoNetConnection::NotifyActorChannelCleanedUp(UActorChannel* Channel, EChannelCloseReason CloseReason)
+{
+	const UDemoNetDriver* const NetDriver = GetDriver();
+
+	if (Channel && NetDriver && NetDriver->HasDeltaCheckpoints())
+	{
+		GetOpenChannelMap().Remove(Channel->ActorNetGUID);
 	}
 }
 
