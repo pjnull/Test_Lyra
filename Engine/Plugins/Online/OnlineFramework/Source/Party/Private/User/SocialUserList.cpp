@@ -718,8 +718,7 @@ void FSocialUserList::MarkPartyMemberAsDirty(UPartyMember& PartyMember)
 	// will have their own set of relationships (e.g. muted, blocked) to each of the other players.
 	if (OwnerToolkit.IsValid())
 	{
-		USocialUser* const PartyMemberSocialUser = FindOwnersRelationshipTo(PartyMember);
-		if (ensure(PartyMemberSocialUser))
+		if (USocialUser* const PartyMemberSocialUser = FindOwnersRelationshipTo(PartyMember))
 		{
 			MarkUserAsDirty(*PartyMemberSocialUser);
 		}
