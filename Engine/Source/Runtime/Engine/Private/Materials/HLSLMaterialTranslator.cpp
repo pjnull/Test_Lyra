@@ -6401,6 +6401,10 @@ int32 FHLSLMaterialTranslator::VirtualTextureUniform(FName ParameterName, int32 
 
 int32 FHLSLMaterialTranslator::VirtualTextureWorldToUV(int32 WorldPositionIndex, int32 P0, int32 P1, int32 P2)
 {
+	if (WorldPositionIndex == INDEX_NONE || P0 == INDEX_NONE || P1 == INDEX_NONE || P2 == INDEX_NONE)
+	{
+		return INDEX_NONE;
+	}
 	FString	SampleCode(TEXT("VirtualTextureWorldToUV(%s, %s, %s, %s)"));
 	return AddInlinedCodeChunk(MCT_Float2, *SampleCode, *GetParameterCode(WorldPositionIndex), *GetParameterCode(P0), *GetParameterCode(P1), *GetParameterCode(P2));
 }
