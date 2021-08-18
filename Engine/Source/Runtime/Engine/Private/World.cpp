@@ -364,6 +364,7 @@ uint32 UWorld::CleanupWorldGlobalTag = 0;
 
 UWorld::UWorld( const FObjectInitializer& ObjectInitializer )
 : UObject(ObjectInitializer)
+, bAllowDeferredPhysicsStateCreation(false)
 , FeatureLevel(GMaxRHIFeatureLevel)
 , bIsBuilt(false)
 , bShouldTick(true)
@@ -380,6 +381,7 @@ UWorld::UWorld( const FObjectInitializer& ObjectInitializer )
 ,	FlushLevelStreamingType(EFlushLevelStreamingType::None)
 ,	NextTravelType(TRAVEL_Relative)
 ,	CleanupWorldTag(0)
+
 {
 	TimerManager = new FTimerManager();
 #if WITH_EDITOR
@@ -5208,6 +5210,16 @@ void UWorld::RemovePhysicsVolume(APhysicsVolume* Volume)
 	NonDefaultPhysicsVolumeList.RemoveSwap(Volume);
 	// Also remove null entries that may accumulate as items become invalidated
 	NonDefaultPhysicsVolumeList.RemoveSwap(nullptr);
+}
+
+void UWorld::SetAllowDeferredPhysicsStateCreation(bool bAllow)
+{
+	bAllowDeferredPhysicsStateCreation = bAllow;
+}
+
+bool UWorld::GetAllowDeferredPhysicsStateCreation() const
+{
+	return bAllowDeferredPhysicsStateCreation;
 }
 
 ALevelScriptActor* UWorld::GetLevelScriptActor( ULevel* OwnerLevel ) const

@@ -1277,6 +1277,11 @@ void ULevel::IncrementalUpdateComponents(int32 NumComponentsToUpdate, bool bReru
 bool ULevel::IncrementalRegisterComponents(bool bPreRegisterComponents, int32 NumComponentsToUpdate, FRegisterComponentContext* Context)
 {
 	// Find next valid actor to process components registration
+	if (OwningWorld)
+	{
+		OwningWorld->SetAllowDeferredPhysicsStateCreation(true);
+	}
+
 	while (CurrentActorIndexForIncrementalUpdate < Actors.Num())
 	{
 		AActor* Actor = Actors[CurrentActorIndexForIncrementalUpdate];
@@ -1358,6 +1363,11 @@ bool ULevel::IncrementalRunConstructionScripts(bool bProcessAllActors)
 		{
 			break;
 		}
+	}
+
+	if (OwningWorld)
+	{
+		OwningWorld->SetAllowDeferredPhysicsStateCreation(false);
 	}
 
 	if (CurrentActorIndexForIncrementalUpdate >= Actors.Num())

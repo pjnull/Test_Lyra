@@ -1093,6 +1093,9 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<APhysicsVolume>								DefaultPhysicsVolume;
 
+	// Flag for allowing physics state creation deferall during load 
+	bool bAllowDeferredPhysicsStateCreation;
+
 public:
 
 	/** View locations rendered in the previous frame, if any. */
@@ -2476,6 +2479,9 @@ public:
 
 	/** Get the count of all PhysicsVolumes in the world that are not a DefaultPhysicsVolume. */
 	int32 GetNonDefaultPhysicsVolumeCount() const;
+
+	void SetAllowDeferredPhysicsStateCreation(bool bAllow);
+	bool GetAllowDeferredPhysicsStateCreation() const;
 
 	/**
 	 * Returns the current (or specified) level's level scripting actor
