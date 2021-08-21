@@ -352,7 +352,7 @@ public:
 	UNetworkPhysicsComponent();
 
 	virtual void InitializeComponent() override;
-	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	virtual void UninitializeComponent() override;
 	virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction) override;
 
 	UPROPERTY(Replicated, transient)

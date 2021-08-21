@@ -1092,9 +1092,9 @@ void UNetworkPhysicsComponent::InitializeComponent()
 #endif
 }
 
-void UNetworkPhysicsComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+void UNetworkPhysicsComponent::UninitializeComponent()
 {
-	Super::EndPlay(EndPlayReason);
+	Super::UninitializeComponent();
 #if WITH_CHAOS
 
 	if (!UE_NETWORK_PHYSICS::bEnableMock())
