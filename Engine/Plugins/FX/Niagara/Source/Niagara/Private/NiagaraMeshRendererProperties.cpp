@@ -228,7 +228,7 @@ void UNiagaraMeshRendererProperties::PostInitProperties()
 		InitBindings();
 
 #if WITH_EDITOR
-		if (GIsEditor)
+		if (GEditor)
 		{
 			GEditor->GetEditorSubsystem<UImportSubsystem>()->OnAssetReimport.AddUObject(this, &UNiagaraMeshRendererProperties::OnAssetReimported);
 		}
@@ -687,7 +687,10 @@ void UNiagaraMeshRendererProperties::BeginDestroy()
 			}
 		}
 
-		GEditor->GetEditorSubsystem<UImportSubsystem>()->OnAssetReimport.RemoveAll(this);
+		if ( GEditor )
+		{
+			GEditor->GetEditorSubsystem<UImportSubsystem>()->OnAssetReimport.RemoveAll(this);
+		}
 	}
 #endif
 }
