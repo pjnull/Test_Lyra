@@ -1838,6 +1838,8 @@ void SPathView::HandleSettingChanged(FName PropertyName)
 		(PropertyName == "DisplayEngineFolder") ||
 		(PropertyName == "DisplayPluginFolders") ||
 		(PropertyName == "DisplayL10NFolder") ||
+		(PropertyName == GET_MEMBER_NAME_CHECKED(UContentBrowserSettings, bDisplayContentFolderSuffix)) ||
+		(PropertyName == GET_MEMBER_NAME_CHECKED(UContentBrowserSettings, bDisplayFriendlyNameForPluginFolders)) ||
 		(PropertyName == NAME_None))	// @todo: Needed if PostEditChange was called manually, for now
 	{
 		const bool bHadSelectedPath = TreeViewPtr->GetNumItemsSelected() > 0;
