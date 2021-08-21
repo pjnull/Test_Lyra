@@ -335,6 +335,13 @@ void FMockManagedState::AsyncTick(UWorld* World, Chaos::FPhysicsSolver* Solver, 
 					const float DeltaYaw = FRotator::NormalizeAxis(InputCmd.TargetYaw - CurrentYaw );
 					PT->AddTorque(FVector(0.f, 0.f, DeltaYaw * GT_State.AutoFaceTargetYawStrength));
 				}
+				else
+				{
+					// Prevent spheres from spinning in place.
+					FVector AngularVelocity = PT->W();
+					const float DragFactor = FMath::Max(0.f, FMath::Min(1.f - (UE_NETWORK_PHYSICS::DampYawVelocityK() * DeltaSeconds), 1.f));
+					PT->SetW(Chaos::FVec3(AngularVelocity.X, AngularVelocity.Y, AngularVelocity.Z * DragFactor));
+				}
 			}
 
 			// Drag force
