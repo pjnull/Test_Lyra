@@ -150,6 +150,8 @@ FPlatformEOSHelpersPtr FOnlineSubsystemEOS::EOSHelpersPtr;
 
 void FOnlineSubsystemEOS::ModuleInit()
 {
+	LLM_SCOPE(ELLMTag::RealTimeCommunications);
+
 	EOSHelpersPtr = MakeShareable(new FPlatformEOSHelpers());
 
 	const FName EOSSharedModuleName = TEXT("EOSShared");

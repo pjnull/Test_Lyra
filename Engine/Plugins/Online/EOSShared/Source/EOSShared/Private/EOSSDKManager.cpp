@@ -118,6 +118,7 @@ static FDelayedAutoRegisterHelper GKickoffDll(EDelayedRegisterRunPhase::EOS_DLL_
 {
 	Async(EAsyncExecution::Thread, []
 	{
+		LLM_SCOPE(ELLMTag::RealTimeCommunications);
 		SCOPED_BOOT_TIMING("Preloading EOS module");
 		GetSdkDllHandle();
 	});
@@ -128,6 +129,7 @@ static FDelayedAutoRegisterHelper GKickoffDll(EDelayedRegisterRunPhase::EOS_DLL_
 FEOSSDKManager::FEOSSDKManager()
 {
 #if EOSSDK_RUNTIME_LOAD_REQUIRED
+	LLM_SCOPE(ELLMTag::RealTimeCommunications);
 	SDKHandle = GetSdkDllHandle();
 	if (SDKHandle == nullptr)
 	{
