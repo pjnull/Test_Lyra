@@ -1029,7 +1029,6 @@ void UGeometryCollectionComponent::RegisterForEvents()
 
 			}
 		}
-#endif
 	}
 }
 
