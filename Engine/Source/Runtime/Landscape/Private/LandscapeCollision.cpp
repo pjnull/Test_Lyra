@@ -2591,7 +2591,16 @@ void ULandscapeInfo::UpdateAddCollision(FIntPoint LandscapeKey)
 		ULandscapeComponent* Comp = XYtoComponentMap.FindRef(NeighborsKeys[i]);
 		if (Comp)
 		{
-			NeighborCollisions[i] = Comp->CollisionComponent.Get();
+			ULandscapeHeightfieldCollisionComponent* NeighborCollision = Comp->CollisionComponent.Get();
+			// Skip cooked because CollisionHeightData not saved during cook
+			if (NeighborCollision && !NeighborCollision->GetOutermost()->bIsCookedForEditor)
+			{
+				NeighborCollisions[i] = NeighborCollision;
+			}
+			else
+			{
+				NeighborCollisions[i] = NULL;
+			}
 		}
 		else
 		{
