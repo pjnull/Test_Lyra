@@ -367,7 +367,7 @@ void UNetConnection::InitBase(UNetDriver* InDriver,class FSocket* InSocket, cons
 	NetConnectionHistogram.InitHitchTracking();
 
 	// Current state
-	State = InState;
+	SetConnectionState(InState);
 	// Copy the URL
 	URL = InURL;
 
@@ -434,6 +434,7 @@ void UNetConnection::InitBase(UNetDriver* InDriver,class FSocket* InSocket, cons
 	}
 
 	UE_NET_TRACE_CONNECTION_CREATED(NetTraceId, GetConnectionId());
+	UE_NET_TRACE_CONNECTION_STATE_UPDATED(NetTraceId, GetConnectionId(), static_cast<uint8>(GetConnectionState()));
 }
 
 /**
@@ -451,7 +452,7 @@ void UNetConnection::InitConnection(UNetDriver* InDriver, EConnectionState InSta
 	// We won't be sending any packets, so use a default size
 	MaxPacket = (InMaxPacket == 0 || InMaxPacket > MAX_PACKET_SIZE) ? MAX_PACKET_SIZE : InMaxPacket;
 	PacketOverhead = 0;
-	State = InState;
+	SetConnectionState(InState);
 
 #if DO_ENABLE_NET_TEST
 	// Copy the command line settings from the net driver
@@ -567,6 +568,14 @@ void UNetConnection::NotifyAnalyticsProvider()
 	}
 }
 
+void UNetConnection::NotifyConnectionUpdated()
+{
+	if (const uint32 MyConnectionId = GetConnectionId() && OwningActor && RemoteAddr)
+	{
+		UE_NET_TRACE_CONNECTION_UPDATED(NetTraceId, MyConnectionId, *(RemoteAddr->ToString(true)), *(OwningActor->GetName()));
+	}
+}
+
 void UNetConnection::EnableEncryptionWithKey(TArrayView<const uint8> Key)
 {
 	FEncryptionData EncryptionData;
@@ -604,7 +613,7 @@ void UNetConnection::EnableEncryptionWithKeyServer(TArrayView<const uint8> Key)
 
 void UNetConnection::EnableEncryptionServer(const FEncryptionData& EncryptionData)
 {
-	if (State != USOCK_Invalid && State != USOCK_Closed && Driver)
+	if (GetConnectionState() != USOCK_Invalid && GetConnectionState() != USOCK_Closed && Driver)
 	{
 		SendClientEncryptionAck();
 		EnableEncryption(EncryptionData);
@@ -617,7 +626,7 @@ void UNetConnection::EnableEncryptionServer(const FEncryptionData& EncryptionDat
 
 void UNetConnection::SendClientEncryptionAck()
 {
-	if (State != USOCK_Invalid && State != USOCK_Closed && Driver)
+	if (GetConnectionState() != USOCK_Invalid && GetConnectionState() != USOCK_Closed && Driver)
 	{
 		FNetControlMessage<NMT_EncryptionAck>::Send(this);
 		FlushNet();
@@ -786,6 +795,41 @@ void UNetConnection::Serialize( FArchive& Ar )
 	}
 }
 
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
+EConnectionState const UNetConnection::GetConnectionState() const
+{
+	return State;
+}
+
+void UNetConnection::SetConnectionState(EConnectionState ConnectionState)
+{
+	State = ConnectionState;
+	UE_NET_TRACE_CONNECTION_STATE_UPDATED(NetTraceId, GetConnectionId(), static_cast<uint8>(State));
+}
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
+
+const TCHAR* LexToString(const EConnectionState Value)
+{
+	switch (Value)
+	{
+	case EConnectionState::USOCK_Closed:
+		return TEXT("Closed");
+		break;
+	case EConnectionState::USOCK_Open:
+		return TEXT("Open");
+		break;
+	case EConnectionState::USOCK_Pending:
+		return TEXT("Pending");
+		break;
+	case EConnectionState::USOCK_Invalid:
+	default:
+		return TEXT("Invalid");
+		break;
+	}
+
+	return TEXT("Invalid");
+}
+
 void UNetConnection::Close()
 {
 	if (IsInternalAck())
@@ -794,7 +838,7 @@ void UNetConnection::Close()
 		SetIgnoreReservedChannels(false);
 	}
 
-	if (Driver != nullptr && State != USOCK_Closed)
+	if (Driver != nullptr && GetConnectionState() != USOCK_Closed)
 	{
 		NETWORK_PROFILER(GNetworkProfiler.TrackEvent(TEXT("CLOSE"), *(GetName() + TEXT(" ") + LowLevelGetRemoteAddress()), this));
 		UE_LOG(LogNet, Log, TEXT("UNetConnection::Close: %s, Channels: %i, Time: %s"), *Describe(), OpenChannels.Num(), *FDateTime::UtcNow().ToString(TEXT("%Y.%m.%d-%H.%M.%S")));
@@ -803,7 +847,7 @@ void UNetConnection::Close()
 		{
 			Channels[0]->Close(EChannelCloseReason::Destroyed);
 		}
-		State = USOCK_Closed;
+		SetConnectionState(EConnectionState::USOCK_Closed);
 
 		if ((Handler == nullptr || Handler->IsFullyInitialized()) && HasReceivedClientPacket())
 		{
@@ -849,7 +893,7 @@ void UNetConnection::CleanUp()
 	}
 	Children.Empty();
 
-	if ( State != USOCK_Closed )
+	if ( GetConnectionState() != USOCK_Closed )
 	{
 		UE_LOG( LogNet, Log, TEXT( "UNetConnection::Cleanup: Closing open connection. %s" ), *Describe() );
 	}
@@ -1050,7 +1094,7 @@ bool UNetConnection::Exec( UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar 
 void UNetConnection::AssertValid()
 {
 	// Make sure this connection is in a reasonable state.
-	check(State==USOCK_Closed || State==USOCK_Pending || State==USOCK_Open);
+	check(GetConnectionState()==USOCK_Closed || GetConnectionState()==USOCK_Pending || GetConnectionState()==USOCK_Open);
 
 }
 
@@ -1119,6 +1163,8 @@ void UNetConnection::UpdateLevelVisibility(const FUpdateLevelVisibilityLevelInfo
 		}
 	}
 	UpdateLevelVisibilityInternal(LevelVisibility);
+
+	NotifyConnectionUpdated();
 }
 
 void UNetConnection::UpdateLevelVisibilityInternal(const FUpdateLevelVisibilityLevelInfo& LevelVisibility)
@@ -1490,7 +1536,7 @@ void UNetConnection::FlushNet(bool bIgnoreSimulation)
 	TimeSensitive = 0;
 
 	// If there is any pending data to send, send it.
-	if (SendBuffer.GetNumBits() || HasDirtyAcks || ( Driver->GetElapsedTime() - LastSendTime > Driver->KeepAliveTime && !IsInternalAck() && State != USOCK_Closed))
+	if (SendBuffer.GetNumBits() || HasDirtyAcks || ( Driver->GetElapsedTime() - LastSendTime > Driver->KeepAliveTime && !IsInternalAck() && GetConnectionState() != USOCK_Closed))
 	{
 		// Due to the PacketHandler handshake code, servers must never send the client data,
 		// before first receiving a client control packet (which is taken as an indication of a complete handshake).
@@ -1567,7 +1613,7 @@ void UNetConnection::FlushNet(bool bIgnoreSimulation)
 
 		// if the connection is closing/being destroyed/etc we need to send immediately regardless of settings
 		// because we won't be around to send it delayed
-		if (State != USOCK_Closed && !IsGarbageCollecting() && !bIgnoreSimulation && !IsInternalAck())
+		if (GetConnectionState() != USOCK_Closed && !IsGarbageCollecting() && !bIgnoreSimulation && !IsInternalAck())
 		{
 			bWasPacketEmulated = CheckOutgoingPacketEmulation(Traits);
 		}
@@ -2386,7 +2432,7 @@ void UNetConnection::ReceivedPacket( FBitReader& Reader, bool bIsReinjectedPacke
 	}
 
 	// Disassemble and dispatch all bunches in the packet.
-	while( !Reader.AtEnd() && State!=USOCK_Closed )
+	while( !Reader.AtEnd() && GetConnectionState()!=USOCK_Closed )
 	{
 		// For demo backwards compatibility, old replays still have this bit
 		if (IsInternalAck() && EngineNetworkProtocolVersion < EEngineNetworkVersionHistory::HISTORY_ACKS_INCLUDED_IN_HEADER)
@@ -2850,7 +2896,7 @@ void UNetConnection::ReceivedPacket( FBitReader& Reader, bool bIsReinjectedPacke
 					if( Bunch.ChIndex==0 )
 					{
 						UE_LOG(LogNetTraffic, Log, TEXT("Channel 0 create failed") );
-						State = USOCK_Closed;
+						SetConnectionState(EConnectionState::USOCK_Closed);
 					}
 					continue;
 				}
@@ -3464,7 +3510,7 @@ float UNetConnection::GetTimeoutValue()
 
 	float Timeout = Driver->InitialConnectTimeout;
 
-	if ((State != USOCK_Pending) && (bPendingDestroy || (OwningActor && OwningActor->UseShortConnectTimeout())))
+	if ((GetConnectionState() != USOCK_Pending) && (bPendingDestroy || (OwningActor && OwningActor->UseShortConnectTimeout())))
 	{
 		const float ConnectionTimeout = Driver->ConnectionTimeout;
 
@@ -3774,7 +3820,7 @@ void UNetConnection::Tick(float DeltaSeconds)
 		// If channel 0 has closed, mark the connection as closed.
 		if (Channels[0] == nullptr && (OutReliable[0] != InitOutReliable || InReliable[0] != InitInReliable))
 		{
-			State = USOCK_Closed;
+			SetConnectionState(EConnectionState::USOCK_Closed);
 		}
 	}
 
@@ -3923,7 +3969,7 @@ void UNetConnection::HandleClientPlayer( APlayerController *PC, UNetConnection* 
 	PC->SetPlayer(LocalPlayer);
 	UE_LOG(LogNet, Verbose, TEXT("%s setplayer %s"),*PC->GetName(),*LocalPlayer->GetName());
 	LastReceiveTime = Driver->GetElapsedTime();
-	State = USOCK_Open;
+	SetConnectionState(EConnectionState::USOCK_Open);
 	PlayerController = PC;
 	OwningActor = PC;
 
@@ -3960,6 +4006,8 @@ void UNetConnection::HandleClientPlayer( APlayerController *PC, UNetConnection* 
 			It->SendSplitJoin(Options);
 		}
 	}
+
+	NotifyConnectionUpdated();
 }
 
 void UChildConnection::HandleClientPlayer(APlayerController* PC, UNetConnection* NetConnection)
@@ -4028,6 +4076,8 @@ void UChildConnection::HandleClientPlayer(APlayerController* PC, UNetConnection*
 	UE_LOG(LogNet, Verbose, TEXT("%s setplayer %s"), *PC->GetName(), *NewPlayer->GetName());
 	PlayerController = PC;
 	OwningActor = PC;
+
+	NotifyConnectionUpdated();
 }
 
 #if DO_ENABLE_NET_TEST
@@ -4473,7 +4523,7 @@ void UNetConnection::ProcessJitter(uint32 PacketJitterClockTimeMS)
 
 void UNetConnection::SendChallengeControlMessage()
 {
-	if (State != USOCK_Invalid && State != USOCK_Closed && Driver)
+	if (GetConnectionState() != USOCK_Invalid && GetConnectionState() != USOCK_Closed && Driver)
 	{
 		Challenge = FString::Printf(TEXT("%08X"), FPlatformTime::Cycles());
 		SetExpectedClientLoginMsgType(NMT_Login);
@@ -4488,7 +4538,7 @@ void UNetConnection::SendChallengeControlMessage()
 
 void UNetConnection::SendChallengeControlMessage(const FEncryptionKeyResponse& Response)
 {
-	if (State != USOCK_Invalid && State != USOCK_Closed && Driver)
+	if (GetConnectionState() != USOCK_Invalid && GetConnectionState() != USOCK_Closed && Driver)
 	{
 		if (Response.Response == EEncryptionResponse::Success)
 		{
@@ -4561,9 +4611,11 @@ USimulatedClientNetConnection::USimulatedClientNetConnection( const FObjectIniti
 
 void USimulatedClientNetConnection::HandleClientPlayer( class APlayerController* PC, class UNetConnection* NetConnection )
 {
-	State = USOCK_Open;
+	SetConnectionState(EConnectionState::USOCK_Open);
 	PlayerController = PC;
 	OwningActor = PC;
+
+	NotifyConnectionUpdated();
 }
 
 // ----------------------------------------------------------------
