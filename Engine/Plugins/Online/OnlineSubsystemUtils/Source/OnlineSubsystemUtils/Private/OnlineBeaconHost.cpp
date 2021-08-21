@@ -425,7 +425,7 @@ void AOnlineBeaconHost::SendFailurePacket(UNetConnection* Connection, const FTex
 
 void AOnlineBeaconHost::CloseHandshakeConnection(UNetConnection* Connection)
 {
-	if (Connection && Connection->State != USOCK_Closed)
+	if (Connection && Connection->GetConnectionState() != USOCK_Closed)
 	{
 		UE_LOG(LogBeacon, Verbose, TEXT("%s: Closing connection: %s"), *GetDebugName(Connection), *Connection->PlayerId.ToDebugString());
 		OnConnectionClosed(Connection);
@@ -532,7 +532,7 @@ void AOnlineBeaconHost::OnHelloSequenceComplete(UNetConnection* Connection)
 		UE_LOG(LogBeacon, Log, TEXT("%s: OnlineBeaconHost::OnHelloSequenceComplete: Connection is null."), *GetDebugName());
 		return;
 	}
-	if (Connection->State == USOCK_Invalid || Connection->State == USOCK_Closed || Connection->Driver == nullptr)
+	if (Connection->GetConnectionState() == USOCK_Invalid || Connection->GetConnectionState() == USOCK_Closed || Connection->Driver == nullptr)
 	{
 		UE_LOG(LogBeacon, Log, TEXT("%s: OnlineBeaconHost::OnHelloSequenceComplete: connection in invalid state. %s"), *GetDebugName(Connection), *Connection->Describe());
 		return;
