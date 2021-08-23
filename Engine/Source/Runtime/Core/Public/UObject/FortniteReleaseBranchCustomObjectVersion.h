@@ -18,6 +18,9 @@ struct CORE_API FFortniteReleaseBranchCustomObjectVersion
 		// Add the long range attachment tethers to the cloth asset to avoid a large hitch during the cloth's initialization.
 		ChaosClothAddTethersToCachedData,
 
+		// Chaos::TKinematicTarget no longer stores a full transform, only position/rotation.
+		ChaosKinematicTargetRemoveScale,
+
 		// -----<new versions can be added above this line>-------------------------------------------------
 		VersionPlusOne,
 		LatestVersion = VersionPlusOne - 1
