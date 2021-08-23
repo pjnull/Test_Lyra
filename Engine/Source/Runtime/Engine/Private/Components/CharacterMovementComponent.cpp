@@ -238,7 +238,7 @@ namespace CharacterMovementCVars
 		TEXT("p.AsyncCharacterMovement"),
 		AsyncCharacterMovement, TEXT("1 enables asynchronous simulation of character movement on physics thread. Toggling this at runtime is not recommended."));
 
-	int32 BasedMovementMode = 0;
+	int32 BasedMovementMode = 2;
 	FAutoConsoleVariableRef CVarBasedMovementMode(
 		TEXT("p.BasedMovementMode"),
 		BasedMovementMode, TEXT("0 means always on regular tick (default); 1 means only if not deferring updates; 2 means update and save based movement both on regular ticks and post physics when on a physics base."));
