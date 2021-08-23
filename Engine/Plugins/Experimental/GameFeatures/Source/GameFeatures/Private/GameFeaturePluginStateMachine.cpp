@@ -1103,13 +1103,13 @@ struct FGameFeaturePluginState_Unregistering : public FGameFeaturePluginState
 		{
 			const FString PluginName = FPaths::GetBaseFilename(StateProperties.PluginInstalledFilename);
 			UGameFeaturesSubsystem::Get().OnGameFeatureUnregistering(StateProperties.GameFeatureData, PluginName);
+			UGameFeaturesSubsystem::Get().UnloadGameFeatureData(StateProperties.GameFeatureData);
 		}
 
 		StateProperties.GameFeatureData = nullptr;
-		// @todo Make UnloadGameFeature in asset manager, which will call UnloadPrimaryAsset on the GameFeatureData
 
 		// @todo GC, then make sure all loaded content is out of memory
-		GEngine->ForceGarbageCollection(true);
+		GEngine->ForceGarbageCollection(true); // this is tick delayed
 
 		StateStatus.SetTransition(EGameFeaturePluginState::Unmounting);
 	}

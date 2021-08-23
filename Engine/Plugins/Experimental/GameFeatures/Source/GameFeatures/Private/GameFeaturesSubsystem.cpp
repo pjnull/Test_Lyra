@@ -191,6 +191,12 @@ TSharedPtr<FStreamableHandle> UGameFeaturesSubsystem::LoadGameFeatureData(const 
 	return nullptr;
 }
 
+void UGameFeaturesSubsystem::UnloadGameFeatureData(const UGameFeatureData* GameFeatureToUnload)
+{
+	UAssetManager& LocalAssetManager = UAssetManager::Get();
+	LocalAssetManager.UnloadPrimaryAsset(GameFeatureToUnload->GetPrimaryAssetId());
+}
+
 void UGameFeaturesSubsystem::AddGameFeatureToAssetManager(const UGameFeatureData* GameFeatureToAdd, const FString& PluginName)
 {
 	check(GameFeatureToAdd);
