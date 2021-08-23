@@ -142,18 +142,14 @@ bool FNiagaraScriptExecutionContextBase::Execute(uint32 NumInstances, const FScr
 
 		FNiagaraVMExecutableData& ExecData = Script->GetVMExecutableData();
 
-		// Is there a pending optimization task?
-		ExecData.OptimizationTask.Lock.ReadLock();
-		const bool bHasOptimizationTask = ExecData.OptimizationTask.State.IsValid();
-		ExecData.OptimizationTask.Lock.ReadUnlock();
-
-		// If so take the write lock and apply it
-		if (bHasOptimizationTask)
+		// If we have an optimization task it must be ready at this point
+		// However we will need to lock and test again as multiple threads may be coming in here
+		if (ExecData.OptimizationTask.State.IsValid())
 		{
-			FWriteScopeLock Lock(ExecData.OptimizationTask.Lock);
+			FScopeLock Lock(&ExecData.OptimizationTask.Lock);
 			if (ExecData.OptimizationTask.State.IsValid())
 			{
-				ExecData.ApplyFinishedOptimization(ExecData.OptimizationTask.State);
+				ExecData.ApplyFinishedOptimization(Script->GetVMExecutableDataCompilationId(), ExecData.OptimizationTask.State);
 				ExecData.OptimizationTask.State.Reset();
 			}
 		}

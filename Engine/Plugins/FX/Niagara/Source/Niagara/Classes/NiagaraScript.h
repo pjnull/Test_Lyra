@@ -320,14 +320,16 @@ struct TStructOpsTypeTraits<FNiagaraVMExecutableByteCode> : public TStructOpsTyp
 
 // Carrier for uncompressed, and optimmized bytecode returned from optimization task
 struct NIAGARA_API FNiagaraScriptAsyncOptimizeTaskState
-{	
+{
+	FNiagaraVMExecutableDataId CachedScriptVMId;
 	FNiagaraVMExecutableByteCode SourceByteCode;
 	FNiagaraVMExecutableByteCode OptimizedByteCode;
 
 	TArray<uint8, TInlineAllocator<32>> ExternalFunctionRegisterCounts;
 	
-	bool bShouldOptimizeByteCode;
-	bool bShouldFreeSourceByteCodeOnCooked;
+	bool bShouldOptimizeByteCode = false;
+	bool bShouldFreeSourceByteCodeOnCooked = false;
+	bool bOptimizationComplete = false;
 		
 	void OptimizeByteCode();
 };
@@ -356,14 +358,11 @@ public:
 		FOptimizationTask(const FOptimizationTask&) { }
 		FOptimizationTask& operator=(const FOptimizationTask&) { return *this; }
 
-		operator FRWLock&() { return Lock; }
-		operator const FRWLock&() const { return Lock; }
-		
 		// Optimization task if one is pending, that should be applied before execution
 		FNiagaraScriptAsyncOptimizeTaskStatePtr State;
 
-		// RW Lock used to manage the optimization task results 
-		FRWLock Lock;
+		// Lock used to apply the optimization results
+		FCriticalSection Lock;
 	} OptimizationTask;
 
 	/** Number of temp registers used by this script. */
@@ -486,7 +485,7 @@ public:
 	UPROPERTY()
 	uint32 bNeedsGPUContextInit : 1;
 
-	void ApplyFinishedOptimization(const FNiagaraScriptAsyncOptimizeTaskStatePtr& Result);
+	void ApplyFinishedOptimization(const FNiagaraVMExecutableDataId& CachedScriptVMId, const FNiagaraScriptAsyncOptimizeTaskStatePtr& Result);
 
 	void SerializeData(FArchive& Ar, bool bDDCData);
 	
