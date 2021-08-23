@@ -2369,6 +2369,11 @@ void UNiagaraScript::RequestCompile(const FGuid& ScriptVersion, bool bForceCompi
 	FVersionedNiagaraScriptData* ScriptData = GetScriptData(ScriptVersion);
 	if (ScriptData && (!AreScriptAndSourceSynchronized(ScriptVersion) || bForceCompile))
 	{
+		{
+			FWriteScopeLock Lock(CachedScriptVM.OptimizationTask.Lock);
+			CachedScriptVM.OptimizationTask.State = nullptr;
+		}
+
 		FNiagaraVMExecutableDataId& LastGeneratedVMId = GetLastGeneratedVMId(ScriptVersion);
 		if (IsCompilable() == false)
 		{

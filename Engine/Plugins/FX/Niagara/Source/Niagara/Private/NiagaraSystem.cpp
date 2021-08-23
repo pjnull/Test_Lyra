@@ -3158,6 +3158,11 @@ void UNiagaraSystem::AsyncOptimizeAllScripts()
 		return;
 	}
 
+	if ( !IsReadyToRun() )
+	{
+		return;
+	}
+
 	FGraphEventArray Prereqs;
 	ForEachScript(
 		[&](UNiagaraScript* Script)
