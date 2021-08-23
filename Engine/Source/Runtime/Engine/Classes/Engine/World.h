@@ -4118,5 +4118,6 @@ FORCEINLINE_DEBUGGABLE bool UWorld::IsNetMode(ENetMode Mode) const
 #endif
 }
 
+UE_DEPRECATED(5.0, "Please use LexToString(EWorldType::Type Type) instead")
 FString ENGINE_API ToString(EWorldType::Type Type);
 FString ENGINE_API ToString(ENetMode NetMode);
