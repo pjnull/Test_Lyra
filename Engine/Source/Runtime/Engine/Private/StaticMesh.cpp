@@ -5439,38 +5439,29 @@ void UStaticMesh::ExecutePostLoadInternal(FStaticMeshPostLoadContext& Context)
 			// iterate over all platform and platform group entry: ex: XBOXONE = 2, CONSOLE=1, MOBILE = 3
 			if (PerQualityLevelData.PerQuality.Num() == 0)
 			{
-				for (const TPair<FName, int32>& Pair : PerPlatformData.PerPlatform)
+				TMap<FName, int32> SortedPerPlatforms = PerPlatformData.PerPlatform;
+				SortedPerPlatforms.KeySort([&](const FName& A, const FName& B) { return (PlatformGroupNameArray.Contains(A) > PlatformGroupNameArray.Contains(B)); });
+
+				for (const TPair<FName, int32>& Pair : SortedPerPlatforms)
 				{
 					bool bIsPlatformGroup = PlatformGroupNameArray.Contains(Pair.Key);
 
 					FSupportedQualityLevelArray QualityLevels;
 					FString PlatformEntry = Pair.Key.ToString();
 
-					if (bIsPlatformGroup)
-					{
-						QualityLevels = PerQualityLevelData.GetPlatformGroupQualityLevels(*PlatformEntry);
-					}
-					else
-					{
-						QualityLevels = PerQualityLevelData.GetSupportedQualityLevels(*PlatformEntry);
-					}
+					QualityLevels = QualityLevelProperty::PerPlatformOverrideMapping(PlatformEntry);
 
 					// we now have a range of quality levels supported on that platform or from that group
+					// note: 
+					// -platform group overrides will be applied first
+					// -platform override sharing the same quality level will take the smallest MinLOD value between them
+					// -ex: if XboxOne and PS4 maps to high and XboxOne MinLOD = 2 and PS4 MINLOD = 1, MINLOD 1 will be selected
 					for (int32& QLKey : QualityLevels)
 					{
 						int32* Value = PerQualityLevelData.PerQuality.Find(QLKey);
 						if (Value != nullptr)
 						{
-							//low/medium takes highest minLOD index
-							if (QLKey <= (int32)QualityLevelProperty::EQualityLevels::Medium)
-							{
-								*Value = FMath::Max(Pair.Value, *Value);
-							}
-							//high/epic/cinematic takes lowest minLOD index
-							else
-							{
-								*Value = FMath::Min(Pair.Value, *Value);
-							}
+							*Value = FMath::Min(Pair.Value, *Value);
 						}
 						else
 						{

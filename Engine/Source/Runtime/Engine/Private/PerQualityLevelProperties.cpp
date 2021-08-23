@@ -4,95 +4,116 @@
 #include "Misc/ConfigCacheIni.h"
 #include "Misc/DataDrivenPlatformInfoRegistry.h"
 
+#if WITH_EDITOR
+#include "Interfaces/ITargetPlatform.h"
+#include "PlatformInfo.h"
+#endif
+
+
 namespace QualityLevelProperty
 {
-	static TArray<FName> Names = { FName("Low"), FName("Medium"), FName("High"), FName("Epic"), FName("Cinematic") };
+	static TArray<FName> QualityLevelNames = { FName("Low"), FName("Medium"), FName("High"), FName("Epic"), FName("Cinematic") };
+	static FString QualityLevelMappingStr = TEXT("QualityLevelMapping");
 
 	FName QualityLevelToFName(int32 QL)
 	{
 		if (QL >= 0 && QL < static_cast<int32>(EQualityLevels::Num))
 		{
-			return Names[QL];
+			return QualityLevelNames[QL];
 		}
 		else
 		{
 			return NAME_None;
 		}
-		return Names[QL];
+		return QualityLevelNames[QL];
 	}
 
 	int32 FNameToQualityLevel(FName QL)
 	{
-		return Names.IndexOfByKey(QL);
+		return QualityLevelNames.IndexOfByKey(QL);
 	}
+
+#if WITH_EDITOR
+	static TMap<FString, FSupportedQualityLevelArray> CachedPerPlatformToQualityLevels;
+	static FCriticalSection MappingCriticalSection;
+
+	FSupportedQualityLevelArray PerPlatformOverrideMapping(FString& InPlatformName)
+	{
+		FSupportedQualityLevelArray* CachedMappingQualitLevelInfo = nullptr;
+		{
+			FScopeLock ScopeLock(&MappingCriticalSection);
+			CachedMappingQualitLevelInfo = CachedPerPlatformToQualityLevels.Find(InPlatformName);
+			if (CachedMappingQualitLevelInfo)
+			{
+				return *CachedMappingQualitLevelInfo;
+			}
+		}
+
+		// Platform (group) names
+		const TArray<FName>& PlatformGroupNameArray = PlatformInfo::GetAllPlatformGroupNames();
+		TArray<FName> EnginePlatforms;
+
+		bool bIsPlatformGroup = PlatformGroupNameArray.Contains(FName(*InPlatformName));
+		if (bIsPlatformGroup)
+		{
+			// get all the platforms from that group
+			for (const FName& DataDrivenPlatformName : FDataDrivenPlatformInfoRegistry::GetSortedPlatformNames())
+			{
+				// gather all platform related to the platform group
+				const FDataDrivenPlatformInfo& DataDrivenPlatformInfo = FDataDrivenPlatformInfoRegistry::GetPlatformInfo(DataDrivenPlatformName);
+				if (DataDrivenPlatformInfo.PlatformGroupName == FName(*InPlatformName))
+				{
+					EnginePlatforms.AddUnique(DataDrivenPlatformName);
+				}
+			}
+		}
+		else
+		{
+			const FString PlatformNameStr = FDataDrivenPlatformInfoRegistry::GetPlatformInfo(FName(InPlatformName)).IniPlatformName.ToString();
+			InPlatformName = *PlatformNameStr;
+
+			EnginePlatforms.AddUnique(FName(*InPlatformName));
+		}
+
+		FSupportedQualityLevelArray QualityLevels;
+
+		for (const FName& EnginePlatformName : EnginePlatforms)
+		{
+			//load individual platform ini files
+			FConfigFile EngineSettings;
+			 FConfigCacheIni::LoadLocalIniFile(EngineSettings, TEXT("Engine"), true, *EnginePlatformName.ToString());
+
+			FString MappingStr;
+			if (EngineSettings.GetString(TEXT("SystemSettings"), *QualityLevelMappingStr, MappingStr))
+			{
+				int32 Value = FNameToQualityLevel(FName(*MappingStr));
+				if (Value == INDEX_NONE)
+				{
+					UE_LOG(LogCore, Warning, TEXT("Bad QualityLevelMapping input value. Need to be either [low,medium,high,epic,cinematic]"));
+					continue;
+				}		
+				QualityLevels.Add(Value);
+			}
+			else
+			{
+				UE_LOG(LogCore, Warning, TEXT("Didnt found QualityLevelMapping in the %sEngine.ini. Need to define QualityLevelMapping under the [SystemSettings] section. All perplatform MinLOD will not be converted to PerQuality"), *EnginePlatformName.ToString());
+			}
+		}
+
+		// Cache the Scalability setting for this platform
+		{
+			FScopeLock ScopeLock(&MappingCriticalSection);
+			CachedMappingQualitLevelInfo = &CachedPerPlatformToQualityLevels.Add(InPlatformName, QualityLevels);
+		}
+
+		return *CachedMappingQualitLevelInfo;
+	}
+#endif
 }
 
 #if WITH_EDITOR
-#include "Interfaces/ITargetPlatform.h"
-#include "PlatformInfo.h"
-
-static TMap<FString, FSupportedQualityLevelArray> SupportedQualitLevels;
+static TMap<FString, FSupportedQualityLevelArray> SupportedQualityLevels;
 static FCriticalSection CookCriticalSection;
-
-template<typename _StructType, typename _ValueType, EName _BasePropertyName>
-FSupportedQualityLevelArray FPerQualityLevelProperty<_StructType, _ValueType, _BasePropertyName>::GetPlatformGroupQualityLevels(const TCHAR* InGroupName) const
-{
-	FSupportedQualityLevelArray* CachedCookingQualitLevelInfo = nullptr;
-
-	{
-		FScopeLock ScopeLock(&CookCriticalSection);
-		CachedCookingQualitLevelInfo = SupportedQualitLevels.Find(InGroupName);
-		if (CachedCookingQualitLevelInfo)
-		{
-			return *CachedCookingQualitLevelInfo;
-		}
-	}
-
-	FSupportedQualityLevelArray GroupQualitLevelsInfo;
-
-	//filter entries to remove from the final list of platforms
-	const TArray<FString> Filters = { TEXT("NoEditor"), TEXT("Client"), TEXT("Server"), TEXT("AllDesktop") };
-
-	// Platform (group) names
-	TMultiMap<FName, FName> GroupToPlatform;
-
-	// sanitize all vanilla platform names
-	// generate a list of all platform groups
-	const TArray<FName>& SanitizedPlatformNameArray = PlatformInfo::GetAllVanillaPlatformNames().FilterByPredicate([&Filters, &GroupToPlatform](const FName& PlatformName)
-		{
-			for (const FString& Filter : Filters)
-			{
-				const int32 Position = PlatformName.ToString().Find(Filter);
-				if (Position != INDEX_NONE)
-				{
-					return false;
-				}
-			}
-
-			if (const PlatformInfo::FTargetPlatformInfo* PlatformInfo = PlatformInfo::FindPlatformInfo(PlatformName))
-			{
-				GroupToPlatform.AddUnique(PlatformInfo->DataDrivenPlatformInfo->PlatformGroupName, PlatformName);
-			}
-			return true;
-		});
-
-
-	TArray<FName> Platforms;
-	GroupToPlatform.MultiFind(InGroupName, Platforms);
-
-	for (FName& Platform : Platforms)
-	{
-		GroupQualitLevelsInfo.Append(GetSupportedQualityLevels(*Platform.ToString()));
-	}
-	
-	// Cache the result
-	{
-		FScopeLock ScopeLock(&CookCriticalSection);
-		CachedCookingQualitLevelInfo = &SupportedQualitLevels.Add(FString(InGroupName), GroupQualitLevelsInfo);
-	}
-
-	return *CachedCookingQualitLevelInfo;
-}
 
 template<typename _StructType, typename _ValueType, EName _BasePropertyName>
 FSupportedQualityLevelArray FPerQualityLevelProperty<_StructType, _ValueType, _BasePropertyName>::GetSupportedQualityLevels(const TCHAR* InPlatformName) const
@@ -104,7 +125,7 @@ FSupportedQualityLevelArray FPerQualityLevelProperty<_StructType, _ValueType, _B
 	
 	{
 		FScopeLock ScopeLock(&CookCriticalSection);
-		CachedCookingQualitLevelInfo = SupportedQualitLevels.Find(InPlatformName);
+		CachedCookingQualitLevelInfo = SupportedQualityLevels.Find(InPlatformName);
 		if (CachedCookingQualitLevelInfo)
 		{
 			return *CachedCookingQualitLevelInfo;
@@ -144,7 +165,7 @@ FSupportedQualityLevelArray FPerQualityLevelProperty<_StructType, _ValueType, _B
 	// Cache the Scalability setting for this platform
 	{
 		FScopeLock ScopeLock(&CookCriticalSection);
-		CachedCookingQualitLevelInfo = &SupportedQualitLevels.Add(FString(InPlatformName), CookingQualitLevelInfo);
+		CachedCookingQualitLevelInfo = &SupportedQualityLevels.Add(FString(InPlatformName), CookingQualitLevelInfo);
 	}
 
 	return *CachedCookingQualitLevelInfo;
@@ -250,7 +271,6 @@ template ENGINE_API void operator<<(FStructuredArchive::FSlot Slot, FPerQualityL
 
 #if WITH_EDITOR
 template FSupportedQualityLevelArray FPerQualityLevelProperty<FPerQualityLevelInt, int32, NAME_IntProperty>::GetSupportedQualityLevels(const TCHAR* InPlatformName) const;
-template FSupportedQualityLevelArray FPerQualityLevelProperty<FPerQualityLevelInt, int32, NAME_IntProperty>::GetPlatformGroupQualityLevels(const TCHAR* InGroupName) const;
 template void FPerQualityLevelProperty<FPerQualityLevelInt, int32, NAME_IntProperty>::StripQualtiyLevelForCooking(const TCHAR* InPlatformName);
 template bool FPerQualityLevelProperty<FPerQualityLevelInt, int32, NAME_IntProperty>::IsQualityLevelValid(int32 QualityLevel) const;
 #endif
