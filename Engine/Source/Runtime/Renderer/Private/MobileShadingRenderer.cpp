@@ -518,8 +518,8 @@ void FMobileSceneRenderer::InitViews(FRDGBuilder& GraphBuilder, FSceneTexturesCo
 		PrepareViewVisibilityLists();
 	}
 
-	/** Before SetupMobileBasePassAfterShadowInit, we need to update the uniform buffer and shadow info for all movable point lights.*/
-	UpdateMovablePointLightUniformBufferAndShadowInfo();
+	/** Before SetupMobileBasePassAfterShadowInit, we need to update the uniform buffer and shadow info for all movable local lights.*/
+	UpdateMovableLocalLightUniformBufferAndShadowInfo();
 
 	SetupMobileBasePassAfterShadowInit(BasePassDepthStencilAccess, ViewCommandsPerView, InstanceCullingManager);
 
@@ -1626,7 +1626,7 @@ void FMobileSceneRenderer::PreTonemapMSAA(FRHICommandListImmediate& RHICmdList, 
 }
 
 /** Before SetupMobileBasePassAfterShadowInit, we need to update the uniform buffer and shadow info for all movable point lights.*/
-void FMobileSceneRenderer::UpdateMovablePointLightUniformBufferAndShadowInfo()
+void FMobileSceneRenderer::UpdateMovableLocalLightUniformBufferAndShadowInfo()
 {
 	static auto* MobileNumDynamicPointLightsCVar = IConsoleManager::Get().FindTConsoleVariableDataInt(TEXT("r.MobileNumDynamicPointLights"));
 	const int32 MobileNumDynamicPointLights = MobileNumDynamicPointLightsCVar->GetValueOnRenderThread();
@@ -1659,7 +1659,7 @@ void FMobileSceneRenderer::UpdateMovablePointLightUniformBufferAndShadowInfo()
 
 			if (bIsValidLightType && LightProxy->IsMovable())
 			{
-				LightSceneInfo->ConditionalUpdateMobileMovablePointLightUniformBuffer(this);
+				LightSceneInfo->UpdateMobileMovableLocalLightUniformBuffer(this);
 
 				bool bDynamicShadows = bShouldDynamicShadows
 					&& LightType == LightType_Spot
