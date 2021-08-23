@@ -220,6 +220,9 @@ SWidget::SWidget()
 #if UE_SLATE_WITH_WIDGET_UNIQUE_IDENTIFIER
 	, UniqueIdentifier(++SlateTraceMetaData::UniqueIdGenerator)
 #endif
+#if STATS
+	, AllocSize(0)
+#endif
 #if ENABLE_STATNAMEDEVENTS
 	, StatIDStringStorage(nullptr)
 #endif
