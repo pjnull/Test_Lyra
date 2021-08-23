@@ -1030,6 +1030,7 @@ void UGeometryCollectionComponent::RegisterForEvents()
 			}
 		}
 	}
+#endif
 }
 
 void UGeometryCollectionComponent::UpdateRBCollisionEventRegistration()
