@@ -131,6 +131,7 @@ void FDomainDatabase::RebuildFromScratch()
 	TempDomain.Reset();
 	GameDomain.Reset();
 	DomainsDefinedByPlugins.Reset();
+	SpecificAssetPackageDomains.Reset();
 
 	// Create the built-in domains
 	//@TODO: Would be good to get the path roots directly from FLongPackagePathsSingleton but it's private
