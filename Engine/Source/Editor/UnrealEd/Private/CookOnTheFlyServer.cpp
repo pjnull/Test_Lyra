@@ -1818,7 +1818,7 @@ void UCookOnTheFlyServer::ProcessRequest(UE::Cook::FPackageData& PackageData, UE
 	using namespace UE::Cook;
 	OutNumPushed = 0;
 
-	if (PackageData.HasAllCookedPlatforms(PackageData.GetRequestedPlatforms(), true /* bIncludeFailed */))
+	if (PackageData.AreAllRequestedPlatformsCooked(true /* bAllowFailedCooks */))
 	{
 #if DEBUG_COOKONTHEFLY
 		UE_LOG(LogCook, Display, TEXT("Package for platform already cooked %s, discarding request"), *PackageData.GetFileName().ToString());
@@ -2124,9 +2124,11 @@ void UCookOnTheFlyServer::LoadPackageInQueue(UE::Cook::FPackageData& PackageData
 
 			UE_LOG(LogCook, Verbose, TEXT("Request for %s received going to save %s"), *PackageFileName.ToString(), *NewPackageFileName.ToString());
 			FPackageData& OtherPackageData = PackageDatas->AddPackageDataByPackageNameChecked(LoadedPackage->GetFName());
-			OtherPackageData.UpdateRequestData(PackageData.GetRequestedPlatforms(), PackageData.GetIsUrgent(), FCompletionCallback());
+			TArray<const ITargetPlatform*, TInlineAllocator<ExpectedMaxNumPlatforms>> RequestedPlatforms;
+			PackageData.GetRequestedPlatforms(RequestedPlatforms);
+			OtherPackageData.UpdateRequestData(RequestedPlatforms, PackageData.GetIsUrgent(), FCompletionCallback());
 
-			PackageData.AddCookedPlatforms(PlatformManager->GetSessionPlatforms(), true);
+			PackageData.SetPlatformsCooked(PlatformManager->GetSessionPlatforms(), true);
 			RejectPackageToLoad(PackageData, TEXT("is redirected to another filename"));
 			return;
 		}
@@ -2207,7 +2209,7 @@ void UCookOnTheFlyServer::LoadPackageInQueue(UE::Cook::FPackageData& PackageData
 		}
 	}
 
-	if (PackageData.HasAllCookedPlatforms(PackageData.GetRequestedPlatforms(), true))
+	if (PackageData.AreAllRequestedPlatformsCooked(true))
 	{
 		// Already cooked. This can happen if we needed to load a package that was previously cooked and garbage collected because it is a loaddependency of a new request.
 		// Send the package back to idle, nothing further to do with it.
@@ -2224,8 +2226,14 @@ void UCookOnTheFlyServer::LoadPackageInQueue(UE::Cook::FPackageData& PackageData
 void UCookOnTheFlyServer::RejectPackageToLoad(UE::Cook::FPackageData& PackageData, const TCHAR* Reason)
 {
 	// make sure this package doesn't exist
-	for (const ITargetPlatform* TargetPlatform : PackageData.GetRequestedPlatforms())
+	for (const TPair<const ITargetPlatform*, UE::Cook::FPackageData::FPlatformData>& Pair : PackageData.GetPlatformDatas())
 	{
+		if (!Pair.Value.bRequested)
+		{
+			continue;
+		}
+		const ITargetPlatform* TargetPlatform = Pair.Key;
+
 		const FString SandboxFilename = ConvertToFullSandboxPath(PackageData.GetFileName().ToString(), true, TargetPlatform->PlatformName());
 		if (IFileManager::Get().FileExists(*SandboxFilename))
 		{
@@ -2749,7 +2757,8 @@ bool UCookOnTheFlyServer::BeginPrepareSave(UE::Cook::FPackageData& PackageData, 
 	TArray<FWeakObjectPtr>& CachedObjectsInOuter = PackageData.GetCachedObjectsInOuter();
 	int32& CookedPlatformDataNextIndex = PackageData.GetCookedPlatformDataNextIndex();
 	FWeakObjectPtr* CachedObjectsInOuterData = CachedObjectsInOuter.GetData();
-	const TArray<const ITargetPlatform*>& TargetPlatforms = PackageData.GetRequestedPlatforms();
+	TArray<const ITargetPlatform*, TInlineAllocator<ExpectedMaxNumPlatforms>> TargetPlatforms;
+	PackageData.GetRequestedPlatforms(TargetPlatforms);
 	int NumPlatforms = TargetPlatforms.Num();
 	int NumIndexes = CachedObjectsInOuter.Num() * NumPlatforms;
 	while (CookedPlatformDataNextIndex < NumIndexes)
@@ -2880,7 +2889,7 @@ void UCookOnTheFlyServer::ReleaseCookedPlatformData(UE::Cook::FPackageData& Pack
 		// and this PackageData may therefore still have GetNumPendingCookedPlatformData > 0
 		if (!IsCookingInEditor()) // ClearAllCachedCookedPlatformData calls are only used when not in editor.
 		{
-			int32 NumPlatforms = PackageData.GetRequestedPlatforms().Num();
+			int32 NumPlatforms = PackageData.GetNumRequestedPlatforms();
 			if (NumPlatforms > 0) // Shouldn't happen because PumpSaves checks for this, but avoid a divide by 0 if it does.
 			{
 				// We have only called BeginCacheForCookedPlatformData on Object,Platform pairs up to GetCookedPlatformDataNextIndex.
@@ -3198,7 +3207,7 @@ void UCookOnTheFlyServer::PumpSaves(UE::Cook::FTickStackData& StackData, uint32 
 		}
 
 		// Cook only the session platforms that have not yet been cooked for the given package
-		PackageData.GetUncookedPlatforms(PackageData.GetRequestedPlatforms(), PlatformsForPackage);
+		PackageData.GetUncookedPlatforms(PlatformsForPackage);
 		if (PlatformsForPackage.Num() == 0)
 		{
 			// We've already saved all possible platforms for this package; this should not be possible.
@@ -3268,7 +3277,7 @@ void UCookOnTheFlyServer::PumpSaves(UE::Cook::FTickStackData& StackData, uint32 
 			if (PackageData.GetHasBeginPrepareSaveFailed())
 			{
 				ReleaseCookedPlatformData(PackageData, true /* bCompletedSave */);
-				PackageData.AddCookedPlatforms(PackageData.GetRequestedPlatforms(), false);
+				PackageData.SetPlatformsCooked(PlatformsForPackage, false /* bSucceeded */);
 				PackageData.SendToState(EPackageState::Idle, ESendFlags::QueueAdd);
 				++OutNumPushed;
 				continue;
@@ -3760,8 +3769,8 @@ void UCookOnTheFlyServer::MarkPackageDirtyForCookerFromSchedulerThread(const FNa
 	if ( PackageData && IsCookingInEditor() )
 	{
 		check(IsInGameThread()); // We're editing scheduler data, which is only allowable from the scheduler thread
-		bool bHadCookedPlatforms = PackageData->GetNumCookedPlatforms() > 0;
-		PackageData->ClearCookedPlatforms();
+		bool bHadCookedPlatforms = PackageData->HasAnyCookedPlatform();
+		PackageData->SetPlatformsNotCooked();
 		if (PackageData->IsInProgress())
 		{
 			PackageData->SendToState(UE::Cook::EPackageState::Request, UE::Cook::ESendFlags::QueueAddAndRemove);
@@ -4637,7 +4646,7 @@ void FSaveCookedPackageContext::FinishPlatform()
 	// by editor-only data; we may need to save it later when new content loads it through non editor-only references.
 	if (!bLocalReferencedOnlyByEditorOnlyData)
 	{
-		PackageData.AddCookedPlatform(TargetPlatform, bSuccessful);
+		PackageData.SetPlatformCooked(TargetPlatform, bSuccessful);
 	}
 
 	// Update flags used to determine garbage collection.
@@ -4686,7 +4695,7 @@ void FSaveCookedPackageContext::FinishPackage()
 					if (LocalizedPackageData)
 					{
 						bool bIsUrgent = false;
-						LocalizedPackageData->UpdateRequestData(PackageData.GetRequestedPlatforms(), bIsUrgent, UE::Cook::FCompletionCallback());
+						LocalizedPackageData->UpdateRequestData(PlatformsForPackage, bIsUrgent, UE::Cook::FCompletionCallback());
 					}
 				}
 			}
@@ -4714,7 +4723,7 @@ void FSaveCookedPackageContext::FinishPackage()
 				if (SoftObjectPackageData)
 				{
 					bool bIsUrgent = false;
-					SoftObjectPackageData->UpdateRequestData(PackageData.GetRequestedPlatforms(), bIsUrgent, UE::Cook::FCompletionCallback());
+					SoftObjectPackageData->UpdateRequestData(PlatformsForPackage, bIsUrgent, UE::Cook::FCompletionCallback());
 				}
 			}
 		}
@@ -5870,7 +5879,7 @@ void UCookOnTheFlyServer::PopulateCookedPackages(TArrayView<const ITargetPlatfor
 			UE::Cook::FPackageData* PackageData = PackageDatas->TryAddPackageDataByPackageName(IdenticalPackage);
 			if (PackageData)
 			{
-				PackageData->AddCookedPlatforms({ TargetPlatform }, true /* bSucceeded */);
+				PackageData->SetPlatformCooked(TargetPlatform, true /* bSucceeded */);
 				PackagesToKeep.Add(IdenticalPackage);
 			}
 		}
@@ -5881,7 +5890,7 @@ void UCookOnTheFlyServer::PopulateCookedPackages(TArrayView<const ITargetPlatfor
 			if (PackageData)
 			{
 				ensure(!PackageData->HasAnyCookedPlatforms({ TargetPlatform }, /* bIncludeFailed */ false));
-				PackageData->AddCookedPlatforms({ TargetPlatform }, false /* bSucceeded */);
+				PackageData->SetPlatformCooked(TargetPlatform, false /* bSucceeded */);
 				PackagesToKeep.Add(UncookedPackage);
 			}
 		}
@@ -7324,7 +7333,7 @@ void UCookOnTheFlyServer::ResetCookResults(TConstArrayView<const ITargetPlatform
 {
 	for (UE::Cook::FPackageData* PackageData : *PackageDatas.Get())
 	{
-		PackageData->RemoveCookedPlatforms(TargetPlatforms);
+		PackageData->SetPlatformsNotCooked(TargetPlatforms);
 	}
 
 	TArray<FName> PackageNames;
@@ -8220,10 +8229,13 @@ void UCookOnTheFlyServer::MaybeMarkPackageAsAlreadyLoaded(UPackage *Package)
 		bShouldMarkAsAlreadyProcessed = PackageData->HasAllCookedPlatforms(PlatformManager->GetSessionPlatforms(), true /* bIncludeFailed */);
 
 		FString Platforms;
-		for (const ITargetPlatform* CookedPlatform : PackageData->GetCookedPlatforms())
+		for (const TPair<const ITargetPlatform*, UE::Cook::FPackageData::FPlatformData>& Pair : PackageData->GetPlatformDatas())
 		{
-			Platforms += TEXT(" ");
-			Platforms += CookedPlatform->PlatformName();
+			if (Pair.Value.bCookAttempted)
+			{
+				Platforms += TEXT(" ");
+				Platforms += Pair.Key->PlatformName();
+			}
 		}
 		if (IsCookFlagSet(ECookInitializationFlags::LogDebugInfo))
 		{
@@ -8885,7 +8897,7 @@ uint32 UCookOnTheFlyServer::FullLoadAndSave(uint32& CookedPackageCount)
 					}
 				}
 
-				PackageData.AddCookedPlatforms(TargetPlatforms, SavePackageSuccessPerPlatform);
+				PackageData.SetPlatformsCooked(TargetPlatforms, SavePackageSuccessPerPlatform);
 
 				if (SavePackageSuccessPerPlatform.Contains(false))
 				{
