@@ -888,7 +888,11 @@ struct FGameFeaturePluginState_Mounting : public FGameFeaturePluginState
 		
 		// JMarcus TODO: Async Mounting?
 		EInstallBundleRequestFlags InstallFlags = EInstallBundleRequestFlags::None;
-		TValueOrError<FInstallBundleRequestInfo, EInstallBundleResult> MaybeRequestInfo = BundleManager->RequestUpdateContent(InstallBundles, InstallFlags);
+
+		// Make bundle manager use verbose log level for most logs.
+		// We are already done with downloading, so we don't care about logging too much here unless mounting fails.
+		const ELogVerbosity::Type InstallBundleManagerVerbosityOverride = ELogVerbosity::Verbose;
+		TValueOrError<FInstallBundleRequestInfo, EInstallBundleResult> MaybeRequestInfo = BundleManager->RequestUpdateContent(InstallBundles, InstallFlags, InstallBundleManagerVerbosityOverride);
 
 		if (!MaybeRequestInfo.IsValid())
 		{
