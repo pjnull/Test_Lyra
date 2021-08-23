@@ -466,15 +466,15 @@ public:
 		return true;
 	}
 
-	virtual IPackageStoreWriter* GetPackageStoreWriter(const FName& PlatformName) override
+	virtual ICookedPackageWriter* GetPackageWriter(const FName& PlatformName) override
 	{
 		if (Cooker.CookOnTheFlyOptions.bZenStore)
 		{
-			for (FSavePackageContext* Context : Cooker.SavePackageContexts)
+			for (UE::Cook::FCookSavePackageContext* Context : Cooker.SavePackageContexts)
 			{
-				if (FName(*Context->TargetPlatform->PlatformName()) == PlatformName)
+				if (FName(*Context->SaveContext.TargetPlatform->PlatformName()) == PlatformName)
 				{
-					return Context->PackageStoreWriter;
+					return Context->PackageWriter;
 				}
 			}
 		}
@@ -506,9 +506,9 @@ public:
 
 		if (Cooker.CookOnTheFlyOptions.bZenStore)
 		{
-			for (FSavePackageContext* Context : Cooker.SavePackageContexts)
+			for (UE::Cook::FCookSavePackageContext* Context : Cooker.SavePackageContexts)
 			{
-				Context->PackageStoreWriter->Flush();
+				Context->PackageWriter->Flush();
 			}
 		}
 
@@ -3205,7 +3205,7 @@ private: // Used only by UCookOnTheFlyServer, which has private access
 	// Per-platform data, only valid in PerPlatform callbacks
 	const ITargetPlatform* TargetPlatform = nullptr;
 	FSavePackageContext* SavePackageContext = nullptr;
-	IPackageStoreWriter* PackageStoreWriter = nullptr;
+	ICookedPackageWriter* PackageWriter = nullptr;
 	FString PlatFilename;
 	FSavePackageResultStruct SavePackageResult;
 	bool bPlatformSetupSuccessful = false;
@@ -4192,7 +4192,7 @@ private:
 public:
 
 
-	void Initialize(TConstArrayView<FSavePackageContext*> SavePackageContexts)
+	void Initialize(TConstArrayView<UE::Cook::FCookSavePackageContext*> SavePackageContexts)
 	{
 		if (bInitialized)
 		{
@@ -4219,14 +4219,14 @@ public:
 		bInitialized = true;
 	}
 
-	void InitializePlatformSettings(TConstArrayView<FSavePackageContext*> SavePackageContexts)
+	void InitializePlatformSettings(TConstArrayView<UE::Cook::FCookSavePackageContext*> SavePackageContexts)
 	{
 		if (IsRunningCookDiff() || IsRunningCookLinkerDiff())
 		{
 			bool bCompatible = true;
-			for (FSavePackageContext* SavePackageContext : SavePackageContexts)
+			for (UE::Cook::FCookSavePackageContext* SavePackageContext : SavePackageContexts)
 			{
-				if (SavePackageContext && SavePackageContext->PackageStoreWriter)
+				if (SavePackageContext && SavePackageContext->PackageWriter)
 				{
 					bCompatible = false;
 					break;
@@ -4235,7 +4235,7 @@ public:
 			if (!bCompatible)
 			{
 				const TCHAR* CommandLineArg = IsRunningCookDiff() ? TEXT("-DIFFONLY") : TEXT("-LINKERDIFF");
-				UE_LOG(LogCook, Fatal, TEXT("%s was enabled, but PackageStoreWriter is also enabled and PackageStoreWriter does not support %s."),
+				UE_LOG(LogCook, Fatal, TEXT("%s was enabled, but PackageWriter is also enabled and PackageWriter does not support %s."),
 					CommandLineArg, CommandLineArg);
 				bDiffEnabled = false;
 				LinkerDiffMode = LDM_None;
@@ -4461,7 +4461,7 @@ void UCookOnTheFlyServer::SaveCookedPackage(UE::Cook::FSaveCookedPackageContext&
 			{
 				if (DiffModeHelper->IsRunningCookDiff())
 				{
-					check(!Context.PackageStoreWriter); // IsRunningCookDiff should have been disabled by DiffModeHelper if we have any PackageStoreWriter
+					check(!Context.PackageWriter); // IsRunningCookDiff should have been disabled by DiffModeHelper if we have any PackageWriter
 					DiffModeHelper->ProcessPackage(Package);
 
 					// When looking for deterministic cook issues, first serialize the package to memory and do a simple diff with the existing package
@@ -4481,7 +4481,7 @@ void UCookOnTheFlyServer::SaveCookedPackage(UE::Cook::FSaveCookedPackageContext&
 				}
 				else if (DiffModeHelper->IsRunningCookLinkerDiff())
 				{
-					check(!Context.PackageStoreWriter); // IsRunningCookLinkerDiff should have been disabled by DiffModeHelper if we have any PackageStoreWriter
+					check(!Context.PackageWriter); // IsRunningCookLinkerDiff should have been disabled by DiffModeHelper if we have any PackageWriter
 
 					Context.SavePackageResult = GEditor->Save(Package, Context.World, Context.FlagsToCook, *Context.PlatFilename,
 						GError, nullptr, Context.bEndianSwap, false, Context.SaveFlags, TargetPlatform,
@@ -4650,14 +4650,23 @@ void FSaveCookedPackageContext::SetupPlatform(const ITargetPlatform* InTargetPla
 		World->PersistentLevel->HandleLegacyMapBuildData();
 	}
 
-	SavePackageContext = COTFS.GetSavePackageContext(TargetPlatform);
-	PackageStoreWriter = SavePackageContext ? SavePackageContext->PackageStoreWriter : nullptr;
-	if (PackageStoreWriter)
+	FCookSavePackageContext* CookContext = COTFS.GetSavePackageContext(TargetPlatform);
+	if (CookContext)
 	{
-		IPackageStoreWriter::FBeginPackageInfo Info;
+		SavePackageContext = &CookContext->SaveContext;
+		PackageWriter = CookContext->PackageWriter;
+	}
+	else
+	{
+		SavePackageContext = nullptr;
+		PackageWriter = nullptr;
+	}
+	if (PackageWriter)
+	{
+		ICookedPackageWriter::FBeginPackageInfo Info;
 		Info.PackageName = Package->GetFName();
 
-		PackageStoreWriter->BeginPackage(Info);
+		PackageWriter->BeginPackage(Info);
 	}
 
 	// Indicate Setup was successful
@@ -4670,7 +4679,7 @@ void FSaveCookedPackageContext::FinishPlatform()
 	bool bSuccessful = SavePackageResult.IsSuccessful();
 	bool bLocalReferencedOnlyByEditorOnlyData = SavePackageResult == ESavePackageResult::ReferencedOnlyByEditorOnlyData;
 
-	if (bPlatformSetupSuccessful && PackageStoreWriter)
+	if (bPlatformSetupSuccessful && PackageWriter)
 	{
 		FAssetRegistryGenerator* Generator = COTFS.PlatformManager->GetPlatformData(TargetPlatform)->RegistryGenerator.Get();
 		FAssetPackageData* AssetPackageData = Generator->GetAssetPackageData(Package->GetFName());
@@ -4683,7 +4692,7 @@ void FSaveCookedPackageContext::FinishPlatform()
 			TargetDomainDependencies = UE::TargetDomain::CollectDependenciesObject(Package, TargetPlatform, nullptr /* ErrorMessage */);
 		}
 
-		IPackageStoreWriter::FCommitPackageInfo Info;
+		ICookedPackageWriter::FCommitPackageInfo Info;
 		Info.bSucceeded = bSuccessful;
 		Info.PackageName = Package->GetFName();
 		PRAGMA_DISABLE_DEPRECATION_WARNINGS
@@ -4691,7 +4700,7 @@ void FSaveCookedPackageContext::FinishPlatform()
 		PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		Info.TargetDomainDependencies = TargetDomainDependencies;
 
-		PackageStoreWriter->CommitPackage(Info);
+		PackageWriter->CommitPackage(Info);
 	}
 
 	// Update asset registry
@@ -6232,14 +6241,14 @@ void UCookOnTheFlyServer::PopulateCookedPackagesFromPackageStore(const TArrayVie
 
 	struct FPreviousAssetPackageData
 	{
-		FPreviousAssetPackageData(const TArray<IPackageStoreWriter::FCookedPackageInfo>& InCookedPackages)
+		FPreviousAssetPackageData(const TArray<ICookedPackageWriter::FCookedPackageInfo>& InCookedPackages)
 		{
 			AssetPackageDatas.SetNum(InCookedPackages.Num());
 			AssetPackageDataMap.Reserve(InCookedPackages.Num());
 
 			for (int32 Idx = 0, Count = InCookedPackages.Num(); Idx < Count; ++Idx)
 			{
-				const IPackageStoreWriter::FCookedPackageInfo& CookedPackageInfo = InCookedPackages[Idx];
+				const ICookedPackageWriter::FCookedPackageInfo& CookedPackageInfo = InCookedPackages[Idx];
 				FAssetPackageData& AssetPackageData = AssetPackageDatas[Idx];
 				
 				AssetPackageData.CookedHash = CookedPackageInfo.Hash;
@@ -6262,14 +6271,14 @@ void UCookOnTheFlyServer::PopulateCookedPackagesFromPackageStore(const TArrayVie
 		
 		UE::Cook::FPlatformData* PlatformData = PlatformManager->GetPlatformData(Platform);
 		FAssetRegistryGenerator* PlatformAssetRegistry = PlatformData->RegistryGenerator.Get();
-		IPackageStoreWriter* PackageStoreWriter = GetPackageStoreWriter(FName(*Platform->PlatformName()));
+		ICookedPackageWriter* PackageWriter = GetPackageWriter(FName(*Platform->PlatformName()));
 		
 		check(PlatformData);
 		check(PlatformAssetRegistry);
-		check(PackageStoreWriter);
+		check(PackageWriter);
 
-		TArray<IPackageStoreWriter::FCookedPackageInfo> CookedPackages;
-		PackageStoreWriter->GetCookedPackages(CookedPackages);
+		TArray<ICookedPackageWriter::FCookedPackageInfo> CookedPackages;
+		PackageWriter->GetCookedPackages(CookedPackages);
 		
 		UE_LOG(LogCook, Display, TEXT("Found '%d' cooked package(s) in package store"), CookedPackages.Num());
 
@@ -6297,7 +6306,7 @@ void UCookOnTheFlyServer::PopulateCookedPackagesFromPackageStore(const TArrayVie
 		
 		UE_LOG(LogCook, Display, TEXT("Keeping '%d' and removing '%d' cooked package(s)"), Difference.IdenticalCookedPackages.Num(), PackagesToRemove.Num());
 		
-		PackageStoreWriter->RemoveCookedPackages(PackagesToRemove);
+		PackageWriter->RemoveCookedPackages(PackagesToRemove);
 		
 		TArray<FName> PackagesToKeep;
 		for (const FName& IdenticalPackageName : Difference.IdenticalCookedPackages)
@@ -7916,7 +7925,7 @@ void UCookOnTheFlyServer::InitializePackageStore(const TArrayView<const ITargetP
 		const FString ResolvedRootPath = RootPathSandbox.Replace(TEXT("[Platform]"), *PlatformString);
 		const FString ResolvedProjectPath = ProjectPathSandbox.Replace(TEXT("[Platform]"), *PlatformString);
 
-		IPackageStoreWriter* PackageStoreWriter = nullptr;
+		ICookedPackageWriter* PackageWriter = nullptr;
 		if (IsUsingIoStore())
 		{
 			FString MetadataDirectoryPath = ProjectPathSandbox / TEXT("Metadata");
@@ -7924,14 +7933,14 @@ void UCookOnTheFlyServer::InitializePackageStore(const TArrayView<const ITargetP
 
 			if (IsUsingZenStore())
 			{
-				PackageStoreWriter = new FZenStoreWriter(	ResolvedRootPath, 
+				PackageWriter = new FZenStoreWriter(	ResolvedRootPath, 
 															MetadataDirectoryPath, 
 															TargetPlatform, 
 															bIsCleanBuild);
 			}
 			else
 			{
-				PackageStoreWriter = new FFilePackageStoreWriter(ResolvedRootPath, MetadataDirectoryPath, TargetPlatform);
+				PackageWriter = new FFilePackageStoreWriter(ResolvedRootPath, MetadataDirectoryPath, TargetPlatform);
 			}
 		}
 
@@ -7941,7 +7950,8 @@ void UCookOnTheFlyServer::InitializePackageStore(const TArrayView<const ITargetP
 		bool bLegacyBulkDataOffsets = false;
 		PlatformEngineIni.GetBool(TEXT("Core.System"), TEXT("LegacyBulkDataOffsets"), bLegacyBulkDataOffsets);
 
-		FSavePackageContext* SavePackageContext = new FSavePackageContext(TargetPlatform, PackageStoreWriter, bLegacyBulkDataOffsets);
+		UE::Cook::FCookSavePackageContext* SavePackageContext 
+			= new UE::Cook::FCookSavePackageContext(TargetPlatform, PackageWriter, bLegacyBulkDataOffsets);
 		SavePackageContexts.Add(SavePackageContext);
 	}
 
@@ -7952,11 +7962,11 @@ void UCookOnTheFlyServer::InitializePackageStore(const TArrayView<const ITargetP
 			PopulateCookedPackagesFromPackageStore(TargetPlatforms);
 		}
 
-		for (const FSavePackageContext* Context : SavePackageContexts)
+		for (const UE::Cook::FCookSavePackageContext* Context : SavePackageContexts)
 		{
-			IPackageStoreWriter::FCookInfo CookInfo;
-			CookInfo.CookMode = IsCookOnTheFlyMode() ? IPackageStoreWriter::FCookInfo::CookOnTheFlyMode : IPackageStoreWriter::FCookInfo::CookByTheBookMode;
-			Context->PackageStoreWriter->BeginCook(CookInfo);
+			ICookedPackageWriter::FCookInfo CookInfo;
+			CookInfo.CookMode = IsCookOnTheFlyMode() ? ICookedPackageWriter::FCookInfo::CookOnTheFlyMode : ICookedPackageWriter::FCookInfo::CookByTheBookMode;
+			Context->PackageWriter->BeginCook(CookInfo);
 		}
 	}
 }
@@ -7966,13 +7976,13 @@ void UCookOnTheFlyServer::FinalizePackageStore()
 	UE_SCOPED_HIERARCHICAL_COOKTIMER(FinalizePackageStore);
 
 	UE_LOG(LogCook, Display, TEXT("Finalize package store(s)..."));
-	for (FSavePackageContext* PackageContext : SavePackageContexts)
+	for (UE::Cook::FCookSavePackageContext* PackageContext : SavePackageContexts)
 	{
 		if (PackageContext != nullptr)
 		{
-			if (PackageContext->PackageStoreWriter != nullptr)
+			if (PackageContext->PackageWriter != nullptr)
 			{
-				PackageContext->PackageStoreWriter->EndCook();
+				PackageContext->PackageWriter->EndCook();
 			}
 		}
 	}
@@ -7983,7 +7993,7 @@ void UCookOnTheFlyServer::FinalizePackageStore()
 
 void UCookOnTheFlyServer::ClearPackageStoreContexts()
 {
-	for (FSavePackageContext* Context : SavePackageContexts)
+	for (UE::Cook::FCookSavePackageContext* Context : SavePackageContexts)
 	{
 		delete Context;
 	}
@@ -9262,7 +9272,7 @@ uint32 UCookOnTheFlyServer::FullLoadAndSave(uint32& CookedPackageCount)
 						}
 								
 						GIsCookerLoadingPackage = true;
-						FSavePackageContext* const SavePackageContext = (IsCookByTheBookMode() && SavePackageContexts.Num() > 0) ? SavePackageContexts[PlatformIndex] : nullptr;
+						FSavePackageContext* const SavePackageContext = (IsCookByTheBookMode() && SavePackageContexts.Num() > 0) ? &SavePackageContexts[PlatformIndex]->SaveContext : nullptr;
 						FSavePackageResultStruct SaveResult = GEditor->Save(Package, World, FlagsToCook, *PlatFilename, GError, NULL, bSwap, false, SaveFlags, Target, FDateTime::MinValue(), 
 																			false, /*DiffMap*/ nullptr,	SavePackageContext);
 						GIsCookerLoadingPackage = false;
@@ -9346,24 +9356,24 @@ uint32 UCookOnTheFlyServer::FullLoadAndSave(uint32& CookedPackageCount)
 	return Result;
 }
 
-IPackageStoreWriter* UCookOnTheFlyServer::GetPackageStoreWriter(const FName& PlatformName) const
+ICookedPackageWriter* UCookOnTheFlyServer::GetPackageWriter(const FName& PlatformName) const
 {
-	for (const FSavePackageContext* Context : SavePackageContexts)
+	for (const UE::Cook::FCookSavePackageContext* Context : SavePackageContexts)
 	{
-		if (FName(*Context->TargetPlatform->PlatformName()) == PlatformName)
+		if (FName(*Context->SaveContext.TargetPlatform->PlatformName()) == PlatformName)
 		{
-			return Context->PackageStoreWriter;
+			return Context->PackageWriter;
 		}
 	}
 
 	return nullptr;
 }
 
-FSavePackageContext* UCookOnTheFlyServer::GetSavePackageContext(const ITargetPlatform* TargetPlatform) const
+UE::Cook::FCookSavePackageContext* UCookOnTheFlyServer::GetSavePackageContext(const ITargetPlatform* TargetPlatform) const
 {
-	for (FSavePackageContext* Context : SavePackageContexts)
+	for (UE::Cook::FCookSavePackageContext* Context : SavePackageContexts)
 	{
-		if (Context->TargetPlatform == TargetPlatform)
+		if (Context->SaveContext.TargetPlatform == TargetPlatform)
 		{
 			return Context;
 		}
