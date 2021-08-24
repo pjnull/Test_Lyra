@@ -257,7 +257,7 @@ void UChildActorComponent::PostEditUndo()
 	{
 		if (Component)
 		{
-			if (Component->IsPendingKill() && Component->GetOwner() == ChildActor)
+			if (!IsValid(Component) && Component->GetOwner() == ChildActor)
 			{
 				Component = ChildActor->GetRootComponent();
 			}

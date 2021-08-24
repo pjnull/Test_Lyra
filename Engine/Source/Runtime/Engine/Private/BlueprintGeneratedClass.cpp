@@ -1165,10 +1165,9 @@ UActorComponent* UBlueprintGeneratedClass::FindComponentTemplateByName(const FNa
 
 void UBlueprintGeneratedClass::CreateTimelineComponent(AActor* Actor, const UTimelineTemplate* TimelineTemplate)
 {
-	if (!Actor
+	if (!IsValid(Actor)
 		|| !TimelineTemplate
-		|| Actor->IsTemplate()
-		|| Actor->IsPendingKill())
+		|| Actor->IsTemplate())
 	{
 		return;
 	}
@@ -1286,7 +1285,7 @@ void UBlueprintGeneratedClass::CreateTimelineComponent(AActor* Actor, const UTim
 void UBlueprintGeneratedClass::CreateComponentsForActor(const UClass* ThisClass, AActor* Actor)
 {
 	check(ThisClass && Actor);
-	if (Actor->IsTemplate() || Actor->IsPendingKill())
+	if (Actor->IsTemplate() || !IsValid(Actor))
 	{
 		return;
 	}

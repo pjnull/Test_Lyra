@@ -2457,7 +2457,7 @@ void ULandscapeHeightfieldCollisionComponent::PostLoad()
 
 #if WITH_EDITOR
 	// PostLoad of the landscape can decide to recreate collision, in which case this components checks are irrelevant
-	if (!HasAnyFlags(RF_ClassDefaultObject) && !IsPendingKill())
+	if (!HasAnyFlags(RF_ClassDefaultObject) && IsValid(this))
 	{
 		bShouldSaveCookedDataToDDC[0] = true;
 		bShouldSaveCookedDataToDDC[1] = true;

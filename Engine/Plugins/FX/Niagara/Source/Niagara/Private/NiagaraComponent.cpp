@@ -118,7 +118,7 @@ FAutoConsoleCommandWithWorldAndArgs DumpNiagaraComponentsCommand(
 			for (TObjectIterator<UNiagaraComponent> It; It; ++It)
 			{
 				UNiagaraComponent* Component = *It;
-				if ( Component->IsPendingKill() )
+				if ( !IsValid(Component) )
 				{
 					continue;
 				}
@@ -1450,7 +1450,7 @@ void UNiagaraComponent::DestroyInstance()
 
 void UNiagaraComponent::OnPooledReuse(UWorld* NewWorld)
 {
-	check(!IsPendingKill());
+	check(IsValid(this));
 	SetUserParametersToDefaultValues();
 
 	//Need to reset the component's visibility in case it's returned to the pool while marked invisible.

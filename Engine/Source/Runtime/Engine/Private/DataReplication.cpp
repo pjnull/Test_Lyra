@@ -1111,7 +1111,7 @@ bool FObjectReplicator::ReceivedBunch(FNetBitReader& Bunch, const FReplicationFl
 				bGuidsChanged = true;
 				bForceUpdateUnmapped = true;
 			}
-			else if (Object == nullptr || Object->IsPendingKill())
+			else if (!IsValid(Object))
 			{
 				// replicated function destroyed Object
 				return true;
@@ -2111,7 +2111,7 @@ void FObjectReplicator::CallRepNotifies(bool bSkipIfChannelHasQueuedBunches)
 	CSV_SCOPED_TIMING_STAT_EXCLUSIVE(RepNotifies);
 	UObject* Object = GetObject();
 
-	if (!Object || Object->IsPendingKill())
+	if (!IsValid(Object))
 	{
 		return;
 	}
@@ -2129,7 +2129,7 @@ void FObjectReplicator::CallRepNotifies(bool bSkipIfChannelHasQueuedBunches)
 	FReceivingRepState* ReceivingRepState = RepState->GetReceivingRepState();
 	RepLayout->CallRepNotifies(ReceivingRepState, Object);
 
-	if (!Object->IsPendingKill())
+	if (IsValid(Object))
 	{
 		Object->PostRepNotifies();
 	}
@@ -2139,7 +2139,7 @@ void FObjectReplicator::UpdateUnmappedObjects(bool & bOutHasMoreUnmapped)
 {
 	UObject* Object = GetObject();
 	
-	if (!Object || Object->IsPendingKill())
+	if (!IsValid(Object))
 	{
 		bOutHasMoreUnmapped = false;
 		return;

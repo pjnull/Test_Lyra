@@ -414,7 +414,7 @@ bool UNiagaraDataInterfaceSpline::PerInstanceTick(void* PerInstanceData, FNiagar
 			{
 				if (USplineComponent* UserSplineComp = Cast<USplineComponent>(UserParamObject))
 				{
-					if (!UserSplineComp->IsPendingKill())
+					if (IsValid(UserSplineComp))
 					{
 						SplineComponent = UserSplineComp;
 					}

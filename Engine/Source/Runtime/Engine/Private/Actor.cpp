@@ -231,9 +231,9 @@ bool AActor::CheckActorComponents() const
 		{
 			continue;
 		}
-		if (Inner->IsPendingKill())
+		if (!IsValidChecked(Inner))
 		{
-			UE_LOG(LogCheckComponents, Warning, TEXT("Component is pending kill. Me = %s, Component = %s"), *this->GetFullName(), *Inner->GetFullName());
+			UE_LOG(LogCheckComponents, Warning, TEXT("Component is invalid. Me = %s, Component = %s"), *this->GetFullName(), *Inner->GetFullName());
 		}
 		if (Inner->IsTemplate() && !IsTemplate())
 		{
@@ -253,9 +253,9 @@ bool AActor::CheckActorComponents() const
 			UE_LOG(LogCheckComponents, Error, TEXT("SerializedComponent does not have me as an outer. Me = %s, Component = %s"), *this->GetFullName(), *Inner->GetFullName());
 			bResult = false;
 		}
-		if (Inner->IsPendingKill())
+		if (!IsValidChecked(Inner))
 		{
-			UE_LOG(LogCheckComponents, Warning, TEXT("SerializedComponent is pending kill. Me = %s, Component = %s"), *this->GetFullName(), *Inner->GetFullName());
+			UE_LOG(LogCheckComponents, Warning, TEXT("SerializedComponent is invalid. Me = %s, Component = %s"), *this->GetFullName(), *Inner->GetFullName());
 		}
 		if (Inner->IsTemplate() && !IsTemplate())
 		{
@@ -877,10 +877,10 @@ void AActor::PostLoad()
 		// Propagate the hidden at editor startup flag to the transient hidden flag
 		bHiddenEdTemporary = bHiddenEd;
 
-		// Check/warning when loading actors in editor. Should never load IsPendingKill() Actors!
-		if ( IsPendingKill() )
+		// Check/warning when loading actors in editor. Should never load invalid Actors!
+		if ( !IsValidChecked(this) )
 		{
-			UE_LOG(LogActor, Log,  TEXT("Loaded Actor (%s) with IsPendingKill() == true"), *GetName() );
+			UE_LOG(LogActor, Log,  TEXT("Loaded Actor (%s) with IsValid() == false"), *GetName() );
 		}
 	}
 
@@ -1280,7 +1280,7 @@ void AActor::TickActor( float DeltaSeconds, ELevelTick TickType, FActorTickFunct
 
 	// Non-player update.
 	// If an Actor has been Destroyed or its level has been unloaded don't execute any queued ticks
-	if (!IsPendingKill() && GetWorld())
+	if (IsValidChecked(this) && GetWorld())
 	{
 		Tick(DeltaSeconds);	// perform any tick functions unique to an actor subclass
 	}
@@ -1384,7 +1384,7 @@ void AActor::CallPreReplication(UNetDriver* NetDriver)
 	for (UActorComponent* Component : ReplicatedComponents)
 	{
 		// Only call on components that aren't pending kill
-		if (Component && !Component->IsPendingKill())
+		if (IsValid(Component))
 		{
 			Component->PreReplication(*NetDriver->FindOrCreateRepChangedPropertyTracker(Component).Get());
 		}
@@ -1564,7 +1564,7 @@ FBox AActor::CalculateComponentsBoundingBoxInLocalSpace(bool bNonColliding, bool
 
 bool AActor::CheckStillInWorld()
 {
-	if (IsPendingKill())
+	if (!IsValidChecked(this))
 	{
 		return false;
 	}
@@ -1828,7 +1828,7 @@ static void MarkOwnerRelevantComponentsDirty(AActor* TheActor)
 	for (int32 i = 0; i < TheActor->Children.Num(); i++)
 	{
 		AActor* Child = TheActor->Children[i];
-		if (Child != nullptr && !Child->IsPendingKill())
+		if (IsValid(Child))
 		{
 			MarkOwnerRelevantComponentsDirty(Child);
 		}
@@ -1855,7 +1855,7 @@ float AActor::GetLastRenderTime() const
 
 void AActor::SetOwner(AActor* NewOwner)
 {
-	if (Owner != NewOwner && !IsPendingKill())
+	if (Owner != NewOwner && IsValidChecked(this))
 	{
 		if (NewOwner != nullptr && NewOwner->IsOwnedBy(this))
 		{
@@ -2691,7 +2691,7 @@ extern bool IsPrimCompValidAndAlive(UPrimitiveComponent* PrimComp);
 /** Used to determine if it is ok to call a notification on this object */
 bool IsActorValidToNotify(AActor* Actor)
 {
-	return (Actor != nullptr) && !Actor->IsPendingKill() && !Actor->GetClass()->HasAnyClassFlags(CLASS_NewerVersionExists);
+	return IsValid(Actor) && !Actor->GetClass()->HasAnyClassFlags(CLASS_NewerVersionExists);
 }
 
 void AActor::InternalDispatchBlockingHit(UPrimitiveComponent* MyComp, UPrimitiveComponent* OtherComp, bool bSelfMoved, FHitResult const& Hit)
@@ -2715,7 +2715,7 @@ void AActor::InternalDispatchBlockingHit(UPrimitiveComponent* MyComp, UPrimitive
 		}
 
 		// If component is still alive, call delegate on component
-		if(!MyComp->IsPendingKill())
+		if(IsValidChecked(MyComp))
 		{
 			MyComp->OnComponentHit.Broadcast(MyComp, OtherActor, OtherComp, FVector(0,0,0), Hit);
 		}
@@ -2739,9 +2739,9 @@ void AActor::DisplayDebug(UCanvas* Canvas, const FDebugDisplayInfo& DebugDisplay
 	DisplayDebugManager.SetDrawColor(FColor(255, 0, 0));
 
 	FString T = GetHumanReadableName();
-	if( IsPendingKill() )
+	if( !IsValidChecked(this) )
 	{
-		T = FString::Printf(TEXT("%s DELETED (IsPendingKill() == true)"), *T);
+		T = FString::Printf(TEXT("%s DELETED (IsValid() == false)"), *T);
 	}
 	if( T != "" )
 	{
@@ -2791,8 +2791,7 @@ void AActor::DisplayDebug(UCanvas* Canvas, const FDebugDisplayInfo& DebugDisplay
 		bool bFoundAnyOverlaps = false;
 		for (AActor* const TestActor : TouchingActors)
 		{
-			if (TestActor &&
-				!TestActor->IsPendingKill())
+			if (IsValid(TestActor))
 			{
 				T = T + TestActor->GetName() + " ";
 				bFoundAnyOverlaps = true;
@@ -3209,7 +3208,7 @@ void AActor::PostEditImport()
 
 bool AActor::IsSelectedInEditor() const
 {
-	return !IsPendingKill() && GIsActorSelectedInEditor && GIsActorSelectedInEditor(this);
+	return IsValidChecked(this) && GIsActorSelectedInEditor && GIsActorSelectedInEditor(this);
 }
 
 bool AActor::SupportsExternalPackaging() const
@@ -3219,7 +3218,7 @@ bool AActor::SupportsExternalPackaging() const
 		return false;
 	}
 
-	if (IsPendingKill())
+	if (!IsValidChecked(this))
 	{
 		return false;
 	}
@@ -3396,7 +3395,7 @@ void AActor::PostSpawnInitialize(FTransform const& UserSpawnTransform, AActor* I
 #endif
 
 	// See if anything has deleted us
-	if( IsPendingKill() && !bNoFail )
+	if( !IsValidChecked(this) && !bNoFail )
 	{
 		return;
 	}
@@ -3540,10 +3539,10 @@ void AActor::PostActorConstruction()
 			}
 		}
 
-		if (!IsPendingKill())
+		if (IsValidChecked(this))
 		{
 			PostInitializeComponents();
-			if (!IsPendingKill())
+			if (IsValidChecked(this))
 			{
 				if (!bActorInitialized)
 				{
@@ -3729,7 +3728,7 @@ EActorUpdateOverlapsMethod AActor::GetUpdateOverlapsMethodDuringLevelStreaming()
 
 void AActor::DispatchBeginPlay(bool bFromLevelStreaming)
 {
-	UWorld* World = (!HasActorBegunPlay() && !IsPendingKill() ? GetWorld() : nullptr);
+	UWorld* World = (!HasActorBegunPlay() && IsValidChecked(this) ? GetWorld() : nullptr);
 
 	if (World)
 	{
@@ -3750,7 +3749,7 @@ void AActor::DispatchBeginPlay(bool bFromLevelStreaming)
 			World->DestroyActor(this, true); 
 		}
 		
-		if (!IsPendingKill())
+		if (IsValidChecked(this))
 		{
 			// Initialize overlap state
 			UpdateInitialOverlaps(bFromLevelStreaming);
@@ -4416,7 +4415,7 @@ int32 AActor::GetFunctionCallspace( UFunction* Function, FFrame* Stack )
 	// If we are on a client and function is 'skip on client', absorb it
 	FunctionCallspace::Type Callspace = (LocalRole < ROLE_Authority) && Function->HasAllFunctionFlags(FUNC_BlueprintAuthorityOnly) ? FunctionCallspace::Absorbed : FunctionCallspace::Local;
 	
-	if (IsPendingKill())
+	if (!IsValidChecked(this))
 	{
 		// Never call remote on a pending kill actor. 
 		// We can call it local or absorb it depending on authority/role check above.
@@ -4888,7 +4887,7 @@ static USceneComponent* GetUnregisteredParent(UActorComponent* Component)
 			!SceneComponent->GetAttachParent()->IsRegistered())
 	{
 		SceneComponent = SceneComponent->GetAttachParent();
-		if (SceneComponent->bAutoRegister && !SceneComponent->IsPendingKill())
+		if (SceneComponent->bAutoRegister && IsValidChecked(SceneComponent))
 		{
 			// We found unregistered parent that should be registered
 			// But keep looking up the tree
@@ -4942,7 +4941,7 @@ bool AActor::IncrementalRegisterComponents(int32 NumComponentsToRegister, FRegis
 	for (int32 CompIdx = 0; CompIdx < Components.Num() && NumRegisteredComponentsThisRun < NumComponentsToRegister; CompIdx++)
 	{
 		UActorComponent* Component = Components[CompIdx];
-		if (!Component->IsRegistered() && Component->bAutoRegister && !Component->IsPendingKill())
+		if (!Component->IsRegistered() && Component->bAutoRegister && IsValidChecked(Component))
 		{
 			// Ensure that all parent are registered first
 			USceneComponent* UnregisteredParentComponent = GetUnregisteredParent(Component);
@@ -5214,7 +5213,7 @@ void AActor::SetLifeSpan( float InLifespan )
 	// Store the new value
 	InitialLifeSpan = InLifespan;
 	// Initialize a timer for the actors lifespan if there is one. Otherwise clear any existing timer
-	if ((GetLocalRole() == ROLE_Authority || GetTearOff()) && !IsPendingKill())
+	if ((GetLocalRole() == ROLE_Authority || GetTearOff()) && IsValidChecked(this))
 	{
 		if( InLifespan > 0.0f)
 		{
@@ -5243,7 +5242,7 @@ void AActor::PostInitializeComponents()
 {
 	QUICK_SCOPE_CYCLE_COUNTER(STAT_Actor_PostInitComponents);
 
-	if( !IsPendingKill() )
+	if(IsValidChecked(this) )
 	{
 		bActorInitialized = true;
 		
@@ -5500,7 +5499,7 @@ bool AActor::IsHLODRelevant() const
 		return false;
 	}
 
-	if (IsPendingKill())
+	if (!IsValidChecked(this))
 	{
 		return false;
 	}

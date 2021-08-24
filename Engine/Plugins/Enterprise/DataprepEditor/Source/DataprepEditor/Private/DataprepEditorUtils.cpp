@@ -484,7 +484,7 @@ TSet<TWeakObjectPtr<UObject>> FDataprepEditorUtils::GetActorsReferencingAssets(U
 
 	for (UObject* Asset : InAssets)
 	{
-		if (!ensure(Asset) || Asset->IsPendingKill())
+		if (!ensure(Asset) || !IsValid(Asset))
 		{
 			continue;
 		}
@@ -548,7 +548,7 @@ TSet<TWeakObjectPtr<UObject>> FDataprepEditorUtils::GetActorsReferencingAssets(U
 	for (TActorIterator<AActor> It(InWorld, AActor::StaticClass(), Flags); It; ++It)
 	{
 		AActor* Actor = *It;
-		if (!Actor || Actor->IsPendingKill())
+		if (!IsValid(Actor))
 		{
 			continue;
 		}

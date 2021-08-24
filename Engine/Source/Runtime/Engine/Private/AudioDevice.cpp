@@ -4848,10 +4848,10 @@ void FAudioDevice::AddNewActiveSoundInternal(const FActiveSound& NewActiveSound,
 	ActiveSound->bIsPlayingAudio = true;
 
 #if !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
-	if (!ensureMsgf(ActiveSound->Sound->GetFName() != NAME_None, TEXT("AddNewActiveSound with DESTROYED sound %s. AudioComponent=%s. IsPendingKill=%d. BeginDestroy=%d"),
+	if (!ensureMsgf(ActiveSound->Sound->GetFName() != NAME_None, TEXT("AddNewActiveSound with DESTROYED sound %s. AudioComponent=%s. IsValid=%d. BeginDestroy=%d"),
 		*ActiveSound->Sound->GetPathName(),
 		*ActiveSound->GetAudioComponentName(),
-		(int32)ActiveSound->Sound->IsPendingKill(),
+		(int32)IsValid(ActiveSound->Sound),
 		(int32)ActiveSound->Sound->HasAnyFlags(RF_BeginDestroyed)))
 	{
 		static FName InvalidSoundName(TEXT("DESTROYED_Sound"));
@@ -5800,7 +5800,7 @@ UAudioComponent* FAudioDevice::CreateComponent(USoundBase* Sound, const FCreateC
 	if (Sound && Params.AudioDevice && GEngine && GEngine->UseSound())
 	{
 		// Avoid creating component if we're trying to play a sound on an already destroyed actor.
-		if (Params.Actor == nullptr || !Params.Actor->IsPendingKill())
+		if (Params.Actor == nullptr || IsValid(Params.Actor))
 		{
 			// Listener position could change before long sounds finish
 			const FSoundAttenuationSettings* AttenuationSettingsToApply = (Params.AttenuationSettings ? &Params.AttenuationSettings->Attenuation : Sound->GetAttenuationSettingsToApply());

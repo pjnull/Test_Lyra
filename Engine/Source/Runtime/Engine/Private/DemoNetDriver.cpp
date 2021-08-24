@@ -1778,7 +1778,7 @@ void UDemoNetDriver::TickDemoRecordFrame(float DeltaSeconds)
 				{
 					AActor* Actor = ActorInfo->Actor;
 
-					if (Actor->IsPendingKill())
+					if (!IsValid(Actor))
 					{
 						ActorsToRemove.Add(Actor);
 						continue;

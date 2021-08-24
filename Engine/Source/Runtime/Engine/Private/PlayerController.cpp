@@ -931,7 +931,7 @@ void APlayerController::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
 
-	if ( !IsPendingKill() && (GetNetMode() != NM_Client) )
+	if ( IsValid(this) && (GetNetMode() != NM_Client) )
 	{
 		// create a new player replication info
 		InitPlayerState();
@@ -4690,7 +4690,7 @@ void APlayerController::TickActor( float DeltaSeconds, ELevelTick TickType, FAct
 		// Clear axis inputs from previous frame.
 		RotationInput = FRotator::ZeroRotator;
 
-		if (!IsPendingKill())
+		if (IsValid(this))
 		{
 			Tick(DeltaSeconds);	// perform any tick functions unique to an actor subclass
 		}
@@ -4708,7 +4708,7 @@ void APlayerController::TickActor( float DeltaSeconds, ELevelTick TickType, FAct
 		// force physics update for clients that aren't sending movement updates in a timely manner 
 		// this prevents cheats associated with artificially induced ping spikes
 		// skip updates if pawn lost autonomous proxy role (e.g. TurnOff() call)
-		if (GetPawn() && !GetPawn()->IsPendingKill() && GetPawn()->GetRemoteRole() == ROLE_AutonomousProxy && GetPawn()->IsReplicatingMovement())
+		if (IsValid(GetPawn()) && GetPawn()->GetRemoteRole() == ROLE_AutonomousProxy && GetPawn()->IsReplicatingMovement())
 		{
 			UMovementComponent* PawnMovement = GetPawn()->GetMovementComponent();
 			INetworkPredictionInterface* NetworkPredictionInterface = Cast<INetworkPredictionInterface>(PawnMovement);
@@ -4826,7 +4826,7 @@ void APlayerController::TickActor( float DeltaSeconds, ELevelTick TickType, FAct
 			PlayerTick(DeltaSeconds);
 		}
 
-		if (IsPendingKill())
+		if (!IsValid(this))
 		{
 			return;
 		}
@@ -4857,7 +4857,7 @@ void APlayerController::TickActor( float DeltaSeconds, ELevelTick TickType, FAct
 		}
 	}
 
-	if (!IsPendingKill())
+	if (IsValid(this))
 	{
 		QUICK_SCOPE_CYCLE_COUNTER(Tick);
 		Tick(DeltaSeconds);	// perform any tick functions unique to an actor subclass

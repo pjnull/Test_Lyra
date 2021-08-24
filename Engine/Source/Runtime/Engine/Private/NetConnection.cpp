@@ -3784,7 +3784,7 @@ void UNetConnection::Tick(float DeltaSeconds)
 				UActorChannel* CurChannel = ActorChannelArray[ActorChannelIdx];
 				
 				bool bRemoveChannel = false;
-				if ( CurChannel && !CurChannel->IsPendingKill() )
+				if ( IsValid(CurChannel) )
 				{
 					check( CurChannel->ChIndex == -1 );
 					if ( CurChannel->ProcessQueuedBunches() )

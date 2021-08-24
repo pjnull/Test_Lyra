@@ -2737,7 +2737,7 @@ public:
 	 */
 	inline bool IsPendingKillPending() const
 	{
-		return bActorIsBeingDestroyed || IsPendingKill();
+		return bActorIsBeingDestroyed || !IsValidChecked(this);
 	}
 
 	/** Invalidate lighting cache with default options. */

@@ -2531,7 +2531,7 @@ bool UEngine::SetCustomTimeStep(UEngineCustomTimeStep* InCustomTimeStep)
 		}
 
 		bIsCurrentCustomTimeStepInitialized = false;
-		CustomTimeStep = InCustomTimeStep && !InCustomTimeStep->IsPendingKill() ? InCustomTimeStep : nullptr;
+		CustomTimeStep = IsValid(InCustomTimeStep) ? InCustomTimeStep : nullptr;
 
 		if (CustomTimeStep)
 			{
@@ -2565,7 +2565,7 @@ bool UEngine::SetTimecodeProvider(UTimecodeProvider* InTimecodeProvider)
 		}
 
 		bIsCurrentTimecodeProviderInitialized = false;
-		TimecodeProvider = InTimecodeProvider && !InTimecodeProvider->IsPendingKill() ? InTimecodeProvider : nullptr;
+		TimecodeProvider = IsValid(InTimecodeProvider) ? InTimecodeProvider : nullptr;
 
 		if (TimecodeProvider)
 			{
@@ -11172,7 +11172,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		DebugClasses.Reserve(DebugProperties.Num());
 		for (int32 i = 0; i < DebugProperties.Num(); i++)
 		{
-			if (DebugProperties[i].Obj != NULL && !DebugProperties[i].Obj->IsPendingKill())
+			if (IsValid(DebugProperties[i].Obj))
 			{
 				UClass* Cls = Cast<UClass>(DebugProperties[i].Obj);
 				if (Cls != NULL)
@@ -11228,7 +11228,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 					// getall
 					for (UObject* RelevantObject : RelevantObjects)
 					{
-						if ( RelevantObject->IsA(Cls) && !RelevantObject->IsPendingKill() &&
+						if ( RelevantObject->IsA(Cls) && IsValidChecked(RelevantObject) &&
 							(DebugProperties[i].WithinClass == NULL || (RelevantObject->GetOuter() != NULL && RelevantObject->GetOuter()->GetClass()->IsChildOf(DebugProperties[i].WithinClass))) )
 						{
 							DrawProperty(CanvasObject, RelevantObject, DebugProperties[i], Prop, X, Y);

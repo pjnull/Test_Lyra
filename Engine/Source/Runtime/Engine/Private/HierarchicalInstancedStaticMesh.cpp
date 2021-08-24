@@ -3573,7 +3573,7 @@ static void RebuildFoliageTrees(const TArray<FString>& Args)
 	for (TObjectIterator<UHierarchicalInstancedStaticMeshComponent> It; It; ++It)
 	{
 		UHierarchicalInstancedStaticMeshComponent* Comp = *It;
-		if (Comp && !Comp->IsTemplate() && !Comp->IsPendingKill())
+		if (IsValid(Comp) && !Comp->IsTemplate())
 		{
 			Comp->BuildTreeIfOutdated(/*Async*/false, /*ForceUpdate*/true);
 			Comp->MarkRenderStateDirty();

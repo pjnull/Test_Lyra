@@ -465,7 +465,7 @@ void AActor::GetSubobjectsWithStableNamesForNetworking(TArray<UObject*> &ObjList
 	// For experimenting with replicating ALL stably named components initially
 	for (UActorComponent* Component : OwnedComponents)
 	{
-		if (Component && !Component->IsPendingKill() && Component->IsNameStableForNetworking())
+		if (IsValid(Component) && Component->IsNameStableForNetworking())
 		{
 			ObjList.Add(Component);
 			Component->GetSubobjectsWithStableNamesForNetworking(ObjList);

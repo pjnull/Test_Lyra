@@ -1270,8 +1270,7 @@ TScriptInterface<class ICameraLensEffectInterface> APlayerCameraManager::FindGen
 
 		// if the lens effect in our list is valid, and either it treats the requested effect as the same
 		// or if the requested effect would treat our existing lens effect as the same...
-		if (LensEffectObject 
-		&& !LensEffectObject->IsPendingKill()
+		if (IsValid(LensEffectObject)
 		&& (  (LensEffectObject->GetClass() == LensEffectEmitterClass)
 		    ||(LensEffectInterface->ShouldTreatEmitterAsSame(LensEffectEmitterClass))
 		    ||(OtherEffectDefaultInterface && OtherEffectDefaultInterface->ShouldTreatEmitterAsSame(LensEffectObject->GetClass()))
@@ -1622,9 +1621,9 @@ void FTViewTarget::CheckViewTarget(APlayerController* OwningController)
 		PlayerState = NULL;
 	}
 
-	if ((PlayerState != NULL) && !PlayerState->IsPendingKill())
+	if (IsValid(PlayerState))
 	{
-		if ((Target == NULL) || Target->IsPendingKill() || !Cast<APawn>(Target) || (CastChecked<APawn>(Target)->GetPlayerState() != PlayerState) )
+		if (!IsValid(Target) || !Cast<APawn>(Target) || (CastChecked<APawn>(Target)->GetPlayerState() != PlayerState) )
 		{
 			Target = NULL;
 
@@ -1639,7 +1638,7 @@ void FTViewTarget::CheckViewTarget(APlayerController* OwningController)
 				if (AController* PlayerStateOwner = Cast<AController>(PlayerState->GetOwner()))
 				{
 					AActor* PlayerStateViewTarget = PlayerStateOwner->GetPawn();
-					if( PlayerStateViewTarget && !PlayerStateViewTarget->IsPendingKill() )
+					if( IsValid(PlayerStateViewTarget) )
 					{
 						OwningController->PlayerCameraManager->AssignViewTarget(PlayerStateViewTarget, *this);
 					}
@@ -1656,7 +1655,7 @@ void FTViewTarget::CheckViewTarget(APlayerController* OwningController)
 		}
 	}
 
-	if ((Target == NULL) || Target->IsPendingKill())
+	if (!IsValid(Target))
 	{
 		if (OwningController->GetPawn() && !OwningController->GetPawn()->IsPendingKillPending() )
 		{

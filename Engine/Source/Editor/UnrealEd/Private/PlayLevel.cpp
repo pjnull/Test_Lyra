@@ -1183,7 +1183,7 @@ int32 FInternalPlayLevelUtils::ResolveDirtyBlueprints(const bool bPromptForCompi
 		if (!FBlueprintEditorUtils::IsDataOnlyBlueprint(Blueprint)
 			&& (bIsDirtyAndShouldBeRecompiled || (FBlueprintEditorUtils::IsLevelScriptBlueprint(Blueprint) && bForceLevelScriptRecompile))
 			&& (Blueprint->Status != BS_Unknown)
-			&& !Blueprint->IsPendingKill())
+			&& IsValid(Blueprint))
 		{
 			InNeedOfRecompile.Add(Blueprint);
 

@@ -160,6 +160,7 @@ public:
 	/**
 	 * Checks the PendingKill flag to see if it is dead but memory still valid
 	 */
+	UE_DEPRECATED(5.0, "IsPendingKill() should no longer be used. Use IsValid(Object) instead which also checks against null.")
 	FORCEINLINE bool IsPendingKill() const
 	{
 		return GUObjectArray.IndexToObject(InternalIndex)->IsPendingKill();

@@ -176,7 +176,7 @@ int64 UChannel::Close(EChannelCloseReason Reason)
 
 void UChannel::ConditionalCleanUp( const bool bForDestroy, EChannelCloseReason CloseReason )
 {
-	if ( !IsPendingKill() && !bPooled)
+	if (IsValidChecked(this) && !bPooled)
 	{
 		// CleanUp can return false to signify that we shouldn't mark pending kill quite yet
 		// We'll need to call cleanup again later on
@@ -2732,7 +2732,7 @@ void UActorChannel::ProcessBunch( FInBunch & Bunch )
 		bSpawnedNewActor = Connection->PackageMap->SerializeNewActor(Bunch, this, NewChannelActor);
 
 		// We are unsynchronized. Instead of crashing, let's try to recover.
-		if (NewChannelActor == NULL || NewChannelActor->IsPendingKill())
+		if (!IsValid(NewChannelActor))
 		{
 			// got a redundant destruction info, possible when streaming
 			if (!bSpawnedNewActor && Bunch.bReliable && Bunch.bClose && Bunch.AtEnd())
@@ -2839,9 +2839,9 @@ void UActorChannel::ProcessBunch( FInBunch & Bunch )
 			continue;
 		}
 
-		if ( !RepObj || RepObj->IsPendingKill() )
+		if ( !IsValid(RepObj) )
 		{
-			if ( !Actor || Actor->IsPendingKill() )
+			if ( !IsValid(Actor) )
 			{
 				// If we couldn't find the actor, that's pretty bad, we need to stop processing on this channel
 				UE_LOG( LogNet, Warning, TEXT( "UActorChannel::ProcessBunch: ReadContentBlockPayload failed to find/create ACTOR. RepObj: %s, Channel: %i" ), RepObj ? *RepObj->GetFullName() : TEXT( "NULL" ), ChIndex );
@@ -2880,7 +2880,7 @@ void UActorChannel::ProcessBunch( FInBunch & Bunch )
 		// Check to see if the actor was destroyed
 		// If so, don't continue processing packets on this channel, or we'll trigger an error otherwise
 		// note that this is a legitimate occurrence, particularly on client to server RPCs
-		if ( !Actor || Actor->IsPendingKill() )
+		if ( !IsValid(Actor) )
 		{
 			UE_LOG( LogNet, VeryVerbose, TEXT( "UActorChannel::ProcessBunch: Actor was destroyed during Replicator.ReceivedBunch processing" ) );
 			// If we lose the actor on this channel, we can no longer process bunches, so consider this channel broken
@@ -4219,7 +4219,7 @@ bool UActorChannel::ReplicateSubobject(UObject *Obj, FOutBunch &Bunch, const FRe
 {
 	SCOPE_CYCLE_UOBJECT(ActorChannelRepSubObj, Obj);
 
-	if (!Obj || Obj->IsPendingKill())
+	if (!IsValid(Obj))
 	{
 		return false;
 	}

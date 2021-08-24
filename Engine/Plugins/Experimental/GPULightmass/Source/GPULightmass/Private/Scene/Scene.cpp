@@ -139,7 +139,7 @@ void FScene::GatherImportanceVolumes()
 	for (TObjectIterator<ALightmassImportanceVolume> It; It; ++It)
 	{
 		ALightmassImportanceVolume* LMIVolume = *It;
-		if (GPULightmass->World->ContainsActor(LMIVolume) && !LMIVolume->IsPendingKill())
+		if (GPULightmass->World->ContainsActor(LMIVolume) && IsValid(LMIVolume))
 		{
 			CombinedImportanceVolume += LMIVolume->GetComponentsBoundingBox(true);
 			ImportanceVolumes.Add(LMIVolume->GetComponentsBoundingBox(true));

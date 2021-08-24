@@ -552,7 +552,7 @@ void UObject::PreEditUndo()
 
 void UObject::PostEditUndo()
 {
-	if( !IsPendingKill() )
+	if( IsValidChecked(this) )
 	{
 		PostEditChange();
 	}
@@ -589,7 +589,7 @@ TSharedPtr<ITransactionObjectAnnotation> UObject::CreateAndRestoreTransactionAnn
 
 bool UObject::IsSelectedInEditor() const
 {
-	return !IsPendingKill() && GIsObjectSelectedInEditor && GIsObjectSelectedInEditor(this);
+	return IsValidChecked(this) && GIsObjectSelectedInEditor && GIsObjectSelectedInEditor(this);
 }
 
 #endif // WITH_EDITOR
@@ -1417,7 +1417,7 @@ void UObject::Serialize(FStructuredArchive::FRecord Record)
 		// Keep track of pending kill
 		if (UnderlyingArchive.IsTransacting())
 		{
-			bool WasKill = IsPendingKill();
+			bool WasKill = !IsValidChecked(this);
 			if (UnderlyingArchive.IsLoading())
 			{
 				Record << SA_VALUE(TEXT("WasKill"), WasKill);
@@ -1984,7 +1984,7 @@ void UObject::GetResourceSizeEx(FResourceSizeEx& CumulativeResourceSize)
 bool UObject::IsAsset() const
 {
 	// Assets are not transient or CDOs. They must be public.
-	const bool bHasValidObjectFlags = !HasAnyFlags(RF_Transient | RF_ClassDefaultObject) && HasAnyFlags(RF_Public) && !IsPendingKill();
+	const bool bHasValidObjectFlags = !HasAnyFlags(RF_Transient | RF_ClassDefaultObject) && HasAnyFlags(RF_Public) && IsValidChecked(this);
 
 	if ( bHasValidObjectFlags )
 	{
@@ -2027,7 +2027,7 @@ bool UObject::IsSafeForRootSet() const
 	}
 
 	// Exclude linkers from root set if we're using seekfree loading		
-	if (!IsPendingKill())
+	if (IsValidChecked(this))
 	{
 		return true;
 	}
@@ -3613,7 +3613,7 @@ bool StaticExec( UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar )
 								continue;
 							}
 
-							if ( (bShowPendingKills || !CurrentObject->IsPendingKill()) && CurrentObject->IsA(Class) )
+							if ( (bShowPendingKills || IsValidChecked(CurrentObject)) && CurrentObject->IsA(Class) )
 							{
 								if (!Property)
 								{
@@ -3869,7 +3869,7 @@ bool StaticExec( UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar )
 				// Skip objects that are trashed
 				if ((Target->GetOutermost() == GetTransientPackage())
 					|| Target->GetClass()->HasAnyClassFlags(CLASS_NewerVersionExists)
-					|| Target->IsPendingKill())
+					|| !IsValidChecked(Target))
 				{
 					continue;
 				}
@@ -3885,7 +3885,7 @@ bool StaticExec( UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar )
 					const UClass* SubObjClass = SubObj->GetClass();
 					const FString SubObjName = SubObj->GetName();
 
-					if (SubObj->IsPendingKill())
+					if (!IsValid(SubObj))
 					{
 						continue;
 					}

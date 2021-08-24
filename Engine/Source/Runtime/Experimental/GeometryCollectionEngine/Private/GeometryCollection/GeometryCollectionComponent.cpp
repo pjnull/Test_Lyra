@@ -2732,7 +2732,7 @@ void UGeometryCollectionComponent::ClearEmbeddedGeometry()
 
 	for (UActorComponent* TargetComponent : TargetComponents)
 	{
-		if ((TargetComponent->GetOuter() == this) || (TargetComponent->GetOuter()->IsPendingKill()))
+		if ((TargetComponent->GetOuter() == this) || !IsValidChecked(TargetComponent->GetOuter()))
 		{
 			if (UInstancedStaticMeshComponent* ISMComponent = Cast<UInstancedStaticMeshComponent>(TargetComponent))
 			{

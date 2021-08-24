@@ -9393,7 +9393,7 @@ void FBlueprintEditor::OnEditTabClosed(TSharedRef<SDockTab> Tab)
 // Tries to open the specified graph and bring it's document to the front
 TSharedPtr<SGraphEditor> FBlueprintEditor::OpenGraphAndBringToFront(UEdGraph* Graph, bool bSetFocus)
 {
-	if (!Graph || Graph->IsPendingKill())
+	if (!IsValid(Graph))
 	{
 		return TSharedPtr<SGraphEditor>();
 	}
@@ -9870,7 +9870,7 @@ UEdGraph* FBlueprintEditor::GetFocusedGraph() const
 	{
 		if (UEdGraph* Graph = FocusedGraphEdPtr.Pin()->GetCurrentGraph())
 		{
-			if (!Graph->IsPendingKill())
+			if (IsValid(Graph))
 			{
 				return Graph;
 			}

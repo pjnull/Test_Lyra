@@ -1691,7 +1691,7 @@ void UWidgetComponent::SetSlateWidget(const TSharedPtr<SWidget>& InSlateWidget)
 void UWidgetComponent::UpdateWidget()
 {
 	// Don't do any work if Slate is not initialized
-	if (FSlateApplication::IsInitialized() && !IsPendingKill())
+	if (FSlateApplication::IsInitialized() && IsValid(this))
 	{
 		if (Space == EWidgetSpace::World)
 		{

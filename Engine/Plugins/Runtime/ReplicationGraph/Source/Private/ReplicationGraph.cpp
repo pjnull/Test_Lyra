@@ -583,7 +583,7 @@ void UReplicationGraph::InitializeForWorld(UWorld* World)
 		for (FActorIterator Iter(World); Iter; ++Iter)
 		{
 			AActor* Actor = *Iter;
-			if (Actor != nullptr && !Actor->IsPendingKill() && ULevel::IsNetActor(Actor))
+			if (IsValid(Actor) && ULevel::IsNetActor(Actor))
 			{
 				AddNetworkActor(Actor);
 			}
@@ -1779,8 +1779,8 @@ int64 UReplicationGraph::ReplicateSingleActor(AActor* Actor, FConnectionReplicat
 		UE_LOG(LogReplicationGraph, Display, TEXT("UReplicationGraph::ReplicateSingleActor: %s. NetConnection: %s"), *Actor->GetName(), *NetConnection->Describe());
 	}
 
-	if (!ensureMsgf(IsActorValidForReplication(Actor), TEXT("Actor not valid for replication (BeingDestroyed:%d) (PendingKill:%d) (Unreachable:%d) (TearOff:%d)! Actor = %s, Channel = %s"),
-					Actor->IsActorBeingDestroyed(), Actor->IsPendingKill(), Actor->IsUnreachable(), Actor->GetTearOff(),
+	if (!ensureMsgf(IsActorValidForReplication(Actor), TEXT("Actor not valid for replication (BeingDestroyed:%d) (IsValid:%d) (Unreachable:%d) (TearOff:%d)! Actor = %s, Channel = %s"),
+					Actor->IsActorBeingDestroyed(), IsValid(Actor), Actor->IsUnreachable(), Actor->GetTearOff(),
 					*Actor->GetFullName(), *DescribeSafe(ActorInfo.Channel)))
 	{
 		return 0;
@@ -1918,9 +1918,9 @@ int64 UReplicationGraph::ReplicateSingleActor(AActor* Actor, FConnectionReplicat
 				continue;
 			}
 
-			if (!ensureMsgf(IsActorValidForReplication(DependentActor), TEXT("DependentActor %s (Owner: %s) not valid for replication (BeingDestroyed:%d) (PendingKill:%d) (Unreachable:%d) (TearOff:%d)! Channel = %s"),
+			if (!ensureMsgf(IsActorValidForReplication(DependentActor), TEXT("DependentActor %s (Owner: %s) not valid for replication (BeingDestroyed:%d) (IsValid:%d) (Unreachable:%d) (TearOff:%d)! Channel = %s"),
 							*DependentActor->GetFullName(), *Actor->GetFullName(),
-							DependentActor->IsActorBeingDestroyed(), DependentActor->IsPendingKill(), DependentActor->IsUnreachable(), DependentActor->GetTearOff(),
+							DependentActor->IsActorBeingDestroyed(), IsValid(DependentActor), DependentActor->IsUnreachable(), DependentActor->GetTearOff(),
 							*DescribeSafe(DependentActorConnectionInfo.Channel)))
 			{
 				continue;
@@ -2872,7 +2872,7 @@ void UReplicationGraphNode::CleanChildNodes(UReplicationGraphNode::NodeOrdering 
 {
 	auto RemoveFunc = [](UReplicationGraphNode* GridChildNode)
 	{
-		return (GridChildNode == nullptr) || GridChildNode->IsPendingKill();
+		return !IsValid(GridChildNode);
 	};
 
 	if (NodeOrder == NodeOrdering::IgnoreOrdering)

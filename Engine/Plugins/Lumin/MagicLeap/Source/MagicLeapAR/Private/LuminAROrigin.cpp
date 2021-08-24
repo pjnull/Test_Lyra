@@ -56,7 +56,7 @@ ALuminAROrigin* ALuminAROrigin::GetOriginActor(
 	ALuminAROrigin* FoundActor = nullptr;
 	for (TActorIterator<ALuminAROrigin> Iter(GameWorld); Iter; ++Iter)
 	{
-		if (!(*Iter)->IsPendingKill())
+		if (IsValid(*Iter))
 		{
 			FoundActor = *Iter;
 			break;

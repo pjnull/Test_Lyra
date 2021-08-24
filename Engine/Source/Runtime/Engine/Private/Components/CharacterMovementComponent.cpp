@@ -6368,7 +6368,7 @@ void UCharacterMovementComponent::FindFloor(const FVector& CapsuleLocation, FFin
 				|| MovementBaseUtility::IsDynamicBase(MovementBase);
 			}
 
-			const bool IsActorBasePendingKill = BaseActor && BaseActor->IsPendingKill();
+			const bool IsActorBasePendingKill = BaseActor && !IsValid(BaseActor);
 
 			if ( !bForceNextFloorCheck && !IsActorBasePendingKill && MovementBase )
 			{

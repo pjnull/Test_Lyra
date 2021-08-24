@@ -666,7 +666,7 @@ bool FHierarchicalLODBuilder::ShouldBuildHLODForLevel(const UWorld* InWorld, con
 
 bool FHierarchicalLODBuilder::ShouldGenerateCluster(AActor* Actor, const int32 HLODLevelIndex)
 {
-	if (!Actor)
+	if (!IsValid(Actor))
 	{
 		return false;
 	}

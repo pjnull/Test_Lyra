@@ -324,6 +324,7 @@ void UBoolProperty::SetBoolSize(const uint32 InSize, const bool bIsNativeBool, c
 	check(ByteMask != 0);
 }
 
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
 void UBoolProperty::Serialize(FArchive& Ar)
 {
 	Super::Serialize(Ar);
@@ -346,6 +347,7 @@ void UBoolProperty::Serialize(FArchive& Ar)
 		Ar << NativeBool;
 	}
 }
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 IMPLEMENT_CORE_INTRINSIC_CLASS(UBoolProperty, UProperty,
 	{

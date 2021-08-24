@@ -624,7 +624,7 @@ void FReloadClassReinstancer::UpdateDefaultProperties()
 		for (FThreadSafeObjectIterator It(NewClass); It; ++It)
 		{
 			UObject* ObjectPtr = *It;
-			if (ObjectPtr->IsPendingKill() || ObjectPtr->GetOutermost() == TransientPackage)
+			if (!IsValidChecked(ObjectPtr) || ObjectPtr->GetOutermost() == TransientPackage)
 			{
 				continue;
 			}
@@ -1179,7 +1179,7 @@ void FReload::ReplaceReferencesToReconstructedCDOs()
 	{
 		UObject* CurObject = *ObjIter;
 
-		if (CurObject->IsPendingKill())
+		if (!IsValidChecked(CurObject))
 		{
 			continue;
 		}

@@ -266,7 +266,7 @@ void UMagicLeapMovementComponent::SetUpdatedComponent(USceneComponent* NewUpdate
 
 	Super::SetUpdatedComponent(NewUpdatedComponent);
 
-	if (UpdatedPrimitive != nullptr && !UpdatedPrimitive->IsPendingKill())
+	if (IsValid(UpdatedPrimitive))
 	{
 		UpdatedPrimitive->OnComponentBeginOverlap.AddDynamic(this, &UMagicLeapMovementComponent::OnUpdatedComponentOverlapBegin);
 		UpdatedPrimitive->OnComponentEndOverlap.AddDynamic(this, &UMagicLeapMovementComponent::OnUpdatedComponentOverlapEnd);

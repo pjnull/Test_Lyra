@@ -3089,7 +3089,7 @@ void FBlueprintEditorUtils::FindDependentBlueprints(UBlueprint* Blueprint, TArra
 	// the previous version of htis code checked IsPendingKill():
 	TArray<UBlueprint*> AllBlueprintSafe;
 	Algo::TransformIf(AllBlueprints, AllBlueprintSafe, 
-		[](UObject* Obj)->bool { return Obj && !Obj->IsPendingKill(); }, 
+		[](UObject* Obj)->bool { return IsValid(Obj); }, 
 		[](UObject* Obj)->UBlueprint* { return static_cast<UBlueprint*>(Obj); } 
 	);
 
@@ -8778,7 +8778,7 @@ void FBlueprintEditorUtils::AnalyticsTrackNewNode( UEdGraphNode *NewNode )
 
 bool FBlueprintEditorUtils::IsObjectADebugCandidate( AActor* InActorObject, UBlueprint* InBlueprint, bool bInDisallowDerivedBlueprints )
 {
-	const bool bPassesFlags = !InActorObject->HasAnyFlags(RF_ClassDefaultObject) && !InActorObject->IsPendingKill();
+	const bool bPassesFlags = !InActorObject->HasAnyFlags(RF_ClassDefaultObject) && IsValid(InActorObject);
 	bool bCanDebugThisObject = false;
 	if( bInDisallowDerivedBlueprints == true )
 	{
@@ -10016,7 +10016,7 @@ namespace
 		{
 			UK2Node* Node = *It;
 
-			if (Node && !Node->HasAnyFlags(RF_Transient) && !Node->IsPendingKill())
+			if (Node && !Node->HasAnyFlags(RF_Transient) && IsValidChecked(Node))
 			{
 				bool bReconstruct = FFindOrUpdateNodeHelper<TObject, bIsFind>::FindOrUpdateNode(Node, InFindExisting);
 

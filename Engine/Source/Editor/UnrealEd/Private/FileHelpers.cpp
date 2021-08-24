@@ -2837,7 +2837,7 @@ EAutosaveContentPackagesResult::Type FEditorFileUtils::AutosaveMapEx(const FStri
 						{
 							if (Cast<AActor>(Object))
 							{
-								if (!Object->IsPendingKill())
+								if (IsValidChecked(Object))
 								{
 									bActorPackageNeedsToSave = true;
 									return false;
@@ -4444,7 +4444,7 @@ void FEditorFileUtils::GetDirtyWorldPackages(TArray<UPackage*>& OutDirtyPackages
 							{
 								if (Cast<AActor>(Object))
 								{
-									if (!Object->IsPendingKill())
+									if (IsValidChecked(Object))
 									{
 										bActorPackageNeedsToSave = true;
 										return false;

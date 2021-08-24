@@ -150,7 +150,7 @@ void UDataprepOverlappingActorsSelectionTransform::OnExecution_Implementation(co
 
 	for (UObject* Object : InObjects)
 	{
-		if (!ensure(Object) || Object->IsPendingKill())
+		if (!ensure(Object) || !IsValidChecked(Object))
 		{
 			continue;
 		}

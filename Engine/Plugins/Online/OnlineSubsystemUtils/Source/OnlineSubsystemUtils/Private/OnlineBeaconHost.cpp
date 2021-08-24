@@ -438,7 +438,7 @@ void AOnlineBeaconHost::CloseHandshakeConnection(UNetConnection* Connection)
 
 void AOnlineBeaconHost::DisconnectClient(AOnlineBeaconClient* ClientActor)
 {
-	if (ClientActor && ClientActor->GetConnectionState() != EBeaconConnectionState::Closed && !ClientActor->IsPendingKill())
+	if (IsValid(ClientActor) && ClientActor->GetConnectionState() != EBeaconConnectionState::Closed)
 	{
 		ClientActor->SetConnectionState(EBeaconConnectionState::Closed);
 

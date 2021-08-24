@@ -1920,7 +1920,7 @@ void UNetDriver::TickDispatch( float DeltaTime )
 				{
 					CurConn->CleanUp();
 				}
-				else if (!CurConn->IsPendingKill())
+				else if (IsValid(CurConn))
 				{
 					CurConn->PreTickDispatch();
 				}
@@ -1952,7 +1952,7 @@ void UNetDriver::TickDispatch( float DeltaTime )
 			}
 		}
 	}
-	else if (!ServerConnection->IsPendingKill())
+	else if (IsValid(ServerConnection))
 	{
 		ServerConnection->PreTickDispatch();
 	}
@@ -1967,7 +1967,7 @@ void UNetDriver::PostTickDispatch()
 	// Flush out of order packet caches for connections that did not receive the missing packets during TickDispatch
 	if (ServerConnection != nullptr)
 	{
-		if (!ServerConnection->IsPendingKill())
+		if (IsValid(ServerConnection))
 		{
 			ServerConnection->PostTickDispatch();
 		}
@@ -1976,7 +1976,7 @@ void UNetDriver::PostTickDispatch()
 	TArray<UNetConnection*> ClientConnCopy = ClientConnections;
 	for (UNetConnection* CurConn : ClientConnCopy)
 	{
-		if (!CurConn->IsPendingKill())
+		if (IsValid(CurConn))
 		{
 			CurConn->PostTickDispatch();
 		}
@@ -5250,7 +5250,7 @@ UChannel* UNetDriver::GetOrCreateChannelByName(const FName& ChName)
 		if (RetVal)
 		{
 			check(RetVal->GetClass() == ChannelDefinitionMap[ChName].ChannelClass);
-			check(!RetVal->IsPendingKill());
+			check(IsValid(RetVal));
 			RetVal->bPooled = false;
 		}
 	}
@@ -5270,8 +5270,7 @@ UChannel* UNetDriver::InternalCreateChannelByName(const FName& ChName)
 
 void UNetDriver::ReleaseToChannelPool(UChannel* Channel)
 {
-	check(Channel);
-	check(!Channel->IsPendingKill());
+	check(IsValid(Channel));
 	if (Channel->ChName == NAME_Actor && CVarActorChannelPool.GetValueOnAnyThread() != 0)
 	{
 		ActorChannelPool.Push(Channel);

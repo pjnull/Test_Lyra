@@ -2561,8 +2561,7 @@ void UWorld::AddToWorld( ULevel* Level, const FTransform& LevelTransform, bool b
 	SCOPE_CYCLE_COUNTER(STAT_AddToWorldTime);
 	CSV_SCOPED_TIMING_STAT_EXCLUSIVE(AddToWorld);
 
-	check(Level);
-	check(!Level->IsPendingKill());
+	check(IsValid(Level));
 	check(!Level->IsUnreachable());
 
 	FScopeCycleCounterUObject ContextScope(Level);
@@ -2901,8 +2900,7 @@ void UWorld::RemoveFromWorld( ULevel* Level, bool bAllowIncrementalRemoval )
 	CSV_SCOPED_TIMING_STAT_EXCLUSIVE(RemoveFromWorld);
 
 	FScopeCycleCounterUObject Context(Level);
-	check(Level);
-	check(!Level->IsPendingKill());
+	check(IsValid(Level));
 	check(!Level->IsUnreachable());
 
 	Level->bIsDisassociatingLevel = true;

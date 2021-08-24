@@ -56,7 +56,7 @@ public:
 	explicit TComponentIterator(AActor* OwnerActor)
 		: CompIndex(-1)
 	{
-		if (OwnerActor && !OwnerActor->IsPendingKill())
+		if (IsValid(OwnerActor))
 		{
 			OwnerActor->GetComponents<T>(AllComponents);
 		}
@@ -105,7 +105,7 @@ protected:
 			check(Comp);
 			if (Comp->IsRegistered())
 			{
-				checkf(!Comp->IsPendingKill(), TEXT("Registered game framework component was pending kill! Comp: %s"), *GetPathNameSafe(Comp));
+				checkf(IsValid(Comp), TEXT("Registered game framework component was pending kill! Comp: %s"), *GetPathNameSafe(Comp));
 				return true;
 			}
 		}
@@ -134,7 +134,7 @@ public:
 	explicit TConstComponentIterator(const AActor* OwnerActor)
 		: CompIndex(-1)
 	{
-		if (OwnerActor && !OwnerActor->IsPendingKill())
+		if (IsValid(OwnerActor))
 		{
 			OwnerActor->GetComponents<const T>(AllComponents);
 		}
@@ -183,7 +183,7 @@ protected:
 			check(Comp);
 			if (Comp->IsRegistered())
 			{
-				checkf(!Comp->IsPendingKill(), TEXT("Registered game framework component was pending kill! Comp: %s"), *GetPathNameSafe(Comp));
+				checkf(IsValidChecked(Comp), TEXT("Registered game framework component was invalid! Comp: %s"), *GetPathNameSafe(Comp));
 				return true;
 			}
 		}

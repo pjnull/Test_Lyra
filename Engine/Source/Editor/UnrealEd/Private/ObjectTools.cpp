@@ -167,7 +167,7 @@ namespace ObjectTools
 			{
 				if( ObjectPackage != GetTransientPackage()
 					&& (ObjectPackage->HasAnyPackageFlags(PKG_PlayInEditor) == false)
-					&& !Obj->IsPendingKill() 
+					&& IsValidChecked(Obj) 
 					&& !Obj->IsA<AActor>())
 				{
 					bIsSupported = true;
@@ -3015,7 +3015,7 @@ namespace ObjectTools
 				UActorComponent* CurComponent = *ComponentItr;
 
 				// Skip if already pending GC
-				if (!CurComponent->IsPendingKill())
+				if (IsValid(CurComponent))
 				{
 					// Deselect if active
 					USelection* SelectedComponents = GEditor->GetSelectedComponents();
@@ -3045,7 +3045,7 @@ namespace ObjectTools
 				AActor* CurActor = *ActorItr;
 
 				// Skip if already pending GC
-				if ( !CurActor->IsPendingKill() )
+				if ( IsValid(CurActor) )
 				{
 					// Deselect if active
 					USelection* SelectedActors = GEditor->GetSelectedActors();

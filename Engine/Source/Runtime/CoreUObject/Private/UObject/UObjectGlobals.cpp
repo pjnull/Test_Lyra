@@ -444,7 +444,7 @@ void GlobalSetProperty( const TCHAR* Value, UClass* Class, FProperty* Property, 
 		for( FThreadSafeObjectIterator It; It; ++It )
 		{	
 			UObject* Object = *It;
-			if( Object->IsA(Class) && !Object->IsPendingKill() )
+			if( Object->IsA(Class) && IsValidChecked(Object) )
 			{
 				// If we're in a PIE session then only allow set commands to affect PlayInEditor objects.
 				if( !GIsPlayInEditorWorld || Object->GetOutermost()->HasAnyPackageFlags(PKG_PlayInEditor)  )
@@ -3856,7 +3856,7 @@ public:
 			{
 				checkSlow( Object->IsValidLowLevel() );
 				// We cannot use RF_PendingKill on objects that are part of the root set.
-				checkCode( if( Object->IsPendingKill() ) { UE_LOG(LogUObjectGlobals, Fatal, TEXT("Object %s is part of root set though has been marked RF_PendingKill!"), *Object->GetFullName() ); } );
+				checkCode( if( !IsValidChecked(Object) ) { UE_LOG(LogUObjectGlobals, Fatal, TEXT("Object %s is part of root set though is invalid!"), *Object->GetFullName() ); } );
 				// Add to list of objects to serialize.
 				ObjectsToSerialize.Add( Object );
 			}

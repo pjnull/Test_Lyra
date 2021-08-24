@@ -1587,6 +1587,8 @@ private:
 	}
 };
 
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
+
 /**
 * Test validity of object
 *
@@ -1597,6 +1599,20 @@ FORCEINLINE bool IsValid(const UObject *Test)
 {
 	return Test && !Test->IsPendingKill();
 }
+
+/**
+* Test validity of object similar to IsValid(Test) however the null pointer test is skipped
+*
+* @param	Test			The object to test
+* @return	Return true if the object is usable: not pending kill
+*/
+FORCEINLINE bool IsValidChecked(const UObject* Test)
+{
+	check(Test);
+	return !Test->IsPendingKill();
+}
+
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 #if WITH_EDITOR
 /** Callback for editor object selection. This must be in core instead of editor for UObject::IsSelectedInEditor to work */

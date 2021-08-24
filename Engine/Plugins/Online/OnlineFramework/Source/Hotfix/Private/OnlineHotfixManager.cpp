@@ -1098,7 +1098,7 @@ bool UOnlineHotfixManager::HotfixIniFile(const FString& FileName, const FString&
 			GetObjectsOfClass(Class, Objects, true, RF_NoFlags);
 			for (UObject* Object : Objects)
 			{
-				if (!Object->IsPendingKill())
+				if (IsValid(Object))
 				{
 					// Force a reload of the config vars
 					UE_LOG(LogHotfixManager, Verbose, TEXT("Reloading %s"), *Object->GetPathName());
@@ -1274,7 +1274,7 @@ bool UOnlineHotfixManager::HotfixPakIniFile(const FString& FileName)
 				GetObjectsOfClass(Class, Objects, true, RF_NoFlags);
 				for (UObject* Object : Objects)
 				{
-					if (!Object->IsPendingKill())
+					if (IsValid(Object))
 					{
 						// Force a reload of the config vars
 						Object->ReloadConfig();
@@ -1459,7 +1459,7 @@ void UOnlineHotfixManager::RestoreBackupIniFiles()
 				GetObjectsOfClass(Class, Objects, true, RF_NoFlags);
 				for (UObject* Object : Objects)
 				{
-					if (!Object->IsPendingKill())
+					if (IsValid(Object))
 					{
 						UE_LOG(LogHotfixManager, Verbose, TEXT("Restoring %s"), *Object->GetPathName());
 						Object->ReloadConfig();

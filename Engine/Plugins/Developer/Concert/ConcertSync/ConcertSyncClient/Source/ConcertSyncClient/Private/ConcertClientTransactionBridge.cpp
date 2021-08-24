@@ -153,7 +153,7 @@ struct FEditorTransactionNotification
 				DeltaChange.bHasNameChange = !InObjectUpdate.ObjectData.NewName.IsNone();
 				DeltaChange.bHasOuterChange = !InObjectUpdate.ObjectData.NewOuterPathName.IsNone();
 				DeltaChange.bHasExternalPackageChange = !InObjectUpdate.ObjectData.NewExternalPackageName.IsNone();
-				DeltaChange.bHasPendingKillChange = InObjectUpdate.ObjectData.bIsPendingKill != InTransactionObject->IsPendingKill();
+				DeltaChange.bHasPendingKillChange = InObjectUpdate.ObjectData.bIsPendingKill != !IsValid(InTransactionObject);
 				DeltaChange.bHasNonPropertyChanges = InObjectUpdate.ObjectData.SerializedData.Num() > 0;
 				for (const FConcertSerializedPropertyData& PropertyData : InObjectUpdate.PropertyDatas)
 				{
@@ -646,7 +646,7 @@ void FConcertClientTransactionBridge::HandleObjectTransacted(UObject* InObject, 
 				ObjectUpdatePtr->ObjectId = ObjectId;
 				ObjectUpdatePtr->ObjectPathDepth = ConcertSyncClientUtil::GetObjectPathDepth(InObject);
 				ObjectUpdatePtr->ObjectData.bAllowCreate = false;
-				ObjectUpdatePtr->ObjectData.bIsPendingKill = InObject->IsPendingKill();
+				ObjectUpdatePtr->ObjectData.bIsPendingKill = !IsValid(InObject);
 			}
 
 			if (TransactionAnnotation.IsValid())
@@ -685,8 +685,8 @@ void FConcertClientTransactionBridge::HandleObjectTransacted(UObject* InObject, 
 		FConcertExportedObject& ObjectUpdate = OngoingTransaction.FinalizedData.FinalizedObjectUpdates.AddDefaulted_GetRef();
 		ObjectUpdate.ObjectId = ObjectId;
 		ObjectUpdate.ObjectPathDepth = ConcertSyncClientUtil::GetObjectPathDepth(InObject);
-		ObjectUpdate.ObjectData.bAllowCreate = InTransactionEvent.HasPendingKillChange() && !InObject->IsPendingKill();
-		ObjectUpdate.ObjectData.bIsPendingKill = InObject->IsPendingKill();
+		ObjectUpdate.ObjectData.bAllowCreate = InTransactionEvent.HasPendingKillChange() && IsValid(InObject);
+		ObjectUpdate.ObjectData.bIsPendingKill = !IsValid(InObject);
 		ObjectUpdate.ObjectData.NewPackageName = NewObjectPackageName;
 		ObjectUpdate.ObjectData.NewName = NewObjectName;
 		ObjectUpdate.ObjectData.NewOuterPathName = NewObjectOuterPathName;
@@ -699,7 +699,7 @@ void FConcertClientTransactionBridge::HandleObjectTransacted(UObject* InObject, 
 		}
 
 		// If this object changed from being pending kill to not being pending kill, we have to send a full object update (including all properties), rather than attempt a delta-update
-		const bool bForceFullObjectUpdate = InTransactionEvent.HasPendingKillChange() && !InObject->IsPendingKill();
+		const bool bForceFullObjectUpdate = InTransactionEvent.HasPendingKillChange() && IsValid(InObject);
 		if (bForceFullObjectUpdate)
 		{
 			// Serialize the entire object.

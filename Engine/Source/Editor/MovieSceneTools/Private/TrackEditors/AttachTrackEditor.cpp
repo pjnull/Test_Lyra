@@ -260,7 +260,7 @@ bool F3DAttachTrackEditor::IsActorPickable(const AActor* const ParentActor, FGui
 	if (ParentActor->IsListedInSceneOutliner() &&
 		!FActorEditorUtils::IsABuilderBrush(ParentActor) &&
 		!ParentActor->IsA( AWorldSettings::StaticClass() ) &&
-		!ParentActor->IsPendingKill())
+		IsValid(ParentActor))
 	{			
 		return true;
 	}

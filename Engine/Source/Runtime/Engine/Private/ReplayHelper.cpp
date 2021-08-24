@@ -556,7 +556,7 @@ void FReplayHelper::SaveCheckpoint(UNetConnection* Connection)
 						AActor* Actor = NetworkObjectInfo->Actor;
 
 						// check to see if it should replicate at all
-						bool bCheckpointActor = Actor && !Actor->IsPendingKill() && ((Actor->GetRemoteRole() != ROLE_None || Actor->GetTearOff()) && (Actor == Connection->PlayerController || Cast<APlayerController>(Actor) == nullptr));
+						bool bCheckpointActor = IsValid(Actor) && ((Actor->GetRemoteRole() != ROLE_None || Actor->GetTearOff()) && (Actor == Connection->PlayerController || Cast<APlayerController>(Actor) == nullptr));
 						
 						// now look for an open channel
 						bCheckpointActor = bCheckpointActor && ActorChannelMap.Contains(NetworkObjectInfo->Actor);

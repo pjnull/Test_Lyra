@@ -627,7 +627,7 @@ void AGameMode::AddInactivePlayer(APlayerState* PlayerState, APlayerController* 
 			for (int32 Idx = 0; Idx < InactivePlayerArray.Num(); ++Idx)
 			{
 				APlayerState* const CurrentPlayerState = InactivePlayerArray[Idx];
-				if ((CurrentPlayerState == nullptr) || CurrentPlayerState->IsPendingKill())
+				if (!IsValid(CurrentPlayerState))
 				{
 					// already destroyed, just remove it
 					InactivePlayerArray.RemoveAt(Idx, 1);
@@ -688,7 +688,7 @@ bool AGameMode::FindInactivePlayer(APlayerController* PC)
 	for (int32 i=0; i < InactivePlayerArray.Num(); i++)
 	{
 		APlayerState* CurrentPlayerState = InactivePlayerArray[i];
-		if ( (CurrentPlayerState == nullptr) || CurrentPlayerState->IsPendingKill() )
+		if ( !IsValid(CurrentPlayerState) )
 		{
 			InactivePlayerArray.RemoveAt(i,1);
 			i--;

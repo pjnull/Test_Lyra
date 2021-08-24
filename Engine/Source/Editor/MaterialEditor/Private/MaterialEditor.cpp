@@ -5724,7 +5724,7 @@ void FMaterialEditor::RedoGraphAction()
 	{
 		// @TODO Find a more coherent check for this, rather than rely on sage knowledge that the schema won't exist.
 		// If our previous transaction created the current graph, it won't have a schema after undo.
-		if (FocusedGraphEd->GetCurrentGraph()->IsPendingKill())
+		if (!IsValidChecked(FocusedGraphEd->GetCurrentGraph()))
 		{
 			CloseDocumentTab(FocusedGraphEd->GetCurrentGraph());
 			DocumentManager->CleanInvalidTabs();

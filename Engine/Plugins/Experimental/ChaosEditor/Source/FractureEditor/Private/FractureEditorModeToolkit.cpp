@@ -989,7 +989,7 @@ void FFractureEditorModeToolkit::SetOutlinerComponents(const TArray<UGeometryCol
 		FGeometryCollectionEdit RestCollection = Component->EditRestCollection(GeometryCollection::EEditUpdate::None);
 		UGeometryCollection* FracturedGeometryCollection = RestCollection.GetRestCollection();
 
-		if (FracturedGeometryCollection && !FracturedGeometryCollection->IsPendingKill()) // Prevents crash when GC is deleted from content browser and actor is selected.
+		if (FracturedGeometryCollection && IsValidChecked(FracturedGeometryCollection)) // Prevents crash when GC is deleted from content browser and actor is selected.
 		{
 			TSharedPtr<FGeometryCollection, ESPMode::ThreadSafe> GeometryCollectionPtr = FracturedGeometryCollection->GetGeometryCollection();
 
@@ -1136,7 +1136,7 @@ void FFractureEditorModeToolkit::UpdateGeometryComponentAttributes(UGeometryColl
 	if (Component)
 	{
 		const UGeometryCollection* RestCollection = Component->GetRestCollection();
-		if (RestCollection && !RestCollection->IsPendingKill())
+		if (RestCollection && IsValidChecked(RestCollection))
 		{
 			FGeometryCollectionPtr GeometryCollection = RestCollection->GetGeometryCollection();
 
@@ -1414,7 +1414,7 @@ void FFractureEditorModeToolkit::RegenerateHistogram()
 void FFractureEditorModeToolkit::OnOutlinerBoneSelectionChanged(UGeometryCollectionComponent* RootComponent, TArray<int32>& SelectedBones)
 {
 	const UGeometryCollection* RestCollection = RootComponent->GetRestCollection();
-	if (RestCollection && !RestCollection->IsPendingKill())
+	if (RestCollection && IsValidChecked(RestCollection))
 	{
 		FScopedTransaction Transaction(FractureTransactionContexts::SelectBoneContext, LOCTEXT("SelectGeometryCollectionBoneTransaction", "Select Bone"), RootComponent);
 
@@ -1444,7 +1444,7 @@ void FFractureEditorModeToolkit::OnOutlinerBoneSelectionChanged(UGeometryCollect
 void FFractureEditorModeToolkit::OnHistogramBoneSelectionChanged(UGeometryCollectionComponent* RootComponent, TArray<int32>& SelectedBones)
 {
 	const UGeometryCollection* RestCollection = RootComponent->GetRestCollection();
-	if (RestCollection && !RestCollection->IsPendingKill())
+	if (RestCollection && IsValidChecked(RestCollection))
 	{
 		FScopedTransaction Transaction(FractureTransactionContexts::SelectBoneContext, LOCTEXT("SelectGeometryCollectionBoneTransaction", "Select Bone"), RootComponent);
 
