@@ -1621,7 +1621,7 @@ void FTViewTarget::CheckViewTarget(APlayerController* OwningController)
 		PlayerState = NULL;
 	}
 
-	if (IsValid(PlayerState))
+	if (PlayerState && IsValidChecked(PlayerState))
 	{
 		if (!IsValid(Target) || !Cast<APawn>(Target) || (CastChecked<APawn>(Target)->GetPlayerState() != PlayerState) )
 		{

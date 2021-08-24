@@ -152,7 +152,7 @@ void FGameplayDebuggerCategory_AI::CollectData(APlayerController* OwnerPC, AActo
 		DataPack.ControllerName = TEXT("No Controller");
 	}
 
-	if (IsValid(MyPawn))
+	if (MyPawn && IsValidChecked(MyPawn))
 	{
 		UCharacterMovementComponent* CharMovementComp = MyChar ? MyChar->GetCharacterMovement() : nullptr;
 		if (CharMovementComp)
