@@ -280,7 +280,7 @@ static void ParsePreviewPlatforms(const FConfigFile& IniFile)
 static void LoadDDPIIniSettings(const FConfigFile& IniFile, FDataDrivenPlatformInfo& Info, FName PlatformName)
 {
 	// look if this platform has any overrides on the commandline
-	FString CmdLinePrefix = FString::Printf(TEXT("ddpi:%s:"), *IniPlatformName.ToString());
+	FString CmdLinePrefix = FString::Printf(TEXT("ddpi:%s:"), *PlatformName.ToString());
 	if (FCString::Strifind(FCommandLine::Get(), *CmdLinePrefix) != nullptr)
 	{
 		GCommandLinePrefix = CmdLinePrefix;
@@ -386,8 +386,9 @@ const TMap<FName, FDataDrivenPlatformInfo>& FDataDrivenPlatformInfoRegistry::Get
 			if (IniFile.Contains(TEXT("DataDrivenPlatformInfo")))
 			{
 				// cache info
-				FDataDrivenPlatformInfoRegistry::FPlatformInfo& Info = DataDrivenPlatforms.FindOrAdd(PlatformName, FDataDrivenPlatformInfoRegistry::FPlatformInfo());
+				FDataDrivenPlatformInfo& Info = DataDrivenPlatforms.FindOrAdd(PlatformName, FDataDrivenPlatformInfo());
 				LoadDDPIIniSettings(IniFile, Info, PlatformName);
+				Info.IniPlatformName = PlatformName;
 
 				// get the parent to build list later
 				FString IniParent;
