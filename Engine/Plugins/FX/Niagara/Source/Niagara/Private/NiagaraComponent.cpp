@@ -1800,7 +1800,11 @@ FBoxSphereBounds UNiagaraComponent::CalcBounds(const FTransform& LocalToWorld) c
 	else
 	{
 		FBox SimBounds(ForceInit);
-		if (Asset && Asset->bFixedBounds)
+		if ( SystemInstanceController.IsValid() )
+		{
+			SimBounds = SystemInstanceController->GetSystemFixedBounds();
+		}
+		if (!SimBounds.IsValid && Asset && Asset->bFixedBounds)
 		{
 			SimBounds = Asset->GetFixedBounds();
 		}
