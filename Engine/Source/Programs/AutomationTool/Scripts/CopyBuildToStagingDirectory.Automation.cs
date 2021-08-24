@@ -4365,7 +4365,7 @@ namespace AutomationScripts
 					Params.Client,
 					Params.Manifests,
 					Params.SeparateDebugInfo,
-					Params.HasDLCName
+					Params.HasDLCName ? Params.DLCFile.Directory : null
 					);
 				LogDeploymentContext(SC);
 

@@ -121,8 +121,21 @@ static void DDPIIniRedirect(FString& StringData)
 	StringData = FoundValue;
 }
 
+// used to quickly check for commandline override
+static FString GCommandLinePrefix;
 static FString DDPITryRedirect(const FConfigFile& IniFile, const TCHAR* Key, bool* OutHadBang=nullptr)
 {
+	// check for commandline param
+	if (GCommandLinePrefix.Len() > 0)
+	{
+		FString CmdLineValue;
+		if (FParse::Value(FCommandLine::Get(), *(GCommandLinePrefix + Key + TEXT("=")), CmdLineValue))
+		{
+			UE_LOG(LogTemp, Display, TEXT("--> Overriding DDPI setting %s for to %s (via prefix %s)"), Key, *CmdLineValue, *GCommandLinePrefix);
+			return CmdLineValue;
+		}
+	}
+
 	FString StringData;
 	bool bWasFound = false;
 	if ((bWasFound = IniFile.GetString(TEXT("DataDrivenPlatformInfo"), Key, StringData)) == false)
@@ -266,6 +279,13 @@ static void ParsePreviewPlatforms(const FConfigFile& IniFile)
 
 static void LoadDDPIIniSettings(const FConfigFile& IniFile, FDataDrivenPlatformInfo& Info, FName PlatformName)
 {
+	// look if this platform has any overrides on the commandline
+	FString CmdLinePrefix = FString::Printf(TEXT("ddpi:%s:"), *IniPlatformName.ToString());
+	if (FCString::Strifind(FCommandLine::Get(), *CmdLinePrefix) != nullptr)
+	{
+		GCommandLinePrefix = CmdLinePrefix;
+	}
+
 	DDPIGetBool(IniFile, TEXT("bIsConfidential"), Info.bIsConfidential);
 	DDPIGetBool(IniFile, TEXT("bIsFakePlatform"), Info.bIsFakePlatform);
 	DDPIGetString(IniFile, TEXT("TargetSettingsIniSectionName"), Info.TargetSettingsIniSectionName);
@@ -329,7 +349,8 @@ static void LoadDDPIIniSettings(const FConfigFile& IniFile, FDataDrivenPlatformI
 	}
 	Info.UBTPlatformString = Info.UBTPlatformName.ToString();
 		
-	
+	GCommandLinePrefix = TEXT("");
+
 	// now that we have all targetplatforms in a single TP module per platform, just look for it (or a ShaderFormat for other tools that may want this)
 	// we could look for Platform*, but then platforms that are a substring of another one could return a false positive (Windows* would find Windows31TargetPlatform)
 	Info.bHasCompiledTargetSupport = FDataDrivenPlatformInfoRegistry::HasCompiledSupportForPlatform(PlatformName, FDataDrivenPlatformInfoRegistry::EPlatformNameType::TargetPlatform);
@@ -365,9 +386,8 @@ const TMap<FName, FDataDrivenPlatformInfo>& FDataDrivenPlatformInfoRegistry::Get
 			if (IniFile.Contains(TEXT("DataDrivenPlatformInfo")))
 			{
 				// cache info
-				FDataDrivenPlatformInfo& Info = DataDrivenPlatforms.FindOrAdd(PlatformName, FDataDrivenPlatformInfo());
+				FDataDrivenPlatformInfoRegistry::FPlatformInfo& Info = DataDrivenPlatforms.FindOrAdd(PlatformName, FDataDrivenPlatformInfoRegistry::FPlatformInfo());
 				LoadDDPIIniSettings(IniFile, Info, PlatformName);
-				Info.IniPlatformName = PlatformName;
 
 				// get the parent to build list later
 				FString IniParent;
