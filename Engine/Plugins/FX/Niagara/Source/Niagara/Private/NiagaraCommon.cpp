@@ -298,7 +298,7 @@ void FNiagaraSystemUpdateContext::AddInternal(UNiagaraComponent* Comp, bool bReI
 	if (FNiagaraSystemInstanceControllerPtr SystemInstanceController = Comp->GetSystemInstanceController())
 	{
 		SystemInstanceController->WaitForConcurrentTickAndFinalize();
-		if (IsValidChecked(Comp))
+		if (!IsValidChecked(Comp))
 		{
 			return;
 		}
