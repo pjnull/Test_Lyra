@@ -279,8 +279,6 @@ FNiagaraWorldManager::~FNiagaraWorldManager()
 
 FNiagaraWorldManager* FNiagaraWorldManager::Get(const UWorld* World)
 {
-	ensureMsgf(World && !World->bIsTearingDown, TEXT("Invalid world parameter for FNiagaraWorldManager::Get - if the world is tearing down then there should be no more work done with Niagara."));
-	
 	FNiagaraWorldManager** OutWorld = WorldManagers.Find(World);
 	if (OutWorld == nullptr)
 	{
