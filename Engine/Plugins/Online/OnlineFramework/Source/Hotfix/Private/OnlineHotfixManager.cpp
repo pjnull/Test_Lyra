@@ -1487,6 +1487,8 @@ void UOnlineHotfixManager::PatchAssetsFromIniFiles()
 	FConfigSection* AssetHotfixConfigSection = GConfig->GetSectionPrivate(TEXT("AssetHotfix"), false, true, GGameIni);
 	if (AssetHotfixConfigSection != nullptr)
 	{
+		TSet<UDataTable*> ChangedTables;
+
 		for (FConfigSection::TIterator It(*AssetHotfixConfigSection); It; ++It)
 		{
 			FMoviePlayerProxy::BlockingTick();
@@ -1549,7 +1551,7 @@ void UOnlineHotfixManager::PatchAssetsFromIniFiles()
 								//	+DataTable=<data table path>;RowUpdate;<row name>;<column name>;<new value>
 								//	+CurveTable=<curve table path>;RowUpdate;<row name>;<column name>;<new value>
 								//	+CurveFloat=<curve float path>;RowUpdate;None;<column name>;<new value>
-								HotfixRowUpdate(Asset, AssetPath, Tokens[2], Tokens[3], Tokens[4], ProblemStrings);
+								HotfixRowUpdate(Asset, AssetPath, Tokens[2], Tokens[3], Tokens[4], ProblemStrings, &ChangedTables);
 								bAddAssetToHotfixedList = ProblemStrings.Num() == 0;
 							}
 							else if ((HotfixType == TableUpdate || HotfixType == CurveUpdate) && Tokens.Num() == 3)
@@ -1621,6 +1623,14 @@ void UOnlineHotfixManager::PatchAssetsFromIniFiles()
 				UE_LOG(LogHotfixManager, Error, TEXT("[Item: %d] Invalid patchable asset type '%s' - supported types: %s"), TotalPatchableAssets, *It.Key().ToString(), *PatchableAssetClassesStr);
 			}
 		}
+
+		for (UDataTable* Table : ChangedTables)
+		{
+			if (Table != nullptr)
+			{
+				Table->HandleDataTableChanged();
+			}
+		}
 	}
 
 	if (TotalPatchableAssets == 0)
@@ -1638,7 +1648,7 @@ void UOnlineHotfixManager::PatchAssetsFromIniFiles()
 }
 
 
-void UOnlineHotfixManager::HotfixRowUpdate(UObject* Asset, const FString& AssetPath, const FString& RowName, const FString& ColumnName, const FString& NewValue, TArray<FString>& ProblemStrings)
+void UOnlineHotfixManager::HotfixRowUpdate(UObject* Asset, const FString& AssetPath, const FString& RowName, const FString& ColumnName, const FString& NewValue, TArray<FString>& ProblemStrings, TSet<UDataTable*>* ChangedTables)
 {
 	if (AssetPath.IsEmpty())
 	{
@@ -1785,7 +1795,14 @@ void UOnlineHotfixManager::HotfixRowUpdate(UObject* Asset, const FString& AssetP
 
 		if (bWasDataTableChanged)
 		{
-			DataTable->HandleDataTableChanged();
+			if (ChangedTables == nullptr)
+			{
+				DataTable->HandleDataTableChanged();
+			}
+			else
+			{
+				ChangedTables->Add(DataTable);
+			}
 		}
 	}
 	else if (CurveTable)
