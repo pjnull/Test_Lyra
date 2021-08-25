@@ -18,6 +18,7 @@
 	#include "RHI.h"
 	#include "AudioCompressionSettings.h"
 #endif // WITH_ENGINE
+#include "Windows/WindowsPlatformProperties.h"
 
 
 #define LOCTEXT_NAMESPACE "TGenericWindowsTargetPlatform"
