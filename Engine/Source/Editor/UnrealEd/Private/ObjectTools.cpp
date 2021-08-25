@@ -4546,6 +4546,10 @@ namespace ThumbnailTools
 
 		if( RenderInfo != NULL && RenderInfo->Renderer != NULL )
 		{
+			// Make sure we suppress any message dialogs that might result from constructing
+			// or initializing any of the renderable objects.
+			TGuardValue<bool> Unattended(GIsRunningUnattendedScript, true);
+
 			const float ZoomFactor = 1.0f;
 
 			uint32 DrawWidth = InImageWidth;
