@@ -1243,7 +1243,7 @@ FMenuAndSearchBoxWidgets FNiagaraSystemToolkitParameterPanelViewModel::GetParame
 		.NamespaceId(Category.NamespaceMetaData.GetGuid())
 		.ShowNamespaceCategory(false)
 		.ShowGraphParameters(false)
-		.AutoExpandMenu(true)
+		.AutoExpandMenu(false)
 		.AdditionalCulledParameterNames(AdditionalCulledParameterNames);
 
 	ParameterMenuSearchBoxWidget = MenuWidget->GetSearchBox();
