@@ -6,6 +6,7 @@
 #include "Misc/FileHelper.h"
 #include "Misc/ConfigCacheIni.h"
 #include "Modules/ModuleManager.h"
+#include "Misc/CommandLine.h"
 
 
 namespace 
