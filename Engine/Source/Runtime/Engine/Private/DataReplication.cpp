@@ -503,6 +503,20 @@ void FObjectReplicator::InitWithObject( UObject* InObject, UNetConnection * InCo
 	// Make a copy of the net properties
 	uint8* Source = bUseDefaultState ? (uint8*)GetObject()->GetArchetype() : (uint8*)InObject;
 
+	if ((Source == nullptr) && bUseDefaultState)
+	{
+		if (ObjectClass != nullptr)
+		{
+			UE_LOG(LogRep, Error, TEXT("FObjectReplicator::InitWithObject: Invalid object archetype, initializing shadow state to class default state: %s"), *GetFullNameSafe(InObject));
+			Source = (uint8*)ObjectClass->GetDefaultObject();
+		}
+		else
+		{
+			UE_LOG(LogRep, Error, TEXT("FObjectReplicator::InitWithObject: Invalid object archetype and class, initializing shadow state to current object state: %s"), *GetFullNameSafe(InObject));
+			Source = (uint8*)InObject;
+		}
+	}
+
 	InitRecentProperties( Source );
 
 	Connection->Driver->AllOwnedReplicators.Add(this);
