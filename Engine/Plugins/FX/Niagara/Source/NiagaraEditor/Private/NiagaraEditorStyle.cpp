@@ -66,7 +66,9 @@ namespace NiagaraEditorStyleImpl {
 void InitStats(TSharedRef< FSlateStyleSet > Style)
 {
 	const FTextBlockStyle CategoryText = FAppStyle::Get().GetWidgetStyle<FTextBlockStyle>("DetailsView.CategoryTextStyle");
-
+	const FSlateColor SelectionColor = FEditorStyle::GetSlateColor("SelectionColor");
+	const FSlateColor SelectionColor_Pressed = FEditorStyle::GetSlateColor("SelectionColor_Pressed");
+	
 	Style->Set("NiagaraEditor.StatsText", CategoryText);
 }
 
