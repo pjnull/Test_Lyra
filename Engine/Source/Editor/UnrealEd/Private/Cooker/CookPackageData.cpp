@@ -225,6 +225,14 @@ namespace Cook
 	{
 		bool bHasAnyOthers = false;
 		bool bModified = false;
+		
+		// make sure the platform is in the map, as this may be called earlier than a Request (which does create the entry), in the case 
+		// of DLC pre-cooked package population
+		if (PlatformDatas.Find(TargetPlatform) == nullptr)
+		{
+			PlatformDatas.Add(TargetPlatform);
+		}
+
 		for (TPair<const ITargetPlatform*, FPlatformData>& Pair : PlatformDatas)
 		{
 			if (Pair.Key == TargetPlatform)
