@@ -587,6 +587,7 @@ void SSCreateBlueprintPathPicker::Construct(const FArguments& InArgs)
 	PathPickerConfig.DefaultPath = AssetPath;
 	PathPickerConfig.OnPathSelected = FOnPathSelected::CreateRaw(this, &SSCreateBlueprintPathPicker::OnSelectAssetPath);
 	PathPickerConfig.bAllowReadOnlyFolders = false;
+	PathPickerConfig.bOnPathSelectedPassesVirtualPaths = true;
 
 	ChildSlot
 	[
