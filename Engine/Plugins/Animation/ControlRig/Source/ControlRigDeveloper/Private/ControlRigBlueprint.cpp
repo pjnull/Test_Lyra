@@ -1772,6 +1772,7 @@ void UControlRigBlueprint::PostTransacted(const FTransactionObjectEvent& Transac
 				return;
 			}
 
+			Status = BS_Dirty;
 			PropagateHierarchyFromBPToInstances();
 
 			// make sure the bone name list is up 2 date for the editor graph
@@ -1785,7 +1786,7 @@ void UControlRigBlueprint::PostTransacted(const FTransactionObjectEvent& Transac
 				RigGraph->CacheNameLists(Hierarchy, &DrawContainer);
 			}
 
-			RequestAutoVMRecompilation();
+			RequestAutoVMRecompilation(); 
 			MarkPackageDirty();
 		}
 
