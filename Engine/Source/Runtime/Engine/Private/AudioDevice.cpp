@@ -5185,12 +5185,15 @@ void FAudioDevice::StopActiveSound(const uint64 AudioComponentID)
 		if (ActiveSound)
 		{
 			FAudioDeviceManager* AudioDeviceManager = GEngine->GetAudioDeviceManager();
-
-			FAudioDeviceHandle AudioDevice = AudioDeviceManager->GetAudioDevice(AudioDeviceID);
-
-			if (AudioDevice.IsValid())
+			
+			if (AudioDeviceManager)
 			{
-				AudioDevice->AddSoundToStop(ActiveSound);
+				FAudioDeviceHandle AudioDevice = AudioDeviceManager->GetAudioDevice(AudioDeviceID);
+
+				if (AudioDevice.IsValid())
+				{
+					AudioDevice->AddSoundToStop(ActiveSound);
+				}
 			}
 		}
 	});
