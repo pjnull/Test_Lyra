@@ -1,0 +1,270 @@
+// Copyright Epic Games, Inc. All Rights Reserved.
+
+#pragma once
+
+/*=============================================================================
+
+Note on ordering of operations and frame numbers:
+
+[GT]
+	Write data to next FNetworkPredictionSimCallbackInput as necessary
+	Game Thread can know which Simulation Frame number the input will be processed on (FNetworkPredictionAsyncWorldManager::NextPhysicsStep)
+
+[PT]
+	CurrentPhysicsStep = N
+
+	[Marshal Service]
+		1. Apply Data from GT:
+			a. New Instances
+			b. State Mods
+			c. InputCmds (locally controlled clients + remotely controlled on server... NOT remote controlled on clients this is done in Reconcile)
+
+		<<< Data for frame SimulationFrame is now "finalized" >>>
+			Think of it like "this is the data given to the [AsyncModelDef's] Tick function and Physics Simulation.
+
+		2. Network Synchronization
+			a. Clients apply the "finalized" data from the server here
+		3. Game Thread Synchronization
+			b. Clients and Server marshal data back to GT here
+
+		4. Copy "finalized" data forward to next frame (LocalFrame + 1)
+
+	[Tick Service]
+		
+		5. Run the user's Tick function (LocalFrame+1)			
+
+	[Physics Engine]
+	
+		6. Step physics Simulation (rigid bodies, etc. This has nothing to do with NP gameplay data)
+
+
+
+More succinctly:
+1. Process data from GT
+2. Sync with Network and GT
+3. Gameplay Simulation Tick
+4. Physics Tick
+
+
+=============================================================================*/
+
+namespace UE_NP {
+
+class IAsyncMarshalService_Internal
+{
+public:
+
+	virtual ~IAsyncMarshalService_Internal() = default;
+	virtual void MarshalPreSimulate(const int32 LocalFrame, const bool bIsResim, const FNetworkPredictionSimCallbackInput* SimInput, FNetworkPredictionSimCallbackOutput& Output) = 0;
+};
+
+template<typename AsyncModelDef>
+class TAsyncMarshalService_Internal : public IAsyncMarshalService_Internal
+{
+	HOIST_ASYNCMODELDEF_TYPES()
+
+public:
+
+	TAsyncMarshalService_Internal(TAsyncModelDataStore_Internal<AsyncModelDef>* InDataStore)
+	{
+		npCheck(InDataStore != nullptr);
+		DataStore = InDataStore;
+	}
+
+	// Marshal data from SimInput and to SimOutput, prior to ticking
+	void MarshalPreSimulate(const int32 LocalFrame, const bool bIsResim, const FNetworkPredictionSimCallbackInput* SimInput, FNetworkPredictionSimCallbackOutput& SimOutput) final override
+	{
+		const TAsyncModelDataStore_Input<AsyncModelDef>* InputData = SimInput->GetDataStore<AsyncModelDef>();
+		TAsncFrameSnapshot<AsyncModelDef>& Snapshot = DataStore->Frames[LocalFrame];
+
+		/*
+		// Copy previous frame's contents
+		if (LocalFrame > 0)
+		{
+			Snapshot.NetStates = DataStore->Frames[LocalFrame-1].NetStates;
+			if (!bIsResim)
+			{
+				// Don't copy inputs forward during a resim
+				// This is because non locally controlled sim inputs will be set in the Reconcile phase, 
+				// and copying previous InputCmds would over-write that.
+				Snapshot.InputCmds = DataStore->Frames[LocalFrame-1].InputCmds;
+			}
+		}
+		*/
+
+		// New instances
+		for (const typename TAsyncModelDataStore_Input<AsyncModelDef>::FNewInstance& NewInstance : InputData->NewInstances)
+		{
+			DataStore->Instances.FindOrAdd(NewInstance.ID) = NewInstance.StaticData;
+
+			NpResizeForIndex(Snapshot.InputCmds, NewInstance.StaticData.Index);
+			NpResizeForIndex(Snapshot.NetStates, NewInstance.StaticData.Index);
+
+			Snapshot.NetStates[NewInstance.StaticData.Index] = NewInstance.NetState;
+		}
+
+		// State Mods
+		for (const typename TAsyncModelDataStore_Input<AsyncModelDef>::FLocalStateMod& LocalMod : InputData->LocalStateMods)
+		{
+			LocalMod.Func(DataStore->Instances.FindChecked(LocalMod.ID).LocalState);
+		}
+
+		for (const typename TAsyncModelDataStore_Input<AsyncModelDef>::FNetStateMod& NetMod : InputData->NetStateMods)
+		{
+			NetMod.Func(Snapshot.NetStates[NetMod.Index]);
+		}
+
+		// New Local InputCmds
+		for (const typename TAsyncModelDataStore_Input<AsyncModelDef>::FLocalInputCmd& LocalInput : InputData->LocalInputCmds)
+		{
+			Snapshot.InputCmds[LocalInput.Index] = LocalInput.InputCmd;
+		}
+
+		// Deletes (? - careful here)
+
+		// Apply Corrections
+		ApplyCorrections(LocalFrame);
+
+		// Copy Snapshot back for GT
+		TAsyncModelDataStore_Output<AsyncModelDef>* OutputData = SimOutput.GetDataStore<AsyncModelDef>();
+		OutputData->Snapshot = Snapshot;
+
+		// Copy snapshot state forward to next frame
+		DataStore->Frames[LocalFrame+1].NetStates = Snapshot.NetStates;
+		if (!bIsResim)
+		{
+			// Don't copy inputs forward during a resim
+			// This is because non locally controlled sim inputs will be set in the Reconcile phase, 
+			// and copying previous InputCmds would over-write that.
+			DataStore->Frames[LocalFrame+1].InputCmds = Snapshot.InputCmds;
+		}
+	}
+
+	void ApplyCorrections(int32 LocalFrame)
+	{
+		for (TConstSetBitIterator<> BitIt(DataStore->NetRecvData.PendingCorrectionMask); BitIt; ++BitIt)
+		{
+			const int32 idx = BitIt.GetIndex();
+			const typename TAsyncNetRecvData<AsyncModelDef>::FInstance& RecvData = DataStore->NetRecvData.NetRecvInstances[idx];
+			if (RecvData.Frame == LocalFrame)
+			{
+				TAsncFrameSnapshot<AsyncModelDef>& Snapshot = DataStore->Frames[LocalFrame];
+
+				NpResizeForIndex(Snapshot.InputCmds, idx);
+				NpResizeForIndex(Snapshot.NetStates, idx);
+				
+				Snapshot.InputCmds[idx] = RecvData.InputCmd;
+				Snapshot.NetStates[idx] = RecvData.NetState;
+
+				DataStore->NetRecvData.PendingCorrectionMask[idx] = false;
+			}
+		}
+	}
+	
+
+protected:
+
+	TAsyncModelDataStore_Internal<AsyncModelDef>* DataStore = nullptr;
+};
+
+// ------------------------------------------------------------------------------------------
+
+class IAsyncMarshalService_External
+{
+public:
+
+	virtual ~IAsyncMarshalService_External() = default;
+	virtual void MarshalInput(const int32 Frame, FNetworkPredictionSimCallbackInput* SimInput) = 0;
+	virtual void MarshalOutput(FNetworkPredictionSimCallbackOutput* SimOutput) = 0;
+};
+
+
+template<typename AsyncModelDef>
+class TAsyncMarshalService_External : public IAsyncMarshalService_External
+{
+	HOIST_ASYNCMODELDEF_TYPES()
+
+public:
+
+	TAsyncMarshalService_External(TAsyncModelDataStore_External<AsyncModelDef>* InDataStore_External, TAsyncModelDataStore_Internal<AsyncModelDef>* InDataStore_Internal)
+	{
+		npCheck(InDataStore_External != nullptr);
+		npCheck(InDataStore_Internal != nullptr);
+		DataStore_External = InDataStore_External;
+		DataStore_Internal = InDataStore_Internal;
+	}
+
+	// Marshal external data to SimInput
+	void MarshalInput(const int32 Frame, FNetworkPredictionSimCallbackInput* SimInput) final override
+	{
+		TAsyncModelDataStore_Input<AsyncModelDef>* InputData = SimInput->GetDataStore<AsyncModelDef>();
+
+		// ---------------------------------------------------------------------
+		//	InputCmds
+		// ---------------------------------------------------------------------
+
+		for (TAsyncPendingInputCmdPtr<AsyncModelDef>& Info : DataStore_External->ActivePendingInputCmds)
+		{
+			npCheckSlow(Info.PendingInputCmd != nullptr);
+			InputData->LocalInputCmds.Emplace(Info.Index, *Info.PendingInputCmd);
+		}
+
+		for (auto& MapIt : DataStore_External->PendingInputCmdBuffers)
+		{
+			TAsyncPendingInputCmdBuffer<AsyncModelDef>& PendingInputs = MapIt.Value.Get();
+			InputData->LocalInputCmds.Emplace(PendingInputs.Index, PendingInputs.Buffer[Frame % PendingInputs.Buffer.Num()]);
+		}
+
+		// ---------------------------------------------------------------------
+		//	Network
+		// ---------------------------------------------------------------------
+
+		if (DataStore_External->PendingNetRecv.NetRecvDirtyMask.Contains(true))
+		{
+			DataStore_External->PendingNetRecv.LocalFrameOffset = SimInput->LocalFrameOffset;
+			DataStore_Internal->NetRecvQueue.Enqueue(MoveTemp(DataStore_External->PendingNetRecv));
+			DataStore_External->PendingNetRecv.Reset();
+		}
+	}
+
+	// Marshal output data to external data store
+	void MarshalOutput(FNetworkPredictionSimCallbackOutput* SimOutput) final override
+	{
+		TAsyncModelDataStore_Output<AsyncModelDef>* OutputData = SimOutput->GetDataStore<AsyncModelDef>();
+		DataStore_External->LatestSnapshot = MoveTemp(OutputData->Snapshot);
+
+		const int32 Num = FMath::Min<int32>(DataStore_External->LatestSnapshot.NetStates.Num(), DataStore_External->OutputWriteTargets.Num());
+		for (int32 idx=0; idx < Num; ++idx)
+		{
+			if (NetStateType* OutNetState = DataStore_External->OutputWriteTargets[idx].OutNetState)
+			{
+				*OutNetState = DataStore_External->LatestSnapshot.NetStates[idx];
+			}
+		}
+	}
+	
+	void ModifyLocalState(FNetworkPredictionAsyncID ID, TUniqueFunction<void(LocalStateType&)> Func, FNetworkPredictionSimCallbackInput* AsyncInput)
+	{
+		npCheckSlow(AsyncInput);
+		if (ensure(AsyncInput))
+		{
+			//AsyncInput->GetDataStore<AsyncModelDef>()->LocalStateMods.Emplace(MoveTemp(Func));
+		}
+	}
+	
+	void ModifyNetState(FNetworkPredictionAsyncID ID, TUniqueFunction<void(NetStateType&)> Func, FNetworkPredictionSimCallbackInput* AsyncInput)
+	{
+		npCheckSlow(AsyncInput);
+		const int32 idx = DataStore_External->Instances.FindChecked(ID).Index;
+		AsyncInput->GetDataStore<AsyncModelDef>()->NetStateMods.Emplace(idx, MoveTemp(Func));
+		
+	}
+
+private:
+
+	TAsyncModelDataStore_External<AsyncModelDef>* DataStore_External = nullptr;
+	TAsyncModelDataStore_Internal<AsyncModelDef>* DataStore_Internal = nullptr;
+};
+
+
+} // namespace UE_NP

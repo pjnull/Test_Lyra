@@ -289,7 +289,7 @@ struct TStructOpsTypeTraits<FMockManagedState> : public TStructOpsTypeTraitsBase
 
 
 // This is just wrapping FMockAsyncObjectManagerCallback 
-// I just wanted to keep the chaos stuff bs in the cpp file and define a clean interface for the game code
+// I just wanted to keep the chaos stuff in the cpp file and define a clean interface for the game code
 class FMockObjectManager : public INetworkPhysicsSubsystem
 {
 public:

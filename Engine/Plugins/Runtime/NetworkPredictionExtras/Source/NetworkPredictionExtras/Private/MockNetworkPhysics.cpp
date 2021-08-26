@@ -984,11 +984,6 @@ void UNetworkPhysicsComponent::InitializeComponent()
 #if WITH_CHAOS
 	Super::InitializeComponent();
 
-	if (!UE_NETWORK_PHYSICS::bEnableMock())
-	{
-		return;
-	}
-
 	UWorld* World = GetWorld();	
 	checkSlow(World);
 	UNetworkPhysicsManager* Manager = World->GetSubsystem<UNetworkPhysicsManager>();
@@ -1076,24 +1071,26 @@ void UNetworkPhysicsComponent::InitializeComponent()
 			DrawDebugBox(P.DrawWorld, P.Loc, ActorExtent, P.Rot, P.Color, false, P.Lifetime, 0, Thickness);
 		});
 
-		
-		if (bEnableMockGameplay)
+		if (UE_NETWORK_PHYSICS::bEnableMock())
 		{
-			FMockObjectManager* MockManager = FMockObjectManager::Get(World);
-			checkSlow(MockManager);
+			if (bEnableMockGameplay)
+			{
+				FMockObjectManager* MockManager = FMockObjectManager::Get(World);
+				checkSlow(MockManager);
 
-			InManagedState.Proxy = PrimitiveComponent->BodyInstance.ActorHandle;
-			OutManagedState.Proxy = PrimitiveComponent->BodyInstance.ActorHandle;
-			ReplicatedManagedState.Proxy = PrimitiveComponent->BodyInstance.ActorHandle;
-			MockManager->RegisterManagedMockObject(&ReplicatedManagedState, &InManagedState, &OutManagedState);
-		}
+				InManagedState.Proxy = PrimitiveComponent->BodyInstance.ActorHandle;
+				OutManagedState.Proxy = PrimitiveComponent->BodyInstance.ActorHandle;
+				ReplicatedManagedState.Proxy = PrimitiveComponent->BodyInstance.ActorHandle;
+				MockManager->RegisterManagedMockObject(&ReplicatedManagedState, &InManagedState, &OutManagedState);
+			}
 
-		if (bCanBeKicked)
-		{
-			FMockObjectManager* MockManager = FMockObjectManager::Get(World);
-			checkSlow(MockManager);
+			if (bCanBeKicked)
+			{
+				FMockObjectManager* MockManager = FMockObjectManager::Get(World);
+				checkSlow(MockManager);
 
-			MockManager->RegisterBall(PrimitiveComponent->BodyInstance.ActorHandle);
+				MockManager->RegisterBall(PrimitiveComponent->BodyInstance.ActorHandle);
+			}
 		}
 	}
 #endif
@@ -1104,35 +1101,32 @@ void UNetworkPhysicsComponent::UninitializeComponent()
 	Super::UninitializeComponent();
 #if WITH_CHAOS
 
-	if (!UE_NETWORK_PHYSICS::bEnableMock())
-	{
-		return;
-	}
-
 	//UE_LOG(LogTemp, Warning, TEXT("EndPlay %s"), *GetPathNameSafe(this));
 	if (UWorld* World = GetWorld())
 	{
 		if (UNetworkPhysicsManager* Manager = World->GetSubsystem<UNetworkPhysicsManager>())
 		{
-			if (bEnableMockGameplay)
+			if (UE_NETWORK_PHYSICS::bEnableMock())
 			{
-				if (FMockObjectManager* MockManager = FMockObjectManager::Get(World))
+				if (bEnableMockGameplay)
 				{
-					//UE_LOG(LogTemp, Warning, TEXT("   Unregistering MockManager. 0x%X"), (int64)&ReplicatedManagedState);
-					MockManager->UnregisterManagedMockObject(&ReplicatedManagedState, &InManagedState, &OutManagedState);
+					if (FMockObjectManager* MockManager = FMockObjectManager::Get(World))
+					{
+						//UE_LOG(LogTemp, Warning, TEXT("   Unregistering MockManager. 0x%X"), (int64)&ReplicatedManagedState);
+						MockManager->UnregisterManagedMockObject(&ReplicatedManagedState, &InManagedState, &OutManagedState);
+					}
 				}
-			}
 
-			if (bCanBeKicked)
-			{
-				if (FMockObjectManager* MockManager = FMockObjectManager::Get(World))
+				if (bCanBeKicked)
 				{
-					MockManager->UnregisterBall(NetworkPhysicsState.Proxy);
+					if (FMockObjectManager* MockManager = FMockObjectManager::Get(World))
+					{
+						MockManager->UnregisterBall(NetworkPhysicsState.Proxy);
+					}
 				}
+
+				Manager->UnregisterPhysicsProxy(&NetworkPhysicsState);
 			}
-
-			Manager->UnregisterPhysicsProxy(&NetworkPhysicsState);
-
 
 		}
 	}
@@ -1143,11 +1137,6 @@ void UNetworkPhysicsComponent::TickComponent(float DeltaTime, enum ELevelTick Ti
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 #if WITH_CHAOS
-
-	if (!UE_NETWORK_PHYSICS::bEnableMock())
-	{
-		return;
-	}
 
 	APlayerController* PC = GetOwnerPC();
 	if (PC && PC->IsLocalController())
