@@ -7,6 +7,7 @@
 #include "Misc/ConfigCacheIni.h"
 #include "Misc/Paths.h"
 #include "Misc/DelayedAutoRegister.h"
+#include "Misc/CommandLine.h"
 
 #define LOCTEXT_NAMESPACE "PlatformInfo"
 
