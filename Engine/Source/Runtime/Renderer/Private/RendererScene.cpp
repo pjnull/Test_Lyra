@@ -3450,6 +3450,20 @@ void FScene::UpdateCachedRenderStates(FPrimitiveSceneProxy* SceneProxy)
 	}
 }
 
+#if RHI_RAYTRACING
+
+void FScene::UpdateCachedRayTracingState(FPrimitiveSceneProxy* SceneProxy)
+{
+	check(IsInRenderingThread());
+
+	if (SceneProxy->GetPrimitiveSceneInfo())
+	{
+		SceneProxy->GetPrimitiveSceneInfo()->bCachedRaytracingDataDirty = true;
+	}
+}
+
+#endif // RHI_RAYTRACING
+
 /**
  * @return		true if hit proxies should be rendered in this scene.
  */
