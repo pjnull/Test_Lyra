@@ -1847,6 +1847,7 @@ void FMediaPlayerFacade::TickInput(FTimespan DeltaTime, FTimespan Timecode)
 
 		Player->TickInput(DeltaTime, Timecode);
 
+		bool bIsBroadcastAllowed = bAreEventsSafeForAnyThread || IsInGameThread();
 		if (Player->GetPlayerFeatureFlag(IMediaPlayer::EFeatureFlag::UsePlaybackTimingV2))
 		{
 			//
@@ -1856,9 +1857,16 @@ void FMediaPlayerFacade::TickInput(FTimespan DeltaTime, FTimespan Timecode)
 			// process deferred events
 			// NOTE: if there is no player anymore we execute the remaining queued events in TickFetch (backwards compatibility - should move here once V1 support removed)
 			EMediaEvent Event;
+			if (bIsBroadcastAllowed)
+			{
+				while (QueuedEventBroadcasts.Dequeue(Event))
+				{
+					MediaEvent.Broadcast(Event);
+				}
+			}
 			while (QueuedEvents.Dequeue(Event))
 			{
-				ProcessEvent(Event);
+				ProcessEvent(Event, bIsBroadcastAllowed);
 			}
 
 			// Handling events may have killed the player. Did it?
@@ -1921,7 +1929,7 @@ void FMediaPlayerFacade::TickInput(FTimespan DeltaTime, FTimespan Timecode)
 					{
 						bEventCancelsBlock = true;
 					}
-					ProcessEvent(Event);
+					ProcessEvent(Event, bIsBroadcastAllowed);
 				}
 
 				// We might have lost the player during event handling or an event breaks the block...
@@ -2004,7 +2012,7 @@ void FMediaPlayerFacade::TickFetch(FTimespan DeltaTime, FTimespan Timecode)
 			EMediaEvent Event;
 			while (QueuedEvents.Dequeue(Event))
 			{
-				ProcessEvent(Event);
+				ProcessEvent(Event, true);
 			}
 		}
 
