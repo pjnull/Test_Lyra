@@ -108,6 +108,7 @@ FMediaPlayerFacade::FMediaPlayerFacade()
 	, bHaveActiveAudio(false)
 	, VideoSampleAvailability(-1)
 	, AudioSampleAvailability(-1)
+	, bAreEventsSafeForAnyThread(false)
 {
 	BlockOnRangeDisabled = false;
 
@@ -1436,6 +1437,11 @@ FTimespan FMediaPlayerFacade::GetLastAudioRenderedSampleTime() const
 	return LastAudioRenderedSampleTime.TimeStamp.Time;
 }
 
+void FMediaPlayerFacade::SetAreEventsSafeForAnyThread(bool bInAreEventsSafeForAnyThread)
+{
+	bAreEventsSafeForAnyThread = bInAreEventsSafeForAnyThread;
+}
+
 /* FMediaPlayerFacade implementation
 *****************************************************************************/
 
@@ -1728,7 +1734,7 @@ bool FMediaPlayerFacade::GetVideoTrackFormat(int32 TrackIndex, int32 FormatIndex
 }
 
 
-void FMediaPlayerFacade::ProcessEvent(EMediaEvent Event)
+void FMediaPlayerFacade::ProcessEvent(EMediaEvent Event, bool bIsBroadcastAllowed)
 {
 	SCOPE_CYCLE_COUNTER(STAT_MediaUtils_FacadeProcessEvent);
 
@@ -1786,7 +1792,14 @@ void FMediaPlayerFacade::ProcessEvent(EMediaEvent Event)
 		}
 	}
 
-	MediaEvent.Broadcast(Event);
+	if (bIsBroadcastAllowed)
+	{
+		MediaEvent.Broadcast(Event);
+	}
+	else
+	{
+		QueuedEventBroadcasts.Enqueue(Event);
+	}
 }
 
 
@@ -1958,11 +1971,21 @@ void FMediaPlayerFacade::TickFetch(FTimespan DeltaTime, FTimespan Timecode)
 
 	if (!Player.IsValid())
 	{
-		// process deferred events
+		// Send out deferred broadcasts.
 		EMediaEvent Event;
+		bool bIsBroadcastAllowed = bAreEventsSafeForAnyThread || IsInGameThread();
+		if (bIsBroadcastAllowed)
+		{
+			while (QueuedEventBroadcasts.Dequeue(Event))
+			{
+				MediaEvent.Broadcast(Event);
+			}
+		}
+
+		// process deferred events
 		while (QueuedEvents.Dequeue(Event))
 		{
-			ProcessEvent(Event);
+			ProcessEvent(Event, bIsBroadcastAllowed);
 		}
 		return;
 	}
