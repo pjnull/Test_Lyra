@@ -800,8 +800,21 @@ public:
 
 	/**
 	* Finds the active sound for the specified audio component ID
+	* NOTE: Current engine code uses "SendCommandToActiveSounds" instead
 	*/
 	FActiveSound* FindActiveSound(uint64 AudioComponentID);
+
+	/**
+	 * Whether a given Audio Component ID should be allowed to have multiple
+	 * associated Active Sounds
+	 */
+	bool CanHaveMultipleActiveSounds(uint64 AudioComponentID);
+
+	/**
+	 * Set whether a given Audio Component ID should be allowed to have multiple
+	 * associated Active Sounds
+	 */
+	void SetCanHaveMultipleActiveSounds(uint64 AudioComponentID, bool InCanHaveMultipleActiveSounds);
 
 	/**
 	 * Removes an active sound from the active sounds array
@@ -1458,7 +1471,14 @@ protected:
 	 */
 	virtual void OnListenerUpdated(const TArray<FListener>& InListeners) {};
 
+	//Only Audio Components should be able to call the private function "SendCommandToActiveSounds"
+	friend void UAudioComponent::SendCommandToAllActiveSoundsInComponent(TFunction<void(FActiveSound*)> InFunc);
+
 private:
+	/**
+	 * Performs an operation on all active sounds within an audio component
+	 */
+	void SendCommandToActiveSounds(uint64 AudioComponentID, TFunction<void(FActiveSound*)> InFunc);
 
 	/**
 	 * Adds an active sound to the audio device. Can be a new active sound or one provided by the re-triggering
@@ -2104,6 +2124,9 @@ private:
 	TArray<USoundWave*> ReferencedSoundWaves_AudioThread;
 	FCriticalSection ReferencedSoundWaveCritSec;
 
+	/** Ensures we don't have any container thread safety issues when accessing arrays of active sounds */
+	FCriticalSection ActiveSoundsPerComponentCritSec;
+
 	TArray<USoundWave*> PrecachingSoundWaves;
 
 	TArray<FWaveInstance*> ActiveWaveInstances;
@@ -2128,7 +2151,10 @@ private:
 	/** A set of sounds which need to be deleted but weren't able to be deleted due to pending async operations */
 	TArray<FActiveSound*> PendingSoundsToDelete;
 
-	TMap<uint64, FActiveSound*> AudioComponentIDToActiveSoundMap;
+	TMap<uint64, TArray<FActiveSound*>> AudioComponentIDToActiveSoundMap;
+
+	/** Used to determine if a given Audio Component should be allowed to have multiple simultaneous associated active sounds */
+	TMap<uint64, bool> AudioComponentIDToCanHaveMultipleActiveSoundsMap;
 
 	TMap<uint32, FAudioVolumeProxy> AudioVolumeProxies;
 
