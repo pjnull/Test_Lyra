@@ -374,6 +374,7 @@ UNavigationSystemV1::UNavigationSystemV1(const FObjectInitializer& ObjectInitial
 	, bWholeWorldNavigable(false)
 	, bSkipAgentHeightCheckWhenPickingNavData(false)
 	, DirtyAreaWarningSizeThreshold(-1.0f)
+	, GatheringNavModifiersWarningLimitTime(-1.0f)
 	, OperationMode(FNavigationSystemRunMode::InvalidMode)
 	, bAbortAsyncQueriesRequested(false)
 	, NavBuildingLockFlags(0)
@@ -705,6 +706,9 @@ void UNavigationSystemV1::ConstructNavOctree()
 	DefaultOctreeController.Reset();
 	DefaultOctreeController.NavOctree = MakeShareable(new FNavigationOctree(FVector(0, 0, 0), 64000));
 	DefaultOctreeController.NavOctree->SetDataGatheringMode(DataGatheringMode);
+#if !UE_BUILD_SHIPPING	
+	DefaultOctreeController.NavOctree->SetGatheringNavModifiersTimeLimitWarning(GatheringNavModifiersWarningLimitTime);
+#endif // !UE_BUILD_SHIPPING	
 }
 
 bool UNavigationSystemV1::ConditionalPopulateNavOctree()
