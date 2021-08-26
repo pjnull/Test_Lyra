@@ -40,198 +40,218 @@ struct FPhysicsMovementSimulation
 			return;
 		}
 
-		if (!InputCmd.bLegit)
+		auto* PT = LocalState.Proxy->GetPhysicsThreadAPI();
+		if (!PT)
 		{
-  			UE_LOG(LogTemp, Warning, TEXT("Illegitimate InputCmd has seeped in!!! SimFrame: %d. LocalFrame: %d"), SimulationFrame, Context.LocalStorageFrame);
+			return;
 		}
 
-		if (auto* PT = LocalState.Proxy->GetPhysicsThreadAPI())
+		if (!InputCmd.bLegit)
 		{
-			UE_NETWORK_PHYSICS::ConditionalFrameEnsure();
-			if (UE_NETWORK_PHYSICS::ConditionalFrameBreakpoint())
+			// THis is just debug warning trying to make sure we never submit uninitialized input cmds into the system.
+			UE_LOG(LogNetworkPrediction, Warning, TEXT("Illegitimate InputCmd has seeped in!!! SimFrame: %d. LocalFrame: %d"), SimulationFrame, Context.LocalStorageFrame);
+		}
+
+		UE_NETWORK_PHYSICS::ConditionalFrameEnsure();
+		if (UE_NETWORK_PHYSICS::ConditionalFrameBreakpoint())
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[%d][%d] Location: %s"), UE_NETWORK_PHYSICS::DebugSimulationFrame(), UE_NETWORK_PHYSICS::DebugServer(), *PT->X().ToString());
+		}
+
+		FVector TracePosition = PT->X();
+		FVector EndPosition = TracePosition + FVector(0.f, 0.f, -100.f);
+		FCollisionShape Shape = FCollisionShape::MakeSphere(250.f);
+		ECollisionChannel CollisionChannel = ECollisionChannel::ECC_WorldStatic; 
+		FCollisionQueryParams QueryParams = FCollisionQueryParams::DefaultQueryParam;
+		FCollisionResponseParams ResponseParams = FCollisionResponseParams::DefaultResponseParam;
+		FCollisionObjectQueryParams ObjectParams(ECollisionChannel::ECC_PhysicsBody);
+
+		FHitResult OutHit;
+		const bool bInAir = !UE_NETWORK_PHYSICS::JumpHack() && !World->LineTraceSingleByChannel(OutHit, TracePosition, EndPosition, ECollisionChannel::ECC_WorldStatic, QueryParams, ResponseParams);
+		const float UpDot = FVector::DotProduct(PT->R().GetUpVector(), FVector::UpVector);
+
+		// Debug CVar to make jump cause mispredictions
+		if (UE_NETWORK_PHYSICS::JumpMisPredict())
+		{
+			if (InputCmd.bJumpedPressed && NetState.JumpStartFrame + 10 < SimulationFrame)
 			{
-				UE_LOG(LogTemp, Warning, TEXT("[%d][%d] Location: %s"), UE_NETWORK_PHYSICS::DebugSimulationFrame(), UE_NETWORK_PHYSICS::DebugServer(), *PT->X().ToString());
+				NetState.JumpStartFrame = SimulationFrame;
+				PT->SetLinearImpulse(FVector(0.f, 0.f, 60000.f + (FMath::FRand() * 50000.f)));
 			}
+			return;
+		}
 
-			//UE_LOG(LogTemp, Warning, TEXT("[%d] 0x%X <%s> TICK_INTERNAL"), SimulationFrame, (int64)LocalState.Proxy->GetHandleUnsafe(), *PT->X().ToString());
-
-			FVector TracePosition = PT->X();
-			FVector EndPosition = TracePosition + FVector(0.f, 0.f, -100.f);
-			FCollisionShape Shape = FCollisionShape::MakeSphere(250.f);
-			ECollisionChannel CollisionChannel = ECollisionChannel::ECC_WorldStatic; 
-			FCollisionQueryParams QueryParams = FCollisionQueryParams::DefaultQueryParam;
-
-			FCollisionResponseParams ResponseParams = FCollisionResponseParams::DefaultResponseParam;
-			FCollisionObjectQueryParams ObjectParams(ECollisionChannel::ECC_PhysicsBody);
-
-			
-			FHitResult OutHit;
-			const bool bInAir = !UE_NETWORK_PHYSICS::JumpHack() && !World->LineTraceSingleByChannel(OutHit, TracePosition, EndPosition, ECollisionChannel::ECC_WorldStatic, QueryParams, ResponseParams);
-			const float UpDot = FVector::DotProduct(PT->R().GetUpVector(), FVector::UpVector);
-
-			if (UE_NETWORK_PHYSICS::JumpMisPredict())
-			{
-				if (InputCmd.bJumpedPressed && NetState.JumpStartFrame + 10 < SimulationFrame)
-				{
-					NetState.JumpStartFrame = SimulationFrame;
-					PT->SetLinearImpulse(FVector(0.f, 0.f, 60000.f + (FMath::FRand() * 50000.f)));
-				}
-				return;
-			}
-
-			if (UE_NETWORK_PHYSICS::MockImpulse() && NetState.KickFrame + 10 < SimulationFrame)
-			{
-				/*
-				for (FSingleParticlePhysicsProxy* BallProxy : BallProxies)
-				{					
+		// Impulse on physics ball (not reimplemented yet)
+		if (UE_NETWORK_PHYSICS::MockImpulse() && NetState.KickFrame + 10 < SimulationFrame)
+		{
+			/*
+			for (FSingleParticlePhysicsProxy* BallProxy : BallProxies)
+			{					
 				if (auto* BallPT = BallProxy->GetPhysicsThreadAPI())
 				{
-				const FVector BallLocation = BallPT->X();
-				const float BallRadius = BallPT->Geometry()->BoundingBox().OriginRadius(); //GetRadius();
-
-				if (BallRadius > 0.f && (FVector::DistSquared(PT->X(), BallLocation) < BallRadius * BallRadius))
-				{
-				FVector Impulse = BallPT->X() - PT->X();
-				Impulse.Z =0.f;
-				Impulse.Normalize();
-				Impulse *= UE_NETWORK_PHYSICS::MockImpulseX;
-				Impulse.Z = UE_NETWORK_PHYSICS::MockImpulseZ();
-
-				//UE_LOG(LogTemp, Warning, TEXT("Applied Force. %s"), *GetNameSafe(HitPrimitive->GetOwner()));
-				BallPT->SetLinearImpulse( Impulse, false );
-				SimObject->KickFrame = SimulationFrame;
-				}
-				}
-				}
-				*/
-			}
-
-			// ---------------------------------------------------------------------------------------------
-
-			if (!bInAir)
-			{
-				if (NetState.InAirFrame != 0)
-				{
-					NetState.InAirFrame = 0;
-					//SimObject->JumpStartFrame = 0;
-				}
-
-				// Check for recovery start
-				if (NetState.RecoveryFrame == 0)
-				{
-					if (UpDot < 0.2f)
+					const FVector BallLocation = BallPT->X();
+					const float BallRadius = BallPT->Geometry()->BoundingBox().OriginRadius(); //GetRadius();
+						
+					if (BallRadius > 0.f && (FVector::DistSquared(PT->X(), BallLocation) < BallRadius * BallRadius))
 					{
-						NetState.RecoveryFrame = SimulationFrame;
+						FVector Impulse = BallPT->X() - PT->X();
+						Impulse.Z =0.f;
+						Impulse.Normalize();
+						Impulse *= UE_NETWORK_PHYSICS::MockImpulseX();
+						Impulse.Z = UE_NETWORK_PHYSICS::MockImpulseZ();
+
+						//UE_LOG(LogTemp, Warning, TEXT("Applied Force. %s"), *GetNameSafe(HitPrimitive->GetOwner()));
+						BallPT->SetLinearImpulse( Impulse, false );
+						NetState.KickFrame = SimulationFrame;
 					}
 				}
+			}
+			*/
+		}
+
+		if (!bInAir)
+		{
+			if (NetState.InAirFrame != 0)
+			{
+				NetState.InAirFrame = 0;
+			}
+		}
+		else
+		{
+			if (NetState.InAirFrame == 0)
+			{
+				NetState.InAirFrame = SimulationFrame;
+			}
+		}
+
+		if (InputCmd.bJumpedPressed)
+		{
+			if (NetState.InAirFrame == 0 || (NetState.InAirFrame + UE_NETWORK_PHYSICS::JumpFudgeFrames() > SimulationFrame))
+			{
+				if (NetState.JumpStartFrame == 0)
+				{
+					NetState.JumpStartFrame = SimulationFrame;
+				}
+
+				if (NetState.JumpStartFrame + UE_NETWORK_PHYSICS::JumpFrameDuration() > SimulationFrame)
+				{
+					PT->AddForce( Chaos::FVec3(0.f, 0.f, UE_NETWORK_PHYSICS::JumpForce()) );
+
+					//UE_LOG(LogTemp, Warning, TEXT("[%d] Jumped [JumpStart: %d. InAir: %d]"), SimulationFrame, NetState.JumpStartFrame, NetState.InAirFrame);
+					NetState.JumpCooldownMS = 1000;
+				}
+			}
+		}
+		else
+		{
+			if (NetState.InAirFrame == 0 && (NetState.JumpStartFrame + UE_NETWORK_PHYSICS::JumpFrameDuration() < SimulationFrame))
+			{
+				NetState.JumpStartFrame = 0;
+			}
+		}
+		
+		// Keep pawn upright
+		if (NetState.bEnableKeepUpright && UpDot < 0.95f)
+		{
+			FRotator Rot = PT->R().Rotator();
+			FVector Target(0, 0, 1); // TODO choose up based on floor normal
+			FVector CurrentUp = Rot.RotateVector(Target);
+			FVector Torque = -FVector::CrossProduct(Target, CurrentUp);
+			FVector Damp(PT->W().X* UE_NETWORK_PHYSICS::TurnDampK(), PT->W().Y* UE_NETWORK_PHYSICS::TurnDampK(), 0);
+
+			PT->AddTorque(Torque* UE_NETWORK_PHYSICS::TurnK() + Damp);
+		}
+
+		if (InputCmd.bBrakesPressed)
+		{
+			FVector NewV = PT->V();
+			if (NewV.SizeSquared2D() < 1.f)
+			{
+				PT->SetV( Chaos::FVec3(0.f, 0.f, NewV.Z));
 			}
 			else
 			{
-				if (NetState.InAirFrame == 0)
-				{
-					NetState.InAirFrame = SimulationFrame;
-				}
+				PT->SetV( Chaos::FVec3(NewV.X * 0.8f, NewV.Y * 0.8f, NewV.Z));
 			}
-
-			//UE_LOG(LogNetworkPhysics, Log, TEXT("[%d] AirFrame: %d. JumpFrame: %d"), SimulationFrame, SimObject->InAirFrame, SimObject->JumpStartFrame);
-			if (InputCmd.bJumpedPressed)
+		}
+		else
+		{
+			// Movement
+			if (InputCmd.Force.SizeSquared() > 0.001f)
 			{
-				if (NetState.InAirFrame == 0 || (NetState.InAirFrame + UE_NETWORK_PHYSICS::JumpFudgeFrames() > SimulationFrame))
-				{
-					if (NetState.JumpStartFrame == 0)
-					{
-						NetState.JumpStartFrame = SimulationFrame;
-					}
+				PT->AddForce(InputCmd.Force * NetState.ForceMultiplier * UE_NETWORK_PHYSICS::MovementK());
 
-					if (NetState.JumpStartFrame + UE_NETWORK_PHYSICS::JumpFrameDuration() > SimulationFrame)
-					{
-						PT->AddForce( Chaos::FVec3(0.f, 0.f, UE_NETWORK_PHYSICS::JumpForce()) );
-
-						//UE_LOG(LogTemp, Warning, TEXT("[%d] Jumped [JumpStart: %d. InAir: %d]"), SimulationFrame, SimObject->JumpStartFrame, SimObject->InAirFrame);
-						NetState.JumpCooldownMS = 1000;
-					}
-				}
 			}
-			else
+			else if(!bInAir)
 			{
-				if (NetState.InAirFrame == 0 && (NetState.JumpStartFrame + UE_NETWORK_PHYSICS::JumpFrameDuration() < SimulationFrame))
-				{
-					NetState.JumpStartFrame = 0;
-				}
-			}
-
-			if (NetState.RecoveryFrame != 0)
-			{
-				if (UpDot > 0.7f)
-				{
-					// Recovered
-					NetState.RecoveryFrame = 0;
-				}
-				else
-				{
-					// Doing it per-axis like this is probably wrong
-					FRotator Rot = PT->R().Rotator();
-					const float DeltaRoll = FRotator::NormalizeAxis( -1.f * (Rot.Roll + (PT->W().X * UE_NETWORK_PHYSICS::TurnDampK())));
-					const float DeltaPitch = FRotator::NormalizeAxis( -1.f * (Rot.Pitch + (PT->W().Y * UE_NETWORK_PHYSICS::TurnDampK())));
-
-					PT->AddTorque(FVector(DeltaRoll, DeltaPitch, 0.f) * UE_NETWORK_PHYSICS::TurnK() * 1.5f);
-					PT->AddForce(FVector(0.f, 0.f, 600.f));
-				}
-			}
-			else if (InputCmd.bBrakesPressed)
-			{
+				// Auto brake: Applied when no input and grounded.
 				FVector NewV = PT->V();
 				if (NewV.SizeSquared2D() < 1.f)
 				{
-					PT->SetV( Chaos::FVec3(0.f, 0.f, NewV.Z));
+					PT->SetV(Chaos::FVec3(0.f, 0.f, NewV.Z));
 				}
 				else
 				{
-					PT->SetV( Chaos::FVec3(NewV.X * 0.8f, NewV.Y * 0.8f, NewV.Z));
+					const float DragFactor = FMath::Max(0.f, FMath::Min(1.f - (NetState.AutoBrakeStrength * DeltaSeconds), 1.f));
+					PT->SetV(Chaos::FVec3(NewV.X * DragFactor, NewV.Y * DragFactor, NewV.Z));
 				}
+			}
+
+			// Rotation
+			if (InputCmd.Torque.SizeSquared() > 0.001f)
+			{
+				PT->AddTorque(InputCmd.Torque* NetState.ForceMultiplier* UE_NETWORK_PHYSICS::RotationK());
+			}
+
+			if (NetState.bEnableAutoFaceTargetYaw)
+			{
+				// Auto Turn to target yaw
+				const float CurrentYaw = PT->R().Rotator().Yaw + (PT->W().Z * NetState.AutoFaceTargetYawDamp);
+				const float DesiredYaw = FMath::DegreesToRadians(InputCmd.TargetYaw);
+				const float DeltaYaw = FRotator::NormalizeAxis(InputCmd.TargetYaw - CurrentYaw );
+				PT->AddTorque(FVector(0.f, 0.f, DeltaYaw * NetState.AutoFaceTargetYawStrength));
 			}
 			else
 			{
-				// Movement
-				if (InputCmd.Force.SizeSquared() > 0.001f)
-				{
-					const FVector MovementForce = InputCmd.Force * NetState.ForceMultiplier * UE_NETWORK_PHYSICS::MovementK();
-					npEnsure(MovementForce.ContainsNaN() == false);
-					PT->AddForce(MovementForce);
-
-					// Auto Turn
-					const float CurrentYaw = PT->R().Rotator().Yaw + (PT->W().Z * UE_NETWORK_PHYSICS::TurnDampK());
-					const float DesiredYaw = InputCmd.Force.Rotation().Yaw;
-					const float DeltaYaw = FRotator::NormalizeAxis( DesiredYaw - CurrentYaw );
-
-					ensure(!FMath::IsNaN(DesiredYaw));
-					PT->AddTorque(FVector(0.f, 0.f, DeltaYaw * UE_NETWORK_PHYSICS::TurnK()));
-				}
+				// Prevent spheres from spinning in place.
+				FVector AngularVelocity = PT->W();
+				const float DragFactor = FMath::Max(0.f, FMath::Min(1.f - (UE_NETWORK_PHYSICS::DampYawVelocityK() * DeltaSeconds), 1.f));
+				PT->SetW(Chaos::FVec3(AngularVelocity.X, AngularVelocity.Y, AngularVelocity.Z * DragFactor));
 			}
+		}
 
-			// Drag force
-			FVector V = PT->V();
-			V.Z = 0.f;
-			if (V.SizeSquared() > 0.1f)
+		// Drag force
+		FVector V = PT->V();
+		V.Z = 0.f;
+		if (V.SizeSquared() > 0.1f)
+		{
+			FVector Drag = -1.f * V * UE_NETWORK_PHYSICS::DragK();
+			PT->AddForce(Drag);
+		}
+
+
+		//  angular velocity limit
+		FVector W = PT->W();
+		{
+			const float MaxAngularVelocitySq = UE_NETWORK_PHYSICS::MaxAngularVelocity() * UE_NETWORK_PHYSICS::MaxAngularVelocity();
+			if (W.SizeSquared() > MaxAngularVelocitySq)
 			{
-				FVector Drag = -1.f * V * UE_NETWORK_PHYSICS::DragK();
-				ensure(Drag.ContainsNaN() == false);
-				PT->AddForce(Drag);
+				W = W.GetUnsafeNormal() * UE_NETWORK_PHYSICS::MaxAngularVelocity();
+				PT->SetW(W);
 			}
+		}
 
-			NetState.JumpCooldownMS = FMath::Max( NetState.JumpCooldownMS - (int32)(DeltaSeconds* 1000.f), 0);
-			if (NetState.JumpCooldownMS != 0)
-			{
-				UE_CLOG(UE_NETWORK_PHYSICS::MockDebug(), LogNetworkPhysics, Log, TEXT("[%d/%d] JumpCount: %d. JumpCooldown: %d"), SimulationFrame, Context.LocalStorageFrame, NetState.JumpCount, NetState.JumpCooldownMS);
-			}
+		NetState.JumpCooldownMS = FMath::Max( NetState.JumpCooldownMS - (int32)(DeltaSeconds* 1000.f), 0);
+		if (NetState.JumpCooldownMS != 0)
+		{
+			UE_CLOG(UE_NETWORK_PHYSICS::MockDebug(), LogNetworkPhysics, Log, TEXT("[%d/%d] JumpCount: %d. JumpCooldown: %d"), SimulationFrame, Context.LocalStorageFrame, NetState.JumpCount, NetState.JumpCooldownMS);
+		}
 
-			if (InputCmd.bJumpedPressed)
-			{
-				// Note this is really just for debugging. "How many times was the button pressed"
-				NetState.JumpCount++;
-				UE_CLOG(UE_NETWORK_PHYSICS::MockDebug(), LogNetworkPhysics, Log, TEXT("[%d/%d] bJumpedPressed: %d. Count: %d"), SimulationFrame, Context.LocalStorageFrame, InputCmd.bJumpedPressed, NetState.JumpCount);
-				UE_LOG(LogNetworkPhysics, Log, TEXT("[%d/%d] bJumpedPressed: %d. Count: %d"), SimulationFrame, Context.LocalStorageFrame, InputCmd.bJumpedPressed, NetState.JumpCount);
-			}
+		if (InputCmd.bJumpedPressed)
+		{
+			// Note this is really just for debugging. "How many times was the button pressed"
+			NetState.JumpCount++;
+			UE_CLOG(UE_NETWORK_PHYSICS::MockDebug(), LogNetworkPhysics, Log, TEXT("[%d/%d] bJumpedPressed: %d. Count: %d"), SimulationFrame, Context.LocalStorageFrame, InputCmd.bJumpedPressed, NetState.JumpCount);
 		}
 	}
 };
@@ -276,21 +296,19 @@ void UPhysicsMovementComponent::InitializeComponent()
 		return;
 	}
 
-	if (UE_NP::bEnableMock3() > 0)
+	
+	FPhysicsMovementLocalState LocalState;
+	LocalState.Proxy = this->GetManagedProxy();
+	if (LocalState.Proxy)
 	{
-		FPhysicsMovementLocalState LocalState;
-		LocalState.Proxy = UE_NP::FindBestPhysicsProxy(GetOwner(), ManagedComponentTag);
-		if (LocalState.Proxy)
+		if (ensure(NetworkPredictionProxy.RegisterProxy(GetWorld())))
 		{
-			if (ensure(NetworkPredictionProxy.RegisterProxy(GetWorld())))
-			{
-				NetworkPredictionProxy.RegisterSim<FPhysicsMovementAsyncModelDef>(MoveTemp(LocalState), FPhysicsMovementNetState(), &PendingInputCmd, &MovementState);
-			}
+			NetworkPredictionProxy.RegisterSim<FPhysicsMovementAsyncModelDef>(MoveTemp(LocalState), FPhysicsMovementNetState(), &PendingInputCmd, &MovementState);
 		}
-		else
-		{
-			UE_LOG(LogNetworkPhysics, Warning, TEXT("No valid physics body found on %s"), *GetName());
-		}
+	}
+	else
+	{
+		UE_LOG(LogNetworkPhysics, Warning, TEXT("No valid physics body found on %s"), *GetName());
 	}
 #endif
 }

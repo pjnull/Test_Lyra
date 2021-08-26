@@ -420,6 +420,8 @@ public:
 
 protected:
 
+	FSingleParticlePhysicsProxy* GetManagedProxy() const { return NetworkPhysicsState.Proxy; }
+
 	// Which component's physics body to manage if there are multiple PrimitiveComponent and not the root component.
 	UPROPERTY(EditDefaultsOnly, Category = "Network Physics")
 	FName ManagedComponentTag=NAME_None;

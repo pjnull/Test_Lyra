@@ -3,7 +3,9 @@
 #pragma once
 
 #include "NetworkPhysics.h"
+#include "NetworkPredictionLog.h"
 #include "Async/NetworkPredictionAsyncProxy.h"
+#include "MockNetworkPhysics.h"
 #include "PhysicsMovement.generated.h"
 
 
@@ -20,6 +22,13 @@ struct FPhysicsInputCmd
 	UPROPERTY(BlueprintReadWrite,Category="Input")
 	FVector	Force;
 
+	UPROPERTY(BlueprintReadWrite, Category = "Input")
+	FVector	Torque;
+
+	/** Target yaw of character (Degrees). Torque will be applied to rotate character towards target. */
+	UPROPERTY(BlueprintReadWrite, Category = "Input")
+	float TargetYaw;
+
 	UPROPERTY(BlueprintReadWrite,Category="Input")
 	bool bJumpedPressed = false;
 
@@ -33,32 +42,29 @@ struct FPhysicsInputCmd
 	{
 		if (Ar.IsSaving() && !bLegit)
 		{
-			//UE_LOG(LogTemp, Warning, TEXT("Sending Bad Input!"));
+			UE_LOG(LogNetworkPrediction, Warning, TEXT("FPhysicsInputCmd Sending Bad Input!"));
 		}
 
 		Ar << Force;
+		Ar << Torque;
+		Ar << TargetYaw;
 		Ar << bJumpedPressed;
 		Ar << bBrakesPressed;
 		Ar << bLegit;
 
 		if (!Ar.IsSaving() && !bLegit)
 		{
-			//UE_LOG(LogTemp, Warning, TEXT("Received Bad Input!"));
+			UE_LOG(LogNetworkPrediction, Warning, TEXT("FPhysicsInputCmd Received Bad Input!"));
 		}
 	}
 
 	bool ShouldReconcile(const FPhysicsInputCmd& AuthState) const
 	{
-		//return FVector::DistSquared(Force, AuthState.Force) > 0.1f || 
-		return Force != AuthState.Force ||
-			bJumpedPressed != AuthState.bJumpedPressed || 
-			bBrakesPressed != AuthState.bBrakesPressed ||
-			bLegit != AuthState.bLegit;
-	}
-
-	void ApplyCorrection(const FPhysicsInputCmd& AuthState)
-	{
-		*this = AuthState;
+		return FVector::DistSquared(Force, AuthState.Force) > 0.1f
+			|| FVector::DistSquared(Torque, AuthState.Torque) > 0.1f
+			|| !FMath::IsNearlyEqual(TargetYaw, AuthState.TargetYaw, 1.0f)
+			|| bJumpedPressed != AuthState.bJumpedPressed || 
+			bBrakesPressed != AuthState.bBrakesPressed;
 	}
 };
 
@@ -70,6 +76,24 @@ struct FPhysicsMovementNetState
 	// Actually used by AsyncTick to scale force applied
 	UPROPERTY(BlueprintReadWrite, Category="Mock Object")
 	float ForceMultiplier = 125000.f;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Mock Object")
+	float AutoFaceTargetYawStrength = 200000.f;
+	
+	UPROPERTY(BlueprintReadWrite, Category = "Mock Object")
+	float AutoFaceTargetYawDamp = 20.f;
+
+	// If enabled, input cmd should specify target yaw.
+	UPROPERTY(BlueprintReadWrite, Category = "Mock Object")
+	bool bEnableAutoFaceTargetYaw = false;
+
+	// If enabled, object will attempt to keep its up vector aligned with world up.
+	UPROPERTY(BlueprintReadWrite, Category = "Mock Object")
+	bool bEnableKeepUpright = true;
+
+	// Strength of auto brake force applied when no input force and on ground.
+	UPROPERTY(BlueprintReadWrite, Category = "Mock Object")
+	float AutoBrakeStrength = 5.f;
 
 	// Arbitrary data that doesn't affect sim but could still trigger rollback
 	UPROPERTY(BlueprintReadWrite, Category="Mock Object")
@@ -105,6 +129,11 @@ struct FPhysicsMovementNetState
 	{
 		Ar << ForceMultiplier;
 		Ar << RandValue;
+		Ar << AutoFaceTargetYawStrength;
+		Ar << AutoFaceTargetYawDamp;
+		Ar << bEnableAutoFaceTargetYaw;
+		Ar << AutoBrakeStrength;
+		Ar << bEnableKeepUpright;
 		Ar << JumpCooldownMS;
 		Ar << JumpCount;
 		Ar << CheckSum;	
@@ -119,6 +148,11 @@ struct FPhysicsMovementNetState
 		return 
 			ForceMultiplier != AuthState.ForceMultiplier || 
 			RandValue != AuthState.RandValue ||
+			AutoFaceTargetYawStrength != AuthState.AutoFaceTargetYawStrength ||
+			AutoFaceTargetYawDamp != AuthState.AutoFaceTargetYawDamp ||
+			bEnableAutoFaceTargetYaw != AuthState.bEnableAutoFaceTargetYaw ||
+			AutoBrakeStrength != AuthState.AutoBrakeStrength ||
+			bEnableKeepUpright != AuthState.bEnableKeepUpright ||
 			JumpCooldownMS != AuthState.JumpCooldownMS || 
 			JumpCount != AuthState.JumpCount ||
 			RecoveryFrame != AuthState.RecoveryFrame ||
@@ -137,7 +171,7 @@ struct FPhysicsMovementLocalState
 };
 
 UCLASS(BlueprintType, meta=(BlueprintSpawnableComponent))
-class NETWORKPREDICTIONEXTRAS_API UPhysicsMovementComponent : public UActorComponent
+class NETWORKPREDICTIONEXTRAS_API UPhysicsMovementComponent : public UNetworkPhysicsComponent
 {
 	GENERATED_BODY()
 
@@ -166,10 +200,6 @@ public:
 	// Event called when local input is needed: fill out PendingInputCmd with latest input data
 	UPROPERTY(BlueprintAssignable, Category = "Input")
 	FOnGenerateLocalInputCmd OnGenerateLocalInputCmd;
-
-	// Which component's physics body to manage if there are multiple PrimitiveComponent and not the root component.
-	UPROPERTY(EditDefaultsOnly, Category = "Physics")
-	FName ManagedComponentTag = NAME_None;
 
 	void TestMisprediction();
 
