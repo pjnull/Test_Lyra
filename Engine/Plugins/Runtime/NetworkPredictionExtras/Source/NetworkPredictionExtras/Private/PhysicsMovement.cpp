@@ -366,6 +366,30 @@ APlayerController* UPhysicsMovementComponent::GetOwnerPC() const
 	return nullptr;
 }
 
+void UPhysicsMovementComponent::SetAutoTargetYawStrength(float Strength)
+{
+	NetworkPredictionProxy.ModifyNetState<FPhysicsMovementAsyncModelDef>([Strength](FPhysicsMovementNetState& NetState)
+	{
+		NetState.AutoFaceTargetYawStrength = Strength;
+	});	
+}
+
+void UPhysicsMovementComponent::SetAutoTargetYawDamp(float YawDamp)
+{
+	NetworkPredictionProxy.ModifyNetState<FPhysicsMovementAsyncModelDef>([YawDamp](FPhysicsMovementNetState& NetState)
+	{
+		NetState.AutoFaceTargetYawDamp = YawDamp;
+	});	
+}
+
+void UPhysicsMovementComponent::SetEnableTargetYaw(bool bTargetYaw)
+{
+	NetworkPredictionProxy.ModifyNetState<FPhysicsMovementAsyncModelDef>([bTargetYaw](FPhysicsMovementNetState& NetState)
+	{
+		NetState.bEnableAutoFaceTargetYaw = bTargetYaw;
+	});	
+}
+
 void UPhysicsMovementComponent::TestMisprediction()
 {
 	const int32 RandValue = FMath::RandHelper(1024);

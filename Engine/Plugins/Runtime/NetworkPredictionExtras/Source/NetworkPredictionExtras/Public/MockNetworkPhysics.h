@@ -358,51 +358,9 @@ public:
 	UPROPERTY(Replicated, transient)
 	FNetworkPhysicsState NetworkPhysicsState;
 
-	// ----------------------------------------------------------------
-	// API for setting pending input cmd (used by local controller)
-	// ----------------------------------------------------------------
-
-	UFUNCTION(BlueprintPure, Category = "Mock Input")
-	FMockPhysInputCmd GetPendingInputCmd() const { return InManagedState.InputCmd; }
-
-	UFUNCTION(BlueprintCallable, Category = "Mock Input")
-	void SetPendingInputCmd(const FMockPhysInputCmd& In) { InManagedState.InputCmd = In; }
-
-	DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnGeneratedLocalInputCmd);
-	
-	UPROPERTY(BlueprintAssignable, Category = "Components|Activation")
-	FOnGeneratedLocalInputCmd OnGeneratedLocalInputCmd;
-
-	// ----------------------------------------------------------------
-	// API for setting the GT owned state
-	//	Its probably wrong to let clients mod this without a PredictionKey mechanism
-	// ----------------------------------------------------------------
-
-	UFUNCTION(BlueprintPure, Category = "Mock State")
-	FMockState_GT GetMockState_GT() const { return InManagedState.GT_State; }
-
-	UFUNCTION(BlueprintCallable, Category = "Mock State")
-	void SetMockState_GT(const FMockState_GT& In) { InManagedState.GT_State = In; }
-
-	// ----------------------------------------------------------------
-	// API for setting the PT owned state
-	// ----------------------------------------------------------------
-
-	UFUNCTION(BlueprintPure, Category = "Mock Input")
-	FMockState_PT GetMockState_PT() const { return OutManagedState.PT_State; }
-
-	// ----------------------------------------------------------------
-	// Misc API
-	// ----------------------------------------------------------------
-
 	UFUNCTION(BlueprintPure, Category = "Network Physics")
 	int32 GetNetworkPredictionLOD() const { return NetworkPhysicsState.LocalLOD; }
-
-	// Makes the object "controllable". This includes logic like air-recover.
-	UPROPERTY(EditDefaultsOnly, Category="Network Physics")
-	bool bEnableMockGameplay=false;
-
-
+	
 	void ProcessInputs_External(FMockManagedState& State, int32 PhysicsStep, int32 LocalFrameOffset);
 	void StartRecording(TArray<FMockPhysInputCmd>* Stream);
 	void StopRecording();

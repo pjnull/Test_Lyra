@@ -1070,28 +1070,6 @@ void UNetworkPhysicsComponent::InitializeComponent()
 			ActorExtent *= Actor->GetActorScale3D();
 			DrawDebugBox(P.DrawWorld, P.Loc, ActorExtent, P.Rot, P.Color, false, P.Lifetime, 0, Thickness);
 		});
-
-		if (UE_NETWORK_PHYSICS::bEnableMock())
-		{
-			if (bEnableMockGameplay)
-			{
-				FMockObjectManager* MockManager = FMockObjectManager::Get(World);
-				checkSlow(MockManager);
-
-				InManagedState.Proxy = PrimitiveComponent->BodyInstance.ActorHandle;
-				OutManagedState.Proxy = PrimitiveComponent->BodyInstance.ActorHandle;
-				ReplicatedManagedState.Proxy = PrimitiveComponent->BodyInstance.ActorHandle;
-				MockManager->RegisterManagedMockObject(&ReplicatedManagedState, &InManagedState, &OutManagedState);
-			}
-
-			if (bCanBeKicked)
-			{
-				FMockObjectManager* MockManager = FMockObjectManager::Get(World);
-				checkSlow(MockManager);
-
-				MockManager->RegisterBall(PrimitiveComponent->BodyInstance.ActorHandle);
-			}
-		}
 	}
 #endif
 }
@@ -1100,34 +1078,11 @@ void UNetworkPhysicsComponent::UninitializeComponent()
 {
 	Super::UninitializeComponent();
 #if WITH_CHAOS
-
-	//UE_LOG(LogTemp, Warning, TEXT("EndPlay %s"), *GetPathNameSafe(this));
 	if (UWorld* World = GetWorld())
 	{
 		if (UNetworkPhysicsManager* Manager = World->GetSubsystem<UNetworkPhysicsManager>())
 		{
-			if (UE_NETWORK_PHYSICS::bEnableMock())
-			{
-				if (bEnableMockGameplay)
-				{
-					if (FMockObjectManager* MockManager = FMockObjectManager::Get(World))
-					{
-						//UE_LOG(LogTemp, Warning, TEXT("   Unregistering MockManager. 0x%X"), (int64)&ReplicatedManagedState);
-						MockManager->UnregisterManagedMockObject(&ReplicatedManagedState, &InManagedState, &OutManagedState);
-					}
-				}
-
-				if (bCanBeKicked)
-				{
-					if (FMockObjectManager* MockManager = FMockObjectManager::Get(World))
-					{
-						MockManager->UnregisterBall(NetworkPhysicsState.Proxy);
-					}
-				}
-
-				Manager->UnregisterPhysicsProxy(&NetworkPhysicsState);
-			}
-
+			Manager->UnregisterPhysicsProxy(&NetworkPhysicsState);
 		}
 	}
 #endif
@@ -1142,7 +1097,7 @@ void UNetworkPhysicsComponent::TickComponent(float DeltaTime, enum ELevelTick Ti
 	if (PC && PC->IsLocalController())
 	{
 		// Broadcast out a delegate. The user will use GetPendingInputCmd/SetPendingInputCmd to write to ManagedState.InputCmd
-		OnGeneratedLocalInputCmd.Broadcast();
+		//OnGeneratedLocalInputCmd.Broadcast();
 		if (bRecording)
 		{
 
@@ -1436,6 +1391,7 @@ FAutoConsoleCommandWithWorldAndArgs PlaybackInputCmds(TEXT("np2.PlaybackInputs")
 FAutoConsoleCommandWithWorldAndArgs ForceMockCorrectionCmd(TEXT("np2.ForceMockCorrection"), TEXT(""),
 	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray< FString >& Args, UWorld* InWorld) 
 {
+	/*
 	for (TObjectIterator<UWorld> It; It; ++It)
 	{
 		UWorld* World = *It;
@@ -1456,11 +1412,13 @@ FAutoConsoleCommandWithWorldAndArgs ForceMockCorrectionCmd(TEXT("np2.ForceMockCo
 			}
 		}
 	}
+	*/
 }));
 
 FAutoConsoleCommandWithWorldAndArgs ForceMockCorrectionCmd2(TEXT("np2.ForceMockCorrection2"), TEXT(""),
 	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray< FString >& Args, UWorld* InWorld) 
 {
+			/*
 	for (TObjectIterator<UWorld> It; It; ++It)
 	{
 		UWorld* World = *It;
@@ -1481,4 +1439,5 @@ FAutoConsoleCommandWithWorldAndArgs ForceMockCorrectionCmd2(TEXT("np2.ForceMockC
 			}
 		}
 	}
+	*/
 }));

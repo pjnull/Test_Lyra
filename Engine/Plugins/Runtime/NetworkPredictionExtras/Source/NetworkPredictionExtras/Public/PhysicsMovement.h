@@ -201,6 +201,17 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Input")
 	FOnGenerateLocalInputCmd OnGenerateLocalInputCmd;
 
+	
+
+	UFUNCTION(BlueprintCallable, Category="Movement")
+	void SetAutoTargetYawStrength(float Strength);
+
+	UFUNCTION(BlueprintCallable, Category="Movement")
+	void SetAutoTargetYawDamp(float YawDamp);
+
+	UFUNCTION(BlueprintCallable, Category="Movement")
+	void SetEnableTargetYaw(bool bTargetYaw);
+
 	void TestMisprediction();
 
 private:
