@@ -364,6 +364,24 @@ public:
 		return false;
 	}
 
+	bool GetPersistentStorageUsageByCategory(const FString& InCategory, int64& UsedSpace, int64& RemainingSpace, int64& Quota, int64* OptionalQuota = nullptr)
+	{
+		FRWScopeLock ReadLock(CategoryLock, SLT_ReadOnly);
+
+		if (const FPersistentStorageCategorySharedPtr& Category = Categories.FindRef(InCategory))
+		{
+			UsedSpace = Category->GetUsedSize();
+			RemainingSpace = Category->GetAvailableSize();
+			Quota = Category->GetCategoryQuota();
+			if (OptionalQuota != nullptr)
+			{
+				*OptionalQuota = Category->GetCategoryOptionalQuota();
+			}
+			return true;
+		}
+		return false;
+	}
+
 	/// <summary>
 	/// Returns any additional required free space and optional free space
 	/// </summary>
