@@ -35,12 +35,6 @@ FAutoConsoleVariableRef CVarLUTSize(
 	TEXT("Size of film LUT"),
 	ECVF_RenderThreadSafe);
 
-TAutoConsoleVariable<int32> CVarTonemapperFilm(
-	TEXT("r.TonemapperFilm"),
-	1,
-	TEXT("Use new film tone mapper"),
-	ECVF_RenderThreadSafe);
-
 TAutoConsoleVariable<int32> CVarColorGrading(
 	TEXT("r.Color.Grading"), 1,
 	TEXT("Controls whether post process settings's color grading settings should be applied."),
@@ -138,7 +132,6 @@ BEGIN_SHADER_PARAMETER_STRUCT(FCombineLUTParameters, )
 	SHADER_PARAMETER(uint32, bIsTemperatureWhiteBalance)
 	SHADER_PARAMETER_STRUCT_INCLUDE(FColorRemapParameters, ColorRemap)
 	SHADER_PARAMETER_STRUCT_INCLUDE(FTonemapperOutputDeviceParameters, OutputDevice)
-	SHADER_PARAMETER_STRUCT_INCLUDE(FMobileFilmTonemapParameters, MobileFilmTonemap)
 END_SHADER_PARAMETER_STRUCT()
 
 void GetCombineLUTParameters(
@@ -220,24 +213,8 @@ void GetCombineLUTParameters(
 	Parameters.FilmShoulder = Settings.FilmShoulder;
 	Parameters.FilmBlackClip = Settings.FilmBlackClip;
 	Parameters.FilmWhiteClip = Settings.FilmWhiteClip;
-	Parameters.bUseMobileTonemapper = CVarTonemapperFilm.GetValueOnRenderThread() == 0;
-
-
-	Parameters.MobileFilmTonemap = GetMobileFilmTonemapParameters(
-		Settings,
-		/* UseColorMatrix = */ true,
-		/* UseShadowTint = */ true,
-		/* UseContrast = */ true);
-
-	Parameters.bUseMobileTonemapper = CVarTonemapperFilm.GetValueOnRenderThread() == 0;
 
 	Parameters.OutputDevice = GetTonemapperOutputDeviceParameters(ViewFamily);
-
-	Parameters.MobileFilmTonemap = GetMobileFilmTonemapParameters(
-		Settings,
-		/* UseColorMatrix = */ true,
-		/* UseShadowTint = */ true,
-		/* UseContrast = */ true);
 }
 
 class FLUTBlenderShader : public FGlobalShader
