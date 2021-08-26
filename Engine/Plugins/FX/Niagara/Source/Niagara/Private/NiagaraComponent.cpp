@@ -3199,11 +3199,23 @@ void UNiagaraComponent::SetAsset(UNiagaraSystem* InAsset, bool bResetExistingOve
 	}
 #endif
 
-	if (Asset && IsRegistered())
+	if ( Asset )
 	{
-		if (bAutoActivate || bWasActive)
+		// Apply system overrides to the component
+		CastShadow = Asset->bOverrideCastShadow ? Asset->bCastShadow : CastShadow;
+		bReceivesDecals = Asset->bOverrideReceivesDecals ? Asset->bReceivesDecals : bReceivesDecals;
+
+		bRenderCustomDepth = Asset->bOverrideRenderCustomDepth ? Asset->bRenderCustomDepth : bRenderCustomDepth;
+		CustomDepthStencilWriteMask = Asset->bOverrideCustomDepthStencilValue ? Asset->CustomDepthStencilWriteMask : CustomDepthStencilWriteMask;
+		CustomDepthStencilValue = Asset->bOverrideCustomDepthStencilWriteMask ? Asset->CustomDepthStencilValue : CustomDepthStencilValue;
+
+		// Activate
+		if ( IsRegistered() )
 		{
-			Activate();
+			if (bAutoActivate || bWasActive)
+			{
+				Activate();
+			}
 		}
 	}
 }
