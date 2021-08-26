@@ -372,7 +372,7 @@ struct FGameFeaturePluginState_Uninstalling : public FGameFeaturePluginState
 
 		if (!Result.HasError() && BundleResult.Result != EInstallBundleReleaseResult::OK)
 		{
-			Result = MakeError(UE::GameFeatures::StateMachineErrorNamespace + TEXT("BundleManager_UninstallFailure_") + LexToString(BundleResult.Result));
+			Result = MakeError(UE::GameFeatures::StateMachineErrorNamespace + TEXT("BundleManager_Uninstall_Failure_") + LexToString(BundleResult.Result));
 		}
 
 		if (PendingBundles.Num() > 0)
@@ -418,7 +418,7 @@ struct FGameFeaturePluginState_Uninstalling : public FGameFeaturePluginState
 		if (EnumHasAnyFlags(RequestInfo.InfoFlags, EInstallBundleRequestInfoFlags::SkippedUnknownBundles))
 		{
 			ensureMsgf(false, TEXT("Unable to enqueue uninstall for the PluginURL(%s) because failed to resolve install bundles!"), *StateProperties.PluginURL);
-			Result = MakeError(UE::GameFeatures::StateMachineErrorNamespace + TEXT("BundleManager_CannotResolveInstallBundles"));
+			Result = MakeError(UE::GameFeatures::StateMachineErrorNamespace + TEXT("BundleManager_Cannot_Resolve_InstallBundles_For_Release"));
 			return;
 		}
 
@@ -514,7 +514,7 @@ struct FGameFeaturePluginState_Downloading : public FGameFeaturePluginState
 		if (!MaybeRequestInfo.IsValid())
 		{
 			ensureMsgf(false, TEXT("Unable to enqueue download for the PluginURL(%s) because %s"), *StateProperties.PluginURL, LexToString(MaybeRequestInfo.GetError()));
-			Result = MakeError(UE::GameFeatures::StateMachineErrorNamespace + TEXT("BundleManager_CannotStartDownload"));
+			Result = MakeError(UE::GameFeatures::StateMachineErrorNamespace + TEXT("BundleManager_Cannot_Start_Download"));
 			UpdateStateMachineImmediate();
 			return;
 		}
@@ -524,7 +524,7 @@ struct FGameFeaturePluginState_Downloading : public FGameFeaturePluginState
 		if (EnumHasAnyFlags(RequestInfo.InfoFlags, EInstallBundleRequestInfoFlags::SkippedUnknownBundles))
 		{
 			ensureMsgf(false, TEXT("Unable to enqueue download for the PluginURL(%s) because failed to resolve install bundles!"), *StateProperties.PluginURL);
-			Result = MakeError(UE::GameFeatures::StateMachineErrorNamespace + TEXT("BundleManager_CannotResolveInstallBundles"));
+			Result = MakeError(UE::GameFeatures::StateMachineErrorNamespace + TEXT("BundleManager_Cannot_Resolve_InstallBundles_For_Download"));
 			UpdateStateMachineImmediate();
 			return;
 		}
@@ -561,11 +561,11 @@ struct FGameFeaturePluginState_Downloading : public FGameFeaturePluginState
 		{
 			if (BundleResult.OptionalErrorCode.IsEmpty())
 			{
-				Result = MakeError(UE::GameFeatures::StateMachineErrorNamespace + TEXT("BundleManager_DownloadFailure_") + LexToString(BundleResult.Result));
+				Result = MakeError(UE::GameFeatures::StateMachineErrorNamespace + TEXT("BundleManager_Download_Failure_") + LexToString(BundleResult.Result));
 			}
 			else
 			{
-				Result = MakeError(UE::GameFeatures::StateMachineErrorNamespace + TEXT("BundleManager_DownloadFailure_") + BundleResult.OptionalErrorCode);
+				Result = MakeError(UE::GameFeatures::StateMachineErrorNamespace + TEXT("BundleManager_Download_Failure_") + BundleResult.OptionalErrorCode);
 			}
 		}
 
@@ -721,7 +721,7 @@ struct FGameFeaturePluginState_Unmounting : public FGameFeaturePluginState
 
 		if (!Result.HasError() && BundleResult.Result != EInstallBundleReleaseResult::OK)
 		{
-			Result = MakeError(UE::GameFeatures::StateMachineErrorNamespace + TEXT("BundleManager_UnmountError_") + LexToString(BundleResult.Result));
+			Result = MakeError(UE::GameFeatures::StateMachineErrorNamespace + TEXT("BundleManager_Unmount_Error_") + LexToString(BundleResult.Result));
 		}
 
 		if (PendingBundles.Num() > 0)
@@ -765,7 +765,7 @@ struct FGameFeaturePluginState_Unmounting : public FGameFeaturePluginState
 		if (!MaybeRequestInfo.IsValid())
 		{
 			ensureMsgf(false, TEXT("Unable to enqueue unmount for the PluginURL(%s) because %s"), *StateProperties.PluginURL, LexToString(MaybeRequestInfo.GetError()));
-			Result = MakeError(UE::GameFeatures::StateMachineErrorNamespace + TEXT("BundleManager_CannotStartUnmount"));
+			Result = MakeError(UE::GameFeatures::StateMachineErrorNamespace + TEXT("BundleManager_Cannot_Start_Unmount"));
 			return;
 		}
 
@@ -774,7 +774,7 @@ struct FGameFeaturePluginState_Unmounting : public FGameFeaturePluginState
 		if (EnumHasAnyFlags(RequestInfo.InfoFlags, EInstallBundleRequestInfoFlags::SkippedUnknownBundles))
 		{
 			ensureMsgf(false, TEXT("Unable to enqueue unmount for the PluginURL(%s) because failed to resolve install bundles!"), *StateProperties.PluginURL);
-			Result = MakeError(UE::GameFeatures::StateMachineErrorNamespace + TEXT("BundleManager_CannotResolveInstallBundles"));
+			Result = MakeError(UE::GameFeatures::StateMachineErrorNamespace + TEXT("BundleManager_Cannot_Resolve_InstallBundles_For_Unmount"));
 			return;
 		}
 
@@ -835,11 +835,11 @@ struct FGameFeaturePluginState_Mounting : public FGameFeaturePluginState
 		{
 			if (BundleResult.OptionalErrorCode.IsEmpty())
 			{
-				Result = MakeError(UE::GameFeatures::StateMachineErrorNamespace + TEXT("BundleManager_MountError_") + LexToString(BundleResult.Result));
+				Result = MakeError(UE::GameFeatures::StateMachineErrorNamespace + TEXT("BundleManager_Mount_Error_") + LexToString(BundleResult.Result));
 			}
 			else
 			{
-				Result = MakeError(UE::GameFeatures::StateMachineErrorNamespace + TEXT("BundleManager_MountError_") + BundleResult.OptionalErrorCode);
+				Result = MakeError(UE::GameFeatures::StateMachineErrorNamespace + TEXT("BundleManager_Mount_Error_") + BundleResult.OptionalErrorCode);
 			}
 		}
 
@@ -897,7 +897,7 @@ struct FGameFeaturePluginState_Mounting : public FGameFeaturePluginState
 		if (!MaybeRequestInfo.IsValid())
 		{
 			ensureMsgf(false, TEXT("Unable to enqueue mount for the PluginURL(%s) because %s"), *StateProperties.PluginURL, LexToString(MaybeRequestInfo.GetError()));
-			Result = MakeError(UE::GameFeatures::StateMachineErrorNamespace + TEXT("BundleManager_CannotStartMount"));
+			Result = MakeError(UE::GameFeatures::StateMachineErrorNamespace + TEXT("BundleManager_Cannot_Start_Mount"));
 			return;
 		}
 
@@ -906,7 +906,7 @@ struct FGameFeaturePluginState_Mounting : public FGameFeaturePluginState
 		if (EnumHasAnyFlags(RequestInfo.InfoFlags, EInstallBundleRequestInfoFlags::SkippedUnknownBundles))
 		{
 			ensureMsgf(false, TEXT("Unable to enqueue mount for the PluginURL(%s) because failed to resolve install bundles!"), *StateProperties.PluginURL);
-			Result = MakeError(UE::GameFeatures::StateMachineErrorNamespace + TEXT("BundleManager_CannotResolveInstallBundles"));
+			Result = MakeError(UE::GameFeatures::StateMachineErrorNamespace + TEXT("BundleManager_Cannot_Resolve_InstallBundles_For_Mount"));
 			return;
 		}
 
@@ -944,7 +944,7 @@ struct FGameFeaturePluginState_Mounting : public FGameFeaturePluginState
 		const bool bAddedPlugin = IPluginManager::Get().AddToPluginsList(StateProperties.PluginInstalledFilename);
 		if (!bAddedPlugin)
 		{
-			StateStatus.SetTransitionError(EGameFeaturePluginState::ErrorMounting, UE::GameFeatures::StateMachineErrorNamespace + TEXT("Failed_To_Mount_Plugin"));
+			StateStatus.SetTransitionError(EGameFeaturePluginState::ErrorMounting, UE::GameFeatures::StateMachineErrorNamespace + TEXT("Failed_To_Register_Plugin"));
 			return;
 		}
 		
@@ -960,20 +960,24 @@ struct FGameFeaturePluginState_Mounting : public FGameFeaturePluginState
 				TArray<uint8> SerializedAssetData;
 				const FString PluginFolder = FPaths::GetPath(StateProperties.PluginInstalledFilename);
 				const FString PluginAssetRegistry = PluginFolder / TEXT("AssetRegistry.bin");
-				if (ensure(IFileManager::Get().FileExists(*PluginAssetRegistry) && FFileHelper::LoadFileToArray(SerializedAssetData, *PluginAssetRegistry)))
+				if (!ensure(IFileManager::Get().FileExists(*PluginAssetRegistry)))
 				{
-					FAssetRegistryState PluginAssetRegistryState;
-					FMemoryReader Ar(SerializedAssetData);
-					PluginAssetRegistryState.Load(Ar);
-
-					IAssetRegistry& AssetRegistry = UAssetManager::Get().GetAssetRegistry();
-					AssetRegistry.AppendState(PluginAssetRegistryState);
-				}
-				else
-				{
-					StateStatus.SetTransitionError(EGameFeaturePluginState::ErrorMounting, UE::GameFeatures::StateMachineErrorNamespace + TEXT("Failed_To_Mount_Plugin"));
+					StateStatus.SetTransitionError(EGameFeaturePluginState::ErrorMounting, UE::GameFeatures::StateMachineErrorNamespace + TEXT("Plugin_AssetRegistry_Not_Found"));
 					return;
 				}
+
+				if (!FFileHelper::LoadFileToArray(SerializedAssetData, *PluginAssetRegistry))
+				{
+					StateStatus.SetTransitionError(EGameFeaturePluginState::ErrorMounting, UE::GameFeatures::StateMachineErrorNamespace + TEXT("Failed_To_Load_Plugin_AssetRegistry"));
+					return;
+				}
+
+				FAssetRegistryState PluginAssetRegistryState;
+				FMemoryReader Ar(SerializedAssetData);
+				PluginAssetRegistryState.Load(Ar);
+
+				IAssetRegistry& AssetRegistry = UAssetManager::Get().GetAssetRegistry();
+				AssetRegistry.AppendState(PluginAssetRegistryState);
 			}
 		}
 
