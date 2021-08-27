@@ -142,7 +142,10 @@ void UWaterBodyOceanComponent::OnUpdateBody(bool bWithExclusionVolumes)
 		for (int32 i = 0; i < Boxes.Num(); ++i)
 		{
 			const FBoxSphereBounds& Box = Boxes[i];
-			FString Name = FString::Printf(TEXT("OceanCollisionBoxComponent_%d"), i);
+			// We want a deterministic name within this water body component's outer to avoid non-deterministic cook issues but we also want to avoid reusing a component that might have been deleted
+			//  prior to that (in order to avoid potentially stalls caused by the primitive component not having been FinishDestroy-ed) (because OnUpdateBody runs 2 times in a row, 
+			//  once with bWithExclusionVolumes == false, once with bWithExclusionVolumes == true) so we use MakeUniqueObjectName for the name here :
+			FName Name = MakeUniqueObjectName(OwnerActor, UOceanCollisionComponent::StaticClass(), *FString::Printf(TEXT("OceanCollisionBoxComponent_%d"), i));
 			UOceanBoxCollisionComponent* BoxComponent = nullptr;
 			if (CollisionBoxes.IsValidIndex(i) && (CollisionBoxes[i] != nullptr))
 			{
@@ -150,7 +153,7 @@ void UWaterBodyOceanComponent::OnUpdateBody(bool bWithExclusionVolumes)
 			}
 			else
 			{
-				BoxComponent = NewObject<UOceanBoxCollisionComponent>(OwnerActor, *Name);
+				BoxComponent = NewObject<UOceanBoxCollisionComponent>(OwnerActor, Name);
 				BoxComponent->SetupAttachment(this);
 				CollisionBoxes.Add(BoxComponent);
 			}
@@ -177,7 +180,10 @@ void UWaterBodyOceanComponent::OnUpdateBody(bool bWithExclusionVolumes)
 		for (int32 i = 0; i < ConvexSets.Num(); ++i)
 		{
 			const TArray<FKConvexElem>& ConvexSet = ConvexSets[i];
-			FString Name = FString::Printf(TEXT("OceanCollisionComponent_%d"), i);
+			// We want a deterministic name within this water body component's outer to avoid non-deterministic cook issues but we also want to avoid reusing a component that might have been deleted
+			//  prior to that (in order to avoid potentially stalls caused by the primitive component not having been FinishDestroy-ed) (because OnUpdateBody runs 2 times in a row, 
+			//  once with bWithExclusionVolumes == false, once with bWithExclusionVolumes == true) so we use MakeUniqueObjectName for the name here :
+			FName Name = MakeUniqueObjectName(OwnerActor, UOceanCollisionComponent::StaticClass(), *FString::Printf(TEXT("OceanCollisionComponent_%d"), i));
 			UOceanCollisionComponent* CollisionComponent = nullptr;
 			if (CollisionHullSets.IsValidIndex(i) && (CollisionHullSets[i] != nullptr))
 			{
@@ -185,7 +191,7 @@ void UWaterBodyOceanComponent::OnUpdateBody(bool bWithExclusionVolumes)
 			}
 			else
 			{
-				CollisionComponent = NewObject<UOceanCollisionComponent>(OwnerActor, *Name);
+				CollisionComponent = NewObject<UOceanCollisionComponent>(OwnerActor, Name);
 				CollisionComponent->SetupAttachment(this);
 				CollisionHullSets.Add(CollisionComponent);
 			}
