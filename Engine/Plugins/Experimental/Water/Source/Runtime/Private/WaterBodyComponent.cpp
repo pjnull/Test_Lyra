@@ -800,8 +800,9 @@ void UWaterBodyComponent::OnPostEditChangeProperty(FPropertyChangedEvent& Proper
 	}
 }
 
-EWaterBodyStatus UWaterBodyComponent::CheckWaterBodyStatus(FText* OutError) const
+TArray<TSharedRef<FTokenizedMessage>> UWaterBodyComponent::CheckWaterBodyStatus() const
 {
+	TArray<TSharedRef<FTokenizedMessage>> Result;
 	if (!IsTemplate())
 	{
 		if (const UWorld* World = GetWorld())
@@ -810,55 +811,35 @@ EWaterBodyStatus UWaterBodyComponent::CheckWaterBodyStatus(FText* OutError) cons
 			{
 				if (AffectsWaterMesh() && (WaterSubsystem->GetWaterMeshActor() == nullptr))
 				{
-					if (OutError) 
-					{
-						*OutError = LOCTEXT("MapCheck_Message_MissingWaterMesh", "This water body requires a WaterMeshActor to be rendered. Please add one to the map. ");
-					}
-					return EWaterBodyStatus::MissingWaterMesh;
+					Result.Add(FTokenizedMessage::Create(
+						EMessageSeverity::Error,
+						FText::Format(
+							LOCTEXT("MapCheck_Message_MissingWaterMesh", "Water body {0} requires a WaterMeshActor to be rendered. Please add one to the map. "),
+							FText::FromString(GetWaterBodyActor()->GetActorLabel()))));
 				}
 			}
 
 			if (AffectsLandscape() && FindLandscape() == nullptr)
 			{
-				if (OutError) 
-				{
-					*OutError = LOCTEXT("MapCheck_Message_MissingLandscape", "This water body requires a Landscape to be rendered. Please add one to the map. ");
-				}
-				return EWaterBodyStatus::MissingLandscape;
+				Result.Add(FTokenizedMessage::Create(
+					EMessageSeverity::Error,
+					FText::Format(
+						LOCTEXT("MapCheck_Message_MissingLandscape", "Water body {0} requires a Landscape to be rendered. Please add one to the map. "),
+						FText::FromString(GetWaterBodyActor()->GetActorLabel()))));
 			}
 		}
 	}
-
-	return EWaterBodyStatus::Valid;
+	return Result;
 }
 
 void UWaterBodyComponent::CheckForErrors()
 {
 	Super::CheckForErrors();
 
-	FText Error;
-	switch (CheckWaterBodyStatus(&Error))
+	TArray<TSharedRef<FTokenizedMessage>> StatusMessages = CheckWaterBodyStatus();
+	for (const TSharedRef<FTokenizedMessage>& StatusMessage : StatusMessages)
 	{
-	case EWaterBodyStatus::MissingWaterMesh:
-		FMessageLog("MapCheck").Error()
-			->AddToken(FUObjectToken::Create(this))
-			->AddToken(FTextToken::Create(Error))
-			->AddToken(FMapErrorToken::Create(TEXT("WaterBodyMissingWaterMesh")));
-		break;
-	case EWaterBodyStatus::MissingLandscape:
-		FMessageLog("MapCheck").Error()
-			->AddToken(FUObjectToken::Create(this))
-			->AddToken(FTextToken::Create(Error))
-			->AddToken(FMapErrorToken::Create(TEXT("WaterBodyMissingLandscape")));
-		break;
-	case EWaterBodyStatus::InvalidWaveData:
-		FMessageLog("MapCheck").Warning()
-			->AddToken(FUObjectToken::Create(this))
-			->AddToken(FTextToken::Create(Error))
-			->AddToken(FMapErrorToken::Create(TEXT("WaterBodyInvalidWaveData")));
-		break;
-	case EWaterBodyStatus::Valid:
-	default: break;
+		FMessageLog("MapCheck").AddMessage(StatusMessage);
 	}
 }
 

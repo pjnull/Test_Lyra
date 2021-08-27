@@ -166,7 +166,22 @@ void AWaterBody::UpdateActorIcon()
 		IWaterModuleInterface& WaterModule = FModuleManager::GetModuleChecked<IWaterModuleInterface>("Water");
 		if (const IWaterEditorServices* WaterEditorServices = WaterModule.GetWaterEditorServices())
 		{
-			if (WaterBodyComponent == nullptr || WaterBodyComponent->CheckWaterBodyStatus() != EWaterBodyStatus::Valid)
+			bool bHasError = false;
+			if (WaterBodyComponent)
+			{
+				TArray<TSharedRef<FTokenizedMessage>> StatusMessages = WaterBodyComponent->CheckWaterBodyStatus();
+				for (const TSharedRef<FTokenizedMessage>& StatusMessage : StatusMessages)
+				{
+					// Message severities are ordered from most severe to least severe.
+					if (StatusMessage->GetSeverity() <= EMessageSeverity::Error)
+					{
+						bHasError = true;
+						break;
+					}
+				}
+			}
+
+			if (bHasError)
 			{
 				IconTexture = WaterEditorServices->GetErrorSprite();
 			}

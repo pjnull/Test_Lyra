@@ -23,6 +23,7 @@ class AWaterBodyIsland;
 class AWaterBodyExclusionVolume;
 class ALandscapeProxy;
 class UMaterialInstanceDynamic;
+class FTokenizedMessage;
 
 // ----------------------------------------------------------------------------------
 
@@ -329,7 +330,7 @@ protected:
 	/** Validates this component's data */
 	virtual void CheckForErrors() override;
 
-	virtual EWaterBodyStatus CheckWaterBodyStatus(FText* OutError = nullptr) const;
+	virtual TArray<TSharedRef<FTokenizedMessage>> CheckWaterBodyStatus() const;
 #endif // WITH_EDITOR
 
 	EWaterBodyQueryFlags CheckAndAjustQueryFlags(EWaterBodyQueryFlags InQueryFlags) const;
