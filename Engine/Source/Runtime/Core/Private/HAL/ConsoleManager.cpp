@@ -2176,13 +2176,6 @@ static TAutoConsoleVariable<int32> CVarMobileEnableMovableLightCSMShaderCulling(
 	TEXT("1: Primitives lit by movable directional light render with the CSM shader when determined to be within CSM range. (default)"),
 	ECVF_RenderThreadSafe | ECVF_ReadOnly);
 
-static TAutoConsoleVariable<int32> CVarMobileEnableSkyReflectionCapture(
-	TEXT("r.Mobile.EnableSkyReflectionCapture"),
-	0,
-	TEXT("0: Disable the use of Sky Reflection Captures (default)\n")
-	TEXT("1: Enable the use of Sky Reflection Captures\n"),
-	ECVF_RenderThreadSafe | ECVF_ReadOnly);
-
 static TAutoConsoleVariable<int32> CVarMobileUseCSMShaderBranch(
 	TEXT("r.Mobile.UseCSMShaderBranch"),
 	0,

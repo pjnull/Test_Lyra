@@ -929,8 +929,8 @@ void FPersistentUniformBuffers::Initialize()
 		MobileDirectionalLightUniformBuffers[Index] = TUniformBufferRef<FMobileDirectionalLightShaderParameters>::CreateUniformBufferImmediate(MobileDirectionalLightShaderParameters, UniformBuffer_MultiFrame, EUniformBufferValidation::None);
 	}
 
-	FMobileReflectionCaptureShaderParameters MobileSkyReflectionShaderParameters;
-	MobileSkyReflectionUniformBuffer = TUniformBufferRef<FMobileReflectionCaptureShaderParameters>::CreateUniformBufferImmediate(MobileSkyReflectionShaderParameters, UniformBuffer_MultiFrame, EUniformBufferValidation::None);
+	const FMobileReflectionCaptureShaderParameters* DefaultMobileSkyReflectionParameters = (const FMobileReflectionCaptureShaderParameters*)GDefaultMobileReflectionCaptureUniformBuffer.GetContents();
+	MobileSkyReflectionUniformBuffer = TUniformBufferRef<FMobileReflectionCaptureShaderParameters>::CreateUniformBufferImmediate(*DefaultMobileSkyReflectionParameters, UniformBuffer_MultiFrame, EUniformBufferValidation::None);
 }
 
 TSet<IPersistentViewUniformBufferExtension*> PersistentViewUniformBufferExtensions;

@@ -180,11 +180,7 @@ bool MobileBasePass::GetShaders(
 
 static bool UseSkyReflectionCapture(const FScene* RenderScene)
 {
-	static TConsoleVariableData<int32>* CVarMobileEnableSkyReflectionCapture = IConsoleManager::Get().FindTConsoleVariableDataInt(TEXT("r.Mobile.EnableSkyReflectionCapture"));
-	check(CVarMobileEnableSkyReflectionCapture);
-
-	return (CVarMobileEnableSkyReflectionCapture->GetValueOnRenderThread() == 1)
-		&& RenderScene
+	return RenderScene
 		&& RenderScene->SkyLight
 		&& RenderScene->SkyLight->ProcessedTexture
 		&& RenderScene->SkyLight->ProcessedTexture->TextureRHI;
