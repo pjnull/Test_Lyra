@@ -375,7 +375,7 @@ UNiagaraCullProxyComponent* FNiagaraWorldManager::GetCullProxy(UNiagaraComponent
 			CullProxy->SetAsset(System);
 			CullProxy->SetAllowScalability(false);
 
-			CullProxy->bAutoActivate = false;
+			CullProxy->bAutoActivate = true;
 			CullProxy->SetAutoDestroy(false);
 			CullProxy->bAllowAnyoneToDestroyMe = true;
 			CullProxy->RegisterComponentWithWorld(World);

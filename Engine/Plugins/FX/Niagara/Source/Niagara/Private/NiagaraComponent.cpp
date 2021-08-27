@@ -1756,11 +1756,15 @@ void UNiagaraComponent::SendRenderDynamicData_Concurrent()
 			{
 				//Render the cull proxy at this location instead.
 				NewProxyDynamicData.bUseCullProxy = true;
+
 				//Some renderers may need this transform on the GT so override here.
 				FNiagaraSystemInstanceControllerPtr CullProxyController = CullProxy->GetSystemInstanceController();
-				CullProxyController->GetSystemInstance_Unsafe()->SetWorldTransform(SystemInstanceController->GetSystemInstance_Unsafe()->GetWorldTransform());
-				CullProxyController->GenerateSetDynamicDataCommands(SetDataCommands, *RenderData, *NiagaraProxy);
-				CullProxyController->GetSystemInstance_Unsafe()->SetWorldTransform(FTransform::Identity);
+				if ( ensureMsgf(CullProxyController.IsValid(), TEXT("CullProxy is missing the system instance controller for System '%s' Component '%s'"), *GetNameSafe(Asset), *GetFullNameSafe(this)) )
+				{
+					CullProxyController->GetSystemInstance_Unsafe()->SetWorldTransform(SystemInstanceController->GetSystemInstance_Unsafe()->GetWorldTransform());
+					CullProxyController->GenerateSetDynamicDataCommands(SetDataCommands, *RenderData, *NiagaraProxy);
+					CullProxyController->GetSystemInstance_Unsafe()->SetWorldTransform(FTransform::Identity);
+				}
 			}
 			else
 			{
