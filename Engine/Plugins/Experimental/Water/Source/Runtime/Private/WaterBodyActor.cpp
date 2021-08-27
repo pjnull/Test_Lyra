@@ -318,31 +318,14 @@ void AWaterBody::InitializeBody()
 	}
 }
 
-void AWaterBody::PostInitProperties()
+void AWaterBody::DeprecateData()
 {
-	Super::PostInitProperties();
+	// Note: this function will be called multiple times so its important that the deprecated data
 
-	InitializeBody();
-}
-
-void AWaterBody::Serialize(FArchive& Ar)
-{
-	Super::Serialize(Ar);
-
-	Ar.UsingCustomVersion(FWaterCustomVersion::GUID);
-
-	if (Ar.IsLoading())
-	{
-		InitializeBody();
-	}
-}
-
-void AWaterBody::PostLoad()
-{
-	Super::PostLoad();
-
-	InitializeBody();
-
+	// Deprecation of actor data must happen during serialize so that CDOs are updated correctly for delta-serialization.
+	// Without this, WaterBodyComponents will serialize based on an incorrect archetype and all "default" properties will be reset
+	// to their native defaults. The deprecation is still also required in ::PostLoad because non-cdo components will lose the 
+	// data during their Serialize which occurs after this.
 #if WITH_EDITORONLY_DATA
 	if (SplineComp)
 	{
@@ -360,13 +343,6 @@ void AWaterBody::PostLoad()
 					WaterSplineMetadata->RiverWidth = OldSplineMetadata->RiverWidth;
 				}
 			}
-		}
-
-		// Keep metadata in sync
-		if (WaterSplineMetadata)
-		{
-			const int32 NumPoints = SplineComp->GetNumberOfSplinePoints();
-			WaterSplineMetadata->Fixup(NumPoints, SplineComp);
 		}
 	}
 
@@ -502,15 +478,12 @@ void AWaterBody::PostLoad()
 			WaterWaves->Rename(nullptr, this, REN_DoNotDirty | REN_DontCreateRedirectors | REN_ForceNoResetLoaders | REN_NonTransactional);
 		}
 	}
-	
+
 	if (GetLinkerCustomVersion(FFortniteMainBranchObjectVersion::GUID) < FFortniteMainBranchObjectVersion::WaterBodyComponentRefactor)
 	{
 		check(WaterBodyComponent && WaterBodyComponent->GetWaterBodyType() == GetWaterBodyType());
 		check(SplineComp);
 
-		WaterBodyComponent->SetRelativeTransform(SplineComp->GetRelativeTransform());
-		SplineComp->ResetRelativeTransform();
-		
 		WaterBodyComponent->Mobility = SplineComp->Mobility;
 		WaterBodyComponent->PhysicalMaterial = PhysicalMaterial_DEPRECATED;
 		WaterBodyComponent->TargetWaveMaskDepth = TargetWaveMaskDepth_DEPRECATED;
@@ -521,7 +494,7 @@ void AWaterBody::PostLoad()
 		WaterBodyComponent->SetWaterMaterial(WaterMaterial_DEPRECATED);
 		WaterBodyComponent->SetUnderwaterPostProcessMaterial(UnderwaterPostProcessMaterial_DEPRECATED);
 		WaterBodyComponent->WaterHeightmapSettings = WaterHeightmapSettings_DEPRECATED;
-		WaterBodyComponent->LayerWeightmapSettings = MoveTemp(LayerWeightmapSettings_DEPRECATED);
+		WaterBodyComponent->LayerWeightmapSettings = LayerWeightmapSettings_DEPRECATED;
 		WaterBodyComponent->bAffectsLandscape = bAffectsLandscape_DEPRECATED;
 		WaterBodyComponent->bGenerateCollisions = bGenerateCollisions_DEPRECATED;
 		WaterBodyComponent->bOverrideWaterMesh = bOverrideWaterMesh_DEPRECATED;
@@ -530,11 +503,61 @@ void AWaterBody::PostLoad()
 		WaterBodyComponent->CollisionProfileName = CollisionProfileName_DEPRECATED;
 		WaterBodyComponent->WaterMID = WaterMID_DEPRECATED;
 		WaterBodyComponent->UnderwaterPostProcessMID = UnderwaterPostProcessMID_DEPRECATED;
-		WaterBodyComponent->Islands = MoveTemp(Islands_DEPRECATED);
-		WaterBodyComponent->ExclusionVolumes = MoveTemp(ExclusionVolumes_DEPRECATED);
+		WaterBodyComponent->Islands = Islands_DEPRECATED;
+		WaterBodyComponent->ExclusionVolumes = ExclusionVolumes_DEPRECATED;
 		WaterBodyComponent->bCanAffectNavigation = bCanAffectNavigation_DEPRECATED;
 		WaterBodyComponent->WaterNavAreaClass = WaterNavAreaClass_DEPRECATED;
 		WaterBodyComponent->ShapeDilation = ShapeDilation_DEPRECATED;
+	}
+#endif // WITH_EDITORONLY_DATA
+}
+
+void AWaterBody::PostInitProperties()
+{
+	Super::PostInitProperties();
+
+	InitializeBody();
+}
+
+void AWaterBody::Serialize(FArchive& Ar)
+{
+	Super::Serialize(Ar);
+
+	Ar.UsingCustomVersion(FWaterCustomVersion::GUID);
+
+	if (Ar.IsLoading())
+	{
+		InitializeBody();
+
+#if WITH_EDITORONLY_DATA
+		DeprecateData();
+#endif // WITH_EDITORONLY_DATA
+	}
+}
+
+void AWaterBody::PostLoad()
+{
+	Super::PostLoad();
+
+	InitializeBody();
+
+#if WITH_EDITORONLY_DATA
+	if (SplineComp)
+	{
+		// Keep metadata in sync
+		if (WaterSplineMetadata)
+		{
+			const int32 NumPoints = SplineComp->GetNumberOfSplinePoints();
+			WaterSplineMetadata->Fixup(NumPoints, SplineComp);
+		}
+	}
+	
+	DeprecateData();
+	
+	if (GetLinkerCustomVersion(FFortniteMainBranchObjectVersion::GUID) < FFortniteMainBranchObjectVersion::WaterBodyComponentRefactor)
+	{
+		WaterBodyComponent->SetRelativeTransform(SplineComp->GetRelativeTransform());
+		SplineComp->ResetRelativeTransform();
 	}
 #endif
 }

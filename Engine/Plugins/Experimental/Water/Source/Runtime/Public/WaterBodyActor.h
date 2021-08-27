@@ -97,6 +97,8 @@ protected:
 	/** Initializes the water body by creating the respective component for this water body type. */
 	virtual void InitializeBody();
 
+	virtual void DeprecateData();
+
 	/** The spline data attached to this water type. */
 	UPROPERTY(Category = Water, VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	UWaterSplineComponent* SplineComp;
