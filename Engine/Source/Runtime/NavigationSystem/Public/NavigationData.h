@@ -654,6 +654,12 @@ public:
 	 *	SuspendedDirtyAreas care needs to be taken to not use this feature for 
 	 *	extended periods of time - otherwise SuspendedDirtyAreas can get very large. */
 	virtual void SetRebuildingSuspended(const bool bNewSuspend);
+
+	/** Retrieves if this NavData instance's navigation generation is suspended */
+	virtual bool IsRebuildingSuspended() const { return bRebuildingSuspended; }
+
+	/** Retrieves the number of suspended dirty areas */
+	virtual int32 GetNumSuspendedDirtyAreas() const { return SuspendedDirtyAreas.Num(); }
 	
 	/** releases navigation generator if any has been created */
 protected:
