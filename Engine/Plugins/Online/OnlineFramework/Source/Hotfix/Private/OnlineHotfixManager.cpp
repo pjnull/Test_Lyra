@@ -7,8 +7,6 @@
 #include "UObject/Package.h"
 #include "Http.h"
 
-#include "HAL/MemoryMisc.h"
-
 #include "Logging/LogSuppressionInterface.h"
 
 #include "Misc/NetworkVersion.h"
@@ -281,10 +279,6 @@ void UOnlineHotfixManager::Cleanup()
 void UOnlineHotfixManager::StartHotfixProcess()
 {
 	UE_LOG(LogHotfixManager, Log, TEXT("Starting Hotfix Process"));
-
-#if ENABLE_SHARED_MEMORY_TRACKER
-	FSharedMemoryTracker::PrintMemoryDiff(TEXT("StartHotfixProcess"));
-#endif
 
 	// Patching the editor this way seems like a bad idea
 	bool bShouldHotfix = IsRunningGame() || IsRunningDedicatedServer() || IsRunningClientOnly();
@@ -723,10 +717,6 @@ EHotfixResult UOnlineHotfixManager::ApplyHotfix()
 
 	for (const FCloudFileHeader& FileHeader : ChangedHotfixFileList)
 	{
-#if ENABLE_SHARED_MEMORY_TRACKER
-        FSharedMemoryTracker MemTracker(*FString::Printf(TEXT("ApplyHotfix - %s"), *FileHeader.FileName));
-#endif
-
 		if (!ApplyHotfixProcessing(FileHeader))
 		{
 			UE_LOG(LogHotfixManager, Error, TEXT("Couldn't apply hotfix file (%s)"), *FileHeader.FileName);
@@ -1487,22 +1477,22 @@ void UOnlineHotfixManager::PatchAssetsFromIniFiles()
 	FConfigSection* AssetHotfixConfigSection = GConfig->GetSectionPrivate(TEXT("AssetHotfix"), false, true, GGameIni);
 	if (AssetHotfixConfigSection != nullptr)
 	{
+		// These are the asset types we support patching right now
+		UClass* const PatchableAssetClasses[] = 
+		{ 
+			UCurveTable::StaticClass(), 
+			UDataTable::StaticClass(), 
+			UCurveFloat::StaticClass(),
+            UCurveVector::StaticClass(),
+			UCurveLinearColor::StaticClass(),
+		};
+
 		TSet<UDataTable*> ChangedTables;
 
 		for (FConfigSection::TIterator It(*AssetHotfixConfigSection); It; ++It)
 		{
 			FMoviePlayerProxy::BlockingTick();
 			++TotalPatchableAssets;
-
-			TArray<UClass*> PatchableAssetClasses;
-			{
-				// These are the asset types we support patching right now
-				PatchableAssetClasses.Add(UCurveTable::StaticClass());
-				PatchableAssetClasses.Add(UDataTable::StaticClass());
-				PatchableAssetClasses.Add(UCurveFloat::StaticClass());
-				PatchableAssetClasses.Add(UCurveVector::StaticClass());
-				PatchableAssetClasses.Add(UCurveLinearColor::StaticClass());
-			}
 
 			// Make sure the entry has a valid class name that we support
 			UClass* AssetClass = nullptr;
@@ -1613,10 +1603,6 @@ void UOnlineHotfixManager::PatchAssetsFromIniFiles()
 				{
 					UE_LOG(LogHotfixManager, Warning, TEXT("[Item: %d] Empty value given for '%s' entry!"), TotalPatchableAssets, *It.Key().ToString());
 				}
-
-#if ENABLE_SHARED_MEMORY_TRACKER
-				FSharedMemoryTracker::PrintMemoryDiff(*FString::Printf(TEXT("AssetHotfix: %s"), *AssetClass->GetPathName()));
-#endif
 			}
 			else
 			{
