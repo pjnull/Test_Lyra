@@ -1622,7 +1622,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 template <typename T>
 T* GetValid(T* Test)
 {
-	static_assert(std::is_base_of_v<UObject, T>, "GetValid can only work with UObject-derived classes");
+	static_assert(std::is_base_of<UObject, T>::value, "GetValid can only work with UObject-derived classes");
 	return IsValid(Test) ? Test : nullptr;
 }
 
@@ -1635,7 +1635,7 @@ T* GetValid(T* Test)
 template <typename T>
 const T* GetValid(const T* Test)
 {
-	static_assert(std::is_base_of_v<UObject, T>, "GetValid can only work with UObject-derived classes");
+	static_assert(std::is_base_of<UObject, T>::value, "GetValid can only work with UObject-derived classes");
 	return IsValid(Test) ? Test : nullptr;
 }
 
