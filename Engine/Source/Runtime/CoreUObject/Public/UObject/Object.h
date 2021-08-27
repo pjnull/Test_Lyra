@@ -1613,6 +1613,31 @@ FORCEINLINE bool IsValidChecked(const UObject* Test)
 }
 
 PRAGMA_ENABLE_DEPRECATION_WARNINGS
+/**
+* Returns a pointer to a valid object if the Test object passes IsValid() tests, otherwise null
+*
+* @param	Test			The object to test
+* @return	Pointer to a valid object if the Test object passes IsValid() tests, otherwise null
+*/
+template <typename T>
+T* GetValid(T* Test)
+{
+	static_assert(std::is_base_of_v<UObject, T>, "GetValid can only work with UObject-derived classes");
+	return IsValid(Test) ? Test : nullptr;
+}
+
+/**
+* Returns a pointer to a valid object if the Test object passes IsValid() tests, otherwise null
+*
+* @param	Test			The object to test
+* @return	Pointer to a valid object if the Test object passes IsValid() tests, otherwise null
+*/
+template <typename T>
+const T* GetValid(const T* Test)
+{
+	static_assert(std::is_base_of_v<UObject, T>, "GetValid can only work with UObject-derived classes");
+	return IsValid(Test) ? Test : nullptr;
+}
 
 #if WITH_EDITOR
 /** Callback for editor object selection. This must be in core instead of editor for UObject::IsSelectedInEditor to work */

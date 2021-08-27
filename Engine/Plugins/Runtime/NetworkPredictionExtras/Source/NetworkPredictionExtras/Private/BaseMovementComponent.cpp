@@ -113,11 +113,11 @@ void UBaseMovementComponent::SetUpdatedComponent(USceneComponent* NewUpdatedComp
 	}
 
 	// Don't assign pending kill components, but allow those to null out previous UpdatedComponent.
-	UpdatedComponent = IsValid(NewUpdatedComponent) ? NewUpdatedComponent : NULL;
+	UpdatedComponent = GetValid(NewUpdatedComponent);
 	UpdatedPrimitive = Cast<UPrimitiveComponent>(UpdatedComponent);
 
 	// Assign delegates
-	if (UpdatedComponent && IsValidChecked(UpdatedComponent))
+	if (UpdatedComponent)
 	{
 		UpdatedComponent->SetShouldUpdatePhysicsVolume(true);
 		UpdatedComponent->PhysicsVolumeChangedDelegate.AddUniqueDynamic(this, &UBaseMovementComponent::PhysicsVolumeChanged);
