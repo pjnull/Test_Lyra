@@ -177,24 +177,33 @@ public:
 		return true;
 	}
 
-	void UnregisterInstance(FNetworkPredictionAsyncID& OutID)
+	void UnregisterInstance(FNetworkPredictionAsyncID& ID)
 	{
 		npCheckSlow(AsyncCallback);
 		FNetworkPredictionSimCallbackInput* Input = AsyncCallback->GetProducerInputData_External();
 		npCheckSlow(Input);
 
-		ForEachSim<IAsyncRegistrationService>(GlobalInstanceData_External.FindChecked(OutID), RegistrationServices, [&](IAsyncRegistrationService* Service)
+		ForEachSim<IAsyncRegistrationService>(GlobalInstanceData_External.FindChecked(ID), RegistrationServices, [&](IAsyncRegistrationService* Service)
 		{
-			Service->UnregisterInstance(OutID, Input);
+			Service->UnregisterInstance(ID, Input);
 		});
 
-		GlobalInstanceData_External.FindAndRemoveChecked(OutID);
-		OutID.Reset();
+		GlobalInstanceData_External.FindAndRemoveChecked(ID);
+		int32 idx = PlayerControllerMap.IndexOfByKey(ID);
+		if (idx != INDEX_NONE)
+		{
+			PlayerControllerMap.RemoveAtSwap(idx, 1, false);
+		}
+		ID.Reset();
 	}
 
 	// Remaps the temporary, negative ClientID to the received serverID
 	void RemapClientInstance(FNetworkPredictionAsyncID ClientID, FNetworkPredictionAsyncID ServerID)
 	{
+		npCheckSlow(AsyncCallback);
+		FNetworkPredictionSimCallbackInput* Input = AsyncCallback->GetProducerInputData_External();
+		npCheckSlow(Input);
+
 		FGlobalInstanceData Data = GlobalInstanceData_External.FindAndRemoveChecked(ClientID);
 		GlobalInstanceData_External.Emplace(ServerID, Data);
 
@@ -205,7 +214,7 @@ public:
 
 		ForEachSim<IAsyncRegistrationService>(Data, RegistrationServices, [&](IAsyncRegistrationService* Service)
 		{
-			Service->RemapClientInstance(ClientID, ServerID);
+			Service->RemapClientInstance(ClientID, ServerID, Input);
 		});
 	}
 
@@ -240,17 +249,6 @@ public:
 		RegistrationServices.Array[AsyncModelDef::ID]->UnregisterInstance(ID, Input);
 
 		GlobalInstanceData_External.FindOrAdd(ID).Sims &= ~(1 << AsyncModelDef::ID);
-
-		/*
-		npCheckSlow(AsyncCallback);
-		TNetworkPredictionAsyncInput<ModelDef>* Input = AsyncCallback->GetProducerInputData_External();
-		npCheckSlow(Input);
-
-		Input->MarshalledDeletes.Emplace(Key);
-
-		NetRecvInputCmds.Remove(Key);
-		ControllerInputMap.Remove(Key);
-		*/
 	}
 	
 	// Binds an NP instance to a PlayerController. PlayerController is required for networking, by setting a controlling PC the server will
@@ -306,7 +304,6 @@ public:
 				if (npEnsure(SignedFutureDelta > 0) && npEnsure(SignedFutureDelta < 16))
 				{
 					FutureDelta = (uint8)SignedFutureDelta;
-					FutureFrame = ControllerInfo->LastFrame;
 				}
 			}
 

@@ -37,15 +37,6 @@ Note on ordering of operations and frame numbers:
 	
 		6. Step physics Simulation (rigid bodies, etc. This has nothing to do with NP gameplay data)
 
-
-
-More succinctly:
-1. Process data from GT
-2. Sync with Network and GT
-3. Gameplay Simulation Tick
-4. Physics Tick
-
-
 =============================================================================*/
 
 namespace UE_NP {
@@ -104,12 +95,12 @@ public:
 		}
 
 		// State Mods
-		for (const typename TAsyncModelDataStore_Input<AsyncModelDef>::FLocalStateMod& LocalMod : InputData->LocalStateMods)
+		for (const TAsyncLocalStateMod<AsyncModelDef>& LocalMod : InputData->LocalStateMods)
 		{
 			LocalMod.Func(DataStore->Instances.FindChecked(LocalMod.ID).LocalState);
 		}
 
-		for (const typename TAsyncModelDataStore_Input<AsyncModelDef>::FNetStateMod& NetMod : InputData->NetStateMods)
+		for (const TAsyncNetStateMod<AsyncModelDef>& NetMod : InputData->NetStateMods)
 		{
 			NetMod.Func(Snapshot.NetStates[NetMod.Index]);
 		}
@@ -120,7 +111,12 @@ public:
 			Snapshot.InputCmds[LocalInput.Index] = LocalInput.InputCmd;
 		}
 
-		// Deletes (? - careful here)
+		// Deletes
+		for (const FNetworkPredictionAsyncID& ID : InputData->DeletedInstances)
+		{
+			// I'm not sure if this is enough. Maybe we should track the 'kill frame' on the PT rather than removing anything from data structures
+			DataStore->Instances.Remove(ID);
+		}
 
 		// Apply Corrections
 		ApplyCorrections(LocalFrame);
@@ -246,18 +242,36 @@ public:
 	void ModifyLocalState(FNetworkPredictionAsyncID ID, TUniqueFunction<void(LocalStateType&)> Func, FNetworkPredictionSimCallbackInput* AsyncInput)
 	{
 		npCheckSlow(AsyncInput);
-		if (ensure(AsyncInput))
+		if (!npEnsure(ID.IsValid()))
 		{
-			//AsyncInput->GetDataStore<AsyncModelDef>()->LocalStateMods.Emplace(MoveTemp(Func));
+			// We can't accept this state mod without a valid ID
+			return;
+		}
+
+		if (ID.IsClientGenerated())
+		{
+			// We can't just drop this mod like we can for NetState since the local state is non replicable. We need to save it to a deferred data data structure
+			DataStore_External->DeferredLocalStateMods.Emplace(ID, MoveTemp(Func));
+		}
+		else
+		{
+			AsyncInput->GetDataStore<AsyncModelDef>()->LocalStateMods.Emplace(ID, MoveTemp(Func));
 		}
 	}
 	
 	void ModifyNetState(FNetworkPredictionAsyncID ID, TUniqueFunction<void(NetStateType&)> Func, FNetworkPredictionSimCallbackInput* AsyncInput)
 	{
+		if (ID.IsClientGenerated() || !ID.IsValid())
+		{
+			// We don't have a valid server created ID yet, so we will just drop this on the floor.
+			// It doesn't matter because GT mods are already "just guesses" wrt synchronization/networking 
+			// and we will have authoritative server state repped to us when we get the ID anyways
+			return;
+		}
+
 		npCheckSlow(AsyncInput);
 		const int32 idx = DataStore_External->Instances.FindChecked(ID).Index;
 		AsyncInput->GetDataStore<AsyncModelDef>()->NetStateMods.Emplace(idx, MoveTemp(Func));
-		
 	}
 
 private:

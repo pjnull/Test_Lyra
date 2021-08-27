@@ -133,6 +133,32 @@ struct TAsyncNetRecvData
 	}
 };
 
+template<typename AsyncModelDef>
+struct TAsyncLocalStateMod
+{
+	HOIST_ASYNCMODELDEF_TYPES()
+
+	TAsyncLocalStateMod(FNetworkPredictionAsyncID id, TUniqueFunction<void(LocalStateType&)> f)
+		: ID(id), Func(MoveTemp(f)) {}
+
+	FNetworkPredictionAsyncID ID;
+	TUniqueFunction<void(LocalStateType&)> Func;
+
+	bool operator==(const FNetworkPredictionAsyncID& id) const { return ID == id; }
+};
+
+template<typename AsyncModelDef>
+struct TAsyncNetStateMod
+{
+	HOIST_ASYNCMODELDEF_TYPES()
+
+	TAsyncNetStateMod(int32 i, TUniqueFunction<void(NetStateType&)> f)
+		: Index(i), Func(MoveTemp(f)) {}
+
+	int32 Index;
+	TUniqueFunction<void(NetStateType&)> Func;
+};
+
 // ---------------------------------------------------------------------
 // DataStore for Marshaled data GT->PT (lives on the SimCallback Input)
 // ---------------------------------------------------------------------
@@ -149,23 +175,6 @@ struct TAsyncModelDataStore_Input
 		NetStateType NetState;
 	};
 
-	struct FLocalStateMod
-	{
-		FLocalStateMod(FNetworkPredictionAsyncID id, TUniqueFunction<void(LocalStateType&)> f)
-			: ID(id), Func(MoveTemp(f)) {}
-
-		FNetworkPredictionAsyncID ID;
-		TUniqueFunction<void(LocalStateType&)> Func;
-	};
-	struct FNetStateMod
-	{
-		FNetStateMod(int32 i, TUniqueFunction<void(NetStateType&)> f)
-			: Index(i), Func(MoveTemp(f)) {}
-
-		int32 Index;
-		TUniqueFunction<void(NetStateType&)> Func;
-	};
-
 	struct FLocalInputCmd
 	{
 		FLocalInputCmd(int32 InIndex, InputCmdType& InInputCmd)
@@ -175,8 +184,8 @@ struct TAsyncModelDataStore_Input
 	};
 
 	TArray<FNewInstance> NewInstances;
-	TArray<FLocalStateMod> LocalStateMods;
-	TArray<FNetStateMod> NetStateMods;
+	TArray<TAsyncLocalStateMod<AsyncModelDef>> LocalStateMods;
+	TArray<TAsyncNetStateMod<AsyncModelDef>> NetStateMods;
 	TArray<FLocalInputCmd> LocalInputCmds;
 	TArray<FNetworkPredictionAsyncID> DeletedInstances;
 
@@ -238,29 +247,27 @@ struct TAsyncModelDataStore_External
 
 	TAsncFrameSnapshot<AsyncModelDef> LatestSnapshot;
 
-	TArray<TAsyncPendingInputCmdPtr<AsyncModelDef>>	InActivePendingInputCmds;
-	
+	TArray<TAsyncPendingInputCmdPtr<AsyncModelDef>>	InActivePendingInputCmds;	
 	TArray<TAsyncPendingInputCmdPtr<AsyncModelDef>>	ActivePendingInputCmds; // PendingINputCmds that get marshaled directly to PT
 	TSortedMap<FNetworkPredictionAsyncID, TUniqueObj<TAsyncPendingInputCmdBuffer<AsyncModelDef>>> PendingInputCmdBuffers; // GT buffered InputCmds
 
 	TArray<TAsyncOutputWriteTargets<AsyncModelDef>>	OutputWriteTargets;
 
-	TAsyncNetRecvData<AsyncModelDef> PendingNetRecv;
+	TAsyncNetRecvData<AsyncModelDef> PendingNetRecv;	// Network Data is written here (clients, receiving)
+
+	TArray<TAsyncLocalStateMod<AsyncModelDef>> DeferredLocalStateMods;
 	
 	void Reset()
 	{
 		Instances.Reset();
 		FreeIndices.Reset();
 		LatestSnapshot.Reset();
-
 		InActivePendingInputCmds.Reset();
 		ActivePendingInputCmds.Reset();
-
 		PendingInputCmdBuffers.Reset();
-
 		OutputWriteTargets.Reset();
-
 		PendingNetRecv.Reset();
+		DeferredLocalStateMods.Reset();
 	}
 };
 

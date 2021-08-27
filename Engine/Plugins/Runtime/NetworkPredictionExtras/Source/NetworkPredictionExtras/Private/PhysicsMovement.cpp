@@ -22,11 +22,6 @@
 #include "Async/NetworkPredictionAsyncModelDefRegistry.h"
 #include "Async/NetworkPredictionAsyncProxyImpl.h"
 
-namespace UE_NP
-{
-	NETSIM_DEVCVAR_SHIPCONST_INT(bEnableMock3, 1, "np2.Mock3.Enable", "Enable Mock2 implementation");
-}
-
 struct FPhysicsMovementSimulation
 {
 	static void Tick_Internal(FNetworkPredictionAsyncTickContext& Context, UE_NP::FNetworkPredictionAsyncID ID, FPhysicsInputCmd& InputCmd, FPhysicsMovementLocalState& LocalState, FPhysicsMovementNetState& NetState)
@@ -228,9 +223,8 @@ struct FPhysicsMovementSimulation
 			FVector Drag = -1.f * V * UE_NETWORK_PHYSICS::DragK();
 			PT->AddForce(Drag);
 		}
-
-
-		//  angular velocity limit
+		
+		// angular velocity limit
 		FVector W = PT->W();
 		{
 			const float MaxAngularVelocitySq = UE_NETWORK_PHYSICS::MaxAngularVelocity() * UE_NETWORK_PHYSICS::MaxAngularVelocity();
@@ -319,34 +313,31 @@ void UPhysicsMovementComponent::PreReplication(IRepChangedPropertyTracker & Chan
 	NetworkPredictionProxy.OnPreReplication();
 }
 
-void UPhysicsMovementComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+void UPhysicsMovementComponent::UninitializeComponent()
 {
-	Super::EndPlay(EndPlayReason);
-	if (UE_NP::bEnableMock3() > 0)
-	{
-		NetworkPredictionProxy.UnregisterProxy();
-	}
+	Super::UninitializeComponent();
+	NetworkPredictionProxy.UnregisterProxy();
 }
 
 void UPhysicsMovementComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-	if (UE_NP::bEnableMock3() > 0)
+	
+	APlayerController* PC = GetOwnerPC();
+
+	// RegisterController when owning PC changes, or at least once (With null controller) on server
+	if (CachedPC != PC || (!bHasRegisteredController && GetOwnerRole() == ROLE_Authority))
 	{
-		APlayerController* PC = GetOwnerPC();
+		NetworkPredictionProxy.RegisterController(PC);
+		bHasRegisteredController = true;
+		CachedPC = PC;
+	}
 
-		if (CachedPC != PC)
-		{
-			NetworkPredictionProxy.RegisterController(PC);
-			CachedPC = PC;
-		}
-
-		if (PC && PC->IsLocalController())
-		{
-			// Broadcast out a delegate. The user will write to PendingInputCmd
-			OnGenerateLocalInputCmd.Broadcast();
-			PendingInputCmd.bLegit = true;
-		}
+	if ((PC && PC->IsLocalController()) || (GetOwnerRole() == ROLE_Authority))
+	{
+		// Broadcast out a delegate. The user will write to PendingInputCmd
+		OnGenerateLocalInputCmd.Broadcast();
+		PendingInputCmd.bLegit = true;
 	}
 }
 
@@ -387,6 +378,12 @@ void UPhysicsMovementComponent::SetEnableTargetYaw(bool bTargetYaw)
 	NetworkPredictionProxy.ModifyNetState<FPhysicsMovementAsyncModelDef>([bTargetYaw](FPhysicsMovementNetState& NetState)
 	{
 		NetState.bEnableAutoFaceTargetYaw = bTargetYaw;
+	});	
+
+
+	NetworkPredictionProxy.ModifyLocalState<FPhysicsMovementAsyncModelDef>([bTargetYaw](FPhysicsMovementLocalState& LocalState)
+	{
+		//NetState.bEnableAutoFaceTargetYaw = bTargetYaw;
 	});	
 }
 

@@ -43,7 +43,11 @@ void FNetworkPredictionAsyncWorldManager::RegisterController(FNetworkPredictionA
 	}
 	else
 	{
-		PlayerControllerMap.RemoveAt(PlayerControllerMap.IndexOfByKey(ID), 1, false);
+		int32 ExistingIdx = PlayerControllerMap.IndexOfByKey(ID);
+		if (ExistingIdx != INDEX_NONE)
+		{
+			PlayerControllerMap.RemoveAt(ExistingIdx, 1, false);
+		}
 		if (bIsServer)
 		{
 			// Non PC backed sim: only pull input cmd if on server

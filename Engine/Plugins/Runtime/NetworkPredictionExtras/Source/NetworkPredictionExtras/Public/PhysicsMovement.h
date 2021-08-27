@@ -16,6 +16,7 @@ struct FPhysicsInputCmd
 
 	FPhysicsInputCmd()
 		: Force(ForceInitToZero)
+		, Torque(ForceInitToZero)
 	{ }
 
 	// Simple world vector force to be applied
@@ -27,7 +28,7 @@ struct FPhysicsInputCmd
 
 	/** Target yaw of character (Degrees). Torque will be applied to rotate character towards target. */
 	UPROPERTY(BlueprintReadWrite, Category = "Input")
-	float TargetYaw;
+	float TargetYaw = 0.f;
 
 	UPROPERTY(BlueprintReadWrite,Category="Input")
 	bool bJumpedPressed = false;
@@ -180,7 +181,7 @@ public:
 	UPhysicsMovementComponent();
 
 	virtual void InitializeComponent() override;
-	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	virtual void UninitializeComponent() override;
 	virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction) override;
 	virtual void PreReplication(IRepChangedPropertyTracker & ChangedPropertyTracker);
 
@@ -218,6 +219,8 @@ private:
 
 	APlayerController* GetOwnerPC() const;
 
+	// Crude way of detecting possession change
 	UPROPERTY()
 	APlayerController* CachedPC = nullptr;
+	bool bHasRegisteredController = false;
 };

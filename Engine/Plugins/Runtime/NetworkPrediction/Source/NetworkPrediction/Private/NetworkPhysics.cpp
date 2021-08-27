@@ -250,7 +250,7 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 
 				if (Proxy->GetHandle_LowLevel() == nullptr)
 				{
-					UE_LOG(LogTemp, Warning, TEXT("No valid LowLEvel handle yet..."));
+					UE_LOG(LogNetworkPhysics, Warning, TEXT("No valid LowLevel handle yet."));
 					continue;
 				}
 

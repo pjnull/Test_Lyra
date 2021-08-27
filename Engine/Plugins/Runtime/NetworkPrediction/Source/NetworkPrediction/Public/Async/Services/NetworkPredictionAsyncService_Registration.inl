@@ -13,7 +13,7 @@ public:
 
 	virtual ~IAsyncRegistrationService() = default;
 	virtual void UnregisterInstance(FNetworkPredictionAsyncID ID, FNetworkPredictionSimCallbackInput* Input) = 0;
-	virtual void RemapClientInstance(FNetworkPredictionAsyncID ClientID, FNetworkPredictionAsyncID ServerID) = 0;
+	virtual void RemapClientInstance(FNetworkPredictionAsyncID ClientID, FNetworkPredictionAsyncID ServerID, FNetworkPredictionSimCallbackInput* Input) = 0;
 	
 	virtual void SetInputSource(FNetworkPredictionAsyncID ID, ENetworkPredictionAsyncInputSource Type, bool bIsLocal) = 0;
 };
@@ -45,24 +45,29 @@ public:
 
 	void UnregisterInstance( FNetworkPredictionAsyncID ID, FNetworkPredictionSimCallbackInput* Input) final override
 	{
-		TAsyncModelDataStore_Input<AsyncModelDef>* InputDataStore = Input->GetDataStore<AsyncModelDef>();
-
-		/*
-		UObject* obj = Algo::BinarySearch(DataStore->Instances_External, ID, TAsncInstanceStaticData<AsyncModelDef>::ID);
-		int32 idx = = Algo::BinarySearch(DataStore->Instances_External, ID, TAsncInstanceStaticData<AsyncModelDef>::ID);
-		TAsncInstanceStaticData<AsyncModelDef>* InstanceData = Algo::BinarySearch(DataStore->Instances_External, ID, TAsncInstanceStaticData<AsyncModelDef>::ID);
-		if (npEnsure(InstanceData))
+		if (ID.IsClientGenerated())
 		{
-
+			DeferredInitMap.Remove(ID);
+			DeferredInputSource.Remove(ID);
 		}
-		*/
+		else if(ID.IsValid())
+		{
+			TAsncInstanceStaticData<AsyncModelDef> InstanceData = DataStore->Instances.FindAndRemoveChecked(ID);
+			DataStore->FreeIndices[InstanceData.Index] = true;
 
-	/*
-		TAsncInstanceStaticData<AsyncModelDef>& InstanceData = DataStore->Instances_External.FindChecked(ID);
-		npCheckSlow(DataStore->FreeIndices_External.IsValidIndex(InstanceData.Index));
-		
-		DataStore->FreeIndices_External[InstanceData.Index] = false;
-		*/
+			// Remove from active input data structure
+			ClearInputSource(ID, InstanceData.Index);
+
+			// also remove from the inactive struct
+			int32 idx = DataStore->InActivePendingInputCmds.IndexOfByKey(InstanceData.Index);
+			if (idx != INDEX_NONE)
+			{
+				DataStore->InActivePendingInputCmds.RemoveAtSwap(idx, 1, false);
+			}
+
+			TAsyncModelDataStore_Input<AsyncModelDef>* InputDataStore = Input->GetDataStore<AsyncModelDef>();
+			InputDataStore->DeletedInstances.Add(ID);
+		}
 	}
 
 	void SetInputSource(FNetworkPredictionAsyncID ID, ENetworkPredictionAsyncInputSource Type, bool bIsLocal) final override
@@ -77,14 +82,31 @@ public:
 		}
 	}
 
-	void RemapClientInstance(FNetworkPredictionAsyncID ClientID, FNetworkPredictionAsyncID ServerID) final override
+	void RemapClientInstance(FNetworkPredictionAsyncID ClientID, FNetworkPredictionAsyncID ServerID, FNetworkPredictionSimCallbackInput* AsyncInput) final override
 	{
+		// Complete deferred registration on ServerID
 		FDeferredRegistration DeferredInfo = DeferredInitMap.FindAndRemoveChecked(ClientID);
 		RegisterInstance_Impl(ServerID, DeferredInfo.Input, MoveTemp(DeferredInfo.InitialValueLocal), MoveTemp(DeferredInfo.InitialValueNet), DeferredInfo.PendingInputCmd, DeferredInfo.OutNetState);
 
+		// Remap deferred InputSource data
 		if (FDeferredInputSource* InputSource = DeferredInputSource.Find(ClientID))
 		{
 			SetInputSource_Impl(ServerID, InputSource->Type, InputSource->bIsLocal);
+		}
+
+		// Remap any deferred local state mods
+		TAsyncModelDataStore_Input<AsyncModelDef>* InputData = AsyncInput->GetDataStore<AsyncModelDef>();
+		npCheckSlow(InputData);
+
+		// note: going in reverse would be better since we could use RemoveAtSwap but preserving order that mods are applied is important and that would reverse them
+		for (int32 idx=0; idx < DataStore->DeferredLocalStateMods.Num(); ++idx)
+		{
+			TAsyncLocalStateMod<AsyncModelDef>& StateMod = DataStore->DeferredLocalStateMods[idx];
+			if (StateMod.ID == ClientID)
+			{
+				InputData->LocalStateMods.Emplace(ServerID, MoveTemp(StateMod.Func));
+				DataStore->DeferredLocalStateMods.RemoveAt(idx, 1, false);
+			}
 		}
 	}
 
@@ -141,12 +163,7 @@ private:
 		const int32 InstanceIndex = DataStore->Instances.FindChecked(ID).Index;
 
 		// Remove previous entries
-		int32 idx = DataStore->ActivePendingInputCmds.IndexOfByKey(InstanceIndex);
-		if (idx != INDEX_NONE)
-		{
-			DataStore->ActivePendingInputCmds.RemoveAtSwap(idx, 1, false);
-		}
-		DataStore->PendingInputCmdBuffers.Remove(ID);
+		ClearInputSource(ID, InstanceIndex);
 
 		// Add this ID to the one of the lists
 		switch(Type)
@@ -173,6 +190,16 @@ private:
 				break;
 			}
 		}
+	}
+
+	void ClearInputSource(FNetworkPredictionAsyncID ID, const int32 InstanceIndex)
+	{
+		int32 idx = DataStore->ActivePendingInputCmds.IndexOfByKey(InstanceIndex);
+		if (idx != INDEX_NONE)
+		{
+			DataStore->ActivePendingInputCmds.RemoveAtSwap(idx, 1, false);
+		}
+		DataStore->PendingInputCmdBuffers.Remove(ID);
 	}
 
 	struct FDeferredRegistration
