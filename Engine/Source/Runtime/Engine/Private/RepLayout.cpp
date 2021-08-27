@@ -5078,15 +5078,25 @@ static bool DiffStableProperties_r(FDiffStablePropertiesSharedParams& Params, TD
 				{
 					if (FObjectPropertyBase* ObjProperty = CastFieldChecked<FObjectPropertyBase>(Cmd.Property))
 					{
-						if (ObjProperty->PropertyClass && (ObjProperty->PropertyClass->IsChildOf(AActor::StaticClass()) || ObjProperty->PropertyClass->IsChildOf(UActorComponent::StaticClass())))
+						UObject* ObjValue = ObjProperty->GetObjectPropertyValue(StackParams.Source + Cmd);
+
+						const bool bIsActor = ObjProperty->PropertyClass && ObjProperty->PropertyClass->IsChildOf(AActor::StaticClass());
+						const bool bIsActorComponent = ObjProperty->PropertyClass && ObjProperty->PropertyClass->IsChildOf(UActorComponent::StaticClass());
+
+						const bool bNetStartupActor = bIsActor && ObjValue && Cast<AActor>(ObjValue)->IsNetStartupActor();
+						const bool bIsReplicatedActor = bIsActor && ObjValue && Cast<AActor>(ObjValue)->GetIsReplicated();
+
+						// This is similar to AActor::IsNameStableForNetworking but we want to ignore forced net addressable objects for now
+						const bool bStableForNetworking = bNetStartupActor || (ObjValue && (ObjValue->HasAnyFlags(RF_WasLoaded | RF_DefaultSubObject) || ObjValue->IsNative() || ObjValue->IsDefaultSubobject()));
+
+						if (bIsReplicatedActor || bIsActorComponent)
 						{
-							// skip actor and component references
+							// skip replicated actor and component references
 							continue;
 						}
 
-						if (UObject* ObjValue = ObjProperty->GetObjectPropertyValue(StackParams.Source + Cmd))
+						if (ObjValue)
 						{
-							const bool bStableForNetworking = (ObjValue->HasAnyFlags(RF_WasLoaded | RF_DefaultSubObject) || ObjValue->IsNative() || ObjValue->IsDefaultSubobject());
 							if (!bStableForNetworking)
 							{
 								// skip object references without a stable name

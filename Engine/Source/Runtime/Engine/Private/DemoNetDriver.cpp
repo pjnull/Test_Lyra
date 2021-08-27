@@ -745,6 +745,7 @@ bool UDemoNetDriver::InitBase(bool bInitAsClient, FNetworkNotify* InNotify, cons
 		ResetElapsedTime();
 		bIsFastForwarding				= false;
 		bIsFastForwardingForCheckpoint	= false;
+		bIsRestoringStartupActors		= false;
 		bWasStartStreamingSuccessful	= true;
 		SavedReplicatedWorldTimeSeconds	= 0.0f;
 		SavedSecondsToSkip				= 0.0f;
@@ -814,6 +815,7 @@ void UDemoNetDriver::ResetDemoState()
 
 	bIsFastForwarding = false;
 	bIsFastForwardingForCheckpoint = false;
+	bIsRestoringStartupActors = false;
 	bWasStartStreamingSuccessful = false;
 	bIsWaitingForHeaderDownload = false;
 	bIsWaitingForStream = false;
@@ -3069,6 +3071,8 @@ FReplayExternalDataArray* UDemoNetDriver::GetExternalDataArrayForObject(UObject*
 PRAGMA_DISABLE_DEPRECATION_WARNINGS
 void UDemoNetDriver::RespawnNecessaryNetStartupActors(TArray<AActor*>& SpawnedActors, ULevel* Level /* = nullptr */)
 {
+	TGuardValue<bool> RestoringStartupActors(bIsRestoringStartupActors, true);
+
 	for (auto It = RollbackNetStartupActors.CreateIterator(); It; ++It)
 	{
 		if (ReplayHelper.DeletedNetStartupActors.Contains(It.Key()))

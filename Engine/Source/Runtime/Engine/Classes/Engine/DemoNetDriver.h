@@ -349,6 +349,7 @@ private:
 	bool bIsFastForwardingForCheckpoint;
 	bool bWasStartStreamingSuccessful;
 	bool bIsFinalizingFastForward;
+	bool bIsRestoringStartupActors;
 
 	TArray<FNetworkGUID> NonQueuedGUIDsForScrubbing;
 
@@ -638,6 +639,7 @@ public:
 
 	bool IsFastForwarding() const { return bIsFastForwarding; }
 	bool IsFinalizingFastForward() const { return bIsFinalizingFastForward; }
+	bool IsRestoringStartupActors() const { return bIsRestoringStartupActors; }
 
 	FReplayExternalDataArray* GetExternalDataArrayForObject(UObject* Object);
 
