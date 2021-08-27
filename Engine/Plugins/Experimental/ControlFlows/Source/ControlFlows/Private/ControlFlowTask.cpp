@@ -129,13 +129,13 @@ void FControlFlowSimpleSubTask::Execute()
 {
 	if (TaskPopulator.IsBound() && GetTaskFlow().IsValid())
 	{
-		TaskPopulator.Execute(GetTaskFlow().ToSharedRef());
-
 		GetTaskFlow()->OnComplete().BindSP(SharedThis(this), &FControlFlowSimpleSubTask::CompletedSubTask);
 		GetTaskFlow()->OnExecutedWithoutAnyNodes().BindSP(SharedThis(this), &FControlFlowSimpleSubTask::CompletedSubTask);
 		GetTaskFlow()->OnCancelled().BindSP(SharedThis(this), &FControlFlowSimpleSubTask::CancelledSubTask);
 
-		ensureAlwaysMsgf(!GetTaskFlow()->IsRunning(), TEXT("Did you call ExecuteFlow() on a SubFlow?"));
+		TaskPopulator.Execute(GetTaskFlow().ToSharedRef());
+
+		ensureAlwaysMsgf(!GetTaskFlow()->IsRunning(), TEXT("Did you call ExecuteFlow() on a SubFlow? You don't need to."));
 
 		GetTaskFlow()->ExecuteFlow();
 	}
