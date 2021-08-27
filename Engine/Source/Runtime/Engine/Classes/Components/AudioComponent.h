@@ -241,6 +241,10 @@ class ENGINE_API UAudioComponent : public USceneComponent
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Sound)
 	uint8 bSuppressSubtitles:1;
 
+	/** If true, the Audio Component will be able to associate with multiple active sounds */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Sound)
+	bool bCanContainMultipleActiveSounds;
+
 	/** Whether this audio component is previewing a sound */
 	uint8 bPreviewComponent:1;
 
@@ -796,6 +800,9 @@ public:
 		Audio::FQuartzQuantizedRequestData QuantizedRequestData;
 	};
 
+	/** Performs a command on all associated audio components */
+	void SendCommandToAllActiveSoundsInComponent(TFunction<void(FActiveSound*)> InFunc);
+
 private:
 
 	uint64 AudioComponentID;
@@ -840,7 +847,7 @@ private:
 protected:
 
 	/** Utility function called by Play and FadeIn to start a sound playing. */
-	void PlayInternal(const PlayInternalRequestData& InPlayRequestData);
+	void PlayInternal(const PlayInternalRequestData& InPlayRequestData, USoundBase * InSound = nullptr);
 
 #if WITH_EDITORONLY_DATA
 	/** Utility function that updates which texture is displayed on the sprite dependent on the properties of the Audio Component. */
