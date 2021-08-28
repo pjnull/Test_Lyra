@@ -8,7 +8,7 @@ class IAsyncReconcileService
 {
 public:
 	virtual ~IAsyncReconcileService() = default;
-	virtual int32 Reconcile(const int32 LastCompletedStep) = 0;
+	virtual int32 Reconcile(const int32 LastCompletedStep, int32 LocalFrameOffset) = 0;
 };
 
 template<typename AsyncModelDef>
@@ -24,7 +24,7 @@ public:
 		DataStore = InDataStore;
 	}
 
-	int32 Reconcile(const int32 LastCompletedStep) final override
+	int32 Reconcile(const int32 LastCompletedStep, int32 LocalFrameOffset) final override
 	{
 		if (!DataStore->NetRecvQueue.Dequeue(DataStore->NetRecvData))
 		{
@@ -32,7 +32,6 @@ public:
 		}
 		npEnsure(DataStore->NetRecvQueue.IsEmpty()); // We should enqueue exactly one NetRecv snapshot per marshalled input, which should be exactly one call to Reconcile
 		DataStore->NetRecvData.PendingCorrectionMask.Reset();
-		const int32 LocalFrameOffset = DataStore->NetRecvData.LocalFrameOffset;
 
 		int32 RewindFrame = INDEX_NONE;
 		for (TConstSetBitIterator<> BitIt(DataStore->NetRecvData.NetRecvDirtyMask); BitIt; ++BitIt)
@@ -55,18 +54,18 @@ public:
 
 					if (LocalInputCmd.ShouldReconcile(RecvData.InputCmd))
 					{
-						UE_LOG(LogNetworkPrediction, Log, TEXT("Reconcile on InputCmd. %s. Instance: %d. Frame: %d"), AsyncModelDef::GetName(), idx, RecvData.Frame);
+						UE_LOG(LogNetworkPrediction, Log, TEXT("Reconcile on InputCmd. %s. Instance: %d. Frame: [%d/%d]"), AsyncModelDef::GetName(), idx, RecvData.Frame - LocalFrameOffset, RecvData.Frame);
 						bShouldReconcile = true;
 					}
 					if (LocalNetState.ShouldReconcile(RecvData.NetState))
 					{
-						UE_LOG(LogNetworkPrediction, Log, TEXT("Reconcile on NetState. %s. Instance: %d. Frame: %d"), AsyncModelDef::GetName(), idx, RecvData.Frame);
+						UE_LOG(LogNetworkPrediction, Log, TEXT("Reconcile on NetState. %s. Instance: %d. Frame: [%d/%d]"), AsyncModelDef::GetName(), idx, RecvData.Frame - LocalFrameOffset, RecvData.Frame);
 						bShouldReconcile = true;
 					}
 				}
 				else
 				{
-					UE_LOG(LogNetworkPrediction, Log, TEXT("Reconcile due to invalid state. %s. Instance: %d. Frame: %d"), AsyncModelDef::GetName(), idx, RecvData.Frame);
+					UE_LOG(LogNetworkPrediction, Log, TEXT("Reconcile due to invalid state. %s. Instance: %d. Frame: [%d/%d]"), AsyncModelDef::GetName(), idx, RecvData.Frame - LocalFrameOffset, RecvData.Frame);
 					bShouldReconcile = true;
 				}
 

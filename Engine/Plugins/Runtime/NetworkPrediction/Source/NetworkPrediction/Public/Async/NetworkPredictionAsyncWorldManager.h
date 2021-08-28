@@ -44,7 +44,7 @@ public:
 		Chaos::FPhysicsSolver* PhysicsSolver = static_cast<Chaos::FPhysicsSolver*>(this->GetSolver());
 
 		const int32 LocalFrame = PhysicsSolver->GetCurrentFrame();
-		const int32 SimulationFrame = LocalFrame - Input->LocalFrameOffset;
+		const int32 SimulationFrame = LocalFrame - LocalFrameOffset;
 		
 		bool bIsResim = true;
 		if (LocalFrame > LatestFrame)
@@ -55,7 +55,7 @@ public:
 
 		FNetworkPredictionSimCallbackOutput& Output = this->GetProducerOutputData_Internal();
 		Output.SimulationFrame = SimulationFrame;
-		Output.LocalFrameOffset = Input->LocalFrameOffset;
+		Output.LocalFrameOffset = LocalFrameOffset;
 
 		// Marshal all data from GT
 		for (TUniquePtr<IAsyncMarshalService_Internal>& ServicePtr : MarshalServices.Array)
@@ -104,7 +104,6 @@ public:
 
 	void OnContactModification_Internal(const TArrayView<Chaos::FPBDCollisionConstraintHandleModification>& Modifications) final override { }
 
-	int32 LocalFrameOffset_Internal = 0;
 	int32 LatestFrame = -1; // Highest frame we've simmed. Used to detect resim
 	UWorld* World = nullptr;
 
@@ -112,12 +111,15 @@ public:
 
 	int32 Reconcile_Internal(int32 LastCompletedStep)
 	{
+		// pop latest localframe offset
+		while(LocalFrameOffsetQueue.Dequeue(LocalFrameOffset));
+
 		int32 RewindFrame = INDEX_NONE;
 		for (TUniquePtr<IAsyncReconcileService>& ServicePtr : ReconcileServices.Array)
 		{
 			if (IAsyncReconcileService* Service = ServicePtr.Get())
 			{
-				const int32 Frame = Service->Reconcile(LastCompletedStep);
+				const int32 Frame = Service->Reconcile(LastCompletedStep, LocalFrameOffset);
 				if (Frame != INDEX_NONE)
 				{
 					RewindFrame = RewindFrame == INDEX_NONE ? Frame : FMath::Min<int32>(RewindFrame, Frame);
@@ -128,7 +130,15 @@ public:
 		return RewindFrame;
 	}
 
+	void PushLatestLocalFrameOffset(int32 InLocalFrameOffset)
+	{
+		LocalFrameOffsetQueue.Enqueue(InLocalFrameOffset);
+	}
+
 private:
+
+	TQueue<int32> LocalFrameOffsetQueue;
+	int32 LocalFrameOffset = 0;
 
 	TAsyncServiceStorage<IAsyncMarshalService_Internal> MarshalServices;
 	TAsyncServiceStorage<IAsyncTickingService> TickingServices;
@@ -393,7 +403,7 @@ public:
 		FNetworkPredictionSimCallbackInput* AsyncInput = AsyncCallback->GetProducerInputData_External();
 		npCheckSlow(AsyncInput);
 		
-		AsyncInput->LocalFrameOffset = LocalFrameOffset;
+		AsyncCallback->PushLatestLocalFrameOffset(LocalFrameOffset);
 		
 		// Sync Networked InputCmds
 		NetSerializePlayerControllerInputCmds(PhysicsStep, [&](FNetworkPredictionAsyncID ID, int32 PendingInputBufferFrame, FArchive& Ar)

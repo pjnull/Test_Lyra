@@ -14,7 +14,6 @@ struct FNetworkPredictionSimCallbackInput : public Chaos::FSimCallbackInput
 
 	void Reset()
 	{
-		LocalFrameOffset = 0;
 		DataStoreCollection.Reset();
 	}
 
@@ -29,8 +28,6 @@ struct FNetworkPredictionSimCallbackInput : public Chaos::FSimCallbackInput
 	{
 		return DataStoreCollection.GetDataStore<TAsyncModelDataStore_Input<AsyncModelDef>, AsyncModelDef>();
 	}
-
-	int32 LocalFrameOffset = 0;
 
 private:
 

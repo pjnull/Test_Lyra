@@ -116,14 +116,12 @@ struct TAsyncNetRecvData
 	TArray<FInstance> NetRecvInstances;
 	TBitArray<> NetRecvDirtyMask;
 	TBitArray<> PendingCorrectionMask;
-	int32 LocalFrameOffset = 0;
 
 	void Reset()
 	{
 		NetRecvInstances.Reset();
 		NetRecvDirtyMask.Reset();
 		PendingCorrectionMask.Reset();
-		LocalFrameOffset = 0;
 	}
 
 	void MarkIndexDirty(const int32 idx)

@@ -37,6 +37,18 @@ Note on ordering of operations and frame numbers:
 	
 		6. Step physics Simulation (rigid bodies, etc. This has nothing to do with NP gameplay data)
 
+
+Its important to preserve the ordering above. Particular the "We apply all GT data and THEN "finalize" back to GT".
+	-This allows us to "cover" all data modifications from GT->PT->GT
+	-E.g, when we register a new instance on the GT, we marshal its creation to the PT, and marshal it back when the PT consumes its (rather than waiting for the next PT tick)
+		-But we can also during creation, immediately write it to the GT output. (RegisterInstance_Impl in NetworkPredictionAsyncService_Registration.inl)
+	-In other words, the GT can accurately "predict" its mods/new instances on the latest.
+		-(note this prediction isn't perfect because we are writing to the previously marshalled frame on the GT, but it prevents "gaps" where the data/new instance isn't present)
+
+That is the current thinking at least. The only alternative approach I see is to marshal back the previous frame's data without any of the latest GT data applied. This was the initial 
+attempt but the "gap" mentioned above proved to be pretty annoying and something we had to guard against. 
+	
+
 =============================================================================*/
 
 namespace UE_NP {
@@ -126,13 +138,28 @@ public:
 		OutputData->Snapshot = Snapshot;
 
 		// Copy snapshot state forward to next frame
-		DataStore->Frames[LocalFrame+1].NetStates = Snapshot.NetStates;
+		TAsncFrameSnapshot<AsyncModelDef>& NextSnapshot = DataStore->Frames[LocalFrame+1];
+		NextSnapshot.NetStates = Snapshot.NetStates;
 		if (!bIsResim)
 		{
 			// Don't copy inputs forward during a resim
 			// This is because non locally controlled sim inputs will be set in the Reconcile phase, 
 			// and copying previous InputCmds would over-write that.
-			DataStore->Frames[LocalFrame+1].InputCmds = Snapshot.InputCmds;
+			NextSnapshot.InputCmds = Snapshot.InputCmds;
+		}
+		else
+		{
+			// But even in resim we have to copy the AP input cmds forward due to how we are synchronizing with the GT and correction above.
+			// Using the Input's LocalInputCmds is a bit abusive but is the simplest approach since the data is right there. See notes at 
+			// the top of this header
+			for (const typename TAsyncModelDataStore_Input<AsyncModelDef>::FLocalInputCmd& LocalInput : InputData->LocalInputCmds)
+			{
+				const int32 idx = LocalInput.Index;
+				if (Snapshot.InputCmds.IsValidIndex(idx) && NextSnapshot.InputCmds.IsValidIndex(idx))
+				{
+					NextSnapshot.InputCmds[idx] = Snapshot.InputCmds[idx];
+				}
+			}
 		}
 	}
 
@@ -217,7 +244,6 @@ public:
 
 		if (DataStore_External->PendingNetRecv.NetRecvDirtyMask.Contains(true))
 		{
-			DataStore_External->PendingNetRecv.LocalFrameOffset = SimInput->LocalFrameOffset;
 			DataStore_Internal->NetRecvQueue.Enqueue(MoveTemp(DataStore_External->PendingNetRecv));
 			DataStore_External->PendingNetRecv.Reset();
 		}

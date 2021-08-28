@@ -51,6 +51,8 @@ namespace UE_NETWORK_PHYSICS
 	NP_DEVCVAR_INT(FixedLocalFrameOffset, -1, "np2.FixedLocalFrameOffset", "When > 0, use hardcoded frame offset on client from head");	
 	NP_DEVCVAR_INT(FixedLocalFrameOffsetTolerance, 3, "np2.FixedLocalFrameOffsetTolerance", "Tolerance when using np2.FixedLocalFrameOffset");
 
+	NP_DEVCVAR_INT(ForceInputFault, 0, "np2.ForceInputFault", "Force input fault correction");
+
 	// NOTE: These have temporarily been switched to regular CVar style variables, because the NP_DECVAR_* macros
 	// can only make ECVF_Cheat variables, which cannot be hotfixed with DefaultEngine.ini. Instead they use
 	// ConsoleVariables.ini, which isn't loaded in shipping.
@@ -747,7 +749,7 @@ void UNetworkPhysicsManager::PostNetRecv()
 					const int32 FrameOffset = LatestAckdClientFrame - LatestAckdServerFrame;
 					if (FrameOffset != LocalOffset)
 					{
-						UE_CLOG(UE_NETWORK_PHYSICS::LogCorrections > 0, LogNetworkPhysics, Log, TEXT("LocalOFfset Changed: %d -> %d"), LocalOffset, FrameOffset);
+						UE_CLOG(UE_NETWORK_PHYSICS::LogCorrections > 0, LogNetworkPhysics, Log, TEXT("LocalOFfset Changed: %d -> %d [C:%d. S:%d]"), LocalOffset, FrameOffset, LatestAckdClientFrame, LatestAckdServerFrame);
 						LocalOffset = FrameOffset;
 					}
 				}
@@ -1074,6 +1076,9 @@ void UNetworkPhysicsManager::ProcessClientInputBuffers_External(int32 PhysicsSte
 	UWorld* World = GetWorld();
 	constexpr int32 MaxBufferedCmds = 16;
 
+	const bool bForceFault = UE_NETWORK_PHYSICS::ForceInputFault > 0;
+	UE_NETWORK_PHYSICS::ForceInputFault = 0;
+
 	for (FConstPlayerControllerIterator Iterator = World->GetPlayerControllerIterator(); Iterator; ++Iterator)
 	{
 		if (APlayerController* PC = Iterator->Get())
@@ -1083,7 +1088,7 @@ void UNetworkPhysicsManager::ProcessClientInputBuffers_External(int32 PhysicsSte
 
 			auto UpdateLastProcessedInputFrame = [&]()
 			{
-				const int32 NumBufferedInputCmds = InputBuffer.HeadFrame() - FrameInfo.LastProcessedInputFrame;
+				const int32 NumBufferedInputCmds = bForceFault ? 0 : (InputBuffer.HeadFrame() - FrameInfo.LastProcessedInputFrame);
 
 				// Check Overflow
 				if (NumBufferedInputCmds > MaxBufferedCmds)
