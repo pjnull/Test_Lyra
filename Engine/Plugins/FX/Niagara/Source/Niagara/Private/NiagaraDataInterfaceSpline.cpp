@@ -656,29 +656,29 @@ bool UNiagaraDataInterfaceSpline::PerInstanceTick(void* PerInstanceData, FNiagar
 				// Bind positions
 				TargetData->SplinePositionsLUT.Initialize(TEXT("SplinePositionsLUT"), sizeof(FVector4), rtShaderLUT.Positions.Num(), EPixelFormat::PF_A32B32G32R32F, BUF_Static);
 				BufferSize = rtShaderLUT.Positions.Num() * sizeof(FVector4);
-				FVector4* PositionBufferData = static_cast<FVector4*>(RHILockVertexBuffer(TargetData->SplinePositionsLUT.Buffer, 0, BufferSize, EResourceLockMode::RLM_WriteOnly));
+				FVector4* PositionBufferData = static_cast<FVector4*>(RHILockBuffer(TargetData->SplinePositionsLUT.Buffer, 0, BufferSize, EResourceLockMode::RLM_WriteOnly));
 				for (int32 Index = 0; Index < rtShaderLUT.Positions.Num(); Index++)
 				{
 					PositionBufferData[Index] = FVector4(rtShaderLUT.Positions[Index]);
 				}
-				RHIUnlockVertexBuffer(TargetData->SplinePositionsLUT.Buffer);
+				RHIUnlockBuffer(TargetData->SplinePositionsLUT.Buffer);
 		
 				// Bind scales
 				TargetData->SplineScalesLUT.Initialize(TEXT("SplineScalesLUT"), sizeof(FVector4), rtShaderLUT.Scales.Num(), EPixelFormat::PF_A32B32G32R32F, BUF_Static);
 				BufferSize = rtShaderLUT.Scales.Num() * sizeof(FVector4);
-				FVector4* ScaleBufferData = static_cast<FVector4*>(RHILockVertexBuffer(TargetData->SplineScalesLUT.Buffer, 0, BufferSize, EResourceLockMode::RLM_WriteOnly));
+				FVector4* ScaleBufferData = static_cast<FVector4*>(RHILockBuffer(TargetData->SplineScalesLUT.Buffer, 0, BufferSize, EResourceLockMode::RLM_WriteOnly));
 				for (int32 Index = 0; Index < rtShaderLUT.Scales.Num(); Index++)
 				{
 					ScaleBufferData[Index] = FVector4(rtShaderLUT.Scales[Index]);
 				}
-				RHIUnlockVertexBuffer(TargetData->SplineScalesLUT.Buffer);
+				RHIUnlockBuffer(TargetData->SplineScalesLUT.Buffer);
 				
 				// Bind rotations
 				TargetData->SplineRotationsLUT.Initialize(TEXT("SplineRotationsLUT"), sizeof(FQuat), rtShaderLUT.Rotations.Num(), EPixelFormat::PF_A32B32G32R32F, BUF_Static);
 				BufferSize = rtShaderLUT.Rotations.Num() * sizeof(FQuat);
-				FQuat* RotationBufferData = static_cast<FQuat*>(RHILockVertexBuffer(TargetData->SplineRotationsLUT.Buffer, 0, BufferSize, EResourceLockMode::RLM_WriteOnly));
+				FQuat* RotationBufferData = static_cast<FQuat*>(RHILockBuffer(TargetData->SplineRotationsLUT.Buffer, 0, BufferSize, EResourceLockMode::RLM_WriteOnly));
 				FPlatformMemory::Memcpy(RotationBufferData, rtShaderLUT.Rotations.GetData(), BufferSize);
-				RHIUnlockVertexBuffer(TargetData->SplineRotationsLUT.Buffer);
+				RHIUnlockBuffer(TargetData->SplineRotationsLUT.Buffer);
 				
 				INC_MEMORY_STAT_BY(STAT_NiagaraGPUDataInterfaceMemory, TargetData->SplinePositionsLUT.NumBytes);
 				INC_MEMORY_STAT_BY(STAT_NiagaraGPUDataInterfaceMemory, TargetData->SplineScalesLUT.NumBytes);
