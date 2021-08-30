@@ -88,6 +88,7 @@ namespace Audio
 		virtual FString GetDefaultDeviceName() override;
 		virtual FAudioPlatformSettings GetPlatformSettings() const override;
 		virtual void OnHardwareUpdate() override;
+		virtual IAudioPlatformDeviceInfoCache* GetDeviceInfoCache() const override;
 		//~ End IAudioMixerPlatformInterface
 
 		//~ Begin IAudioMixerDeviceChangedListener
@@ -95,10 +96,11 @@ namespace Audio
 		virtual void UnregisterDeviceChangedListener() override;
 		virtual void OnDefaultCaptureDeviceChanged(const EAudioDeviceRole InAudioDeviceRole, const FString& DeviceId) override;
 		virtual void OnDefaultRenderDeviceChanged(const EAudioDeviceRole InAudioDeviceRole, const FString& DeviceId) override;
-		virtual void OnDeviceAdded(const FString& DeviceId) override;
-		virtual void OnDeviceRemoved(const FString& DeviceId) override;
-		virtual void OnDeviceStateChanged(const FString& DeviceId, const EAudioDeviceState InState) override;
-		virtual FString GetDeviceId() const override;
+		virtual void OnDeviceAdded(const FString& DeviceId, bool bIsRenderDevice) override;
+		virtual void OnDeviceRemoved(const FString& DeviceId, bool bIsRenderDevice) override;
+		virtual void OnDeviceStateChanged(const FString& DeviceId, const EAudioDeviceState InState, bool bIsRenderDevice) override;
+		virtual void OnSessionDisconnect(Audio::IAudioMixerDeviceChangedListener::EDisconnectReason InReason) override;
+		virtual FString GetDeviceId() const override;		
 		//~ End IAudioMixerDeviceChangedListener
 
 	private:
@@ -139,6 +141,8 @@ namespace Audio
 		float TimeSinceNullDeviceWasLastChecked;
 
 		bool FirstBufferSubmitted{false};
+
+		TUniquePtr<IAudioPlatformDeviceInfoCache> DeviceInfoCache;
 
 		uint32 bIsInitialized : 1;
 		uint32 bIsDeviceOpen : 1;

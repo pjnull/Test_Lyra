@@ -60,6 +60,14 @@ FAutoConsoleVariableRef CVarDisableDeviceSwap(
 	TEXT("0: Not Enabled, 1: Enabled"),
 	ECVF_Default);
 
+static int32 bUseAudioDeviceInfoCacheCVar = 1;
+FAutoConsoleVariableRef CVarUseAudioDeviceInfoCache(
+	TEXT("au.UseCachedDeviceInfoCache"),
+	bUseAudioDeviceInfoCacheCVar,
+	TEXT("Uses a Cache of the DeviceCache instead of asking the OS")
+	TEXT("0 off, 1 on"),
+	ECVF_Default);
+	
 static int32 bRecycleThreadsCVar = 1;
 FAutoConsoleVariableRef CVarRecycleThreads(
 	TEXT("au.RecycleThreads"),
@@ -845,6 +853,15 @@ namespace Audio
 	bool IAudioMixer::ShouldLogDeviceSwaps()
 	{
 		return EnableDetailedWindowsDeviceLoggingCVar != 0;
+	}
+
+	bool IAudioMixer::ShouldUseDeviceInfoCache()
+	{		
+#if PLATFORM_WINDOWS // PLATFORM_HOLOLENS uses old path.
+		return bUseAudioDeviceInfoCacheCVar != 0;
+#else //PLATFORM_WINDOWS
+		return false;
+#endif //PLATFORM_WINDOWS
 	}
 	
 	bool IAudioMixer::ShouldRecycleThreads()

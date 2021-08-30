@@ -45,6 +45,7 @@
 #endif
 
 #include "Misc/CoreDelegates.h"
+#include "ProfilingDebugging/ScopedTimers.h"
 
 #define XAUDIO2_LOG_RESULT(FunctionName, Result) \
 	{ \
@@ -506,6 +507,15 @@ namespace Audio
 
 	bool FMixerPlatformXAudio2::GetNumOutputDevices(uint32& OutNumOutputDevices)
 	{
+		SCOPED_NAMED_EVENT(FMixerPlatformXAudio2_GetNumOutputDevices, FColor::Blue);
+
+		// Use Cache if we have it.
+		if (IAudioPlatformDeviceInfoCache* Cache = GetDeviceInfoCache())
+		{
+			OutNumOutputDevices = Cache->GetAllActiveOutputDevices().Num();
+			return true;
+		}
+
 		OutNumOutputDevices = 0;
 
 		if (!bIsInitialized)
@@ -553,6 +563,8 @@ namespace Audio
 #if PLATFORM_WINDOWS
 	static bool GetMMDeviceInfo(IMMDevice* MMDevice, FAudioPlatformDeviceInfo& OutInfo)
 	{
+		SCOPED_NAMED_EVENT(FMixerPlatformXAudio2_GetMMDeviceInfo, FColor::Blue);
+		
 		check(MMDevice);
 
 		OutInfo.Reset();
@@ -708,6 +720,31 @@ namespace Audio
 
 	bool FMixerPlatformXAudio2::GetOutputDeviceInfo(const uint32 InDeviceIndex, FAudioPlatformDeviceInfo& OutInfo)
 	{
+		SCOPED_NAMED_EVENT(FMixerPlatformXAudio2_GetOutputDeviceInfo, FColor::Blue);
+				
+		// Use Cache if we have it. (index is a bad way to find the device, but we do it here).
+		if (IAudioPlatformDeviceInfoCache* Cache = GetDeviceInfoCache())
+		{
+			if (InDeviceIndex == AUDIO_MIXER_DEFAULT_DEVICE_INDEX)
+			{
+				if (TOptional<FAudioPlatformDeviceInfo> Defaults = Cache->FindDefaultOutputDevice())
+				{
+					OutInfo = *Defaults;
+					return true;
+				}
+			}
+			else
+			{
+				TArray<FAudioPlatformDeviceInfo> ActiveDevices = Cache->GetAllActiveOutputDevices();
+				if (ActiveDevices.IsValidIndex(InDeviceIndex))
+				{
+					OutInfo = ActiveDevices[InDeviceIndex];
+					return true;
+				}
+			}
+			return false;
+		}
+		
 		if (!bIsInitialized)
 		{
 			AUDIO_PLATFORM_LOG_ONCE(TEXT("XAudio2 was not initialized."), Error);
@@ -1286,6 +1323,8 @@ namespace Audio
 		bool bDidStopGeneratingAudio = false;
 #if PLATFORM_WINDOWS && XAUDIO_SUPPORTS_DEVICE_DETAILS
 
+		SCOPED_NAMED_EVENT(FMixerPlatformXAudio2_MoveAudioStreamToNewAudioDevice, FColor::Blue);
+
 		uint32 NumDevices = 0;
 		// XAudio2 for HoloLens doesn't have GetDeviceCount, use local wrapper instead
 		if (!GetNumOutputDevices(NumDevices))
@@ -1326,6 +1365,8 @@ namespace Audio
 			{
 				return bDidStopGeneratingAudio;
 			}
+
+			SCOPED_NAMED_EVENT(FMixerPlatformXAudio2_MoveAudioStreamToNewAudioDevice_DestroyVoices, FColor::Blue);
 
 			// If an XAudio2 callback is in flight,
 			// we have to wait for it here.
@@ -1691,14 +1732,30 @@ namespace Audio
 		XMA2_INFO_CALL(FXMAAudioInfo::Tick());
 #endif //WITH_XMA2
 
-		if (bIsUsingNullDevice)
+	}
+
+	Audio::IAudioPlatformDeviceInfoCache* FMixerPlatformXAudio2::GetDeviceInfoCache() const
+	{
+		if (IAudioMixer::ShouldUseDeviceInfoCache())
 		{
-			float CurrentTime = FPlatformTime::Seconds();
-			if (CurrentTime - TimeSinceNullDeviceWasLastChecked > 1.0f)
-			{
-				bMoveAudioStreamToNewAudioDevice = true;
-				TimeSinceNullDeviceWasLastChecked = CurrentTime;
-			}
+			return DeviceInfoCache.Get();
+		}
+		// Disabled.
+		return nullptr;
+	}
+
+	void FMixerPlatformXAudio2::OnSessionDisconnect(IAudioMixerDeviceChangedListener::EDisconnectReason InReason)
+	{
+		// Device has disconnected from current session.
+		if (InReason == IAudioMixerDeviceChangedListener::EDisconnectReason::FormatChanged)
+		{
+			// OnFormatChanged, retry again same device.
+			RequestDeviceSwap(GetDeviceId());
+		}
+		else
+		{
+			// Device removed entirely, so attempt to switch to default.
+			RequestDeviceSwap(TEXT(""));
 		}
 	}
 
