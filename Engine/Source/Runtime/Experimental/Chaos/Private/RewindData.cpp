@@ -524,7 +524,6 @@ void FRewindData::MarkDirtyFromPT(FGeometryParticleHandle& Handle)
 	{
 		if (bRecordingHistory || Latest.Velocities.IsClean(FrameAndPhase))
 		{
-			{
 			if (auto Data = Latest.Velocities.WriteAccessNonDecreasing(FrameAndPhase, PropertiesPool))
 			{
 				Data->CopyFrom(*Kinematic);
@@ -541,6 +540,7 @@ void FRewindData::MarkDirtyFromPT(FGeometryParticleHandle& Handle)
 				}
 			}
 		}
+	}
 }
 
 template <bool bResim>
