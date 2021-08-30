@@ -181,6 +181,9 @@ namespace Audio
 		/** Called by FWindowsMMNotificationClient to toggle logging for audio device changes: */
 		AUDIOMIXERCORE_API static bool ShouldLogDeviceSwaps();
 
+		/** Called by AudioMixer to see if it should reycle the threads: */
+		AUDIOMIXERCORE_API static bool ShouldRecycleThreads();
+
 	protected:
 
 		IAudioMixer() 
@@ -600,6 +603,9 @@ namespace Audio
 
 		/** When called, terminates the null device. */
 		void StopRunningNullDevice();
+		
+		/** Called by platform specific logic to pre-create or create the null renderer thread  */
+		void CreateNullDeviceThread(const TFunction<void()> InCallback, float InBufferDuration, bool bShouldPauseOnStart);
 
 	protected:
 
