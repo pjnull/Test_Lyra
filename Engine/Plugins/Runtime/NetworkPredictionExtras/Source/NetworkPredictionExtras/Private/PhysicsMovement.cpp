@@ -47,6 +47,9 @@ struct FPhysicsMovementSimulation
 			UE_LOG(LogNetworkPrediction, Warning, TEXT("Illegitimate InputCmd has seeped in!!! SimFrame: %d. LocalFrame: %d"), SimulationFrame, Context.LocalStorageFrame);
 		}
 
+		//UE_LOG(LogTemp, Warning, TEXT("[%s][%d][%d] Yaw: %f %s"), World->GetNetMode() == NM_Client ? TEXT("C") : TEXT("S"), SimulationFrame, SimulationFrame - Context.LocalStorageFrame, InputCmd.TargetYaw, Context.bIsResim ? TEXT("RESIM") : TEXT(" "));
+		//UE_LOG(LogTemp, Warning, TEXT("[%s][%d][%d] 0x%X Count: %d %s"), World->GetNetMode() == NM_Client ? TEXT("C") : TEXT("S"), SimulationFrame, SimulationFrame - Context.LocalStorageFrame, (int64)&InputCmd, InputCmd.Counter, Context.bIsResim ? TEXT("RESIM") : TEXT(" "));
+
 		UE_NETWORK_PHYSICS::ConditionalFrameEnsure();
 		if (UE_NETWORK_PHYSICS::ConditionalFrameBreakpoint())
 		{
@@ -338,6 +341,7 @@ void UPhysicsMovementComponent::TickComponent(float DeltaTime, enum ELevelTick T
 		// Broadcast out a delegate. The user will write to PendingInputCmd
 		OnGenerateLocalInputCmd.Broadcast();
 		PendingInputCmd.bLegit = true;
+		//PendingInputCmd.Counter++;
 	}
 }
 

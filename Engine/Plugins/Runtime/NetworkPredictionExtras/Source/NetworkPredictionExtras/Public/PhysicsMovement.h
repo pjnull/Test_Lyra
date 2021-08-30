@@ -5,7 +5,7 @@
 #include "NetworkPhysics.h"
 #include "NetworkPredictionLog.h"
 #include "Async/NetworkPredictionAsyncProxy.h"
-#include "MockNetworkPhysics.h"
+#include "NetworkPhysicsComponent.h"
 #include "PhysicsMovement.generated.h"
 
 
@@ -38,6 +38,8 @@ struct FPhysicsInputCmd
 
 	// For testing: to ensure the system only sees user created InputCmds and not defaults
 	bool bLegit = false;
+	// Debugging. 
+	int32 Counter = 0;
 
 	void NetSerialize(FArchive& Ar)
 	{
@@ -52,6 +54,7 @@ struct FPhysicsInputCmd
 		Ar << bJumpedPressed;
 		Ar << bBrakesPressed;
 		Ar << bLegit;
+		Ar << Counter;
 
 		if (!Ar.IsSaving() && !bLegit)
 		{
@@ -64,8 +67,10 @@ struct FPhysicsInputCmd
 		return FVector::DistSquared(Force, AuthState.Force) > 0.1f
 			|| FVector::DistSquared(Torque, AuthState.Torque) > 0.1f
 			|| !FMath::IsNearlyEqual(TargetYaw, AuthState.TargetYaw, 1.0f)
-			|| bJumpedPressed != AuthState.bJumpedPressed || 
-			bBrakesPressed != AuthState.bBrakesPressed;
+			|| bJumpedPressed != AuthState.bJumpedPressed
+			//|| Counter != AuthState.Counter // this will cause constant corrections with multiple clients but useful in testing single client
+			|| bBrakesPressed != AuthState.bBrakesPressed;
+			
 	}
 };
 
