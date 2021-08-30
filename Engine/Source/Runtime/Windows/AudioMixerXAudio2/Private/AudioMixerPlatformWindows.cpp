@@ -622,6 +622,49 @@ namespace Audio
 
 			TArray<EAudioMixerChannel::Type> OutputChannels;	// TODO. Generate this from the ChannelNum and bitmask when we are asked for it.
 			mutable FRWLock MutationLock;
+
+			FCacheEntry& operator=(const FCacheEntry& InOther)
+			{
+				// Copy everything but the lock. 
+				DeviceId = InOther.DeviceId;
+				FriendlyName = InOther.FriendlyName;
+				DeviceFriendlyName = InOther.DeviceFriendlyName;
+				State = InOther.State;
+				NumChannels = InOther.NumChannels;
+				SampleRate = InOther.SampleRate;
+				Type = InOther.Type;
+				SpeakerConfig = InOther.SpeakerConfig;
+				OutputChannels = InOther.OutputChannels;
+				return *this;
+			}
+
+			FCacheEntry& operator=(FCacheEntry&& InOther)
+			{
+				DeviceId = MoveTemp(InOther.DeviceId);
+				FriendlyName = MoveTemp(InOther.FriendlyName);
+				DeviceFriendlyName = MoveTemp(InOther.DeviceFriendlyName);
+				State = MoveTemp(InOther.State);
+				NumChannels = MoveTemp(InOther.NumChannels);
+				SampleRate = MoveTemp(InOther.SampleRate);
+				Type = MoveTemp(InOther.Type);
+				SpeakerConfig = MoveTemp(InOther.SpeakerConfig);
+				OutputChannels = MoveTemp(InOther.OutputChannels);
+				return *this;
+			}
+
+			FCacheEntry(const FCacheEntry& InOther)
+			{
+				*this = InOther;
+			}
+
+			FCacheEntry(FCacheEntry&& InOther)
+			{
+				*this = MoveTemp(InOther);
+			}
+
+			FCacheEntry(const FString& InDeviceId)
+				: DeviceId{ InDeviceId }
+			{}
 		};
 		
 		TScopeComObject<IMMDeviceEnumerator> DeviceEnumerator;
@@ -885,7 +928,7 @@ namespace Audio
 								);
 
 								check(!NewCache.Contains(Info.DeviceId));
-								NewCache.Emplace(Info.DeviceId) = MoveTemp(Info);
+								NewCache.Emplace(Info.DeviceId, Info);
 							}
 						}
 					}
