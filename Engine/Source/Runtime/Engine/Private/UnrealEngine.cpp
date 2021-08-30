@@ -13822,6 +13822,7 @@ bool UEngine::LoadMap( FWorldContext& WorldContext, FURL URL, class UPendingNetG
 	// send a callback message
 	PostLoadMapCaller.Broadcast(WorldContext.World());
 	MoviePlayerBlock.Finish();
+	FMoviePlayerProxy::BlockingForceFinished();
 
 	WorldContext.World()->bWorldWasLoadedThisTick = true;
 

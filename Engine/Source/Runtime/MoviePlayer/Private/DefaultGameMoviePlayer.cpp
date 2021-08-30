@@ -653,21 +653,16 @@ void FDefaultGameMoviePlayer::BlockingFinished()
 {
 	if (bIsPlayOnBlockingEnabled)
 	{
-		UE_LOG(LogMoviePlayer, Verbose, TEXT("BlockingFinished. Refcount: %d."), BlockingRefCount);
-
-		// Uopdate ref count.
-		ensureMsgf(BlockingRefCount > 0, TEXT("MoviePlayer blockingrefcount <= 0."), BlockingRefCount);
-		BlockingRefCount--;
-		if (BlockingRefCount <= 0)
+		// Only call WaitForMovieToFinish if we are playing a movie,
+		// as WaitForMovieToFinish has side effects if a movie is not playing,
+		// and this can cause a hang.
+		if (LoadingScreenIsPrepared() && IsMovieCurrentlyPlaying())
 		{
-			// Only call WaitForMovieToFinish if we are playing a movie,
-			// as WaitForMovieToFinish has side effects if a movie is not playing,
-			// and this can cause a hang.
-			if (LoadingScreenIsPrepared() && IsMovieCurrentlyPlaying())
-			{
-				WaitForMovieToFinish();
-			}
+			UE_LOG(LogMoviePlayer, Verbose, TEXT("BlockingFinished. Refcount: %d."), BlockingRefCount);
+			WaitForMovieToFinish();
 		}
+		
+		BlockingRefCount = 0;
 	}
 }
 

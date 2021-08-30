@@ -182,6 +182,7 @@
 #endif
 
 	#include "MoviePlayer.h"
+	#include "MoviePlayerProxy.h"
     #include "PreLoadScreenManager.h"
 	#include "InstallBundleManagerInterface.h"
 
@@ -4966,6 +4967,7 @@ void FEngineLoop::Tick()
 	}
 
 	// Ensure we aren't starting a frame while loading or playing a loading movie
+	FMoviePlayerProxy::BlockingForceFinished();
 	ensure(GetMoviePlayer()->IsLoadingFinished() && !GetMoviePlayer()->IsMovieCurrentlyPlaying());
 
 #if UE_EXTERNAL_PROFILING_ENABLED
@@ -5252,6 +5254,7 @@ void FEngineLoop::Tick()
 
 		FAssetCompilingManager::Get().ProcessAsyncTasks(true);
 
+		FMoviePlayerProxy::BlockingForceFinished();
 		// Tick the platform and input portion of Slate application, we need to do this before we run things
 		// concurrent with networking.
 		if (FSlateApplication::IsInitialized() && !bIdleMode)
@@ -5425,6 +5428,7 @@ void FEngineLoop::Tick()
 			FThreadManager::Get().Tick();
 			GEngine->TickDeferredCommands();		
 		}
+		FMoviePlayerProxy::BlockingForceFinished();
 
 #if !UE_SERVER
 		// tick media framework

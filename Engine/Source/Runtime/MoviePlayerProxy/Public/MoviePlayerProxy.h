@@ -23,7 +23,8 @@ public:
 	static void BlockingTick();
 	/** Call this once the blocking operation is done to shut down the movie player. */
 	static void BlockingFinished();
-
+	/** Call this to make sure the movie player is no longer running. */
+	static void BlockingForceFinished();
 	/** Call this to hook up a server. */
 	static void RegisterServer(IMoviePlayerProxyServer* InServer);
 	/** Call this to unregister the current server. */
