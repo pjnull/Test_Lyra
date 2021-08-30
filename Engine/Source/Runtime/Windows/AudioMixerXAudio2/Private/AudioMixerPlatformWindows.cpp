@@ -11,11 +11,15 @@
 #include "AudioDeviceNotificationSubsystem.h"
 
 #if PLATFORM_WINDOWS
+
+#include "ScopedCom.h"
+
 #include "Windows/AllowWindowsPlatformTypes.h"
 #include "Windows/AllowWindowsPlatformAtomics.h"
 
 #define INITGUID
 #include <mmdeviceapi.h>
+#include <audiopolicy.h>
 #include <functiondiscoverykeys_devpkey.h>
 
 class FWindowsMMNotificationClient final : public IMMNotificationClient
@@ -26,7 +30,7 @@ public:
 		, DeviceEnumerator(nullptr)
 	{
 		bComInitialized = FWindowsPlatformMisc::CoInitialize();
-		HRESULT Result = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_INPROC_SERVER, __uuidof(IMMDeviceEnumerator), (void**)&DeviceEnumerator);
+		HRESULT Result = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&DeviceEnumerator.Obj));
 		if (Result == S_OK)
 		{
 			DeviceEnumerator->RegisterEndpointNotificationCallback(this);
@@ -38,7 +42,6 @@ public:
 		if (DeviceEnumerator)
 		{
 			DeviceEnumerator->UnregisterEndpointNotificationCallback(this);
-			SAFE_RELEASE(DeviceEnumerator);
 		}
 
 		if (bComInitialized)
@@ -184,7 +187,21 @@ public:
 		}
 		return S_OK;
 	}
-
+	
+	Audio::TScopeComObject<IMMDevice> GetDevice(const FString InDeviceID) const
+	{
+		// Get device.
+		Audio::TScopeComObject<IMMDevice> Device;
+		HRESULT Hr = DeviceEnumerator->GetDevice(*InDeviceID, &Device.Obj);
+		if (SUCCEEDED(Hr))
+		{
+			return Device;
+		}
+		
+		// Fail.
+		return {};
+	}
+	
 	HRESULT STDMETHODCALLTYPE OnPropertyValueChanged(LPCWSTR pwstrDeviceId, const PROPERTYKEY key)
 	{
 		FScopeLock ScopeLock(&ListenerArrayMutationLock);
@@ -251,7 +268,7 @@ private:
 	LONG Ref;
 	TSet<Audio::IAudioMixerDeviceChangedListener*> Listeners;
 	FCriticalSection ListenerArrayMutationLock;
-	IMMDeviceEnumerator* DeviceEnumerator;
+	Audio::TScopeComObject<IMMDeviceEnumerator> DeviceEnumerator;
 	bool bComInitialized;
 };
 
@@ -266,7 +283,11 @@ namespace Audio
 	{
 		if (!WindowsNotificationClient.IsValid())
 		{
-			WindowsNotificationClient = TSharedPtr<FWindowsMMNotificationClient>(new FWindowsMMNotificationClient);
+			// Shared (This is a COM object, so we don't delete it, just derecement the ref counter).
+			WindowsNotificationClient = TSharedPtr<FWindowsMMNotificationClient>(
+				new FWindowsMMNotificationClient, 
+				[](FWindowsMMNotificationClient* InPtr) { InPtr->Release(); }
+			);
 		}
 
 		WindowsNotificationClient->RegisterDeviceChangedListener(this);
@@ -277,6 +298,7 @@ namespace Audio
 		if (WindowsNotificationClient.IsValid())
 		{
 			WindowsNotificationClient->UnRegisterDeviceDeviceChangedListener(this);
+			WindowsNotificationClient.Reset();
 		}
 	}
 

@@ -41,6 +41,7 @@
 #if PLATFORM_WINDOWS
 #include <mmdeviceapi.h>
 #include <FunctionDiscoveryKeys_devpkey.h>
+#include <AudioClient.h>
 #endif
 
 #include "Misc/CoreDelegates.h"
@@ -73,6 +74,8 @@
 
 static FString GetErrorString(HRESULT Result)
 {
+#define CASE_AND_STRING(RESULT) case HRESULT(RESULT): return TEXT(#RESULT)
+
 	switch (Result)
 	{
 		case HRESULT(XAUDIO2_E_INVALID_CALL):			return TEXT("XAUDIO2_E_INVALID_CALL");
@@ -86,6 +89,50 @@ static FString GetErrorString(HRESULT Result)
 		case HRESULT(E_POINTER):						return TEXT("E_POINTER");
 		case HRESULT(E_INVALIDARG):						return TEXT("E_INVALIDARG");
 		case HRESULT(E_OUTOFMEMORY):					return TEXT("E_OUTOFMEMORY");
+
+		// AudioClient.h
+		CASE_AND_STRING(AUDCLNT_E_NOT_INITIALIZED				 );
+		CASE_AND_STRING(AUDCLNT_E_ALREADY_INITIALIZED			 );
+		CASE_AND_STRING(AUDCLNT_E_WRONG_ENDPOINT_TYPE			 );
+		CASE_AND_STRING(AUDCLNT_E_DEVICE_INVALIDATED			 );
+		CASE_AND_STRING(AUDCLNT_E_NOT_STOPPED					 );
+		CASE_AND_STRING(AUDCLNT_E_BUFFER_TOO_LARGE				 );
+		CASE_AND_STRING(AUDCLNT_E_OUT_OF_ORDER					 );
+		CASE_AND_STRING(AUDCLNT_E_UNSUPPORTED_FORMAT			 );
+		CASE_AND_STRING(AUDCLNT_E_INVALID_SIZE					 );
+		CASE_AND_STRING(AUDCLNT_E_DEVICE_IN_USE					 );
+		CASE_AND_STRING(AUDCLNT_E_BUFFER_OPERATION_PENDING		 );
+		CASE_AND_STRING(AUDCLNT_E_THREAD_NOT_REGISTERED			 );
+		CASE_AND_STRING(AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED	 );
+		CASE_AND_STRING(AUDCLNT_E_ENDPOINT_CREATE_FAILED		 );
+		CASE_AND_STRING(AUDCLNT_E_SERVICE_NOT_RUNNING			 );
+		CASE_AND_STRING(AUDCLNT_E_EVENTHANDLE_NOT_EXPECTED		 );
+		CASE_AND_STRING(AUDCLNT_E_EXCLUSIVE_MODE_ONLY			 );
+		CASE_AND_STRING(AUDCLNT_E_BUFDURATION_PERIOD_NOT_EQUAL	 );
+		CASE_AND_STRING(AUDCLNT_E_EVENTHANDLE_NOT_SET			 );
+		CASE_AND_STRING(AUDCLNT_E_INCORRECT_BUFFER_SIZE			 );
+		CASE_AND_STRING(AUDCLNT_E_BUFFER_SIZE_ERROR				 );
+		CASE_AND_STRING(AUDCLNT_E_CPUUSAGE_EXCEEDED				 );
+		CASE_AND_STRING(AUDCLNT_E_BUFFER_ERROR					 );
+		CASE_AND_STRING(AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED		 );
+		CASE_AND_STRING(AUDCLNT_E_INVALID_DEVICE_PERIOD			 );
+		CASE_AND_STRING(AUDCLNT_E_INVALID_STREAM_FLAG			 );
+		CASE_AND_STRING(AUDCLNT_E_ENDPOINT_OFFLOAD_NOT_CAPABLE	 );
+		CASE_AND_STRING(AUDCLNT_E_OUT_OF_OFFLOAD_RESOURCES		 );
+		CASE_AND_STRING(AUDCLNT_E_OFFLOAD_MODE_ONLY				 );
+		CASE_AND_STRING(AUDCLNT_E_NONOFFLOAD_MODE_ONLY			 );
+		CASE_AND_STRING(AUDCLNT_E_RESOURCES_INVALIDATED			 );
+		CASE_AND_STRING(AUDCLNT_E_RAW_MODE_UNSUPPORTED			 );
+		CASE_AND_STRING(AUDCLNT_E_ENGINE_PERIODICITY_LOCKED		 );
+		CASE_AND_STRING(AUDCLNT_E_ENGINE_FORMAT_LOCKED			 );
+		CASE_AND_STRING(AUDCLNT_E_HEADTRACKING_ENABLED			 );
+		CASE_AND_STRING(AUDCLNT_E_HEADTRACKING_UNSUPPORTED		 );
+		CASE_AND_STRING(AUDCLNT_S_BUFFER_EMPTY					 );
+		CASE_AND_STRING(AUDCLNT_S_THREAD_ALREADY_REGISTERED		 );
+		CASE_AND_STRING(AUDCLNT_S_POSITION_STALLED				 );
+
+		#undef CASE_AND_STRING
+
 	#endif
 		case HRESULT(0xe000020b):						return TEXT("ERROR_NO_SUCH_DEVINST");
 
@@ -541,11 +588,19 @@ namespace Audio
 
 		// Get the format of the property
 		WaveFormatEx = (WAVEFORMATEX *)DeviceFormat.blob.pBlobData;
-		if (!ensure(WaveFormatEx))
+		if (!WaveFormatEx)
 		{
-			// Force an error if we failed to get a WaveFormat back from the data blob.
-			Result = E_FAIL;
+			// Some devices don't provide the Device format, so try the OEMFormat as well.
+			Result = PropertyStore->GetValue(PKEY_AudioEngine_OEMFormat, &DeviceFormat);
 			XAUDIO2_GOTO_CLEANUP_ON_FAIL(Result);
+
+			WaveFormatEx = (WAVEFORMATEX*)DeviceFormat.blob.pBlobData;
+			if (!ensure(DeviceFormat.blob.pBlobData))
+			{
+				// Force an error if we failed to get a WaveFormat back from the data blob.
+				Result = E_FAIL;
+				XAUDIO2_GOTO_CLEANUP_ON_FAIL(Result);
+			}
 		}
 		
 		OutInfo.DeviceId = FString(DeviceId);
@@ -642,13 +697,6 @@ namespace Audio
 			}
 		}
 
-		for (int32 i = 0; i < OutInfo.NumChannels; ++i)
-		{
-			if (i < OutInfo.OutputChannelArray.Num())
-			{
-				UE_LOG(LogAudioMixer, Display, TEXT("%d: %s"), i, EAudioMixerChannel::ToString(OutInfo.OutputChannelArray[i]));
-			}
-		}
 	Cleanup:
 		PropVariantClear(&FriendlyName);
 		PropVariantClear(&DeviceFormat);
