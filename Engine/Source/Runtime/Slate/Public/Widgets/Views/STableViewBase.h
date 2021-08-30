@@ -160,6 +160,9 @@ public:
 
 	void SetScrollbarVisibility(const EVisibility InVisibility);
 
+	/** Returns true if scrolling is possible; false if the view is big enough to fit all the content. */
+	bool IsScrollbarNeeded() const;
+
 	/** Sets the fixed offset in items to always apply to the top/left (depending on orientation) of the list. */
 	void SetFixedLineScrollOffset(TOptional<double> InFixedLineScrollOffset);
 
