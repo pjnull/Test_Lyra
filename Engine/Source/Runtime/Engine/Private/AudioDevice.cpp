@@ -4981,7 +4981,7 @@ void FAudioDevice::AddVirtualLoop(const FAudioVirtualLoop& InVirtualLoop)
 		{
 			// if we can't have more than one sound, we should have only one element (or less) here
 			ensure(ExistingSounds.Num() <= 1);
-			for (int i = ExistingSounds.Num() - 1; i >= 0; --i)
+			for (int32 i = ExistingSounds.Num() - 1; i >= 0; --i)
 			{
 				if (ExistingSounds[i])
 				{
@@ -5703,7 +5703,8 @@ void FAudioDevice::UnlinkActiveSoundFromComponent(const FActiveSound& InActiveSo
 	{
 		TArray<FActiveSound*> & ActiveSoundsInComponent = AudioComponentIDToActiveSoundMap.FindOrAdd(AudioComponentID);
 
-		for (int i = ActiveSoundsInComponent.Num() - 1; i >= 0; --i)
+		// Only unlink the specific active sound that is stopping
+		for (int32 i = ActiveSoundsInComponent.Num() - 1; i >= 0; --i)
 		{
 			if (ActiveSoundsInComponent[i]->GetInstanceID() == InActiveSound.GetInstanceID())
 			{
@@ -5711,6 +5712,14 @@ void FAudioDevice::UnlinkActiveSoundFromComponent(const FActiveSound& InActiveSo
 				break;
 			}
 		}
+
+		// If there are no longer any active sounds associated with the audio component, clean up
+		if (!ActiveSoundsInComponent.Num())
+		{
+			AudioComponentIDToActiveSoundMap.Remove(AudioComponentID);
+			AudioComponentIDToCanHaveMultipleActiveSoundsMap.Remove(AudioComponentID);
+		}
+
 	}
 }
 
