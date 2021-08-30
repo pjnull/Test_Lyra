@@ -940,6 +940,7 @@ namespace UnrealBuildTool
 			{
 				Result += " -Wl,--icf=all"; // Enables ICF (Identical Code Folding). [all, safe] safe == fold functions that can be proven not to have their address taken.
 				if (!bUseLLD)
+				{
 					Result += " -Wl,--icf-iterations=3";
 				}
 			}
