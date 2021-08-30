@@ -4695,17 +4695,29 @@ void FAudioDevice::NotifyPluginListenersWorldChanged(UWorld* World)
 	}
 }
 
-void FAudioDevice::AddNewActiveSound(const FActiveSound& NewActiveSound)
+void FAudioDevice::AddNewActiveSound(const FActiveSound& ActiveSound, const TArray<FAudioParameter>* InDefaultParams)
+{
+	TArray<FAudioParameter> Params;
+	if (InDefaultParams)
+	{
+		Params.Append(*InDefaultParams);
+	}
+
+	AddNewActiveSound(ActiveSound, MoveTemp(Params));
+}
+
+void FAudioDevice::AddNewActiveSound(const FActiveSound& NewActiveSound, TArray<FAudioParameter>&& InDefaultParams)
 {
 	if (USoundBase* Sound = NewActiveSound.GetSound())
 	{
 		Sound->InitResources();
+		Sound->InitParameters(InDefaultParams, "NewSoundRequest");
 	}
 
-	AddNewActiveSoundInternal(NewActiveSound, nullptr);
+	AddNewActiveSoundInternal(NewActiveSound, MoveTemp(InDefaultParams));
 }
 
-void FAudioDevice::AddNewActiveSoundInternal(const FActiveSound& NewActiveSound, FAudioVirtualLoop* VirtualLoopToRetrigger)
+void FAudioDevice::AddNewActiveSoundInternal(const FActiveSound& InNewActiveSound, TArray<FAudioParameter>&& InDefaultParams, FAudioVirtualLoop* InVirtualLoopToRetrigger)
 {
 	LLM_SCOPE(ELLMTag::AudioMisc);
 	
@@ -4713,29 +4725,29 @@ void FAudioDevice::AddNewActiveSoundInternal(const FActiveSound& NewActiveSound,
 	{
 		DECLARE_CYCLE_STAT(TEXT("FAudioThreadTask.AddNewActiveSound"), STAT_AudioAddNewActiveSound, STATGROUP_AudioThreadCommands);
 
-		FAudioDevice* AudioDevice = this;
-		FAudioThread::RunCommandOnAudioThread([AudioDevice, NewActiveSound, VirtualLoopToRetrigger]()
+
+		FAudioThread::RunCommandOnAudioThread([AudioDevice = this, InNewActiveSound, DefaultParams = MoveTemp(InDefaultParams)]() mutable
 		{
-			AudioDevice->AddNewActiveSoundInternal(NewActiveSound, VirtualLoopToRetrigger);
+			AudioDevice->AddNewActiveSoundInternal(InNewActiveSound, MoveTemp(DefaultParams));
 		}, GET_STATID(STAT_AudioAddNewActiveSound));
 
 		return;
 	}
 
-	USoundBase* Sound = NewActiveSound.GetSound();
+	USoundBase* Sound = InNewActiveSound.GetSound();
 	if (Sound == nullptr)
 	{
-		ReportSoundFailedToStart(NewActiveSound.AudioComponentID, VirtualLoopToRetrigger);
+		ReportSoundFailedToStart(InNewActiveSound.AudioComponentID, InVirtualLoopToRetrigger);
 		return;
 	}
 
 	// Don't allow buses to try to play if we're not using the audio mixer.
 	if (!IsAudioMixerEnabled())
 	{
-		USoundSourceBus* Bus = Cast<USoundSourceBus>(NewActiveSound.Sound);
+		USoundSourceBus* Bus = Cast<USoundSourceBus>(InNewActiveSound.Sound);
 		if (Bus)
 		{
-			ReportSoundFailedToStart(NewActiveSound.AudioComponentID, VirtualLoopToRetrigger);
+			ReportSoundFailedToStart(InNewActiveSound.AudioComponentID, InVirtualLoopToRetrigger);
 			return;
 		}
 	}
@@ -4744,11 +4756,11 @@ void FAudioDevice::AddNewActiveSoundInternal(const FActiveSound& NewActiveSound,
 	{
 		// TODO: Determine if this check has already been completed at AudioComponent level and skip if so. Also,
 		// unify code paths determining if sound is audible.
-		if (!SoundIsAudible(NewActiveSound))
+		if (!SoundIsAudible(InNewActiveSound))
 		{
-			UE_LOG(LogAudio, Log, TEXT("New ActiveSound not created for out of range Sound %s"), *NewActiveSound.Sound->GetName());
+			UE_LOG(LogAudio, Log, TEXT("New ActiveSound not created for out of range Sound %s"), *InNewActiveSound.Sound->GetName());
 
-			ReportSoundFailedToStart(NewActiveSound.AudioComponentID, VirtualLoopToRetrigger);
+			ReportSoundFailedToStart(InNewActiveSound.AudioComponentID, InVirtualLoopToRetrigger);
 			return;
 		}
 	}
@@ -4763,10 +4775,10 @@ void FAudioDevice::AddNewActiveSoundInternal(const FActiveSound& NewActiveSound,
 		{
 			// Reject the new sound if it doesn't have the debug sound name substring
 			FString SoundName;
-			NewActiveSound.Sound->GetName(SoundName);
+			InNewActiveSound.Sound->GetName(SoundName);
 			if (!SoundName.Contains(DebugSound))
 			{
-				ReportSoundFailedToStart(NewActiveSound.AudioComponentID, VirtualLoopToRetrigger);
+				ReportSoundFailedToStart(InNewActiveSound.AudioComponentID, InVirtualLoopToRetrigger);
 				return;
 			}
 		}
@@ -4774,11 +4786,11 @@ void FAudioDevice::AddNewActiveSoundInternal(const FActiveSound& NewActiveSound,
 #endif // !UE_BUILD_SHIPPING
 
 	// Determine if sound is loop and eligible for virtualize prior to creating "live" active sound in next Concurrency check step
-	if (!VirtualLoopToRetrigger)
+	if (!InVirtualLoopToRetrigger)
 	{
 		const bool bDoRangeCheck = true;
 		FAudioVirtualLoop VirtualLoop;
-		if (FAudioVirtualLoop::Virtualize(NewActiveSound, *this, bDoRangeCheck, VirtualLoop))
+		if (FAudioVirtualLoop::Virtualize(InNewActiveSound, *this, bDoRangeCheck, VirtualLoop))
 		{
 			UE_LOG(LogAudio, Verbose, TEXT("New ActiveSound %s Virtualizing: Failed to pass initial audible range check"), *Sound->GetName());
 			AddVirtualLoop(VirtualLoop);
@@ -4786,31 +4798,31 @@ void FAudioDevice::AddNewActiveSoundInternal(const FActiveSound& NewActiveSound,
 		}
 	}
 
-	// Evaluate concurrency. This will create an ActiveSound ptr which is a copy of NewActiveSound if the sound can play.
+	// Evaluate concurrency. This will create an ActiveSound ptr which is a copy of InNewActiveSound if the sound can play.
 	FActiveSound* ActiveSound = nullptr;
 
 	{
 		SCOPE_CYCLE_COUNTER(STAT_AudioEvaluateConcurrency);
 
 		// Try to create a new active sound. This returns nullptr if too many sounds are playing with this sound's concurrency setting
-		ActiveSound = ConcurrencyManager.CreateNewActiveSound(NewActiveSound, VirtualLoopToRetrigger != nullptr);
+		ActiveSound = ConcurrencyManager.CreateNewActiveSound(InNewActiveSound, InVirtualLoopToRetrigger != nullptr);
 	}
 
 	// Didn't pass concurrency, and not an attempt to revive from virtualization, so see if candidate for virtualization
 	if (!ActiveSound)
 	{
-		if (!VirtualLoopToRetrigger)
+		if (!InVirtualLoopToRetrigger)
 		{
 			const bool bDoRangeCheck = false;
 			FAudioVirtualLoop VirtualLoop;
-			if (FAudioVirtualLoop::Virtualize(NewActiveSound, *this, bDoRangeCheck, VirtualLoop))
+			if (FAudioVirtualLoop::Virtualize(InNewActiveSound, *this, bDoRangeCheck, VirtualLoop))
 			{
 				UE_LOG(LogAudioConcurrency, Verbose, TEXT("New ActiveSound %s Virtualizing: Failed to pass concurrency"), *Sound->GetName());
 				AddVirtualLoop(VirtualLoop);
 			}
 			else
 			{
-				ReportSoundFailedToStart(NewActiveSound.GetAudioComponentID(), VirtualLoopToRetrigger);
+				ReportSoundFailedToStart(InNewActiveSound.GetAudioComponentID(), InVirtualLoopToRetrigger);
 			}
 		}
 		return;
@@ -4821,7 +4833,7 @@ void FAudioDevice::AddNewActiveSoundInternal(const FActiveSound& NewActiveSound,
 	if (GIsEditor)
 	{
 		// If the sound played on an editor preview world, treat it as a preview sound (unpausable and ignoring the realtime volume slider)
-		if (const UWorld* World = NewActiveSound.GetWorld())
+		if (const UWorld* World = InNewActiveSound.GetWorld())
 		{
 			ActiveSound->bIsPreviewSound |= (World->WorldType == EWorldType::EditorPreview);
 		}
@@ -4835,7 +4847,7 @@ void FAudioDevice::AddNewActiveSoundInternal(const FActiveSound& NewActiveSound,
 	(*PlayCount)++;
 
 #if !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
-	UE_LOG(LogAudio, VeryVerbose, TEXT("New ActiveSound %s Comp: %s Loc: %s"), *Sound->GetName(), *NewActiveSound.GetAudioComponentName(), *NewActiveSound.Transform.GetTranslation().ToString());
+	UE_LOG(LogAudio, VeryVerbose, TEXT("New ActiveSound %s Comp: %s Loc: %s"), *Sound->GetName(), *InNewActiveSound.GetAudioComponentName(), *InNewActiveSound.Transform.GetTranslation().ToString());
 #endif // !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
 
 	// Cull one-shot active sounds if we've reached our max limit of one shot active sounds before we attempt to evaluate concurrency
@@ -4862,23 +4874,33 @@ void FAudioDevice::AddNewActiveSoundInternal(const FActiveSound& NewActiveSound,
 	// Mark to not report playback complete on destruction as responsibility therein has been
 	// passed to newly created ActiveSound added below.  Add as stopping sound prior to adding
 	// new sound to ensure AudioComponentIDToActiveSoundMap is registered with the correct ActiveSound.
-	if (VirtualLoopToRetrigger)
+	if (InVirtualLoopToRetrigger)
 	{
-		FActiveSound& VirtualActiveSound = VirtualLoopToRetrigger->GetActiveSound();
+		FActiveSound& VirtualActiveSound = InVirtualLoopToRetrigger->GetActiveSound();
 		AddSoundToStop(&VirtualActiveSound);
 
 		// Clear must be called after AddSoundToStop to ensure AudioComponent is properly removed from AudioComponentIDToActiveSoundMap
 		VirtualActiveSound.ClearAudioComponent();
 	}
 
-	FAudioInstanceTransmitterInitParams TransmitterInitParams
+	// Retriggering a virtualized ActiveSound results in an
+	// already created, valid transmitter, and thus forwarded
+	// initial params should be ignored to avoid stomping existing
+	// parameter state.
+	if (!ActiveSound->InstanceTransmitter.IsValid())
 	{
-		ActiveSound->GetAudioComponentID(),
-		GetSampleRate()
-	};
-	ActiveSound->InstanceTransmitter = Sound->CreateInstanceTransmitter(TransmitterInitParams);
+		Audio::FParameterTransmitterInitParams TransmitterInitParams
+		{
+			ActiveSound->GetAudioComponentID(),
+			GetSampleRate(),
+			MoveTemp(InDefaultParams)
+		};
+
+		ActiveSound->InstanceTransmitter = Sound->CreateParameterTransmitter(MoveTemp(TransmitterInitParams));
+	}
 
 	ActiveSounds.Add(ActiveSound);
+
 	if (ActiveSound->GetAudioComponentID() > 0)
 	{
 		TArray<FActiveSound *> & ActiveSoundArray = AudioComponentIDToActiveSoundMap.FindOrAdd(ActiveSound->GetAudioComponentID());
@@ -4906,7 +4928,7 @@ void FAudioDevice::RetriggerVirtualLoop(FAudioVirtualLoop& VirtualLoopToRetrigge
 {
 	check(IsInAudioThread());
 
-	AddNewActiveSoundInternal(VirtualLoopToRetrigger.GetActiveSound(), &VirtualLoopToRetrigger);
+	AddNewActiveSoundInternal(VirtualLoopToRetrigger.GetActiveSound(), { }, &VirtualLoopToRetrigger);
 }
 
 void FAudioDevice::AddEnvelopeFollowerDelegate(USoundSubmix* InSubmix, const FOnSubmixEnvelopeBP& OnSubmixEnvelopeBP)
@@ -5950,7 +5972,7 @@ UAudioComponent* FAudioDevice::CreateComponent(USoundBase* Sound, const FCreateC
 	return AudioComponent;
 }
 
-void FAudioDevice::PlaySoundAtLocation(USoundBase* Sound, UWorld* World, float VolumeMultiplier, float PitchMultiplier, float StartTime, const FVector& Location, const FRotator& Rotation, USoundAttenuation* AttenuationSettings, USoundConcurrency* Concurrency, const TArray<FAudioComponentParam>* Params, AActor* OwningActor)
+void FAudioDevice::PlaySoundAtLocation(USoundBase* Sound, UWorld* World, float VolumeMultiplier, float PitchMultiplier, float StartTime, const FVector& Location, const FRotator& Rotation, USoundAttenuation* AttenuationSettings, USoundConcurrency* Concurrency, const TArray<FAudioParameter>* Params, AActor* OwningActor)
 {
 	check(IsInGameThread());
 
@@ -6008,16 +6030,7 @@ void FAudioDevice::PlaySoundAtLocation(USoundBase* Sound, UWorld* World, float V
 
 		NewActiveSound.SetOwner(OwningActor);
 
-		// Apply any optional audio component instance params on the sound
-		if (Params)
-		{
-			for (const FAudioComponentParam& Param : *Params)
-			{
-				NewActiveSound.SetSoundParameter(Param);
-			}
-		}
-
-		AddNewActiveSound(NewActiveSound);
+		AddNewActiveSound(NewActiveSound, Params);
 	}
 	else
 	{
