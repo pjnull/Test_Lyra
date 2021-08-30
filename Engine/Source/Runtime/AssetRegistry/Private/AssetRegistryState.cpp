@@ -328,50 +328,54 @@ void FAssetRegistryState::InitializeFromExisting(const TMap<FName, FAssetData*>&
 
 	for (const TPair<FName, FAssetData*>& Pair : AssetDataMap)
 	{
-		FAssetData* ExistingData = nullptr;
-
-		if (InInitializationMode == EInitializationMode::OnlyUpdateExisting)
+		if (Pair.Value == nullptr)
 		{
-			ExistingData = CachedAssetsByObjectPath.FindRef(Pair.Key);
-			if (!ExistingData)
-			{
-				continue;
-			}
+			// don't do anything 
+			continue;
 		}
 
-		if (Pair.Value)
+
+		FAssetData* ExistingData = nullptr;
+
+		if (InInitializationMode != EInitializationMode::Rebuild) // minor optimization to avoid lookup in rebuild mode
 		{
-			// Filter asset registry tags now
-			const FAssetData& AssetData = *Pair.Value;
+			ExistingData = CachedAssetsByObjectPath.FindRef(Pair.Key);
+		}
+		if ((InInitializationMode == EInitializationMode::OnlyUpdateExisting) && 
+			(ExistingData == nullptr) )
+		{
+			continue;
+		}
 
-			FAssetDataTagMap LocalTagsAndValues;
-			FAssetRegistryState::FilterTags(AssetData.TagsAndValues, LocalTagsAndValues, Options.CookFilterlistTagsByClass.Find(AssetData.AssetClass), Options);
+		// Filter asset registry tags now
+		const FAssetData& AssetData = *Pair.Value;
 
-			if (InInitializationMode == EInitializationMode::OnlyUpdateExisting)
+		FAssetDataTagMap LocalTagsAndValues;
+		FAssetRegistryState::FilterTags(AssetData.TagsAndValues, LocalTagsAndValues, Options.CookFilterlistTagsByClass.Find(AssetData.AssetClass), Options);
+
+		
+		// in append or onlyupdateexisting we may have some existing data
+		// in rebuild mode existing data should never be found
+		if (ExistingData) 
+		{
+			// Bundle tags might have changed even if other tags haven't
+			ExistingData->TaggedAssetBundles = AssetData.TaggedAssetBundles;
+
+			// If tags have changed we need to update CachedAssetsByTag
+			if (LocalTagsAndValues != ExistingData->TagsAndValues)
 			{
-				// Only modify tags
-				if (ExistingData)
-				{
-					// Bundle tags might have changed even if other tags haven't
-					ExistingData->TaggedAssetBundles = AssetData.TaggedAssetBundles;
-
-					// If tags have changed we need to update CachedAssetsByTag
-					if (LocalTagsAndValues != ExistingData->TagsAndValues)
-					{
-						FAssetData TempData = *ExistingData;
-						TempData.TagsAndValues = FAssetDataTagMapSharedView(MoveTemp(LocalTagsAndValues));
-						UpdateAssetData(ExistingData, TempData);
-					}
-				}
+				FAssetData TempData = *ExistingData;
+				TempData.TagsAndValues = FAssetDataTagMapSharedView(MoveTemp(LocalTagsAndValues));
+				UpdateAssetData(ExistingData, TempData);
 			}
-			else
-			{
-				FAssetData* NewData = new FAssetData(AssetData.PackageName, AssetData.PackagePath, AssetData.AssetName,
-					AssetData.AssetClass, LocalTagsAndValues, AssetData.ChunkIDs, AssetData.PackageFlags);
-				NewData->TaggedAssetBundles = AssetData.TaggedAssetBundles;
+		}
+		else 
+		{
+			FAssetData* NewData = new FAssetData(AssetData.PackageName, AssetData.PackagePath, AssetData.AssetName,
+				AssetData.AssetClass, LocalTagsAndValues, AssetData.ChunkIDs, AssetData.PackageFlags);
+			NewData->TaggedAssetBundles = AssetData.TaggedAssetBundles;
 
-				AddAssetData(NewData);
-			}
+			AddAssetData(NewData);
 		}
 	}
 
