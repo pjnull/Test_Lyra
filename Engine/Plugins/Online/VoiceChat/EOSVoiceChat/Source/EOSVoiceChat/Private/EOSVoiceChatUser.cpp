@@ -883,7 +883,7 @@ FString FEOSVoiceChatUser::InsecureGetJoinToken(const FString& ChannelName, EVoi
 	FEOSVoiceChannelConnectionInfo ConnectionInfo;
 	GConfig->GetString(TEXT("EOSVoiceChat"), TEXT("InsecureClientBaseUrl"), ConnectionInfo.ClientBaseUrl, GEngineIni);
 
-	ConnectionInfo.ParticipantToken = TEXT("0:EOSVoiceChatTest:`UserName:`RoomName:sss");
+	ConnectionInfo.ParticipantToken = TEXT("0:EOSVoiceChatTest:`RoomName:`UserName:sss");
 	ConnectionInfo.ParticipantToken.ReplaceInline(TEXT("`UserName"), *GetLoggedInPlayerName());
 	ConnectionInfo.ParticipantToken.ReplaceInline(TEXT("`RoomName"), *ChannelName);
 
@@ -2292,7 +2292,7 @@ bool FEOSVoiceChatUser::Exec(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& A
 						EOS_EXEC_LOG(TEXT("        Join Status: %s"), LexToString(ChannelSession.JoinState));
 						EOS_EXEC_LOG(TEXT("        bIsNotListeningDisabled: %s"), *LexToString(ChannelSession.bIsNotListening));
 						EOS_EXEC_LOG(TEXT("        bAudioEnabled: Desired:%s Actual:%s"), *LexToString(ChannelSession.DesiredSendingState.bAudioEnabled), *LexToString(ChannelSession.ActiveSendingState.bAudioEnabled));
-						EOS_EXEC_LOG(TEXT("        bIsLobby=%s"), *LexToString(ChannelSession.IsLobbySession()));
+						EOS_EXEC_LOG(TEXT("        bIsLobby: %s"), *LexToString(ChannelSession.IsLobbySession()));
 						if (ChannelSession.IsLobbySession())
 						{
 							EOS_EXEC_LOG(TEXT("          LobbyId: %s"), *ChannelSession.LobbyId);
