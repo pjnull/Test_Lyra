@@ -1586,6 +1586,7 @@ void UMovieSceneCompiledDataManager::PopulateSubSequenceTree(UMovieSceneSubTrack
 						}
 						RootPath->PopGenerations(1);
 					}
+
 					CurRootRangeStart = CurRootRange.GetUpperBoundValue();
 					CurRootRange = TRange<FFrameNumber>(CurRootRangeStart.FloorToFrame(), (CurRootRangeStart + RootLoopLength).FloorToFrame());
 					if (CurRootRange.GetUpperBoundValue() > RootSectionEndTime)
