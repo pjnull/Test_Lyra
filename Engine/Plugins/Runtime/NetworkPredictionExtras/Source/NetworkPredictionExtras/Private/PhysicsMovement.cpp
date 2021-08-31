@@ -382,14 +382,26 @@ void UPhysicsMovementComponent::SetEnableTargetYaw(bool bTargetYaw)
 	NetworkPredictionProxy.ModifyNetState<FPhysicsMovementAsyncModelDef>([bTargetYaw](FPhysicsMovementNetState& NetState)
 	{
 		NetState.bEnableAutoFaceTargetYaw = bTargetYaw;
-	});	
-
-
-	NetworkPredictionProxy.ModifyLocalState<FPhysicsMovementAsyncModelDef>([bTargetYaw](FPhysicsMovementLocalState& LocalState)
-	{
-		//NetState.bEnableAutoFaceTargetYaw = bTargetYaw;
-	});	
+	});
 }
+
+
+void UPhysicsMovementComponent::SetEnableKeepUpright(bool bKeepUpright)
+{
+	NetworkPredictionProxy.ModifyNetState<FPhysicsMovementAsyncModelDef>([bKeepUpright](FPhysicsMovementNetState& NetState)
+	{
+		NetState.bEnableKeepUpright = bKeepUpright;
+	});
+}
+
+void UPhysicsMovementComponent::SetAutoBrakeStrength(float AutoBrakeStrength)
+{
+	NetworkPredictionProxy.ModifyNetState<FPhysicsMovementAsyncModelDef>([AutoBrakeStrength](FPhysicsMovementNetState& NetState)
+	{
+		NetState.AutoBrakeStrength = AutoBrakeStrength;
+	});
+}
+
 
 void UPhysicsMovementComponent::TestMisprediction()
 {

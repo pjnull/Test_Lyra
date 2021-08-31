@@ -218,6 +218,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Movement")
 	void SetEnableTargetYaw(bool bTargetYaw);
 
+	UFUNCTION(BlueprintCallable, Category="Movement")
+	void SetEnableKeepUpright(bool bKeepUpright);
+
+	UFUNCTION(BlueprintCallable, Category="Movement")
+	void SetAutoBrakeStrength(float BrakeStrength);
+
 	void TestMisprediction();
 
 private:
