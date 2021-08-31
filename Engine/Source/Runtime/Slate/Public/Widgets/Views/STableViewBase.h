@@ -169,6 +169,9 @@ public:
 	/** Sets whether the list should lerp between scroll offsets or jump instantly between them. */
 	void SetIsScrollAnimationEnabled(bool bInEnableScrollAnimation);
 
+	/** Enables/disables being able to scroll with the right mouse button. */
+	void SetIsRightClickScrollingEnabled(const bool bInEnableRightClickScrolling);
+
 	/** Sets the multiplier applied when wheel scrolling. Higher numbers will cover more distance per click of the wheel. */
 	void SetWheelScrollMultiplier(float NewWheelScrollMultiplier);
 
@@ -366,6 +369,9 @@ protected:
 
 	/** True to lerp smoothly between offsets when the desired scroll offset changes. */
 	bool bEnableAnimatedScrolling = false;
+
+	/** True to allow right click drag scrolling. */
+	bool bEnableRightClickScrolling = true;
 
 	/** The currently displayed scroll offset from the beginning of the list in items. */
 	double CurrentScrollOffset = 0.;

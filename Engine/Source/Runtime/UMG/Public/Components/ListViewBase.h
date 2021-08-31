@@ -682,6 +682,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Scrolling)
 	bool bEnableScrollAnimation = false;
 
+	/** True to allow right click drag scrolling. */
+	UPROPERTY(EditAnywhere, Category = Scrolling)
+	bool bEnableRightClickScrolling = true;
+
 	UPROPERTY(EditAnywhere, Category = Scrolling)
 	bool bEnableFixedLineOffset = false;
 
