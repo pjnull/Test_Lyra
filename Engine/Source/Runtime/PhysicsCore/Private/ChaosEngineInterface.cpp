@@ -1075,17 +1075,18 @@ void FChaosEngineInterface::SetConstraintUserData(const FPhysicsConstraintHandle
 
 void FChaosEngineInterface::ReleaseConstraint(FPhysicsConstraintHandle& InConstraintRef)
 {
+	using namespace Chaos;
 	if (bEnableChaosJointConstraints)
 	{
 		LLM_SCOPE(ELLMTag::Chaos);
 		if (InConstraintRef.IsValid() && InConstraintRef.Constraint->IsType(Chaos::EConstraintType::JointConstraintType))
 		{
-			if (Chaos::FJointConstraint* Constraint = static_cast<Chaos::FJointConstraint*>(InConstraintRef.Constraint))
+			if (FJointConstraint* Constraint = static_cast<FJointConstraint*>(InConstraintRef.Constraint))
 			{
 				if (FJointConstraintPhysicsProxy* Proxy = Constraint->GetProxy<FJointConstraintPhysicsProxy>())
 				{
-					check(Proxy->GetSolver<Chaos::FPhysicsSolver>());
-					Chaos::FPhysicsSolver* Solver = Proxy->GetSolver<Chaos::FPhysicsSolver>();
+					check(Proxy->GetSolver<FPhysicsSolver>());
+					FPhysicsSolver* Solver = Proxy->GetSolver<FPhysicsSolver>();
 					// TODO: we should probably figure out a way to call this from within UnregisterObject, to match
 					// what RegisterObject does
 					if (FChaosScene* Scene = FChaosEngineInterface::GetCurrentScene(Constraint->GetKinematicEndPoint()))
@@ -1098,14 +1099,14 @@ void FChaosEngineInterface::ReleaseConstraint(FPhysicsConstraintHandle& InConstr
 				}
 			}
 		}
-		else if (InConstraintRef.IsValid() && InConstraintRef.Constraint->IsType(Chaos::EConstraintType::SuspensionConstraintType))
+		else if (InConstraintRef.IsValid() && InConstraintRef.Constraint->IsType(EConstraintType::SuspensionConstraintType))
 		{
-			if (Chaos::FSuspensionConstraint* Constraint = static_cast<Chaos::FSuspensionConstraint*>(InConstraintRef.Constraint))
+			if (Chaos::FSuspensionConstraint* Constraint = static_cast<FSuspensionConstraint*>(InConstraintRef.Constraint))
 			{
 				if (FSuspensionConstraintPhysicsProxy* Proxy = Constraint->GetProxy<FSuspensionConstraintPhysicsProxy>())
 				{
-					check(Proxy->GetSolver<Chaos::FPhysicsSolver>());
-					Chaos::FPhysicsSolver* Solver = Proxy->GetSolver<Chaos::FPhysicsSolver>();
+					check(Proxy->GetSolver<FPhysicsSolver>());
+					FPhysicsSolver* Solver = Proxy->GetSolver<FPhysicsSolver>();
 
 					Solver->UnregisterObject(Constraint);
 
