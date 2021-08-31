@@ -308,9 +308,7 @@ public:
 		}
 
 		FString FriendlyName = TEXT("[No Friendly Name for Device]");
-		
-		CoInitialize(nullptr);
-		
+			
 		// Get device.
 		if (Audio::TScopeComObject<IMMDevice> Device = GetDevice(*InDeviceID))
 		{
@@ -338,8 +336,6 @@ public:
 				PropVariantClear(&PropString);
 			}
 		}
-
-		CoUninitialize();
 		return FriendlyName;
 	}
 
