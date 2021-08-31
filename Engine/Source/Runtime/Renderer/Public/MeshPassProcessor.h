@@ -163,11 +163,11 @@ struct FMinimalBoundShaderStateInput
 	{
 		if (!CachedVertexShader)
 		{
-			CachedVertexShader = VertexShaderResource ? static_cast<FRHIVertexShader*>(VertexShaderResource->GetShader(VertexShaderIndex)) : nullptr;
 			CachedPixelShader = PixelShaderResource ? static_cast<FRHIPixelShader*>(PixelShaderResource->GetShader(PixelShaderIndex)) : nullptr;
 #if PLATFORM_SUPPORTS_GEOMETRY_SHADERS
 			CachedGeometryShader = GeometryShaderResource ? static_cast<FRHIGeometryShader*>(GeometryShaderResource->GetShader(GeometryShaderIndex)) : nullptr;
 #endif
+			CachedVertexShader = VertexShaderResource ? static_cast<FRHIVertexShader*>(VertexShaderResource->GetShader(VertexShaderIndex)) : nullptr;
 		}
 
 		return FBoundShaderStateInput(VertexDeclarationRHI
