@@ -481,6 +481,20 @@ bool UContentBrowserAssetDataSource::CreateAssetFilter(FAssetFilterInputParams& 
 				}
 				InternalPathFilter.bRecursivePaths = InFilter.bRecursivePaths;
 				CreateCompiledFilter(InternalPathFilter, CompiledInternalPathFilter);
+
+				// Remove paths that do not pass item attribute filter (Engine, Plugins, Developer, Localized, etc..)
+				if (InFilter.ItemAttributeFilter != EContentBrowserItemAttributeFilter::IncludeAll)
+				{
+					for (auto It = CompiledInternalPathFilter.PackagePaths.CreateIterator(); It; ++It)
+					{
+						FNameBuilder PathStr(*It);
+						FStringView Path(PathStr);
+						if (!ContentBrowserDataUtils::PathPassesAttributeFilter(Path, 0, InFilter.ItemAttributeFilter))
+						{
+							It.RemoveCurrent();
+						}
+					}
+				}
 			}
 
 			if (CompiledInclusiveFilter.PackagePaths.Num() > 0)
