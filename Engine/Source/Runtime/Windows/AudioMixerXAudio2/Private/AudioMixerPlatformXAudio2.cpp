@@ -440,13 +440,6 @@ namespace Audio
 		LoadVorbisLibraries();
 #endif // WITH_ENGINE
 
-		if(IAudioMixer::ShouldRecycleThreads())
-		{
-			// Pre-create the null render device thread on XAudio2, so we can simple wake it up when we need it.
-			// Give it nothing to do, with a slow tick as the default, but ask it to wait for a signal to wake up.
-			CreateNullDeviceThread([] {}, 1.0f, true);
-		}
-
 		bIsInitialized = true;
 
 		return true;

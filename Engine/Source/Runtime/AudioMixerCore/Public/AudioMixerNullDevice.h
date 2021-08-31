@@ -24,7 +24,7 @@ namespace Audio
 		 * Constructing the FMixerNullCallback immediately begins calling
 		 * InCallback every BufferDuration seconds.
 		 */
-		FMixerNullCallback(float BufferDuration, TFunction<void()> InCallback, EThreadPriority ThreadPriority = TPri_TimeCritical, bool bStartedPaused = false);
+		FMixerNullCallback(float BufferDuration, TFunction<void()> InCallback, EThreadPriority ThreadPriority = TPri_TimeCritical);
 
 		/**
 		 * The destructor waits on Callback to be completed before stopping the thread.
@@ -34,12 +34,6 @@ namespace Audio
 		// FRunnable override:
 		virtual uint32 Run() override;
 		virtual void Stop() override;
-
-		// Resume a paused null renderer. 
-		void Resume(const TFunction<void()>& InCallback, float InBufferDuration);
-
-		// Pause the thread, making it sleep until woken, not consuming cycles or buffers.
-		void Pause();
 
 	private:
 
@@ -54,10 +48,10 @@ namespace Audio
 
 		// Flagged on Stop
 		std::atomic<bool> bShouldShutdown;
-		std::atomic<bool> bShouldRecyle;
-		FEvent* SleepEvent = nullptr;
-		FEvent* WakeupEvent = nullptr;	
+		FEvent* SleepEvent;
+		
 		TUniquePtr<FRunnableThread> CallbackThread;
+		
 	};
 }
 
