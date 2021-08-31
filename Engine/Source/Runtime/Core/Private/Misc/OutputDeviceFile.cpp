@@ -29,9 +29,15 @@
 #include "Misc/Fork.h"
 #include "Stats/Stats.h"
 
+#include <atomic>
+
 /** Used by tools which include only core to disable log file creation. */
 #ifndef ALLOW_LOG_FILE
 	#define ALLOW_LOG_FILE 1
+#endif
+
+#ifndef OUTPUTDEVICE_DEFAULT_ASYNC_WRITER_THREAD_NAME_OPTION
+	#define OUTPUTDEVICE_DEFAULT_ASYNC_WRITER_THREAD_NAME_OPTION FAsyncWriter::EThreadNameOption::FileName
 #endif
 
 typedef uint8 UTF8BOMType[3];
@@ -43,6 +49,7 @@ static FAutoConsoleVariableRef CVarLogFlushInterval(
 	GLogFlushIntervalSec,
 	TEXT("Logging interval in seconds"),
 	ECVF_Default );
+
 
 #if UE_BUILD_SHIPPING
 static float GLogFlushIntervalSec_Shipping = 0.0f;
@@ -150,7 +157,7 @@ void FAsyncWriter::FlushBuffer()
 	check(SerializeRequestCounter.GetValue() == 0);
 }
 
-FAsyncWriter::FAsyncWriter(FArchive& InAr)
+FAsyncWriter::FAsyncWriter(FArchive& InAr, FAsyncWriter::EThreadNameOption NameOption)
 	: Thread(nullptr)
 	, Ar(InAr)
 	, BufferStartPos(0)
@@ -171,7 +178,18 @@ FAsyncWriter::FAsyncWriter(FArchive& InAr)
 	{
 		if (FPlatformProcess::SupportsMultithreading() || FForkProcessHelper::SupportsMultithreadingPostFork())
 		{
-			FString WriterName = FString::Printf(TEXT("FAsyncWriter_%s"), *FPaths::GetBaseFilename(Ar.GetArchiveName()));
+			FString WriterName;
+			
+			if (NameOption == EThreadNameOption::FileName)
+			{
+				WriterName = FString::Printf(TEXT("FAsyncWriter_%s"), *FPaths::GetBaseFilename(Ar.GetArchiveName()));
+			}
+			else if (NameOption == EThreadNameOption::Sequential)
+			{
+				static std::atomic<uint64> AsyncWriterCount(0);
+				WriterName = FString::Printf(TEXT("FAsyncWriter_%llu"), ++AsyncWriterCount);
+			}
+
 			FPlatformAtomics::InterlockedExchangePtr((void**)&Thread, FForkProcessHelper::CreateForkableThread(this, *WriterName, 0, TPri_BelowNormal));
 		}
 	}
@@ -483,8 +501,10 @@ bool FOutputDeviceFile::CreateWriter(uint32 MaxAttempts)
 
 	if (Ar)
 	{
+		const FAsyncWriter::EThreadNameOption NameOption = OUTPUTDEVICE_DEFAULT_ASYNC_WRITER_THREAD_NAME_OPTION;
+
 		WriterArchive = Ar;
-		AsyncWriter = new FAsyncWriter(*WriterArchive);
+		AsyncWriter = new FAsyncWriter(*WriterArchive, NameOption);
 		WriteByteOrderMarkToArchive(EByteOrderMark::UTF8);
 		if (OnFileOpenedFn)
 		{

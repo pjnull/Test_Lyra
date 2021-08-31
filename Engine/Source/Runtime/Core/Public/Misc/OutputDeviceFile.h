@@ -63,7 +63,13 @@ class CORE_API FAsyncWriter : public FRunnable, public FSingleThreadRunnable, pu
 
 public:
 
-	FAsyncWriter(FArchive& InAr);
+	enum class EThreadNameOption : uint8
+	{
+		FileName,   // Appends the filename in the threadname: FAsyncWriter_FileName
+		Sequential, // Uses a global sequential number to append to the threadname: FAsyncWriter_1
+	};
+
+	FAsyncWriter(FArchive& InAr, FAsyncWriter::EThreadNameOption NameOption=FAsyncWriter::EThreadNameOption::FileName);
 
 	virtual ~FAsyncWriter();
 
