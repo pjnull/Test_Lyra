@@ -593,16 +593,18 @@ bool UNiagaraDataInterfaceSpline::PerInstanceTick(void* PerInstanceData, FNiagar
 		InstData->DefaultUpVector = SplineComponent->DefaultUpVector;
 
 		bool bShouldBuildLUT = (bUseLUT || IsUsedWithGPUEmitter(SystemInstance)) && InstData->SplineLUT.MaxIndex < 0;
-		bool bShouldSyncToGPU = IsUsedWithGPUEmitter(SystemInstance) && !InstData->bSyncedGPUCopy;
 		
 		if (InstData->SplineCurvesVersion != SplineComponent->SplineCurves.Version)
 		{
 			InstData->SplineCurves = SplineComponent->SplineCurves;
 			InstData->SplineCurvesVersion = InstData->SplineCurves.Version;
 			InstData->bSyncedGPUCopy = false;
+			InstData->SplineLUT.Reset();
 
 			bShouldBuildLUT = bUseLUT || IsUsedWithGPUEmitter(SystemInstance);
 		}
+		
+		bool bShouldSyncToGPU = IsUsedWithGPUEmitter(SystemInstance) && !InstData->bSyncedGPUCopy && InstData->SplineLUT.MaxIndex != INDEX_NONE;
 		
 		// We must build the LUT if this is for GPU regardless of settings
 		if (bShouldBuildLUT)
@@ -610,10 +612,6 @@ bool UNiagaraDataInterfaceSpline::PerInstanceTick(void* PerInstanceData, FNiagar
 			InstData->SplineLUT.BuildLUT(InstData->SplineCurves, bUseLUT? NumLUTSteps : 256/*Default the LUT to a reasonable value if it's not specifically enabled*/);
 
 			bShouldSyncToGPU = IsUsedWithGPUEmitter(SystemInstance);				
-		}
-		else
-		{
-			InstData->SplineLUT.Reset();
 		}
 
 
