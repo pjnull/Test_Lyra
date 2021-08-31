@@ -17,7 +17,7 @@ FStructVariantCustomization::~FStructVariantCustomization()
 {
 	if (SyncEditableInstanceFromVariantsTickHandle.IsValid())
 	{
-		FTicker::GetCoreTicker().RemoveTicker(SyncEditableInstanceFromVariantsTickHandle);
+		FTSTicker::GetCoreTicker().RemoveTicker(SyncEditableInstanceFromVariantsTickHandle);
 	}
 }
 
@@ -47,7 +47,7 @@ void FStructVariantCustomization::CustomizeHeader(TSharedRef<IPropertyHandle> In
 	// If there are multiple then we'll just edit the defaults
 	// TODO: Better support for "multiple values"?
 	SyncEditableInstanceFromVariants();
-	SyncEditableInstanceFromVariantsTickHandle = FTicker::GetCoreTicker().AddTicker(TEXT("StructVariantCustomization"), 0.1f, [WeakThis = TWeakPtr<FStructVariantCustomization>(SharedThis(this))](float)
+	SyncEditableInstanceFromVariantsTickHandle = FTSTicker::GetCoreTicker().AddTicker(TEXT("StructVariantCustomization"), 0.1f, [WeakThis = TWeakPtr<FStructVariantCustomization>(SharedThis(this))](float)
 	{
 		if (TSharedPtr<FStructVariantCustomization> This = WeakThis.Pin())
 		{

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Containers/Ticker.h"
 #include "IPropertyTypeCustomization.h"
 
 class FStructOnScope;
@@ -58,5 +59,5 @@ private:
 	TSharedPtr<FStructOnScope> StructInstanceData;
 
 	/** Handle for the periodic call to SyncEditableInstanceFromVariants */
-	FDelegateHandle SyncEditableInstanceFromVariantsTickHandle;
+	FTSTicker::FDelegateHandle SyncEditableInstanceFromVariantsTickHandle;
 };
