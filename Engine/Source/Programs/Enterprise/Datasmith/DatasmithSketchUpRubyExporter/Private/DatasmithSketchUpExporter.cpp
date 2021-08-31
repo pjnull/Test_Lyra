@@ -516,7 +516,10 @@ public:
 		return true;
 	}
 
-
+	bool OnStyleModified()
+	{
+		return Context.Materials.InvalidateDefaultMaterial();
+	}
 };
 
 ///////////////////////////////////////////////////////////////////////////
@@ -796,6 +799,18 @@ VALUE DatasmithSketchUpDirectLinkExporter_on_entity_removed(VALUE self, VALUE ru
 	return Qtrue;
 }
 
+VALUE DatasmithSketchUpDirectLinkExporter_on_style_changed(VALUE self)
+{
+	// Converting args
+	FDatasmithSketchUpDirectLinkExporter* Ptr;
+	Data_Get_Struct(self, FDatasmithSketchUpDirectLinkExporter, Ptr);
+	// Done converting args
+
+	Ptr->OnStyleModified();
+
+	return Qtrue;
+}
+
 VALUE on_load(VALUE self, VALUE enable_ui, VALUE engine_path) {
 	// Converting args
 	Check_Type(engine_path, T_STRING);
@@ -876,6 +891,8 @@ extern "C" DLLEXPORT void Init_DatasmithSketchUp()
 	rb_define_method(DatasmithSketchUpDirectLinkExporterCRubyClass, "on_material_added_by_id", ToRuby(DatasmithSketchUpDirectLinkExporter_on_material_added_by_id), 1);
 
 	rb_define_method(DatasmithSketchUpDirectLinkExporterCRubyClass, "on_entity_removed", ToRuby(DatasmithSketchUpDirectLinkExporter_on_entity_removed), 2);
+
+	rb_define_method(DatasmithSketchUpDirectLinkExporterCRubyClass, "on_style_changed", ToRuby(DatasmithSketchUpDirectLinkExporter_on_style_changed), 0);
 
 	rb_define_method(DatasmithSketchUpDirectLinkExporterCRubyClass, "update", ToRuby(DatasmithSketchUpDirectLinkExporter_update), 0);
 	rb_define_method(DatasmithSketchUpDirectLinkExporterCRubyClass, "send_update", ToRuby(DatasmithSketchUpDirectLinkExporter_send_update), 0);
