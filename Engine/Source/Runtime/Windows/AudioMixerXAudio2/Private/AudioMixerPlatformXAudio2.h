@@ -11,6 +11,8 @@
 #endif
 #include "Windows/HideWindowsPlatformTypes.h"
 
+#include "Async/Future.h"
+
 #if PLATFORM_WINDOWS
 #pragma comment(lib,"xaudio2_9redist.lib")
 #endif
