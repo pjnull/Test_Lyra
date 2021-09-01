@@ -212,6 +212,8 @@ namespace Audio
 
 	void FXAudio2VoiceCallback::OnBufferEnd(void* BufferContext)
 	{
+		SCOPED_NAMED_EVENT(FXAudio2VoiceCallback_OnBufferEnd, FColor::Blue);
+		
 		check(BufferContext);
 		IAudioMixerPlatformInterface* MixerPlatform = (IAudioMixerPlatformInterface*)BufferContext;
 		MixerPlatform->ReadNextBuffer();
@@ -1284,6 +1286,9 @@ namespace Audio
 	bool FMixerPlatformXAudio2::CheckAudioDeviceChange()
 	{
 #if PLATFORM_WINDOWS && XAUDIO_SUPPORTS_DEVICE_DETAILS
+
+		SCOPED_NAMED_EVENT(FMixerPlatformXAudio2_CheckAudioDeviceChange, FColor::Blue);
+
 		FScopeLock Lock(&AudioDeviceSwapCriticalSection);
 
 		if (bMoveAudioStreamToNewAudioDevice)
@@ -1454,21 +1459,25 @@ namespace Audio
 				OutputAudioStreamMasteringVoice = nullptr;
 			}
 #else
-			// open up on the default device
-			Result = XAudio2System->CreateMasteringVoice(
-				&OutputAudioStreamMasteringVoice,
-				AudioStreamInfo.DeviceInfo.NumChannels,
-				AudioStreamInfo.DeviceInfo.SampleRate,
-				0,
-				*AudioStreamInfo.DeviceInfo.DeviceId,
-				nullptr,
-				AudioCategory_GameEffects);
-			if (FAILED(Result))
 			{
-				XAUDIO2_LOG_RESULT("XAudio2System->CreateMasteringVoice", Result);
-				// Switch to running null device by setting OutputAudioStreamMasteringVoice to null.
-				// Will default to null device when calling `ResumePlaybackOnNewDevice()`
-				OutputAudioStreamMasteringVoice = nullptr;
+				SCOPED_NAMED_EVENT(FMixerPlatformXAudio2_MoveAudioStreamToNewAudioDevice_CreateMaster, FColor::Blue);
+
+				// open up on the default device
+				Result = XAudio2System->CreateMasteringVoice(
+					&OutputAudioStreamMasteringVoice,
+					AudioStreamInfo.DeviceInfo.NumChannels,
+					AudioStreamInfo.DeviceInfo.SampleRate,
+					0,
+					*AudioStreamInfo.DeviceInfo.DeviceId,
+					nullptr,
+					AudioCategory_GameEffects);
+				if (FAILED(Result))
+				{
+					XAUDIO2_LOG_RESULT("XAudio2System->CreateMasteringVoice", Result);
+					// Switch to running null device by setting OutputAudioStreamMasteringVoice to null.
+					// Will default to null device when calling `ResumePlaybackOnNewDevice()`
+					OutputAudioStreamMasteringVoice = nullptr;
+				}			
 			}
 #endif
 
@@ -1481,20 +1490,25 @@ namespace Audio
 			Format.nBlockAlign = sizeof(float) * Format.nChannels;
 			Format.wBitsPerSample = sizeof(float) * 8;
 
-			// Create the output source voice
-			Result = XAudio2System->CreateSourceVoice(&OutputAudioStreamSourceVoice, &Format, XAUDIO2_VOICE_NOPITCH, 2.0f, &OutputVoiceCallback);
-			if (FAILED(Result))
-			{
-				XAUDIO2_LOG_RESULT("XAudio2System->CreateSourceVoice", Result);
-				// Switch to running null device by setting OutputAudioStreamSourceVoice to null.
-				// Will default to null device when calling `ResumePlaybackOnNewDevice()`
-				OutputAudioStreamSourceVoice = nullptr;
+			{				
+				SCOPED_NAMED_EVENT(FMixerPlatformXAudio2_MoveAudioStreamToNewAudioDevice_CreateSource, FColor::Blue);
+
+				// Create the output source voice
+				Result = XAudio2System->CreateSourceVoice(&OutputAudioStreamSourceVoice, &Format, XAUDIO2_VOICE_NOPITCH, 2.0f, &OutputVoiceCallback);
+				if (FAILED(Result))
+				{
+					XAUDIO2_LOG_RESULT("XAudio2System->CreateSourceVoice", Result);
+					// Switch to running null device by setting OutputAudioStreamSourceVoice to null.
+					// Will default to null device when calling `ResumePlaybackOnNewDevice()`
+					OutputAudioStreamSourceVoice = nullptr;
+				}
 			}
 
 			// Reinitialize the output circular buffer to match the buffer math of the new audio device.
 			const int32 NumOutputSamples = AudioStreamInfo.NumOutputFrames * AudioStreamInfo.DeviceInfo.NumChannels;
 			if (ensure(NumOutputSamples > 0))
 			{
+				SCOPED_NAMED_EVENT(FMixerPlatformXAudio2_MoveAudioStreamToNewAudioDevice_OutBufferInit, FColor::Blue);
 				OutputBuffer.Init(AudioStreamInfo.AudioMixer, NumOutputSamples, NumOutputBuffers, AudioStreamInfo.DeviceInfo.Format);
 			}
 		}
@@ -1516,6 +1530,8 @@ namespace Audio
 
 	void FMixerPlatformXAudio2::ResumePlaybackOnNewDevice()
 	{
+		SCOPED_NAMED_EVENT(FMixerPlatformXAudio2_ResumePlaybackOnNewDevice, FColor::Blue);
+		
 		int32 NumSamplesPopped = 0;
 		TArrayView<const uint8> PoppedAudio = OutputBuffer.PopBufferData(NumSamplesPopped);
 		SubmitBuffer(PoppedAudio.GetData());
@@ -1542,6 +1558,8 @@ namespace Audio
 
 	void FMixerPlatformXAudio2::SubmitBuffer(const uint8* Buffer)
 	{
+		SCOPED_NAMED_EVENT(FMixerPlatformXAudio2_SubmitBuffer, FColor::Blue);
+
 		if (OutputAudioStreamSourceVoice)
 		{
 			// Create a new xaudio2 buffer submission

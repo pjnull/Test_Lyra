@@ -270,6 +270,7 @@ void FAudioThread::Exit()
 uint32 FAudioThread::Run()
 {
 	LLM_SCOPE(ELLMTag::AudioMisc);
+	SCOPED_NAMED_EVENT(FAudioThread_Run, FColor::Blue);
 
 	FMemory::SetupTLSCachesOnCurrentThread();
 	FPlatformProcess::SetupAudioThread();

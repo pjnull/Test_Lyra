@@ -177,6 +177,8 @@ namespace Audio
 
 	void FOutputBuffer::Init(IAudioMixer* InAudioMixer, const int32 InNumSamples, const int32 InNumBuffers, const EAudioMixerStreamDataFormat::Type InDataFormat)
 	{
+		SCOPED_NAMED_EVENT(FOutputBuffer_Init, FColor::Blue);
+
 		RenderBuffer.Reset();
 		RenderBuffer.AddUninitialized(InNumSamples);
 
@@ -586,6 +588,8 @@ namespace Audio
 
 	void IAudioMixerPlatformInterface::BeginGeneratingAudio()
 	{
+		SCOPED_NAMED_EVENT(IAudioMixerPlatformInterface_BeginGeneratingAudio, FColor::Blue);
+		
 		checkf(!bIsGeneratingAudio, TEXT("BeginGeneratingAudio() is being run with StreamState = %i and bIsGeneratingAudio = %i"), AudioStreamInfo.StreamState, !!bIsGeneratingAudio);
 
 		bIsGeneratingAudio = true;
@@ -618,7 +622,9 @@ namespace Audio
 	}
 
 	void IAudioMixerPlatformInterface::StopGeneratingAudio()
-	{
+	{		
+		SCOPED_NAMED_EVENT(IAudioMixerPlatformInterface_StopGeneratingAudio, FColor::Blue);
+
 		// Stop the FRunnable thread
 
 		if (AudioStreamInfo.StreamState != EAudioOutputStreamState::Stopped)
@@ -634,7 +640,10 @@ namespace Audio
 
 		if (AudioRenderThread != nullptr)
 		{
-			AudioRenderThread->Kill();
+			{
+				SCOPED_NAMED_EVENT(IAudioMixerPlatformInterface_StopGeneratingAudio_KillRenderThread, FColor::Blue);
+				AudioRenderThread->Kill();
+			}
 
 			// WaitForCompletion will complete right away when single threaded, and AudioStreamInfo.StreamState will never be set to stopped
 			if (FPlatformProcess::SupportsMultithreading())
