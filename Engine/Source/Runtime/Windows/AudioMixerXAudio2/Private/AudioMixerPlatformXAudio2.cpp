@@ -46,6 +46,7 @@
 
 #include "Misc/CoreDelegates.h"
 #include "ProfilingDebugging/ScopedTimers.h"
+#include "Async/Async.h"
 
 #define XAUDIO2_LOG_RESULT(FunctionName, Result) \
 	{ \
