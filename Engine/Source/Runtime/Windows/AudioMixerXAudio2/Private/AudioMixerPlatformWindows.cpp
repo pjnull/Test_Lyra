@@ -304,7 +304,7 @@ public:
 	{
 		if (InDeviceID.IsEmpty())
 		{
-			return TEXT("[Empty Device ID]");
+			return TEXT("System Default");
 		}
 
 		FString FriendlyName = TEXT("[No Friendly Name for Device]");

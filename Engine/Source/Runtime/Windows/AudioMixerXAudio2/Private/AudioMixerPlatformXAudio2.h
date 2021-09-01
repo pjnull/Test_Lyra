@@ -104,7 +104,17 @@ namespace Audio
 		//~ End IAudioMixerDeviceChangedListener
 
 	private:
-
+	
+		struct FXAudio2AsyncCreateResult
+		{
+			IXAudio2* XAudio2System = nullptr;
+			IXAudio2MasteringVoice* OutputAudioStreamMasteringVoice = nullptr;
+			IXAudio2SourceVoice* OutputAudioStreamSourceVoice = nullptr;
+			FAudioPlatformDeviceInfo DeviceInfo;
+		};
+		TFuture<FXAudio2AsyncCreateResult> ActiveDeviceSwap;
+		bool CheckThreadedDeviceSwap();
+	
 		bool AllowDeviceSwap();
 
 		// Used to teardown and reinitialize XAudio2.

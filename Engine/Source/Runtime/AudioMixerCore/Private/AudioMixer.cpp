@@ -60,6 +60,14 @@ FAutoConsoleVariableRef CVarDisableDeviceSwap(
 	TEXT("0: Not Enabled, 1: Enabled"),
 	ECVF_Default);
 
+static int32 bUseThreadedDeviceSwapCVar = 1;
+FAutoConsoleVariableRef CVarUseThreadedDeviceSwap(
+	TEXT("au.UseThreadedDeviceSwap"),
+	bUseThreadedDeviceSwapCVar,
+	TEXT("Lets Device Swap go wide.")
+	TEXT("0 off, 1 on"),
+	ECVF_Default);
+
 static int32 bUseAudioDeviceInfoCacheCVar = 1;
 FAutoConsoleVariableRef CVarUseAudioDeviceInfoCache(
 	TEXT("au.UseCachedDeviceInfoCache"),
@@ -442,7 +450,7 @@ namespace Audio
 
 	void IAudioMixerPlatformInterface::StartRunningNullDevice()
 	{
-		UE_LOG(LogAudioMixer, Display, TEXT("StartRunningNullDevice() called"));
+		UE_LOG(LogAudioMixer, Verbose, TEXT("StartRunningNullDevice() called"));
 		SCOPED_NAMED_EVENT(FMixerPlatformXAudio2_StartRunningNullDevice, FColor::Blue);
 		
 		auto ThrowAwayBuffer = [this]() { this->ReadNextBuffer(); };
@@ -467,7 +475,7 @@ namespace Audio
 
 	void IAudioMixerPlatformInterface::StopRunningNullDevice()
 	{		
-		UE_LOG(LogAudioMixer, Display, TEXT("StopRunningNullDevice() called"));
+		UE_LOG(LogAudioMixer, Verbose, TEXT("StopRunningNullDevice() called"));
 		SCOPED_NAMED_EVENT(FMixerPlatformXAudio2_StopRunningNullDevice, FColor::Blue);
 
 		if (NullDeviceCallback.IsValid())
@@ -619,6 +627,7 @@ namespace Audio
 		check(AudioRenderThread == nullptr);
 		AudioRenderThread = FRunnableThread::Create(this, *FString::Printf(TEXT("AudioMixerRenderThread(%d)"), AudioMixerTaskCounter.Increment()), 0, (EThreadPriority)SetRenderThreadPriorityCVar, FPlatformAffinity::GetAudioThreadMask());
 		check(AudioRenderThread != nullptr);
+		int testing = 0;
 	}
 
 	void IAudioMixerPlatformInterface::StopGeneratingAudio()
@@ -722,6 +731,8 @@ namespace Audio
 				// if we reached this block, we timed out, and should attempt to
 				// bail on our current device.
 				bMoveAudioStreamToNewAudioDevice = true;
+
+				UE_LOG(LogAudioMixer, Warning, TEXT("AudioMixerPlatformInterface. Timeout waiting for h/w. (Trying new device)."));
 			}
 		}
 
@@ -855,6 +866,11 @@ namespace Audio
 	bool IAudioMixer::ShouldLogDeviceSwaps()
 	{
 		return EnableDetailedWindowsDeviceLoggingCVar != 0;
+	}
+
+	bool IAudioMixer::ShouldUseThreadedDeviceSwap()
+	{
+		return bUseThreadedDeviceSwapCVar != 0;
 	}
 
 	bool IAudioMixer::ShouldUseDeviceInfoCache()
