@@ -10,6 +10,7 @@
 #include "Misc/ConfigCacheIni.h"
 #include "Misc/ScopeTryLock.h"
 #include "ProfilingDebugging/CsvProfiler.h"
+#include "ProfilingDebugging/ScopedTimers.h"
 
 // Defines the "Audio" category in the CSV profiler.
 // This should only be defined here. Modules who wish to use this category should contain the line
@@ -64,6 +65,14 @@ FAutoConsoleVariableRef CVarUseAudioDeviceInfoCache(
 	TEXT("au.UseCachedDeviceInfoCache"),
 	bUseAudioDeviceInfoCacheCVar,
 	TEXT("Uses a Cache of the DeviceCache instead of asking the OS")
+	TEXT("0 off, 1 on"),
+	ECVF_Default);
+	
+static int32 bRecycleThreadsCVar = 1;
+FAutoConsoleVariableRef CVarRecycleThreads(
+	TEXT("au.RecycleThreads"),
+	bRecycleThreadsCVar,
+	TEXT("Keeps threads to reuse instead of create/destroying them")
 	TEXT("0 off, 1 on"),
 	ECVF_Default);
 
@@ -432,32 +441,50 @@ namespace Audio
 	void IAudioMixerPlatformInterface::StartRunningNullDevice()
 	{
 		UE_LOG(LogAudioMixer, Display, TEXT("StartRunningNullDevice() called"));
+		SCOPED_NAMED_EVENT(FMixerPlatformXAudio2_StartRunningNullDevice, FColor::Blue);
+		
+		auto ThrowAwayBuffer = [this]() { this->ReadNextBuffer(); };
+		float SafeSampleRate = OpenStreamParams.SampleRate > 0.f ? OpenStreamParams.SampleRate : 48000.f;
+		float BufferDuration = ((float)OpenStreamParams.NumFrames) / SafeSampleRate;
 
+		AudioRenderEvent->Trigger();
 		if (!NullDeviceCallback.IsValid())
 		{
-
-			check(OpenStreamParams.NumFrames * AudioStreamInfo.DeviceInfo.NumChannels == OutputBuffer.GetNumSamples());
-
-			AudioRenderEvent->Trigger();
-
-			float BufferDuration = ((float) OpenStreamParams.NumFrames) / OpenStreamParams.SampleRate;
-			NullDeviceCallback.Reset(new FMixerNullCallback( BufferDuration, [this]()
-			{
-				this->ReadNextBuffer();
-			}));
-			bIsUsingNullDevice = true;
+			// Create the thread and tell it not to pause.
+			CreateNullDeviceThread(ThrowAwayBuffer, BufferDuration, false);
+			check(NullDeviceCallback.IsValid());
 		}
+		else
+		{
+			// Reuse existing thread if we have one.
+			NullDeviceCallback->Resume(ThrowAwayBuffer, BufferDuration);
+		}
+
+		bIsUsingNullDevice = true;
 	}
 
 	void IAudioMixerPlatformInterface::StopRunningNullDevice()
-	{
+	{		
 		UE_LOG(LogAudioMixer, Display, TEXT("StopRunningNullDevice() called"));
+		SCOPED_NAMED_EVENT(FMixerPlatformXAudio2_StopRunningNullDevice, FColor::Blue);
 
 		if (NullDeviceCallback.IsValid())
 		{
-			NullDeviceCallback.Reset();
+			if(IAudioMixer::ShouldRecycleThreads())
+			{
+				NullDeviceCallback->Pause();
+			}
+			else
+			{
+				NullDeviceCallback.Reset();
+			}
 			bIsUsingNullDevice = false;
 		}
+	}
+
+	void IAudioMixerPlatformInterface::CreateNullDeviceThread(const TFunction<void()> InCallback, float InBufferDuration, bool bShouldPauseOnStart)
+	{
+		NullDeviceCallback.Reset(new FMixerNullCallback(InBufferDuration, InCallback, TPri_TimeCritical, bShouldPauseOnStart));
 	}
 
 	void IAudioMixerPlatformInterface::ApplyMasterAttenuation(TArrayView<const uint8>& OutPoppedAudio)
@@ -828,5 +855,10 @@ namespace Audio
 #else //PLATFORM_WINDOWS
 		return false;
 #endif //PLATFORM_WINDOWS
+	}
+	
+	bool IAudioMixer::ShouldRecycleThreads()
+	{
+		return bRecycleThreadsCVar != 0;
 	}
 }
