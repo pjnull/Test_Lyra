@@ -9473,7 +9473,7 @@ void UCharacterMovementComponent::ServerMoveHandleClientError(float ClientTimeSt
 				ClientTrustFactor = FMath::Clamp(FVector::DotProduct(BaseDirection, RelativeDirection), 0.f, 1.f);
 
 				// To improve position syncing, use old base for take-off
-				if (MovementBaseUtility::UseRelativeLocation(LastServerMovementBase) && !CharacterOwner->IsMatineeControlled())
+				if (MovementBaseUtility::UseRelativeLocation(LastServerMovementBase))
 				{
 					FVector BaseLocation;
 					FQuat BaseQuat;
