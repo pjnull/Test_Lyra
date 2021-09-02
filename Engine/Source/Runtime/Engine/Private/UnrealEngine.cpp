@@ -15908,7 +15908,7 @@ int32 UEngine::RenderStatLevels(UWorld* World, FViewport* Viewport, FCanvas* Can
 		FString LevelPackageName = LevelStatus.PackageName.ToString();
 		FString DisplayName = LevelPackageName;
 
-		if (World->GetWorldPartition())
+		if (World->IsPartitionedWorld())
 		{
 			int32 CutPos = LevelPackageName.Find(*MapShortName);
 			if (CutPos != INDEX_NONE)
