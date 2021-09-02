@@ -804,8 +804,9 @@ public:
 	void NotifyActiveSoundOcclusionTraceDone(FActiveSound* ActiveSound, bool bIsOccluded);
 
 	/**
-	* Finds the active sound for the specified audio component ID
-	* NOTE: Current engine code uses "SendCommandToActiveSounds" instead
+	* Finds the active sound for the specified audio component ID.
+	* This call cannot be called from the GameThread & AudioComponents can now execute 
+	* multiple ActiveSound instances at once.  Use 'SendCommandToActiveSounds' instead.
 	*/
 	FActiveSound* FindActiveSound(uint64 AudioComponentID);
 
@@ -813,7 +814,7 @@ public:
 	 * Whether a given Audio Component ID should be allowed to have multiple
 	 * associated Active Sounds
 	 */
-	bool CanHaveMultipleActiveSounds(uint64 AudioComponentID);
+	bool CanHaveMultipleActiveSounds(uint64 AudioComponentID) const;
 
 	/**
 	 * Set whether a given Audio Component ID should be allowed to have multiple
@@ -1351,6 +1352,9 @@ public:
 		return bIsBakedAnalysisEnabled;
 	}
 
+	/** Performs an operation on all active sounds requested to execute by an audio component */
+	void SendCommandToActiveSounds(uint64 InAudioComponentID, TFunction<void(FActiveSound&)> InFunc, const TStatId InStatId = TStatId());
+
 	virtual bool IsNonRealtime() const
 	{
 		return false;
@@ -1476,14 +1480,7 @@ protected:
 	 */
 	virtual void OnListenerUpdated(const TArray<FListener>& InListeners) {};
 
-	//Only Audio Components should be able to call the private function "SendCommandToActiveSounds"
-	friend void UAudioComponent::SendCommandToAllActiveSoundsInComponent(TFunction<void(FActiveSound*)> InFunc);
-
-private:
-	/**
-	 * Performs an operation on all active sounds within an audio component
-	 */
-	void SendCommandToActiveSounds(uint64 AudioComponentID, TFunction<void(FActiveSound*)> InFunc);
+	private:
 
 	/**
 	 * Adds an active sound to the audio device. Can be a new active sound or one provided by the re-triggering
@@ -2128,9 +2125,6 @@ private:
 	void UpdateReferencedSoundWaves();
 	TArray<USoundWave*> ReferencedSoundWaves_AudioThread;
 	FCriticalSection ReferencedSoundWaveCritSec;
-
-	/** Ensures we don't have any container thread safety issues when accessing arrays of active sounds */
-	FCriticalSection ActiveSoundsPerComponentCritSec;
 
 	TArray<USoundWave*> PrecachingSoundWaves;
 

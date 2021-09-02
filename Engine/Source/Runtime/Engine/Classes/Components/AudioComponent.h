@@ -102,7 +102,6 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnAudioMultiEnvelopeValue, const
 DECLARE_MULTICAST_DELEGATE_FourParams(FOnAudioMultiEnvelopeValueNative, const UAudioComponent*, const float, const float, const int32);
 
 
-
 /** Type of fade to use when adjusting the audio component's volume. */
 UENUM(BlueprintType)
 enum class EAudioFaderCurve : uint8
@@ -171,7 +170,7 @@ class ENGINE_API UAudioComponent : public USceneComponent, public ISoundGenerato
 
 	/** Array of per-instance parameters for this AudioComponent. Direct changes to this array from Blueprint (as opposed to updates
 	  * made via the Set functions) will not be forwarded to the sound if the component is actively playing. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Sound, AdvancedDisplay)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Sound, AdvancedDisplay, meta = (DisplayAfter = "bDisableParameterUpdatesWhilePlaying"))
 	TArray<FAudioParameter> InstanceParameters;
 
 	/** SoundClass that overrides that set on the referenced SoundBase when component is played. */
@@ -217,9 +216,13 @@ class ENGINE_API UAudioComponent : public USceneComponent, public ISoundGenerato
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Sound)
 	uint8 bSuppressSubtitles:1;
 
-	/** If true, the Audio Component will be able to associate with multiple active sounds */
+	/** If true, the Audio Component will be able to play multiple sound instances at once. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Sound)
-	bool bCanContainMultipleActiveSounds;
+	uint8 bCanPlayMultipleInstances:1;
+
+	/** If true, the Audio Component will ignore parameter updates for already-playing sound(s). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Sound, AdvancedDisplay)
+	uint8 bDisableParameterUpdatesWhilePlaying : 1;
 
 	/** Whether this audio component is previewing a sound */
 	uint8 bPreviewComponent:1;
@@ -485,6 +488,13 @@ public:
 		, EAudioFaderCurve InFadeCurve = EAudioFaderCurve::Linear
 	);
 
+private:
+
+	static uint64 AudioComponentIDCounter;
+	static TMap<uint64, UAudioComponent*> AudioIDToComponentMap;
+	static FCriticalSection AudioIDToComponentMapLock;
+
+public:
 	/** Stop an audio component's sound, issue any delegates if needed */
 	UFUNCTION(BlueprintCallable, Category="Audio|Components|Audio")
 	virtual void Stop();
@@ -749,10 +759,7 @@ public:
 		// Quantized event data
 		Audio::FQuartzQuantizedRequestData QuantizedRequestData;
 	};
-
-	/** Performs a command on all associated audio components */
-	void SendCommandToAllActiveSoundsInComponent(TFunction<void(FActiveSound*)> InFunc);
-
+	
 private:
 
 	uint64 AudioComponentID;
@@ -805,8 +812,4 @@ protected:
 #endif
 
 	FRandomStream RandomStream;
-
-	static uint64 AudioComponentIDCounter;
-	static TMap<uint64, UAudioComponent*> AudioIDToComponentMap;
-	static FCriticalSection AudioIDToComponentMapLock;
 };

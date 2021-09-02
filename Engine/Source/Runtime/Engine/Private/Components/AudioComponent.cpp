@@ -61,7 +61,8 @@ UAudioComponent::UAudioComponent(const FObjectInitializer& ObjectInitializer)
 	VolumeMultiplier = 1.f;
 	bOverridePriority = false;
 	bOverrideSubtitlePriority = false;
-	bCanContainMultipleActiveSounds = false;
+	bCanPlayMultipleInstances = false;
+	bDisableParameterUpdatesWhilePlaying = false;
 	bIsPreviewSound = false;
 	bIsPaused = false;
 
@@ -272,7 +273,7 @@ void UAudioComponent::SetSound(USoundBase* NewSound)
 	const bool bWasAutoDestroy = bAutoDestroy;
 	bAutoDestroy = false;
 	//Only stop the existing sound if we are limited to one sound per component
-	if (!bCanContainMultipleActiveSounds)
+	if (!bCanPlayMultipleInstances)
 	{
 		Stop();
 	}
@@ -285,7 +286,7 @@ void UAudioComponent::SetSound(USoundBase* NewSound)
 		UGameplayStatics::PrimeSound(Sound);
 	}
 
-	if (bPlay && !bCanContainMultipleActiveSounds)
+	if (bPlay && !bCanPlayMultipleInstances)
 	{
 		Play();
 	}
@@ -311,15 +312,10 @@ void UAudioComponent::OnUpdateTransform(EUpdateTransformFlags UpdateTransformFla
 		{
 			DECLARE_CYCLE_STAT(TEXT("FAudioThreadTask.UpdateAudioComponentTransform"), STAT_AudioUpdateComponentTransform, STATGROUP_AudioThreadCommands);
 
-			const uint64 MyAudioComponentID = AudioComponentID;
 			const FTransform& MyTransform = GetComponentTransform();
-
-			SendCommandToAllActiveSoundsInComponent([MyTransform](FActiveSound* ActiveSound)
+			AudioDevice->SendCommandToActiveSounds(AudioComponentID, [MyTransform](FActiveSound& ActiveSound)
 			{
-				if (ActiveSound)
-				{
-					ActiveSound->Transform = MyTransform;
-				}
+				ActiveSound.Transform = MyTransform;
 			});
 		}
 	}
@@ -453,7 +449,7 @@ void UAudioComponent::PlayInternal(const PlayInternalRequestData& InPlayRequestD
 		bool bCurrentAutoDestroy = bAutoDestroy;
 		bAutoDestroy = false;
 		//Only stop if this component is limited to one active sound
-		if (!bCanContainMultipleActiveSounds)
+		if (!bCanPlayMultipleInstances)
 		{
 			Stop();
 		}
@@ -620,6 +616,9 @@ void UAudioComponent::PlayInternal(const PlayInternalRequestData& InPlayRequestD
 			// Bump ActiveCount... this is used to determine if an audio component is still active after a sound reports back as completed
 			++ActiveCount;
 
+			// Pass along whether or not component is setup to support multiple active sounds. This is to ensure virtualization will function accordingly.
+			AudioDevice->SetCanHaveMultipleActiveSounds(AudioComponentID, bCanPlayMultipleInstances);
+
 			AudioDevice->AddNewActiveSound(NewActiveSound, &InstanceParameters);
 
 			// In editor, the audio thread is not run separate from the game thread, and can result in calling PlaybackComplete prior
@@ -706,17 +705,10 @@ void UAudioComponent::AdjustVolumeInternal(float AdjustVolumeDuration, float Adj
 		BroadcastPlayState();
 	}
 
-	const uint64 InAudioComponentID = AudioComponentID;
-
 	DECLARE_CYCLE_STAT(TEXT("FAudioThreadTask.AdjustVolume"), STAT_AudioAdjustVolume, STATGROUP_AudioThreadCommands);
-	SendCommandToAllActiveSoundsInComponent([bInIsFadeOut, AdjustVolumeLevel, AdjustVolumeDuration, FadeCurve](FActiveSound* ActiveSound)
+	AudioDevice->SendCommandToActiveSounds(AudioComponentID, [bInIsFadeOut, AdjustVolumeLevel, AdjustVolumeDuration, FadeCurve](FActiveSound& ActiveSound)
 	{
-		if (!ActiveSound)
-		{
-			return;
-		}
-
-		Audio::FVolumeFader& Fader = ActiveSound->ComponentVolumeFader;
+		Audio::FVolumeFader& Fader = ActiveSound.ComponentVolumeFader;
 		const float InitialTargetVolume = Fader.GetTargetVolume();
 
 		// Ignore fade out request if requested volume is higher than current target.
@@ -726,7 +718,7 @@ void UAudioComponent::AdjustVolumeInternal(float AdjustVolumeDuration, float Adj
 		}
 
 		const bool ToZeroVolume = FMath::IsNearlyZero(AdjustVolumeLevel);
-		if (ActiveSound->FadeOut == FActiveSound::EFadeOut::Concurrency)
+		if (ActiveSound.FadeOut == FActiveSound::EFadeOut::Concurrency)
 		{
 			// Ignore adjust volume request if non-zero and currently voice stealing.
 			if (!FMath::IsNearlyZero(AdjustVolumeLevel))
@@ -742,7 +734,7 @@ void UAudioComponent::AdjustVolumeInternal(float AdjustVolumeDuration, float Adj
 		}
 		else
 		{
-			ActiveSound->FadeOut = bInIsFadeOut || ToZeroVolume ? FActiveSound::EFadeOut::User : FActiveSound::EFadeOut::None;
+			ActiveSound.FadeOut = bInIsFadeOut || ToZeroVolume ? FActiveSound::EFadeOut::User : FActiveSound::EFadeOut::None;
 		}
 
 		if (bInIsFadeOut || ToZeroVolume)
@@ -756,7 +748,7 @@ void UAudioComponent::AdjustVolumeInternal(float AdjustVolumeDuration, float Adj
 		}
 
 		Fader.StartFade(AdjustVolumeLevel, AdjustVolumeDuration, static_cast<Audio::EFaderCurve>(FadeCurve));
-	});
+	}, GET_STATID(STAT_AudioAdjustVolume));
 }
 
 void UAudioComponent::Stop()
@@ -810,24 +802,18 @@ void UAudioComponent::StopDelayed(float DelayTime)
 	}
 
 	// 2. Performs delayed stop with no fade
-	const uint64 InAudioComponentID = AudioComponentID;
 	DECLARE_CYCLE_STAT(TEXT("FAudioThreadTask.StopDelayed"), STAT_AudioStopDelayed, STATGROUP_AudioThreadCommands);
-	SendCommandToAllActiveSoundsInComponent([DelayTime](FActiveSound* ActiveSound)
+	AudioDevice->SendCommandToActiveSounds(AudioComponentID, [DelayTime](FActiveSound& ActiveSound)
 	{
-		if (!ActiveSound)
-		{
-			return;
-		}
-
-		if (const USoundBase* StoppingSound = ActiveSound->GetSound())
+		if (const USoundBase* StoppingSound = ActiveSound.GetSound())
 		{
 			UE_LOG(LogAudio, Verbose, TEXT("%g: Delayed Stop requested for sound '%s'"),
-				ActiveSound->GetWorld() ? ActiveSound->GetWorld()->GetAudioTimeSeconds() : 0.0f,
+				ActiveSound.GetWorld() ? ActiveSound.GetWorld()->GetAudioTimeSeconds() : 0.0f,
 				*StoppingSound->GetName());
 		}
 
-		Audio::FVolumeFader& Fader = ActiveSound->ComponentVolumeFader;
-		switch (ActiveSound->FadeOut)
+		Audio::FVolumeFader& Fader = ActiveSound.ComponentVolumeFader;
+		switch (ActiveSound.FadeOut)
 		{
 			case FActiveSound::EFadeOut::Concurrency:
 				{
@@ -843,12 +829,12 @@ void UAudioComponent::StopDelayed(float DelayTime)
 			case FActiveSound::EFadeOut::None:
 			default:
 			{
-				ActiveSound->FadeOut = FActiveSound::EFadeOut::User;
+				ActiveSound.FadeOut = FActiveSound::EFadeOut::User;
 				Fader.SetActiveDuration(DelayTime);
 			}
 			break;
 		}
-	});
+	}, GET_STATID(STAT_AudioStopDelayed));
 }
 
 void UAudioComponent::SetPaused(bool bPause)
@@ -1001,9 +987,9 @@ void UAudioComponent::PostEditChangeProperty(FPropertyChangedEvent& PropertyChan
 		Play();
 	}
 
-	if (PropertyChangedEvent.GetPropertyName() == "bCanReferMultipleActiveSounds")
+	if (PropertyChangedEvent.GetPropertyName() == GET_MEMBER_NAME_CHECKED(UAudioComponent, bCanPlayMultipleInstances))
 	{
-		GetAudioDevice()->SetCanHaveMultipleActiveSounds(AudioComponentID, bCanContainMultipleActiveSounds);
+		GetAudioDevice()->SetCanHaveMultipleActiveSounds(AudioComponentID, bCanPlayMultipleInstances);
 	}
 
 #if WITH_EDITORONLY_DATA
@@ -1043,7 +1029,7 @@ bool UAudioComponent::BP_GetAttenuationSettingsToApply(FSoundAttenuationSettings
 
 void UAudioComponent::CollectAttenuationShapesForVisualization(TMultiMap<EAttenuationShape::Type, FBaseAttenuationSettings::AttenuationShapeDetails>& ShapeDetailsMap) const
 {
-	const FSoundAttenuationSettings *AttenuationSettingsToApply = GetAttenuationSettingsToApply();
+	const FSoundAttenuationSettings* AttenuationSettingsToApply = GetAttenuationSettingsToApply();
 
 	if (AttenuationSettingsToApply)
 	{
@@ -1055,7 +1041,7 @@ void UAudioComponent::CollectAttenuationShapesForVisualization(TMultiMap<EAttenu
 	if (SoundCue)
 	{
 		TArray<USoundNodeAttenuation*> AttenuationNodes;
-		SoundCue->RecursiveFindAttenuation( SoundCue->FirstNode, AttenuationNodes );
+		SoundCue->RecursiveFindAttenuation(SoundCue->FirstNode, AttenuationNodes);
 		for (int32 NodeIndex = 0; NodeIndex < AttenuationNodes.Num(); ++NodeIndex)
 		{
 			AttenuationSettingsToApply = AttenuationNodes[NodeIndex]->GetAttenuationSettingsToApply();
@@ -1134,15 +1120,10 @@ void UAudioComponent::SetVolumeMultiplier(const float NewVolumeMultiplier)
 		if (FAudioDevice* AudioDevice = GetAudioDevice())
 		{
 			DECLARE_CYCLE_STAT(TEXT("FAudioThreadTask.SetVolumeMultiplier"), STAT_AudioSetVolumeMultiplier, STATGROUP_AudioThreadCommands);
-
-			const uint64 MyAudioComponentID = AudioComponentID;
-			SendCommandToAllActiveSoundsInComponent([NewVolumeMultiplier](FActiveSound* ActiveSound)
+			AudioDevice->SendCommandToActiveSounds(AudioComponentID, [NewVolumeMultiplier](FActiveSound& ActiveSound)
 			{
-				if (ActiveSound)
-				{
-					ActiveSound->SetVolume(NewVolumeMultiplier);
-				}
-			});
+				ActiveSound.SetVolume(NewVolumeMultiplier);
+			}, GET_STATID(STAT_AudioSetVolumeMultiplier));
 		}
 	}
 }
@@ -1157,15 +1138,10 @@ void UAudioComponent::SetPitchMultiplier(const float NewPitchMultiplier)
 		if (FAudioDevice* AudioDevice = GetAudioDevice())
 		{
 			DECLARE_CYCLE_STAT(TEXT("FAudioThreadTask.SetPitchMultiplier"), STAT_AudioSetPitchMultiplier, STATGROUP_AudioThreadCommands);
-
-			const uint64 MyAudioComponentID = AudioComponentID;
-			SendCommandToAllActiveSoundsInComponent([NewPitchMultiplier](FActiveSound* ActiveSound)
+			AudioDevice->SendCommandToActiveSounds(AudioComponentID, [NewPitchMultiplier](FActiveSound& ActiveSound)
 			{
-				if (ActiveSound)
-				{
-					ActiveSound->SetPitch(NewPitchMultiplier);
-				}
-			});
+				ActiveSound.SetPitch(NewPitchMultiplier);
+			}, GET_STATID(STAT_AudioSetPitchMultiplier));
 		}
 	}
 }
@@ -1179,15 +1155,10 @@ void UAudioComponent::SetUISound(const bool bInIsUISound)
 		if (FAudioDevice* AudioDevice = GetAudioDevice())
 		{
 			DECLARE_CYCLE_STAT(TEXT("FAudioThreadTask.SetIsUISound"), STAT_AudioSetIsUISound, STATGROUP_AudioThreadCommands);
-
-			const uint64 MyAudioComponentID = AudioComponentID;
-			SendCommandToAllActiveSoundsInComponent([bInIsUISound](FActiveSound* ActiveSound)
+			AudioDevice->SendCommandToActiveSounds(AudioComponentID, [bInIsUISound](FActiveSound& ActiveSound)
 			{
-				if (ActiveSound)
-				{
-					ActiveSound->bIsUISound = bInIsUISound;
-				}
-			});
+				ActiveSound.bIsUISound = bInIsUISound;
+			}, GET_STATID(STAT_AudioSetIsUISound));
 		}
 	}
 }
@@ -1202,15 +1173,10 @@ void UAudioComponent::AdjustAttenuation(const FSoundAttenuationSettings& InAtten
 		if (FAudioDevice* AudioDevice = GetAudioDevice())
 		{
 			DECLARE_CYCLE_STAT(TEXT("FAudioThreadTask.AdjustAttenuation"), STAT_AudioAdjustAttenuation, STATGROUP_AudioThreadCommands);
-
-			const uint64 MyAudioComponentID = AudioComponentID;
-			SendCommandToAllActiveSoundsInComponent([InAttenuationSettings](FActiveSound* ActiveSound)
+			AudioDevice->SendCommandToActiveSounds(AudioComponentID, [InAttenuationSettings](FActiveSound& ActiveSound)
 			{
-				if (ActiveSound)
-				{
-					ActiveSound->AttenuationSettings = InAttenuationSettings;
-				}
-			});
+				ActiveSound.AttenuationSettings = InAttenuationSettings;
+			}, GET_STATID(STAT_AudioAdjustAttenuation));
 		}
 	}
 }
@@ -1219,21 +1185,17 @@ void UAudioComponent::SetSubmixSend(USoundSubmixBase* Submix, float SendLevel)
 {
 	if (FAudioDevice* AudioDevice = GetAudioDevice())
 	{
-		DECLARE_CYCLE_STAT(TEXT("FAudioThreadTask.AudioSetSubmixSend"), STAT_SetSubmixSend, STATGROUP_AudioThreadCommands);
-
 		const uint64 MyAudioComponentID = AudioComponentID;
 
 		FSoundSubmixSendInfo SendInfo;
 		SendInfo.SoundSubmix = Submix;
 		SendInfo.SendLevel = SendLevel;
 
-		SendCommandToAllActiveSoundsInComponent([SendInfo](FActiveSound* ActiveSound)
+		DECLARE_CYCLE_STAT(TEXT("FAudioThreadTask.AudioSetSubmixSend"), STAT_SetSubmixSend, STATGROUP_AudioThreadCommands);
+		AudioDevice->SendCommandToActiveSounds(AudioComponentID, [SendInfo](FActiveSound& ActiveSound)
 		{
-			if (ActiveSound)
-			{
-				ActiveSound->SetSubmixSend(SendInfo);
-			}
-		});
+			ActiveSound.SetSubmixSend(SendInfo);
+		}, GET_STATID(STAT_SetSubmixSend));
 	}
 }
 
@@ -1241,19 +1203,15 @@ void UAudioComponent::SetBusSendEffectInternal(USoundSourceBus* InSourceBus, UAu
 {
 	if (FAudioDevice* AudioDevice = GetAudioDevice())
 	{
-		const uint64 MyAudioComponentID = AudioComponentID;
 
 		FSoundSourceBusSendInfo SourceBusSendInfo;
 		SourceBusSendInfo.SoundSourceBus = InSourceBus;
 		SourceBusSendInfo.AudioBus = InAudioBus;
 		SourceBusSendInfo.SendLevel = SendLevel;
 
-		SendCommandToAllActiveSoundsInComponent([InBusSendType, SourceBusSendInfo](FActiveSound* ActiveSound)
+		AudioDevice->SendCommandToActiveSounds(AudioComponentID, [InBusSendType, SourceBusSendInfo](FActiveSound& ActiveSound)
 		{
-			if (ActiveSound)
-			{
-				ActiveSound->SetSourceBusSend(InBusSendType, SourceBusSendInfo);
-			}
+			ActiveSound.SetSourceBusSend(InBusSendType, SourceBusSendInfo);
 		});
 	}
 }
@@ -1283,15 +1241,10 @@ void UAudioComponent::SetLowPassFilterEnabled(bool InLowPassFilterEnabled)
 	if (FAudioDevice* AudioDevice = GetAudioDevice())
 	{
 		DECLARE_CYCLE_STAT(TEXT("FAudioThreadTask.SetLowPassFilterFrequency"), STAT_AudioSetLowPassFilterEnabled, STATGROUP_AudioThreadCommands);
-
-		const uint64 MyAudioComponentID = AudioComponentID;
-		SendCommandToAllActiveSoundsInComponent([InLowPassFilterEnabled](FActiveSound* ActiveSound)
+		AudioDevice->SendCommandToActiveSounds(AudioComponentID, [InLowPassFilterEnabled](FActiveSound& ActiveSound)
 		{
-			if (ActiveSound)
-			{
-				ActiveSound->bEnableLowPassFilter = InLowPassFilterEnabled;
-			}
-		});
+			ActiveSound.bEnableLowPassFilter = InLowPassFilterEnabled;
+		}, GET_STATID(STAT_AudioSetLowPassFilterEnabled));
 	}
 }
 
@@ -1300,15 +1253,10 @@ void UAudioComponent::SetLowPassFilterFrequency(float InLowPassFilterFrequency)
 	if (FAudioDevice* AudioDevice = GetAudioDevice())
 	{
 		DECLARE_CYCLE_STAT(TEXT("FAudioThreadTask.SetLowPassFilterFrequency"), STAT_AudioSetLowPassFilterFrequency, STATGROUP_AudioThreadCommands);
-
-		const uint64 MyAudioComponentID = AudioComponentID;
-		SendCommandToAllActiveSoundsInComponent([InLowPassFilterFrequency](FActiveSound* ActiveSound)
+		AudioDevice->SendCommandToActiveSounds(AudioComponentID, [InLowPassFilterFrequency](FActiveSound& ActiveSound)
 		{
-			if (ActiveSound)
-			{
-				ActiveSound->LowPassFilterFrequency = InLowPassFilterFrequency;
-			}
-		});
+			ActiveSound.LowPassFilterFrequency = InLowPassFilterFrequency;
+		}, GET_STATID(STAT_AudioSetLowPassFilterFrequency));
 	}
 }
 
@@ -1317,22 +1265,17 @@ void UAudioComponent::SetOutputToBusOnly(bool bInOutputToBusOnly)
 	if (FAudioDevice* AudioDevice = GetAudioDevice())
 	{
 		DECLARE_CYCLE_STAT(TEXT("FAudioThreadTask.SetOutputToBusOnly"), STAT_AudioSetOutputToBusOnly, STATGROUP_AudioThreadCommands);
-
-		const uint64 MyAudioComponentID = AudioComponentID;
-		SendCommandToAllActiveSoundsInComponent([bInOutputToBusOnly](FActiveSound* ActiveSound)
+		AudioDevice->SendCommandToActiveSounds(AudioComponentID, [bInOutputToBusOnly](FActiveSound& ActiveSound)
 		{
-			if (ActiveSound)
+			ActiveSound.bHasActiveMainSubmixOutputOverride = true;
+			ActiveSound.bHasActiveSubmixSendRoutingOverride = true;
+			if (bInOutputToBusOnly)
 			{
-				ActiveSound->bHasActiveMainSubmixOutputOverride = true;
-				ActiveSound->bHasActiveSubmixSendRoutingOverride = true;
-				if (bInOutputToBusOnly)
-				{
-					ActiveSound->bHasActiveBusSendRoutingOverride = true;
-					ActiveSound->bEnableBusSendRoutingOverride = true;
-				}
-				ActiveSound->bEnableMainSubmixOutputOverride = !bInOutputToBusOnly;
-				ActiveSound->bEnableSubmixSendRoutingOverride = !bInOutputToBusOnly;
+				ActiveSound.bHasActiveBusSendRoutingOverride = true;
+				ActiveSound.bEnableBusSendRoutingOverride = true;
 			}
+			ActiveSound.bEnableMainSubmixOutputOverride = !bInOutputToBusOnly;
+			ActiveSound.bEnableSubmixSendRoutingOverride = !bInOutputToBusOnly;
 		});
 	}
 }
@@ -1552,12 +1495,4 @@ bool UAudioComponent::GetCookedEnvelopeDataForAllPlayingSounds(TArray<FSoundWave
 void UAudioComponent::SetSourceEffectChain(USoundEffectSourcePresetChain* InSourceEffectChain)
 {
 	SourceEffectChain = InSourceEffectChain;
-}
-
-void UAudioComponent::SendCommandToAllActiveSoundsInComponent(TFunction<void(FActiveSound*)> InFunc)
-{
-	if (FAudioDevice* AudioDevice = GetAudioDevice())
-	{
-		AudioDevice->SendCommandToActiveSounds(AudioComponentID, InFunc);
-	}
 }
