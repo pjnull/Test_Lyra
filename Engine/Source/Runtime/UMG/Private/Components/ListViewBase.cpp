@@ -93,6 +93,16 @@ const TArray<UUserWidget*>& UListViewBase::GetDisplayedEntryWidgets() const
 	return EntryWidgetPool.GetActiveWidgets(); 
 }
 
+float UListViewBase::GetScrollOffset() const
+{
+	if (MyTableViewBase.IsValid())
+	{
+		return MyTableViewBase->GetScrollOffset();
+	}
+
+	return 0.0f;
+}
+
 TSharedRef<SWidget> UListViewBase::RebuildWidget()
 {
 	FText ErrorText;
