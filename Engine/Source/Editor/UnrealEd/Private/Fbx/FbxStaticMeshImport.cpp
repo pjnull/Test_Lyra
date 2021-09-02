@@ -2009,7 +2009,6 @@ UStaticMesh* UnFbx::FFbxImporter::ImportStaticMeshAsSingle(UObject* InParent, TA
 			FExistingStaticMeshData* MutableExistMeshDataPtr = const_cast<FExistingStaticMeshData*>(ExistMeshDataPtr);
 			FMeshBuildSettings& ExistingBuildSettings = MutableExistMeshDataPtr->ExistingLODData[LODIndex].ExistingBuildSettings;
 			ExistingBuildSettings.bRemoveDegenerates = SrcModel.BuildSettings.bRemoveDegenerates;
-			ExistingBuildSettings.bBuildAdjacencyBuffer = SrcModel.BuildSettings.bBuildAdjacencyBuffer;
 			ExistingBuildSettings.bBuildReversedIndexBuffer = SrcModel.BuildSettings.bBuildReversedIndexBuffer;
 			ExistingBuildSettings.bRecomputeNormals = SrcModel.BuildSettings.bRecomputeNormals;
 			ExistingBuildSettings.bRecomputeTangents = SrcModel.BuildSettings.bRecomputeTangents;
