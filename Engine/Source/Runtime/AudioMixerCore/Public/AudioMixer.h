@@ -666,7 +666,8 @@ namespace Audio
 		bool bWarnedBufferUnderrun;
 
 		/** The audio render thread. */
-		FRunnableThread* AudioRenderThread;
+		//FRunnableThread* AudioRenderThread;
+		TUniquePtr<FRunnableThread> AudioRenderThread;
 
 		/** The render thread sync event. */
 		FEvent* AudioRenderEvent;

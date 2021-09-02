@@ -309,7 +309,6 @@ namespace Audio
 
 	IAudioMixerPlatformInterface::IAudioMixerPlatformInterface()
 		: bWarnedBufferUnderrun(false)
-		, AudioRenderThread(nullptr)
 		, AudioRenderEvent(nullptr)
 		, bIsInDeviceSwap(false)
 		, AudioFadeEvent(nullptr)
@@ -624,10 +623,9 @@ namespace Audio
 		AudioFadeEvent = FPlatformProcess::GetSynchEventFromPool();
 		check(AudioFadeEvent != nullptr);
 
-		check(AudioRenderThread == nullptr);
-		AudioRenderThread = FRunnableThread::Create(this, *FString::Printf(TEXT("AudioMixerRenderThread(%d)"), AudioMixerTaskCounter.Increment()), 0, (EThreadPriority)SetRenderThreadPriorityCVar, FPlatformAffinity::GetAudioThreadMask());
-		check(AudioRenderThread != nullptr);
-		int testing = 0;
+		check(!AudioRenderThread.IsValid());
+		AudioRenderThread.Reset(FRunnableThread::Create(this, *FString::Printf(TEXT("AudioMixerRenderThread(%d)"), AudioMixerTaskCounter.Increment()), 0, (EThreadPriority)SetRenderThreadPriorityCVar, FPlatformAffinity::GetAudioThreadMask()));
+		check(AudioRenderThread.IsValid());
 	}
 
 	void IAudioMixerPlatformInterface::StopGeneratingAudio()
@@ -647,7 +645,7 @@ namespace Audio
 			AudioRenderEvent->Trigger();
 		}
 
-		if (AudioRenderThread != nullptr)
+		if (AudioRenderThread.IsValid())
 		{
 			{
 				SCOPED_NAMED_EVENT(IAudioMixerPlatformInterface_StopGeneratingAudio_KillRenderThread, FColor::Blue);
@@ -664,8 +662,7 @@ namespace Audio
 				AudioStreamInfo.StreamState = EAudioOutputStreamState::Stopped;
 			}
 
-			delete AudioRenderThread;
-			AudioRenderThread = nullptr;
+			AudioRenderThread.Reset();
 		}
 
 		if (AudioRenderEvent != nullptr)
