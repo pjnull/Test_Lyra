@@ -1392,11 +1392,18 @@ void SPathView::DefaultSort(const FTreeItem* InTreeItem, TArray<TSharedPtr<FTree
 			bIsRootInvariantFolder = !RootInvariantFolder.FindChar(TEXT('/'), SecondSlashIndex);
 		}
 
-		It->GetItem().GetItemName().ToString(SortInfo.FolderName);
+		SortInfo.FolderName = It->GetItem().GetDisplayName().ToString();
 
 		SortInfo.bIsClassesFolder = false;
 		if (bIsRootInvariantFolder)
 		{
+			FNameBuilder ItemNameBuilder(It->GetItem().GetItemName());
+			const FStringView ItemNameView(ItemNameBuilder);
+			if (ItemNameView.StartsWith(ClassesPrefix))
+			{
+				SortInfo.bIsClassesFolder = true;
+			}
+
 			if (SortInfo.FolderName.StartsWith(ClassesPrefix))
 			{
 				SortInfo.bIsClassesFolder = true;
