@@ -784,7 +784,8 @@ bool UE::PipelineCacheUtilities::LoadStablePipelineCacheFile(const FString& File
 		else if (NewPSO.Type == FPipelineCacheFileFormatPSO::DescriptorType::RayTracing)
 		{
 			// not yet supported
-			UE_LOG(LogPipelineCacheUtilities, Warning, TEXT("Raytracing PSOs aren't yet supported in the PSO stable cache. Filename:%s PSO:%s"), *Filename, *NewPSO.ToStringReadable());
+			++OutPSOsRejected;
+			UE_LOG(LogPipelineCacheUtilities, Display, TEXT("Raytracing PSOs aren't yet supported in the PSO stable cache. Filename:%s PSO:%s"), *Filename, *NewPSO.ToStringReadable());
 		}
 	}
 
