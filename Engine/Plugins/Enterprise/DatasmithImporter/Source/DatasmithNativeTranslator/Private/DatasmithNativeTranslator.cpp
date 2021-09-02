@@ -87,7 +87,7 @@ namespace DatasmithNativeTranslatorImpl
 		return Result;
 	}
 
-	TOptional<FMeshDescription> ExtractMeshDescription(FDatasmithMeshSourceModel& DSSourceModel, int32 LinkerUEVersion)
+	TOptional<FMeshDescription> ExtractMeshDescription(FDatasmithMeshSourceModel& DSSourceModel)
 	{
 		FRawMesh RawMesh;
 		DSSourceModel.RawMeshBulkData.LoadRawMesh( RawMesh );
@@ -167,7 +167,7 @@ bool FDatasmithNativeTranslator::LoadStaticMesh(const TSharedRef<IDatasmithMeshE
 		{
 			for (FDatasmithMeshSourceModel& SourceModel : DatasmithMesh.SourceModels)
 			{
-				if (TOptional<FMeshDescription> Mesh = ExtractMeshDescription(SourceModel, DatasmithMesh->GetLinkerUEVersion()))
+				if (TOptional<FMeshDescription> Mesh = ExtractMeshDescription(SourceModel))
 				{
 					OutMeshPayload.LodMeshes.Add(MoveTemp(Mesh.GetValue()));
 					continue;
