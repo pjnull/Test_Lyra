@@ -2552,8 +2552,8 @@ namespace Audio
 			{
 				FSourceInfo& SourceInfo = SourceInfos[SourceId];
 
-				// Don't need to do anything if it's not active
-				if (!SourceInfo.bIsActive)
+				// Don't need to do anything if it's not active or not paused. 
+				if (!SourceInfo.bIsActive && !SourceInfo.bIsPaused)
 				{
 					continue;
 				}
