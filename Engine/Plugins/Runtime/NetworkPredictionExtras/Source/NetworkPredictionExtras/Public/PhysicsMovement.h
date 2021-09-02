@@ -6,8 +6,14 @@
 #include "NetworkPredictionLog.h"
 #include "Async/NetworkPredictionAsyncProxy.h"
 #include "NetworkPhysicsComponent.h"
+#include "NetworkPredictionCVars.h"
 #include "PhysicsMovement.generated.h"
 
+namespace UE_NP
+{
+	NETSIM_DEVCVAR_SHIPCONST_INT(ForceReconcilePhysicsInputCmd, 0, "np2.PhysicsInputCmdForceReconcile", "");
+	NETSIM_DEVCVAR_SHIPCONST_INT(ForceReconcilePhysicsMovementState, 0, "np2.ForceReconcilePhysicsMovementState", "");
+};
 
 USTRUCT(BlueprintType)
 struct FPhysicsInputCmd
@@ -69,8 +75,14 @@ struct FPhysicsInputCmd
 			|| !FMath::IsNearlyEqual(TargetYaw, AuthState.TargetYaw, 1.0f)
 			|| bJumpedPressed != AuthState.bJumpedPressed
 			//|| Counter != AuthState.Counter // this will cause constant corrections with multiple clients but useful in testing single client
-			|| bBrakesPressed != AuthState.bBrakesPressed;
+			|| bBrakesPressed != AuthState.bBrakesPressed
+			|| (UE_NP::ForceReconcilePhysicsInputCmd() > 0);
 			
+	}
+
+	FString ToString() const
+	{
+		return FString(TEXT(""));
 	}
 };
 
@@ -164,7 +176,9 @@ struct FPhysicsMovementNetState
 			RecoveryFrame != AuthState.RecoveryFrame ||
 			JumpStartFrame != AuthState.JumpStartFrame ||
 			InAirFrame != AuthState.InAirFrame ||
-			KickFrame!= AuthState.KickFrame;
+			KickFrame!= AuthState.KickFrame ||
+			CheckSum != AuthState.CheckSum ||
+			(UE_NP::ForceReconcilePhysicsMovementState() > 0);
 	}
 };
 
@@ -174,6 +188,8 @@ struct FPhysicsMovementLocalState
 	GENERATED_BODY()
 
 	FSingleParticlePhysicsProxy* Proxy = nullptr;
+
+	FCollisionQueryParams QueryParams = FCollisionQueryParams::DefaultQueryParam;
 };
 
 UCLASS(BlueprintType, meta=(BlueprintSpawnableComponent))

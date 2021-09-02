@@ -59,9 +59,11 @@ struct TFrameStorage
 	T&       operator[](int32 Index) { return Buffer[Index % Buffer.Num()]; }
 	const T& operator[](int32 Index) const { return Buffer[Index % Buffer.Num()]; }
 
+	int32 Num() const { return Buffer.Num(); }
+
 private:
 	
-	TStaticArray<T, UE_NP::MaxAsyncModelDefs> Buffer;
+	TStaticArray<T, UE_NP::NumFramesStorage> Buffer;
 };
 
 

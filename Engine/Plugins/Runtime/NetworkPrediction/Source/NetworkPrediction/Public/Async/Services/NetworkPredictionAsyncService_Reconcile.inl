@@ -1,8 +1,12 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #pragma once
+#include "NetworkPredictionCVars.h"
 
 namespace UE_NP {
+
+	
+NETSIM_DEVCVAR_SHIPCONST_INT(EnableFutureInputs, 0, "np2.EnableFutureInputs", "");
 
 class IAsyncReconcileService
 {
@@ -80,14 +84,22 @@ public:
 			// Apply all Input corrections for future frames if non-locally controlled.
 			//	doing this in a second pass maybe more cache coherent, but this is simpler for now.
 			// -------------------------------------------------------
+			
 			if ((RecvData.Flags & (uint8)EInstanceFlags::LocallyControlled) == 0)
 			{
+				const InputCmdType& SourceInput = EnableFutureInputs() ? RecvData.LatestInputCmd : RecvData.InputCmd;
+
+				const int32 NumFrames = (LastCompletedStep+1) - FMath::Max<int32>(0, RecvData.Frame+1);
+				npEnsureMsgf(NumFrames < DataStore->Frames.Num(), TEXT("Too many input corrections. [%d %d] %d %d"), (LastCompletedStep+1), FMath::Max<int32>(0, RecvData.Frame+1), NumFrames, DataStore->Frames.Num() );
+
 				for (int32 Frame= FMath::Max<int32>(0, RecvData.Frame+1); Frame <= LastCompletedStep+1; ++Frame)
 				{
 					TAsncFrameSnapshot<AsyncModelDef>& FutureSnapshot = DataStore->Frames[Frame];
-					FutureSnapshot.InputCmds[idx] = RecvData.LatestInputCmd;
+
+					NpResizeForIndex(FutureSnapshot.InputCmds, idx);
+					FutureSnapshot.InputCmds[idx] = SourceInput;
 				}
-			}
+			}			
 		}
 
 		DataStore->NetRecvData.NetRecvDirtyMask.Reset();

@@ -50,6 +50,9 @@ struct FPhysicsMovementSimulation
 		//UE_LOG(LogTemp, Warning, TEXT("[%s][%d][%d] Yaw: %f %s"), World->GetNetMode() == NM_Client ? TEXT("C") : TEXT("S"), SimulationFrame, SimulationFrame - Context.LocalStorageFrame, InputCmd.TargetYaw, Context.bIsResim ? TEXT("RESIM") : TEXT(" "));
 		//UE_LOG(LogTemp, Warning, TEXT("[%s][%d][%d] 0x%X Count: %d %s"), World->GetNetMode() == NM_Client ? TEXT("C") : TEXT("S"), SimulationFrame, SimulationFrame - Context.LocalStorageFrame, (int64)&InputCmd, InputCmd.Counter, Context.bIsResim ? TEXT("RESIM") : TEXT(" "));
 
+		//UE_LOG(LogTemp, Warning, TEXT("0x%X [%s][%d][%d][%d] ID: %d. CheckSum: %d %s"), (int64)World, World->GetNetMode() == NM_Client ? TEXT("C") : TEXT("S"), SimulationFrame, Context.LocalStorageFrame, SimulationFrame - Context.LocalStorageFrame, (int32)ID, NetState.CheckSum, Context.bIsResim ? TEXT("RESIM") : TEXT(" "));
+		NetState.CheckSum++;
+
 		UE_NETWORK_PHYSICS::ConditionalFrameEnsure();
 		if (UE_NETWORK_PHYSICS::ConditionalFrameBreakpoint())
 		{
@@ -59,14 +62,21 @@ struct FPhysicsMovementSimulation
 		FVector TracePosition = PT->X();
 		FVector EndPosition = TracePosition + FVector(0.f, 0.f, -100.f);
 		FCollisionShape Shape = FCollisionShape::MakeSphere(250.f);
-		ECollisionChannel CollisionChannel = ECollisionChannel::ECC_WorldStatic; 
-		FCollisionQueryParams QueryParams = FCollisionQueryParams::DefaultQueryParam;
+		ECollisionChannel CollisionChannel = ECollisionChannel::ECC_WorldStatic;
 		FCollisionResponseParams ResponseParams = FCollisionResponseParams::DefaultResponseParam;
 		FCollisionObjectQueryParams ObjectParams(ECollisionChannel::ECC_PhysicsBody);
 
 		FHitResult OutHit;
-		const bool bInAir = !UE_NETWORK_PHYSICS::JumpHack() && !World->LineTraceSingleByChannel(OutHit, TracePosition, EndPosition, ECollisionChannel::ECC_WorldStatic, QueryParams, ResponseParams);
+		bool bInAir = !UE_NETWORK_PHYSICS::JumpHack() && !World->LineTraceSingleByChannel(OutHit, TracePosition, EndPosition, ECollisionChannel::ECC_WorldStatic, LocalState.QueryParams, ResponseParams);
 		const float UpDot = FVector::DotProduct(PT->R().GetUpVector(), FVector::UpVector);
+
+		if (UPrimitiveComponent* HitPrim = OutHit.Component.Get())
+		{
+			if (FPhysicsInterface::IsValid(HitPrim->BodyInstance.ActorHandle) && (LocalState.Proxy == HitPrim->BodyInstance.ActorHandle))
+			{
+				ensure(false); // hit self somehow?
+			}
+		}
 
 		// Debug CVar to make jump cause mispredictions
 		if (UE_NETWORK_PHYSICS::JumpMisPredict())
@@ -296,6 +306,7 @@ void UPhysicsMovementComponent::InitializeComponent()
 	
 	FPhysicsMovementLocalState LocalState;
 	LocalState.Proxy = this->GetManagedProxy();
+	LocalState.QueryParams.AddIgnoredActor(GetOwner());
 	if (LocalState.Proxy)
 	{
 		if (ensure(NetworkPredictionProxy.RegisterProxy(GetWorld())))
