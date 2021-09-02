@@ -91,7 +91,7 @@ public:
 	template <typename StructType>
 	const StructType* GetStructInstance() const
 	{
-		return static_cast<StructType*>(GetStructInstance(TBaseStructure<StructType>::Get()));
+		return static_cast<const StructType*>(GetStructInstance(TBaseStructure<StructType>::Get()));
 	}
 
 	/**
