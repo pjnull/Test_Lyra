@@ -711,6 +711,7 @@ bool UVPFullScreenUserWidget::Display(UWorld* InWorld)
 		if (bWasAdded)
 		{
 			FWorldDelegates::LevelRemovedFromWorld.AddUObject(this, &UVPFullScreenUserWidget::OnLevelRemovedFromWorld);
+			FWorldDelegates::OnWorldCleanup.AddUObject(this, &UVPFullScreenUserWidget::OnWorldCleanup);
 
 			VPFullScreenUserWidgetPrivate::FWorldCleanupListener::Get()->AddWidget(this);
 
@@ -759,6 +760,7 @@ void UVPFullScreenUserWidget::Hide()
 	{
 		ReleaseWidget();
 		FWorldDelegates::LevelRemovedFromWorld.RemoveAll(this);
+		FWorldDelegates::OnWorldCleanup.RemoveAll(this);
 
 		VPFullScreenUserWidgetPrivate::FWorldCleanupListener::Get()->RemoveWidget(this);
 
@@ -830,6 +832,14 @@ void UVPFullScreenUserWidget::OnLevelRemovedFromWorld(ULevel* InLevel, UWorld* I
 	// If the InLevel is invalid, then the entire world is about to disappear.
 	//Hide the widget to clear the memory and reference to the world it may hold.
 	if (InLevel == nullptr && InWorld && InWorld == World.Get())
+	{
+		Hide();
+	}
+}
+
+void UVPFullScreenUserWidget::OnWorldCleanup(UWorld* InWorld, bool bSessionEnded, bool bCleanupResources)
+{
+	if (IsDisplayed() && World == InWorld)
 	{
 		Hide();
 	}
