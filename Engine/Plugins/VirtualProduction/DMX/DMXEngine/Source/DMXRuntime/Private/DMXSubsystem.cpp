@@ -765,7 +765,6 @@ void UDMXSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 	for (const FAssetData& AssetData : AssetDatas)
 	{
-		{
 		UDMXLibrary* DMXLibrary = Cast<UDMXLibrary>(AssetData.ToSoftObjectPath().TryLoad());
 
 		if (DMXLibrary)

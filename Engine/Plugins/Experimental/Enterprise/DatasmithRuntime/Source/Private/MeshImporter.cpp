@@ -394,12 +394,12 @@ namespace DatasmithRuntime
 
 			// If normals are invalid, compute normals and tangents at polygon level then vertex level
 			if (bHasInvalidNormals)
-				{
-				FStaticMeshOperations::ComputePolygonTangentsAndNormals(MeshDescription, THRESH_POINTS_ARE_SAME);
+			{
+				FStaticMeshOperations::ComputeTriangleTangentsAndNormals(MeshDescription, THRESH_POINTS_ARE_SAME);
 
 				const EComputeNTBsFlags ComputeFlags = EComputeNTBsFlags::Normals | EComputeNTBsFlags::Tangents | EComputeNTBsFlags::UseMikkTSpace;
 				FStaticMeshOperations::ComputeTangentsAndNormals(MeshDescription, ComputeFlags);
-				}
+			}
 			else if (bHasInvalidTangents)
 			{
 				FStaticMeshOperations::ComputeMikktTangents(MeshDescription, true);

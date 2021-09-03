@@ -3286,7 +3286,7 @@ SLevelSnapshotsEditorResultsRow::~SLevelSnapshotsEditorResultsRow()
 	{
 		for (int32 SplitterSlotCount = 0; SplitterSlotCount < NestedSplitterPtr->GetChildren()->Num(); SplitterSlotCount++)
 		{
-			NestedSplitterPtr->SlotAt(SplitterSlotCount).OnSlotResized(nullptr);
+			NestedSplitterPtr->SlotAt(SplitterSlotCount).OnSlotResized();
 		}
 	}
 
@@ -3294,7 +3294,7 @@ SLevelSnapshotsEditorResultsRow::~SLevelSnapshotsEditorResultsRow()
 	{
 		for (int32 SplitterSlotCount = 0; SplitterSlotCount < OuterSplitterPtr->GetChildren()->Num(); SplitterSlotCount++)
 		{
-			OuterSplitterPtr->SlotAt(SplitterSlotCount).OnSlotResized(nullptr);
+			OuterSplitterPtr->SlotAt(SplitterSlotCount).OnSlotResized();
 		}
 	}
 

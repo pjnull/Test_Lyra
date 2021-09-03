@@ -228,7 +228,7 @@ namespace DataprepGeometryOperationsUtils
 				FMeshDescription* MeshDescription = BakeMeshDescription( StaticMeshComponent );
 				TestedMeshDescriptions.Add(MeshDescription);
 
-				TVertexAttributesConstRef<FVector> VertexPositions = MeshDescription->VertexAttributes().GetAttributesRef<FVector>(MeshAttribute::Vertex::Position);
+				TVertexAttributesConstRef<FVector3f> VertexPositions = MeshDescription->VertexAttributes().GetAttributesRef<FVector3f>(MeshAttribute::Vertex::Position);
 				for (FVertexID VertexID : MeshDescription->Vertices().GetElementIDs())
 				{
 					if (Volume->QueryDistance(VertexPositions[VertexID]) > MaxDistance)

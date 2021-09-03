@@ -17,12 +17,12 @@ struct FNDISpline_InstanceData_RenderThread
 		Reset();
 	}
 	
-	FMatrix SplineTransform;
-	FMatrix SplineTransformRotationMat;
-	FMatrix SplineTransformInverseTranspose;
+	FMatrix44f SplineTransform;
+	FMatrix44f SplineTransformRotationMat;
+	FMatrix44f SplineTransformInverseTranspose;
 	FQuat SplineTransformRotation;
 
-	FVector DefaultUpVector;
+	FVector3f DefaultUpVector;
 
 	float SplineLength;
 	float SplineDistanceStep;

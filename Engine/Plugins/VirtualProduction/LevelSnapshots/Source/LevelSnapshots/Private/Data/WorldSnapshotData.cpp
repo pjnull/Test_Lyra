@@ -658,7 +658,7 @@ namespace
 	{
 		check(ActorToDespawn);
 
-		if (!ActorToDespawn->IsPendingKill())
+		if ( IsValid(ActorToDespawn) )
 		{
 #if WITH_EDITOR
 			GEditor->SelectActor(ActorToDespawn, /*bSelect =*/true, /*bNotifyForActor =*/false, /*bSelectEvenIfHidden =*/true);
