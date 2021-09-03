@@ -525,7 +525,7 @@ namespace Audio
 
 		// Envelope following data
 		float EnvelopeValues[AUDIO_MIXER_MAX_OUTPUT_CHANNELS];
-		TArray<Audio::FEnvelopeFollower> EnvelopeFollowers;
+		Audio::FEnvelopeFollower EnvelopeFollower;
 		int32 EnvelopeNumChannels;
 		FCriticalSection EnvelopeCriticalSection;
 
@@ -569,7 +569,7 @@ namespace Audio
 
 		struct FSpectralAnalysisBandInfo
 		{
-			FEnvelopeFollower EnvelopeFollower;
+			FInlineEnvelopeFollower EnvelopeFollower;
 		};
 
 		struct FSpectrumAnalysisDelegateInfo
