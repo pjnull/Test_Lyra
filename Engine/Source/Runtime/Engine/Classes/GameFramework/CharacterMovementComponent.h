@@ -1103,27 +1103,6 @@ public:
 	/** Last valid projected hit result from raycast to geometry from navmesh */
 	FHitResult CachedProjectedNavMeshHitResult;
 
-	/** Remember last server movement base so we can detect mounts/dismounts and respond accordingly. */
-	UPrimitiveComponent* LastServerMovementBase = nullptr;
-
-	/** Remember last server movement base bone so we can detect mounts/dismounts and respond accordingly. */
-	FName LastServerMovementBaseBoneName = NAME_None;
-
-	/** Remember if the client was previously falling so we can tell when they've just landed. */
-	bool bLastClientIsFalling = false;
-
-	/** Remember if the server was previously falling so we can tell when they've just landed. */
-	bool bLastServerIsFalling = false;
-
-	/** Whether we were just walking on something, used to help with transitions off moving objects. */
-	bool bLastServerIsWalking = false;
-
-	/** Whether we're stepping off a moving platform (and should trust the client somewhat when landing). */
-	bool bCanTrustClientOnLanding = false;
-
-	/** How loosely the client can follow the server location during this fall. */
-	float MaxServerClientErrorWhileFalling = 0.f;
-
 	/** How often we should raycast to project from navmesh to underlying geometry */
 	UPROPERTY(Category="Character Movement: NavMesh Movement", EditAnywhere, BlueprintReadWrite, meta=(editcondition = "bProjectNavMeshWalking"))
 	float NavMeshProjectionInterval;
