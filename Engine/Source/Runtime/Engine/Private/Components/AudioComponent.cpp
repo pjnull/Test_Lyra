@@ -312,10 +312,9 @@ void UAudioComponent::OnUpdateTransform(EUpdateTransformFlags UpdateTransformFla
 		{
 			DECLARE_CYCLE_STAT(TEXT("FAudioThreadTask.UpdateAudioComponentTransform"), STAT_AudioUpdateComponentTransform, STATGROUP_AudioThreadCommands);
 
-			const FTransform& MyTransform = GetComponentTransform();
-			AudioDevice->SendCommandToActiveSounds(AudioComponentID, [MyTransform](FActiveSound& ActiveSound)
+			AudioDevice->SendCommandToActiveSounds(AudioComponentID, [NewTransform = GetComponentTransform()](FActiveSound& ActiveSound)
 			{
-				ActiveSound.Transform = MyTransform;
+				ActiveSound.Transform = NewTransform;
 			});
 		}
 	}

@@ -808,6 +808,7 @@ public:
 	* This call cannot be called from the GameThread & AudioComponents can now execute 
 	* multiple ActiveSound instances at once.  Use 'SendCommandToActiveSounds' instead.
 	*/
+	UE_DEPRECATED(5.0, "This call cannot be called from the GameThread & AudioComponents can now execute multiple ActiveSound instances at once.  Use 'SendCommandToActiveSounds' instead.")
 	FActiveSound* FindActiveSound(uint64 AudioComponentID);
 
 	/**
@@ -1353,7 +1354,7 @@ public:
 	}
 
 	/** Performs an operation on all active sounds requested to execute by an audio component */
-	void SendCommandToActiveSounds(uint64 InAudioComponentID, TFunction<void(FActiveSound&)> InFunc, const TStatId InStatId = TStatId());
+	void SendCommandToActiveSounds(uint64 InAudioComponentID, TUniqueFunction<void(FActiveSound&)> InFunc, const TStatId InStatId = TStatId());
 
 	virtual bool IsNonRealtime() const
 	{
