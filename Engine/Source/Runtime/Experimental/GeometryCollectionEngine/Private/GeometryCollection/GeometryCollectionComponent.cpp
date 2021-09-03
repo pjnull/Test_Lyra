@@ -1437,6 +1437,8 @@ void UGeometryCollectionComponent::InitConstantData(FGeometryCollectionConstantD
 		{
 			bUsingHideArray = true;
 
+			bool bAllHidden = true;
+
 			const TManagedArray<bool>& Hide = Collection->GetAttribute<bool>("Hide", FGeometryCollection::TransformGroup);
 			for (int32 GeomIdx = 0; GeomIdx < NumGeom; ++GeomIdx)
 			{
@@ -1447,6 +1449,17 @@ void UGeometryCollectionComponent::InitConstantData(FGeometryCollectionConstantD
 					{
 						VisibleOverride[FaceStart[GeomIdx]+FaceIdxOffset] = false;
 					}
+				}
+				else
+				{
+					bAllHidden = false;
+				}
+			}
+			if (!ensure(!bAllHidden)) // if they're all hidden, rendering would crash -- unhide them
+			{
+				for (int32 FaceIdx = 0; FaceIdx < VisibleOverride.Num(); ++FaceIdx)
+				{
+					VisibleOverride[FaceIdx] = true;
 				}
 			}
 		}
