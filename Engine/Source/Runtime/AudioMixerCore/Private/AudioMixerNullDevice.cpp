@@ -33,7 +33,7 @@ namespace Audio
 				WakeupEvent->Wait(MAX_uint32);
 				WakeupEvent->Reset();
 				
-				UE_LOG(LogAudioMixer, Display, TEXT("FMixerNullCallback: Simulating a h/w device callback at [%dms]"), (int32)(CallbackTime * 1000.f));
+				UE_CLOG(!bShouldShutdown && !bShouldRecyle, LogAudioMixer, Display, TEXT("FMixerNullCallback: Simulating a h/w device callback at [%dms]"), (int32)(CallbackTime * 1000.f));
 
 				// Reset our time differential.
 				AudioClock = FPlatformTime::Seconds();
