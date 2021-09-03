@@ -9396,7 +9396,6 @@ void UCharacterMovementComponent::ServerMoveHandleClientError(float ClientTimeSt
 		}
 	}
 
-				if (MovementBaseUtility::UseRelativeLocation(LastServerMovementBase) && !CharacterOwner->IsMatineeControlled())
 	// Compute the client error from the server's position
 	// If client has accumulated a noticeable positional error, correct them.
 	bNetworkLargeClientCorrection = ServerData->bForceClientUpdate;
