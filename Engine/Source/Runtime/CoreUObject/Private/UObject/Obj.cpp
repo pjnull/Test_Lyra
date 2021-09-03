@@ -1451,6 +1451,12 @@ void UObject::Serialize(FStructuredArchive::FRecord Record)
 			FSoftObjectPath::InvalidateTag();
 		}
 
+		// Keep track of sparse class data for undo/redo
+		if (UnderlyingArchive.IsTransacting() && HasAnyFlags(RF_ClassDefaultObject) && ObjClass->GetSparseClassDataStruct())
+		{
+			ObjClass->SerializeSparseClassData(Record.EnterField(SA_FIELD_NAME(TEXT("SparseClassData"))));
+		}
+
 		// Memory counting (with proper alignment to match C++)
 		SIZE_T Size = GetClass()->GetStructureSize();
 		UnderlyingArchive.CountBytes(Size, Size);
