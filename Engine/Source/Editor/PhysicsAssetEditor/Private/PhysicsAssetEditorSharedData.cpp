@@ -2575,6 +2575,13 @@ void FPhysicsAssetEditorSharedData::EnableSimulation(bool bEnableSimulation)
 	}
 	else
 	{
+		// keep the EditorSkelComp animation asset if any set 
+		UAnimationAsset* PreviewAnimationAsset = nullptr;
+		if (EditorSkelComp->PreviewInstance)
+		{
+			PreviewAnimationAsset = EditorSkelComp->PreviewInstance->CurrentAsset;
+		}
+
 		// Disable the PreviewInstance
 		//EditorSkelComp->AnimScriptInstance = nullptr;
 		//if(EditorSkelComp->GetAnimationMode() != EAnimationMode::AnimationSingleNode)
@@ -2597,7 +2604,13 @@ void FPhysicsAssetEditorSharedData::EnableSimulation(bool bEnableSimulation)
 		EditorSkelComp->SetWorldTransform(ResetTM);
 		// Force an update of the skeletal mesh to get it back to ref pose
 		EditorSkelComp->RefreshBoneTransforms();
-		
+	
+		// restore the EditorSkelComp animation asset 
+		if (PreviewAnimationAsset)
+		{
+			EditorSkelComp->EnablePreview(true, PreviewAnimationAsset);
+		}
+
 		BroadcastPreviewChanged();
 	}
 
