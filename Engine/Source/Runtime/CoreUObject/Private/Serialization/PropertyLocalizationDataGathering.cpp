@@ -202,6 +202,17 @@ void FPropertyLocalizationDataGatherer::GatherLocalizationDataFromObject(const U
 	// Gather text from our fields.
 	GatherLocalizationDataFromObjectFields(Path, Object, GatherTextFlags);
 
+	// Also gather from the sparse data on UClass types.
+	if (const UClass* Class = Cast<UClass>(Object))
+	{
+		if (const UScriptStruct* SparseDataStruct = Class->GetSparseClassDataStruct())
+		{
+			const void* SparseData = const_cast<UClass*>(Class)->GetOrCreateSparseClassData();
+			const void* ArchetypeSparseData = Class->GetArchetypeForSparseClassData();
+			GatherLocalizationDataFromStructWithCallbacks(Path + TEXT(".SparseClassData"), SparseDataStruct, SparseData, ArchetypeSparseData, GatherTextFlags);
+		}
+	}
+
 	// Also gather from the script data on UStruct types.
 	{
 		if (!!(GatherTextFlags & EPropertyLocalizationGathererTextFlags::ForceHasScript))
