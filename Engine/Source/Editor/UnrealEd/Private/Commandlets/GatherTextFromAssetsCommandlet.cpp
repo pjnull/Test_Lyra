@@ -328,6 +328,12 @@ void UGatherTextFromAssetsCommandlet::PurgeGarbage(const bool bPurgeReferencedPa
 	CollectGarbage(RF_NoFlags);
 	ObjectsToKeepAlive.Reset();
 
+	// Fully process the shader compilation results when performing a full purge, as it's the only way to reclaim that memory
+	if (bPurgeReferencedPackages && GShaderCompilingManager)
+	{
+		GShaderCompilingManager->ProcessAsyncResults(false, false);
+	}
+
 	if (!bPurgeReferencedPackages)
 	{
 		// Sort the remaining packages to gather so that currently loaded packages are processed first, followed by those with the most dependencies
@@ -892,6 +898,10 @@ int32 UGatherTextFromAssetsCommandlet::Main(const FString& Params)
 	}
 	UE_LOG(LogGatherTextFromAssetsCommandlet, Display, TEXT("Loaded %d packages in %.2f seconds. %d failed."), NumPackagesProcessed, FPlatformTime::Seconds() - PackageLoadingStartTime, NumPackagesFailed);
 
+	// Collect garbage after loading all packages
+	// This reclaims as much memory as possible for the rest of the gather pipeline
+	PurgeGarbage(/*bPurgeReferencedPackages*/true);
+	
 	if (GShaderCompilingManager)
 	{
 		GShaderCompilingManager->SkipShaderCompilation(!bWasShaderCompilationEnabled);
