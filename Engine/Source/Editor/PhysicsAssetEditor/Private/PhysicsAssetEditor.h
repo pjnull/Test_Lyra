@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "Stats/Stats.h"
 #include "Widgets/SWidget.h"
-#include "Widgets\Notifications\SNotificationList.h"
+#include "Widgets/Notifications/SNotificationList.h"
 #include "UObject/GCObject.h"
 #include "Textures/SlateIcon.h"
 #include "Editor/UnrealEdTypes.h"
