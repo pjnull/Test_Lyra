@@ -184,7 +184,7 @@ void UArrayProperty::Serialize(FArchive& Ar)
 {
 	Super::Serialize(Ar);
 	Ar << Inner;
-	checkSlow(Inner || HasAnyFlags(RF_ClassDefaultObject) || IsPendingKill());
+	checkSlow(Inner || HasAnyFlags(RF_ClassDefaultObject) || !IsValidChecked(this));
 }
 void UArrayProperty::AddReferencedObjects(UObject* InThis, FReferenceCollector& Collector)
 {
@@ -336,14 +336,14 @@ void UBoolProperty::Serialize(FArchive& Ar)
 	if (Ar.IsLoading())
 	{
 		Ar << NativeBool;
-		if (!IsPendingKill())
+		if (IsValidChecked(this))
 		{
 			SetBoolSize(BoolSize, !!NativeBool);
 		}
 	}
 	else
 	{
-		NativeBool = (!HasAnyFlags(RF_ClassDefaultObject) && !IsPendingKill() && Ar.IsSaving()) ? (IsNativeBool() ? 1 : 0) : 0;
+		NativeBool = (!HasAnyFlags(RF_ClassDefaultObject) && IsValidChecked(this) && Ar.IsSaving()) ? (IsNativeBool() ? 1 : 0) : 0;
 		Ar << NativeBool;
 	}
 }
