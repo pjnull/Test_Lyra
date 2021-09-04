@@ -729,28 +729,25 @@ void UReplicationGraph::FlushNetDormancy(AActor* Actor, bool bWasDormInitial)
 
 	GlobalInfo.LastFlushNetDormancyFrame = ReplicationGraphFrame;
 
-
 	if (bWasDormInitial)
 	{
 		AddNetworkActor(Actor);
 	}
-	else
-	{
-		GlobalInfo.Events.DormancyFlush.Broadcast(Actor, GlobalInfo);
 
-		// Stinks to have to iterate through like this, especially when net driver is doing a similar thing.
-		// Dormancy should probably be rewritten.
-		for (UNetReplicationGraphConnection* ConnectionManager: Connections)
+	GlobalInfo.Events.DormancyFlush.Broadcast(Actor, GlobalInfo);
+
+	// Stinks to have to iterate through like this, especially when net driver is doing a similar thing.
+	// Dormancy should probably be rewritten.
+	for (UNetReplicationGraphConnection* ConnectionManager: Connections)
+	{
+		if (FConnectionReplicationActorInfo* Info = ConnectionManager->ActorInfoMap.Find(Actor))
 		{
-			if (FConnectionReplicationActorInfo* Info = ConnectionManager->ActorInfoMap.Find(Actor))
-			{
-				Info->bDormantOnConnection = false;
-			}
-			// Actor is no longer going to be dormant so we're going to remove it from the prev dormant actor list
-			if (!GlobalInfo.bWantsToBeDormant)
-			{
-				ConnectionManager->PrevDormantActorList.RemoveFast(Actor);
-			}
+			Info->bDormantOnConnection = false;
+		}
+		// Actor is no longer going to be dormant so we're going to remove it from the prev dormant actor list
+		if (!GlobalInfo.bWantsToBeDormant)
+		{
+			ConnectionManager->PrevDormantActorList.RemoveFast(Actor);
 		}
 	}
 }
