@@ -323,7 +323,7 @@ void SLevelSnapshotsEditorCreationForm::OnWindowClosed(const TSharedRef<SWindow>
 		ProjectSettingsObjectPtr->SetLastCreationWindowSize(WindowSize);
 		ProjectSettingsObjectPtr->SaveConfig();
 	}
-
+	
 	if (DataManagementSettingsObjectPtr.IsValid())
 	{
 		DataManagementSettingsObjectPtr->SaveConfig();
