@@ -112,8 +112,9 @@ namespace QualityLevelProperty
 }
 
 #if WITH_EDITOR
-static TMap<FString, FSupportedQualityLevelArray> SupportedQualityLevels;
-static FCriticalSection CookCriticalSection;
+static TMap<FString, FSupportedQualityLevelArray> GSupportedQualityLevels;
+static FCriticalSection GCookCriticalSection;
+
 
 template<typename _StructType, typename _ValueType, EName _BasePropertyName>
 FSupportedQualityLevelArray FPerQualityLevelProperty<_StructType, _ValueType, _BasePropertyName>::GetSupportedQualityLevels(const TCHAR* InPlatformName) const
@@ -124,8 +125,8 @@ FSupportedQualityLevelArray FPerQualityLevelProperty<_StructType, _ValueType, _B
 	FSupportedQualityLevelArray* CachedCookingQualitLevelInfo = nullptr;
 	
 	{
-		FScopeLock ScopeLock(&CookCriticalSection);
-		CachedCookingQualitLevelInfo = SupportedQualityLevels.Find(InPlatformName);
+		FScopeLock ScopeLock(&GCookCriticalSection);
+		CachedCookingQualitLevelInfo = GSupportedQualityLevels.Find(InPlatformName);
 		if (CachedCookingQualitLevelInfo)
 		{
 			return *CachedCookingQualitLevelInfo;
@@ -164,8 +165,8 @@ FSupportedQualityLevelArray FPerQualityLevelProperty<_StructType, _ValueType, _B
 
 	// Cache the Scalability setting for this platform
 	{
-		FScopeLock ScopeLock(&CookCriticalSection);
-		CachedCookingQualitLevelInfo = &SupportedQualityLevels.Add(FString(InPlatformName), CookingQualitLevelInfo);
+		FScopeLock ScopeLock(&GCookCriticalSection);
+		CachedCookingQualitLevelInfo = &GSupportedQualityLevels.Add(FString(InPlatformName), CookingQualitLevelInfo);
 	}
 
 	return *CachedCookingQualitLevelInfo;
