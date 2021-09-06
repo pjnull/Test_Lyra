@@ -54,20 +54,20 @@ namespace
 					{
 						const int32 ChannelIndex = *ChannelPtr - 1;
 						if (ensure(UniverseData.IsValidIndex(ChannelIndex)))
-						{
-							if (bNormalizedValues)
 							{
+					if (bNormalizedValues)
+					{
 								MovieSceneFloatValue.Value = UDMXEntityFixtureType::BytesToNormalizedValue(CellAttributePtr->DataType, CellAttributePtr->bUseLSBMode, &UniverseData[ChannelIndex]);
-							}
-							else
-							{
+					}
+					else
+					{
 								MovieSceneFloatValue.Value = UDMXEntityFixtureType::BytesToInt(CellAttributePtr->DataType, CellAttributePtr->bUseLSBMode, &UniverseData[ChannelIndex]);
-							}
+					}
 						}
 
-						bAcquiredValue = true;
-					}
+					bAcquiredValue = true;
 				}
+			}
 			}
 			else
 			{

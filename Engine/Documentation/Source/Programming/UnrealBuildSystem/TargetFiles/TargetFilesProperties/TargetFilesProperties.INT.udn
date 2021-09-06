@@ -122,8 +122,6 @@ $ bCompileWithPluginSupport (Boolean): Whether to include plugin support.
 
 $ bCompileWithAccessibilitySupport (Boolean): Whether to allow accessibility code in both Slate and the OS layer.
 
-$ bCompileWithSlateWidgetTracking (Boolean): Whether to allow the Slate Widget Tracker to track registered Widgets.
-
 $ bUseDebugLiveCodingConsole (Boolean): Whether to enable support for live coding
 
 $ bWithDirectXMath (Boolean): Whether to enable support for DirectX Math LWC_TODO: No longer supported. Needs removing.
@@ -145,6 +143,8 @@ $ bCompileForSize (Boolean): True if we want to favor optimizing size over speed
 $ bForceCompileDevelopmentAutomationTests (Boolean): Whether to compile development automation tests.
 
 $ bForceCompilePerformanceAutomationTests (Boolean): Whether to compile performance automation tests.
+
+$ bForceDisableAutomationTests (Boolean): Whether to override the defaults for automation tests (Debug/Development configs)
 
 $ bEventDrivenLoader (Boolean): If true, event driven loader will be used in cooked builds. @todoio This needs to be replaced by a runtime solution after async loading refactor.
 
@@ -179,10 +179,6 @@ $ bAdaptiveUnityEnablesEditAndContinue (Boolean): Creates a dedicated PCH for ea
 $ bAdaptiveUnityCompilesHeaderFiles (Boolean): Creates a dedicated source file for each header file in the working set to detect missing includes in headers.
 
 $ MinGameModuleSourceFilesForUnityBuild (Int32): The number of source files in a game module before unity build will be activated for that module.  This allows small game modules to have faster iterative compile times for single files, at the expense of slower full rebuild times.  This setting can be overridden by the bFasterWithoutUnity option in a module's Build.cs file.
-
-$ DefaultWarningLevel (WarningLevel): Default treatment of uncategorized warnings
-
-$ DeprecationWarningLevel (WarningLevel): Whether to treat all warnings as errors. UE generally treats most warnings as errors, with the exception of deprecation warnings,
 
 $ ShadowVariableWarningLevel (WarningLevel): Forces shadow variable warnings to be treated as errors on platforms that support it.
 

@@ -102,8 +102,8 @@ void FDMXFixturePatchChannel::UpdateNumberOfChannels(bool bResetDefaultValues /*
 
 		for (int32 IdxCellY = 0; IdxCellY < NumYCells; IdxCellY++)
 		{
-			for (int32 IdxCellX = 0; IdxCellX < NumXCells; IdxCellX++)
-			{
+		for (int32 IdxCellX = 0; IdxCellX < NumXCells; IdxCellX++)
+		{
 				FIntPoint CellCoordinates = FIntPoint(IdxCellX, IdxCellY);
 
 				for (const FDMXFixtureCellAttribute& CellAttribute : Mode.FixtureMatrixConfig.CellAttributes)

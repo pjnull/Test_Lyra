@@ -70,10 +70,6 @@ $ bAdaptiveUnityCompilesHeaderFiles : Creates a dedicated source file for each h
 
 $ MinGameModuleSourceFilesForUnityBuild : The number of source files in a game module before unity build will be activated for that module.  This allows small game modules to have faster iterative compile times for single files, at the expense of slower full rebuild times.  This setting can be overridden by the bFasterWithoutUnity option in a module's Build.cs file.
 
-$ DefaultWarningLevel : Default treatment of uncategorized warnings
-
-$ DeprecationWarningLevel : Whether to treat all warnings as errors. UE generally treats most warnings as errors, with the exception of deprecation warnings,
-
 $ bWarningsAsErrors : Whether to enable all warnings as errors. UE enables most warnings as errors already, but disables a few (such as deprecation warnings).
 
 $ UnsafeTypeCastWarningLevel : Indicates what warning/error level to treat unsafe type casts as on platforms that support it (e.g., double->float or int64->int32)
@@ -193,11 +189,13 @@ $ WindowsSdkVersion : The specific Windows SDK version to use. This may be a spe
 
 $ StaticAnalyzer : The static analyzer to use.
 
+$ StaticAnalyzerOutputType : The output type to use for the static analyzer.
+
 $ bStrictConformanceMode : Enables strict standard conformance mode (/permissive-) in VS2017+.
 
 $ PCHMemoryAllocationFactor : Determines the amount of memory that the compiler allocates to construct precompiled headers (/Zm).
 
-$ PDBPageSize : Override the PDB page size. Used when the PDB file grows over 4GB. Expected values are 4096 (default), 8192, 16384, 32768
+$ AdditionalLinkerOptions : Allow the target to specify extra options for linking that aren't otherwise noted here
 
 $ bClangTimeTrace : (Experimental) Appends the -ftime-trace argument to the command line for Clang to output a JSON file containing a timeline for the compile. See http://aras-p.info/blog/2019/01/16/time-trace-timeline-flame-chart-profiler-for-Clang/ for more info.
 
@@ -237,15 +235,15 @@ $ MsvcCRTRedistVersion : Which MSVC CRT Redist version to use
 
 ### TaskExecutor
 
-$ bStopCompilationAfterErrors : When enabled, will stop compiling targets after a compile error occurs.
-
-$ bShowCompilationTimes : Whether to show compilation times along with worst offenders or not.
-
 $ MaxProcessorCount : Maximum processor count for local execution.
 
 $ ProcessorCountMultiplier : Processor count multiplier for local execution. Can be below 1 to reserve CPU for other tasks. When using the local executor (not XGE), run a single action on each CPU core. Note that you can set this to a larger value to get slightly faster build times in many cases, but your computer's responsiveness during compiling may be much worse. This value is ignored if the CPU does not support hyper-threading.
 
 $ MemoryPerActionBytes : Free memory per action in bytes, used to limit the number of parallel actions if the machine is memory starved. Set to 0 to disable free memory checking.
+
+$ bStopCompilationAfterErrors : When enabled, will stop compiling targets after a compile error occurs.
+
+$ bShowCompilationTimes : Whether to show compilation times along with worst offenders or not.
 
 ### HybridExecutor
 
