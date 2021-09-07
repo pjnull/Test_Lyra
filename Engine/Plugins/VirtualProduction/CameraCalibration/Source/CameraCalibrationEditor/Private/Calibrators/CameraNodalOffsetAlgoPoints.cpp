@@ -191,7 +191,7 @@ namespace CameraNodalOffsetAlgoPoints
 
 void UCameraNodalOffsetAlgoPoints::Initialize(UNodalOffsetTool* InNodalOffsetTool)
 {
-	GEditor->OnObjectsReplaced().AddUObject(this, &UCameraNodalOffsetAlgoPoints::OnObjectsReplaced);
+	FCoreUObjectDelegates::OnObjectsReplaced.AddUObject(this, &UCameraNodalOffsetAlgoPoints::OnObjectsReplaced);
 
 	NodalOffsetTool = InNodalOffsetTool;
 
@@ -201,7 +201,7 @@ void UCameraNodalOffsetAlgoPoints::Initialize(UNodalOffsetTool* InNodalOffsetToo
 
 void UCameraNodalOffsetAlgoPoints::Shutdown()
 {
-	GEditor->OnObjectsReplaced().RemoveAll(this);
+	FCoreUObjectDelegates::OnObjectsReplaced.RemoveAll(this);
 
 	NodalOffsetTool.Reset();
 }
