@@ -35,6 +35,7 @@
 #include "SkeletalMesh.generated.h"
 
 class UAnimInstance;
+class UAnimSequence;
 class UAssetUserData;
 class UBodySetup;
 class USkeletalMeshSocket;
@@ -413,11 +414,11 @@ struct FSkeletalMeshLODInfo
 
 	/** Pose which should be used to reskin vertex influences for which the bones will be removed in this LOD level, uses ref-pose by default */
 	UPROPERTY(EditAnywhere, Category = ReductionSettings)
-	TObjectPtr<class UAnimSequence> BakePose;
+	TObjectPtr<UAnimSequence> BakePose;
 
 	/** This is used when you are sharing the LOD settings, but you'd like to override the BasePose. This precedes prior to BakePose*/
 	UPROPERTY(EditAnywhere, Category = ReductionSettings)
-	TObjectPtr<class UAnimSequence> BakePoseOverride;
+	TObjectPtr<UAnimSequence> BakePoseOverride;
 
 	/** The filename of the file tha was used to import this LOD if it was not auto generated. */
 	UPROPERTY(VisibleAnywhere, Category= SkeletalMeshLODInfo, AdvancedDisplay)
@@ -937,7 +938,7 @@ protected:
 	UE_DEPRECATED(5.00, "This must be protected for async build, always use the accessors even internally.")
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Mesh)
 	FVector PositiveBoundsExtension;
-	
+
 	static FName GetPositiveBoundsExtensionMemberName()
 	{
 		PRAGMA_DISABLE_DEPRECATION_WARNINGS
@@ -2128,7 +2129,7 @@ public:
 	{
 		WaitUntilAsyncPropertyReleased(ESkeletalMeshAsyncProperties::RefBasesInvMatrix);
 		PRAGMA_DISABLE_DEPRECATION_WARNINGS
-		return RefBasesInvMatrix;
+			return RefBasesInvMatrix;
 		PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	}
 
