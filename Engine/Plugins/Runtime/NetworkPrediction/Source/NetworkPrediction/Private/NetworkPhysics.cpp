@@ -175,7 +175,10 @@ struct FNetworkPhysicsRewindCallback : public Chaos::IRewindCallback
 		const float Error = FQuat::ErrorAutoNormalize(A, B);
 		const bool b = D == 0 ? A != B : Error > D;
 
-		//UE_LOG(LogTemp, Warning, TEXT("Error: %f"), Error);
+		if (b)
+		{
+			//UE_LOG(LogTemp, Warning, TEXT("%s Error: %f"), Str, Error);
+		}
 
 		UE_CLOG(UE_NETWORK_PHYSICS::LogCorrections > 0 && b && Str, LogNetworkPhysics, Log, TEXT("%s correction. Server: %s. Local: %s. Delta: %f"), Str, *A.ToString(), *B.ToString(), FQuat::ErrorAutoNormalize(A, B));
 		return b;
