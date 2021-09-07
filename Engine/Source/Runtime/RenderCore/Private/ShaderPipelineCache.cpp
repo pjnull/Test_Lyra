@@ -628,12 +628,12 @@ bool FShaderPipelineCache::Precompile(FRHICommandListImmediate& RHICmdList, ESha
 			if (PSO.GraphicsDesc.MeshShader != FSHAHash())
 			{
 				FMeshShaderRHIRef MeshShader = FShaderCodeLibrary::CreateMeshShader(Platform, PSO.GraphicsDesc.MeshShader);
-				GraphicsInitializer.BoundShaderState.MeshShaderRHI = MeshShader;
+				GraphicsInitializer.BoundShaderState.SetMeshShader(MeshShader);
 
 				if (PSO.GraphicsDesc.AmplificationShader != FSHAHash())
 				{
 					FAmplificationShaderRHIRef AmplificationShader = FShaderCodeLibrary::CreateAmplificationShader(Platform, PSO.GraphicsDesc.AmplificationShader);
-					GraphicsInitializer.BoundShaderState.AmplificationShaderRHI = AmplificationShader;
+					GraphicsInitializer.BoundShaderState.SetAmplificationShader(AmplificationShader);
 				}
 			}
 			else
@@ -653,7 +653,7 @@ bool FShaderPipelineCache::Precompile(FRHICommandListImmediate& RHICmdList, ESha
 				if (PSO.GraphicsDesc.GeometryShader != FSHAHash())
 				{
 					GeometryShader = FShaderCodeLibrary::CreateGeometryShader(Platform, PSO.GraphicsDesc.GeometryShader);
-					GraphicsInitializer.BoundShaderState.GeometryShaderRHI = GeometryShader;
+					GraphicsInitializer.BoundShaderState.SetGeometryShader(GeometryShader);
 				}
 #endif
 			}
@@ -700,7 +700,7 @@ bool FShaderPipelineCache::Precompile(FRHICommandListImmediate& RHICmdList, ESha
 			GraphicsInitializer.bFromPSOFileCache = true;
 			
 			// Use SetGraphicsPipelineState to call down into PipelineStateCache and also handle the fallback case used by OpenGL.
-			SetGraphicsPipelineState(RHICmdList, GraphicsInitializer, 0, EApplyRendertargetOption::DoNothing, false);
+			SetGraphicsPipelineState(RHICmdList, GraphicsInitializer, 0, false);
 			bOk = true;
 		}
 		else if(FPipelineCacheFileFormatPSO::DescriptorType::Compute == PSO.Type)

@@ -50,7 +50,7 @@ FD3D12LowLevelGraphicsPipelineStateDesc GetLowLevelGraphicsPipelineStateDesc(con
 	}
 
 #define COPY_SHADER(Initial, Name) \
-	if (FD3D12##Name##Shader* Shader = (FD3D12##Name##Shader*) Initializer.BoundShaderState.##Name##ShaderRHI) \
+	if (FD3D12##Name##Shader* Shader = (FD3D12##Name##Shader*) Initializer.BoundShaderState.Get##Name##Shader()) \
 	{ \
 		Desc.Desc.Initial##S = Shader->ShaderBytecode.GetShaderBytecode(); \
 		Desc.Initial##SHash = Shader->ShaderBytecode.GetHash(); \
@@ -64,7 +64,7 @@ FD3D12LowLevelGraphicsPipelineStateDesc GetLowLevelGraphicsPipelineStateDesc(con
 
 #if PLATFORM_WINDOWS
 #define EXT_SHADER(Initial, Name) \
-	if (FD3D12##Name##Shader* Shader = (FD3D12##Name##Shader*) Initializer.BoundShaderState.##Name##ShaderRHI) \
+	if (FD3D12##Name##Shader* Shader = (FD3D12##Name##Shader*) Initializer.BoundShaderState.Get##Name##Shader()) \
 	{ \
 		if (Shader->VendorExtensions.Num() > 0) \
 		{ \

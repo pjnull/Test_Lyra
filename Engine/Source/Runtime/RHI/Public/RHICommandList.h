@@ -1347,6 +1347,22 @@ FRHICOMMAND_MACRO(FRHICommandSetGraphicsPipelineState)
 	RHI_API void Execute(FRHICommandListBase& CmdList);
 };
 
+#if PLATFORM_USE_FALLBACK_PSO
+FRHICOMMAND_MACRO(FRHICommandSetGraphicsPipelineStateFromInitializer)
+{
+	FGraphicsPipelineStateInitializer PsoInit;
+	uint32 StencilRef;
+	bool bApplyAdditionalState;
+	FORCEINLINE_DEBUGGABLE FRHICommandSetGraphicsPipelineStateFromInitializer(const FGraphicsPipelineStateInitializer& InPsoInit, uint32 InStencilRef, bool bInApplyAdditionalState)
+		: PsoInit(InPsoInit)
+		, StencilRef(InStencilRef)
+		, bApplyAdditionalState(bInApplyAdditionalState)
+	{
+	}
+	RHI_API void Execute(FRHICommandListBase& CmdList);
+};
+#endif
+
 struct FRHICommandDispatchComputeShaderString
 {
 	static const TCHAR* TStr() { return TEXT("FRHICommandDispatchComputeShader"); }
@@ -3049,10 +3065,10 @@ public:
 	void operator delete(void *RawMemory);
 	
 	inline FRHIVertexShader* GetBoundVertexShader() const { return BoundShaderInput.VertexShaderRHI; }
-	inline FRHIMeshShader* GetBoundMeshShader() const { return BoundShaderInput.MeshShaderRHI; }
-	inline FRHIAmplificationShader* GetBoundAmplificationShader() const { return BoundShaderInput.AmplificationShaderRHI; }
+	inline FRHIMeshShader* GetBoundMeshShader() const { return BoundShaderInput.GetMeshShader(); }
+	inline FRHIAmplificationShader* GetBoundAmplificationShader() const { return BoundShaderInput.GetAmplificationShader(); }
 	inline FRHIPixelShader* GetBoundPixelShader() const { return BoundShaderInput.PixelShaderRHI; }
-	inline FRHIGeometryShader* GetBoundGeometryShader() const { return BoundShaderInput.GeometryShaderRHI; }
+	inline FRHIGeometryShader* GetBoundGeometryShader() const { return BoundShaderInput.GetGeometryShader(); }
 
 	template <typename LAMBDA>
 	FORCEINLINE_DEBUGGABLE void EnqueueLambda(LAMBDA&& Lambda)
@@ -3441,6 +3457,20 @@ public:
 	{
 		SetGraphicsPipelineState(GraphicsPipelineState, ShaderInput, 0, bApplyAdditionalState);
 	}
+
+#if PLATFORM_USE_FALLBACK_PSO
+	FORCEINLINE_DEBUGGABLE void SetGraphicsPipelineState(const FGraphicsPipelineStateInitializer& PsoInit, uint32 StencilRef, bool bApplyAdditionalState)
+	{
+		//check(IsOutsideRenderPass());
+		BoundShaderInput = PsoInit.BoundShaderState;
+		if (Bypass())
+		{
+			GetContext().RHISetGraphicsPipelineState(PsoInit, StencilRef, bApplyAdditionalState);
+			return;
+		}
+		ALLOC_COMMAND(FRHICommandSetGraphicsPipelineStateFromInitializer)(PsoInit, StencilRef, bApplyAdditionalState);
+	}
+#endif
 
 	FORCEINLINE_DEBUGGABLE void DrawPrimitiveIndirect(FRHIBuffer* ArgumentBuffer, uint32 ArgumentOffset)
 	{
