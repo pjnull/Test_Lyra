@@ -3119,3 +3119,11 @@ int32 FAndroidMisc::GetAndroidScreenOrientation(EDeviceScreenOrientation ScreenO
 	return static_cast<int32>(AndroidScreenOrientation);
 }
 #endif // USE_ANDROID_JNI
+
+extern void AndroidThunkCpp_ShowConsoleWindow();
+void FAndroidMisc::ShowConsoleWindow()
+{
+#if !UE_BUILD_SHIPPING && USE_ANDROID_JNI
+	AndroidThunkCpp_ShowConsoleWindow();
+#endif // !UE_BUILD_SHIPPING && USE_ANDROID_JNI
+}
