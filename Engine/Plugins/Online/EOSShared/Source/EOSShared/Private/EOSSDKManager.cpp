@@ -89,13 +89,13 @@ namespace
 	{
 		void* Result = nullptr;
 
-		const FString SDKBinaryPath = FPaths::Combine(FPaths::ProjectDir(), TEXT("Binaries"), FPlatformProcess::GetBinariesSubdirectory(), TEXT(EOSSDK_RUNTIME_LIBRARY_NAME));
-		Result = FPlatformProcess::GetDllHandle(*SDKBinaryPath);
+		const FString ProjectBinaryPath = FPaths::Combine(FPaths::ProjectDir(), TEXT("Binaries"), FPlatformProcess::GetBinariesSubdirectory(), TEXT(EOSSDK_RUNTIME_LIBRARY_NAME));
+		Result = FPlatformProcess::GetDllHandle(*ProjectBinaryPath);
 
 		if (!Result)
 		{
-			// Fallback on searching by name
-			Result = FPlatformProcess::GetDllHandle(TEXT(EOSSDK_RUNTIME_LIBRARY_NAME));
+			const FString EngineBinaryPath = FPaths::Combine(FPaths::EngineDir(), TEXT("Binaries"), FPlatformProcess::GetBinariesSubdirectory(), TEXT(EOSSDK_RUNTIME_LIBRARY_NAME));
+			Result = FPlatformProcess::GetDllHandle(*EngineBinaryPath);
 		}
 
 		return Result;
@@ -300,7 +300,7 @@ void FEOSSDKManager::ReleaseReleasedPlatforms()
 	{
 		if (ensure(ActivePlatforms.Contains(PlatformHandle)))
 		{
-			EOS_Platform_Release(PlatformHandle);
+		EOS_Platform_Release(PlatformHandle);
 			ActivePlatforms.Remove(PlatformHandle);
 		}
 	}
@@ -308,11 +308,11 @@ void FEOSSDKManager::ReleaseReleasedPlatforms()
 
 	if (TickerHandle.IsValid() &&
 		ActivePlatforms.Num() == 0)
-	{
-		FTSTicker::GetCoreTicker().RemoveTicker(TickerHandle);
-		TickerHandle.Reset();
+		{
+			FTSTicker::GetCoreTicker().RemoveTicker(TickerHandle);
+			TickerHandle.Reset();
+		}
 	}
-}
 
 void FEOSSDKManager::Shutdown()
 {
@@ -322,11 +322,11 @@ void FEOSSDKManager::Shutdown()
 		ReleaseReleasedPlatforms();
 
 		if (ActivePlatforms.Num() > 0)
-		{
+			{
 			UE_LOG(LogEOSSDK, Warning, TEXT("FEOSSDKManager::Shutdown Releasing %d remaining platforms"), ActivePlatforms.Num());
 			ReleasedPlatforms.Append(ActivePlatforms);
 			ReleaseReleasedPlatforms();
-		}
+			}
 
 #if !NO_LOGGING
 		FCoreDelegates::OnLogVerbosityChanged.RemoveAll(this);
