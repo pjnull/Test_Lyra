@@ -517,7 +517,7 @@ FReply SSequencerTreeView::OnDrop(const FGeometry& MyGeometry, const FDragDropEv
 
 FReply SSequencerTreeView::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
 {
-	const TArray<FDisplayNodeRef>& ItemsSourceRef = (*this->TreeItemsSource);
+	const TArray<FDisplayNodeRef>& ItemsSourceRef = (*this->ItemsSource);
 
 	// Don't respond to key-presses containing "Alt" as a modifier
 	if (ItemsSourceRef.Num() > 0 && !InKeyEvent.IsAltDown())
@@ -844,7 +844,7 @@ bool SSequencerTreeView::SynchronizeSequencerSelectionWithTreeSelection()
 		FSequencer& Sequencer = SequencerNodeTree->GetSequencer();
 		FSequencerSelection& Selection = Sequencer.GetSelection();
 
-		const TArray<FDisplayNodeRef>& ItemsSourceRef = (*this->TreeItemsSource);
+		const TArray<FDisplayNodeRef>& ItemsSourceRef = (*this->ItemsSource);
 			
 		for (int32 ItemIndex = 0; ItemIndex < ItemsSourceRef.Num(); ++ItemIndex)
 		{
