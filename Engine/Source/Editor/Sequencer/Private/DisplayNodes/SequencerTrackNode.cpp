@@ -727,6 +727,11 @@ FText FSequencerTrackNode::GetDisplayName() const
 	return AssociatedTrack.IsValid() ? AssociatedTrack->GetDisplayName() : FText::GetEmpty();
 }
 
+FText FSequencerTrackNode::GetDisplayNameToolTipText() const
+{
+	return AssociatedTrack.IsValid() ? AssociatedTrack->GetDisplayNameToolTipText() : FText::GetEmpty();
+}
+
 FSlateColor FSequencerTrackNode::GetDisplayNameColor() const
 {
 	UMovieSceneTrack* Track = GetTrack();
