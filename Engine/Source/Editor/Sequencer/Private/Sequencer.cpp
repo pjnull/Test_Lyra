@@ -6453,17 +6453,17 @@ TArray<FGuid> FSequencer::AddActors(const TArray<TWeakObjectPtr<AActor> >& InAct
 		{
 			for (const FGuid& Possessable : PossessableGuids)
 			{
-				FString PossessablePath = NewNodePath += Possessable.ToString();
+				FString PossessablePath = NewNodePath + Possessable.ToString();
 
 				// Object Bindings use their FGuid as their unique key.
 				SequencerWidget->AddAdditionalPathToSelectionSet(PossessablePath);
 			}
 		}
-
-		RefreshTree();
-
-		SynchronizeSequencerSelectionWithExternalSelection();
 	}
+		
+	RefreshTree();
+
+	SynchronizeSequencerSelectionWithExternalSelection();
 
 	return PossessableGuids;
 }
