@@ -288,10 +288,7 @@ void STableViewBase::Tick( const FGeometry& AllottedGeometry, const double InCur
 				CurrentScrollOffset = TargetScrollOffset = DesiredScrollOffset;
 			}
 			
-			// FMath::Fractional() is insufficient here as it casts to int32 (too small for the integer part of a float when the scroll offset is enormous), so we do a double/int64 version here.
-			double FirstLineScrollOffset = CurrentScrollOffset / NumItemsPerLine;
-			FirstLineScrollOffset = FirstLineScrollOffset - (int64)FirstLineScrollOffset;
-			ItemsPanel->SetFirstLineScrollOffset(FirstLineScrollOffset);
+			ItemsPanel->SetFirstLineScrollOffset(GetFirstLineScrollOffset());
 
 			if (AllowOverscroll == EAllowOverscroll::Yes)
 			{
@@ -937,6 +934,14 @@ float STableViewBase::GetNumLiveWidgets() const
 int32 STableViewBase::GetNumItemsPerLine() const
 {
 	return 1;
+}
+
+float STableViewBase::GetFirstLineScrollOffset() const
+{
+	// FMath::Fractional() is insufficient here as it casts to int32 (too small for the integer part of a float when
+	// the scroll offset is enormous), so we do a double/int64 version here.
+	const double FirstLineScrollOffset = CurrentScrollOffset / GetNumItemsPerLine();
+	return FirstLineScrollOffset - (int64)FirstLineScrollOffset;
 }
 
 void STableViewBase::NavigateToWidget(const uint32 UserIndex, const TSharedPtr<SWidget>& NavigationDestination, ENavigationSource NavigationSource) const
