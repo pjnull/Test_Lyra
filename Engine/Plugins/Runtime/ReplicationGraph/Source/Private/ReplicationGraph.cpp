@@ -747,7 +747,7 @@ void UReplicationGraph::FlushNetDormancy(AActor* Actor, bool bWasDormInitial)
 		// Actor is no longer going to be dormant so we're going to remove it from the prev dormant actor list
 		if (!GlobalInfo.bWantsToBeDormant)
 		{
-			ConnectionManager->PrevDormantActorList.RemoveFast(Actor);
+			ConnectionManager->SetActorDormantOnConnection(Actor);
 		}
 	}
 }
@@ -833,10 +833,7 @@ void UReplicationGraph::NotifyActorDormancyChange(AActor* Actor, ENetDormancy Ol
 		// So we need to clear the per-connection dormancy bool here, since the one in FlushNetDormancy won't do it.
 		for (UNetReplicationGraphConnection* ConnectionManager: Connections)
 		{
-			if (FConnectionReplicationActorInfo* Info = ConnectionManager->ActorInfoMap.Find(Actor))
-			{
-				Info->bDormantOnConnection = false;
-			}
+			ConnectionManager->SetActorDormantOnConnection(Actor);
 		}
 	}
 }
@@ -2677,10 +2674,7 @@ void UNetReplicationGraphConnection::NotifyClientVisibleLevelNamesAdd(FName Leve
 		{
 			if (Actor && (Actor->NetDormancy == DORM_DormantAll || (Actor->NetDormancy == DORM_Initial && Actor->IsNetStartupActor() == false)))
 			{
-				if (FConnectionReplicationActorInfo* ActorInfo = ActorInfoMap.Find(Actor))
-				{
-					ActorInfo->bDormantOnConnection = false;
-				}
+				SetActorDormantOnConnection(Actor);
 			}
 		}
 	}
@@ -2823,6 +2817,15 @@ void UNetReplicationGraphConnection::OnUpdateViewerLocation(FLastLocationGatherI
 	}
 
 	LocationInfo->LastLocation = Viewer.ViewLocation;
+}
+
+void UNetReplicationGraphConnection::SetActorDormantOnConnection(AActor* InActor)
+{
+	if (FConnectionReplicationActorInfo* Info = ActorInfoMap.Find(InActor))
+	{
+		Info->bDormantOnConnection = false;
+		PrevDormantActorList.RemoveFast(InActor);
+	}
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------
@@ -5510,7 +5513,7 @@ void UReplicationGraphNode_GridSpatialization2D::GatherActorListsForConnection(c
 		{
 			int32 NumActorsToRemove = CVar_RepGraph_ReplicatedDormantDestructionInfosPerFrame;
 			
-			UE_LOG(LogReplicationGraph, Verbose, TEXT("UReplicationGraphNode_GridSpatialization2D::GatherActorListsForConnection: Removing %d Actors (List size: %d)"), Params.ConnectionManager.PrevDormantActorList.Num(), NumActorsToRemove);
+			UE_LOG(LogReplicationGraph, Verbose, TEXT("UReplicationGraphNode_GridSpatialization2D::GatherActorListsForConnection: Removing %d Actors (List size: %d)"), FMath::Min(NumActorsToRemove, Params.ConnectionManager.PrevDormantActorList.Num()), Params.ConnectionManager.PrevDormantActorList.Num());
 
 			// any previous dormant actors not in the current node dormant list
 			for (int32 i = 0; i < Params.ConnectionManager.PrevDormantActorList.Num() && NumActorsToRemove > 0; i++, NumActorsToRemove--)
