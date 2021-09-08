@@ -10,6 +10,7 @@ FName FContentBrowserItemPath::GetVirtualPathName() const
 
 FName FContentBrowserItemPath::GetInternalPathName() const
 {
+	check(!InternalPath.IsNone());
 	return InternalPath;
 }
 
@@ -20,6 +21,7 @@ FString FContentBrowserItemPath::GetVirtualPathString() const
 
 FString FContentBrowserItemPath::GetInternalPathString() const
 {
+	check(!InternalPath.IsNone());
 	return InternalPath.ToString();
 }
 
