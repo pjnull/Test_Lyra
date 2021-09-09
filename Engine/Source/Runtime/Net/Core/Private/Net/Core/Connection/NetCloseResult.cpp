@@ -305,13 +305,15 @@ ENetworkFailure::Type ToNetworkFailure(ENetCloseResult Val)
 
 ENetCloseResult FromSecurityEvent(ESecurityEvent::Type Val)
 {
-	const UEnum* NetFailEnum = StaticEnum<ENetworkFailure::Type>();
-	const uint32 FirstSecurityEvent = (uint32)NetFailEnum->GetMaxEnumValue();
-	const uint32 ConvertedVal = FirstSecurityEvent + (uint32)Val;
-
-	if (NetFailEnum != nullptr && ConvertedVal < (uint32)ENetCloseResult::Unknown)
+	if (const UEnum* NetFailEnum = StaticEnum<ENetworkFailure::Type>())
 	{
-		return (ENetCloseResult)(ConvertedVal);
+		const uint32 FirstSecurityEvent = (uint32)NetFailEnum->GetMaxEnumValue();
+		const uint32 ConvertedVal = FirstSecurityEvent + (uint32)Val;
+
+		if (ConvertedVal < (uint32)ENetCloseResult::Unknown)
+		{
+			return (ENetCloseResult)(ConvertedVal);
+		}
 	}
 
 	return ENetCloseResult::Unknown;
@@ -370,37 +372,37 @@ bool FNetCloseResultEnumTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Tests must cover all ESecurityEvent entries"),
 					FCString::Strlen(ESecurityEvent::ToString((ESecurityEvent::Type)(LastSecurityEvent + 1))) == 0);
 
-		const int64 FirstSecurityEventDuplicate = NetFailEnumLast + 1;
-		bool bFirstMismatch = false;
-		bool bListMismatch = false;
-
-		auto ConvertSecurityEnumName =
-			[](ESecurityEvent::Type InVal) -> FString
-			{
-				TStringBuilder<256> ConvertedElement;
-
-				ConvertedElement.Append(TEXT("Security"));
-				ConvertedElement.Append(ToCStr(FString(ESecurityEvent::ToString((ESecurityEvent::Type)InVal)).Replace(TEXT("_"), TEXT(""))));
-
-				return ConvertedElement.ToString();
-			};
-
-		for (int64 EnumIdx=0; EnumIdx<=LastSecurityEvent; EnumIdx++)
-		{
-			bListMismatch = bListMismatch || NetCloseResultEnum->GetNameStringByValue(FirstSecurityEventDuplicate + EnumIdx) !=
-												ConvertSecurityEnumName((ESecurityEvent::Type)EnumIdx);
-
-			if (EnumIdx == 0)
-			{
-				bFirstMismatch = bListMismatch;
-			}
-		}
-
-		TestFalse(TEXT("ENetCloseResult must contain ESecurityEvent entries, after ENetworkFailure entries"), bFirstMismatch);
-		TestFalse(TEXT("ENetCloseResult must contain all ESecurityEvent entries"), bListMismatch);
-
 		if (NetCloseResultEnum != nullptr)
 		{
+			const int64 FirstSecurityEventDuplicate = NetFailEnumLast + 1;
+			bool bFirstMismatch = false;
+			bool bListMismatch = false;
+
+			auto ConvertSecurityEnumName =
+				[](ESecurityEvent::Type InVal) -> FString
+				{
+					TStringBuilder<256> ConvertedElement;
+
+					ConvertedElement.Append(TEXT("Security"));
+					ConvertedElement.Append(ToCStr(FString(ESecurityEvent::ToString((ESecurityEvent::Type)InVal)).Replace(TEXT("_"), TEXT(""))));
+
+					return ConvertedElement.ToString();
+				};
+
+			for (int64 EnumIdx=0; EnumIdx<=LastSecurityEvent; EnumIdx++)
+			{
+				bListMismatch = bListMismatch || NetCloseResultEnum->GetNameStringByValue(FirstSecurityEventDuplicate + EnumIdx) !=
+													ConvertSecurityEnumName((ESecurityEvent::Type)EnumIdx);
+
+				if (EnumIdx == 0)
+				{
+					bFirstMismatch = bListMismatch;
+				}
+			}
+
+			TestFalse(TEXT("ENetCloseResult must contain ESecurityEvent entries, after ENetworkFailure entries"), bFirstMismatch);
+			TestFalse(TEXT("ENetCloseResult must contain all ESecurityEvent entries"), bListMismatch);
+
 			bool bConversionMismatch = false;
 
 			for (int64 EnumIdx=0; EnumIdx<=LastSecurityEvent && !bConversionMismatch; EnumIdx++)
