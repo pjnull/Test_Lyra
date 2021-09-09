@@ -2522,6 +2522,8 @@ FSoundWaveProxyPtr USoundWave::CreateSoundWaveProxy()
 	EnsureZerothChunkIsLoaded();
 #endif // #if WITH_EDITORONLY_DATA
 
+	LLM_SCOPE(ELLMTag::AudioSoundWaveProxies);
+
 	*bUseBinkAudioProxyFlag = bUseBinkAudio;
 	*bIsSeekableStreamingProxyFlag = bSeekableStreaming;
 	*bIsStreamingProxyFlag = IsStreaming(nullptr);
@@ -2535,6 +2537,8 @@ TUniquePtr<Audio::IProxyData> USoundWave::CreateNewProxyData(const Audio::FProxy
 #if WITH_EDITORONLY_DATA
 	EnsureZerothChunkIsLoaded();
 #endif // #if WITH_EDITORONLY_DATA
+
+	LLM_SCOPE(ELLMTag::AudioSoundWaveProxies);
 
 	*bUseBinkAudioProxyFlag = bUseBinkAudio;
 	*bIsSeekableStreamingProxyFlag = bSeekableStreaming;
@@ -3215,6 +3219,8 @@ FSoundWaveProxy::FSoundWaveProxy(USoundWave* InWave)
 	, CurrentChunkRevision(InWave->CurrentChunkRevision)
 #endif // #if WITH_EDITOR
 {
+	LLM_SCOPE(ELLMTag::AudioSoundWaveProxies);
+
 	// cache the runtime format for this wave
 	if (GEngine)
 	{
@@ -3240,6 +3246,7 @@ FSoundWaveProxy::FSoundWaveProxy(USoundWave* InWave)
 
 void FSoundWaveProxy::ReleaseCompressedAudio()
 {
+	LLM_SCOPE(ELLMTag::AudioSoundWaveProxies);
 	FirstChunk = FAudioChunkHandle();
 }
 
@@ -3251,6 +3258,7 @@ uint32 FSoundWaveProxy::GetSizeOfChunk(uint32 ChunkIndex) const
 
 TArrayView<const uint8> FSoundWaveProxy::GetZerothChunk(const FSoundWaveProxyPtr& SoundWaveProxy, bool bForImmediatePlayback)
 {
+	LLM_SCOPE(ELLMTag::AudioSoundWaveProxies);
 	if (ensure(SoundWaveProxy.IsValid()) && SoundWaveProxy->IsZerothChunkDataLoaded())
 	{
 		if (*SoundWaveProxy->bShouldUseStreamCachingPtr)
@@ -3275,6 +3283,7 @@ TArrayView<const uint8> FSoundWaveProxy::GetZerothChunk(const FSoundWaveProxyPtr
 
 bool FSoundWaveProxy::GetChunkData(int32 ChunkIndex, uint8** OutChunkData, bool bMakeSureChunkIsLoaded)
 {
+	LLM_SCOPE(ELLMTag::AudioSoundWaveProxies);
 	if (GetChunkFromDDC(ChunkIndex, OutChunkData, bMakeSureChunkIsLoaded) == 0)
 	{
 #if WITH_EDITORONLY_DATA
@@ -3314,6 +3323,8 @@ const TArrayView<uint8> FSoundWaveProxy::GetZerothChunkDataView() const
 
 void FSoundWaveProxy::EnsureZerothChunkIsLoaded()
 {
+	LLM_SCOPE(ELLMTag::AudioSoundWaveProxies);
+
 	// If the zeroth chunk is already loaded, early exit.
 	if (ZerothChunkData->GetView().Num() > 0 || !*bShouldUseStreamCachingPtr)
 	{
@@ -3381,6 +3392,7 @@ const FStreamedAudioChunk& FSoundWaveProxy::GetChunk(uint32 ChunkIndex) const
 
 int32 FSoundWaveProxy::GetChunkFromDDC(int32 ChunkIndex, uint8** OutChunkData, bool bMakeSureChunkIsLoaded)
 {
+	LLM_SCOPE(ELLMTag::AudioSoundWaveProxies);
 	// This function shouldn't be called on audio marked "ForceInline."
 	ensureMsgf(RunningPlatformData.IsValid(), TEXT("Calling GetNumChunks on a FSoundWaveProxy without RunnigPlatformData is not allowed! SoundWave: %s - %s")
 		, *GetFName().ToString(), EnumToString(LoadingBehavior));

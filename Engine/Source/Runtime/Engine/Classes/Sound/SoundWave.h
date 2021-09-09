@@ -327,6 +327,7 @@ public:
 
 	Audio::IProxyDataPtr Clone() const override
 	{
+		LLM_SCOPE(ELLMTag::AudioSoundWaveProxies);
 		return MakeUnique<FSoundWaveProxy>(*this);
 	}
 
