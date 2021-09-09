@@ -115,7 +115,7 @@ bool FOodleNetResultEnumTest::RunTest(const FString& Parameters)
 {
 	const UEnum* OodleResultEnum = StaticEnum<EOodleNetResult>();
 
-	if (TestTrue(TEXT("EOodleNetResult must exist"), OodleResultEnum != nullptr))
+	if (TestTrue(TEXT("EOodleNetResult must exist"), OodleResultEnum != nullptr) && OodleResultEnum != nullptr)
 	{
 		const int64 OodleResultEnumLast = OodleResultEnum->GetMaxEnumValue() - 1;
 		bool bLexMismatch = false;
