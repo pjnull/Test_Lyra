@@ -99,10 +99,11 @@ bool FMovieSceneEntitySystemRunner::HasQueuedUpdates() const
 {
 	if (UpdateQueue.Num() != 0 || DissectedUpdates.Num() != 0)
 	{
-		if (UMovieSceneEntitySystemLinker* Linker = GetLinker())
-		{
-			return Linker->EntityManager.HasStructureChangedSince(LastInstantiationVersion);
-		}
+		return true;
+	}
+	if (UMovieSceneEntitySystemLinker* Linker = GetLinker())
+	{
+		return Linker->EntityManager.HasStructureChangedSince(LastInstantiationVersion);
 	}
 	return false;
 }
