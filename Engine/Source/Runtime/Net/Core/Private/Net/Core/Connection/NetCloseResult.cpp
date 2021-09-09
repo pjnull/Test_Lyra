@@ -2,6 +2,7 @@
 
 // Includes
 #include "Net/Core/Connection/NetCloseResult.h"
+#include "Net/Core/Connection/NetEnums.h"
 #include "UObject/UObjectGlobals.h"
 #include "UObject/Class.h"
 
@@ -278,7 +279,7 @@ const TCHAR* LexToString(ENetCloseResult InResult)
 
 ENetCloseResult FromNetworkFailure(ENetworkFailure::Type Val)
 {
-	const UEnum* NetFailEnum = FindObject<UEnum>(nullptr, TEXT("NetCore.ENetworkFailure"));
+	const UEnum* NetFailEnum = StaticEnum<ENetworkFailure::Type>();
 	const uint32 RawVal = (uint32)Val;
 
 	if (NetFailEnum != nullptr && RawVal < (uint32)NetFailEnum->GetMaxEnumValue())
@@ -291,7 +292,7 @@ ENetCloseResult FromNetworkFailure(ENetworkFailure::Type Val)
 
 ENetworkFailure::Type ToNetworkFailure(ENetCloseResult Val)
 {
-	const UEnum* NetFailEnum = FindObject<UEnum>(nullptr, TEXT("NetCore.ENetworkFailure"));
+	const UEnum* NetFailEnum = StaticEnum<ENetworkFailure::Type>();
 	const uint32 RawVal = (uint32)Val;
 
 	if (NetFailEnum != nullptr && RawVal < (uint32)NetFailEnum->GetMaxEnumValue())
@@ -304,7 +305,7 @@ ENetworkFailure::Type ToNetworkFailure(ENetCloseResult Val)
 
 ENetCloseResult FromSecurityEvent(ESecurityEvent::Type Val)
 {
-	const UEnum* NetFailEnum = FindObject<UEnum>(nullptr, TEXT("NetCore.ENetworkFailure"));
+	const UEnum* NetFailEnum = StaticEnum<ENetworkFailure::Type>();
 	const uint32 FirstSecurityEvent = (uint32)NetFailEnum->GetMaxEnumValue();
 	const uint32 ConvertedVal = FirstSecurityEvent + (uint32)Val;
 
@@ -329,7 +330,7 @@ bool FNetCloseResultEnumTest::RunTest(const FString& Parameters)
 	using namespace UE::Net;
 
 	// Search by name due to remapping being required for old enums that have been moved
-	const UEnum* NetFailEnum = FindObject<UEnum>(nullptr, TEXT("NetCore.ENetworkFailure"));
+	const UEnum* NetFailEnum = StaticEnum<ENetworkFailure::Type>();
 	const UEnum* NetCloseResultEnum = StaticEnum<ENetCloseResult>();
 	int64 NetFailEnumLast = 0;
 
