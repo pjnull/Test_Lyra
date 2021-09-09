@@ -429,7 +429,7 @@ void UNetConnection::InitBase(UNetDriver* InDriver,class FSocket* InSocket, cons
 			},
 			[this]()
 			{
-				Close();
+				Close(ENetCloseResult::RPCDoS);
 			});
 	}
 
@@ -498,7 +498,19 @@ void UNetConnection::InitHandler()
 		{
 			Handler::Mode Mode = Driver->ServerConnection != nullptr ? Handler::Mode::Client : Handler::Mode::Server;
 
-			Handler->InitializeDelegates(FPacketHandlerLowLevelSendTraits::CreateUObject(this, &UNetConnection::LowLevelSend));
+			FPacketHandlerNotifyAddHandler NotifyAddHandler;
+			
+			NotifyAddHandler.BindLambda([this](TSharedPtr<HandlerComponent>& NewHandler)
+				{
+					if (NewHandler.IsValid())
+					{
+						NewHandler->InitFaultRecovery(GetFaultRecovery());
+					}
+				});
+
+			Handler->InitializeDelegates(FPacketHandlerLowLevelSendTraits::CreateUObject(this, &UNetConnection::LowLevelSend),
+											MoveTemp(NotifyAddHandler));
+
 			Handler->NotifyAnalyticsProvider(Driver->AnalyticsProvider, Driver->AnalyticsAggregator);
 			Handler->Initialize(Mode, MaxPacket * 8, false, nullptr, nullptr, Driver->NetDriverName);
 
@@ -830,8 +842,10 @@ const TCHAR* LexToString(const EConnectionState Value)
 	return TEXT("Invalid");
 }
 
-void UNetConnection::Close()
+void UNetConnection::Close(FNetResult&& CloseReason)
 {
+	using namespace UE::Net;
+
 	if (IsInternalAck())
 	{
 		SetReserveDestroyedChannels(false);
@@ -841,7 +855,21 @@ void UNetConnection::Close()
 	if (Driver != nullptr && GetConnectionState() != USOCK_Closed)
 	{
 		NETWORK_PROFILER(GNetworkProfiler.TrackEvent(TEXT("CLOSE"), *(GetName() + TEXT(" ") + LowLevelGetRemoteAddress()), this));
-		UE_LOG(LogNet, Log, TEXT("UNetConnection::Close: %s, Channels: %i, Time: %s"), *Describe(), OpenChannels.Num(), *FDateTime::UtcNow().ToString(TEXT("%Y.%m.%d-%H.%M.%S")));
+
+		UE_LOG(LogNet, Log, TEXT("UNetConnection::Close: %s, Channels: %i, Time: %s"), *Describe(), OpenChannels.Num(),
+				*FDateTime::UtcNow().ToString(TEXT("%Y.%m.%d-%H.%M.%S")));
+
+		FNetCloseResult* CastedCloseReason = Cast<ENetCloseResult>(&CloseReason);
+
+		if (CastedCloseReason == nullptr || *CastedCloseReason != ENetCloseResult::Unknown)
+		{
+			UE_LOG(LogNet, Log, TEXT("UNetConnection::Close: CloseReason:"));
+
+			for (FNetCloseResult::FConstIterator It(CloseReason); It; ++It)
+			{
+				UE_LOG(LogNet, Log, TEXT(" - %s"), ToCStr(It->DynamicToString()));
+			}
+		}
 
 		if (Channels[0] != nullptr)
 		{
@@ -898,7 +926,7 @@ void UNetConnection::CleanUp()
 		UE_LOG( LogNet, Log, TEXT( "UNetConnection::Cleanup: Closing open connection. %s" ), *Describe() );
 	}
 
-	Close();
+	Close(ENetCloseResult::Cleanup);
 
 	if (Driver != nullptr)
 	{
@@ -1228,11 +1256,21 @@ void UNetConnection::UpdateLevelVisibilityInternal(const FUpdateLevelVisibilityL
 		}
 		else
 		{
-			UE_LOG(LogPlayerController, Warning, TEXT("ServerUpdateLevelVisibility() ignored non-existant package. PackageName='%s', FileName='%s'"), *LevelVisibility.PackageName.ToString(), *LevelVisibility.FileName.ToString());
+			FString PackageNameStr = LevelVisibility.PackageName.ToString();
+			FString FileNameStr = LevelVisibility.FileName.ToString();
+
+			UE_LOG(LogPlayerController, Warning, TEXT("ServerUpdateLevelVisibility() ignored non-existant package. PackageName='%s', FileName='%s'"),
+					ToCStr(PackageNameStr), ToCStr(FileNameStr));
 
 			if (!LevelVisibility.bSkipCloseOnError)
 			{
-				Close();
+				TStringBuilder<1024> VisibilityParms;
+
+				VisibilityParms.Append(ToCStr(PackageNameStr));
+				VisibilityParms.Append(TEXT(','));
+				VisibilityParms.Append(ToCStr(FileNameStr));
+
+				Close({ENetCloseResult::MissingLevelPackage, VisibilityParms.ToString()});
 			}
 		}
 	}
@@ -1304,6 +1342,8 @@ void UNetConnection::InitSendBuffer()
 
 void UNetConnection::ReceivedRawPacket( void* InData, int32 Count )
 {
+	using namespace UE::Net;
+
 #if !UE_BUILD_SHIPPING
 	// Add an opportunity for the hook to block further processing
 	bool bBlockReceive = false;
@@ -1328,15 +1368,19 @@ void UNetConnection::ReceivedRawPacket( void* InData, int32 Count )
 
 	if (Handler.IsValid())
 	{
-		const ProcessedPacket UnProcessedPacket = Handler->Incoming(Data, Count);
+		FReceivedPacketView PacketView;
 
-		if (!UnProcessedPacket.bError)
+		PacketView.DataView = {Data, Count, ECountUnits::Bytes};
+
+		EIncomingResult IncomingResult = Handler->Incoming(PacketView);
+
+		if (IncomingResult == EIncomingResult::Success)
 		{
-			Count = FMath::DivideAndRoundUp(UnProcessedPacket.CountBits, 8);
+			Count = PacketView.DataView.NumBytes();
 
 			if (Count > 0)
 			{
-				Data = UnProcessedPacket.Data;
+				Data = PacketView.DataView.GetMutableData();
 			}
 			// This packed has been consumed
 			else
@@ -1346,8 +1390,11 @@ void UNetConnection::ReceivedRawPacket( void* InData, int32 Count )
 		}
 		else
 		{
-			CLOSE_CONNECTION_DUE_TO_SECURITY_VIOLATION(this, ESecurityEvent::Malformed_Packet,
-														TEXT("Packet failed PacketHandler processing."));
+			UE_LOG(LogNet, Warning, TEXT("Packet failed PacketHandler processing."));
+
+			FInPacketTraits& Traits = PacketView.Traits;
+
+			Close(AddToAndConsumeChainResultPtr(Traits.ExtendedError, ENetCloseResult::PacketHandlerIncomingError));
 
 			return;
 		}
@@ -1415,13 +1462,17 @@ void UNetConnection::ReceivedRawPacket( void* InData, int32 Count )
 		// MalformedPacket - Received a packet with 0's in the last byte
 		else
 		{
-			CLOSE_CONNECTION_DUE_TO_SECURITY_VIOLATION(this, ESecurityEvent::Malformed_Packet, TEXT("Received packet with 0's in last byte of packet"));
+			UE_LOG(LogNet, Warning, TEXT("Received packet with 0's in last byte of packet"));
+
+			Close(ENetCloseResult::ZeroLastByte);
 		}
 	}
 	// MalformedPacket - Received a packet of 0 bytes
 	else 
 	{
-		CLOSE_CONNECTION_DUE_TO_SECURITY_VIOLATION(this, ESecurityEvent::Malformed_Packet, TEXT("Received zero-size packet"));
+		UE_LOG(LogNet, Warning, TEXT("Received zero-size packet"));
+
+		Close(ENetCloseResult::ZeroSize);
 	}
 }
 
@@ -1543,8 +1594,10 @@ void UNetConnection::FlushNet(bool bIgnoreSimulation)
 		if (!HasReceivedClientPacket() && CVarRandomizeSequence.GetValueOnAnyThread() != 0)
 		{
 			UE_LOG(LogNet, Log, TEXT("Attempting to send data before handshake is complete. %s"), *Describe());
-			Close();
+
+			Close(ENetCloseResult::PrematureSend);
 			InitSendBuffer();
+
 			return;
 		}
 
@@ -2182,6 +2235,8 @@ FNetworkGUID UNetConnection::GetActorGUIDFromOpenBunch(FInBunch& Bunch)
 
 void UNetConnection::ReceivedPacket( FBitReader& Reader, bool bIsReinjectedPacket)
 {
+	using namespace UE::Net;
+
 	SCOPED_NAMED_EVENT(UNetConnection_ReceivedPacket, FColor::Green);
 	AssertValid();
 
@@ -2252,7 +2307,10 @@ void UNetConnection::ReceivedPacket( FBitReader& Reader, bool bIsReinjectedPacke
 		FNetPacketNotify::FNotificationHeader Header;
 		if (!PacketNotify.ReadHeader(Header, Reader))
 		{
-			CLOSE_CONNECTION_DUE_TO_SECURITY_VIOLATION(this, ESecurityEvent::Malformed_Packet, TEXT("Failed to read PacketHeader"));
+			UE_LOG(LogNet, Warning, TEXT("Failed to read PacketHeader"));
+
+			Close(ENetCloseResult::ReadHeaderFail);
+
 			return;
 		}
 
@@ -2383,7 +2441,10 @@ void UNetConnection::ReceivedPacket( FBitReader& Reader, bool bIsReinjectedPacke
 			// Sanity check
 			if (FNetPacketNotify::SequenceNumberT(LastNotifiedPacketId) != AckedSequence)
 			{
-				CLOSE_CONNECTION_DUE_TO_SECURITY_VIOLATION(this, ESecurityEvent::Malformed_Packet, TEXT("LastNotifiedPacketId != AckedSequence"));
+				UE_LOG(LogNet, Warning, TEXT("LastNotifiedPacketId != AckedSequence"));
+
+				Close(ENetCloseResult::AckSequenceMismatch);
+
 				return;
 			}
 
@@ -2404,7 +2465,10 @@ void UNetConnection::ReceivedPacket( FBitReader& Reader, bool bIsReinjectedPacke
 		// Extra information associated with the header (read only after acks have been processed)
 		if (PacketSequenceDelta > 0 && !ReadPacketInfo(Reader, bHasPacketInfoPayload))
 		{
-			CLOSE_CONNECTION_DUE_TO_SECURITY_VIOLATION(this, ESecurityEvent::Malformed_Packet, TEXT("Failed to read PacketHeader"));
+			UE_LOG(LogNet, Warning, TEXT("Failed to read extra PacketHeader information"));
+
+			Close(ENetCloseResult::ReadHeaderExtraFail);
+
 			return;
 		}
 	}
@@ -2478,7 +2542,10 @@ void UNetConnection::ReceivedPacket( FBitReader& Reader, bool bIsReinjectedPacke
 
 				if (ChIndex >= (uint32)MaxChannelSize)
 				{
-					CLOSE_CONNECTION_DUE_TO_SECURITY_VIOLATION(this, ESecurityEvent::Malformed_Packet, TEXT("Bunch channel index exceeds channel limit"));
+					UE_LOG(LogNet, Warning, TEXT("Bunch channel index exceeds channel limit"));
+
+					Close(ENetCloseResult::BunchBadChannelIndex);
+
 					return;
 				}
 
@@ -2593,7 +2660,10 @@ void UNetConnection::ReceivedPacket( FBitReader& Reader, bool bIsReinjectedPacke
 
 					if( Reader.IsError() )
 					{
-						CLOSE_CONNECTION_DUE_TO_SECURITY_VIOLATION(this, ESecurityEvent::Malformed_Packet, TEXT("Channel name serialization failed."));
+						UE_LOG(LogNet, Warning, TEXT("Channel name serialization failed."));
+
+						Close(ENetCloseResult::BunchChannelNameFail);
+
 						return;
 					}
 				}
@@ -2610,7 +2680,9 @@ void UNetConnection::ReceivedPacket( FBitReader& Reader, bool bIsReinjectedPacke
 			{
 				UE_LOG(LogNet, Error, TEXT("Existing channel at index %d with type \"%s\" differs from the incoming bunch's expected channel type, \"%s\"."),
 					Bunch.ChIndex, *Channel->ChName.ToString(), *Bunch.ChName.ToString());
-				Close();
+
+				Close(ENetCloseResult::BunchWrongChannelType);
+
 				return;
 			}
 
@@ -2630,7 +2702,10 @@ void UNetConnection::ReceivedPacket( FBitReader& Reader, bool bIsReinjectedPacke
 
 			if( Reader.IsError() )
 			{
-				CLOSE_CONNECTION_DUE_TO_SECURITY_VIOLATION(this, ESecurityEvent::Malformed_Packet, TEXT("Bunch header overflowed"));
+				UE_LOG(LogNet, Warning, TEXT("Bunch header overflowed"));
+
+				Close(ENetCloseResult::BunchHeaderOverflow);
+
 				return;
 			}
 
@@ -2641,7 +2716,10 @@ void UNetConnection::ReceivedPacket( FBitReader& Reader, bool bIsReinjectedPacke
 			if( Reader.IsError() )
 			{
 				// Bunch claims it's larger than the enclosing packet.
-				CLOSE_CONNECTION_DUE_TO_SECURITY_VIOLATION(this, ESecurityEvent::Invalid_Data, TEXT("Bunch data overflowed (%i %i+%i/%i)"), IncomingStartPos, HeaderPos, BunchDataBits, Reader.GetNumBits());
+				UE_LOG(LogNet, Warning, TEXT("Bunch data overflowed (%i %i+%i/%i)"), IncomingStartPos, HeaderPos, BunchDataBits, Reader.GetNumBits());
+
+				Close(ENetCloseResult::BunchDataOverflow);
+
 				return;
 			}
 
@@ -2681,9 +2759,12 @@ void UNetConnection::ReceivedPacket( FBitReader& Reader, bool bIsReinjectedPacke
 				// Can't handle other channels until control channel exists.
 				if ( Channels[0] == NULL )
 				{
-					//CLOSE_CONNECTION_DUE_TO_SECURITY_VIOLATION(this, ESecurityEvent::Malformed_Packet, TEXT( "UNetConnection::ReceivedPacket: Received non-control bunch before control channel was created. ChIndex: %i, ChType: %i" ), Bunch.ChIndex, Bunch.ChType);
-					UE_LOG( LogNetTraffic, Log, TEXT( "UNetConnection::ReceivedPacket: Received non-control bunch before control channel was created. ChIndex: %i, ChName: %s" ), Bunch.ChIndex, *Bunch.ChName.ToString() );
-					Close();
+					UE_LOG(LogNetTraffic, Log,
+							TEXT("ReceivedPacket: Received non-control bunch before control channel was created. ChIndex: %i, ChName: %s"),
+							Bunch.ChIndex, *Bunch.ChName.ToString());
+
+					Close(ENetCloseResult::BunchPrematureControlChannel);
+
 					return;
 				}
 				// on the server, if we receive bunch data for a channel that doesn't exist while we're still logging in,
@@ -2691,16 +2772,22 @@ void UNetConnection::ReceivedPacket( FBitReader& Reader, bool bIsReinjectedPacke
 				// so reject it
 				else if ( PlayerController == NULL && Driver->ClientConnections.Contains( this ) )
 				{
-					CLOSE_CONNECTION_DUE_TO_SECURITY_VIOLATION(this, ESecurityEvent::Malformed_Packet, TEXT( "UNetConnection::ReceivedPacket: Received non-control bunch before player controller was assigned. ChIndex: %i, ChName: %s" ), Bunch.ChIndex, *Bunch.ChName.ToString());
+					UE_LOG(LogNet, Warning,
+							TEXT("ReceivedPacket: Received non-control bunch before player controller was assigned. ChIndex: %i, ChName: %s" ),
+							Bunch.ChIndex, *Bunch.ChName.ToString());
+
+					Close(ENetCloseResult::BunchPrematureChannel);
+
 					return;
 				}
 			}
 			// ignore control channel close if it hasn't been opened yet
 			if ( Bunch.ChIndex == 0 && Channels[0] == NULL && Bunch.bClose && Bunch.ChName == NAME_Control )
 			{
-				//CLOSE_CONNECTION_DUE_TO_SECURITY_VIOLATION(this, ESecurityEvent::Malformed_Packet, TEXT( "UNetConnection::ReceivedPacket: Received control channel close before open" ));
-				UE_LOG( LogNetTraffic, Log, TEXT( "UNetConnection::ReceivedPacket: Received control channel close before open" ) );
-				Close();
+				UE_LOG(LogNetTraffic, Log, TEXT("ReceivedPacket: Received control channel close before open"));
+
+				Close(ENetCloseResult::BunchPrematureControlClose);
+
 				return;
 			}
 
@@ -2821,8 +2908,10 @@ void UNetConnection::ReceivedPacket( FBitReader& Reader, bool bIsReinjectedPacke
 				// Validate channel type.
 				if ( !Driver->IsKnownChannelName( Bunch.ChName ) )
 				{
-					// Unknown type.
-					CLOSE_CONNECTION_DUE_TO_SECURITY_VIOLATION(this, ESecurityEvent::Invalid_Data, TEXT( "UNetConnection::ReceivedPacket: Connection unknown channel type (%s)" ), *Bunch.ChName.ToString());
+					UE_LOG(LogNet, Warning, TEXT("ReceivedPacket: Connection unknown channel type (%s)"), *Bunch.ChName.ToString());
+
+					Close(ENetCloseResult::UnknownChannelType);
+
 					return;
 				}
 
@@ -2918,7 +3007,9 @@ void UNetConnection::ReceivedPacket( FBitReader& Reader, bool bIsReinjectedPacke
 			if (bIsServer && (Bunch.IsCriticalError() || Bunch.IsError()))
 			{
 				UE_LOG( LogNetTraffic, Error, TEXT("Received corrupted packet data from client %s.  Disconnecting."), *LowLevelGetRemoteAddress() );
-				Close();
+
+				Close(AddToAndConsumeChainResultPtr(Bunch.ExtendedError, ENetCloseResult::CorruptData));
+
 				return;
 			}
 
@@ -3690,7 +3781,8 @@ void UNetConnection::Tick(float DeltaSeconds)
 
 	if (bConnectionPendingCloseDueToSocketSendFailure)
 	{
-		Close();
+		Close(ENetCloseResult::SocketSendFailure);
+
 		bConnectionPendingCloseDueToSocketSendFailure = false;
 
 		// early out
@@ -3920,7 +4012,8 @@ void UNetConnection::HandleConnectionTimeout(const FString& Error)
 		GEngine->BroadcastNetworkFailure(Driver->GetWorld(), Driver, ENetworkFailure::ConnectionTimeout, Error);
 	}
 
-	Close();
+	Close(ENetCloseResult::ConnectionTimeout);
+
 #if USE_SERVER_PERF_COUNTERS
 	PerfCountersIncrement(TEXT("TimedoutConnections"));
 #endif
@@ -4040,7 +4133,7 @@ void UChildConnection::HandleClientPlayer(APlayerController* PC, UNetConnection*
 #endif
 		if (ensure(Parent != nullptr))
 		{
-			Parent->Close();
+			Parent->Close(ENetCloseResult::BadChildConnectionIndex);
 		}
 		return; // avoid crash
 	}
@@ -4322,8 +4415,10 @@ bool UNetConnection::TrackLogsPerSecond()
 		if ( LogsPerSecond > MAX_LOGS_PER_SECOND_INSTANT )
 		{
 			// Hit this instant limit, we instantly disconnect them
-			UE_LOG( LogNet, Warning, TEXT( "UNetConnection::TrackLogsPerSecond instant FAILED. LogsPerSecond: %f, RemoteAddr: %s" ), (float)LogsPerSecond, *LowLevelGetRemoteAddress() );
-			Close();		// Close the connection
+			UE_LOG(LogNet, Warning, TEXT("TrackLogsPerSecond instant FAILED. LogsPerSecond: %f, RemoteAddr: %s"),
+					(float)LogsPerSecond, *LowLevelGetRemoteAddress());
+
+			Close(ENetCloseResult::LogLimitInstant);
 
 #if USE_SERVER_PERF_COUNTERS
 			PerfCountersIncrement(TEXT("ClosedConnectionsDueToMaxBadRPCsLimit"));
@@ -4337,13 +4432,17 @@ bool UNetConnection::TrackLogsPerSecond()
 			LogSustainedCount++;
 
 			// Warn that we are approaching getting disconnected (will be useful when going over historical logs)
-			UE_LOG( LogNet, Warning, TEXT( "UNetConnection::TrackLogsPerSecond: LogsPerSecond > MAX_LOGS_PER_SECOND_SUSTAINED. LogSustainedCount: %i, LogsPerSecond: %f, RemoteAddr: %s" ), LogSustainedCount, (float)LogsPerSecond, *LowLevelGetRemoteAddress() );
+			UE_LOG(LogNet, Warning,
+					TEXT("TrackLogsPerSecond: LogsPerSecond > MAX_LOGS_PER_SECOND_SUSTAINED. LogSustainedCount: %i, LogsPerSecond: %f, RemoteAddr: %s"),
+					LogSustainedCount, (float)LogsPerSecond, *LowLevelGetRemoteAddress() );
 
 			if ( LogSustainedCount > MAX_SUSTAINED_COUNT )
 			{
 				// Hit the sustained limit for too long, disconnect them
-				UE_LOG( LogNet, Warning, TEXT( "UNetConnection::TrackLogsPerSecond: LogSustainedCount > MAX_SUSTAINED_COUNT. LogsPerSecond: %f, RemoteAddr: %s" ), (float)LogsPerSecond, *LowLevelGetRemoteAddress() );
-				Close();		// Close the connection
+				UE_LOG(LogNet, Warning, TEXT("TrackLogsPerSecond: LogSustainedCount > MAX_SUSTAINED_COUNT. LogsPerSecond: %f, RemoteAddr: %s"),
+						(float)LogsPerSecond, *LowLevelGetRemoteAddress());
+
+				Close(ENetCloseResult::LogLimitSustained);
 
 #if USE_SERVER_PERF_COUNTERS
 				PerfCountersIncrement(TEXT("ClosedConnectionsDueToMaxBadRPCsLimit"));

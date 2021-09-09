@@ -28,6 +28,7 @@
 #include "Net/Core/Misc/ResizableCircularQueue.h"
 #include "Net/NetAnalyticsTypes.h"
 #include "Net/RPCDoSDetection.h"
+#include "Net/Core/Connection/NetCloseResult.h"
 #include "Net/TrafficControl.h"
 
 #include "NetConnection.generated.h"
@@ -75,39 +76,6 @@ enum EConnectionState
 };
 ENGINE_API const TCHAR* LexToString(const EConnectionState Value);
 
-// 
-// Security event types used for UE_SECURITY_LOG
-//
-namespace ESecurityEvent
-{ 
-	enum Type
-	{
-		Malformed_Packet = 0, // The packet didn't follow protocol
-		Invalid_Data = 1,     // The packet contained invalid data
-		Closed = 2            // The connection had issues (potentially malicious) and was closed
-	};
-	
-	/** @return the stringified version of the enum passed in */
-	inline const TCHAR* ToString(const ESecurityEvent::Type EnumVal)
-	{
-		switch (EnumVal)
-		{
-			case Malformed_Packet:
-			{
-				return TEXT("Malformed_Packet");
-			}
-			case Invalid_Data:
-			{
-				return TEXT("Invalid_Data");
-			}
-			case Closed:
-			{
-				return TEXT("Closed");
-			}
-		}
-		return TEXT("");
-	}
-}
 
 /** If this connection is from a client, this is the current login state of this connection/login attempt */
 namespace EClientLoginState
@@ -272,6 +240,9 @@ public:
 UCLASS(customConstructor, Abstract, MinimalAPI, transient, config=Engine)
 class UNetConnection : public UPlayer
 {
+	using FNetResult = UE::Net::FNetResult;
+	using FNetCloseResult = UE::Net::FNetCloseResult;
+
 	GENERATED_BODY()
 
 public:
@@ -919,8 +890,32 @@ public:
 	 */
 	virtual TSharedPtr<const FInternetAddr> GetRemoteAddr() { return RemoteAddr; }
 
-	/** closes the connection (including sending a close notify across the network) */
-	ENGINE_API void Close();
+	/**
+	 * Closes the connection (including sending a close notify across the network)
+	 * NOTE: To be deprecated in the near future.
+	 */
+	void Close()
+	{
+		Close(FNetCloseResult());
+	}
+
+	/**
+	 * Closes the connection (including sending a close notify across the network)
+	 *
+	 * @param CloseReason	Specifies the reason for the Close
+	 */
+	void Close(FNetCloseResult&& CloseReason)
+	{
+		Close(static_cast<FNetResult&&>(MoveTemp(CloseReason)));
+	}
+
+	/**
+	 * Closes the connection (including sending a close notify across the network)
+	 *
+	 * @param CloseReason	Specifies the reason for the Close
+	 */
+	ENGINE_API void Close(FNetResult&& CloseReason);
+
 
 	/** closes the control channel, cleans up structures, and prepares for deletion */
 	ENGINE_API virtual void CleanUp();
