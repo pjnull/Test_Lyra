@@ -64,7 +64,7 @@ void FNetConnectionFaultRecovery::TickRealtime(double TimeSeconds)
 		}
 	}
 
-	if ((TimeSeconds - LastPerSecPacketCheck) > 1.0)
+	if (Connection != nullptr && (TimeSeconds - LastPerSecPacketCheck) > 1.0)
 	{
 		const int32 NewInTotalHandlerPacket = Connection->GetInTotalHandlerPackets();
 

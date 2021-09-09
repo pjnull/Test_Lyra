@@ -347,7 +347,7 @@ bool FNetCloseResultEnumTest::RunTest(const FString& Parameters)
 
 		TestTrue(TEXT("ENetCloseResult must contain (start with) all ENetworkFailure elements"),
 					(NetFailEnumLast == (int64)LastNetworkFailureEntry) &&
-					(NetFailEnumLast == (int64)LastNetworkFailureDuplicate));
+					((int64)LastNetworkFailureEntry == (int64)LastNetworkFailureDuplicate));
 
 
 		if (NetCloseResultEnum != nullptr)
