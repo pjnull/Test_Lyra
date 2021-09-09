@@ -29,6 +29,7 @@
 #include "Net/NetAnalyticsTypes.h"
 #include "Net/RPCDoSDetection.h"
 #include "Net/Core/Connection/NetCloseResult.h"
+#include "Net/NetConnectionFaultRecovery.h"
 #include "Net/TrafficControl.h"
 
 #include "NetConnection.generated.h"
@@ -492,6 +493,16 @@ public:
 	int32 InTotalPacketsLost, OutTotalPacketsLost;
 	/** total acks sent on this connection */
 	int32 OutTotalAcks;
+
+private:
+	/** total packets received on this connection, including PacketHandler */
+	int32 InTotalHandlerPackets;
+
+public:
+	int32 GetInTotalHandlerPackets() const
+	{
+		return InTotalHandlerPackets;
+	}
 
 	/** Percentage of packets lost during the last StatPeriod */
 	using FNetConnectionPacketLoss = TPacketLossData<3>;
@@ -1547,6 +1558,12 @@ private:
 	/** RPC/Replication code DoS detection */
 	FRPCDoSDetection RPCDoS;
 
+	/** NetConnection specific Fault Recovery for attempting to recover from connection faults, before triggering Close */
+	UE::Net::FNetConnectionFaultRecovery FaultRecovery;
+
+	/** Whether or not this NetConnection has already received an NMT_CloseReason message */
+	bool bReceivedCloseReason = false;
+
 
 	int32 GetFreeChannelIndex(const FName& ChName) const;
 
@@ -1561,6 +1578,29 @@ public:
 	{
 		return RPCDoS;
 	}
+
+	UE::Net::FNetConnectionFaultRecovery* GetFaultRecovery()
+	{
+		return &FaultRecovery;
+	}
+
+	bool HasReceivedCloseReason() const
+	{
+		return bReceivedCloseReason;
+	}
+
+	void SetReceivedCloseReason(bool bInReceivedCloseReason)
+	{
+		bReceivedCloseReason = bInReceivedCloseReason;
+	}
+
+private:
+	/**
+	 * Attempts to recover from a NetConnection error, and closes the connection if that fails
+	 *
+	 * @param InResult		The type of error result being handled
+	 */
+	void HandleNetResultOrClose(ENetCloseResult InResult);
 
 protected:
 	TOptional<FNetworkCongestionControl> NetworkCongestionControl;

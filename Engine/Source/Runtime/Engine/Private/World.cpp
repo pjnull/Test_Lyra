@@ -5557,7 +5557,7 @@ void UWorld::NotifyControlMessage(UNetConnection* Connection, uint8 MessageType,
 				{
 					UE_LOG(LogNet, Log, TEXT("%s received NMT_DebugText Text=[%s] Desc=%s DescRemote=%s"),
 							*Connection->Driver->GetDescription(), *Text, *Connection->LowLevelDescribe(),
-							*Connection->LowLevelGetRemoteAddress());
+							ToCStr(Connection->LowLevelGetRemoteAddress(true)));
 				}
 
 				break;
@@ -5586,7 +5586,8 @@ void UWorld::NotifyControlMessage(UNetConnection* Connection, uint8 MessageType,
 		if ( !Connection->IsClientMsgTypeValid( MessageType ) )
 		{
 			// If we get here, either code is mismatched on the client side, or someone could be spoofing the client address
-			UE_LOG( LogNet, Error, TEXT( "IsClientMsgTypeValid FAILED (%i): Remote Address = %s" ), (int)MessageType, *Connection->LowLevelGetRemoteAddress() );
+			UE_LOG(LogNet, Error, TEXT( "IsClientMsgTypeValid FAILED (%i): Remote Address = %s" ), (int)MessageType,
+					ToCStr(Connection->LowLevelGetRemoteAddress(true)));
 			Bunch.SetError();
 			return;
 		}
@@ -5955,7 +5956,59 @@ void UWorld::NotifyControlMessage(UNetConnection* Connection, uint8 MessageType,
 				{
 					UE_LOG(LogNet, Log, TEXT("%s received NMT_DebugText Text=[%s] Desc=%s DescRemote=%s"),
 							*Connection->Driver->GetDescription(), *Text, *Connection->LowLevelDescribe(),
-							*Connection->LowLevelGetRemoteAddress());
+							ToCStr(Connection->LowLevelGetRemoteAddress(true)));
+				}
+
+				break;
+			}
+
+			case NMT_CloseReason:
+			{
+				FString CloseReasonList;
+
+				if (FNetControlMessage<NMT_CloseReason>::Receive(Bunch, CloseReasonList) && !CloseReasonList.IsEmpty())
+				{
+					bool bValid = true;
+					auto IsAlnum_NoLocale = [](TCHAR Char) -> bool
+						{
+							return (Char >= TEXT('A') && Char <= TEXT('Z')) || (Char >= TEXT('a') && Char <= TEXT('z')) ||
+									(Char >= TEXT('0') && Char <= TEXT('9'));
+						};
+
+					for (const TCHAR CurChar : CloseReasonList)
+					{
+						if (!IsAlnum_NoLocale(CurChar) && CurChar != TEXT('_') && CurChar != TEXT(','))
+						{
+							bValid = false;
+							break;
+						}
+					}
+
+					if (bValid && !Connection->HasReceivedCloseReason())
+					{
+						const bool bAnalyticsValid = Connection->NetAnalyticsData.IsValid();
+						TArray<FString> CloseReasonsAlloc;
+						TArray<FString>& ClientCloseReasons = (bAnalyticsValid ? Connection->AnalyticsVars.ClientCloseReasons : CloseReasonsAlloc);
+
+						CloseReasonList.ParseIntoArray(ClientCloseReasons, TEXT(","));
+
+						if (ClientCloseReasons.Num() < 128)
+						{
+							UE_LOG(LogNet, Log, TEXT("NMT_CloseReason: (Client Disconnect Reasons) %s"),
+									ToCStr(Connection->LowLevelGetRemoteAddress(true)));
+
+							for (const FString& CurReason : ClientCloseReasons)
+							{
+								UE_LOG(LogNet, Log, TEXT(" - %s"), ToCStr(CurReason));
+							}
+						}
+						else
+						{
+							ClientCloseReasons.Empty();
+						}
+
+						Connection->SetReceivedCloseReason(true);
+					}
 				}
 
 				break;

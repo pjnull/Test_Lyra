@@ -85,6 +85,10 @@ static TAutoConsoleVariable<int32> CVarDisableBandwithThrottling(TEXT("net.Disab
 TAutoConsoleVariable<int32> CVarNetEnableCongestionControl(TEXT("net.EnableCongestionControl"), 0,
 	TEXT("Enables congestion control module."));
 
+static TAutoConsoleVariable<int32> CVarLogUnhandledFaults(TEXT("net.LogUnhandledFaults"), 1,
+	TEXT("Whether or not to warn about unhandled net faults (could be deliberate, depending on implementation). 0 = off, 1 = log once, 2 = log always."));
+
+
 extern int32 GNetDormancyValidate;
 extern bool GbNetReuseReplicatorsForDormantObjects;
 
@@ -326,6 +330,8 @@ UNetConnection::UNetConnection(const FObjectInitializer& ObjectInitializer)
  */
 void UNetConnection::InitBase(UNetDriver* InDriver,class FSocket* InSocket, const FURL& InURL, EConnectionState InState, int32 InMaxPacket, int32 InPacketOverhead)
 {
+	using namespace UE::Net;
+
 	// Oodle depends upon this
 	check(InMaxPacket <= MAX_PACKET_SIZE);
 
@@ -358,10 +364,14 @@ void UNetConnection::InitBase(UNetDriver* InDriver,class FSocket* InSocket, cons
 
 	// Analytics
 	TSharedPtr<FNetAnalyticsAggregator>& AnalyticsAggregator = Driver->AnalyticsAggregator;
+	const bool bIsReplay = IsReplay();
+	const bool bIsServer = Driver->IsServer();
 
-	if (AnalyticsAggregator.IsValid())
+	if (AnalyticsAggregator.IsValid() && !bIsReplay)
 	{
-		NetAnalyticsData = REGISTER_NET_ANALYTICS(AnalyticsAggregator, FNetConnAnalyticsData, TEXT("Core.ServerNetConn"));
+		const TCHAR* AnalyticsDataName = (bIsServer ? TEXT("Core.ServerNetConn") : TEXT("Core.ClientNetConn"));
+
+		NetAnalyticsData = REGISTER_NET_ANALYTICS(AnalyticsAggregator, FNetConnAnalyticsData, AnalyticsDataName);
 	}
 
 	NetConnectionHistogram.InitHitchTracking();
@@ -383,6 +393,35 @@ void UNetConnection::InitBase(UNetDriver* InDriver,class FSocket* InSocket, cons
 	Handler.Reset(NULL);
 
 	InitHandler();
+
+
+	FaultRecovery.InitDefaults((Driver != nullptr ? Driver->NetDriverName.ToString() : TEXT("")), this);
+
+	if (CVarLogUnhandledFaults.GetValueOnAnyThread() != 0)
+	{
+		FaultRecovery.FaultManager.SetUnhandledResultCallback([](FNetResult&& InResult)
+			{
+				static TArray<uint32> LoggedResults;
+
+				const int32 LogVal = CVarLogUnhandledFaults.GetValueOnAnyThread();
+				const bool bUniqueLog = LogVal == 1;
+				const bool bAlwaysLog = LogVal == 2;
+				const uint32 ResultHash = GetTypeHash(InResult);
+
+				if (bAlwaysLog || (bUniqueLog && !LoggedResults.Contains(ResultHash)))
+				{
+					if (bUniqueLog)
+					{
+						LoggedResults.AddUnique(ResultHash);
+					}
+
+					UE_LOG(LogNet, Warning, TEXT("NetConnection FaultManager: Unhandled fault: %s"),
+							ToCStr(InResult.DynamicToString(ENetResultString::WithChain)));
+				}
+
+				return EHandleNetResult::NotHandled;
+			});
+	}
 
 #if DO_ENABLE_NET_TEST
 	// Copy the command line settings from the net driver
@@ -410,7 +449,7 @@ void UNetConnection::InitBase(UNetDriver* InDriver,class FSocket* InSocket, cons
 		PackageMap = PackageMapClient;
 	}
 
-	if (Driver->IsServer() && !IsReplay())
+	if (bIsServer && !bIsReplay)
 	{
 		RPCDoS.Init(Driver->NetDriverName, AnalyticsAggregator,
 			[WorldPtr = TWeakObjectPtr<UWorld>(InDriver->GetWorld())]() -> UWorld*
@@ -859,6 +898,7 @@ void UNetConnection::Close(FNetResult&& CloseReason)
 		UE_LOG(LogNet, Log, TEXT("UNetConnection::Close: %s, Channels: %i, Time: %s"), *Describe(), OpenChannels.Num(),
 				*FDateTime::UtcNow().ToString(TEXT("%Y.%m.%d-%H.%M.%S")));
 
+		FString CloseReasonsStr;
 		FNetCloseResult* CastedCloseReason = Cast<ENetCloseResult>(&CloseReason);
 
 		if (CastedCloseReason == nullptr || *CastedCloseReason != ENetCloseResult::Unknown)
@@ -867,23 +907,43 @@ void UNetConnection::Close(FNetResult&& CloseReason)
 
 			for (FNetCloseResult::FConstIterator It(CloseReason); It; ++It)
 			{
+				if (CloseReasonsStr.Len() > 0)
+				{
+					CloseReasonsStr += TEXT(',');
+				}
+
+				CloseReasonsStr += It->DynamicToString(ENetResultString::ResultEnumOnly);
+
 				UE_LOG(LogNet, Log, TEXT(" - %s"), ToCStr(It->DynamicToString()));
 			}
 		}
 
+		const bool bReadyToSend = (Handler == nullptr || Handler->IsFullyInitialized()) && HasReceivedClientPacket();
+
 		if (Channels[0] != nullptr)
 		{
+			if (bReadyToSend && Driver->ServerConnection != nullptr)
+			{
+				FNetControlMessage<NMT_CloseReason>::Send(this, CloseReasonsStr);
+			}
+
 			Channels[0]->Close(EChannelCloseReason::Destroyed);
 		}
+
 		SetConnectionState(EConnectionState::USOCK_Closed);
 
-		if ((Handler == nullptr || Handler->IsFullyInitialized()) && HasReceivedClientPacket())
+		if (bReadyToSend)
 		{
 			FlushNet();
 		}
 
 		if (NetAnalyticsData.IsValid())
 		{
+			if (!AnalyticsVars.CloseReason.IsValid())
+			{
+				AnalyticsVars.CloseReason = MakeUnique<FNetResult>(MoveTemp(CloseReason));
+			}
+
 			NetAnalyticsData->CommitAnalytics(AnalyticsVars);
 		}
 
@@ -898,6 +958,18 @@ void UNetConnection::Close(FNetResult&& CloseReason)
 	LogCallLastTime		= 0;
 	LogCallCount		= 0;
 	LogSustainedCount	= 0;
+}
+
+void UNetConnection::HandleNetResultOrClose(ENetCloseResult InResult)
+{
+	using namespace UE::Net;
+
+	const EHandleNetResult RecoveryResult = FaultRecovery.HandleNetResult(InResult);
+
+	if (RecoveryResult == EHandleNetResult::NotHandled)
+	{
+		Close(InResult);
+	}
 }
 
 FString UNetConnection::Describe()
@@ -1366,6 +1438,8 @@ void UNetConnection::ReceivedRawPacket( void* InData, int32 Count )
 
 	uint8* Data = (uint8*)InData;
 
+	++InTotalHandlerPackets;
+
 	if (Handler.IsValid())
 	{
 		FReceivedPacketView PacketView;
@@ -1392,9 +1466,23 @@ void UNetConnection::ReceivedRawPacket( void* InData, int32 Count )
 		{
 			UE_LOG(LogNet, Warning, TEXT("Packet failed PacketHandler processing."));
 
-			FInPacketTraits& Traits = PacketView.Traits;
 
-			Close(AddToAndConsumeChainResultPtr(Traits.ExtendedError, ENetCloseResult::PacketHandlerIncomingError));
+			FInPacketTraits& Traits = PacketView.Traits;
+			const bool bErrorNotRecoverable = !Traits.ExtendedError.IsValid() ||
+												Traits.ExtendedError->HasChainResult(ENetCloseResult::NotRecoverable);
+			bool bCloseConnection = bErrorNotRecoverable;
+
+			if (!bErrorNotRecoverable)
+			{
+				const EHandleNetResult RecoveryResult = FaultRecovery.FaultManager.HandleNetResult(MoveTemp(*Traits.ExtendedError));
+
+				bCloseConnection = RecoveryResult == EHandleNetResult::NotHandled;
+			}
+
+			if (bCloseConnection)
+			{
+				Close(AddToAndConsumeChainResultPtr(Traits.ExtendedError, ENetCloseResult::PacketHandlerIncomingError));
+			}
 
 			return;
 		}
@@ -1464,7 +1552,7 @@ void UNetConnection::ReceivedRawPacket( void* InData, int32 Count )
 		{
 			UE_LOG(LogNet, Warning, TEXT("Received packet with 0's in last byte of packet"));
 
-			Close(ENetCloseResult::ZeroLastByte);
+			HandleNetResultOrClose(ENetCloseResult::ZeroLastByte);
 		}
 	}
 	// MalformedPacket - Received a packet of 0 bytes
@@ -1472,7 +1560,7 @@ void UNetConnection::ReceivedRawPacket( void* InData, int32 Count )
 	{
 		UE_LOG(LogNet, Warning, TEXT("Received zero-size packet"));
 
-		Close(ENetCloseResult::ZeroSize);
+		HandleNetResultOrClose(ENetCloseResult::ZeroSize);
 	}
 }
 
@@ -1480,9 +1568,19 @@ void UNetConnection::PreTickDispatch()
 {
 	const bool bIsServer = Driver->ServerConnection == nullptr;
 
-	if (bIsServer && !IsReplay())
+	if (!IsReplay())
 	{
-		RPCDoS.PreTickDispatch(Driver->LastTickDispatchRealtime);
+		double LastTickDispatchRealtime = Driver->LastTickDispatchRealtime;
+
+		if (bIsServer)
+		{
+			RPCDoS.PreTickDispatch(LastTickDispatchRealtime);
+		}
+
+		if (FaultRecovery.DoesRequireTick())
+		{
+			FaultRecovery.TickRealtime(LastTickDispatchRealtime);
+		}
 	}
 }
 
@@ -2309,7 +2407,7 @@ void UNetConnection::ReceivedPacket( FBitReader& Reader, bool bIsReinjectedPacke
 		{
 			UE_LOG(LogNet, Warning, TEXT("Failed to read PacketHeader"));
 
-			Close(ENetCloseResult::ReadHeaderFail);
+			HandleNetResultOrClose(ENetCloseResult::ReadHeaderFail);
 
 			return;
 		}
@@ -2467,7 +2565,7 @@ void UNetConnection::ReceivedPacket( FBitReader& Reader, bool bIsReinjectedPacke
 		{
 			UE_LOG(LogNet, Warning, TEXT("Failed to read extra PacketHeader information"));
 
-			Close(ENetCloseResult::ReadHeaderExtraFail);
+			HandleNetResultOrClose(ENetCloseResult::ReadHeaderExtraFail);
 
 			return;
 		}
@@ -2662,7 +2760,7 @@ void UNetConnection::ReceivedPacket( FBitReader& Reader, bool bIsReinjectedPacke
 					{
 						UE_LOG(LogNet, Warning, TEXT("Channel name serialization failed."));
 
-						Close(ENetCloseResult::BunchChannelNameFail);
+						HandleNetResultOrClose(ENetCloseResult::BunchChannelNameFail);
 
 						return;
 					}
@@ -2704,7 +2802,7 @@ void UNetConnection::ReceivedPacket( FBitReader& Reader, bool bIsReinjectedPacke
 			{
 				UE_LOG(LogNet, Warning, TEXT("Bunch header overflowed"));
 
-				Close(ENetCloseResult::BunchHeaderOverflow);
+				HandleNetResultOrClose(ENetCloseResult::BunchHeaderOverflow);
 
 				return;
 			}
@@ -2718,7 +2816,7 @@ void UNetConnection::ReceivedPacket( FBitReader& Reader, bool bIsReinjectedPacke
 				// Bunch claims it's larger than the enclosing packet.
 				UE_LOG(LogNet, Warning, TEXT("Bunch data overflowed (%i %i+%i/%i)"), IncomingStartPos, HeaderPos, BunchDataBits, Reader.GetNumBits());
 
-				Close(ENetCloseResult::BunchDataOverflow);
+				HandleNetResultOrClose(ENetCloseResult::BunchDataOverflow);
 
 				return;
 			}
