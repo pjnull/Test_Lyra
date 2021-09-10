@@ -14,22 +14,6 @@ using System.Security.Cryptography;
 
 namespace Gauntlet
 {
-
-	/// <summary>
-	/// Describes reasons an Unreal process may have exited
-	/// </summary>
-	public enum UnrealProcessResult
-	{
-		ExitOk,							// No known issues
-		InitializationFailure,			// Process failed to initialize (e.g. the editor or game failed to load)
-		EncounteredFatalError,			// A fatal error occured
-		EncounteredEnsure,				// An ensure occurred (will only be returned if the test considers ensures as fatal)
-		TimeOut,						// A timeout occurred
-		TestFailure,					// A test is known to have failed
-		UnrealError,					// Unreal exited with an error code unrelated to test issues
-		Unknown,						// Something not in the above
-	}
-
 	/// <summary>
 	/// Implementation of a Gauntlet TestNode that is capable of executing tests on an Unreal "session" where multiple
 	/// Unreal instances may be involved. This class leans on UnrealSession to do the work of spinning up, monitoring, and
@@ -75,58 +59,41 @@ namespace Gauntlet
 		/// <summary>
 		/// Returns a list of all log channels the heartbeat tick should look for.
 		/// </summary>
-		public virtual List<string> GetAdditionalLogChannels()
+		public virtual IEnumerable<string> GetHeartbeatLogCategories()
 		{
-			List<string> ReturnList = new List<string>();
-			ReturnList.Add("OrionTest");
-			return ReturnList;
+			return Enumerable.Empty<string>();
 		}
 
 		/// <summary>
-		/// Returns Warnings found during tests. By default only ensures and warnings in case of abnormal exit are considered
+		/// Returns Warnings found during tests. By default only ensures and are considered
 		/// </summary>
 		public override IEnumerable<string> GetWarnings()
 		{
-			if (RoleResults == null)
+			IEnumerable<string> WarningList = Events.Where(E => E.IsWarning).Select(E => E.Message);
+			
+			if (RoleResults != null)
 			{
-				return Events.Where(E => E.IsWarning).Select(E => E.Message);
+				WarningList = WarningList.Union(RoleResults.SelectMany(R => R.Events.Where(E => E.Severity == EventSeverity.Warning)).Select(E => E.Summary));
 			}
 
-			IEnumerable<string> Warnings = RoleResults.SelectMany(R =>
-			{
-				return R.LogSummary.Ensures.Select(E => E.Message);
-			}).ToList(); 
-
-			// add all warnings from from roles if desired
-			if (Flags.HasFlag(BehaviorFlags.PromoteWarnings))
-			{
-				Warnings = Warnings.Concat(RoleResults.SelectMany(R => R.LogSummary.Warnings.Select(W => W.ToString()))).ToList();
-			}
-
-			return Warnings;
+			return WarningList.ToArray();
 		}
 
 		/// <summary>
-		/// Returns Errors found during tests. By default only fatal errors and errors in case of abnormal exit are considered
+		/// Returns Errors found during tests. By default only fatal errors are considered
+		/// returning lists of events
 		/// </summary>
 		public override IEnumerable<string> GetErrors()
 		{
-			if (RoleResults == null)
+			IEnumerable<string> ErrorList = Events.Where(E => E.IsError).Select(E => E.Message);
+			
+			if (RoleResults != null)
 			{
-				return Events.Where(E => E.IsError).Select(E => E.Message);
+				ErrorList = ErrorList.Union(RoleResults.SelectMany(R => R.Events.Where(E => E.Severity == EventSeverity.Error)).Select(E => E.Summary));
 			}
 
-			var FailedRoles = GetRolesThatFailed();
-
-			IEnumerable<string> Errors = FailedRoles.Where(R => R.LogSummary.FatalError != null).Select(R => R.LogSummary.FatalError.Message).ToList();
-
-			// add all errors from from roles if desired
-			if (Flags.HasFlag(BehaviorFlags.PromoteErrors))
-			{
-				Errors = Errors.Union(RoleResults.SelectMany(R => R.LogSummary.Errors.Select(W => W.ToString()))).ToList();
-			}
-
-			return Errors;
+			return ErrorList.ToArray();
+			
 		}
 
 
@@ -240,15 +207,21 @@ namespace Gauntlet
 			public UnrealRoleArtifacts Artifacts;
 
 			/// <summary>
+			/// Events that occurred during the test pass. Asserts/Ensures/Errors/Warnings should all be in here
+			/// </summary>
+			public IEnumerable<UnrealTestEvent> Events;
+
+			/// <summary>
 			/// Constructor. All members are required
 			/// </summary>
-			public UnrealRoleResult(UnrealProcessResult InResult, int InExitCode, string InSummary, UnrealLog InLog, UnrealRoleArtifacts InArtifacts)
+			public UnrealRoleResult(UnrealProcessResult InResult, int InExitCode, string InSummary, UnrealLog InLog, UnrealRoleArtifacts InArtifacts, IEnumerable<UnrealTestEvent> InEvents)
 			{
 				ProcessResult = InResult;
 				ExitCode = InExitCode;
 				Summary = InSummary;
 				LogSummary = InLog;
 				Artifacts = InArtifacts;
+				Events = InEvents;
 			}
 		};
 
@@ -888,13 +861,20 @@ namespace Gauntlet
 
 			if (App != null)
 			{
-				List<string> LogCategories = GetAdditionalLogChannels();
+				List<string> LogCategories = new List<string>();
 				LogCategories.Add("Gauntlet");
 
 				UnrealLogParser Parser = new UnrealLogParser(App.StdOut);
 				List<string> TestLines = new List<string>();
 				TestLines.AddRange(Parser.GetLogChannels(LogCategories, true));
 
+				// get the categories used to monitor process (this needs rethought).
+				IEnumerable<string> HeartbeatCategories = GetHeartbeatLogCategories().Union(GetCachedConfiguration().LogCategoriesForEvents);
+
+				IEnumerable<UnrealLog.LogEntry> Entries = Parser.LogEntries.Where(E => HeartbeatCategories.Contains(E.Category));
+
+				TestLines.AddRange(Entries.Select(E => E.ToString()));
+								
 				for (int i = LastLogCount; i < TestLines.Count(); i++)
 				{
 					Log.Info(TestLines[i]);
@@ -1468,6 +1448,66 @@ namespace Gauntlet
 		}
 
 		/// <summary>
+		/// Creates an EventList from the artifacts for the specified role. By default this will be asserts (errors), ensures (warnings)
+		/// from the log, plus any log entries from categories that are the list returned by GetMonitoredLogCategories(). Nodes can also set
+		/// their behavior flags to elevate *all* warnings/errors
+		/// </summary>
+		/// <param name="InReason"></param>
+		/// <param name="InRoleArtifacts"></param>
+		/// <param name="InLog"></param>
+		/// <returns></returns>
+		protected virtual IEnumerable<UnrealTestEvent> CreateEventListFromArtifact(StopReason InReason, UnrealRoleArtifacts InRoleArtifacts, UnrealLog InLog)
+		{
+			List<UnrealTestEvent> EventList = new List<UnrealTestEvent>();
+
+			// Create events for any fatal errors in the log
+			if (InLog.FatalError != null)
+			{
+				UnrealTestEvent FatalEvent = new UnrealTestEvent(EventSeverity.Fatal, InLog.FatalError.Message, Enumerable.Empty<string>(), InLog.FatalError);
+				EventList.Add(FatalEvent);
+			}
+
+			// Create events for any ensures
+			foreach (UnrealLog.CallstackMessage Ensure in InLog.Ensures)
+			{
+				UnrealTestEvent EnsureEvent = new UnrealTestEvent(EventSeverity.Warning, Ensure.Message, Enumerable.Empty<string>(), Ensure);
+				EventList.Add(EnsureEvent);
+			}
+
+			HashSet<string> MonitoredCategorySet = new HashSet<string>();
+
+			foreach(string Category in GetCachedConfiguration().LogCategoriesForEvents)
+			{
+				MonitoredCategorySet.Add(Category);
+			}
+
+			bool TrackAllWarnings = GetCachedConfiguration().ShowWarningsInSummary || Flags.HasFlag(BehaviorFlags.PromoteWarnings);
+			bool TrackAllErrors = GetCachedConfiguration().ShowErrorsInSummary || Flags.HasFlag(BehaviorFlags.PromoteErrors);
+
+			// now look at the log. Add events for warnings/errors if the category is monitored or if this test is flagged to 
+			// promote all warnings/errors
+			foreach (UnrealLog.LogEntry Entry in InLog.LogEntries)
+			{
+				bool IsMonitored = MonitoredCategorySet.Contains(Entry.Category);
+
+				if (Entry.Level == UnrealLog.LogLevel.Warning && 
+					(IsMonitored || TrackAllWarnings))
+				{
+					EventList.Add(new UnrealTestEvent(EventSeverity.Warning, Entry.ToString(), Enumerable.Empty<string>()));
+				}
+
+				if (Entry.Level == UnrealLog.LogLevel.Error &&
+					(IsMonitored || TrackAllErrors))
+				{
+					EventList.Add(new UnrealTestEvent(EventSeverity.Error, Entry.ToString(), Enumerable.Empty<string>()));
+				}
+			}
+
+			return EventList;
+		}
+
+
+		/// <summary>
 		/// Returns a RoleResult, a representation of this roles result from the test, for the provided artifact
 		/// </summary>
 		/// <param name="InRoleArtifacts"></param>
@@ -1482,6 +1522,8 @@ namespace Gauntlet
 			// Give ourselves (and derived classes) a chance to analyze what happened
 			UnrealProcessResult ProcessResult = GetExitCodeAndReason(InReason, LogSummary, InRoleArtifacts, out ExitReason, out ExitCode);
 
+			IEnumerable<UnrealTestEvent> EventList = CreateEventListFromArtifact(InReason, InRoleArtifacts, LogSummary);
+
 			// if the test is stopping for a reason other than completion, mark this as failing incase derived classes
 			// don't do the right thing
 			if (InReason == StopReason.MaxDuration)
@@ -1490,7 +1532,7 @@ namespace Gauntlet
 				ExitCode = -1;
 			}
 
-			return new UnrealRoleResult(ProcessResult, ExitCode, ExitReason, LogSummary, InRoleArtifacts); 
+			return new UnrealRoleResult(ProcessResult, ExitCode, ExitReason, LogSummary, InRoleArtifacts, EventList); 
 		}
 
 		/// <summary>
@@ -1644,97 +1686,97 @@ namespace Gauntlet
 				LogSummary.Warnings.Count() > 0 ? string.Format("Log Warnings: {0}", LogSummary.Warnings.Count()) : null,
 			});
 
-			if (LogSummary.FatalError != null)
-			{
-				MB.H4(string.Format("Fatal Error: {0}", LogSummary.FatalError.Message));
-				MB.UnorderedList(LogSummary.FatalError.Callstack.Take(MaxCallstackLines));
+			// Separate the events we want to report on
+			IEnumerable<UnrealTestEvent> Asserts = InRoleResult.Events.Where(E => E.Severity == EventSeverity.Fatal);
+			IEnumerable<UnrealTestEvent> Errors = InRoleResult.Events.Where(E => E.Severity == EventSeverity.Error);
+			IEnumerable<UnrealTestEvent> Ensures = InRoleResult.Events.Where(E => E.IsEnsure);
+			IEnumerable<UnrealTestEvent> Warnings = InRoleResult.Events.Where(E => E.Severity == EventSeverity.Warning && !E.IsEnsure);
 
-				if (LogSummary.FatalError.Callstack.Count() > MaxCallstackLines)
+			foreach (UnrealTestEvent Event in Asserts)
+			{
+				MB.H4(string.Format("Fatal Error: {0}", Event.Summary));
+				MB.UnorderedList(Event.Details.Take(MaxCallstackLines));
+
+				if (Event.Details.Count() > MaxCallstackLines)
 				{
 					MB.Paragraph("See log for full callstack");
 				}
 			}
 
-			if (LogSummary.Ensures.Count() > 0)
+			foreach (UnrealTestEvent Event in Ensures)
 			{
-				foreach (var Ensure in LogSummary.Ensures.Distinct())
-				{
-					MB.H4(string.Format("Warning: Ensure: {0}", Ensure.Message));
-					MB.UnorderedList(Ensure.Callstack.Take(MaxCallstackLines));
+				MB.H4(string.Format("Warning: Ensure: {0}", Event.Summary));
+				MB.UnorderedList(Event.Details.Take(MaxCallstackLines));
 
-					if (Ensure.Callstack.Count() > MaxCallstackLines)
+				if (Event.Details.Count() > MaxCallstackLines)
+				{
+					MB.Paragraph("See log for full callstack");
+				}
+			}
+		
+
+			if (Errors.Any())
+			{
+				var ErrorList = Errors.Select(E => E.Summary).Distinct();
+				var PrintedErrorList = ErrorList;
+
+				string TrimStatement = "";
+
+				// too many warnings. If there was an abnormal exit show the last ones as they may be relevant
+				if (ErrorList.Count() > MaxLogLines)
+				{
+					if (LogSummary.HasAbnormalExit)
 					{
-						MB.Paragraph("See log for full callstack");
+						PrintedErrorList = ErrorList.Skip(ErrorList.Count() - MaxLogLines);
+						TrimStatement = string.Format("(Last {0} of {1} errors)", MaxLogLines, ErrorList.Count());
 					}
+					else
+					{
+						PrintedErrorList = ErrorList.Take(MaxLogLines);
+						TrimStatement = string.Format("(First {0} of {1} errors)", MaxLogLines, ErrorList.Count());
+					}
+				}
+
+				MB.H4("Errors:");
+				MB.UnorderedList(PrintedErrorList);
+
+				if (!string.IsNullOrEmpty(TrimStatement))
+				{
+					MB.Paragraph(TrimStatement);
 				}
 			}
 
-			// Show errors/warnings if that option is set	
-			if (GetCachedConfiguration().ShowErrorsInSummary)
+			if (Warnings.Any())
 			{
-				if (LogSummary.Errors.Count() > 0)
+				var WarningList = Warnings.Select(E => E.Summary).Distinct();
+				var PrintedWarningList = WarningList;
+
+				string TrimStatement = "";
+
+				// too many warnings. If there was an abnormal exit show the last ones as they may be relevant
+				if (WarningList.Count() > MaxLogLines)
 				{
-					IEnumerable<UnrealLog.LogEntry> Errors = LogSummary.Errors.Distinct();
-
-					string TrimStatement = "";
-
-					if (Errors.Count() > MaxLogLines)
+					if (LogSummary.HasAbnormalExit)
 					{
-						// too many errors. If there was an abnormal exit show the last ones as they may be relevant
-						if (LogSummary.HasAbnormalExit)
-						{
-							Errors = Errors.Skip(Errors.Count() - MaxLogLines);
-							TrimStatement = string.Format("(Last {0} of {1} errors)", MaxLogLines, LogSummary.Errors.Count());
-						}
-						else
-						{
-							Errors = Errors.Take(MaxLogLines);
-							TrimStatement = string.Format("(First {0} of {1} errors)", MaxLogLines, LogSummary.Errors.Count());
-						}
+						PrintedWarningList = WarningList.Skip(WarningList.Count() - MaxLogLines);
+						TrimStatement = string.Format("(Last {0} of {1} errors)", MaxLogLines, WarningList.Count());
 					}
-
-					MB.H4("Errors");
-					MB.UnorderedList(Errors.Select(E => E.ToString()));
-
-					if (!string.IsNullOrEmpty(TrimStatement))
+					else
 					{
-						MB.Paragraph(TrimStatement);
+						PrintedWarningList = WarningList.Take(MaxLogLines);
+						TrimStatement = string.Format("(First {0} of {1} errors)", MaxLogLines, WarningList.Count());
 					}
+				}
+
+				MB.H4("Warnings:");
+				MB.UnorderedList(PrintedWarningList);
+
+				if (!string.IsNullOrEmpty(TrimStatement))
+				{
+					MB.Paragraph(TrimStatement);
 				}
 			}
 
-			if (GetCachedConfiguration().ShowWarningsInSummary)
-			{
-				if (LogSummary.Warnings.Count() > 0)
-				{
-					IEnumerable<UnrealLog.LogEntry> Warnings = LogSummary.Warnings.Distinct();
-
-					string TrimStatement = "";
-
-					if (Warnings.Count() > MaxLogLines)
-					{
-						// too many warnings. If there was an abnormal exit show the last ones as they may be relevant
-						if (LogSummary.HasAbnormalExit)
-						{
-							Warnings = Warnings.Skip(Warnings.Count() - MaxLogLines);
-							TrimStatement = string.Format("(Last {0} of {1} warnings)", MaxLogLines, LogSummary.Warnings.Count());
-						}
-						else
-						{
-							Warnings = Warnings.Take(MaxLogLines);
-							TrimStatement = string.Format("(First {0} of {1} warnings)", MaxLogLines, LogSummary.Warnings.Count());
-						}
-					}
-
-					MB.H4("Warnings");
-					MB.UnorderedList(Warnings.Select(E => E.ToString()));
-
-					if (!string.IsNullOrEmpty(TrimStatement))
-					{
-						MB.Paragraph(TrimStatement);
-					}
-				}
-			}
 
 			MB.H4("Artifacts");
 			string[] ArtifactList = new string[]
