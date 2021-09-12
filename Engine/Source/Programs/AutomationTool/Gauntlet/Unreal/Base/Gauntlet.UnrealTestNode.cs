@@ -1675,15 +1675,27 @@ namespace Gauntlet
 
 			MB.H3(string.Format("Role: {0} ({1} {2})", RoleArtifacts.SessionRole.RoleType, RoleArtifacts.SessionRole.Platform, RoleArtifacts.SessionRole.Configuration));
 
-			//string RoleState = InRoleResult.ExitCode == 0 ? "Completed:" : "Error:";
-			string RoleState = "Result: ";
-			MB.Paragraph(string.Format("{0} {1} ({2}, ExitCode={3})", RoleState, InRoleResult.Summary, InRoleResult.ProcessResult, InRoleResult.ExitCode));
+			bool HaveFatalError = LogSummary.FatalError != null;
+
+			// If we have no fatal error use "Error" which Horde will highlight. Otherwise use "Failed" since the fatal error will be below and highligted
+			string FailedString = HaveFatalError ? "Failed: " : "Error: ";
+			string CompletedString = "Completed: ";
+
+			string RoleState = InRoleResult.ExitCode != 0 && InRoleResult.LogSummary.HasAbnormalExit ? FailedString : CompletedString;
+
+			MB.H4(string.Format("{0} {1} ({2}, ExitCode={3})", RoleState, InRoleResult.Summary, InRoleResult.ProcessResult, InRoleResult.ExitCode));
+
+			// log command line up here for visibility
+			//MB.Paragraph(string.Format("CommandLine: {0}", RoleArtifacts.AppInstance.CommandLine));
 
 			MB.UnorderedList(new string[] {
+				string.Format("CommandLine: {0}", RoleArtifacts.AppInstance.CommandLine),
+				string.Format("Log: {0}", RoleArtifacts.LogPath),
+				string.Format("SavedDir: {0}", RoleArtifacts.ArtifactPath),
 				LogSummary.FatalError != null ? "Fatal Errors: 1" : null,
 				LogSummary.Ensures.Count() > 0 ? string.Format("Ensures: {0}", LogSummary.Ensures.Count()) : null,
 				LogSummary.Errors.Count() > 0 ? string.Format("Log Errors: {0}", LogSummary.Errors.Count()) : null,
-				LogSummary.Warnings.Count() > 0 ? string.Format("Log Warnings: {0}", LogSummary.Warnings.Count()) : null,
+				LogSummary.Warnings.Count() > 0 ? string.Format("Log Warnings: {0}", LogSummary.Warnings.Count()) : null
 			});
 
 			// Separate the events we want to report on
@@ -1695,22 +1707,38 @@ namespace Gauntlet
 			foreach (UnrealTestEvent Event in Asserts)
 			{
 				MB.H4(string.Format("Fatal Error: {0}", Event.Summary));
-				MB.UnorderedList(Event.Details.Take(MaxCallstackLines));
 
-				if (Event.Details.Count() > MaxCallstackLines)
+				if (Event.Callstack.Any())
 				{
-					MB.Paragraph("See log for full callstack");
+					MB.UnorderedList(Event.Callstack.Take(MaxCallstackLines));
+
+					if (Event.Callstack.Count() > MaxCallstackLines)
+					{
+						MB.Paragraph("See log for full callstack");
+					}
+				}
+				else
+				{
+					MB.Paragraph("Could not parse callstack. See log for full callstack");
 				}
 			}
 
-			foreach (UnrealTestEvent Event in Ensures)
+			foreach (UnrealTestEvent Event in Ensures.Distinct())
 			{
 				MB.H4(string.Format("Warning: Ensure: {0}", Event.Summary));
-				MB.UnorderedList(Event.Details.Take(MaxCallstackLines));
 
-				if (Event.Details.Count() > MaxCallstackLines)
+				if (Event.Callstack.Any())
 				{
-					MB.Paragraph("See log for full callstack");
+					MB.UnorderedList(Event.Callstack.Take(MaxCallstackLines));
+
+					if (Event.Callstack.Count() > MaxCallstackLines)
+					{
+						MB.Paragraph("See log for full callstack");
+					}
+				}
+				else
+				{
+					MB.Paragraph("Could not parse callstack. See log for full callstack");
 				}
 			}
 		
@@ -1776,16 +1804,6 @@ namespace Gauntlet
 					MB.Paragraph(TrimStatement);
 				}
 			}
-
-
-			MB.H4("Artifacts");
-			string[] ArtifactList = new string[]
-			{
-				string.Format("Log: {0}", RoleArtifacts.LogPath),
-				string.Format("SavedDir: {0}", RoleArtifacts.ArtifactPath),
-				string.Format("Commandline: {0}", RoleArtifacts.AppInstance.CommandLine),
-			};
-			MB.UnorderedList(ArtifactList);
 
 			return MB.ToString(); 		
 		}
@@ -1913,7 +1931,6 @@ namespace Gauntlet
 		/// <returns></returns>
 		protected virtual string GetTestSummaryHeader()
 		{
-			int AbnormalExits = 0;
 			int FatalErrors = 0;
 			int Ensures = 0;
 			int Errors = 0;
@@ -1924,92 +1941,45 @@ namespace Gauntlet
 			bool TestFailed = GetTestResult() != TestResult.Passed;
 
 			// Good/Bad news upfront
+			string Prefix = TestFailed ? "Error: " : "";
 			string WarningStatement = (HasWarnings && !TestFailed)  ? " With Warnings" : "";
-			string ResultString = string.Format("*** {0}{1} ***", GetTestResult(), WarningStatement);
+			string ResultString = string.Format("{0}{1} {2}{3} ***", Prefix, this.Name, GetTestResult(), WarningStatement);
 			MB.H2(ResultString);
-
-			if (TestFailed)
-			{
-				// If the test didn't pass then show a brief summary of any roles that had an abnormal exit, or failing that
-				// are reported as having a failure. Tests should overload GetArtifactsWithFailures if necessary
-				IEnumerable<UnrealRoleResult> RolesCausingFailure = GetRolesThatExitedAbnormally();
-				bool HadAbnormalExit = RolesCausingFailure.Any();
-
-				if (!HadAbnormalExit)
-				{
-					RolesCausingFailure = GetRolesThatFailed();
-				}
-
-				// get roles that didn't fail
-				IEnumerable<UnrealRoleResult> RolesWithoutFailures = RoleResults.Where(R => R.ProcessResult == UnrealProcessResult.ExitOk);
-
-				if (RolesCausingFailure.Any())
-				{
-					List<string> RoleItems = new List<string>();
-
-					MB.H3("Roles with Failures");
-
-					foreach (var Role in RolesCausingFailure)
-					{
-						string RoleName = Role.Artifacts.SessionRole.RoleType.ToString();
-						MB.Paragraph(string.Format("Error: {0}: {1} ({2}, ExitCode {3})", RoleName, Role.Summary, Role.ProcessResult, Role.ExitCode));
 						
-						if (Role.LogSummary.FatalError != null)
-						{
-							MB.Paragraph(Role.LogSummary.FatalError.Message);
-							MB.UnorderedList(Role.LogSummary.FatalError.Callstack.Take(15));
-						}
+			IEnumerable<UnrealRoleResult> SortedRoles = RoleResults.OrderBy(R => R.ProcessResult == UnrealProcessResult.ExitOk);
 
-						MB.Paragraph("Logs/Saved:");
-						MB.UnorderedList(new string[] { Role.Artifacts.LogPath, Role.Artifacts.ArtifactPath });
-					}
+			// create a quick summary of total failures, ensures, errors, etc. Don't write out errors etc for roles, those will be
+			// displayed individually by GetFormattedRoleSummary
+			foreach (var RoleResult in SortedRoles)
+			{
+				string RoleName = RoleResult.Artifacts.SessionRole.RoleType.ToString();
 
-					MB.Paragraph(string.Format("(See 'Role Report' above summary for more details on each role)", RolesCausingFailure.First().Artifacts.SessionRole.ToString()));
-				}
-				else
-				{
-					MB.Paragraph(string.Format("Error: {0} failed due to undiagnosed reasons", this.Name));
-					MB.Paragraph("See 'Role Report' above summary for more details on each role");
-				}
+				MB.Paragraph(string.Format("{0} Role: {1} ({2}, ExitCode {3})", RoleName, RoleResult.Summary, RoleResult.ProcessResult, RoleResult.ExitCode));
 
-				// show roles without issues incase cross-referencing is needed
-				/*if (RolesWithoutFailures.Any())
-				{
-					MB.H3("Roles with no reported failures");
+				FatalErrors += RoleResult.LogSummary.FatalError != null ? 1 : 0;
+				Ensures += RoleResult.LogSummary.Ensures.Count();
+				Errors += RoleResult.LogSummary.Errors.Count();
+				Warnings += RoleResult.LogSummary.Warnings.Count();
+			}
 
-					foreach (var Role in RolesWithoutFailures)
-					{
-						string RoleName = Role.Artifacts.SessionRole.RoleType.ToString();
-						MB.Paragraph(string.Format("Completed: {0}: {1} ({2}, ExitCode {3})", RoleName, Role.Summary, Role.ProcessResult, Role.ExitCode));
-						MB.UnorderedList(new string[] { Role.Artifacts.LogPath, Role.Artifacts.ArtifactPath });
-					}
-				}*/
+			MB.UnorderedList(new string[] {
+				string.Format("Context: {0}", Context.ToString()),
+				FatalErrors > 0 ? string.Format("FatalErrors: {0}", FatalErrors) : null,
+				Ensures > 0 ? string.Format("Ensures: {0}", Ensures) : null,
+				Errors > 0 ? string.Format("Log Errors: {0}", Errors) : null,
+				Warnings > 0 ? string.Format("Log Warnings: {0}", Warnings) : null,
+				string.Format("Result: {0}", GetTestResult())
+			});
+
+			if (TestFailed && GetRolesThatExitedAbnormally().Any() == false)
+			{
+				MB.Paragraph(string.Format("Error: {0} failed due to undiagnosed reasons", this.Name));
+				MB.Paragraph("See 'Role Report' below for more details on each role");
 			}
 			else
 			{
-				// create a quicck summary of total failures, ensures, errors, etc
-				foreach (var RoleResult in RoleResults)
-				{
-					if (RoleResult.ExitCode != 0 && RoleResult.Artifacts.AppInstance.WasKilled == false)
-					{
-						AbnormalExits++;
-					}
-
-					FatalErrors += RoleResult.LogSummary.FatalError != null ? 1 : 0;
-					Ensures += RoleResult.LogSummary.Ensures.Count();
-					Errors += RoleResult.LogSummary.Errors.Count();
-					Warnings += RoleResult.LogSummary.Warnings.Count();
-				}
-
-				MB.UnorderedList(new string[] {
-					string.Format("Context: {0}", Context.ToString()),
-					FatalErrors > 0 ? string.Format("FatalErrors: {0}", FatalErrors) : null,
-					Ensures > 0 ? string.Format("Ensures: {0}", Ensures) : null,
-					Errors > 0 ? string.Format("Log Errors: {0}", Errors) : null,
-					Warnings > 0 ? string.Format("Log Warnings: {0}", Warnings) : null,
-					string.Format("Result: {0}", GetTestResult())
-				});
-			}
+				MB.Paragraph("See 'Role Report' below for more details on each role");
+			}			
 
 			return MB.ToString();
 		}
@@ -2042,10 +2012,16 @@ namespace Gauntlet
 				Score += R.LogSummary.Warnings.Count();
 
 				return Score;
-			});
+			});		
+
+			// add Summary
+			ReportBuilder.HorizontalLine();
+			ReportBuilder.H1("Test Summary: " + this.Name);
+			ReportBuilder.HorizontalLine();
+			ReportBuilder.Append(GetTestSummaryHeader());
 
 			ReportBuilder.HorizontalLine();
-			ReportBuilder.H1(string.Format("Role(s) Report: {0}", this.Name));
+			ReportBuilder.H1(string.Format("Role(s): {0}", this.Name));
 			ReportBuilder.HorizontalLine();
 
 			// Add a summary of each 
@@ -2053,13 +2029,7 @@ namespace Gauntlet
 			{
 				string Summary = GetFormattedRoleSummary(Role);
 				ReportBuilder.Append(Summary);
-				ReportBuilder.HorizontalLine();
 			}
-
-			// add Summary
-			ReportBuilder.H1("Test Report: " + this.Name);
-			ReportBuilder.HorizontalLine();
-			ReportBuilder.Append(GetTestSummaryHeader());
 
 			return ReportBuilder.ToString();
 		}
