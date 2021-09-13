@@ -1635,7 +1635,7 @@ bool UNiagaraGraph::RenameParameter(const FNiagaraVariable& Parameter, FName New
 	NewParameter.SetName(NewName);
 
 	TObjectPtr<UNiagaraScriptVariable>* OldScriptVariablePtr = VariableToScriptVariable.Find(Parameter);
-	UNiagaraScriptVariable* OldScriptVariable = OldScriptVariablePtr ? *OldScriptVariablePtr : nullptr;
+	TObjectPtr<UNiagaraScriptVariable> OldScriptVariable = OldScriptVariablePtr ? *OldScriptVariablePtr : nullptr;
 	FNiagaraVariableMetaData OldMetaData;
 	OldMetaData.CreateNewGuid();
 	if (OldScriptVariable != nullptr)
