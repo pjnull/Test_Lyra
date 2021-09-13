@@ -119,7 +119,7 @@ bool FAESGCMNetResultEnumTest::RunTest(const FString& Parameters)
 {
 	const UEnum* AESGCMResultEnum = StaticEnum<EAESGCMNetResult>();
 
-	if (TestTrue(TEXT("EAESGCMNetResult must exist"), AESGCMResultEnum != nullptr))
+	if (TestTrue(TEXT("EAESGCMNetResult must exist"), AESGCMResultEnum != nullptr) && AESGCMResultEnum != nullptr)
 	{
 		const int64 AESGCMResultEnumLast = AESGCMResultEnum->GetMaxEnumValue() - 1;
 		bool bLexMismatch = false;
