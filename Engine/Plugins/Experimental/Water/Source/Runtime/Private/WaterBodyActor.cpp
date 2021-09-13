@@ -307,7 +307,7 @@ void AWaterBody::InitializeBody()
 	// the component pointer directly from the list of components
 	if (WaterBodyComponent == nullptr || WaterBodyComponent->GetOwner() != this || WaterBodyComponent->GetWaterBodyType() != GetWaterBodyType())
 	{
-		WaterBodyComponent = Cast<UWaterBodyComponent>(FindComponentByClass(WaterBodyComponentClass));
+		WaterBodyComponent = FindObject<UWaterBodyComponent>(this, *GetWaterBodyComponentName(GetWaterBodyType()).ToString());
 	}
 
 	if (!WaterBodyComponent)
@@ -493,7 +493,7 @@ void AWaterBody::DeprecateData()
 			WaterWaves->Rename(nullptr, this, REN_DoNotDirty | REN_DontCreateRedirectors | REN_ForceNoResetLoaders | REN_NonTransactional);
 		}
 	}
-
+	
 	if (GetLinkerCustomVersion(FFortniteMainBranchObjectVersion::GUID) < FFortniteMainBranchObjectVersion::WaterBodyComponentRefactor)
 	{
 		check(WaterBodyComponent && WaterBodyComponent->GetWaterBodyType() == GetWaterBodyType());
