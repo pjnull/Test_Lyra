@@ -1451,7 +1451,7 @@ TSharedRef< SWidget > FLevelEditorToolBar::MakeLevelEditorToolBar( const TShared
 			.AutoWidth()
 			[
 				SNew(SSpacer)
-				.Size(FVector2D(120.f, 1.0f))
+				.Size(FVector2D(60.f, 1.0f))
 			]
 			
 			+ SHorizontalBox::Slot()
@@ -1474,12 +1474,12 @@ TSharedRef< SWidget > FLevelEditorToolBar::MakeLevelEditorToolBar( const TShared
 				]
 			]
 			+ SHorizontalBox::Slot()
-			.HAlign(HAlign_Left)
 			[
 				UToolMenus::Get()->GenerateWidget("LevelEditor.LevelEditorToolBar.PlayToolBar", MenuContext)
 			]
 			+ SHorizontalBox::Slot()
 			.HAlign(HAlign_Right)
+			.AutoWidth()
 			.Padding(0.0f, 0.0f, 7.0f, 0.0f)
 			[
 				UToolMenus::Get()->GenerateWidget("LevelEditor.LevelEditorToolBar.SettingsToolBar", MenuContext)
