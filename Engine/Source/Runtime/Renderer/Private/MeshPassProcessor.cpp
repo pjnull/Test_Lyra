@@ -16,6 +16,7 @@
 #include "PipelineStateCache.h"
 #include "RayTracing/RayTracingMaterialHitShaders.h"
 #include "Hash/CityHash.h"
+#include "ComponentRecreateRenderStateContext.h"
 
 FRWLock FGraphicsMinimalPipelineStateId::PersistentIdTableLock;
 FGraphicsMinimalPipelineStateId::PersistentTableType FGraphicsMinimalPipelineStateId::PersistentIdTable;
@@ -1572,6 +1573,16 @@ void FCachedPassMeshDrawListContext::FinalizeCommand(
 
 PassProcessorCreateFunction FPassProcessorManager::JumpTable[(int32)EShadingPath::Num][EMeshPass::Num] = {};
 EMeshPassFlags FPassProcessorManager::Flags[(int32)EShadingPath::Num][EMeshPass::Num] = {};
+
+void FPassProcessorManager::SetPassFlags(EShadingPath ShadingPath, EMeshPass::Type PassType, EMeshPassFlags NewFlags)
+{
+	check(IsInGameThread());
+	FGlobalComponentRecreateRenderStateContext Context;
+	if (JumpTable[(uint32)ShadingPath][PassType])
+	{
+		Flags[(uint32)ShadingPath][PassType] = NewFlags;
+	}
+}
 
 
 

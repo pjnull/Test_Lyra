@@ -1892,6 +1892,9 @@ public:
 		return Flags[ShadingPathIdx][PassType];
 	}
 
+	/** Only call on the game thread. Heavy weight. Flush rendering commands and recreate all component render states. */
+	static void SetPassFlags(EShadingPath ShadingPath, EMeshPass::Type PassType, EMeshPassFlags NewFlags);
+
 private:
 	RENDERER_API static PassProcessorCreateFunction JumpTable[(uint32)EShadingPath::Num][EMeshPass::Num];
 	RENDERER_API static EMeshPassFlags Flags[(uint32)EShadingPath::Num][EMeshPass::Num];

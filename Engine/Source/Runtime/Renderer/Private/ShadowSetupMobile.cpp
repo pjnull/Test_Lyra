@@ -15,6 +15,7 @@ ShadowSetupMobile.cpp: Shadow setup implementation for mobile specific features.
 #include "SceneRendering.h"
 #include "DynamicPrimitiveDrawing.h"
 #include "ScenePrivate.h"
+#include "MeshPassProcessor.h"
 
 static TAutoConsoleVariable<int32> CVarCsmShaderCullingDebugGfx(
 	TEXT("r.Mobile.Shadow.CSMShaderCullingDebugGfx"),
@@ -35,6 +36,48 @@ static TAutoConsoleVariable<int32> CVarsCsmShaderCullingMethod(
 	TEXT("5 - Disable culling if mobile distance field shadowing is used for all views.\n")
 	TEXT("Combine with 16 to change primitive bounding test to spheres instead of box. (i.e. 18 == combined casters + sphere test)")
 	,ECVF_RenderThreadSafe);
+
+static void OnCsmShaderCullingMethodChanged()
+{
+	// Cannot do this in editors because feature levels can change
+#if !WITH_EDITOR
+	static int32 PrevValue = CSMShaderCullingMethodDefault;
+	const int32 CurValue = (CVarsCsmShaderCullingMethod.GetValueOnGameThread() & 0xF);
+	
+	if (CurValue != PrevValue && (CurValue == 5 || PrevValue == 5))
+	{
+		PrevValue = CurValue;
+
+		if (CurValue == 5)
+		{
+			TArray<ERHIFeatureLevel::Type> UsedFeatureLevels;
+			for (TObjectIterator<UWorld> It; It; ++It)
+			{
+				const UWorld* World = *It;
+				if (World && World->Scene)
+				{
+					UsedFeatureLevels.AddUnique(World->Scene->GetFeatureLevel());
+				}
+			}
+
+			bool bBasePassAlwaysUseCSM = UsedFeatureLevels.Num() > 0;
+			for (ERHIFeatureLevel::Type FeatureLevel : UsedFeatureLevels)
+			{
+				bBasePassAlwaysUseCSM = bBasePassAlwaysUseCSM && MobileBasePassAlwaysUsesCSM(GetFeatureLevelShaderPlatform(FeatureLevel));
+			}
+
+			const EMeshPassFlags NewFlags = bBasePassAlwaysUseCSM ? EMeshPassFlags::MainView : (EMeshPassFlags::CachedMeshCommands | EMeshPassFlags::MainView);
+			FPassProcessorManager::SetPassFlags(EShadingPath::Mobile, EMeshPass::MobileBasePassCSM, NewFlags);
+		}
+		else
+		{
+			FPassProcessorManager::SetPassFlags(EShadingPath::Mobile, EMeshPass::MobileBasePassCSM, EMeshPassFlags::CachedMeshCommands | EMeshPassFlags::MainView);
+		}
+	}
+#endif
+}
+
+static FAutoConsoleVariableSink CVarsCsmShaderCullingMethodSink(FConsoleCommandDelegate::CreateStatic(&OnCsmShaderCullingMethodChanged));
 
 static bool CouldStaticMeshEverReceiveCSMFromStationaryLight(ERHIFeatureLevel::Type FeatureLevel, const FPrimitiveSceneInfo* PrimitiveSceneInfo, const FStaticMeshBatch& StaticMesh)
 {
