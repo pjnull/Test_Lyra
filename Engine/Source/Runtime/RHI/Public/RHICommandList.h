@@ -685,10 +685,10 @@ protected:
 
 	FORCEINLINE void ValidateBoundShader(FRHIVertexShader* ShaderRHI) { checkSlow(BoundShaderInput.VertexShaderRHI == ShaderRHI); }
 	FORCEINLINE void ValidateBoundShader(FRHIPixelShader* ShaderRHI) { checkSlow(BoundShaderInput.PixelShaderRHI == ShaderRHI); }
-	FORCEINLINE void ValidateBoundShader(FRHIGeometryShader* ShaderRHI) { checkSlow(BoundShaderInput.GeometryShaderRHI == ShaderRHI); }
+	FORCEINLINE void ValidateBoundShader(FRHIGeometryShader* ShaderRHI) { checkSlow(BoundShaderInput.GetGeometryShader() == ShaderRHI); }
 	FORCEINLINE void ValidateBoundShader(FRHIComputeShader* ShaderRHI) { checkSlow(BoundComputeShaderRHI == ShaderRHI); }
-	FORCEINLINE void ValidateBoundShader(FRHIMeshShader* ShaderRHI) { checkSlow(BoundShaderInput.MeshShaderRHI == ShaderRHI); }
-	FORCEINLINE void ValidateBoundShader(FRHIAmplificationShader* ShaderRHI) { checkSlow(BoundShaderInput.AmplificationShaderRHI == ShaderRHI); }
+	FORCEINLINE void ValidateBoundShader(FRHIMeshShader* ShaderRHI) { checkSlow(BoundShaderInput.GetMeshShader() == ShaderRHI); }
+	FORCEINLINE void ValidateBoundShader(FRHIAmplificationShader* ShaderRHI) { checkSlow(BoundShaderInput.GetAmplificationShader() == ShaderRHI); }
 
 	FORCEINLINE void ValidateBoundShader(FRHIGraphicsShader* ShaderRHI)
 	{
@@ -696,10 +696,10 @@ protected:
 		switch (ShaderRHI->GetFrequency())
 		{
 		case SF_Vertex: checkSlow(BoundShaderInput.VertexShaderRHI == ShaderRHI); break;
-		case SF_Mesh: checkSlow(BoundShaderInput.MeshShaderRHI == ShaderRHI); break;
-		case SF_Amplification: checkSlow(BoundShaderInput.AmplificationShaderRHI == ShaderRHI); break;
+		case SF_Mesh: checkSlow(BoundShaderInput.GetMeshShader() == ShaderRHI); break;
+		case SF_Amplification: checkSlow(BoundShaderInput.GetAmplificationShader() == ShaderRHI); break;
 		case SF_Pixel: checkSlow(BoundShaderInput.PixelShaderRHI == ShaderRHI); break;
-		case SF_Geometry: checkSlow(BoundShaderInput.GeometryShaderRHI == ShaderRHI); break;
+		case SF_Geometry: checkSlow(BoundShaderInput.GetGeometryShader() == ShaderRHI); break;
 		default: checkfSlow(false, TEXT("Unexpected graphics shader type %d"), ShaderRHI->GetFrequency());
 		}
 #endif // DO_GUARD_SLOW
