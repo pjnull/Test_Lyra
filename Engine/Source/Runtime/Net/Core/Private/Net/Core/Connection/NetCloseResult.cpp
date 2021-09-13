@@ -337,7 +337,7 @@ bool FNetCloseResultEnumTest::RunTest(const FString& Parameters)
 	int64 NetFailEnumLast = 0;
 
 	// Until ENetworkFailure is deprecated
-	if (TestTrue(TEXT("ENetworkFailure must exist"), NetFailEnum != nullptr))
+	if (TestTrue(TEXT("ENetworkFailure must exist"), NetFailEnum != nullptr) && NetFailEnum != nullptr)
 	{
 		// If a new element is added to the end of ENetworkFailure, update this
 		const ENetworkFailure::Type LastNetworkFailureEntry = ENetworkFailure::NetChecksumMismatch;
