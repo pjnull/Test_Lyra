@@ -2,7 +2,7 @@
 #include "CoreTechInterfaceImpl.h"
 
 #include "CADInterfacesModule.h"
-#include "CoretechFileReader.h"
+#include "CoretechFileParser.h"
 
 #include "Misc/Paths.h"
 
@@ -462,17 +462,6 @@ namespace CADLibrary
 		return ChangeTesselationParameters(ImportParams.ChordTolerance / ImportParams.ScaleFactor, ModelUnit, ImportParams.MaxNormalAngle);
 	}
 
-	ECoreTechParsingResult FCoreTechInterfaceImpl::LoadFile(const FFileDescription& InFileDescription, const FImportParameters& InImportParameters, const FString& InCachePath, FArchiveSceneGraph& OutSceneGraphArchive, TArray<FString>& OutWarningMessages, TArray<FBodyMesh>& OutBodyMeshes)
-	{
-		FCoreTechFileReader::FContext Context(InImportParameters, InCachePath, OutSceneGraphArchive, OutWarningMessages, OutBodyMeshes);
-
-		FCoreTechFileReader FileReader(Context);
-
-		ECoreTechParsingResult Result = FileReader.ProcessFile(InFileDescription);
-
-		return Result;
-	}
-
 	int32 GetColorName(CT_OBJECT_ID ObjectID)
 	{
 		FColor Color;
@@ -525,7 +514,7 @@ namespace CADLibrary
 
 		if (bIsBody)
 		{
-			CoreTechFileReaderUtils::GetBodyTessellation(ObjectId, OutBodyMesh, ProcessFace);
+			CoreTechFileParserUtils::GetBodyTessellation(ObjectId, OutBodyMesh, ProcessFace);
 		}
 		else
 		{
@@ -539,7 +528,7 @@ namespace CADLibrary
 
 			while (CT_OBJECT_ID BodyId = ObjectList.IteratorIter())
 			{
-				CoreTechFileReaderUtils::GetBodyTessellation(BodyId, OutBodyMesh, ProcessFace);
+				CoreTechFileParserUtils::GetBodyTessellation(BodyId, OutBodyMesh, ProcessFace);
 			}
 		}
 	}
