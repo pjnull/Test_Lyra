@@ -58,7 +58,7 @@ public class EOSSDK : ModuleRules
 		}
 	}
 
-	public string EngineBinariesDir
+	public virtual string EngineBinariesDir
 	{
 		get
 		{
@@ -176,10 +176,11 @@ public class EOSSDK : ModuleRules
 			if(!bUseProjectBinary)
             {
 				PublicAdditionalLibraries.Add(Path.Combine(SDKBinariesDir, LibraryLinkName));
-				RuntimeDependencies.Add(Path.Combine("$(EngineDir)/Binaries", Target.Platform.ToString(), RuntimeLibraryFileName), Path.Combine(SDKBinariesDir, RuntimeLibraryFileName));
-				// needed for linux to find the .so
-				PublicRuntimeLibraryPaths.Add(Path.Combine("$(EngineDir)/Binaries", Target.Platform.ToString()));
+				RuntimeDependencies.Add(Path.Combine(EngineBinariesDir, RuntimeLibraryFileName), Path.Combine(SDKBinariesDir, RuntimeLibraryFileName));
 
+				// needed for linux to find the .so
+				PublicRuntimeLibraryPaths.Add(EngineBinariesDir);
+				
 				if (bRequiresRuntimeLoad)
 				{
 					PublicDelayLoadDLLs.Add(RuntimeLibraryFileName);
