@@ -416,7 +416,7 @@ bool FNetCloseResultEnumTest::RunTest(const FString& Parameters)
 	}
 
 
-	if (TestTrue(TEXT("ENetCloseResult must exist"), NetCloseResultEnum != nullptr))
+	if (TestTrue(TEXT("ENetCloseResult must exist"), NetCloseResultEnum != nullptr) && NetCloseResultEnum != nullptr)
 	{
 		const int64 NetCloseResultEnumLast = NetCloseResultEnum->GetMaxEnumValue() - 1;
 		bool bLexMismatch = false;
