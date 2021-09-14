@@ -61,6 +61,7 @@
 #include "ProfilingDebugging/StallDetector.h"
 #include "RenderUtils.h"
 #include "ProfilingDebugging/CountersTrace.h"
+#include "ClearReplacementShaders.h"
 
 #if WITH_EDITOR
 #include "TextureCompiler.h"
@@ -6782,6 +6783,12 @@ void CompileGlobalShaderMap(EShaderPlatform Platform, const ITargetPlatform* Tar
 		if (GCreateShadersOnLoad && Platform == GMaxRHIShaderPlatform)
 		{
 			GGlobalShaderMap[Platform]->BeginCreateAllShaders();
+		}
+
+		// While we're early in the game's startup, create certain global shaders that may be later created on random threads otherwise. 
+		if (!GRHISupportsMultithreadedShaderCreation)
+		{
+			CreateClearReplacementShaders();
 		}
 	}
 }
