@@ -4163,7 +4163,7 @@ UObject* FObjectInitializer::CreateDefaultSubobject(UObject* Outer, FName Subobj
 			}
 			// Clear PendingKill flag in case we recycled a subobject of a dead object.
 			// @todo: we should not be recycling subobjects unless we're currently loading from a package
-			Result->ClearPendingKill();
+			Result->ClearInternalFlags(EInternalObjectFlags::PendingKill);
 		}
 	}
 	return Result;
