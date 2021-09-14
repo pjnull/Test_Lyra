@@ -102,14 +102,14 @@ namespace OpenGLConsoleVariables
 		TEXT("If set to 1, use OpenGL's separate shader objects to eliminate expensive program linking"),
 		ECVF_ReadOnly|ECVF_RenderThreadSafe);
 
-	static int32 GOpenGLForceBilinear = 0;
+	int32 GOpenGLForceBilinear = 0;
 	static FAutoConsoleVariableRef CVarOpenGLForceBilinearSampling(
 		TEXT("r.OpenGL.ForceBilinear"),
 		GOpenGLForceBilinear,
 		TEXT("Force GL to override all trilinear or aniso texture filtering states to bilinear.\n")
 		TEXT("0: disabled. (default)\n")
 		TEXT("1: enabled."),
-		ECVF_RenderThreadSafe
+		ECVF_ReadOnly | ECVF_RenderThreadSafe
 	);
 };
 
