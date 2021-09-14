@@ -980,27 +980,29 @@ void UNiagaraDataInterfaceLandscape::ApplyLandscape(const FNiagaraSystemInstance
 			const int32 RuntimeVirtualTextureCount = InstanceData.Landscape->RuntimeVirtualTextures.Num();
 			for (int32 TextureIt = 0; TextureIt < RuntimeVirtualTextureCount; ++TextureIt)
 			{
-				const URuntimeVirtualTexture* Vt = InstanceData.Landscape->RuntimeVirtualTextures[TextureIt];
-				const ERuntimeVirtualTextureMaterialType VirtualMaterialType = Vt->GetMaterialType();
-
-				switch (VirtualMaterialType)
+				if (const URuntimeVirtualTexture* Vt = InstanceData.Landscape->RuntimeVirtualTextures[TextureIt])
 				{
-				case ERuntimeVirtualTextureMaterialType::WorldHeight:
-					if (InstanceData.HeightVirtualTextureIndex == INDEX_NONE)
+					const ERuntimeVirtualTextureMaterialType VirtualMaterialType = Vt->GetMaterialType();
+
+					switch (VirtualMaterialType)
 					{
-						InstanceData.HeightVirtualTextureIndex = TextureIt;
-					}
-					break;
+					case ERuntimeVirtualTextureMaterialType::WorldHeight:
+						if (InstanceData.HeightVirtualTextureIndex == INDEX_NONE)
+						{
+							InstanceData.HeightVirtualTextureIndex = TextureIt;
+						}
+						break;
 				case ERuntimeVirtualTextureMaterialType::BaseColor_Normal_Roughness:
-				case ERuntimeVirtualTextureMaterialType::BaseColor_Normal_Specular:
-				case ERuntimeVirtualTextureMaterialType::BaseColor_Normal_Specular_YCoCg:
-				case ERuntimeVirtualTextureMaterialType::BaseColor_Normal_Specular_Mask_YCoCg:
-					if (InstanceData.NormalVirtualTextureIndex == INDEX_NONE)
-					{
-						InstanceData.NormalVirtualTextureIndex = TextureIt;
-						InstanceData.NormalVirtualTextureMode = VirtualMaterialType;
+					case ERuntimeVirtualTextureMaterialType::BaseColor_Normal_Specular:
+					case ERuntimeVirtualTextureMaterialType::BaseColor_Normal_Specular_YCoCg:
+					case ERuntimeVirtualTextureMaterialType::BaseColor_Normal_Specular_Mask_YCoCg:
+						if (InstanceData.NormalVirtualTextureIndex == INDEX_NONE)
+						{
+							InstanceData.NormalVirtualTextureIndex = TextureIt;
+							InstanceData.NormalVirtualTextureMode = VirtualMaterialType;
+						}
+						break;
 					}
-					break;
 				}
 			}
 		}
