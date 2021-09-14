@@ -2063,12 +2063,19 @@ void CollectGarbageInternal(EObjectFlags KeepFlags, bool bPerformFullPurge)
 
 #if VERIFY_DISREGARD_GC_ASSUMPTIONS
 		// Only verify assumptions if option is enabled. This avoids false positives in the Editor or commandlets.
-		if ((GUObjectArray.DisregardForGCEnabled() || GUObjectClusters.GetNumAllocatedClusters()) && GShouldVerifyGCAssumptions)
+		if (GShouldVerifyGCAssumptions)
 		{
 			DECLARE_SCOPE_CYCLE_COUNTER(TEXT("CollectGarbageInternal.VerifyGCAssumptions"), STAT_CollectGarbageInternal_VerifyGCAssumptions, STATGROUP_GC);
 			const double StartTime = FPlatformTime::Seconds();
-			VerifyGCAssumptions();
-			VerifyClustersAssumptions();
+			if (GUObjectArray.DisregardForGCEnabled())
+			{
+				VerifyGCAssumptions();
+			}
+			if (GUObjectClusters.GetNumAllocatedClusters())
+			{
+				VerifyClustersAssumptions();
+			}
+			VerifyObjectFlagMirroring();
 			UE_LOG(LogGarbage, Log, TEXT("%f ms for Verify GC Assumptions"), (FPlatformTime::Seconds() - StartTime) * 1000);
 		}
 #endif

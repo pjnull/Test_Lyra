@@ -54,14 +54,18 @@ public:
 	/** Modifies object flags for a specific object */
 	FORCEINLINE void SetFlags( EObjectFlags NewFlags )
 	{
-		checkSlow(!(NewFlags & (RF_MarkAsNative | RF_MarkAsRootSet))); // These flags can't be used outside of constructors / internal code
+		PRAGMA_DISABLE_DEPRECATION_WARNINGS
+		checkSlow(!(NewFlags & (RF_MarkAsNative | RF_MarkAsRootSet | RF_PendingKill))); // These flags can't be used outside of constructors / internal code
+		PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		SetFlagsTo(GetFlags() | NewFlags);
 	}
 
 	/** Clears subset of flags for a specific object */
 	FORCEINLINE void ClearFlags( EObjectFlags NewFlags )
 	{
-		checkSlow(!(NewFlags & (RF_MarkAsNative | RF_MarkAsRootSet)) || NewFlags == RF_AllFlags); // These flags can't be used outside of constructors / internal code
+		PRAGMA_DISABLE_DEPRECATION_WARNINGS
+		checkSlow(!(NewFlags & (RF_MarkAsNative | RF_MarkAsRootSet | RF_PendingKill)) || NewFlags == RF_AllFlags); // These flags can't be used outside of constructors / internal code
+		PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		SetFlagsTo(GetFlags() & ~NewFlags);
 	}
 
@@ -163,16 +167,22 @@ public:
 	UE_DEPRECATED(5.0, "IsPendingKill() should no longer be used. Use IsValid(Object) instead which also checks against null.")
 	FORCEINLINE bool IsPendingKill() const
 	{
-		return GUObjectArray.IndexToObject(InternalIndex)->IsPendingKill();
+		PRAGMA_DISABLE_DEPRECATION_WARNINGS
+		checkSlow(GUObjectArray.IndexToObject(InternalIndex)->HasAnyFlags(EInternalObjectFlags::PendingKill) == HasAnyFlags(RF_PendingKill));
+		return HasAnyFlags(RF_PendingKill);
+		PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	}
 
 	/**
-	 * Marks this object as RF_PendingKill.
+	 * Marks this object as PendingKill.
 	 */
 	FORCEINLINE void MarkPendingKill()
 	{
 		check(!IsRooted());
+		PRAGMA_DISABLE_DEPRECATION_WARNINGS
+		SetFlagsTo(GetFlags() | RF_PendingKill);
 		GUObjectArray.IndexToObject(InternalIndex)->SetPendingKill();
+		PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	}
 
 	/**
@@ -180,6 +190,9 @@ public:
 	 */
 	FORCEINLINE void ClearPendingKill()
 	{
+		PRAGMA_DISABLE_DEPRECATION_WARNINGS
+		SetFlagsTo(GetFlags() & ~RF_PendingKill);
+		PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		GUObjectArray.IndexToObject(InternalIndex)->ClearPendingKill();
 	}
 
@@ -244,6 +257,7 @@ public:
 	 */
 	FORCEINLINE void SetInternalFlags(EInternalObjectFlags FlagsToSet) const
 	{
+		checkf(!(FlagsToSet & EInternalObjectFlags::PendingKill), TEXT("SetInternalFlags should not set the PendingKill flag. Use MarkPendingKill instead"));
 		GUObjectArray.IndexToObject(InternalIndex)->SetFlags(FlagsToSet);
 	}
 
@@ -277,6 +291,7 @@ public:
 	 */
 	FORCEINLINE void ClearInternalFlags(EInternalObjectFlags FlagsToClear) const
 	{
+		checkf(!(FlagsToClear & EInternalObjectFlags::PendingKill), TEXT("ClearInternalFlags should not clear PendingKill flag. Use ClearPendingKill instead"));
 		GUObjectArray.IndexToObject(InternalIndex)->ClearFlags(FlagsToClear);
 	}
 
@@ -288,6 +303,7 @@ public:
 	 */
 	FORCEINLINE bool AtomicallyClearInternalFlags(EInternalObjectFlags FlagsToClear) const
 	{
+		checkf(!(FlagsToClear & EInternalObjectFlags::PendingKill), TEXT("AtomicallyClearInternalFlags should not clear PendingKill flag. Use ClearPendingKill instead"));
 		return GUObjectArray.IndexToObject(InternalIndex)->ThisThreadAtomicallyClearedFlag(FlagsToClear);
 	}
 
