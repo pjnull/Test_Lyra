@@ -98,6 +98,7 @@ public:
 
 	virtual FOnPrepareLoadingScreen& OnPrepareLoadingScreen() override { return OnPrepareLoadingScreenDelegate; }
 	virtual FOnMoviePlaybackStarted& OnMoviePlaybackStarted() override { return OnMoviePlaybackStartedDelegate; }
+	virtual FOnMoviePlaybackTick& OnMoviePlaybackTick() override { return OnMoviePlaybackTickDelegate; }
 	virtual FOnMoviePlaybackFinished& OnMoviePlaybackFinished() override { return OnMoviePlaybackFinishedDelegate; }
 	virtual FOnMovieClipFinished& OnMovieClipFinished() override { return OnMovieClipFinishedDelegate; }
 	
@@ -203,6 +204,9 @@ private:
 	FOnPrepareLoadingScreen OnPrepareLoadingScreenDelegate;
 	
 	FOnMoviePlaybackStarted OnMoviePlaybackStartedDelegate;
+
+	/** Called periodically when the game thread is blocked and a movie is playing. */
+	FOnMoviePlaybackTick OnMoviePlaybackTickDelegate;
 
 	FOnMoviePlaybackFinished OnMoviePlaybackFinishedDelegate;
 

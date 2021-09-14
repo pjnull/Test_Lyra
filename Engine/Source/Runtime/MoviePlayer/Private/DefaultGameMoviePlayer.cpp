@@ -642,8 +642,14 @@ void FDefaultGameMoviePlayer::BlockingTick()
 		{
 			// Yes. Time for another tick.
 			LastBlockingTickTime = Time;
+			
+			// Call HTTP manager.
 			FHttpManager& HttpManager = FHttpModule::Get().GetHttpManager();
 			HttpManager.Tick(0.0f);
+
+			// Callbacks.
+			OnMoviePlaybackTick().Broadcast(DeltaTime);
+
 			UE_LOG(LogMoviePlayer, VeryVerbose, TEXT("BlockingTick deltatime:%f"), DeltaTime);
 		}
 	}
