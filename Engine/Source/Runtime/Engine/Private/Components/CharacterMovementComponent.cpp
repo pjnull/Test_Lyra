@@ -9429,6 +9429,7 @@ void UCharacterMovementComponent::ServerMoveHandleClientError(float ClientTimeSt
 	const bool bClientJustLanded = bLastClientIsFalling && !bClientIsFalling;
 
 	FVector RelativeLocation = ServerLoc;
+	FVector RelativeVelocity = Velocity;
 	bool bUseLastBase = false;
 	bool bFallingWithinAcceptableError = false;
 
@@ -9487,7 +9488,7 @@ void UCharacterMovementComponent::ServerMoveHandleClientError(float ClientTimeSt
 			if (IsValid(LastServerMovementBase) && MovementBaseUtility::IsDynamicBase(LastServerMovementBase) && MaxWalkSpeed > KINDA_SMALL_NUMBER)
 			{
 				const FVector LastBaseVelocity = MovementBaseUtility::GetMovementBaseVelocity(LastServerMovementBase, LastServerMovementBaseBoneName);
-				const FVector RelativeVelocity = Velocity - LastBaseVelocity;
+				RelativeVelocity = Velocity - LastBaseVelocity;
 				const FVector BaseDirection = LastBaseVelocity.GetSafeNormal2D();
 				const FVector RelativeDirection = RelativeVelocity * (1.f / MaxWalkSpeed);
 
@@ -9580,6 +9581,7 @@ void UCharacterMovementComponent::ServerMoveHandleClientError(float ClientTimeSt
 			// Relative location
 			if (bDeferServerCorrectionsWhenFalling && bUseLastBase)
 			{
+				ServerData->PendingAdjustment.NewVel = RelativeVelocity;
 				ServerData->PendingAdjustment.NewBase = LastServerMovementBase;
 				ServerData->PendingAdjustment.NewBaseBoneName = LastServerMovementBaseBoneName;
 				ServerData->PendingAdjustment.NewLoc = RelativeLocation;
