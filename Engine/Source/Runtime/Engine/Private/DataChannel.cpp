@@ -3629,7 +3629,7 @@ int32 UActorChannel::WriteContentBlockPayload( UObject* Obj, FNetBitWriter &Bunc
 	return HeaderNumBits;
 }
 
-UObject* UActorChannel::ReadContentBlockHeader( FInBunch & Bunch, bool& bObjectDeleted, bool& bOutHasRepLayout )
+UObject* UActorChannel::ReadContentBlockHeader(FInBunch& Bunch, bool& bObjectDeleted, bool& bOutHasRepLayout)
 {
 	using namespace UE::Net;
 
@@ -3640,9 +3640,9 @@ UObject* UActorChannel::ReadContentBlockHeader( FInBunch & Bunch, bool& bObjectD
 
 	bOutHasRepLayout = Bunch.ReadBit() != 0 ? true : false;
 
-	if ( Bunch.IsError() )
+	if (Bunch.IsError())
 	{
-		UE_LOG( LogNetTraffic, Error, TEXT( "UActorChannel::ReadContentBlockHeader: Bunch.IsError() == true after bOutHasRepLayout. Actor: %s" ), *Actor->GetName() );
+		UE_LOG(LogNetTraffic, Error, TEXT("UActorChannel::ReadContentBlockHeader: Bunch.IsError() == true after bOutHasRepLayout. Actor: %s"), *Actor->GetName());
 
 		AddToChainResultPtr(Bunch.ExtendedError, ENetCloseResult::ContentBlockHeaderRepLayoutFail);
 
@@ -3651,16 +3651,16 @@ UObject* UActorChannel::ReadContentBlockHeader( FInBunch & Bunch, bool& bObjectD
 
 	const bool bIsActor = Bunch.ReadBit() != 0 ? true : false;
 
-	if ( Bunch.IsError() )
+	if (Bunch.IsError())
 	{
-		UE_LOG( LogNetTraffic, Error, TEXT( "UActorChannel::ReadContentBlockHeader: Bunch.IsError() == true after reading actor bit. Actor: %s" ), *Actor->GetName() );
+		UE_LOG(LogNetTraffic, Error, TEXT("UActorChannel::ReadContentBlockHeader: Bunch.IsError() == true after reading actor bit. Actor: %s"), *Actor->GetName());
 
 		AddToChainResultPtr(Bunch.ExtendedError, ENetCloseResult::ContentBlockHeaderIsActorFail);
 
 		return NULL;
 	}
 
-	if ( bIsActor )
+	if (bIsActor)
 	{
 		// If this is for the actor on the channel, we don't need to read anything else
 		return Actor;
@@ -3675,13 +3675,13 @@ UObject* UActorChannel::ReadContentBlockHeader( FInBunch & Bunch, bool& bObjectD
 	UObject* SubObj = NULL;
 
 	// Manually serialize the object so that we can get the NetGUID (in order to assign it if we spawn the object here)
-	Connection->PackageMap->SerializeObject( Bunch, UObject::StaticClass(), SubObj, &NetGUID );
+	Connection->PackageMap->SerializeObject(Bunch, UObject::StaticClass(), SubObj, &NetGUID);
 
-	NET_CHECKSUM_OR_END( Bunch );
+	NET_CHECKSUM_OR_END(Bunch);
 
-	if ( Bunch.IsError() )
+	if (Bunch.IsError())
 	{
-		UE_LOG( LogNetTraffic, Error, TEXT( "UActorChannel::ReadContentBlockHeader: Bunch.IsError() == true after SerializeObject. SubObj: %s, Actor: %s" ), SubObj ? *SubObj->GetName() : TEXT("Null"), *Actor->GetName() );
+		UE_LOG(LogNetTraffic, Error, TEXT("UActorChannel::ReadContentBlockHeader: Bunch.IsError() == true after SerializeObject. SubObj: %s, Actor: %s"), SubObj ? *SubObj->GetName() : TEXT("Null"), *Actor->GetName());
 
 		Bunch.SetError();
 		AddToChainResultPtr(Bunch.ExtendedError, ENetCloseResult::ContentBlockHeaderObjFail);
@@ -3689,9 +3689,9 @@ UObject* UActorChannel::ReadContentBlockHeader( FInBunch & Bunch, bool& bObjectD
 		return NULL;
 	}
 
-	if ( Bunch.AtEnd() )
+	if (Bunch.AtEnd())
 	{
-		UE_LOG( LogNetTraffic, Error, TEXT( "UActorChannel::ReadContentBlockHeader: Bunch.AtEnd() == true after SerializeObject. SubObj: %s, Actor: %s" ), SubObj ? *SubObj->GetName() : TEXT("Null"), *Actor->GetName() );
+		UE_LOG(LogNetTraffic, Error, TEXT("UActorChannel::ReadContentBlockHeader: Bunch.AtEnd() == true after SerializeObject. SubObj: %s, Actor: %s"), SubObj ? *SubObj->GetName() : TEXT("Null"), *Actor->GetName());
 
 		Bunch.SetError();
 		AddToChainResultPtr(Bunch.ExtendedError, ENetCloseResult::ContentBlockHeaderPrematureEnd);
@@ -3700,12 +3700,12 @@ UObject* UActorChannel::ReadContentBlockHeader( FInBunch & Bunch, bool& bObjectD
 	}
 
 	// Validate existing sub-object
-	if ( SubObj != NULL )
+	if (SubObj != NULL)
 	{
 		// Sub-objects can't be actors (should just use an actor channel in this case)
-		if ( Cast< AActor >( SubObj ) != NULL )
+		if (Cast< AActor >(SubObj) != NULL)
 		{
-			UE_LOG( LogNetTraffic, Error, TEXT( "UActorChannel::ReadContentBlockHeader: Sub-object not allowed to be actor type. SubObj: %s, Actor: %s" ), *SubObj->GetName(), *Actor->GetName() );
+			UE_LOG(LogNetTraffic, Error, TEXT("UActorChannel::ReadContentBlockHeader: Sub-object not allowed to be actor type. SubObj: %s, Actor: %s"), *SubObj->GetName(), *Actor->GetName());
 
 			Bunch.SetError();
 			AddToChainResultPtr(Bunch.ExtendedError, ENetCloseResult::ContentBlockHeaderSubObjectActor);
@@ -3717,9 +3717,9 @@ UObject* UActorChannel::ReadContentBlockHeader( FInBunch & Bunch, bool& bObjectD
 		UActorComponent* Component = Cast<UActorComponent>(SubObj);
 		if (Component && !SubObj->IsIn(Actor))
 		{
-			UE_LOG( LogNetTraffic, Error, TEXT( "UActorChannel::ReadContentBlockHeader: Actor component not in parent actor. SubObj: %s, Actor: %s" ), *SubObj->GetFullName(), *Actor->GetFullName() );
+			UE_LOG(LogNetTraffic, Error, TEXT("UActorChannel::ReadContentBlockHeader: Actor component not in parent actor. SubObj: %s, Actor: %s"), *SubObj->GetFullName(), *Actor->GetFullName());
 
-			if ( IsServer )
+			if (IsServer)
 			{
 				Bunch.SetError();
 				AddToChainResultPtr(Bunch.ExtendedError, ENetCloseResult::ContentBlockHeaderBadParent);
@@ -3729,12 +3729,12 @@ UObject* UActorChannel::ReadContentBlockHeader( FInBunch & Bunch, bool& bObjectD
 		}
 	}
 
-	if ( IsServer )
+	if (IsServer)
 	{
 		// The server should never need to create sub objects
-		if ( SubObj == NULL )
+		if (SubObj == NULL)
 		{
-			UE_LOG( LogNetTraffic, Error, TEXT( "ReadContentBlockHeader: Client attempted to create sub-object. Actor: %s" ), *Actor->GetName() );
+			UE_LOG(LogNetTraffic, Error, TEXT("ReadContentBlockHeader: Client attempted to create sub-object. Actor: %s"), *Actor->GetName());
 
 			Bunch.SetError();
 			AddToChainResultPtr(Bunch.ExtendedError, ENetCloseResult::ContentBlockHeaderInvalidCreate);
@@ -3747,24 +3747,24 @@ UObject* UActorChannel::ReadContentBlockHeader( FInBunch & Bunch, bool& bObjectD
 
 	const bool bStablyNamed = Bunch.ReadBit() != 0 ? true : false;
 
-	if ( Bunch.IsError() )
+	if (Bunch.IsError())
 	{
-		UE_LOG( LogNetTraffic, Error, TEXT( "UActorChannel::ReadContentBlockHeader: Bunch.IsError() == true after reading stably named bit. Actor: %s" ), *Actor->GetName() );
+		UE_LOG(LogNetTraffic, Error, TEXT("UActorChannel::ReadContentBlockHeader: Bunch.IsError() == true after reading stably named bit. Actor: %s"), *Actor->GetName());
 
 		AddToChainResultPtr(Bunch.ExtendedError, ENetCloseResult::ContentBlockHeaderStablyNamedFail);
 
 		return NULL;
 	}
 
-	if ( bStablyNamed )
+	if (bStablyNamed)
 	{
 		// If this is a stably named sub-object, we shouldn't need to create it. Don't raise a bunch error though because this may happen while a level is streaming out.
-		if ( SubObj == NULL )
+		if (SubObj == NULL)
 		{
 			// (ignore though if this is for replays)
-			if ( !Connection->IsInternalAck() )
+			if (!Connection->IsInternalAck())
 			{
-				UE_LOG( LogNetTraffic, Log, TEXT( "ReadContentBlockHeader: Stably named sub-object not found. Its level may have streamed out. Component: %s, Actor: %s" ), *Connection->Driver->GuidCache->FullNetGUIDPath( NetGUID ), *Actor->GetName() );
+				UE_LOG(LogNetTraffic, Log, TEXT("ReadContentBlockHeader: Stably named sub-object not found. Its level may have streamed out. Component: %s, Actor: %s"), *Connection->Driver->GuidCache->FullNetGUIDPath(NetGUID), *Actor->GetName());
 			}
 
 			return NULL;
@@ -3777,25 +3777,25 @@ UObject* UActorChannel::ReadContentBlockHeader( FInBunch & Bunch, bool& bObjectD
 	// Manually serialize the object so that we can get the NetGUID (in order to assign it if we spawn the object here)
 	FNetworkGUID ClassNetGUID;
 	UObject* SubObjClassObj = NULL;
-	Connection->PackageMap->SerializeObject( Bunch, UObject::StaticClass(), SubObjClassObj, &ClassNetGUID );
+	Connection->PackageMap->SerializeObject(Bunch, UObject::StaticClass(), SubObjClassObj, &ClassNetGUID);
 
 	// Delete sub-object
-	if ( !ClassNetGUID.IsValid() )
+	if (!ClassNetGUID.IsValid())
 	{
-		if ( SubObj )
+		if (SubObj)
 		{
 			// Unmap this object so we can remap it if it becomes relevant again in the future
-			MoveMappedObjectToUnmapped( SubObj );
+			MoveMappedObjectToUnmapped(SubObj);
 
 			// Stop tracking this sub-object
-			CreateSubObjects.Remove( SubObj );
+			CreateSubObjects.Remove(SubObj);
 
-			if ( Connection != nullptr && Connection->Driver != nullptr )
+			if (Connection != nullptr && Connection->Driver != nullptr)
 			{
-				Connection->Driver->RepChangedPropertyTrackerMap.Remove( SubObj );
+				Connection->Driver->RepChangedPropertyTrackerMap.Remove(SubObj);
 			}
 
-			Actor->OnSubobjectDestroyFromReplication( SubObj );
+			Actor->OnSubobjectDestroyFromReplication(SubObj);
 
 			SubObj->PreDestroyFromReplication();
 			SubObj->MarkPendingKill();
@@ -3804,32 +3804,31 @@ UObject* UActorChannel::ReadContentBlockHeader( FInBunch & Bunch, bool& bObjectD
 		return NULL;
 	}
 
-	UClass * SubObjClass = Cast< UClass >( SubObjClassObj );
+	UClass* SubObjClass = Cast< UClass >(SubObjClassObj);
 
-	if ( SubObjClass == NULL )
+	if (SubObjClass == NULL)
 	{
-		UE_LOG( LogNetTraffic, Warning, TEXT( "UActorChannel::ReadContentBlockHeader: Unable to read sub-object class. Actor: %s" ), *Actor->GetName() );
+		UE_LOG(LogNetTraffic, Warning, TEXT("UActorChannel::ReadContentBlockHeader: Unable to read sub-object class. Actor: %s"), *Actor->GetName());
 
 		// Valid NetGUID but no class was resolved - this is an error
-		if ( SubObj == NULL )
+		if (SubObj == NULL)
 		{
 			// (unless we're using replays, which could be backwards compatibility kicking in)
-			if ( !Connection->IsInternalAck() )
+			if (!Connection->IsInternalAck())
 			{
-				UE_LOG( LogNetTraffic, Error, TEXT( "UActorChannel::ReadContentBlockHeader: Unable to read sub-object class (SubObj == NULL). Actor: %s" ), *Actor->GetName() );
+				UE_LOG(LogNetTraffic, Error, TEXT("UActorChannel::ReadContentBlockHeader: Unable to read sub-object class (SubObj == NULL). Actor: %s"), *Actor->GetName());
 
 				Bunch.SetError();
 				AddToChainResultPtr(Bunch.ExtendedError, ENetCloseResult::ContentBlockHeaderNoSubObjectClass);
+				return NULL;
 			}
-
-			return NULL;
 		}
 	}
 	else
 	{
-		if ( SubObjClass == UObject::StaticClass() )
+		if (SubObjClass == UObject::StaticClass())
 		{
-			UE_LOG( LogNetTraffic, Error, TEXT( "UActorChannel::ReadContentBlockHeader: SubObjClass == UObject::StaticClass(). Actor: %s" ), *Actor->GetName() );
+			UE_LOG(LogNetTraffic, Error, TEXT("UActorChannel::ReadContentBlockHeader: SubObjClass == UObject::StaticClass(). Actor: %s"), *Actor->GetName());
 
 			Bunch.SetError();
 			AddToChainResultPtr(Bunch.ExtendedError, ENetCloseResult::ContentBlockHeaderUObjectSubObject);
@@ -3837,9 +3836,9 @@ UObject* UActorChannel::ReadContentBlockHeader( FInBunch & Bunch, bool& bObjectD
 			return NULL;
 		}
 
-		if ( SubObjClass->IsChildOf( AActor::StaticClass() ) )
+		if (SubObjClass->IsChildOf(AActor::StaticClass()))
 		{
-			UE_LOG( LogNetTraffic, Error, TEXT( "UActorChannel::ReadContentBlockHeader: Sub-object cannot be actor class. Actor: %s" ), *Actor->GetName() );
+			UE_LOG(LogNetTraffic, Error, TEXT("UActorChannel::ReadContentBlockHeader: Sub-object cannot be actor class. Actor: %s"), *Actor->GetName());
 
 			Bunch.SetError();
 			AddToChainResultPtr(Bunch.ExtendedError, ENetCloseResult::ContentBlockHeaderAActorSubObject);
@@ -3850,9 +3849,9 @@ UObject* UActorChannel::ReadContentBlockHeader( FInBunch & Bunch, bool& bObjectD
 
 	UObject* ObjOuter = Actor;
 	if (Connection->EngineNetworkProtocolVersion >= HISTORY_SUBOBJECT_OUTER_CHAIN)
-	{ 
+	{
 		const bool bActorIsOuter = Bunch.ReadBit() != 0;
-	
+
 		if (Bunch.IsError())
 		{
 			UE_LOG(LogNetTraffic, Error, TEXT("UActorChannel::ReadContentBlockHeader: Bunch.IsError() == true after reading actor is outer bit. Actor: %s"), *Actor->GetName());
@@ -3875,6 +3874,12 @@ UObject* UActorChannel::ReadContentBlockHeader( FInBunch & Bunch, bool& bObjectD
 				return nullptr;
 			}
 		}
+	}
+
+	// in this case we may still have needed to serialize the outer above, so check again now
+	if ((SubObjClass == nullptr) && (SubObj == nullptr) && Connection->IsInternalAck())
+	{
+		return nullptr;
 	}
 
 	if ( SubObj == NULL )
