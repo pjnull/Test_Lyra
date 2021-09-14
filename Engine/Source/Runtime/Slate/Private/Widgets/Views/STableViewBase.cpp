@@ -608,7 +608,7 @@ FReply STableViewBase::OnTouchMoved( const FGeometry& MyGeometry, const FPointer
 		
 		TickScrollDelta -= ScrollByAmount;
 
-		if (FSlateApplication::Get().HasTraveledFarEnoughToTriggerDrag(InTouchEvent, PressedScreenSpacePosition))
+		if (FSlateApplication::Get().HasTraveledFarEnoughToTriggerDrag(InTouchEvent, PressedScreenSpacePosition, Orientation))
 		{
 			// Make sure the active timer is registered to update the inertial scroll
 			if ( !bIsScrollingActiveTimerRegistered )
@@ -624,13 +624,14 @@ FReply STableViewBase::OnTouchMoved( const FGeometry& MyGeometry, const FPointer
 			// The user has moved the list some amount; they are probably
 			// trying to scroll. From now on, the list assumes the user is scrolling
 			// until they lift their finger.
-			return FReply::Handled().CaptureMouse( AsShared() );
+			return HasMouseCapture() ? FReply::Handled() : FReply::Handled().CaptureMouse(AsShared());
 		}
-		return FReply::Handled();
+
+		return FReply::Unhandled();
 	}
 	else
 	{
-		return FReply::Handled();
+		return FReply::Unhandled();
 	}
 }
 
@@ -647,7 +648,7 @@ FReply STableViewBase::OnTouchEnded( const FGeometry& MyGeometry, const FPointer
 	}
 	else
 	{
-		return FReply::Handled();
+		return FReply::Unhandled();
 	}
 }
 
