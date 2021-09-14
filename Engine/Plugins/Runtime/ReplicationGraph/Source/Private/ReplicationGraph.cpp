@@ -380,6 +380,8 @@ void UReplicationGraph::RemoveConnectionGraphNode(UReplicationGraphNode* GraphNo
 
 UNetReplicationGraphConnection* UReplicationGraph::FindOrAddConnectionManager(UNetConnection* NetConnection)
 {
+	check(NetConnection);
+
 	// Children do not have a connection manager, this is handled by their parent.
 	// We do not want to create connection managers for children, so redirect them.
 	if (NetConnection->GetUChildConnection() != nullptr)
@@ -388,6 +390,8 @@ UNetReplicationGraphConnection* UReplicationGraph::FindOrAddConnectionManager(UN
 		UE_LOG(LogReplicationGraph, Verbose, TEXT("UReplicationGraph::FindOrAddConnectionManager was called with a child connection, redirecting to parent"));
 		check(NetConnection != nullptr);
 	}
+
+	check(NetConnection->GetDriver() == NetDriver);
 
 	// Could use an acceleration map if necessary
 	RG_QUICK_SCOPE_CYCLE_COUNTER(UReplicationGraph_FindConnectionManager)
