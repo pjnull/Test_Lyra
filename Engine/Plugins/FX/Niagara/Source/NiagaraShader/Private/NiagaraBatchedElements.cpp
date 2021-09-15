@@ -109,7 +109,8 @@ void FBatchedElementNiagaraInvertColorChannel::BindShaders(FRHICommandList& RHIC
 	GraphicsPSOInit.PrimitiveType = PT_TriangleList;
 	GraphicsPSOInit.BlendState = TStaticBlendState<CW_ALPHA, BO_Subtract, BF_One, BF_DestColor, BO_Subtract, BF_One, BF_DestAlpha>::GetRHI();
 
-	SetGraphicsPipelineState(RHICmdList, GraphicsPSOInit, EApplyRendertargetOption::ForceApply);
+	RHICmdList.ApplyCachedRenderTargets(GraphicsPSOInit);
+	SetGraphicsPipelineState(RHICmdList, GraphicsPSOInit, 0);
 
 	VertexShader->SetParameters(RHICmdList, InTransform);
 
