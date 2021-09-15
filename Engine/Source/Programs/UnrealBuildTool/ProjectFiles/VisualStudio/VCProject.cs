@@ -280,6 +280,7 @@ namespace UnrealBuildTool
 		bool bUsePrecompiled;
 		string BuildToolOverride;
 		Dictionary<DirectoryReference, string> ModuleDirToForceIncludePaths = new Dictionary<DirectoryReference, string>();
+		Dictionary<DirectoryReference, string> ModuleDirToPchHeaderFile = new Dictionary<DirectoryReference, string>();
 		VCProjectFileSettings Settings;
 
 		/// This is the platform name that Visual Studio is always guaranteed to support.  We'll use this as
@@ -534,7 +535,9 @@ namespace UnrealBuildTool
 					List<string> ForceIncludePaths = new List<string>(CompileEnvironment.ForceIncludeFiles.Select(x => InsertPathVariables(x.Location)));
 					if (CompileEnvironment.PrecompiledHeaderIncludeFilename != null)
 					{
-						ForceIncludePaths.Add(InsertPathVariables(CompileEnvironment.PrecompiledHeaderIncludeFilename));
+						string PchHeaderFile = InsertPathVariables(CompileEnvironment.PrecompiledHeaderIncludeFilename);
+						ForceIncludePaths.Insert(0, PchHeaderFile);
+						ModuleDirToPchHeaderFile[Module.ModuleDirectory] = PchHeaderFile;
 					}
 					ModuleDirToForceIncludePaths[Module.ModuleDirectory] = String.Join(";", ForceIncludePaths);
 				}
@@ -590,7 +593,7 @@ namespace UnrealBuildTool
 
 			return Version;
 		}
-
+		
 		/// <summary>
 		/// Gets compiler switch for specifying in AdditionalOptions in .vcxproj file for specific C++ version
 		/// </summary>
@@ -796,13 +799,13 @@ namespace UnrealBuildTool
 		void AppendIncludePaths(StringBuilder Builder, IncludePathsCollection Collection, HashSet<DirectoryReference> IgnorePaths)
 		{
 			foreach (DirectoryReference IncludePath in Collection.AbsolutePaths)
-			{
-				if (!IgnorePaths.Contains(IncludePath) && !IncludePathIsFilteredOut(IncludePath))
-				{
-					Builder.Append(NormalizeProjectPath(IncludePath.FullName));
-					Builder.Append(';');
-				}
-			}
+					{
+						if (!IgnorePaths.Contains(IncludePath) && !IncludePathIsFilteredOut(IncludePath))
+						{
+							Builder.Append(NormalizeProjectPath(IncludePath.FullName));
+							Builder.Append(';');
+						}
+					}
 		}
 
 		/// Implements Project interface
@@ -1140,6 +1143,7 @@ namespace UnrealBuildTool
 
 				Dictionary<DirectoryReference, string> DirectoryToIncludeSearchPaths = new Dictionary<DirectoryReference, string>();
 				Dictionary<DirectoryReference, string> DirectoryToForceIncludePaths = new Dictionary<DirectoryReference, string>();
+				Dictionary<DirectoryReference, string> DirectoryToPchFile = new Dictionary<DirectoryReference, string>();
 				foreach (AliasedFile AliasedFile in LocalAliasedFiles)
 				{
 					// No need to add the root directory relative to the project (it would just be an empty string!)
@@ -1160,8 +1164,8 @@ namespace UnrealBuildTool
 
 					if (VCFileType != "ClCompile")
 					{
-						VCProjectFileContent.AppendLine("    <{0} Include=\"{1}\"/>", VCFileType, EscapeFileName(AliasedFile.FileSystemPath));
-					}
+							VCProjectFileContent.AppendLine("    <{0} Include=\"{1}\"/>", VCFileType, EscapeFileName(AliasedFile.FileSystemPath));
+						}
 					else
 					{
 						DirectoryReference Directory = AliasedFile.Location.Directory;
@@ -1189,28 +1193,39 @@ namespace UnrealBuildTool
 							DirectoryToForceIncludePaths[Directory] = ForceIncludePaths;
 						}
 
+						// Find the PCH file
+						string PchHeaderFile;
+						if (!DirectoryToPchFile.TryGetValue(Directory, out PchHeaderFile))
+						{
+							for (DirectoryReference ParentDir = Directory; ParentDir != null; ParentDir = ParentDir.ParentDirectory)
+							{
+								if (ModuleDirToPchHeaderFile.TryGetValue(ParentDir, out PchHeaderFile))
+								{
+									break;
+								}
+							}
+							DirectoryToPchFile[Directory] = PchHeaderFile;
+						}
 
 						// Find the include search paths
 						VCProjectFileContent.AppendLine("    <{0} Include=\"{1}\">", VCFileType, EscapeFileName(AliasedFile.FileSystemPath));
 						if (TryGetBuildEnvironment(Directory, out BuildEnvironment BuildEnvironment))
 						{
 							string IncludeSearchPaths = String.Empty;
-							if (!DirectoryToIncludeSearchPaths.TryGetValue(Directory, out IncludeSearchPaths))
-							{
-								StringBuilder Builder = new StringBuilder();
+						if (!DirectoryToIncludeSearchPaths.TryGetValue(Directory, out IncludeSearchPaths))
+						{
+							StringBuilder Builder = new StringBuilder();
 								AppendIncludePaths(Builder, BuildEnvironment.UserIncludePaths, SharedIncludeSearchPathsSet);
 								AppendIncludePaths(Builder, BuildEnvironment.SystemIncludePaths, SharedIncludeSearchPathsSet);
-								IncludeSearchPaths = Builder.ToString();
+							IncludeSearchPaths = Builder.ToString();
 
-								DirectoryToIncludeSearchPaths.Add(Directory, IncludeSearchPaths);
-							}
-							VCProjectFileContent.AppendLine("      <AdditionalIncludeDirectories>$(NMakeIncludeSearchPath);{0}</AdditionalIncludeDirectories>", IncludeSearchPaths);
-							VCProjectFileContent.AppendLine("      <ForcedIncludeFiles>$(NMakeForcedIncludes);{0}</ForcedIncludeFiles>", ForceIncludePaths);
-
-							if (BuildEnvironment.PchIncludeFile != null)
-							{
-								VCProjectFileContent.AppendLine("      <AdditionalOptions>$(AdditionalOptions) /Yu&quot;{0}&quot;</AdditionalOptions>", BuildEnvironment.PchIncludeFile);
-							}
+							DirectoryToIncludeSearchPaths.Add(Directory, IncludeSearchPaths);
+						}
+						VCProjectFileContent.AppendLine("      <AdditionalIncludeDirectories>$(NMakeIncludeSearchPath);{0}</AdditionalIncludeDirectories>", IncludeSearchPaths);
+						VCProjectFileContent.AppendLine("      <ForcedIncludeFiles>{0}</ForcedIncludeFiles>", ForceIncludePaths);
+						if (PchHeaderFile != null && ProjectFileFormat >= VCProjectFileFormat.VisualStudio2022)
+						{
+							VCProjectFileContent.AppendLine("      <AdditionalOptions>/Yu\"{0}\"</AdditionalOptions>", PchHeaderFile);
 						}
 						VCProjectFileContent.AppendLine("    </{0}>", VCFileType);
 					}
@@ -1815,27 +1830,27 @@ namespace UnrealBuildTool
 				// Parse the basic structure of the document, updating properties and recursing into other referenced projects as we go
 				if (!IsDotNETCoreProject())
 				{
-					foreach (XmlElement Element in Document.DocumentElement.ChildNodes.OfType<XmlElement>())
-					{
+				foreach (XmlElement Element in Document.DocumentElement.ChildNodes.OfType<XmlElement>())
+				{
 						if (Element.Name == "PropertyGroup")
-						{
-							string Condition = Element.GetAttribute("Condition");
+					{
+						string Condition = Element.GetAttribute("Condition");
 							if (!String.IsNullOrEmpty(Condition))
-							{
-								Match Match = Regex.Match(Condition, "^\\s*'\\$\\(Configuration\\)\\|\\$\\(Platform\\)'\\s*==\\s*'(.+)\\|(.+)'\\s*$");
+						{
+							Match Match = Regex.Match(Condition, "^\\s*'\\$\\(Configuration\\)\\|\\$\\(Platform\\)'\\s*==\\s*'(.+)\\|(.+)'\\s*$");
 								if (Match.Success && Match.Groups.Count == 3)
-								{
-									Configurations.Add(Match.Groups[1].Value);
-									Platforms.Add(Match.Groups[2].Value);
-								}
-								else
-								{
-									Log.TraceWarning("Unable to parse configuration/platform from condition '{0}': {1}", InitFilePath, Condition);
-								}
+							{
+								Configurations.Add(Match.Groups[1].Value);
+								Platforms.Add(Match.Groups[2].Value);
+							}
+							else
+							{
+								Log.TraceWarning("Unable to parse configuration/platform from condition '{0}': {1}", InitFilePath, Condition);
 							}
 						}
 					}
 				}
+			}
 				else
 				{
 					bool ConfigurationsFound = false;
