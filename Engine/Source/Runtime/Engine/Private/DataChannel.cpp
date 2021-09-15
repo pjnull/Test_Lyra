@@ -3887,12 +3887,12 @@ UObject* UActorChannel::ReadContentBlockHeader(FInBunch& Bunch, bool& bObjectDel
 		check( !IsServer );
 
 		// Construct the sub-object
-		UE_LOG( LogNetTraffic, Log, TEXT( "UActorChannel::ReadContentBlockHeader: Instantiating sub-object. Class: %s, Actor: %s, Outer: %s" ), *SubObjClass->GetName(), *Actor->GetName(), *ObjOuter->GetName() );
+		UE_LOG( LogNetTraffic, Log, TEXT( "UActorChannel::ReadContentBlockHeader: Instantiating sub-object. Class: %s, Actor: %s, Outer: %s" ), *GetNameSafe(SubObjClass), *Actor->GetName(), *ObjOuter->GetName() );
 		
 		SubObj = NewObject< UObject >(ObjOuter, SubObjClass);
 
 		// Sanity check some things
-		checkf(SubObj != NULL, TEXT("UActorChannel::ReadContentBlockHeader: Subobject is NULL after instantiating. Class: %s, Actor %s"), *SubObjClass->GetName(), *Actor->GetName());
+		checkf(SubObj != NULL, TEXT("UActorChannel::ReadContentBlockHeader: Subobject is NULL after instantiating. Class: %s, Actor %s"), *GetNameSafe(SubObjClass), *Actor->GetName());
 		checkf(SubObj->IsIn(ObjOuter), TEXT("UActorChannel::ReadContentBlockHeader: Subobject is not in Outer. SubObject: %s, Actor: %s, Outer: %s"), *SubObj->GetName(), *Actor->GetName(), *ObjOuter->GetName());
 		checkf(Cast< AActor >(SubObj) == NULL, TEXT("UActorChannel::ReadContentBlockHeader: Subobject is an Actor. SubObject: %s, Actor: %s"), *SubObj->GetName(), *Actor->GetName());
 
