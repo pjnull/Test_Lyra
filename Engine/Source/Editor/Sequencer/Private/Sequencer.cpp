@@ -2957,6 +2957,8 @@ void FSequencer::SetPlaybackRange(TRange<FFrameNumber> Range)
 	}
 }
 
+PRAGMA_DISABLE_OPTIMIZATION
+
 UMovieSceneSection* FSequencer::FindNextOrPreviousShot(UMovieSceneSequence* Sequence, FFrameNumber SearchFromTime, const bool bNextShot) const
 {
 	UMovieScene* OwnerMovieScene = Sequence->GetMovieScene();
@@ -3042,6 +3044,8 @@ UMovieSceneSection* FSequencer::FindNextOrPreviousShot(UMovieSceneSequence* Sequ
 
 	return CinematicShotTrack->GetAllSections()[TargetShotIndex];
 }
+
+PRAGMA_ENABLE_OPTIMIZATION
 
 void FSequencer::SetSelectionRangeToShot(const bool bNextShot)
 {
@@ -11458,10 +11462,19 @@ void FSequencer::StepToNextShot()
 		return;
 	}
 
-	FMovieSceneSequenceID OuterSequenceID = ActiveTemplateIDs[ActiveTemplateIDs.Num()-2];
+	FMovieSceneSequenceID OuterSequenceID = ActiveTemplateIDs[ActiveTemplateIDs.Num() - 2];
 	UMovieSceneSequence* Sequence = RootTemplateInstance.GetSequence(OuterSequenceID);
 
-	FFrameTime CurrentTime = SubSequenceRange.GetLowerBoundValue() * RootToLocalTransform.InverseFromWarp(RootToLocalLoopCounter);
+	FMovieSceneCompiledDataID DataID = CompiledDataManager->Compile(RootSequence.Get());
+	const FMovieSceneSequenceHierarchy& Hierarchy = CompiledDataManager->GetHierarchyChecked(DataID);
+
+	const FMovieSceneSubSequenceData*  SubData = Hierarchy.FindSubData(GetFocusedTemplateID());
+	if (!SubData)
+	{
+		return;
+	}
+
+	FFrameTime CurrentTime = SubSequenceRange.GetLowerBoundValue() * SubData->OuterToInnerTransform.InverseFromWarp(RootToLocalLoopCounter);
 
 	UMovieSceneSubSection* NextShot = Cast<UMovieSceneSubSection>(FindNextOrPreviousShot(Sequence, CurrentTime.FloorToFrame(), true));
 	if (!NextShot)
@@ -11494,7 +11507,16 @@ void FSequencer::StepToPreviousShot()
 	FMovieSceneSequenceID OuterSequenceID = ActiveTemplateIDs[ActiveTemplateIDs.Num() - 2];
 	UMovieSceneSequence* Sequence = RootTemplateInstance.GetSequence(OuterSequenceID);
 
-	FFrameTime CurrentTime = SubSequenceRange.GetLowerBoundValue() * RootToLocalTransform.InverseFromWarp(RootToLocalLoopCounter);
+	FMovieSceneCompiledDataID DataID = CompiledDataManager->Compile(RootSequence.Get());
+	const FMovieSceneSequenceHierarchy& Hierarchy = CompiledDataManager->GetHierarchyChecked(DataID);
+
+	const FMovieSceneSubSequenceData*  SubData = Hierarchy.FindSubData(GetFocusedTemplateID());
+	if (!SubData)
+	{
+		return;
+	}
+
+	FFrameTime CurrentTime = SubSequenceRange.GetLowerBoundValue() * SubData->OuterToInnerTransform.InverseFromWarp(RootToLocalLoopCounter);
 	UMovieSceneSubSection* PreviousShot = Cast<UMovieSceneSubSection>(FindNextOrPreviousShot(Sequence, CurrentTime.FloorToFrame(), false));
 	if (!PreviousShot)
 	{
