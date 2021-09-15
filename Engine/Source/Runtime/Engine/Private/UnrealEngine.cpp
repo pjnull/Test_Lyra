@@ -12380,11 +12380,11 @@ void DestroyNamedNetDriver_Local(FWorldContext &Context, FName NetDriverName)
 			
 			ensureMsgf(!NetDriver->IsInTick(), TEXT("Attempting to destroy NetDriver %s [%s] while it is ticking."), *NetDriver->GetName(), *NetDriverName.ToString());
 
+			Context.ActiveNetDrivers.RemoveAtSwap(Index);
 			NetDriver->SetWorld(NULL);
 			NetDriver->Shutdown();
 			NetDriver->LowLevelDestroy();
-			Context.ActiveNetDrivers.RemoveAtSwap(Index);
-			
+
 			Context.World()->ClearNetDriver(NetDriver);
 
 			break;
