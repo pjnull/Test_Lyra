@@ -2417,9 +2417,10 @@ bool FMaterial::BeginCompileShaderMap(
 
 	if(bSuccess)
 	{
+#if WITH_EDITOR
 		FShaderCompileUtilities::GenerateBrdfHeaders((EShaderPlatform)Platform);
 		FShaderCompileUtilities::ApplyDerivedDefines(*MaterialEnvironment, nullptr, (EShaderPlatform)Platform);
-
+#endif
 		{
 			FShaderParametersMetadata* UniformBufferStruct = NewCompilationOutput.UniformExpressionSet.CreateBufferStruct();
 			SetupMaterialEnvironment(Platform, *UniformBufferStruct, NewCompilationOutput.UniformExpressionSet, *MaterialEnvironment);
