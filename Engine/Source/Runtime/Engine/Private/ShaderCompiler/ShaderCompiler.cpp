@@ -6641,6 +6641,7 @@ void CompileGlobalShaderMap(EShaderPlatform Platform, const ITargetPlatform* Tar
 		GGlobalShaderMap[Platform] = new FGlobalShaderMap(Platform);
 
 		bool bLoadedFromCacheFile = false;
+		bool bShaderMapIsBeingCompiled = false;
 
 		// Try to load the global shaders from a local cache file if it exists
 		// This method is used exclusively with cooked content, since the DDC is not present
@@ -6771,6 +6772,7 @@ void CompileGlobalShaderMap(EShaderPlatform Platform, const ITargetPlatform* Tar
 				{
 					// it's a miss, but we haven't built anything yet. Save the counting until we actually have it built.
 					COOK_STAT(Timer.TrackCyclesOnly());
+					bShaderMapIsBeingCompiled = true;
 				}
 
 				++HandleIndex;
@@ -6786,7 +6788,7 @@ void CompileGlobalShaderMap(EShaderPlatform Platform, const ITargetPlatform* Tar
 		}
 
 		// While we're early in the game's startup, create certain global shaders that may be later created on random threads otherwise. 
-		if (!GRHISupportsMultithreadedShaderCreation)
+		if (!bShaderMapIsBeingCompiled && !GRHISupportsMultithreadedShaderCreation)
 		{
 			CreateClearReplacementShaders();
 		}
@@ -7221,6 +7223,11 @@ void ProcessCompiledGlobalShaders(const TArray<FShaderCommonCompileJobPtr>& Comp
 
 		// Save the global shader map for any platforms that were recompiled
 		SaveGlobalShaderMapToDerivedDataCache(ShaderPlatformsProcessed[PlatformIndex]);
+
+		if (ShaderPlatformsProcessed[PlatformIndex] == GMaxRHIShaderPlatform && !GRHISupportsMultithreadedShaderCreation)
+		{
+			CreateClearReplacementShaders();
+		}
 	}
 }
 
