@@ -2957,8 +2957,6 @@ void FSequencer::SetPlaybackRange(TRange<FFrameNumber> Range)
 	}
 }
 
-PRAGMA_DISABLE_OPTIMIZATION
-
 UMovieSceneSection* FSequencer::FindNextOrPreviousShot(UMovieSceneSequence* Sequence, FFrameNumber SearchFromTime, const bool bNextShot) const
 {
 	UMovieScene* OwnerMovieScene = Sequence->GetMovieScene();
@@ -3044,8 +3042,6 @@ UMovieSceneSection* FSequencer::FindNextOrPreviousShot(UMovieSceneSequence* Sequ
 
 	return CinematicShotTrack->GetAllSections()[TargetShotIndex];
 }
-
-PRAGMA_ENABLE_OPTIMIZATION
 
 void FSequencer::SetSelectionRangeToShot(const bool bNextShot)
 {
