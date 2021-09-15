@@ -1584,15 +1584,12 @@ public:
 		return &FaultRecovery;
 	}
 
-	bool HasReceivedCloseReason() const
-	{
-		return bReceivedCloseReason;
-	}
-
-	void SetReceivedCloseReason(bool bInReceivedCloseReason)
-	{
-		bReceivedCloseReason = bInReceivedCloseReason;
-	}
+	/**
+	 * Handles parsing/validation and logging of NMT_CloseReason messages
+	 *
+	 * @param CloseReasonList	Delimited list of close reasons
+	 */
+	ENGINE_API void HandleReceiveCloseReason(const FString& CloseReasonList);
 
 private:
 	/**

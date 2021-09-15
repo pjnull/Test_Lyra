@@ -1703,6 +1703,9 @@ void UControlChannel::ReceivedBunch( FInBunch& Bunch )
 				case NMT_EncryptionAck:
 					//FNetControlMessage<NMT_EncryptionAck>::Discard(Bunch);
 					break;
+				case NMT_CloseReason:
+					FNetControlMessage<NMT_CloseReason>::Discard(Bunch);
+					break;
 				case NMT_BeaconWelcome:
 					//FNetControlMessage<NMT_BeaconWelcome>::Discard(Bunch);
 					break;

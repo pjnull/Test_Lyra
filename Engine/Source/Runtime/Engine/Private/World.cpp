@@ -5968,47 +5968,7 @@ void UWorld::NotifyControlMessage(UNetConnection* Connection, uint8 MessageType,
 
 				if (FNetControlMessage<NMT_CloseReason>::Receive(Bunch, CloseReasonList) && !CloseReasonList.IsEmpty())
 				{
-					bool bValid = true;
-					auto IsAlnum_NoLocale = [](TCHAR Char) -> bool
-						{
-							return (Char >= TEXT('A') && Char <= TEXT('Z')) || (Char >= TEXT('a') && Char <= TEXT('z')) ||
-									(Char >= TEXT('0') && Char <= TEXT('9'));
-						};
-
-					for (const TCHAR CurChar : CloseReasonList)
-					{
-						if (!IsAlnum_NoLocale(CurChar) && CurChar != TEXT('_') && CurChar != TEXT(','))
-						{
-							bValid = false;
-							break;
-						}
-					}
-
-					if (bValid && !Connection->HasReceivedCloseReason())
-					{
-						const bool bAnalyticsValid = Connection->NetAnalyticsData.IsValid();
-						TArray<FString> CloseReasonsAlloc;
-						TArray<FString>& ClientCloseReasons = (bAnalyticsValid ? Connection->AnalyticsVars.ClientCloseReasons : CloseReasonsAlloc);
-
-						CloseReasonList.ParseIntoArray(ClientCloseReasons, TEXT(","));
-
-						if (ClientCloseReasons.Num() < 128)
-						{
-							UE_LOG(LogNet, Log, TEXT("NMT_CloseReason: (Client Disconnect Reasons) %s"),
-									ToCStr(Connection->LowLevelGetRemoteAddress(true)));
-
-							for (const FString& CurReason : ClientCloseReasons)
-							{
-								UE_LOG(LogNet, Log, TEXT(" - %s"), ToCStr(CurReason));
-							}
-						}
-						else
-						{
-							ClientCloseReasons.Empty();
-						}
-
-						Connection->SetReceivedCloseReason(true);
-					}
+					Connection->HandleReceiveCloseReason(CloseReasonList);
 				}
 
 				break;
