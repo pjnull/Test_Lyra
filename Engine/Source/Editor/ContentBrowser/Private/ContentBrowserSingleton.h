@@ -67,9 +67,11 @@ public:
 	virtual void GetSelectedFolders(TArray<FString>& SelectedFolders) override;
 	virtual void GetSelectedPathViewFolders(TArray<FString>& SelectedFolders) override;
 	virtual FString GetCurrentPath(const EContentBrowserPathType PathType) override;
+	virtual FContentBrowserItemPath GetCurrentPath() override;
 	virtual void CaptureThumbnailFromViewport(FViewport* InViewport, TArray<FAssetData>& SelectedAssets) override;
 	virtual void SetSelectedPaths(const TArray<FString>& FolderPaths, bool bNeedsRefresh = false, bool bPathsAreVirtual = false) override;
 	virtual void ForceShowPluginContent(bool bEnginePlugin) override;
+	virtual FContentBrowserItemPath GetInitialPathToSaveAsset(const FContentBrowserItemPath& InPath) override;
 	virtual void SaveContentBrowserSettings(TSharedPtr<SWidget> ContentBrowserWidget) override;
 	virtual void ExecuteRename(TSharedPtr<SWidget> PickerWidget) override;
 	virtual void ExecuteAddFolder(TSharedPtr<SWidget> PathPickerWidget) override;

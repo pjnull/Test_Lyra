@@ -305,8 +305,10 @@ void SSCreateBlueprintPicker::Construct(const FArguments& InArgs)
 
 	ClassViewer = StaticCastSharedRef<SClassViewer>(ClassViewerModule.CreateClassViewer(ClassViewerOptions, FOnClassPicked::CreateSP(this, &SSCreateBlueprintPicker::OnClassPicked)));
 
-	FString PackageName;
-	AssetPath.SetPathFromString(ContentBrowserModule.Get().GetCurrentPath(EContentBrowserPathType::Virtual), EContentBrowserPathType::Virtual);
+	AssetPath = ContentBrowserModule.Get().GetCurrentPath();
+
+	// Change path if cannot write to it
+	AssetPath = ContentBrowserModule.Get().GetInitialPathToSaveAsset(AssetPath);
 
 	ECreateBlueprintFromActorMode ValidCreateMethods = FCreateBlueprintFromActorDialog::GetValidCreationMethods();
 
@@ -327,6 +329,7 @@ void SSCreateBlueprintPicker::Construct(const FArguments& InArgs)
 
 	AssetName = UPackageTools::SanitizePackageName(AssetName + TEXT("Blueprint"));
 
+	FString PackageName;
 	AssetToolsModule.Get().CreateUniqueAssetName(AssetPath.GetInternalPathString() / AssetName, TEXT(""), PackageName, AssetName);
 
 	TSharedPtr<SGridPanel> CreationMethodSection;
