@@ -680,6 +680,7 @@ public:
 	 *
 	 * @param PathPickerWidget The path picker widget where we want to add an folder
 	*/
+	virtual void RefreshPathView(TSharedPtr<SWidget> PathPickerWidget) = 0;
 
 	/** Returns InPath if can be written to, otherwise picks a default path that can be written to */
 	virtual FContentBrowserItemPath GetInitialPathToSaveAsset(const FContentBrowserItemPath& InPath) = 0;
