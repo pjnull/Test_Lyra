@@ -252,7 +252,7 @@ bool UQuartzClockHandle::IsClockRunning(const UObject* WorldContextObject)
 
 float UQuartzClockHandle::GetDurationOfQuantizationTypeInSeconds(const UObject* WorldContextObject, const EQuartzCommandQuantization& QuantizationType, float Multiplier)
 {
-	if (QuartzSubsystem != nullptr)
+	if (UQuartzSubsystem* QuartzSubsystem = GetQuartzSubsystem())
 	{
 		return QuartzSubsystem->GetDurationOfQuantizationTypeInSeconds(WorldContextObject, CurrentClockId, QuantizationType, Multiplier);
 	}
@@ -264,7 +264,7 @@ float UQuartzClockHandle::GetDurationOfQuantizationTypeInSeconds(const UObject* 
 
 FQuartzTransportTimeStamp UQuartzClockHandle::GetCurrentTimestamp(const UObject* WorldContextObject)
 {
-	if (QuartzSubsystem != nullptr)
+	if (UQuartzSubsystem* QuartzSubsystem = GetQuartzSubsystem())
 	{
 		return QuartzSubsystem->GetCurrentClockTimestamp(WorldContextObject, CurrentClockId);
 	}
@@ -276,7 +276,7 @@ FQuartzTransportTimeStamp UQuartzClockHandle::GetCurrentTimestamp(const UObject*
 
 float UQuartzClockHandle::GetEstimatedRunTime(const UObject* WorldContextObject)
 {
-	if (QuartzSubsystem != nullptr)
+	if (UQuartzSubsystem* QuartzSubsystem = GetQuartzSubsystem())
 	{
 		return QuartzSubsystem->GetEstimatedClockRunTime(WorldContextObject, CurrentClockId);
 	}
