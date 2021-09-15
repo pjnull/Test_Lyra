@@ -307,13 +307,19 @@ public:
 	UFUNCTION(BlueprintCallable, Category = Niagara, meta = (DisplayName = "Set whether or not to lock the desired age delta time to the seek delta."))
 	void SetLockDesiredAgeDeltaTimeToSeekDelta(bool bLock);
 
-	/** Sets the maximum time that you can jump within a tick which is used when seeking from the current age, to the desired age.  This is only relevant
-	when using the DesiredAge age update mode. */
+	/**
+	Get the maximum CPU time in seconds we will simulate to the desired age, when we go beyond this limit ticks will be processed in the next frame.
+	This is only relevant when using the DesiredAge age update mode.
+	Note: The componet will not be visibile if we have ticks to process and SetCanRenderWhileSeeking is set to true
+	*/
 	UFUNCTION(BlueprintCallable, Category = Niagara, meta = (DisplayName = "Get Max Desired Age Tick Delta"))
 	float GetMaxSimTime() const;
 
-	/** Sets the maximum time that you can jump within a tick which is used when seeking from the current age, to the desired age.  This is only relevant
-	when using the DesiredAge age update mode. */
+	/**
+	Sets the maximum CPU time in seconds we will simulate to the desired age, when we go beyond this limit ticks will be processed in the next frame.
+	This is only relevant when using the DesiredAge age update mode.
+	Note: The componet will not be visibile if we have ticks to process and SetCanRenderWhileSeeking is set to true
+	*/
 	UFUNCTION(BlueprintCallable, Category = Niagara, meta = (DisplayName = "Set Max Desired Age Tick Delta"))
 	void SetMaxSimTime(float InMaxTime);
 

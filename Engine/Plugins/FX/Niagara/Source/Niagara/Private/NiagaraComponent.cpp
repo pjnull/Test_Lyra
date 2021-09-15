@@ -681,16 +681,26 @@ void UNiagaraComponent::TickComponent(float DeltaSeconds, enum ELevelTick TickTy
 						if (bLockDesiredAgeDeltaTimeToSeekDelta || AgeDiff > SeekDelta)
 						{
 							// If we're locking the delta time to the seek delta, or we need to seek more than a frame, tick the simulation by the seek delta.
-							double StartTime = FPlatformTime::Seconds();
-							double CurrentTime = StartTime;
+							const bool bUseMaxSimTime = MaxSimTime > 0.0f;
+							const double EndMaxSimTime = bUseMaxSimTime ? FPlatformTime::Seconds() + MaxSimTime : 0.0f;
 
 							TicksToProcess = FMath::FloorToInt(AgeDiff / SeekDelta);
-							for (; TicksToProcess > 0 && CurrentTime - StartTime < MaxSimTime; --TicksToProcess)
+							while ( TicksToProcess > 0 )
 							{
-								//Cannot do multiple tick off the game thread here without additional work. So we pass in null for the completion event which will force GT execution.
-								//If this becomes a perf problem I can add a new path for the tick code to handle multiple ticks.
+								// Cannot do multiple tick off the game thread here without additional work. So we pass in null for the completion event which will force GT execution.
+								// If this becomes a perf problem I can add a new path for the tick code to handle multiple ticks.
 								SystemInstanceController->ManualTick(SeekDelta, nullptr);
-								CurrentTime = FPlatformTime::Seconds();
+								--TicksToProcess;
+
+								// This limits the amount of time we will consume seeking forward
+								if ( bUseMaxSimTime )
+								{
+									const double CurrentTime = FPlatformTime::Seconds();
+									if ( CurrentTime >= EndMaxSimTime )
+									{
+										break;
+									}
+								}
 							}
 						}
 						else
