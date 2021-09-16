@@ -446,8 +446,8 @@ namespace CADLibrary
 
 	bool FCoreTechInterfaceImpl::SetCoreTechTessellationState(const FImportParameters& ImportParams)
 	{
-		bScaleUVMap = ImportParams.bScaleUVMap;
-		ScaleFactor = ImportParams.ScaleFactor;
+		bScaleUVMap = ImportParams.NeedScaleUVMap();
+		ScaleFactor = ImportParams.GetScaleFactor();
 
 		CT_DOUBLE CurrentUnit = 0.001;
 
@@ -508,7 +508,7 @@ namespace CADLibrary
 
 			if (bScaleUVMap && Tessellation.TexCoordArray.Num() > 0)
 			{
-				CoreTechFileReaderUtils::ScaleUV(FaceID, Tessellation.TexCoordArray, (float) ScaleFactor);
+				CoreTechFileParserUtils::ScaleUV(FaceID, Tessellation.TexCoordArray, (float) ScaleFactor);
 			}
 		};
 
