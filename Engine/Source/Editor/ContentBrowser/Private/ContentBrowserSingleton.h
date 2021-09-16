@@ -16,6 +16,7 @@ class SContentBrowser;
 class UFactory;
 class UToolMenu;
 class FWorkspaceItem;
+struct FTabSpawnerEntry;
 
 #define MAX_CONTENT_BROWSERS 4
 
@@ -157,6 +158,8 @@ private:
 	TSharedRef<FCollectionAssetRegistryBridge> CollectionAssetRegistryBridge;
 
 	TArray<FContentBrowserPluginSettings> PluginSettings;
+
+	TArray<TSharedPtr<FTabSpawnerEntry>> ContentBrowserTabs;
 
 	/** An incrementing int32 which is used when making unique settings strings */
 	int32 SettingsStringID;
