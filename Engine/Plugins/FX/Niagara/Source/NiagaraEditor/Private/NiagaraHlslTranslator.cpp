@@ -5051,7 +5051,7 @@ bool FHlslNiagaraTranslator::GetLiteralConstantVariable(FNiagaraVariable& OutVar
 		FNiagaraVariable ResolvedLocalSpaceCompileOptionVar = ActiveHistoryForFunctionCalls.ResolveAliases(SYS_PARAM_EMITTER_LOCALSPACE);
 		if (CompileOptions.AdditionalDefines.Contains(ResolvedLocalSpaceCompileOptionVar.GetName().ToString()))
 		{
-			OutVar.SetValue(FVector3f(EForceInit::ForceInitToZero));
+			OutVar.SetValue(FVector(EForceInit::ForceInitToZero));
 			return true;
 		}
 	}
