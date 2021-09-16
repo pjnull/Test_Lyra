@@ -45,6 +45,7 @@ public:
 
 	//~ Begin UWorldSubsystem Interface
 	virtual bool DoesSupportWorldType(EWorldType::Type WorldType) const override;
+	void BeginDestroy() override;
 	//~ End UWorldSubsystem Interface
 
 	//~ Begin FTickableGameObject Interface

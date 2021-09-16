@@ -15,12 +15,6 @@ void FQuartzTickableObject::FQuartzTickableObjectGCObjectMembers::AddReferencedO
 
 FQuartzTickableObject::~FQuartzTickableObject()
 {
-	// un-subscribe from Subsystem tick and metronome events
-	if (GCObjectMembers.QuartzSubsystem)
-	{
-		GCObjectMembers.QuartzSubsystem->UnsubscribeFromQuartzTick(this);
-	}
-
 	// shutdown the shared command queue
 	if (CommandQueuePtr.IsValid())
 	{
@@ -66,6 +60,18 @@ int32 FQuartzTickableObject::AddCommandDelegate(const FOnQuartzCommandEventBP& I
 	// need a new slot
 	QuantizedCommandDelegates.AddDefaulted_GetRef().MulticastDelegate.AddUnique(InDelegate);
 	return SlotId;
+}
+
+// called by UQuartzSubsystem::BeginDestroy()
+void FQuartzTickableObject::Shutdown()
+{
+	if (GCObjectMembers.WorldPtr && GCObjectMembers.QuartzSubsystem)
+	{
+		GCObjectMembers.QuartzSubsystem->UnsubscribeFromQuartzTick(this);
+		GCObjectMembers.WorldPtr = nullptr;
+		GCObjectMembers.QuartzSubsystem = nullptr;
+		bHasBeenInitialized = false;
+	}
 }
 
 TSharedPtr<Audio::FShareableQuartzCommandQueue, ESPMode::ThreadSafe> FQuartzTickableObject::GetCommandQueue()

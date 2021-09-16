@@ -62,6 +62,20 @@ UQuartzSubsystem::UQuartzSubsystem()
 
 UQuartzSubsystem::~UQuartzSubsystem()
 {
+}
+
+void UQuartzSubsystem::BeginDestroy()
+{
+	Super::BeginDestroy();
+
+	// force un-subscribe all Quartz tickable objects
+	TArray<FQuartzTickableObject*> SubscribersCopy = QuartzTickSubscribers;
+	for (FQuartzTickableObject* Entry : SubscribersCopy)
+	{
+		Entry->Shutdown();
+	}
+	QuartzTickSubscribers.Reset();
+
 	SubsystemClockManager.Shutdown();
 	SubsystemClockManager.Flush();
 }

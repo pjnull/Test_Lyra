@@ -54,6 +54,8 @@ class AUDIOMIXER_API FQuartzTickableObject
 
 		virtual void ProcessCommand(const Audio::FQuartzQueueCommandData& Data) {};
 
+		void Shutdown();
+
 
 	protected:
 		struct CommandDelegateGameThreadData
