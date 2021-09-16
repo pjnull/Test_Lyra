@@ -947,8 +947,8 @@ static void AssignPackagesDiskOrder(
 							{
 								DepQueue.Push(FindReferencedPackage);
 							}
-						}
-					}
+		}
+	}
 				}
 
 				TArray<FCluster*> OrderedClustersToRead = ClustersToRead.Array();
