@@ -12,6 +12,34 @@
 
 DEFINE_LOG_CATEGORY(LogAudioQuartz);
 
+EQuartzCommandQuantization TimeSignatureQuantizationToCommandQuantization(const EQuartzTimeSignatureQuantization& BeatType)
+{
+	switch (BeatType)
+	{
+		case EQuartzTimeSignatureQuantization::HalfNote :
+			return EQuartzCommandQuantization::HalfNote;
+			break;
+
+		case EQuartzTimeSignatureQuantization::QuarterNote :
+			return EQuartzCommandQuantization::QuarterNote;
+			break;
+
+		case EQuartzTimeSignatureQuantization::EighthNote :
+			return EQuartzCommandQuantization::EighthNote;
+			break;
+
+		case EQuartzTimeSignatureQuantization::SixteenthNote :
+			return EQuartzCommandQuantization::SixteenthNote;
+			break;
+
+		case EQuartzTimeSignatureQuantization::ThirtySecondNote :
+			return EQuartzCommandQuantization::ThirtySecondNote;
+			break;
+
+		default:
+			return EQuartzCommandQuantization::Count;
+	}
+}
 
 FQuartzTimeSignature::FQuartzTimeSignature(const FQuartzTimeSignature& Other)
 	: NumBeats(Other.NumBeats)
@@ -29,7 +57,7 @@ FQuartzTimeSignature& FQuartzTimeSignature::operator=(const FQuartzTimeSignature
 	return *this;
 }
 
-bool FQuartzTimeSignature::operator==(const FQuartzTimeSignature& Other)
+bool FQuartzTimeSignature::operator==(const FQuartzTimeSignature& Other) const
 {
 	bool Result = (NumBeats == Other.NumBeats);
 	Result &= (BeatType == Other.BeatType);
@@ -364,7 +392,7 @@ namespace Audio
 		, OtherClockName(RHS.OtherClockName)
 		, QuantizedCommandPtr(RHS.QuantizedCommandPtr)
 		, QuantizationBoundary(RHS.QuantizationBoundary)
-		, GameThreadCommandQueue(RHS.GameThreadCommandQueue)
+		, GameThreadSubscribers(RHS.GameThreadSubscribers)
 		, GameThreadDelegateID(RHS.GameThreadDelegateID)
 		, OwningClockPointer(nullptr)
 		, SourceID(InSourceID)
@@ -378,6 +406,11 @@ namespace Audio
 		return nullptr;
 	}
 
+	void IQuartzQuantizedCommand::AddSubscriber(TSharedPtr<FShareableQuartzCommandQueue, ESPMode::ThreadSafe> InSubscriber)
+	{
+		GameThreadSubscribers.AddUnique(InSubscriber);
+	}
+
 	void IQuartzQuantizedCommand::OnQueued(const FQuartzQuantizedCommandInitInfo& InCommandInitInfo)
 	{
 		Audio::FMixerDevice* MixerDevice = InCommandInitInfo.OwningClockPointer->GetMixerDevice();
@@ -386,19 +419,25 @@ namespace Audio
 			MixerDevice->QuantizedEventClockManager.PushLatencyTrackerResult(FQuartzCrossThreadMessage::RequestRecieved());
 		}
 
-		GameThreadCommandQueue = InCommandInitInfo.GameThreadCommandQueue; 
+		GameThreadSubscribers.Append(InCommandInitInfo.GameThreadSubscribers);
 		GameThreadDelegateID = InCommandInitInfo.GameThreadDelegateID;
 
-		if (GameThreadCommandQueue.IsValid())
+		if (GameThreadSubscribers.Num())
 		{
 			FQuartzQuantizedCommandDelegateData Data;
 
+			Data.CommandType = GetCommandType();
 			Data.DelegateSubType = EQuartzCommandDelegateSubType::CommandOnQueued;
 			Data.DelegateID = GameThreadDelegateID;
 
-			// TODO: add payload to Data
 
-			GameThreadCommandQueue->PushEvent(Data);
+			for (auto& SubscriberQueue : GameThreadSubscribers)
+			{
+				if (SubscriberQueue.IsValid())
+				{
+					SubscriberQueue->PushEvent(Data);
+				}
+			}
 		}
 
 		UE_LOG(LogAudioQuartz, Verbose, TEXT("OnQueued() called for quantized event type: [%s]"), *GetCommandName().ToString());
@@ -407,14 +446,19 @@ namespace Audio
 
 	void IQuartzQuantizedCommand::FailedToQueue()
 	{
-		if (GameThreadCommandQueue.IsValid())
+		if (GameThreadSubscribers.Num())
 		{
 			FQuartzQuantizedCommandDelegateData Data;
 			Data.DelegateID = GameThreadDelegateID;
 
-			// TODO: add payload to Data
 
-			GameThreadCommandQueue->PushEvent(Data);
+			for (auto& SubscriberQueue : GameThreadSubscribers)
+			{
+				if (SubscriberQueue.IsValid())
+				{
+					SubscriberQueue->PushEvent(Data);
+				}
+			}
 		}
 
 		UE_LOG(LogAudioQuartz, Verbose, TEXT("FailedToQueue() called for quantized event type: [%s]"), *GetCommandName().ToString());
@@ -432,16 +476,21 @@ namespace Audio
 		bAboutToStartHasBeenCalled = true;
 
 
-		if (GameThreadCommandQueue.IsValid())
+		if (GameThreadSubscribers.Num())
 		{
 			FQuartzQuantizedCommandDelegateData Data;
 
+			Data.CommandType = GetCommandType();
 			Data.DelegateSubType = EQuartzCommandDelegateSubType::CommandOnAboutToStart;
 			Data.DelegateID = GameThreadDelegateID;
 
-			// TODO: add payload to Data
-
-			GameThreadCommandQueue->PushEvent(Data);
+			for (auto& SubscriberQueue : GameThreadSubscribers)
+			{
+				if (SubscriberQueue.IsValid())
+				{
+					SubscriberQueue->PushEvent(Data);
+				}
+			}
 		}
 
 		UE_LOG(LogAudioQuartz, Verbose, TEXT("AboutToStart() called for quantized event type: [%s]"), *GetCommandName().ToString());
@@ -450,25 +499,21 @@ namespace Audio
 
 	void IQuartzQuantizedCommand::OnFinalCallback(int32 InNumFramesLeft)
 	{
-		if (GameThreadCommandQueue.IsValid())
+		if (GameThreadSubscribers.Num())
 		{
 			FQuartzQuantizedCommandDelegateData OnStartedData;
 
+			OnStartedData.CommandType = GetCommandType();
 			OnStartedData.DelegateSubType = EQuartzCommandDelegateSubType::CommandOnStarted;
 			OnStartedData.DelegateID = GameThreadDelegateID;
 
-			// TODO: add payload to Data
-
-			GameThreadCommandQueue->PushEvent(OnStartedData);
-
-			// 			if (!IsLooping())
-			// 			{
-			// 				FQuartzQuantizedCommandDelegateData CompletedData;
-			// 				CompletedData.DelegateSubType = EQuartzCommandDelegateSubType::CommandCompleted;
-			// 				CompletedData.DelegateID = GameThreadDelegateID;
-			// 
-			// 				GameThreadCommandQueue->PushEvent(CompletedData);
-			// 			}
+			for (auto& Subscriber : GameThreadSubscribers)
+			{
+				if (Subscriber.IsValid())
+				{
+					Subscriber->PushEvent(OnStartedData);
+				}
+			}
 		}
 
 		UE_LOG(LogAudioQuartz, Verbose, TEXT("OnFinalCallback() called for quantized event type: [%s]"), *GetCommandName().ToString());
@@ -489,16 +534,19 @@ namespace Audio
 
 	void IQuartzQuantizedCommand::Cancel()
 	{
-		if (GameThreadCommandQueue.IsValid())
+		FQuartzQuantizedCommandDelegateData Data;
+
+		Data.CommandType = GetCommandType();
+		Data.DelegateSubType = EQuartzCommandDelegateSubType::CommandOnCanceled;
+		Data.DelegateID = GameThreadDelegateID;
+
+
+		for (auto& SubscriberQueue : GameThreadSubscribers)
 		{
-			FQuartzQuantizedCommandDelegateData Data;
-
-			Data.DelegateSubType = EQuartzCommandDelegateSubType::CommandOnCanceled;
-			Data.DelegateID = GameThreadDelegateID;
-
-			// TODO: add payload to Data
-
-			GameThreadCommandQueue->PushEvent(Data);
+			if (SubscriberQueue.IsValid())
+			{
+				SubscriberQueue->PushEvent(Data);
+			}
 		}
 
 		UE_LOG(LogAudioQuartz, Verbose, TEXT("Cancel() called for quantized event type: [%s]"), *GetCommandName().ToString());
@@ -598,18 +646,18 @@ namespace Audio
 		Timer.StartTimer();
 	}
 
-	double FQuartzCrossThreadMessage::RequestRecieved()
+	double FQuartzCrossThreadMessage::RequestRecieved() const
 	{
 		Timer.StopTimer();
 		return GetResultsMilliseconds();
 	}
 
-	double FQuartzCrossThreadMessage::GetResultsMilliseconds()
+	double FQuartzCrossThreadMessage::GetResultsMilliseconds() const
 	{
 		return Timer.GetResultsMilliseconds();
 	}
 
-	double FQuartzCrossThreadMessage::GetCurrentTimeMilliseconds()
+	double FQuartzCrossThreadMessage::GetCurrentTimeMilliseconds() const
 	{
 		return Timer.GetCurrentTimePassedMs();
 	}

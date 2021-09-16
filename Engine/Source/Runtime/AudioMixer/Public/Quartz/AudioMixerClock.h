@@ -76,7 +76,7 @@ namespace Audio
 		void SetSampleRate(float InNewSampleRate);
 
 		// get the tick rate
-		FQuartzClockTickRate GetTickRate() { return Metronome.GetTickRate(); }
+		FQuartzClockTickRate GetTickRate() const { return Metronome.GetTickRate(); }
 
 		// get the identifier of the clock
 		FName GetName() const { return Name; }
@@ -103,7 +103,9 @@ namespace Audio
 		bool CancelQuantizedCommand(TSharedPtr<IQuartzQuantizedCommand> InCommandPtr);
 
 		// does the clock have any pending events
-		bool HasPendingEvents();
+		bool HasPendingEvents() const;
+
+		int32 NumPendingEvents() const;
 
 		// is the clock currently ticking?
 		bool IsRunning();
