@@ -81,10 +81,10 @@ void UQuartzSubsystem::Tick(float DeltaTime)
 
 	if (MaxQuartzSubscribersToUpdatePerTickCvar <= 0 || NumSubscribers <= MaxQuartzSubscribersToUpdatePerTickCvar)
 	{
-		TArray<FQuartzTickableObject*> SubscribersCopy = QuartzTickSubscribers;
+		TArray<UQuartzClockHandle*> SubscribersCopy = QuartzTickSubscribers;
 
 		// we can afford to update ALL subscribers
-		for (FQuartzTickableObject* Entry : SubscribersCopy)
+		for (UQuartzClockHandle* Entry : SubscribersCopy)
 		{
 			if (Entry && Entry->QuartzIsTickable())
 			{
@@ -99,7 +99,7 @@ void UQuartzSubsystem::Tick(float DeltaTime)
 		// only update up to our limit
 		for (int i = 0; i < MaxQuartzSubscribersToUpdatePerTickCvar; ++i)
 		{
-			FQuartzTickableObject* CurrentSubscriber = QuartzTickSubscribers[UpdateIndex];
+			UQuartzClockHandle* CurrentSubscriber = QuartzTickSubscribers[UpdateIndex];
 			if (!ensure(CurrentSubscriber))
 			{
 				continue;
@@ -135,7 +135,7 @@ bool UQuartzSubsystem::IsTickable() const
 	}
 
 	// if our manager has no clocks, and none of our subscribers are tickable, we don't need to tick
-	for (const FQuartzTickableObject * Entry : QuartzTickSubscribers)
+	for (const UQuartzClockHandle* Entry : QuartzTickSubscribers)
 	{
 		if (Entry && Entry->QuartzIsTickable())
 		{
@@ -152,7 +152,7 @@ TStatId UQuartzSubsystem::GetStatId() const
 }
 
 
-void UQuartzSubsystem::SubscribeToQuartzTick(FQuartzTickableObject * InObjectToTick)
+void UQuartzSubsystem::SubscribeToQuartzTick(UQuartzClockHandle* InObjectToTick)
 {
 	if (!InObjectToTick)
 	{
@@ -163,7 +163,7 @@ void UQuartzSubsystem::SubscribeToQuartzTick(FQuartzTickableObject * InObjectToT
 }
 
 
-void UQuartzSubsystem::UnsubscribeFromQuartzTick(FQuartzTickableObject * InObjectToTick)
+void UQuartzSubsystem::UnsubscribeFromQuartzTick(UQuartzClockHandle* InObjectToTick)
 {
 	if (!InObjectToTick)
 	{
@@ -205,7 +205,6 @@ Audio::FQuartzQuantizedRequestData UQuartzSubsystem::CreateDataDataForSchedulePl
 	CommandInitInfo.ClockHandleName = InClockHandle->GetHandleName();
 	CommandInitInfo.QuantizationBoundary = InQuantizationBoundary;
 	CommandInitInfo.QuantizedCommandPtr = MakeShared<Audio::FQuantizedPlayCommand>();
-	CommandInitInfo.GameThreadSubscribers.Append(InQuantizationBoundary.GameThreadSubscribers);
 
 	const bool bRequiresAudioDevice = CommandInitInfo.QuantizedCommandPtr->RequiresAudioDevice();
 	const bool bClockManagedByAudioDevice = ClockManagerTypeMap.Contains(CommandInitInfo.ClockName)
@@ -218,12 +217,11 @@ Audio::FQuartzQuantizedRequestData UQuartzSubsystem::CreateDataDataForSchedulePl
 
 	if (InDelegate.IsBound())
 	{
-		CommandInitInfo.GameThreadDelegateID = InClockHandle->AddCommandDelegate(InDelegate, CommandInitInfo.GameThreadSubscribers);
+		CommandInitInfo.GameThreadDelegateID = InClockHandle->AddCommandDelegate(InDelegate, CommandInitInfo.GameThreadCommandQueue);
 	}
 
 	return CommandInitInfo;
 }
-
 
 bool UQuartzSubsystem::IsQuartzEnabled()
 {
@@ -247,11 +245,10 @@ Audio::FQuartzQuantizedRequestData UQuartzSubsystem::CreateDataForTickRateChange
 	CommandInitInfo.ClockHandleName = InClockHandle->GetHandleName();
 	CommandInitInfo.QuantizationBoundary = InQuantizationBoundary;
 	CommandInitInfo.QuantizedCommandPtr = TickRateChangeCommandPtr;
-	CommandInitInfo.GameThreadSubscribers.Append(InQuantizationBoundary.GameThreadSubscribers);
 
 	if (InDelegate.IsBound())
 	{
-		CommandInitInfo.GameThreadDelegateID = InClockHandle->AddCommandDelegate(InDelegate, CommandInitInfo.GameThreadSubscribers);
+		CommandInitInfo.GameThreadDelegateID = InClockHandle->AddCommandDelegate(InDelegate, CommandInitInfo.GameThreadCommandQueue);
 	}
 
 	return CommandInitInfo;
@@ -272,11 +269,10 @@ Audio::FQuartzQuantizedRequestData UQuartzSubsystem::CreateDataForTransportReset
 	CommandInitInfo.ClockHandleName = InClockHandle->GetHandleName();
 	CommandInitInfo.QuantizationBoundary = InQuantizationBoundary;
 	CommandInitInfo.QuantizedCommandPtr = TransportResetCommandPtr;
-	CommandInitInfo.GameThreadSubscribers.Append(InQuantizationBoundary.GameThreadSubscribers);
 
 	if (InDelegate.IsBound())
 	{
-		CommandInitInfo.GameThreadDelegateID = InClockHandle->AddCommandDelegate(InDelegate, CommandInitInfo.GameThreadSubscribers);
+		CommandInitInfo.GameThreadDelegateID = InClockHandle->AddCommandDelegate(InDelegate, CommandInitInfo.GameThreadCommandQueue);
 	}
 
 	return CommandInitInfo;
@@ -298,11 +294,10 @@ Audio::FQuartzQuantizedRequestData UQuartzSubsystem::CreateDataForStartOtherCloc
 	CommandInitInfo.OtherClockName = InClockToStart;
 	CommandInitInfo.QuantizationBoundary = InQuantizationBoundary;
 	CommandInitInfo.QuantizedCommandPtr = TransportResetCommandPtr;
-	CommandInitInfo.GameThreadSubscribers.Append(InQuantizationBoundary.GameThreadSubscribers);
 
 	if (InDelegate.IsBound())
 	{
-		CommandInitInfo.GameThreadDelegateID = InClockHandle->AddCommandDelegate(InDelegate, CommandInitInfo.GameThreadSubscribers);
+		CommandInitInfo.GameThreadDelegateID = InClockHandle->AddCommandDelegate(InDelegate, CommandInitInfo.GameThreadCommandQueue);
 	}
 
 	return CommandInitInfo;
@@ -336,9 +331,7 @@ UQuartzClockHandle* UQuartzSubsystem::CreateNewClock(const UObject* WorldContext
 
 	ClockManager->GetOrCreateClock(ClockName, InSettings, bOverrideSettingsIfClockExists);
 
-	UQuartzClockHandle* ClockHandlePtr = (UQuartzClockHandle *)(NewObject<UQuartzClockHandle>()->Init(WorldContextObject->GetWorld()));
-	ClockHandlePtr->SubscribeToClock(WorldContextObject, ClockName);
-
+	UQuartzClockHandle* ClockHandlePtr = NewObject<UQuartzClockHandle>()->Init(WorldContextObject->GetWorld())->SubscribeToClock(WorldContextObject, ClockName);
 	return ClockHandlePtr;
 }
 
@@ -372,8 +365,7 @@ UQuartzClockHandle* UQuartzSubsystem::GetHandleForClock(const UObject* WorldCont
 
 	if (ClockManager->DoesClockExist(ClockName))
 	{
-		UQuartzClockHandle* ClockHandlePtr = (UQuartzClockHandle *)(NewObject<UQuartzClockHandle>()->Init(WorldContextObject->GetWorld()));
-		return ClockHandlePtr->SubscribeToClock(WorldContextObject, ClockName);
+		return NewObject<UQuartzClockHandle>()->Init(WorldContextObject->GetWorld())->SubscribeToClock(WorldContextObject, ClockName);
 	}
 
 	return nullptr;

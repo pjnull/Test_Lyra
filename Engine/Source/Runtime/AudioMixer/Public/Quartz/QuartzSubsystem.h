@@ -19,7 +19,6 @@ namespace Audio
 	class FQuartzClockManager;
 	class FShareableQuartzCommandQueue;
 }
-class FQuartzTickableObject;
 
 using MetronomeCommandQueuePtr = TSharedPtr<Audio::FShareableQuartzCommandQueue, ESPMode::ThreadSafe>;
 
@@ -55,8 +54,8 @@ public:
 
 	// if we have another stakeholder later we can use polymorphism here.
 	// in the mean time, we are avoiding the virtual overhead
-	void SubscribeToQuartzTick(FQuartzTickableObject* InObjectToTick);
-	void UnsubscribeFromQuartzTick(FQuartzTickableObject* InObjectToTick);
+	void SubscribeToQuartzTick(UQuartzClockHandle* InObjectToTick);
+	void UnsubscribeFromQuartzTick(UQuartzClockHandle* InObjectToTick);
 
 	// static methods
 	static UQuartzSubsystem* Get(UWorld* World);
@@ -153,7 +152,7 @@ private:
 	Audio::FQuartzClockManager SubsystemClockManager;
 
 	// list of objects needing to be ticked by Quartz
-	TArray<FQuartzTickableObject *> QuartzTickSubscribers;
+	TArray<UQuartzClockHandle*> QuartzTickSubscribers;
 
 	// index to track the next clock handle to tick (if updates are being amortized across multiple UObject Ticks)
 	int32 UpdateIndex{ 0 };

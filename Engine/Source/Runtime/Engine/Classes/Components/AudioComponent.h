@@ -102,7 +102,6 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnAudioMultiEnvelopeValue, const
 DECLARE_MULTICAST_DELEGATE_FourParams(FOnAudioMultiEnvelopeValueNative, const UAudioComponent*, const float, const float, const int32);
 
 
-
 /** Type of fade to use when adjusting the audio component's volume. */
 UENUM(BlueprintType)
 enum class EAudioFaderCurve : uint8
@@ -161,7 +160,7 @@ class ENGINE_API UInitialActiveSoundParams : public UObject
  * @see USoundBase
  */
 UCLASS(ClassGroup=(Audio, Common), HideCategories=(Object, ActorComponent, Physics, Rendering, Mobility, LOD), ShowCategories=Trigger, meta=(BlueprintSpawnableComponent))
-class ENGINE_API UAudioComponent : public USceneComponent, public ISoundGeneratorParameterInterface, public FQuartzTickableObject
+class ENGINE_API UAudioComponent : public USceneComponent, public ISoundGeneratorParameterInterface
 {
 	GENERATED_UCLASS_BODY()
 
@@ -494,31 +493,13 @@ public:
 
 	virtual void ResetParameters() override;
 
+private:
 
 	static uint64 AudioComponentIDCounter;
 	static TMap<uint64, UAudioComponent*> AudioIDToComponentMap;
 	static FCriticalSection AudioIDToComponentMapLock;
 
-private:
-	// Data to hold pending quartz commands 
-	struct FAudioComponentPendingQuartzCommandData
-	{
-		FQuartzQuantizationBoundary AnticapatoryBoundary;
-		FOnQuartzCommandEventBP Delegate;
-		float StartTime{ 0.0f };
-		float FadeDuration{ 0.0f };
-		float FadeVolume{ 0.0f };
-		EAudioFaderCurve FadeCurve{ EAudioFaderCurve::Linear };
-		uint32 CommandID{ (uint32)INDEX_NONE };
-		TWeakObjectPtr<UQuartzClockHandle> ClockHandle;
-	};
-
-	TArray<FAudioComponentPendingQuartzCommandData> PendingQuartzCommandData;
-
 public:
-	//For if this is being played through a sound queued through Quartz
-	virtual void PlayQueuedQuantizedInternal(const UObject* WorldContextObject, FAudioComponentCommandInfo InCommandInfo);
-
 	/** Stop an audio component's sound, issue any delegates if needed */
 	UFUNCTION(BlueprintCallable, Category="Audio|Components|Audio")
 	virtual void Stop();
@@ -836,13 +817,6 @@ protected:
 	/** Utility function that updates which texture is displayed on the sprite dependent on the properties of the Audio Component. */
 	void UpdateSpriteTexture();
 #endif
-
-	// Used for processing queue commands
-	//~ Begin FQuartzTickableObject
-	virtual void ProcessCommand(const Audio::FQuartzQuantizedCommandDelegateData& Data) override;
-	virtual void ProcessCommand(const Audio::FQuartzMetronomeDelegateData& Data) override {};
-	virtual void ProcessCommand(const Audio::FQuartzQueueCommandData& InQueueCommandData) override;
-	//~ End FQuartzTickableObject
 
 	FRandomStream RandomStream;
 };

@@ -191,7 +191,6 @@ namespace Audio
 
 		void Play(const int32 SourceId);
 		void Stop(const int32 SourceId);
-		void CancelQuantizedSound(const int32 SourceId);
 		void StopInternal(const int32 SourceId);
 		void StopFade(const int32 SourceId, const int32 NumFrames);
 		void Pause(const int32 SourceId);

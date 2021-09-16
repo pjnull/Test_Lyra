@@ -5,10 +5,8 @@
 #include "Sound/QuartzQuantizationUtilities.h"
 #include "UObject/ObjectMacros.h"
 #include "Containers/Queue.h"
-#include "DSP/VolumeFader.h"
 
 // forwards
-class FQuartzTickableObject;
 class UQuartzClockHandle;
 
 namespace Audio
@@ -16,7 +14,6 @@ namespace Audio
 	// Struct used to communicate command state back to the game play thread
 	struct ENGINE_API FQuartzQuantizedCommandDelegateData : public FQuartzCrossThreadMessage
 	{
-		EQuartzCommandType CommandType;
 		EQuartzCommandDelegateSubType DelegateSubType;
 
 		// ID so the clock handle knows which delegate to fire
@@ -34,15 +31,6 @@ namespace Audio
 		EQuartzCommandQuantization Quantization;
 	};
 
-	//Struct used to queue events to be sent to the Audio Render thread closer to their start time
-	struct ENGINE_API FQuartzQueueCommandData : public FQuartzCrossThreadMessage
-	{
-		FAudioComponentCommandInfo AudioComponentCommandInfo;
-		FName ClockName;
-
-		FQuartzQueueCommandData(const FAudioComponentCommandInfo& InAudioComponentCommandInfo, FName InClockName);
-	};
-
 
 	// Class that can be shared between Game Thread and any other thread to queue commands
 	// (ONLY the Game Thread may EXECUTE the commands in the queue, enforced by UQuartzClockHandle* argument in the TFunctions)
@@ -52,8 +40,6 @@ namespace Audio
 		// (add more PushEvent overloads for other event types)
 		void PushEvent(const FQuartzQuantizedCommandDelegateData& Data);
 		void PushEvent(const FQuartzMetronomeDelegateData& Data);
-		void PushEvent(const FQuartzQueueCommandData& Data);
-
 		bool IsQueueEmpty()
 		{
 			return EventDelegateQueue.IsEmpty();
@@ -64,9 +50,9 @@ namespace Audio
 		void StopTakingCommands();
 
 	private:
-		TQueue<TFunction<void(FQuartzTickableObject*)>, EQueueMode::Mpsc> EventDelegateQueue;
+		TQueue<TFunction<void(UQuartzClockHandle*)>, EQueueMode::Mpsc> EventDelegateQueue;
 		FThreadSafeBool bIsAcceptingCommands{ true };
 
-		friend class ::FQuartzTickableObject; // UQuartzTickableObject, and those that inherit from it, are the only classes allowed to pump the command queue
+		friend class ::UQuartzClockHandle; // UClockHandle is the only class allowed to pump the command queue
 	};
 } // namespace Audio
