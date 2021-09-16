@@ -373,7 +373,7 @@ void FEdModeLandscape::Enter()
 		{
 			if (ULandscapeInfo* LandscapeInfo = It.Value())
 			{
-				if (ALandscape* Landscape = IsValid(LandscapeInfo) ? LandscapeInfo->LandscapeActor.Get() : nullptr)
+				if (ALandscape* Landscape = (IsValid(LandscapeInfo) && LandscapeInfo->SupportsLandscapeEditing()) ? LandscapeInfo->LandscapeActor.Get() : nullptr)
 				{
 					Landscape->RegisterLandscapeEdMode(this);
 				}
@@ -401,8 +401,12 @@ void FEdModeLandscape::Enter()
 
 	for (TActorIterator<ALandscapeGizmoActiveActor> It(GetWorld()); It; ++It)
 	{
-		CurrentGizmoActor = *It;
-		break;
+		ALandscapeGizmoActiveActor* GizmoActor = *It;
+		if (GizmoActor->HasAnyFlags(RF_Transient))
+		{
+			CurrentGizmoActor = *It;
+			break;
+		}
 	}
 
 	if (!CurrentGizmoActor.IsValid())
@@ -582,7 +586,7 @@ void FEdModeLandscape::Exit()
 		{
 			if (ULandscapeInfo* LandscapeInfo = It.Value())
 			{
-				if (ALandscape* Landscape = IsValid(LandscapeInfo) ? LandscapeInfo->LandscapeActor.Get() : nullptr)
+				if (ALandscape* Landscape = (IsValid(LandscapeInfo) && LandscapeInfo->SupportsLandscapeEditing()) ? LandscapeInfo->LandscapeActor.Get() : nullptr)
 				{
 					Landscape->UnregisterLandscapeEdMode();
 				}
@@ -2034,7 +2038,7 @@ int32 FEdModeLandscape::UpdateLandscapeList()
 		for (auto It = LandscapeInfoMap.Map.CreateIterator(); It; ++It)
 		{
 			ULandscapeInfo* LandscapeInfo = It.Value();
-			if (IsValid(LandscapeInfo))
+			if (IsValid(LandscapeInfo) && LandscapeInfo->SupportsLandscapeEditing())
 			{
 				if (ALandscape* Landscape = LandscapeInfo->LandscapeActor.Get())
 				{
