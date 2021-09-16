@@ -2523,7 +2523,10 @@ void FArrayProperty::EmitReferenceInfo(UClass& OwnerClass, int32 BaseOffset, TAr
 	{
 		bool bUsesFreezableAllocator = EnumHasAnyFlags(ArrayFlags, EArrayPropertyFlags::UsesMemoryImageAllocator);
 
-		if( Inner->IsA(FStructProperty::StaticClass()) )
+		// Structs and nested arrays share the same implementation on the Garbage Collector side
+		// as arrays of structs already push the array memory into the GC stack and process its tokens
+		// which is exactly what is required for nested arrays to work
+		if( Inner->IsA(FStructProperty::StaticClass()) || Inner->IsA(FArrayProperty::StaticClass()) )
 		{
 			OwnerClass.EmitObjectReference(BaseOffset + GetOffset_ForGC(), GetFName(), bUsesFreezableAllocator ? GCRT_ArrayStructFreezable : GCRT_ArrayStruct);
 
