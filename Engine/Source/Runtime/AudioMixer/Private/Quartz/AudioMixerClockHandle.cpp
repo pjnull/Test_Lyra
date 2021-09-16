@@ -15,6 +15,8 @@ void FQuartzTickableObject::FQuartzTickableObjectGCObjectMembers::AddReferencedO
 
 FQuartzTickableObject::~FQuartzTickableObject()
 {
+	Shutdown();
+
 	// shutdown the shared command queue
 	if (CommandQueuePtr.IsValid())
 	{
