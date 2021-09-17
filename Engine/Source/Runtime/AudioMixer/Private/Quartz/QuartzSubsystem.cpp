@@ -5,6 +5,7 @@
 #include "Quartz/QuartzMetronome.h"
 #include "Quartz/AudioMixerClockManager.h"
 #include "Sound/QuartzQuantizationUtilities.h"
+#include "ProfilingDebugging/CountersTrace.h"
 #include "Stats/Stats.h"
 
 #include "AudioDevice.h"
@@ -89,6 +90,9 @@ bool UQuartzSubsystem::DoesSupportWorldType(EWorldType::Type WorldType) const
 void UQuartzSubsystem::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	TRACE_CPUPROFILER_EVENT_SCOPE(QuartzSubsystem::Tick);
+
+
 	SubsystemClockManager.LowResoultionUpdate(DeltaTime);
 
 	const int32 NumSubscribers = QuartzTickSubscribers.Num();
@@ -134,8 +138,13 @@ void UQuartzSubsystem::Tick(float DeltaTime)
 
 bool UQuartzSubsystem::IsTickable() const
 {
-	const bool bHasTickSubscribers = QuartzTickSubscribers.Num() > 0;
-	const bool bIsManagingClocks = SubsystemClockManager.GetNumClocks() > 0;
+	const int32 NumSubscribers = QuartzTickSubscribers.Num();
+	const int32 NumClocks = SubsystemClockManager.GetNumClocks();
+	const bool bHasTickSubscribers = NumSubscribers > 0;
+	const bool bIsManagingClocks = NumClocks > 0;
+
+	TRACE_INT_VALUE(TEXT("QuartzSubsystem::NumClocks"), NumClocks);
+	TRACE_INT_VALUE(TEXT("QuartzSubsystem::NumSubscribers"), NumSubscribers);
 
 	// if our manager has clocks, we need to tick
 	if (bIsManagingClocks)

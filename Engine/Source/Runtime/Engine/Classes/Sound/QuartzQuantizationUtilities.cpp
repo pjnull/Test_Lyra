@@ -413,6 +413,7 @@ namespace Audio
 
 	void IQuartzQuantizedCommand::OnQueued(const FQuartzQuantizedCommandInitInfo& InCommandInitInfo)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(QuartzQuantizedCommand::OnQueued);
 		Audio::FMixerDevice* MixerDevice = InCommandInitInfo.OwningClockPointer->GetMixerDevice();
 		if (MixerDevice)
 		{
@@ -446,6 +447,7 @@ namespace Audio
 
 	void IQuartzQuantizedCommand::FailedToQueue()
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(QuartzQuantizedCommand::FailedToQueue);
 		if (GameThreadSubscribers.Num())
 		{
 			FQuartzQuantizedCommandDelegateData Data;
@@ -467,6 +469,7 @@ namespace Audio
 
 	void IQuartzQuantizedCommand::AboutToStart()
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(QuartzQuantizedCommand::AboutToStart);
 		// only call once for the lifespan of this event
 		if (bAboutToStartHasBeenCalled)
 		{
@@ -499,6 +502,7 @@ namespace Audio
 
 	void IQuartzQuantizedCommand::OnFinalCallback(int32 InNumFramesLeft)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(QuartzQuantizedCommand::OnFinalCallback);
 		if (GameThreadSubscribers.Num())
 		{
 			FQuartzQuantizedCommandDelegateData OnStartedData;
@@ -522,18 +526,21 @@ namespace Audio
 
 	void IQuartzQuantizedCommand::OnClockPaused()
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(QuartzQuantizedCommand::OnClockPaused);
 		UE_LOG(LogAudioQuartz, Verbose, TEXT("OnClockPaused() called for quantized event type: [%s]"), *GetCommandName().ToString());
 		OnClockPausedCustom();
 	}
 
 	void IQuartzQuantizedCommand::OnClockStarted()
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(QuartzQuantizedCommand::OnClockStarted);
 		UE_LOG(LogAudioQuartz, Verbose, TEXT("OnClockStarted() called for quantized event type: [%s]"), *GetCommandName().ToString());
 		OnClockStartedCustom();
 	}
 
 	void IQuartzQuantizedCommand::Cancel()
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(QuartzQuantizedCommand::Cancel);
 		FQuartzQuantizedCommandDelegateData Data;
 
 		Data.CommandType = GetCommandType();

@@ -28,9 +28,6 @@ namespace Audio
 
 		// Countdown to execution
 		int32 NumFramesUntilExec{ 0 };
-
-		// TODO: int32 TotalNumFramesThreadLatency{ 0 };
-
 	}; // struct PendingCommand
 
 	// Class that encapsulates sample-accurate timing logic, as well as firing QuantizedAudioCommands
