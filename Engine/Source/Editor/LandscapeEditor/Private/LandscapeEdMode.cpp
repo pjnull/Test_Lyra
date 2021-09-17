@@ -373,7 +373,7 @@ void FEdModeLandscape::Enter()
 		{
 			if (ULandscapeInfo* LandscapeInfo = It.Value())
 			{
-				if (ALandscape* Landscape = (IsValid(LandscapeInfo) && LandscapeInfo->SupportsLandscapeEditing()) ? LandscapeInfo->LandscapeActor.Get() : nullptr)
+				if (ALandscape* Landscape = IsValid(LandscapeInfo) ? LandscapeInfo->LandscapeActor.Get() : nullptr)
 				{
 					Landscape->RegisterLandscapeEdMode(this);
 				}
@@ -401,19 +401,13 @@ void FEdModeLandscape::Enter()
 
 	for (TActorIterator<ALandscapeGizmoActiveActor> It(GetWorld()); It; ++It)
 	{
-		ALandscapeGizmoActiveActor* GizmoActor = *It;
-		if (GizmoActor->HasAnyFlags(RF_Transient))
-		{
-			CurrentGizmoActor = *It;
-			break;
-		}
+		CurrentGizmoActor = *It;
+		break;
 	}
 
 	if (!CurrentGizmoActor.IsValid())
 	{
-		FActorSpawnParameters SpawnParams;
-		SpawnParams.ObjectFlags |= RF_Transient;
-		CurrentGizmoActor = GetWorld()->SpawnActor<ALandscapeGizmoActiveActor>(SpawnParams);
+		CurrentGizmoActor = GetWorld()->SpawnActor<ALandscapeGizmoActiveActor>();
 		CurrentGizmoActor->ImportFromClipboard();
 	}
 
@@ -586,7 +580,7 @@ void FEdModeLandscape::Exit()
 		{
 			if (ULandscapeInfo* LandscapeInfo = It.Value())
 			{
-				if (ALandscape* Landscape = (IsValid(LandscapeInfo) && LandscapeInfo->SupportsLandscapeEditing()) ? LandscapeInfo->LandscapeActor.Get() : nullptr)
+				if (ALandscape* Landscape = IsValid(LandscapeInfo) ? LandscapeInfo->LandscapeActor.Get() : nullptr)
 				{
 					Landscape->UnregisterLandscapeEdMode();
 				}
@@ -2038,7 +2032,7 @@ int32 FEdModeLandscape::UpdateLandscapeList()
 		for (auto It = LandscapeInfoMap.Map.CreateIterator(); It; ++It)
 		{
 			ULandscapeInfo* LandscapeInfo = It.Value();
-			if (IsValid(LandscapeInfo) && LandscapeInfo->SupportsLandscapeEditing())
+			if (IsValid(LandscapeInfo))
 			{
 				if (ALandscape* Landscape = LandscapeInfo->LandscapeActor.Get())
 				{

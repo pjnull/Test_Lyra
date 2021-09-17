@@ -152,7 +152,7 @@ private:
 		auto& LandscapeInfoMap = ULandscapeInfoMap::GetLandscapeInfoMap(GWorld);
 		for (TPair<FGuid, ULandscapeInfo*>& Pair : LandscapeInfoMap.Map)
 		{
-			if (Pair.Value && Pair.Value->SupportsLandscapeEditing())
+			if (Pair.Value)
 			{
 				Pair.Value->ClearDirtyData();
 			}
