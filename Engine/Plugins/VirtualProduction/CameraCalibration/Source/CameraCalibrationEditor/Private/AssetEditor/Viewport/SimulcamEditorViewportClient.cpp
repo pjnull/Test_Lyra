@@ -54,9 +54,9 @@ void FSimulcamEditorViewportClient::Draw(FViewport* Viewport, FCanvas* Canvas)
 	TRefCountPtr<FBatchedElementParameters> BatchedElementParameters;
 	BatchedElementParameters = new FBatchedElementTexture2DPreviewParameters(MipLevel, LayerIndex, false, false, false, false, false);
 
-	if (Texture->Resource != nullptr)
+	if (Texture->GetResource() != nullptr)
 	{
-		FCanvasTileItem TileItem(CurrentTexturePosition, Texture->Resource, TextureSize, FLinearColor::White);
+		FCanvasTileItem TileItem(CurrentTexturePosition, Texture->GetResource(), TextureSize, FLinearColor::White);
 		TileItem.BlendMode = ESimpleElementBlendMode::SE_BLEND_Opaque;
 		TileItem.BatchedElementParameters = BatchedElementParameters;
 		Canvas->DrawItem(TileItem);
@@ -127,10 +127,10 @@ bool FSimulcamEditorViewportClient::InputKey(FViewport* Viewport, int32 Controll
 			{
 				if (UTexture* Texture = SimulcamViewportWeakPtr.Pin()->GetTexture())
 				{
-					if (Texture->Resource)
+					if (Texture->GetResource())
 					{
-						uint32 TextureWidth = Texture->Resource->GetSizeX();
-						uint32 TextureHeight = Texture->Resource->GetSizeY();
+						uint32 TextureWidth = Texture->GetResource()->GetSizeX();
+						uint32 TextureHeight = Texture->GetResource()->GetSizeY();
 
 						// create fake geometry and mouseposition
 						const FVector2D FakeMousePosition = GetTexturePosition();
@@ -325,10 +325,10 @@ FText FSimulcamEditorViewportClient::GetDisplayedResolution() const
 	uint32 TextureWidth = 1;
 	UTexture* Texture = SimulcamViewportWeakPtr.Pin()->GetTexture();
 
-	if (Texture && Texture->Resource)
+	if (Texture && Texture->GetResource())
 	{
-		TextureWidth = Texture->Resource->GetSizeX();
-		TextureHeight = Texture->Resource->GetSizeY();
+		TextureWidth = Texture->GetResource()->GetSizeX();
+		TextureHeight = Texture->GetResource()->GetSizeY();
 	}
 
 	int32 TexturePositionX = TexturePosition.X;

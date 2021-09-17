@@ -27,5 +27,5 @@ UTexture* SSimulcamViewport::GetTexture() const
 bool SSimulcamViewport::HasValidTextureResource() const
 {
 	UTexture* CurrentTexture = GetTexture();
-	return CurrentTexture != nullptr && CurrentTexture->Resource != nullptr;
+	return CurrentTexture != nullptr && CurrentTexture->GetResource() != nullptr;
 }
