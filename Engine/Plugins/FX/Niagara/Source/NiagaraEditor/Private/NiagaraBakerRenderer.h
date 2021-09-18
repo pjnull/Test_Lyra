@@ -31,6 +31,10 @@ public:
 
 	// FGCObject Impl
 	virtual void AddReferencedObjects(FReferenceCollector& Collector) override;
+	virtual FString GetReferencerName() const override
+	{
+		return TEXT("FNiagaraBakerRenderer");
+	}
 	// FGCObject Impl
 
 	static ERenderType GetRenderType(FName SourceName, FName& OutName);
