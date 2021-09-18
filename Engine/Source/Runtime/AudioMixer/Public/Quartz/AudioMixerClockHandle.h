@@ -25,6 +25,10 @@ class AUDIOMIXER_API FQuartzTickableObject
 		UWorld* WorldPtr{ nullptr };
 
 		void AddReferencedObjects(FReferenceCollector& Collector) override;
+		virtual FString GetReferencerName() const override
+		{
+			return TEXT("FQuartzTickableObject::FQuartzTickableObjectGCObjectMembers");
+		}
 	};
 
 	public:
