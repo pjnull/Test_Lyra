@@ -14570,7 +14570,7 @@ void UEngine::FindAndPrintStaleReferencesToObject(UObject* ObjectToFindReference
 		{
 			return true;
 		}
-	});
+	}, false);
 	bool bFirstGarbageObjectFound = false;
 	FString PathToCulprit = RefChainSearch.GetRootPath([&bFirstGarbageObjectFound, ObjectToFindReferencesTo](FReferenceChainSearch::FCallbackParams& Params)
 	{
