@@ -14538,13 +14538,80 @@ void UEngine::VerifyLoadMapWorldCleanup()
 				UE_LOG(LogLoad, Error, TEXT("Previously active world %s not cleaned up by garbage collection!"), *World->GetPathName());
 				UE_LOG(LogLoad, Error, TEXT("Once a world has become active, it cannot be reused and must be destroyed and reloaded. World referenced by:"));
 
-				FReferenceChainSearch RefChainSearch(World, EReferenceChainSearchMode::Shortest | EReferenceChainSearchMode::PrintResults);
-				UE_LOG(LogLoad, Fatal, TEXT("Previously active world %s not cleaned up by garbage collection! Referenced by:") LINE_TERMINATOR TEXT("%s"), *World->GetPathName(), *RefChainSearch.GetRootPath());
+				FindAndPrintStaleReferencesToObject(World, ELogVerbosity::Fatal);
 			}
 		}
 	}
 }
 
+void UEngine::FindAndPrintStaleReferencesToObject(UObject* ObjectToFindReferencesTo, ELogVerbosity::Type Verbosity)
+{
+	check(ObjectToFindReferencesTo);
+
+	UObject* OutGarbageObject = nullptr;
+	UObject* OutReferencingObject = nullptr;
+	FReferenceChainSearch RefChainSearch(ObjectToFindReferencesTo, EReferenceChainSearchMode::Default);
+	RefChainSearch.PrintResults([&OutGarbageObject, &OutReferencingObject](FReferenceChainSearch::FCallbackParams& Params)
+	{
+		check(Params.Object);
+		if (!IsValid(Params.Object))
+		{
+			// We may find many chains that lead to the leak but for brevity we only report the first one in the fatal error below
+			if (!OutGarbageObject)
+			{
+				OutGarbageObject = Params.Object;
+				OutReferencingObject = Params.Referencer;
+			}
+			// We only really care about a reference to the first garbage / pending kill object in the chain
+			// as the reference that holds it is the one that prevents the world from being GC'd
+			return false;
+		}
+		else
+		{
+			return true;
+		}
+	});
+	bool bFirstGarbageObjectFound = false;
+	FString PathToCulprit = RefChainSearch.GetRootPath([&bFirstGarbageObjectFound, ObjectToFindReferencesTo](FReferenceChainSearch::FCallbackParams& Params)
+	{
+		check(Params.Object);
+		if (!IsValid(Params.Object) && !bFirstGarbageObjectFound)
+		{
+			bFirstGarbageObjectFound = true;
+			check(Params.Out);
+			Params.Out->Logf(ELogVerbosity::Log, TEXT("%s    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^"), FCString::Spc(Params.Indent));
+			Params.Out->Logf(ELogVerbosity::Log, TEXT("%s    ^ This reference is preventing the old %s from being GC'd ^"), FCString::Spc(Params.Indent), *ObjectToFindReferencesTo->GetClass()->GetName());
+		}
+		return true;
+	});
+	FString GarbageErrorMessage;
+	if (OutGarbageObject && OutReferencingObject)
+	{
+		GarbageErrorMessage = FString::Printf(TEXT("Garbage object %s is %s being referenced by %s"), *OutGarbageObject->GetFullName(), *OutReferencingObject->GetFullName());
+	}
+	else if (OutGarbageObject)
+	{
+		GarbageErrorMessage = FString::Printf(TEXT("Garbage object %s is not referenced so it may have a flag set that's preventing it from being destroyed (see log for details)"), *OutGarbageObject->GetFullName());
+	}
+	else
+	{
+		GarbageErrorMessage = TEXT("However it's not referenced by any garbage object. It may have a flag set that's preventing it from being destroyed (see log for details)");
+	}
+	if (Verbosity == ELogVerbosity::Fatal)
+	{
+		UE_LOG(LogLoad, Fatal, TEXT("Old %s not cleaned up by GC! %s:") LINE_TERMINATOR TEXT("%s"),
+			*ObjectToFindReferencesTo->GetFullName(), 
+			*GarbageErrorMessage,
+			*PathToCulprit);
+	}
+	else
+	{
+		GLog->CategorizedLogf(TEXT("LogLoad"), Verbosity, TEXT("Old %s not cleaned up by GC! %s:") LINE_TERMINATOR TEXT("%s"),
+			*ObjectToFindReferencesTo->GetFullName(), 
+			*GarbageErrorMessage,
+			*PathToCulprit);
+	}
+}
 
 /*-----------------------------------------------------------------------------
 Async persistent level map change.
