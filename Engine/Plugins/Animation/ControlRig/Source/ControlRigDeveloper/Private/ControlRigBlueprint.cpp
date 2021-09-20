@@ -345,7 +345,8 @@ void UControlRigBlueprint::PostLoad()
 
 	bVMRecompilationRequired = true;
 	{
-		FControlRigBlueprintVMCompileScope CompileScope(this);
+		TGuardValue<bool> IsCompilingGuard(bIsCompiling, true);
+		
 		TArray<UControlRigBlueprint*> ReferencedBlueprints = GetReferencedControlRigBlueprints();
 
 		// PostLoad all referenced BPs so that their function graphs are fully loaded 
@@ -508,7 +509,12 @@ void UControlRigBlueprint::PostLoad()
 #endif
 	}
 
+#if WITH_EDITOR
+	// delay compilation until the package has been loaded
+	FCoreUObjectDelegates::OnEndLoadPackage.AddUObject(this, &UControlRigBlueprint::HandlePackageDone);
+#else
 	RecompileVMIfRequired();
+#endif
 	RequestControlRigInit();
 
 	FCoreUObjectDelegates::OnObjectModified.RemoveAll(this);
@@ -521,6 +527,21 @@ void UControlRigBlueprint::PostLoad()
 		Package->SetDirtyFlag(bDirtyDuringLoad);
 	}
 }
+
+#if WITH_EDITOR
+void UControlRigBlueprint::HandlePackageDone(TConstArrayView<UPackage*> InPackages)
+{
+	if (!InPackages.Contains(GetPackage()))
+	{
+		return;
+	}
+
+	FCoreUObjectDelegates::OnEndLoadPackage.RemoveAll(this);
+	
+	RecompileVM();
+	RequestControlRigInit();
+}
+#endif
 
 void UControlRigBlueprint::RecompileVM()
 {
@@ -544,11 +565,6 @@ void UControlRigBlueprint::RecompileVM()
 
 		CDO->VMRuntimeSettings = VMRuntimeSettings;
 		CDO->GetHierarchy()->CopyHierarchy(Hierarchy);
-
-		if (CDO->VM->GetOuter() != CDO)
-		{
-			CDO->SetVM(NewObject<URigVM>(CDO, TEXT("VM")));
-		}
 
 		if (!HasAnyFlags(RF_Transient | RF_Transactional))
 		{
@@ -1288,29 +1304,6 @@ URigVMController* UControlRigBlueprint::GetOrCreateController(URigVMGraph* InGra
 		}
 		return FRigVMController_BulkEditResult();
 	});
-
-	Controller->RequestNewExternalVariableDelegate.BindLambda([WeakThis](FRigVMGraphVariableDescription InVariable, bool bInIsPublic, bool bInIsReadOnly) -> FName
-	{
-		if (WeakThis.IsValid())
-		{
-			for (FBPVariableDescription& ExistingVariable : WeakThis->NewVariables)
-			{
-				if (ExistingVariable.VarName == InVariable.Name)
-				{
-					return FName();
-				}
-			}
-
-			FRigVMExternalVariable ExternalVariable = InVariable.ToExternalVariable();
-			return WeakThis->AddMemberVariable(InVariable.Name,
-				ExternalVariable.TypeObject ? ExternalVariable.TypeObject->GetPathName() : ExternalVariable.TypeName.ToString(),
-				bInIsPublic,
-				bInIsReadOnly,
-				InVariable.DefaultValue);
-		}
-		
-		return FName();
-	});
 	
 #endif
 
@@ -1797,7 +1790,6 @@ void UControlRigBlueprint::PostTransacted(const FTransactionObjectEvent& Transac
 				return;
 			}
 
-			Status = BS_Dirty;
 			PropagateHierarchyFromBPToInstances();
 
 			// make sure the bone name list is up 2 date for the editor graph
@@ -1811,7 +1803,7 @@ void UControlRigBlueprint::PostTransacted(const FTransactionObjectEvent& Transac
 				RigGraph->CacheNameLists(Hierarchy, &DrawContainer);
 			}
 
-			RequestAutoVMRecompilation(); 
+			RequestAutoVMRecompilation();
 			MarkPackageDirty();
 		}
 
