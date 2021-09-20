@@ -1366,7 +1366,7 @@ TSharedRef<SWidget> FNiagaraSystemToolkitParameterPanelViewModel::CreateAddParam
 		.OnAddParameter_Lambda(AddParameterLambda)
 		.OnAddScriptVar_Lambda(AddScriptVarLambda)
 		.OnAddParameterDefinitions(this, &FNiagaraSystemToolkitParameterPanelViewModel::AddParameterDefinitions)
-		.OnAllowMakeType_UObject(AssignmentNode, &UNiagaraNodeWithDynamicPins::AllowNiagaraTypeForAddPin)
+		.OnAllowMakeType_Static(&INiagaraParameterPanelViewModel::CanMakeNewParameterOfType)
 		.AllowCreatingNew(true)
 		.NamespaceId(FNiagaraEditorUtilities::GetNamespaceIdForUsage(FNiagaraStackGraphUtilities::GetOutputNodeUsage(*AssignmentNode)))
 		.ShowNamespaceCategory(false)
