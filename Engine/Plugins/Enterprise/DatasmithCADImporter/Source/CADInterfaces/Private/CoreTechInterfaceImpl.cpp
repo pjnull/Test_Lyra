@@ -2,7 +2,7 @@
 #include "CoreTechInterfaceImpl.h"
 
 #include "CADInterfacesModule.h"
-#include "CoretechFileParser.h"
+#include "CoreTechFileParser.h"
 
 #include "Misc/Paths.h"
 
