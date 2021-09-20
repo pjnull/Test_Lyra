@@ -3304,10 +3304,20 @@ FMaterialRenderProxy::FMaterialRenderProxy()
 	, DeletedFlag(0)
 	, HasVirtualTextureCallbacks(0)
 {
+	// MaterialRenderProxyMap is only used by shader compiling
+	if (!FPlatformProperties::RequiresCookedData())
+	{
+		FMaterialRenderProxy::MaterialRenderProxyMap.Add(this);
+	}
 }
 
 FMaterialRenderProxy::~FMaterialRenderProxy()
 {
+	if (!FPlatformProperties::RequiresCookedData())
+	{
+		FMaterialRenderProxy::MaterialRenderProxyMap.Remove(this);
+	}
+
 	if(IsInitialized())
 	{
 		check(IsInRenderingThread());
@@ -3324,22 +3334,8 @@ FMaterialRenderProxy::~FMaterialRenderProxy()
 	DeletedFlag = 1;
 }
 
-void FMaterialRenderProxy::InitDynamicRHI()
-{
-	// MaterialRenderProxyMap is only used by shader compiling
-	if (!FPlatformProperties::RequiresCookedData())
-	{
-		FMaterialRenderProxy::MaterialRenderProxyMap.Add(this);
-	}
-}
-
 void FMaterialRenderProxy::ReleaseDynamicRHI()
 {
-	if (!FPlatformProperties::RequiresCookedData())
-	{
-		FMaterialRenderProxy::MaterialRenderProxyMap.Remove(this);
-	}
-
 	DeferredUniformExpressionCacheRequests.Remove(this);
 
 	InvalidateUniformExpressionCache(true);
