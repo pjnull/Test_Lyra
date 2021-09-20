@@ -106,6 +106,7 @@ public:
 	virtual void BlockingStarted() override;
 	virtual void BlockingTick() override;
 	virtual void BlockingFinished() override;
+	virtual void SetIsSlateThreadAllowed(bool bInIsSlateThreadAllowed) override;
 
 	/** FTickableObjectRenderThread interface */
 	virtual void Tick( float DeltaTime ) override;
@@ -220,6 +221,8 @@ private:
 
 	/** If true then play movie when blocking starts, if false then play movie on loadmap. */
 	bool bIsPlayOnBlockingEnabled;
+	/** If true then we can use the Slate thread. */
+	bool bIsSlateThreadAllowed;
 
 	/** Critical section to allow the slate loading thread and the render thread to safely utilize the synchronization mechanism for ticking Slate. */
 	FCriticalSection SyncMechanismCriticalSection;

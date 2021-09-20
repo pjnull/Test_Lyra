@@ -117,6 +117,7 @@ FDefaultGameMoviePlayer::FDefaultGameMoviePlayer()
 	, LastPlayTime(0.0)
 	, bInitialized(false)
 	, bIsPlayOnBlockingEnabled(false)
+	, bIsSlateThreadAllowed(true)
 	, ViewportDPIScale(1.0f)
 	, BlockingRefCount(0)
 	, LastBlockingTickTime(0.0)
@@ -622,7 +623,7 @@ bool FDefaultGameMoviePlayer::IsMovieStreamingFinished() const
 
 void FDefaultGameMoviePlayer::BlockingStarted()
 {
-	if (bIsPlayOnBlockingEnabled)
+	if ((bIsPlayOnBlockingEnabled) && (bIsSlateThreadAllowed))
 	{
 		UE_LOG(LogMoviePlayer, Verbose, TEXT("BlockingStarted %d"), BlockingRefCount);
 		BlockingRefCount++;
@@ -669,6 +670,21 @@ void FDefaultGameMoviePlayer::BlockingFinished()
 		}
 		
 		BlockingRefCount = 0;
+	}
+}
+
+void FDefaultGameMoviePlayer::SetIsSlateThreadAllowed(bool bInIsSlateThreadAllowed)
+{
+	if (bIsSlateThreadAllowed != bInIsSlateThreadAllowed)
+	{
+		bIsSlateThreadAllowed = bInIsSlateThreadAllowed;
+
+		// Can we use the Slate thread?
+		if (bIsSlateThreadAllowed == false)
+		{
+			// Nope. Make sure its no longer running.
+			BlockingFinished();
+		}
 	}
 }
 
