@@ -19,6 +19,7 @@
 #include "Materials/MaterialExpressionPerInstanceRandom.h"
 #include "Materials/MaterialExpressionRuntimeVirtualTextureSampleParameter.h"
 #include "Materials/MaterialExpressionScalarParameter.h"
+#include "Materials/MaterialExpressionCurveAtlasRowParameter.h"
 #include "Materials/MaterialExpressionStaticBoolParameter.h"
 #include "Materials/MaterialExpressionStaticComponentMaskParameter.h"
 #include "Materials/MaterialExpressionStaticSwitchParameter.h"
@@ -464,19 +465,26 @@ bool FMaterialCachedExpressionData::UpdateForExpressions(const FMaterialCachedEx
 			const int32 Index = TryAddParameter(Parameters, EMaterialParameterType::Scalar, ParameterInfo, ExpressionScalarParameter->ExpressionGUID);
 			if (Index != INDEX_NONE)
 			{
-				Parameters.ScalarValues.Insert(ExpressionScalarParameter->DefaultValue, Index);
-				Parameters.ScalarMinMaxValues.Insert(FVector2D(ExpressionScalarParameter->SliderMin, ExpressionScalarParameter->SliderMax), Index);
+				UCurveLinearColorAtlas* CurveAtlas = nullptr;
+				UCurveLinearColor* Curve = nullptr;
 				if (ExpressionScalarParameter->IsUsedAsAtlasPosition())
 				{
-					UMaterialExpressionCurveAtlasRowParameter* ExpressionAtlasParameter = Cast<UMaterialExpressionCurveAtlasRowParameter>(ExpressionScalarParameter);
-					Parameters.ScalarCurveValues.Insert(ExpressionAtlasParameter->Curve, Index);
-					Parameters.ScalarCurveAtlasValues.Insert(ExpressionAtlasParameter->Atlas, Index);
+					UMaterialExpressionCurveAtlasRowParameter* ExpressionCurveAtlasParameter = Cast<UMaterialExpressionCurveAtlasRowParameter>(ExpressionScalarParameter);
+					CurveAtlas = ExpressionCurveAtlasParameter->Atlas;
+					Curve = ExpressionCurveAtlasParameter->Curve;
 				}
-				else
+
+				float Value = ExpressionScalarParameter->DefaultValue;
+				// UMaterialExpressionCurveAtlasRowParameter will update 'DefaultValue' with the index of the curve during compile, make sure we do that now so the correct value is cached
+				int32 CurveIndex = INDEX_NONE;
+				if (Curve && CurveAtlas && CurveAtlas->GetCurveIndex(Curve, CurveIndex))
 				{
-					Parameters.ScalarCurveValues.Insert(nullptr, Index);
-					Parameters.ScalarCurveAtlasValues.Insert(nullptr, Index);
+					Value = (float)CurveIndex;
 				}
+				Parameters.ScalarValues.Insert(Value, Index);
+				Parameters.ScalarMinMaxValues.Insert(FVector2D(ExpressionScalarParameter->SliderMin, ExpressionScalarParameter->SliderMax), Index);
+				Parameters.ScalarCurveValues.Insert(Curve, Index);
+				Parameters.ScalarCurveAtlasValues.Insert(CurveAtlas, Index);
 			}
 		}
 		else if (UMaterialExpressionVectorParameter* ExpressionVectorParameter = Cast<UMaterialExpressionVectorParameter>(Expression))
