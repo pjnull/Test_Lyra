@@ -2,14 +2,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.IO;
 using AutomationTool;
 using UnrealBuildTool;
-using Microsoft.Win32;
-using System.Diagnostics;
-using Tools.DotNETCommon;
-
+using AutomationScripts;
+using EpicGames.Core;
+using UnrealBuildBase;
 
 
 public class ModifyStageContext
@@ -287,17 +285,17 @@ public class MakeCookedEditor : BuildCommand
 
 	protected virtual void StageEngineEditorFiles(ProjectParams Params, DeploymentContext SC, ModifyStageContext Context)
 	{
-		StagePlatformExtensionFiles(Params, SC, Context, EngineDirectory);
+		StagePlatformExtensionFiles(Params, SC, Context, Unreal.EngineDirectory);
 		StagePluginFiles(Params, SC, Context, true);
 
 		// engine shaders
 		if (Context.bStageShaderDirs)
 		{
-			Context.NonUFSFilesToStage.AddRange(DirectoryReference.EnumerateFiles(DirectoryReference.Combine(EngineDirectory, "Shaders"), "*", SearchOption.AllDirectories));
+			Context.NonUFSFilesToStage.AddRange(DirectoryReference.EnumerateFiles(DirectoryReference.Combine(Unreal.EngineDirectory, "Shaders"), "*", SearchOption.AllDirectories));
 			GatherTargetDependencies(Params, SC, Context, "ShaderCompileWorker");
 		}
 
-		StageIniPathArray(Params, SC, "EngineExtraStageFiles", EngineDirectory, Context);
+		StageIniPathArray(Params, SC, "EngineExtraStageFiles", Unreal.EngineDirectory, Context);
 
 		Context.FilesToUncook.Add(FileReference.Combine(Context.EngineDirectory, "Content", "EngineMaterials", "DefaultMaterial.uasset"));
 	}
@@ -348,7 +346,7 @@ public class MakeCookedEditor : BuildCommand
 
 	protected virtual ModifyStageContext CreateContext(ProjectParams Params)
 	{
-		return new ModifyStageContext(EngineDirectory, Params, this);
+		return new ModifyStageContext(Unreal.EngineDirectory, Params, this);
 	}
 
 	protected virtual void ModifyParams(ProjectParams BuildParams)
@@ -476,7 +474,7 @@ public class MakeCookedEditor : BuildCommand
 			{
 				IEnumerable<RuntimeDependency> TargetPlugins = Target.Receipt.RuntimeDependencies.Where(x => x.Path.GetExtension().ToLower() == ".uplugin");
 				// grab just engine plugins, or non-engine plugins depending
-				TargetPlugins = TargetPlugins.Where(x => (bEnginePlugins ? x.Path.IsUnderDirectory(EngineDirectory) : !x.Path.IsUnderDirectory(EngineDirectory)));
+				TargetPlugins = TargetPlugins.Where(x => (bEnginePlugins ? x.Path.IsUnderDirectory(Unreal.EngineDirectory) : !x.Path.IsUnderDirectory(Unreal.EngineDirectory)));
 
 				// convert to paths
 				ActivePlugins.AddRange(TargetPlugins.Select(x => x.Path));
@@ -658,7 +656,7 @@ public class MakeCookedEditor : BuildCommand
 		FileReference ReceiptFilename = TargetReceipt.GetDefaultPath(Params.RawProjectPath.Directory, ReceiptName, SC.StageTargetPlatform.IniPlatformType, Configuration, Architecture);
 		if (!FileReference.Exists(ReceiptFilename))
 		{
-			ReceiptFilename = TargetReceipt.GetDefaultPath(EngineDirectory, ReceiptName, SC.StageTargetPlatform.IniPlatformType, Configuration, Architecture);
+			ReceiptFilename = TargetReceipt.GetDefaultPath(Unreal.EngineDirectory, ReceiptName, SC.StageTargetPlatform.IniPlatformType, Configuration, Architecture);
 		}
 
 		TargetReceipt Receipt;

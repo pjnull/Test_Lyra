@@ -20,17 +20,12 @@
 class FWindowsTargetPlatformModule
 	: public ITargetPlatformModule
 {
-	TArray<ITargetPlatform*> TargetPlatforms;
-
 public:
 
 	/** Destructor. */
 	~FWindowsTargetPlatformModule( )
 	{
-		for (ITargetPlatform* TP : TargetPlatforms)
-		{
-			delete TP;
-		}
+		Singleton = nullptr;
 	}
 
 public:
