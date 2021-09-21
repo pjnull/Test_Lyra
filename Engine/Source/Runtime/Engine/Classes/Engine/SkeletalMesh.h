@@ -151,7 +151,6 @@ public:
 class FSkeletalMeshPostLoadContext : public FSkeletalMeshCompilationContext
 {
 public:
-	bool bIsPreSkeletalMeshBuildRefactor = false;
 	bool bHasCachedDerivedData = false;
 };
 
@@ -788,7 +787,7 @@ public:
 
 	/* Fill the OutMesh with the imported data */
 	void LoadLODImportedData(const int32 LODIndex, FSkeletalMeshImportData& OutMesh) const;
-	
+
 	/* Fill the asset LOD entry with the InMesh. */
 	void SaveLODImportedData(const int32 LODIndex, FSkeletalMeshImportData& InMesh);
 	
@@ -1014,6 +1013,9 @@ public:
 	{
 		return false;
 	}
+
+	/* Return true if this skeletalmesh was never build since its creation. */
+	bool IsInitialBuildDone() const;
 
 	/* Return true if the reduction settings are setup to reduce a LOD*/
 	bool IsReductionActive(int32 LODIndex) const;
