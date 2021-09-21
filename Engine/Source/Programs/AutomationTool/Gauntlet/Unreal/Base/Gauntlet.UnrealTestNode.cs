@@ -863,17 +863,17 @@ namespace Gauntlet
 			{
 				List<string> LogCategories = new List<string>();
 				LogCategories.Add("Gauntlet");
+				{
+					// get the categories used to monitor process (this needs rethought).
+					IEnumerable<string> HeartbeatCategories = GetHeartbeatLogCategories().Union(GetCachedConfiguration().LogCategoriesForEvents);
+					LogCategories.AddRange(HeartbeatCategories);
+				}
+				LogCategories = LogCategories.Distinct().ToList();
 
 				UnrealLogParser Parser = new UnrealLogParser(App.StdOut);
 				List<string> TestLines = new List<string>();
+				// ONLY ADD RANGE ONCE. Ordering is important and will be skewed if multiple ranges are added which can skew how logs are pulled out.
 				TestLines.AddRange(Parser.GetLogChannels(LogCategories, true));
-
-				// get the categories used to monitor process (this needs rethought).
-				IEnumerable<string> HeartbeatCategories = GetHeartbeatLogCategories().Union(GetCachedConfiguration().LogCategoriesForEvents);
-
-				IEnumerable<UnrealLog.LogEntry> Entries = Parser.LogEntries.Where(E => HeartbeatCategories.Contains(E.Category));
-
-				TestLines.AddRange(Entries.Select(E => E.ToString()));
 								
 				for (int i = LastLogCount; i < TestLines.Count(); i++)
 				{
