@@ -3685,6 +3685,7 @@ namespace UnrealBuildTool
 			if (Rules.bBuildEditor)
 			{
 				GlobalCompileEnvironment.Definitions.Add("WITH_EDITOR=1");
+				GlobalCompileEnvironment.Definitions.Add("WITH_IOSTORE_IN_EDITOR=1");
 			}
 			else if (!GlobalCompileEnvironment.Definitions.Contains("WITH_EDITOR=0"))
 			{
