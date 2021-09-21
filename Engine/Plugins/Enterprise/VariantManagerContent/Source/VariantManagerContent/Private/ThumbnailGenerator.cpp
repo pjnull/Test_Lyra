@@ -141,7 +141,7 @@ UTexture2D* ThumbnailGenerator::GenerateThumbnailFromTexture(UTexture2D* Texture
 	int32 TargetWidth = Texture->GetSizeX();
 	int32 TargetHeight = Texture->GetSizeY();
 
-	if (TargetWidth == 0 || TargetHeight == 0 || !Texture->Resource)
+	if (TargetWidth == 0 || TargetHeight == 0 || !Texture->GetResource())
 		{
 		UE_LOG(LogVariantContent, Error, TEXT("Failed create a thumbnail from texture '%s'"), *Texture->GetName());
 		return nullptr;
@@ -185,7 +185,7 @@ UTexture2D* ThumbnailGenerator::GenerateThumbnailFromTexture(UTexture2D* Texture
 		1.0f,
 		1.0f,
 		FLinearColor::White,
-		Texture->Resource,
+		Texture->GetResource(),
 		bAlphaBlend);
 	Canvas.Flush_GameThread();
 
