@@ -2488,7 +2488,7 @@ public:
 		, RasterizerState(nullptr)
 		, DepthStencilState(nullptr)
 		, RenderTargetsEnabled(0)
-		, RenderTargetFormats(InPlace, PF_Unknown)
+		, RenderTargetFormats(InPlace, UE_PIXELFORMAT_TO_UINT8(PF_Unknown))
 		, RenderTargetFlags(InPlace, TexCreate_None)
 		, DepthStencilTargetFormat(PF_Unknown)
 		, DepthStencilTargetFlag(TexCreate_None)
@@ -2529,7 +2529,7 @@ public:
 		ERenderTargetLoadAction		InStencilTargetLoadAction,
 		ERenderTargetStoreAction	InStencilTargetStoreAction,
 		FExclusiveDepthStencil		InDepthStencilAccess,
-		uint32						InNumSamples,
+		uint16						InNumSamples,
 		ESubpassHint				InSubpassHint,
 		uint8						InSubpassIndex,
 		EConservativeRasterization	InConservativeRasterization,
@@ -2989,7 +2989,7 @@ struct FRHIRenderPassInfo
 
 
 	// Color, no depth, optional resolve, optional mip, optional array slice
-	explicit FRHIRenderPassInfo(FRHITexture* ColorRT, ERenderTargetActions ColorAction, FRHITexture* ResolveRT = nullptr, uint32 InMipIndex = 0, int32 InArraySlice = -1)
+	explicit FRHIRenderPassInfo(FRHITexture* ColorRT, ERenderTargetActions ColorAction, FRHITexture* ResolveRT = nullptr, uint8 InMipIndex = 0, int32 InArraySlice = -1)
 	{
 		check(ColorRT);
 		ColorRenderTargets[0].RenderTarget = ColorRT;
@@ -3262,7 +3262,7 @@ struct RHI_API FRHITextureCreateInfo
 		EPixelFormat InFormat,
 		FClearValueBinding InClearValue,
 		ETextureCreateFlags InFlags,
-		uint32 InArraySize,
+		uint16 InArraySize,
 		uint8 InNumMips = 1,
 		uint8 InNumSamples = 1)
 	{
@@ -3295,7 +3295,7 @@ struct RHI_API FRHITextureCreateInfo
 		EPixelFormat InFormat,
 		FClearValueBinding InClearValue,
 		ETextureCreateFlags InFlags,
-		uint32 InArraySize,
+		uint16 InArraySize,
 		uint8 InNumMips = 1,
 		uint8 InNumSamples = 1)
 	{
