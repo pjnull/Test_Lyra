@@ -25,7 +25,7 @@ public:
 	/** Destructor. */
 	~FWindowsTargetPlatformModule( )
 	{
-		Singleton = nullptr;
+
 	}
 
 public:
