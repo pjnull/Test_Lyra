@@ -810,6 +810,10 @@ void FUnixCrashContext::GenerateCrashInfoAndLaunchReporter(bool bReportingNonCra
 		{
 			UE_LOG(LogCore, Warning, TEXT("MakeDirectory %s failed"), *CrashInfoAbsolute);
 		}
+		else
+		{
+			UE_LOG(LogCore, Warning, TEXT("MakeDirectory %s failed"), *CrashInfoAbsolute);
+		}
 	}
 
 #endif
