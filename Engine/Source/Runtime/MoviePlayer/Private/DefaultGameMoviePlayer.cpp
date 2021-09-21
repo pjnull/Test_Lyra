@@ -462,6 +462,10 @@ void FDefaultGameMoviePlayer::WaitForMovieToFinish(bool bAllowEngineTick)
         {
             VirtualRenderWindow->SetContent(SNullWidget::NullWidget);
         }
+		if (UserWidgetHolder.IsValid())
+		{
+			UserWidgetHolder->SetContent(SNullWidget::NullWidget);
+		}
 
 		const bool bAutoCompleteWhenLoadingCompletes = LoadingScreenAttributes.bAutoCompleteWhenLoadingCompletes;
 		const bool bWaitForManualStop = LoadingScreenAttributes.bWaitForManualStop;
