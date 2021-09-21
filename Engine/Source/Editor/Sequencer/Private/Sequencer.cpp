@@ -145,6 +145,7 @@
 #include "SequencerCustomizationManager.h"
 #include "SSequencerGroupManager.h"
 #include "ActorTreeItem.h"
+#include "Widgets/Layout/SSpacer.h"
 
 #include "EntitySystem/MovieSceneEntitySystemLinker.h"
 #include "EntitySystem/MovieScenePreAnimatedStateSystem.h"
