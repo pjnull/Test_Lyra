@@ -282,7 +282,7 @@ public:
 	}
 
 	FLifetimeProperty(int32 InRepIndex)
-		: RepIndex(InRepIndex)
+		: RepIndex((uint16)InRepIndex)
 		, Condition(COND_None)
 		, RepNotifyCondition(REPNOTIFY_OnChanged)
 		, bIsPushBased(false)
@@ -291,7 +291,7 @@ public:
 	}
 
 	FLifetimeProperty(int32 InRepIndex, ELifetimeCondition InCondition, ELifetimeRepNotifyCondition InRepNotifyCondition=REPNOTIFY_OnChanged, bool bInIsPushBased=false)
-		: RepIndex(InRepIndex)
+		: RepIndex((uint16)InRepIndex)
 		, Condition(InCondition)
 		, RepNotifyCondition(InRepNotifyCondition)
 		, bIsPushBased(bInIsPushBased)
