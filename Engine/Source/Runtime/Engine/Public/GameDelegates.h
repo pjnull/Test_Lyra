@@ -45,6 +45,9 @@ DECLARE_MULTICAST_DELEGATE_OneParam(FPendingConnectionLostDelegate, const FUniqu
 /** Delegate to handle when a connection is disconnecting */
 DECLARE_MULTICAST_DELEGATE_TwoParams(FHandleDisconnectDelegate, class UWorld* /*InWorld*/, class UNetDriver* /*NetDriver*/);
 
+/** Delegate to allow game to use a custom ICookedEditorPackageManager class */
+DECLARE_DELEGATE_RetVal(TUniquePtr<class ICookedEditorPackageManager>, FCookedEditorPackageManagerFactoryDelegate);
+
 // Helper defines to make defining the delegate members easy
 #define DEFINE_GAME_DELEGATE(DelegateType) \
 	public: F##DelegateType& Get##DelegateType() { return DelegateType; } \
@@ -85,6 +88,8 @@ public:
 
 	// DEPRECATED, switch to subclassing AssetManager instead
 	DEFINE_GAME_DELEGATE(CookModificationDelegate);
+
+	DEFINE_GAME_DELEGATE(CookedEditorPackageManagerFactoryDelegate);
 public:
 	UE_DEPRECATED(4.26, "Switch to subclassing AssetManager instead")
 	FAssignStreamingChunkDelegate& GetAssignStreamingChunkDelegate() { return AssignStreamingChunkDelegate; }

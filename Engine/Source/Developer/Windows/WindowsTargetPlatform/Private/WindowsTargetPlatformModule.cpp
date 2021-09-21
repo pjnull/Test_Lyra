@@ -7,12 +7,11 @@
 #include "Modules/ModuleManager.h"
 #include "UObject/Package.h"
 #include "UObject/WeakObjectPtr.h"
+#if WITH_ENGINE
+#include "CookedEditorTargetPlatform.h"
+#endif
 
 #define LOCTEXT_NAMESPACE "FWindowsTargetPlatformModule"
-
-
-/** Holds the target platform singleton. */
-static ITargetPlatform* Singleton = nullptr;
 
 
 /**
@@ -21,12 +20,17 @@ static ITargetPlatform* Singleton = nullptr;
 class FWindowsTargetPlatformModule
 	: public ITargetPlatformModule
 {
+	TArray<ITargetPlatform*> TargetPlatforms;
+
 public:
 
 	/** Destructor. */
 	~FWindowsTargetPlatformModule( )
 	{
-		Singleton = nullptr;
+		for (ITargetPlatform* TP : TargetPlatforms)
+		{
+			delete TP;
+		}
 	}
 
 public:
@@ -55,6 +59,15 @@ public:
 		TargetPlatforms.Add(new TGenericWindowsTargetPlatform<FWindowsPlatformProperties<false, true, false>>());
 		// Client TP
 		TargetPlatforms.Add(new TGenericWindowsTargetPlatform<FWindowsPlatformProperties<false, false, true>>());
+
+#if WITH_ENGINE
+		// currently this TP requires the engine for allowing GameDelegates usage
+		bool bSupportCookedEditor;
+		if (GConfig->GetBool(TEXT("CookedEditorSettings"), TEXT("bSupportCookedEditor"), bSupportCookedEditor, GGameIni) && bSupportCookedEditor)
+		{
+			TargetPlatforms.Add(new TCookedEditorTargetPlatform<FWindowsEditorTargetPlatformParent>());
+		}
+#endif
 	}
 
 public:
