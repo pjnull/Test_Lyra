@@ -147,6 +147,7 @@ class FCullObjectsForShadowCS : public FGlobalShader
 		SHADER_PARAMETER_STRUCT_INCLUDE(FDistanceFieldCulledObjectBufferParameters, CulledObjectBufferParameters)
 		SHADER_PARAMETER(uint32, ObjectBoundingGeometryIndexCount)
 		SHADER_PARAMETER(FMatrix44f, WorldToShadow)
+		SHADER_PARAMETER(float, ObjectExpandScale)
 		SHADER_PARAMETER(uint32, NumShadowHullPlanes)
 		SHADER_PARAMETER(FVector4, ShadowBoundingSphere)
 		SHADER_PARAMETER_ARRAY(FVector4,ShadowConvexHull,[12])
@@ -521,6 +522,7 @@ void CullDistanceFieldObjectsForLight(
 		PassParameters->CulledObjectBufferParameters = CulledObjectBufferParameters;
 		PassParameters->ObjectBoundingGeometryIndexCount = UE_ARRAY_COUNT(GCubeIndices);
 		PassParameters->WorldToShadow = WorldToShadowValue;
+		PassParameters->ObjectExpandScale = bIsHeightfield ? 0.f : WorldToShadowValue.GetMaximumAxisScale();
 		PassParameters->NumShadowHullPlanes = NumPlanes;
 		PassParameters->ShadowBoundingSphere = ShadowBoundingSphereValue;
 
