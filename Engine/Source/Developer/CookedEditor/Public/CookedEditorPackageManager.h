@@ -17,7 +17,7 @@ typedef FWindowsEditorTargetPlatformParent FHostPlatformEditorTargetPlatformPare
 #elif PLATFORM_LINUX
 typedef FLinuxEditorTargetPlatformParent FHostPlatformEditorTargetPlatformParent;
 #elif PLATFORM_MAC
-typedef TGenericMacTargetPlatform<FMacPlatformProperties<false, false, false>> FMacEditorTargetPlatformParent;
+typedef TGenericMacTargetPlatform<false, false, false> FMacEditorTargetPlatformParent;
 typedef FMacEditorTargetPlatformParent FHostPlatformEditorTargetPlatformParent;
 #endif
 
