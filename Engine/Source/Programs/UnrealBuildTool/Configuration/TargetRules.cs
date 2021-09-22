@@ -1802,8 +1802,8 @@ namespace UnrealBuildTool
 			// this setting can be used to compile out the shader compiler if that is important
 			//GlobalDefinitions.Add("UE_ALLOW_SHADER_COMPILING=0");
 
-			ConfigHierarchy ProjectGameIni = ConfigCache.ReadHierarchy(ConfigHierarchyType.Game, ProjectFile.Directory, Platform);
-			List<string> DisabledPlugins;
+			ConfigHierarchy ProjectGameIni = ConfigCache.ReadHierarchy(ConfigHierarchyType.Game, ProjectFile?.Directory, Platform);
+			List<string>? DisabledPlugins;
 			// disable them, and remove them from Enabled in case they were there
 			if (ProjectGameIni.GetArray("CookedEditorSettings", "DisabledPlugins", out DisabledPlugins))
 			{
