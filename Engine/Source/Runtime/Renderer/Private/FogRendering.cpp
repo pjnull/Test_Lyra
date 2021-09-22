@@ -131,31 +131,7 @@ public:
 	void SetParameters(FRHICommandList& RHICmdList, const FViewInfo& View, float FogClipSpaceZ)
 	{
 		FGlobalShader::SetParameters<FViewUniformShaderParameters>(RHICmdList, RHICmdList.GetBoundVertexShader(), View.ViewUniformBuffer);
-
-		{
-			// The fog can be set to start at a certain euclidean distance.
-			// clamp the value to be behind the near plane z
-			float FogStartDistance = FMath::Max(30.0f, View.ExponentialFogParameters.W);
-
-			// Here we compute the nearest z value the fog can start
-			// to render the quad at this z value with depth test enabled.
-			// This means with a bigger distance specified more pixels are
-			// are culled and don't need to be rendered. This is faster if
-			// there is opaque content nearer than the computed z.
-
-			FMatrix InvProjectionMatrix = View.ViewMatrices.GetInvProjectionMatrix();
-
-			FVector ViewSpaceCorner = InvProjectionMatrix.TransformFVector4(FVector4f(1, 1, 1, 1));
-
-			float Ratio = ViewSpaceCorner.Z / ViewSpaceCorner.Size();
-
-			FVector ViewSpaceStartFogPoint(0.0f, 0.0f, FogStartDistance * Ratio);
-			FVector4f ClipSpaceMaxDistance = View.ViewMatrices.GetProjectionMatrix().TransformPosition(ViewSpaceStartFogPoint);
-
-			float LocalFogClipSpaceZ = ClipSpaceMaxDistance.Z / ClipSpaceMaxDistance.W;
-
-			SetShaderValue(RHICmdList, RHICmdList.GetBoundVertexShader(),FogStartZ, LocalFogClipSpaceZ);
-		}
+		SetShaderValue(RHICmdList, RHICmdList.GetBoundVertexShader(), FogStartZ, FogClipSpaceZ);
 	}
 
 private:
