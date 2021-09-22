@@ -6601,7 +6601,7 @@ bool FSkeletalMeshSceneProxy::HasDynamicIndirectShadowCasterRepresentation() con
 	return CastsDynamicShadow() && CastsDynamicIndirectShadow();
 }
 
-void FSkeletalMeshSceneProxy::GetShadowShapes(TArray<FCapsuleShape>& CapsuleShapes) const 
+void FSkeletalMeshSceneProxy::GetShadowShapes(TArray<FCapsuleShape3f>& CapsuleShapes) const 
 {
 	SCOPE_CYCLE_COUNTER(STAT_GetShadowShapes);
 
@@ -6616,7 +6616,7 @@ void FSkeletalMeshSceneProxy::GetShadowShapes(TArray<FCapsuleShape>& CapsuleShap
 		FMatrix ReferenceToWorld = ReferenceToLocalMatrices[CapsuleData.Key] * ProxyLocalToWorld;
 		const float MaxScale = ReferenceToWorld.GetScaleVector().GetMax();
 
-		FCapsuleShape& NewCapsule = CapsuleShapes[CapsuleIndex++];
+		FCapsuleShape3f& NewCapsule = CapsuleShapes[CapsuleIndex++];
 
 		NewCapsule.Center = ReferenceToWorld.TransformPosition(CapsuleData.Value.Center);
 		NewCapsule.Radius = CapsuleData.Value.Radius * MaxScale;
@@ -6902,7 +6902,7 @@ bool FSkeletalMeshSceneProxy::GetMeshUVDensities(int32 LODIndex, int32 SectionIn
 	return FPrimitiveSceneProxy::GetMeshUVDensities(LODIndex, SectionIndex, WorldUVDensities);
 	}
 
-bool FSkeletalMeshSceneProxy::GetMaterialTextureScales(int32 LODIndex, int32 SectionIndex, const FMaterialRenderProxy* MaterialRenderProxy, FVector4* OneOverScales, FIntVector4* UVChannelIndices) const
+bool FSkeletalMeshSceneProxy::GetMaterialTextureScales(int32 LODIndex, int32 SectionIndex, const FMaterialRenderProxy* MaterialRenderProxy, FVector4f* OneOverScales, FIntVector4* UVChannelIndices) const
 	{
 	if (LODSections.IsValidIndex(LODIndex) && LODSections[LODIndex].SectionElements.IsValidIndex(SectionIndex))
 	{
