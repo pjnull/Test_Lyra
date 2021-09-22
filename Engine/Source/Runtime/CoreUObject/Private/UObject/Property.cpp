@@ -603,6 +603,30 @@ const TCHAR* FPropertyHelpers::ReadToken( const TCHAR* Buffer, FStringBuilderBas
 	return Buffer;
 }
 
+FString FGCStackSizeHelper::GetPropertyPath() const
+{
+	FString Result;
+	const FProperty* PreviousProperty = nullptr;
+
+	for (int32 PropertyIndex = 0; PropertyIndex < PropertyStack.Num(); ++PropertyIndex)
+	{
+		const FProperty* Property = PropertyStack[PropertyIndex];
+		if (PreviousProperty && Property->GetOwner<FProperty>() == PreviousProperty && Property->GetFName() == PreviousProperty->GetFName())
+		{
+			// Skipping inner properties (inside of containers) if their name matches their owner name - TArrayName.TArrayName doesn't have much value
+			// but we do want to keep TMapName.TMapName_Key
+			continue;
+		}
+		if (PropertyIndex > 0)
+		{
+			Result += '.';
+		}
+		Result += Property->GetName();
+		PreviousProperty = Property;
+	}
+	return Result;
+}
+
 /*-----------------------------------------------------------------------------
 	FProperty implementation.
 -----------------------------------------------------------------------------*/
