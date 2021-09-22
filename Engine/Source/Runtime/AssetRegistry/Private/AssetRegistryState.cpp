@@ -334,15 +334,12 @@ void FAssetRegistryState::InitializeFromExisting(const TMap<FName, FAssetData*>&
 			continue;
 		}
 
-
 		FAssetData* ExistingData = nullptr;
-
 		if (InInitializationMode != EInitializationMode::Rebuild) // minor optimization to avoid lookup in rebuild mode
 		{
 			ExistingData = CachedAssetsByObjectPath.FindRef(Pair.Key);
 		}
-		if ((InInitializationMode == EInitializationMode::OnlyUpdateExisting) && 
-			(ExistingData == nullptr) )
+		if (InInitializationMode == EInitializationMode::OnlyUpdateExisting && ExistingData == nullptr)
 		{
 			continue;
 		}
@@ -352,11 +349,10 @@ void FAssetRegistryState::InitializeFromExisting(const TMap<FName, FAssetData*>&
 
 		FAssetDataTagMap LocalTagsAndValues;
 		FAssetRegistryState::FilterTags(AssetData.TagsAndValues, LocalTagsAndValues, Options.CookFilterlistTagsByClass.Find(AssetData.AssetClass), Options);
-
 		
 		// in append or onlyupdateexisting we may have some existing data
 		// in rebuild mode existing data should never be found
-		if (ExistingData) 
+		if (ExistingData)
 		{
 			// Bundle tags might have changed even if other tags haven't
 			ExistingData->TaggedAssetBundles = AssetData.TaggedAssetBundles;
@@ -369,7 +365,7 @@ void FAssetRegistryState::InitializeFromExisting(const TMap<FName, FAssetData*>&
 				UpdateAssetData(ExistingData, TempData);
 			}
 		}
-		else 
+		else
 		{
 			FAssetData* NewData = new FAssetData(AssetData.PackageName, AssetData.PackagePath, AssetData.AssetName,
 				AssetData.AssetClass, LocalTagsAndValues, AssetData.ChunkIDs, AssetData.PackageFlags);
