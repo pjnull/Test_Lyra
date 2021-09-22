@@ -29,8 +29,8 @@ public:
 	/** Allows for a custom target platform module to initialize this TargetPlatform with an existing
 	 * PackageManager instead of going through the standard factory function */
 	explicit TCookedEditorTargetPlatform(TUniquePtr<ICookedEditorPackageManager>&& ExistingManager)
-		: PackageManager(ExistingManager)
 	{
+		PackageManager = MoveTemp(ExistingManager);
 	}
 
 	~TCookedEditorTargetPlatform()
