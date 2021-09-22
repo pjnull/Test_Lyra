@@ -384,9 +384,9 @@ void ULandscapeComponent::Serialize(FArchive& Ar)
 		{
 			FLandscapeLayerComponentData& LayerComponentData = ItPair.Value;
 			TexturesAndMaterials.Add((UObject**)&LayerComponentData.HeightmapData.Texture);
-			for (UTexture2D* WeightmapTexture : LayerComponentData.WeightmapData.Textures)
+			for (UE_TRANSITIONAL_OBJECT_PTR(UTexture2D)& WeightmapTexture : LayerComponentData.WeightmapData.Textures)
 			{
-				TexturesAndMaterials.Add((UObject**)&WeightmapTexture);
+				TexturesAndMaterials.Add((UObject**)&static_cast<UTexture2D*&>(WeightmapTexture));
 			}
 		}
 		for (TObjectPtr<UMaterialInstanceConstant>& MaterialInstance : MaterialInstances)
