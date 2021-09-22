@@ -137,6 +137,10 @@ private:
 // FGCObject interface
 protected:
 	virtual void AddReferencedObjects( FReferenceCollector& Collector ) override;
+	virtual FString GetReferencerName() const override
+	{
+		return TEXT("FUsdLevelSequenceHelperImpl");
+	}
 
 // Sequences handling
 public:
