@@ -152,9 +152,9 @@ public:
 			FVector ViewSpaceStartFogPoint(0.0f, 0.0f, FogStartDistance * Ratio);
 			FVector4f ClipSpaceMaxDistance = View.ViewMatrices.GetProjectionMatrix().TransformPosition(ViewSpaceStartFogPoint);
 
-			float FogClipSpaceZ = ClipSpaceMaxDistance.Z / ClipSpaceMaxDistance.W;
+			float LocalFogClipSpaceZ = ClipSpaceMaxDistance.Z / ClipSpaceMaxDistance.W;
 
-			SetShaderValue(RHICmdList, RHICmdList.GetBoundVertexShader(),FogStartZ, FogClipSpaceZ);
+			SetShaderValue(RHICmdList, RHICmdList.GetBoundVertexShader(),FogStartZ, LocalFogClipSpaceZ);
 		}
 	}
 
