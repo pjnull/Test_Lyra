@@ -4,7 +4,7 @@
 #include "NiagaraComponent.h"
 #include "NiagaraSystem.h"
 #include "NiagaraComputeExecutionContext.h"
-#include "NiagaraEmitterInstanceBatcher.h"
+#include "NiagaraGpuComputeDispatchInterface.h"
 #include "NiagaraBatchedElements.h"
 
 #include "Niagara/Classes/NiagaraDataInterfaceRenderTarget2D.h"
@@ -93,20 +93,13 @@ bool FNiagaraBakerRenderer::RenderView(UNiagaraComponent* PreviewComponent, cons
 	check(World);
 
 	// We need any GPU sims to flush pending ticks
-	if (World->Scene && World->Scene->GetFXSystem())
+	FNiagaraGpuComputeDispatchInterface* ComputeDispatchInterface = FNiagaraGpuComputeDispatchInterface::Get(World);
+	ensureMsgf(ComputeDispatchInterface, TEXT("The batcher was not valid on the world this may result in incorrect baking"));
+	if (ComputeDispatchInterface)
 	{
-		NiagaraEmitterInstanceBatcher* NiagaraBatcher = static_cast<NiagaraEmitterInstanceBatcher*>(World->Scene->GetFXSystem()->GetInterface(NiagaraEmitterInstanceBatcher::Name));
-		if (NiagaraBatcher)
-		{
-			ENQUEUE_RENDER_COMMAND(NiagaraFlushBatcher)(
-				[RT_NiagaraBatcher=NiagaraBatcher](FRHICommandListImmediate& RHICmdList)
-				{
-					RT_NiagaraBatcher->ProcessPendingTicksFlush(RHICmdList, true);
-				}
-			);
-		}
+		ComputeDispatchInterface->FlushPendingTicks_GameThread();
 	}
-
+	
 	const FNiagaraBakerTextureSettings& OutputTextureSettings = BakerSettings->OutputTextures[iOutputTextureIndex];
 
 	// Validate the rect
