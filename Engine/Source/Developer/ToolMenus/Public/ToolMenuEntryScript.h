@@ -63,7 +63,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Advanced")
 	EUserInterfaceActionType UserInterfaceActionType;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Appearance")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Advanced")
 	FName StyleNameOverride;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "SubMenu")
