@@ -921,7 +921,7 @@ bool UAssetToolsImpl::AdvancedCopyPackages(const TMap<FString, FString>& SourceA
 		ExistingObjectSet.Reserve(SourceAndDestPackages.Num());
 		NewObjectSet.Reserve(SourceAndDestPackages.Num());
 
-		FScopedSlowTask LoopProgress(SourceAndDestPackages.Num() * 2 , LOCTEXT("AdvancedCopying", "Copying files and dependencies..."));
+		FScopedSlowTask LoopProgress(SourceAndDestPackages.Num(), LOCTEXT("AdvancedCopying", "Copying files and dependencies..."));
 		LoopProgress.MakeDialog();
 
 		for (const auto& Package : SourceAndDestPackages)
@@ -933,24 +933,7 @@ bool UAssetToolsImpl::AdvancedCopyPackages(const TMap<FString, FString>& SourceA
 			if (FPackageName::DoesPackageExist(PackageName, nullptr, &SrcFilename))
 			{
 				LoopProgress.EnterProgressFrame();
-				UPackage* Pkg = FindPackage(nullptr, *PackageName);
-				if (Pkg)
-				{
-					Pkg->FullyLoad();
-				}
-			}
-		}
-
-		for (const auto& Package : SourceAndDestPackages)
-		{
-			const FString& PackageName = Package.Key;
-			const FString& DestFilename = Package.Value;
-			FString SrcFilename;
-
-			if (FPackageName::DoesPackageExist(PackageName, nullptr, &SrcFilename))
-			{
-				LoopProgress.EnterProgressFrame();
-				UPackage* Pkg = FindPackage(nullptr, *PackageName);
+				UPackage* Pkg = LoadPackage(nullptr, *PackageName, LOAD_None);
 				if (Pkg)
 				{
 					FString Name = ObjectTools::SanitizeObjectName(FPaths::GetBaseFilename(SrcFilename));
