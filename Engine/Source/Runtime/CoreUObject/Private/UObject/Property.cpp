@@ -650,14 +650,15 @@ FString FGCStackSizeHelper::GetPropertyPath() const
 	for (int32 PropertyIndex = 0; PropertyIndex < PropertyStack.Num(); ++PropertyIndex)
 	{
 		const FProperty* Property = PropertyStack[PropertyIndex];
-		if (PreviousProperty && Property->GetOwner<FProperty>() == PreviousProperty && Property->GetFName() == PreviousProperty->GetFName())
-		{
-			// Skipping inner properties (inside of containers) if their name matches their owner name - TArrayName.TArrayName doesn't have much value
-			// but we do want to keep TMapName.TMapName_Key
-			continue;
-		}
+		check(Property);
 		if (PropertyIndex > 0)
 		{
+			if (Property->GetOwner<FProperty>() == PreviousProperty && Property->GetFName() == PreviousProperty->GetFName())
+			{
+				// Skipping inner properties (inside of containers) if their name matches their owner name - TArrayName.TArrayName doesn't have much value
+				// but we do want to keep TMapName.TMapName_Key
+				continue;
+			}
 			Result += '.';
 		}
 		Result += Property->GetName();
