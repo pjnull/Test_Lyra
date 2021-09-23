@@ -199,6 +199,36 @@ template <> FORCEINLINE const TArray<FMaterialInstanceResource::TNamedParameter<
 template <> FORCEINLINE const TArray<FMaterialInstanceResource::TNamedParameter<const UTexture*> >& FMaterialInstanceResource::GetValueArray() const { return TextureParameterArray; }
 template <> FORCEINLINE const TArray<FMaterialInstanceResource::TNamedParameter<const URuntimeVirtualTexture*> >& FMaterialInstanceResource::GetValueArray() const { return RuntimeVirtualTextureParameterArray; }
 
+template <>
+inline bool FMaterialInstanceResource::RenderThread_GetParameterValue<const UTexture*>(const FHashedMaterialParameterInfo& ParameterInfo, FMaterialParameterValue& OutValue) const
+{
+	const TArray<TNamedParameter<const UTexture*>>& ValueArray = GetValueArray<const UTexture*>();
+	for (const TNamedParameter<const UTexture*>& Parameter : ValueArray)
+	{
+		if (Parameter.Info == ParameterInfo && Parameter.Value)
+		{
+			OutValue = Parameter.Value;
+			return true;
+		}
+	}
+	return false;
+}
+
+template <>
+inline bool FMaterialInstanceResource::RenderThread_GetParameterValue<const URuntimeVirtualTexture*>(const FHashedMaterialParameterInfo& ParameterInfo, FMaterialParameterValue& OutValue) const
+{
+	const TArray<TNamedParameter<const URuntimeVirtualTexture*>>& ValueArray = GetValueArray<const URuntimeVirtualTexture*>();
+	for (const TNamedParameter<const URuntimeVirtualTexture*>& Parameter : ValueArray)
+	{
+		if (Parameter.Info == ParameterInfo && Parameter.Value)
+		{
+			OutValue = Parameter.Value;
+			return true;
+		}
+	}
+	return false;
+}
+
 struct FMaterialInstanceParameterSet
 {
 	TArray<FMaterialInstanceResource::TNamedParameter<float> > ScalarParameters;
