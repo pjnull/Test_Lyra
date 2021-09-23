@@ -1007,6 +1007,15 @@ public:
 	UPROPERTY(Category = "RootMotion", EditAnywhere, BlueprintReadWrite)
 	uint8 bAllowPhysicsRotationDuringAnimRootMotion : 1;
 
+	/**
+	 * When applying a root motion override while falling off a moving object, this controls how long it takes to lose half the former base's velocity (in seconds).
+	 * Set to 0 to ignore former bases (default).
+	 * Set to -1 for no decay.
+	 * Any other positive value sets the half-life for exponential decay.
+	 */
+	UPROPERTY(Category = "RootMotion", EditAnywhere, BlueprintReadWrite)
+	float FormerBaseVelocityDecayHalfLife = 0.f;
+
 protected:
 
 	// AI PATH FOLLOWING
@@ -1126,6 +1135,9 @@ public:
 
 	/** How loosely the client can follow the server location during this fall. */
 	float MaxServerClientErrorWhileFalling = 0.f;
+
+	/** Left over velocity when leaving a moving base. Helps with airborne root motion. */
+	FVector DecayingFormerBaseVelocity = FVector::ZeroVector;
 
 	/** How often we should raycast to project from navmesh to underlying geometry */
 	UPROPERTY(Category="Character Movement: NavMesh Movement", EditAnywhere, BlueprintReadWrite, meta=(editcondition = "bProjectNavMeshWalking"))
@@ -2576,6 +2588,9 @@ protected:
 
 	/** Applies root motion from root motion sources to velocity (override and additive) */
 	void ApplyRootMotionToVelocity(float deltaTime);
+
+	/** Reduces former base velocity according to FormerBaseVelocityDecayHalfLife */
+	void DecayFormerBaseVelocity(float deltaTime);
 
 public:
 
