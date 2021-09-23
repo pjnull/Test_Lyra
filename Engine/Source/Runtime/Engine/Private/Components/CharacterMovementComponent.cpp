@@ -2298,6 +2298,8 @@ void UCharacterMovementComponent::PerformMovement(float DeltaSeconds)
 	{
 		return;
 	}
+
+	bTeleportedSinceLastUpdate = UpdatedComponent->GetComponentLocation() != LastUpdateLocation;
 	
 	// no movement if we can't move, or if currently doing physical simulation on UpdatedComponent
 	if (MovementMode == MOVE_None || UpdatedComponent->Mobility != EComponentMobility::Movable || UpdatedComponent->IsSimulatingPhysics())
@@ -2321,7 +2323,7 @@ void UCharacterMovementComponent::PerformMovement(float DeltaSeconds)
 	}
 
 	// Force floor update if we've moved outside of CharacterMovement since last update.
-	bForceNextFloorCheck |= (IsMovingOnGround() && UpdatedComponent->GetComponentLocation() != LastUpdateLocation);
+	bForceNextFloorCheck |= (IsMovingOnGround() && bTeleportedSinceLastUpdate);
 
 	// Update saved LastPreAdditiveVelocity with any external changes to character Velocity that happened since last update.
 	if( CurrentRootMotion.HasAdditiveVelocity() )
@@ -9449,7 +9451,7 @@ void UCharacterMovementComponent::ServerMoveHandleClientError(float ClientTimeSt
 	if (bDeferServerCorrectionsWhenFalling)
 	{
 		// Teleports and other movement modes mean we should just trust the server like we normally would
-		if (bJustTeleported || (MovementMode != MOVE_Walking && MovementMode != MOVE_Falling))
+		if (bTeleportedSinceLastUpdate || (MovementMode != MOVE_Walking && MovementMode != MOVE_Falling))
 		{
 			MaxServerClientErrorWhileFalling = 0.f;
 			bCanTrustClientOnLanding = false;
@@ -9473,25 +9475,28 @@ void UCharacterMovementComponent::ServerMoveHandleClientError(float ClientTimeSt
 			// no longer falling; server should trust client up to a point to finish the landing as the client sees it
 			const FVector LocDiff = ServerLoc - ClientLoc;
 
-			if (LocDiff.SizeSquared() < FMath::Square(MaxLandingCorrection))
+			if (!LocDiff.IsNearlyZero(KINDA_SMALL_NUMBER))
 			{
-				ServerLoc = ClientLoc;
-				UpdatedComponent->MoveComponent(ServerLoc - UpdatedComponent->GetComponentLocation(), UpdatedComponent->GetComponentQuat(), true, nullptr, EMoveComponentFlags::MOVECOMP_NoFlags, ETeleportType::TeleportPhysics);
-				bJustTeleported = true;
-			}
-			else
-			{
-				const FVector ClampedDiff = LocDiff.GetSafeNormal() * MaxLandingCorrection;
-				ServerLoc -= ClampedDiff;
-				UpdatedComponent->MoveComponent(ServerLoc - UpdatedComponent->GetComponentLocation(), UpdatedComponent->GetComponentQuat(), true, nullptr, EMoveComponentFlags::MOVECOMP_NoFlags, ETeleportType::TeleportPhysics);
-				bJustTeleported = true;
+				if (LocDiff.SizeSquared() < FMath::Square(MaxLandingCorrection))
+				{
+					ServerLoc = ClientLoc;
+					UpdatedComponent->MoveComponent(ServerLoc - UpdatedComponent->GetComponentLocation(), UpdatedComponent->GetComponentQuat(), true, nullptr, EMoveComponentFlags::MOVECOMP_NoFlags, ETeleportType::TeleportPhysics);
+					bJustTeleported = true;
+				}
+				else
+				{
+					const FVector ClampedDiff = LocDiff.GetSafeNormal() * MaxLandingCorrection;
+					ServerLoc -= ClampedDiff;
+					UpdatedComponent->MoveComponent(ServerLoc - UpdatedComponent->GetComponentLocation(), UpdatedComponent->GetComponentQuat(), true, nullptr, EMoveComponentFlags::MOVECOMP_NoFlags, ETeleportType::TeleportPhysics);
+					bJustTeleported = true;
+				}
 			}
 
 			MaxServerClientErrorWhileFalling = 0.f;
 			bCanTrustClientOnLanding = false;
 		}
 
-		if (bServerIsFalling && bLastServerIsWalking && !bJustTeleported)
+		if (bServerIsFalling && bLastServerIsWalking && !bTeleportedSinceLastUpdate)
 		{
 			float ClientForwardFactor = 1.f;
 			if (IsValid(LastServerMovementBase) && MovementBaseUtility::IsDynamicBase(LastServerMovementBase) && MaxWalkSpeed > KINDA_SMALL_NUMBER)
@@ -9522,18 +9527,21 @@ void UCharacterMovementComponent::ServerMoveHandleClientError(float ClientTimeSt
 				const FVector LocDiff = ServerLoc - ClientLoc;
 
 				// Potentially trust the client a little when taking off in the opposite direction to the base (to help not get corrected back onto the base)
-				if (LocDiff.SizeSquared() < FMath::Square(AdjustedClientAuthorityThreshold))
+				if (!LocDiff.IsNearlyZero(KINDA_SMALL_NUMBER))
 				{
-					ServerLoc = ClientLoc;
-					UpdatedComponent->MoveComponent(ServerLoc - UpdatedComponent->GetComponentLocation(), UpdatedComponent->GetComponentQuat(), true, nullptr, EMoveComponentFlags::MOVECOMP_NoFlags, ETeleportType::TeleportPhysics);
-					bJustTeleported = true;
-				}
-				else
-				{
-					const FVector ClampedDiff = LocDiff.GetSafeNormal() * AdjustedClientAuthorityThreshold;
-					ServerLoc -= ClampedDiff;
-					UpdatedComponent->MoveComponent(ServerLoc - UpdatedComponent->GetComponentLocation(), UpdatedComponent->GetComponentQuat(), true, nullptr, EMoveComponentFlags::MOVECOMP_NoFlags, ETeleportType::TeleportPhysics);
-					bJustTeleported = true;
+					if (LocDiff.SizeSquared() < FMath::Square(AdjustedClientAuthorityThreshold))
+					{
+						ServerLoc = ClientLoc;
+						UpdatedComponent->MoveComponent(ServerLoc - UpdatedComponent->GetComponentLocation(), UpdatedComponent->GetComponentQuat(), true, nullptr, EMoveComponentFlags::MOVECOMP_NoFlags, ETeleportType::TeleportPhysics);
+						bJustTeleported = true;
+					}
+					else
+					{
+						const FVector ClampedDiff = LocDiff.GetSafeNormal() * AdjustedClientAuthorityThreshold;
+						ServerLoc -= ClampedDiff;
+						UpdatedComponent->MoveComponent(ServerLoc - UpdatedComponent->GetComponentLocation(), UpdatedComponent->GetComponentQuat(), true, nullptr, EMoveComponentFlags::MOVECOMP_NoFlags, ETeleportType::TeleportPhysics);
+						bJustTeleported = true;
+					}
 				}
 			}
 
