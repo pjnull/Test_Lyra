@@ -268,6 +268,13 @@ namespace CharacterMovementCVars
 		TEXT("To avoid constant corrections, when an airborne server and client are further than p.MaxFallingCorrectionLeash cm apart, they'll be pulled in to that distance minus this value."),
 		ECVF_Default);
 
+	static bool bAddFormerBaseVelocityToRootMotionOverrideWhenFalling = true;
+	FAutoConsoleVariableRef CVarAddFormerBaseVelocityToRootMotionOverrideWhenFalling(
+		TEXT("p.AddFormerBaseVelocityToRootMotionOverrideWhenFalling"),
+		bAddFormerBaseVelocityToRootMotionOverrideWhenFalling,
+		TEXT("To avoid sudden velocity changes when a root motion source moves the pawn from a moving base to free fall, this CVar will enable the FormerBaseVelocityDecayHalfLife property on CharacterMovementComponent."),
+		ECVF_Default);
+
 #if !UE_BUILD_SHIPPING
 
 	int32 NetShowCorrections = 0;
@@ -1241,7 +1248,17 @@ void UCharacterMovementComponent::OnMovementModeChanged(EMovementMode PreviousMo
 
 		if (MovementMode == MOVE_Falling)
 		{
-			Velocity += GetImpartedMovementBaseVelocity();
+			DecayingFormerBaseVelocity = GetImpartedMovementBaseVelocity();
+			Velocity += DecayingFormerBaseVelocity;
+			if (bMovementInProgress && CurrentRootMotion.HasAdditiveVelocity())
+			{
+				// If we leave a base during movement and we have additive root motion, we need to add the imparted velocity so that it retains it next tick
+				CurrentRootMotion.LastPreAdditiveVelocity += DecayingFormerBaseVelocity;
+			}
+			if (!CharacterMovementCVars::bAddFormerBaseVelocityToRootMotionOverrideWhenFalling || FormerBaseVelocityDecayHalfLife == 0.f)
+			{
+				DecayingFormerBaseVelocity = FVector::ZeroVector;
+			}
 			CharacterOwner->Falling();
 		}
 
@@ -2481,6 +2498,10 @@ void UCharacterMovementComponent::PerformMovement(float DeltaSeconds)
 				{
 					AnimRootMotionVelocity = CalcAnimRootMotionVelocity(RootMotionParams.GetRootMotionTransform().GetTranslation(), DeltaSeconds, Velocity);
 					Velocity = ConstrainAnimRootMotionVelocity(AnimRootMotionVelocity, Velocity);
+					if (IsFalling())
+					{
+						Velocity += FVector(DecayingFormerBaseVelocity.X, DecayingFormerBaseVelocity.Y, 0.f);
+					}
 				}
 				
 				UE_LOG(LogRootMotion, Log,  TEXT("PerformMovement WorldSpaceRootMotion Translation: %s, Rotation: %s, Actor Facing: %s, Velocity: %s")
@@ -2500,6 +2521,10 @@ void UCharacterMovementComponent::PerformMovement(float DeltaSeconds)
 					const FVector VelocityBeforeOverride = Velocity;
 					FVector NewVelocity = Velocity;
 					CurrentRootMotion.AccumulateOverrideRootMotionVelocity(DeltaSeconds, *CharacterOwner, *this, NewVelocity);
+					if (IsFalling())
+					{
+						NewVelocity += CurrentRootMotion.HasOverrideVelocityWithIgnoreZAccumulate() ? FVector(DecayingFormerBaseVelocity.X, DecayingFormerBaseVelocity.Y, 0.f) : DecayingFormerBaseVelocity;
+					}
 					Velocity = NewVelocity;
 
 #if ROOT_MOTION_DEBUG
@@ -3984,6 +4009,10 @@ void UCharacterMovementComponent::ApplyRootMotionToVelocity(float deltaTime)
 	if( HasAnimRootMotion() && deltaTime > 0.f )
 	{
 		Velocity = ConstrainAnimRootMotionVelocity(AnimRootMotionVelocity, Velocity);
+		if (IsFalling())
+		{
+			Velocity += FVector(DecayingFormerBaseVelocity.X, DecayingFormerBaseVelocity.Y, 0.f);
+		}
 		return;
 	}
 
@@ -3995,6 +4024,10 @@ void UCharacterMovementComponent::ApplyRootMotionToVelocity(float deltaTime)
 	if( CurrentRootMotion.HasOverrideVelocity() )
 	{
 		CurrentRootMotion.AccumulateOverrideRootMotionVelocity(deltaTime, *CharacterOwner, *this, Velocity);
+		if (IsFalling())
+		{
+			Velocity += CurrentRootMotion.HasOverrideVelocityWithIgnoreZAccumulate() ? FVector(DecayingFormerBaseVelocity.X, DecayingFormerBaseVelocity.Y, 0.f) : DecayingFormerBaseVelocity;
+		}
 		bAppliedRootMotion = true;
 
 #if ROOT_MOTION_DEBUG
@@ -4045,6 +4078,18 @@ void UCharacterMovementComponent::ApplyRootMotionToVelocity(float deltaTime)
 		{
 			SetMovementMode(MOVE_Falling);
 		}
+	}
+}
+
+void UCharacterMovementComponent::DecayFormerBaseVelocity(float deltaTime)
+{
+	if (!CharacterMovementCVars::bAddFormerBaseVelocityToRootMotionOverrideWhenFalling || FormerBaseVelocityDecayHalfLife == 0.f)
+	{
+		DecayingFormerBaseVelocity = FVector::ZeroVector;
+	}
+	else if (FormerBaseVelocityDecayHalfLife > 0.f)
+	{
+		DecayingFormerBaseVelocity *= FMath::Exp2(-deltaTime * 1.f / FormerBaseVelocityDecayHalfLife);
 	}
 }
 
@@ -4384,6 +4429,7 @@ void UCharacterMovementComponent::PhysFalling(float deltaTime, int32 Iterations)
 
 		//UE_LOG(LogCharacterMovement, Log, TEXT("dt=(%.6f) OldLocation=(%s) OldVelocity=(%s) OldVelocityWithRootMotion=(%s) NewVelocity=(%s)"), timeTick, *(UpdatedComponent->GetComponentLocation()).ToString(), *OldVelocity.ToString(), *OldVelocityWithRootMotion.ToString(), *Velocity.ToString());
 		ApplyRootMotionToVelocity(timeTick);
+		DecayFormerBaseVelocity(timeTick);
 
 		// See if we need to sub-step to exactly reach the apex. This is important for avoiding "cutting off the top" of the trajectory as framerate varies.
 		if (CharacterMovementCVars::ForceJumpPeakSubstep && OldVelocityWithRootMotion.Z > 0.f && Velocity.Z <= 0.f && NumJumpApexAttempts < MaxJumpApexAttemptsPerSimulation)
