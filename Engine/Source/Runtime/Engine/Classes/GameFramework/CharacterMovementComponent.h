@@ -1118,6 +1118,9 @@ public:
 	/** Whether we were just walking on something, used to help with transitions off moving objects. */
 	bool bLastServerIsWalking = false;
 
+	/** True if the UpdatedComponent was moved outside of this CharacterMovementComponent since the last move -- its starting location for this update doesn't match its ending position for the previous update. */
+	bool bTeleportedSinceLastUpdate = false;
+
 	/** Whether we're stepping off a moving platform (and should trust the client somewhat when landing). */
 	bool bCanTrustClientOnLanding = false;
 
