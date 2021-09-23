@@ -7,6 +7,7 @@
 #include "Interfaces/IPluginManager.h"
 
 #include "GenericWindowsTargetPlatform.h"
+#include "Windows/WindowsPlatformProperties.h"
 #include "LinuxTargetPlatform.h"
 #include "GenericMacTargetPlatform.h"
 typedef TGenericWindowsTargetPlatform<FWindowsPlatformProperties<false, false, false>> FWindowsEditorTargetPlatformParent;
