@@ -387,15 +387,14 @@ bool SRemoteControlPanel::IsExposed(const TSharedPtr<IPropertyHandle>& PropertyH
 	
 	TArray<UObject*> OuterObjects;
 	PropertyHandle->GetOuterObjects(OuterObjects);
-
-	FString Path = PropertyHandle->GeneratePathToProperty();
+	const FString Path = PropertyHandle->GeneratePathToProperty();
 
 	TArray<TSharedPtr<FRemoteControlProperty>, TInlineAllocator<1>> PotentialMatches;
 	for (const TWeakPtr<FRemoteControlProperty>& WeakProperty : Preset->GetExposedEntities<FRemoteControlProperty>())
 	{
 		if (TSharedPtr<FRemoteControlProperty> Property = WeakProperty.Pin())
 		{
-			if (Property->FieldPathInfo.ToPathPropertyString() == Path)
+			if (Property->CheckIsBoundToPropertyPath(Path))
 			{
 				PotentialMatches.Add(Property);
 			}
@@ -410,7 +409,7 @@ bool SRemoteControlPanel::IsExposed(const TSharedPtr<IPropertyHandle>& PropertyH
 
 		for (const TSharedPtr<FRemoteControlProperty>& Property : PotentialMatches)
 		{
-			if (Property->GetBoundObjects().Contains(OuterObject))
+			if (Property->ContainsBoundObjects(OuterObjects))
 			{
 				bFoundPropForObject = true;
 				break;
@@ -799,8 +798,7 @@ void SRemoteControlPanel::Unexpose(const TSharedPtr<IPropertyHandle>& Handle)
 {
 	TArray<UObject*> OuterObjects;
 	Handle->GetOuterObjects(OuterObjects);
-
-	FString Path = Handle->GeneratePathToProperty();
+	const FString Path = Handle->GeneratePathToProperty();
 
 	// Find an exposed property with the same path.
 	TArray<TSharedPtr<FRemoteControlProperty>, TInlineAllocator<1>> PotentialMatches;
@@ -808,7 +806,7 @@ void SRemoteControlPanel::Unexpose(const TSharedPtr<IPropertyHandle>& Handle)
 	{
 		if (TSharedPtr<FRemoteControlProperty> Property = WeakProperty.Pin())
 		{
-			if (Property->FieldPathInfo.ToPathPropertyString() == Path)
+			if (Property->CheckIsBoundToPropertyPath(Path))
 			{
 				PotentialMatches.Add(Property);
 			}
@@ -817,23 +815,7 @@ void SRemoteControlPanel::Unexpose(const TSharedPtr<IPropertyHandle>& Handle)
 
 	for (const TSharedPtr<FRemoteControlProperty>& Property : PotentialMatches)
 	{
-		TArray<UObject*> PropertyOwners = Property->GetBoundObjects();
-		if (PropertyOwners.Num() != OuterObjects.Num())
-		{
-			continue;
-		}
-
-		bool bHasSameObjects = true;
-		for (UObject* Owner : PropertyOwners)
-		{
-			if (!OuterObjects.Contains(Owner))
-			{
-				bHasSameObjects = false;
-				break;
-			}
-		}
-
-		if (bHasSameObjects && OuterObjects.Num())
+		if (Property->ContainsBoundObjects(OuterObjects))
 		{
 			Preset->Unexpose(Property->GetId());
 			break;
