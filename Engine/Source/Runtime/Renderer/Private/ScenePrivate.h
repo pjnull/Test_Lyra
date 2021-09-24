@@ -57,6 +57,7 @@
 #include "VolumetricRenderTargetViewStateData.h"
 #include "GPUScene.h"
 #include "DynamicBVH.h"
+#include "OIT/OIT.h"
 
 /** Factor by which to grow occlusion tests **/
 #define OCCLUSION_SLOP (1.0f)
@@ -2784,6 +2785,9 @@ public:
 
 	/** The hair strands in the scene. */
 	FHairStrandsSceneData HairStrandsSceneData;
+
+	/** The OIT resources in the scene. */
+	FOITSceneData OITSceneData;
 
 	/** 
 	 * Precomputed lighting volumes in the scene, used for interpolating dynamic object lighting.
