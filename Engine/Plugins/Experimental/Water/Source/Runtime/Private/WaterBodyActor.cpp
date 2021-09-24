@@ -307,7 +307,7 @@ void AWaterBody::InitializeBody()
 	// the component pointer directly from the list of components
 	if (WaterBodyComponent == nullptr || WaterBodyComponent->GetOwner() != this || WaterBodyComponent->GetWaterBodyType() != GetWaterBodyType())
 	{
-		WaterBodyComponent = FindObject<UWaterBodyComponent>(this, *GetWaterBodyComponentName(GetWaterBodyType()).ToString());
+		WaterBodyComponent = Cast<UWaterBodyComponent>(FindComponentByClass(WaterBodyComponentClass));
 	}
 
 	if (!WaterBodyComponent)
