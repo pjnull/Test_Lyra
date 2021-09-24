@@ -26,6 +26,7 @@ namespace HairAttribute
 		extern HAIRSTRANDSCORE_API const FName Width;			// float
 		extern HAIRSTRANDSCORE_API const FName ClosestGuides;	// FVector
 		extern HAIRSTRANDSCORE_API const FName GuideWeights;	// FVector
+		extern HAIRSTRANDSCORE_API const FName GroupName;		// FName
 	}
 
 	namespace Groom
