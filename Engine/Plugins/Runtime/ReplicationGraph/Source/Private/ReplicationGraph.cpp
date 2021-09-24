@@ -751,7 +751,7 @@ void UReplicationGraph::FlushNetDormancy(AActor* Actor, bool bWasDormInitial)
 		// Actor is no longer going to be dormant so we're going to remove it from the prev dormant actor list
 		if (!GlobalInfo.bWantsToBeDormant)
 		{
-			ConnectionManager->SetActorDormantOnConnection(Actor);
+			ConnectionManager->SetActorNotDormantOnConnection(Actor);
 		}
 	}
 }
@@ -837,7 +837,7 @@ void UReplicationGraph::NotifyActorDormancyChange(AActor* Actor, ENetDormancy Ol
 		// So we need to clear the per-connection dormancy bool here, since the one in FlushNetDormancy won't do it.
 		for (UNetReplicationGraphConnection* ConnectionManager: Connections)
 		{
-			ConnectionManager->SetActorDormantOnConnection(Actor);
+			ConnectionManager->SetActorNotDormantOnConnection(Actor);
 		}
 	}
 }
@@ -2678,7 +2678,7 @@ void UNetReplicationGraphConnection::NotifyClientVisibleLevelNamesAdd(FName Leve
 		{
 			if (Actor && (Actor->NetDormancy == DORM_DormantAll || (Actor->NetDormancy == DORM_Initial && Actor->IsNetStartupActor() == false)))
 			{
-				SetActorDormantOnConnection(Actor);
+				SetActorNotDormantOnConnection(Actor);
 			}
 		}
 	}
@@ -2823,11 +2823,12 @@ void UNetReplicationGraphConnection::OnUpdateViewerLocation(FLastLocationGatherI
 	LocationInfo->LastLocation = Viewer.ViewLocation;
 }
 
-void UNetReplicationGraphConnection::SetActorDormantOnConnection(AActor* InActor)
+void UNetReplicationGraphConnection::SetActorNotDormantOnConnection(AActor* InActor)
 {
 	if (FConnectionReplicationActorInfo* Info = ActorInfoMap.Find(InActor))
 	{
 		Info->bDormantOnConnection = false;
+		Info->bGridSpatilization_AlreadyDormant = false;
 		PrevDormantActorList.RemoveFast(InActor);
 	}
 }
