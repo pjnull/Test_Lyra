@@ -744,15 +744,7 @@ void UReplicationGraph::FlushNetDormancy(AActor* Actor, bool bWasDormInitial)
 	// Dormancy should probably be rewritten.
 	for (UNetReplicationGraphConnection* ConnectionManager: Connections)
 	{
-		if (FConnectionReplicationActorInfo* Info = ConnectionManager->ActorInfoMap.Find(Actor))
-		{
-			Info->bDormantOnConnection = false;
-		}
-		// Actor is no longer going to be dormant so we're going to remove it from the prev dormant actor list
-		if (!GlobalInfo.bWantsToBeDormant)
-		{
-			ConnectionManager->SetActorNotDormantOnConnection(Actor);
-		}
+		ConnectionManager->SetActorNotDormantOnConnection(Actor);
 	}
 }
 
