@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "CEF/CEFBrowserApp.h"
+#include "HAL/IConsoleManager.h"
 
 #if WITH_CEF3
 
