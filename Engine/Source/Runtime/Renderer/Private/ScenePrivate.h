@@ -28,7 +28,6 @@
 #include "ScenePrivateBase.h"
 #include "RenderTargetPool.h"
 #include "SceneCore.h"
-#include "Containers/AllocatorFixedSizeFreeList.h"
 #include "PrimitiveSceneInfo.h"
 #include "LightSceneInfo.h"
 #include "DepthRendering.h"
@@ -2921,8 +2920,6 @@ public:
 	float DynamicIndirectShadowsSelfShadowingIntensity;
 
 	const FReadOnlyCVARCache& ReadOnlyCVARCache;
-
-	TAllocatorFixedSizeFreeList<sizeof(FLightPrimitiveInteraction), 16384 / sizeof(FLightPrimitiveInteraction)> LightPrimitiveInteractionAllocator;
 
 #if WITH_EDITOR
 	/** Editor Pixel inspector */
