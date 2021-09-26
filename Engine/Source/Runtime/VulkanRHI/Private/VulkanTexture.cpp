@@ -381,6 +381,21 @@ void FVulkanSurface::GenerateImageCreateInfo(
 		ImageCreateInfo.usage |= VK_IMAGE_USAGE_STORAGE_BIT;
 	}
 
+	#if VULKAN_SUPPORTS_EXTERNAL_MEMORY
+	if (EnumHasAnyFlags(UEFlags, TexCreate_External))
+	{
+		VkExternalMemoryImageCreateInfoKHR& ExternalMemImageCreateInfo = OutImageCreateInfo.ExternalMemImageCreateInfo;
+		ZeroVulkanStruct(ExternalMemImageCreateInfo, VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO_KHR);
+#if PLATFORM_WINDOWS
+		ExternalMemImageCreateInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT_KHR;
+#else
+	    ExternalMemImageCreateInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT_KHR;
+#endif
+		ExternalMemImageCreateInfo.pNext = ImageCreateInfo.pNext;
+    	ImageCreateInfo.pNext = &ExternalMemImageCreateInfo;
+	}
+#endif // VULKAN_SUPPORTS_EXTERNAL_MEMORY
+
 	//#todo-rco: If using CONCURRENT, make sure to NOT do so on render targets as that kills DCC compression
 	ImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	ImageCreateInfo.queueFamilyIndexCount = 0;
@@ -612,7 +627,7 @@ FVulkanSurface::FVulkanSurface(FVulkanDevice& InDevice, FVulkanEvictable* Owner,
 		VulkanRHI::vkGetBufferMemoryRequirements(VulkanDevice, CpuReadbackBuffer->Buffer, &MemoryRequirements);
 		// Set minimum alignment to 16 bytes, as some buffers are used with CPU SIMD instructions
 		MemoryRequirements.alignment = FMath::Max<VkDeviceSize>(16, MemoryRequirements.alignment);
-		if (!InDevice.GetMemoryManager().AllocateBufferMemory(Allocation, Owner, MemoryRequirements, BufferMemFlags, EVulkanAllocationMetaBufferStaging, __FILE__, __LINE__))
+		if (!InDevice.GetMemoryManager().AllocateBufferMemory(Allocation, Owner, MemoryRequirements, BufferMemFlags, EVulkanAllocationMetaBufferStaging, false, __FILE__, __LINE__))
 		{
 			InDevice.GetMemoryManager().HandleOOM();
 		}
@@ -644,6 +659,7 @@ FVulkanSurface::FVulkanSurface(FVulkanDevice& InDevice, FVulkanEvictable* Owner,
 	const bool bUAV = EnumHasAnyFlags(UEFlags, TexCreate_UAV);
 	const bool bCPUReadback = EnumHasAnyFlags(UEFlags, TexCreate_CPUReadback);
 	const bool bDynamic = EnumHasAnyFlags(UEFlags, TexCreate_Dynamic);
+	const bool bExternal = EnumHasAnyFlags(UEFlags, TexCreate_External);
 
 	VkMemoryPropertyFlags MemoryFlags = bCPUReadback ? VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT : VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
@@ -671,7 +687,7 @@ FVulkanSurface::FVulkanSurface(FVulkanDevice& InDevice, FVulkanEvictable* Owner,
 	VkDeviceSize SizeToBeConsideredForDedicated = 12 * 1024 * 1024;
 	if ((bRenderTarget || MemoryRequirements.size >= SizeToBeConsideredForDedicated) && !bMemoryless && InDevice.GetOptionalExtensions().HasKHRDedicatedAllocation && GVulkanEnableDedicatedImageMemory)
 	{
-		if(!InDevice.GetMemoryManager().AllocateDedicatedImageMemory(Allocation, Owner, Image, MemoryRequirements, MemoryFlags, MetaType, __FILE__, __LINE__))
+		if(!InDevice.GetMemoryManager().AllocateDedicatedImageMemory(Allocation, Owner, Image, MemoryRequirements, MemoryFlags, MetaType, bExternal, __FILE__, __LINE__))
 		{
 			checkNoEntry();
 		}
@@ -679,7 +695,7 @@ FVulkanSurface::FVulkanSurface(FVulkanDevice& InDevice, FVulkanEvictable* Owner,
 	else
 #endif
 	{
-		if(!InDevice.GetMemoryManager().AllocateImageMemory(Allocation, Owner, MemoryRequirements, MemoryFlags, MetaType, __FILE__, __LINE__))
+		if(!InDevice.GetMemoryManager().AllocateImageMemory(Allocation, Owner, MemoryRequirements, MemoryFlags, MetaType, bExternal, __FILE__, __LINE__))
 		{
 			checkNoEntry();
 		}
@@ -728,8 +744,10 @@ void FVulkanSurface::InternalMoveSurface(FVulkanDevice& InDevice, FVulkanCommand
 	const bool bRenderTarget = EnumHasAnyFlags(UEFlags, TexCreate_RenderTargetable | TexCreate_DepthStencilTargetable | TexCreate_ResolveTargetable);
 	const bool bCPUReadback = EnumHasAnyFlags(UEFlags, TexCreate_CPUReadback);
 	const bool bMemoryless = EnumHasAnyFlags(UEFlags, TexCreate_Memoryless);
+	const bool bExternal = EnumHasAnyFlags(UEFlags, TexCreate_External);
 	checkf(!bCPUReadback, TEXT("Move of CPUReadback surfaces not currently supported.   UEFlags=0x%x"), (int32)UEFlags);
 	checkf(!bMemoryless || !InDevice.GetDeviceMemoryManager().SupportsMemoryless(), TEXT("Move of Memoryless surfaces not currently supported.   UEFlags=0x%x"), (int32)UEFlags);
+	checkf(!bExternal, TEXT("Move of external memory not supported. UEFlags=0x%x"), (int32)UEFlags);
 
 #if UE_BUILD_DEBUG || UE_BUILD_DEVELOPMENT
 	// This shouldn't change
@@ -871,7 +889,7 @@ void FVulkanSurface::EvictSurface(FVulkanDevice& InDevice)
 
 	FVulkanAllocation HostAllocation;
 	const EVulkanAllocationMetaType MetaType = EVulkanAllocationMetaImageOther;
-	if (!InDevice.GetMemoryManager().AllocateImageMemory(HostAllocation, this, MemoryRequirements, MemProps, MetaType, __FILE__, __LINE__))
+	if (!InDevice.GetMemoryManager().AllocateImageMemory(HostAllocation, this, MemoryRequirements, MemProps, MetaType, false, __FILE__, __LINE__))
 	{
 		InDevice.GetMemoryManager().HandleOOM();
 		checkNoEntry();
