@@ -637,51 +637,6 @@ void ALandscapeProxy::FixupWeightmaps()
 	}
 }
 
-void ALandscapeProxy::RepairInvalidTextures()
-{
-	TArray<UTexture*> InvalidTextures;
-	for (ULandscapeComponent* Component : LandscapeComponents)
-	{
-		InvalidTextures.Append(Component->RepairInvalidTextures());
-	}
-
-	if (!InvalidTextures.IsEmpty())
-	{
-		FFormatNamedArguments Arguments;
-		Arguments.Add(TEXT("LandscapeName"), FText::FromString(GetPathName()));
-		Arguments.Add(TEXT("ErrorMessage"), FText::Format(LOCTEXT("InvalidTexturesMessage", "Invalid data detected on {0} {0}|plural(one = texture, other = textures). The data has been cleared to avoid fatal error."), InvalidTextures.Num()));
-		FMessageLog("MapCheck").Error()
-			->AddToken(FTextToken::Create(FText::Format(LOCTEXT("MapCheck_Message_ClearedInvalidWeightmap", "{LandscapeName} : {ErrorMessage}"), Arguments)))
-			->AddToken(FMapErrorToken::Create(FMapErrors::FixedUpDeletedLayerWeightmap));
-	}
-}
-
-bool IsValidLandscapeTextureSourceData(const UTexture& InTexture)
-{
-	FIntPoint SourceDataSize = InTexture.Source.GetLogicalSize();
-	return ((SourceDataSize.X * SourceDataSize.Y) > 0) == InTexture.Source.HasPayloadData();
-}
-
-TArray<UTexture*> ULandscapeComponent::RepairInvalidTextures()
-{
-	TArray<UTexture*> AllTextures = GetGeneratedTextures();
-
-	TArray<UTexture*> InvalidTextures;
-	for (UTexture* Texture : AllTextures)
-	{
-		Texture->ConditionalPostLoad();
-		if (!IsValidLandscapeTextureSourceData(*Texture))
-		{
-			UE_LOG(LogLandscape, Error, TEXT("Invalid data found in texture %s from landscape component %s : clearing data."), *Texture->GetName(), *GetPathName());
-			CreateEmptyTextureMips(CastChecked<UTexture2D>(Texture), true);
-			Texture->PostEditChange();
-			InvalidTextures.Add(Texture);
-		}
-	}
-
-	return InvalidTextures;
-}
-
 void ULandscapeComponent::FixupWeightmaps()
 {
 	if (GIsEditor && !HasAnyFlags(RF_ClassDefaultObject))

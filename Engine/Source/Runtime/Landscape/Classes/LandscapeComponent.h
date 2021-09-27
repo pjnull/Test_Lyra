@@ -698,11 +698,9 @@ public:
 
 	LANDSCAPE_API void UpdateEditToolRenderData();
 
-	/** Fix up component layers, weightmaps */
+	/** Fix up component layers, weightmaps
+	 */
 	LANDSCAPE_API void FixupWeightmaps();
-
-	/** Repair invalid texture data that might have been introduced by a faulty version. Returns the list of repaired textures  */
-	TArray<UTexture*> RepairInvalidTextures();
 
 	// Update layer whitelist to include the currently painted layers
 	LANDSCAPE_API void UpdateLayerWhitelistFromPaintedLayers();
@@ -858,8 +856,6 @@ public:
 #if WITH_EDITOR
 	/** Returns all generated textures and material instances used by this component. */
 	LANDSCAPE_API void GetGeneratedTexturesAndMaterialInstances(TArray<UObject*>& OutTexturesAndMaterials) const;
-	LANDSCAPE_API TArray<UTexture*> GetGeneratedTextures() const;
-	LANDSCAPE_API TArray<UMaterialInstance*> GetGeneratedMaterialInstances() const;
 #endif
 
 	/** Gets the landscape proxy actor which owns this component */
