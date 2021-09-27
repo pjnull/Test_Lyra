@@ -48,6 +48,9 @@ DECLARE_MULTICAST_DELEGATE_TwoParams(FHandleDisconnectDelegate, class UWorld* /*
 /** Delegate to allow game to use a custom ICookedEditorPackageManager class */
 DECLARE_DELEGATE_RetVal(TUniquePtr<class ICookedEditorPackageManager>, FCookedEditorPackageManagerFactoryDelegate);
 
+/** Delegate to inform those interested that a view target has changed. */
+DECLARE_MULTICAST_DELEGATE_ThreeParams(FViewTargetChangedDelegate, class APlayerController* /*PC*/, class AActor* /*OldViewTarget*/, class AActor* /*NewViewTarget*/);
+
 // Helper defines to make defining the delegate members easy
 #define DEFINE_GAME_DELEGATE(DelegateType) \
 	public: F##DelegateType& Get##DelegateType() { return DelegateType; } \
@@ -80,6 +83,9 @@ public:
 
 	// Called when a player is disconnecting due to network failure
 	DEFINE_GAME_DELEGATE(HandleDisconnectDelegate);
+
+	//Called when a PlayerController view target changes.
+	DEFINE_GAME_DELEGATE_TYPED(ViewTargetChangedDelegate, FViewTargetChangedDelegate);
 
 	// Implement all delegates declared above
 	DEFINE_GAME_DELEGATE(AssignLayerChunkDelegate);
