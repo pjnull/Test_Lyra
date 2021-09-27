@@ -150,6 +150,18 @@ FAutoConsoleCommandWithWorldAndArgs DumpNiagaraComponentsCommand(
 	)
 );
 
+static int GNiagaraCanPreventScalabilityCullingOnPlayerFX = 1;
+static FAutoConsoleVariableRef CVarNiagaraCanPreventScalabilityCullingOnPlayerFX(
+	TEXT("fx.Niagara.Scalability.CanPreventCullingOnPlayerFX"),
+	GNiagaraCanPreventScalabilityCullingOnPlayerFX,
+	TEXT("When enabled Niagara can optionally prevent scalability culling on FX linked to the player."),
+	FConsoleVariableDelegate::CreateLambda([](IConsoleVariable* CVar)
+	{
+		FNiagaraWorldManager::OnRefreshOwnerAllowsScalability();
+	}),
+	ECVF_Default
+);
+
 FNiagaraSceneProxy::FNiagaraSceneProxy(UNiagaraComponent* InComponent)
 	: FPrimitiveSceneProxy(InComponent, InComponent->GetAsset() ? InComponent->GetAsset()->GetFName() : FName())
 {
@@ -1016,6 +1028,9 @@ void UNiagaraComponent::ActivateInternal(bool bReset /* = false */, bool bIsScal
 
 	bIsCulledByScalability = false;
 	
+	//Update our owner scalability state but don't register with the manager.
+	ResolveOwnerAllowsScalability(false);
+	
 	//We reset last render time to the current time so that any visibility culling on a delay will function correctly.
 	//Leaving as the default of -1000 causes the visibility code to always assume this should be culled until it's first rendered and initialized by the RT.
 	//Set the component last render time *before* preculling otherwise there are cases where we can pre cull incorrectly.
@@ -1238,7 +1253,7 @@ void UNiagaraComponent::DeactivateImmediateInternal(bool bIsScalabilityCull)
 
 bool UNiagaraComponent::ShouldPreCull()
 {
-	if (bAllowScalability)
+	if (bAllowScalability && bOwnerAllowsScalabiltiy)
 	{
 		if (UNiagaraSystem* System = GetAsset())
 		{
@@ -1261,7 +1276,7 @@ bool UNiagaraComponent::ShouldPreCull()
 
 void UNiagaraComponent::RegisterWithScalabilityManager()
 {
-	if (ScalabilityManagerHandle == INDEX_NONE && bAllowScalability)
+	if (ScalabilityManagerHandle == INDEX_NONE && bAllowScalability && bOwnerAllowsScalabiltiy)
 	{
 		if (UNiagaraSystem* System = GetAsset())
 		{
@@ -1868,6 +1883,30 @@ void UNiagaraComponent::GetUsedMaterials(TArray<UMaterialInterface*>& OutMateria
 	}
 }
 
+bool UNiagaraComponent::ResolveOwnerAllowsScalability(bool bRegister)
+{
+	bOwnerAllowsScalabiltiy = true;
+	
+	if(GNiagaraCanPreventScalabilityCullingOnPlayerFX && Asset && Asset->AllowScalabilityForLocalPlayerFX() == false)
+	{
+		bOwnerAllowsScalabiltiy = IsLocalPlayerEffect() == false;
+	}	
+
+	//Update manager registration if needed.
+	if (bRegister)
+	{
+		if (IsActive() && bOwnerAllowsScalabiltiy)
+		{
+			RegisterWithScalabilityManager();
+		}
+		else if (!bOwnerAllowsScalabiltiy)
+		{
+			UnregisterWithScalabilityManager();
+		}
+	}
+	return bOwnerAllowsScalabiltiy;
+}
+
 void UNiagaraComponent::OnAttachmentChanged()
 {
 	// Uncertain about this. 
@@ -1876,8 +1915,8 @@ void UNiagaraComponent::OnAttachmentChanged()
 	// 		ResetSystem();
 	// 	}
 
+	ResolveOwnerAllowsScalability();
 	Super::OnAttachmentChanged();
-
 }
 
 void UNiagaraComponent::OnChildAttached(USceneComponent* ChildComponent)
@@ -2585,6 +2624,11 @@ void UNiagaraComponent::SetUserParametersToDefaultValues()
 	OverrideParameters.Rebind();
 }
 
+bool UNiagaraComponent::IsLocalPlayerEffect()const
+{
+	return FNiagaraWorldManager::IsComponentLocalPlayerLinked(this);
+}
+
 #if WITH_EDITOR
 
 void UNiagaraComponent::UpgradeDeprecatedParameterOverrides()
@@ -3152,6 +3196,11 @@ void UNiagaraComponent::SetAllowScalability(bool bAllow)
 	{
 		UnregisterWithScalabilityManager();
 	}
+}
+
+bool UNiagaraComponent::GetAllowScalability()const
+{
+	return bAllowScalability;
 }
 
 #if WITH_EDITOR
