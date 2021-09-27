@@ -418,6 +418,11 @@ void FStarshipEditorStyle::FStyle::SetupGeneralStyles()
 
 		Set( "Icons.DirtyBadge", new IMAGE_BRUSH_SVG("Starship/Common/DirtyBadge", Icon12x12));
 		Set( "Icons.MakeStaticMesh", new IMAGE_BRUSH_SVG("Starship/Common/MakeStaticMesh", Icon16x16));
+		Set( "Icons.Documentation", new IMAGE_BRUSH_SVG("Starship/Common/Documentation", Icon16x16));
+		Set( "Icons.Support", new IMAGE_BRUSH_SVG("Starship/Common/Support", Icon16x16));
+		Set( "Icons.Package", new IMAGE_BRUSH_SVG("Starship/Common/ProjectPackage", Icon16x16));
+		Set( "Icons.Comment", new IMAGE_BRUSH_SVG("Starship/Common/Comment", Icon16x16));
+
 	}
 
 	Set( "WarningStripe", new IMAGE_BRUSH( "Common/WarningStripe", FVector2D(20,6), FLinearColor::White, ESlateBrushTileType::Horizontal ) );
@@ -4026,7 +4031,6 @@ void FStarshipEditorStyle::FStyle::SetupGraphEditorStyles()
 		Set("ClassIcon.K2Node_VariableGet",		new IMAGE_BRUSH_SVG("Starship/GraphEditors/VarGet", Icon16x16, FLinearColor::White));
 		Set("ClassIcon.K2Node_VariableSet",		new IMAGE_BRUSH_SVG("Starship/GraphEditors/VarSet", Icon16x16, FLinearColor::White));
 		Set("ClassIcon.K2Node_DynamicCast",		new IMAGE_BRUSH_SVG("Starship/GraphEditors/Cast", Icon16x16));
-		Set("ClassIcon.EdGraphNode_Comment",	new IMAGE_BRUSH_SVG("Starship/GraphEditors/Comment", Icon16x16));
 
 		Set("GraphEditor.Clean",				new IMAGE_BRUSH_SVG("Starship/GraphEditors/CleanUp", Icon20x20));
 		Set("GraphEditor.OverrideFunction_16x", new IMAGE_BRUSH_SVG("Starship/Blueprints/icon_Blueprint_OverrideFunction", Icon16x16));
@@ -4057,7 +4061,6 @@ void FStarshipEditorStyle::FStyle::SetupGraphEditorStyles()
 		Set( "GraphEditor.CustomEvent_16x", new IMAGE_BRUSH_SVG( "Starship/Common/Event", Icon16x16 ) );
 		Set( "GraphEditor.CallInEditorEvent_16x", new IMAGE_BRUSH_SVG( "Starship/GraphEditors/CallInEditorEvent", Icon16x16 ) );
 		Set( "GraphEditor.Timeline_16x", new IMAGE_BRUSH_SVG("Starship/Common/Timecode", Icon16x16));
-		Set( "GraphEditor.Comment_16x", new IMAGE_BRUSH_SVG("Starship/GraphEditors/Comment", Icon16x16));
 		Set( "GraphEditor.Documentation_16x", new IMAGE_BRUSH_SVG("Starship/Common/Documentation", Icon16x16));
 		Set( "GraphEditor.Switch_16x", new IMAGE_BRUSH_SVG("Starship/GraphEditors/Switch", Icon16x16));
 		Set( "GraphEditor.BreakStruct_16x", new IMAGE_BRUSH_SVG("Starship/GraphEditors/BreakStruct", Icon16x16));
