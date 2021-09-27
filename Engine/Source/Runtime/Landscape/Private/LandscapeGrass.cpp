@@ -929,7 +929,7 @@ bool ULandscapeComponent::MaterialHasGrass() const
 
 bool ULandscapeComponent::IsGrassMapOutdated() const
 {
-	if (GrassData->HasValidData())
+	if (GrassData->HasData())
 	{
 		// check material / instances haven't changed
 		const auto& MaterialStateIds = GrassData->MaterialStateIds;
@@ -1356,46 +1356,18 @@ SIZE_T FLandscapeComponentGrassData::GetAllocatedSize() const
 }
 
 bool FLandscapeComponentGrassData::HasWeightData() const
-{
-	return !!WeightOffsets.Num();
-}
-
-bool FLandscapeComponentGrassData::HasValidData() const
-{
-	// If NumElements < 0, its data wasn't computed. 
-	// If == 0, its data was computed (i.e. is valid), but removed (for saving space) because its weight data is all zero : 
-	// If > 0, its data was computed and contains non-zero weight data
-	return (NumElements >= 0);
-}
-
-bool FLandscapeComponentGrassData::HasData() const
-{
-	if (HasValidData())
 	{
-		int32 LocalNumElements = HeightWeightData.Num();
-#if WITH_EDITORONLY_DATA
-		if (LocalNumElements == 0)
-		{
-			LocalNumElements = HeightMipData.Num();
-		}
-#endif
-		return LocalNumElements > 0;
+	return !!WeightOffsets.Num();
 	}
-
-	return false;
-}
 
 TArrayView<uint8> FLandscapeComponentGrassData::GetWeightData(const ULandscapeGrassType* GrassType)
 {
-	if (HasData())
+	if (int32* OffsetPtr = WeightOffsets.Find(GrassType))
 	{
-		if (int32* OffsetPtr = WeightOffsets.Find(GrassType))
-		{
-			int32 Offset = *OffsetPtr;
-			check(Offset + NumElements <= HeightWeightData.Num());
-			check(NumElements);
-			return MakeArrayView<uint8>(&HeightWeightData[Offset], NumElements);
-		}
+		int32 Offset = *OffsetPtr;
+		check(Offset + NumElements <= HeightWeightData.Num());
+		check(NumElements);
+		return MakeArrayView<uint8>(&HeightWeightData[Offset], NumElements);
 	}
 
 	return TArrayView<uint8>();
@@ -1408,12 +1380,11 @@ bool FLandscapeComponentGrassData::Contains(ULandscapeGrassType* GrassType) cons
 
 TArrayView<uint16> FLandscapeComponentGrassData::GetHeightData()
 {
-	if (!HasData())
+	check(NumElements <= HeightWeightData.Num());
+	if (NumElements == 0)
 	{
 		return TArrayView<uint16>();
 	}
-
-	check(NumElements <= HeightWeightData.Num());
 	return MakeArrayView<uint16>((uint16*)&HeightWeightData[0], NumElements);
 }
 
@@ -1541,8 +1512,6 @@ FArchive& operator<<(FArchive& Ar, FLandscapeComponentGrassData& Data)
 		Ar << Data.NumElements;
 		Ar << Data.WeightOffsets;
 		Ar << Data.HeightWeightData;
-
-		checkf(Data.HasValidData() || Ar.IsTransacting(), TEXT("If this asserts, then serialization occurred on grass data that wasn't properly loaded/computed. It's a problem"));
 	}
 
 	return Ar;
@@ -1550,7 +1519,6 @@ FArchive& operator<<(FArchive& Ar, FLandscapeComponentGrassData& Data)
 
 void FLandscapeComponentGrassData::ConditionalDiscardDataOnLoad()
 {
-	check(HasValidData());
 	if (!GIsEditor && GGrassDiscardDataOnLoad)
 	{
 		bool bRemoved = false;
@@ -1568,9 +1536,8 @@ void FLandscapeComponentGrassData::ConditionalDiscardDataOnLoad()
 		if (WeightOffsets.Num() == 0)
 		{
 			*this = FLandscapeComponentGrassData();
-			NumElements = 0;
 		}
-		else if (bRemoved) 
+		else if (bRemoved)
 		{
 			TMap<ULandscapeGrassType*, int32> PreviousOffsets(MoveTemp(WeightOffsets));
 			TArray<uint8> PreviousHeightWeightData(MoveTemp(HeightWeightData));
@@ -2508,7 +2475,7 @@ void ALandscapeProxy::UpdateGrassDataStatus(TSet<UTexture2D*>* OutCurrentForcedS
 
 			if (bHasGrassTypes || bBakeMaterialPositionOffsetIntoCollision)
 			{
-				if (Component->IsGrassMapOutdated() || !Component->GrassData->HasValidData() || GGrassUpdateAllOnRebuild != 0)
+				if (Component->IsGrassMapOutdated() || !Component->GrassData->HasData() || GGrassUpdateAllOnRebuild != 0)
 				{
 					if (OutComponentsNeedingGrassMapRender)
 					{
@@ -2940,7 +2907,7 @@ void ALandscapeProxy::UpdateGrass(const TArray<FVector>& Cameras, int32& InOutNu
 
 #if WITH_EDITOR
 										// render grass data if we don't have any
-										if (!Component->GrassData->HasValidData())
+										if (!Component->GrassData->HasData())
 										{
 											if (!Component->CanRenderGrassMap())
 											{
