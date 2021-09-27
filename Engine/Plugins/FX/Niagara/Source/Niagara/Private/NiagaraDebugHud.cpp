@@ -642,10 +642,12 @@ void FNiagaraDebugHud::GatherSystemInfo()
 		SysInfo.Reset();
 		++SysInfo.FramesSinceVisible;
 
+		#if WITH_PARTICLE_PERF_STATS
 		if (SysInfo.PerfStats.IsUnique())
 		{
 			SysInfo.PerfStats = nullptr;
 		}
+		#endif
 	}
 
 	// Iterate all components looking for active ones in the world we are in
@@ -1268,6 +1270,7 @@ void FNiagaraDebugHud::DrawOverview(class FNiagaraWorldManager* WorldManager, FC
 		}
 		else if (Settings.OverviewMode == ENiagaraDebugHUDOverviewMode::Performance && StatsListener)
 		{
+		#if WITH_PARTICLE_PERF_STATS
 			FNiagaraDebugHUDPerfStats& GlobalPerfStats = StatsListener->GetGlobalStats();
 
 			if (Settings.PerfGraphMode == ENiagaraDebugHUDPerfGraphMode::None)
@@ -1323,6 +1326,7 @@ void FNiagaraDebugHud::DrawOverview(class FNiagaraWorldManager* WorldManager, FC
 						Canvas->DrawShadowedString((X + (Col.MaxWidth * 0.5f)) - StringWidth * 0.5f, Y, *SysCountString, Font, FLinearColor::Black);
 					});
 			}
+			#endif//WITH_PARTICLE_PERF_STATS
 		}
 		TotalOverviewWidth = ColumnOffset;
 	}
@@ -1469,7 +1473,8 @@ void FNiagaraDebugHud::DrawOverview(class FNiagaraWorldManager* WorldManager, FC
 			}
 			TextLocation.Y += fAdvanceHeight;
 		}
-
+		
+		#if WITH_PARTICLE_PERF_STATS
 		//Draw graph
 		if (Settings.OverviewMode == ENiagaraDebugHUDOverviewMode::Performance && StatsListener)
 		{
@@ -1535,6 +1540,7 @@ void FNiagaraDebugHud::DrawOverview(class FNiagaraWorldManager* WorldManager, FC
 				}
 			}
 		}
+		#endif//WITH_PARTICLE_PERF_STATS
 	}
 
 	TextLocation.Y += fAdvanceHeight;
