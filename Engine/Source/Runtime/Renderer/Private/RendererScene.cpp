@@ -2671,12 +2671,6 @@ void FScene::InvalidateRuntimeVirtualTexture(class URuntimeVirtualTextureCompone
 	}
 }
 
-void FScene::InvalidatePathTracedOutput()
-{
-	checkSlow(IsInRenderingThread());
-	bPathTracingNeedsInvalidation = true;
-}
-
 void FScene::FlushDirtyRuntimeVirtualTextures()
 {
 	checkSlow(IsInRenderingThread());
@@ -4892,14 +4886,6 @@ void FRendererModule::UpdateStaticDrawListsForMaterials(const TArray<const FMate
 FSceneViewStateInterface* FRendererModule::AllocateViewState()
 {
 	return new FSceneViewState();
-}
-
-void FRendererModule::InvalidatePathTracedOutput()
-{
-	for (FSceneInterface* Scene : AllocatedScenes)
-	{
-		Scene->InvalidatePathTracedOutput();
-	}
 }
 
 //////////////////////////////////////////////////////////////////////////
