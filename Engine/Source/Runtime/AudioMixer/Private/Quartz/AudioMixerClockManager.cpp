@@ -166,7 +166,7 @@ namespace Audio
 		{
 			if (ActiveClocks[i]->GetName() == InName)
 			{
-				UE_LOG(LogAudioQuartz, Display, TEXT("Removing Clock: %s"), *InName.ToString());
+				UE_LOG(LogAudioQuartz, Verbose, TEXT("Removing Clock: %s"), *InName.ToString());
 				ActiveClocks.RemoveAtSwap(i);
 			}
 		}
