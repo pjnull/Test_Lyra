@@ -87,6 +87,7 @@ UNiagaraDataInterfaceAudioPlayer::UNiagaraDataInterfaceAudioPlayer(FObjectInitia
 	MaxPlaysPerTick = 10;
 }
 
+#if WITH_EDITORONLY_DATA
 bool UNiagaraDataInterfaceAudioPlayer::UpgradeFunctionCall(FNiagaraFunctionSignature& FunctionSignature)
 {
 	bool bWasChanged = false;
@@ -100,6 +101,7 @@ bool UNiagaraDataInterfaceAudioPlayer::UpgradeFunctionCall(FNiagaraFunctionSigna
 
 	return bWasChanged;
 }
+#endif
 
 void UNiagaraDataInterfaceAudioPlayer::PostInitProperties()
 {
