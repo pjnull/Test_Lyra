@@ -718,6 +718,7 @@ void FNiagaraDebugHud::GatherSystemInfo()
 
 		if (NiagaraComponent->IsRegisteredWithScalabilityManager())
 		{
+#if WITH_NIAGARA_DEBUGGER
 			if (NiagaraComponent->DebugCachedScalabilityState.bCulled)
 			{
 				++GlobalTotalCulled;
@@ -744,6 +745,7 @@ void FNiagaraDebugHud::GatherSystemInfo()
 					++SystemDebugInfo.TotalCulledByBudget;
 				}
 			}
+#endif//WITH_NIAGARA_DEBUGGER
 		}
 
 		// Track rough memory usage
