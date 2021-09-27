@@ -254,28 +254,33 @@ struct FLandscapeComponentGrassData
 	TMap<int32, TArray<uint16>> HeightMipData;
 
 	// Grass data was updated but not saved yet
-	bool bIsDirty = false;
+	bool bIsDirty;
 #endif
 	
-	static constexpr int32 UnknownNumElements = -1;
-	// Elements per contiguous array: for validation and also to indicate whether the grass data is valid (NumElements >= 0, meaning 0 elements is valid but the grass data is all zero and 
-	//  therefore empty) or not known yet (== UnknownNumElements)
-	int32 NumElements = UnknownNumElements;
+	// Elements per contiguous array (for validation)
+	int32 NumElements = 0;
 	// Serialized in one block to prevent Slack waste
 	TMap<ULandscapeGrassType*, int32> WeightOffsets;
 	TArray<uint8> HeightWeightData;
 
-	FLandscapeComponentGrassData() = default;
+	FLandscapeComponentGrassData()
+#if WITH_EDITORONLY_DATA
+		: bIsDirty(false) 
+#endif
+	{}
 
 #if WITH_EDITOR
 	FLandscapeComponentGrassData(ULandscapeComponent* Component);
 #endif
 
-	// Returns whether grass data has been computed (or serialized) yet. Returns true even if the data is completely empty (e.g. all-zero weightmap data)
-	bool HasValidData() const;
-
-	// Returns whether the data is completely empty (e.g. all-zero weightmap data). Returns false if the data just wasn't computed yet :
-	bool HasData() const;
+	bool HasData()
+	{
+		return HeightWeightData.Num() > 0 
+#if WITH_EDITORONLY_DATA
+			|| HeightMipData.Num() > 0
+#endif
+			;
+	}
 
 	void InitializeFrom(const TArray<uint16>& HeightData, const TMap<ULandscapeGrassType*, TArray<uint8>>& WeightData);
 
