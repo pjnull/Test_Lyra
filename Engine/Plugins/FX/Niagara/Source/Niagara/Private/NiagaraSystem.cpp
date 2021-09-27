@@ -1254,6 +1254,11 @@ const TArray<FNiagaraEmitterHandle>& UNiagaraSystem::GetEmitterHandles()const
 	return EmitterHandles;
 }
 
+bool UNiagaraSystem::AllowScalabilityForLocalPlayerFX()const
+{
+	return bAllowCullingForLocalPlayers;
+}
+
 bool UNiagaraSystem::IsReadyToRunInternal() const
 {
 	//TODO: Ideally we'd never even load Niagara assets on the server but this is a larger issue. Tracked in FORT-342580
@@ -3411,6 +3416,7 @@ void UNiagaraSystem::ResolveScalabilitySettings()
 	if (UNiagaraEffectType* ActualEffectType = GetEffectType())
 	{
 		CurrentScalabilitySettings = ActualEffectType->GetActiveSystemScalabilitySettings();
+		bAllowCullingForLocalPlayers = ActualEffectType->bAllowCullingForLocalPlayers;
 	}
 
 	if (bOverrideScalabilitySettings)
@@ -3456,6 +3462,11 @@ void UNiagaraSystem::ResolveScalabilitySettings()
 
 				break;//These overrides *should* be for orthogonal platform sets so we can exit after we've found a match.
 			}
+		}
+
+		if (bOverrideAllowCullingForLocalPlayers)
+		{
+			bAllowCullingForLocalPlayers = bAllowCullingForLocalPlayersOverride;
 		}
 	}
 
