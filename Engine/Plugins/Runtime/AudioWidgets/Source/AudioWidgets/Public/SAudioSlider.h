@@ -12,10 +12,41 @@
 #include "Styling/SlateWidgetStyleAsset.h"
 #include "Widgets/DeclarativeSyntaxSupport.h"
 #include "Widgets/SCompoundWidget.h"
+#include "Widgets/Input/NumericTypeInterface.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SEditableText.h"
 #include "Widgets/Input/SSlider.h"
 #include "Widgets/Layout/SConstraintCanvas.h"
+#include "Widgets/Layout/SWidgetSwitcher.h"
+
+// FVariablePrecisionNumericInterface
+// Taken from PropertyEditor/VariablePrecisionNumericInterface.h
+// Todo: move to a shared location for use in other audio code
+// 
+// Allow more precision as the numbers get closer to zero
+struct FVariablePrecisionNumericInterface : public TDefaultNumericTypeInterface<float>
+{
+	FVariablePrecisionNumericInterface() {}
+
+	virtual FString ToString(const float& Value) const override
+	{
+		// examples: 1000, 100.1, 10.12, 1.123
+
+		int32 FractionalDigits = 3;
+		if ((Value / 1000.f) >= 1.f)
+			FractionalDigits = 0;
+		else if ((Value / 100.f) >= 1.f)
+			FractionalDigits = 1;
+		else if ((Value / 10.f) >= 1.f)
+			FractionalDigits = 2;
+
+		const FNumberFormattingOptions NumberFormattingOptions = FNumberFormattingOptions()
+			.SetUseGrouping(false)
+			.SetMinimumFractionalDigits(FractionalDigits)
+			.SetMaximumFractionalDigits(FractionalDigits);
+		return FastDecimalFormat::NumberToString(Value, ExpressionParser::GetLocalizedNumberFormattingRules(), NumberFormattingOptions);
+	}
+};
 
 /**
  * Slate audio sliders that wrap SSlider and provides additional audio specific functionality.
@@ -29,6 +60,7 @@ public:
 	{
 		_Value = 0.0f;
 		_AlwaysShowLabel = false;
+		_Orientation = Orient_Vertical;
 
 		const ISlateStyle* AudioSliderStyle = FSlateStyleRegistry::FindSlateStyle("AudioSliderStyle");
 		if (ensure(AudioSliderStyle))
@@ -46,6 +78,9 @@ public:
 		/** Whether the text label is always shown or only on hover. */
 		SLATE_ATTRIBUTE(bool, AlwaysShowLabel)
 
+		/** The orientation of the slider. */
+		SLATE_ARGUMENT(EOrientation, Orientation)
+
 		/** The color to draw the label background in. */
 		SLATE_ATTRIBUTE(FSlateColor, LabelBackgroundColor)
 
@@ -60,6 +95,9 @@ public:
 		
 		/** The color to draw the widget background in. */
 		SLATE_ATTRIBUTE(FSlateColor, WidgetBackgroundColor)
+		
+		/** When specified, use this as the slider's desired size */
+		SLATE_ATTRIBUTE(TOptional<FVector2D>, DesiredSizeOverride)
 
 		/** Called when the value is changed by slider or typing */
 		SLATE_EVENT(FOnFloatValueChanged, OnValueChanged)
@@ -68,6 +106,9 @@ public:
 
 	SAudioSliderBase();
 	virtual ~SAudioSliderBase() {};
+
+	// Holds a delegate that is executed when the slider's value changed.
+	FOnFloatValueChanged OnValueChanged;
 
 	/**
 	 * Construct the widget.
@@ -78,7 +119,12 @@ public:
 	virtual const float GetOutputValue(const float LinValue);
 	virtual const float GetLinValue(const float OutputValue);
 	
+	/**
+	 * Set the slider's linear (0-1 normalized) value. 
+	 */
+	void SetValue(float LinValue);
 	FVector2D ComputeDesiredSize(float) const;
+	void SetDesiredSizeOverride(const FVector2D DesiredSize);
 	void SetUnitsText(const FText Units);
 	/**
 	*  Set whether text label read only or editable.
@@ -88,17 +134,23 @@ public:
 	 * Set whether the text label is always shown or only on hover.
 	 */
 	void SetAlwaysShowLabel(const bool bAlwaysShowLabel);
+	void SetOrientation(EOrientation InOrientation);
 	void SetSliderBackgroundColor(FSlateColor InSliderBackgroundColor);
 	void SetSliderBarColor(FSlateColor InSliderBarColor);
 	void SetSliderThumbColor(FSlateColor InSliderThumbColor);
 	void SetLabelBackgroundColor(FSlateColor InLabelBackgroundColor);
 	void SetWidgetBackgroundColor(FSlateColor InWidgetBackgroundColor);
+	void SetOutputRange(const FVector2D Range);
 
 protected:
 	// Holds the slider's current linear value, from 0.0 - 1.0f
 	TAttribute<float> ValueAttribute;
 	// Whether the text label is always shown or only on hover
 	TAttribute<bool> AlwaysShowLabel;
+	// Holds the slider's orientation
+	TAttribute<EOrientation> Orientation;
+	// Optional override for desired size 
+	TAttribute<TOptional<FVector2D>> DesiredSizeOverride;
 
 	// Various colors 
 	TAttribute<FSlateColor> LabelBackgroundColor;
@@ -109,6 +161,7 @@ protected:
 
 	// Widget components
 	TSharedPtr<SSlider> Slider;
+	TSharedPtr<SConstraintCanvas> TextLabel;
 	TSharedPtr<SEditableText> ValueText;
 	TSharedPtr<SEditableText> UnitsText;
 	TSharedPtr<SImage> LabelBackgroundImage;
@@ -120,8 +173,16 @@ protected:
 	TSharedPtr<SImage> SliderBarRectangleImage;
 	TSharedPtr<SImage> WidgetBackgroundImage;
 
-	// Holds a delegate that is executed when the slider's value changed.
-	FOnFloatValueChanged OnValueChanged;
+	// Range for output, currently only used for frequency sliders and sliders without curves
+	FVector2D OutputRange = FVector2D(0.0f, 1.0f);
+	static const FVector2D LinearRange;
+	/** Used to convert and format value text strings **/
+	static const FVariablePrecisionNumericInterface NumericInterface;
+private:
+	/** Switches between the vertical and horizontal views */
+	TSharedPtr<class SWidgetSwitcher> WidgetSwitcher;
+
+	TSharedRef<class SWidgetSwitcher> CreateWidgetLayout();
 };
 
 /* 
@@ -166,10 +227,6 @@ class AUDIOWIDGETS_API SAudioFrequencySlider
 public:
 	SAudioFrequencySlider();
 	void Construct(const SAudioSlider::FArguments& InDeclaration);
-	void SetOutputRange(const FVector2D Range);
 	const float GetOutputValue(const float LinValue);
 	const float GetLinValue(const float OutputValue);
-protected:
-	FVector2D OutputRange;
-	static const FVector2D LinearRange;
 };
