@@ -2056,12 +2056,10 @@ void UEngine::ShutdownHMD()
 	auto SavedStereo = StereoRenderingDevice;
 	auto SavedHMD = XRSystem;
 	auto SavedViewExtentions = ViewExtensions;
-	{
-		FSuspendRenderingThread Suspend(false);
-		StereoRenderingDevice.Reset();
-		XRSystem.Reset();
-	}
-	// shutdown will occur here.
+
+	FlushRenderingCommands();
+	StereoRenderingDevice.Reset();
+	XRSystem.Reset();
 }
 
 void UEngine::TickDeferredCommands()
