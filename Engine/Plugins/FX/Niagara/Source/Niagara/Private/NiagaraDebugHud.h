@@ -85,7 +85,9 @@ class FNiagaraDebugHud
 	{
 		FString		SystemName;
 
+		#if WITH_PARTICLE_PERF_STATS
 		TSharedPtr<FNiagaraDebugHUDPerfStats> PerfStats = nullptr;
+		#endif
 		FLinearColor UniqueColor = FLinearColor::Red;
 		int32		FramesSinceVisible = 0;
 
