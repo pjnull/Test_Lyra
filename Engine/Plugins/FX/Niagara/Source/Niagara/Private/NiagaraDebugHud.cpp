@@ -1269,9 +1269,9 @@ void FNiagaraDebugHud::DrawOverview(class FNiagaraWorldManager* WorldManager, FC
 					Canvas->DrawShadowedString(X, Y, *FString::FromInt(SystemInfo.TotalPlayerSystems), Font, RowColor);
 				});
 		}
+#if WITH_PARTICLE_PERF_STATS
 		else if (Settings.OverviewMode == ENiagaraDebugHUDOverviewMode::Performance && StatsListener)
 		{
-		#if WITH_PARTICLE_PERF_STATS
 			FNiagaraDebugHUDPerfStats& GlobalPerfStats = StatsListener->GetGlobalStats();
 
 			if (Settings.PerfGraphMode == ENiagaraDebugHUDPerfGraphMode::None)
@@ -1327,8 +1327,8 @@ void FNiagaraDebugHud::DrawOverview(class FNiagaraWorldManager* WorldManager, FC
 						Canvas->DrawShadowedString((X + (Col.MaxWidth * 0.5f)) - StringWidth * 0.5f, Y, *SysCountString, Font, FLinearColor::Black);
 					});
 			}
-			#endif//WITH_PARTICLE_PERF_STATS
 		}
+#endif//WITH_PARTICLE_PERF_STATS
 		TotalOverviewWidth = ColumnOffset;
 	}
 
