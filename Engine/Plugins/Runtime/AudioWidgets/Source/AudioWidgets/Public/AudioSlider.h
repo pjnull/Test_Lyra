@@ -96,7 +96,11 @@ public:
 	/** Sets whether editable value text is read only or not. */
 	UFUNCTION(BlueprintCallable, Category = "Appearance")
 	void SetAlwaysShowLabel(const bool bSetAlwaysShowLabel);
-	
+
+	/** The slider's orientation. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Appearance)
+	TEnumAsByte<EOrientation> Orientation;
+
 	/** Called when the value is changed by slider or typing. */
 	UPROPERTY(BlueprintAssignable, Category = "Widget Event")
 	FOnFloatValueChangedEvent OnValueChanged;
