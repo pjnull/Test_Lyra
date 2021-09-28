@@ -2882,8 +2882,9 @@ void FAssetRegistryImpl::TickGatherer(Impl::FEventContext& EventContext, const d
 		int32 NumPending = NumFilesToSearch + NumPathsToSearch + BackgroundPathResults.Num() + BackgroundAssetResults.Num() + BackgroundDependencyResults.Num() + BackgroundCookedPackageNamesWithoutAssetDataResults.Num();
 		HighestPending = FMath::Max(this->HighestPending, NumPending);
 
-		// Notify the status change
-		if (bIsSearching || bHadAssetsToProcess)
+		bOutIdle = !bInterrupted && !bIsSearching && NumPending == 0;
+		// Notify the status change, only when something changed, or when sending the final result before going idle
+		if (bIsSearching || bHadAssetsToProcess || (bOutIdle && !this->bGatherIdle))
 		{
 			EventContext.ProgressUpdateData.Emplace(
 				HighestPending,					// NumTotalAssets
@@ -2892,8 +2893,6 @@ void FAssetRegistryImpl::TickGatherer(Impl::FEventContext& EventContext, const d
 				bIsDiscoveringFiles				// bIsDiscoveringAssetFiles
 			);
 		}
-
-		bOutIdle = !bInterrupted && !bIsSearching && NumPending == 0;
 		this->bGatherIdle = bOutIdle;
 	};
 
