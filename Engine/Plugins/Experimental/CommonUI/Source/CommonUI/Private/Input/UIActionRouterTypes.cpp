@@ -576,6 +576,11 @@ void FActionRouterBindingCollection::AddBinding(FUIActionBinding& Binding)
 		ActionBindings.Add(Binding.Handle);
 		Binding.OwningCollection = AsShared();
 
+		if (Binding.HoldMappings.Num() > 0)
+		{
+			++HoldBindingsCount;
+		}
+
 		if (IsReceivingInput())
 		{
 			GetActionRouter().OnBoundActionsUpdated().Broadcast();
@@ -590,6 +595,12 @@ void FActionRouterBindingCollection::RemoveBinding(FUIActionBindingHandle Bindin
 		if (TSharedPtr<FUIActionBinding> UIBinding = FUIActionBinding::FindBinding(BindingHandle))
 		{
 			UIBinding->OwningCollection.Reset();
+
+			if (UIBinding->HoldMappings.Num() > 0)
+			{
+				--HoldBindingsCount;
+				ensure(HoldBindingsCount >= 0);
+			}
 		}
 
 		if (IsReceivingInput())
