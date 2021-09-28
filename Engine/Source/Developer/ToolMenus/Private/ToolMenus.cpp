@@ -1910,10 +1910,11 @@ TSharedRef<SWidget> UToolMenus::GenerateWidget(UToolMenu* GeneratedMenu)
 
 		FMenuBuilder MenuBuilder(GeneratedMenu->bShouldCloseWindowAfterMenuSelection, GeneratedMenu->Context.CommandList, GeneratedMenu->Context.GetAllExtenders(), GeneratedMenu->bCloseSelfOnly, GeneratedMenu->StyleSet, GeneratedMenu->bSearchable, GeneratedMenu->MenuName);
 
-		if (GeneratedMenu->StyleName != NAME_None)
-		{
-			MenuBuilder.SetStyle(GeneratedMenu->StyleSet, GeneratedMenu->StyleName);
-		}
+		// Default consistent style is applied, necessary for toolbars to be displayed as menus
+		//if (GeneratedMenu->StyleName != NAME_None)
+		//{
+		//	MenuBuilder.SetStyle(GeneratedMenu->StyleSet, GeneratedMenu->StyleName);
+		//}
 
 		MenuBuilder.SetExtendersEnabled(GeneratedMenu->bExtendersEnabled);
 		PopulateMenuBuilder(MenuBuilder, GeneratedMenu);
