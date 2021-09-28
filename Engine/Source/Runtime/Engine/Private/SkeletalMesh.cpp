@@ -2546,6 +2546,12 @@ void USkeletalMesh::RemoveLegacyClothingSections()
 						// Remove the reference index
 						Section.CorrespondClothSectionIndex_DEPRECATED = INDEX_NONE;
 
+						//Make sure the UserSectionsData is up to date
+						if (FSkelMeshSourceSectionUserData* SectionUserData = LodModel.UserSectionsData.Find(Section.OriginalDataSectionIndex))
+						{
+							SectionUserData->CorrespondClothAssetIndex = Section.CorrespondClothAssetIndex;
+						}
+
 						ClothingSectionCount++;
 					}
 					else
