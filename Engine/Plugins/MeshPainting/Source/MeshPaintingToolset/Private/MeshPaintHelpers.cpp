@@ -1407,7 +1407,14 @@ TSharedPtr<IMeshPaintComponentAdapter> UMeshPaintingSubsystem::GetAdapterForComp
 	}
 	else if (const USkeletalMeshComponent* InSkeletalMeshComponent = Cast<USkeletalMeshComponent>(InComponent))
 	{
-		ComponentActorString = InSkeletalMeshComponent->SkeletalMesh->GetName();
+		if (InSkeletalMeshComponent->SkeletalMesh)
+		{
+			ComponentActorString = InSkeletalMeshComponent->SkeletalMesh->GetName();
+		}
+		else
+		{
+			return TSharedPtr<IMeshPaintComponentAdapter>();
+		}
 	} 
 	else
 	{
@@ -1514,6 +1521,10 @@ bool UMeshPaintingSubsystem::FindHitResult(const FRay Ray, FHitResult& BestTrace
 		for (UMeshComponent* MeshComponent : PaintableComponents)
 		{
 			TSharedPtr<IMeshPaintComponentAdapter> MeshAdapter = GetAdapterForComponent(MeshComponent);
+			if (!MeshAdapter.IsValid())
+			{
+				continue;
+			}
 
 			// Ray trace
 			FHitResult TraceHitResult(1.0f);
