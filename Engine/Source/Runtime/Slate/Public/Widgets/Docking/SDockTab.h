@@ -87,6 +87,7 @@ public:
 		, _OnPersistVisualState()
 		, _TabColorScale(FLinearColor::Transparent)
 		, _ForegroundColor(FSlateColor::UseStyle())
+		, _IconColor()
 		{}
 
 		SLATE_DEFAULT_SLOT( FArguments, Content )
@@ -114,6 +115,7 @@ public:
 		SLATE_EVENT( FSimpleDelegate, OnTabDrawerClosed)
 		SLATE_ATTRIBUTE( FLinearColor, TabColorScale )
 		SLATE_ATTRIBUTE( FSlateColor, ForegroundColor )
+		SLATE_ATTRIBUTE( FLinearColor, IconColor)
 	SLATE_END_ARGS()
 
 
@@ -344,6 +346,9 @@ protected:
 	/** @return Returns a color to scale the background of this tab by */
 	FSlateColor GetTabColor() const;
 
+	/** @return Returns the color of this tab's icon */
+	FSlateColor GetIconColor() const;
+
 	/** @return the image brush for the tab's flasher overlay */
 	const FSlateBrush* GetFlashOverlayImageBrush() const;
 
@@ -454,6 +459,9 @@ protected:
 
 	/** Color of this tab */
 	TAttribute<FLinearColor> TabColorScale;
+
+	/** Color of this tab's icon */
+	TAttribute<FLinearColor> IconColor;
 
 	/** @return the scaling of the tab based on the opening/closing animation */
 	FVector2D GetAnimatedScale() const;

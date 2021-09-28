@@ -190,7 +190,10 @@ TSharedRef<SDockTab> FLevelEditorModule::SpawnLevelEditor( const FSpawnTabArgs& 
 {
 	TSharedRef<SDockTab> LevelEditorTab = SNew(SDockTab)
 		.TabRole(ETabRole::MajorTab)
-		.ContentPadding( FMargin(0) );
+		.ContentPadding(FMargin(0))
+		.IconColor(FAppStyle::Get().GetColor("LevelEditor.AssetColor")); // Same color as FAssetTypeActions_World
+
+	LevelEditorTab->SetTabIcon(FAppStyle::Get().GetBrush("LevelEditor.Tab"));
 
 	SetLevelEditorInstanceTab(LevelEditorTab);
 	TSharedPtr< SWindow > OwnerWindow = InArgs.GetOwnerWindow();
