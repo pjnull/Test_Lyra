@@ -13762,7 +13762,14 @@ bool UEngine::LoadMap( FWorldContext& WorldContext, FURL URL, class UPendingNetG
 
 	if (FAudioDevice* AudioDevice = WorldContext.World()->GetAudioDeviceRaw())
 	{
-		AudioDevice->SetDefaultBaseSoundMix(WorldContext.World()->GetWorldSettings()->DefaultBaseSoundMix);
+		if (AWorldSettings* WorldSettings = WorldContext.World()->GetWorldSettings())
+		{
+			AudioDevice->SetDefaultBaseSoundMix(WorldSettings->DefaultBaseSoundMix);
+		}
+		else
+		{
+			UE_LOG(LogInit, Warning, TEXT("Unable to get world settings. Can't initialize default base soundmix."));
+		}
 	}
 
 	// Listen for clients.
