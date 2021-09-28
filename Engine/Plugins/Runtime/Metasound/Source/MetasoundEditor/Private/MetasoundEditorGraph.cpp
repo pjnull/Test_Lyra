@@ -232,7 +232,7 @@ void UMetasoundEditorGraphInputLiteral::PostEditUndo()
 
 	if (UMetasoundEditorGraphInput* Input = Cast<UMetasoundEditorGraphInput>(GetOuter()))
 	{
-		Input->UpdateDocumentInput(false /* bPostTransaction */);
+		Input->OnLiteralChanged(false /* bPostTransaction */);
 	}
 }
 
@@ -269,20 +269,6 @@ void UMetasoundEditorGraphInput::UpdateDocumentInput(bool bPostTransaction)
 	// Disabled as internal call to validation to all other open graphs
 	// is expensive and can be spammed by dragging values 
 // 	Metasound::Editor::FGraphBuilder::RegisterGraphWithFrontend(*Metasound);
-
-	const bool bIsPreviewing = CastChecked<UMetasoundEditorGraph>(GetOuter())->IsPreviewing();
-	if (bIsPreviewing)
-	{
-		UAudioComponent* PreviewComponent = GEditor->GetPreviewAudioComponent();
-		check(PreviewComponent);
-
-		if (TScriptInterface<IAudioParameterInterface> ParamInterface = PreviewComponent)
-		{
-			Metasound::Frontend::FConstNodeHandle ConstNodeHandle = GetConstNodeHandle();
-			Metasound::FVertexName VertexKey = NodeHandle->GetNodeName();
-			UpdatePreviewInstance(VertexKey, ParamInterface);
-		}
-	}
 }
 
 void UMetasoundEditorGraphInput::UpdatePreviewInstance(const Metasound::FVertexName& InParameterName, TScriptInterface<IAudioParameterInterface>& InParamInterface) const
@@ -333,7 +319,26 @@ void UMetasoundEditorGraphInput::PostEditUndo()
 		return;
 	}
 
-	UpdateDocumentInput(false /* bPostTransaction */);
+	OnLiteralChanged(false /* bPostTransaction */);
+}
+
+void UMetasoundEditorGraphInput::OnLiteralChanged(bool bPostTransaction)
+{
+	UpdateDocumentInput(bPostTransaction);
+
+	const bool bIsPreviewing = CastChecked<UMetasoundEditorGraph>(GetOuter())->IsPreviewing();
+	if (bIsPreviewing)
+	{
+		UAudioComponent* PreviewComponent = GEditor->GetPreviewAudioComponent();
+		check(PreviewComponent);
+
+		if (TScriptInterface<IAudioParameterInterface> ParamInterface = PreviewComponent)
+		{
+			Metasound::Frontend::FConstNodeHandle NodeHandle = GetConstNodeHandle();
+			Metasound::FVertexName VertexKey = NodeHandle->GetNodeName();
+			UpdatePreviewInstance(VertexKey, ParamInterface);
+		}
+	}
 }
 
 void UMetasoundEditorGraphInput::OnDataTypeChanged()

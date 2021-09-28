@@ -21,7 +21,6 @@
 #include "MetasoundEditorGraph.h"
 #include "MetasoundEditorGraphBuilder.h"
 #include "MetasoundEditorGraphConnectionDrawingPolicy.h"
-#include "MetasoundEditorGraphInputNodes.h"
 #include "MetasoundEditorGraphNodeFactory.h"
 #include "MetasoundEditorGraphSchema.h"
 #include "MetasoundEditorSettings.h"
@@ -451,17 +450,6 @@ namespace Metasound
 				}
 			}
 
-			virtual TUniquePtr<IMetaSoundInputLiteralCustomization> CreateInputLiteralCustomization(UClass& InClass, IDetailCategoryBuilder& InDefaultCategoryBuilder) const override
-			{
-				const TUniquePtr<IMetaSoundInputLiteralCustomizationFactory>* CustomizationFactory = LiteralCustomizationFactories.Find(&InClass);
-				if (CustomizationFactory && CustomizationFactory->IsValid())
-				{
-					return (*CustomizationFactory)->CreateLiteralCustomization(InDefaultCategoryBuilder);
-				}
-
-				return nullptr;
-			}
-
 			virtual const TSubclassOf<UMetasoundEditorGraphInputLiteral> FindInputLiteralClass(EMetasoundFrontendLiteralType InLiteralType) const override
 			{
 				return NodeInputClassRegistry.FindRef(InLiteralType);
@@ -536,8 +524,6 @@ namespace Metasound
 				PropertyModule.RegisterCustomPropertyTypeLayout(
 					"MetasoundEditorGraphInputObjectRef",
 					FOnGetPropertyTypeCustomizationInstance::CreateLambda([]() { return MakeShared<FMetasoundInputObjectDetailCustomization>(); }));
-
-				LiteralCustomizationFactories.Add(UMetasoundEditorGraphInputFloat::StaticClass(), MakeUnique<FMetasoundFloatLiteralCustomizationFactory>());
 
 				StyleSet = MakeShared<FSlateStyle>();
 
@@ -616,8 +602,6 @@ namespace Metasound
 			TArray<TSharedPtr<FAssetTypeActions_Base>> AssetActions;
 			TMap<FName, FEditorDataType> DataTypeInfo;
 			TMap<EMetasoundFrontendLiteralType, const TSubclassOf<UMetasoundEditorGraphInputLiteral>> NodeInputClassRegistry;
-
-			TMap<UClass*, TUniquePtr<IMetaSoundInputLiteralCustomizationFactory>> LiteralCustomizationFactories;
 
 			TSharedPtr<FMetasoundGraphNodeFactory> GraphNodeFactory;
 			TSharedPtr<FGraphPanelPinConnectionFactory> GraphConnectionFactory;

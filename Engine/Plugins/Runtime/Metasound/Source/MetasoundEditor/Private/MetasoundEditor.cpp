@@ -1750,14 +1750,6 @@ namespace Metasound
 			MetasoundGraphEditor->NotifyGraphChanged();
 		}
 
-		void FEditor::RefreshDetails()
-		{
-			if (MetasoundDetails.IsValid())
-			{
-				MetasoundDetails->ForceRefresh();
-			}
-		}
-
 		void FEditor::RefreshInterface()
 		{
 			if (MetasoundInterfaceMenu.IsValid())
