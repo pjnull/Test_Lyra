@@ -121,6 +121,27 @@ void UCommonActivatableWidget::RegisterInputTreeNode(const TSharedPtr<FActivatab
 	InputTreeNode = OwnerNode;
 }
 
+void UCommonActivatableWidget::ClearActiveHoldInputs()
+{
+	if (InputTreeNode.IsValid())
+	{
+		TSharedPtr<FActivatableTreeNode> Node = InputTreeNode.Pin();
+		if (Node->HasHoldBindings())
+		{
+			const TArray<FUIActionBindingHandle>& NodeActionBindings = Node->GetActionBindings();
+			for (const FUIActionBindingHandle& Handle : NodeActionBindings)
+			{
+				const TSharedPtr<FUIActionBinding>& UIActionBinding = FUIActionBinding::FindBinding(Handle);
+				if (UIActionBinding.IsValid() && UIActionBinding->IsHoldActive())
+				{
+					UIActionBinding->CancelHold();
+					UIActionBinding->OnHoldActionProgressed.Broadcast(0.0f);
+				}
+			}
+		}
+	}
+}
+
 TSharedRef<SWidget> UCommonActivatableWidget::RebuildWidget()
 {
 	// Note: the scoped builder guards against design-time so we don't need to here (as it'd make the scoped lifetime more awkward to leverage)
@@ -166,23 +187,7 @@ void UCommonActivatableWidget::NativeOnDeactivated()
 		}
 
 		// Cancel any holds that were active
-		if (InputTreeNode.IsValid())
-		{
-			TSharedPtr<FActivatableTreeNode> Node = InputTreeNode.Pin();
-			if (Node->HasHoldBindings())
-			{
-				const TArray<FUIActionBindingHandle>& NodeActionBindings = Node->GetActionBindings();
-				for (const FUIActionBindingHandle& Handle : NodeActionBindings)
-				{
-					const TSharedPtr<FUIActionBinding>& UIActionBinding = FUIActionBinding::FindBinding(Handle);
-					if (UIActionBinding.IsValid() && UIActionBinding->IsHoldActive())
-					{
-						UIActionBinding->CancelHold();
-						UIActionBinding->OnHoldActionProgressed.Broadcast(0.0f);
-					}
-				}
-			}
-		}
+		ClearActiveHoldInputs();
 
 		BP_OnDeactivated();
 		OnDeactivated().Broadcast();

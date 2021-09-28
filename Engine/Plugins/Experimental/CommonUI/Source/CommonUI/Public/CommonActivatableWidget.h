@@ -94,6 +94,7 @@ public:
 	bool SetsVisibilityOnDeactivated() const { return bSetVisibilityOnDeactivated; }
 
 	void RegisterInputTreeNode(const TSharedPtr<FActivatableTreeNode>& OwnerNode);
+	void ClearActiveHoldInputs();
 
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
