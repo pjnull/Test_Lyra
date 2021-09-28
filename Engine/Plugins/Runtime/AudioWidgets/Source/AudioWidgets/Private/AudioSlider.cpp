@@ -13,7 +13,6 @@ UAudioSliderBase::UAudioSliderBase(const FObjectInitializer& ObjectInitializer)
 {
 	Value = 0.0f;
 	AlwaysShowLabel = false;
-	Orientation = Orient_Vertical;
 	LabelBackgroundColor = FLinearColor(0.01033f, 0.01033f, 0.01033f);
 	SliderBackgroundColor = FLinearColor(0.01033f, 0.01033f, 0.01033f);
 	SliderBarColor = FLinearColor::Black;
@@ -32,7 +31,6 @@ void UAudioSliderBase::SynchronizeProperties()
 	
 	MyAudioSlider->SetAlwaysShowLabel(AlwaysShowLabel);
 	MyAudioSlider->SetLabelBackgroundColor(LabelBackgroundColor);
-	MyAudioSlider->SetOrientation(Orientation);
 	MyAudioSlider->SetSliderBackgroundColor(SliderBackgroundColor);
 	MyAudioSlider->SetSliderBarColor(SliderBarColor);
 	MyAudioSlider->SetSliderThumbColor(SliderThumbColor);
