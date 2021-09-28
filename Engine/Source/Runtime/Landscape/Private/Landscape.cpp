@@ -1186,51 +1186,63 @@ ULevel* ULandscapeComponent::GetLevel() const
 }
 
 #if WITH_EDITOR
-void ULandscapeComponent::GetGeneratedTexturesAndMaterialInstances(TArray<UObject*>& OutTexturesAndMaterials) const
+TArray<UTexture*> ULandscapeComponent::GetGeneratedTextures() const
 {
+	TArray<UTexture*> OutTextures;
 	if (HeightmapTexture)
 	{
-		OutTexturesAndMaterials.Add(HeightmapTexture);
+		OutTextures.Add(HeightmapTexture);
 	}
 
 	for (const auto& ItPair : LayersData)
 	{
 		const FLandscapeLayerComponentData& LayerComponentData = ItPair.Value;
 
-		OutTexturesAndMaterials.Add(LayerComponentData.HeightmapData.Texture);
-		OutTexturesAndMaterials.Append(LayerComponentData.WeightmapData.Textures);
+		OutTextures.Add(LayerComponentData.HeightmapData.Texture);
+		OutTextures.Append(LayerComponentData.WeightmapData.Textures);
 	}
 
-	for (UTexture2D* Weightmap : WeightmapTextures)
-	{
-		OutTexturesAndMaterials.Add(Weightmap);
-	}
+	OutTextures.Append(WeightmapTextures);
 
 	if (XYOffsetmapTexture)
 	{
-		OutTexturesAndMaterials.Add(XYOffsetmapTexture);
+		OutTextures.Add(XYOffsetmapTexture);
 	}
 
+	TArray<UMaterialInstance*> OutMaterials;
 	for (UMaterialInstance* MaterialInstance : MaterialInstances)
 	{
 		for (ULandscapeMaterialInstanceConstant* CurrentMIC = Cast<ULandscapeMaterialInstanceConstant>(MaterialInstance); CurrentMIC; CurrentMIC = Cast<ULandscapeMaterialInstanceConstant>(CurrentMIC->Parent))
 		{
-			OutTexturesAndMaterials.Add(CurrentMIC);
-
 			// Sometimes weight map is not registered in the WeightmapTextures, so
 			// we need to get it from here.
-			auto* WeightmapPtr = CurrentMIC->TextureParameterValues.FindByPredicate(
+			FTextureParameterValue* WeightmapPtr = CurrentMIC->TextureParameterValues.FindByPredicate(
 				[](const FTextureParameterValue& ParamValue)
 			{
 				static const FName WeightmapParamName("Weightmap0");
 				return ParamValue.ParameterInfo.Name == WeightmapParamName;
 			});
 
-			if (WeightmapPtr != nullptr &&
-				!OutTexturesAndMaterials.Contains(WeightmapPtr->ParameterValue))
+			if (WeightmapPtr != nullptr)
 			{
-				OutTexturesAndMaterials.Add(WeightmapPtr->ParameterValue);
+				OutTextures.AddUnique(WeightmapPtr->ParameterValue);
 			}
+		}
+	}
+
+	OutTextures.Remove(nullptr);
+
+	return OutTextures;
+}
+
+TArray<UMaterialInstance*> ULandscapeComponent::GetGeneratedMaterialInstances() const
+{
+	TArray<UMaterialInstance*> OutMaterials;
+	for (UMaterialInstance* MaterialInstance : MaterialInstances)
+	{
+		for (ULandscapeMaterialInstanceConstant* CurrentMIC = Cast<ULandscapeMaterialInstanceConstant>(MaterialInstance); CurrentMIC; CurrentMIC = Cast<ULandscapeMaterialInstanceConstant>(CurrentMIC->Parent))
+		{
+			OutMaterials.Add(CurrentMIC);
 		}
 	}
 
@@ -1238,9 +1250,20 @@ void ULandscapeComponent::GetGeneratedTexturesAndMaterialInstances(TArray<UObjec
 	{
 		for (ULandscapeMaterialInstanceConstant* CurrentMIC = Cast<ULandscapeMaterialInstanceConstant>(MaterialInstance); CurrentMIC; CurrentMIC = Cast<ULandscapeMaterialInstanceConstant>(CurrentMIC->Parent))
 		{
-			OutTexturesAndMaterials.Add(CurrentMIC);
+			OutMaterials.Add(CurrentMIC);
 		}
 	}
+
+	return OutMaterials;
+}
+
+void ULandscapeComponent::GetGeneratedTexturesAndMaterialInstances(TArray<UObject*>& OutTexturesAndMaterials) const
+{
+	TArray<UTexture*> LocalTextures = GetGeneratedTextures();
+	TArray<UMaterialInstance*> LocalMaterialInstances = GetGeneratedMaterialInstances();
+	OutTexturesAndMaterials.Reserve(LocalTextures.Num() + LocalMaterialInstances.Num());
+	OutTexturesAndMaterials.Append(LocalTextures);
+	OutTexturesAndMaterials.Append(LocalMaterialInstances);
 }
 #endif
 
@@ -2466,6 +2489,8 @@ void ALandscapeProxy::PostLoad()
 	// track feature level change to flush grass cache
 	FOnFeatureLevelChanged::FDelegate FeatureLevelChangedDelegate = FOnFeatureLevelChanged::FDelegate::CreateUObject(this, &ALandscapeProxy::OnFeatureLevelChanged);
 	FeatureLevelChangedDelegateHandle = GetWorld()->AddOnFeatureLevelChangedHandler(FeatureLevelChangedDelegate);
+
+	RepairInvalidTextures();
 #endif
 }
 

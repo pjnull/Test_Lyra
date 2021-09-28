@@ -956,8 +956,11 @@ public:
 	// Get Hole Landscape Material assigned to this Landscape
 	virtual UMaterialInterface* GetLandscapeHoleMaterial() const;
 
-	// 
+	/** Fix up component layers, weightmaps */
 	void FixupWeightmaps();
+
+	/** Repair invalid texture data that might have been introduced by a faulty version :  */
+	void RepairInvalidTextures();
 
 	// Remove Invalid weightmaps
 	LANDSCAPE_API void RemoveInvalidWeightmaps();
