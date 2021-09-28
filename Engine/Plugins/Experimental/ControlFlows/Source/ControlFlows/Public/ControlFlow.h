@@ -7,6 +7,8 @@
 #include "Templates/UnrealTypeTraits.h"
 
 class UObject;
+class FControlFlowTask_Branch;
+class FControlFlowTask_BranchLegacy;
 
 /**
  *  System/Tool to queue (asynchronous or synchronous) functions for modularity implemented via delegates.
