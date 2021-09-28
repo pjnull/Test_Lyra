@@ -135,7 +135,8 @@ UModelingToolsEditorMode::UModelingToolsEditorMode()
 		EM_ModelingToolsEditorModeId,
 		LOCTEXT("ModelingToolsEditorModeName", "Modeling"),
 		FSlateIcon("ModelingToolsStyle", "LevelEditor.ModelingToolsMode", "LevelEditor.ModelingToolsMode.Small"),
-		true);
+		true,
+		5000);
 }
 
 UModelingToolsEditorMode::UModelingToolsEditorMode(FVTableHelper& Helper)
