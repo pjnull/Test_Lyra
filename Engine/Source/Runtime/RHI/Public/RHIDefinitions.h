@@ -1503,7 +1503,13 @@ enum class EGpuVendorId
 	Broadcom	= 0x14E4,
 	Qualcomm	= 0x5143,
 	Intel		= 0x8086,
-	Mesa		= 0x10005,
+	Apple		= 0x106B,
+	Vivante		= 0x7a05,
+	VeriSilicon	= 0x1EB1,
+
+	Kazan		= 0x10003,	// VkVendorId
+	Codeplay	= 0x10004,	// VkVendorId
+	Mesa		= 0x10005,	// VkVendorId
 };
 
 /** An enumeration of the different RHI reference types. */
