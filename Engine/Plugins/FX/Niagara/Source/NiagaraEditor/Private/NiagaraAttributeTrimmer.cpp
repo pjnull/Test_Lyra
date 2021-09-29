@@ -564,7 +564,7 @@ static void TrimAttributes_Aggressive(const FNiagaraCompileRequestDuplicateData*
 			}
 		}
 
-		FImpureFunctionParser ImpureFunctionParser(CompileData->NodeGraphDeepCopy.Get(), ParamMap->OriginatingScriptUsage);
+		FImpureFunctionParser ImpureFunctionParser(CompileDuplicateData->NodeGraphDeepCopy.Get(), ParamMap->OriginatingScriptUsage);
 		for (const FModuleScopedPin& RequiredFunctionInput : ImpureFunctionParser.ReadFunctionInputs())
 		{
 			FDependencyChain Dependencies;
