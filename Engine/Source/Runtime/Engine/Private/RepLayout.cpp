@@ -6182,7 +6182,7 @@ void FRepLayout::InitFromClass(
 	}
 #endif
 
-	if (NumberOfLifetimeProperties == 0)
+	if (NumberOfLifetimeProperties == 0 && !LifetimeCustomPropertyState.IsValid())
 	{
 		Flags |= ERepLayoutFlags::NoReplicatedProperties;
 	}
@@ -6972,13 +6972,13 @@ FRepStateStaticBuffer FRepLayout::CreateShadowBuffer(const FConstRepObjectDataBu
 	if (!IsEmpty())
 	{
 		if (ShadowDataBufferSize == 0)
-	{
-		UE_LOG(LogRep, Error, TEXT("FRepLayout::InitShadowData: Invalid RepLayout: %s"), *GetPathNameSafe(Owner));
-	}
+		{
+			UE_LOG(LogRep, Error, TEXT("FRepLayout::InitShadowData: Invalid RepLayout: %s"), *GetPathNameSafe(Owner));
+		}
 		else
-	{
-		InitRepStateStaticBuffer(ShadowData, Source);
-	}
+		{
+			InitRepStateStaticBuffer(ShadowData, Source);
+		}
 	}
 
 	return ShadowData;
