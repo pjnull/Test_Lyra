@@ -114,7 +114,7 @@ struct FResourceSizeNeedsUpdating
 		// TickStreaming may also possibly be called where OnObjectPropertyChanged could cause problems
 		if (OriginalNum == 0)
 		{
-			FTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateRaw(this, &FResourceSizeNeedsUpdating::BroadcastOnObjectPropertyChanged));
+			FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateRaw(this, &FResourceSizeNeedsUpdating::BroadcastOnObjectPropertyChanged));
 		}
 	}
 
