@@ -12,7 +12,7 @@ class ULiveLinkRetargetAsset;
 
 /** Proxy override for this UAnimInstance-derived class */
 USTRUCT()
-struct LIVELINK_API FLiveLinkInstanceProxy : public FAnimInstanceProxy
+struct LIVELINKANIMATIONCORE_API FLiveLinkInstanceProxy : public FAnimInstanceProxy
 {
 public:
 	friend struct FAnimNode_LiveLinkPose;
@@ -38,7 +38,7 @@ public:
 };
 
 UCLASS(transient, NotBlueprintable)
-class LIVELINK_API ULiveLinkInstance : public UAnimInstance
+class LIVELINKANIMATIONCORE_API ULiveLinkInstance : public UAnimInstance
 {
 	GENERATED_BODY()
 

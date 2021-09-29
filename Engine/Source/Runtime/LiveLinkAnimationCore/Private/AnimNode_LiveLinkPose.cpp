@@ -1,16 +1,15 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "AnimNode_LiveLinkPose.h"
-#include "ILiveLinkClient.h"
-
-#include "Features/IModularFeatures.h"
 
 #include "Animation/AnimInstanceProxy.h"
+#include "Animation/AnimTrace.h"
+#include "Features/IModularFeatures.h"
+#include "ILiveLinkClient.h"
 #include "LiveLinkCustomVersion.h"
 #include "LiveLinkRemapAsset.h"
 #include "Roles/LiveLinkAnimationRole.h"
 #include "Roles/LiveLinkAnimationTypes.h"
-#include "Animation/AnimTrace.h"
 
 FAnimNode_LiveLinkPose::FAnimNode_LiveLinkPose() 
 	: RetargetAsset(ULiveLinkRemapAsset::StaticClass())
@@ -34,7 +33,13 @@ void FAnimNode_LiveLinkPose::Initialize_AnyThread(const FAnimationInitializeCont
 
 void FAnimNode_LiveLinkPose::PreUpdate(const UAnimInstance* InAnimInstance)
 {
-	LiveLinkClient_AnyThread = LiveLinkClient_GameThread.GetClient();
+	ILiveLinkClient* ThisFrameClient = nullptr;
+	IModularFeatures& ModularFeatures = IModularFeatures::Get();
+	if (ModularFeatures.IsModularFeatureAvailable(ILiveLinkClient::ModularFeatureName))
+	{
+		ThisFrameClient = &IModularFeatures::Get().GetModularFeature<ILiveLinkClient>(ILiveLinkClient::ModularFeatureName);
+	}
+	LiveLinkClient_AnyThread = ThisFrameClient;
 
 	// Protection as a class graph pin does not honor rules on abstract classes and NoClear
 	UClass* RetargetAssetPtr = RetargetAsset.Get();
@@ -74,10 +79,10 @@ void FAnimNode_LiveLinkPose::Evaluate_AnyThread(FPoseContext& Output)
 
 	FLiveLinkSubjectFrameData SubjectFrameData;
 
-	TSubclassOf<ULiveLinkRole> SubjectRole = LiveLinkClient_AnyThread->GetSubjectRole(LiveLinkSubjectName);
+	TSubclassOf<ULiveLinkRole> SubjectRole = LiveLinkClient_AnyThread->GetSubjectRole_AnyThread(LiveLinkSubjectName);
 	if (SubjectRole)
 	{
-		if (LiveLinkClient_AnyThread->DoesSubjectSupportsRole(LiveLinkSubjectName, ULiveLinkAnimationRole::StaticClass()))
+		if (LiveLinkClient_AnyThread->DoesSubjectSupportsRole_AnyThread(LiveLinkSubjectName, ULiveLinkAnimationRole::StaticClass()))
 		{
 			//Process animation data if the subject is from that type
 			if (LiveLinkClient_AnyThread->EvaluateFrame_AnyThread(LiveLinkSubjectName, ULiveLinkAnimationRole::StaticClass(), SubjectFrameData))
@@ -92,7 +97,7 @@ void FAnimNode_LiveLinkPose::Evaluate_AnyThread(FPoseContext& Output)
 				CachedDeltaTime = 0.f; // Reset so that if we evaluate again we don't "create" time inside of the retargeter
 			}
 		}
-		else if (LiveLinkClient_AnyThread->DoesSubjectSupportsRole(LiveLinkSubjectName, ULiveLinkBasicRole::StaticClass()))
+		else if (LiveLinkClient_AnyThread->DoesSubjectSupportsRole_AnyThread(LiveLinkSubjectName, ULiveLinkBasicRole::StaticClass()))
 		{
 			//Otherwise, fetch basic data that contains property / curve data
 			if (LiveLinkClient_AnyThread->EvaluateFrame_AnyThread(LiveLinkSubjectName, ULiveLinkBasicRole::StaticClass(), SubjectFrameData))

@@ -29,10 +29,6 @@
 		{
 			"Name": "nDisplay",
 			"Enabled": true
-		},
-		{
-			"Name": "LiveLink",
-			"Enabled": true
 		}
 	]
 }

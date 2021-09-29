@@ -19,7 +19,7 @@ struct FBlendedCurve;
 
 // Base class for retargeting live link data. 
 UCLASS(Abstract)
-class LIVELINK_API ULiveLinkRetargetAsset : public UObject
+class LIVELINKANIMATIONCORE_API ULiveLinkRetargetAsset : public UObject
 {
 	GENERATED_UCLASS_BODY()
 
