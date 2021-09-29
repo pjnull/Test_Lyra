@@ -1333,6 +1333,7 @@ void FEOSVoiceChatUser::BindChannelCallbacks(FChannelSession& ChannelSession)
 		static_assert(EOS_RTCAUDIO_ADDNOTIFYAUDIOBEFORERENDER_API_LATEST == 1, "EOS_RTC_AddNotifyAudioBeforeRenderOptions updated, check new fields");
 		AudioBeforeRenderOptions.LocalUserId = LoginSession.LocalUserProductUserId;
 		AudioBeforeRenderOptions.RoomName = Utf8RoomName.Get();
+		AudioBeforeRenderOptions.bUnmixedAudio = false;
 		ChannelSession.OnAudioBeforeRenderNotificationId = EOS_RTCAudio_AddNotifyAudioBeforeRender(EOS_RTC_GetAudioInterface(GetRtcInterface()), &AudioBeforeRenderOptions, this, &FEOSVoiceChatUser::OnChannelAudioBeforeRenderStatic);
 		if (ChannelSession.OnAudioBeforeRenderNotificationId == EOS_INVALID_NOTIFICATIONID)
 		{
@@ -2167,9 +2168,10 @@ void FEOSVoiceChatUser::OnChannelAudioBeforeRender(const EOS_RTCAudio_AudioBefor
 
 			// TODO EOS doesn't tell us if it's silence or not, maybe need to compare all the samples to some threshold?
 			const bool bIsSilence = false;
+			const FString PlayerName = ProductUserIdToString(CallbackInfo->ParticipantId);
 
 			FScopeLock Lock(&BeforeRecvAudioRenderedLock);
-			OnVoiceChatBeforeRecvAudioRenderedDelegate.Broadcast(Samples, Buffer->SampleRate, Buffer->Channels, bIsSilence);
+			OnVoiceChatBeforeRecvAudioRenderedDelegate.Broadcast(Samples, Buffer->SampleRate, Buffer->Channels, bIsSilence, PlayerName);
 		}
 		else
 		{
