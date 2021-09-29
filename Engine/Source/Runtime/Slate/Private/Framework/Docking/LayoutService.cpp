@@ -26,7 +26,7 @@ static FString PrepareLayoutStringForIni(const FString& LayoutString)
 
 static FString GetLayoutStringFromIni(const FString& LayoutString, bool& bOutIsJson)
 {
-	if (LayoutString.StartsWith(TEXT("NSLOCTEXT(\""), ESearchCase::CaseSensitive))
+	if (FTextStringHelper::IsComplexText(*LayoutString))
 	{
 		bOutIsJson = false;
 		return LayoutString;
