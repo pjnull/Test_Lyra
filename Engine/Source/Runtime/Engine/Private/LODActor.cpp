@@ -721,21 +721,6 @@ void ALODActor::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEve
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 }
 
-bool ALODActor::GetReferencedContentObjects( TArray<UObject*>& Objects ) const
-{
-	Super::GetReferencedContentObjects(Objects);
-	
-	// Retrieve referenced objects for sub actors as well
-	for (AActor* SubActor : SubActors)
-	{
-		if (SubActor)
-		{
-			SubActor->GetReferencedContentObjects(Objects);
-		}
-	}
-	return true;
-}
-
 void ALODActor::CheckForErrors()
 {
 	FMessageLog MapCheck("MapCheck");
