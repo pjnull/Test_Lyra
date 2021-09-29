@@ -2532,6 +2532,13 @@ void FPhysicsAssetEditorSharedData::ToggleSimulation()
 
 void FPhysicsAssetEditorSharedData::EnableSimulation(bool bEnableSimulation)
 {
+	// keep the EditorSkelComp animation asset if any set 
+	UAnimationAsset* PreviewAnimationAsset = nullptr;
+	if (EditorSkelComp->PreviewInstance)
+	{
+		PreviewAnimationAsset = EditorSkelComp->PreviewInstance->CurrentAsset;
+	}
+
 	if (bEnableSimulation)
 	{
 		// in Chaos, we have to manipulate the RBAN node in the Anim Instance (at least until we get SkelMeshComp implemented)
@@ -2559,6 +2566,13 @@ void FPhysicsAssetEditorSharedData::EnableSimulation(bool bEnableSimulation)
 			// Disable main solver physics
 			EditorSkelComp->SetAllBodiesSimulatePhysics(false);
 
+			// make sure we enable the preview animation is any compatible with the skeleton
+			if (PreviewAnimationAsset && EditorSkelComp->SkeletalMesh && PreviewAnimationAsset->GetSkeleton() == EditorSkelComp->SkeletalMesh->GetSkeleton())
+			{
+				EditorSkelComp->EnablePreview(true, PreviewAnimationAsset);
+				EditorSkelComp->Play(true);
+			}
+
 			// Add the floor
 			TSharedPtr<IPersonaPreviewScene> Scene = PreviewScene.Pin();
 			if (Scene != nullptr)
@@ -2578,13 +2592,6 @@ void FPhysicsAssetEditorSharedData::EnableSimulation(bool bEnableSimulation)
 	}
 	else
 	{
-		// keep the EditorSkelComp animation asset if any set 
-		UAnimationAsset* PreviewAnimationAsset = nullptr;
-		if (EditorSkelComp->PreviewInstance)
-		{
-			PreviewAnimationAsset = EditorSkelComp->PreviewInstance->CurrentAsset;
-		}
-
 		// Disable the PreviewInstance
 		//EditorSkelComp->AnimScriptInstance = nullptr;
 		//if(EditorSkelComp->GetAnimationMode() != EAnimationMode::AnimationSingleNode)
