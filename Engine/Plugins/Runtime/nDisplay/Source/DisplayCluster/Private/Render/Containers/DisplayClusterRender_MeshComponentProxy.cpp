@@ -73,33 +73,38 @@ void FDisplayClusterRender_MeshComponentProxy::UpdateRHI_RenderThread(FRHIComman
 
 		// Create Vertex buffer RHI:
 		{
-			FRHIResourceCreateInfo CreateInfo(TEXT("DisplayClusterRender_MeshComponentProxy_VertexBuffer"));
-				;
-			size_t VertexDataSize = sizeof(FDisplayClusterMeshVertex) * NumVertices;
+			size_t VertexDataSize = sizeof(FDisplayClusterMeshVertexType) * NumVertices;
 			if (VertexDataSize == 0)
 			{
 				UE_LOG(LogDisplayClusterRender, Warning, TEXT("MeshComponent has a vertex size of 0, please make sure a mesh is assigned."))
-					return;
+				return;
 			}
-
+		
+			FRHIResourceCreateInfo CreateInfo(TEXT("DisplayClusterRender_MeshComponentProxy_VertexBuffer"));
 			VertexBufferRHI = RHICreateVertexBuffer(VertexDataSize, Usage, CreateInfo);
-			FDisplayClusterMeshVertex* DestVertexData = reinterpret_cast<FDisplayClusterMeshVertex*>(RHILockBuffer(VertexBufferRHI, 0, VertexDataSize, RLM_WriteOnly));
+
+			FDisplayClusterMeshVertexType* DestVertexData = reinterpret_cast<FDisplayClusterMeshVertexType*>(RHILockBuffer(VertexBufferRHI, 0, VertexDataSize, RLM_WriteOnly));
 			if (DestVertexData)
 			{
-				FPlatformMemory::Memcpy(DestVertexData, InMeshData->GetVertexData().GetData(), VertexDataSize);
+				const FDisplayClusterMeshVertex* SrcVertexData = InMeshData->GetVertexData().GetData();
+				for (uint32 i = 0; i < NumVertices; i++)
+				{
+					DestVertexData[i] = SrcVertexData[i];
+				}
+			
 				RHIUnlockBuffer(VertexBufferRHI);
 			}
 		}
 
 		// Create Index buffer RHI:
 		{
-			FRHIResourceCreateInfo CreateInfo(TEXT("DisplayClusterRender_MeshComponentProxy_IndexBuffer"));
 			size_t IndexDataSize = sizeof(uint32) * InMeshData->GetIndexData().Num();
 
+			FRHIResourceCreateInfo CreateInfo(TEXT("DisplayClusterRender_MeshComponentProxy_IndexBuffer"));
 			IndexBufferRHI = RHICreateIndexBuffer(sizeof(uint32), IndexDataSize, Usage, CreateInfo);
 
 			uint32* DestIndexData = reinterpret_cast<uint32*>(RHILockBuffer(IndexBufferRHI, 0, IndexDataSize, RLM_WriteOnly));
-			if (DestIndexData)
+			if(DestIndexData)
 			{
 				FPlatformMemory::Memcpy(DestIndexData, InMeshData->GetIndexData().GetData(), IndexDataSize);
 				RHIUnlockBuffer(IndexBufferRHI);
