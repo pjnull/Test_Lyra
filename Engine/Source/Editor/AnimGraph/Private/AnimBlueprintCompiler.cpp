@@ -1870,6 +1870,8 @@ void FAnimBlueprintCompilerContext::ProcessFoldedPropertyRecords()
 						}
 						else
 						{
+							// Propagate some relevant property flags
+							Record->GeneratedProperty->SetPropertyFlags(Record->Property->GetPropertyFlags() & CPF_EditFixedSize);
 							Record->PropertyIndex = PropertyIndex++;
 						}
 					}

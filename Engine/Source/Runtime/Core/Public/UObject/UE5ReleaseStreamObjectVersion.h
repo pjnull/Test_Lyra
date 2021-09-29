@@ -42,6 +42,9 @@ struct CORE_API FUE5ReleaseStreamObjectVersion
 		// PackedLevelInstance bounds fix
 		PackedLevelInstanceBoundsFix,
 
+		// Custom property anim graph nodes (linked anim graphs, control rig etc.) now use optional pin manager
+		CustomPropertyAnimGraphNodesUseOptionalPinManager,
+		
 		// -----<new versions can be added above this line>-------------------------------------------------
 		VersionPlusOne,
 		LatestVersion = VersionPlusOne - 1

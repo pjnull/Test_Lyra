@@ -199,8 +199,14 @@ void UAnimBlueprintExtension_Base::HandleStartCompilingClass(const UClass* InCla
 						{
 							CopyRecord.LibraryCompiledHandle = PropertyAccessExtension->GetCompiledHandle(CopyRecord.LibraryHandle);
 
-							// Push compiled desc back to origial node for feedback
-							if(FAnimGraphNodePropertyBinding* Binding = OriginalNode->PropertyBindings.Find(CopyRecord.DestProperty->GetFName()))
+							// Push compiled desc back to original node for feedback
+							FName BindingName = CopyRecord.DestProperty->GetFName();
+							if(CopyRecord.DestArrayIndex != INDEX_NONE)
+							{
+								BindingName.SetNumber(CopyRecord.DestArrayIndex + 1);
+							}
+
+							if(FAnimGraphNodePropertyBinding* Binding = OriginalNode->PropertyBindings.Find(BindingName))
 							{
 								if(CopyRecord.LibraryCompiledHandle.IsValid())
 								{
@@ -346,8 +352,6 @@ void UAnimBlueprintExtension_Base::ProcessNodePins(UAnimGraphNode_Base* InNode, 
 		{
 			FEvaluationHandlerRecord& EvalHandler = PerNodeStructEvalHandlers.FindOrAdd(InNode);
 			EvalHandler.AnimGraphNode = InNode;
-			EvalHandler.NodeVariableProperty = NodeProperty;
-			EvalHandler.bServicesNodeProperties = true;
 
 			// for array properties we need to account for the extra FName number 
 			FName ComparisonName = PropertyBinding.Key;
@@ -355,7 +359,15 @@ void UAnimBlueprintExtension_Base::ProcessNodePins(UAnimGraphNode_Base* InNode, 
 
 			if (FProperty* Property = FindFProperty<FProperty>(NodeProperty->Struct, ComparisonName))
 			{
+				EvalHandler.NodeVariableProperty = NodeProperty;
+				EvalHandler.bServicesNodeProperties = true;
 				EvalHandler.RegisterPropertyBinding(Property, PropertyBinding.Value);
+			}
+			else if(FProperty* ClassProperty = FindFProperty<FProperty>(InCompilationContext.GetBlueprint()->SkeletonGeneratedClass, PropertyBinding.Value.PropertyName))
+			{
+				EvalHandler.NodeVariableProperty = NodeProperty;
+				EvalHandler.bServicesInstanceProperties = true;
+				EvalHandler.RegisterPropertyBinding(ClassProperty, PropertyBinding.Value);
 			}
 			else
 			{
@@ -501,32 +513,35 @@ void UAnimBlueprintExtension_Base::CreateEvaluationHandler(IAnimBlueprintCompila
 			{
 				for (FPropertyCopyRecord& CopyRecord : PropHandler.CopyRecords)
 				{
-					// New set node for the property
-					UK2Node_VariableSet* VarAssignNode = InCompilationContext.SpawnIntermediateNode<UK2Node_VariableSet>(InNode, InCompilationContext.GetConsolidatedEventGraph());
-					VarAssignNode->VariableReference.SetSelfMember(CopyRecord.DestProperty->GetFName());
-					VarAssignNode->AllocateDefaultPins();
-					Record.CustomEventNodes.Add(VarAssignNode);
-
-					// Wire up the exec line, and update the end of the chain
-					UEdGraphPin* ExecVariablesIn = K2Schema->FindExecutionPin(*VarAssignNode, EGPD_Input);
-					ExecChain->MakeLinkTo(ExecVariablesIn);
-					ExecChain = K2Schema->FindExecutionPin(*VarAssignNode, EGPD_Output);
-
-					// Find the property pin on the set node and configure
-					for (UEdGraphPin* TargetPin : VarAssignNode->Pins)
+					if(CopyRecord.DestPin)
 					{
-						FName PinPropertyName(TargetPin->PinName);
+						// New set node for the property
+						UK2Node_VariableSet* VarAssignNode = InCompilationContext.SpawnIntermediateNode<UK2Node_VariableSet>(InNode, InCompilationContext.GetConsolidatedEventGraph());
+						VarAssignNode->VariableReference.SetSelfMember(CopyRecord.DestProperty->GetFName());
+						VarAssignNode->AllocateDefaultPins();
+						Record.CustomEventNodes.Add(VarAssignNode);
 
-						if (PinPropertyName == PropertyName)
+						// Wire up the exec line, and update the end of the chain
+						UEdGraphPin* ExecVariablesIn = K2Schema->FindExecutionPin(*VarAssignNode, EGPD_Input);
+						ExecChain->MakeLinkTo(ExecVariablesIn);
+						ExecChain = K2Schema->FindExecutionPin(*VarAssignNode, EGPD_Output);
+
+						// Find the property pin on the set node and configure
+						for (UEdGraphPin* TargetPin : VarAssignNode->Pins)
 						{
-							// This is us, wire up the variable
-							UEdGraphPin* DestPin = CopyRecord.DestPin;
+							FName PinPropertyName(TargetPin->PinName);
 
-							// Copy the data (link up to the source nodes)
-							TargetPin->CopyPersistentDataFromOldPin(*DestPin);
-							InCompilationContext.GetMessageLog().NotifyIntermediatePinCreation(TargetPin, DestPin);
-							
-							break;
+							if (PinPropertyName == PropertyName)
+							{
+								// This is us, wire up the variable
+								UEdGraphPin* DestPin = CopyRecord.DestPin;
+
+								// Copy the data (link up to the source nodes)
+								TargetPin->CopyPersistentDataFromOldPin(*DestPin);
+								InCompilationContext.GetMessageLog().NotifyIntermediatePinCreation(TargetPin, DestPin);
+								
+								break;
+							}
 						}
 					}
 				}
@@ -596,14 +611,15 @@ void UAnimBlueprintExtension_Base::CreateEvaluationHandler(IAnimBlueprintCompila
 
 				if(FoldedPropertyRecord != nullptr)
 				{
-					// We only support per-instance members here. If this is held on the class then something is wrong
-					check(!FoldedPropertyRecord->bIsOnClass);
+					// We only support per-instance members here.
+					if(!FoldedPropertyRecord->bIsOnClass)
+					{
+						// We must have created an assignment node for the mutable data block by now
+						check(InstanceAssignmentNode != nullptr);
 
-					// We must have created an assignment node for the mutable data block by now
-					check(InstanceAssignmentNode != nullptr);
-
-					// Redirect to the instance's mutable data area assignment node
-					TargetPin = InstanceAssignmentNode->FindPinChecked(FoldedPropertyRecord->GeneratedProperty->GetFName());
+						// Redirect to the instance's mutable data area assignment node
+						TargetPin = InstanceAssignmentNode->FindPinChecked(FoldedPropertyRecord->GeneratedProperty->GetFName());
+					}
 				}
 
 				if (TargetPin->PinType.IsArray())
@@ -869,7 +885,12 @@ void UAnimBlueprintExtension_Base::FEvaluationHandlerRecord::RegisterPropertyBin
 	// Prepend the destination property with the node's member property if the property is not on a UClass
 	if(Cast<UClass>(InProperty->Owner.ToUObject()) == nullptr)
 	{
+		Handler.bInstanceIsTarget = false;
 		DestPropertyPath.Add(NodeVariableProperty->GetName());
+	}
+	else
+	{
+		Handler.bInstanceIsTarget = true;
 	}
 
 	if(InBinding.ArrayIndex != INDEX_NONE)
