@@ -65,6 +65,11 @@ public:
 		Instance = &InInterface;
 	}
 
+	static IMetaSoundAssetManager* Get()
+	{
+		return Instance;
+	}
+
 	static IMetaSoundAssetManager& GetChecked()
 	{
 		check(Instance);

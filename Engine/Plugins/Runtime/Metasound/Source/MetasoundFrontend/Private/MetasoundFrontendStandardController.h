@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
 #include "MetasoundBuilderInterface.h"
 #include "MetasoundFrontendController.h"
 #include "MetasoundFrontendDocument.h"
@@ -344,6 +343,7 @@ namespace Metasound
 		};
 
 
+
 		/** FBaseNodeController provides common functionality for multiple derived
 		 * node controllers.
 		 */
@@ -398,6 +398,7 @@ namespace Metasound
 
 			const FVertexName& GetNodeName() const override;
 
+			// This only exists to allow for transform fix-ups to easily cleanup input/output node names.
 			void SetNodeName(const FVertexName& InName) override { checkNoEntry(); }
 
 			/** Returns the readable display name of the given node (Used only within MetaSound
@@ -413,12 +414,12 @@ namespace Metasound
 			/** Returns the title of the given node (what to label in visual node). */
 			const FText& GetDisplayTitle() const override;
 
-			bool CanAddInput(const FString& InVertexName) const override;
-			FInputHandle AddInput(const FString& InVertexName, const FMetasoundFrontendLiteral* InDefault) override;
+			bool CanAddInput(const FVertexName& InVertexName) const override;
+			FInputHandle AddInput(const FVertexName& InVertexName, const FMetasoundFrontendLiteral* InDefault) override;
 			bool RemoveInput(FGuid InVertexID) override;
 
-			bool CanAddOutput(const FString& InVertexName) const override;
-			FInputHandle AddOutput(const FString& InVertexName, const FMetasoundFrontendLiteral* InDefault) override;
+			bool CanAddOutput(const FVertexName& InVertexName) const override;
+			FInputHandle AddOutput(const FVertexName& InVertexName, const FMetasoundFrontendLiteral* InDefault) override;
 			bool RemoveOutput(FGuid InVertexID) override;
 
 			/** Returns all node inputs. */
@@ -757,6 +758,16 @@ namespace Metasound
 			TArray<FNodeHandle> GetInputNodes() override;
 			TArray<FConstNodeHandle> GetConstInputNodes() const override;
 
+			virtual FVariableHandle AddVariable(const FName& InDataType) override;
+			virtual FVariableHandle FindVariable(const FGuid& InVariableID) override;
+			virtual FConstVariableHandle FindVariable(const FGuid& InVariableID) const override;
+			virtual bool RemoveVariable(const FGuid& InVariableID) override;
+			virtual TArray<FVariableHandle> GetVariables() override;
+			virtual TArray<FConstVariableHandle> GetVariables() const override;
+			virtual FNodeHandle FindOrAddVariableMutatorNode(const FGuid& InVariableID) override;
+			virtual FNodeHandle AddVariableAccessorNode(const FGuid& InVariableID) override;
+			virtual FNodeHandle AddVariableDeferredAccessorNode(const FGuid& InVariableID) override;
+
 			void ClearGraph() override;
 
 			void IterateNodes(TFunctionRef<void(FNodeHandle)> InFunction, EMetasoundFrontendClassType InClassType) override;
@@ -849,6 +860,14 @@ namespace Metasound
 			FConstDocumentAccess ShareAccess() const override;
 
 		private:
+
+			FMetasoundFrontendVariable* FindFrontendVariable(const FGuid& InVariableID);
+			const FMetasoundFrontendVariable* FindFrontendVariable(const FGuid& InVariableID) const;
+			FNodeHandle FindHeadNodeInVariableStack(const FGuid& InVariableID);
+			FNodeHandle FindTailNodeInVariableStack(const FGuid& InVariableID);
+			// Remove variable node from variable stack, and reconnect variable to remaining nodes.
+			void SpliceVariableNodeFromVariableStack(INodeController& InNode);
+
 
 			FNodeHandle AddNode(FConstClassAccessPtr InExistingDependency);
 			bool RemoveNode(const FMetasoundFrontendNode& InDesc);

@@ -935,14 +935,17 @@ FText UMetasoundEditorGraphSchema::GetPinDisplayName(const UEdGraphPin* Pin) con
 			return Super::GetPinDisplayName(Pin);
 		}
 
+		case EMetasoundFrontendClassType::Literal:
 		case EMetasoundFrontendClassType::Variable:
+		case EMetasoundFrontendClassType::VariableAccessor:
+		case EMetasoundFrontendClassType::VariableMutator:
 		case EMetasoundFrontendClassType::Graph:
 			// TODO: Implement above
 
 		case EMetasoundFrontendClassType::Invalid:
 		default:
 		{
-			static_assert(static_cast<int32>(EMetasoundFrontendClassType::Invalid) == 5, "Possible missing EMetasoundFrontendClassType case coverage");
+			static_assert(static_cast<int32>(EMetasoundFrontendClassType::Invalid) == 8, "Possible missing EMetasoundFrontendClassType case coverage");
 			return Super::GetPinDisplayName(Pin);
 		}
 	}

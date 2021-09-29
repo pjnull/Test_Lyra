@@ -673,11 +673,14 @@ namespace Metasound
 
 				case EMetasoundFrontendClassType::Invalid:
 				case EMetasoundFrontendClassType::Graph:
-				case EMetasoundFrontendClassType::Variable:
+				case EMetasoundFrontendClassType::Variable: // Not yet supported in editor
+				case EMetasoundFrontendClassType::Literal: // Not yet supported in editor
+				case EMetasoundFrontendClassType::VariableMutator: // Not yet supported in editor
+				case EMetasoundFrontendClassType::VariableAccessor: // Not yet supported in editor
 				default:
 				{
 					checkNoEntry();
-					static_assert(static_cast<int32>(EMetasoundFrontendClassType::Invalid) == 5, "Possible missing FMetasoundFrontendClassType case coverage");
+					static_assert(static_cast<int32>(EMetasoundFrontendClassType::Invalid) == 8, "Possible missing FMetasoundFrontendClassType case coverage");
 				}
 				break;
 			}
@@ -925,11 +928,14 @@ namespace Metasound
 					break;
 
 					case EMetasoundFrontendClassType::Graph:
+					case EMetasoundFrontendClassType::Literal:
+					case EMetasoundFrontendClassType::VariableAccessor:
+					case EMetasoundFrontendClassType::VariableMutator:
 					case EMetasoundFrontendClassType::Variable:
 					case EMetasoundFrontendClassType::External:
 					default:
 					{
-						static_assert(static_cast<int32>(EMetasoundFrontendClassType::Invalid) == 5, "Possible missing MetasoundFrontendClassType switch case coverage.");
+						static_assert(static_cast<int32>(EMetasoundFrontendClassType::Invalid) == 8, "Possible missing MetasoundFrontendClassType switch case coverage.");
 
 						if (ensure(GraphHandle->RemoveNode(*NodeHandle)))
 						{

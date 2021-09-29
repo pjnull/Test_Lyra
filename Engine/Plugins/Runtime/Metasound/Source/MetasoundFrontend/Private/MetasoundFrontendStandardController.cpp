@@ -5,7 +5,6 @@
 #include "Algo/ForEach.h"
 #include "Algo/NoneOf.h"
 #include "Algo/Transform.h"
-#include "CoreMinimal.h"
 #include "HAL/FileManager.h"
 #include "HAL/IConsoleManager.h"
 #include "MetasoundAccessPtr.h"
@@ -15,12 +14,15 @@
 #include "MetasoundFrontendDocument.h"
 #include "MetasoundFrontendDocumentAccessPtr.h"
 #include "MetasoundFrontendGraph.h"
+#include "MetasoundFrontendInvalidController.h"
 #include "MetasoundFrontendRegistries.h"
 #include "MetasoundFrontendSearchEngine.h"
 #include "MetasoundFrontendSubgraphNodeController.h"
+#include "MetasoundFrontendVariableController.h"
 #include "MetasoundJsonBackend.h"
 #include "MetasoundOperatorBuilder.h"
 #include "MetasoundTrace.h"
+#include "MetasoundVariableNodes.h"
 #include "MetasoundVertex.h"
 #include "StructDeserializer.h"
 #include "StructSerializer.h"
@@ -40,7 +42,7 @@ namespace Metasound
 {
 	namespace Frontend
 	{
-		namespace FrontendControllerIntrinsics
+		namespace FrontendControllerPrivate
 		{
 			namespace NodeLayout
 			{
@@ -48,34 +50,32 @@ namespace Metasound
 				static const FVector2D BufferY{ 0.0f, 100.0f };
 			}
 
-			// utility function for returning invalid values. If an invalid value type
-			// needs special construction, this template can be specialized. 
-			template<typename ValueType>
-			ValueType GetInvalidValue()
+			bool InsertConnect(FOutputHandle OutputToConnect, FInputHandle InputToConnect, FOutputHandle NewOutput)
 			{
-				ValueType InvalidValue;
-				return InvalidValue;
+				bool bSuccess = true;
+
+				TArray<FInputHandle> Inputs = OutputToConnect->GetConnectedInputs();
+				bSuccess &= OutputToConnect->Connect(*InputToConnect);
+				for (const FInputHandle& Input : Inputs)
+				{
+					bSuccess &= NewOutput->Connect(*Input);
+				}
+				return bSuccess;
 			}
-
-			// Invalid value specialization for int32
-			template<>
-			int32 GetInvalidValue<int32>() { return INDEX_NONE; }
-
-			// Invalid value specialization for EMetasoundFrontendClassType
-			template<>
-			EMetasoundFrontendClassType GetInvalidValue<EMetasoundFrontendClassType>() { return EMetasoundFrontendClassType::Invalid; }
-
-			// Invalid value specialization for FText
-			template<>
-			FText GetInvalidValue<FText>() { return FText::GetEmpty(); }
-
-			template<typename ValueType>
-			const ValueType& GetInvalidValueConstRef()
+		
+			bool InsertConnect(FInputHandle InputToConnect, FOutputHandle OutputToConnect, FInputHandle NewInput)
 			{
-				static const ValueType Value = GetInvalidValue<ValueType>();
-				return Value;
+				bool bSuccess = true;
+
+				FOutputHandle PreviouslyConnectedOutput = InputToConnect->GetConnectedOutput();
+				bSuccess &= OutputToConnect->Connect(*InputToConnect);
+				if (PreviouslyConnectedOutput->IsValid())
+				{
+					bSuccess &= NewInput->Connect(*PreviouslyConnectedOutput);
+				}
+				return bSuccess;
 			}
-		} // namespace FrontendControllerIntrinsics
+		} // namespace FrontendControllerPrivate
 
 
 		FDocumentAccess IDocumentAccessor::GetSharedAccess(IDocumentAccessor& InDocumentAccessor)
@@ -117,7 +117,7 @@ namespace Metasound
 			{
 				return Vertex->TypeName;
 			}
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FName>();
+			return Invalid::GetInvalidName();
 		}
 
 		const FVertexName& FBaseOutputController::GetName() const
@@ -126,7 +126,7 @@ namespace Metasound
 			{
 				return Vertex->Name;
 			}
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FVertexName>();
+			return Invalid::GetInvalidName();
 		}
 
 		FGuid FBaseOutputController::GetOwningNodeID() const
@@ -254,7 +254,7 @@ namespace Metasound
 				return FText::FromName(GetName());
 			}
 
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FText>();
+			return Invalid::GetInvalidText();
 		}
 
 		const FText& FBaseOutputController::GetTooltip() const
@@ -264,7 +264,7 @@ namespace Metasound
 				return Output->Metadata.Description;
 			}
 
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FText>();
+			return Invalid::GetInvalidText();
 		}
 
 		const FMetasoundFrontendVertexMetadata& FBaseOutputController::GetMetadata() const
@@ -274,7 +274,7 @@ namespace Metasound
 				return Output->Metadata;
 			}
 
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FMetasoundFrontendVertexMetadata>();
+			return Invalid::GetInvalidVertexMetadata();
 		}
 
 		FDocumentAccess FBaseOutputController::ShareAccess()
@@ -340,7 +340,7 @@ namespace Metasound
 				return Input->Metadata.Description;
 			}
 
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FText>();
+			return Invalid::GetInvalidText();
 		}
 
 		const FMetasoundFrontendVertexMetadata& FInputNodeOutputController::GetMetadata() const
@@ -350,7 +350,7 @@ namespace Metasound
 				return Input->Metadata;
 			}
 
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FMetasoundFrontendVertexMetadata>();
+			return Invalid::GetInvalidVertexMetadata();
 		}
 
 		void FInputNodeOutputController::SetName(const FVertexName& InName)
@@ -405,7 +405,7 @@ namespace Metasound
 				return FText::FromName(GetName());
 			}
 
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FText>();
+			return Invalid::GetInvalidText();
 		}
 
 		const FText& FOutputNodeOutputController::GetTooltip() const
@@ -415,7 +415,7 @@ namespace Metasound
 				return OwningOutput->Metadata.Description;
 			}
 
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FText>();
+			return Invalid::GetInvalidText();
 		}
 
 		const FMetasoundFrontendVertexMetadata& FOutputNodeOutputController::GetMetadata() const
@@ -425,7 +425,7 @@ namespace Metasound
 				return OwningOutput->Metadata;
 			}
 
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FMetasoundFrontendVertexMetadata>();
+			return Invalid::GetInvalidVertexMetadata();
 		}
 
 		void FOutputNodeOutputController::SetName(const FVertexName& InName)
@@ -483,7 +483,7 @@ namespace Metasound
 				return Vertex->TypeName;
 			}
 			
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FName>();
+			return Invalid::GetInvalidName();
 		}
 
 		const FVertexName& FBaseInputController::GetName() const
@@ -493,7 +493,7 @@ namespace Metasound
 				return Vertex->Name;
 			}
 			
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FVertexName>();
+			return Invalid::GetInvalidName();
 		}
 
 		FText FBaseInputController::GetDisplayName() const
@@ -508,7 +508,7 @@ namespace Metasound
 				return FText::FromName(GetName());
 			}
 			
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FText>();
+			return Invalid::GetInvalidText();
 		}
 
 		const FMetasoundFrontendLiteral* FBaseInputController::GetLiteral() const
@@ -555,7 +555,7 @@ namespace Metasound
 				return ClassInput->Metadata.Description;
 			}
 			
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FText>();
+			return Invalid::GetInvalidText();
 		}
 
 		const FMetasoundFrontendVertexMetadata& FBaseInputController::GetMetadata() const
@@ -565,7 +565,7 @@ namespace Metasound
 				return ClassInput->Metadata;
 			}
 
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FMetasoundFrontendVertexMetadata>();
+			return Invalid::GetInvalidVertexMetadata();
 		}
 
 		bool FBaseInputController::IsConnected() const 
@@ -598,7 +598,7 @@ namespace Metasound
 				return OutputNode->GetOutputWithID(Edge->FromVertexID);
 			}
 
-			return FInvalidOutputController::GetInvalid();
+			return IOutputController::GetInvalidHandle();
 		}
 
 		FConstOutputHandle FBaseInputController::GetConnectedOutput() const
@@ -611,7 +611,7 @@ namespace Metasound
 				return OutputNode->GetOutputWithID(Edge->FromVertexID);
 			}
 
-			return FInvalidOutputController::GetInvalid();
+			return IOutputController::GetInvalidHandle();
 		}
 
 		FConnectability FBaseInputController::CanConnectTo(const IOutputController& InController) const
@@ -856,7 +856,7 @@ namespace Metasound
 				return OwningOutput->Metadata.Description;
 			}
 			
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FText>();
+			return Invalid::GetInvalidText();
 		}
 
 		const FMetasoundFrontendVertexMetadata& FOutputNodeInputController::GetMetadata() const
@@ -866,7 +866,7 @@ namespace Metasound
 				return OwningOutput->Metadata;
 			}
 
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FMetasoundFrontendVertexMetadata>();
+			return Invalid::GetInvalidVertexMetadata();
 		}
 
 		void FOutputNodeInputController::SetName(const FVertexName& InName)
@@ -922,7 +922,7 @@ namespace Metasound
 				return FText::FromName(GetName());
 			}
 
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FText>();
+			return Invalid::GetInvalidText();
 		}
 
 		const FText& FInputNodeInputController::GetTooltip() const
@@ -932,7 +932,7 @@ namespace Metasound
 				return OwningInput->Metadata.Description;
 			}
 			
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FText>();
+			return Invalid::GetInvalidText();
 		}
 
 		const FMetasoundFrontendVertexMetadata& FInputNodeInputController::GetMetadata() const
@@ -942,7 +942,7 @@ namespace Metasound
 				return OwningInput->Metadata;
 			}
 
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FMetasoundFrontendVertexMetadata>();
+			return Invalid::GetInvalidVertexMetadata();
 		}
 
 		void FInputNodeInputController::SetName(const FVertexName& InName)
@@ -1096,7 +1096,7 @@ namespace Metasound
 			{
 				return Class->Interface;
 			}
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FMetasoundFrontendClassInterface>();
+			return Invalid::GetInvalidClassInterface();
 		}
 
 		const FMetasoundFrontendClassMetadata& FBaseNodeController::GetClassMetadata() const
@@ -1105,7 +1105,7 @@ namespace Metasound
 			{
 				return Class->Metadata;
 			}
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FMetasoundFrontendClassMetadata>();
+			return Invalid::GetInvalidClassMetadata();
 		}
 
 		const FMetasoundFrontendInterfaceStyle& FBaseNodeController::GetInputStyle() const
@@ -1115,7 +1115,7 @@ namespace Metasound
 				return Class->Interface.GetInputStyle();
 			}
 
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FMetasoundFrontendInterfaceStyle>();
+			return Invalid::GetInvalidInterfaceStyle();
 		}
 
 		const FMetasoundFrontendInterfaceStyle& FBaseNodeController::GetOutputStyle() const
@@ -1125,7 +1125,7 @@ namespace Metasound
 				return Class->Interface.GetOutputStyle();
 			}
 
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FMetasoundFrontendInterfaceStyle>();
+			return Invalid::GetInvalidInterfaceStyle();
 		}
 
 		const FMetasoundFrontendClassStyle& FBaseNodeController::GetClassStyle() const
@@ -1164,7 +1164,7 @@ namespace Metasound
 			{
 				return Class->Metadata.GetDescription();
 			}
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FText>();
+			return Invalid::GetInvalidText();
 		}
 
 		const FVertexName& FBaseNodeController::GetNodeName() const
@@ -1173,20 +1173,20 @@ namespace Metasound
 			{
 				return Node->Name;
 			}
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FVertexName>();
+			return Invalid::GetInvalidName();
 		}
 
-		bool FBaseNodeController::CanAddInput(const FString& InVertexName) const
+		bool FBaseNodeController::CanAddInput(const FVertexName& InVertexName) const
 		{
 			// TODO: not yet supported
 			return false;
 		}
 
-		FInputHandle FBaseNodeController::AddInput(const FString& InVertexName, const FMetasoundFrontendLiteral* InDefault)
+		FInputHandle FBaseNodeController::AddInput(const FVertexName& InVertexName, const FMetasoundFrontendLiteral* InDefault)
 		{
 			checkNoEntry();
 			// TODO: not yet supported
-			return FInvalidInputController::GetInvalid();
+			return IInputController::GetInvalidHandle();
 		}
 
 		bool FBaseNodeController::RemoveInput(FGuid InVertexID)
@@ -1196,17 +1196,17 @@ namespace Metasound
 			return false;
 		}
 
-		bool FBaseNodeController::CanAddOutput(const FString& InVertexName) const
+		bool FBaseNodeController::CanAddOutput(const FVertexName& InVertexName) const
 		{
 			// TODO: not yet supported
 			return false;
 		}
 
-		FInputHandle FBaseNodeController::AddOutput(const FString& InVertexName, const FMetasoundFrontendLiteral* InDefault)
+		FInputHandle FBaseNodeController::AddOutput(const FVertexName& InVertexName, const FMetasoundFrontendLiteral* InDefault)
 		{
 			checkNoEntry();
 			// TODO: not yet supported
-			return FInvalidInputController::GetInvalid();
+			return IInputController::GetInvalidHandle();
 		}
 
 		bool FBaseNodeController::RemoveOutput(FGuid InVertexID)
@@ -1329,7 +1329,7 @@ namespace Metasound
 				return Class->Metadata.GetDisplayName();
 			}
 
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FText>();
+			return Invalid::GetInvalidText();
 		}
 
 		FText FBaseNodeController::GetDisplayName() const
@@ -1345,7 +1345,7 @@ namespace Metasound
 				return FText::FromString(GetNodeName().ToString());
 			}
 
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FText>();
+			return Invalid::GetInvalidText();
 		}
 
 		void FBaseNodeController::IterateConstInputs(TUniqueFunction<void(FConstInputHandle)> InFunction) const
@@ -1481,7 +1481,7 @@ namespace Metasound
 				return CreateInputController(Params.VertexID, Params.NodeVertexPtr, Params.ClassInputPtr, ThisNode);
 			}
 
-			return FInvalidInputController::GetInvalid();
+			return IInputController::GetInvalidHandle();
 		}
 
 		bool FBaseNodeController::IsRequired() const
@@ -1500,7 +1500,7 @@ namespace Metasound
 				return CreateInputController(Params.VertexID, Params.NodeVertexPtr, Params.ClassInputPtr, ThisNode);
 			}
 
-			return FInvalidInputController::GetInvalid();
+			return IInputController::GetInvalidHandle();
 		}
 
 		FOutputHandle FBaseNodeController::GetOutputWithID(FGuid InVertexID)
@@ -1513,7 +1513,7 @@ namespace Metasound
 				return CreateOutputController(Params.VertexID, Params.NodeVertexPtr, Params.ClassOutputPtr, ThisNode);
 			}
 
-			return FInvalidOutputController::GetInvalid();
+			return IOutputController::GetInvalidHandle();
 		}
 
 		FConstOutputHandle FBaseNodeController::GetOutputWithID(FGuid InVertexID) const
@@ -1527,7 +1527,7 @@ namespace Metasound
 				return CreateOutputController(Params.VertexID, Params.NodeVertexPtr, Params.ClassOutputPtr, ThisNode);
 			}
 
-			return FInvalidOutputController::GetInvalid();
+			return IOutputController::GetInvalidHandle();
 		}
 
 		TArray<FBaseNodeController::FInputControllerParams> FBaseNodeController::GetInputControllerParams() const
@@ -1640,7 +1640,7 @@ namespace Metasound
 				return GetOwningGraph()->GetOwningDocument()->GetSubgraphWithClassID(Class->ID);
 			}
 
-			return FInvalidGraphController::GetInvalid();
+			return IGraphController::GetInvalidHandle();
 		}
 
 		FConstGraphHandle FBaseNodeController::AsGraph() const
@@ -1652,7 +1652,7 @@ namespace Metasound
 				return GetOwningGraph()->GetOwningDocument()->GetSubgraphWithClassID(Class->ID);
 			}
 
-			return FInvalidGraphController::GetInvalid();
+			return IGraphController::GetInvalidHandle();
 		}
 
 		FMetasoundFrontendVersionNumber FBaseNodeController::FindHighestMinorVersionInRegistry() const
@@ -1895,9 +1895,12 @@ namespace Metasound
 			METASOUND_TRACE_CPUPROFILER_EVENT_SCOPE(BaseNodeController::CanAutoUpdate);
 
 			const FMetasoundFrontendClassMetadata& NodeClassMetadata = GetClassMetadata();
-			if (!IMetaSoundAssetManager::GetChecked().CanAutoUpdate(NodeClassMetadata.GetClassName()))
+			if (IMetaSoundAssetManager* AssetManager = IMetaSoundAssetManager::Get())
 			{
-				return false;
+				if (!AssetManager->CanAutoUpdate(NodeClassMetadata.GetClassName()))
+				{
+					return false;
+				}
 			}
 
 			FMetasoundFrontendClass RegistryClass;
@@ -2003,7 +2006,7 @@ namespace Metasound
 					}
 				}
 			}
-			return FInvalidNodeController::GetInvalid();
+			return INodeController::GetInvalidHandle();
 		}
 
 		FConstNodeHandle FNodeController::CreateConstNodeHandle(const FNodeController::FInitParams& InParams)
@@ -2023,7 +2026,7 @@ namespace Metasound
 					}
 				}
 			}
-			return FInvalidNodeController::GetInvalid();
+			return INodeController::GetInvalidHandle();
 		}
 
 		bool FNodeController::IsValid() const
@@ -2095,7 +2098,7 @@ namespace Metasound
 				}
 			}
 
-			return FInvalidNodeController::GetInvalid();
+			return INodeController::GetInvalidHandle();
 		}
 
 		const FText& FOutputNodeController::GetDescription() const
@@ -2105,7 +2108,7 @@ namespace Metasound
 				return OwningOutput->Metadata.Description;
 			}
 
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FText>();
+			return Invalid::GetInvalidText();
 		}
 
 		FText FOutputNodeController::GetDisplayName() const
@@ -2120,7 +2123,7 @@ namespace Metasound
 				return FText::FromName(GetNodeName());
 			}
 
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FText>();
+			return Invalid::GetInvalidText();
 		}
 
 		void FOutputNodeController::SetDescription(const FText& InDescription)
@@ -2192,7 +2195,7 @@ namespace Metasound
 				}
 			}
 
-			return FInvalidNodeController::GetInvalid();
+			return INodeController::GetInvalidHandle();
 		}
 
 		const FText& FOutputNodeController::GetDisplayTitle() const
@@ -2310,7 +2313,7 @@ namespace Metasound
 				}
 			}
 
-			return FInvalidNodeController::GetInvalid();
+			return INodeController::GetInvalidHandle();
 		}
 
 		FConstNodeHandle FInputNodeController::CreateConstInputNodeHandle(const FInputNodeController::FInitParams& InParams)
@@ -2337,7 +2340,7 @@ namespace Metasound
 				}
 			}
 
-			return FInvalidNodeController::GetInvalid();
+			return INodeController::GetInvalidHandle();
 		}
 
 		bool FInputNodeController::IsValid() const
@@ -2362,7 +2365,7 @@ namespace Metasound
 				return OwningInput->Metadata.Description;
 			}
 
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FText>();
+			return Invalid::GetInvalidText();
 		}
 
 		FText FInputNodeController::GetDisplayName() const
@@ -2377,7 +2380,7 @@ namespace Metasound
 				return FText::FromName(GetNodeName());
 			}
 
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FText>();
+			return Invalid::GetInvalidText();
 		}
 
 		const FText& FInputNodeController::GetDisplayTitle() const
@@ -2510,7 +2513,7 @@ namespace Metasound
 					UE_LOG(LogMetaSound, Warning, TEXT("Failed to make graph controller [ClassID:%s]. Class must be EMeatsoundFrontendClassType::Graph."), *GraphClass->ID.ToString())
 				}
 			}
-			return FInvalidGraphController::GetInvalid();
+			return IGraphController::GetInvalidHandle();
 		}
 
 		FConstGraphHandle FGraphController::CreateConstGraphHandle(const FGraphController::FInitParams& InParams)
@@ -2526,7 +2529,7 @@ namespace Metasound
 					UE_LOG(LogMetaSound, Warning, TEXT("Failed to make graph controller [ClassID:%s]. Class must be EMeatsoundFrontendClassType::Graph."), *GraphClass->ID.ToString())
 				}
 			}
-			return FInvalidGraphController::GetInvalid();
+			return IGraphController::GetInvalidHandle();
 		}
 
 		bool FGraphController::IsValid() const
@@ -2551,7 +2554,7 @@ namespace Metasound
 				return GraphClass->Metadata.GetDisplayName();
 			}
 
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FText>();
+			return Invalid::GetInvalidText();
 		}
 
 		TArray<FVertexName> FGraphController::GetInputVertexNames() const
@@ -2647,7 +2650,7 @@ namespace Metasound
 				return GraphClass->Graph.Style;
 			}
 
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FMetasoundFrontendGraphStyle>();
+			return Invalid::GetInvalidGraphStyle();
 		}
 
 		void FGraphController::SetGraphStyle(const FMetasoundFrontendGraphStyle& InStyle)
@@ -2674,6 +2677,369 @@ namespace Metasound
 				return NodeClass.Metadata.GetType() == EMetasoundFrontendClassType::Input;
 			};
 			return GetNodesByPredicate(IsInputNode);
+		}
+
+		FVariableHandle FGraphController::AddVariable(const FName& InDataType)
+		{
+			if (FMetasoundFrontendGraphClass* GraphClass = GraphClassPtr.Get())
+			{
+				const IDataTypeRegistry& Registry = IDataTypeRegistry::Get();
+				FDataTypeRegistryInfo Info;
+				if (ensure(Registry.GetDataTypeInfo(InDataType, Info)))
+				{
+					FGuid VariableID = FGuid::NewGuid();
+
+					FMetasoundFrontendVariable Variable;
+					Variable.DisplayName = Info.DataTypeDisplayText;
+					Variable.TypeName = Info.DataTypeName;
+					Variable.Literal.SetFromLiteral(Registry.CreateDefaultLiteral(InDataType));
+					Variable.ID = VariableID;
+
+					FMetasoundFrontendClass VariableNodeClass;
+					if (IDataTypeRegistry::Get().GetFrontendVariableClass(Variable.TypeName, VariableNodeClass))
+					{
+						FNodeHandle InitNode = AddNode(VariableNodeClass.Metadata);
+						if (InitNode->IsValid())
+						{
+							Variable.VariableNodeID = InitNode->GetID();
+							GraphClass->Graph.Variables.Add(MoveTemp(Variable));
+						}
+					}
+
+					return FindVariable(VariableID);
+				}
+			}
+
+			return IVariableController::GetInvalidHandle();
+		}
+
+		FVariableHandle FGraphController::FindVariable(const FGuid& InVariableID)
+		{
+			FVariableAccessPtr VariablePtr = GraphClassPtr.GetVariableWithID(InVariableID);
+			return MakeShared<FVariableController>(FVariableController::FInitParams{VariablePtr, this->AsShared()});
+		}
+
+		FConstVariableHandle FGraphController::FindVariable(const FGuid& InVariableID) const
+		{
+			FConstVariableAccessPtr ConstVariablePtr = GraphClassPtr.GetVariableWithID(InVariableID);
+			return MakeShared<FVariableController>(FVariableController::FInitParams{ConstCastAccessPtr<FVariableAccessPtr>(ConstVariablePtr), ConstCastSharedRef<IGraphController>(this->AsShared())});
+		}
+
+		bool FGraphController::RemoveVariable(const FGuid& InVariableID)
+		{
+			if (FMetasoundFrontendGraphClass* GraphClass = GraphClassPtr.Get())
+			{
+				if (FMetasoundFrontendVariable* Variable = FindFrontendVariable(InVariableID))
+				{
+					FNodeHandle NodeHandle = GetNodeWithID(Variable->VariableNodeID);
+					RemoveNode(*NodeHandle);
+
+					NodeHandle = GetNodeWithID(Variable->MutatorNodeID);
+					RemoveNode(*NodeHandle);
+
+					for (const FGuid& NodeID : Variable->AccessorNodeIDs)
+					{
+						NodeHandle = GetNodeWithID(NodeID);
+						RemoveNode(*NodeHandle);
+					}
+
+					for (const FGuid& NodeID : Variable->DeferredAccessorNodeIDs)
+					{
+						NodeHandle = GetNodeWithID(NodeID);
+						RemoveNode(*NodeHandle);
+					}
+
+					auto IsVariableWithID = [&](const FMetasoundFrontendVariable& InVariable)
+					{
+						return InVariable.ID == InVariableID;
+					};
+					GraphClass->Graph.Variables.RemoveAllSwap(IsVariableWithID);
+					return true;
+				}
+			}
+
+			return false;
+		}
+
+		TArray<FVariableHandle> FGraphController::GetVariables()
+		{
+			TArray<FVariableHandle> VariableHandles;
+
+			if (FMetasoundFrontendGraphClass* GraphClass = GraphClassPtr.Get())
+			{
+				for (const FMetasoundFrontendVariable& Variable : GraphClass->Graph.Variables)
+				{
+					VariableHandles.Add(FindVariable(Variable.ID));
+				}
+			}
+
+			return VariableHandles;
+		}
+
+		TArray<FConstVariableHandle> FGraphController::GetVariables() const
+		{
+			TArray<FConstVariableHandle> VariableHandles;
+
+			if (const FMetasoundFrontendGraphClass* GraphClass = GraphClassPtr.Get())
+			{
+				for (const FMetasoundFrontendVariable& Variable : GraphClass->Graph.Variables)
+				{
+					VariableHandles.Add(FindVariable(Variable.ID));
+				}
+			}
+
+			return VariableHandles;
+		}
+
+		FNodeHandle FGraphController::FindOrAddVariableMutatorNode(const FGuid& InVariableID)
+		{
+			if (FMetasoundFrontendVariable* Variable = FindFrontendVariable(InVariableID))
+			{
+				FNodeHandle SetNode = GetNodeWithID(Variable->MutatorNodeID);
+				if (!SetNode->IsValid())
+				{
+					FMetasoundFrontendClass SetNodeClass;
+					if (IDataTypeRegistry::Get().GetFrontendSetVariableClass(Variable->TypeName, SetNodeClass))
+					{
+						SetNode = AddNode(SetNodeClass.Metadata);
+						if (SetNode->IsValid())
+						{
+							Variable->MutatorNodeID = SetNode->GetID();
+							FGuid SourceVariableNodeID = Variable->VariableNodeID;
+
+							// Connect last delayed getter in variable stack.
+							if (Variable->DeferredAccessorNodeIDs.Num() > 0)
+							{
+								SourceVariableNodeID = Variable->DeferredAccessorNodeIDs.Last();
+							}
+							FNodeHandle SourceVariableNode = GetNodeWithID(SourceVariableNodeID);
+
+							if (ensure(SourceVariableNode->IsValid()))
+							{
+								FInputHandle SetNodeInput = SetNode->GetInputsWithVertexName(VariableNames::GetInputVariableName())[0];
+								FOutputHandle SourceVariableNodeOutput = SourceVariableNode->GetOutputsWithVertexName(VariableNames::GetOutputVariableName())[0];
+
+								ensure(SetNodeInput->Connect(*SourceVariableNodeOutput));
+							}
+
+							// Connect to first inline getter in variable stack
+							if (Variable->AccessorNodeIDs.Num() > 0)
+							{
+								FNodeHandle HeadGetNode = GetNodeWithID(Variable->AccessorNodeIDs[0]);
+								if (HeadGetNode->IsValid())
+								{
+									FOutputHandle SetNodeOutput = SetNode->GetOutputsWithVertexName(VariableNames::GetOutputVariableName())[0];
+									FInputHandle GetNodeInput = HeadGetNode->GetInputsWithVertexName(VariableNames::GetInputVariableName())[0];
+
+									ensure(SetNodeOutput->Connect(*GetNodeInput));
+								}
+							}
+						}
+					}
+					else
+					{
+						UE_LOG(LogMetaSound, Warning, TEXT("Could not find registered \"set variable\" node class for data type \"%s\""), *Variable->TypeName.ToString());
+					}
+				}
+				return SetNode;
+			}
+			
+			return INodeController::GetInvalidHandle();
+		}
+
+		FNodeHandle FGraphController::AddVariableAccessorNode(const FGuid& InVariableID)
+		{
+			if (FMetasoundFrontendVariable* Variable = FindFrontendVariable(InVariableID))
+			{
+				FMetasoundFrontendClass NodeClass;
+				if (IDataTypeRegistry::Get().GetFrontendGetVariableClass(Variable->TypeName, NodeClass))
+				{
+					FNodeHandle NewNode = AddNode(NodeClass.Metadata);
+
+					if (NewNode->IsValid())
+					{
+						// Connect new node.
+						FInputHandle NewInput = NewNode->GetInputsWithVertexName(VariableNames::GetInputVariableName())[0];
+						FNodeHandle TailNode = FindTailNodeInVariableStack(InVariableID);
+
+						if (TailNode->IsValid())
+						{
+							// connect new node to the last "get" node.
+							FOutputHandle TailNodeOutput = TailNode->GetOutputsWithVertexName(VariableNames::GetOutputVariableName())[0];
+							check(!TailNodeOutput->IsConnected());
+							const bool bSuccess = TailNodeOutput->Connect(*NewInput);
+							check(bSuccess);
+						}
+
+						// Add node ID to variable after connecting since the array
+						// order of node ids is used to determine whether a node 
+						// is the tail node.
+						Variable->AccessorNodeIDs.Add(NewNode->GetID());
+					}
+
+					return NewNode;
+				}
+				else
+				{
+					UE_LOG(LogMetaSound, Warning, TEXT("Could not find registered \"get variable\" node class for data type \"%s\""), *Variable->TypeName.ToString());
+				}
+			}
+
+			return INodeController::GetInvalidHandle();
+		}
+
+		FNodeHandle FGraphController::AddVariableDeferredAccessorNode(const FGuid& InVariableID)
+		{
+			if (FMetasoundFrontendVariable* Variable = FindFrontendVariable(InVariableID))
+			{
+				FMetasoundFrontendClass NodeClass;
+				if (IDataTypeRegistry::Get().GetFrontendGetDelayedVariableClass(Variable->TypeName, NodeClass))
+				{
+					FNodeHandle NewNode = AddNode(NodeClass.Metadata);
+
+					if (NewNode->IsValid())
+					{
+						// Connect new node.
+						FOutputHandle NewNodeOutput = NewNode->GetOutputsWithVertexName(VariableNames::GetOutputVariableName())[0];
+						FNodeHandle HeadNode = FindHeadNodeInVariableStack(InVariableID);
+						if (HeadNode->IsValid())
+						{
+							FInputHandle HeadNodeInput = HeadNode->GetInputsWithVertexName(VariableNames::GetInputVariableName())[0];
+							const bool bSuccess = HeadNodeInput->Connect(*NewNodeOutput);
+							check(bSuccess);
+						}
+
+						FInputHandle NewNodeInput = NewNode->GetInputsWithVertexName(VariableNames::GetInputVariableName())[0];
+						FNodeHandle VariableNode = GetNodeWithID(Variable->VariableNodeID);
+						if (ensure(VariableNode->IsValid()))
+						{
+							FOutputHandle VariableNodeOutput = VariableNode->GetOutputsWithVertexName(VariableNames::GetOutputVariableName())[0];
+							const bool bSuccess = VariableNodeOutput->Connect(*NewNodeInput);
+							check(bSuccess);
+						}
+
+						// Add node ID to variable after connecting since the array
+						// order of node ids is used to determine whether a node 
+						// is the tail node.
+						Variable->DeferredAccessorNodeIDs.Add(NewNode->GetID());
+					}
+
+					return NewNode;
+				}
+				else
+				{
+					UE_LOG(LogMetaSound, Warning, TEXT("Could not find registered \"get variable\" node class for data type \"%s\""), *Variable->TypeName.ToString());
+				}
+			}
+
+			return INodeController::GetInvalidHandle();
+		}
+
+		FMetasoundFrontendVariable* FGraphController::FindFrontendVariable(const FGuid& InVariableID)
+		{
+			if (FMetasoundFrontendGraphClass* GraphClass = GraphClassPtr.Get())
+			{
+				auto IsVariableWithID = [&](const FMetasoundFrontendVariable& InVariable)
+				{
+					return InVariable.ID == InVariableID;
+				};
+				return GraphClass->Graph.Variables.FindByPredicate(IsVariableWithID);
+			}
+			return nullptr;
+		}
+
+		const FMetasoundFrontendVariable* FGraphController::FindFrontendVariable(const FGuid& InVariableID) const
+		{
+			if (const FMetasoundFrontendGraphClass* GraphClass = GraphClassPtr.Get())
+			{
+				auto IsVariableWithID = [&](const FMetasoundFrontendVariable& InVariable)
+				{
+					return InVariable.ID == InVariableID;
+				};
+				return GraphClass->Graph.Variables.FindByPredicate(IsVariableWithID);
+			}
+			return nullptr;
+		}
+
+		FNodeHandle FGraphController::FindHeadNodeInVariableStack(const FGuid& InVariableID)
+		{
+			// The variable "stack" is [GetDelayedNodes, SetNode, GetNodes].
+			if (FMetasoundFrontendVariable* Variable = FindFrontendVariable(InVariableID))
+			{
+				if (Variable->DeferredAccessorNodeIDs.Num() > 0)
+				{
+					return GetNodeWithID(Variable->DeferredAccessorNodeIDs[0]);
+				}
+
+				if (FrontendInvalidID != Variable->MutatorNodeID)
+				{
+					return GetNodeWithID(Variable->MutatorNodeID);
+				}
+
+				if (Variable->AccessorNodeIDs.Num() > 0)
+				{
+					return GetNodeWithID(Variable->AccessorNodeIDs[0]);
+				}
+			}
+
+			return INodeController::GetInvalidHandle();
+		}
+
+		FNodeHandle FGraphController::FindTailNodeInVariableStack(const FGuid& InVariableID)
+		{
+			// The variable "stack" is [GetDelayedNodes, SetNode, GetNodes].
+			if (FMetasoundFrontendVariable* Variable = FindFrontendVariable(InVariableID))
+			{
+				if (Variable->AccessorNodeIDs.Num() > 0)
+				{
+					return GetNodeWithID(Variable->AccessorNodeIDs.Last());
+				}
+
+				if (FrontendInvalidID != Variable->MutatorNodeID)
+				{
+					return GetNodeWithID(Variable->MutatorNodeID);
+				}
+
+				if (Variable->DeferredAccessorNodeIDs.Num() > 0)
+				{
+					return GetNodeWithID(Variable->DeferredAccessorNodeIDs.Last());
+				}
+			}
+
+			return INodeController::GetInvalidHandle();
+		}
+
+		void FGraphController::SpliceVariableNodeFromVariableStack(INodeController& InNode)
+		{
+			// Variable nodes are organized in a stack to ensure that variables are
+			// accessed in a consistent manner at runtime. A single variable object is 
+			// shared amongst all nodes associated with a single variable. The variable
+			// object is shared by daisy-chaining the variable from one node to the
+			// next. 
+			//
+			// If a node is removed, that daisy-chain must be preserved. This function 
+			// removes a node while maintaining the daisy-chain.
+			check(InNode.IsValid());
+
+			TArray<FInputHandle> Inputs = InNode.GetInputsWithVertexName(VariableNames::GetInputVariableName());
+			if (Inputs.Num() == 1)
+			{
+				FInputHandle InputToSpliceOut = Inputs[0];
+				FOutputHandle OutputToReroute = InputToSpliceOut->GetConnectedOutput();
+
+				if (OutputToReroute->IsValid())
+				{
+					TArray<FOutputHandle> Outputs = InNode.GetOutputsWithVertexName(VariableNames::GetOutputVariableName());
+					if (ensure(Outputs.Num() == 1))
+					{
+						FOutputHandle OutputToSpliceOut = Outputs[0];
+						for (const FInputHandle& InputToReroute : OutputToSpliceOut->GetConnectedInputs())
+						{
+							ensure(InputToReroute->Connect(*OutputToReroute));
+						}
+					}
+				}
+			}
 		}
 
 		void FGraphController::ClearGraph()
@@ -2874,7 +3240,7 @@ namespace Metasound
 					UE_LOG(LogMetaSound, Display, TEXT("Failed to add input. Input with same name \"%s\" exists in class [ClassID:%s]"), *InClassInput.Name.ToString(), *GraphClass->ID.ToString());
 				}
 			}
-			return FInvalidNodeController::GetInvalid();
+			return INodeController::GetInvalidHandle();
 		}
 
 		FNodeHandle FGraphController::AddInputVertex(const FVertexName& InName, const FName InTypeName, const FText& InToolTip, const FMetasoundFrontendLiteral* InDefaultValue)
@@ -2993,7 +3359,7 @@ namespace Metasound
 				}
 			}
 
-			return FInvalidNodeController::GetInvalid();
+			return INodeController::GetInvalidHandle();
 		}
 
 		bool FGraphController::RemoveOutputVertex(const FVertexName& InName)
@@ -3192,35 +3558,49 @@ namespace Metasound
 		// On success, invalidates the received node handle.
 		bool FGraphController::RemoveNode(INodeController& InNode)
 		{
+			const EMetasoundFrontendClassType NodeClassType = InNode.GetClassMetadata().GetType();
+			const bool bIsVariableNodeClassType = (NodeClassType == EMetasoundFrontendClassType::Variable) || (NodeClassType == EMetasoundFrontendClassType::VariableAccessor) || (NodeClassType == EMetasoundFrontendClassType::VariableMutator);
+
+			if (bIsVariableNodeClassType)
+			{
+				// Variable nodes of the same variable are connected serially. 
+				// Special care is taken to ensure the stack is connected when
+				// removing a node from the stack.
+				SpliceVariableNodeFromVariableStack(InNode);
+			}
+			
 			if (FMetasoundFrontendGraphClass* GraphClass = GraphClassPtr.Get())
 			{
 				FGuid NodeID = InNode.GetID();
-				auto IsNodeWithSameID = [&](const FMetasoundFrontendNode& InDesc) { return InDesc.GetID() == NodeID; };
-				if (const FMetasoundFrontendNode* Desc = GraphClass->Graph.Nodes.FindByPredicate(IsNodeWithSameID))
+				auto IsNodeWithSameID = [&](const FMetasoundFrontendNode& InFrontendNode) { return InFrontendNode.GetID() == NodeID; };
+				if (const FMetasoundFrontendNode* FrontendNode = GraphClass->Graph.Nodes.FindByPredicate(IsNodeWithSameID))
 				{
-					switch(InNode.GetClassMetadata().GetType())
+					switch(NodeClassType)
 					{
 						case EMetasoundFrontendClassType::Input:
 						{
-							return RemoveInput(*Desc);
+							return RemoveInput(*FrontendNode);
 						}
 
 						case EMetasoundFrontendClassType::Output:
 						{
-							return RemoveOutput(*Desc);
+							return RemoveOutput(*FrontendNode);
 						}
 
 						case EMetasoundFrontendClassType::Variable:
+						case EMetasoundFrontendClassType::VariableAccessor:
+						case EMetasoundFrontendClassType::VariableMutator:
+						case EMetasoundFrontendClassType::Literal:
 						case EMetasoundFrontendClassType::External:
 						case EMetasoundFrontendClassType::Graph:
 						{
-							return RemoveNode(*Desc);
+							return RemoveNode(*FrontendNode);
 						}
 
 						default:
 						case EMetasoundFrontendClassType::Invalid:
 						{
-							static_assert(static_cast<int32>(EMetasoundFrontendClassType::Invalid) == 5, "Possible missing switch case coverage for EMetasoundFrontendClassType.");
+							static_assert(static_cast<int32>(EMetasoundFrontendClassType::Invalid) == 8, "Possible missing switch case coverage for EMetasoundFrontendClassType.");
 							checkNoEntry();
 						}
 					}
@@ -3237,7 +3617,7 @@ namespace Metasound
 			{
 				return GraphClass->Metadata;
 			}
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FMetasoundFrontendClassMetadata>();
+			return Invalid::GetInvalidClassMetadata();
 		}
 
 		void FGraphController::SetGraphMetadata(const FMetasoundFrontendClassMetadata& InMetadata)
@@ -3266,7 +3646,7 @@ namespace Metasound
 				UE_LOG(LogMetaSound, Warning, TEXT("Incompatible Metasound NodeType encountered when attempting to create an empty subgraph.  NodeType must equal EMetasoundFrontendClassType::Graph"));
 			}
 			
-			return FInvalidNodeController::GetInvalid();
+			return INodeController::GetInvalidHandle();
 		}
 
 		TUniquePtr<IOperator> FGraphController::BuildOperator(const FOperatorSettings& InSettings, const FMetasoundEnvironment& InEnvironment, TArray<IOperatorBuilder::FBuildErrorPtr>& OutBuildErrors) const
@@ -3317,10 +3697,13 @@ namespace Metasound
 
 					// Cache the asset name on the node if it node is reference to asset-defined graph.
 					const FNodeRegistryKey RegistryKey = NodeRegistryKey::CreateKey(NodeClass->Metadata);
-					if (const FSoftObjectPath* Path = IMetaSoundAssetManager::GetChecked().FindObjectPathFromKey(RegistryKey))
+					if (IMetaSoundAssetManager* AssetManager = IMetaSoundAssetManager::Get())
 					{
-						const FString& AssetName = Path->GetAssetName();
-						Node.Name = *AssetName;
+						if (const FSoftObjectPath* Path = AssetManager->FindObjectPathFromKey(RegistryKey))
+						{
+							const FString& AssetName = Path->GetAssetName();
+							Node.Name = *AssetName;
+						}
 					}
 					Node.UpdateID();
 
@@ -3329,7 +3712,7 @@ namespace Metasound
 				}
 			}
 
-			return FInvalidNodeController::GetInvalid();
+			return INodeController::GetInvalidHandle();
 		}
 
 		bool FGraphController::RemoveNode(const FMetasoundFrontendNode& InDesc)
@@ -3393,6 +3776,7 @@ namespace Metasound
 
 			return false;
 		}
+
 
 		void FGraphController::UpdateInterfaceChangeID()
 		{
@@ -3544,7 +3928,7 @@ namespace Metasound
 				return GetNodeHandle(NodeAndClass[0]);
 			}
 
-			return FInvalidNodeController::GetInvalid();
+			return INodeController::GetInvalidHandle();
 		}
 
 		FConstNodeHandle FGraphController::GetNodeByPredicate(TFunctionRef<bool (const FMetasoundFrontendClass&, const FMetasoundFrontendNode&)> InPredicate) const
@@ -3555,7 +3939,7 @@ namespace Metasound
 				return GetNodeHandle(NodeAndClass[0]);
 			}
 
-			return FInvalidNodeController::GetInvalid();
+			return INodeController::GetInvalidHandle();
 		}
 
 		TArray<FNodeHandle> FGraphController::GetNodesByPredicate(TFunctionRef<bool (const FMetasoundFrontendClass&, const FMetasoundFrontendNode&)> InFilterFunc)
@@ -3674,6 +4058,9 @@ namespace Metasound
 						}
 						break;
 
+					case EMetasoundFrontendClassType::Variable:
+					case EMetasoundFrontendClassType::VariableAccessor:
+					case EMetasoundFrontendClassType::VariableMutator:
 					case EMetasoundFrontendClassType::External:
 						{
 							FNodeController::FInitParams InitParams
@@ -3705,7 +4092,7 @@ namespace Metasound
 				}
 			}
 
-			return FInvalidNodeController::GetInvalid();
+			return INodeController::GetInvalidHandle();
 		}
 
 		FConstNodeHandle FGraphController::GetNodeHandle(const FGraphController::FConstNodeAndClass& InNodeAndClass) const
@@ -3775,7 +4162,7 @@ namespace Metasound
 				}
 			}
 
-			return FInvalidNodeController::GetInvalid();
+			return INodeController::GetInvalidHandle();
 		}
 
 		FMetasoundFrontendClassInput* FGraphController::FindInputDescriptionWithName(const FVertexName& InName)
@@ -3938,7 +4325,7 @@ namespace Metasound
 				return Document->Dependencies;
 			}
 
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<TArray<FMetasoundFrontendClass>>();
+			return Invalid::GetInvalidClassArray();
 		}
 
 		const TArray<FMetasoundFrontendGraphClass>& FDocumentController::GetSubgraphs() const
@@ -3947,7 +4334,7 @@ namespace Metasound
 			{
 				return Document->Subgraphs;
 			}
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<TArray<FMetasoundFrontendGraphClass>>();
+			return Invalid::GetInvalidGraphClassArray();
 		}
 
 		const FMetasoundFrontendGraphClass& FDocumentController::GetRootGraphClass() const
@@ -3956,7 +4343,7 @@ namespace Metasound
 			{
 				return Doc->RootGraph;
 			}
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FMetasoundFrontendGraphClass>();
+			return Invalid::GetInvalidGraphClass();
 		}
 
 		bool FDocumentController::AddDuplicateSubgraph(const FMetasoundFrontendGraphClass& InGraphToCopy, const FMetasoundFrontendDocument& InOtherDocument)
@@ -4109,7 +4496,7 @@ namespace Metasound
 				return Document->Metadata;
 			}
 
-			return FrontendControllerIntrinsics::GetInvalidValueConstRef<FMetasoundFrontendDocumentMetadata>();
+			return Invalid::GetInvalidDocumentMetadata();
 		}
 
 		FConstClassAccessPtr FDocumentController::FindClass(const FNodeRegistryKey& InKey) const
@@ -4318,7 +4705,7 @@ namespace Metasound
 				return FGraphController::CreateGraphHandle(FGraphController::FInitParams{GraphClass, this->AsShared()});
 			}
 
-			return FInvalidGraphController::GetInvalid();
+			return IGraphController::GetInvalidHandle();
 		}
 
 		FConstGraphHandle FDocumentController::GetRootGraph() const
@@ -4332,7 +4719,7 @@ namespace Metasound
 						ConstCastSharedRef<IDocumentController>(this->AsShared())
 					});
 			}
-			return FInvalidGraphController::GetInvalid();
+			return IGraphController::GetInvalidHandle();
 		}
 
 		TArray<FGraphHandle> FDocumentController::GetSubgraphHandles() 
