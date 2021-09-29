@@ -41,7 +41,7 @@ void UFractureTransformGizmoSettings::ResetGizmo(bool bResetRotation)
 	TransformGizmo->SetVisibility((bool)CombinedBounds.IsValid);
 	if (CombinedBounds.IsValid)
 	{
-		if (bCenterOnSelection && !GIsTransacting)
+		if (bCenterOnSelection && !GIsTransacting && GUndo)
 		{
 			FTransform Transform = TransformProxy->GetTransform();
 			Transform.SetTranslation(CombinedBounds.GetCenter());
