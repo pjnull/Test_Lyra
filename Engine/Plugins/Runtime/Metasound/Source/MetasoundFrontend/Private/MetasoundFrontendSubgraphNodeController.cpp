@@ -88,7 +88,7 @@ namespace Metasound
 					}
 				}
 			}
-			return FInvalidNodeController::GetInvalid();
+			return INodeController::GetInvalidHandle();
 		}
 
 		FConstNodeHandle FSubgraphNodeController::CreateConstNodeHandle(const FSubgraphNodeController::FInitParams& InParams)
@@ -108,7 +108,7 @@ namespace Metasound
 					}
 				}
 			}
-			return FInvalidNodeController::GetInvalid();
+			return INodeController::GetInvalidHandle();
 		}
 
 		bool FSubgraphNodeController::IsValid() const

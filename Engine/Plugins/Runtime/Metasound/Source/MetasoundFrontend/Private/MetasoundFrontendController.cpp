@@ -11,27 +11,38 @@ namespace Metasound
 	{
 		FOutputHandle IOutputController::GetInvalidHandle()
 		{
-			return FInvalidOutputController::GetInvalid();
+			static FOutputHandle Invalid = MakeShared<FInvalidOutputController>();
+			return Invalid;
 		}
 
 		FInputHandle IInputController::GetInvalidHandle()
 		{
-			return FInvalidInputController::GetInvalid();
+			static FInputHandle Invalid = MakeShared<FInvalidInputController>();
+			return Invalid;
+		}
+
+		FVariableHandle IVariableController::GetInvalidHandle()
+		{
+			static FVariableHandle Invalid = MakeShared<FInvalidVariableController>();
+			return Invalid;
 		}
 
 		FNodeHandle INodeController::GetInvalidHandle()
 		{
-			return FInvalidNodeController::GetInvalid();
+			static FNodeHandle Invalid = MakeShared<FInvalidNodeController>();
+			return Invalid;
 		}
 
 		FGraphHandle IGraphController::GetInvalidHandle()
 		{
-			return FInvalidGraphController::GetInvalid();
+			static FGraphHandle Invalid = MakeShared<FInvalidGraphController>();
+			return Invalid;
 		}
 
 		FDocumentHandle IDocumentController::GetInvalidHandle()
 		{
-			return FInvalidDocumentController::GetInvalid();
+			static FDocumentHandle Invalid = MakeShared<FInvalidDocumentController>();
+			return Invalid;
 		}
 			
 		FDocumentHandle IDocumentController::CreateDocumentHandle(FDocumentAccessPtr InDocument)
