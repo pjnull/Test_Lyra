@@ -185,8 +185,8 @@ struct FTextureToComponentHelper
 			}
 
 			{
-				TArray<UTexture2D*>& WeightmapTextures = Component->GetWeightmapTextures();
-				TArray<FWeightmapLayerAllocationInfo>& AllocInfos = Component->GetWeightmapLayerAllocations();
+				const TArray<UTexture2D*>& WeightmapTextures = Component->GetWeightmapTextures();
+				const TArray<FWeightmapLayerAllocationInfo>& AllocInfos = Component->GetWeightmapLayerAllocations();
 
 				for (FWeightmapLayerAllocationInfo const& AllocInfo : AllocInfos)
 				{
@@ -3114,11 +3114,13 @@ int32 ALandscape::RegenerateLayersHeightmaps(FTextureToComponentHelper const& Ma
 
 void ALandscape::UpdateForChangedHeightmaps(ULandscapeComponent* InComponent, const FLandscapeEditLayerReadbackResult& InReadbackResult)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(LandscapeLayers_UpdateForChangedHeightmaps);
+
 	// If the source data has changed, mark the component as needing a collision data update:
 	//  - If ELandscapeComponentUpdateFlag::Component_Update_Heightmap_Collision is passed, it will be done immediately
 	//  - If not, at least the component's collision data will still get updated eventually, when the flag is finally passed :
 	if (InReadbackResult.bModified)
-	{
+{
 		InComponent->SetPendingCollisionDataUpdate(true);
 	}
 
@@ -3132,8 +3134,8 @@ void ALandscape::UpdateForChangedHeightmaps(ULandscapeComponent* InComponent, co
 			InComponent->UpdateCachedBounds();
 			InComponent->UpdateComponentToWorld();
 
-			// Avoid updating height field if we are going to recreate collision in this update
-			bool bUpdateHeightfieldRegion = !IsUpdateFlagEnabledForModes(ELandscapeComponentUpdateFlag::Component_Update_Recreate_Collision, HeightUpdateMode);
+		// Avoid updating height field if we are going to recreate collision in this update
+		bool bUpdateHeightfieldRegion = !IsUpdateFlagEnabledForModes(ELandscapeComponentUpdateFlag::Component_Update_Recreate_Collision, HeightUpdateMode);
 			InComponent->UpdateCollisionData(bUpdateHeightfieldRegion);
 			InComponent->SetPendingCollisionDataUpdate(false);
 		}
@@ -3387,6 +3389,8 @@ bool ALandscape::ResolveLayersTexture(
 	const int32 CompletedReadbackNum = InCPUReadback->GetCompletedResultNum();
 	if (CompletedReadbackNum > 0)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(LandscapeLayers_PerformReadbacks);
+
 		// Copy final result to texture source.
 		TArray<TArray<FColor>> const& OutMipsData = InCPUReadback->GetResult(CompletedReadbackNum - 1);
 
@@ -3406,13 +3410,13 @@ bool ALandscape::ResolveLayersTexture(
 						DirtyDelegate(InOutputTexture, (FColor*)TextureData, OutMipsData[MipIndex].GetData());
 						bChanged = true;
 					}
+					}
+
+					FMemory::Memcpy(TextureData, OutMipsData[MipIndex].GetData(), OutMipsData[MipIndex].Num() * sizeof(FColor));
+
+					InOutputTexture->Source.UnlockMip(MipIndex);
 				}
-
-				FMemory::Memcpy(TextureData, OutMipsData[MipIndex].GetData(), OutMipsData[MipIndex].Num() * sizeof(FColor));
-
-				InOutputTexture->Source.UnlockMip(MipIndex);
 			}
-		}
 
 		// Process component flags from all result contexts.
 		for (int32 ResultIndex = 0; ResultIndex < CompletedReadbackNum; ++ResultIndex)
@@ -5206,6 +5210,8 @@ void ALandscape::UpdateLayersContent(bool bInWaitForStreaming, bool bInSkipMonit
 	{
 		LandscapeEdMode->PostUpdateLayerContent();
 	}
+
+	FLandscapeEditLayerReadback::GarbageCollectTasks();
 }
 
 // not thread safe
@@ -5413,8 +5419,6 @@ void ALandscape::TickLayers(float DeltaTime)
 
 		UpdateLayersContent();
 	}
-
-	FLandscapeEditLayerReadback::GarbageCollectTasks();
 }
 
 #endif
