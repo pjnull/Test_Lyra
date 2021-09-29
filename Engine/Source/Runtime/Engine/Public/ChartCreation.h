@@ -228,6 +228,7 @@ public:
 	bool bIsChartingPaused;
 	
 	// memory stats
+	uint32 NumFramesAtCriticalMemoryPressure;
 	uint64 MaxPhysicalMemory;
 	uint64 MaxVirtualMemory;
 	uint64 MinPhysicalMemory;

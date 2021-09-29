@@ -13,6 +13,10 @@
 #include <sys/sysinfo.h>
 #include <sys/mman.h>
 
+#include "Android/AndroidPlatformCrashContext.h"
+#include "Async/TaskGraphInterfaces.h"
+#include "Async/Async.h"
+
 #define JNI_CURRENT_VERSION JNI_VERSION_1_6
 extern JavaVM* GJavaVM;
 
@@ -53,6 +57,8 @@ void FAndroidPlatformMemory::Init()
 		float(MemoryConstants.PageSize/1024.0)
 		);
 }
+
+extern void (*GMemoryWarningHandler)(const FGenericMemoryWarningContext& Context);
 
 namespace AndroidPlatformMemory
 {
@@ -95,6 +101,28 @@ namespace AndroidPlatformMemory
 
 		// we were unable to find whitespace in front of the number
 		return 0;
+	}
+
+	static FAndroidMemoryWarningContext GAndroidMemoryWarningContext;
+	static void SendMemoryWarningContext()
+	{
+		if (FTaskGraphInterface::IsRunning())
+		{
+			// Run on game thread to avoid mem handler callback getting confused.
+			AsyncTask(ENamedThreads::GameThread, [AndroidMemoryWarningContext = GAndroidMemoryWarningContext]()
+				{
+					if (GMemoryWarningHandler)
+					{
+						// note that we may also call this when recovering from low memory conditions. (i.e. not in low memory state.)
+						GMemoryWarningHandler(AndroidMemoryWarningContext);
+					}
+				});
+		}
+		else
+		{
+			const FAndroidMemoryWarningContext& Context = GAndroidMemoryWarningContext;
+			UE_LOG(LogAndroid, Warning, TEXT("Not calling memory warning handler, received too early. Last Trim Memory State: %d"), (int)Context.LastTrimMemoryState);
+		}
 	}
 }
 
@@ -204,6 +232,28 @@ FPlatformMemoryStats FAndroidPlatformMemory::GetStats()
 	}
 #endif
 
+	// convert Android's TRIM status to FGenericPlatformMemoryStats::EMemoryPressureStatus.
+	auto AndroidTRIMToMemPressureStatus = [](EAndroidTrimMemoryValues LastTrimMemoryState)
+	{
+		switch (LastTrimMemoryState)
+		{
+			case EAndroidTrimMemoryValues::Running_Critical:
+				return FGenericPlatformMemoryStats::EMemoryPressureStatus::Critical;
+			case EAndroidTrimMemoryValues::Unknown:
+				return FGenericPlatformMemoryStats::EMemoryPressureStatus::Unknown;
+			case EAndroidTrimMemoryValues::Complete:
+			case EAndroidTrimMemoryValues::Moderate:
+			case EAndroidTrimMemoryValues::Background:
+			case EAndroidTrimMemoryValues::UI_Hidden:
+			case EAndroidTrimMemoryValues::Running_Low:
+			case EAndroidTrimMemoryValues::Running_Moderate:
+			default:
+				return FGenericPlatformMemoryStats::EMemoryPressureStatus::Nominal;
+		}
+	};
+
+	MemoryStats.MemoryPressureStatus = AndroidTRIMToMemPressureStatus(AndroidPlatformMemory::GAndroidMemoryWarningContext.LastTrimMemoryState);
+
 	return MemoryStats;
 }
 
@@ -241,6 +291,20 @@ uint64 FAndroidPlatformMemory::GetMemoryUsedFast()
 	return 0;
 }
 
+// Called from JNI when trim messages are recieved.
+void FAndroidPlatformMemory::UpdateOSMemoryStatus(EOSMemoryStatusCategory OSMemoryStatusCategory, int Value)
+{
+	switch (OSMemoryStatusCategory)
+	{
+		case EOSMemoryStatusCategory::OSTrim:
+			AndroidPlatformMemory::GAndroidMemoryWarningContext.LastTrimMemoryState = (FAndroidPlatformMemory::EAndroidTrimMemoryValues)Value;
+			break;
+		default:
+			checkNoEntry();
+	}
+
+	AndroidPlatformMemory::SendMemoryWarningContext();
+}
 
 const FPlatformMemoryConstants& FAndroidPlatformMemory::GetConstants()
 {

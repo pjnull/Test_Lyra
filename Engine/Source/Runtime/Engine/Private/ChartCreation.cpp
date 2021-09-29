@@ -617,6 +617,7 @@ void FPerformanceTrackingChart::Reset(const FDateTime& InStartTime)
 	AccumulatedChartTime = 0.0;
 	TimeDisregarded = 0.0;
 	FramesDisregarded = 0;
+	NumFramesAtCriticalMemoryPressure = 0;
 	MaxPhysicalMemory = 0;
 	MaxVirtualMemory = 0;
 	MinPhysicalMemory = ULONG_MAX;
@@ -701,6 +702,7 @@ void FPerformanceTrackingChart::AccumulateWith(const FPerformanceTrackingChart& 
 	TimeDisregarded += Chart.TimeDisregarded;
 	FramesDisregarded += Chart.FramesDisregarded;
 	CaptureStartTime = FMath::Min(CaptureStartTime, Chart.CaptureStartTime);
+	NumFramesAtCriticalMemoryPressure += Chart.NumFramesAtCriticalMemoryPressure;
 	MaxPhysicalMemory = FMath::Max(MaxPhysicalMemory, Chart.MaxPhysicalMemory);
 	MaxVirtualMemory = FMath::Min(MaxVirtualMemory, Chart.MaxVirtualMemory);
 	MinPhysicalMemory = FMath::Min(MinPhysicalMemory, Chart.MinPhysicalMemory);
@@ -803,6 +805,7 @@ void FPerformanceTrackingChart::ProcessFrame(const FFrameData& FrameData)
 		MinAvailablePhysicalMemory = FMath::Min(MinAvailablePhysicalMemory, static_cast<uint64>(MemoryStats.GetAvailablePhysical(true)));
 		TotalPhysicalMemoryUsed += MemoryStats.UsedPhysical;
 		TotalVirtualMemoryUsed += MemoryStats.UsedVirtual;
+		NumFramesAtCriticalMemoryPressure += MemoryStats.MemoryPressureStatus == FGenericPlatformMemoryStats::EMemoryPressureStatus::Critical ? 1 : 0;
 
 		// Handle hitching
 		if (FrameData.HitchStatus != EFrameHitchType::NoHitch)
