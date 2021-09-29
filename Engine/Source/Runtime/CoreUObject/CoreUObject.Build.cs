@@ -27,5 +27,10 @@ public class CoreUObject : ModuleRules
 
 		//@TODO: UE-127233
 		// UnsafeTypeCastWarningLevel = WarningLevel.Warning;
+
+		if (Target.bBuildWithEditorOnlyData)
+		{
+			PrivateDependencyModuleNames.Add("DerivedDataCache");
+		}
 	}
 }
