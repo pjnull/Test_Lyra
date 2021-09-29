@@ -13,6 +13,7 @@
 #include "MetasoundOperatorSettings.h"
 #include "MetasoundTrigger.h"
 #include "Misc/Guid.h"
+#include "Templates/TypeHash.h"
 #include "UObject/NameTypes.h"
 
 #include <atomic>
@@ -58,8 +59,8 @@ namespace Metasound
 
 		friend uint32 GetTypeHash(const FSendAddress& InAddress)
 		{
-			uint32 HashedChannel = HashCombineFast(GetTypeHash(InAddress.DataType), GetTypeHash(InAddress.ChannelName));
-			HashedChannel = HashCombineFast(HashedChannel, GetTypeHash(InAddress.InstanceID));
+			uint32 HashedChannel = HashCombineFast(::GetTypeHash(InAddress.DataType), ::GetTypeHash(InAddress.ChannelName));
+			HashedChannel = HashCombineFast(HashedChannel, ::GetTypeHash(InAddress.InstanceID));
 			return HashedChannel;
 		}
 
