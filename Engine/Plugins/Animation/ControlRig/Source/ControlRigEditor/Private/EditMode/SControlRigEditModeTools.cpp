@@ -12,6 +12,7 @@
 #include "Modules/ModuleManager.h"
 #include "ControlRigEditMode.h"
 #include "EditorModeManager.h"
+#include "Widgets/Input/SButton.h"
 #include "Widgets/Layout/SExpandableArea.h"
 #include "Widgets/Layout/SScrollBox.h"
 #include "MovieSceneSequence.h"
