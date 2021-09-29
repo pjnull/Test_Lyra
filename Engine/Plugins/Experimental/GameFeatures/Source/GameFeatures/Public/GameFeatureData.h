@@ -9,6 +9,21 @@
 
 #include "GameFeatureData.generated.h"
 
+// experience data, currently bundled with game feature data, but may move elsewhere
+USTRUCT()
+struct GAMEFEATURES_API FVkExperienceData
+{
+	GENERATED_BODY()
+
+	/** main map to stream in */
+	UPROPERTY(EditAnywhere, Category="Experience")
+	TSoftObjectPtr<UWorld> DefaultMap;
+
+	/** optional base map (intended to support using ready-made base terrains) */
+	UPROPERTY(EditAnywhere, Category="Experience")
+	TSoftObjectPtr<UWorld> BaseMap;
+};
+
 /** Data related to a game feature, a collection of code and content that adds a separable discrete feature to the game */
 UCLASS()
 class GAMEFEATURES_API UGameFeatureData : public UPrimaryDataAsset
@@ -44,6 +59,7 @@ public:
 
 	const TArray<UGameFeatureAction*>& GetActions() const { return Actions; }
 
+	const FVkExperienceData& GetExperienceData() const { return ExperienceData; }
 private:
 	/** Internal helper function to reload config data on objects as a result of a plugin INI being loaded */
 	void ReloadConfigs(FConfigFile& PluginConfig) const;
@@ -57,4 +73,7 @@ protected:
 	/** List of asset types to scan at startup */
 	UPROPERTY(EditAnywhere, Category="Game Feature | Asset Manager", meta=(TitleProperty="PrimaryAssetType"))
 	TArray<FPrimaryAssetTypeInfo> PrimaryAssetTypesToScan;
+
+	UPROPERTY(EditAnywhere, Category="Experience")
+	FVkExperienceData ExperienceData;
 };
