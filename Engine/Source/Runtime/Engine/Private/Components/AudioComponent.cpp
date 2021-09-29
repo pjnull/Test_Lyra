@@ -478,7 +478,7 @@ void UAudioComponent::PlayQuantized(
 		PendingQuartzCommandData.Add(AudioComponentQuartzCommandData);
 		PlayQueuedQuantizedInternal(WorldContextObject, NewComponentCommandInfo);
 	}
-	else
+	else if(InClockHandle)
 	{
 		// We need to make an "anticipatory" quantization boundary
 		PendingQuartzCommandData.Add(AudioComponentQuartzCommandData); 
