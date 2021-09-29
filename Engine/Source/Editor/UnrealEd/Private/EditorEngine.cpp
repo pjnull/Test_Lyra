@@ -7594,15 +7594,17 @@ ULevelEditorDragDropHandler* UEditorEngine::GetLevelEditorDragDropHandler() cons
 {
 	if (DragDropHandler == nullptr)
 	{
-		DragDropHandler = const_cast<UEditorEngine*>(this)->CreateLevelEditorDragDropHandler();
+		if (OnCreateLevelEditorDragDropHandlerDelegate.IsBound())
+		{
+			DragDropHandler = OnCreateLevelEditorDragDropHandlerDelegate.Execute();
+		}
+		else
+		{
+			DragDropHandler = NewObject<ULevelEditorDragDropHandler>(const_cast<UEditorEngine*>(this));
+		}
 	}
 
 	return DragDropHandler;
-}
-
-ULevelEditorDragDropHandler* UEditorEngine::CreateLevelEditorDragDropHandler()
-{
-	return NewObject<ULevelEditorDragDropHandler>(this);
 }
 
 #undef LOCTEXT_NAMESPACE 
