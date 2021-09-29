@@ -467,7 +467,7 @@ public:
 			}
 			else
 			{
-				BuildCookRunParams += FString::Printf(TEXT(" -clientconfig=%s"), LexToString(ConfigurationInfo.Configuration));
+				BuildCookRunParams += FString::Printf(TEXT(" -target=%s -clientconfig=%s"), *BuildTargetInfo->Name, LexToString(ConfigurationInfo.Configuration));
 			}
 		}
 // 		else if (Mode == EPrepareContentMode::PrepareForDebugging)
