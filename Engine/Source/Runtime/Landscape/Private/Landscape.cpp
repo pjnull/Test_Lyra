@@ -514,6 +514,8 @@ void ULandscapeComponent::Serialize(FArchive& Ar)
 		{
 			Ar << GrassData.Get();
 		}
+
+		checkf(IsTemplate() || GrassData->HasValidData() || Ar.IsTransacting(), TEXT("If this asserts, then serialization occurred on grass data that wasn't properly loaded/computed. It's a problem"));
 	}
 
 #if WITH_EDITOR
