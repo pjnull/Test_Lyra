@@ -2259,6 +2259,27 @@ public:
 	FTraceHandle	AsyncOverlapByObjectType(const FVector& Pos, const FQuat& Rot, const FCollisionObjectQueryParams& ObjectQueryParams, const FCollisionShape& CollisionShape, const FCollisionQueryParams& Params = FCollisionQueryParams::DefaultQueryParam, FOverlapDelegate * InDelegate = NULL, uint32 UserData = 0);
 
 	/**
+	 * Interface for Async trace
+	 * Pretty much same parameter set except you can optional set delegate to be called when execution is completed and you can set UserData if you'd like
+	 * if no delegate, you can query trace data using QueryTraceData or QueryOverlapData
+	 * the data is available only in the next frame after request is made - in other words, if request is made in frame X, you can get the result in frame (X+1)
+	 *
+	 *  @param  Pos             Location of center of shape to test against the world
+	 *  @param  ProfileName     The 'profile' used to determine which components to hit
+	 *  @param	CollisionShape		CollisionShape - supports Box, Sphere, Capsule
+	 *  @param  Params          Additional parameters used for the trace
+	 *	@param	InDeleagte		Delegate function to be called - to see example, search FTraceDelegate
+	 *							Example can be void MyActor::TraceDone(const FTraceHandle& TraceHandle, FTraceDatum & TraceData)
+	 *							Before sending to the function,
+	 *
+	 *							FTraceDelegate TraceDelegate;
+	 *							TraceDelegate.BindRaw(this, &MyActor::TraceDone);
+	 *
+	 *	@param UserData			UserData
+	 */
+	FTraceHandle	AsyncOverlapByProfile(const FVector& Pos, const FQuat& Rot, FName ProfileName, const FCollisionShape& CollisionShape, const FCollisionQueryParams& Params = FCollisionQueryParams::DefaultQueryParam, FOverlapDelegate* InDelegate = NULL, uint32 UserData = 0);
+
+	/**
 	 * Query function 
 	 * return true if already done and returning valid result - can be hit or no hit
 	 * return false if either expired or not yet evaluated or invalid
