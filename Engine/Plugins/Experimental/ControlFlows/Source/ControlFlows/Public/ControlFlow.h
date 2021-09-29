@@ -94,12 +94,26 @@ public:
 	}
 
 public:
+	template<typename...ArgsT>
+	FControlFlow& BranchFlow(ArgsT...Args)
+	{
+		return QueueStep(Args...);
+	}
+
+public:
 	//TODO: Revoke public access
 
 	FSimpleDelegate& QueueFunction(const FString& FlowNodeDebugName = TEXT(""));
 	FControlFlowWaitDelegate& QueueWait(const FString& FlowNodeDebugName = TEXT(""));
 	FControlFlowPopulator& QueueControlFlow(const FString& TaskName = TEXT(""), const FString& FlowNodeDebugName = TEXT(""));
 	FControlFlowBranchDefiner& QueueControlFlowBranch(const FString& TaskName = TEXT(""), const FString& FlowNodeDebugName = TEXT(""));
+
+private:
+	template<typename FunctionT, typename...ArgsT>
+	void QueueStep_Internal(const FString& InDebugName, FunctionT InBranchLambda, ArgsT...Params)
+	{
+		QueueControlFlowBranch(InDebugName).BindLambda(InBranchLambda, Params...);
+	}
 
 private:
 	template<typename BindingObjectT, typename...PayloadParamsT>
