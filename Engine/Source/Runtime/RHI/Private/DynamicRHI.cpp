@@ -204,9 +204,8 @@ static void RHIDetectAndWarnOfBadDrivers(bool bHasEditorToken)
 				}
 			}
 
-			FPlatformMisc::MessageBoxExt(EAppMsgType::Ok,
-				*LocalizedMsg.ToString(),
-				*NSLOCTEXT("MessageDialog", "TitleVideoCardDriverIssue", "WARNING: Known issues with graphics driver").ToString());
+			FText Title = NSLOCTEXT("MessageDialog", "TitleVideoCardDriverIssue", "WARNING: Known issues with graphics driver");
+			FMessageDialog::Open(EAppMsgType::Ok, LocalizedMsg, &Title);
 		}
 	}
 }
