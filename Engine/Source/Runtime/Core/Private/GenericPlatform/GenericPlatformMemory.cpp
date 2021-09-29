@@ -108,6 +108,7 @@ FGenericPlatformMemoryStats::FGenericPlatformMemoryStats()
 	, PeakUsedPhysical( 0 )
 	, UsedVirtual( 0 )
 	, PeakUsedVirtual( 0 )
+	, MemoryPressureStatus( EMemoryPressureStatus::Unknown )
 {}
 
 bool FGenericPlatformMemory::bIsOOM = false;
