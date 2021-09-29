@@ -5,7 +5,6 @@
 #include "Animation/AnimNodeBase.h"
 
 #include "CoreMinimal.h"
-#include "LiveLinkClientReference.h"
 #include "LiveLinkRetargetAsset.h"
 #include "LiveLinkTypes.h"
 
@@ -18,7 +17,7 @@ class ILiveLinkClient;
 PRAGMA_DISABLE_DEPRECATION_WARNINGS
 
 USTRUCT(BlueprintInternalUseOnly)
-struct LIVELINK_API FAnimNode_LiveLinkPose : public FAnimNode_Base
+struct LIVELINKANIMATIONCORE_API FAnimNode_LiveLinkPose : public FAnimNode_Base
 {
 	GENERATED_BODY()
 
@@ -61,7 +60,6 @@ protected:
 
 private:
 
-	FLiveLinkClientReference LiveLinkClient_GameThread;
 	ILiveLinkClient* LiveLinkClient_AnyThread;
 
 	// Delta time from update so that it can be passed to retargeter

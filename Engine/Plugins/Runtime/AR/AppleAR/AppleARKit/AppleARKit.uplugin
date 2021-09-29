@@ -37,10 +37,6 @@
             "Enabled": true
 		},
 		{
-            "Name": "LiveLink",
-            "Enabled": true
-        },
-		{
             "Name": "ARUtilities",
             "Enabled": true
         }

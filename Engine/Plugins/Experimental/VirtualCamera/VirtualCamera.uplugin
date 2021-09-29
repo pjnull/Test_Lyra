@@ -65,10 +65,6 @@
 			"Enabled": true
 		},
 		{
-			"Name": "LiveLink",
-			"Enabled": true
-		},
-		{
 			"Name": "RemoteSession",
 			"Enabled": true
 		},
