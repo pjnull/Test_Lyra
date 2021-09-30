@@ -2763,7 +2763,9 @@ void USkeletalMesh::CreateUserSectionsDataForLegacyAssets()
 			}
 			bMustUseReductionSourceData = false;
 		}
-		ThisLODModel.UpdateChunkedSectionInfo(GetName());
+
+		const int32 NumberOfClothAssets = GetMeshClothingAssets().Num();
+		ThisLODModel.UpdateChunkedSectionInfo(GetName(), NumberOfClothAssets);
 
 		if (bMustUseReductionSourceData)
 		{
