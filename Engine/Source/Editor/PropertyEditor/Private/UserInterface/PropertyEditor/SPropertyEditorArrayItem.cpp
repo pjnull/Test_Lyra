@@ -43,9 +43,14 @@ FPropertyAccess::Result FTitleMetadataFormatter::GetDisplayText(FText& OutText) 
 	for(TSharedPtr<IPropertyHandle> PropertyHandle : PropertyHandles)
 	{
 		FText ReplaceValue;
-		if (PropertyHandle->GetValueAsDisplayText(ReplaceValue))
+		FPropertyAccess::Result Result = PropertyHandle->GetValueAsDisplayText(ReplaceValue);
+		if (Result == FPropertyAccess::Success)
 		{
 			FormatArgs.Add(PropertyHandle->GetProperty()->GetName(), ReplaceValue);
+		}
+		else
+		{
+			return Result;
 		}
 	}
 
