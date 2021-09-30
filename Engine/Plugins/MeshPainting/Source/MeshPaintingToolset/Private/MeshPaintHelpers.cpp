@@ -5,6 +5,7 @@
 #include "MeshPaintingToolsetTypes.h"
 #include "IMeshPaintComponentAdapter.h"
 #include "MeshPaintAdapterFactory.h"
+#include "Components/SplineMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
@@ -1397,11 +1398,18 @@ void UMeshPaintingSubsystem::ApplyVertexColorsToAllLODs(IMeshPaintComponentAdapt
 	}
 }
 
-TSharedPtr<IMeshPaintComponentAdapter> UMeshPaintingSubsystem::GetAdapterForComponent(const UMeshComponent* InComponent) const
+FName UMeshPaintingSubsystem::GetComponentActorName(const UMeshComponent* InComponent) const
 {
+	check(InComponent);
+
 	FString ComponentActorString;
-	
-	if (const UStaticMeshComponent* InStaticMeshComponent = Cast<UStaticMeshComponent>(InComponent))
+
+	// Must check USplineMeshComponent before UStaticMeshComponent since the former derives from the latter.
+	if (InComponent->IsA(USplineMeshComponent::StaticClass()))
+	{
+		ComponentActorString = InComponent->GetName();
+	}
+	else if (const UStaticMeshComponent* InStaticMeshComponent = Cast<UStaticMeshComponent>(InComponent))
 	{
 		ComponentActorString = InStaticMeshComponent->GetStaticMesh()->GetName();
 	}
@@ -1415,40 +1423,34 @@ TSharedPtr<IMeshPaintComponentAdapter> UMeshPaintingSubsystem::GetAdapterForComp
 		{
 			return TSharedPtr<IMeshPaintComponentAdapter>();
 		}
-	} 
-	else
-	{
-		return TSharedPtr<IMeshPaintComponentAdapter>();
-	}
-	ComponentActorString += TEXT("_") + InComponent->GetOwner()->GetName();
-	const FName ComponentActorName = FName(ComponentActorString);
-	const TSharedPtr<IMeshPaintComponentAdapter>* MeshAdapterPtr = ComponentToAdapterMap.Find(ComponentActorName);
-	return MeshAdapterPtr ? *MeshAdapterPtr : TSharedPtr<IMeshPaintComponentAdapter>();
-}
-
-void UMeshPaintingSubsystem::AddToComponentToAdapterMap(const UMeshComponent* InComponent, const TSharedPtr<IMeshPaintComponentAdapter> InAdapter) 
-{
-	if (!InAdapter)
-	{
-		return;
-	}
-
-	FString ComponentActorString;
-	if (const UStaticMeshComponent* InStaticMeshComponent = Cast<UStaticMeshComponent>(InComponent))
-	{
-		ComponentActorString = InStaticMeshComponent->GetStaticMesh()->GetName();
-	}
-	else if (const USkeletalMeshComponent* InSkeletalMeshComponent = Cast<USkeletalMeshComponent>(InComponent))
-	{
-		ComponentActorString = InSkeletalMeshComponent->SkeletalMesh->GetName();
 	}
 	else
 	{
 		ComponentActorString = InComponent->GetName();
 	}
 	ComponentActorString += TEXT("_") + InComponent->GetOwner()->GetName();
-	const FName ComponentActorName = FName(ComponentActorString);
-	ComponentToAdapterMap.Add(ComponentActorName, InAdapter);
+	return FName(ComponentActorString);
+}
+
+TSharedPtr<IMeshPaintComponentAdapter> UMeshPaintingSubsystem::GetAdapterForComponent(const UMeshComponent* InComponent) const
+{
+	if (InComponent)
+	{
+		FName ComponentActorName = GetComponentActorName(InComponent);
+		const TSharedPtr<IMeshPaintComponentAdapter>* MeshAdapterPtr = ComponentToAdapterMap.Find(ComponentActorName);
+		return MeshAdapterPtr ? *MeshAdapterPtr : TSharedPtr<IMeshPaintComponentAdapter>();
+	}
+
+	return TSharedPtr<IMeshPaintComponentAdapter>();
+}
+
+void UMeshPaintingSubsystem::AddToComponentToAdapterMap(const UMeshComponent* InComponent, const TSharedPtr<IMeshPaintComponentAdapter> InAdapter) 
+{
+	if (InComponent && InAdapter)
+	{
+		FName ComponentActorName = GetComponentActorName(InComponent);
+		ComponentToAdapterMap.Add(ComponentActorName, InAdapter);
+	}
 }
 
 TArray<UMeshComponent*> UMeshPaintingSubsystem::GetSelectedMeshComponents() const
