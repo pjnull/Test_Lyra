@@ -430,11 +430,12 @@ public:
 		, bIsFocusable(false)
 		, bForceSmallIcons(InForceSmallIcons)
 	{
+		MultiBox->bIsFocusable = bIsFocusable;
 	}
 
 	void SetLabelVisibility( EVisibility InLabelVisibility ) { LabelVisibility  = InLabelVisibility ; }
 
-	void SetIsFocusable( bool bInIsFocusable ) { bIsFocusable = bInIsFocusable; }
+	void SetIsFocusable(bool bInIsFocusable);
 
 	/**
 	 * Adds a tool bar button

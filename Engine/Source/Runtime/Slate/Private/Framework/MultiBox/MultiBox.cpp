@@ -1003,6 +1003,7 @@ void SMultiBoxWidget::BuildMultiBoxWidget()
 		{
 			MainWidget = HorizontalBox = ClippedHorizontalBox = SNew(SClippingHorizontalBox)
 				.OnWrapButtonClicked(FOnGetContent::CreateSP(this, &SMultiBoxWidget::OnWrapButtonClicked))
+				.IsFocusable(MultiBox->bIsFocusable)
 				.StyleSet(StyleSet)
 				.StyleName(StyleName);
 		}
@@ -1501,7 +1502,7 @@ FReply SMultiBoxWidget::OnDrop( const FGeometry& MyGeometry, const FDragDropEven
 
 bool SMultiBoxWidget::SupportsKeyboardFocus() const
 {
-	return true;
+	return MultiBox->bIsFocusable;
 }
 
 FReply SMultiBoxWidget::FocusNextWidget(EUINavigation NavigationType)
