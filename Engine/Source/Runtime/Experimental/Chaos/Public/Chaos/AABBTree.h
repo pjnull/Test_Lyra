@@ -14,10 +14,13 @@
 
 CSV_DECLARE_CATEGORY_EXTERN(ChaosPhysicsTimers);
 
-struct FAABBTreeCVars
+struct CHAOS_API FAABBTreeCVars
 {
 	static int32 UpdateDirtyElementPayloadData;
 	static FAutoConsoleVariableRef CVarUpdateDirtyElementPayloadData;
+
+	static float MaxNonGlobalElementBoundsExtrema; 
+	static FAutoConsoleVariableRef CVarMaxNonGlobalElementBoundsExtrema;
 };
 
 struct CHAOS_API FAABBTreeDirtyGridCVars
@@ -939,6 +942,39 @@ public:
 		return GlobalPayloads;
 	}
 
+	// Returns true if bounds appear valid. Returns false if extremely large values, contains NaN, or is empty.
+	FORCEINLINE_DEBUGGABLE bool ValidateBounds(const TAABB<T, 3>& Bounds)
+	{
+		const TVec3<T>& Min = Bounds.Min();
+		const TVec3<T>& Max = Bounds.Max();
+
+		for (int32 i = 0; i < 3; ++i)
+		{
+			const T& MinComponent = Min[i];
+			const T& MaxComponent = Max[i];
+
+			// If element is extremely far out on any axis, if past limit return false to make it a global element and prevent huge numbers poisoning splitting algorithm computation.
+			if (MinComponent <= -FAABBTreeCVars::MaxNonGlobalElementBoundsExtrema || MaxComponent >= FAABBTreeCVars::MaxNonGlobalElementBoundsExtrema)
+			{
+				return false;
+			}
+
+			// Are we an empty aabb?
+			if (MinComponent > MaxComponent)
+			{
+				return false;
+			}
+
+			// Are we NaN/Inf?
+			if (!FMath::IsFinite(MinComponent) || !FMath::IsFinite(MaxComponent))
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
 	virtual void Serialize(FChaosArchive& Ar) override
 	{
 		Ar.UsingCustomVersion(FExternalPhysicsCustomObjectVersion::GUID);
@@ -1360,6 +1396,16 @@ private:
 				bool bHasBoundingBox = HasBoundingBox(Particle);
 				auto Payload = Particle.template GetPayload<TPayloadType>(Idx);
 				TAABB<T, 3> ElemBounds = ComputeWorldSpaceBoundingBox(Particle, false, (T)0);
+
+				// If bounds are bad, use global so we won't screw up splitting computations.
+				if (ValidateBounds(ElemBounds) == false)
+				{
+					bHasBoundingBox = false;
+					ensureMsgf(false, TEXT("AABBTree encountered invalid bounds input. Forcing element to global payload. Min: %s Max: %s. If Bounds are valid but large, increase FAABBTreeCVars::MaxNonGlobalElementBoundsExtrema."),
+						*ElemBounds.Min().ToString(), *ElemBounds.Max().ToString());
+				}
+
+
 				if (bHasBoundingBox)
 				{
 					if (ElemBounds.Extents().Max() > MaxPayloadBounds)
