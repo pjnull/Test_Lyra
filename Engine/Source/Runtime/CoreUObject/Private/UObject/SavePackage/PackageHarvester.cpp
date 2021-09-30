@@ -477,7 +477,7 @@ FArchive& FPackageHarvester::operator<<(FSoftObjectPath& Value)
 
 		ThreadContext.GetSerializationOptions(ReferencingPackageName, ReferencingPropertyName, CollectType, SerializeType, this);
 
-		if (CollectType != ESoftObjectPathCollectType::NeverCollect)
+		if (CollectType != ESoftObjectPathCollectType::NeverCollect && CollectType != ESoftObjectPathCollectType::NonPackage)
 		{
 			// Don't track if this is a never collect path
 			FString Path = Value.ToString();

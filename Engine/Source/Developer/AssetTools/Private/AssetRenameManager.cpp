@@ -572,7 +572,7 @@ struct FSoftObjectPathRenameSerializer : public FArchiveUObject
 
 			ThreadContext.GetSerializationOptions(ReferencingPackageName, ReferencingPropertyName, CollectType, SerializeType, this);
 
-			if (CollectType == ESoftObjectPathCollectType::NeverCollect)
+			if (CollectType == ESoftObjectPathCollectType::NeverCollect || CollectType == ESoftObjectPathCollectType::NonPackage)
 			{
 				return *this;
 			}

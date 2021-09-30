@@ -581,6 +581,7 @@ bool UCookOnTheFlyServer::StartCookOnTheFly(FCookOnTheFlyOptions InCookOnTheFlyO
 		PackageTracker->NeverCookPackageList.Add(NeverCookPackage);
 	}
 
+	GRedirectCollector.OnStartupPackageLoadComplete();
 
 	{
 		UE::Cook::FPlatformManager::FReadScopeLock PlatformScopeLock(PlatformManager->ReadLockPlatforms());
@@ -7900,6 +7901,7 @@ void UCookOnTheFlyServer::StartCookByTheBook( const FCookByTheBookStartupOptions
 			GRedirectCollector.ProcessSoftObjectPathPackageList(StartupPackage, false, StartupSoftObjectPackages);
 		}
 	}
+	GRedirectCollector.OnStartupPackageLoadComplete();
 
 	TMap<FName, TArray<FName>> GameDefaultObjects;
 	GetGameDefaultObjects(TargetPlatforms, GameDefaultObjects);
