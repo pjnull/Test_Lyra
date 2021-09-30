@@ -2158,6 +2158,14 @@ void EOS_CALL FEOSVoiceChatUser::OnChannelAudioBeforeRenderStatic(const EOS_RTCA
 	}
 }
 
+static FString HACK_ProductUserIdToString(EOS_ProductUserId UserId)
+{
+	char UserIdStr[EOS_PRODUCTUSERID_MAX_LENGTH];
+	int32_t Length = sizeof(UserIdStr);
+	EOS_ProductUserId_ToString(UserId, UserIdStr, &Length);
+	return UTF8_TO_TCHAR(UserIdStr);
+}
+
 void FEOSVoiceChatUser::OnChannelAudioBeforeRender(const EOS_RTCAudio_AudioBeforeRenderCallbackInfo* CallbackInfo)
 {
 	if (EOS_RTCAudio_AudioBuffer* Buffer = CallbackInfo->Buffer)
@@ -2168,7 +2176,7 @@ void FEOSVoiceChatUser::OnChannelAudioBeforeRender(const EOS_RTCAudio_AudioBefor
 
 			// TODO EOS doesn't tell us if it's silence or not, maybe need to compare all the samples to some threshold?
 			const bool bIsSilence = false;
-			const FString PlayerName = ProductUserIdToString(CallbackInfo->ParticipantId);
+			const FString PlayerName = HACK_ProductUserIdToString(CallbackInfo->ParticipantId);
 
 			FScopeLock Lock(&BeforeRecvAudioRenderedLock);
 			OnVoiceChatBeforeRecvAudioRenderedDelegate.Broadcast(Samples, Buffer->SampleRate, Buffer->Channels, bIsSilence, PlayerName);
