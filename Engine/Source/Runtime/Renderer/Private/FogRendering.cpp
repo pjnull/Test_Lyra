@@ -131,7 +131,7 @@ public:
 	void SetParameters(FRHICommandList& RHICmdList, const FViewInfo& View, float FogClipSpaceZ)
 	{
 		FGlobalShader::SetParameters<FViewUniformShaderParameters>(RHICmdList, RHICmdList.GetBoundVertexShader(), View.ViewUniformBuffer);
-		SetShaderValue(RHICmdList, RHICmdList.GetBoundVertexShader(), FogStartZ, FogClipSpaceZ);
+		SetShaderValue(RHICmdList, RHICmdList.GetBoundVertexShader(),FogStartZ, FogClipSpaceZ);
 	}
 
 private:
