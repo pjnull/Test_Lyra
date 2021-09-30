@@ -114,12 +114,6 @@ private:
 		QueueControlFlowBranch(InDebugName).BindLambda(InBranchLambda, Params...);
 	}
 
-	template<typename FunctionT, typename...ArgsT>
-	void QueueStep_Internal(const FString& InDebugName, FunctionT InBranchLambda, ArgsT...Params)
-	{
-		QueueControlFlow(InDebugName).BindLambda(InBranchLambda, Params...);
-	}
-
 private:
 	template<typename BindingObjectT, typename...PayloadParamsT>
 	void QueueStep_Internal(const FString& InDebugName, TSharedRef<BindingObjectT> InBindingObject, PayloadParamsT...Params)
