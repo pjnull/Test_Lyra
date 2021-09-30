@@ -435,7 +435,6 @@ void FNiagaraAsyncCompileTask::WaitAndResolveResult()
 {
 	check(IsInGameThread());
 	
-
 	bWaitForCompileJob = true;
 	while (!IsDone())
 	{
@@ -2965,11 +2964,16 @@ bool UNiagaraSystem::RequestCompile(bool bForce, FNiagaraSystemUpdateContext* Op
 		return false;
 	}
 
-	if (ActiveCompilations.Num() > 0)
+	// we don't want to stack compilations, so we remove requests that have not started processing yet
+	for (int i = ActiveCompilations.Num() - 1; i >= 1; i--)
 	{
-		PollForCompilationComplete();
-	}
-	
+		FNiagaraSystemCompileRequest& Request = ActiveCompilations[i];
+		for (auto& AsyncTask : Request.DDCTasks)
+		{
+			AsyncTask->AbortTask();
+		}
+		ActiveCompilations.RemoveAt(i);
+	}	
 
 	// Record that we entered this function already.
 	SCOPE_CYCLE_COUNTER(STAT_Niagara_System_CompileScript);
@@ -3124,7 +3128,7 @@ bool UNiagaraSystem::RequestCompile(bool bForce, FNiagaraSystemUpdateContext* Op
 
 
 	// We might be able to just complete compilation right now if nothing needed compilation.
-	if (ScriptsNeedingCompile.Num() == 0)
+	if (ScriptsNeedingCompile.Num() == 0 && ActiveCompilations.Num() == 1)
 	{
 		ActiveCompilation.bAllScriptsSynchronized = true;
 		PollForCompilationComplete();
