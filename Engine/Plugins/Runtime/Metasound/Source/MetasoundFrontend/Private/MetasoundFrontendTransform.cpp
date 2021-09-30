@@ -460,7 +460,12 @@ namespace Metasound
 				return false;
 			}
 
-			if (!RootGraphHandle->GetGraphMetadata().GetAutoUpdateManagesInterface())
+			// Callers of this transform should check that the graph is supposed to
+			// be managed externally before calling this transform. If a scenario
+			// arises where this transform is used outside of AutoUpdate, then this
+			// early exist should be removed as it's mostly here to protect against
+			// accidental manipulation of metasound graphs.
+			if (!ensure(RootGraphHandle->GetGraphMetadata().GetAutoUpdateManagesInterface()))
 			{
 				return false;
 			}
@@ -471,208 +476,187 @@ namespace Metasound
 				return false;
 			}
 
-			// 2. Run transform to ensure preset matches reference archetype
+			// Run transform to ensure preset matches reference archetype
 			const FMetasoundFrontendVersion& RefArchetypeVersion = ReferencedDocument->GetArchetypeVersion();
 			FMatchRootGraphToArchetype(RefArchetypeVersion).Transform(InDocument);
 
-			using FDefaultKey = TPair<FVertexName, FName>;
-			struct FDefaultInputValue
-			{
-				FGuid VertexID;
-				FVertexName VertexName;
-				FMetasoundFrontendLiteral Literal;
-			};
-			struct FDefaultOutputValue
-			{
-				FGuid VertexID;
-				FVertexName VertexName;
-			};
-			TMap<FDefaultKey, FDefaultInputValue> InitInputDefaults;
-			TMap<FDefaultKey, FDefaultOutputValue> InitOutputDefaults;
+			// Determine the inputs and outputs needed in the wrapping graph. Also
+			// cache any exiting literals that have been set on the wrapping graph.
+			TArray<FMetasoundFrontendClassInput> ClassInputs = GenerateRequiredClassInputs(RootGraphHandle);
+			TArray<FMetasoundFrontendClassOutput> ClassOutputs = GenerateRequiredClassOutputs(RootGraphHandle);
 
-			// 1. Prep by caching existing output guids, input literal values, & clearing graph
-			RootGraphHandle->IterateConstNodes([&](FConstNodeHandle InputNode)
-			{
-				FGuid InputID = InputNode->GetID();
-				if (ensure(InputNode->GetNumInputs() == 1))
-				{
-					InputNode->IterateConstInputs([&](FConstInputHandle Input)
-					{
-						const FGuid InputVertexID = RootGraphHandle->GetVertexIDForInputVertex(InputNode->GetNodeName());
-						FMetasoundFrontendLiteral Literal = RootGraphHandle->GetDefaultInput(InputVertexID);
-
-						FDefaultKey Key(InputNode->GetNodeName(), Input->GetDataType());
-						FDefaultInputValue Value = { MoveTemp(InputID), InputNode->GetNodeName(), MoveTemp(Literal) };
-						InitInputDefaults.Emplace(MoveTemp(Key), MoveTemp(Value));
-					});
-				}
-			}, EMetasoundFrontendClassType::Input);
-
-			RootGraphHandle->IterateConstNodes([&](FConstNodeHandle OutputNode)
-			{
-				FGuid OutputID = OutputNode->GetID();
-				if (ensure(OutputNode->GetNumOutputs() == 1))
-				{
-					OutputNode->IterateConstOutputs([&](FConstOutputHandle Output)
-					{
-						FDefaultKey Key(OutputNode->GetNodeName(), Output->GetDataType());
-						FDefaultOutputValue Value = { MoveTemp(OutputID), OutputNode->GetNodeName() };
-						InitOutputDefaults.Emplace(MoveTemp(Key), MoveTemp(Value));
-					});
-				}
-			}, EMetasoundFrontendClassType::Output);
-
+			// Clear the root graph so it can be rebuilt.
 			RootGraphHandle->ClearGraph();
 
-			// 2. Set initial locations of 3 columns (inputs, reference node, and outputs)
-			const TArray<FConstNodeHandle> ReferencedInputs = ReferencedGraphHandle->GetConstInputNodes();
-			const TArray<FConstNodeHandle> ReferencedOutputs = ReferencedGraphHandle->GetConstOutputNodes();
-
-			FVector2D InputNodeLocation = FVector2D::ZeroVector;
-
-			const float ReferenceNodeYOffset = FMath::Max(ReferencedInputs.Num(), ReferencedOutputs.Num()) * 0.5f;
-			const FVector2D ReferenceNodeLocation = InputNodeLocation + FVector2D(DisplayStyle::NodeLayout::DefaultOffsetX.X, ReferenceNodeYOffset);
-			FVector2D OutputNodeLocation = InputNodeLocation + (2 * DisplayStyle::NodeLayout::DefaultOffsetX);
-
-			TMap<FVertexName, FVertexName> PresetInputToReferenceInputMap;
-			TMap<FVertexName, FVertexName> PresetOutputToReferenceOutputMap;
-
-			// 2. Generate preset's inputs & outputs
-			for (const FConstNodeHandle& RefGraphInputNode : ReferencedInputs)
-			{
-				const FText& Description = RefGraphInputNode->GetDescription();
-
-				// Should only ever be one
-				ensure(RefGraphInputNode->GetNumInputs() == 1);
-				RefGraphInputNode->IterateConstInputs([&](FConstInputHandle RefGraphInputHandle)
-				{
-					using namespace Metasound::Frontend;
-
-					FNodeHandle NodeHandle = INodeController::GetInvalidHandle();
-					const FName DataTypeName = RefGraphInputHandle->GetDataType();
-
-					const FDefaultKey Key(RefGraphInputNode->GetNodeName(), DataTypeName);
-					if (const FDefaultInputValue* InputValue = InitInputDefaults.Find(Key))
-					{
-						FMetasoundFrontendClassInput ClassInput;
-						ClassInput.Name = InputValue->VertexName;
-						ClassInput.TypeName = DataTypeName;
-						ClassInput.Metadata.Description = Description;
-						ClassInput.VertexID = InputValue->VertexID;
-						ClassInput.DefaultLiteral = InputValue->Literal;
-
-						NodeHandle = RootGraphHandle->AddInputVertex(ClassInput);
-					}
-					else
-					{
-						FGuid InputID = ReferencedGraphHandle->GetVertexIDForInputVertex(RefGraphInputHandle->GetName());
-						const FMetasoundFrontendLiteral DefaultLiteral = ReferencedGraphHandle->GetDefaultInput(InputID);
-						NodeHandle = RootGraphHandle->AddInputVertex(RefGraphInputNode->GetNodeName(), DataTypeName, Description, &DefaultLiteral);
-					}
-
-					if (ensure(NodeHandle->IsValid()))
-					{
-						FMetasoundFrontendNodeStyle NodeStyle;
-						NodeStyle.Display.Locations.Add(FGuid().NewGuid(), InputNodeLocation);
-						NodeHandle->SetNodeStyle(NodeStyle);
-
-						PresetInputToReferenceInputMap.Add(NodeHandle->GetNodeName(), RefGraphInputHandle->GetName());
-						InputNodeLocation += DisplayStyle::NodeLayout::DefaultOffsetY;
-					}
-				});
-			}
-
-			for (const FConstNodeHandle& RefGraphOutputNode : ReferencedOutputs)
-			{
-				const FText& Description = RefGraphOutputNode->GetDescription();
-
-				// Should only ever be one
-				ensure(RefGraphOutputNode->GetNumOutputs() == 1);
-				RefGraphOutputNode->IterateConstOutputs([&](FConstOutputHandle RefGraphOutputHandle)
-				{
-					using namespace Metasound::Frontend;
-
-					FNodeHandle NodeHandle = INodeController::GetInvalidHandle();
-					const FName DataTypeName = RefGraphOutputHandle->GetDataType();
-					
-					const FVertexName OutputName = RefGraphOutputHandle->GetName();
-					const FDefaultKey Key(OutputName, DataTypeName);
-					if (FDefaultOutputValue* OutputValue = InitOutputDefaults.Find(Key))
-					{
-						FMetasoundFrontendClassOutput ClassOutput;
-						ClassOutput.Name = OutputValue->VertexName;
-						ClassOutput.TypeName = DataTypeName;
-						ClassOutput.Metadata.Description = Description;
-						ClassOutput.VertexID = OutputValue->VertexID;
-
-						NodeHandle = RootGraphHandle->AddOutputVertex(ClassOutput);
-					}
-					else
-					{
-						NodeHandle = RootGraphHandle->AddOutputVertex(OutputName, DataTypeName, Description);
-					}
-
-					if (ensure(NodeHandle->IsValid()))
-					{
-						FMetasoundFrontendNodeStyle NodeStyle;
-						NodeStyle.Display.Locations.Add(FGuid().NewGuid(), OutputNodeLocation);
-						NodeHandle->SetNodeStyle(NodeStyle);
-
-						PresetOutputToReferenceOutputMap.Add(NodeHandle->GetNodeName(), RefGraphOutputHandle->GetName());
-						OutputNodeLocation += DisplayStyle::NodeLayout::DefaultOffsetY;
-					}
-				});
-			}
-
-			// 3. Generate a referencing node to the given referenced MetaSound.
-			FMetasoundFrontendClassMetadata ReferencedClassMetadata = ReferencedGraphHandle->GetOwningDocument()->GetRootGraphClass().Metadata;
-
+			// Add referenced node
+			FMetasoundFrontendClassMetadata ReferencedClassMetadata = ReferencedGraphHandle->GetGraphMetadata();
 			// Swap type on look-up as it will be referenced as an externally defined class relative to the new Preset asset
 			ReferencedClassMetadata.SetType(EMetasoundFrontendClassType::External);
 
+			// Set node location.
 			FNodeHandle ReferencedNodeHandle = RootGraphHandle->AddNode(ReferencedClassMetadata);
-			ensure (ReferencedNodeHandle->IsValid());
 			FMetasoundFrontendNodeStyle RefNodeStyle;
-			RefNodeStyle.Display.Locations.Add(FGuid::NewGuid(), ReferenceNodeLocation);
+			// Offset to be to the right of input nodes
+			RefNodeStyle.Display.Locations.Add(FGuid::NewGuid(), DisplayStyle::NodeLayout::DefaultOffsetX);
 			ReferencedNodeHandle->SetNodeStyle(RefNodeStyle);
 
-			// 4. Connect preset's respective inputs & outputs to generated referencing node.
-			RootGraphHandle->IterateNodes([&](FNodeHandle InputNode)
-			{
-				const FVertexName& Name = InputNode->GetNodeName();
-
-				// Should only ever be one
-				ensure(InputNode->GetNumOutputs() == 1);
-				InputNode->IterateOutputs([&](FOutputHandle OutputHandle)
-				{
-					const TArray<FInputHandle> ReferenceInputs = ReferencedNodeHandle->GetInputs();
-					if (ensure(ReferenceInputs.Num() == 1))
-					{
-						ensure(ReferenceInputs[0]->Connect(*OutputHandle));
-					}
-				});
-			},
-			EMetasoundFrontendClassType::Input);
-
-			RootGraphHandle->IterateNodes([&](FNodeHandle OutputNode)
-			{
-				const FVertexName& Name = OutputNode->GetNodeName();
-
-				// Should only ever be one
-				ensure(OutputNode->GetNumInputs() == 1);
-				OutputNode->IterateInputs([&](FInputHandle InputHandle)
-				{
-					const FVertexName& OutputName = PresetOutputToReferenceOutputMap.FindChecked(Name);
-					const TArray<FOutputHandle> ReferenceInputs = ReferencedNodeHandle->GetOutputsWithVertexName(OutputName);
-					if (ensure(ReferenceInputs.Num() == 1))
-					{
-						ensure(InputHandle->Connect(*ReferenceInputs[0]));
-					}
-				});
-			},
-			EMetasoundFrontendClassType::Output);
+			// Connect parent graph to wrapped graph
+			AddAndConnectInputs(ClassInputs, RootGraphHandle, ReferencedNodeHandle);
+			AddAndConnectOutputs(ClassOutputs, RootGraphHandle, ReferencedNodeHandle);
 
 			return true;
+		}
+
+		void FRebuildPresetRootGraph::AddAndConnectInputs(const TArray<FMetasoundFrontendClassInput>& InClassInputs, FGraphHandle& InParentGraphHandle, FNodeHandle& InWrappedNode) const
+		{
+			// Add inputs and space appropriately
+			FVector2D InputNodeLocation = FVector2D::ZeroVector;
+
+			for (const FMetasoundFrontendClassInput& ClassInput : InClassInputs)
+			{
+				FNodeHandle InputNode = InParentGraphHandle->AddInputVertex(ClassInput);
+				
+				if (ensure(InputNode->IsValid()))
+				{
+					// Set input node location
+					FMetasoundFrontendNodeStyle NodeStyle;
+					NodeStyle.Display.Locations.Add(FGuid::NewGuid(), InputNodeLocation);
+					InputNode->SetNodeStyle(NodeStyle);
+					InputNodeLocation += DisplayStyle::NodeLayout::DefaultOffsetY;
+
+					// Connect input node to corresponding wrapped node. 
+					TArray<FOutputHandle> OutputsToConnect = InputNode->GetOutputsWithVertexName(ClassInput.Name);
+					if (ensure(OutputsToConnect.Num() == 1))
+					{
+						FOutputHandle OutputToConnect = OutputsToConnect[0];
+
+						TArray<FInputHandle> InputsToConnect = InWrappedNode->GetInputsWithVertexName(ClassInput.Name);
+						if (ensure(InputsToConnect.Num() == 1))
+						{
+							bool bSuccess = OutputToConnect->Connect(*InputsToConnect[0]);
+							check(bSuccess);
+						}
+					}
+				}
+			}
+		}
+
+		void FRebuildPresetRootGraph::AddAndConnectOutputs(const TArray<FMetasoundFrontendClassOutput>& InClassOutputs, FGraphHandle& InParentGraphHandle, FNodeHandle& InWrappedNode) const
+		{
+			// Add outputs and space appropriately
+			FVector2D OutputNodeLocation = (2 * DisplayStyle::NodeLayout::DefaultOffsetX);
+
+			for (const FMetasoundFrontendClassOutput& ClassOutput : InClassOutputs)
+			{
+				FNodeHandle OutputNode = InParentGraphHandle->AddOutputVertex(ClassOutput);
+				
+				if (ensure(OutputNode->IsValid()))
+				{
+					// Set input node location
+					FMetasoundFrontendNodeStyle NodeStyle;
+					NodeStyle.Display.Locations.Add(FGuid::NewGuid(), OutputNodeLocation);
+					OutputNode->SetNodeStyle(NodeStyle);
+					OutputNodeLocation += DisplayStyle::NodeLayout::DefaultOffsetY;
+
+					// Connect input node to corresponding wrapped node. 
+					TArray<FInputHandle> InputsToConnect = OutputNode->GetInputsWithVertexName(ClassOutput.Name);
+					if (ensure(InputsToConnect.Num() == 1))
+					{
+						FInputHandle InputToConnect = InputsToConnect[0];
+
+						TArray<FOutputHandle> OutputsToConnect = InWrappedNode->GetOutputsWithVertexName(ClassOutput.Name);
+						if (ensure(OutputsToConnect.Num() == 1))
+						{
+							bool bSuccess = InputToConnect->Connect(*OutputsToConnect[0]);
+							check(bSuccess);
+						}
+					}
+				}
+			}
+		}
+
+
+
+		TArray<FMetasoundFrontendClassInput> FRebuildPresetRootGraph::GenerateRequiredClassInputs(const FConstGraphHandle& InParentGraph) const
+		{
+			TArray<FMetasoundFrontendClassInput> ClassInputs;
+
+			FConstGraphHandle WrappedGraph = ReferencedDocument->GetRootGraph();
+
+			// Iterate through all input nodes of wrapped graph
+			WrappedGraph->IterateConstNodes([&](FConstNodeHandle InputNode)
+			{
+				const FName NodeName = InputNode->GetNodeName();
+				TArray<FConstInputHandle> Inputs = InputNode->GetConstInputsWithVertexName(NodeName);
+				if (ensure(Inputs.Num() == 1))
+				{
+					const FConstInputHandle& Input = Inputs[0];
+
+					FMetasoundFrontendClassInput ClassInput;
+
+					ClassInput.Name = NodeName;
+					ClassInput.TypeName = Input->GetDataType();
+					ClassInput.Metadata.Description = InputNode->GetDescription();
+
+					if (InParentGraph->ContainsInputVertexWithName(NodeName))
+					{
+						// If the input vertex already exists in the parent graph,
+						// use the default literal value from the parent graph.
+						ClassInput.VertexID = InParentGraph->GetVertexIDForInputVertex(NodeName);
+						ClassInput.DefaultLiteral = InParentGraph->GetDefaultInput(ClassInput.VertexID);
+					}
+					else
+					{
+						// If the input vertex does not exist on the parent graph,
+						// then it is a new vertex and should use the default value
+						// of the wrapped graph.
+						ClassInput.VertexID = FGuid::NewGuid();
+						FGuid WrappedVertexID = WrappedGraph->GetVertexIDForInputVertex(NodeName);
+						ClassInput.DefaultLiteral = WrappedGraph->GetDefaultInput(WrappedVertexID);
+					}
+
+					ClassInputs.Add(MoveTemp(ClassInput));
+				}
+			}, EMetasoundFrontendClassType::Input);
+
+			return ClassInputs;
+		}
+
+		TArray<FMetasoundFrontendClassOutput> FRebuildPresetRootGraph::GenerateRequiredClassOutputs(const FConstGraphHandle& InParentGraph) const
+		{
+			TArray<FMetasoundFrontendClassOutput> ClassOutputs;
+
+			FConstGraphHandle WrappedGraph = ReferencedDocument->GetRootGraph();
+
+			// Iterate over the wrapped graph's output nodes.
+			WrappedGraph->IterateConstNodes([&](FConstNodeHandle OutputNode)
+			{
+				const FName NodeName = OutputNode->GetNodeName();
+				TArray<FConstOutputHandle> Outputs = OutputNode->GetConstOutputsWithVertexName(NodeName);
+				if (ensure(Outputs.Num() == 1))
+				{
+					const FConstOutputHandle& Output = Outputs[0];
+
+					FMetasoundFrontendClassOutput ClassOutput;
+
+					ClassOutput.Name = NodeName;
+					ClassOutput.TypeName = Output->GetDataType();
+					ClassOutput.Metadata.Description = OutputNode->GetDescription();
+
+					if (InParentGraph->ContainsOutputVertexWithName(NodeName))
+					{
+						ClassOutput.VertexID = InParentGraph->GetVertexIDForInputVertex(NodeName);
+					}
+					else
+					{
+						ClassOutput.VertexID = FGuid::NewGuid();
+					}
+
+					ClassOutputs.Add(MoveTemp(ClassOutput));
+				}
+			}, EMetasoundFrontendClassType::Output);
+
+			return ClassOutputs;
 		}
 
 		bool FSynchronizeAssetClassDisplayName::Transform(FDocumentHandle InDocument) const
