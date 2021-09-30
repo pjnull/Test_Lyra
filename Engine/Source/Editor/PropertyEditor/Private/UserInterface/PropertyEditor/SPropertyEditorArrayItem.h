@@ -11,6 +11,16 @@
 class FPropertyEditor;
 class IPropertyHandle;
 
+struct FTitleMetadataFormatter
+{
+	FText Format;
+	TArray<TSharedPtr<IPropertyHandle>> PropertyHandles;
+
+	FPropertyAccess::Result GetDisplayText(FText& OutText) const;
+
+	static TSharedPtr<FTitleMetadataFormatter> TryParse(TSharedPtr<IPropertyHandle> RootProperty, const FString& TitlePropertyRaw);
+};
+
 class SPropertyEditorArrayItem : public SCompoundWidget
 {
 public:
@@ -34,5 +44,5 @@ private:
 
 private:
 	TSharedPtr<FPropertyEditor> PropertyEditor;
-	TSharedPtr<IPropertyHandle> TitlePropertyHandle;
+	TSharedPtr<FTitleMetadataFormatter> TitlePropertyFormatter;
 };
