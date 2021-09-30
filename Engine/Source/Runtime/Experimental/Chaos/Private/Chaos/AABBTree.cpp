@@ -5,7 +5,7 @@
 int32 FAABBTreeCVars::UpdateDirtyElementPayloadData = 1;
 FAutoConsoleVariableRef FAABBTreeCVars::CVarUpdateDirtyElementPayloadData(TEXT("p.aabbtree.updatedirtyelementpayloads"), FAABBTreeCVars::UpdateDirtyElementPayloadData, TEXT("Allow AABB tree elements to update internal payload data when they recieve a payload update"));
 
-float FAABBTreeCVars::MaxNonGlobalElementBoundsExtrema = 1e15;
+float FAABBTreeCVars::MaxNonGlobalElementBoundsExtrema = 1e15f;
 FAutoConsoleVariableRef FAABBTreeCVars::CVarMaxNonGlobalElementBoundsExtrema(TEXT("p.aabbtree.MaxNonGlobalElementBoundsExtrema"), FAABBTreeCVars::MaxNonGlobalElementBoundsExtrema, TEXT("If Min/Max of particle world bounds exceeds this threshold, element is put in global array instead of being used in leaf splitting."));
 
 
