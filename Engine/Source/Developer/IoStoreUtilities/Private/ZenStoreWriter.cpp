@@ -279,7 +279,7 @@ FZenStoreWriter::FZenStoreWriter(
 
 	HttpClient->TryCreateProject(ProjectId, OplogId, AbsServerRoot, AbsEngineDir, AbsProjectDir);
 
-	PackageStoreOptimizer->Initialize(InTargetPlatform);
+	PackageStoreOptimizer->Initialize();
 
 	FPackageStoreManifest::FZenServerInfo& ZenServerInfo = PackageStoreManifest.EditZenServerInfo();
 	ZenServerInfo.HostName = HttpClient->GetHostName();

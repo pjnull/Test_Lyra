@@ -321,7 +321,7 @@ public:
 		return TotalScriptObjectCount;
 	}
 
-	IOSTOREUTILITIES_API void Initialize(const ITargetPlatform* TargetPlatform);
+	IOSTOREUTILITIES_API void Initialize();
 	void Initialize(const FIoBuffer& ScriptObjectsBuffer);
 
 	FPackageStorePackage* CreateMissingPackage(const FName& Name) const;
@@ -389,8 +389,8 @@ private:
 	void CreateExportBundles(FPackageStorePackage* Package) const;
 	bool VerifyRedirect(const FPackageStorePackage* SourcePackage, FPackageStorePackage& TargetPackage, bool bIsBuildingDLC) const;
 	void FinalizePackageHeader(FPackageStorePackage* Package) const;
-	void FindScriptObjectsRecursive(FPackageObjectIndex OuterIndex, UObject* Object, EObjectMark ExcludedObjectMarks, const ITargetPlatform* TargetPlatform);
-	void FindScriptObjects(const ITargetPlatform* TargetPlatform);
+	void FindScriptObjectsRecursive(FPackageObjectIndex OuterIndex, UObject* Object);
+	void FindScriptObjects();
 
 	TMap<FPackageObjectIndex, FScriptObjectData> ScriptObjectsMap;
 	uint64 TotalPackageCount = 0;

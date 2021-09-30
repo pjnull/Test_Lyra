@@ -94,7 +94,7 @@ void FLooseCookedPackageWriter::BeginCook(const FCookInfo& Info)
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(SaveScriptObjects);
 		FPackageStoreOptimizer PackageStoreOptimizer;
-		PackageStoreOptimizer.Initialize(&TargetPlatform);
+		PackageStoreOptimizer.Initialize();
 		FIoBuffer ScriptObjectsBuffer = PackageStoreOptimizer.CreateScriptObjectsBuffer();
 		FFileHelper::SaveArrayToFile(
 			MakeArrayView(ScriptObjectsBuffer.Data(), ScriptObjectsBuffer.DataSize()),

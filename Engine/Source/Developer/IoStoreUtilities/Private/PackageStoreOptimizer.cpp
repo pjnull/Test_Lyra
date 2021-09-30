@@ -97,9 +97,9 @@ static FString RemapLocalizationPathIfNeeded(const FString& Path, FString* OutRe
 	return Path;
 }
 
-void FPackageStoreOptimizer::Initialize(const ITargetPlatform* TargetPlatform)
+void FPackageStoreOptimizer::Initialize()
 {
-	FindScriptObjects(TargetPlatform);
+	FindScriptObjects();
 }
 
 void FPackageStoreOptimizer::Initialize(const FIoBuffer& ScriptObjectsBuffer)
@@ -1549,20 +1549,11 @@ FIoBuffer FPackageStoreOptimizer::CreatePackageBuffer(const FPackageStorePackage
 	return BundleBuffer;
 }
 
-void FPackageStoreOptimizer::FindScriptObjectsRecursive(FPackageObjectIndex OuterIndex, UObject* Object, EObjectMark ExcludedObjectMarks, const ITargetPlatform* TargetPlatform)
+void FPackageStoreOptimizer::FindScriptObjectsRecursive(FPackageObjectIndex OuterIndex, UObject* Object)
 {
 	if (!Object->HasAllFlags(RF_Public))
 	{
 		UE_LOG(LogPackageStoreOptimizer, Verbose, TEXT("Skipping script object: %s (!RF_Public)"), *Object->GetFullName());
-		return;
-	}
-
-	const UObject* ObjectForExclusion = Object->HasAnyFlags(RF_ClassDefaultObject) ? (const UObject*)Object->GetClass() : Object;
-	const EObjectMark ObjectMarks = GetExcludedObjectMarksForObject(ObjectForExclusion, TargetPlatform);
-
-	if (ObjectMarks & ExcludedObjectMarks)
-	{
-		UE_LOG(LogPackageStoreOptimizer, Verbose, TEXT("Skipping script object: %s (Excluded for target platform)"), *Object->GetFullName());
 		return;
 	}
 
@@ -1617,16 +1608,14 @@ void FPackageStoreOptimizer::FindScriptObjectsRecursive(FPackageObjectIndex Oute
 	GetObjectsWithOuter(Object, InnerObjects, /*bIncludeNestedObjects*/false);
 	for (UObject* InnerObject : InnerObjects)
 	{
-		FindScriptObjectsRecursive(GlobalImportIndex, InnerObject, ExcludedObjectMarks, TargetPlatform);
+		FindScriptObjectsRecursive(GlobalImportIndex, InnerObject);
 	}
 };
 
-void FPackageStoreOptimizer::FindScriptObjects(const ITargetPlatform* TargetPlatform)
+void FPackageStoreOptimizer::FindScriptObjects()
 {
-	const EObjectMark ExcludedObjectMarks = GetExcludedObjectMarksForTargetPlatform(TargetPlatform);
-
 	TArray<UPackage*> ScriptPackages;
-	FindAllRuntimeScriptPackages(ScriptPackages, TargetPlatform->AllowsEditorObjects());
+	FindAllRuntimeScriptPackages(ScriptPackages);
 
 	TArray<UObject*> InnerObjects;
 	for (UPackage* Package : ScriptPackages)
@@ -1650,7 +1639,7 @@ void FPackageStoreOptimizer::FindScriptObjects(const ITargetPlatform* TargetPlat
 		GetObjectsWithOuter(Package, InnerObjects, /*bIncludeNestedObjects*/false);
 		for (UObject* InnerObject : InnerObjects)
 		{
-			FindScriptObjectsRecursive(GlobalImportIndex, InnerObject, ExcludedObjectMarks, TargetPlatform);
+			FindScriptObjectsRecursive(GlobalImportIndex, InnerObject);
 		}
 	}
 
