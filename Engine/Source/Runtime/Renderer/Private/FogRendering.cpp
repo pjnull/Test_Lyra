@@ -407,21 +407,13 @@ static void SetFogShaders(FRHICommandList& RHICmdList, FGraphicsPipelineStateIni
 
 		if (GraphicsPSOInit.bDepthBounds)
 		{
-			const FMatrix Projection = View.ViewMatrices.GetProjectionMatrix();
-			const FVector4 FogStartPoint4 = FVector4(0.0f, 0.0f, View.ExponentialFogParameters.W, 1.f);
-			const FVector4 FogStartPoint4Clip = Projection.TransformFVector4(FogStartPoint4);
-			float FogCDistanceClip = float(FogStartPoint4Clip.Z / FogStartPoint4Clip.W); // LWC_TODO: precision loss
-
-			if (FogCDistanceClip > 0.0f && FogCDistanceClip < 1.0f)
+			if (bool(ERHIZBuffer::IsInverted))
 			{
-				if (bool(ERHIZBuffer::IsInverted))
-				{
-					RHICmdList.SetDepthBounds(0.0f, FogClipSpaceZ);
-				}
-				else
-				{
-					RHICmdList.SetDepthBounds(FogClipSpaceZ, 1.0f);
-				}
+				RHICmdList.SetDepthBounds(0.0f, FogClipSpaceZ);
+			}
+			else
+			{
+				RHICmdList.SetDepthBounds(FogClipSpaceZ, 1.0f);
 			}
 		}
 
