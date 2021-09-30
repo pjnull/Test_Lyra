@@ -8,7 +8,7 @@
 
 /*static*/ TSharedPtr<FTitleMetadataFormatter> FTitleMetadataFormatter::TryParse(TSharedPtr<IPropertyHandle> RootProperty, const FString& TitlePropertyRaw)
 {
-	if (!TitlePropertyRaw.IsEmpty())
+	if (RootProperty.IsValid() && !TitlePropertyRaw.IsEmpty())
 	{
 		TSharedRef<FTitleMetadataFormatter> TitleFormatter = MakeShared<FTitleMetadataFormatter>();
 
