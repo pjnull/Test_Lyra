@@ -18,8 +18,6 @@
 
 void UK2Node_AnimNodeReference::ExpandNode(FKismetCompilerContext& InCompilerContext, UEdGraph* InSourceGraph)
 {
-	bool bFound = false;
-
 	UAnimGraphNode_Base* LabelledNode = nullptr;
 	UAnimBlueprintExtension_Tag* Extension = UAnimBlueprintExtension::FindExtension<UAnimBlueprintExtension_Tag>(Cast<UAnimBlueprint>(GetBlueprint()));
 	if(Extension)
