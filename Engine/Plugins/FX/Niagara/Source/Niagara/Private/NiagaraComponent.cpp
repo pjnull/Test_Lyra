@@ -13,8 +13,8 @@
 #include "NiagaraDataInterface.h"
 #include "NiagaraDataSetAccessor.h"
 #include "NiagaraEmitterInstance.h"
-#include "NiagaraEmitterInstanceBatcher.h"
 #include "NiagaraFunctionLibrary.h"
+#include "NiagaraGpuComputeDispatchInterface.h"
 #include "NiagaraRenderer.h"
 #include "NiagaraStats.h"
 #include "NiagaraSystem.h"
@@ -170,7 +170,7 @@ FNiagaraSceneProxy::FNiagaraSceneProxy(UNiagaraComponent* InComponent)
 		LLM_SCOPE(ELLMTag::Niagara);
 
 		RenderData = SystemInstanceController->CreateSystemRenderData(GetScene().GetFeatureLevel());
-		Batcher = SystemInstanceController->GetBatcher();
+		ComputeDispatchInterface = SystemInstanceController->GetComputeDispatchInterface();
 
 		bAlwaysHasVelocity = RenderData->HasAnyMotionBlurEnabled();
 
@@ -224,7 +224,7 @@ void FNiagaraSceneProxy::CreateRenderThreadResources()
 	if (RenderData)
 	{
 		LLM_SCOPE(ELLMTag::Niagara);
-		RenderData->CreateRenderThreadResources(*Batcher);
+		RenderData->CreateRenderThreadResources();
 	}
 }
 
@@ -836,33 +836,23 @@ UNiagaraDataInterface* UNiagaraComponent::GetDataInterface(const FString& Name)
 
 bool UNiagaraComponent::IsWorldReadyToRun() const
 {
-	// The niagara system instance assumes that a batcher exists when it is created. We need to wait until this has happened before successfully activating this system.
-	bool FXSystemExists = false;
-	bool WorldManagerExists = false;
+	// The Niagara system instance assumes that a ComputeDispatchInterface exists when it is created. We need to wait until this has happened before successfully activating this system.
 	UWorld* World = GetWorld();
-	if (World)
+	if ( World == nullptr)
 	{
-		if (World->Scene)
-		{
-			FFXSystemInterface*  FXSystemInterface = World->Scene->GetFXSystem();
-			if (FXSystemInterface)
-			{
-				NiagaraEmitterInstanceBatcher* FoundBatcher = static_cast<NiagaraEmitterInstanceBatcher*>(FXSystemInterface->GetInterface(NiagaraEmitterInstanceBatcher::Name));
-				if (FoundBatcher != nullptr)
-				{
-					FXSystemExists = true;
-				}
-			}
-		}
-
-		FNiagaraWorldManager* WorldManager = FNiagaraWorldManager::Get(World);
-		if (WorldManager)
-		{
-			WorldManagerExists = true;
-		}
+		return false;
 	}
 
-	return WorldManagerExists && FXSystemExists;
+	if ( FNiagaraGpuComputeDispatchInterface::Get(World) == nullptr )
+	{
+		return false;
+	}
+
+	if (FNiagaraWorldManager::Get(World) == nullptr)
+	{
+		return false;
+	}
+	return true;
 }
 
 bool UNiagaraComponent::InitializeSystem()
@@ -3020,7 +3010,8 @@ void UNiagaraComponent::SetOverrideParameterStoreValue(const FNiagaraVariableBas
 		UNiagaraDataInterface* OriginalDI = InValue.GetDataInterface();
 		UNiagaraDataInterface* DuplicatedDI = DuplicateObject(OriginalDI, this);
 		OverrideParameters.SetDataInterface(DuplicatedDI, InKey);
-		DuplicatedDI->SetUsedByGPUEmitter(OriginalDI->IsUsedWithGPUEmitter(nullptr));
+		DuplicatedDI->SetUsedByCPUEmitter(OriginalDI->IsUsedWithCPUEmitter());
+		DuplicatedDI->SetUsedByGPUEmitter(OriginalDI->IsUsedWithGPUEmitter());
 	}
 	else if (InKey.IsUObject())
 	{

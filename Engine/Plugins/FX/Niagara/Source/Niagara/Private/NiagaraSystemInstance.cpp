@@ -4,14 +4,16 @@
 #include "NiagaraSystemGpuComputeProxy.h"
 #include "NiagaraConstants.h"
 #include "NiagaraCommon.h"
+#include "NiagaraComputeExecutionContext.h"
 #include "NiagaraDataInterface.h"
+#include "NiagaraGPUSystemTick.h"
 #include "NiagaraStats.h"
 #include "NiagaraParameterCollection.h"
 #include "NiagaraWorldManager.h"
 #include "NiagaraComponent.h"
 #include "NiagaraRenderer.h"
 #include "NiagaraGpuComputeDebug.h"
-#include "NiagaraEmitterInstanceBatcher.h"
+#include "NiagaraGpuComputeDispatchInterface.h"
 #include "NiagaraCrashReporterHandler.h"
 
 #include "Async/Async.h"
@@ -128,15 +130,8 @@ FNiagaraSystemInstance::FNiagaraSystemInstance(UWorld& InWorld, UNiagaraSystem& 
 		InstanceParameters.SetOwner(InAttachComponent);
 	}
 
-	if (World->Scene)
-	{
-		FFXSystemInterface*  FXSystemInterface = World->Scene->GetFXSystem();
-		if (FXSystemInterface)
-		{
-			Batcher = static_cast<NiagaraEmitterInstanceBatcher*>(FXSystemInterface->GetInterface(NiagaraEmitterInstanceBatcher::Name));
-		}
-		FeatureLevel = World->FeatureLevel;
-	}
+	ComputeDispatchInterface = FNiagaraGpuComputeDispatchInterface::Get(World);
+	FeatureLevel = World->FeatureLevel;
 
 	// In some cases the system may have already stated that you should ignore dependencies and tick as early as possible.
 	if (!InAsset.bRequireCurrentFrameData)
@@ -499,7 +494,7 @@ void FNiagaraSystemInstance::SetGpuComputeDebug(bool bEnableDebug)
 {
 #if NIAGARA_COMPUTEDEBUG_ENABLED
 	UNiagaraSystem* System  = GetSystem();
-	if (Batcher == nullptr || System == nullptr)
+	if (ComputeDispatchInterface == nullptr || System == nullptr)
 	{
 		return;
 	}
@@ -522,9 +517,9 @@ void FNiagaraSystemInstance::SetGpuComputeDebug(bool bEnableDebug)
 
 		ENQUEUE_RENDER_COMMAND(NiagaraAddGPUSystemDebug)
 		(
-			[RT_Batcher=Batcher, RT_InstanceID=GetId(), RT_SystemName=SystemName](FRHICommandListImmediate& RHICmdList)
+			[RT_ComputeDispatchInterface=ComputeDispatchInterface, RT_InstanceID=GetId(), RT_SystemName=SystemName](FRHICommandListImmediate& RHICmdList)
 			{
-				if (FNiagaraGpuComputeDebug* GpuComputeDebug = RT_Batcher->GetGpuComputeDebug())
+				if (FNiagaraGpuComputeDebug* GpuComputeDebug = RT_ComputeDispatchInterface->GetGpuComputeDebug())
 				{
 					GpuComputeDebug->AddSystemInstance(RT_InstanceID, RT_SystemName);
 				}
@@ -535,9 +530,9 @@ void FNiagaraSystemInstance::SetGpuComputeDebug(bool bEnableDebug)
 	{
 		ENQUEUE_RENDER_COMMAND(NiagaraRemoveGPUSystemDebug)
 		(
-			[RT_Batcher=Batcher, RT_InstanceID=GetId()](FRHICommandListImmediate& RHICmdList)
+			[RT_ComputeDispatchInterface=ComputeDispatchInterface, RT_InstanceID=GetId()](FRHICommandListImmediate& RHICmdList)
 			{
-				if (FNiagaraGpuComputeDebug* GpuComputeDebug = RT_Batcher->GetGpuComputeDebug())
+				if (FNiagaraGpuComputeDebug* GpuComputeDebug = RT_ComputeDispatchInterface->GetGpuComputeDebug())
 				{
 					GpuComputeDebug->RemoveSystemInstance(RT_InstanceID);
 				}
@@ -634,7 +629,7 @@ bool FNiagaraSystemInstance::DeallocateSystemInstance(FNiagaraSystemInstancePtr&
 		if (SystemInstanceAllocation->SystemGpuComputeProxy)
 		{
 			FNiagaraSystemGpuComputeProxy* Proxy = SystemInstanceAllocation->SystemGpuComputeProxy.Release();
-			Proxy->RemoveFromBatcher(SystemInstanceAllocation->GetBatcher(), true);
+			Proxy->RemoveFromRenderThread(SystemInstanceAllocation->GetComputeDispatchInterface(), true);
 		}
 
 		// Queue deferred deletion from the WorldManager
@@ -687,7 +682,7 @@ void FNiagaraSystemInstance::Complete(bool bExternalCompletion)
 	if (SystemGpuComputeProxy)
 	{
 		FNiagaraSystemGpuComputeProxy* Proxy = SystemGpuComputeProxy.Release();
-		Proxy->RemoveFromBatcher(GetBatcher(), true);
+		Proxy->RemoveFromRenderThread(GetComputeDispatchInterface(), true);
 	}
 
 	if (!bPooled)
@@ -783,14 +778,14 @@ void FNiagaraSystemInstance::Reset(FNiagaraSystemInstance::EResetMode Mode)
 		Mode = EResetMode::ReInit;
 	}
 
-	// Remove any existing proxy from the batcher
+	// Remove any existing proxy from the diaptcher
 	// This MUST be done before the emitters array is re-initialized
 	if (SystemGpuComputeProxy.IsValid())
 	{
 		if (IsComplete() || (Mode != EResetMode::ResetSystem))
 		{
 			FNiagaraSystemGpuComputeProxy* Proxy = SystemGpuComputeProxy.Release();
-			Proxy->RemoveFromBatcher(GetBatcher(), true);
+			Proxy->RemoveFromRenderThread(GetComputeDispatchInterface(), true);
 		}
 	}
 
@@ -846,11 +841,11 @@ void FNiagaraSystemInstance::Reset(FNiagaraSystemInstance::EResetMode Mode)
 		//Interface init can disable the system.
 		if (!IsComplete())
 		{
-			// Create the shared context for the batcher if we have a single active GPU emitter in the system
+			// Create the shared context for the dispatcher if we have a single active GPU emitter in the system
 			if (bHasGPUEmitters && !SystemGpuComputeProxy.IsValid())
 			{
 				SystemGpuComputeProxy.Reset(new FNiagaraSystemGpuComputeProxy(this));
-				SystemGpuComputeProxy->AddToBatcher(GetBatcher());
+				SystemGpuComputeProxy->AddToRenderThread(GetComputeDispatchInterface());
 			}
 
 			// Create new random seed
@@ -1158,7 +1153,7 @@ void FNiagaraSystemInstance::Cleanup()
 	if (SystemGpuComputeProxy)
 	{
 		FNiagaraSystemGpuComputeProxy* Proxy = SystemGpuComputeProxy.Release();
-		Proxy->RemoveFromBatcher(GetBatcher(), true);
+		Proxy->RemoveFromRenderThread(GetComputeDispatchInterface(), true);
 	}
 
 	UnbindParameters();
@@ -1399,7 +1394,7 @@ void FNiagaraSystemInstance::InitDataInterfaces()
 	//Now the interfaces in the simulations are all correct, we can build the per instance data table.
 	int32 InstanceDataSize = 0;
 	DataInterfaceInstanceDataOffsets.Empty();
-	auto CalcInstDataSize = [&](const FNiagaraParameterStore& ParamStore, bool bIsGPUSimulation, bool bSearchInstanceParams)
+	auto CalcInstDataSize = [&](const FNiagaraParameterStore& ParamStore, bool bIsCPUSimulation, bool bIsGPUSimulation, bool bSearchInstanceParams)
 	{
 		const TArrayView<const FNiagaraVariableWithOffset> Params = ParamStore.ReadParameterVariables();
 		const TArray<UNiagaraDataInterface*>& Interfaces = ParamStore.GetDataInterfaces();
@@ -1451,25 +1446,29 @@ void FNiagaraSystemInstance::InitDataInterfaces()
 							Proxy->SourceDIName = Var.GetName();
 						}
 					}
+					else if (bIsCPUSimulation)
+					{
+						Interface->SetUsedByCPUEmitter(true);
+					}
 				}
 			}
 		}
 	};
 
-	CalcInstDataSize(InstanceParameters, false, false);//This probably should be a proper exec context.
+	CalcInstDataSize(InstanceParameters, false, false, false);//This probably should be a proper exec context.
 
 	if (SystemSimulation->GetIsSolo() && FNiagaraSystemSimulation::UseLegacySystemSimulationContexts())
 	{
-		CalcInstDataSize(SystemSimulation->GetSpawnExecutionContext()->Parameters, false, false);
+		CalcInstDataSize(SystemSimulation->GetSpawnExecutionContext()->Parameters, true, false, false);
 		SystemSimulation->GetSpawnExecutionContext()->DirtyDataInterfaces();
 
-		CalcInstDataSize(SystemSimulation->GetUpdateExecutionContext()->Parameters, false, false);
+		CalcInstDataSize(SystemSimulation->GetUpdateExecutionContext()->Parameters, true, false, false);
 		SystemSimulation->GetUpdateExecutionContext()->DirtyDataInterfaces();
 	}
 	else
 	{
-		CalcInstDataSize(SystemSimulation->GetSpawnExecutionContext()->Parameters, false, true);
-		CalcInstDataSize(SystemSimulation->GetUpdateExecutionContext()->Parameters, false, true);
+		CalcInstDataSize(SystemSimulation->GetSpawnExecutionContext()->Parameters, true, false, true);
+		CalcInstDataSize(SystemSimulation->GetUpdateExecutionContext()->Parameters, true, false, true);
 	}
 
 	//Iterate over interfaces to get size for table and clear their interface bindings.
@@ -1483,16 +1482,16 @@ void FNiagaraSystemInstance::InitDataInterfaces()
 
 		const bool bGPUSimulation = Sim.GetCachedEmitter() && (Sim.GetCachedEmitter()->SimTarget == ENiagaraSimTarget::GPUComputeSim);
 
-		CalcInstDataSize(Sim.GetSpawnExecutionContext().Parameters, bGPUSimulation, false);
-		CalcInstDataSize(Sim.GetUpdateExecutionContext().Parameters, bGPUSimulation, false);
+		CalcInstDataSize(Sim.GetSpawnExecutionContext().Parameters, !bGPUSimulation, bGPUSimulation, false);
+		CalcInstDataSize(Sim.GetUpdateExecutionContext().Parameters, !bGPUSimulation, bGPUSimulation, false);
 		for (int32 i = 0; i < Sim.GetEventExecutionContexts().Num(); i++)
 		{
-			CalcInstDataSize(Sim.GetEventExecutionContexts()[i].Parameters, bGPUSimulation, false);
+			CalcInstDataSize(Sim.GetEventExecutionContexts()[i].Parameters, !bGPUSimulation, bGPUSimulation, false);
 		}
 
 		if (Sim.GetCachedEmitter() && Sim.GetCachedEmitter()->SimTarget == ENiagaraSimTarget::GPUComputeSim && Sim.GetGPUContext())
 		{
-			CalcInstDataSize(Sim.GetGPUContext()->CombinedParamStore, bGPUSimulation, false);
+			CalcInstDataSize(Sim.GetGPUContext()->CombinedParamStore, !bGPUSimulation, bGPUSimulation, false);
 		}
 
 		//Also force a rebind while we're here.
@@ -1525,7 +1524,7 @@ void FNiagaraSystemInstance::InitDataInterfaces()
 				PostTickDataInterfaces.Add(i);
 			}
 
-			if (bHasGPUEmitters)
+			if (Interface->IsUsedWithGPUEmitter())
 			{
 				const int32 GPUDataSize = Interface->PerInstanceDataPassedToRenderThreadSize();
 				if (GPUDataSize > 0)

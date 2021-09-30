@@ -9,6 +9,7 @@
 #include "ViewModels/NiagaraSystemViewModel.h"
 #include "Widgets/SNiagaraBakerWidget.h"
 #include "NiagaraBakerRenderer.h"
+#include "NiagaraGpuComputeDispatchInterface.h"
 #include "NiagaraComponent.h"
 #include "NiagaraSystem.h"
 
@@ -152,6 +153,10 @@ void FNiagaraBakerViewModel::RenderBaker()
 	}
 
 	UWorld* World = PreviewComponent->GetWorld();
+	FSceneInterface* BakerScene = World->Scene;
+
+	FNiagaraGpuComputeDispatchInterface* ComputeDispatchInterface = FNiagaraGpuComputeDispatchInterface::Get(World);
+	ensureMsgf(ComputeDispatchInterface, TEXT("The batcher was not valid on the world this may result in incorrect baking"));
 
 	// Create output render targets & output Baker data
 	TArray<UTextureRenderTarget2D*, TInlineAllocator<4>> RenderTargets;
@@ -189,6 +194,12 @@ void FNiagaraBakerViewModel::RenderBaker()
 		PreviewComponent->SetSeekDelta(BakerSettings->GetSeekDelta());
 		PreviewComponent->SeekToDesiredAge(FrameTime);
 		PreviewComponent->TickComponent(BakerSettings->GetSeekDelta(), ELevelTick::LEVELTICK_All, nullptr);
+
+		// We need any GPU sims to flush pending ticks
+		if (ComputeDispatchInterface)
+		{
+			ComputeDispatchInterface->FlushPendingTicks_GameThread();
+		}
 
 		const float WorldTime = FApp::GetCurrentTime() - BakerSettings->StartSeconds - BakerSettings->DurationSeconds + FrameTime;
 

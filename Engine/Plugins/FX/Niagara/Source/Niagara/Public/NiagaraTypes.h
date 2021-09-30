@@ -1548,6 +1548,7 @@ struct FNiagaraVariable : public FNiagaraVariableBase
 	template<typename T>
 	void SetValue(const T& Data)
 	{
+		static_assert(!TIsUECoreVariant<T, double>::Value, "Double core variant, please use SetDoubleValue.");
 		check(sizeof(T) == TypeDefHandle->GetSize());
 		AllocateData();
 		FMemory::Memcpy(VarData.GetData(), &Data, VarData.Num());
@@ -1556,11 +1557,40 @@ struct FNiagaraVariable : public FNiagaraVariableBase
 	template<typename T>
 	T GetValue() const
 	{
+		static_assert(!TIsUECoreVariant<T, double>::Value, "Double core variant, please use GetDoubleValue.");
 		check(sizeof(T) == TypeDefHandle->GetSize());
 		check(IsDataAllocated());
 		T Value;
 		FMemory::Memcpy(&Value, GetData(), TypeDefHandle->GetSize());
 		return Value;
+	}
+
+	template<typename T>
+	void SetDoubleValue(const T& Data)
+	{
+	#if UE_LARGE_WORLD_COORDINATES_DISABLED
+		SetValue<T>(Data);
+	#else
+		static_assert(TIsUECoreVariant<T, double>::Value, "Float core variant, please use SetValue.");
+		check(sizeof(T) == TypeDefHandle->GetSize());
+		AllocateData();
+		FMemory::Memcpy(VarData.GetData(), &Data, VarData.Num());
+	#endif
+	}
+
+	template<typename T>
+	T GetDoubleValue() const
+	{
+	#if UE_LARGE_WORLD_COORDINATES_DISABLED
+		return GetValue<T>();
+	#else
+		static_assert(TIsUECoreVariant<T, double>::Value, "Float core variant, please use GetValue.");
+		check(sizeof(T) == TypeDefHandle->GetSize());
+		check(IsDataAllocated());
+		T Value;
+		FMemory::Memcpy(&Value, GetData(), TypeDefHandle->GetSize());
+		return Value;
+	#endif
 	}
 
 	void SetData(const uint8* Data)

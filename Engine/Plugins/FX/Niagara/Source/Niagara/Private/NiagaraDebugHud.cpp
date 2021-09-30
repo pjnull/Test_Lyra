@@ -2,8 +2,9 @@
 
 #include "NiagaraDebugHud.h"
 #include "NiagaraComponent.h"
-#include "NiagaraEmitterInstanceBatcher.h"
 #include "NiagaraFunctionLibrary.h"
+#include "NiagaraGpuComputeDispatchInterface.h"
+#include "NiagaraComputeExecutionContext.h"
 #include "NiagaraScript.h"
 #include "NiagaraSystem.h"
 #include "NiagaraWorldManager.h"
@@ -521,12 +522,6 @@ namespace NiagaraDebugLocal
 			}
 		}
 	}
-
-	FString GetHudActorName(AActor* Actor)
-	{
-		FString Name = Actor->GetActorNameOrLabel();
-		return Name.Len() == 0 ? GetNameSafe(Actor) : Name;
-	}
 }
 
 FNiagaraDebugHud::FNiagaraDebugHud(UWorld* World)
@@ -691,7 +686,7 @@ void FNiagaraDebugHud::GatherSystemInfo()
 			if ( Settings.bActorFilterEnabled )
 			{
 				AActor* Actor = NiagaraComponent->GetOwner();
-				bIsMatch &= (Actor != nullptr) && GetHudActorName(Actor).MatchesWildcard(Settings.ActorFilter);
+				bIsMatch &= (Actor != nullptr) && Actor->GetActorNameOrLabel().MatchesWildcard(Settings.ActorFilter);
 			}
 
 			// Filter by component
@@ -876,9 +871,9 @@ FNiagaraDataSet* FNiagaraDebugHud::GetParticleDataSet(FNiagaraSystemInstance* Sy
 			GpuCachedData->PendingEmitterData[iEmitter]->Frame.Init(&AllEmittersCompiledData[iEmitter]->DataSetCompiledData);
 
 			ENQUEUE_RENDER_COMMAND(NiagaraReadbackGpuSim)(
-				[RT_Batcher=SystemInstance->GetBatcher(), RT_InstanceID=SystemInstance->GetId(), RT_DebugInfo=GpuCachedData->PendingEmitterData[iEmitter], RT_Context=GPUExecContext](FRHICommandListImmediate& RHICmdList)
+				[RT_ComputeDispatchInterface=SystemInstance->GetComputeDispatchInterface(), RT_InstanceID=SystemInstance->GetId(), RT_DebugInfo=GpuCachedData->PendingEmitterData[iEmitter], RT_Context=GPUExecContext](FRHICommandListImmediate& RHICmdList)
 				{
-					RT_Batcher->AddDebugReadback(RT_InstanceID, RT_DebugInfo, RT_Context);
+					RT_ComputeDispatchInterface->AddDebugReadback(RT_InstanceID, RT_DebugInfo, RT_Context);
 				}
 			);
 		}
@@ -1937,7 +1932,7 @@ void FNiagaraDebugHud::DrawComponents(FNiagaraWorldManager* WorldManager, UCanva
 				StringBuilder.Append(TEXT("Component - "));
 				if ( OwnerActor )
 				{
-					StringBuilder.Append(*GetHudActorName(OwnerActor));
+					StringBuilder.Append(*OwnerActor->GetActorNameOrLabel());
 					StringBuilder.Append(TEXT("/"));
 				}
 				StringBuilder.Append(*GetNameSafe(NiagaraComponent));

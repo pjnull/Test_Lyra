@@ -9,7 +9,7 @@
 #include "NiagaraComponent.h"
 #include "Engine/Engine.h"
 #include "DynamicBufferAllocator.h"
-#include "NiagaraEmitterInstanceBatcher.h"
+#include "NiagaraComputeExecutionContext.h"
 #include "NiagaraGPUSortInfo.h"
 #include "NiagaraEmitterInstance.h"
 #include "NiagaraSystemInstanceController.h"
@@ -185,6 +185,13 @@ FRHIShaderResourceView* FNiagaraRenderer::GetDummyUIntBuffer()
 	check(IsInRenderingThread());
 	static TGlobalResource<FNiagaraEmptyBufferSRV> DummyUIntBuffer(PF_R32_UINT, TEXT("NiagaraRenderer::DummyUInt"));
 	return DummyUIntBuffer.SRV;
+}
+
+FRHIShaderResourceView* FNiagaraRenderer::GetDummyUInt2Buffer()
+{
+	check(IsInRenderingThread());
+	static TGlobalResource<FNiagaraEmptyBufferSRV> DummyUInt2Buffer(PF_R32G32_UINT, TEXT("NiagaraRenderer::DummyUInt2"));
+	return DummyUInt2Buffer.SRV;
 }
 
 FRHIShaderResourceView* FNiagaraRenderer::GetDummyUInt4Buffer()

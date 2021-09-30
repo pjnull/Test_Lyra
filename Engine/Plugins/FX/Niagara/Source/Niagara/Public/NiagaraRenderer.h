@@ -82,7 +82,7 @@ public:
 	FNiagaraRenderer& operator=(const FNiagaraRenderer& Other) = delete;
 
 	virtual void Initialize(const UNiagaraRendererProperties *InProps, const FNiagaraEmitterInstance* Emitter, const FNiagaraSystemInstanceController& InComponent);
-	virtual void CreateRenderThreadResources(NiagaraEmitterInstanceBatcher* Batcher) {}
+	virtual void CreateRenderThreadResources() {}
 	virtual void ReleaseRenderThreadResources() {}
 	virtual void DestroyRenderState_Concurrent() {}
 
@@ -123,6 +123,7 @@ public:
 	static FRHIShaderResourceView* GetDummyWhiteColorBuffer();
 	static FRHIShaderResourceView* GetDummyIntBuffer();
 	static FRHIShaderResourceView* GetDummyUIntBuffer();
+	static FRHIShaderResourceView* GetDummyUInt2Buffer();
 	static FRHIShaderResourceView* GetDummyUInt4Buffer();
 	static FRHIShaderResourceView* GetDummyTextureReadBuffer2D();
 	static FRHIShaderResourceView* GetDummyTextureReadBuffer2DArray();
