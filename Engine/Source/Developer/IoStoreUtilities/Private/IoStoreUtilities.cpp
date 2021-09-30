@@ -1977,12 +1977,7 @@ void LogContainerPackageInfo(const TArray<FContainerTargetSpec*>& ContainerTarge
 	{
 		uint64 StoreSize = ContainerTarget->Header.StoreEntries.Num();
 		uint64 PackageCount = ContainerTarget->Packages.Num();
-		uint64 LocalizedPackageCount = 0;
-
-		for (const auto& KV : ContainerTarget->Header.CulturePackageMap)
-		{
-			LocalizedPackageCount += KV.Value.Num();
-		}
+		uint64 LocalizedPackageCount = ContainerTarget->Header.LocalizedPackages.Num();
 
 		UE_LOG(LogIoStore, Display, TEXT("%-30s %20.0lf %20llu %20llu"),
 			*ContainerTarget->Name.ToString(),
@@ -3017,7 +3012,6 @@ int32 Describe(
 
 	struct FPackageRedirect
 	{
-		FName Culture;
 		FPackageDesc* Source = nullptr;
 		FPackageDesc* Target = nullptr;
 	};
@@ -3027,6 +3021,7 @@ int32 Describe(
 		FName Name;
 		FIoContainerId Id;
 		FGuid EncryptionKeyGuid;
+		TArray<FPackageDesc*> LocalizedPackages;
 		TArray<FPackageRedirect> PackageRedirects;
 		bool bCompressed;
 		bool bSigned;
@@ -3177,7 +3172,7 @@ int32 Describe(
 		FContainerDesc* ContainerDesc = nullptr;
 		TArray<FPackageDesc*> Packages;
 		FIoStoreReader* Reader = nullptr;
-		FCulturePackageMap RawCulturePackageMap;
+		TArray<FIoContainerHeaderLocalizedPackage> RawLocalizedPackages;
 		TArray<FIoContainerHeaderPackageRedirect> RawPackageRedirects;
 	};
 
@@ -3224,7 +3219,7 @@ int32 Describe(
 			FIoContainerHeader ContainerHeader;
 			Ar << ContainerHeader;
 
-			Job.RawCulturePackageMap = ContainerHeader.CulturePackageMap;
+			Job.RawLocalizedPackages = ContainerHeader.LocalizedPackages;
 			Job.RawPackageRedirects = ContainerHeader.PackageRedirects;
 
 			TArrayView<FFilePackageStoreEntry> StoreEntries(reinterpret_cast<FFilePackageStoreEntry*>(ContainerHeader.StoreEntries.GetData()), ContainerHeader.PackageCount);
@@ -3289,16 +3284,9 @@ int32 Describe(
 			PackageRedirect.Source = PackageByIdMap.FindRef(RedirectPair.SourcePackageId);
 			PackageRedirect.Target = PackageByIdMap.FindRef(RedirectPair.TargetPackageId);
 		}
-		for (const auto& CultureRedirectsPair : LoadContainerHeaderJob.RawCulturePackageMap)
+		for (const auto& LocalizedPackage : LoadContainerHeaderJob.RawLocalizedPackages)
 		{
-			FName Culture(CultureRedirectsPair.Get<0>());
-			for (const auto& RedirectPair : CultureRedirectsPair.Get<1>())
-			{
-				FPackageRedirect& PackageRedirect = LoadContainerHeaderJob.ContainerDesc->PackageRedirects.AddDefaulted_GetRef();
-				PackageRedirect.Source = PackageByIdMap.FindRef(RedirectPair.SourcePackageId);
-				PackageRedirect.Target = PackageByIdMap.FindRef(RedirectPair.TargetPackageId);
-				PackageRedirect.Culture = Culture;
-			}
+			LoadContainerHeaderJob.ContainerDesc->LocalizedPackages.Add(PackageByIdMap.FindRef(LocalizedPackage.SourcePackageId));
 		}
 	}
 	
@@ -3640,6 +3628,18 @@ int32 Describe(
 				OutputOverride->Logf(ELogVerbosity::Display, TEXT("\t\tEncryptionKeyGuid: %s"), *ContainerDesc->EncryptionKeyGuid.ToString());
 			}
 
+			if (ContainerDesc->LocalizedPackages.Num())
+			{
+				OutputOverride->Logf(ELogVerbosity::Display, TEXT("--------------------------------------------"));
+				OutputOverride->Logf(ELogVerbosity::Display, TEXT("Localized Packages"));
+				OutputOverride->Logf(ELogVerbosity::Display, TEXT("=========="));
+				for (const FPackageDesc* LocalizedPackage : ContainerDesc->LocalizedPackages)
+				{
+					OutputOverride->Logf(ELogVerbosity::Display, TEXT("\t*************************"));
+					OutputOverride->Logf(ELogVerbosity::Display, TEXT("\t\t           Source: 0x%llX '%s'"), LocalizedPackage->PackageId.ValueForDebugging(), *LocalizedPackage->PackageName.ToString());
+				}
+			}
+
 			if (ContainerDesc->PackageRedirects.Num())
 			{
 				OutputOverride->Logf(ELogVerbosity::Display, TEXT("--------------------------------------------"));
@@ -3648,10 +3648,6 @@ int32 Describe(
 				for (const FPackageRedirect& Redirect : ContainerDesc->PackageRedirects)
 				{
 					OutputOverride->Logf(ELogVerbosity::Display, TEXT("\t*************************"));
-					if (!Redirect.Culture.IsNone())
-					{
-						OutputOverride->Logf(ELogVerbosity::Display, TEXT("\t\t          Culture: %s"), *Redirect.Culture.ToString());
-					}
 					OutputOverride->Logf(ELogVerbosity::Display, TEXT("\t\t           Source: 0x%llX '%s'"), Redirect.Source->PackageId.ValueForDebugging(), *Redirect.Source->PackageName.ToString());
 					OutputOverride->Logf(ELogVerbosity::Display, TEXT("\t\t           Target: 0x%llX '%s'"), Redirect.Target->PackageId.ValueForDebugging(), *Redirect.Target->PackageName.ToString());
 				}

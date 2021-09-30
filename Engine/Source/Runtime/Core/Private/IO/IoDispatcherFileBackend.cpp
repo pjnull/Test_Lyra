@@ -896,6 +896,11 @@ TIoStatusOr<FIoContainerHeader> FFileIoStoreReader::ReadContainerHeader() const
 	FMemoryReaderView Ar(MakeArrayView(IoBuffer.Data(), static_cast<int32>(IoBuffer.DataSize())));
 	FIoContainerHeader ContainerHeader;
 	Ar << ContainerHeader;
+	if (Ar.IsError())
+	{
+		UE_LOG(LogIoDispatcher, Warning, TEXT("Invalid container header in file '%s'"), *ContainerFile.FilePath);
+		ContainerHeader = FIoContainerHeader();
+	}
 	return ContainerHeader;
 }
 

@@ -20,11 +20,11 @@ FFilePackageStore::FFilePackageStore()
 
 void FFilePackageStore::Initialize()
 {
-	// Setup culture
-	FInternationalization& Internationalization = FInternationalization::Get();
-	FString CurrentCulture = Internationalization.GetCurrentCulture()->GetName();
-	FParse::Value(FCommandLine::Get(), TEXT("CULTURE="), CurrentCulture);
-	CurrentCultureNames = Internationalization.GetPrioritizedCultureNames(CurrentCulture);
+	FInternationalization::Get().OnCultureChanged().AddLambda([this]
+	{
+		FWriteScopeLock Lock(EntriesLock);
+		bNeedsUpdate = true;
+	});
 }
 
 void FFilePackageStore::Lock()
@@ -156,26 +156,13 @@ void FFilePackageStore::Update()
 			++Index;
 		}
 
+		for (const FIoContainerHeaderLocalizedPackage& LocalizedPackage : ContainerHeader->LocalizedPackages)
 		{
-			TRACE_CPUPROFILER_EVENT_SCOPE(LoadPackageStoreLocalization);
-			const FSourceToLocalizedPackageIdMap* LocalizedPackages = nullptr;
-			for (const FString& CultureName : CurrentCultureNames)
+			FName& SourcePackageName = AllLocalizedPackages.FindOrAdd(LocalizedPackage.SourcePackageId);
+			if (SourcePackageName.IsNone())
 			{
-				LocalizedPackages = ContainerHeader->CulturePackageMap.Find(CultureName);
-				if (LocalizedPackages)
-				{
-					break;
-				}
-			}
-
-			if (LocalizedPackages)
-			{
-				for (const FIoContainerHeaderPackageRedirect& Redirect : *LocalizedPackages)
-				{
-					FNameEntryId NameEntry = ContainerHeader->RedirectsNameMap[Redirect.SourcePackageName.GetIndex()];
-					FName SourcePackageName = FName::CreateFromDisplayId(NameEntry, Redirect.SourcePackageName.GetNumber());
-					RedirectsPackageMap.Emplace(Redirect.SourcePackageId, MakeTuple(SourcePackageName, Redirect.TargetPackageId));
-				}
+				FNameEntryId NameEntry = ContainerHeader->RedirectsNameMap[LocalizedPackage.SourcePackageName.GetIndex()];
+				SourcePackageName = FName::CreateFromDisplayId(NameEntry, LocalizedPackage.SourcePackageName.GetNumber());
 			}
 		}
 

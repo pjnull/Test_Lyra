@@ -1759,6 +1759,7 @@ FIoContainerHeader FPackageStoreOptimizer::CreateContainerHeader(const FIoContai
 	Header.PackageIds.Reserve(SortedPackageStoreEntries.Num());
 	FPackageStoreNameMapBuilder RedirectsNameMapBuilder;
 	RedirectsNameMapBuilder.SetNameMapType(FMappedName::EType::Container);
+	TSet<FPackageId> AllLocalizedPackages;
 	for (const FPackageStoreEntryResource* Entry : SortedPackageStoreEntries)
 	{
 		Header.PackageIds.Add(Entry->GetPackageId());
@@ -1768,7 +1769,11 @@ FIoContainerHeader FPackageStoreOptimizer::CreateContainerHeader(const FIoContai
 			FMappedName MappedSourcePackageName = RedirectsNameMapBuilder.MapName(Entry->GetSourcePackageName());
 			if (!Entry->Region.IsNone())
 			{
-				Header.CulturePackageMap.FindOrAdd(Entry->Region.ToString()).Add({ Entry->GetSourcePackageId(), Entry->GetPackageId(), MappedSourcePackageName });
+				if (!AllLocalizedPackages.Contains(Entry->GetSourcePackageId()))
+				{
+					Header.LocalizedPackages.Add({ Entry->GetSourcePackageId(), MappedSourcePackageName });
+					AllLocalizedPackages.Add(Entry->GetSourcePackageId());
+				}
 			}
 			else
 			{
