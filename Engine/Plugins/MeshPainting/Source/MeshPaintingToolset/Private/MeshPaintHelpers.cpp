@@ -1421,7 +1421,7 @@ FName UMeshPaintingSubsystem::GetComponentActorName(const UMeshComponent* InComp
 		}
 		else
 		{
-			return TSharedPtr<IMeshPaintComponentAdapter>();
+			return NAME_None;
 		}
 	}
 	else
@@ -1437,8 +1437,11 @@ TSharedPtr<IMeshPaintComponentAdapter> UMeshPaintingSubsystem::GetAdapterForComp
 	if (InComponent)
 	{
 		FName ComponentActorName = GetComponentActorName(InComponent);
-		const TSharedPtr<IMeshPaintComponentAdapter>* MeshAdapterPtr = ComponentToAdapterMap.Find(ComponentActorName);
-		return MeshAdapterPtr ? *MeshAdapterPtr : TSharedPtr<IMeshPaintComponentAdapter>();
+		if (ComponentActorName.IsValid() && !ComponentActorName.IsNone())
+		{
+			const TSharedPtr<IMeshPaintComponentAdapter>* MeshAdapterPtr = ComponentToAdapterMap.Find(ComponentActorName);
+			return MeshAdapterPtr ? *MeshAdapterPtr : TSharedPtr<IMeshPaintComponentAdapter>();
+		}
 	}
 
 	return TSharedPtr<IMeshPaintComponentAdapter>();
@@ -1449,7 +1452,10 @@ void UMeshPaintingSubsystem::AddToComponentToAdapterMap(const UMeshComponent* In
 	if (InComponent && InAdapter)
 	{
 		FName ComponentActorName = GetComponentActorName(InComponent);
-		ComponentToAdapterMap.Add(ComponentActorName, InAdapter);
+		if (ComponentActorName.IsValid() && !ComponentActorName.IsNone())
+		{
+			ComponentToAdapterMap.Add(ComponentActorName, InAdapter);
+		}
 	}
 }
 
