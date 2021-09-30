@@ -305,7 +305,7 @@ void UK2Node_EnhancedInputAction::GetMenuActions(FBlueprintActionDatabaseRegistr
 	// Do a first time registration using the node's class to pull in all existing actions
 	if (ActionRegistrar.IsOpenForRegistration(GetClass()))
 	{
-		IAssetRegistry& AssetRegistry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry").Get();
+		IAssetRegistry& AssetRegistry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry")).Get();
 
 		static bool bRegisterOnce = true;
 		if (bRegisterOnce)
@@ -324,9 +324,11 @@ void UK2Node_EnhancedInputAction::GetMenuActions(FBlueprintActionDatabaseRegistr
 			UBlueprintNodeSpawner* NodeSpawner = UBlueprintNodeSpawner::Create(GetClass());
 			check(NodeSpawner != nullptr);
 
-			const UInputAction* Action = Cast<const UInputAction>(ActionAsset.GetAsset());
-			NodeSpawner->CustomizeNodeDelegate = UBlueprintNodeSpawner::FCustomizeNodeDelegate::CreateStatic(CustomizeInputNodeLambda, TWeakObjectPtr<const UInputAction>(Action));
-			ActionRegistrar.AddBlueprintAction(Action, NodeSpawner);
+			if (const UInputAction* Action = Cast<const UInputAction>(ActionAsset.GetAsset()))
+			{
+				NodeSpawner->CustomizeNodeDelegate = UBlueprintNodeSpawner::FCustomizeNodeDelegate::CreateStatic(CustomizeInputNodeLambda, TWeakObjectPtr<const UInputAction>(Action));
+				ActionRegistrar.AddBlueprintAction(Action, NodeSpawner);	
+			}
 		}
 	}
 	else if (const UInputAction* Action = Cast<const UInputAction>(ActionRegistrar.GetActionKeyFilter()))
