@@ -49,6 +49,7 @@
 #include "MovieSceneObjectBindingID.h"
 #include "ControlRig.h"
 #include "IControlRigObjectBinding.h"
+#include "ScopedTransaction.h"
 
 #define LOCTEXT_NAMESPACE "ControlRigEditMode"
 

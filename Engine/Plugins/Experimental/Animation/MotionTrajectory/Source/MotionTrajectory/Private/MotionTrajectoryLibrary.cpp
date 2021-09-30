@@ -2,6 +2,7 @@
 
 #include "MotionTrajectoryLibrary.h"
 #include "Algo/Find.h"
+#include "GameFramework/Actor.h"
 
 static void FlattenTrajectoryPosition(FTrajectorySample& Sample, float& AccumulatedDeltaDistance, bool PreserveSpeed)
 {
