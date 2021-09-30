@@ -111,6 +111,8 @@ TSharedPtr<SGraphPin> SPropertyAccessNode::CreatePinWidget(UEdGraphPin* Pin) con
 		{
 			IPropertyAccessEditor& PropertyAccessEditor = IModularFeatures::Get().GetModularFeature<IPropertyAccessEditor>("PropertyAccessEditor");
 
+			K2Node_PropertyAccess->Modify();
+			
 			TArray<FString> StringPath;
 			PropertyAccessEditor.MakeStringPath(InBindingChain, StringPath);
 			K2Node_PropertyAccess->SetPath(MoveTemp(StringPath));
@@ -121,6 +123,8 @@ TSharedPtr<SGraphPin> SPropertyAccessNode::CreatePinWidget(UEdGraphPin* Pin) con
 
 	Args.OnRemoveBinding = FOnRemoveBinding::CreateLambda([K2Node_PropertyAccess](FName InPropertyName)
 	{
+		K2Node_PropertyAccess->Modify();
+		
 		K2Node_PropertyAccess->ClearPath();
 		FBlueprintEditorUtils::MarkBlueprintAsModified(K2Node_PropertyAccess->GetBlueprint());
 	});
