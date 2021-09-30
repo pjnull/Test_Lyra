@@ -177,8 +177,6 @@ void SPathView::Construct( const FArguments& InArgs )
 	TSharedRef<SBox> SearchBox = SNew(SBox);
 	if (!InArgs._ExternalSearch)
 	{
-		SearchBox->SetPadding(FMargin(0, 1, 0, 3));
-
 		SearchBox->SetContent(
 			SNew(SHorizontalBox)
 
@@ -204,21 +202,32 @@ void SPathView::Construct( const FArguments& InArgs )
 	[
 		SNew(SVerticalBox)
 
-		// Search
-		+ SVerticalBox::Slot()
-		.AutoHeight()
-		[
-			SearchBox
-		]
-
-		// Tree title
 		+SVerticalBox::Slot()
 		.AutoHeight()
 		[
-			SNew(STextBlock)
-			.Font( FEditorStyle::GetFontStyle("ContentBrowser.SourceTitleFont") )
-			.Text(this, &SPathView::GetTreeTitle)
-			.Visibility(InArgs._ShowTreeTitle ? EVisibility::Visible : EVisibility::Collapsed)
+			SNew(SBorder)
+			.BorderImage(FAppStyle::Get().GetBrush("Brushes.Panel"))
+			.Padding(8.f)
+			[
+				SNew(SVerticalBox)
+
+				// Search
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				[
+					SearchBox
+				]
+
+				// Tree title
+				+SVerticalBox::Slot()
+				.AutoHeight()
+				[
+					SNew(STextBlock)
+					.Font( FEditorStyle::GetFontStyle("ContentBrowser.SourceTitleFont") )
+					.Text(this, &SPathView::GetTreeTitle)
+					.Visibility(InArgs._ShowTreeTitle ? EVisibility::Visible : EVisibility::Collapsed)
+				]
+			]
 		]
 
 		// Separator
