@@ -283,7 +283,7 @@ FZenStoreWriter::FZenStoreWriter(
 							AbsEngineDir, 
 							AbsProjectDir);
 
-	PackageStoreOptimizer->Initialize(InTargetPlatform);
+	PackageStoreOptimizer->Initialize();
 
 	FPackageStoreManifest::FZenServerInfo& ZenServerInfo = PackageStoreManifest.EditZenServerInfo();
 	ZenServerInfo.HostName = HttpClient->GetHostName();

@@ -148,21 +148,18 @@ uint64 FPackageObjectIndex::GenerateImportHashFromObjectPath(const FStringView& 
 	return Hash;
 }
 
-void FindAllRuntimeScriptPackages(TArray<UPackage*>& OutPackages, bool bAllowEditorOnlyPackages)
+void FindAllRuntimeScriptPackages(TArray<UPackage*>& OutPackages)
 {
 	OutPackages.Empty(256);
-	ForEachObjectOfClass(UPackage::StaticClass(), [&OutPackages, bAllowEditorOnlyPackages](UObject* InPackageObj)
+	ForEachObjectOfClass(UPackage::StaticClass(), [&OutPackages](UObject* InPackageObj)
 	{
 		UPackage* Package = CastChecked<UPackage>(InPackageObj);
 		if (Package->HasAnyPackageFlags(PKG_CompiledIn))
 		{
-			if (!Package->HasAnyPackageFlags(PKG_EditorOnly) || bAllowEditorOnlyPackages)
+			TCHAR Buffer[FName::StringBufferSize];
+			if (FStringView(Buffer, Package->GetFName().ToString(Buffer)).StartsWith(TEXT("/Script/"), ESearchCase::CaseSensitive))
 			{
-				TCHAR Buffer[FName::StringBufferSize];
-				if (FStringView(Buffer, Package->GetFName().ToString(Buffer)).StartsWith(TEXT("/Script/"), ESearchCase::CaseSensitive))
-				{
-					OutPackages.Add(Package);
-				}
+				OutPackages.Add(Package);
 			}
 		}
 	}, /*bIncludeDerivedClasses*/false);
@@ -1157,6 +1154,15 @@ public:
 		ActiveFPLB->EndFastPathLoadBuffer = AllExportDataPtr + AllExportDataSize;
 	}
 
+	~FExportArchive()
+	{
+#if WITH_EDITOR
+		// Detach all lazy loaders.
+		const bool bEnsureAllBulkDataIsLoaded = false;
+		DetachAllBulkData(bEnsureAllBulkDataIsLoaded);
+#endif
+
+	}
 	void ExportBufferBegin(UObject* Object, uint64 InExportCookedFileSerialOffset, uint64 InExportSerialSize)
 	{
 		CurrentExport = Object;
@@ -1361,6 +1367,56 @@ public:
 		return *this;
 	}
 	//~ End FArchive::FLinkerLoad Interface
+
+#if WITH_EDITOR
+	/**
+	 * Attaches/ associates the passed in bulk data object with the linker.
+	 *
+	 * @param	Owner		UObject owning the bulk data
+	 * @param	BulkData	Bulk data object to associate
+	 */
+	virtual void AttachBulkData(UObject* Owner, FUntypedBulkData* BulkData) override
+	{
+		check(BulkDataLoaders.Find(BulkData) == INDEX_NONE);
+		BulkDataLoaders.Add(BulkData);
+	}
+
+	/**
+	 * Detaches the passed in bulk data object from the linker.
+	 *
+	 * @param	BulkData	Bulk data object to detach
+	 * @param	bEnsureBulkDataIsLoaded	Whether to ensure that the bulk data is loaded before detaching
+	 */
+	virtual void DetachBulkData(FUntypedBulkData* BulkData, bool bEnsureBulkDataIsLoaded) override
+	{
+		int32 RemovedCount = BulkDataLoaders.Remove(BulkData);
+		if (RemovedCount != 1)
+		{
+			UE_LOG(LogStreaming, Fatal, TEXT("Detachment inconsistency: %i (%s)"), RemovedCount, *PackageDesc->PackageNameToLoad.ToString());
+		}
+		BulkData->DetachFromArchive(this, bEnsureBulkDataIsLoaded);
+	}
+
+	/**
+	 * Detaches all attached bulk  data objects.
+	 *
+	 * @param	bEnsureBulkDataIsLoaded	Whether to ensure that the bulk data is loaded before detaching
+	 */
+	void DetachAllBulkData(bool bEnsureAllBulkDataIsLoaded)
+	{
+		auto BulkDataToDetach = BulkDataLoaders;
+		for (auto BulkData : BulkDataToDetach)
+		{
+			check(BulkData);
+			BulkData->DetachFromArchive(this, bEnsureAllBulkDataIsLoaded);
+		}
+		BulkDataLoaders.Empty();
+	}
+
+	/** Bulk data that does not need to be loaded when the linker is loaded.												*/
+	TArray<FUntypedBulkData*> BulkDataLoaders;
+
+#endif // WITH_EDITOR
 
 private:
 	friend FAsyncPackage2;
@@ -3216,7 +3272,7 @@ void FGlobalImportStore::FindAllScriptObjects()
 	TStringBuilder<FName::StringBufferSize> Name;
 	TArray<UPackage*> ScriptPackages;
 	TArray<UObject*> Objects;
-	FindAllRuntimeScriptPackages(ScriptPackages, WITH_IOSTORE_IN_EDITOR);
+	FindAllRuntimeScriptPackages(ScriptPackages);
 
 	for (UPackage* Package : ScriptPackages)
 	{
