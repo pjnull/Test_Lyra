@@ -362,6 +362,15 @@ void FPackageHarvester::TryHarvestImport(UObject* InObject)
 		{
 			*this << Package;
 		}
+		else
+		{
+			if (!IsFilterEditorOnly())
+			{
+				// operator<<(FStructuredArchive::FSlot Slot, FObjectImport& I) will need to write NAME_None for this empty ExternalPackage pointer
+				HarvestPackageHeaderName(NAME_None);
+			}
+		}
+
 		// For things with a BP-created class we need to recurse into that class so the import ClassPackage will load properly
 		// We don't do this for native classes to avoid bloating the import table, but we need to harvest their name and outer (package) name
 		if (!ObjClass->IsNative())
