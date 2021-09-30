@@ -769,9 +769,7 @@ uint64 FAudioChunkCache::AddOrTouchChunk(const FChunkKey& InKey, TFunction<void(
 
 	FScopeLock ScopeLock(&CacheMutationCriticalSection);
 
-	const uint64 LookupIDForChunk = GetCacheLookupIDForChunk(InKey);
 	FCacheElement* FoundElement = FindElementForKey(InKey);
-
 	if (FoundElement)
 	{
 		TouchElement(FoundElement);
@@ -1235,24 +1233,21 @@ FAudioChunkCache::FCacheElement* FAudioChunkCache::FindElementForKey(const FChun
 {
 	FScopeLock ScopeLock(&CacheMutationCriticalSection);
 
-	if (CacheLookupIdMap.Contains(InKey))
+	const uint64 CacheOffset = GetCacheLookupIDForChunk(InKey);
+
+	// If we have a known cache offset, access that chunk directly.
+	if (CacheOffset != InvalidAudioStreamCacheLookupID)
 	{
-		const uint64 CacheOffset = CacheLookupIdMap[InKey];
+		check(CacheOffset < CachePool.Num());
 
-		// If we have a known cache offset, access that chunk directly.
-		if (CacheOffset != InvalidAudioStreamCacheLookupID)
+		// Finally, sanity check that the key is still the same.
+		if (CachePool[CacheOffset].Key == InKey)
 		{
-			check(CacheOffset < CachePool.Num());
-
-			// Finally, sanity check that the key is still the same.
-			if (CachePool[CacheOffset].Key == InKey)
-			{
-				return &CachePool[CacheOffset];
-			}
-
-			UE_LOG(LogAudioStreamCaching, Verbose, TEXT("Cache Miss for soundwave: %s. (Cache Lookup ID [%i] currently stores chunk for Soundwave: %s"),
-				*InKey.SoundWaveName.ToString(), CacheOffset, *CachePool[CacheOffset].Key.SoundWaveName.ToString());
+			return &CachePool[CacheOffset];
 		}
+
+		UE_LOG(LogAudioStreamCaching, Verbose, TEXT("Cache Miss for soundwave: %s. (Cache Lookup ID [%i] currently stores chunk for Soundwave: %s"),
+			*InKey.SoundWaveName.ToString(), CacheOffset, *CachePool[CacheOffset].Key.SoundWaveName.ToString());
 	}
 
 	if (EnableExhaustiveCacheSearchesCVar)
