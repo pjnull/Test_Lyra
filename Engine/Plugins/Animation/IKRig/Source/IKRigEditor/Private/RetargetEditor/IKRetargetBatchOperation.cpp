@@ -2,6 +2,7 @@
 
 #include "RetargetEditor/IKRetargetBatchOperation.h"
 
+#include "Animation/AnimSequence.h"
 #include "AnimationBlueprintLibrary.h"
 #include "AnimPose.h"
 #include "AnimPreviewInstance.h"
@@ -19,6 +20,7 @@
 #include "Misc/ScopedSlowTask.h"
 #include "Retargeter/IKRetargeter.h"
 #include "Widgets/Notifications/SNotificationList.h"
+
 
 #define LOCTEXT_NAMESPACE "RetargetBatchOperation"
 
@@ -258,9 +260,9 @@ void FIKRetargetBatchOperation::ConvertAnimation(
 			// store key data for each bone
 			for (int32 TargetBoneIndex=0; TargetBoneIndex<TargetLocalPose.Num(); ++TargetBoneIndex)
 			{
-				BoneTracks[TargetBoneIndex].PosKeys.Add(TargetLocalPose[TargetBoneIndex].GetLocation());
-				BoneTracks[TargetBoneIndex].RotKeys.Add(TargetLocalPose[TargetBoneIndex].GetRotation());
-				BoneTracks[TargetBoneIndex].ScaleKeys.Add(TargetLocalPose[TargetBoneIndex].GetScale3D());
+				BoneTracks[TargetBoneIndex].PosKeys.Add(FVector3f(TargetLocalPose[TargetBoneIndex].GetLocation()));
+				BoneTracks[TargetBoneIndex].RotKeys.Add(FQuat4f(TargetLocalPose[TargetBoneIndex].GetRotation()));
+				BoneTracks[TargetBoneIndex].ScaleKeys.Add(FVector4f(TargetLocalPose[TargetBoneIndex].GetScale3D()));
 			}
 		}
 

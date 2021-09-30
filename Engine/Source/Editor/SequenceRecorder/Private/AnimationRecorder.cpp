@@ -761,9 +761,9 @@ bool FAnimationRecorder::Record(USkeletalMeshComponent* Component, FTransform co
 
 				if (bRecordTransforms)
 				{
-					RawTrack.PosKeys.Add(LocalTransform.GetTranslation());
-					RawTrack.RotKeys.Add(LocalTransform.GetRotation());
-					RawTrack.ScaleKeys.Add(LocalTransform.GetScale3D());  
+					RawTrack.PosKeys.Add(FVector3f(LocalTransform.GetTranslation()));
+					RawTrack.RotKeys.Add(FQuat4f(LocalTransform.GetRotation()));
+					RawTrack.ScaleKeys.Add(FVector3f(LocalTransform.GetScale3D()));  
 					if (AnimationSerializer)
 					{
 						SerializedAnimation.AddTransform(TrackIndex, LocalTransform);
@@ -779,9 +779,9 @@ bool FAnimationRecorder::Record(USkeletalMeshComponent* Component, FTransform co
 				else if (FrameToAdd == 0)
 				{
 					// Populate with identity keys
-					RawTrack.PosKeys.Add(FVector::ZeroVector);
-					RawTrack.RotKeys.Add(FQuat::Identity);
-					RawTrack.ScaleKeys.Add(FVector::OneVector);
+					RawTrack.PosKeys.Add(FVector3f::ZeroVector);
+					RawTrack.RotKeys.Add(FQuat4f::Identity);
+					RawTrack.ScaleKeys.Add(FVector3f::OneVector);
 				}
 			}
 		}
