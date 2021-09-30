@@ -1090,8 +1090,14 @@ TArray<uint16> ULandscapeComponent::RenderWPOHeightmap(int32 LOD)
 
 void ULandscapeComponent::RemoveGrassMap()
 {
-	GrassData = MakeShareable(new FLandscapeComponentGrassData());
+	*GrassData = FLandscapeComponentGrassData();
+
 	GrassData->bIsDirty = true;
+	if (!MaterialHasGrass())
+	{
+		// Mark grass data as valid but empty if it just doesn't support grass because nothing will ever trigger a RenderGrassMaps on it, which would leave NumElements unset (which is considered as invalid data) :
+		GrassData->NumElements = 0;
+	}
 }
 
 void ALandscapeProxy::RenderGrassMaps(const TArray<ULandscapeComponent*>& InLandscapeComponents, const TArray<ULandscapeGrassType*>& GrassTypes)

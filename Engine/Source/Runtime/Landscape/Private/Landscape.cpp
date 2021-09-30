@@ -514,6 +514,9 @@ void ULandscapeComponent::Serialize(FArchive& Ar)
 		{
 			Ar << GrassData.Get();
 		}
+
+		// When loading or saving a component, validate that grass data is valid : 
+		checkf(IsTemplate() || !Ar.IsLoading() || !Ar.IsSaving() || GrassData->HasValidData(), TEXT("If this asserts, then serialization occurred on grass data that wasn't properly loaded/computed. It's a problem"));
 	}
 
 #if WITH_EDITOR
