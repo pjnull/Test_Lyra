@@ -1182,7 +1182,8 @@ public:
 
 	// Stored list of dormant actors in a previous cell when it's been left - this is for
 	// the dormant dynamic actor destruction feature.
-	FActorRepListRefView PrevDormantActorList;
+	// This property doesn't support multiple spatialization grids and has been switched to use PrevDormantActorListPerNode.
+	//FActorRepListRefView PrevDormantActorList;
 
 #if REPGRAPH_DETAILS
 	bool bEnableFullActorPrioritizationDetails = false;
@@ -1240,7 +1241,15 @@ public:
 	/** Generates a set of all the visible level names for this connection and its subconnections (if any) */
 	virtual void GetClientVisibleLevelNames(TSet<FName>& OutLevelNames) const;
 
+	FActorRepListRefView& GetPrevDormantActorListForNode(const UReplicationGraphNode* GridNode);
+
+	void RemoveActorFromAllPrevDormantActorLists(AActor* InActor);
+
 private:
+
+	// Stored list of dormant actors in a previous cell when it's been left - this is for
+	// the dormant dynamic actor destruction feature.
+	TMap<TObjectKey<UReplicationGraphNode>, FActorRepListRefView> PrevDormantActorListPerNode;
 
 	friend UReplicationGraph;
 
