@@ -94,6 +94,7 @@ public:
 	}
 
 public:
+	// Note: This is just an alias for QueueStep. There is no enforcement that this will deduce to QueueControlFlowBranch.
 	template<typename...ArgsT>
 	FControlFlow& BranchFlow(ArgsT...Args)
 	{
@@ -101,8 +102,6 @@ public:
 	}
 
 public:
-	//TODO: Revoke public access
-
 	FSimpleDelegate& QueueFunction(const FString& FlowNodeDebugName = TEXT(""));
 	FControlFlowWaitDelegate& QueueWait(const FString& FlowNodeDebugName = TEXT(""));
 	FControlFlowPopulator& QueueControlFlow(const FString& TaskName = TEXT(""), const FString& FlowNodeDebugName = TEXT(""));
@@ -113,6 +112,12 @@ private:
 	void QueueStep_Internal(const FString& InDebugName, FunctionT InBranchLambda, ArgsT...Params)
 	{
 		QueueControlFlowBranch(InDebugName).BindLambda(InBranchLambda, Params...);
+	}
+
+	template<typename FunctionT, typename...ArgsT>
+	void QueueStep_Internal(const FString& InDebugName, FunctionT InBranchLambda, ArgsT...Params)
+	{
+		QueueControlFlow(InDebugName).BindLambda(InBranchLambda, Params...);
 	}
 
 private:
