@@ -844,61 +844,28 @@ namespace UnrealBuildTool
 			}
 		}
 
-		static string GetCompileArguments_CPP(CppCompileEnvironment CompileEnvironment, bool bDisableOptimizations)
+		static string GetCompileArguments_CPP(CppCompileEnvironment CompileEnvironment)
 		{
 			string Result = "";
 
 			Result += " -x c++";
 			Result += GetCppStandardCompileArgument(CompileEnvironment.CppStandard);
 
-			// optimization level
-			if (bDisableOptimizations)
-			{
-				Result += " -O0";
-			}
-			else
-			{
-				Result += " -O3";
-			}
-
 			return Result;
 		}
 
-		static string GetCompileArguments_C(bool bDisableOptimizations)
+		static string GetCompileArguments_C()
 		{
-			string Result = "";
-
-			Result += " -x c";
-
-			// optimization level
-			if (bDisableOptimizations)
-			{
-				Result += " -O0";
-			}
-			else
-			{
-				Result += " -O3";
-			}
-
+			string Result = " -x c";
 			return Result;
 		}
 
-		static string GetCompileArguments_PCH(CppCompileEnvironment CompileEnvironment, bool bDisableOptimizations)
+		static string GetCompileArguments_PCH(CppCompileEnvironment CompileEnvironment)
 		{
 			string Result = "";
 
 			Result += " -x c++-header";
 			Result += GetCppStandardCompileArgument(CompileEnvironment.CppStandard);
-
-			// optimization level
-			if (bDisableOptimizations)
-			{
-				Result += " -O0";
-			}
-			else
-			{
-				Result += " -O3";
-			}
 
 			return Result;
 		}
@@ -1436,20 +1403,10 @@ namespace UnrealBuildTool
 						bool bIsPlainCFile = Path.GetExtension(SourceFile.AbsolutePath).ToUpperInvariant() == ".C";
 						bool bDisableShadowWarning = false;
 
-						// should we disable optimizations on this file?
-						// @todo android - We wouldn't need this if we could disable optimizations per function (via pragma)
-						bool bDisableOptimizations = false;// SourceFile.AbsolutePath.ToUpperInvariant().IndexOf("\\SLATE\\") != -1;
-						if (bDisableOptimizations && CompileEnvironment.bOptimizeCode)
-						{
-							Log.TraceWarning("Disabling optimizations on {0}", SourceFile.AbsolutePath);
-						}
-
-						bDisableOptimizations = bDisableOptimizations || !CompileEnvironment.bOptimizeCode;
-
 						// Add C or C++ specific compiler arguments.
 						if (bIsPlainCFile)
 						{
-							FileArguments += GetCompileArguments_C(bDisableOptimizations);
+							FileArguments += GetCompileArguments_C();
 
 							// remove shadow variable warnings for externally included files
 							if (!SourceFile.Location.IsUnderDirectory(Unreal.RootDirectory))
@@ -1459,11 +1416,11 @@ namespace UnrealBuildTool
 						}
 						else if (CompileEnvironment.PrecompiledHeaderAction == PrecompiledHeaderAction.Create)
 						{
-							FileArguments += GetCompileArguments_PCH(CompileEnvironment, bDisableOptimizations);
+							FileArguments += GetCompileArguments_PCH(CompileEnvironment);
 						}
 						else
 						{
-							FileArguments += GetCompileArguments_CPP(CompileEnvironment, bDisableOptimizations);
+							FileArguments += GetCompileArguments_CPP(CompileEnvironment);
 
 							// only use PCH for .cpp files
 							FileArguments += PCHArguments;
