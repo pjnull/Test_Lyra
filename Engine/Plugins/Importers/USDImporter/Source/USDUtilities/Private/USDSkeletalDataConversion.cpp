@@ -1767,9 +1767,9 @@ bool UsdToUnreal::ConvertSkelAnim( const pxr::UsdSkelSkeletonQuery& InUsdSkeleto
 				FTransform UEJointTransform = UsdToUnreal::ConvertMatrix( StageInfo, UsdJointTransform );
 
 				FRawAnimSequenceTrack& JointTrack = JointTracks[ BoneIndex ];
-				JointTrack.PosKeys.Add( UEJointTransform.GetTranslation() );
-				JointTrack.RotKeys.Add( UEJointTransform.GetRotation() );
-				JointTrack.ScaleKeys.Add( UEJointTransform.GetScale3D() );
+				JointTrack.PosKeys.Add( FVector3f(UEJointTransform.GetTranslation()) );
+				JointTrack.RotKeys.Add( FQuat4f(UEJointTransform.GetRotation()) );
+				JointTrack.ScaleKeys.Add( FVector3f(UEJointTransform.GetScale3D()) );
 			}
 		}
 
