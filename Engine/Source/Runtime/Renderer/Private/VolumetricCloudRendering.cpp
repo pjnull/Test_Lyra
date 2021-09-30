@@ -1936,7 +1936,9 @@ static TRDGUniformBufferRef<FRenderVolumetricCloudGlobalParameters> CreateCloudP
 		VolumetricCloudParams.OpaqueIntersectionMode = 2;	// always intersect with opaque
 	}
 
-	if (CloudRC.bIsReflectionRendering)
+	const bool bIsPathTracing = MainView.Family && MainView.Family->EngineShowFlags.PathTracing;
+	if (CloudRC.bIsReflectionRendering 
+		&& !(bIsPathTracing && CloudRC.bIsSkyRealTimeReflectionRendering))	// When using path tracing and real time sky capture, the captured sky cubemap is used to render the sky in the main view. As such, we always use the view settings.
 	{
 		const float BaseReflectionRaySampleCount = 10.0f;
 		const float BaseReflectionShadowRaySampleCount = 3.0f;
