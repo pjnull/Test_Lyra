@@ -41,7 +41,6 @@ private:
 
 	FRWLock EntriesLock;
 	FCriticalSection UpdateLock;
-	TArray<FString> CurrentCultureNames;
 	TArray<FMountedContainer> MountedContainers;
 	TMap<FPackageId, const FFilePackageStoreEntry*> StoreEntriesMap;
 	TMap<FPackageId, TTuple<FName, FPackageId>> RedirectsPackageMap;
