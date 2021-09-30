@@ -30,6 +30,19 @@ public:
 	bool Contains(const int32& Key) const { return Branches.Contains(Key); }
 	TSharedRef<FControlFlow>& FindChecked(const int32& Key) { return Branches.FindChecked(Key); }
 
+	bool IsAnyBranchRunning() const
+	{
+		for (TPair<int32, TSharedRef<FControlFlow>> BranchPair : Branches)
+		{
+			if (BranchPair.Value->IsRunning())
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 private:
 	TMap<int32, TSharedRef<FControlFlow>> Branches;
 };
