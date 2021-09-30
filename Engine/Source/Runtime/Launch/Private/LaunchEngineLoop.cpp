@@ -315,9 +315,11 @@ class FExecuteConcurrentWithSlateTickTask
 
 public:
 
-	FExecuteConcurrentWithSlateTickTask(TFunction<void()> InTickWithSlate)
+	FExecuteConcurrentWithSlateTickTask(TFunction<void()> InTickWithSlate, FEvent* InCompleteEvent)
 		: TickWithSlate(InTickWithSlate)
+		, CompleteEvent(InCompleteEvent)
 	{
+		check(CompleteEvent);
 	}
 
 	static FORCEINLINE TStatId GetStatId()
@@ -335,7 +337,11 @@ public:
 	void DoTask(ENamedThreads::Type CurrentThread, const FGraphEventRef& MyCompletionGraphEvent)
 	{
 		TickWithSlate();
+		CompleteEvent->Trigger();
 	}
+
+private:
+	FEvent* CompleteEvent;
 };
 
 // Pipe output to std output
@@ -5282,6 +5288,7 @@ void FEngineLoop::Tick()
 #if WITH_ENGINE
 		// process concurrent Slate tasks
 		FGraphEventRef ConcurrentTask;
+		FEvent* ConcurrentTaskCompleteEvent = nullptr;
 		const bool bDoConcurrentSlateTick = GEngine->ShouldDoAsyncEndOfFrameTasks();
 
 		const UGameViewportClient* const GameViewport = GEngine->GameViewport;
@@ -5302,6 +5309,9 @@ void FEngineLoop::Tick()
 
 			if (CurrentDemoNetDriver && CurrentDemoNetDriver->ShouldTickFlushAsyncEndOfFrame())
 			{
+				ConcurrentTaskCompleteEvent = FPlatformProcess::GetSynchEventFromPool();
+				check(ConcurrentTaskCompleteEvent);
+
 				ConcurrentTask = TGraphTask<FExecuteConcurrentWithSlateTickTask>::CreateTask(nullptr, ENamedThreads::GameThread).ConstructAndDispatchWhenReady(
 					[CurrentDemoNetDriver, DeltaSeconds]()
 				{
@@ -5314,7 +5324,9 @@ void FEngineLoop::Tick()
 					{
 						CurrentDemoNetDriver->TickFlushAsyncEndOfFrame(DeltaSeconds);
 					}
-				});
+				},
+				ConcurrentTaskCompleteEvent);
+				check(ConcurrentTask.IsValid());
 			}
 		}
 #endif
@@ -5343,7 +5355,10 @@ void FEngineLoop::Tick()
 			CSV_SCOPED_SET_WAIT_STAT(Slate);
 
 			QUICK_SCOPE_CYCLE_COUNTER(STAT_ConcurrentWithSlateTickTasks_Wait);
-			FTaskGraphInterface::Get().WaitUntilTaskCompletes(ConcurrentTask);
+			check(ConcurrentTaskCompleteEvent);
+			ConcurrentTaskCompleteEvent->Wait();
+			FPlatformProcess::ReturnSynchEventToPool(ConcurrentTaskCompleteEvent);
+			ConcurrentTaskCompleteEvent = nullptr;
 			ConcurrentTask = nullptr;
 		}
 		{
