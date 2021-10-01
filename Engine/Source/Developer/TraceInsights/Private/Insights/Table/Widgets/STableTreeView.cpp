@@ -1099,7 +1099,7 @@ bool STableTreeView::MakeSubtreeVisible(FTableTreeNodePtr NodePtr, bool bFilterI
 
 void STableTreeView::HandleItemToStringArray(const FTableTreeNodePtr& FTableTreeNodePtr, TArray<FString>& OutSearchStrings)
 {
-	OutSearchStrings.Add(FTableTreeNodePtr->GetName().GetPlainNameString());
+	OutSearchStrings.Add(FTableTreeNodePtr->GetName().ToString());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
