@@ -115,7 +115,7 @@ bool FInputBindingMultipleKeyValuesTest::RunTest(const FString& Parameters)
 	{
 		WHEN(InputIsTicked(Data));
 		THEN(HoldingKeyTriggersAction(Data, TestAction));
-		AND(TestEqual(TEXT("Single keypress generates a consistent value over multiple ticks"), FInputTestHelper::GetTriggered<FVector3f>(Data, TestAction), FVector3f(1.f, 0.f, 0.f)));
+		AND(TestEqual(TEXT("Single keypress generates a consistent value over multiple ticks"), FInputTestHelper::GetTriggered<FVector>(Data, TestAction), FVector(1.f, 0.f, 0.f)));
 	}
 
 	// Switch keys in a single tick
@@ -127,7 +127,7 @@ bool FInputBindingMultipleKeyValuesTest::RunTest(const FString& Parameters)
 	{
 		WHEN(InputIsTicked(Data));
 		THEN(HoldingKeyTriggersAction(Data, TestAction));
-		AND(TestEqual(TEXT("Switching keys in a single tick generates a consistent value"), FInputTestHelper::GetTriggered<FVector3f>(Data, TestAction), FVector3f(1.f, 0.f, 0.f)));
+		AND(TestEqual(TEXT("Switching keys in a single tick generates a consistent value"), FInputTestHelper::GetTriggered<FVector>(Data, TestAction), FVector(1.f, 0.f, 0.f)));
 	}
 
 	// Switch keys over 2 ticks
@@ -140,7 +140,7 @@ bool FInputBindingMultipleKeyValuesTest::RunTest(const FString& Parameters)
 	{
 		WHEN(InputIsTicked(Data));
 		THEN(HoldingKeyTriggersAction(Data, TestAction));
-		AND(TestEqual(TEXT("Switching keys over two ticks generates a consistent value"), FInputTestHelper::GetTriggered<FVector3f>(Data, TestAction), FVector3f(1.f, 0.f, 0.f)));
+		AND(TestEqual(TEXT("Switching keys over two ticks generates a consistent value"), FInputTestHelper::GetTriggered<FVector>(Data, TestAction), FVector(1.f, 0.f, 0.f)));
 	}
 
 	// Release both keys
@@ -155,7 +155,7 @@ bool FInputBindingMultipleKeyValuesTest::RunTest(const FString& Parameters)
 	{
 		WHEN(InputIsTicked(Data));
 		THEN(HoldingKeyTriggersAction(Data, TestAction));
-		AND(TestEqual(TEXT("Multiple key actuations on a single tick generates a consistent value"), FInputTestHelper::GetTriggered<FVector3f>(Data, TestAction), FVector3f(1.f, 0.f, 0.f)));
+		AND(TestEqual(TEXT("Multiple key actuations on a single tick generates a consistent value"), FInputTestHelper::GetTriggered<FVector>(Data, TestAction), FVector(1.f, 0.f, 0.f)));
 	}
 
 	// Unpressed shouldn't trigger

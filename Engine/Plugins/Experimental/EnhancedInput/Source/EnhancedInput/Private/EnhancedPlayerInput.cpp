@@ -126,7 +126,7 @@ void UEnhancedPlayerInput::ProcessActionMappingEvent(const UInputAction* Action,
 
 		// Apply modifications to the raw value
 		EInputActionValueType ValueType = ActionData.Value.GetValueType();
-		FInputActionValue ModifiedValue = ApplyModifiers(Modifiers, FInputActionValue(ValueType, RawKeyValue.Get<FVector3f>()), DeltaTime);
+		FInputActionValue ModifiedValue = ApplyModifiers(Modifiers, FInputActionValue(ValueType, RawKeyValue.Get<FVector>()), DeltaTime);
 		//UE_CLOG(RawKeyValue.GetMagnitudeSq(), LogTemp, Warning, TEXT("Modified %s -> %s"), *RawKeyValue.ToString(), *ModifiedValue.ToString());
 
 		// Derive a trigger state for this mapping using all applicable triggers
@@ -137,8 +137,8 @@ void UEnhancedPlayerInput::ProcessActionMappingEvent(const UInputAction* Action,
 		if(ModifiedValue.GetMagnitudeSq())
 		{
 			const int32 NumComponents = FMath::Max(1, int32(ValueType));
-			FVector3f Modified = ModifiedValue.Get<FVector3f>();
-			FVector3f Merged = ActionData.Value.Get<FVector3f>();
+			FVector Modified = ModifiedValue.Get<FVector>();
+			FVector Merged = ActionData.Value.Get<FVector>();
 			for (int32 Component = 0; Component < NumComponents; ++Component)
 			{
 				if (FMath::Abs(Modified[Component]) >= FMath::Abs(Merged[Component]))
@@ -204,7 +204,7 @@ void UEnhancedPlayerInput::ProcessInputStack(const TArray<UInputComponent*>& Inp
 		}
 
 		FKeyState* KeyState = GetKeyState(Mapping.Key);
-		FVector3f RawKeyValue = KeyState ? KeyState->RawValue : FVector3f::ZeroVector;
+		FVector RawKeyValue = KeyState ? KeyState->RawValue : FVector::ZeroVector;
 		//UE_CLOG(RawKeyValue.SizeSquared(), LogTemp, Warning, TEXT("Key %s - state %s"), *Mapping.Key.GetDisplayName().ToString(), *RawKeyValue.ToString());
 
 		// Establish update type.
@@ -399,7 +399,7 @@ void UEnhancedPlayerInput::ProcessInputStack(const TArray<UInputComponent*>& Inp
 		{
 			const FKeyState* KeyState = GetKeyState(Delegate->Chord.Key);
 			
-			FInputActionValue ActionValue(KeyState ? KeyState->RawValue : FVector3f::ZeroVector);
+			FInputActionValue ActionValue(KeyState ? KeyState->RawValue : FVector::ZeroVector);
 			
 			Delegate->Execute(ActionValue);
 		}
