@@ -2823,12 +2823,6 @@ namespace AutomationScripts
 						Dictionary<string, string> UnrealPakResponseFile = PakParams.UnrealPakResponseFile;
 						if (ShouldCreateIoStoreContainerFiles(Params, SC))
 						{
-							bool bLegacyBulkDataOffsets = false;
-							if (PlatformEngineConfig.GetBool("Core.System", "LegacyBulkDataOffsets", out bLegacyBulkDataOffsets) && bLegacyBulkDataOffsets)
-							{
-								throw new AutomationException("'LegacyBulkDataOffsets' is enabled, this needs to be disabled and the data recooked in order for IoStore to work");
-							}
-
 							bool bAllowBulkDataInIoStore = true;
 							if(!PlatformEngineConfig.GetBool("Core.System", "AllowBulkDataInIoStore", out bAllowBulkDataInIoStore))
 							{

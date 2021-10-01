@@ -855,7 +855,7 @@ void FBulkDataBase::Serialize(FArchive& Ar, UObject* Owner, int32 /*Index*/, boo
 		const FLinkerLoad* Linker = nullptr;
 		if (bEngineUsesIoStore)
 		{
-			checkf(IsInlined() || !NeedsOffsetFixup(), TEXT("IODispatcher does not support offset fixups; 'LegacyBulkDataOffsets=true' will not work with the IoStore!"));
+			checkf(IsInlined() || !NeedsOffsetFixup(), TEXT("IODispatcher does not support offset fixups; SaveBulkData during cooking should have added the flag BULKDATA_NoOffsetFixUp."));
 			checkf(IsInlined() || IsInSeparateFile() || !GEventDrivenLoaderEnabled,
 				TEXT("IODispatcher does not support finding the file size of header segments, which is required if BulkData is at end-of-file and EDL is enabled. ")
 				TEXT("Non-inline BulkData must be stored in a separate file when EDL is enabled!"));
@@ -1748,7 +1748,7 @@ void FBulkDataBase::ProcessDuplicateData(EBulkDataFlags NewFlags, int64 NewSizeO
 			| BULKDATA_OptionalPayload | BULKDATA_PayloadInSeperateFile | BULKDATA_PayloadAtEndOfFile);
 		if (bUsingIODispatcher)
 		{
-			checkf(!NeedsOffsetFixup(), TEXT("IODispatcher does not support offset fixups; 'LegacyBulkDataOffsets=true' will not work with the IoStore!"));
+			checkf(!NeedsOffsetFixup(), TEXT("IODispatcher does not support offset fixups; SaveBulkData during cooking should have added the flag BULKDATA_NoOffsetFixUp"));
 			BulkDataFlags = static_cast<EBulkDataFlags>(BulkDataFlags | BULKDATA_UsesIoDispatcher);
 		}
 		else
