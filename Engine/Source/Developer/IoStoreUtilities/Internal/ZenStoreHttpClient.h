@@ -29,6 +29,7 @@ class IOSTOREUTILITIES_API FZenStoreHttpClient
 public:
 	FZenStoreHttpClient();
 	FZenStoreHttpClient(const FStringView InHostName, uint16 InPort);
+	FZenStoreHttpClient(UE::Zen::EServiceMode Mode);
 	~FZenStoreHttpClient();
 
 	void Initialize(FStringView InProjectId, 
