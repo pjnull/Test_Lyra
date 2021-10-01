@@ -196,6 +196,12 @@ public:
 	/** Get list of root path item names */
 	TArray<FName> GetRootPathItemNames() const;	
 
+	/** Get current item category filter enum */
+	EContentBrowserItemCategoryFilter GetContentBrowserItemCategoryFilter() const;
+
+	/** Get current item attribute filter enum */
+	EContentBrowserItemAttributeFilter GetContentBrowserItemAttributeFilter() const;
+
 protected:
 	/** Expands all parents of the specified item */
 	void RecursiveExpandParents(const TSharedPtr<FTreeItem>& Item);
