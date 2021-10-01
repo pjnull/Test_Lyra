@@ -1,6 +1,8 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "MetasoundFrontendSubgraphNodeController.h"
+#include "MetasoundFrontendInputController.h"
+#include "MetasoundFrontendOutputController.h"
 
 #include "Algo/Transform.h"
 
