@@ -2,7 +2,8 @@
 
 #pragma once
 
-#include "MetasoundFrontendStandardController.h"
+#include "MetasoundFrontendController.h"
+#include "MetasoundFrontendNodeController.h"
 
 namespace Metasound
 {

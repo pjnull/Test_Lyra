@@ -3,7 +3,7 @@
 #include "MetasoundFrontendController.h"
 
 #include "MetasoundFrontendInvalidController.h"
-#include "MetasoundFrontendStandardController.h"
+#include "MetasoundFrontendDocumentController.h"
 
 namespace Metasound
 {
@@ -65,6 +65,16 @@ namespace Metasound
 		FConstDocumentHandle IDocumentController::CreateDocumentHandle(const FMetasoundFrontendDocument& InDocument)
 		{
 			return CreateDocumentHandle(MakeAccessPtr<FConstDocumentAccessPtr>(InDocument.AccessPoint, InDocument));
+		}
+
+		FDocumentAccess IDocumentAccessor::GetSharedAccess(IDocumentAccessor& InDocumentAccessor)
+		{
+			return InDocumentAccessor.ShareAccess();
+		}
+
+		FConstDocumentAccess IDocumentAccessor::GetSharedAccess(const IDocumentAccessor& InDocumentAccessor)
+		{
+			return InDocumentAccessor.ShareAccess();
 		}
 	}
 }
