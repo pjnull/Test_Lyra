@@ -505,8 +505,6 @@ class FTSRUpdateHistoryCS : public FTSRShader
 	}
 }; // class FTSRUpdateHistoryCS
 
-#if COMPILE_TSR_DEBUG_PASSES
-
 class FTSRDebugHistoryCS : public FTSRShader
 {
 	DECLARE_GLOBAL_SHADER(FTSRDebugHistoryCS);
@@ -519,8 +517,6 @@ class FTSRDebugHistoryCS : public FTSRShader
 		SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D, DebugOutput)
 		END_SHADER_PARAMETER_STRUCT()
 }; // class FTSRDebugHistoryCS
-
-#endif
 
 IMPLEMENT_GLOBAL_SHADER(FTSRClearPrevTexturesCS,     "/Engine/Private/TemporalSuperResolution/TSRClearPrevTextures.usf",     "MainCS", SF_Compute);
 IMPLEMENT_GLOBAL_SHADER(FTSRDilateVelocityCS,        "/Engine/Private/TemporalSuperResolution/TSRDilateVelocity.usf",        "MainCS", SF_Compute);
@@ -536,9 +532,7 @@ IMPLEMENT_GLOBAL_SHADER(FTSRFilterAntiAliasingCS,    "/Engine/Private/TemporalSu
 IMPLEMENT_GLOBAL_SHADER(FTSRUpdateSuperResHistoryCS, "/Engine/Private/TemporalSuperResolution/TSRUpdateSuperResHistory.usf", "MainCS", SF_Compute);
 IMPLEMENT_GLOBAL_SHADER(FTSRUpdateHistoryCS,         "/Engine/Private/TemporalSuperResolution/TSRUpdateHistory.usf",         "MainCS", SF_Compute);
 
-#if COMPILE_TSR_DEBUG_PASSES
 IMPLEMENT_GLOBAL_SHADER(FTSRDebugHistoryCS,          "/Engine/Private/TemporalSuperResolution/TSRDebugHistory.usf",          "MainCS", SF_Compute);
-#endif
 
 DECLARE_GPU_STAT(TemporalSuperResolution)
 
