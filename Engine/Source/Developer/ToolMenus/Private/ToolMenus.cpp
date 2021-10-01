@@ -261,10 +261,20 @@ public:
 		UIAction = UToolMenus::ConvertUIAction(Block, MenuData->Context);
 		bUIActionIsSet = UIAction.ExecuteAction.IsBound() || UIAction.CanExecuteAction.IsBound() || UIAction.GetActionCheckState.IsBound() || UIAction.IsActionVisibleDelegate.IsBound();
 
-		if (Block.MakeWidget.IsBound())
+		if (Block.MakeCustomWidget.IsBound())
+		{
+			FToolMenuCustomWidgetContext EntryWidgetContext;
+			TSharedRef<FMultiBox> MultiBox = MenuBuilder.GetMultiBox();
+			EntryWidgetContext.StyleSet = MultiBox->GetStyleSet();
+			EntryWidgetContext.StyleName = MultiBox->GetStyleName();
+			Widget = Block.MakeCustomWidget.Execute(MenuData->Context, EntryWidgetContext);
+		}
+		PRAGMA_DISABLE_DEPRECATION_WARNINGS
+		else if (Block.MakeWidget.IsBound())
 		{
 			Widget = Block.MakeWidget.Execute(MenuData->Context);
 		}
+		PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 		LabelToDisplay = Block.Label;
 		if (bIsEditing && (!Block.Label.IsSet() || Block.Label.Get().IsEmpty()))
@@ -1301,13 +1311,24 @@ void UToolMenus::PopulateToolBarBuilder(FToolBarBuilder& ToolBarBuilder, UToolMe
 
 			FUIAction UIAction = ConvertUIAction(Block, MenuData->Context);
 
+			ToolBarBuilder.BeginStyleOverride(Block.StyleNameOverride);
+
 			TSharedPtr<SWidget> Widget;
-			if (Block.MakeWidget.IsBound())
+
+			if (Block.MakeCustomWidget.IsBound())
+			{
+				FToolMenuCustomWidgetContext EntryWidgetContext;
+				TSharedRef<FMultiBox> MultiBox = ToolBarBuilder.GetMultiBox();
+				EntryWidgetContext.StyleSet = MultiBox->GetStyleSet();
+				EntryWidgetContext.StyleName = MultiBox->GetStyleName();
+				Widget = Block.MakeCustomWidget.Execute(MenuData->Context, EntryWidgetContext);
+			}
+			PRAGMA_DISABLE_DEPRECATION_WARNINGS
+			else if(Block.MakeWidget.IsBound())
 			{
 				Widget = Block.MakeWidget.Execute(MenuData->Context);
 			}
-
-			ToolBarBuilder.BeginStyleOverride(Block.StyleNameOverride);
+			PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 			if (Block.Type == EMultiBlockType::ToolBarButton)
 			{

@@ -11,7 +11,7 @@ class SWidget;
 class SWindow;
 class UToolMenu;
 
-class CONTENTBROWSERASSETDATASOURCE_API FAssetFolderContextMenu : public TSharedFromThis<FAssetFolderContextMenu>
+class CONTENTBROWSERASSETDATASOURCE_API FAssetFolderContextMenu : public TSharedFromThis<FAssetFolderContextMenu>, public FTickableEditorObject
 {
 public:
 	/** Makes the context menu widget */
@@ -60,8 +60,14 @@ private:
 	/** Handler to check to see if "Connect to source control" can be executed */
 	bool CanExecuteSCCConnect() const;	
 
-	/** Initializes some variable used to in "CanExecute" checks that won't change at runtime or are too expensive to check every frame. */
-	void CacheCanExecuteVars();
+	bool IsProcessingSCCCheckOut() const;
+
+	bool IsProcessingSCCOpenForAdd() const;
+
+	bool IsProcessingSCCCheckIn() const;
+
+	/** Initializes and start to process some variable used to in "CanExecute" checks that won't change at runtime or are too expensive to check every frame. */
+	void StartProcessCanExecuteVars();
 
 	/** Returns a list of names of packages in all selected paths in the sources view */
 	void GetPackageNamesInSelectedPaths(TArray<FString>& OutPackageNames) const;
@@ -69,7 +75,18 @@ private:
 	/** Gets the first selected path, if it exists */
 	FString GetFirstSelectedPath() const;
 
+	/** Begin FTickableEditorObject interface */
+	virtual void Tick(float DeltaTime) override;
+	virtual bool IsTickable() const override { return !PackageNamesToProcess.IsEmpty(); }
+	virtual TStatId GetStatId() const override;
+	/** End FTickableEditorObject interface */
 private:
+
+	void ProcessCanExecuteVars();
+
+	/** Stop or cancel the process of some variable used to in "CanExecute" checks */
+	void StopProcessCanExecuteVars();
+
 	TArray<FString> SelectedPaths;
 	TWeakPtr<SWidget> ParentWidget;
 
@@ -77,4 +94,7 @@ private:
 	bool bCanExecuteSCCCheckOut = false;
 	bool bCanExecuteSCCOpenForAdd = false;
 	bool bCanExecuteSCCCheckIn = false;
+
+	TArray<FString> PackageNamesToProcess;
+	int32 CurrentPackageIndex = 0;
 };
