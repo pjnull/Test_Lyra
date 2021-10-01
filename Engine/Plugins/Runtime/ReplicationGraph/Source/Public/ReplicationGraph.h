@@ -603,7 +603,11 @@ public:
 
 	void ForceRebuild() { bNeedsRebuild = true; }
 
-	void AddSpatialRebuildBlacklistClass(UClass* Class) { RebuildSpatialBlacklistMap.Set(Class, true); }
+	// Marks a class as preventing spatial rebuilds when an instance leaves the grid
+	void AddToClassRebuildDenyList(UClass* Class) { ClassRebuildDenyList.Set(Class, true); }
+
+	UE_DEPRECATED(5.0, "Use AddToClassRebuildDenyList instead")
+	void AddSpatialRebuildBlacklistClass(UClass* Class) { AddToClassRebuildDenyList(Class); }
 
 #if !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
 	TArray<FString> DebugActorNames;
@@ -633,7 +637,7 @@ private:
 	FBox GridBounds;
 
 	// Classmap of actor classes which CANNOT force a rebuild of the spatialization tree. They will be clamped instead. E.g, projectiles.
-	TClassMap<bool> RebuildSpatialBlacklistMap;
+	TClassMap<bool> ClassRebuildDenyList;
 	
 	struct FActorCellInfo
 	{
