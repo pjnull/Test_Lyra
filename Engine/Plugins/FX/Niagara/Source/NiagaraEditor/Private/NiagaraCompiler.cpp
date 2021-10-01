@@ -596,7 +596,7 @@ void FNiagaraCompileRequestDuplicateData::FinishPrecompileDuplicate(const TArray
 			FString TranslationName = TEXT("Emitter");
 			Builder.BeginTranslation(TranslationName);
 			Builder.BeginUsage(FoundOutputNode->GetUsage(), SimStageName);
-			Builder.EnableScriptWhitelist(true, FoundOutputNode->GetUsage());
+			Builder.EnableScriptAllowList(true, FoundOutputNode->GetUsage());
 			Builder.BuildParameterMaps(FoundOutputNode, true);
 			Builder.EndUsage();
 
