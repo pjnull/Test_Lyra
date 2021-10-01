@@ -45,7 +45,6 @@ public:
 	FInputActionValue(Axis1D InValue) : Value(InValue, 0.f, 0.f),						ValueType(EInputActionValueType::Axis1D) {}
 	FInputActionValue(Axis2D InValue) : Value(InValue, 0.f),							ValueType(EInputActionValueType::Axis2D) {}
 	FInputActionValue(Axis3D InValue) : Value(InValue),									ValueType(EInputActionValueType::Axis3D) {}
-	FInputActionValue(FVector3f InValue) : Value(InValue),									ValueType(EInputActionValueType::Axis3D) {}
 
 	// Build a specific type with an arbitrary Axis3D value
 	FInputActionValue(EInputActionValueType InValueType, Axis3D InValue) : Value(InValue), ValueType(InValueType)
@@ -69,7 +68,7 @@ public:
 	// Resets Value without affecting ValueType
 	void Reset()
 	{
-		Value = FVector3f::ZeroVector;
+		Value = FVector::ZeroVector;
 	}
 
 	FInputActionValue& operator+=(const FInputActionValue& Rhs)
@@ -196,7 +195,7 @@ public:
 
 protected:
 
-	FVector3f Value = FVector3f::ZeroVector;
+	FVector Value = FVector::ZeroVector;
 
 	EInputActionValueType ValueType = EInputActionValueType::Boolean;
 
@@ -224,12 +223,6 @@ inline FInputActionValue::Axis2D FInputActionValue::Get() const
 
 template<>
 inline FInputActionValue::Axis3D FInputActionValue::Get() const
-{
-	return Value;
-}
-
-template<>
-inline FVector3f FInputActionValue::Get() const
 {
 	return Value;
 }

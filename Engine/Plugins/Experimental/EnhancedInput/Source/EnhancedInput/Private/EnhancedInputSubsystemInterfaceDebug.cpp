@@ -183,7 +183,7 @@ void IEnhancedInputSubsystemInterface::ShowDebugInfo(UCanvas* Canvas)
 					FString Output = "      ";
 
 					const FKeyState* KeyState = PlayerInput->GetKeyState(Mapping.Key);
-					FInputActionValue RawValue(FInputActionValue::GetValueTypeFromKey(Mapping.Key), KeyState ? KeyState->RawValue : FVector3f::ZeroVector);
+					FInputActionValue RawValue(FInputActionValue::GetValueTypeFromKey(Mapping.Key), KeyState ? KeyState->RawValue : FVector::ZeroVector);
 
 					// Show raw key value if non-zero
 					Output += Mapping.Key.GetDisplayName().ToString() + (!KeyOwner && RawValue.GetMagnitudeSq() ? " - ( " + RawValue.ToString() + " ) - " : " - ");
@@ -312,10 +312,10 @@ void IEnhancedInputSubsystemInterface::ShowDebugActionModifiers(UCanvas* Canvas,
 			VisScreenPos.X += DrawSize.X + VisPad.X;
 		};
 
-		auto BuildSampleOffset = [&VisSize](int32 x, int32 y) { return FVector3f(x / (VisSize.X - 1) * 2.f - 1.f, y / (VisSize.Y - 1) * 2.f - 1.f, 0.f); };
+		auto BuildSampleOffset = [&VisSize](int32 x, int32 y) { return FVector(x / (VisSize.X - 1) * 2.f - 1.f, y / (VisSize.Y - 1) * 2.f - 1.f, 0.f); };
 
 
-		static TArray<FVector3f> RunningSampleData;
+		static TArray<FVector> RunningSampleData;
 		RunningSampleData.SetNumUninitialized(VisSize.X * VisSize.Y, false);
 
 		// Reset running data to initial values
@@ -327,7 +327,7 @@ void IEnhancedInputSubsystemInterface::ShowDebugActionModifiers(UCanvas* Canvas,
 			}
 		}
 
-		auto BuildVisualizationTexture = [&VisSize, &Action, BuildSampleOffset](const UObject* Owner, const TArray<FVector3f>& SampleData)
+		auto BuildVisualizationTexture = [&VisSize, &Action, BuildSampleOffset](const UObject* Owner, const TArray<FVector>& SampleData)
 		{
 			TArray<FColor> ColorData;
 			ColorData.Reserve(SampleData.Num());
@@ -336,8 +336,8 @@ void IEnhancedInputSubsystemInterface::ShowDebugActionModifiers(UCanvas* Canvas,
 			{
 				for (int32 x = 0; x < VisSize.X; ++x)
 				{
-					FVector3f SampleOffset = BuildSampleOffset(x, y);
-					FVector3f Result = SampleData[x + y * VisSize.X];
+					FVector SampleOffset = BuildSampleOffset(x, y);
+					FVector Result = SampleData[x + y * VisSize.X];
 
 					if (const UInputModifier* Modifier = Cast<const UInputModifier>(Owner))
 					{
@@ -369,7 +369,7 @@ void IEnhancedInputSubsystemInterface::ShowDebugActionModifiers(UCanvas* Canvas,
 			UTexture2D* Visualization = FoundVis ? FoundVis->Texture : nullptr;
 			if (!Visualization)	// TODO: Running sample calculation requires we always step into this unless all visualizations are already valid
 			{
-				static TArray<FVector3f> SampleData;
+				static TArray<FVector> SampleData;
 				SampleData.Reserve(VisSize.X * VisSize.Y);
 				SampleData.Reset();
 				// Take copies of each modifier to do the sampling, so as not to corrupt internal state.
@@ -383,12 +383,12 @@ void IEnhancedInputSubsystemInterface::ShowDebugActionModifiers(UCanvas* Canvas,
 						const float DeltaTime = 0.f;// 1.f / 60.f;	// TODO: If we want to sample the whole space at a given time step we need to reset the modifier state each sample and rebuild every frame.
 
 						// Update local result
-						FVector3f Result = SampleModifier->ModifyRaw(PlayerInput, FInputActionValue(Action->ValueType, BuildSampleOffset(x, y)), DeltaTime).Get<FVector3f>();
+						FVector Result = SampleModifier->ModifyRaw(PlayerInput, FInputActionValue(Action->ValueType, BuildSampleOffset(x, y)), DeltaTime).Get<FVector>();
 						SampleData.Add(Result);
 
 						// Update running result
-						FVector3f& RunningResult = RunningSampleData[x + y * VisSize.X];
-						RunningResult = RunningSampleModifier->ModifyRaw(PlayerInput, FInputActionValue(Action->ValueType, RunningResult), DeltaTime).Get<FVector3f>();
+						FVector& RunningResult = RunningSampleData[x + y * VisSize.X];
+						RunningResult = RunningSampleModifier->ModifyRaw(PlayerInput, FInputActionValue(Action->ValueType, RunningResult), DeltaTime).Get<FVector>();
 
 					}
 				}
