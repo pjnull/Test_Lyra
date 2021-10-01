@@ -1,4 +1,4 @@
-﻿// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "RetargetEditor/IKRetargetBatchOperation.h"
 
@@ -6,6 +6,7 @@
 #include "AnimationBlueprintLibrary.h"
 #include "AnimPose.h"
 #include "AnimPreviewInstance.h"
+#include "Animation/AnimSequence.h"
 #include "ContentBrowserModule.h"
 #include "EditorReimportHandler.h"
 #include "IContentBrowserSingleton.h"

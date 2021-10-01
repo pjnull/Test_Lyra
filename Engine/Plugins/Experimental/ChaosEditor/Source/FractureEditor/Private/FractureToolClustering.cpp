@@ -7,7 +7,7 @@
 #include "GeometryCollection/GeometryCollectionComponent.h"
 #include "GeometryCollection/GeometryCollection.h"
 #include "GeometryCollection/GeometryCollectionClusteringUtility.h"
-
+#include "ScopedTransaction.h"
 
 #define LOCTEXT_NAMESPACE "FractureToolClusteringOps"
 

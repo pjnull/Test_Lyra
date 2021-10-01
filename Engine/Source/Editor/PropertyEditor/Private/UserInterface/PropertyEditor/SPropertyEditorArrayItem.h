@@ -7,6 +7,7 @@
 #include "Fonts/SlateFontInfo.h"
 #include "EditorStyleSet.h"
 #include "UserInterface/PropertyEditor/PropertyEditorConstants.h"
+#include "PropertyEditorModule.h"
 
 class FPropertyEditor;
 class IPropertyHandle;

@@ -5,7 +5,7 @@
 #include "IOpenXRHMDModule.h"
 #include "IHeadMountedDisplayModule.h"
 #include "CoreMinimal.h"
-
+#include "Templates/RefCounting.h"
 #include <openxr/openxr.h>
 
 class FOpenXRHMDModule : public IOpenXRHMDModule

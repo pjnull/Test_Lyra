@@ -16,6 +16,7 @@
 #include "IDetailChildrenBuilder.h"
 #include "OptimusComputeDataInterface.h"
 #include "OptimusResourceDescription.h"
+#include "ScopedTransaction.h"
 #include "Widgets/Input/SMultiLineEditableTextBox.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SSeparator.h"
