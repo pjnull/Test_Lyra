@@ -74,7 +74,7 @@ void UFractureToolGenerateAsset::OpenGenerateAssetDialog(TArray<AActor*>& Actors
 	SAssignNew(PickAssetPathWindow, SWindow)
 		.Title(LOCTEXT("SelectPath", "Select Path"))
 		.ToolTipText(LOCTEXT("SelectPathTooltip", "Select the path where the Geometry Collection will be created at"))
-		.ClientSize(FVector2D(400, 400));
+		.ClientSize(FVector2D(500, 500));
 
 	// NOTE - the parent window has to completely exist before this one does so the parent gets set properly.
 	// This is why we do not just put this in the Contents()[ ... ] of the Window above.
