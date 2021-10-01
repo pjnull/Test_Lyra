@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Input/Reply.h"
+#include "TickableEditorObject.h"
 
 class FExtender;
 class FMenuBuilder;
@@ -14,6 +15,8 @@ class UToolMenu;
 class CONTENTBROWSERASSETDATASOURCE_API FAssetFolderContextMenu : public TSharedFromThis<FAssetFolderContextMenu>, public FTickableEditorObject
 {
 public:
+	virtual ~FAssetFolderContextMenu() = default;
+
 	/** Makes the context menu widget */
 	void MakeContextMenu(
 		UToolMenu* InMenu,

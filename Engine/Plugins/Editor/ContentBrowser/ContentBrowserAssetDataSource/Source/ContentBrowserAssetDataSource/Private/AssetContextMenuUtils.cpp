@@ -9,6 +9,7 @@
 #include "ToolMenuEntry.h"
 #include "ToolMenuSection.h"
 #include "Widgets/Images/SThrobber.h"
+#include "Widgets/SBoxPanel.h"
 #include "Widgets/Text/STextBlock.h"
 
 namespace UE::ContentBrowserAssetDataSource::Private
