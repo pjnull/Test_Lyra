@@ -586,10 +586,12 @@ UObject* UMovieSceneSection::GetImplicitObjectOwner()
 				}
 				else if (FMovieScenePossessable* MovieScenePossessable = MovieScene->FindPossessable(Guid))
 				{
+#if WITH_EDITORONLY_DATA
 					if (MovieScenePossessable->GetPossessedObjectClass() && MovieScenePossessable->GetPossessedObjectClass()->GetDefaultObject())
 					{
 						return MovieScenePossessable->GetPossessedObjectClass()->GetDefaultObject();
 					}
+#endif
 				}
 			}
 		}
