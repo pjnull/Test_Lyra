@@ -246,7 +246,7 @@ TFuture<TIoStatusOr<uint64>> FZenStoreHttpClient::AppendOp(FCbPackage OpEntry)
 		{
 			// Old-style with all attachments by value
 
-			OpEntry.Save(SerializedPackage);
+			UE::Zen::SaveCbPackage(OpEntry, SerializedPackage);
 		}
 		else
 		{
