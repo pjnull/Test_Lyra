@@ -326,7 +326,25 @@ TSharedPtr<SContentBrowser> FContentBrowserSingleton::FindContentBrowserToSync(b
 		ChooseNewPrimaryBrowser();
 	}
 
-	if ( PrimaryContentBrowser.IsValid() && (bAllowLockedBrowsers || !PrimaryContentBrowser.Pin()->IsLocked()) )
+	auto CanContentBrowserBeSynced =
+		[ this, bAllowLockedBrowsers ]( const TWeakPtr< SContentBrowser >& ContentBrowser ) -> bool
+		{
+			// Content browser can be synced if:
+			// - It's valid.
+			// - It's not locked or we allow locked browsers (bAllowLockedBrowsers).
+			// - If it's the drawer, the active window needs to have a status bar so that it can show the drawer.
+
+			bool bCanBeSynced = ContentBrowser.IsValid() && ( bAllowLockedBrowsers || !PrimaryContentBrowser.Pin()->IsLocked() );
+
+			if ( ContentBrowser == ContentBrowserDrawer )
+			{
+				bCanBeSynced = bCanBeSynced && GEditor->GetEditorSubsystem<UStatusBarSubsystem>()->ActiveWindowHasStatusBar();
+			}
+
+			return bCanBeSynced;
+		};
+
+	if ( CanContentBrowserBeSynced( PrimaryContentBrowser ) )
 	{
 		// If wanting to spawn a new browser window, don't set the BrowserToSync in order to summon a new browser
 		if (!bNewSpawnBrowser)
@@ -339,19 +357,18 @@ TSharedPtr<SContentBrowser> FContentBrowserSingleton::FindContentBrowserToSync(b
 	{
 
 		// If there is no primary or it is locked, sync the content browser drawer if it's available
-		if (GEditor->GetEditorSubsystem<UStatusBarSubsystem>()->ActiveWindowHasStatusBar() &&
-			ContentBrowserDrawer.IsValid() && !ContentBrowserDrawer.Pin()->IsLocked())
+		if ( CanContentBrowserBeSynced( ContentBrowserDrawer ) )
 		{
 			ContentBrowserToSync = ContentBrowserDrawer.Pin();
 		}
 		else
 		{
-			// if the drawer doesn't exist find the first non-locked valid browser
-			for (int32 BrowserIdx = 0; BrowserIdx < AllContentBrowsers.Num(); ++BrowserIdx)
+			// if the drawer isn't available, find the first non-locked valid browser
+			for ( const TWeakPtr< SContentBrowser >& ContentBrowser : AllContentBrowsers )
 			{
-				if (AllContentBrowsers[BrowserIdx].IsValid() && (bAllowLockedBrowsers || !AllContentBrowsers[BrowserIdx].Pin()->IsLocked()))
+				if ( CanContentBrowserBeSynced( ContentBrowser ) )
 				{
-					ContentBrowserToSync = AllContentBrowsers[BrowserIdx].Pin();
+					ContentBrowserToSync = ContentBrowser.Pin();
 					break;
 				}
 			}
