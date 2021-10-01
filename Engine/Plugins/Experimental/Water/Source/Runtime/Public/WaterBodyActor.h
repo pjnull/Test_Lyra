@@ -68,6 +68,12 @@ public:
 	virtual void Serialize(FArchive& Ar) override;
 	virtual void PostLoad() override;
 	virtual void PostRegisterAllComponents() override;
+
+#if WITH_EDITOR
+	virtual void SetActorHiddenInGame(bool bNewHidden) override;
+	virtual void SetIsTemporarilyHiddenInEditor(bool bIsHidden) override;
+	virtual bool SetIsHiddenEdLayer(bool bIsHiddenEdLayer) override;
+#endif // WITH_EDITOR
 	
 	/** Returns the type of body */
 	UFUNCTION(BlueprintCallable, Category=Water)
@@ -237,7 +243,7 @@ public:
 	}
 
 	UE_DEPRECATED(4.27, "Moved to WaterBodyComponent")
-	virtual void SetDynamicParametersOnMID(UMaterialInstanceDynamic* InMID) final { return WaterBodyComponent->SetDynamicParametersOnMID(InMID); }
+	virtual void SetDynamicParametersOnMID(UMaterialInstanceDynamic* InMID) final { WaterBodyComponent->SetDynamicParametersOnMID(InMID); }
 
 	UE_DEPRECATED(4.27, "Moved to WaterBodyComponent")
 	bool IsWorldLocationInExclusionVolume(const FVector& InWorldLocation) const { return WaterBodyComponent->IsWorldLocationInExclusionVolume(InWorldLocation); }
