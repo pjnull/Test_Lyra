@@ -4926,8 +4926,8 @@ bool UReplicationGraphNode_GridSpatialization2D::WillActorLocationGrowSpatialBou
 
 void UReplicationGraphNode_GridSpatialization2D::HandleActorOutOfSpatialBounds(AActor* Actor, const FVector& Location3D, const bool bStaticActor)
 {
-	// Don't rebuild spatialization for blacklisted actors. They will just get clamped to the grid.
-	if (RebuildSpatialBlacklistMap.Get(Actor->GetClass()) != nullptr)
+	// Don't rebuild spatialization for denied actors. They will just get clamped to the grid.
+	if (ClassRebuildDenyList.Get(Actor->GetClass()) != nullptr)
 	{
 		return;
 	}
