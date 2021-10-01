@@ -89,29 +89,6 @@ uint8* FItemPropertyNode::GetValueBaseAddress(uint8* StartAddress, bool bIsSpars
 uint8* FItemPropertyNode::GetValueAddress(uint8* StartAddress, bool bIsSparseData) const
 {
 	uint8* Result = GetValueBaseAddress(StartAddress, bIsSparseData);
-
-	const FProperty* MyProperty = GetProperty();
-
-	const FArrayProperty* ArrayProperty = CastField<FArrayProperty>(MyProperty);
-	const FSetProperty* SetProperty = CastField<FSetProperty>(MyProperty);
-	const FMapProperty* MapProperty = CastField<FMapProperty>(MyProperty);
-
-	if( Result && ArrayProperty)
-	{
-		FScriptArrayHelper ArrayHelper(ArrayProperty, Result);
-		Result = ArrayHelper.GetRawPtr();
-	}
-	else if (Result && SetProperty)
-	{
-		FScriptSetHelper SetHelper(SetProperty, Result);
-		Result = SetHelper.GetElementPtr(0);
-	}
-	else if (Result && MapProperty)
-	{
-		FScriptMapHelper MapHelper(MapProperty, Result);
-		Result = MapHelper.GetPairPtr(0);
-	}
-
 	return Result;
 }
 
