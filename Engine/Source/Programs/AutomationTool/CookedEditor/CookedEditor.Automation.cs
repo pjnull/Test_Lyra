@@ -615,16 +615,22 @@ public class MakeCookedEditor : BuildCommand
 		);
 
 		string TargetPlatformType = "CookedEditor";
-		string TargetPlatformName = ProjectPath.GetFileNameWithoutAnyExtensions() + TargetPlatformType;
+		string TargetName;
+
+		// look to see if ini overrides tgarget name
+		ConfigHierarchy GameConfig = ConfigCache.ReadHierarchy(ConfigHierarchyType.Game, ProjectPath.Directory, BuildHostPlatform.Current.Platform);
+		if (!GameConfig.GetString("CookedEditorSettings", "CookedEditorTargetName", out TargetName))
+		{
+			// if not, then use ProjectCookedEditor
+			TargetName = ProjectPath.GetFileNameWithoutAnyExtensions() + TargetPlatformType;
+		}
 
 		// cook the cooked editor targetplatorm as the "client"
 		Params.ClientCookedTargets.Clear();
-		Params.ClientCookedTargets.Add(TargetPlatformName);
+		Params.ClientCookedTargets.Add(TargetName);
 		//Params.ClientCookedTargets.Add("CrashReportClientEditor");
 		Params.ClientTargetPlatforms = new List<TargetPlatformDescriptor>() { new TargetPlatformDescriptor(Params.ClientTargetPlatforms[0].Type, TargetPlatformType) };
 
-//		Params.EditorTargets.Clear();
-//		Params.EditorTargets.Add(TargetPlatformName);
 		Params.ServerCookedTargets.Clear();
 
 		// when making cooked editors, we some special commandline options to override some assumptions about editor data
