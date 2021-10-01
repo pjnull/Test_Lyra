@@ -478,11 +478,11 @@ public:
 	DECLARE_MULTICAST_DELEGATE_OneParam(FPlatformChangedLaptopMode, EConvertibleLaptopMode);
 	static FPlatformChangedLaptopMode PlatformChangedLaptopMode;
 
-	/** Sent when the platform needs the user to fix headset tracking on startup (PS4 Morpheus only) */
+	/** Sent when the platform needs the user to fix headset tracking on startup (Most platforms do not need this.) */
 	DECLARE_MULTICAST_DELEGATE(FVRHeadsetTrackingInitializingAndNeedsHMDToBeTrackedDelegate);
 	static FVRHeadsetTrackingInitializingAndNeedsHMDToBeTrackedDelegate VRHeadsetTrackingInitializingAndNeedsHMDToBeTrackedDelegate;
 
-	/** Sent when the platform finds that needed headset tracking on startup has completed (PS4 Morpheus only) */
+	/** Sent when the platform finds that needed headset tracking on startup has completed (Most platforms do not need this.) */
 	DECLARE_MULTICAST_DELEGATE(FVRHeadsetTrackingInitializedDelegate);
 	static FVRHeadsetTrackingInitializedDelegate VRHeadsetTrackingInitializedDelegate;
 
