@@ -379,6 +379,20 @@ namespace UE::Zen {
 		return PerformBlocking(Uri, RequestVerb::Delete, 0u);
 	}
 
+	static const char* GetSessionIdHeader() {
+		static FCbObjectId SessionId = FCbObjectId::NewObjectId();
+
+		static const char* HeaderString = [&] {
+			static TAnsiStringBuilder<64> SessionIdHeader;
+			SessionIdHeader << "UE-Session: " << SessionId;
+			return SessionIdHeader.GetData(); 
+		}();
+
+		return HeaderString;
+	}
+
+	static std::atomic<int> RequestId{1};
+
 	FZenHttpRequest::Result FZenHttpRequest::PerformBlocking(FStringView Uri, RequestVerb Verb, uint32 ContentLength)
 	{
 		// Strip any leading slashes because we compose the prefix and the suffix with a separating slash below
@@ -387,8 +401,12 @@ namespace UE::Zen {
 			Uri.RightChopInline(1);
 		}
 
-		static const char* CommonHeaders[] = {
-			"User-Agent: UE",
+		TAnsiStringBuilder<32> RequestIdHeader;
+		RequestIdHeader << "UE-Request: " << RequestId++;
+
+		const char* CommonHeaders[] = {
+			GetSessionIdHeader(),
+			RequestIdHeader.GetData(),
 			nullptr
 		};
 
