@@ -208,6 +208,7 @@ void SPathView::Construct( const FArguments& InArgs )
 			SNew(SBorder)
 			.BorderImage(FAppStyle::Get().GetBrush("Brushes.Panel"))
 			.Padding(8.f)
+			.Visibility(!InArgs._ExternalSearch || InArgs._ShowTreeTitle ? EVisibility::Visible : EVisibility::Collapsed)
 			[
 				SNew(SVerticalBox)
 
