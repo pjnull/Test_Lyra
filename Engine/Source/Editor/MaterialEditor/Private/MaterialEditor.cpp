@@ -82,6 +82,7 @@
 #include "Materials/MaterialExpressionTransformPosition.h"
 #include "Materials/MaterialExpressionVectorParameter.h"
 #include "Materials/MaterialExpressionStaticBoolParameter.h"
+#include "Materials/MaterialExpressionCustomOutput.h"
 #include "Materials/MaterialFunction.h"
 #include "Materials/MaterialFunctionInstance.h"
 #include "Materials/MaterialParameterCollection.h"
@@ -6185,7 +6186,7 @@ void FMaterialEditor::RefreshExpressionPreview(UMaterialExpression* MaterialExpr
 FMatExpressionPreview* FMaterialEditor::GetExpressionPreview(UMaterialExpression* MaterialExpression, bool& bNewlyCreated)
 {
 	bNewlyCreated = false;
-	if (!MaterialExpression->bHidePreviewWindow && !MaterialExpression->bCollapsed)
+	if (!MaterialExpression->bHidePreviewWindow && !MaterialExpression->bCollapsed && !MaterialExpression->IsA<UMaterialExpressionCustomOutput>())
 	{
 		FMatExpressionPreview* Preview = NULL;
 		for( int32 PreviewIndex = 0 ; PreviewIndex < ExpressionPreviews.Num() ; ++PreviewIndex )
