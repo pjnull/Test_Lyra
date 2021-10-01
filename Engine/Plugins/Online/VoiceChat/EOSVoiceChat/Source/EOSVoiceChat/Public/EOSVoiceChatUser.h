@@ -302,6 +302,7 @@ protected:
 	void ApplyAudioInputOptions();
 	void ApplyAudioOutputOptions();
 	void ApplyPlayerBlock(const FGlobalParticipant& GlobalParticipant, const FChannelSession& ChannelSession, FChannelParticipant& ChannelParticipant);
+	void ApplyReceivingOptions(const FChannelSession& ChannelSession);
 	void ApplyPlayerReceivingOptions(const FGlobalParticipant& GlobalParticipant, const FChannelSession& ChannelSession, FChannelParticipant& ChannelParticipant, bool bForce = false);
 	void ApplySendingOptions();
 	void ApplySendingOptions(FChannelSession& ChannelSession, const bool bForce = false);
