@@ -1823,8 +1823,7 @@ void FLevelEditorActionCallbacks::OnSelectAllActorsOfClass( bool bArchetype )
 
 bool FLevelEditorActionCallbacks::CanSelectAllActorsOfClass()
 {
-	FSelectedActorInfo SelectionInfo = AssetSelectionUtils::GetSelectedActorInfo();
-	return SelectionInfo.NumSelected > 0 && SelectionInfo.bAllSelectedActorsOfSameType;
+	return GEditor->GetSelectedActorCount() > 0;
 }
 
 void FLevelEditorActionCallbacks::OnSelectComponentOwnerActor()
