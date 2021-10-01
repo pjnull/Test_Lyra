@@ -6,7 +6,7 @@
 #include "ObjectElementEditorSelectionInterface.generated.h"
 
 UCLASS()
-class UObjectElementEditorSelectionInterface : public UObjectElementSelectionInterface
+class UNREALED_API UObjectElementEditorSelectionInterface : public UObjectElementSelectionInterface
 {
 	GENERATED_BODY()
 

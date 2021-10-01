@@ -3,10 +3,10 @@
 #pragma once
 
 #include "Elements/Interfaces/TypedElementDetailsInterface.h"
-#include "ObjectElementDetailsInterface.generated.h"
+#include "ActorElementDetailsInterface.generated.h"
 
 UCLASS()
-class UObjectElementDetailsInterface : public UObject, public ITypedElementDetailsInterface
+class UNREALED_API UActorElementDetailsInterface : public UObject, public ITypedElementDetailsInterface
 {
 	GENERATED_BODY()
 

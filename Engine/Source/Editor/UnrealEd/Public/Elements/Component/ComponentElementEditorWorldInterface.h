@@ -2,19 +2,20 @@
 
 #pragma once
 
-#include "Elements/SMInstance/SMInstanceElementWorldInterface.h"
-#include "SMInstanceElementEditorWorldInterface.generated.h"
+#include "Elements/Component/ComponentElementWorldInterface.h"
+#include "ComponentElementEditorWorldInterface.generated.h"
 
 UCLASS()
-class USMInstanceElementEditorWorldInterface : public USMInstanceElementWorldInterface
+class UNREALED_API UComponentElementEditorWorldInterface : public UComponentElementWorldInterface
 {
 	GENERATED_BODY()
 
 public:
+	virtual void NotifyMovementStarted(const FTypedElementHandle& InElementHandle) override;
+	virtual void NotifyMovementOngoing(const FTypedElementHandle& InElementHandle) override;
+	virtual void NotifyMovementEnded(const FTypedElementHandle& InElementHandle) override;
 	virtual bool CanDeleteElement(const FTypedElementHandle& InElementHandle) override;
-	virtual bool DeleteElement(const FTypedElementHandle& InElementHandle, UWorld* InWorld, UTypedElementSelectionSet* InSelectionSet, const FTypedElementDeletionOptions& InDeletionOptions) override;
 	virtual bool DeleteElements(TArrayView<const FTypedElementHandle> InElementHandles, UWorld* InWorld, UTypedElementSelectionSet* InSelectionSet, const FTypedElementDeletionOptions& InDeletionOptions) override;
 	virtual bool CanDuplicateElement(const FTypedElementHandle& InElementHandle) override;
-	virtual FTypedElementHandle DuplicateElement(const FTypedElementHandle& InElementHandle, UWorld* InWorld, const FVector& InLocationOffset) override;
 	virtual void DuplicateElements(TArrayView<const FTypedElementHandle> InElementHandles, UWorld* InWorld, const FVector& InLocationOffset, TArray<FTypedElementHandle>& OutNewElements) override;
 };
