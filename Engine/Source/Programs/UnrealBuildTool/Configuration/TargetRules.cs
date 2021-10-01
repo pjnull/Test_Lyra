@@ -1813,6 +1813,10 @@ namespace UnrealBuildTool
 					EnablePlugins.Remove(PluginName);
 				}
 			}
+
+			// enable > 4gb pdb file support, which needs an up-to-date compiler and can make pdbs a little bigger, so we 
+			// only enable it when needed
+			WindowsPlatform.AdditionalLinkerOptions = "/PDBPAGESIZE:8192";
 		}
 
 		/// <summary>
