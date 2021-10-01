@@ -8,7 +8,7 @@
 class UActorComponent;
 
 UCLASS()
-class UComponentElementEditorSelectionInterface : public UComponentElementSelectionInterface
+class UNREALED_API UComponentElementEditorSelectionInterface : public UComponentElementSelectionInterface
 {
 	GENERATED_BODY()
 

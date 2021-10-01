@@ -3,13 +3,14 @@
 #pragma once
 
 #include "Elements/Interfaces/TypedElementDetailsInterface.h"
-#include "ActorElementDetailsInterface.generated.h"
+#include "ComponentElementDetailsInterface.generated.h"
 
 UCLASS()
-class UActorElementDetailsInterface : public UObject, public ITypedElementDetailsInterface
+class UNREALED_API UComponentElementDetailsInterface : public UObject, public ITypedElementDetailsInterface
 {
 	GENERATED_BODY()
 
 public:
+	virtual bool IsTopLevelElement(const FTypedElementHandle& InElementHandle) override { return false; }
 	virtual TUniquePtr<ITypedElementDetailsObject> GetDetailsObject(const FTypedElementHandle& InElementHandle) override;
 };

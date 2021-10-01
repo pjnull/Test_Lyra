@@ -2,15 +2,17 @@
 
 #pragma once
 
-#include "Elements/Component/ComponentElementWorldInterface.h"
-#include "ComponentElementEditorWorldInterface.generated.h"
+#include "Elements/Actor/ActorElementWorldInterface.h"
+#include "ActorElementEditorWorldInterface.generated.h"
 
 UCLASS()
-class UComponentElementEditorWorldInterface : public UComponentElementWorldInterface
+class UNREALED_API UActorElementEditorWorldInterface : public UActorElementWorldInterface
 {
 	GENERATED_BODY()
 
 public:
+	virtual bool GetPivotOffset(const FTypedElementHandle& InElementHandle, FVector& OutPivotOffset) override;
+	virtual bool SetPivotOffset(const FTypedElementHandle& InElementHandle, const FVector& InPivotOffset) override;
 	virtual void NotifyMovementStarted(const FTypedElementHandle& InElementHandle) override;
 	virtual void NotifyMovementOngoing(const FTypedElementHandle& InElementHandle) override;
 	virtual void NotifyMovementEnded(const FTypedElementHandle& InElementHandle) override;

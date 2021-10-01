@@ -7,7 +7,7 @@
 #include "ActorElementEditorAssetDataInterface.generated.h"
 
 UCLASS()
-class UActorElementEditorAssetDataInterface : public UActorElementAssetDataInterface
+class UNREALED_API UActorElementEditorAssetDataInterface : public UActorElementAssetDataInterface
 {
 	GENERATED_BODY()
 
