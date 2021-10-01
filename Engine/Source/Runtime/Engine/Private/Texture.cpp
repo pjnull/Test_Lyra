@@ -8,7 +8,6 @@
 #include "Materials/Material.h"
 #include "Misc/ConfigCacheIni.h"
 #include "Misc/FeedbackContext.h"
-#include "Misc/ScopeExit.h"
 #include "HAL/LowLevelMemTracker.h"
 #include "UObject/UObjectIterator.h"
 #include "UObject/ObjectSaveContext.h"
@@ -113,8 +112,6 @@ UTexture::UTexture(const FObjectInitializer& ObjectInitializer)
 	CompositeTextureMode = CTM_NormalRoughnessToAlpha;
 	CompositePower = 1.0f;
 	bUseLegacyGamma = false;
-	bIsImporting = false;
-	bCustomPropertiesImported = false;
 	AlphaCoverageThresholds = FVector4(0, 0, 0, 0);
 	PaddingColor = FColor::Black;
 	ChromaKeyColor = FColorList::Magenta;
@@ -239,46 +236,6 @@ void UTexture::UpdateResource()
 	}
 }
 
-void UTexture::ExportCustomProperties(FOutputDevice& Out, uint32 Indent)
-{
-#if WITH_EDITOR
-	if (HasAnyFlags(RF_ClassDefaultObject))
-	{
-		return;
-	}
-
-	// Texture source data export : first, make sure it is ready for export :
-	FinishCachePlatformData();
-
-	Source.ExportCustomProperties(Out, Indent);
-
-	Out.Logf(TEXT("\r\n"));
-#endif // WITH_EDITOR
-}
-
-void UTexture::ImportCustomProperties(const TCHAR* SourceText, FFeedbackContext* Warn)
-{
-#if WITH_EDITOR
-	Source.ImportCustomProperties(SourceText, Warn);
-
-	BeginCachePlatformData();
-
-	bCustomPropertiesImported = true;
-#endif // WITH_EDITOR
-}
-
-void UTexture::PostEditImport()
-{
-#if WITH_EDITOR
-	bIsImporting = true;
-
-	if (bCustomPropertiesImported)
-	{
-		FinishCachePlatformData();
-	}
-#endif // WITH_EDITOR
-}
-
 bool UTexture::IsPostLoadThreadSafe() const
 {
 	return false;
@@ -327,25 +284,8 @@ bool UTexture::CanEditChange(const FProperty* InProperty) const
 
 void UTexture::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE(UTexture_PostEditChangeProperty);
-
+	TRACE_CPUPROFILER_EVENT_SCOPE(UTexture::PostEditChangeProperty);
 	Super::PostEditChangeProperty(PropertyChangedEvent);
-
-#if WITH_EDITOR
-	ON_SCOPE_EXIT
-	{
-		// PostEditChange is the last step in the import sequence (PreEditChange/PostEditImport/PostEditChange, called twice : see further details) so reset the import-related flags here:
-		bIsImporting = false;
-		bCustomPropertiesImported = false;
-	};
-
-	// When PostEditChange is called as part of the import process (PostEditImport has just been called), it may be called twice : once for the (sub-)object declaration, and once for the definition, the latter being 
-	//  when ImportCustomProperties is called. Because texture bulk data is only being copied to in ImportCustomProperties, it's invalid to do anything the first time so we postpone it to the second call :
-	if (bIsImporting && !bCustomPropertiesImported)
-	{
-		return;
-	}
-#endif // WITH_EDITOR
 
 	SetLightingGuid();
 
@@ -1749,97 +1689,6 @@ FSharedBuffer FTextureSource::TryDecompressJpegData(IImageWrapperModule* ImageWr
 	}	
 }
 
-void FTextureSource::ExportCustomProperties(FOutputDevice& Out, uint32 Indent)
-{
-	check(LockState == ELockState::None);
-
-	FSharedBuffer Payload = BulkData.GetPayload().Get();
-	uint64 PayloadSize = Payload.GetSize();
-
-	Out.Logf(TEXT("%sCustomProperties TextureSourceData "), FCString::Spc(Indent));
-
-	Out.Logf(TEXT("PayloadSize=%llu "), PayloadSize);
-	TArrayView<uint8> Buffer((uint8*)Payload.GetData(), PayloadSize);
-	for (uint8 Element : Buffer)
-	{
-		Out.Logf(TEXT("%x "), Element);
-	}
-}
-
-void FTextureSource::ImportCustomProperties(const TCHAR* SourceText, FFeedbackContext* Warn)
-{
-	check(LockState == ELockState::None);
-
-	if (FParse::Command(&SourceText, TEXT("TextureSourceData")))
-	{
-		uint64 PayloadSize = 0;
-		if (FParse::Value(SourceText, TEXT("PayloadSize="), PayloadSize))
-		{
-			while (*SourceText && (!FChar::IsWhitespace(*SourceText)))
-			{
-				++SourceText;
-			}
-			FParse::Next(&SourceText);
-		}
-
-		bool bSuccess = true;
-		if (PayloadSize > (uint64)0)
-		{
-			TCHAR* StopStr;
-			FUniqueBuffer Buffer = FUniqueBuffer::Alloc(PayloadSize);
-			uint8* DestData = (uint8*)Buffer.GetData();
-			if (DestData)
-			{
-				uint64 Index = 0;
-				while (FChar::IsHexDigit(*SourceText))
-				{
-					if (Index < PayloadSize)
-					{
-						DestData[Index++] = (uint8)FCString::Strtoi(SourceText, &StopStr, 16);
-						while (FChar::IsHexDigit(*SourceText))
-						{
-							SourceText++;
-						}
-					}
-					FParse::Next(&SourceText);
-				}
-
-				if (Index != PayloadSize)
-				{
-					Warn->Log(*NSLOCTEXT("UnrealEd", "Importing_TextureSource_SyntaxError", "Syntax Error").ToString());
-					bSuccess = false;
-				}
-			}
-			else
-			{
-				Warn->Log(*NSLOCTEXT("UnrealEd", "Importing_TextureSource_BulkDataAllocFailure", "Couldn't allocate bulk data").ToString());
-				bSuccess = false;
-			}
-			
-			if (bSuccess)
-			{
-				BulkData.UpdatePayload(Buffer.MoveToShared());
-			}
-		}
-
-		if (bSuccess)
-		{
-			if (!bGuidIsHash)
-			{
-				ForceGenerateGuid();
-			}
-		}
-		else
-		{
-			BulkData.Reset();
-		}
-	}
-	else
-	{
-		Warn->Log(*NSLOCTEXT("UnrealEd", "Importing_TextureSource_MissingTextureSourceDataCommand", "Missing TextureSourceData tag from import text.").ToString());
-	}
-}
-
 bool FTextureSource::CanPNGCompress() const
 {
 	bool bCanPngCompressFormat = (Format == TSF_G8 || Format == TSF_G16 || Format == TSF_RGBA8 || Format == TSF_BGRA8 || Format == TSF_RGBA16);
@@ -1960,8 +1809,6 @@ void FTextureSource::UseHashAsGuid()
 {
 	if (HasPayloadData())
 	{
-		checkf(LockState == ELockState::None, TEXT("UseHashAsGuid shouldn't be called in-between LockMip/UnlockMip"));
-
 		bGuidIsHash = true;
 		Id = BulkData.GetPayloadId().ToGuid();
 	}
