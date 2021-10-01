@@ -734,25 +734,9 @@ FContentBrowserDataCompiledFilter SPathView::CreateCompiledFolderFilter() const
 
 	FContentBrowserDataFilter DataFilter;
 	DataFilter.bRecursivePaths = true;
-
 	DataFilter.ItemTypeFilter = EContentBrowserItemTypeFilter::IncludeFolders;
-
-	DataFilter.ItemCategoryFilter = InitialCategoryFilter;
-	if (bAllowClassesFolder && ContentBrowserSettings->GetDisplayCppFolders())
-	{
-		DataFilter.ItemCategoryFilter |= EContentBrowserItemCategoryFilter::IncludeClasses;
-	}
-	else
-	{
-		DataFilter.ItemCategoryFilter &= ~EContentBrowserItemCategoryFilter::IncludeClasses;
-	}
-	DataFilter.ItemCategoryFilter &= ~EContentBrowserItemCategoryFilter::IncludeCollections;
-	
-	DataFilter.ItemAttributeFilter = EContentBrowserItemAttributeFilter::IncludeProject
-		| (ContentBrowserSettings->GetDisplayEngineFolder() ? EContentBrowserItemAttributeFilter::IncludeEngine : EContentBrowserItemAttributeFilter::IncludeNone)
-		| (ContentBrowserSettings->GetDisplayPluginFolders() ? EContentBrowserItemAttributeFilter::IncludePlugins : EContentBrowserItemAttributeFilter::IncludeNone)
-		| (ContentBrowserSettings->GetDisplayDevelopersFolder() ? EContentBrowserItemAttributeFilter::IncludeDeveloper : EContentBrowserItemAttributeFilter::IncludeNone)
-		| (ContentBrowserSettings->GetDisplayL10NFolder() ? EContentBrowserItemAttributeFilter::IncludeLocalized : EContentBrowserItemAttributeFilter::IncludeNone);
+	DataFilter.ItemCategoryFilter = GetContentBrowserItemCategoryFilter();
+	DataFilter.ItemAttributeFilter = GetContentBrowserItemAttributeFilter();
 
 	TSharedPtr<FBlacklistPaths> CombinedFolderBlacklist = ContentBrowserUtils::GetCombinedFolderBlacklist(FolderBlacklist, bAllowReadOnlyFolders ? nullptr : WritableFolderBlacklist);
 
@@ -793,6 +777,33 @@ FContentBrowserDataCompiledFilter SPathView::CreateCompiledFolderFilter() const
 		ContentBrowserData->CompileFilter(RootPath, DataFilter, CompiledDataFilter);
 	}
 	return CompiledDataFilter;
+}
+
+EContentBrowserItemCategoryFilter SPathView::GetContentBrowserItemCategoryFilter() const
+{
+	const UContentBrowserSettings* ContentBrowserSettings = GetDefault<UContentBrowserSettings>();
+	EContentBrowserItemCategoryFilter ItemCategoryFilter = InitialCategoryFilter;
+	if (bAllowClassesFolder && ContentBrowserSettings->GetDisplayCppFolders())
+	{
+		ItemCategoryFilter |= EContentBrowserItemCategoryFilter::IncludeClasses;
+	}
+	else
+	{
+		ItemCategoryFilter &= ~EContentBrowserItemCategoryFilter::IncludeClasses;
+	}
+	ItemCategoryFilter &= ~EContentBrowserItemCategoryFilter::IncludeCollections;
+
+	return ItemCategoryFilter;
+}
+
+EContentBrowserItemAttributeFilter SPathView::GetContentBrowserItemAttributeFilter() const
+{
+	const UContentBrowserSettings* ContentBrowserSettings = GetDefault<UContentBrowserSettings>();
+	return EContentBrowserItemAttributeFilter::IncludeProject
+			| (ContentBrowserSettings->GetDisplayEngineFolder() ? EContentBrowserItemAttributeFilter::IncludeEngine : EContentBrowserItemAttributeFilter::IncludeNone)
+			| (ContentBrowserSettings->GetDisplayPluginFolders() ? EContentBrowserItemAttributeFilter::IncludePlugins : EContentBrowserItemAttributeFilter::IncludeNone)
+			| (ContentBrowserSettings->GetDisplayDevelopersFolder() ? EContentBrowserItemAttributeFilter::IncludeDeveloper : EContentBrowserItemAttributeFilter::IncludeNone)
+			| (ContentBrowserSettings->GetDisplayL10NFolder() ? EContentBrowserItemAttributeFilter::IncludeLocalized : EContentBrowserItemAttributeFilter::IncludeNone);
 }
 
 void SPathView::SyncToItems(TArrayView<const FContentBrowserItem> ItemsToSync, const bool bAllowImplicitSync)
