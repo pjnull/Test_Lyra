@@ -211,6 +211,7 @@ TSharedPtr<SGraphPin> SPropertyAccessNode::CreatePinWidget(UEdGraphPin* Pin) con
 	IPropertyAccessBlueprintBinding::FBindingMenuArgs MenuArgs;
 	MenuArgs.OnSetPropertyAccessContextId = FOnSetPropertyAccessContextId::CreateLambda([K2Node_PropertyAccess](const FName& InContextId)
 	{
+		K2Node_PropertyAccess->Modify();
 		K2Node_PropertyAccess->SetContextId(InContextId);
 		FBlueprintEditorUtils::MarkBlueprintAsModified(K2Node_PropertyAccess->GetBlueprint());
 	});
