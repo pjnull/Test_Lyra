@@ -2152,6 +2152,10 @@ private:
 	TArray<FAsyncPackage2*> LoadedPackagesToProcess;
 	/** [GAME THREAD] Game thread CompletedPackages list */
 	TArray<FAsyncPackage2*> CompletedPackages;
+#if WITH_IOSTORE_IN_EDITOR
+	/** [GAME THREAD] Game thread LoadedAssets list */
+	TArray<FWeakObjectPtr> LoadedAssets;
+#endif
 	/** [ASYNC/GAME THREAD] Packages to be deleted from async thread */
 	TQueue<FAsyncPackage2*, EQueueMode::Spsc> DeferredDeletePackages;
 	
@@ -4713,6 +4717,10 @@ EAsyncPackageState::Type FAsyncLoadingThread2::ProcessLoadedPackagesFromGameThre
 				AsyncPackageLookup.Remove(Package->Desc.UPackageId);
 				if (!Package->bLoadHasFailed)
 				{
+#if WITH_IOSTORE_IN_EDITOR
+					// In the editor we need to find any assets and add them to list for later callback
+					Package->GetLoadedAssets(LoadedAssets);
+#endif
 					Package->ClearConstructedObjects();
 				}
 			}
@@ -4835,6 +4843,22 @@ EAsyncPackageState::Type FAsyncLoadingThread2::ProcessLoadedPackagesFromGameThre
 
 	if (Result == EAsyncPackageState::Complete)
 	{
+#if WITH_IOSTORE_IN_EDITOR
+		// In editor builds, call the asset load callback. This happens in both editor and standalone to match EndLoad
+		TArray<FWeakObjectPtr> TempLoadedAssets = LoadedAssets;
+		LoadedAssets.Reset();
+
+		// Make a copy because LoadedAssets could be modified by one of the OnAssetLoaded callbacks
+		for (const FWeakObjectPtr& WeakAsset : TempLoadedAssets)
+		{
+			// It may have been unloaded/marked pending kill since being added, ignore those cases
+			if (UObject* LoadedAsset = WeakAsset.Get())
+			{
+				FCoreUObjectDelegates::OnAssetLoaded.Broadcast(LoadedAsset);
+			}
+		}
+#endif
+
 		// We're not done until all packages have been deleted
 		Result = CompletedPackages.Num() ? EAsyncPackageState::PendingImports  : EAsyncPackageState::Complete;
 		if (Result == EAsyncPackageState::Complete && ThreadState.HasDeferredFrees())
@@ -5655,6 +5679,13 @@ double FAsyncPackage2::GetLoadStartTime() const
 #if WITH_IOSTORE_IN_EDITOR
 void FAsyncPackage2::GetLoadedAssets(TArray<FWeakObjectPtr>& AssetList)
 {
+	for (UObject* Object : ConstructedObjects)
+	{
+		if (IsValid(Object) && Object->IsAsset())
+		{
+			AssetList.AddUnique(Object);
+		}
+	}
 }
 #endif
 
