@@ -172,17 +172,17 @@ void FDerivedDataInformation::UpdateRemoteCacheState()
 		if (DDCProjectSettings->RecommendEveryoneSetupAGlobalLocalDDCPath && EditorSettings->GlobalLocalDDCPath.Path.IsEmpty())
 		{
 			RemoteCacheState = ERemoteCacheState::Warning;
-			RemoteCacheWarningMessage = FText::FText(LOCTEXT("GlobalLocalDDCPathWarning", "It is recommended that you set up a valid Global Local DDC Path"));
+			RemoteCacheWarningMessage = FText(LOCTEXT("GlobalLocalDDCPathWarning", "It is recommended that you set up a valid Global Local DDC Path"));
 		}
 		else if (DDCProjectSettings->RecommendEveryoneEnableS3DDC && EditorSettings->bEnableS3DDC == false)
 		{
 			RemoteCacheState = ERemoteCacheState::Warning;
-			RemoteCacheWarningMessage = FText::FText(LOCTEXT("AWSS3CacheEnabledWarning", "It is recommended that you enable the AWS S3 Cache"));
+			RemoteCacheWarningMessage = FText(LOCTEXT("AWSS3CacheEnabledWarning", "It is recommended that you enable the AWS S3 Cache"));
 		}
 		else if (DDCProjectSettings->RecommendEveryoneSetupAGlobalS3DDCPath && EditorSettings->GlobalS3DDCPath.Path.IsEmpty())
 		{
 			RemoteCacheState = ERemoteCacheState::Warning;
-			RemoteCacheWarningMessage = FText::FText(LOCTEXT("S3GloblaLocalPathdWarning", "It is recommended that you set up a valid Global Local S3 DDC Path"));
+			RemoteCacheWarningMessage = FText(LOCTEXT("S3GloblaLocalPathdWarning", "It is recommended that you set up a valid Global Local S3 DDC Path"));
 		}
 		
 	}
@@ -195,26 +195,26 @@ FText FDerivedDataInformation::GetRemoteCacheStateAsText()
 	{
 	case ERemoteCacheState::Idle:
 	{
-		return FText::FText(LOCTEXT("DDCStateIdle","Idle"));
+		return FText(LOCTEXT("DDCStateIdle","Idle"));
 		break;
 	}
 
 	case ERemoteCacheState::Busy:
 	{
-		return FText::FText(LOCTEXT("DDCStateBusy", "Busy"));
+		return FText(LOCTEXT("DDCStateBusy", "Busy"));
 		break;
 	}
 
 	case ERemoteCacheState::Unavailable:
 	{
-		return FText::FText(LOCTEXT("DDCStateUnavailable", "Unavailable"));
+		return FText(LOCTEXT("DDCStateUnavailable", "Unavailable"));
 		break;
 	}
 
 	default:
 	case ERemoteCacheState::Warning:
 	{
-		return FText::FText(LOCTEXT("DDCStateWarning", "Warning"));
+		return FText(LOCTEXT("DDCStateWarning", "Warning"));
 		break;
 	}
 	}
