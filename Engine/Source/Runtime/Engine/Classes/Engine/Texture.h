@@ -266,10 +266,10 @@ struct FTextureSource
 
 	/** Unlock a mip. */
 	ENGINE_API void UnlockMip(int32 BlockIndex, int32 LayerIndex, int32 MipIndex);
-
+	
 	/** Retrieve a copy of the data for a particular mip. */
 	ENGINE_API bool GetMipData(TArray64<uint8>& OutMipData, int32 BlockIndex, int32 LayerIndex, int32 MipIndex, class IImageWrapperModule* ImageWrapperModule = nullptr);
-
+	
 	/** Returns a FMipData structure that wraps around the entire mip chain for read only operations. This is more efficient than calling the above method once per mip. */
 	ENGINE_API FMipData GetMipData(class IImageWrapperModule* ImageWrapperModule);
 
@@ -302,10 +302,6 @@ struct FTextureSource
 
 	/** Returns the compression format of the source data in enum format. */
 	ETextureSourceCompressionFormat GetSourceCompression() const;
-
-	/** Support for copy/paste */
-	void ExportCustomProperties(FOutputDevice& Out, uint32 Indent);
-	void ImportCustomProperties(const TCHAR* SourceText, FFeedbackContext* Warn);
 
 	/** Trivial accessors. These will only give values for Block0 so may not be correct for UDIM/multi-block textures, use GetBlock() for this case. */
 	FGuid GetPersistentId() const { return BulkData.GetIdentifier(); }
@@ -1034,12 +1030,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Texture, AdvancedDisplay)
 	uint8 bUseLegacyGamma:1;
 
-	/** Indicates we're currently importing the object (set in PostEditImport, unset in the subsequent PostEditChange) */
-	uint8 bIsImporting : 1;
-	
-	/** Indicates ImportCustomProperties has been called (set in ImportCustomProperties, unset in the subsequent PostEditChange) */
-	uint8 bCustomPropertiesImported : 1;
-
 #endif // WITH_EDITORONLY_DATA
 
 	/** If true, the RHI texture will be created using TexCreate_NoTiling */
@@ -1106,10 +1096,6 @@ public:
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnTextureSaved, class UTexture*);
 	/** triggered before a texture is being saved */
 	ENGINE_API static FOnTextureSaved PreSaveEvent;
-
-	ENGINE_API virtual void ExportCustomProperties(FOutputDevice& Out, uint32 Indent) override;
-	ENGINE_API virtual void ImportCustomProperties(const TCHAR* SourceText, FFeedbackContext* Warn) override;
-	ENGINE_API virtual void PostEditImport() override;
 
 	/**
 	 * Resets the resource for the texture.
