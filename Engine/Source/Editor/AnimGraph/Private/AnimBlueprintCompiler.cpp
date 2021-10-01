@@ -1033,7 +1033,7 @@ void FAnimBlueprintCompilerContext::CopyTermDefaultsToDefaultObject(UObject* Def
 											const bool bFunctionLibraryCall = FunctionClass->IsChildOf<UBlueprintFunctionLibrary>();
 											const bool bAnimInstanceCall = FunctionClass->IsChildOf<UAnimInstance>();
 
-											// Whitelisted/blacklisted? Some functions are not really 'pure', so we give people the opportunity to mark them up.
+											// Allowed/denied? Some functions are not really 'pure', so we give people the opportunity to mark them up.
 											// Mark up the class if it is generally thread safe, then unsafe functions can be marked up individually. We assume
 											// that classes are unsafe by default, as well as if they are marked up NotBlueprintThreadSafe.
 											const bool bClassThreadSafe = FunctionClass->HasMetaData(TEXT("BlueprintThreadSafe"));
