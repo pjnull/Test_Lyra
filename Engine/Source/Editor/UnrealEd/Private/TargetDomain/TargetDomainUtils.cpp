@@ -388,6 +388,7 @@ bool IsIterativeEnabled(FName PackageName)
 TArray<const UTF8CHAR*> FEditorDomainOplog::ReservedOplogKeys;
 
 FEditorDomainOplog::FEditorDomainOplog()
+: HttpClient(UE::Zen::DefaultNoLaunch)
 {
 	StaticInit();
 

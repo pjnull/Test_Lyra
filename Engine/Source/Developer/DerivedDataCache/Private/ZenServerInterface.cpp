@@ -36,7 +36,7 @@ FScopeZenService::FScopeZenService(FStringView InstanceURL)
 {
 	if (!InstanceURL.IsEmpty() && !InstanceURL.Equals(TEXT("<DefaultInstance>")))
 	{
-		UniqueNonDefaultInstance = MakeUnique<FZenServiceInstance>(InstanceURL);
+		UniqueNonDefaultInstance = MakeUnique<FZenServiceInstance>(Default, InstanceURL);
 		ServiceInstance = UniqueNonDefaultInstance.Get();
 	}
 	else
@@ -55,7 +55,7 @@ FScopeZenService::FScopeZenService(FStringView InstanceHostName, uint16 Instance
 		URL.AppendAnsi(":");
 		URL << InstancePort;
 
-		UniqueNonDefaultInstance = MakeUnique<FZenServiceInstance>(URL);
+		UniqueNonDefaultInstance = MakeUnique<FZenServiceInstance>(Default, URL);
 		ServiceInstance = UniqueNonDefaultInstance.Get();
 	}
 	else
@@ -64,7 +64,28 @@ FScopeZenService::FScopeZenService(FStringView InstanceHostName, uint16 Instance
 	}
 }
 
-FZenServiceInstance::FZenServiceInstance(FStringView InstanceURL)
+FScopeZenService::FScopeZenService(EServiceMode Mode)
+{
+	switch (Mode)
+	{
+		case Default:
+		{
+			ServiceInstance = &GetDefaultServiceInstance();
+		}
+		break;
+		case DefaultNoLaunch:
+		{
+			UniqueNonDefaultInstance = MakeUnique<FZenServiceInstance>(Mode, FStringView());
+			ServiceInstance = UniqueNonDefaultInstance.Get();
+		}
+		break;
+		default:
+		unimplemented();
+	}
+
+}
+
+FZenServiceInstance::FZenServiceInstance(EServiceMode Mode, FStringView InstanceURL)
 {
 	Settings.AutoLaunchSettings.DataPath = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::EngineVersionAgnosticUserDir(), TEXT("Zen")));
 	Settings.AutoLaunchSettings.WorkspaceDataPath = Settings.AutoLaunchSettings.DataPath;
@@ -72,7 +93,17 @@ FZenServiceInstance::FZenServiceInstance(FStringView InstanceURL)
 
 	if (Settings.bAutoLaunch)
 	{
-		bHasLaunchedLocal = AutoLaunch();
+		if (Mode == DefaultNoLaunch)
+		{
+			Settings.bAutoLaunch = false;
+			HostName = TEXT("localhost");
+			Port = (AutoLaunchedPort != 0) ? AutoLaunchedPort : Settings.AutoLaunchSettings.DesiredPort;
+		}
+		else
+		{
+			bHasLaunchedLocal = AutoLaunch();
+			AutoLaunchedPort = Port;
+		}
 	}
 	else
 	{

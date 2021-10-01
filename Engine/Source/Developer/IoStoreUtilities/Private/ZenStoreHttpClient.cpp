@@ -38,6 +38,12 @@ FZenStoreHttpClient::FZenStoreHttpClient(const FStringView InHostName, uint16 In
 	RequestPool = MakeUnique<Zen::FZenHttpRequestPool>(ZenService.GetInstance().GetURL(), PoolEntryCount);
 }
 
+FZenStoreHttpClient::FZenStoreHttpClient(UE::Zen::EServiceMode Mode)
+: ZenService(Mode)
+{
+	RequestPool = MakeUnique<Zen::FZenHttpRequestPool>(ZenService.GetInstance().GetURL(), PoolEntryCount);
+}
+
 FZenStoreHttpClient::~FZenStoreHttpClient()
 {
 }

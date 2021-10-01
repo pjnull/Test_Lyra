@@ -22,6 +22,8 @@ namespace UE::Zen {
 
 class FZenServiceInstance;
 
+enum EServiceMode {Default, DefaultNoLaunch};
+
 /**
  * Type used to declare usage of a Zen server instance whether the shared default instance or a unique non-default instance.
  * Used to help manage launch, and optionally in the future, shutdown a shared default instance.  Use the default constructor
@@ -37,6 +39,7 @@ public:
 	}
 	UE_API FScopeZenService(FStringView InstanceURL);
 	UE_API FScopeZenService(FStringView InstanceHostName, uint16 InstancePort);
+	UE_API FScopeZenService(EServiceMode Mode);
 
 	UE_API const FZenServiceInstance& GetInstance() const { return *ServiceInstance; }
 	UE_API FZenServiceInstance& GetInstance() { return *ServiceInstance; }
@@ -68,11 +71,12 @@ UE_API FZenServiceInstance& GetDefaultServiceInstance();
 class FZenServiceInstance
 {
 public:
+
 	 UE_API FZenServiceInstance()
-	 : FZenServiceInstance(FStringView())
+	 : FZenServiceInstance(Default, FStringView())
 	 {
 	 }
-	 UE_API FZenServiceInstance(FStringView InstanceURL);
+	 UE_API FZenServiceInstance(EServiceMode Mode, FStringView InstanceURL);
 	 UE_API ~FZenServiceInstance();
 
 	 inline const TCHAR* GetURL() const { return *URL; }
@@ -114,11 +118,20 @@ private:
 	FString URL;
 	FString HostName;
 	uint16 Port;
+	static inline uint16 AutoLaunchedPort = 0;
 	bool bHasLaunchedLocal = false;
 };
 
 } // namespace UE::Zen
 
 #undef UE_API
+
+#else
+
+namespace UE::Zen {
+
+enum EServiceMode {Default, DefaultNoLaunch};
+
+} // namespace UE::Zen
 
 #endif // UE_WITH_ZEN
