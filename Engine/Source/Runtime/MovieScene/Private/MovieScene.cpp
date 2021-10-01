@@ -332,8 +332,13 @@ bool UMovieScene::ReplacePossessable( const FGuid& OldGuid, const FMovieScenePos
 		{	
 			Modify();
 
+			bool bNullPossessedObjectClass = true;
+#if WITH_EDITORONLY_DATA
+			bNullPossessedObjectClass = InNewPosessable.GetPossessedObjectClass() == nullptr;
+#endif
+
 			// Found it!
-			if (InNewPosessable.GetPossessedObjectClass() == nullptr)
+			if (bNullPossessedObjectClass)
 			{
 				// @todo: delete this when
 				// bool ReplacePossessable(const FGuid& OldGuid, const FGuid& NewGuid, const FString& Name)
