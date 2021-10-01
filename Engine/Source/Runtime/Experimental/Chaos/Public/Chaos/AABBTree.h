@@ -1398,7 +1398,7 @@ private:
 				TAABB<T, 3> ElemBounds = ComputeWorldSpaceBoundingBox(Particle, false, (T)0);
 
 				// If bounds are bad, use global so we won't screw up splitting computations.
-				if (ValidateBounds(ElemBounds) == false)
+				if (bHasBoundingBox && ValidateBounds(ElemBounds) == false)
 				{
 					bHasBoundingBox = false;
 					ensureMsgf(false, TEXT("AABBTree encountered invalid bounds input. Forcing element to global payload. Min: %s Max: %s. If Bounds are valid but large, increase FAABBTreeCVars::MaxNonGlobalElementBoundsExtrema."),
