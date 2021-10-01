@@ -67,7 +67,7 @@ public:
 			}
 
 			FVector2D Value2D;
-			FVector Value3D;
+			FVector3f Value3D;
 
 			if (Value3D.InitFromString(ValueStr))
 			{
