@@ -11,14 +11,13 @@
 #include "HAL/PlatformApplicationMisc.h"
 #include "WorkspaceMenuStructure.h"
 #include "WorkspaceMenuStructureModule.h"
-#include "TraceServices/ITraceServicesModule.h"
 #include "Widgets/Docking/SDockTab.h"
 #include "Trace/StoreClient.h"
 #include "Stats/Stats.h"
 #include "ObjectPropertyTrace.h"
-#include "SAnimGraphSchematicView.h"
 #include "SAnimationCurvesView.h"
 #include "SBlendWeightsView.h"
+#include "SMontageView.h"
 #include "SObjectPropertiesView.h"
 #include "SNotifiesView.h"
 
@@ -72,6 +71,8 @@ void FGameplayInsightsModule::StartupModule()
 	IModularFeatures::Get().RegisterModularFeature(IRewindDebuggerViewCreator::ModularFeatureName, &AnimGraphSchematicViewCreator);
 	static FBlendWeightsViewCreator BlendWeightsViewCreator;
 	IModularFeatures::Get().RegisterModularFeature(IRewindDebuggerViewCreator::ModularFeatureName, &BlendWeightsViewCreator);
+	static FMontageViewCreator MontageViewCreator;
+	IModularFeatures::Get().RegisterModularFeature(IRewindDebuggerViewCreator::ModularFeatureName, &MontageViewCreator);
 	static FNotifiesViewCreator NotifiesViewCreator;
 	IModularFeatures::Get().RegisterModularFeature(IRewindDebuggerViewCreator::ModularFeatureName, &NotifiesViewCreator);
 	static FAnimationCurvesViewCreator AnimationCurvesViewCreator;
