@@ -803,7 +803,7 @@ bool TrySavePackage(UPackage* Package)
 	}
 
 	FMemoryPackageWriter* PackageWriter = new FMemoryPackageWriter();
-	FSavePackageContext SavePackageContext(nullptr /* TargetPlatform */, PackageWriter, false /* bInForceLegacyOffsets */);
+	FSavePackageContext SavePackageContext(nullptr /* TargetPlatform */, PackageWriter);
 	FSavePackageResultStruct Result = GEditor->Save(Package, nullptr, RF_Standalone, TEXT("EditorDomainPackageWriter"),
 		GError, nullptr /* Conform */, false /* bForceByteSwapping */, true /* bWarnOfLongFilename */,
 		SaveFlags, nullptr /* TargetPlatform */, FDateTime::MinValue(), false /* bSlowTask */,

@@ -2336,10 +2336,6 @@ ESavePackageResult SaveBulkData(FLinkerSave* Linker, int64& InOutStartOffset, co
 		{
 			FailureReason = TEXT("SAVE_BulkDataByReference is incompatible with bUpdatingLoadedPath");
 		}
-		else if (SavePackageContext != nullptr && SavePackageContext->bForceLegacyOffsets)
-		{
-			FailureReason = TEXT("SAVE_BulkDataByReference is incompatible with bForceLegacyOffsets");
-		}
 		if (FailureReason)
 		{
 			UE_LOG(LogSavePackage, Error, TEXT("SaveBulkData failed for %s: %s."), Filename, FailureReason);
@@ -2433,16 +2429,10 @@ ESavePackageResult SaveBulkData(FLinkerSave* Linker, int64& InOutStartOffset, co
 			if (SaveLocation == ESaveLocation::SeparateSegment)
 			{
 				BulkDataFlags |= BULKDATA_PayloadInSeperateFile;
-				// If we are using IoStore (implemented in AsyncLoader2), then we will have no linkers and can not manipulate the
-				// offset as we will not have the Linker's Summary.BulkDataStartOffset information at runtime.
-				// This means that manipulated offsets are incompatible with IoStore.
-				// We now by default do not manipulate the offset for separate files, but we need to optionally leave it on
-				// to prevent larger patching sizes. In the future we may want to remove it even for end-of-file BulkData.
-				// Note that bForceLegacyOffsets is incompatible with using IoStore.
-				if (SavePackageContext != nullptr && SavePackageContext->bForceLegacyOffsets == false)
-				{
-					BulkDataFlags |= BULKDATA_NoOffsetFixUp;
-				}
+				// OffsetFixup is not useful when bulkdata is in separate segments.
+				// It is also not supported if we are using IoStore, which always uses SeparateSegments, because 
+				// the Linker's Summary.BulkDataStartOffset information is not available when loading with AsyncLoader2.
+				BulkDataFlags |= BULKDATA_NoOffsetFixUp;
 
 				if (bBulkItemIsOptional)
 				{

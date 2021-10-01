@@ -7444,8 +7444,12 @@ UE::Cook::FCookSavePackageContext* UCookOnTheFlyServer::CreateSaveContext(const 
 		
 	bool bLegacyBulkDataOffsets = false;
 	PlatformEngineIni.GetBool(TEXT("Core.System"), TEXT("LegacyBulkDataOffsets"), bLegacyBulkDataOffsets);
+	if (bLegacyBulkDataOffsets)
+	{
+		UE_LOG(LogCook, Warning, TEXT("Engine.ini:[Core.System]:LegacyBulkDataOffsets is no longer supported in UE5. The intended use was to reduce patch diffs, but UE5 changed cooked bytes in every package for other reasons, so removing support for this flag does not cause additional patch diffs."));
+	}
 
-	return new UE::Cook::FCookSavePackageContext(TargetPlatform, PackageWriter, bLegacyBulkDataOffsets, WriterDebugName);
+	return new UE::Cook::FCookSavePackageContext(TargetPlatform, PackageWriter, WriterDebugName);
 }
 
 void UCookOnTheFlyServer::FinalizePackageStore()
