@@ -17,7 +17,7 @@ FInputActionValue UInputModifierScalar::ModifyRaw_Implementation(const UEnhanced
 	// Don't try and scale bools
 	if (ensureMsgf(CurrentValue.GetValueType() != EInputActionValueType::Boolean, TEXT("Scale modifier doesn't support boolean values.")))
 	{
-		return CurrentValue.Get<FVector>() * Scalar;
+		return CurrentValue.Get<FVector3f>() * Scalar;
 	}
 	return CurrentValue;
 };
@@ -29,14 +29,14 @@ FInputActionValue UInputModifierScalar::ModifyRaw_Implementation(const UEnhanced
 
 FInputActionValue UInputModifierNegate::ModifyRaw_Implementation(const UEnhancedPlayerInput* PlayerInput, FInputActionValue CurrentValue, float DeltaTime)
 {
-	return CurrentValue.Get<FVector>() * FVector(bX ? -1.f : 1.f, bY ? -1.f : 1.f, bZ ? -1.f : 1.f);
+	return CurrentValue.Get<FVector3f>() * FVector3f(bX ? -1.f : 1.f, bY ? -1.f : 1.f, bZ ? -1.f : 1.f);
 }
 
 
 FLinearColor UInputModifierNegate::GetVisualizationColor_Implementation(FInputActionValue SampleValue, FInputActionValue FinalValue) const
 {
-	FVector Sample = SampleValue.Get<FVector>();
-	FVector Final = FinalValue.Get<FVector>();
+	FVector3f Sample = SampleValue.Get<FVector3f>();
+	FVector3f Final = FinalValue.Get<FVector3f>();
 	return FLinearColor(Sample.X != Final.X ? 1.f : 0.f, Sample.Y != Final.Y ? 1.f : 0.f, Sample.Z != Final.Z ? 1.f : 0.f);
 }
 
@@ -59,7 +59,7 @@ FInputActionValue UInputModifierDeadZone::ModifyRaw_Implementation(const UEnhanc
 		return FMath::Min(1.f, (FMath::Max(0.f, FMath::Abs(AxisVal) - LowerThreshold) / (UpperThreshold - LowerThreshold))) * FMath::Sign(AxisVal);
 	};
 
-	FVector NewValue = CurrentValue.Get<FVector>();
+	FVector3f NewValue = CurrentValue.Get<FVector3f>();
 	switch (Type)
 	{
 	case EDeadZoneType::Axial:
@@ -181,7 +181,8 @@ FInputActionValue UInputModifierSmooth::ModifyRaw_Implementation(const UEnhanced
 
 FInputActionValue UInputModifierResponseCurveExponential::ModifyRaw_Implementation(const UEnhancedPlayerInput* PlayerInput, FInputActionValue CurrentValue, float DeltaTime)
 {
-	FVector ResponseValue = CurrentValue.Get<FVector>();
+	// Put this into a regular vector because CurveExponent is a normal FVector and it would cause function resolution ambiguity
+	FVector ResponseValue = FVector(CurrentValue.Get<FVector3f>());
 	switch (CurrentValue.GetValueType())
 	{
 	case EInputActionValueType::Axis3D:
@@ -194,12 +195,13 @@ FInputActionValue UInputModifierResponseCurveExponential::ModifyRaw_Implementati
 		ResponseValue.X = CurveExponent.X != 1.f ? FMath::Sign(ResponseValue.X) * FMath::Pow(FMath::Abs(ResponseValue.X), CurveExponent.X) : ResponseValue.X;
 		break;
 	}
-	return ResponseValue;
+	
+	return FVector3f(UE_REAL_TO_FLOAT(ResponseValue.X), UE_REAL_TO_FLOAT(ResponseValue.Y), UE_REAL_TO_FLOAT(ResponseValue.Z));
 };
 
 FInputActionValue UInputModifierResponseCurveUser::ModifyRaw_Implementation(const UEnhancedPlayerInput* PlayerInput, FInputActionValue CurrentValue, float DeltaTime)
 {
-	FVector ResponseValue = CurrentValue.Get<FVector>();
+	FVector3f ResponseValue = CurrentValue.Get<FVector3f>();
 	switch (CurrentValue.GetValueType())
 	{
 	case EInputActionValueType::Axis3D:
@@ -263,7 +265,7 @@ FInputActionValue UInputModifierFOVScaling::ModifyRaw_Implementation(const UEnha
 
 FInputActionValue UInputModifierToWorldSpace::ModifyRaw_Implementation(const UEnhancedPlayerInput* PlayerInput, FInputActionValue CurrentValue, float DeltaTime)
 {
-	FVector Converted = CurrentValue.Get<FVector>();
+	FVector3f Converted = CurrentValue.Get<FVector3f>();
 	switch (CurrentValue.GetValueType())
 	{
 	case EInputActionValueType::Axis3D:
@@ -286,7 +288,7 @@ FLinearColor UInputModifierToWorldSpace::GetVisualizationColor_Implementation(FI
 {
 	// Draw a cross with X/Y colors inverted (Green on X axis, Red on Y axis)
 	const float CrossSize = 0.1f;
-	FVector Sample = SampleValue.Get<FVector>();
+	FVector3f Sample = SampleValue.Get<FVector3f>();
 	// Draw arrows at the ends for aesthetics
 	const float ArrowStart = 0.8f;
 	const float ArrowOffset = 1.f - (1.f - ArrowStart) * 0.5f;
@@ -301,7 +303,7 @@ FLinearColor UInputModifierToWorldSpace::GetVisualizationColor_Implementation(FI
 
 FInputActionValue UInputModifierSwizzleAxis::ModifyRaw_Implementation(const UEnhancedPlayerInput* PlayerInput, FInputActionValue CurrentValue, float DeltaTime)
 {
-	FVector Value = CurrentValue.Get<FVector>();
+	FVector3f Value = CurrentValue.Get<FVector3f>();
 	switch (Order)
 	{
 	case EInputAxisSwizzle::YXZ:

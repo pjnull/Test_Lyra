@@ -573,16 +573,10 @@ public:
 	float GetRawKeyValue( FKey InKey ) const;
 
 	/** @return processed value of the InKey */
-	FVector GetProcessedVectorKeyValue(FKey InKey) const;
+	FVector3f GetProcessedVectorKeyValue(FKey InKey) const;
 
 	/** @return raw value of the InKey */
-	FVector GetRawVectorKeyValue(FKey InKey) const;
-
-	UE_DEPRECATED(4.21, "Use GetProcessedVectorKeyValue or GetRawVectorKeyValue instead. GetRawVectorKeyValue will have the same result as GetVectorKeyValue previously.")
-	FVector GetVectorKeyValue(FKey InKey) const
-	{
-		return GetRawVectorKeyValue(InKey);
-	}
+	FVector3f GetRawVectorKeyValue(FKey InKey) const;
 
 	/** @return true if alt key is pressed */
 	bool IsAltPressed() const;

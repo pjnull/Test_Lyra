@@ -72,8 +72,8 @@ bool FInputActionValueMatchesTriggerValue::RunTest(const FString& Parameters)
 	AND(InputIsTicked(Data));
 	THEN(PressingKeyTriggersAction(Data, TestAction3));
 	// TestEqual can't handle printing out FVector2Ds so promote to FVector here
-	AND(TestEqual(TEXT("Desired 2D"), FInputTestHelper::GetActionData(Data, TestAction3).GetValue().Get<FVector>(), FVector(Test2DValue, 0.f)));
-	AND(TestEqual(TEXT("Matching 2D"), FInputTestHelper::GetActionData(Data, TestAction3).GetValue().Get<FVector>(), FInputTestHelper::GetTriggered<FVector>(Data, TestAction3)));
+	AND(TestEqual(TEXT("Desired 2D"), FInputTestHelper::GetActionData(Data, TestAction3).GetValue().Get<FVector3f>(), FVector3f(Test2DValue, 0.f)));
+	AND(TestEqual(TEXT("Matching 2D"), FInputTestHelper::GetActionData(Data, TestAction3).GetValue().Get<FVector3f>(), FInputTestHelper::GetTriggered<FVector3f>(Data, TestAction3)));
 
 	return true;
 }

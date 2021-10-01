@@ -282,7 +282,7 @@ bool UPlayerInput::InputAxis(FKey Key, float Delta, float DeltaTime, int32 NumSa
 		TestEventEdges(KeyState, KeyState.Value.X);
 
 		// accumulate deltas until processed next
-		KeyState.SampleCountAccumulator += NumSamples;
+		KeyState.SampleCountAccumulator += (uint8)NumSamples;
 		KeyState.RawValueAccumulator.X += Delta;
 	}
 
@@ -618,7 +618,7 @@ struct FAxisDelegate
 
 	friend inline uint32 GetTypeHash(FAxisDelegate const& D)
 	{
-		return (PTRINT)D.Obj + (PTRINT)D.Func;
+		return uint32((PTRINT)D.Obj + (PTRINT)D.Func);
 	}
 };
 
@@ -1135,7 +1135,7 @@ void UPlayerInput::ProcessInputStack(const TArray<UInputComponent*>& InputCompon
 		 	if ( SmoothedMouse[0] != 0 )
 		 	{
 		 		// not first non-zero
-		 		MouseSamplingTotal += FApp::GetDeltaTime();
+		 		MouseSamplingTotal += UE_REAL_TO_FLOAT(FApp::GetDeltaTime());
 		 		MouseSamples += KeyState->SampleCountAccumulator;
 		 	}
 		}
@@ -1482,7 +1482,7 @@ float UPlayerInput::SmoothMouse(float aMouse, uint8& SampleCount, int32 Index)
 		}
 	}
 
-	const float DeltaTime = FApp::GetDeltaTime();
+	const float DeltaTime = UE_REAL_TO_FLOAT(FApp::GetDeltaTime());
 
 	if (DeltaTime < 0.25f)
 	{
@@ -1523,7 +1523,7 @@ float UPlayerInput::SmoothMouse(float aMouse, uint8& SampleCount, int32 Index)
 				{
 					// fewer samples, so going slow
 					// use number of samples we should have had for sample count
-					SampleCount = DeltaTime/MouseSamplingTime;
+					SampleCount = (uint8)(DeltaTime / MouseSamplingTime);
 				}
 			}
 
@@ -1725,18 +1725,18 @@ float UPlayerInput::GetRawKeyValue( FKey InKey ) const
 	return KeyState ? KeyState->RawValue.X : 0.f;
 }
 
-FVector UPlayerInput::GetProcessedVectorKeyValue(FKey InKey) const
+FVector3f UPlayerInput::GetProcessedVectorKeyValue(FKey InKey) const
 {
 	UE_CLOG(InKey == EKeys::AnyKey, LogInput, Warning, TEXT("GetProcessedVectorKeyValue cannot return a meaningful result for AnyKey"));
 	FKeyState const* const KeyState = KeyStateMap.Find(InKey);
-	return KeyState ? KeyState->Value : FVector(0, 0, 0);
+	return KeyState ? KeyState->Value : FVector3f::ZeroVector;
 }
 
-FVector UPlayerInput::GetRawVectorKeyValue(FKey InKey) const
+FVector3f UPlayerInput::GetRawVectorKeyValue(FKey InKey) const
 {
 	UE_CLOG(InKey == EKeys::AnyKey, LogInput, Warning, TEXT("GetRawVectorKeyValue cannot return a meaningful result for AnyKey"));
 	FKeyState const* const KeyState = KeyStateMap.Find(InKey);
-	return KeyState ? KeyState->RawValue : FVector(0, 0, 0);
+	return KeyState ? KeyState->RawValue : FVector3f::ZeroVector;
 }
 
 bool UPlayerInput::IsPressed( FKey InKey ) const
