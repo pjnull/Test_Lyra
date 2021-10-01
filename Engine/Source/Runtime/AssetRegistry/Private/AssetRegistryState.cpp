@@ -627,8 +627,8 @@ bool FAssetRegistryState::EnumerateAssets(const FARCompiledFilter& Filter, const
 		return false;
 	}
 
-	const uint32 FilterWithoutPackageFlags = Filter.WithoutPackageFlags; // -V561
-	const uint32 FilterWithPackageFlags = Filter.WithPackageFlags; // -V561
+	const uint32 FilterWithoutPackageFlags = Filter.WithoutPackageFlags;
+	const uint32 FilterWithPackageFlags = Filter.WithPackageFlags;
 
 	// The assets that match each filter
 	TArray<TArray<FAssetData*>, TInlineAllocator<5>> FilterResults;
