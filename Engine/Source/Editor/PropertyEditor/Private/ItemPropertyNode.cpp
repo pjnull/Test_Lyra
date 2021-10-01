@@ -7,6 +7,7 @@
 #include "PropertyEditorHelpers.h"
 #include "PropertyPathHelpers.h"
 #include "Classes/EditorStyleSettings.h"
+#include "UserInterface/PropertyEditor/SPropertyEditorArrayItem.h"
 
 #define LOCTEXT_NAMESPACE "ItemPropertyNode"
 
@@ -521,8 +522,8 @@ FText FItemPropertyNode::GetDisplayName() const
 				{
 					// Check if this property has Title Property Meta
 					static const FName NAME_TitleProperty = FName(TEXT("TitleProperty"));
-					FName TitlePropertyName = *PropertyPtr->GetMetaData(NAME_TitleProperty);
-					if (TitlePropertyName != NAME_None)
+					FString TitleProperty = PropertyPtr->GetMetaData(NAME_TitleProperty);
+					if (!TitleProperty.IsEmpty())
 					{
 						FItemPropertyNode* NonConstThis = const_cast<FItemPropertyNode*>(this);
 
@@ -546,17 +547,11 @@ FText FItemPropertyNode::GetDisplayName() const
 						// Find the property and get the right property handle
 						if (PropertyStruct != nullptr)
 						{
-							FProperty* TitleProperty = PropertyStruct->FindPropertyByName(TitlePropertyName);
-							if (TitleProperty != nullptr)
+							const TSharedPtr<IPropertyHandle> ThisAsHandle = PropertyEditorHelpers::GetPropertyHandle(NonConstThis->AsShared(), nullptr, nullptr);
+							TSharedPtr<FTitleMetadataFormatter> TitleFormatter = FTitleMetadataFormatter::TryParse(ThisAsHandle, TitleProperty);
+							if (TitleFormatter)
 							{
-								const TSharedPtr<IPropertyHandle> ThisAsHandle = PropertyEditorHelpers::GetPropertyHandle(NonConstThis->AsShared(), nullptr, nullptr);
-								const TSharedPtr<IPropertyHandle> ChildPropertyHandle = ThisAsHandle->GetChildHandle(TitlePropertyName, true);
-
-								// Can be null in the case that it doesn't have a UI handle yet (like in the case of newly created instanced properties)
-								if (ChildPropertyHandle.IsValid())
-								{
-									ChildPropertyHandle->GetValueAsDisplayText(FinalDisplayName);
-								}
+								TitleFormatter->GetDisplayText(FinalDisplayName);
 							}
 						}
 					}
