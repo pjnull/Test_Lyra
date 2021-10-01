@@ -123,7 +123,7 @@ protected:
 	EWaterBodyType WaterBodyType;
 
 	// #todo_water: This should be moved to the component when component subobjects are supported
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Instanced, Category = Water, DisplayName = "Waves Source")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Instanced, Category = Wave, DisplayName = "Waves Source")
 	UWaterWavesBase* WaterWaves = nullptr;
 
 #if WITH_EDITORONLY_DATA
