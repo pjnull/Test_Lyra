@@ -191,6 +191,7 @@ private:
 	static void WindowClosedHandler(const TSharedRef<SWindow>& InWindow);
 
 	static void ResetViewport();
+	static void ResetFrameBuffer();
 
 	TSharedPtr<SWindow> Window;
 	TSharedPtr<class SCaptureRegionWidget> CaptureRegionWidget;
