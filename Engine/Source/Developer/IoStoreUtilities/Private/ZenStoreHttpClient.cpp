@@ -583,6 +583,10 @@ FZenStoreHttpClient::FZenStoreHttpClient(const FStringView InHostName, uint16 In
 {
 }
 
+FZenStoreHttpClient::FZenStoreHttpClient(UE::Zen::EServiceMode Mode)
+{
+}
+
 FZenStoreHttpClient::~FZenStoreHttpClient()
 {
 }
