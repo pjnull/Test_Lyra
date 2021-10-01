@@ -146,8 +146,9 @@ public:
 	enum class ECommandFilterType
 	{
 		None,
-		Blacklist,
-		Whitelist
+
+		DenyList,
+		AllowList
 	};
 
 	/**
@@ -164,7 +165,7 @@ public:
 	void UnregisterCommandFilterOwner(const FName InOwnerName);
 
 	/**
-	* Command passes blacklist and whitelist filters
+	* Command passes allow/deny list filters
 	*
 	* @param InBindingContext	The context in which the command is active
 	* @param InCommandName		The name of the command
@@ -221,8 +222,8 @@ private:
 
 	struct FCommandFilterForContext
 	{
-		TMap<FName, FCommandFilterOwners> BlacklistedCommands;
-		TMap<FName, FCommandFilterOwners> WhitelistedCommands;
+		TMap<FName, FCommandFilterOwners> CommandDenyList;
+		TMap<FName, FCommandFilterOwners> CommandAllowList;
 	};
 
 	/** Mapping of command filters by context */
