@@ -6,6 +6,7 @@
 #include "Widgets/DeclarativeSyntaxSupport.h"
 #include "Widgets/SWidget.h"
 #include "Widgets/SCompoundWidget.h"
+#include "Widgets/Notifications/SNotificationList.h"
 #include "Animation/CurveSequence.h"
 #include "Framework/Commands/Commands.h"
 
@@ -65,4 +66,5 @@ private:
 	FCurveSequence BusyPulseSequence;
 	FCurveSequence FadeGetSequence;
 	FCurveSequence FadePutSequence;
+	TSharedPtr<SNotificationItem> NotificationItem;
 };
