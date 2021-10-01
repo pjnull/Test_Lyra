@@ -1554,7 +1554,7 @@ FArchive& operator<<(FArchive& Ar, FLandscapeComponentGrassData& Data)
 
 void FLandscapeComponentGrassData::ConditionalDiscardDataOnLoad()
 {
-	check(HasValidData());
+	//check(HasValidData());
 	if (!GIsEditor && GGrassDiscardDataOnLoad)
 	{
 		bool bRemoved = false;
