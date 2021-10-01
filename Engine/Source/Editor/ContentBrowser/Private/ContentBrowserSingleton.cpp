@@ -338,8 +338,9 @@ TSharedPtr<SContentBrowser> FContentBrowserSingleton::FindContentBrowserToSync(b
 	else
 	{
 
-		// If there is no primary or it is locked, sync the content browser drawer
-		if (ContentBrowserDrawer.IsValid())
+		// If there is no primary or it is locked, sync the content browser drawer if it's available
+		if (GEditor->GetEditorSubsystem<UStatusBarSubsystem>()->ActiveWindowHasStatusBar() &&
+			ContentBrowserDrawer.IsValid() && !ContentBrowserDrawer.Pin()->IsLocked())
 		{
 			ContentBrowserToSync = ContentBrowserDrawer.Pin();
 		}
