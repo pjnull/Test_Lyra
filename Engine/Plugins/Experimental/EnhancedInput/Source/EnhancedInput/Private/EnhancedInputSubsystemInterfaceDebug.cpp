@@ -183,7 +183,7 @@ void IEnhancedInputSubsystemInterface::ShowDebugInfo(UCanvas* Canvas)
 					FString Output = "      ";
 
 					const FKeyState* KeyState = PlayerInput->GetKeyState(Mapping.Key);
-					FInputActionValue RawValue(FInputActionValue::GetValueTypeFromKey(Mapping.Key), KeyState ? KeyState->RawValue : FVector::ZeroVector);
+					FInputActionValue RawValue(FInputActionValue::GetValueTypeFromKey(Mapping.Key), KeyState ? FVector(KeyState->RawValue) : FVector::ZeroVector);
 
 					// Show raw key value if non-zero
 					Output += Mapping.Key.GetDisplayName().ToString() + (!KeyOwner && RawValue.GetMagnitudeSq() ? " - ( " + RawValue.ToString() + " ) - " : " - ");

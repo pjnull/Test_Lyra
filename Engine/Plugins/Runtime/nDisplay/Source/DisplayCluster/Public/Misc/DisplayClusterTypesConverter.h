@@ -66,6 +66,7 @@ template <> inline FString DisplayClusterTypesConverter::ToString<>(const uint32
 template <> inline FString DisplayClusterTypesConverter::ToString<>(const float& From)      { return FString::SanitizeFloat(From); }
 template <> inline FString DisplayClusterTypesConverter::ToString<>(const double& From)     { return FString::Printf(TEXT("%lf"), From); }
 template <> inline FString DisplayClusterTypesConverter::ToString<>(const FVector& From)    { return From.ToString(); }
+template <> inline FString DisplayClusterTypesConverter::ToString<>(const FVector3f& From)  { return From.ToString(); }
 template <> inline FString DisplayClusterTypesConverter::ToString<>(const FVector2D& From)  { return From.ToString(); }
 template <> inline FString DisplayClusterTypesConverter::ToString<>(const FRotator& From)   { return From.ToString(); }
 template <> inline FString DisplayClusterTypesConverter::ToString<>(const FMatrix& From)    { return From.ToString(); }
@@ -320,6 +321,14 @@ template <> inline FString DisplayClusterTypesConverter::ToHexString<>(const dou
 	return FString(FString(TEXT("0x")) + FString(stm.str().c_str()));
 }
 
+template <> inline FString DisplayClusterTypesConverter::ToHexString<>(const FVector3f& From)
+{
+	return FString::Printf(TEXT("X=%s Y=%s Z=%s"), 
+		*DisplayClusterTypesConverter::template ToHexString<>(From.X),
+		*DisplayClusterTypesConverter::template ToHexString<>(From.Y),
+		*DisplayClusterTypesConverter::template ToHexString<>(From.Z));
+}
+
 template <> inline FString DisplayClusterTypesConverter::ToHexString<>(const FVector& From)
 {
 	return FString::Printf(TEXT("X=%s Y=%s Z=%s"), 
@@ -409,6 +418,22 @@ template <> inline FVector DisplayClusterTypesConverter::FromHexString<>(const F
 {
 	FString X, Y, Z;
 	FVector Result;
+
+	const bool bSuccessful = FParse::Value(*From, TEXT("X="), X) && FParse::Value(*From, TEXT("Y="), Y) && FParse::Value(*From, TEXT("Z="), Z);
+	if (bSuccessful)
+	{
+		Result.X = DisplayClusterTypesConverter::template FromHexString<float>(X);
+		Result.Y = DisplayClusterTypesConverter::template FromHexString<float>(Y);
+		Result.Z = DisplayClusterTypesConverter::template FromHexString<float>(Z);
+	}
+
+	return Result;
+}
+
+template <> inline FVector3f DisplayClusterTypesConverter::FromHexString<>(const FString& From)
+{
+	FString X, Y, Z;
+	FVector3f Result;
 
 	const bool bSuccessful = FParse::Value(*From, TEXT("X="), X) && FParse::Value(*From, TEXT("Y="), Y) && FParse::Value(*From, TEXT("Z="), Z);
 	if (bSuccessful)
