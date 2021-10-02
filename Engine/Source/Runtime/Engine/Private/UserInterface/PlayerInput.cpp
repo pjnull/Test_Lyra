@@ -1725,18 +1725,18 @@ float UPlayerInput::GetRawKeyValue( FKey InKey ) const
 	return KeyState ? KeyState->RawValue.X : 0.f;
 }
 
-FVector3f UPlayerInput::GetProcessedVectorKeyValue(FKey InKey) const
+FVector UPlayerInput::GetProcessedVectorKeyValue(FKey InKey) const
 {
 	UE_CLOG(InKey == EKeys::AnyKey, LogInput, Warning, TEXT("GetProcessedVectorKeyValue cannot return a meaningful result for AnyKey"));
 	FKeyState const* const KeyState = KeyStateMap.Find(InKey);
-	return KeyState ? KeyState->Value : FVector3f::ZeroVector;
+	return KeyState ? KeyState->Value : FVector(0, 0, 0);
 }
 
-FVector3f UPlayerInput::GetRawVectorKeyValue(FKey InKey) const
+FVector UPlayerInput::GetRawVectorKeyValue(FKey InKey) const
 {
 	UE_CLOG(InKey == EKeys::AnyKey, LogInput, Warning, TEXT("GetRawVectorKeyValue cannot return a meaningful result for AnyKey"));
 	FKeyState const* const KeyState = KeyStateMap.Find(InKey);
-	return KeyState ? KeyState->RawValue : FVector3f::ZeroVector;
+	return KeyState ? KeyState->RawValue : FVector(0, 0, 0);
 }
 
 bool UPlayerInput::IsPressed( FKey InKey ) const
