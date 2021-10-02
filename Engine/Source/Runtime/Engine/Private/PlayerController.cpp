@@ -5260,7 +5260,7 @@ float APlayerController::GetInputAnalogKeyState(const FKey Key) const
 
 FVector APlayerController::GetInputVectorKeyState(const FKey Key) const
 {
-	return (PlayerInput ? FVector(PlayerInput->GetRawVectorKeyValue(Key)) : FVector());
+	return (PlayerInput ? PlayerInput->GetRawVectorKeyValue(Key) : FVector());
 }
 
 void APlayerController::GetInputTouchState(ETouchIndex::Type FingerIndex, float& LocationX, float& LocationY, bool& bIsCurrentlyPressed) const
