@@ -204,7 +204,7 @@ void UEnhancedPlayerInput::ProcessInputStack(const TArray<UInputComponent*>& Inp
 		}
 
 		FKeyState* KeyState = GetKeyState(Mapping.Key);
-		FVector RawKeyValue = KeyState ? KeyState->RawValue : FVector::ZeroVector;
+		FVector RawKeyValue = KeyState ? FVector(KeyState->RawValue) : FVector::ZeroVector;
 		//UE_CLOG(RawKeyValue.SizeSquared(), LogTemp, Warning, TEXT("Key %s - state %s"), *Mapping.Key.GetDisplayName().ToString(), *RawKeyValue.ToString());
 
 		// Establish update type.
@@ -399,7 +399,7 @@ void UEnhancedPlayerInput::ProcessInputStack(const TArray<UInputComponent*>& Inp
 		{
 			const FKeyState* KeyState = GetKeyState(Delegate->Chord.Key);
 			
-			FInputActionValue ActionValue(KeyState ? KeyState->RawValue : FVector::ZeroVector);
+			FInputActionValue ActionValue(KeyState ? FVector(KeyState->RawValue) : FVector::ZeroVector);
 			
 			Delegate->Execute(ActionValue);
 		}
