@@ -230,7 +230,7 @@ protected:
 	bool IsShowAllAdvancedChecked() const { return CurrentFilter.bShowAllAdvanced; }
 
 	/** @return true if show only differing is checked */
-	bool IsShowOnlyWhitelistedChecked() const { return CurrentFilter.bShowOnlyWhitelisted; }
+	bool IsShowOnlyAllowedChecked() const { return CurrentFilter.bShowOnlyAllowed; }
 
 	/** @return true if show all advanced is checked */
 	bool IsShowAllChildrenIfCategoryMatchesChecked() const { return CurrentFilter.bShowAllChildrenIfCategoryMatches; }
@@ -251,7 +251,7 @@ protected:
 	void OnShowAllAdvancedClicked();
 
 	/** Called when show only differing is clicked */
-	void OnShowOnlyWhitelistedClicked();
+	void OnShowOnlyAllowedClicked();
 
 	/** Called when show all children if category matches is clicked */
 	void OnShowAllChildrenIfCategoryMatchesClicked();
@@ -274,7 +274,7 @@ protected:
 	void OnFilterTextCommitted(const FText& InSearchText, ETextCommit::Type InCommitType);
 
 	/** Called when the list of currently differing properties changes */
-	virtual void UpdatePropertiesWhitelist(const TSet<FPropertyPath> InWhitelistedProperties) override { CurrentFilter.WhitelistedProperties = InWhitelistedProperties; }
+	virtual void UpdatePropertyAllowList(const TSet<FPropertyPath> InAllowedProperties) override { CurrentFilter.PropertyAllowList = InAllowedProperties; }
 
 	virtual TSharedPtr<SWidget> GetNameAreaWidget() override;
 	virtual void SetNameAreaCustomContent(TSharedRef<SWidget>& InCustomContent) override;
@@ -403,9 +403,9 @@ protected:
 
 	int32 NumVisibleTopLevelObjectNodes;
 
-	/** Used to refresh the tree when the whitelist changes */
-	FDelegateHandle PropertyWhitelistedChangedDelegate;
-	FDelegateHandle PropertyWhitelistedEnabledDelegate;
+	/** Used to refresh the tree when the allow list filter changes */
+	FDelegateHandle PropertyAllowListChangedDelegate;
+	FDelegateHandle PropertyAllowListEnabledDelegate;
 
 	/** Delegate for overriding the show modified filter */
 	FSimpleDelegate CustomFilterDelegate;

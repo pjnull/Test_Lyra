@@ -122,7 +122,7 @@ int32 UOSCServer::GetPort() const
 TSet<FString> UOSCServer::GetWhitelistedClients() const
 {
 	check(ServerProxy.IsValid());
-	return ServerProxy->GetAllowListClients();
+	return ServerProxy->GetClientAllowList();
 }
 
 void UOSCServer::BindEventToOnOSCAddressPatternMatchesPath(const FOSCAddress& InOSCAddressPattern, const FOSCDispatchMessageEventBP& InEvent)
