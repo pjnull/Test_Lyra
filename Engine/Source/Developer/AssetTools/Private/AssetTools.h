@@ -210,7 +210,7 @@ private:
 	/** Blacklist of folder paths to write to */
 	TSharedRef<FBlacklistPaths> WritableFolderBlacklist;
 
-	/** List of sub content path blacklisted for every mount. */
+	/** List of sub content paths denied for every mount. */
 	TArray<FString> SubContentBlacklistPaths;
 };
 

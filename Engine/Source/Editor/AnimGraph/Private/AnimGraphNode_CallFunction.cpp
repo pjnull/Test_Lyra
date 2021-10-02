@@ -1,4 +1,4 @@
-﻿// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "AnimGraphNode_CallFunction.h"
 
@@ -192,7 +192,7 @@ void UAnimGraphNode_CallFunction::BindDelegates()
 	}
 }
 
-bool UAnimGraphNode_CallFunction::IsFunctionBlacklisted(const UFunction* InFunction) const
+bool UAnimGraphNode_CallFunction::IsFunctionDenied(const UFunction* InFunction) const
 {
 	return InFunction->GetFName() == GET_FUNCTION_NAME_CHECKED(UAnimInstance, BlueprintThreadSafeUpdateAnimation);
 }
@@ -246,9 +246,9 @@ bool UAnimGraphNode_CallFunction::ValidateFunction(const UFunction* InFunction, 
 		InvalidateMessage(LOCTEXT("FunctionInternalError", "@@ uses an internal-only function"));
 	}
 
-	if(IsFunctionBlacklisted(InFunction))
+	if(IsFunctionDenied(InFunction))
 	{
-		InvalidateMessage(LOCTEXT("FunctionBlacklistedError", "@@ uses a blacklisted function"));
+		InvalidateMessage(LOCTEXT("FunctionDenyListError", "@@ uses a denied function"));
 	}
 	
 	return bValid;

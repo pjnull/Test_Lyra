@@ -1032,7 +1032,7 @@ bool UAnimBlueprintExtension_Base::FEvaluationHandlerRecord::CheckForLogicalNot(
 }
 
 /** The functions that we can safely native-break */
-static const FName NativeBreakFunctionNameWhitelist[] =
+static const FName NativeBreakFunctionNameAllowList[] =
 {
 	FName(TEXT("BreakVector")),
 	FName(TEXT("BreakVector2D")),
@@ -1040,9 +1040,9 @@ static const FName NativeBreakFunctionNameWhitelist[] =
 };
 
 /** Check whether a native break function can be safely used in the fast-path copy system (ie. source and dest data will be the same) */
-static bool IsWhitelistedNativeBreak(const FName& InFunctionName)
+static bool IsNativeBreakAllowed(const FName& InFunctionName)
 {
-	for(const FName& FunctionName : NativeBreakFunctionNameWhitelist)
+	for(const FName& FunctionName : NativeBreakFunctionNameAllowList)
 	{
 		if(InFunctionName == FunctionName)
 		{
@@ -1054,7 +1054,7 @@ static bool IsWhitelistedNativeBreak(const FName& InFunctionName)
 }
 
 /** The functions that we can safely native-make */
-static const FName NativeMakeFunctionNameWhitelist[] =
+static const FName NativeMakeFunctionNameAllowList[] =
 {
 	FName(TEXT("MakeVector")),
 	FName(TEXT("MakeVector2D")),
@@ -1062,9 +1062,9 @@ static const FName NativeMakeFunctionNameWhitelist[] =
 };
 
 /** Check whether a native break function can be safely used in the fast-path copy system (ie. source and dest data will be the same) */
-static bool IsWhitelistedNativeMake(const FName& InFunctionName)
+static bool IsNativeMakeAllowed(const FName& InFunctionName)
 {
-	for(const FName& FunctionName : NativeMakeFunctionNameWhitelist)
+	for(const FName& FunctionName : NativeMakeFunctionNameAllowList)
 	{
 		if(InFunctionName == FunctionName)
 		{
@@ -1096,7 +1096,7 @@ bool UAnimBlueprintExtension_Base::FEvaluationHandlerRecord::CheckForStructMembe
 		else if(UK2Node_CallFunction* NativeBreakNode = Cast<UK2Node_CallFunction>(FollowKnots(DestPin, SourcePin)))
 		{
 			UFunction* Function = NativeBreakNode->FunctionReference.ResolveMember<UFunction>(UKismetMathLibrary::StaticClass());
-			if(Function && Function->HasMetaData(TEXT("NativeBreakFunc")) && IsWhitelistedNativeBreak(Function->GetFName()))
+			if(Function && Function->HasMetaData(TEXT("NativeBreakFunc")) && IsNativeBreakAllowed(Function->GetFName()))
 			{
 				if(UEdGraphPin* InputPin = FindFirstInputPin(NativeBreakNode))
 				{
@@ -1148,7 +1148,7 @@ bool UAnimBlueprintExtension_Base::FEvaluationHandlerRecord::CheckForSplitPinAcc
 		else if(UK2Node_CallFunction* NativeMakeNode = Cast<UK2Node_CallFunction>(FollowKnots(DestPin, SourcePin)))
 		{
 			UFunction* Function = NativeMakeNode->FunctionReference.ResolveMember<UFunction>(UKismetMathLibrary::StaticClass());
-			if(Function && Function->HasMetaData(TEXT("NativeMakeFunc")) && IsWhitelistedNativeMake(Function->GetFName()))
+			if(Function && Function->HasMetaData(TEXT("NativeMakeFunc")) && IsNativeMakeAllowed(Function->GetFName()))
 			{
 				// Idea here is to account for split pins, so we want to narrow the scope to not also include user-placed makes
 				UObject* SourceObject = Context.MessageLog.FindSourceObject(NativeMakeNode);

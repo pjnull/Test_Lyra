@@ -55,7 +55,7 @@ namespace UnrealBuildTool
 		/// use the Project setting.
 		/// </summary>
 		/// <returns></returns>
-		static public IEnumerable<string> TargetsWhitelistedForAppleSilicon
+		static public IEnumerable<string> TargetsAllowedForAppleSilicon
 		{
 			get
 			{
@@ -77,7 +77,7 @@ namespace UnrealBuildTool
 		/// of what their project says
 		/// </summary>
 		/// <returns></returns>
-		static public IEnumerable<TargetType> TargetTypesBlacklistedForAppleSilicon
+		static public IEnumerable<TargetType> TargetTypesDeniedForAppleSilicon
 		{
 			get
 			{
