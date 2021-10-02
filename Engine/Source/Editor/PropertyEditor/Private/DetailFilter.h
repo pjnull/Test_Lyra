@@ -14,7 +14,7 @@ struct FDetailFilter
 		, bShowOnlyKeyable(false)
 		, bShowOnlyAnimated(false)
 		, bShowFavoritesCategory(false)
-		, bShowOnlyWhitelisted(false)
+		, bShowOnlyAllowed(false)
 	{}
 
 	bool IsEmptyFilter() const
@@ -22,7 +22,7 @@ struct FDetailFilter
 		return FilterStrings.Num() == 0
 			&& VisibleSections.Num() == 0
 			&& bShowAllAdvanced == false
-			&& bShowOnlyWhitelisted == false
+			&& bShowOnlyAllowed == false
 			&& bShowAllChildrenIfCategoryMatches == false
 			&& bShowOnlyKeyable == false
 			&& bShowOnlyAnimated == false;
@@ -42,10 +42,10 @@ struct FDetailFilter
 	bool bShowOnlyAnimated;
 	/** If we should show the favorites category. */
 	bool bShowFavoritesCategory;
-	/** If we should only show whitelisted properties */
-	bool bShowOnlyWhitelisted;
-	/** The set of whitelisted properties to show. */
-	TSet<FPropertyPath> WhitelistedProperties;
+	/** If we should only show properties that match PropertyAllowList */
+	bool bShowOnlyAllowed;
+	/** The set of allowed properties to show. */
+	TSet<FPropertyPath> PropertyAllowList;
 	/** The set of selected sections to show. If empty, all sections are shown.*/
 	TSet<FName> VisibleSections;
 };
