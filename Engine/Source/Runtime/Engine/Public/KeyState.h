@@ -12,10 +12,10 @@
 struct FKeyState
 {
 	/** This is the most recent raw value reported by the device.  For digital buttons, 0 or 1.  For analog buttons, 0->1.  For axes, -1->1. The X field is for non-vector keys */
-	FVector RawValue;
+	FVector3f RawValue;
 
 	/** The final "value" for this control, after any optional processing. */
-	FVector Value;
+	FVector3f Value;
 
 	/** Global time of last up->down or down->up transition. */
 	float LastUpDownTransitionTime;
@@ -42,7 +42,7 @@ struct FKeyState
 	TArray<uint32> EventAccumulator[IE_MAX];
 
 	/** Used to accumulate input values during the frame and flushed after processing. */
-	FVector RawValueAccumulator;
+	FVector3f RawValueAccumulator;
 
 	FKeyState()
 		: RawValue(0.f, 0.f, 0.f)
