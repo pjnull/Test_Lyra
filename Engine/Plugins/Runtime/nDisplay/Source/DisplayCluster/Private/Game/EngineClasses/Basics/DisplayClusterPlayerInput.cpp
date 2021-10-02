@@ -104,15 +104,15 @@ bool UDisplayClusterPlayerInput::DeserializeKeyStateMap(const TMap<FString, FStr
 		TArray<FString> Fields;
 		DisplayClusterHelpers::str::template StrToArray<FString>(it->Value, FString(";"), Fields, false);
 
-		KeyState.RawValue                 = DisplayClusterTypesConverter::template FromHexString<FVector3f>(Fields[0]);
-		KeyState.Value                    = DisplayClusterTypesConverter::template FromHexString<FVector3f>(Fields[1]);
+		KeyState.RawValue                 = DisplayClusterTypesConverter::template FromHexString<FVector>(Fields[0]);
+		KeyState.Value                    = DisplayClusterTypesConverter::template FromHexString<FVector>(Fields[1]);
 		KeyState.LastUpDownTransitionTime = DisplayClusterTypesConverter::template FromHexString<float>(Fields[2]);
 		KeyState.bDown                    = DisplayClusterTypesConverter::template FromString<bool>(Fields[3]) ? 1 : 0;
 		KeyState.bDownPrevious            = DisplayClusterTypesConverter::template FromString<bool>(Fields[4]) ? 1 : 0;
 		KeyState.bConsumed                = DisplayClusterTypesConverter::template FromString<bool>(Fields[5]) ? 1 : 0;
 		KeyState.PairSampledAxes          = DisplayClusterTypesConverter::template FromString<uint8>(Fields[6]);
 		KeyState.SampleCountAccumulator   = DisplayClusterTypesConverter::template FromString<uint8>(Fields[7]);
-		KeyState.RawValueAccumulator      = DisplayClusterTypesConverter::template FromHexString<FVector3f>(Fields[8]);
+		KeyState.RawValueAccumulator      = DisplayClusterTypesConverter::template FromHexString<FVector>(Fields[8]);
 
 		for (int i = 0; i < IE_MAX; ++i)
 		{
