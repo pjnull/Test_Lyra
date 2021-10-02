@@ -14,6 +14,7 @@
 
 class FMenuBuilder;
 class SComboButton;
+class FScopedTransaction;
 
 /**
  * A level viewport toolbar widget that is placed in a viewport
@@ -159,8 +160,9 @@ private:
 	void OnCamSpeedScalarChanged(float NewValue);
 
 	/** Called by the floor offset slider in the perspective viewport to get the offset value */
-	TOptional<float> OnGetFloorOffset() const;
+	float OnGetFloorOffset() const;
 	/** Called when the floor offset slider is adjusted in the perspective viewport */
+	void OnBeginSliderMovementFloorOffset();
 	void OnFloorOffsetChanged( float NewValue );
 	void OnFloorOffsetCommitted ( float NewValue, ETextCommit::Type CommitType );
 
@@ -206,6 +208,9 @@ private:
 
 	/** Pinned commands widget */
 	TSharedPtr<IPinnedCommandList> PinnedCommands;
+
+	/** Transaction to handle scoping updates for sliders we own that transact objects (i.e. floor mesh) */
+	TUniquePtr<FScopedTransaction> PendingTransaction;
 
 	/** Whether to show the 'Show' menu */
 	bool bShowShowMenu;

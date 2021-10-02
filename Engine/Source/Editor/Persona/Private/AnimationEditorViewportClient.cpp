@@ -165,16 +165,24 @@ FAnimationViewportClient::~FAnimationViewportClient()
 		ScenePtr->UnregisterOnPreTick(this);
 		ScenePtr->UnregisterOnPostTick(this);
 
-		if (OnPhysicsCreatedDelegateHandle.IsValid())
+		if (UDebugSkelMeshComponent* PreviewMeshComponent = GetAnimPreviewScene()->GetPreviewMeshComponent())
 		{
-			UDebugSkelMeshComponent* PreviewMeshComponent = GetAnimPreviewScene()->GetPreviewMeshComponent();
-			if (PreviewMeshComponent)
+			if (OnPhysicsCreatedDelegateHandle.IsValid())
 			{
 				PreviewMeshComponent->UnregisterOnPhysicsCreatedDelegate(OnPhysicsCreatedDelegateHandle);
+			}
+
+			if (OnMeshChangedDelegateHandle.IsValid())
+			{
+				if (USkeletalMesh* SkelMesh = PreviewMeshComponent->SkeletalMesh)
+				{
+					SkelMesh->GetOnMeshChanged().Remove(OnMeshChangedDelegateHandle);
+				}
 			}
 		}
 	}
 	OnPhysicsCreatedDelegateHandle.Reset();
+	OnMeshChangedDelegateHandle.Reset();
 
 	UAssetViewerSettings::Get()->OnAssetViewerSettingsChanged().RemoveAll(this);
 }
@@ -369,6 +377,21 @@ static void DisableAllBodiesSimulatePhysics(UDebugSkelMeshComponent* PreviewMesh
 
 void FAnimationViewportClient::HandleSkeletalMeshChanged(USkeletalMesh* OldSkeletalMesh, USkeletalMesh* NewSkeletalMesh)
 {
+	// Set up our notifications that the mesh we're watching has changed from some external source (like undo/redo)
+	if (OldSkeletalMesh)
+	{
+		OldSkeletalMesh->GetOnMeshChanged().Remove(OnMeshChangedDelegateHandle);
+	}
+
+	if (NewSkeletalMesh)
+	{
+		OnMeshChangedDelegateHandle = NewSkeletalMesh->GetOnMeshChanged().AddLambda([this]()
+		{
+			UpdateCameraSetup();
+			Invalidate();
+		});
+	}
+
 	if (OldSkeletalMesh != NewSkeletalMesh || NewSkeletalMesh == nullptr)
 	{
 		if (!bInitiallyFocused)
@@ -1751,23 +1774,13 @@ float FAnimationViewportClient::GetFloorOffset() const
 	return 0.0f;
 }
 
-void FAnimationViewportClient::SetFloorOffset( float NewValue, bool bCommitted )
+void FAnimationViewportClient::SetFloorOffset( float NewValue )
 {
 	USkeletalMesh* Mesh = GetPreviewScene()->GetPreviewMeshComponent()->SkeletalMesh;
 
 	if ( Mesh )
 	{
-		if (bCommitted)
-		{
-			PendingTransaction.Reset();
-		}
-		else if (!PendingTransaction.IsValid())
-		{
-			// This value is saved in a UPROPERTY for the mesh, so changes are transactional
-			PendingTransaction = MakeUnique<FScopedTransaction>( LOCTEXT( "SetFloorOffset", "Set Floor Offset" ) );
-			Mesh->Modify();
-		}
-
+		Mesh->Modify();
 		Mesh->SetFloorOffset(NewValue);
 		UpdateCameraSetup(); // This does the actual moving of the floor mesh
 		Invalidate();
