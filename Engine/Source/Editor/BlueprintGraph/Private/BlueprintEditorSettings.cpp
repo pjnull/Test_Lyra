@@ -33,7 +33,7 @@ UBlueprintEditorSettings::UBlueprintEditorSettings(const FObjectInitializer& Obj
 	, bNavigateToNativeFunctionsFromCallNodes(true)
 	, bDoubleClickNavigatesToParent(true)
 	, bEnableTypePromotion(true)
-	, TypePromotionPinBlacklist { UEdGraphSchema_K2::PC_String, UEdGraphSchema_K2::PC_Text }
+	, TypePromotionPinDenyList { UEdGraphSchema_K2::PC_String, UEdGraphSchema_K2::PC_Text }
 	, BreakpointReloadMethod(EBlueprintBreakpointReloadMethod::RestoreAll)
 	// Experimental
 	, bEnableNamespaceFilteringFeatures(false)
@@ -129,7 +129,7 @@ void UBlueprintEditorSettings::PostEditChangeProperty(FPropertyChangedEvent& Pro
 	
 	// Refresh type promotion when the preference gets changed so that we can correctly rebuild the action database
 	if (PropertyName == GET_MEMBER_NAME_CHECKED(UBlueprintEditorSettings, bEnableTypePromotion) || 
-		PropertyName == GET_MEMBER_NAME_CHECKED(UBlueprintEditorSettings, TypePromotionPinBlacklist))
+		PropertyName == GET_MEMBER_NAME_CHECKED(UBlueprintEditorSettings, TypePromotionPinDenyList))
 	{
 		FTypePromotion::ClearNodeSpawners();
 		FTypePromotion::RefreshPromotionTables();

@@ -1004,24 +1004,24 @@ namespace UnrealBuildTool
 				IEnumerable<string> TargetArchitectures = new[] { MacExports.IntelArchitecture };
 
 				// These targets are known to work so are whitelisted
-				bool IsWhiteListed = MacExports.TargetsWhitelistedForAppleSilicon.Contains(TargetName, StringComparer.OrdinalIgnoreCase);
+				bool IsAllowed = MacExports.TargetsAllowedForAppleSilicon.Contains(TargetName, StringComparer.OrdinalIgnoreCase);
 
 				// These target types are known to never work so are blacklisted. This is mostly to avoid generating an arm64 editor config for 
 				// a code project that is set to be universal
-				bool IsBlacklisted = MacExports.TargetTypesBlacklistedForAppleSilicon.Contains(Config.ProjectTarget.TargetRules.Type);
+				bool IsDenied = MacExports.TargetTypesDeniedForAppleSilicon.Contains(Config.ProjectTarget.TargetRules.Type);
 
-				// check whitelists and blacklists
-				if (IsWhiteListed)
+				// determine the target architectures based on what's allowed/denied
+				if (IsAllowed)
 				{
 					TargetArchitectures = AllArchitectures;
 				}
-				else if (IsBlacklisted)
+				else if (IsDenied)
 				{
 					TargetArchitectures = new[] { MacExports.IntelArchitecture };
 				}
 				else
 				{
-					// if no project file then this is a non-whitelisted tool/program. Default to Intel for installed builds because we know all of that works. 
+					// if no project file then this is an unspecified tool/program. Default to Intel for installed builds because we know all of that works. 
 					if (InProjectFile == null)
 					{
 						// For misc tools we default to Intel for installed builds because we know all of that works. 
