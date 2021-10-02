@@ -272,7 +272,7 @@ private:
 	mutable bool IniSettingRecurse = false;
 	mutable FIniSettingContainer AccessedIniStrings;
 	TArray<const FConfigFile*> OpenConfigFiles;
-	TArray<FString> ConfigSettingBlacklist;
+	TArray<FString> ConfigSettingDenyList;
 	void OnFConfigDeleted(const FConfigFile* Config);
 	void OnFConfigCreated(const FConfigFile* Config);
 
