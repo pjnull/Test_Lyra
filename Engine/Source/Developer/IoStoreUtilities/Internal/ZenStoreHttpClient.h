@@ -32,12 +32,9 @@ public:
 	FZenStoreHttpClient(UE::Zen::EServiceMode Mode);
 	~FZenStoreHttpClient();
 
-	void Initialize(FStringView InProjectId, 
-					FStringView InOplogId, 
-					FStringView ServerRoot, 
-					FStringView EngineRoot, 
-					FStringView ProjectRoot);
-	void EstablishWritableOpLog(FStringView InProjectId, FStringView InOplogId, bool bFullBuild);
+	bool TryCreateProject(FStringView InProjectId, FStringView InOplogId, FStringView ServerRoot, 
+					FStringView EngineRoot, FStringView ProjectRoot);
+	bool TryCreateOplog(FStringView InProjectId, FStringView InOplogId, bool bFullBuild);
 
 	void InitializeReadOnly(FStringView InProjectId, FStringView InOplogId);
 

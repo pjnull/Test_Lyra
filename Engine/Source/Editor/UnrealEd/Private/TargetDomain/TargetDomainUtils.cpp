@@ -406,15 +406,8 @@ FEditorDomainOplog::FEditorDomainOplog()
 	FString AbsEngineDir = PlatformFile.ConvertToAbsolutePathForExternalAppForRead(*EngineDir);
 	FString AbsProjectDir = PlatformFile.ConvertToAbsolutePathForExternalAppForRead(*ProjectDir);
 
-	HttpClient.Initialize(ProjectId,
-		OplogId,
-		AbsServerRoot,
-		AbsEngineDir,
-		AbsProjectDir);
-	if (HttpClient.IsConnected())
-	{
-		HttpClient.EstablishWritableOpLog(ProjectId, OplogId, false /* bFullBuild */);
-	}
+	HttpClient.TryCreateProject(ProjectId, OplogId, AbsServerRoot, AbsEngineDir, AbsProjectDir);
+	HttpClient.TryCreateOplog(ProjectId, OplogId, false /* bFullBuild */);
 }
 
 void FEditorDomainOplog::InitializeRead()

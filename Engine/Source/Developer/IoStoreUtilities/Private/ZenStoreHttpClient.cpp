@@ -48,8 +48,8 @@ FZenStoreHttpClient::~FZenStoreHttpClient()
 {
 }
 
-void 
-FZenStoreHttpClient::Initialize(FStringView InProjectId, 
+bool
+FZenStoreHttpClient::TryCreateProject(FStringView InProjectId, 
 	FStringView InOplogId, 
 	FStringView ServerRoot,
 	FStringView EngineRoot,
@@ -117,11 +117,16 @@ FZenStoreHttpClient::Initialize(FStringView InProjectId,
 
 	bAllowRead = true;
 	bAllowEdit = true;
+
+	return bConnectionSucceeded;
 }
 
-void FZenStoreHttpClient::EstablishWritableOpLog(FStringView InProjectId, FStringView InOplogId, bool bFullBuild)
+bool FZenStoreHttpClient::TryCreateOplog(FStringView InProjectId, FStringView InOplogId, bool bFullBuild)
 {
-	check(IsConnected());
+	if (!IsConnected())
+	{
+		return false;
+	}
 
 	UE::Zen::FZenScopedRequestPtr Request(RequestPool.Get());
 
@@ -152,8 +157,9 @@ void FZenStoreHttpClient::EstablishWritableOpLog(FStringView InProjectId, FStrin
 		if (Res != Zen::FZenHttpRequest::Result::Success)
 		{
 			UE_LOG(LogZenStore, Error, TEXT("Zen oplog '%s'/'%s' creation FAILED"), *FString(InProjectId), *FString(InOplogId));
-
-			// TODO: how to recover / handle this?
+			// Demote the connection status back to not connected
+			bConnectionSucceeded = false;
+			return false;
 		}
 		else if (Request->GetResponseCode() == 201)
 		{
@@ -177,6 +183,7 @@ void FZenStoreHttpClient::EstablishWritableOpLog(FStringView InProjectId, FStrin
 	}
 
 	TempDirPath = FUTF8ToTCHAR(OplogInfo["tempdir"].AsString());
+	return true;
 }
 
 void FZenStoreHttpClient::InitializeReadOnly(FStringView InProjectId, FStringView InOplogId)
@@ -591,17 +598,15 @@ FZenStoreHttpClient::~FZenStoreHttpClient()
 {
 }
 
-void FZenStoreHttpClient::Initialize(
-	FStringView InProjectId,
-	FStringView InOplogId,
-	FStringView ServerRoot,
-	FStringView EngineRoot,
-	FStringView ProjectRoot)
+bool FZenStoreHttpClient::TryCreateProject(FStringView InProjectId, FStringView InOplogId, FStringView ServerRoot,
+	FStringView EngineRoot,	FStringView ProjectRoot)
 {
+	return false;
 }
 
-void FZenStoreHttpClient::EstablishWritableOpLog(FStringView InProjectId, FStringView InOplogId, bool bFullBuild)
+bool FZenStoreHttpClient::TryCreateOplog(FStringView InProjectId, FStringView InOplogId, bool bFullBuild)
 {
+	return false;
 }
 
 void FZenStoreHttpClient::InitializeReadOnly(FStringView InProjectId, FStringView InOplogId)
