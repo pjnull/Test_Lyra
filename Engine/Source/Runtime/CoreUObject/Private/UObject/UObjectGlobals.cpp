@@ -3533,11 +3533,19 @@ void FScopedObjectFlagMarker::RestoreObjectFlags()
 		UObject* Object = It.Key();
 		FStoredObjectFlags& PreviousObjectFlags = It.Value();
 
-		// clear all flags
+		// clear all flags, frist clear the PendingKill flag as we don't allow clearing it through ClearFlags
+		Object->ClearPendingKill();
 		Object->ClearFlags(RF_AllFlags);
 		Object->ClearInternalFlags(EInternalObjectFlags::AllFlags);
 
-		// then reset the ones that were originally set
+		// then reset the ones that were originally set, start with PendingKill as we don't allow setting it through SetFlags
+		if ((PreviousObjectFlags.InternalFlags & EInternalObjectFlags::PendingKill) == EInternalObjectFlags::PendingKill)
+		{
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
+			checkf((PreviousObjectFlags.Flags & RF_PendingKill) == RF_PendingKill, TEXT("Object %s had EInternalObjectFlags::PendingKill flag set but no RF_PendingKill"), *Object->GetFullName());
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
+			Object->MarkPendingKill();
+		}
 		Object->SetFlags(PreviousObjectFlags.Flags);
 		Object->SetInternalFlags(PreviousObjectFlags.InternalFlags);
 	}
