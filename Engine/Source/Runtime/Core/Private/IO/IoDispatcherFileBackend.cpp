@@ -415,6 +415,17 @@ void FFileIoStoreOffsetSortedRequestQueue::Push(FFileIoStoreReadRequest* Request
 	PeekRequestIndex = INDEX_NONE;
 }
 
+void FFileIoStoreOffsetSortedRequestQueue::CancelRequestsWithFileHandle(uint64 FileHandle)
+{
+	for (FFileIoStoreReadRequest* Request : Requests)
+	{
+		if (Request->FileHandle == FileHandle)
+		{
+			Request->bCancelled = true;
+		}
+	}
+}
+
 void FFileIoStoreRequestQueue::UpdateSortRequestsByOffset()
 {
 	// Must hold CriticalSection here
@@ -620,11 +631,22 @@ void FFileIoStoreRequestQueue::Unlock()
 void FFileIoStoreRequestQueue::CancelRequestsWithFileHandle(const uint64 FileHandle)
 {
 	FScopeLock _(&CriticalSection);
-	for (FFileIoStoreReadRequest* Request : Heap)
+	
+	if (bSortRequestsByOffset)
 	{
-		if (Request->FileHandle == FileHandle)
+		for (FFileIoStoreOffsetSortedRequestQueue& SubQueue : SortedPriorityQueues)
 		{
-			Request->bCancelled = true;
+			SubQueue.CancelRequestsWithFileHandle(FileHandle);
+		}
+	}
+	else
+	{
+		for (FFileIoStoreReadRequest* Request : Heap)
+		{
+			if (Request->FileHandle == FileHandle)
+			{
+				Request->bCancelled = true;
+			}
 		}
 	}
 }
