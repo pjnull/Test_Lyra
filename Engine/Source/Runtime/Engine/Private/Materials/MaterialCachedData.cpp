@@ -130,7 +130,7 @@ static int32 TryAddParameter(FMaterialCachedParameters& CachedParameters,
 		EditorInfo.Group = InEditorInfo.Group;
 		EditorInfo.SortPriority = InEditorInfo.SortPriority;
 	}
-
+	
 	// Still return INDEX_NONE, to signify this parameter was already added (don't want to add it again)
 	return INDEX_NONE;
 }
@@ -485,15 +485,15 @@ bool FMaterialCachedExpressionData::UpdateForExpressions(const FMaterialCachedEx
 					Parameters.ScalarMinMaxValues.Insert(FVector2D(ParameterMeta.ScalarMin, ParameterMeta.ScalarMax), Index);
 					Parameters.ScalarPrimitiveDataIndexValues.Insert(ParameterMeta.PrimitiveDataIndex, Index);
 					if (ParameterMeta.bUsedAsAtlasPosition)
-					{
+				{
 						Parameters.ScalarCurveValues.Insert(ParameterMeta.ScalarCurve.Get(), Index);
 						Parameters.ScalarCurveAtlasValues.Insert(ParameterMeta.ScalarAtlas.Get(), Index);
-					}
+				}
 					else
-					{
+		{
 						Parameters.ScalarCurveValues.Insert(nullptr, Index);
 						Parameters.ScalarCurveAtlasValues.Insert(nullptr, Index);
-					}
+			}
 					break;
 				case EMaterialParameterType::Vector:
 					Parameters.VectorValues.Insert(ParameterMeta.Value.AsLinearColor(), Index);
@@ -521,7 +521,7 @@ bool FMaterialCachedExpressionData::UpdateForExpressions(const FMaterialCachedEx
 				default:
 					checkNoEntry();
 					break;
-				}
+		}
 			}
 		}
 
@@ -633,9 +633,9 @@ bool FMaterialCachedExpressionData::UpdateForExpressions(const FMaterialCachedEx
 					SetMaterialAttributePropertyConnected(MaterialProperty, AttributeInput.Expression ? true : false);
 				}
 			}
-		}
-		else if (UMaterialExpressionMakeMaterialAttributes* MakeMatAttributes = Cast<UMaterialExpressionMakeMaterialAttributes>(Expression))
-		{
+			}
+			else if (UMaterialExpressionMakeMaterialAttributes* MakeMatAttributes = Cast<UMaterialExpressionMakeMaterialAttributes>(Expression))
+			{
 			// Only set the material property if it hasn't been set yet.  We want to specifically avoid a Set Material Attributes node which doesn't have a 
 			// attribute set from disabling the attribute from a different Set Material Attributes node which does have it enabled.
 			auto SetMatAttributeConditionally = [&](EMaterialProperty InMaterialProperty, bool InIsConnected)
@@ -841,10 +841,16 @@ void FMaterialCachedParameters::GetAllParameterInfoOfType(EMaterialParameterType
 	{
 		OutParameterInfo.Add(*It);
 #if WITH_EDITORONLY_DATA
-		OutParameterIds.Add(Entry.EditorInfo[It.GetId().AsInteger()].ExpressionGuid);
-#else
-		OutParameterIds.Add(FGuid());
+		// cooked materials can strip out expression guids
+		if (It.GetId().AsInteger() < Entry.EditorInfo.Num())
+		{
+			OutParameterIds.Add(Entry.EditorInfo[It.GetId().AsInteger()].ExpressionGuid);
+		}
+		else
 #endif
+		{
+			OutParameterIds.Add(FGuid());
+		}
 	}
 }
 
@@ -862,10 +868,16 @@ void FMaterialCachedParameters::GetAllGlobalParameterInfoOfType(EMaterialParamet
 		{
 			OutParameterInfo.Add(ParameterInfo);
 #if WITH_EDITORONLY_DATA
-			OutParameterIds.Add(Entry.EditorInfo[It.GetId().AsInteger()].ExpressionGuid);
-#else
-			OutParameterIds.Add(FGuid());
+			// cooked materials can strip out expression guids
+			if (It.GetId().AsInteger() < Entry.EditorInfo.Num())
+			{
+				OutParameterIds.Add(Entry.EditorInfo[It.GetId().AsInteger()].ExpressionGuid);
+			}
+			else
 #endif
+			{
+				OutParameterIds.Add(FGuid());
+			}
 		}
 	}
 }
