@@ -19,7 +19,7 @@
 			"Name": "nDisplaySupportForLevelSnapshots",
 			"Type": "Runtime",
 			"LoadingPhase": "Default",
-			"WhitelistPlatforms": [
+			"PlatformAllowList": [
 				"Win64",
 				"Linux"
 			]

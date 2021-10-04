@@ -20,7 +20,7 @@
 			"Name": "PlatformCrypto",
 			"Type": "RuntimeAndProgram",
 			"LoadingPhase": "EarliestPossible",
-			"WhitelistPlatforms": [
+			"PlatformAllowList": [
 				"Android",
 				"IOS",
 				"Mac",
@@ -29,16 +29,16 @@
 				"LinuxArm64",
 				"PS4"
 			],
-			"BlacklistPlatforms": [
+			"PlatformDenyList": [
 				"TVOS"
 			],
-			"WhitelistPrograms": [ "UnrealPak" ]
+			"ProgramAllowList": [ "UnrealPak" ]
 		},
 		{
 			"Name": "PlatformCryptoTypes",
 			"Type": "RuntimeAndProgram",
 			"LoadingPhase": "EarliestPossible",
-			"WhitelistPlatforms": [
+			"PlatformAllowList": [
 				"Android",
 				"IOS",
 				"Mac",
@@ -47,7 +47,7 @@
 				"LinuxArm64",
 				"PS4"
 			],
-			"BlacklistPlatforms": [
+			"PlatformDenyList": [
 				"TVOS"
 			]
 		},
@@ -55,7 +55,7 @@
 			"Name": "PlatformCryptoOpenSSL",
 			"Type": "RuntimeAndProgram",
 			"LoadingPhase": "EarliestPossible",
-			"WhitelistPlatforms": [
+			"PlatformAllowList": [
 				"Android",
 				"IOS",
 				"Mac",
@@ -64,7 +64,7 @@
 				"LinuxArm64",
 				"PS4"
 			],
-			"BlacklistPlatforms": [
+			"PlatformDenyList": [
 				"TVOS"
 			]
 		}
