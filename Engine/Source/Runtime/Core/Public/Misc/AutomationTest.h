@@ -881,9 +881,9 @@ public:
 	void LoadTestModules();
 
 	/**
-	 * Load the test Blacklist from the config.
+	 * Load the test deny list from the config.
 	 */
-	void BuildTestBlacklistFromConfig();
+	void BuildTestDenyListFromConfig();
 
 	/**
 	 * Populates the provided array with the names of all tests in the framework that are valid to run for the current
@@ -1051,10 +1051,10 @@ private:
 		 std::atomic<FFeedbackContext*> DestinationContext;
 	 };
 
-	//** Store information about blacklisted test */
-	struct FBlacklistEntry
+	//** Store information about a test deny list entry */
+	struct FTestDenyListEntry
 	{
-		FBlacklistEntry() :
+		FTestDenyListEntry() :
 			bWarn(false) {}
 
 		FString Map;
@@ -1097,14 +1097,14 @@ private:
 
 
 	/**
-	 * Internal helper method that verify if a test is black listed.
+	 * Internal helper method that verify if a test is currently disabled by the deny list
 	 *
 	 * @param	TestName		Beautified test name to be checked
-	 * @param	OutReason		Output the reason for the test being blacklisted
+	 * @param	OutReason		Output the reason for the test being denied
 	 * @param	OutWarn			Output true if the config ask for a warning message
-	 * @return	true if the TestName is part of the blacklist.
+	 * @return	true if the TestName is part of the deny list.
 	 */
-	bool IsBlacklisted(const FString& TestName, FString* OutReason = nullptr, bool* OutWarn = nullptr) const;
+	bool IsDenied(const FString& TestName, FString* OutReason = nullptr, bool* OutWarn = nullptr) const;
 
 	/** Constructor */
 	FAutomationTestFramework();
@@ -1165,7 +1165,7 @@ private:
 
 	bool bCaptureStack;
 
-	TMap<FString, FBlacklistEntry> TestBlacklist;
+	TMap<FString, FTestDenyListEntry> TestDenyList;
 };
 
 

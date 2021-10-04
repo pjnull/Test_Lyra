@@ -43,7 +43,7 @@ void FAutomationWorkerModule::StartupModule()
 	FAutomationTestFramework::Get().PreTestingEvent.AddRaw(this, &FAutomationWorkerModule::HandlePreTestingEvent);
 	FAutomationTestFramework::Get().PostTestingEvent.AddRaw(this, &FAutomationWorkerModule::HandlePostTestingEvent);
 
-	FAutomationTestFramework::Get().BuildTestBlacklistFromConfig();
+	FAutomationTestFramework::Get().BuildTestDenyListFromConfig();
 }
 
 void FAutomationWorkerModule::ShutdownModule()

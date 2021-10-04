@@ -512,9 +512,9 @@ void FAutomationTestFramework::LoadTestModules( )
 	}
 }
 
-void FAutomationTestFramework::BuildTestBlacklistFromConfig()
+void FAutomationTestFramework::BuildTestDenyListFromConfig()
 {
-	TestBlacklist.Empty();
+	TestDenyList.Empty();
 	if (GConfig)
 	{
 
@@ -522,25 +522,25 @@ void FAutomationTestFramework::BuildTestBlacklistFromConfig()
 
 		for (const FString& ConfigFilename : GConfig->GetFilenames())
 		{
-			FConfigSection* BlacklistSection = GConfig->GetSectionPrivate(TEXT("AutomationTestBlacklist"), false, true, ConfigFilename);
-			if (BlacklistSection)
+			FConfigSection* DenyListSection = GConfig->GetSectionPrivate(TEXT("AutomationTestDenyList"), false, true, ConfigFilename);
+			if (DenyListSection)
 			{
-				// Parse all blacklist definitions of the format "BlacklistTest=(Map=/Game/Tests/MapName, Test=TestName, Reason="Foo")"
-				for (FConfigSection::TIterator Section(*BlacklistSection); Section; ++Section)
+				// Parse all list entries of the format "TestDenyList=(Map=/Game/Tests/MapName, Test=TestName, Reason="Foo")"
+				for (FConfigSection::TIterator Section(*DenyListSection); Section; ++Section)
 				{
-					if (Section.Key() == TEXT("BlacklistTest"))
+					if (Section.Key() == TEXT("TestDenyList"))
 					{
-						FString BlacklistValue = Section.Value().GetValue();
+						FString DenyListValue = Section.Value().GetValue();
 						FString Map, Test, Reason, RHIs, Warn, ListName;
 						bool bSuccess = false;
 
-						if (FParse::Value(*BlacklistValue, TEXT("Test="), Test, true))
+						if (FParse::Value(*DenyListValue, TEXT("Test="), Test, true))
 						{
 							ListName = FString(Test);
-							FParse::Value(*BlacklistValue, TEXT("Map="), Map, true);
-							FParse::Value(*BlacklistValue, TEXT("Reason="), Reason);
-							FParse::Value(*BlacklistValue, TEXT("RHIs="), RHIs);
-							FParse::Value(*BlacklistValue, TEXT("Warn="), Warn);
+							FParse::Value(*DenyListValue, TEXT("Map="), Map, true);
+							FParse::Value(*DenyListValue, TEXT("Reason="), Reason);
+							FParse::Value(*DenyListValue, TEXT("RHIs="), RHIs);
+							FParse::Value(*DenyListValue, TEXT("Warn="), Warn);
 
 							if (Map.IsEmpty())
 							{
@@ -549,7 +549,7 @@ void FAutomationTestFramework::BuildTestBlacklistFromConfig()
 							}
 							else if (Map.StartsWith(TEXT("/")))
 							{
-								// Account for Functional Tests based on Map - historically blacklisting was made only for functional tests
+								// Account for Functional Tests based on Map - historically deny listing was made only for functional tests
 								ListName = TEXT("Project.Functional Tests.") + Map + TEXT(".") + ListName;
 								bSuccess = true;
 							}
@@ -560,12 +560,12 @@ void FAutomationTestFramework::BuildTestBlacklistFromConfig()
 						{
 							if ((!Map.IsEmpty() && CommandLine.Contains(Map)) || CommandLine.Contains(Test))
 							{
-								UE_LOG(LogAutomationTest, Warning, TEXT("Test '%s' is blacklisted but allowing due to command line."), *BlacklistValue);
+								UE_LOG(LogAutomationTest, Warning, TEXT("Test '%s' is on deny list but allowing due to command line."), *DenyListValue);
 							}
 							else
 							{
 								ListName.RemoveSpacesInline();
-								FBlacklistEntry& Entry = TestBlacklist.Add(ListName);
+								FTestDenyListEntry& Entry = TestDenyList.Add(ListName);
 								Entry.Map = Map;
 								Entry.Test = Test;
 								Entry.Reason = Reason;
@@ -582,7 +582,7 @@ void FAutomationTestFramework::BuildTestBlacklistFromConfig()
 						}
 						else
 						{
-							UE_LOG(LogAutomationTest, Error, TEXT("Invalid blacklisted test definition: '%s'"), *BlacklistValue);
+							UE_LOG(LogAutomationTest, Error, TEXT("Invalid test definition in deny list: '%s'"), *DenyListValue);
 						}
 					}
 				}
@@ -590,20 +590,20 @@ void FAutomationTestFramework::BuildTestBlacklistFromConfig()
 		}
 	}
 
-	if (TestBlacklist.Num() > 0)
+	if (TestDenyList.Num() > 0)
 	{
-		UE_LOG(LogAutomationTest, Log, TEXT("Automated Test Blacklist:"));
-		for (auto& KV : TestBlacklist)
+		UE_LOG(LogAutomationTest, Log, TEXT("Automated Test DenyList:"));
+		for (auto& KV : TestDenyList)
 		{
 			UE_LOG(LogAutomationTest, Log, TEXT("\tTest: %s"), *KV.Key);
 		}
 	}
 }
 
-bool FAutomationTestFramework::IsBlacklisted(const FString& TestName, FString* OutReason, bool *OutWarn) const
+bool FAutomationTestFramework::IsDenied(const FString& TestName, FString* OutReason, bool *OutWarn) const
 {
 	const FString ListName = TestName.Replace(TEXT(" "), TEXT(""));
-	const FBlacklistEntry* Entry = TestBlacklist.Find(ListName);
+	const FTestDenyListEntry* Entry = TestDenyList.Find(ListName);
 
 	if (Entry)
 	{
@@ -696,10 +696,10 @@ void FAutomationTestFramework::GetValidTestNames( TArray<FAutomationTestInfo>& T
 			CurTest->GenerateTestNames(TestsToAdd);
 			for (FAutomationTestInfo& Test : TestsToAdd)
 			{
-				FString BlacklistReason;
+				FString DenyListReason;
 				bool bWarn(false);
 				FString TestName = Test.GetDisplayName();
-				if (!IsBlacklisted(TestName.Replace(TEXT(" "), TEXT("")), &BlacklistReason, &bWarn))
+				if (!IsDenied(TestName.Replace(TEXT(" "), TEXT("")), &DenyListReason, &bWarn))
 				{
 					TestInfo.Add(MoveTemp(Test));
 				}
@@ -707,11 +707,11 @@ void FAutomationTestFramework::GetValidTestNames( TArray<FAutomationTestInfo>& T
 				{
 					if (bWarn)
 					{
-						UE_LOG(LogAutomationTest, Warning, TEXT("Test '%s' is blacklisted. %s"), *TestName, *BlacklistReason);
+						UE_LOG(LogAutomationTest, Warning, TEXT("Test '%s' is on deny list. %s"), *TestName, *DenyListReason);
 					}
 					else
 					{
-						UE_LOG(LogAutomationTest, Display, TEXT("Test '%s' is blacklisted. %s"), *TestName, *BlacklistReason);
+						UE_LOG(LogAutomationTest, Display, TEXT("Test '%s' is on deny list. %s"), *TestName, *DenyListReason);
 					}
 				}
 			}
