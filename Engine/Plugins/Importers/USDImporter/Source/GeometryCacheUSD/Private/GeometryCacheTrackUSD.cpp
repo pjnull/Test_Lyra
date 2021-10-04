@@ -2,6 +2,9 @@
 
 #include "GeometryCacheTrackUSD.h"
 
+#include "UsdWrappers/SdfLayer.h"
+#include "UsdWrappers/UsdStage.h"
+
 #include "GeometryCacheUSDStream.h"
 #include "IGeometryCacheStreamer.h"
 
@@ -11,9 +14,13 @@ UGeometryCacheTrackUsd::UGeometryCacheTrackUsd()
 {
 }
 
-UGeometryCacheTrackUsd::~UGeometryCacheTrackUsd()
+void UGeometryCacheTrackUsd::BeginDestroy()
 {
-	IGeometryCacheStreamer::Get().UnregisterTrack(this);
+	CurrentStage = UE::FUsdStage();
+
+	IGeometryCacheStreamer::Get().UnregisterTrack( this );
+
+	Super::BeginDestroy();
 }
 
 const bool UGeometryCacheTrackUsd::UpdateMeshData(const float Time, const bool bLooping, int32& InOutMeshSampleIndex, FGeometryCacheMeshData*& OutMeshData)
@@ -109,18 +116,28 @@ bool UGeometryCacheTrackUsd::GetMeshData(int32 SampleIndex, FGeometryCacheMeshDa
 	return false;
 }
 
-void UGeometryCacheTrackUsd::Initialize(FReadUsdMeshFunction InReadFunc, const FString& InPrimpath, int32 InStartFrameIndex, int32 InEndFrameIndex)
+void UGeometryCacheTrackUsd::Initialize(
+	const UE::FUsdStage& InStage,
+	const FString& InPrimPath,
+	const FName& InRenderContext,
+	const TMap< FString, TMap< FString, int32 > >& InMaterialToPrimvarToUVIndex,
+	int32 InStartFrameIndex,
+	int32 InEndFrameIndex,
+	FReadUsdMeshFunction InReadFunc
+)
 {
+	CurrentStage = InStage;
+	StageRootLayerPath = CurrentStage ? CurrentStage.GetRootLayer().GetRealPath() : FString();
+
+	PrimPath = InPrimPath;
+	RenderContext = InRenderContext;
+	MaterialToPrimvarToUVIndex = InMaterialToPrimvarToUVIndex;
 	StartFrameIndex = InStartFrameIndex;
 	EndFrameIndex = InEndFrameIndex;
-	Duration = (float) (EndFrameIndex - StartFrameIndex);
 
-	// Setup the corresponding stream
-	FGeometryCacheUsdStream* Stream = new FGeometryCacheUsdStream(this, InReadFunc, InPrimpath);
+	Duration = ( float ) ( EndFrameIndex - StartFrameIndex );
 
-	IGeometryCacheStreamer& Streamer = IGeometryCacheStreamer::Get();
-	Streamer.RegisterTrack(this, Stream);
-
-	Stream->Prefetch(StartFrameIndex);
-	GetMeshData(StartFrameIndex, MeshData);
+	FGeometryCacheUsdStream* Stream = new FGeometryCacheUsdStream( this, InReadFunc );
+	IGeometryCacheStreamer::Get().RegisterTrack( this, Stream );
+	Stream->Prefetch( StartFrameIndex );
 }

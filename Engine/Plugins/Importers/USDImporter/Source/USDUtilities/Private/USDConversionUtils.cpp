@@ -909,6 +909,15 @@ double UsdUtils::GetDefaultTimeCode()
 #endif
 }
 
+double UsdUtils::GetEarliestTimeCode()
+{
+#if USE_USD_SDK
+	return pxr::UsdTimeCode::EarliestTime().GetValue();
+#else
+	return 0.0;
+#endif
+}
+
 UUsdAssetImportData* UsdUtils::GetAssetImportData( UObject* Asset )
 {
 	UUsdAssetImportData* ImportData = nullptr;
