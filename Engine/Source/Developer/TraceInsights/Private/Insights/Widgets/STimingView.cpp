@@ -21,6 +21,7 @@
 #include "Styling/CoreStyle.h"
 #include "Styling/SlateBrush.h"
 #include "Styling/StyleColors.h"
+#include "Styling/ToolBarStyle.h"
 #include "TraceServices/AnalysisService.h"
 #include "Widgets/Docking/SDockTab.h"
 #include "Widgets/Input/SButton.h"
@@ -145,6 +146,7 @@ STimingView::~STimingView()
 void STimingView::Construct(const FArguments& InArgs)
 {
 	FSlimHorizontalToolBarBuilder LeftToolbar(nullptr, FMultiBoxCustomization::None);
+	LeftToolbar.SetStyle(&FInsightsStyle::Get(), "SecondaryToolbar");
 
 	LeftToolbar.BeginSection("Menus");
 	LeftToolbar.AddComboButton(
@@ -182,6 +184,7 @@ void STimingView::Construct(const FArguments& InArgs)
 	//////////////////////////////////////////////////
 
 	FSlimHorizontalToolBarBuilder RightToolbar(nullptr, FMultiBoxCustomization::None);
+	RightToolbar.SetStyle(&FInsightsStyle::Get(), "SecondaryToolbar2");
 
 	FUIAction AutoScrollToggleButtonAction;
 	AutoScrollToggleButtonAction.GetActionCheckState.BindLambda([this]
@@ -198,9 +201,9 @@ void STimingView::Construct(const FArguments& InArgs)
 	RightToolbar.AddToolBarButton(
 		AutoScrollToggleButtonAction,
 		NAME_None,
-		FText::GetEmpty(),
+		TAttribute<FText>(),
 		LOCTEXT("AutoScrollToolTip", "Auto-Scroll"),
-		FSlateIcon(FInsightsStyle::GetStyleSetName(),"Icon.AutoScroll"),
+		FSlateIcon(FInsightsStyle::GetStyleSetName(),"AutoScroll.Icon.Small"),
 		EUserInterfaceActionType::ToggleButton);
 	RightToolbar.AddComboButton(
 		FUIAction(),
@@ -241,25 +244,29 @@ void STimingView::Construct(const FArguments& InArgs)
 		]
 
 		+ SOverlay::Slot()
-		.HAlign(HAlign_Left)
+		.HAlign(HAlign_Fill)
 		.VAlign(VAlign_Top)
-		.Padding(FMargin(2.0f, 0.0f, 0.0f, 0.0f))
+		.Padding(FMargin(0.0f))
 		[
-			LeftToolbar.MakeWidget()
-		]
-
-		+ SOverlay::Slot()
-		.HAlign(HAlign_Right)
-		.VAlign(VAlign_Top)
-		.Padding(FMargin(0.0f, 0.0f, 6.0f, 0.0f))
-		[
-			RightToolbar.MakeWidget()
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot()
+			.HAlign(HAlign_Left)
+			.FillWidth(1.0f)
+			[
+				LeftToolbar.MakeWidget()
+			]
+			+ SHorizontalBox::Slot()
+			.HAlign(HAlign_Right)
+			.AutoWidth()
+			[
+				RightToolbar.MakeWidget()
+			]
 		]
 
 		+ SOverlay::Slot()
 		.HAlign(HAlign_Fill)
 		.VAlign(VAlign_Fill)
-		.Padding(FMargin(0.0f, 0.0f, 0.0f, 0.0f))
+		.Padding(FMargin(0.0f))
 		[
 			ExtensionOverlay.ToSharedRef()
 		]
@@ -528,7 +535,7 @@ void STimingView::Tick(const FGeometry& AllottedGeometry, const double InCurrent
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Update viewport.
 
-	Viewport.SetPosY(40.0f); // height of toolbar
+	Viewport.SetPosY(32.0f); // height of toolbar
 	Viewport.UpdateSize(FMath::RoundToFloat(ViewWidth), FMath::RoundToFloat(ViewHeight) - Viewport.GetPosY());
 
 	if (!bIsPanning && !bAutoScroll)
@@ -1429,6 +1436,14 @@ int32 STimingView::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeom
 
 	// Fill the background of the toolbar.
 	DrawContext.DrawBox(0.0f, 0.0f, ViewWidth, Viewport.GetPosY(), WhiteBrush, FSlateColor(EStyleColor::Panel).GetSpecifiedColor());
+
+	// Fill the background of the vertical scrollbar.
+	const float ScrollBarHeight = Viewport.GetScrollableAreaHeight();
+	if (ScrollBarHeight > 0)
+	{
+		constexpr float ScrollBarWidth = 12.0f;
+		DrawContext.DrawBox(ViewWidth - ScrollBarWidth, Viewport.GetPosY() + Viewport.GetTopOffset(), ScrollBarWidth, ScrollBarHeight, WhiteBrush, FSlateColor(EStyleColor::Panel).GetSpecifiedColor());
+	}
 
 	//////////////////////////////////////////////////
 	// Draw the overscroll indication lines.
