@@ -83,6 +83,7 @@ namespace Audio
 		FPatchInput(const FPatchOutputStrongPtr& InOutput);
 		FPatchInput(const FPatchInput& Other);
 		FPatchInput& operator=(const FPatchInput& Other);
+		FPatchInput& operator=(FPatchInput&& Other);
 		FPatchInput(FPatchInput&& Other);
 
 		/** Default constructed FPatchInput instances will always return -1 for PushAudio and true for IsOutputStillActive. */
@@ -187,7 +188,8 @@ namespace Audio
 		FPatchOutputStrongPtr AddNewPatch(int32 MaxLatencyInSamples, float InGain);
 
 		/** Adds a new a patch from an existing patch output. */
-		void AddNewPatch(FPatchOutputStrongPtr& InPatchOutputStrongPtr);
+		void AddNewPatch(FPatchOutputStrongPtr&& InPatchOutputStrongPtr);
+		void AddNewPatch(const FPatchOutputStrongPtr& InPatchOutputStrongPtr);
 
 		/** This call pushes audio to all outputs connected to this splitter. Only should be called from one thread. */
 		int32 PushAudio(const float* InBuffer, int32 InNumSamples);

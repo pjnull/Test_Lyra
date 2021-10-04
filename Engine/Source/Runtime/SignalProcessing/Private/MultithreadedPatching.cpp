@@ -2,7 +2,16 @@
 
 #include "DSP/MultithreadedPatching.h"
 #include "DSP/BufferVectorOperations.h"
+#include "HAL/IConsoleManager.h"
 
+
+static int32 MultithreadedPatchingPushCallsPerOutputCleanupCheckCVar = 256;
+FAutoConsoleVariableRef CVarMultithreadedPatchingPushCallsPerOutputCleanupCheck(
+	TEXT("au.MultithreadedPatching.PushCallsPerOutputCleanupCheck"),
+	MultithreadedPatchingPushCallsPerOutputCleanupCheckCVar,
+	TEXT("Number of push calls (usually corrisponding to audio block updates)\n")
+	TEXT("before checking if an output is ready to be destroyed. Default = 256"),
+	ECVF_Default);
 
 namespace Audio
 {
@@ -144,6 +153,16 @@ namespace Audio
 		return *this;
 	}
 
+	FPatchInput& FPatchInput::operator=(FPatchInput&& Other)
+	{
+		OutputHandle = MoveTemp(Other.OutputHandle);
+
+		PushCallsCounter = Other.PushCallsCounter;
+		Other.PushCallsCounter = 0;
+
+		return *this;
+	}
+
 	FPatchInput::~FPatchInput()
 	{
 		if (OutputHandle.IsValid())
@@ -161,14 +180,19 @@ namespace Audio
 
 		int32 SamplesPushed = OutputHandle->InternalBuffer.Push(InBuffer, NumSamples);
 
-		// Every so often, we check to see if the output handle has been destroyed and clean it up.
-		static const int32 NumPushCallsUntilCleanupCheck = 256;
-		
-		PushCallsCounter = (PushCallsCounter + 1) % NumPushCallsUntilCleanupCheck;
-		if (PushCallsCounter == 0 && OutputHandle.IsUnique())
+		// Periodically check to see if the output handle has been destroyed and clean it up.
+		// If the buffer is full, check as well to determine if it is possibly due to the
+		// output going stale between periodic push call counter checks.
+		const int32 PushCallsPerOutputCleanupCheck = FMath::Max(1, MultithreadedPatchingPushCallsPerOutputCleanupCheckCVar);
+		PushCallsCounter = (PushCallsCounter + 1) % PushCallsPerOutputCleanupCheck;
+		if (PushCallsCounter == 0 || SamplesPushed == 0)
 		{
-			// Delete the output.
-			OutputHandle.Reset();
+			if (OutputHandle.IsUnique())
+			{
+				// Deletes the output as it is the last remaining handle
+				OutputHandle.Reset();
+				SamplesPushed = INDEX_NONE;
+			}
 		}
 
 		return SamplesPushed;
@@ -186,7 +210,7 @@ namespace Audio
 
 	bool FPatchInput::IsOutputStillActive()
 	{
-		return OutputHandle.IsUnique() || OutputHandle.IsValid();
+		return OutputHandle.IsValid() && !OutputHandle.IsUnique();
 	}
 
 	FPatchMixer::FPatchMixer()
@@ -368,21 +392,25 @@ namespace Audio
 
 	FPatchOutputStrongPtr FPatchSplitter::AddNewPatch(int32 MaxLatencyInSamples, float InGain)
 	{
-		// Allocate a new FPatchOutput, then store a weak pointer to it in our PendingOutputs array to be added in our next call to PushAudio.
-		FPatchOutputStrongPtr StrongOutputPtr = MakeShareable(new FPatchOutput(MaxLatencyInSamples * 2, InGain));
-
+		FPatchOutputStrongPtr StrongOutputPtr = MakeShared<FPatchOutput, ESPMode::ThreadSafe>(MaxLatencyInSamples * 2, InGain);
 		{
 			FScopeLock ScopeLock(&PendingOutputsCriticalSection);
-			PendingOutputs.Emplace(StrongOutputPtr);
+			PendingOutputs.Add(StrongOutputPtr);
 		}
 
 		return StrongOutputPtr;
 	}
 
-	void FPatchSplitter::AddNewPatch(FPatchOutputStrongPtr& InPatchOutputStrongPtr)
+	void FPatchSplitter::AddNewPatch(FPatchOutputStrongPtr&& InPatchOutputStrongPtr)
 	{
 		FScopeLock ScopeLock(&PendingOutputsCriticalSection);
-		PendingOutputs.Emplace(InPatchOutputStrongPtr);
+		PendingOutputs.Add(MoveTemp(InPatchOutputStrongPtr));
+	}
+
+	void FPatchSplitter::AddNewPatch(const FPatchOutputStrongPtr& InPatchOutputStrongPtr)
+	{
+		FScopeLock ScopeLock(&PendingOutputsCriticalSection);
+		PendingOutputs.Add(InPatchOutputStrongPtr);
 	}
 
 	int32 FPatchSplitter::Num()
@@ -423,15 +451,13 @@ namespace Audio
 	void FPatchSplitter::AddPendingPatches()
 	{
 		FScopeLock ScopeLock(&PendingOutputsCriticalSection);
-		ConnectedOutputs.Append(PendingOutputs);
-		PendingOutputs.Reset();
+		ConnectedOutputs.Append(MoveTemp(PendingOutputs));
 	}
 
 	int32 FPatchSplitter::PushAudio(const float* InBuffer, int32 InNumSamples)
 	{
-		AddPendingPatches();
-
 		FScopeLock ScopeLock(&ConnectedOutputsCriticalSection);
+		AddPendingPatches();
 
 		int32 MinimumSamplesPushed = TNumericLimits<int32>::Max();
 
