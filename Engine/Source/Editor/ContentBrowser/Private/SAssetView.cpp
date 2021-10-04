@@ -338,7 +338,7 @@ void SAssetView::Construct( const FArguments& InArgs )
 	[
 		SNew(SBorder)
 		.Padding(0)
-		.BorderImage(FAppStyle::Get().GetBrush("Brushes.Header"))
+		.BorderImage(FAppStyle::Get().GetBrush("Brushes.Panel"))
 		[
 			VerticalBox
 		]
@@ -372,14 +372,9 @@ void SAssetView::Construct( const FArguments& InArgs )
 			.HAlign(HAlign_Fill)
 			.VAlign(VAlign_Fill)
 			[
-				// Container for the view types
-				SNew(SBorder)
-				.BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
-				[
-					SAssignNew(ViewContainer, SBox)
-					.Padding(6.0f)
+				SAssignNew(ViewContainer, SBox)
+				.Padding(6.0f)
 
-				]
 			]
 
 			+ SOverlay::Slot()
