@@ -160,15 +160,15 @@ struct FSceneViewInitOptions : public FSceneViewProjectionData
 	float FOV;
 	float DesiredFOV;
 
+	/** In case of ortho, generate a fake view position that has a non-zero W component. The view position will be derived based on the view matrix. */
+	bool bUseFauxOrthoViewPos;
+
 #if WITH_EDITOR
 	/** default to 0'th view index, which is a bitfield of 1 */
 	uint64 EditorViewBitflag;
 
 	/** this can be specified for ortho views so that it's min draw distance/LOD parenting etc, is controlled by a perspective viewport */
 	FVector OverrideLODViewOrigin;
-
-	/** In case of ortho, generate a fake view position that has a non-zero W component. The view position will be derived based on the view matrix. */
-	bool bUseFauxOrthoViewPos;
 
 	/** Whether game screen percentage should be disabled. */
 	bool bDisableGameScreenPercentage;
@@ -194,10 +194,10 @@ struct FSceneViewInitOptions : public FSceneViewProjectionData
 		, bUseFieldOfViewForLOD(true)
 		, FOV(90.f)
 		, DesiredFOV(90.f)
+		, bUseFauxOrthoViewPos(false)
 #if WITH_EDITOR
 		, EditorViewBitflag(1)
 		, OverrideLODViewOrigin(ForceInitToZero)
-		, bUseFauxOrthoViewPos(false)
 		, bDisableGameScreenPercentage(false)
 		//@TODO: , const TBitArray<>& InSpriteCategoryVisibility=TBitArray<>()
 #endif
@@ -217,9 +217,7 @@ struct FViewMatrices
 		FVector ViewOrigin = FVector::ZeroVector;
 		FIntRect ConstrainedViewRect = FIntRect(0, 0, 0, 0);
 		EStereoscopicPass StereoPass = eSSP_FULL;
-#if WITH_EDITOR
 		bool bUseFauxOrthoViewPos = false;
-#endif
 	};
 
 	FViewMatrices()
