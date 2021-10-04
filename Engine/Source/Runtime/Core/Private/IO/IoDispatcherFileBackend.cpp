@@ -1578,7 +1578,6 @@ FIoRequestImpl* FFileIoStore::GetCompletedRequests()
 		FFileIoStoreReadRequest* CompletedRequest = *It;
 
 		FFileIoStats::OnReadComplete(CompletedRequest->Size);
-		TRACE_COUNTER_ADD(IoDispatcherFileBackendTotalBytesRead, CompletedRequest->Size);
 
 		if (!CompletedRequest->ImmediateScatter.Request)
 		{
