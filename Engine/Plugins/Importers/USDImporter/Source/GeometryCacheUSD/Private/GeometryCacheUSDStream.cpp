@@ -204,6 +204,18 @@ bool FGeometryCacheUsdStream::GetFrameData(int32 FrameIndex, FGeometryCacheMeshD
 		OutMeshData = **MeshDataPtr;
 		return true;
 	}
+	// If the user requested a frame that isn't loaded yet, synchronously fetch it right away
+	// or else UGeometryCacheTrackUsd::GetSampleInfo may return invalid bounding boxes that may lead
+	// to issues, and wouldn't otherwise be updated until that frame is requested again.
+	// It may lead to a bit of stuttering when animating through an unloaded section with the sequencer
+	// or by dragging the Time property of the stage actor, but the alternative would be a spam of
+	// warnings on the output log and glitchy bounding boxes on the level
+	else if ( IsInGameThread() )
+	{
+		LoadFrameData( FrameIndex );
+		return GetFrameData( FrameIndex, OutMeshData );
+	}
+
 	return false;
 }
 
