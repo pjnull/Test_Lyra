@@ -15,12 +15,14 @@
 
 #include "UsdWrappers/SdfPath.h"
 #include "UsdWrappers/UsdPrim.h"
+#include "UsdWrappers/UsdStage.h"
 
 #include "Async/Async.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/CollisionProfile.h"
 #include "Engine/StaticMesh.h"
 #include "GeometryCache.h"
+#include "GeometryCacheComponent.h"
 #include "Interfaces/ITargetPlatform.h"
 #include "Interfaces/ITargetPlatformManagerModule.h"
 #include "Materials/Material.h"
@@ -607,39 +609,62 @@ namespace UsdGeomMeshTranslatorImpl
 			const FName AssetName = MakeUniqueObjectName( GetTransientPackage(), UGeometryCache::StaticClass(), *FPaths::GetBaseFilename( InPrimPath ) );
 			GeometryCache = NewObject< UGeometryCache >( GetTransientPackage(), AssetName, Context->ObjectFlags | EObjectFlags::RF_Public );
 
+			const UE::FUsdStage& Stage = Context->Stage;
+
+			TMap< FString, TMap< FString, int32 > > Unused;
+			TMap< FString, TMap< FString, int32 > >* MaterialToPrimvarToUVIndex = Context->MaterialToPrimvarToUVIndex ? Context->MaterialToPrimvarToUVIndex : &Unused;
+
 			// Create and configure a new USDTrack to be added to the GeometryCache
 			UGeometryCacheTrackUsd* UsdTrack = NewObject< UGeometryCacheTrackUsd >( GeometryCache );
-
-			// Pull out this data from the Context because the translation context itself cannot ever go into the read function, since it also holds
-			// a strong pointer to the asset cache. If that cache can't be collected we can't ever delete the stage actor that owns it, or the read function closure.
-			// Note that the read function closure *will* get discarded as soon as the UGeometryCache that owns the track is collected, but moving the data out of the
-			// context like this prevents the AssetCache from being pinned, and allows UGeometryCacheTrackUsd's to run, which will unregister itself and
-			// cause the closure to be destroyed in the first place
-			const UE::FUsdStage Stage = Context->Stage;
-			const FName RenderContext = Context->RenderContext;
-			const bool bAllowInterpretingLODs = Context->bAllowInterpretingLODs;
-			const TMap< FString, TMap< FString, int32 > > MaterialToPrimvarToUVIndex = Context->MaterialToPrimvarToUVIndex
-				? *Context->MaterialToPrimvarToUVIndex
-				: TMap< FString, TMap< FString, int32 > >{};
-
-			UsdTrack->Initialize( [ = ]( FGeometryCacheMeshData& OutMeshData, const FString& InPrimPath, float Time )
+			UsdTrack->Initialize(
+				Stage,
+				InPrimPath,
+				Context->RenderContext,
+				*MaterialToPrimvarToUVIndex,
+				Stage.GetStartTimeCode(),
+				Stage.GetEndTimeCode(),
+				[InPrimPath]( const TWeakObjectPtr<UGeometryCacheTrackUsd> TrackPtr, float Time, FGeometryCacheMeshData& OutMeshData )
 				{
+					UGeometryCacheTrackUsd* Track = TrackPtr.Get();
+					if ( !Track )
+					{
+						return;
+					}
+
+					if ( !Track->CurrentStage )
+					{
+						if ( !Track->StageRootLayerPath.IsEmpty() )
+						{
+							const bool bUseStageCache = true;
+							Track->CurrentStage = UnrealUSDWrapper::OpenStage( *Track->StageRootLayerPath, EUsdInitialLoadSet::LoadAll, bUseStageCache );
+							UE_LOG( LogUsd, Warning, TEXT( "UGeometryCacheTrackUsd is reopening the stage '%s' to stream in frames for the geometry cache generated for prim '%s'" ), *Track->StageRootLayerPath, *InPrimPath );
+						}
+					}
+					if ( !Track->CurrentStage )
+					{
+						return;
+					}
+
+					UE::FUsdPrim Prim = Track->CurrentStage.GetPrimAtPath( UE::FSdfPath{ *Track->PrimPath } );
+					if ( !Prim )
+					{
+						return;
+					}
+
 					// Get MeshDescription associated with the prim
 					// #ueent_todo: Replace MeshDescription with RawMesh to optimize
 					TArray< FMeshDescription > LODIndexToMeshDescription;
 					TArray< UsdUtils::FUsdPrimMaterialAssignmentInfo > LODIndexToMaterialInfo;
-
-					UE::FSdfPath PrimPath( *InPrimPath );
-					UE::FUsdPrim Prim = Stage.GetPrimAtPath( PrimPath );
+					const bool bAllowInterpretingLODs = false;  // GeometryCaches don't have LODs, so we will never do this
 
 					UsdGeomMeshTranslatorImpl::LoadMeshDescriptions(
 						pxr::UsdTyped( Prim ),
 						LODIndexToMeshDescription,
 						LODIndexToMaterialInfo,
-						MaterialToPrimvarToUVIndex,
+						Track->MaterialToPrimvarToUVIndex,
 						pxr::UsdTimeCode( Time ),
 						bAllowInterpretingLODs,
-						RenderContext
+						Track->RenderContext
 					);
 
 					// Convert the MeshDescription to MeshData
@@ -651,7 +676,7 @@ namespace UsdGeomMeshTranslatorImpl
 							const float ComparisonThreshold = THRESH_POINTS_ARE_SAME;
 
 							// This function make sure the Polygon Normals Tangents Binormals are computed and also remove degenerated triangle from the render mesh description.
-							FStaticMeshOperations::ComputeTriangleTangentsAndNormals(MeshDescription, ComparisonThreshold);
+							FStaticMeshOperations::ComputeTriangleTangentsAndNormals( MeshDescription, ComparisonThreshold );
 
 							// Compute any missing normals or tangents.
 							// Static meshes always blend normals of overlapping corners.
@@ -662,15 +687,9 @@ namespace UsdGeomMeshTranslatorImpl
 							FStaticMeshOperations::ComputeTangentsAndNormals( MeshDescription, ComputeNTBsOptions );
 
 							UsdGeomMeshTranslatorImpl::GeometryCacheDataForMeshDescription( OutMeshData, MeshDescription );
-
-							return true;
 						}
 					}
-					return false;
-				},
-				InPrimPath,
-				Stage.GetStartTimeCode(),
-				Stage.GetEndTimeCode()
+				}
 			);
 
 			GeometryCache->AddTrack( UsdTrack );
@@ -1153,8 +1172,11 @@ void FUsdGeomMeshTranslator::UpdateComponents( USceneComponent* SceneComponent )
 	{
 		UGeometryCache* GeometryCache = Cast< UGeometryCache >( Context->AssetCache->GetAssetForPrim( PrimPath.GetString() ) );
 
+		bool bShouldRegister = false;
 		if ( GeometryCache != GeometryCacheUsdComponent->GetGeometryCache() )
 		{
+			bShouldRegister = true;
+
 			if ( GeometryCacheUsdComponent->IsRegistered() )
 			{
 				GeometryCacheUsdComponent->UnregisterComponent();
@@ -1162,13 +1184,21 @@ void FUsdGeomMeshTranslator::UpdateComponents( USceneComponent* SceneComponent )
 
 			// Skip the extra handling in SetGeometryCache
 			GeometryCacheUsdComponent->GeometryCache = GeometryCache;
-
-			GeometryCacheUsdComponent->RegisterComponent();
 		}
-		else
+
+		// This is the main call responsible for animating the geometry cache.
+		// It needs to happen after setting the geometry cache and before registering, because we must force the
+		// geometry cache to register itself at Context->Time so that it will synchronously load that frame right away.
+		// Otherwise the geometry cache will start at t=0 regardless of Context->Time
+		GeometryCacheUsdComponent->SetManualTick( true );
+		GeometryCacheUsdComponent->TickAtThisTime( Context->Time, true, false, true );
+
+		// Note how we should only register if our geometry cache changed: If we did this every time we would
+		// register too early during the process of duplicating into PIE, and that would prevent a future RegisterComponent
+		// call from naturally creating the required render state
+		if ( bShouldRegister && !GeometryCacheUsdComponent->IsRegistered() )
 		{
-			GeometryCacheUsdComponent->SetManualTick( true );
-			GeometryCacheUsdComponent->TickAtThisTime( Context->Time, true, false, true );
+			GeometryCacheUsdComponent->RegisterComponent();
 		}
 	}
 #endif // WITH_EDITOR

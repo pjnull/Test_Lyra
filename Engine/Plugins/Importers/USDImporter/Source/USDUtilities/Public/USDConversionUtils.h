@@ -161,6 +161,9 @@ namespace UsdUtils
 	/** Returns the time code for non-timesampled values. Usually a quiet NaN. */
 	USDUTILITIES_API double GetDefaultTimeCode();
 
+	/** Returns the earliest possible timecode. Use it to always fetch the first frame of an animated attribute */
+	USDUTILITIES_API double GetEarliestTimeCode();
+
 	USDUTILITIES_API UUsdAssetImportData* GetAssetImportData( UObject* Asset );
 
 	/** Adds a reference on Prim to the layer at AbsoluteFilePath */
