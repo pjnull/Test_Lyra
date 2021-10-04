@@ -84,15 +84,6 @@ public:
 	UE_DEPRECATED(4.23, "ILiveLinkClient::GetAndFreeLastRecordedFrames is deprecated. Please register using RegisterForSubjectFrames to receive subject frames instead!")
 	virtual void GetAndFreeLastRecordedFrames(const FGuid& InHandlerGuid, FName SubjectName, TArray<FLiveLinkFrame> &OutFrames) {}
 
-	UE_DEPRECATED(4.23, "ILiveLinkClient::AddSourceToSubjectWhiteList is deprecated. Please register using SetSubjectEnabled to enabled a subject instead!")
-	virtual void AddSourceToSubjectWhiteList(FName SubjectName, FGuid SourceGuid) {}
-
-	UE_DEPRECATED(4.23, "ILiveLinkClient::RemoveSourceFromSubjectWhiteList is deprecated. Please register using SetSubjectEnabled to disable a subject instead!")
-	virtual void RemoveSourceFromSubjectWhiteList(FName SubjectName, FGuid SourceGuid) {}
-	
-	UE_DEPRECATED(4.23, "ILiveLinkClient::ClearSourceWhiteLists is deprecated. Please register using SetSubjectEnabled to disable a subject instead!")
-	virtual void ClearSourceWhiteLists() {}
-
 	UE_DEPRECATED(4.23, "ILiveLinkClient::RegisterSubjectsChangedHandle is deprecated. Please register using OnLiveLinkSubjectAdded and OnLiveLinkSubjectRemoved instead!")
 	virtual FDelegateHandle RegisterSubjectsChangedHandle(const FSimpleMulticastDelegate::FDelegate& SubjectsChanged) { return FDelegateHandle(); }
 
