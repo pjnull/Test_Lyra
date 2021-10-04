@@ -1014,18 +1014,15 @@ void FGeometryCacheCreateAssetsTaskChain::SetupTasks()
 {
 	FScopedUnrealAllocs UnrealAllocs;
 
-	// To parse all LODs we need to actively switch variant sets to other variants (triggering prim loading/unloading and notices),
-	// which could cause race conditions if other async translation tasks are trying to access those prims
-	ESchemaTranslationLaunchPolicy LaunchPolicy = ESchemaTranslationLaunchPolicy::Async;
-	if ( Context->bAllowInterpretingLODs && UsdUtils::IsGeomMeshALOD( GetPrim() ) )
-	{
-		LaunchPolicy = ESchemaTranslationLaunchPolicy::ExclusiveSync;
-	}
-
 	// Create mesh descriptions (Async or ExclusiveSync)
-	Do( LaunchPolicy,
+	Do( ESchemaTranslationLaunchPolicy::Async,
 		[ this ]() -> bool
 		{
+			// Always hash the mesh at the same time because it may be animated, and
+			// otherwise we may think it's a new asset just because the context is at a different timecode (e.g. if we reload)
+			// TODO: Hash all timecodes, or else our mesh may change at t=5 and we never reload it because we only hash t=0
+			const double TimeCode = UsdUtils::GetEarliestTimeCode();
+			const bool bAllowInterpretingLODs = false;  // GeometryCaches don't have LODs
 			TMap< FString, TMap< FString, int32 > > Unused;
 			TMap< FString, TMap< FString, int32 > >* MaterialToPrimvarToUVIndex = Context->MaterialToPrimvarToUVIndex ? Context->MaterialToPrimvarToUVIndex : &Unused;
 
@@ -1034,8 +1031,8 @@ void FGeometryCacheCreateAssetsTaskChain::SetupTasks()
 				LODIndexToMeshDescription,
 				LODIndexToMaterialInfo,
 				*MaterialToPrimvarToUVIndex,
-				pxr::UsdTimeCode( Context->Time ),
-				Context->bAllowInterpretingLODs,
+				pxr::UsdTimeCode( TimeCode ),
+				bAllowInterpretingLODs,
 				Context->RenderContext
 			);
 
