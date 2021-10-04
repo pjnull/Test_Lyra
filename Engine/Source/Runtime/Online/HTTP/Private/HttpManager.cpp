@@ -174,7 +174,8 @@ void FHttpManager::Flush(bool bShutdown)
 	{
 		if (Requests.Num())
 		{
-			UE_LOG(LogHttp, Warning, TEXT("Http module shutting down, but needs to wait on %d outstanding Http requests:"), Requests.Num());
+			// Don't emit these tracking logs in commandlet runs. Build system traps warnings during cook, and these are not truly fatal, but useful for tracking down shutdown issues.
+			UE_CLOG(!IsRunningCommandlet(), LogHttp, Warning, TEXT("Http module shutting down, but needs to wait on %d outstanding Http requests:"), Requests.Num());
 		}
 		// Clear delegates since they may point to deleted instances
 		for (TArray<FHttpRequestRef>::TIterator It(Requests); It; ++It)
@@ -183,7 +184,8 @@ void FHttpManager::Flush(bool bShutdown)
 			Request->OnProcessRequestComplete().Unbind();
 			Request->OnRequestProgress().Unbind();
 			Request->OnHeaderReceived().Unbind();
-			UE_LOG(LogHttp, Warning, TEXT("	verb=[%s] url=[%s] refs=[%d] status=%s"), *Request->GetVerb(), *Request->GetURL(), Request.GetSharedReferenceCount(), EHttpRequestStatus::ToString(Request->GetStatus()));
+			// Don't emit these tracking logs in commandlet runs. Build system traps warnings during cook, and these are not truly fatal, but useful for tracking down shutdown issues.
+			UE_CLOG(!IsRunningCommandlet(), LogHttp, Warning, TEXT("	verb=[%s] url=[%s] refs=[%d] status=%s"), *Request->GetVerb(), *Request->GetURL(), Request.GetSharedReferenceCount(), EHttpRequestStatus::ToString(Request->GetStatus()));
 		}
 	}
 
@@ -191,7 +193,8 @@ void FHttpManager::Flush(bool bShutdown)
 	double BeginWaitTime = FPlatformTime::Seconds();
 	double LastTime = BeginWaitTime;
 	double StallWarnTime = BeginWaitTime + 0.5;
-	UE_LOG(LogHttp, Warning, TEXT("cleaning up %d outstanding Http requests."), Requests.Num());
+	// Don't emit these tracking logs in commandlet runs. Build system traps warnings during cook, and these are not truly fatal, but useful for tracking down shutdown issues.
+	UE_CLOG(!IsRunningCommandlet(), LogHttp, Warning, TEXT("cleaning up %d outstanding Http requests."), Requests.Num());
 	double AppTime = FPlatformTime::Seconds();
 	while (Requests.Num() > 0 && (FlushTimeHardLimitSeconds < 0 || (AppTime - BeginWaitTime < FlushTimeHardLimitSeconds)))
 	{
@@ -202,16 +205,22 @@ void FHttpManager::Flush(bool bShutdown)
 		{
 			if (bAlwaysCancelRequestsOnFlush)
 			{
-				UE_LOG(LogHttp, Warning, TEXT("Immediately cancelling active HTTP requests"));
+				// Don't emit these tracking logs in commandlet runs. Build system traps warnings during cook, and these are not truly fatal, but useful for tracking down shutdown issues.
+				UE_CLOG(!IsRunningCommandlet(), LogHttp, Warning, TEXT("Immediately cancelling %d active HTTP requests:"), Requests.Num());
 			}
 			else
 			{
-				UE_LOG(LogHttp, Warning, TEXT("Canceling remaining HTTP requests after waiting %0.2f seconds"), (AppTime - BeginWaitTime));
+				// Don't emit these tracking logs in commandlet runs. Build system traps warnings during cook, and these are not truly fatal, but useful for tracking down shutdown issues.
+				UE_CLOG(!IsRunningCommandlet(), LogHttp, Warning, TEXT("Canceling remaining %d HTTP requests after waiting %0.2f seconds:"), Requests.Num(), (AppTime - BeginWaitTime));
 			}
 
 			for (TArray<FHttpRequestRef>::TIterator It(Requests); It; ++It)
 			{
 				FHttpRequestRef& Request = *It;
+
+				// if we are shutting down, list the outstanding requests that had to be canceled.
+				// Don't emit these tracking logs in commandlet runs. Build system traps warnings during cook, and these are not truly fatal, but useful for tracking down shutdown issues.
+				UE_CLOG(!IsRunningCommandlet() && bShutdown, LogHttp, Warning, TEXT("	verb=[%s] url=[%s] refs=[%d] status=%s"), *Request->GetVerb(), *Request->GetURL(), Request.GetSharedReferenceCount(), EHttpRequestStatus::ToString(Request->GetStatus()));
 				FScopedEnterBackgroundEvent(*Request->GetURL());
 				Request->CancelRequest();
 			}
@@ -226,14 +235,16 @@ void FHttpManager::Flush(bool bShutdown)
 				{
 					if (AppTime >= StallWarnTime)
 					{
-						UE_LOG(LogHttp, Warning, TEXT("Ticking HTTPThread for %d outstanding Http requests."), Requests.Num());
+						// Don't emit these tracking logs in commandlet runs. Build system traps warnings during cook, and these are not truly fatal, but useful for tracking down shutdown issues.
+						UE_CLOG(!IsRunningCommandlet(), LogHttp, Warning, TEXT("Ticking HTTPThread for %d outstanding Http requests."), Requests.Num());
 						StallWarnTime = AppTime + 0.5;
 					}
 					Thread->Tick();
 				}
 				else
 				{
-					UE_LOG(LogHttp, Warning, TEXT("Sleeping %.3fs to wait for %d outstanding Http requests."), SecondsToSleepForOutstandingRequests, Requests.Num());
+					// Don't emit these tracking logs in commandlet runs. Build system traps warnings during cook, and these are not truly fatal, but useful for tracking down shutdown issues.
+					UE_CLOG(!IsRunningCommandlet(), LogHttp, Warning, TEXT("Sleeping %.3fs to wait for %d outstanding Http requests."), SecondsToSleepForOutstandingRequests, Requests.Num());
 					FPlatformProcess::Sleep(SecondsToSleepForOutstandingRequests);
 				}
 			}
@@ -245,7 +256,17 @@ void FHttpManager::Flush(bool bShutdown)
 		AppTime = FPlatformTime::Seconds();
 	}
 
-	UE_CLOG((FlushTimeHardLimitSeconds > 0 && (AppTime - BeginWaitTime > FlushTimeHardLimitSeconds)), LogHttp, Warning, TEXT("HTTTManager::Flush exceeded hard limit %.3fs time  %.3fs"), FlushTimeHardLimitSeconds, AppTime - BeginWaitTime);
+	// Don't emit these tracking logs in commandlet runs. Build system traps warnings during cook, and these are not truly fatal, but useful for tracking down shutdown issues.
+	if (Requests.Num() > 0 && (FlushTimeHardLimitSeconds > 0 && (AppTime - BeginWaitTime > FlushTimeHardLimitSeconds)) && !IsRunningCommandlet())
+	{
+		UE_LOG(LogHttp, Warning, TEXT("HTTTManager::Flush exceeded hard limit %.3fs time  %.3fs. These requets are being abandoned without being flushed:"), FlushTimeHardLimitSeconds, AppTime - BeginWaitTime);
+		for (TArray<FHttpRequestRef>::TIterator It(Requests); It; ++It)
+		{
+			FHttpRequestRef& Request = *It;
+			// if we are shutting down, list the outstanding requests that are being abandoned without being canceled.
+			UE_LOG(LogHttp, Warning, TEXT("	verb=[%s] url=[%s] refs=[%d] status=%s"), *Request->GetVerb(), *Request->GetURL(), Request.GetSharedReferenceCount(), EHttpRequestStatus::ToString(Request->GetStatus()));
+		}
+	}
 	bFlushing = false;
 }
 
