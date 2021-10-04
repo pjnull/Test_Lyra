@@ -3,6 +3,7 @@
 
 #include "Misc/EnumClassFlags.h"
 #include "Trace/Trace.h"
+#include "Misc/EnumClassFlags.h"
 
 #if !defined(UE_MEMORY_TRACE_AVAILABLE)
 #   define UE_MEMORY_TRACE_AVAILABLE 0
