@@ -809,6 +809,9 @@ void FAllocationsProvider::AddHeapSpec(HeapId Id, HeapId ParentId, const FString
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void FAllocationsProvider::EditHeapSpec(HeapId Id, HeapId ParentId, const FStringView& Name, EMemoryTraceHeapFlags Flags)
+{
+	Lock.WriteAccessCheck();
+
 	AddHeapSpec(Id, ParentId, Name, Flags);
 }
 
