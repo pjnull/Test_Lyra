@@ -2586,7 +2586,7 @@ void WritePakFooter(FArchive& PakHandle, FPakFooterInfo& Footer)
 	//		PakEntries (Encoded and NonEncoded)
 	// SecondaryIndex PathHashIndex: used by default in shipped versions of games.  Uses less memory, but does not provide access to all filenames.
 	//		TMap from hash of FilePath to FPakEntryLocation
-	//		Pruned DirectoryIndex, containing only the FilePaths that were requested kept by whitelist config variables
+	//		Pruned DirectoryIndex, containing only the FilePaths that were requested kept by allow list config variables
 	// SecondaryIndex FullDirectoryIndex: used for developer tools and for titles that opt out of PathHashIndex because they need access to all filenames.
 	//		TMap from DirectoryPath to FDirectory, which itself is a TMap from CleanFileName to FPakEntryLocation
 	// Each Index is separately encrypted and hashed.  Runtime consumer such as the tools or the client game will only load one of these off of disk (unless runtime verification is turned on).
