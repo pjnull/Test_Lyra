@@ -61,23 +61,23 @@ bool FHttpManager::IsDomainAllowed(const FString& Url) const
 {
 #if !UE_BUILD_SHIPPING
 #if !(UE_GAME || UE_SERVER)
-	// Whitelist is opt-in in non-shipping non-game/server builds
-	static const bool bEnableWhitelist = FParse::Param(FCommandLine::Get(), TEXT("EnableHttpWhitelist"));
-	if (!bEnableWhitelist)
+	// Allowed domain filtering is opt-in in non-shipping non-game/server builds
+	static const bool bForceUseAllowList = FParse::Param(FCommandLine::Get(), TEXT("EnableHttpDomainRestrictions"));
+	if (!bForceUseAllowList)
 	{
 		return true;
 	}
 #else
-	// Allow non-shipping game/server builds to disable the whitelist check
-	static const bool bDisableWhitelist = FParse::Param(FCommandLine::Get(), TEXT("DisableHttpWhitelist"));
-	if (bDisableWhitelist)
+	// The check is on by default but allow non-shipping game/server builds to disable the filtering
+	static const bool bIgnoreAllowList = FParse::Param(FCommandLine::Get(), TEXT("DisableHttpDomainRestrictions"));
+	if (bIgnoreAllowList)
 	{
 		return true;
 	}
 #endif
 #endif // !UE_BUILD_SHIPPING
 
-	// check to see if the Domain is white-listed (or no white-list specified)
+	// check to see if the Domain is allowed (either on the list or the list was empty)
 	const TArray<FString>& AllowedDomains = FHttpModule::Get().GetAllowedDomains();
 	if (AllowedDomains.Num() > 0)
 	{
