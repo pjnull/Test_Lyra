@@ -1641,7 +1641,7 @@ enum class ETextureCreateFlags : uint64
     NoFastClearFinalize               = 1ull << 29,
     // Hint to the driver that this resource is managed properly by the engine for Alternate-Frame-Rendering in mGPU usage.
     AFRManual                         = 1ull << 30,
-    // Workaround for 128^3 volume textures getting bloated 4x due to tiling mode on PS4
+    // Workaround for 128^3 volume textures getting bloated 4x due to tiling mode on some platforms.
     ReduceMemoryWithTilingMode        = 1ull << 31,
     /** Texture should be allocated from transient memory. */
     Transient                         = 1ull << 32,
