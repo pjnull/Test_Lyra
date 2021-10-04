@@ -3,7 +3,6 @@
 
 #include "Misc/EnumClassFlags.h"
 #include "Trace/Trace.h"
-#include "Misc/EnumClassFlags.h"
 
 #if !defined(UE_MEMORY_TRACE_AVAILABLE)
 #   define UE_MEMORY_TRACE_AVAILABLE 0
@@ -31,8 +30,8 @@ typedef uint32 HeapId;
 ////////////////////////////////////////////////////////////////////////////////
 enum EMemoryTraceRootHeap : uint8
 {
-	SystemMemory, // System memory
-	VideoMemory, //Vram
+	SystemMemory, // RAM
+	VideoMemory, // VRAM
 	EndHardcoded = VideoMemory,
 	EndReserved = 15
 };
@@ -146,6 +145,5 @@ inline void MemoryTrace_Alloc(uint64 Address, uint64 Size, uint32 Alignment, Hea
 inline void MemoryTrace_Free(uint64 Address, HeapId RootHeap = 0) {}
 inline void MemoryTrace_ReallocFree(uint64 Address, HeapId RootHeap = 0) {}
 inline void MemoryTrace_ReallocAlloc(uint64 Address, uint64 NewSize, uint32 Alignment, HeapId RootHeap = 0) {}
-
 
 #endif // UE_MEMORY_TRACE_ENABLED
