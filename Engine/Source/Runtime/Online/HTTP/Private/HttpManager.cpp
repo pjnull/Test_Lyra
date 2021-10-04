@@ -143,22 +143,38 @@ void FHttpManager::Flush(bool bShutdown)
 	bFlushing = true;
 
 	FScopeLock ScopeLock(&RequestLock);
-	double FlushTimeSoftLimitSeconds = 5.0; // default to generous limit
+	// designates the amount of time we will wait during a flush before we try to cancel the request.
+	// This MUST be strictly < FlushTimeHardLimitSeconds for the logic to work and actually cancel the request,
+	// since we must Tick at least one time for the cancel to work.
+	// Setting this to < 0 will disable the cancel, but FlushTimeHardLimitSeconds can still be used to stop waiting on requests.
+	double FlushTimeSoftLimitSeconds = 2.0; // default to generous limit
 	GConfig->GetDouble(TEXT("HTTP"), TEXT("FlushTimeSoftLimitSeconds"), FlushTimeSoftLimitSeconds, GEngineIni);
 
-	double FlushTimeHardLimitSeconds = -1.0; // default to no limit
+	// After we hit the soft time limit and cancel the requests, we wait some additional time for the canceled requests to go away.
+	// if they don't go away in time, we will hit this "hard" time limit that will just stop waiting.
+	// If we are shutting down, this is probably fine. If we are flushing for other reasons, 
+	// this could indicate things lying around, and we'll put out some warning log messages to indicate this.
+	// Setting this to < 0 will disable all time limits and the code will wait infinitely for all requests to complete.
+	double FlushTimeHardLimitSeconds = 4.0; // Don't use -1. Waiting infinitely on HTTP requests is probably a bad idea.
 	GConfig->GetDouble(TEXT("HTTP"), TEXT("FlushTimeHardLimitSeconds"), FlushTimeHardLimitSeconds, GEngineIni);
 
+	// Instead of waiting for the soft time limit, we might want to always cancel requests IMMEDIATELY on flush,
+	// usually due to platform requirements to go to sleep in a timely manner, etc.
+	// In this case, set this bool to true and the code will immediately cancel the requests.
+	// You must still set a hard time limit > 0 for this bool to work.
 	bool bAlwaysCancelRequestsOnFlush = false; // Default to not immediately canceling
 	GConfig->GetBool(TEXT("HTTP"), TEXT("bAlwaysCancelRequestsOnFlush"), bAlwaysCancelRequestsOnFlush, GEngineIni);
 
+	// this specifies how long to sleep between calls to tick.
+	// The smaller the value, the more quickly we may find out that all requests have completed, but the more work may
+	// be done in the meantime.
 	float SecondsToSleepForOutstandingRequests = 0.5f;
 	GConfig->GetFloat(TEXT("HTTP"), TEXT("RequestCleanupDelaySec"), SecondsToSleepForOutstandingRequests, GEngineIni);
 	if (bShutdown)
 	{
 		if (Requests.Num())
 		{
-			UE_LOG(LogHttp, Display, TEXT("Http module shutting down, but needs to wait on %d outstanding Http requests:"), Requests.Num());
+			UE_LOG(LogHttp, Warning, TEXT("Http module shutting down, but needs to wait on %d outstanding Http requests:"), Requests.Num());
 		}
 		// Clear delegates since they may point to deleted instances
 		for (TArray<FHttpRequestRef>::TIterator It(Requests); It; ++It)
@@ -167,7 +183,7 @@ void FHttpManager::Flush(bool bShutdown)
 			Request->OnProcessRequestComplete().Unbind();
 			Request->OnRequestProgress().Unbind();
 			Request->OnHeaderReceived().Unbind();
-			UE_LOG(LogHttp, Display, TEXT("	verb=[%s] url=[%s] refs=[%d] status=%s"), *Request->GetVerb(), *Request->GetURL(), Request.GetSharedReferenceCount(), EHttpRequestStatus::ToString(Request->GetStatus()));
+			UE_LOG(LogHttp, Warning, TEXT("	verb=[%s] url=[%s] refs=[%d] status=%s"), *Request->GetVerb(), *Request->GetURL(), Request.GetSharedReferenceCount(), EHttpRequestStatus::ToString(Request->GetStatus()));
 		}
 	}
 
@@ -175,7 +191,7 @@ void FHttpManager::Flush(bool bShutdown)
 	double BeginWaitTime = FPlatformTime::Seconds();
 	double LastTime = BeginWaitTime;
 	double StallWarnTime = BeginWaitTime + 0.5;
-	UE_LOG(LogHttp, Display, TEXT("cleaning up %d outstanding Http requests."), Requests.Num());
+	UE_LOG(LogHttp, Warning, TEXT("cleaning up %d outstanding Http requests."), Requests.Num());
 	double AppTime = FPlatformTime::Seconds();
 	while (Requests.Num() > 0 && (FlushTimeHardLimitSeconds < 0 || (AppTime - BeginWaitTime < FlushTimeHardLimitSeconds)))
 	{
@@ -186,21 +202,17 @@ void FHttpManager::Flush(bool bShutdown)
 		{
 			if (bAlwaysCancelRequestsOnFlush)
 			{
-				UE_LOG(LogHttp, Display, TEXT("Immediately cancelling active HTTP requests"));
+				UE_LOG(LogHttp, Warning, TEXT("Immediately cancelling active HTTP requests"));
 			}
 			else
 			{
-				UE_LOG(LogHttp, Display, TEXT("Canceling remaining HTTP requests after waiting %0.2f seconds"), (AppTime - BeginWaitTime));
+				UE_LOG(LogHttp, Warning, TEXT("Canceling remaining HTTP requests after waiting %0.2f seconds"), (AppTime - BeginWaitTime));
 			}
 
 			for (TArray<FHttpRequestRef>::TIterator It(Requests); It; ++It)
 			{
 				FHttpRequestRef& Request = *It;
 				FScopedEnterBackgroundEvent(*Request->GetURL());
-				if (IsEngineExitRequested())
-				{
-					ensureMsgf(Request.IsUnique(), TEXT("Dangling HTTP request! This may cause undefined behaviour or crash during module shutdown! verb=[%s] url=[%s] refs=[%d] status=%s"), *Request->GetVerb(), *Request->GetURL(), Request.GetSharedReferenceCount(), EHttpRequestStatus::ToString(Request->GetStatus()));
-				}
 				Request->CancelRequest();
 			}
 		}
@@ -214,14 +226,14 @@ void FHttpManager::Flush(bool bShutdown)
 				{
 					if (AppTime >= StallWarnTime)
 					{
-						UE_LOG(LogHttp, Display, TEXT("Ticking HTTPThread for %d outstanding Http requests."), Requests.Num());
+						UE_LOG(LogHttp, Warning, TEXT("Ticking HTTPThread for %d outstanding Http requests."), Requests.Num());
 						StallWarnTime = AppTime + 0.5;
 					}
 					Thread->Tick();
 				}
 				else
 				{
-					UE_LOG(LogHttp, Display, TEXT("Sleeping %.3fs to wait for %d outstanding Http requests."), SecondsToSleepForOutstandingRequests, Requests.Num());
+					UE_LOG(LogHttp, Warning, TEXT("Sleeping %.3fs to wait for %d outstanding Http requests."), SecondsToSleepForOutstandingRequests, Requests.Num());
 					FPlatformProcess::Sleep(SecondsToSleepForOutstandingRequests);
 				}
 			}
