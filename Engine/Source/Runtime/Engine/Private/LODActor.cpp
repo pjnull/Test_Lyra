@@ -1011,17 +1011,43 @@ void ALODActor::ClearInstances()
 	});
 }
 
-void ALODActor::AddInstances(const UStaticMesh* InStaticMesh, const UMaterialInterface* InMaterial, const TArray<FTransform>& InTransforms)
+void ALODActor::AddInstances(const UStaticMesh* InStaticMesh, const UMaterialInterface* InMaterial, const TArray<FTransform>& InTransforms, const TArray<FCustomPrimitiveData>& InCustomPrimitiveData)
 {
 	check(InStaticMesh);
 	check(InMaterial);
-	check(InTransforms.Num() > 0);
+	check(!InTransforms.IsEmpty());
+	check(InCustomPrimitiveData.IsEmpty() || InCustomPrimitiveData.Num() == InTransforms.Num());
 
 	UInstancedStaticMeshComponent* Component = GetOrCreateISMComponent(FHLODInstancingKey(InStaticMesh, InMaterial));
-	Component->AddInstances(InTransforms, /*bShouldReturnIndices*/false, /*bWorldSpace*/true);
+
+	// Adjust number of custom data floats
+	for (const FCustomPrimitiveData& CustomPrimData : InCustomPrimitiveData)
+	{
+		Component->NumCustomDataFloats = FMath::Max(Component->NumCustomDataFloats, CustomPrimData.Data.Num());
+	}
+
+	Component->PreAllocateInstancesMemory(InTransforms.Num());
+	
+	// Add all new instances
+	for (int32 i = 0; i < InTransforms.Num(); i++)
+	{
+		int32 InstanceIndex = Component->AddInstance(InTransforms[i], /*bWorldSpace*/true);
+
+		// Assign per instance custom data, if any
+		if (!InCustomPrimitiveData.IsEmpty())
+		{
+			const FCustomPrimitiveData& CustomPrimData = InCustomPrimitiveData[i];
+			Component->SetCustomData(InstanceIndex, CustomPrimData.Data);
+		}
+	}
 
 	// Ensure parenting is up to date and take into account the newly created component.
 	UpdateSubActorLODParents();
+}
+
+void ALODActor::AddInstances(const UStaticMesh* InStaticMesh, const UMaterialInterface* InMaterial, const TArray<FTransform>& InTransforms)
+{
+	AddInstances(InStaticMesh, InMaterial, InTransforms, {});
 }
 
 void ALODActor::SetupImposters(const UMaterialInterface* InImposterMaterial, UStaticMesh* InStaticMesh, const TArray<FTransform>& InTransforms)
