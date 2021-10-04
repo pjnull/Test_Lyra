@@ -54,8 +54,6 @@ public:
 	virtual const TArray<FLiveLinkFrame>* GetSubjectRawFrames(FName SubjectName) override;
 	virtual void ClearSubjectsFrames(FName SubjectName) override;
 	virtual void ClearAllSubjectsFrames() override;
-	virtual void AddSourceToSubjectWhiteList(FName SubjectName, FGuid SourceGuid) override;
-	virtual void RemoveSourceFromSubjectWhiteList(FName SubjectName, FGuid SourceGuid) override;
 	virtual TSubclassOf<ULiveLinkRole> GetSubjectRole(const FLiveLinkSubjectKey& SubjectKey) const override;
 	virtual TSubclassOf<ULiveLinkRole> GetSubjectRole(FLiveLinkSubjectName SubjectName) const override;
 	virtual bool DoesSubjectSupportsRole(const FLiveLinkSubjectKey& SubjectKey, TSubclassOf<ULiveLinkRole> SupportedRole) const override;

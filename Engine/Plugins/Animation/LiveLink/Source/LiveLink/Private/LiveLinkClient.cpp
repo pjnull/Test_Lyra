@@ -1772,16 +1772,6 @@ void FLiveLinkClient_Base_DEPRECATED::ClearAllSubjectsFrames()
 	ClearAllSubjectsFrames_AnyThread();
 }
 
-void FLiveLinkClient_Base_DEPRECATED::AddSourceToSubjectWhiteList(FName SubjectName, FGuid SourceGuid)
-{
-	SetSubjectEnabled({ SourceGuid, SubjectName }, true);
-}
-
-void FLiveLinkClient_Base_DEPRECATED::RemoveSourceFromSubjectWhiteList(FName SubjectName, FGuid SourceGuid)
-{
-	SetSubjectEnabled({ SourceGuid, SubjectName}, false);
-}
-
 TSubclassOf<ULiveLinkRole> FLiveLinkClient_Base_DEPRECATED::GetSubjectRole(const FLiveLinkSubjectKey& SubjectKey) const
 {
 	return GetSubjectRole_AnyThread(SubjectKey);
