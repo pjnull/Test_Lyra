@@ -1807,6 +1807,15 @@ namespace UnrealBuildTool
 			// disable them, and remove them from Enabled in case they were there
 			if (ProjectGameIni.GetArray("CookedEditorSettings", "DisabledPlugins", out DisabledPlugins))
 			{
+				if (Configuration == UnrealTargetConfiguration.Shipping)
+				{
+					List<string>? DisabledPluginsShipping;
+					if (ProjectGameIni.GetArray("CookedEditorSettings", "DisabledPluginsInShipping", out DisabledPluginsShipping))
+					{
+						DisabledPlugins.AddRange(DisabledPluginsShipping);
+					}
+				}
+
 				foreach (string PluginName in DisabledPlugins)
 				{
 					DisablePlugins.Add(PluginName);
