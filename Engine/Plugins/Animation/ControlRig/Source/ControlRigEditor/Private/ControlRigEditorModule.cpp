@@ -987,7 +987,7 @@ void FControlRigEditorModule::HandleAddControlRigExtenderToToolbar(FToolBarBuild
 		FOnGetContent::CreateRaw(this, &FControlRigEditorModule::GenerateAnimationMenu, InAnimationEditor),
 		LOCTEXT("EditInSequencer", "Edit in Sequencer"),
 		LOCTEXT("EditInSequencer_Tooltip", "Edit this Anim Sequence In Sequencer."),
-		FSlateIcon(FEditorStyle::GetStyleSetName(), "Persona.ExportToFBX")
+		FSlateIcon(FEditorStyle::GetStyleSetName(), "Persona.EditInSequencer")
 	);
 }
 
