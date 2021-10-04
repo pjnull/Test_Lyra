@@ -19,7 +19,7 @@
 		"Name": "ResonanceAudio",
 		"Type": "Runtime",
 		"LoadingPhase": "Default",
-		"WhitelistPlatforms": [
+		"PlatformAllowList": [
 			"Android",
 			"IOS",
 			"Linux",
@@ -32,7 +32,7 @@
       "Name": "ResonanceAudioEditor",
       "Type": "Editor",
       "LoadingPhase": "PostEngineInit",
-      "WhitelistPlatforms": [
+      "PlatformAllowList": [
         "Linux",
         "Mac",
         "Win64"
