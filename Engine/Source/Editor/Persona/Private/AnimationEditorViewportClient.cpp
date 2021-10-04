@@ -1387,18 +1387,48 @@ void FAnimationViewportClient::DrawMeshBones(UDebugSkelMeshComponent * MeshCompo
 
 void FAnimationViewportClient::DrawBones(const TArray<FBoneIndexType>& RequiredBones, const FReferenceSkeleton& RefSkeleton, const TArray<FTransform> & WorldTransforms, const TArray<int32>& InSelectedBones, FPrimitiveDrawInterface* PDI, const TArray<FLinearColor>& BoneColours, float BoundRadius, float LineThickness/*=0.f*/, bool bForceDraw/*=false*/, float InBoneRadius/*=1.f*/) const
 {
-	TArray<int32> SelectedBones = InSelectedBones;
-	if(InSelectedBones.Num() > 0 && GetBoneDrawMode() == EBoneDrawMode::SelectedAndParents)
+	TBitArray<> SelectedBones(false, RefSkeleton.GetNum());
+
+	if (InSelectedBones.Num() > 0)
 	{
-		int32 BoneIndex = InSelectedBones[0];
-		while (BoneIndex != INDEX_NONE)
+		// Add the selected bones
+		if (GetBoneDrawMode() == EBoneDrawMode::Selected || GetBoneDrawMode() == EBoneDrawMode::SelectedAndParents || GetBoneDrawMode() == EBoneDrawMode::SelectedAndChildren || GetBoneDrawMode() == EBoneDrawMode::SelectedAndParentsAndChildren)
 		{
-			int32 ParentIndex = RefSkeleton.GetParentIndex(BoneIndex);
-			if (ParentIndex != INDEX_NONE)
+			for (int32 BoneIndex : InSelectedBones)
 			{
-				SelectedBones.AddUnique(ParentIndex);
+				if (BoneIndex != INDEX_NONE)
+				{
+					SelectedBones[BoneIndex] = true;
+				}
 			}
-			BoneIndex = ParentIndex;
+		}
+
+		// Add the children of the selected bones
+		if (GetBoneDrawMode() == EBoneDrawMode::SelectedAndChildren || GetBoneDrawMode() == EBoneDrawMode::SelectedAndParentsAndChildren)
+		{
+			for (int32 BoneIndex = 0; BoneIndex < RefSkeleton.GetNum(); ++BoneIndex)
+			{
+				int32 ParentIndex = RefSkeleton.GetParentIndex(BoneIndex);
+				if (ParentIndex != INDEX_NONE && SelectedBones[ParentIndex])
+				{
+					SelectedBones[BoneIndex] = true;
+				}
+			}
+		}
+
+		// Add the parents of the selected bones
+		if (GetBoneDrawMode() == EBoneDrawMode::SelectedAndParents || GetBoneDrawMode() == EBoneDrawMode::SelectedAndParentsAndChildren)
+		{
+			for (int32 BoneIndex : InSelectedBones)
+			{
+				if (BoneIndex != INDEX_NONE)
+				{
+					for (int ParentIndex = RefSkeleton.GetParentIndex(BoneIndex); ParentIndex != INDEX_NONE; ParentIndex = RefSkeleton.GetParentIndex(ParentIndex))
+					{
+						SelectedBones[ParentIndex] = true;
+					}
+				}
+			}
 		}
 	}
 
@@ -1409,36 +1439,35 @@ void FAnimationViewportClient::DrawBones(const TArray<FBoneIndexType>& RequiredB
 	{
 		const int32 BoneIndex = RequiredBones[Index];
 
-		if (bForceDraw ||
-			(GetBoneDrawMode() == EBoneDrawMode::All) ||
-			((GetBoneDrawMode() == EBoneDrawMode::Selected || GetBoneDrawMode() == EBoneDrawMode::SelectedAndParents) && SelectedBones.Contains(BoneIndex) )
-			)
+		if (bForceDraw || GetBoneDrawMode() == EBoneDrawMode::All || SelectedBones[BoneIndex])
 		{
 			const int32 ParentIndex = RefSkeleton.GetParentIndex(BoneIndex);
 			FVector Start, End;
+			float Radius;
 			FLinearColor LineColor = BoneColours[BoneIndex];
 
 			if (ParentIndex >= 0)
 			{
 				Start = WorldTransforms[ParentIndex].GetLocation();
 				End = WorldTransforms[BoneIndex].GetLocation();
+				// Scale the radius proportionally to the bone length (clamped by bound to not be too long or big)
+				const float BoneLength = (End - Start).Size();
+				Radius = FMath::Clamp(BoneLength * 0.05f, 0.1f, MaxDrawRadius) * InBoneRadius;
 			}
 			else
 			{
 				Start = FVector::ZeroVector;
 				End = WorldTransforms[BoneIndex].GetLocation();
+				// Set the radius to a constant size (rather than proportional to bone length)
+				Radius = FMath::Min(1.0f, MaxDrawRadius) * InBoneRadius;
 			}
 
-			const float BoneLength = (End - Start).Size();
-
-			// clamp by bound, we don't want too long or big
-			const float Radius = FMath::Clamp(BoneLength * 0.05f, 0.1f, MaxDrawRadius) * InBoneRadius;
 			//Render Sphere for bone end point and a cone between it and its parent.
 			SkeletalDebugRendering::DrawWireBone(PDI, Start, End, LineColor, SDPG_Foreground, Radius);
 
 			// draw gizmo
 			if ((GetLocalAxesMode() == ELocalAxesMode::All) ||
-				((GetLocalAxesMode() == ELocalAxesMode::Selected) && SelectedBones.Contains(BoneIndex))
+				(GetLocalAxesMode() == ELocalAxesMode::Selected && InSelectedBones.Contains(BoneIndex))
 				)
 			{
 				// we want to say 10 % of bone length is good
