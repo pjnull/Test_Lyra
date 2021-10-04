@@ -1411,7 +1411,10 @@ FName UMeshPaintingSubsystem::GetComponentActorName(const UMeshComponent* InComp
 	}
 	else if (const UStaticMeshComponent* InStaticMeshComponent = Cast<UStaticMeshComponent>(InComponent))
 	{
-		ComponentActorString = InStaticMeshComponent->GetStaticMesh()->GetName();
+		if (InStaticMeshComponent->GetStaticMesh())
+		{
+			ComponentActorString = InStaticMeshComponent->GetStaticMesh()->GetName();
+		}
 	}
 	else if (const USkeletalMeshComponent* InSkeletalMeshComponent = Cast<USkeletalMeshComponent>(InComponent))
 	{
@@ -1428,8 +1431,16 @@ FName UMeshPaintingSubsystem::GetComponentActorName(const UMeshComponent* InComp
 	{
 		ComponentActorString = InComponent->GetName();
 	}
-	ComponentActorString += TEXT("_") + InComponent->GetOwner()->GetName();
-	return FName(ComponentActorString);
+
+	if (ComponentActorString.IsEmpty())
+	{
+		return NAME_None;
+	}
+	else
+	{
+		ComponentActorString += TEXT("_") + InComponent->GetOwner()->GetName();
+		return FName(ComponentActorString);
+	}
 }
 
 TSharedPtr<IMeshPaintComponentAdapter> UMeshPaintingSubsystem::GetAdapterForComponent(const UMeshComponent* InComponent) const
