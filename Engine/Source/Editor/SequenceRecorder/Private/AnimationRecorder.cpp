@@ -677,7 +677,8 @@ void FAnimationRecorder::UpdateRecord(USkeletalMeshComponent* Component, float D
 	if (MaxFrame != UnBoundedFrameCount && FramesRecorded >= MaxFrame)
 	{
 		UE_LOG(LogAnimation, Log, TEXT("Animation Recording exceeds the time limited (%d mins). Stopping recording animation... "), (int32)((float)MaxFrame / ((1.0f / IntervalTime) * 60.0f)));
-		StopRecord(true);
+		FAnimationRecorderManager::Get().StopRecordingAnimation(Component, true);
+		return;
 	}
 }
 
@@ -910,9 +911,10 @@ void FAnimationRecorder::RecordNotifies(USkeletalMeshComponent* Component, const
 
 void FAnimationRecorderManager::Tick(float DeltaTime)
 {
-	for (auto& Inst : RecorderInstances)
+	// Not range-based as instance can delete upon update
+	for (int32 i = 0; i < RecorderInstances.Num(); ++i)
 	{
-		Inst.Update(DeltaTime);
+		RecorderInstances[i].Update(DeltaTime);
 	}
 }
 
@@ -1230,7 +1232,7 @@ void FAnimationRecorderManager::StopRecordingAnimation(USkeletalMeshComponent* C
 			Inst.FinishRecording(bShowMessage);
 
 			// remove instance, which will clean itself up
-			RecorderInstances.RemoveAtSwap(Idx);
+			RecorderInstances.RemoveAtSwap(Idx, 1, false);
 
 			// all done
 			break;
