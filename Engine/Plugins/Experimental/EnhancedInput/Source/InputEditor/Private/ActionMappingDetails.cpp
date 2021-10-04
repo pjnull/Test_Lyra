@@ -105,7 +105,7 @@ FText FActionMappingsNodeBuilder::GetAddNewActionTooltip() const
 	}
 	else
 	{
-		return LOCTEXT("AddActionMappingToolTip_Disabled", "Cannot add an action mapping while en empty mapping exists");
+		return LOCTEXT("AddActionMappingToolTip_Disabled", "Cannot add an action mapping while an empty mapping exists");
 	}
 }
 
