@@ -926,7 +926,7 @@ void FMaterialShaderMapId::AppendKeyString(FString& KeyString) const
 		KeyString += ReferencedParameterCollections[CollectionIndex].ToString();
 	}
 
-	TMap<const TCHAR*,FCachedUniformBufferDeclaration> ReferencedUniformBuffers;
+	TSortedMap<const TCHAR*, FCachedUniformBufferDeclaration, FDefaultAllocator, FUniformBufferNameSortOrder> ReferencedUniformBuffers;
 
 	// Add the inputs for any shaders that are stored inline in the shader map
 	for (int32 ShaderIndex = 0; ShaderIndex < ShaderTypeDependencies.Num(); ShaderIndex++)
