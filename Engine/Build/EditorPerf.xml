@@ -188,7 +188,7 @@
 				</Node>
 				<Property Name="BaselineGraphNodes" Value="$(BaselineGraphNodes);$(BaselineNodeName)"/>
 
-				<Label Category="Test" Name="$(Project) EditorPerf $(Platform)" Requires="$(RunNodeName)"/>
+				<Label Category="Tests" Name="$(Project) EditorPerf $(Platform)" Requires="$(RunNodeName)"/>
 			
 			</Agent>
 
