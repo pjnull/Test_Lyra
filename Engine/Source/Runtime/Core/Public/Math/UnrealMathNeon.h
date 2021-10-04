@@ -34,7 +34,7 @@ template<typename T, typename BASE_TYPE>
 struct alignas(alignof(T)) VectorRegisterWrapper
 {
 	FORCEINLINE VectorRegisterWrapper() {}
-	FORCEINLINE VectorRegisterWrapper(const T& vec) : m_vec(vec) {}
+	FORCEINLINE constexpr VectorRegisterWrapper(T vec) : m_vec(vec) {}
 
 	FORCEINLINE operator T&() { return m_vec; }
 	FORCEINLINE operator const T&() const { return m_vec; }
