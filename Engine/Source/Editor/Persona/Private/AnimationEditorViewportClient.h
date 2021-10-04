@@ -44,8 +44,10 @@ namespace EBoneDrawMode
 		None,
 		Selected,
 		SelectedAndParents,
+		SelectedAndChildren,
+		SelectedAndParentsAndChildren,
 		All,
-		NumAxesModes
+		NumDrawModes
 	};
 };
 
