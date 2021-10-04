@@ -257,8 +257,8 @@ class CreatePlatformExtension : BuildCommand
 					ChildPlugin.WriteStringArrayField("SupportedTargetPlatforms", new string[]{ Platform.ToString() } );
 				}
 
-				// select all modules that are not blacklisted
-				IEnumerable<ModuleDescriptor> ModuleDescs = ParentModuleDescs.Where( ModuleDesc => !(bHasPlatform && ModuleDesc.BlacklistPlatforms != null && ModuleDesc.BlacklistPlatforms.Contains(Platform)) );
+				// select all modules that are not denied
+				IEnumerable<ModuleDescriptor> ModuleDescs = ParentModuleDescs.Where( ModuleDesc => !(bHasPlatform && ModuleDesc.PlatformDenyList != null && ModuleDesc.PlatformDenyList.Contains(Platform)) );
 				if (ModuleDescs.Any() )
 				{
 					ChildPlugin.WriteArrayStart("Modules");
@@ -269,9 +269,9 @@ class CreatePlatformExtension : BuildCommand
 						ChildPlugin.WriteValue("Name", ParentModuleDesc.Name);
 						ChildPlugin.WriteValue("Type", ParentModuleDesc.Type.ToString());
 						ChildPlugin.WriteValue("LoadingPhase", ParentModuleDesc.LoadingPhase.ToString());
-						if (NeedsPlatformReference(ParentModuleDesc.WhitelistPlatforms, ParentModuleDesc.bHasExplicitPlatforms))
+						if (NeedsPlatformReference(ParentModuleDesc.PlatformAllowList, ParentModuleDesc.bHasExplicitPlatforms))
 						{
-							ChildPlugin.WriteStringArrayField("WhitelistPlatforms", new string[] { Platform.ToString() } );
+							ChildPlugin.WriteStringArrayField("PlatformAllowList", new string[] { Platform.ToString() } );
 						}
 						ChildPlugin.WriteObjectEnd();
 
@@ -426,13 +426,13 @@ class CreatePlatformExtension : BuildCommand
 			return true;
 		}
 
-		// the module has a non-empty whitelist platform list so we must create a child reference
-		if (ModuleDesc.WhitelistPlatforms != null && ModuleDesc.WhitelistPlatforms.Count >= 0)
+		// the module has a non-empty platform allow list so we must create a child reference
+		if (ModuleDesc.PlatformAllowList != null && ModuleDesc.PlatformAllowList.Count >= 0)
 		{
 			return true;
 		}
 
-		// the module has an empty whitelist platform list so no explicit platform reference is needed
+		// the module has an empty platform allow list so no explicit platform reference is needed
 		return false;
 	}
 
