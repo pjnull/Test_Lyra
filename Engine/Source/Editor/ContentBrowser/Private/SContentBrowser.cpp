@@ -68,6 +68,7 @@
 #include "IContentBrowserDataModule.h"
 #include "ContentBrowserDataSource.h"
 #include "ContentBrowserDataSubsystem.h"
+#include "ContentBrowserDataUtils.h"
 #include "StatusBarSubsystem.h"
 #include "Brushes/SlateColorBrush.h"
 #include "ToolMenu.h"
@@ -2054,6 +2055,8 @@ bool SContentBrowser::OnHasCrumbDelimiterContent(const FString& CrumbData) const
 		FContentBrowserDataFilter SubItemsFilter;
 		SubItemsFilter.ItemTypeFilter = EContentBrowserItemTypeFilter::IncludeFolders;
 		SubItemsFilter.bRecursivePaths = false;
+		SubItemsFilter.ItemCategoryFilter = PathViewPtr->GetContentBrowserItemCategoryFilter();
+		SubItemsFilter.ItemAttributeFilter = PathViewPtr->GetContentBrowserItemAttributeFilter();
 
 		bool bHasSubItems = false;
 		ContentBrowserData->EnumerateItemsUnderPath(*CrumbData, SubItemsFilter, [&bHasSubItems](FContentBrowserItemData&& InSubItem)
@@ -2120,13 +2123,76 @@ TSharedRef<SWidget> SContentBrowser::OnGetCrumbDelimiterContent(const FString& C
 	}
 	else if( SourcesData.HasVirtualPaths() )
 	{
+		const UContentBrowserSettings* ContentBrowserSettings = GetDefault<UContentBrowserSettings>();
+		const bool bDisplayEmpty = ContentBrowserSettings->DisplayEmptyFolders;
+
 		UContentBrowserDataSubsystem* ContentBrowserData = IContentBrowserDataModule::Get().GetSubsystem();
 
 		FContentBrowserDataFilter SubItemsFilter;
 		SubItemsFilter.ItemTypeFilter = EContentBrowserItemTypeFilter::IncludeFolders;
 		SubItemsFilter.bRecursivePaths = false;
+		SubItemsFilter.ItemCategoryFilter = PathViewPtr->GetContentBrowserItemCategoryFilter();
+		SubItemsFilter.ItemAttributeFilter = PathViewPtr->GetContentBrowserItemAttributeFilter();
 
 		TArray<FContentBrowserItem> SubItems = ContentBrowserData->GetItemsUnderPath(*CrumbData, SubItemsFilter);
+
+		for (auto It = SubItems.CreateIterator(); It; ++It)
+		{
+			const FContentBrowserItem& Item = *It;
+			if (!Item.GetInternalPath().IsNone())
+			{
+				if (!PathViewPtr->InternalPathPassesBlockLists(FNameBuilder(Item.GetInternalPath())))
+				{
+					It.RemoveCurrent();
+					continue;
+				}
+			}
+			else
+			{
+				// Test if any child internal paths pass for this fully virtual path
+				bool bPasses = false;
+				for (const FContentBrowserItemData& ItemData : Item.GetInternalItems())
+				{
+					if (UContentBrowserDataSource* ItemDataSource = ItemData.GetOwnerDataSource())
+					{
+						ItemDataSource->GetRootPathVirtualTree().EnumerateSubPaths(Item.GetVirtualPath(), [this, &bPasses, &SubItemsFilter](FName VirtualSubPath, FName InternalPath)
+						{
+							if (!InternalPath.IsNone())
+							{
+								const FNameBuilder InternalPathBuilder(InternalPath);
+								if (ContentBrowserDataUtils::PathPassesAttributeFilter(InternalPathBuilder, 0, SubItemsFilter.ItemAttributeFilter) &&
+									PathViewPtr->InternalPathPassesBlockLists(InternalPathBuilder))
+								{
+									bPasses = true;
+									// Stop enumerating
+									return false;
+								}
+							}
+							// Keep enumerating
+							return true;
+						}, /*bRecurse*/ true);
+
+						if (bPasses)
+						{
+							break;
+						}
+					}
+				}
+
+				if (!bPasses)
+				{
+					It.RemoveCurrent();
+					continue;
+				}
+			}
+
+			if (!bDisplayEmpty && !ContentBrowserData->IsFolderVisibleIfHidingEmpty(Item.GetVirtualPath()))
+			{
+				It.RemoveCurrent();
+				continue;
+			}
+		}
+
 		SubItems.Sort([](const FContentBrowserItem& ItemOne, const FContentBrowserItem& ItemTwo)
 		{
 			return ItemOne.GetDisplayName().CompareTo(ItemTwo.GetDisplayName()) < 0;

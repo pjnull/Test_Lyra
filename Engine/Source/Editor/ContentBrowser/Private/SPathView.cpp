@@ -807,6 +807,47 @@ EContentBrowserItemAttributeFilter SPathView::GetContentBrowserItemAttributeFilt
 			| (ContentBrowserSettings->GetDisplayL10NFolder() ? EContentBrowserItemAttributeFilter::IncludeLocalized : EContentBrowserItemAttributeFilter::IncludeNone);
 }
 
+bool SPathView::InternalPathPassesBlockLists(const FStringView InInternalPath, const int32 InAlreadyCheckedDepth) const
+{
+	TArray<const FBlacklistPaths*, TInlineAllocator<2>> BlockLists;
+	if (FolderBlacklist.IsValid() && FolderBlacklist->HasFiltering())
+	{
+		BlockLists.Add(FolderBlacklist.Get());
+	}
+
+	if (!bAllowReadOnlyFolders && WritableFolderBlacklist.IsValid() && WritableFolderBlacklist->HasFiltering())
+	{
+		BlockLists.Add(WritableFolderBlacklist.Get());
+	}
+
+	for (const FBlacklistPaths* Filter : BlockLists)
+	{
+		if (!Filter->PassesStartsWithFilter(InInternalPath))
+		{
+			return false;
+		}
+	}
+
+	if (InAlreadyCheckedDepth < 1 && PluginPathFilters.IsValid() && PluginPathFilters->Num() > 0)
+	{
+		const UContentBrowserSettings* ContentBrowserSettings = GetDefault<UContentBrowserSettings>();
+		if (ContentBrowserSettings->GetDisplayPluginFolders())
+		{
+			bool bHadClassesPrefix;
+			const FStringView FirstFolderName = FContentBrowserVirtualPathTree::GetMountPointFromPath(InInternalPath, bHadClassesPrefix);
+			if (TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(FirstFolderName))
+			{
+				if (!PluginPathFilters->PassesAllFilters(Plugin.ToSharedRef()))
+				{
+					return false;
+				}
+			}
+		}
+	}
+
+	return true;
+}
+
 void SPathView::SyncToItems(TArrayView<const FContentBrowserItem> ItemsToSync, const bool bAllowImplicitSync)
 {
 	TArray<FName> VirtualPathsToSync;
