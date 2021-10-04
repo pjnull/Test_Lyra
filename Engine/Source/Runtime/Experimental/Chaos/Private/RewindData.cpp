@@ -7,6 +7,7 @@
 #include "Chaos/PBDJointConstraints.h"
 #include "Misc/Paths.h"
 #include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
 
 namespace Chaos
 {
