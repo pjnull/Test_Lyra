@@ -3177,7 +3177,7 @@ namespace UnrealBuildTool
 
 						if (PluginReference.bHasExplicitPlatforms)
 						{
-							PluginReference.WhitelistPlatforms = PluginReference.SupportedTargetPlatforms; //synthesize whitelist if it must be explicit
+							PluginReference.PlatformAllowList = PluginReference.SupportedTargetPlatforms; //synthesize allow list if it must be explicit
 						}
 
 						AddPlugin(PluginReference, "default plugins", ExcludeFolders, NameToInstance, NameToInfo);
