@@ -165,6 +165,7 @@ public:
 	*/
 	UE_DEPRECATED(5.0, "Please use GetAllChannels instead")
 	UFUNCTION(BlueprintCallable, Category = "Sequencer|Section", meta=(ScriptMethod, DevelopmentOnly))
+	UFUNCTION(BlueprintCallable, Category = "Movie Scene | Section", meta=(ScriptMethod, DevelopmentOnly))
 	static TArray<UMovieSceneScriptingChannel*> GetChannels(UMovieSceneSection* Section);
 
 	/**
@@ -191,6 +192,7 @@ public:
 	*/
 	UE_DEPRECATED(5.0, "Please use GetChannelsByType instead")
 	UFUNCTION(BlueprintCallable, Category = "Sequencer|Section", meta = (ScriptMethod, DeterminesOutputType="TrackType", DevelopmentOnly))
+	UFUNCTION(BlueprintCallable, Category = "Movie Scene | Section", meta = (ScriptMethod, DeterminesOutputType="TrackType", DevelopmentOnly))
 	static TArray<UMovieSceneScriptingChannel*> FindChannelsByType(UMovieSceneSection* Section, TSubclassOf<UMovieSceneScriptingChannel> ChannelType);
 
 	/**
