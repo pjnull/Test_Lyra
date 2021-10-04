@@ -1104,24 +1104,25 @@ void FUsdGeomMeshTranslator::CreateAssets()
 
 USceneComponent* FUsdGeomMeshTranslator::CreateComponents()
 {
+	TOptional< TSubclassOf< USceneComponent > > ComponentType;
+
 #if WITH_EDITOR
-	// Animated meshes as GeometryCache
+	// Force animated meshes as GeometryCache
 	if ( GUseGeometryCacheUSD && UsdGeomMeshTranslatorImpl::IsAnimated( GetPrim() ) )
 	{
-		TOptional< TSubclassOf< USceneComponent > > GeometryCacheComponent( UGeometryCacheUsdComponent::StaticClass() );
-		return CreateComponentsEx( GeometryCacheComponent, {} );
+		ComponentType = UGeometryCacheUsdComponent::StaticClass();
 	}
 #endif // WITH_EDITOR
 
-	// Animated and static meshes as StaticMesh
-	USceneComponent* SceneComponent = CreateComponentsEx( {}, {} );
+	USceneComponent* SceneComponent = CreateComponentsEx( ComponentType, {} );
+
+	const FString PrimPathString = PrimPath.GetString();
 
 	// Handle material overrides
-	// #ueent_todo: Do the analogue for geometry cache
 	// Note: This can be here and not in USDGeomXformableTranslator because there is no way that a collapsed mesh prim could end up with a material override
 	if ( UStaticMeshComponent* StaticMeshComponent = Cast<UStaticMeshComponent>( SceneComponent ) )
 	{
-		if ( UStaticMesh* StaticMesh = Cast< UStaticMesh >( Context->AssetCache->GetAssetForPrim( PrimPath.GetString() ) ) )
+		if ( UStaticMesh* StaticMesh = Cast< UStaticMesh >( Context->AssetCache->GetAssetForPrim( PrimPathString ) ) )
 		{
 			TArray<UMaterialInterface*> ExistingAssignments;
 			for ( FStaticMaterial& StaticMaterial : StaticMesh->GetStaticMaterials() )
@@ -1137,6 +1138,25 @@ USceneComponent* FUsdGeomMeshTranslator::CreateComponents()
 				Context->Time,
 				Context->ObjectFlags,
 				Context->bAllowInterpretingLODs,
+				Context->RenderContext
+			);
+		}
+	}
+	else if ( UGeometryCacheComponent* Component = Cast<UGeometryCacheComponent>( SceneComponent ) )
+	{
+		if ( UGeometryCache* GeometryCache = Cast< UGeometryCache >( Context->AssetCache->GetAssetForPrim( PrimPathString ) ) )
+		{
+			// Geometry caches don't support LODs
+			const bool bAllowInterpretingLODs = false;
+
+			MeshTranslationImpl::SetMaterialOverrides(
+				GetPrim(),
+				GeometryCache->Materials,
+				*Component,
+				*Context->AssetCache.Get(),
+				Context->Time,
+				Context->ObjectFlags,
+				bAllowInterpretingLODs,
 				Context->RenderContext
 			);
 		}
