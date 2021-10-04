@@ -94,6 +94,14 @@ static FAutoConsoleVariableRef CVarNiagaraCompileWaitLoggingTerminationCap(
 	ECVF_Default
 );
 
+static float GNiagaraCompileDDCWaitTimeout = 10.0f;
+static FAutoConsoleVariableRef CVarNiagaraCompileDDCWaitTimeout(
+	TEXT("fx.Niagara.CompileDDCWaitTimeout"),
+	GNiagaraCompileDDCWaitTimeout,
+	TEXT("During script compilation, how long do we wait for the ddc to answer in seconds before starting shader compilation?"),
+	ECVF_Default
+);
+
 //////////////////////////////////////////////////////////////////////////
 
 UNiagaraSystem::UNiagaraSystem(const FObjectInitializer& ObjectInitializer)
@@ -480,6 +488,11 @@ void FNiagaraAsyncCompileTask::CheckDDCResult()
 		}
 		DDCFetchTime = FPlatformTime::Seconds() - StartTaskTime;
 		UE_LOG(LogNiagara, Verbose, TEXT("Compile task for %s took %f seconds to fetch data from ddc."), *AssetPath, DDCFetchTime);
+	}
+	else if ((FPlatformTime::Seconds() - StartTaskTime) > GNiagaraCompileDDCWaitTimeout)
+	{
+		MoveToState(ENiagaraCompilationState::Precompile);
+		UE_LOG(LogNiagara, Log, TEXT("DDC timed out after %i seconds, starting compilation for %s."), (int)GNiagaraCompileDDCWaitTimeout, *AssetPath);
 	}
 }
 
