@@ -7,6 +7,7 @@
 #include "Layout/Visibility.h"
 #include "SAnimationEditorViewport.h"
 #include "SEditorViewport.h"
+#include "ScopedTransaction.h"
 #include "Styling/SlateColor.h"
 #include "Types/SlateEnums.h"
 #include "Widgets/DeclarativeSyntaxSupport.h"
@@ -14,7 +15,7 @@
 
 class FMenuBuilder;
 class SComboButton;
-class FScopedTransaction;
+
 
 /**
  * A level viewport toolbar widget that is placed in a viewport
