@@ -132,7 +132,7 @@ static bool BlueprintNativeCodeGenUtilsImpl::GeneratePluginDescFile(const FBluep
 				ModuleDesc->WhitelistPlatforms.AddUnique(PlatformInfo->DataDrivenPlatformInfo->UBTPlatformString);
 
 				FName UBTPlatformName = PlatformInfo->DataDrivenPlatformInfo->UBTPlatformName;
-				// Hack to allow clients for PS4/XboxOne (etc.) to build the nativized assets plugin
+				// Hack to allow clients for some platforms to build the nativized assets plugin
 				const bool bIsClientValidForPlatform = UBTPlatformName == TEXT("Win64") ||
 					UBTPlatformName == TEXT("Linux") ||
 					UBTPlatformName == TEXT("LinuxArm64") ||
@@ -144,7 +144,7 @@ static bool BlueprintNativeCodeGenUtilsImpl::GeneratePluginDescFile(const FBluep
 				case EBuildTargetType::Game:
 					ModuleDesc->WhitelistTargets.AddUnique(EBuildTargetType::Game);
 
-					// Hack to allow clients for PS4/XboxOne (etc.) to build the nativized assets plugin
+					// Hack to allow clients for some platforms to build the nativized assets plugin
 					if(!bIsClientValidForPlatform)
 					{
 						// Also add "Client" target
