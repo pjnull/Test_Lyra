@@ -140,7 +140,8 @@ EPushResult FFileSystemBackend::PushData(const FPayloadId& Id, const FCompressed
 	TStringBuilder<512> FilePath;
 	CreateFilePath(Id, FilePath);
 
-	if (!IFileManager::Get().Move(FilePath.ToString(), *TempFilePath))
+	// If the file already exists we don't need to replace it, we will also do our own error logging.
+	if (!IFileManager::Get().Move(FilePath.ToString(), *TempFilePath, /*Replace*/ false, /*EvenIfReadOnly*/ false, /*Attributes*/ false, /*bDoNotRetryOrError*/ true))
 	{
 		// Store the error message in case we need to display it
 		TStringBuilder<MAX_SPRINTF> SystemErrorMsg;
