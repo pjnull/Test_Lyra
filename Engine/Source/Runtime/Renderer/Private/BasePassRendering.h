@@ -444,7 +444,6 @@ public:
 		// This define simply lets the compilation environment know that we are using BasePassPixelShader.usf, so that we can check for more
 		// complicated defines later in the compilation pipe.
 		OutEnvironment.SetDefine(TEXT("IS_BASE_PASS"), 1);
-		OutEnvironment.SetDefine(TEXT("IS_MOBILE_BASE_PASS"), 0);
 
 		TBasePassPixelShaderBaseType<LightMapPolicyType>::ModifyCompilationEnvironment(Parameters, OutEnvironment);
 	}

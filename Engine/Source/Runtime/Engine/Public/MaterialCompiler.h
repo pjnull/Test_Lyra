@@ -388,8 +388,6 @@ public:
 	virtual int32 SkyAtmosphereAerialPerspective(int32 WorldPosition) = 0;
 	virtual int32 SkyAtmosphereDistantLightScatteredLuminance() = 0;
 
-	virtual int32 SkyLightEnvMapSample(int32 DirectionCodeChunk, int32 RoughnessCodeChunk) = 0;
-
 	virtual int32 GetCloudSampleAltitude() = 0;
 	virtual int32 GetCloudSampleAltitudeInLayer() = 0;
 	virtual int32 GetCloudSampleNormAltitudeInLayer() = 0;
@@ -804,11 +802,6 @@ public:
 	virtual int32 SkyAtmosphereDistantLightScatteredLuminance() override
 	{
 		return Compiler->SkyAtmosphereDistantLightScatteredLuminance();
-	}
-
-	virtual int32 SkyLightEnvMapSample(int32 DirectionCodeChunk, int32 RoughnessCodeChunk) override
-	{
-		return Compiler->SkyLightEnvMapSample(DirectionCodeChunk, RoughnessCodeChunk);
 	}
 
 	virtual int32 GetCloudSampleAltitude() override
