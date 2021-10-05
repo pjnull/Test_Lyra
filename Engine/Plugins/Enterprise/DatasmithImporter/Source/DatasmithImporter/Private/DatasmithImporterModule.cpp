@@ -413,15 +413,17 @@ TSharedRef<FExtender> FDatasmithImporterModule::OnExtendLevelEditorActorSelectio
 	if ( bShouldExtendActorActions )
 	{
 		// Add the Datasmith actions sub-menu extender
-		Extender->AddMenuExtension("ActorControl", EExtensionHook::After, nullptr, FMenuExtensionDelegate::CreateLambda(
+		Extender->AddMenuExtension("ActorTypeTools", EExtensionHook::After, nullptr, FMenuExtensionDelegate::CreateLambda(
 			[SelectedActors](FMenuBuilder& MenuBuilder)
 		{
+			MenuBuilder.BeginSection("Datasmith", LOCTEXT("DatasmithMenuSection", "Datasmith"));
 			MenuBuilder.AddSubMenu(
 				NSLOCTEXT("DatasmithActions", "ObjectContext_Datasmith", "Datasmith"),
 				NSLOCTEXT("DatasmithActions", "ObjectContext_Datasmith", "Datasmith"),
 				FNewMenuDelegate::CreateStatic( &FDatasmithImporterModule::PopulateDatasmithActorsMenu, SelectedActors ),
 				false,
 				FSlateIcon());
+			MenuBuilder.EndSection()
 		}));
 	}
 
