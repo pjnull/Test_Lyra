@@ -375,7 +375,7 @@ void SKismetDebuggingView::Tick( const FGeometry& AllottedGeometry, const double
 	
 	// Gather the old root set
 	TSet<UObject*> OldRootSet;
-	for (const FDebugTreeItemPtr Item : DebugTreeView->GetRootTreeItems())
+	for (const FDebugTreeItemPtr& Item : DebugTreeView->GetRootTreeItems())
 	{
 		if (UObject* OldObject = Item->GetParentObject())
 		{
