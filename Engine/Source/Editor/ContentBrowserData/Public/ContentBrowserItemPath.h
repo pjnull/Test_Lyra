@@ -14,6 +14,13 @@ class CONTENTBROWSERDATA_API FContentBrowserItemPath
 {
 public:
 	FContentBrowserItemPath();
+
+	FContentBrowserItemPath(const FName InVirtualPath, const FName InInternalPath)
+		: VirtualPath(InVirtualPath)
+		, InternalPath(InInternalPath)
+	{
+	}
+
 	FContentBrowserItemPath(const FStringView InPath, const EContentBrowserPathType InPathType);
 	FContentBrowserItemPath(const TCHAR* InPath, const EContentBrowserPathType InPathType);
 	FContentBrowserItemPath(const FName InPath, const EContentBrowserPathType InPathType);
