@@ -28,9 +28,6 @@ FRHIBreadcrumb* FRHIBreadcrumbStack::PushBreadcrumb(FMemStackBase& Allocator, co
 		FirstUnsubmittedBreadcrumb = NewBreadcrumb;
 	}
 
-	UE_LOG(LogRHI, Log, TEXT("[%p] RHI Breadcrumb Push:\n"), this);
-	DebugLog();
-
 	return NewBreadcrumb;
 }
 
@@ -48,8 +45,6 @@ FRHIBreadcrumb* FRHIBreadcrumbStack::PopBreadcrumb()
 {
 	check(BreadcrumbStackTop != nullptr); // popping more than pushing
 	BreadcrumbStackTop = BreadcrumbStackTop->Parent;
-	UE_LOG(LogRHI, Log, TEXT("[%p] RHI Breadcrumb Pop:\n"), this);
-	DebugLog();
 	return BreadcrumbStackTop;
 }
 
