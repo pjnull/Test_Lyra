@@ -175,10 +175,10 @@ namespace Metasound
 			TArray<FConstInputHandle> GetConstInputs() const override { return TArray<FConstInputHandle>(); }
 			TArray<FConstOutputHandle> GetConstOutputs() const override { return TArray<FConstOutputHandle>(); }
 
-			TArray<FInputHandle> GetInputsWithVertexName(const FVertexName& InName) override { return TArray<FInputHandle>(); }
-			TArray<FConstInputHandle> GetConstInputsWithVertexName(const FVertexName& InName) const override { return TArray<FConstInputHandle>(); }
-			TArray<FOutputHandle> GetOutputsWithVertexName(const FVertexName& InName) override { return TArray<FOutputHandle>(); }
-			TArray<FConstOutputHandle> GetConstOutputsWithVertexName(const FVertexName& InName) const override { return TArray<FConstOutputHandle>(); }
+			virtual FInputHandle GetInputWithVertexName(const FVertexName& InName) override { return IInputController::GetInvalidHandle(); }
+			virtual FConstInputHandle GetConstInputWithVertexName(const FVertexName& InName) const override { return IInputController::GetInvalidHandle(); }
+			virtual FOutputHandle GetOutputWithVertexName(const FVertexName& InName) override { return IOutputController::GetInvalidHandle(); }
+			virtual FConstOutputHandle GetConstOutputWithVertexName(const FVertexName& InName) const override { return IOutputController::GetInvalidHandle(); }
 			FInputHandle GetInputWithID(FGuid InVertexID) override { return IInputController::GetInvalidHandle(); }
 			FOutputHandle GetOutputWithID(FGuid InVertexID) override { return IOutputController::GetInvalidHandle(); }
 			FConstInputHandle GetInputWithID(FGuid InVertexID) const override { return IInputController::GetInvalidHandle(); }

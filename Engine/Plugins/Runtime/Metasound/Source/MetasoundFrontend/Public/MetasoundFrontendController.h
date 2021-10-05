@@ -417,8 +417,8 @@ namespace Metasound
 			/** Returns number of node outputs. */
 			virtual int32 GetNumOutputs() const = 0;
 
-			virtual TArray<FInputHandle> GetInputsWithVertexName(const FVertexName& InName) = 0;
-			virtual TArray<FConstInputHandle> GetConstInputsWithVertexName(const FVertexName& InName) const = 0;
+			virtual FInputHandle GetInputWithVertexName(const FVertexName& InName) = 0;
+			virtual FConstInputHandle GetConstInputWithVertexName(const FVertexName& InName) const = 0;
 
 			/** Returns all node outputs. */
 			virtual TArray<FOutputHandle> GetOutputs() = 0;
@@ -426,8 +426,8 @@ namespace Metasound
 			/** Returns all node outputs. */
 			virtual TArray<FConstOutputHandle> GetConstOutputs() const = 0;
 
-			virtual TArray<FOutputHandle> GetOutputsWithVertexName(const FVertexName& InName) = 0;
-			virtual TArray<FConstOutputHandle> GetConstOutputsWithVertexName(const FVertexName& InName) const = 0;
+			virtual FOutputHandle GetOutputWithVertexName(const FVertexName& InName) = 0;
+			virtual FConstOutputHandle GetConstOutputWithVertexName(const FVertexName& InName) const = 0;
 
 			/** Returns true if node is required to satisfy the document archetype. */
 			virtual bool IsRequired() const = 0;

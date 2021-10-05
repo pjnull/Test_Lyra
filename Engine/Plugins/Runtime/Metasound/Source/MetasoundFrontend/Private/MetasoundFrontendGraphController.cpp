@@ -347,8 +347,8 @@ namespace Metasound
 
 							if (ensure(SourceVariableNode->IsValid()))
 							{
-								FInputHandle SetNodeInput = SetNode->GetInputsWithVertexName(VariableNames::GetInputVariableName())[0];
-								FOutputHandle SourceVariableNodeOutput = SourceVariableNode->GetOutputsWithVertexName(VariableNames::GetOutputVariableName())[0];
+								FInputHandle SetNodeInput = SetNode->GetInputWithVertexName(VariableNames::GetInputVariableName());
+								FOutputHandle SourceVariableNodeOutput = SourceVariableNode->GetOutputWithVertexName(VariableNames::GetOutputVariableName());
 
 								ensure(SetNodeInput->Connect(*SourceVariableNodeOutput));
 							}
@@ -359,8 +359,8 @@ namespace Metasound
 								FNodeHandle HeadGetNode = GetNodeWithID(Variable->AccessorNodeIDs[0]);
 								if (HeadGetNode->IsValid())
 								{
-									FOutputHandle SetNodeOutput = SetNode->GetOutputsWithVertexName(VariableNames::GetOutputVariableName())[0];
-									FInputHandle GetNodeInput = HeadGetNode->GetInputsWithVertexName(VariableNames::GetInputVariableName())[0];
+									FOutputHandle SetNodeOutput = SetNode->GetOutputWithVertexName(VariableNames::GetOutputVariableName());
+									FInputHandle GetNodeInput = HeadGetNode->GetInputWithVertexName(VariableNames::GetInputVariableName());
 
 									ensure(SetNodeOutput->Connect(*GetNodeInput));
 								}
@@ -390,13 +390,13 @@ namespace Metasound
 					if (NewNode->IsValid())
 					{
 						// Connect new node.
-						FInputHandle NewInput = NewNode->GetInputsWithVertexName(VariableNames::GetInputVariableName())[0];
+						FInputHandle NewInput = NewNode->GetInputWithVertexName(VariableNames::GetInputVariableName());
 						FNodeHandle TailNode = FindTailNodeInVariableStack(InVariableID);
 
 						if (TailNode->IsValid())
 						{
 							// connect new node to the last "get" node.
-							FOutputHandle TailNodeOutput = TailNode->GetOutputsWithVertexName(VariableNames::GetOutputVariableName())[0];
+							FOutputHandle TailNodeOutput = TailNode->GetOutputWithVertexName(VariableNames::GetOutputVariableName());
 							check(!TailNodeOutput->IsConnected());
 							const bool bSuccess = TailNodeOutput->Connect(*NewInput);
 							check(bSuccess);
@@ -431,20 +431,20 @@ namespace Metasound
 					if (NewNode->IsValid())
 					{
 						// Connect new node.
-						FOutputHandle NewNodeOutput = NewNode->GetOutputsWithVertexName(VariableNames::GetOutputVariableName())[0];
+						FOutputHandle NewNodeOutput = NewNode->GetOutputWithVertexName(VariableNames::GetOutputVariableName());
 						FNodeHandle HeadNode = FindHeadNodeInVariableStack(InVariableID);
 						if (HeadNode->IsValid())
 						{
-							FInputHandle HeadNodeInput = HeadNode->GetInputsWithVertexName(VariableNames::GetInputVariableName())[0];
+							FInputHandle HeadNodeInput = HeadNode->GetInputWithVertexName(VariableNames::GetInputVariableName());
 							const bool bSuccess = HeadNodeInput->Connect(*NewNodeOutput);
 							check(bSuccess);
 						}
 
-						FInputHandle NewNodeInput = NewNode->GetInputsWithVertexName(VariableNames::GetInputVariableName())[0];
+						FInputHandle NewNodeInput = NewNode->GetInputWithVertexName(VariableNames::GetInputVariableName());
 						FNodeHandle VariableNode = GetNodeWithID(Variable->VariableNodeID);
 						if (ensure(VariableNode->IsValid()))
 						{
-							FOutputHandle VariableNodeOutput = VariableNode->GetOutputsWithVertexName(VariableNames::GetOutputVariableName())[0];
+							FOutputHandle VariableNodeOutput = VariableNode->GetOutputWithVertexName(VariableNames::GetOutputVariableName());
 							const bool bSuccess = VariableNodeOutput->Connect(*NewNodeInput);
 							check(bSuccess);
 						}
@@ -552,23 +552,15 @@ namespace Metasound
 			// removes a node while maintaining the daisy-chain.
 			check(InNode.IsValid());
 
-			TArray<FInputHandle> Inputs = InNode.GetInputsWithVertexName(VariableNames::GetInputVariableName());
-			if (Inputs.Num() == 1)
-			{
-				FInputHandle InputToSpliceOut = Inputs[0];
-				FOutputHandle OutputToReroute = InputToSpliceOut->GetConnectedOutput();
+			FInputHandle InputToSpliceOut = InNode.GetInputWithVertexName(VariableNames::GetInputVariableName());
+			FOutputHandle OutputToReroute = InputToSpliceOut->GetConnectedOutput();
 
-				if (OutputToReroute->IsValid())
+			if (OutputToReroute->IsValid())
+			{
+				FOutputHandle OutputToSpliceOut = InNode.GetOutputWithVertexName(VariableNames::GetOutputVariableName());
+				for (const FInputHandle& InputToReroute : OutputToSpliceOut->GetConnectedInputs())
 				{
-					TArray<FOutputHandle> Outputs = InNode.GetOutputsWithVertexName(VariableNames::GetOutputVariableName());
-					if (ensure(Outputs.Num() == 1))
-					{
-						FOutputHandle OutputToSpliceOut = Outputs[0];
-						for (const FInputHandle& InputToReroute : OutputToSpliceOut->GetConnectedInputs())
-						{
-							ensure(InputToReroute->Connect(*OutputToReroute));
-						}
-					}
+					ensure(InputToReroute->Connect(*OutputToReroute));
 				}
 			}
 		}

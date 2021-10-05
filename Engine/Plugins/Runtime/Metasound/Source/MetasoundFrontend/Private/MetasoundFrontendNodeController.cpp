@@ -454,78 +454,54 @@ namespace Metasound
 			}
 		}
 
-		TArray<FInputHandle> FBaseNodeController::GetInputsWithVertexName(const FVertexName& InName)
+		FInputHandle FBaseNodeController::GetInputWithVertexName(const FVertexName& InName)
 		{
-			TArray<FInputHandle> Inputs;
-
-			FNodeHandle ThisNode = this->AsShared();
-
-			for (const FInputControllerParams& Params : GetInputControllerParamsWithVertexName(InName))
+			FInputControllerParams Params;
+			if (FindInputControllerParamsWithVertexName(InName, Params))
 			{
-				FInputHandle InputHandle = CreateInputController(Params.VertexID, Params.NodeVertexPtr, Params.ClassInputPtr, ThisNode);
-				if (InputHandle->IsValid())
-				{
-					Inputs.Add(InputHandle);
-				}
+				FNodeHandle ThisNode = this->AsShared();
+				return CreateInputController(Params.VertexID, Params.NodeVertexPtr, Params.ClassInputPtr, ThisNode);
 			}
 
-			return Inputs;
+			return IInputController::GetInvalidHandle();
 		}
 
-		TArray<FConstInputHandle> FBaseNodeController::GetConstInputsWithVertexName(const FVertexName& InName) const
+		FConstInputHandle FBaseNodeController::GetConstInputWithVertexName(const FVertexName& InName) const
 		{
-			TArray<FConstInputHandle> Inputs;
-
-			// See early use of ConstCastSharedRef in this class for discussion.
-			FNodeHandle ThisNode = ConstCastSharedRef<INodeController>(this->AsShared());
-
-			for (const FInputControllerParams& Params : GetInputControllerParamsWithVertexName(InName))
+			FInputControllerParams Params;
+			if (FindInputControllerParamsWithVertexName(InName, Params))
 			{
-				FInputHandle InputHandle = CreateInputController(Params.VertexID, Params.NodeVertexPtr, Params.ClassInputPtr, ThisNode);
-				if (InputHandle->IsValid())
-				{
-					Inputs.Add(InputHandle);
-				}
+				// See early use of ConstCastSharedRef in this class for discussion.
+				FNodeHandle ThisNode = ConstCastSharedRef<INodeController>(this->AsShared());
+				return CreateInputController(Params.VertexID, Params.NodeVertexPtr, Params.ClassInputPtr, ThisNode);
 			}
 
-			return Inputs;
+			return IInputController::GetInvalidHandle();
 		}
 
-		TArray<FOutputHandle> FBaseNodeController::GetOutputsWithVertexName(const FVertexName& InName)
+		FOutputHandle FBaseNodeController::GetOutputWithVertexName(const FVertexName& InName)
 		{
-			TArray<FOutputHandle> Outputs;
-
-			FNodeHandle ThisNode = this->AsShared();
-
-			for (const FOutputControllerParams& Params : GetOutputControllerParamsWithVertexName(InName))
+			FOutputControllerParams Params;
+			if (FindOutputControllerParamsWithVertexName(InName, Params))
 			{
-				FOutputHandle OutputHandle = CreateOutputController(Params.VertexID, Params.NodeVertexPtr, Params.ClassOutputPtr, ThisNode);
-				if (OutputHandle->IsValid())
-				{
-					Outputs.Add(OutputHandle);
-				}
+				FNodeHandle ThisNode = this->AsShared();
+				return CreateOutputController(Params.VertexID, Params.NodeVertexPtr, Params.ClassOutputPtr, ThisNode);
 			}
 
-			return Outputs;
+			return IOutputController::GetInvalidHandle();
 		}
 
-		TArray<FConstOutputHandle> FBaseNodeController::GetConstOutputsWithVertexName(const FVertexName& InName) const
+		FConstOutputHandle FBaseNodeController::GetConstOutputWithVertexName(const FVertexName& InName) const
 		{
-			TArray<FConstOutputHandle> Outputs;
-
-			// See early use of ConstCastSharedRef in this class for discussion.
-			FNodeHandle ThisNode = ConstCastSharedRef<INodeController>(this->AsShared());
-
-			for (const FOutputControllerParams& Params : GetOutputControllerParamsWithVertexName(InName))
+			FOutputControllerParams Params;
+			if (FindOutputControllerParamsWithVertexName(InName, Params))
 			{
-				FConstOutputHandle OutputHandle = CreateOutputController(Params.VertexID, Params.NodeVertexPtr, Params.ClassOutputPtr, ThisNode);
-				if (OutputHandle->IsValid())
-				{
-					Outputs.Add(OutputHandle);
-				}
+				// See early use of ConstCastSharedRef in this class for discussion.
+				FNodeHandle ThisNode = ConstCastSharedRef<INodeController>(this->AsShared());
+				return CreateOutputController(Params.VertexID, Params.NodeVertexPtr, Params.ClassOutputPtr, ThisNode);
 			}
 
-			return Outputs;
+			return IOutputController::GetInvalidHandle();
 		}
 
 		FInputHandle FBaseNodeController::GetInputWithID(FGuid InVertexID)
@@ -625,36 +601,34 @@ namespace Metasound
 			return Outputs;
 		}
 
-		TArray<FBaseNodeController::FInputControllerParams> FBaseNodeController::GetInputControllerParamsWithVertexName(const FVertexName& InName) const
+		bool FBaseNodeController::FindInputControllerParamsWithVertexName(const FVertexName& InName, FInputControllerParams& OutParams) const
 		{
-			TArray<FBaseNodeController::FInputControllerParams> Inputs;
-
 			FConstVertexAccessPtr NodeVertexPtr = NodePtr.GetInputWithName(InName);
 
 			if (const FMetasoundFrontendVertex* Vertex = NodeVertexPtr.Get())
 			{
 				FConstClassInputAccessPtr ClassInputPtr = ClassPtr.GetInputWithName(InName);
 
-				Inputs.Add({Vertex->VertexID, NodeVertexPtr, ClassInputPtr});
+				OutParams = FInputControllerParams{Vertex->VertexID, NodeVertexPtr, ClassInputPtr};
+				return true;
 			}
 
-			return Inputs;
+			return false;
 		}
 
-		TArray<FBaseNodeController::FOutputControllerParams> FBaseNodeController::GetOutputControllerParamsWithVertexName(const FVertexName& InName) const
+		bool FBaseNodeController::FindOutputControllerParamsWithVertexName(const FVertexName& InName, FOutputControllerParams& OutParams) const
 		{
-			TArray<FBaseNodeController::FOutputControllerParams> Outputs;
-
 			FConstVertexAccessPtr NodeVertexPtr = NodePtr.GetOutputWithName(InName);
 
 			if (const FMetasoundFrontendVertex* Vertex = NodeVertexPtr.Get())
 			{
 				FConstClassOutputAccessPtr ClassOutputPtr = ClassPtr.GetOutputWithName(InName);
 
-				Outputs.Add({Vertex->VertexID, NodeVertexPtr, ClassOutputPtr});
+				OutParams = FOutputControllerParams{Vertex->VertexID, NodeVertexPtr, ClassOutputPtr};
+				return true;
 			}
 
-			return Outputs;
+			return false;
 		}
 
 		bool FBaseNodeController::FindInputControllerParamsWithID(FGuid InVertexID, FInputControllerParams& OutParams) const

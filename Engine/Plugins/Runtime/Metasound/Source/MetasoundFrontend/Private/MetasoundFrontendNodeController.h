@@ -104,8 +104,8 @@ namespace Metasound
 			int32 GetNumInputs() const override;
 			int32 GetNumOutputs() const override;
 
-			TArray<FInputHandle> GetInputsWithVertexName(const FVertexName& InName) override;
-			TArray<FConstInputHandle> GetConstInputsWithVertexName(const FVertexName& InName) const override;
+			FInputHandle GetInputWithVertexName(const FVertexName& InName) override;
+			FConstInputHandle GetConstInputWithVertexName(const FVertexName& InName) const override;
 
 			/** Returns all node outputs. */
 			TArray<FOutputHandle> GetOutputs() override;
@@ -113,8 +113,8 @@ namespace Metasound
 			/** Returns all node outputs. */
 			TArray<FConstOutputHandle> GetConstOutputs() const override;
 
-			TArray<FOutputHandle> GetOutputsWithVertexName(const FVertexName& InName) override;
-			TArray<FConstOutputHandle> GetConstOutputsWithVertexName(const FVertexName& InName) const override;
+			FOutputHandle GetOutputWithVertexName(const FVertexName& InName) override;
+			FConstOutputHandle GetConstOutputWithVertexName(const FVertexName& InName) const override;
 
 			bool IsRequired() const override;
 
@@ -171,8 +171,8 @@ namespace Metasound
 			virtual TArray<FInputControllerParams> GetInputControllerParams() const;
 			virtual TArray<FOutputControllerParams> GetOutputControllerParams() const;
 
-			virtual TArray<FInputControllerParams> GetInputControllerParamsWithVertexName(const FVertexName& InName) const;
-			virtual TArray<FOutputControllerParams> GetOutputControllerParamsWithVertexName(const FVertexName& InName) const;
+			virtual bool FindInputControllerParamsWithVertexName(const FVertexName& InName, FInputControllerParams& OutParams) const;
+			virtual bool FindOutputControllerParamsWithVertexName(const FVertexName& InName, FOutputControllerParams& OutParams) const;
 
 			virtual bool FindInputControllerParamsWithID(FGuid InVertexID, FInputControllerParams& OutParams) const;
 			virtual bool FindOutputControllerParamsWithID(FGuid InVertexID, FOutputControllerParams& OutParams) const;

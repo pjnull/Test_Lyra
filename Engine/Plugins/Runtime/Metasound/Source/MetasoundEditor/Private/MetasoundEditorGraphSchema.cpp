@@ -917,18 +917,18 @@ FText UMetasoundEditorGraphSchema::GetPinDisplayName(const UEdGraphPin* Pin) con
 		{
 			if (Pin->Direction == EGPD_Input)
 			{
-				TArray<FConstInputHandle> InputHandles = NodeHandle->GetConstInputsWithVertexName(Pin->GetFName());
-				if (ensure(!InputHandles.IsEmpty()))
+				FConstInputHandle InputHandle = NodeHandle->GetConstInputWithVertexName(Pin->GetFName());
+				if (InputHandle->IsValid())
 				{
-					return InputHandles[0]->GetDisplayName();;
+					return InputHandle->GetDisplayName();;
 				}
 			}
 			else
 			{
-				TArray<FConstOutputHandle> OutputHandles = NodeHandle->GetConstOutputsWithVertexName(Pin->GetFName());
-				if (ensure(!OutputHandles.IsEmpty()))
+				FConstOutputHandle OutputHandle = NodeHandle->GetConstOutputWithVertexName(Pin->GetFName());
+				if (OutputHandle->IsValid())
 				{
-					return OutputHandles[0]->GetDisplayName();
+					return OutputHandle->GetDisplayName();
 				}
 			}
 

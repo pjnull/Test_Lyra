@@ -248,23 +248,20 @@ namespace Metasound
 			// Generate the converter node.
 			FNodeHandle ConverterNode = OwningGraph->AddNode(InConverterInfo.NodeKey);
 
-			TArray<FInputHandle> ConverterInputs = ConverterNode->GetInputsWithVertexName(InConverterInfo.PreferredConverterInputPin);
-			TArray<FOutputHandle> ConverterOutputs = ConverterNode->GetOutputsWithVertexName(InConverterInfo.PreferredConverterOutputPin);
+			FInputHandle ConverterInput = ConverterNode->GetInputWithVertexName(InConverterInfo.PreferredConverterInputPin);
+			FOutputHandle ConverterOutput = ConverterNode->GetOutputWithVertexName(InConverterInfo.PreferredConverterOutputPin);
 
-			if (ConverterInputs.Num() < 1)
+			if (!ConverterInput->IsValid())
 			{
 				UE_LOG(LogMetaSound, Warning, TEXT("Converter node [Name: %s] does not support preferred input vertex [Vertex: %s]"), *ConverterNode->GetNodeName().ToString(), *InConverterInfo.PreferredConverterInputPin.ToString());
 				return false;
 			}
 
-			if (ConverterOutputs.Num() < 1)
+			if (!ConverterOutput->IsValid())
 			{
 				UE_LOG(LogMetaSound, Warning, TEXT("Converter node [Name: %s] does not support preferred output vertex [Vertex: %s]"), *ConverterNode->GetNodeName().ToString(), *InConverterInfo.PreferredConverterOutputPin.ToString());
 				return false;
 			}
-
-			FInputHandle ConverterInput = ConverterInputs[0];
-			FOutputHandle ConverterOutput = ConverterOutputs[0];
 
 			// Connect the output InController to the converter, than connect the converter to this input.
 			if (ConverterInput->Connect(InController) && Connect(*ConverterOutput))

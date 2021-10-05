@@ -2,7 +2,6 @@
 #include "MetasoundFrontendTransform.h"
 
 #include "Algo/Transform.h"
-#include "CoreMinimal.h"
 #include "MetasoundArchetype.h"
 #include "MetasoundAssetBase.h"
 #include "MetasoundFrontendArchetypeRegistry.h"
@@ -181,11 +180,8 @@ namespace Metasound
 						FNodeHandle OriginalInputNode = InGraph->GetInputNodeWithName(OriginalVertex.Name);
 						Locations = OriginalInputNode->GetNodeStyle().Display.Locations;
 
-						TArray<FOutputHandle> Outputs = OriginalInputNode->GetOutputsWithVertexName(OriginalVertex.Name);
-						if (Outputs.Num() == 1)
-						{
-							ConnectedInputs = Outputs[0]->GetConnectedInputs();
-						}
+						FOutputHandle OriginalInputNodeOutput = OriginalInputNode->GetOutputWithVertexName(OriginalVertex.Name);
+						ConnectedInputs = OriginalInputNodeOutput->GetConnectedInputs();
 						InGraph->RemoveInputVertex(OriginalVertex.Name);
 					}
 				}
@@ -201,14 +197,10 @@ namespace Metasound
 				}
 
 				// Copy prior node connections
-				TArray<FOutputHandle> OutputHandles= NewInputNode->GetOutputsWithVertexName(NewVertex.Name);
-				if (OutputHandles.Num() == 1)
+				FOutputHandle OutputHandle = NewInputNode->GetOutputWithVertexName(NewVertex.Name);
+				for (FInputHandle& ConnectedInput : ConnectedInputs)
 				{
-					FOutputHandle OutputHandle = OutputHandles[0];
-					for (FInputHandle& ConnectedInput : ConnectedInputs)
-					{
-						OutputHandle->Connect(*ConnectedInput);
-					}
+					OutputHandle->Connect(*ConnectedInput);
 				}
 			}
 
@@ -232,11 +224,8 @@ namespace Metasound
 					{
 						FNodeHandle OriginalOutputNode = InGraph->GetOutputNodeWithName(OriginalVertex.Name);
 						Locations = OriginalOutputNode->GetNodeStyle().Display.Locations;
-						TArray<FInputHandle> Inputs = OriginalOutputNode->GetInputsWithVertexName(OriginalVertex.Name);
-						if (Inputs.Num() == 1)
-						{
-							ConnectedOutput = Inputs[0]->GetConnectedOutput();
-						}
+						FInputHandle Input = OriginalOutputNode->GetInputWithVertexName(OriginalVertex.Name);
+						ConnectedOutput = Input->GetConnectedOutput();
 						InGraph->RemoveOutputVertex(OriginalVertex.Name);
 					}
 				}
@@ -251,11 +240,8 @@ namespace Metasound
 				}
 
 				// Copy prior node connections
-				TArray<FInputHandle> InputHandles= NewOutputNode->GetInputsWithVertexName(NewVertex.Name);
-				if (InputHandles.Num() == 1)
-				{
-					ConnectedOutput->Connect(*InputHandles[0]);
-				}
+				FInputHandle InputHandle = NewOutputNode->GetInputWithVertexName(NewVertex.Name);
+				ConnectedOutput->Connect(*InputHandle);
 			}
 
 			return bDidEdit;
@@ -525,18 +511,10 @@ namespace Metasound
 					InputNodeLocation += DisplayStyle::NodeLayout::DefaultOffsetY;
 
 					// Connect input node to corresponding wrapped node. 
-					TArray<FOutputHandle> OutputsToConnect = InputNode->GetOutputsWithVertexName(ClassInput.Name);
-					if (ensure(OutputsToConnect.Num() == 1))
-					{
-						FOutputHandle OutputToConnect = OutputsToConnect[0];
-
-						TArray<FInputHandle> InputsToConnect = InWrappedNode->GetInputsWithVertexName(ClassInput.Name);
-						if (ensure(InputsToConnect.Num() == 1))
-						{
-							bool bSuccess = OutputToConnect->Connect(*InputsToConnect[0]);
-							check(bSuccess);
-						}
-					}
+					FOutputHandle OutputToConnect = InputNode->GetOutputWithVertexName(ClassInput.Name);
+					FInputHandle InputToConnect = InWrappedNode->GetInputWithVertexName(ClassInput.Name);
+					bool bSuccess = OutputToConnect->Connect(*InputToConnect);
+					check(bSuccess);
 				}
 			}
 		}
@@ -559,18 +537,10 @@ namespace Metasound
 					OutputNodeLocation += DisplayStyle::NodeLayout::DefaultOffsetY;
 
 					// Connect input node to corresponding wrapped node. 
-					TArray<FInputHandle> InputsToConnect = OutputNode->GetInputsWithVertexName(ClassOutput.Name);
-					if (ensure(InputsToConnect.Num() == 1))
-					{
-						FInputHandle InputToConnect = InputsToConnect[0];
-
-						TArray<FOutputHandle> OutputsToConnect = InWrappedNode->GetOutputsWithVertexName(ClassOutput.Name);
-						if (ensure(OutputsToConnect.Num() == 1))
-						{
-							bool bSuccess = InputToConnect->Connect(*OutputsToConnect[0]);
-							check(bSuccess);
-						}
-					}
+					FInputHandle InputToConnect = OutputNode->GetInputWithVertexName(ClassOutput.Name);
+					FOutputHandle OutputToConnect = InWrappedNode->GetOutputWithVertexName(ClassOutput.Name);
+					bool bSuccess = InputToConnect->Connect(*OutputToConnect);
+					check(bSuccess);
 				}
 			}
 		}
@@ -587,11 +557,9 @@ namespace Metasound
 			WrappedGraph->IterateConstNodes([&](FConstNodeHandle InputNode)
 			{
 				const FName NodeName = InputNode->GetNodeName();
-				TArray<FConstInputHandle> Inputs = InputNode->GetConstInputsWithVertexName(NodeName);
-				if (ensure(Inputs.Num() == 1))
+				FConstInputHandle Input = InputNode->GetConstInputWithVertexName(NodeName);
+				if (ensure(Input->IsValid()))
 				{
-					const FConstInputHandle& Input = Inputs[0];
-
 					FMetasoundFrontendClassInput ClassInput;
 
 					ClassInput.Name = NodeName;
@@ -632,11 +600,9 @@ namespace Metasound
 			WrappedGraph->IterateConstNodes([&](FConstNodeHandle OutputNode)
 			{
 				const FName NodeName = OutputNode->GetNodeName();
-				TArray<FConstOutputHandle> Outputs = OutputNode->GetConstOutputsWithVertexName(NodeName);
-				if (ensure(Outputs.Num() == 1))
+				FConstOutputHandle Output = OutputNode->GetConstOutputWithVertexName(NodeName);
+				if (ensure(Output->IsValid()))
 				{
-					const FConstOutputHandle& Output = Outputs[0];
-
 					FMetasoundFrontendClassOutput ClassOutput;
 
 					ClassOutput.Name = NodeName;

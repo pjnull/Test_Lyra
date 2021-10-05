@@ -334,25 +334,7 @@ namespace Metasound
 			{
 				if (UMetasoundEditorGraphNode* EdNode = CastChecked<UMetasoundEditorGraphNode>(InPin->GetOwningNode()))
 				{
-					FNodeHandle NodeHandle = EdNode->GetNodeHandle();
-					if (NodeHandle->IsValid())
-					{
-						TArray<FInputHandle> Inputs;
-						const EMetasoundFrontendClassType ClassType = NodeHandle->GetClassMetadata().GetType();
-						if (ClassType == EMetasoundFrontendClassType::Input || ClassType == EMetasoundFrontendClassType::Output)
-						{
-							Inputs = NodeHandle->GetInputs();
-						}
-						else
-						{
-							Inputs = NodeHandle->GetInputsWithVertexName(InPin->GetFName());
-						}
-
-						if (ensure(Inputs.Num() == 1))
-						{
-							return Inputs[0];
-						}
-					}
+					return EdNode->GetNodeHandle()->GetInputWithVertexName(InPin->GetFName());
 				}
 			}
 
@@ -372,25 +354,7 @@ namespace Metasound
 			{
 				if (UMetasoundEditorGraphNode* EdNode = CastChecked<UMetasoundEditorGraphNode>(InPin->GetOwningNode()))
 				{
-					FNodeHandle NodeHandle = EdNode->GetNodeHandle();
-					if (NodeHandle->IsValid())
-					{
-						TArray<FOutputHandle> Outputs;
-						const EMetasoundFrontendClassType ClassType = NodeHandle->GetClassMetadata().GetType();
-						if (ClassType == EMetasoundFrontendClassType::Input || ClassType == EMetasoundFrontendClassType::Output)
-						{
-							Outputs = NodeHandle->GetOutputs();
-						}
-						else
-						{
-							Outputs = NodeHandle->GetOutputsWithVertexName(InPin->GetFName());
-						}
-
-						if (ensure(Outputs.Num() == 1))
-						{
-							return Outputs[0];
-						}
-					}
+					return EdNode->GetNodeHandle()->GetOutputWithVertexName(InPin->GetFName());
 				}
 			}
 
@@ -736,7 +700,7 @@ namespace Metasound
 			if (InPin.Direction == EGPD_Input)
 			{
 				FNodeHandle NodeHandle = CastChecked<UMetasoundEditorGraphNode>(InPin.GetOwningNode())->GetNodeHandle();
-				InputHandles = NodeHandle->GetInputsWithVertexName(InPin.GetFName());
+				InputHandles.Add(NodeHandle->GetInputWithVertexName(InPin.GetFName()));
 				InputPins.Add(&InPin);
 			}
 			else
@@ -745,7 +709,7 @@ namespace Metasound
 				for (UEdGraphPin* Pin : InPin.LinkedTo)
 				{
 					FNodeHandle NodeHandle = CastChecked<UMetasoundEditorGraphNode>(Pin->GetOwningNode())->GetNodeHandle();
-					InputHandles.Append(NodeHandle->GetInputsWithVertexName(Pin->GetFName()));
+					InputHandles.Add(NodeHandle->GetInputWithVertexName(Pin->GetFName()));
 					InputPins.Add(Pin);
 				}
 			}
