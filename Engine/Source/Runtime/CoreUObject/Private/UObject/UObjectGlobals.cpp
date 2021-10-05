@@ -758,15 +758,16 @@ bool ResolveName(UObject*& InPackage, FString& InOutName, bool Create, bool Thro
 			Create         = false;
 		}
 
-		FName* ScriptPackageName = nullptr;
+		bool bIsScriptPackage = false;
 		if (!bSubobjectPath)
 		{
 			// In case this is a short script package name, convert to long name before passing to CreatePackage/FindObject.
-			ScriptPackageName = FPackageName::FindScriptPackageName(*PartialName);
+			FName* ScriptPackageName = FPackageName::FindScriptPackageName(*PartialName);
 			if (ScriptPackageName)
 			{
 				PartialName = ScriptPackageName->ToString();
 			}
+			bIsScriptPackage = ScriptPackageName || FPackageName::IsScriptPackage(PartialName);
 		}
 
 		// Process any package redirects before calling CreatePackage/FindObject
@@ -795,13 +796,17 @@ bool ResolveName(UObject*& InPackage, FString& InOutName, bool Create, bool Thro
 		{
 			// Try to find the package in memory first, should be faster than attempting to load or create
 			InPackage = StaticFindObjectFast(UPackage::StaticClass(), InPackage, *PartialName);
-			if (!ScriptPackageName && !InPackage)
+			if (!bIsScriptPackage && !InPackage)
 			{
 				InPackage = LoadPackage(Cast<UPackage>(InPackage), *PartialName, LoadFlags, nullptr, InstancingContext);
 			}
 			if (!InPackage)
 			{
 				InPackage = CreatePackage(*PartialName);
+				if (bIsScriptPackage)
+				{
+					Cast<UPackage>(InPackage)->SetPackageFlags(PKG_CompiledIn);
+				}
 			}
 
 			check(InPackage);
