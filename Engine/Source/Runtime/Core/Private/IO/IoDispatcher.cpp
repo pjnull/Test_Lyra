@@ -940,24 +940,35 @@ FIoRequest::Status() const
 	}
 }
 
-TIoStatusOr<FIoBuffer>
-FIoRequest::GetResult()
+const FIoBuffer*
+FIoRequest::GetResult() const
 {
 	if (!Impl)
 	{
-		return FIoStatus::Invalid;
+		return nullptr;
 	}
 	FIoStatus Status(Impl->ErrorCode.Load());
 	check(Status.IsCompleted());
 	TIoStatusOr<FIoBuffer> Result;
 	if (Status.IsOk())
 	{
-		return Impl->GetBuffer();
+		return &Impl->GetBuffer();
 	}
 	else
 	{
-		return Status;
+		return nullptr;
 	}
+}
+
+const FIoBuffer&
+FIoRequest::GetResultOrDie() const
+{
+	const FIoBuffer* Result = GetResult();
+	if (!Result)
+	{
+		UE_LOG(LogIoDispatcher, Fatal, TEXT("I/O Error '%s'"), *Status().ToString());
+	}
+	return *Result;
 }
 
 void

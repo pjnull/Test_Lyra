@@ -628,7 +628,7 @@ struct FGlobalImportStore
 			InitialLoadEvent->Wait();
 			FPlatformProcess::ReturnSynchEventToPool(InitialLoadEvent);
 
-			FIoBuffer InitialLoadIoBuffer = IoRequest.GetResult().ConsumeValueOrDie();
+			const FIoBuffer& InitialLoadIoBuffer = IoRequest.GetResultOrDie();
 			FLargeMemoryReader InitialLoadArchive(InitialLoadIoBuffer.Data(), InitialLoadIoBuffer.DataSize());
 			FNameMap NameMap;
 			NameMap.Load(InitialLoadArchive, FMappedName::EType::Global);
@@ -3478,7 +3478,7 @@ EAsyncPackageState::Type FAsyncPackage2::Event_ProcessPackageSummary(FAsyncLoadi
 	{
 		check(Package->ExportBundleEntryIndex == 0);
 
-		const uint8* PackageSummaryData = Package->IoRequest.GetResult().ValueOrDie().Data();
+		const uint8* PackageSummaryData = Package->IoRequest.GetResultOrDie().Data();
 		const FPackageSummary* PackageSummary = reinterpret_cast<const FPackageSummary*>(PackageSummaryData);
 		{
 			TRACE_CPUPROFILER_EVENT_SCOPE(LoadPackageNameMap);
@@ -3597,7 +3597,7 @@ EAsyncPackageState::Type FAsyncPackage2::Event_ProcessExportBundle(FAsyncLoading
 	if (!Package->bLoadHasFailed)
 	{
 		const FExportBundleHeader* ExportBundle = Package->Data.ExportBundleHeaders + InExportBundleIndex;
-		const FIoBuffer& IoBuffer = Package->IoRequest.GetResult().ValueOrDie();
+		const FIoBuffer& IoBuffer = Package->IoRequest.GetResultOrDie();
 		const uint64 AllExportDataSize = IoBuffer.DataSize() - (Package->AllExportDataPtr - IoBuffer.Data());
 		if (Package->ExportBundleEntryIndex == 0)
 		{

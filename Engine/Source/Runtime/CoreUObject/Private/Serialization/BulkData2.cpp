@@ -477,8 +477,7 @@ public:
 			bool bIsOk = true;
 			for (Request& Request : RequestArray)
 			{
-				TIoStatusOr<FIoBuffer> RequestResult = Request.IoRequest.GetResult();
-				bIsOk &= RequestResult.IsOk();
+				bIsOk &= Request.IoRequest.Status().IsOk();
 			}
 			if (bIsOk)
 			{
@@ -1681,14 +1680,14 @@ void FBulkDataBase::InternalLoadFromIoStore(void** DstBuffer)
 	Batch.IssueAndTriggerEvent(BatchCompletedEvent);
 	BatchCompletedEvent->Wait(); // Blocking wait until all requests in the batch are done
 	FPlatformProcess::ReturnSynchEventToPool(BatchCompletedEvent);
-	CHECK_IOSTATUS(Request.GetResult().Status(), TEXT("FIoRequest"));
+	CHECK_IOSTATUS(Request.Status(), TEXT("FIoRequest"));
 
 	// If the data is compressed we need to decompress it to the destination buffer.
 	// We know it was compressed via FArchive so the easiest way to decompress it 
 	// is to wrap it in a memory reader archive.
 	if (IsStoredCompressedOnDisk())
 	{
-		const FIoBuffer& CompressedBuffer = Request.GetResult().ValueOrDie();
+		const FIoBuffer& CompressedBuffer = Request.GetResultOrDie();
 		FLargeMemoryReader Ar(CompressedBuffer.Data(), (int64)CompressedBuffer.DataSize());
 		Ar.SerializeCompressed(*DstBuffer, GetBulkDataSize(), GetDecompressionFormat(), COMPRESS_NoFlags, false);
 	}
