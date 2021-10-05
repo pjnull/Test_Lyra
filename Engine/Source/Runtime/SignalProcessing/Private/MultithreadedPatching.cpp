@@ -17,8 +17,8 @@ namespace Audio
 {
 	TAtomic<int32> FPatchOutput::PatchIDCounter(0);
 
-	FPatchOutput::FPatchOutput(int32 MaxCapacity, float InGain /*= 1.0f*/)
-		: InternalBuffer(MaxCapacity)
+	FPatchOutput::FPatchOutput(int32 InMaxCapacity, float InGain /*= 1.0f*/)
+		: InternalBuffer(InMaxCapacity)
 		, TargetGain(InGain)
 		, PreviousGain(InGain)
 		, PatchID(++PatchIDCounter)
@@ -41,12 +41,12 @@ namespace Audio
 	{
 		if (IsInputStale())
 		{
-			return -1;
+			return INDEX_NONE;
 		}
 
 		if (bUseLatestAudio && InternalBuffer.Num() > (uint32) NumSamples)
 		{
-			InternalBuffer.SetNum(((uint32)NumSamples));
+			InternalBuffer.SetNum((uint32)NumSamples);
 		}
 
 		int32 PopResult = InternalBuffer.Pop(OutBuffer, NumSamples);
@@ -75,7 +75,7 @@ namespace Audio
 	{
 		if (IsInputStale())
 		{
-			return -1;
+			return INDEX_NONE;
 		}
 
 		MixingBuffer.SetNumUninitialized(NumSamples, false);
@@ -113,7 +113,6 @@ namespace Audio
 
 	FPatchInput::FPatchInput(const FPatchOutputStrongPtr& InOutput)
 		: OutputHandle(InOutput)
-		, PushCallsCounter(0)
 	{
 		if (OutputHandle.IsValid())
 		{
@@ -121,22 +120,19 @@ namespace Audio
 		}
 	}
 
-	FPatchInput::FPatchInput()
-		: PushCallsCounter(0)
+	FPatchInput::FPatchInput(const FPatchInput& InOther)
+		: OutputHandle(InOther.OutputHandle)
 	{
-	}
-
-	FPatchInput::FPatchInput(const FPatchInput& Other)
-		: FPatchInput(Other.OutputHandle)
-	{
+		if (OutputHandle.IsValid())
+		{
+			OutputHandle->NumAliveInputs++;
+		}
 	}
 
 	FPatchInput::FPatchInput(FPatchInput&& Other)
+		: OutputHandle(MoveTemp(Other.OutputHandle))
+		, PushCallsCounter(Other.PushCallsCounter)
 	{
-		OutputHandle = Other.OutputHandle;
-		Other.OutputHandle.Reset();
-
-		PushCallsCounter = Other.PushCallsCounter;
 		Other.PushCallsCounter = 0;
 	}
 
@@ -175,7 +171,7 @@ namespace Audio
 	{
 		if (!OutputHandle.IsValid())
 		{
-			return -1;
+			return INDEX_NONE;
 		}
 
 		int32 SamplesPushed = OutputHandle->InternalBuffer.Push(InBuffer, NumSamples);
@@ -213,15 +209,11 @@ namespace Audio
 		return OutputHandle.IsValid() && !OutputHandle.IsUnique();
 	}
 
-	FPatchMixer::FPatchMixer()
-	{
-	}
-
 	FPatchInput FPatchMixer::AddNewInput(int32 InMaxLatencyInSamples, float InGain)
 	{
 		FScopeLock ScopeLock(&PendingNewInputsCriticalSection);
 
-		int32 NewPatchIndex = PendingNewInputs.Emplace(new FPatchOutput(InMaxLatencyInSamples, InGain));
+		const int32 NewPatchIndex = PendingNewInputs.Add(MakeShared<FPatchOutput, ESPMode::ThreadSafe>(InMaxLatencyInSamples, InGain));
 		return FPatchInput(PendingNewInputs[NewPatchIndex]);
 	}
 
@@ -328,7 +320,7 @@ namespace Audio
 	{
 		FScopeLock PendingInputDeletionScopeLock(&InputDeletionCriticalSection);
 
-		 // Callers of this function must have CurrentPatchesCritialSection locked so that 
+		 // Callers of this function must have CurrentPatchesCriticalSection locked so that 
 		 // this is not causing a race condition.
 		for (const FPatchOutputStrongPtr& Patch : CurrentInputs)
 		{
@@ -340,7 +332,7 @@ namespace Audio
 			}
 		}
 
-		// Iterate through all of the PatchIDs we need to clean up.
+		// Iterate through all of the PatchIDs to be cleaned up.
 		for (const int32& PatchID : DisconnectedInputs)
 		{
 			bool bInputRemoved = false;
@@ -366,7 +358,7 @@ namespace Audio
 				continue;
 			}
 
-			// Next, we check out current patchs.
+			// Disconnect stale patches.
 			for (int32 Index = 0; Index < CurrentInputs.Num(); Index++)
 			{
 				checkSlow(CurrentInputs[Index].IsValid());
@@ -380,14 +372,6 @@ namespace Audio
 		}
 
 		DisconnectedInputs.Reset();
-	}
-
-	FPatchSplitter::FPatchSplitter()
-	{
-	}
-
-	FPatchSplitter::~FPatchSplitter()
-	{
 	}
 
 	FPatchOutputStrongPtr FPatchSplitter::AddNewPatch(int32 MaxLatencyInSamples, float InGain)
@@ -485,14 +469,6 @@ namespace Audio
 		return MinimumSamplesPushed;
 	}
 
-	FPatchMixerSplitter::FPatchMixerSplitter()
-	{
-	}
-
-	FPatchMixerSplitter::~FPatchMixerSplitter()
-	{
-	}
-
 	FPatchOutputStrongPtr FPatchMixerSplitter::AddNewOutput(int32 MaxLatencyInSamples, float InGain)
 	{
 		return Splitter.AddNewPatch(MaxLatencyInSamples, InGain);
@@ -513,25 +489,28 @@ namespace Audio
 		Mixer.AddNewInput(InInput);
 	}
 
-	void FPatchMixerSplitter::RemovePatch(const FPatchInput& TapInput)
+	void FPatchMixerSplitter::RemovePatch(const FPatchInput& InInput)
 	{
-		Mixer.RemovePatch(TapInput);
+		Mixer.RemovePatch(InInput);
 	}
 
 	void FPatchMixerSplitter::ProcessAudio()
 	{
-		int32 NumSamplesToForward = FMath::Min(Mixer.MaxNumberOfSamplesThatCanBePopped(), Splitter.MaxNumberOfSamplesThatCanBePushed());
+		const int32 NumSamplesToPop = Mixer.MaxNumberOfSamplesThatCanBePopped();
+		const int32 NumSamplesToPush = Splitter.MaxNumberOfSamplesThatCanBePushed();
+		const int32 NumSamplesToForward = FMath::Min(NumSamplesToPush, NumSamplesToPop);
 		
 		if (NumSamplesToForward <= 0)
 		{
-			// Likely there are either no inputs or no outputs connected, or one of the inputs has not pushed any audio yet. Early exit.
+			// Early exit when there are either no inputs or no outputs
+			// connected, or one of the inputs has not pushed any audio yet.
 			return;
 		}
 
 		IntermediateBuffer.Reset();
 		IntermediateBuffer.AddUninitialized(NumSamplesToForward);
 
-		// Mix down inputs:
+		// Mix down inputs
 		int32 PopResult = Mixer.PopAudio(IntermediateBuffer.GetData(), NumSamplesToForward, false);
 		check(PopResult == NumSamplesToForward);
 		
