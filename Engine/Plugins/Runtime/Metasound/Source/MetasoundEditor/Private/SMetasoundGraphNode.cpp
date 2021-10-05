@@ -55,7 +55,7 @@ SMetasoundGraphNode::~SMetasoundGraphNode()
 			if (UMetasoundEditorGraphInputFloat* InputFloat = Cast<UMetasoundEditorGraphInputFloat>(GraphInput->Literal))
 			{
 				InputFloat->OnDefaultValueChanged.Remove(InputSliderOnValueChangedDelegateHandle);
-				InputFloat->OnInputWidgetRangeChanged.Remove(InputSliderOnRangeChangedDelegateHandle);
+				InputFloat->OnRangeChanged.Remove(InputSliderOnRangeChangedDelegateHandle);
 			}
 		}
 	}
@@ -554,6 +554,7 @@ TSharedRef<SWidget> SMetasoundGraphNode::CreateNodeContentArea()
 					{
 						SAssignNew(InputSlider, SAudioSlider)
 							.OnValueChanged_Lambda(OnValueChangedLambda);
+						InputSlider->SetShowUnitsText(false);
 					}
 					// Slider layout 
 					if (InputFloat->InputWidgetOrientation == Orient_Vertical)
@@ -596,30 +597,38 @@ TSharedRef<SWidget> SMetasoundGraphNode::CreateNodeContentArea()
 					}
 
 					// setup delegates 
-					if (!InputSliderOnValueChangedDelegateHandle.IsValid())
+					// clear delegate if necessary (ex. if was just saved) 
+					if (InputSliderOnValueChangedDelegateHandle.IsValid())
 					{
-						InputSliderOnValueChangedDelegateHandle = InputFloat->OnDefaultValueChanged.AddLambda([InputSlider = this->InputSlider](float Value)
-						{
-							if (InputSlider.IsValid())
-							{
-								const float LinValue = InputSlider->GetLinValue(Value);
-								InputSlider->SetValue(LinValue);
-							}
-						});
+						InputFloat->OnDefaultValueChanged.Remove(InputSliderOnValueChangedDelegateHandle);
+						InputSliderOnValueChangedDelegateHandle.Reset();
 					}
-					if (!InputSliderOnRangeChangedDelegateHandle.IsValid())
+					InputSliderOnValueChangedDelegateHandle = InputFloat->OnDefaultValueChanged.AddLambda([InputSlider = this->InputSlider](float Value)
 					{
-						InputSliderOnRangeChangedDelegateHandle = InputFloat->OnInputWidgetRangeChanged.AddLambda([InputSlider = this->InputSlider](FVector2D Range)
+						if (InputSlider.IsValid())
 						{
-							if (InputSlider.IsValid())
-							{
-								InputSlider->SetOutputRange(Range);
-							}
-						});
+							const float LinValue = InputSlider->GetLinValue(Value);
+							InputSlider->SetValue(LinValue);
+						}
+					});
+
+					if (InputSliderOnRangeChangedDelegateHandle.IsValid())
+					{
+						InputFloat->OnRangeChanged.Remove(InputSliderOnRangeChangedDelegateHandle);
+						InputSliderOnRangeChangedDelegateHandle.Reset();
 					}
-					InputSlider->SetOutputRange(InputFloat->GetInputWidgetRange());
+					InputSliderOnRangeChangedDelegateHandle = InputFloat->OnRangeChanged.AddLambda([InputSlider = this->InputSlider](FVector2D Range)
+					{
+						if (InputSlider.IsValid())
+						{
+							InputSlider->SetOutputRange(Range);
+						}
+					});
+
+					InputSlider->SetOutputRange(InputFloat->GetRange());
 					InputSlider->SetOrientation(InputFloat->InputWidgetOrientation);
 					InputSlider->SetAlwaysShowLabel(true);
+					InputSlider->SetUnitsTextReadOnly(true);
 					InputSlider->SetValue(InputSlider->GetLinValue(InputFloat->GetDefault()));
 				}
 			}

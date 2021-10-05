@@ -152,7 +152,7 @@ public:
 
 // For input widget
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnMetasoundInputValueChangedEvent, float);
-DECLARE_MULTICAST_DELEGATE_OneParam(FOnMetasoundInputWidgetRangeChangedEvent, FVector2D);
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnMetasoundRangeChangedEvent, FVector2D);
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnMetasoundInputClampDefaultChangedEvent, bool);
 
 UENUM()
@@ -175,14 +175,18 @@ class UMetasoundEditorGraphInputFloat : public UMetasoundEditorGraphInputLiteral
 {
 	GENERATED_BODY()
 
+private:
+	UPROPERTY(EditAnywhere, Category = DefaultValue)
+	float Default = 0.f;
+
 public:
 	virtual ~UMetasoundEditorGraphInputFloat() = default;
 
 	UPROPERTY(EditAnywhere, Category = DefaultValue, meta=(EditCondition = "InputWidgetType == EMetasoundInputWidget::None", EditConditionHides))
 	bool ClampDefault = false;
 
-	UPROPERTY(EditAnywhere, Category = DefaultValue, meta=(EditCondition = "ClampDefault || InputWidgetType == EMetasoundInputWidget::Slider", EditConditionHides))
-	FVector2D InputWidgetRange = FVector2D(TNumericLimits<float>::Lowest(), TNumericLimits<float>::Max());
+	UPROPERTY(EditAnywhere, Category = DefaultValue, meta = (EditCondition = "ClampDefault || InputWidgetType == EMetasoundInputWidget::Slider", EditConditionHides))
+	FVector2D Range = FVector2D(FMath::Min(0.0f, Default), FMath::Max(0.0f, Default));
 
 	UPROPERTY(EditAnywhere, Category = DefaultValue)
 	EMetasoundInputWidget InputWidgetType = EMetasoundInputWidget::None;
@@ -193,9 +197,8 @@ public:
 	UPROPERTY(EditAnywhere, Category = DefaultValue, meta=(EditCondition="InputWidgetType == EMetasoundInputWidget::Slider", EditConditionHides))
 	EMetasoundInputWidgetValueType InputWidgetValueType = EMetasoundInputWidgetValueType::Linear;
 
-
 	FOnMetasoundInputValueChangedEvent OnDefaultValueChanged;
-	FOnMetasoundInputWidgetRangeChangedEvent OnInputWidgetRangeChanged;
+	FOnMetasoundRangeChangedEvent OnRangeChanged;
 	FOnMetasoundInputClampDefaultChangedEvent OnClampInputChanged;
 
 	virtual FMetasoundFrontendLiteral GetDefault() const override;
@@ -206,11 +209,7 @@ public:
 
 	void SetDefault(const float InDefault);
 	float GetDefault();
-	FVector2D GetInputWidgetRange();
-
-private: 
-	UPROPERTY(EditAnywhere, Category = DefaultValue)
-	float Default = 0.f;
+	FVector2D GetRange();
 };
 
 UCLASS(MinimalAPI)

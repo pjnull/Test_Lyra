@@ -12,6 +12,7 @@
 #include "Styling/SlateWidgetStyleAsset.h"
 #include "Widgets/DeclarativeSyntaxSupport.h"
 #include "Widgets/SCompoundWidget.h"
+#include "Widgets/SOverlay.h"
 #include "Widgets/Input/NumericTypeInterface.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SEditableText.h"
@@ -31,13 +32,13 @@ struct FVariablePrecisionNumericInterface : public TDefaultNumericTypeInterface<
 	virtual FString ToString(const float& Value) const override
 	{
 		// examples: 1000, 100.1, 10.12, 1.123
-
+		float AbsValue = FMath::Abs(Value);
 		int32 FractionalDigits = 3;
-		if ((Value / 1000.f) >= 1.f)
+		if ((AbsValue / 1000.f) >= 1.f)
 			FractionalDigits = 0;
-		else if ((Value / 100.f) >= 1.f)
+		else if ((AbsValue / 100.f) >= 1.f)
 			FractionalDigits = 1;
-		else if ((Value / 10.f) >= 1.f)
+		else if ((AbsValue / 10.f) >= 1.f)
 			FractionalDigits = 2;
 
 		const FNumberFormattingOptions NumberFormattingOptions = FNumberFormattingOptions()
@@ -60,6 +61,7 @@ public:
 	{
 		_Value = 0.0f;
 		_AlwaysShowLabel = false;
+		_ShowUnitsText = true;
 		_Orientation = Orient_Vertical;
 
 		const ISlateStyle* AudioSliderStyle = FSlateStyleRegistry::FindSlateStyle("AudioSliderStyle");
@@ -77,6 +79,9 @@ public:
 
 		/** Whether the text label is always shown or only on hover. */
 		SLATE_ATTRIBUTE(bool, AlwaysShowLabel)
+			
+		/** Whether to show the units part of the text label. */
+		SLATE_ATTRIBUTE(bool, ShowUnitsText)
 
 		/** The orientation of the slider. */
 		SLATE_ARGUMENT(EOrientation, Orientation)
@@ -127,13 +132,16 @@ public:
 	void SetDesiredSizeOverride(const FVector2D DesiredSize);
 	void SetUnitsText(const FText Units);
 	/**
-	*  Set whether text label read only or editable.
+	*  Set whether text label (both value and units) read only or editable.
 	*/
-	void SetTextReadOnly(const bool bIsReadOnly);
+	void SetAllTextReadOnly(const bool bIsReadOnly);
+	void SetUnitsTextReadOnly(const bool bIsReadOnly);
+
 	/**
 	 * Set whether the text label is always shown or only on hover.
 	 */
 	void SetAlwaysShowLabel(const bool bAlwaysShowLabel);
+	void SetShowUnitsText(const bool bShowUnitsText);
 	void SetOrientation(EOrientation InOrientation);
 	void SetSliderBackgroundColor(FSlateColor InSliderBackgroundColor);
 	void SetSliderBarColor(FSlateColor InSliderBarColor);
@@ -147,6 +155,8 @@ protected:
 	TAttribute<float> ValueAttribute;
 	// Whether the text label is always shown or only on hover
 	TAttribute<bool> AlwaysShowLabel;
+	// Whether to show the units part of the text label 
+	TAttribute<bool> ShowUnitsText;
 	// Holds the slider's orientation
 	TAttribute<EOrientation> Orientation;
 	// Optional override for desired size 
@@ -161,17 +171,19 @@ protected:
 
 	// Widget components
 	TSharedPtr<SSlider> Slider;
-	TSharedPtr<SConstraintCanvas> TextLabel;
 	TSharedPtr<SEditableText> ValueText;
 	TSharedPtr<SEditableText> UnitsText;
 	TSharedPtr<SImage> LabelBackgroundImage;
 	TSharedPtr<SImage> SliderBackgroundTopCapImage;
+	TSharedPtr<SImage> SliderBackgroundLeftCapImage;
 	TSharedPtr<SImage> SliderBackgroundBottomCapImage;
+	TSharedPtr<SImage> SliderBackgroundRightCapImage;
 	TSharedPtr<SImage> SliderBackgroundRectangleImage;
 	TSharedPtr<SImage> SliderBarTopCapImage;
 	TSharedPtr<SImage> SliderBarBottomCapImage;
 	TSharedPtr<SImage> SliderBarRectangleImage;
 	TSharedPtr<SImage> WidgetBackgroundImage;
+	TSharedPtr<SOverlay> TextLabel;
 
 	// Range for output, currently only used for frequency sliders and sliders without curves
 	FVector2D OutputRange = FVector2D(0.0f, 1.0f);
@@ -180,9 +192,12 @@ protected:
 	static const FVariablePrecisionNumericInterface NumericInterface;
 private:
 	/** Switches between the vertical and horizontal views */
-	TSharedPtr<class SWidgetSwitcher> WidgetSwitcher;
+	TSharedPtr<SWidgetSwitcher> LayoutWidgetSwitcher;
+	TSharedPtr<SWidgetSwitcher> TextWidgetSwitcher;
 
-	TSharedRef<class SWidgetSwitcher> CreateWidgetLayout();
+	TSharedRef<SWidgetSwitcher> CreateWidgetLayout();
+	TSharedRef<SWidgetSwitcher> CreateTextWidgetSwitcher();
+	void UpdateValueTextWidth();
 };
 
 /* 
@@ -201,6 +216,7 @@ public:
 	const TWeakObjectPtr<const UCurveFloat> GetLinToOutputCurve();
 	const float GetOutputValue(const float LinValue);
 	const float GetLinValue(const float OutputValue);
+
 protected:
 	// Curves for mapping linear (0.0 - 1.0) to output (ex. dB for volume)  
 	TWeakObjectPtr<const UCurveFloat> LinToOutputCurve = nullptr;

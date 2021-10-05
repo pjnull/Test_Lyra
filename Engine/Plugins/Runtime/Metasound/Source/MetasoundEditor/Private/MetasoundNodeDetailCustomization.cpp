@@ -87,7 +87,7 @@ namespace Metasound
 			if (FloatLiteral.IsValid())
 			{
 				FloatLiteral->OnClampInputChanged.Remove(OnClampInputChangedDelegateHandle);
-				FloatLiteral->OnInputWidgetRangeChanged.Remove(InputWidgetOnRangeChangedDelegateHandle);
+				FloatLiteral->OnRangeChanged.Remove(InputWidgetOnRangeChangedDelegateHandle);
 			}
 		}
 
@@ -107,9 +107,9 @@ namespace Metasound
 				// If clamping or using slider, clamp default value to given range 
 				if (InputFloat->ClampDefault || InputFloat->InputWidgetType == EMetasoundInputWidget::Slider)
 				{
-					FVector2D InputWidgetRange = InputFloat->GetInputWidgetRange();
-					InDefaultValueHandle->SetInstanceMetaData("ClampMin", FString::Printf(TEXT("%f"), InputWidgetRange.X));
-					InDefaultValueHandle->SetInstanceMetaData("ClampMax", FString::Printf(TEXT("%f"), InputWidgetRange.Y));
+					FVector2D Range = InputFloat->GetRange();
+					InDefaultValueHandle->SetInstanceMetaData("ClampMin", FString::Printf(TEXT("%f"), Range.X));
+					InDefaultValueHandle->SetInstanceMetaData("ClampMax", FString::Printf(TEXT("%f"), Range.Y));
 				}
 				else // Stop clamping
 				{
@@ -131,10 +131,10 @@ namespace Metasound
 					}
 				});
 			}
-			if (IDetailPropertyRow* Row = InputCategoryBuilder->AddExternalObjectProperty(TArray<UObject*>({ InputFloat }), GET_MEMBER_NAME_CHECKED(UMetasoundEditorGraphInputFloat, InputWidgetRange)))
+			if (IDetailPropertyRow* Row = InputCategoryBuilder->AddExternalObjectProperty(TArray<UObject*>({ InputFloat }), GET_MEMBER_NAME_CHECKED(UMetasoundEditorGraphInputFloat, Range)))
 			{
-				TSharedPtr<IPropertyHandle> InputWidgetRangeHandle = Row->GetPropertyHandle();
-				if (InputWidgetRangeHandle.IsValid())
+				TSharedPtr<IPropertyHandle> RangeHandle = Row->GetPropertyHandle();
+				if (RangeHandle.IsValid())
 				{
 					TWeakObjectPtr<UMetasoundEditorGraphInput> Input = Cast<UMetasoundEditorGraphInput>(FloatLiteral->GetOuter());
 					FSimpleDelegate UpdateDocumentInput = FSimpleDelegate::CreateLambda([Input]()
@@ -144,17 +144,17 @@ namespace Metasound
 							Input->UpdateDocumentInput();
 						}
 					});
-					InputWidgetRangeHandle->SetOnPropertyValueChanged(UpdateDocumentInput);
-					InputWidgetRangeHandle->SetOnChildPropertyValueChanged(UpdateDocumentInput);
+					RangeHandle->SetOnPropertyValueChanged(UpdateDocumentInput);
+					RangeHandle->SetOnChildPropertyValueChanged(UpdateDocumentInput);
 
 					// If the range is changed, we want to update these details in case we now need to clamp the value
 					if (!InputWidgetOnRangeChangedDelegateHandle.IsValid())
 					{
-						InputWidgetOnRangeChangedDelegateHandle = InputFloat->OnInputWidgetRangeChanged.AddLambda([this](FVector2D Range)
+						InputWidgetOnRangeChangedDelegateHandle = InputFloat->OnRangeChanged.AddLambda([this](FVector2D Range)
 						{
 							if (FloatLiteral.IsValid())
 							{
-								FloatLiteral->OnInputWidgetRangeChanged.Remove(InputWidgetOnRangeChangedDelegateHandle);
+								FloatLiteral->OnRangeChanged.Remove(InputWidgetOnRangeChangedDelegateHandle);
 								TSharedPtr<FEditor> ParentEditor = FGraphBuilder::GetEditorForMetasound(*FloatLiteral->GetOutermostObject());
 								if (ParentEditor.IsValid())
 								{

@@ -26,11 +26,12 @@ FAudioSliderStyle::FAudioSliderStyle()
 	const FVector2D SliderBackgroundRectangleSize = FVector2D(SliderBackgroundWidth, SliderBackgroundHeight - SliderBackgroundWidth);
 	const FVector2D SliderBackgroundSize = FVector2D(SliderBackgroundWidth, SliderBackgroundHeight);
 	
-	const float LabelVerticalPadding = 6.0f;
+	const float LabelVerticalPadding = 3.0f;
 	const FVector2D DesiredWidgetSizeVertical = FVector2D(LabelWidth, LabelHeight + LabelVerticalPadding + SliderBackgroundHeight);
 	const FVector2D DesiredWidgetSizeHorizontal = FVector2D(SliderBackgroundHeight + LabelWidth, SliderBackgroundWidth);
 	
 	Set("AudioSlider.LabelVerticalPadding", LabelVerticalPadding);
+	Set("AudioSlider.LabelBackgroundSize", LabelBackgroundSize);
 	Set("AudioSlider.DesiredWidgetSizeVertical", DesiredWidgetSizeVertical);
 	Set("AudioSlider.DesiredWidgetSizeHorizontal", DesiredWidgetSizeHorizontal);
 
@@ -38,6 +39,7 @@ FAudioSliderStyle::FAudioSliderStyle()
 	Set("AudioSlider.SliderBarCap", new IMAGE_BRUSH_SVG(TEXT("SliderBarCap"), SliderBarCapSize));
 	Set("AudioSlider.SliderBarRectangle", new IMAGE_BRUSH_SVG(TEXT("SliderBarRectangle"), SliderBarRectangleSize));
 	Set("AudioSlider.SliderBackgroundCap", new IMAGE_BRUSH_SVG(TEXT("SliderBackgroundCap"), SliderBackgroundCapSize));
+	Set("AudioSlider.SliderBackgroundCapHorizontal", new IMAGE_BRUSH_SVG(TEXT("SliderBackgroundCapHorizontal"), FVector2D(SliderBackgroundCapSize.Y, SliderBackgroundCapSize.X)));
 	Set("AudioSlider.SliderBackgroundRectangle", new IMAGE_BRUSH_SVG(TEXT("SliderBackgroundRectangle"), SliderBackgroundRectangleSize));
 	Set("AudioSlider.WidgetBackground", new IMAGE_BRUSH_SVG(TEXT("WidgetBackground"), DesiredWidgetSizeVertical));
 
