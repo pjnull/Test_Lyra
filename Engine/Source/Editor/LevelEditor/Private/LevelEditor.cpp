@@ -1115,13 +1115,13 @@ void FLevelEditorModule::BindGlobalLevelEditorCommands()
 	ActionList.MapAction(
 		Commands.SelectStaticMeshesOfSameClass,
 		FExecuteAction::CreateStatic( &FLevelEditorActionCallbacks::ExecuteExecCommand, FString( TEXT("ACTOR SELECT MATCHINGSTATICMESH") ) ),
-		FCanExecuteAction::CreateStatic( &FLevelEditorActionCallbacks::ActorTypesSelected_CanExecute, FLevelEditorActionCallbacks::IncludeStaticMeshes, /*bSingleOnly*/ false )
+		FCanExecuteAction::CreateStatic( &FLevelEditorActionCallbacks::ActorSelected_CanExecute )
 		);
 
 	ActionList.MapAction(
 		Commands.SelectStaticMeshesAllClasses,
 		FExecuteAction::CreateStatic( &FLevelEditorActionCallbacks::ExecuteExecCommand, FString( TEXT("ACTOR SELECT MATCHINGSTATICMESH ALLCLASSES") ) ),
-		FCanExecuteAction::CreateStatic( &FLevelEditorActionCallbacks::ActorTypesSelected_CanExecute, FLevelEditorActionCallbacks::IncludeStaticMeshes, /*bSingleOnly*/ false )
+		FCanExecuteAction::CreateStatic( &FLevelEditorActionCallbacks::ActorSelected_CanExecute )
 		);
 
 	ActionList.MapAction(
