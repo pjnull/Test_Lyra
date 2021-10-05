@@ -11261,7 +11261,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	}
 
 	// draw debug properties
-#if !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
+#if !UE_BUILD_SHIPPING
 
 	auto DrawDebugPropertiesForWorld = [Canvas, CanvasObject, &DebugProperties](UWorld* DebugWorld, int32& X, int32& Y)
 	{
