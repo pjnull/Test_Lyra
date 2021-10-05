@@ -162,7 +162,9 @@ void ULandscapeEditorObject::PostEditChangeProperty(FPropertyChangedEvent& Prope
 		PropertyChangedEvent.MemberProperty->GetFName() == GET_MEMBER_NAME_CHECKED(ULandscapeEditorObject, ImportLandscape_HeightmapFilename) ||
 		PropertyChangedEvent.MemberProperty->GetFName() == GET_MEMBER_NAME_CHECKED(ULandscapeEditorObject, ImportLandscape_Layers))
 	{
-		RefreshImportLayersList();
+		// In Import/Export tool we need to refresh from the existing material
+		const bool bRefreshFromTarget = ParentMode && ParentMode->CurrentTool && ParentMode->CurrentTool->GetToolName() == FName(TEXT("ImportExport"));
+		RefreshImportLayersList(bRefreshFromTarget);
 	}
 
 	if (PropertyChangedEvent.MemberProperty == nullptr ||
