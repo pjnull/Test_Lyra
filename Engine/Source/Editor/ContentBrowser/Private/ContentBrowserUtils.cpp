@@ -618,7 +618,7 @@ TSharedPtr<FBlacklistPaths> ContentBrowserUtils::GetCombinedFolderBlacklist(cons
 
 		if (bHidingReadOnlyFolders && bHidingFolders)
 		{
-			FBlacklistPaths IntersectedFilter = FolderBlacklist->CombinePathFilters(*WritableFolderBlacklist.Get());
+			FPathPermissionList IntersectedFilter = FolderBlacklist->CombinePathFilters(*WritableFolderBlacklist.Get());
 			CombinedFolderBlacklist->Append(IntersectedFilter);
 		}
 		else if (bHidingReadOnlyFolders)
