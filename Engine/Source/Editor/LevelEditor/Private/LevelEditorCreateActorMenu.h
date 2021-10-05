@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 
+struct FToolMenuSection;
 class UToolMenu;
 class ULevelEditorContextMenuContext;
 
