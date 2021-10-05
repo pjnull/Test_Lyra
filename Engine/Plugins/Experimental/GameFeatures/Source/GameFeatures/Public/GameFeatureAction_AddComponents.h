@@ -24,7 +24,7 @@ struct GAMEFEATURES_API FGameFeatureComponentEntry
 	GENERATED_BODY()
 
 	// The base actor class to add a component to
-	UPROPERTY(EditAnywhere, Category="Components")
+	UPROPERTY(EditAnywhere, Category="Components", meta=(AllowAbstract="True"))
 	TSoftClassPtr<AActor> ActorClass;
 
 	// The component class to add to the specified type of actor
