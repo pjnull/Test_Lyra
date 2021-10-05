@@ -1545,6 +1545,25 @@ float3 MaterialExpressionPostSkinOffset(FMaterialVertexParameters Parameters)
 #endif
 }
 
+// We use a forward declaration towards the real implementation of functions we need. This is always defined for base passes (opaque and translucent)
+#if defined(IS_BASE_PASS) && IS_MOBILE_BASE_PASS==0
+float3 GetSkyLightReflectionSupportingBlend(float3 ReflectionVector, float Roughness, out float OutSkyAverageBrightness);
+#elif defined(IS_BASE_PASS) && IS_MOBILE_BASE_PASS==1
+half3 GetMobileSkyLightReflection(half3 ReflectionVector, half Roughness, half CubemapMaxMip);
+#endif
+
+float3 MaterialExpressionSkyLightEnvMapSample(float3 Direction, float Roughness)
+{
+#if defined(IS_BASE_PASS) && IS_MOBILE_BASE_PASS==0
+	float SkyAverageBrightness = 1.0f;
+	return GetSkyLightReflectionSupportingBlend(Direction, Roughness, SkyAverageBrightness);
+#elif defined(IS_BASE_PASS) && IS_MOBILE_BASE_PASS==1
+	return GetMobileSkyLightReflection(Direction, Roughness, MobileReflectionCapture.Params.y);
+#else 
+	return 0.0f;
+#endif
+}
+
 /**
  * Utility function to unmirror one coordinate value to the other side
  * UnMirrored == 1 if normal
