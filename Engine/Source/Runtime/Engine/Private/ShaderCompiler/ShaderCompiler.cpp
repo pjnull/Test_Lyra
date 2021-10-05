@@ -4550,6 +4550,10 @@ void FShaderCompilingManager::PrintStats(bool bForceLogIgnoringTimeInverval)
 	{
 		return;
 	}
+	if (!AllowShaderCompiling())
+	{
+		return;
+	}
 
 	UE_LOG(LogShaderCompilers, Display, TEXT("================================================"));
 
