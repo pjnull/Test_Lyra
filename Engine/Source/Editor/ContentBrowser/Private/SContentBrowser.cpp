@@ -667,6 +667,12 @@ TSharedRef<SWidget> SContentBrowser::CreateLockButton(const FContentBrowserConfi
 
 TSharedRef<SWidget> SContentBrowser::CreateAssetView(const FContentBrowserConfig* Config)
 {
+	// Item height is specified explicitly here, rather than relying on the padding being exactly right,
+	// so that the search box doesn't subtly shift up/down when the filters are wrapped to a new row in the SWrapBox.
+	const float SearchFilterItemHeight = 32.0f;
+
+	const float SearchBoxDesiredWidth = 500.0f;
+
 	return
 		SNew(SVerticalBox)
 		+ SVerticalBox::Slot()
@@ -675,77 +681,100 @@ TSharedRef<SWidget> SContentBrowser::CreateAssetView(const FContentBrowserConfig
 		[
 			SNew(SBorder)
 			.BorderImage(FAppStyle::Get().GetBrush("Brushes.Panel"))
-			.Padding(FMargin(0.0f, 5.0f))
 			[
-				SNew(SHorizontalBox)
-				// Search
-				+ SHorizontalBox::Slot()
-				.VAlign(VAlign_Center)
-				.Padding(5, 0, 0, 0)
-				.FillWidth(TAttribute<float>(this, &SContentBrowser::GetSearchBoxFillWidth))
-				[
-					SAssignNew(SearchBoxPtr, SAssetSearchBox)
-					.HintText(this, &SContentBrowser::GetSearchAssetsHintText)
-					.OnTextChanged(this, &SContentBrowser::OnSearchBoxChanged)
-					.OnTextCommitted(this, &SContentBrowser::OnSearchBoxCommitted)
-					.OnKeyDownHandler(this, &SContentBrowser::OnSearchKeyDown)
-					.OnAssetSearchBoxSuggestionFilter(this, &SContentBrowser::OnAssetSearchSuggestionFilter)
-					.OnAssetSearchBoxSuggestionChosen(this, &SContentBrowser::OnAssetSearchSuggestionChosen)
-					.DelayChangeNotificationsWhileTyping(true)
-					.Visibility((Config != nullptr ? Config->bCanShowAssetSearch : true) ? EVisibility::Visible : EVisibility::Collapsed)
-					.AddMetaData<FTagMetaData>(FTagMetaData(TEXT("ContentBrowserSearchAssets")))
-				]
-					
-				// Save Search
-				+ SHorizontalBox::Slot()
-				.AutoWidth()
-				.VAlign(VAlign_Center)
-				.Padding(2.0f, 0.0f, 0.0f, 0.0f)
-				[
-					SNew(SButton)
-					.ButtonStyle(FAppStyle::Get(), "SimpleButton")
-					.ToolTipText(LOCTEXT("SaveSearchButtonTooltip", "Save the current search as a dynamic collection."))
-					.IsEnabled(this, &SContentBrowser::IsSaveSearchButtonEnabled)
-					.OnClicked(this, &SContentBrowser::OnSaveSearchButtonClicked)
-					.ContentPadding(FMargin(1, 1))
-					.Visibility((Config != nullptr ? Config->bCanShowAssetSearch : true) ? EVisibility::Visible : EVisibility::Collapsed)
-					[
-						SNew(STextBlock)
-						.TextStyle(FEditorStyle::Get(), "GenericFilters.TextStyle")
-						.Font(FEditorStyle::Get().GetFontStyle("FontAwesome.10"))
-						.Text(FEditorFontGlyphs::Floppy_O)
-					]
-				]
-				+ SHorizontalBox::Slot()
-				.AutoWidth()
+				SNew(SWrapBox)
+				.UseAllottedSize(true)
+				.InnerSlotPadding(FVector2D(4.0f, 0.0f))
+				+ SWrapBox::Slot()
 				.HAlign(HAlign_Left)
-				.Padding(5, 0, 0, 0)
+				.VAlign(VAlign_Center)
+				.FillEmptySpace(true)
 				[
-					SNew(SComboButton)
-					.ComboButtonStyle(&FAppStyle::Get().GetWidgetStyle<FComboButtonStyle>("SimpleComboButtonWithIcon"))
-					.ForegroundColor(FSlateColor::UseStyle())
-					.ToolTipText(LOCTEXT("AddFilterToolTip", "Add an asset filter."))
-					.OnGetMenuContent(this, &SContentBrowser::MakeAddFilterMenu)
-					.ContentPadding(FMargin(1, 0))
-					.AddMetaData<FTagMetaData>(FTagMetaData(TEXT("ContentBrowserFiltersCombo")))
-					.Visibility((Config != nullptr ? Config->bCanShowFilters : true) ? EVisibility::Visible : EVisibility::Collapsed)
-					.ButtonContent()
+					// Search field / Save Search button / Filter dropdown
+					SNew(SBox)
+					.MinDesiredHeight(SearchFilterItemHeight)
+					.VAlign(VAlign_Center)
+					.WidthOverride(SearchBoxDesiredWidth)
 					[
-						SNew(SImage)
-						.Image(FAppStyle::Get().GetBrush("Icons.Filter"))
-						.ColorAndOpacity(FSlateColor::UseForeground())
+						SNew(SHorizontalBox)
+						// Search
+						+ SHorizontalBox::Slot()
+						.VAlign(VAlign_Center)
+						.Padding(5, 0, 0, 0)
+						.FillWidth(1.0)
+						[
+							SAssignNew(SearchBoxPtr, SAssetSearchBox)
+							.HintText(this, &SContentBrowser::GetSearchAssetsHintText)
+							.OnTextChanged(this, &SContentBrowser::OnSearchBoxChanged)
+							.OnTextCommitted(this, &SContentBrowser::OnSearchBoxCommitted)
+							.OnKeyDownHandler(this, &SContentBrowser::OnSearchKeyDown)
+							.OnAssetSearchBoxSuggestionFilter(this, &SContentBrowser::OnAssetSearchSuggestionFilter)
+							.OnAssetSearchBoxSuggestionChosen(this, &SContentBrowser::OnAssetSearchSuggestionChosen)
+							.DelayChangeNotificationsWhileTyping(true)
+							.Visibility((Config != nullptr ? Config->bCanShowAssetSearch : true) ? EVisibility::Visible : EVisibility::Collapsed)
+							.AddMetaData<FTagMetaData>(FTagMetaData(TEXT("ContentBrowserSearchAssets")))
+						]
+					
+						// Save Search
+						+ SHorizontalBox::Slot()
+						.AutoWidth()
+						.VAlign(VAlign_Center)
+						.Padding(2.0f, 0.0f, 0.0f, 0.0f)
+						[
+							SNew(SButton)
+							.ButtonStyle(FAppStyle::Get(), "SimpleButton")
+							.ToolTipText(LOCTEXT("SaveSearchButtonTooltip", "Save the current search as a dynamic collection."))
+							.IsEnabled(this, &SContentBrowser::IsSaveSearchButtonEnabled)
+							.OnClicked(this, &SContentBrowser::OnSaveSearchButtonClicked)
+							.ContentPadding(FMargin(1, 1))
+							.Visibility((Config != nullptr ? Config->bCanShowAssetSearch : true) ? EVisibility::Visible : EVisibility::Collapsed)
+							[
+								SNew(STextBlock)
+								.TextStyle(FEditorStyle::Get(), "GenericFilters.TextStyle")
+								.Font(FEditorStyle::Get().GetFontStyle("FontAwesome.10"))
+								.Text(FEditorFontGlyphs::Floppy_O)
+							]
+						]
+						// Filter dropdown
+						+ SHorizontalBox::Slot()
+						.AutoWidth()
+						.HAlign(HAlign_Left)
+						.Padding(5, 0, 0, 0)
+						[
+							SNew(SComboButton)
+							.ComboButtonStyle(&FAppStyle::Get().GetWidgetStyle<FComboButtonStyle>("SimpleComboButtonWithIcon"))
+							.ForegroundColor(FSlateColor::UseStyle())
+							.ToolTipText(LOCTEXT("AddFilterToolTip", "Add an asset filter."))
+							.OnGetMenuContent(this, &SContentBrowser::MakeAddFilterMenu)
+							.ContentPadding(FMargin(1, 0))
+							.AddMetaData<FTagMetaData>(FTagMetaData(TEXT("ContentBrowserFiltersCombo")))
+							.Visibility((Config != nullptr ? Config->bCanShowFilters : true) ? EVisibility::Visible : EVisibility::Collapsed)
+							.ButtonContent()
+							[
+								SNew(SImage)
+								.Image(FAppStyle::Get().GetBrush("Icons.Filter"))
+								.ColorAndOpacity(FSlateColor::UseForeground())
+							]
+						]
 					]
 				]
-				+ SHorizontalBox::Slot()
-				.Padding(5.0f,0.0f,0.0f,0.0f)
+				+ SWrapBox::Slot()
+				.HAlign(HAlign_Left)
 				.VAlign(VAlign_Center)
+				.FillEmptySpace(true)
 				[
-					SAssignNew(FilterListPtr, SFilterList)
-					.OnFilterChanged(this, &SContentBrowser::OnFilterChanged)
-					.OnGetContextMenu(this, &SContentBrowser::GetFilterContextMenu)
-					.Visibility((Config != nullptr ? Config->bCanShowFilters : true) ? EVisibility::Visible : EVisibility::Collapsed)
-					.FrontendFilters(FrontendFilters)
-					.AddMetaData<FTagMetaData>(FTagMetaData(TEXT("ContentBrowserFilters")))
+					// Filter list
+					SNew(SBox)
+					.MinDesiredHeight_Lambda([this, SearchFilterItemHeight]() { return FilterListPtr->HasAnyFilters() ? SearchFilterItemHeight : 0; })
+					.VAlign(VAlign_Center)
+					[
+						SAssignNew(FilterListPtr, SFilterList)
+						.OnFilterChanged(this, &SContentBrowser::OnFilterChanged)
+						.OnGetContextMenu(this, &SContentBrowser::GetFilterContextMenu)
+						.Visibility((Config != nullptr ? Config->bCanShowFilters : true) ? EVisibility::Visible : EVisibility::Collapsed)
+						.FrontendFilters(FrontendFilters)
+						.AddMetaData<FTagMetaData>(FTagMetaData(TEXT("ContentBrowserFilters")))
+					]
 				]
 			]
 		]
@@ -1137,20 +1166,6 @@ SSplitter::ESizeRule SContentBrowser::GetPathAreaSizeRule() const
 SSplitter::ESizeRule SContentBrowser::GetCollectionsAreaSizeRule() const
 {
 	return CollectionArea->IsExpanded() ? SSplitter::ESizeRule::FractionOfParent : SSplitter::ESizeRule::SizeToContent;
-}
-
-float SContentBrowser::GetSearchBoxFillWidth() const
-{
-	// Gives more room to the search box when the  content browser is constrained to a small space
-	float LocalWidth = GetTickSpaceGeometry().GetLocalSize().X;
-	if (LocalWidth < 1000.f)
-	{
-		return 1.0f;
-	}
-	else
-	{
-		return .35f;
-	}
 }
 
 FText SContentBrowser::GetHighlightedText() const

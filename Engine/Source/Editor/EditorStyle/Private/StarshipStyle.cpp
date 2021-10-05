@@ -6305,6 +6305,22 @@ void FStarshipEditorStyle::FStyle::SetupContentBrowserStyle()
 		/* ... and add the new style */
 		Set("ContentBrowser.FilterButton", ContentBrowserFilterButtonCheckBoxStyle );
 
+		// Filter list implemented as toolbar
+		FToolBarStyle FilterToolBar = FToolBarStyle(FStarshipCoreStyle::GetCoreStyle().GetWidgetStyle<FToolBarStyle>("SlimToolBar"))
+			.SetIconSize(Icon16x16)
+			.SetBackground(FSlateNoResource())
+			.SetLabelPadding(FMargin(0))
+			.SetComboButtonPadding(FMargin(0))
+			.SetBlockPadding(FMargin(3, 0))
+			.SetIndentedBlockPadding(FMargin(0))
+			.SetBackgroundPadding(FMargin(0))
+			.SetButtonPadding(FMargin(0))
+			.SetCheckBoxPadding(FMargin(0))
+			.SetSeparatorBrush(FSlateNoResource())
+			.SetSeparatorPadding(FMargin(0));
+
+		Set("ContentBrowser.FilterToolBar", FilterToolBar);
+
 		// Sources view
 		Set("ContentBrowser.Sources.Paths", new IMAGE_BRUSH("ContentBrowser/Sources_Paths_16x", Icon16x16));
 		Set("ContentBrowser.Sources.Collections", new IMAGE_BRUSH("ContentBrowser/Sources_Collections_Standard_16x", Icon16x16));
