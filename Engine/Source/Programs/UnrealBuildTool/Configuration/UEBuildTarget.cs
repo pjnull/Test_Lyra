@@ -13,6 +13,7 @@ using System.Runtime.Serialization;
 using System.Text.RegularExpressions;
 using EpicGames.Core;
 using System.Reflection;
+using OpenTracing.Util;
 using UnrealBuildBase;
 
 namespace UnrealBuildTool
@@ -709,13 +710,13 @@ namespace UnrealBuildTool
 			}
 
 			RulesAssembly RulesAssembly;
-			using(Timeline.ScopeEvent("RulesCompiler.CreateTargetRulesAssembly()"))
+			using (GlobalTracer.Instance.BuildSpan("RulesCompiler.CreateTargetRulesAssembly()").StartActive())
 			{
 				RulesAssembly = RulesCompiler.CreateTargetRulesAssembly(Descriptor.ProjectFile, Descriptor.Name, bSkipRulesCompile, bForceRulesCompile, bUsePrecompiled, Descriptor.ForeignPlugin);
 			}
 
 			TargetRules RulesObject;
-			using(Timeline.ScopeEvent("RulesAssembly.CreateTargetRules()"))
+			using (GlobalTracer.Instance.BuildSpan("RulesAssembly.CreateTargetRules()").StartActive())
 			{
 				RulesObject = RulesAssembly.CreateTargetRules(Descriptor.Name, Descriptor.Platform, Descriptor.Configuration, Descriptor.Architecture, Descriptor.ProjectFile, Descriptor.AdditionalArguments);
 			}
@@ -815,11 +816,11 @@ namespace UnrealBuildTool
 
 			// Generate a build target from this rules module
 			UEBuildTarget Target;
-			using(Timeline.ScopeEvent("UEBuildTarget constructor"))
+			using (GlobalTracer.Instance.BuildSpan("UEBuildTarget constructor").StartActive())
 			{
 				Target = new UEBuildTarget(Descriptor, new ReadOnlyTargetRules(RulesObject), RulesAssembly);
 			}
-			using(Timeline.ScopeEvent("UEBuildTarget.PreBuildSetup()"))
+			using (GlobalTracer.Instance.BuildSpan("UEBuildTarget.PreBuildSetup()").StartActive())
 			{
 				Target.PreBuildSetup();
 			}
@@ -1750,7 +1751,7 @@ namespace UnrealBuildTool
 
 			// Generate headers
 			HashSet<UEBuildModuleCPP> ModulesToGenerateHeadersFor = GatherDependencyModules(OriginalBinaries.ToList());
-			using(Timeline.ScopeEvent("ExternalExecution.SetupUObjectModules()"))
+			using (GlobalTracer.Instance.BuildSpan("ExternalExecution.SetupUObjectModules()").StartActive())
 			{
 				ExternalExecution.SetupUObjectModules(ModulesToGenerateHeadersFor, Rules.Platform, ProjectDescriptor, Makefile.UObjectModules, Makefile.UObjectModuleHeaders, Rules.GeneratedCodeVersion, MetadataCache);
 			}
@@ -1820,7 +1821,7 @@ namespace UnrealBuildTool
 
 			// Build the target's binaries.
 			DirectoryReference ExeDir = GetExecutableDir();
-			using(Timeline.ScopeEvent("UEBuildBinary.Build()"))
+			using (GlobalTracer.Instance.BuildSpan("UEBuildBinary.Build()").StartActive())
 			{
 				foreach (UEBuildBinary Binary in BuildBinaries)
 				{

@@ -17,6 +17,7 @@ using Microsoft.CodeAnalysis.Emit;
 using System.Reflection.Metadata;
 using Microsoft.CodeAnalysis.Text;
 using System.Runtime.InteropServices;
+using OpenTracing.Util;
 using UnrealBuildBase;
 
 namespace UnrealBuildTool
@@ -334,7 +335,7 @@ namespace UnrealBuildTool
 			// Compile the assembly if me
 			if (bNeedsCompilation)
 			{
-				using(Timeline.ScopeEvent(String.Format("Compiling rules assembly ({0})", OutputAssemblyPath.GetFileName())))
+				using (GlobalTracer.Instance.BuildSpan(String.Format("Compiling rules assembly ({0})", OutputAssemblyPath.GetFileName())).StartActive())
 				{
 					CompiledAssembly = CompileAssembly(OutputAssemblyPath, SourceFileNames, ReferencedAssembies, PreprocessorDefines, TreatWarningsAsErrors);
 				}
