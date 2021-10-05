@@ -3259,9 +3259,21 @@ namespace UnrealBuildTool
 			else
 			{
 				// Check if the plugin is required for this platform
-				if(!Reference.IsEnabledForPlatform(Platform) || !Reference.IsEnabledForTargetConfiguration(Configuration) || !Reference.IsEnabledForTarget(TargetType))
+				if(!Reference.IsEnabledForPlatform(Platform))
 				{
-					Log.TraceLog("Ignoring plugin '{0}' (referenced via {1}) for platform/configuration", Reference.Name, ReferenceChain);
+					Log.TraceLog("Ignoring plugin '{0}' (referenced via {1}), not enabled for platform {2}", Reference.Name, ReferenceChain, Platform);
+					return null;
+				}
+
+				if (!Reference.IsEnabledForTargetConfiguration(Configuration))
+				{
+					Log.TraceLog("Ignoring plugin '{0}' (referenced via {1}), not enabled for target configuration {2}", Reference.Name, ReferenceChain, Configuration);
+					return null;
+				}
+
+				if (!Reference.IsEnabledForTarget(TargetType))
+				{
+					Log.TraceLog("Ignoring plugin '{0}' (referenced via {1}), not enabled for target {2}", Reference.Name, ReferenceChain, TargetType);
 					return null;
 				}
 

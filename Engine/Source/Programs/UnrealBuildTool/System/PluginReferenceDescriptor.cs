@@ -139,7 +139,7 @@ namespace UnrealBuildTool
 			}
 			if(TargetDenyList != null && TargetDenyList.Length > 0)
 			{
-				Writer.WriteEnumArrayField("TargetsDenyList", TargetDenyList);
+				Writer.WriteEnumArrayField("TargetDenyList", TargetDenyList);
 			}
 			if(SupportedTargetPlatforms != null && SupportedTargetPlatforms.Length > 0)
 			{
