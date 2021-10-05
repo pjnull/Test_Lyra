@@ -1,7 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 #pragma once
 
-#include "Misc/EnumClassFlags.h"
 #include "Trace/Trace.h"
 
 #if !defined(UE_MEMORY_TRACE_AVAILABLE)
@@ -32,7 +31,8 @@ enum EMemoryTraceRootHeap : uint8
 {
 	SystemMemory, // RAM
 	VideoMemory, // VRAM
-	EndHardcoded = VideoMemory,
+	Trace,
+	EndHardcoded = Trace,
 	EndReserved = 15
 };
 
@@ -138,12 +138,13 @@ CORE_API void MemoryTrace_ReallocAlloc(uint64 Address, uint64 NewSize, uint32 Al
 
 #else
 
-inline HeapId MemoryTrace_HeapSpec(HeapId ParentId, const TCHAR* Name) { return ~0; }
+inline HeapId MemoryTrace_RootHeapSpec(const TCHAR* Name, EMemoryTraceHeapFlags Flags = EMemoryTraceHeapFlags::None) { return ~0; };
+inline HeapId MemoryTrace_HeapSpec(const TCHAR* Name, EMemoryTraceHeapFlags Flags = EMemoryTraceHeapFlags::None) { return ~0; }
 inline void MemoryTrace_MarkAllocAsHeap(uint64 Address, HeapId Heap) {}
 inline void MemoryTrace_UnmarkAllocAsHeap(uint64 Address, HeapId Heap) {}
-inline void MemoryTrace_Alloc(uint64 Address, uint64 Size, uint32 Alignment, HeapId RootHeap = 0) {}
-inline void MemoryTrace_Free(uint64 Address, HeapId RootHeap = 0) {}
-inline void MemoryTrace_ReallocFree(uint64 Address, HeapId RootHeap = 0) {}
-inline void MemoryTrace_ReallocAlloc(uint64 Address, uint64 NewSize, uint32 Alignment, HeapId RootHeap = 0) {}
+inline void MemoryTrace_Alloc(uint64 Address, uint64 Size, uint32 Alignment, HeapId RootHeap = EMemoryTraceRootHeap::SystemMemory) {}
+inline void MemoryTrace_Free(uint64 Address, HeapId RootHeap = EMemoryTraceRootHeap::SystemMemory) {}
+inline void MemoryTrace_ReallocFree(uint64 Address, HeapId RootHeap = EMemoryTraceRootHeap::SystemMemory) {}
+inline void MemoryTrace_ReallocAlloc(uint64 Address, uint64 NewSize, uint32 Alignment, HeapId RootHeap = EMemoryTraceRootHeap::SystemMemory) {}
 
 #endif // UE_MEMORY_TRACE_ENABLED

@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "ProfilingDebugging/MemoryTrace.h"
+#include "ProfilingDebugging/TraceMalloc.h"
 
 #if UE_MEMORY_TRACE_ENABLED
 
@@ -71,7 +72,7 @@ static_assert(sizeof(FAddrPack) == sizeof(uint64), "");
 
 ////////////////////////////////////////////////////////////////////////////////
 static FUndestructed<FAllocationTrace> GAllocationTrace;
-
+static FUndestructed<FTraceMalloc> GTraceMalloc;
 
 ////////////////////////////////////////////////////////////////////////////////
 class FMallocWrapper
@@ -353,7 +354,7 @@ void FVirtualWinApiHooks::Initialize(bool bInLight)
 LPVOID WINAPI FVirtualWinApiHooks::VmAlloc(LPVOID Address, SIZE_T Size, DWORD Type, DWORD Protect)
 {
 	LPVOID Ret = VmAllocOrig(Address, Size, Type, Protect);
-	if (Ret != nullptr && (Type & MEM_COMMIT))
+	if (Ret != nullptr && (Type & MEM_COMMIT) && FTraceMalloc::ShouldTrace())
 	{
 		const uint32 Owner = GetOwner();
 		GAllocationTrace->Alloc(Ret, Size, 0, Owner, EMemoryTraceRootHeap::SystemMemory);
@@ -366,7 +367,10 @@ LPVOID WINAPI FVirtualWinApiHooks::VmAlloc(LPVOID Address, SIZE_T Size, DWORD Ty
 ////////////////////////////////////////////////////////////////////////////////
 BOOL WINAPI FVirtualWinApiHooks::VmFree(LPVOID Address, SIZE_T Size, DWORD Type)
 {
-	GAllocationTrace->Free(Address, EMemoryTraceRootHeap::SystemMemory);
+	if (FTraceMalloc::ShouldTrace())
+	{
+		GAllocationTrace->Free(Address, EMemoryTraceRootHeap::SystemMemory);
+	}
 	return VmFreeOrig(Address, Size, Type);
 }
 
@@ -374,7 +378,7 @@ BOOL WINAPI FVirtualWinApiHooks::VmFree(LPVOID Address, SIZE_T Size, DWORD Type)
 LPVOID WINAPI FVirtualWinApiHooks::VmAllocEx(HANDLE Process, LPVOID Address, SIZE_T Size, DWORD Type, DWORD Protect)
 {
 	LPVOID Ret = VmAllocExOrig(Process, Address, Size, Type, Protect);
-	if (Process == GetCurrentProcess() && Ret != nullptr && (Type & MEM_COMMIT))
+	if (Process == GetCurrentProcess() && Ret != nullptr && (Type & MEM_COMMIT) && FTraceMalloc::ShouldTrace())
 	{
 		const uint32 Owner = GetOwner();
 		GAllocationTrace->Alloc(Ret, Size, 0, Owner);
@@ -387,7 +391,7 @@ LPVOID WINAPI FVirtualWinApiHooks::VmAllocEx(HANDLE Process, LPVOID Address, SIZ
 ////////////////////////////////////////////////////////////////////////////////
 BOOL WINAPI FVirtualWinApiHooks::VmFreeEx(HANDLE Process, LPVOID Address, SIZE_T Size, DWORD Type)
 {
-	if (Process == GetCurrentProcess())
+	if (Process == GetCurrentProcess() && FTraceMalloc::ShouldTrace())
 	{
 		GAllocationTrace->Free(Address, EMemoryTraceRootHeap::SystemMemory);
 	}
@@ -438,18 +442,19 @@ FMalloc* MemoryTrace_Create(FMalloc* InMalloc)
 		GAllocationTrace.Construct();
 		GAllocationTrace->Initialize();
 
-		MemoryTrace_InitTags(InMalloc);
+		GTraceMalloc.Construct(InMalloc);
+		MemoryTrace_InitTags(&GTraceMalloc);
 
-		Backtracer_Create(InMalloc);
+		Backtracer_Create(&GTraceMalloc);
 
 #if defined(PLATFORM_SUPPORTS_TRACE_WIN32_VIRTUAL_MEMORY_HOOKS)
 		FVirtualWinApiHooks::Initialize(false);
 #endif // defined(PLATFORM_SUPPORTS_TRACE_WIN32_VIRTUAL_MEMORY_HOOKS)
 
-		static FUndestructed<FMallocWrapper> MemoryTrace;
-		MemoryTrace.Construct(InMalloc);
+		static FUndestructed<FMallocWrapper> SMallocWrapper;
+		SMallocWrapper.Construct(InMalloc);
 
-		return &MemoryTrace;
+		return &SMallocWrapper;
 	}
 
 	return InMalloc;
@@ -475,11 +480,11 @@ HeapId MemoryTrace_HeapSpec(HeapId ParentId, const TCHAR* Name, EMemoryTraceHeap
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-HeapId MemoryTrace_RootHeapSpec(const TCHAR* Name)
+HeapId MemoryTrace_RootHeapSpec(const TCHAR* Name, EMemoryTraceHeapFlags Flags)
 {
 	if (GAllocationTrace.IsConstructed())
 	{
-		return GAllocationTrace->RootHeapSpec(Name);
+		return GAllocationTrace->RootHeapSpec(Name, Flags);
 	}
 	return ~0;
 }
