@@ -2254,6 +2254,19 @@ FIntRect ULandscapeComponent::GetComponentExtent() const
 //
 // ALandscape
 //
+bool ULandscapeInfo::SupportsLandscapeEditing() const
+{
+	bool bSupportsEditing = true;
+	ForAllLandscapeProxies([&bSupportsEditing](ALandscapeProxy* Proxy)
+	{
+		if(Proxy->GetOutermost()->bIsCookedForEditor)
+		{
+			bSupportsEditing = false;
+		}
+	});
+	return bSupportsEditing;
+}
+
 bool ULandscapeInfo::AreAllComponentsRegistered() const
 {
 	const TArray<ALandscapeProxy*>& LandscapeProxies = ALandscapeProxy::GetLandscapeProxies();
