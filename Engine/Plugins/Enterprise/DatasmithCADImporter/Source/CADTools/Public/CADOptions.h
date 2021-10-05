@@ -70,6 +70,14 @@ namespace CADLibrary
 		{
 		}
 	
+		/**
+		 * @param ValueInMM, the value in millimeter to convert into the scene metric unit 
+		 */
+		double ConvertMMToImportUnit(double ValueInMM) const
+		{
+			return ValueInMM * 0.001 / MetricUnit;
+		}
+
 		void SetTesselationParameters(double InChordTolerance, double InMaxEdgeLength, double InMaxNormalAngle, CADLibrary::EStitchingTechnique InStitchingTechnique)
 		{
 			ChordTolerance = InChordTolerance;
