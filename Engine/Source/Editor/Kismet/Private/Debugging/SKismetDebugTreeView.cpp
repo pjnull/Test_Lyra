@@ -25,7 +25,7 @@
 
 #define LOCTEXT_NAMESPACE "DebugViewUI"
 
-DEFINE_LOG_CATEGORY_STATIC(LogBlueprintDebuggingView, Log, All);
+DEFINE_LOG_CATEGORY_STATIC(LogBlueprintDebugTreeView, Log, All);
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -1878,7 +1878,7 @@ protected:
 		}
 		else
 		{
-			UE_LOG(LogBlueprintDebuggingView, Warning, TEXT("Cannot select the non-actor object '%s'"), (ObjectContext != nullptr) ? *ObjectContext->GetName() : TEXT("(nullptr)"));
+			UE_LOG(LogBlueprintDebugTreeView, Warning, TEXT("Cannot select the non-actor object '%s'"), (ObjectContext != nullptr) ? *ObjectContext->GetName() : TEXT("(nullptr)"));
 		}
 	}
 
