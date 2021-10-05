@@ -1160,7 +1160,7 @@ void FLevelEditorContextMenuImpl::FillActorMenu(UToolMenu* Menu)
 				.IsFocusable(false)
 				[
 					SNew(SImage)
-					.Image(FEditorStyle::GetBrush("PropertyWindow.Button_PickActorInteractive"))
+					.Image(FEditorStyle::GetBrush("Icons.EyeDropper"))
 					.ColorAndOpacity(FSlateColor::UseForeground())
 				]
 			]
