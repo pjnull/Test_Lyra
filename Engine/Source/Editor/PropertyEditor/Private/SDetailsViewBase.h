@@ -319,7 +319,18 @@ protected:
 	void SavePreSearchExpandedItems();
 	void RestorePreSearchExpandedItems();
 
-	struct FDetailsViewConfig& GetMutableViewConfig();
+	/** 
+	 * Get a mutable version of the view config for setting values.
+	 * @returns		The view config for this view. 
+	 * @note		If DetailsViewArgs.ViewIdentifier is not set, it is not possible to store settings for this view.
+	 */
+	struct FDetailsViewConfig* GetMutableViewConfig();
+
+	/**
+	 * Get a const version of the view config for getting values.
+	 * @returns		The view config for this view. 
+	 * @note		If DetailsViewArgs.ViewIdentifier is not set, it is not possible to retrieve settings for this view.
+	 */
 	const FDetailsViewConfig* GetConstViewConfig() const;
 	void SaveViewConfig();
 
