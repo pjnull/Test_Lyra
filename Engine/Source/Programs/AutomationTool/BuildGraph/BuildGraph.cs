@@ -9,6 +9,8 @@ using System.Reflection;
 using System.Text;
 using System.Xml;
 using EpicGames.Core;
+using OpenTracing;
+using OpenTracing.Util;
 using UnrealBuildBase;
 using UnrealBuildTool;
 
@@ -746,15 +748,15 @@ namespace AutomationTool
 
 			// Read the manifests for all the input storage blocks
 			Dictionary<TempStorageBlock, TempStorageManifest> InputManifests = new Dictionary<TempStorageBlock, TempStorageManifest>();
-			using (ITraceSpan Span = TraceSpan.Create("TempStorage", "Read"))
+			using (IScope Scope = GlobalTracer.Instance.BuildSpan("TempStorage").WithTag("resource", "read").StartActive())
 			{
-				Span.AddMetadata("blocks", InputStorageBlocks.Count.ToString());
+				Scope.Span.SetTag("blocks", InputStorageBlocks.Count);
 				foreach (TempStorageBlock InputStorageBlock in InputStorageBlocks)
 				{
 					TempStorageManifest Manifest = Storage.Retreive(InputStorageBlock.NodeName, InputStorageBlock.OutputName);
 					InputManifests[InputStorageBlock] = Manifest;
 				}
-				Span.AddMetadata("size", string.Format("{0:n0}", InputManifests.Sum(x => x.Value.GetTotalSize())));
+				Scope.Span.SetTag("size", InputManifests.Sum(x => x.Value.GetTotalSize()));
 			}
 
 			// Read all the input storage blocks, keeping track of which block each file came from
@@ -873,7 +875,7 @@ namespace AutomationTool
 			}
 
 			// Write all the storage blocks, and update the mapping from file to storage block
-			using (ITraceSpan Span = EpicGames.Core.TraceSpan.Create("TempStorage", "Write"))
+			using (GlobalTracer.Instance.BuildSpan("TempStorage").WithTag("resource", "Write").StartActive())
 			{
 				foreach (KeyValuePair<string, HashSet<FileReference>> Pair in OutputStorageBlockToFiles)
 				{
