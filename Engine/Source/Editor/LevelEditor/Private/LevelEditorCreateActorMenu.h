@@ -27,9 +27,9 @@ namespace LevelEditorCreateActorMenu
 {
 	/**
 	 * Fill the context menu section(s) for adding or replacing an actor in the viewport
-	 * @param	MenuBuilder		The menu builder used to generate the context menu
+	 * @param	Section		The tool menu section to which entries are added
 	 */
-	void FillAddReplaceContextMenuSections(UToolMenu* Menu, ULevelEditorContextMenuContext* LevelEditorMenuContext);
+	void FillAddReplaceContextMenuSections(FToolMenuSection& Section, ULevelEditorContextMenuContext* LevelEditorMenuContext);
 
 	/**
 	 * Fill the context menu for adding or replacing an actor. Used for in-viewport and level editor toolbar menus.

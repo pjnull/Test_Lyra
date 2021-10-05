@@ -103,11 +103,13 @@ void SLevelEditor::BindCommands()
 
 	LevelEditorCommands->MapAction( 
 		Actions.EditAssetNoConfirmMultiple, 
-		FExecuteAction::CreateStatic( &FLevelEditorActionCallbacks::EditAsset_Clicked, EToolkitMode::Standalone, TWeakPtr< SLevelEditor >( SharedThis( this ) ), false ) );
+		FExecuteAction::CreateStatic( &FLevelEditorActionCallbacks::EditAsset_Clicked, EToolkitMode::Standalone, TWeakPtr< SLevelEditor >( SharedThis( this ) ), false ),
+		FCanExecuteAction::CreateStatic( &FLevelEditorActionCallbacks::EditAsset_CanExecute ) );
 
 	LevelEditorCommands->MapAction(
 		Actions.EditAsset,
-		FExecuteAction::CreateStatic( &FLevelEditorActionCallbacks::EditAsset_Clicked, EToolkitMode::Standalone, TWeakPtr< SLevelEditor >( SharedThis( this ) ), true ) );
+		FExecuteAction::CreateStatic( &FLevelEditorActionCallbacks::EditAsset_Clicked, EToolkitMode::Standalone, TWeakPtr< SLevelEditor >( SharedThis( this ) ), true ),
+		FCanExecuteAction::CreateStatic(&FLevelEditorActionCallbacks::EditAsset_CanExecute));
 
 	LevelEditorCommands->MapAction(
 		Actions.CheckOutProjectSettingsConfig,

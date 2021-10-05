@@ -368,73 +368,31 @@ static void BuildSingleAssetAddReplaceActorMenu(FToolMenuSection& Section, const
 	}
 }
 
-void LevelEditorCreateActorMenu::FillAddReplaceContextMenuSections(UToolMenu* Menu, ULevelEditorContextMenuContext* LevelEditorMenuContext)
+void LevelEditorCreateActorMenu::FillAddReplaceContextMenuSections(FToolMenuSection& Section, ULevelEditorContextMenuContext* LevelEditorMenuContext)
 {
 	FAssetData TargetAssetData;
 	TArray< FActorFactoryAssetProxy::FMenuItem > AssetMenuOptions;
 	GetContentBrowserSelectionFactoryMenuEntries( /*OUT*/TargetAssetData, /*OUT*/AssetMenuOptions );
 
-	const bool bCanPlaceActor = LevelEditorMenuContext && (LevelEditorMenuContext->ContextType == ELevelEditorMenuContext::Viewport);
+	const bool bCanPlaceActor = true;
 	const bool bCanReplaceActors = CanReplaceActors();
 
-	if ( AssetMenuOptions.Num() == 0 )
+	if (bCanPlaceActor)
 	{
-		{
-			FToolMenuSection& Section = Menu->AddSection("ActorType");
-
-			if (bCanPlaceActor)
-			{
-				Section.AddSubMenu(
-					"AddActor",
-					NSLOCTEXT("LevelViewportContextMenu", "AddActorHeading", "Place Actor") , 
-					NSLOCTEXT("LevelViewportContextMenu", "AddActorMenu_ToolTip", "Templates for adding a new actor to the world"),
-					FNewToolMenuDelegate::CreateStatic(&LevelEditorCreateActorMenu::FillAddReplaceActorMenu, EActorCreateMode::Add));
-			}
-
-			if (bCanReplaceActors)
-			{
-				Section.AddSubMenu(
-					"ReplaceActor",
-					NSLOCTEXT("LevelViewportContextMenu", "ReplaceActorHeading", "Replace Selected Actors with") , 
-					NSLOCTEXT("LevelViewportContextMenu", "ReplaceActorMenu_ToolTip", "Templates for replacing selected with new actors in the world"),
-					FNewToolMenuDelegate::CreateStatic(&LevelEditorCreateActorMenu::FillAddReplaceActorMenu, EActorCreateMode::Replace));
-			}
-		}
+		Section.AddSubMenu(
+			"AddActor",
+			NSLOCTEXT("LevelViewportContextMenu", "AddActorHeading", "Place Actor") , 
+			NSLOCTEXT("LevelViewportContextMenu", "AddActorMenu_ToolTip", "Templates for adding a new actor to the world"),
+			FNewToolMenuDelegate::CreateStatic(&LevelEditorCreateActorMenu::FillAddReplaceActorMenu, EActorCreateMode::Add));
 	}
-	else
+
+	if (bCanReplaceActors)
 	{
-		while ( AssetMenuOptions.Num() > 1 )
-		{
-			AssetMenuOptions.Pop();
-		}
-
-		if (bCanPlaceActor)
-		{
-			FToolMenuSection& Section = Menu->AddSection("AddActor", NSLOCTEXT("LevelViewportContextMenu", "AddActorHeading", "Place Actor"));
-			FUIAction Action( FExecuteAction::CreateStatic( &FLevelEditorActionCallbacks::AddActor_Clicked, AssetMenuOptions[0].FactoryToUse,  AssetMenuOptions[0].AssetData ) );
-			TSharedRef<SWidget> Widget = SNew(SAssetMenuEntry, TargetAssetData, AssetMenuOptions);
-			Section.AddEntry(FToolMenuEntry::InitSubMenu(
-				"AddActor",
-				Action,
-				Widget,
-				FNewToolMenuDelegate::CreateStatic(&LevelEditorCreateActorMenu::FillAddReplaceActorMenu, EActorCreateMode::Add)
-			));
-		}
-
-		if (bCanReplaceActors)
-		{
-			{
-				FToolMenuSection& Section = Menu->AddSection("ReplaceActor", NSLOCTEXT("LevelViewportContextMenu", "ReplaceActorHeading", "Replace Selected Actors with"));
-				FUIAction Action( FExecuteAction::CreateStatic( &FLevelEditorActionCallbacks::ReplaceActors_Clicked, AssetMenuOptions[0].FactoryToUse,  AssetMenuOptions[0].AssetData ) );
-				TSharedRef<SWidget> Widget = SNew(SAssetMenuEntry, TargetAssetData, AssetMenuOptions);
-				Section.AddEntry(FToolMenuEntry::InitSubMenu(
-					"ReplaceActor",
-					Action,
-					Widget,
-					FNewToolMenuDelegate::CreateStatic(&LevelEditorCreateActorMenu::FillAddReplaceActorMenu, EActorCreateMode::Replace)
-				));
-			}
-		}
+		Section.AddSubMenu(
+			"ReplaceActor",
+			NSLOCTEXT("LevelViewportContextMenu", "ReplaceActorHeading", "Replace Selected Actors with") , 
+			NSLOCTEXT("LevelViewportContextMenu", "ReplaceActorMenu_ToolTip", "Templates for replacing selected with new actors in the world"),
+			FNewToolMenuDelegate::CreateStatic(&LevelEditorCreateActorMenu::FillAddReplaceActorMenu, EActorCreateMode::Replace));
 	}
 }
 

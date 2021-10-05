@@ -717,7 +717,8 @@ void FLevelEditorModule::BindGlobalLevelEditorCommands()
 
 	ActionList.MapAction( 
 		FGlobalEditorCommonCommands::Get().FindInContentBrowser, 
-		FExecuteAction::CreateStatic( &FLevelEditorActionCallbacks::FindInContentBrowser_Clicked )
+		FExecuteAction::CreateStatic( &FLevelEditorActionCallbacks::FindInContentBrowser_Clicked ),
+		FCanExecuteAction::CreateStatic( &FLevelEditorActionCallbacks::FindInContentBrowser_CanExecute )
 		);
 
 	ActionList.MapAction(
@@ -748,7 +749,8 @@ void FLevelEditorModule::BindGlobalLevelEditorCommands()
 
 	ActionList.MapAction(
 		Commands.GoToCodeForActor, 
-		FExecuteAction::CreateStatic( &FLevelEditorActionCallbacks::GoToCodeForActor_Clicked )
+		FExecuteAction::CreateStatic( &FLevelEditorActionCallbacks::GoToCodeForActor_Clicked ),
+		FCanExecuteAction::CreateStatic( &FLevelEditorActionCallbacks::GoToCodeForActor_CanExecute )
 		);
 
 	ActionList.MapAction( 
@@ -966,7 +968,8 @@ void FLevelEditorModule::BindGlobalLevelEditorCommands()
 
 	ActionList.MapAction(
 		Commands.DetachFromParent,
-		FExecuteAction::CreateStatic( &FLevelEditorActionCallbacks::DetachActor_Clicked )
+		FExecuteAction::CreateStatic( &FLevelEditorActionCallbacks::DetachActor_Clicked ),
+		FCanExecuteAction::CreateStatic( &FLevelEditorActionCallbacks::DetachActor_CanExecute )
 		);
 
 	ActionList.MapAction(
@@ -993,7 +996,8 @@ void FLevelEditorModule::BindGlobalLevelEditorCommands()
 
 	ActionList.MapAction(
 		Commands.RegroupActors,
-		FExecuteAction::CreateStatic( &FLevelEditorActionCallbacks::RegroupActor_Clicked )
+		FExecuteAction::CreateStatic( &FLevelEditorActionCallbacks::RegroupActor_Clicked ),
+		FCanExecuteAction::CreateStatic( &FLevelEditorActionCallbacks::ActorSelected_CanExecute )
 		);
 
 	ActionList.MapAction(
