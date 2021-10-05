@@ -423,7 +423,7 @@ TSharedRef<FExtender> FDatasmithImporterModule::OnExtendLevelEditorActorSelectio
 				FNewMenuDelegate::CreateStatic( &FDatasmithImporterModule::PopulateDatasmithActorsMenu, SelectedActors ),
 				false,
 				FSlateIcon());
-			MenuBuilder.EndSection()
+			MenuBuilder.EndSection();
 		}));
 	}
 
