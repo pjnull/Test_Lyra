@@ -905,10 +905,11 @@ void SDetailsViewBase::Tick( const FGeometry& AllottedGeometry, const double InC
 {
 	HandlePendingCleanup();
 
-	FDetailsViewConfig& ViewConfig = GetMutableViewConfig();
-	if (ViewConfig.ValueColumnWidth != ColumnSizeData.ValueColumnWidth.Get(0))
+	FDetailsViewConfig* ViewConfig = GetMutableViewConfig();
+	if (ViewConfig != nullptr &&
+		ViewConfig->ValueColumnWidth != ColumnSizeData.ValueColumnWidth.Get(0))
 	{
-		ViewConfig.ValueColumnWidth = ColumnSizeData.ValueColumnWidth.Get(0);
+		ViewConfig->ValueColumnWidth = ColumnSizeData.ValueColumnWidth.Get(0);
 		SaveViewConfig();
 	}
 
