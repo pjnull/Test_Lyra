@@ -1125,7 +1125,7 @@ void SContentBrowser::RegisterContentBrowserToolBar()
 					.VAlign(VAlign_Center)
 					[
 						SNew(SImage)
-						.Image(FAppStyle::Get().GetBrush("Icons.Save"))
+						.Image(FAppStyle::Get().GetBrush("MainFrame.SaveAll"))
 						.ColorAndOpacity(FSlateColor::UseForeground())
 					]
 
