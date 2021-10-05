@@ -2493,6 +2493,7 @@ void USkeletalMesh::RemoveLegacyClothingSections()
 						if (FSkelMeshSourceSectionUserData* SectionUserData = LodModel.UserSectionsData.Find(Section.OriginalDataSectionIndex))
 						{
 							SectionUserData->CorrespondClothAssetIndex = Section.CorrespondClothAssetIndex;
+							SectionUserData->ClothingData = Section.ClothingData;
 						}
 
 						ClothingSectionCount++;
@@ -2707,8 +2708,7 @@ void USkeletalMesh::CreateUserSectionsDataForLegacyAssets()
 			bMustUseReductionSourceData = false;
 		}
 
-		const int32 NumberOfClothAssets = GetMeshClothingAssets().Num();
-		ThisLODModel.UpdateChunkedSectionInfo(GetName(), NumberOfClothAssets);
+		ThisLODModel.UpdateChunkedSectionInfo(GetName());
 
 		if (bMustUseReductionSourceData)
 		{
