@@ -102,7 +102,6 @@ void FControlFlow::HandleControlFlowNodeCompleted(TSharedRef<const FControlFlowN
 
 FString FControlFlow::GetFlowPath() const
 {
-	static FString SingleFlowFormat = TEXT("{0}(x1).");
 	static FString DuplicateFlowFormat = TEXT("{0}(x{1}).");
 
 	FString FlowPath;
