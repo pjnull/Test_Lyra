@@ -9,6 +9,7 @@
 #include "ICurveEditorDragOperation.h"
 #include "ICurveEditorToolExtension.h"
 #include "CurveDrawInfo.h"
+#include "Framework/MultiBox/MultiBoxBuilder.h"
 
 struct FCurveModelID;
 struct FCurveEditorScreenSpace;
