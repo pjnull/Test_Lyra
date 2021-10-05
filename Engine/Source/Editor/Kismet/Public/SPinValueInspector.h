@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "EdGraph/EdGraphPin.h"
 #include "Widgets/SCompoundWidget.h"
-#include "Widgets/Views/STreeView.h"
+#include "Debugging/SKismetDebugTreeView.h"
 
 class SSearchBox;
 
@@ -15,7 +15,7 @@ typedef TSharedPtr<struct FPinValueInspectorTreeViewNode> FPinValueInspectorTree
  * Inspects the referenced pin object's underlying property value and presents it within a tree view.
  * Compound properties (e.g. structs/containers) will be broken down into a hierarchy of child nodes.
  */
-class KISMETWIDGETS_API SPinValueInspector : public SCompoundWidget
+class KISMET_API SPinValueInspector : public SCompoundWidget
 {
 public:
 	SLATE_BEGIN_ARGS(SPinValueInspector)
@@ -31,11 +31,14 @@ protected:
 	/** @return Visibility of the search box filter widget. */
 	EVisibility GetSearchFilterVisibility() const;
 
-	/** Obtains the set of children for the given value item node. */
-	void OnGetTreeViewNodeChildren(FPinValueInspectorTreeViewNodePtr InNode, TArray<FPinValueInspectorTreeViewNodePtr>& OutChildren);
+	/** Passes SearchText through to tree view */
+	void OnSearchTextChanged(const FText& InSearchText);
 
-	/** Generates a row widget that presents the given value item node. */
-	TSharedRef<ITableRow> OnGenerateRowForTreeViewNode(FPinValueInspectorTreeViewNodePtr InNode, const TSharedRef<STableViewBase>& OwnerTable);
+	/** requests the constrained box be resized */
+	void OnExpansionChanged(FDebugTreeItemPtr InItem, bool bItemIsExpanded);
+
+	/** Adds the pin to the tree view */
+	void PopulateTreeView();
 
 private:
 	/** Holds a weak reference to the target pin. */
@@ -44,12 +47,9 @@ private:
 	/** The instance that's currently selected as the debugging target. */
 	TWeakObjectPtr<UObject> TargetObject;
 
-	/** Root node(s) presented through the tree view widget. */
-	TArray<FPinValueInspectorTreeViewNodePtr> RootNodes;
-
 	/** Presents a hierarchical display of the inspected value along with any sub-values as children. */
-	TSharedPtr<STreeView<FPinValueInspectorTreeViewNodePtr>> TreeViewWidget;
+	TSharedPtr<SKismetDebugTreeView> TreeViewWidget;
 
-	/** Holds a reference to the search box widget, used to filter the tree view display. */
-	TSharedPtr<SSearchBox> SearchBoxWidget;
+	/** The box that handles resizing of the Tree View */
+	TSharedPtr<class SPinValueInspector_ConstrainedBox> ConstrainedBox;
 };
