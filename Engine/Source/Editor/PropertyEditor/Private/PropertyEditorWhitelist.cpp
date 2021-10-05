@@ -69,7 +69,7 @@ void FPropertyEditorWhitelist::ClearWhitelist()
 void FPropertyEditorWhitelist::AddToWhitelist(TSoftObjectPtr<UStruct> Struct, const FName PropertyName, const FName Owner)
 {
 	FPropertyEditorWhitelistEntry& Entry = RawPropertyEditorWhitelist.FindOrAdd(Struct);
-	if (Entry.Whitelist.AddWhitelistItem(Owner, PropertyName))
+	if (Entry.Whitelist.AddAllowListItem(Owner, PropertyName))
 	{
 		ClearCache();
 		WhitelistUpdatedDelegate.Broadcast(Struct, Owner);
@@ -79,7 +79,7 @@ void FPropertyEditorWhitelist::AddToWhitelist(TSoftObjectPtr<UStruct> Struct, co
 void FPropertyEditorWhitelist::RemoveFromWhitelist(TSoftObjectPtr<UStruct> Struct, const FName PropertyName, const FName Owner)
 {
 	FPropertyEditorWhitelistEntry& Entry = RawPropertyEditorWhitelist.FindOrAdd(Struct);
-	if (Entry.Whitelist.RemoveWhitelistItem(Owner, PropertyName))
+	if (Entry.Whitelist.RemoveAllowListItem(Owner, PropertyName))
 	{
 		ClearCache();
 		WhitelistUpdatedDelegate.Broadcast(Struct, Owner);
@@ -89,7 +89,7 @@ void FPropertyEditorWhitelist::RemoveFromWhitelist(TSoftObjectPtr<UStruct> Struc
 void FPropertyEditorWhitelist::AddToBlacklist(TSoftObjectPtr<UStruct> Struct, const FName PropertyName, const FName Owner)
 {
 	FPropertyEditorWhitelistEntry& Entry = RawPropertyEditorWhitelist.FindOrAdd(Struct);
-	if (Entry.Whitelist.AddBlacklistItem(Owner, PropertyName))
+	if (Entry.Whitelist.AddDenyListItem(Owner, PropertyName))
 	{
 		ClearCache();
 		WhitelistUpdatedDelegate.Broadcast(Struct, Owner);
@@ -99,7 +99,7 @@ void FPropertyEditorWhitelist::AddToBlacklist(TSoftObjectPtr<UStruct> Struct, co
 void FPropertyEditorWhitelist::RemoveFromBlacklist(TSoftObjectPtr<UStruct> Struct, const FName PropertyName, const FName Owner)
 {
 	FPropertyEditorWhitelistEntry& Entry = RawPropertyEditorWhitelist.FindOrAdd(Struct);
-	if (Entry.Whitelist.RemoveBlacklistItem(Owner, PropertyName))
+	if (Entry.Whitelist.RemoveDenyListItem(Owner, PropertyName))
 	{
 		ClearCache();
 		WhitelistUpdatedDelegate.Broadcast(Struct, Owner);
@@ -145,7 +145,7 @@ const FBlacklistNames& FPropertyEditorWhitelist::GetCachedWhitelistForStructHelp
 	check(Struct);
 
 	const FPropertyEditorWhitelistEntry* Entry = RawPropertyEditorWhitelist.Find(Struct);
-	bool bIsThisWhitelistEmpty = Entry ? Entry->Whitelist.GetWhitelist().Num() == 0 : true;
+	bool bIsThisWhitelistEmpty = Entry ? Entry->Whitelist.GetAllowList().Num() == 0 : true;
 
 	// Normally this case would be caught in GetCachedWhitelistForStruct, but when being called recursively from a subclass
 	// we still need to update bInOutShouldWhitelistAllProperties so that new whitelists cache properly.
@@ -183,11 +183,11 @@ const FBlacklistNames& FPropertyEditorWhitelist::GetCachedWhitelistForStructHelp
 		// Whitelist all properties if the flag is set, the parent Struct has a whitelist, and this Struct has no whitelist
 		// If the parent Struct's whitelist is empty then that already implies all properties are visible
 		// If this Struct has a whitelist, the manually-specified list always overrides the ShouldWhitelistAllProperties rule
-		if (bInOutShouldWhitelistAllProperties && NewWhitelist.GetWhitelist().Num() > 0 && bIsThisWhitelistEmpty)
+		if (bInOutShouldWhitelistAllProperties && NewWhitelist.GetAllowList().Num() > 0 && bIsThisWhitelistEmpty)
 		{
 			for (TFieldIterator<FProperty> Property(Struct, EFieldIteratorFlags::ExcludeSuper, EFieldIteratorFlags::ExcludeDeprecated); Property; ++Property)
 			{
-				NewWhitelist.AddWhitelistItem(PropertyEditorWhitelistOwner, Property->GetFName());
+				NewWhitelist.AddAllowListItem(PropertyEditorWhitelistOwner, Property->GetFName());
 			}
 		}
 
@@ -210,7 +210,7 @@ bool FPropertyEditorWhitelist::IsSpecificPropertyWhitelisted(const UStruct* Obje
 	const FPropertyEditorWhitelistEntry* Entry = RawPropertyEditorWhitelist.Find(ObjectStruct);
 	if (Entry)
 	{
-		return Entry->Whitelist.GetWhitelist().Contains(PropertyName);
+		return Entry->Whitelist.GetAllowList().Contains(PropertyName);
 	}
 	return false;
 }
@@ -220,7 +220,7 @@ bool FPropertyEditorWhitelist::IsSpecificPropertyBlacklisted(const UStruct* Obje
 	const FPropertyEditorWhitelistEntry* Entry = RawPropertyEditorWhitelist.Find(ObjectStruct);
 	if (Entry)
 	{
-		return Entry->Whitelist.GetBlacklist().Contains(PropertyName);
+		return Entry->Whitelist.GetDenyList().Contains(PropertyName);
 	}
 	return false;
 }

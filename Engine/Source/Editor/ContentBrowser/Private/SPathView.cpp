@@ -764,7 +764,7 @@ FContentBrowserDataCompiledFilter SPathView::CreateCompiledFolderFilter() const
 				{
 					CombinedFolderBlacklist = MakeShared<FBlacklistPaths>();
 				}
-				CombinedFolderBlacklist->AddBlacklistItem("PluginPathFilters", MountedAssetPath);
+				CombinedFolderBlacklist->AddDenyListItem("PluginPathFilters", MountedAssetPath);
 			}
 		}
 	}

@@ -184,7 +184,7 @@ UAssetToolsImpl::UAssetToolsImpl(const FObjectInitializer& ObjectInitializer)
 	GConfig->GetArray(TEXT("AssetTools"), TEXT("SupportedAssetTypes"), SupportedTypesArray, GEditorIni);
 	for (const FString& Type : SupportedTypesArray)
 	{
-		AssetClassBlacklist->AddWhitelistItem("AssetToolsConfigFile", *Type);
+		AssetClassBlacklist->AddAllowListItem("AssetToolsConfigFile", *Type);
 	}
 	AssetClassBlacklist->OnFilterChanged().AddUObject(this, &UAssetToolsImpl::AssetClassBlacklistChanged);
 
@@ -192,7 +192,7 @@ UAssetToolsImpl::UAssetToolsImpl(const FObjectInitializer& ObjectInitializer)
 	GConfig->GetArray(TEXT("AssetTools"), TEXT("BlacklistAssetPaths"), BlacklistedViewPath, GEditorIni);
 	for (const FString& Path : BlacklistedViewPath)
 	{
-		FolderBlacklist->AddBlacklistItem("AssetToolsConfigFile", Path);
+		FolderBlacklist->AddDenyListItem("AssetToolsConfigFile", Path);
 	}
 
 	GConfig->GetArray(TEXT("AssetTools"), TEXT("BlacklistContentSubPaths"), SubContentBlacklistPaths, GEditorIni);
@@ -3521,7 +3521,7 @@ void UAssetToolsImpl::AddSubContentBlacklist(const FString& InMount)
 {
 	for (const FString& SubContentPath : SubContentBlacklistPaths)
 	{
-		FolderBlacklist->AddBlacklistItem("AssetToolsConfigFile", InMount / SubContentPath);
+		FolderBlacklist->AddDenyListItem("AssetToolsConfigFile", InMount / SubContentPath);
 	}
 }
 

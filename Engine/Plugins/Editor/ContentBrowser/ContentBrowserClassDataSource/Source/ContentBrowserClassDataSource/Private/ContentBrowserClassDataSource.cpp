@@ -267,7 +267,7 @@ void UContentBrowserClassDataSource::CompileFilter(const FName InPath, const FCo
 	// If we are filtering all classes, then we can bail now as we won't return any file items
 	if ((ClassFilter && (ClassFilter->ClassNamesToInclude.Num() > 0 && !ClassFilter->ClassNamesToInclude.Contains(NAME_Class))) ||
 		(ClassFilter && (ClassFilter->ClassNamesToExclude.Num() > 0 &&  ClassFilter->ClassNamesToExclude.Contains(NAME_Class))) ||
-		(ClassBlacklist && (ClassBlacklist->IsBlacklistAll() || !ClassBlacklist->PassesFilter(NAME_Class)))
+		(ClassBlacklist && (ClassBlacklist->IsDenyListAll() || !ClassBlacklist->PassesFilter(NAME_Class)))
 		)
 	{
 		return;
@@ -344,6 +344,7 @@ void UContentBrowserClassDataSource::EnumerateItemsMatchingFilter(const FContent
 			}
 		}
 	}
+
 }
 
 void UContentBrowserClassDataSource::EnumerateItemsAtPath(const FName InPath, const EContentBrowserItemTypeFilter InItemTypeFilter, TFunctionRef<bool(FContentBrowserItemData&&)> InCallback)
