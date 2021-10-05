@@ -668,23 +668,26 @@ void SRigHierarchy::OnHierarchyModified(ERigHierarchyNotification InNotif, URigH
 			{
 				if(URigHierarchy* Hierarchy = GetDebuggedHierarchy())
 				{
-					TArray<FRigElementWeight> ParentWeights = Hierarchy->GetParentWeightArray(InElement->GetKey());
-					if(ParentWeights.Num() > 0)
+					if(InElement)
 					{
-						TArray<FRigElementKey> ParentKeys = Hierarchy->GetParents(InElement->GetKey());
-						check(ParentKeys.Num() == ParentWeights.Num());
-						for(int32 ParentIndex=0;ParentIndex<ParentKeys.Num();ParentIndex++)
+						TArray<FRigElementWeight> ParentWeights = Hierarchy->GetParentWeightArray(InElement->GetKey());
+						if(ParentWeights.Num() > 0)
 						{
-							if(ParentWeights[ParentIndex].IsAlmostZero())
+							TArray<FRigElementKey> ParentKeys = Hierarchy->GetParents(InElement->GetKey());
+							check(ParentKeys.Num() == ParentWeights.Num());
+							for(int32 ParentIndex=0;ParentIndex<ParentKeys.Num();ParentIndex++)
 							{
-								continue;
+								if(ParentWeights[ParentIndex].IsAlmostZero())
+								{
+									continue;
+								}
+	
+								if(TreeView->ReparentElement(InElement->GetKey(), ParentKeys[ParentIndex]))
+								{
+									RefreshTreeView(false);
+								}
+								break;
 							}
-
-							if(TreeView->ReparentElement(InElement->GetKey(), ParentKeys[ParentIndex]))
-							{
-								RefreshTreeView(false);
-							}
-							break;
 						}
 					}
 				}
