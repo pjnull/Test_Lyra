@@ -728,6 +728,12 @@ bool FActivatableTreeNode::ProcessNormalInput(ECommonInputMode ActiveInputMode, 
 
 bool FActivatableTreeNode::IsWidgetActivated() const
 {
+#if !UE_BUILD_SHIPPING
+	UE_CLOG(!RepresentedWidget.IsValid(), LogUIActionRouter, Warning, 
+		TEXT("Represented Widget not Valid: %s - %s"), 
+		*DebugWidgetName, 
+		Parent.IsValid() ? *Parent.Pin()->DebugWidgetName : TEXT("No Parent"));
+#endif
 	return ensure(RepresentedWidget.IsValid()) && RepresentedWidget->IsActivated();
 }
 
