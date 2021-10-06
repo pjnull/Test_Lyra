@@ -503,6 +503,15 @@ namespace UnrealBuildTool
 			MaxPlatform = CachedMaxPlatform;
 			return CachedPlatformsValid;
 		}
+		
+		//This doesn't take into account SDK version overrides in packaging
+		public int GetMinSdkVersion(int MinSdk = 21)
+		{
+			int MinSDKVersion = MinSdk;
+			ConfigHierarchy Ini = ConfigCache.ReadHierarchy(ConfigHierarchyType.Engine, DirectoryReference.FromFile(ProjectFile), UnrealTargetPlatform.Android);
+			Ini.GetInt32("/Script/AndroidRuntimeSettings.AndroidRuntimeSettings", "MinSDKVersion", out MinSDKVersion);
+			return MinSDKVersion;
+		}
 
 		protected virtual bool ValidateNDK(string PlatformsFilename, string ApiString)
 		{
@@ -973,6 +982,22 @@ namespace UnrealBuildTool
 			if (Sanitizer != ClangSanitizer.None)
 			{
 				Result += " -fsanitize=" + GetCompilerOption(Sanitizer);
+			}
+
+			int MinSDKVersion = GetMinSdkVersion();
+			if (MinSDKVersion >= 28)
+			{
+				//Pack relocations in RELR format and Android APS2 packed format for RELA relocations if they can't be expressed in RELR
+				Result += " -Wl,--pack-dyn-relocs=android+relr,--use-android-relr-tags";
+			}
+			else if (MinSDKVersion >= 23)
+			{
+				Result += " -Wl,--pack-dyn-relocs=android";
+			}
+
+			if (MinSDKVersion >= 23)
+			{
+				Result += " -Wl,--hash-style=gnu";  // generate GNU style hashes, faster lookup and faster startup. Avoids generating old .hash section. Supported on >= Android M
 			}
 
 			return Result;
