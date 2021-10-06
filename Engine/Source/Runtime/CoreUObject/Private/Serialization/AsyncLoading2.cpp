@@ -1799,7 +1799,7 @@ struct FAsyncPackage2
 	void StartLoading(FIoBatch& IoBatch);
 
 #if WITH_IOSTORE_IN_EDITOR
-	void GetLoadedAssets(TArray<FWeakObjectPtr>& AssetList);
+	void GetLoadedAssetsAndPackages(TSet<FWeakObjectPtr>& AssetList, TSet<UPackage*>& PackageList);
 #endif
 
 private:
@@ -2154,7 +2154,7 @@ private:
 	TArray<FAsyncPackage2*> CompletedPackages;
 #if WITH_IOSTORE_IN_EDITOR
 	/** [GAME THREAD] Game thread LoadedAssets list */
-	TArray<FWeakObjectPtr> LoadedAssets;
+	TSet<FWeakObjectPtr> LoadedAssets;
 #endif
 	/** [ASYNC/GAME THREAD] Packages to be deleted from async thread */
 	TQueue<FAsyncPackage2*, EQueueMode::Spsc> DeferredDeletePackages;
@@ -4638,6 +4638,9 @@ EAsyncPackageState::Type FAsyncLoadingThread2::ProcessLoadedPackagesFromGameThre
 
 		bLocalDidSomething |= LoadedPackagesToProcess.Num() > 0;
 		TArray<FAsyncPackage2*, TInlineAllocator<4>> PackagesReadyForCallback;
+#if WITH_IOSTORE_IN_EDITOR
+		TSet<UPackage*> CompletedUPackages;
+#endif
 		for (int32 PackageIndex = 0; PackageIndex < LoadedPackagesToProcess.Num(); ++PackageIndex)
 		{
 			SCOPED_LOADTIMER(ProcessLoadedPackagesTime);
@@ -4718,8 +4721,8 @@ EAsyncPackageState::Type FAsyncLoadingThread2::ProcessLoadedPackagesFromGameThre
 				if (!Package->bLoadHasFailed)
 				{
 #if WITH_IOSTORE_IN_EDITOR
-					// In the editor we need to find any assets and add them to list for later callback
-					Package->GetLoadedAssets(LoadedAssets);
+					// In the editor we need to find any assets and packages and add them to list for later callback
+					Package->GetLoadedAssetsAndPackages(LoadedAssets, CompletedUPackages);
 #endif
 					Package->ClearConstructedObjects();
 				}
@@ -4765,6 +4768,15 @@ EAsyncPackageState::Type FAsyncLoadingThread2::ProcessLoadedPackagesFromGameThre
 			UE_ASYNC_PACKAGE_LOG(Verbose, Package->Desc, TEXT("GameThread: LoadCompleted"),
 				TEXT("All loading of package is done, and the async package and load request will be deleted."));
 		}
+#if WITH_IOSTORE_IN_EDITOR
+		// Call the global delegate for package endloads and set the bHasBeenLoaded flag that is used to
+		// check which packages have reached this state
+		for (UPackage* CompletedUPackage : CompletedUPackages)
+		{
+			CompletedUPackage->SetHasBeenEndLoaded(true);
+		}
+		FCoreUObjectDelegates::OnEndLoadPackage.Broadcast(CompletedUPackages.Array());
+#endif
 		
 		{
 			TArray<FFailedPackageRequest> LocalFailedPackageRequests;
@@ -4845,7 +4857,7 @@ EAsyncPackageState::Type FAsyncLoadingThread2::ProcessLoadedPackagesFromGameThre
 	{
 #if WITH_IOSTORE_IN_EDITOR
 		// In editor builds, call the asset load callback. This happens in both editor and standalone to match EndLoad
-		TArray<FWeakObjectPtr> TempLoadedAssets = LoadedAssets;
+		TSet<FWeakObjectPtr> TempLoadedAssets = LoadedAssets;
 		LoadedAssets.Reset();
 
 		// Make a copy because LoadedAssets could be modified by one of the OnAssetLoaded callbacks
@@ -5677,14 +5689,20 @@ double FAsyncPackage2::GetLoadStartTime() const
 }
 
 #if WITH_IOSTORE_IN_EDITOR
-void FAsyncPackage2::GetLoadedAssets(TArray<FWeakObjectPtr>& AssetList)
+void FAsyncPackage2::GetLoadedAssetsAndPackages(TSet<FWeakObjectPtr>& AssetList, TSet<UPackage*>& PackageList)
 {
 	for (UObject* Object : ConstructedObjects)
 	{
 		if (IsValid(Object) && Object->IsAsset())
 		{
-			AssetList.AddUnique(Object);
+			AssetList.Add(Object);
 		}
+	}
+
+	// All ConstructedObjects belong to this package, so we only have to consider the single package in this->LinkerRoot
+	if (LinkerRoot && !LinkerRoot->HasAnyFlags(RF_Transient) && !LinkerRoot->HasAnyPackageFlags(PKG_InMemoryOnly))
+	{
+		PackageList.Add(LinkerRoot);
 	}
 }
 #endif
@@ -5878,15 +5896,6 @@ void FAsyncPackage2::CallCompletionCallbacks(EAsyncLoadingResult::Type LoadingRe
 	checkSlow(IsInGameThread());
 
 	UPackage* LoadedPackage = (!bLoadHasFailed) ? LinkerRoot : nullptr;
-#if WITH_EDITOR
-	if (GIsEditor && LoadedPackage)
-	{
-		// Call the global delegate for package endloads, which is a kind of completioncallback,
-		// and set the bHasBeenLoaded flag that is used to check which packages have reached this state
-		LoadedPackage->bHasBeenEndLoaded = true;
-		FCoreUObjectDelegates::OnEndLoadPackage.Broadcast(TConstArrayView<UPackage*> { LoadedPackage });
-	}
-#endif
 	for (FCompletionCallback& CompletionCallback : CompletionCallbacks)
 	{
 		CompletionCallback->ExecuteIfBound(Desc.UPackageName, LoadedPackage, LoadingResult);
