@@ -217,7 +217,7 @@ namespace Audio
 		return FPatchInput(PendingNewInputs[NewPatchIndex]);
 	}
 
-	void FPatchMixer::AddNewInput(FPatchInput& InPatchInput)
+	void FPatchMixer::AddNewInput(const FPatchInput& InPatchInput)
 	{
 		if (!InPatchInput.OutputHandle.IsValid())
 		{
@@ -273,9 +273,14 @@ namespace Audio
 		CleanUpDisconnectedPatches();
 		ConnectNewPatches();
 
+		if (CurrentInputs.IsEmpty())
+		{
+			return INDEX_NONE;
+		}
+
 		// Iterate through our inputs and see which input has the least audio buffered.
 		uint32 SmallestNumSamplesBuffered = TNumericLimits<uint32>::Max();
-
+		
 		for (FPatchOutputStrongPtr& Output : CurrentInputs)
 		{
 			if (Output.IsValid())
@@ -284,16 +289,7 @@ namespace Audio
 			}
 		}
 
-		if (SmallestNumSamplesBuffered == TNumericLimits<uint32>::Max())
-		{
-			return -1;
-		}
-		else
-		{
-			// If this check is hit, we need to either change this function to return an int64 or find a different way to notify the caller that all outputs have been disconeccted.
-			check(SmallestNumSamplesBuffered <= ((uint32)TNumericLimits<int32>::Max()));
-			return SmallestNumSamplesBuffered;
-		}
+		return SmallestNumSamplesBuffered;
 	}
 
 	void FPatchMixer::DisconnectAllInputs()
@@ -409,27 +405,23 @@ namespace Audio
 		FScopeLock ScopeLock(&ConnectedOutputsCriticalSection);
 		AddPendingPatches();
 
+		if (ConnectedOutputs.IsEmpty())
+		{
+			return INDEX_NONE;
+		}
+
 		// Iterate over our outputs and get the smallest remainder of all of our circular buffers.
 		uint32 SmallestRemainder = TNumericLimits<uint32>::Max();
-
 		for (FPatchInput& Input : ConnectedOutputs)
 		{
-			if (Input.OutputHandle.IsValid())
+			const uint32 InputRemainder = Input.OutputHandle->InternalBuffer.Remainder();
+			if (InputRemainder > 0 || Input.IsOutputStillActive())
 			{
-				SmallestRemainder = FMath::Min(SmallestRemainder, Input.OutputHandle->InternalBuffer.Remainder());
+				SmallestRemainder = FMath::Min(SmallestRemainder, InputRemainder);
 			}
 		}
 
-		if (SmallestRemainder == TNumericLimits<uint32>::Max())
-		{
-			return -1;
-		}
-		else
-		{
-			// If we hit this check, we need to either return an int64 or use some other method to notify the caller that all outputs are disconnected.
-			check(SmallestRemainder <= ((uint32)TNumericLimits<int32>::Max()));
-			return SmallestRemainder;
-		}
+		return SmallestRemainder;
 	}
 
 	void FPatchSplitter::AddPendingPatches()
@@ -443,29 +435,25 @@ namespace Audio
 		FScopeLock ScopeLock(&ConnectedOutputsCriticalSection);
 		AddPendingPatches();
 
-		int32 MinimumSamplesPushed = TNumericLimits<int32>::Max();
+		if (ConnectedOutputs.IsEmpty())
+		{
+			return INDEX_NONE;
+		}
 
-		// Iterate through our array of connected outputs from the end, removing destroyed outputs as we go.
+		int32 MinimumSamplesPushed = TNumericLimits<int32>::Max();
 		for (int32 Index = ConnectedOutputs.Num() - 1; Index >= 0; Index--)
 		{
-			int32 NumSamplesPushed = ConnectedOutputs[Index].PushAudio(InBuffer, InNumSamples);
-			if (NumSamplesPushed >= 0)
+			FPatchInput& ConnectedOutput = ConnectedOutputs[Index];
+			const int32 NumSamplesPushed = ConnectedOutput.PushAudio(InBuffer, InNumSamples);
+			if (NumSamplesPushed == INDEX_NONE)
 			{
-				MinimumSamplesPushed = FMath::Min(MinimumSamplesPushed, NumSamplesPushed);
+				ConnectedOutputs.RemoveAtSwap(Index, 1, false /* bAllowShrinking */);
 			}
 			else
 			{
-				// If this output has been destroyed, remove it from our array of connected outputs.
-				ConnectedOutputs.RemoveAtSwap(Index);
+				MinimumSamplesPushed = FMath::Min(MinimumSamplesPushed, NumSamplesPushed);
 			}
 		}
-
-		// If we weren't able to push audio to any of our outputs, return -1.
-		if (MinimumSamplesPushed == TNumericLimits<int32>::Max())
-		{
-			MinimumSamplesPushed = -1;
-		}
-
 		return MinimumSamplesPushed;
 	}
 
@@ -474,7 +462,7 @@ namespace Audio
 		return Splitter.AddNewPatch(MaxLatencyInSamples, InGain);
 	}
 
-	void FPatchMixerSplitter::AddNewOutput(FPatchOutputStrongPtr& InPatchOutputStrongPtr)
+	void FPatchMixerSplitter::AddNewOutput(const FPatchOutputStrongPtr& InPatchOutputStrongPtr)
 	{
 		Splitter.AddNewPatch(InPatchOutputStrongPtr);
 	}
@@ -516,8 +504,7 @@ namespace Audio
 		
 		OnProcessAudio(TArrayView<const float>(IntermediateBuffer));
 
-		// Push audio to outputs:
-		int32 PushResult = Splitter.PushAudio(IntermediateBuffer.GetData(), NumSamplesToForward);
-		check(PushResult == NumSamplesToForward);
+		// Push audio to outputs
+		Splitter.PushAudio(IntermediateBuffer.GetData(), NumSamplesToForward);
 	}
 }

@@ -124,10 +124,10 @@ namespace Audio
 		FPatchInput AddNewInput(int32 MaxLatencyInSamples, float InGain);
 
 		/** Adds an existing patch input to the patch mixer. */
-		void AddNewInput(FPatchInput& InPatchInput);
+		void AddNewInput(const FPatchInput& InPatchInput);
 
 		/** Removes a tap from the tap collector. Calling this is thread safe, though FPatchOutput will likely not be deleted until the next call of PopAudio. */
-		void RemovePatch(const FPatchInput& TapInput);
+		void RemovePatch(const FPatchInput& InPatchInput);
 
 		/** Mixes all inputs into a single buffer. This should only be called from a single thread. Returns the number of non-silent samples popped to OutBuffer. */
 		int32 PopAudio(float* OutBuffer, int32 OutNumSamples, bool bUseLatestAudio);
@@ -217,7 +217,7 @@ namespace Audio
 		FPatchOutputStrongPtr AddNewOutput(int32 MaxLatencyInSamples, float InGain);
 
 		/** Adds a new a patch from an existing patch output. */
-		void AddNewOutput(FPatchOutputStrongPtr& InPatchOutputStrongPtr);
+		void AddNewOutput(const FPatchOutputStrongPtr& InPatchOutputStrongPtr);
 
 		/** Adds a new input to the tap collector. Calling this is thread safe, but individual instances of FPatchInput are only safe to be used from one thread. */
 		FPatchInput AddNewInput(int32 MaxLatencyInSamples, float InGain);

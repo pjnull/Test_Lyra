@@ -80,8 +80,8 @@ namespace AudioModulation
 
 		virtual void GetDebugValues(TArray<FString>& OutDebugValues) const override
 		{
-			const float AttackTime = EnvelopeFollower.GetAttackTime();
-			const float ReleaseTime = EnvelopeFollower.GetReleaseTime();
+			const float AttackTime = EnvelopeFollower.GetAttackTimeMsec() / 1000.f;
+			const float ReleaseTime = EnvelopeFollower.GetReleaseTimeMsec() / 1000.f;
 
 			OutDebugValues.Add(FString::Printf(TEXT("%.4f"), GetValue()));
 			OutDebugValues.Add(FString::Printf(TEXT("%.4f"), Gain));
@@ -123,13 +123,16 @@ namespace AudioModulation
 
 		void InitBus()
 		{
-			if (FAudioDeviceManager* DeviceManager = FAudioDeviceManager::Get())
+			if (BusId != INDEX_NONE)
 			{
-				FAudioDevice* AudioDevice = DeviceManager->GetAudioDeviceRaw(AudioDeviceId);
-				if (Audio::FMixerDevice* MixerDevice = static_cast<Audio::FMixerDevice*>(AudioDevice))
+				if (FAudioDeviceManager* DeviceManager = FAudioDeviceManager::Get())
 				{
-					AudioBusPatch = MixerDevice->AddPatchForAudioBus(BusId, Gain);
-					bInitialized = true;
+					FAudioDevice* AudioDevice = DeviceManager->GetAudioDeviceRaw(AudioDeviceId);
+					if (Audio::FMixerDevice* MixerDevice = static_cast<Audio::FMixerDevice*>(AudioDevice))
+					{
+						AudioBusPatch = MixerDevice->AddPatchForAudioBus(BusId, Gain);
+						bInitialized = true;
+					}
 				}
 			}
 		}
@@ -178,6 +181,7 @@ namespace AudioModulation
 			}
 			else
 			{
+				bInitialized = false;
 				CurrentValue = 0.f;
 			}
 
