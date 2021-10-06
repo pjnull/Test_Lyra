@@ -380,7 +380,7 @@ namespace UEPushModelPrivate
 				It->CountBytes(Ar);
 			}
 
-			return sizeof(this) + Ar.GetMem();
+			return sizeof(*this) + Ar.GetMem();
 		}
 
 	private:
