@@ -265,6 +265,9 @@ void FLevelEditorModule::StartupModule()
 	// Bind level editor commands shared across an instance
 	BindGlobalLevelEditorCommands();
 
+	// Exposes the global level editor command list to subscribers from other systems
+	FInputBindingManager::Get().RegisterCommandList(FLevelEditorCommands::Get().GetContextName(), GetGlobalLevelEditorActions());
+
 	FViewportTypeDefinition ViewportType = FViewportTypeDefinition([](const FAssetEditorViewportConstructionArgs& ConstructionArgs, TSharedPtr<ILevelEditor> InLevelEditor)
 		{
 			TSharedPtr<SLevelViewport> EditorViewport = SNew(SLevelViewport, ConstructionArgs)
@@ -330,7 +333,7 @@ void FLevelEditorModule::ShutdownModule()
 	{
 		FGlobalTabmanager::Get()->UnregisterTabSpawner("LevelEditor");
 		FModuleManager::GetModuleChecked<ISlateReflectorModule>("SlateReflector").UnregisterTabSpawner();
-	}	
+	}
 
 	FLevelEditorCommands::Unregister();
 	FLevelEditorModesCommands::Unregister();
@@ -1780,6 +1783,6 @@ void FLevelEditorModule::BindGlobalLevelEditorCommands()
 		FExecuteAction::CreateStatic(&FLevelEditorActionCallbacks::OpenMergeActor_Clicked)
 		);
 }
-	
+
 
 #undef LOCTEXT_NAMESPACE
