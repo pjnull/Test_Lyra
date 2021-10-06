@@ -90,6 +90,7 @@ namespace AutomationTool
 			MsBuild(Env, ProjectFile, CmdLine, LogName);
 		}
 
+		///
 		/// <summary>
 		/// returns true if this is a linux executable using some awful conventions
 		/// <param name="Filename">Filename</param>
