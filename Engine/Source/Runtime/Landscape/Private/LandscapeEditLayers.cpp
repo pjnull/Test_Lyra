@@ -2869,7 +2869,7 @@ int32 ALandscape::RegenerateLayersHeightmaps(FTextureToComponentHelper const& Ma
 			if (CPUReadback == nullptr)
 			{
 				FLandscapeEditLayerReadback* NewCPUReadback = new FLandscapeEditLayerReadback();
-				const uint8* LockedMip = ComponentHeightmap->Source.LockMip(0);
+				const uint8* LockedMip = ComponentHeightmap->Source.LockMipReadOnly(0);
 				const uint32 Hash = FLandscapeEditLayerReadback::CalculateHash(LockedMip, ComponentHeightmap->GetSizeX() * ComponentHeightmap->GetSizeY() * sizeof(FColor));
 				ComponentHeightmap->Source.UnlockMip(0);
 				NewCPUReadback->SetHash(Hash);
@@ -3181,7 +3181,6 @@ void ALandscape::ResolveLayersHeightmapTexture(
 			if (bChanged)
 			{
 				ChangedComponents.Append(MapHelper.HeightmapToComponents[Heightmap]);
-				Heightmap->MarkPackageDirty();
 			}
 		}
 	}
@@ -3394,22 +3393,53 @@ bool ALandscape::ResolveLayersTexture(
 		// Copy final result to texture source.
 		TArray<TArray<FColor>> const& OutMipsData = InCPUReadback->GetResult(CompletedReadbackNum - 1);
 
+		bool bTextureModified = false;
 		for (int8 MipIndex = 0; MipIndex < OutMipsData.Num(); ++MipIndex)
 		{
 			if (OutMipsData[MipIndex].Num() > 0)
 			{
-				uint8* TextureData = InOutputTexture->Source.LockMip(MipIndex);
+				TRACE_CPUPROFILER_EVENT_SCOPE(LandscapeLayers_ReadbackMip);
 
 				// Do dirty detection on first mip.
 				// Don't do this for intermediate renders.
 				if (MipIndex == 0 && !bIntermediateRender)
 				{
-					const uint32 Hash = FLandscapeEditLayerReadback::CalculateHash((uint8*)OutMipsData[MipIndex].GetData(), OutMipsData[MipIndex].Num() * sizeof(FColor));
+					uint32 Hash = 0;
+					{
+						TRACE_CPUPROFILER_EVENT_SCOPE(LandscapeLayers_CalculateHash);
+						Hash = FLandscapeEditLayerReadback::CalculateHash((uint8*)OutMipsData[MipIndex].GetData(), OutMipsData[MipIndex].Num() * sizeof(FColor));
+					}
+
 					if (InCPUReadback->SetHash(Hash))
 					{
-						DirtyDelegate(InOutputTexture, (FColor*)TextureData, OutMipsData[MipIndex].GetData());
 						bChanged = true;
 					}
+					else
+					{
+						check(!bIntermediateRender);
+						// Nothing has changed (and we don't do an intermediate render), we can stop right there, no need for mapping / unmapping the other mips : 
+						break;
+					}
+				}
+
+				if (bChanged || bIntermediateRender)
+				{
+					TRACE_CPUPROFILER_EVENT_SCOPE(LandscapeLayers_ModifySourceTextureData);
+
+					// We're about to modify the texture's source data, the texture needs to know so that it can handle properly update cached platform data (additionally, the package needs to be dirtied) :
+					if (!bTextureModified)
+					{
+						InOutputTexture->Modify();
+						bTextureModified = true;
+					}
+
+					// Read-write lock : 
+					uint8* TextureData = InOutputTexture->Source.LockMip(MipIndex);
+
+					// Optional DirtyDelegate (only needs read-only access to texture data but we've already locked the mip in read-write so it's fine :
+					if (MipIndex == 0 && !bIntermediateRender)
+					{
+						DirtyDelegate(InOutputTexture, (FColor*)TextureData, OutMipsData[MipIndex].GetData());
 					}
 
 					FMemory::Memcpy(TextureData, OutMipsData[MipIndex].GetData(), OutMipsData[MipIndex].Num() * sizeof(FColor));
@@ -3417,6 +3447,7 @@ bool ALandscape::ResolveLayersTexture(
 					InOutputTexture->Source.UnlockMip(MipIndex);
 				}
 			}
+		}
 
 		// Process component flags from all result contexts.
 		for (int32 ResultIndex = 0; ResultIndex < CompletedReadbackNum; ++ResultIndex)
@@ -4218,7 +4249,7 @@ int32 ALandscape::RegenerateLayersWeightmaps(FTextureToComponentHelper const& Ma
 					if (CPUReadback == nullptr)
 					{
 						FLandscapeEditLayerReadback* NewCPUReadback = new FLandscapeEditLayerReadback();
-						const uint8* LockedMip = WeightmapTexture->Source.LockMip(0);
+						const uint8* LockedMip = WeightmapTexture->Source.LockMipReadOnly(0);
 						const uint32 Hash = FLandscapeEditLayerReadback::CalculateHash(LockedMip, WeightmapTexture->GetSizeX() * WeightmapTexture->GetSizeY() * sizeof(FColor));
 						NewCPUReadback->SetHash(Hash);
 						WeightmapTexture->Source.UnlockMip(0);
@@ -4621,7 +4652,6 @@ void ALandscape::ResolveLayersWeightmapTexture(
 			if (bChanged)
 			{
 				ChangedComponents.Append(MapHelper.WeightmapToComponents[Weightmap]);
-				Weightmap->MarkPackageDirty();
 			}
 		}
 	}
@@ -6172,7 +6202,7 @@ LANDSCAPE_API extern bool GDisableUpdateLandscapeMaterialInstances;
 uint32 ULandscapeComponent::ComputeLayerHash() const
 {
 	UTexture2D* Heightmap = GetHeightmap(true);
-	const uint8* MipData = Heightmap->Source.LockMip(0);
+	const uint8* MipData = Heightmap->Source.LockMipReadOnly(0);
 	uint32 Hash = FCrc::MemCrc32(MipData, Heightmap->GetSizeX()*Heightmap->GetSizeY() * sizeof(FColor));
 	Heightmap->Source.UnlockMip(0);
 
@@ -6195,7 +6225,7 @@ uint32 ULandscapeComponent::ComputeLayerHash() const
 		{
             // Compute hash of actual data of the texture that is owned by the component (per Texture Channel)
 			UTexture2D* Weightmap = Weightmaps[AllocationInfo.WeightmapTextureIndex];
-			MipData = Weightmap->Source.LockMip(0) + ChannelOffsets[AllocationInfo.WeightmapTextureChannel];
+			MipData = Weightmap->Source.LockMipReadOnly(0) + ChannelOffsets[AllocationInfo.WeightmapTextureChannel];
 			TArray<uint8> ChannelData;
 			ChannelData.AddDefaulted(Weightmap->GetSizeX()*Weightmap->GetSizeY());
 			int32 TexSize = (SubsectionSizeQuads + 1)*NumSubsections;
