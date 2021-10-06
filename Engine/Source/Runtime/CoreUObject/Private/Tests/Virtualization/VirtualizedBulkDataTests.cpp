@@ -17,7 +17,7 @@
 namespace UE::Virtualization
 {
 	
-constexpr const uint32 TestFlags = EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::SmokeFilter;
+constexpr const uint32 TestFlags = EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::EngineFilter;
 
 /** Creates a buffer full of random data to make it easy to have something to test against. */
 TUniquePtr<uint8[]> CreateRandomData(int64 BufferSize)
