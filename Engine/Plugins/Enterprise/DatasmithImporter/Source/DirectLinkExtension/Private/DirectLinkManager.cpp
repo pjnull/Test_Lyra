@@ -200,7 +200,7 @@ namespace UE::DatasmithImporter
 		TArray<TSharedRef<FAutoReimportInfo>> AutoReimportInfoList;
 		RegisteredAutoReimportExternalSourceMap.MultiFind(DirectLinkExternalSource, AutoReimportInfoList);
 		RegisteredAutoReimportExternalSourceMap.Remove(DirectLinkExternalSource);
-		for (const TSharedRef<FAutoReimportInfo> AutoReimportInfo : AutoReimportInfoList)
+		for (const TSharedRef<FAutoReimportInfo>& AutoReimportInfo : AutoReimportInfoList)
 		{
 			RegisteredAutoReimportObjectMap.Remove(AutoReimportInfo->TargetObject.Get());
 		}
