@@ -95,6 +95,13 @@ static TAutoConsoleVariable<int32> CVarVolumetricCloudShadowSampleAtmosphericLig
 	TEXT("Enable the sampling of atmospheric lights shadow map in order to produce volumetric shadows."),
 	ECVF_RenderThreadSafe | ECVF_Scalability);
 
+// The project setting for the cloud shadow to affect all translucenct surface not relying on the translucent lighting volume (enable/disable runtime and shader code).  This is not implemented on mobile as VolumetricClouds are not available on these platforms.
+static TAutoConsoleVariable<int32> CVarSupportCloudShadowOnForwardLitTranslucent(
+	TEXT("r.SupportCloudShadowOnForwardLitTranslucent"),
+	0,
+	TEXT("Enables cloud shadow to affect all translucenct surface not relying on the translucent lighting volume."),
+	ECVF_ReadOnly | ECVF_RenderThreadSafe);
+
 ////////////////////////////////////////////////////////////////////////// Cloud SKY AO
 
 static TAutoConsoleVariable<int32> CVarVolumetricCloudSkyAO(
@@ -2486,8 +2493,23 @@ bool FSceneRenderer::RenderVolumetricCloud(
 	return bAsyncComputeUsed;
 }
 
-bool SetupLightCloudTransmittanceParameters(const FScene* Scene, const FViewInfo& View, const FLightSceneInfo* LightSceneInfo, FLightCloudTransmittanceParameters& OutParameters)
+bool SetupLightCloudTransmittanceParameters(FRDGBuilder& GraphBuilder, const FScene* Scene, const FViewInfo& View, const FLightSceneInfo* LightSceneInfo, FLightCloudTransmittanceParameters& OutParameters)
 {
+	auto DefaultLightCloudTransmittanceParameters = [](FRDGBuilder& GraphBuilder, FLightCloudTransmittanceParameters& OutParam)
+	{
+		OutParam.CloudShadowmapTexture = GSystemTextures.GetBlackDummy(GraphBuilder);
+		OutParam.CloudShadowmapSampler = TStaticSamplerState<SF_Bilinear, AM_Clamp, AM_Clamp, AM_Clamp>::GetRHI();
+		OutParam.CloudShadowmapFarDepthKm = 1.0f;
+		OutParam.CloudShadowmapWorldToLightClipMatrix = FMatrix::Identity;
+		OutParam.CloudShadowmapStrength = 0.0f;
+	};
+
+	if (!Scene || !LightSceneInfo)
+	{
+		DefaultLightCloudTransmittanceParameters(GraphBuilder, OutParameters);
+		return false;
+	}
+
 	FLightSceneProxy* AtmosphereLight0Proxy = Scene->AtmosphereLights[0] ? Scene->AtmosphereLights[0]->Proxy : nullptr;
 	FLightSceneProxy* AtmosphereLight1Proxy = Scene->AtmosphereLights[1] ? Scene->AtmosphereLights[1]->Proxy : nullptr;
 	const FVolumetricCloudRenderSceneInfo* CloudInfo = Scene->GetVolumetricCloudSceneInfo();
@@ -2513,11 +2535,7 @@ bool SetupLightCloudTransmittanceParameters(const FScene* Scene, const FViewInfo
 	}
 	else
 	{
-		OutParameters.CloudShadowmapTexture = View.VolumetricCloudShadowRenderTarget[0];
-		OutParameters.CloudShadowmapSampler = TStaticSamplerState<SF_Bilinear, AM_Clamp, AM_Clamp, AM_Clamp>::GetRHI();
-		OutParameters.CloudShadowmapFarDepthKm = 1.0f;
-		OutParameters.CloudShadowmapWorldToLightClipMatrix = FMatrix::Identity;
-		OutParameters.CloudShadowmapStrength = 0.0f;
+		DefaultLightCloudTransmittanceParameters(GraphBuilder, OutParameters);
 	}
 
 	return bLight0CloudPerPixelTransmittance || bLight1CloudPerPixelTransmittance;
