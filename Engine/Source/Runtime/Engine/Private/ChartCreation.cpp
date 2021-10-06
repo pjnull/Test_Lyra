@@ -805,7 +805,7 @@ void FPerformanceTrackingChart::ProcessFrame(const FFrameData& FrameData)
 		MinAvailablePhysicalMemory = FMath::Min(MinAvailablePhysicalMemory, static_cast<uint64>(MemoryStats.GetAvailablePhysical(true)));
 		TotalPhysicalMemoryUsed += MemoryStats.UsedPhysical;
 		TotalVirtualMemoryUsed += MemoryStats.UsedVirtual;
-		NumFramesAtCriticalMemoryPressure += MemoryStats.MemoryPressureStatus == FGenericPlatformMemoryStats::EMemoryPressureStatus::Critical ? 1 : 0;
+		NumFramesAtCriticalMemoryPressure += MemoryStats.GetMemoryPressureStatus() == FGenericPlatformMemoryStats::EMemoryPressureStatus::Critical ? 1 : 0;
 
 		// Handle hitching
 		if (FrameData.HitchStatus != EFrameHitchType::NoHitch)

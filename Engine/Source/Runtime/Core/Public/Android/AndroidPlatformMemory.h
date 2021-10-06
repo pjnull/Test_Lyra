@@ -12,7 +12,9 @@
  *	Android implementation of the FGenericPlatformMemoryStats.
  */
 struct FPlatformMemoryStats : public FGenericPlatformMemoryStats
-{};
+{
+	FGenericPlatformMemoryStats::EMemoryPressureStatus GetMemoryPressureStatus();
+};
 
 /**
 * Android implementation of the memory OS functions
@@ -82,7 +84,7 @@ struct CORE_API FAndroidPlatformMemory : public FGenericPlatformMemory
 	//~ End FGenericPlatformMemory Interface
 	
 	// ANDROID ONLY:
-	enum class EAndroidTrimMemoryValues
+	enum class ETrimValues
 	{
 		Unknown = -1,
 		Complete = 80,			// the process is nearing the end of the background LRU list, and if more memory isn't found soon it will be killed.

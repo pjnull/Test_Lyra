@@ -232,29 +232,32 @@ FPlatformMemoryStats FAndroidPlatformMemory::GetStats()
 	}
 #endif
 
+	return MemoryStats;
+}
+
+FGenericPlatformMemoryStats::EMemoryPressureStatus FPlatformMemoryStats::GetMemoryPressureStatus()
+{
 	// convert Android's TRIM status to FGenericPlatformMemoryStats::EMemoryPressureStatus.
-	auto AndroidTRIMToMemPressureStatus = [](EAndroidTrimMemoryValues LastTrimMemoryState)
+	auto AndroidTRIMToMemPressureStatus = [](FAndroidPlatformMemory::ETrimValues LastTrimMemoryState)
 	{
 		switch (LastTrimMemoryState)
 		{
-			case EAndroidTrimMemoryValues::Running_Critical:
-				return FGenericPlatformMemoryStats::EMemoryPressureStatus::Critical;
-			case EAndroidTrimMemoryValues::Unknown:
-				return FGenericPlatformMemoryStats::EMemoryPressureStatus::Unknown;
-			case EAndroidTrimMemoryValues::Complete:
-			case EAndroidTrimMemoryValues::Moderate:
-			case EAndroidTrimMemoryValues::Background:
-			case EAndroidTrimMemoryValues::UI_Hidden:
-			case EAndroidTrimMemoryValues::Running_Low:
-			case EAndroidTrimMemoryValues::Running_Moderate:
-			default:
-				return FGenericPlatformMemoryStats::EMemoryPressureStatus::Nominal;
+		case FAndroidPlatformMemory::ETrimValues::Running_Critical:
+			return FGenericPlatformMemoryStats::EMemoryPressureStatus::Critical;
+		case FAndroidPlatformMemory::ETrimValues::Unknown:
+			return FGenericPlatformMemoryStats::EMemoryPressureStatus::Unknown;
+		case FAndroidPlatformMemory::ETrimValues::Complete:
+		case FAndroidPlatformMemory::ETrimValues::Moderate:
+		case FAndroidPlatformMemory::ETrimValues::Background:
+		case FAndroidPlatformMemory::ETrimValues::UI_Hidden:
+		case FAndroidPlatformMemory::ETrimValues::Running_Low:
+		case FAndroidPlatformMemory::ETrimValues::Running_Moderate:
+		default:
+			return FGenericPlatformMemoryStats::EMemoryPressureStatus::Nominal;
 		}
 	};
 
-	MemoryStats.MemoryPressureStatus = AndroidTRIMToMemPressureStatus(AndroidPlatformMemory::GAndroidMemoryWarningContext.LastTrimMemoryState);
-
-	return MemoryStats;
+	return AndroidTRIMToMemPressureStatus(AndroidPlatformMemory::GAndroidMemoryWarningContext.LastTrimMemoryState);
 }
 
 uint64 FAndroidPlatformMemory::GetMemoryUsedFast()
@@ -297,7 +300,7 @@ void FAndroidPlatformMemory::UpdateOSMemoryStatus(EOSMemoryStatusCategory OSMemo
 	switch (OSMemoryStatusCategory)
 	{
 		case EOSMemoryStatusCategory::OSTrim:
-			AndroidPlatformMemory::GAndroidMemoryWarningContext.LastTrimMemoryState = (FAndroidPlatformMemory::EAndroidTrimMemoryValues)Value;
+			AndroidPlatformMemory::GAndroidMemoryWarningContext.LastTrimMemoryState = (FAndroidPlatformMemory::ETrimValues)Value;
 			break;
 		default:
 			checkNoEntry();

@@ -155,7 +155,7 @@ struct CORE_API FGenericPlatformMemoryStats : public FPlatformMemoryConstants
 		Nominal, 
 		Critical, // high risk of OOM conditions
 	};
-	EMemoryPressureStatus MemoryPressureStatus;
+	EMemoryPressureStatus GetMemoryPressureStatus();
 
 	/** Default constructor, clears all variables. */
 	FGenericPlatformMemoryStats();
