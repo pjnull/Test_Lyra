@@ -1940,18 +1940,6 @@ void UEngine::Init(IEngineLoop* InEngineLoop)
 		NewStatDelegate.Broadcast(EngineStat.CommandName, EngineStat.CategoryName, EngineStat.DescriptionString);
 	}
 
-	// Command line option for enabling named events
-	if (FParse::Param(FCommandLine::Get(), TEXT("statnamedevents")))
-	{
-		GCycleStatsShouldEmitNamedEvents = 1;
-	}
-
-	if (FParse::Param(FCommandLine::Get(), TEXT("verbosenamedevents")))
-	{
-		GCycleStatsShouldEmitNamedEvents = 1;
-		GShouldEmitVerboseNamedEvents = 1;
-	}
-
 #if UE_NET_TRACE_ENABLED
 	uint32 NetTraceVerbosity;
 	if(FParse::Value(FCommandLine::Get(), TEXT("NetTrace="), NetTraceVerbosity))
