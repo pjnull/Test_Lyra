@@ -46,18 +46,9 @@ void UAsyncCaptureScene::Start(UCameraComponent* ViewCamera, TSubclassOf<ASceneC
 
 		if (CaptureComponent->TextureTarget == nullptr)
 		{
-			int32 CaptureWidth = ResX;
-			int32 CaptureHeight = ResY;
-
-			if (CaptureComponent->GetEnableOrthographicTiling() && CaptureComponent->ProjectionType == ECameraProjectionMode::Orthographic)
-			{
-				CaptureWidth /= CaptureComponent->GetNumXTiles();
-				CaptureHeight /= CaptureComponent->GetNumYTiles();
-			}
-
 			SceneCaptureRT = NewObject<UTextureRenderTarget2D>(this, TEXT("AsyncCaptureScene_RT"), RF_Transient);
 			SceneCaptureRT->RenderTargetFormat = RTF_RGBA8_SRGB;
-			SceneCaptureRT->InitAutoFormat(CaptureWidth, CaptureHeight);
+			SceneCaptureRT->InitAutoFormat(ResX, ResY);
 			SceneCaptureRT->UpdateResourceImmediate(true);
 
 			CaptureComponent->TextureTarget = SceneCaptureRT;
@@ -83,7 +74,6 @@ void UAsyncCaptureScene::Activate()
 	FinishLoadingBeforeScreenshot();
 
 	USceneCaptureComponent2D* CaptureComponent = SceneCapture->GetCaptureComponent2D();
-	CaptureComponent->TileID = 0;
 	CaptureComponent->CaptureScene();
 
 	FinishLoadingBeforeScreenshot();
