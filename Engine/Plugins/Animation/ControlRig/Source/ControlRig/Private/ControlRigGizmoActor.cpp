@@ -71,6 +71,7 @@ void AControlRigGizmoActor::SetSelectable(bool bInSelectable)
 	{
 		bSelectable = bInSelectable;
 		StaticMeshComponent->bSelectable = bSelectable && bEnabled;
+		StaticMeshComponent->AttachToComponent(RootComponent, FAttachmentTransformRules::KeepRelativeTransform); //need to do this so the bSelectable flag is actually used, otherwise it appears to use a cached mesh
 		if (!bSelectable)
 		{
 			SetSelected(false);
