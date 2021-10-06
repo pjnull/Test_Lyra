@@ -317,7 +317,8 @@ struct FTextureSource
 	FORCEINLINE bool IsLongLatCubemap() const { return bLongLatCubemap; }
 	FORCEINLINE int64 GetSizeOnDisk() const { return BulkData.GetPayloadSize(); }
 	inline bool HasPayloadData() const { return BulkData.HasPayloadData(); }
-	FORCEINLINE bool IsBulkDataLoaded() const { return BulkData.IsDataLoaded(); }
+	/** Returns true if the texture's bulkdata payload is either already in memory or if the payload is 0 bytes in length. It will return false if the payload needs to load from disk */
+	FORCEINLINE bool IsBulkDataLoaded() const { return BulkData.DoesPayloadNeedLoading(); }
 
 	ENGINE_API void OperateOnLoadedBulkData(TFunctionRef<void (const FSharedBuffer& BulkDataBuffer)> Operation);
 

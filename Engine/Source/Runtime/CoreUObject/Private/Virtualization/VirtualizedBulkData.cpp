@@ -708,7 +708,17 @@ void FVirtualizedUntypedBulkData::Serialize(FArchive& Ar, UObject* Owner, bool b
 					// as we will not be able to load it on demand.
 					FCompressedBuffer CompressedPayload;
 					SerializeData(Ar, CompressedPayload, Flags);
-					Payload = CompressedPayload.Decompress();
+					
+					// Only decompress if there is actual data, otherwise we might as well just 
+					// store the payload as an empty FSharedBuffer.
+					if (CompressedPayload.GetRawSize() > 0)
+					{
+						Payload = CompressedPayload.Decompress();
+					}
+					else
+					{
+						Payload.Reset();
+					}
 				}
 			}
 			if (bAllowRegister)
@@ -1145,8 +1155,6 @@ void FVirtualizedUntypedBulkData::UpdatePayloadImpl(FSharedBuffer&& InPayload, F
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FVirtualizedUntypedBulkData::UpdatePayloadImpl);
 
-	UnloadData();
-
 	if (AttachedAr != nullptr)
 	{
 		AttachedAr->DetachBulkData(this, false);
@@ -1154,8 +1162,17 @@ void FVirtualizedUntypedBulkData::UpdatePayloadImpl(FSharedBuffer&& InPayload, F
 
 	check(AttachedAr == nullptr);
 
-	// Make sure that we own the memory in the shared buffer
-	Payload = MoveTemp(InPayload).MakeOwned();
+	// We only take the payload if it has a length to avoid potentially holding onto a
+	// 0 byte allocation in the FSharedBuffer
+	if(InPayload.GetSize() > 0)
+	{ 
+		Payload = MoveTemp(InPayload).MakeOwned();
+	}
+	else
+	{
+		Payload.Reset();
+	}
+
 	PayloadSize = (int64)Payload.GetSize();
 	PayloadContentId = MoveTemp(InPayloadID);
 
@@ -1223,9 +1240,14 @@ TFuture<FSharedBuffer> FVirtualizedUntypedBulkData::GetPayload() const
 {
 	TPromise<FSharedBuffer> Promise;
 	
-	// Avoid a unnecessary compression and decompression if we already have the uncompressed payload
-	if (Payload && GetPayloadSize() > 0)
+	if (GetPayloadSize() == 0)
 	{
+		// Early out for 0 sized payloads
+		Promise.SetValue(FSharedBuffer());
+	}
+	else if (Payload)
+	{
+		// Avoid a unnecessary compression and decompression if we already have the uncompressed payload
 		Promise.SetValue(Payload);
 	}
 	else
