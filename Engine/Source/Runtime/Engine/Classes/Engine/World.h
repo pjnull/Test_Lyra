@@ -1003,9 +1003,6 @@ public:
 	/** Returns the level, if any, in the process of being made visible */
 	ULevel* GetCurrentLevelPendingVisibility() const { return CurrentLevelPendingVisibility; }
 
-	/** Returns the best candidate level, if any, to become the CurrentLevelPendingVisibility */
-	ULevel* CalculateNextPreferredLevelPendingVisibility() const;
-
 	/** Returns the level, if any, in the process of being made invisible */
 	ULevel* GetCurrentLevelPendingInvisibility() const { return CurrentLevelPendingInvisibility; }
 
@@ -1057,11 +1054,18 @@ public:
 	/** Whether the world is currently in a BlockTillLevelStreamingCompleted() call */
 	bool GetIsInBlockTillLevelStreamingCompleted() const { return IsInBlockTillLevelStreamingCompleted > 0; }
 
+	/** Returns BlockTillLevelStreamingCompletedEpoch. */
+	int32 GetBlockTillLevelStreamingCompletedEpoch() const { return BlockTillLevelStreamingCompletedEpoch; }
+
 	/** Prefix we used to rename streaming levels, non empty in PIE and standalone preview */
 	UPROPERTY()
 	FString										StreamingLevelsPrefix;
 
 private:
+
+	/** Returns wether AddToWorld should be skipped on a given level */
+	bool CanAddLoadedLevelToWorld(ULevel* Level) const;
+
 	/** Pointer to the current level in the queue to be made visible, NULL if none are pending. */
 	UPROPERTY(Transient)
 	TObjectPtr<class ULevel>								CurrentLevelPendingVisibility;
@@ -1250,6 +1254,9 @@ private:
 
 	/** Whether the world is currently in a BlockTillLevelStreamingCompleted() call */
 	uint32 IsInBlockTillLevelStreamingCompleted;
+
+	/** Epoch updated every time BlockTillLevelStreamingCompleted() is called. */
+	int32 BlockTillLevelStreamingCompletedEpoch;
 
 	/** The world's navigation data manager */
 	UPROPERTY(Transient)

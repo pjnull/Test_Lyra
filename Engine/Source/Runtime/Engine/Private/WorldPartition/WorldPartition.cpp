@@ -1195,13 +1195,13 @@ void UWorldPartition::UpdateStreamingState()
 	}
 }
 
-class ULevel* UWorldPartition::GetPreferredLoadedLevelToAddToWorld() const
+bool UWorldPartition::CanAddLoadedLevelToWorld(class ULevel* InLevel) const
 {
 	if (GetWorld()->IsGameWorld())
 	{
-		return StreamingPolicy->GetPreferredLoadedLevelToAddToWorld();
+		return StreamingPolicy->CanAddLoadedLevelToWorld(InLevel);
 	}
-	return nullptr;
+	return true;
 }
 
 bool UWorldPartition::IsStreamingCompleted(EWorldPartitionRuntimeCellState QueryState, const TArray<FWorldPartitionStreamingQuerySource>& QuerySources, bool bExactState) const

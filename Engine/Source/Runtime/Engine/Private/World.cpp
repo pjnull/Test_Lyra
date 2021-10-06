@@ -404,6 +404,7 @@ UWorld::UWorld( const FObjectInitializer& ObjectInitializer )
 	});
 
 	IsInBlockTillLevelStreamingCompleted = 0;
+	BlockTillLevelStreamingCompletedEpoch = 0;
 }
 
 UWorld::~UWorld()
@@ -2578,11 +2579,8 @@ void UWorld::AddToWorld( ULevel* Level, const FTransform& LevelTransform, bool b
 
 	if (bExecuteNextStep)
 	{
-		ULevel* NextPreferredLevelPendingVisibility = CalculateNextPreferredLevelPendingVisibility();
-		if (NextPreferredLevelPendingVisibility != nullptr && NextPreferredLevelPendingVisibility != Level)
+		if (!CanAddLoadedLevelToWorld(Level))
 		{
-			// Don't add to world if the level is not the preferred one
-			check(CurrentLevelPendingVisibility == nullptr);
 			bExecuteNextStep = false;
 		}
 	}
@@ -3473,7 +3471,7 @@ void FStreamingLevelsToConsider::Add_Internal(ULevelStreaming* StreamingLevel, b
 			if (bGuaranteedNotInContainer || !StreamingLevels.Contains(StreamingLevel))
 			{
 				auto PrioritySort = [](ULevelStreaming* LambdaStreamingLevel, ULevelStreaming* OtherStreamingLevel)
-			{
+				{
 					if (LambdaStreamingLevel && OtherStreamingLevel)
 					{
 						const int32 Priority = LambdaStreamingLevel->GetPriority();
@@ -3635,7 +3633,12 @@ void UWorld::BlockTillLevelStreamingCompleted()
 {
 	const double StartTime = FPlatformTime::Seconds();
 	TScopeCounter<uint32> IsInBlockTillLevelStreamingCompletedCounter(IsInBlockTillLevelStreamingCompleted);
-	
+
+	if (IsInBlockTillLevelStreamingCompleted == 1)
+	{
+		++BlockTillLevelStreamingCompletedEpoch;
+	}
+
 	bool bWorkToDo = false;
 	do
 	{
@@ -3686,14 +3689,17 @@ void UWorld::InternalUpdateStreamingState()
 	}
 }
 
-ULevel* UWorld::CalculateNextPreferredLevelPendingVisibility() const
+bool UWorld::CanAddLoadedLevelToWorld(ULevel* Level) const
 {
 	if (CurrentLevelPendingVisibility == nullptr)
 	{
-		const UWorldPartition* WorldPartition = GetWorldPartition();
-		return WorldPartition ? WorldPartition->GetPreferredLoadedLevelToAddToWorld() : nullptr;
+		// Allow world partition to decide wether a level should be added or not to the world
+		if (const UWorldPartition* WorldPartition = GetWorldPartition())
+		{
+			return WorldPartition->CanAddLoadedLevelToWorld(Level);
+		}
 	}
-	return nullptr;
+	return true;
 }
 
 void UWorld::UpdateLevelStreaming()
