@@ -656,8 +656,8 @@ namespace CADLibrary
 		{
 			CT_LIST_IO ObjectList;
 			ObjectList.PushBack(BodyId);
-			FString BodyFile = FString::Printf(TEXT("UEx%08x"), Body.MeshActorName);
-			CT_KERNEL_IO::SaveFile(ObjectList, *FPaths::Combine(CADFileData.GetCADCachePath(), TEXT("body"), BodyFile + TEXT(".ct")), L"Ct");
+			FString BodyFile = CADFileData.GetBodyCachePath(Body.MeshActorName);
+			CT_KERNEL_IO::SaveFile(ObjectList, *BodyFile, L"Ct");
 		}
 
 		FObjectDisplayDataId BodyMaterial;
