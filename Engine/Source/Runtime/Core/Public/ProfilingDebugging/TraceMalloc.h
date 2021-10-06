@@ -1,6 +1,7 @@
 ﻿// Copyright Epic Games, Inc. All Rights Reserved.
 #pragma once
 #include "MemoryTrace.h"
+#include "HAL/MemoryBase.h"
 
 class FTraceMalloc : public FMalloc
 {
