@@ -135,9 +135,11 @@ FCompressionSettings::FCompressionSettings(const FCompressedBuffer& Buffer)
 	// as not set.
 	if (!Buffer.TryGetCompressParameters(Compressor, CompressionLevel))
 	{
+		Reset();
+	}
+	else
+	{
 		bIsSet = true;
-		Compressor = ECompressedBufferCompressor::NotSet;
-		CompressionLevel = ECompressedBufferCompressionLevel::None;
 	}
 }
 
