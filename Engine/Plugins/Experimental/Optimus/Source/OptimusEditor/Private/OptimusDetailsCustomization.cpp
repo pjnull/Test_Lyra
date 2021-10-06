@@ -11,7 +11,6 @@
 
 #include "ComputeFramework/ShaderParamTypeDefinition.h"
 #include "DetailWidgetRow.h"
-#include "EditorFontGlyphs.h"
 #include "IPropertyTypeCustomization.h"
 #include "IDetailChildrenBuilder.h"
 #include "OptimusComputeDataInterface.h"
@@ -137,13 +136,13 @@ FText FOptimusDataTypeRefCustomization::GetDeclarationText() const
 
 // =============================================================================================
 
-TSharedRef<IPropertyTypeCustomization> FOptimusResourceContextCustomization::MakeInstance()
+TSharedRef<IPropertyTypeCustomization> FOptimusDataDomainCustomization::MakeInstance()
 {
-	return MakeShared<FOptimusResourceContextCustomization>();
+	return MakeShared<FOptimusDataDomainCustomization>();
 }
 
 
-FOptimusResourceContextCustomization::FOptimusResourceContextCustomization()
+FOptimusDataDomainCustomization::FOptimusDataDomainCustomization()
 {
 	for (FName Name: UOptimusComputeDataInterface::GetUniqueAllTopLevelContexts())
 	{
@@ -153,13 +152,13 @@ FOptimusResourceContextCustomization::FOptimusResourceContextCustomization()
 }
 
 
-void FOptimusResourceContextCustomization::CustomizeHeader(
+void FOptimusDataDomainCustomization::CustomizeHeader(
 	TSharedRef<IPropertyHandle> InPropertyHandle,
 	FDetailWidgetRow& InHeaderRow,
 	IPropertyTypeCustomizationUtils& InCustomizationUtils
 	)
 {
-	TSharedPtr<IPropertyHandle> ContextNameProperty = InPropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FOptimusResourceContext, ContextName));
+	TSharedPtr<IPropertyHandle> ContextNameProperty = InPropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FOptimusDataDomain, Name));
 	
 	InHeaderRow.NameContent()
 	[
@@ -194,13 +193,13 @@ void FOptimusResourceContextCustomization::CustomizeHeader(
 }
 
 
-TSharedRef<IPropertyTypeCustomization> FOptimusNestedResourceContextCustomization::MakeInstance()
+TSharedRef<IPropertyTypeCustomization> FOptimusMultiLevelDataDomainCustomization::MakeInstance()
 {
-	return MakeShared<FOptimusNestedResourceContextCustomization>();
+	return MakeShared<FOptimusMultiLevelDataDomainCustomization>();
 }
 
 
-FOptimusNestedResourceContextCustomization::FOptimusNestedResourceContextCustomization()
+FOptimusMultiLevelDataDomainCustomization::FOptimusMultiLevelDataDomainCustomization()
 {
 	for (TArray<FName> Names: UOptimusComputeDataInterface::GetUniqueAllNestedContexts())
 	{
@@ -222,14 +221,12 @@ FOptimusNestedResourceContextCustomization::FOptimusNestedResourceContextCustomi
 }
 
 
-void FOptimusNestedResourceContextCustomization::CustomizeHeader(
+void FOptimusMultiLevelDataDomainCustomization::CustomizeHeader(
 	TSharedRef<IPropertyHandle> InPropertyHandle,
 	FDetailWidgetRow& InHeaderRow,
 	IPropertyTypeCustomizationUtils& InCustomizationUtils
 	)
 {
-	TSharedPtr<IPropertyHandle> ContextNamesProperty = InPropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FOptimusNestedResourceContext, ContextNames));
-
 	auto FormatNames = [](const TArray<FName>& InNames) -> FText
 	{
 		TArray<FText> NameParts;
@@ -255,48 +252,48 @@ void FOptimusNestedResourceContextCustomization::CustomizeHeader(
 					.Text(FormatNames(*InNames))
 					.Font(IPropertyTypeCustomizationUtils::GetRegularFont());
 			})
-			.OnSelectionChanged_Lambda([ContextNamesProperty](TSharedPtr<TArray<FName>> InNames, ESelectInfo::Type)
+			.OnSelectionChanged_Lambda([InPropertyHandle](TSharedPtr<TArray<FName>> InNames, ESelectInfo::Type)
 			{
 				FScopedTransaction Transaction(LOCTEXT("SetResourceContexts", "Set Resource Contexts"));
 				// Ideally we'd like to match up the raw data with the outers, but I'm not
 				// convinced that there's always 1-to-1 relation.
 				TArray<UObject *> OuterObjects;
-				ContextNamesProperty->GetOuterObjects(OuterObjects);
+				InPropertyHandle->GetOuterObjects(OuterObjects);
 				for (UObject *OuterObject: OuterObjects)
 				{
 					// Notify the object that is has been modified so that undo/redo works.
 					OuterObject->Modify();
 				}
 				
-				ContextNamesProperty->NotifyPreChange();
+				InPropertyHandle->NotifyPreChange();
 				TArray<void*> RawDataPtrs;
-				ContextNamesProperty->AccessRawData(RawDataPtrs);
+				InPropertyHandle->AccessRawData(RawDataPtrs);
 
 				for (void* RawPtr: RawDataPtrs)
 				{
-					*static_cast<TArray<FName>*>(RawPtr) = *InNames; 
+					static_cast<FOptimusMultiLevelDataDomain*>(RawPtr)->LevelNames = *InNames; 
 				}
 
-				ContextNamesProperty->NotifyPostChange(EPropertyChangeType::ValueSet);
+				InPropertyHandle->NotifyPostChange(EPropertyChangeType::ValueSet);
 			})
 			[
 				SNew(STextBlock)
 				.Font(IPropertyTypeCustomizationUtils::GetRegularFont())
-				.Text_Lambda([ContextNamesProperty, FormatNames]()
+				.Text_Lambda([InPropertyHandle, FormatNames]()
 				{
 					TArray<const void *> RawDataPtrs;
-					ContextNamesProperty->AccessRawData(RawDataPtrs);
+					InPropertyHandle->AccessRawData(RawDataPtrs);
 
 					bool bItemsDiffer = false;
 					TArray<FName> Names;
 					for (const void* RawPtr: RawDataPtrs)
 					{
-						const TArray<FName>* SrcNames = static_cast<const TArray<FName>*>(RawPtr);
+						const FOptimusMultiLevelDataDomain* DataDomain = static_cast<const FOptimusMultiLevelDataDomain*>(RawPtr);
 						if (Names.IsEmpty())
 						{
-							Names = *SrcNames;
+							Names = DataDomain->LevelNames;
 						}
-						else if (Names != *SrcNames)
+						else if (Names != DataDomain->LevelNames)
 						{
 							bItemsDiffer = true;
 							break;
