@@ -40,16 +40,11 @@ private:
 	void NotifyComplete(UTextureRenderTarget2D* InTexture);
 	void Start(UCameraComponent* ViewCamera, TSubclassOf<ASceneCapture2D> SceneCaptureClass, int ResX, int ResY);
 	void FinishLoadingBeforeScreenshot();
-	bool Tick(float DeltaTime);
-
-	void ReadBackTile();
-
+	
 private:
 	UPROPERTY()
 	TObjectPtr<ASceneCapture2D> SceneCapture;
 
 	UPROPERTY()
 	TObjectPtr<UTextureRenderTarget2D> SceneCaptureRT;
-
-	FTSTicker::FDelegateHandle TickerHandle;
 };

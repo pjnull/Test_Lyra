@@ -90,34 +90,7 @@ void UAsyncCaptureScene::Activate()
 
 	CaptureComponent->CaptureScene();
 
-	TickerHandle = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateUObject(this, &ThisClass::Tick));
-}
-
-bool UAsyncCaptureScene::Tick(float DeltaTime)
-{
-	USceneCaptureComponent2D* CaptureComponent = SceneCapture->GetCaptureComponent2D();
-
-	// If we're doing orthographic tiling capture, we can continue to delay - while we wait for it to finish.
-	if (CaptureComponent->GetEnableOrthographicTiling() && CaptureComponent->ProjectionType == ECameraProjectionMode::Orthographic)
-	{
-		const int32 NumTiles = CaptureComponent->GetNumXTiles() * CaptureComponent->GetNumYTiles();
-		CaptureComponent->CaptureScene();
-
-		ReadBackTile();
-
-		CaptureComponent->TileID++;
-		if (CaptureComponent->TileID < NumTiles)
-		{
-			// We still need to keep capturing if we're not done yet.
-			NotifyComplete(SceneCaptureRT);
-			return false;
-		}
-
-		return true;
-	}
-
 	NotifyComplete(SceneCaptureRT);
-	return false;
 }
 
 void UAsyncCaptureScene::NotifyComplete(UTextureRenderTarget2D* InTexture)
@@ -129,11 +102,6 @@ void UAsyncCaptureScene::NotifyComplete(UTextureRenderTarget2D* InTexture)
 	{
 		SceneCapture->Destroy();
 	}
-}
-
-void UAsyncCaptureScene::ReadBackTile()
-{
-	
 }
 
 void UAsyncCaptureScene::FinishLoadingBeforeScreenshot()
