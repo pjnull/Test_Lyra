@@ -568,8 +568,6 @@ public:
 		return SaveArgs.SavePackageContext ? SaveArgs.SavePackageContext->PackageWriter : nullptr;
 	}
 
-	bool IsAdditionalFilesNeedLinkerSize() const;
-
 public:
 	ESavePackageResult Result;
 

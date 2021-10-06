@@ -430,7 +430,7 @@ bool FZenStoreWriter::WriteAdditionalFile(const FAdditionalFileInfo& Info, const
 
 void FZenStoreWriter::WriteLinkerAdditionalData(const FLinkerAdditionalDataInfo& Info, const FIoBuffer& Data, const TArray<FFileRegion>& FileRegions)
 {
-	// Should not be called because bsLinkerAdditionalDataInSeparateArchive is false
+	// LinkerAdditionalData is not yet implemented in this writer; it is only used for VirtualizedBulkData which is not used in cooked content
 	checkNoEntry();
 }
 

@@ -2137,7 +2137,7 @@ ESavePackageResult AppendAdditionalData(FLinkerSave& Linker, int64& InOutDataSta
 	}
 
 	IPackageWriter* PackageWriter = SavePackageContext ? SavePackageContext->PackageWriter : nullptr;
-	if (PackageWriter && SavePackageContext->PackageWriterCapabilities.bLinkerAdditionalDataInSeparateArchive)
+	if (PackageWriter)
 	{
 		FLargeMemoryWriterWithRegions DataArchive;
 		for (FLinkerSave::AdditionalDataCallback& Callback : Linker.AdditionalDataToAppend)
@@ -2174,7 +2174,7 @@ ESavePackageResult AppendAdditionalData(FLinkerSave& Linker, int64& InOutDataSta
 	return ESavePackageResult::Success;
 }
 
-ESavePackageResult CreatePayloadSidecarFile(FLinkerSave& Linker, const FPackagePath& PackagePath, const bool bSaveAsync, const bool bWriteToDisk, FSavePackageOutputFileArray& AdditionalPackageFiles)
+ESavePackageResult CreatePayloadSidecarFile(FLinkerSave& Linker, const FPackagePath& PackagePath, const bool bSaveAsync, const bool bWriteToDisk, FSavePackageOutputFileArray& AdditionalPackageFiles, FSavePackageContext* SavePackageContext)
 {
 	if (Linker.SidecarDataToAppend.IsEmpty())
 	{
@@ -2189,6 +2189,8 @@ ESavePackageResult CreatePayloadSidecarFile(FLinkerSave& Linker, const FPackageP
 	// once we enable SavePackage2 only. 
 	checkf(!Linker.IsCooking(), TEXT("Cannot write a sidecar file during cooking! (%s)"), *PackagePath.GetDebugName());
 	checkf(bWriteToDisk, TEXT("Cannot disable writing of the sidecar data to disk, that is supposed to be a cook only operation! (%s)"), *PackagePath.GetDebugName());
+	IPackageWriter* PackageWriter = SavePackageContext ? SavePackageContext->PackageWriter : nullptr;
+	checkf(!PackageWriter, TEXT("PayloadSidecarFiles are not currently implemented for PackageWriters. (%s)"), *PackagePath.GetDebugName());
 
 	FLargeMemoryWriter Ar(0, true);
 
@@ -2314,7 +2316,7 @@ ESavePackageResult SaveBulkData(FLinkerSave* Linker, int64& InOutStartOffset, co
 
 	bool bAlignBulkData = false;
 	bool bUseFileRegions = false;
-	bool bOneBulkPerRegion = false;
+	bool bDeclareRegionForEachAdditionalFile = false;
 	int64 BulkDataAlignment = 0;
 
 	if (TargetPlatform)
@@ -2323,10 +2325,10 @@ ESavePackageResult SaveBulkData(FLinkerSave* Linker, int64& InOutStartOffset, co
 		bUseFileRegions = TargetPlatform->SupportsFeature(ETargetPlatformFeatures::CookFileRegionMetadata);
 		BulkDataAlignment = TargetPlatform->GetMemoryMappingAlignment();
 	}
-	else if (PackageWriter)
+	if (PackageWriter)
 	{
 		bUseFileRegions = true;
-		bOneBulkPerRegion = true;
+		bDeclareRegionForEachAdditionalFile = SavePackageContext->PackageWriterCapabilities.bDeclareRegionForEachAdditionalFile;
 	}
 
 	if (bRequestSaveByReference)
@@ -2452,7 +2454,6 @@ ESavePackageResult SaveBulkData(FLinkerSave* Linker, int64& InOutStartOffset, co
 			}
 			else if (SaveLocation == ESaveLocation::SeparateArchiveAtEndOfPackage)
 			{
-				BulkDataFlags |= BULKDATA_NoOffsetFixUp;
 				TargetArchive = BulkArchive.Get();
 				TargetRegions = &BulkArchive->FileRegions;
 			}
@@ -2493,25 +2494,25 @@ ESavePackageResult SaveBulkData(FLinkerSave* Linker, int64& InOutStartOffset, co
 			BulkData->SerializeBulkData(*TargetArchive, BulkData->Lock(LOCK_READ_ONLY), static_cast<EBulkDataFlags>(BulkDataFlags));
 			BulkData->Unlock();
 			const int64 BulkEndOffset = TargetArchive->Tell();
+
+			BulkDataOffsetInFile = BulkStartOffset;
 			if (SaveLocation == ESaveLocation::SeparateArchiveAtEndOfPackage)
 			{
-				// BulkDatas will be read from a CompositeArchive that holds an exports segment followed by a bulkdata segment.
-				// We record offsets in the bulkdata segment relative to the beginning of the CompositeArchive.
+				// BulkDatas are written in a separate archive that is appended onto the exports archive;
+				// the input BulkStartOffset is relative to the beginning of this separate archive.
+				// But records of the BulkData's offset needs to instead be relative to the beginning of the exports archive.
 				// We have to do this to distinguish them from inline bulkdatas in the exports segment
-				check((BulkDataFlags& BULKDATA_NoOffsetFixUp) != 0); // offset fixups are not supported with this SaveLocation
-				BulkDataOffsetInFile = BulkStartOffset + InOutStartOffset;
+				BulkDataOffsetInFile += Linker->Summary.BulkDataStartOffset;
 			}
-			else if ((BulkDataFlags & BULKDATA_NoOffsetFixUp) == 0)
+			if ((BulkDataFlags & BULKDATA_NoOffsetFixUp) == 0)
 			{
-				BulkDataOffsetInFile = BulkStartOffset - Linker->Summary.BulkDataStartOffset;
-			}
-			else
-			{
-				BulkDataOffsetInFile = BulkStartOffset;
+				// The runtime will add in the Summary.BulkDataStartOffset, so we subtract it here.
+				// This allows the decoupling of the values written into the package from the size of the exports section.
+				BulkDataOffsetInFile -= Linker->Summary.BulkDataStartOffset;
 			}
 			BulkDataSizeOnDisk = BulkEndOffset - BulkStartOffset;
 
-			if ((bOneBulkPerRegion || (bUseFileRegions && BulkDataStorageInfo.BulkDataFileRegionType != EFileRegionType::None)) && BulkDataSizeOnDisk > 0)
+			if ((bDeclareRegionForEachAdditionalFile || (bUseFileRegions && BulkDataStorageInfo.BulkDataFileRegionType != EFileRegionType::None)) && BulkDataSizeOnDisk > 0)
 			{
 				TargetRegions->Add(FFileRegion(BulkStartOffset, BulkDataSizeOnDisk, BulkDataStorageInfo.BulkDataFileRegionType));
 			}

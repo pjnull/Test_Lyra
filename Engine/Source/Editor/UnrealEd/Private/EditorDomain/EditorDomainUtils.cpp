@@ -638,8 +638,7 @@ public:
 	virtual FCapabilities GetCapabilities() const override
 	{
 		FCapabilities Result;
-		Result.bAdditionalFilesNeedLinkerSize = true;
-		Result.bLinkerAdditionalDataInSeparateArchive = true;
+		Result.bDeclareRegionForEachAdditionalFile = true;
 		return Result;
 	}
 

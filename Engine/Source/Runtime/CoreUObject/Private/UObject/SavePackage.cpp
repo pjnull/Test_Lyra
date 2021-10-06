@@ -4273,7 +4273,7 @@ FSavePackageResultStruct UPackage::Save(UPackage* InOuter, UObject* Base, EObjec
 						return AppendAdditionalDataResult;
 					}
 
-					ESavePackageResult CreateSidecarResult = SavePackageUtilities::CreatePayloadSidecarFile(*Linker, TargetPackagePath, bSaveAsync, !bDiffing, AdditionalOutputFiles);
+					ESavePackageResult CreateSidecarResult = SavePackageUtilities::CreatePayloadSidecarFile(*Linker, TargetPackagePath, bSaveAsync, !bDiffing, AdditionalOutputFiles, SavePackageContext);
 					if (CreateSidecarResult != ESavePackageResult::Success)
 					{
 						return CreateSidecarResult;
@@ -4282,12 +4282,23 @@ FSavePackageResultStruct UPackage::Save(UPackage* InOuter, UObject* Base, EObjec
 #if WITH_EDITOR
 					if (bIsCooking && AdditionalFilesFromExports.Num() > 0)
 					{
-						const bool bWriteFileToDisk = !bDiffing;
+						bool bWriteFileToDisk = !bDiffing;
 						for (FLargeMemoryWriter& Writer : AdditionalFilesFromExports)
 						{
 							const int64 Size = Writer.TotalSize();
 							TotalPackageSizeUncompressed += Size;
 
+							if (PackageWriter)
+							{
+								IPackageWriter::FAdditionalFileInfo FileInfo;
+								FileInfo.PackageName = InOuter->GetFName();
+								FileInfo.Filename = *Writer.GetArchiveName();
+
+								FIoBuffer FileData(FIoBuffer::Wrap, Writer.GetData(), Size);
+
+								const bool bWrittenToPackageStore = PackageWriter->WriteAdditionalFile(FileInfo, FileData);
+								bWriteFileToDisk &= !bWrittenToPackageStore;
+							}
 							if (bComputeHash || bWriteFileToDisk)
 							{
 								FLargeMemoryPtr DataPtr(Writer.ReleaseOwnership());
@@ -4310,13 +4321,30 @@ FSavePackageResultStruct UPackage::Save(UPackage* InOuter, UObject* Base, EObjec
 					return ESavePackageResult::Success;
 				};
 			
-				bool bAdditionalFilesNeedLinkerSize = PackageWriter ? SavePackageContext->PackageWriterCapabilities.bAdditionalFilesNeedLinkerSize : false;
-				if (!bAdditionalFilesNeedLinkerSize)
+				if (PackageWriter)
 				{
+					int32 ExportsSize = Linker->Tell();
+					ESavePackageResult AdditionalFilesResult = WriteAdditionalFiles(ExportsSize);
+					checkf(Linker->Tell() == ExportsSize, TEXT("The writing of additional files is not allowed to append to the LinkerSave when using a PackageWriter."));
+					if (AdditionalFilesResult != ESavePackageResult::Success)
+					{
+						return AdditionalFilesResult;
+					}
+				}
+				else
+				{
+					// AdditionalFiles are appended to the Linker's archive, and so must be appended before we can calculate the full size of the Package
 					ESavePackageResult AdditionalFilesResult = WriteAdditionalFiles(-1);
 					if (AdditionalFilesResult != ESavePackageResult::Success)
 					{
 						return AdditionalFilesResult;
+					}
+
+					// write the package post tag
+					if (!bTextFormat)
+					{
+						uint32 Tag = PACKAGE_FILE_TAG;
+						StructuredArchiveRoot.GetUnderlyingArchive() << Tag;
 					}
 				}
 
@@ -4327,26 +4355,7 @@ FSavePackageResultStruct UPackage::Save(UPackage* InOuter, UObject* Base, EObjec
 					return UpdatePayloadTocResult;
 				}
 
-				// write the package post tag
-				if (!bTextFormat)
-				{
-					uint32 Tag = PACKAGE_FILE_TAG;
-					StructuredArchiveRoot.GetUnderlyingArchive() << Tag;
-				}
-
-				// We capture the package size before the first seek to work with archives that don't report the file
-				// size correctly while the file is still being written to.
 				PackageSize = Linker->Tell();
-
-				if (bAdditionalFilesNeedLinkerSize)
-				{
-					ESavePackageResult AdditionalFilesResult = WriteAdditionalFiles(PackageSize);
-					if (AdditionalFilesResult != ESavePackageResult::Success)
-					{
-						return AdditionalFilesResult;
-					}
-					checkf(Linker->Tell() == PackageSize, TEXT("The writing of additional files is not allowed to append to the LinkerSave when bAdditionalFilesNeedLinkerSize is true."));
-				}
 
 				// Save the import map.
 				{
@@ -4611,10 +4620,10 @@ FSavePackageResultStruct UPackage::Save(UPackage* InOuter, UObject* Base, EObjec
 							FLargeMemoryWriter* Writer = static_cast<FLargeMemoryWriter*>(Linker->Saver);
 							const int64 DataSize = Writer->TotalSize();
 
+							checkf(!bIsCooking || AdditionalOutputFiles.IsEmpty(), TEXT("Saving additional output files during cooking is not currently supported! (%s)"), *NewPathToSave);
+
 							if (PackageWriter)
 							{
-								checkf(AdditionalOutputFiles.IsEmpty(), TEXT("Saving additional output files during cooking is not supported!"));
-
 								if (!(SaveFlags & SAVE_DiffCallstack))  // Avoid double counting the package size if SAVE_DiffCallstack flag is set and DiffSettings.bSaveForDiff == true.
 									TotalPackageSizeUncompressed += DataSize;
 

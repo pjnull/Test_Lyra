@@ -2231,13 +2231,29 @@ ESavePackageResult InnerSave(FSaveContext& SaveContext)
 		return SaveContext.Result;
 	}
 
-	bool bAdditionalFilesNeedLinkerSize = SaveContext.IsAdditionalFilesNeedLinkerSize();
-	if (!bAdditionalFilesNeedLinkerSize)
+	if (SaveContext.GetPackageWriter())
 	{
+		int32 ExportsSize = SaveContext.Linker->Tell();
+		SaveContext.Result = WriteAdditionalFiles(SaveContext, SlowTask, ExportsSize);
+		checkf(SaveContext.Linker->Tell() == ExportsSize, TEXT("The writing of additional files is not allowed to append to the LinkerSave when using a PackageWriter."));
+		if (SaveContext.Result != ESavePackageResult::Success)
+		{
+			return SaveContext.Result;
+		}
+	}
+	else
+	{
+		// AdditionalFiles are appended to the Linker's archive, and so must be appended before we can calculate the full size of the Package
 		SaveContext.Result = WriteAdditionalFiles(SaveContext, SlowTask, -1);
 		if (SaveContext.Result != ESavePackageResult::Success)
 		{
 			return SaveContext.Result;
+		}
+
+		if (!SaveContext.IsTextFormat())
+		{
+			uint32 Tag = PACKAGE_FILE_TAG;
+			StructuredArchiveRoot.GetUnderlyingArchive() << Tag;
 		}
 	}
 
@@ -2248,26 +2264,8 @@ ESavePackageResult InnerSave(FSaveContext& SaveContext)
 		return SaveContext.Result;
 	}
 
-	// Write Package Post Tag
-	if (!SaveContext.IsTextFormat())
-	{
-		uint32 Tag = PACKAGE_FILE_TAG;
-		StructuredArchiveRoot.GetUnderlyingArchive() << Tag;
-	}
-
-	// Capture Package Size
 	int32 PackageSize = SaveContext.Linker->Tell();
 	SaveContext.TotalPackageSizeUncompressed += PackageSize;
-
-	if (bAdditionalFilesNeedLinkerSize)
-	{
-		SaveContext.Result = WriteAdditionalFiles(SaveContext, SlowTask, PackageSize);
-		if (SaveContext.Result != ESavePackageResult::Success)
-		{
-			return SaveContext.Result;
-		}
-		checkf(SaveContext.Linker->Tell() == PackageSize, TEXT("The writing of additional files is not allowed to append to the LinkerSave when bAdditionalFilesNeedLinkerSize is true."));
-	}
 
 	for (const FSavePackageOutputFile& File : SaveContext.AdditionalPackageFiles)
 	{
@@ -2351,7 +2349,7 @@ ESavePackageResult WriteAdditionalFiles(FSaveContext& SaveContext, FScopedSlowTa
 	}
 
 	// Create the payload side car file (if needed)
-	Result = SavePackageUtilities::CreatePayloadSidecarFile(*SaveContext.Linker.Get(), SaveContext.GetTargetPackagePath(), SaveContext.IsSaveAsync(), !SaveContext.IsDiffing(), SaveContext.AdditionalPackageFiles);
+	Result = SavePackageUtilities::CreatePayloadSidecarFile(*SaveContext.Linker.Get(), SaveContext.GetTargetPackagePath(), SaveContext.IsSaveAsync(), !SaveContext.IsDiffing(), SaveContext.AdditionalPackageFiles, SaveContext.GetSavePackageContext());
 	if (Result != ESavePackageResult::Success)
 	{
 		return Result;

@@ -22,17 +22,12 @@ public:
 
 	struct FCapabilities
 	{
-		/** Whether this writer needs BulkDatas to be written after the Linker's archive has finalized its size.
-
-			Some PackageWriters need that behavior because they put the BulkDatas in a segment following
-			the exports in a Composite archive.
+		/**
+		 * Whether an entry should be created for each BulkData stored in the BulkData section
+		 * This is necessary for some Writers that need to be able to load the BulkDatas individually.
+		 * For other writers the extra regions are an unnecessary performance cost.
 		 */
-		bool bAdditionalFilesNeedLinkerSize = false;
-		/** Whether data stored in Linker.AdditionalDataToAppend should be serialized to a separate archive.
-
-			If false, the data will be serialized to the end of the LinkerSave archive instead.
-		*/
-		bool bLinkerAdditionalDataInSeparateArchive = false;
+		bool bDeclareRegionForEachAdditionalFile = false;
 	};
 
 	/** Return capabilities/settings this PackageWriter has/requires 
@@ -120,11 +115,7 @@ public:
 	{
 		FName PackageName;
 	};
-	/** Write separate data written by UObjects via FLinkerSave::AdditionalDataToAppend.
-
-		This function will not be called unless GetCapabilities().bLinkerAdditionalDataInSeparateArchive is true.
-		If that function is false, the data was inlined into the PackageData instead.
-	*/
+	/** Write separate data written by UObjects via FLinkerSave::AdditionalDataToAppend. */
 	virtual void WriteLinkerAdditionalData(const FLinkerAdditionalDataInfo& Info, const FIoBuffer& Data, const TArray<FFileRegion>& FileRegions) = 0;
 };
 
