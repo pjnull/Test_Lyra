@@ -525,8 +525,18 @@ namespace CADLibrary
 		}
 
 		// Ask the transformation of the instance
-		if (CT_INSTANCE_IO::AskTransformation(InstanceNodeId, (double*)Instance.TransformMatrix.M) == IO_OK)
+		double Matrix[16];
+		if (CT_INSTANCE_IO::AskTransformation(InstanceNodeId, Matrix) == IO_OK)
 		{
+			int32 Index = 0;
+			for (int32 Andex = 0; Andex < 4; ++Andex)
+			{
+				for (int32 Bndex = 0; Bndex < 4; ++Bndex, ++Index)
+				{
+					Instance.TransformMatrix.M[Andex][Bndex] = Matrix[Index];
+				}
+			}
+
 			if (Instance.TransformMatrix.ContainsNaN())
 			{
 				Instance.TransformMatrix.SetIdentity();
