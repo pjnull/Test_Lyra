@@ -3,6 +3,7 @@
 #include "DirectLinkUriResolver.h"
 
 #include "DirectLinkExtensionModule.h"
+#include "DirectLinkExternalSource.h"
 #include "IDirectLinkManager.h"
 
 namespace UE::DatasmithImporter
