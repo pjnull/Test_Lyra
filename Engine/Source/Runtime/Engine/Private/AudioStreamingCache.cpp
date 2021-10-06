@@ -125,14 +125,6 @@ FAutoConsoleVariableRef CVarSaveAudiomemReportOnCacheOverflow(
 	TEXT("0: Disabled, 1: Enabled"),
 	ECVF_Default);
 
-static int32 UseObjectKeyInChunkKeyComparisonsCVar = 1;
-FAutoConsoleVariableRef CVarUseObjectKeyInChunkKeyComparisons(
-	TEXT("au.streamcaching.UseObjectKeyInChunkKeyComparisons"),
-	UseObjectKeyInChunkKeyComparisonsCVar,
-	TEXT("Enables the comparison of FObjectKeys when comparing Stream Cache Chunk Keys.  Without this FName collisions could occur if 2 SoundWaves have the same name.\n")
-	TEXT("1: (default) Compare object keys.  0: Do not compare object keys."),
-	ECVF_Default);
-
 static int32 DebugViewCVar = 2;
 FAutoConsoleVariableRef CVarDebugView(
 	TEXT("au.streamcaching.DebugView"),
@@ -287,23 +279,11 @@ FAudioChunkCache::FChunkKey::FChunkKey(const FSoundWaveProxyPtr& InSoundWave, ui
 
 bool FAudioChunkCache::FChunkKey::operator==(const FChunkKey& Other) const
 {
-	if (UseObjectKeyInChunkKeyComparisonsCVar != 0)
-	{
 #if WITH_EDITOR
 	return (SoundWaveName == Other.SoundWaveName) && (ObjectKey == Other.ObjectKey) && (ChunkIndex == Other.ChunkIndex) && (ChunkRevision == Other.ChunkRevision);
 #else
 	return (SoundWaveName == Other.SoundWaveName) && (ObjectKey == Other.ObjectKey) && (ChunkIndex == Other.ChunkIndex);
 #endif
-	}
-	else
-	{
-#if WITH_EDITOR
-		return (SoundWaveName == Other.SoundWaveName) && (ChunkIndex == Other.ChunkIndex) && (ChunkRevision == Other.ChunkRevision);
-#else
-		return (SoundWaveName == Other.SoundWaveName) && (ChunkIndex == Other.ChunkIndex);
-#endif
-	}
-
 }
 
 bool FAudioChunkCache::FChunkKey::IsChunkStale()
