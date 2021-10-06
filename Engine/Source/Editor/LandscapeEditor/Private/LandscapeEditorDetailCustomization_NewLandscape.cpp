@@ -43,6 +43,7 @@
 #include "LandscapeDataAccess.h"
 #include "Settings/EditorExperimentalSettings.h"
 #include "Editor.h"
+#include "Editor/EditorEngine.h"
 #include "LandscapeSubsystem.h"
 #include "SPrimaryButton.h"
 #include "Widgets/Input/SSegmentedControl.h"
@@ -852,6 +853,8 @@ FReply FLandscapeEditorDetailCustomization_NewLandscape::OnCreateButtonClicked()
 
 		ULandscapeInfo* LandscapeInfo = Landscape->GetLandscapeInfo();
 		check(LandscapeInfo);
+
+		FActorLabelUtilities::SetActorLabelUnique(Landscape, ALandscape::StaticClass()->GetName());
 
 		LandscapeInfo->UpdateLayerInfoMap(Landscape);
 
