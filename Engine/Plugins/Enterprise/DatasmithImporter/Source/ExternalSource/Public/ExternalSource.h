@@ -5,9 +5,12 @@
 #include "SourceUri.h"
 
 #include "Async/Future.h"
+#include "Containers/Queue.h"
 #include "Containers/UnrealString.h"
+#include "Delegates/Delegate.h"
+#include "Delegates/DelegateCombinations.h"
 #include "HAL/Platform.h"
-#include "Misc/EnumClassFlags.h"
+#include "Logging/LogMacros.h"
 #include "Templates/SharedPointer.h"
 
 class FAsyncTaskNotification;
@@ -21,7 +24,7 @@ namespace UE::DatasmithImporter
 
 DECLARE_LOG_CATEGORY_EXTERN(LogExternalSource, Log, All);
 
-DECLARE_MULTICAST_DELEGATE_OneParam(OnExternalSourceChangedDelegate, const TSharedRef<UE::DatasmithImporter::FExternalSource>&)
+DECLARE_MULTICAST_DELEGATE_OneParam(OnExternalSourceChangedDelegate, const TSharedRef<UE::DatasmithImporter::FExternalSource>&);
 
 namespace UE::DatasmithImporter
 {

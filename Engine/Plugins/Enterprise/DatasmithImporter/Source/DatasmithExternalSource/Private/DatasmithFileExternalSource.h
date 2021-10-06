@@ -5,6 +5,7 @@
 #include "ExternalSource.h"
 
 #include "CoreMinimal.h"
+#include "Misc/SecureHash.h"
 
 class IDatasmithScene;
 

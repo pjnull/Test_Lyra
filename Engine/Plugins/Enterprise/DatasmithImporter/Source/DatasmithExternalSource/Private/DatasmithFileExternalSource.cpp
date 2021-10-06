@@ -9,6 +9,7 @@
 #include "DatasmithTranslator.h"
 #include "DatasmithUtils.h"
 #include "Logging/LogMacros.h"
+#include "Misc/Paths.h"
 
 DEFINE_LOG_CATEGORY(LogDatasmithFileExternalSource);
 

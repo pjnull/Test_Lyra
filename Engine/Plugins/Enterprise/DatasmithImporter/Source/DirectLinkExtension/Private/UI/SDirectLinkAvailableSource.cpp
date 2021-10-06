@@ -4,6 +4,11 @@
 #include "DirectLinkExternalSource.h"
 #include "DirectLinkUriResolver.h"
 
+#include "Widgets/Input/SButton.h"
+#include "Widgets/Text/STextBlock.h"
+#include "Widgets/Views/SListView.h"
+#include "Widgets/Views/STableRow.h"
+
 #define LOCTEXT_NAMESPACE "DirectLinkAvailableSourceWindow"
 
 namespace UE::DatasmithImporter

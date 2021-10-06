@@ -6,6 +6,7 @@
 
 #include "Containers/Array.h"
 #include "Containers/UnrealString.h"
+#include "Templates/SharedPointer.h"
 #include "UObject/NameTypes.h"
 
 #if WITH_EDITOR

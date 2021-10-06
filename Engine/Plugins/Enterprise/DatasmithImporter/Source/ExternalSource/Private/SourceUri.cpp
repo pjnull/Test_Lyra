@@ -2,6 +2,8 @@
 
 #include "SourceUri.h"
 
+#include "Misc/Paths.h"
+
 namespace UE::DatasmithImporter
 {
 	bool FSourceUri::IsValid() const

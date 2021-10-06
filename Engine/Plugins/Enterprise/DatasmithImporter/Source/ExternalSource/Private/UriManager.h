@@ -3,6 +3,7 @@
 #pragma once
 
 #include "IUriManager.h"
+#include "Containers/Array.h"
 
 namespace UE::DatasmithImporter
 {

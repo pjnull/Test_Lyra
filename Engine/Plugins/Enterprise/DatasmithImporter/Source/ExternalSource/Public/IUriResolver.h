@@ -4,6 +4,7 @@
 
 #include "CoreTypes.h"
 #include "UObject/NameTypes.h"
+#include "Templates/SharedPointer.h"
 
 namespace UE::DatasmithImporter
 {
