@@ -125,10 +125,6 @@ TSharedRef<SWidget> SDerivedDataStatusBarWidget::CreateStatusBarMenu()
 
 void SDerivedDataStatusBarWidget::Construct(const FArguments& InArgs)
 {	
-	BusyPulseSequence = FCurveSequence(0.f, 1.0f, ECurveEaseFunction::QuadInOut);
-	FadeGetSequence = FCurveSequence(0.f, 0.5f, ECurveEaseFunction::Linear);
-	FadePutSequence = FCurveSequence(0.f, 0.5f, ECurveEaseFunction::Linear);
-
 	this->ChildSlot
 	[
 		SNew(SComboButton)
@@ -172,17 +168,17 @@ void SDerivedDataStatusBarWidget::Construct(const FArguments& InArgs)
 				[
 					SNew(SImage)
 					.Image(FAppStyle::Get().GetBrush("DerivedData.RemoteCache.Uploading"))
-					.ColorAndOpacity_Lambda([this] { return ( FDerivedDataInformation::IsUploading() && FDerivedDataInformation::GetRemoteCacheState() == ERemoteCacheState::Busy )? FLinearColor::White.CopyWithNewOpacity(0.5f + (0.5f * FMath::MakePulsatingValue(FadePutSequence.GetLerp(), 1))) : FLinearColor(0,0,0,0); })
+					.ColorAndOpacity_Lambda([this] { return ( FDerivedDataInformation::IsUploading() && FDerivedDataInformation::GetRemoteCacheState() == ERemoteCacheState::Busy )? FLinearColor::White.CopyWithNewOpacity(FMath::MakePulsatingValue(ElapsedUploadTime, 2)) : FLinearColor(0,0,0,0); })
 					.ToolTipText_Lambda([this] { return GetRemoteCacheToolTipText(); })
 				]
 
 				+ SOverlay::Slot()
 				.HAlign(HAlign_Center)
-				.VAlign(VAlign_Bottom)
+				.VAlign(VAlign_Top)
 				[
 					SNew(SImage)
 					.Image(FAppStyle::Get().GetBrush("DerivedData.RemoteCache.Downloading"))
-					.ColorAndOpacity_Lambda([this] { return ( FDerivedDataInformation::IsDownloading() && FDerivedDataInformation::GetRemoteCacheState()==ERemoteCacheState::Busy ) ? FLinearColor::White.CopyWithNewOpacity(0.5f + (0.5f * FMath::MakePulsatingValue(FadeGetSequence.GetLerp(), 1))) : FLinearColor(0, 0, 0, 0); })
+					.ColorAndOpacity_Lambda([this] { return ( FDerivedDataInformation::IsDownloading() && FDerivedDataInformation::GetRemoteCacheState()==ERemoteCacheState::Busy ) ? FLinearColor::White.CopyWithNewOpacity(FMath::MakePulsatingValue(ElapsedDownloadTime, 2)) : FLinearColor(0, 0, 0, 0); })
 					.ToolTipText_Lambda([this] { return GetRemoteCacheToolTipText(); })
 				]				
 			]
@@ -200,7 +196,7 @@ void SDerivedDataStatusBarWidget::Construct(const FArguments& InArgs)
 		.OnGetMenuContent(FOnGetContent::CreateRaw(this, &SDerivedDataStatusBarWidget::CreateStatusBarMenu))
 	];
 
-	RegisterActiveTimer(0.5f, FWidgetActiveTimerDelegate::CreateSP(this, &SDerivedDataStatusBarWidget::UpdateBusyIndicator));
+	RegisterActiveTimer(0.2f, FWidgetActiveTimerDelegate::CreateSP(this, &SDerivedDataStatusBarWidget::UpdateBusyIndicator));
 	RegisterActiveTimer(5.0f, FWidgetActiveTimerDelegate::CreateSP(this, &SDerivedDataStatusBarWidget::UpdateWarnings));
 }
 
@@ -210,20 +206,31 @@ EActiveTimerReturnType SDerivedDataStatusBarWidget::UpdateBusyIndicator(double I
 
 	bBusy = GetDerivedDataCache()->AnyAsyncRequestsRemaining();
 
-	FadeGetSequence.PlayRelative(this->AsShared(), FDerivedDataInformation::IsDownloading());
-	FadePutSequence.PlayRelative(this->AsShared(), FDerivedDataInformation::IsUploading());
-
-	if (bBusy)
+	if (FDerivedDataInformation::IsUploading())
 	{
-		if (!BusyPulseSequence.IsPlaying())
-		{
-			BusyPulseSequence.Play(this->AsShared(), true);
-		}
+		ElapsedUploadTime += fmod(InDeltaTime,3600.0);
 	}
 	else
 	{
-		BusyPulseSequence.JumpToEnd();
-		BusyPulseSequence.Pause();
+		ElapsedUploadTime = 0.0;
+	}
+
+	if (FDerivedDataInformation::IsDownloading())
+	{
+		ElapsedDownloadTime += fmod(InDeltaTime, 3600.0);
+	}
+	else
+	{
+		ElapsedDownloadTime = 0.0;
+	}
+
+	if (bBusy)
+	{
+		ElapsedBusyTime += fmod(InDeltaTime, 3600.0);
+	}
+	else
+	{
+		ElapsedBusyTime = 0;
 	}
 
 	return EActiveTimerReturnType::Continue;

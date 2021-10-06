@@ -53,9 +53,19 @@ FZenDerivedDataBackend::~FZenDerivedDataBackend()
 {
 }
 
+FString FZenDerivedDataBackend::GetDisplayName() const
+{
+	return FString(TEXT("Zen"));
+}
+
 FString FZenDerivedDataBackend::GetName() const
 {
 	return ZenService.GetInstance().GetURL();
+}
+
+bool FZenDerivedDataBackend::IsRemote() const
+{
+	return true;
 }
 
 bool FZenDerivedDataBackend::IsServiceReady()

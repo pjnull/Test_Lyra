@@ -37,7 +37,7 @@ double FDerivedDataInformation::GetCacheActivitySizeBytes(bool bGet, bool bLocal
 	{
 		const FDerivedDataBackendInterface* Backend = LeafUsageStats[Index]->GetBackendInterface();
 
-		if ((Backend->GetSpeedClass() == FDerivedDataBackendInterface::ESpeedClass::Local) != bLocal)
+		if (Backend->IsRemote() == bLocal)
 			continue;
 
 		TSharedRef<FDerivedDataCacheStatsNode> Usage = Backend->GatherUsageStats();
@@ -80,7 +80,7 @@ double FDerivedDataInformation::GetCacheActivityTimeSeconds(bool bGet, bool bLoc
 	{
 		const FDerivedDataBackendInterface* Backend = LeafUsageStats[Index]->GetBackendInterface();
 
-		if ((Backend->GetSpeedClass() == FDerivedDataBackendInterface::ESpeedClass::Local) != bLocal)
+		if (Backend->IsRemote() == bLocal)
 			continue;
 
 		TSharedRef<FDerivedDataCacheStatsNode> Usage = Backend->GatherUsageStats();
@@ -128,7 +128,7 @@ bool FDerivedDataInformation::GetHasRemoteCache()
 	{
 		const FDerivedDataBackendInterface* Backend = LeafUsageStats[Index]->GetBackendInterface();
 
-		if (Backend->GetSpeedClass() != FDerivedDataBackendInterface::ESpeedClass::Local)
+		if (Backend->IsRemote())
 			return true;
 	}
 
