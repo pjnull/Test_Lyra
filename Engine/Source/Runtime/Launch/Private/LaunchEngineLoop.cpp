@@ -28,6 +28,7 @@
 #include "Misc/CommandLine.h"
 #include "Misc/App.h"
 #include "Misc/OutputDeviceConsole.h"
+#include "Misc/ScopeExit.h"
 #include "HAL/PlatformFileManager.h"
 #include "HAL/FileManagerGeneric.h"
 #include "HAL/ExceptionHandling.h"
@@ -35,6 +36,7 @@
 #include "Stats/StatsMallocProfilerProxy.h"
 #include "Trace/Trace.inl"
 #include "ProfilingDebugging/TraceAuxiliary.h"
+#include "ProfilingDebugging/BootProfiling.h"
 #if WITH_ENGINE
 #include "HAL/PlatformSplash.h"
 #endif
@@ -1532,6 +1534,7 @@ DECLARE_CYCLE_STAT(TEXT("FEngineLoop::PreInitPostStartupScreen.AfterStats"), STA
 
 int32 FEngineLoop::PreInitPreStartupScreen(const TCHAR* CmdLine)
 {
+	ON_SCOPE_EXIT { GEnginePreInitPreStartupScreenEndTime = FPlatformTime::Seconds(); };
 	FDelayedAutoRegisterHelper::RunAndClearDelayedAutoRegisterDelegates(EDelayedRegisterRunPhase::StartOfEnginePreInit);
 	SCOPED_BOOT_TIMING("FEngineLoop::PreInitPreStartupScreen");
 
@@ -3057,6 +3060,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 int32 FEngineLoop::PreInitPostStartupScreen(const TCHAR* CmdLine)
 {
+	ON_SCOPE_EXIT{ GEnginePreInitPostStartupScreenEndTime = FPlatformTime::Seconds(); };
 	SCOPED_BOOT_TIMING("FEngineLoop::PreInitPostStartupScreen");
 
 	if (IsEngineExitRequested())
@@ -4217,6 +4221,7 @@ void GameLoopIsStarved()
 
 int32 FEngineLoop::Init()
 {
+	ON_SCOPE_EXIT{ GEngineInitEndTime = FPlatformTime::Seconds(); };
 	LLM_SCOPE(ELLMTag::EngineInitMemory);
 	SCOPED_BOOT_TIMING("FEngineLoop::Init");
 
