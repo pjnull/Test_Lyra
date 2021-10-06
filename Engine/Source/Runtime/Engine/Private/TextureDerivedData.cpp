@@ -907,8 +907,20 @@ void FTexturePlatformData::CancelCache()
 
 bool FTexturePlatformData::IsUsingNewDerivedData()
 {
-	static const bool bUseNewDerivedData = FParse::Param(FCommandLine::Get(), TEXT("DDC2AsyncTextureBuilds")) || FParse::Param(FCommandLine::Get(), TEXT("DDC2TextureBuilds"));
-	return bUseNewDerivedData;
+	struct FTextureDerivedDataSetting
+	{
+		FTextureDerivedDataSetting()
+		{
+			bUseNewDerivedData = FParse::Param(FCommandLine::Get(), TEXT("DDC2AsyncTextureBuilds")) || FParse::Param(FCommandLine::Get(), TEXT("DDC2TextureBuilds"));
+			if (!bUseNewDerivedData)
+			{
+				GConfig->GetBool(TEXT("TextureBuild"), TEXT("NewTextureBuilds"), bUseNewDerivedData, GEditorIni);
+			}
+		}
+		bool bUseNewDerivedData;
+	};
+	static const FTextureDerivedDataSetting TextureDerivedDataSetting;
+	return TextureDerivedDataSetting.bUseNewDerivedData;
 }
 
 bool FTexturePlatformData::IsAsyncWorkComplete() const
