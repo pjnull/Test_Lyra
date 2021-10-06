@@ -25,7 +25,7 @@ UAsyncCaptureScene::UAsyncCaptureScene()
 {
 }
 
-UAsyncCaptureScene* UAsyncCaptureScene::CaptureScreenshot(UCameraComponent* ViewCamera, TSubclassOf<ASceneCapture2D> SceneCaptureClass, int ResX, int ResY)
+UAsyncCaptureScene* UAsyncCaptureScene::CaptureSceneAsync(UCameraComponent* ViewCamera, TSubclassOf<ASceneCapture2D> SceneCaptureClass, int ResX, int ResY)
 {
 	UAsyncCaptureScene* AsyncTask = NewObject<UAsyncCaptureScene>();
 	AsyncTask->Start(ViewCamera, SceneCaptureClass, ResX, ResY);
@@ -44,11 +44,20 @@ void UAsyncCaptureScene::Start(UCameraComponent* ViewCamera, TSubclassOf<ASceneC
 	{
 		USceneCaptureComponent2D* CaptureComponent = SceneCapture->GetCaptureComponent2D();
 
-		if(CaptureComponent->TextureTarget == nullptr)
+		if (CaptureComponent->TextureTarget == nullptr)
 		{
+			int32 CaptureWidth = ResX;
+			int32 CaptureHeight = ResY;
+
+			if (CaptureComponent->GetEnableOrthographicTiling() && CaptureComponent->ProjectionType == ECameraProjectionMode::Orthographic)
+			{
+				CaptureWidth /= CaptureComponent->GetNumXTiles();
+				CaptureHeight /= CaptureComponent->GetNumYTiles();
+			}
+
 			SceneCaptureRT = NewObject<UTextureRenderTarget2D>(this, TEXT("AsyncCaptureScene_RT"), RF_Transient);
 			SceneCaptureRT->RenderTargetFormat = RTF_RGBA8_SRGB;
-			SceneCaptureRT->InitAutoFormat(ResX, ResY);
+			SceneCaptureRT->InitAutoFormat(CaptureWidth, CaptureHeight);
 			SceneCaptureRT->UpdateResourceImmediate(true);
 
 			CaptureComponent->TextureTarget = SceneCaptureRT;
@@ -61,10 +70,6 @@ void UAsyncCaptureScene::Start(UCameraComponent* ViewCamera, TSubclassOf<ASceneC
 		FMinimalViewInfo CaptureView;
 		ViewCamera->GetCameraView(0, CaptureView);
 		CaptureComponent->SetCameraView(CaptureView);
-
-		CaptureComponent->CaptureScene();
-		FinishLoadingBeforeScreenshot();
-		CaptureComponent->CaptureScene();
 	}
 }
 
@@ -75,45 +80,44 @@ void UAsyncCaptureScene::Activate()
 		NotifyComplete(nullptr);
 	}
 
-	//TArray<FColor> RawPixels;
-	//RawPixels.SetNum(SceneCaptureRT->GetSurfaceWidth() * SceneCaptureRT->GetSurfaceHeight());
-	//ReadPixelsFromRT(SceneCaptureRT, &RawPixels);
+	FinishLoadingBeforeScreenshot();
 
-	//const FString AbsoluteFilePath = 
-	//	FPaths::ConvertRelativePathToFull(GetDefault<UEngine>()->GameScreenshotSaveDirectory.Path / TargetFilename + TEXT(".png"));
+	USceneCaptureComponent2D* CaptureComponent = SceneCapture->GetCaptureComponent2D();
+	CaptureComponent->TileID = 0;
+	CaptureComponent->CaptureScene();
 
-	//IImageWriteQueueModule* ImageWriteQueueModule = FModuleManager::Get().GetModulePtr<IImageWriteQueueModule>("ImageWriteQueue");
+	FinishLoadingBeforeScreenshot();
 
-	//TUniquePtr<FImageWriteTask> ImageTask = MakeUnique<FImageWriteTask>();
-	//ImageTask->Format = EImageFormat::PNG;
-	//ImageTask->PixelData = MakeUnique<TImagePixelData<FColor>>(FIntPoint(SceneCaptureRT->GetSurfaceWidth(), SceneCaptureRT->GetSurfaceHeight()), TArray64<FColor>(MoveTemp(RawPixels)));
-	//ImageTask->Filename = AbsoluteFilePath;
-	//ImageTask->bOverwriteFile = true;
-	//ImageTask->CompressionQuality = (int32)EImageCompressionQuality::Uncompressed;
-	////ImageTask->OnCompleted = OnCompleteWrapper;
+	CaptureComponent->CaptureScene();
 
-	//TFuture<bool> DispatchedTask = ImageWriteQueueModule->GetWriteQueue().Enqueue(MoveTemp(ImageTask));
-	//DispatchedTask.Wait();
-
-	NotifyComplete(SceneCaptureRT);
+	TickerHandle = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateUObject(this, &ThisClass::Tick));
 }
 
-void UAsyncCaptureScene::ReadPixelsFromRT(UTextureRenderTarget2D* InRT, TArray<FColor>* OutPixels)
+bool UAsyncCaptureScene::Tick(float DeltaTime)
 {
-	ENQUEUE_RENDER_COMMAND(ReadScreenshotRTCmd)(
-		[InRT, OutPixels](FRHICommandListImmediate& RHICmdList)
-	{
-		FTextureRenderTarget2DResource* RTResource =
-			static_cast<FTextureRenderTarget2DResource*>(InRT->GetRenderTargetResource());
+	USceneCaptureComponent2D* CaptureComponent = SceneCapture->GetCaptureComponent2D();
 
-		RHICmdList.ReadSurfaceData(
-			RTResource->GetTextureRHI(),
-			FIntRect(0, 0, InRT->SizeX, InRT->SizeY),
-			*OutPixels,
-			FReadSurfaceDataFlags()
-		);
-	});
-	FlushRenderingCommands();
+	// If we're doing orthographic tiling capture, we can continue to delay - while we wait for it to finish.
+	if (CaptureComponent->GetEnableOrthographicTiling() && CaptureComponent->ProjectionType == ECameraProjectionMode::Orthographic)
+	{
+		const int32 NumTiles = CaptureComponent->GetNumXTiles() * CaptureComponent->GetNumYTiles();
+		CaptureComponent->CaptureScene();
+
+		ReadBackTile();
+
+		CaptureComponent->TileID++;
+		if (CaptureComponent->TileID < NumTiles)
+		{
+			// We still need to keep capturing if we're not done yet.
+			NotifyComplete(SceneCaptureRT);
+			return false;
+		}
+
+		return true;
+	}
+
+	NotifyComplete(SceneCaptureRT);
+	return false;
 }
 
 void UAsyncCaptureScene::NotifyComplete(UTextureRenderTarget2D* InTexture)
@@ -125,6 +129,11 @@ void UAsyncCaptureScene::NotifyComplete(UTextureRenderTarget2D* InTexture)
 	{
 		SceneCapture->Destroy();
 	}
+}
+
+void UAsyncCaptureScene::ReadBackTile()
+{
+	
 }
 
 void UAsyncCaptureScene::FinishLoadingBeforeScreenshot()
