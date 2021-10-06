@@ -94,11 +94,11 @@ public:
 	}
 
 public:
-	// Note: This is just an alias for QueueStep. There is no enforcement that this will deduce to QueueControlFlowBranch.
-	template<typename...ArgsT>
-	FControlFlow& BranchFlow(ArgsT...Args)
+	template<typename FunctionT, typename...ArgsT>
+	FControlFlow& BranchFlow(FunctionT InBranchLambda, ArgsT...Params)
 	{
-		return QueueStep(Args...);
+		QueueControlFlowBranch(FormatOrGetNewNodeDebugName()).BindLambda(InBranchLambda, Params...);
+		return *this;
 	}
 
 public:
@@ -106,13 +106,6 @@ public:
 	FControlFlowWaitDelegate& QueueWait(const FString& FlowNodeDebugName = TEXT(""));
 	FControlFlowPopulator& QueueControlFlow(const FString& TaskName = TEXT(""), const FString& FlowNodeDebugName = TEXT(""));
 	FControlFlowBranchDefiner& QueueControlFlowBranch(const FString& TaskName = TEXT(""), const FString& FlowNodeDebugName = TEXT(""));
-
-private:
-	template<typename FunctionT, typename...ArgsT>
-	void QueueStep_Internal(const FString& InDebugName, FunctionT InBranchLambda, ArgsT...Params)
-	{
-		QueueControlFlowBranch(InDebugName).BindLambda(InBranchLambda, Params...);
-	}
 
 private:
 	template<typename BindingObjectT, typename...PayloadParamsT>
