@@ -1508,11 +1508,10 @@ void FMemoryImageResult::ApplyPatches(void* FrozenObject) const
 	}
 }
 
-FMemoryImageObject FMemoryImageResult::LoadFromArchive(FArchive& Ar, const FTypeLayoutDesc& TypeDesc, FPointerTableBase* PointerTable)
+FMemoryImageObject FMemoryImageResult::LoadFromArchive(FArchive& Ar, const FTypeLayoutDesc& TypeDesc, FPointerTableBase* PointerTable, FPlatformTypeLayoutParameters& LayoutParameters)
 {
 	SCOPED_LOADTIMER(FMemoryImageResult_LoadFromArchive);
 
-	FPlatformTypeLayoutParameters LayoutParameters;
 	Ar << LayoutParameters;
 
 	uint32 FrozenSize = 0u;
