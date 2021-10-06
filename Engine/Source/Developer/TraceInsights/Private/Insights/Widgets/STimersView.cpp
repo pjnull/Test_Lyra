@@ -184,13 +184,13 @@ void STimersView::Construct(const FArguments& InArgs)
 					SNew(SCheckBox)
 					.Style(FCoreStyle::Get(), "ToggleButtonCheckbox")
 					.HAlign(HAlign_Center)
-					.Padding(2.0f)
+					.Padding(3.0f)
 					.OnCheckStateChanged(this, &STimersView::FilterOutZeroCountTimers_OnCheckStateChanged)
 					.IsChecked(this, &STimersView::FilterOutZeroCountTimers_IsChecked)
 					.ToolTipText(LOCTEXT("FilterOutZeroCountTimers_Tooltip", "Filter out the timers having zero total instance count (aggregated stats)."))
 					[
-						SNew(STextBlock)
-						.Text(LOCTEXT("FilterOutZeroCountTimers_Button", " !0 "))
+						SNew(SImage)
+						.Image(FInsightsStyle::Get().GetBrush("ZeroCountFilter.Icon.Small"))
 					]
 				]
 			]
@@ -259,7 +259,7 @@ void STimersView::Construct(const FArguments& InArgs)
 					.OnSelectionChanged(this, &STimersView::TreeView_OnSelectionChanged)
 					.OnMouseButtonDoubleClick(this, &STimersView::TreeView_OnMouseButtonDoubleClick)
 					.OnContextMenuOpening(FOnContextMenuOpening::CreateSP(this, &STimersView::TreeView_GetMenuContent))
-					.ItemHeight(12.0f)
+					.ItemHeight(16.0f)
 					.HeaderRow
 					(
 						SAssignNew(TreeViewHeaderRow, SHeaderRow)
@@ -1397,6 +1397,15 @@ void STimersView::SortTreeNodesRec(FTimerNode& Node, const Insights::ITableCellV
 	{
 		Node.SortChildrenAscending(Sorter);
 	}
+/*
+	for (Insights::FBaseTreeNodePtr ChildPtr : Node.GetChildren())
+	{
+		if (ChildPtr->GetChildren().Num() > 0)
+		{
+			SortTreeNodesRec(*StaticCastSharedPtr<FTimerNode>(ChildPtr), Sorter);
+		}
+	}
+*/
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1524,9 +1533,9 @@ void STimersView::ShowColumn(const FName ColumnId)
 	ColumnArgs
 		.ColumnId(Column.GetId())
 		.DefaultLabel(Column.GetShortName())
-		.HAlignHeader(HAlign_Fill)
-		.VAlignHeader(VAlign_Fill)
-		.HeaderContentPadding(FMargin(2.0f))
+		.ToolTip(STimersViewTooltip::GetColumnTooltip(Column))
+		.HAlignHeader(Column.GetHorizontalAlignment())
+		.VAlignHeader(VAlign_Center)
 		.HAlignCell(HAlign_Fill)
 		.VAlignCell(VAlign_Fill)
 		.SortMode(this, &STimersView::GetSortModeForColumn, Column.GetId())
@@ -1536,8 +1545,8 @@ void STimersView::ShowColumn(const FName ColumnId)
 		.HeaderContent()
 		[
 			SNew(SBox)
-			.ToolTip(STimersViewTooltip::GetColumnTooltip(Column))
-			.HAlign(Column.GetHorizontalAlignment())
+			.HeightOverride(24.0f)
+			.Padding(FMargin(0.0f))
 			.VAlign(VAlign_Center)
 			[
 				SNew(STextBlock)
