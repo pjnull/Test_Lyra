@@ -77,7 +77,7 @@ public:
 			// We can use HashCombineFast since we're hashing FName and they won't give the same result across different engine restart anyway.
 			uint32 Hash = HashCombineFast(HashCombineFast(GetTypeHash(InChunkKey.SoundWaveName), InChunkKey.ChunkIndex), GetTypeHash(InChunkKey.ObjectKey));
 #if WITH_EDITOR
-			Hash = HashCombineFast(Hash, ChunkRevision);
+			Hash = HashCombineFast(Hash, InChunkKey.ChunkRevision);
 #endif
 			return Hash;
 		}
