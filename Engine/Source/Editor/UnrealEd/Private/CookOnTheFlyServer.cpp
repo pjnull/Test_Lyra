@@ -480,14 +480,6 @@ UCookOnTheFlyServer::UCookOnTheFlyServer(const FObjectInitializer& ObjectInitial
 	ExternalRequests = MakeUnique<UE::Cook::FExternalRequests>();
 	PackageTracker = MakeUnique<UE::Cook::FPackageTracker>(*PackageDatas.Get());
 	DiffModeHelper = MakeUnique<FDiffModeCookServerUtils>();
-	bSaveAsyncAllowed = true;
-	FString Temp;
-	const TCHAR* CommandLine = FCommandLine::Get();
-	if (FParse::Value(CommandLine, TEXT("-diffagainstcookdirectory="), Temp) || FParse::Value(CommandLine, TEXT("-breakonfile="), Temp))
-	{
-		// async save doesn't work with any of these flags
-		bSaveAsyncAllowed = false;
-	}
 }
 
 UCookOnTheFlyServer::UCookOnTheFlyServer(FVTableHelper& Helper) :Super(Helper) {}
@@ -4342,7 +4334,7 @@ void FSaveCookedPackageContext::SetupPackage()
 		UE_LOG(LogCook, Fatal, TEXT("Package %s marked as reloading for cook by was requested to save"), *PackageName);
 	}
 
-	SaveFlags = SAVE_KeepGUID | (COTFS.bSaveAsyncAllowed ? SAVE_Async : SAVE_None)
+	SaveFlags = SAVE_KeepGUID | SAVE_Async
 		| (COTFS.IsCookFlagSet(ECookInitializationFlags::Unversioned) ? SAVE_Unversioned : 0);
 
 	// removing editor only packages only works when cooking in commandlet and non iterative cooking
