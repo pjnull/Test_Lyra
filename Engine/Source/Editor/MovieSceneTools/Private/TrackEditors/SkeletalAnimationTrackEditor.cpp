@@ -1143,9 +1143,15 @@ void FSkeletalAnimationTrackEditor::OnSequencerSaved(ISequencer& )
 				UMovieScene* MovieScene = SequencerPtr->GetFocusedMovieSceneSequence()->GetMovieScene();
 				FMovieSceneSequenceIDRef Template = SequencerPtr->GetFocusedTemplateID();
 				FMovieSceneSequenceTransform RootToLocalTransform;
-				for (FLevelSequenceAnimSequenceLinkItem& Item : LevelAnimLink->AnimSequenceLinks)
+				for (int32 Index = LevelAnimLink->AnimSequenceLinks.Num() -1; Index >=0 ; --Index) 
 				{
+					FLevelSequenceAnimSequenceLinkItem& Item = LevelAnimLink->AnimSequenceLinks[Index];
 					UAnimSequence* AnimSequence = Item.ResolveAnimSequence();
+					if (AnimSequence == nullptr)
+					{
+						LevelAnimLink->AnimSequenceLinks.RemoveAt(Index);
+						continue;
+					}
 					if (IInterface_AssetUserData* AnimAssetUserData = Cast< IInterface_AssetUserData >(AnimSequence))
 					{
 						UAnimSequenceLevelSequenceLink* AnimLevelLink = AnimAssetUserData->GetAssetUserData< UAnimSequenceLevelSequenceLink >();
@@ -1226,11 +1232,13 @@ bool FSkeletalAnimationTrackEditor::CreateAnimationSequence(const TArray<UObject
 
 		if (bResult && bCreateSoftLink)
 		{
+			FScopedTransaction Transaction(LOCTEXT("SaveLinkedAnimation_Transaction", "Save Link Animation"));
 			TSharedPtr<ISequencer> SequencerPtr = GetSequencer();
 			ULevelSequence* LevelSequence = Cast<ULevelSequence>(SequencerPtr->GetFocusedMovieSceneSequence());
 			if (LevelSequence && LevelSequence->GetClass()->ImplementsInterface(UInterface_AssetUserData::StaticClass())
 				&& AnimSequence->GetClass()->ImplementsInterface(UInterface_AssetUserData::StaticClass()))
 			{
+				LevelSequence->Modify();
 				if (IInterface_AssetUserData* AnimAssetUserData = Cast< IInterface_AssetUserData >(AnimSequence))
 				{
 					UAnimSequenceLevelSequenceLink* AnimLevelLink = AnimAssetUserData->GetAssetUserData< UAnimSequenceLevelSequenceLink >();
