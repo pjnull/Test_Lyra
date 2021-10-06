@@ -1872,6 +1872,9 @@ void FAnimBlueprintCompilerContext::ProcessFoldedPropertyRecords()
 						{
 							// Propagate some relevant property flags
 							Record->GeneratedProperty->SetPropertyFlags(Record->Property->GetPropertyFlags() & CPF_EditFixedSize);
+
+							// Properties need to be BP visible to allow them to be set by the generated exec chains in CreateEvaluationHandlerForNode
+							Record->GeneratedProperty->SetPropertyFlags(CPF_BlueprintVisible);
 							Record->PropertyIndex = PropertyIndex++;
 						}
 					}

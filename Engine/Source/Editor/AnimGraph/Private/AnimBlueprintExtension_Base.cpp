@@ -419,7 +419,8 @@ struct FInternalOptionalPinManager : public FOptionalPinManager
 		{
 			if(const IAnimBlueprintCompilationContext::FFoldedPropertyRecord* FoldedPropertyRecord = CompilationContext.GetFoldedPropertyRecord(Node, It->GetFName()))
 			{
-				if(!FoldedPropertyRecord->bIsOnClass)
+				// Dont expose array properties here - they are handled by a struct member get-by-ref
+				if(!FoldedPropertyRecord->bIsOnClass && !FoldedPropertyRecord->GeneratedProperty->IsA<FArrayProperty>())
 				{
 					FOptionalPinFromProperty& OptionalPin = Properties[Properties.Num() - 1 - FoldedPropertyRecord->PropertyIndex];
 				
@@ -618,7 +619,13 @@ void UAnimBlueprintExtension_Base::CreateEvaluationHandler(IAnimBlueprintCompila
 						check(InstanceAssignmentNode != nullptr);
 
 						// Redirect to the instance's mutable data area assignment node
-						TargetPin = InstanceAssignmentNode->FindPinChecked(FoldedPropertyRecord->GeneratedProperty->GetFName());
+						PropertyName = FoldedPropertyRecord->GeneratedProperty->GetFName();
+
+						// We dont need to handle arrays with a member set, as they use a member get-by-ref
+						if(!TargetPin->PinType.IsArray())
+						{
+							TargetPin = InstanceAssignmentNode->FindPinChecked(FoldedPropertyRecord->GeneratedProperty->GetFName());
+						}
 					}
 				}
 
@@ -626,8 +633,8 @@ void UAnimBlueprintExtension_Base::CreateEvaluationHandler(IAnimBlueprintCompila
 				{
 					// Grab the array that we need to set members for
 					UK2Node_StructMemberGet* FetchArrayNode = InCompilationContext.SpawnIntermediateNode<UK2Node_StructMemberGet>(InNode, InCompilationContext.GetConsolidatedEventGraph());
-					FetchArrayNode->VariableReference.SetSelfMember(Record.NodeVariableProperty->GetFName());
-					FetchArrayNode->StructType = Record.NodeVariableProperty->Struct;
+					FetchArrayNode->VariableReference.SetSelfMember(FoldedPropertyRecord ? MutableDataProperty->GetFName() : Record.NodeVariableProperty->GetFName());
+					FetchArrayNode->StructType = FoldedPropertyRecord ? MutableDataProperty->Struct : Record.NodeVariableProperty->Struct;
 					FetchArrayNode->AllocatePinsForSingleMemberGet(PropertyName);
 					Record.CustomEventNodes.Add(FetchArrayNode);
 
