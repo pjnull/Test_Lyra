@@ -2480,31 +2480,17 @@ FSavePackageResultStruct UPackage::Save(UPackage* InOuter, UObject* Base, EObjec
 					FString DiffCookedPackagesPath;
 					// if we are cooking and we have diff cooked packages on the commandline then do some special stuff
 
-					// Finds the asset object within a package
-					auto FindAssetInPackage = [](UPackage* Package) -> UObject*
-					{
-						UObject* Asset = nullptr;
-						ForEachObjectWithOuter(Package, [&Asset](UObject* Object)
-							{
-								if (!Asset && Object->IsAsset() && !UE::AssetRegistry::FFiltering::ShouldSkipAsset(Object))
-								{
-									Asset = Object;
-								}
-							}, /*bIncludeNestedObjects*/ false);
-						return Asset;
-					};
-
 					if (TargetPlatform != nullptr && (SaveFlags & SAVE_DiffCallstack))
 					{
 						// The entire package will be serialized to memory and then compared against package on disk.
 						// Each difference will be log with its Serialize call stack trace
-						FArchive* Saver = new FArchiveStackTrace(FindAssetInPackage(InOuter), *InOuter->GetLoadedPath().GetPackageName(), true, InOutDiffMap);
+						FArchive* Saver = new FArchiveStackTrace(InOuter->FindAssetInPackage(), *InOuter->GetLoadedPath().GetPackageName(), true, InOutDiffMap);
 						Linker = MakePimpl<FLinkerSave>(InOuter, Saver, bForceByteSwapping, bSaveUnversionedNative);
 					}
 					else if (TargetPlatform != nullptr && (SaveFlags & SAVE_DiffOnly))
 					{
 						// The entire package will be serialized to memory and then compared against package on disk
-						FArchive* Saver = new FArchiveStackTrace(FindAssetInPackage(InOuter), *InOuter->GetLoadedPath().GetPackageName(), false);
+						FArchive* Saver = new FArchiveStackTrace(InOuter->FindAssetInPackage(), *InOuter->GetLoadedPath().GetPackageName(), false);
 						Linker = MakePimpl<FLinkerSave>(InOuter, Saver, bForceByteSwapping, bSaveUnversionedNative);
 					}
 					else if ((!!TargetPlatform) && FParse::Value(FCommandLine::Get(), TEXT("DiffCookedPackages="), DiffCookedPackagesPath))

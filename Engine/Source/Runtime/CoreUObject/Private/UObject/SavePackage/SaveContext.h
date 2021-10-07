@@ -75,18 +75,13 @@ public:
 		check(InFilename);
 		// if we are cooking we should be doing it in the editor
 		check(!IsCooking() || WITH_EDITOR);
+
+		SaveArgs.TopLevelFlags = UE::SavePackageUtilities::NormalizeTopLevelFlags(SaveArgs.TopLevelFlags, IsCooking());
+
 		// if the asset wasn't provided, fetch it from the package
 		if (Asset == nullptr)
 		{
-			ForEachObjectWithPackage(Package, [this](UObject* InObject)
-				{
-					if (InObject->IsAsset() && !UE::AssetRegistry::FFiltering::ShouldSkipAsset(InObject))
-					{
-						Asset = InObject;
-						return false;
-					}
-					return true;
-				}, false/*bIncludeNestedObjects*/);
+			Asset = InPackage->FindAssetInPackage(SaveArgs.TopLevelFlags);
 		}
 
 		TargetPackagePath = FPackagePath::FromLocalPath(InFilename);
@@ -94,8 +89,6 @@ public:
 		{
 			TargetPackagePath.SetHeaderExtension(EPackageExtension::EmptyString);
 		}
-
-		SaveArgs.TopLevelFlags = UE::SavePackageUtilities::NormalizeTopLevelFlags(SaveArgs.TopLevelFlags, IsCooking());
 
 		bCanUseUnversionedPropertySerialization = CanUseUnversionedPropertySerialization(SaveArgs.TargetPlatform);
 		bTextFormat = FString(Filename).EndsWith(FPackageName::GetTextAssetPackageExtension()) || FString(Filename).EndsWith(FPackageName::GetTextMapPackageExtension());
