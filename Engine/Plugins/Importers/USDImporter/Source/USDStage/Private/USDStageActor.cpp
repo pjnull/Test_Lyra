@@ -648,7 +648,7 @@ AUsdStageActor::AUsdStageActor()
 	// c.f. doc comment on FRecompilationTracker for more info.
 
 	IUsdSchemasModule& UsdSchemasModule = FModuleManager::Get().LoadModuleChecked< IUsdSchemasModule >( TEXT("USDSchemas") );
-	RenderContext = UsdSchemasModule.GetRenderContextRegistry().GetUniversalRenderContext();
+	RenderContext = UsdSchemasModule.GetRenderContextRegistry().GetUnrealRenderContext();
 
 	Transactor = NewObject<UUsdTransactor>( this, TEXT( "Transactor" ), EObjectFlags::RF_Transactional );
 	Transactor->Initialize( this );

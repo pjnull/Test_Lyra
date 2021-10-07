@@ -1169,6 +1169,23 @@ bool UsdUtils::RenamePrim( UE::FUsdPrim& Prim, const TCHAR* NewPrimName )
 #endif // #if USE_USD_SDK
 }
 
+FString UsdUtils::GetUniqueName( FString Name, const TSet<FString>& UsedNames )
+{
+	if ( !UsedNames.Contains( Name ) )
+	{
+		return Name;
+	}
+
+	int32 Suffix = 0;
+	FString Result;
+	do
+	{
+		Result = FString::Printf( TEXT( "%s_%d" ), *Name, Suffix++ );
+	} while ( UsedNames.Contains( Result ) );
+
+	return Result;
+}
+
 FString UsdUtils::SanitizeUsdIdentifier( const TCHAR* InIdentifier )
 {
 #if USE_USD_SDK

@@ -338,7 +338,7 @@ namespace UsdGeomMeshTranslatorImpl
 	// Note that these other LODs will be hidden in other variants, and won't show up on traversal unless we actively switch the variants (which we do here).
 	// We use a separate function for this because there is a very specific set of conditions where we successfully can do this, and we
 	// want to fall back to just parsing UsdMesh as a simple single-LOD mesh if we fail.
-	bool TryLoadingMultipleLODs( const pxr::UsdTyped& UsdMesh, TArray<FMeshDescription>& OutLODIndexToMeshDescription, TArray<UsdUtils::FUsdPrimMaterialAssignmentInfo>& OutLODIndexToMaterialInfo, const TMap< FString, TMap< FString, int32 > >& InMaterialToPrimvarToUVIndex, const pxr::UsdTimeCode InTimeCode )
+	bool TryLoadingMultipleLODs( const pxr::UsdTyped& UsdMesh, TArray<FMeshDescription>& OutLODIndexToMeshDescription, TArray<UsdUtils::FUsdPrimMaterialAssignmentInfo>& OutLODIndexToMaterialInfo, const TMap< FString, TMap< FString, int32 > >& InMaterialToPrimvarToUVIndex, const pxr::UsdTimeCode InTimeCode, const pxr::TfToken& RenderContext )
 	{
 		FScopedUsdAllocs Allocs;
 
@@ -365,7 +365,7 @@ namespace UsdGeomMeshTranslatorImpl
 			FStaticMeshAttributes StaticMeshAttributes( TempMeshDescription );
 			StaticMeshAttributes.Register();
 
-			bool bSuccess = UsdToUnreal::ConvertGeomMesh( LODMesh, TempMeshDescription, TempMaterialInfo, FTransform::Identity, InMaterialToPrimvarToUVIndex, InTimeCode );
+			bool bSuccess = UsdToUnreal::ConvertGeomMesh( LODMesh, TempMeshDescription, TempMaterialInfo, FTransform::Identity, InMaterialToPrimvarToUVIndex, InTimeCode, RenderContext );
 			if ( bSuccess )
 			{
 				LODIndexToMeshDescriptionMap.Add( LODIndex, MoveTemp( TempMeshDescription ) );
@@ -398,10 +398,16 @@ namespace UsdGeomMeshTranslatorImpl
 			return;
 		}
 
+		pxr::TfToken RenderContextToken = pxr::UsdShadeTokens->universalRenderContext;
+		if ( !RenderContext.IsNone() )
+		{
+			RenderContextToken = UnrealToUsd::ConvertToken( *RenderContext.ToString() ).Get();
+		}
+
 		bool bInterpretedLODs = false;
 		if ( bInterpretLODs )
 		{
-			bInterpretedLODs = TryLoadingMultipleLODs( UsdMesh, OutLODIndexToMeshDescription, OutLODIndexToMaterialInfo, MaterialToPrimvarToUVIndex, TimeCode );
+			bInterpretedLODs = TryLoadingMultipleLODs( UsdMesh, OutLODIndexToMeshDescription, OutLODIndexToMaterialInfo, MaterialToPrimvarToUVIndex, TimeCode, RenderContextToken );
 		}
 
 		if ( !bInterpretedLODs )
@@ -411,12 +417,6 @@ namespace UsdGeomMeshTranslatorImpl
 
 			FStaticMeshAttributes StaticMeshAttributes( TempMeshDescription );
 			StaticMeshAttributes.Register();
-
-			pxr::TfToken RenderContextToken = pxr::UsdShadeTokens->universalRenderContext;
-			if ( !RenderContext.IsNone() )
-			{
-				RenderContextToken = UnrealToUsd::ConvertToken( *RenderContext.ToString() ).Get();
-			}
 
 			bool bSuccess = UsdToUnreal::ConvertGeomMesh( UsdMesh, TempMeshDescription, TempMaterialInfo, FTransform::Identity, MaterialToPrimvarToUVIndex, TimeCode, RenderContextToken );
 
