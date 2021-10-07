@@ -215,7 +215,8 @@ enum class EFiBCacheBarWidget
 	CacheAllUnindexedButton,
 	CurrentAssetNameText,
 	UnresponsiveEditorWarningText,
-	ShowCacheFailuresButton
+	ShowCacheFailuresButton,
+	ShowCacheStatusText
 };
 
 // Search bar widgets.
@@ -364,9 +365,6 @@ private:
 
 	/** Returns TRUE if Blueprint caching is in progress */
 	bool IsCacheInProgress() const;
-
-	/** Returns the color of the cache bar */
-	FSlateColor GetCacheBarColor() const;
 
 	/** Returns the BG image used for the cache bar */
 	const FSlateBrush* GetCacheBarImage() const;
