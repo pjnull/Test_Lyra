@@ -2071,6 +2071,8 @@ namespace Metasound
 
 			UMetasoundEditorGraph& Graph = GetMetaSoundGraphChecked();
 
+			TArray<TObjectPtr<UObject>> SelectedObjects;
+
 			FName NameToSelect;
 			switch (static_cast<ENodeSection>(InSectionID))
 			{
@@ -2094,6 +2096,7 @@ namespace Metasound
 								Input->NameChanged.Remove(*NameChangeDelegate);
 							}
 							NameChangeDelegateHandles.FindOrAdd(NodeID) = Input->NameChanged.AddSP(this, &FEditor::OnInputNameChanged);
+							SelectedObjects.Add(Input);
 						}
 					}
 				}
@@ -2119,6 +2122,7 @@ namespace Metasound
 								Output->NameChanged.Remove(*NameChangeDelegate);
 							}
 							NameChangeDelegateHandles.FindOrAdd(NodeID) = Output->NameChanged.AddSP(this, &FEditor::OnOutputNameChanged);
+							SelectedObjects.Add(Output);
 						}
 					}
 				}
@@ -2136,6 +2140,7 @@ namespace Metasound
 				if (!NameToSelect.IsNone())
 				{
 					MetasoundInterfaceMenu->SelectItemByName(NameToSelect);
+					SetSelection(SelectedObjects);
 				}
 			}
 			return FReply::Handled();
