@@ -622,7 +622,7 @@ void UtilsInitialize(bool bEditorDomainEnabled)
 			GEditorDomainOplog = MakeUnique<FEditorDomainOplog>();
 			if (!GEditorDomainOplog->IsValid())
 			{
-				UE_LOG(LogEditorDomain, Warning, TEXT("Failed to connect to ZenServer; EditorDomain oplog is unavailable."));
+				UE_LOG(LogEditorDomain, Display, TEXT("Failed to connect to ZenServer; EditorDomain oplog is unavailable."));
 				GEditorDomainOplog.Reset();
 			}
 		}

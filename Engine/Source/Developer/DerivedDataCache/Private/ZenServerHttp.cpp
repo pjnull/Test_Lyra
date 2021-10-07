@@ -58,9 +58,6 @@ namespace UE::Zen {
 		curl_easy_cleanup(Curl);
 	}
 
-	/**
-	 * Resets all options on the request except those that should always be set.
-	 */
 	void FZenHttpRequest::Reset()
 	{
 		Headers.Reset();
@@ -97,6 +94,11 @@ namespace UE::Zen {
 		curl_easy_setopt(Curl, CURLOPT_DEBUGFUNCTION, StaticDebugCallback);
 		curl_easy_setopt(Curl, CURLOPT_VERBOSE, 1L);
 #endif
+	}
+
+	void FZenHttpRequest::Initialize(bool bInLogErrors)
+	{
+		bLogErrors = bInLogErrors;
 	}
 
 	void FZenHttpRequest::AddHeader(FStringView Header, FStringView Value)
@@ -746,7 +748,7 @@ namespace UE::Zen {
 		for (uint8 i = 0; i < Pool.Num(); ++i)
 		{
 			Pool[i].IsAllocated = 0u;
-			Pool[i].Request = new FZenHttpRequest(InServiceUrl, true);
+			Pool[i].Request = new FZenHttpRequest(InServiceUrl, true /* bLogErrors */);
 		}
 	}
 

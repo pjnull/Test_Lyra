@@ -62,7 +62,8 @@ FZenStoreHttpClient::TryCreateProject(FStringView InProjectId,
 	// Establish project
 
 	{
-		UE::Zen::FZenScopedRequestPtr Request(RequestPool.Get());
+		// Create the connection request with no logging of errors; our caller will handle logging the connection error
+		UE::Zen::FZenScopedRequestPtr Request(RequestPool.Get(), false /* bLogErrors */);
 
 		TStringBuilder<128> ProjectUri;
 		ProjectUri << "/prj/" << InProjectId;
@@ -93,7 +94,7 @@ FZenStoreHttpClient::TryCreateProject(FStringView InProjectId,
 
 			if (Res != Zen::FZenHttpRequest::Result::Success)
 			{
-				UE_LOG(LogZenStore, Error, TEXT("Zen project '%s' creation FAILED"), *FString(InProjectId));
+				UE_LOG(LogZenStore, Display, TEXT("Zen project '%s' creation FAILED"), *FString(InProjectId));
 				bConnectionSucceeded = false;
 
 				// TODO: how to recover / handle this?
