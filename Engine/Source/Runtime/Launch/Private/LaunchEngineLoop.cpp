@@ -1554,7 +1554,7 @@ int32 FEngineLoop::PreInitPreStartupScreen(const TCHAR* CmdLine)
 		GCycleStatsShouldEmitNamedEvents = 1;
 	}
 	
-	if (FParse::Param(FCommandLine::Get(), TEXT("verbosenamedevents")))
+	if (FParse::Param(CmdLine, TEXT("verbosenamedevents")))
 	{
 		GCycleStatsShouldEmitNamedEvents = 1;
 		GShouldEmitVerboseNamedEvents = 1;
