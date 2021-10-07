@@ -667,17 +667,7 @@ void UMetasoundEditorGraphSchema::GetContextMenuActions(class UToolMenu* Menu, c
 {
 	using namespace Metasound::Editor;
 
-	if (Context->Pin)
-	{
-		FToolMenuSection& Section = Menu->AddSection("MetasoundGraphSchemaPinActions", LOCTEXT("PinActionsMenuHeader", "Pin Actions"));
-
-		// Only displays the 'Break Link' option if there is a link to break
-		if (Context->Pin->LinkedTo.Num() > 0)
-		{
-			Section.AddMenuEntry(FGraphEditorCommands::Get().BreakPinLinks);
-		}
-	}
-	else if (Context->Node && Context->Node->IsA<UMetasoundEditorGraphNode>())
+	if (!Context->Pin && Context->Node && Context->Node->IsA<UMetasoundEditorGraphNode>())
 	{
 		FToolMenuSection& Section = Menu->AddSection("MetasoundGraphSchemaNodeActions", LOCTEXT("NodeActionsMenuHeader", "Node Actions"));
 		Section.AddMenuEntry(FGenericCommands::Get().Delete);
