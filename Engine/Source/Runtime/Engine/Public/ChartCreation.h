@@ -269,7 +269,7 @@ public:
 
 	int64 GetTotalHitchFrameTime() const
 	{
-		return HitchTimeHistogram.GetNumMeasurements();
+		return HitchTimeHistogram.GetSumOfAllMeasures();
 	}
 
 	double GetPercentMissedVSync(int32 TargetFPS) const
@@ -289,10 +289,15 @@ public:
 
 	double GetAvgHitchFrameLength() const
 	{
-		const double TotalTime = GetTotalTime();
-		const int32 TotalHitchFrameTime = GetTotalHitchFrameTime();
+		return HitchTimeHistogram.GetAverageOfAllMeasures();
+	}
 
-		return (TotalTime > 0.0) ? (TotalHitchFrameTime / TotalTime) : 0.0;
+	double GetPercentHitchTime() const
+	{
+		const double TotalTime = GetTotalTime();
+		const double TotalHitchTime = HitchTimeHistogram.GetSumOfAllMeasures();
+
+		return (TotalTime > 0.0) ? ((TotalHitchTime * 100.0) / TotalTime) : 0.0;
 	}
 
 	void ChangeLabel(const FString& NewLabel)
