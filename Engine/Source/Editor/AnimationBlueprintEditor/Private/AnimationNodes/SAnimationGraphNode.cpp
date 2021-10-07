@@ -290,7 +290,7 @@ void SAnimationGraphNode::CreateBelowPinControls(TSharedPtr<SVerticalBox> MainBo
 		// Insert above the error reporting bar
 		MainBox->InsertSlot(FMath::Max(0, MainBox->NumSlots() - TagAndFunctionsSlotReverseIndex))
 		.AutoHeight()
-		.Padding(4.0f)
+		.Padding(4.0f, 2.0f, 4.0f, 2.0f)
 		[
 			SNew(SVerticalBox)
 			.IsEnabled_Lambda([this](){ return IsNodeEditable(); })
@@ -299,9 +299,16 @@ void SAnimationGraphNode::CreateBelowPinControls(TSharedPtr<SVerticalBox> MainBo
 			[
 				CreateNodeFunctionsWidget(AnimNode, MakeAttributeLambda(UseLowDetailNode))
 			]
+		];
+
+		MainBox->InsertSlot(FMath::Max(0, MainBox->NumSlots() - TagAndFunctionsSlotReverseIndex))
+		.AutoHeight()
+		.Padding(4.0f, 2.0f, 4.0f, 2.0f)
+		[
+			SNew(SVerticalBox)
+			.IsEnabled_Lambda([this](){ return IsNodeEditable(); })
 			+SVerticalBox::Slot()
 			.AutoHeight()
-			.Padding(4.0f, 0.0f, 4.0f, 4.0f)
 			.HAlign(HAlign_Right)
 			[
 				CreateNodeTagWidget(AnimNode, MakeAttributeLambda(UseLowDetailNode))
@@ -461,11 +468,15 @@ TSharedRef<SWidget> SAnimationGraphNode::CreateNodeTagWidget(UAnimGraphNode_Base
 		]
 		.HighDetail()
 		[
-			SNew(SInlineEditableTextBlock)
-			.ToolTipText_Lambda([InAnimNode](){ return FText::Format(LOCTEXT("TagFormat_Tooltip", "Tag: {0}\nThis node can be referenced elsewhere in this Anim Blueprint using this tag"), FText::FromName(InAnimNode->GetTag())); })
-			.Style(&FEditorStyle::Get().GetWidgetStyle<FInlineEditableTextBlockStyle>("AnimGraph.Node.Tag"))
-			.Text_Lambda([InAnimNode](){ return FText::FromName(InAnimNode->GetTag()); })
-			.OnTextCommitted_Lambda([InAnimNode](const FText& InText, ETextCommit::Type InCommitType){ InAnimNode->SetTag(*InText.ToString()); })
+			SNew(SBox)
+			.Padding(FMargin(4.0f, 0.0f, 4.0f, 4.0f))
+			[
+				SNew(SInlineEditableTextBlock)
+				.ToolTipText_Lambda([InAnimNode](){ return FText::Format(LOCTEXT("TagFormat_Tooltip", "Tag: {0}\nThis node can be referenced elsewhere in this Anim Blueprint using this tag"), FText::FromName(InAnimNode->GetTag())); })
+				.Style(&FEditorStyle::Get().GetWidgetStyle<FInlineEditableTextBlockStyle>("AnimGraph.Node.Tag"))
+				.Text_Lambda([InAnimNode](){ return FText::FromName(InAnimNode->GetTag()); })
+				.OnTextCommitted_Lambda([InAnimNode](const FText& InText, ETextCommit::Type InCommitType){ InAnimNode->SetTag(*InText.ToString()); })
+			]
 		];
 }
 
@@ -499,11 +510,16 @@ void SAnimationGraphNode::ReconfigurePinWidgetsForPropertyBindings(UAnimGraphNod
 					// Hide any value widgets when we have bindings
 					if(PinWidget->GetValueWidget() != SNullWidget::NullWidget)
 					{
-						PinWidget->GetValueWidget()->SetVisibility(MakeAttributeLambda([WeakPropertyBindingWidget = TWeakPtr<SWidget>(PropertyBindingWidget)]()
+						PinWidget->GetValueWidget()->SetVisibility(MakeAttributeLambda([WeakPropertyBindingWidget = TWeakPtr<SWidget>(PropertyBindingWidget), WeakPinWidget = TWeakPtr<SGraphPin>(PinWidget)]()
 						{
 							EVisibility Visibility = EVisibility::Collapsed;
 
-							if(WeakPropertyBindingWidget.IsValid())
+							if (WeakPinWidget.IsValid())
+							{
+								Visibility = WeakPinWidget.Pin()->GetDefaultValueVisibility();
+							}
+
+							if(Visibility == EVisibility::Visible && WeakPropertyBindingWidget.IsValid())
 							{
 								Visibility = WeakPropertyBindingWidget.Pin()->GetVisibility() == EVisibility::Visible ? EVisibility::Collapsed : EVisibility::Visible;
 							}
