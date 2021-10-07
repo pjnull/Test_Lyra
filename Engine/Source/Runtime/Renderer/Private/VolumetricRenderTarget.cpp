@@ -726,6 +726,7 @@ void ComposeVolumetricRenderTargetOverSceneUnderWater(
 		PermutationVector.Set<FComposeVolumetricRTOverScenePS::FUpsamplingMode>(UpsamplingMode);
 		PermutationVector.Set<FComposeVolumetricRTOverScenePS::FRenderUnderWaterBuffer>(1);
 		PermutationVector.Set<FComposeVolumetricRTOverScenePS::FRenderCameraUnderWater>(0);
+		PermutationVector.Set<FComposeVolumetricRTOverScenePS::FMSAASampleCount>(1);
 		TShaderMapRef<FComposeVolumetricRTOverScenePS> PixelShader(ViewInfo.ShaderMap, PermutationVector);
 
 		FComposeVolumetricRTOverScenePS::FParameters* PassParameters = GraphBuilder.AllocParameters<FComposeVolumetricRTOverScenePS::FParameters>();
@@ -784,6 +785,7 @@ void ComposeVolumetricRenderTargetOverSceneForVisualization(
 		PermutationVector.Set<FComposeVolumetricRTOverScenePS::FUpsamplingMode>(0);
 		PermutationVector.Set<FComposeVolumetricRTOverScenePS::FRenderUnderWaterBuffer>(0);
 		PermutationVector.Set<FComposeVolumetricRTOverScenePS::FRenderCameraUnderWater>(0);
+		PermutationVector.Set<FComposeVolumetricRTOverScenePS::FMSAASampleCount>(1);
 		TShaderMapRef<FComposeVolumetricRTOverScenePS> PixelShader(ViewInfo.ShaderMap, PermutationVector);
 
 		FComposeVolumetricRTOverScenePS::FParameters* PassParameters = GraphBuilder.AllocParameters<FComposeVolumetricRTOverScenePS::FParameters>();
