@@ -20,6 +20,7 @@
 #include "K2Node_TemporaryVariable.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "KismetCompiler.h"
+#include "Subsystems/AssetEditorSubsystem.h"
 
 #define LOCTEXT_NAMESPACE "K2Node_EnhancedInputAction"
 
@@ -170,6 +171,16 @@ bool UK2Node_EnhancedInputAction::IsCompatibleWithGraph(UEdGraph const* Graph) c
 		bIsCompatible = (Blueprint != nullptr) && Blueprint->SupportsInputEvents() && !bIsConstructionScript && Super::IsCompatibleWithGraph(Graph);
 	}
 	return bIsCompatible;
+}
+
+UObject* UK2Node_EnhancedInputAction::GetJumpTargetForDoubleClick() const
+{
+	return const_cast<UObject*>(Cast<UObject>(InputAction));
+}
+
+void UK2Node_EnhancedInputAction::JumpToDefinition() const
+{
+	GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(GetJumpTargetForDoubleClick());
 }
 
 void UK2Node_EnhancedInputAction::ValidateNodeDuringCompilation(class FCompilerResultsLog& MessageLog) const
