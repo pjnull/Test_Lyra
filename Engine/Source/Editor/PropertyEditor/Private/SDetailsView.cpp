@@ -49,14 +49,17 @@ void SDetailsView::Construct(const FArguments& InArgs, const FDetailsViewArgs& I
 	DetailsViewArgs = InDetailsViewArgs;
 
 	const FDetailsViewConfig* ViewConfig = GetConstViewConfig();
-	if (ViewConfig && ViewConfig->ValueColumnWidth != 0 && ViewConfig->ValueColumnWidth != DetailsViewArgs.ColumnWidth)
+	if (ViewConfig != nullptr)
 	{
-		DetailsViewArgs.ColumnWidth = ViewConfig->ValueColumnWidth;
-	}
+		if (ViewConfig->ValueColumnWidth != 0 && ViewConfig->ValueColumnWidth != DetailsViewArgs.ColumnWidth)
+		{
+			DetailsViewArgs.ColumnWidth = ViewConfig->ValueColumnWidth;
+		}
 
-	if (DetailsViewArgs.bShowSectionSelector && ViewConfig)
-	{
-		DetailsViewArgs.bShowSectionSelector = ViewConfig->bShowSections;
+		if (DetailsViewArgs.bShowSectionSelector)
+		{
+			DetailsViewArgs.bShowSectionSelector = ViewConfig->bShowSections;
+		}
 	}
 
 	ColumnSizeData.SetValueColumnWidth(DetailsViewArgs.ColumnWidth);
