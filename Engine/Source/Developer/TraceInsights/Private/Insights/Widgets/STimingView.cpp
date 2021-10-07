@@ -4356,7 +4356,7 @@ void STimingView::CreateAllTracksMenu(FMenuBuilder& MenuBuilder)
 		//	SNew(STextBlock)
 		//	.Text(LOCTEXT("ForegroundTracks", "Foreground Tracks")),
 		//	FText(), true);
-		
+
 		MenuBuilder.AddWidget(
 			SNew(SBox)
 			.MaxDesiredHeight(MaxDesiredHeight)
@@ -4616,7 +4616,8 @@ void STimingView::CreateCpuThreadTrackColoringModeMenu(FMenuBuilder& MenuBuilder
 		);
 		MenuBuilder.AddMenuEntry(
 			LOCTEXT("CpuThreadTrackColoringMode_ByDuration", "By Duration"),
-			LOCTEXT("CpuThreadTrackColoringMode_ByDuration_Desc", "Assign a color to CPU/GPU timing events based on their duration (inclusive time).\nred: > 10 ms,   yellow: (1 ms .. 10 ms],   green: (100 us .. 1 ms],   blue: ≤ 100 us"),
+			LOCTEXT("CpuThreadTrackColoringMode_ByDuration_Desc",
+"Assign a color to CPU/GPU timing events based on their duration (inclusive time).\n\t≥ 10ms : red\n\t≥ 1ms : yellow\n\t≥ 100μs : green\n\t≥ 10μs : cyan\n\t≥ 1μs : blue\n\t< 1μs : grey"),
 			FSlateIcon(),
 			FUIAction(
 				FExecuteAction::CreateSP(this, &STimingView::SetCpuThreadTrackColoringMode, Insights::ETimingEventsColoringMode::ByDuration),
