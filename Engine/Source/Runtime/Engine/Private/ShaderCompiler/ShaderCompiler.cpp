@@ -6564,15 +6564,16 @@ bool IsGlobalShaderMapComplete(const TCHAR* TypeNameSubstring)
 		FGlobalShaderMap* GlobalShaderMap = GGlobalShaderMap[Platform];
 
 		// look at any shadermap in the GlobalShaderMap for the permutation flags, as they will all be the same
-		const FGlobalShaderMapSection* FirstShaderMap = GlobalShaderMap->GetFirstSection();
-		if (FirstShaderMap == nullptr)
-		{
-			// if we had no sections at all, we know we aren't complete
-			return false;
-		}
-		EShaderPermutationFlags GlobalShaderPermutation = FirstShaderMap->GetPermutationFlags();
 		if (GlobalShaderMap)
 		{
+			const FGlobalShaderMapSection* FirstShaderMap = GlobalShaderMap->GetFirstSection();
+			if (FirstShaderMap == nullptr)
+			{
+				// if we had no sections at all, we know we aren't complete
+				return false;
+			}
+			EShaderPermutationFlags GlobalShaderPermutation = FirstShaderMap->GetPermutationFlags();
+
 			// Check if the individual shaders are complete
 			for (TLinkedList<FShaderType*>::TIterator ShaderTypeIt(FShaderType::GetTypeList()); ShaderTypeIt; ShaderTypeIt.Next())
 			{
