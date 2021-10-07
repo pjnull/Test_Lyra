@@ -700,9 +700,14 @@ FIoStatus FFileIoStoreReader::Initialize(const TCHAR* InContainerPath, int32 InO
 		Partition.ContainerFileIndex = GlobalPartitionIndex++;
 	}
 
-	if (TocResource.ChunkHashSeeds.Num() == TocResource.Header.TocEntryCount)
+	if (!TocResource.ChunkPerfectHashSeeds.IsEmpty())
 	{
-		PerfectHashMap.TocChunkHashSeeds = MoveTemp(TocResource.ChunkHashSeeds);
+		for (int32 ChunkIndexWithoutPerfectHash : TocResource.ChunkIndicesWithoutPerfectHash)
+		{
+			TocImperfectHashMapFallback.Add(TocResource.ChunkIds[ChunkIndexWithoutPerfectHash], TocResource.ChunkOffsetLengths[ChunkIndexWithoutPerfectHash]);
+		}
+
+		PerfectHashMap.TocChunkHashSeeds = MoveTemp(TocResource.ChunkPerfectHashSeeds);
 		PerfectHashMap.TocOffsetAndLengths = MoveTemp(TocResource.ChunkOffsetLengths);
 		PerfectHashMap.TocChunkHashes.SetNumUninitialized(TocResource.Header.TocEntryCount);
 		// Store only the chunk hashes, assumes that the perfect hash function is different from the
@@ -715,6 +720,7 @@ FIoStatus FFileIoStoreReader::Initialize(const TCHAR* InContainerPath, int32 InO
 	}
 	else
 	{
+		UE_LOG(LogIoDispatcher, Warning, TEXT("Falling back to imperfect hashmap for container '%s'"), *TocFilePath);
 		for (uint32 ChunkIndex = 0; ChunkIndex < TocResource.Header.TocEntryCount; ++ChunkIndex)
 		{
 			TocImperfectHashMapFallback.Add(TocResource.ChunkIds[ChunkIndex], TocResource.ChunkOffsetLengths[ChunkIndex]);
@@ -777,7 +783,8 @@ const FIoOffsetAndLength* FFileIoStoreReader::FindChunkInternal(const FIoChunkId
 		{
 			return nullptr;
 		}
-		uint32 SeedIndex = FIoStoreTocResource::HashChunkIdWithSeed(0, ChunkId) % ChunkCount;
+		const uint32 SeedCount = PerfectHashMap.TocChunkHashSeeds.Num();
+		uint32 SeedIndex = FIoStoreTocResource::HashChunkIdWithSeed(0, ChunkId) % SeedCount;
 		const int32 Seed = PerfectHashMap.TocChunkHashSeeds[SeedIndex];
 		if (Seed == 0)
 		{
@@ -786,7 +793,16 @@ const FIoOffsetAndLength* FFileIoStoreReader::FindChunkInternal(const FIoChunkId
 		uint32 Slot;
 		if (Seed < 0)
 		{
-			Slot = static_cast<uint32>(-Seed - 1);
+			uint32 SeedAsIndex = static_cast<uint32>(-Seed - 1);
+			if (SeedAsIndex < ChunkCount)
+			{
+				Slot = static_cast<uint32>(SeedAsIndex);
+			}
+			else
+			{
+				// Entry without perfect hash
+				return TocImperfectHashMapFallback.Find(ChunkId);
+			}
 		}
 		else
 		{
@@ -1600,6 +1616,7 @@ FIoRequestImpl* FFileIoStore::GetCompletedRequests()
 		FFileIoStoreReadRequest* CompletedRequest = *It;
 
 		FFileIoStats::OnReadComplete(CompletedRequest->Size);
+		TRACE_COUNTER_ADD(IoDispatcherFileBackendTotalBytesRead, CompletedRequest->Size);
 
 		if (!CompletedRequest->ImmediateScatter.Request)
 		{

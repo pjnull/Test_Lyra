@@ -59,12 +59,11 @@
 #include "ZenStoreWriter.h"
 #include "IO/IoContainerHeader.h"
 #include "ProfilingDebugging/CountersTrace.h"
+#include "IO/IoStore.h"
 
 //PRAGMA_DISABLE_OPTIMIZATION
 
 IMPLEMENT_MODULE(FDefaultModuleImpl, IoStoreUtilities);
-
-DEFINE_LOG_CATEGORY_STATIC(LogIoStore, Log, All);
 
 #define IOSTORE_CPU_SCOPE(NAME) TRACE_CPUPROFILER_EVENT_SCOPE(IoStore##NAME);
 #define IOSTORE_CPU_SCOPE_DATA(NAME, DATA) TRACE_CPUPROFILER_EVENT_SCOPE(IoStore##NAME);
