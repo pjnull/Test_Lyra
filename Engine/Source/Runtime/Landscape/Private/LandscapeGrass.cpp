@@ -975,7 +975,20 @@ bool ULandscapeComponent::CanRenderGrassMap() const
 	FMaterialResource* MaterialResource = MaterialInstance != nullptr ? MaterialInstance->GetMaterialResource(ComponentWorld->FeatureLevel) : nullptr;
 
 	// Check we can render the material
-	if (MaterialResource == nullptr || !MaterialResource->HasValidGameThreadShaderMap())
+	if (MaterialResource == nullptr)
+	{
+		return false;
+	}
+
+	// We only need the GrassWeight shaders on the fixed grid vertex factory to render grass maps : 
+	FMaterialShaderTypes ShaderTypes;
+	ShaderTypes.AddShaderType<FLandscapeGrassWeightVS>();
+	ShaderTypes.AddShaderType<FLandscapeGrassWeightPS>();
+
+	FVertexFactoryType* LandscapeGrassVF = FindVertexFactoryType(FName(TEXT("FLandscapeFixedGridVertexFactory"), FNAME_Find));
+
+	FMaterialShaders Shaders;
+	if (!MaterialResource->TryGetShaders(ShaderTypes, LandscapeGrassVF, Shaders))
 	{
 		return false;
 	}
