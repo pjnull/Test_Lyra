@@ -271,6 +271,13 @@ FZenServiceInstance::PopulateSettings(FStringView InstanceURL)
 
 		ReadUInt16FromConfig(AutoLaunchConfigSection, TEXT("DesiredPort"), Settings.AutoLaunchSettings.DesiredPort, GEngineIni);
 		GConfig->GetBool(AutoLaunchConfigSection, TEXT("Hidden"), Settings.AutoLaunchSettings.bHidden, GEngineIni);
+
+		FString LogCommandLineOverrideValue;
+		if (FParse::Value(FCommandLine::Get(), TEXT("ZenLogPath="), LogCommandLineOverrideValue))
+		{
+			Settings.AutoLaunchSettings.LogPath = LogCommandLineOverrideValue;
+			UE_LOG(LogZenServiceInstance, Log, TEXT("Found command line override ZenLogPath=%s"), *LogCommandLineOverrideValue);
+		}
 	}
 
 	// ConnectExisting settings
@@ -337,6 +344,12 @@ FZenServiceInstance::AutoLaunch()
 		FPlatformProcess::GetCurrentProcessId(),
 		Settings.AutoLaunchSettings.DesiredPort,
 		*Settings.AutoLaunchSettings.DataPath);
+
+	if (!Settings.AutoLaunchSettings.LogPath.IsEmpty())
+	{
+		Parms.Appendf(TEXT(" --abslog \"%s\""),
+			*FPaths::ConvertRelativePathToFull(Settings.AutoLaunchSettings.LogPath));
+	}
 
 	if (!Settings.AutoLaunchSettings.ExtraArgs.IsEmpty())
 	{

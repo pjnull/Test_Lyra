@@ -101,6 +101,7 @@ private:
 		{
 			FString WorkspaceDataPath;
 			FString DataPath;
+			FString LogPath;
 			FString ExtraArgs;
 			uint16 DesiredPort = 1337;
 			bool bHidden = true;
