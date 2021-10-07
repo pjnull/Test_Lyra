@@ -69,6 +69,15 @@ PRAGMA_DISABLE_OPTIMIZATION
 CSV_DECLARE_CATEGORY_MODULE_EXTERN(CORE_API, FileIO);
 CSV_DEFINE_STAT(FileIO, FrameCompletedExportBundleLoadsKB);
 
+FArchive& operator<<(FArchive& Ar, FZenPackageVersioningInfo& VersioningInfo)
+{
+	Ar << VersioningInfo.ZenVersion;
+	Ar << VersioningInfo.PackageVersion;
+	Ar << VersioningInfo.LicenseeVersion;
+	VersioningInfo.CustomVersions.Serialize(Ar);
+	return Ar;
+}
+
 FArchive& operator<<(FArchive& Ar, FExportBundleEntry& ExportBundleEntry)
 {
 	Ar << ExportBundleEntry.LocalExportIndex;
@@ -2017,7 +2026,7 @@ private:
 	 *
 	 * @return true
 	 */
-	void CreateUPackage(const FPackageSummary* PackageSummary);
+	void CreateUPackage(const FZenPackageSummary* PackageSummary, const FZenPackageVersioningInfo* VersioningInfo);
 
 	/**
 	 * Finish up UPackage
@@ -3478,13 +3487,21 @@ EAsyncPackageState::Type FAsyncPackage2::Event_ProcessPackageSummary(FAsyncLoadi
 	{
 		check(Package->ExportBundleEntryIndex == 0);
 
-		const uint8* PackageSummaryData = Package->IoRequest.GetResultOrDie().Data();
-		const FPackageSummary* PackageSummary = reinterpret_cast<const FPackageSummary*>(PackageSummaryData);
+		const uint8* PackageHeaderData = Package->IoRequest.GetResultOrDie().Data();
+		const FZenPackageSummary* PackageSummary = reinterpret_cast<const FZenPackageSummary*>(PackageHeaderData);
+		
+		TArrayView<const uint8> PackageHeaderDataView(PackageHeaderData + sizeof(FZenPackageSummary), PackageSummary->HeaderSize - sizeof(FZenPackageSummary));
+		FMemoryReaderView PackageHeaderDataReader(PackageHeaderDataView);
+
+		FZenPackageVersioningInfo VersioningInfo;
+		if (PackageSummary->bHasVersioningInfo)
+		{
+			PackageHeaderDataReader << VersioningInfo;
+		}
+
 		{
 			TRACE_CPUPROFILER_EVENT_SCOPE(LoadPackageNameMap);
-			TArrayView<const uint8> NameMapView(PackageSummaryData + sizeof(FPackageSummary), PackageSummary->HeaderSize - sizeof(FPackageSummary));
-			FMemoryReaderView NameMapReader(NameMapView);
-			Package->NameMap.Load(NameMapReader, FMappedName::EType::Package);
+			Package->NameMap.Load(PackageHeaderDataReader, FMappedName::EType::Package);
 		}
 
 		{
@@ -3502,20 +3519,20 @@ EAsyncPackageState::Type FAsyncPackage2::Event_ProcessPackageSummary(FAsyncLoadi
 
 		Package->CookedHeaderSize = PackageSummary->CookedHeaderSize;
 		Package->ImportStore.ImportMap = TArrayView<const FPackageObjectIndex>(
-				reinterpret_cast<const FPackageObjectIndex*>(PackageSummaryData + PackageSummary->ImportMapOffset),
+				reinterpret_cast<const FPackageObjectIndex*>(PackageHeaderData + PackageSummary->ImportMapOffset),
 				(PackageSummary->ExportMapOffset - PackageSummary->ImportMapOffset) / sizeof(FPackageObjectIndex));
-		Package->ExportMap = reinterpret_cast<const FExportMapEntry*>(PackageSummaryData + PackageSummary->ExportMapOffset);
+		Package->ExportMap = reinterpret_cast<const FExportMapEntry*>(PackageHeaderData + PackageSummary->ExportMapOffset);
 
 		uint64 ExportBundleHeadersOffset = PackageSummary->GraphDataOffset;
 		uint64 ArcsDataOffset = ExportBundleHeadersOffset + Package->Data.ExportBundleHeadersSize;
 		uint64 ArcsDataSize = PackageSummary->HeaderSize - ArcsDataOffset;
-		Package->ArcsData = TArrayView<const uint8>(PackageSummaryData + ArcsDataOffset, ArcsDataSize);
-		FMemory::Memcpy(Package->Data.ExportBundlesMetaMemory, PackageSummaryData + ExportBundleHeadersOffset, Package->Data.ExportBundleHeadersSize);
-		FMemory::Memcpy(Package->Data.ExportBundlesMetaMemory + Package->Data.ExportBundleHeadersSize, PackageSummaryData + PackageSummary->ExportBundleEntriesOffset, Package->Data.ExportBundleEntriesSize);
+		Package->ArcsData = TArrayView<const uint8>(PackageHeaderData + ArcsDataOffset, ArcsDataSize);
+		FMemory::Memcpy(Package->Data.ExportBundlesMetaMemory, PackageHeaderData + ExportBundleHeadersOffset, Package->Data.ExportBundleHeadersSize);
+		FMemory::Memcpy(Package->Data.ExportBundlesMetaMemory + Package->Data.ExportBundleHeadersSize, PackageHeaderData + PackageSummary->ExportBundleEntriesOffset, Package->Data.ExportBundleEntriesSize);
 
-		Package->CreateUPackage(PackageSummary);
+		Package->CreateUPackage(PackageSummary, PackageSummary->bHasVersioningInfo ? &VersioningInfo : nullptr);
 
-		Package->AllExportDataPtr = PackageSummaryData + PackageSummary->HeaderSize;
+		Package->AllExportDataPtr = PackageHeaderData + PackageSummary->HeaderSize;
 
 		Package->ExportToBundleMappings.SetNum(Package->Data.ExportInfo.ExportCount);
 		for (int32 ExportBundleIndex = 0, ExportBundleCount = Package->Data.ExportInfo.ExportBundleCount; ExportBundleIndex < ExportBundleCount; ++ExportBundleIndex)
@@ -3608,7 +3625,10 @@ EAsyncPackageState::Type FAsyncPackage2::Event_ProcessExportBundle(FAsyncLoading
 			Ar.SetUEVer(Package->LinkerRoot->LinkerPackageVersion);
 			Ar.SetLicenseeUEVer(Package->LinkerRoot->LinkerLicenseeVersion);
 			// Ar.SetEngineVer(Summary.SavedByEngineVersion); // very old versioning scheme
-			// Ar.SetCustomVersions(LinkerRoot->LinkerCustomVersion); // only if not cooking with -unversioned
+			if (!Package->LinkerRoot->LinkerCustomVersion.GetAllVersions().IsEmpty())
+			{
+				Ar.SetCustomVersions(Package->LinkerRoot->LinkerCustomVersion);
+			}
 			Ar.SetUseUnversionedPropertySerialization((Package->LinkerRoot->GetPackageFlags() & PKG_UnversionedProperties) != 0);
 			Ar.SetIsLoading(true);
 			Ar.SetIsPersistent(true);
@@ -5741,7 +5761,7 @@ void FAsyncPackage2::EndAsyncLoad()
 	}
 }
 
-void FAsyncPackage2::CreateUPackage(const FPackageSummary* PackageSummary)
+void FAsyncPackage2::CreateUPackage(const FZenPackageSummary* PackageSummary, const FZenPackageVersioningInfo* VersioningInfo)
 {
 	check(!LinkerRoot);
 
@@ -5790,9 +5810,17 @@ void FAsyncPackage2::CreateUPackage(const FPackageSummary* PackageSummary)
 		LinkerRoot->SetCanBeImportedFlag(Desc.bCanBeImported);
 		LinkerRoot->SetPackageId(Desc.UPackageId);
 		LinkerRoot->SetPackageFlagsTo(PackageSummary->PackageFlags | PKG_Cooked);
-		LinkerRoot->LinkerPackageVersion = GPackageFileUEVersion;
-		LinkerRoot->LinkerLicenseeVersion = GPackageFileLicenseeUEVersion;
-		// LinkerRoot->LinkerCustomVersion = PackageSummaryVersions; // only if (!bCustomVersionIsLatest)
+		if (VersioningInfo)
+		{
+			LinkerRoot->LinkerPackageVersion = VersioningInfo->PackageVersion;
+			LinkerRoot->LinkerLicenseeVersion = VersioningInfo->LicenseeVersion;
+			LinkerRoot->LinkerCustomVersion = VersioningInfo->CustomVersions;
+		}
+		else
+		{
+			LinkerRoot->LinkerPackageVersion = GPackageFileUEVersion;
+			LinkerRoot->LinkerLicenseeVersion = GPackageFileLicenseeUEVersion;
+		}
 #if WITH_IOSTORE_IN_EDITOR
 		LinkerRoot->bIsCookedForEditor = !!(PackageSummary->PackageFlags & PKG_FilterEditorOnly);
 #endif

@@ -526,7 +526,7 @@ public:
 			}
 
 			FIoBuffer Buffer = Status.ConsumeValueOrDie();
-			uint32 HeaderSize = reinterpret_cast<const FPackageSummary*>(Buffer.Data())->HeaderSize;
+			uint32 HeaderSize = reinterpret_cast<const FZenPackageSummary*>(Buffer.Data())->HeaderSize;
 			if (HeaderSize > Buffer.DataSize())
 			{
 				ReadOptions.SetRange(0, HeaderSize);
@@ -3375,21 +3375,28 @@ int32 Describe(
 		TIoStatusOr<FIoBuffer> IoBuffer = Reader->Read(Job.ChunkId, ReadOptions);
 		check(IoBuffer.IsOk());
 		const uint8* PackageSummaryData = IoBuffer.ValueOrDie().Data();
-		const FPackageSummary* PackageSummary = reinterpret_cast<const FPackageSummary*>(PackageSummaryData);
+		const FZenPackageSummary* PackageSummary = reinterpret_cast<const FZenPackageSummary*>(PackageSummaryData);
 		if (PackageSummary->HeaderSize > IoBuffer.ValueOrDie().DataSize())
 		{
 			ReadOptions.SetRange(0, PackageSummary->HeaderSize);
 			IoBuffer = Reader->Read(Job.ChunkId, ReadOptions);
 			PackageSummaryData = IoBuffer.ValueOrDie().Data();
-			PackageSummary = reinterpret_cast<const FPackageSummary*>(PackageSummaryData);
+			PackageSummary = reinterpret_cast<const FZenPackageSummary*>(PackageSummaryData);
+		}
+
+		TArrayView<const uint8> HeaderDataView(PackageSummaryData + sizeof(FZenPackageSummary), PackageSummary->HeaderSize - sizeof(FZenPackageSummary));
+		FMemoryReaderView HeaderDataReader(HeaderDataView);
+
+		FZenPackageVersioningInfo VersioningInfo;
+		if (PackageSummary->bHasVersioningInfo)
+		{
+			HeaderDataReader << VersioningInfo;
 		}
 
 		TArray<FNameEntryId> PackageNameMap;
 		{
 			TRACE_CPUPROFILER_EVENT_SCOPE(LoadNameBatch);
-			TArrayView<const uint8> NameMapView(PackageSummaryData + sizeof(FPackageSummary), PackageSummary->HeaderSize - sizeof(FPackageSummary));
-			FMemoryReaderView NameMapReader(NameMapView);
-			PackageNameMap = LoadNameBatch(NameMapReader);
+			PackageNameMap = LoadNameBatch(HeaderDataReader);
 		}
 
 		Job.PackageDesc->PackageName = FName::CreateFromDisplayId(PackageNameMap[PackageSummary->Name.GetIndex()], PackageSummary->Name.GetNumber());

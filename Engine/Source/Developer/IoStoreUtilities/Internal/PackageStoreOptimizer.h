@@ -255,6 +255,8 @@ private:
 	FName SourceName;
 	FString Region;
 
+	TOptional<FZenPackageVersioningInfo> VersioningInfo;
+
 	FPackageStoreNameMapBuilder NameMapBuilder;
 	TArray<FPackageObjectIndex> Imports;
 	TArray<FExport> Exports;
@@ -275,6 +277,7 @@ private:
 	uint64 ExportBundleEntriesSize = 0;
 	uint64 GraphDataSize = 0;
 	uint64 NameMapSize = 0;
+	uint64 VersioningInfoSize = 0;
 	uint32 LoadOrder = 0;
 	
 	TArray<FExportBundleGraphNode> ExportBundleGraphNodes;
@@ -357,7 +360,8 @@ private:
 
 	struct FPackageStoreHeaderData
 	{
-		FPackageSummary Summary;
+		FZenPackageSummary Summary;
+		TOptional<FZenPackageVersioningInfo> VersioningInfo;
 		TArray<FPackageId> ImportedPackageIds;
 		TArray<FNameEntryId> NameMap;
 		TArray<FPackageObjectIndex> Imports;

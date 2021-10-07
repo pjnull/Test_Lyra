@@ -125,6 +125,14 @@ FPackageStorePackage* FPackageStoreOptimizer::CreatePackageFromCookedHeader(cons
 	Package->SourceName = *RemapLocalizationPathIfNeeded(Name.ToString(), &Package->Region);
 
 	FCookedHeaderData CookedHeaderData = LoadCookedHeader(CookedHeaderBuffer);
+	if (!CookedHeaderData.Summary.bUnversioned)
+	{
+		FZenPackageVersioningInfo& VersioningInfo = Package->VersioningInfo.Emplace();
+		VersioningInfo.ZenVersion = EZenPackageVersion::Latest;
+		VersioningInfo.PackageVersion = CookedHeaderData.Summary.GetFileVersionUE();
+		VersioningInfo.LicenseeVersion = CookedHeaderData.Summary.GetFileVersionLicenseeUE();
+		VersioningInfo.CustomVersions = CookedHeaderData.Summary.GetCustomVersionContainer();
+	}
 	Package->PackageFlags = CookedHeaderData.Summary.GetPackageFlags();
 	Package->CookedHeaderSize = CookedHeaderData.Summary.TotalHeaderSize;
 	for (int32 I = 0; I < CookedHeaderData.Summary.NamesReferencedFromExportDataCount; ++I)
@@ -149,6 +157,10 @@ FPackageStorePackage* FPackageStoreOptimizer::CreatePackageFromPackageStoreHeade
 	Package->SourceName = *RemapLocalizationPathIfNeeded(Name.ToString(), &Package->Region);
 
 	FPackageStoreHeaderData PackageStoreHeaderData = LoadPackageStoreHeader(Buffer, PackageStoreEntry);
+	if (PackageStoreHeaderData.VersioningInfo.IsSet())
+	{
+		Package->VersioningInfo.Emplace(PackageStoreHeaderData.VersioningInfo.GetValue());
+	}
 	Package->PackageFlags = PackageStoreHeaderData.Summary.PackageFlags;
 	Package->CookedHeaderSize = PackageStoreHeaderData.Summary.CookedHeaderSize;
 	for (const FNameEntryId& DisplayIndex : PackageStoreHeaderData.NameMap)
@@ -269,14 +281,21 @@ FPackageStoreOptimizer::FPackageStoreHeaderData FPackageStoreOptimizer::LoadPack
 
 	const uint8* HeaderData = PackageStoreHeaderBuffer.Data();
 
-	FPackageSummary& Summary = PackageStoreHeaderData.Summary;
-	Summary = *reinterpret_cast<const FPackageSummary*>(HeaderData);
+	FZenPackageSummary& Summary = PackageStoreHeaderData.Summary;
+	Summary = *reinterpret_cast<const FZenPackageSummary*>(HeaderData);
 	check(PackageStoreHeaderBuffer.DataSize() == Summary.HeaderSize);
 
+	TArrayView<const uint8> HeaderDataView(HeaderData + sizeof(FZenPackageSummary), Summary.HeaderSize - sizeof(FZenPackageSummary));
+	FMemoryReaderView HeaderDataReader(HeaderDataView);
+	
+	if (Summary.bHasVersioningInfo)
+	{
+		FZenPackageVersioningInfo& VersioningInfo = PackageStoreHeaderData.VersioningInfo.Emplace();
+		HeaderDataReader << VersioningInfo;
+	}
+
 	TArray<FNameEntryId>& NameMap = PackageStoreHeaderData.NameMap;
-	TArrayView<const uint8> NameMapView(HeaderData + sizeof(FPackageSummary), Summary.HeaderSize - sizeof(FPackageSummary));
-	FMemoryReaderView NameMapReader(NameMapView);
-	NameMap = LoadNameBatch(NameMapReader);
+	NameMap = LoadNameBatch(HeaderDataReader);
 
 	for (FPackageId PackageId : PackageStoreEntry.ImportedPackageIds)
 	{
@@ -1406,8 +1425,16 @@ void FPackageStoreOptimizer::FinalizePackageHeader(FPackageStorePackage* Package
 	SaveNameBatch(Package->NameMapBuilder.GetNameMap(), NameMapArchive);
 	Package->NameMapSize = NameMapArchive.Tell();
 
+	FBufferWriter VersioningInfoArchive(nullptr, 0, EBufferWriterFlags::AllowResize | EBufferWriterFlags::TakeOwnership);
+	if (Package->VersioningInfo.IsSet())
+	{
+		VersioningInfoArchive << Package->VersioningInfo.GetValue();
+		Package->VersioningInfoSize = VersioningInfoArchive.Tell();
+	}
+
 	Package->HeaderSize =
-		sizeof(FPackageSummary)
+		sizeof(FZenPackageSummary)
+		+ Package->VersioningInfoSize
 		+ Package->NameMapSize
 		+ Package->ImportMapSize
 		+ Package->ExportMapSize
@@ -1417,13 +1444,23 @@ void FPackageStoreOptimizer::FinalizePackageHeader(FPackageStorePackage* Package
 	Package->HeaderBuffer = FIoBuffer(Package->HeaderSize);
 	uint8* HeaderData = Package->HeaderBuffer.Data();
 	FMemory::Memzero(HeaderData, Package->HeaderSize);
-	FPackageSummary* PackageSummary = reinterpret_cast<FPackageSummary*>(HeaderData);
+	FZenPackageSummary* PackageSummary = reinterpret_cast<FZenPackageSummary*>(HeaderData);
 	PackageSummary->HeaderSize = Package->HeaderSize;
 	PackageSummary->Name = MappedPackageName;
 	PackageSummary->PackageFlags = Package->PackageFlags;
 	PackageSummary->CookedHeaderSize = Package->CookedHeaderSize;
 	FBufferWriter HeaderArchive(HeaderData, Package->HeaderSize);
-	HeaderArchive.Seek(sizeof(FPackageSummary));
+	HeaderArchive.Seek(sizeof(FZenPackageSummary));
+
+	if (Package->VersioningInfo.IsSet())
+	{
+		PackageSummary->bHasVersioningInfo = 1;
+		HeaderArchive.Serialize(VersioningInfoArchive.GetWriterData(), VersioningInfoArchive.Tell());
+	}
+	else
+	{
+		PackageSummary->bHasVersioningInfo = 0;
+	}
 
 	HeaderArchive.Serialize(NameMapArchive.GetWriterData(), NameMapArchive.Tell());
 	PackageSummary->ImportMapOffset = HeaderArchive.Tell();
