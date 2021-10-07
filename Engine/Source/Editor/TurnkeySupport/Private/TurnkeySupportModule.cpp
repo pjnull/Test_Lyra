@@ -465,7 +465,7 @@ public:
 			{
 				BuildCookRunParams += FString::Printf(TEXT(" -server -noclient -target=%s -serverconfig=%s"), *BuildTargetInfo->Name, LexToString(ConfigurationInfo.Configuration));
 			}
-			else
+			else if (BuildTargetInfo)
 			{
 				BuildCookRunParams += FString::Printf(TEXT(" -target=%s -clientconfig=%s"), *BuildTargetInfo->Name, LexToString(ConfigurationInfo.Configuration));
 			}
