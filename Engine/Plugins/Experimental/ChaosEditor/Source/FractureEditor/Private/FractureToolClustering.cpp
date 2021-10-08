@@ -157,7 +157,7 @@ FSlateIcon UFractureToolUncluster::GetToolIcon() const
 
 void UFractureToolUncluster::RegisterUICommand(FFractureEditorCommands* BindingContext)
 {
-	UI_COMMAND_EXT(BindingContext, UICommandInfo, "Uncluster", "Uncluster", "Remove parent cluster and move bones up a level.", EUserInterfaceActionType::Button, FInputChord());
+	UI_COMMAND_EXT(BindingContext, UICommandInfo, "Uncluster", "Unclstr", "Remove parent cluster and move bones up a level.", EUserInterfaceActionType::Button, FInputChord());
 	BindingContext->Uncluster = UICommandInfo;
 }
 

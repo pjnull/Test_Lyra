@@ -42,7 +42,7 @@ FSlateIcon UFractureToolGenerateAsset::GetToolIcon() const
 
 void UFractureToolGenerateAsset::RegisterUICommand(FFractureEditorCommands* BindingContext)
 {
-	UI_COMMAND_EXT(BindingContext, UICommandInfo, "GenerateAsset", "New", "Generate Asset", EUserInterfaceActionType::ToggleButton, FInputChord());
+	UI_COMMAND_EXT(BindingContext, UICommandInfo, "GenerateAsset", "New", "Generate a geometry collection asset from static meshes contained in selected actors.", EUserInterfaceActionType::ToggleButton, FInputChord());
 	BindingContext->GenerateAsset = UICommandInfo;
 }
 
@@ -363,7 +363,7 @@ FSlateIcon UFractureToolResetAsset::GetToolIcon() const
 
 void UFractureToolResetAsset::RegisterUICommand(FFractureEditorCommands* BindingContext)
 {
-	UI_COMMAND_EXT(BindingContext, UICommandInfo, "ResetAsset", "Reset", "Reset", EUserInterfaceActionType::ToggleButton, FInputChord());
+	UI_COMMAND_EXT(BindingContext, UICommandInfo, "ResetAsset", "Reset", "Reset selected geometry collection(s) to their initial unfractured state.", EUserInterfaceActionType::ToggleButton, FInputChord());
 	BindingContext->ResetAsset = UICommandInfo;
 }
 
