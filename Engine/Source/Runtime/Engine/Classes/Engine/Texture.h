@@ -782,6 +782,10 @@ public:
 	// Only because we don't want to expose FVirtualTextureBuiltData
 	ENGINE_API int32 GetNumVTMips() const;
 	ENGINE_API EPixelFormat GetLayerPixelFormat(uint32 LayerIndex) const;
+
+private:
+
+	bool CanUseCookedDataPath() const;
 };
 
 /**

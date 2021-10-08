@@ -1343,7 +1343,7 @@ bool FTexturePlatformData::TryLoadMips(int32 FirstMipToLoad, void** OutMipData, 
 
 int32 FTexturePlatformData::GetNumNonStreamingMips() const
 {
-	if (FPlatformProperties::RequiresCookedData())
+	if (CanUseCookedDataPath())
 	{
 		// We're on a cooked platform so we should only be streaming mips that were not inlined in the texture by thecooker.
 		int32 NumNonStreamingMips = Mips.Num();
@@ -1397,7 +1397,7 @@ int32 FTexturePlatformData::GetNumNonStreamingMips() const
 int32 FTexturePlatformData::GetNumNonOptionalMips() const
 {
 	// TODO : Count from last mip to first.
-	if (FPlatformProperties::RequiresCookedData())
+	if (CanUseCookedDataPath())
 	{
 		int32 NumNonOptionalMips = Mips.Num();
 
@@ -1462,6 +1462,15 @@ EPixelFormat FTexturePlatformData::GetLayerPixelFormat(uint32 LayerIndex) const
 	}
 	check(LayerIndex == 0u);
 	return PixelFormat;
+}
+
+bool FTexturePlatformData::CanUseCookedDataPath() const
+{
+#if WITH_IOSTORE_IN_EDITOR
+	return Mips.Num() > 0 && Mips[0].BulkData.IsUsingIODispatcher();
+#else	
+	return FPlatformProperties::RequiresCookedData();
+#endif //WITH_IOSTORE_IN_EDITOR
 }
 
 #if WITH_EDITOR
