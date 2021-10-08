@@ -9,7 +9,6 @@
 
 /** List of owner names that requested a specific item filtered, allows unregistering specific set of changes by a given plugin or system */
 typedef TArray<FName> FPermissionListOwners;
-typedef TArray<FName> FBlacklistOwners;
 
 class CORE_API FNamePermissionList : public TSharedFromThis<FNamePermissionList>
 {
@@ -91,31 +90,6 @@ public:
 
 	/** Triggered when filter changes */
 	FSimpleMulticastDelegate& OnFilterChanged() { return OnFilterChangedDelegate; }
-
-
-	UE_DEPRECATED(5.0, "Use AddDenyListItem")
-	bool AddBlacklistItem(const FName OwnerName, const FName Item) { return AddDenyListItem(OwnerName, Item); }
-
-	UE_DEPRECATED(5.0, "Use AddAllowListItem")
-	bool AddWhitelistItem(const FName OwnerName, const FName Item) { return AddAllowListItem(OwnerName, Item); }
-
-	UE_DEPRECATED(5.0, "Use RemoveDenyListItem")
-	bool RemoveBlacklistItem(const FName OwnerName, const FName Item) { return RemoveDenyListItem(OwnerName, Item); }
-
-	UE_DEPRECATED(5.0, "Use RemoveAllowListItem")
-	bool RemoveWhitelistItem(const FName OwnerName, const FName Item) { return RemoveAllowListItem(OwnerName, Item); }
-
-	UE_DEPRECATED(5.0, "Use AddDenyListAll")
-	bool AddBlacklistAll(const FName OwnerName) { return AddDenyListAll(OwnerName); }
-
-	UE_DEPRECATED(5.0, "Use GetDenyList")
-	const TMap<FName, FBlacklistOwners>& GetBlacklist() const { return GetDenyList(); }
-	
-	UE_DEPRECATED(5.0, "Use GetAllowList")
-	const TMap<FName, FBlacklistOwners>& GetWhitelist() const { return GetAllowList(); }
-
-	UE_DEPRECATED(5.0, "Use IsDenyListAll")
-	bool IsBlacklistAll() const { return IsDenyListAll(); }
 
 protected:
 
@@ -251,37 +225,6 @@ public:
 	/** Triggered when filter changes */
 	FSimpleMulticastDelegate& OnFilterChanged() { return OnFilterChangedDelegate; }
 
-
-	UE_DEPRECATED(5.0, "Use AddDenyListItem")
-	bool AddBlacklistItem(const FName OwnerName, const FStringView Item) { return AddDenyListItem(OwnerName, Item); }
-
-	UE_DEPRECATED(5.0, "Use AddDenyListItem")
-	bool AddBlacklistItem(const FName OwnerName, const FName Item) { return AddDenyListItem(OwnerName, Item); }
-
-	UE_DEPRECATED(5.0, "Use AddDenyListItem")
-	bool AddBlacklistItem(const FName OwnerName, const TCHAR* Item) { return AddDenyListItem(OwnerName, Item); }
-
-	UE_DEPRECATED(5.0, "Use AddAllowListItem")
-	bool AddWhitelistItem(const FName OwnerName, const FStringView Item) { return AddAllowListItem(OwnerName, Item); }
-
-	UE_DEPRECATED(5.0, "Use AddAllowListItem")
-	bool AddWhitelistItem(const FName OwnerName, const FName Item) { return AddAllowListItem(OwnerName, Item); }
-
-	UE_DEPRECATED(5.0, "Use AddAllowListItem")
-	bool AddWhitelistItem(const FName OwnerName, const TCHAR* Item) { return AddAllowListItem(OwnerName, Item); }
-
-	UE_DEPRECATED(5.0, "Use AddDenyListAll")
-	bool AddBlacklistAll(const FName OwnerName) { return AddDenyListAll(OwnerName); }
-
-	UE_DEPRECATED(5.0, "Use GetDenyList")
-	const TMap<FString, FBlacklistOwners>& GetBlacklist() const { return GetDenyList(); }
-	
-	UE_DEPRECATED(5.0, "Use GetAllowList")
-	const TMap<FString, FBlacklistOwners>& GetWhitelist() const { return GetAllowList(); }
-
-	UE_DEPRECATED(5.0, "Use IsDenyListAll")
-	bool IsBlacklistAll() const { return IsDenyListAll(); }
-
 protected:
 
 	/** List if items to filter out */
@@ -298,18 +241,4 @@ protected:
 
 	/** Temporarily prevent delegate from being triggered */
 	bool bSuppressOnFilterChanged = false;
-};
-
-class CORE_API FBlacklistNames : public FNamePermissionList
-{
-public:
-	FBlacklistNames() {}
-	virtual ~FBlacklistNames() {}
-};
-
-class CORE_API FBlacklistPaths : public FPathPermissionList
-{
-public:
-	FBlacklistPaths() {}
-	virtual ~FBlacklistPaths() {}
 };

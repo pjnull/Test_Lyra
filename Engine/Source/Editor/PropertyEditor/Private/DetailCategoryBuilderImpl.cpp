@@ -15,7 +15,7 @@
 #include "ObjectPropertyNode.h"
 #include "PropertyCustomizationHelpers.h"
 #include "PropertyEditorModule.h"
-#include "PropertyEditorWhitelist.h"
+#include "PropertyEditorPermissionList.h"
 #include "SDetailCategoryTableRow.h"
 #include "SDetailSingleItemRow.h"
 #include "StructurePropertyNode.h"

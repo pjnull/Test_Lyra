@@ -9,7 +9,7 @@
 #include "ObjectPropertyNode.h"
 #include "SConstrainedBox.h"
 #include "PropertyCustomizationHelpers.h"
-#include "PropertyEditorWhitelist.h"
+#include "PropertyEditorPermissionList.h"
 #include "SDetailCategoryTableRow.h"
 #include "SDetailSingleItemRow.h"
 

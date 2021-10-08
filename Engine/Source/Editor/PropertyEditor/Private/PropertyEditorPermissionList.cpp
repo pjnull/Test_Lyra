@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "PropertyEditorWhitelist.h"
+#include "PropertyEditorPermissionList.h"
 
 #include "Editor.h"
 #include "Misc/CoreDelegates.h"

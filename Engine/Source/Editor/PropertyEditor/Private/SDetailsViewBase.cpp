@@ -27,7 +27,7 @@
 #include "ScopedTransaction.h"
 #include "SDetailNameArea.h"
 #include "SDetailsView.h"
-#include "PropertyEditorWhitelist.h"
+#include "PropertyEditorPermissionList.h"
 
 #include "ThumbnailRendering/ThumbnailManager.h"
 
