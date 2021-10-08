@@ -845,13 +845,13 @@ void ULandscapeComponent::FixupWeightmaps()
 	}
 }
 
-void ULandscapeComponent::UpdateLayerWhitelistFromPaintedLayers()
+void ULandscapeComponent::UpdateLayerAllowListFromPaintedLayers()
 {
 	TArray<FWeightmapLayerAllocationInfo>& ComponentWeightmapLayerAllocations = GetWeightmapLayerAllocations();
 
 	for (const auto& Allocation : ComponentWeightmapLayerAllocations)
 	{
-		LayerWhitelist.AddUnique(Allocation.LayerInfo);
+		LayerAllowList.AddUnique(Allocation.LayerInfo);
 	}
 }
 

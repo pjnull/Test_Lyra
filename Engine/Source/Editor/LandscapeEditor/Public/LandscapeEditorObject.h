@@ -696,7 +696,7 @@ public:
 	ELandscapeImportResult CreateNewLayersInfo(TArray<FLandscapeImportLayerInfo>& OutNewLayerInfos);
 	void InitializeDefaultHeightData(TArray<uint16>& OutData);
 	void ExpandImportData(TArray<uint16>& OutHeightData, TArray<FLandscapeImportLayerInfo>& OutImportLayerInfos);
-	void UpdateComponentLayerWhitelist();
+	void UpdateComponentLayerAllowList();
 	bool UseSingleFileImport() const;
 	void OnChangeImportLandscapeResolution(int32 DescriptorIndex);
 	void OnImportHeightmapFilenameChanged() { RefreshImports(); }

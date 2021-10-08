@@ -253,8 +253,8 @@ public:
 	 */
 	LANDSCAPE_API void FixupProxiesTransform(bool bDirty = false);
 	
-	// Update per-component layer whitelists to include the currently painted layers
-	LANDSCAPE_API void UpdateComponentLayerWhitelist();
+	// Update per-component layer allow list to include the currently painted layers
+	LANDSCAPE_API void UpdateComponentLayerAllowList();
 
 	LANDSCAPE_API void RecreateCollisionComponents();
 

@@ -170,7 +170,7 @@ void ULandscapeEditorObject::PostEditChangeProperty(FPropertyChangedEvent& Prope
 	if (PropertyChangedEvent.MemberProperty == nullptr ||
 		PropertyChangedEvent.MemberProperty->GetFName() == GET_MEMBER_NAME_CHECKED(ULandscapeEditorObject, PaintingRestriction))
 	{
-		UpdateComponentLayerWhitelist();
+		UpdateComponentLayerAllowList();
 	}
 
 	if (PropertyChangedEvent.MemberProperty == nullptr ||
@@ -889,11 +889,11 @@ void ULandscapeEditorObject::RefreshImportLayersList(bool bRefreshFromTarget)
 	}
 }
 
-void ULandscapeEditorObject::UpdateComponentLayerWhitelist()
+void ULandscapeEditorObject::UpdateComponentLayerAllowList()
 {
 	if (ParentMode->CurrentToolTarget.LandscapeInfo.IsValid())
 	{
-		ParentMode->CurrentToolTarget.LandscapeInfo->UpdateComponentLayerWhitelist();
+		ParentMode->CurrentToolTarget.LandscapeInfo->UpdateComponentLayerAllowList();
 	}
 }
 

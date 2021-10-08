@@ -175,8 +175,8 @@ enum class ELandscapeLayerPaintingRestriction : uint8
 	/** Restricts painting to only components that already have this layer. */
 	ExistingOnly UMETA(DisplayName="Existing Layers Only"),
 
-	/** Restricts painting to only components that have this layer in their whitelist. */
-	UseComponentWhitelist UMETA(DisplayName="Component Whitelist"),
+	/** Restricts painting to only components that have this layer in their allow list. */
+	UseComponentAllowList UMETA(DisplayName="Component Allow List"),
 };
 
 UENUM()

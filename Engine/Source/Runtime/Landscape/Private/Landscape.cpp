@@ -2969,13 +2969,13 @@ void ULandscapeInfo::FixupProxiesTransform(bool bDirty)
 	}
 }
 
-void ULandscapeInfo::UpdateComponentLayerWhitelist()
+void ULandscapeInfo::UpdateComponentLayerAllowList()
 {
 	ForAllLandscapeProxies([](ALandscapeProxy* Proxy)
 	{
 		for (ULandscapeComponent* Comp : Proxy->LandscapeComponents)
 		{
-			Comp->UpdateLayerWhitelistFromPaintedLayers();
+			Comp->UpdateLayerAllowListFromPaintedLayers();
 		}
 	});
 }

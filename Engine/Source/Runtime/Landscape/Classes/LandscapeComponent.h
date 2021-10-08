@@ -603,13 +603,13 @@ public:
 	TObjectPtr<UTexture2D> GIBakedBaseColorTexture;
 
 #if WITH_EDITORONLY_DATA
-	/** LOD level Bias to use when lighting buidling via lightmass, -1 Means automatic LOD calculation based on ForcedLOD + LODBias */
+	/** LOD level Bias to use when lighting building via lightmass, -1 Means automatic LOD calculation based on ForcedLOD + LODBias */
 	UPROPERTY(EditAnywhere, Category=LandscapeComponent)
 	int32 LightingLODBias;
 
 	// List of layers allowed to be painted on this component
 	UPROPERTY(EditAnywhere, Category=LandscapeComponent)
-	TArray<TObjectPtr<ULandscapeLayerInfoObject>> LayerWhitelist;
+	TArray<TObjectPtr<ULandscapeLayerInfoObject>> LayerAllowList;
 
 	/** Pointer to data shared with the render thread, used by the editor tools */
 	UPROPERTY(Transient, DuplicateTransient, NonTransactional)
@@ -704,8 +704,8 @@ public:
 	/** Repair invalid texture data that might have been introduced by a faulty version. Returns the list of repaired textures  */
 	TArray<UTexture*> RepairInvalidTextures();
 
-	// Update layer whitelist to include the currently painted layers
-	LANDSCAPE_API void UpdateLayerWhitelistFromPaintedLayers();
+	// Update layer allow list to include the currently painted layers
+	LANDSCAPE_API void UpdateLayerAllowListFromPaintedLayers();
 	
 	//~ Begin UPrimitiveComponent Interface.
 	virtual bool GetLightMapResolution( int32& Width, int32& Height ) const override;
