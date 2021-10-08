@@ -108,7 +108,7 @@ public class ModifyStageContext
 		// stage the processed NonUFSFiles
 		SC.StageFiles(StagedFileType.NonUFS, StagedNonUFSFiles.Values);
 
-		// now remove or whitelist restricted files
+		// now remove or allow restricted files
 		HandleRestrictedFiles(SC, ref SC.FilesToStage.UFSFiles);
 		HandleRestrictedFiles(SC, ref SC.FilesToStage.NonUFSFiles);
 	}
@@ -201,11 +201,11 @@ public class ModifyStageContext
 //				Console.WriteLine("{0} is restricted", FileRef.FullName);
 				if (bStageRestrictedDirs)
 				{
-					// if we want to stage restricted files, then we need to whitelist the folder
-					if (!SC.WhitelistDirectories.Contains(StagedFile.Directory))
+					// if we want to stage restricted files, then we need to add the folder to the allow list
+					if (!SC.DirectoriesAllowList.Contains(StagedFile.Directory))
 					{
-						Console.WriteLine("Whitelisting dir {0}", StagedFile.Directory.Name);
-						SC.WhitelistDirectories.Add(StagedFile.Directory);
+						Console.WriteLine("Allowing dir {0}", StagedFile.Directory.Name);
+						SC.DirectoriesAllowList.Add(StagedFile.Directory);
 					}
 				}
 				else
@@ -231,8 +231,8 @@ public class ModifyStageContext
 			{
 				if (SC.RestrictedFolderNames.Any(x => Pair.Key.ContainsName(x)))
 				{
-					Console.WriteLine("Whitelisting dir {0}", Pair.Value.Directory.FullName);
-					SC.WhitelistDirectories.Add(Pair.Key.Directory);
+					Console.WriteLine("Allowing dir {0}", Pair.Value.Directory.FullName);
+					SC.DirectoriesAllowList.Add(Pair.Key.Directory);
 				}
 			}
 		}
@@ -248,11 +248,11 @@ public class ModifyStageContext
 		//		//				Console.WriteLine("{0} is restricted", FileRef.FullName);
 		//		if (bStageRestrictedDirs)
 		//		{
-		//			// if we want to stage restricted files, then we need to whitelist the folder
-		//			if (!SC.WhitelistDirectories.Contains(StagedFile.Directory))
+		//			// if we want to stage restricted files, then we need to explicitly allow the folder
+		//			if (!SC.DirectoriesAllowList.Contains(StagedFile.Directory))
 		//			{
-		//				Console.WriteLine("Whitelisting dir {0}", StagedFile.Directory.Name);
-		//				SC.WhitelistDirectories.Add(StagedFile.Directory);
+		//				Console.WriteLine("Allowing dir {0}", StagedFile.Directory.Name);
+		//				SC.DirectoriesAllowList.Add(StagedFile.Directory);
 		//			}
 		//		}
 		//		else

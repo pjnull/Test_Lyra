@@ -18,7 +18,7 @@ using System.Linq;
 [Help("P4", "Create a changelist for the new files")]
 class CreatePlatformExtension : BuildCommand
 {
-	readonly List<ModuleHostType> ModuleTypeBlacklist = new List<ModuleHostType>
+	readonly List<ModuleHostType> ModuleTypeDenyList = new List<ModuleHostType>
 	{
 		ModuleHostType.Developer,
 		ModuleHostType.Editor, 
@@ -201,7 +201,7 @@ class CreatePlatformExtension : BuildCommand
 		}
 
 		// load the plugin & find suitable modules, if required
-		PluginDescriptor ParentPlugin = PluginDescriptor.FromFile(PluginPath); //NOTE: if the PluginPath is itself a child plugin, not all whitelist, blacklist & supported platform information will be available.
+		PluginDescriptor ParentPlugin = PluginDescriptor.FromFile(PluginPath); //NOTE: if the PluginPath is itself a child plugin, not all allow list, deny list & supported platform information will be available.
 		List<ModuleDescriptor> ParentModuleDescs = new List<ModuleDescriptor>();
 		Dictionary<ModuleDescriptor, FileReference> ParentModuleRules = new Dictionary<ModuleDescriptor, FileReference>();
 		if (!bSkipPluginModules && ParentPlugin.Modules != null)
@@ -415,7 +415,7 @@ class CreatePlatformExtension : BuildCommand
 	private bool CanCreatePlatformExtensionForPluginModule( ModuleDescriptor ModuleDesc )
 	{
 		// make sure it's a type that is usually associated with platform extensions
-		if (ModuleTypeBlacklist.Contains(ModuleDesc.Type))
+		if (ModuleTypeDenyList.Contains(ModuleDesc.Type))
 		{
 			return false;
 		}
