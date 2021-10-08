@@ -237,6 +237,7 @@ void FPolicyParameterInfoCombo::CreateCustomRowWidget(IDetailChildrenBuilder& In
 		[
 			SNew(STextBlock)
 			.Text(this, &FPolicyParameterInfoCombo::GetOrAddCustomParameterValueText)
+			.Font(IDetailLayoutBuilder::GetDetailFont())
 		]
 	];
 }
@@ -248,7 +249,9 @@ void FPolicyParameterInfoCombo::SetOnSelectedDelegate(FOnItemSelected InDelegate
 
 TSharedRef<SWidget> FPolicyParameterInfoCombo::MakeCustomParameterValueComboWidget(TSharedPtr<FString> InItem)
 {
-	return SNew(STextBlock).Text(FText::FromString(*InItem));
+	return SNew(STextBlock)
+		.Text(FText::FromString(*InItem))
+		.Font(IDetailLayoutBuilder::GetDetailFont());
 }
 
 void FPolicyParameterInfoCombo::OnCustomParameterValueSelected(TSharedPtr<FString> InValue, ESelectInfo::Type SelectInfo)
