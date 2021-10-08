@@ -603,7 +603,7 @@ UDatasmithSceneElement* UDatasmithSceneElement::GetExistingDatasmithScene(const 
 		UDatasmithSceneElement* DatasmithSceneElement = NewObject<UDatasmithSceneElement>();
 		DatasmithSceneElement->ExternalSourcePtr = ExternalSource;
 		
-		ExternalSource->SetSceneName(SceneAsset->GetName()); // keep initial name
+		ExternalSource->SetSceneName(*SceneAsset->GetName()); // keep initial name
 
 		// Setup pipe for reimport
 		const bool bLoadConfig = false;
