@@ -144,31 +144,31 @@ void FAssetRegistryState::Reset()
 	CachedPackageData.Empty();
 }
 
-void FAssetRegistryState::FilterTags(const FAssetDataTagMapSharedView& InTagsAndValues, FAssetDataTagMap& OutTagsAndValues, const TSet<FName>* ClassSpecificFilterlist, const FAssetRegistrySerializationOptions& Options)
+void FAssetRegistryState::FilterTags(const FAssetDataTagMapSharedView& InTagsAndValues, FAssetDataTagMap& OutTagsAndValues, const TSet<FName>* ClassSpecificFilterList, const FAssetRegistrySerializationOptions& Options)
 {
 	static FName WildcardName(TEXT("*"));
-	const TSet<FName>* AllClassesFilterlist = Options.CookFilterlistTagsByClass.Find(WildcardName);
+	const TSet<FName>* AllClassesFilterList = Options.CookFilterlistTagsByClass.Find(WildcardName);
 
-	// Exclude blacklisted tags or include only white listed tags, based on how we were configured in ini
+	// Exclude denied tags or include only allowed tags, based on how we were configured in ini
 	for (const auto& TagPair : InTagsAndValues)
 	{
-		const bool bInAllClasseslist = AllClassesFilterlist && (AllClassesFilterlist->Contains(TagPair.Key) || AllClassesFilterlist->Contains(WildcardName));
-		const bool bInClassSpecificlist = ClassSpecificFilterlist && (ClassSpecificFilterlist->Contains(TagPair.Key) || ClassSpecificFilterlist->Contains(WildcardName));
-		if (Options.bUseAssetRegistryTagsWhitelistInsteadOfBlacklist)
+		const bool bInAllClassesList = AllClassesFilterList && (AllClassesFilterList->Contains(TagPair.Key) || AllClassesFilterList->Contains(WildcardName));
+		const bool bInClassSpecificList = ClassSpecificFilterList && (ClassSpecificFilterList->Contains(TagPair.Key) || ClassSpecificFilterList->Contains(WildcardName));
+		if (Options.bUseAssetRegistryTagsAllowListInsteadOfDenyList)
 		{
-			// It's a white list, only include it if it is in the all classes list or in the class specific list
-			if (bInAllClasseslist || bInClassSpecificlist)
+			// It's an allow list, only include it if it is in the all classes list or in the class specific list
+			if (bInAllClassesList || bInClassSpecificList)
 			{
-				// It is in the white list. Keep it.
+				// It is in the allow list. Keep it.
 				OutTagsAndValues.Add(TagPair.Key, TagPair.Value.ToLoose());
 			}
 		}
 		else
 		{
-			// It's a blacklist, include it unless it is in the all classes list or in the class specific list
-			if (!bInAllClasseslist && !bInClassSpecificlist)
+			// It's a deny list, include it unless it is in the all classes list or in the class specific list
+			if (!bInAllClassesList && !bInClassSpecificList)
 			{
-				// It isn't in the blacklist. Keep it.
+				// It isn't in the deny list. Keep it.
 				OutTagsAndValues.Add(TagPair.Key, TagPair.Value.ToLoose());
 			}
 		}
