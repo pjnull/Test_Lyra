@@ -38,6 +38,7 @@
 #include "EditorDirectories.h"
 #include "Dialogs/Dialogs.h"
 #include "UnrealEdGlobals.h"
+#include "LevelEditorSubsystem.h"
 #include "EditorLevelUtils.h"
 #include "BusyCursor.h"
 #include "MRUFavoritesList.h"
@@ -2739,7 +2740,13 @@ bool FEditorFileUtils::LoadMap(const FString& InFilename, bool LoadAsTemplate, b
 	GConfig->SetString(TEXT("EditorStartup"), TEXT("LastLevel"), *LongMapPackageName, GEditorPerProjectIni);
 
 	// Deactivate any editor modes when loading a new map
-	GLevelEditorModeTools().DeactivateAllModes();
+	if (ULevelEditorSubsystem* LevelEditorSubsystem = GEditor->GetEditorSubsystem<ULevelEditorSubsystem>())
+	{
+		if (FEditorModeTools* ModeManager = LevelEditorSubsystem->GetLevelEditorModeManager())
+		{
+			ModeManager->DeactivateAllModes();
+		}
+	}
 
 	FString LoadCommand = FString::Printf(TEXT("MAP LOAD FILE=\"%s\" TEMPLATE=%d SHOWPROGRESS=%d FEATURELEVEL=%d"), *Filename, LoadAsTemplate, bShowProgress, (int32)GEditor->DefaultWorldFeatureLevel);
 	const bool bResult = GEditor->Exec( NULL, *LoadCommand );
@@ -4675,7 +4682,14 @@ bool UEditorLoadingAndSavingUtils::SaveMap(UWorld* World, const FString& AssetPa
 
 UWorld* UEditorLoadingAndSavingUtils::NewBlankMap(bool bSaveExistingMap)
 {
-	GLevelEditorModeTools().DeactivateAllModes();
+	// Deactivate any editor modes when creating a new map
+	if (ULevelEditorSubsystem* LevelEditorSubsystem = GEditor->GetEditorSubsystem<ULevelEditorSubsystem>())
+	{
+		if (FEditorModeTools* ModeManager = LevelEditorSubsystem->GetLevelEditorModeManager())
+		{
+			ModeManager->DeactivateAllModes();
+		}
+	}
 
 	const bool bPromptUserToSave = false;
 	const bool bFastSave = !bPromptUserToSave;
