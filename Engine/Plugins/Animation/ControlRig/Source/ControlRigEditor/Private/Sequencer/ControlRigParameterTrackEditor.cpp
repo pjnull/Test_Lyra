@@ -2219,6 +2219,10 @@ void FControlRigParameterTrackEditor::GetControlRigKeys(UControlRig* InControlRi
 			continue;
 		}
 
+		if (SectionToKey->ControlChannelMap.Find(ControlElement->GetName()) == nullptr)
+		{
+			continue;
+		}
 		bool bMaskKeyOut = (ControlIndex >= ControlsMask.Num() || ControlsMask[ControlIndex] == false);
 		bool bSetKey = ControlElement->GetName() == ParameterName && !bMaskKeyOut;
 

@@ -1036,9 +1036,11 @@ FReply FControlRigSpaceChannelHelpers::OpenBakeDialog(ISequencer* Sequencer, FMo
 					for (const FRigElementKey& ControlKey : InControls)
 					{
 						FSpaceChannelAndSection SpaceChannelAndSection = FControlRigSpaceChannelHelpers::FindSpaceChannelAndSectionForControl(ControlRig, ControlKey.Name, Sequencer, false /*bCreateIfNeeded*/);
-
-						FControlRigSpaceChannelHelpers::SequencerBakeControlInSpace(ControlRig, Sequencer, SpaceChannelAndSection.SpaceChannel, SpaceChannelAndSection.SectionToKey,
-							Frames, InHierarchy, ControlKey, InSettings);
+						if (SpaceChannelAndSection.SpaceChannel)
+						{
+							FControlRigSpaceChannelHelpers::SequencerBakeControlInSpace(ControlRig, Sequencer, SpaceChannelAndSection.SpaceChannel, SpaceChannelAndSection.SectionToKey,
+								Frames, InHierarchy, ControlKey, InSettings);
+						}
 					}
 					return FReply::Handled();
 				});
