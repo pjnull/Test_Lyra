@@ -467,7 +467,7 @@ namespace EpicGames.Core
 		[MethodImplAttribute(MethodImplOptions.NoInlining)]
 		public static void TraceConsole(FileReference File, int Line, string Format, params object[] Args)
 		{
-			WriteLinePrivate(1, false, LogEventType.Console, LogFormatOptions.NoSeverityPrefix, "{0}({1}): {2}", File, Line, String.Format(Format, Args));
+			WriteLinePrivate(false, LogEventType.Console, LogFormatOptions.NoSeverityPrefix, "{0}({1}): {2}", File, Line, String.Format(Format, Args));
 		}
 
 
