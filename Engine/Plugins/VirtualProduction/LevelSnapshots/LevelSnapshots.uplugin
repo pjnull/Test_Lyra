@@ -35,6 +35,11 @@
 			"Name": "FoliageSupport",
 			"Type": "UncookedOnly",
 			"LoadingPhase": "PostDefault"
-		}
+		},
+        {
+            "Name": "nDisplaySupport",
+            "Type": "Runtime",
+            "LoadingPhase": "PostDefault"
+        } 
 	]
 }
