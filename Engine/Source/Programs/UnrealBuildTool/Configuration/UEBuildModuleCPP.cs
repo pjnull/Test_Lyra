@@ -74,9 +74,9 @@ namespace UnrealBuildTool
 		}
 
 		/// <summary>
-		/// List of whitelisted circular dependencies. Please do NOT add new modules here; refactor to allow the modules to be decoupled instead.
+		/// List of allowed circular dependencies. Please do NOT add new modules here; refactor to allow the modules to be decoupled instead.
 		/// </summary>
-		static readonly KeyValuePair<string, string>[] WhitelistedCircularDependencies =
+		static readonly KeyValuePair<string, string>[] CircularDependenciesAllowList =
 		{
 			new KeyValuePair<string, string>("AIModule", "AITestSuite"),
 			new KeyValuePair<string, string>("AnimGraph", "UnrealEd"),
@@ -188,7 +188,7 @@ namespace UnrealBuildTool
 
 			foreach(string CircularlyReferencedModuleName in Rules.CircularlyReferencedDependentModules)
 			{
-				if(CircularlyReferencedModuleName != "BlueprintContext" && !WhitelistedCircularDependencies.Any(x => x.Key == Name && x.Value == CircularlyReferencedModuleName))
+				if(CircularlyReferencedModuleName != "BlueprintContext" && !CircularDependenciesAllowList.Any(x => x.Key == Name && x.Value == CircularlyReferencedModuleName))
 				{
 					Log.TraceWarning("Found reference between '{0}' and '{1}'. Support for circular references is being phased out; please do not introduce new ones.", Name, CircularlyReferencedModuleName);
 				}
