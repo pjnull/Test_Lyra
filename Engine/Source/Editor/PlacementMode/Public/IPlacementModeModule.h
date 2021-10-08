@@ -311,11 +311,11 @@ public:
 	 */
 	virtual const FPlacementCategoryInfo* GetRegisteredPlacementCategory(FName UniqueHandle) const = 0;
 
-	/** Placement categories blacklist */
+	/** Placement categories deny list */
 	virtual TSharedRef<FNamePermissionList>& GetCategoryPermissionList() = 0;
 
 	/**
-	 * Get all placement categories that aren't blacklisted, sorted by SortOrder
+	 * Get all placement categories that aren't denied, sorted by SortOrder
 	 *
 	 * @param OutCategories	The array to populate with registered category information
 	 */

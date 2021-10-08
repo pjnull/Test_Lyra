@@ -338,7 +338,7 @@ struct FUsdStageActorImpl
 		return bOwnedByStageActor;
 	}
 
-	static void WhitelistComponentHierarchy( USceneComponent* Component, TSet<UObject*>& VisitedObjects )
+	static void AllowListComponentHierarchy( USceneComponent* Component, TSet<UObject*>& VisitedObjects )
 	{
 		if ( !Component || VisitedObjects.Contains( Component ) )
 		{
@@ -366,7 +366,7 @@ struct FUsdStageActorImpl
 		// tracked by a prim twin
 		for ( USceneComponent* Child : Component->GetAttachChildren() )
 		{
-			WhitelistComponentHierarchy( Child, VisitedObjects );
+			AllowListComponentHierarchy( Child, VisitedObjects );
 		}
 	}
 
@@ -1510,7 +1510,7 @@ void AUsdStageActor::OnLevelActorDeleted( AActor* DeletedActor )
 	{
 		// DeletedActor is already detached from our hierarchy, so we must tag it directly
 		TSet<UObject*> VisitedObjects;
-		FUsdStageActorImpl::WhitelistComponentHierarchy( DeletedActor->GetRootComponent(), VisitedObjects );
+		FUsdStageActorImpl::AllowListComponentHierarchy( DeletedActor->GetRootComponent(), VisitedObjects );
 	}
 }
 
@@ -2135,7 +2135,7 @@ void AUsdStageActor::OnObjectPropertyChanged( UObject* ObjectBeingModified, FPro
 	if ( RootLayer.FilePath == OldRootLayer.FilePath && FUsdStageActorImpl::ObjectNeedsMultiUserTag( ObjectBeingModified, this ) )
 	{
 		TSet<UObject*> VisitedObjects;
-		FUsdStageActorImpl::WhitelistComponentHierarchy( GetRootComponent(), VisitedObjects );
+		FUsdStageActorImpl::AllowListComponentHierarchy( GetRootComponent(), VisitedObjects );
 	}
 
 	UObject* PrimObject = ObjectBeingModified;

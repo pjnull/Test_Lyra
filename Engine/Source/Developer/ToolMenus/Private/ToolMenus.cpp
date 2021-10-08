@@ -978,15 +978,15 @@ void UToolMenus::ApplyCustomization(UToolMenu* GeneratedMenu)
 		}
 	}
 
-	// Hide items based on blacklist
-	if (CustomizedMenu.BlacklistFilter.HasFiltering())
+	// Hide items based on deny list
+	if (CustomizedMenu.MenuPermissions.HasFiltering())
 	{
 		for (int32 SectionIndex = 0; SectionIndex < NewSections.Num(); ++SectionIndex)
 		{
 			FToolMenuSection& Section = NewSections[SectionIndex];
 			for (int32 i = 0; i < Section.Blocks.Num(); ++i)
 			{
-				if (!CustomizedMenu.BlacklistFilter.PassesFilter(Section.Blocks[i].Name))
+				if (!CustomizedMenu.MenuPermissions.PassesFilter(Section.Blocks[i].Name))
 				{
 					Section.Blocks.RemoveAt(i);
 					--i;

@@ -520,17 +520,17 @@ bool SControlRigPoseAnimSelectionToolbar::IsOnToggleFilter(FControlRigAssetType 
 /////////////////////////////////////////////////////////////////
 //  Helper to Select Path 
 
-class SWhiteListPathDialog : public SWindow
+class SPathDialogWithAllowList : public SWindow
 {
 public:
-	SLATE_BEGIN_ARGS(SWhiteListPathDialog)
+	SLATE_BEGIN_ARGS(SPathDialogWithAllowList)
 	{
 	}
 
 	SLATE_ARGUMENT(FText, DefaultAssetPath)
 		SLATE_END_ARGS()
 
-		SWhiteListPathDialog()
+		SPathDialogWithAllowList()
 		: UserResponse(EAppReturnType::Cancel)
 	{
 	}
@@ -553,17 +553,17 @@ protected:
 
 };
 
-void SWhiteListPathDialog::Construct(const FArguments& InArgs)
+void SPathDialogWithAllowList::Construct(const FArguments& InArgs)
 {
 	AssetPath = FText::FromString(FPackageName::GetLongPackagePath(InArgs._DefaultAssetPath.ToString()));
 
 	FPathPickerConfig PathPickerConfig;
-	PathPickerConfig.OnPathSelected = FOnPathSelected::CreateSP(this, &SWhiteListPathDialog::OnPathChange);
+	PathPickerConfig.OnPathSelected = FOnPathSelected::CreateSP(this, &SPathDialogWithAllowList::OnPathChange);
 
 	FContentBrowserModule& ContentBrowserModule = FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
 
 	SWindow::Construct(SWindow::FArguments()
-		.Title(LOCTEXT("SWhiteListPathDialog_Title", "Select Folder To Contain Poses"))
+		.Title(LOCTEXT("SPathDialogWithAllowList_Title", "Select Folder To Contain Poses"))
 		.SupportsMinimize(false)
 		.SupportsMaximize(false)
 		//.SizingRule( ESizingRule::Autosized )
@@ -611,8 +611,8 @@ void SWhiteListPathDialog::Construct(const FArguments& InArgs)
 					.HAlign(HAlign_Center)
 					.ContentPadding(FEditorStyle::GetMargin("StandardDialog.ContentPadding"))
 					.Text(LOCTEXT("OK", "OK"))
-					.OnClicked(this, &SWhiteListPathDialog::OnButtonClick, EAppReturnType::Ok)
-					.IsEnabled(this, &SWhiteListPathDialog::IsOkButtonEnabled)
+					.OnClicked(this, &SPathDialogWithAllowList::OnButtonClick, EAppReturnType::Ok)
+					.IsEnabled(this, &SPathDialogWithAllowList::IsOkButtonEnabled)
 				]
 				+SUniformGridPanel::Slot(1, 0)
 				[
@@ -620,18 +620,18 @@ void SWhiteListPathDialog::Construct(const FArguments& InArgs)
 					.HAlign(HAlign_Center)
 					.ContentPadding(FEditorStyle::GetMargin("StandardDialog.ContentPadding"))
 					.Text(LOCTEXT("Cancel", "Cancel"))
-					.OnClicked(this, &SWhiteListPathDialog::OnButtonClick, EAppReturnType::Cancel)
+					.OnClicked(this, &SPathDialogWithAllowList::OnButtonClick, EAppReturnType::Cancel)
 				]
 			]
 		]);
 }
 
-void SWhiteListPathDialog::OnPathChange(const FString& NewPath)
+void SPathDialogWithAllowList::OnPathChange(const FString& NewPath)
 {
 	AssetPath = FText::FromString(NewPath);
 }
 
-FReply SWhiteListPathDialog::OnButtonClick(EAppReturnType::Type ButtonID)
+FReply SPathDialogWithAllowList::OnButtonClick(EAppReturnType::Type ButtonID)
 {
 	UserResponse = ButtonID;
 	RequestDestroyWindow();
@@ -639,18 +639,18 @@ FReply SWhiteListPathDialog::OnButtonClick(EAppReturnType::Type ButtonID)
 	return FReply::Handled();
 }
 
-bool SWhiteListPathDialog::IsOkButtonEnabled() const
+bool SPathDialogWithAllowList::IsOkButtonEnabled() const
 {
 	return !AssetPath.IsEmptyOrWhitespace();
 }
 
-EAppReturnType::Type SWhiteListPathDialog::ShowModal()
+EAppReturnType::Type SPathDialogWithAllowList::ShowModal()
 {
 	GEditor->EditorAddModalWindow(SharedThis(this));
 	return UserResponse;
 }
 
-FString SWhiteListPathDialog::GetAssetPath()
+FString SPathDialogWithAllowList::GetAssetPath()
 {
 	return AssetPath.ToString();
 }
@@ -1172,8 +1172,8 @@ void SControlRigBaseListWidget::ExecuteDeleteAssets(const TArray<FAssetData> Sel
 
 void SControlRigBaseListWidget::ExecuteAddFolderToView()
 {
-	TSharedRef<SWhiteListPathDialog> NewAnimDlg =
-		SNew(SWhiteListPathDialog);
+	TSharedRef<SPathDialogWithAllowList> NewAnimDlg =
+		SNew(SPathDialogWithAllowList);
 
 	if (NewAnimDlg->ShowModal() != EAppReturnType::Cancel)
 	{
@@ -1185,7 +1185,7 @@ void SControlRigBaseListWidget::ExecuteAddFolderToView()
 		PoseSettings->RootSaveDirs.Add(Path);
 		PoseSettings->SaveConfig();
 
-		//Need to refresh since the blacklist changed
+		//Need to refresh since the deny list changed
 		FContentBrowserModule& ContentBrowserModule = FModuleManager::Get().LoadModuleChecked<FContentBrowserModule>(TEXT("ContentBrowser"));
 		ContentBrowserModule.Get().RefreshPathView(PathPicker);
 	}
