@@ -25,4 +25,4 @@ public:
 	TUniquePtr<UE::DatasmithImporter::FUriManager> UriManager;
 };
 
-IMPLEMENT_MODULE(FExternalSourceModule, EXTERNALSOURCE_MODULE_NAME);
+IMPLEMENT_MODULE(FExternalSourceModule, ExternalSource);
