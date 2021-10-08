@@ -32,7 +32,7 @@
 #include "CoreGlobals.h"
 #include "AssetToolsModule.h"
 #include "EditorDirectories.h"
-#include "Misc/BlacklistNames.h"
+#include "Misc/NamePermissionList.h"
 #include "StatusBarSubsystem.h"
 #include "ToolMenus.h"
 

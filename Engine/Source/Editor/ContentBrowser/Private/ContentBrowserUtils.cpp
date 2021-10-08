@@ -573,7 +573,7 @@ void ContentBrowserUtils::ConvertLegacySelectionToVirtualPaths(TArrayView<const 
 	ConvertLegacySelectionToVirtualPathsImpl(InAssets, InFolders, InUseFolderPaths, OutVirtualPaths);
 }
 
-void ContentBrowserUtils::AppendAssetFilterToContentBrowserFilter(const FARFilter& InAssetFilter, const TSharedPtr<FBlacklistNames>& InAssetClassBlacklist, const TSharedPtr<FBlacklistPaths>& InFolderBlacklist, FContentBrowserDataFilter& OutDataFilter)
+void ContentBrowserUtils::AppendAssetFilterToContentBrowserFilter(const FARFilter& InAssetFilter, const TSharedPtr<FNamePermissionList>& InAssetClassBlacklist, const TSharedPtr<FPathPermissionList>& InFolderBlacklist, FContentBrowserDataFilter& OutDataFilter)
 {
 	if (InAssetFilter.ObjectPaths.Num() > 0 || InAssetFilter.TagsAndValues.Num() > 0 || InAssetFilter.bIncludeOnlyOnDiskAssets)
 	{
@@ -606,15 +606,15 @@ void ContentBrowserUtils::AppendAssetFilterToContentBrowserFilter(const FARFilte
 	}
 }
 
-TSharedPtr<FBlacklistPaths> ContentBrowserUtils::GetCombinedFolderBlacklist(const TSharedPtr<FBlacklistPaths>& FolderBlacklist, const TSharedPtr<FBlacklistPaths>& WritableFolderBlacklist)
+TSharedPtr<FPathPermissionList> ContentBrowserUtils::GetCombinedFolderBlacklist(const TSharedPtr<FPathPermissionList>& FolderBlacklist, const TSharedPtr<FPathPermissionList>& WritableFolderBlacklist)
 {
-	TSharedPtr<FBlacklistPaths> CombinedFolderBlacklist;
+	TSharedPtr<FPathPermissionList> CombinedFolderBlacklist;
 
 	const bool bHidingFolders = FolderBlacklist && FolderBlacklist->HasFiltering();
 	const bool bHidingReadOnlyFolders = WritableFolderBlacklist && WritableFolderBlacklist->HasFiltering();
 	if (bHidingFolders || bHidingReadOnlyFolders)
 	{
-		CombinedFolderBlacklist = MakeShared<FBlacklistPaths>();
+		CombinedFolderBlacklist = MakeShared<FPathPermissionList>();
 
 		if (bHidingReadOnlyFolders && bHidingFolders)
 		{

@@ -10,7 +10,7 @@
 #include "EditorStyleSet.h"
 #include "WorkflowOrientedApp/WorkflowUObjectDocuments.h"
 #include "Widgets/Docking/SDockTab.h"
-#include "Misc/BlacklistNames.h"
+#include "Misc/NamePermissionList.h"
 
 /////////////////////////////////////////////////////
 // FTabInfo

@@ -39,7 +39,7 @@ FPropertyEditorWhitelist::~FPropertyEditorWhitelist()
 	}
 }
 
-void FPropertyEditorWhitelist::AddWhitelist(TSoftObjectPtr<UStruct> Struct, const FBlacklistNames& Whitelist, EPropertyEditorWhitelistRules Rules)
+void FPropertyEditorWhitelist::AddWhitelist(TSoftObjectPtr<UStruct> Struct, const FNamePermissionList& Whitelist, EPropertyEditorWhitelistRules Rules)
 {
 	FPropertyEditorWhitelistEntry& Entry = RawPropertyEditorWhitelist.FindOrAdd(Struct);
 	Entry.Whitelist.Append(Whitelist);
@@ -126,9 +126,9 @@ bool FPropertyEditorWhitelist::DoesPropertyPassFilter(const UStruct* ObjectStruc
 	return true;
 }
 
-const FBlacklistNames& FPropertyEditorWhitelist::GetCachedWhitelistForStruct(const UStruct* Struct) const
+const FNamePermissionList& FPropertyEditorWhitelist::GetCachedWhitelistForStruct(const UStruct* Struct) const
 {
-	const FBlacklistNames* CachedWhitelist = CachedPropertyEditorWhitelist.Find(Struct);
+	const FNamePermissionList* CachedWhitelist = CachedPropertyEditorWhitelist.Find(Struct);
 	if (CachedWhitelist)
 	{
 		return *CachedWhitelist;
@@ -140,7 +140,7 @@ const FBlacklistNames& FPropertyEditorWhitelist::GetCachedWhitelistForStruct(con
 	return GetCachedWhitelistForStructHelper(Struct, bShouldWhitelistAllProperties);
 }
 
-const FBlacklistNames& FPropertyEditorWhitelist::GetCachedWhitelistForStructHelper(const UStruct* Struct, bool& bInOutShouldWhitelistAllProperties) const
+const FNamePermissionList& FPropertyEditorWhitelist::GetCachedWhitelistForStructHelper(const UStruct* Struct, bool& bInOutShouldWhitelistAllProperties) const
 {
 	check(Struct);
 
@@ -149,7 +149,7 @@ const FBlacklistNames& FPropertyEditorWhitelist::GetCachedWhitelistForStructHelp
 
 	// Normally this case would be caught in GetCachedWhitelistForStruct, but when being called recursively from a subclass
 	// we still need to update bInOutShouldWhitelistAllProperties so that new whitelists cache properly.
-	FBlacklistNames* Whitelist = CachedPropertyEditorWhitelist.Find(Struct);
+	FNamePermissionList* Whitelist = CachedPropertyEditorWhitelist.Find(Struct);
 	if (Whitelist)
 	{
 		// Same check as below, but it specifically has to come after the recursive call so we have to duplicate the code here
@@ -160,7 +160,7 @@ const FBlacklistNames& FPropertyEditorWhitelist::GetCachedWhitelistForStructHelp
 	}
 	else
 	{
-		FBlacklistNames NewWhitelist;
+		FNamePermissionList NewWhitelist;
 
 		UStruct* SuperStruct = Struct->GetSuperStruct();
 		// Recursively fill the cache for all parent structs

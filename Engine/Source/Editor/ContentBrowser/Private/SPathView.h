@@ -25,7 +25,7 @@ class FSourcesSearch;
 struct FHistoryData;
 class FTreeItem;
 class FContentBrowserSingleton;
-class FBlacklistPaths;
+class FPathPermissionList;
 class UToolMenu;
 
 typedef TTextFilter< const FString& > FolderTextFilter;
@@ -91,7 +91,7 @@ public:
 		SLATE_ARGUMENT( TSharedPtr<FSourcesSearch>, ExternalSearch )
 
 		/** Optional Custom Folder Blacklist to be used to filter folders. */
-		SLATE_ARGUMENT( TSharedPtr<FBlacklistPaths>, CustomFolderBlacklist)
+		SLATE_ARGUMENT( TSharedPtr<FPathPermissionList>, CustomFolderBlacklist)
 
 		/** The plugin filter collection */
 		SLATE_ARGUMENT( TSharedPtr<FPluginFilterCollectionType>, PluginPathFilters)
@@ -390,15 +390,15 @@ protected:
 	TSharedPtr<SWidget> PathViewWidget;
 
 	/** Blacklist filter to hide folders */
-	TSharedPtr<FBlacklistPaths> FolderBlacklist;
+	TSharedPtr<FPathPermissionList> FolderBlacklist;
 
 	/** Writable folder filter */
-	TSharedPtr<FBlacklistPaths> WritableFolderBlacklist;
+	TSharedPtr<FPathPermissionList> WritableFolderBlacklist;
 
 	TMap<FName, TWeakPtr<FTreeItem>> TreeItemLookup;
 
 	/** Custom Folder Blacklist*/
-	TSharedPtr<FBlacklistPaths> CustomFolderBlacklist;
+	TSharedPtr<FPathPermissionList> CustomFolderBlacklist;
 
 private:
 	/** Used to track if the list of last expanded path should be updated */

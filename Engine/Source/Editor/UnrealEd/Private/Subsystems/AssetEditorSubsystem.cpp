@@ -23,7 +23,7 @@
 #include "Interfaces/IAnalyticsProvider.h"
 #include "Misc/FeedbackContext.h"
 #include "Misc/ConfigCacheIni.h"
-#include "Misc/BlacklistNames.h"
+#include "Misc/NamePermissionList.h"
 #include "StudioAnalytics.h"
 #include "EditorModeRegistry.h"
 #include "Tools/UEdMode.h"

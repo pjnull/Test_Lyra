@@ -24,7 +24,7 @@
 #include "SourcesViewWidgets.h"
 #include "Widgets/Input/SSearchBox.h"
 #include "ContentBrowserModule.h"
-#include "Misc/BlacklistNames.h"
+#include "Misc/NamePermissionList.h"
 #include "Misc/PathViews.h"
 
 #include "IContentBrowserDataModule.h"
@@ -739,13 +739,13 @@ FContentBrowserDataCompiledFilter SPathView::CreateCompiledFolderFilter() const
 	DataFilter.ItemCategoryFilter = GetContentBrowserItemCategoryFilter();
 	DataFilter.ItemAttributeFilter = GetContentBrowserItemAttributeFilter();
 
-	TSharedPtr<FBlacklistPaths> CombinedFolderBlacklist = ContentBrowserUtils::GetCombinedFolderBlacklist(FolderBlacklist, bAllowReadOnlyFolders ? nullptr : WritableFolderBlacklist);
+	TSharedPtr<FPathPermissionList> CombinedFolderBlacklist = ContentBrowserUtils::GetCombinedFolderBlacklist(FolderBlacklist, bAllowReadOnlyFolders ? nullptr : WritableFolderBlacklist);
 
 	if (CustomFolderBlacklist.IsValid())
 	{
 		if (!CombinedFolderBlacklist.IsValid())
 		{
-			CombinedFolderBlacklist = MakeShared<FBlacklistPaths>();
+			CombinedFolderBlacklist = MakeShared<FPathPermissionList>();
 		}
 		CombinedFolderBlacklist->Append(*CustomFolderBlacklist);
 	}
@@ -762,7 +762,7 @@ FContentBrowserDataCompiledFilter SPathView::CreateCompiledFolderFilter() const
 
 				if (!CombinedFolderBlacklist.IsValid())
 				{
-					CombinedFolderBlacklist = MakeShared<FBlacklistPaths>();
+					CombinedFolderBlacklist = MakeShared<FPathPermissionList>();
 				}
 				CombinedFolderBlacklist->AddDenyListItem("PluginPathFilters", MountedAssetPath);
 			}
@@ -809,7 +809,7 @@ EContentBrowserItemAttributeFilter SPathView::GetContentBrowserItemAttributeFilt
 
 bool SPathView::InternalPathPassesBlockLists(const FStringView InInternalPath, const int32 InAlreadyCheckedDepth) const
 {
-	TArray<const FBlacklistPaths*, TInlineAllocator<2>> BlockLists;
+	TArray<const FPathPermissionList*, TInlineAllocator<2>> BlockLists;
 	if (FolderBlacklist.IsValid() && FolderBlacklist->HasFiltering())
 	{
 		BlockLists.Add(FolderBlacklist.Get());
@@ -820,7 +820,7 @@ bool SPathView::InternalPathPassesBlockLists(const FStringView InInternalPath, c
 		BlockLists.Add(WritableFolderBlacklist.Get());
 	}
 
-	for (const FBlacklistPaths* Filter : BlockLists)
+	for (const FPathPermissionList* Filter : BlockLists)
 	{
 		if (!Filter->PassesStartsWithFilter(InInternalPath))
 		{

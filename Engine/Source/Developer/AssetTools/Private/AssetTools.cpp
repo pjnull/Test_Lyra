@@ -147,7 +147,7 @@
 #include "AssetToolsSettings.h"
 #include "AssetVtConversion.h"
 #include "Misc/ConfigCacheIni.h"
-#include "Misc/BlacklistNames.h"
+#include "Misc/NamePermissionList.h"
 #include "InterchangeManager.h"
 #include "InterchangeProjectSettings.h"
 #include "Engine/World.h"
@@ -176,9 +176,9 @@ UAssetToolsImpl::UAssetToolsImpl(const FObjectInitializer& ObjectInitializer)
 	, AssetRenameManager(MakeShareable(new FAssetRenameManager))
 	, AssetFixUpRedirectors(MakeShareable(new FAssetFixUpRedirectors))
 	, NextUserCategoryBit(EAssetTypeCategories::FirstUser)
-	, AssetClassBlacklist(MakeShared<FBlacklistNames>())
-	, FolderBlacklist(MakeShared<FBlacklistPaths>())
-	, WritableFolderBlacklist(MakeShared<FBlacklistPaths>())
+	, AssetClassBlacklist(MakeShared<FNamePermissionList>())
+	, FolderBlacklist(MakeShared<FPathPermissionList>())
+	, WritableFolderBlacklist(MakeShared<FPathPermissionList>())
 {
 	TArray<FString> SupportedTypesArray;
 	GConfig->GetArray(TEXT("AssetTools"), TEXT("SupportedAssetTypes"), SupportedTypesArray, GEditorIni);
@@ -3494,7 +3494,7 @@ TArray<UFactory*> UAssetToolsImpl::GetNewAssetFactories() const
 	return MoveTemp(Factories);
 }
 
-TSharedRef<FBlacklistNames>& UAssetToolsImpl::GetAssetClassBlacklist()
+TSharedRef<FNamePermissionList>& UAssetToolsImpl::GetAssetClassBlacklist()
 {
 	return AssetClassBlacklist;
 }
@@ -3530,12 +3530,12 @@ void UAssetToolsImpl::OnContentPathMounted(const FString& InAssetPath, const FSt
 	AddSubContentBlacklist(InAssetPath);
 }
 
-TSharedRef<FBlacklistPaths>& UAssetToolsImpl::GetFolderBlacklist()
+TSharedRef<FPathPermissionList>& UAssetToolsImpl::GetFolderBlacklist()
 {
 	return FolderBlacklist;
 }
 
-TSharedRef<FBlacklistPaths>& UAssetToolsImpl::GetWritableFolderBlacklist()
+TSharedRef<FPathPermissionList>& UAssetToolsImpl::GetWritableFolderBlacklist()
 {
 	return WritableFolderBlacklist;
 }

@@ -7,7 +7,7 @@
 #include "AssetViewUtils.h"
 #include "AssetPropertyTagCache.h"
 #include "ObjectTools.h"
-#include "Misc/BlacklistNames.h"
+#include "Misc/NamePermissionList.h"
 #include "Misc/ScopedSlowTask.h"
 #include "HAL/FileManager.h"
 #include "FileHelpers.h"
@@ -121,7 +121,7 @@ void SetOptionalErrorMessage(FText* OutErrorMsg, FText InErrorMsg)
 
 bool CanModifyPath(IAssetTools* InAssetTools, const FName InFolderPath, FText* OutErrorMsg)
 {
-	const TSharedRef<FBlacklistPaths>& WritableFolderFilter = InAssetTools->GetWritableFolderBlacklist();
+	const TSharedRef<FPathPermissionList>& WritableFolderFilter = InAssetTools->GetWritableFolderBlacklist();
 	if (!WritableFolderFilter->PassesStartsWithFilter(InFolderPath))
 	{
 		SetOptionalErrorMessage(OutErrorMsg, FText::Format(LOCTEXT("Error_FolderIsLocked", "Folder '{0}' is Locked"), FText::FromName(InFolderPath)));

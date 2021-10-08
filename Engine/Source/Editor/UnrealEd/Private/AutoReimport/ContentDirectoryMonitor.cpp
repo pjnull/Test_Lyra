@@ -19,7 +19,7 @@
 #include "AssetToolsModule.h"
 #include "AutoReimport/ReimportFeedbackContext.h"
 #include "AutoReimport/AssetSourceFilenameCache.h"
-#include "Misc/BlacklistNames.h"
+#include "Misc/NamePermissionList.h"
 
 #define LOCTEXT_NAMESPACE "ContentDirectoryMonitor"
 

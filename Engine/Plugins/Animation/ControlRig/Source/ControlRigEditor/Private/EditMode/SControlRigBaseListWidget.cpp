@@ -711,7 +711,7 @@ void SControlRigBaseListWidget::Construct(const FArguments& InArgs)
 	PathPickerConfig.bAddDefaultPath = true;
 	PathPickerConfig.bOnPathSelectedPassesVirtualPaths = false;
 	PathPickerConfig.DefaultPath = CurrentlySelectedInternalPath;
-	CustomFolderBlacklist = PathPickerConfig.CustomFolderBlacklist = MakeShared<FBlacklistPaths>();
+	CustomFolderBlacklist = PathPickerConfig.CustomFolderBlacklist = MakeShared<FPathPermissionList>();
 	for (const FString& Path : PosesDirectories)
 	{
 		PathPickerConfig.CustomFolderBlacklist.Get()->AddAllowListItem("PoseLibrary", Path);

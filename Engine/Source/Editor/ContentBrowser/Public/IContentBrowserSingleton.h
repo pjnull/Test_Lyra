@@ -16,7 +16,7 @@
 #include "Framework/Views/ITypedTableView.h"
 #include "AssetThumbnail.h"
 #include "ContentBrowserItemPath.h"
-#include "Misc/BlacklistNames.h"
+#include "Misc/NamePermissionList.h"
 
 class FViewport;
 class UFactory;
@@ -337,7 +337,7 @@ struct FPathPickerConfig
 	FString DefaultPath;
 
 	/** Custom Folder Blacklist to be used to filter folders in this Path Picker. */
-	TSharedPtr<FBlacklistPaths> CustomFolderBlacklist;
+	TSharedPtr<FPathPermissionList> CustomFolderBlacklist;
 
 	/** The delegate that fires when a path was selected */
 	FOnPathSelected OnPathSelected;

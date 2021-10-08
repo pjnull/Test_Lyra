@@ -2220,7 +2220,7 @@ bool UContentBrowserAssetDataSource::PathPassesCompiledDataFilter(const FContent
 	FNameBuilder PathStr(InPath);
 	FStringView Path(PathStr);
 
-	auto PathPassesFilter = [Path](const FBlacklistPaths& InPathFilter, const bool InRecursive)
+	auto PathPassesFilter = [Path](const FPathPermissionList& InPathFilter, const bool InRecursive)
 	{
 		return !InPathFilter.HasFiltering() || (InRecursive ? InPathFilter.PassesStartsWithFilter(Path, /*bAllowParentPaths*/true) : InPathFilter.PassesFilter(Path));
 	};

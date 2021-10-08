@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "UObject/SoftObjectPtr.h"
 #include "UObject/WeakObjectPtr.h"
-#include "Misc/BlacklistNames.h"
+#include "Misc/NamePermissionList.h"
 
 /** Struct, OwnerName */
 DECLARE_MULTICAST_DELEGATE_TwoParams(FWhitelistUpdated, TSoftObjectPtr<UStruct>, FName);
@@ -37,7 +37,7 @@ enum class EPropertyEditorWhitelistRules : uint8
 
 struct FPropertyEditorWhitelistEntry
 {
-    FBlacklistNames Whitelist;
+    FNamePermissionList Whitelist;
     EPropertyEditorWhitelistRules Rules = EPropertyEditorWhitelistRules::UseExistingWhitelist;
 };
 
@@ -51,7 +51,7 @@ public:
 	}
 
 	/** Add a set of rules for a specific base UStruct to determine which properties are visible in all details panels */
-	void AddWhitelist(TSoftObjectPtr<UStruct> Struct, const FBlacklistNames& Whitelist, EPropertyEditorWhitelistRules Rules = EPropertyEditorWhitelistRules::UseExistingWhitelist);
+	void AddWhitelist(TSoftObjectPtr<UStruct> Struct, const FNamePermissionList& Whitelist, EPropertyEditorWhitelistRules Rules = EPropertyEditorWhitelistRules::UseExistingWhitelist);
 	/** Remove a set of rules for a specific base UStruct to determine which properties are visible in all details panels */
 	void RemoveWhitelist(TSoftObjectPtr<UStruct> Struct);
 	/** Remove all rules */
@@ -114,9 +114,9 @@ private:
 	TMap<TSoftObjectPtr<UStruct>, FPropertyEditorWhitelistEntry> RawPropertyEditorWhitelist;
 
 	/** Lazily-constructed combined cache of both the flattened class whitelist and struct whitelist */
-	mutable TMap<TWeakObjectPtr<const UStruct>, FBlacklistNames> CachedPropertyEditorWhitelist;
+	mutable TMap<TWeakObjectPtr<const UStruct>, FNamePermissionList> CachedPropertyEditorWhitelist;
 
 	/** Get or create the cached whitelist for a specific UStruct */
-	const FBlacklistNames& GetCachedWhitelistForStruct(const UStruct* Struct) const;
-	const FBlacklistNames& GetCachedWhitelistForStructHelper(const UStruct* Struct, bool& bInOutShouldWhitelistAllProperties) const;
+	const FNamePermissionList& GetCachedWhitelistForStruct(const UStruct* Struct) const;
+	const FNamePermissionList& GetCachedWhitelistForStructHelper(const UStruct* Struct, bool& bInOutShouldWhitelistAllProperties) const;
 };

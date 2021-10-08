@@ -8,7 +8,7 @@
 #include "CollectionManagerModule.h"
 #include "ICollectionManager.h"
 #include "Misc/StringBuilder.h"
-#include "Misc/BlacklistNames.h"
+#include "Misc/NamePermissionList.h"
 #include "UObject/UObjectHash.h"
 #include "ToolMenus.h"
 #include "NewClassContextMenu.h"
@@ -88,7 +88,7 @@ void UContentBrowserClassDataSource::CompileFilter(const FName InPath, const FCo
 	const FContentBrowserDataClassFilter* ClassFilter = InFilter.ExtraFilters.FindFilter<FContentBrowserDataClassFilter>();
 	const FContentBrowserDataCollectionFilter* CollectionFilter = InFilter.ExtraFilters.FindFilter<FContentBrowserDataCollectionFilter>();
 
-	const FBlacklistNames* ClassBlacklist = ClassFilter && ClassFilter->ClassBlacklist && ClassFilter->ClassBlacklist->HasFiltering() ? ClassFilter->ClassBlacklist.Get() : nullptr;
+	const FNamePermissionList* ClassBlacklist = ClassFilter && ClassFilter->ClassBlacklist && ClassFilter->ClassBlacklist->HasFiltering() ? ClassFilter->ClassBlacklist.Get() : nullptr;
 
 	const bool bIncludeFolders = EnumHasAnyFlags(InFilter.ItemTypeFilter, EContentBrowserItemTypeFilter::IncludeFolders);
 	const bool bIncludeFiles = EnumHasAnyFlags(InFilter.ItemTypeFilter, EContentBrowserItemTypeFilter::IncludeFiles);

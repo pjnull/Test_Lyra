@@ -91,7 +91,7 @@ public:
 
 	virtual void UnregisterPlacementCategory(FName Handle);
 
-	virtual TSharedRef<FBlacklistNames>& GetCategoryBlacklist() override { return CategoryBlacklist; }
+	virtual TSharedRef<FNamePermissionList>& GetCategoryBlacklist() override { return CategoryBlacklist; }
 
 	virtual void GetSortedCategories(TArray<FPlacementCategoryInfo>& OutCategories) const;
 
@@ -131,7 +131,7 @@ private:
 
 	TMap<FName, FPlacementCategory> Categories;
 
-	TSharedRef<FBlacklistNames> CategoryBlacklist;
+	TSharedRef<FNamePermissionList> CategoryBlacklist;
 
 	TMap<FName, TPlaceableItemPredicate> PlaceableItemPredicates;
 

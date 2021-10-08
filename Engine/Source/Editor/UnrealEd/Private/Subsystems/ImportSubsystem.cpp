@@ -7,7 +7,7 @@
 #include "ObjectTools.h"
 #include "FileHelpers.h"
 #include "EditorReimportHandler.h"
-#include "Misc/BlacklistNames.h"
+#include "Misc/NamePermissionList.h"
 #include "InterchangeManager.h"
 #include "InterchangeFactoryBase.h"
 

@@ -46,7 +46,7 @@
 #include "DesktopPlatformModule.h"
 #include "Misc/FileHelper.h"
 #include "Misc/TextFilterUtils.h"
-#include "Misc/BlacklistNames.h"
+#include "Misc/NamePermissionList.h"
 #include "AssetRegistryState.h"
 #include "Materials/Material.h"
 #include "ContentBrowserMenuContexts.h"
@@ -1783,7 +1783,7 @@ FContentBrowserDataFilter SAssetView::CreateBackendDataFilter() const
 		| (IsShowingDevelopersContent() ? EContentBrowserItemAttributeFilter::IncludeDeveloper : EContentBrowserItemAttributeFilter::IncludeNone)
 		| (IsShowingLocalizedContent() ? EContentBrowserItemAttributeFilter::IncludeLocalized : EContentBrowserItemAttributeFilter::IncludeNone);
 
-	TSharedPtr<FBlacklistPaths> CombinedFolderBlacklist = ContentBrowserUtils::GetCombinedFolderBlacklist(FolderBlacklist, IsShowingReadOnlyFolders() ? nullptr : WritableFolderBlacklist);
+	TSharedPtr<FPathPermissionList> CombinedFolderBlacklist = ContentBrowserUtils::GetCombinedFolderBlacklist(FolderBlacklist, IsShowingReadOnlyFolders() ? nullptr : WritableFolderBlacklist);
 	ContentBrowserUtils::AppendAssetFilterToContentBrowserFilter(BackendFilter, AssetClassBlacklist, CombinedFolderBlacklist, DataFilter);
 
 	if (bHasCollections && !SourcesData.IsDynamicCollection())

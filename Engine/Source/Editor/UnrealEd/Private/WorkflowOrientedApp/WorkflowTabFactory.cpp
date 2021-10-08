@@ -10,7 +10,7 @@
 #include "IDocumentation.h"
 #include "Widgets/Docking/SDockTab.h"
 #include "Framework/Docking/TabManager.h"
-#include "Misc/BlacklistNames.h"
+#include "Misc/NamePermissionList.h"
 
 /////////////////////////////////////////////////////
 // FWorkflowTabFactory

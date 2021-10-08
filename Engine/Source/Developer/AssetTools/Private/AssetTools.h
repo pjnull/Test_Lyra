@@ -7,7 +7,7 @@
 #include "IAssetTypeActions.h"
 #include "AssetData.h"
 #include "AssetRenameManager.h"
-#include "Misc/BlacklistNames.h"
+#include "Misc/NamePermissionList.h"
 #include "UObject/StrongObjectPtr.h"
 #include "Factories/Factory.h"
 #include "AssetTools.generated.h"
@@ -116,9 +116,9 @@ public:
 	virtual void ConvertVirtualTextures(const TArray<UTexture2D*>& Textures, bool bConvertBackToNonVirtual, const TArray<UMaterial*>* RelatedMaterials = nullptr) const override;
 	virtual bool IsAssetClassSupported(const UClass* AssetClass) const override;
 	virtual TArray<UFactory*> GetNewAssetFactories() const override;
-	virtual TSharedRef<FBlacklistNames>& GetAssetClassBlacklist() override;
-	virtual TSharedRef<FBlacklistPaths>& GetFolderBlacklist() override;
-	virtual TSharedRef<FBlacklistPaths>& GetWritableFolderBlacklist() override;
+	virtual TSharedRef<FNamePermissionList>& GetAssetClassBlacklist() override;
+	virtual TSharedRef<FPathPermissionList>& GetFolderBlacklist() override;
+	virtual TSharedRef<FPathPermissionList>& GetWritableFolderBlacklist() override;
 	virtual bool AllPassWritableFolderFilter(const TArray<FString>& InPaths) const override;
 	virtual void NotifyBlockedByWritableFolderFilter() const;
 	
@@ -202,13 +202,13 @@ private:
 	uint32 NextUserCategoryBit;
 
 	/** Blacklist of assets by class name */
-	TSharedRef<FBlacklistNames> AssetClassBlacklist;
+	TSharedRef<FNamePermissionList> AssetClassBlacklist;
 
 	/** Blacklist of folder paths */
-	TSharedRef<FBlacklistPaths> FolderBlacklist;
+	TSharedRef<FPathPermissionList> FolderBlacklist;
 
 	/** Blacklist of folder paths to write to */
-	TSharedRef<FBlacklistPaths> WritableFolderBlacklist;
+	TSharedRef<FPathPermissionList> WritableFolderBlacklist;
 
 	/** List of sub content paths denied for every mount. */
 	TArray<FString> SubContentBlacklistPaths;

@@ -13,8 +13,8 @@
 class SAssetView;
 class SPathView;
 
-class FBlacklistNames;
-class FBlacklistPaths;
+class FNamePermissionList;
+class FPathPermissionList;
 
 struct FARFilter;
 struct FContentBrowserItem;
@@ -78,10 +78,10 @@ namespace ContentBrowserUtils
 	void ConvertLegacySelectionToVirtualPaths(TArrayView<const FAssetData> InAssets, TArrayView<const FString> InFolders, const bool InUseFolderPaths, TSet<FName>& OutVirtualPaths);
 
 	/** Append the asset registry filter and blacklists to the content browser data filter */
-	void AppendAssetFilterToContentBrowserFilter(const FARFilter& InAssetFilter, const TSharedPtr<FBlacklistNames>& InAssetClassBlacklist, const TSharedPtr<FBlacklistPaths>& InFolderBlacklist, FContentBrowserDataFilter& OutDataFilter);
+	void AppendAssetFilterToContentBrowserFilter(const FARFilter& InAssetFilter, const TSharedPtr<FNamePermissionList>& InAssetClassBlacklist, const TSharedPtr<FPathPermissionList>& InFolderBlacklist, FContentBrowserDataFilter& OutDataFilter);
 
 	/* Combine folder filters into a new filter if either are active */
-	TSharedPtr<FBlacklistPaths> GetCombinedFolderBlacklist(const TSharedPtr<FBlacklistPaths>& FolderBlacklist, const TSharedPtr<FBlacklistPaths>& WritableFolderBlacklist);
+	TSharedPtr<FPathPermissionList> GetCombinedFolderBlacklist(const TSharedPtr<FPathPermissionList>& FolderBlacklist, const TSharedPtr<FPathPermissionList>& WritableFolderBlacklist);
 
 	/** Shared logic to know if we can perform certain operation depending on which view it occurred, either PathView or AssetView */
 	bool CanDeleteFromAssetView(TWeakPtr<SAssetView> AssetView, FText* OutErrorMsg = nullptr);

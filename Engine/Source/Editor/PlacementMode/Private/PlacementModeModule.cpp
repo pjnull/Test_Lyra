@@ -5,7 +5,7 @@
 #include "Modules/ModuleManager.h"
 #include "UObject/Object.h"
 #include "Misc/Guid.h"
-#include "Misc/BlacklistNames.h"
+#include "Misc/NamePermissionList.h"
 #include "UObject/Class.h"
 #include "UObject/UObjectHash.h"
 #include "UObject/UObjectIterator.h"
@@ -74,7 +74,7 @@ TOptional<FLinearColor> GetBasicShapeColorOverride()
 }
 
 FPlacementModeModule::FPlacementModeModule()
-	: CategoryBlacklist(MakeShareable(new FBlacklistNames()))
+	: CategoryBlacklist(MakeShareable(new FNamePermissionList()))
 {
 	CategoryBlacklist->OnFilterChanged().AddRaw(this, &FPlacementModeModule::OnCategoryBlacklistChanged);
 }
