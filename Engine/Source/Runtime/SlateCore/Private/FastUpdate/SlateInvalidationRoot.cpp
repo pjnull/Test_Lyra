@@ -886,6 +886,8 @@ bool FSlateInvalidationRoot::ProcessInvalidation()
 	FScopedDurationTimer TmpPerformance_ProcessInvalidation(PerformanceStat.InvalidationProcessing);
 #endif
 
+	TGuardValue<bool> OnFastPathGuard(GSlateIsOnFastProcessInvalidation, true);
+
 	bool bWidgetsNeedRepaint = false;
 
 	if (!bNeedsSlowPath)
