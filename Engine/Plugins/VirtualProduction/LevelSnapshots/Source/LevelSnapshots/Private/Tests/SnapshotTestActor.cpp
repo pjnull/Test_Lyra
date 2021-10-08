@@ -39,6 +39,10 @@ ASnapshotTestActor::ASnapshotTestActor()
 	{
 		CylinderMesh = CylinderFinder.Object;
 	}
+
+	StaticMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("StaticMeshComponent"));
+	StaticMeshComponent->SetupAttachment(RootComponent);
+	StaticMeshComponent->SetStaticMesh(CubeMesh);
 	
 	InstancedMeshComponent = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("InstancedMeshComponent"));
 	InstancedMeshComponent->SetupAttachment(RootComponent);

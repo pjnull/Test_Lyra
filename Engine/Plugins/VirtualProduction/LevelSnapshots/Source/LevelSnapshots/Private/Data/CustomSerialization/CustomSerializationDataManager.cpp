@@ -157,6 +157,7 @@ void FCustomSerializationDataWriter::WriteObjectAnnotation(const FObjectAnnotato
 	{
 		FMemoryWriter MemoryWriter(SerializationDataGetter_ReadWrite.Execute()->RootAnnotationData, true);
 		FObjectAndNameAsStringProxyArchive RootArchive(MemoryWriter, false);
+		WorldData_ReadOnly.GetSnapshotVersionInfo().ApplyToArchive(RootArchive);
 		Writer.Execute(RootArchive);
 	}
 }

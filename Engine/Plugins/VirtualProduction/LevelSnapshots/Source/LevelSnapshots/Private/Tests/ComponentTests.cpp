@@ -13,6 +13,7 @@
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "Misc/AutomationTest.h"
+#include "Util/EquivalenceUtil.h"
 
 // TODO: FExistingSubobjectHasDifferentClass > Change a subobject's class and try to restore into it
 // TODO: FAttachementRestoration
@@ -123,8 +124,8 @@ bool FAddedAndRemovedComponentsCorrectOnSnapshotActorAndGenerateDiff::RunTest(co
 				return;
 			}
 
-			TestTrue(TEXT("ActorWithAddedComponent: HasOriginalChangedPropertiesSinceSnapshotWasTaken"), Snapshot->HasOriginalChangedPropertiesSinceSnapshotWasTaken(*SnapshotActorWithAddedComponent , ActorWithAddedComponent));
-			TestTrue(TEXT("ActorWithRemovedComponent: HasOriginalChangedPropertiesSinceSnapshotWasTaken"), Snapshot->HasOriginalChangedPropertiesSinceSnapshotWasTaken(*SnapshotActorWithRemovedComponent , ActorWithRemovedComponent));
+			TestTrue(TEXT("ActorWithAddedComponent: HasOriginalChangedPropertiesSinceSnapshotWasTaken"), SnapshotUtil::HasOriginalChangedPropertiesSinceSnapshotWasTaken(Snapshot->GetSerializedData(), *SnapshotActorWithAddedComponent , ActorWithAddedComponent));
+			TestTrue(TEXT("ActorWithRemovedComponent: HasOriginalChangedPropertiesSinceSnapshotWasTaken"), SnapshotUtil::HasOriginalChangedPropertiesSinceSnapshotWasTaken(Snapshot->GetSerializedData(), *SnapshotActorWithRemovedComponent , ActorWithRemovedComponent));
 		});
 	
 	return true;

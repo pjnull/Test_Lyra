@@ -30,6 +30,11 @@
 			"Name": "LevelSnapshotsEditor",
 			"Type": "UncookedOnly",
 			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "FoliageSupport",
+			"Type": "UncookedOnly",
+			"LoadingPhase": "PostDefault"
 		}
 	]
 }

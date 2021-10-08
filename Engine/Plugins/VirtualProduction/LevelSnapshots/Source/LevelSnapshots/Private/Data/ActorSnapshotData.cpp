@@ -7,19 +7,21 @@
 #include "Data/WorldSnapshotData.h"
 #include "Data/SnapshotCustomVersion.h"
 #include "CustomSerialization/CustomObjectSerializationWrapper.h"
+#include "Data/Util/ActorHashUtil.h"
+#include "Data/Util/SnapshotObjectUtil.h"
+#include "Data/Util/SnapshotUtil.h"
 #include "LevelSnapshotsLog.h"
 #include "LevelSnapshotsModule.h"
 #include "PropertySelectionMap.h"
-#include "Restorability/SnapshotRestorability.h"
-#include "Util/SnapshotObjectUtil.h"
-#include "Util/SnapshotUtil.h"
+#include "RestorationEvents/ApplySnapshotToActorScope.h"
+#include "RestorationEvents/RecreateComponentScope.h"
+#include "RestorationEvents/RemoveComponentScope.h"
+#include "SnapshotConsoleVariables.h"
+#include "SnapshotRestorability.h"
 
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "Modules/ModuleManager.h"
-#include "RestorationEvents/ApplySnapshotToActorScope.h"
-#include "RestorationEvents/RecreateComponentScope.h"
-#include "RestorationEvents/RemoveComponentScope.h"
 #include "Templates/NonNullPointer.h"
 #include "UObject/Package.h"
 #include "UObject/Script.h"
@@ -212,10 +214,22 @@ namespace
 			UpdateDetailsViewAfterUpdatingComponents();
 		}
 	}
+
+	void ConditionBreakOnActor(AActor* Actor)
+	{
+		const FString NameToSearchFor = SnapshotCVars::CVarBreakOnSnapshotActor.GetValueOnAnyThread();
+		if (!NameToSearchFor.IsEmpty() && Actor->GetName().Contains(NameToSearchFor))
+		{
+			UE_DEBUG_BREAK();
+		}
+	}
 }
+
 
 FActorSnapshotData FActorSnapshotData::SnapshotActor(AActor* OriginalActor, FWorldSnapshotData& WorldData)
 {
+	ConditionBreakOnActor(OriginalActor);
+	
 	FActorSnapshotData Result;
 	UClass* ActorClass = OriginalActor->GetClass();
 	Result.ActorClass = ActorClass;
@@ -244,7 +258,8 @@ FActorSnapshotData FActorSnapshotData::SnapshotActor(AActor* OriginalActor, FWor
 			FCustomObjectSerializationWrapper::TakeSnapshotForSubobject(Comp, WorldData);
 		}
 	}
-	
+
+	SnapshotUtil::PopulateActorHash(Result.Hash, OriginalActor);
 	return Result;
 }
 
@@ -491,7 +506,8 @@ void FActorSnapshotData::DeserializeIntoEditorWorldActor(UWorld* SnapshotWorld, 
 		UE_LOG(LogLevelSnapshots, Warning, TEXT("Failed to serialize into actor %s. Skipping..."), *OriginalActor->GetName());
 		return;
 	}
-	
+
+	const AActor* AttachParentBeforeRestore = OriginalActor->GetAttachParentActor();
 	SerializeActor(OriginalActor, *Deserialized);
 
 	TInlineComponentArray<UActorComponent*> DeserializedComponents;
@@ -526,6 +542,16 @@ void FActorSnapshotData::DeserializeIntoEditorWorldActor(UWorld* SnapshotWorld, 
 
 	// Fixes up restored attachments
 	OriginalActor->UpdateComponentTransforms();
+
+#if WITH_EDITOR
+	// Update World Outliner. Usually called by USceneComponent::AttachToComponent.
+	const AActor* AttachParentAfterRestore = OriginalActor->GetAttachParentActor();
+	const bool bAttachParentChanged = AttachParentBeforeRestore != AttachParentAfterRestore;
+	if (bAttachParentChanged)
+	{
+		GEngine->BroadcastLevelActorAttached(OriginalActor, AttachParentAfterRestore);
+	}
+#endif
 }
 
 void FActorSnapshotData::DeserializeComponents(
@@ -575,10 +601,9 @@ inline void FActorSnapshotData::DeserializeSubobjectsForSnapshotActor(AActor* In
 	{
 		check(!ComponentData.Contains(SubobjectIndex));
 
+		FString LocalisationNamespace;
 #if USE_STABLE_LOCALIZATION_KEYS
-		const FString LocalisationNamespace = TextNamespaceUtil::EnsurePackageNamespace(InLocalisationSnapshotPackage);
-#else
-		const FString LocalisationNamespace;
+		LocalisationNamespace = TextNamespaceUtil::EnsurePackageNamespace(InLocalisationSnapshotPackage);
 #endif
 
 		// Ensures the object is allocated and serialized into. Return value not needed.

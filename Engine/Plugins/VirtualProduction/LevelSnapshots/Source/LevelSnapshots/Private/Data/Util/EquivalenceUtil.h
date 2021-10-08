@@ -25,13 +25,15 @@ namespace SnapshotUtil
 	 * @param OnWorldComponentUnmatched Called when component exists in editor world but not in snapshot world
 	 */
 	void IterateComponents(AActor* SnapshotActor, AActor* WorldActor, FHandleMatchedActorComponent OnComponentsMatched, FHandleUnmatchedActorComponent OnSnapshotComponentUnmatched, FHandleUnmatchedActorComponent OnWorldComponentUnmatched);
-
+	
 	/** Checks whether the original actor has any properties that changed since the snapshot was taken.  */
 	bool HasOriginalChangedPropertiesSinceSnapshotWasTaken(const FWorldSnapshotData& WorldData, AActor* SnapshotActor, AActor* WorldActor);
 
 	/**
 	 * Checks whether the snapshot and original property value should be considered equal.
 	 * Primitive properties are trivial. Special support is needed for object references.
+	 *
+	 * @param IgnoredProperties Properties to ignore
 	 */
 	bool AreSnapshotAndOriginalPropertiesEquivalent(const FWorldSnapshotData& WorldData, const FProperty* LeafProperty, void* SnapshotContainer, void* WorldContainer, AActor* SnapshotActor, AActor* WorldActor);
 

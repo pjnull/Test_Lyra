@@ -227,6 +227,9 @@ public:
 	/** Should this tab be sized based on its content. */
 	bool ShouldAutosize() const;
 
+	/** Set whether this tab should be sized based on its content. */
+	void SetShouldAutosize(const bool bNewShouldAutosize);
+
 	/** @return true if the tab can be closed */
 	bool CanCloseTab() const;
 

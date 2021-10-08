@@ -891,6 +891,11 @@ bool SDockTab::ShouldAutosize() const
 	return bShouldAutosize;
 }
 
+void SDockTab::SetShouldAutosize(const bool bNewShouldAutosize)
+{
+	bShouldAutosize = bNewShouldAutosize;
+}
+
 FReply SDockTab::OnCloseButtonClicked()
 {
 	RequestCloseTab();

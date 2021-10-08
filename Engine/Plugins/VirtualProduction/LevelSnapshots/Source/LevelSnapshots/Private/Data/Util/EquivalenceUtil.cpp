@@ -30,7 +30,7 @@ namespace
 		for (TFieldIterator<FProperty> FieldIt(ClassToIterate); FieldIt; ++FieldIt)
 		{
 			// Ask external modules about the property
-			const FPropertyComparisonParams Params { ClassToIterate, *FieldIt, SnapshotObject, WorldObject, SnapshotObject, WorldObject, SnapshotActor, WorldActor} ;
+			const FPropertyComparisonParams Params { WorldData, ClassToIterate, *FieldIt, SnapshotObject, WorldObject, SnapshotObject, WorldObject, SnapshotActor, WorldActor} ;
 			const IPropertyComparer::EPropertyComparison ComparisonResult = Module.ShouldConsiderPropertyEqual(PropertyComparers, Params);
 			
 			switch (ComparisonResult)
@@ -154,7 +154,7 @@ void SnapshotUtil::IterateComponents(AActor* SnapshotActor, AActor* WorldActor, 
 
 bool SnapshotUtil::HasOriginalChangedPropertiesSinceSnapshotWasTaken(const FWorldSnapshotData& WorldData, AActor* SnapshotActor, AActor* WorldActor)
 {
-	SCOPED_SNAPSHOT_CORE_TRACE(HasOriginalChangedSinceSnapshot);
+	SCOPED_SNAPSHOT_CORE_TRACE(HasOriginalChangedPropertiesSinceSnapshotWasTaken);
 	
 	if (!IsValid(SnapshotActor) || !IsValid(WorldActor))
 	{

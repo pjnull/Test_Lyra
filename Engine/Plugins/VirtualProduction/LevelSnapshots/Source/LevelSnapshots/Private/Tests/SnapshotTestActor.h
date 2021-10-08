@@ -203,6 +203,9 @@ public:
 	/******************** Subobject Component references  ********************/
 
 	UPROPERTY(EditAnywhere, Category = "Level Snapshots")
+	UStaticMeshComponent* StaticMeshComponent;
+	
+	UPROPERTY(EditAnywhere, Category = "Level Snapshots")
 	UInstancedStaticMeshComponent* InstancedMeshComponent;
 
 	UPROPERTY(EditAnywhere, Category = "Level Snapshots")
