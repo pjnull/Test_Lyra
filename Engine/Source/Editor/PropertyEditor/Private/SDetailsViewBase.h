@@ -415,8 +415,8 @@ protected:
 	int32 NumVisibleTopLevelObjectNodes;
 
 	/** Used to refresh the tree when the allow list filter changes */
-	FDelegateHandle PropertyAllowListChangedDelegate;
-	FDelegateHandle PropertyAllowListEnabledDelegate;
+	FDelegateHandle PropertyPermissionListChangedDelegate;
+	FDelegateHandle PropertyPermissionListEnabledDelegate;
 
 	/** Delegate for overriding the show modified filter */
 	FSimpleDelegate CustomFilterDelegate;

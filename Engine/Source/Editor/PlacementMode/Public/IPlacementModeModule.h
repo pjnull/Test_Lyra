@@ -312,7 +312,7 @@ public:
 	virtual const FPlacementCategoryInfo* GetRegisteredPlacementCategory(FName UniqueHandle) const = 0;
 
 	/** Placement categories blacklist */
-	virtual TSharedRef<FNamePermissionList>& GetCategoryBlacklist() = 0;
+	virtual TSharedRef<FNamePermissionList>& GetCategoryPermissionList() = 0;
 
 	/**
 	 * Get all placement categories that aren't blacklisted, sorted by SortOrder

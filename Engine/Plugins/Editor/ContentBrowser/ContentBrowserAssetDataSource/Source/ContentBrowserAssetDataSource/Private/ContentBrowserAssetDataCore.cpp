@@ -121,7 +121,7 @@ void SetOptionalErrorMessage(FText* OutErrorMsg, FText InErrorMsg)
 
 bool CanModifyPath(IAssetTools* InAssetTools, const FName InFolderPath, FText* OutErrorMsg)
 {
-	const TSharedRef<FPathPermissionList>& WritableFolderFilter = InAssetTools->GetWritableFolderBlacklist();
+	const TSharedRef<FPathPermissionList>& WritableFolderFilter = InAssetTools->GetWritableFolderPermissionList();
 	if (!WritableFolderFilter->PassesStartsWithFilter(InFolderPath))
 	{
 		SetOptionalErrorMessage(OutErrorMsg, FText::Format(LOCTEXT("Error_FolderIsLocked", "Folder '{0}' is Locked"), FText::FromName(InFolderPath)));

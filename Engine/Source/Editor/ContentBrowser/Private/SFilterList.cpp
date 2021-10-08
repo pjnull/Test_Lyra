@@ -1356,7 +1356,7 @@ void SFilterList::PopulateAddFilterMenu(UToolMenu* Menu)
 	};
 	AssetTypeActionsList.Sort( FCompareIAssetTypeActions() );
 
-	TSharedRef<FNamePermissionList> AssetClassBlacklist = AssetToolsModule.Get().GetAssetClassBlacklist();
+	TSharedRef<FNamePermissionList> AssetClassPermissionList = AssetToolsModule.Get().GetAssetClassPermissionList();
 
 	// For every asset type, move it into all the categories it should appear in
 	for (int32 ClassIdx = 0; ClassIdx < AssetTypeActionsList.Num(); ++ClassIdx)
@@ -1368,7 +1368,7 @@ void SFilterList::PopulateAddFilterMenu(UToolMenu* Menu)
 			if ( ensure(TypeActions.IsValid()) && TypeActions->CanFilter() )
 			{
 				UClass* SupportedClass = TypeActions->GetSupportedClass();
-				if ((!SupportedClass || AssetClassBlacklist->PassesFilter(SupportedClass->GetFName())) && !IsFilteredByPicker(InitialClassFilters, SupportedClass))
+				if ((!SupportedClass || AssetClassPermissionList->PassesFilter(SupportedClass->GetFName())) && !IsFilteredByPicker(InitialClassFilters, SupportedClass))
 				{
 					for ( auto MenuIt = CategoryToMenuMap.CreateIterator(); MenuIt; ++MenuIt )
 					{
@@ -1626,7 +1626,7 @@ void SFilterList::GetTypeActionsForCategory(EAssetTypeCategories::Type Category,
 	FAssetToolsModule& AssetToolsModule = FModuleManager::LoadModuleChecked<FAssetToolsModule>(TEXT("AssetTools"));
 	TArray<TWeakPtr<IAssetTypeActions>> AssetTypeActionsList;
 	AssetToolsModule.Get().GetAssetTypeActionsList(AssetTypeActionsList);
-	TSharedRef<FNamePermissionList> AssetClassBlacklist = AssetToolsModule.Get().GetAssetClassBlacklist();
+	TSharedRef<FNamePermissionList> AssetClassPermissionList = AssetToolsModule.Get().GetAssetClassPermissionList();
 
 	// Find all asset type actions that match the category
 	for (int32 ClassIdx = 0; ClassIdx < AssetTypeActionsList.Num(); ++ClassIdx)
@@ -1636,7 +1636,7 @@ void SFilterList::GetTypeActionsForCategory(EAssetTypeCategories::Type Category,
 
 		if (ensure(AssetTypeActions.IsValid()) && AssetTypeActions->CanFilter() && AssetTypeActions->GetCategories() & Category)
 		{
-			if (AssetTypeActions->GetSupportedClass() == nullptr || AssetClassBlacklist->PassesFilter(AssetTypeActions->GetSupportedClass()->GetFName()))
+			if (AssetTypeActions->GetSupportedClass() == nullptr || AssetClassPermissionList->PassesFilter(AssetTypeActions->GetSupportedClass()->GetFName()))
 			{
 				TypeActions.Add(WeakTypeActions);
 			}

@@ -337,7 +337,7 @@ struct FPathPickerConfig
 	FString DefaultPath;
 
 	/** Custom Folder Blacklist to be used to filter folders in this Path Picker. */
-	TSharedPtr<FPathPermissionList> CustomFolderBlacklist;
+	TSharedPtr<FPathPermissionList> CustomFolderPermissionList;
 
 	/** The delegate that fires when a path was selected */
 	FOnPathSelected OnPathSelected;

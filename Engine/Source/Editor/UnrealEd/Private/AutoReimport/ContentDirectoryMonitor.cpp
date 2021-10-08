@@ -153,7 +153,7 @@ bool FContentDirectoryMonitor::ShouldConsiderChange(const DirectoryWatcher::FUpd
 
 	static const FName AssetToolsName("AssetTools");
 	IAssetTools& AssetTools = FModuleManager::LoadModuleChecked<FAssetToolsModule>(AssetToolsName).Get();
-	if (!AssetTools.GetWritableFolderBlacklist()->PassesStartsWithFilter(Transaction.Filename.Get()))
+	if (!AssetTools.GetWritableFolderPermissionList()->PassesStartsWithFilter(Transaction.Filename.Get()))
 	{
 		return false;
 	}

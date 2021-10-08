@@ -35,7 +35,7 @@ public:
 	bool bRecursivePackagePathsToExclude = false;
 	FPathPermissionList PackagePathsToInclude;
 	FPathPermissionList PackagePathsToExclude;
-	FPathPermissionList PathBlacklist;
+	FPathPermissionList PathPermissionList;
 	TSet<FName> ExcludedPackagePaths;
 	EContentBrowserItemAttributeFilter ItemAttributeFilter = EContentBrowserItemAttributeFilter::IncludeAll;
 	FString VirtualPathToScanOnDemand;
@@ -77,8 +77,8 @@ public:
 		const FContentBrowserDataClassFilter* ClassFilter = nullptr;
 		const FContentBrowserDataCollectionFilter* CollectionFilter = nullptr;
 
-		const FPathPermissionList* PathBlacklist = nullptr;
-		const FNamePermissionList* ClassBlacklist = nullptr;
+		const FPathPermissionList* PathPermissionList = nullptr;
+		const FNamePermissionList* ClassPermissionList = nullptr;
 
 		FContentBrowserDataFilterList* FilterList = nullptr;
 		FContentBrowserCompiledAssetDataFilter* AssetDataFilter = nullptr;

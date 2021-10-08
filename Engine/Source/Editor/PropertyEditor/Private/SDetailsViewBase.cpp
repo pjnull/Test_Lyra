@@ -52,14 +52,14 @@ SDetailsViewBase::SDetailsViewBase() :
 		CurrentFilter.bShowOnlyModified = ViewConfig->bShowOnlyModified;
 	}
 
-	PropertyAllowListChangedDelegate = FPropertyEditorWhitelist::Get().WhitelistUpdatedDelegate.AddLambda([this](TSoftObjectPtr<UStruct> Struct, FName Owner) { ForceRefresh(); });
-	PropertyAllowListEnabledDelegate = FPropertyEditorWhitelist::Get().WhitelistEnabledDelegate.AddRaw(this, &SDetailsViewBase::ForceRefresh);
+	PropertyPermissionListChangedDelegate = FPropertyEditorPermissionList::Get().PermissionListUpdatedDelegate.AddLambda([this](TSoftObjectPtr<UStruct> Struct, FName Owner) { ForceRefresh(); });
+	PropertyPermissionListEnabledDelegate = FPropertyEditorPermissionList::Get().PermissionListEnabledDelegate.AddRaw(this, &SDetailsViewBase::ForceRefresh);
 }
 
 SDetailsViewBase::~SDetailsViewBase()
 {
-	FPropertyEditorWhitelist::Get().WhitelistUpdatedDelegate.Remove(PropertyAllowListChangedDelegate);
-	FPropertyEditorWhitelist::Get().WhitelistEnabledDelegate.Remove(PropertyAllowListEnabledDelegate);
+	FPropertyEditorPermissionList::Get().PermissionListUpdatedDelegate.Remove(PropertyPermissionListChangedDelegate);
+	FPropertyEditorPermissionList::Get().PermissionListUpdatedDelegate.Remove(PropertyPermissionListEnabledDelegate);
 }
 
 void SDetailsViewBase::OnGetChildrenForDetailTree(TSharedRef<FDetailTreeNode> InTreeNode, TArray< TSharedRef<FDetailTreeNode> >& OutChildren)

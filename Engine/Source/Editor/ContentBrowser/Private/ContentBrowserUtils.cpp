@@ -573,7 +573,7 @@ void ContentBrowserUtils::ConvertLegacySelectionToVirtualPaths(TArrayView<const 
 	ConvertLegacySelectionToVirtualPathsImpl(InAssets, InFolders, InUseFolderPaths, OutVirtualPaths);
 }
 
-void ContentBrowserUtils::AppendAssetFilterToContentBrowserFilter(const FARFilter& InAssetFilter, const TSharedPtr<FNamePermissionList>& InAssetClassBlacklist, const TSharedPtr<FPathPermissionList>& InFolderBlacklist, FContentBrowserDataFilter& OutDataFilter)
+void ContentBrowserUtils::AppendAssetFilterToContentBrowserFilter(const FARFilter& InAssetFilter, const TSharedPtr<FNamePermissionList>& InAssetClassPermissionList, const TSharedPtr<FPathPermissionList>& InFolderPermissionList, FContentBrowserDataFilter& OutDataFilter)
 {
 	if (InAssetFilter.ObjectPaths.Num() > 0 || InAssetFilter.TagsAndValues.Num() > 0 || InAssetFilter.bIncludeOnlyOnDiskAssets)
 	{
@@ -583,16 +583,16 @@ void ContentBrowserUtils::AppendAssetFilterToContentBrowserFilter(const FARFilte
 		ObjectFilter.bOnDiskObjectsOnly = InAssetFilter.bIncludeOnlyOnDiskAssets;
 	}
 
-	if (InAssetFilter.PackageNames.Num() > 0 || InAssetFilter.PackagePaths.Num() > 0 || (InFolderBlacklist && InFolderBlacklist->HasFiltering()))
+	if (InAssetFilter.PackageNames.Num() > 0 || InAssetFilter.PackagePaths.Num() > 0 || (InFolderPermissionList && InFolderPermissionList->HasFiltering()))
 	{
 		FContentBrowserDataPackageFilter& PackageFilter = OutDataFilter.ExtraFilters.FindOrAddFilter<FContentBrowserDataPackageFilter>();
 		PackageFilter.PackageNamesToInclude = InAssetFilter.PackageNames;
 		PackageFilter.PackagePathsToInclude = InAssetFilter.PackagePaths;
 		PackageFilter.bRecursivePackagePathsToInclude = InAssetFilter.bRecursivePaths;
-		PackageFilter.PathBlacklist = InFolderBlacklist;
+		PackageFilter.PathPermissionList = InFolderPermissionList;
 	}
 
-	if (InAssetFilter.ClassNames.Num() > 0 || (InAssetClassBlacklist && InAssetClassBlacklist->HasFiltering()))
+	if (InAssetFilter.ClassNames.Num() > 0 || (InAssetClassPermissionList && InAssetClassPermissionList->HasFiltering()))
 	{
 		FContentBrowserDataClassFilter& ClassFilter = OutDataFilter.ExtraFilters.FindOrAddFilter<FContentBrowserDataClassFilter>();
 		ClassFilter.ClassNamesToInclude = InAssetFilter.ClassNames;
@@ -602,36 +602,36 @@ void ContentBrowserUtils::AppendAssetFilterToContentBrowserFilter(const FARFilte
 			ClassFilter.ClassNamesToExclude = InAssetFilter.RecursiveClassesExclusionSet.Array();
 			ClassFilter.bRecursiveClassNamesToExclude = false;
 		}
-		ClassFilter.ClassBlacklist = InAssetClassBlacklist;
+		ClassFilter.ClassPermissionList = InAssetClassPermissionList;
 	}
 }
 
-TSharedPtr<FPathPermissionList> ContentBrowserUtils::GetCombinedFolderBlacklist(const TSharedPtr<FPathPermissionList>& FolderBlacklist, const TSharedPtr<FPathPermissionList>& WritableFolderBlacklist)
+TSharedPtr<FPathPermissionList> ContentBrowserUtils::GetCombinedFolderPermissionList(const TSharedPtr<FPathPermissionList>& FolderPermissionList, const TSharedPtr<FPathPermissionList>& WritableFolderPermissionList)
 {
-	TSharedPtr<FPathPermissionList> CombinedFolderBlacklist;
+	TSharedPtr<FPathPermissionList> CombinedFolderPermissionList;
 
-	const bool bHidingFolders = FolderBlacklist && FolderBlacklist->HasFiltering();
-	const bool bHidingReadOnlyFolders = WritableFolderBlacklist && WritableFolderBlacklist->HasFiltering();
+	const bool bHidingFolders = FolderPermissionList && FolderPermissionList->HasFiltering();
+	const bool bHidingReadOnlyFolders = WritableFolderPermissionList && WritableFolderPermissionList->HasFiltering();
 	if (bHidingFolders || bHidingReadOnlyFolders)
 	{
-		CombinedFolderBlacklist = MakeShared<FPathPermissionList>();
+		CombinedFolderPermissionList = MakeShared<FPathPermissionList>();
 
 		if (bHidingReadOnlyFolders && bHidingFolders)
 		{
-			FPathPermissionList IntersectedFilter = FolderBlacklist->CombinePathFilters(*WritableFolderBlacklist.Get());
-			CombinedFolderBlacklist->Append(IntersectedFilter);
+			FPathPermissionList IntersectedFilter = FolderPermissionList->CombinePathFilters(*WritableFolderPermissionList.Get());
+			CombinedFolderPermissionList->Append(IntersectedFilter);
 		}
 		else if (bHidingReadOnlyFolders)
 		{
-			CombinedFolderBlacklist->Append(*WritableFolderBlacklist);
+			CombinedFolderPermissionList->Append(*WritableFolderPermissionList);
 		}
 		else if (bHidingFolders)
 		{
-			CombinedFolderBlacklist->Append(*FolderBlacklist);
+			CombinedFolderPermissionList->Append(*FolderPermissionList);
 		}
 	}
 
-	return CombinedFolderBlacklist;
+	return CombinedFolderPermissionList;
 }
 
 bool ContentBrowserUtils::CanDeleteFromAssetView(TWeakPtr<SAssetView> AssetView, FText* OutErrorMsg)

@@ -248,7 +248,7 @@ public:
 	bool bRecursivePackagePathsToExclude = false;
 
 	/** Optional set of additional path filtering */
-	TSharedPtr<FPathPermissionList> PathBlacklist;
+	TSharedPtr<FPathPermissionList> PathPermissionList;
 };
 
 /**
@@ -278,7 +278,7 @@ public:
 	bool bRecursiveClassNamesToExclude = false;
 
 	/** Optional set of additional class filtering */
-	TSharedPtr<FNamePermissionList> ClassBlacklist;
+	TSharedPtr<FNamePermissionList> ClassPermissionList;
 };
 
 /**

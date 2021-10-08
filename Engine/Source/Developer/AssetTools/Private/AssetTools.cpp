@@ -176,23 +176,23 @@ UAssetToolsImpl::UAssetToolsImpl(const FObjectInitializer& ObjectInitializer)
 	, AssetRenameManager(MakeShareable(new FAssetRenameManager))
 	, AssetFixUpRedirectors(MakeShareable(new FAssetFixUpRedirectors))
 	, NextUserCategoryBit(EAssetTypeCategories::FirstUser)
-	, AssetClassBlacklist(MakeShared<FNamePermissionList>())
-	, FolderBlacklist(MakeShared<FPathPermissionList>())
-	, WritableFolderBlacklist(MakeShared<FPathPermissionList>())
+	, AssetClassPermissionList(MakeShared<FNamePermissionList>())
+	, FolderPermissionList(MakeShared<FPathPermissionList>())
+	, WritableFolderPermissionList(MakeShared<FPathPermissionList>())
 {
 	TArray<FString> SupportedTypesArray;
 	GConfig->GetArray(TEXT("AssetTools"), TEXT("SupportedAssetTypes"), SupportedTypesArray, GEditorIni);
 	for (const FString& Type : SupportedTypesArray)
 	{
-		AssetClassBlacklist->AddAllowListItem("AssetToolsConfigFile", *Type);
+		AssetClassPermissionList->AddAllowListItem("AssetToolsConfigFile", *Type);
 	}
-	AssetClassBlacklist->OnFilterChanged().AddUObject(this, &UAssetToolsImpl::AssetClassBlacklistChanged);
+	AssetClassPermissionList->OnFilterChanged().AddUObject(this, &UAssetToolsImpl::AssetClassPermissionListChanged);
 
 	TArray<FString> BlacklistedViewPath;
 	GConfig->GetArray(TEXT("AssetTools"), TEXT("BlacklistAssetPaths"), BlacklistedViewPath, GEditorIni);
 	for (const FString& Path : BlacklistedViewPath)
 	{
-		FolderBlacklist->AddDenyListItem("AssetToolsConfigFile", Path);
+		FolderPermissionList->AddDenyListItem("AssetToolsConfigFile", Path);
 	}
 
 	GConfig->GetArray(TEXT("AssetTools"), TEXT("BlacklistContentSubPaths"), SubContentBlacklistPaths, GEditorIni);
@@ -325,7 +325,7 @@ void UAssetToolsImpl::RegisterAssetTypeActions(const TSharedRef<IAssetTypeAction
 	bool bSupported = false;
 	if (const UClass* SupportedClass = NewActions->GetSupportedClass())
 	{
-		bSupported = AssetClassBlacklist->PassesFilter(SupportedClass->GetFName());
+		bSupported = AssetClassPermissionList->PassesFilter(SupportedClass->GetFName());
 	}
 	else
 	{
@@ -1111,7 +1111,7 @@ TArray<UObject*> UAssetToolsImpl::ImportAssets(const FString& DestinationPath)
 
 TArray<UObject*> UAssetToolsImpl::ImportAssetsWithDialog(const FString& DestinationPath)
 {
-	if (!GetWritableFolderBlacklist()->PassesStartsWithFilter(DestinationPath))
+	if (!GetWritableFolderPermissionList()->PassesStartsWithFilter(DestinationPath))
 	{
 		NotifyBlockedByWritableFolderFilter();
 		return TArray<UObject*>();
@@ -3494,19 +3494,19 @@ TArray<UFactory*> UAssetToolsImpl::GetNewAssetFactories() const
 	return MoveTemp(Factories);
 }
 
-TSharedRef<FNamePermissionList>& UAssetToolsImpl::GetAssetClassBlacklist()
+TSharedRef<FNamePermissionList>& UAssetToolsImpl::GetAssetClassPermissionList()
 {
-	return AssetClassBlacklist;
+	return AssetClassPermissionList;
 }
 
-void UAssetToolsImpl::AssetClassBlacklistChanged()
+void UAssetToolsImpl::AssetClassPermissionListChanged()
 {
 	for (TSharedRef<IAssetTypeActions>& ActionsIt : AssetTypeActionsList)
 	{
 		bool bSupported = false;
 		if (const UClass* SupportedClass = ActionsIt->GetSupportedClass())
 		{
-			bSupported = AssetClassBlacklist->PassesFilter(SupportedClass->GetFName());
+			bSupported = AssetClassPermissionList->PassesFilter(SupportedClass->GetFName());
 		}
 		else
 		{
@@ -3521,7 +3521,7 @@ void UAssetToolsImpl::AddSubContentBlacklist(const FString& InMount)
 {
 	for (const FString& SubContentPath : SubContentBlacklistPaths)
 	{
-		FolderBlacklist->AddDenyListItem("AssetToolsConfigFile", InMount / SubContentPath);
+		FolderPermissionList->AddDenyListItem("AssetToolsConfigFile", InMount / SubContentPath);
 	}
 }
 
@@ -3530,23 +3530,23 @@ void UAssetToolsImpl::OnContentPathMounted(const FString& InAssetPath, const FSt
 	AddSubContentBlacklist(InAssetPath);
 }
 
-TSharedRef<FPathPermissionList>& UAssetToolsImpl::GetFolderBlacklist()
+TSharedRef<FPathPermissionList>& UAssetToolsImpl::GetFolderPermissionList()
 {
-	return FolderBlacklist;
+	return FolderPermissionList;
 }
 
-TSharedRef<FPathPermissionList>& UAssetToolsImpl::GetWritableFolderBlacklist()
+TSharedRef<FPathPermissionList>& UAssetToolsImpl::GetWritableFolderPermissionList()
 {
-	return WritableFolderBlacklist;
+	return WritableFolderPermissionList;
 }
 
 bool UAssetToolsImpl::AllPassWritableFolderFilter(const TArray<FString>& InPaths) const
 {
-	if (WritableFolderBlacklist->HasFiltering())
+	if (WritableFolderPermissionList->HasFiltering())
 	{
 		for (const FString& Path : InPaths)
 		{
-			if (!WritableFolderBlacklist->PassesStartsWithFilter(Path))
+			if (!WritableFolderPermissionList->PassesStartsWithFilter(Path))
 			{
 				return false;
 			}

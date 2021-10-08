@@ -8,115 +8,115 @@
 #include "Misc/NamePermissionList.h"
 
 /** Struct, OwnerName */
-DECLARE_MULTICAST_DELEGATE_TwoParams(FWhitelistUpdated, TSoftObjectPtr<UStruct>, FName);
+DECLARE_MULTICAST_DELEGATE_TwoParams(FPermissionListUpdated, TSoftObjectPtr<UStruct>, FName);
 
 /**
- * A hierarchical set of rules that can be used to whitelist all properties of specific Structs without
+ * A hierarchical set of rules that can be used to PermissionList all properties of specific Structs without
  * having to manually add every single property in those Structs. These rules are applied in order from
- * the base Struct to the leaf Struct. UseExistingWhitelist has dual-functionality to alternatively
- * inherit the parent Struct's rule if no whitelist is manually defined.
+ * the base Struct to the leaf Struct. UseExistingPermissionList has dual-functionality to alternatively
+ * inherit the parent Struct's rule if no PermissionList is manually defined.
  * 
  * For example, if you have:
- * class A - (UseExistingWhitelist "MyProp")						Whitelist = "MyProp"
- * class B : public class A - (WhitelistAllProperties)				Whitelist = "MyProp","PropA1","PropA2"
- * class C : public class B - (UseExistingWhitelist "AnotherProp")	Whitelist = "MyProp","PropA1","PropA2","AnotherProp"
- * class D : public class B - (UseExistingWhitelist)				Whitelist = "MyProp","PropA1","PropA2","PropD1","PropD2"
- * Note that because class C manually defines a whitelist, it does not inherit the WhitelistAllProperties rule from class B, while
- * class D does not define a whitelist, so it does inherit the rule, causing all of class D's properties to also get added to the whitelist.
+ * class A - (UseExistingPermissionList "MyProp")						PermissionList = "MyProp"
+ * class B : public class A - (AllowListListAllProperties)				PermissionList = "MyProp","PropA1","PropA2"
+ * class C : public class B - (UseExistingPermissionList "AnotherProp")	PermissionList = "MyProp","PropA1","PropA2","AnotherProp"
+ * class D : public class B - (UseExistingPermissionList)				PermissionList = "MyProp","PropA1","PropA2","PropD1","PropD2"
+ * Note that because class C manually defines a PermissionList, it does not inherit the AllowListAllProperties rule from class B, while
+ * class D does not define a PermissionList, so it does inherit the rule, causing all of class D's properties to also get added to the AllowList.
  */
-enum class EPropertyEditorWhitelistRules : uint8
+enum class EPropertyEditorPermissionListRules : uint8
 {
-	// If a whitelist is manually defined for this struct, whitelist those properties. Otherwise, use the parent Struct's rule.
-	UseExistingWhitelist,
-	// If no whitelist is manually defined for this Struct, whitelist all properties from this Struct and its subclasses
-	WhitelistAllProperties,
-	// If a whitelist is manually defined for this Struct, whitelist all properties from this Struct's subclasses.
-	// If this functionality is needed without any properties to whitelist, a fake property must be whitelisted instead.
-	WhitelistAllSubclassProperties
+	// If a PermissionList is manually defined for this struct, PermissionList those properties. Otherwise, use the parent Struct's rule.
+	UseExistingPermissionList,
+	// If no PermissionList is manually defined for this Struct, AllowList all properties from this Struct and its subclasses
+	AllowListAllProperties,
+	// If a PermissionList is manually defined for this Struct, AllowList all properties from this Struct's subclasses.
+	// If this functionality is needed without any properties to AllowList, a fake property must be added to AllowList instead.
+	AllowListAllSubclassProperties
 };
 
-struct FPropertyEditorWhitelistEntry
+struct FPropertyEditorPermissionListEntry
 {
-    FNamePermissionList Whitelist;
-    EPropertyEditorWhitelistRules Rules = EPropertyEditorWhitelistRules::UseExistingWhitelist;
+    FNamePermissionList PermissionList;
+    EPropertyEditorPermissionListRules Rules = EPropertyEditorPermissionListRules::UseExistingPermissionList;
 };
 
-class PROPERTYEDITOR_API FPropertyEditorWhitelist
+class PROPERTYEDITOR_API FPropertyEditorPermissionList
 {
 public:
-	static FPropertyEditorWhitelist& Get()
+	static FPropertyEditorPermissionList& Get()
 	{
-		static FPropertyEditorWhitelist Whitelist;
-		return Whitelist;
+		static FPropertyEditorPermissionList PermissionList;
+		return PermissionList;
 	}
 
 	/** Add a set of rules for a specific base UStruct to determine which properties are visible in all details panels */
-	void AddWhitelist(TSoftObjectPtr<UStruct> Struct, const FNamePermissionList& Whitelist, EPropertyEditorWhitelistRules Rules = EPropertyEditorWhitelistRules::UseExistingWhitelist);
+	void AddPermissionList(TSoftObjectPtr<UStruct> Struct, const FNamePermissionList& PermissionList, EPropertyEditorPermissionListRules Rules = EPropertyEditorPermissionListRules::UseExistingPermissionList);
 	/** Remove a set of rules for a specific base UStruct to determine which properties are visible in all details panels */
-	void RemoveWhitelist(TSoftObjectPtr<UStruct> Struct);
+	void RemovePermissionList(TSoftObjectPtr<UStruct> Struct);
 	/** Remove all rules */
-	void ClearWhitelist();
+	void ClearPermissionList();
 
-	/** Add a specific property to a UStruct's whitelist */
-	void AddToWhitelist(TSoftObjectPtr<UStruct> Struct, const FName PropertyName, const FName Owner = NAME_None);
-	/** Remove a specific property from a UStruct's whitelist */
-	void RemoveFromWhitelist(TSoftObjectPtr<UStruct> Struct, const FName PropertyName, const FName Owner = NAME_None);
-	/** Add a specific property to a UStruct's blacklist */
-	void AddToBlacklist(TSoftObjectPtr<UStruct> Struct, const FName PropertyName, const FName Owner = NAME_None);
-	/** Remove a specific property from a UStruct's blacklist */
-    void RemoveFromBlacklist(TSoftObjectPtr<UStruct> Struct, const FName PropertyName, const FName Owner = NAME_None);
+	/** Add a specific property to a UStruct's AllowList */
+	void AddToAllowList(TSoftObjectPtr<UStruct> Struct, const FName PropertyName, const FName Owner = NAME_None);
+	/** Remove a specific property from a UStruct's AllowList */
+	void RemoveFromAllowList(TSoftObjectPtr<UStruct> Struct, const FName PropertyName, const FName Owner = NAME_None);
+	/** Add a specific property to a UStruct's DenyList */
+	void AddToDenyList(TSoftObjectPtr<UStruct> Struct, const FName PropertyName, const FName Owner = NAME_None);
+	/** Remove a specific property from a UStruct's DenyList */
+    void RemoveFromDenyList(TSoftObjectPtr<UStruct> Struct, const FName PropertyName, const FName Owner = NAME_None);
 
-	/** When the whitelist or blacklist for any struct was added to or removed from. */
-    FWhitelistUpdated WhitelistUpdatedDelegate;
+	/** When the PermissionList or DenyList for any struct was added to or removed from. */
+    FPermissionListUpdated PermissionListUpdatedDelegate;
     
-	/** When the entire whitelist is enabled or disabled */
-	FSimpleMulticastDelegate WhitelistEnabledDelegate;
+	/** When the entire PermissionList is enabled or disabled */
+	FSimpleMulticastDelegate PermissionListEnabledDelegate;
 
 	/** Controls whether DoesPropertyPassFilter always returns true or performs property-based filtering. */
-	bool IsEnabled() const { return bEnablePropertyEditorWhitelist; }
-	/** Turn on or off the property editor whitelist. DoesPropertyPassFilter will always return true if disabled. */
+	bool IsEnabled() const { return bEnablePropertyEditorPermissionList; }
+	/** Turn on or off the property editor PermissionList. DoesPropertyPassFilter will always return true if disabled. */
 	void SetEnabled(bool bEnable);
 
-	/** Whether the Details View should show special menu entries to add/remove items in the whitelist */
+	/** Whether the Details View should show special menu entries to add/remove items in the PermissionList */
 	bool ShouldShowMenuEntries() const { return bShouldShowMenuEntries;}
-	/** Turn on or off menu entries to modify the whitelist from a Details View */
+	/** Turn on or off menu entries to modify the PermissionList from a Details View */
 	void SetShouldShowMenuEntries(bool bShow) { bShouldShowMenuEntries = bShow; }
 
 	/**
-	 * Checks if a property passes the whitelist/blacklist filtering specified by PropertyEditorWhitelists
-	 * This should be relatively fast as it maintains a flattened cache of all inherited whitelists for every UStruct (which is generated lazily).
+	 * Checks if a property passes the PermissionList/DenyList filtering specified by PropertyEditorPermissionLists
+	 * This should be relatively fast as it maintains a flattened cache of all inherited PermissionLists for every UStruct (which is generated lazily).
 	 */
 	bool DoesPropertyPassFilter(const UStruct* ObjectStruct, FName PropertyName) const;
 
-	/** Check whether a property exists on the whitelist for a specific Struct - this will return false if the property is whitelisted on a parent Struct */
-	bool IsSpecificPropertyWhitelisted(const UStruct* ObjectStruct, FName PropertyName) const;
-	/** Check whether a property exists on the blacklist for a specific Struct - this will return false if the property is blacklisted on a parent Struct */
-	bool IsSpecificPropertyBlacklisted(const UStruct* ObjectStruct, FName PropertyName) const;
+	/** Check whether a property exists on the PermissionList for a specific Struct - this will return false if the property is AllowListed on a parent Struct */
+	bool IsSpecificPropertyAllowListed(const UStruct* ObjectStruct, FName PropertyName) const;
+	/** Check whether a property exists on the DenyList for a specific Struct - this will return false if the property is DenyListed on a parent Struct */
+	bool IsSpecificPropertyDenyListed(const UStruct* ObjectStruct, FName PropertyName) const;
 
-	/** Gets a read-only copy of the original, un-flattened whitelist. */
-	const TMap<TSoftObjectPtr<UStruct>, FPropertyEditorWhitelistEntry>& GetRawWhitelist() const { return RawPropertyEditorWhitelist; }
+	/** Gets a read-only copy of the original, un-flattened PermissionList. */
+	const TMap<TSoftObjectPtr<UStruct>, FPropertyEditorPermissionListEntry>& GetRawPermissionList() const { return RawPropertyEditorPermissionList; }
 
-	/** Clear CachedPropertyEditorWhitelist to cause the whitelisted property list to be regenerated next time it's queried */
+	/** Clear CachedPropertyEditorPermissionList to cause the PermissionListed property list to be regenerated next time it's queried */
 	void ClearCache();
 
 private:
-	FPropertyEditorWhitelist();
-	~FPropertyEditorWhitelist();
+	FPropertyEditorPermissionList();
+	~FPropertyEditorPermissionList();
 
 	void RegisterOnBlueprintCompiled();
 	
-	/** Whether DoesPropertyPassFilter should perform its whitelist check or always return true */
-	bool bEnablePropertyEditorWhitelist = false;
-	/** Whether SDetailSingleItemRow should add menu items to add/remove properties to/from the whitelist */
+	/** Whether DoesPropertyPassFilter should perform its PermissionList check or always return true */
+	bool bEnablePropertyEditorPermissionList = false;
+	/** Whether SDetailSingleItemRow should add menu items to add/remove properties to/from the PermissionList */
 	bool bShouldShowMenuEntries = false;
 	
-	/** Stores assigned whitelists from AddWhitelist(), which are later flattened and stored in CachedPropertyEditorWhitelist. */
-	TMap<TSoftObjectPtr<UStruct>, FPropertyEditorWhitelistEntry> RawPropertyEditorWhitelist;
+	/** Stores assigned PermissionLists from AddPermissionList(), which are later flattened and stored in CachedPropertyEditorPermissionList. */
+	TMap<TSoftObjectPtr<UStruct>, FPropertyEditorPermissionListEntry> RawPropertyEditorPermissionList;
 
-	/** Lazily-constructed combined cache of both the flattened class whitelist and struct whitelist */
-	mutable TMap<TWeakObjectPtr<const UStruct>, FNamePermissionList> CachedPropertyEditorWhitelist;
+	/** Lazily-constructed combined cache of both the flattened class PermissionList and struct PermissionList */
+	mutable TMap<TWeakObjectPtr<const UStruct>, FNamePermissionList> CachedPropertyEditorPermissionList;
 
-	/** Get or create the cached whitelist for a specific UStruct */
-	const FNamePermissionList& GetCachedWhitelistForStruct(const UStruct* Struct) const;
-	const FNamePermissionList& GetCachedWhitelistForStructHelper(const UStruct* Struct, bool& bInOutShouldWhitelistAllProperties) const;
+	/** Get or create the cached PermissionList for a specific UStruct */
+	const FNamePermissionList& GetCachedPermissionListForStruct(const UStruct* Struct) const;
+	const FNamePermissionList& GetCachedPermissionListForStructHelper(const UStruct* Struct, bool& bInOutShouldAllowListAllProperties) const;
 };

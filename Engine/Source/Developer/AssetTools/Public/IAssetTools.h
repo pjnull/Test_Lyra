@@ -437,14 +437,14 @@ public:
 	/** Find all supported asset factories. */
 	virtual TArray<UFactory*> GetNewAssetFactories() const = 0;
 
-	/** Get asset class blacklist for content browser and other systems */
-	virtual TSharedRef<FNamePermissionList>& GetAssetClassBlacklist() = 0;
+	/** Get asset class permission list for content browser and other systems */
+	virtual TSharedRef<FNamePermissionList>& GetAssetClassPermissionList() = 0;
 
-	/** Get folder blacklist for content browser and other systems */
-	virtual TSharedRef<FPathPermissionList>& GetFolderBlacklist() = 0;
+	/** Get folder permission list for content browser and other systems */
+	virtual TSharedRef<FPathPermissionList>& GetFolderPermissionList() = 0;
 
-	/** Get writable folder blacklist for content browser and other systems */
-	virtual TSharedRef<FPathPermissionList>& GetWritableFolderBlacklist() = 0;
+	/** Get writable folder permission list for content browser and other systems */
+	virtual TSharedRef<FPathPermissionList>& GetWritableFolderPermissionList() = 0;
 
 	/** Returns true if all in list pass writable folder filter */
 	virtual bool AllPassWritableFolderFilter(const TArray<FString>& InPaths) const = 0;

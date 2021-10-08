@@ -91,7 +91,7 @@ public:
 
 	virtual void UnregisterPlacementCategory(FName Handle);
 
-	virtual TSharedRef<FNamePermissionList>& GetCategoryBlacklist() override { return CategoryBlacklist; }
+	virtual TSharedRef<FNamePermissionList>& GetCategoryPermissionList() override { return CategoryPermissionList; }
 
 	virtual void GetSortedCategories(TArray<FPlacementCategoryInfo>& OutCategories) const;
 
@@ -125,13 +125,13 @@ private:
 
 	bool PassesFilters(const TSharedPtr<FPlaceableItem>& Item) const;
 
-	void OnCategoryBlacklistChanged();
+	void OnCategoryPermissionListChanged();
 
 private:
 
 	TMap<FName, FPlacementCategory> Categories;
 
-	TSharedRef<FNamePermissionList> CategoryBlacklist;
+	TSharedRef<FNamePermissionList> CategoryPermissionList;
 
 	TMap<FName, TPlaceableItemPredicate> PlaceableItemPredicates;
 

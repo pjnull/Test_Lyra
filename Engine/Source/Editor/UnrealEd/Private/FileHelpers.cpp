@@ -4458,7 +4458,7 @@ FString FEditorFileUtils::ExtractPackageName(const FString& ObjectPath)
 void FEditorFileUtils::GetDirtyWorldPackages(TArray<UPackage*>& OutDirtyPackages, const FShouldIgnorePackageFunctionRef& ShouldIgnorePackageFunction)
 {
 	FAssetToolsModule& AssetToolsModule = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools");
-	const TSharedRef<FPathPermissionList>& WritableFolderFilter = AssetToolsModule.Get().GetWritableFolderBlacklist();
+	const TSharedRef<FPathPermissionList>& WritableFolderFilter = AssetToolsModule.Get().GetWritableFolderPermissionList();
 	const bool bHasWritableFolderFilter = WritableFolderFilter->HasFiltering();
 
 	for (TObjectIterator<UWorld> WorldIt; WorldIt; ++WorldIt)
@@ -4580,7 +4580,7 @@ void FEditorFileUtils::GetDirtyWorldPackages(TArray<UPackage*>& OutDirtyPackages
 void FEditorFileUtils::GetDirtyContentPackages(TArray<UPackage*>& OutDirtyPackages, const FShouldIgnorePackageFunctionRef& ShouldIgnorePackageFunction)
 {
 	FAssetToolsModule& AssetToolsModule = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools");
-	const TSharedRef<FPathPermissionList>& WritableFolderFilter = AssetToolsModule.Get().GetWritableFolderBlacklist();
+	const TSharedRef<FPathPermissionList>& WritableFolderFilter = AssetToolsModule.Get().GetWritableFolderPermissionList();
 	const bool bHasWritableFolderFilter = WritableFolderFilter->HasFiltering();
 
 	// Make a list of all content packages that we should save

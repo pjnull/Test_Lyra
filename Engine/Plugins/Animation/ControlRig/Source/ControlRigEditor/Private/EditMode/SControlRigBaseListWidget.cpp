@@ -711,10 +711,10 @@ void SControlRigBaseListWidget::Construct(const FArguments& InArgs)
 	PathPickerConfig.bAddDefaultPath = true;
 	PathPickerConfig.bOnPathSelectedPassesVirtualPaths = false;
 	PathPickerConfig.DefaultPath = CurrentlySelectedInternalPath;
-	CustomFolderBlacklist = PathPickerConfig.CustomFolderBlacklist = MakeShared<FPathPermissionList>();
+	CustomFolderPermissionList = PathPickerConfig.CustomFolderPermissionList = MakeShared<FPathPermissionList>();
 	for (const FString& Path : PosesDirectories)
 	{
-		PathPickerConfig.CustomFolderBlacklist.Get()->AddAllowListItem("PoseLibrary", Path);
+		PathPickerConfig.CustomFolderPermissionList.Get()->AddAllowListItem("PoseLibrary", Path);
 	}
 
 	PathPickerConfig.OnGetFolderContextMenu = FOnGetFolderContextMenu::CreateSP(this, &SControlRigBaseListWidget::OnGetFolderContextMenu);
@@ -1178,7 +1178,7 @@ void SControlRigBaseListWidget::ExecuteAddFolderToView()
 	if (NewAnimDlg->ShowModal() != EAppReturnType::Cancel)
 	{
 		FString AssetPath = NewAnimDlg->GetAssetPath();
-		CustomFolderBlacklist.Get()->AddAllowListItem("PoseLibrary", AssetPath);
+		CustomFolderPermissionList.Get()->AddAllowListItem("PoseLibrary", AssetPath);
 	    UControlRigPoseProjectSettings* PoseSettings = GetMutableDefault<UControlRigPoseProjectSettings>();
 		FDirectoryPath Path;
 		Path.Path = AssetPath;

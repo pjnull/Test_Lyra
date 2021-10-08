@@ -116,9 +116,9 @@ public:
 	virtual void ConvertVirtualTextures(const TArray<UTexture2D*>& Textures, bool bConvertBackToNonVirtual, const TArray<UMaterial*>* RelatedMaterials = nullptr) const override;
 	virtual bool IsAssetClassSupported(const UClass* AssetClass) const override;
 	virtual TArray<UFactory*> GetNewAssetFactories() const override;
-	virtual TSharedRef<FNamePermissionList>& GetAssetClassBlacklist() override;
-	virtual TSharedRef<FPathPermissionList>& GetFolderBlacklist() override;
-	virtual TSharedRef<FPathPermissionList>& GetWritableFolderBlacklist() override;
+	virtual TSharedRef<FNamePermissionList>& GetAssetClassPermissionList() override;
+	virtual TSharedRef<FPathPermissionList>& GetFolderPermissionList() override;
+	virtual TSharedRef<FPathPermissionList>& GetWritableFolderPermissionList() override;
 	virtual bool AllPassWritableFolderFilter(const TArray<FString>& InPaths) const override;
 	virtual void NotifyBlockedByWritableFolderFilter() const;
 	
@@ -177,7 +177,7 @@ private:
 	UObject* PerformDuplicateAsset(const FString& AssetName, const FString& PackagePath, UObject* OriginalObject, bool bWithDialog);
 
 	/** Internal method that performs actions when asset class blacklist filter changes */
-	void AssetClassBlacklistChanged();
+	void AssetClassPermissionListChanged();
 
 	/**
 	 * Add sub content blacklist filter for a new mount point
@@ -201,14 +201,14 @@ private:
 	/** The next user category bit to allocate (set to 0 when there are no more bits left) */
 	uint32 NextUserCategoryBit;
 
-	/** Blacklist of assets by class name */
-	TSharedRef<FNamePermissionList> AssetClassBlacklist;
+	/** Permission list of assets by class name */
+	TSharedRef<FNamePermissionList> AssetClassPermissionList;
 
-	/** Blacklist of folder paths */
-	TSharedRef<FPathPermissionList> FolderBlacklist;
+	/** Permission list of folder paths */
+	TSharedRef<FPathPermissionList> FolderPermissionList;
 
-	/** Blacklist of folder paths to write to */
-	TSharedRef<FPathPermissionList> WritableFolderBlacklist;
+	/** Permission list of folder paths to write to */
+	TSharedRef<FPathPermissionList> WritableFolderPermissionList;
 
 	/** List of sub content paths denied for every mount. */
 	TArray<FString> SubContentBlacklistPaths;

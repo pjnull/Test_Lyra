@@ -23,7 +23,7 @@ public:
 	FString VirtualPath;
 	bool bRecursivePaths = false;
 	EContentBrowserItemAttributeFilter ItemAttributeFilter = EContentBrowserItemAttributeFilter::IncludeNone;
-	TSharedPtr<FPathPermissionList> Blacklist;
+	TSharedPtr<FPathPermissionList> PermissionList;
 	TArray<FString> FileExtensionsToInclude;
 };
 

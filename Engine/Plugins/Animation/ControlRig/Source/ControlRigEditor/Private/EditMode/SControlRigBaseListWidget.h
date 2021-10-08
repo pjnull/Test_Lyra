@@ -132,7 +132,7 @@ private:
 	TSharedPtr< FUICommandList > Commands;
 
 	/** Blacklist held by the Path Picker*/
-	TSharedPtr<FPathPermissionList> CustomFolderBlacklist;
+	TSharedPtr<FPathPermissionList> CustomFolderPermissionList;
 
 	/** Utility function to display notifications to the user */
 	void NotifyUser(FNotificationInfo& NotificationInfo);

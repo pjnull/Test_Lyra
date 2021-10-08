@@ -115,8 +115,8 @@ void SPathView::Construct( const FArguments& InArgs )
 	ContentBrowserData->OnItemDataDiscoveryComplete().AddSP(this, &SPathView::HandleItemDataDiscoveryComplete);
 
 	FAssetToolsModule& AssetToolsModule = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools");
-	FolderBlacklist = AssetToolsModule.Get().GetFolderBlacklist();
-	WritableFolderBlacklist = AssetToolsModule.Get().GetWritableFolderBlacklist();
+	FolderPermissionList = AssetToolsModule.Get().GetFolderPermissionList();
+	WritableFolderPermissionList = AssetToolsModule.Get().GetWritableFolderPermissionList();
 
 	// Listen for when view settings are changed
 	FContentBrowserModule& ContentBrowserModule = FModuleManager::GetModuleChecked<FContentBrowserModule>(TEXT("ContentBrowser"));
@@ -248,7 +248,7 @@ void SPathView::Construct( const FArguments& InArgs )
 		]
 	];
 
-	CustomFolderBlacklist = InArgs._CustomFolderBlacklist;
+	CustomFolderPermissionList = InArgs._CustomFolderPermissionList;
 	// Add all paths currently gathered from the asset registry
 	Populate();
 
@@ -739,15 +739,15 @@ FContentBrowserDataCompiledFilter SPathView::CreateCompiledFolderFilter() const
 	DataFilter.ItemCategoryFilter = GetContentBrowserItemCategoryFilter();
 	DataFilter.ItemAttributeFilter = GetContentBrowserItemAttributeFilter();
 
-	TSharedPtr<FPathPermissionList> CombinedFolderBlacklist = ContentBrowserUtils::GetCombinedFolderBlacklist(FolderBlacklist, bAllowReadOnlyFolders ? nullptr : WritableFolderBlacklist);
+	TSharedPtr<FPathPermissionList> CombinedFolderPermissionList = ContentBrowserUtils::GetCombinedFolderPermissionList(FolderPermissionList, bAllowReadOnlyFolders ? nullptr : WritableFolderPermissionList);
 
-	if (CustomFolderBlacklist.IsValid())
+	if (CustomFolderPermissionList.IsValid())
 	{
-		if (!CombinedFolderBlacklist.IsValid())
+		if (!CombinedFolderPermissionList.IsValid())
 		{
-			CombinedFolderBlacklist = MakeShared<FPathPermissionList>();
+			CombinedFolderPermissionList = MakeShared<FPathPermissionList>();
 		}
-		CombinedFolderBlacklist->Append(*CustomFolderBlacklist);
+		CombinedFolderPermissionList->Append(*CustomFolderPermissionList);
 	}
 
 	if (PluginPathFilters.IsValid() && PluginPathFilters->Num() > 0 && ContentBrowserSettings->GetDisplayPluginFolders())
@@ -760,16 +760,16 @@ FContentBrowserDataCompiledFilter SPathView::CreateCompiledFolderFilter() const
 				FString MountedAssetPath = Plugin->GetMountedAssetPath();
 				MountedAssetPath.RemoveFromEnd(TEXT("/"), ESearchCase::CaseSensitive);
 
-				if (!CombinedFolderBlacklist.IsValid())
+				if (!CombinedFolderPermissionList.IsValid())
 				{
-					CombinedFolderBlacklist = MakeShared<FPathPermissionList>();
+					CombinedFolderPermissionList = MakeShared<FPathPermissionList>();
 				}
-				CombinedFolderBlacklist->AddDenyListItem("PluginPathFilters", MountedAssetPath);
+				CombinedFolderPermissionList->AddDenyListItem("PluginPathFilters", MountedAssetPath);
 			}
 		}
 	}
 
-	ContentBrowserUtils::AppendAssetFilterToContentBrowserFilter(FARFilter(), nullptr, CombinedFolderBlacklist, DataFilter);
+	ContentBrowserUtils::AppendAssetFilterToContentBrowserFilter(FARFilter(), nullptr, CombinedFolderPermissionList, DataFilter);
 
 	FContentBrowserDataCompiledFilter CompiledDataFilter;
 	{
@@ -810,14 +810,14 @@ EContentBrowserItemAttributeFilter SPathView::GetContentBrowserItemAttributeFilt
 bool SPathView::InternalPathPassesBlockLists(const FStringView InInternalPath, const int32 InAlreadyCheckedDepth) const
 {
 	TArray<const FPathPermissionList*, TInlineAllocator<2>> BlockLists;
-	if (FolderBlacklist.IsValid() && FolderBlacklist->HasFiltering())
+	if (FolderPermissionList.IsValid() && FolderPermissionList->HasFiltering())
 	{
-		BlockLists.Add(FolderBlacklist.Get());
+		BlockLists.Add(FolderPermissionList.Get());
 	}
 
-	if (!bAllowReadOnlyFolders && WritableFolderBlacklist.IsValid() && WritableFolderBlacklist->HasFiltering())
+	if (!bAllowReadOnlyFolders && WritableFolderPermissionList.IsValid() && WritableFolderPermissionList->HasFiltering())
 	{
-		BlockLists.Add(WritableFolderBlacklist.Get());
+		BlockLists.Add(WritableFolderPermissionList.Get());
 	}
 
 	for (const FPathPermissionList* Filter : BlockLists)

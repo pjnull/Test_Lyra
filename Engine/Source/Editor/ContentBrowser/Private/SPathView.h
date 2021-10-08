@@ -91,7 +91,7 @@ public:
 		SLATE_ARGUMENT( TSharedPtr<FSourcesSearch>, ExternalSearch )
 
 		/** Optional Custom Folder Blacklist to be used to filter folders. */
-		SLATE_ARGUMENT( TSharedPtr<FPathPermissionList>, CustomFolderBlacklist)
+		SLATE_ARGUMENT( TSharedPtr<FPathPermissionList>, CustomFolderPermissionList)
 
 		/** The plugin filter collection */
 		SLATE_ARGUMENT( TSharedPtr<FPluginFilterCollectionType>, PluginPathFilters)
@@ -390,15 +390,15 @@ protected:
 	TSharedPtr<SWidget> PathViewWidget;
 
 	/** Blacklist filter to hide folders */
-	TSharedPtr<FPathPermissionList> FolderBlacklist;
+	TSharedPtr<FPathPermissionList> FolderPermissionList;
 
 	/** Writable folder filter */
-	TSharedPtr<FPathPermissionList> WritableFolderBlacklist;
+	TSharedPtr<FPathPermissionList> WritableFolderPermissionList;
 
 	TMap<FName, TWeakPtr<FTreeItem>> TreeItemLookup;
 
 	/** Custom Folder Blacklist*/
-	TSharedPtr<FPathPermissionList> CustomFolderBlacklist;
+	TSharedPtr<FPathPermissionList> CustomFolderPermissionList;
 
 private:
 	/** Used to track if the list of last expanded path should be updated */

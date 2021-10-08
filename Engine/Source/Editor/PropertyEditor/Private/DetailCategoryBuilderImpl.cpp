@@ -836,7 +836,7 @@ bool PassesInlineFilters(FDetailItemNode& Node)
 						// passes the filter before deciding whether to include its child properties.
 						if (ParentNode != DetailNodeParent->GetPropertyNode().Get())
 						{
-							return FPropertyEditorWhitelist::Get().DoesPropertyPassFilter(FDetailTreeNode::GetPropertyNodeBaseStructure(ParentNode->GetParentNode()), ParentProperty->GetFName());
+							return FPropertyEditorPermissionList::Get().DoesPropertyPassFilter(FDetailTreeNode::GetPropertyNodeBaseStructure(ParentNode->GetParentNode()), ParentProperty->GetFName());
 						}
 					}
 				}
@@ -852,7 +852,7 @@ bool PassesInlineFilters(FDetailItemNode& Node)
 					{
 						if (GrandparentProperty->HasMetaData("EditInline"))
 						{
-							return FPropertyEditorWhitelist::Get().DoesPropertyPassFilter(GrandparentProperty->GetOwnerClass(), GrandparentProperty->GetFName());
+							return FPropertyEditorPermissionList::Get().DoesPropertyPassFilter(GrandparentProperty->GetOwnerClass(), GrandparentProperty->GetFName());
 						}
 					}
 				}
@@ -876,9 +876,9 @@ void FDetailCategoryImpl::GenerateNodesFromCustomizations(const TArray<FDetailLa
 				TSharedRef<FDetailItemNode> NewNode = MakeShareable(new FDetailItemNode(Customization, AsShared(), IsParentEnabled));
 				// Discard nodes that don't pass the property whitelist. There is a special check here for properties in structs that do not have a
 				// parent struct node (eg ShowOnlyInnerProperties). Both the node and it's container must pass the filter.
-				if (FPropertyEditorWhitelist::Get().IsEnabled())
+				if (FPropertyEditorPermissionList::Get().IsEnabled())
 				{
-					if (!FPropertyEditorWhitelist::Get().DoesPropertyPassFilter(NewNode->GetParentBaseStructure(), NewNode->GetNodeName()) || !PassesInlineFilters(NewNode.Get()))
+					if (!FPropertyEditorPermissionList::Get().DoesPropertyPassFilter(NewNode->GetParentBaseStructure(), NewNode->GetNodeName()) || !PassesInlineFilters(NewNode.Get()))
 					{
 						continue;
 					}

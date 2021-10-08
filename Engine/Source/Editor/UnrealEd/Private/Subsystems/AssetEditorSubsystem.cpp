@@ -308,7 +308,7 @@ bool UAssetEditorSubsystem::OpenEditorForAsset(UObject* Asset, const EToolkitMod
 			return false;
 		}
 
-		if (!AssetToolsModule.Get().GetWritableFolderBlacklist()->PassesStartsWithFilter(Package->GetName()))
+		if (!AssetToolsModule.Get().GetWritableFolderPermissionList()->PassesStartsWithFilter(Package->GetName()))
 		{
 			AssetToolsModule.Get().NotifyBlockedByWritableFolderFilter();
 			return false;

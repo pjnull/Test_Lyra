@@ -1049,7 +1049,7 @@ FContentBrowserItemPath FContentBrowserSingleton::GetInitialPathToSaveAsset(cons
 	}
 	else
 	{
-		bPathIsWritable = AssetToolsModule.Get().GetWritableFolderBlacklist()->PassesStartsWithFilter(InPath.GetInternalPathName(), /*bAllowParentPaths*/true);
+		bPathIsWritable = AssetToolsModule.Get().GetWritableFolderPermissionList()->PassesStartsWithFilter(InPath.GetInternalPathName(), /*bAllowParentPaths*/true);
 	}
 
 	FString AssetPath;
@@ -1063,7 +1063,7 @@ FContentBrowserItemPath FContentBrowserSingleton::GetInitialPathToSaveAsset(cons
 		const FString DefaultFilesystemDirectory = FEditorDirectories::Get().GetLastDirectory(ELastDirectory::NEW_ASSET);
 		if (!DefaultFilesystemDirectory.IsEmpty() && FPackageName::TryConvertFilenameToLongPackageName(DefaultFilesystemDirectory, AssetPath))
 		{
-			if (AssetToolsModule.Get().GetWritableFolderBlacklist()->PassesStartsWithFilter(AssetPath, /*bAllowParentPaths*/true))
+			if (AssetToolsModule.Get().GetWritableFolderPermissionList()->PassesStartsWithFilter(AssetPath, /*bAllowParentPaths*/true))
 			{
 				bPathIsWritable = true;
 			}
@@ -1082,7 +1082,7 @@ FContentBrowserItemPath FContentBrowserSingleton::GetInitialPathToSaveAsset(cons
 				{
 					if (IContentBrowserDataModule::Get().GetSubsystem()->TryConvertVirtualPath(FNameBuilder(VirtualPath), AssetPath) == EContentBrowserPathType::Internal)
 					{
-						if (AssetToolsModule.Get().GetWritableFolderBlacklist()->PassesStartsWithFilter(AssetPath, /*bAllowParentPaths*/true))
+						if (AssetToolsModule.Get().GetWritableFolderPermissionList()->PassesStartsWithFilter(AssetPath, /*bAllowParentPaths*/true))
 						{
 							break;
 						}

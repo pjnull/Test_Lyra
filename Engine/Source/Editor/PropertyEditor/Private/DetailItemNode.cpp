@@ -416,7 +416,7 @@ void FDetailItemNode::GenerateChildren( bool bUpdateFilteredNodes )
 		Children[i]->SetParentNode(AsShared());
 		if (Children[i]->GetNodeType() == EDetailNodeType::Object || Children[i]->GetNodeType() == EDetailNodeType::Item)
 		{
-			if (!FPropertyEditorWhitelist::Get().DoesPropertyPassFilter(Children[i]->GetParentBaseStructure(), Children[i]->GetNodeName()))
+			if (!FPropertyEditorPermissionList::Get().DoesPropertyPassFilter(Children[i]->GetParentBaseStructure(), Children[i]->GetNodeName()))
 			{
 				Children.RemoveAt(i);
 			}
