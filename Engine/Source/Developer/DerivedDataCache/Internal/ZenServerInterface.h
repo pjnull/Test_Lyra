@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "HAL/Platform.h"
+
 #ifndef UE_WITH_ZEN
 #	if PLATFORM_WINDOWS
 #		define UE_WITH_ZEN 1
