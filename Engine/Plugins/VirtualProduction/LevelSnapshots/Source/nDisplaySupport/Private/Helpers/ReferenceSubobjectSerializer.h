@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Restorability/Serialization/ICustomObjectSnapshotSerializer.h"
+#include "Restorability/Serialization/ObjectSnapshotSerializationData.h"
 
 class FScriptMapHelper;
 class ILevelSnapshotsModule;
