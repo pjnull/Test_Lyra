@@ -5,6 +5,27 @@
 #include "CoreMinimal.h"
 #include "HashSettings.generated.h"
 
+UENUM()
+namespace EHashAlgorithmChooseBehavior
+{
+	enum Type
+	{
+		/**
+		 * Use whichever algorithm is faster
+		 */
+		UseFastest,
+		/**
+		 * Always use CRC32 (only works if CRC32 is enabled)
+		 */
+		UseCrc32,
+		/**
+		 * Always use MD5 (only works if MD5 is enabled)
+		 */
+		UseMD5,
+	};
+}
+
+
 USTRUCT()
 struct LEVELSNAPSHOTS_API FHashSettings
 {
@@ -24,13 +45,35 @@ struct LEVELSNAPSHOTS_API FHashSettings
 	 * the actor data. 
 	 */
 	UPROPERTY(EditAnywhere, Category = "Level Snapshots")
-	double HashCutoffSeconds = 5;
+	double HashCutoffSeconds = 0.3;
 
-	/** Whether Level Snapshots will compute CRC32 hashes (when taking and analysing snapshots) */
+	/** Whether to compare world actor's to its saved hash when loading a snapshot. Boosts performance. */
+	UPROPERTY(EditAnywhere, Category = "Level Snapshots")
+	bool bUseHashForLoading = true;
+	
+	/**
+	 * Whether Level Snapshots will compute CRC32 hashes (when taking and analysing snapshots)
+	 * Speed: CRC32 < MD5 < SHA1.
+	 *
+	 * Disabling this option results in:
+	 *  1. Taking a snapshot will be faster (CRC32 will no longer be computed when snapshot is taken)
+	 *  2. When loading a snapshot, CRC32 is no longer available to quickly check whether an actor has changed.
+	 */
 	UPROPERTY(EditAnywhere, Category = "Level Snapshots")
 	bool bCanUseCRC = true;
 
-	/** Whether Level Snapshots will compute MD5 hashes (when taking and analysing snapshots) */
+	/**
+	 * Whether Level Snapshots will compute MD5 hashes (when taking and analysing snapshots).
+	 * Speed: CRC32 < MD5 < SHA1.
+	 *
+	 * Disabling this option results in:
+	 *  1. Taking a snapshot will be faster (MD5 will no longer be computed when snapshot is taken)
+	 *  2. When loading a snapshot, MD5 is no longer available to quickly check whether an actor has changed.
+	 */
 	UPROPERTY(EditAnywhere, Category = "Level Snapshots")
 	bool bCanUseMD5 = true;
+
+	/** Which hash algorithm to use when comparing a snapshot to the world. */
+	UPROPERTY(EditAnywhere, Category = "Level Snapshots")
+	TEnumAsByte<EHashAlgorithmChooseBehavior::Type> SnapshotDiffAlgorithm = EHashAlgorithmChooseBehavior::UseFastest;
 };

@@ -17,6 +17,14 @@ FSnapshotTestRunner::FSnapshotTestRunner()
 			);
 }
 
+FSnapshotTestRunner::FSnapshotTestRunner(FSnapshotTestRunner&& Other)
+{
+	TestWorld = Other.TestWorld;
+	Snapshots = Other.Snapshots;
+	// Prevent Other's destructor from calling RemoveFromRoot
+	Other.Snapshots.Empty();
+}
+
 FSnapshotTestRunner::~FSnapshotTestRunner()
 {
 	for (auto SnapshotIt = Snapshots.CreateIterator(); SnapshotIt; ++SnapshotIt)

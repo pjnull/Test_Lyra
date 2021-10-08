@@ -25,36 +25,12 @@ namespace
 
 		virtual FArchive& operator<<(UObject*& Object) override
 		{
-			if (!Object || !Object->IsIn(SerializedObject))
-			{
-				auto UniqueName = GetPathNameSafe(Object);
-				*this << UniqueName;
-			}
-			else
+			FString UniqueName = GetPathNameSafe(Object);
+			*this << UniqueName;
+			
+			if (Object && Object->IsIn(SerializedObject))
 			{
 				ObjectsToSerialize.Enqueue(Object);
-			}
-
-			return *this;
-		}
-	};
-
-	/** Serializes subobjects but skips the currently serialized FName */
-	class FSkipSerializedObjectNameArchive : public FSubobjectArchive
-	{
-	public:
-
-		explicit FSkipSerializedObjectNameArchive(FArchive& Archive)
-			: FSubobjectArchive(Archive)
-		{}
-		
-		virtual FArchive& operator<<(class FName& Name) override
-		{
-			checkSlow(SerializedObject);
-
-			if(Name != SerializedObject->GetFName())
-			{
-				InnerArchive << Name;
 			}
 
 			return *this;
@@ -84,11 +60,5 @@ namespace
 void SerializeObjectState::SerializeWithSubobjects(FArchive& Archive, UObject* Root)
 {
 	FSubobjectArchive Proxy(Archive);
-	SerializeObjectStateInternal(Proxy, Root);
-}
-
-void SerializeObjectState::SerializeWithoutObjectName(FArchive& Archive, UObject* Root)
-{
-	FSkipSerializedObjectNameArchive Proxy(Archive);
 	SerializeObjectStateInternal(Proxy, Root);
 }

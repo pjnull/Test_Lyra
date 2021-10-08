@@ -55,8 +55,7 @@ void ULevelSnapshotsEditorProjectSettings::PostEditChangeProperty(FPropertyChang
 		FPropertyInfoHelpers::UpdateDecimalComparisionPrecision(FloatComparisonPrecision, DoubleComparisonPrecision);
 	}
 
-	
-	if (PropertyChangedEvent.GetPropertyName() == GET_MEMBER_NAME_CHECKED(ULevelSnapshotsEditorProjectSettings, HashSettings))
+	if (PropertyChangedEvent.MemberProperty && PropertyChangedEvent.MemberProperty->GetFName() == GET_MEMBER_NAME_CHECKED(ULevelSnapshotsEditorProjectSettings, HashSettings))
 	{
 		SnapshotUtil::GHashSettings = HashSettings;
 	}

@@ -74,6 +74,8 @@ class ASnapshotTestActor : public ACharacter
 	GENERATED_BODY()
 public:
 
+	static ASnapshotTestActor* Spawn(UWorld* World, FName Name);
+	
 	ASnapshotTestActor();
 
 	bool HasAnyValidHardObjectReference() const;

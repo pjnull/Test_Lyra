@@ -8,6 +8,7 @@
 #include "Util/SerializeObjectState.h"
 
 #include "Serialization/BufferArchive.h"
+#include "Serialization/MemoryHasher.h"
 #include "Stats/StatsMisc.h"
 
 FHashSettings SnapshotUtil::GHashSettings;
@@ -27,7 +28,7 @@ void SnapshotUtil::PopulateActorHash(FActorSnapshotHash& ActorData, AActor* Worl
 
 		// FArchiveComputeFullCrc32 is faster than FArchiveComputeIncrementalCrc32 for actors
 		FArchiveComputeFullCrc32 CrcArchive;
-		SerializeObjectState::SerializeWithoutObjectName(CrcArchive, WorldActor);
+		SerializeObjectState::SerializeWithSubobjects(CrcArchive, WorldActor);
 		ActorData.Crc32DataLength = CrcArchive.GetSerializedData().Num();
 		ActorData.Crc32 = CrcArchive.GetCrc32();
 		ActorData.MicroSecondsForCrc = FPlatformTime::Seconds() - StartTime;
@@ -38,31 +39,88 @@ void SnapshotUtil::PopulateActorHash(FActorSnapshotHash& ActorData, AActor* Worl
 		const double StartTime = FPlatformTime::Seconds();
 		
 		// FArchiveComputeIncrementalMD5 is faster than FArchiveComputeFullMD5 for actors
-		FArchiveComputeIncrementalMD5 MD5Archive;
-		SerializeObjectState::SerializeWithoutObjectName(MD5Archive, WorldActor);
+		FArchiveComputeFullMD5 MD5Archive;
+		SerializeObjectState::SerializeWithSubobjects(MD5Archive, WorldActor);
+		ActorData.MD5DataLength = MD5Archive.GetSerializedData().Num();
 		ActorData.MD5 = MD5Archive.GetMD5();
 		ActorData.MicroSecondsForMD5 = FPlatformTime::Seconds() - StartTime;
+	}
+}
+
+namespace
+{
+	enum class EHashAlgorithm
+	{
+		None,
+		CRC32,
+		MD5
+	};
+
+	EHashAlgorithm GetCRC32Algorithm(const FActorSnapshotHash& ActorData)
+	{
+		return ActorData.HasCrc32() ? EHashAlgorithm::CRC32 : EHashAlgorithm::None;
+	}
+	EHashAlgorithm GetMD5Algorithm(const FActorSnapshotHash& ActorData)
+	{
+		return ActorData.HasMD5() ? EHashAlgorithm::MD5 : EHashAlgorithm::None;
+	}
+	EHashAlgorithm GetFastestAlgorithm(const FActorSnapshotHash& ActorData)
+	{
+		const bool bCrcIsFaster = ActorData.MicroSecondsForCrc < ActorData.MicroSecondsForMD5;
+		return bCrcIsFaster ?
+				ActorData.HasCrc32() ? EHashAlgorithm::CRC32 : GetMD5Algorithm(ActorData)
+				:
+				ActorData.HasMD5() ? EHashAlgorithm::MD5 : GetCRC32Algorithm(ActorData);
+	}
+	
+	
+	EHashAlgorithm DetermineHashAlgorithm(const FActorSnapshotHash& ActorData)
+	{
+		if (!SnapshotUtil::GHashSettings.bUseHashForLoading)
+		{
+			return EHashAlgorithm::None;
+		}
+		
+		switch (SnapshotUtil::GHashSettings.SnapshotDiffAlgorithm)
+		{
+			case EHashAlgorithmChooseBehavior::UseCrc32:
+				return GetCRC32Algorithm(ActorData);
+			case EHashAlgorithmChooseBehavior::UseMD5:
+				return GetMD5Algorithm(ActorData);
+			
+			case EHashAlgorithmChooseBehavior::UseFastest:
+			default:
+				return GetFastestAlgorithm(ActorData);
+		}
 	}
 }
 
 bool SnapshotUtil::HasMatchingHash(const FActorSnapshotHash& ActorData, AActor* WorldActor)
 {
 	SCOPED_SNAPSHOT_CORE_TRACE(HasMatchingHash);
-
-	const bool bCrcIsFaster = ActorData.MicroSecondsForCrc < ActorData.MicroSecondsForMD5;
-	if (bCrcIsFaster && GHashSettings.bCanUseCRC)
+	
+	switch (DetermineHashAlgorithm(ActorData))
 	{
-		FArchiveComputeFullCrc32 Archive;
-		SerializeObjectState::SerializeWithoutObjectName(Archive, WorldActor);
-		return ActorData.MicroSecondsForCrc < GHashSettings.HashCutoffSeconds && ActorData.Crc32DataLength == Archive.GetSerializedData().Num() && ActorData.Crc32 == Archive.GetCrc32();
+		case EHashAlgorithm::CRC32:
+			if (ActorData.MicroSecondsForCrc < GHashSettings.HashCutoffSeconds)
+			{
+				FArchiveComputeFullCrc32 Archive;
+				SerializeObjectState::SerializeWithSubobjects(Archive, WorldActor);
+				return ActorData.Crc32DataLength == Archive.GetSerializedData().Num() && Archive.GetSerializedData().Num() && ActorData.Crc32 == Archive.GetCrc32();
+			}
+			return false;
+			
+		case EHashAlgorithm::MD5:
+			if (ActorData.MicroSecondsForCrc < GHashSettings.HashCutoffSeconds)
+			{
+				FArchiveComputeFullMD5 Archive;
+				SerializeObjectState::SerializeWithSubobjects(Archive, WorldActor);
+				return ActorData.MD5DataLength == Archive.GetSerializedData().Num() && ActorData.MD5 == Archive.GetMD5();
+			}
+			return false;
+		
+		case EHashAlgorithm::None:
+		default:
+			return false;
 	}
-
-	if (GHashSettings.bCanUseMD5)
-	{
-		FArchiveComputeIncrementalMD5 Archive;
-		SerializeObjectState::SerializeWithoutObjectName(Archive, WorldActor);
-		return ActorData.MicroSecondsForMD5 < GHashSettings.HashCutoffSeconds && ActorData.MD5 == Archive.GetMD5();
-	}
-
-	return false;
 }

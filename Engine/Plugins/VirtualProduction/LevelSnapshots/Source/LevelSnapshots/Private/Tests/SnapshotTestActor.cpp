@@ -15,6 +15,13 @@ USnapshotTestComponent::USnapshotTestComponent()
 	Subobject = CreateDefaultSubobject<USubobject>(TEXT("Subobject"));
 }
 
+ASnapshotTestActor* ASnapshotTestActor::Spawn(UWorld* World, FName Name)
+{
+	FActorSpawnParameters Params;
+	Params.Name = Name;
+	return World->SpawnActor<ASnapshotTestActor>(Params);
+}
+
 ASnapshotTestActor::ASnapshotTestActor()
 {
 	ConstructorHelpers::FObjectFinder<UMaterialInterface> GradientLinearMaterialFinder(TEXT("Material'/Engine/MaterialTemplates/Gradients/Gradient_Linear.Gradient_Linear'"), LOAD_Quiet | LOAD_NoWarn);
