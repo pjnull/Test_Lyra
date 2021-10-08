@@ -267,9 +267,17 @@ public:
 		return HitchTimeHistogram.GetNumMeasurements();
 	}
 
-	int64 GetTotalHitchFrameTime() const
+	/**
+	 * Sum of all recorded hitch lengths (in seconds)
+	 * @param bSubtractHitchThreshold Bias towards larger hitches by removing "acceptable" frame time
+	 **/
+	double GetTotalHitchFrameTime(bool bSubtractHitchThreshold = true) const;
+
+	double GetPercentHitchTime(bool bSubtractHitchThreshold = true) const
 	{
-		return HitchTimeHistogram.GetSumOfAllMeasures();
+		const double TotalTime = GetTotalTime();
+		const double TotalHitchTime = GetTotalHitchFrameTime(bSubtractHitchThreshold);
+		return (TotalTime > 0.0) ? ((TotalHitchTime * 100.0) / TotalTime) : 0.0;
 	}
 
 	double GetPercentMissedVSync(int32 TargetFPS) const
@@ -290,21 +298,6 @@ public:
 	double GetAvgHitchFrameLength() const
 	{
 		return HitchTimeHistogram.GetAverageOfAllMeasures();
-	}
-
-	double GetPercentHitchTime(bool bSubtractHitchThreshold=true) const
-	{
-		const double TotalTime = GetTotalTime();
-		double TotalHitchTime = HitchTimeHistogram.GetSumOfAllMeasures();
-
-		if (bSubtractHitchThreshold && HitchTimeHistogram.GetNumBins() > 0)
-		{
-			// subtract hitch threshold to weight larger hitches
-			const double HitchThrehsold = HitchTimeHistogram.GetBinLowerBound(0);
-			TotalHitchTime -= HitchThrehsold * HitchTimeHistogram.GetNumMeasurements();
-		}
-
-		return (TotalTime > 0.0) ? ((TotalHitchTime * 100.0) / TotalTime) : 0.0;
 	}
 
 	void ChangeLabel(const FString& NewLabel)
