@@ -447,8 +447,8 @@ namespace EpicGames.Core
 		/// <summary>
 		/// Writes a warning message to the console.
 		/// </summary>
-		/// <param name="File">The file containing the error</param>
-		/// <param name="Line">Line number of the error</param>
+		/// <param name="File">The file containing the warning</param>
+		/// <param name="Line">Line number of the warning</param>
 		/// <param name="Format">Message format string</param>
 		/// <param name="Args">Optional arguments</param>
 		[StringFormatMethod("Format")]
@@ -456,6 +456,20 @@ namespace EpicGames.Core
 		{
 			WriteLinePrivate(false, LogEventType.Warning, LogFormatOptions.NoSeverityPrefix, "{0}({1}): warning: {2}", File, Line, String.Format(Format, Args));
 		}
+
+		/// <summary>
+		/// Writes a message to the console.
+		/// </summary>
+		/// <param name="File">The file containing the message</param>
+		/// <param name="Line">Line number of the message</param>
+		/// <param name="Format">Message format string</param>
+		/// <param name="Args">Optional arguments</param>
+		[MethodImplAttribute(MethodImplOptions.NoInlining)]
+		public static void TraceConsole(FileReference File, int Line, string Format, params object[] Args)
+		{
+			WriteLinePrivate(1, false, LogEventType.Console, LogFormatOptions.NoSeverityPrefix, "{0}({1}): {2}", File, Line, String.Format(Format, Args));
+		}
+
 
 		/// <summary>
 		/// Writes a very verbose message to the console.
