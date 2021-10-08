@@ -984,22 +984,6 @@ namespace UnrealBuildTool
 				Result += " -fsanitize=" + GetCompilerOption(Sanitizer);
 			}
 
-			int MinSDKVersion = GetMinSdkVersion();
-			if (MinSDKVersion >= 28)
-			{
-				//Pack relocations in RELR format and Android APS2 packed format for RELA relocations if they can't be expressed in RELR
-				Result += " -Wl,--pack-dyn-relocs=android+relr,--use-android-relr-tags";
-			}
-			else if (MinSDKVersion >= 23)
-			{
-				Result += " -Wl,--pack-dyn-relocs=android";
-			}
-
-			if (MinSDKVersion >= 23)
-			{
-				Result += " -Wl,--hash-style=gnu";  // generate GNU style hashes, faster lookup and faster startup. Avoids generating old .hash section. Supported on >= Android M
-			}
-
 			return Result;
 		}
 
