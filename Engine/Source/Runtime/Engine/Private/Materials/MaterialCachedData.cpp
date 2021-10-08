@@ -731,9 +731,9 @@ int32 FMaterialCachedParameters::FindParameterIndex(EMaterialParameterType Type,
 void FMaterialCachedParameters::GetParameterValueByIndex(EMaterialParameterType Type, int32 ParameterIndex, FMaterialParameterMetadata& OutResult) const
 {
 	const FMaterialCachedParameterEntry& Entry = GetParameterTypeEntry(Type);
-
-	const bool bIsEditorOnlyDataStripped = Entry.ExpressionGuids.Num() == 0;
+	
 #if WITH_EDITORONLY_DATA
+	const bool bIsEditorOnlyDataStripped = Entry.ExpressionGuids.Num() == 0;
 	if (!bIsEditorOnlyDataStripped)
 	{
 	const FMaterialCachedParameterEditorInfo& EditorInfo = Entry.EditorInfo[ParameterIndex];
