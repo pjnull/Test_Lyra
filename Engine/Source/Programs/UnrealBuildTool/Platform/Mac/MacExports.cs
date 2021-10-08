@@ -39,7 +39,7 @@ namespace UnrealBuildTool
 		}
 
 		/// <summary>
-		/// Default to building for Intel for the time being. Targets can be whitelisted below, and
+		/// Default to building for Intel for the time being. Targets can be allow listed below, and
 		/// projects can be set to universal to override this.
 		/// </summary>
 		public static string DefaultArchitecture

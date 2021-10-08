@@ -90,7 +90,7 @@ public:
 		/** Optional external search. Will hide and replace our internal search UI */
 		SLATE_ARGUMENT( TSharedPtr<FSourcesSearch>, ExternalSearch )
 
-		/** Optional Custom Folder Blacklist to be used to filter folders. */
+		/** Optional Custom Folder permission list to be used to filter folders. */
 		SLATE_ARGUMENT( TSharedPtr<FPathPermissionList>, CustomFolderPermissionList)
 
 		/** The plugin filter collection */
@@ -389,7 +389,7 @@ protected:
 
 	TSharedPtr<SWidget> PathViewWidget;
 
-	/** Blacklist filter to hide folders */
+	/** Permission filter to hide folders */
 	TSharedPtr<FPathPermissionList> FolderPermissionList;
 
 	/** Writable folder filter */
@@ -397,7 +397,7 @@ protected:
 
 	TMap<FName, TWeakPtr<FTreeItem>> TreeItemLookup;
 
-	/** Custom Folder Blacklist*/
+	/** Custom Folder permissions */
 	TSharedPtr<FPathPermissionList> CustomFolderPermissionList;
 
 private:

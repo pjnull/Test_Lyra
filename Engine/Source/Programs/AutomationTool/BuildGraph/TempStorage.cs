@@ -1136,7 +1136,7 @@ namespace AutomationTool
 		}
 
 		/// <summary>
-		/// Checks whether the given path is whitelisted as a build product that can be produced by more than one node (timestamps may be modified, etc..). Used to suppress
+		/// Checks whether the given path is allowed as a build product that can be produced by more than one node (timestamps may be modified, etc..). Used to suppress
 		/// warnings about build products being overwritten.
 		/// </summary>
 		/// <param name="LocalFile">File name to check</param>

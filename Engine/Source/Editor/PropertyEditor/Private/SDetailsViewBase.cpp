@@ -434,7 +434,7 @@ void SDetailsViewBase::UpdateSinglePropertyMap(TSharedPtr<FComplexPropertyNode> 
 
 	// Ask for custom detail layouts, unless disabled. One reason for disabling custom layouts is that the custom layouts
 	// inhibit our ability to find a single property's tree node. This is problematic for the diff and merge tools, that need
-	// to display and highlight each changed property for the user. We could whitelist 'good' customizations here if 
+	// to display and highlight each changed property for the user. We could allow 'known good' customizations here if 
 	// we can make them work with the diff/merge tools.
 	if (!bDisableCustomDetailLayouts)
 	{

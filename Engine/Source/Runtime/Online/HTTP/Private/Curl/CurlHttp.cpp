@@ -1337,7 +1337,7 @@ void FCurlHttpRequest::FinishedRequest()
 		// Call delegate with failure
 		OnProcessRequestComplete().ExecuteIfBound(SharedThis(this), Response, false);
 
-		//Delegate needs to know about the errors -- so nuke Response (since connection failed) afterwards...
+		//Delegate needs to know about the errors -- so clear out Response (since connection failed) afterwards...
 		Response = nullptr;
 	}
 }

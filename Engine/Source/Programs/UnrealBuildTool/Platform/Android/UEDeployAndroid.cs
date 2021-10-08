@@ -3852,7 +3852,7 @@ namespace UnrealBuildTool
 						Log.TraceInformation("Cleaning up file {0}", filename);
 						SafeDeleteFile(filename, false);
 
-						// Check to see if this file also exists in our target destination, and if so nuke it too
+						// Check to see if this file also exists in our target destination, and if so delete it too
 						string DestFilename = Path.Combine(ImmediateBaseDir, Utils.MakePathRelativeTo(filename, CleanUpBaseDir));
 						if (File.Exists(DestFilename))
 						{

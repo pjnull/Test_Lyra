@@ -75,7 +75,7 @@ FGuid FMovieSceneObjectCache::FindObjectId(UObject& InObject, IMovieScenePlayer&
 
 	if (!bReentrantUpdate)
 	{
-		// @todo: Currently we nuke the entire object cache when attempting to find an object's ID to ensure that we do a 
+		// @todo: Currently we delete the entire object cache when attempting to find an object's ID to ensure that we do a 
 		// complete lookup from scratch. This is required for UMG as it interchanges content slots without notifying sequencer.
 		Clear(Player);
 	}

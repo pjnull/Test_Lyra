@@ -558,7 +558,7 @@ bool FTypePromotion::IsPromotableFunction(const UFunction* Function)
 		Function->GetReturnProperty() &&
 		OpName != OperatorNames::NoOp && 
 		!IsPinTypeDeniedForTypePromotion(Function) &&
-		// Users can black list specific functions from being considered for type promo
+		// Users can deny specific functions from being considered for type promotion
 		!Function->HasMetaData(FBlueprintMetadata::MD_IgnoreTypePromotion);
 }
 

@@ -582,7 +582,7 @@ public:
 	DECLARE_DELEGATE_RetVal(bool, FIsLoadingMovieCurrentlyPlaying)
 	static FIsLoadingMovieCurrentlyPlaying IsLoadingMovieCurrentlyPlaying;
 
-	// Callback to allow user code to prevent url from being launched from FPlatformProcess::LaunchURL. Used to apply http whitelist
+	// Callback to allow user code to prevent url from being launched from FPlatformProcess::LaunchURL. Used to apply http allow list
 	// Return true for to launch the url
 	DECLARE_DELEGATE_RetVal_OneParam(bool, FShouldLaunchUrl, const TCHAR* /* URL */);
 	static FShouldLaunchUrl ShouldLaunchUrl;

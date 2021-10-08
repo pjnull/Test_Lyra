@@ -131,7 +131,7 @@ private:
 	/** Commands handled by this widget */
 	TSharedPtr< FUICommandList > Commands;
 
-	/** Blacklist held by the Path Picker*/
+	/** Deny list held by the Path Picker*/
 	TSharedPtr<FPathPermissionList> CustomFolderPermissionList;
 
 	/** Utility function to display notifications to the user */

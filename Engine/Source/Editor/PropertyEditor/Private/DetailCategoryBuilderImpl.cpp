@@ -874,7 +874,7 @@ void FDetailCategoryImpl::GenerateNodesFromCustomizations(const TArray<FDetailLa
 			if (!IsCustomProperty(Customization.GetPropertyNode()) || Customization.bCustom)
 			{
 				TSharedRef<FDetailItemNode> NewNode = MakeShareable(new FDetailItemNode(Customization, AsShared(), IsParentEnabled));
-				// Discard nodes that don't pass the property whitelist. There is a special check here for properties in structs that do not have a
+				// Discard nodes that don't pass the property permission test. There is a special check here for properties in structs that do not have a
 				// parent struct node (eg ShowOnlyInnerProperties). Both the node and it's container must pass the filter.
 				if (FPropertyEditorPermissionList::Get().IsEnabled())
 				{
