@@ -4,8 +4,6 @@
 #include "PropertySelectionMap.h"
 #include "SnapshotTestRunner.h"
 #include "SnapshotTestActor.h"
-#include "Tests/SnapshotTestRunner.h"
-#include "Tests/SnapshotTestActor.h"
 
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -13,7 +11,6 @@
 #include "EngineUtils.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
-#include "ToolContextInterfaces.h"
 #include "GameFramework/Actor.h"
 #include "Misc/AutomationTest.h"
 #include "Util/EquivalenceUtil.h"
