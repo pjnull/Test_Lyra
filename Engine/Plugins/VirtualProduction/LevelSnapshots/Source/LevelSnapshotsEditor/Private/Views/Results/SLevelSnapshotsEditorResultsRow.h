@@ -58,4 +58,15 @@ private:
 	float CachedNestedColumnWidthAdjusted = 0.f;
 	
 	FLevelSnapshotsEditorResultsSplitterManagerPtr SplitterManagerPtr;
+
+	#define LOCTEXT_NAMESPACE "LevelSnapshotsEditor"
+
+	const FTextFormat AddTextFormat = FTextFormat(LOCTEXT("LevelSnapshots_AddFormat", "Restore {DisplayName} ({ObjectType}) to {NewParent}"));
+	const FTextFormat RemoveTextFormat = FTextFormat(LOCTEXT("LevelSnapshots_RemoveFormat", "Remove {DisplayName} ({ObjectType}) from {CurrentParent}"));
+
+	const FText ActorComponentText = LOCTEXT("LevelSnapshots_ActorComponent", "ActorComponent");
+	const FText SceneComponentText = LOCTEXT("LevelSnapshots_SceneComponent", "SceneComponent");
+	const FText SubobjectText = LOCTEXT("LevelSnapshots_Subobject", "Subobject");
+
+	#undef LOCTEXT_NAMESPACE
 };

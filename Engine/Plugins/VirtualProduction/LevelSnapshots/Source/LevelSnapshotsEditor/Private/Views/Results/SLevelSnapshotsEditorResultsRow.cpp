@@ -251,13 +251,6 @@ void SLevelSnapshotsEditorResultsRow::GenerateAddedAndRemovedRowComponents(
 	const TSharedRef<SHorizontalBox> BasicRowWidgets, const FLevelSnapshotsEditorResultsRowPtr PinnedItem, const FText& InDisplayText) const
 {
 	check(PinnedItem.IsValid());
-	
-	const FTextFormat AddTextFormat = FTextFormat(LOCTEXT("LevelSnapshots_AddFormat", "Restore {DisplayName} ({ObjectType}) to {NewParent}"));
-	const FTextFormat RemoveTextFormat = FTextFormat(LOCTEXT("LevelSnapshots_RemoveFormat", "Remove {DisplayName} ({ObjectType}) from {CurrentParent}"));
-
-	const FText& ActorComponentText = LOCTEXT("LevelSnapshots_ActorComponent", "ActorComponent");
-	const FText& SceneComponentText = LOCTEXT("LevelSnapshots_SceneComponent", "SceneComponent");
-	const FText& SubobjectText = LOCTEXT("LevelSnapshots_Subobject", "Subobject");
 
 	USceneComponent* ObjectAsSceneComponent = Cast<USceneComponent>(PinnedItem->GetWorldObject());
 
@@ -281,11 +274,18 @@ void SLevelSnapshotsEditorResultsRow::GenerateAddedAndRemovedRowComponents(
 		.Font(FCoreStyle::GetDefaultFontStyle("Italic", FCoreStyle::RegularTextSize))
 		.Text(InDisplayText)
 		.ToolTipText(
-			FText::Format( 
+			FText::Format
+			( 
 				PinnedItem->GetRowType() == FLevelSnapshotsEditorResultsRow::RemovedComponentToAdd ? AddTextFormat : RemoveTextFormat, 
-				InDisplayText, ObjectAsSceneComponent ? SceneComponentText : ActorComponentText, FText::FromString(
-					ObjectAsSceneComponent ? ObjectAsSceneComponent->GetAttachParent() ? ObjectAsSceneComponent->GetAttachParent()->GetName() : "Root" : "Actor"
-				)
+				InDisplayText, 
+				ObjectAsSceneComponent ? SceneComponentText : ActorComponentText, 
+				ObjectAsSceneComponent ? 
+					ObjectAsSceneComponent->GetAttachParent() ? 
+						FText::FromString(ObjectAsSceneComponent->GetAttachParent()->GetName()) 
+						: FText::FromString("Root") 
+				: PinnedItem->GetDirectParentRow().IsValid() ? 
+					PinnedItem->GetDirectParentRow().Pin()->GetDisplayName() 
+					: FText::FromString("Actor")
 			)
 		)
 	];
@@ -454,4 +454,3 @@ FReply SLevelSnapshotsEditorResultsRow::OnMouseButtonUp(const FGeometry& MyGeome
 }
 
 #undef LOCTEXT_NAMESPACE
-
