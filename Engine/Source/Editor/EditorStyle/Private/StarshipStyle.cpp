@@ -7063,61 +7063,42 @@ void FStarshipEditorStyle::FStyle::SetupToolkitStyles()
 		Set("CurveEditorToolBar", CurveEditorToolbar);
 
 		// Tab
-		Set("GenericCurveEditor.TabIcon", new IMAGE_BRUSH("GenericCurveEditor/Icons/CurveEditor_32x", Icon16x16, FLinearColor(1.f, 1.f, 1.f, 0.8f)));
+		Set("GenericCurveEditor.TabIcon", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/CurveEditorTab", Icon16x16, FLinearColor(1.f, 1.f, 1.f, 0.8f)));
 
 		// Zoom / Framing
-		Set("GenericCurveEditor.ZoomToFit", new IMAGE_BRUSH("GenericCurveEditor/Icons/FramingSelected_48x", Icon48x48));
-		Set("GenericCurveEditor.ZoomToFit.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/FramingSelected_48x", Icon24x24));
+		Set("GenericCurveEditor.ZoomToFit", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/FramingSelected", Icon20x20));
 
 		// Time/Value Snapping
-		Set("GenericCurveEditor.ToggleInputSnapping", new IMAGE_BRUSH("GenericCurveEditor/Icons/AdjustKeySnapFrame_48x", Icon48x48));
-		Set("GenericCurveEditor.ToggleInputSnapping.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/AdjustKeySnapFrame_48x", Icon24x24));
-		Set("GenericCurveEditor.ToggleOutputSnapping", new IMAGE_BRUSH("GenericCurveEditor/Icons/AdjustKeySnapValue_48x", Icon48x48));
-		Set("GenericCurveEditor.ToggleOutputSnapping.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/AdjustKeySnapValue_48x", Icon24x24));
+		Set("GenericCurveEditor.ToggleInputSnapping", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/AdjustKeySnapFrameHorizontal", Icon20x20));
+		Set("GenericCurveEditor.ToggleOutputSnapping", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/AdjustKeySnapFrameVertical", Icon20x20));
 
 		// Tangent Types
-		Set("GenericCurveEditor.InterpolationCubicAuto", new IMAGE_BRUSH("GenericCurveEditor/Icons/CubicTangentAuto_48x", Icon48x48));
-		Set("GenericCurveEditor.InterpolationCubicAuto.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/CubicTangentAuto_48x", Icon24x24));
-		Set("GenericCurveEditor.InterpolationCubicUser", new IMAGE_BRUSH("GenericCurveEditor/Icons/TangentsCubic_48x", Icon48x48));
-		Set("GenericCurveEditor.InterpolationCubicUser.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/TangentsCubic_48x", Icon24x24));
-		Set("GenericCurveEditor.InterpolationCubicBreak", new IMAGE_BRUSH("GenericCurveEditor/Icons/CubicTangentBroken_48x", Icon48x48));
-		Set("GenericCurveEditor.InterpolationCubicBreak.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/CubicTangentBroken_48x", Icon24x24));
-		Set("GenericCurveEditor.InterpolationToggleWeighted", new IMAGE_BRUSH("GenericCurveEditor/Icons/CubicTangentWeighted_48x", Icon48x48));
-		Set("GenericCurveEditor.InterpolationToggleWeighted.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/CubicTangentWeighted_48x", Icon24x24));
-		Set("GenericCurveEditor.InterpolationLinear", new IMAGE_BRUSH("GenericCurveEditor/Icons/TangentsLinear_48x", Icon48x48));
-		Set("GenericCurveEditor.InterpolationLinear.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/TangentsLinear_48x", Icon24x24));
-		Set("GenericCurveEditor.InterpolationConstant", new IMAGE_BRUSH("GenericCurveEditor/Icons/TangentsConstant_48x", Icon48x48));
-		Set("GenericCurveEditor.InterpolationConstant.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/TangentsConstant_48x", Icon24x24));
+		Set("GenericCurveEditor.InterpolationCubicAuto", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/TangentsCubicAuto", Icon20x20));
+		Set("GenericCurveEditor.InterpolationCubicUser", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/TangentsCubicUser", Icon20x20));
+		Set("GenericCurveEditor.InterpolationCubicBreak", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/TangentsCubicBreak", Icon20x20));
+		Set("GenericCurveEditor.InterpolationToggleWeighted", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/TangentsWeighted", Icon20x20));
+		Set("GenericCurveEditor.InterpolationLinear", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/TangentsLinear", Icon20x20));
+		Set("GenericCurveEditor.InterpolationConstant", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/TangentsConstant", Icon20x20));
 
 		// Tangent Modifications
-		Set("GenericCurveEditor.FlattenTangents", new IMAGE_BRUSH("GenericCurveEditor/Icons/MiscFlatten_48x", Icon48x48));
-		Set("GenericCurveEditor.FlattenTangents.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/MiscFlatten_48x", Icon24x24));
-		Set("GenericCurveEditor.StraightenTangents", new IMAGE_BRUSH("GenericCurveEditor/Icons/MiscStraighten_48x", Icon48x48));
-		Set("GenericCurveEditor.StraightenTangents.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/MiscStraighten_48x", Icon24x24));
+		Set("GenericCurveEditor.FlattenTangents", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/MiscFlatten", Icon20x20));
+		Set("GenericCurveEditor.StraightenTangents", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/MiscStraighten", Icon20x20));
 
 		// View Modes
-		Set("GenericCurveEditor.SetViewModeAbsolute", new IMAGE_BRUSH("GenericCurveEditor/Icons/GraphViewAbsolute_48x", Icon48x48));
-		Set("GenericCurveEditor.SetViewModeAbsolute.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/GraphViewAbsolute_48x", Icon24x24));
-		Set("GenericCurveEditor.SetViewModeStacked", new IMAGE_BRUSH("GenericCurveEditor/Icons/GraphViewStack_48x", Icon48x48));
-		Set("GenericCurveEditor.SetViewModeStacked.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/GraphViewStack_48x", Icon24x24));
-		Set("GenericCurveEditor.SetViewModeNormalized", new IMAGE_BRUSH("GenericCurveEditor/Icons/GraphViewNormalized_48x", Icon48x48));
-		Set("GenericCurveEditor.SetViewModeNormalized.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/GraphViewNormalized_48x", Icon24x24));
+		Set("GenericCurveEditor.SetViewModeAbsolute", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/GraphViewAbsolute_20", Icon20x20));
+		Set("GenericCurveEditor.SetViewModeStacked", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/GraphViewStack_20", Icon20x20));
+		Set("GenericCurveEditor.SetViewModeNormalized", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/GraphViewNormalized_20", Icon20x20));
 
 		// Axis Snapping
-		Set("GenericCurveEditor.SetAxisSnappingNone", new IMAGE_BRUSH("GenericCurveEditor/Icons/AdjustKeyMoveFree_48x", Icon48x48));
-		Set("GenericCurveEditor.SetAxisSnappingNone.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/AdjustKeyMoveFree_48x", Icon24x24));
-		Set("GenericCurveEditor.SetAxisSnappingHorizontal", new IMAGE_BRUSH("GenericCurveEditor/Icons/AdjustKeyLockValue_48x", Icon48x48));
-		Set("GenericCurveEditor.SetAxisSnappingHorizontal.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/AdjustKeyLockValue_48x", Icon24x24));
-		Set("GenericCurveEditor.SetAxisSnappingVertical", new IMAGE_BRUSH("GenericCurveEditor/Icons/AdjustKeyLockFrame_48x", Icon48x48));
-		Set("GenericCurveEditor.SetAxisSnappingVertical.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/AdjustKeyLockFrame_48x", Icon24x24));
+		Set("GenericCurveEditor.SetAxisSnappingNone", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/AdjustKeyMoveFree_20", Icon20x20));
+		Set("GenericCurveEditor.SetAxisSnappingHorizontal", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/AdjustKeyLockValue_20", Icon20x20));
+		Set("GenericCurveEditor.SetAxisSnappingVertical", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/AdjustKeyLockFrame_20", Icon20x20));
 
 		// Deactivate Tool
-		Set("GenericCurveEditor.DeactivateCurrentTool", new IMAGE_BRUSH("GenericCurveEditor/Icons/GeneralPointer_48x", Icon48x48));
-		Set("GenericCurveEditor.DeactivateCurrentTool.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/GeneralPointer_48x", Icon24x24));
+		Set("GenericCurveEditor.DeactivateCurrentTool", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/Select", Icon20x20));
 
 		// Filters
-		Set("GenericCurveEditor.OpenUserImplementableFilterWindow", new IMAGE_BRUSH("GenericCurveEditor/Icons/MiscFilters_48x", Icon48x48));
-		Set("GenericCurveEditor.OpenUserImplementableFilterWindow.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/MiscFilters_48x", Icon24x24));
+		Set("GenericCurveEditor.OpenUserImplementableFilterWindow", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/MiscFilters", Icon20x20));
 
 		// Key Types
 		Set("GenericCurveEditor.Key", new IMAGE_BRUSH("GenericCurveEditor/Keys/Diamond_Filled", FVector2D(11.0f, 11.0f))); 
@@ -7128,37 +7109,23 @@ void FStarshipEditorStyle::FStyle::SetupToolkitStyles()
 		Set("GenericCurveEditor.WeightedTangentCubicKey", new IMAGE_BRUSH("GenericCurveEditor/Keys/Trapezoid_Filled", FVector2D(11.0f, 11.0f)));
 
 		// Pre-Infinity
-		Set("GenericCurveEditor.SetPreInfinityExtrapConstant", new IMAGE_BRUSH("GenericCurveEditor/Icons/PreInfinityConstant_48x", Icon48x48));
-		Set("GenericCurveEditor.SetPreInfinityExtrapConstant.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/PreInfinityConstant_48x", Icon24x24));
-		Set("GenericCurveEditor.SetPreInfinityExtrapCycle", new IMAGE_BRUSH("GenericCurveEditor/Icons/PreInfinityCycle_48x", Icon48x48));
-		Set("GenericCurveEditor.SetPreInfinityExtrapCycle.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/PreInfinityCycle_48x", Icon24x24));
-		Set("GenericCurveEditor.SetPreInfinityExtrapCycleWithOffset", new IMAGE_BRUSH("GenericCurveEditor/Icons/PreInfinityOffset_48x", Icon48x48));
-		Set("GenericCurveEditor.SetPreInfinityExtrapCycleWithOffset.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/PreInfinityOffset_48x", Icon24x24));
-		Set("GenericCurveEditor.SetPreInfinityExtrapLinear", new IMAGE_BRUSH("GenericCurveEditor/Icons/PreInfinityLinear_48x", Icon48x48));
-		Set("GenericCurveEditor.SetPreInfinityExtrapLinear.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/PreInfinityLinear_48x", Icon24x24));
-		Set("GenericCurveEditor.SetPreInfinityExtrapOscillate", new IMAGE_BRUSH("GenericCurveEditor/Icons/PreInfinityOscillate_48x", Icon48x48));
-		Set("GenericCurveEditor.SetPreInfinityExtrapOscillate.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/PreInfinityOscillate_48x", Icon24x24));
-		Set("GenericCurveEditor.PreInfinityMixed", new IMAGE_BRUSH("GenericCurveEditor/Icons/PreInfinityMultipleSelected_48x", Icon48x48));
-		Set("GenericCurveEditor.PreInfinityMixed.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/PreInfinityMultipleSelected_48x", Icon24x24));
-
+		Set("GenericCurveEditor.SetPreInfinityExtrapConstant", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/PreInfinityConstant_20", Icon20x20));
+		Set("GenericCurveEditor.SetPreInfinityExtrapCycle", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/PreInfinityCycle_20", Icon20x20));
+		Set("GenericCurveEditor.SetPreInfinityExtrapCycleWithOffset", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/PreInfinityOffset_20", Icon20x20));
+		Set("GenericCurveEditor.SetPreInfinityExtrapLinear", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/PreInfinityLinear_20", Icon20x20));
+		Set("GenericCurveEditor.SetPreInfinityExtrapOscillate", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/PreInfinityOscillate_20", Icon20x20));
+		Set("GenericCurveEditor.PreInfinityMixed", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/PreInfinityMultipleSelected_20", Icon20x20));
 
 		// Post-Infinity
-		Set("GenericCurveEditor.SetPostInfinityExtrapConstant", new IMAGE_BRUSH("GenericCurveEditor/Icons/PostInfinityConstant_48x", Icon48x48));
-		Set("GenericCurveEditor.SetPostInfinityExtrapConstant.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/PostInfinityConstant_48x", Icon24x24));
-		Set("GenericCurveEditor.SetPostInfinityExtrapCycle", new IMAGE_BRUSH("GenericCurveEditor/Icons/PostInfinityCycle_48x", Icon48x48));
-		Set("GenericCurveEditor.SetPostInfinityExtrapCycle.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/PostInfinityCycle_48x", Icon24x24));
-		Set("GenericCurveEditor.SetPostInfinityExtrapCycleWithOffset", new IMAGE_BRUSH("GenericCurveEditor/Icons/PostInfinityOffset_48x", Icon48x48));
-		Set("GenericCurveEditor.SetPostInfinityExtrapCycleWithOffset.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/PostInfinityOffset_48x", Icon24x24));
-		Set("GenericCurveEditor.SetPostInfinityExtrapLinear", new IMAGE_BRUSH("GenericCurveEditor/Icons/PostInfinityLinear_48x", Icon48x48));
-		Set("GenericCurveEditor.SetPostInfinityExtrapLinear.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/PostInfinityLinear_48x", Icon24x24));
-		Set("GenericCurveEditor.SetPostInfinityExtrapOscillate", new IMAGE_BRUSH("GenericCurveEditor/Icons/PostInfinityOscillate_48x", Icon48x48));
-		Set("GenericCurveEditor.SetPostInfinityExtrapOscillate.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/PostInfinityOscillate_48x", Icon24x24));
-		Set("GenericCurveEditor.PostInfinityMixed", new IMAGE_BRUSH("GenericCurveEditor/Icons/PostInfinityMultipleSelected_48x", Icon48x48));
-		Set("GenericCurveEditor.PostInfinityMixed.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/PostInfinityMultipleSelected_48x", Icon24x24));
+		Set("GenericCurveEditor.SetPostInfinityExtrapConstant", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/PostInfinityConstant_20", Icon20x20));
+		Set("GenericCurveEditor.SetPostInfinityExtrapCycle", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/PostInfinityCycle_20", Icon20x20));
+		Set("GenericCurveEditor.SetPostInfinityExtrapCycleWithOffset", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/PostInfinityOffset_20", Icon20x20));
+		Set("GenericCurveEditor.SetPostInfinityExtrapLinear", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/PostInfinityLinear_20", Icon20x20));
+		Set("GenericCurveEditor.SetPostInfinityExtrapOscillate", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/PostInfinityOscillate_20", Icon20x20));
+		Set("GenericCurveEditor.PostInfinityMixed", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/PostInfinityMultipleSelected_20", Icon20x20));
 
 		// Misc
-		Set("GenericCurveEditor.VisibilityOptions", new IMAGE_BRUSH("GenericCurveEditor/Icons/SettingsVisibility_48x", Icon48x48));
-		Set("GenericCurveEditor.VisibilityOptions.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/SettingsVisibility_48x", Icon24x24));
+		Set("GenericCurveEditor.VisibilityOptions", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/VisibilityOptions", Icon20x20));
 
 		Set("GenericCurveEditor.Pin_Active", new IMAGE_BRUSH("Common/PushPin_Down", Icon16x16));
 		Set("GenericCurveEditor.Pin_Inactive", new IMAGE_BRUSH("Common/PushPin_Up", Icon16x16));
@@ -7168,17 +7135,12 @@ void FStarshipEditorStyle::FStyle::SetupToolkitStyles()
 
 	// Generic Curve Editor Tools
 	{
-		Set("CurveEditorTools.SetFocusPlaybackTime", new IMAGE_BRUSH("GenericCurveEditor/Icons/FramingPlayback_48x", Icon48x48));
-		Set("CurveEditorTools.SetFocusPlaybackTime.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/FramingPlayback_48x", Icon24x24));
-		Set("CurveEditorTools.SetFocusPlaybackRange", new IMAGE_BRUSH("GenericCurveEditor/Icons/FramingTimeRange_48x", Icon48x48));
-		Set("CurveEditorTools.SetFocusPlaybackRange.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/FramingTimeRange_48x", Icon24x24));
+		Set("CurveEditorTools.SetFocusPlaybackTime", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/FramingPlayback", Icon20x20));
+		Set("CurveEditorTools.SetFocusPlaybackRange", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/FramingTimeRange", Icon20x20));
 
-		Set("CurveEditorTools.ActivateTransformTool", new IMAGE_BRUSH("GenericCurveEditor/Icons/ToolsTransform_48x", Icon48x48));
-		Set("CurveEditorTools.ActivateTransformTool.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/ToolsTransform_48x", Icon24x24));
-		Set("CurveEditorTools.ActivateRetimeTool", new IMAGE_BRUSH("GenericCurveEditor/Icons/ToolsRetime_48x", Icon48x48));
-		Set("CurveEditorTools.ActivateRetimeTool.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/ToolsRetime_48x", Icon24x24));
-		Set("CurveEditorTools.ActivateMultiScaleTool", new IMAGE_BRUSH("GenericCurveEditor/Icons/ToolsMultiScale_48x", Icon48x48));
-		Set("CurveEditorTools.ActivateMultiScaleTool.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/ToolsMultiScale_48x", Icon24x24));
+		Set("CurveEditorTools.ActivateTransformTool", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/ToolsTransform", Icon20x20));
+		Set("CurveEditorTools.ActivateRetimeTool", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/ToolsRetime", Icon20x20));
+		Set("CurveEditorTools.ActivateMultiScaleTool", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/ToolsMultiScale", Icon20x20));
 	}
 
 	// General Curve Icons
