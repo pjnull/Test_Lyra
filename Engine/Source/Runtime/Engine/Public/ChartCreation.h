@@ -292,10 +292,17 @@ public:
 		return HitchTimeHistogram.GetAverageOfAllMeasures();
 	}
 
-	double GetPercentHitchTime() const
+	double GetPercentHitchTime(bool bSubtractHitchThreshold=true) const
 	{
 		const double TotalTime = GetTotalTime();
-		const double TotalHitchTime = HitchTimeHistogram.GetSumOfAllMeasures();
+		double TotalHitchTime = HitchTimeHistogram.GetSumOfAllMeasures();
+
+		if (bSubtractHitchThreshold && HitchTimeHistogram.GetNumBins() > 0)
+		{
+			// subtract hitch threshold to weight larger hitches
+			const double HitchThrehsold = HitchTimeHistogram.GetBinLowerBound(0);
+			TotalHitchTime -= HitchThrehsold * HitchTimeHistogram.GetNumMeasurements();
+		}
 
 		return (TotalTime > 0.0) ? ((TotalHitchTime * 100.0) / TotalTime) : 0.0;
 	}
