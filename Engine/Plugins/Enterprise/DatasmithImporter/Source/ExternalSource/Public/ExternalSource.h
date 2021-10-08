@@ -86,6 +86,18 @@ namespace UE::DatasmithImporter
 		const TSharedPtr<IDatasmithTranslator>& GetAssetTranslator();
 
 		/**
+		 * Return the name of the scene that will be loaded.
+		 * #ueent-todo This is only required because of the way the Datasmith reimport works. Consider removing it when we adapt the ExternalSource to interchange.
+		 */
+		FString GetSceneName() const;
+
+		/**
+		 * Override the name of the scene that will be loaded. If the pointer is nullptr, the override will be reset.
+		 * #ueent-todo This is only required because of the way the Datasmith reimport works. Consider removing it when we adapt the ExternalSource to interchange.
+		 */
+		void SetSceneName(const TCHAR* SceneName);
+
+		/**
 		 * Attempt to load the FExternalSource according to its supported capabilities.
 		 */
 		TSharedPtr<IDatasmithScene> TryLoad();
@@ -157,6 +169,7 @@ namespace UE::DatasmithImporter
 		 */
 		FSourceUri SourceUri;
 
+		FString SceneName;
 
 		TSharedPtr<IDatasmithTranslator> AssetTranslator;
 	};

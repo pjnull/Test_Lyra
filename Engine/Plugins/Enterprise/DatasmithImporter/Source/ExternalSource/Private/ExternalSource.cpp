@@ -35,6 +35,29 @@ namespace UE::DatasmithImporter
 		return AssetTranslator;
 	}
 
+	FString FExternalSource::GetSceneName() const
+	{
+		if (SceneName.IsEmpty())
+		{
+			return GetSourceName();
+		}
+		
+		return SceneName;
+	}
+
+	void FExternalSource::SetSceneName(const TCHAR* InSceneName)
+	{
+		if (InSceneName)
+		{
+			SceneName = InSceneName;
+		}
+		else
+		{
+			SceneName.Reset();
+		}
+	}
+
+
 	TSharedPtr<IDatasmithScene> FExternalSource::TryLoad()
 	{
 		if (!IsAvailable())
@@ -172,16 +195,17 @@ namespace UE::DatasmithImporter
 
 		TSharedPtr<IDatasmithScene> Scene = GetDatasmithScene();
 
+		if (Scene.IsValid())
+		{
+			Scene->SetName(*GetSceneName());			
+			ValidateDatasmithVersion();
+			OnExternalSourceLoaded.Broadcast(AsShared());
+		}
+
 		FOptionalScenePromise CurrentPromise;
 		while (PendingPromiseQueue.Dequeue(CurrentPromise))
 		{
 			CurrentPromise->SetValue(Scene);
-		}
-
-		if (Scene.IsValid())
-		{
-			ValidateDatasmithVersion();
-			OnExternalSourceLoaded.Broadcast(AsShared());
 		}
 	}
 

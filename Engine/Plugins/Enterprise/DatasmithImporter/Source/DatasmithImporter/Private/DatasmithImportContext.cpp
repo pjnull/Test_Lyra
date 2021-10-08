@@ -242,7 +242,7 @@ FDatasmithImportContext::FDatasmithImportContext(const TSharedRef<UE::DatasmithI
 	Options->FileName = FPaths::GetCleanFilename(FileName);
 	Options->FilePath = FPaths::ConvertRelativePathToFull(FileName);
 	Options->SourceUri = InExternalSource->GetSourceUri().ToString();
-	SceneName = FDatasmithUtils::SanitizeObjectName(InExternalSource->GetSourceName());
+	SceneName = FDatasmithUtils::SanitizeObjectName(InExternalSource->GetSceneName());
 
 	FileHash = FMD5Hash::HashFile(*Options->FilePath);
 }

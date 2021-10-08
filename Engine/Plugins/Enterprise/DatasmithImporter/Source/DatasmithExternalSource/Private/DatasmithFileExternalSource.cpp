@@ -53,7 +53,7 @@ namespace UE::DatasmithImporter
 			return nullptr;
 		}
 	
-		TSharedRef<IDatasmithScene> LoadedScene = FDatasmithSceneFactory::CreateScene(*GetSourceName());
+		TSharedRef<IDatasmithScene> LoadedScene = FDatasmithSceneFactory::CreateScene(*GetSceneName());
 		if (!Translator->LoadScene(LoadedScene))
 		{
 			UE_LOG(LogDatasmithFileExternalSource, Warning, TEXT("Datasmith import error: Scene translation failure. Abort import."));

@@ -552,19 +552,7 @@ UDatasmithSceneElement* UDatasmithSceneElement::ConstructDatasmithSceneFromFile(
 	}
 
 	UDatasmithSceneElement* DatasmithSceneElement = NewObject<UDatasmithSceneElement>();
-
-	const TSharedPtr<IDatasmithTranslator>& AssetTranslator = ExternalSource->GetAssetTranslator();
-	if (!AssetTranslator.IsValid())
-	{
-		UE_LOG(LogDatasmithImport, Error, TEXT("Datasmith import error: no suitable translator found for this source. Abort import."));
-		return nullptr;
-	}
-	
-	DatasmithSceneElement->SourcePtr.Reset(new FDatasmithTranslatableSceneSource(AssetTranslator->GetSource()));
-	FDatasmithTranslatableSceneSource& TranslatableSource = *DatasmithSceneElement->SourcePtr;
-
-	TSharedRef< IDatasmithScene > Scene = FDatasmithSceneFactory::CreateScene(*ExternalSource->GetSourceName());
-	DatasmithSceneElement->SetDatasmithSceneElement(Scene);
+	DatasmithSceneElement->ExternalSourcePtr = ExternalSource;
 
 	const bool bLoadConfig = false; // don't load values from ini files
 	DatasmithSceneElement->ImportContextPtr.Reset(new FDatasmithImportContext(ExternalSource.ToSharedRef(), bLoadConfig, GetLoggerName(), GetDisplayName()));
@@ -612,30 +600,10 @@ UDatasmithSceneElement* UDatasmithSceneElement::GetExistingDatasmithScene(const 
 			return nullptr;
 		}
 
-		const TSharedPtr<IDatasmithTranslator>& AssetTranslator = ExternalSource->GetAssetTranslator();
-		if (!AssetTranslator.IsValid())
-		{
-			UE_LOG(LogDatasmithImport, Error, TEXT("Datasmith import error: no suitable translator found for this source. Abort import."));
-			return nullptr;
-		}
-
-
-		FDatasmithSceneSource Source = AssetTranslator->GetSource();
-		Source.SetSceneName(SceneAsset->GetName()); // keep initial name
-
 		UDatasmithSceneElement* DatasmithSceneElement = NewObject<UDatasmithSceneElement>();
-
-		DatasmithSceneElement->SourcePtr.Reset(new FDatasmithTranslatableSceneSource(Source));
-		FDatasmithTranslatableSceneSource& TranslatableSource = *DatasmithSceneElement->SourcePtr;
-
-		if (!TranslatableSource.IsTranslatable())
-		{
-			UE_LOG(LogDatasmithImport, Warning, TEXT("Datasmith ReimportScene error: no suitable translator found for this source. Abort import."));
-			return nullptr;
-		}
-
-		TSharedRef< IDatasmithScene > Scene = FDatasmithSceneFactory::CreateScene( *Source.GetSceneName() );
-		DatasmithSceneElement->SetDatasmithSceneElement(Scene);
+		DatasmithSceneElement->ExternalSourcePtr = ExternalSource;
+		
+		ExternalSource->SetSceneName(SceneAsset->GetName()); // keep initial name
 
 		// Setup pipe for reimport
 		const bool bLoadConfig = false;
@@ -655,21 +623,22 @@ UDatasmithSceneElement* UDatasmithSceneElement::GetExistingDatasmithScene(const 
 
 bool UDatasmithSceneElement::TranslateScene()
 {
-	if (!SourcePtr.IsValid() || !ImportContextPtr.IsValid() || !GetSceneElement().IsValid())
+	if (!ImportContextPtr.IsValid() || !ExternalSourcePtr.IsValid())
 	{
 		UE_LOG(LogDatasmithImport, Error, TEXT("Invalid State. Ensure ConstructDatasmithSceneFromFile has been called."));
 		return false;
 	}
 
-	FDatasmithTranslatableSceneSource& TranslatableSource = *SourcePtr;
-
-	TSharedRef<IDatasmithScene> Scene = GetSceneElement().ToSharedRef();
 	const bool bSilent = true; // don't pop options window
-	ImportContextPtr->InitScene(Scene);
 	ImportContextPtr->InitOptions(nullptr, TOptional<FString>(), bSilent);
 
 	bTranslated = true;
-	if (!TranslatableSource.Translate(Scene))
+	if (TSharedPtr<IDatasmithScene> LoadedScene = ExternalSourcePtr->TryLoad())
+	{
+		SetDatasmithSceneElement(LoadedScene);
+		ImportContextPtr->InitScene(LoadedScene.ToSharedRef());
+	}
+	else
 	{
 		UE_LOG(LogDatasmithImport, Error, TEXT("Datasmith import error: Scene translation failure. Abort import."));
 		return false;
@@ -707,7 +676,7 @@ FDatasmithImportFactoryCreateFileResult UDatasmithSceneElement::ImportScene(cons
 		return Result;
 	}
 
-	if (!ImportContextPtr.IsValid() || !GetSceneElement().IsValid())
+	if (!ImportContextPtr.IsValid() || !ExternalSourcePtr.IsValid())
 	{
 		UE_LOG(LogDatasmithImport, Error, TEXT("Invalid State. Ensure ConstructDatasmithSceneFromFile has been called."));
 		return Result;
@@ -754,7 +723,7 @@ FDatasmithImportFactoryCreateFileResult UDatasmithSceneElement::ReimportScene()
 {
 	FDatasmithImportFactoryCreateFileResult Result;
 
-	if (this == nullptr || !ImportContextPtr.IsValid() || !ImportContextPtr->Options.IsValid() || !SourcePtr.IsValid() || SourcePtr->GetTranslator() == nullptr || !GetSceneElement().IsValid())
+	if (this == nullptr || !ImportContextPtr.IsValid() || !ImportContextPtr->Options.IsValid() || !ExternalSourcePtr.IsValid())
 	{
 		UE_LOG(LogDatasmithImport, Error, TEXT("Invalid State. Ensure GetExistingDatasmithScene has been called."));
 		return Result;
@@ -771,9 +740,6 @@ FDatasmithImportFactoryCreateFileResult UDatasmithSceneElement::ReimportScene()
 		return Result;
 	}
 
-	TSharedRef< IDatasmithScene > Scene = GetSceneElement().ToSharedRef();
-	ImportContext.InitScene(Scene);
-
 	EObjectFlags NewObjectFlags = RF_Public | RF_Standalone | RF_Transactional;
 	TSharedPtr<FJsonObject> ImportSettingsJson;
 	const bool bIsSilent = true;
@@ -783,8 +749,12 @@ FDatasmithImportFactoryCreateFileResult UDatasmithSceneElement::ReimportScene()
 		return Result;
 	}
 
-	FDatasmithTranslatableSceneSource& TranslatableSource = *SourcePtr;
-	if (!TranslatableSource.Translate(Scene))
+	if (TSharedPtr<IDatasmithScene> LoadedScene = ExternalSourcePtr->TryLoad())
+	{
+		SetDatasmithSceneElement(LoadedScene);
+		ImportContextPtr->InitScene(LoadedScene.ToSharedRef());
+	}
+	else
 	{
 		UE_LOG(LogDatasmithImport, Error, TEXT("Datasmith import error: Scene translation failure. Abort import."));
 		return Result;
@@ -883,7 +853,7 @@ UDatasmithImportOptions* UDatasmithSceneElement::GetImportOptions()
 void UDatasmithSceneElement::DestroyScene()
 {
 	ImportContextPtr.Reset();
-	SourcePtr.Reset();
+	ExternalSourcePtr.Reset();
 	Reset();
 }
 
