@@ -15,9 +15,6 @@
 #include "Misc/AutomationTest.h"
 #include "Util/EquivalenceUtil.h"
 
-// TODO: FExistingSubobjectHasDifferentClass > Change a subobject's class and try to restore into it
-// TODO: FAttachementRestoration
-
 /**
  * Checks that instanced and native components are diffed correctly:
  *  - Added components are marked to be removed
@@ -436,7 +433,7 @@ bool FComponentsHaveComponentsAsOuters::RunTest(const FString& Parameters)
 			return MoveTemp(Result);
 		}
 
-		static void TestRecreatedActor(UWorld* World, TCHAR* ActorName, FAutomationTestBase& Test)
+		static void TestRecreatedActor(UWorld* World, FAutomationTestBase& Test)
 		{
 			ASnapshotTestActor* Actor = FindObject<ASnapshotTestActor>(World->PersistentLevel, TEXT("CorrectComponentOrder"));
 			if (Actor)
@@ -488,8 +485,8 @@ bool FComponentsHaveComponentsAsOuters::RunTest(const FString& Parameters)
 		.ApplySnapshot()
 		.ModifyWorld([this](UWorld* World)
 		{
-			Local::TestRecreatedActor(World, TEXT("CorrectComponentOrder"), *this);
-			Local::TestRecreatedActor(World, TEXT("OutOfOrder"), *this);
+			Local::TestRecreatedActor(World, *this);
+			Local::TestRecreatedActor(World, *this);
 		});
 	
 	return true;
