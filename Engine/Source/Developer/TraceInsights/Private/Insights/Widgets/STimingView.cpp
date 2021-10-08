@@ -4509,65 +4509,115 @@ void STimingView::ToggleAutoHideEmptyTracks()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void AddMenuEntryRadioButton(
+	FMenuBuilder& InOutMenuBuilder,
+	const FUIAction& InAction,
+	const TAttribute<FText>& InLabel,
+	const TAttribute<FText>& InToolTipText,
+	const TAttribute<FText>& InKeybinding)
+{
+	InOutMenuBuilder.AddMenuEntry(
+		InAction,
+		SNew(SBox)
+		.Padding(FMargin(0.0f))
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot()
+			.Padding(FMargin(2.0f, 0.0f))
+			.VAlign(VAlign_Center)
+			.FillWidth(1.0f)
+			[
+				SNew(STextBlock)
+				.TextStyle(FCoreStyle::Get(), "Menu.Label")
+				.Text(InLabel)
+			]
+			+ SHorizontalBox::Slot()
+			.Padding(FMargin(4.0f, 0.0f))
+			.VAlign(VAlign_Center)
+			.AutoWidth()
+			[
+				SNew(STextBlock)
+				.TextStyle(FCoreStyle::Get(), "Menu.Keybinding")
+				.ColorAndOpacity(FSlateColor::UseSubduedForeground())
+				.Text(InKeybinding)
+			]
+		],
+		NAME_None,
+		InToolTipText,
+		EUserInterfaceActionType::RadioButton
+	);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void STimingView::CreateDepthLimitMenu(FMenuBuilder& MenuBuilder)
 {
 	MenuBuilder.BeginSection("DepthLimit", LOCTEXT("DepthLimitHeading", "Depth Limit"));
 	{
-		MenuBuilder.AddMenuEntry(
-			LOCTEXT("UnlimitedDepth", "Unlimited"),
-			LOCTEXT("UnlimitedDepth_Desc", "Timing Events tracks (like the Cpu Thread tracks) can have unlimited depth (lanes)."),
-			FSlateIcon(),
+		AddMenuEntryRadioButton(MenuBuilder,
 			FUIAction(
 				FExecuteAction::CreateSP(this, &STimingView::SetEventDepthLimit, FTimingProfilerManager::UnlimitedEventDepth),
 				FCanExecuteAction(),
 				FIsActionChecked::CreateSP(this, &STimingView::CheckEventDepthLimit, FTimingProfilerManager::UnlimitedEventDepth)),
-			NAME_None,
-			EUserInterfaceActionType::RadioButton
-		);
-		MenuBuilder.AddMenuEntry(
-			LOCTEXT("DepthLimit4", "4 Lanes"),
-			LOCTEXT("DepthLimit4_Desc", "Timing Events tracks (like the Cpu Thread tracks) can have maximum 4 lanes."),
-			FSlateIcon(),
+			LOCTEXT("UnlimitedDepth", "Unlimited"),
+			LOCTEXT("UnlimitedDepth_Desc", "Timing Events tracks (like the Cpu Thread tracks) can have unlimited depth (lanes)."),
+			TAttribute<FText>::Create(TAttribute<FText>::FGetter::CreateSP(this, &STimingView::GetEventDepthLimitKeybindingText, FTimingProfilerManager::UnlimitedEventDepth)));
+
+		AddMenuEntryRadioButton(MenuBuilder,
 			FUIAction(
 				FExecuteAction::CreateSP(this, &STimingView::SetEventDepthLimit, (uint32)4),
 				FCanExecuteAction(),
 				FIsActionChecked::CreateSP(this, &STimingView::CheckEventDepthLimit, (uint32)4)),
-			NAME_None,
-			EUserInterfaceActionType::RadioButton
-		);
-		MenuBuilder.AddMenuEntry(
-			LOCTEXT("DepthLimit1", "Single Lane"),
-			LOCTEXT("DepthLimit1_Desc", "Timing Events tracks (like the Cpu Thread tracks) can have a single lane."),
-			FSlateIcon(),
+			LOCTEXT("DepthLimit4", "4 Lanes"),
+			LOCTEXT("DepthLimit4_Desc", "Timing Events tracks (like the Cpu Thread tracks) can have maximum 4 lanes."),
+			TAttribute<FText>::Create(TAttribute<FText>::FGetter::CreateSP(this, &STimingView::GetEventDepthLimitKeybindingText, (uint32)4)));
+
+		AddMenuEntryRadioButton(MenuBuilder,
 			FUIAction(
 				FExecuteAction::CreateSP(this, &STimingView::SetEventDepthLimit, (uint32)1),
 				FCanExecuteAction(),
 				FIsActionChecked::CreateSP(this, &STimingView::CheckEventDepthLimit, (uint32)1)),
-			NAME_None,
-			EUserInterfaceActionType::RadioButton
-		);
+			LOCTEXT("DepthLimit1", "Single Lane"),
+			LOCTEXT("DepthLimit1_Desc", "Timing Events tracks (like the Cpu Thread tracks) can have a single lane."),
+			TAttribute<FText>::Create(TAttribute<FText>::FGetter::CreateSP(this, &STimingView::GetEventDepthLimitKeybindingText, (uint32)1)));
 	}
 	MenuBuilder.EndSection();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void STimingView::ChooseNextEventDepthLimit()
+FText STimingView::GetEventDepthLimitKeybindingText(uint32 DepthLimit) const
 {
-	uint32 DepthLimit = FTimingProfilerManager::Get()->GetEventDepthLimit();
+	uint32 CurrentDepthLimit = FTimingProfilerManager::Get()->GetEventDepthLimit();
+	uint32 NextDepthLimit = GetNextEventDepthLimit(CurrentDepthLimit);
+	return DepthLimit == NextDepthLimit ? LOCTEXT("DepthLimitKeybinding", "X") : FText::GetEmpty();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+uint32 STimingView::GetNextEventDepthLimit(uint32 DepthLimit) const
+{
 	if (DepthLimit == 1)
 	{
-		DepthLimit = 4;
+		return 4;
 	}
 	else if (DepthLimit == 4)
 	{
-		DepthLimit = FTimingProfilerManager::UnlimitedEventDepth;
+		return FTimingProfilerManager::UnlimitedEventDepth;
 	}
-	else
+	else // Unlimited
 	{
-		DepthLimit = 1;
+		return 1;
 	}
-	FTimingProfilerManager::Get()->SetEventDepthLimit(DepthLimit);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void STimingView::ChooseNextEventDepthLimit()
+{
+	const uint32 CurrentDepthLimit = FTimingProfilerManager::Get()->GetEventDepthLimit();
+	const uint32 NextDepthLimit = GetNextEventDepthLimit(CurrentDepthLimit);
+	FTimingProfilerManager::Get()->SetEventDepthLimit(NextDepthLimit);
 	Viewport.AddDirtyFlags(ETimingTrackViewportDirtyFlags::HInvalidated);
 }
 
@@ -4581,7 +4631,7 @@ void STimingView::SetEventDepthLimit(uint32 DepthLimit)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool STimingView::CheckEventDepthLimit(uint32 DepthLimit)
+bool STimingView::CheckEventDepthLimit(uint32 DepthLimit) const
 {
 	return DepthLimit == FTimingProfilerManager::Get()->GetEventDepthLimit();
 }
