@@ -732,12 +732,16 @@ void FMaterialCachedParameters::GetParameterValueByIndex(EMaterialParameterType 
 {
 	const FMaterialCachedParameterEntry& Entry = GetParameterTypeEntry(Type);
 
+	const bool bIsEditorOnlyDataStripped = Entry.ExpressionGuids.Num() == 0;
 #if WITH_EDITORONLY_DATA
+	if (!bIsEditorOnlyDataStripped)
+	{
 	const FMaterialCachedParameterEditorInfo& EditorInfo = Entry.EditorInfo[ParameterIndex];
 	OutResult.ExpressionGuid = EditorInfo.ExpressionGuid;
 	OutResult.Description = EditorInfo.Description;
 	OutResult.Group = EditorInfo.Group;
 	OutResult.SortPriority = EditorInfo.SortPriority;
+	}
 #endif
 
 	switch (Type)
@@ -747,6 +751,8 @@ void FMaterialCachedParameters::GetParameterValueByIndex(EMaterialParameterType 
 		OutResult.PrimitiveDataIndex = ScalarPrimitiveDataIndexValues[ParameterIndex];
 
 #if WITH_EDITORONLY_DATA
+		if (!bIsEditorOnlyDataStripped)
+		{
 		OutResult.ScalarMin = ScalarMinMaxValues[ParameterIndex].X;
 		OutResult.ScalarMax = ScalarMinMaxValues[ParameterIndex].Y;
 		{
@@ -759,6 +765,7 @@ void FMaterialCachedParameters::GetParameterValueByIndex(EMaterialParameterType 
 				OutResult.bUsedAsAtlasPosition = true;
 			}
 		}
+		}
 #endif // WITH_EDITORONLY_DATA
 		break;
 	case EMaterialParameterType::Vector:
@@ -766,14 +773,20 @@ void FMaterialCachedParameters::GetParameterValueByIndex(EMaterialParameterType 
 		OutResult.PrimitiveDataIndex = VectorPrimitiveDataIndexValues[ParameterIndex];
 
 #if  WITH_EDITORONLY_DATA
+		if (!bIsEditorOnlyDataStripped)
+		{
 		OutResult.ChannelNames = VectorChannelNameValues[ParameterIndex];
 		OutResult.bUsedAsChannelMask = VectorUsedAsChannelMaskValues[ParameterIndex];
+		}
 #endif // WITH_EDITORONLY_DATA
 		break;
 	case EMaterialParameterType::Texture:
 		OutResult.Value = TextureValues[ParameterIndex];
 #if WITH_EDITORONLY_DATA
+		if (!bIsEditorOnlyDataStripped)
+		{
 		OutResult.ChannelNames = TextureChannelNameValues[ParameterIndex];
+		}
 #endif // WITH_EDITORONLY_DATA
 		break;
 	case EMaterialParameterType::RuntimeVirtualTexture:
@@ -784,10 +797,16 @@ void FMaterialCachedParameters::GetParameterValueByIndex(EMaterialParameterType 
 		break;
 #if WITH_EDITORONLY_DATA
 	case EMaterialParameterType::StaticSwitch:
+		if (!bIsEditorOnlyDataStripped)
+		{
 		OutResult.Value = StaticSwitchValues[ParameterIndex];
+		}
 		break;
 	case EMaterialParameterType::StaticComponentMask:
+		if (!bIsEditorOnlyDataStripped)
+		{
 		OutResult.Value = StaticComponentMaskValues[ParameterIndex];
+		}
 		break;
 #endif // WITH_EDITORONLY_DATA
 	default:
