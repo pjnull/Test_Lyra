@@ -1256,7 +1256,7 @@ void UMovieSceneCompiledDataManager::GatherTrack(const FMovieSceneBinding* Objec
 
 		for (const FMovieSceneTrackEvaluationFieldEntry& Entry : EvaluationField.Entries)
 		{
-			if (Track->IsRowEvalDisabled(Entry.Section->GetRowIndex()))
+			if (Entry.Section && Track->IsRowEvalDisabled(Entry.Section->GetRowIndex()))
 			{
 				continue;
 			}
