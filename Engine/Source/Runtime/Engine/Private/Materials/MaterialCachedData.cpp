@@ -733,14 +733,14 @@ void FMaterialCachedParameters::GetParameterValueByIndex(EMaterialParameterType 
 	const FMaterialCachedParameterEntry& Entry = GetParameterTypeEntry(Type);
 	
 #if WITH_EDITORONLY_DATA
-	const bool bIsEditorOnlyDataStripped = Entry.ExpressionGuids.Num() == 0;
+	const bool bIsEditorOnlyDataStripped = Entry.EditorInfo.Num() == 0;
 	if (!bIsEditorOnlyDataStripped)
 	{
-	const FMaterialCachedParameterEditorInfo& EditorInfo = Entry.EditorInfo[ParameterIndex];
-	OutResult.ExpressionGuid = EditorInfo.ExpressionGuid;
-	OutResult.Description = EditorInfo.Description;
-	OutResult.Group = EditorInfo.Group;
-	OutResult.SortPriority = EditorInfo.SortPriority;
+		const FMaterialCachedParameterEditorInfo& EditorInfo = Entry.EditorInfo[ParameterIndex];
+		OutResult.ExpressionGuid = EditorInfo.ExpressionGuid;
+		OutResult.Description = EditorInfo.Description;
+		OutResult.Group = EditorInfo.Group;
+		OutResult.SortPriority = EditorInfo.SortPriority;
 	}
 #endif
 
@@ -753,18 +753,18 @@ void FMaterialCachedParameters::GetParameterValueByIndex(EMaterialParameterType 
 #if WITH_EDITORONLY_DATA
 		if (!bIsEditorOnlyDataStripped)
 		{
-		OutResult.ScalarMin = ScalarMinMaxValues[ParameterIndex].X;
-		OutResult.ScalarMax = ScalarMinMaxValues[ParameterIndex].Y;
-		{
-			UCurveLinearColor* Curve = ScalarCurveValues[ParameterIndex];
-			UCurveLinearColorAtlas* Atlas = ScalarCurveAtlasValues[ParameterIndex];
-			if (Curve && Atlas)
+			OutResult.ScalarMin = ScalarMinMaxValues[ParameterIndex].X;
+			OutResult.ScalarMax = ScalarMinMaxValues[ParameterIndex].Y;
 			{
-				OutResult.ScalarCurve = Curve;
-				OutResult.ScalarAtlas = Atlas;
-				OutResult.bUsedAsAtlasPosition = true;
+				UCurveLinearColor* Curve = ScalarCurveValues[ParameterIndex];
+				UCurveLinearColorAtlas* Atlas = ScalarCurveAtlasValues[ParameterIndex];
+				if (Curve && Atlas)
+				{
+					OutResult.ScalarCurve = Curve;
+					OutResult.ScalarAtlas = Atlas;
+					OutResult.bUsedAsAtlasPosition = true;
+				}
 			}
-		}
 		}
 #endif // WITH_EDITORONLY_DATA
 		break;
@@ -775,8 +775,8 @@ void FMaterialCachedParameters::GetParameterValueByIndex(EMaterialParameterType 
 #if  WITH_EDITORONLY_DATA
 		if (!bIsEditorOnlyDataStripped)
 		{
-		OutResult.ChannelNames = VectorChannelNameValues[ParameterIndex];
-		OutResult.bUsedAsChannelMask = VectorUsedAsChannelMaskValues[ParameterIndex];
+			OutResult.ChannelNames = VectorChannelNameValues[ParameterIndex];
+			OutResult.bUsedAsChannelMask = VectorUsedAsChannelMaskValues[ParameterIndex];
 		}
 #endif // WITH_EDITORONLY_DATA
 		break;
@@ -785,7 +785,7 @@ void FMaterialCachedParameters::GetParameterValueByIndex(EMaterialParameterType 
 #if WITH_EDITORONLY_DATA
 		if (!bIsEditorOnlyDataStripped)
 		{
-		OutResult.ChannelNames = TextureChannelNameValues[ParameterIndex];
+			OutResult.ChannelNames = TextureChannelNameValues[ParameterIndex];
 		}
 #endif // WITH_EDITORONLY_DATA
 		break;
@@ -799,13 +799,13 @@ void FMaterialCachedParameters::GetParameterValueByIndex(EMaterialParameterType 
 	case EMaterialParameterType::StaticSwitch:
 		if (!bIsEditorOnlyDataStripped)
 		{
-		OutResult.Value = StaticSwitchValues[ParameterIndex];
+			OutResult.Value = StaticSwitchValues[ParameterIndex];
 		}
 		break;
 	case EMaterialParameterType::StaticComponentMask:
 		if (!bIsEditorOnlyDataStripped)
 		{
-		OutResult.Value = StaticComponentMaskValues[ParameterIndex];
+			OutResult.Value = StaticComponentMaskValues[ParameterIndex];
 		}
 		break;
 #endif // WITH_EDITORONLY_DATA
