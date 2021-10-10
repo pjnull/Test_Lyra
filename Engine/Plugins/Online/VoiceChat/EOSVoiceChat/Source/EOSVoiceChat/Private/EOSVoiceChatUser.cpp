@@ -713,41 +713,6 @@ bool FEOSVoiceChatUser::IsPlayerMuted(const FString& PlayerName) const
 	return GetGlobalParticipant(PlayerName).bAudioMuted;
 }
 
-void FEOSVoiceChatUser::SetChannelPlayerMuted(const FString& ChannelName, const FString& PlayerName, bool bAudioMuted)
-{
-	if (FChannelSession* ChannelSession = LoginSession.ChannelSessions.Find(ChannelName))
-	{
-		if (FChannelParticipant* ChannelParticipant = ChannelSession->Participants.Find(PlayerName))
-		{
-			const bool bMutedInChannelChanged = ChannelParticipant->bMutedInChannel != bAudioMuted;
-
-			EOSVOICECHATUSER_CLOG(bMutedInChannelChanged, Log, TEXT("SetChannelPlayerMuted PlayerName=[%s] bMutedInChannel=[%s]"), *PlayerName, *LexToString(bAudioMuted));
-			EOSVOICECHATUSER_CLOG(!bMutedInChannelChanged, Verbose, TEXT("SetChannelPlayerMuted PlayerName=[%s] bMutedInChannel=[%s] (No change)"), *PlayerName, *LexToString(bAudioMuted));
-
-			if (bMutedInChannelChanged)
-			{
-				ChannelParticipant->bMutedInChannel = bAudioMuted;
-
-				FGlobalParticipant& GlobalParticipant = GetGlobalParticipant(PlayerName);
-				ApplyPlayerReceivingOptions(GlobalParticipant, *ChannelSession, *ChannelParticipant);
-			}
-		}
-	}
-}
-
-bool FEOSVoiceChatUser::IsChannelPlayerMuted(const FString& ChannelName, const FString& PlayerName) const
-{
-	if (const FChannelSession* ChannelSession = LoginSession.ChannelSessions.Find(ChannelName))
-	{
-		if (const FChannelParticipant* ChannelParticipant = ChannelSession->Participants.Find(PlayerName))
-		{
-			return ChannelParticipant->bMutedInChannel;
-		}
-	}
-
-	return false;
-}
-
 void FEOSVoiceChatUser::SetPlayerVolume(const FString& PlayerName, float Volume)
 {
 	EOSVOICECHATUSER_LOG(Log, TEXT("SetPlayerVolume PlayerName=[%s] Volume=[%s]"), *PlayerName, *LexToString(Volume));
@@ -1217,7 +1182,7 @@ void FEOSVoiceChatUser::ApplyPlayerReceivingOptions(const FGlobalParticipant& Gl
 	// TODO ChannelParticipant should be const, and we should update the bAudioMuted (the *actual* state, not the *desired* state) in the OnUpdateReceiving callback.
 	check(IsLoggedIn());
 
-	const bool bAudioMuted = GlobalParticipant.bAudioMuted || ChannelSession.bIsNotListening || ChannelParticipant.bMutedInChannel;
+	const bool bAudioMuted = GlobalParticipant.bAudioMuted || ChannelSession.bIsNotListening;
 
 	if (ChannelParticipant.bAudioMuted != bAudioMuted || bForce)
 	{

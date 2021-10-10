@@ -70,8 +70,6 @@ public:
 	virtual FOnVoiceChatPlayerTalkingUpdatedDelegate& OnVoiceChatPlayerTalkingUpdated() override { return OnVoiceChatPlayerTalkingUpdatedDelegate; }
 	virtual void SetPlayerMuted(const FString& PlayerName, bool bAudioMuted) override;
 	virtual bool IsPlayerMuted(const FString& PlayerName) const override;
-	virtual void SetChannelPlayerMuted(const FString& ChannelName, const FString& PlayerName, bool bAudioMuted) override;
-	virtual bool IsChannelPlayerMuted(const FString& ChannelName, const FString& PlayerName) const override;
 	virtual FOnVoiceChatPlayerMuteUpdatedDelegate& OnVoiceChatPlayerMuteUpdated() override { return OnVoiceChatPlayerMuteUpdatedDelegate; }
 	virtual void SetPlayerVolume(const FString& PlayerName, float Volume) override;
 	virtual float GetPlayerVolume(const FString& PlayerName) const override;
@@ -131,8 +129,6 @@ protected:
 		bool bAudioMuted = false;
 		// Current block state
 		bool bBlocked = false;
-		// Desired channel mute state
-		bool bMutedInChannel = false;
 		// Current audio status
 		TOptional<EOS_ERTCAudioStatus> AudioStatus;
 	};
