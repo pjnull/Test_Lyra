@@ -75,7 +75,7 @@ public:
 	//~End of UObject interface
 
 	/** List of components to add to gameplay actors when this game feature is enabled */
-	UPROPERTY(EditAnywhere, Category="Components", meta=(TitleProperty="ComponentClass"))
+	UPROPERTY(EditAnywhere, Category="Components", meta=(TitleProperty="{ActorClass} -> {ComponentClass}"))
 	TArray<FGameFeatureComponentEntry> ComponentList;
 
 private:
