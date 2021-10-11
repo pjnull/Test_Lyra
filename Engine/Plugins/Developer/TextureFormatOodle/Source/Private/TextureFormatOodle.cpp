@@ -541,6 +541,16 @@ public:
 			UniversalTiling = OodleTex_RDO_UniversalTiling_Disable;
 		}
 
+		#if 0
+		// leave this if 0 block for developers to toggle for debugging
+		// Debug Color any non-RDO
+		//  easy way to make sure you're seeing RDO textures
+		if (RDOLambda == 0)
+		{
+			bUseDebugColor = true;
+		}
+		#endif
+
 		*bOutDebugColor = bUseDebugColor;
 		*OutRDOLambda = RDOLambda;
 		*OutEffortLevel = EffortLevel;
