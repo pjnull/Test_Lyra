@@ -752,12 +752,26 @@ struct FControlRigParameterPreAnimatedTokenProducer : IMovieScenePreAnimatedToke
 								}
 							}
 						}
+						//make sure to evaluate the control rig
+						ControlRig->Evaluate_AnyThread();
+
 						//unbind instances and reset animbp
 						FControlRigBindingHelper::UnBindFromSequencerInstance(ControlRig);
 
-						//restore skel mesh and due a tick
+						//do a tick and restore skel mesh
 						if (USkeletalMeshComponent* SkeletalMeshComponent = Cast<USkeletalMeshComponent>(ControlRig->GetObjectBinding()->GetBoundObject()))
 						{
+							// Restore pose after unbinding to force the restored pose
+							SkeletalMeshComponent->SetUpdateAnimationInEditor(true);
+							SkeletalMeshComponent->SetUpdateClothInEditor(true);
+							SkeletalMeshComponent->TickAnimation(0.f, false);
+
+							SkeletalMeshComponent->RefreshBoneTransforms();
+							SkeletalMeshComponent->RefreshSlaveComponents();
+							SkeletalMeshComponent->UpdateComponentToWorld();
+							SkeletalMeshComponent->FinalizeBoneTransform();
+							SkeletalMeshComponent->MarkRenderTransformDirty();
+							SkeletalMeshComponent->MarkRenderDynamicDataDirty();
 							SkeletalMeshRestoreState.RestoreState(SkeletalMeshComponent);
 						}
 						//only unbind if not a component
