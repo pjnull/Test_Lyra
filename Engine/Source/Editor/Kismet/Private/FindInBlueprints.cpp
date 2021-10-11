@@ -31,7 +31,6 @@
 #include "ImaginaryBlueprintData.h"
 #include "FiBSearchInstance.h"
 #include "BlueprintEditorTabs.h"
-#include "BlueprintEditorSettings.h"
 #include "HAL/PlatformApplicationMisc.h"
 #include "Framework/Commands/UICommandList.h"
 #include "Widgets/Docking/SDockTab.h"
@@ -605,8 +604,6 @@ void SFindInBlueprints::Construct( const FArguments& InArgs, TSharedPtr<FBluepri
 	}
 
 	bIsInFindWithinBlueprintMode = BlueprintEditorPtr.IsValid();
-
-	const bool bHostFindInBlueprintsInGlobalTab = GetDefault<UBlueprintEditorSettings>()->bHostFindInBlueprintsInGlobalTab;
 	
 	this->ChildSlot
 	[
@@ -635,25 +632,12 @@ void SFindInBlueprints::Construct( const FArguments& InArgs, TSharedPtr<FBluepri
 				[
 					SNew(SButton)
 					.OnClicked(this, &SFindInBlueprints::OnOpenGlobalFindResults)
-					.Visibility(!InArgs._bHideFindGlobalButton && BlueprintEditorPtr.IsValid() && bHostFindInBlueprintsInGlobalTab ? EVisibility::Visible : EVisibility::Collapsed)
+					.Visibility(!InArgs._bHideFindGlobalButton && BlueprintEditorPtr.IsValid() ? EVisibility::Visible : EVisibility::Collapsed)
 					.ToolTipText(LOCTEXT("OpenInGlobalFindResultsButtonTooltip", "Find in all Blueprints"))
 					[
 						SNew(STextBlock)
 						.TextStyle(FEditorStyle::Get(), "FindResults.FindInBlueprints")
 						.Text(FText::FromString(FString(TEXT("\xf1e5"))) /*fa-binoculars*/)
-					]
-				]
-				+SHorizontalBox::Slot()
-				.Padding(2.f, 0.f)
-				.AutoWidth()
-				[
-					SNew(SCheckBox)
-					.OnCheckStateChanged(this, &SFindInBlueprints::OnFindModeChanged)
-					.IsChecked(this, &SFindInBlueprints::OnGetFindModeChecked)
-					.Visibility(InArgs._bHideSearchBar || bHostFindInBlueprintsInGlobalTab ? EVisibility::Collapsed : EVisibility::Visible)
-					[
-						SNew(STextBlock)
-						.Text(LOCTEXT("BlueprintSearchModeChange", "Find In Current Blueprint Only"))
 					]
 				]
 				+SHorizontalBox::Slot()
@@ -1162,16 +1146,6 @@ void SFindInBlueprints::OnSearchTextCommitted( const FText& Text, ETextCommit::T
 	{
 		MakeSearchQuery(SearchValue, bIsInFindWithinBlueprintMode);
 	}
-}
-
-void SFindInBlueprints::OnFindModeChanged(ECheckBoxState CheckState)
-{
-	bIsInFindWithinBlueprintMode = CheckState == ECheckBoxState::Checked;
-}
-
-ECheckBoxState SFindInBlueprints::OnGetFindModeChecked() const
-{
-	return bIsInFindWithinBlueprintMode ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 }
 
 void SFindInBlueprints::LaunchStreamThread(const FString& InSearchValue, const FStreamSearchOptions& InSearchOptions, FOnSearchComplete InOnSearchComplete)

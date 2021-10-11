@@ -103,23 +103,6 @@ void UBlueprintEditorSettings::PostEditChangeProperty(FPropertyChangedEvent& Pro
 {
 	const FName PropertyName = (PropertyChangedEvent.Property != nullptr) ? PropertyChangedEvent.Property->GetFName() : NAME_None;
 
-	if (PropertyName == GET_MEMBER_NAME_CHECKED(UBlueprintEditorSettings, bHostFindInBlueprintsInGlobalTab))
-	{
-		// Close all open Blueprint editors to reset associated FiB states.
-		UAssetEditorSubsystem* AssetEditorSubsystem = GEditor->GetEditorSubsystem<UAssetEditorSubsystem>();
-		TArray<UObject*> EditedAssets = AssetEditorSubsystem->GetAllEditedAssets();
-		for (UObject* EditedAsset : EditedAssets)
-		{
-			if (EditedAsset->IsA<UBlueprint>())
-			{
-				AssetEditorSubsystem->CloseAllEditorsForAsset(EditedAsset);
-			}
-		}
-
-		// Enable or disable the feature through the FiB manager.
-		FFindInBlueprintSearchManager::Get().EnableGlobalFindResults(bHostFindInBlueprintsInGlobalTab);
-	}
-
 	bool bShouldRebuildRegistry = false;
 	
 	if (PropertyName == GET_MEMBER_NAME_CHECKED(UBlueprintEditorSettings, bExposeDeprecatedFunctions))
