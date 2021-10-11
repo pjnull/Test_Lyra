@@ -22,9 +22,8 @@
 #include "Widgets/Progress/SProjectLauncherProgress.h"
 #include "Widgets/Project/SProjectLauncherProjectPicker.h"
 #include "Widgets/Settings/SProjectLauncherSettings.h"
-#include "SEditorHeaderButton.h"
 #include "Styling/AppStyle.h"
-
+#include "Styling/StyleColors.h"
 
 #define LOCTEXT_NAMESPACE "SProjectLauncher"
 
@@ -206,12 +205,32 @@ void SProjectLauncher::Construct(const FArguments& InArgs, const TSharedRef<SDoc
 							.AutoWidth()
 							.Padding(0, 0, 16, 0)
 							[
-								SNew(SEditorHeaderButton)
-								.Icon(FAppStyle::Get().GetBrush("Icons.Plus"))
-								.Text(LOCTEXT("AddButtonLabel", "Add"))
+								SNew(SComboButton)
+								.ContentPadding(FMargin(2.0f, 3.0f))
 								.ToolTipText(LOCTEXT("AddFilterToolTip", "Add a new custom launch profile using wizard"))
 								.OnGetMenuContent(this, &SProjectLauncher::MakeProfileWizardsMenu)
 								.Visibility(this, &SProjectLauncher::GetProfileWizardsMenuVisibility)
+								.HasDownArrow(false)
+								.ButtonStyle(&FAppStyle::Get().GetWidgetStyle<FButtonStyle>("Button"))
+								.ButtonContent()
+								[
+									SNew(SHorizontalBox)
+									+ SHorizontalBox::Slot()
+									.AutoWidth()
+									[
+										SNew(SImage)
+										.Image(FAppStyle::Get().GetBrush("Icons.Plus"))
+										.ColorAndOpacity(FStyleColors::AccentGreen)
+									]
+									+ SHorizontalBox::Slot()
+									.Padding(FMargin(3, 0, 0, 0))
+									.AutoWidth()
+									[
+										SNew(STextBlock)
+										.TextStyle(FAppStyle::Get(), "SmallButtonText")
+										.Text(LOCTEXT("AddButtonLabel", "Add"))
+									]
+								]
 							]
 						]
 					]

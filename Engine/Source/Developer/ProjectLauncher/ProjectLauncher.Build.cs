@@ -29,7 +29,6 @@ public class ProjectLauncher : ModuleRules
 				"SlateCore",
                 "EditorStyle",
                 "WorkspaceMenuStructure",
-				"EditorWidgets",
 			}
 		);
 

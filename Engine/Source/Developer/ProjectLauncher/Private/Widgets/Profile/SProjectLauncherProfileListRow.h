@@ -17,7 +17,6 @@
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Shared/SProjectLauncherProfileLaunchButton.h"
 #include "Widgets/Shared/SProjectLauncherProfileNameDescEditor.h"
-#include "SSimpleButton.h"
 
 #define LOCTEXT_NAMESPACE "SProjectLauncherSimpleDeviceListRow"
 
@@ -97,11 +96,15 @@ public:
 					.VAlign(VAlign_Center)
 					.Padding(4, 0, 0, 0)
 					[
-						SNew(SSimpleButton)
+						SNew(SButton)
 						.OnClicked(this, &SProjectLauncherProfileListRow::OnEditClicked)
 						.ToolTipText(LOCTEXT("EditProfileToolTipText", "Edit profile."))
-						.Icon(this, &SProjectLauncherProfileListRow::GetEditIcon)
-						
+						.ButtonStyle(&FAppStyle::Get().GetWidgetStyle<FButtonStyle>("SimpleButton"))
+						[
+							SNew(SImage)
+							.ColorAndOpacity(FSlateColor::UseForeground())
+							.Image(this, &SProjectLauncherProfileListRow::GetEditIcon)
+						]
 					]
 
 					+ SHorizontalBox::Slot()
