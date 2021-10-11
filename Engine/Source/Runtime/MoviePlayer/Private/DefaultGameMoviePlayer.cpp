@@ -1055,6 +1055,6 @@ void FDefaultGameMoviePlayer::Resume()
 
 void FDefaultGameMoviePlayer::SetIsPlayOnBlockingEnabled(bool bIsEnabled)
 {
-	bIsPlayOnBlockingEnabled = true;
+	bIsPlayOnBlockingEnabled = bIsEnabled;
 }
 
