@@ -374,7 +374,7 @@ static void GetEncodeSpeedOptions(ETextureEncodeSpeed InEncodeSpeed, FTextureEnc
 	// crash if we use GetDefault while someone edits the project settings.
 	// At the moment there's no guaranteed game thread place to do this as jobs can be kicked
 	// off from worker threads (async encodes shader/light map).
-	struct ThreadSafeInitCSO
+	static struct ThreadSafeInitCSO
 	{
 		FTextureEncodeSpeedOptions Fast, Final;
 		ThreadSafeInitCSO()
@@ -390,6 +390,15 @@ static void GetEncodeSpeedOptions(ETextureEncodeSpeed InEncodeSpeed, FTextureEnc
 			Final.Tiling = Settings->FinalUniversalTiling;
 			Final.bUsesRDO = Settings->bFinalUsesRDO;
 			Final.RDOLambda = Settings->FinalRDOLambda;
+			
+			// log settings once at startup
+			UEnum* EncodeEffortEnum = StaticEnum<ETextureEncodeEffort>();
+
+			UE_LOG(LogTexture, Display, TEXT("Oodle Texture Encode Speed settings: Fast: RDO %s Lambda %d, Effort %s Final: RDO %s Lambda %d, Effort %s"), \
+				Fast.bUsesRDO ? TEXT("On") : TEXT("Off"), Fast.bUsesRDO ? Fast.RDOLambda : 0,  *(EncodeEffortEnum->GetNameStringByValue((int64)Fast.Effort)), \
+				Final.bUsesRDO ? TEXT("On") : TEXT("Off"), Final.bUsesRDO ? Final.RDOLambda : 0,  *(EncodeEffortEnum->GetNameStringByValue((int64)Final.Effort)) );
+
+
 		}
 	} EncodeSpeedOptions;
 
