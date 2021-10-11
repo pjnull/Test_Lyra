@@ -17,6 +17,7 @@
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Shared/SProjectLauncherProfileLaunchButton.h"
 #include "Widgets/Shared/SProjectLauncherProfileNameDescEditor.h"
+#include "Widgets/Layout/SSeparator.h"
 
 #define LOCTEXT_NAMESPACE "SProjectLauncherSimpleDeviceListRow"
 
