@@ -22,6 +22,7 @@
 #include "Widgets/Progress/SProjectLauncherProgress.h"
 #include "Widgets/Project/SProjectLauncherProjectPicker.h"
 #include "Widgets/Settings/SProjectLauncherSettings.h"
+#include "SEditorHeaderButton.h"
 #include "Styling/AppStyle.h"
 
 
@@ -96,31 +97,33 @@ void SProjectLauncher::Construct(const FArguments& InArgs, const TSharedRef<SDoc
 
 			// Simple SProjectLauncher
 			+ SSplitter::Slot()
-			.Value(0.7f)
+			.Value(0.55f)
 			[
 				SNew(SVerticalBox)
 
 				+ SVerticalBox::Slot()
 				.AutoHeight()
-				.Padding(2)
 				[
-					SNew(SHorizontalBox)
-					
-					// Project Bar
-					+ SHorizontalBox::Slot()
-					.AutoWidth()
+					SNew(SBorder)
+					.BorderImage(FAppStyle::Get().GetBrush("Brushes.Panel"))
 					[
-						SNew(SProjectLauncherProjectPicker, InModel)
-					]
+						SNew(SHorizontalBox)
 
-					// Advanced Button
-					+ SHorizontalBox::Slot()
-					.HAlign(HAlign_Right)
-					[
-						SNew(SBorder)
-						.Padding(2)
-						.BorderImage(FAppStyle::Get().GetBrush("ToolPanel.GroupBorder"))
+						// Project Bar
+						+ SHorizontalBox::Slot()
+						.AutoWidth()
+						.Padding(0, 4)
 						[
+							SNew(SProjectLauncherProjectPicker, InModel)
+						]
+
+						// Advanced Button
+						+ SHorizontalBox::Slot()
+						.AutoWidth()
+						.VAlign(VAlign_Center)
+						.Padding(6, 0, 0, 0)
+						[
+							
 							SNew(SCheckBox)
 							.Style(FAppStyle::Get(), "ToggleButtonCheckbox")
 							.IsFocusable(true)
@@ -129,23 +132,25 @@ void SProjectLauncher::Construct(const FArguments& InArgs, const TSharedRef<SDoc
 							.IsChecked(this, &SProjectLauncher::OnIsAdvanced)
 							[
 								SNew(SHorizontalBox)
-
 								// Icon
 								+ SHorizontalBox::Slot()
 								.VAlign(VAlign_Center)
+								.AutoWidth()
 								[
 									SNew(SImage)
 									.Image(this, &SProjectLauncher::GetAdvancedToggleBrush)
+									.DesiredSizeOverride(FVector2D(16, 16))
+									.ColorAndOpacity(FSlateColor::UseForeground())
 								]
 
 								// Text
 								+ SHorizontalBox::Slot()
 								.AutoWidth()
 								.VAlign(VAlign_Center)
-								.Padding(4,0,4,0)
+								.Padding(4, 0, 4, 0)
 								[
 									SNew(STextBlock)
-									.Text(LOCTEXT("AdvancedButton", "Advanced"))
+									.Text(LOCTEXT("AdvancedButton", "Show Advanced"))
 								]
 							]
 						]
@@ -154,9 +159,10 @@ void SProjectLauncher::Construct(const FArguments& InArgs, const TSharedRef<SDoc
 
 				+ SVerticalBox::Slot()
 				.FillHeight(1)
-				.Padding(2)
+				.Padding(0)
 				[
 					SNew(SBorder)
+					.BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
 					[
 						SAssignNew(LaunchList, SProjectLauncherSimpleDeviceListView, InModel)
 						.OnProfileRun(this, &SProjectLauncher::OnProfileRun)
@@ -166,54 +172,46 @@ void SProjectLauncher::Construct(const FArguments& InArgs, const TSharedRef<SDoc
 			]
 
 			+ SSplitter::Slot()
-			.Value(0.3f)
+			.Value(0.45f)
 			[
 				SNew(SBorder)
+				.Padding(0)
+				.BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
 				[
 					SNew(SVerticalBox)
 
 					+ SVerticalBox::Slot()
 					.AutoHeight()
-					.Padding(2)
+					.Padding(0)
 					[
 						SNew(SBorder)
-						.BorderImage(FAppStyle::Get().GetBrush("ToolPanel.GroupBorder"))
-						.Padding(4.0)
+						.BorderImage(FAppStyle::Get().GetBrush("Brushes.Panel"))
 						[
 							SNew(SHorizontalBox)
 
 							+ SHorizontalBox::Slot()
+							.VAlign(VAlign_Center)
 							.FillWidth(1.0f)
+							.Padding(14, 0, 0, 0)
 							[
 								SNew(STextBlock)
 								.Text(LOCTEXT("ProjectLauncherCustomProfilesTitle", "Custom Launch Profiles"))
+								.Font(FAppStyle::Get().GetFontStyle("NormalFontBold"))
 							]
+
+							
 
 							+ SHorizontalBox::Slot()
 							.HAlign(HAlign_Right)
 							.AutoWidth()
+							.Padding(0, 0, 16, 0)
 							[
-								SNew(SComboButton)
-								.ContentPadding(0)
+								SNew(SEditorHeaderButton)
+								.Icon(FAppStyle::Get().GetBrush("Icons.Plus"))
+								.Text(LOCTEXT("AddButtonLabel", "Add"))
 								.ToolTipText(LOCTEXT("AddFilterToolTip", "Add a new custom launch profile using wizard"))
 								.OnGetMenuContent(this, &SProjectLauncher::MakeProfileWizardsMenu)
-								.HasDownArrow(true)
-								.ContentPadding(FMargin(1, 0))
 								.Visibility(this, &SProjectLauncher::GetProfileWizardsMenuVisibility)
-							]
-
-							+ SHorizontalBox::Slot()
-							.HAlign(HAlign_Right)
-							.AutoWidth()
-							[
-								SNew(SButton)
-								.ToolTipText(LOCTEXT("ProjectLauncherCustomProfileAdd", "Add a new custom launch profile."))
-								.ContentPadding(0)
-								.OnClicked(this, &SProjectLauncher::OnAddCustomLaunchProfileClicked)
-								[
-									SNew(SImage)
-									.Image(FAppStyle::Get().GetBrush("EditableComboBox.Add"))
-								]
 							]
 						]
 					]
@@ -222,7 +220,7 @@ void SProjectLauncher::Construct(const FArguments& InArgs, const TSharedRef<SDoc
 					.Padding(2)
 					[
 						SAssignNew(ProfileList, SBorder)
-						.BorderImage(FAppStyle::Get().GetBrush("NoBorder"))
+						.BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
 						.Padding(0)
 						[
 							// Simple Launch List
@@ -288,7 +286,7 @@ ECheckBoxState SProjectLauncher::OnIsAdvanced() const
 
 const FSlateBrush* SProjectLauncher::GetAdvancedToggleBrush() const
 {
-	return FAppStyle::Get().GetBrush("LauncherCommand.AdvancedBuild.Medium");
+	return FAppStyle::Get().GetBrush("Icons.Advanced");
 }
 
 
@@ -324,15 +322,13 @@ void SProjectLauncher::OnProfileDelete(const ILauncherProfileRef& Profile)
 }
 
 
-FReply SProjectLauncher::OnAddCustomLaunchProfileClicked()
+void SProjectLauncher::OnAddCustomLaunchProfileClicked()
 {
 	ILauncherProfileRef Profile = Model->GetProfileManager()->AddNewProfile();
 	
 	OnProfileEdit(Profile);
 
 	ProfileSettingsPanel->EnterEditMode();
-
-	return FReply::Handled();
 }
 
 
@@ -345,6 +341,22 @@ EVisibility SProjectLauncher::GetProfileWizardsMenuVisibility() const
 TSharedRef<SWidget> SProjectLauncher::MakeProfileWizardsMenu()
 {
 	FMenuBuilder MenuBuilder(true, NULL);
+
+	MenuBuilder.BeginSection("Create", LOCTEXT("CreateSection", "CREATE"));
+
+	MenuBuilder.AddMenuEntry(
+		LOCTEXT("CustomProfileLabel", "Create Custom Profile"),
+		LOCTEXT("CustomProfileDescription", "Add a new custom launch profile."),
+		FSlateIcon(),
+		FUIAction(
+			FExecuteAction::CreateSP(this, &SProjectLauncher::OnAddCustomLaunchProfileClicked),
+			FCanExecuteAction()
+		)
+	);
+
+	MenuBuilder.EndSection();
+
+	MenuBuilder.BeginSection("CreateFromPreset", LOCTEXT("CreateFromPreset", "CREATE FROM PRESET"));
 
 	const TArray<ILauncherProfileWizardPtr>& Wizards = Model->GetProfileManager()->GetProfileWizards();
 	for (const ILauncherProfileWizardPtr& Wizard : Wizards)
@@ -362,6 +374,8 @@ TSharedRef<SWidget> SProjectLauncher::MakeProfileWizardsMenu()
 				)
 			);
 	}
+
+	MenuBuilder.EndSection();
 
 	return MenuBuilder.MakeWidget();
 }

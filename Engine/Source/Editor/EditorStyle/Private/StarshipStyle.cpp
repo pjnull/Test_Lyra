@@ -429,6 +429,10 @@ void FStarshipEditorStyle::FStyle::SetupGeneralStyles()
 		Set("Icons.SelectInViewport", new IMAGE_BRUSH_SVG("Starship/Common/SelectInViewport", Icon16x16));
 		Set("Icons.BrowseContent", new IMAGE_BRUSH_SVG("Starship/Common/BrowseContent", Icon16x16));
 		Set("Icons.Use", new IMAGE_BRUSH_SVG("Starship/Common/use-circle", Icon16x16));
+		Set("Icons.Advanced", new IMAGE_BRUSH_SVG("Starship/Common/Advanced", Icon16x16));
+		Set("Icons.Launch", new IMAGE_BRUSH_SVG("Starship/Common/ProjectLauncher", Icon16x16));
+		Set("Icons.Next", new IMAGE_BRUSH_SVG("Starship/Common/NextArrow", Icon16x16));
+		Set("Icons.Previous", new IMAGE_BRUSH_SVG("Starship/Common/PreviousArrow", Icon16x16));
 	}
 
 	Set( "WarningStripe", new IMAGE_BRUSH( "Common/WarningStripe", FVector2D(20,6), FLinearColor::White, ESlateBrushTileType::Horizontal ) );
@@ -1213,8 +1217,8 @@ void FStarshipEditorStyle::FStyle::SetupGeneralStyles()
 			.SetShadowOffset( FVector2D::ZeroVector )
 		);
 
-		Set("GraphBreadcrumb.BrowseBack", new IMAGE_BRUSH_SVG( "Starship/GraphEditors/PreviousArrow", Icon20x20));
-		Set("GraphBreadcrumb.BrowseForward", new IMAGE_BRUSH_SVG( "Starship/GraphEditors/NextArrow", Icon20x20));
+		Set("GraphBreadcrumb.BrowseBack", new IMAGE_BRUSH_SVG( "Starship/Common/PreviousArrow", Icon20x20));
+		Set("GraphBreadcrumb.BrowseForward", new IMAGE_BRUSH_SVG( "Starship/Common/NextArrow", Icon20x20));
 
 		const FComboButtonStyle FastJumpComboBoxComboButton = FComboButtonStyle()
 			.SetButtonStyle(GetWidgetStyle<FButtonStyle>("GraphBreadcrumbButton"));
@@ -5575,8 +5579,8 @@ void FStarshipEditorStyle::FStyle::SetupPersonaStyle()
 		Set( "Kismet.WatchIcon", new IMAGE_BRUSH_SVG( "Starship/GraphEditors/WatchVariable", Icon16x16 ) );
 		Set( "Kismet.LatentActionIcon", new IMAGE_BRUSH_SVG( "Starship/Common/Timecode", Icon16x16 ) );
 
-		Set( "Kismet.Trace.CurrentIndex", new IMAGE_BRUSH_SVG( "Starship/GraphEditors/NextArrow", Icon16x16 ) );
-		Set( "Kismet.Trace.PreviousIndex", new IMAGE_BRUSH_SVG( "Starship/GraphEditors/PreviousArrow", Icon16x16 ) );
+		Set( "Kismet.Trace.CurrentIndex", new IMAGE_BRUSH_SVG( "Starship/Common/NextArrow", Icon16x16 ) );
+		Set( "Kismet.Trace.PreviousIndex", new IMAGE_BRUSH_SVG( "Starship/Common/PreviousArrow", Icon16x16 ) );
 
 		Set( "Kismet.DebuggerOverlay.Breakpoint.Disabled", new IMAGE_BRUSH_SVG( "Starship/Blueprints/Breakpoint_Disabled", Icon32x32, FStyleColors::AccentRed) );
 		Set( "Kismet.DebuggerOverlay.Breakpoint.EnabledAndInvalid", new IMAGE_BRUSH_SVG( "Starship/Blueprints/Breakpoint_Invalid", Icon32x32, FStyleColors::AccentRed) );
@@ -7475,7 +7479,7 @@ void FStarshipEditorStyle::FStyle::SetupAutomationStyles()
 		Set( "Launcher.Instance_Server", new IMAGE_BRUSH( "Launcher/Instance_Server", Icon25x25 ) );
 		Set( "Launcher.Instance_Unknown", new IMAGE_BRUSH( "Launcher/Instance_Unknown", Icon25x25 ) );
 		Set( "LauncherCommand.DeployBuild", new IMAGE_BRUSH( "Launcher/Launcher_Deploy", Icon40x40 ) );
-		Set( "LauncherCommand.QuickLaunch", new IMAGE_BRUSH( "Launcher/Launcher_Launch", Icon40x40 ) );
+		Set( "LauncherCommand.QuickLaunch", new IMAGE_BRUSH_SVG( "Starship/Launcher/PaperAirplane", Icon20x20 ) );
 		Set( "LauncherCommand.CreateBuild", new IMAGE_BRUSH( "Launcher/Launcher_Build", Icon40x40 ) );
 		Set( "LauncherCommand.AdvancedBuild", new IMAGE_BRUSH( "Launcher/Launcher_Advanced", Icon40x40 ) );
 		Set( "LauncherCommand.AdvancedBuild.Medium", new IMAGE_BRUSH("Launcher/Launcher_Advanced", Icon25x25) );
@@ -7487,7 +7491,10 @@ void FStarshipEditorStyle::FStyle::SetupAutomationStyles()
 			.SetShadowOffset(FVector2D(1, 1))
 			.SetShadowColorAndOpacity(FLinearColor(0, 0, 0, 0.9f)));
 
-		Set( "Launcher.Platform.Warning", new IMAGE_BRUSH( "Icons/alert", Icon24x24) );
+		const FComboButtonStyle LauncherComboButton = FComboButtonStyle(FStarshipCoreStyle::GetCoreStyle().GetWidgetStyle<FComboButtonStyle>("ComboButton"))
+			.SetDownArrowPadding(FMargin(67.0f, 2.0f, 2.0f, 2.0f));
+
+		Set("Launcher.ComboButton", LauncherComboButton);
 
 #if DDPI_HAS_EXTENDED_PLATFORMINFO_DATA
 
@@ -7529,33 +7536,31 @@ void FStarshipEditorStyle::FStyle::SetupAutomationStyles()
 
 	// Device Manager
 	{
-		Set( "DeviceDetails.Claim", new IMAGE_BRUSH( "Icons/icon_DeviceClaim_40x", Icon40x40 ) );
-		Set( "DeviceDetails.Claim.Small", new IMAGE_BRUSH( "Icons/icon_DeviceClaim_40x", Icon20x20 ) );
-		Set( "DeviceDetails.Release", new IMAGE_BRUSH( "Icons/icon_DeviceRelease_40x", Icon40x40 ) );
-		Set( "DeviceDetails.Release.Small", new IMAGE_BRUSH( "Icons/icon_DeviceRelease_40x", Icon20x20 ) );
-		Set( "DeviceDetails.Remove", new IMAGE_BRUSH( "Icons/icon_DeviceRemove_40x", Icon40x40 ) );
-		Set( "DeviceDetails.Remove.Small", new IMAGE_BRUSH( "Icons/icon_DeviceRemove_40x", Icon20x20 ) );
-		Set( "DeviceDetails.Share", new IMAGE_BRUSH( "Icons/icon_DeviceShare_40x", Icon40x40 ) );
-		Set( "DeviceDetails.Share.Small", new IMAGE_BRUSH( "Icons/icon_DeviceShare_40x", Icon20x20 ) );
+		Set( "DeviceDetails.Claim", new IMAGE_BRUSH_SVG( "Starship/DeviceManager/DeviceClaim", Icon20x20) );
+		Set( "DeviceDetails.Release", new IMAGE_BRUSH_SVG("Starship/DeviceManager/DeviceRelease", Icon20x20));
+		Set( "DeviceDetails.Remove", new IMAGE_BRUSH_SVG("Starship/DeviceManager/DeviceRemove", Icon20x20));
+		Set( "DeviceDetails.Share", new IMAGE_BRUSH_SVG("Starship/DeviceManager/DeviceShare", Icon20x20));
 
-		Set( "DeviceDetails.Connect", new IMAGE_BRUSH( "Icons/icon_DeviceConnect_40x", Icon40x40 ) );
-		Set( "DeviceDetails.Connect.Small", new IMAGE_BRUSH( "Icons/icon_DeviceConnect_40x", Icon20x20 ) );
-		Set( "DeviceDetails.Disconnect", new IMAGE_BRUSH( "Icons/icon_DeviceDisconnect_40x", Icon40x40 ) );
-		Set( "DeviceDetails.Disconnect.Small", new IMAGE_BRUSH( "Icons/icon_DeviceDisconnect_40x", Icon20x20 ) );
+		Set( "DeviceDetails.Connect", new IMAGE_BRUSH_SVG("Starship/DeviceManager/CircleCheck_20", Icon20x20));
+		Set( "DeviceDetails.Disconnect", new IMAGE_BRUSH_SVG("Starship/DeviceManager/CircleX_20", Icon20x20));
 
-		Set( "DeviceDetails.PowerOn", new IMAGE_BRUSH( "Icons/icon_DevicePowerOn_40x", Icon40x40 ) );
-		Set( "DeviceDetails.PowerOn.Small", new IMAGE_BRUSH( "Icons/icon_DevicePowerOn_40x", Icon20x20 ) );
-		Set( "DeviceDetails.PowerOff", new IMAGE_BRUSH( "Icons/icon_DevicePowerOff_40x", Icon40x40 ) );
-		Set( "DeviceDetails.PowerOff.Small", new IMAGE_BRUSH( "Icons/icon_DevicePowerOff_40x", Icon20x20 ) );
-		Set( "DeviceDetails.PowerOffForce", new IMAGE_BRUSH( "Icons/icon_DevicePowerOff_40x", Icon40x40 ) );
-		Set( "DeviceDetails.PowerOffForce.Small", new IMAGE_BRUSH( "Icons/icon_DevicePowerOff_40x", Icon20x20 ) );
-		Set( "DeviceDetails.Reboot", new IMAGE_BRUSH( "Icons/icon_DeviceReboot_40x", Icon40x40 ) );
-		Set( "DeviceDetails.Reboot.Small", new IMAGE_BRUSH( "Icons/icon_DeviceReboot_40x", Icon20x20 ) );
+		Set( "DeviceDetails.PowerOn", new IMAGE_BRUSH_SVG("Starship/DeviceManager/PowerOn_20", Icon20x20));
+		Set( "DeviceDetails.PowerOff", new IMAGE_BRUSH_SVG("Starship/DeviceManager/CircleMinus_20", Icon20x20));
+		Set( "DeviceDetails.PowerOffForce", new IMAGE_BRUSH_SVG("Starship/DeviceManager/CircleMinus_20", Icon20x20));
+		Set( "DeviceDetails.Reboot", new IMAGE_BRUSH_SVG("Starship/DeviceManager/Reboot", Icon20x20));
 
 		Set( "DeviceDetails.TabIcon", new IMAGE_BRUSH_SVG( "Starship/Common/DeviceManager", Icon16x16 ) );
 		Set( "DeviceDetails.Tabs.Tools", new IMAGE_BRUSH( "/Icons/icon_tab_Tools_16x", Icon16x16 ) );
 		Set( "DeviceDetails.Tabs.ProfileEditor", new IMAGE_BRUSH_SVG( "Starship/Common/DeviceProfiles", Icon16x16 ) );
 		Set( "DeviceDetails.Tabs.ProfileEditorSingleProfile", new IMAGE_BRUSH( "/Icons/icon_tab_DeviceProfileEditor_16x", Icon16x16 ) );
+
+		// Todo: Remove this button style once Property Editor has been reskinned
+		const FButtonStyle DeviceProfileCellButton = FButtonStyle(FStarshipCoreStyle::GetCoreStyle().GetWidgetStyle<FButtonStyle>("NoBorder"))
+			.SetNormalForeground(FStyleColors::AccentBlack)
+			.SetHoveredForeground(FLinearColor::FromSRGBColor(FColor::FromHex("#868686FF")))
+			.SetPressedForeground(FLinearColor::FromSRGBColor(FColor::FromHex("#868686FF")));
+		
+		Set("DeviceDetails.EditButton", DeviceProfileCellButton);
 	}
 
 	// Settings Editor
