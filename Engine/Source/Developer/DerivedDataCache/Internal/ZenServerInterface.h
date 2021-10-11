@@ -17,6 +17,7 @@
 #include "Containers/StringView.h"
 #include "Containers/UnrealString.h"
 #include "Templates/UniquePtr.h"
+#include "ZenStatistics.h"
 
 #define UE_API DERIVEDDATACACHE_API
 
@@ -84,7 +85,7 @@ public:
 	 inline const TCHAR* GetURL() const { return *URL; }
 	 inline const TCHAR* GetHostName() const { return *HostName; }
 	 inline uint16 GetPort() const { return Port; }
-
+	 UE_API bool GetStats(FZenStats& stats) const;
 	 UE_API bool IsServiceRunning();
 	 UE_API bool IsServiceReady();
 
