@@ -29,6 +29,8 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Misc/FileHelper.h"
 #include "Modules/ModuleManager.h"
+#include "RenderUtils.h"
+#include "RHI.h"
 
 #if WITH_EDITOR
 	#include "Factories/TextureFactory.h"
@@ -546,20 +548,26 @@ namespace UE
 #endif // WITH_EDITOR
 
 								Texture = UsdUtils::CreateTexture( FileInput.GetAttr(), MaterialPrimPath, LODGroup, TexturesCache );
+
+								if ( Texture )
+								{
+									Texture->SRGB = bSRGB;
+									Texture->CompressionSettings = CompressionSettings;
+
+									if ( bForceVirtualTextures )
+									{
+										Texture->VirtualTextureStreaming = true;
+										UsdUtils::NotifyIfVirtualTexturesNeeded( Texture );
+									}
+
+									Texture->UpdateResource();
+
+									TexturesCache->CacheAsset( TextureHash, Texture );
+								}
 							}
 
 							if ( Texture )
 							{
-								Texture->SRGB = bSRGB;
-								Texture->CompressionSettings = CompressionSettings;
-
-								if ( bForceVirtualTextures )
-								{
-									Texture->VirtualTextureStreaming = true;
-								}
-
-								Texture->UpdateResource();
-
 								FString PrimvarName = GetPrimvarUsedAsST(Source);
 								int32 UVIndex = 0;
 								if ( !PrimvarName.IsEmpty() && PrimvarToUVIndex )
@@ -577,8 +585,6 @@ namespace UE
 										)
 									);
 								}
-
-								TexturesCache->CacheAsset( TextureHash, Texture );
 
 								FTextureParameterValue OutTextureValue;
 								OutTextureValue.Texture = Texture;
@@ -2065,6 +2071,29 @@ UTexture* UsdUtils::CreateTexture( const pxr::UsdAttribute& TextureAssetPathAttr
 	else
 	{
 		return UsdShadeConversionImpl::CreateTextureAtRuntime( TextureAssetPathAttr, PrimPath, LODGroup );
+	}
+}
+
+void UsdUtils::NotifyIfVirtualTexturesNeeded( UTexture* Texture )
+{
+	if ( !Texture || !Texture->VirtualTextureStreaming )
+	{
+		return;
+	}
+
+	FString TexturePath = Texture->GetName();
+	if ( UUsdAssetImportData* AssetImportData = Cast<UUsdAssetImportData>( Texture ) )
+	{
+		TexturePath = AssetImportData->PrimPath;
+	}
+
+	if ( !UseVirtualTexturing( GMaxRHIFeatureLevel ) )
+	{
+		FUsdLogManager::LogMessage(
+			EMessageSeverity::Warning,
+			FText::Format( LOCTEXT( "DisabledVirtualTexturing", "Texture '{0}' requires Virtual Textures, but the feature is disabled for this project" ),
+				FText::FromString( TexturePath ) )
+		);
 	}
 }
 
