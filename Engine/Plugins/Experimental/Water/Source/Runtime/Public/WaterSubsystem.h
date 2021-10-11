@@ -52,6 +52,13 @@ struct FUnderwaterPostProcessVolume : public IInterface_PostProcessVolume
 		return PostProcessProperties;
 	}
 
+#if DEBUG_POST_PROCESS_VOLUME_ENABLE
+	virtual FString GetDebugName() const override
+	{
+		return FString("UnderwaterPostProcessVolume");
+	}
+#endif
+
 	FPostProcessVolumeProperties PostProcessProperties;
 };
 

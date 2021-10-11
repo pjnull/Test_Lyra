@@ -8327,6 +8327,21 @@ static void DoPostProcessVolume(IInterface_PostProcessVolume* Volume, FVector Vi
 		}
 	}
 
+#if DEBUG_POST_PROCESS_VOLUME_ENABLE
+	if (SceneView->Family && SceneView->Family->EngineShowFlags.VisualizePostProcessStack)
+	{
+		FPostProcessSettingsDebugInfo& PPDebug = SceneView->FinalPostProcessDebugInfo.AddDefaulted_GetRef();
+
+		PPDebug.Name = Volume->GetDebugName();
+
+		FPostProcessVolumeProperties VProperties = Volume->GetProperties();
+		PPDebug.bIsEnabled = VProperties.bIsEnabled;
+		PPDebug.bIsUnbound = VProperties.bIsUnbound;
+		PPDebug.Priority = VProperties.Priority;
+		PPDebug.CurrentBlendWeight = LocalWeight;
+	}
+#endif
+
 	if (LocalWeight > 0)
 	{
 		SceneView->OverridePostProcessSettings(*VolumeProperties.Settings, LocalWeight);
@@ -8336,6 +8351,10 @@ static void DoPostProcessVolume(IInterface_PostProcessVolume* Volume, FVector Vi
 void UWorld::AddPostProcessingSettings(FVector ViewLocation, FSceneView* SceneView)
 {
 	OnBeginPostProcessSettings.Broadcast(ViewLocation, SceneView);
+
+#if DEBUG_POST_PROCESS_VOLUME_ENABLE
+	SceneView->FinalPostProcessDebugInfo.Reset();
+#endif
 
 	for (IInterface_PostProcessVolume* PPVolume : PostProcessVolumes)
 	{

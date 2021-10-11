@@ -17,6 +17,7 @@
 #include "GlobalDistanceFieldParameters.h"
 #include "DebugViewModeHelpers.h"
 #include "RendererInterface.h"
+#include "Interfaces/Interface_PostProcessVolume.h"
 
 class FForwardLightingViewResources;
 class FSceneView;
@@ -1157,6 +1158,9 @@ public:
 	 * Setup by the main thread, passed to the render thread and never touched again by the main thread.
 	 */
 	FFinalPostProcessSettings FinalPostProcessSettings;
+#if DEBUG_POST_PROCESS_VOLUME_ENABLE
+	TArray<FPostProcessSettingsDebugInfo> FinalPostProcessDebugInfo;
+#endif
 
 	// The antialiasing method.
 	EAntiAliasingMethod AntiAliasingMethod;
