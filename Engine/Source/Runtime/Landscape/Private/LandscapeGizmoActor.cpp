@@ -38,7 +38,8 @@ public:
 
 	/** Initialization constructor. */
 	FLandscapeGizmoMeshRenderProxy(const FMaterialRenderProxy* InParent, const float InTop, const float InBottom, const UTexture2D* InAlphaTexture, const FLinearColor& InScaleBias, const FMatrix& InWorldToLandscapeMatrix)
-	:	Parent(InParent)
+	:	FMaterialRenderProxy(InParent->GetMaterialName())
+	,	Parent(InParent)
 	,	TopHeight(InTop)
 	,	BottomHeight(InBottom)
 	,	AlphaTexture(InAlphaTexture)

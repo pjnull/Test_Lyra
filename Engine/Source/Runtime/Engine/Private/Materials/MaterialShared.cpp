@@ -3228,7 +3228,7 @@ void FMaterialRenderProxy::CacheUniformExpressions(bool bRecreateUniformBuffer)
 
 	if (IsMarkedForGarbageCollection())
 	{
-		UE_LOG(LogMaterial, Fatal, TEXT("Cannot queue the Expression Cache when it is about to be deleted"));
+		UE_LOG(LogMaterial, Fatal, TEXT("Cannot queue the Expression Cache for Material %s when it is about to be deleted"), *MaterialName);
 	}
 	DeferredUniformExpressionCacheRequests.Add(this);
 
@@ -3301,8 +3301,9 @@ void FMaterialRenderProxy::UpdateUniformExpressionCacheIfNeeded(ERHIFeatureLevel
 	}
 }
 
-FMaterialRenderProxy::FMaterialRenderProxy()
+FMaterialRenderProxy::FMaterialRenderProxy(FString InMaterialName)
 	: SubsurfaceProfileRT(0)
+	, MaterialName(InMaterialName)
 	, MarkedForGarbageCollection(0)
 	, DeletedFlag(0)
 	, HasVirtualTextureCallbacks(0)
