@@ -20,6 +20,7 @@
 #include "Animation/AnimNotifies/AnimNotifyState.h"
 #include "Subsystems/AssetEditorSubsystem.h"
 #include "Animation/BuiltInAttributeTypes.h"
+#include "AnimationRecorderParameters.h"
 
 #define LOCTEXT_NAMESPACE "FAnimationRecorder"
 
@@ -54,7 +55,6 @@ void FAnimationRecorder::SetSampleRateAndLength(float SampleRateHz, float Length
 {
 	if (SampleRateHz <= 0.f)
 	{
-
 		// invalid rate passed in, fall back to default
 		SampleRateHz = FAnimationRecordingSettings::DefaultSampleRate;
 	}
@@ -95,13 +95,15 @@ bool FAnimationRecorder::SetAnimCompressionScheme(UAnimBoneCompressionSettings* 
 }
 
 // Internal. Pops up a dialog to get saved asset path
-static bool PromptUserForAssetPath(FString& AssetPath, FString& AssetName)
+static bool PromptUserForAssetDetails(FString& AssetPath, FString& AssetName, float& OutSampleRate, float& OutMaximumDuration)
 {
 	TSharedRef<SCreateAnimationDlg> NewAnimDlg = SNew(SCreateAnimationDlg);
 	if (NewAnimDlg->ShowModal() != EAppReturnType::Cancel)
 	{
 		AssetPath = NewAnimDlg->GetFullAssetPath();
 		AssetName = NewAnimDlg->GetAssetName();
+		OutMaximumDuration = NewAnimDlg->GetRecordingParameters()->GetRecordingDurationSeconds();
+		OutSampleRate = NewAnimDlg->GetRecordingParameters()->GetRecordingSampleRate();
 		return true;
 	}
 
@@ -113,14 +115,18 @@ bool FAnimationRecorder::TriggerRecordAnimation(USkeletalMeshComponent* Componen
 	FString AssetPath;
 	FString AssetName;
 
+	float SampleRate;
+	float MaximumLength;
+
 	if (!Component || !Component->SkeletalMesh || !Component->SkeletalMesh->GetSkeleton())
 	{
 		return false;
 	}
 
 	// ask for path
-	if (PromptUserForAssetPath(AssetPath, AssetName))
+	if (PromptUserForAssetDetails(AssetPath, AssetName, SampleRate, MaximumLength))
 	{
+		SetSampleRateAndLength(SampleRate, MaximumLength);
 		return TriggerRecordAnimation(Component, AssetPath, AssetName);
 	}
 
@@ -149,10 +155,15 @@ bool FAnimationRecorder::TriggerRecordAnimation(USkeletalMeshComponent* Componen
 	if (Parent == nullptr)
 	{
 		// bad or no path passed in, do the popup
-		if (PromptUserForAssetPath(ValidatedAssetPath, ValidatedAssetName) == false)
+		float SampleRate;
+		float MaximumLength;
+
+		if (PromptUserForAssetDetails(ValidatedAssetPath, ValidatedAssetName, SampleRate, MaximumLength) == false)
 		{
 			return false;
 		}
+
+		SetSampleRateAndLength(SampleRate, MaximumLength);
 		
 		Parent = CreatePackage( *ValidatedAssetPath);
 	}
