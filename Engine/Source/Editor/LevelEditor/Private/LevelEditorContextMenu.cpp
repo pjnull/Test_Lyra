@@ -274,6 +274,8 @@ void FLevelEditorContextMenu::RegisterActorContextMenu()
 			// Edit and Find entries (a) always appear in main menu, and (b) appear in right-click menu if referenced asset is available
 			if (LevelEditorContext->ContextType == ELevelEditorMenuContext::MainMenu || ReferencedAssets.Num() > 0)
 			{
+				Section.AddMenuEntry(FGlobalEditorCommonCommands::Get().FindInContentBrowser);
+
 				if (ReferencedAssets.Num() == 0)
 				{
 					Section.AddMenuEntry(
@@ -303,8 +305,6 @@ void FLevelEditorContextMenu::RegisterActorContextMenu()
 						AssetIcon
 					);
 				}
-
-				Section.AddMenuEntry(FGlobalEditorCommonCommands::Get().FindInContentBrowser);
 			}
 
 			if (LevelEditorContext->ContextType == ELevelEditorMenuContext::MainMenu)
@@ -408,17 +408,17 @@ void FLevelEditorContextMenu::RegisterActorContextMenu()
 			// Build the menu for grouping actors - this is either the Group item or Groups submenu
 			BuildGroupMenu(Section, SelectionInfo);
 
-			// Attach/detach, events should go in main menu only
+			// Attach and detach
+			Section.AddSubMenu(
+				"ActorAttachToSubMenu",
+				LOCTEXT("ActorAttachToSubMenu", "Attach To"),
+				LOCTEXT("ActorAttachToSubMenu_ToolTip", "Attach Actor as child"),
+				FNewToolMenuDelegate::CreateStatic(&FLevelEditorContextMenuImpl::FillActorMenu));
+			Section.AddMenuEntry(FLevelEditorCommands::Get().DetachFromParent);
+
+			// Add/jump to event should go in main menu only
 			if (LevelEditorContext->ContextType == ELevelEditorMenuContext::MainMenu)
 			{
-				Section.AddSubMenu(
-					"ActorAttachToSubMenu",
-					LOCTEXT("ActorAttachToSubMenu", "Attach To"),
-					LOCTEXT("ActorAttachToSubMenu_ToolTip", "Attach Actor as child"),
-					FNewToolMenuDelegate::CreateStatic(&FLevelEditorContextMenuImpl::FillActorMenu));
-
-				Section.AddMenuEntry(FLevelEditorCommands::Get().DetachFromParent);
-
 				FLevelScriptEventMenuHelper::FillLevelBlueprintEventsMenu(Section, SelectedActors);
 			}
 		}
