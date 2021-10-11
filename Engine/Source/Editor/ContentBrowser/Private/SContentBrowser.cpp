@@ -683,6 +683,7 @@ TSharedRef<SWidget> SContentBrowser::CreateAssetView(const FContentBrowserConfig
 		[
 			SNew(SBorder)
 			.BorderImage(FAppStyle::Get().GetBrush("Brushes.Panel"))
+			.Padding(FMargin(2.0f, 2.0f, 2.0f, 0.0f))
 			[
 				SNew(SWrapBox)
 				.UseAllottedSize(true)
