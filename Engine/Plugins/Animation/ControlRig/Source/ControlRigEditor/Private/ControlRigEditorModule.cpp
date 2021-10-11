@@ -330,7 +330,7 @@ void FControlRigEditorModule::StartupModule()
 			.SetTooltipText(NSLOCTEXT("UnrealEditor", "MotionTrailTabTooltip", "Open the Motion Trail tab."))
 			.SetMenuType(ETabSpawnerMenuType::Hidden)
 			.SetIcon(FSlateIcon(FEditorStyle::GetStyleSetName(), "Persona.Tabs.AnimSlotManager"));//MZ todo replace with correct icon SkeletonTree.SkeletonSocket
-		FGlobalTabmanager::Get()->RegisterDefaultTabWindowSize(IControlRigEditorModule::ControlRigMotionTrailTab, FVector2D(200, 500));
+		FGlobalTabmanager::Get()->RegisterDefaultTabWindowSize(IControlRigEditorModule::ControlRigMotionTrailTab, FVector2D(425, 575));
 
 	};
 #endif
