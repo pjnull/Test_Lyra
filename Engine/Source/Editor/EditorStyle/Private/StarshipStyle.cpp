@@ -4794,10 +4794,18 @@ void FStarshipEditorStyle::FStyle::SetupLevelEditorStyle()
 		Set( "LevelViewport.Icon", new IMAGE_BRUSH( "Icons/icon_tab_viewport_16px", Icon16x16 ) );
 
 		Set( "LevelViewportContextMenu.ActorType.Text", FTextBlockStyle(NormalText)
-			.SetFont( DEFAULT_FONT( "Regular", 8 ) )
-			.SetColorAndOpacity( FLinearColor(0.72f, 0.72f, 0.72f, 1.f) ) );
+			.SetFont( DEFAULT_FONT( "Regular", 7 ) )
+			.SetColorAndOpacity( FSlateColor::UseSubduedForeground() ) );
 
-		Set( "LevelViewportContextMenu.AssetLabel.Text", FTextBlockStyle(NormalText) .SetFont( DEFAULT_FONT( "Regular", 9 ) ) );
+		Set( "LevelViewportContextMenu.AssetLabel.Text", FTextBlockStyle(NormalText)
+			.SetFont( DEFAULT_FONT( "Regular", 9 ) )
+			.SetColorAndOpacity( FSlateColor::UseForeground() ) );
+
+		Set( "LevelViewportContextMenu.AssetTileItem.ThumbnailAreaBackground", new FSlateRoundedBoxBrush(FStyleColors::Recessed, 4.0f) );
+		
+		FLinearColor TransparentRecessed = FStyleColors::Recessed.GetSpecifiedColor();
+		TransparentRecessed.A = 0.3f;
+		Set( "LevelViewportContextMenu.AssetTileItem.NameAreaBackground", new FSlateRoundedBoxBrush(TransparentRecessed, 4.0f) );
 
 		Set( "LevelViewport.CursorIcon", new IMAGE_BRUSH( "Common/Cursor", Icon16x16 ) );
 	}
