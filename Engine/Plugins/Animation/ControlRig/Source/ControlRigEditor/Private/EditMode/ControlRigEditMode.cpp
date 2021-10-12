@@ -2951,7 +2951,10 @@ void FControlRigEditMode::TickGizmo(AControlRigGizmoActor* GizmoActor, const FTr
 			{
 				GizmoActor->SetGizmoColor(ControlElement->Settings.GizmoColor);
 				GizmoActor->SetIsTemporarilyHiddenInEditor(!ControlElement->Settings.bGizmoVisible || Settings->bHideManipulators);
-				GizmoActor->SetSelectable(ControlElement->Settings.bGizmoVisible && !Settings->bHideManipulators && ControlElement->Settings.bAnimatable);
+				if (!IsInLevelEditor()) //don't change this in level editor otherwise we can never select it
+				{
+					GizmoActor->SetSelectable(ControlElement->Settings.bGizmoVisible && !Settings->bHideManipulators && ControlElement->Settings.bAnimatable);
+				}
 			}
 		}
 	}
