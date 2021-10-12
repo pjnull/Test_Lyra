@@ -758,10 +758,12 @@ void UMaterialEditorInstanceConstant::ResetOverrides(int32 Index, EMaterialParam
 				if (ParameterType != EMaterialParameterType::None)
 				{
 					FMaterialParameterMetadata SourceValue;
+					bool bOverride = false;
 					if (SourceInstance->GetParameterValue(ParameterType, Parameter->ParameterInfo, SourceValue, EMaterialGetParameterValueFlags::CheckInstanceOverrides))
 					{
-						Parameter->bOverride = SourceValue.bOverride;
+						bOverride = SourceValue.bOverride;
 					}
+					Parameter->bOverride = bOverride;
 				}
 			}
 		}

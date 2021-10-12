@@ -478,6 +478,7 @@ public:
 	FDerivInfo GetDerivInfo(int32 Index, bool bAllowNonFloat = false) const;
 
 protected:
+	bool GetParameterOverrideValueForCurrentFunction(EMaterialParameterType ParameterType, FName ParameterName, FMaterialParameterMetadata& OutResult) const;
 
 	bool IsMaterialPropertyUsed(EMaterialProperty Property, int32 PropertyChunkIndex, const FLinearColor& ReferenceValue, int32 NumComponents) const;
 

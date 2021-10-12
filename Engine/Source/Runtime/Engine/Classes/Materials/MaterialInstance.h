@@ -1094,7 +1094,7 @@ namespace MaterialInstance_Private
 
 		TArray<FMaterialParameterInfo> CachedParamInfos;
 		TArray<FGuid> CachedParamGuids;
-		ParentMaterial->GetCachedExpressionData().Parameters.GetAllParameterInfoOfType(ParamTypeEnum, CachedParamInfos, CachedParamGuids);
+		ParentMaterial->GetAllParameterInfoOfType(ParamTypeEnum, CachedParamInfos, CachedParamGuids);
 		int32 NumCachedParams = CachedParamGuids.Num();
 		check(NumCachedParams == CachedParamInfos.Num());
 

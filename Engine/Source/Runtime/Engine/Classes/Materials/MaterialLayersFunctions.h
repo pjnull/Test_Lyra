@@ -60,6 +60,8 @@ struct ENGINE_API FMaterialParameterInfo
 		Ar << Ref.Name << Ref.Association << Ref.Index;
 		return Ar;
 	}
+
+	bool RemapLayerIndex(TArrayView<const int32> IndexRemap, FMaterialParameterInfo& OutResult) const;
 };
 
 struct FMemoryImageMaterialParameterInfo
@@ -101,6 +103,8 @@ public:
 		Ref.Name = NameToScriptName(RefName);
 		return Ar;
 	}
+
+	bool RemapLayerIndex(TArrayView<const int32> IndexRemap, FMemoryImageMaterialParameterInfo& OutResult) const;
 
 	LAYOUT_FIELD(FScriptName, Name);
 	LAYOUT_FIELD(int32, Index);

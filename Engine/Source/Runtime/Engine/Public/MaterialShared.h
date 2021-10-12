@@ -1806,7 +1806,6 @@ public:
 	virtual bool HasPerInstanceRandom() const { return false; }
 	virtual bool HasVertexInterpolator() const { return false; }
 	virtual bool HasRuntimeVirtualTextureOutput() const { return false; }
-	virtual bool HasMaterialLayers() const { return false; }
 	virtual bool CastsRayTracedShadows() const { return true; }
 	virtual EMaterialShadingRate GetShadingRate() const { return MSR_1x1; }
 	/**
@@ -2720,7 +2719,6 @@ public:
 	ENGINE_API virtual bool HasPerInstanceRandom() const override;
 	ENGINE_API virtual bool HasVertexInterpolator() const override;
 	ENGINE_API virtual bool HasRuntimeVirtualTextureOutput() const override;
-	ENGINE_API virtual bool HasMaterialLayers() const override;
 	ENGINE_API virtual bool CastsRayTracedShadows() const override;
 	ENGINE_API  virtual UMaterialInterface* GetMaterialInterface() const override;
 	/**

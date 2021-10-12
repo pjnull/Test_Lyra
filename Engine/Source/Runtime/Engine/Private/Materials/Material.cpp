@@ -1900,7 +1900,7 @@ void UMaterial::UpdateCachedExpressionData()
 
 bool UMaterial::GetParameterValue(EMaterialParameterType Type, const FMemoryImageMaterialParameterInfo& ParameterInfo, FMaterialParameterMetadata& OutResult, EMaterialGetParameterValueFlags Flags) const
 {
-	if (EnumHasAnyFlags(Flags, EMaterialGetParameterValueFlags::CheckNonOverrides) && CachedExpressionData)
+	if (CachedExpressionData)
 	{
 		return CachedExpressionData->Parameters.GetParameterValue(Type, ParameterInfo, OutResult);
 	}

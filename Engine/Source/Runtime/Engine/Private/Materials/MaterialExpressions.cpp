@@ -32,6 +32,7 @@
 #include "Materials/MaterialFunctionMaterialLayer.h"
 #include "Materials/MaterialFunctionMaterialLayerBlend.h"
 #include "Materials/MaterialFunctionInstance.h"
+#include "Materials/MaterialInstanceSupport.h"
 #include "Materials/Material.h"
 #include "Engine/Texture2D.h"
 #include "Engine/TextureRenderTarget2D.h"
@@ -12529,6 +12530,94 @@ void UMaterialFunctionInterface::ForceRecompileForRendering(FMaterialUpdateConte
 		}
 	}
 }
+
+bool UMaterialFunctionInterface::GetParameterOverrideValue(EMaterialParameterType Type, const FName& ParameterName, FMaterialParameterMetadata& OutValue) const
+{
+	return false;
+}
+
+bool UMaterialFunctionInterface::OverrideNamedScalarParameter(const FHashedMaterialParameterInfo& ParameterInfo, float& OutValue)
+{
+	FMaterialParameterMetadata Meta;
+	if (GetParameterOverrideValue(EMaterialParameterType::Scalar, ParameterInfo.GetName(), Meta))
+	{
+		OutValue = Meta.Value.AsScalar();
+		return true;
+	}
+	return false;
+}
+
+bool UMaterialFunctionInterface::OverrideNamedVectorParameter(const FHashedMaterialParameterInfo& ParameterInfo, FLinearColor& OutValue)
+{
+	FMaterialParameterMetadata Meta;
+	if (GetParameterOverrideValue(EMaterialParameterType::Vector, ParameterInfo.GetName(), Meta))
+	{
+		OutValue = Meta.Value.AsLinearColor();
+		return true;
+	}
+	return false;
+}
+
+bool UMaterialFunctionInterface::OverrideNamedTextureParameter(const FHashedMaterialParameterInfo& ParameterInfo, class UTexture*& OutValue)
+{
+	FMaterialParameterMetadata Meta;
+	if (GetParameterOverrideValue(EMaterialParameterType::Texture, ParameterInfo.GetName(), Meta))
+	{
+		OutValue = Meta.Value.Texture;
+		return true;
+	}
+	return false;
+}
+
+bool UMaterialFunctionInterface::OverrideNamedRuntimeVirtualTextureParameter(const FHashedMaterialParameterInfo& ParameterInfo, class URuntimeVirtualTexture*& OutValue)
+{
+	FMaterialParameterMetadata Meta;
+	if (GetParameterOverrideValue(EMaterialParameterType::RuntimeVirtualTexture, ParameterInfo.GetName(), Meta))
+	{
+		OutValue = Meta.Value.RuntimeVirtualTexture;
+		return true;
+	}
+	return false;
+}
+
+bool UMaterialFunctionInterface::OverrideNamedFontParameter(const FHashedMaterialParameterInfo& ParameterInfo, class UFont*& OutFontValue, int32& OutFontPage)
+{
+	FMaterialParameterMetadata Meta;
+	if (GetParameterOverrideValue(EMaterialParameterType::Font, ParameterInfo.GetName(), Meta))
+	{
+		OutFontValue = Meta.Value.Font.Value;
+		OutFontPage = Meta.Value.Font.Page;
+		return true;
+	}
+	return false;
+}
+
+bool UMaterialFunctionInterface::OverrideNamedStaticSwitchParameter(const FHashedMaterialParameterInfo& ParameterInfo, bool& OutValue, FGuid& OutExpressionGuid)
+{
+	FMaterialParameterMetadata Meta;
+	if (GetParameterOverrideValue(EMaterialParameterType::StaticSwitch, ParameterInfo.GetName(), Meta))
+	{
+		OutExpressionGuid = Meta.ExpressionGuid;
+		OutValue = Meta.Value.AsStaticSwitch();
+		return true;
+	}
+	return false;
+}
+
+bool UMaterialFunctionInterface::OverrideNamedStaticComponentMaskParameter(const FHashedMaterialParameterInfo& ParameterInfo, bool& OutR, bool& OutG, bool& OutB, bool& OutA, FGuid& OutExpressionGuid)
+{
+	FMaterialParameterMetadata Meta;
+	if (GetParameterOverrideValue(EMaterialParameterType::Scalar, ParameterInfo.GetName(), Meta))
+	{
+		OutExpressionGuid = Meta.ExpressionGuid;
+		OutR = Meta.Value.Bool[0];
+		OutG = Meta.Value.Bool[1];
+		OutB = Meta.Value.Bool[2];
+		OutA = Meta.Value.Bool[3];
+		return true;
+	}
+	return false;
+}
 #endif // WITH_EDITOR
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -13535,112 +13624,26 @@ bool UMaterialFunctionInstance::HasFlippedCoordinates() const
 {
 	return Parent ? Parent->HasFlippedCoordinates() : false;
 }
-#endif
 
-bool UMaterialFunctionInstance::OverrideNamedScalarParameter(const FHashedMaterialParameterInfo& ParameterInfo, float& OutValue)
+bool UMaterialFunctionInstance::GetParameterOverrideValue(EMaterialParameterType Type, const FName& ParameterName, FMaterialParameterMetadata& OutResult) const
 {
-	for (const FScalarParameterValue& ScalarParameter : ScalarParameterValues)
+	const FMemoryImageMaterialParameterInfo ParameterInfo(ParameterName);
+
+	bool bResult = false;
+	switch (Type)
 	{
-		if (ScalarParameter.ParameterInfo.Name == ParameterInfo.Name)
-		{
-			OutValue = ScalarParameter.ParameterValue;
-			return true;
-		}
+	case EMaterialParameterType::Scalar: bResult = GameThread_GetParameterValue(ScalarParameterValues, ParameterInfo, OutResult); break;
+	case EMaterialParameterType::Vector: bResult = GameThread_GetParameterValue(VectorParameterValues, ParameterInfo, OutResult); break;
+	case EMaterialParameterType::Texture: bResult = GameThread_GetParameterValue(TextureParameterValues, ParameterInfo, OutResult); break;
+	case EMaterialParameterType::RuntimeVirtualTexture: bResult = GameThread_GetParameterValue(RuntimeVirtualTextureParameterValues, ParameterInfo, OutResult); break;
+	case EMaterialParameterType::Font: bResult = GameThread_GetParameterValue(FontParameterValues, ParameterInfo, OutResult); break;
+	case EMaterialParameterType::StaticSwitch: bResult = GameThread_GetParameterValue(StaticSwitchParameterValues, ParameterInfo, OutResult); break;
+	case EMaterialParameterType::StaticComponentMask: bResult = GameThread_GetParameterValue(StaticComponentMaskParameterValues, ParameterInfo, OutResult); break;
+	default: checkNoEntry(); break;
 	}
-
-	return false;
+	return bResult;
 }
-
-bool UMaterialFunctionInstance::OverrideNamedVectorParameter(const FHashedMaterialParameterInfo& ParameterInfo, FLinearColor& OutValue)
-{
-	for (const FVectorParameterValue& VectorParameter : VectorParameterValues)
-	{
-		if (VectorParameter.ParameterInfo.Name == ParameterInfo.Name)
-		{
-			OutValue = VectorParameter.ParameterValue;
-			return true;
-		}
-	}
-
-	return false;
-}
-
-bool UMaterialFunctionInstance::OverrideNamedTextureParameter(const FHashedMaterialParameterInfo& ParameterInfo, UTexture*& OutValue)
-{
-	for (const FTextureParameterValue& TextureParameter : TextureParameterValues)
-	{
-		if (TextureParameter.ParameterInfo.Name == ParameterInfo.Name)
-		{
-			OutValue = TextureParameter.ParameterValue;
-			return true;
-		}
-	}
-
-	return false;
-}
-
-bool UMaterialFunctionInstance::OverrideNamedRuntimeVirtualTextureParameter(const FHashedMaterialParameterInfo& ParameterInfo, URuntimeVirtualTexture*& OutValue)
-{
-	for (const FRuntimeVirtualTextureParameterValue& RuntimeVirtualTextureParameter : RuntimeVirtualTextureParameterValues)
-	{
-		if (RuntimeVirtualTextureParameter.ParameterInfo.Name == ParameterInfo.Name)
-		{
-			OutValue = RuntimeVirtualTextureParameter.ParameterValue;
-			return true;
-		}
-	}
-
-	return false;
-}
-
-bool UMaterialFunctionInstance::OverrideNamedFontParameter(const FHashedMaterialParameterInfo& ParameterInfo, UFont*& OutFontValue, int32& OutFontPage)
-{
-	for (const FFontParameterValue& FontParameter : FontParameterValues)
-	{
-		if (FontParameter.ParameterInfo.Name == ParameterInfo.Name)
-		{
-			OutFontValue = FontParameter.FontValue;
-			OutFontPage = FontParameter.FontPage;
-			return true;
-		}
-	}
-
-	return false;
-}
-
-bool UMaterialFunctionInstance::OverrideNamedStaticSwitchParameter(const FHashedMaterialParameterInfo& ParameterInfo, bool& OutValue, FGuid& OutExpressionGuid)
-{
-	for (const FStaticSwitchParameter& StaticSwitchParameter : StaticSwitchParameterValues)
-	{
-		if (StaticSwitchParameter.ParameterInfo.Name == ParameterInfo.Name)
-		{
-			OutValue = StaticSwitchParameter.Value;
-			OutExpressionGuid = StaticSwitchParameter.ExpressionGUID;
-			return true;
-		}
-	}
-
-	return false;
-}
-
-bool UMaterialFunctionInstance::OverrideNamedStaticComponentMaskParameter(const FHashedMaterialParameterInfo& ParameterInfo, bool& OutR, bool& OutG, bool& OutB, bool& OutA, FGuid& OutExpressionGuid)
-{
-	for (const FStaticComponentMaskParameter& StaticComponentMaskParameter : StaticComponentMaskParameterValues)
-	{
-		if (StaticComponentMaskParameter.ParameterInfo.Name == ParameterInfo.Name)
-		{
-			OutR = StaticComponentMaskParameter.R;
-			OutG = StaticComponentMaskParameter.G;
-			OutB = StaticComponentMaskParameter.B;
-			OutA = StaticComponentMaskParameter.A;
-			OutExpressionGuid = StaticComponentMaskParameter.ExpressionGUID;
-			return true;
-		}
-	}
-
-	return false;
-}
-
+#endif // WITH_EDITOR
 
 ///////////////////////////////////////////////////////////////////////////////
 // FMaterialLayersFunctions::ID
