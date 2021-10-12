@@ -277,7 +277,7 @@ public:
 	template <typename OpType, typename LastResultType, typename CallableType>
 	void SetExecFunction(TOnlineAsyncOp<OpType>& InOperation, LastResultType&& InLastResult, CallableType&& InCallable)
 	{
-		ExecFunction = [this, WeakOperation = TWeakPtr<TOnlineAsyncOp<OpType>>(InOperation.AsShared()), &LastResult = InLastResult, Callable = MoveTemp(InCallable)]()
+		ExecFunction = [this, WeakOperation = TWeakPtr<TOnlineAsyncOp<OpType>>(InOperation.AsShared()), &LastResult = InLastResult, Callable = MoveTemp(InCallable)]() mutable
 		{
 			TSharedPtr<TOnlineAsyncOp<OpType>> PinnedOperation = WeakOperation.Pin();
 			if (PinnedOperation)
@@ -324,7 +324,7 @@ public:
 	template <typename OpType, typename CallableType>
 	void SetExecFunction(TOnlineAsyncOp<OpType>& InOperation, CallableType&& InCallable)
 	{
-		ExecFunction = [this, WeakOperation = TWeakPtr<TOnlineAsyncOp<OpType>>(InOperation.AsShared()), Callable = MoveTemp(InCallable)]()
+		ExecFunction = [this, WeakOperation = TWeakPtr<TOnlineAsyncOp<OpType>>(InOperation.AsShared()), Callable = MoveTemp(InCallable)]() mutable
 		{
 			TSharedPtr<TOnlineAsyncOp<OpType>> PinnedOperation = WeakOperation.Pin();
 			if (PinnedOperation)
@@ -433,7 +433,7 @@ public:
 	template <typename OpType, typename CallableType>
 	void SetExecFunction(TOnlineAsyncOp<OpType>& InOperation, CallableType&& InCallable)
 	{
-		ExecFunction = [this, WeakOperation = TWeakPtr<TOnlineAsyncOp<OpType>>(InOperation.AsShared()), Callable = MoveTemp(InCallable)]()
+		ExecFunction = [this, WeakOperation = TWeakPtr<TOnlineAsyncOp<OpType>>(InOperation.AsShared()), Callable = MoveTemp(InCallable)]() mutable
 		{
 			TSharedPtr<TOnlineAsyncOp<OpType>> PinnedOperation = WeakOperation.Pin();
 			if (PinnedOperation)
