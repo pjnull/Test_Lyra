@@ -111,6 +111,11 @@ bool IsPrimaryAsset(const FAssetData& InAssetData)
 	return !InAssetData.IsRedirector() || InAssetData.IsUAsset();
 }
 
+bool IsPrimaryAsset(UObject* InObject)
+{
+	return !FAssetData::IsRedirector(InObject) && FAssetData::IsUAsset(InObject);
+}
+
 void SetOptionalErrorMessage(FText* OutErrorMsg, FText InErrorMsg)
 {
 	if (OutErrorMsg)
