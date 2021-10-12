@@ -78,6 +78,9 @@ private:
 	UPROPERTY(EditAnywhere, Transient, Category = "In Camera VFX", meta = (PropertyPath = "CameraSettings.SoftEdge"))
 	FDisplayClusterEditorPropertyReference SoftEdgeRef;
 
+	UPROPERTY(EditAnywhere, Transient, Category = "In Camera VFX", meta = (PropertyPath = "CameraSettings.Border"))
+	FDisplayClusterEditorPropertyReference BorderRef;
+
 	UPROPERTY(EditAnywhere, Transient, Category = "In Camera VFX", meta = (PropertyPath = "CameraSettings.FrustumRotation"))
 	FDisplayClusterEditorPropertyReference FrustumRotationRef;
 

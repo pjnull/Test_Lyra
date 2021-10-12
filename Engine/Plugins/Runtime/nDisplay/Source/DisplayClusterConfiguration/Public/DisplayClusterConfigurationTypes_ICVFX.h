@@ -385,6 +385,24 @@ struct DISPLAYCLUSTERCONFIGURATION_API FDisplayClusterConfigurationICVFX_CameraS
 };
 
 USTRUCT(BlueprintType)
+struct DISPLAYCLUSTERCONFIGURATION_API FDisplayClusterConfigurationICVFX_CameraBorder
+{
+	GENERATED_BODY()
+
+	/** Enable Innder Frustum Border. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = NDisplay, meta = (DisplayName = "Enable Inner Frustum Border"))
+	bool Enable = false;
+
+	/** Adjust border width to the top and bottom edges of the inner frustum. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = NDisplay, meta = (DisplayName = "Border Width", ClampMin = "0.0", UIMin = "0.0", ClampMax = "0.1", UIMax = "0.1"))
+	float Thickness = 0.05f;
+
+	/** Adjust color of the border edges of the inner frustum. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = NDisplay, meta = (DisplayName = "Border Color"))
+	FLinearColor Color = FLinearColor::Blue;
+};
+
+USTRUCT(BlueprintType)
 struct DISPLAYCLUSTERCONFIGURATION_API FDisplayClusterConfigurationICVFX_CameraSettings
 {
 	GENERATED_BODY()
@@ -419,6 +437,10 @@ public:
 	/** Specify an offset on the inner frustum. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "In Camera VFX", meta = (DisplayName = "Inner Frustum Offset", EditCondition = "bEnable"))
 	FVector FrustumOffset = FVector::ZeroVector;
+
+	/**Border for the inner frustum. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "In Camera VFX", meta = (DisplayName = "Inner Frustum Border", EditCondition = "bEnable"))
+	FDisplayClusterConfigurationICVFX_CameraBorder Border;
 
 	/** Render motion blur more accurately by subtracting blur from camera motion and avoiding amplification of blur by the physical camera. */
 	UPROPERTY(BlueprintReadWrite, BlueprintReadWrite, EditAnywhere, Category = "In Camera VFX", meta = (EditCondition = "bEnable"))
