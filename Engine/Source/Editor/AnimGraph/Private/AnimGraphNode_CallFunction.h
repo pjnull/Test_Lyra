@@ -54,6 +54,7 @@ private:
 	// UAnimGraphNode_Base interface
 	virtual void GetRequiredExtensions(TArray<TSubclassOf<UAnimBlueprintExtension>>& OutExtensions) const override;
 	virtual bool ShouldCreateStructEvalHandlers() const override { return false; }
+	virtual void OnProcessDuringCompilation(IAnimBlueprintCompilationContext& InCompilationContext, IAnimBlueprintGeneratedClassCompiledData& OutCompiledData) override;
 
 private:
 	void AllocateFunctionPins();

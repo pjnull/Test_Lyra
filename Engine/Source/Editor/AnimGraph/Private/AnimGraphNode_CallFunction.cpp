@@ -126,8 +126,7 @@ void UAnimGraphNode_CallFunction::ExpandNode(FKismetCompilerContext& CompilerCon
 
 		UAnimBlueprintExtension_CallFunction* Extension = UAnimBlueprintExtension::GetExtension<UAnimBlueprintExtension_CallFunction>(GetAnimBlueprint());
 		
-		const FName EventName = Extension->AddCustomEventName(this);
-		Node.Function.SetFromFunctionName(EventName);
+		const FName EventName = Extension->GetCustomEventName(this);
 
 		UK2Node_CustomEvent* CustomEventNode = CompilerContext.SpawnIntermediateEventNode<UK2Node_CustomEvent>(this, nullptr, CompilerContext.ConsolidatedEventGraph);
 		CustomEventNode->bInternalEvent = true;
@@ -346,6 +345,14 @@ void UAnimGraphNode_CallFunction::ValidateNodeDuringCompilation(FCompilerResults
 			ValidateFunction(Function, &MessageLog);
 		}
 	}
+}
+
+void UAnimGraphNode_CallFunction::OnProcessDuringCompilation(IAnimBlueprintCompilationContext& InCompilationContext, IAnimBlueprintGeneratedClassCompiledData& OutCompiledData)
+{
+	UAnimBlueprintExtension_CallFunction* Extension = UAnimBlueprintExtension::GetExtension<UAnimBlueprintExtension_CallFunction>(GetAnimBlueprint());
+
+	const FName EventName = Extension->AddCustomEventName(this);
+	Node.Function.SetFromFunctionName(EventName);
 }
 
 #undef LOCTEXT_NAMESPACE
