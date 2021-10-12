@@ -188,7 +188,7 @@ PyObject* ParentExternalWindowToSlate(PyObject* InSelf, PyObject* InArgs)
 		if (SlateParentWindowHandle && ExternalWindowHandle)
 		{
 #if PLATFORM_WINDOWS
-			::SetParent((HWND)ExternalWindowHandle, (HWND)SlateParentWindowHandle);
+			::SetWindowLongPtr((HWND)ExternalWindowHandle, -8/*GWL_HWNDPARENT*/, (LONG_PTR)SlateParentWindowHandle);
 #endif
 		}
 	}
