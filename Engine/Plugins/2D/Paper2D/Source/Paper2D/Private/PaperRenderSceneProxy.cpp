@@ -47,7 +47,7 @@ public:
 public:
 	/** Initialization constructor. */
 	FSpriteTextureOverrideRenderProxy(const FMaterialRenderProxy* InParent, const UTexture* InBaseTexture, FAdditionalSpriteTextureArray InAdditionalTextures UE_EXPAND_IF_WITH_EDITOR(, const FPaperRenderSceneProxyTextureOverrideMap& InTextureOverrideList))
-		: FMaterialRenderProxy(InParent->GetMaterialName())
+		: FMaterialRenderProxy(InParent ? InParent->GetMaterialName() : TEXT("FSpriteTextureOverrideRenderProxy"))
 		, Parent(InParent)
 		, BaseTexture(InBaseTexture)
 		, AdditionalTextures(InAdditionalTextures)
