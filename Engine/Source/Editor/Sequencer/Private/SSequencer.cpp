@@ -504,6 +504,7 @@ void SSequencer::Construct(const FArguments& InArgs, TSharedRef<FSequencer> InSe
 			// Grid lines match the color specified in FSequencerTimeSliderController::OnPaintViewArea
 			.GridLineTint(FLinearColor(0.f, 0.f, 0.f, 0.3f))
 			.ExternalTimeSliderController(CurveEditorTimeSliderController)
+			.MinimumViewPanelHeight(0.f)
 			.TabManager(InSequencer->GetToolkitHost()->GetTabManager())
 			.DisabledTimeSnapTooltip(LOCTEXT("CurveEditorTimeSnapDisabledTooltip", "Time Snapping is currently driven by Sequencer."))
 			.TreeContent()
