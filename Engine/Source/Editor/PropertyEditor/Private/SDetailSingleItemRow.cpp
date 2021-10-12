@@ -566,6 +566,7 @@ void SDetailSingleItemRow::Construct( const FArguments& InArgs, FDetailLayoutCus
 			FSlimHorizontalToolBarBuilder ToolbarBuilder(TSharedPtr<FUICommandList>(), FMultiBoxCustomization::None);
 			ToolbarBuilder.SetLabelVisibility(EVisibility::Collapsed);
 			ToolbarBuilder.SetStyle(&FAppStyle::Get(), "DetailsView.ExtensionToolBar");
+			ToolbarBuilder.SetIsFocusable(false);
 
 			for (const FPropertyRowExtensionButton& Extension : ExtensionButtons)
 			{

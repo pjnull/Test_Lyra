@@ -20,7 +20,7 @@ public:
 	SLATE_BEGIN_ARGS(SClippingHorizontalBox) 
 		: _StyleSet(&FCoreStyle::Get())
 		, _StyleName(NAME_None)
-		, _IsFocusable(false)
+		, _IsFocusable(true)
 		{ }
 
 		SLATE_ARGUMENT(FOnGetContent, OnWrapButtonClicked)

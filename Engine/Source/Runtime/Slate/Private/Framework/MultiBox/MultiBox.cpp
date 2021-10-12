@@ -249,6 +249,7 @@ FMultiBox::FMultiBox(const EMultiBoxType InType, FMultiBoxCustomization InCustom
 	, StyleName( "ToolBar" )
 	, Type( InType )
 	, bShouldCloseWindowAfterMenuSelection( bInShouldCloseWindowAfterMenuSelection )
+	, bIsFocusable( true )
 {
 
 	if (InType == EMultiBoxType::SlimHorizontalToolBar && FCoreStyle::IsStarshipStyle())
