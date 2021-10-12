@@ -4237,7 +4237,7 @@ void SAssetView::FillToggleColumnsMenu(FMenuBuilder& MenuBuilder)
 
 void SAssetView::ResetColumns()
 {
-	HiddenColumnNames.Empty();
+	HiddenColumnNames = DefaultHiddenColumnNames;
 	NumVisibleColumns = ColumnView->GetHeaderRow()->GetColumns().Num();
 	ColumnView->GetHeaderRow()->RefreshColumns();
 	ColumnView->RebuildList();
