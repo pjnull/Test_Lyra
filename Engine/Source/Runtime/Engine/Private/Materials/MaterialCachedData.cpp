@@ -154,7 +154,6 @@ bool FMaterialCachedExpressionData::UpdateForFunction(const FMaterialCachedExpre
 			if (Index != INDEX_NONE)
 			{
 				Parameters.ScalarValues.Insert(Param.ParameterValue, Index);
-				Parameters.ScalarPrimitiveDataIndexValues.Insert(INDEX_NONE, Index);
 				Parameters.ScalarMinMaxValues.Insert(FVector2D(), Index);
 				if (Param.AtlasData.bIsUsedAsAtlasPosition)
 				{
@@ -176,7 +175,6 @@ bool FMaterialCachedExpressionData::UpdateForFunction(const FMaterialCachedExpre
 			if (Index != INDEX_NONE)
 			{
 				Parameters.VectorValues.Insert(Param.ParameterValue, Index);
-				Parameters.VectorPrimitiveDataIndexValues.Insert(INDEX_NONE, Index);
 				Parameters.VectorChannelNameValues.Insert(FParameterChannelNames(), Index);
 				Parameters.VectorUsedAsChannelMaskValues.Insert(false, Index);
 			}
@@ -360,7 +358,6 @@ void FMaterialCachedParameters_UpdateForLayerParameters(FMaterialCachedParameter
 				if (Index != INDEX_NONE)
 				{
 					Parameters.ScalarValues.Insert(Param.ParameterValue, Index);
-					Parameters.ScalarPrimitiveDataIndexValues.Insert(INDEX_NONE, Index);
 					Parameters.ScalarMinMaxValues.Insert(FVector2D(), Index);
 					if (Param.AtlasData.bIsUsedAsAtlasPosition)
 					{
@@ -385,7 +382,6 @@ void FMaterialCachedParameters_UpdateForLayerParameters(FMaterialCachedParameter
 				if (Index != INDEX_NONE)
 				{
 					Parameters.VectorValues.Insert(Param.ParameterValue, Index);
-					Parameters.VectorPrimitiveDataIndexValues.Insert(INDEX_NONE, Index);
 					Parameters.VectorChannelNameValues.Insert(FParameterChannelNames(), Index);
 					Parameters.VectorUsedAsChannelMaskValues.Insert(false, Index);
 				}
