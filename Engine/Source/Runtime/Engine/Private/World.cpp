@@ -3639,6 +3639,7 @@ void UWorld::BlockTillLevelStreamingCompleted()
 		++BlockTillLevelStreamingCompletedEpoch;
 	}
 
+	bool bIsStreamingPaused = false;
 	bool bWorkToDo = false;
 	do
 	{
@@ -3651,20 +3652,22 @@ void UWorld::BlockTillLevelStreamingCompleted()
 		bWorkToDo = (IsVisibilityRequestPending() || IsAsyncLoading());
 		if (bWorkToDo)
 		{
-			if (GEngine->GameViewport && GEngine->BeginStreamingPauseDelegate && GEngine->BeginStreamingPauseDelegate->IsBound())
+			if (!bIsStreamingPaused && GEngine->GameViewport && GEngine->BeginStreamingPauseDelegate && GEngine->BeginStreamingPauseDelegate->IsBound())
 			{
 				GEngine->BeginStreamingPauseDelegate->Execute(GEngine->GameViewport->Viewport);
+				bIsStreamingPaused = true;
 			}
 
 			// Flush level streaming requests, blocking till completion.
 			FlushLevelStreaming(EFlushLevelStreamingType::Full);
-
-			if (GEngine->EndStreamingPauseDelegate && GEngine->EndStreamingPauseDelegate->IsBound())
-			{
-				GEngine->EndStreamingPauseDelegate->Execute();
-			}
 		}
 	} while (bWorkToDo);
+
+	if (bIsStreamingPaused && GEngine->EndStreamingPauseDelegate && GEngine->EndStreamingPauseDelegate->IsBound())
+	{
+		GEngine->EndStreamingPauseDelegate->Execute();
+	}
+
 	const double ElapsedTime = FPlatformTime::Seconds() - StartTime;
 	UE_LOG(LogWorld, Log, TEXT("BlockTillLevelStreamingCompleted took %s seconds (MatchStarted %d)"), *FText::AsNumber(ElapsedTime).ToString(), bMatchStarted);
 }
