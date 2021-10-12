@@ -4268,7 +4268,7 @@ FSavePackageResultStruct UEditorEngine::Save( UPackage* InOuter, UObject* InBase
 			// Look at top level object for the base root candidate,
 			// this should find the world if the package contains a map, however worlds are sometimes not properly flagged as asset when saved
 			// This will also allow other asset types that need to have Pre/PostSaveRoot called on them to be done so properly
-			Base = InOuter->FindAssetInPackage(TopLevelFlags);
+			Base = InOuter->FindAssetInPackage();
 		}
 	}
 

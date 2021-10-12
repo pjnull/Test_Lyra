@@ -81,7 +81,7 @@ public:
 		// if the asset wasn't provided, fetch it from the package
 		if (Asset == nullptr)
 		{
-			Asset = InPackage->FindAssetInPackage(SaveArgs.TopLevelFlags);
+			Asset = InPackage->FindAssetInPackage();
 		}
 
 		TargetPackagePath = FPackagePath::FromLocalPath(InFilename);
@@ -96,6 +96,11 @@ public:
 		if (ProcessPrestreamingRequests)
 		{
 			bIsProcessingPrestreamPackages = ProcessPrestreamingRequests->GetInt() > 0;
+		}
+		static const IConsoleVariable* FixupStandaloneFlags = IConsoleManager::Get().FindConsoleVariable(TEXT("save.FixupStandaloneFlags"));
+		if (FixupStandaloneFlags)
+		{
+			bIsFixupStandaloneFlags = FixupStandaloneFlags->GetInt() != 0;
 		}
 
 		ObjectSaveContext.Set(InPackage, GetTargetPlatform(), TargetPackagePath, SaveArgs.SaveFlags);
@@ -313,6 +318,11 @@ public:
 	bool IsProcessingPrestreamingRequests() const
 	{
 		return bIsProcessingPrestreamPackages;
+	}
+
+	bool IsFixupStandaloneFlags() const
+	{
+		return bIsFixupStandaloneFlags;
 	}
 
 	FUObjectSerializeContext* GetSerializeContext() const
@@ -600,6 +610,7 @@ private:
 	bool bCanUseUnversionedPropertySerialization = false;
 	bool bTextFormat = false;
 	bool bIsProcessingPrestreamPackages = false;
+	bool bIsFixupStandaloneFlags = false;
 	bool bNeedPreSaveCleanup = false;
 	bool bGenerateFileStub = false;
 

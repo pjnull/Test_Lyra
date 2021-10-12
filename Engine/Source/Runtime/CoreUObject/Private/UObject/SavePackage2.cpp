@@ -4,6 +4,7 @@
 #include "UObject/SavePackage.h"
 
 #if UE_WITH_SAVEPACKAGE
+#include "AssetRegistry/AssetData.h"
 #include "Async/ParallelFor.h"
 #include "Blueprint/BlueprintSupport.h"
 #include "HAL/FileManager.h"
@@ -55,6 +56,13 @@ bool IsEditorOnlyObject(const UObject* InObject, bool bCheckRecursive, bool bChe
 namespace
 {
 
+int32 GFixupStandaloneFlags = 0;
+static FAutoConsoleVariableRef CVar_FixupStandaloneFlags(
+	TEXT("save.FixupStandaloneFlags"),
+	GFixupStandaloneFlags,
+	TEXT("If non-zero, when the UAsset of a package is missing RF_Standalone, the flag is added. If zero, the flags are not changed and the save fails.")
+);
+
 ESavePackageResult WriteAdditionalFiles(FSaveContext& SaveContext, FScopedSlowTask& SlowTask, int64 LinkerSize);
 
 ESavePackageResult ReturnSuccessOrCancel()
@@ -101,18 +109,45 @@ ESavePackageResult ValidatePackage(FSaveContext& SaveContext)
 
 	FString FilenameStr(SaveContext.GetFilename());
 
-	// If an asset is provided, validate it is in the package
 	UObject* Asset = SaveContext.GetAsset();
-	if (Asset && !Asset->IsInPackage(SaveContext.GetPackage()))
+	if (Asset)
 	{
-		if (SaveContext.IsGenerateSaveError() && SaveContext.GetError())
+		// If an asset is provided, validate it is in the package
+		if (!Asset->IsInPackage(SaveContext.GetPackage()))
 		{
-			FFormatNamedArguments Arguments;
-			Arguments.Add(TEXT("Name"), FText::FromString(FilenameStr));
-			FText ErrorText = FText::Format(NSLOCTEXT("SavePackage2", "AssetSaveNotInPackage", "The Asset '{Name}' being saved is not in the provided is not in the provided package."), Arguments);
-			SaveContext.GetError()->Logf(ELogVerbosity::Warning, TEXT("%s"), *ErrorText.ToString());
+			if (SaveContext.IsGenerateSaveError() && SaveContext.GetError())
+			{
+				FFormatNamedArguments Arguments;
+				Arguments.Add(TEXT("Name"), FText::FromString(FilenameStr));
+				FText ErrorText = FText::Format(NSLOCTEXT("SavePackage2", "AssetSaveNotInPackage", "The Asset '{Name}' being saved is not in the provided package."), Arguments);
+				SaveContext.GetError()->Logf(ELogVerbosity::Warning, TEXT("%s"), *ErrorText.ToString());
+			}
+			return ESavePackageResult::Error;
 		}
-		return ESavePackageResult::Error;
+
+		// If An asset is provided, validate it has the requested TopLevelFlags
+		EObjectFlags TopLevelFlags = SaveContext.GetTopLevelFlags();
+		if (TopLevelFlags != RF_NoFlags && !Asset->HasAnyFlags(TopLevelFlags))
+		{
+			if (SaveContext.IsFixupStandaloneFlags() && FAssetData::IsUAsset(Asset) && EnumHasAnyFlags(TopLevelFlags, RF_Standalone))
+			{
+				UE_LOG(LogSavePackage, Warning, TEXT("The Asset %s being saved is missing the RF_Standalone flag; adding it."), *Asset->GetPathName());
+				Asset->SetFlags(RF_Standalone);
+				check(Asset->HasAnyFlags(TopLevelFlags));
+			}
+			else
+			{
+				FFormatNamedArguments Arguments;
+				Arguments.Add(TEXT("Name"), FText::FromString(Asset->GetPathName()));
+				static_assert(sizeof(TopLevelFlags) <= sizeof(uint32), "Expect EObjectFlags to be uint32");
+				Arguments.Add(TEXT("Flags"), FText::FromString(FString::Printf(TEXT("%x"), (uint32)TopLevelFlags)));
+				FText ErrorText = FText::Format(NSLOCTEXT("SavePackage2", "AssetSaveMissingStandaloneFlag",
+					"The Asset {Name} being saved does not have any of the provided object flags (0x{Flags}); saving the package would cause data loss. "
+					"Run with -dpcvars=save.FixupStandaloneFlags=1 to add the RF_Standalone flag."), Arguments);
+				SaveContext.GetError()->Logf(ELogVerbosity::Warning, TEXT("%s"), *ErrorText.ToString());
+				return ESavePackageResult::Error;
+			}
+		}
 	}
 
 	// Make sure package is allowed to be saved.
@@ -296,7 +331,8 @@ ESavePackageResult HarvestPackage(FSaveContext& SaveContext)
 	else
 	{
 		// Validate that if an asset is provided it has the appropriate top level flags
-		ensureMsgf(!Asset || Asset->HasAnyFlags(TopLevelFlags), TEXT("The asset to save %s in package %s do not contain any of the provided object flags."), *Asset->GetName(), *SaveContext.GetPackage()->GetName());
+		checkf(!Asset || Asset->HasAnyFlags(TopLevelFlags), TEXT("The asset to save %s in package %s does not contain any of the provided object flags.")
+			TEXT("This should have been checked already in ValidatePackage"), *Asset->GetName(), *SaveContext.GetPackage()->GetName());
 		ForEachObjectWithPackage(SaveContext.GetPackage(), [&Harvester, TopLevelFlags](UObject* InObject)
 			{
 				if (InObject->HasAnyFlags(TopLevelFlags))
