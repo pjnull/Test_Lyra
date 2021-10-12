@@ -78,27 +78,29 @@ FTimingProfilerProvider::~FTimingProfilerProvider()
 {
 }
 
-uint32 FTimingProfilerProvider::AddCpuTimer(FStringView Name)
+uint32 FTimingProfilerProvider::AddCpuTimer(FStringView Name, const TCHAR* File, uint32 Line)
 {
 	Session.WriteAccessCheck();
 
-	FTimingProfilerTimer& Timer = AddTimerInternal(Name, false);
+	FTimingProfilerTimer& Timer = AddTimerInternal(Name, File, Line, false);
 	return Timer.Id;
 }
 
-uint32 FTimingProfilerProvider::AddGpuTimer(FStringView Name)
+uint32 FTimingProfilerProvider::AddGpuTimer(FStringView Name, const TCHAR* File, uint32 Line)
 {
 	Session.WriteAccessCheck();
 
-	FTimingProfilerTimer& Timer = AddTimerInternal(Name, true);
+	FTimingProfilerTimer& Timer = AddTimerInternal(Name, File, Line, true);
 	return Timer.Id;
 }
 
-FTimingProfilerTimer& FTimingProfilerProvider::AddTimerInternal(FStringView Name, bool IsGpuTimer)
+FTimingProfilerTimer& FTimingProfilerProvider::AddTimerInternal(FStringView Name, const TCHAR* File, uint32 Line, bool IsGpuTimer)
 {
 	FTimingProfilerTimer& Timer = Timers.AddDefaulted_GetRef();
 	Timer.Id = Timers.Num() - 1;
 	Timer.Name = Session.StoreString(Name);
+	Timer.File = File ? Session.StoreString(File) : nullptr;
+	Timer.Line = Line;
 	Timer.IsGpuTimer = IsGpuTimer;
 	return Timer;
 }
@@ -109,6 +111,16 @@ void FTimingProfilerProvider::SetTimerName(uint32 TimerId, FStringView Name)
 
 	FTimingProfilerTimer& Timer = Timers[TimerId];
 	Timer.Name = Session.StoreString(Name);
+}
+
+void FTimingProfilerProvider::SetTimerNameAndLocation(uint32 TimerId, FStringView Name, const TCHAR* File, uint32 Line)
+{
+	Session.WriteAccessCheck();
+
+	FTimingProfilerTimer& Timer = Timers[TimerId];
+	Timer.Name = Session.StoreString(Name);
+	Timer.File = File ? Session.StoreString(File) : nullptr;
+	Timer.Line = Line;
 }
 
 uint32 FTimingProfilerProvider::AddMetadata(uint32 MasterTimerId, TArray<uint8>&& Metadata)
