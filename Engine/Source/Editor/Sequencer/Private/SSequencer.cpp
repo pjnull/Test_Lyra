@@ -157,11 +157,11 @@ public:
 					UPackage* MovieScenePackageToSave = MovieSceneToSave->GetOuter()->GetOutermost();
 					if (MovieScenePackageToSave->IsDirty())
 					{
-						return FSlateIcon(FEditorStyle::GetStyleSetName(), "Sequencer.SaveAsterisk");
+						return FSlateIcon(FAppStyle::Get().GetStyleSetName(), "Icons.SaveChanged");
 					}
 				}
 
-				return FSlateIcon(FEditorStyle::GetStyleSetName(), "Sequencer.Save");
+				return FSlateIcon(FAppStyle::Get().GetStyleSetName(), "Icons.Save");
 				}));
 
 			if (WeakSequencer.Pin()->GetHostCapabilities().bSupportsSaveMovieSceneAsset)
@@ -1381,10 +1381,10 @@ TSharedRef<SWidget> SSequencer::MakeToolBar()
 					UPackage* MovieScenePackageToSave = MovieSceneToSave->GetOuter()->GetOutermost();
 					if (MovieScenePackageToSave->IsDirty())
 					{
-						return FSlateIcon(FEditorStyle::GetStyleSetName(), "Sequencer.SaveAsterisk");
+						return FSlateIcon(FAppStyle::Get().GetStyleSetName(), "Icons.SaveChanged");
 					}
 				}
-				return FSlateIcon(FEditorStyle::GetStyleSetName(), "Sequencer.Save");
+				return FSlateIcon(FAppStyle::Get().GetStyleSetName(), "Icons.Save");
 			}));
 
 			if (SequencerPtr.Pin()->GetHostCapabilities().bSupportsSaveMovieSceneAsset)
@@ -1398,12 +1398,12 @@ TSharedRef<SWidget> SSequencer::MakeToolBar()
 				);
 			}
 
-			ToolBarBuilder.AddToolBarButton( FSequencerCommands::Get().FindInContentBrowser );
+			ToolBarBuilder.AddToolBarButton( FSequencerCommands::Get().FindInContentBrowser, NAME_None, TAttribute<FText>(), TAttribute<FText>(), FSlateIcon(FAppStyle::Get().GetStyleSetName(), "SystemWideCommands.FindInContentBrowser") );
 			ToolBarBuilder.AddToolBarButton( FSequencerCommands::Get().CreateCamera );
 
 			if (SequencerPtr.Pin()->GetHostCapabilities().bSupportsRenderMovie)
 			{
-				ToolBarBuilder.AddToolBarButton( FSequencerCommands::Get().RenderMovie );
+				ToolBarBuilder.AddToolBarButton( FSequencerCommands::Get().RenderMovie, NAME_None, TAttribute<FText>(), TAttribute<FText>(), FSlateIcon(FEditorStyle::GetStyleSetName(), "LevelEditor.OpenCinematic"));
 				
 				ToolBarBuilder.AddComboButton(
 					FUIAction(),
@@ -1418,7 +1418,7 @@ TSharedRef<SWidget> SSequencer::MakeToolBar()
 			if (RootSequence->GetTypedOuter<UBlueprint>() == nullptr)
 			{
 				// Only show this button where it makes sense (ie, if the sequence is not contained within a blueprint already)
-				ToolBarBuilder.AddToolBarButton(FSequencerCommands::Get().OpenDirectorBlueprint);
+				ToolBarBuilder.AddToolBarButton(FSequencerCommands::Get().OpenDirectorBlueprint, NAME_None, TAttribute<FText>(), TAttribute<FText>(), FSlateIcon(FAppStyle::Get().GetStyleSetName(), "LevelEditor.OpenLevelBlueprint"));
 			}
 
 			ToolBarBuilder.AddSeparator("Level Sequence Separator");
@@ -1437,7 +1437,7 @@ TSharedRef<SWidget> SSequencer::MakeToolBar()
 			FOnGetContent::CreateSP(this, &SSequencer::MakeViewMenu),
 			LOCTEXT("ViewOptions", "View Options"),
 			LOCTEXT("ViewOptionsToolTip", "View Options"),
-			FSlateIcon(FEditorStyle::GetStyleSetName(), "Sequencer.ViewOptions")
+			FSlateIcon(FAppStyle::Get().GetStyleSetName(), "Icons.Visibility")
 		);
 
 		ToolBarBuilder.AddComboButton(
@@ -1589,7 +1589,7 @@ TSharedRef<SWidget> SSequencer::MakeToolBar()
 		// Only add the button if supported
 		if (SequencerPtr.Pin()->GetHostCapabilities().bSupportsCurveEditor)
 		{
-			ToolBarBuilder.AddToolBarButton( FSequencerCommands::Get().ToggleShowCurveEditor );
+			ToolBarBuilder.AddToolBarButton( FSequencerCommands::Get().ToggleShowCurveEditor, NAME_None, TAttribute<FText>(), TAttribute<FText>(), FSlateIcon(FEditorStyle::GetStyleSetName(), "GenericCurveEditor"));
 		}
 	}
 	ToolBarBuilder.EndSection();
@@ -1980,7 +1980,7 @@ TSharedRef<SWidget> SSequencer::MakeActionsMenu()
 		if (RootSequence->GetTypedOuter<UBlueprint>() == nullptr)
 		{
 			// Only show this button where it makes sense (ie, if the sequence is not contained within a blueprint already)
-			MenuBuilder.AddMenuEntry(FSequencerCommands::Get().OpenDirectorBlueprint);
+			MenuBuilder.AddMenuEntry(FSequencerCommands::Get().OpenDirectorBlueprint, NAME_None, TAttribute<FText>(), TAttribute<FText>(), FSlateIcon(FAppStyle::Get().GetStyleSetName(), "LevelEditor.OpenLevelBlueprint"));
 		}
 
 		MenuBuilder.AddMenuEntry(FSequencerCommands::Get().OpenTaggedBindingManager);

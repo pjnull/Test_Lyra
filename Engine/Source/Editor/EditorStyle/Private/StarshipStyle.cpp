@@ -419,6 +419,7 @@ void FStarshipEditorStyle::FStyle::SetupGeneralStyles()
 		Set("Icons.Crop", new IMAGE_BRUSH_SVG("Starship/Common/Crop", Icon16x16));
 		Set("Icons.Fullscreen", new IMAGE_BRUSH_SVG("Starship/Common/EnableFullscreen", Icon16x16));
 		Set("Icons.Save", new IMAGE_BRUSH_SVG( "Starship/Common/SaveCurrent", Icon16x16 ) );
+		Set("Icons.SaveChanged", new IMAGE_BRUSH_SVG( "Starship/Common/SaveChanged", Icon16x16 ) );
 
 		Set("Icons.DirtyBadge", new IMAGE_BRUSH_SVG("Starship/Common/DirtyBadge", Icon12x12));
 		Set("Icons.MakeStaticMesh", new IMAGE_BRUSH_SVG("Starship/Common/MakeStaticMesh", Icon16x16));
@@ -433,6 +434,8 @@ void FStarshipEditorStyle::FStyle::SetupGeneralStyles()
 		Set("Icons.Launch", new IMAGE_BRUSH_SVG("Starship/Common/ProjectLauncher", Icon16x16));
 		Set("Icons.Next", new IMAGE_BRUSH_SVG("Starship/Common/NextArrow", Icon16x16));
 		Set("Icons.Previous", new IMAGE_BRUSH_SVG("Starship/Common/PreviousArrow", Icon16x16));
+		Set("Icons.Visibility", new IMAGE_BRUSH_SVG("Starship/Common/Visibility", Icon20x20));
+		Set("Icons.World", new IMAGE_BRUSH_SVG("Starship/Common/World", Icon20x20));
 	}
 
 	Set( "WarningStripe", new IMAGE_BRUSH( "Common/WarningStripe", FVector2D(20,6), FLinearColor::White, ESlateBrushTileType::Horizontal ) );
@@ -2021,20 +2024,10 @@ void FStarshipEditorStyle::FStyle::SetupSequencerStyles()
 
 		Set("Sequencer.NotificationImage_AddedPlayMovieSceneEvent", new IMAGE_BRUSH("Old/Checkbox_checked", Icon16x16));
 
-		Set("Sequencer.Save", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Save_48x", Icon48x48));
-		Set("Sequencer.Save.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Save_48x", Icon24x24));
-		Set("Sequencer.SaveAsterisk", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_SaveAsterisk_48x", Icon48x48));
-		Set("Sequencer.SaveAsterisk.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_SaveAsterisk_48x", Icon24x24));
 		Set("Sequencer.SaveAs", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_SaveAs_48x", Icon48x48));
-		Set("Sequencer.SaveAs.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_SaveAs_48x", Icon24x24));
 		Set("Sequencer.ImportFBX", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_ImportFBX_48x", Icon48x48));
-		Set("Sequencer.ImportFBX.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_ImportFBX_48x", Icon24x24));
 		Set("Sequencer.ExportFBX", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_ExportFBX_48x", Icon48x48));
-		Set("Sequencer.ExportFBX.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_ExportFBX_48x", Icon24x24));
-		Set("Sequencer.DiscardChanges", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Revert_24x", Icon48x48));
-		Set("Sequencer.DiscardChanges.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Revert_24x", Icon24x24));
 		Set("Sequencer.RestoreAnimatedState", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_RestoreAnimatedState_24x", Icon48x48));
-		Set("Sequencer.RestoreAnimatedState.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_RestoreAnimatedState_24x", Icon24x24));
 		Set("Sequencer.GenericGripLeft", new BOX_BRUSH("Sequencer/GenericGripLeft", FMargin(5.f / 16.f)));
 		Set("Sequencer.GenericGripRight", new BOX_BRUSH("Sequencer/GenericGripRight", FMargin(5.f / 16.f)));
 		Set("Sequencer.SectionArea.Background", new FSlateColorBrush(FStyleColors::White));
@@ -2083,48 +2076,21 @@ void FStarshipEditorStyle::FStyle::SetupSequencerStyles()
 		Set("Sequencer.AnimationOutliner.BoldFont", DEFAULT_FONT("Bold", 11));
 		Set("Sequencer.AnimationOutliner.RegularFont", DEFAULT_FONT("Regular", 9));
 		Set("Sequencer.AnimationOutliner.ItalicFont", DEFAULT_FONT("Italic", 10));
+
 		Set("Sequencer.ShotFilter", new IMAGE_BRUSH("Sequencer/FilteredArea", FVector2D(74, 74), FLinearColor::White, ESlateBrushTileType::Both));
 		Set("Sequencer.KeyMark", new IMAGE_BRUSH("Sequencer/KeyMark", FVector2D(3, 21), FLinearColor::White, ESlateBrushTileType::NoTile));
-		Set("Sequencer.ToggleAutoKeyEnabled", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Auto_Key_24x", Icon48x48));
-		Set("Sequencer.ToggleAutoKeyEnabled.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Auto_Key_24x", Icon24x24));
-		Set("Sequencer.SetAutoKey", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Auto_Key_24x", Icon48x48));
-		Set("Sequencer.SetAutoKey.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Auto_Key_24x", Icon24x24));
-		Set("Sequencer.SetAutoTrack", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Auto_Track_24x", Icon48x48));
-		Set("Sequencer.SetAutoTrack.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Auto_Track_24x", Icon24x24));
-		Set("Sequencer.SetAutoChangeAll", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Auto_Key_All_24x", Icon48x48));
-		Set("Sequencer.SetAutoChangeAll.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Auto_Key_All_24x", Icon24x24));
-		Set("Sequencer.SetAutoChangeNone", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Disable_Auto_Key_24x", Icon48x48));
-		Set("Sequencer.SetAutoChangeNone.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Disable_Auto_Key_24x", Icon24x24));
-		Set("Sequencer.AllowAllEdits", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Allow_All_Edits_24x", Icon48x48));
-		Set("Sequencer.AllowAllEdits.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Allow_All_Edits_24x", Icon24x24));
-		Set("Sequencer.AllowSequencerEditsOnly", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Allow_Sequencer_Edits_Only_24x", Icon48x48));
-		Set("Sequencer.AllowSequencerEditsOnly.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Allow_Sequencer_Edits_Only_24x", Icon24x24));
-		Set("Sequencer.AllowLevelEditsOnly", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Allow_Level_Edits_Only_24x", Icon48x48));
-		Set("Sequencer.AllowLevelEditsOnly.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Allow_Level_Edits_Only_24x", Icon24x24));
-		Set("Sequencer.SetKeyAll", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Key_All_24x", Icon48x48));
-		Set("Sequencer.SetKeyAll.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Key_All_24x", Icon24x24));
-		Set("Sequencer.SetKeyGroup", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Key_Group_24x", Icon48x48));
-		Set("Sequencer.SetKeyGroup.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Key_Group_24x", Icon24x24));
-		Set("Sequencer.SetKeyChanged", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Key_Part_24x", Icon48x48));
-		Set("Sequencer.SetKeyChanged.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Key_Part_24x", Icon24x24));
-		Set("Sequencer.ToggleIsSnapEnabled", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Snap_24x", Icon48x48));
-		Set("Sequencer.ToggleIsSnapEnabled.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Snap_24x", Icon24x24));
-		Set("Sequencer.ToggleShowCurveEditor", new IMAGE_BRUSH("GenericCurveEditor/Icons/GenericCurveEditor_48x", Icon48x48));
-		Set("Sequencer.ToggleShowCurveEditor.Small", new IMAGE_BRUSH("GenericCurveEditor/Icons/GenericCurveEditor_48x", Icon24x24));
-		Set("Sequencer.OpenDirectorBlueprint", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_OpenDirectorBlueprint_24x", Icon48x48));
-		Set("Sequencer.OpenDirectorBlueprint.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_OpenDirectorBlueprint_24x", Icon24x24));
-		Set("Sequencer.OpenTaggedBindingManager", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_OpenTaggedBindingManager_16x", Icon48x48));
-		Set("Sequencer.OpenTaggedBindingManager.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_OpenTaggedBindingManager_16x", Icon24x24));
-		Set("Sequencer.OpenNodeGroupsManager", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_OpenGroupManager_16x", Icon48x48));
-		Set("Sequencer.OpenNodeGroupsManager.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_OpenGroupManager_16x", Icon24x24));
+		Set("Sequencer.ToggleAutoKeyEnabled", new IMAGE_BRUSH_SVG("Starship/Sequencer/AutoKey", Icon20x20));
+		Set("Sequencer.AllowAllEdits", new IMAGE_BRUSH_SVG("Starship/Sequencer/AllowAllEdits", Icon20x20));
+		Set("Sequencer.AllowSequencerEditsOnly", new IMAGE_BRUSH_SVG("Starship/Sequencer/AllowSequencerEditsOnly", Icon20x20));
+		Set("Sequencer.AllowLevelEditsOnly", new IMAGE_BRUSH_SVG("Starship/Sequencer/AllowLevelEditsOnly", Icon20x20));
+		Set("Sequencer.SetKeyAll", new IMAGE_BRUSH_SVG("Starship/Sequencer/KeyAll", Icon20x20));
+		Set("Sequencer.SetKeyGroup", new IMAGE_BRUSH_SVG("Starship/Sequencer/KeyGroup", Icon20x20));
+		Set("Sequencer.SetKeyChanged", new IMAGE_BRUSH_SVG("Starship/Sequencer/KeyChanged", Icon20x20));
+		Set("Sequencer.ToggleIsSnapEnabled", new IMAGE_BRUSH_SVG("Starship/Sequencer/Snap", Icon20x20));
 
-		Set("Sequencer.ToggleAutoScroll", new IMAGE_BRUSH("Icons/icon_Sequencer_ToggleAutoScroll_40x", Icon48x48));
-		Set("Sequencer.ToggleAutoScroll.Small", new IMAGE_BRUSH("Icons/icon_Sequencer_ToggleAutoScroll_16x", Icon16x16));
-		Set("Sequencer.MoveTool.Small", new IMAGE_BRUSH("Icons/SequencerIcons/icon_Sequencer_Move_24x", Icon16x16));
-		Set("Sequencer.MarqueeTool.Small", new IMAGE_BRUSH("Icons/SequencerIcons/icon_Sequencer_Marquee_24x", Icon16x16));
-		Set("Sequencer.RenderMovie.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Create_Movie_24x", Icon24x24));
-		Set("Sequencer.CreateCamera.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Create_Camera_24x", Icon24x24));
-		Set("Sequencer.FindInContentBrowser.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Find_In_Content_Browser_24x", Icon24x24));
+		Set("Sequencer.OpenTaggedBindingManager", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_OpenTaggedBindingManager_16x", Icon48x48));
+		Set("Sequencer.OpenNodeGroupsManager", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_OpenGroupManager_16x", Icon48x48));
+		Set("Sequencer.CreateCamera", new IMAGE_BRUSH_SVG("Starship/Sequencer/CreateCamera", Icon20x20));
 		Set("Sequencer.LockCamera", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Look_Thru_24x", Icon16x16));
 		Set("Sequencer.UnlockCamera", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Look_Thru_24x", Icon16x16, FLinearColor(1.f, 1.f, 1.f, 0.5f)));
 		Set("Sequencer.Thumbnail.SectionHandle", new IMAGE_BRUSH("Old/White", Icon16x16, FLinearColor::Black));
@@ -2135,18 +2101,8 @@ void FStarshipEditorStyle::FStyle::SetupSequencerStyles()
 		Set("Sequencer.LockSequence", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Locked_16x", Icon16x16));
 		Set("Sequencer.UnlockSequence", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Unlocked_16x", Icon16x16));
 
-		Set("Sequencer.Actions", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Actions_24x", Icon48x48));
-		Set("Sequencer.Actions.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Actions_24x", Icon24x24));
-		Set("Sequencer.ViewOptions", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_View_Options_24x", Icon48x48));
-		Set("Sequencer.ViewOptions.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_View_Options_24x", Icon24x24));
-		Set("Sequencer.PlaybackOptions", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Playback_Options_24x", Icon48x48));
-		Set("Sequencer.PlaybackOptions.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Playback_Options_24x", Icon24x24));
-		Set("Sequencer.SelectEditOptions", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_SelectEdit_Options_24x", Icon48x48));
-		Set("Sequencer.SelectEditOptions.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_SelectEdit_Options_24x", Icon24x24));
-		Set("Sequencer.Time", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Time_24x", Icon48x48));
-		Set("Sequencer.Time.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Time_24x", Icon24x24));
-		Set("Sequencer.Value", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Value_24x", Icon48x48));
-		Set("Sequencer.Value.Small", new IMAGE_BRUSH("Sequencer/Main_Icons/Icon_Sequencer_Value_24x", Icon24x24));
+		Set("Sequencer.Actions", new IMAGE_BRUSH_SVG("Starship/Sequencer/Actions", Icon20x20));
+		Set("Sequencer.PlaybackOptions", new IMAGE_BRUSH_SVG("Starship/Sequencer/PlaybackOptions", Icon20x20));
 
 		Set("Sequencer.OverlayPanel.Background", new BOX_BRUSH("Sequencer/OverlayPanelBackground", FMargin(26.f / 54.f)));
 
@@ -7075,6 +7031,7 @@ void FStarshipEditorStyle::FStyle::SetupToolkitStyles()
 		Set("CurveEditorToolBar", CurveEditorToolbar);
 
 		// Tab
+		Set("GenericCurveEditor", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/CurveEditor", Icon20x20));
 		Set("GenericCurveEditor.TabIcon", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/CurveEditorTab", Icon16x16, FLinearColor(1.f, 1.f, 1.f, 0.8f)));
 
 		// Zoom / Framing
@@ -7135,9 +7092,6 @@ void FStarshipEditorStyle::FStyle::SetupToolkitStyles()
 		Set("GenericCurveEditor.SetPostInfinityExtrapLinear", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/PostInfinityLinear_20", Icon20x20));
 		Set("GenericCurveEditor.SetPostInfinityExtrapOscillate", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/PostInfinityOscillate_20", Icon20x20));
 		Set("GenericCurveEditor.PostInfinityMixed", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/PostInfinityMultipleSelected_20", Icon20x20));
-
-		// Misc
-		Set("GenericCurveEditor.VisibilityOptions", new IMAGE_BRUSH_SVG("Starship/GenericCurveEditor/VisibilityOptions", Icon20x20));
 
 		Set("GenericCurveEditor.Pin_Active", new IMAGE_BRUSH("Common/PushPin_Down", Icon16x16));
 		Set("GenericCurveEditor.Pin_Inactive", new IMAGE_BRUSH("Common/PushPin_Up", Icon16x16));
