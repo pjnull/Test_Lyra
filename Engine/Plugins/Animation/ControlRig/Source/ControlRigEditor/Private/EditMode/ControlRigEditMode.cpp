@@ -2131,7 +2131,8 @@ void FControlRigEditMode::OpenSpacePickerWidget()
 		else
 		{
 			const FTransform Transform = InHierarchy->GetGlobalTransform(InControlKey);
-			InHierarchy->SwitchToParent(InControlKey, InSpaceKey);
+			URigHierarchy::TElementDependencyMap Dependencies = InHierarchy->GetDependenciesForVM(RuntimeRig->GetVM());
+			InHierarchy->SwitchToParent(InControlKey, InSpaceKey, false, true, Dependencies, nullptr);
 			InHierarchy->SetGlobalTransform(InControlKey, Transform);
 		}
 		

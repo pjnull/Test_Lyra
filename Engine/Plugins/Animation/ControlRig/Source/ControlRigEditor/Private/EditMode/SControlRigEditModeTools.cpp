@@ -672,7 +672,8 @@ void SControlRigEditModeTools::HandleActiveSpaceChanged(URigHierarchy* InHierarc
 		if (UControlRig* ControlRig = SequencerRig.Get())
 		{
 			FString FailureReason;
-			if(!InHierarchy->CanSwitchToParent(InControlKey, InSpaceKey, &FailureReason))
+			URigHierarchy::TElementDependencyMap DependencyMap = InHierarchy->GetDependenciesForVM(ControlRig->GetVM());
+			if(!InHierarchy->CanSwitchToParent(InControlKey, InSpaceKey, DependencyMap, &FailureReason))
 			{
 				// notification
 				FNotificationInfo Info(FText::FromString(FailureReason));

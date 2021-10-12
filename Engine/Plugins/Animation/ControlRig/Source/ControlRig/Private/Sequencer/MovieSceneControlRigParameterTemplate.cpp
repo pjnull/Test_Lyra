@@ -678,7 +678,12 @@ struct FControlRigParameterPreAnimatedTokenProducer : IMovieScenePreAnimatedToke
 									break;
 								case EMovieSceneControlRigSpaceType::ControlRig:
 								{
+#if WITH_EDITOR
+									URigHierarchy::TElementDependencyMap Dependencies = RigHierarchy->GetDependenciesForVM(ControlRig->GetVM());
+									RigHierarchy->SwitchToParent(ControlKey, SpaceNameAndValue.Value.ControlRigElement, false, true, Dependencies, nullptr);
+#else
 									RigHierarchy->SwitchToParent(ControlKey, SpaceNameAndValue.Value.ControlRigElement);
+#endif
 								}
 								break;
 								}
@@ -1120,7 +1125,12 @@ struct FControlRigParameterExecutionToken : IMovieSceneExecutionToken
 										break;
 									case EMovieSceneControlRigSpaceType::ControlRig:
 										{
-											RigHierarchy->SwitchToParent(ControlKey, SpaceNameAndValue.Value.ControlRigElement);	
+#if WITH_EDITOR
+											URigHierarchy::TElementDependencyMap Dependencies = RigHierarchy->GetDependenciesForVM(ControlRig->GetVM());
+											RigHierarchy->SwitchToParent(ControlKey, SpaceNameAndValue.Value.ControlRigElement, false, true, Dependencies, nullptr);
+#else
+											RigHierarchy->SwitchToParent(ControlKey, SpaceNameAndValue.Value.ControlRigElement);
+#endif	
 										}
 										break;
 								}

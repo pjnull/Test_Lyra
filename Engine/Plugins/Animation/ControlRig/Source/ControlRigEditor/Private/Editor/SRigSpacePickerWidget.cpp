@@ -15,6 +15,8 @@
 #include "Widgets/Notifications/SNotificationList.h"
 #include "Framework/Notifications/NotificationManager.h"
 #include "Modules/ModuleManager.h"
+#include "ControlRig.h"
+#include "ControlRigBlueprint.h"
 
 #define LOCTEXT_NAMESPACE "SRigSpacePickerWidget"
 
@@ -603,8 +605,22 @@ FReply SRigSpacePickerWidget::HandleAddElementClicked()
 			{
 				for(const FRigElementKey& ControlKey : ControlKeys)
 				{
+					URigHierarchy::TElementDependencyMap DependencyMap;
 					FString FailureReason;
-					if(!Hierarchy->CanSwitchToParent(ControlKey, Key, &FailureReason))
+
+					if(UControlRig* ControlRig = Hierarchy->GetTypedOuter<UControlRig>())
+					{
+						DependencyMap = Hierarchy->GetDependenciesForVM(ControlRig->GetVM()); 
+					}
+					else if(UControlRigBlueprint* RigBlueprint = Hierarchy->GetTypedOuter<UControlRigBlueprint>())
+					{
+						if(UControlRig* CDO = Cast<UControlRig>(RigBlueprint->GetControlRigClass()->GetDefaultObject()))
+						{
+							DependencyMap = Hierarchy->GetDependenciesForVM(CDO->GetVM()); 
+						}
+					}
+					
+					if(!Hierarchy->CanSwitchToParent(ControlKey, Key, DependencyMap, &FailureReason))
 					{
 						// notification
 						FNotificationInfo Info(FText::FromString(FailureReason));
@@ -663,6 +679,11 @@ FReply SRigSpacePickerWidget::HandleAddElementClicked()
 		FPopupTransitionEffect(FPopupTransitionEffect::ContextMenu)
 	);
 
+	if(!ContextMenu.IsValid())
+	{
+		return FReply::Unhandled();
+	}
+	
 	ContextMenu.Pin()->GetOnMenuDismissed().AddLambda([this](TSharedRef<IMenu> InMenu)
 	{
 		ContextMenu.Reset();
