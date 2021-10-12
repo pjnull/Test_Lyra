@@ -1021,12 +1021,6 @@ void SSequencer::Construct(const FArguments& InArgs, TSharedRef<FSequencer> InSe
 					]
 
 					+ SGridPanel::Slot(Column1, Row2, SGridPanel::Layer(40))
-					.Padding(ResizeBarPadding)
-					[
-						SAssignNew(TickResolutionOverlay, SSequencerTimePanel, SequencerPtr)
-					]
-
-					+ SGridPanel::Slot(Column1, Row2, SGridPanel::Layer(50))
 						.Padding(ResizeBarPadding)
 						.HAlign(HAlign_Left)
 						.VAlign(VAlign_Top)
@@ -1096,8 +1090,6 @@ void SSequencer::Construct(const FArguments& InArgs, TSharedRef<FSequencer> InSe
 	];
 
 	ApplySequencerCustomization(RootCustomization);
-
-	HideTickResolutionOverlay();
 
 	InSequencer->GetSelection().GetOnKeySelectionChanged().AddSP(this, &SSequencer::HandleKeySelectionChanged);
 	InSequencer->GetSelection().GetOnSectionSelectionChanged().AddSP(this, &SSequencer::HandleSectionSelectionChanged);
@@ -1187,14 +1179,34 @@ void SSequencer::BindCommands(TSharedRef<FUICommandList> SequencerCommandBinding
 	);
 }
 
-void SSequencer::ShowTickResolutionOverlay()
+void SSequencer::OpenTickResolutionOptions()
 {
-	TickResolutionOverlay->SetVisibility(EVisibility::Visible);
-}
+	if (TSharedPtr<SWindow> Window = WeakTickResolutionOptionsWindow.Pin())
+	{
+		Window->DrawAttention(FWindowDrawAttentionParameters());
+		return;
+	}
 
-void SSequencer::HideTickResolutionOverlay()
-{
-	TickResolutionOverlay->SetVisibility(EVisibility::Collapsed);
+	TSharedRef<SWindow> TickResolutionOptionsWindow = SNew(SWindow)
+		.Title(LOCTEXT("TickResolutionOptions_Title", "Advanced Time Properties"))
+		.SupportsMaximize(false)
+		.ClientSize(FVector2D(600.f, 500.f))
+		.Content()
+		[
+			SNew(SSequencerTimePanel, SequencerPtr)
+		];
+
+	TSharedPtr<SWindow> ParentWindow = FSlateApplication::Get().FindWidgetWindow(AsShared());
+	if (ParentWindow)
+	{
+		FSlateApplication::Get().AddWindowAsNativeChild(TickResolutionOptionsWindow, ParentWindow.ToSharedRef());
+	}
+	else
+	{
+		FSlateApplication::Get().AddWindow(TickResolutionOptionsWindow);
+	}
+
+	WeakTickResolutionOptionsWindow = TickResolutionOptionsWindow;
 }
 
 const ISequencerEditTool* SSequencer::GetEditTool() const
