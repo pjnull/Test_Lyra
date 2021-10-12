@@ -40,12 +40,11 @@ bool FContainersWithObjectReferencesInCDO::RunTest(const FString& Parameters)
 	return true;
 }
 
-namespace
+namespace RestoreCollision
 {
-	bool AllCollisionResponseEqual(ASnapshotTestActor* Instance, ECollisionResponse Response)
+	static bool AreCollisionResponsesEqual(ASnapshotTestActor* Instance, ECollisionResponse Response, int32 NumChannels)
 	{
 		const FCollisionResponse& Responses = Instance->StaticMeshComponent->BodyInstance.GetCollisionResponse();
-		constexpr int32 NumChannels = 32;
 		for (int32 i = 0; i < NumChannels; ++i)
 		{
 			if (Responses.GetResponse(static_cast<ECollisionChannel>(i)) != Response)
@@ -54,6 +53,15 @@ namespace
 			}
 		}
 		return true;
+	}
+	static bool WereAllCollisionResponsesRestored(ASnapshotTestActor* Instance, ECollisionResponse Response)
+	{
+		return AreCollisionResponsesEqual(Instance, Response, 32);
+	}
+
+	static bool WereCollisionProfileResponsesRestored(ASnapshotTestActor* Instance, ECollisionResponse Response)
+	{
+		return AreCollisionResponsesEqual(Instance, Response, static_cast<int32>(ECollisionChannel::ECC_EngineTraceChannel1));
 	}
 }
 
@@ -119,14 +127,14 @@ bool FRestoreCollision::RunTest(const FString& Parameters)
 		.ApplySnapshot()
 		.RunTest([&]()
 		{
-			TestTrue(TEXT("Collision response restored"), AllCollisionResponseEqual(CustomBlockAllToOverlapAll, ECR_Block));
+			TestTrue(TEXT("CustomBlockAllToOverlapAll: SetResponseToAllChannels restored"), RestoreCollision::WereAllCollisionResponsesRestored(CustomBlockAllToOverlapAll, ECR_Block));
 			
 			TestTrue(TEXT("Default collision restored"), DefaultToCustom->StaticMeshComponent->bUseDefaultCollision);
 			
-			TestTrue(TEXT("Collision responses correct"), AllCollisionResponseEqual(CustomToDefault, ECR_Ignore));
+			TestTrue(TEXT("CustomToDefault: SetResponseToAllChannels restored"), RestoreCollision::WereAllCollisionResponsesRestored(CustomToDefault, ECR_Ignore));
 			
 			TestEqual(TEXT("Profile name restored"), ChangeCollisionProfile->StaticMeshComponent->GetCollisionProfileName(), FName("OverlapAll"));
-			TestTrue(TEXT("Collision responses correct"), AllCollisionResponseEqual(ChangeCollisionProfile, ECR_Overlap));
+			TestTrue(TEXT("Collision profile responses restored"), RestoreCollision::WereCollisionProfileResponsesRestored(ChangeCollisionProfile, ECR_Overlap));
 		});
 	
 	return true;

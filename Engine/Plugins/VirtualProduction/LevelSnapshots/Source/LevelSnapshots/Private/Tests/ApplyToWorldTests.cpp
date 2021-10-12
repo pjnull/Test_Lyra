@@ -92,13 +92,13 @@ bool FRestoreReferenceProperties::RunTest(const FString& Parameters)
 	FSnapshotTestRunner()
 		.ModifyWorld([&](UWorld* World)
 		{
-			FirstActor = World->SpawnActor<ASnapshotTestActor>();
-			SecondActor = World->SpawnActor<ASnapshotTestActor>();
-			PointToSelfActor = World->SpawnActor<ASnapshotTestActor>();
-			FromWorldToExternal = World->SpawnActor<ASnapshotTestActor>();
-			FromExternalToWorld = World->SpawnActor<ASnapshotTestActor>();
+			FirstActor = ASnapshotTestActor::Spawn(World, "FirstActor");
+			SecondActor = ASnapshotTestActor::Spawn(World, "SecondActor");
+			PointToSelfActor = ASnapshotTestActor::Spawn(World, "PointToSelfActor");
+			FromWorldToExternal = ASnapshotTestActor::Spawn(World, "FromWorldToExternal");
+			FromExternalToWorld = ASnapshotTestActor::Spawn(World, "FromExternalToWorld");
 			
-			MaterialAndMesh = World->SpawnActor<ASnapshotTestActor>();
+			MaterialAndMesh = ASnapshotTestActor::Spawn(World, "MaterialAndMesh");
 			
 			FirstActor->SetObjectReference(SecondActor);
 			SecondActor->SetObjectReference(FirstActor);

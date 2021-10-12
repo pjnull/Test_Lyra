@@ -23,7 +23,18 @@ namespace
 			, SerializedObject()
 		{}
 
+		virtual FArchive& operator<<(FObjectPtr& Object) override
+		{
+			UObject* UObject = Object.Get();
+			return HandleObject(UObject);
+		}
+
 		virtual FArchive& operator<<(UObject*& Object) override
+		{
+			return HandleObject(Object);
+		}
+
+		FArchive& HandleObject(UObject*& Object)
 		{
 			FString UniqueName = GetPathNameSafe(Object);
 			*this << UniqueName;

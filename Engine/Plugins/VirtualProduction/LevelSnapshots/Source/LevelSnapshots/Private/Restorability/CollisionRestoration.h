@@ -6,9 +6,9 @@
 #include "LevelSnapshotsModule.h"
 #include "Restorability/IPropertyComparer.h"
 #include "Restorability/ISnapshotLoader.h"
+#include "PhysicsEngine/BodyInstance.h"
 
 class UStaticMeshComponent;
-struct FBodyInstance;
 
 /**
  * UPrimitiveComponent::BodyInstance requires special logic for restoring & loading collision information.
