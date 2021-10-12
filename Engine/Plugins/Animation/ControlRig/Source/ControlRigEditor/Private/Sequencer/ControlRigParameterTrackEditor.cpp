@@ -2076,12 +2076,10 @@ void FControlRigParameterTrackEditor::HandleControlSelected(UControlRig* Subject
 	//if fk rig show hierarchy.
 	if (Subject->IsA<UFKControlRig>())
 	{
-		FControlRigEditMode* EditMode = GetEditMode();
-		if (EditMode)
+		if (UControlRigEditModeSettings* Settings = GetMutableDefault<UControlRigEditModeSettings>())
 		{
-			EditMode->GetSettings()->bDisplayHierarchy = true;
+			Settings->bDisplayHierarchy = true;
 		}
-
 	}
 
 	if (bIsDoingSelection)
