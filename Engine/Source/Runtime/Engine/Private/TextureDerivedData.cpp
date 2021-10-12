@@ -1367,13 +1367,6 @@ bool FTexturePlatformData::TryLoadMips(int32 FirstMipToLoad, void** OutMipData, 
 
 #if WITH_EDITOR
 
-	if (IsInGameThread())
-	{
-		// need to be done with initial fetch. Is still valid if we are in the worker thread and grabbing
-		// the mips as part of the job.
-		check(AsyncTask == nullptr);  
-	}
-
 	TArray<uint8> TempData;
 	FAsyncMipHandles AsyncHandles;
 	FDerivedDataCacheInterface& DDC = GetDerivedDataCacheRef();
