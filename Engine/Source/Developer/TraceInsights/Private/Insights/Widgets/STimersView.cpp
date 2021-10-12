@@ -7,6 +7,9 @@
 #include "Framework/Commands/UICommandList.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "HAL/PlatformApplicationMisc.h"
+#include "ISourceCodeAccessModule.h"
+#include "ISourceCodeAccessor.h"
+#include "Modules/ModuleManager.h"
 #include "SlateOptMacros.h"
 #include "TraceServices/AnalysisService.h"
 #include "Widgets/Input/SCheckBox.h"
@@ -403,7 +406,7 @@ TSharedPtr<SWidget> STimersView::TreeView_GetMenuContent()
 			return TimingView.IsValid() && NumSelectedNodes == 1 && SelectedNode.IsValid() && SelectedNode->GetType() != ETimerNodeType::Group;
 		};
 
-		/* Highlight event */
+		// Highlight event
 		{
 			FUIAction Action_ToggleHighlight;
 			Action_ToggleHighlight.CanExecuteAction = FCanExecuteAction::CreateLambda(CanExecute);
@@ -435,7 +438,7 @@ TSharedPtr<SWidget> STimersView::TreeView_GetMenuContent()
 			}
 		}
 
-		/* Add/remove series to/from graph track */
+		// Add/remove series to/from graph track
 		{
 			FUIAction Action_ToggleTimerInGraphTrack;
 			Action_ToggleTimerInGraphTrack.CanExecuteAction = FCanExecuteAction::CreateLambda(CanExecute);
@@ -461,6 +464,42 @@ TSharedPtr<SWidget> STimersView::TreeView_GetMenuContent()
 					FSlateIcon(FEditorStyle::GetStyleSetName(), "ProfilerCommand.ToggleShowDataGraph"), Action_ToggleTimerInGraphTrack, NAME_None, EUserInterfaceActionType::Button
 				);
 			}
+		}
+
+		// Open source in IDE
+		{
+			ISourceCodeAccessModule& SourceCodeAccessModule = FModuleManager::LoadModuleChecked<ISourceCodeAccessModule>("SourceCodeAccess");
+			ISourceCodeAccessor& SourceCodeAccessor = SourceCodeAccessModule.GetAccessor();
+
+			FString File;
+			uint32 Line = 0;
+			bool bIsValidSource = false;
+			if (NumSelectedNodes == 1 && SelectedNode.IsValid() && SelectedNode->GetType() != ETimerNodeType::Group)
+			{
+				bIsValidSource = SelectedNode->GetSourceFileAndLine(File, Line);
+			}
+
+			FText ItemLabel = FText::Format(LOCTEXT("ContextMenu_Header_OpenSource", "Open source in {0}"), SourceCodeAccessor.GetNameText());
+			FText ItemToolTip = FText::Format(LOCTEXT("ContextMenu_Header_OpenSource_Desc", "Open source file of selected timer in {0}.\n{1} ({2})"),
+				SourceCodeAccessor.GetNameText(), FText::FromString(File), FText::AsNumber(Line));
+
+			FUIAction Action_OpenSource;
+			Action_OpenSource.CanExecuteAction = FCanExecuteAction::CreateLambda([bIsValidSource]() { return bIsValidSource; });
+			Action_OpenSource.ExecuteAction = FExecuteAction::CreateSP(this, &STimersView::OpenSourceFileInIDE, SelectedNode);
+
+			MenuBuilder.AddMenuEntry
+			(
+				ItemLabel,
+				ItemToolTip,
+#if PLATFORM_WINDOWS
+				FSlateIcon(FAppStyle::GetAppStyleSetName(), "MainFrame.OpenVisualStudio"),
+#else
+				FSlateIcon(),
+#endif
+				Action_OpenSource,
+				NAME_None,
+				EUserInterfaceActionType::Button
+			);
 		}
 	}
 	MenuBuilder.EndSection();
@@ -2075,6 +2114,24 @@ void STimersView::ContextMenu_CopySelectedToClipboard_Execute()
 FReply STimersView::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
 {
 	return CommandList->ProcessCommandBindings(InKeyEvent) == true ? FReply::Handled() : FReply::Unhandled();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void STimersView::OpenSourceFileInIDE(FTimerNodePtr InNode) const
+{
+	if (InNode.IsValid() && InNode->GetType() != ETimerNodeType::Group)
+	{
+		FString File;
+		uint32 Line = 0;
+		bool bIsValidSource = InNode->GetSourceFileAndLine(File, Line);
+		if (bIsValidSource)
+		{
+			ISourceCodeAccessModule& SourceCodeAccessModule = FModuleManager::LoadModuleChecked<ISourceCodeAccessModule>("SourceCodeAccess");
+			ISourceCodeAccessor& SourceCodeAccessor = SourceCodeAccessModule.GetAccessor();
+			SourceCodeAccessor.OpenFileAtLine(File, Line);
+		}
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
