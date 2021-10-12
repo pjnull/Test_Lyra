@@ -1,12 +1,13 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 #pragma once
 
+#include "ProfilingDebugging/CallstackTrace.h"
 #include "CoreTypes.h"
 #include "Experimental/Containers/GrowOnlyLockFreeHash.h"
-#include "HAL/CriticalSection.h"
 #include "Trace/Trace.h"
 #include "Trace/Trace.inl"
-#include "Misc/ScopeLock.h"
+
+#if UE_CALLSTACK_TRACE_ENABLED
 
 ////////////////////////////////////////////////////////////////////////////////
 UE_TRACE_CHANNEL_EXTERN(CallstackChannel)
@@ -84,3 +85,5 @@ namespace {
 		std::atomic_uint32_t		CallstackIdCounter;
 	};
 }
+
+#endif
