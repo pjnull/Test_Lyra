@@ -362,26 +362,32 @@ void FWorldSnapshotData::ApplyToWorld_HandleRemovingActors(UWorld* WorldToApplyT
 #endif
 }
 
-namespace
+namespace WorldSnapshotData
 {
-	void DeleteActor(AActor* ActorToDespawn)
+	static void HandleNameClash(const FSoftObjectPath& OriginalRemovedActorPath)
 	{
-		check(ActorToDespawn);
-
-		if ( IsValid(ActorToDespawn) )
+		UObject* FoundObject = FindObject<UObject>(nullptr, *OriginalRemovedActorPath.ToString());
+		if (!FoundObject)
 		{
-#if WITH_EDITOR
-			GEditor->SelectActor(ActorToDespawn, /*bSelect =*/true, /*bNotifyForActor =*/false, /*bSelectEvenIfHidden =*/true);
-			const bool bVerifyDeletionCanHappen = true;
-			const bool bWarnAboutReferences = false;
-			GEditor->edactDeleteSelected(ActorToDespawn->GetWorld(), bVerifyDeletionCanHappen, bWarnAboutReferences, bWarnAboutReferences);
-#else
-			ActorToDespawn->Destroy(true, true);
-#endif
+			return;
 		}
 
-		const FName NewName = MakeUniqueObjectName(ActorToDespawn->GetLevel(), ActorToDespawn->GetClass());
-		ActorToDespawn->Rename(*NewName.ToString(), nullptr, REN_NonTransactional);
+		// If it's not an actor then it's possibly an UObjectRedirector
+		AActor* AsActor = Cast<AActor>(FoundObject);
+		if (IsValid(AsActor))
+		{
+#if WITH_EDITOR
+			GEditor->SelectActor(AsActor, /*bSelect =*/true, /*bNotifyForActor =*/false, /*bSelectEvenIfHidden =*/true);
+			const bool bVerifyDeletionCanHappen = true;
+			const bool bWarnAboutReferences = false;
+			GEditor->edactDeleteSelected(AsActor->GetWorld(), bVerifyDeletionCanHappen, bWarnAboutReferences, bWarnAboutReferences);
+#else
+			AsActor->Destroy(true, true);
+#endif
+		}
+		
+		const FName NewName = MakeUniqueObjectName(FoundObject->GetOuter(), FoundObject->GetClass());
+		FoundObject->Rename(*NewName.ToString(), nullptr, REN_NonTransactional | REN_DontCreateRedirectors);
 	}
 }
 
@@ -410,12 +416,8 @@ void FWorldSnapshotData::ApplyToWorld_HandleRecreatingActors(TSet<AActor*>& Eval
 			UE_LOG(LogLevelSnapshots, Warning, TEXT("Failed to resolve class '%s'. Was it removed?"), *ActorSnapshot->GetActorClass().ToString());
 			continue;
 		}
-		
-		if (UObject* NameClash = OriginalRemovedActorPath.ResolveObject())
-		{
-			AActor* Actor = Cast<AActor>(NameClash);
-			DeleteActor(Actor);
-		}
+
+		WorldSnapshotData::HandleNameClash(OriginalRemovedActorPath);
 		
 		// Example: /Game/MapName.MapName:PersistentLevel.StaticMeshActor_42.StaticMeshComponent becomes /Game/MapName.MapName
 		const FSoftObjectPath PathToOwningWorldAsset = OriginalRemovedActorPath.GetAssetPathString();

@@ -1,5 +1,7 @@
 ﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
+#include "CoreMinimal.h"
+
 #include "PropertySelectionMap.h"
 #include "SnapshotTestRunner.h"
 #include "SnapshotTestActor.h"
@@ -7,6 +9,7 @@
 
 #include "Engine/World.h"
 #include "Misc/AutomationTest.h"
+#include "UObject/WeakObjectPtr.h"
 
 // Bug fixes should generally be tested. Put tests for bug fixes here.
 
@@ -127,4 +130,73 @@ bool FRestoreCollision::RunTest(const FString& Parameters)
 		});
 	
 	return true;
+}
+
+/**
+* Suppose snapshot contains Root > Child and now the hierarchy is Child > Root. This used to cause a crash.
+ */
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUpdateAttachChildrenInfiniteLoop, "VirtualProduction.LevelSnapshots.Snapshot.Regression.UpdateAttachChildrenInfiniteLoop", (EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::EngineFilter));
+bool FUpdateAttachChildrenInfiniteLoop::RunTest(const FString& Parameters)
+{
+	ASnapshotTestActor* Root = nullptr;
+	ASnapshotTestActor* Child = nullptr;
+	
+	FSnapshotTestRunner()
+		.ModifyWorld([&](UWorld* World)
+		{
+			Root = ASnapshotTestActor::Spawn(World, "Root");
+			Child = ASnapshotTestActor::Spawn(World, "Child");
+
+			Child->AttachToActor(Root, FAttachmentTransformRules::KeepRelativeTransform);
+		})
+		.TakeSnapshot()
+		.ModifyWorld([&](UWorld* World)
+		{
+			Child->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+			Root->AttachToActor(Child, FAttachmentTransformRules::KeepRelativeTransform);
+		})
+		// If the issue remains, ApplySnapshot will now cause a stack overflow crash 
+		.ApplySnapshot()
+		.RunTest([&]()
+		{
+			TestTrue(TEXT("Root: attach component"), Root->GetRootComponent()->GetAttachParent() == nullptr);
+			TestTrue(TEXT("Root: attach actor"), Root->GetAttachParentActor() == nullptr);
+			
+			TestTrue(TEXT("Child: attach component"), Child->GetRootComponent()->GetAttachParent() == Root->GetRootComponent());
+			TestTrue(TEXT("Child: attach actor"), Child->GetAttachParentActor() == Root);
+		});
+
+	return true;
+}
+
+/**
+ * Spawn naked AActor and add instanced components. RootComponent needs to be set.
+ */
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRestoreRootComponent, "VirtualProduction.LevelSnapshots.Snapshot.Regression.RestoreRootComponent", (EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::EngineFilter));
+bool FRestoreRootComponent::RunTest(const FString& Parameters)
+{
+	AActor* Actor = nullptr;
+	USceneComponent* InstancedComponent = nullptr;
+	
+	FSnapshotTestRunner()
+    	.ModifyWorld([&](UWorld* World)
+    	{
+    		Actor = World->SpawnActor<AActor>();
+
+    		InstancedComponent = NewObject<USceneComponent>(Actor, USceneComponent::StaticClass(), "InstancedComponent");
+    		Actor->AddInstanceComponent(InstancedComponent);
+    		Actor->SetRootComponent(InstancedComponent);
+    	})
+    	.TakeSnapshot()
+    	.ModifyWorld([&](UWorld* World)
+    	{
+    		InstancedComponent->DestroyComponent();
+    	})
+    	.ApplySnapshot()
+    	.RunTest([&]()
+    	{
+    		TestTrue(TEXT("RootComponent"), Actor->GetRootComponent() != nullptr && Actor->GetRootComponent()->GetFName().IsEqual("InstancedComponent"));
+    	});
+
+    return true;
 }

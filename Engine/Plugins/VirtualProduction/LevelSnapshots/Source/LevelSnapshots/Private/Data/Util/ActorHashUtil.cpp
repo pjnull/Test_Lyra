@@ -4,6 +4,7 @@
 
 #include "LevelSnapshotsLog.h"
 #include "Data/ActorSnapshotHash.h"
+#include "GameFramework/Actor.h"
 #include "Util/HashArchive.h"
 #include "Util/SerializeObjectState.h"
 

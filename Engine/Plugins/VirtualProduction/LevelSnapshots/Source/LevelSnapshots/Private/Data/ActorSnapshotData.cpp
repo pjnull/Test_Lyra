@@ -490,6 +490,23 @@ void FActorSnapshotData::PostSerializeSnapshotActor(AActor* SnapshotActor, FWorl
 	}
 }
 
+namespace ActorSnapshotData
+{
+	static void PreventAttachParentInfiniteRecursion(UActorComponent* Original, const FPropertySelection& PropertySelection)
+	{
+		static const FProperty* AttachParent = USceneComponent::StaticClass()->FindPropertyByName(FName("AttachParent"));
+
+		// Suppose snapshot contains Root > Child and now the hierarchy is Child > Root.
+		// Root's AttachChildren still contains Child after we apply snapshot since that property is transient.
+		// Solution: Detach now, then serialize AttachParent, and OnRegister will automatically call AttachToComponent and update everything.
+		USceneComponent* SceneComponent = Cast<USceneComponent>(Original);
+		if (Original && PropertySelection.IsPropertySelected(nullptr, AttachParent))
+		{
+			SceneComponent->DetachFromComponent(FDetachmentTransformRules::KeepRelativeTransform);
+		}
+	}
+}
+
 void FActorSnapshotData::DeserializeIntoExistingWorldActor(UWorld* SnapshotWorld, AActor* OriginalActor, FWorldSnapshotData& WorldData, UPackage* InLocalisationSnapshotPackage, const FPropertySelectionMap& SelectedProperties)
 {
 	const bool bWasRecreated = false;
@@ -513,7 +530,8 @@ void FActorSnapshotData::DeserializeIntoExistingWorldActor(UWorld* SnapshotWorld
 		const FRestoreObjectScope FinishRestore = FCustomObjectSerializationWrapper::PreSubobjectRestore_EditorWorld(Deserialized, Original, WorldData, SelectedProperties, InLocalisationSnapshotPackage);
 		const FPropertySelection* ComponentSelectedProperties = SelectedProperties.GetObjectSelection(Original).GetPropertySelection();
 		if (ComponentSelectedProperties)
-		{		
+		{
+			ActorSnapshotData::PreventAttachParentInfiniteRecursion(Original, *ComponentSelectedProperties);
 			FApplySnapshotDataArchiveV2::ApplyToExistingEditorWorldObject(SerializedCompData, WorldData, Original, Deserialized, SelectedProperties, *ComponentSelectedProperties);
 		};
 	};

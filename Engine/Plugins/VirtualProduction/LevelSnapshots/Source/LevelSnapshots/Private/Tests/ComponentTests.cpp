@@ -6,6 +6,7 @@
 #include "SnapshotTestActor.h"
 
 #include "Components/PointLightComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "EngineUtils.h"

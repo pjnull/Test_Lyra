@@ -40,9 +40,11 @@ namespace
 		// These properties are not visible by default because they're not CPF_Edit
 		const FProperty* AttachParent = USceneComponent::StaticClass()->FindPropertyByName(FName("AttachParent"));
 		const FProperty* AttachSocketName = USceneComponent::StaticClass()->FindPropertyByName(FName("AttachSocketName"));
+		// RootComponent is usually set automatically but sometimes not... for example spawning AActor with instanced components only
+		const FProperty* RootComponent = AActor::StaticClass()->FindPropertyByName(FName("RootComponent"));
 		if (ensure(AttachParent && AttachSocketName))
 		{
-			Module.AddWhitelistedProperties({ AttachParent, AttachSocketName });
+			Module.AddWhitelistedProperties({ AttachParent, AttachSocketName, RootComponent });
 		}
 	}
 

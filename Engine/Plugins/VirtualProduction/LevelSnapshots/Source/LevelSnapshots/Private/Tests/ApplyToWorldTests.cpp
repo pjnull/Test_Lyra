@@ -3,14 +3,14 @@
 #include "PropertySelectionMap.h"
 #include "SnapshotTestRunner.h"
 #include "SnapshotTestActor.h"
+#include "Util/EquivalenceUtil.h"
 
 #include "Components/PointLightComponent.h"
 #include "Engine/PointLight.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshActor.h"
-#include "Materials/MaterialInterface.h"
 #include "Misc/AutomationTest.h"
-#include "Util/EquivalenceUtil.h"
+#include "PreviewScene.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRestoreSimpleProperties, "VirtualProduction.LevelSnapshots.Snapshot.RestoreSimpleProperties", (EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::EngineFilter));
 bool FRestoreSimpleProperties::RunTest(const FString& Parameters)

@@ -29,6 +29,7 @@ public:
 	
 	FSnapshotTestRunner& TakeSnapshot(FName SnapshotId = DefaultSnapshotId);
 	FSnapshotTestRunner& AccessSnapshot(TFunction<void(ULevelSnapshot*)> Callback, FName SnapshotId = DefaultSnapshotId);
+	FSnapshotTestRunner& AccessSnapshotAndWorld(TFunction<void(ULevelSnapshot*, UWorld*)> Callback, FName SnapshotId = DefaultSnapshotId);
 	
 	FSnapshotTestRunner& ApplySnapshot(TFunction<ULevelSnapshotFilter*()> Callback, FName SnapshotId = DefaultSnapshotId);
 	FSnapshotTestRunner& ApplySnapshot(ULevelSnapshotFilter* Filter = nullptr, FName SnapshotId = DefaultSnapshotId);

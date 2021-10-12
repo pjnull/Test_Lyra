@@ -7,6 +7,9 @@
 #include "Restorability/IPropertyComparer.h"
 #include "Restorability/ISnapshotLoader.h"
 
+class UStaticMeshComponent;
+struct FBodyInstance;
+
 /**
  * UPrimitiveComponent::BodyInstance requires special logic for restoring & loading collision information.
  */
@@ -36,7 +39,12 @@ public:
 
 private:
 
-	bool HaveNonDefaultCollisionPropertiesChanged(const FPropertyComparisonParams& Params, UStaticMeshComponent* SnapshotObject, UStaticMeshComponent* WorldObject, const FBodyInstance& SnapshotBody, const FBodyInstance& WorldBody) const;
+	bool HaveNonDefaultCollisionPropertiesChanged(
+		const FPropertyComparisonParams& Params, 
+		UStaticMeshComponent* SnapshotObject, 
+		UStaticMeshComponent* WorldObject, 
+		const FBodyInstance& SnapshotBody,
+		const FBodyInstance& WorldBody) const;
 	
 	const FProperty* BodyInstanceProperty;
 	const FProperty* ObjectTypeProperty;

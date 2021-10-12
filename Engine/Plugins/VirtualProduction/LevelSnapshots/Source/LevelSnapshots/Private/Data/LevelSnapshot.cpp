@@ -36,24 +36,8 @@ void ULevelSnapshot::ApplySnapshotToWorld(UWorld* TargetWorld, const FPropertySe
 		return;
 	}
 	
-	if (MapPath != FSoftObjectPath(TargetWorld))
-	{
-#if WITH_EDITOR && !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
-		if (TargetWorld->IsPlayInEditor())
-		{
-			FMessageLog("PIE").Warning(
-				FText::Format(NSLOCTEXT("LevelSnapshots", "IncompatibleWorlds", "This snapshot was taken in world '%s' and cannot be applied to PIE world '%s'. Snapshots can only be applied to the world they were taken in."),
-				FText::FromString(MapPath.ToString()),
-				FText::FromString(TargetWorld->GetPathName())
-				)
-			);
-		}
-#endif // WITH_EDITOR
-		UE_LOG(LogLevelSnapshots, Error, TEXT("This snapshot was taken for world '%s' and cannot be applied to world '%s': snapshots currently only support applying to the world they were taken in. "), *MapPath.ToString(), *TargetWorld->GetPathName());
-		return;
-	}
-
 	UE_LOG(LogLevelSnapshots, Log, TEXT("Applying snapshot %s to world %s"), *GetPathName(), *TargetWorld->GetPathName());
+	UE_CLOG(MapPath != FSoftObjectPath(TargetWorld), LogLevelSnapshots, Log, TEXT("Snapshot was taken for different world called '%s'"), *MapPath.ToString());
 	ON_SCOPE_EXIT
 	{
 		UE_LOG(LogLevelSnapshots, Log, TEXT("Finished applying snapshot"));
@@ -241,7 +225,7 @@ void ULevelSnapshot::DiffWorld(UWorld* World, FActorPathConsumer HandleMatchedAc
 			const FSoftObjectPath LevelPath = OriginalActorPath.GetAssetPathString();
 			if (!LoadedLevels.Contains(LevelPath))
 			{
-				UE_LOG(LogLevelSnapshots, Warning, TEXT("Skipping actor %s because level %s is not loaded or does not exist (see Levels window)."), *OriginalActorPath.ToString(), *LevelPath.ToString());
+				UE_LOG(LogLevelSnapshots, Log, TEXT("Skipping actor %s because level %s is not loaded or does not exist (see Levels window)."), *OriginalActorPath.ToString(), *LevelPath.ToString());
 				return;
 			}
 			
