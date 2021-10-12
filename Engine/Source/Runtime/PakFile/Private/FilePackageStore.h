@@ -23,8 +23,7 @@ public:
 	virtual void Lock() override;
 	virtual void Unlock() override;
 	virtual bool DoesPackageExist(FPackageId PackageId) override;
-	virtual FPackageStoreEntryHandle GetPackageEntryHandle(FPackageId PackageId, const FName& PackageName) override;
-	virtual FPackageStoreEntry GetPackageEntry(FPackageStoreEntryHandle Handle) override;
+	virtual EPackageStoreEntryStatus GetPackageStoreEntry(FPackageId PackageId, FPackageStoreEntry& OutPackageStoreEntry) override;
 	virtual bool GetPackageRedirectInfo(FPackageId PackageId, FName& OutSourcePackageName, FPackageId& OutRedirectedToPackageId) override;
 
 	void Mount(const FIoContainerHeader* ContainerHeader, uint32 Order);

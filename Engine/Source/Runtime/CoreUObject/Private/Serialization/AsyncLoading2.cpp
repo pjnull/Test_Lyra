@@ -61,6 +61,7 @@
 #include "HAL/LowLevelMemStats.h"
 #include "HAL/IPlatformFileOpenLogWrapper.h"
 #include "Modules/ModuleManager.h"
+#include "Containers/SpscQueue.h"
 
 #if UE_BUILD_DEVELOPMENT || UE_BUILD_DEBUG
 PRAGMA_DISABLE_OPTIMIZATION
@@ -357,7 +358,6 @@ struct FPackageRequest
 	FName UPackageName;
 	FPackageId PackageIdToLoad;
 	TUniquePtr<FLoadPackageAsyncDelegate> PackageLoadedDelegate;
-	FPackageStoreEntryHandle StoreEntryHandle;
 	FPackageRequest* Next = nullptr;
 
 	static FPackageRequest Create(const int32 RequestId, const int32 Priority, FName PackageNameToLoad, FPackageId PackageIdToLoad, FName CustomName, TUniquePtr<FLoadPackageAsyncDelegate> PackageLoadedDelegate)
@@ -371,169 +371,9 @@ struct FPackageRequest
 			FName(),
 			PackageIdToLoad,
 			MoveTemp(PackageLoadedDelegate),
-			FPackageStoreEntryHandle(),
 			nullptr
 		};
 	}
-};
-
-class FPackageRequestQueue
-{
-	struct FPackageRequestList
-	{
-		FPackageRequest* Head = nullptr;
-		FPackageRequest* Tail = nullptr;
-
-		void Add(FPackageRequest* Request)
-		{
-			check(!Request->Next);
-
-			if (!Tail)
-			{
-				check(!Head);
-				Head = Tail = Request;
-			}
-			else
-			{
-				Tail->Next = Request;
-				Tail = Request;
-			}
-		}
-
-		FPackageRequest* Pop()
-		{
-			FPackageRequest* Request = Head;
-			if (Request)
-			{
-				Head = Request->Next;
-				Request->Next = nullptr;
-
-				if (!Head)
-				{
-					Tail = nullptr;
-				}
-			}
-
-			return Request;
-		}
-	};
-
-public:
-	FPackageRequestQueue(IPackageStore& InPackageStore)
-		: PackageStore(InPackageStore)
-	{ }
-
-	void Enqueue(FPackageRequest&& LoadPackageRequest)
-	{
-		TCHAR NameBuffer[FName::StringBufferSize];
-		uint32 NameLen = LoadPackageRequest.PackageNameToLoad.ToString(NameBuffer);
-		FStringView PackageNameStr = FStringView(NameBuffer, NameLen);
-		if (!FPackageName::IsValidLongPackageName(PackageNameStr))
-		{
-			FString NewPackageNameStr;
-			if (FPackageName::TryConvertFilenameToLongPackageName(FString(PackageNameStr), NewPackageNameStr))
-			{
-				LoadPackageRequest.PackageNameToLoad = *NewPackageNameStr;
-				LoadPackageRequest.PackageIdToLoad = FPackageId::FromName(LoadPackageRequest.PackageNameToLoad);
-			}
-		}
-
-		LoadPackageRequest.UPackageName = LoadPackageRequest.PackageNameToLoad;
-		{
-			FName SourcePackageName;
-			FPackageId RedirectedToPackageId;
-			if (PackageStore.GetPackageRedirectInfo(LoadPackageRequest.PackageIdToLoad, SourcePackageName, RedirectedToPackageId))
-			{
-				LoadPackageRequest.PackageIdToLoad = RedirectedToPackageId;
-				LoadPackageRequest.UPackageName = SourcePackageName;
-			}
-		}
-
-		LoadPackageRequest.StoreEntryHandle = PackageStore.GetPackageEntryHandle(LoadPackageRequest.PackageIdToLoad, LoadPackageRequest.PackageNameToLoad);
-		
-		// Fixup CustomName to handle any input string that can be converted to a long package name.
-		if (!LoadPackageRequest.CustomName.IsNone())
-		{
-			NameLen = LoadPackageRequest.CustomName.ToString(NameBuffer);
-			PackageNameStr = FStringView(NameBuffer, NameLen);
-			if (!FPackageName::IsValidLongPackageName(PackageNameStr))
-			{
-				FString NewPackageNameStr;
-				if (FPackageName::TryConvertFilenameToLongPackageName(FString(PackageNameStr), NewPackageNameStr))
-				{
-					LoadPackageRequest.CustomName = *NewPackageNameStr;
-				}
-			}
-			LoadPackageRequest.UPackageName = LoadPackageRequest.CustomName;
-		}
-
-		FPackageRequest* Request = Alloc();
-		check(Request->Next == nullptr)
-		*Request = MoveTemp(LoadPackageRequest);
-
-		FScopeLock _(&CriticalSection);
-
-#if WITH_COTF
-		EPackageStoreEntryStatus Status = Request->StoreEntryHandle.Status();
-
-		if (Status == EPackageStoreEntryStatus::Pending)
-		{
-			PendingRequests.Add(Request);
-		}
-		else
-#endif
-		{
-			ReadyRequests.Add(Request);
-		}
-	}
-
-	void Dequeue(TFunction<bool(FPackageRequest&)>&& Fn)
-	{
-		FScopeLock _(&CriticalSection);
-
-#if WITH_COTF
-		for (auto It = PendingRequests.CreateIterator(); It; ++It)
-		{
-			FPackageRequest* PendingRequest = *It;
-			PendingRequest->StoreEntryHandle = PackageStore.GetPackageEntryHandle(PendingRequest->PackageIdToLoad, PendingRequest->PackageNameToLoad);
-			if (PendingRequest->StoreEntryHandle.Status() != EPackageStoreEntryStatus::Pending)
-			{
-				ReadyRequests.Add(PendingRequest);
-				It.RemoveCurrent();
-			}
-		}
-#endif
-		FPackageRequest* ReadyRequest = ReadyRequests.Pop();
-		while (ReadyRequest)
-		{
-			bool bContinue = Fn(*ReadyRequest);
-			Free(ReadyRequest);
-			if (!bContinue)
-			{
-				break;
-			}
-
-			ReadyRequest = ReadyRequests.Pop();
-		}
-	}
-
-private:
-	FPackageRequest* Alloc()
-	{
-		return new FPackageRequest;
-	}
-
-	void Free(FPackageRequest* Request)
-	{
-		delete Request;
-	}
-
-	IPackageStore& PackageStore;
-	FCriticalSection CriticalSection;
-	FPackageRequestList ReadyRequests;
-#if WITH_COTF
-	TArray<FPackageRequest*> PendingRequests;
-#endif
 };
 
 struct FAsyncPackageDesc2
@@ -542,8 +382,6 @@ struct FAsyncPackageDesc2
 	int32 RequestID;
 	// Package priority
 	int32 Priority;
-	// The package store entry with meta data about the actual disk package
-	const FPackageStoreEntryHandle StoreEntry;
 	// The package id of the UPackage being loaded
 	// It will be used as key when tracking active async packages
 	FPackageId UPackageId;
@@ -563,14 +401,12 @@ struct FAsyncPackageDesc2
 		int32 Priority,
 		FName UPackageName,
 		FPackageId PackageIdToLoad,
-		bool bHasCustomName,
-		const FPackageStoreEntryHandle StoreEntryHandle)
+		bool bHasCustomName)
 	{
 		return FAsyncPackageDesc2
 		{
 			RequestID,
 			Priority,
-			StoreEntryHandle,
 			FPackageId::FromName(UPackageName),
 			PackageIdToLoad,
 			UPackageName,
@@ -584,14 +420,12 @@ struct FAsyncPackageDesc2
 		int32 Priority,
 		FPackageId ImportedPackageId,
 		FPackageId PackageIdToLoad,
-		FName UPackageName,
-		const FPackageStoreEntryHandle StoreEntryHandle)
+		FName UPackageName)
 	{
 		return FAsyncPackageDesc2
 		{
 			RequestID,
 			Priority,
-			StoreEntryHandle,
 			ImportedPackageId,
 			PackageIdToLoad,
 			UPackageName,
@@ -1701,6 +1535,7 @@ enum EEventLoadNode2 : uint8
 
 struct FAsyncPackageData
 {
+	uint8* MemoryBuffer = nullptr;
 	FPackageStoreExportInfo ExportInfo;
 	uint64 ExportBundleHeadersSize = 0;
 	uint64 ExportBundleEntriesSize = 0;
@@ -1709,7 +1544,6 @@ struct FAsyncPackageData
 	const FExportBundleEntry* ExportBundleEntries = nullptr;
 	TArrayView<FExportObject> Exports;
 	TArrayView<FAsyncPackage2*> ImportedAsyncPackages;
-	TArrayView<FEventLoadNode2> PackageNodes;
 	TArrayView<FEventLoadNode2> ExportBundleNodes;
 	TArrayView<const FPackageId> ImportedPackageIds;
 	TArrayView<const FSHAHash> ShaderMapHashes;
@@ -1726,7 +1560,6 @@ struct FAsyncPackage2
 	friend class FAsyncLoadingThread2;
 
 	FAsyncPackage2(const FAsyncPackageDesc2& InDesc,
-		const FAsyncPackageData& InData,
 		FAsyncLoadingThread2& InAsyncLoadingThread,
 		FAsyncLoadEventGraphAllocator& InGraphAllocator,
 		const FAsyncLoadEventSpec* EventSpecs);
@@ -1819,6 +1652,7 @@ private:
 		int32 BundleIndex[FExportBundleEntry::ExportCommandType_Count];
 	};
 
+	uint8 PackageNodesMemory[EEventLoadNode2::Package_NumPhases * sizeof(FEventLoadNode2)];
 	/** Basic information associated with this package */
 	FAsyncPackageDesc2 Desc;
 	FAsyncPackageData Data;
@@ -2001,7 +1835,8 @@ public:
 	void CallCompletionCallbacks(EAsyncLoadingResult::Type LoadingResult);
 
 private:
-	void CreateNodes(const FAsyncLoadEventSpec* EventSpecs);
+	void CreatePackageNodes(const FAsyncLoadEventSpec* EventSpecs);
+	void CreateExportBundleNodes(const FAsyncLoadEventSpec* EventSpecs);
 	void SetupSerializedArcs();
 	void SetupScriptDependencies();
 	bool HaveAllDependenciesReachedStateDebug(FAsyncPackage2* Package, TSet<FAsyncPackage2*>& VisitedPackages, EAsyncPackageLoadingState2 WaitForPackageState);
@@ -2212,7 +2047,8 @@ private:
 	TSharedPtr<IPackageStore> PackageStore;
 	FLoadedPackageStore LoadedPackageStore;
 	FGlobalImportStore GlobalImportStore;
-	TUniquePtr<FPackageRequestQueue> PackageRequestQueue;
+	TSpscQueue<FPackageRequest> PackageRequestQueue;
+	TArray<FAsyncPackage2*> PendingPackages;
 
 	/** Initial load pending CDOs */
 	TMap<UClass*, TArray<FEventLoadNode2*>> PendingCDOs;
@@ -2330,7 +2166,6 @@ public:
 
 	void UpdatePackagePriority(FAsyncPackage2* Package, int32 NewPriority);
 
-	FAsyncPackageDesc2 CreatePackageDesc(const FPackageRequest& Request, bool& bIsMissingPackage);
 	FAsyncPackage2* FindOrInsertPackage(FAsyncPackageDesc2& InDesc, bool& bInserted, TUniquePtr<FLoadPackageAsyncDelegate>&& PackageLoadedDelegate = TUniquePtr<FLoadPackageAsyncDelegate>());
 	void QueueMissingPackage(FAsyncPackageDesc2& PackageDesc, TUniquePtr<FLoadPackageAsyncDelegate>&& LoadPackageAsyncDelegate);
 
@@ -2511,43 +2346,45 @@ private:
 
 	FAsyncPackage2* CreateAsyncPackage(const FAsyncPackageDesc2& Desc)
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE(CreateAsyncPackage);
 		UE_ASYNC_PACKAGE_DEBUG(Desc);
-		checkf(Desc.StoreEntry, TEXT("No package store entry for package %s"), *Desc.UPackageName.ToString());
 
-		FPackageStoreEntry PackageStoreEntry = PackageStore->GetPackageEntry(Desc.StoreEntry);
+		ExistingAsyncPackagesCounter.Increment();
+		return new FAsyncPackage2(Desc, *this, GraphAllocator, EventSpecs.GetData());
+	}
 
-		FAsyncPackageData Data;
+	void InitializeAsyncPackageFromPackageStore(FAsyncPackage2* AsyncPackage, const FPackageStoreEntry& PackageStoreEntry)
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(InitializeAsyncPackageFromPackageStore);
+		UE_ASYNC_PACKAGE_DEBUG(AsyncPackage->Desc);
+		
+		FAsyncPackageData& Data = AsyncPackage->Data;
 		Data.ExportInfo = PackageStoreEntry.ExportInfo;
 
 		const int32 ExportBundleNodeCount = Data.ExportInfo.ExportBundleCount * EEventLoadNode2::ExportBundle_NumPhases;
 		const int32 ImportedPackageCount = PackageStoreEntry.ImportedPackageIds.Num();
 		const int32 ShaderMapHashesCount = PackageStoreEntry.ShaderMapHashes.Num();
-		const int32 NodeCount = EEventLoadNode2::Package_NumPhases + ExportBundleNodeCount;
-
+		
 		Data.ExportBundleHeadersSize = sizeof(FExportBundleHeader) * Data.ExportInfo.ExportBundleCount;
 		Data.ExportBundleEntriesSize = sizeof(FExportBundleEntry) * Data.ExportInfo.ExportCount * FExportBundleEntry::ExportCommandType_Count;
 		const uint64 ExportBundlesMetaSize = Data.ExportBundleHeadersSize + Data.ExportBundleEntriesSize;
 
-		const uint64 AsyncPackageMemSize = Align(sizeof(FAsyncPackage2), 8);
 		const uint64 ExportBundlesMetaMemSize = Align(ExportBundlesMetaSize, 8);
 		const uint64 ExportsMemSize = Align(sizeof(FExportObject) * Data.ExportInfo.ExportCount, 8);
 		const uint64 ImportedPackagesMemSize = Align(sizeof(FAsyncPackage2*) * ImportedPackageCount, 8);
-		const uint64 PackageNodesMemSize = Align(sizeof(FEventLoadNode2) * NodeCount, 8);
+		const uint64 ExportBundleNodesMemSize = Align(sizeof(FEventLoadNode2) * ExportBundleNodeCount, 8);
 		const uint64 ImportedPackageIdsMemSize = Align(sizeof(FPackageId) * ImportedPackageCount, 8);
 		const uint64 ShaderMapHashesMemSize = Align(sizeof(FSHAHash) * ShaderMapHashesCount, 8);
 		const uint64 MemoryBufferSize =
-			AsyncPackageMemSize +
 			ExportBundlesMetaMemSize +
 			ExportsMemSize +
 			ImportedPackagesMemSize +
-			PackageNodesMemSize +
+			ExportBundleNodesMemSize +
 			ImportedPackageIdsMemSize +
 			ShaderMapHashesMemSize;
 
-		uint8* MemoryBuffer = reinterpret_cast<uint8*>(FMemory::Malloc(MemoryBufferSize));
+		Data.MemoryBuffer = reinterpret_cast<uint8*>(FMemory::Malloc(MemoryBufferSize));
 
-		uint8* DataPtr = MemoryBuffer + AsyncPackageMemSize;
+		uint8* DataPtr = Data.MemoryBuffer;
 
 		Data.ExportBundlesMetaMemory = DataPtr;
 		Data.ExportBundleHeaders = reinterpret_cast<const FExportBundleHeader*>(Data.ExportBundlesMetaMemory);
@@ -2558,25 +2395,29 @@ private:
 		DataPtr += ExportsMemSize;
 		Data.ImportedAsyncPackages = MakeArrayView(reinterpret_cast<FAsyncPackage2**>(DataPtr), 0);
 		DataPtr += ImportedPackagesMemSize;
-		Data.PackageNodes = MakeArrayView(reinterpret_cast<FEventLoadNode2*>(DataPtr), NodeCount);
-		Data.ExportBundleNodes = MakeArrayView(&Data.PackageNodes[EEventLoadNode2::Package_NumPhases], ExportBundleNodeCount);
-		DataPtr += PackageNodesMemSize;
+		Data.ExportBundleNodes = MakeArrayView(reinterpret_cast<FEventLoadNode2*>(DataPtr), ExportBundleNodeCount);
+		DataPtr += ExportBundleNodesMemSize;
 		Data.ImportedPackageIds = MakeArrayView(reinterpret_cast<const FPackageId*>(DataPtr), ImportedPackageCount);
 		FMemory::Memcpy((void*)Data.ImportedPackageIds.GetData(), PackageStoreEntry.ImportedPackageIds.GetData(), sizeof(FPackageId) * ImportedPackageCount);
 		DataPtr += ImportedPackageIdsMemSize;
 		Data.ShaderMapHashes = MakeArrayView(reinterpret_cast<const FSHAHash*>(DataPtr), ShaderMapHashesCount);
 		FMemory::Memcpy((void*)Data.ShaderMapHashes.GetData(), PackageStoreEntry.ShaderMapHashes.GetData(), sizeof(FSHAHash) * ShaderMapHashesCount);
+	
+		AsyncPackage->CreateExportBundleNodes(EventSpecs.GetData());
 
-		ExistingAsyncPackagesCounter.Increment();
-		return new (MemoryBuffer) FAsyncPackage2(Desc, Data, *this, GraphAllocator, EventSpecs.GetData());
+		AsyncPackage->ImportStore.AddPackageReferences();
+		AsyncPackage->ConstructedObjects.Reserve(Data.ExportInfo.ExportCount + 1); // +1 for UPackage, may grow dynamically beoynd that
+		for (FExportObject& Export : Data.Exports)
+		{
+			Export = FExportObject();
+		}
 	}
 
 	void DeleteAsyncPackage(FAsyncPackage2* Package)
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(DeleteAsyncPackage);
 		UE_ASYNC_PACKAGE_DEBUG(Package->Desc);
-		Package->~FAsyncPackage2();
-		FMemory::Free(Package);
+		delete Package;
 		ExistingAsyncPackagesCounter.Decrement();
 	}
 
@@ -2671,8 +2512,7 @@ void FAsyncLoadingThread2::InitializeLoading()
 	{
 		AltZenaphore.NotifyOne();
 	});
-	PackageRequestQueue = MakeUnique<FPackageRequestQueue>(*PackageStore.Get());
-
+	
 	FPackageName::DoesPackageExistOverride().BindLambda([this](FName PackageName)
 	{
 		LazyInitializeFromLoadPackage();
@@ -2742,15 +2582,87 @@ bool FAsyncLoadingThread2::CreateAsyncPackagesFromQueue(FAsyncLoadingThreadState
 
 	PackageStore->Lock();
 
+	for (auto It = PendingPackages.CreateIterator(); It; ++It)
+	{
+		FAsyncPackage2* PendingPackage = *It;
+		FPackageStoreEntry PackageEntry;
+		if (EPackageStoreEntryStatus::Ok == PackageStore->GetPackageStoreEntry(PendingPackage->Desc.PackageIdToLoad, PackageEntry))
+		{
+			InitializeAsyncPackageFromPackageStore(PendingPackage, PackageEntry);
+			PendingPackage->ImportPackagesRecursive(IoBatch, *PackageStore.Get());
+			PendingPackage->StartLoading(IoBatch);
+			It.RemoveCurrent();
+		}
+	}
 	for (;;)
 	{
 		int32 NumDequeued = 0;
-		PackageRequestQueue->Dequeue([this, &NumDequeued, TimeSliceGranularity, &IoBatch](FPackageRequest& Request)
+		while (NumDequeued < TimeSliceGranularity)
 		{
-			bool bIsMissingPackage;
-			FAsyncPackageDesc2 PackageDesc = CreatePackageDesc(Request, bIsMissingPackage);
+			TOptional<FPackageRequest> OptionalRequest = PackageRequestQueue.Dequeue();
+			if (!OptionalRequest.IsSet())
+			{
+				break;
+			}
+			++NumDequeued;
+		
+			FPackageRequest& Request = OptionalRequest.GetValue();
+			TCHAR NameBuffer[FName::StringBufferSize];
+			uint32 NameLen = Request.PackageNameToLoad.ToString(NameBuffer);
+			FStringView PackageNameStr = FStringView(NameBuffer, NameLen);
+			if (!FPackageName::IsValidLongPackageName(PackageNameStr))
+			{
+				FString NewPackageNameStr;
+				if (FPackageName::TryConvertFilenameToLongPackageName(FString(PackageNameStr), NewPackageNameStr))
+				{
+					Request.PackageNameToLoad = *NewPackageNameStr;
+					Request.PackageIdToLoad = FPackageId::FromName(Request.PackageNameToLoad);
+				}
+			}
 
-			if (bIsMissingPackage)
+			Request.UPackageName = Request.PackageNameToLoad;
+			{
+				FName SourcePackageName;
+				FPackageId RedirectedToPackageId;
+				if (PackageStore->GetPackageRedirectInfo(Request.PackageIdToLoad, SourcePackageName, RedirectedToPackageId))
+				{
+					Request.PackageIdToLoad = RedirectedToPackageId;
+					Request.UPackageName = SourcePackageName;
+				}
+			}
+
+			// Fixup CustomName to handle any input string that can be converted to a long package name.
+			if (!Request.CustomName.IsNone())
+			{
+				NameLen = Request.CustomName.ToString(NameBuffer);
+				PackageNameStr = FStringView(NameBuffer, NameLen);
+				if (!FPackageName::IsValidLongPackageName(PackageNameStr))
+				{
+					FString NewPackageNameStr;
+					if (FPackageName::TryConvertFilenameToLongPackageName(FString(PackageNameStr), NewPackageNameStr))
+					{
+						Request.CustomName = *NewPackageNameStr;
+					}
+				}
+				Request.UPackageName = Request.CustomName;
+			}
+
+			FPackageId PackageIdToLoad = Request.PackageIdToLoad;
+			FPackageStoreEntry PackageEntry;
+			EPackageStoreEntryStatus PackageStatus = PackageStore->GetPackageStoreEntry(PackageIdToLoad, PackageEntry);
+			if (PackageStatus == EPackageStoreEntryStatus::Missing)
+			{
+				// While there is an active load request for (InName=/Temp/PackageABC_abc, InPackageToLoadFrom=/Game/PackageABC), then allow these requests too:
+				// (InName=/Temp/PackageA_abc, InPackageToLoadFrom=/Temp/PackageABC_abc) and (InName=/Temp/PackageABC_xyz, InPackageToLoadFrom=/Temp/PackageABC_abc)
+				FAsyncPackage2* Package = GetAsyncPackage(Request.PackageIdToLoad);
+				if (Package)
+				{
+					PackageIdToLoad = Package->Desc.PackageIdToLoad;
+					PackageStatus = PackageStore->GetPackageStoreEntry(PackageIdToLoad, PackageEntry);
+				}
+			}
+			FAsyncPackageDesc2 PackageDesc = FAsyncPackageDesc2::FromPackageRequest(Request.RequestId, Request.Priority, Request.UPackageName, PackageIdToLoad, !Request.CustomName.IsNone());
+			if (PackageStatus == EPackageStoreEntryStatus::Missing)
 			{
 				QueueMissingPackage(PackageDesc, MoveTemp(Request.PackageLoadedDelegate));
 			}
@@ -2765,11 +2677,25 @@ bool FAsyncLoadingThread2::CreateAsyncPackagesFromQueue(FAsyncLoadingThreadState
 					UE_ASYNC_PACKAGE_LOG(Verbose, PackageDesc, TEXT("CreateAsyncPackages: AddPackage"),
 						TEXT("Start loading package."));
 #if !UE_BUILD_SHIPPING
-						if (FileOpenLogWrapper)
-						{
-							FileOpenLogWrapper->AddPackageToOpenLog(*PackageDesc.UPackageName.ToString());
-						}
+					if (FileOpenLogWrapper)
+					{
+						FileOpenLogWrapper->AddPackageToOpenLog(*PackageDesc.UPackageName.ToString());
+					}
 #endif
+					if (PackageStatus == EPackageStoreEntryStatus::Ok)
+					{
+						InitializeAsyncPackageFromPackageStore(Package, PackageEntry);
+						{
+							TRACE_CPUPROFILER_EVENT_SCOPE(ImportPackages);
+							Package->ImportPackagesRecursive(IoBatch, *PackageStore.Get());
+						}
+						Package->StartLoading(IoBatch);
+					}
+					else
+					{
+						check(PackageStatus == EPackageStoreEntryStatus::Pending);
+						PendingPackages.Add(Package);
+					}
 				}
 				else
 				{
@@ -2778,22 +2704,8 @@ bool FAsyncLoadingThread2::CreateAsyncPackagesFromQueue(FAsyncLoadingThreadState
 				}
 
 				--QueuedPackagesCounter;
-				if (Package)
-				{
-					{
-						TRACE_CPUPROFILER_EVENT_SCOPE(ImportPackages);
-						Package->ImportPackagesRecursive(IoBatch, *PackageStore.Get());
-					}
-
-					if (bInserted)
-					{
-						Package->StartLoading(IoBatch);
-					}
-				}
 			}
-
-			return ++NumDequeued < TimeSliceGranularity;
-		});
+		}
 		
 		bPackagesCreated |= NumDequeued > 0;
 
@@ -3350,9 +3262,10 @@ void FAsyncPackage2::ImportPackagesRecursive(FIoBatch& IoBatch, IPackageStore& P
 		}
 		
 		FLoadedPackageRef& PackageRef = ImportStore.LoadedPackageStore.GetPackageRef(ImportedPackageId);
-		const FPackageStoreEntryHandle ImportedPackageEntry = PackageStore.GetPackageEntryHandle(ImportedPackageIdToLoad);
+		FPackageStoreEntry ImportedPackageEntry;
+		EPackageStoreEntryStatus ImportedPackageStatus = PackageStore.GetPackageStoreEntry(ImportedPackageIdToLoad, ImportedPackageEntry);
 
-		if (!ImportedPackageEntry)
+		if (ImportedPackageStatus == EPackageStoreEntryStatus::Missing)
 		{
 			UE_ASYNC_PACKAGE_LOG(Warning, Desc, TEXT("ImportPackages: SkipPackage"),
 				TEXT("Skipping non mounted imported package with id '0x%llX'"), ImportedPackageId.Value());
@@ -3363,7 +3276,7 @@ void FAsyncPackage2::ImportPackagesRecursive(FIoBatch& IoBatch, IPackageStore& P
 
 		FAsyncPackage2* ImportedPackage = nullptr;
 		bool bInserted = false;
-		FAsyncPackageDesc2 PackageDesc = FAsyncPackageDesc2::FromPackageImport(INDEX_NONE, Desc.Priority, ImportedPackageId, ImportedPackageIdToLoad, ImportedPackageUPackageName, ImportedPackageEntry);
+		FAsyncPackageDesc2 PackageDesc = FAsyncPackageDesc2::FromPackageImport(INDEX_NONE, Desc.Priority, ImportedPackageId, ImportedPackageIdToLoad, ImportedPackageUPackageName);
 		if (PackageRef.AreAllPublicExportsLoaded())
 		{
 			ImportedPackage = AsyncLoadingThread.FindAsyncPackage(ImportedPackageId);
@@ -3398,8 +3311,17 @@ void FAsyncPackage2::ImportPackagesRecursive(FIoBatch& IoBatch, IPackageStore& P
 
 		if (bInserted)
 		{
-			ImportedPackage->ImportPackagesRecursive(IoBatch, PackageStore);
-			ImportedPackage->StartLoading(IoBatch);
+			if (ImportedPackageStatus == EPackageStoreEntryStatus::Ok)
+			{
+				AsyncLoadingThread.InitializeAsyncPackageFromPackageStore(ImportedPackage, ImportedPackageEntry);
+				ImportedPackage->ImportPackagesRecursive(IoBatch, PackageStore);
+				ImportedPackage->StartLoading(IoBatch);
+			}
+			else
+			{
+				check(ImportedPackageStatus == EPackageStoreEntryStatus::Pending);
+				AsyncLoadingThread.PendingPackages.Add(ImportedPackage);
+			}
 		}
 	}
 	UE_ASYNC_PACKAGE_LOG_VERBOSE(VeryVerbose, Desc, TEXT("ImportPackages: ImportsDone"),
@@ -4499,7 +4421,7 @@ EAsyncPackageState::Type FAsyncPackage2::Event_DeferredPostLoadExportBundle(FAsy
 FEventLoadNode2& FAsyncPackage2::GetPackageNode(EEventLoadNode2 Phase)
 {
 	check(Phase < EEventLoadNode2::Package_NumPhases);
-	return Data.PackageNodes[Phase];
+	return *(reinterpret_cast<FEventLoadNode2*>(PackageNodesMemory) + Phase);
 }
 
 FEventLoadNode2& FAsyncPackage2::GetExportBundleNode(EEventLoadNode2 Phase, uint32 ExportBundleIndex)
@@ -4564,7 +4486,7 @@ EAsyncPackageState::Type FAsyncLoadingThread2::ProcessAsyncLoadingFromGameThread
 				return EAsyncPackageState::TimeOut;
 			}
 
-			if (QueuedPackagesCounter)
+			if (QueuedPackagesCounter || !PendingPackages.IsEmpty())
 			{
 				if (CreateAsyncPackagesFromQueue(ThreadState))
 				{
@@ -5152,7 +5074,7 @@ uint32 FAsyncLoadingThread2::Run()
 				{
 					bDidSomething = false;
 
-					if (QueuedPackagesCounter)
+					if (QueuedPackagesCounter || !PendingPackages.IsEmpty())
 					{
 						if (CreateAsyncPackagesFromQueue(ThreadState))
 						{
@@ -5544,38 +5466,35 @@ void FAsyncLoadingThread2::NotifyConstructedDuringAsyncLoading(UObject* Object, 
 */
 FAsyncPackage2::FAsyncPackage2(
 	const FAsyncPackageDesc2& InDesc,
-	const FAsyncPackageData& InData,
 	FAsyncLoadingThread2& InAsyncLoadingThread,
 	FAsyncLoadEventGraphAllocator& InGraphAllocator,
 	const FAsyncLoadEventSpec* EventSpecs)
 : Desc(InDesc)
-, Data(InData)
 , AsyncLoadingThread(InAsyncLoadingThread)
 , GraphAllocator(InGraphAllocator)
 , ImportStore(*AsyncLoadingThread.PackageStore.Get(), AsyncLoadingThread.GlobalImportStore, AsyncLoadingThread.LoadedPackageStore, Desc, Data.ImportedPackageIds)
 {
 	TRACE_LOADTIME_NEW_ASYNC_PACKAGE(this);
-	ImportStore.AddPackageReferences();
 	AddRequestID(Desc.RequestID);
 
-	ConstructedObjects.Reserve(Data.ExportInfo.ExportCount + 1); // +1 for UPackage, may grow dynamically beoynd that
-
-	for (FExportObject& Export : Data.Exports)
-	{
-		Export = FExportObject();
-	}
-
-	CreateNodes(EventSpecs);
+	CreatePackageNodes(EventSpecs);
 }
 
-void FAsyncPackage2::CreateNodes(const FAsyncLoadEventSpec* EventSpecs)
+void FAsyncPackage2::CreatePackageNodes(const FAsyncLoadEventSpec* EventSpecs)
 {
 	const int32 BarrierCount = 1;
+	
+	FEventLoadNode2* Node = reinterpret_cast<FEventLoadNode2*>(PackageNodesMemory);
 	for (int32 Phase = 0; Phase < EEventLoadNode2::Package_NumPhases; ++Phase)
 	{
-		new (&Data.PackageNodes[Phase]) FEventLoadNode2(EventSpecs + Phase, this, -1, BarrierCount);
+		new (Node) FEventLoadNode2(EventSpecs + Phase, this, -1, BarrierCount);
+		++Node;
 	}
+}
 
+void FAsyncPackage2::CreateExportBundleNodes(const FAsyncLoadEventSpec* EventSpecs)
+{
+	const int32 BarrierCount = 1;
 	for (int32 ExportBundleIndex = 0; ExportBundleIndex < Data.ExportInfo.ExportBundleCount; ++ExportBundleIndex)
 	{
 		uint32 NodeIndex = EEventLoadNode2::ExportBundle_NumPhases * ExportBundleIndex;
@@ -5601,6 +5520,8 @@ FAsyncPackage2::~FAsyncPackage2()
 	
 	checkf(ConstructedObjects.Num() == 0, TEXT("ClearConstructedObjects() has not been called for package %s"),
 		*Desc.PackageNameToLoad.ToString());
+
+	FMemory::Free(Data.MemoryBuffer);
 }
 
 void FAsyncPackage2::ReleaseRef()
@@ -5991,37 +5912,12 @@ int32 FAsyncLoadingThread2::LoadPackage(const FPackagePath& InPackagePath, FName
 		? MakeUnique<FLoadPackageAsyncDelegate>(MoveTemp(InCompletionDelegate))
 		: TUniquePtr<FLoadPackageAsyncDelegate>();
 
-	PackageStore->Lock();
-	PackageRequestQueue->Enqueue(FPackageRequest::Create(RequestId, InPackagePriority, PackageNameToLoad, PackageIdToLoad, InCustomName, MoveTemp(CompletionDelegate)));
-	PackageStore->Unlock();
+	PackageRequestQueue.Enqueue(FPackageRequest::Create(RequestId, InPackagePriority, PackageNameToLoad, PackageIdToLoad, InCustomName, MoveTemp(CompletionDelegate)));
 	++QueuedPackagesCounter;
 
 	AltZenaphore.NotifyOne();
 
 	return RequestId;
-}
-
-FAsyncPackageDesc2 FAsyncLoadingThread2::CreatePackageDesc(const FPackageRequest& Request, bool& bIsMissingPackage)
-{
-	FPackageId PackageIdToLoad = Request.PackageIdToLoad;
-	FPackageStoreEntryHandle StoreEntry = Request.StoreEntryHandle;
-	
-	if (StoreEntry.Status() == EPackageStoreEntryStatus::Missing)
-	{
-		// While there is an active load request for (InName=/Temp/PackageABC_abc, InPackageToLoadFrom=/Game/PackageABC), then allow these requests too:
-		// (InName=/Temp/PackageA_abc, InPackageToLoadFrom=/Temp/PackageABC_abc) and (InName=/Temp/PackageABC_xyz, InPackageToLoadFrom=/Temp/PackageABC_abc)
-		FAsyncPackage2* Package = GetAsyncPackage(PackageIdToLoad);
-		if (Package)
-		{
-			PackageIdToLoad = Package->Desc.PackageIdToLoad;
-			StoreEntry = Package->Desc.StoreEntry;
-		}
-	}
-
-	FAsyncPackageDesc2 PackageDesc = FAsyncPackageDesc2::FromPackageRequest(Request.RequestId, Request.Priority, Request.UPackageName, PackageIdToLoad, !Request.CustomName.IsNone(), Request.StoreEntryHandle);
-	bIsMissingPackage = StoreEntry.Status() == EPackageStoreEntryStatus::Missing;
-
-	return MoveTemp(PackageDesc);
 }
 
 void FAsyncLoadingThread2::QueueMissingPackage(FAsyncPackageDesc2& PackageDesc, TUniquePtr<FLoadPackageAsyncDelegate>&& PackageLoadedDelegate)

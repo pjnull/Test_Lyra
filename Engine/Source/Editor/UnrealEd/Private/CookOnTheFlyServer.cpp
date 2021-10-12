@@ -385,12 +385,6 @@ public:
 		return Cooker.FindOrCreatePackageWriter(TargetPlatform);
 	}
 
-	DECLARE_DERIVED_EVENT(UCookOnTheFlyServer::FCookOnTheFlyServerInterface, UE::Cook::ICookOnTheFlyServer::FFlushEvent, FFlushEvent);
-	virtual FFlushEvent& OnFlush() override
-	{
-		return FlushEvent;
-	}
-
 	virtual double WaitForPendingFlush() override
 	{
 		const double StartTime = bIsFlushing ? FPlatformTime::Seconds() : 0.0;
@@ -410,11 +404,6 @@ public:
 		for (UE::Cook::FCookSavePackageContext* Context : Cooker.SavePackageContexts)
 		{
 			Context->PackageWriter->Flush();
-		}
-
-		if (FlushEvent.IsBound())
-		{
-			FlushEvent.Broadcast();
 		}
 
 		UE_LOG(LogCook, Log, TEXT("Flush completed"));
@@ -455,7 +444,6 @@ private:
 	}
 
 	UCookOnTheFlyServer& Cooker;
-	FFlushEvent FlushEvent;
 	FEvent* FlushCompletedEvent;
 	FCriticalSection FlushCriticalSection;
 	FCriticalSection RequestsCriticalSection;
@@ -590,7 +578,7 @@ bool UCookOnTheFlyServer::StartCookOnTheFly(FCookOnTheFlyOptions InCookOnTheFlyO
 	{
 		UE::Cook::FIoStoreCookOnTheFlyServerOptions ServerOptions;
 		ServerOptions.Port = -1; // Use default
-		CookOnTheFlyRequestManager = UE::Cook::MakeIoStoreCookOnTheFlyRequestManager(*CookOnTheFlyServerInterface, MoveTemp(ServerOptions));
+		CookOnTheFlyRequestManager = UE::Cook::MakeIoStoreCookOnTheFlyRequestManager(*CookOnTheFlyServerInterface, AssetRegistry, MoveTemp(ServerOptions));
 	}
 	else
 	{
