@@ -79,12 +79,15 @@ bool SScaleBox::CustomPrepass(float LayoutScaleMultiplier)
 
 	const bool bNeedsNormalizingPrepassOrLocalGeometry = DoesScaleRequireNormalizingPrepassOrLocalGeometry();
 
-	// If we need a normalizing prepass, or we've yet to give the child a chance to generate a desired
-	// size, do that now.
+	// Call the prepass on the child widget only once
+	bool bCallChildPrepassInternal = true;
+
+	// If we need a normalizing prepass (in ComputeContentScale)
+	//or we've yet to give the child a chance to generate a desired size, then do that now.
 	if (bNeedsNormalizingPrepassOrLocalGeometry || !LastAllocatedArea.IsSet())
 	{
-		ChildSlotWidget.SlatePrepass(LayoutScaleMultiplier);
-
+		Prepass_ChildLoop(LayoutScaleMultiplier, &ChildSlot);
+		bCallChildPrepassInternal = false;
 		NormalizedContentDesiredSize = ChildSlotWidget.GetDesiredSize();
 	}
 	else
@@ -108,11 +111,6 @@ bool SScaleBox::CustomPrepass(float LayoutScaleMultiplier)
 		NewComputedContentScale = ComputeContentScale(NullGeometry);
 	}
 
-	if (bNeedsNormalizingPrepassOrLocalGeometry)
-	{
-		ChildSlotWidget.Invalidate(EInvalidateWidgetReason::Prepass);
-	}
-
 	// Extract the incoming scale out of the layout scale if 
 	if (NewComputedContentScale.IsSet())
 	{
@@ -124,7 +122,7 @@ bool SScaleBox::CustomPrepass(float LayoutScaleMultiplier)
 
 	ComputedContentScale = NewComputedContentScale;
 
-	return true;
+	return bCallChildPrepassInternal;
 }
 
 bool SScaleBox::DoesScaleRequireNormalizingPrepassOrLocalGeometry() const
