@@ -746,7 +746,6 @@ void FMemoryPackageWriter::WriteLinkerAdditionalData(const FLinkerAdditionalData
 		check(FileRegion.Length > 0); // SavePackage is not allowed to call WriteLinkerAdditionalData with empty regions
 		BulkDataRegions.Add(FSharedBuffer::MakeView(DataStart + FileRegion.Offset, FileRegion.Length, DataOwner));
 	}
-
 }
 
 bool TrySavePackage(UPackage* Package)
@@ -771,6 +770,7 @@ bool TrySavePackage(UPackage* Package)
 		UE_LOG(LogEditorDomain, Verbose, TEXT("Skipping save of blocked package to EditorDomain: %s."), *Package->GetName())
 		return false;
 	}
+	UE_LOG(LogEditorDomain, Verbose, TEXT("Saving to EditorDomain: %s."), *Package->GetName())
 
 	uint32 SaveFlags = SAVE_NoError // Do not crash the SaveServer on an error
 		| SAVE_BulkDataByReference	// EditorDomain saves reference bulkdata from the WorkspaceDomain rather than duplicating it
