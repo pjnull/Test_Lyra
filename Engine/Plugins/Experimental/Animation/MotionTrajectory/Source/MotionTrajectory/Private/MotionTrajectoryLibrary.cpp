@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "MotionTrajectoryLibrary.h"
+#include "GameFramework/Actor.h"
 #include "Algo/Find.h"
 #include "GameFramework/Actor.h"
 
