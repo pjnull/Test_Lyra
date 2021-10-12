@@ -28,7 +28,6 @@
 				"Win64",
 				"Linux",
 				"LinuxArm64",
-				"PS4"
 			]
 		}
 	],
@@ -45,7 +44,6 @@
 				"Win64",
 				"Linux",
 				"LinuxArm64",
-				"PS4"
 			]
 		}
 	]

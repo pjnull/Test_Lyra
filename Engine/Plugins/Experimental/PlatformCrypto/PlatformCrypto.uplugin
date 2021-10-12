@@ -27,7 +27,6 @@
 				"Win64",
 				"Linux",
 				"LinuxArm64",
-				"PS4"
 			],
 			"PlatformDenyList": [
 				"TVOS"
@@ -45,7 +44,6 @@
 				"Win64",
 				"Linux",
 				"LinuxArm64",
-				"PS4"
 			],
 			"PlatformDenyList": [
 				"TVOS"
@@ -62,7 +60,6 @@
 				"Win64",
 				"Linux",
 				"LinuxArm64",
-				"PS4"
 			],
 			"PlatformDenyList": [
 				"TVOS"
