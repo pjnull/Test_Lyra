@@ -233,8 +233,9 @@ namespace UnrealBuildTool
 		/// Constructs a ModuleDescriptor from a Json object
 		/// </summary>
 		/// <param name="InObject"></param>
+		/// <param name="JsonFilePath"></param>
 		/// <returns>The new module descriptor</returns>
-		public static ModuleDescriptor FromJsonObject(JsonObject InObject)
+		public static ModuleDescriptor FromJsonObject(JsonObject InObject, FileReference? JsonFilePath)
 		{
 			ModuleDescriptor Module = new ModuleDescriptor(InObject.GetStringField("Name"), InObject.GetEnumField<ModuleHostType>("Type"));
 
@@ -262,7 +263,7 @@ namespace UnrealBuildTool
 						}
 						else
 						{
-							Log.TraceWarning("Unknown platform {0} while parsing allow list for module descriptor {1}", TargetPlatformName, Module.Name);
+							Log.TraceWarningTask(JsonFilePath, $"Unknown platform {TargetPlatformName} while parsing allow list for module descriptor {Module.Name}");
 						}
 					}
 				}
@@ -280,7 +281,7 @@ namespace UnrealBuildTool
 						}
 						else
 						{
-							Log.TraceWarning("Unknown platform {0} while parsing deny list for module descriptor {1}", TargetPlatformName, Module.Name);
+							Log.TraceWarningTask(JsonFilePath, "Unknown platform {TargetPlatformName} while parsing deny list for module descriptor {Module.Name}");
 						}
 					}
 				}

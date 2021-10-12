@@ -339,7 +339,7 @@ namespace UnrealBuildTool
 			string PlatformName = Tokens[1];
 			if (!IsValidChildPluginSuffix(PlatformName))
 			{
-				Log.TraceWarning("Ignoring child plugin: {0} - Unknown suffix \"{1}\". Expected valid platform or group", Child.File.GetFileName(), PlatformName);
+				Log.TraceWarningTask(Filename, $"Ignoring child plugin: {Child.File.GetFileName()} - Unknown suffix \"{PlatformName}\": expected valid platform or group.");
 				return;
 			}
 

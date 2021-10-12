@@ -339,7 +339,7 @@ namespace UnrealBuildTool
 					}
 					else
 					{
-						Log.WriteLineOnce(LogEventType.Warning, LogFormatOptions.NoSeverityPrefix, "{0}: warning: Referenced directory '{1}' does not exist.", RulesFile, Dir);
+						Log.TraceWarningTask(RulesFile, $"Referenced directory '{Dir}' does not exist.");
 					}
 				}
 			}
