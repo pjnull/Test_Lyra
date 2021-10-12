@@ -1430,7 +1430,7 @@ namespace AutomationTool
         /// <summary>
         /// Determines if Blueprint assets should be substituted with auto-generated code.
         /// </summary>
-		[Obsolete("The RunAssetNativization property has been deprecated. This feature is no longer supported.")]
+		[Obsolete("The RunAssetNativization property has been deprecated in 5.0. This feature is no longer supported.")]
         public bool RunAssetNativization
 		{
 			get { return false; }
