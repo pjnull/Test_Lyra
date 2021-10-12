@@ -243,13 +243,13 @@ bool FMultiBlock::GetSearchable() const
  */
 FMultiBox::FMultiBox(const EMultiBoxType InType, FMultiBoxCustomization InCustomization, const bool bInShouldCloseWindowAfterMenuSelection)
 	: bHasSearchWidget(false)
+	, bIsFocusable(true)
 	, CommandLists()
 	, Blocks()
 	, StyleSet( &FCoreStyle::Get() )
 	, StyleName( "ToolBar" )
 	, Type( InType )
 	, bShouldCloseWindowAfterMenuSelection( bInShouldCloseWindowAfterMenuSelection )
-	, bIsFocusable( true )
 {
 
 	if (InType == EMultiBoxType::SlimHorizontalToolBar && FCoreStyle::IsStarshipStyle())
