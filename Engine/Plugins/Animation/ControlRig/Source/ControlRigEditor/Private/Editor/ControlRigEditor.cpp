@@ -4640,10 +4640,7 @@ void FControlRigEditor::UpdateDefaultValueForVariable(FBPVariableDescription& In
 				{
 					FString NewDefaultValue;
 					TargetProperty->ExportTextItem(NewDefaultValue, OldPropertyAddr, OldPropertyAddr, nullptr, PPF_None);
-					if(NewDefaultValue.Len() < 80)
-					{
-						InVariable.DefaultValue = NewDefaultValue;
-					}
+					InVariable.DefaultValue = NewDefaultValue;
 				}
 			}
 		}
