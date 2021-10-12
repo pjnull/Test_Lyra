@@ -477,15 +477,6 @@ namespace UnrealBuildTool
 			return NDKVersionInt;
 		}
 
-		//This doesn't take into account SDK version overrides in packaging
-		public int GetMinSdkVersion(int MinSdk = 21)
-		{
-			int MinSDKVersion = MinSdk;
-			ConfigHierarchy Ini = ConfigCache.ReadHierarchy(ConfigHierarchyType.Engine, DirectoryReference.FromFile(ProjectFile), UnrealTargetPlatform.Android);
-			Ini.GetInt32("/Script/AndroidRuntimeSettings.AndroidRuntimeSettings", "MinSDKVersion", out MinSDKVersion);
-			return MinSDKVersion;
-		}
-
 		static string CachedPlatformsFilename = "";
 		static bool CachedPlatformsValid = false;
 		static int CachedMinPlatform = -1;
