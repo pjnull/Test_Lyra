@@ -67,7 +67,7 @@ public:
 	bool CanRename(const FText& InNewName, FText& OutError) const;
 	bool IsRequired() const;
 	TArray<UMetasoundEditorGraphNode*> GetNodes() const;
-	void SetDataType(FName InNewType);
+	void SetDataType(FName InNewType, bool bPostTransaction = true, bool bRegisterParentGraph = true);
 	void SetDescription(const FText& InDescription);
 	void SetDisplayName(const FText& InNewName);
 	void SetNodeName(const FName& InNewName);
@@ -162,7 +162,6 @@ public:
 	void SetPreviewID(uint32 InPreviewID);
 	bool IsPreviewing() const;
 
-	virtual bool Synchronize() override;
 	virtual bool Validate(bool bInClearUpdateNotes) override;
 
 	virtual void RegisterGraphWithFrontend() override;

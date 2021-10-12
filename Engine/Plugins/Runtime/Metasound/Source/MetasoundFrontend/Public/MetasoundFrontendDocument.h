@@ -405,9 +405,9 @@ public:
 		return ID;
 	}
 
-	void UpdateID()
+	void UpdateID(const FGuid& InNewGuid)
 	{
-		ID = FGuid::NewGuid();
+		ID = InNewGuid;
 	}
 };
 

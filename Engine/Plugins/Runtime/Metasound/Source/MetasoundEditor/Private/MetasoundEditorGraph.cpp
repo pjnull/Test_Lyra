@@ -97,7 +97,7 @@ void UMetasoundEditorGraphVariable::SetDisplayName(const FText& InNewName)
 	NameChanged.Broadcast(NodeID);
 }
 
-void UMetasoundEditorGraphVariable::SetDataType(FName InNewType)
+void UMetasoundEditorGraphVariable::SetDataType(FName InNewType, bool bPostTransaction, bool bRegisterParentGraph)
 {
 	using namespace Metasound::Editor;
 	using namespace Metasound::Frontend;
@@ -108,7 +108,7 @@ void UMetasoundEditorGraphVariable::SetDataType(FName InNewType)
 		return;
 	}
 
-	const FScopedTransaction Transaction(LOCTEXT("SetVariableDataType", "Set MetaSound Variable Type"));
+	const FScopedTransaction Transaction(LOCTEXT("SetVariableDataType", "Set MetaSound Variable Type"), bPostTransaction);
 	Graph->GetMetasoundChecked().Modify();
 	Graph->Modify();
 
@@ -160,7 +160,10 @@ void UMetasoundEditorGraphVariable::SetDataType(FName InNewType)
 	// EdGraph variable can result in refreshing editors while in a desync'ed state)
 	NameChanged.Broadcast(NodeID);
 
-	FGraphBuilder::RegisterGraphWithFrontend(Metasound);
+	if (bRegisterParentGraph)
+	{
+		FGraphBuilder::RegisterGraphWithFrontend(Metasound);
+	}
 }
 
 Metasound::Frontend::FNodeHandle UMetasoundEditorGraphVariable::GetNodeHandle() const
@@ -351,7 +354,11 @@ void UMetasoundEditorGraphInput::OnDataTypeChanged()
 	{
 		InputLiteralClass = UMetasoundEditorGraphInputLiteral::StaticClass();
 	}
-	Literal = NewObject<UMetasoundEditorGraphInputLiteral>(this, InputLiteralClass, FName(), RF_Transactional);
+
+	if (Literal && Literal->GetClass() != InputLiteralClass)
+	{
+		Literal = NewObject<UMetasoundEditorGraphInputLiteral>(this, InputLiteralClass, FName(), RF_Transactional);
+	}
 }
 
 Metasound::Frontend::FNodeHandle UMetasoundEditorGraphOutput::AddNodeHandle(const FName& InName, FName InDataType)
@@ -445,18 +452,6 @@ void UMetasoundEditorGraph::RegisterGraphWithFrontend()
 	{
 		FGraphBuilder::RegisterGraphWithFrontend(*ParentMetasound);
 	}
-}
-
-bool UMetasoundEditorGraph::Synchronize()
-{
-	using namespace Metasound::Editor;
-
-	if (UObject* ParentMetasound = GetOuter())
-	{
-		return FGraphBuilder::SynchronizeGraph(*ParentMetasound);
-	}
-
-	return false;
 }
 
 bool UMetasoundEditorGraph::Validate(bool bInClearUpdateNotes)

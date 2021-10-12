@@ -294,7 +294,9 @@ namespace Metasound
 			void IterateConstNodes(TFunctionRef<void(FConstNodeHandle)> InFunction, EMetasoundFrontendClassType InClassType /* = EMetasoundFrontendClassType::Invalid */) const override { }
 			void IterateNodes(TFunctionRef<void(FNodeHandle)> InFunction, EMetasoundFrontendClassType InClassType /* = EMetasoundFrontendClassType::Invalid */) override { }
 
+			bool ContainsOutputVertex(const FVertexName& InName, const FName& InTypeName) const override { return false; }
 			bool ContainsOutputVertexWithName(const FVertexName& InName) const override { return false; }
+			bool ContainsInputVertex(const FVertexName& InName, const FName& InTypeName) const override { return false; }
 			bool ContainsInputVertexWithName(const FVertexName& InName) const override { return false; }
 
 			FConstNodeHandle GetOutputNodeWithName(const FVertexName& InName) const override { return INodeController::GetInvalidHandle(); }
@@ -341,8 +343,8 @@ namespace Metasound
 			// @returns false if the input name couldn't be found.
 			bool ClearLiteralForInput(const FVertexName& InInputName, FGuid InVertexID) override { return false; }
 
-			FNodeHandle AddNode(const FNodeRegistryKey& InNodeClass) override { return INodeController::GetInvalidHandle(); }
-			FNodeHandle AddNode(const FMetasoundFrontendClassMetadata& InNodeClass) override { return INodeController::GetInvalidHandle(); }
+			FNodeHandle AddNode(const FNodeRegistryKey& InNodeClass, FGuid InNodeGuid) override { return INodeController::GetInvalidHandle(); }
+			FNodeHandle AddNode(const FMetasoundFrontendClassMetadata& InNodeClass, FGuid InNodeGuid) override { return INodeController::GetInvalidHandle(); }
 			FNodeHandle AddDuplicateNode(const INodeController& InNode) override { return INodeController::GetInvalidHandle(); }
 
 			// Remove the node corresponding to this node handle.

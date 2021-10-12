@@ -90,7 +90,9 @@ namespace Metasound
 			const FMetasoundFrontendGraphStyle& GetGraphStyle() const override;
 			void SetGraphStyle(const FMetasoundFrontendGraphStyle& InStyle) override;
 
+			bool ContainsInputVertex(const FVertexName& InName, const FName& InTypeName) const override;
 			bool ContainsInputVertexWithName(const FVertexName& InName) const override;
+			bool ContainsOutputVertex(const FVertexName& InName, const FName& InTypeName) const override;
 			bool ContainsOutputVertexWithName(const FVertexName& InName) const override;
 
 			FConstNodeHandle GetInputNodeWithName(const FVertexName& InName) const override;
@@ -145,8 +147,8 @@ namespace Metasound
 			// @returns false if the input name couldn't be found.
 			bool ClearLiteralForInput(const FVertexName& InInputName, FGuid InVertexID) override;
 
-			FNodeHandle AddNode(const FNodeRegistryKey& InNodeClass) override;
-			FNodeHandle AddNode(const FMetasoundFrontendClassMetadata& InClassMetadata) override;
+			FNodeHandle AddNode(const FNodeRegistryKey& InNodeClass, FGuid InNodeGuid) override;
+			FNodeHandle AddNode(const FMetasoundFrontendClassMetadata& InClassMetadata, FGuid InNodeGuid) override;
 			FNodeHandle AddDuplicateNode(const INodeController& InNode) override;
 
 			// Remove the node corresponding to this node handle.
@@ -180,7 +182,7 @@ namespace Metasound
 			void SpliceVariableNodeFromVariableStack(INodeController& InNode);
 
 
-			FNodeHandle AddNode(FConstClassAccessPtr InExistingDependency);
+			FNodeHandle AddNode(FConstClassAccessPtr InExistingDependency, FGuid InNodeGuid);
 			bool RemoveNode(const FMetasoundFrontendNode& InDesc);
 			bool RemoveInput(const FMetasoundFrontendNode& InNode);
 			bool RemoveOutput(const FMetasoundFrontendNode& InNode);

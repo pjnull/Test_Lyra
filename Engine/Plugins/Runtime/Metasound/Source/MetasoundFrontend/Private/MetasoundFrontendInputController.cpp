@@ -182,7 +182,7 @@ namespace Metasound
 			const FName& DataType = GetDataType();
 			const FName& OtherDataType = InController.GetDataType();
 
-			if (!DataType.IsValid())
+			if (DataType == Invalid::GetInvalidName())
 			{
 				return OutConnectability;
 			}
@@ -212,7 +212,7 @@ namespace Metasound
 			const FName& DataType = GetDataType();
 			const FName& OtherDataType = InController.GetDataType();
 
-			if (!DataType.IsValid())
+			if (DataType == Invalid::GetInvalidName())
 			{
 				return false;
 			}

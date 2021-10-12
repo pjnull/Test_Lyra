@@ -655,9 +655,25 @@ namespace Metasound
 			/** Returns true if an output vertex with the given Name exists.
 			 *
 			 * @param InName - Name of vertex.
-			 * @return True if the vertex exists, false otherwise. 
+			 * @param InTypeName - DataType Name of vertex.
+			 * @return True if the vertex exists, false otherwise.
+			 */
+			virtual bool ContainsOutputVertex(const FVertexName& InName, const FName& InTypeName) const = 0;
+
+			/** Returns true if an output vertex with the given Name exists.
+			 *
+			 * @param InName - Name of vertex.
+			 * @param InTypeName - DataType Name of vertex.
+			 * @return True if the vertex exists, false otherwise.
 			 */
 			virtual bool ContainsOutputVertexWithName(const FVertexName& InName) const = 0;
+
+			/** Returns true if an input vertex with the given Name exists.
+			 *
+			 * @param InName - Name of vertex.
+			 * @return True if the vertex exists, false otherwise.
+			 */
+			virtual bool ContainsInputVertex(const FVertexName& InName, const FName& InTypeName) const = 0;
 
 			/** Returns true if an input vertex with the given Name exists.
 			 *
@@ -791,18 +807,22 @@ namespace Metasound
 			/** Add a new node to this graph from the node registry.
 			 *
 			 * @param InKey - Registry key for node.
+			 * @param InNodeGuid - (Optional) Explicit guid for the new node. Must be unique within the graph.
+			 * Only useful to specify explicitly when caller is managing or tracking the graph's guids (ex. replacing removed node).
 			 * 
-			 * @return Node handle for class. On error, an invalid handle is returned. 
+			 * @return Node handle for class. On error, an invalid handle is returned.
 			 */
-			virtual FNodeHandle AddNode(const FNodeRegistryKey& InKey) = 0;
+			virtual FNodeHandle AddNode(const FNodeRegistryKey& InKey, FGuid InNodeGuid = FGuid::NewGuid()) = 0;
 
 			/** Add a new node to this graph.
 			 *
 			 * @param InClassMetadata - Info for node class.
-			 * 
-			 * @return Node handle for class. On error, an invalid handle is returned. 
+			 * @param InNodeGuid - (Optional) Explicit guid for the new node. Must be unique within the graph.
+			 * Only useful to specify explicitly when caller is managing or tracking the graph's guids (ex. replacing removed node).
+			 *
+			 * @return Node handle for class. On error, an invalid handle is returned.
 			 */
-			virtual FNodeHandle AddNode(const FMetasoundFrontendClassMetadata& InClassMetadata) = 0;
+			virtual FNodeHandle AddNode(const FMetasoundFrontendClassMetadata& InClassMetadata, FGuid InNodeGuid = FGuid::NewGuid()) = 0;
 
 			/** Add a new node to this graph by duplicating the supplied node.
 			 * The new node has the same interface and node class as the supplied node.

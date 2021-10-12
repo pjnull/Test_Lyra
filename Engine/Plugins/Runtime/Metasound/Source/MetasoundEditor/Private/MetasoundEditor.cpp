@@ -1908,6 +1908,24 @@ namespace Metasound
 					NameChangeDelegateHandles.FindOrAdd(NodeID) = EdGraphOutput->NameChanged.AddSP(this, &FEditor::OnOutputNameChanged);
 				}
 			}, EMetasoundFrontendClassType::Output);
+
+			// In certain cases, while synchronizing the editor layer with the frontend, nodes
+			// associated with delegates are orphaned, but can still have stale handles
+			// associated.  Clear them out to avoid them being fired.
+			TArray<FGuid> StaleNodeGuids;
+			UMetasoundEditorGraph& Graph = GetMetaSoundGraphChecked();
+			for (const TPair<FGuid, FDelegateHandle>& Pair : NameChangeDelegateHandles)
+			{
+				if (!Graph.FindInput(Pair.Key))
+				{
+					StaleNodeGuids.Add(Pair.Key);
+				}
+			}
+
+			for (const FGuid& StaleNodeGuid : StaleNodeGuids)
+			{
+				NameChangeDelegateHandles.Remove(StaleNodeGuid);
+			}
 		}
 
 		void FEditor::CollectStaticSections(TArray<int32>& StaticSectionIDs)
