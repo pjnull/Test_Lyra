@@ -270,6 +270,7 @@ public:
 		HQReflectionInvAverageBrigtnessParams.Bind(Initializer.ParameterMap, TEXT("ReflectionAverageBrigtness"));
 		HQReflectanceMaxValueRGBMParams.Bind(Initializer.ParameterMap, TEXT("ReflectanceMaxValueRGBM"));
 		HQReflectionPositionsAndRadii.Bind(Initializer.ParameterMap, TEXT("ReflectionPositionsAndRadii"));
+		HQReflectionTilePositions.Bind(Initializer.ParameterMap, TEXT("ReflectionTilePositions"));
 		HQReflectionCaptureBoxTransformArray.Bind(Initializer.ParameterMap, TEXT("CaptureBoxTransformArray"));
 		HQReflectionCaptureBoxScalesArray.Bind(Initializer.ParameterMap, TEXT("CaptureBoxScalesArray"));
 
@@ -291,6 +292,7 @@ private:
 	LAYOUT_FIELD(FShaderParameter, HQReflectionInvAverageBrigtnessParams);
 	LAYOUT_FIELD(FShaderParameter, HQReflectanceMaxValueRGBMParams);
 	LAYOUT_FIELD(FShaderParameter, HQReflectionPositionsAndRadii);
+	LAYOUT_FIELD(FShaderParameter, HQReflectionTilePositions);
 	LAYOUT_FIELD(FShaderParameter, HQReflectionCaptureBoxTransformArray);
 	LAYOUT_FIELD(FShaderParameter, HQReflectionCaptureBoxScalesArray);
 

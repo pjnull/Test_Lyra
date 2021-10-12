@@ -398,11 +398,7 @@ public:
 		return ProjectionMatrix.M[3][3] < 1.0f;
 	}
 
-	inline void HackOverrideViewMatrixForShadows(const FMatrix& InViewMatrix)
-	{
-		OverriddenTranslatedViewMatrix = ViewMatrix = InViewMatrix;
-		OverriddenInvTranslatedViewMatrix = InViewMatrix.Inverse();
-	}
+	ENGINE_API void HackOverrideViewMatrixForShadows(const FMatrix& InViewMatrix);
 
 	void SaveProjectionNoAAMatrix()
 	{
@@ -575,11 +571,15 @@ enum ETranslucencyVolumeCascade
 	TVC_MAX,
 };
 
+//VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, PrevProjection)
+//VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, PrevViewProj)
+//VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, PrevViewRotationProj)
+
 // View uniform buffer member declarations
 #define VIEW_UNIFORM_BUFFER_MEMBER_TABLE \
 	VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, TranslatedWorldToClip) \
-	VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, WorldToClip) \
-	VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, ClipToWorld)  \
+	VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, RelativeWorldToClip) \
+	VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, ClipToRelativeWorld)  \
 	VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, TranslatedWorldToView) \
 	VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, ViewToTranslatedWorld) \
 	VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, TranslatedWorldToCameraView) \
@@ -589,9 +589,11 @@ enum ETranslucencyVolumeCascade
 	VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, ClipToView) \
 	VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, ClipToTranslatedWorld) \
 	VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, SVPositionToTranslatedWorld) \
-	VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, ScreenToWorld) \
+	VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, ScreenToRelativeWorld) \
 	VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, ScreenToTranslatedWorld) \
 	VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, MobileMultiviewShadowTransform) \
+	VIEW_UNIFORM_BUFFER_MEMBER(FVector3f, ViewTilePosition) \
+	VIEW_UNIFORM_BUFFER_MEMBER(FVector3f, MatrixTilePosition) \
 	VIEW_UNIFORM_BUFFER_MEMBER_EX(FVector3f, ViewForward, EShaderPrecisionModifier::Half) \
 	VIEW_UNIFORM_BUFFER_MEMBER_EX(FVector3f, ViewUp, EShaderPrecisionModifier::Half) \
 	VIEW_UNIFORM_BUFFER_MEMBER_EX(FVector3f, ViewRight, EShaderPrecisionModifier::Half) \
@@ -599,13 +601,10 @@ enum ETranslucencyVolumeCascade
 	VIEW_UNIFORM_BUFFER_MEMBER_EX(FVector3f, HMDViewNoRollRight, EShaderPrecisionModifier::Half) \
 	VIEW_UNIFORM_BUFFER_MEMBER(FVector4f, InvDeviceZToWorldZTransform) \
 	VIEW_UNIFORM_BUFFER_MEMBER_EX(FVector4f, ScreenPositionScaleBias, EShaderPrecisionModifier::Half) \
-	VIEW_UNIFORM_BUFFER_MEMBER(FVector3f, WorldCameraOrigin) \
+	VIEW_UNIFORM_BUFFER_MEMBER(FVector3f, RelativeWorldCameraOrigin) \
 	VIEW_UNIFORM_BUFFER_MEMBER(FVector3f, TranslatedWorldCameraOrigin) \
-	VIEW_UNIFORM_BUFFER_MEMBER(FVector3f, WorldViewOrigin) \
-	VIEW_UNIFORM_BUFFER_MEMBER(FVector3f, PreViewTranslation) \
-	VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, PrevProjection) \
-	VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, PrevViewProj) \
-	VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, PrevViewRotationProj) \
+	VIEW_UNIFORM_BUFFER_MEMBER(FVector3f, RelativeWorldViewOrigin) \
+	VIEW_UNIFORM_BUFFER_MEMBER(FVector3f, RelativePreViewTranslation) \
 	VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, PrevViewToClip) \
 	VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, PrevClipToView) \
 	VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, PrevTranslatedWorldToClip) \
@@ -613,10 +612,11 @@ enum ETranslucencyVolumeCascade
 	VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, PrevViewToTranslatedWorld) \
 	VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, PrevTranslatedWorldToCameraView) \
 	VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, PrevCameraViewToTranslatedWorld) \
-	VIEW_UNIFORM_BUFFER_MEMBER(FVector3f, PrevWorldCameraOrigin) \
-	VIEW_UNIFORM_BUFFER_MEMBER(FVector3f, PrevWorldViewOrigin) \
-	VIEW_UNIFORM_BUFFER_MEMBER(FVector3f, PrevPreViewTranslation) \
-	VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, PrevInvViewProj) \
+	VIEW_UNIFORM_BUFFER_MEMBER(FVector3f, PrevTranslatedWorldCameraOrigin) \
+	VIEW_UNIFORM_BUFFER_MEMBER(FVector3f, PrevRelativeWorldCameraOrigin) \
+	VIEW_UNIFORM_BUFFER_MEMBER(FVector3f, PrevRelativeWorldViewOrigin) \
+	VIEW_UNIFORM_BUFFER_MEMBER(FVector3f, RelativePrevPreViewTranslation) \
+	VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, PrevClipToRelativeWorld) \
 	VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, PrevScreenToTranslatedWorld) \
 	VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, ClipToPrevClip) \
 	VIEW_UNIFORM_BUFFER_MEMBER(FMatrix44f, ClipToPrevClipWithAA) \
