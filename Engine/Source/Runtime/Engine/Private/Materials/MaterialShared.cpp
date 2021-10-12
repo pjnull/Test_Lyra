@@ -2628,12 +2628,11 @@ bool FMaterial::TryGetShaders(const FMaterialShaderTypes& InTypes, const FVertex
 	const bool bShaderMapComplete = bIsInGameThread ? IsGameThreadShaderMapComplete() : IsRenderingThreadShaderMapComplete();
 	const uint32 CompilingShaderMapId = bIsInGameThread ? GameThreadCompilingShaderMapId : RenderingThreadCompilingShaderMapId;
 
-#if WITH_EDITOR && DO_CHECK
-	// Attempt to get some more info for a rare crash (UE-35937)
-	FMaterialShaderMap* GameThreadShaderMapPtr = GameThreadShaderMap;
-	checkf(ShaderMap, TEXT("RenderingThreadShaderMap was NULL (GameThreadShaderMap is %p). This may relate to bug UE-35937"), GameThreadShaderMapPtr);
-#endif
-	
+	if (ShaderMap == nullptr)
+	{
+		return false;
+	}
+
 	OutShaders.ShaderMap = ShaderMap;
 	const EShaderPlatform ShaderPlatform = ShaderMap->GetShaderPlatform();
 	const EShaderPermutationFlags PermutationFlags = ShaderMap->GetPermutationFlags();

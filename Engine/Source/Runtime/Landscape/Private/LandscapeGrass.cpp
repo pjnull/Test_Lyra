@@ -986,9 +986,7 @@ bool ULandscapeComponent::CanRenderGrassMap() const
 	ShaderTypes.AddShaderType<FLandscapeGrassWeightPS>();
 
 	FVertexFactoryType* LandscapeGrassVF = FindVertexFactoryType(FName(TEXT("FLandscapeFixedGridVertexFactory"), FNAME_Find));
-
-	FMaterialShaders Shaders;
-	if (!MaterialResource->TryGetShaders(ShaderTypes, LandscapeGrassVF, Shaders))
+	if (!MaterialResource->HasShaders(ShaderTypes, LandscapeGrassVF))
 	{
 		return false;
 	}
