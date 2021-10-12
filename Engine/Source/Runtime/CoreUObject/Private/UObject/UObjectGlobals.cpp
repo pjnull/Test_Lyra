@@ -1183,9 +1183,9 @@ UPackage* LoadPackageInternal(UPackage* InOuter, const FPackagePath& PackagePath
 			{
 				FlushAsyncLoading(RequestID);
 			}
-		}
 
-		return (InOuter ? InOuter : FindObjectFast<UPackage>(nullptr, PackageName));
+			return (InOuter ? InOuter : FindObjectFast<UPackage>(nullptr, PackageName));
+		}
 	}
 
 	UPackage* Result = nullptr;

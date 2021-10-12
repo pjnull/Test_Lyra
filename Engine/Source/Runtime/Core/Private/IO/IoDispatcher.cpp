@@ -4,6 +4,7 @@
 #include "IO/IoDispatcherPrivate.h"
 #include "IO/IoStore.h"
 #include "Misc/ScopeRWLock.h"
+#include "Misc/CommandLine.h"
 #include "Misc/CoreDelegates.h"
 #include "Math/RandomStream.h"
 #include "Misc/ScopeLock.h"
@@ -382,6 +383,11 @@ public:
 		return TotalLoaded;
 	}
 
+	bool HasMountedBackend() const
+	{
+		return Backends.Num() > 0;
+	}
+
 private:
 	friend class FIoBatch;
 	friend class FIoRequest;
@@ -699,10 +705,28 @@ HasScriptObjectsChunk(FIoDispatcher& Dispatcher)
 	return bHasScriptObjectsChunk;
 }
 
+static bool
+HasUseIoStoreParam()
+{
+	static bool bForceIoStore = WITH_IOSTORE_IN_EDITOR && FParse::Param(FCommandLine::Get(), TEXT("UseIoStore"));
+	return bForceIoStore;
+}
+
 bool
 FIoDispatcher::IsInitialized()
 {
-	return GIoDispatcher && HasScriptObjectsChunk(*GIoDispatcher);
+	if (GIoDispatcher)
+	{
+		if (HasScriptObjectsChunk(*GIoDispatcher))
+		{
+			return true;
+		}
+		if (HasUseIoStoreParam() && GIoDispatcher->Impl->HasMountedBackend())
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 FIoStatus
