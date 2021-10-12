@@ -2431,7 +2431,7 @@ public:
 
 	/** Initialization constructor. */
 	FColoredMaterialRenderProxy(const FMaterialRenderProxy* InParent,const FLinearColor& InColor, FName InColorParamName = NAME_Color):
-		FMaterialRenderProxy(InParent->GetMaterialName()),
+		FMaterialRenderProxy(InParent ? InParent->GetMaterialName() : TEXT("FColoredMaterialRenderProxy")),
 		Parent(InParent),
 		Color(InColor),
 		ColorParamName(InColorParamName)
@@ -2477,7 +2477,7 @@ public:
 
 	/** Initialization constructor. */
 	FOverrideSelectionColorMaterialRenderProxy(const FMaterialRenderProxy* InParent, const FLinearColor& InSelectionColor) :
-		FMaterialRenderProxy(InParent->GetMaterialName()),
+		FMaterialRenderProxy(InParent ? InParent->GetMaterialName() : TEXT("FOverrideSelectionColorMaterialRenderProxy")),
 		Parent(InParent),
 		SelectionColor(FLinearColor(InSelectionColor.R, InSelectionColor.G, InSelectionColor.B, 1))
 	{
