@@ -4908,7 +4908,7 @@ static inline void BeginFrameRenderThread(FRHICommandListImmediate& RHICmdList, 
 	if (UE_TRACE_CHANNELEXPR_IS_ENABLED(CpuChannel))
 	{
 		TraceFrameEventThreadId = FPlatformTLS::GetCurrentThreadId();
-		FCpuProfilerTrace::OutputBeginDynamicEvent(TEXT("Frame"));
+		FCpuProfilerTrace::OutputBeginDynamicEvent(TEXT("Frame"), __FILE__, __LINE__);
 	}
 #endif //CPUPROFILERTRACE_ENABLED
 
