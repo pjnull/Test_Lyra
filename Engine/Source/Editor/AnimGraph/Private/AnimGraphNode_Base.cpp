@@ -569,27 +569,45 @@ FEditorModeID UAnimGraphNode_Base::GetEditorMode() const
 	return AnimNodeEditModes::AnimNode;
 }
 
-FAnimNode_Base* UAnimGraphNode_Base::FindDebugAnimNode(USkeletalMeshComponent * PreviewSkelMeshComp) const
+FAnimNode_Base* UAnimGraphNode_Base::FindDebugAnimNode(USkeletalMeshComponent* InPreviewSkelMeshComp) const
 {
 	FAnimNode_Base* DebugNode = nullptr;
 
-	if (PreviewSkelMeshComp != nullptr && PreviewSkelMeshComp->GetAnimInstance() != nullptr)
+	if (InPreviewSkelMeshComp != nullptr)
 	{
-		// find an anim node index from debug data
-		UAnimBlueprintGeneratedClass* AnimBlueprintClass = Cast<UAnimBlueprintGeneratedClass>(PreviewSkelMeshComp->GetAnimInstance()->GetClass());
-		if (AnimBlueprintClass)
+		auto FindDebugNode = [this](UAnimInstance* InAnimInstance) -> FAnimNode_Base* 
 		{
+			if (!InAnimInstance)
+			{
+				return nullptr;
+			}
+			UAnimBlueprintGeneratedClass* AnimBlueprintClass = Cast<UAnimBlueprintGeneratedClass>(InAnimInstance->GetClass());
+			if (!AnimBlueprintClass)
+			{
+				return nullptr;
+			}
+			
 			FAnimBlueprintDebugData& DebugData = AnimBlueprintClass->GetAnimBlueprintDebugData();
 			int32* IndexPtr = DebugData.NodePropertyToIndexMap.Find(this);
-
-			if (IndexPtr)
+			if (!IndexPtr)
 			{
-				int32 AnimNodeIndex = *IndexPtr;
-				// reverse node index temporarily because of a bug in NodeGuidToIndexMap
-				AnimNodeIndex = AnimBlueprintClass->GetAnimNodeProperties().Num() - AnimNodeIndex - 1;
-
-				DebugNode = AnimBlueprintClass->GetAnimNodeProperties()[AnimNodeIndex]->ContainerPtrToValuePtr<FAnimNode_Base>(PreviewSkelMeshComp->GetAnimInstance());
+				return nullptr;
 			}
+			
+			int32 AnimNodeIndex = *IndexPtr;
+			// reverse node index temporarily because of a bug in NodeGuidToIndexMap
+			AnimNodeIndex = AnimBlueprintClass->GetAnimNodeProperties().Num() - AnimNodeIndex - 1;
+
+			return AnimBlueprintClass->GetAnimNodeProperties()[AnimNodeIndex]->ContainerPtrToValuePtr<FAnimNode_Base>(InAnimInstance);
+		};
+	
+		// Try to find this node on the anim BP.
+		DebugNode = FindDebugNode(InPreviewSkelMeshComp->GetAnimInstance());
+		
+		// Failing that, try the post-process BP instead.
+		if (!DebugNode)
+		{
+			DebugNode = FindDebugNode(InPreviewSkelMeshComp->GetPostProcessInstance());			
 		}
 	}
 
