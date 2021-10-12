@@ -2167,7 +2167,7 @@ ESavePackageResult AppendAdditionalData(FLinkerSave& Linker, int64& InOutDataSta
 	return ESavePackageResult::Success;
 }
 
-ESavePackageResult CreatePayloadSidecarFile(FLinkerSave& Linker, const FPackagePath& PackagePath, const bool bSaveAsync, const bool bWriteToDisk, FSavePackageOutputFileArray& AdditionalPackageFiles, FSavePackageContext* SavePackageContext)
+ESavePackageResult CreatePayloadSidecarFile(FLinkerSave& Linker, const FPackagePath& PackagePath, const bool bSaveToMemory, const bool bWriteToDisk, FSavePackageOutputFileArray& AdditionalPackageFiles, FSavePackageContext* SavePackageContext)
 {
 	if (Linker.SidecarDataToAppend.IsEmpty())
 	{
@@ -2231,7 +2231,7 @@ ESavePackageResult CreatePayloadSidecarFile(FLinkerSave& Linker, const FPackageP
 
 	FString TargetFilePath = PackagePath.GetLocalFullPath(EPackageSegment::PayloadSidecar);
 
-	if (bSaveAsync)
+	if (bSaveToMemory)
 	{
 		AdditionalPackageFiles.Emplace(MoveTemp(TargetFilePath), FLargeMemoryPtr(Ar.ReleaseOwnership()), TArray<FFileRegion>(), DataSize);
 	}

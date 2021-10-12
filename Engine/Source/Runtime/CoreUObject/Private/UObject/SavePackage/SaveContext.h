@@ -230,9 +230,9 @@ public:
 		return !!(SaveArgs.SaveFlags & SAVE_FromAutosave);
 	}
 
-	bool IsSaveAsync() const
+	bool IsSaveToMemory() const
 	{
-		return !!(SaveArgs.SaveFlags & SAVE_Async);
+		return !!(SaveArgs.SaveFlags & SAVE_Async) || GetPackageWriter();
 	}
 
 	bool IsGenerateSaveError() const

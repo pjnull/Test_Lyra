@@ -10,6 +10,7 @@
 #include "Templates/UniquePtr.h"
 
 class FAssetRegistryState;
+class ICookedPackageWriter;
 class IPackageStoreWriter;
 struct FPackageStoreEntryResource;
 
@@ -117,6 +118,12 @@ public:
 	};
 	/** Write separate data written by UObjects via FLinkerSave::AdditionalDataToAppend. */
 	virtual void WriteLinkerAdditionalData(const FLinkerAdditionalDataInfo& Info, const FIoBuffer& Data, const TArray<FFileRegion>& FileRegions) = 0;
+
+	/** Downcast function for IPackageWriters that implement the ICookedPackageWriters inherited interface. */
+	virtual ICookedPackageWriter* AsCookedPackageWriter()
+	{
+		return nullptr;
+	}
 };
 
 /** Interface for cooking that writes cooked packages to storage usable by the runtime game. */
@@ -144,6 +151,11 @@ public:
 	virtual FDateTime GetPreviousCookTime() const
 	{
 		return FDateTime::MaxValue();
+	}
+
+	virtual ICookedPackageWriter* AsCookedPackageWriter() override
+	{
+		return this;
 	}
 
 	struct FCookInfo
@@ -208,6 +220,27 @@ public:
 	 * Signal the given cooked package(s) have been checked for changes and have not been modified since the last cook.
 	 */
 	virtual void MarkPackagesUpToDate(TArrayView<const FName> UpToDatePackages) = 0;
+
+	struct FPreviousCookedBytesData
+	{
+		TUniquePtr<uint8> Data;
+		int64 Size;
+		int64 HeaderSize;
+		int64 StartOffset;
+	};
+	/** Load the bytes of the previously-cooked package, used for diffing */
+	virtual bool GetPreviousCookedBytes(FName PackageName, const ITargetPlatform* TargetPlatform,
+		const TCHAR* SandboxFilename, FPreviousCookedBytesData& OutData) = 0;
+
+	enum class EOutputLocation
+	{
+		/** Cooked files that can be read from runtime or staged, e.g. <ProjectDir>/Saved/Cooked/<Platform>/<PackagePath>.uasset */
+		Cooked,
+		/** Files read by diff utilities, e.g. <ProjectDir>/Saved/Cooked/<Platform>/<PackagePath>_ForDiff.uasset */
+		Diff,
+	};
+	/** Set the output location for the package. Only applies to the until the next BeginPackage. */
+	virtual void SetCookOutputLocation(EOutputLocation Location) = 0;
 
 	/** Downcast function for ICookedPackageWriters that implement the IPackageStoreWriter inherited interface. */
 	virtual IPackageStoreWriter* AsPackageStoreWriter()

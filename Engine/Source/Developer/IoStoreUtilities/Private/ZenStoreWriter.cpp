@@ -434,6 +434,20 @@ void FZenStoreWriter::WriteLinkerAdditionalData(const FLinkerAdditionalDataInfo&
 	checkNoEntry();
 }
 
+bool FZenStoreWriter::GetPreviousCookedBytes(FName PackageName, const ITargetPlatform* InTargetPlatform,
+	const TCHAR* SandboxFilename, FPreviousCookedBytesData& OutData)
+{
+	// GetCookCapabilities returns bDiffModeSupported == false, so GetPreviousCookedBytes should never be called
+	checkNoEntry();
+	return false;
+}
+
+void FZenStoreWriter::SetCookOutputLocation(EOutputLocation Location)
+{
+	// GetCookCapabilities returns bDiffModeSupported == false, so SetCookOutputLocation should never be called
+	checkNoEntry();
+}
+
 void FZenStoreWriter::BeginCook(const FCookInfo& Info)
 {
 	CookMode = Info.CookMode;

@@ -746,7 +746,7 @@ ESavePackageResult CreateLinker(FSaveContext& SaveContext)
 		}
 		else
 		{
-			if (SaveContext.IsSaveAsync())
+			if (SaveContext.IsSaveToMemory())
 			{
 				// Allocate the linker with a memory writer, forcing byte swapping if wanted.
 				SaveContext.Linker = MakePimpl<FLinkerSave>(SaveContext.GetPackage(), SaveContext.IsForceByteSwapping(), SaveContext.IsSaveUnversionedNative());
@@ -1906,41 +1906,75 @@ ESavePackageResult FinalizeFile(FStructuredArchive::FRecord& StructuredArchiveRo
 
 	FSavePackageContext* SavePackageContext = SaveContext.GetSavePackageContext();
 	IPackageWriter* PackageWriter = SavePackageContext ? SavePackageContext->PackageWriter : nullptr;
-	if (SaveContext.IsSaveAsync())
+	if (SaveContext.IsSaveToMemory())
 	{
 		FString PathToSave = SaveContext.GetFilename();
 		FLinkerSave* Linker = SaveContext.GetLinker();
 
-		if (SaveContext.IsDiffCallstack())
+		if (SaveContext.IsDiffing())
 		{
-			checkf(SaveContext.AdditionalPackageFiles.IsEmpty(), TEXT("Saving additional output files with the 'SAVE_DiffCallstack' flag is not currently supported! (%s)"), *PathToSave);
+			checkf(SaveContext.AdditionalPackageFiles.IsEmpty(), TEXT("Saving additional output files with the 'SAVE_DiffOnly' or 'SAVE_DiffCallstack' flag is not currently supported! (%s)"), *PathToSave);
 
-			const TCHAR* CutoffString = TEXT("UEditorEngine::Save()");
 			FArchiveStackTrace* Writer = static_cast<FArchiveStackTrace*>(Linker->Saver);
-			TMap<FName, FArchiveDiffStats> PackageDiffStats;
-			Writer->CompareWith(*PathToSave, SaveContext.IsCooking() ? Linker->Summary.TotalHeaderSize : 0, CutoffString, SaveContext.GetMaxDiffsToLog(), PackageDiffStats);
-			SaveContext.TotalPackageSizeUncompressed += Writer->TotalSize();
-
-			//COOK_STAT(FSavePackageStats::NumberOfDifferentPackages++);
-			//COOK_STAT(FSavePackageStats::MergeStats(PackageDiffStats));
-
-			if (SaveContext.IsSavingForDiff())
+			TUniquePtr<uint8> ExistingBytes;
+			FArchiveStackTrace::FPackageData ExistingPackageData;
+			ICookedPackageWriter* CookedPackageWriter = nullptr;
+			if (PackageWriter)
 			{
-				PathToSave = FPaths::Combine(FPaths::GetPath(PathToSave), FPaths::GetBaseFilename(PathToSave) + TEXT("_ForDiff") + FPaths::GetExtension(PathToSave, true));
+				CookedPackageWriter = PackageWriter->AsCookedPackageWriter();
+				if (!CookedPackageWriter)
+				{
+					UE_LOG(LogSavePackage, Error, TEXT("SAVE_DiffCallstack and SAVE_DiffOnly flags require that the PackageWriter be an ICookedPackageWriter. ('%s')"),
+						*PathToSave);
+					return ESavePackageResult::Error;
+				}
+				ICookedPackageWriter::FPreviousCookedBytesData ExistingPackageWriterData;
+				CookedPackageWriter->GetPreviousCookedBytes(SaveContext.GetPackage()->GetFName(), SaveContext.GetTargetPlatform(), *PathToSave,
+					ExistingPackageWriterData);
+				ExistingBytes = MoveTemp(ExistingPackageWriterData.Data);
+				ExistingPackageData.Data = ExistingBytes.Get();
+				ExistingPackageData.Size = ExistingPackageWriterData.Size;
+				ExistingPackageData.HeaderSize = ExistingPackageWriterData.HeaderSize;
+				ExistingPackageData.StartOffset = ExistingPackageWriterData.StartOffset;
 			}
-		}
-		else if (SaveContext.IsDiffOnly())
-		{
-			checkf(SaveContext.AdditionalPackageFiles.IsEmpty(), TEXT("Saving additional output files with the 'SAVE_DiffOnly' flag is not currently supported! (%s)"), *PathToSave);
-
-			FArchiveStackTrace* Writer = (FArchiveStackTrace*)(Linker->Saver);
-			FArchiveDiffMap OutDiffMap;
-			SaveContext.bDiffOnlyIdentical = Writer->GenerateDiffMap(*PathToSave, IsEventDrivenLoaderEnabledInCookedBuilds() ? Linker->Summary.TotalHeaderSize : 0, SaveContext.GetMaxDiffsToLog(), OutDiffMap);
-			SaveContext.TotalPackageSizeUncompressed += Writer->TotalSize();
-			if (FArchiveDiffMap* OutDiffMapPtr = SaveContext.GetDiffMapPtr())
+			else
 			{
-				*OutDiffMapPtr = MoveTemp(OutDiffMap);
+				FArchiveStackTrace::LoadPackageIntoMemory(*PathToSave, ExistingPackageData, ExistingBytes);
 			}
+
+			if (SaveContext.IsDiffCallstack())
+			{
+				TMap<FName, FArchiveDiffStats> PackageDiffStats;
+				const TCHAR* CutoffString = TEXT("UEditorEngine::Save()");
+				Writer->CompareWith(ExistingPackageData, *PathToSave, Linker->Summary.TotalHeaderSize, CutoffString,
+					SaveContext.GetMaxDiffsToLog(), PackageDiffStats);
+
+				//COOK_STAT(FSavePackageStats::NumberOfDifferentPackages++);
+				//COOK_STAT(FSavePackageStats::MergeStats(PackageDiffStats));
+
+				if (SaveContext.IsSavingForDiff())
+				{
+					if (CookedPackageWriter)
+					{
+						CookedPackageWriter->SetCookOutputLocation(ICookedPackageWriter::EOutputLocation::Diff);
+					}
+					else
+					{
+						PathToSave = FPaths::Combine(FPaths::GetPath(PathToSave), FPaths::GetBaseFilename(PathToSave) + TEXT("_ForDiff") + FPaths::GetExtension(PathToSave, true));
+					}
+				}
+			}
+			else
+			{
+				FArchiveDiffMap OutDiffMap;
+				SaveContext.bDiffOnlyIdentical = Writer->GenerateDiffMap(ExistingPackageData,
+					IsEventDrivenLoaderEnabledInCookedBuilds() ? Linker->Summary.TotalHeaderSize : 0, SaveContext.GetMaxDiffsToLog(), OutDiffMap);
+				if (FArchiveDiffMap* OutDiffMapPtr = SaveContext.GetDiffMapPtr())
+				{
+					*OutDiffMapPtr = MoveTemp(OutDiffMap);
+				}
+			}
+			SaveContext.TotalPackageSizeUncompressed += Writer->TotalSize();
 		}
 
 		if (!SaveContext.IsDiffing() || SaveContext.IsSavingForDiff())
@@ -1949,7 +1983,7 @@ ESavePackageResult FinalizeFile(FStructuredArchive::FRecord& StructuredArchiveRo
 			FLargeMemoryWriter* Writer = static_cast<FLargeMemoryWriter*>(Linker->Saver);
 			const int64 DataSize = Writer->TotalSize();
 
-			if (SaveContext.IsDiffCallstack())  // Avoid double counting the package size if SAVE_DiffCallstack flag is set and DiffSettings.bSaveForDiff == true.
+			if (SaveContext.IsDiffCallstack())  // Avoid double counting if we save twice due to DiffSettings.bSaveForDiff == true.
 			{
 				SaveContext.TotalPackageSizeUncompressed += DataSize;
 			}
@@ -2008,14 +2042,11 @@ ESavePackageResult FinalizeFile(FStructuredArchive::FRecord& StructuredArchiveRo
 			}
 			SaveContext.CloseLinkerArchives();
 		}
-		else
-		{
-			checkf(!PackageWriter, TEXT("PackageWriter is not currently supported when diffing."));
-		}
 	}
 	else
 	{
-		checkf(!PackageWriter, TEXT("PackageWriter is not currently supported with synchronous writes."));
+		checkf(!SaveContext.IsDiffing(), TEXT("SAVE_DiffOnly with -diffonly is only supported with bSaveToMemory. %s"), SaveContext.GetFilename());
+		checkf(!PackageWriter, TEXT("PackageWriter is not currently supported with synchronous writes. %s"), SaveContext.GetFilename());
 
 		// Destroy archives used for saving, closing file handle.
 		if (SaveContext.CloseLinkerArchives() == false)
@@ -2385,7 +2416,8 @@ ESavePackageResult WriteAdditionalFiles(FSaveContext& SaveContext, FScopedSlowTa
 	}
 
 	// Create the payload side car file (if needed)
-	Result = SavePackageUtilities::CreatePayloadSidecarFile(*SaveContext.Linker.Get(), SaveContext.GetTargetPackagePath(), SaveContext.IsSaveAsync(), !SaveContext.IsDiffing(), SaveContext.AdditionalPackageFiles, SaveContext.GetSavePackageContext());
+	Result = SavePackageUtilities::CreatePayloadSidecarFile(*SaveContext.Linker.Get(), SaveContext.GetTargetPackagePath(), SaveContext.IsSaveToMemory(),
+		!SaveContext.IsDiffing(), SaveContext.AdditionalPackageFiles, SaveContext.GetSavePackageContext());
 	if (Result != ESavePackageResult::Success)
 	{
 		return Result;
