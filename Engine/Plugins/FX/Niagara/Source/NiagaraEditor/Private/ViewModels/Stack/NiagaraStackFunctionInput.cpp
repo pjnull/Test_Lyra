@@ -986,7 +986,8 @@ void UNiagaraStackFunctionInput::RefreshFromMetaData(TArray<FStackIssue>& NewIss
 	FGuid CurrentOwningGraphChangeId;
 	FGuid CurrentFunctionGraphChangeId;
 	GetCurrentChangeIds(CurrentOwningGraphChangeId, CurrentFunctionGraphChangeId);
-	if (LastFunctionGraphChangeId.IsSet() && CurrentFunctionGraphChangeId == LastFunctionGraphChangeId)
+	if (LastOwningGraphChangeId.IsSet() && CurrentOwningGraphChangeId == LastOwningGraphChangeId &&
+		LastFunctionGraphChangeId.IsSet() && CurrentFunctionGraphChangeId == LastFunctionGraphChangeId)
 	{
 		// If the called function graph hasn't changed, then the metadata will also be the same and we can skip updating these values.
 		NewIssues.Append(InputMetaDataIssues);
