@@ -420,10 +420,10 @@ void SRigHierarchy::BindCommands()
 		FIsActionChecked::CreateLambda([this]() { return DisplaySettings.bShowRigidBodies; }));
 
 	CommandList->MapAction(
-		Commands.ShowSockets,
-		FExecuteAction::CreateLambda([this]() { DisplaySettings.bShowSockets = !DisplaySettings.bShowSockets; RefreshTreeView(); }),
+		Commands.ShowReferences,
+		FExecuteAction::CreateLambda([this]() { DisplaySettings.bShowReferences = !DisplaySettings.bShowReferences; RefreshTreeView(); }),
 		FCanExecuteAction(),
-		FIsActionChecked::CreateLambda([this]() { return DisplaySettings.bShowSockets; }));
+		FIsActionChecked::CreateLambda([this]() { return DisplaySettings.bShowReferences; }));
 
 	CommandList->MapAction(
 		Commands.ShowDynamicHierarchy,
@@ -1632,7 +1632,7 @@ bool SRigHierarchy::CanRenameItem() const
 	{
 		const FRigElementKey Key = GetSelectedKeys()[0];
 		if(Key.Type == ERigElementType::RigidBody ||
-			Key.Type == ERigElementType::Socket)
+			Key.Type == ERigElementType::Reference)
 		{
 			return false;
 		}
@@ -1940,7 +1940,7 @@ TOptional<EItemDropZone> SRigHierarchy::OnCanAcceptDrop(const FDragDropEvent& Dr
 			case ERigElementType::Control:
 			case ERigElementType::Null:
 			case ERigElementType::RigidBody:
-			case ERigElementType::Socket:
+			case ERigElementType::Reference:
 			{
 				for (const FRigElementKey& DraggedKey : RigDragDropOp->GetElements())
 				{
@@ -1949,7 +1949,7 @@ TOptional<EItemDropZone> SRigHierarchy::OnCanAcceptDrop(const FDragDropEvent& Dr
 						case ERigElementType::Control:
 						case ERigElementType::Null:
 						case ERigElementType::RigidBody:
-						case ERigElementType::Socket:
+						case ERigElementType::Reference:
 						{
 							break;
 						}

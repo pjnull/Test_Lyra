@@ -149,9 +149,9 @@ public:
 	void CopyPose(URigHierarchy* InHierarchy, bool bCurrent, bool bInitial);
 
 	/**
-	 * Update all elements that depend on external sockets
+	 * Update all elements that depend on external references
 	 */
-	void UpdateSockets(const FRigUnitContext* InContext);
+	void UpdateReferences(const FRigUnitContext* InContext);
 
 	/**
 	 * Resets the current pose of a filtered lost if elements to the initial / ref pose.
@@ -730,22 +730,22 @@ public:
 	}
 
 	/**
-	 * Returns all sockets
+	 * Returns all references
 	 * @param bTraverse Returns the elements in order of a depth first traversal
 	 */
-	FORCEINLINE TArray<FRigSocketElement*> GetSockets(bool bTraverse = false) const
+	FORCEINLINE TArray<FRigReferenceElement*> GetReferences(bool bTraverse = false) const
 	{
-		return GetElementsOfType<FRigSocketElement>(bTraverse);
+		return GetElementsOfType<FRigReferenceElement>(bTraverse);
 	}
 
 	/**
-	 * Returns all sockets
+	 * Returns all references
 	 * @param bTraverse Returns the elements in order of a depth first traversal
 	 */
-	UFUNCTION(BlueprintCallable, Category = URigHierarchy, meta = (DisplayName = "Get Sockets", ScriptName = "GetSockets"))
-    FORCEINLINE TArray<FRigElementKey> GetSocketKeys(bool bTraverse = true) const
+	UFUNCTION(BlueprintCallable, Category = URigHierarchy, meta = (DisplayName = "Get References", ScriptName = "GetReferences"))
+    FORCEINLINE TArray<FRigElementKey> GetReferenceKeys(bool bTraverse = true) const
 	{
-		return GetKeysOfType<FRigSocketElement>(bTraverse);
+		return GetKeysOfType<FRigReferenceElement>(bTraverse);
 	}
 
 	/**
@@ -1818,7 +1818,7 @@ public:
 
 	/**
 	 * Switches a multi parent element to world space.
-	 * This injects a world space socket.
+	 * This injects a world space reference.
 	 * @param InChild The key of the multi parented element
 	 * @param bInitial If true the initial weights will be used
 	 * @param bAffectChildren If set to false children will not move (maintain global).
@@ -1829,7 +1829,7 @@ public:
 
 	/**
 	* Switches a multi parent element to world space.
-	* This injects a world space socket.
+	* This injects a world space reference.
 	* @param InChild The multi parented element
 	* @param bInitial If true the initial weights will be used
 	* @param bAffectChildren If set to false children will not move (maintain global).
@@ -1838,12 +1838,12 @@ public:
 	bool SwitchToWorldSpace(FRigBaseElement* InChild, bool bInitial = false, bool bAffectChildren = true);
 
 	/**
-	 * Adds the world space socket or returns it
+	 * Adds the world space reference or returns it
 	 */
-	FRigElementKey GetOrAddWorldSpaceSocket();
+	FRigElementKey GetOrAddWorldSpaceReference();
 	
-	static FRigElementKey GetDefaultParentSocketKey();
-	static FRigElementKey GetWorldSpaceSocketKey();
+	static FRigElementKey GetDefaultParentKey();
+	static FRigElementKey GetWorldSpaceReferenceKey();
 
 	/**
 	 * Returns true if an element is parented to another element
@@ -2732,7 +2732,7 @@ protected:
 			{
 				return 4;
 			}
-			case ERigElementType::Socket:
+			case ERigElementType::Reference:
 			{
 				return 5;
 			}
@@ -2777,7 +2777,7 @@ protected:
 			}
 			case 5:
 			{
-				return ERigElementType::Socket;
+				return ERigElementType::Reference;
 			}
 			case 6:
 			{
@@ -2793,7 +2793,7 @@ protected:
 		return ERigElementType::None;
 	}
 
-	FTransform GetWorldTransformForSocket(const FRigUnitContext* InContext, const FRigElementKey& InKey, bool bInitial);
+	FTransform GetWorldTransformForReference(const FRigUnitContext* InContext, const FRigElementKey& InKey, bool bInitial);
 	
 	FORCEINLINE static float GetWeightForLerp(const float WeightA, const float WeightB)
 	{

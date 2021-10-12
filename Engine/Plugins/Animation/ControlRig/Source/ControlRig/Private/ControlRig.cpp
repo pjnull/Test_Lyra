@@ -686,8 +686,8 @@ void UControlRig::Execute(const EControlRigState InState, const FName& InEventNa
 
 	if(GetHierarchy())
 	{
-		// if we have any aux elements dirty them
-		GetHierarchy()->UpdateSockets(&Context);
+		// if we have any referenced elements dirty them
+		GetHierarchy()->UpdateReferences(&Context);
 	}
 
 #if WITH_EDITOR

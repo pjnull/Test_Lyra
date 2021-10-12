@@ -272,11 +272,11 @@ FKeyHandle FControlRigSpaceChannelHelpers::SequencerKeyControlRigSpaceChannel(UC
 	EvaluateChannel(Channel, Time, ExistingValue);
 	FMovieSceneControlRigSpaceBaseKey Value = ExistingValue;
 
-	if (SpaceKey == RigHierarchy->GetWorldSpaceSocketKey())
+	if (SpaceKey == RigHierarchy->GetWorldSpaceReferenceKey())
 	{
 		Value.SpaceType = EMovieSceneControlRigSpaceType::World;
 	}
-	else if (SpaceKey == RigHierarchy->GetDefaultParentSocketKey())
+	else if (SpaceKey == RigHierarchy->GetDefaultParentKey())
 	{
 		Value.SpaceType = EMovieSceneControlRigSpaceType::Parent;
 	}
@@ -617,11 +617,11 @@ void FControlRigSpaceChannelHelpers::SequencerBakeControlInSpace(UControlRig* Co
 		EvaluateChannel(Channel, EndFrame, EndFrameValue);
 
 		FMovieSceneControlRigSpaceBaseKey Value;
-		if (Settings.TargetSpace == RigHierarchy->GetWorldSpaceSocketKey())
+		if (Settings.TargetSpace == RigHierarchy->GetWorldSpaceReferenceKey())
 		{
 			Value.SpaceType = EMovieSceneControlRigSpaceType::World;
 		}
-		else if (Settings.TargetSpace == RigHierarchy->GetDefaultParentSocketKey())
+		else if (Settings.TargetSpace == RigHierarchy->GetDefaultParentKey())
 		{
 			Value.SpaceType = EMovieSceneControlRigSpaceType::Parent;
 		}
@@ -997,7 +997,7 @@ FReply FControlRigSpaceChannelHelpers::OpenBakeDialog(ISequencer* Sequencer, FMo
 			FMovieSceneControlRigSpaceBaseKey Value;
 
 			URigHierarchy* RigHierarchy = ControlRig->GetHierarchy();
-			Settings.TargetSpace = URigHierarchy::GetDefaultParentSocketKey();
+			Settings.TargetSpace = URigHierarchy::GetDefaultParentKey();
 
 			TRange<FFrameNumber> Range = Sequencer->GetFocusedMovieSceneSequence()->GetMovieScene()->GetPlaybackRange();
 			Settings.StartFrame = Range.GetLowerBoundValue();

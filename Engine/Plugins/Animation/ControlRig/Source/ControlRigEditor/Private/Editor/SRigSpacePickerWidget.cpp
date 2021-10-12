@@ -91,7 +91,7 @@ void SRigSpacePickerWidget::Construct(const FArguments& InArgs)
 		AddSpacePickerRow(
 			TopLevelListBox,
 			ESpacePickerType_Parent,
-			URigHierarchy::GetDefaultParentSocketKey(),
+			URigHierarchy::GetDefaultParentKey(),
 			FEditorStyle::GetBrush("EditorViewport.RelativeCoordinateSystem_Local"),
 			LOCTEXT("Parent", "Parent"),
 			FOnClicked::CreateSP(this, &SRigSpacePickerWidget::HandleParentSpaceClicked)
@@ -100,7 +100,7 @@ void SRigSpacePickerWidget::Construct(const FArguments& InArgs)
 		AddSpacePickerRow(
 			TopLevelListBox,
 			ESpacePickerType_World,
-			URigHierarchy::GetWorldSpaceSocketKey(),
+			URigHierarchy::GetWorldSpaceReferenceKey(),
 			FEditorStyle::GetBrush("EditorViewport.RelativeCoordinateSystem_World"),
 			LOCTEXT("World", "World"),
 			FOnClicked::CreateSP(this, &SRigSpacePickerWidget::HandleWorldSpaceClicked)
@@ -349,8 +349,8 @@ const TArray<FRigElementKey>& SRigSpacePickerWidget::GetActiveSpaces() const
 TArray<FRigElementKey> SRigSpacePickerWidget::GetDefaultSpaces() const
 {
 	TArray<FRigElementKey> DefaultSpaces;
-	DefaultSpaces.Add(URigHierarchy::GetDefaultParentSocketKey());
-	DefaultSpaces.Add(URigHierarchy::GetWorldSpaceSocketKey());
+	DefaultSpaces.Add(URigHierarchy::GetDefaultParentKey());
+	DefaultSpaces.Add(URigHierarchy::GetWorldSpaceReferenceKey());
 	return DefaultSpaces;
 }
 
@@ -507,12 +507,12 @@ void SRigSpacePickerWidget::AddSpacePickerRow(
 
 FReply SRigSpacePickerWidget::HandleParentSpaceClicked()
 {
-	return HandleElementSpaceClicked(URigHierarchy::GetDefaultParentSocketKey());
+	return HandleElementSpaceClicked(URigHierarchy::GetDefaultParentKey());
 }
 
 FReply SRigSpacePickerWidget::HandleWorldSpaceClicked()
 {
-	return HandleElementSpaceClicked(URigHierarchy::GetWorldSpaceSocketKey());
+	return HandleElementSpaceClicked(URigHierarchy::GetWorldSpaceReferenceKey());
 }
 
 FReply SRigSpacePickerWidget::HandleElementSpaceClicked(FRigElementKey InKey)
@@ -758,7 +758,7 @@ FSlateColor SRigSpacePickerWidget::GetButtonColor(ESpacePickerType InType, FRigE
 		case ESpacePickerType_Parent:
 		{
 			// this is also true if the object has no parent
-			if(ActiveSpaceKeys.Contains(URigHierarchy::GetDefaultParentSocketKey()))
+			if(ActiveSpaceKeys.Contains(URigHierarchy::GetDefaultParentKey()))
 			{
 				return ActiveColor;
 			}
@@ -766,7 +766,7 @@ FSlateColor SRigSpacePickerWidget::GetButtonColor(ESpacePickerType InType, FRigE
 		}
 		case ESpacePickerType_World:
 		{
-			if(ActiveSpaceKeys.Contains(URigHierarchy::GetWorldSpaceSocketKey()))
+			if(ActiveSpaceKeys.Contains(URigHierarchy::GetWorldSpaceReferenceKey()))
 			{
 				return ActiveColor;
 			}
@@ -806,7 +806,7 @@ FRigElementKey SRigSpacePickerWidget::GetActiveSpace_Private(URigHierarchy* InHi
 				{
 					if(!IsDefaultSpace(ParentKeys[ParentIndex]))
 					{
-						return URigHierarchy::GetDefaultParentSocketKey();
+						return URigHierarchy::GetDefaultParentKey();
 					}
 				}
 
@@ -814,7 +814,7 @@ FRigElementKey SRigSpacePickerWidget::GetActiveSpace_Private(URigHierarchy* InHi
 			}
 		}
 	}
-	return URigHierarchy::GetDefaultParentSocketKey();
+	return URigHierarchy::GetDefaultParentKey();
 }
 
 TArray<FRigElementKey> SRigSpacePickerWidget::GetCurrentParents_Private(URigHierarchy* InHierarchy,
@@ -831,7 +831,7 @@ TArray<FRigElementKey> SRigSpacePickerWidget::GetCurrentParents_Private(URigHier
 	{
 		if(!IsDefaultSpace(Parents[0]))
 		{
-			Parents[0] = URigHierarchy::GetDefaultParentSocketKey();
+			Parents[0] = URigHierarchy::GetDefaultParentKey();
 		}
 	}
 	return Parents;
@@ -930,7 +930,7 @@ void SRigSpacePickerWidget::RepopulateItemSpaces()
 			if(TypeOrder.IsEmpty())
 			{
 				TypeOrder.Add(ERigElementType::Control, 0);
-				TypeOrder.Add(ERigElementType::Socket, 1);
+				TypeOrder.Add(ERigElementType::Reference, 1);
 				TypeOrder.Add(ERigElementType::Null, 2);
 				TypeOrder.Add(ERigElementType::Bone, 3);
 				TypeOrder.Add(ERigElementType::RigidBody, 4);
@@ -993,7 +993,7 @@ void SRigSpacePickerWidget::UpdateActiveSpaces()
 	
 	for(int32 ControlIndex=0;ControlIndex<ControlKeys.Num();ControlIndex++)
 	{
-		ActiveSpaceKeys.Add(URigHierarchy::GetDefaultParentSocketKey());
+		ActiveSpaceKeys.Add(URigHierarchy::GetDefaultParentKey());
 
 		if(GetActiveSpaceDelegate.IsBound())
 		{
@@ -1019,7 +1019,7 @@ bool SRigSpacePickerWidget::IsDefaultSpace(const FRigElementKey& InKey) const
 {
 	if(bShowDefaultSpaces)
 	{
-		return InKey == URigHierarchy::GetDefaultParentSocketKey() || InKey == URigHierarchy::GetWorldSpaceSocketKey();
+		return InKey == URigHierarchy::GetDefaultParentKey() || InKey == URigHierarchy::GetWorldSpaceReferenceKey();
 	}
 	return false;
 }

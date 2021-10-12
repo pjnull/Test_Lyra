@@ -274,7 +274,7 @@ void SControlRigEditModeTools::Construct(const FArguments& InArgs, FControlRigEd
 	DisplaySettings.bShowBones = false;
 	DisplaySettings.bShowControls = true;
 	DisplaySettings.bShowNulls = false;
-	DisplaySettings.bShowSockets = false;
+	DisplaySettings.bShowReferences = false;
 	DisplaySettings.bShowRigidBodies = false;
 	DisplaySettings.bHideParentsOnFilter = true;
 	DisplaySettings.bFlattenHierarchyOnFilter = true;
@@ -774,7 +774,7 @@ FReply SControlRigEditModeTools::OnBakeControlsToNewSpaceButtonClicked()
 		FMovieSceneControlRigSpaceBaseKey Value;
 		using namespace UE::MovieScene;
 		URigHierarchy* RigHierarchy = SpacePickerWidget->GetHierarchy();
-		Settings.TargetSpace = URigHierarchy::GetDefaultParentSocketKey();
+		Settings.TargetSpace = URigHierarchy::GetDefaultParentKey();
 		
 		TRange<FFrameNumber> Range = Sequencer->GetFocusedMovieSceneSequence()->GetMovieScene()->GetPlaybackRange();
 		TArray<FFrameNumber> Keys;
