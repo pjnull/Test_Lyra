@@ -78,26 +78,12 @@ FTimingProfilerProvider::~FTimingProfilerProvider()
 {
 }
 
-uint32 FTimingProfilerProvider::AddCpuTimer(const TCHAR* Name)
+uint32 FTimingProfilerProvider::AddCpuTimer(FStringView Name)
 {
 	Session.WriteAccessCheck();
 
 	FTimingProfilerTimer& Timer = AddTimerInternal(Name, false);
 	return Timer.Id;
-}
-
-void FTimingProfilerProvider::SetTimerName(uint32 TimerId, const TCHAR* Name)
-{
-	Session.WriteAccessCheck();
-	
-	FTimingProfilerTimer& Timer = Timers[TimerId];
-	Timer.Name = Session.StoreString(Name);
-	uint32 NameHash = 0;
-	for (const TCHAR* c = Name; *c; ++c)
-	{
-		NameHash = (NameHash + *c) * 0x2c2c57ed;
-	}
-	Timer.NameHash = NameHash;
 }
 
 uint32 FTimingProfilerProvider::AddGpuTimer(FStringView Name)
@@ -113,14 +99,16 @@ FTimingProfilerTimer& FTimingProfilerProvider::AddTimerInternal(FStringView Name
 	FTimingProfilerTimer& Timer = Timers.AddDefaulted_GetRef();
 	Timer.Id = Timers.Num() - 1;
 	Timer.Name = Session.StoreString(Name);
-	uint32 NameHash = 0;
-	for (TCHAR c : Name)
-	{
-		NameHash = (NameHash + c) * 0x2c2c57ed;
-	}
-	Timer.NameHash = NameHash;
 	Timer.IsGpuTimer = IsGpuTimer;
 	return Timer;
+}
+
+void FTimingProfilerProvider::SetTimerName(uint32 TimerId, FStringView Name)
+{
+	Session.WriteAccessCheck();
+
+	FTimingProfilerTimer& Timer = Timers[TimerId];
+	Timer.Name = Session.StoreString(Name);
 }
 
 uint32 FTimingProfilerProvider::AddMetadata(uint32 MasterTimerId, TArray<uint8>&& Metadata)
@@ -504,7 +492,7 @@ ITimingProfilerButterfly* FTimingProfilerProvider::CreateButterfly(double Interv
 				double InclusiveTime = Time - StackEntry.StartTime;
 				check(InclusiveTime >= 0.0);
 				check(StackEntry.ExclusiveTime >= 0.0 && StackEntry.ExclusiveTime <= InclusiveTime);
-				
+
 				StackEntry.Node->InclusiveTime += InclusiveTime;
 				StackEntry.Node->ExclusiveTime += StackEntry.ExclusiveTime;
 				++StackEntry.Node->Count;

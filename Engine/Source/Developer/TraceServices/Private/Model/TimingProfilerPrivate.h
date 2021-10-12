@@ -22,9 +22,9 @@ public:
 
 	explicit FTimingProfilerProvider(IAnalysisSession& InSession);
 	virtual ~FTimingProfilerProvider();
-	uint32 AddCpuTimer(const TCHAR* Name);
+	uint32 AddCpuTimer(FStringView Name);
 	uint32 AddGpuTimer(FStringView Name);
-	void SetTimerName(uint32 TimerId, const TCHAR* Name);
+	void SetTimerName(uint32 TimerId, FStringView Name);
 	uint32 AddMetadata(uint32 MasterTimerId, TArray<uint8>&& Metadata);
 	TimelineInternal& EditCpuThreadTimeline(uint32 ThreadId);
 	TimelineInternal& EditGpuTimeline();

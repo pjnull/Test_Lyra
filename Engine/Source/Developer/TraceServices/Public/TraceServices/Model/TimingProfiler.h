@@ -15,7 +15,6 @@ struct FTimingProfilerTimer
 {
 	const TCHAR* Name = nullptr;
 	uint32 Id = 0;
-	uint32 NameHash = 0;
 	bool IsGpuTimer = false;
 };
 
