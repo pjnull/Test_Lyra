@@ -2480,6 +2480,12 @@ void FUnrealClassDefinitionInfo::ParseClassProperties(TArray<FPropertySpecifier>
 			InheritClassFlags &= ~CLASS_Transient;
 			break;
 
+		case EClassMetadataSpecifier::Optional:
+
+			// Optional class
+			ParsedClassFlags |= CLASS_Optional;
+			break;
+
 		case EClassMetadataSpecifier::CustomConstructor:
 
 			// we will not export a constructor for this class, assuming it is in the CPP block

@@ -2917,7 +2917,7 @@ static void ShowIntrinsicClasses( FOutputDevice& Ar )
 			{
 				MarkedClasses.AddClass(*It);
 			}
-			else if ( !It->HasAnyClassFlags(CLASS_Parsed) )
+			else
 			{
 				UnmarkedClasses.AddClass(*It);
 			}

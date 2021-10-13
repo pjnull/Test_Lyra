@@ -182,8 +182,8 @@ enum EClassFlags
 	CLASS_Config			  = 0x00000004u,
 	/** This object type can't be saved; null it out at save time. */
 	CLASS_Transient			  = 0x00000008u,
-	/** Successfully parsed. */
-	CLASS_Parsed              = 0x00000010u,
+	/** This object type may not be available in certain context. (i.e. game runtime or in certain configuration). Optional class data is saved separately to other object types. (i.e. might use sidecar files) */
+	CLASS_Optional            = 0x00000010u,
 	/** */
 	CLASS_MatchedSerializers  = 0x00000020u,
 	/** Indicates that the config settings for this class will be saved to Project/User*.ini (similar to CLASS_GlobalUserConfig) */
@@ -252,7 +252,7 @@ enum EClassFlags
 ENUM_CLASS_FLAGS(EClassFlags);
 
 /** Flags to inherit from base class */
-#define CLASS_Inherit ((EClassFlags)(CLASS_Transient | CLASS_DefaultConfig | CLASS_Config | CLASS_PerObjectConfig | CLASS_ConfigDoNotCheckDefaults | CLASS_NotPlaceable \
+#define CLASS_Inherit ((EClassFlags)(CLASS_Transient | CLASS_Optional | CLASS_DefaultConfig | CLASS_Config | CLASS_PerObjectConfig | CLASS_ConfigDoNotCheckDefaults | CLASS_NotPlaceable \
 						| CLASS_Const | CLASS_HasInstancedReference | CLASS_Deprecated | CLASS_DefaultToInstanced | CLASS_GlobalUserConfig | CLASS_ProjectUserConfig | CLASS_NeedsDeferredDependencyLoading))
 
 /** These flags will be cleared by the compiler when the class is parsed during script compilation */
@@ -725,6 +725,9 @@ namespace UC
 
 		/// This class should be saved normally (it cancels out an inherited transient flag).
 		nonTransient,
+
+		/// This class is optional and might not be available in certain context. reference from non optional data type is not allowed.
+		Optional,
 
 		/// Load object configuration at construction time.  These flags are inherited by subclasses.
 		/// Class containing config properties. Usage config=ConfigName or config=inherit (inherits config name from base class).
