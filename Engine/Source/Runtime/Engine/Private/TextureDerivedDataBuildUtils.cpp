@@ -235,7 +235,7 @@ bool TryFindTextureBuildFunction(FStringBuilderBase& OutFunctionName, const FNam
 	return UE::DerivedData::GetBuild().GetFunctionRegistry().FindFunctionVersion(FunctionName).IsValid();
 }
 
-FCbObject SaveTextureBuildSettings(const UTexture& Texture, const FTextureBuildSettings& BuildSettings, int32 LayerIndex, int32 NumInlineMips)
+FCbObject SaveTextureBuildSettings(const UTexture& Texture, const FTextureBuildSettings& BuildSettings, int32 LayerIndex, int32 NumInlineMips, bool bUseCompositeTexture)
 {
 	const ITextureFormat* TextureFormat = nullptr;
 	if (ITextureFormatManagerModule* TFM = GetTextureFormatManager())
@@ -268,7 +268,7 @@ FCbObject SaveTextureBuildSettings(const UTexture& Texture, const FTextureBuildS
 	Writer.SetName("Source");
 	WriteSource(Writer, Texture, LayerIndex);
 
-	if (Texture.CompositeTexture)
+	if (bUseCompositeTexture && Texture.CompositeTexture)
 	{
 		Writer.SetName("CompositeSource");
 		WriteSource(Writer, *Texture.CompositeTexture, LayerIndex);
