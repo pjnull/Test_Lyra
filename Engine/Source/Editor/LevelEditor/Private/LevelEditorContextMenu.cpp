@@ -261,8 +261,9 @@ void FLevelEditorContextMenu::RegisterActorContextMenu()
 		SelectionInfo = AssetSelectionUtils::BuildSelectedActorInfo(SelectedActors);
 
 		{
-			// General actions that apply to most actors and their assets
-			FToolMenuSection& Section = InMenu->AddSection("ActorGeneral", LOCTEXT("ActorHeading", "Actor"));
+			// General actions that apply to most actors and their underlying assets
+			// In most cases, you DO NOT want to extend this section; look at ActorUETools or ActorTypeTools below
+			FToolMenuSection& Section = InMenu->AddSection("ActorGeneral", LOCTEXT("AssetOptionsHeading", "Asset Options"));
 
 			// Check if current selection has any referenced assets that can be edited
 			TArray< UObject* > ReferencedAssets;
@@ -328,16 +329,21 @@ void FLevelEditorContextMenu::RegisterActorContextMenu()
 			LevelEditorCreateActorMenu::FillAddReplaceContextMenuSections(Section, LevelEditorContext);
 		}
 
-		if (LevelEditorContext->ContextType == ELevelEditorMenuContext::Viewport)
+		if (LevelEditorContext->ContextType == ELevelEditorMenuContext::Viewport || LevelEditorContext->ContextType == ELevelEditorMenuContext::SceneOutliner)
 		{
-			// Options that are only relevant in the viewport context menu (e.g. are spatial, require clicks)
+			// Options that only appear in the viewport context menu or scene outliner (will affect the current viewport)
+			// In most cases, you DO NOT want to extend this section; look at ActorUETools or ActorTypeTools below
 			FToolMenuSection& Section = InMenu->AddSection("ActorViewOptions", LOCTEXT("ViewOptionsHeading", "View Options"));
 			const FVector* ClickLocation = &GEditor->ClickLocation;
 
-			FUIAction GoHereAction;
-			GoHereAction.ExecuteAction = FExecuteAction::CreateStatic(&FLevelEditorActionCallbacks::GoHere_Clicked, ClickLocation);
+			// This keys off the mouse position so can only appear in the viewport
+			if (LevelEditorContext->ContextType == ELevelEditorMenuContext::Viewport)
+			{
+				FUIAction GoHereAction;
+				GoHereAction.ExecuteAction = FExecuteAction::CreateStatic(&FLevelEditorActionCallbacks::GoHere_Clicked, ClickLocation);
+				Section.AddMenuEntry(FLevelEditorCommands::Get().GoHere);
+			}
 
-			Section.AddMenuEntry(FLevelEditorCommands::Get().GoHere);
 			Section.AddMenuEntry(FLevelEditorCommands::Get().SnapCameraToObject);
 			Section.AddMenuEntry(FLevelEditorCommands::Get().SnapObjectToCamera);
 
@@ -372,7 +378,8 @@ void FLevelEditorContextMenu::RegisterActorContextMenu()
 		}
 
 		{
-			// Options for editing, transforming, etc.
+			// Options for editing, transforming, and manipulating this actor
+			// In most cases, you DO NOT want to extend this section; look at ActorUETools or ActorTypeTools below
 			FToolMenuSection& Section = InMenu->AddSection("ActorOptions", LOCTEXT("ActorOptionsHeading", "Actor Options"));
 
 			Section.AddSubMenu(
