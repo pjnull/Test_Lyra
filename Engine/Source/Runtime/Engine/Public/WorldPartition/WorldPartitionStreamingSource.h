@@ -72,14 +72,14 @@ public:
 		}
 
 		const int32 SegmentCount = FMath::Max(4, FMath::CeilToInt(64 * Angle / 360.f));
-		const float AngleStep = Angle / float(SegmentCount);
+		const FReal AngleStep = Angle / FReal(SegmentCount);
 		const FRotator ShapeRotation = FRotationMatrix::MakeFromX(Axis).Rotator();
 		const FVector ScaledAxis = FVector::ForwardVector * Radius;
 		const int32 RollCount = 16;
 
 		Segments.Reserve(2 * (RollCount + 1) * (SegmentCount + 2));
 		int32 LastArcStartIndex = -1;
-		for (int i = 0; i <= RollCount; ++i)
+		for (int32 i = 0; i <= RollCount; ++i)
 		{
 			const float Roll = 180.f * i / float(RollCount);
 			const FTransform Transform(FRotator(0, 0, Roll) + ShapeRotation, Center);

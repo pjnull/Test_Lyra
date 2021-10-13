@@ -2754,7 +2754,7 @@ void UWorld::AddToWorld( ULevel* Level, const FTransform& LevelTransform, bool b
 				Level->ClearActorsSeamlessTraveledFlag();
 			}
 
-			const float PreventNextStepTimeLimit = GLevelStreamingForceRouteActorInitializeNextFrame ? 0.0f : TimeLimit;
+			const double PreventNextStepTimeLimit = GLevelStreamingForceRouteActorInitializeNextFrame ? 0.0 : TimeLimit;
 			bExecuteNextStep = (!bConsiderTimeLimit || !IsTimeLimitExceeded( TEXT("initializing network actors"), StartTime, Level, PreventNextStepTimeLimit ));
 		}
 
@@ -4156,7 +4156,7 @@ bool UWorld::HandleDemoScrubCommand(const TCHAR* Cmd, FOutputDevice& Ar, UWorld*
 		if (PlayerController != nullptr)
 		{
 			GetWorldSettings()->SetPauserPlayerState(PlayerController->PlayerState);
-			const uint32 Time = FCString::Atoi(*TimeString);
+			const float Time = FCString::Atof(*TimeString);
 			DemoNetDriver->GotoTimeInSeconds(Time);
 		}
 	}
@@ -5715,7 +5715,7 @@ void UWorld::NotifyControlMessage(UNetConnection* Connection, uint8 MessageType,
 						break;
 					}
 
-					uint8 SplitscreenCount = FMath::Min(Connection->Children.Num() + 1, 255);
+					int32 SplitscreenCount = FMath::Min(Connection->Children.Num() + 1, 255);
 
 					// Don't allow clients to specify this value
 					InURL.RemoveOption(TEXT("SplitscreenCount"));
@@ -5861,7 +5861,7 @@ void UWorld::NotifyControlMessage(UNetConnection* Connection, uint8 MessageType,
 						break;
 					}
 
-					uint8 SplitscreenCount = FMath::Min(Connection->Children.Num() + 2, 255);
+					int32 SplitscreenCount = FMath::Min(Connection->Children.Num() + 2, 255);
 
 					// Don't allow clients to specify this value
 					InURL.RemoveOption(TEXT("SplitscreenCount"));
@@ -6259,9 +6259,9 @@ bool UWorld::SetNewWorldOrigin(FIntVector InNewOriginLocation)
 	FCoreDelegates::PostWorldOriginOffset.Broadcast(this, PreviosWorldOriginLocation, OriginLocation);
 
 	const double CurrentTime = FPlatformTime::Seconds();
-	const float TimeTaken = CurrentTime - MoveStartTime;
+	const double TimeTaken = CurrentTime - MoveStartTime;
 	UE_LOG(LogLevel, Log, TEXT("WORLD TRANSLATION END {%d, %d, %d} took %.4f ms"),
-		OriginLocation.X, OriginLocation.Y, OriginLocation.Z, TimeTaken*1000);
+		OriginLocation.X, OriginLocation.Y, OriginLocation.Z, TimeTaken * 1000);
 	
 	return true;
 }
@@ -8011,7 +8011,7 @@ static ULevel* DuplicateLevelWithPrefix(ULevel* InLevel, int32 InstanceID )
 	}
 
 	const double DuplicateEnd = FPlatformTime::Seconds();
-	const float TotalSeconds = ( DuplicateEnd - DuplicateStart );
+	const double TotalSeconds = ( DuplicateEnd - DuplicateStart );
 
 	UE_LOG( LogNet, Log, TEXT( "DuplicateLevelWithPrefix. TotalSeconds: %2.2f" ), TotalSeconds );
 
