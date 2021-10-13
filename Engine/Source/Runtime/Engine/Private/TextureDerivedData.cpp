@@ -393,10 +393,42 @@ static void GetEncodeSpeedOptions(ETextureEncodeSpeed InEncodeSpeed, FTextureEnc
 			
 			// log settings once at startup
 			UEnum* EncodeEffortEnum = StaticEnum<ETextureEncodeEffort>();
+			
+			UEnum* UniversalTilingEnum = StaticEnum<ETextureUniversalTiling>();
 
-			UE_LOG(LogTexture, Display, TEXT("Oodle Texture Encode Speed settings: Fast: RDO %s Lambda %d, Effort %s Final: RDO %s Lambda %d, Effort %s"), \
-				Fast.bUsesRDO ? TEXT("On") : TEXT("Off"), Fast.bUsesRDO ? Fast.RDOLambda : 0,  *(EncodeEffortEnum->GetNameStringByValue((int64)Fast.Effort)), \
-				Final.bUsesRDO ? TEXT("On") : TEXT("Off"), Final.bUsesRDO ? Final.RDOLambda : 0,  *(EncodeEffortEnum->GetNameStringByValue((int64)Final.Effort)) );
+			FString FastRDOString;
+			if ( Fast.bUsesRDO )
+			{
+				FastRDOString = FString(TEXT("On"));
+				if ( Fast.Tiling != ETextureUniversalTiling::Disabled )
+				{
+					FastRDOString += TEXT(" UT=");
+					FastRDOString += UniversalTilingEnum->GetNameStringByValue((int64)Fast.Tiling);
+				}
+			}
+			else
+			{
+				FastRDOString = FString(TEXT("Off"));
+			}
+			
+			FString FinalRDOString;
+			if ( Final.bUsesRDO )
+			{
+				FinalRDOString = FString(TEXT("On"));
+				if ( Final.Tiling != ETextureUniversalTiling::Disabled )
+				{
+					FinalRDOString += TEXT(" UT=");
+					FinalRDOString += UniversalTilingEnum->GetNameStringByValue((int64)Final.Tiling);
+				}
+			}
+			else
+			{
+				FinalRDOString = FString(TEXT("Off"));
+			}
+
+			UE_LOG(LogTexture, Display, TEXT("Oodle Texture Encode Speed settings: Fast: RDO %s Lambda=%d, Effort=%s Final: RDO %s Lambda=%d, Effort=%s"), \
+				*FastRDOString, Fast.bUsesRDO ? Fast.RDOLambda : 0,  *(EncodeEffortEnum->GetNameStringByValue((int64)Fast.Effort)), \
+				*FinalRDOString, Final.bUsesRDO ? Final.RDOLambda : 0,  *(EncodeEffortEnum->GetNameStringByValue((int64)Final.Effort)) );
 
 
 		}
