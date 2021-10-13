@@ -18,6 +18,7 @@
 #include "Serialization/BufferArchive.h"
 #include "Stats/StatsMisc.h"
 #include "UObject/Package.h"
+#include "Util/SnapshotUtil.h"
 #if WITH_EDITOR
 #include "Editor.h"
 #include "Editor/EditorEngine.h"
@@ -39,7 +40,6 @@ void FWorldSnapshotData::OnDestroySnapshotWorld()
 {
 	TempActorWorld.Reset();
 
-	// Avoid object leaking
 	for (auto ClassDefaultsIt = ClassDefaults.CreateIterator(); ClassDefaultsIt; ++ClassDefaultsIt)
 	{
 		ClassDefaultsIt->Value.CachedLoadedClassDefault = nullptr;
@@ -49,6 +49,11 @@ void FWorldSnapshotData::OnDestroySnapshotWorld()
 	{
 		SubobjectIt->Value.SnapshotObject.Reset();
 		SubobjectIt->Value.EditorObject.Reset();
+	}
+
+	for (auto ActorDataIt = ActorData.CreateIterator(); ActorDataIt; ++ ActorDataIt)
+	{
+		ActorDataIt->Value.ResetTransientData();
 	}
 }
 
@@ -151,12 +156,40 @@ bool FWorldSnapshotData::HasMatchingSavedActor(const FSoftObjectPath& OriginalOb
 	return ActorData.Contains(OriginalObjectPath);
 }
 
+namespace WorldSnapshotData
+{
+	static void ConditionallyRerunConstructionScript(FWorldSnapshotData& This, const TOptional<AActor*>& RequiredActor, const TArray<int32>& OriginalObjectDependencies, UPackage* LocalisationSnapshotPackage)
+	{
+		bool bHadActorDependencies = false;
+		for (int32 OriginalObjectIndex : OriginalObjectDependencies)
+		{
+			const FSoftObjectPath& ObjectPath = This.SerializedObjectReferences[OriginalObjectIndex];
+			if (This.ActorData.Contains(ObjectPath))
+			{
+				This.GetDeserializedActor(ObjectPath, LocalisationSnapshotPackage);
+				bHadActorDependencies = true;
+			}
+		}
+		
+		if (bHadActorDependencies && ensure(RequiredActor))
+		{
+			RequiredActor.GetValue()->RerunConstructionScripts();
+		}
+	}
+}
+
 TOptional<AActor*> FWorldSnapshotData::GetDeserializedActor(const FSoftObjectPath& OriginalObjectPath, UPackage* LocalisationSnapshotPackage)
 {
 	FActorSnapshotData* SerializedActor = ActorData.Find(OriginalObjectPath);
 	if (SerializedActor)
 	{
-		return SerializedActor->GetDeserialized(TempActorWorld->GetWorld(), *this, OriginalObjectPath, LocalisationSnapshotPackage);
+		const bool bJustReceivedSerialisation = !SerializedActor->bReceivedSerialisation;
+		const TOptional<AActor*> Result = SerializedActor->GetDeserialized(TempActorWorld->GetWorld(), *this, OriginalObjectPath, LocalisationSnapshotPackage);
+		if (bJustReceivedSerialisation && ensure(SerializedActor->bReceivedSerialisation))
+		{
+			WorldSnapshotData::ConditionallyRerunConstructionScript(*this, Result, SerializedActor->ObjectDependencies, LocalisationSnapshotPackage);
+		}
+		return Result;
 	}
 
 	UE_LOG(LogLevelSnapshots, Warning, TEXT("No save data found for actor %s"), *OriginalObjectPath.ToString());

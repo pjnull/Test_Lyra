@@ -4,8 +4,8 @@
 #include "ILevelSnapshotsModule.h"
 #include "ISnapshotRestorabilityOverrider.h"
 #include "PropertySelectionMap.h"
-#include "SnapshotTestRunner.h"
-#include "SnapshotTestActor.h"
+#include "Util/SnapshotTestRunner.h"
+#include "Types/SnapshotTestActor.h"
 
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"

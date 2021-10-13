@@ -8,7 +8,7 @@
 #include "SnapshotArchive.h"
 
 /* For writing data into an editor object. */
-class FApplySnapshotDataArchiveV2 : public FSnapshotArchive
+class FApplySnapshotToEditorArchive : public FSnapshotArchive
 {
 	using Super = FSnapshotArchive;
 public:
@@ -29,7 +29,7 @@ protected:
 
 private:
 
-	FApplySnapshotDataArchiveV2(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InOriginalObject, const FPropertySelectionMap& InSelectionMapForResolvingSubobjects, TOptional<const FPropertySelection*> InSelectionSet);
+	FApplySnapshotToEditorArchive(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InOriginalObject, const FPropertySelectionMap& InSelectionMapForResolvingSubobjects, TOptional<const FPropertySelection*> InSelectionSet);
 
 	bool ShouldSerializeAllProperties() const;
 

@@ -1,6 +1,6 @@
 ﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "Archive/ApplySnapshotDataArchiveV2.h"
+#include "Archive/ApplySnapshotToEditorArchive.h"
 
 #include "Archive/ClassDefaults/ApplyClassDefaulDataArchive.h"
 #include "Data/PropertySelection.h"
@@ -141,7 +141,7 @@ namespace
 	}
 }
 
-void FApplySnapshotDataArchiveV2::ApplyToExistingEditorWorldObject(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InOriginalObject, UObject* InDeserializedVersion, const FPropertySelectionMap& InSelectionMapForResolvingSubobjects, const FPropertySelection& InSelectionSet)
+void FApplySnapshotToEditorArchive::ApplyToExistingEditorWorldObject(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InOriginalObject, UObject* InDeserializedVersion, const FPropertySelectionMap& InSelectionMapForResolvingSubobjects, const FPropertySelection& InSelectionSet)
 {
 	if (InSelectionSet.IsEmpty())
 	{
@@ -158,7 +158,7 @@ void FApplySnapshotDataArchiveV2::ApplyToExistingEditorWorldObject(FObjectSnapsh
 #endif
 	
 	// Step 1: Serialise  properties that were different from CDO at time of snapshotting and that are still different from CDO
-	FApplySnapshotDataArchiveV2 ApplySavedData(InObjectData, InSharedData, InOriginalObject, InSelectionMapForResolvingSubobjects, &InSelectionSet);
+	FApplySnapshotToEditorArchive ApplySavedData(InObjectData, InSharedData, InOriginalObject, InSelectionMapForResolvingSubobjects, &InSelectionSet);
 	InOriginalObject->Serialize(ApplySavedData);
 	
 	// Step 2: Serialise any remaining properties that were not covered: properties that were equal to the CDO value when the snapshot was taken but now are different from the CDO.
@@ -168,7 +168,7 @@ void FApplySnapshotDataArchiveV2::ApplyToExistingEditorWorldObject(FObjectSnapsh
 	FixUpTextPropertiesDifferentInCDO(MoveTemp(TextProperties), InSharedData, InOriginalObject);
 }
 
-void FApplySnapshotDataArchiveV2::ApplyToRecreatedEditorWorldObject(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InOriginalObject, UObject* InDeserializedVersion, const FPropertySelectionMap& InSelectionMapForResolvingSubobjects)
+void FApplySnapshotToEditorArchive::ApplyToRecreatedEditorWorldObject(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InOriginalObject, UObject* InDeserializedVersion, const FPropertySelectionMap& InSelectionMapForResolvingSubobjects)
 {
 	const FApplySnapshotPropertiesScope NotifySnapshotListeners({ InOriginalObject, InSelectionMapForResolvingSubobjects, {}, true });
 #if WITH_EDITOR
@@ -181,11 +181,11 @@ void FApplySnapshotDataArchiveV2::ApplyToRecreatedEditorWorldObject(FObjectSnaps
 	
 	// Apply all properties that we saved into the target actor.
 	// We assume that InOriginalObject was already created with the snapshot CDO as template: we do not need Step 2 from ApplyToExistingWorldObject.
-	FApplySnapshotDataArchiveV2 ApplySavedData(InObjectData, InSharedData, InOriginalObject, InSelectionMapForResolvingSubobjects, {});
+	FApplySnapshotToEditorArchive ApplySavedData(InObjectData, InSharedData, InOriginalObject, InSelectionMapForResolvingSubobjects, {});
 	InOriginalObject->Serialize(ApplySavedData);
 }
 
-bool FApplySnapshotDataArchiveV2::ShouldSkipProperty(const FProperty* InProperty) const
+bool FApplySnapshotToEditorArchive::ShouldSkipProperty(const FProperty* InProperty) const
 {
 	SCOPED_SNAPSHOT_CORE_TRACE(ShouldSkipProperty);
 	
@@ -200,7 +200,7 @@ bool FApplySnapshotDataArchiveV2::ShouldSkipProperty(const FProperty* InProperty
 	return bShouldSkipProperty;
 }
 
-void FApplySnapshotDataArchiveV2::PushSerializedProperty(FProperty* InProperty, const bool bIsEditorOnlyProperty)
+void FApplySnapshotToEditorArchive::PushSerializedProperty(FProperty* InProperty, const bool bIsEditorOnlyProperty)
 {
 	// Do before call to super because super appends InProperty to property chain
 	PropertiesLeftToSerialize.RemoveProperty(GetSerializedPropertyChain(), InProperty);
@@ -208,7 +208,7 @@ void FApplySnapshotDataArchiveV2::PushSerializedProperty(FProperty* InProperty, 
 	Super::PushSerializedProperty(InProperty, bIsEditorOnlyProperty);
 }
 
-UObject* FApplySnapshotDataArchiveV2::ResolveObjectDependency(int32 ObjectIndex) const
+UObject* FApplySnapshotToEditorArchive::ResolveObjectDependency(int32 ObjectIndex) const
 {
 	FString LocalizationNamespace;
 #if USE_STABLE_LOCALIZATION_KEYS
@@ -217,7 +217,7 @@ UObject* FApplySnapshotDataArchiveV2::ResolveObjectDependency(int32 ObjectIndex)
 	return SnapshotUtil::Object::ResolveObjectDependencyForEditorWorld(GetSharedData(), ObjectIndex, LocalizationNamespace, SelectionMapForResolvingSubobjects);
 }
 
-FApplySnapshotDataArchiveV2::FApplySnapshotDataArchiveV2(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InOriginalObject, const FPropertySelectionMap& InSelectionMapForResolvingSubobjects, TOptional<const FPropertySelection*> InSelectionSet)
+FApplySnapshotToEditorArchive::FApplySnapshotToEditorArchive(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InOriginalObject, const FPropertySelectionMap& InSelectionMapForResolvingSubobjects, TOptional<const FPropertySelection*> InSelectionSet)
         :
         Super(InObjectData, InSharedData, true, InOriginalObject),
 		SelectionMapForResolvingSubobjects(InSelectionMapForResolvingSubobjects),
@@ -229,7 +229,7 @@ FApplySnapshotDataArchiveV2::FApplySnapshotDataArchiveV2(FObjectSnapshotData& In
 	}
 }
 
-bool FApplySnapshotDataArchiveV2::ShouldSerializeAllProperties() const
+bool FApplySnapshotToEditorArchive::ShouldSerializeAllProperties() const
 {
 	return !SelectionSet.IsSet();
 }

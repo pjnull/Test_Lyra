@@ -2,7 +2,7 @@
 
 #include "Data/Util/EquivalenceUtil.h"
 
-#include "Archive/ApplySnapshotDataArchiveV2.h"
+#include "Archive/ApplySnapshotToEditorArchive.h"
 #include "Data/WorldSnapshotData.h"
 #include "Data/SnapshotCustomVersion.h"
 #include "Data/CustomSerialization/CustomObjectSerializationWrapper.h"
@@ -10,18 +10,11 @@
 #include "LevelSnapshotsModule.h"
 #include "PropertyComparisonParams.h"
 #include "PropertyInfoHelpers.h"
-#include "SnapshotCustomVersion.h"
 #include "SnapshotRestorability.h"
-#include "CustomSerialization/CustomObjectSerializationWrapper.h"
 #include "SnapshotUtil.h"
-#include "PropertyInfoHelpers.h"
-#include "Restorability/PropertyComparisonParams.h"
-#include "Restorability/SnapshotRestorability.h"
 
 #include "Components/ActorComponent.h"
 #include "EngineUtils.h"
-#include "SnapshotUtil.h"
-#include "CustomSerialization/CustomObjectSerializationWrapper.h"
 #include "GameFramework/Actor.h"
 #include "UObject/TextProperty.h"
 #include "UObject/UnrealType.h"

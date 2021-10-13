@@ -5,8 +5,8 @@
 #include "PropertySelectionMap.h"
 #include "Serialization/ICustomObjectSnapshotSerializer.h"
 #include "Serialization/ObjectSnapshotSerializationData.h"
-#include "SnapshotTestActor.h"
-#include "SnapshotTestRunner.h"
+#include "Util/SnapshotTestRunner.h"
+#include "Types/SnapshotTestActor.h"
 #include "Engine/StaticMeshActor.h"
 
 #include "Misc/AutomationTest.h"

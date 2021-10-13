@@ -7,6 +7,7 @@
 #include "LevelSnapshotsLog.h"
 #include "Restorability/PropertyComparisonParams.h"
 #include "Restorability/CollisionRestoration.h"
+#include "Restorability/GridPlacementRestoration.h"
 
 #include "Algo/AllOf.h"
 #include "Components/ActorComponent.h"
@@ -78,7 +79,15 @@ namespace
 		{
 			Module.AddBlacklistedProperties({ BasePropertyOverrides });
 		}
-		
+	}
+
+	void DisableIrrelevantActorProperties(FLevelSnapshotsModule& Module)
+	{
+		const FProperty* ActorGuid = AActor::StaticClass()->FindPropertyByName(FName("ActorGuid"));
+		if (ensure(ActorGuid))
+		{
+			Module.AddBlacklistedProperties({ ActorGuid });
+		}
 	}
 }
 
@@ -110,9 +119,11 @@ void FLevelSnapshotsModule::StartupModule()
 	DisableIrrelevantBrushSubobjects(*this);
 	DisableIrrelevantWorldSettings(*this);
 	DisableIrrelevantMaterialInstanceProperties(*this);
+	DisableIrrelevantActorProperties(*this);
 
 	// Interact with special engine features
 	FCollisionRestoration::Register(*this);
+	GridPlacementRestoration::Register(*this);
 }
 
 void FLevelSnapshotsModule::ShutdownModule()
