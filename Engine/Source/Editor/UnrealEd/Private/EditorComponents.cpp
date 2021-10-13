@@ -139,6 +139,14 @@ static void GetAxisColors(FLinearColor Out[3], bool b3D)
 	}
 }
 
+static double FmodFloor(double X, double Y)
+{
+	const double Div = (X / Y);
+	const double IntPortion = Y * FMath::FloorToDouble(Div);
+	const double Result = X - IntPortion;
+	return Result;
+}
+
 void FGridWidget::DrawNewGrid(const FSceneView* View, FPrimitiveDrawInterface* PDI)
 {
 	UMaterial* GridMaterial = GetActiveLevelGridMaterial();
@@ -255,9 +263,9 @@ void FGridWidget::DrawNewGrid(const FSceneView* View, FPrimitiveDrawInterface* P
 
 	FVector CameraPos = View->ViewMatrices.GetViewOrigin();
 
-	FVector2D UVCameraPos = FVector2D(CameraPos.X, CameraPos.Y);
+	FVector UVCameraPos = FVector(CameraPos.X, CameraPos.Y, 0);
 
-	ObjectToWorld.SetOrigin(FVector(CameraPos.X, CameraPos.Y, 0));
+	ObjectToWorld.SetOrigin(UVCameraPos);
 
 	FLinearColor AxisColors[3];
 	GetAxisColors(AxisColors, true);
@@ -267,7 +275,7 @@ void FGridWidget::DrawNewGrid(const FSceneView* View, FPrimitiveDrawInterface* P
 
 	if(!bIsPerspective)
 	{
-		float FarZ = 100000.0f;
+		double FarZ = 100000.0;
 
 		if(View->ViewMatrices.GetViewMatrix().M[1][1] == -1.f )		// Top
 		{
@@ -275,7 +283,7 @@ void FGridWidget::DrawNewGrid(const FSceneView* View, FPrimitiveDrawInterface* P
 		}
 		if(View->ViewMatrices.GetViewMatrix().M[1][2] == -1.f )		// Front
 		{
-			UVCameraPos = FVector2D(CameraPos.Z, CameraPos.X);
+			UVCameraPos = FVector(CameraPos.Z, CameraPos.X, 0);
 			ObjectToWorld.SetAxis(0, FVector(0,0,1));
 			ObjectToWorld.SetAxis(1, FVector(1,0,0));
 			ObjectToWorld.SetAxis(2, FVector(0,1,0));
@@ -285,7 +293,7 @@ void FGridWidget::DrawNewGrid(const FSceneView* View, FPrimitiveDrawInterface* P
 		}
 		else if(View->ViewMatrices.GetViewMatrix().M[1][0] == 1.f )		// Side
 		{
-			UVCameraPos = FVector2D(CameraPos.Y, CameraPos.Z);
+			UVCameraPos = FVector(CameraPos.Y, CameraPos.Z, 0);
 			ObjectToWorld.SetAxis(0, FVector(0,1,0));
 			ObjectToWorld.SetAxis(1, FVector(0,0,1));
 			ObjectToWorld.SetAxis(2, FVector(1,0,0));
@@ -302,34 +310,39 @@ void FGridWidget::DrawNewGrid(const FSceneView* View, FPrimitiveDrawInterface* P
 	PDI->SetHitProxy(0);
 
 	// good enough to avoid the AMD artifacts, horizon still appears to be a line
-	float Radii = 100000;
+	double Radii = 100000;
 
 	if(bIsPerspective)
 	{
 		// the higher we get the larger we make the geometry to give the illusion of an infinite grid while maintains the precision nearby
-		Radii *= FMath::Max<float>( 1.0f, FMath::Abs(CameraPos.Z) / 1000.0f );
+		Radii *= FMath::Max<double>( 1.0, FMath::Abs(CameraPos.Z) / 1000.0 );
 	}
 	else
 	{
-		float ScaleX = View->ViewMatrices.GetProjectionMatrix().M[0][0];
-		float ScaleY = View->ViewMatrices.GetProjectionMatrix().M[1][1];
+		double ScaleX = View->ViewMatrices.GetProjectionMatrix().M[0][0];
+		double ScaleY = View->ViewMatrices.GetProjectionMatrix().M[1][1];
 
-		float Scale = FMath::Min(ScaleX, ScaleY);
+		double Scale = FMath::Min(ScaleX, ScaleY);
 
 		Scale *= View->UnscaledViewRect.Width();
 
 		// We render a larger grid if we are zoomed out more (good precision at any scale)
-		Radii *= 1.0f / Scale;
+		Radii *= 1.0 / Scale;
 	}
 
-	FVector2D UVMid = UVCameraPos * WorldToUVScale;
-	float UVRadi = Radii * WorldToUVScale;
+	// The grid tiles every 10 cells, so wrap the values here
+	// This is needed to keep precision when position becomes very large
+	UVCameraPos.X = FmodFloor(UVCameraPos.X, (double)SnapGridSize * 10.0);
+	UVCameraPos.Y = FmodFloor(UVCameraPos.Y, (double)SnapGridSize * 10.0);
 
-	FVector2D UVMin = UVMid + FVector2D(-UVRadi, -UVRadi);
-	FVector2D UVMax = UVMid + FVector2D(UVRadi, UVRadi);
+	FVector UVMid = UVCameraPos * WorldToUVScale;
+	double UVRadi = Radii * WorldToUVScale;
+
+	FVector UVMin = UVMid + FVector(-UVRadi, -UVRadi, 0);
+	FVector UVMax = UVMid + FVector(UVRadi, UVRadi, 0);
 
 	// vertex pos is in -1..1 range
-	DrawPlane10x10(PDI, ObjectToWorld, Radii, UVMin, UVMax, MaterialInst->GetRenderProxy(), SDPG_World );
+	DrawPlane10x10(PDI, ObjectToWorld, Radii, FVector2D(UVMin), FVector2D(UVMax), MaterialInst->GetRenderProxy(), SDPG_World );
 }
 
 
