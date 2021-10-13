@@ -310,7 +310,7 @@ public class Engine : ModuleRules
 			);
 		}
 
-		WhitelistRestrictedFolders.Add("Private/NotForLicensees");
+		AllowedRestrictedFolders.Add("Private/NotForLicensees");
 
 		if (!Target.bBuildRequiresCookedData && Target.bCompileAgainstEngine)
 		{
