@@ -74,10 +74,7 @@ class FZenServiceInstance
 {
 public:
 
-	 UE_API FZenServiceInstance()
-	 : FZenServiceInstance(Default, FStringView())
-	 {
-	 }
+	 UE_API FZenServiceInstance();
 	 UE_API FZenServiceInstance(EServiceMode Mode, FStringView InstanceURL);
 	 UE_API ~FZenServiceInstance();
 

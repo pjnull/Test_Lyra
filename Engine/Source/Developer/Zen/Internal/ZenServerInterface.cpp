@@ -94,6 +94,12 @@ FScopeZenService::FScopeZenService(EServiceMode Mode)
 FScopeZenService::~FScopeZenService()
 {}
 
+FZenServiceInstance::FZenServiceInstance()
+: FZenServiceInstance(Default, FStringView())
+{
+}
+
+
 FZenServiceInstance::FZenServiceInstance(EServiceMode Mode, FStringView InstanceURL)
 {
 	Settings.AutoLaunchSettings.DataPath = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::EngineVersionAgnosticUserDir(), TEXT("Zen")));
