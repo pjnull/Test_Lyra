@@ -283,6 +283,11 @@ public:
 #endif
 	FAsyncCookHelper* CurrentCookHelper;
 
+#if WITH_CHAOS
+	// Will contain deserialized data from the serialization function that can be used at PostLoad time.
+	TUniquePtr<FChaosDerivedDataReader<float, 3>> ChaosDerivedDataReader;
+#endif
+
 public:
 	//~ Begin UObject Interface.
 	virtual void Serialize(FArchive& Ar) override;
@@ -331,7 +336,9 @@ private:
 #elif WITH_CHAOS
 	// TODO: ProcessFormatData_Chaos is calling ProcessFormatData_Chaos directly - it's better if CreatePhysicsMeshes can be used but that code path requires WITH_EDITOR
 	friend class UMRMeshComponent;
+	FByteBulkData* GetCookedFormatData();
 	bool ProcessFormatData_Chaos(FByteBulkData* FormatData);
+	bool ProcessFormatData_Chaos(FChaosDerivedDataReader<float, 3>& Reader);
 	bool RuntimeCookPhysics_Chaos();
 	void FinishCreatingPhysicsMeshes_Chaos(FChaosDerivedDataReader<float, 3>& InReader);
 	void FinishCreatingPhysicsMeshes_Chaos(Chaos::FCookHelper& InHelper);
