@@ -896,10 +896,11 @@ TSharedRef<SDockTab> SLevelEditor::SpawnLevelEditorTab( const FSpawnTabArgs& Arg
 		FDetailsViewArgs DetailsViewArgs;
 		DetailsViewArgs.NameAreaSettings = FDetailsViewArgs::HideNameArea;
 		DetailsViewArgs.NotifyHook = GUnrealEd;
+		DetailsViewArgs.ColumnWidth = 0.5f;
 
 		WorldSettingsView = PropPlugin.CreateDetailView( DetailsViewArgs );
 
-		if (GetWorld() != NULL)
+		if (GetWorld() != nullptr)
 		{
 			WorldSettingsView->SetObject(GetWorld()->GetWorldSettings());
 		}
