@@ -1735,4 +1735,15 @@ bool SMultiBoxWidget::OnVisualizeTooltip(const TSharedPtr<SWidget>& TooltipConte
 	// tooltips on multibox widgets are not supported outside of the editor or programs
 	return !GIsEditor && !FGenericPlatformProperties::IsProgram();
 }
+
+void SMultiBoxWidget::SetSummonedMenuTime(double InSummonedMenuTime)
+{
+	SummonedMenuTime = InSummonedMenuTime;
+}
+
+double SMultiBoxWidget::GetSummonedMenuTime() const
+{
+	return SummonedMenuTime;
+}
+
 #undef LOCTEXT_NAMESPACE
