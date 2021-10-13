@@ -1736,6 +1736,7 @@ void USkeletalMeshComponent::ComputeRequiredBones(TArray<FBoneIndexType>& OutReq
 	if (!bIgnorePhysicsAsset && PhysicsAsset)
 	{
 		TArray<FBoneIndexType> PhysAssetBones;
+		PhysAssetBones.Reserve(PhysicsAsset->SkeletalBodySetups.Num());
 		for (int32 i = 0; i<PhysicsAsset->SkeletalBodySetups.Num(); i++)
 		{
 			if (!ensure(PhysicsAsset->SkeletalBodySetups[i]))
@@ -1817,8 +1818,9 @@ void USkeletalMeshComponent::ComputeRequiredBones(TArray<FBoneIndexType>& OutReq
 	TArray<FBoneIndexType> NeededBonesForFillComponentSpaceTransforms;
 	{
 		TArray<FBoneIndexType> ForceAnimatedSocketBones;
-
-		for (const USkeletalMeshSocket* Socket : SkeletalMesh->GetActiveSocketList())
+		TArray<USkeletalMeshSocket*> ActiveSocketList = SkeletalMesh->GetActiveSocketList();
+		ForceAnimatedSocketBones.Reserve(ActiveSocketList.Num());
+		for (const USkeletalMeshSocket* Socket : ActiveSocketList)
 		{
 			int32 BoneIndex = SkeletalMesh->GetRefSkeleton().FindBoneIndex(Socket->BoneName);
 			if (BoneIndex != INDEX_NONE)
