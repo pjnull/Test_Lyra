@@ -1101,6 +1101,25 @@ public:
 
 		return bSucceeded;
 	}
+	
+	/** Get name of compressor
+	 * 
+	 * @return Name of thumbnail compressor
+	 */
+	FName GetThumbnailCompressorName() const override
+	{
+		static FName CompressorName = TEXT("PNG");
+		return CompressorName;
+	}
+
+	/** Is lossless compression
+	 * 
+	 * @return true if compression is lossless
+	 */
+	bool IsLosslessCompression() const override
+	{
+		return true;
+	}
 };
 
 
@@ -1170,6 +1189,25 @@ public:
 		}
 
 		return bSucceeded;
+	}
+
+	/** Get name of compressor
+	 * 
+	 * @return Name of thumbnail compressor
+	 */
+	FName GetThumbnailCompressorName() const override
+	{
+		static FName CompressorName = TEXT("JPEG");
+		return CompressorName;
+	}
+
+	/** Is lossless compression
+	 * 
+	 * @return true if compression is lossless
+	 */
+	bool IsLosslessCompression() const override
+	{
+		return false;
 	}
 };
 
