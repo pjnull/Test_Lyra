@@ -359,14 +359,15 @@ void UTexture::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEven
 			RequiresNotifyMaterials = true;
 		}
 #endif //WITH_EDITORONLY_DATA
-
-		bool bPreventSRGB = (CompressionSettings == TC_Alpha || CompressionSettings == TC_Normalmap || CompressionSettings == TC_Masks || CompressionSettings == TC_HDR || CompressionSettings == TC_HDR_Compressed || CompressionSettings == TC_HalfFloat);
-		if(bPreventSRGB && SRGB == true)
-		{
-			SRGB = false;
-		}
 	}
-	else if (!GDisableAutomaticTextureMaterialUpdateDependencies)
+
+	const bool bPreventSRGB = (CompressionSettings == TC_Alpha || CompressionSettings == TC_Normalmap || CompressionSettings == TC_Masks || CompressionSettings == TC_HDR || CompressionSettings == TC_HDR_Compressed || CompressionSettings == TC_HalfFloat);
+	if (bPreventSRGB && SRGB == true)
+	{
+		SRGB = false;
+	}
+
+	if (!PropertyThatChanged && !GDisableAutomaticTextureMaterialUpdateDependencies)
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(UpdateDependentMaterials);
 
