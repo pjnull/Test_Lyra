@@ -1020,6 +1020,18 @@ void FLevelSnapshotsEditorResultsRow::SetWidgetCheckedState(const ECheckBoxState
 	}
 }
 
+ECheckBoxState FLevelSnapshotsEditorResultsRow::GenerateChildWidgetCheckedStateBasedOnParent() const
+{
+	ECheckBoxState NewState = GetWidgetCheckedState();
+
+	if (NewState == ECheckBoxState::Undetermined)
+	{
+		NewState = ECheckBoxState::Checked;
+	}
+
+	return NewState;
+}
+
 bool FLevelSnapshotsEditorResultsRow::GetIsNodeChecked() const
 {
 	return GetWidgetCheckedState() == ECheckBoxState::Checked ? true : false;
