@@ -416,8 +416,7 @@ private:
 	void RenderFog(
 		FRDGBuilder& GraphBuilder,
 		const FMinimalSceneTextures& SceneTextures,
-		FRDGTextureRef LightShaftOcclusionTexture,
-		const FIntPoint& LightShaftOcclusionTextureExtent);
+		FRDGTextureRef LightShaftOcclusionTexture);
 
 	void RenderUnderWaterFog(
 		FRDGBuilder& GraphBuilder,
