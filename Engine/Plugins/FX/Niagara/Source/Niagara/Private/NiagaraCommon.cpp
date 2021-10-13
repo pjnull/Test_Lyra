@@ -1286,7 +1286,7 @@ void AliasRapidIterationConstant(const FNiagaraAliasContext& InContext, TArray<F
 			ModuleNameIndex = 2;
 		}
 
-		if (ensureMsgf(InOutSplitName.Num() >= MinParts, TEXT("Can not resolve malformed rapid iteration parameter")))
+		if (ensureAlwaysMsgf(InOutSplitName.Num() >= MinParts, TEXT("Can not resolve malformed rapid iteration parameter '%s' we expect %d parts"), *FString::Join(InOutSplitName, TEXT(".")), MinParts))
 		{
 			const TOptional<TPair<FString, FString>>& EmitterMapping = InContext.GetEmitterMapping();
 			const TOptional<TPair<FString, FString>>& ModuleMapping = InContext.GetModuleMapping();
