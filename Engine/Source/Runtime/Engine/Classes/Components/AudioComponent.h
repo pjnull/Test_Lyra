@@ -690,6 +690,9 @@ private:
 
 	void BroadcastPlayState();
 
+	/** Returns the owning world's "AudioTime" - affected by world pause, but not time dilation.  If no world exists, returns the application time */
+	float GetAudioTimeSeconds() const;
+
 public:
 	/** Set when the sound is finished with initial fading in */
 	void SetFadeInComplete();
