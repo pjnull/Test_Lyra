@@ -49,7 +49,7 @@ namespace Metasound
 {
 	namespace Editor
 	{
-		namespace VariableCustomizationPrivate
+		namespace MemberCustomizationPrivate
 		{
 			/** Minimum size of the details title panel */
 			static const float DetailsTitleMinWidth = 125.f;
@@ -80,7 +80,7 @@ namespace Metasound
 				"Audio:Mono",
 				"Audio:Stereo"
 			};
-		} // namespace VariableCustomizationPrivate
+		} // namespace MemberCustomizationPrivate
 
 		FMetasoundFloatLiteralCustomization::~FMetasoundFloatLiteralCustomization()
 		{
@@ -174,7 +174,7 @@ namespace Metasound
 		{
 			DataTypeName = FName();
 
-			const FString* MetadataDataTypeName = ProxyHandle->GetInstanceMetaData(VariableCustomizationPrivate::DataTypeNameIdentifier);
+			const FString* MetadataDataTypeName = ProxyHandle->GetInstanceMetaData(MemberCustomizationPrivate::DataTypeNameIdentifier);
 			if (ensure(MetadataDataTypeName))
 			{
 				DataTypeName = **MetadataDataTypeName;
@@ -225,7 +225,7 @@ namespace Metasound
 		{
 			DataTypeName = FName();
 
-			const FString* MetadataDataTypeName = ProxyHandle->GetInstanceMetaData(VariableCustomizationPrivate::DataTypeNameIdentifier);
+			const FString* MetadataDataTypeName = ProxyHandle->GetInstanceMetaData(MemberCustomizationPrivate::DataTypeNameIdentifier);
 			if (ensure(MetadataDataTypeName))
 			{
 				DataTypeName = **MetadataDataTypeName;
@@ -318,7 +318,7 @@ namespace Metasound
 		{
 			ProxyGenClass.Reset();
 
-			const FString* MetadataProxyGenClass = ProxyHandle->GetInstanceMetaData(VariableCustomizationPrivate::ProxyGeneratorClassNameIdentifier);
+			const FString* MetadataProxyGenClass = ProxyHandle->GetInstanceMetaData(MemberCustomizationPrivate::ProxyGeneratorClassNameIdentifier);
 			TSharedPtr<IPropertyHandle> MetadataHandle = ProxyHandle->GetParentHandle();
 			if (!ensure(MetadataProxyGenClass))
 			{
@@ -423,7 +423,7 @@ namespace Metasound
 			}
 
 			return SNew(STextBlock)
-				.Text(VariableCustomizationPrivate::DefaultPropertyText)
+				.Text(MemberCustomizationPrivate::DefaultPropertyText)
 				.Font(IDetailLayoutBuilder::GetDetailFont());
 		}
 
@@ -501,7 +501,7 @@ namespace Metasound
 			CacheProxyData(ProxyProperty);
 
 			TSharedRef<SWidget> ValueWidget = CreateValueWidget(ParentArrayProperty, StructPropertyHandle, bIsInArray);
-			FDetailWidgetRow& ValueRow = ChildBuilder.AddCustomRow(VariableCustomizationPrivate::DefaultPropertyText);
+			FDetailWidgetRow& ValueRow = ChildBuilder.AddCustomRow(MemberCustomizationPrivate::DefaultPropertyText);
 			if (bIsInArray)
 			{
 				ValueRow.NameContent()
@@ -550,27 +550,27 @@ namespace Metasound
 		{
 		}
 
-		void FMetasoundVariableDataTypeSelector::AddDataTypeSelector(IDetailLayoutBuilder& InDetailLayout, const FText& InRowName, TWeakObjectPtr<UMetasoundEditorGraphVariable> InGraphVariable, bool bIsEnabled)
+		void FMetasoundDataTypeSelector::AddDataTypeSelector(IDetailLayoutBuilder& InDetailLayout, const FText& InRowName, TWeakObjectPtr<UMetasoundEditorGraphMember> InGraphMember, bool bIsEnabled)
 		{
 			DetailLayoutBuilder = &InDetailLayout;
 
 			IDetailCategoryBuilder& CategoryBuilder = InDetailLayout.EditCategory("General");
 
 			TSharedPtr<FString> CurrentTypeString;
-			FString CurrentTypeName = InGraphVariable->TypeName.ToString();
-			bool bCurrentTypeIsArray = CurrentTypeName.EndsWith(VariableCustomizationPrivate::ArrayIdentifier);
+			FString CurrentTypeName = InGraphMember->TypeName.ToString();
+			bool bCurrentTypeIsArray = CurrentTypeName.EndsWith(MemberCustomizationPrivate::ArrayIdentifier);
 			if (bCurrentTypeIsArray)
 			{
-				CurrentTypeName.LeftChopInline(VariableCustomizationPrivate::ArrayIdentifier.Len());
+				CurrentTypeName.LeftChopInline(MemberCustomizationPrivate::ArrayIdentifier.Len());
 			}
 
 			IMetasoundEditorModule& EditorModule = FModuleManager::GetModuleChecked<IMetasoundEditorModule>("MetaSoundEditor");
 
 			// Not all types have an equivalent array type. Base types without array
 			// types should have the "Is Array" checkbox disabled. 
-			const FName ArrayType = *(CurrentTypeName + VariableCustomizationPrivate::ArrayIdentifier);
+			const FName ArrayType = *(CurrentTypeName + MemberCustomizationPrivate::ArrayIdentifier);
 			const bool bIsArrayTypeRegistered = EditorModule.IsRegisteredDataType(ArrayType);
-			const bool bIsArrayTypeRegisteredHidden = VariableCustomizationPrivate::HiddenInputTypeNames.Contains(ArrayType);
+			const bool bIsArrayTypeRegisteredHidden = MemberCustomizationPrivate::HiddenInputTypeNames.Contains(ArrayType);
 
 			DataTypeNames.Reset();
 			EditorModule.IterateDataTypes([&](const FEditorDataType& EditorDataType)
@@ -578,7 +578,7 @@ namespace Metasound
 				const FString TypeName = EditorDataType.RegistryInfo.DataTypeName.ToString(); 
 
 				// Array types are handled separately via checkbox
-				if (TypeName.EndsWith(VariableCustomizationPrivate::ArrayIdentifier))
+				if (TypeName.EndsWith(MemberCustomizationPrivate::ArrayIdentifier))
 				{
 					return;
 				}
@@ -591,7 +591,7 @@ namespace Metasound
 				}
 
 				// Hidden input types should be omitted from the drop down.
-				if (!VariableCustomizationPrivate::HiddenInputTypeNames.Contains(EditorDataType.RegistryInfo.DataTypeName))
+				if (!MemberCustomizationPrivate::HiddenInputTypeNames.Contains(EditorDataType.RegistryInfo.DataTypeName))
 				{
 					DataTypeNames.Add(TypeStrPtr);
 				}
@@ -630,9 +630,9 @@ namespace Metasound
 					SAssignNew(DataTypeComboBox, STextComboBox)
 					.OptionsSource(&DataTypeNames)
 					.InitiallySelectedItem(CurrentTypeString)
-					.OnSelectionChanged_Lambda([this, InGraphVariable](TSharedPtr<FString> ItemSelected, ESelectInfo::Type SelectInfo)
+					.OnSelectionChanged_Lambda([this, InGraphMember](TSharedPtr<FString> ItemSelected, ESelectInfo::Type SelectInfo)
 					{
-						OnBaseDataTypeChanged(InGraphVariable, ItemSelected, SelectInfo);
+						OnBaseDataTypeChanged(InGraphMember, ItemSelected, SelectInfo);
 					})
 					.IsEnabled(bIsEnabled)
 				]
@@ -643,13 +643,13 @@ namespace Metasound
 				[
 					SAssignNew(DataTypeArrayCheckbox, SCheckBox)
 					.IsEnabled(bIsArrayTypeRegistered && !bIsArrayTypeRegisteredHidden)
-					.IsChecked_Lambda([this, InGraphVariable]()
+					.IsChecked_Lambda([this, InGraphMember]()
 					{
-						return OnGetDataTypeArrayCheckState(InGraphVariable);
+						return OnGetDataTypeArrayCheckState(InGraphMember);
 					})
-					.OnCheckStateChanged_Lambda([this, InGraphVariable](ECheckBoxState InNewState)
+					.OnCheckStateChanged_Lambda([this, InGraphMember](ECheckBoxState InNewState)
 					{
-						OnDataTypeArrayChanged(InGraphVariable, InNewState);
+						OnDataTypeArrayChanged(InGraphMember, InNewState);
 					})
 					[
 						SNew(STextBlock)
@@ -660,12 +660,12 @@ namespace Metasound
 			];
 		}
 
-		ECheckBoxState FMetasoundVariableDataTypeSelector::OnGetDataTypeArrayCheckState(TWeakObjectPtr<UMetasoundEditorGraphVariable> InGraphVariable) const
+		ECheckBoxState FMetasoundDataTypeSelector::OnGetDataTypeArrayCheckState(TWeakObjectPtr<UMetasoundEditorGraphMember> InGraphMember) const
 		{
-			if (InGraphVariable.IsValid())
+			if (InGraphMember.IsValid())
 			{
-				FString CurrentTypeName = InGraphVariable->TypeName.ToString();
-				bool bCurrentTypeIsArray = CurrentTypeName.EndsWith(VariableCustomizationPrivate::ArrayIdentifier);
+				FString CurrentTypeName = InGraphMember->TypeName.ToString();
+				bool bCurrentTypeIsArray = CurrentTypeName.EndsWith(MemberCustomizationPrivate::ArrayIdentifier);
 				return bCurrentTypeIsArray ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 			}
 
@@ -676,9 +676,9 @@ namespace Metasound
 		{
 			using namespace Frontend;
 
-			TMetasoundVariableDetailCustomization<UMetasoundEditorGraphInput>::CustomizeDetails(DetailLayout);
+			TMetasoundGraphMemberDetailCustomization<UMetasoundEditorGraphInput>::CustomizeDetails(DetailLayout);
 
-			if (!GraphVariable.IsValid())
+			if (!GraphMember.IsValid())
 			{
 				return;
 			}
@@ -700,13 +700,13 @@ namespace Metasound
 				.IsReadOnly(bIsRequired || !bIsGraphEditable)
 				.Font(IDetailLayoutBuilder::GetDetailFont());
 
-			CategoryBuilder.AddCustomRow(VariableCustomizationPrivate::InputNameText)
+			CategoryBuilder.AddCustomRow(MemberCustomizationPrivate::InputNameText)
 			.EditCondition(!bIsRequired && bIsGraphEditable, nullptr)
 			.NameContent()
 			[
 				SNew(STextBlock)
 				.Font(IDetailLayoutBuilder::GetDetailFontBold())
-				.Text(VariableCustomizationPrivate::InputNameText)
+				.Text(MemberCustomizationPrivate::InputNameText)
 				.ToolTipText(LOCTEXT("InputName_Description", "Name used by external systems to identify input. Used as DisplayName within MetaSound Graph Editor if no DisplayName is provided."))
 			]
 			.ValueContent()
@@ -715,13 +715,13 @@ namespace Metasound
 			];
 
 			// TODO: Enable and use proper FText property editor
-// 			CategoryBuilder.AddCustomRow(VariableCustomizationPrivate::InputDisplayNameText)
+// 			CategoryBuilder.AddCustomRow(MemberCustomizationPrivate::InputDisplayNameText)
 // 			.EditCondition(!bIsRequired && bIsGraphEditable, nullptr)
 // 			.NameContent()
 // 			[
 // 				SNew(STextBlock)
 // 				.Font(IDetailLayoutBuilder::GetDetailFontBold())
-// 				.Text(VariableCustomizationPrivate::InputDisplayNameText)
+// 				.Text(MemberCustomizationPrivate::InputDisplayNameText)
 // 				.ToolTipText(LOCTEXT("InputDisplayName_Description", "Optional, localized name used within the MetaSounds editor(s) to describe the given input."))
 // 			]
 // 			.ValueContent()
@@ -729,13 +729,13 @@ namespace Metasound
 // 				DisplayNameEditableTextBox.ToSharedRef()
 // 			];
 
-			CategoryBuilder.AddCustomRow(VariableCustomizationPrivate::NodeTooltipText)
+			CategoryBuilder.AddCustomRow(MemberCustomizationPrivate::NodeTooltipText)
 			.EditCondition(!bIsRequired && bIsGraphEditable, nullptr)
 			.NameContent()
 			[
 				SNew(STextBlock)
 				.Font(IDetailLayoutBuilder::GetDetailFontBold())
-				.Text(VariableCustomizationPrivate::NodeTooltipText)
+				.Text(MemberCustomizationPrivate::NodeTooltipText)
 			]
 			.ValueContent()
 			[
@@ -745,13 +745,13 @@ namespace Metasound
 				.IsReadOnly(bIsRequired || !bIsGraphEditable)
 				.ModiferKeyForNewLine(EModifierKey::Shift)
 				.RevertTextOnEscape(true)
-				.WrapTextAt(VariableCustomizationPrivate::DetailsTitleMaxWidth - VariableCustomizationPrivate::DetailsTitleWrapPadding)
+				.WrapTextAt(MemberCustomizationPrivate::DetailsTitleMaxWidth - MemberCustomizationPrivate::DetailsTitleWrapPadding)
 				.Font(IDetailLayoutBuilder::GetDetailFont())
 			];
 
-			AddDataTypeSelector(DetailLayout, VariableCustomizationPrivate::DataTypeNameText, GraphVariable, !bIsRequired && bIsGraphEditable);
+			AddDataTypeSelector(DetailLayout, MemberCustomizationPrivate::DataTypeNameText, GraphMember, !bIsRequired && bIsGraphEditable);
 
-			FNodeHandle NodeHandle = GraphVariable->GetNodeHandle();
+			FNodeHandle NodeHandle = GraphMember->GetNodeHandle();
 			const TArray<FOutputHandle>& Outputs = NodeHandle->GetOutputs();
 			if (!ensure(!Outputs.IsEmpty()))
 			{
@@ -760,7 +760,7 @@ namespace Metasound
 
 			IDetailCategoryBuilder& DefaultCategoryBuilder = DetailLayout.EditCategory("DefaultValue");
 			TSharedPtr<IPropertyHandle> LiteralHandle = DetailLayout.GetProperty(GET_MEMBER_NAME_CHECKED(UMetasoundEditorGraphInput, Literal));
-			if (ensure(GraphVariable.IsValid()) && ensure(LiteralHandle.IsValid()))
+			if (ensure(GraphMember.IsValid()) && ensure(LiteralHandle.IsValid()))
 			{
 				UObject* LiteralObject = nullptr;
 				if (LiteralHandle->GetValue(LiteralObject) == FPropertyAccess::Success)
@@ -778,11 +778,11 @@ namespace Metasound
 							{
 								SetDefaultPropertyMetaData(DefaultValueHandle.ToSharedRef());
 
-								FSimpleDelegate UpdateDocumentInput = FSimpleDelegate::CreateLambda([GraphVariable = this->GraphVariable]()
+								FSimpleDelegate UpdateDocumentInput = FSimpleDelegate::CreateLambda([GraphMember = this->GraphMember]()
 								{
-									if (GraphVariable.IsValid())
+									if (GraphMember.IsValid())
 									{
-										GraphVariable->UpdateDocumentInput();
+										GraphMember->UpdateDocumentInput();
 									}
 								});
 
@@ -812,9 +812,9 @@ namespace Metasound
 			}
 		}
 
-		void FMetasoundVariableDataTypeSelector::OnDataTypeArrayChanged(TWeakObjectPtr<UMetasoundEditorGraphVariable> InGraphVariable, ECheckBoxState InNewState)
+		void FMetasoundDataTypeSelector::OnDataTypeArrayChanged(TWeakObjectPtr<UMetasoundEditorGraphMember> InGraphMember, ECheckBoxState InNewState)
 		{
-			if (InGraphVariable.IsValid())
+			if (InGraphMember.IsValid())
 			{
 				TSharedPtr<FString> DataTypeRoot = DataTypeComboBox->GetSelectedItem();
 				if (ensure(DataTypeRoot.IsValid()))
@@ -822,14 +822,14 @@ namespace Metasound
 					FString DataTypeString = *DataTypeRoot.Get();
 					if (InNewState == ECheckBoxState::Checked)
 					{
-						DataTypeString += VariableCustomizationPrivate::ArrayIdentifier;
+						DataTypeString += MemberCustomizationPrivate::ArrayIdentifier;
 					}
 
 					// Have to stop playback to avoid attempting to change live edit data on invalid input type.
 					check(GEditor);
 					GEditor->ResetPreviewAudioComponent();
 
-					InGraphVariable->SetDataType(FName(DataTypeString));
+					InGraphMember->SetDataType(FName(DataTypeString));
 
 					// Required to rebuild the literal details customization.
 					// This is seemingly dangerous (as the Builder's raw ptr is cached),
@@ -841,14 +841,14 @@ namespace Metasound
 			}
 		}
 
-		void FMetasoundVariableDataTypeSelector::OnBaseDataTypeChanged(TWeakObjectPtr<UMetasoundEditorGraphVariable> InGraphVariable, TSharedPtr<FString> ItemSelected, ESelectInfo::Type SelectInfo)
+		void FMetasoundDataTypeSelector::OnBaseDataTypeChanged(TWeakObjectPtr<UMetasoundEditorGraphMember> InGraphMember, TSharedPtr<FString> ItemSelected, ESelectInfo::Type SelectInfo)
 		{
-			if (ItemSelected.IsValid() && !ItemSelected->IsEmpty() && InGraphVariable.IsValid())
+			if (ItemSelected.IsValid() && !ItemSelected->IsEmpty() && InGraphMember.IsValid())
 			{
 				IMetasoundEditorModule& EditorModule = FModuleManager::GetModuleChecked<IMetasoundEditorModule>("MetaSoundEditor");
 
 				FName BaseDataTypeName = FName(*ItemSelected.Get());
-				FName ArrayDataTypeName = FName(*ItemSelected.Get() + VariableCustomizationPrivate::ArrayIdentifier);
+				FName ArrayDataTypeName = FName(*ItemSelected.Get() + MemberCustomizationPrivate::ArrayIdentifier);
 
 				FName NewDataTypeName;
 
@@ -883,7 +883,7 @@ namespace Metasound
 				check(GEditor);
 				GEditor->ResetPreviewAudioComponent();
 
-				InGraphVariable->SetDataType(NewDataTypeName);
+				InGraphMember->SetDataType(NewDataTypeName);
 
 				// Required to rebuild the literal details customization.
 				// This is seemingly dangerous (as the Builder's raw ptr is cached),
@@ -898,7 +898,7 @@ namespace Metasound
 		{
 			using namespace Frontend;
 
-			if (!GraphVariable.IsValid())
+			if (!GraphMember.IsValid())
 			{
 				return;
 			}
@@ -916,11 +916,11 @@ namespace Metasound
 			}
 
 			FString TypeNameString = TypeName.ToString();
-			if (TypeNameString.EndsWith(VariableCustomizationPrivate::ArrayIdentifier))
+			if (TypeNameString.EndsWith(MemberCustomizationPrivate::ArrayIdentifier))
 			{
-				TypeNameString = TypeNameString.LeftChop(VariableCustomizationPrivate::ArrayIdentifier.Len());
+				TypeNameString = TypeNameString.LeftChop(MemberCustomizationPrivate::ArrayIdentifier.Len());
 			}
-			InDefaultPropertyHandle->SetInstanceMetaData(VariableCustomizationPrivate::DataTypeNameIdentifier, TypeNameString);
+			InDefaultPropertyHandle->SetInstanceMetaData(MemberCustomizationPrivate::DataTypeNameIdentifier, TypeNameString);
 
 			FDataTypeRegistryInfo DataTypeInfo;
 			if (!ensure(IDataTypeRegistry::Get().GetDataTypeInfo(TypeName, DataTypeInfo)))
@@ -938,7 +938,7 @@ namespace Metasound
 			if (ProxyGenClass)
 			{
 				const FString ClassName = ProxyGenClass->GetName();
-				InDefaultPropertyHandle->SetInstanceMetaData(VariableCustomizationPrivate::ProxyGeneratorClassNameIdentifier, ClassName);
+				InDefaultPropertyHandle->SetInstanceMetaData(MemberCustomizationPrivate::ProxyGeneratorClassNameIdentifier, ClassName);
 			}
 		}
 
@@ -949,7 +949,7 @@ namespace Metasound
 			FName TypeName;
 
 			// Just take last type.  If more than one, all types are the same.
-			FConstNodeHandle NodeHandle = GraphVariable->GetConstNodeHandle();
+			FConstNodeHandle NodeHandle = GraphMember->GetConstNodeHandle();
 			NodeHandle->IterateConstOutputs([InTypeName = &TypeName](FConstOutputHandle OutputHandle)
 			{
 				*InTypeName = OutputHandle->GetDataType();
@@ -962,9 +962,9 @@ namespace Metasound
 		{
 			using namespace Frontend;
 
-			TMetasoundVariableDetailCustomization<UMetasoundEditorGraphOutput>::CustomizeDetails(DetailLayout);
+			TMetasoundGraphMemberDetailCustomization<UMetasoundEditorGraphOutput>::CustomizeDetails(DetailLayout);
 
-			if (!GraphVariable.IsValid())
+			if (!GraphMember.IsValid())
 			{
 				return;
 			}
@@ -987,13 +987,13 @@ namespace Metasound
 				.IsReadOnly(bIsRequired || !bIsGraphEditable)
 				.Font(IDetailLayoutBuilder::GetDetailFont());
 
-			CategoryBuilder.AddCustomRow(VariableCustomizationPrivate::OutputNameText)
+			CategoryBuilder.AddCustomRow(MemberCustomizationPrivate::OutputNameText)
 			.EditCondition(!bIsRequired && bIsGraphEditable, nullptr)
 			.NameContent()
 			[
 				SNew(STextBlock)
 				.Font(IDetailLayoutBuilder::GetDetailFontBold())
-				.Text(VariableCustomizationPrivate::OutputNameText)
+				.Text(MemberCustomizationPrivate::OutputNameText)
 				.ToolTipText(LOCTEXT("OutputName_Description", "Name used by external systems to identify output. Used as DisplayName within MetaSound Graph Editor if no DisplayName is provided."))
 			]
 			.ValueContent()
@@ -1002,13 +1002,13 @@ namespace Metasound
 			];
 
 			// TODO: Enable and use proper FText property editor
-// 			CategoryBuilder.AddCustomRow(VariableCustomizationPrivate::OutputDisplayNameText)
+// 			CategoryBuilder.AddCustomRow(MemberCustomizationPrivate::OutputDisplayNameText)
 // 			.EditCondition(!bIsRequired && bIsGraphEditable, nullptr)
 // 			.NameContent()
 // 			[
 // 				SNew(STextBlock)
 // 				.Font(IDetailLayoutBuilder::GetDetailFontBold())
-// 				.Text(VariableCustomizationPrivate::OutputDisplayNameText)
+// 				.Text(MemberCustomizationPrivate::OutputDisplayNameText)
 // 				.ToolTipText(LOCTEXT("OutputDisplayName_Description", "Optional, localized name used within the MetaSounds editor(s) to describe the given output."))
 // 			]
 // 			.ValueContent()
@@ -1016,13 +1016,13 @@ namespace Metasound
 // 				DisplayNameEditableTextBox.ToSharedRef()
 // 			];
 
-			CategoryBuilder.AddCustomRow(VariableCustomizationPrivate::NodeTooltipText)
+			CategoryBuilder.AddCustomRow(MemberCustomizationPrivate::NodeTooltipText)
 			.EditCondition(!bIsRequired && bIsGraphEditable, nullptr)
 			.NameContent()
 			[
 				SNew(STextBlock)
 				.Font(IDetailLayoutBuilder::GetDetailFontBold())
-				.Text(VariableCustomizationPrivate::NodeTooltipText)
+				.Text(MemberCustomizationPrivate::NodeTooltipText)
 			]
 			.ValueContent()
 			[
@@ -1032,11 +1032,11 @@ namespace Metasound
 				.IsReadOnly(bIsRequired || !bIsGraphEditable)
 				.ModiferKeyForNewLine(EModifierKey::Shift)
 				.RevertTextOnEscape(true)
-				.WrapTextAt(VariableCustomizationPrivate::DetailsTitleMaxWidth - VariableCustomizationPrivate::DetailsTitleWrapPadding)
+				.WrapTextAt(MemberCustomizationPrivate::DetailsTitleMaxWidth - MemberCustomizationPrivate::DetailsTitleWrapPadding)
 				.Font(IDetailLayoutBuilder::GetDetailFont())
 			];
 
-			AddDataTypeSelector(DetailLayout, VariableCustomizationPrivate::DataTypeNameText, GraphVariable, !bIsRequired && bIsGraphEditable);
+			AddDataTypeSelector(DetailLayout, MemberCustomizationPrivate::DataTypeNameText, GraphMember, !bIsRequired && bIsGraphEditable);
 
 // 			CategoryBuilder.AddCustomRow(LOCTEXT("OutputPrivate", "Private"))
 // 			.Visibility(TAttribute<EVisibility>(EVisibility::Hidden))
@@ -1058,7 +1058,7 @@ namespace Metasound
 		{
 			using namespace Frontend;
 
-			if (!GraphVariable.IsValid())
+			if (!GraphMember.IsValid())
 			{
 				return;
 			}
@@ -1076,11 +1076,11 @@ namespace Metasound
 			}
 
 			FString TypeNameString = TypeName.ToString();
-			if (TypeNameString.EndsWith(VariableCustomizationPrivate::ArrayIdentifier))
+			if (TypeNameString.EndsWith(MemberCustomizationPrivate::ArrayIdentifier))
 			{
-				TypeNameString = TypeNameString.LeftChop(VariableCustomizationPrivate::ArrayIdentifier.Len());
+				TypeNameString = TypeNameString.LeftChop(MemberCustomizationPrivate::ArrayIdentifier.Len());
 			}
-			InDefaultPropertyHandle->SetInstanceMetaData(VariableCustomizationPrivate::DataTypeNameIdentifier, TypeNameString);
+			InDefaultPropertyHandle->SetInstanceMetaData(MemberCustomizationPrivate::DataTypeNameIdentifier, TypeNameString);
 
 			FDataTypeRegistryInfo DataTypeInfo;
 			if (!ensure(IDataTypeRegistry::Get().GetDataTypeInfo(TypeName, DataTypeInfo)))
@@ -1098,7 +1098,7 @@ namespace Metasound
 			if (ProxyGenClass)
 			{
 				const FString ClassName = ProxyGenClass->GetName();
-				InDefaultPropertyHandle->SetInstanceMetaData(VariableCustomizationPrivate::ProxyGeneratorClassNameIdentifier, ClassName);
+				InDefaultPropertyHandle->SetInstanceMetaData(MemberCustomizationPrivate::ProxyGeneratorClassNameIdentifier, ClassName);
 			}
 		}
 
@@ -1109,7 +1109,7 @@ namespace Metasound
 			FName TypeName;
 
 			// Just take last type.  If more than one, all types are the same.
-			FConstNodeHandle NodeHandle = GraphVariable->GetConstNodeHandle();
+			FConstNodeHandle NodeHandle = GraphMember->GetConstNodeHandle();
 			NodeHandle->IterateConstInputs([InTypeName = &TypeName](FConstInputHandle InputHandle)
 			{
 				*InTypeName = InputHandle->GetDataType();

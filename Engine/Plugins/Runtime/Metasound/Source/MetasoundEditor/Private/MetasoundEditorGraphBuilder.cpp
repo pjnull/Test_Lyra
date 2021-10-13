@@ -816,12 +816,12 @@ namespace Metasound
 			PresetAsset->ConformObjectDataToArchetype();
 		}
 
-		void FGraphBuilder::DeleteVariableNodeHandle(UMetasoundEditorGraphVariable& InVariable)
+		void FGraphBuilder::DeleteGraphVertexNodeHandle(UMetasoundEditorGraphVertex& InGraphVertex)
 		{
 			using namespace Frontend;
 
-			FNodeHandle NodeHandle = InVariable.GetNodeHandle();
-			TArray<UMetasoundEditorGraphNode*> Nodes = InVariable.GetNodes();
+			FNodeHandle NodeHandle = InGraphVertex.GetNodeHandle();
+			TArray<UMetasoundEditorGraphNode*> Nodes = InGraphVertex.GetNodes();
 			for (UMetasoundEditorGraphNode* Node : Nodes)
 			{
 				if (ensure(Node))
@@ -1342,7 +1342,7 @@ namespace Metasound
 				}
 			}
 
-			bIsEditorGraphDirty |= SynchronizeVariables(InMetaSound);
+			bIsEditorGraphDirty |= SynchronizeGraphVertices(InMetaSound);
 
 			// Get all external nodes from Frontend graph.  Input and output references will only be added/synchronized
 			// if required when synchronizing connections (as they are not required to inhabit editor graph).
@@ -1622,7 +1622,7 @@ namespace Metasound
 			return OldValue != InPin.DefaultValue;
 		}
 
-		bool FGraphBuilder::SynchronizeVariables(UObject& InMetaSound)
+		bool FGraphBuilder::SynchronizeGraphVertices(UObject& InMetaSound)
 		{
 			using namespace Frontend;
 
@@ -1664,7 +1664,7 @@ namespace Metasound
 				bIsEditorGraphDirty = true;
 			}, EMetasoundFrontendClassType::Output);
 
-			TArray<UMetasoundEditorGraphVariable*> ToRemove;
+			TArray<UMetasoundEditorGraphMember*> ToRemove;
 			Graph->IterateInputs([&](UMetasoundEditorGraphInput& Input)
 			{
 				if (!Inputs.Contains(&Input))
@@ -1683,9 +1683,9 @@ namespace Metasound
 			});
 
 			bIsEditorGraphDirty |= !ToRemove.IsEmpty();
-			for (UMetasoundEditorGraphVariable* Variable : ToRemove)
+			for (UMetasoundEditorGraphMember* GraphMember: ToRemove)
 			{
-				Graph->RemoveVariable(*Variable);
+				Graph->RemoveGraphMember(*GraphMember);
 			}
 
 			GraphHandle->IterateNodes([&](FNodeHandle NodeHandle)

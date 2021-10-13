@@ -130,9 +130,9 @@ namespace Metasound
 			// Returns the default literal stored on the respective Frontend Node's Input.
 			static bool GetPinLiteral(UEdGraphPin& InInputPin, FMetasoundFrontendLiteral& OutLiteralDefault);
 
-			// Deletes Editor Graph Variable's associated Frontend node, as well as any
-			// Editor Graph nodes referencing the given variable.
-			static void DeleteVariableNodeHandle(UMetasoundEditorGraphVariable& InVariable);
+			// Deletes Editor Graph Vertex's associated Frontend node, as well as any
+			// Editor Graph nodes referencing the given vertex.
+			static void DeleteGraphVertexNodeHandle(UMetasoundEditorGraphVertex& InGraphVertex);
 
 			// Retrieves the proper pin color for the given PinType
 			static FLinearColor GetPinCategoryColor(const FEdGraphPinType& PinType);
@@ -184,7 +184,7 @@ namespace Metasound
 			// Synchronizes inputs and outputs for the given MetaSound.
 			//
 			// @return True if the UEdGraph was altered. False otherwise.
-			static bool SynchronizeVariables(UObject& InMetaSound);
+			static bool SynchronizeGraphVertices(UObject& InMetaSound);
 
 			// Returns true if the FInputHandle and UEdGraphPin match each other.
 			static bool IsMatchingInputHandleAndPin(const Frontend::FConstInputHandle& InInputHandle, const UEdGraphPin& InEditorPin);

@@ -58,6 +58,7 @@ namespace Metasound
 			None,
 			Inputs,
 			Outputs,
+			Variables,
 
 			COUNT
 		};
@@ -269,7 +270,7 @@ namespace Metasound
 
 			/** Create new graph editor widget */
 			void CreateGraphEditorWidget();
-
+			
 		private:
 			TSharedPtr<SWidget> BuildAnalyzerWidget() const;
 

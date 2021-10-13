@@ -113,14 +113,14 @@ namespace Metasound
 			TWeakObjectPtr<UClass> ProxyGenClass;
 		};
 
-		class FMetasoundVariableDataTypeSelector
+		class FMetasoundDataTypeSelector
 		{
 		public:
-			void AddDataTypeSelector(IDetailLayoutBuilder& InDetailLayoutBuilder, const FText& InRowName, TWeakObjectPtr<UMetasoundEditorGraphVariable> InGraphVariable, bool bIsRequired);
+			void AddDataTypeSelector(IDetailLayoutBuilder& InDetailLayoutBuilder, const FText& InRowName, TWeakObjectPtr<UMetasoundEditorGraphMember> InGraphMember, bool bIsRequired);
 
-			void OnDataTypeArrayChanged(TWeakObjectPtr<UMetasoundEditorGraphVariable> InGraphVariable, ECheckBoxState InNewState);
-			ECheckBoxState OnGetDataTypeArrayCheckState(TWeakObjectPtr<UMetasoundEditorGraphVariable> InGraphVariable) const;
-			void OnBaseDataTypeChanged(TWeakObjectPtr<UMetasoundEditorGraphVariable> InGraphVariable, TSharedPtr<FString> ItemSelected, ESelectInfo::Type SelectInfo);
+			void OnDataTypeArrayChanged(TWeakObjectPtr<UMetasoundEditorGraphMember> InGraphMember, ECheckBoxState InNewState);
+			ECheckBoxState OnGetDataTypeArrayCheckState(TWeakObjectPtr<UMetasoundEditorGraphMember> InGraphMember) const;
+			void OnBaseDataTypeChanged(TWeakObjectPtr<UMetasoundEditorGraphMember> InGraphMember, TSharedPtr<FString> ItemSelected, ESelectInfo::Type SelectInfo);
 
 		protected:
 			TFunction<void()> OnDataTypeChanged;
@@ -133,20 +133,20 @@ namespace Metasound
 				IDetailLayoutBuilder* DetailLayoutBuilder = nullptr;
 		};
 
-		template <typename VariableType>
-		class TMetasoundVariableDetailCustomization : public IDetailCustomization, public FMetasoundVariableDataTypeSelector
+		template <typename GraphMemberType>
+		class TMetasoundGraphMemberDetailCustomization : public IDetailCustomization, public FMetasoundDataTypeSelector
 		{
 		public:
-			TMetasoundVariableDetailCustomization(const FText& InVariableLabel)
+			TMetasoundGraphMemberDetailCustomization(const FText& InGraphMemberLabel)
 				: IDetailCustomization()
-				, VariableLabel(InVariableLabel)
+				, GraphMemberLabel(InGraphMemberLabel)
 			{
 			}
 
 		protected:
-			FText VariableLabel;
+			FText GraphMemberLabel;
 
-			TWeakObjectPtr<VariableType> GraphVariable;
+			TWeakObjectPtr<GraphMemberType> GraphMember;
 			TSharedPtr<SEditableTextBox> NameEditableTextBox;
 			TSharedPtr<SEditableTextBox> DisplayNameEditableTextBox;
 			bool bIsNameInvalid = false;
@@ -161,7 +161,7 @@ namespace Metasound
 					return;
 				}
 
-				GraphVariable = Cast<VariableType>(Objects[0].Get());
+				GraphMember = Cast<GraphMemberType>(Objects[0].Get());
 			}
 			// End of IDetailCustomization interface
 
@@ -172,13 +172,13 @@ namespace Metasound
 				bIsNameInvalid = false;
 				DisplayNameEditableTextBox->SetError(FText::GetEmpty());
 
-				if (!ensure(GraphVariable.IsValid()))
+				if (!ensure(GraphMember.IsValid()))
 				{
 					return;
 				}
 
 				FText Error;
-				if (!GraphVariable->CanRename(InNewName, Error))
+				if (!GraphMember->CanRename(InNewName, Error))
 				{
 					bIsNameInvalid = true;
 					DisplayNameEditableTextBox->SetError(Error);
@@ -189,9 +189,9 @@ namespace Metasound
 			{
 				using namespace Frontend;
 
-				if (GraphVariable.IsValid())
+				if (GraphMember.IsValid())
 				{
-					return GraphVariable->GetConstNodeHandle()->GetDisplayName();
+					return GraphMember->GetConstNodeHandle()->GetDisplayName();
 				}
 
 				return FText::GetEmpty();
@@ -201,9 +201,9 @@ namespace Metasound
 			{
 				using namespace Frontend;
 
-				if (GraphVariable.IsValid())
+				if (GraphMember.IsValid())
 				{
-					return FText::FromName(GraphVariable->GetConstNodeHandle()->GetNodeName());
+					return FText::FromName(GraphMember->GetConstNodeHandle()->GetNodeName());
 				}
 
 				return FText::GetEmpty();
@@ -211,9 +211,9 @@ namespace Metasound
 
 			bool IsGraphEditable() const
 			{
-				if (GraphVariable.IsValid())
+				if (GraphMember.IsValid())
 				{
-					Metasound::Frontend::FConstNodeHandle NodeHandle = GraphVariable->GetConstNodeHandle();
+					Metasound::Frontend::FConstNodeHandle NodeHandle = GraphMember->GetConstNodeHandle();
 					return NodeHandle->GetOwningGraph()->GetGraphStyle().bIsGraphEditable;
 				}
 
@@ -222,9 +222,9 @@ namespace Metasound
 
 			bool IsRequired() const
 			{
-				if (GraphVariable.IsValid())
+				if (GraphMember.IsValid())
 				{
-					return GraphVariable->IsRequired();
+					return GraphMember->IsRequired();
 				}
 
 				return true;
@@ -234,18 +234,18 @@ namespace Metasound
 			{
 				using namespace Frontend;
 
-				if (GraphVariable.IsValid())
+				if (GraphMember.IsValid())
 				{
-					GraphVariable->SetDescription(InNewText);
+					GraphMember->SetDescription(InNewText);
 				}
 			}
 
 			FText GetTooltip() const
 			{
 				using namespace Frontend;
-				if (GraphVariable.IsValid())
+				if (GraphMember.IsValid())
 				{
-					FNodeHandle NodeHandle = GraphVariable->GetNodeHandle();
+					FNodeHandle NodeHandle = GraphMember->GetNodeHandle();
 					return NodeHandle->GetDescription();
 				}
 
@@ -256,9 +256,9 @@ namespace Metasound
 			{
 				using namespace Frontend;
 
-				if (!bIsNameInvalid && GraphVariable.IsValid())
+				if (!bIsNameInvalid && GraphMember.IsValid())
 				{
-					GraphVariable->SetDisplayName(InNewName);
+					GraphMember->SetDisplayName(InNewName);
 				}
 
 				DisplayNameEditableTextBox->SetError(FText::GetEmpty());
@@ -269,9 +269,9 @@ namespace Metasound
 			{
 				using namespace Frontend;
 
-				if (!bIsNameInvalid && GraphVariable.IsValid())
+				if (!bIsNameInvalid && GraphMember.IsValid())
 				{
-					GraphVariable->SetNodeName(*InNewName.ToString());
+					GraphMember->SetName(*InNewName.ToString());
 				}
 
 				DisplayNameEditableTextBox->SetError(FText::GetEmpty());
@@ -280,9 +280,9 @@ namespace Metasound
 
 			ECheckBoxState OnGetPrivateCheckboxState() const
 			{
-				if (GraphVariable.IsValid())
+				if (GraphMember.IsValid())
 				{
-					return GraphVariable->GetNodeHandle()->GetNodeStyle().bIsPrivate ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+					return GraphMember->GetNodeHandle()->GetNodeStyle().bIsPrivate ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 				}
 
 				return ECheckBoxState::Unchecked;
@@ -290,10 +290,10 @@ namespace Metasound
 
 			void OnPrivateChanged(ECheckBoxState InNewState)
 			{
-				if (GraphVariable.IsValid())
+				if (GraphMember.IsValid())
 				{
 					const bool bIsChecked = InNewState == ECheckBoxState::Checked;
-					Frontend::FNodeHandle NodeHandle = GraphVariable->GetNodeHandle();
+					Frontend::FNodeHandle NodeHandle = GraphMember->GetNodeHandle();
 					FMetasoundFrontendNodeStyle NodeStyle = NodeHandle->GetNodeStyle();
 					NodeStyle.bIsPrivate = bIsChecked;
 					NodeHandle->SetNodeStyle(NodeStyle);
@@ -301,11 +301,11 @@ namespace Metasound
 			}
 		};
 
-		class FMetasoundInputDetailCustomization : public TMetasoundVariableDetailCustomization<UMetasoundEditorGraphInput>
+		class FMetasoundInputDetailCustomization : public TMetasoundGraphMemberDetailCustomization<UMetasoundEditorGraphInput>
 		{
 		public:
 			FMetasoundInputDetailCustomization()
-				: TMetasoundVariableDetailCustomization<UMetasoundEditorGraphInput>(LOCTEXT("InputVariableLabel", "Input"))
+				: TMetasoundGraphMemberDetailCustomization<UMetasoundEditorGraphInput>(LOCTEXT("InputGraphMemberLabel", "Input"))
 			{
 			}
 			virtual ~FMetasoundInputDetailCustomization() = default;
@@ -322,11 +322,11 @@ namespace Metasound
 			TUniquePtr<IMetaSoundInputLiteralCustomization> LiteralCustomization;
 		};
 
-		class FMetasoundOutputDetailCustomization : public TMetasoundVariableDetailCustomization<UMetasoundEditorGraphOutput>
+		class FMetasoundOutputDetailCustomization : public TMetasoundGraphMemberDetailCustomization<UMetasoundEditorGraphOutput>
 		{
 		public:
 			FMetasoundOutputDetailCustomization()
-				: TMetasoundVariableDetailCustomization<UMetasoundEditorGraphOutput>(LOCTEXT("OutputVariableLabel", "Output"))
+				: TMetasoundGraphMemberDetailCustomization<UMetasoundEditorGraphOutput>(LOCTEXT("OutputGraphMemberLabel", "Output"))
 			{
 			}
 
