@@ -61,6 +61,7 @@ FDatasmithGLTFImporter::FDatasmithGLTFImporter(TSharedRef<IDatasmithScene>& OutS
 	{
 		bGenerateLightmapUVs = InOptions->bGenerateLightmapUVs;
 		ImportScale = InOptions->ImportScale;
+		bAnimationFrameRateFromFile = InOptions->bAnimationFrameRateFromFile;
 	}
 }
 
@@ -72,6 +73,7 @@ void FDatasmithGLTFImporter::SetImportOptions(UDatasmithGLTFImportOptions* InOpt
 	{
 		bGenerateLightmapUVs = InOptions->bGenerateLightmapUVs;
 		ImportScale = InOptions->ImportScale;
+		bAnimationFrameRateFromFile = InOptions->bAnimationFrameRateFromFile;
 	}
 }
 
@@ -396,7 +398,7 @@ bool FDatasmithGLTFImporter::SendSceneToDatasmith()
 	}
 
 	AnimationImporter->CurrentScene = &DatasmithScene.Get();
-	AnimationImporter->CreateAnimations(*GLTFAsset);
+	AnimationImporter->CreateAnimations(*GLTFAsset, bAnimationFrameRateFromFile);
 
 	if (VariantSets.IsValid())
 	{
