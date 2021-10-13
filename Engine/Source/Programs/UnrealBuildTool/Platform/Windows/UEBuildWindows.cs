@@ -1056,14 +1056,17 @@ namespace UnrealBuildTool
 				return WindowsCompiler.VisualStudio2022;
 			}
 			// If we do have a Visual Studio installation, but we're missing just the C++ parts, warn about that.
-			DirectoryReference? VSInstallDir;
-			if (TryGetVSInstallDir(WindowsCompiler.VisualStudio2019, out VSInstallDir))
+			if (TryGetVSInstallDirs(WindowsCompiler.VisualStudio2019) != null)
 			{
 				Log.TraceWarning("Visual Studio 2019 is installed, but is missing the C++ toolchain. Please verify that the \"VC++ 2019 toolset\" component is selected in the Visual Studio 2019 installation options.");
 			}
+			else if (TryGetVSInstallDirs(WindowsCompiler.VisualStudio2022) != null)
+			{
+				Log.TraceWarning("Visual Studio 2022 is installed, but is missing the C++ toolchain. Please verify that the \"VS 2022 C++ x64/x86 build tools (Latest)\" component is selected in the Visual Studio 2022 installation options.");
+			}
 			else
 			{
-				Log.TraceWarning("No Visual C++ installation was found. Please download and install Visual Studio 2019 with C++ components.");
+				Log.TraceWarning("No Visual C++ installation was found. Please download and install Visual Studio 2019 (or newer) with C++ components.");
 			}
 
 			// Finally, default to VS2019 anyway
@@ -1093,27 +1096,16 @@ namespace UnrealBuildTool
 		/// Visual Studio.
 		/// </summary>
 		/// <param name="Compiler">Version of the toolchain to look for.</param>
-		/// <param name="InstallDir">On success, the directory that Visual Studio is installed to.</param>
 		/// <returns>True if the directory was found, false otherwise.</returns>
-		public static bool TryGetVSInstallDir(WindowsCompiler Compiler, [NotNullWhen(true)] out DirectoryReference? InstallDir)
+		public static IEnumerable<DirectoryReference>? TryGetVSInstallDirs(WindowsCompiler Compiler)
 		{
-			if (BuildHostPlatform.Current.Platform != UnrealTargetPlatform.Win64)
-			{
-				InstallDir = null;
-				return false;
-			}
-
 			List<VisualStudioInstallation> Installations = FindVisualStudioInstallations(Compiler);
 			if(Installations.Count == 0)
 			{
-				InstallDir = null;
-				return false;
+				return null;
 			}
-			else
-			{
-				InstallDir = Installations[0].BaseDir;
-				return true;
-			}
+
+			return Installations.Select(x => x.BaseDir);
 		}
 
 		/// <summary>
