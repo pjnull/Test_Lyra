@@ -15,7 +15,7 @@ public:
 	FIoRequestImpl* NextRequest = nullptr;
 	void* BackendData = nullptr;
 	LLM(const UE::LLMPrivate::FTagData* InheritedLLMTag);
-#if USE_MEMORY_TRACE_TAGS
+#if UE_MEMORY_TAGS_TRACE_ENABLED
 	int32 InheritedTraceTag;
 #endif
 	FIoChunkId ChunkId;
@@ -26,7 +26,7 @@ public:
 		: Dispatcher(InDispatcher)
 	{
 		LLM(InheritedLLMTag = FLowLevelMemTracker::bIsDisabled ? nullptr : FLowLevelMemTracker::Get().GetActiveTagData(ELLMTracker::Default));
-#if USE_MEMORY_TRACE_TAGS
+#if UE_MEMORY_TAGS_TRACE_ENABLED
 		InheritedTraceTag = MemoryTrace_GetActiveTag();
 #endif
 	}
