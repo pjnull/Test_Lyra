@@ -596,7 +596,6 @@ public:
 	 */
 	EProjectPackagingBuildConfigurations GetBuildConfigurationForPlatform(FName PlatformName) const;
 	void SetBuildConfigurationForPlatform(FName PlatformName, EProjectPackagingBuildConfigurations Configuration);
-	void SetBuildConfigurationForAllPlatforms(EProjectPackagingBuildConfigurations Configuration);
 
 	FName GetTargetFlavorForPlatform(FName PlatformName) const;
 	void SetTargetFlavorForPlatform(FName PlatformName, FName TargetFlavorName);
