@@ -537,7 +537,7 @@ void FShaderParameterMap::RemoveParameterAllocation(const TCHAR* ParameterName)
 void FShaderCompilerDefinitions::SetFloatDefine(const TCHAR* Name, float Value)
 {
 	// Make sure the printed value perfectly matches the given number
-	FString Define = FString::SanitizeFloat(Value, 9) + TEXT("f");
+	FString Define = FString::Printf(TEXT("%#.9gf"), Value);
 	Definitions.Add(Name, MoveTemp(Define));
 }
 
