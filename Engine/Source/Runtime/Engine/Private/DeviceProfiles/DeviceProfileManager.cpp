@@ -115,8 +115,7 @@ static void GetCVarsFromDPFragmentIncludes(const FString& CurrentSectionName, co
 
 	for(const FString& FragmentInclude : FragmentIncludeArray)
 	{
-		FString FragmentSectionName = FString::Printf(TEXT("%s %s"), *FragmentInclude, *UDeviceProfileFragment::StaticClass()->GetName());
-		GetFragmentCVars(FragmentSectionName, CVarArrayName, FragmentCVarsINOUT, ConfigSystem);
+		GetFragmentCVars(FragmentInclude, CVarArrayName, FragmentCVarsINOUT, ConfigSystem);
 	}
 }
 
