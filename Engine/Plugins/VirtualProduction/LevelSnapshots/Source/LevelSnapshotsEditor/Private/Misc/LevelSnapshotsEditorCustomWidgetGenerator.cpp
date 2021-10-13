@@ -56,7 +56,8 @@ void LevelSnapshotsEditorCustomWidgetGenerator::CreateRowsForPropertiesNotHandle
 
 	// Create property
 	const FLevelSnapshotsEditorResultsRowPtr NewProperty = 
-		MakeShared<FLevelSnapshotsEditorResultsRow>(InFieldPath->GetDisplayNameText(), FLevelSnapshotsEditorResultsRow::SingleProperty, ECheckBoxState::Checked, 
+		MakeShared<FLevelSnapshotsEditorResultsRow>(InFieldPath->GetDisplayNameText(), FLevelSnapshotsEditorResultsRow::SingleProperty, 
+		InDirectParentRow.IsValid() ? InDirectParentRow.Pin()->GetWidgetCheckedState() : ECheckBoxState::Checked, 
 		InResultsView, InDirectParentRow);
 
 	NewProperty->InitPropertyRowWithCustomWidget(InDirectParentRow, InFieldPath.Get(), CustomSnapshotWidget, CustomWorldWidget);
