@@ -136,6 +136,7 @@ public class UnrealEd : ModuleRules
 				"CurveEditor",
 				"ContentBrowserData",
 				"DerivedDataCache",
+				"Zen",
 				"DesktopPlatform",
 				"LauncherPlatform",
 				"EditorStyle",

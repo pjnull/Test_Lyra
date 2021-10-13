@@ -8,6 +8,7 @@ public class DerivedDataCache : ModuleRules
 	public DerivedDataCache(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PrivateDependencyModuleNames.Add("Core");
+		PrivateDependencyModuleNames.Add("Zen");
 
 		// Dependencies for "S3" and "HTTP" backends
 		PrivateDependencyModuleNames.AddRange(new string[] { "SSL", "Json", "Zen" });
