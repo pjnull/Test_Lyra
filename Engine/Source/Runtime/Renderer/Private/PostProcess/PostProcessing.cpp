@@ -52,6 +52,8 @@
 #include "ScreenSpaceRayTracing.h"
 #include "SceneViewExtension.h"
 #include "FXSystem.h"
+#include "SkyAtmosphereRendering.h"
+#include "Strata/Strata.h"
 
 bool IsMobileEyeAdaptationEnabled(const FViewInfo& View);
 
@@ -326,6 +328,8 @@ void AddPostProcessingPasses(FRDGBuilder& GraphBuilder, const FViewInfo& View, c
 	check(View.VerifyMembersChecks());
 	Inputs.Validate();
 
+	FScene* Scene = View.Family->Scene->GetRenderScene();
+
 	const FIntRect PrimaryViewRect = View.ViewRect;
 	const FIntRect SeparateTranslucencyRect = Inputs.SeparateTranslucencyTextures->GetDimensions().GetViewport(PrimaryViewRect).Rect;
 
@@ -386,6 +390,8 @@ void AddPostProcessingPasses(FRDGBuilder& GraphBuilder, const FViewInfo& View, c
 		VisualizeStationaryLightOverlap,
 		VisualizeLightCulling,
 		VisualizePostProcessStack,
+		VisualizeStrata,
+		VisualizeSkyAtmosphere,
 		VisualizeLevelInstance,
 		SelectionOutline,
 		EditorPrimitive,
@@ -428,6 +434,8 @@ void AddPostProcessingPasses(FRDGBuilder& GraphBuilder, const FViewInfo& View, c
 		TEXT("VisualizeStationaryLightOverlap"),
 		TEXT("VisualizeLightCulling"),
 		TEXT("VisualizePostProcessStack"),
+		TEXT("VisualizeStrata"),
+		TEXT("VisualizeSkyAtmosphere"),
 		TEXT("VisualizeLevelInstance"),
 		TEXT("SelectionOutline"),
 		TEXT("EditorPrimitive"),
@@ -453,7 +461,9 @@ void AddPostProcessingPasses(FRDGBuilder& GraphBuilder, const FViewInfo& View, c
 #if DEBUG_POST_PROCESS_VOLUME_ENABLE
 	PassSequence.SetEnabled(EPass::VisualizePostProcessStack, EngineShowFlags.VisualizePostProcessStack);
 #endif
+	PassSequence.SetEnabled(EPass::VisualizeStrata, Strata::ShouldRenderStrataDebugPasses(View));
 #if WITH_EDITOR
+	PassSequence.SetEnabled(EPass::VisualizeSkyAtmosphere, Scene && View.Family&& View.Family->EngineShowFlags.VisualizeSkyAtmosphere&& ShouldRenderSkyAtmosphereDebugPasses(Scene, View.Family->EngineShowFlags));
 	PassSequence.SetEnabled(EPass::VisualizeLevelInstance, GIsEditor && EngineShowFlags.EditingLevelInstance && EngineShowFlags.VisualizeLevelInstanceEditing && !bVisualizeHDR);
 	PassSequence.SetEnabled(EPass::SelectionOutline, GIsEditor && EngineShowFlags.Selection && EngineShowFlags.SelectionOutline && !EngineShowFlags.Wireframe && !bVisualizeHDR && !IStereoRendering::IsStereoEyeView(View));
 	PassSequence.SetEnabled(EPass::EditorPrimitive, FSceneRenderer::ShouldCompositeEditorPrimitives(View));
@@ -1082,12 +1092,28 @@ void AddPostProcessingPasses(FRDGBuilder& GraphBuilder, const FViewInfo& View, c
 	{
 		FScreenPassRenderTarget OverrideOutput;
 		PassSequence.AcceptOverrideIfLastPass(EPass::VisualizePostProcessStack, OverrideOutput);
-		OverrideOutput = OverrideOutput.IsValid() ? OverrideOutput : FScreenPassRenderTarget::CreateFromInput(GraphBuilder, SceneColor, View.GetOverwriteLoadAction(), TEXT("VisualizeComplexity"));
+		OverrideOutput = OverrideOutput.IsValid() ? OverrideOutput : FScreenPassRenderTarget::CreateFromInput(GraphBuilder, SceneColor, View.GetOverwriteLoadAction(), TEXT("VisualizePostProcessStack"));
 		SceneColor = AddFinalPostProcessDebugInfoPasses(GraphBuilder, View, OverrideOutput);
 	}
 #endif
 
+	if (PassSequence.IsEnabled(EPass::VisualizeStrata))
+	{
+		FScreenPassRenderTarget OverrideOutput;
+		PassSequence.AcceptOverrideIfLastPass(EPass::VisualizeStrata, OverrideOutput);
+		OverrideOutput = OverrideOutput.IsValid() ? OverrideOutput : FScreenPassRenderTarget::CreateFromInput(GraphBuilder, SceneColor, View.GetOverwriteLoadAction(), TEXT("VisualizeStrata"));
+		SceneColor = Strata::AddStrataDebugPasses(GraphBuilder, View, OverrideOutput);
+	}
+
 #if WITH_EDITOR
+	if (PassSequence.IsEnabled(EPass::VisualizeSkyAtmosphere))
+	{
+		FScreenPassRenderTarget OverrideOutput;
+		PassSequence.AcceptOverrideIfLastPass(EPass::VisualizeSkyAtmosphere, OverrideOutput);
+		OverrideOutput = OverrideOutput.IsValid() ? OverrideOutput : FScreenPassRenderTarget::CreateFromInput(GraphBuilder, SceneColor, View.GetOverwriteLoadAction(), TEXT("VisualizeSkyAtmosphere"));
+		SceneColor = AddSkyAtmosphereDebugPasses(GraphBuilder, Scene, *View.Family, View, OverrideOutput);
+	}
+
 	if (PassSequence.IsEnabled(EPass::VisualizeLevelInstance))
 	{
 		FVisualizeLevelInstanceInputs PassInputs;
