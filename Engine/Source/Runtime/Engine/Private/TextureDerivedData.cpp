@@ -1360,7 +1360,10 @@ FTexturePlatformData::~FTexturePlatformData()
 #if WITH_EDITOR
 	if (AsyncTask)
 	{
-		AsyncTask->Wait();
+		if (!AsyncTask->Cancel())
+		{
+			AsyncTask->Wait();
+		}
 		delete AsyncTask;
 		AsyncTask = nullptr;
 	}
