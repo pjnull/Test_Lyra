@@ -7523,6 +7523,18 @@ void FStarshipEditorStyle::FStyle::SetupAutomationStyles()
 				}
 			}
 		}
+
+		for (const FPreviewPlatformMenuItem& Item : FDataDrivenPlatformInfoRegistry::GetAllPreviewPlatformMenuItems())
+		{
+			if (!Item.ActiveIconPath.IsEmpty())
+			{
+				Set(Item.ActiveIconName, new PLATFORM_IMAGE_BRUSH(Item.ActiveIconPath, Icon40x40));
+			}
+			if (!Item.InactiveIconPath.IsEmpty())
+			{
+				Set(Item.InactiveIconName, new PLATFORM_IMAGE_BRUSH(Item.InactiveIconPath, Icon40x40));
+			}
+		}
 #endif
 
 		Set("Launcher.NoHoverTableRow", FTableRowStyle(NormalTableRowStyle)
