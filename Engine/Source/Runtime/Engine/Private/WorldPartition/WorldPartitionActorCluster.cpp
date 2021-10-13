@@ -153,12 +153,14 @@ FActorClusterInstance::FActorClusterInstance(const FActorCluster* InCluster, con
 	, ContainerInstance(InContainerInstance)
 {
 	// Bounds based on cluster mode
-	Bounds = Cluster->Bounds;
 	if (ContainerInstance->ClusterMode == EContainerClusterMode::Embedded)
 	{
 		Bounds = ContainerInstance->Bounds;
 	}
-	Bounds = Bounds.TransformBy(ContainerInstance->Transform);
+	else
+	{
+		Bounds = Cluster->Bounds.TransformBy(ContainerInstance->Transform);
+	}
 	
 	TSet<const UDataLayer*> DataLayerSet;
 	DataLayerSet.Reserve(Cluster->DataLayers.Num() + ContainerInstance->DataLayers.Num());
@@ -352,7 +354,7 @@ void FActorClusterContext::CreateContainerInstanceRecursive(uint64 ID, const FTr
 	
 	ParentBounds += Bounds;
 	
-	UE_LOG(LogWorldPartition, Verbose, TEXT("ContainerInstance (%08x) Bounds (%s) Package (%s)"), ID, *Bounds.TransformBy(Transform).ToString(), *Container->GetContainerPackage().ToString());
+	UE_LOG(LogWorldPartition, Verbose, TEXT("ContainerInstance (%08x) Bounds (%s) Package (%s)"), ID, *Bounds.ToString(), *Container->GetContainerPackage().ToString());
 	ContainerInstances.Add(FActorContainerInstance(ID, Transform, Bounds, DataLayers, ClusterMode, Container, MoveTemp(ChildContainers), MoveTemp(ActorDescViewMap)));
 }
 
