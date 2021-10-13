@@ -37,7 +37,8 @@ void FSimpleElementVS::SetParameters(FRHICommandList& RHICmdList, const FRelativ
 	SetShaderValue(RHICmdList, RHICmdList.GetBoundVertexShader(), TransformTilePosition, Matrices.TilePosition);
 	SetShaderValue(RHICmdList, RHICmdList.GetBoundVertexShader(), SwitchVerticalAxis, bSwitchVerticalAxis ? -1.0f : 1.0f);
 
-	// Clamp Z-values to near plane for ortho-projection, we don't want any near-plane clipping
+	// Clamp Z-values to far plane for ortho-projection, we don't want any far-plane clipping
+	static_assert(bool(ERHIZBuffer::IsInverted), "FSimpleElementVS far plane clipping assumes inverted depth buffer");
 	SetShaderValue(RHICmdList, RHICmdList.GetBoundVertexShader(), DepthMinValue, bPerspectiveProjection ? -1.0f : 0.0f);
 }
 
