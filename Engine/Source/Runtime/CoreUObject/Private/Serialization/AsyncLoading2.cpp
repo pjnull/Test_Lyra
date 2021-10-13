@@ -2047,7 +2047,7 @@ private:
 	TSharedPtr<IPackageStore> PackageStore;
 	FLoadedPackageStore LoadedPackageStore;
 	FGlobalImportStore GlobalImportStore;
-	TSpscQueue<FPackageRequest> PackageRequestQueue;
+	TUniquePtr<TSpscQueue<FPackageRequest>> PackageRequestQueue;
 	TArray<FAsyncPackage2*> PendingPackages;
 
 	/** Initial load pending CDOs */
@@ -2599,7 +2599,7 @@ bool FAsyncLoadingThread2::CreateAsyncPackagesFromQueue(FAsyncLoadingThreadState
 		int32 NumDequeued = 0;
 		while (NumDequeued < TimeSliceGranularity)
 		{
-			TOptional<FPackageRequest> OptionalRequest = PackageRequestQueue.Dequeue();
+			TOptional<FPackageRequest> OptionalRequest = PackageRequestQueue->Dequeue();
 			if (!OptionalRequest.IsSet())
 			{
 				break;
@@ -4883,6 +4883,7 @@ EAsyncPackageState::Type FAsyncLoadingThread2::TickAsyncLoadingFromGameThread(FA
 FAsyncLoadingThread2::FAsyncLoadingThread2(FIoDispatcher& InIoDispatcher)
 	: Thread(nullptr)
 	, IoDispatcher(InIoDispatcher)
+	, PackageRequestQueue(new TSpscQueue<FPackageRequest>())
 {
 #if !WITH_IOSTORE_IN_EDITOR
 	GEventDrivenLoaderEnabled = true;
@@ -5912,7 +5913,7 @@ int32 FAsyncLoadingThread2::LoadPackage(const FPackagePath& InPackagePath, FName
 		? MakeUnique<FLoadPackageAsyncDelegate>(MoveTemp(InCompletionDelegate))
 		: TUniquePtr<FLoadPackageAsyncDelegate>();
 
-	PackageRequestQueue.Enqueue(FPackageRequest::Create(RequestId, InPackagePriority, PackageNameToLoad, PackageIdToLoad, InCustomName, MoveTemp(CompletionDelegate)));
+	PackageRequestQueue->Enqueue(FPackageRequest::Create(RequestId, InPackagePriority, PackageNameToLoad, PackageIdToLoad, InCustomName, MoveTemp(CompletionDelegate)));
 	++QueuedPackagesCounter;
 
 	AltZenaphore.NotifyOne();
