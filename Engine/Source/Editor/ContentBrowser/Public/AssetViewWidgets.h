@@ -585,6 +585,9 @@ protected:
 	const FSlateBrush* GetFolderBackgroundImage() const;
 	const FSlateBrush* GetFolderBackgroundShadowImage() const;
 
+	const FSlateBrush* GetNameAreaBackgroundImage() const;
+	FSlateColor GetNameAreaTextColor() const;
+
 	FOptionalSize GetNameAreaMaxDesiredHeight() const;
 
 	int32 GetGenericThumbnailSize() const;
