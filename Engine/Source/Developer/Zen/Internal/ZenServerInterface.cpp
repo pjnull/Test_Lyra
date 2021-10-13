@@ -33,6 +33,11 @@ FZenServiceInstance& GetDefaultServiceInstance()
 	return DefaultServiceInstance;
 }
 
+FScopeZenService::FScopeZenService()
+	: FScopeZenService(FStringView())
+{
+}
+
 FScopeZenService::FScopeZenService(FStringView InstanceURL)
 {
 	if (!InstanceURL.IsEmpty() && !InstanceURL.Equals(TEXT("<DefaultInstance>")))
@@ -85,6 +90,9 @@ FScopeZenService::FScopeZenService(EServiceMode Mode)
 	}
 
 }
+
+FScopeZenService::~FScopeZenService()
+{}
 
 FZenServiceInstance::FZenServiceInstance(EServiceMode Mode, FStringView InstanceURL)
 {

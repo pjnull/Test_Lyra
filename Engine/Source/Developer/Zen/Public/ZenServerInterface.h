@@ -19,7 +19,7 @@
 #include "Templates/UniquePtr.h"
 #include "ZenStatistics.h"
 
-#define UE_API DERIVEDDATACACHE_API
+#define UE_API ZEN_API
 
 namespace UE::Zen {
 
@@ -36,13 +36,12 @@ enum EServiceMode {Default, DefaultNoLaunch};
 class FScopeZenService
 {
 public:
-	UE_API FScopeZenService()
-	: FScopeZenService(FStringView())
-	{
-	}
+	UE_API FScopeZenService();
 	UE_API FScopeZenService(FStringView InstanceURL);
 	UE_API FScopeZenService(FStringView InstanceHostName, uint16 InstancePort);
 	UE_API FScopeZenService(EServiceMode Mode);
+	UE_API ~FScopeZenService();
+
 
 	UE_API const FZenServiceInstance& GetInstance() const { return *ServiceInstance; }
 	UE_API FZenServiceInstance& GetInstance() { return *ServiceInstance; }

@@ -2,14 +2,6 @@
 
 #pragma once
 
-#ifndef UE_WITH_ZEN
-#	if PLATFORM_WINDOWS
-#		define UE_WITH_ZEN 1
-#	else
-#		define UE_WITH_ZEN 0
-#	endif
-#endif
-
 #if UE_WITH_ZEN
 
 namespace UE::Zen {
