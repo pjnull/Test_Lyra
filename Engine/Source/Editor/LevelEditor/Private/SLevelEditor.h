@@ -238,6 +238,9 @@ private:
 	/** Called when element selection changes */
 	void OnElementSelectionChanged(const UTypedElementSelectionSet* SelectionSet, bool bForceRefresh = false);
 
+	/** Called when actor selection changes */
+	void OnActorSelectionChanged(const TArray<UObject*>& NewSelection, bool bForceRefresh);
+
 	/** Called to set property editors to show the given actors, even if those actors aren't in the current selection set */
 	void OnOverridePropertyEditorSelection(const TArray<AActor*>& NewSelection, bool bForceRefresh = false);
 

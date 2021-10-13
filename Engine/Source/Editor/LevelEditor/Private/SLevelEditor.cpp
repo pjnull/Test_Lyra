@@ -286,6 +286,7 @@ void SLevelEditor::Initialize( const TSharedRef<SDockTab>& OwnerTab, const TShar
 	FModuleManager::Get().LoadModuleChecked("StatusBar");
 
 	LevelEditorModule.OnElementSelectionChanged().AddSP(this, &SLevelEditor::OnElementSelectionChanged);
+	LevelEditorModule.OnActorSelectionChanged().AddSP(this, &SLevelEditor::OnActorSelectionChanged);
 	LevelEditorModule.OnOverridePropertyEditorSelection().AddSP(this, &SLevelEditor::OnOverridePropertyEditorSelection);
 
 	TSharedRef<SWidget> ContentArea = RestoreContentArea( OwnerTab, OwnerWindow );
@@ -1740,6 +1741,11 @@ void SLevelEditor::OnElementSelectionChanged(const UTypedElementSelectionSet* Se
 #endif
 
 	bNeedsRefresh = false;
+}
+
+void SLevelEditor::OnActorSelectionChanged(const TArray<UObject*>& NewSelection, bool bForceRefresh)
+{
+	GetEditorModeManager().ActorSelectionChangeNotify();
 }
 
 void SLevelEditor::OnOverridePropertyEditorSelection(const TArray<AActor*>& NewSelection, bool bForceRefresh)
