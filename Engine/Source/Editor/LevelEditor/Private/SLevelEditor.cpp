@@ -238,8 +238,6 @@ void SLevelEditor::Initialize( const TSharedRef<SDockTab>& OwnerTab, const TShar
 {
 	SelectedElements = NewObject<UTypedElementSelectionSet>(GetTransientPackage(), NAME_None, RF_Transactional);
 	SelectedElements->AddToRoot();
-	
-	ModeUILayer = MakeShareable(new FLevelEditorModeUILayer(this));
 
 	// Register the level editor specific selection behavior
 	{
@@ -564,17 +562,21 @@ void SLevelEditor::OnToolkitHostingStarted( const TSharedRef< class IToolkit >& 
 	//   at once.  OR, we allow multiple to be hosted, but we only show tabs for one at a time (fast switching.)
 	//   Otherwise, it's going to be a huge cluster trying to distinguish tabs for different assets of the same type
 	//   of editor
-	
+	TSharedPtr<FLevelEditorModeUILayer> ModeUILayer = MakeShareable(new FLevelEditorModeUILayer(this));
 	HostedToolkits.Add( Toolkit );
 	ModeUILayer->OnToolkitHostingStarted(Toolkit);
+
+	ModeUILayers.Add(Toolkit->GetToolkitFName(), ModeUILayer);
 }
 
 void SLevelEditor::OnToolkitHostingFinished( const TSharedRef< class IToolkit >& Toolkit )
 {
-	TSharedPtr<FTabManager> LevelEditorTabManager = GetTabManager();
-
-	ModeUILayer->OnToolkitHostingFinished(Toolkit);
-
+	TSharedPtr<FLevelEditorModeUILayer> ModeUILayer; 
+	ModeUILayers.RemoveAndCopyValue(Toolkit->GetToolkitFName(), ModeUILayer);
+	if(ModeUILayer)
+	{
+		ModeUILayer->OnToolkitHostingFinished(Toolkit);
+	}
 	HostedToolkits.Remove( Toolkit );
 
 	// @todo toolkit minor: If user clicks X on all opened world-centric toolkit tabs, should we exit that toolkit automatically?
@@ -639,6 +641,7 @@ void SLevelEditor::AttachSequencer( TSharedPtr<SWidget> SequencerWidget, TShared
 			else
 			{
 				Tab->SetContent(SNullWidget::NullWidget);
+				Tab->RequestCloseTab();
 				SequencerAssetEditor.Reset();
 			}
 		}

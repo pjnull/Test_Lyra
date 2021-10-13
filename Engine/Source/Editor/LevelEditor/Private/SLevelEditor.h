@@ -333,7 +333,7 @@ private:
 	/** If this flag is raised we will force refresh on next selection update. */
 	bool bNeedsRefresh : 1;
 
-	TSharedPtr<FLevelEditorModeUILayer> ModeUILayer;
+	TMap<FName, TSharedPtr<FLevelEditorModeUILayer>> ModeUILayers;
 
 	/** Viewport context menu title, cached each time the element selection set changes */
 	FText CachedViewportContextMenuTitle;
