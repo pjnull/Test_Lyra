@@ -424,14 +424,16 @@ void FEditorCommonDrawHelper::DrawBaseInfo(const FSceneView* View,FPrimitiveDraw
 // @todo UE - reimplement with new component attachment system
 }
 
+#define GRID_WORLD_MAX (2097152.0*0.5)
+
 void FEditorCommonDrawHelper::DrawOldGrid(const FSceneView* View,FPrimitiveDrawInterface* PDI)
 {
 	ESceneDepthPriorityGroup eDPG = (ESceneDepthPriorityGroup)DepthPriorityGroup;
 
 	bool bIsPerspective = ( View->ViewMatrices.GetProjectionMatrix().M[3][3] < 1.0f );
 
-	// Don't attempt to draw the grid lines from the maximum half world extent as it may be clipped due to floating point truncation errors
-	const float HalfWorldExtent = HALF_WORLD_MAX - 1000.0f;
+	// LWC_TODO - replace with LWC version of HALF_WORLD_MAX once we have it
+	static double MaxGridExtent = 8.0 * 1024 * 1024 * 1024;
 
 	// Draw 3D perspective grid
 	if( bIsPerspective)
@@ -479,52 +481,52 @@ void FEditorCommonDrawHelper::DrawOldGrid(const FSceneView* View,FPrimitiveDrawI
 	// Draw ortho grid.
 	else
 	{
-		const bool bIsOrthoXY = ( FMath::Abs(View->ViewMatrices.GetViewMatrix().M[2][2]) > 0.0f );
-		const bool bIsOrthoXZ = ( FMath::Abs(View->ViewMatrices.GetViewMatrix().M[1][2]) > 0.0f );
-		const bool bIsOrthoYZ = ( FMath::Abs(View->ViewMatrices.GetViewMatrix().M[0][2]) > 0.0f );
+		const bool bIsOrthoXY = ( FMath::Abs(View->ViewMatrices.GetViewMatrix().M[2][2]) > 0 );
+		const bool bIsOrthoXZ = ( FMath::Abs(View->ViewMatrices.GetViewMatrix().M[1][2]) > 0 );
+		const bool bIsOrthoYZ = ( FMath::Abs(View->ViewMatrices.GetViewMatrix().M[0][2]) > 0 );
 
 		FLinearColor AxisColors[3];
 		GetAxisColors(AxisColors, false);
 
 		if (bIsOrthoXY)
 		{
-			const bool bNegative = View->ViewMatrices.GetViewMatrix().M[2][2] > 0.0f;
+			const bool bNegative = View->ViewMatrices.GetViewMatrix().M[2][2] > 0;
 
-			FVector StartY(0.0f, +HalfWorldExtent, bNegative ? HalfWorldExtent : -HalfWorldExtent);
-			FVector EndY(0.0f, -HalfWorldExtent, bNegative ? HalfWorldExtent : -HalfWorldExtent);
-			FVector StartX(+HalfWorldExtent, 0.0f, bNegative ? HalfWorldExtent : -HalfWorldExtent);
-			FVector EndX(-HalfWorldExtent, 0.0f, bNegative ? HalfWorldExtent : -HalfWorldExtent);
+			FVector StartY(0, +MaxGridExtent, bNegative ? MaxGridExtent : -MaxGridExtent);
+			FVector EndY(0, -MaxGridExtent, bNegative ? MaxGridExtent : -MaxGridExtent);
+			FVector StartX(+MaxGridExtent, 0, bNegative ? MaxGridExtent : -MaxGridExtent);
+			FVector EndX(-MaxGridExtent, 0, bNegative ? MaxGridExtent : -MaxGridExtent);
 
-			DrawGridSection( GEditor->GetGridSize(), &StartY, &EndY, &StartY.X, &EndY.X, 0, View, PDI);
-			DrawGridSection( GEditor->GetGridSize(), &StartX, &EndX, &StartX.Y, &EndX.Y, 1, View, PDI);
+			DrawGridSection( GEditor->GetGridSize(), MaxGridExtent, &StartY, &EndY, &StartY.X, &EndY.X, 0, View, PDI);
+			DrawGridSection( GEditor->GetGridSize(), MaxGridExtent, &StartX, &EndX, &StartX.Y, &EndX.Y, 1, View, PDI);
 			DrawOriginAxisLine( &StartY, &EndY, &StartY.X, &EndY.X, View, PDI, AxisColors[1] );
 			DrawOriginAxisLine( &StartX, &EndX, &StartX.Y, &EndX.Y, View, PDI, AxisColors[0] );
 		}
 		else if( bIsOrthoXZ )
 		{
-			const bool bNegative = View->ViewMatrices.GetViewMatrix().M[1][2] > 0.0f;
+			const bool bNegative = View->ViewMatrices.GetViewMatrix().M[1][2] > 0;
 
-			FVector StartZ(0.0f, bNegative ? HalfWorldExtent : -HalfWorldExtent, +HalfWorldExtent);
-			FVector EndZ(0.0f, bNegative ? HalfWorldExtent : -HalfWorldExtent, -HalfWorldExtent);
-			FVector StartX(+HalfWorldExtent, bNegative ? HalfWorldExtent : -HalfWorldExtent, 0.0f);
-			FVector EndX(-HalfWorldExtent, bNegative ? HalfWorldExtent : -HalfWorldExtent, 0.0f);
+			FVector StartZ(0, bNegative ? MaxGridExtent : -MaxGridExtent, +MaxGridExtent);
+			FVector EndZ(0, bNegative ? MaxGridExtent : -MaxGridExtent, -MaxGridExtent);
+			FVector StartX(+MaxGridExtent, bNegative ? MaxGridExtent : -MaxGridExtent, 0);
+			FVector EndX(-MaxGridExtent, bNegative ? MaxGridExtent : -MaxGridExtent, 0);
 
-			DrawGridSection( GEditor->GetGridSize(), &StartZ, &EndZ, &StartZ.X, &EndZ.X, 0, View, PDI);
-			DrawGridSection( GEditor->GetGridSize(), &StartX, &EndX, &StartX.Z, &EndX.Z, 2, View, PDI);
+			DrawGridSection( GEditor->GetGridSize(), MaxGridExtent, &StartZ, &EndZ, &StartZ.X, &EndZ.X, 0, View, PDI);
+			DrawGridSection( GEditor->GetGridSize(), MaxGridExtent, &StartX, &EndX, &StartX.Z, &EndX.Z, 2, View, PDI);
 			DrawOriginAxisLine( &StartZ, &EndZ, &StartZ.X, &EndZ.X, View, PDI, AxisColors[2] );
 			DrawOriginAxisLine( &StartX, &EndX, &StartX.Z, &EndX.Z, View, PDI, AxisColors[0] );
 		}
 		else if( bIsOrthoYZ )
 		{
-			const bool bNegative = View->ViewMatrices.GetViewMatrix().M[0][2] < 0.0f;
+			const bool bNegative = View->ViewMatrices.GetViewMatrix().M[0][2] < 0;
 
-			FVector StartZ(bNegative ? -HalfWorldExtent : HalfWorldExtent, 0.0f, +HalfWorldExtent);
-			FVector EndZ(bNegative ? -HalfWorldExtent : HalfWorldExtent, 0.0f, -HalfWorldExtent);
-			FVector StartY(bNegative ? -HalfWorldExtent : HalfWorldExtent, +HalfWorldExtent, 0.0f);
-			FVector EndY(bNegative ? -HalfWorldExtent : HalfWorldExtent, -HalfWorldExtent, 0.0f);
+			FVector StartZ(bNegative ? -MaxGridExtent : MaxGridExtent, 0, +MaxGridExtent);
+			FVector EndZ(bNegative ? -MaxGridExtent : MaxGridExtent, 0, -MaxGridExtent);
+			FVector StartY(bNegative ? -MaxGridExtent : MaxGridExtent, +MaxGridExtent, 0);
+			FVector EndY(bNegative ? -MaxGridExtent : MaxGridExtent, -MaxGridExtent, 0);
 
-			DrawGridSection( GEditor->GetGridSize(), &StartZ, &EndZ, &StartZ.Y, &EndZ.Y, 1, View, PDI);
-			DrawGridSection( GEditor->GetGridSize(), &StartY, &EndY, &StartY.Z, &EndY.Z, 2, View, PDI);
+			DrawGridSection( GEditor->GetGridSize(), MaxGridExtent, &StartZ, &EndZ, &StartZ.Y, &EndZ.Y, 1, View, PDI);
+			DrawGridSection( GEditor->GetGridSize(), MaxGridExtent, &StartY, &EndY, &StartY.Z, &EndY.Z, 2, View, PDI);
 			DrawOriginAxisLine( &StartZ, &EndZ, &StartZ.Y, &EndZ.Y, View, PDI, AxisColors[2] );
 			DrawOriginAxisLine( &StartY, &EndY, &StartY.Z, &EndY.Z, View, PDI, AxisColors[1] );
 		}
@@ -533,20 +535,20 @@ void FEditorCommonDrawHelper::DrawOldGrid(const FSceneView* View,FPrimitiveDrawI
 		{
 			float KillZ = GWorld->GetWorldSettings()->KillZ;
 
-			PDI->DrawLine(FVector(-HalfWorldExtent, 0, KillZ), FVector(HalfWorldExtent, 0, KillZ), FColor::Red, SDPG_Foreground);
-			PDI->DrawLine(FVector(0, -HalfWorldExtent, KillZ), FVector(0, HalfWorldExtent, KillZ), FColor::Red, SDPG_Foreground);
+			PDI->DrawLine(FVector(-MaxGridExtent, 0, KillZ), FVector(MaxGridExtent, 0, KillZ), FColor::Red, SDPG_Foreground);
+			PDI->DrawLine(FVector(0, -MaxGridExtent, KillZ), FVector(0, MaxGridExtent, KillZ), FColor::Red, SDPG_Foreground);
 		}
 	}
 
 	// Draw orthogonal worldframe.
 	if(bDrawWorldBox)
 	{
-		DrawWireBox(PDI, FBox(FVector(-HalfWorldExtent, -HalfWorldExtent, -HalfWorldExtent), FVector(HalfWorldExtent, HalfWorldExtent, HalfWorldExtent)), GEngine->C_WorldBox, eDPG);
+		DrawWireBox(PDI, FBox(FVector(-MaxGridExtent, -MaxGridExtent, -MaxGridExtent), FVector(MaxGridExtent, MaxGridExtent, MaxGridExtent)), GEngine->C_WorldBox, eDPG);
 	}
 }
 
 
-void FEditorCommonDrawHelper::DrawGridSection(float ViewportGridY,FVector* A,FVector* B, FVector::FReal* AX, FVector::FReal* BX,int32 Axis,const FSceneView* View,FPrimitiveDrawInterface* PDI )
+void FEditorCommonDrawHelper::DrawGridSection(double ViewportGridY, double MaxSize, FVector* A,FVector* B, FVector::FReal* AX, FVector::FReal* BX,int32 Axis,const FSceneView* View,FPrimitiveDrawInterface* PDI )
 {
 	if( ViewportGridY == 0 )
 	{
@@ -557,17 +559,17 @@ void FEditorCommonDrawHelper::DrawGridSection(float ViewportGridY,FVector* A,FVe
 	// todo
 	int32 Exponent = GEditor->IsGridSizePowerOfTwo() ? 8 : 10;
 
-	const float SizeX = View->UnscaledViewRect.Width();
-	const float Zoom = (1.0f / View->ViewMatrices.GetProjectionMatrix().M[0][0]) * 2.0f / SizeX;
-	const float Dist = SizeX * Zoom / ViewportGridY;
+	const double SizeX = View->UnscaledViewRect.Width();
+	const double Zoom = (1.0 / View->ViewMatrices.GetProjectionMatrix().M[0][0]) * 2.0 / SizeX;
+	const double Dist = SizeX * Zoom / ViewportGridY;
 
 	// when the grid fades
-	static float Tweak = 4.0f;
+	static double Tweak = 4.0;
 
-	float IncValue = FMath::LogX(Exponent, Dist / (float)(SizeX / Tweak));
+	double IncValue = FMath::LogX(Exponent, Dist / (double)(SizeX / Tweak));
 	int32 IncScale = 1;
 
-	for(float x = 0; x < IncValue; ++x)
+	for(double x = 0; x < IncValue; ++x)
 	{
 		IncScale *= Exponent;
 	}
@@ -578,15 +580,15 @@ void FEditorCommonDrawHelper::DrawGridSection(float ViewportGridY,FVector* A,FVe
 		return;
 	}
 
-	// 0 excluded for hard transitions .. 0.5f for very soft transitions
-	const float TransitionRegion = 0.5f;
+	// 0 excluded for hard transitions .. 0.5 for very soft transitions
+	const double TransitionRegion = 0.5;
 
-	const float InvTransitionRegion = 1.0f / TransitionRegion;
-	float Fract = IncValue - floorf(IncValue);
-	float AlphaA = FMath::Clamp(Fract * InvTransitionRegion, 0.0f, 1.0f);
-	float AlphaB = FMath::Clamp(InvTransitionRegion - Fract * InvTransitionRegion, 0.0f, 1.0f);
+	const double InvTransitionRegion = 1.0 / TransitionRegion;
+	const double Fract = IncValue - FMath::FloorToDouble(IncValue);
+	float AlphaA = FMath::Clamp<float>(Fract * InvTransitionRegion, 0.0f, 1.0f);
+	float AlphaB = FMath::Clamp<float>(InvTransitionRegion - Fract * InvTransitionRegion, 0.0f, 1.0f);
 
-	if(IncValue < -0.5f)
+	if(IncValue < -0.5)
 	{
 		// no fade in magnification case
 		AlphaA = 1.0f;
@@ -609,12 +611,12 @@ void FEditorCommonDrawHelper::DrawGridSection(float ViewportGridY,FVector* A,FVe
 	}
 
 	// Draw major and minor grid lines
-	const int32 FirstLineClamped = FMath::Max<int32>(FirstLine - 1,-HALF_WORLD_MAX/ViewportGridY) / IncScale;
-	const int32 LastLineClamped = FMath::Min<int32>(LastLine + 1, +HALF_WORLD_MAX/ViewportGridY) / IncScale;
+	const int32 FirstLineClamped = FMath::Max<int32>(FirstLine - 1, -MaxSize / ViewportGridY) / IncScale;
+	const int32 LastLineClamped = FMath::Min<int32>(LastLine + 1, +MaxSize / ViewportGridY) / IncScale;
 	for( int32 LineIndex = FirstLineClamped; LineIndex <= LastLineClamped; ++LineIndex )
 	{
-		*AX = FPlatformMath::TruncToFloat(LineIndex * ViewportGridY) * IncScale;
-		*BX = FPlatformMath::TruncToFloat(LineIndex * ViewportGridY) * IncScale;
+		*AX = FPlatformMath::TruncToDouble(LineIndex * ViewportGridY) * IncScale;
+		*BX = FPlatformMath::TruncToDouble(LineIndex * ViewportGridY) * IncScale;
 
 		// Only minor lines fade out with ortho zoom distance.  Origin lines and major lines are drawn
 		// at 100% opacity, but with a brighter value
