@@ -1244,11 +1244,11 @@ void FLevelEditorToolBar::RegisterLevelEditorToolBar( const TSharedRef<FUIComman
 							TSharedPtr<SLevelEditor> LevelEditorPin = LevelEditorPtr.Pin();
 							if (LevelEditorPin.IsValid() && LevelEditorPin->GetEditorModeManager().IsDefaultMode(Mode.ID))
 							{
-								DefaultModes.Add(Mode.ID);
+								DefaultModes.Add(Mode);
 							}
 							else
 							{
-								NonDefaultModes.Add(Mode.ID);
+								NonDefaultModes.Add(Mode);
 							}
 
 						}
@@ -1262,7 +1262,7 @@ void FLevelEditorToolBar::RegisterLevelEditorToolBar( const TSharedRef<FUIComman
 								TSharedPtr<FUICommandInfo> EditorModeCommand =
 									FInputBindingManager::Get().FindCommandInContext(Commands.GetContextName(), EditorModeCommandName);
 
-								if (EditorModeCommand->GetDefaultChord(EMultipleKeyBindingIndex(0)).IsValidChord())
+								if (Mode.IsVisible())
 								{
 									CommandInfos.Add(EditorModeCommand);
 								}
