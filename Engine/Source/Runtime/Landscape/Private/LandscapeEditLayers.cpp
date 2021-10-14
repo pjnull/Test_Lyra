@@ -1413,11 +1413,11 @@ bool ALandscape::IsTextureReady(UTexture2D* InTexture, bool bInWaitForStreaming)
 bool ALandscape::IsMaterialResourceCompiled(FMaterialResource* InMaterialResource, bool bInWaitForCompilation) const
 {
 	check(InMaterialResource);
-	if (bInWaitForCompilation && !InMaterialResource->HasValidGameThreadShaderMap())
+	if (bInWaitForCompilation && !InMaterialResource->IsGameThreadShaderMapComplete())
 	{
 		InMaterialResource->FinishCompilation();
 	}
-	return InMaterialResource->HasValidGameThreadShaderMap();
+	return InMaterialResource->IsGameThreadShaderMapComplete();
 }
 
 bool ALandscape::ComputeLandscapeLayerBrushInfo(FTransform& OutLandscapeTransform, FIntPoint& OutLandscapeSize, FIntPoint& OutLandscapeRenderTargetSize)
