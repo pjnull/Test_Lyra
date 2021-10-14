@@ -109,6 +109,30 @@ ESavePackageResult ValidatePackage(FSaveContext& SaveContext)
 
 	FString FilenameStr(SaveContext.GetFilename());
 
+	/// Cooking checks
+	if (SaveContext.IsCooking())
+	{
+#if WITH_EDITORONLY_DATA
+		// if we strip editor only data, validate the package isn't referenced only by editor data
+		// This check has to be done prior to validating the asset, because invalid state in the
+		// package after stripping editoronly objects is okay if we're going to skip saving the whole package.
+		if (SaveContext.IsStripEditorOnly())
+		{
+			// Don't save packages marked as editor-only.
+			if (SaveContext.CanSkipEditorReferencedPackagesWhenCooking() && SaveContext.GetPackage()->IsLoadedByEditorPropertiesOnly())
+			{
+				UE_CLOG(SaveContext.IsGenerateSaveError(), LogSavePackage, Display, TEXT("Package loaded by editor-only properties: %s. Package will not be saved."), *SaveContext.GetPackage()->GetName());
+				return ESavePackageResult::ReferencedOnlyByEditorOnlyData;
+			}
+			else if (SaveContext.GetPackage()->HasAnyPackageFlags(PKG_EditorOnly))
+			{
+				UE_CLOG(SaveContext.IsGenerateSaveError(), LogSavePackage, Display, TEXT("Package marked as editor-only: %s. Package will not be saved."), *SaveContext.GetPackage()->GetName());
+				return ESavePackageResult::ReferencedOnlyByEditorOnlyData;
+			}
+		}
+#endif
+	}
+
 	UObject* Asset = SaveContext.GetAsset();
 	if (Asset)
 	{
@@ -125,7 +149,7 @@ ESavePackageResult ValidatePackage(FSaveContext& SaveContext)
 			return ESavePackageResult::Error;
 		}
 
-		// If An asset is provided, validate it has the requested TopLevelFlags
+		// If An asset is provided, validate it has the requested TopLevelFlags.
 		EObjectFlags TopLevelFlags = SaveContext.GetTopLevelFlags();
 		if (TopLevelFlags != RF_NoFlags && !Asset->HasAnyFlags(TopLevelFlags))
 		{
@@ -141,9 +165,19 @@ ESavePackageResult ValidatePackage(FSaveContext& SaveContext)
 				Arguments.Add(TEXT("Name"), FText::FromString(Asset->GetPathName()));
 				static_assert(sizeof(TopLevelFlags) <= sizeof(uint32), "Expect EObjectFlags to be uint32");
 				Arguments.Add(TEXT("Flags"), FText::FromString(FString::Printf(TEXT("%x"), (uint32)TopLevelFlags)));
-				FText ErrorText = FText::Format(NSLOCTEXT("SavePackage2", "AssetSaveMissingStandaloneFlag",
-					"The Asset {Name} being saved does not have any of the provided object flags (0x{Flags}); saving the package would cause data loss. "
-					"Run with -dpcvars=save.FixupStandaloneFlags=1 to add the RF_Standalone flag."), Arguments);
+				FText ErrorText;
+				if (FAssetData::IsUAsset(Asset) && EnumHasAnyFlags(TopLevelFlags, RF_Standalone))
+				{
+					ErrorText = FText::Format(NSLOCTEXT("SavePackage2", "AssetSaveMissingStandaloneFlag",
+						"The Asset {Name} being saved does not have any of the provided object flags (0x{Flags}); saving the package would cause data loss. "
+						"Run with -dpcvars=save.FixupStandaloneFlags=1 to add the RF_Standalone flag."), Arguments);
+				}
+				else
+				{
+					ErrorText = FText::Format(NSLOCTEXT("SavePackage2", "AssetSaveMissingTopLevelFlags",
+						"The Asset {Name} being saved does not have any of the provided object flags (0x{Flags}); saving the package would cause data loss."),
+						Arguments);
+				}
 				SaveContext.GetError()->Logf(ELogVerbosity::Warning, TEXT("%s"), *ErrorText.ToString());
 				return ESavePackageResult::Error;
 			}
@@ -185,28 +219,6 @@ ESavePackageResult ValidatePackage(FSaveContext& SaveContext)
 			SaveContext.GetError()->Logf(ELogVerbosity::Warning, TEXT("%s"), *ErrorText.ToString());
 		}
 		return ESavePackageResult::Error;
-	}
-
-	/// Cooking checks
-	if (SaveContext.IsCooking())
-	{
-#if WITH_EDITORONLY_DATA
-		// if we strip editor only data, validate the package isn't referenced only by editor data
-		if (SaveContext.IsStripEditorOnly())
-		{
-			// Don't save packages marked as editor-only.
-			if (SaveContext.CanSkipEditorReferencedPackagesWhenCooking() && SaveContext.GetPackage()->IsLoadedByEditorPropertiesOnly())
-			{
-				UE_CLOG(SaveContext.IsGenerateSaveError(), LogSavePackage, Display, TEXT("Package loaded by editor-only properties: %s. Package will not be saved."), *SaveContext.GetPackage()->GetName());
-				return ESavePackageResult::ReferencedOnlyByEditorOnlyData;
-			}
-			else if (SaveContext.GetPackage()->HasAnyPackageFlags(PKG_EditorOnly))
-			{
-				UE_CLOG(SaveContext.IsGenerateSaveError(), LogSavePackage, Display, TEXT("Package marked as editor-only: %s. Package will not be saved."), *SaveContext.GetPackage()->GetName());
-				return ESavePackageResult::ReferencedOnlyByEditorOnlyData;
-			}			
-		}
-#endif
 	}
 
 	// Warn about long package names, which may be bad for consoles with limited filename lengths.
