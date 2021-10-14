@@ -457,10 +457,13 @@ FZenServiceInstance::AutoLaunch()
 		return false;
 	}
 #if PLATFORM_WINDOWS
-	UE_LOG(LogZenServiceInstance, Display, TEXT("Waiting for Zen service to come online..."));
-	bool bIsReady = WAIT_OBJECT_0 == ::WaitForSingleObject(ReadyEvent, 4000);
-	::CloseHandle(ReadyEvent);
-	UE_CLOG(!bIsReady, LogZenServiceInstance, Fatal, TEXT("AutoLaunched Zen service was not ready after 4 seconds"));
+	if (ReadyEvent)
+	{
+		UE_LOG(LogZenServiceInstance, Display, TEXT("Waiting for Zen service to come online..."));
+		bool bIsReady = WAIT_OBJECT_0 == ::WaitForSingleObject(ReadyEvent, 4000);
+		::CloseHandle(ReadyEvent);
+		UE_CLOG(!bIsReady, LogZenServiceInstance, Fatal, TEXT("AutoLaunched Zen service was not ready after 4 seconds"));
+	}
 #endif
 	return true;
 }
