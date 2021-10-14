@@ -2409,12 +2409,17 @@ void FFindInBlueprintSearchManager::OnBlueprintUnloaded(UBlueprint* InBlueprint)
 					if (FPackageName::IsValidLongPackageName(PackageName))
 					{
 						FString PackageFilename;
-						if (FPackageName::DoesPackageExist(PackageName, nullptr, &PackageFilename))
+						const FPackageName::EPackageLocationFilter PackageLocation = FPackageName::DoesPackageExistEx(PackageName, FPackageName::EPackageLocationFilter::Any, nullptr, &PackageFilename);
+						if (PackageLocation != FPackageName::EPackageLocationFilter::None)
 						{
-							TArray<FString> FilesToScan = { PackageFilename };
-							AssetRegistryModule->Get().ScanModifiedAssetFiles(FilesToScan);
+							if (PackageLocation == FPackageName::EPackageLocationFilter::Uncooked)
+							{
+								TArray<FString> FilesToScan = { PackageFilename };
+								AssetRegistryModule->Get().ScanModifiedAssetFiles(FilesToScan);
 
-							AssetData = AssetRegistryModule->Get().GetAssetByObjectPath(AssetPath, bIncludeOnlyOnDiskAssets);
+								AssetData = AssetRegistryModule->Get().GetAssetByObjectPath(AssetPath, bIncludeOnlyOnDiskAssets);
+							}
+
 							if (AssetData.IsValid())
 							{
 								AddUnloadedBlueprintSearchMetadata(AssetData);
