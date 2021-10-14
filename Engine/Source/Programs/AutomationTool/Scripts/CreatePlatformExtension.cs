@@ -248,14 +248,17 @@ class CreatePlatformExtension : BuildCommand
 		{
 			// find all module rules that are listed in the plugin
 			DirectoryReference ModuleRulesPath = DirectoryReference.Combine( PluginDir, "Source" );
-			var ModuleRules = DirectoryReference.EnumerateFiles(ModuleRulesPath, "*.build.cs", SearchOption.AllDirectories);
-			foreach (FileReference ModuleRule in ModuleRules)
+			if (DirectoryReference.Exists(ModuleRulesPath))
 			{
-				string ModuleRuleName = GetPlatformExtensionBaseNameFromPath(ModuleRule.FullName);
-				ModuleDescriptor ModuleDesc = ParentPlugin.Modules.Find(ParentModuleDesc => ParentModuleDesc.Name.Equals(ModuleRuleName, StringComparison.InvariantCultureIgnoreCase));
-				if (ModuleDesc != null)
+				var ModuleRules = DirectoryReference.EnumerateFiles(ModuleRulesPath, "*.build.cs", SearchOption.AllDirectories);
+				foreach (FileReference ModuleRule in ModuleRules)
 				{
-					ParentModuleRules.Add(ModuleDesc, ModuleRule);
+					string ModuleRuleName = GetPlatformExtensionBaseNameFromPath(ModuleRule.FullName);
+					ModuleDescriptor ModuleDesc = ParentPlugin.Modules.Find(ParentModuleDesc => ParentModuleDesc.Name.Equals(ModuleRuleName, StringComparison.InvariantCultureIgnoreCase));
+					if (ModuleDesc != null)
+					{
+						ParentModuleRules.Add(ModuleDesc, ModuleRule);
+					}
 				}
 			}
 		}
@@ -263,12 +266,11 @@ class CreatePlatformExtension : BuildCommand
 		bool bParentPluginDirty = false;
 
 		// generate the platform extension files
-		string BasePluginDir = GetRelativeBaseDirectory(PluginDir, RootDir);
 		string BasePluginName = GetPlatformExtensionBaseNameFromPath(PluginPath.FullName);
 		foreach (string PlatformName in Platforms)
 		{
 			// verify final file name
-			string FinalFileName = Path.Combine(RootDir.FullName, "Platforms", PlatformName, BasePluginDir, BasePluginName + "_" + PlatformName + ".uplugin");
+			string FinalFileName = MakePlatformExtensionPathFromSource(RootDir, PluginDir, PlatformName, BasePluginName + "_" + PlatformName + ".uplugin");
 			if (File.Exists(FinalFileName) && !(bOverwriteExistingFile && EditFile(FinalFileName)))
 			{
 				Log.TraceWarning($"Skipping {FinalFileName} as it already exists");
@@ -455,14 +457,13 @@ class CreatePlatformExtension : BuildCommand
 		}
 
 		// load template and generate the platform extension files
-		string BaseModuleDir = GetRelativeBaseDirectory( ModuleDir, RootDir );
 		string BaseModuleFileName = GetPlatformExtensionBaseNameFromPath( ModulePath.FullName );
 		string CopyrightLine = MakeCopyrightLine();
 		string Template = LoadTemplate($"PlatformExtension{ModuleExtension}.template");
 		foreach (string PlatformName in PlatformNames)
 		{
 			// verify the final file name
-			string FinalFileName = Path.Combine(RootDir.FullName, "Platforms", PlatformName, BaseModuleDir, BaseModuleFileName + "_" + PlatformName + ModuleExtension );
+			string FinalFileName = MakePlatformExtensionPathFromSource(RootDir, ModuleDir, PlatformName, BaseModuleFileName + "_" + PlatformName + ModuleExtension );
 			if (File.Exists(FinalFileName) && !(bOverwriteExistingFile && EditFile(FinalFileName) ))
 			{
 				Log.TraceWarning($"Skipping {FinalFileName} as it already exists");
@@ -577,23 +578,37 @@ class CreatePlatformExtension : BuildCommand
 
 
 	/// <summary>
-	/// Gets the relative path from the given root. If the root is also under a Platforms/[name] then that is also removed
+	/// Generates the final platform extension file path for the given source directory, platform & filename
 	/// </summary>
-	private string GetRelativeBaseDirectory(DirectoryReference ChildDir, DirectoryReference RootDir)
+	private string MakePlatformExtensionPathFromSource( DirectoryReference RootDir, DirectoryReference SourceDir, string PlatformName, string Filename )
 	{
-		DirectoryReference PlatformsDir = DirectoryReference.Combine(RootDir, "Platforms");
-		string BaseDir;
-		if (ChildDir.IsUnderDirectory(PlatformsDir))
+		string BaseDir = SourceDir.MakeRelativeTo(RootDir)
+			.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+
+		// handle Restricted folders first - need to keep the restricted folder at the start of the path
+		string OptionalRestrictedDir = "";
+		if (BaseDir.StartsWith("Restricted" + Path.DirectorySeparatorChar))
 		{
-			BaseDir = ChildDir.MakeRelativeTo(PlatformsDir);
-			BaseDir = BaseDir.Substring(BaseDir.IndexOf(Path.DirectorySeparatorChar) + 1);
-		}
-		else
-		{
-			BaseDir = ChildDir.MakeRelativeTo(RootDir);
+			string[] RestrictedFragments = BaseDir.Split(Path.DirectorySeparatorChar, 3); // 3 = Restricted/NotForLicensees/<remainder...>
+			if (RestrictedFragments.Length > 0)
+			{
+				OptionalRestrictedDir = Path.Combine( RestrictedFragments.SkipLast(1).ToArray() ); // Restricted/NotForLicensees
+				BaseDir = RestrictedFragments.Last(); // remainder
+			}
 		}
 
-		return BaseDir;
+		// handle Platform folders next - trim off the source platform
+		if (BaseDir.StartsWith("Platforms" + Path.DirectorySeparatorChar))
+		{
+			string[] PlatformFragments = BaseDir.Split(Path.DirectorySeparatorChar, 3); // 3 = Platforms/<platform>/<remainder...>
+			if (PlatformFragments.Length > 0)
+			{
+				BaseDir = PlatformFragments.Last(); //remainder
+			}
+		}
+
+		// build the final path
+		return Path.Combine( RootDir.FullName, OptionalRestrictedDir, "Platforms", PlatformName, BaseDir, Filename );
 	}
 
 
