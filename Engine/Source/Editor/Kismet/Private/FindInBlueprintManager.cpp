@@ -2408,21 +2408,25 @@ void FFindInBlueprintSearchManager::OnBlueprintUnloaded(UBlueprint* InBlueprint)
 					const FString PackageName = AssetData.PackageName.ToString();
 					if (FPackageName::IsValidLongPackageName(PackageName))
 					{
-						FString PackageFilename;
-						const FPackageName::EPackageLocationFilter PackageLocation = FPackageName::DoesPackageExistEx(PackageName, FPackageName::EPackageLocationFilter::Any, nullptr, &PackageFilename);
-						if (PackageLocation != FPackageName::EPackageLocationFilter::None)
+						FPackagePath PackagePath;
+						if (FPackagePath::TryFromPackageName(PackageName, PackagePath))
 						{
-							if (PackageLocation == FPackageName::EPackageLocationFilter::Uncooked)
+							FPackagePath OutPackagePath;
+							const FPackageName::EPackageLocationFilter PackageLocation = FPackageName::DoesPackageExistEx(PackagePath, FPackageName::EPackageLocationFilter::Any, nullptr, /*bMatchCaseOnDisk*/ false, &OutPackagePath);
+							if (PackageLocation != FPackageName::EPackageLocationFilter::None)
 							{
-								TArray<FString> FilesToScan = { PackageFilename };
-								AssetRegistryModule->Get().ScanModifiedAssetFiles(FilesToScan);
+								if (PackageLocation == FPackageName::EPackageLocationFilter::Uncooked && OutPackagePath.HasLocalPath())
+								{
+									TArray<FString> FilesToScan = { OutPackagePath.GetLocalFullPath() };
+									AssetRegistryModule->Get().ScanModifiedAssetFiles(FilesToScan);
 
-								AssetData = AssetRegistryModule->Get().GetAssetByObjectPath(AssetPath, bIncludeOnlyOnDiskAssets);
-							}
+									AssetData = AssetRegistryModule->Get().GetAssetByObjectPath(AssetPath, bIncludeOnlyOnDiskAssets);
+								}
 
-							if (AssetData.IsValid())
-							{
-								AddUnloadedBlueprintSearchMetadata(AssetData);
+								if (AssetData.IsValid())
+								{
+									AddUnloadedBlueprintSearchMetadata(AssetData);
+								}
 							}
 						}
 					}
