@@ -409,7 +409,7 @@ void SDetailSingleItemRow::Construct( const FArguments& InArgs, FDetailLayoutCus
 				NameColumnBox->AddSlot()
 					.HAlign(HAlign_Left)
 					.VAlign(VAlign_Center)
-					.Padding(-2, 0, -10, 0)
+					.Padding(-4, 0, -10, 0)
 					.AutoWidth()
 					[
 						ReorderHandle
@@ -429,7 +429,7 @@ void SDetailSingleItemRow::Construct( const FArguments& InArgs, FDetailLayoutCus
 					NameColumnBox->AddSlot()
 						.HAlign(HAlign_Left)
 						.VAlign(VAlign_Center)
-						.Padding(-2, 0, -10, 0)
+						.Padding(-4, 0, -10, 0)
 						.AutoWidth()
 						[
 							ArrayHandle
