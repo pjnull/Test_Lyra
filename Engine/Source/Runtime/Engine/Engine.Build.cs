@@ -407,11 +407,6 @@ public class Engine : ModuleRules
 			PrivateIncludePathModuleNames.Add("IOSRuntimeSettings");
 		}
 
-		if (Target.Platform == UnrealTargetPlatform.Switch)
-		{
-			PrivateIncludePathModuleNames.Add("SwitchRuntimeSettings");
-		}
-
 		if (Target.IsInPlatformGroup(UnrealPlatformGroup.Unix))
 		{
 			AddEngineThirdPartyPrivateStaticDependencies(Target,
