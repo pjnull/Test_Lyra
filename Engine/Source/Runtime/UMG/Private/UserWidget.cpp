@@ -1424,16 +1424,6 @@ void UUserWidget::TickActionsAndAnimation(float InDeltaTime)
 
 void UUserWidget::PostTickActionsAndAnimation(float InDeltaTime)
 {
-	const bool bWasPlayingAnimation = IsPlayingAnimation();
-	if (bWasPlayingAnimation)
-	{ 
-		TSharedPtr<SWidget> CachedWidget = GetCachedWidget();
-		if (CachedWidget.IsValid())
-		{
-			CachedWidget->MarkPrepassAsDirty();
-		}
-	}
-
 	// The process of ticking the players above can stop them so we remove them after all players have ticked
 	for (UUMGSequencePlayer* StoppedPlayer : StoppedSequencePlayers)
 	{
