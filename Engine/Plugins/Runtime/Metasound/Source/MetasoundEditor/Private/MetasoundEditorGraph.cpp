@@ -75,6 +75,15 @@ void UMetasoundEditorGraphVertex::SetName(const FName& InNewName)
 	FNodeHandle NodeHandle = GetNodeHandle();
 	NodeHandle->SetNodeName(InNewName);
 
+	TArray<UMetasoundEditorGraphNode*> Nodes = GetNodes();
+	for (UMetasoundEditorGraphNode* Node : Nodes)
+	{
+		for (UEdGraphPin* Pin : Node->GetAllPins())
+		{
+			Pin->PinName = InNewName;
+		}
+	}
+
 	NameChanged.Broadcast(NodeID);
 }
 
@@ -368,7 +377,7 @@ void UMetasoundEditorGraphInput::OnDataTypeChanged()
 		InputLiteralClass = UMetasoundEditorGraphInputLiteral::StaticClass();
 	}
 
-	if (Literal && Literal->GetClass() != InputLiteralClass)
+	if (!Literal || Literal->GetClass() != InputLiteralClass)
 	{
 		Literal = NewObject<UMetasoundEditorGraphInputLiteral>(this, InputLiteralClass, FName(), RF_Transactional);
 	}

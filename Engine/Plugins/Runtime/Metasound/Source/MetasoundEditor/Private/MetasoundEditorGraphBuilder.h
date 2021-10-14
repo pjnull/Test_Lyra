@@ -115,6 +115,9 @@ namespace Metasound
 			// Generates a unique output name for the given MetaSound object
 			static FName GenerateUniqueNameByClassType(const UObject& InMetaSound, EMetasoundFrontendClassType InClassType, const FName& InBaseName);
 
+			// Whether or not associated editor graph is in an error state or not.
+			static bool GraphContainsErrors(const UObject& InMetaSound);
+
 			static TArray<FString> GetDataTypeNameCategories(const FName& InDataTypeName);
 
 			// Get the input handle from an input pin.  Ensures pin is an input pin.
@@ -163,6 +166,17 @@ namespace Metasound
 			//
 			// @return True if the UEdGraph was altered, false otherwise. 
 			static bool SynchronizeGraph(UObject& InMetaSound);
+
+			// Synchronizes editor nodes with frontend nodes, removing editor nodes that not represented in the frontend, and adding editor nodes that are not associated with a frontend node.
+			//
+			// @return True if the UMetasoundEditorGraphNode was altered. False otherwise.
+
+			static bool SynchronizeNodes(UObject& InMetaSound);
+
+			// Synchronizes and reports to log whether or not an editor member node's associated FrontendNode ID has changed and therefore been updated through node versioning.
+			//
+			// @return True if the UMetasoundEditorGraphNode was altered. False otherwise.
+			static bool SynchronizeNodeMembers(UObject& InMetaSound);
 
 			// Adds and removes pins so that the UMetasoundEditorGraphNode matches the InNode.
 			//

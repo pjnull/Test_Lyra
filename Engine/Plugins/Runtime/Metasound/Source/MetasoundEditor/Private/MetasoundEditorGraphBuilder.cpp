@@ -366,6 +366,29 @@ namespace Metasound
 			return GetOutputHandleFromPin(InPin);
 		}
 
+		bool FGraphBuilder::GraphContainsErrors(const UObject& InMetaSound)
+		{
+			const FMetasoundAssetBase* MetaSoundAsset = IMetasoundUObjectRegistry::Get().GetObjectAsAssetBase(&InMetaSound);
+			check(MetaSoundAsset);
+			const UMetasoundEditorGraph* EditorGraph = CastChecked<UMetasoundEditorGraph>(MetaSoundAsset->GetGraph());
+
+			// Get all editor nodes from editor graph (some nodes on graph may *NOT* be metasound ed nodes,
+			// such as comment boxes, etc, so just get nodes of class UMetasoundEditorGraph).
+			TArray<const UMetasoundEditorGraphNode*> EditorNodes;
+			EditorGraph->GetNodesOfClass(EditorNodes);
+
+			// Do not synchronize with errors present as the graph is expected to be malformed.
+			for (const UMetasoundEditorGraphNode* Node : EditorNodes)
+			{
+				if (Node->ErrorType == EMessageSeverity::Error)
+				{
+					return true;
+				}
+			}
+
+			return false;
+		}
+
 		void FGraphBuilder::SynchronizeNodeLocation(FVector2D InLocation, Frontend::FNodeHandle InNodeHandle, UMetasoundEditorGraphNode& InNode)
 		{
 			InNode.NodePosX = InLocation.X;
@@ -1276,6 +1299,21 @@ namespace Metasound
 			GraphBuilderPrivate::InitializeGraph(InMetaSound);
 
 			bool bIsEditorGraphDirty = false;
+			if (!GraphContainsErrors(InMetaSound))
+			{
+				bIsEditorGraphDirty |= SynchronizeGraphVertices(InMetaSound);
+				bIsEditorGraphDirty |= SynchronizeNodeMembers(InMetaSound);
+				bIsEditorGraphDirty |= SynchronizeNodes(InMetaSound);
+				bIsEditorGraphDirty |= SynchronizeConnections(InMetaSound);
+			}
+			return bIsEditorGraphDirty;
+		}
+
+		bool FGraphBuilder::SynchronizeNodeMembers(UObject& InMetaSound)
+		{
+			using namespace Frontend;
+
+			bool bIsEditorGraphDirty = false;
 
 			FMetasoundAssetBase* MetaSoundAsset = IMetasoundUObjectRegistry::Get().GetObjectAsAssetBase(&InMetaSound);
 			check(MetaSoundAsset);
@@ -1342,25 +1380,24 @@ namespace Metasound
 				}
 			}
 
-			bIsEditorGraphDirty |= SynchronizeGraphVertices(InMetaSound);
+			return bIsEditorGraphDirty;
+		}
+
+		bool FGraphBuilder::SynchronizeNodes(UObject& InMetaSound)
+		{
+			using namespace Frontend;
+
+			bool bIsEditorGraphDirty = false;
 
 			// Get all external nodes from Frontend graph.  Input and output references will only be added/synchronized
 			// if required when synchronizing connections (as they are not required to inhabit editor graph).
+			FMetasoundAssetBase* MetaSoundAsset = IMetasoundUObjectRegistry::Get().GetObjectAsAssetBase(&InMetaSound);
+			check(MetaSoundAsset);
+			FGraphHandle GraphHandle = MetaSoundAsset->GetRootGraphHandle();
 			TArray<FNodeHandle> FrontendNodes = GraphHandle->GetNodes();
-
-			// Get all editor nodes from editor graph (some nodes on graph may *NOT* be metasound ed nodes,
-			// such as comment boxes, etc, so just get nodes of class UMetasoundEditorGraph).
+			UMetasoundEditorGraph* EditorGraph = CastChecked<UMetasoundEditorGraph>(MetaSoundAsset->GetGraph());
 			TArray<UMetasoundEditorGraphNode*> EditorNodes;
 			EditorGraph->GetNodesOfClass(EditorNodes);
-
-			// Do not synchronize with errors present as the graph is expected to be malformed.
-			for (UMetasoundEditorGraphNode* Node : EditorNodes)
-			{
-				if (Node->ErrorType == EMessageSeverity::Error)
-				{
-					return true;
-				}
-			}
 
 			TMap<FGuid, UMetasoundEditorGraphNode*> EditorNodesByEdNodeGuid;
 			for (UMetasoundEditorGraphNode* Node : EditorNodes)
@@ -1413,8 +1450,8 @@ namespace Metasound
 				}
 			}
 
-			// FrontendNodes contains nodes which need to be added to the editor graph.
-			// EditorNodes contains nodes that need to be removed from the editor graph.
+			// FrontendNodes now contains nodes which need to be added to the editor graph.
+			// EditorNodes now contains nodes that need to be removed from the editor graph.
 			// AssociatedNodes contains pairs which we have to check have synchronized pins
 
 			// Add and remove nodes first in order to make sure correct editor nodes
@@ -1474,8 +1511,6 @@ namespace Metasound
 				}
 			}
 
-			// Synchronize connections.
-			bIsEditorGraphDirty |= SynchronizeConnections(InMetaSound);
 			return bIsEditorGraphDirty;
 		}
 
@@ -1631,8 +1666,6 @@ namespace Metasound
 			FMetasoundAssetBase* MetaSoundAsset = IMetasoundUObjectRegistry::Get().GetObjectAsAssetBase(&InMetaSound);
 			check(MetaSoundAsset);
 			UMetasoundEditorGraph* Graph = CastChecked<UMetasoundEditorGraph>(MetaSoundAsset->GetGraph());
-
-			IMetasoundEditorModule& EditorModule = FModuleManager::GetModuleChecked<IMetasoundEditorModule>("MetaSoundEditor");
 
 			TSet<UMetasoundEditorGraphInput*> Inputs;
 			TSet<UMetasoundEditorGraphOutput*> Outputs;
