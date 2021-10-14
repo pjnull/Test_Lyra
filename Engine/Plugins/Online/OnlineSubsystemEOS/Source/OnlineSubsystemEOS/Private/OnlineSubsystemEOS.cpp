@@ -416,12 +416,18 @@ bool FOnlineSubsystemEOS::Shutdown()
 	UE_LOG_ONLINE(VeryVerbose, TEXT("FOnlineSubsystemEOS::Shutdown()"));
 
 	// EOS-22677 workaround: Make sure tick is called at least once before shutting down.
-	EOS_Platform_Tick(*EOSPlatformHandle);
+	if (EOSPlatformHandle)
+	{
+		EOS_Platform_Tick(*EOSPlatformHandle);
+	}
 
 	StopTicker();
 
-	SocketSubsystem->Shutdown();
-	SocketSubsystem = nullptr;
+	if (SocketSubsystem)
+	{
+		SocketSubsystem->Shutdown();
+		SocketSubsystem = nullptr;
+	}
 
 	// Release our ref to the interfaces. May still exist since they can be aggregated
 	UserManager = nullptr;
