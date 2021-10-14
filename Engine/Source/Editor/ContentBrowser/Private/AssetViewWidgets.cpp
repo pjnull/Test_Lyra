@@ -1804,7 +1804,7 @@ void SAssetTileItem::Construct( const FArguments& InArgs )
 								.TextStyle(FAppStyle::Get(), "ContentBrowser.ClassFont")
 								.OverflowPolicy(ETextOverflowPolicy::Ellipsis)
 								.Text(this, &SAssetTileItem::GetAssetClassText)
-								.ColorAndOpacity(FSlateColor::UseSubduedForeground())
+								.ColorAndOpacity(this, &SAssetTileItem::GetAssetClassLabelTextColor)
 							]
 							
 						]
@@ -1921,6 +1921,18 @@ EVisibility SAssetTileItem::GetAssetClassLabelVisibility() const
 		}
 	}
 	return EVisibility::Collapsed;
+}
+
+FSlateColor SAssetTileItem::GetAssetClassLabelTextColor() const
+{
+	const bool bIsSelected = IsSelected.IsBound() ? IsSelected.Execute() : false;
+	const bool bIsHoveredOrDraggedOver = IsHovered() || bDraggedOver;
+	if (bIsSelected || bIsHoveredOrDraggedOver)
+	{
+		return FStyleColors::White;
+	}
+
+	return FSlateColor::UseSubduedForeground();
 }
 
 FSlateFontInfo SAssetTileItem::GetThumbnailFont() const

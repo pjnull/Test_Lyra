@@ -258,7 +258,21 @@ public:
 								SNew(STextBlock)
 								.Text(ProjectItem->GetEngineLabel())
 								.Font(FAppStyle::Get().GetFontStyle("ProjectBrowser.ProjectTile.Font"))
-								.ColorAndOpacity(FAppStyle::Get().GetSlateColor("Colors.White25"))
+								.ColorAndOpacity_Lambda
+								(
+									[this]()
+									{
+										const bool bIsSelected = IsSelected();
+										const bool bIsRowHovered = IsHovered();
+
+										if (bIsSelected || bIsRowHovered)
+										{
+											return FStyleColors::White;
+										}
+
+										return FSlateColor::UseSubduedForeground();
+									}
+								)
 							]
 						]
 					]
