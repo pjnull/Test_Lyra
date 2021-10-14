@@ -425,7 +425,19 @@ float UCineCameraComponent::GetDesiredFocusDistance(const FVector& InLocation) c
 				FocusPoint = FocusSettings.TrackingFocusSettings.RelativeOffset;
 			}
 
-			DesiredFocusDistance = (FocusPoint - InLocation).Size();
+			const FVector ViewDirection(1, 0, 0);
+			const bool bBehindCamera = FVector::DotProduct(ViewDirection, FocusPoint - InLocation) < 0;
+
+			if (bBehindCamera)
+			{
+				DesiredFocusDistance = 0;
+			}
+			else
+			{
+				FVector OutClosestPoint;
+				FMath::PointDistToLine(FocusPoint, ViewDirection, InLocation, OutClosestPoint);
+				DesiredFocusDistance = (OutClosestPoint - InLocation).Size();
+			}
 		}
 		break;
 	}
