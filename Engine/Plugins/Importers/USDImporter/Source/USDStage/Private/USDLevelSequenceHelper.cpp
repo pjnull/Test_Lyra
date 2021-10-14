@@ -1737,6 +1737,7 @@ public:
 
 	void BindToUsdStageActor( AUsdStageActor* InStageActor ) {}
 	void UnbindFromUsdStageActor() {}
+	void OnStageActorRenamed() {};
 
 	void AddPrim( UUsdPrimTwin& PrimTwin ) {}
 	void RemovePrim(const UUsdPrimTwin& PrimTwin) {}
