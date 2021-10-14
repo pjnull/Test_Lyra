@@ -64,11 +64,21 @@ public:
 	PRAGMA_DISABLE_OPTIMIZATION
 	virtual void RegisterCommands() override
 	{
-		UI_COMMAND(Command_CopyToClipboard, "Copy To Clipboard", "Copies selection to clipboard", EUserInterfaceActionType::Button, FInputChord(EModifierKey::Control, EKeys::C));
+		UI_COMMAND(Command_CopyToClipboard,
+			"Copy To Clipboard",
+			"Copies the selection (timers and their aggregated statistics) to clipboard.",
+			EUserInterfaceActionType::Button,
+			FInputChord(EModifierKey::Control, EKeys::C));
+		UI_COMMAND(Command_OpenSource,
+			"Open Source",
+			"Opens the source file of the selected timer in the registered IDE.",
+			EUserInterfaceActionType::Button,
+			FInputChord());
 	}
 	PRAGMA_ENABLE_OPTIMIZATION
 
 	TSharedPtr<FUICommandInfo> Command_CopyToClipboard;
+	TSharedPtr<FUICommandInfo> Command_OpenSource;
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -109,7 +119,8 @@ void STimersView::InitCommandList()
 {
 	FTimersViewCommands::Register();
 	CommandList = MakeShared<FUICommandList>();
-	CommandList->MapAction(FTimersViewCommands::Get().Command_CopyToClipboard, FExecuteAction::CreateSP(this, &STimersView::ContextMenu_CopySelectedToClipboard_Execute), FCanExecuteAction::CreateSP(this, &STimersView::ContextMenu_CopySelectedToClipboard_CanExecute));
+	CommandList->MapAction(FTimersViewCommands::Get().Command_CopyToClipboard, FExecuteAction::CreateSP(this, &STimersView::ContextMenu_CopyToClipboard_Execute), FCanExecuteAction::CreateSP(this, &STimersView::ContextMenu_CopyToClipboard_CanExecute));
+	CommandList->MapAction(FTimersViewCommands::Get().Command_OpenSource, FExecuteAction::CreateSP(this, &STimersView::ContextMenu_OpenSource_Execute), FCanExecuteAction::CreateSP(this, &STimersView::ContextMenu_OpenSource_CanExecute));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -423,7 +434,7 @@ TSharedPtr<SWidget> STimersView::TreeView_GetMenuContent()
 				MenuBuilder.AddMenuEntry
 				(
 					LOCTEXT("ContextMenu_Header_TimerOptions_StopHighlightEvent", "Stop Highlighting Event"),
-					LOCTEXT("ContextMenu_Header_TimerOptions_StopHighlightEvent_Desc", "Stops highlighting timing event instances of this timer."),
+					LOCTEXT("ContextMenu_Header_TimerOptions_StopHighlightEvent_Desc", "Stops highlighting timing event instances for the selected timer."),
 					FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.EventGraph.FilteredEvent"), Action_ToggleHighlight, NAME_None, EUserInterfaceActionType::Button
 				);
 			}
@@ -432,7 +443,7 @@ TSharedPtr<SWidget> STimersView::TreeView_GetMenuContent()
 				MenuBuilder.AddMenuEntry
 				(
 					LOCTEXT("ContextMenu_Header_TimerOptions_HighlightEvent", "Highlight Event"),
-					LOCTEXT("ContextMenu_Header_TimerOptions_HighlightEvent_Desc", "Highlights all timing event instances of this timer."),
+					LOCTEXT("ContextMenu_Header_TimerOptions_HighlightEvent_Desc", "Highlights all timing event instances for the selected timer."),
 					FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.EventGraph.FilteredEvent"), Action_ToggleHighlight, NAME_None, EUserInterfaceActionType::Button
 				);
 			}
@@ -451,7 +462,7 @@ TSharedPtr<SWidget> STimersView::TreeView_GetMenuContent()
 				MenuBuilder.AddMenuEntry
 				(
 					LOCTEXT("ContextMenu_Header_TimerOptions_RemoveFromGraphTrack", "Remove series from graph track"),
-					LOCTEXT("ContextMenu_Header_TimerOptions_RemoveFromGraphTrack_Desc", "Remove the series containing event instances of this timer from the timing graph track."),
+					LOCTEXT("ContextMenu_Header_TimerOptions_RemoveFromGraphTrack_Desc", "Remove the series containing event instances of the selected timer from the timing graph track."),
 					FSlateIcon(FEditorStyle::GetStyleSetName(), "ProfilerCommand.ToggleShowDataGraph"), Action_ToggleTimerInGraphTrack, NAME_None, EUserInterfaceActionType::Button
 				);
 			}
@@ -460,13 +471,13 @@ TSharedPtr<SWidget> STimersView::TreeView_GetMenuContent()
 				MenuBuilder.AddMenuEntry
 				(
 					LOCTEXT("ContextMenu_Header_TimerOptions_AddToGraphTrack", "Add series to graph track"),
-					LOCTEXT("ContextMenu_Header_TimerOptions_AddToGraphTrack_Desc", "Add a series containing event instances of this timer to the timing graph track."),
+					LOCTEXT("ContextMenu_Header_TimerOptions_AddToGraphTrack_Desc", "Add a series containing event instances of the selected timer to the timing graph track."),
 					FSlateIcon(FEditorStyle::GetStyleSetName(), "ProfilerCommand.ToggleShowDataGraph"), Action_ToggleTimerInGraphTrack, NAME_None, EUserInterfaceActionType::Button
 				);
 			}
 		}
 
-		// Open source in IDE
+		// Open Source in IDE
 		{
 			ISourceCodeAccessModule& SourceCodeAccessModule = FModuleManager::LoadModuleChecked<ISourceCodeAccessModule>("SourceCodeAccess");
 			ISourceCodeAccessor& SourceCodeAccessor = SourceCodeAccessModule.GetAccessor();
@@ -479,26 +490,30 @@ TSharedPtr<SWidget> STimersView::TreeView_GetMenuContent()
 				bIsValidSource = SelectedNode->GetSourceFileAndLine(File, Line);
 			}
 
-			FText ItemLabel = FText::Format(LOCTEXT("ContextMenu_Header_OpenSource", "Open source in {0}"), SourceCodeAccessor.GetNameText());
-			FText ItemToolTip = FText::Format(LOCTEXT("ContextMenu_Header_OpenSource_Desc", "Open source file of selected timer in {0}.\n{1} ({2})"),
-				SourceCodeAccessor.GetNameText(), FText::FromString(File), FText::AsNumber(Line));
+			FText ItemLabel = FText::Format(LOCTEXT("ContextMenu_Header_OpenSource", "Open Source in {0}"), SourceCodeAccessor.GetNameText());
 
-			FUIAction Action_OpenSource;
-			Action_OpenSource.CanExecuteAction = FCanExecuteAction::CreateLambda([bIsValidSource]() { return bIsValidSource; });
-			Action_OpenSource.ExecuteAction = FExecuteAction::CreateSP(this, &STimersView::OpenSourceFileInIDE, SelectedNode);
+			FText ItemToolTip;
+			if (bIsValidSource)
+			{
+				ItemToolTip = FText::Format(LOCTEXT("ContextMenu_Header_OpenSource_Desc1", "Opens the source file of the selected timer in {0}.\n{1} ({2})"),
+					SourceCodeAccessor.GetNameText(), FText::FromString(File), FText::AsNumber(Line, &FNumberFormattingOptions::DefaultNoGrouping()));
+			}
+			else
+			{
+				ItemToolTip = FText::Format(LOCTEXT("ContextMenu_Header_OpenSource_Desc2", "Opens the source file of the selected timer in {0}."),
+					SourceCodeAccessor.GetNameText());
+			}
 
-			MenuBuilder.AddMenuEntry
-			(
+			MenuBuilder.AddMenuEntry(
+				FTimersViewCommands::Get().Command_OpenSource,
+				NAME_None,
 				ItemLabel,
 				ItemToolTip,
 #if PLATFORM_WINDOWS
-				FSlateIcon(FAppStyle::GetAppStyleSetName(), "MainFrame.OpenVisualStudio"),
+				FSlateIcon(FAppStyle::GetAppStyleSetName(), "MainFrame.OpenVisualStudio")
 #else
-				FSlateIcon(),
+				FSlateIcon()
 #endif
-				Action_OpenSource,
-				NAME_None,
-				EUserInterfaceActionType::Button
 			);
 		}
 	}
@@ -514,7 +529,11 @@ TSharedPtr<SWidget> STimersView::TreeView_GetMenuContent()
 			TAttribute<FText>(),
 			FSlateIcon(FCoreStyle::Get().GetStyleSetName(), "GenericCommands.Copy")
 		);
+	}
+	MenuBuilder.EndSection();
 
+	MenuBuilder.BeginSection("Sorting", LOCTEXT("ContextMenu_Header_Sorting", "Sorting"));
+	{
 		MenuBuilder.AddSubMenu
 		(
 			LOCTEXT("ContextMenu_Header_Misc_Sort", "Sort By"),
@@ -800,6 +819,10 @@ void STimersView::InsightsManager_OnSessionChanged()
 
 void STimersView::InsightsManager_OnSessionAnalysisCompleted()
 {
+	// Re-sync the list of timers to update the "<unknown>" timer names.
+	RebuildTree(true);
+
+	// Aggregate stats automatically for the entire session (but only if user didn't made a time selection yet).
 	if (Aggregator->IsEmptyTimeInterval() && !Aggregator->IsRunning())
 	{
 		TSharedPtr<FInsightsManager> InsightsManager = FInsightsManager::Get();
@@ -2067,7 +2090,7 @@ void STimersView::ToggleTimingViewMainGraphEventSeries(FTimerNodePtr TimerNode) 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool STimersView::ContextMenu_CopySelectedToClipboard_CanExecute() const
+bool STimersView::ContextMenu_CopyToClipboard_CanExecute() const
 {
 	const TArray<FTimerNodePtr> SelectedNodes = TreeView->GetSelectedItems();
 
@@ -2076,7 +2099,7 @@ bool STimersView::ContextMenu_CopySelectedToClipboard_CanExecute() const
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void STimersView::ContextMenu_CopySelectedToClipboard_Execute()
+void STimersView::ContextMenu_CopyToClipboard_Execute()
 {
 	if (!Table->IsValid())
 	{
@@ -2111,9 +2134,33 @@ void STimersView::ContextMenu_CopySelectedToClipboard_Execute()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-FReply STimersView::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
+bool STimersView::ContextMenu_OpenSource_CanExecute() const
 {
-	return CommandList->ProcessCommandBindings(InKeyEvent) == true ? FReply::Handled() : FReply::Unhandled();
+	const TArray<FTimerNodePtr> SelectedNodes = TreeView->GetSelectedItems();
+	const int32 NumSelectedNodes = SelectedNodes.Num();
+	if (NumSelectedNodes == 1)
+	{
+		FTimerNodePtr SelectedNode = SelectedNodes[0];
+		if (SelectedNode.IsValid() && SelectedNode->GetType() != ETimerNodeType::Group)
+		{
+			FString File;
+			uint32 Line = 0;
+			return SelectedNode->GetSourceFileAndLine(File, Line);
+		}
+	}
+	return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void STimersView::ContextMenu_OpenSource_Execute() const
+{
+	const TArray<FTimerNodePtr> SelectedNodes = TreeView->GetSelectedItems();
+	const int32 NumSelectedNodes = SelectedNodes.Num();
+	if (NumSelectedNodes == 1)
+	{
+		OpenSourceFileInIDE(SelectedNodes[0]);
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2132,6 +2179,13 @@ void STimersView::OpenSourceFileInIDE(FTimerNodePtr InNode) const
 			SourceCodeAccessor.OpenFileAtLine(File, Line);
 		}
 	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+FReply STimersView::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
+{
+	return CommandList->ProcessCommandBindings(InKeyEvent) == true ? FReply::Handled() : FReply::Unhandled();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

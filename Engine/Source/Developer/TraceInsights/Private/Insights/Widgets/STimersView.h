@@ -118,8 +118,11 @@ private:
 	void TreeView_BuildSortByMenu(FMenuBuilder& MenuBuilder);
 	void TreeView_BuildViewColumnMenu(FMenuBuilder& MenuBuilder);
 
-	bool ContextMenu_CopySelectedToClipboard_CanExecute() const;
-	void ContextMenu_CopySelectedToClipboard_Execute();
+	bool ContextMenu_CopyToClipboard_CanExecute() const;
+	void ContextMenu_CopyToClipboard_Execute();
+
+	bool ContextMenu_OpenSource_CanExecute() const;
+	void ContextMenu_OpenSource_Execute() const;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Tree View - Columns' Header
