@@ -333,6 +333,7 @@ bool FVirtualizationManager::PushData(const FPayloadId& Id, const FCompressedBuf
 	// should change to async at some point, although this makes handling failed
 	// pushed much more difficult.
 
+	int32 ErrorCount = 0;
 	bool bWasPayloadPushed = false;
 	FBackendArray& Backends = StorageType == EStorageType::Local ? LocalCachableBackends : PersistentStorageBackends;
 
@@ -343,9 +344,9 @@ bool FVirtualizationManager::PushData(const FPayloadId& Id, const FCompressedBuf
 		UE_CLOG(Result != EPushResult::Failed, LogVirtualization, Verbose, TEXT("[%s] Pushed the payload '%s'"), *Backend->GetDebugString(), *Id.ToString());
 		UE_CLOG(Result == EPushResult::Failed, LogVirtualization, Error, TEXT("[%s] Failed to push the payload '%s'"), *Backend->GetDebugString(), *Id.ToString());
 
-		if (Result != EPushResult::Failed)
+		if (Result == EPushResult::Failed)
 		{
-			bWasPayloadPushed = true;
+			ErrorCount++;
 		}
 		
 		// Debugging operation where we immediately try to pull the payload after each push (when possible) and assert 
@@ -358,9 +359,11 @@ bool FVirtualizationManager::PushData(const FPayloadId& Id, const FCompressedBuf
 		}
 	}
 
-	UE_CLOG(!bWasPayloadPushed, LogVirtualization, Error, TEXT("Payload '%s' failed to be pushed to any backend'"), *Id.ToString());
+	UE_CLOG(ErrorCount == Backends.Num(), LogVirtualization, Error, TEXT("Payload '%s' failed to be pushed to any backend'"), *Id.ToString());
 
-	return bWasPayloadPushed;
+	// For local storage we consider the push to have failed only if ALL backends gave an error, if at least one backend succeeded then the operation succeeded.
+	// For persistent storage we require that all backends succeeded, so any errors will fail the push operation.
+	return StorageType == EStorageType::Local ? ErrorCount < Backends.Num() : ErrorCount == 0;
 }
 
 FCompressedBuffer FVirtualizationManager::PullData(const FPayloadId& Id)
