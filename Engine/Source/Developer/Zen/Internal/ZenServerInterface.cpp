@@ -366,6 +366,13 @@ FZenServiceInstance::AutoLaunch()
 			*FPaths::ConvertRelativePathToFull(Settings.AutoLaunchSettings.LogPath));
 	}
 
+#if PLATFORM_WINDOWS
+	const TCHAR* ReadyEventName = TEXT("Local\\ZenAutoLaunchReadyCheck");
+	HANDLE ReadyEvent = ::CreateEvent(NULL, false, false, ReadyEventName);
+	Parms.Appendf(TEXT(" --child-id \"%s\""),
+		ReadyEventName);
+#endif
+
 	if (!Settings.AutoLaunchSettings.ExtraArgs.IsEmpty())
 	{
 		Parms.AppendChar(TEXT(' '));
@@ -445,7 +452,17 @@ FZenServiceInstance::AutoLaunch()
 	}
 #endif
 
-	return Proc.IsValid();
+	if (!Proc.IsValid())
+	{
+		return false;
+	}
+#if PLATFORM_WINDOWS
+	UE_LOG(LogZenServiceInstance, Display, TEXT("Waiting for Zen service to come online..."));
+	bool bIsReady = WAIT_OBJECT_0 == ::WaitForSingleObject(ReadyEvent, 4000);
+	::CloseHandle(ReadyEvent);
+	UE_CLOG(!bIsReady, LogZenServiceInstance, Fatal, TEXT("AutoLaunched Zen service was not ready after 4 seconds"));
+#endif
+	return true;
 }
 
 bool 
