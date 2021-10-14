@@ -3971,6 +3971,7 @@ FString FHLSLMaterialTranslator::CastValue(const FString& Code, EMaterialValueTy
 				else
 				{
 					static const TCHAR* Mask[] = { TEXT("<ERROR>"), TEXT("x"), TEXT("xy"), TEXT("xyz"), TEXT("xyzw") };
+					check(NumComponents <= 4);
 					Result += FString::Printf(TEXT("%s.%s"), *Code, Mask[NumComponents]);
 				}
 			}
