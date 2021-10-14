@@ -17,6 +17,7 @@
 #include "ScopedTransaction.h"
 #include "SlateOptMacros.h"
 #include "Styling/SlateIconFinder.h"
+#include "Styling/StyleColors.h"
 #include "SubobjectEditorExtensionContext.h"
 #include "Subsystems/PanelExtensionSubsystem.h"	// SExtensionPanel
 #include "Widgets/Images/SImage.h"
