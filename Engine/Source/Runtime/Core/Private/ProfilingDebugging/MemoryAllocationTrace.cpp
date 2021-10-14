@@ -5,7 +5,7 @@
 #include "ProfilingDebugging/TraceMalloc.h"
 
 #if UE_TRACE_ENABLED
-UE_TRACE_CHANNEL_DEFINE(MemAllocChannel)
+UE_TRACE_CHANNEL_DEFINE(MemAllocChannel, "Memory allocations", true)
 #endif
 
 #if UE_MEMORY_TRACE_ENABLED
