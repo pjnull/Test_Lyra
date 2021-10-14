@@ -45,7 +45,7 @@ bool GTargetDomainClassUseAllowList = true;
 bool GTargetDomainClassEmptyAllowList = false;
 
 // Change to a new guid when EditorDomain needs to be invalidated
-const TCHAR* EditorDomainVersion = TEXT("B9190641FCE0441EBC818BBE6C265735");
+const TCHAR* EditorDomainVersion = TEXT("A8FBE991C37D45F0B428D9CC24201DE8");
 											
 // Identifier of the CacheBuckets for EditorDomain tables
 const TCHAR* EditorDomainPackageBucketName = TEXT("EditorDomainPackage");
@@ -819,16 +819,20 @@ bool TrySavePackage(UPackage* Package)
 	// some attachments may be identical, and Attachments are not allowed to have identical PayloadIds.
 	// We need to keep the duplicate copies of identical payloads because BulkDatas were written into
 	// the exports with offsets that expect all attachment segments to exist in the segmented archive.
-	auto IntToPayloadId = [](int32 Value)
+	auto IntToPayloadId = [](uint32 Value)
 	{
-		alignas(int32) FPayloadId::ByteArray Bytes{};
-		static_assert(sizeof(Bytes) >= sizeof(int32), "We are storing an int32 counter in the Bytes array");
-		int32* IntView = reinterpret_cast<int32*>(Bytes);
-		IntView[0] = Value;
+		alignas(decltype(Value)) FPayloadId::ByteArray Bytes{};
+		static_assert(sizeof(Bytes) >= sizeof(Value), "We are storing an integer counter in the Bytes array");
+		// The PayloadIds are sorted as an array of bytes, so the bytes of the integer must be written big-endian
+		for (int ByteIndex = 0; ByteIndex < sizeof(Value); ++ByteIndex)
+		{
+			Bytes[sizeof(Bytes) - 1 - ByteIndex] = static_cast<uint8>(Value & 0xff);
+			Value >>= 8;
+		}
 		return FPayloadId(Bytes);
 	};
 
-	int32 AttachmentIndex = 1; // 0 is not a valid value for IntToPayloadId
+	uint32 AttachmentIndex = 1; // 0 is not a valid value for IntToPayloadId
 	const FSharedBuffer& ExportsBuffer = PackageWriter->GetHeaderAndExports();
 	check(ExportsBuffer.GetSize() > 0); // Header+Exports segment is non-zero in length
 	RecordBuilder.AddAttachment(ExportsBuffer, IntToPayloadId(AttachmentIndex++));
