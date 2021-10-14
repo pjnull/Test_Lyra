@@ -41,16 +41,6 @@
 extern "C" {
 #endif
 
-//UE4 BEGIN
-#ifndef EXPAT_MANGLE
-#define EXPAT_MANGLE 0
-#endif
-
-#if EXPAT_MANGLE
-#include "expat_mangle.h"
-#endif
-//UE4 END
-
 /* The following token may be returned by XmlContentTok */
 #define XML_TOK_TRAILING_RSQB                                                  \
   -5 /* ] or ]] at the end of the scan; might be                               \
