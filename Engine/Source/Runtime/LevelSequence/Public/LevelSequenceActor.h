@@ -7,7 +7,6 @@
 #include "UObject/Object.h"
 #include "UObject/SoftObjectPath.h"
 #include "GameFramework/Actor.h"
-#include "UObject/SoftObjectPath.h"
 #include "LevelSequencePlayer.h"
 #include "MovieSceneBindingOwnerInterface.h"
 #include "MovieSceneBindingOverrides.h"
@@ -84,7 +83,12 @@ public:
 	TObjectPtr<ULevelSequencePlayer> SequencePlayer;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="General", meta=(AllowedClasses="LevelSequence"))
-	FSoftObjectPath LevelSequence;
+	TObjectPtr<ULevelSequence> LevelSequenceAsset;
+
+#if WITH_EDITORONLY_DATA
+	UPROPERTY()
+	FSoftObjectPath LevelSequence_DEPRECATED;
+#endif
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Cameras", meta=(ShowOnlyInnerProperties))
 	FLevelSequenceCameraSettings CameraSettings;
@@ -128,8 +132,9 @@ public:
 	 * @return Level sequence, or nullptr if not assigned or if it cannot be loaded.
 	 * @see SetSequence
 	 */
-	UFUNCTION(BlueprintCallable, Category="Sequencer|Player")
-	ULevelSequence* LoadSequence() const;
+	UE_DEPRECATED(5.0, "LoadSequence has been deprecated, please use GetSequence")
+	UFUNCTION(BlueprintCallable, Category="Sequencer|Player", meta=(DeprecatedFunction))
+	ULevelSequence* LoadSequence() const { return GetSequence(); }
 
 	/**
 	 * Set the level sequence being played by this actor.
@@ -292,14 +297,13 @@ public:
 
 	/** Initialize the player object with the specified asset */
 	void InitializePlayerWithSequence(ULevelSequence* LevelSequenceAsset);
-	void OnSequenceLoaded(const FName& PackageName, UPackage* Package, EAsyncLoadingResult::Type Result);
 
 #if WITH_EDITOR
 	virtual TSharedPtr<FStructOnScope> GetObjectPickerProxy(TSharedPtr<IPropertyHandle> PropertyHandle) override;
 	virtual void UpdateObjectFromProxy(FStructOnScope& Proxy, IPropertyHandle& ObjectPropertyHandle) override;
 	virtual UMovieSceneSequence* RetrieveOwnedSequence() const override
 	{
-		return LoadSequence();
+		return GetSequence();
 	}
 #endif
 
