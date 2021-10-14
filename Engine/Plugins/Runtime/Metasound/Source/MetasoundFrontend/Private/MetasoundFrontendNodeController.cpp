@@ -791,6 +791,7 @@ namespace Metasound
 				});
 			});
 
+			const FGuid ReplacedNodeGuid = GetID();
 			if (!ensureAlways(GetOwningGraph()->RemoveNode(*this)))
 			{
 				return this->AsShared();
@@ -803,7 +804,7 @@ namespace Metasound
 			FDocumentHandle Document = GetOwningGraph()->GetOwningDocument();
 			ensureAlways(Document->SynchronizeDependency(RegistryKey) != nullptr);
 
-			FNodeHandle ReplacementNode = GetOwningGraph()->AddNode(RegisteredClass->Metadata);
+			FNodeHandle ReplacementNode = GetOwningGraph()->AddNode(RegisteredClass->Metadata, ReplacedNodeGuid);
 			if (!ensureAlways(ReplacementNode->IsValid()))
 			{
 				return this->AsShared();
