@@ -271,6 +271,7 @@ namespace Metasound
 
 				if (!bIsNameInvalid && GraphMember.IsValid())
 				{
+					GraphMember->SetDisplayName(FText::GetEmpty());
 					GraphMember->SetName(*InNewName.ToString());
 				}
 
