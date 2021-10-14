@@ -838,11 +838,6 @@ void SUsdStage::OpenStage( const TCHAR* FilePath )
 		SetActor( &UsdStageModule.GetUsdStageActor( GWorld ) );
 	}
 
-	// Block writing level sequence changes back to the USD stage until we finished this transaction, because once we do
-	// the movie scene and tracks will all trigger OnObjectTransacted. We listen for those on FUsdLevelSequenceHelperImpl::OnObjectTransacted,
-	// and would otherwise end up writing all of the data we just loaded back to the USD stage
-	ViewModel.UsdStageActor->BlockMonitoringLevelSequenceForThisTransaction();
-
 	ViewModel.OpenStage( FilePath );
 }
 

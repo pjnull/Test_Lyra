@@ -53,7 +53,12 @@ void UUsdPrimTwin::Clear()
 
 	for (const TPair< FString, UUsdPrimTwin* >& Pair : Children)
 	{
-		Pair.Value->Clear();
+		// Apparently when changing levels it is possible for these objects to already be nullptr by the time we try clearing them,
+		// so its safer to check
+		if ( Pair.Value )
+		{
+			Pair.Value->Clear();
+		}
 	}
 	Children.Empty();
 

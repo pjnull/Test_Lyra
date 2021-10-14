@@ -149,6 +149,7 @@ public:
 	void CreateLocalLayersSequences();
 	void BindToUsdStageActor( AUsdStageActor* InStageActor );
 	void UnbindFromUsdStageActor();
+	void OnStageActorRenamed();
 
 	ULevelSequence* GetMainLevelSequence() const { return MainLevelSequence; }
 	TArray< ULevelSequence* > GetSubSequences() const
@@ -474,6 +475,55 @@ void FUsdLevelSequenceHelperImpl::UnbindFromUsdStageActor()
 	}
 
 	OnStageEditTargetChangedHandle.Reset();
+}
+
+void FUsdLevelSequenceHelperImpl::OnStageActorRenamed()
+{
+	AUsdStageActor* StageActorPtr = StageActor.Get();
+	if ( !StageActorPtr )
+	{
+		return;
+	}
+
+	FMovieScenePossessable NewPossessable {
+	#if WITH_EDITOR
+		StageActorPtr->GetActorLabel(),
+#else
+		StageActorPtr->GetName(),
+#endif // WITH_EDITOR
+		StageActorPtr->GetClass()
+	};
+	FGuid NewId = NewPossessable.GetGuid();
+
+	bool bDidSomething = false;
+	for ( const TPair<FString, ULevelSequence*>& Pair : LevelSequencesByIdentifier )
+	{
+		ULevelSequence* Sequence = Pair.Value;
+		if ( !Sequence )
+		{
+			continue;
+		}
+
+		UMovieScene* MovieScene = Sequence->GetMovieScene();
+		if ( !MovieScene )
+		{
+			continue;
+		}
+
+		const bool bDidRenameMovieScene = MovieScene->ReplacePossessable( StageActorBinding, NewPossessable );
+		if ( bDidRenameMovieScene )
+		{
+			Sequence->UnbindPossessableObjects( NewId );
+			Sequence->BindPossessableObject( NewId, *StageActorPtr, StageActorPtr->GetWorld() );
+
+			bDidSomething = true;
+		}
+	}
+
+	if ( bDidSomething )
+	{
+		StageActorBinding = NewId;
+	}
 }
 
 ULevelSequence* FUsdLevelSequenceHelperImpl::FindSequenceForAttribute( const UE::FUsdAttribute& Attribute )
@@ -1742,6 +1792,14 @@ ULevelSequence* FUsdLevelSequenceHelper::Init(const UE::FUsdStage& UsdStage)
 	else
 	{
 		return nullptr;
+	}
+}
+
+void FUsdLevelSequenceHelper::OnStageActorRenamed()
+{
+	if ( UsdSequencerImpl.IsValid() )
+	{
+		UsdSequencerImpl->OnStageActorRenamed();
 	}
 }
 

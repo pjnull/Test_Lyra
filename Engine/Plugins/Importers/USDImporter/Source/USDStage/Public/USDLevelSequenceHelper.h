@@ -33,6 +33,9 @@ public:
 	/** Creates the main level sequence and subsequences from the usd stage layers */
 	ULevelSequence* Init(const UE::FUsdStage& UsdStage);
 
+	/** Call this whenever the stage actor is renamed, to replace the possessable binding with a new one */
+	void OnStageActorRenamed();
+
 	/** Resets the helper, abandoning all managed LevelSequences */
 	void Clear();
 

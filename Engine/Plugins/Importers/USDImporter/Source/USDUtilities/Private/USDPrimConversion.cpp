@@ -836,31 +836,26 @@ bool UnrealToUsd::ConvertXformable( const FTransform& RelativeTransform, pxr::Us
 	bool bResetXFormStack = false;
 	XForm.GetLocalTransformation( &UsdMatrix, &bResetXFormStack, UsdTimeCode );
 
-	if ( !GfIsClose( UsdMatrix, UsdTransform, THRESH_VECTORS_ARE_NEAR ) )
+	bool bFoundTransformOp = false;
+	std::vector< pxr::UsdGeomXformOp > XFormOps = XForm.GetOrderedXformOps( &bResetXFormStack );
+	for ( const pxr::UsdGeomXformOp& XFormOp : XFormOps )
 	{
-		bResetXFormStack = false;
-		bool bFoundTransformOp = false;
-
-		std::vector< pxr::UsdGeomXformOp > XFormOps = XForm.GetOrderedXformOps( &bResetXFormStack );
-		for ( const pxr::UsdGeomXformOp& XFormOp : XFormOps )
+		// Found transform op, trying to set its value
+		if ( XFormOp.GetOpType() == pxr::UsdGeomXformOp::TypeTransform )
 		{
-			// Found transform op, trying to set its value
-			if ( XFormOp.GetOpType() == pxr::UsdGeomXformOp::TypeTransform )
-			{
-				bFoundTransformOp = true;
-				XFormOp.Set( UsdTransform, UsdTimeCode );
-				break;
-			}
+			bFoundTransformOp = true;
+			XFormOp.Set( UsdTransform, UsdTimeCode );
+			break;
 		}
+	}
 
-		// If transformOp is not found, make a new one
-		if ( !bFoundTransformOp )
+	// If transformOp is not found, make a new one
+	if ( !bFoundTransformOp )
+	{
+		pxr::UsdGeomXformOp MatrixXform = XForm.MakeMatrixXform();
+		if ( MatrixXform )
 		{
-			pxr::UsdGeomXformOp MatrixXform = XForm.MakeMatrixXform();
-			if ( MatrixXform )
-			{
-				MatrixXform.Set( UsdTransform, UsdTimeCode );
-			}
+			MatrixXform.Set( UsdTransform, UsdTimeCode );
 		}
 	}
 
