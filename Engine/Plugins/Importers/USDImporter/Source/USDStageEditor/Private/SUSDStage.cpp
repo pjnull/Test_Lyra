@@ -415,9 +415,11 @@ void SUsdStage::FillFileMenu( FMenuBuilder& MenuBuilder )
 			EUserInterfaceActionType::Button
 		);
 
+		MenuBuilder.AddSeparator();
+
 		MenuBuilder.AddMenuEntry(
 			LOCTEXT("Reload", "Reload"),
-			LOCTEXT("Reload_ToolTip", "Reloads the stage from disk"),
+			LOCTEXT("Reload_ToolTip", "Reloads the stage from disk, keeping aspects of the session intact"),
 			FSlateIcon(),
 			FUIAction(
 				FExecuteAction::CreateSP( this, &SUsdStage::OnReloadStage ),
@@ -426,6 +428,20 @@ void SUsdStage::FillFileMenu( FMenuBuilder& MenuBuilder )
 			NAME_None,
 			EUserInterfaceActionType::Button
 		);
+
+		MenuBuilder.AddMenuEntry(
+			LOCTEXT( "ResetState", "Reset state" ),
+			LOCTEXT( "ResetState_ToolTip", "Resets the session layer and other options like edit target and muted layers" ),
+			FSlateIcon(),
+			FUIAction(
+				FExecuteAction::CreateSP( this, &SUsdStage::OnResetStage ),
+				FCanExecuteAction()
+			),
+			NAME_None,
+			EUserInterfaceActionType::Button
+		);
+
+		MenuBuilder.AddSeparator();
 
 		MenuBuilder.AddMenuEntry(
 			LOCTEXT("Close", "Close"),
@@ -778,6 +794,16 @@ void SUsdStage::OnReloadStage()
 	FScopedTransaction Transaction( LOCTEXT( "ReloadTransaction", "Reload USD stage" ) );
 
 	ViewModel.ReloadStage();
+
+	if ( UsdLayersTreeView )
+	{
+		UsdLayersTreeView->Refresh( ViewModel.UsdStageActor.Get(), true );
+	}
+}
+
+void SUsdStage::OnResetStage()
+{
+	ViewModel.ResetStage();
 
 	if ( UsdLayersTreeView )
 	{

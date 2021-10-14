@@ -163,6 +163,30 @@ void FUsdStageViewModel::ReloadStage()
 #endif // #if USE_USD_SDK
 }
 
+void FUsdStageViewModel::ResetStage()
+{
+#if USE_USD_SDK
+	if ( !UsdStageActor.IsValid() )
+	{
+		return;
+	}
+
+	UE::FUsdStage Stage = UsdStageActor->GetOrLoadUsdStage();
+	pxr::UsdStageRefPtr UsdStage = pxr::UsdStageRefPtr( Stage );
+
+	if ( UsdStage )
+	{
+		FScopedUsdAllocs Allocs;
+
+		UsdStage->GetSessionLayer()->Clear();
+
+		UsdStage->SetEditTarget( UsdStage->GetEditTargetForLocalLayer( UsdStage->GetRootLayer() ) );
+
+		UsdStage->MuteAndUnmuteLayers( {}, UsdStage->GetMutedLayers() );
+	}
+#endif // #if USE_USD_SDK
+}
+
 void FUsdStageViewModel::CloseStage()
 {
 	if ( AUsdStageActor* StageActor = UsdStageActor.Get() )
