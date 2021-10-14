@@ -1189,7 +1189,7 @@ namespace AutomationScripts
 						String TargetPlatformName = ThisPlatform.GetCookPlatform(Params.DedicatedServer, Params.Client);
 						FileReference OutputFile = FileReference.Combine(SC.ProjectRoot, "Intermediate", "Config", TargetPlatformName, "BinaryConfig.ini");
 						String CommandletParams = String.Format("-TargetPlatform={0} -OutputFile={1} -StagedPluginsFile={2}", TargetPlatformName, OutputFile.FullName, PluginListFile.FullName);
-						RunCommandlet(SC.RawProjectPath, Params.UE4Exe, "MakeBinaryConfig", CommandletParams);
+						RunCommandlet(SC.RawProjectPath, Params.UnrealExe, "MakeBinaryConfig", CommandletParams);
 						SC.StageFile(StagedFileType.UFS, OutputFile, StagedFileReference.Combine(SC.RelativeProjectRootForStage, "Config", OutputFile.GetFileName()));
 					}
 

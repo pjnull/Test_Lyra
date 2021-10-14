@@ -998,7 +998,7 @@ namespace AutomationScripts
 
 		private static IProcessResult RunCookOnTheFlyServer(FileReference ProjectName, string ServerLogFile, string TargetPlatform, string AdditionalCommandLine)
 		{
-			var ServerApp = HostPlatform.Current.GetUE4ExePath("UnrealEditor.exe");
+			var ServerApp = HostPlatform.Current.GetUnrealExePath("UnrealEditor.exe");
 			var Args = String.Format("{0} -run=cook -cookonthefly -unattended -CrashForUAT -log",
 				CommandUtils.MakePathSafeToUseWithCommandLine(ProjectName.FullName));
 			if (!String.IsNullOrEmpty(ServerLogFile))
@@ -1048,7 +1048,7 @@ namespace AutomationScripts
 		string UnrealFileServerResponseFileName = CombinePaths(CmdEnv.LogFolder, "UnrealFileServerList.txt");
 		File.WriteAllLines(UnrealFileServerResponseFileName, UnrealFileServerResponseFile);
 #endif
-			var UnrealFileServerExe = HostPlatform.Current.GetUE4ExePath("UnrealFileServer.exe");
+			var UnrealFileServerExe = HostPlatform.Current.GetUnrealExePath("UnrealFileServer.exe");
 
 			LogInformation("Running UnrealFileServer *******");
 			var Args = String.Format("{0} -abslog={1} -unattended -CrashForUAT -log {2}",
@@ -1077,7 +1077,7 @@ namespace AutomationScripts
 			LogInformation("UnrealTrace: Starting server");
 
 			// Locate the UnrealTrace binary
-			var UnrealTracePath = HostPlatform.Current.GetUE4ExePath("UnrealTraceServer.exe");
+			var UnrealTracePath = HostPlatform.Current.GetUnrealExePath("UnrealTraceServer.exe");
 			if (!File.Exists(UnrealTracePath))
 			{
 				LogWarning("UnrealTrace: Unable to locate binary at " + UnrealTracePath);

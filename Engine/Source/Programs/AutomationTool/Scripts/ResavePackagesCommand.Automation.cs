@@ -112,11 +112,11 @@ namespace AutomationScripts.Automation
 			LogInformation("Running Step:- ResavePackages::RunResavePackagesCommandlet");
 
 			// Find the commandlet binary
-			string UE4EditorExe = HostPlatform.Current.GetUE4ExePath(Params.UE4Exe);
-			if (!FileExists(UE4EditorExe))
+			string UEEditorExe = HostPlatform.Current.GetUnrealExePath(Params.UnrealExe);
+			if (!FileExists(UEEditorExe))
 			{
-				LogError("Missing " + UE4EditorExe + " executable. Needs to be built first.");
-				throw new AutomationException("Missing " + UE4EditorExe + " executable. Needs to be built first.");
+				LogError("Missing " + UEEditorExe + " executable. Needs to be built first.");
+				throw new AutomationException("Missing " + UEEditorExe + " executable. Needs to be built first.");
 			}
 
 			// Now let's rebuild lightmaps for the project
@@ -128,7 +128,7 @@ namespace AutomationScripts.Automation
                 {
                     CommandletParams += String.Format(" -SCCProvider={0} -P4Port={1} -P4User={2} -P4Client={3} -P4Changelist={4} -P4Passwd={5}", "Perforce", P4Env.ServerAndPort, P4Env.User, P4Env.Client, WorkingCL.ToString(), P4.GetAuthenticationToken());
                 }
-				ResavePackagesCommandlet(Params.RawProjectPath, Params.UE4Exe, Params.MapsToRebuildLightMaps.ToArray(), CommandletParams);
+				ResavePackagesCommandlet(Params.RawProjectPath, Params.UnrealExe, Params.MapsToRebuildLightMaps.ToArray(), CommandletParams);
 			}
 			catch (Exception Ex)
 			{
