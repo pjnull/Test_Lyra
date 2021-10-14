@@ -86,16 +86,16 @@ namespace AutomationScripts.Automation
 		private void BuildNecessaryTargets()
 		{
 			LogInformation("Running Step:- RebuildHLOD::BuildNecessaryTargets");
-			UE4Build.BuildAgenda Agenda = new UE4Build.BuildAgenda();
+			UnrealBuild.BuildAgenda Agenda = new UnrealBuild.BuildAgenda();
             Agenda.AddTarget("UnrealHeaderTool", UnrealBuildTool.UnrealTargetPlatform.Win64, UnrealBuildTool.UnrealTargetConfiguration.Development);
 			Agenda.AddTarget("ShaderCompileWorker", UnrealBuildTool.UnrealTargetPlatform.Win64, UnrealBuildTool.UnrealTargetConfiguration.Development);			
 			Agenda.AddTarget(CommandletTargetName, UnrealBuildTool.UnrealTargetPlatform.Win64, UnrealBuildTool.UnrealTargetConfiguration.Development);
 
 			try
 			{
-				UE4Build Builder = new UE4Build(this);
+				UnrealBuild Builder = new UnrealBuild(this);
 				Builder.Build(Agenda, InDeleteBuildProducts: true, InUpdateVersionFiles: true, InForceNoXGE: false, InChangelistNumberOverride: GetLatestCodeChange());
-				UE4Build.CheckBuildProducts(Builder.BuildProductFiles);
+				UnrealBuild.CheckBuildProducts(Builder.BuildProductFiles);
 			}
 			catch (AutomationException)
 			{

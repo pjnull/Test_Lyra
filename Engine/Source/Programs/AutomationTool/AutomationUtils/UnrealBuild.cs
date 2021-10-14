@@ -15,15 +15,15 @@ using UnrealBuildBase;
 
 namespace AutomationTool
 {
-	class UE4BuildException : AutomationException
+	class UnrealBuildException : AutomationException
 	{
-		public UE4BuildException(string Message)
+		public UnrealBuildException(string Message)
 			: base("BUILD FAILED: " + Message)
 		{
 			OutputFormat = AutomationExceptionOutputFormat.Minimal;
 		}
 
-		public UE4BuildException(string Format, params object[] Args)
+		public UnrealBuildException(string Format, params object[] Args)
 			: this(String.Format(Format, Args))
 		{
 		}
@@ -35,7 +35,7 @@ namespace AutomationTool
 	[Help("ForceNonUnity", "Toggle to disable the unity build system")]
 	[Help("ForceUnity", "Toggle to force enable the unity build system")]
 	[Help("Licensee", "If set, this build is being compiled by a licensee")]
-	public class UE4Build
+	public class UnrealBuild
 	{
 		private BuildCommand OwnerCommand;
 
@@ -49,7 +49,7 @@ namespace AutomationTool
 			string File = CommandUtils.CombinePaths(InFile);
 			if (!CommandUtils.FileExists(File) && !CommandUtils.DirectoryExists(File))
 			{
-				throw new UE4BuildException("Specified file to AddBuildProduct {0} does not exist.", File);
+				throw new UnrealBuildException("Specified file to AddBuildProduct {0} does not exist.", File);
 			}
 			BuildProductFiles.Add(File);
 		}
@@ -66,7 +66,7 @@ namespace AutomationTool
 		{
 			if (!FileReference.Exists(ManifestFile))
 			{
-				throw new UE4BuildException("UBT Manifest {0} does not exist.", ManifestFile);
+				throw new UnrealBuildException("UBT Manifest {0} does not exist.", ManifestFile);
 			}
 
 			BuildManifest Manifest = CommandUtils.ReadManifest(ManifestFile);
@@ -74,7 +74,7 @@ namespace AutomationTool
 			{
 				if (!CommandUtils.FileExists_NoExceptions(Item) && !CommandUtils.DirectoryExists_NoExceptions(Item))
 				{
-					throw new UE4BuildException("{0} was in manifest but was not produced.", Item);
+					throw new UnrealBuildException("{0} was in manifest but was not produced.", Item);
 				}
 				AddBuildProduct(Item);
 			}
@@ -85,7 +85,7 @@ namespace AutomationTool
 		{			
 			if (CommandUtils.FileExists(UBTExecutable) == false)
 			{
-				throw new UE4BuildException("UBT does not exist in {0}.", UBTExecutable);
+				throw new UnrealBuildException("UBT does not exist in {0}.", UBTExecutable);
 			}
 		}
 
@@ -135,7 +135,7 @@ namespace AutomationTool
 			{
 				if (!CommandUtils.FileExists_NoExceptions(XGEFile))
 				{
-					throw new UE4BuildException("Couldn't find file: {0}", XGEFile);
+					throw new UnrealBuildException("Couldn't find file: {0}", XGEFile);
 				}
 				int FileNum = 0;
 				string OutFile;
@@ -168,7 +168,7 @@ namespace AutomationTool
 			{
 				if (!CommandUtils.FileExists_NoExceptions(ManifestItem))
 				{
-					throw new UE4BuildException("{0} was in manifest but was not produced.", ManifestItem);
+					throw new UnrealBuildException("{0} was in manifest but was not produced.", ManifestItem);
 				}
 				AddBuildProduct(ManifestItem);
 			}
@@ -505,7 +505,7 @@ namespace AutomationTool
 		}
 
 
-		public UE4Build(BuildCommand Command)
+		public UnrealBuild(BuildCommand Command)
 		{
 			OwnerCommand = Command;
 			BuildProductFiles.Clear();
@@ -566,7 +566,7 @@ namespace AutomationTool
 				}
 				if (!CommandUtils.FileExists(TaskFilePath))
 				{
-					throw new UE4BuildException("Unable to find xge xml: " + TaskFilePath);
+					throw new UnrealBuildException("Unable to find xge xml: " + TaskFilePath);
 				}
 
 				CombineXGEScope.Span.Finish();
@@ -613,7 +613,7 @@ namespace AutomationTool
 							}
 							else if (SuccesCode != 0)
 							{
-								throw new UE4BuildException("Command failed (Result:{3}): {0} {1}. See logfile for details: '{2}' ",
+								throw new UnrealBuildException("Command failed (Result:{3}): {0} {1}. See logfile for details: '{2}' ",
 																XGETool, Args, Path.GetFileName(LogFile), SuccesCode);
 							}
 							CommandUtils.LogVerbose("{0} {1} Done *******", XGETool, Args);
@@ -656,7 +656,7 @@ namespace AutomationTool
 				{
 					if (!CommandUtils.FileExists_NoExceptions(XGEFile))
 					{
-						throw new UE4BuildException("Couldn't find file: {0}", XGEFile);
+						throw new UnrealBuildException("Couldn't find file: {0}", XGEFile);
 					}
 					var TargetFile = TaskFilePath + "." + Path.GetFileName(XGEFile);
 					CommandUtils.CopyFile(XGEFile, TargetFile);
@@ -904,7 +904,7 @@ namespace AutomationTool
 											string ActionJob = ThisAction + string.Format("_{0}", Job);
 											if (!ActionToAction.ContainsKey(ActionJob))
 											{
-												throw new UE4BuildException("Action not found '{0}' in {1}->{2}", ActionJob, XGEFile, TargetFile);
+												throw new UnrealBuildException("Action not found '{0}' in {1}->{2}", ActionJob, XGEFile, TargetFile);
 												// the XGE schedule is not topologically sorted. Hmmm. Well, we make a scary assumption here that this 
 											}
 											NewDepends += ActionToAction[ActionJob];
@@ -979,7 +979,7 @@ namespace AutomationTool
 		{
 			if (!CommandUtils.CmdEnv.HasCapabilityToCompile)
 			{
-				throw new UE4BuildException("You are attempting to compile on a machine that does not have a supported compiler!");
+				throw new UnrealBuildException("You are attempting to compile on a machine that does not have a supported compiler!");
 			}
 			bool DeleteBuildProducts = InDeleteBuildProducts.HasValue ? InDeleteBuildProducts.Value : ParseParam("Clean");
 			if (InUpdateVersionFiles)
@@ -1026,7 +1026,7 @@ namespace AutomationTool
 
 			// only run ParallelExecutor if not running XGE (and we've requested ParallelExecutor and it exists)
 			bool bCanUseParallelExecutor = InUseParallelExecutor && (HostPlatform.Current.HostEditorPlatform == UnrealTargetPlatform.Win64);
-			CommandUtils.LogLog("************************* UE4Build:");
+			CommandUtils.LogLog("************************* UnrealBuild:");
 			CommandUtils.LogLog("************************* UseXGE: {0}", bCanUseXGE);
 			CommandUtils.LogLog("************************* UseParallelExecutor: {0}", bCanUseParallelExecutor);
 
@@ -1131,7 +1131,7 @@ namespace AutomationTool
 			CommandUtils.LogSetProgress(InShowProgress, "Building...");
 			if (!ProcessXGEItems(XGEItems, XGETool, Args, TaskFilePath, InShowProgress))
 			{
-				throw new UE4BuildException("{0} failed, retries not enabled:", XGETool);
+				throw new UnrealBuildException("{0} failed, retries not enabled:", XGETool);
 			}
 		}
 
@@ -1154,7 +1154,7 @@ namespace AutomationTool
 					{
 						if (!CommandUtils.FileExists(Product) && !CommandUtils.DirectoryExists(Product))
 						{
-							throw new UE4BuildException("{0} was a build product but no longer exists", Product);
+							throw new UnrealBuildException("{0} was a build product but no longer exists", Product);
 						}
 						CommandUtils.LogLog(Product);
 					}
@@ -1176,7 +1176,7 @@ namespace AutomationTool
 				CommandUtils.P4.Sync("-f -k " + CommandUtils.MakePathSafeToUseWithCommandLine(File) + "#head"); // sync the file without overwriting local one
 				if (!CommandUtils.FileExists(File))
 				{
-					throw new UE4BuildException("{0} was a build product but no longer exists", File);
+					throw new UnrealBuildException("{0} was a build product but no longer exists", File);
 				}
 
 				CommandUtils.P4.ReconcileNoDeletes(WorkingCL, CommandUtils.MakePathSafeToUseWithCommandLine(File));
@@ -1234,7 +1234,7 @@ namespace AutomationTool
 				var UBTProduct = CommandUtils.CombinePaths(UBTLocation, UBTFile);
 				if (!CommandUtils.FileExists_NoExceptions(UBTProduct))
 				{
-					throw new UE4BuildException("Cannot add UBT to the build products because {0} does not exist.", UBTProduct);
+					throw new UnrealBuildException("Cannot add UBT to the build products because {0} does not exist.", UBTProduct);
 				}
 				AddBuildProduct(UBTProduct);
 			}
@@ -1251,7 +1251,7 @@ namespace AutomationTool
 				string UATScriptFilePath = BuildProduct.FullName;
 				if (!CommandUtils.FileExists_NoExceptions(UATScriptFilePath))
 				{
-					throw new UE4BuildException("Cannot add UAT to the build products because {0} does not exist.", UATScriptFilePath);
+					throw new UnrealBuildException("Cannot add UAT to the build products because {0} does not exist.", UATScriptFilePath);
 				}
 				AddBuildProduct(UATScriptFilePath);
 			}
@@ -1285,5 +1285,15 @@ namespace AutomationTool
 
 		// List of everything we built so far
 		public readonly HashSet<string> BuildProductFiles = new HashSet<string>(StringComparer.InvariantCultureIgnoreCase);
+	}
+
+	[Obsolete("Deprecated in 5.0. Use UnrealBuild")]
+	public class UE4Build : UnrealBuild
+	{
+		public UE4Build(BuildCommand Command) : base(Command)
+		{
+		}
+
+
 	}
 }

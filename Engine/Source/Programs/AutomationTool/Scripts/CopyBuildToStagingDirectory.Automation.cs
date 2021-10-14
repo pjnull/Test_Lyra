@@ -129,7 +129,7 @@ namespace AutomationScripts
 				{
 					if (!CommandUtils.FileExists_NoExceptions(BuildPatchToolExe))
 					{
-						UEBuildUtils.BuildBuildPatchTool(null, UnrealBuildTool.BuildHostPlatform.Current.Platform);
+						UnrealBuildUtils.BuildBuildPatchTool(null, UnrealBuildTool.BuildHostPlatform.Current.Platform);
 					}
 				}
 			}

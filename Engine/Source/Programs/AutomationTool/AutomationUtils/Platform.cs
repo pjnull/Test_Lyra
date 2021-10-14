@@ -543,7 +543,7 @@ namespace AutomationTool
 		/// </summary>
 		/// <param name="Agenda">Agenda to update</param>
 		/// <param name="ExtraBuildProducts">Any additional files that will be created</param>
-		public virtual void MakeAgenda(UE4Build.BuildAgenda Agenda, List<string> ExtraBuildProducts)
+		public virtual void MakeAgenda(UnrealBuild.BuildAgenda Agenda, List<string> ExtraBuildProducts)
 		{
 		}
 
@@ -742,7 +742,7 @@ namespace AutomationTool
 			get { return true; }
 		}
 
-		public virtual void PreBuildAgenda(UE4Build Build, UE4Build.BuildAgenda Agenda, ProjectParams Params)
+		public virtual void PreBuildAgenda(UnrealBuild Build, UnrealBuild.BuildAgenda Agenda, ProjectParams Params)
 		{
 
 		}

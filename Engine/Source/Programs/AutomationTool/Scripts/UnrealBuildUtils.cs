@@ -1,4 +1,4 @@
-﻿// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 using System;
 using System.Collections.Generic;
@@ -10,7 +10,7 @@ using UnrealBuildTool;
 /// <summary>
 /// Common UEBuild utilities
 /// </summary>
-public class UEBuildUtils : CommandUtils
+public class UnrealBuildUtils : CommandUtils
 {
 	/// <summary>
 	/// Builds BuildPatchTool for the specified platform.
@@ -19,7 +19,7 @@ public class UEBuildUtils : CommandUtils
 	/// <param name="InPlatform"></param>
 	public static void BuildBuildPatchTool(BuildCommand Command, UnrealBuildTool.UnrealTargetPlatform InPlatform)
 	{
-		BuildProduct(Command, new UE4Build.BuildTarget()
+		BuildProduct(Command, new UnrealBuild.BuildTarget()
 			{
 				UprojectPath = null,
 				TargetName = "BuildPatchTool",
@@ -35,7 +35,7 @@ public class UEBuildUtils : CommandUtils
 	/// <param name="InPlatform"></param>
 	public static void BuildUnrealHeaderTool(BuildCommand Command, UnrealBuildTool.UnrealTargetPlatform InPlatform)
 	{
-		BuildProduct(Command, new UE4Build.BuildTarget()
+		BuildProduct(Command, new UnrealBuild.BuildTarget()
 		{
 			UprojectPath = null,
 			TargetName = "UnrealHeaderTool",
@@ -44,30 +44,30 @@ public class UEBuildUtils : CommandUtils
 		});
 	}
 
-	private static void BuildProduct(BuildCommand Command, UE4Build.BuildTarget Target)
+	private static void BuildProduct(BuildCommand Command, UnrealBuild.BuildTarget Target)
 	{
 		if (Target == null)
 		{
-			throw new AutomationException("Target is required when calling UE4BuildUtils.BuildProduct");
+			throw new AutomationException("Target is required when calling UnrealBuildUtils.BuildProduct");
 		}
 
 		LogInformation("Building {0}", Target.TargetName);
 
 		if (Command == null)
 		{
-			Command = new UE4BuildUtilDummyBuildCommand();
+			Command = new UnrealBuildUtilDummyBuildCommand();
 		}
 
-		var UE4Build = new UE4Build(Command);
+		var UnrealBuild = new UnrealBuild(Command);
 
-		var Agenda = new UE4Build.BuildAgenda();
+		var Agenda = new UnrealBuild.BuildAgenda();
 		Agenda.Targets.Add(Target);
 
-		UE4Build.Build(Agenda, InDeleteBuildProducts: true, InUpdateVersionFiles: true);
-		UE4Build.CheckBuildProducts(UE4Build.BuildProductFiles);
+		UnrealBuild.Build(Agenda, InDeleteBuildProducts: true, InUpdateVersionFiles: true);
+		UnrealBuild.CheckBuildProducts(UnrealBuild.BuildProductFiles);
 	}
 
-	class UE4BuildUtilDummyBuildCommand : BuildCommand
+	class UnrealBuildUtilDummyBuildCommand : BuildCommand
 	{
 		public override void ExecuteBuild()
 		{

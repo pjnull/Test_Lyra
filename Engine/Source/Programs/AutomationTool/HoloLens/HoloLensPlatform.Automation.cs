@@ -376,7 +376,7 @@ namespace HoloLens.Automation
 
 		}
 
-		public override void PreBuildAgenda(UE4Build Build, UE4Build.BuildAgenda Agenda, ProjectParams Params)
+		public override void PreBuildAgenda(UnrealBuild Build, UnrealBuild.BuildAgenda Agenda, ProjectParams Params)
 		{
 			if(ActualArchitectures.Length == 0)
 			{
@@ -395,7 +395,7 @@ namespace HoloLens.Automation
 
 					foreach (var Arch in ActualArchitectures)
 					{
-						Agenda.Targets.Add(new UE4Build.BuildTarget()
+						Agenda.Targets.Add(new UnrealBuild.BuildTarget()
 						{
 							TargetName = target,
 							Platform = UnrealTargetPlatform.HoloLens,
