@@ -1110,7 +1110,7 @@ protected:
 	virtual void DispatchParallelTickPose(FActorComponentTickFunction* TickFunction) {}
 
 	/** Helper function for UpdateLODStatus, called with a valid index for InMasterPoseComponentPredictedLODLevel when updating LOD status for slave components */
-	bool UpdateLODStatus_Internal(int32 InMasterPoseComponentPredictedLODLevel);
+	bool UpdateLODStatus_Internal(int32 InMasterPoseComponentPredictedLODLevel, bool bRequestedByMasterPoseComponent = false);
 
 public:
 	/**
