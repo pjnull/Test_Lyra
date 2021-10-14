@@ -66,8 +66,9 @@ FSequencerTimeSliderController::FSequencerTimeSliderController( const FTimeSlide
 	ContextMenuSuppression = 0;
 }
 
-FFrameTime FSequencerTimeSliderController::ComputeScrubTimeFromMouse(const FGeometry& Geometry, FVector2D ScreenSpacePosition, FScrubRangeToScreen RangeToScreen) const
+FFrameTime FSequencerTimeSliderController::ComputeScrubTimeFromMouse(const FGeometry& Geometry, const FPointerEvent& MouseEvent, FScrubRangeToScreen RangeToScreen) const
 {
+	FVector2D           ScreenSpacePosition = MouseEvent.GetScreenSpacePosition();
 	FVector2D           CursorPos     = Geometry.AbsoluteToLocal( ScreenSpacePosition );
 	double              MouseSeconds  = RangeToScreen.LocalXToInput( CursorPos.X );
 	FFrameTime          ScrubTime     = MouseSeconds * GetTickResolution();
@@ -78,7 +79,7 @@ FFrameTime FSequencerTimeSliderController::ComputeScrubTimeFromMouse(const FGeom
 		return ScrubTime;
 	}
 	
-	if ( Sequencer->GetSequencerSettings()->GetIsSnapEnabled() )
+	if ( Sequencer->GetSequencerSettings()->GetIsSnapEnabled() || MouseEvent.IsShiftDown() )
 	{
 		if (Sequencer->GetSequencerSettings()->GetSnapPlayTimeToInterval())
 		{
@@ -95,11 +96,8 @@ FFrameTime FSequencerTimeSliderController::ComputeScrubTimeFromMouse(const FGeom
 			}
 		}
 
-		if (Sequencer->GetSequencerSettings()->GetSnapPlayTimeToKeys())
-		{
-			// SnapTimeToNearestKey will return ScrubTime unmodified if there is no key within range.
-			ScrubTime = SnapTimeToNearestKey(RangeToScreen, CursorPos.X, ScrubTime);
-		}
+		// SnapTimeToNearestKey will return ScrubTime unmodified if there is no key within range.
+		ScrubTime = SnapTimeToNearestKey(MouseEvent, RangeToScreen, CursorPos.X, ScrubTime);
 	}
 
 	if (Sequencer->GetSequencerSettings()->ShouldKeepCursorInPlayRangeWhileScrubbing())
@@ -880,11 +878,11 @@ FReply FSequencerTimeSliderController::OnMouseButtonUp( SWidget& WidgetOwner, co
 
 			if (MouseDragType == DRAG_SCRUBBING_TIME)
 			{
-				ScrubTime = ComputeScrubTimeFromMouse(MyGeometry, CursorPos, RangeToScreen);
+				ScrubTime = ComputeScrubTimeFromMouse(MyGeometry, MouseEvent, RangeToScreen);
 			}
-			else if (Sequencer.IsValid() && Sequencer->GetSequencerSettings()->GetSnapPlayTimeToKeys())
+			else if (Sequencer.IsValid())
 			{
-				ScrubTime = SnapTimeToNearestKey(RangeToScreen, CursorPos.X, ScrubTime);
+				ScrubTime = SnapTimeToNearestKey(MouseEvent, RangeToScreen, CursorPos.X, ScrubTime);
 			}
 
 			CommitScrubPosition( ScrubTime, /*bIsScrubbing=*/false );
@@ -1024,7 +1022,7 @@ FReply FSequencerTimeSliderController::OnMouseMove( SWidget& WidgetOwner, const 
 		else
 		{
 			FFrameTime MouseTime = ComputeFrameTimeFromMouse(MyGeometry, MouseEvent.GetScreenSpacePosition(), RangeToScreen);
-			FFrameTime ScrubTime = ComputeScrubTimeFromMouse(MyGeometry, MouseEvent.GetScreenSpacePosition(), RangeToScreen);
+			FFrameTime ScrubTime = ComputeScrubTimeFromMouse(MyGeometry, MouseEvent, RangeToScreen);
 			FFrameTime MouseDownTime = ComputeFrameTimeFromMouse(MyGeometry, MouseDownPosition[0], RangeToScreen);
 			FFrameNumber DiffFrame = MouseTime.FrameNumber - MouseDownTime.FrameNumber;
 
@@ -1719,7 +1717,7 @@ bool FSequencerTimeSliderController::HitTestMark(const FScrubRangeToScreen& Rang
 	return false;
 }
 
-FFrameTime FSequencerTimeSliderController::SnapTimeToNearestKey(const FScrubRangeToScreen& RangeToScreen, float CursorPos, FFrameTime InTime) const
+FFrameTime FSequencerTimeSliderController::SnapTimeToNearestKey(const FPointerEvent& MouseEvent, const FScrubRangeToScreen& RangeToScreen, float CursorPos, FFrameTime InTime) const
 {
 	if (!WeakSequencer.IsValid())
 	{
@@ -1728,12 +1726,27 @@ FFrameTime FSequencerTimeSliderController::SnapTimeToNearestKey(const FScrubRang
 
 	if (TimeSliderArgs.OnGetNearestKey.IsBound())
 	{
+		ENearestKeyOption NearestKeyOption = ENearestKeyOption::NKO_None;
+
 		// If there are any tracks selected we'll find the nearest key only on that track. If there are no keys selected,
 		// we will try to find the nearest keys on all tracks. This mirrors the behavior of the Jump to Next Keyframe commands.
 		const TSet< TSharedRef<FSequencerDisplayNode> >& SelectedNodes = WeakSequencer.Pin()->GetSelection().GetSelectedOutlinerNodes();
-		const bool bSearchAllTracks = SelectedNodes.Num() == 0;
+		if (SelectedNodes.Num() == 0)
+		{
+			EnumAddFlags(NearestKeyOption, ENearestKeyOption::NKO_SearchAllTracks);
+		}
 
-		FFrameNumber NearestKey = TimeSliderArgs.OnGetNearestKey.Execute(InTime, bSearchAllTracks);
+		if (WeakSequencer.Pin()->GetSequencerSettings()->GetSnapPlayTimeToKeys() || MouseEvent.IsShiftDown())
+		{
+			EnumAddFlags(NearestKeyOption, ENearestKeyOption::NKO_SearchKeys);
+		}
+
+		if (WeakSequencer.Pin()->GetSequencerSettings()->GetSnapPlayTimeToMarkers() || MouseEvent.IsShiftDown())
+		{
+			EnumAddFlags(NearestKeyOption, ENearestKeyOption::NKO_SearchMarkers);
+		}
+
+		FFrameNumber NearestKey = TimeSliderArgs.OnGetNearestKey.Execute(InTime, NearestKeyOption);
 
 		float LocalKeyPos = RangeToScreen.InputToLocalX( NearestKey / GetTickResolution() );
 		static float MouseTolerance = 20.f;
