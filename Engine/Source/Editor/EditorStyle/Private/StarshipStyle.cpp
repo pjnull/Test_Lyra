@@ -587,15 +587,23 @@ void FStarshipEditorStyle::FStyle::SetupGeneralStyles()
 	}
 
 	// Help button
-	Set( "HelpButton", FButtonStyle(Button)
-		.SetNormal( FSlateNoResource() )
-		.SetHovered(FSlateNoResource() )
-		.SetPressed(FSlateNoResource() )
+	FSlateBrush* HelpIcon = new CORE_IMAGE_BRUSH_SVG("Starship/Common/help", Icon16x16);
+	Set("HelpIcon", HelpIcon);
+	Set("HelpIcon.Hovered", HelpIcon);
+	Set("HelpIcon.Pressed", HelpIcon);
+
+	FButtonStyle CompactButton = FButtonStyle(Button)
+		.SetNormalPadding(FMargin(4))
+		.SetPressedPadding(FMargin(4));
+	Set("CompactButton", CompactButton);
+	Set("HelpButton", CompactButton);
+
+	Set("CompactComboButton", FComboButtonStyle(GetWidgetStyle<FComboButtonStyle>("ComboButton"))
+		.SetButtonStyle(CompactButton)
+		.SetDownArrowPadding(FMargin(4, 0, 0, 0))
+		.SetContentPadding(FMargin(4, 0, 0, 0))
 	);
 
-	Set( "HelpIcon", new IMAGE_BRUSH( "Common/icon_Help_Default_16x", Icon16x16 ) );
-	Set( "HelpIcon.Hovered", new IMAGE_BRUSH( "Common/icon_Help_Hover_16x", Icon16x16 ) );
-	Set( "HelpIcon.Pressed", new IMAGE_BRUSH( "Common/icon_Help_Pressed_16x", Icon16x16 ) );
 
 	// Error Reporting
 	{
