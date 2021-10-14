@@ -2180,11 +2180,9 @@ void SSubobjectEditor::OnFindReferences()
 		{
 			const FString VariableName = Data->GetVariableName().ToString();
 
-			// Search for both an explicit variable reference (finds get/sets of exactly that var, without including related-sounding variables)
-			// and a softer search for (VariableName) to capture bound component/widget event nodes which wouldn't otherwise show up
-			//@TODO: This logic is duplicated in SMyBlueprint::OnFindReference(), keep in sync
-			const FString SearchTerm = FString::Printf(
-				TEXT("Nodes(VariableReference(MemberName=+\"%s\") || Name=\"(%s)\")"), *VariableName, *VariableName);
+			FMemberReference MemberReference;
+			MemberReference.SetSelfMember(*VariableName);
+			const FString SearchTerm = MemberReference.GetReferenceSearchString(GetBlueprint()->SkeletonGeneratedClass);
 
 			TSharedRef<IBlueprintEditor> BlueprintEditor = StaticCastSharedRef<IBlueprintEditor>(
 				FoundAssetEditor.ToSharedRef());

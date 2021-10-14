@@ -2244,6 +2244,11 @@ UClass* FBlueprintEditorUtils::GetSkeletonClass(UClass* FromClass)
 	return nullptr;
 }
 
+const UClass* FBlueprintEditorUtils::GetSkeletonClass(const UClass* FromClass)
+{
+	return GetSkeletonClass(const_cast<UClass*>(FromClass));
+}
+
 UClass* FBlueprintEditorUtils::GetMostUpToDateClass(UClass* FromClass)
 {
 	if (!FromClass || FromClass->HasAnyClassFlags(CLASS_Native) || FromClass->bCooked)

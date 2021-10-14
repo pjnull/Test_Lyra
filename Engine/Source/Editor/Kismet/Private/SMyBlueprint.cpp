@@ -2713,19 +2713,16 @@ void SMyBlueprint::OnFindReference()
 	}
 	else if (FEdGraphSchemaAction_K2Var* VarAction = SelectionAsVar())
 	{
-		FString GuidTerm;
-		const FGuid Guid = FBlueprintEditorUtils::FindMemberVariableGuidByName(Blueprint, VarAction->GetVariableName());
-		if (Guid.IsValid())
+		if(FProperty* Property = VarAction->GetProperty())
 		{
-			GuidTerm = FString::Printf(TEXT(" && MemberGuid(A=%i && B=%i && C=%i && D=%i)"), Guid.A, Guid.B, Guid.C, Guid.D);
+			FMemberReference MemberReference;
+			MemberReference.SetFromField<FProperty>(Property, true, Property->GetOwnerClass());
+			SearchTerm = MemberReference.GetReferenceSearchString(Property->GetOwnerClass());
 		}
-
-		const FString VariableName = VarAction->GetVariableName().ToString();
-
-		// Search for both an explicit variable reference (finds get/sets of exactly that var, without including related-sounding variables)
-		// and a softer search for (VariableName) to capture bound component/widget event nodes which wouldn't otherwise show up
-		//@TODO: This logic is duplicated in SSCSEditor::OnFindReferences(), keep in sync
-		SearchTerm = FString::Printf(TEXT("Nodes(VariableReference(MemberName=+\"%s\"%s) || Name=\"(%s)\")"), *VariableName, *GuidTerm, *VariableName);
+		else
+		{
+			SearchTerm = VarAction->GetVariableName().ToString();
+		}
 		bUseQuotes = false;
 	}
 	else if (FEdGraphSchemaAction_K2LocalVar* LocalVarAction = SelectionAsLocalVar())
