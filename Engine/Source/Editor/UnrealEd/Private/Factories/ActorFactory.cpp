@@ -2053,7 +2053,7 @@ UObject* UActorFactoryLevelSequence::GetAssetFromActorInstance(AActor* Instance)
 {
 	if (ALevelSequenceActor* LevelSequenceActor = Cast<ALevelSequenceActor>(Instance))
 	{
-		return LevelSequenceActor->GetSequence();
+		return LevelSequenceActor->LoadSequence();
 	}
 
 	return nullptr;

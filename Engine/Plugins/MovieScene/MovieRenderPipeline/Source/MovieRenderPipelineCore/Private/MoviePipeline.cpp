@@ -782,7 +782,7 @@ void UMoviePipeline::InitializeLevelSequenceActor()
 	for (auto It = TActorIterator<ALevelSequenceActor>(GetWorld()); It; ++It)
 	{
 		// Iterate through all of them in the event someone has multiple copies in the world on accident.
-		if (It->GetSequence() == TargetSequence)
+		if (It->LevelSequence == TargetSequence)
 		{
 			// Found it!
 			ExistingActor = *It;

@@ -82,7 +82,7 @@ UMovieScene* GetMovieScene(TWeakObjectPtr<ALevelSequenceActor> LevelSequenceActo
 		return nullptr;
 	}
 
-	ULevelSequence* LevelSequence = Actor->GetSequence();
+	ULevelSequence* LevelSequence = Cast<ULevelSequence>(Actor->LoadSequence());
 	if (!LevelSequence)
 	{
 		return nullptr;
@@ -251,7 +251,7 @@ void UAutomatedLevelSequenceCapture::Initialize(TSharedPtr<FSceneViewport> InVie
 			{
 				for( auto It = TActorIterator<ALevelSequenceActor>( InViewport->GetClient()->GetWorld() ); It; ++It )
 				{
-					if( It->GetSequence() == Asset )
+					if( It->LevelSequence == LevelSequenceAsset )
 					{
 						// Found it!
 						Actor = *It;
@@ -544,7 +544,7 @@ void UAutomatedLevelSequenceCapture::SetupFrameRange()
 	ALevelSequenceActor* Actor = LevelSequenceActor.Get();
 	if( Actor )
 	{
-		ULevelSequence* LevelSequence = Actor->GetSequence();
+		ULevelSequence* LevelSequence = Actor->LoadSequence();
 		if( LevelSequence != nullptr )
 		{
 			UMovieScene* MovieScene = LevelSequence->GetMovieScene();

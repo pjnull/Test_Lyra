@@ -290,6 +290,10 @@ void FControlRigBlueprintActions::OnSpawnedSkeletalMeshActorChanged(UObject* InO
 	ULevelSequence* Sequence = LevelSequenceActor->GetSequence();
 	if (Sequence == nullptr)
 	{
+		Sequence = LevelSequenceActor->LoadSequence();
+	}
+	if (Sequence == nullptr)
+	{
 		return;
 	}
 	UMovieScene* MovieScene = Sequence->GetMovieScene();
