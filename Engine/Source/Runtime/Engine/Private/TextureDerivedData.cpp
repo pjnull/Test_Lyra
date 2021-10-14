@@ -2260,6 +2260,12 @@ void UTexture::BeginCacheForCookedPlatformData( const ITargetPlatform *TargetPla
 		// Now have a unique list - kick off the caches.
 		for (int32 SettingsIndex = 0; SettingsIndex < BuildSettingsCacheKeysFetchOrBuild.Num(); ++SettingsIndex)
 		{
+			// If we have two platforms that generate the same key, we can have duplicates (e.g. -run=DerivedDataCache  -TargetPlatform=WindowsEditor+Windows) 
+			if (CookedPlatformData.Find(BuildSettingsCacheKeysFetchOrBuild[SettingsIndex]))
+			{
+				continue;
+			}
+
 			FTexturePlatformData* PlatformDataToCache = new FTexturePlatformData();
 			PlatformDataToCache->Cache(
 				*this,
