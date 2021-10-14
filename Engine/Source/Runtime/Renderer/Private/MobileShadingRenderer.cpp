@@ -46,7 +46,6 @@
 #include "EngineModule.h"
 #include "GPUScene.h"
 #include "MaterialSceneTextureId.h"
-#include "DebugViewModeRendering.h"
 #include "SkyAtmosphereRendering.h"
 #include "VisualizeTexture.h"
 #include "VT/VirtualTextureFeedback.h"
@@ -171,7 +170,6 @@ static void RenderOpaqueFX(
 BEGIN_SHADER_PARAMETER_STRUCT(FMobileRenderPassParameters, )
 	SHADER_PARAMETER_STRUCT_INCLUDE(FViewShaderParameters, View)
 	SHADER_PARAMETER_RDG_UNIFORM_BUFFER(FMobileBasePassUniformParameters, MobileBasePass)
-	SHADER_PARAMETER_RDG_UNIFORM_BUFFER(FDebugViewModePassUniformParameters, DebugViewMode)
 	RDG_BUFFER_ACCESS_ARRAY(DrawIndirectArgsBuffers)
 	RDG_BUFFER_ACCESS_ARRAY(InstanceIdOffsetBuffers)
 	RENDER_TARGET_BINDING_SLOTS()
@@ -1032,13 +1030,7 @@ void FMobileSceneRenderer::RenderForward(FRDGBuilder& GraphBuilder, FRDGTextureR
 		PassParameters->View = View.GetShaderParameters();
 		PassParameters->MobileBasePass = CreateMobileBasePassUniformBuffer(GraphBuilder, View, EMobileBasePass::Opaque, SetupMode, MobileBasePassTextures);
 		PassParameters->RenderTargets = BasePassRenderTargets;
-		#if WITH_DEBUG_VIEW_MODES
-		if (ViewFamily.UseDebugViewPS())
-		{
-			PassParameters->DebugViewMode = CreateDebugViewModePassUniformBuffer(GraphBuilder, View, SceneTextures.QuadOverdraw);
-		}
-		#endif
-		
+	
 		BuildInstanceCullingDrawParams(GraphBuilder, View, PassParameters);
 
 		// Split if we need to render translucency in a separate render pass
@@ -1319,12 +1311,6 @@ void FMobileSceneRenderer::RenderDeferred(FRDGBuilder& GraphBuilder, const FSort
 		PassParameters->View = View.GetShaderParameters();
 		PassParameters->MobileBasePass = CreateMobileBasePassUniformBuffer(GraphBuilder, View, EMobileBasePass::Opaque, SetupMode, MobileBasePassTextures);
 		PassParameters->RenderTargets = BasePassRenderTargets;
-		#if WITH_DEBUG_VIEW_MODES
-		if (ViewFamily.UseDebugViewPS())
-		{
-			PassParameters->DebugViewMode = CreateDebugViewModePassUniformBuffer(GraphBuilder, View, SceneTextures.QuadOverdraw);
-		}
-		#endif
 		
 		BuildInstanceCullingDrawParams(GraphBuilder, View, PassParameters);
 
