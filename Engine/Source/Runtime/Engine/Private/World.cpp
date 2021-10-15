@@ -1568,7 +1568,7 @@ void UWorld::RepairWorldSettings()
 			AActor* Actor = PersistentLevel->Actors[Index];
 			if (Actor != nullptr && Actor->IsA<AWorldSettings>())
 			{
-				UE_LOG(LogWorld, Warning, TEXT("Extra World Settings '%s' actor found. Resave level or actors to clean up"), *Actor->GetName());
+				UE_LOG(LogWorld, Warning, TEXT("Extra World Settings '%s' actor found. Resave level %s or actors to clean up"), *Actor->GetPathName(), *PersistentLevel->GetPathName());
 				Actor->Destroy();
 			}
 		}
