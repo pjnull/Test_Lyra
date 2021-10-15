@@ -25,8 +25,8 @@ namespace AutomationToolDriver
 		private static DirectoryReference AutomationToolBinaryDir = DirectoryReference.Combine(Unreal.EngineDirectory, "Binaries", "DotNET", "AutomationTool");
 		private static FileReference ScriptModuleManifestPath = FileReference.Combine(AutomationToolBinaryDir, "ScriptModuleManifest.json");
 
-	    // Cache records of last-modified times for files
-	    class WriteTimeCache
+		// Cache records of last-modified times for files
+		class WriteTimeCache
 	    {
 		    private Dictionary<string, DateTime> WriteTimes = new Dictionary<string, DateTime>();
 			public DateTime GetLastWriteTime(string BasePath, string RelativeFilePath)
@@ -55,7 +55,8 @@ namespace AutomationToolDriver
 			
 			HashSet<FileReference> FoundAutomationProjects = FindAutomationProjects(ScriptsForProjectFileName, AdditionalScriptsFolders);
 
-			if (Unreal.IsEngineInstalled())
+			bool bInitializeFromScriptMdodulesManifest = Unreal.IsEngineInstalled() || (bNoCompile && !bUseBuildRecords);
+			if (bInitializeFromScriptMdodulesManifest)
 			{
 				Log.TraceLog($"Loading script module manifest from {ScriptModuleManifestPath}");
 				HashSet<string> ScriptModuleAssemblyPaths = JsonSerializer.Deserialize<HashSet<string>>(FileReference.ReadAllText(ScriptModuleManifestPath));
