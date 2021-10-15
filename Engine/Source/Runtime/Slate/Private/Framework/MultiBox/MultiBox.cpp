@@ -959,6 +959,15 @@ void SMultiBoxWidget::BuildMultiBoxWidget()
 	const TArray< TSharedRef< const FMultiBlock > >& Blocks = MultiBox->GetBlocks();
 	if ( Blocks.Num() == 0 )
 	{
+		// Clear content if there was any
+		if (ChildSlot.Num() > 0 && ChildSlot.GetWidget() != SNullWidget::NullWidget)
+		{
+			ChildSlot
+			[
+				SNullWidget::NullWidget
+			];
+		}
+
 		return;
 	}
 
