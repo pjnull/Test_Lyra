@@ -2,8 +2,10 @@
 
 #include "Misc/LevelSnapshotsEditorCustomWidgetGenerator.h"
 
+#include "Data/PropertySelection.h"
 #include "LevelSnapshotsLog.h"
 #include "Views/Results/LevelSnapshotsEditorResultsRow.h"
+
 #include "Widgets/Text/STextBlock.h"
 
 #define LOCTEXT_NAMESPACE "LevelSnapshotsEditor"
@@ -86,33 +88,52 @@ TSharedPtr<SWidget> LevelSnapshotsEditorCustomWidgetGenerator::GenerateGenericPr
 
 		const FName OwnerObjectName = ParentObject->GetFName();
 
+		// Owning object is an FProperty (usually for members of a collection, I.E., Property is an item in array/set/map, so OwnerProperty is the collection property)
 		if (const FProperty* OwnerProperty = FindFProperty<FProperty>(InObject->GetClass(), OwnerObjectName))
 		{
 			void* OwnerPropertyValue = OwnerProperty->ContainerPtrToValuePtr<void>(InObject);
 			PropertyValue = OwnerProperty->ContainerPtrToValuePtr<void>(OwnerPropertyValue);
 		}
-		else if (const UScriptStruct* ScriptStruct = Cast<UScriptStruct>(ParentObject))
+		else if (const UScriptStruct* ParentScriptStruct = Cast<UScriptStruct>(ParentObject)) 
 		{
-			for (TFieldIterator<FStructProperty> It(InObject->GetClass()); It; ++It)
-			{
-				const FStructProperty* StructProp = *It;
-				if (StructProp->Struct == ScriptStruct)
-				{
-					if (void* StructPtr = StructProp->ContainerPtrToValuePtr<void>(InObject))
-					{
-						PropertyValue = Property->ContainerPtrToValuePtr<void>(StructPtr);
-					}
+			// For members of a struct, the struct is a UScriptStruct object rather than the FStructProperty.
+			// In this case, we need to go through the Class tree an generate a PropertyChain, e.g. FStructProperty->FStructProperty->LeafProperty
 
-					break;
+			UStruct* IterableStruct;
+
+			if (UScriptStruct* AsScriptStruct = Cast<UScriptStruct>(InObject))
+			{
+				IterableStruct = AsScriptStruct;
+			}
+			else
+			{
+				IterableStruct = InObject->GetClass();
+			}
+			check(IterableStruct);
+
+			TOptional<FLevelSnapshotPropertyChain> OutChain = FLevelSnapshotPropertyChain::FindPathToProperty(Property, IterableStruct);
+
+			if (OutChain.IsSet())
+			{
+				void* ChainIterationPropertyPtr = InObject;
+
+				for (int32 ChainIndex = 0; ChainIndex < OutChain.GetValue().GetNumProperties(); ChainIndex++)
+				{
+					const FProperty* IteratedProperty = OutChain.GetValue().GetPropertyFromRoot(ChainIndex);
+
+					ChainIterationPropertyPtr = IteratedProperty->ContainerPtrToValuePtr<void>(ChainIterationPropertyPtr);
 				}
+
+				PropertyValue = ChainIterationPropertyPtr;
 			}
 			
 		}
-		else if (Property->GetOwner<UClass>())
+		else if (Property->GetOwner<UClass>()) // This means the property is a surface-level property in a class, so it's not in a struct or collection
 		{
 			PropertyValue = Property->ContainerPtrToValuePtr<void>(InObject);
 		}
 
+		// We should have found a value ptr in the methods above, but we ensure in case of a missed scenario
 		if (ensure(PropertyValue != nullptr))
 		{
 			FString ValueText;
