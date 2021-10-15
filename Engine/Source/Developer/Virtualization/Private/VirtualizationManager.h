@@ -8,6 +8,8 @@
 #include "Templates/UniquePtr.h"
 #include "Virtualization/PayloadId.h"
 
+#include "Virtualization/VirtualizationSystem.h"
+
 // TODO: Do we want to keep this header public for UE5 release? If the only interaction should be
 //		 via FVirtualizedUntypedBulkData or other such classes we might not want to expose this 
 //		 at all.
@@ -49,49 +51,19 @@ namespace UE::Virtualization
 class IVirtualizationBackend;
 class IVirtualizationBackendFactory;
 
-/** Profiling data containing all activity relating to payloads. */
-struct FPayloadActivityInfo
-{
-	struct FActivity
-	{
-		/** The number of payloads that have been involved by the activity. */
-		int64 PayloadCount = 0;
-		/** The total size of all payloads involved in the activity, in bytes. */
-		int64 TotalBytes = 0;
-		/** The total number of cycles spent on the activity across all threads. */
-		int64 CyclesSpent = 0;
-	};
-
-	FActivity Pull;
-	FActivity Push;
-	FActivity Cache;
-};
-
-/** Describes the type of storage to use for a given action */
-enum EStorageType
-{
-	/** Store in the local cache backends, this can be called from any thread */
-	Local = 0,
-	/** Store in the persistent backends, this can only be called from the game thread due to limitations with ISourceControlModule. */
-	Persistent
-};
-
 /** This is used as a wrapper around the various potential back end implementations. 
 	The calling code shouldn't need to care about which back ends are actually in use. */
-class COREUOBJECT_API FVirtualizationManager
+class FVirtualizationManager : public IVirtualizationSystem
 {
 public:
 	using FRegistedFactories = TMap<FName, IVirtualizationBackendFactory*>;
 	using FBackendArray = TArray<IVirtualizationBackend*>;
 
-	/** Singleton access */
-	static FVirtualizationManager& Get();
-
 	FVirtualizationManager();
-	~FVirtualizationManager();
+	virtual ~FVirtualizationManager();
 
 	/** Poll to see if content virtualization is enabled or not. */
-	bool IsEnabled() const;
+	virtual bool IsEnabled() const override;
 	
 	/** 
 	 * Push a payload to the virtualization backends.
@@ -104,7 +76,7 @@ public:
 	 *						for details.
 	 * @return	True if at least one backend now contains the payload, otherwise false.
 	 */
-	bool PushData(const FPayloadId& Id, const FCompressedBuffer& Payload, EStorageType StorageType);
+	virtual bool PushData(const FPayloadId& Id, const FCompressedBuffer& Payload, EStorageType StorageType) override;
 
 	/** 
 	 * Pull a payload from the virtualization backends.
@@ -116,10 +88,10 @@ public:
 	 *			If no backend contained the payload then an empty invalid FCompressedBuffer
 	 *			will be returned.
 	 */
-	FCompressedBuffer PullData(const FPayloadId& Id);
+	virtual FCompressedBuffer PullData(const FPayloadId& Id) override;
 
 	/** Access profiling info relating to payload activity. Stats will only be collected if ENABLE_COOK_STATS is enabled.*/
-	FPayloadActivityInfo GetPayloadActivityInfo() const;
+	virtual FPayloadActivityInfo GetPayloadActivityInfo() const override;
 
 private:
 	

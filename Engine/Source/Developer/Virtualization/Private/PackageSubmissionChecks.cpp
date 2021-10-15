@@ -4,7 +4,7 @@
 
 #include "Containers/UnrealString.h"
 #include "Misc/PackageName.h"
-#include "Virtualization/VirtualizationManager.h"
+#include "Virtualization/VirtualizationSystem.h"
 #include "Virtualization/VirtualizedBulkData.h"
 
 #define LOCTEXT_NAMESPACE "Virtualization"
@@ -16,11 +16,11 @@ void OnPrePackageSubmission(const TArray<FString>& FilesToSubmit, TArray<FText>&
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(UE::Virtualization::OnPrePackageSubmission);
 
-	FVirtualizationManager& Manager = FVirtualizationManager::Get();
+	IVirtualizationSystem& System = IVirtualizationSystem::Get();
 
 	// TODO: We could check to see if the package is virtualized even if it is disabled for the project
 	// as a safety feature?
-	if (!Manager.IsEnabled())
+	if (!System.IsEnabled())
 	{
 		return;
 	}
@@ -39,11 +39,11 @@ void OnPrePackageSubmission(const TArray<FString>& FilesToSubmit, TArray<FText>&
 			{
 				for (const FPayloadId& PayloadId : PayloadsInPackage)
 				{
-					FCompressedBuffer Payload = Manager.PullData(PayloadId);
+					FCompressedBuffer Payload = System.PullData(PayloadId);
 
 					if (Payload)
 					{
-						if (!Manager.PushData(PayloadId, Payload, EStorageType::Persistent))
+						if (!System.PushData(PayloadId, Payload, EStorageType::Persistent))
 						{
 							FText Message = FText::Format(LOCTEXT("Virtualization_PushFailure", "Failed to push payload '{0}' from the package '{1}'"),
 								FText::FromString(PayloadId.ToString()),

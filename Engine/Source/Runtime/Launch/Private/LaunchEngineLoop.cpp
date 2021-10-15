@@ -111,7 +111,7 @@
 	#include "AssetCompilingManager.h"
 	#include "Serialization/BulkDataRegistry.h"
 	#include "ShaderCompiler.h"
-	#include "Virtualization/VirtualizationManager.h"
+	#include "Virtualization/VirtualizationSystem.h"
 
 	#if PLATFORM_WINDOWS
 		#include "Windows/AllowWindowsPlatformTypes.h"
@@ -2886,8 +2886,9 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 #endif
 
 #if WITH_EDITOR
-		// Make sure that FVirtualizationManager is first called from the game thread
-		UE::Virtualization::FVirtualizationManager::Get();
+		// The virtualization system will be initialized when ever IVirtualizationSystem::Get is called
+		// but here we try to explicitly initialize it.
+		UE::Virtualization::Initialize();
 #endif //WITH_EDITOR
 
 		check(!GDistanceFieldAsyncQueue);

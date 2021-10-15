@@ -1,20 +1,20 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "Virtualization/VirtualizationManager.h"
+#include "VirtualizationManager.h"
 
 #include "HAL/PlatformTime.h"
+#include "IVirtualizationBackend.h"
 #include "Misc/CommandLine.h"
 #include "Misc/ConfigCacheIni.h"
+#include "Misc/CoreDelegates.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
 #include "Misc/ScopeLock.h"
-#include "Virtualization/IVirtualizationBackend.h"
-
 #include "ProfilingDebugging/CookStats.h"
-#include "Misc/CoreDelegates.h"
 
 namespace UE::Virtualization
 {
+UE_REGISTER_VIRTUALIZATION_SYSTEM(UE::Virtualization::FVirtualizationManager, Default);
 
 /** Utility struct, similar to FScopeLock but allows the lock to be enabled/disabled more easily */
 struct FConditionalScopeLock
@@ -233,13 +233,6 @@ namespace Profiling
 	}
 #endif // ENABLE_COOK_STATS
 } //namespace Profiling
-
-FVirtualizationManager& FVirtualizationManager::Get()
-{
-	// TODO: Do we really need to make this a singleton? Easier for prototyping.
-	static FVirtualizationManager Singleton;
-	return Singleton;
-}
 
 FVirtualizationManager::FVirtualizationManager()
 	: bEnablePayloadPushing(true)

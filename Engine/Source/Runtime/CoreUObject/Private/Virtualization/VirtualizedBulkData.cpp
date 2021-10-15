@@ -16,7 +16,7 @@
 #include "UObject/Object.h"
 #include "UObject/ObjectSaveContext.h"
 #include "Virtualization/IVirtualizationSourceControlUtilities.h"
-#include "Virtualization/VirtualizationManager.h"
+#include "Virtualization/VirtualizationSystem.h"
 
 //#if WITH_EDITORONLY_DATA
 
@@ -1005,8 +1005,9 @@ void FVirtualizedUntypedBulkData::PushData()
 	// We only need to push if the payload if it actually has data and it is not 
 	// currently virtualized (either we have an updated payload in memory or the 
 	// payload is currently non-virtualized and stored on disk)
-	FVirtualizationManager& VirtualizationManager = FVirtualizationManager::Get();
-	if (!IsDataVirtualized() && GetPayloadSize() > 0 && VirtualizationManager.IsEnabled())
+	
+	IVirtualizationSystem& VirtualizationSystem = IVirtualizationSystem::Get();
+	if (!IsDataVirtualized() && GetPayloadSize() > 0 && VirtualizationSystem.IsEnabled())
 	{ 
 		TRACE_CPUPROFILER_EVENT_SCOPE(FVirtualizedUntypedBulkData::PushData);
 
@@ -1022,7 +1023,7 @@ void FVirtualizedUntypedBulkData::PushData()
 		RecompressForSerialization(PayloadToPush, Flags);
 
 		// TODO: We could make this a config option?
-		if (VirtualizationManager.PushData(PayloadContentId, PayloadToPush, EStorageType::Local))
+		if (VirtualizationSystem.PushData(PayloadContentId, PayloadToPush, EStorageType::Local))
 		{
 			EnumAddFlags(Flags, EFlags::IsVirtualized);
 			EnumRemoveFlags(Flags, EFlags::ReferencesLegacyFile | EFlags::LegacyFileIsCompressed);
@@ -1044,7 +1045,7 @@ FCompressedBuffer FVirtualizedUntypedBulkData::PullData() const
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FVirtualizedUntypedBulkData::PullData);
 
-	FCompressedBuffer PulledPayload = FVirtualizationManager::Get().PullData(PayloadContentId);
+	FCompressedBuffer PulledPayload = IVirtualizationSystem::Get().PullData(PayloadContentId);
 
 	if (PulledPayload)
 	{
