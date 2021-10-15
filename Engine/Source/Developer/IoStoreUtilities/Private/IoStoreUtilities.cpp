@@ -559,7 +559,14 @@ private:
 	public:
 		FZenStoreDataSource(const FPackageStoreManifest::FZenServerInfo& ZenServerInfo)
 		{
-			ZenStoreClient = MakeUnique<UE::FZenStoreHttpClient>(ZenServerInfo.HostName, ZenServerInfo.Port);
+			if (ZenServerInfo.bAutoLaunch)
+			{
+				ZenStoreClient = MakeUnique<UE::FZenStoreHttpClient>(ZenServerInfo.AutoLaunchExecutablePath, ZenServerInfo.AutoLaunchArguments, ZenServerInfo.Port);
+			}
+			else
+			{
+				ZenStoreClient = MakeUnique<UE::FZenStoreHttpClient>(ZenServerInfo.HostName, ZenServerInfo.Port);
+			}
 			ZenStoreClient->InitializeReadOnly(ZenServerInfo.ProjectId, ZenServerInfo.OplogId);
 		}
 

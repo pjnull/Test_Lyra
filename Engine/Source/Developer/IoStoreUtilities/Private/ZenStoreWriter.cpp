@@ -282,6 +282,14 @@ FZenStoreWriter::FZenStoreWriter(
 	PackageStoreOptimizer->Initialize();
 
 	FPackageStoreManifest::FZenServerInfo& ZenServerInfo = PackageStoreManifest.EditZenServerInfo();
+
+#if UE_WITH_ZEN
+	const UE::Zen::FZenServiceInstance& ZenServiceInstance = HttpClient->GetZenServiceInstance();
+	ZenServerInfo.bAutoLaunch = ZenServiceInstance.IsAutoLaunch();
+	ZenServerInfo.AutoLaunchExecutablePath = ZenServiceInstance.GetAutoLaunchExecutablePath();
+	ZenServerInfo.AutoLaunchArguments = ZenServiceInstance.GetAutoLaunchArguments();
+#endif
+
 	ZenServerInfo.HostName = HttpClient->GetHostName();
 	ZenServerInfo.Port = HttpClient->GetPort();
 	ZenServerInfo.ProjectId = ProjectId;

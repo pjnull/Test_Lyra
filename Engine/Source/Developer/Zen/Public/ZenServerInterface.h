@@ -25,7 +25,7 @@ namespace UE::Zen {
 
 class FZenServiceInstance;
 
-enum EServiceMode {Default, DefaultNoLaunch};
+enum EServiceMode {Default, DefaultNoLaunch, ForcedLaunch};
 
 /**
  * Type used to declare usage of a Zen server instance whether the shared default instance or a unique non-default instance.
@@ -39,6 +39,7 @@ public:
 	UE_API FScopeZenService();
 	UE_API FScopeZenService(FStringView InstanceURL);
 	UE_API FScopeZenService(FStringView InstanceHostName, uint16 InstancePort);
+	UE_API FScopeZenService(FStringView AutoLaunchExecutablePath, FStringView AutoLaunchArguments, uint16 DesiredPort);
 	UE_API FScopeZenService(EServiceMode Mode);
 	UE_API ~FScopeZenService();
 
@@ -74,16 +75,20 @@ class FZenServiceInstance
 {
 public:
 
-	 UE_API FZenServiceInstance();
-	 UE_API FZenServiceInstance(EServiceMode Mode, FStringView InstanceURL);
-	 UE_API ~FZenServiceInstance();
+	UE_API FZenServiceInstance();
+	UE_API FZenServiceInstance(EServiceMode Mode, FStringView AutoLaunchExecutablePath, FStringView AutoLaunchArguments, uint16 DesiredPort);
+	UE_API FZenServiceInstance(EServiceMode Mode, FStringView InstanceURL);
+	UE_API ~FZenServiceInstance();
 
-	 inline const TCHAR* GetURL() const { return *URL; }
-	 inline const TCHAR* GetHostName() const { return *HostName; }
-	 inline uint16 GetPort() const { return Port; }
-	 UE_API bool GetStats(FZenStats& stats) const;
-	 UE_API bool IsServiceRunning();
-	 UE_API bool IsServiceReady();
+	inline const TCHAR* GetURL() const { return *URL; }
+	inline const TCHAR* GetHostName() const { return *HostName; }
+	inline uint16 GetPort() const { return Port; }
+	inline bool IsAutoLaunch() const { return Settings.bAutoLaunch; }
+	UE_API FString GetAutoLaunchExecutablePath() const;
+	UE_API FString GetAutoLaunchArguments() const;
+	UE_API bool GetStats(FZenStats& stats) const;
+	UE_API bool IsServiceRunning();
+	UE_API bool IsServiceReady();
 
 private:
 	struct FZenConnectSettings
@@ -112,7 +117,9 @@ private:
 	void PopulateSettings(FStringView InstanceURL);
 	void PromptUserToStopRunningServerInstance(const FString& ServerFilePath);
 	FString ConditionalUpdateLocalInstall();
+	FString GetAutoLaunchExecutablePath(FStringView CleanExecutableFileName) const;
 	bool AutoLaunch();
+	bool AutoLaunch(FStringView AutoLaunchExecutablePath, FStringView AutoLaunchArguments, uint16 DesiredPort);
 
 	FSettings Settings;
 	FString URL;

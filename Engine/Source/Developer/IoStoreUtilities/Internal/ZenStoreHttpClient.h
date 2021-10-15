@@ -28,7 +28,8 @@ class IOSTOREUTILITIES_API FZenStoreHttpClient
 {
 public:
 	FZenStoreHttpClient();
-	FZenStoreHttpClient(const FStringView InHostName, uint16 InPort);
+	FZenStoreHttpClient(FStringView HostName, uint16 Port);
+	FZenStoreHttpClient(FStringView AutoLaunchExecutablePath, FStringView AutoLaunchArguments, uint16 DesiredPort);
 	FZenStoreHttpClient(UE::Zen::EServiceMode Mode);
 	~FZenStoreHttpClient();
 
@@ -52,6 +53,7 @@ public:
 #if UE_WITH_ZEN
 	const TCHAR* GetHostName() const { return ZenService.GetInstance().GetHostName(); }
 	uint16 GetPort() const { return ZenService.GetInstance().GetPort(); }
+	const UE::Zen::FZenServiceInstance& GetZenServiceInstance() const { return ZenService.GetInstance(); }
 #else // Default to localhost:1337 for platforms where Zen wouldn't be supported yet
 	const TCHAR* GetHostName() const { return TEXT("localhost"); }
 	uint16 GetPort() const { return 1337; }

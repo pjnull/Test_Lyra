@@ -14,6 +14,7 @@
 #include "Misc/App.h"
 #include "Misc/ConfigCacheIni.h"
 #include "Misc/Paths.h"
+#include "Misc/PathViews.h"
 #include "String/LexFromString.h"
 
 #if PLATFORM_WINDOWS
@@ -70,6 +71,12 @@ FScopeZenService::FScopeZenService(FStringView InstanceHostName, uint16 Instance
 	}
 }
 
+FScopeZenService::FScopeZenService(FStringView AutoLaunchExecutablePath, FStringView AutoLaunchArguments, uint16 DesiredPort)
+{
+	UniqueNonDefaultInstance = MakeUnique<FZenServiceInstance>(ForcedLaunch, AutoLaunchExecutablePath, AutoLaunchArguments, DesiredPort);
+	ServiceInstance = UniqueNonDefaultInstance.Get();
+}
+
 FScopeZenService::FScopeZenService(EServiceMode Mode)
 {
 	switch (Mode)
@@ -99,6 +106,29 @@ FZenServiceInstance::FZenServiceInstance()
 {
 }
 
+FZenServiceInstance::FZenServiceInstance(EServiceMode Mode, FStringView AutoLaunchExecutablePath, FStringView AutoLaunchArguments, uint16 DesiredPort)
+{
+	if (Mode == ForcedLaunch)
+	{
+		Settings.bAutoLaunch = true;
+		HostName = TEXT("localhost");
+		Port = DesiredPort;
+		bHasLaunchedLocal = AutoLaunch(AutoLaunchExecutablePath, AutoLaunchArguments, Port);
+		
+		if (bHasLaunchedLocal)
+		{
+			AutoLaunchedPort = Port;
+		}
+
+		TStringBuilder<128> URLBuilder;
+		URLBuilder << TEXT("http://") << HostName << TEXT(":") << Port << TEXT("/");
+		URL = URLBuilder.ToString();
+	}
+	else
+	{
+		unimplemented();
+	}
+}
 
 FZenServiceInstance::FZenServiceInstance(EServiceMode Mode, FStringView InstanceURL)
 {
@@ -117,7 +147,10 @@ FZenServiceInstance::FZenServiceInstance(EServiceMode Mode, FStringView Instance
 		else
 		{
 			bHasLaunchedLocal = AutoLaunch();
-			AutoLaunchedPort = Port;
+			if (bHasLaunchedLocal)
+			{
+				AutoLaunchedPort = Port;
+			}
 		}
 	}
 	else
@@ -321,7 +354,7 @@ FZenServiceInstance::ConditionalUpdateLocalInstall()
 {
 	FString InTreeFilePath = FPaths::ConvertRelativePathToFull(FPlatformProcess::GenerateApplicationPath(TEXT("zenserver"), EBuildConfiguration::Development));
 
-	FString InstallFilePath = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::EngineSavedDir(), TEXT("ZenServer"), FPaths::GetCleanFilename(InTreeFilePath)));
+	FString InstallFilePath = GetAutoLaunchExecutablePath(FPathViews::GetCleanFilename(InTreeFilePath));
 
 	IFileManager& FileManager = IFileManager::Get();
 	FDateTime InTreeFileTime;
@@ -347,16 +380,26 @@ FZenServiceInstance::ConditionalUpdateLocalInstall()
 	return InstallFilePath;
 }
 
-bool
-FZenServiceInstance::AutoLaunch()
+FString
+FZenServiceInstance::GetAutoLaunchExecutablePath(FStringView CleanExecutableFileName) const
 {
-	// TODO: Install and update will be delegated to be the responsibility of the launched zenserver process in the future.
-	FString MainFilePath = ConditionalUpdateLocalInstall();
+	return FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::EngineSavedDir(), TEXT("ZenServer"), FString(CleanExecutableFileName)));
+}
 
+FString
+FZenServiceInstance::GetAutoLaunchExecutablePath() const
+{
+	FString ExecutableFileName = FPlatformProcess::GenerateApplicationPath(TEXT("zenserver"), EBuildConfiguration::Development);
+
+	return GetAutoLaunchExecutablePath(FPathViews::GetCleanFilename(ExecutableFileName));
+}
+
+FString
+FZenServiceInstance::GetAutoLaunchArguments() const
+{
 	FString Parms;
 
-	Parms.Appendf(TEXT("--owner-pid %d --port %d --data-dir \"%s\""),
-		FPlatformProcess::GetCurrentProcessId(),
+	Parms.Appendf(TEXT("--port %d --data-dir \"%s\""),
 		Settings.AutoLaunchSettings.DesiredPort,
 		*Settings.AutoLaunchSettings.DataPath);
 
@@ -366,21 +409,43 @@ FZenServiceInstance::AutoLaunch()
 			*FPaths::ConvertRelativePathToFull(Settings.AutoLaunchSettings.LogPath));
 	}
 
-#if PLATFORM_WINDOWS
-	const TCHAR* ReadyEventName = TEXT("Local\\ZenAutoLaunchReadyCheck");
-	HANDLE ReadyEvent = ::CreateEvent(NULL, false, false, ReadyEventName);
-	Parms.Appendf(TEXT(" --child-id \"%s\""),
-		ReadyEventName);
-#endif
-
 	if (!Settings.AutoLaunchSettings.ExtraArgs.IsEmpty())
 	{
 		Parms.AppendChar(TEXT(' '));
 		Parms.Append(Settings.AutoLaunchSettings.ExtraArgs);
 	}
+	return Parms;
+}
+
+bool
+FZenServiceInstance::AutoLaunch()
+{
+	// TODO: Install and update will be delegated to be the responsibility of the launched zenserver process in the future.
+	FString MainFilePath = ConditionalUpdateLocalInstall();
+
+	FString Parms = GetAutoLaunchArguments();
+
+	return AutoLaunch(MainFilePath, Parms, Settings.AutoLaunchSettings.DesiredPort);
+}
+
+bool
+FZenServiceInstance::AutoLaunch(FStringView AutoLaunchExecutablePath, FStringView AutoLaunchArguments, uint16 DesiredPort)
+{
 	HostName = TEXT("localhost");
 	// For now assuming that we get to run on the port we want
-	Port = Settings.AutoLaunchSettings.DesiredPort;
+	Port = DesiredPort;
+
+	FString FinalExecutablePath(MoveTemp(AutoLaunchExecutablePath));
+	FString FinalParms;
+	FinalParms.Appendf(TEXT("--owner-pid %d "),
+		FPlatformProcess::GetCurrentProcessId());
+#if PLATFORM_WINDOWS
+	const TCHAR* ReadyEventName = TEXT("Local\\ZenAutoLaunchReadyCheck");
+	HANDLE ReadyEvent = ::CreateEvent(NULL, false, false, ReadyEventName);
+	FinalParms.Appendf(TEXT(" --child-id \"%s\" "),
+		ReadyEventName);
+#endif
+	FinalParms += MoveTemp(AutoLaunchArguments);
 
 	FProcHandle Proc;
 #if PLATFORM_WINDOWS
@@ -402,7 +467,7 @@ FZenServiceInstance::AutoLaunch()
 			HANDLE(nullptr)
 		};
 
-		FString CommandLine = FString::Printf(TEXT("\"%s\" %s"), *MainFilePath, *Parms);
+		FString CommandLine = FString::Printf(TEXT("\"%s\" %s"), *FinalExecutablePath, *FinalParms);
 		PROCESS_INFORMATION ProcInfo;
 		if (CreateProcess(NULL, CommandLine.GetCharArray().GetData(), nullptr, nullptr, false, (::DWORD)(NORMAL_PRIORITY_CLASS | DETACHED_PROCESS), nullptr, nullptr, &StartupInfo, &ProcInfo))
 		{
@@ -418,10 +483,10 @@ FZenServiceInstance::AutoLaunch()
 		ZeroMemory(&ShellExecuteInfo, sizeof(ShellExecuteInfo));
 		ShellExecuteInfo.cbSize = sizeof(ShellExecuteInfo);
 		ShellExecuteInfo.fMask = SEE_MASK_UNICODE | SEE_MASK_NOCLOSEPROCESS;
-		ShellExecuteInfo.lpFile = *MainFilePath;
+		ShellExecuteInfo.lpFile = *FinalExecutablePath;
 		ShellExecuteInfo.lpVerb = TEXT("runas");
 		ShellExecuteInfo.nShow = Settings.AutoLaunchSettings.bHidden ? SW_HIDE : SW_SHOWMINNOACTIVE;
-		ShellExecuteInfo.lpParameters = *Parms;
+		ShellExecuteInfo.lpParameters = *FinalParms;
 
 		if (ShellExecuteEx(&ShellExecuteInfo))
 		{
