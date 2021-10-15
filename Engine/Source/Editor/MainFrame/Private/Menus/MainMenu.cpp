@@ -477,7 +477,7 @@ void FMainMenu::RegisterToolsMenu()
 		FText::Format(LOCTEXT("AddCodeToProjectTooltip", "Adds C++ code to the project. The code can only be compiled if you have {0} installed."), ShortIDEName)
 	);
 
-	Section.AddDynamicEntry("CodeProject", FNewToolMenuSectionDelegate::CreateLambda([ShortIDEName, RefreshIDEIcon](FToolMenuSection& InSection)
+	Section.AddDynamicEntry("CodeProject", FNewToolMenuSectionDelegate::CreateLambda([ShortIDEName, RefreshIDEIcon, OpenIDEIcon](FToolMenuSection& InSection)
 	{
 		if (FSourceCodeNavigation::DoesModuleSolutionExist())
 		{
@@ -492,7 +492,7 @@ void FMainMenu::RegisterToolsMenu()
 			InSection.AddMenuEntry( FMainFrameCommands::Get().RefreshCodeProject,
 				FText::Format(LOCTEXT("GenerateCodeProjectLabel", "Generate {0} Project"), ShortIDEName),
 				FText::Format(LOCTEXT("GenerateCodeProjectTooltip", "Generates your C++ code project in {0}."), ShortIDEName),
-				RefreshIDEIcon	
+				OpenIDEIcon
 			);
 		}
 	}));
