@@ -44,7 +44,7 @@ FZenDerivedDataBackend::FZenDerivedDataBackend(
 {
 	if (IsServiceReady())
 	{
-		RequestPool = MakeUnique<Zen::FZenHttpRequestPool>(ZenService.GetInstance().GetURL());
+		RequestPool = MakeUnique<Zen::FZenHttpRequestPool>(ZenService.GetInstance().GetURL(), 32);
 		bIsUsable = true;
 	}
  	bCacheRecordEndpointEnabled = false;
