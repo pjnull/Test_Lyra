@@ -127,6 +127,9 @@ void UAnimSequenceBase::PostLoad()
 		}
 	}
 
+#if WITH_EDITOR
+	InitializeNotifyTrack();
+#endif
 	RefreshCacheData();
 
 	if(USkeleton* MySkeleton = GetSkeleton())

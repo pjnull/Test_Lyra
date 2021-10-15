@@ -890,48 +890,50 @@ void UAnimSequence::PostLoad()
 	// No animation data is found. Warn - this should check before we check CompressedTrackOffsets size
 	// Otherwise, we'll see empty data set crashing game due to no CompressedTrackOffsets
 	// You can't check RawAnimationData size since it gets removed during cooking
-#if WITH_EDITOR
-	if (DataModel->GetNumberOfKeys() == 0 && DataModel->GetNumberOfFloatCurves() == 0 )
+	if (GetOutermost()->HasAnyPackageFlags(PKG_Cooked | PKG_FilterEditorOnly))
 	{
-		UE_LOG(LogAnimation, Warning, TEXT("No animation data exists for sequence %s (%s)"), *GetName(), (GetOuter() ? *GetOuter()->GetFullName() : *GetFullName()) );
-
-		if (!IsRunningGame())
-		{
-			static FName NAME_LoadErrors("LoadErrors");
-			FMessageLog LoadErrors(NAME_LoadErrors);
-
-			TSharedRef<FTokenizedMessage> Message = LoadErrors.Warning();
-			Message->AddToken(FTextToken::Create(LOCTEXT("EmptyAnimationData1", "The Animation ")));
-			Message->AddToken(FAssetNameToken::Create(GetPathName(), FText::FromString(GetName())));
-			Message->AddToken(FTextToken::Create(LOCTEXT("EmptyAnimationData2", " has no animation data. Recommend to remove.")));
-			LoadErrors.Notify();
-		}
-	}
-	// @remove temp hack for fixing length
-	// @todo need to fix importer/editing feature
-	else if (GetPlayLength() == 0.f )
-	{
-		ensure(DataModel->GetNumberOfKeys() == 1);
-		Controller->SetPlayLength(MINIMUM_ANIMATION_LENGTH);
-	}
-	// Raw data exists, but missing compress animation data
-	else
-#endif
-	if( GetSkeleton() && !IsCompressedDataValid()
-#if WITH_EDITOR
-		&& !bCompressionInProgress
-#endif
-		)
-	{
-		UE_LOG(LogAnimation, Fatal, TEXT("No animation compression exists for sequence %s (%s)"), *GetName(), (GetOuter() ? *GetOuter()->GetFullName() : *GetFullName()) );
-	}
-
-	// Update the virtual bone GUID according to the skeleton
-	if (FPlatformProperties::RequiresCookedData())
-	{
+		// Update the virtual bone GUID according to the skeleton
 		if (GetSkeleton())
 		{
 			SetSkeletonVirtualBoneGuid(GetSkeleton()->GetVirtualBoneGuid());
+		}
+	}
+	else
+	{
+#if WITH_EDITOR
+		if (DataModel->GetNumberOfKeys() == 0 && DataModel->GetNumberOfFloatCurves() == 0 )
+		{
+			UE_LOG(LogAnimation, Warning, TEXT("No animation data exists for sequence %s (%s)"), *GetName(), (GetOuter() ? *GetOuter()->GetFullName() : *GetFullName()) );
+
+			if (!IsRunningGame())
+			{
+				static FName NAME_LoadErrors("LoadErrors");
+				FMessageLog LoadErrors(NAME_LoadErrors);
+
+				TSharedRef<FTokenizedMessage> Message = LoadErrors.Warning();
+				Message->AddToken(FTextToken::Create(LOCTEXT("EmptyAnimationData1", "The Animation ")));
+				Message->AddToken(FAssetNameToken::Create(GetPathName(), FText::FromString(GetName())));
+				Message->AddToken(FTextToken::Create(LOCTEXT("EmptyAnimationData2", " has no animation data. Recommend to remove.")));
+				LoadErrors.Notify();
+			}
+		}
+		// @remove temp hack for fixing length
+		// @todo need to fix importer/editing feature
+		else if (GetPlayLength() == 0.f )
+		{
+			ensure(DataModel->GetNumberOfKeys() == 1);
+			Controller->SetPlayLength(MINIMUM_ANIMATION_LENGTH);
+		}
+		// Raw data exists, but missing compress animation data
+		else
+#endif
+		if( GetSkeleton() && !IsCompressedDataValid()
+#if WITH_EDITOR
+			&& !bCompressionInProgress
+#endif
+			)
+		{
+			UE_LOG(LogAnimation, Fatal, TEXT("No animation compression exists for sequence %s (%s)"), *GetName(), (GetOuter() ? *GetOuter()->GetFullName() : *GetFullName()) );
 		}
 	}
 
