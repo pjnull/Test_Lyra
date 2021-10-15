@@ -7,6 +7,7 @@
 class UHLODLayer;
 class FWorldPartitionActorDesc;
 class UActorDescContainer;
+class UWorldPartition;
 enum class EContainerClusterMode : uint8;
 enum class EActorGridPlacement : uint8;
 
