@@ -731,7 +731,7 @@ namespace Chaos
 
 				ensure(Info.Proxy->GetHandle_LowLevel() == nullptr);	//should have already cleared this out
 				delete Info.Proxy;
-				PendingDestroyPhysicsProxy.RemoveAtSwap(Idx);
+				PendingDestroyPhysicsProxy.RemoveAtSwap(Idx, 1, false);
 			}
 		}
 
@@ -1123,7 +1123,7 @@ namespace Chaos
 			if (Callback->bPendingDelete)
 			{
 				//will also be in SimCallbackObjects so we'll delete it in that loop
-				ContactModifiers.RemoveAtSwap(Idx);
+				ContactModifiers.RemoveAtSwap(Idx, 1, false);
 			}
 		}
 
@@ -1132,7 +1132,7 @@ namespace Chaos
 			ISimCallbackObject* Callback = SimCallbackObjects[Idx];
 			if (Callback->bPendingDelete)
 			{
-				SimCallbackObjects.RemoveAtSwap(Idx);
+				SimCallbackObjects.RemoveAtSwap(Idx, 1, false);
 			}
 		}
 
