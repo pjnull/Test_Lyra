@@ -383,7 +383,10 @@ TArray<FEnhancedActionKeyMapping> ReorderMappings(const TArray<FEnhancedActionKe
 			}
 		};
 		EvaluateTriggers(Mapping.Triggers);
+		
+		ensureMsgf(Mapping.Action, TEXT("A key mapping has no associated action!"));
 		EvaluateTriggers(Mapping.Action->Triggers);
+
 		return bFoundChordTrigger;
 	};
 
@@ -391,10 +394,19 @@ TArray<FEnhancedActionKeyMapping> ReorderMappings(const TArray<FEnhancedActionKe
 	TArray<FEnhancedActionKeyMapping> ChordedMappings;
 	TArray<FEnhancedActionKeyMapping> OtherMappings;
 	OtherMappings.Reserve(UnorderedMappings.Num());		// Mappings will most likely be Other
+	int32 NumEmptyMappings = 0;
 	for (const FEnhancedActionKeyMapping& Mapping : UnorderedMappings)
 	{
-		TArray<FEnhancedActionKeyMapping>& MappingArray = GatherChordingActions(Mapping) ? ChordedMappings : OtherMappings;
-		MappingArray.Add(Mapping);
+		if(Mapping.Action)
+		{
+			TArray<FEnhancedActionKeyMapping>& MappingArray = GatherChordingActions(Mapping) ? ChordedMappings : OtherMappings;
+			MappingArray.Add(Mapping);
+		}
+		else
+		{
+			++NumEmptyMappings;
+			UE_LOG(LogEnhancedInput, Warning, TEXT("A Key Mapping with a blank action has been added! Ignoring the key mapping to '%s'"), *Mapping.Key.ToString());
+		}
 	}
 
 	TArray<FEnhancedActionKeyMapping> OrderedMappings;
@@ -421,7 +433,7 @@ TArray<FEnhancedActionKeyMapping> ReorderMappings(const TArray<FEnhancedActionKe
 
 	OrderedMappings.Append(MoveTemp(ChordedMappings));
 	OrderedMappings.Append(MoveTemp(OtherMappings));
-	checkf(OrderedMappings.Num() == UnorderedMappings.Num(), TEXT("Number of mappings changed during reorder."));
+	checkf(OrderedMappings.Num() == UnorderedMappings.Num() - NumEmptyMappings, TEXT("Number of mappings unexpectedly changed during reorder."));
 
 	return OrderedMappings;
 }
