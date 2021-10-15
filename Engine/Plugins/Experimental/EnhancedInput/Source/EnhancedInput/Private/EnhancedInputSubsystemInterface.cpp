@@ -384,8 +384,10 @@ TArray<FEnhancedActionKeyMapping> ReorderMappings(const TArray<FEnhancedActionKe
 		};
 		EvaluateTriggers(Mapping.Triggers);
 		
-		ensureMsgf(Mapping.Action, TEXT("A key mapping has no associated action!"));
-		EvaluateTriggers(Mapping.Action->Triggers);
+		if(ensureMsgf(Mapping.Action, TEXT("A key mapping has no associated action!")))
+		{
+			EvaluateTriggers(Mapping.Action->Triggers);			
+		}
 
 		return bFoundChordTrigger;
 	};
