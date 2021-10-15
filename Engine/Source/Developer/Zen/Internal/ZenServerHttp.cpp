@@ -433,7 +433,13 @@ namespace UE::Zen {
 		const char* CommonHeaders[] = {
 			GetSessionIdHeader(),
 			RequestIdHeader.GetData(),
-			"Expect:",
+#if 0
+			// Strip any Expect: 100-Continue header since this just introduces latency
+			//
+			// This causes stalls in some cases when using the http.sys server implementation
+			// so this is currently disabled until we can debug it properly
+			"Expect:",	
+#endif
 			nullptr
 		};
 
