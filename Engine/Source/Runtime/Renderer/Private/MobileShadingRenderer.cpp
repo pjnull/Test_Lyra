@@ -454,8 +454,8 @@ void FMobileSceneRenderer::InitViews(FRDGBuilder& GraphBuilder, FSceneTexturesCo
 		bShouldRenderVelocities ||
 		bRequireSeparateViewPass ||
 		bIsFullDepthPrepassEnabled;
-	// never keep MSAA depth
-	bKeepDepthContent = (NumMSAASamples > 1 ? false : bKeepDepthContent);
+	// never keep MSAA depth if SceneDepthAux is enabled
+	bKeepDepthContent = ((NumMSAASamples > 1) && MobileRequiresSceneDepthAux(ShaderPlatform)) ? false : bKeepDepthContent;
 
 	// Update the bKeepDepthContent based on the mobile renderer status.
 	SceneTexturesConfig.bKeepDepthContent = bKeepDepthContent;
@@ -821,6 +821,11 @@ void FMobileSceneRenderer::Render(FRDGBuilder& GraphBuilder)
 	{
 		RenderFullDepthPrepass(GraphBuilder, SceneTextures);
 
+		if (!MobileRequiresSceneDepthAux(ShaderPlatform))
+		{
+			AddResolveSceneDepthPass(GraphBuilder, Views, SceneTextures.Depth);
+		}
+
 		SceneTextures.MobileSetupMode = EMobileSceneTextureSetupMode::SceneDepth;
 		SceneTextures.MobileUniformBuffer = CreateMobileSceneTextureUniformBuffer(GraphBuilder, SceneTextures.MobileSetupMode);
 
@@ -984,7 +989,10 @@ void FMobileSceneRenderer::RenderForward(FRDGBuilder& GraphBuilder, FRDGTextureR
 
 	FRenderTargetBindingSlots BasePassRenderTargets;
 	BasePassRenderTargets[0] = FRenderTargetBinding(SceneColor, SceneColorResolve, ERenderTargetLoadAction::EClear);
-	BasePassRenderTargets[1] = FRenderTargetBinding(SceneTextures.DepthAux.Target, SceneTextures.DepthAux.Resolve, ERenderTargetLoadAction::EClear);
+	if (MobileRequiresSceneDepthAux(ShaderPlatform))
+	{
+		BasePassRenderTargets[1] = FRenderTargetBinding(SceneTextures.DepthAux.Target, SceneTextures.DepthAux.Resolve, ERenderTargetLoadAction::EClear);
+	}
 	BasePassRenderTargets.DepthStencil = bIsFullDepthPrepassEnabled ? FDepthStencilBinding(SceneDepth, ERenderTargetLoadAction::ELoad, FExclusiveDepthStencil::DepthRead_StencilWrite) : FDepthStencilBinding(SceneDepth, ERenderTargetLoadAction::EClear, FExclusiveDepthStencil::DepthWrite_StencilWrite);
 	BasePassRenderTargets.ShadingRateTexture = (!MainView.bIsSceneCapture && !MainView.bIsReflectionCapture && ShadingRateTarget.IsValid()) ? RegisterExternalTexture(GraphBuilder, ShadingRateTarget->GetRenderTargetItem().ShaderResourceTexture, TEXT("ShadingRateTexture")) : nullptr;
 	BasePassRenderTargets.SubpassHint = ESubpassHint::DepthReadSubpass;
@@ -1134,7 +1142,10 @@ void FMobileSceneRenderer::RenderForwardMultiPass(FRDGBuilder& GraphBuilder, FMo
 	}
 
 	BasePassRenderTargets[0].SetLoadAction(ERenderTargetLoadAction::ELoad);
-	BasePassRenderTargets[1].SetLoadAction(ERenderTargetLoadAction::ELoad);
+	if (MobileRequiresSceneDepthAux(ShaderPlatform))
+	{
+		BasePassRenderTargets[1].SetLoadAction(ERenderTargetLoadAction::ELoad);
+	}
 	BasePassRenderTargets.DepthStencil.SetDepthLoadAction(ERenderTargetLoadAction::ELoad);
 	BasePassRenderTargets.DepthStencil.SetStencilLoadAction(ERenderTargetLoadAction::ELoad);
 	BasePassRenderTargets.DepthStencil.SetDepthStencilAccess(ExclusiveDepthStencil);
