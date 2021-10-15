@@ -20,7 +20,7 @@ namespace Insights
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 FTable::FTable()
-	: Name()
+	: DisplayName()
 	, Description()
 	, Columns()
 	, ColumnIdToPtrMapping()
@@ -138,7 +138,8 @@ void FTable::GetVisibleColumnsData(const TArray<Insights::FBaseTreeNodePtr>& InN
 	{
 		for (const TSharedRef<Insights::FTableColumn>& ColumnRef : VisibleColumns)
 		{
-			OutData += ColumnRef->GetShortName().ToString().ReplaceCharWithEscapedChar() + Separator;
+			OutData += ColumnRef->GetShortName().ToString().ReplaceCharWithEscapedChar();
+			OutData += Separator;
 		}
 	}
 
@@ -166,7 +167,8 @@ void FTable::GetVisibleColumnsData(const TArray<Insights::FBaseTreeNodePtr>& InN
 		for (const TSharedRef<Insights::FTableColumn>& ColumnRef : VisibleColumns)
 		{
 			FText NodeText = ColumnRef->GetValueAsText(*Node);
-			OutData += NodeText.ToString().ReplaceCharWithEscapedChar() + Separator;
+			OutData += NodeText.ToString().ReplaceCharWithEscapedChar();
+			OutData += Separator;
 		}
 
 		if (OutData.Len() > 0)
