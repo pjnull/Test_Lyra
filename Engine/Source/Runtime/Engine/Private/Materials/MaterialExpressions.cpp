@@ -12384,23 +12384,28 @@ void UMaterialExpressionCustom::Serialize(FStructuredArchive::FRecord Record)
 			TEXT("GetWorldPosition(Parameters)"),
 			TEXT("GetPrevWorldPosition(Parameters)"),
 			TEXT("GetObjectWorldPosition(Parameters)"),
+			TEXT("GetPrimitiveData(Parameters).WorldToLocal"),
+			TEXT("GetPrimitiveData(Parameters).LocalToWorld"),
 		};
 
 		for (const TCHAR* Member : UniformMembers)
 		{
 			const FString ViewSearchString = FString(TEXT("View.")) + Member;
-			const FString ResolvedSearchString = FString(TEXT("ResolvedView.")) + Member;
 			const FString ReplaceString = FString(TEXT("LWCToFloat(ResolvedView.")) + Member + FString(TEXT(")"));
-
-			if (Code.ReplaceInline(*ResolvedSearchString, *ReplaceString, ESearchCase::CaseSensitive) > 0)
-			{
-				bDidUpdate = true;
-			}
 
 			if (Code.ReplaceInline(*ViewSearchString, *ReplaceString, ESearchCase::CaseSensitive) > 0)
 			{
 				bDidUpdate = true;
 			}
+		}
+
+		// We really want to replace all instances of 'View.Member' and 'ResolvedView.Member' with 'LWCToFloat(ResolvedView.Member)'
+		// But since this is just dumb string processing and we're not really attempting to parse HLSL, replacing 'View.Member' will also match 'ResolvedVIEW.Member', and turn it into 'ResolvedLWCToFloat(ResolvedView.Member)'
+		// So we just allow that to happen, and then fix up any instances of 'ResolvedLWCToFloat' here
+		// This is admittedly pretty ugly...if this gets any worse probably need to just add a real HLSL parser here
+		if (Code.ReplaceInline(TEXT("ResolvedLWCToFloat(ResolvedView."), TEXT("LWCToFloat(ResolvedView."), ESearchCase::CaseSensitive) > 0)
+		{
+			bDidUpdate = true;
 		}
 
 		for (const TCHAR* Expression : GlobalExpressions)
