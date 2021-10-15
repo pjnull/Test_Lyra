@@ -1,12 +1,11 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "SEditorHeaderButton.h"
-#include "SComponentClassCombo.h"
+#include "SPositiveActionButton.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SButton.h"
 #include "Styling/StyleColors.h"
 
-void SEditorHeaderButton::Construct(const FArguments& InArgs)
+void SPositiveActionButton::Construct(const FArguments& InArgs)
 {
 	check(InArgs._Icon.IsSet());
 
@@ -77,13 +76,13 @@ void SEditorHeaderButton::Construct(const FArguments& InArgs)
 	}
 }
 
-void SEditorHeaderButton::SetMenuContentWidgetToFocus(TWeakPtr<SWidget> Widget)
+void SPositiveActionButton::SetMenuContentWidgetToFocus(TWeakPtr<SWidget> Widget)
 {
 	check(ComboButton.IsValid());
 	ComboButton->SetMenuContentWidgetToFocus(Widget);
 }
 
-void SEditorHeaderButton::SetIsMenuOpen(bool bIsOpen, bool bIsFocused)
+void SPositiveActionButton::SetIsMenuOpen(bool bIsOpen, bool bIsFocused)
 {
 	check(ComboButton.IsValid());
 	ComboButton->SetIsOpen(bIsOpen, bIsFocused);

@@ -16,7 +16,7 @@
 #include "Widgets/Input/SSearchBox.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "SComponentClassCombo.h"
-#include "SEditorHeaderButton.h"
+#include "SPositiveActionButton.h"
 #include "Editor/UnrealEdEngine.h"
 #include "Subsystems/PanelExtensionSubsystem.h"	// SExtensionPanel
 #include "ThumbnailRendering/ThumbnailManager.h"
@@ -103,7 +103,7 @@ void SSubobjectBlueprintEditor::Construct(const FArguments& InArgs)
 	.Padding(0.0f, 0.0f, 4.0f, 0.0f)
 	.AutoWidth()
 	[
-		SNew(SEditorHeaderButton)
+		SNew(SPositiveActionButton)
 		.AddMetaData<FTagMetaData>(FTagMetaData(TEXT("Actor.ConvertToBlueprint")))
 		.Visibility(this, &SSubobjectBlueprintEditor::GetPromoteToBlueprintButtonVisibility)
 		.OnClicked(this, &SSubobjectBlueprintEditor::OnPromoteToBlueprintClicked)
@@ -118,7 +118,7 @@ void SSubobjectBlueprintEditor::Construct(const FArguments& InArgs)
 	.VAlign(VAlign_Center)
 	.AutoWidth()
 	[
-		SNew(SEditorHeaderButton)
+		SNew(SPositiveActionButton)
 		.AddMetaData<FTagMetaData>(FTagMetaData(TEXT("Actor.EditBlueprint")))
 		.Visibility(this, &SSubobjectBlueprintEditor::GetEditBlueprintButtonVisibility)
 		.ToolTipText(LOCTEXT("EditActorBlueprint_Tooltip", "Edit the Blueprint for this Actor"))

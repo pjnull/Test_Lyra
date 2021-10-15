@@ -26,7 +26,7 @@
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Widgets/Layout/SSplitter.h"
 #include "DragAndDrop/DecoratedDragDropOp.h"
-#include "SEditorHeaderButton.h"
+#include "SPositiveActionButton.h"
 #include "Styling/ToolBarStyle.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "Framework/MultiBox/MultiBoxExtender.h"
@@ -480,7 +480,7 @@ void FUserDefinedStructureEditor::FillToolbar(FToolBarBuilder& ToolbarBuilder)
 		.VAlign(VAlign_Fill)
 		.Padding(ToolBarStyle.ButtonPadding)
 		[
-			SNew(SEditorHeaderButton)
+			SNew(SPositiveActionButton)
 			.Text(LOCTEXT("AddStructVariable", "Add Variable"))
 			.ToolTipText(LOCTEXT("AddStructVariableToolTip", "Adds a new member variable to the end of this structure"))
 			.OnClicked(this, &FUserDefinedStructureEditor::OnAddNewField)

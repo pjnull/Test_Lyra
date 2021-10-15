@@ -85,7 +85,7 @@
 #include "ISCSEditorUICustomization.h"
 
 #include "Logging/MessageLog.h"
-#include "SEditorHeaderButton.h"
+#include "SPositiveActionButton.h"
 
 #define LOCTEXT_NAMESPACE "SSCSEditor"
 
@@ -4019,7 +4019,7 @@ void SSCSEditor::Construct( const FArguments& InArgs )
 	.Padding(0,0,4,0)
 	.AutoWidth()
 	[
-		SNew(SEditorHeaderButton)
+		SNew(SPositiveActionButton)
 		.AddMetaData<FTagMetaData>( FTagMetaData(TEXT("Actor.ConvertToBlueprint")) )
 		.Visibility( this, &SSCSEditor::GetPromoteToBlueprintButtonVisibility )
 		.OnClicked( this, &SSCSEditor::OnPromoteToBlueprintClicked )
@@ -4034,7 +4034,7 @@ void SSCSEditor::Construct( const FArguments& InArgs )
 	.VAlign(VAlign_Center)
 	.AutoWidth()
 	[
-		SNew(SEditorHeaderButton)
+		SNew(SPositiveActionButton)
 		.AddMetaData<FTagMetaData>(FTagMetaData(TEXT("Actor.EditBlueprint")))
 		.Visibility(this, &SSCSEditor::GetEditBlueprintButtonVisibility)
 		.ToolTipText(LOCTEXT("EditActorBlueprint_Tooltip", "Edit the Blueprint for this Actor"))

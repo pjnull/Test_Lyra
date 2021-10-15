@@ -7,11 +7,13 @@
 #include "Widgets/SCompoundWidget.h"
 #include "Widgets/Input/SComboButton.h"
 
-class EDITORWIDGETS_API SEditorHeaderButton : public SCompoundWidget
+/** A Button that is used to call out/highlight a positive option (Add, Save etc). It can also be used to open a menu.
+*/
+class TOOLWIDGETS_API SPositiveActionButton : public SCompoundWidget
 {
 public:
 
-	SLATE_BEGIN_ARGS(SEditorHeaderButton) :
+	SLATE_BEGIN_ARGS(SPositiveActionButton) :
 		_Icon(FAppStyle::Get().GetBrush("Icons.Plus"))
 		{}
 
@@ -34,7 +36,7 @@ public:
 
 	SLATE_END_ARGS()
 
-	SEditorHeaderButton() {}
+	SPositiveActionButton() {}
 
 	void Construct(const FArguments& InArgs);
 

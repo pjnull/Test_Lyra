@@ -52,7 +52,7 @@
 #include "Animation/AnimClassInterface.h"
 #include "BPGraphClipboardData.h"
 #include "K2Node_ExternalGraphInterface.h"
-#include "SEditorHeaderButton.h"
+#include "SPositiveActionButton.h"
 
 #define LOCTEXT_NAMESPACE "MyBlueprint"
 
@@ -370,7 +370,7 @@ void SMyBlueprint::Construct(const FArguments& InArgs, TWeakPtr<FBlueprintEditor
 		ToolbarBuilderWidget = SNew(SBox);
 	}
 
-	TSharedPtr<SWidget> AddNewMenu = SNew(SEditorHeaderButton)
+	TSharedPtr<SWidget> AddNewMenu = SNew(SPositiveActionButton)
 		.AddMetaData<FTagMetaData>(FTagMetaData(TEXT("MyBlueprintAddNewCombo")))
 		.Icon(FAppStyle::Get().GetBrush("Icons.Plus"))
 		.Text(LOCTEXT("AddNewLabel", "Add"))

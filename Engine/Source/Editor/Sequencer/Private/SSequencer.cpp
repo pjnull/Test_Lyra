@@ -31,7 +31,7 @@
 #include "Widgets/Input/SSpinBox.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Docking/SDockTab.h"
-#include "SEditorHeaderButton.h"
+#include "SPositiveActionButton.h"
 #include "EditorStyleSet.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "MovieSceneSequenceEditor.h"
@@ -1341,7 +1341,7 @@ void SSequencer::HandleOutlinerNodeSelectionChanged()
 
 TSharedRef<SWidget> SSequencer::MakeAddButton()
 {
-	return SNew(SEditorHeaderButton)
+	return SNew(SPositiveActionButton)
 	.OnGetMenuContent(this, &SSequencer::MakeAddMenu)
 	.Icon(FAppStyle::Get().GetBrush("Icons.Plus"))
 	.Text(LOCTEXT("Track", "Track"))

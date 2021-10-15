@@ -33,7 +33,7 @@
 #include "Selection.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "SComponentClassCombo.h"
-#include "SEditorHeaderButton.h"
+#include "SPositiveActionButton.h"
 #include "CreateBlueprintFromActorDialog.h"
 #include "ClassViewerFilter.h"
 #include "GameProjectGenerationModule.h"	// Adding new component classes

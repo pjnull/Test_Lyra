@@ -13,7 +13,7 @@
 #include "Kismet2/ComponentEditorUtils.h"
 #include "Kismet2/KismetEditorUtilities.h"		// ApplyInstanceChangesToBlueprint
 #include "SComponentClassCombo.h"
-#include "SEditorHeaderButton.h"
+#include "SPositiveActionButton.h"
 #include "ScopedTransaction.h"
 #include "SlateOptMacros.h"
 #include "Styling/SlateIconFinder.h"
