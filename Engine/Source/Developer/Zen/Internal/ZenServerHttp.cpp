@@ -433,6 +433,7 @@ namespace UE::Zen {
 		const char* CommonHeaders[] = {
 			GetSessionIdHeader(),
 			RequestIdHeader.GetData(),
+			"Expect:",
 			nullptr
 		};
 
