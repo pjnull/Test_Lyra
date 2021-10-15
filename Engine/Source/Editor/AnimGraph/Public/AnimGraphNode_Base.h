@@ -247,6 +247,7 @@ public:
 	virtual void PinConnectionListChanged(UEdGraphPin* Pin) override;
 	virtual void AutowireNewNode(UEdGraphPin* FromPin) override;
 	virtual void PostPlacedNewNode() override;
+	virtual void PostPasteNode() override;
 	virtual void DestroyNode() override;
 	// End of UEdGraphNode interface
 

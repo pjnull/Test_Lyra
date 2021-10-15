@@ -168,6 +168,14 @@ void UAnimGraphNode_Base::PostPlacedNewNode()
 	UAnimBlueprintExtension::RequestExtensionsForNode(this);
 }
 
+void UAnimGraphNode_Base::PostPasteNode()
+{
+	Super::PostPasteNode();
+
+	// This makes sure that all anim BP extensions are registered that this node needs
+	UAnimBlueprintExtension::RequestExtensionsForNode(this);
+}
+
 void UAnimGraphNode_Base::DestroyNode()
 {
 	// This node may have been the last using its extension, so refresh
