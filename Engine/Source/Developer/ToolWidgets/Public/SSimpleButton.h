@@ -6,7 +6,7 @@
 #include "Widgets/DeclarativeSyntaxSupport.h"
 #include "Widgets/Input/SButton.h"
 
-class EDITORWIDGETS_API SSimpleButton : public SButton
+class TOOLWIDGETS_API SSimpleButton : public SButton
 {
 public:
 
