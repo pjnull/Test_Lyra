@@ -279,7 +279,7 @@ struct AUDIOEXTENSIONS_API FAudioParameter
 	float FloatParam = 0.f;
 
 	// Boolean value of parameter
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "Value (Bool)", DisplayAfter = "ParamType", EditConditionHides, EditCondition = "ParamType == EAudioParameterType::None || ParamType == EAudioParameterType::Bool"), Category = AudioParameter)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "Value (Bool)", DisplayAfter = "ParamType", EditConditionHides, EditCondition = "ParamType == EAudioParameterType::None || ParamType == EAudioParameterType::Boolean"), Category = AudioParameter)
 	bool BoolParam = false;
 
 	// Integer value of parameter. If set to 'Default Construct', value is number of array items to construct.
