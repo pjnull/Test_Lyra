@@ -213,7 +213,7 @@ public:
 	 * @param FadeTime - Fade time to user when interpolating between current value and new values.
 	 *					 If non-positive, change is immediate.
 	 */
-	UFUNCTION(BlueprintCallable, Category = "Audio", DisplayName = "Clear All Global Control Bus Mix Value", meta = (
+	UFUNCTION(BlueprintCallable, Category = "Audio", DisplayName = "Clear All Global Control Bus Mix Values", meta = (
 		WorldContext = "WorldContextObject",
 		Keywords = "modulation modulator stage")
 	)
