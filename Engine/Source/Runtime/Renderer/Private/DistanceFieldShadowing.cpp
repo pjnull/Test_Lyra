@@ -122,6 +122,13 @@ FAutoConsoleVariableRef CVarAverageHeightFieldObjectsPerShadowCullTile(
 	TEXT("Determines how much memory should be allocated in height field object culling data structures.  Too much = memory waste, too little = flickering due to buffer overflow."),
 	ECVF_RenderThreadSafe | ECVF_ReadOnly);
 
+int32 GDFShadowOffsetDataStructure = 0;
+static FAutoConsoleVariableRef CVarShadowOffsetDataStructure(
+	TEXT("r.DFShadowOffsetDataStructure"),
+	GDFShadowOffsetDataStructure,
+	TEXT("Which data structure to store offset in, 0 - base, 1 - buffer, 2 - texture"),
+	ECVF_RenderThreadSafe | ECVF_ReadOnly);
+
 int32 const GDistanceFieldShadowTileSizeX = 8;
 int32 const GDistanceFieldShadowTileSizeY = 8;
 
@@ -273,7 +280,8 @@ class FDistanceFieldShadowingCS : public FGlobalShader
 	class FShadowQuality : SHADER_PERMUTATION_INT("DF_SHADOW_QUALITY", 3);
 	class FPrimitiveType : SHADER_PERMUTATION_INT("DISTANCEFIELD_PRIMITIVE_TYPE", 2);
 	class FHasPreviousOutput : SHADER_PERMUTATION_BOOL("HAS_PREVIOUS_OUTPUT");
-	using FPermutationDomain = TShaderPermutationDomain<FCullingType, FShadowQuality, FPrimitiveType, FHasPreviousOutput>;
+	class FOffsetDataStructure : SHADER_PERMUTATION_INT("OFFSET_DATA_STRUCT", 3);
+	using FPermutationDomain = TShaderPermutationDomain<FCullingType, FShadowQuality, FPrimitiveType, FHasPreviousOutput, FOffsetDataStructure>;
 
 	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
 	{
@@ -767,6 +775,7 @@ void RayTraceShadows(
 		PermutationVector.Set< FDistanceFieldShadowingCS::FShadowQuality >(DFShadowQuality);
 		PermutationVector.Set< FDistanceFieldShadowingCS::FPrimitiveType >(PrimitiveType);
 		PermutationVector.Set< FDistanceFieldShadowingCS::FHasPreviousOutput >(bHasPrevOutput);
+		PermutationVector.Set< FDistanceFieldShadowingCS::FOffsetDataStructure >(GDFShadowOffsetDataStructure);
 		auto ComputeShader = View.ShaderMap->GetShader< FDistanceFieldShadowingCS >(PermutationVector);
 
 		uint32 GroupSizeX = FMath::DivideAndRoundUp(ScissorRect.Size().X / GetDFShadowDownsampleFactor(), GDistanceFieldShadowTileSizeX);
