@@ -357,7 +357,7 @@ public:
 	FReadBuffer& IndirectionUploadIndicesBuffer;
 	FReadBuffer& IndirectionUploadDataBuffer;
 	uint32* IndirectionUploadIndicesPtr;
-	FVector4* IndirectionUploadDataPtr;
+	FVector4f* IndirectionUploadDataPtr;
 
 	FDistanceFieldIndirectionAtlasUpload(
 		FReadBuffer& InIndirectionUploadIndicesBuffer,
@@ -375,13 +375,13 @@ public:
 			IndirectionUploadIndicesBuffer.Initialize(TEXT("DistanceFields.IndirectionUploadIndicesBuffer"), sizeof(uint32), NumElements, PF_R32_UINT, BUF_Volatile);
 		}
 		
-		if (IndirectionUploadDataBuffer.NumBytes < NumElements * sizeof(FVector4))
+		if (IndirectionUploadDataBuffer.NumBytes < NumElements * sizeof(FVector4f))
 		{
-			IndirectionUploadDataBuffer.Initialize(TEXT("DistanceFields.IndirectionUploadDataBuffer"), sizeof(FVector4), NumElements, PF_A32B32G32R32F, BUF_Volatile);
+			IndirectionUploadDataBuffer.Initialize(TEXT("DistanceFields.IndirectionUploadDataBuffer"), sizeof(FVector4f), NumElements, PF_A32B32G32R32F, BUF_Volatile);
 		}
 		
 		IndirectionUploadIndicesPtr = (uint32*)RHILockBuffer(IndirectionUploadIndicesBuffer.Buffer, 0, NumElements * sizeof(uint32), RLM_WriteOnly);
-		IndirectionUploadDataPtr = (FVector4*)RHILockBuffer(IndirectionUploadDataBuffer.Buffer, 0, NumElements * sizeof(FVector4), RLM_WriteOnly);
+		IndirectionUploadDataPtr = (FVector4f*)RHILockBuffer(IndirectionUploadDataBuffer.Buffer, 0, NumElements * sizeof(FVector4f), RLM_WriteOnly);
 	}
 
 	void Unlock() const
@@ -484,14 +484,14 @@ void FDistanceFieldSceneData::AsyncUpdate(FDistanceFieldAsyncUpdateParameters Up
 		const int32* RESTRICT GlobalBlockOffsets = MipState.AllocatedBlocks.GetData();
 
 		uint32* DestIndirectionTable = nullptr;
-		FVector4* DestIndirection2Table = nullptr;
+		FVector4f* DestIndirection2Table = nullptr;
 		if (GDFShadowOffsetDataStructure == 0)
 		{
 			DestIndirectionTable = (uint32*)IndirectionTableUploadBuffer.Add_GetRef(MipState.IndirectionTableOffset, NumIndirectionEntries);
 		}
 		else if (GDFShadowOffsetDataStructure == 1)
 		{
-			DestIndirection2Table = (FVector4*)Indirection2TableUploadBuffer.Add_GetRef(MipState.IndirectionTableOffset, NumIndirectionEntries);
+			DestIndirection2Table = (FVector4f*)Indirection2TableUploadBuffer.Add_GetRef(MipState.IndirectionTableOffset, NumIndirectionEntries);
 		}
 
 		// Add global allocated brick offset to indirection table entries as we upload them
@@ -499,7 +499,7 @@ void FDistanceFieldSceneData::AsyncUpdate(FDistanceFieldAsyncUpdateParameters Up
 		{
 			const uint32 BrickIndex = SourceIndirectionTable[i];
 			uint32 GlobalBrickIndex = DistanceField::InvalidBrickIndex;
-			FVector4 BrickOffset(0, 0, 0, 0);
+			FVector4f BrickOffset(0, 0, 0, 0);
 
 			if (BrickIndex != DistanceField::InvalidBrickIndex)
 			{
@@ -1235,7 +1235,7 @@ void FDistanceFieldSceneData::UploadAllAssetData(FRDGBuilder& GraphBuilder)
 		return;
 	}
 
-	AssetDataUploadBuffer.Init(NumUploads, AssetDataMipStrideFloat4s * sizeof(FVector4), true, TEXT("DistanceFields.DFAssetDataUploadBuffer"));
+	AssetDataUploadBuffer.Init(NumUploads, AssetDataMipStrideFloat4s * sizeof(FVector4f), true, TEXT("DistanceFields.DFAssetDataUploadBuffer"));
 
 	for (TSet<FDistanceFieldAssetState, TFDistanceFieldAssetStateFuncs>::TConstIterator It(AssetStateArray); It; ++It)
 	{
@@ -1247,17 +1247,17 @@ void FDistanceFieldSceneData::UploadAllAssetData(FRDGBuilder& GraphBuilder)
 			for (int32 ReversedMipIndex = 0; ReversedMipIndex < AssetState.ReversedMips.Num(); ReversedMipIndex++)
 			{
 				//const FDistanceFieldAssetMipState& MipState = AssetState.ReversedMips[ReversedMipIndex];
-				FVector4* UploadAssetData = (FVector4*)AssetDataUploadBuffer.Add_GetRef(AssetId.AsInteger() * DistanceField::NumMips + ReversedMipIndex);
+				FVector4f* UploadAssetData = (FVector4f*)AssetDataUploadBuffer.Add_GetRef(AssetId.AsInteger() * DistanceField::NumMips + ReversedMipIndex);
 				EncodeAssetData(AssetStateArray[AssetId], ReversedMipIndex, UploadAssetData);
 			}
 		}
 		else
 		{
-			FVector4* UploadAssetData = (FVector4*)AssetDataUploadBuffer.Add_GetRef(AssetId.AsInteger() * DistanceField::NumMips);
+			FVector4f* UploadAssetData = (FVector4f*)AssetDataUploadBuffer.Add_GetRef(AssetId.AsInteger() * DistanceField::NumMips);
 			// Clear invalid entries to zero
-			UploadAssetData[0] = FVector4(0.0f, 0.0f, 0.0f, 0.0f);
-			UploadAssetData[1] = FVector4(0.0f, 0.0f, 0.0f, 0.0f);
-			UploadAssetData[2] = FVector4(0.0f, 0.0f, 0.0f, 0.0f);
+			UploadAssetData[0] = FVector4f(0.0f, 0.0f, 0.0f, 0.0f);
+			UploadAssetData[1] = FVector4f(0.0f, 0.0f, 0.0f, 0.0f);
+			UploadAssetData[2] = FVector4f(0.0f, 0.0f, 0.0f, 0.0f);
 		}
 	}
 
@@ -1427,7 +1427,7 @@ void FDistanceFieldSceneData::UpdateDistanceFieldAtlas(
 			}
 			else if (GDFShadowOffsetDataStructure == 1)
 			{
-				Indirection2TableUploadBuffer.Init(NumIndirectionTableAdds, sizeof(FVector4), true, TEXT("DistanceFields.Indirection2TableUploadBuffer"));
+				Indirection2TableUploadBuffer.Init(NumIndirectionTableAdds, sizeof(FVector4f), true, TEXT("DistanceFields.Indirection2TableUploadBuffer"));
 			}
 			else
 			{
