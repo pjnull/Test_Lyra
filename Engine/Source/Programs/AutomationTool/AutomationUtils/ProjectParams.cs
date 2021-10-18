@@ -2307,7 +2307,8 @@ namespace AutomationTool
 				{
 					if (AvailableGameTargets.Count > 1)
 					{
-						string TargetMessage = "";
+						StringBuilder TargetMessage = new StringBuilder("Multiple game targets found for project. Specify the desired target using the -Target=... argument.");
+
 						List<SingleTargetProperties> Targets = DetectedTargets.FindAll(Target => Target.Rules.Type == TargetType.Game);
 						foreach (SingleTargetProperties Target in Targets)
 						{
@@ -2319,15 +2320,15 @@ namespace AutomationTool
 
 							if (PossibleScriptFiles.Count > 0)
 							{
-								TargetMessage += $"Target \"{Target.TargetName}\" from class {Target.TargetClassName}, which may be defined in:\n {String.Join(", or\n", PossibleScriptFiles)}\n";
+								TargetMessage.Append($"\n  Could be \"{Target.TargetName}\" ({String.Join(" or ", PossibleScriptFiles)})");
 							}
 							else
 							{
-								TargetMessage += $"Target \"{Target.TargetName}\" from class {Target.TargetClassName}, source file undetermined.\n";
+								TargetMessage.Append($"\n  Could be \"{Target.TargetName}\"");
 							}
 						}
 
-						throw new AutomationException("More than one Game project found for project: \n" + TargetMessage);
+						throw new AutomationException(TargetMessage.ToString());
 					}
 
 					GameTarget = AvailableGameTargets.First();
