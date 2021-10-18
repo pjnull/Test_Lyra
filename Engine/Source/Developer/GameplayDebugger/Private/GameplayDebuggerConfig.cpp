@@ -4,6 +4,7 @@
 #include "GameplayDebugger.h"
 #include "GameplayDebuggerAddonManager.h"
 #include "CoreGlobals.h"
+#include "Misc/ConfigCacheIni.h"
 
 
 UGameplayDebuggerConfig::UGameplayDebuggerConfig(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
