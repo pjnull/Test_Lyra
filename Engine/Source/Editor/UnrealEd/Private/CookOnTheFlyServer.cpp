@@ -1677,6 +1677,8 @@ void UCookOnTheFlyServer::PumpExternalRequests(const UE::Cook::FCookerTimer& Coo
 	UE::Cook::EExternalRequestType RequestType;
 	while (!CookerTimer.IsTimeUp())
 	{
+		BuildRequests.Reset();
+		SchedulerCallbacks.Reset();
 		RequestType = ExternalRequests->DequeueNextCluster(SchedulerCallbacks, BuildRequests);
 		if (RequestType == UE::Cook::EExternalRequestType::None)
 		{
