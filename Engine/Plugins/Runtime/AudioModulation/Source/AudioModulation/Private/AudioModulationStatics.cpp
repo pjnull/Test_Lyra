@@ -189,7 +189,7 @@ AudioModulation::FAudioModulation* UAudioModulationStatics::GetModulation(UWorld
 	return nullptr;
 }
 
-USoundControlBus* UAudioModulationStatics::CreateBus(UObject* WorldContextObject, FName Name, USoundModulationParameter* Parameter, bool Activate)
+USoundControlBus* UAudioModulationStatics::CreateBus(const UObject* WorldContextObject, FName Name, USoundModulationParameter* Parameter, bool Activate)
 {
 	UWorld* World = UAudioModulationStatics::GetAudioWorld(WorldContextObject);
 	if (!World)
@@ -197,7 +197,7 @@ USoundControlBus* UAudioModulationStatics::CreateBus(UObject* WorldContextObject
 		return nullptr;
 	}
 
-	USoundControlBus* NewBus = NewObject<USoundControlBus>(WorldContextObject, Name);
+	USoundControlBus* NewBus = NewObject<USoundControlBus>(World, Name);
 	NewBus->Parameter = Parameter;
 	NewBus->Address = Name.ToString();
 
@@ -220,7 +220,7 @@ FSoundControlBusMixStage UAudioModulationStatics::CreateBusMixStage(const UObjec
 	return MixStage;
 }
 
-USoundControlBusMix* UAudioModulationStatics::CreateBusMix(UObject* WorldContextObject, FName Name, TArray<FSoundControlBusMixStage> Stages, bool Activate)
+USoundControlBusMix* UAudioModulationStatics::CreateBusMix(const UObject* WorldContextObject, FName Name, TArray<FSoundControlBusMixStage> Stages, bool Activate)
 {
 	UWorld* World = GetAudioWorld(WorldContextObject);
 	if (!World)
@@ -228,7 +228,7 @@ USoundControlBusMix* UAudioModulationStatics::CreateBusMix(UObject* WorldContext
 		return nullptr;
 	}
 
-	USoundControlBusMix* NewBusMix = NewObject<USoundControlBusMix>(WorldContextObject, Name);
+	USoundControlBusMix* NewBusMix = NewObject<USoundControlBusMix>(World, Name);
 	for (FSoundControlBusMixStage& Stage : Stages)
 	{
 		if (Stage.Bus)

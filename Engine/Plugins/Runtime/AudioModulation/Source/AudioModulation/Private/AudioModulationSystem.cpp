@@ -641,34 +641,29 @@ namespace AudioModulation
 			FPatchHandle PatchHandle = FPatchHandle::Get(static_cast<FPatchId>(InModulatorId), RefProxies.Patches);
 			if (PatchHandle.IsValid())
 			{
-				if (FModulatorHandleSet* HandleSet = RefModulators.PatchMap.Find(PatchHandle))
+				if (TArray<uint32>* RefObjectIds = RefModulators.PatchMap.Find(PatchHandle))
 				{
-					HandleSet->Add(InHandleId);
+					RefObjectIds->Add(InHandleId);
 				}
-				return;
 			}
 
 			FBusHandle BusHandle = FBusHandle::Get(static_cast<FBusId>(InModulatorId), RefProxies.Buses);
 			if (BusHandle.IsValid())
 			{
-				if (FModulatorHandleSet* HandleSet = RefModulators.BusMap.Find(BusHandle))
+				if (TArray<uint32>* RefObjectIds = RefModulators.BusMap.Find(BusHandle))
 				{
-					HandleSet->Add(InHandleId);
+					RefObjectIds->Add(InHandleId);
 				}
-				return;
 			}
 
 			FGeneratorHandle GeneratorHandle = FGeneratorHandle::Get(static_cast<FGeneratorId>(InModulatorId), RefProxies.Generators);
 			if (GeneratorHandle.IsValid())
 			{
-				if (FModulatorHandleSet* HandleSet = RefModulators.GeneratorMap.Find(GeneratorHandle))
+				if (TArray<uint32>* RefObjectIds = RefModulators.GeneratorMap.Find(GeneratorHandle))
 				{
-					HandleSet->Add(InHandleId);
+					RefObjectIds->Add(InHandleId);
 				}
-				return;
 			}
-
-			ensureAlwaysMsgf(false, TEXT("Failed to register modulator handle '%i' with pre-existing modulator '%i'"), static_cast<int32>(InHandleId), static_cast<int32>(InModulatorId));
 		});
 	}
 
