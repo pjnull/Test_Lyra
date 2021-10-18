@@ -61,7 +61,11 @@ namespace AutomationToolDriver
 				Log.TraceLog($"Loading script module manifest from {ScriptModuleManifestPath}");
 				HashSet<string> ScriptModuleAssemblyPaths = JsonSerializer.Deserialize<HashSet<string>>(FileReference.ReadAllText(ScriptModuleManifestPath));
 				bBuildSuccess = true;
-				return new HashSet<FileReference>(ScriptModuleAssemblyPaths.Select(x => FileReference.Combine(AutomationToolBinaryDir, x)));
+				return new HashSet<FileReference>(ScriptModuleAssemblyPaths
+					.Select(x => FileReference.Combine(AutomationToolBinaryDir, x))
+					// where AutomationTool has run with a set of script module plugins, it may not be bundled with all of them
+					// this is intended as a temporary workaround pending relocation of uatbuildrecord files and (likely) removal of the manifest.
+					.Where(FileReference.Exists));
 			}
 
 			if (!bForceCompile && bUseBuildRecords)
