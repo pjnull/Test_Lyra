@@ -3933,11 +3933,11 @@ void USkeletalMeshComponent::CompleteParallelAnimationEvaluation(bool bDoPostAni
 
 bool USkeletalMeshComponent::HandleExistingParallelEvaluationTask(bool bBlockOnTask, bool bPerformPostAnimEvaluation)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE(USkeletalMeshComponent);
 	if (IsRunningParallelEvaluation()) // We are already processing eval on another thread
 	{
 		if (bBlockOnTask)
 		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(USkeletalMeshComponent::BlockOnParallelEvaluationTask);
 			check(IsInGameThread()); // Only attempt this from game thread!
 			FTaskGraphInterface::Get().WaitUntilTaskCompletes(ParallelAnimationEvaluationTask, ENamedThreads::GameThread);
 			CompleteParallelAnimationEvaluation(bPerformPostAnimEvaluation); //Perform completion now
