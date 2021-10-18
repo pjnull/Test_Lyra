@@ -1910,7 +1910,7 @@ struct FDistanceFieldAsyncUpdateParameters
 	uint8* BrickUploadDataPtr = nullptr;
 
 	uint32* IndirectionIndicesUploadPtr = nullptr;
-	FVector4* IndirectionDataUploadPtr = nullptr;
+	FVector4f* IndirectionDataUploadPtr = nullptr;
 
 	TArray<FDistanceFieldReadRequest> NewReadRequests;
 	TArray<FDistanceFieldReadRequest> ReadRequestsToUpload;
