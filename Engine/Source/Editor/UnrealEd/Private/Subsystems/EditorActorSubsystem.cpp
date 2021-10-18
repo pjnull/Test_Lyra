@@ -99,15 +99,11 @@ namespace InternalActorUtilitiesSubsystemLibrary
 		GEditor->ClickLocation = Location;
 		GEditor->ClickPlane = FPlane(Location, FVector::UpVector);
 
-		EObjectFlags NewObjectFlags = RF_NoFlags;
+		EObjectFlags NewObjectFlags = RF_Transactional;
 
 		if (bTransient)
 		{
 			NewObjectFlags |= RF_Transient;
-		}
-		else
-		{
-			NewObjectFlags |= RF_Transactional;
 		}
 
 		UActorFactory* FactoryToUse = nullptr;
