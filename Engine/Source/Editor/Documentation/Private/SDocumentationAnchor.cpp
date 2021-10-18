@@ -9,6 +9,7 @@
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/SToolTip.h"
+#include "SSimpleButton.h"
 
 void SDocumentationAnchor::Construct(const FArguments& InArgs )
 {
@@ -31,17 +32,10 @@ void SDocumentationAnchor::Construct(const FArguments& InArgs )
 
 	ChildSlot
 	[
-		SAssignNew(Button, SButton)
-		.ButtonStyle(FAppStyle::Get(), "HelpButton")
-		.ContentPadding(0)
+		SAssignNew(Button, SSimpleButton)
 		.OnClicked(this, &SDocumentationAnchor::OnClicked)
-		.HAlign(HAlign_Center)
-		.VAlign(VAlign_Center)
+		.Icon(FAppStyle::Get().GetBrush("Icons.Help"))
 		.ToolTip(IDocumentation::Get()->CreateToolTip(ToolTipText, nullptr, PreviewLink, InArgs._PreviewExcerptName))
-		[
-			SNew(SImage)
-			.Image(FAppStyle::Get().GetBrush("HelpIcon"))
-		]
 	];
 }
 
