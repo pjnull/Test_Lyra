@@ -5,6 +5,7 @@
 #include "Interfaces/IPluginManager.h"
 #include "DomainAssetReferenceFilter.h"
 #include "Editor.h"
+#include "Settings/ProjectPackagingSettings.h"
 
 DEFINE_LOG_CATEGORY(LogAssetReferenceRestrictions);
 
@@ -130,6 +131,7 @@ void FDomainDatabase::RebuildFromScratch()
 	ScriptDomain.Reset();
 	TempDomain.Reset();
 	GameDomain.Reset();
+	NeverCookDomain.Reset();
 	DomainsDefinedByPlugins.Reset();
 	SpecificAssetPackageDomains.Reset();
 
@@ -211,6 +213,17 @@ void FDomainDatabase::RebuildFromScratch()
 		{
 			BuildDomainFromPlugin(Plugin);
 		}
+	}
+
+	NeverCookDomain = FindOrAddDomainByName(UAssetReferencingPolicySettings::NeverCookDomainName);
+	NeverCookDomain->UserFacingDomainName = LOCTEXT("NeverCook", "Never Cooked Content");
+	NeverCookDomain->bCanSeeEverything = true;
+	const UProjectPackagingSettings* const PackagingSettings = GetDefault<UProjectPackagingSettings>();
+	check(PackagingSettings);
+	for (const FDirectoryPath& DirectoryToNeverCook : PackagingSettings->DirectoriesToNeverCook)
+	{
+		const FString UncookedFolder = DirectoryToNeverCook.Path.StartsWith(TEXT("/"), ESearchCase::CaseSensitive) ? DirectoryToNeverCook.Path : (TEXT("/Game/") + DirectoryToNeverCook.Path);
+		NeverCookDomain->DomainRootPaths.Add(UncookedFolder / TEXT(""));
 	}
 
 	// Rebuild the path map

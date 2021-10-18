@@ -197,6 +197,7 @@ public:
 	static const FString ScriptDomainName;
 	static const FString GameDomainName;
 	static const FString TempDomainName;
+	static const FString NeverCookDomainName;
 
 public:
 	//~UObject interface
