@@ -387,45 +387,8 @@ namespace AutomationToolDriver
 			MSBuildLocator.RegisterMSBuildPath(DotnetSdkDirectory.FullName);
 		}
 
-		/// <summary>
-		/// Determines if a particular script module is supported on the current platform;
-		/// </summary>
-		private static bool IsScriptModuleSupported(string ModuleName)
-        {
-			if (RuntimePlatform.IsMac)
-            {
-				List<string> UnsupportedModules = new List<string>()
-				{
-					"GauntletExtras", "GDK", "WinGDK", "XboxCommonGDK", "XboxOneGDK", "XSX",
-					"FortniteGame", "PS4", "PS5", "Switch",
-				};
-				foreach (string UnsupportedModule in UnsupportedModules)
-				{
-					if (ModuleName.StartsWith(UnsupportedModule, StringComparison.OrdinalIgnoreCase))
-					{
-						return false;
-					}
-				}
-            }
-			else if (RuntimePlatform.IsLinux)
-            {
-				if (ModuleName.StartsWith("Gauntlet", StringComparison.OrdinalIgnoreCase))
-				{
-					return false;
-				}
-				if (ModuleName.StartsWith("PS4", StringComparison.OrdinalIgnoreCase))
-				{
-					return false;
-				}
-            }
-
-			return true;
-        }
-		
 		static HashSet<FileReference> FindAutomationProjects(string ScriptsForProjectFileName, List<string> AdditionalScriptsFolders)
 		{
-			HashSet<FileReference> FoundAutomationProjects = new HashSet<FileReference>();
-
 			// Configure the rules compiler
 			// Get all game folders and convert them to build subfolders.
 			List<DirectoryReference> AllGameFolders = new List<DirectoryReference>();
@@ -462,19 +425,8 @@ namespace AutomationToolDriver
 			
 			List<FileReference> DiscoveredModules = Rules.FindAllRulesSourceFiles(Rules.RulesFileType.AutomationModule,
 				GameFolders: AllGameFolders, ForeignPlugins: null, AdditionalSearchPaths: AllAdditionalScriptFolders);
-			foreach (FileReference ModuleFilename in DiscoveredModules)
-			{
-				if (IsScriptModuleSupported(ModuleFilename.GetFileNameWithoutAnyExtensions()))
-				{
-					FoundAutomationProjects.Add(ModuleFilename);
-				}
-				else
-				{
-					Log.TraceVerbose("Script module {0} filtered by the Host Platform and will not be compiled.", ModuleFilename);
-				}
-			}
 
-			return FoundAutomationProjects;
+			return new HashSet<FileReference>(DiscoveredModules);
 		}
 
 		class MLogger : ILogger
