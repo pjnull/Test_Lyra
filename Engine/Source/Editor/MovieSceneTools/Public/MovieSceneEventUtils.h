@@ -90,6 +90,14 @@ struct MOVIESCENETOOLS_API FMovieSceneEventUtils
 	 */
 	static void RemoveEndpointsForEventSection(UMovieSceneEventSectionBase* EventSection, UBlueprint* DirectorBP);
 
+	/**
+	 * Remove unused custom events (that don't have corresponding event end points in the given event sections)
+	 *
+	 * @param EventSections          (Required, non-null) The event sections to search for event endpoints from
+	 * @param DirectorBP             (Required, non-null) The owning blueprint from which to remove the event section's entry points
+	 */
+	static void RemoveUnusedCustomEvents(const TArray<TWeakObjectPtr<UMovieSceneEventSectionBase>>& EventSections, UBlueprint* DirectorBP);
+
 public:
 
 	/**
