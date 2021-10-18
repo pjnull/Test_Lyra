@@ -2226,7 +2226,7 @@ namespace AutomationTool
 				// Make sure we haven't specified game and clients together
 				if (Targets.Any(x => x.Rules.Type == TargetType.Client) && Targets.Any(x => x.Rules.Type == TargetType.Game))
 				{
-					throw new AutomationException("Cannot specify client ang game targets to be built together");
+					throw new AutomationException("Cannot specify client and game targets to be built together");
 				}
 
 				// Create the lists to receive all the target types
