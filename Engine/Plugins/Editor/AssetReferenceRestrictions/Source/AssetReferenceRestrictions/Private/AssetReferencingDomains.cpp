@@ -215,15 +215,19 @@ void FDomainDatabase::RebuildFromScratch()
 		}
 	}
 
-	NeverCookDomain = FindOrAddDomainByName(UAssetReferencingPolicySettings::NeverCookDomainName);
-	NeverCookDomain->UserFacingDomainName = LOCTEXT("NeverCook", "Never Cooked Content");
-	NeverCookDomain->bCanSeeEverything = true;
 	const UProjectPackagingSettings* const PackagingSettings = GetDefault<UProjectPackagingSettings>();
 	check(PackagingSettings);
-	for (const FDirectoryPath& DirectoryToNeverCook : PackagingSettings->DirectoriesToNeverCook)
+	if (PackagingSettings->DirectoriesToNeverCook.Num() > 0)
 	{
-		const FString UncookedFolder = DirectoryToNeverCook.Path.StartsWith(TEXT("/"), ESearchCase::CaseSensitive) ? DirectoryToNeverCook.Path : (TEXT("/Game/") + DirectoryToNeverCook.Path);
-		NeverCookDomain->DomainRootPaths.Add(UncookedFolder / TEXT(""));
+		NeverCookDomain = FindOrAddDomainByName(UAssetReferencingPolicySettings::NeverCookDomainName);
+		NeverCookDomain->UserFacingDomainName = LOCTEXT("NeverCook", "Never Cooked Content");
+		NeverCookDomain->bCanSeeEverything = true;
+
+		for (const FDirectoryPath& DirectoryToNeverCook : PackagingSettings->DirectoriesToNeverCook)
+		{
+			const FString UncookedFolder = DirectoryToNeverCook.Path.StartsWith(TEXT("/"), ESearchCase::CaseSensitive) ? DirectoryToNeverCook.Path : (TEXT("/Game/") + DirectoryToNeverCook.Path);
+			NeverCookDomain->DomainRootPaths.Add(UncookedFolder / TEXT(""));
+		}
 	}
 
 	// Rebuild the path map
