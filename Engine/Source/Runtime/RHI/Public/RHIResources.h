@@ -87,7 +87,21 @@ public:
 
 private:
 	// Separate function to avoid force inlining this everywhere. Helps both for code size and performance.
-	void Destroy() const;
+	inline void Destroy() const
+	{
+		if (!AtomicFlags.MarkForDelete(std::memory_order_release))
+		{
+			while (true)
+			{
+				auto HP = MakeHazardPointer(PendingDeletes, PendingDeletesHPC);
+				TClosableMpscQueue<FRHIResource*>* PendingDeletesPtr = HP.Get();
+				if (PendingDeletesPtr->Enqueue(const_cast<FRHIResource*>(this)))
+				{
+					break;
+				}
+			}
+		}
+	}
 
 public:
 	FORCEINLINE_DEBUGGABLE uint32 Release() const
