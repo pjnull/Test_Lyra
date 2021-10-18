@@ -229,7 +229,7 @@ void SSettingsEditor::NotifyPostChange( const FPropertyChangedEvent& PropertyCha
 				// external objects, for them if they're DefaultConfig, we update them here.
 				else if (ObjectBeingEdited->GetClass()->HasAnyClassFlags(CLASS_DefaultConfig))
 				{
-					ObjectBeingEdited->UpdateDefaultConfigFile();
+					ObjectBeingEdited->TryUpdateDefaultConfigFile();
 				}
 
 				if (bIsNewFile && bIsSourceControlled)

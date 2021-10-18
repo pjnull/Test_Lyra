@@ -2763,6 +2763,25 @@ void UObject::UpdateDefaultConfigFile(const FString& SpecificFileLocation)
 	UpdateSingleSectionOfConfigFile(SpecificFileLocation.IsEmpty() ? GetDefaultConfigFilename() : SpecificFileLocation);
 }
 
+bool UObject::TryUpdateDefaultConfigFile(const FString& SpecificFileLocation, bool bWarnIfFail)
+{
+	FString ConfigFile = SpecificFileLocation.IsEmpty() ? GetDefaultConfigFilename() : SpecificFileLocation;
+
+	if (FPaths::FileExists(ConfigFile) && !IFileManager::Get().IsReadOnly(*ConfigFile))
+	{
+		UpdateSingleSectionOfConfigFile(ConfigFile);
+
+		return true;
+	}
+
+	if (bWarnIfFail)
+	{
+		UE_LOG(LogObj, Warning, TEXT("Ini File '%s' was not found or is read-only"), *ConfigFile);
+	}
+
+	return false;
+}
+
 void UObject::UpdateGlobalUserConfigFile()
 {
 	UpdateSingleSectionOfConfigFile(GetGlobalUserConfigFilename());

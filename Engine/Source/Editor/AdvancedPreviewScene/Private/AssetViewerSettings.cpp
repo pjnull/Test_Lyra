@@ -1,7 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "AssetViewerSettings.h"
-#include "HAL/FileManager.h"
 #include "UObject/UnrealType.h"
 #include "Editor/EditorPerProjectUserSettings.h"
 #include "Editor.h"
@@ -72,12 +71,7 @@ void UAssetViewerSettings::Save()
 	LocalProfilesObject->SaveConfig();
 
 	SharedProfilesObject->SaveConfig();
-
-	FString DefaultConfigPath = SharedProfilesObject->GetDefaultConfigFilename();
-	if (FPaths::FileExists(DefaultConfigPath) && !IFileManager::Get().IsReadOnly(*DefaultConfigPath))
-	{
-		SharedProfilesObject->UpdateDefaultConfigFile();
-	}
+	SharedProfilesObject->TryUpdateDefaultConfigFile();
 }
 
 void UAssetViewerSettings::PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent)

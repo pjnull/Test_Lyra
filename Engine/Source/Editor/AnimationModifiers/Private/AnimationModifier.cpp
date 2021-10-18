@@ -303,7 +303,7 @@ void UAnimationModifier::UpdateNativeRevisionGuid()
 
 			// Save the new native revision to config files
 			SaveConfig();
-			UpdateDefaultConfigFile();
+			TryUpdateDefaultConfigFile();
 		}
 	}
 }

@@ -979,7 +979,7 @@ void UDeviceProfileManager::SaveProfiles(bool bSaveToDefaults)
 						}
 					}
 					
-					CurrentProfile->UpdateDefaultConfigFile();
+					CurrentProfile->TryUpdateDefaultConfigFile();
 
 					// Recreate texture groups
 					CurrentProfile->ValidateProfile();
