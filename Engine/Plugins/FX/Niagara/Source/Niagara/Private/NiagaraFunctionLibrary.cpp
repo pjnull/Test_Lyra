@@ -77,6 +77,7 @@ UNiagaraComponent* CreateNiagaraSystem(UNiagaraSystem* SystemTemplate, UWorld* W
 				NiagaraComponent->bAutoActivate = false;
 				NiagaraComponent->SetAutoDestroy(bAutoDestroy);
 				NiagaraComponent->bAllowAnyoneToDestroyMe = true;
+				NiagaraComponent->SetVisibleInRayTracing(false);
 			}
 		}
 		else if (FNiagaraWorldManager* WorldManager = FNiagaraWorldManager::Get(World))
