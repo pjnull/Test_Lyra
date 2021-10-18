@@ -516,7 +516,7 @@ void FRequestCluster::StartAsync(const FCookerTimer& CookerTimer, bool& bOutComp
 	if (FEditorDomain::Get())
 	{
 		// Disable BatchDownload until cache storage implements fetch-head requests in response to a Get with SkipData
-		bool bBatchDownloadEnabled = false;
+		bool bBatchDownloadEnabled = true;
 		GConfig->GetBool(TEXT("EditorDomain"), TEXT("BatchDownloadEnabled"), bBatchDownloadEnabled, GEditorIni);
 		if (bBatchDownloadEnabled)
 		{
