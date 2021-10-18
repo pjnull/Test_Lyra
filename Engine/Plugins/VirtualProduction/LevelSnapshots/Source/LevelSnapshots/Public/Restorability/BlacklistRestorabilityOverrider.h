@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "ISnapshotRestorabilityOverrider.h"
+#include "Interfaces/ISnapshotRestorabilityOverrider.h"
 #include "Settings/RestorationBlacklist.h"
 
 /* Disallows provided classes and properties. Uses callback to obtain blacklist so the logic is reusable outside the module. */

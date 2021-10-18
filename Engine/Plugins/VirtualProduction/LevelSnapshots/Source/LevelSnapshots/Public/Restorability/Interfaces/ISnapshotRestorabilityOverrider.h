@@ -6,7 +6,6 @@
 
 class AActor;
 class UActorComponent;
-struct FPropertyContext;
 
 /**
  * Exposes callbacks for deciding whether an actor or component is exposed to the snapshot system.

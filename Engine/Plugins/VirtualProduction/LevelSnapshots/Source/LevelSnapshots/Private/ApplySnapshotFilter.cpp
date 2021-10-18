@@ -2,14 +2,14 @@
 
 #include "ApplySnapshotFilter.h"
 
-#include "IPropertyComparer.h"
 #include "CustomSerialization/CustomSerializationDataManager.h"
 #include "Data/LevelSnapshot.h"
 #include "Data/PropertySelection.h"
+#include "Interfaces/IPropertyComparer.h"
 #include "LevelSnapshotFilters.h"
 #include "LevelSnapshotsLog.h"
 #include "LevelSnapshotsModule.h"
-#include "PropertyComparisonParams.h"
+#include "Params/PropertyComparisonParams.h"
 #include "SnapshotConsoleVariables.h"
 #include "SnapshotCustomVersion.h"
 #include "Restorability/SnapshotRestorability.h"

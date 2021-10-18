@@ -5,7 +5,7 @@
 #include "BlacklistRestorabilityOverrider.h"
 #include "LevelSnapshotsEditorProjectSettings.h"
 #include "LevelSnapshotsLog.h"
-#include "Restorability/PropertyComparisonParams.h"
+#include "Params/PropertyComparisonParams.h"
 #include "Restorability/CollisionRestoration.h"
 #include "Restorability/GridPlacementRestoration.h"
 

@@ -2,7 +2,7 @@
 
 #include "ConstantFilter.h"
 #include "ILevelSnapshotsModule.h"
-#include "ISnapshotRestorabilityOverrider.h"
+#include "Interfaces/ISnapshotRestorabilityOverrider.h"
 #include "PropertySelectionMap.h"
 #include "Util/SnapshotTestRunner.h"
 #include "Types/SnapshotTestActor.h"
@@ -37,19 +37,19 @@ bool FRestoreSubobjectProperties::RunTest(const FString& Parameters)
 
 					Actor->EditableInstancedSubobject_DefaultSubobject->IntProperty					= 1;
 					Actor->EditOnlySubobject_OptionalSubobject->IntProperty							= 2;
-					Actor->EditableInstancedSubobjectArray_OptionalSubobject[0]->IntProperty			= 3;
+					Actor->EditableInstancedSubobjectArray_OptionalSubobject[0]->IntProperty		= 3;
 					Actor->EditOnlySubobjectArray_OptionalSubobject[0]->IntProperty					= 4;
-					Actor->EditableInstancedSubobjectMap_OptionalSubobject["First"]->IntProperty		= 5;
+					Actor->EditableInstancedSubobjectMap_OptionalSubobject["First"]->IntProperty	= 5;
 					Actor->EditOnlySubobjectMap_OptionalSubobject["First"]->IntProperty				= 6;
 				})
 				.TakeSnapshot()
-				.ModifyWorld([&](UWorld* World)
+				.ModifyWorld([&](UWorld*)
 				{
 					Actor->EditableInstancedSubobject_DefaultSubobject->IntProperty					= 10;
 					Actor->EditOnlySubobject_OptionalSubobject->IntProperty							= 20;
-					Actor->EditableInstancedSubobjectArray_OptionalSubobject[0]->IntProperty			= 30;
+					Actor->EditableInstancedSubobjectArray_OptionalSubobject[0]->IntProperty		= 30;
 					Actor->EditOnlySubobjectArray_OptionalSubobject[0]->IntProperty					= 40;
-					Actor->EditableInstancedSubobjectMap_OptionalSubobject["First"]->IntProperty		= 50;
+					Actor->EditableInstancedSubobjectMap_OptionalSubobject["First"]->IntProperty	= 50;
 					Actor->EditOnlySubobjectMap_OptionalSubobject["First"]->IntProperty				= 60;
 				})
 

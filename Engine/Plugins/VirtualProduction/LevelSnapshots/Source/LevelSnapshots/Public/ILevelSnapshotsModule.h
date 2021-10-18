@@ -3,11 +3,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Restorability/IRestorationListener.h"
-#include "Restorability/ISnapshotLoader.h"
-#include "Restorability/IPropertyComparer.h"
-#include "Restorability/ISnapshotRestorabilityOverrider.h"
-#include "Serialization/ICustomObjectSnapshotSerializer.h"
+#include "Interfaces/IRestorationListener.h"
+#include "Interfaces/ISnapshotLoader.h"
+#include "Interfaces/IPropertyComparer.h"
+#include "Interfaces/ISnapshotRestorabilityOverrider.h"
+#include "Interfaces/ICustomObjectSnapshotSerializer.h"
 
 #include "Modules/ModuleInterface.h"
 #include "Modules/ModuleManager.h"

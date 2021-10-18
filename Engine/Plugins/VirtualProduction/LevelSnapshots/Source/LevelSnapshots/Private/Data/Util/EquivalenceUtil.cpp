@@ -8,7 +8,7 @@
 #include "Data/CustomSerialization/CustomObjectSerializationWrapper.h"
 #include "LevelSnapshotsLog.h"
 #include "LevelSnapshotsModule.h"
-#include "PropertyComparisonParams.h"
+#include "Params/PropertyComparisonParams.h"
 #include "PropertyInfoHelpers.h"
 #include "SnapshotRestorability.h"
 #include "SnapshotUtil.h"

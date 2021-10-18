@@ -3,7 +3,7 @@
 #include "DisplayClusterRootActorSerializer.h"
 
 #include "ILevelSnapshotsModule.h"
-#include "Serialization/ObjectSnapshotSerializationData.h"
+#include "Params/ObjectSnapshotSerializationData.h"
 
 #include "UObject/UnrealType.h"
 

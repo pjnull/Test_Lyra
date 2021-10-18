@@ -4,8 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "ILevelSnapshotsModule.h"
-#include "Restorability/IPropertyComparer.h"
-#include "Restorability/ISnapshotRestorabilityOverrider.h"
 #include "UObject/SoftObjectPath.h"
 
 struct FPropertyComparisonParams;

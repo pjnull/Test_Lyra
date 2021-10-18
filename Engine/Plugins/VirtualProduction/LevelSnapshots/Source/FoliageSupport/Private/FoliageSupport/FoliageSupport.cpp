@@ -5,7 +5,7 @@
 #include "FoliageSupport/InstancedFoliageActorData.h"
 #include "PropertySelection.h"
 #include "PropertySelectionMap.h"
-#include "Serialization/ObjectSnapshotSerializationData.h"
+#include "Params/ObjectSnapshotSerializationData.h"
 
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
@@ -66,8 +66,6 @@ void FFoliageSupport::Register(ILevelSnapshotsModule& Module)
 
 ISnapshotRestorabilityOverrider::ERestorabilityOverride FFoliageSupport::IsActorDesirableForCapture(const AActor* Actor)
 {
-	// TODO: Handle foliage type AActor using FFoliageHelper::IsOwnedByFoliage
-	
 	// Foliage's not allowed by default because it is hidden from the scene outliner
 	return Actor->GetClass() == AInstancedFoliageActor::StaticClass() || FFoliageHelper::IsOwnedByFoliage(Actor)
 		? ERestorabilityOverride::Allow : ERestorabilityOverride::DoNotCare;

@@ -2,8 +2,8 @@
 
 #include "Restorability/GridPlacementRestoration.h"
 
-#include "PropertyComparisonParams.h"
-#include "Restorability/IPropertyComparer.h"
+#include "Interfaces/IPropertyComparer.h"
+#include "Params/PropertyComparisonParams.h"
 
 #include "GameFramework/Actor.h"
 

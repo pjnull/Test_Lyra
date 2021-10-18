@@ -5,11 +5,11 @@
 #include "Archive/ApplySnapshotToEditorArchive.h"
 #include "Archive/LoadSnapshotObjectArchive.h"
 #include "CustomSerialization/CustomSerializationDataManager.h"
+#include "Data/WorldSnapshotData.h"
+#include "Interfaces/ICustomObjectSnapshotSerializer.h"
 #include "LevelSnapshotsLog.h"
 #include "LevelSnapshotsModule.h"
 #include "PropertySelectionMap.h"
-#include "Serialization/ICustomObjectSnapshotSerializer.h"
-#include "WorldSnapshotData.h"
 
 #include "GameFramework/Actor.h"
 #include "Modules/ModuleManager.h"

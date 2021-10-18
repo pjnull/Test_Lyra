@@ -5,9 +5,9 @@
 #include "CoreMinimal.h"
 #include "ILevelSnapshotsModule.h"
 #include "FoliageSupport/InstancedFoliageActorData.h"
-#include "Restorability/ISnapshotRestorabilityOverrider.h"
-#include "Restorability/IRestorationListener.h"
-#include "Restorability/Serialization/ICustomObjectSnapshotSerializer.h"
+#include "Interfaces/ISnapshotRestorabilityOverrider.h"
+#include "Interfaces/IRestorationListener.h"
+#include "Interfaces/ICustomObjectSnapshotSerializer.h"
 
 class AInstancedFoliageActor;
 
