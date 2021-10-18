@@ -21,6 +21,7 @@ AWaterZone::AWaterZone(const FObjectInitializer& Initializer)
 	BoundsComponent = CreateDefaultSubobject<UBoxComponent>(TEXT("BoundsComponent"));
 	BoundsComponent->SetCollisionObjectType(ECC_WorldStatic);
 	BoundsComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
+	BoundsComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	BoundsComponent->SetGenerateOverlapEvents(false);
 	BoundsComponent->SetupAttachment(WaterMesh);
 	BoundsComponent->SetBoxExtent(FVector(WaterMesh->GetExtentInTiles() * WaterMesh->GetTileSize(), 51200.f));
