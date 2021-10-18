@@ -1970,12 +1970,14 @@ void FControlRigParameterTrackEditor::HandleOnSpaceAdded(UMovieSceneControlRigPa
 {
 	if (SpaceChannel)
 	{
-		SpaceChannel->OnKeyMovedEvent().AddLambda([this, SpaceChannel,Section](FMovieSceneChannel* Channel, const  TArray<FKeyMoveEventItem>& MovedItems)
+		SpaceChannel->OnKeyMovedEvent().AddLambda([this,Section](FMovieSceneChannel* Channel, const  TArray<FKeyMoveEventItem>& MovedItems)
 			{
+				FMovieSceneControlRigSpaceChannel* SpaceChannel = static_cast<FMovieSceneControlRigSpaceChannel*>(Channel);
 				HandleSpaceKeyMoved(Section, SpaceChannel,MovedItems);
 			});
-		SpaceChannel->OnKeyDeletedEvent().AddLambda([this,SpaceChannel, Section](FMovieSceneChannel* Channel, const  TArray<FKeyAddOrDeleteEventItem>& Items)
+		SpaceChannel->OnKeyDeletedEvent().AddLambda([this, Section](FMovieSceneChannel* Channel, const  TArray<FKeyAddOrDeleteEventItem>& Items)
 			{
+				FMovieSceneControlRigSpaceChannel* SpaceChannel = static_cast<FMovieSceneControlRigSpaceChannel*>(Channel);
 				HandleSpaceKeyDeleted(Section, SpaceChannel,Items);
 			});
 	}
