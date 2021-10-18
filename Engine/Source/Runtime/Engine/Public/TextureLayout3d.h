@@ -141,9 +141,9 @@ public:
 
 		if (FoundNodeIndex != INDEX_NONE)
 		{
-			check(Nodes[FoundNodeIndex].SizeX == bAlignByFour ? ((ElementSizeX + 3u) & ~3u) : ElementSizeX
-				&& Nodes[FoundNodeIndex].SizeY == bAlignByFour ? ((ElementSizeY + 3u) & ~3u) : ElementSizeY
-				&& Nodes[FoundNodeIndex].SizeZ == bAlignByFour ? ((ElementSizeZ + 3u) & ~3u) : ElementSizeZ);
+			check(Nodes[FoundNodeIndex].SizeX == (bAlignByFour ? ((ElementSizeX + 3u) & ~3u) : ElementSizeX)
+				&& Nodes[FoundNodeIndex].SizeY == (bAlignByFour ? ((ElementSizeY + 3u) & ~3u) : ElementSizeY)
+				&& Nodes[FoundNodeIndex].SizeZ == (bAlignByFour ? ((ElementSizeZ + 3u) & ~3u) : ElementSizeZ));
 
 			// Mark the found node as not being used anymore
 			Nodes[FoundNodeIndex].bUsed = false;
