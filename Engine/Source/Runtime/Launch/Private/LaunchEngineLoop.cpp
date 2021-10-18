@@ -484,7 +484,7 @@ static TUniquePtr<FOutputDeviceTestExit> GScopedTestExit;
 
 
 #if WITH_ENGINE
-static void RHIExitAndStopRHIThread()
+static void StopRHIThread()
 {
 #if HAS_GPU_STATS
 	FRealtimeGPUProfiler::SafeRelease();
@@ -497,8 +497,6 @@ static void RHIExitAndStopRHIThread()
 		FGraphEventRef QuitTask = TGraphTask<FReturnGraphTask>::CreateTask(nullptr, ENamedThreads::GameThread).ConstructAndDispatchWhenReady(ENamedThreads::RHIThread);
 		FTaskGraphInterface::Get().WaitUntilTaskCompletes(QuitTask, ENamedThreads::GameThread_Local);
 	}
-
-	RHIExit();
 }
 #endif
 
@@ -4613,8 +4611,7 @@ void FEngineLoop::Exit()
 
 	IStreamingManager::Shutdown();
 
-	// Tear down the RHI.
-	RHIExitAndStopRHIThread();
+	StopRHIThread();
 
 	DestroyMoviePlayer();
 
@@ -4624,6 +4621,8 @@ void FEngineLoop::Exit()
 #endif
 
 	FTaskGraphInterface::Shutdown();
+
+	RHIExit();
 
 	FPlatformMisc::ShutdownTaggedStorage();
 }
