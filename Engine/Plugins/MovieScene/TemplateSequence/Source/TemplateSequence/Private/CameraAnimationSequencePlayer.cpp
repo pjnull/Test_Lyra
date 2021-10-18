@@ -312,9 +312,8 @@ void UCameraAnimationSequencePlayer::Play(bool bLoop, bool bRandomStartTime)
 	bIsLooping = bLoop;
 	Status = EMovieScenePlayerStatus::Playing;
 
-	const FMovieSceneEvaluationRange Range = PlayPosition.PlayTo(PlayPosition.GetCurrentPosition());
-	const FMovieSceneContext Context(Range, Status);
-	RootTemplateInstance.Evaluate(Context, *this);
+	// Unlike the level sequence player, we don't evaluate here because we don't need to: there's
+	// no scene to setup or first frame to hold.  We just have to wait for the next update.
 }
 
 void UCameraAnimationSequencePlayer::Update(FFrameTime NewPosition)
