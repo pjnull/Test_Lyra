@@ -78,7 +78,7 @@ FEnvQueryRequest& FEnvQueryRequest::SetDynamicParam(const FAIDynamicParam& Param
 	checkf(BlackboardComponent || (Param.BBKey.IsSet() == false), TEXT("BBKey.IsSet but no BlackboardComponent provided"));
 
 	// check if given param requires runtime resolve, like reading from BB
-	if (Param.BBKey.IsSet())
+	if (Param.BBKey.IsSet() && BlackboardComponent)
 	{
 		// grab info from BB
 		switch (Param.ParamType)
