@@ -6,6 +6,7 @@
 #include "EntitySystem/MovieSceneEntitySystemLinker.h"
 #include "EntitySystem/MovieSceneEntitySystemTask.h"
 #include "EntitySystem/MovieScenePropertySystemTypes.inl"
+#include "GameFramework/WorldSettings.h"
 #include "MovieSceneTimeHelpers.h"
 #include "MovieSceneTracksComponentTypes.h"
 #include "TemplateSequence.h"
