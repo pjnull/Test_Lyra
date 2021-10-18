@@ -145,6 +145,7 @@ bool FProjectDescriptor::Read(const FJsonObject& Object, const FString& PathToPr
 		{
 			AdditionalPluginDirectories.Empty();
 			FString RemappedDir = FPaths::ProjectDir() + TEXT("../RemappedPlugins/");
+			RemappedDir = FPaths::ConvertRelativePathToFull(RemappedDir);
 			AddPluginDirectory(RemappedDir);
 		}
 	}
