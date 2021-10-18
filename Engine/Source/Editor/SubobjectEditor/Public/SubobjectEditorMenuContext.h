@@ -9,10 +9,13 @@
 class SSubobjectEditor;
 
 UCLASS()
-class KISMET_API USubobjectEditorMenuContext : public UObject
+class SUBOBJECTEDITOR_API USubobjectEditorMenuContext : public UObject
 {
 	GENERATED_BODY()
 public:
+
+	UFUNCTION(BlueprintCallable, Category="Tool Menus")
+	TArray<UObject*> GetSelectedObjects() const;
 
 	TWeakPtr<SSubobjectEditor> SubobjectEditor;
 	

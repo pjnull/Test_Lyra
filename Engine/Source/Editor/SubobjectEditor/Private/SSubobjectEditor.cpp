@@ -3395,4 +3395,23 @@ void SSubobjectEditor::Utils::PopulateHandlesArray(const TArray<FSubobjectEditor
     }
 }
 
+TArray<UObject*> USubobjectEditorMenuContext::GetSelectedObjects() const
+{
+	TArray<UObject*> Result;
+	if (TSharedPtr<SSubobjectEditor> Pinned = SubobjectEditor.Pin())
+	{
+		TArray<FComponentEventConstructionData> SelectedItems;
+		Pinned->GetSelectedItemsForContextMenu(SelectedItems);
+		for (FComponentEventConstructionData& SelectedItemConstructionData : SelectedItems)
+		{
+			if (UObject* SelectedObject = SelectedItemConstructionData.Component.Get())
+			{
+				Result.Add(SelectedObject);
+			}
+		}
+	}
+
+	return Result;
+}
+
 #undef LOCTEXT_NAMESPACE
