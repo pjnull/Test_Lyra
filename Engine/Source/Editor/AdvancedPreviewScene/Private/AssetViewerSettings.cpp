@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "AssetViewerSettings.h"
+#include "HAL/FileManager.h"
 #include "UObject/UnrealType.h"
 #include "Editor/EditorPerProjectUserSettings.h"
 #include "Editor.h"
