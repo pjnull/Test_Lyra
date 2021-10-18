@@ -85,6 +85,9 @@ public:
 	// (dot, notification) http://fortawesome.github.io/Font-Awesome/icon/circle/
 	static FText Circle;
 
+	// http://fortawesome.github.io/Font-Awesome/icon/circle-o/
+	static FText Circle_O;
+
 	// (watch, timer, late, timestamp) http://fortawesome.github.io/Font-Awesome/icon/clock-o/
 	static FText Clock_O;
 

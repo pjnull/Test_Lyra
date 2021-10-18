@@ -27,6 +27,7 @@ FText FEditorFontGlyphs::Caret_Up(FText::FromString(FString(TEXT("\xf0d8"))));
 FText FEditorFontGlyphs::Check(FText::FromString(FString(TEXT("\xf00c"))));
 FText FEditorFontGlyphs::Check_Circle(FText::FromString(FString(TEXT("\xf058"))));
 FText FEditorFontGlyphs::Circle(FText::FromString(FString(TEXT("\xf111"))));
+FText FEditorFontGlyphs::Circle_O(FText::FromString(FString(TEXT("\xf10c"))));
 FText FEditorFontGlyphs::Clock_O(FText::FromString(FString(TEXT("\xf017"))));
 FText FEditorFontGlyphs::Cog(FText::FromString(FString(TEXT("\xf013"))));
 FText FEditorFontGlyphs::Cogs(FText::FromString(FString(TEXT("\xf085"))));
