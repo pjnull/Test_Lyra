@@ -72,7 +72,7 @@ public:
 		int32 IdealNodeIndex = INDEX_NONE;
 		int32 ContainingNodeIndex = INDEX_NONE;
 		int32 RemoveIndex = INDEX_NONE;
-		for (int32 Index = UnusedLeaves.Num() - 1; Index >= 0 ; --Index)
+		for (int32 Index = 0; Index < UnusedLeaves.Num(); ++Index)
 		{
 			if (ElementSizeX <= UnusedLeaves[Index].SizeX && ElementSizeY <= UnusedLeaves[Index].SizeY && ElementSizeZ <= UnusedLeaves[Index].SizeZ)
 			{
@@ -141,7 +141,9 @@ public:
 
 		if (FoundNodeIndex != INDEX_NONE)
 		{
-			check(Nodes[FoundNodeIndex].SizeX == ElementSizeX && Nodes[FoundNodeIndex].SizeY == ElementSizeY && Nodes[FoundNodeIndex].SizeZ == ElementSizeZ);
+			check(Nodes[FoundNodeIndex].SizeX == bAlignByFour ? ((ElementSizeX + 3u) & ~3u) : ElementSizeX
+				&& Nodes[FoundNodeIndex].SizeY == bAlignByFour ? ((ElementSizeY + 3u) & ~3u) : ElementSizeY
+				&& Nodes[FoundNodeIndex].SizeZ == bAlignByFour ? ((ElementSizeZ + 3u) & ~3u) : ElementSizeZ);
 
 			// Mark the found node as not being used anymore
 			Nodes[FoundNodeIndex].bUsed = false;
