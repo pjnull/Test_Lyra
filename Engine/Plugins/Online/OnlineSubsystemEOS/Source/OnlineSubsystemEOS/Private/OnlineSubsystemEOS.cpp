@@ -150,6 +150,8 @@ struct FEOSPlatformOptions :
 
 FPlatformEOSHelpersPtr FOnlineSubsystemEOS::EOSHelpersPtr;
 
+bool FCallbackBase::bShouldCancelAllCallbacks = false;
+
 void FOnlineSubsystemEOS::ModuleInit()
 {
 	LLM_SCOPE(ELLMTag::RealTimeCommunications);
@@ -421,6 +423,7 @@ bool FOnlineSubsystemEOS::Shutdown()
 		EOS_Platform_Tick(*EOSPlatformHandle);
 	}
 
+	FCallbackBase::CancelAllCallbacks();
 	StopTicker();
 
 	if (SocketSubsystem)
