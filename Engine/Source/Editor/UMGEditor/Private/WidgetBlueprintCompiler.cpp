@@ -20,6 +20,7 @@
 #include "IUMGModule.h"
 #include "UMGEditorProjectSettings.h"
 #include "WidgetCompilerRule.h"
+#include "WidgetBlueprintExtension.h"
 #include "Editor/WidgetCompilerLog.h"
 #include "Editor.h"
 
@@ -99,10 +100,18 @@ FWidgetBlueprintCompilerContext::FWidgetBlueprintCompilerContext(UWidgetBlueprin
 	, OldWidgetTree(nullptr)
 	, WidgetSchema(nullptr)
 {
+	UWidgetBlueprintExtension::ForEachExtension(WidgetBlueprint(), [this](UWidgetBlueprintExtension* InExtension)
+		{
+			InExtension->BeginCompilation(*this);
+		});
 }
 
 FWidgetBlueprintCompilerContext::~FWidgetBlueprintCompilerContext()
 {
+	UWidgetBlueprintExtension::ForEachExtension(WidgetBlueprint(), [](UWidgetBlueprintExtension* InExtension)
+		{
+			InExtension->EndCompilation();
+		});
 }
 
 UEdGraphSchema_K2* FWidgetBlueprintCompilerContext::CreateSchema()
@@ -178,6 +187,11 @@ void FWidgetBlueprintCompilerContext::CreateFunctionList()
 			}
 		}
 	}
+
+	UWidgetBlueprintExtension::ForEachExtension(WidgetBlueprint(), [this](UWidgetBlueprintExtension* InExtension)
+		{
+			InExtension->CreateFunctionList();
+		});
 }
 
 void FWidgetBlueprintCompilerContext::ValidateWidgetNames()
@@ -357,8 +371,16 @@ void FWidgetBlueprintCompilerContext::CleanAndSanitizeClass(UBlueprintGeneratedC
 		RenameObjectToTransientPackage(Animation, FName(), false);
 	}
 	NewWidgetBlueprintClass->Animations.Empty();
-
 	NewWidgetBlueprintClass->Bindings.Empty();
+	NewWidgetBlueprintClass->Extensions.Empty();
+
+	if (UWidgetBlueprintGeneratedClass* WidgetClassToClean = Cast<UWidgetBlueprintGeneratedClass>(ClassToClean))
+	{
+		UWidgetBlueprintExtension::ForEachExtension(WidgetBlueprint(), [WidgetClassToClean, InOutOldCDO](UWidgetBlueprintExtension* InExtension)
+			{
+				InExtension->CleanAndSanitizeClass(WidgetClassToClean, InOutOldCDO);
+			});
+	}
 }
 
 void FWidgetBlueprintCompilerContext::SaveSubObjectsFromCleanAndSanitizeClass(FSubobjectCollection& SubObjectsToSave, UBlueprintGeneratedClass* ClassToClean)
@@ -524,6 +546,11 @@ void FWidgetBlueprintCompilerContext::CreateClassVariablesFromBlueprint()
 			WidgetAnimToMemberVariableMap.Add(Animation, AnimationProperty);
 		}
 	}
+
+	UWidgetBlueprintExtension::ForEachExtension(WidgetBlueprint(), [](UWidgetBlueprintExtension* InExtension)
+		{
+			InExtension->CreateClassVariablesFromBlueprint();
+		});
 }
 
 void FWidgetBlueprintCompilerContext::CopyTermDefaultsToDefaultObject(UObject* DefaultObject)
@@ -591,6 +618,11 @@ void FWidgetBlueprintCompilerContext::CopyTermDefaultsToDefaultObject(UObject* D
 			MessageLog.Warning(*LOCTEXT("NonTickableButTickFound", "This widget has a blueprint implemented Tick event but the widget is set to never tick.  This tick event will never be called.").ToString());
 		}
 	}
+
+	UWidgetBlueprintExtension::ForEachExtension(WidgetBlueprint(), [](UWidgetBlueprintExtension* InExtension)
+		{
+			InExtension->CreateClassVariablesFromBlueprint();
+		});
 }
 
 void FWidgetBlueprintCompilerContext::SanitizeBindings(UBlueprintGeneratedClass* Class)
@@ -922,6 +954,11 @@ void FWidgetBlueprintCompilerContext::FinishCompilingClass(UClass* Class)
 	}
 
 	Super::FinishCompilingClass(Class);
+
+	UWidgetBlueprintExtension::ForEachExtension(WidgetBlueprint(), [BPGClass](UWidgetBlueprintExtension* InExtension)
+		{
+			InExtension->FinishCompilingClass(BPGClass);
+		});
 }
 
 
@@ -1031,10 +1068,27 @@ void FWidgetBlueprintCompilerContext::VerifyEventReplysAreNotEmpty(FKismetFuncti
 
 bool FWidgetBlueprintCompilerContext::ValidateGeneratedClass(UBlueprintGeneratedClass* Class)
 {
-	bool SuperResult = Super::ValidateGeneratedClass(Class);
-	bool Result = UWidgetBlueprint::ValidateGeneratedClass(Class);
+	const bool bSuperResult = Super::ValidateGeneratedClass(Class);
+	const bool bResult = UWidgetBlueprint::ValidateGeneratedClass(Class);
 
-	return SuperResult && Result;
+	UWidgetBlueprintGeneratedClass* WidgetClass = Cast<UWidgetBlueprintGeneratedClass>(Class);
+	bool bExtension = WidgetClass != nullptr;
+	if (bExtension)
+	{
+		UWidgetBlueprintExtension::ForEachExtension(WidgetBlueprint(), [&bExtension, WidgetClass](UWidgetBlueprintExtension* InExtension)
+			{
+				bExtension = InExtension->ValidateGeneratedClass(WidgetClass) && bExtension;
+			});
+	}
+
+	return bSuperResult && bResult && bExtension;
+}
+
+void FWidgetBlueprintCompilerContext::AddExtension(UWidgetBlueprintGeneratedClass* Class, UWidgetBlueprintGeneratedClassExtension* Extension)
+{
+	check(Class);
+	check(Extension);
+	Class->Extensions.Add(Extension);
 }
 
 #undef LOCTEXT_NAMESPACE
