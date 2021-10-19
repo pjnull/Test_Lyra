@@ -2013,7 +2013,10 @@ void UEngine::RegisterEndStreamingPauseRenderingDelegate( FEndStreamingPauseDele
 
 void UEngine::OnExternalUIChange(bool bInIsOpening)
 {
-	FSlateApplication::Get().ExternalUIChange(bInIsOpening);
+	if (FSlateApplication::IsInitialized())
+	{
+		FSlateApplication::Get().ExternalUIChange(bInIsOpening);
+	}
 }
 
 void UEngine::ReleaseAudioDeviceManager()
