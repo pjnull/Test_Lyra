@@ -41,6 +41,7 @@
 #include "Math/UnitConversion.h"
 #include "HAL/LowLevelMemTracker.h"
 #include "ProfilingDebugging/CsvProfiler.h"
+#include "ProfilingDebugging/StallDetector.h"
 #include "Types/ReflectionMetadata.h"
 #include "Trace/SlateTrace.h"
 #include "Styling/StarshipCoreStyle.h"
@@ -1986,6 +1987,9 @@ void FSlateApplication::AddModalWindow( TSharedRef<SWindow> InSlateWindow, const
 	// Block on all modal windows unless its a slow task.  In that case the game thread is allowed to run.
 	if( !bSlowTaskWindow )
 	{
+		// Time blocked in this scope shouldn't count against detection of stalls
+		SCOPE_STALL_DETECTOR_PAUSE();
+
 		// Show the cursor if it was previously hidden so users can interact with the window
 		if ( PlatformApplication->Cursor.IsValid() )
 		{
