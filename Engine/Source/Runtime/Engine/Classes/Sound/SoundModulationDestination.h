@@ -142,6 +142,7 @@ namespace Audio
 		private:
 			void ClearHandle();
 			void SetHandle(const FModulatorHandle& InHandle);
+			void SetHandle(FModulatorHandle&& InHandle);
 
 			FDeviceId DeviceId = INDEX_NONE;
 

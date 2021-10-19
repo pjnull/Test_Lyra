@@ -118,13 +118,13 @@ namespace Audio
 	FModulatorHandle::FModulatorHandle(IAudioModulation& InModulation, const USoundModulatorBase* InModulatorBase, FName InParameterName)
 	{
 		HandleId = CreateModulatorHandleId();
-
+		Modulation = &InModulation;
 		Parameter.ParameterName = InParameterName;
 		ModulatorTypeId = InModulation.RegisterModulator(HandleId, InModulatorBase, Parameter);
+
 		if (ModulatorTypeId != INDEX_NONE)
 		{
 			ModulatorId = static_cast<Audio::FModulatorId>(InModulatorBase->GetUniqueID());
-			Modulation = &InModulation;
 		}
 	}
 
@@ -170,19 +170,23 @@ namespace Audio
 
 	FModulatorHandle& FModulatorHandle::operator=(const FModulatorHandle& InOther)
 	{
-		HandleId = CreateModulatorHandleId();
-
 		Parameter = InOther.Parameter;
 
 		if (InOther.Modulation)
 		{
-			InOther.Modulation->RegisterModulator(InOther.HandleId, InOther.ModulatorId);
+			HandleId = CreateModulatorHandleId();
 			ModulatorId = InOther.ModulatorId;
 			ModulatorTypeId = InOther.ModulatorTypeId;
 			Modulation = InOther.Modulation;
+
+			if (ModulatorId != INDEX_NONE)
+			{
+				Modulation->RegisterModulator(HandleId, ModulatorId);
+			}
 		}
 		else
 		{
+			HandleId = INDEX_NONE;
 			ModulatorId = INDEX_NONE;
 			ModulatorTypeId = INDEX_NONE;
 			Modulation = nullptr;
@@ -193,6 +197,14 @@ namespace Audio
 
 	FModulatorHandle& FModulatorHandle::operator=(FModulatorHandle&& InOther)
 	{
+		if (HandleId != INDEX_NONE)
+		{
+			if (ensureAlways(Modulation))
+			{
+				Modulation->UnregisterModulator(*this);
+			}
+		}
+
 		// Move does not activate as presumed already activated or
 		// copying default handle, which is invalid. Removes data
 		// from handle being moved to avoid double deactivation on

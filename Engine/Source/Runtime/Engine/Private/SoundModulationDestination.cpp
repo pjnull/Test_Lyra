@@ -202,6 +202,12 @@ namespace Audio
 		Handle = InHandle;
 	}
 
+	void FModulationDestination::SetHandle(FModulatorHandle&& InHandle)
+	{
+		FScopeLock Lock(&HandleCritSection);
+		Handle = MoveTemp(InHandle);
+	}
+
 	void FModulationDestination::UpdateModulator(const USoundModulatorBase* InModulator)
 	{
 		const TWeakObjectPtr<const USoundModulatorBase> ModPtr(InModulator);

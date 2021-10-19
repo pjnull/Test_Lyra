@@ -79,7 +79,7 @@ public:
 		WorldContext = "WorldContextObject",
 		Keywords = "make modulation LPF modulator")
 	)
-	static USoundControlBus* CreateBus(const UObject* WorldContextObject, FName Name, USoundModulationParameter* Parameter, bool Activate = true);
+	static USoundControlBus* CreateBus(UObject* WorldContextObject, FName Name, USoundModulationParameter* Parameter, bool Activate = true);
 
 	/** Creates a stage used to mix a control bus.
 	 * @param Bus - Bus stage is in charge of applying mix value to.
@@ -111,7 +111,7 @@ public:
 		Keywords = "make modulation modulator")
 	)
 	static USoundControlBusMix* CreateBusMix(
-		const UObject* WorldContextObject,
+		UObject* WorldContextObject,
 		FName Name, 
 		TArray<FSoundControlBusMixStage> Stages,
 		bool Activate);
