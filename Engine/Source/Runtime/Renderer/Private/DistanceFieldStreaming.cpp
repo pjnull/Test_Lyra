@@ -523,7 +523,11 @@ void FDistanceFieldSceneData::AsyncUpdate(FDistanceFieldAsyncUpdateParameters Up
 			}
 			else if (GDFShadowOffsetDataStructure == 1)
 			{
-				DestIndirection2Table[i] = BrickOffset;
+				// This null check isn't really needed but to make static analysis happy
+				if (DestIndirection2Table)
+				{
+					DestIndirection2Table[i] = BrickOffset;
+				}
 			}
 			else if (GDFShadowOffsetDataStructure == 2)
 			{
