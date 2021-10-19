@@ -20,16 +20,16 @@ FInfoEntity& FTopologicalVertex::GetInfo(FInfoEntity& Info) const
 }
 #endif
 
-void FTopologicalVertex::AddConnectedEdge(TSharedRef<FTopologicalEdge> Edge)
+void FTopologicalVertex::AddConnectedEdge(FTopologicalEdge& Edge)
 {
-	ConnectedEdges.Add(Edge);
+	ConnectedEdges.Add(&Edge);
 }
 
-void FTopologicalVertex::RemoveConnectedEdge(TSharedRef<FTopologicalEdge> Edge)
+void FTopologicalVertex::RemoveConnectedEdge(FTopologicalEdge& Edge)
 {
 	for (int32 EdgeIndex = 0; EdgeIndex < ConnectedEdges.Num(); EdgeIndex++)
 	{
-		if(ConnectedEdges[EdgeIndex]==Edge) 
+		if (ConnectedEdges[EdgeIndex] == &Edge)
 		{
 			ConnectedEdges.RemoveAt(EdgeIndex);
 			return;
@@ -40,11 +40,11 @@ void FTopologicalVertex::RemoveConnectedEdge(TSharedRef<FTopologicalEdge> Edge)
 
 bool FTopologicalVertex::IsBorderVertex()
 {
-	for (const TWeakPtr<FTopologicalVertex>& Vertex : GetTwinsEntities())
+	for (FTopologicalVertex* Vertex : GetTwinsEntities())
 	{
-		for (const TWeakPtr<FTopologicalEdge>& Edge : Vertex.Pin()->GetDirectConnectedEdges())
+		for (const FTopologicalEdge* Edge : Vertex->GetDirectConnectedEdges())
 		{
-			if (Edge.Pin()->GetTwinsEntityCount() == 1)
+			if (Edge->GetTwinsEntityCount() == 1)
 			{
 				return true;
 			}
@@ -59,38 +59,38 @@ TSharedPtr<FEntityGeom> FTopologicalVertex::ApplyMatrix(const FMatrixH& InMatrix
 	return FEntity::MakeShared<FTopologicalVertex>(transformedPoint);
 }
 
-void FTopologicalVertex::GetConnectedEdges(TSharedPtr<FTopologicalVertex> OtherVertex, TArray<TSharedPtr<FTopologicalEdge>>& Edges) const
+void FTopologicalVertex::GetConnectedEdges(const FTopologicalVertex& OtherVertex, TArray<FTopologicalEdge*>& OutEdges) const
 {
-	Edges.Reserve(GetTwinsEntityCount());
+	OutEdges.Reserve(GetTwinsEntityCount());
 
-	TSharedPtr<TTopologicalLink<FTopologicalVertex>> OtherVertexLink = OtherVertex->GetLink();
-	for (const TWeakPtr<FTopologicalVertex>& Vertex : GetTwinsEntities())
+	TSharedPtr<TTopologicalLink<FTopologicalVertex>> OtherVertexLink = OtherVertex.GetLink();
+	for (const FTopologicalVertex* Vertex : GetTwinsEntities())
 	{
-		ensureCADKernel(Vertex.IsValid());
-		for (const TWeakPtr<FTopologicalEdge>& Edge : Vertex.Pin()->GetDirectConnectedEdges())
+		ensureCADKernel(Vertex);
+		for (FTopologicalEdge* Edge : Vertex->GetDirectConnectedEdges())
 		{
-			ensureCADKernel(Edge.IsValid());
-			if (Edge.Pin()->GetOtherVertex(Vertex.Pin().ToSharedRef())->GetLink() == OtherVertexLink)
+			ensureCADKernel(Edge);
+			if (Edge->GetOtherVertex(*Vertex)->GetLink() == OtherVertexLink)
 			{
-				Edges.Add(Edge.Pin());
+				OutEdges.Add(Edge);
 			}
 		}
 	}
 }
 
-void FTopologicalVertex::Link(TSharedRef<FTopologicalVertex> Twin)
+void FTopologicalVertex::Link(FTopologicalVertex& Twin)
 {
 	// The active vertex is always the closest of the Barycenter
-	if (TopologicalLink.IsValid() && Twin->TopologicalLink.IsValid())
+	if (TopologicalLink.IsValid() && Twin.TopologicalLink.IsValid())
 	{
-		if (TopologicalLink == Twin->TopologicalLink)
+		if (TopologicalLink == Twin.TopologicalLink)
 		{
 			return;
 		}
 	}
 
 	FPoint Barycenter = GetBarycenter() * (double) GetTwinsEntityCount()
-		+ Twin->GetBarycenter() * (double)Twin->GetTwinsEntityCount();
+		+ Twin.GetBarycenter() * (double)Twin.GetTwinsEntityCount();
 
 	MakeLink(Twin);
 
@@ -101,30 +101,29 @@ void FTopologicalVertex::Link(TSharedRef<FTopologicalVertex> Twin)
 	GetLink()->DefineActiveEntity();
 }
 
-void FTopologicalVertex::UnlinkTo(TSharedRef<FTopologicalVertex> OtherVertex)
+void FTopologicalVertex::UnlinkTo(FTopologicalVertex& OtherVertex)
 {
 	TSharedPtr<FVertexLink> OldLink = GetLink();
 	ResetTopologicalLink();
-	OtherVertex->ResetTopologicalLink();
+	OtherVertex.ResetTopologicalLink();
 
-	for (const TWeakPtr<FTopologicalVertex>& WeakVertex : OldLink->GetTwinsEntities())
+	for (FTopologicalVertex* Vertex : OldLink->GetTwinsEntities())
 	{
-		TSharedPtr<FTopologicalVertex> Vertex = WeakVertex.Pin();
-		if (!Vertex.IsValid() || Vertex.Get() == this || Vertex == OtherVertex)
+		if (!Vertex|| Vertex == this || Vertex == &OtherVertex)
 		{
 			continue;
 		}
 
 		Vertex->ResetTopologicalLink();
-		double Distance1 = Distance(Vertex.ToSharedRef());
-		double Distance2 = OtherVertex->Distance(Vertex.ToSharedRef());
+		double Distance1 = Distance(*Vertex);
+		double Distance2 = OtherVertex.Distance(*Vertex);
 		if (Distance1 < Distance2)
 		{
-			Link(Vertex.ToSharedRef());
+			Link(*Vertex);
 		}
 		else
 		{
-			OtherVertex->Link(Vertex.ToSharedRef());
+			OtherVertex.Link(*Vertex);
 		}
 	}
 }
@@ -132,20 +131,26 @@ void FTopologicalVertex::UnlinkTo(TSharedRef<FTopologicalVertex> OtherVertex)
 void FVertexLink::ComputeBarycenter()
 {
 	Barycenter = FPoint::ZeroPoint;
-	for (const TWeakPtr<FTopologicalVertex>& Vertex : TwinsEntities)
+	for (const FTopologicalVertex* Vertex : TwinsEntities)
 	{
-		Barycenter += Vertex.Pin()->Coordinates;
+		Barycenter += Vertex->Coordinates;
 	}
 	Barycenter /= TwinsEntities.Num();
 }
 
 void FVertexLink::DefineActiveEntity()
 {
-	double DistanceSquare = HUGE_VALUE;
-	TWeakPtr<FTopologicalVertex> ClosedVertex = TwinsEntities.HeapTop();
-	for (const TWeakPtr<FTopologicalVertex>& Vertex : TwinsEntities)
+	if (TwinsEntities.Num() == 0)
 	{
-		double Square = Vertex.Pin()->SquareDistance(Barycenter);
+		ActiveEntity = nullptr;
+		return;
+	}
+
+	double DistanceSquare = HUGE_VALUE;
+	FTopologicalVertex* ClosedVertex = TwinsEntities.HeapTop();
+	for (FTopologicalVertex* Vertex : TwinsEntities)
+	{
+		double Square = Vertex->SquareDistance(Barycenter);
 		if (Square < DistanceSquare)
 		{
 			DistanceSquare = Square;

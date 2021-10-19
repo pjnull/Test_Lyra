@@ -70,7 +70,7 @@ bool FIsoTriangulator::Triangulate()
 
 	if (!BuildLoopSegments())
 	{
-		FMessage::Printf(Log, TEXT("A loop of the surface %d is in self intersecting. The mesh of this sector is canceled."), Grid.GetFace()->GetId());
+		FMessage::Printf(Log, TEXT("A loop of the surface %d is in self intersecting. The mesh of this sector is canceled.\n"), Grid.GetFace()->GetId());
 		return false;
 	}
 
@@ -2014,7 +2014,7 @@ void FIsoTriangulator::MeshCycle(const EGridSpace Space, const TArray<FIsoSegmen
 	{
 		if (CycleIntersectionTool.DoesIntersect(*Segment))
 		{
-			FMessage::Printf(Log, TEXT("A cycle of the surface %d is in self intersecting. The mesh of this sector is canceled."), Grid.GetFace()->GetId());
+			FMessage::Printf(Log, TEXT("A cycle of the surface %d is in self intersecting. The mesh of this sector is canceled.\n"), Grid.GetFace()->GetId());
 			return;
 		}
 	}
@@ -2023,6 +2023,13 @@ void FIsoTriangulator::MeshCycle(const EGridSpace Space, const TArray<FIsoSegmen
 	if (bDisplay)
 	{
 		Open3DDebugSession(TEXT("Mesh cycle"));
+
+		F3DDebugSession _(FString::Printf(TEXT("Cycle")));
+		for (const FIsoSegment* Segment : Cycle)
+		{
+			Display(EGridSpace::UniformScaled, *Segment);
+		}
+		Wait();
 	}
 #endif
 
@@ -2199,6 +2206,7 @@ void FIsoTriangulator::MeshCycle(const EGridSpace Space, const TArray<FIsoSegmen
 		FIsoNode& NextNode = NextSegment->GetOtherNode(&EndNode);
 
 #ifdef DEBUG_FIND_BEST_TRIANGLE
+		int32 TriangleIndex = 0;
 		if (bDisplay)
 		{
 			{
@@ -2273,7 +2281,6 @@ void FIsoTriangulator::MeshCycle(const EGridSpace Space, const TArray<FIsoSegmen
 					continue;
 				}
 
-
 				// Check if the node is inside the sector (X) or outside (Z)
 				const FPoint2D& NodePoint2D = Node->Get2DPoint(EGridSpace::UniformScaled, Grid);
 				double SlopeAtStartNode = GetSlopAtStartNode(StartPoint2D, NodePoint2D, StartReferenceSlope);
@@ -2321,8 +2328,7 @@ void FIsoTriangulator::MeshCycle(const EGridSpace Space, const TArray<FIsoSegmen
 					PointCriteria = HUGE_VALUE;
 				}
 #else // 2D CotangentCrietria
-				const FPoint2D& NodePoint2DSpace = Node->Get2DPoint(Space, Grid);
-				double PointCriteria = FMath::Abs(CotangentCriteria(StartPoint2DSpace, EndPoint2DSpace, NodePoint2DSpace));
+				double PointCriteria = FMath::Abs(CotangentCriteria(StartPoint2D, EndPoint2D, NodePoint2D));
 #endif
 				if (
 					// the candidate triangle is inside the current candidate triangle

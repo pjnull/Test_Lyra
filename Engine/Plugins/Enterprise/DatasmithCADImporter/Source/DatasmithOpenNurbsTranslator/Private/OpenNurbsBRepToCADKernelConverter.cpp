@@ -152,6 +152,42 @@ TSharedPtr<FTopologicalLoop> FOpenNurbsBRepToCADKernelConverter::AddLoop(const O
 	return FTopologicalLoop::Make(Edges, Directions, GeometricTolerance);
 }
 
+void FOpenNurbsBRepToCADKernelConverter::LinkEdgesLoop(const ON_BrepLoop& OpenNurbsLoop, FTopologicalLoop& Loop)
+{
+	int32 EdgeCount = OpenNurbsLoop.TrimCount();
+	for (int32 Index = 0; Index < EdgeCount; ++Index)
+	{
+		ON_BrepTrim& OpenNurbsTrim = *OpenNurbsLoop.Trim(Index);
+		ON_BrepEdge* OpenNurbsEdge = OpenNurbsTrim.Edge();
+		if (OpenNurbsEdge == nullptr)
+		{
+			continue;
+		}
+
+		TSharedPtr<CADKernel::FTopologicalEdge>* Edge = OpenNurbsTrimId2CADKernelEdge.Find(OpenNurbsTrim.m_trim_index);
+		if (!Edge || !Edge->IsValid() || (*Edge)->IsDeleted() || (*Edge)->IsDegenerated())
+		{
+			continue;
+		}
+
+		for (int32 Endex = 0; Endex < OpenNurbsEdge->m_ti.Count(); ++Endex)
+		{
+			int32 LinkedEdgeId = OpenNurbsEdge->m_ti[Endex];
+			if (LinkedEdgeId == OpenNurbsTrim.m_trim_index)
+			{
+				continue;
+			}
+
+			TSharedPtr<CADKernel::FTopologicalEdge>* TwinEdge = OpenNurbsTrimId2CADKernelEdge.Find(LinkedEdgeId);
+			if (TwinEdge->IsValid() && !(*TwinEdge)->IsDeleted() && !(*TwinEdge)->IsDegenerated())
+			{
+				(*Edge)->Link(**TwinEdge, SquareTolerance);
+				break;
+			}
+		}
+	}
+}
+
 TSharedPtr<FTopologicalEdge> FOpenNurbsBRepToCADKernelConverter::AddEdge(const ON_BrepTrim& OpenNurbsTrim, TSharedRef<FSurface>& CarrierSurface)
 {
 	ON_BrepEdge* OpenNurbsEdge = OpenNurbsTrim.Edge();
@@ -219,23 +255,12 @@ TSharedPtr<FTopologicalEdge> FOpenNurbsBRepToCADKernelConverter::AddEdge(const O
 		return TSharedPtr<FTopologicalEdge>();
 	}
 
-	// Build topo i.e. find in the twin trims the the first edge and link both edges
-	for (int32 Index = 0; Index < OpenNurbsEdge->m_ti.Count(); ++Index)
-	{
-		int32 LinkedEdgeId = OpenNurbsEdge->m_ti[Index];
-		if (LinkedEdgeId == OpenNurbsTrim.m_trim_index)
-		{
-			continue;
-		}
 
-		TSharedPtr<CADKernel::FTopologicalEdge>* TwinEdge = OpenNurbsTrimId2CADKernelEdge.Find(LinkedEdgeId);
-		if (TwinEdge)
-		{
-			Edge->Link(TwinEdge->ToSharedRef(), SquareTolerance);
-			break;
-		}
+	// Only Edge with twin need to be in the map used in LinkEdgesLoop 
+	if(OpenNurbsEdge->m_ti.Count() > 1)
+	{
+		OpenNurbsTrimId2CADKernelEdge.Add(OpenNurbsTrim.m_trim_index, Edge);
 	}
-	OpenNurbsTrimId2CADKernelEdge.Add(OpenNurbsTrim.m_trim_index, Edge);
 
 	return Edge;
 }
@@ -264,6 +289,7 @@ TSharedPtr<FTopologicalFace> FOpenNurbsBRepToCADKernelConverter::AddFace(const O
 		TSharedPtr<FTopologicalLoop> Loop = AddLoop(OpenNurbsLoop, Surface);
 		if(Loop.IsValid())
 		{
+			LinkEdgesLoop(OpenNurbsLoop, *Loop);
 			Face->AddLoop(Loop);
 		}
 	}

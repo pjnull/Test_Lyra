@@ -191,9 +191,8 @@ void FShell::CheckTopology(TArray<FFaceSubset>& SubShells)
 					Shell.NonManifoldEdgeCount++;
 				}
 
-				for (TWeakPtr<FTopologicalEdge> WeakEdge : Edge->GetTwinsEntities())
+				for (FTopologicalEdge* NextEdge : Edge->GetTwinsEntities())
 				{
-					TSharedPtr<FTopologicalEdge> NextEdge = WeakEdge.Pin();
 					if (NextEdge->HasMarker1())
 					{
 						continue;

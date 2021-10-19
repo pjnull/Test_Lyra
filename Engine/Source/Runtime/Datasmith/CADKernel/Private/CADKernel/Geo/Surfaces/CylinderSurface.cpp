@@ -8,15 +8,20 @@
 
 using namespace CADKernel;
 
-FCylinderSurface::FCylinderSurface(const double InToleranceGeometric, const FMatrixH& INMatrix, double InRadius, double InStartLength, double InEndLength, double InStartAngle, double InEndAngle)
-	: FSurface(InToleranceGeometric, InStartAngle, InEndAngle, InStartLength, InEndLength)
-	, Matrix(INMatrix)
-	, Radius(InRadius)
+FCylinderSurface::FCylinderSurface(const double InToleranceGeometric, const FMatrixH& InMatrix, double InRadius, double InStartLength, double InEndLength, double InStartAngle, double InEndAngle)
+	: FCylinderSurface(InToleranceGeometric, InMatrix, InRadius, FSurfacicBoundary(InStartAngle, InEndAngle, InStartLength, InEndLength))
+{
+}
+
+FCylinderSurface::FCylinderSurface(const double InToleranceGeometric, const FMatrixH& InMatrix, const double InRadius, const FSurfacicBoundary& InBoundary)
+: FSurface(InToleranceGeometric, InBoundary)
+, Matrix(InMatrix)
+, Radius(InRadius)
 {
 	SetMinToleranceIso();
 }
 
-void FCylinderSurface::InitBoundary() const
+void FCylinderSurface::InitBoundary()
 {
 }
 
@@ -57,9 +62,9 @@ FInfoEntity& FCylinderSurface::GetInfo(FInfoEntity& Info) const
 {
 	return FSurface::GetInfo(Info).Add(TEXT("Matrix"), Matrix)
 							 .Add(TEXT("Radius"), Radius)
-							 .Add(TEXT("StartLength"), Boundary[EIso::IsoV].Min)
-							 .Add(TEXT("EndLength"), Boundary[EIso::IsoU].Max)
 							 .Add(TEXT("StartAngle"), Boundary[EIso::IsoU].Min)
-							 .Add(TEXT("EndAngle"), Boundary[EIso::IsoU].Max);
+							 .Add(TEXT("EndAngle"), Boundary[EIso::IsoU].Max)
+							 .Add(TEXT("StartLength"), Boundary[EIso::IsoV].Min)
+							 .Add(TEXT("EndLength"), Boundary[EIso::IsoV].Max);
 }
 #endif

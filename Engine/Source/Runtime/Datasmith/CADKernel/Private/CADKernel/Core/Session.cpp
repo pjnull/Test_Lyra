@@ -7,7 +7,7 @@
 using namespace CADKernel;
 
 #ifdef CADKERNEL_DEV
-TSharedPtr<FSession> FSession::Session = TSharedPtr<FSession>();
+FSession FSession::Session(0.01);
 #endif
 
 void FSession::SaveDatabase(const TCHAR* FileName)
@@ -52,6 +52,7 @@ void FSession::LoadDatabase(const TCHAR* FilePath)
 	if (!Archive.IsValid())
 	{
 		FMessage::Printf(Log, TEXT("The archive file %s is corrupted\n"), FilePath);
+		return;
 	}
 
 	TSharedRef<FModel> SessionModel = GetModel();

@@ -21,10 +21,10 @@ FSizeCriterion::FSizeCriterion(FCADKernelArchive& Archive, ECriterion InType)
 }
 
 
-void FSizeCriterion::ApplyOnEdgeParameters(TSharedRef<FTopologicalEdge> Edge, const TArray<double>& Coordinates, const TArray<FCurvePoint>& Points) const
+void FSizeCriterion::ApplyOnEdgeParameters(FTopologicalEdge& Edge, const TArray<double>& Coordinates, const TArray<FCurvePoint>& Points) const
 {
-	double NumericPrecision = Edge->GetTolerance3D();
-	if (Edge->Length() <= NumericPrecision)
+	double NumericPrecision = Edge.GetTolerance3D();
+	if (Edge.Length() <= NumericPrecision)
 	{
 		return;
 	}
@@ -32,7 +32,7 @@ void FSizeCriterion::ApplyOnEdgeParameters(TSharedRef<FTopologicalEdge> Edge, co
 	switch (CriterionType)
 	{
 	case ECriterion::MaxSize:
-		ApplyOnEdgeParameters(Edge, Coordinates, Points, Edge->GetDeltaUMaxs(), [](double NewValue, double& AbacusValue)
+		ApplyOnEdgeParameters(Coordinates, Points, Edge.GetDeltaUMaxs(), [](double NewValue, double& AbacusValue)
 			{
 				if (NewValue < AbacusValue)
 				{
@@ -42,7 +42,7 @@ void FSizeCriterion::ApplyOnEdgeParameters(TSharedRef<FTopologicalEdge> Edge, co
 		break;
 
 	case ECriterion::MinSize:
-		ApplyOnEdgeParameters(Edge, Coordinates, Points, Edge->GetDeltaUMins(), [](double NewValue, double& AbacusValue)
+		ApplyOnEdgeParameters(Coordinates, Points, Edge.GetDeltaUMins(), [](double NewValue, double& AbacusValue)
 			{
 				if (NewValue > AbacusValue)
 				{
@@ -56,7 +56,7 @@ void FSizeCriterion::ApplyOnEdgeParameters(TSharedRef<FTopologicalEdge> Edge, co
 	}
 }
 
-void FSizeCriterion::ApplyOnEdgeParameters(TSharedRef<FTopologicalEdge> Edge, const TArray<double>& Coordinates, const TArray<FCurvePoint>& Points, TArray<double>& DeltaUArray, TFunction<void(double, double&)> Compare) const
+void FSizeCriterion::ApplyOnEdgeParameters(const TArray<double>& Coordinates, const TArray<FCurvePoint>& Points, TArray<double>& DeltaUArray, TFunction<void(double, double&)> Compare) const
 {
 	double DeltaUMax = Coordinates[Coordinates.Num() - 1] - Coordinates[0];
 

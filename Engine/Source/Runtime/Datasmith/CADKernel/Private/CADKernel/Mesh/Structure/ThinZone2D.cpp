@@ -47,7 +47,7 @@ void FThinZone2DFinder::FindClosedSegments()
 	int32 SegmentToBeginIndex = 0;
 	for (FEdgeSegment* Segment : SortedLoopSegments)
 	{
-		TSharedPtr<FTopologicalLoop> SegmentLoop = nullptr;
+		FTopologicalLoop* SegmentLoop = nullptr;
 		if (Segment->IsInner())
 		{
 			SegmentLoop = Segment->GetEdge()->GetLoop();
@@ -201,15 +201,15 @@ void FThinZone2DFinder::LinkClosedSegments()
 	FEdgeSegment* Segment = nullptr;
 	FIdent Index = 0;
 	FIdent StartZoneIndex = 0;
-	TSharedPtr<FTopologicalLoop> LastBoundary = nullptr;
+	FTopologicalLoop* LastLoop = nullptr;
 	bool bThinZone = false;
 
 	for (FEdgeSegment* EdgeSegment : LoopSegments)
 	{
 		Segment = EdgeSegment;
-		if (LastBoundary != EdgeSegment->GetEdge()->GetLoop())
+		if (LastLoop != EdgeSegment->GetEdge()->GetLoop())
 		{
-			LastBoundary = EdgeSegment->GetEdge()->GetLoop();
+			LastLoop = EdgeSegment->GetEdge()->GetLoop();
 			Index++;
 			StartSegment = EdgeSegment;
 			StartZoneIndex = Index;

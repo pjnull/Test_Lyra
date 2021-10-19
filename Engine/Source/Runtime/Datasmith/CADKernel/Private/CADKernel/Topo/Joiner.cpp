@@ -157,6 +157,9 @@ void FJoiner::JoinFaces()
 
 	FDuration InitKernelIODuration = FChrono::Elapse(StartJoinTime);
 	FChrono::PrintClockElapse(EVerboseLevel::Log, TEXT(""), TEXT("Join"), InitKernelIODuration);
+
+	// clean the model at the end
+	SplitIntoConnectedShell();
 }
 
 void FJoiner::GetVertices(TArray<TSharedPtr<FTopologicalVertex>>& Vertices)
@@ -264,7 +267,7 @@ void FJoiner::MergeCoincidentVertices(TArray<TSharedPtr<FTopologicalVertex>>& Ve
 			if (DistanceSqr < JoiningVerticesToleranceSquare)
 			{
 				OtherVertex->SetMarker1();
-				Vertex->Link(OtherVertex.ToSharedRef());
+				Vertex->Link(*OtherVertex);
 				Barycenter = Vertex->GetBarycenter();
 			}
 		}
@@ -334,8 +337,8 @@ void FJoiner::MergeBorderVerticesWithCoincidentOtherVertices(TArray<TSharedPtr<F
 		FPoint Barycenter = Vertex->GetBarycenter();
 		for (int32 IndexJ = StartIndexJ; IndexJ < VertexNum; ++IndexJ)
 		{
-			TSharedRef<FTopologicalVertex> OtherVertex = Vertices[SortedVertexIndices[IndexJ]].ToSharedRef();
-			if (Vertex->GetLink() == OtherVertex->GetLink())
+			FTopologicalVertex& OtherVertex = *Vertices[SortedVertexIndices[IndexJ]];
+			if (Vertex->GetLink() == OtherVertex.GetLink())
 			{
 				continue;
 			}
@@ -353,17 +356,17 @@ void FJoiner::MergeBorderVerticesWithCoincidentOtherVertices(TArray<TSharedPtr<F
 				break;
 			}
 
-			double DistanceSqr = OtherVertex->GetLinkActiveEntity()->SquareDistance(Barycenter);
+			double DistanceSqr = OtherVertex.GetLinkActiveEntity()->SquareDistance(Barycenter);
 			if (DistanceSqr < JoiningToleranceSquare)
 			{
-				TArray<TSharedPtr<FTopologicalEdge>> CommonEdges;
+				TArray<FTopologicalEdge*> CommonEdges;
 				Vertex->GetConnectedEdges(OtherVertex, CommonEdges);
 				if (CommonEdges.Num() > 0)
 				{
 					continue;
 				}
 
-				OtherVertex->SetMarker1();
+				OtherVertex.SetMarker1();
 				Vertex->Link(OtherVertex);
 				Barycenter = Vertex->GetBarycenter();
 			}
@@ -401,7 +404,7 @@ void FJoiner::MergeCoincidentEdges(TArray<TSharedPtr<FTopologicalVertex>>& Verti
 		ensureCADKernel(VertexPtr.IsValid());
 		TSharedRef<FTopologicalVertex> Vertex = VertexPtr.ToSharedRef();
 
-		TArray<TWeakPtr<FTopologicalEdge>> ConnectedEdges;
+		TArray<FTopologicalEdge*> ConnectedEdges;
 		Vertex->GetConnectedEdges(ConnectedEdges);
 		int32 ConnectedEdgeCount = ConnectedEdges.Num();
 		if (ConnectedEdgeCount == 1)
@@ -411,7 +414,7 @@ void FJoiner::MergeCoincidentEdges(TArray<TSharedPtr<FTopologicalVertex>>& Verti
 
 		for (int32 EdgeI = 0; EdgeI < ConnectedEdgeCount - 1; ++EdgeI)
 		{
-			TSharedPtr<FTopologicalEdge> Edge = ConnectedEdges[EdgeI].Pin();
+			FTopologicalEdge* Edge = ConnectedEdges[EdgeI];
 			if (!Edge->IsActiveEntity())
 			{
 				continue;
@@ -421,7 +424,7 @@ void FJoiner::MergeCoincidentEdges(TArray<TSharedPtr<FTopologicalVertex>>& Verti
 
 			for (int32 EdgeJ = EdgeI + 1; EdgeJ < ConnectedEdgeCount; ++EdgeJ)
 			{
-				TSharedPtr<FTopologicalEdge> SecondEdge = ConnectedEdges[EdgeJ].Pin();
+				FTopologicalEdge* SecondEdge = ConnectedEdges[EdgeJ];
 				if (!SecondEdge->IsActiveEntity())
 				{
 					continue;
@@ -438,8 +441,8 @@ void FJoiner::MergeCoincidentEdges(TArray<TSharedPtr<FTopologicalVertex>>& Verti
 
 				if (OtherEdgeEndVertex == EndVertex)
 				{
-					FPoint StartTangentEdge = Edge->GetTangentAt(Vertex);
-					FPoint StartTangentOtherEdge = SecondEdge->GetTangentAt(Vertex);
+					FPoint StartTangentEdge = Edge->GetTangentAt(*Vertex);
+					FPoint StartTangentOtherEdge = SecondEdge->GetTangentAt(*Vertex);
 
 					double CosAngle = StartTangentEdge.ComputeCosinus(StartTangentOtherEdge);
 					if (CosAngle < 0.9)
@@ -449,7 +452,7 @@ void FJoiner::MergeCoincidentEdges(TArray<TSharedPtr<FTopologicalVertex>>& Verti
 
 					if (Edge->GetFace() != SecondEdge->GetFace())
 					{
-						Edge->Link(SecondEdge.ToSharedRef(), JoiningTolerance);
+						Edge->Link(*SecondEdge, JoiningTolerance);
 					}
 				}
 			}
@@ -462,12 +465,12 @@ void FJoiner::MergeCoincidentEdges(TArray<TSharedPtr<FTopologicalVertex>>& Verti
 
 }
 
-TSharedPtr<FTopologicalVertex> FJoiner::SplitAndLink(TSharedRef<FTopologicalVertex>& StartVertex, TSharedPtr<FTopologicalEdge>& EdgeToLink, TSharedPtr<FTopologicalEdge>& EdgeToSplit)
+TSharedPtr<FTopologicalVertex> FJoiner::SplitAndLink(FTopologicalVertex& StartVertex, FTopologicalEdge& EdgeToLink, FTopologicalEdge& EdgeToSplit)
 {
-	TSharedPtr<FTopologicalVertex> VertexToLink = EdgeToLink->GetOtherVertex(StartVertex);
+	FTopologicalVertex* VertexToLink = EdgeToLink.GetOtherVertex(StartVertex);
 
 	FPoint ProjectedPoint;
-	double UProjectedPoint = EdgeToSplit->ProjectPoint(VertexToLink->GetBarycenter(), ProjectedPoint);
+	double UProjectedPoint = EdgeToSplit.ProjectPoint(VertexToLink->GetBarycenter(), ProjectedPoint);
 
 	double SquareDistanceToProjectedPoint = ProjectedPoint.SquareDistance(VertexToLink->GetBarycenter());
 	if (SquareDistanceToProjectedPoint > JoiningToleranceSquare)
@@ -476,11 +479,11 @@ TSharedPtr<FTopologicalVertex> FJoiner::SplitAndLink(TSharedRef<FTopologicalVert
 	}
 
 	// Check if the ProjectedPoint is not nearly equal edge boundary
-	TSharedPtr<FTopologicalVertex> EndVertex = EdgeToSplit->GetOtherVertex(StartVertex);
+	FTopologicalVertex* EndVertex = EdgeToSplit.GetOtherVertex(StartVertex);
 	if (EndVertex->SquareDistance(ProjectedPoint) < JoiningToleranceSquare)
 	{
-		VertexToLink->Link(EndVertex.ToSharedRef());
-		EdgeToLink->Link(EdgeToSplit.ToSharedRef(), JoiningTolerance);
+		VertexToLink->Link(*EndVertex);
+		EdgeToLink.Link(EdgeToSplit, JoiningTolerance);
 		// TSharedPtr<FTopologicalVertex>() is returned as EndVertex is not new
 		return TSharedPtr<FTopologicalVertex>();
 	}
@@ -488,17 +491,17 @@ TSharedPtr<FTopologicalVertex> FJoiner::SplitAndLink(TSharedRef<FTopologicalVert
 	// JoinParallelEdges process all edges connected to startVertex (ConnectedEdges).
 	// Connected edges must remain compliant i.e. all edges of ConnectedEdges must be connected to StartVertex
 	// EdgeToSplit->SplitAt() must keep EdgeToSplit connected to StartVertex
-	bool bKeepStartVertexConnectivity = (StartVertex->GetLink() == EdgeToSplit->GetStartVertex()->GetLink());
+	bool bKeepStartVertexConnectivity = (StartVertex.GetLink() == EdgeToSplit.GetStartVertex()->GetLink());
 
 	TSharedPtr<FTopologicalEdge> NewEdge;
-	TSharedPtr<FTopologicalVertex> NewVertex = EdgeToSplit->SplitAt(UProjectedPoint, ProjectedPoint, bKeepStartVertexConnectivity, NewEdge);
+	TSharedPtr<FTopologicalVertex> NewVertex = EdgeToSplit.SplitAt(UProjectedPoint, ProjectedPoint, bKeepStartVertexConnectivity, NewEdge);
 	if (!NewVertex.IsValid())
 	{
 		return TSharedPtr<FTopologicalVertex>();
 	}
 
-	VertexToLink->Link(NewVertex.ToSharedRef());
-	EdgeToLink->Link(EdgeToSplit.ToSharedRef(), JoiningTolerance);
+	VertexToLink->Link(*NewVertex);
+	EdgeToLink.Link(EdgeToSplit, JoiningTolerance);
 
 	return NewVertex;
 }
@@ -521,7 +524,7 @@ void FJoiner::StitchParallelEdges(TArray<TSharedPtr<FTopologicalVertex>>& Vertic
 
 		TSharedRef<FTopologicalVertex> Vertex = VertexPtr.ToSharedRef();
 
-		TArray<TWeakPtr<FTopologicalEdge>> ConnectedEdges;
+		TArray<FTopologicalEdge*> ConnectedEdges;
 		Vertex->GetConnectedEdges(ConnectedEdges);
 		int32 ConnectedEdgeCount = ConnectedEdges.Num();
 		if (ConnectedEdgeCount == 1)
@@ -531,8 +534,8 @@ void FJoiner::StitchParallelEdges(TArray<TSharedPtr<FTopologicalVertex>>& Vertic
 
 		for (int32 EdgeI = 0; EdgeI < ConnectedEdgeCount - 1; ++EdgeI)
 		{
-			TSharedPtr<FTopologicalEdge> Edge = ConnectedEdges[EdgeI].Pin();
-			ensureCADKernel(Edge->GetLoop().IsValid());
+			FTopologicalEdge* Edge = ConnectedEdges[EdgeI];
+			ensureCADKernel(Edge->GetLoop() != nullptr);
 
 			if (Edge->IsDegenerated())
 			{
@@ -547,7 +550,7 @@ void FJoiner::StitchParallelEdges(TArray<TSharedPtr<FTopologicalVertex>>& Vertic
 
 			for (int32 EdgeJ = EdgeI + 1; EdgeJ < ConnectedEdgeCount; ++EdgeJ)
 			{
-				TSharedPtr<FTopologicalEdge> SecondEdge = ConnectedEdges[EdgeJ].Pin();
+				FTopologicalEdge* SecondEdge = ConnectedEdges[EdgeJ];
 				if (Edge->IsDegenerated())
 				{
 					continue;
@@ -564,8 +567,8 @@ void FJoiner::StitchParallelEdges(TArray<TSharedPtr<FTopologicalVertex>>& Vertic
 					continue;
 				}
 
-				FPoint StartTangentEdge = Edge->GetTangentAt(Vertex);
-				FPoint StartTangentOtherEdge = SecondEdge->GetTangentAt(Vertex);
+				FPoint StartTangentEdge = Edge->GetTangentAt(*Vertex);
+				FPoint StartTangentOtherEdge = SecondEdge->GetTangentAt(*Vertex);
 
 				double CosAngle = StartTangentEdge.ComputeCosinus(StartTangentOtherEdge);
 				if (CosAngle < 0.9)
@@ -577,7 +580,7 @@ void FJoiner::StitchParallelEdges(TArray<TSharedPtr<FTopologicalVertex>>& Vertic
 				TSharedRef<FTopologicalVertex> OtherEdgeEndVertex = SecondEdge->GetOtherVertex(Vertex)->GetLinkActiveEntity();
 				if (EndVertex == OtherEdgeEndVertex)
 				{
-					Edge->Link(SecondEdge.ToSharedRef(), JoiningTolerance);
+					Edge->Link(*SecondEdge, JoiningTolerance);
 				}
 				else
 				{
@@ -586,7 +589,7 @@ void FJoiner::StitchParallelEdges(TArray<TSharedPtr<FTopologicalVertex>>& Vertic
 					if (EdgeLength < OtherEdgeLength)
 					{
 						CountSplit++;
-						TSharedPtr<FTopologicalVertex> NewVertex = SplitAndLink(Vertex, Edge, SecondEdge);
+						TSharedPtr<FTopologicalVertex> NewVertex = SplitAndLink(*Vertex, *Edge, *SecondEdge);
 						if (NewVertex.IsValid())
 						{
 							VerticesToProcess.Add(NewVertex);
@@ -595,7 +598,7 @@ void FJoiner::StitchParallelEdges(TArray<TSharedPtr<FTopologicalVertex>>& Vertic
 					else
 					{
 						CountSplit++;
-						TSharedPtr<FTopologicalVertex> NewVertex = SplitAndLink(Vertex, SecondEdge, Edge);
+						TSharedPtr<FTopologicalVertex> NewVertex = SplitAndLink(*Vertex, *SecondEdge, *Edge);
 						if (NewVertex.IsValid())
 						{
 							VerticesToProcess.Add(NewVertex);
@@ -657,15 +660,15 @@ void FJoiner::MergeUnconnectedAdjacentEdges()
 				{
 					TSharedPtr<FTopologicalVertex> EndVertex = Edge.Direction == EOrientation::Front ? Edge.Entity->GetEndVertex() : Edge.Entity->GetStartVertex();
 
-					TArray<TWeakPtr<FTopologicalEdge>> ConnectedEdges;
+					TArray<FTopologicalEdge*> ConnectedEdges;
 					EndVertex->GetConnectedEdges(ConnectedEdges);
 
 					bool bEdgeIsNotTheLast = false;
 					if (ConnectedEdges.Num() == 2)
 					{
 						// check if the edges are tangents
-						FPoint StartTangentEdge = ConnectedEdges[0].Pin()->GetTangentAt(EndVertex.ToSharedRef());
-						FPoint StartTangentOtherEdge = ConnectedEdges[1].Pin()->GetTangentAt(EndVertex.ToSharedRef());
+						FPoint StartTangentEdge = ConnectedEdges[0]->GetTangentAt(*EndVertex);
+						FPoint StartTangentOtherEdge = ConnectedEdges[1]->GetTangentAt(*EndVertex);
 
 						double CosAngle = StartTangentEdge.ComputeCosinus(StartTangentOtherEdge);
 						if (CosAngle < -0.9)
@@ -698,22 +701,27 @@ void FJoiner::MergeUnconnectedAdjacentEdges()
 				TSharedRef<FTopologicalVertex> StartVertex = StartVertexPtr.ToSharedRef();
 				TSharedPtr<FTopologicalVertex> EndVertex = Candidates.Last().Direction == EOrientation::Front ? Candidates.Last().Entity->GetEndVertex() : Candidates.Last().Entity->GetStartVertex();
 
-				FPoint StartTangentEdge = Candidates[0].Entity->GetTangentAt(StartVertex);
+				FPoint StartTangentEdge = Candidates[0].Entity->GetTangentAt(*StartVertex);
 
-				TArray<TSharedPtr<FTopologicalEdge>> Edges;
-				StartVertex->GetConnectedEdges(EndVertex, Edges);
+				TArray<FTopologicalEdge*> Edges;
+				StartVertex->GetConnectedEdges(*EndVertex, Edges);
 
 				// Remove edge that is not parallel edge
-				TSharedPtr<FTopologicalEdge> ParallelEdge;
-				for (TSharedPtr<FTopologicalEdge>& Edge : Edges)
+				FTopologicalEdge* ParallelEdge = nullptr;
+				for (FTopologicalEdge*& Edge : Edges)
 				{
+					if (!Edge)
+					{
+						continue;
+					}
+
 					if (Edge->GetFace() == Face)
 					{
-						Edge.Reset();
+						Edge = nullptr;
 						continue;
 					}
 					
-					FPoint StartTangentOtherEdge = Edge->GetTangentAt(StartVertex);
+					FPoint StartTangentOtherEdge = Edge->GetTangentAt(*StartVertex);
 					double CosAngle = StartTangentEdge.ComputeCosinus(StartTangentOtherEdge);
 					if (CosAngle > 0.9)
 					{
@@ -722,7 +730,7 @@ void FJoiner::MergeUnconnectedAdjacentEdges()
 					}
 				}
 
-				if (ParallelEdge.IsValid())
+				if (ParallelEdge)
 				{
 					//FMessage::Printf(Log, TEXT("Face %d UnconnectedAdjacentEdges\n"), Face->GetId());
 					//for (auto Edge : Candidates)
@@ -741,11 +749,11 @@ void FJoiner::MergeUnconnectedAdjacentEdges()
 
 					// Link to the parallel edge
 					// New edge is link to the first parallel one as the other parallel should already be linked together
-					for (TSharedPtr<FTopologicalEdge>& Edge : Edges)
+					for (FTopologicalEdge* Edge : Edges)
 					{
-						if (Edge.IsValid())
+						if (Edge)
 						{
-							Edge->Link(NewEdge.ToSharedRef(), JoiningTolerance);
+							Edge->Link(*NewEdge, JoiningTolerance);
 							break;
 						}
 					}
@@ -764,20 +772,19 @@ void FJoiner::RemoveIsolatedEdges()
 {
 	FTimePoint StartTime = FChrono::Now();
 
-	TArray<TSharedPtr<FTopologicalEdge>> IsolatedEdges;
+	TArray<FTopologicalEdge*> IsolatedEdges;
 
 	TArray<TSharedPtr<FTopologicalVertex>> Vertices;
 	GetVertices(Vertices);
 
 	for (const TSharedPtr<FTopologicalVertex>& Vertex : Vertices)
 	{
-		for (const TWeakPtr<FTopologicalVertex>& TwinVertex : Vertex->GetTwinsEntities())
+		for (const FTopologicalVertex* TwinVertex : Vertex->GetTwinsEntities())
 		{
-			TArray<TWeakPtr<FTopologicalEdge>> Edges = Vertex->GetDirectConnectedEdges();
-			for (TWeakPtr<FTopologicalEdge> WeakEdge : Edges)
+			TArray<FTopologicalEdge*> Edges = Vertex->GetDirectConnectedEdges();
+			for (FTopologicalEdge* Edge : Edges)
 			{
-				TSharedPtr<FTopologicalEdge> Edge = WeakEdge.Pin();
-				if (!Edge->GetLoop().IsValid())
+				if (Edge->GetLoop() == nullptr)
 				{
 					IsolatedEdges.Add(Edge);
 				}
@@ -819,8 +826,8 @@ void FJoiner::CheckSelfConnectedEdge()
 				{
 					if (!Edge->IsDegenerated() && Edge->Length() < 2 * JoiningTolerance)
 					{
-						FMessage::Printf(Debug, TEXT("Face %d Edge %d was self connected, "), Face->GetId(), Edge->GetId());
-						Edge->GetStartVertex()->UnlinkTo(Edge->GetEndVertex());
+						FMessage::Printf(Debug, TEXT("Face %d Edge %d was self connected\n"), Face->GetId(), Edge->GetId());
+						Edge->GetStartVertex()->UnlinkTo(*Edge->GetEndVertex());
 					}
 				}
 			}
@@ -871,9 +878,8 @@ void FJoiner::SplitIntoConnectedShell()
 					Shell.NonManifoldEdgeCount++;
 				}
 
-				for (TWeakPtr<FTopologicalEdge> WeakEdge : Edge->GetTwinsEntities())
+				for (FTopologicalEdge* NextEdge : Edge->GetTwinsEntities())
 				{
-					TSharedPtr<FTopologicalEdge> NextEdge = WeakEdge.Pin();
 					if (NextEdge->HasMarker1())
 					{
 						continue;
@@ -1031,7 +1037,6 @@ void FJoiner::SplitIntoConnectedShell()
 			Body->AddShell(Shell);
 			Body->SetName(FaceSubset.MainName);
 			Body->SetColorId(FaceSubset.MainColor);
-			Body->SetHostId(Session.NewHostId());
 
 			Shell->Add(FaceSubset.Faces);
 			Shell->SetName(FaceSubset.MainName);

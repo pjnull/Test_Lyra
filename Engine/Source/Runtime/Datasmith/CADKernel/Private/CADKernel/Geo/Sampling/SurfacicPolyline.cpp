@@ -63,7 +63,7 @@ void FSurfacicPolyline::CheckIfDegenerated(const double Tolerance3D, const FSurf
 	bDegeneration2D = (Aabb.GetSize(0) < ToleranceIso[EIso::IsoU] && Aabb.GetSize(1) < ToleranceIso[EIso::IsoV]);
 }
 
-void FSurfacicPolyline::GetExtremities(const FLinearBoundary& InBoundary, const double Tolerance3D, const FSurfacicTolerance& MinToleranceIso, FSurfacicCurveExtremity& Extremities) const
+void FSurfacicPolyline::GetExtremities(const FLinearBoundary& InBoundary, const double Tolerance3D, const FSurfacicTolerance& MinToleranceIso, FSurfacicCurveExtremities& Extremities) const
 {
 	FDichotomyFinder Finder(Coordinates);
 	const int32 StartIndex = Finder.Find(InBoundary.Min);

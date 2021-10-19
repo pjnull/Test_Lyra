@@ -26,12 +26,12 @@ FCompositeSurface::FCompositeSurface(const double InToleranceGeometric, int32 US
 	SetMinToleranceIso();
 }
 
-void FCompositeSurface::InitBoundary() const
+void FCompositeSurface::InitBoundary()
 {
-	Boundary.UVBoundaries[EIso::IsoU].Min = GlobalCoordinates[EIso::IsoU][0];
-	Boundary.UVBoundaries[EIso::IsoV].Min = GlobalCoordinates[EIso::IsoV][0];
-	Boundary.UVBoundaries[EIso::IsoU].Max = GlobalCoordinates[EIso::IsoU][GetSurfNum(EIso::IsoU)];
-	Boundary.UVBoundaries[EIso::IsoV].Max = GlobalCoordinates[EIso::IsoV][GetSurfNum(EIso::IsoV)];
+	Boundary[EIso::IsoU].Min = GlobalCoordinates[EIso::IsoU][0];
+	Boundary[EIso::IsoV].Min = GlobalCoordinates[EIso::IsoV][0];
+	Boundary[EIso::IsoU].Max = GlobalCoordinates[EIso::IsoU][GetSurfNum(EIso::IsoU)];
+	Boundary[EIso::IsoV].Max = GlobalCoordinates[EIso::IsoV][GetSurfNum(EIso::IsoV)];
 }
 
 

@@ -10,7 +10,7 @@
 
 using namespace CADKernel;
 
-void FOffsetSurface::InitBoundary() const
+void FOffsetSurface::InitBoundary()
 {
 	Boundary = BaseSurface->GetBoundary();
 }

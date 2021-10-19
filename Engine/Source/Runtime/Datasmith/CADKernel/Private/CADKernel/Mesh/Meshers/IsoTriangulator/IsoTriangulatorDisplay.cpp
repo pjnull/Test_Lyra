@@ -89,6 +89,8 @@ void FIsoTriangulator::DisplayIsoNodes(EGridSpace Space) const
 	{
 		Display(Space, Node, Node.GetFaceIndex(), EVisuProperty::YellowPoint);
 	}
+	Close3DDebugSession();
+	Open3DDebugSession(TEXT("FIsoTrianguler::IsoNodes Inner"));
 	for (const FIsoNode& Node : InnerNodes)
 	{
 		Display(Space, Node, Node.GetFaceIndex());

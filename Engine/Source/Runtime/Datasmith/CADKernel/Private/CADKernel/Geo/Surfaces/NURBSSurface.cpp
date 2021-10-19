@@ -3,6 +3,7 @@
 #include "CADKernel/Geo/Surfaces/NURBSSurface.h"
 
 #include "CADKernel/Geo/GeoPoint.h"
+#include "CADKernel/Math/Aabb.h"
 
 using namespace CADKernel;
 
@@ -35,6 +36,11 @@ FInfoEntity& FNURBSSurface::GetInfo(FInfoEntity& Info) const
 
 void FNURBSSurface::Finalize()
 {
+	if (bIsRational && Weights.IsEmpty())
+	{
+		bIsRational = false;
+	}
+
 	if (bIsRational)
 	{
 		const double FirstWeigth = Weights[0];
@@ -132,5 +138,41 @@ void FNURBSSurface::FillNurbs(FNurbsSurfaceHomogeneousData& NurbsData)
 	Finalize();
 }
 
+void FNURBSSurface::SetMinToleranceIso()
+{
+	double LengthU = 0;
+	double LengthV = 0;
 
+	for (int32 IndexV = 0, Index = 0; IndexV < PoleVCount; IndexV++)
+	{
+		FAABB ControlPolygonAABB;
+		for (int32 IndexU = 0; IndexU < PoleUCount; IndexU++, Index++)
+		{
+			ControlPolygonAABB += Poles[Index];
+		}
+		double Length = ControlPolygonAABB.DiagonalLength();
+		if (Length > LengthU)
+		{
+			LengthU = Length;
+		}
+	}
 
+	for (int32 IndexU = 0; IndexU < PoleUCount; IndexU++)
+	{
+		FAABB ControlPolygonAABB;
+		for (int32 IndexV = 0, Index = IndexU; IndexV < PoleVCount; IndexV++, Index += PoleUCount)
+		{
+			ControlPolygonAABB += Poles[Index];
+		}
+		double Length = ControlPolygonAABB.DiagonalLength();
+		if (Length > LengthV)
+		{
+			LengthV = Length;
+		}
+	}
+
+	double ToleranceU = Tolerance3D * Boundary[EIso::IsoU].Length() / LengthU * 0.1;
+	double ToleranceV = Tolerance3D * Boundary[EIso::IsoV].Length() / LengthV * 0.1;
+
+	MinToleranceIso.Set(ToleranceU, ToleranceV);
+}

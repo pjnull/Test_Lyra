@@ -44,13 +44,16 @@ void FTopologicalFace::Presample()
 
 void FTopologicalFace::ApplyNaturalLoops()
 {
+	const FSurfacicBoundary& Boundaries = CarrierSurface->GetBoundary();
+	ApplyNaturalLoops(Boundaries);
+}
+
+void FTopologicalFace::ApplyNaturalLoops(const FSurfacicBoundary& Boundaries)
+{
 	ensureCADKernel(Loops.Num() == 0);
 
 	TArray<TSharedPtr<FTopologicalEdge>> Edges;
 	Edges.Reserve(4);
-
-	const FSurfacicBoundary& Bounds = CarrierSurface->GetBoundary();
-
 	TFunction<void(const FPoint&, const FPoint&)> BuildEdge = [&](const FPoint& StartPoint, const FPoint& EndPoint)
 	{
 		double Tolerance3D = CarrierSurface->Get3DTolerance();
@@ -68,26 +71,26 @@ void FTopologicalFace::ApplyNaturalLoops()
 	FPoint EndPoint;
 
 	// Build 4 bounding edges of the surface
-	StartPoint.Set(Bounds.UVBoundaries[EIso::IsoU].Min, Bounds.UVBoundaries[EIso::IsoV].Min);
-	EndPoint.Set(Bounds.UVBoundaries[EIso::IsoU].Min, Bounds.UVBoundaries[EIso::IsoV].Max);
+	StartPoint.Set(Boundaries[EIso::IsoU].Min, Boundaries[EIso::IsoV].Min);
+	EndPoint.Set(Boundaries[EIso::IsoU].Min, Boundaries[EIso::IsoV].Max);
 	BuildEdge(StartPoint, EndPoint);
 
-	StartPoint.Set(Bounds.UVBoundaries[EIso::IsoU].Min, Bounds.UVBoundaries[EIso::IsoV].Max);
-	EndPoint.Set(Bounds.UVBoundaries[EIso::IsoU].Max, Bounds.UVBoundaries[EIso::IsoV].Max);
+	StartPoint.Set(Boundaries[EIso::IsoU].Min, Boundaries[EIso::IsoV].Max);
+	EndPoint.Set(Boundaries[EIso::IsoU].Max, Boundaries[EIso::IsoV].Max);
 	BuildEdge(StartPoint, EndPoint);
 
-	StartPoint.Set(Bounds.UVBoundaries[EIso::IsoU].Max, Bounds.UVBoundaries[EIso::IsoV].Max);
-	EndPoint.Set(Bounds.UVBoundaries[EIso::IsoU].Max, Bounds.UVBoundaries[EIso::IsoV].Min);
+	StartPoint.Set(Boundaries[EIso::IsoU].Max, Boundaries[EIso::IsoV].Max);
+	EndPoint.Set(Boundaries[EIso::IsoU].Max, Boundaries[EIso::IsoV].Min);
 	BuildEdge(StartPoint, EndPoint);
 
-	StartPoint.Set(Bounds.UVBoundaries[EIso::IsoU].Max, Bounds.UVBoundaries[EIso::IsoV].Min);
-	EndPoint.Set(Bounds.UVBoundaries[EIso::IsoU].Min, Bounds.UVBoundaries[EIso::IsoV].Min);
+	StartPoint.Set(Boundaries[EIso::IsoU].Max, Boundaries[EIso::IsoV].Min);
+	EndPoint.Set(Boundaries[EIso::IsoU].Min, Boundaries[EIso::IsoV].Min);
 	BuildEdge(StartPoint, EndPoint);
 
 	TSharedPtr<FTopologicalEdge> PreviousEdge = Edges.Last();
 	for (TSharedPtr<FTopologicalEdge>& Edge : Edges)
 	{
-		PreviousEdge->GetEndVertex()->Link(Edge->GetStartVertex());
+		PreviousEdge->GetEndVertex()->Link(*Edge->GetStartVertex());
 		PreviousEdge = Edge;
 	}
 
@@ -201,20 +204,20 @@ bool FTopologicalFace::HasSameBoundariesAs(const TSharedPtr<FTopologicalFace>& O
 	return bSameBoundary;
 }
 
-TSharedPtr<FTopologicalEdge> FTopologicalFace::GetLinkedEdge(const TSharedPtr<FTopologicalEdge>& LinkedEdge) const
+const FTopologicalEdge* FTopologicalFace::GetLinkedEdge(const FTopologicalEdge& LinkedEdge) const
 {
-	for (TWeakPtr<FTopologicalEdge> TwinEdge : LinkedEdge->GetTwinsEntities())
+	for (FTopologicalEdge* TwinEdge : LinkedEdge.GetTwinsEntities())
 	{
-		if (TwinEdge.Pin()->GetLoop()->GetFace() == AsShared())
+		if (&*TwinEdge->GetLoop()->GetFace() == this)
 		{
-			return TwinEdge.Pin();
+			return TwinEdge;
 		}
 	}
 
-	return TSharedPtr<FTopologicalEdge>();
+	return nullptr;
 }
 
-void FTopologicalFace::GetEdgeIndex(const TSharedPtr<FTopologicalEdge>& Edge, int32& OutBoundaryIndex, int32& OutEdgeIndex) const
+void FTopologicalFace::GetEdgeIndex(const FTopologicalEdge& Edge, int32& OutBoundaryIndex, int32& OutEdgeIndex) const
 {
 	OutEdgeIndex = INDEX_NONE;
 	for (OutBoundaryIndex = 0; OutBoundaryIndex < Loops.Num(); ++OutBoundaryIndex)
@@ -422,9 +425,9 @@ void FTopologicalFace::DefineSurfaceType()
 
 				TSharedPtr<FTopologicalFace> Neighbor;
 				{
-					for(const TWeakPtr<FTopologicalEdge>& NeighborEdge : Edge->GetTwinsEntities() )
+					for(FTopologicalEdge* NeighborEdge : Edge->GetTwinsEntities() )
 					{
-						if (NeighborEdge.HasSameObject(Edge.Get()))
+						if (NeighborEdge == Edge.Get())
 						{
 							continue;
 						}
@@ -440,8 +443,13 @@ void FTopologicalFace::DefineSurfaceType()
 					return;
 				}
 
-				TSharedPtr<FTopologicalEdge> TwinEdge = Edge->GetFirstTwinEdge();
-				int32 SideIndex = Neighbor->GetSideIndex(TwinEdge);
+				FTopologicalEdge* TwinEdge = Edge->GetFirstTwinEdge();
+				if(!TwinEdge)
+				{
+					return;
+				}
+
+				int32 SideIndex = Neighbor->GetSideIndex(*TwinEdge);
 				if (SideIndex < 0)
 				{
 					return;

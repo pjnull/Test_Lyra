@@ -133,15 +133,10 @@ TSharedPtr<FTopologicalEdge> FAliasModelToCADKernelConverter::AddEdge(const AlTr
 		return TSharedPtr<FTopologicalEdge>();
 	}
 
-	// Build topo
+	// Only TrimCurve with twin need to be in the map used in LinkEdgesLoop 
 	TUniquePtr<AlTrimCurve> TwinCurve(AliasTrimCurve.getTwinCurve());
 	if (TwinCurve.IsValid())
 	{
-		if (TSharedPtr<FTopologicalEdge>* TwinEdge = AlEdge2CADKernelEdge.Find(TwinCurve->fSpline))
-		{
-			Edge->Link((*TwinEdge).ToSharedRef(), SquareTolerance);
-		}
-		// only TrimCurve with twin need to be in the map
 		AlEdge2CADKernelEdge.Add(AliasTrimCurve.fSpline, Edge);
 	}
 
@@ -172,6 +167,33 @@ TSharedPtr<FTopologicalLoop> FAliasModelToCADKernelConverter::AddLoop(const AlTr
 	return Loop;
 }
 
+void FAliasModelToCADKernelConverter::LinkEdgesLoop(const AlTrimBoundary& TrimBoundary, FTopologicalLoop& Loop)
+{
+	for (TUniquePtr<AlTrimCurve> TrimCurve(TrimBoundary.firstCurve()); TrimCurve.IsValid(); TrimCurve = TUniquePtr<AlTrimCurve>(TrimCurve->nextCurve()))
+	{
+		TSharedPtr<FTopologicalEdge>* Edge = AlEdge2CADKernelEdge.Find(TrimCurve->fSpline);
+		if (!Edge || !Edge->IsValid() || (*Edge)->IsDeleted() || (*Edge)->IsDegenerated())
+		{
+			continue;
+		}
+
+		ensureCADKernel(&Loop == Edge->GetLoop());
+
+		// Link edges
+		TUniquePtr<AlTrimCurve> TwinCurve(TrimCurve->getTwinCurve());
+		if (TwinCurve.IsValid())
+		{
+			if (TSharedPtr<FTopologicalEdge>* TwinEdge = AlEdge2CADKernelEdge.Find(TwinCurve->fSpline))
+			{
+				if (TwinEdge->IsValid() && !(*TwinEdge)->IsDeleted() && !(*TwinEdge)->IsDegenerated())
+				{
+					(*Edge)->Link(**TwinEdge, SquareTolerance);
+				}
+			}
+		}
+	}
+}
+
 TSharedPtr<FTopologicalFace> FAliasModelToCADKernelConverter::AddTrimRegion(const AlTrimRegion& TrimRegion, EAliasObjectReference InObjectReference, const AlMatrix4x4& InAlMatrix, bool bInOrientation)
 {
 	TSharedPtr<FSurface> Surface = AliasToCADKernelUtils::AddNURBSSurface(GeometricTolerance, TrimRegion, InObjectReference, InAlMatrix);
@@ -186,6 +208,7 @@ TSharedPtr<FTopologicalFace> FAliasModelToCADKernelConverter::AddTrimRegion(cons
 		TSharedPtr<FTopologicalLoop> Loop = AddLoop(*TrimBoundary, Surface);
 		if (Loop.IsValid())
 		{
+			LinkEdgesLoop(*TrimBoundary, *Loop);
 			Loops.Add(Loop);
 		}
 	}

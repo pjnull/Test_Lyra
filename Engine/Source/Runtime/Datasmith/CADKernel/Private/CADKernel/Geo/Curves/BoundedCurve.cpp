@@ -21,7 +21,7 @@ void FBoundedCurve::FindNotDerivableCoordinates(const FLinearBoundary& InBoundar
 	Curve->FindNotDerivableCoordinates(InBoundary, DerivativeOrder, OutNotDerivableCoordinates);
 }
 
-TSharedPtr<FCurve> FBoundedCurve::ReboundCurve(const FLinearBoundary& InBoundary)
+TSharedPtr<FCurve> FBoundedCurve::MakeBoundedCurve(const FLinearBoundary& InBoundary)
 {
 	ensureCADKernel(Curve.IsValid());
 

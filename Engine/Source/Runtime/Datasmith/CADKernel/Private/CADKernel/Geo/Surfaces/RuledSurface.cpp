@@ -140,9 +140,9 @@ void FRuledSurface::Presample(const FSurfacicBoundary& InBoundaries, FCoordinate
 	ArrayUtils::InsertInside(Coordinates[EIso::IsoU], Curve1Sample, GetIsoTolerance(IsoU));
 
 	Coordinates[EIso::IsoV].Empty(3);
-	Coordinates[EIso::IsoV].Add(InBoundaries.UVBoundaries[EIso::IsoV].Min);
-	Coordinates[EIso::IsoV].Add((InBoundaries.UVBoundaries[EIso::IsoV].Max + InBoundaries.UVBoundaries[EIso::IsoV].Min) / 2.0);
-	Coordinates[EIso::IsoV].Add(InBoundaries.UVBoundaries[EIso::IsoV].Max);
+	Coordinates[EIso::IsoV].Add(InBoundaries[EIso::IsoV].Min);
+	Coordinates[EIso::IsoV].Add((InBoundaries[EIso::IsoV].Max + InBoundaries[EIso::IsoV].Min) / 2.0);
+	Coordinates[EIso::IsoV].Add(InBoundaries[EIso::IsoV].Max);
 }
 
 TSharedPtr<FEntityGeom> FRuledSurface::ApplyMatrix(const FMatrixH& InMatrix) const

@@ -96,9 +96,9 @@ void FTabulatedCylinderSurface::Presample(const FSurfacicBoundary& InBoundaries,
 	GuideCurve->Presample(Coordinates[EIso::IsoU], Tolerance3D);
 
 	Coordinates[EIso::IsoV].Empty(3);
-	Coordinates[EIso::IsoV].Add(InBoundaries.UVBoundaries[EIso::IsoV].Min);
-	Coordinates[EIso::IsoV].Add((InBoundaries.UVBoundaries[EIso::IsoV].Max + InBoundaries.UVBoundaries[EIso::IsoV].Min) / 2.0);
-	Coordinates[EIso::IsoV].Add(InBoundaries.UVBoundaries[EIso::IsoV].Max);
+	Coordinates[EIso::IsoV].Add(InBoundaries[EIso::IsoV].Min);
+	Coordinates[EIso::IsoV].Add((InBoundaries[EIso::IsoV].Max + InBoundaries[EIso::IsoV].Min) / 2.0);
+	Coordinates[EIso::IsoV].Add(InBoundaries[EIso::IsoV].Max);
 }
 
 void FTabulatedCylinderSurface::LinesNotDerivables(const FSurfacicBoundary& Bounds, int32 InDerivativeOrder, FCoordinateGrid& OutNotDerivables) const

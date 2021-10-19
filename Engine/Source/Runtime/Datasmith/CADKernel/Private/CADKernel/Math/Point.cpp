@@ -8,6 +8,7 @@
 using namespace CADKernel;
 
 const FPoint FPoint::ZeroPoint(0.,0.,0.);
+const FPoint FPoint::UnitPoint(1., 1., 1.);
 const FPoint FPoint::FarawayPoint(HUGE_VALUE, HUGE_VALUE, HUGE_VALUE);
 const int32 FPoint::Dimension = 3;
 

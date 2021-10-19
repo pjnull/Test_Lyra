@@ -132,6 +132,11 @@ void FDatabase::GetEntities(const TArray<FIdent>& EntityIds, TArray<TSharedPtr<F
 	}
 }
 
+void FCADKernelArchive::SetReferencedEntityOrAddToWaitingList(FIdent ArchiveId, FEntity** Entity)
+{
+	Session.Database.SetReferencedEntityOrAddToWaitingList(ArchiveId, Entity);
+}
+
 void FCADKernelArchive::SetReferencedEntityOrAddToWaitingList(FIdent ArchiveId, TWeakPtr<FEntity>& Entity)
 {
 	Session.Database.SetReferencedEntityOrAddToWaitingList(ArchiveId, Entity);
@@ -244,6 +249,13 @@ void FDatabase::Serialize(FCADKernelArchive& Ar)
 			continue;
 		}
 
+		if (Entity->IsDeleted())
+		{
+			EEntity Type = EEntity::NullEntity;
+			Ar << Type;
+			continue;
+		}
+
 		EEntity Type = Entity->GetEntityType();
 		Ar << Type;
 		Entity->Serialize(Ar);
@@ -264,8 +276,9 @@ void FDatabase::Deserialize(FCADKernelArchive& Ar)
 	Ar << ArchiveSize;
 	DatabaseEntities.Reserve((int32)(DatabaseEntities.Num() + ArchiveSize * 1.5));
 	ArchiveSize += 10;
-	ArchiveIdToWaitingPointers.SetNum(ArchiveSize);
+	ArchiveIdToWaitingSharedPointers.SetNum(ArchiveSize);
 	ArchiveIdToWaitingWeakPointers.SetNum(ArchiveSize);
+	ArchiveIdToWaitingPointers.SetNum(ArchiveSize);
 	ArchiveEntities.Init(TSharedPtr<FEntity>(), ArchiveSize);
 
 	int64 TotalSize = Ar.TotalSize();
@@ -287,7 +300,7 @@ void FDatabase::Deserialize(FCADKernelArchive& Ar)
 		CleanArchiveEntities();
 	}
 
-	ArchiveIdToWaitingPointers.Empty();
+	ArchiveIdToWaitingSharedPointers.Empty();
 	ArchiveEntities.Empty();
 	
 	FMessage::Printf(Log, TEXT("End Deserialisation of %d %d entity\n"), DatabaseEntities.Num(), ArchiveSize);
@@ -305,12 +318,16 @@ void FDatabase::CleanArchiveEntities()
 			{
 			case EEntity::EdgeLink:
 			{
-				StaticCastSharedPtr<FEdgeLink>(Entity)->CleanLink();
+				TSharedPtr<FEdgeLink> EdgeLink = StaticCastSharedPtr<FEdgeLink>(Entity);
+				EdgeLink->CleanLink();
+				ensureCADKernel(EdgeLink->GetTwinsEntitieNum());
 				break;
 			}
 			case EEntity::VertexLink:
 			{
-				StaticCastSharedPtr<FVertexLink>(Entity)->CleanLink();
+				TSharedPtr<FVertexLink> VertexLink = StaticCastSharedPtr<FVertexLink>(Entity);
+				VertexLink->CleanLink();
+				ensureCADKernel(VertexLink->GetTwinsEntitieNum());
 				break;
 			}
 			case EEntity::Body:
