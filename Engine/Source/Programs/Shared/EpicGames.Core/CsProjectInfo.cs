@@ -84,16 +84,6 @@ namespace EpicGames.Core
 		}
 
 		/// <summary>
-		/// Returns whether or not this project is a netcore project (as opposed to full .net sdk) project
-		/// </summary>
-		/// <returns>True if this is a netcore project</returns>
-		private bool IsNetCoreProject()
-		{
-			string Framework;
-			return Properties.TryGetValue("TargetFramework", out Framework) && Framework.StartsWith("netcoreapp");
-		}
-
-		/// <summary>
 		/// Resolve the project's output directory
 		/// </summary>
 		/// <param name="BaseDirectory">Base directory to resolve relative paths to</param>
@@ -104,11 +94,6 @@ namespace EpicGames.Core
 			if (Properties.TryGetValue("OutputPath", out OutputPath))
 			{
 				return DirectoryReference.Combine(BaseDirectory, OutputPath);
-			}
-			else if (IsNetCoreProject())
-			{
-				string Configuration = Properties.ContainsKey("Configuration") ? Properties["Configuration"] : "Development";
-				return DirectoryReference.Combine(BaseDirectory, "bin", Configuration, Properties["TargetFramework"]);
 			}
 			else
 			{
@@ -129,12 +114,6 @@ namespace EpicGames.Core
 				OutputDir = DirectoryReference.Combine(ProjectPath.Directory, OutputPath);
 				return true;
 			}
-			else if (IsNetCoreProject())
-			{
-				string Configuration = Properties.ContainsKey("Configuration") ? Properties["Configuration"] : "Development";
-				OutputDir = DirectoryReference.Combine(ProjectPath.Directory, "bin", Configuration, Properties["TargetFramework"]);
-				return true;
-			}
 			else
 			{
 				OutputDir = null;
@@ -148,16 +127,7 @@ namespace EpicGames.Core
 		/// <returns></returns>
 		public bool TryGetAssemblyName(out string AssemblyName)
 		{
-			if (Properties.TryGetValue("AssemblyName", out AssemblyName))
-			{
-				return true;
-			}
-			else if (IsNetCoreProject())
-			{
-				AssemblyName = ProjectPath.GetFileNameWithoutExtension();
-				return true;
-			}
-			return false;
+			return Properties.TryGetValue("AssemblyName", out AssemblyName);
 		}
 
 		/// <summary>
@@ -203,7 +173,7 @@ namespace EpicGames.Core
 		public void FindCompiledBuildProducts(DirectoryReference OutputDir, HashSet<FileReference> BuildProducts)
 		{
 			string OutputType, AssemblyName;
-			if (Properties.TryGetValue("OutputType", out OutputType) && TryGetAssemblyName(out AssemblyName))
+			if (Properties.TryGetValue("OutputType", out OutputType) && Properties.TryGetValue("AssemblyName", out AssemblyName))
 			{
 				switch (OutputType)
 				{
