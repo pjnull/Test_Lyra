@@ -704,13 +704,39 @@ IMediaSamples::EFetchBestSampleResult FImgMediaPlayer::FetchBestVideoSampleForTi
 {
 	IMediaSamples::EFetchBestSampleResult SampleResult = EFetchBestSampleResult::NoSample;
 
-	if (Loader.IsValid() && IsInitialized())
+	// The facade will keep on asking for frames, so don't do anything if we are stopped.
+	if (Loader.IsValid() && IsInitialized() && (CurrentState != EMediaState::Stopped))
 	{
 		// See if we have any samples in the specified time range.
 		SampleResult = Loader->FetchBestVideoSampleForTimeRange(TimeRange, OutSample, ShouldLoop, CurrentRate, PlaybackIsBlocking);
 		if (SampleResult == IMediaSamples::EFetchBestSampleResult::Ok)
 		{
 			CurrentTime = OutSample->GetTime().Time;
+		}
+
+		// Are we not looping?
+		if (ShouldLoop == false)
+		{
+			// Are we at the end?
+			bool bIsAtEnd = false;
+			if (CurrentRate >= 0.0f)
+			{
+				bIsAtEnd = ((TimeRange.HasUpperBound()) &&
+					(TimeRange.GetUpperBoundValue().Time >= CurrentDuration));
+			}
+			else
+			{
+				bIsAtEnd = ((TimeRange.HasLowerBound()) &&
+					(TimeRange.GetLowerBoundValue().Time <= 0.0f));
+			}
+			if (bIsAtEnd)
+			{
+				// Stop the player.
+				EventSink.ReceiveMediaEvent(EMediaEvent::PlaybackEndReached);
+				CurrentState = EMediaState::Stopped;
+				CurrentRate = 0.0f;
+				EventSink.ReceiveMediaEvent(EMediaEvent::PlaybackSuspended);
+			}
 		}
 	}
 	return SampleResult;
