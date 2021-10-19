@@ -12386,6 +12386,8 @@ void UMaterialExpressionCustom::Serialize(FStructuredArchive::FRecord Record)
 			TEXT("GetObjectWorldPosition(Parameters)"),
 			TEXT("GetPrimitiveData(Parameters).WorldToLocal"),
 			TEXT("GetPrimitiveData(Parameters).LocalToWorld"),
+			TEXT("GetPrimitiveData(Parameters.PrimitiveId).WorldToLocal"),
+			TEXT("GetPrimitiveData(Parameters.PrimitiveId).LocalToWorld"),
 		};
 
 		for (const TCHAR* Member : UniformMembers)
