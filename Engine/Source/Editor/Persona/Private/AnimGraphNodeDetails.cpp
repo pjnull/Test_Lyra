@@ -195,11 +195,8 @@ void FAnimGraphNodeDetails::CustomizeDetails(class IDetailLayoutBuilder& DetailB
 						}
 
 						NameWidget = PropertyNameWidget;
-
-						// we only show children if visibility is one
-						// whenever toggles, this gets called, so it will be refreshed
-						const bool bShowChildren = GetVisibilityOfProperty(ShowHidePropertyHandle) == EVisibility::Visible;
-						PropertyRow.CustomWidget(bShowChildren)
+						
+						PropertyRow.CustomWidget()
 						.NameContent()
 						.MinDesiredWidth(Row.NameWidget.MinWidth)
 						.MaxDesiredWidth(Row.NameWidget.MaxWidth)
@@ -212,6 +209,25 @@ void FAnimGraphNodeDetails::CustomizeDetails(class IDetailLayoutBuilder& DetailB
 						[
 							ValueWidget.ToSharedRef()
 						];
+
+						// Set visibility of children based on parent
+						uint32 NumChildren = 0;
+						TargetPropertyHandle->GetNumChildren(NumChildren);
+						for(uint32 ChildIndex = 0; ChildIndex < NumChildren; ++ChildIndex)
+						{
+							TSharedPtr<IPropertyHandle> ChildHandle = TargetPropertyHandle->GetChildHandle(ChildIndex);
+							IDetailPropertyRow& ChildRow = DetailBuilder.AddPropertyToCategory(ChildHandle);
+
+							ChildRow.Visibility(MakeAttributeLambda([this, WeakShowHidePropertyHandle = TWeakPtr<IPropertyHandle>(ShowHidePropertyHandle)]()
+							{
+								if(TSharedPtr<IPropertyHandle> PinnedShowHidePropertyHandle = WeakShowHidePropertyHandle.Pin())
+								{
+									return GetVisibilityOfProperty(PinnedShowHidePropertyHandle.ToSharedRef());
+								}
+
+								return EVisibility::Visible;
+							}));
+						}
 					}
 					else if (InternalCustomWidget != SNullWidget::NullWidget)
 					{
