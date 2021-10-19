@@ -627,7 +627,6 @@ TSharedRef<SWidget> SMetasoundGraphNode::CreateNodeContentArea()
 
 					InputSlider->SetOutputRange(InputFloat->GetRange());
 					InputSlider->SetOrientation(InputFloat->InputWidgetOrientation);
-					InputSlider->SetAlwaysShowLabel(true);
 					InputSlider->SetUnitsTextReadOnly(true);
 					InputSlider->SetValue(InputSlider->GetLinValue(InputFloat->GetDefault()));
 				}
