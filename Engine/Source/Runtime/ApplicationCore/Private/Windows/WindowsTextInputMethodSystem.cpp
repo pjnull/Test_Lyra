@@ -633,6 +633,8 @@ void FWindowsTextInputMethodSystem::Terminate()
 {
 	HRESULT Result;
 
+	::ImmDestroyContext(IMMContextId);
+
 	// Get source from thread manager, needed to uninstall profile processor related sinks.
 	TComPtr<ITfSource> TSFSource;
 	Result = TSFSource.FromQueryInterface(IID_ITfSource, TSFThreadManager);
@@ -681,7 +683,9 @@ void FWindowsTextInputMethodSystem::Terminate()
 
 	TSFThreadManager.Reset();
 
-	::ImmDestroyContext(IMMContextId);
+	TSFDisabledDocumentManager.Reset();
+	TSFInputProcessorProfiles.Reset();
+	TSFInputProcessorProfileManager.Reset();
 }
 
 void FWindowsTextInputMethodSystem::ClearStaleWindowHandles()
