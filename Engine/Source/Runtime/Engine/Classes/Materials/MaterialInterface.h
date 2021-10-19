@@ -23,6 +23,7 @@
 #if WITH_CHAOS
 #include "Physics/PhysicsInterfaceCore.h"
 #endif
+#include "MaterialShared.h"
 #include "MaterialInterface.generated.h"
 
 class FMaterialCompiler;

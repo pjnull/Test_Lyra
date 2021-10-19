@@ -1,5 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
+#if WITH_CHAOS
+
 #include "Chaos/ChaosScene.h"
 
 #include "Async/AsyncWork.h"
@@ -541,3 +543,5 @@ FGraphEventArray FChaosScene::GetCompletionEvents()
 {
 	return CompletionEvents;
 }
+
+#endif

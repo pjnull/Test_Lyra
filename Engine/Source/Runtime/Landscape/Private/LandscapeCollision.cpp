@@ -618,7 +618,11 @@ void ULandscapeHeightfieldCollisionComponent::CreateCollisionObject()
 
 #if WITH_EDITOR
 		// Use existing heightfield except if it is missing its editor heightfield and the component needs it.
-		if (ExistingHeightfieldRef && (!bNeedsEditorHeightField || ExistingHeightfieldRef->EditorHeightfield != nullptr))
+		if (ExistingHeightfieldRef && (!bNeedsEditorHeightField
+#if WITH_CHAOS
+			|| ExistingHeightfieldRef->EditorHeightfield != nullptr
+#endif
+			))
 #else
 		if (ExistingHeightfieldRef)
 #endif

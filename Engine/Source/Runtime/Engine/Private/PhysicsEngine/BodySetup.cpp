@@ -1974,7 +1974,7 @@ float FKConvexElem::GetVolume(const FVector& Scale) const
 					// Grab triangle indices that we hit
 					int32 I0 = Indices[PolyData.mIndexBase + 0];
 					int32 I1 = Indices[PolyData.mIndexBase + (VertIdx - 1)];
-					int32 I2 = Indices[PolyData.mIndexBase + VecubemapunwraprtIdx];
+					int32 I2 = Indices[PolyData.mIndexBase + VertIdx];
 
 
 					Volume += SignedVolumeOfTriangle(ScaleTransform.TransformPosition(P2UVector(Vertices[I0])), 
