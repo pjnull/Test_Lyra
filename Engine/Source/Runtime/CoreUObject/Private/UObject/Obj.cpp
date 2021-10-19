@@ -54,6 +54,7 @@
 #include "Misc/ExclusiveLoadPackageTimeTracker.h"
 #include "Serialization/DeferredMessageLog.h"
 #include "UObject/CoreRedirects.h"
+#include "HAL/FileManager.h"
 #include "HAL/LowLevelMemTracker.h"
 #include "HAL/LowLevelMemStats.h"
 #include "Misc/PackageAccessTracking.h"
