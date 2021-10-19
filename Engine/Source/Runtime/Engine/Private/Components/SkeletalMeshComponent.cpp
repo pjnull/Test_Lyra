@@ -42,6 +42,10 @@
 #include "ContentStreaming.h"
 #include "Animation/AnimTrace.h"
 #include "Animation/BuiltInAttributeTypes.h"
+#include "HAL/LowLevelMemTracker.h"
+#include "HAL/LowLevelMemStats.h"
+
+LLM_DEFINE_TAG(SkeletalMesh_TransformData);
 
 #if INTEL_ISPC
 #include "SkeletalMeshComponent.ispc.generated.h"
@@ -2892,7 +2896,7 @@ void USkeletalMeshComponent::SetSkeletalMeshWithoutResettingAnimation(USkeletalM
 
 bool USkeletalMeshComponent::AllocateTransformData()
 {
-	LLM_SCOPE(ELLMTag::SkeletalMesh);
+	LLM_SCOPE_BYNAME("SkeletalMesh/TransformData");
 
 	// Allocate transforms if not present.
 	if ( Super::AllocateTransformData() )

@@ -54,6 +54,9 @@
 #include "Animation/AnimationPoseData.h"
 #include "ITimeManagementModule.h"
 #include "CommonFrameRates.h"
+#include "HAL/LowLevelMemTracker.h"
+
+LLM_DEFINE_TAG(SequenceData);
 
 #include "HAL/FileManager.h"
 
@@ -2177,6 +2180,8 @@ void UAnimSequence::ApplyCompressedData(const TArray<uint8>& Data)
 
 void UAnimSequence::SerializeCompressedData(FArchive& Ar, bool bDDCData)
 {
+	LLM_SCOPE_BYNAME(TEXT("Animation/SequenceData")); 
+	
 	if (!HasAnyFlags(RF_ClassDefaultObject))
 	{
 		CompressedData.SerializeCompressedData(Ar, bDDCData, this, this->GetSkeleton(), BoneCompressionSettings, CurveCompressionSettings);

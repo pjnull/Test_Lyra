@@ -169,6 +169,8 @@ UNiagaraComponent* UNiagaraFunctionLibrary::SpawnSystemAttached(
 	bool bPreCullCheck
 )
 {
+	LLM_SCOPE(ELLMTag::Niagara);
+	
 	UNiagaraComponent* PSC = nullptr;
 	if (SystemTemplate)
 	{

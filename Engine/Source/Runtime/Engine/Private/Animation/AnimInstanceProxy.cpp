@@ -1036,6 +1036,7 @@ void FAnimInstanceProxy::RecalcRequiredCurves(const FCurveEvaluationOption& Curv
 
 void FAnimInstanceProxy::UpdateAnimation()
 {
+	LLM_SCOPE(ELLMTag::Animation);
 	DECLARE_SCOPE_HIERARCHICAL_COUNTER_FUNC()
 
 	FMemMark Mark(FMemStack::Get());
