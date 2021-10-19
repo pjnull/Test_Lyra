@@ -1599,7 +1599,6 @@ namespace AutomationTool
 			}
 			else
 			{
-				Console.WriteLine("Fallback on {0}", ValueType.Name);
 				return Convert.ChangeType(ValueText, ValueType);
 			}
 		}
