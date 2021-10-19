@@ -465,15 +465,15 @@ namespace Metasound
 
 			return SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot()
-				.FillWidth(0.95f)
+				.FillWidth(1.0f)
 				.Padding(1.0f, 0.0f, 0.0f, 0.0f)
 				.VAlign(VAlign_Center)
 				[
 					ValueWidget
 				]
 				+ SHorizontalBox::Slot()
-				.FillWidth(0.05f)
-				.Padding(1.0f, 0.0f, 0.0f, 0.0f)
+				.AutoWidth()
+				.Padding(-6.0f, 0.0f, 0.0f, 0.0f) // Negative padding intentional on the left to bring the dropdown closer to the other buttons
 				.VAlign(VAlign_Center)
 				[
 					PropertyCustomizationHelpers::MakeInsertDeleteDuplicateButton(InsertAction, DeleteAction, DuplicateAction)
