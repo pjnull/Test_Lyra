@@ -472,6 +472,10 @@ public:
 	/** Content specified here will not appear in the inner frustum, but can appear in the nDisplay viewports. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "In Camera VFX", meta = (DisplayName = "Content Hidden from Inner Frustum", EditCondition = "bEnable", Substitutions = "LayersTooltip = Layers hidden from the inner frustum, ActorsTooltip = Actors hidden from the inner frustum"))
 	FDisplayClusterConfigurationICVFX_VisibilityList CameraHideList;
+
+	/** A list of viewports that the inner frustum is not rendered to. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = NDisplay, meta = (ClusterItemType = Viewports, DisplayName = "Inner Frustum Hidden in Viewports", EditCondition = "bEnable"))
+	FDisplayClusterConfigurationClusterItemReferenceList HiddenICVFXViewports;
 };
 
 USTRUCT(Blueprintable)
