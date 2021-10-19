@@ -18,7 +18,7 @@
 UImgMediaSource::UImgMediaSource()
 	: IsPathRelativeToProjectRoot(false)
 	, FrameRateOverride(0, 0)
-	, FillGapsInSequence(true)
+	, bFillGapsInSequence(true)
 	, MipMapInfo(MakeShared<FImgMediaMipMapInfo, ESPMode::ThreadSafe>())
 {
 }
@@ -95,7 +95,7 @@ bool UImgMediaSource::GetMediaOption(const FName& Key, bool DefaultValue) const
 {
 	if (Key == ImgMedia::FillGapsInSequenceOption)
 	{
-		return FillGapsInSequence;
+		return bFillGapsInSequence;
 	}
 
 	return Super::GetMediaOption(Key, DefaultValue);
@@ -171,7 +171,7 @@ bool UImgMediaSource::Validate() const
 void UImgMediaSource::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	// Has FillGapsInSequence changed?
-	if (PropertyChangedEvent.GetPropertyName() == GET_MEMBER_NAME_CHECKED(ThisClass, FillGapsInSequence))
+	if (PropertyChangedEvent.GetPropertyName() == GET_MEMBER_NAME_CHECKED(ThisClass, bFillGapsInSequence))
 	{
 		// Clear the cache, as effectively the frames have changed.
 		FImgMediaGlobalCache* GlobalCache = IImgMediaModule::GetGlobalCache();

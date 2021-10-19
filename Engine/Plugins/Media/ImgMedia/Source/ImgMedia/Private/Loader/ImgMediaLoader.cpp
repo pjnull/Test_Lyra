@@ -1103,7 +1103,6 @@ void FImgMediaLoader::AddEmptyFrame(int32 FrameNumber)
 	Frame->Format = EMediaTextureSampleFormat::FloatRGB;
 	Frame->Stride = Frame ->Info.Dim.X * PixelSize;
 	Frame->MipMapsPresent = -1;
-	//Frame->Data = 
 	AddFrameToCache(FrameNumber, Frame);
 }
 

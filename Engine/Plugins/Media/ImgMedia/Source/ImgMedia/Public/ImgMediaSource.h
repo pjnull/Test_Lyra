@@ -58,7 +58,7 @@ public:
 
 	/** If true, then any gaps in the sequence will be filled with blank frames. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Sequence)
-	bool FillGapsInSequence;
+	bool bFillGapsInSequence;
 
 public:
 
