@@ -7,6 +7,7 @@
 #include "EntitySystem/MovieSceneEntitySystemTask.h"
 #include "EntitySystem/MovieScenePropertySystemTypes.inl"
 #include "GameFramework/WorldSettings.h"
+#include "CameraAnimationSequenceSubsystem.h"
 #include "MovieSceneTimeHelpers.h"
 #include "MovieSceneTracksComponentTypes.h"
 #include "TemplateSequence.h"
@@ -226,9 +227,16 @@ void UCameraAnimationSequencePlayer::BeginDestroy()
 
 UMovieSceneEntitySystemLinker* UCameraAnimationSequencePlayer::ConstructEntitySystemLinker()
 {
-	// Create our own private linker, always.
-	UMovieSceneEntitySystemLinker* Linker = NewObject<UMovieSceneEntitySystemLinker>(GetTransientPackage());
-	return Linker;
+	UCameraAnimationSequenceSubsystem* Subsystem = UCameraAnimationSequenceSubsystem::GetCameraAnimationSequenceSubsystem(GetWorld());
+	if (ensure(Subsystem))
+	{
+		UMovieSceneEntitySystemLinker* Linker = Subsystem->GetLinker();
+		if (ensure(Linker))
+		{
+			return Linker;
+		}
+	}
+	return NewObject<UMovieSceneEntitySystemLinker>(GetTransientPackage());
 }
 
 EMovieScenePlayerStatus::Type UCameraAnimationSequencePlayer::GetPlaybackStatus() const
