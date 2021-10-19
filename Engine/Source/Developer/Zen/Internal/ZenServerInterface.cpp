@@ -527,7 +527,7 @@ FZenServiceInstance::AutoLaunch(FStringView AutoLaunchExecutablePath, FStringVie
 		UE_LOG(LogZenServiceInstance, Display, TEXT("Waiting for Zen service to come online..."));
 		bool bIsReady = WAIT_OBJECT_0 == ::WaitForSingleObject(ReadyEvent, 4000);
 		::CloseHandle(ReadyEvent);
-		UE_CLOG(!bIsReady, LogZenServiceInstance, Fatal, TEXT("AutoLaunched Zen service was not ready after 4 seconds"));
+		UE_CLOG(!bIsReady, LogZenServiceInstance, Warning, TEXT("AutoLaunched Zen service was not ready after 4 seconds"));
 	}
 #endif
 	return true;
