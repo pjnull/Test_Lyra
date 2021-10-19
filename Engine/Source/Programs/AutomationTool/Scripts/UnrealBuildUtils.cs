@@ -63,7 +63,7 @@ public class UnrealBuildUtils : CommandUtils
 		var Agenda = new UnrealBuild.BuildAgenda();
 		Agenda.Targets.Add(Target);
 
-		UnrealBuild.Build(Agenda, OverrideCleanBehavior: true, bUpdateVersionFiles: true);
+		UnrealBuild.Build(Agenda, InDeleteBuildProducts: true, InUpdateVersionFiles: true);
 		UnrealBuild.CheckBuildProducts(UnrealBuild.BuildProductFiles);
 	}
 
