@@ -309,6 +309,17 @@ public:
 			BuildCookRunParams += FString::Printf(TEXT(" -project=\"%s\""), *ProjectPath);
 		}
 
+		bool bIsProjectBuildTarget = false;
+		const FTargetInfo* BuildTargetInfo = AllPlatformPackagingSettings->GetBuildTargetInfoForPlatform(IniPlatformName, bIsProjectBuildTarget);
+
+		// Only add the -Target=... argument for code projects. Content projects will return UnrealGame/UnrealClient/UnrealServer here, but
+		// may need a temporary target generated to enable/disable plugins. Specifying -Target in these cases will cause packaging to fail,
+		// since it'll have a different name.
+		if (BuildTargetInfo && bIsProjectBuildTarget)
+		{
+			BuildCookRunParams += FString::Printf(TEXT(" -target=%s"), *BuildTargetInfo->Name);
+		}
+
 		// let the editor add options (-ue4exe in particular)
 		{
 			BuildCookRunParams += FString::Printf(TEXT(" %s"), *FTurnkeyEditorSupport::GetUATOptions());
@@ -453,21 +464,10 @@ public:
 			{
 				BuildConfig = EProjectPackagingBuildConfigurations::PPBC_Shipping;
 			}
-			
-			bool bIsProjectBuildTarget = false;
-			const FTargetInfo* BuildTargetInfo = AllPlatformPackagingSettings->GetBuildTargetInfoForPlatform(IniPlatformName, bIsProjectBuildTarget);
 
 			const UProjectPackagingSettings::FConfigurationInfo& ConfigurationInfo = UProjectPackagingSettings::ConfigurationInfo[(int)BuildConfig];
 			if (BuildTargetInfo)
 			{
-				// Only add the -Target=... argument for code projects. Content projects will return UnrealGame/UnrealClient/UnrealServer here, but
-				// may need a temporary target generated to enable/disable plugins. Specifying -Target in these cases will cause packaging to fail,
-				// since it'll have a different name.
-				if (bIsProjectBuildTarget)
-				{
-					BuildCookRunParams += FString::Printf(TEXT(" -target=%s"), *BuildTargetInfo->Name);
-				}
-
 				if (BuildTargetInfo->Type == EBuildTargetType::Client)
 				{
 					BuildCookRunParams += FString::Printf(TEXT(" -client -clientconfig=%s"), LexToString(ConfigurationInfo.Configuration));
