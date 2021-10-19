@@ -17,6 +17,8 @@ namespace EpicGames.MCP.Automation
 	using EpicGames.MCP.Config;
 	using System.Threading.Tasks;
 	using EpicGames.Core;
+	using System.ComponentModel;
+	using System.Globalization;
 
 	public static class Extensions
 	{
@@ -84,6 +86,7 @@ namespace EpicGames.MCP.Automation
 	/// <summary>
 	/// Enum that defines the MCP backend-compatible platform
 	/// </summary>
+	[TypeConverter(typeof(MCPPlatformTypeConverter))]
 	public partial struct MCPPlatform
 	{
 		#nullable enable
@@ -275,6 +278,44 @@ namespace EpicGames.MCP.Automation
 		public static MCPPlatform AndroidCN = FindOrAddByName("AndroidCN");
 
 	#nullable restore
+	}
+
+	internal class MCPPlatformTypeConverter : TypeConverter
+	{
+		public override bool CanConvertFrom(ITypeDescriptorContext context, Type sourceType)
+		{
+			if (sourceType == typeof(string))
+				return true;
+
+			return base.CanConvertFrom(context, sourceType);
+		}
+
+		public override bool CanConvertTo(ITypeDescriptorContext context, Type destinationType)
+		{
+			if (destinationType == typeof(string))
+				return true;
+
+			return base.CanConvertTo(context, destinationType);
+		}
+
+		public override object ConvertFrom(ITypeDescriptorContext context, CultureInfo culture, object value)
+		{
+			if (value.GetType() == typeof(string))
+			{
+				return MCPPlatform.Parse((string)value);
+			}
+			return base.ConvertFrom(context, culture, value);
+		}
+
+		public override object ConvertTo(ITypeDescriptorContext context, CultureInfo culture, object value, Type destinationType)
+		{
+			if (destinationType == typeof(string))
+			{
+				MCPPlatform Platform = (MCPPlatform)value;
+				return Platform.ToString();
+			}
+			return base.ConvertTo(context, culture, value, destinationType);
+		}
 	}
 
 	/// <summary>
