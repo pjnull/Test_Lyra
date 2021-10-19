@@ -266,7 +266,7 @@ void GatherSpecularIBL(FMaterialPixelParameters MaterialParameters
 #endif
 )
 {
-	half3 ProjectedCaptureVector = GetOffSpecularPeakReflectionDir(MaterialParameters.WorldNormal, MaterialParameters.ReflectionVector, Roughness);
+	half3 ProjectedCaptureVector = MaterialParameters.ReflectionVector;
 
 #if HQ_REFLECTIONS
 
@@ -284,7 +284,8 @@ void GatherSpecularIBL(FMaterialPixelParameters MaterialParameters
 	half3 CaptureVector = MaterialParameters.WorldPosition_CamRelative - CaptureTranslatedWorldPosition;
 	half CaptureVectorLength = sqrt(dot(CaptureVector, CaptureVector));
 	half NormalizedDistanceToCapture = saturate(CaptureVectorLength / CaptureRadius);
-
+	ProjectedCaptureVector = GetOffSpecularPeakReflectionDir(MaterialParameters.WorldNormal, MaterialParameters.ReflectionVector, Roughness);
+	
 	if (CaptureVectorLength < CaptureRadius || CaptureRadius <= 0)
 	{
 #if ALLOW_CUBE_REFLECTIONS
