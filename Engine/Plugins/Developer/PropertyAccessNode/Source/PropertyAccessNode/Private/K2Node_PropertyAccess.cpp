@@ -218,16 +218,17 @@ void UK2Node_PropertyAccess::ReallocatePinsDuringReconstruction(TArray<UEdGraphP
 
 FText UK2Node_PropertyAccess::GetNodeTitle(ENodeTitleType::Type TitleType) const
 {
-	return !TextPath.IsEmpty() ? TextPath : LOCTEXT("PropertyAccess", "Property Access");
+	return LOCTEXT("PropertyAccess", "Property Access");
 }
 
-void UK2Node_PropertyAccess::AddSearchMetaDataInfo(TArray<FSearchTagDataPair>& OutTaggedMetaData) const
+void UK2Node_PropertyAccess::AddPinSearchMetaDataInfo(const UEdGraphPin* InPin, TArray<struct FSearchTagDataPair>& OutTaggedMetaData) const
 {
-	Super::AddSearchMetaDataInfo(OutTaggedMetaData);
+	Super::AddPinSearchMetaDataInfo(InPin, OutTaggedMetaData);
 
+	// Only one pin on the node so no need to check it here
 	if(!TextPath.IsEmpty())
 	{
-		OutTaggedMetaData.Emplace(LOCTEXT("PropertyAccess", "Property Access"), TextPath);
+		OutTaggedMetaData.Emplace(FText::FromString(TEXT("Binding")), TextPath);
 	}
 }
 
