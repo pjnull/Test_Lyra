@@ -10,7 +10,6 @@
 USkeletalMeshThumbnailRenderer::USkeletalMeshThumbnailRenderer(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
-	ThumbnailScene = nullptr;
 }
 
 void USkeletalMeshThumbnailRenderer::Draw(UObject* Object, int32 X, int32 Y, uint32 Width, uint32 Height, FRenderTarget* RenderTarget, FCanvas* Canvas, bool bAdditionalViewFamily)
@@ -18,11 +17,8 @@ void USkeletalMeshThumbnailRenderer::Draw(UObject* Object, int32 X, int32 Y, uin
 	USkeletalMesh* SkeletalMesh = Cast<USkeletalMesh>(Object);
 	if (SkeletalMesh != nullptr)
 	{
-		if ( ThumbnailScene == nullptr )
-		{
-			ThumbnailScene = new FSkeletalMeshThumbnailScene();
-		}
-
+		TSharedRef<FSkeletalMeshThumbnailScene> ThumbnailScene = ThumbnailSceneCache.EnsureThumbnailScene(Object);
+		
 		ThumbnailScene->SetSkeletalMesh(SkeletalMesh);
 		AddAdditionalPreviewSceneContent(Object, ThumbnailScene->GetWorld());
 
@@ -42,11 +38,7 @@ void USkeletalMeshThumbnailRenderer::Draw(UObject* Object, int32 X, int32 Y, uin
 
 void USkeletalMeshThumbnailRenderer::BeginDestroy()
 {
-	if ( ThumbnailScene != nullptr )
-	{
-		delete ThumbnailScene;
-		ThumbnailScene = nullptr;
-	}
+	ThumbnailSceneCache.Clear();
 
 	Super::BeginDestroy();
 }
