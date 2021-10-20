@@ -6,7 +6,7 @@
 #include "Widgets/DeclarativeSyntaxSupport.h"
 #include "Widgets/Input/SComboButton.h"
 
-class EDITORWIDGETS_API SSimpleComboButton : public SComboButton
+class TOOLWIDGETS_API SSimpleComboButton : public SComboButton
 {
 public:
 
