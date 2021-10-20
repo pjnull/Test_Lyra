@@ -645,7 +645,7 @@ bool FCharacterList::CanCacheCharacter(TCHAR Character, const EFontFallback MaxF
 
 FCharacterEntry FCharacterList::GetCharacter(TCHAR Character, const EFontFallback MaxFontFallback)
 {
-	const FCharacterListEntry* InternalEntry = nullptr;
+	TOptional<FCharacterListEntry> InternalEntry;
 	const bool bDirectIndexChar = Character < MaxDirectIndexedEntries;
 
 	// First get a reference to the character, if it is already mapped (mapped does not mean cached though)
@@ -653,7 +653,7 @@ FCharacterEntry FCharacterList::GetCharacter(TCHAR Character, const EFontFallbac
 	{
 		if (DirectIndexEntries.IsValidIndex(Character))
 		{
-			InternalEntry = &DirectIndexEntries[Character];
+			InternalEntry = DirectIndexEntries[Character];
 		}
 	}
 	else
@@ -661,14 +661,14 @@ FCharacterEntry FCharacterList::GetCharacter(TCHAR Character, const EFontFallbac
 		const FCharacterListEntry* const FoundEntry = MappedEntries.Find(Character);
 		if (FoundEntry)
 		{
-			InternalEntry = FoundEntry;
+			InternalEntry = *FoundEntry;
 		}
 	}
 
 	// Determine whether the character needs caching, and map it if needed
 	bool bNeedCaching = false;
 
-	if (InternalEntry)
+	if (InternalEntry.IsSet())
 	{
 		bNeedCaching = !InternalEntry->Valid;
 
@@ -676,7 +676,7 @@ FCharacterEntry FCharacterList::GetCharacter(TCHAR Character, const EFontFallbac
 		if (bNeedCaching && !CanCacheCharacter(Character, MaxFontFallback))
 		{
 			bNeedCaching = false;
-			InternalEntry = nullptr;
+			InternalEntry.Reset();
 		}
 	}
 	// Only map the character if it can be cached
@@ -687,15 +687,15 @@ FCharacterEntry FCharacterList::GetCharacter(TCHAR Character, const EFontFallbac
 		if (bDirectIndexChar)
 		{
 			DirectIndexEntries.AddZeroed((Character - DirectIndexEntries.Num()) + 1);
-			InternalEntry = &DirectIndexEntries[Character];
+			InternalEntry = DirectIndexEntries[Character];
 		}
 		else
 		{
-			InternalEntry = &MappedEntries.Add(Character);
+			InternalEntry = MappedEntries.Add(Character);
 		}
 	}
 
-	if (InternalEntry)
+	if (InternalEntry.IsSet())
 	{
 		if (bNeedCaching)
 		{
@@ -704,20 +704,22 @@ FCharacterEntry FCharacterList::GetCharacter(TCHAR Character, const EFontFallbac
 		// For already-cached characters, reject characters that don't fall within maximum font fallback level requirements
 		else if (Character != SlateFontRendererUtils::InvalidSubChar && MaxFontFallback < InternalEntry->FallbackLevel)
 		{
-			InternalEntry = nullptr;
+			InternalEntry.Reset();
 		}
 	}
 
-	if (InternalEntry)
+	if (InternalEntry.IsSet())
 	{
-		return MakeCharacterEntry(Character, *InternalEntry);
+		return MakeCharacterEntry(Character, InternalEntry.GetValue());
 	}
 
 	return GetCharacter(SlateFontRendererUtils::InvalidSubChar, MaxFontFallback);
 }
 
-FCharacterList::FCharacterListEntry* FCharacterList::CacheCharacter(TCHAR Character)
+FCharacterList::FCharacterListEntry FCharacterList::CacheCharacter(TCHAR Character)
 {
+	FCharacterListEntry NewInternalEntry;
+
 #if WITH_FREETYPE
 	// Fake shape the character
 	{
@@ -753,11 +755,10 @@ FCharacterList::FCharacterListEntry* FCharacterList::CacheCharacter(TCHAR Charac
 				TSharedRef<FFreeTypeAdvanceCache> AdvanceCache = FontCache.FTCacheDirectory->GetAdvanceCache(FaceGlyphData.FaceAndMemory->GetFace(), GlyphFlags, FontInfo.Size, FinalFontScale);
 				if (AdvanceCache->FindOrCache(GlyphIndex, CachedAdvanceData))
 				{
-					XAdvance = FreeTypeUtils::Convert26Dot6ToRoundedPixel<int16>((CachedAdvanceData + (1 << 9)) >> 10);
+					XAdvance = FreeTypeUtils::Convert26Dot6ToRoundedPixel<int16>((CachedAdvanceData + (1<<9)) >> 10);
 				}
 			}
 
-			FCharacterListEntry NewInternalEntry;
 			NewInternalEntry.ShapedGlyphEntry.FontFaceData = MakeShared<FShapedGlyphFaceData>(FaceGlyphData.FaceAndMemory, GlyphFlags, FontInfo.Size, FinalFontScale);
 			NewInternalEntry.ShapedGlyphEntry.GlyphIndex = GlyphIndex;
 			NewInternalEntry.ShapedGlyphEntry.XAdvance = XAdvance;
@@ -769,28 +770,27 @@ FCharacterList::FCharacterListEntry* FCharacterList::CacheCharacter(TCHAR Charac
 			NewInternalEntry.FallbackLevel = FaceGlyphData.CharFallbackLevel;
 			NewInternalEntry.HasKerning = bHasKerning;
 			NewInternalEntry.Valid = Character == 0 || GlyphIndex != 0;
-
-			// Cache the shaped entry in the font cache
-			if (NewInternalEntry.Valid)
-			{
-				FontCache.GetShapedGlyphFontAtlasData(NewInternalEntry.ShapedGlyphEntry, FontKey.GetFontOutlineSettings());
-
-				if (Character < MaxDirectIndexedEntries)
-				{
-					DirectIndexEntries[Character] = MoveTemp(NewInternalEntry);
-					return &DirectIndexEntries[Character];
-				}
-				else
-				{
-					return &MappedEntries.Add(Character, MoveTemp(NewInternalEntry));
-				}
-			}
 		}
 	}
-	
+
+	// Cache the shaped entry in the font cache
+	if (NewInternalEntry.Valid)
+	{
+		FontCache.GetShapedGlyphFontAtlasData(NewInternalEntry.ShapedGlyphEntry, FontKey.GetFontOutlineSettings());
+
+		if (Character < MaxDirectIndexedEntries)
+		{
+			DirectIndexEntries[Character] = NewInternalEntry;
+			return DirectIndexEntries[Character];
+		}
+		else
+		{
+			return MappedEntries.Add(Character, NewInternalEntry);
+		}
+	}
 #endif // WITH_FREETYPE
 
-	return nullptr;
+	return NewInternalEntry;
 }
 
 FCharacterEntry FCharacterList::MakeCharacterEntry(TCHAR Character, const FCharacterListEntry& InternalEntry) const
