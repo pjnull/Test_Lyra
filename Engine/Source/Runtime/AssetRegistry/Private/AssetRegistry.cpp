@@ -529,6 +529,11 @@ void UAssetRegistryImpl::InitializeEvents(UE::AssetRegistry::Impl::FInitializeCo
 	{
 		FCoreUObjectDelegates::OnAssetLoaded.AddUObject(this, &UAssetRegistryImpl::OnAssetLoaded);
 	}
+
+	if (bAddMetaDataTagsToOnGetExtraObjectTags)
+	{
+		UObject::FAssetRegistryTag::OnGetExtraObjectTags.AddUObject(this, &UAssetRegistryImpl::OnGetExtraObjectTags);
+	}
 #endif // WITH_EDITOR
 
 	// Listen for new content paths being added or removed at runtime.  These are usually plugin-specific asset paths that
@@ -4678,6 +4683,30 @@ void UAssetRegistryImpl::GetInheritanceContextWithRequiredLock(FRWScopeLock& InO
 		InheritanceContext.BindToBuffer(StackBuffer, GuardedData, false /* bInInheritanceMapUpToDate */, bCodeGeneratorClassesUpToDate);
 	}
 }
+
+#if WITH_EDITOR
+void UAssetRegistryImpl::OnGetExtraObjectTags(const UObject* Object, TArray<UObject::FAssetRegistryTag>& OutTags)
+{
+	if (bAddMetaDataTagsToOnGetExtraObjectTags)
+	{
+		TSet<FName>& MetaDataTags = UObject::GetMetaDataTagsForAssetRegistry();
+		// It is critical that bIncludeOnlyOnDiskAssets=true otherwise this will cause an infinite loop
+		const FAssetData AssetData = GetAssetByObjectPath(*Object->GetPathName(), /*bIncludeOnlyOnDiskAssets=*/true);
+		for (const FName MetaDataTag : MetaDataTags)
+		{
+			auto OutTagsContainsTagPredicate = [MetaDataTag](const UObject::FAssetRegistryTag& Tag) { return Tag.Name == MetaDataTag; };
+			if (!OutTags.ContainsByPredicate(OutTagsContainsTagPredicate))
+			{
+				FAssetTagValueRef TagValue = AssetData.TagsAndValues.FindTag(MetaDataTag);
+				if (TagValue.IsSet())
+				{
+					OutTags.Add(UObject::FAssetRegistryTag(MetaDataTag, TagValue.AsString(), UObject::FAssetRegistryTag::TT_Alphabetical));
+				}
+			}
+		}
+	}
+}
+#endif
 
 namespace UE::AssetRegistry
 {
