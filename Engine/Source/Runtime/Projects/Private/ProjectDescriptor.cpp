@@ -347,7 +347,9 @@ const FString FProjectDescriptor::MakePathRelativeToProject(const FString& Dir, 
 
 bool FProjectDescriptor::AddPluginDirectory(const FString& Dir)
 {
+#if WITH_EDITOR
 	checkf(!FPaths::IsRelative(Dir), TEXT("%s is not an absolute path"), *Dir);
+#endif
 	check(!Dir.StartsWith(IFileManager::Get().ConvertToAbsolutePathForExternalAppForWrite(*FPaths::ProjectPluginsDir())));
 	check(!Dir.StartsWith(IFileManager::Get().ConvertToAbsolutePathForExternalAppForWrite(*FPaths::EnginePluginsDir())));
 
