@@ -213,6 +213,6 @@ void FDefaultXRCamera::SetupView(FSceneViewFamily& InViewFamily, FSceneView& InV
 
 bool FDefaultXRCamera::IsActiveThisFrame_Internal(const FSceneViewExtensionContext& Context) const
 {
-	bCurrentFrameIsStereoRendering = GEngine && GEngine->IsStereoscopic3D(Context.Viewport); // The current viewport might disallow stereo rendering. Save it so we'll use the correct value in SetupViewFamily.
+	bCurrentFrameIsStereoRendering = Context.IsStereoSupported(); // The current context/viewport might disallow stereo rendering. Save it so we'll use the correct value in SetupViewFamily.
 	return bCurrentFrameIsStereoRendering && TrackingSystem->IsHeadTrackingAllowed();
 }

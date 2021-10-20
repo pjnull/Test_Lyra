@@ -25,6 +25,7 @@ public:
 
 	FViewport* Viewport = nullptr;
 	FSceneInterface* Scene = nullptr;
+	bool bStereoDisabled = false;
 
 	FSceneViewExtensionContext() : Viewport(nullptr), Scene(nullptr) {}
 	explicit FSceneViewExtensionContext(FViewport* InViewport) : Viewport(InViewport) {}
@@ -55,6 +56,11 @@ public:
 		}
 
 		return nullptr;
+	}
+
+	bool IsStereoSupported() const
+	{
+		return !bStereoDisabled && GEngine && GEngine->IsStereoscopic3D(Viewport);
 	}
 };
 

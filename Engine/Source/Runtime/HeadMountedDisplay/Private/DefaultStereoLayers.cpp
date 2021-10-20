@@ -294,7 +294,7 @@ void FDefaultStereoLayers::PostRenderView_RenderThread(FRHICommandListImmediate&
 
 bool FDefaultStereoLayers::IsActiveThisFrame_Internal(const FSceneViewExtensionContext& Context) const
 {
-	return GEngine && GEngine->IsStereoscopic3D(Context.Viewport);
+	return Context.IsStereoSupported();
 }
 
 void FDefaultStereoLayers::SetupViewFamily(FSceneViewFamily& InViewFamily)

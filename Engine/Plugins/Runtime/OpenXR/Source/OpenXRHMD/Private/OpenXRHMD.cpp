@@ -821,7 +821,7 @@ bool FOpenXRHMD::IsActiveThisFrame_Internal(const FSceneViewExtensionContext& Co
 	// Don't activate the SVE if xr is being used for tracking only purposes
 	static const bool bXrTrackingOnly = FParse::Param(FCommandLine::Get(), TEXT("xrtrackingonly"));
 
-	return GEngine && GEngine->IsStereoscopic3D(Context.Viewport) && !bXrTrackingOnly;
+	return Context.IsStereoSupported() && !bXrTrackingOnly;
 }
 
 bool CheckPlatformDepthExtensionSupport(const XrInstanceProperties& InstanceProps)

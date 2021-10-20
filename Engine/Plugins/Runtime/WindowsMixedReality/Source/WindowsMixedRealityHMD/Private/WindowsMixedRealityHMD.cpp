@@ -2015,7 +2015,7 @@ namespace WindowsMixedReality
 
 	bool FWindowsMixedRealityHMD::IsActiveThisFrame_Internal(const FSceneViewExtensionContext& Context) const
 	{
-		return GEngine && GEngine->IsStereoscopic3D(Context.Viewport);
+		return Context.IsStereoSupported();
 	}
 
 #if WITH_WINDOWS_MIXED_REALITY

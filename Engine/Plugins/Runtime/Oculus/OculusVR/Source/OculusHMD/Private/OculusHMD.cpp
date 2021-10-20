@@ -1958,8 +1958,8 @@ namespace OculusHMD
 
 	bool FOculusHMD::IsActiveThisFrame_Internal(const FSceneViewExtensionContext& Context) const
 	{
-		// We need to use GEngine->IsStereoscopic3D in case the current viewport disallows running in stereo.
-		return GEngine && GEngine->IsStereoscopic3D(Context.Viewport);
+		// We need to check the Context and Context-contained viewport for explicit stereo disallowment.
+		return Context.IsStereoSupported();
 	}
 
 

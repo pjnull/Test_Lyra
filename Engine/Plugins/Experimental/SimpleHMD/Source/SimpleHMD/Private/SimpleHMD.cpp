@@ -311,7 +311,7 @@ void FSimpleHMD::PreRenderViewFamily_RenderThread(FRHICommandListImmediate& RHIC
 
 bool FSimpleHMD::IsActiveThisFrame_Internal(const FSceneViewExtensionContext& Context) const
 {
-	return GEngine && GEngine->IsStereoscopic3D(Context.Viewport);
+	return Context.IsStereoSupported();
 }
 
 FSimpleHMD::FSimpleHMD(const FAutoRegister& AutoRegister) :
