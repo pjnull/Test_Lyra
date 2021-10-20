@@ -180,6 +180,7 @@ struct ENGINE_API FMaterialLayersFunctions
 {
 	GENERATED_USTRUCT_BODY()
 
+#if WITH_EDITOR
 	/** Serializable ID structure for FMaterialLayersFunctions which allows us to deterministically recompile shaders*/
 	struct ID
 	{
@@ -203,6 +204,7 @@ struct ENGINE_API FMaterialLayersFunctions
 		//TODO: Investigate whether this is really required given it is only used by FMaterialShaderMapId AND that one also uses UpdateHash
 		void AppendKeyString(FString& KeyString) const;
 	};
+#endif // WITH_EDITOR
 
 	static const FGuid BackgroundGuid;
 		
@@ -212,8 +214,8 @@ struct ENGINE_API FMaterialLayersFunctions
 	{
 		Layers.Empty();
 		Blends.Empty();
-		LayerStates.Empty();
 #if WITH_EDITOR
+		LayerStates.Empty();
 		LayerNames.Empty();
 		RestrictToLayerRelatives.Empty();
 		RestrictToBlendRelatives.Empty();
@@ -228,10 +230,10 @@ struct ENGINE_API FMaterialLayersFunctions
 	UPROPERTY(EditAnywhere, Category=MaterialLayers)
 	TArray<TObjectPtr<class UMaterialFunctionInterface>> Blends;
 
+#if WITH_EDITORONLY_DATA
 	UPROPERTY(EditAnywhere, Category = MaterialLayers)
 	TArray<bool> LayerStates;
 
-#if WITH_EDITORONLY_DATA
 	UPROPERTY(EditAnywhere, Category = MaterialLayers)
 	TArray<FText> LayerNames;
 
@@ -265,8 +267,8 @@ struct ENGINE_API FMaterialLayersFunctions
 	{
 		// Default to a non-blended "background" layer
 		Layers.AddDefaulted();
-		LayerStates.Add(true);
 #if WITH_EDITORONLY_DATA
+		LayerStates.Add(true);
 		FText LayerName = FText(LOCTEXT("Background", "Background"));
 		LayerNames.Add(LayerName);
 		RestrictToLayerRelatives.Add(false);
@@ -288,11 +290,15 @@ struct ENGINE_API FMaterialLayersFunctions
 	void MoveBlendedLayer(int32 SrcLayerIndex, int32 DstLayerIndex);
 
 #if WITH_EDITOR
+	const ID GetID() const;
+
+	/** Gets a string representation of the ID */
+	FString GetStaticPermutationString() const;
+
 	void UnlinkLayerFromParent(int32 Index);
 	bool IsLayerLinkedToParent(int32 Index) const;
 	void RelinkLayersToParent();
 	bool HasAnyUnlinkedLayers() const;
-#endif // WITH_EDITOR
 
 	void ToggleBlendedLayerVisibility(int32 Index)
 	{
@@ -312,7 +318,6 @@ struct ENGINE_API FMaterialLayersFunctions
 		return LayerStates[Index];
 	}
 
-#if WITH_EDITOR
 	FText GetLayerName(int32 Counter) const
 	{
 		FText LayerName = FText::Format(LOCTEXT("LayerPrefix", "Layer {0}"), Counter);
@@ -330,21 +335,16 @@ struct ENGINE_API FMaterialLayersFunctions
 	void SerializeLegacy(FArchive& Ar);
 #endif // WITH_EDITOR
 
-	const ID GetID() const;
-
-	/** Gets a string representation of the ID */
-	FString GetStaticPermutationString() const;
-
 	void PostSerialize(const FArchive& Ar);
 
 	FORCEINLINE bool operator==(const FMaterialLayersFunctions& Other) const
 	{
-		if (Layers != Other.Layers || Blends != Other.Blends || LayerStates != Other.LayerStates)
+		if (Layers != Other.Layers || Blends != Other.Blends)
 		{
 			return false;
 		}
 #if WITH_EDITORONLY_DATA
-		if (LayerLinkStates != Other.LayerLinkStates || DeletedParentLayerGuids != Other.DeletedParentLayerGuids)
+		if (LayerStates != Other.LayerStates || LayerLinkStates != Other.LayerLinkStates || DeletedParentLayerGuids != Other.DeletedParentLayerGuids)
 		{
 			return false;
 		}

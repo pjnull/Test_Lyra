@@ -6936,7 +6936,7 @@ void UMaterialExpressionMaterialAttributeLayers::PostEditChangeProperty(FPropert
 }
 #endif // WITH_EDITOR
 
-#if WITH_EDITORONLY_DATA
+#if WITH_EDITOR
 void UMaterialExpressionMaterialAttributeLayers::RebuildLayerGraph(bool bReportErrors)
 {
 	const TArray<UMaterialFunctionInterface*>& Layers = GetLayers();
@@ -6972,7 +6972,6 @@ void UMaterialExpressionMaterialAttributeLayers::RebuildLayerGraph(bool bReportE
 				LayerCallers[CallerIndex]->FunctionParameterInfo.Index = LayerIndex;
 				++NumActiveLayerCallers;
 
-#if WITH_EDITOR
 				Layers[LayerIndex]->GetInputsAndOutputs(LayerCallers[CallerIndex]->FunctionInputs, LayerCallers[CallerIndex]->FunctionOutputs);
 				for (FFunctionExpressionOutput& FunctionOutput : LayerCallers[CallerIndex]->FunctionOutputs)
 				{
@@ -6990,7 +6989,6 @@ void UMaterialExpressionMaterialAttributeLayers::RebuildLayerGraph(bool bReportE
 
 				// Recursively run through internal functions to allow connection of inputs/outputs
 				LayerCallers[CallerIndex]->UpdateFromFunctionResource();
-#endif
 			}
 		}
 
@@ -7008,7 +7006,6 @@ void UMaterialExpressionMaterialAttributeLayers::RebuildLayerGraph(bool bReportE
 					BlendCallers[CallerIndex]->FunctionParameterInfo.Association = EMaterialParameterAssociation::BlendParameter;
 					BlendCallers[CallerIndex]->FunctionParameterInfo.Index = BlendIndex;
 
-#if WITH_EDITOR
 					Blends[BlendIndex]->GetInputsAndOutputs(BlendCallers[CallerIndex]->FunctionInputs, BlendCallers[CallerIndex]->FunctionOutputs);
 					for (FFunctionExpressionOutput& FunctionOutput : BlendCallers[CallerIndex]->FunctionOutputs)
 					{
@@ -7017,7 +7014,6 @@ void UMaterialExpressionMaterialAttributeLayers::RebuildLayerGraph(bool bReportE
 
 					// Recursively run through internal functions to allow connection of inputs/ouputs
 					BlendCallers[CallerIndex]->UpdateFromFunctionResource();
-#endif
 				}
 				else
 				{
@@ -7038,7 +7034,6 @@ void UMaterialExpressionMaterialAttributeLayers::RebuildLayerGraph(bool bReportE
 			BlendCallers[CallerIndex]->MaterialFunction = nullptr;
 		}
 
-#if WITH_EDITOR
 		// Assemble function chain so each layer blends with the previous
 		if (NumActiveLayerCallers >= 2 && NumActiveBlendCallers >= 1)
 		{
@@ -7061,7 +7056,6 @@ void UMaterialExpressionMaterialAttributeLayers::RebuildLayerGraph(bool bReportE
 				}
 			}
 		}
-#endif
 
 		bIsLayerGraphBuilt = true;
 	}
@@ -7079,9 +7073,7 @@ void UMaterialExpressionMaterialAttributeLayers::OverrideLayerGraph(const FMater
 		RebuildLayerGraph(false);
 	}
 }
-#endif // WITH_EDITORONLY_DATA
 
-#if WITH_EDITOR
 bool UMaterialExpressionMaterialAttributeLayers::ValidateLayerConfiguration(FMaterialCompiler* Compiler, bool bReportErrors)
 {
 #define COMPILER_OR_LOG_ERROR(Format, ...)								\
@@ -13600,7 +13592,6 @@ bool UMaterialFunctionInstance::GetParameterOverrideValue(EMaterialParameterType
 	}
 	return bResult;
 }
-#endif // WITH_EDITOR
 
 ///////////////////////////////////////////////////////////////////////////////
 // FMaterialLayersFunctions::ID
@@ -13649,7 +13640,7 @@ void FMaterialLayersFunctions::ID::AppendKeyString(FString& KeyString) const
 		KeyString += FString::FromInt(State);
 	}
 }
-
+#endif // WITH_EDITOR
 
 ///////////////////////////////////////////////////////////////////////////////
 // FMaterialLayersFunctions
@@ -13657,6 +13648,7 @@ void FMaterialLayersFunctions::ID::AppendKeyString(FString& KeyString) const
 
 const FGuid FMaterialLayersFunctions::BackgroundGuid(2u, 0u, 0u, 0u);
 
+#if WITH_EDITOR
 const FMaterialLayersFunctions::ID FMaterialLayersFunctions::GetID() const
 {
 	FMaterialLayersFunctions::ID Result;
@@ -13706,7 +13698,6 @@ FString FMaterialLayersFunctions::GetStaticPermutationString() const
 	return StaticKeyString;
 }
 
-#if WITH_EDITOR
 void FMaterialLayersFunctions::SerializeLegacy(FArchive& Ar)
 {
 	FString KeyString_DEPRECATED;
@@ -13751,8 +13742,8 @@ int32 FMaterialLayersFunctions::AppendBlendedLayer()
 {
 	const int32 LayerIndex = Layers.AddDefaulted();
 	Blends.AddDefaulted();
-	LayerStates.Add(true);
 #if WITH_EDITORONLY_DATA
+	LayerStates.Add(true);
 	FText LayerName = FText::Format(LOCTEXT("LayerPrefix", "Layer {0}"), Layers.Num() - 1);
 	LayerNames.Add(LayerName);
 	RestrictToLayerRelatives.Add(false);
@@ -13773,8 +13764,9 @@ int32 FMaterialLayersFunctions::AddLayerCopy(const FMaterialLayersFunctions& Sou
 	{
 		Blends.Add(Source.Blends[SourceLayerIndex - 1]);
 	}
-	LayerStates.Add(Source.LayerStates[SourceLayerIndex]);
+	
 #if WITH_EDITOR
+	LayerStates.Add(Source.LayerStates[SourceLayerIndex]);
 	LayerNames.Add(Source.LayerNames[SourceLayerIndex]);
 	RestrictToLayerRelatives.Add(Source.RestrictToLayerRelatives[SourceLayerIndex]);
 	if (LayerIndex > 0)
@@ -13793,8 +13785,9 @@ void FMaterialLayersFunctions::InsertLayerCopy(const FMaterialLayersFunctions& S
 	check(LayerIndex > 0);
 	Layers.Insert(Source.Layers[SourceLayerIndex], LayerIndex);
 	Blends.Insert(Source.Blends[SourceLayerIndex - 1], LayerIndex - 1);
-	LayerStates.Insert(Source.LayerStates[SourceLayerIndex], LayerIndex);
+	
 #if WITH_EDITOR
+	LayerStates.Insert(Source.LayerStates[SourceLayerIndex], LayerIndex);
 	LayerNames.Insert(Source.LayerNames[SourceLayerIndex], LayerIndex);
 	RestrictToLayerRelatives.Insert(Source.RestrictToLayerRelatives[SourceLayerIndex], LayerIndex);
 	RestrictToBlendRelatives.Insert(Source.RestrictToBlendRelatives[SourceLayerIndex - 1], LayerIndex - 1);
@@ -13807,12 +13800,12 @@ void FMaterialLayersFunctions::RemoveBlendedLayerAt(int32 Index)
 {
 	if (Layers.IsValidIndex(Index))
 	{
-		check(Layers.IsValidIndex(Index) && Blends.IsValidIndex(Index - 1) && LayerStates.IsValidIndex(Index));
+		check(Layers.IsValidIndex(Index) && Blends.IsValidIndex(Index - 1));
 		Layers.RemoveAt(Index);
 		Blends.RemoveAt(Index - 1);
-		LayerStates.RemoveAt(Index);
+		
 #if WITH_EDITOR
-		check(LayerNames.IsValidIndex(Index) && RestrictToLayerRelatives.IsValidIndex(Index) && RestrictToBlendRelatives.IsValidIndex(Index - 1));
+		check(LayerStates.IsValidIndex(Index) && LayerNames.IsValidIndex(Index) && RestrictToLayerRelatives.IsValidIndex(Index) && RestrictToBlendRelatives.IsValidIndex(Index - 1));
 
 		if (LayerLinkStates[Index] != EMaterialLayerLinkState::NotFromParent)
 		{
@@ -13822,6 +13815,7 @@ void FMaterialLayersFunctions::RemoveBlendedLayerAt(int32 Index)
 			DeletedParentLayerGuids.Add(LayerGuid);
 		}
 
+		LayerStates.RemoveAt(Index);
 		LayerNames.RemoveAt(Index);
 		RestrictToLayerRelatives.RemoveAt(Index);
 		RestrictToBlendRelatives.RemoveAt(Index - 1);
@@ -13839,8 +13833,8 @@ void FMaterialLayersFunctions::MoveBlendedLayer(int32 SrcLayerIndex, int32 DstLa
 	{
 		Layers.Swap(SrcLayerIndex, DstLayerIndex);
 		Blends.Swap(SrcLayerIndex - 1, DstLayerIndex - 1);
-		LayerStates.Swap(SrcLayerIndex, DstLayerIndex);
 #if WITH_EDITOR
+		LayerStates.Swap(SrcLayerIndex, DstLayerIndex);
 		LayerNames.Swap(SrcLayerIndex, DstLayerIndex);
 		RestrictToLayerRelatives.Swap(SrcLayerIndex, DstLayerIndex);
 		RestrictToBlendRelatives.Swap(SrcLayerIndex - 1, DstLayerIndex - 1);
