@@ -444,7 +444,7 @@ UAnimSequence::UAnimSequence(const FObjectInitializer& ObjectInitializer)
 
 	if (!HasAnyFlags(EObjectFlags::RF_ClassDefaultObject| EObjectFlags::RF_NeedLoad))
 	{
-		check(DataModel);
+		check(IsDataModelValid());
 	}
 #endif
 }
@@ -850,7 +850,10 @@ void UAnimSequence::PostLoad()
 		RemoveNaNTracks();
 	}
 
+	if (ShouldDataModelBeValid())
+	{
 	Controller->RemoveBoneTracksMissingFromSkeleton(GetSkeleton());
+	}
 #endif // WITH_EDITOR
 
 	// if valid additive, but if base additive isn't 
@@ -904,7 +907,7 @@ void UAnimSequence::PostLoad()
 	else
 	{
 #if WITH_EDITOR
-		if (DataModel->GetNumberOfKeys() == 0 && DataModel->GetNumberOfFloatCurves() == 0 )
+		if (IsDataModelValid() && DataModel->GetNumberOfKeys() == 0 && DataModel->GetNumberOfFloatCurves() == 0 )
 		{
 			UE_LOG(LogAnimation, Warning, TEXT("No animation data exists for sequence %s (%s)"), *GetName(), (GetOuter() ? *GetOuter()->GetFullName() : *GetFullName()) );
 
@@ -922,7 +925,7 @@ void UAnimSequence::PostLoad()
 		}
 		// @remove temp hack for fixing length
 		// @todo need to fix importer/editing feature
-		else if (GetPlayLength() == 0.f )
+		else if (IsDataModelValid() && GetPlayLength() == 0.f)
 		{
 			ensure(DataModel->GetNumberOfKeys() == 1);
 			Controller->SetPlayLength(MINIMUM_ANIMATION_LENGTH);
@@ -965,8 +968,11 @@ void UAnimSequence::PostLoad()
 			CurrentSkeleton->VerifySmartName(USkeleton::AnimCurveMappingName, CurveName);
 		}
 #if WITH_EDITOR
+		if (IsDataModelValid())
+		{
 		static const bool DoNotTransactAction = false;
 		Controller->FindOrAddCurveNamesOnSkeleton(CurrentSkeleton, ERawCurveTrackTypes::RCT_Transform, DoNotTransactAction);
+		}
 
 		for (const FAnimSyncMarker& SyncMarker : AuthoredSyncMarkers)
 		{
@@ -976,7 +982,7 @@ void UAnimSequence::PostLoad()
 	}
 
 #if WITH_EDITOR
-	if (GetLinkerCustomVersion(FUE5MainStreamObjectVersion::GUID) < FUE5MainStreamObjectVersion::MoveCustomAttributesToDataModel)
+	if (IsDataModelValid() && GetLinkerCustomVersion(FUE5MainStreamObjectVersion::GUID) < FUE5MainStreamObjectVersion::MoveCustomAttributesToDataModel)
 	{
 		ValidateModel();
 		MoveAttributesToModel();
@@ -1109,7 +1115,7 @@ void UAnimSequence::PostEditChangeProperty(FPropertyChangedEvent& PropertyChange
 
 	// @Todo fix me: This is temporary fix to make sure they always have compressed data
 	ValidateModel();
-	if (DataModel->GetNumBoneTracks() && bNeedPostProcess)
+	if (IsDataModelValid() && DataModel->GetNumBoneTracks() && bNeedPostProcess)
 	{
 		// QQ need new function here to queue async compression
 		PRAGMA_DISABLE_DEPRECATION_WARNINGS
@@ -1143,7 +1149,8 @@ static int32 FindKeyIndex(float Time, const TimeArray& Times)
 void UAnimSequence::GetBoneTransform(FTransform& OutAtom, int32 TrackIndex, float Time, bool bUseRawData) const
 {
 	// If the caller didn't request that raw animation data be used . . .
-	if ( !bUseRawData && IsCompressedDataValid() )
+	const bool bEvaluateCompressedData = (!bUseRawData || !CanEvaluateRawAnimationData());
+	if ( bEvaluateCompressedData && IsCompressedDataValid())
 	{
 		PRAGMA_DISABLE_DEPRECATION_WARNINGS
 		FAnimSequenceDecompressionContext DecompContext(SequenceLength, Interpolation, GetFName(), *CompressedData.CompressedDataStructure);
@@ -1155,17 +1162,20 @@ void UAnimSequence::GetBoneTransform(FTransform& OutAtom, int32 TrackIndex, floa
 			return;
 		}
 	}
-
+	else if (CanEvaluateRawAnimationData())
+	{
 #if WITH_EDITOR
 	ValidateModel();
 	UE::Anim::GetBoneTransformFromModel(DataModel, OutAtom, TrackIndex, Time, Interpolation);
 #endif
 }
+}
 
 void UAnimSequence::GetBoneTransform(FTransform& OutAtom, int32 TrackIndex, FAnimSequenceDecompressionContext& DecompContext, bool bUseRawData) const
 {
 	// If the caller didn't request that raw animation data be used . . .
-	if (!bUseRawData && IsCompressedDataValid())
+	const bool bEvaluateCompressedData = (!bUseRawData || !CanEvaluateRawAnimationData());
+	if ( bEvaluateCompressedData && IsCompressedDataValid())
 	{
 		if (CompressedData.BoneCompressionCodec)
 		{
@@ -1173,11 +1183,13 @@ void UAnimSequence::GetBoneTransform(FTransform& OutAtom, int32 TrackIndex, FAni
 			return;
 		}
 	}
-
+	else if (CanEvaluateRawAnimationData())
+	{
 #if WITH_EDITOR
 	ValidateModel();
 	UE::Anim::GetBoneTransformFromModel(DataModel, OutAtom, TrackIndex, DecompContext.Time, Interpolation);
 #endif
+}
 }
 
 void UAnimSequence::ExtractBoneTransform(const TArray<struct FRawAnimSequenceTrack>& InRawAnimationData, FTransform& OutAtom, int32 TrackIndex, float Time) const
@@ -1225,7 +1237,7 @@ FTransform UAnimSequence::ExtractRootTrackTransform(float Pos, const FBoneContai
 	const int32 TrackIndex = [this, RootBoneIndex]() -> int32
 	{
 #if WITH_EDITOR
-		if (bUseRawDataOnly)
+		if (CanEvaluateRawAnimationData() && bUseRawDataOnly)
 		{
 			ValidateModel();
 			if (const FBoneAnimationTrack* RootTrack = DataModel->FindBoneTrackByIndex(RootBoneIndex))
@@ -1470,7 +1482,7 @@ void UAnimSequence::GetBonePose(FAnimationPoseData& OutAnimationPoseData, const 
 	FCompactPose& OutPose = OutAnimationPoseData.GetPose();
 
 	const FBoneContainer& RequiredBones = OutPose.GetBoneContainer();
-	const bool bUseRawDataForPoseExtraction = bForceUseRawData || UseRawDataForPoseExtraction(RequiredBones);
+	const bool bUseRawDataForPoseExtraction = (CanEvaluateRawAnimationData() && bForceUseRawData) || UseRawDataForPoseExtraction(RequiredBones);
 
 	const bool bIsBakedAdditive = !bUseRawDataForPoseExtraction && IsValidAdditive();
 
@@ -1528,7 +1540,6 @@ void UAnimSequence::GetBonePose(FAnimationPoseData& OutAnimationPoseData, const 
 	}
 
 #if WITH_EDITOR
-	ValidateModel();
 	const int32 NumTracks = bUseRawDataForPoseExtraction ? DataModel->GetNumBoneTracks() : CompressedData.CompressedTrackToSkeletonMapTable.Num();
 #else
 	const int32 NumTracks = CompressedData.CompressedTrackToSkeletonMapTable.Num();
@@ -1581,31 +1592,31 @@ void UAnimSequence::GetBonePose(FAnimationPoseData& OutAnimationPoseData, const 
 const TArray<FRawAnimSequenceTrack>& UAnimSequence::GetRawAnimationData() const
 {
 #if WITH_EDITOR
-	ValidateModel();
+	if (IsDataModelValid())
+	{
 	PRAGMA_DISABLE_DEPRECATION_WARNINGS
 	return DataModel->GetTransientRawAnimationTracks();
 	PRAGMA_ENABLE_DEPRECATION_WARNINGS
-#else
+	}
+#endif
+	
 	static const TArray<FRawAnimSequenceTrack> Tracks;
 	check(false);
 	return Tracks;
-#endif
 }
-
 
 #if WITH_EDITORONLY_DATA
 const TArray<FName>& UAnimSequence::GetAnimationTrackNames() const
 {
-#if WITH_EDITOR
-	ValidateModel();
+	if (IsDataModelValid())
+	{
 	PRAGMA_DISABLE_DEPRECATION_WARNINGS
 	return DataModel->GetTransientRawAnimationTrackNames();
 	PRAGMA_ENABLE_DEPRECATION_WARNINGS
-#else
+	}
 	static const TArray<FName> Names;
 	check(false);
 	return Names;
-#endif 
 }
 #endif 
 
@@ -1801,6 +1812,15 @@ void UAnimSequence::GetBonePose_AdditiveMeshRotationOnly(FAnimationPoseData& Out
 	UE::Anim::Attributes::ConvertToAdditive(BaseAttributes, OutAttributes);
 }
 
+bool UAnimSequence::CanEvaluateRawAnimationData() const
+{
+#if WITH_EDITOR
+	return IsDataModelValid();
+#endif
+
+	return false;
+}
+
 #if WITH_EDITORONLY_DATA
 void UAnimSequence::UpdateRetargetSourceAsset()
 {
@@ -1853,10 +1873,12 @@ FName UAnimSequence::GetRetargetTransformsSourceName() const
 const TArray<FTrackToSkeletonMap>& UAnimSequence::GetRawTrackToSkeletonMapTable() const
 {
 #if WITH_EDITOR
-	ValidateModel();
+	if (IsDataModelValid())
+	{
 	PRAGMA_DISABLE_DEPRECATION_WARNINGS
 	return DataModel->GetTransientRawAnimationTrackSkeletonMappings();
 	PRAGMA_ENABLE_DEPRECATION_WARNINGS
+	}
 #endif
 
 	static const TArray<FTrackToSkeletonMap> TempMap;
@@ -1867,11 +1889,14 @@ const TArray<FTrackToSkeletonMap>& UAnimSequence::GetRawTrackToSkeletonMapTable(
 const FRawAnimSequenceTrack& UAnimSequence::GetRawAnimationTrack(int32 TrackIndex) const
 {
 #if WITH_EDITOR
-	ValidateModel();
+	if (IsDataModelValid())
+	{
 	PRAGMA_DISABLE_DEPRECATION_WARNINGS
 	return DataModel->GetBoneTrackByIndex(TrackIndex).InternalTrackData;
 	PRAGMA_ENABLE_DEPRECATION_WARNINGS 
+	}
 #endif
+	
 	static const FRawAnimSequenceTrack TempTrack;
 	check(false);
 	return TempTrack;
@@ -1880,11 +1905,15 @@ const FRawAnimSequenceTrack& UAnimSequence::GetRawAnimationTrack(int32 TrackInde
 FRawAnimSequenceTrack& UAnimSequence::GetRawAnimationTrack(int32 TrackIndex)
 {
 #if WITH_EDITOR
+	if (IsDataModelValid())
+	{
 	ValidateModel();
 	PRAGMA_DISABLE_DEPRECATION_WARNINGS
 	return DataModel->GetNonConstRawAnimationTrackByIndex(TrackIndex);
 	PRAGMA_ENABLE_DEPRECATION_WARNINGS
+	}
 #endif
+
 		static FRawAnimSequenceTrack TempTrack;
 	check(false);
 	return TempTrack;
@@ -1917,6 +1946,8 @@ bool UAnimSequence::InsertFramesToRawAnimData( int32 StartFrame, int32 EndFrame,
 
 bool UAnimSequence::CropRawAnimData( float CurrentTime, bool bFromStart )
 {
+	ValidateModel();
+	
 	// Save Total Number of Frames before crop
 	const int32 TotalNumOfKeys = GetDataModel()->GetNumberOfKeys();
 	// if current frame is 1, do not try crop. There is nothing to crop
@@ -1947,8 +1978,6 @@ bool UAnimSequence::CropRawAnimData( float CurrentTime, bool bFromStart )
 	const int32 NewNumFrames = NewNumKeys - 1;
 
 	UE_LOG(LogAnimation, Log, TEXT("UAnimSequence::CropRawAnimData %s - CurrentTime: %f, bFromStart: %d, TotalNumOfKeys: %d, KeyIndex: %d, StartKey: %d, NumKeys: %d"), *GetName(), CurrentTime, bFromStart, TotalNumOfKeys, FrameNumber.Value, StartKey, NumKeysToRemove);
-
-	ValidateModel();
 
 	Controller->OpenBracket(LOCTEXT("CropRawAnimation_Bracket", "Cropping Animation Track Data"));
 	UE::Anim::AnimationData::RemoveKeys(this, StartKey, NumKeysToRemove);
@@ -2191,16 +2220,17 @@ void UAnimSequence::SerializeCompressedData(FArchive& Ar, bool bDDCData)
 int32 UAnimSequence::GetSkeletonIndexFromRawDataTrackIndex(const int32 TrackIndex) const
 {
 #if WITH_EDITOR
-	ValidateModel();
+	if (IsDataModelValid())
+	{
 	return DataModel->GetBoneTrackByIndex(TrackIndex).BoneTreeIndex;
-#else
+	}
+#endif // WITH_EDITOR
+	
 	check(false);
 	return INDEX_NONE;
-#endif
 }
 
 #if WITH_EDITOR
-
 bool UAnimSequence::CanBakeAdditive() const
 {
 	return	(NumberOfSampledKeys > 0) &&
@@ -2231,7 +2261,6 @@ FGuid UAnimSequence::GenerateGuidFromRawData() const
 {
 	ValidateModel();
 	return DataModel->GenerateGuid();
-
 }
 
 void CopyTransformToRawAnimationData(const FTransform& BoneTransform, FRawAnimSequenceTrack& Track, int32 Frame)
@@ -2519,6 +2548,8 @@ void UAnimSequence::BakeOutAdditiveIntoRawData(TArray<FRawAnimSequenceTrack>& Ne
 	{
 		return; // Nothing to do
 	}
+
+	ValidateModel();
 
 	USkeleton* MySkeleton = GetSkeleton();
 	check(MySkeleton);
@@ -3566,6 +3597,8 @@ int32 UAnimSequence::GetSpaceBasedAnimationData(TArray< TArray<FTransform> >& An
 	AnimationDataInComponentSpace.Empty(NumBones);
 	AnimationDataInComponentSpace.AddZeroed(NumBones);
 
+	ValidateModel();
+
 	// 2d array of animated time [boneindex][time key]
 	const int32 NumKeys = DataModel->GetNumberOfKeys();
 	const float Interval = DataModel->GetFrameRate().AsInterval();
@@ -3729,8 +3762,6 @@ int32 UAnimSequence::GetSpaceBasedAnimationData(TArray< TArray<FTransform> >& An
 	}
 	else
 	{
-		ValidateModel();
-
 		// now calculating old animated space bases
 		// this one calculates aniamted space per bones and per key
 		for (int32 BoneIndex = 0; BoneIndex < NumBones; ++BoneIndex)
@@ -3792,6 +3823,7 @@ bool UAnimSequence::ConvertAnimationDataToRiggingData(FAnimSequenceTrackContaine
 		TArray< TArray<FTransform> > AnimationDataInComponentSpace;
 		int32 NumBones = GetSpaceBasedAnimationData(AnimationDataInComponentSpace, NULL);
 
+		ValidateModel();
 		const int32 NumModelKeys = DataModel->GetNumberOfKeys();
 
 		if (NumBones > 0)
@@ -4160,7 +4192,6 @@ void UAnimSequence::AddKeyToSequence(float Time, const FName& BoneName, const FT
 	FSmartName NewCurveName;
 	CurrentSkeleton->AddSmartNameAndModify(USkeleton::AnimTrackCurveMappingName, CurveName, NewCurveName);
 
-
 	ValidateModel();
 
 	IAnimationDataController::FScopedBracket ScopedBracket(Controller, LOCTEXT("AddKeyToSequence_Bracket", "Adding key to sequence"));
@@ -4330,11 +4361,12 @@ void UAnimSequence::EvaluateCurveData(FBlendedCurve& OutCurve, float CurrentTime
 		return;
 	}
 
-	if (bUseRawDataOnly || bForceUseRawData || !IsCurveCompressedDataValid())
+	const bool bEvaluateRawData = bUseRawDataOnly || bForceUseRawData || !IsCurveCompressedDataValid();
+	if (CanEvaluateRawAnimationData() && bEvaluateRawData)
 	{
 		Super::EvaluateCurveData(OutCurve, CurrentTime, bForceUseRawData);
 	}
-	else
+	else if(IsCurveCompressedDataValid() && CompressedData.CurveCompressionCodec)
 	{
 		CSV_SCOPED_TIMING_STAT(Animation, EvaluateCurveData);
 		CompressedData.CurveCompressionCodec->DecompressCurves(CompressedData, OutCurve, CurrentTime);
@@ -4345,29 +4377,35 @@ float UAnimSequence::EvaluateCurveData(SmartName::UID_Type CurveUID, float Curre
 {
 	SCOPE_CYCLE_COUNTER(STAT_AnimSeq_EvalCurveData);
 
-	if (bUseRawDataOnly || bForceUseRawData || !IsCurveCompressedDataValid())
+	const bool bEvaluateRawData = bUseRawDataOnly || bForceUseRawData || !IsCurveCompressedDataValid();
+	if (CanEvaluateRawAnimationData() && bEvaluateRawData)
 	{
 		return Super::EvaluateCurveData(CurveUID, CurrentTime, bForceUseRawData);
 	}
-	else
+	else if(IsCurveCompressedDataValid() && CompressedData.CurveCompressionCodec)
 	{
 		return CompressedData.CurveCompressionCodec->DecompressCurve(CompressedData, CurveUID, CurrentTime);
 	}
+
+	return 0.f;
 }
 
 bool UAnimSequence::HasCurveData(SmartName::UID_Type CurveUID, bool bForceUseRawData) const
 {
-	if (bUseRawDataOnly || bForceUseRawData || !IsCurveCompressedDataValid())
+	const bool bEvaluateRawData = bUseRawDataOnly || bForceUseRawData || !IsCurveCompressedDataValid();
+	if (CanEvaluateRawAnimationData() && bEvaluateRawData)
 	{
 		return Super::HasCurveData(CurveUID, bForceUseRawData);
 	}
-
+	else if(IsCurveCompressedDataValid() && CompressedData.CurveCompressionCodec)
+	{
 	for (const FSmartName& CurveName : CompressedData.CompressedCurveNames)
 	{
 		if (CurveName.UID == CurveUID)
 		{
 			return true;
 		}
+	}
 	}
 
 	return false;
@@ -4667,7 +4705,7 @@ void UAnimSequence::ValidateCurrentPosition(const FMarkerSyncAnimPosition& Posit
 
 bool UAnimSequence::UseRawDataForPoseExtraction(const FBoneContainer& RequiredBones) const
 {
-	return bUseRawDataOnly || (GetSkeletonVirtualBoneGuid() != GetSkeleton()->GetVirtualBoneGuid()) || RequiredBones.GetDisableRetargeting() || RequiredBones.ShouldUseRawData() || RequiredBones.ShouldUseSourceData();
+	return CanEvaluateRawAnimationData() && (bUseRawDataOnly || (GetSkeletonVirtualBoneGuid() != GetSkeleton()->GetVirtualBoneGuid()) || RequiredBones.GetDisableRetargeting() || RequiredBones.ShouldUseRawData() || RequiredBones.ShouldUseSourceData());
 }
 
 #if WITH_EDITOR
@@ -5431,9 +5469,8 @@ bool UAnimSequence::IsCompressedDataValid() const
 	// For bone compressed data, we don't check if we have a codec. It is valid to have no compressed data
 	// if we have no raw data. This can happen with sequences that only has curves.
 #if WITH_EDITOR
-	ValidateModel();
 	PRAGMA_DISABLE_DEPRECATION_WARNINGS
-	if (DataModel->GetNumBoneTracks() == 0 && RawAnimationData.Num() == 0)
+	if (IsDataModelValid() && DataModel->GetNumBoneTracks() == 0 && RawAnimationData.Num() == 0)
 	PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	{
 		return true;
@@ -5446,11 +5483,13 @@ bool UAnimSequence::IsCompressedDataValid() const
 bool UAnimSequence::IsCurveCompressedDataValid() const
 {
 #if WITH_EDITOR
-	ValidateModel();
 	// For curve compressed data, we don't check if we have a codec. It is valid to have no compressed data
 	// if we have no raw data. This can happen with sequences that only has bones.
 
-	if (CompressedData.CompressedCurveByteStream.Num() == 0 && DataModel->GetNumberOfFloatCurves() != 0)
+	const bool bNoCompressedCurveData = CompressedData.CompressedCurveByteStream.Num() == 0;
+	const bool bHasRawCurveData = IsDataModelValid() && DataModel->GetNumberOfFloatCurves() != 0;
+
+	if ( bNoCompressedCurveData && bHasRawCurveData )
 	{
 		// No compressed data but we have raw data
 		if (!IsValidAdditive())
@@ -5480,7 +5519,7 @@ void UAnimSequence::ClearCompressedCurveData()
 void UAnimSequence::EnsureValidRawDataGuid()
 {
 PRAGMA_DISABLE_DEPRECATION_WARNINGS
-	if (!RawDataGuid.IsValid())
+	if (IsDataModelValid() && !RawDataGuid.IsValid())
 	{
 		RawDataGuid = GenerateGuidFromRawData();
 	}
@@ -5803,6 +5842,8 @@ void UAnimSequence::OnModelModified(const EAnimDataModelNotifyType& NotifyType, 
 
 void UAnimSequence::ResampleAnimationTrackData()
 {
+	if (ShouldDataModelBeValid())
+	{
 	ValidateModel();
 
 	// Make a copy, deals with bone name and index
@@ -5842,6 +5883,7 @@ void UAnimSequence::ResampleAnimationTrackData()
 			}
 		}
 	}
+}
 }
 
 void UAnimSequence::RecompressAnimationData()
