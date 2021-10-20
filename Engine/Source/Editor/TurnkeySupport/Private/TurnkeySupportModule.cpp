@@ -350,6 +350,10 @@ public:
 			BuildCookRunParams += TEXT(" -installed");
 		}
 
+		if (PackagingSettings->bUseZenStore)
+		{
+			BuildCookRunParams += TEXT(" -zenstore");
+		}
 
 
 		// per mode settings

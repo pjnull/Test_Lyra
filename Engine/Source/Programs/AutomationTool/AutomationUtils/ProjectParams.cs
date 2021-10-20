@@ -2809,9 +2809,9 @@ namespace AutomationTool
                 throw new AutomationException("RawProjectPath {0} file must exist", RawProjectPath);
             }
 
-			if (FileServer && !Cook)
+			if (FileServer && !Cook && !CookInEditor)
 			{
-				throw new AutomationException("Only cooked builds can use a fileserver be staged, use -cook");
+				throw new AutomationException("Only cooked builds can use a fileserver, use -cook or -CookInEditor");
 			}
 
 			if (Stage && !SkipStage && !Cook && !CookOnTheFly && !IsProgramTarget)

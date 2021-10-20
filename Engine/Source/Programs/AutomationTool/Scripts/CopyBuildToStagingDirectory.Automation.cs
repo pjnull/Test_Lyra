@@ -3990,7 +3990,19 @@ namespace AutomationScripts
 				string FileHostParams = " ";
 				if (Params.CookOnTheFly || Params.FileServer)
 				{
-					FileHostParams += Params.ZenStore ? "-cookonthefly -zenstorehost=" : "-filehostip=";
+					if (Params.ZenStore)
+					{
+						if (Params.CookOnTheFly)
+						{
+							FileHostParams += "-cookonthefly ";
+						}
+						FileHostParams += "-zenstorehost=";
+					}
+					else
+					{
+						FileHostParams += "-filehostip=";
+					}
+
 					// add localhost first for platforms using redirection
 					const string LocalHost = "127.0.0.1";
 					if (!IsNullOrEmpty(Params.Port))

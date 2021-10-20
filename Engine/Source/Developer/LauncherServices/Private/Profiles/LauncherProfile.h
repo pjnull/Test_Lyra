@@ -1957,6 +1957,7 @@ public:
 
 		bNotForLicensees = false;
 		bUseIoStore = false;
+		bUseZenStore = false;
 		bShouldUpdateFlash = false;
 		bMakeBinaryConfig = false;
 

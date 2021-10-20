@@ -633,7 +633,11 @@ namespace AutomationScripts
 				{
 					if (Params.ZenStore)
 					{
-						TempCmdLine += "-cookonthefly -zenstorehost=";
+						if (Params.CookOnTheFly)
+						{
+							TempCmdLine += "-cookonthefly";
+						}
+						TempCmdLine += "-zenstorehost=";
 					}
 					else
 					{
@@ -761,7 +765,7 @@ namespace AutomationScripts
 					{
 						TempCmdLine += "-streaming ";
 					}
-					else if (SC.StageTargetPlatform.PlatformType != UnrealTargetPlatform.IOS)
+					else if (!Params.ZenStore && SC.StageTargetPlatform.PlatformType != UnrealTargetPlatform.IOS)
 					{
 						// per josh, allowcaching is deprecated/doesn't make sense for iOS.
 						TempCmdLine += "-allowcaching ";
