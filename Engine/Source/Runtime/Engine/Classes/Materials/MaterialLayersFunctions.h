@@ -188,8 +188,15 @@ struct ENGINE_API FMaterialLayersFunctions
 		TArray<bool> LayerStates;
 
 		bool operator==(const ID& Reference) const;
+		inline bool operator!=(const ID& Reference) const { return !operator==(Reference); }
 
 		void SerializeForDDC(FArchive& Ar);
+
+		friend ID& operator<<(FArchive& Ar, ID& Ref)
+		{
+			Ref.SerializeForDDC(Ar);
+			return Ref;
+		}
 
 		void UpdateHash(FSHA1& HashState) const;
 
@@ -199,21 +206,7 @@ struct ENGINE_API FMaterialLayersFunctions
 
 	static const FGuid BackgroundGuid;
 		
-	FMaterialLayersFunctions()
-	{
-		// Default to a non-blended "background" layer
-		Layers.AddDefaulted();
-		LayerStates.Add(true);
-#if WITH_EDITOR
-		FText LayerName = FText(LOCTEXT("Background", "Background"));
-		LayerNames.Add(LayerName);
-		RestrictToLayerRelatives.Add(false);
-		// Use a consistent Guid for the background layer
-		// Default constructor assigning different guids will break FStructUtils::AttemptToFindUninitializedScriptStructMembers
-		LayerGuids.Add(BackgroundGuid);
-		LayerLinkStates.Add(EMaterialLayerLinkState::NotFromParent);
-#endif
-	}
+	FMaterialLayersFunctions() = default;
 
 	void Empty()
 	{
@@ -266,8 +259,23 @@ struct ENGINE_API FMaterialLayersFunctions
 	TArray<FGuid> DeletedParentLayerGuids;
 #endif // WITH_EDITORONLY_DATA
 
-	UPROPERTY()
-	FString KeyString_DEPRECATED;
+	inline bool IsEmpty() const { return Layers.Num() == 0; }
+
+	void AddDefaultBackgroundLayer()
+	{
+		// Default to a non-blended "background" layer
+		Layers.AddDefaulted();
+		LayerStates.Add(true);
+#if WITH_EDITORONLY_DATA
+		FText LayerName = FText(LOCTEXT("Background", "Background"));
+		LayerNames.Add(LayerName);
+		RestrictToLayerRelatives.Add(false);
+		// Use a consistent Guid for the background layer
+		// Default constructor assigning different guids will break FStructUtils::AttemptToFindUninitializedScriptStructMembers
+		LayerGuids.Add(BackgroundGuid);
+		LayerLinkStates.Add(EMaterialLayerLinkState::NotFromParent);
+#endif // WITH_EDITORONLY_DATA
+	}
 
 	int32 AppendBlendedLayer();
 
@@ -304,7 +312,7 @@ struct ENGINE_API FMaterialLayersFunctions
 		return LayerStates[Index];
 	}
 
-#if WITH_EDITORONLY_DATA
+#if WITH_EDITOR
 	FText GetLayerName(int32 Counter) const
 	{
 		FText LayerName = FText::Format(LOCTEXT("LayerPrefix", "Layer {0}"), Counter);
@@ -319,14 +327,13 @@ struct ENGINE_API FMaterialLayersFunctions
 
 	bool ResolveParent(const FMaterialLayersFunctions& Parent, TArray<int32>& OutRemapLayerIndices);
 
-#endif // WITH_EDITORONLY_DATA
+	void SerializeLegacy(FArchive& Ar);
+#endif // WITH_EDITOR
 
 	const ID GetID() const;
 
-	/** Lists referenced function packages in a string, intended for use as a static permutation identifier. */
+	/** Gets a string representation of the ID */
 	FString GetStaticPermutationString() const;
-
-	void SerializeForDDC(FArchive& Ar);
 
 	void PostSerialize(const FArchive& Ar);
 

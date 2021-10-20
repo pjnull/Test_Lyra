@@ -812,7 +812,7 @@ private:
 	TArray<FStaticSwitchParameter> StaticSwitchParameters;
 	TArray<FStaticComponentMaskParameter> StaticComponentMaskParameters;
 	TArray<FStaticTerrainLayerWeightParameter> TerrainLayerWeightParameters;
-	TArray<FStaticMaterialLayersParameter::ID> MaterialLayersParameterIDs;
+	TOptional<FMaterialLayersFunctions::ID> MaterialLayersId;
 public:
 	/** Guids of any functions the material was dependent on. */
 	TArray<FGuid> ReferencedFunctions;
@@ -941,7 +941,7 @@ public:
 	const TArray<FStaticSwitchParameter> &GetStaticSwitchParameters() const 					{ return StaticSwitchParameters; }
 	const TArray<FStaticComponentMaskParameter> &GetStaticComponentMaskParameters() const 		{ return StaticComponentMaskParameters; }
 	const TArray<FStaticTerrainLayerWeightParameter> &GetTerrainLayerWeightParameters() const 	{ return TerrainLayerWeightParameters; }
-	const TArray<FStaticMaterialLayersParameter::ID> &GetMaterialLayersParameterIDs() const		{ return MaterialLayersParameterIDs; }
+	const TOptional<FMaterialLayersFunctions::ID>& GetMaterialLayersId() const					{ return MaterialLayersId; }
 
 	/** Returns true if the requested shader type is a dependency of this shader map Id. */
 	bool ContainsShaderType(const FShaderType* ShaderType, int32 PermutationId) const;

@@ -6895,7 +6895,7 @@ UMaterialExpressionMaterialAttributeLayers::UMaterialExpressionMaterialAttribute
 	};
 	static FConstructorStatics ConstructorStatics;
 
-	bIsParameterExpression = true;
+	DefaultLayers.AddDefaultBackgroundLayer();
 
 #if WITH_EDITORONLY_DATA
 	MenuCategories.Add(ConstructorStatics.NAME_MaterialAttributes);
@@ -7279,8 +7279,7 @@ int32 UMaterialExpressionMaterialAttributeLayers::Compile(FMaterialCompiler* Com
 {
 	int32 Result = INDEX_NONE;
 
-	// The layer stack is a parameter so can be overridden
-	const FMaterialLayersFunctions* OverrideLayers = Compiler->StaticMaterialLayersParameter(ParameterName);
+	const FMaterialLayersFunctions* OverrideLayers = Compiler->GetMaterialLayers();
 	OverrideLayerGraph(OverrideLayers);
 
 	if (ValidateLayerConfiguration(Compiler, true) && bIsLayerGraphBuilt)
@@ -7328,7 +7327,6 @@ int32 UMaterialExpressionMaterialAttributeLayers::Compile(FMaterialCompiler* Com
 void UMaterialExpressionMaterialAttributeLayers::GetCaption(TArray<FString>& OutCaptions) const
 {
 	OutCaptions.Add(TEXT("Material Attribute Layers"));
-	OutCaptions.Add(FString::Printf(TEXT("'%s'"), *ParameterName.ToString()));
 }
 
 void UMaterialExpressionMaterialAttributeLayers::GetExpressionToolTip(TArray<FString>& OutToolTip) 
@@ -7362,55 +7360,7 @@ uint32 UMaterialExpressionMaterialAttributeLayers::GetInputType(int32 InputIndex
 {
 	return MCT_MaterialAttributes;
 }
-#endif
-
-bool UMaterialExpressionMaterialAttributeLayers::IsNamedParameter(const FHashedMaterialParameterInfo& ParameterInfo, FMaterialLayersFunctions& OutLayers, FGuid& OutExpressionGuid) const
-{
-	if (ParameterInfo.Name == ParameterName)
-	{
-		OutLayers = (ParamLayers != nullptr) ? *ParamLayers : DefaultLayers;
-		OutExpressionGuid = ExpressionGUID;
-		return true;
-	}
-
-	return false;
-}
-
-#if WITH_EDITOR
-bool UMaterialExpressionMaterialAttributeLayers::MatchesSearchQuery(const TCHAR* SearchQuery)
-{
-	if (ParameterName.ToString().Contains(SearchQuery))
-	{
-		return true;
-	}
-
-	return Super::MatchesSearchQuery(SearchQuery);
-}
-
-FString UMaterialExpressionMaterialAttributeLayers::GetEditableName() const
-{
-	return ParameterName.ToString();
-}
-
-void UMaterialExpressionMaterialAttributeLayers::SetEditableName(const FString& NewName)
-{
-	ParameterName = *NewName;
-}
-#endif
-
-void UMaterialExpressionMaterialAttributeLayers::GetAllParameterInfo(TArray<FMaterialParameterInfo> &OutParameterInfo, TArray<FGuid> &OutParameterIds, const FMaterialParameterInfo& InBaseParameterInfo) const
-{
-	int32 CurrentSize = OutParameterInfo.Num();
-	FMaterialParameterInfo NewParameter(ParameterName);
-	OutParameterInfo.AddUnique(NewParameter);
-	if (CurrentSize != OutParameterInfo.Num())
-	{
-		OutParameterIds.Add(ExpressionGUID);
-	}
-	
-	checkf(InBaseParameterInfo.Association == EMaterialParameterAssociation::GlobalParameter && InBaseParameterInfo.Index == INDEX_NONE,
-		TEXT("Tried to gather parameters from a material layer not in the top-level material, shouldn't be possible"));
-}
+#endif // WITH_EDITOR
 
 // -----
 
@@ -13752,52 +13702,17 @@ const FMaterialLayersFunctions::ID FMaterialLayersFunctions::GetID() const
 FString FMaterialLayersFunctions::GetStaticPermutationString() const
 {
 	FString StaticKeyString;
-	for (UMaterialFunctionInterface* Layer : Layers)
-	{
-		UMaterialFunctionInterface* Parent = Layer ? Layer->GetBaseFunction() : nullptr;
-		if (Parent)
-		{
-			StaticKeyString += TEXT("_") + Parent->GetOutermost()->GetFullName();
-		}
-		else
-		{
-			StaticKeyString += TEXT("_NullLayer");
-		}
-	}
-
-	for (UMaterialFunctionInterface* Blend : Blends)
-	{
-		UMaterialFunctionInterface* Parent = Blend ? Blend->GetBaseFunction() : nullptr;
-		if (Parent)
-		{
-			StaticKeyString += TEXT("_") + Parent->GetOutermost()->GetFullName();
-		}
-		else
-		{
-			StaticKeyString += TEXT("_NullBlend");
-		}
-	}
-
-	// @TODO: This will generate unique permutations for disabled layers but
-	// should append layers/blends in reverse order, stopping at opaque and
-	// skipping inactive to allow maximum DDC re-use where possible
-	StaticKeyString += TEXT("_");
-	for (const bool State : LayerStates)
-	{
-		StaticKeyString += State ? TEXT("1") : TEXT("0");
-	}
-
+	GetID().AppendKeyString(StaticKeyString);
 	return StaticKeyString;
 }
 
-void FMaterialLayersFunctions::SerializeForDDC(FArchive& Ar)
+#if WITH_EDITOR
+void FMaterialLayersFunctions::SerializeLegacy(FArchive& Ar)
 {
-	if (!Ar.IsCooking())
-	{
-		KeyString_DEPRECATED = GetStaticPermutationString();
-	}
+	FString KeyString_DEPRECATED;
 	Ar << KeyString_DEPRECATED;
 }
+#endif // WITH_EDITOR
 
 void FMaterialLayersFunctions::PostSerialize(const FArchive& Ar)
 {
@@ -13837,14 +13752,14 @@ int32 FMaterialLayersFunctions::AppendBlendedLayer()
 	const int32 LayerIndex = Layers.AddDefaulted();
 	Blends.AddDefaulted();
 	LayerStates.Add(true);
-#if WITH_EDITOR
+#if WITH_EDITORONLY_DATA
 	FText LayerName = FText::Format(LOCTEXT("LayerPrefix", "Layer {0}"), Layers.Num() - 1);
 	LayerNames.Add(LayerName);
 	RestrictToLayerRelatives.Add(false);
 	RestrictToBlendRelatives.Add(false);
 	LayerGuids.Add(FGuid::NewGuid());
 	LayerLinkStates.Add(EMaterialLayerLinkState::NotFromParent);
-#endif
+#endif // WITH_EDITORONLY_DATA
 	return LayerIndex;
 }
 
@@ -13980,9 +13895,7 @@ bool FMaterialLayersFunctions::HasAnyUnlinkedLayers() const
 	}
 	return false;
 }
-#endif // WITH_EDITOR
 
-#if WITH_EDITORONLY_DATA
 void FMaterialLayersFunctions::LinkAllLayersToParent()
 {
 	for (int32 Index = 0; Index < LayerLinkStates.Num(); ++Index)
@@ -14168,7 +14081,7 @@ bool FMaterialLayersFunctions::ResolveParent(const FMaterialLayersFunctions& Par
 
 	return bUpdatedLayerIndices;
 }
-#endif // WITH_EDITORONLY_DATA
+#endif // WITH_EDITOR
 
 ///////////////////////////////////////////////////////////////////////////////
 // UMaterialExpressionMaterialFunctionCall

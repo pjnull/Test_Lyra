@@ -377,7 +377,7 @@ void FHLSLMaterialTranslator::GatherCustomVertexInterpolators(TArray<UMaterialEx
 		}
 		else if (UMaterialExpressionMaterialAttributeLayers* LayersExpression = Cast<UMaterialExpressionMaterialAttributeLayers>(Expression))
 		{
-			const FMaterialLayersFunctions* OverrideLayers = StaticMaterialLayersParameter(LayersExpression->ParameterName);
+			const FMaterialLayersFunctions* OverrideLayers = GetMaterialLayers();
 			if (OverrideLayers)
 			{
 				LayersExpression->OverrideLayerGraph(OverrideLayers);
@@ -514,7 +514,7 @@ EMaterialExpressionVisitResult FHLSLMaterialTranslator::VisitExpressionsRecursiv
 		}
 		else if (UMaterialExpressionMaterialAttributeLayers* LayersExpression = Cast<UMaterialExpressionMaterialAttributeLayers>(Expression))
 		{
-			const FMaterialLayersFunctions* OverrideLayers = StaticMaterialLayersParameter(LayersExpression->ParameterName);
+			const FMaterialLayersFunctions* OverrideLayers = GetMaterialLayers();
 			if (OverrideLayers)
 			{
 				LayersExpression->OverrideLayerGraph(OverrideLayers);
@@ -6831,20 +6831,9 @@ int32 FHLSLMaterialTranslator::StaticComponentMask(int32 Vector,FName ParameterN
 	return ComponentMask(Vector,bValueR,bValueG,bValueB,bValueA);
 }
 
-const FMaterialLayersFunctions* FHLSLMaterialTranslator::StaticMaterialLayersParameter(FName ParameterName)
+const FMaterialLayersFunctions* FHLSLMaterialTranslator::GetMaterialLayers()
 {
-	FMaterialParameterInfo ParameterInfo = GetParameterAssociationInfo();
-	ParameterInfo.Name = ParameterName;
-
-	for (const FStaticMaterialLayersParameter& Parameter : StaticParameters.MaterialLayersParameters)
-	{
-		if(Parameter.ParameterInfo == ParameterInfo)
-		{
-			return &Parameter.Value;
-		}
-	}
-
-	return nullptr;
+	return StaticParameters.bHasMaterialLayers ? &StaticParameters.MaterialLayers : nullptr;
 }
 
 bool FHLSLMaterialTranslator::GetStaticBoolValue(int32 BoolIndex, bool& bSucceeded)

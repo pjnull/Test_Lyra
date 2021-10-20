@@ -51,6 +51,7 @@ void FMaterialCachedExpressionData::Reset()
 	DynamicParameterNames.Reset();
 	QualityLevelsUsed.Reset();
 	QualityLevelsUsed.AddDefaulted(EMaterialQualityLevel::Num);
+	bHasMaterialLayers = false;
 	bHasRuntimeVirtualTextureOutput = false;
 	bHasSceneColor = false;
 	bHasPerInstanceCustomData = false;
@@ -65,8 +66,8 @@ void FMaterialCachedExpressionData::AddReferencedObjects(FReferenceCollector& Co
 {
 	Parameters.AddReferencedObjects(Collector);
 	Collector.AddReferencedObjects(ReferencedTextures);
-	Collector.AddReferencedObjects(DefaultLayers);
-	Collector.AddReferencedObjects(DefaultLayerBlends);
+	Collector.AddReferencedObjects(MaterialLayers.Layers);
+	Collector.AddReferencedObjects(MaterialLayers.Blends);
 	Collector.AddReferencedObjects(GrassTypes);
 	for (FMaterialFunctionInfo& FunctionInfo : FunctionInfos)
 	{
@@ -374,15 +375,19 @@ bool FMaterialCachedExpressionData::UpdateForExpressions(const FMaterialCachedEx
 		else if (UMaterialExpressionMaterialAttributeLayers* LayersExpression = Cast<UMaterialExpressionMaterialAttributeLayers>(Expression))
 		{
 			checkf(Association == GlobalParameter, TEXT("UMaterialExpressionMaterialAttributeLayers can't be nested"));
-			if (!UpdateForLayerFunctions(Context, LayersExpression->DefaultLayers))
+			// Only a single layers expression is allowed/expected...creating additional layer expression will cause a compile error
+			if (!bHasMaterialLayers)
 			{
-				bResult = false;
+				if (!UpdateForLayerFunctions(Context, LayersExpression->DefaultLayers))
+				{
+					bResult = false;
+				}
+
+				bHasMaterialLayers = true;
+				MaterialLayers = LayersExpression->DefaultLayers;
+				MaterialLayers.LinkAllLayersToParent(); // Initialize all the link states (there is no parent for base materials)
+				LayersExpression->RebuildLayerGraph(false);
 			}
-
-			DefaultLayers = LayersExpression->DefaultLayers.Layers;
-			DefaultLayerBlends = LayersExpression->DefaultLayers.Blends;
-
-			LayersExpression->RebuildLayerGraph(false);
 		}
 		else if (UMaterialExpressionMaterialFunctionCall* FunctionCall = Cast<UMaterialExpressionMaterialFunctionCall>(Expression))
 		{

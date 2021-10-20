@@ -860,7 +860,7 @@ protected:
 	virtual int32 StaticBool(bool bValue) override;
 	virtual int32 StaticBoolParameter(FName ParameterName, bool bDefaultValue) override;
 	virtual int32 StaticComponentMask(int32 Vector, FName ParameterName, bool bDefaultR, bool bDefaultG, bool bDefaultB, bool bDefaultA) override;
-	virtual const FMaterialLayersFunctions* StaticMaterialLayersParameter(FName ParameterName) override;
+	virtual const FMaterialLayersFunctions* GetMaterialLayers() override;
 
 	virtual bool GetStaticBoolValue(int32 BoolIndex, bool& bSucceeded) override;
 

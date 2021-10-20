@@ -20,12 +20,12 @@ class UMaterialExpressionMaterialAttributeLayers : public UMaterialExpression
 	GENERATED_UCLASS_BODY()
 
 	/** name to be referenced when we want to find and set this parameter */
-	UPROPERTY(EditAnywhere, Category=LayersParameter)
-	FName ParameterName;
+	//UPROPERTY(EditAnywhere, Category=LayersParameter)
+	//FName ParameterName;
 
 	/** GUID that should be unique within the material, this is used for parameter renaming. */
-	UPROPERTY()
-	FGuid ExpressionGUID;
+	//UPROPERTY()
+	//FGuid ExpressionGUID;
 
 	UPROPERTY()
 	FMaterialAttributesInput Input;
@@ -123,26 +123,26 @@ class UMaterialExpressionMaterialAttributeLayers : public UMaterialExpression
 	virtual uint32 GetInputType(int32 InputIndex) override;
 	virtual bool IsResultMaterialAttributes(int32 OutputIndex) override {return true;}
 
-	virtual bool MatchesSearchQuery( const TCHAR* SearchQuery ) override;
-	virtual bool CanRenameNode() const override { return true; }
-	virtual FString GetEditableName() const override;
-	virtual void SetEditableName(const FString& NewName) override;
+	//virtual bool MatchesSearchQuery( const TCHAR* SearchQuery ) override;
+	//virtual bool CanRenameNode() const override { return true; }
+	//virtual FString GetEditableName() const override;
+	//virtual void SetEditableName(const FString& NewName) override;
 
-	virtual bool HasAParameterName() const override { return true; }
-	virtual FName GetParameterName() const override { return ParameterName; }
-	virtual void SetParameterName(const FName& Name) override { ParameterName = Name; }
+	//virtual bool HasAParameterName() const override { return true; }
+	//virtual FName GetParameterName() const override { return ParameterName; }
+	//virtual void SetParameterName(const FName& Name) override { ParameterName = Name; }
 #endif
 	//~ End UMaterialExpression Interface
 	
 	/** Return whether this is the named parameter, and fill in its value */
-	bool IsNamedParameter(const FHashedMaterialParameterInfo& ParameterInfo, FMaterialLayersFunctions& OutLayers, FGuid& OutExpressionGuid) const;
+	//bool IsNamedParameter(const FHashedMaterialParameterInfo& ParameterInfo, FMaterialLayersFunctions& OutLayers, FGuid& OutExpressionGuid) const;
 	
-	ENGINE_API virtual FGuid& GetParameterExpressionId() override
-	{
-		return ExpressionGUID;
-	}
+	//ENGINE_API virtual FGuid& GetParameterExpressionId() override
+	//{
+	//	return ExpressionGUID;
+	//}
 
-	void GetAllParameterInfo(TArray<FMaterialParameterInfo> &OutParameterInfo, TArray<FGuid> &OutParameterIds, const FMaterialParameterInfo& InBaseParameterInfo) const;
+	//void GetAllParameterInfo(TArray<FMaterialParameterInfo> &OutParameterInfo, TArray<FGuid> &OutParameterIds, const FMaterialParameterInfo& InBaseParameterInfo) const;
 
 private:
 	/** Internal pointer to parameter-driven layer graph */
