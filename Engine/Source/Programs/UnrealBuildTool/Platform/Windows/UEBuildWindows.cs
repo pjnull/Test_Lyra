@@ -774,6 +774,11 @@ namespace UnrealBuildTool
 			public DirectoryReference BaseDir { get; }
 
 			/// <summary>
+			/// Base directory for the redistributable components
+			/// </summary>
+			public DirectoryReference? RedistDir { get; }
+
+			/// <summary>
 			/// Constructor
 			/// </summary>
 			/// <param name="Family"></param>
@@ -783,7 +788,8 @@ namespace UnrealBuildTool
 			/// <param name="IsPreview">Whether it's a pre-release version of the toolchain</param>
 			/// <param name="Error"></param>
 			/// <param name="BaseDir">Base directory for the toolchain</param>
-			public ToolChainInstallation(VersionNumber Family, int FamilyRank, VersionNumber Version, bool Is64Bit, bool IsPreview, string? Error, DirectoryReference BaseDir)
+			/// <param name="RedistDir">Optional directory for redistributable components (DLLs etc)</param>
+			public ToolChainInstallation(VersionNumber Family, int FamilyRank, VersionNumber Version, bool Is64Bit, bool IsPreview, string? Error, DirectoryReference BaseDir, DirectoryReference? RedistDir)
 			{
 				this.Family = Family;
 				this.FamilyRank = FamilyRank;
@@ -792,6 +798,7 @@ namespace UnrealBuildTool
 				this.IsPreview = IsPreview;
 				this.Error = Error;
 				this.BaseDir = BaseDir;
+				this.RedistDir = RedistDir;
 			}
 		}
 
@@ -1275,7 +1282,7 @@ namespace UnrealBuildTool
 							{
 								FileVersionInfo VersionInfo = FileVersionInfo.GetVersionInfo(IclPath.FullName);
 								VersionNumber Version = new VersionNumber(VersionInfo.FileMajorPart, VersionInfo.FileMinorPart, VersionInfo.FileBuildPart);
-								ToolChains.Add(new ToolChainInstallation(Version, 0, Version, true, false, null, InstallDir));
+								ToolChains.Add(new ToolChainInstallation(Version, 0, Version, true, false, null, InstallDir, null));
 							}
 						}
 					}
@@ -1286,7 +1293,8 @@ namespace UnrealBuildTool
 					    foreach(VisualStudioInstallation Installation in Installations)
 					    {
 						    DirectoryReference ToolChainBaseDir = DirectoryReference.Combine(Installation.BaseDir, "VC", "Tools", "MSVC");
-							FindVisualStudioToolChains(ToolChainBaseDir, Installation.bPreview, ToolChains);
+						    DirectoryReference RedistBaseDir = DirectoryReference.Combine(Installation.BaseDir, "VC", "Redist", "MSVC");
+							FindVisualStudioToolChains(ToolChainBaseDir, RedistBaseDir, Installation.bPreview, ToolChains);
 					    }
 
 						// Enumerate all the AutoSDK toolchains
@@ -1303,10 +1311,10 @@ namespace UnrealBuildTool
 							if (!string.IsNullOrEmpty(VSDir))
 							{
 								DirectoryReference ReleaseBaseDir = DirectoryReference.Combine(PlatformDir, "Win64", VSDir);
-								FindVisualStudioToolChains(ReleaseBaseDir, false, ToolChains);
+								FindVisualStudioToolChains(ReleaseBaseDir, null, false, ToolChains);
 
 								DirectoryReference PreviewBaseDir = DirectoryReference.Combine(PlatformDir, "Win64", $"{VSDir}-Preview");
-								FindVisualStudioToolChains(PreviewBaseDir, true, ToolChains);
+								FindVisualStudioToolChains(PreviewBaseDir, null, true, ToolChains);
 							}
 						}
 					}
@@ -1324,9 +1332,10 @@ namespace UnrealBuildTool
 		/// Finds all the valid Visual Studio toolchains under the given base directory
 		/// </summary>
 		/// <param name="BaseDir">Base directory to search</param>
+		/// <param name="OptionalRedistDir">Optional directory for redistributable components (DLLs etc)</param>
 		/// <param name="bPreview">Whether this is a preview installation</param>
 		/// <param name="ToolChains">Map of tool chain version to installation info</param>
-		static void FindVisualStudioToolChains(DirectoryReference BaseDir, bool bPreview, List<ToolChainInstallation> ToolChains)
+		static void FindVisualStudioToolChains(DirectoryReference BaseDir, DirectoryReference? OptionalRedistDir, bool bPreview, List<ToolChainInstallation> ToolChains)
 		{
 			if (DirectoryReference.Exists(BaseDir))
 			{
@@ -1335,10 +1344,48 @@ namespace UnrealBuildTool
 					VersionNumber? Version;
 					if (IsValidToolChainDirMSVC(ToolChainDir, out Version))
 					{
-						AddVisualCppToolChain(Version, bPreview, ToolChainDir, ToolChains);
+						DirectoryReference? RedistDir = FindVisualStudioRedistForToolChain(ToolChainDir, OptionalRedistDir, Version );
+
+						AddVisualCppToolChain(Version, bPreview, ToolChainDir, RedistDir, ToolChains);
 					}
 				}
 			}
+		}
+
+		/// <summary>
+		/// Finds the most appropriate redist directory for the given toolchain version
+		/// </summary>
+		/// <param name="ToolChainDir"></param>
+		/// <param name="OptionalRedistDir"></param>
+		/// <param name="Version"></param>
+		/// <returns></returns>
+		static DirectoryReference? FindVisualStudioRedistForToolChain( DirectoryReference ToolChainDir, DirectoryReference? OptionalRedistDir, VersionNumber Version )
+		{
+			DirectoryReference? RedistDir;
+			if (OptionalRedistDir == null)
+			{
+				RedistDir = DirectoryReference.Combine(ToolChainDir, "redist"); // AutoSDK keeps redist under the toolchain
+			}
+			else
+			{
+				RedistDir = DirectoryReference.Combine(OptionalRedistDir, ToolChainDir.GetDirectoryName() );
+
+				// exact redist not found - find highest version (they are backwards compatible)
+				if (!DirectoryReference.Exists(RedistDir) && DirectoryReference.Exists(OptionalRedistDir))
+				{
+					RedistDir = DirectoryReference.EnumerateDirectories(OptionalRedistDir)
+						.Where( X => VersionNumber.TryParse(X.GetDirectoryName(), out VersionNumber? DirVersion) )
+						.OrderByDescending( X => VersionNumber.Parse(X.GetDirectoryName()) )
+						.FirstOrDefault();
+				}
+			}
+			
+			if (RedistDir != null && DirectoryReference.Exists(RedistDir) )
+			{
+				return RedistDir;
+			}
+
+			return null;
 		}
 
 		/// <summary>
@@ -1357,7 +1404,7 @@ namespace UnrealBuildTool
 				int Rank = PreferredClangVersions.TakeWhile(x => !x.Contains(Version)).Count();
 				bool Is64Bit = Is64BitExecutable(CompilerFile);
 				Log.TraceLog("Found Clang toolchain: {0} (Version={1}, Is64Bit={2}, Rank={3})", ToolChainDir, Version, Is64Bit, Rank);
-				ToolChains.Add(new ToolChainInstallation(Version, Rank, Version, Is64Bit, false, null, ToolChainDir));
+				ToolChains.Add(new ToolChainInstallation(Version, Rank, Version, Is64Bit, false, null, ToolChainDir, null));
 			}
 		}
 
@@ -1409,8 +1456,9 @@ namespace UnrealBuildTool
 		/// <param name="Version"></param>
 		/// <param name="bPreview"></param>
 		/// <param name="ToolChainDir"></param>
+		/// <param name="RedistDir"></param>
 		/// <param name="ToolChains"></param>
-		static void AddVisualCppToolChain(VersionNumber Version, bool bPreview, DirectoryReference ToolChainDir, List<ToolChainInstallation> ToolChains)
+		static void AddVisualCppToolChain(VersionNumber Version, bool bPreview, DirectoryReference ToolChainDir, DirectoryReference? RedistDir, List<ToolChainInstallation> ToolChains)
 		{
 			bool Is64Bit = Has64BitToolChain(ToolChainDir);
 
@@ -1428,8 +1476,8 @@ namespace UnrealBuildTool
 				Error = String.Format("The Visual C++ 14.23 toolchain is known to have code-generation issues with UE4. Please install a later toolchain from the Visual Studio installer. See here for more information: https://developercommunity.visualstudio.com/content/problem/734585/msvc-142328019-compilation-bug.html");
 			}
 
-			Log.TraceLog("Found Visual Studio toolchain: {0} (Family={1}, FamilyRank={2}, Version={3}, Is64Bit={4}, Preview={5}, Error={6})", ToolChainDir, Family, FamilyRank, Version, Is64Bit, bPreview, Error != null);
-			ToolChains.Add(new ToolChainInstallation(Family, FamilyRank, Version, Is64Bit, bPreview, Error, ToolChainDir));
+			Log.TraceLog("Found Visual Studio toolchain: {0} (Family={1}, FamilyRank={2}, Version={3}, Is64Bit={4}, Preview={5}, Error={6}, Redist={7})", ToolChainDir, Family, FamilyRank, Version, Is64Bit, bPreview, Error != null, RedistDir);
+			ToolChains.Add(new ToolChainInstallation(Family, FamilyRank, Version, Is64Bit, bPreview, Error, ToolChainDir, RedistDir));
 		}
 
 		/// <summary>
@@ -1562,8 +1610,9 @@ namespace UnrealBuildTool
 		/// <param name="CompilerVersion">The minimum compiler version to use</param>
 		/// <param name="OutToolChainVersion">Receives the chosen toolchain version</param>
 		/// <param name="OutToolChainDir">Receives the directory containing the toolchain</param>
+		/// <param name="OutRedistDir">Receives the optional directory containing redistributable components</param>
 		/// <returns>True if the toolchain directory was found correctly</returns>
-		public static bool TryGetToolChainDir(WindowsCompiler Compiler, string? CompilerVersion, [NotNullWhen(true)] out VersionNumber? OutToolChainVersion, [NotNullWhen(true)] out DirectoryReference? OutToolChainDir)
+		public static bool TryGetToolChainDir(WindowsCompiler Compiler, string? CompilerVersion, [NotNullWhen(true)] out VersionNumber? OutToolChainVersion, [NotNullWhen(true)] out DirectoryReference? OutToolChainDir, out DirectoryReference? OutRedistDir)
 		{
 			// Find all the installed toolchains
 			List<ToolChainInstallation> ToolChains = FindToolChainInstallations(Compiler);
@@ -1577,6 +1626,7 @@ namespace UnrealBuildTool
 				{
 					OutToolChainVersion = null;
 					OutToolChainDir = null;
+					OutRedistDir = null;
 					return false;
 				}
 			}
@@ -1612,6 +1662,7 @@ namespace UnrealBuildTool
 			// Get the actual directory for this version
 			OutToolChainVersion = ToolChain.Version;
 			OutToolChainDir = ToolChain.BaseDir;
+			OutRedistDir = ToolChain.RedistDir;
 			return true;
 		}
 
