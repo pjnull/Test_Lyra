@@ -31,6 +31,8 @@
 #include "UObject/UE5MainStreamObjectVersion.h"
 #include "Compression/OodleDataCompression.h"
 #include "Engine/TextureCube.h"
+#include "Engine/RendererSettings.h"
+#include "ColorSpace.h"
 
 #if WITH_EDITOR
 #include "TextureCompiler.h"
@@ -95,10 +97,10 @@ UTexture::UTexture(const FObjectInitializer& ObjectInitializer)
 		[this](FTextureResource* InTextureResource) { SetResource(InTextureResource); })
 {
 	SRGB = true;
-	SourceEncodingOverride = ETextureSourceEncoding::TSE_None;
 	Filter = TF_Default;
 	MipLoadOptions = ETextureMipLoadOptions::Default;
 #if WITH_EDITORONLY_DATA
+	SourceColorSettings = FTextureSourceColorSettings();
 	AdjustBrightness = 1.0f;
 	AdjustBrightnessCurve = 1.0f;
 	AdjustVibrance = 0.0f;
@@ -270,6 +272,18 @@ bool UTexture::CanEditChange(const FProperty* InProperty) const
 		{
 			return !HasHDRSource();
 		}
+		
+		// Only enable chromatic adapation method when the white points differ.
+		if (PropertyName == GET_MEMBER_NAME_STRING_CHECKED(FTextureSourceColorSettings, ChromaticAdaptationMethod))
+		{
+			if (SourceColorSettings.ColorSpace == ETextureColorSpace::TCS_None)
+			{
+				return false;
+			}
+
+			const URendererSettings* Settings = GetDefault<URendererSettings>();
+			return !Settings->WhiteChromaticityCoordinate.Equals(SourceColorSettings.WhiteChromaticityCoordinate);
+		}
 
 		// Virtual Texturing is only supported for Texture2D 
 		static const FName VirtualTextureStreamingName = GET_MEMBER_NAME_CHECKED(UTexture, VirtualTextureStreaming);
@@ -303,6 +317,7 @@ void UTexture::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEven
 		static const FName SrgbName = GET_MEMBER_NAME_CHECKED(UTexture, SRGB);
 		static const FName VirtualTextureStreamingName = GET_MEMBER_NAME_CHECKED(UTexture, VirtualTextureStreaming);
 #if WITH_EDITORONLY_DATA
+		static const FName SourceColorSpaceName = GET_MEMBER_NAME_CHECKED(FTextureSourceColorSettings, ColorSpace);
 		static const FName MaxTextureSizeName = GET_MEMBER_NAME_CHECKED(UTexture, MaxTextureSize);
 		static const FName CompressionQualityName = GET_MEMBER_NAME_CHECKED(UTexture, CompressionQuality);
 #endif //WITH_EDITORONLY_DATA
@@ -338,6 +353,15 @@ void UTexture::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEven
 			DeferCompressionWasEnabled = DeferCompression;
 		}
 #if WITH_EDITORONLY_DATA
+		else if (PropertyName == SourceColorSpaceName)
+		{
+			// Update the chromaticity coordinates member variables based on the color space choice (unless custom).
+			if (SourceColorSettings.ColorSpace != ETextureColorSpace::TCS_Custom)
+			{
+				UE::Color::FColorSpace ColorSpace(static_cast<UE::Color::EColorSpace>(SourceColorSettings.ColorSpace));
+				ColorSpace.GetChromaticities(SourceColorSettings.RedChromaticityCoordinate, SourceColorSettings.GreenChromaticityCoordinate, SourceColorSettings.BlueChromaticityCoordinate, SourceColorSettings.WhiteChromaticityCoordinate);
+			}
+		}
 		else if (PropertyName == CompressionQualityName)
 		{
 			RequiresNotifyMaterials = true;

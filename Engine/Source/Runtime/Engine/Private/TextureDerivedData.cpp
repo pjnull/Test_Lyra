@@ -49,6 +49,7 @@
 #include "VT/LightmapVirtualTexture.h"
 #include "TextureCompiler.h"
 #include "TextureEncodingSettings.h"
+#include "ColorSpace.h"
 
 /*------------------------------------------------------------------------------
 	Versioning for texture derived data.
@@ -66,9 +67,6 @@
 // This is useful during development, but once large numbers of VT are present in shipped content, it will have the same problem as TEXTURE_DERIVEDDATA_VER
 #define TEXTURE_VT_DERIVEDDATA_VER	TEXT("93F54B64FA524F78BCA4EA2CD30B1E9F")
 
-// Version number for the texture encoding enum types (UE::Color::EEncoding/ETextureSourceEncoding).
-// Make sure to increment upon changes to the list.
-#define TEXTURE_ENCODING_TYPES_VER 2
 
 #if ENABLE_COOK_STATS
 namespace TextureCookStats
@@ -96,7 +94,9 @@ static void SerializeForKey(FArchive& Ar, const FTextureBuildSettings& Settings)
 	float TempFloat;
 	uint8 TempByte;
 	FColor TempColor;
+	FVector2D TempVector2D;
 	FVector4 TempVector4;
+	UE::Color::FColorSpace TempColorSpace;
 	FGuid TempGuid;
 
 	TempFloat = Settings.ColorAdjustment.AdjustBrightness; Ar << TempFloat;
@@ -119,8 +119,20 @@ static void SerializeForKey(FArchive& Ar, const FTextureBuildSettings& Settings)
 
 	if (Settings.SourceEncodingOverride != 0 /*UE::Color::EEncoding::None*/)
 	{
-		TempUint32 = TEXTURE_ENCODING_TYPES_VER; Ar << TempUint32;
+		TempUint32 = UE::Color::ENCODING_TYPES_VER; Ar << TempUint32;
 		TempByte = Settings.SourceEncodingOverride; Ar << TempByte;
+	}
+
+	if (Settings.bHasColorSpaceDefinition)
+	{
+		TempUint32 = UE::Color::COLORSPACE_VER; Ar << TempUint32;
+		TempColorSpace = UE::Color::FColorSpace::GetWorking(); Ar << TempColorSpace;
+
+		TempVector2D = Settings.RedChromaticityCoordinate; Ar << TempVector2D;
+		TempVector2D = Settings.GreenChromaticityCoordinate; Ar << TempVector2D;
+		TempVector2D = Settings.BlueChromaticityCoordinate; Ar << TempVector2D;
+		TempVector2D = Settings.WhiteChromaticityCoordinate; Ar << TempVector2D;
+		TempByte = Settings.ChromaticAdaptationMethod; Ar << TempByte;
 	}
 
 	TempByte = Settings.bPreserveBorder; Ar << TempByte;
@@ -658,7 +670,13 @@ static void GetTextureBuildSettings(
 	OutBuildSettings.bTextureArray = false;
 	OutBuildSettings.DiffuseConvolveMipLevel = 0;
 	OutBuildSettings.bLongLatSource = false;
-	OutBuildSettings.SourceEncodingOverride = Texture.SourceEncodingOverride.GetValue();
+	OutBuildSettings.SourceEncodingOverride = static_cast<uint8>(Texture.SourceColorSettings.EncodingOverride);
+	OutBuildSettings.bHasColorSpaceDefinition = Texture.SourceColorSettings.ColorSpace != ETextureColorSpace::TCS_None;
+	OutBuildSettings.RedChromaticityCoordinate = Texture.SourceColorSettings.RedChromaticityCoordinate;
+	OutBuildSettings.GreenChromaticityCoordinate = Texture.SourceColorSettings.GreenChromaticityCoordinate;
+	OutBuildSettings.BlueChromaticityCoordinate = Texture.SourceColorSettings.BlueChromaticityCoordinate;
+	OutBuildSettings.WhiteChromaticityCoordinate = Texture.SourceColorSettings.WhiteChromaticityCoordinate;
+	OutBuildSettings.ChromaticAdaptationMethod = static_cast<uint8>(Texture.SourceColorSettings.ChromaticAdaptationMethod);
 
 	if (Texture.MaxTextureSize > 0)
 	{
