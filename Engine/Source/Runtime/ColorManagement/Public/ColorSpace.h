@@ -5,6 +5,7 @@
 #include "CoreTypes.h"
 #include "Math/Vector.h"
 #include "Math/Matrix.h"
+#include "Containers/StaticArray.h"
 #include "ColorManagementDefines.h"
 
 namespace UE { namespace Color {
