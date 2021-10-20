@@ -68,7 +68,8 @@ public class UnrealEd : ModuleRules
 				"NavigationSystem",
 				"Media",
 				"VirtualTexturingEditor",
-				"TextureBuild"
+				"TextureBuild",
+				"ToolWidgets",
 			}
 		);
 

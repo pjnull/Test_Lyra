@@ -11,7 +11,7 @@ enum class EMessageStyle
 	Error
 };
 
-class EDITORWIDGETS_API SWarningOrErrorBox : public SBorder
+class TOOLWIDGETS_API SWarningOrErrorBox : public SBorder
 {
 public:
 	SLATE_BEGIN_ARGS(SWarningOrErrorBox)
