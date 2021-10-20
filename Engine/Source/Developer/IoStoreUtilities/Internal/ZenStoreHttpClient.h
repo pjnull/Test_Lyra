@@ -30,7 +30,7 @@ public:
 	FZenStoreHttpClient();
 	FZenStoreHttpClient(FStringView HostName, uint16 Port);
 	FZenStoreHttpClient(FStringView AutoLaunchExecutablePath, FStringView AutoLaunchArguments, uint16 DesiredPort);
-	FZenStoreHttpClient(UE::Zen::EServiceMode Mode);
+	explicit FZenStoreHttpClient(UE::Zen::EServiceMode Mode);
 	~FZenStoreHttpClient();
 
 	bool TryCreateProject(FStringView InProjectId, FStringView InOplogId, FStringView ServerRoot, 
@@ -44,11 +44,11 @@ public:
 	void StartBuildPass();
 	TIoStatusOr<uint64> EndBuildPass(FCbPackage OpEntry);
 
-	TFuture<TIoStatusOr<uint64>> AppendOp(FCbPackage OpEntry);
+	TIoStatusOr<uint64> AppendOp(FCbPackage OpEntry);
 
 	TIoStatusOr<uint64> GetChunkSize(const FIoChunkId& Id);
 	TIoStatusOr<FIoBuffer> ReadChunk(const FIoChunkId& Id, uint64 Offset = 0, uint64 Size = ~0ull);
-	TIoStatusOr<FIoBuffer> ReadOpLogAttachment(FStringView Id, uint64 Offset = 0, uint64 Size = ~0ull);
+	TIoStatusOr<FIoBuffer> ReadOpLogAttachment(FStringView Id);
 
 #if UE_WITH_ZEN
 	const TCHAR* GetHostName() const { return ZenService.GetInstance().GetHostName(); }
@@ -66,7 +66,7 @@ public:
 	static const UTF8CHAR* FindAttachmentId(FUtf8StringView AttachmentText);
 
 private:
-	TIoStatusOr<FIoBuffer> ReadOpLogUri(FStringBuilderBase& ChunkUri, uint64 Offset, uint64 Size);
+	TIoStatusOr<FIoBuffer> ReadOpLogUri(FStringBuilderBase& ChunkUri, uint64 Offset = 0, uint64 Size = ~0ull);
 
 	static const uint32 PoolEntryCount;
 #if UE_WITH_ZEN

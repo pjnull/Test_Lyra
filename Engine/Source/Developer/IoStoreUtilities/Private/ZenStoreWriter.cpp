@@ -93,18 +93,8 @@ public:
 		FHttpRequest* Request = Alloc();
 
 		Request->OpEntry	= MoveTemp(OpEntry);
-		Request->Callback	= MoveTemp(Callback);
-		Request->HttpResult = HttpClient
-			.AppendOp(MoveTemp(Request->OpEntry))
-			.Next([StartTime = FPlatformTime::Seconds()](TIoStatusOr<uint64> Status)
-			{
-				return FHttpRequestResult
-				{
-					FPlatformTime::Seconds() - StartTime,
-					Status.IsOk() ? Status.ValueOrDie() : 0,
-					Status.IsOk()
-				};
-			});
+		Request->Callback	= MoveTemp(Callback);			
+		Request->StartTime	= FPlatformTime::Seconds();
 
 		{
 			FScopeLock _(&QueueCriticalSection);
@@ -136,9 +126,9 @@ private:
 	struct FHttpRequest
 	{
 		FCbPackage OpEntry;
-		TFuture<FHttpRequestResult> HttpResult;
 		FHttpRequestCompleted Callback;
 		FHttpRequest* Next = nullptr;
+		double StartTime = 0;
 	};
 
 	FHttpRequest* Alloc()
@@ -190,7 +180,16 @@ private:
 				FHttpRequest* Request = PendingRequests;
 				while (Request)
 				{
-					Request->Callback(Request->HttpResult.Get());
+					TIoStatusOr<uint64> Status = HttpClient.AppendOp(MoveTemp(Request->OpEntry));
+			
+					FHttpRequestResult HttpResult
+					{
+						FPlatformTime::Seconds() - Request->StartTime,
+						Status.IsOk() ? Status.ValueOrDie() : 0,
+						Status.IsOk()
+					};
+
+					Request->Callback(HttpResult);
 
 					FHttpRequest* FreeRequest = Request;
 					Request = Request->Next;
@@ -592,7 +591,7 @@ void FZenStoreWriter::BeginCook(const FCookInfo& Info)
 
 		Pkg.SetObject(Obj);
 
-		TIoStatusOr<uint64> Status = HttpClient->AppendOp(Pkg).Get();
+		TIoStatusOr<uint64> Status = HttpClient->AppendOp(Pkg);
 		UE_CLOG(!Status.IsOk(), LogZenStoreWriter, Fatal, TEXT("Failed to append OpLog"));
 	}
 }
