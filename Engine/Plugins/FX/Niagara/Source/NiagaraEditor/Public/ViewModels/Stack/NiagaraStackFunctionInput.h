@@ -244,6 +244,8 @@ public:
 
 	/** Gets whether or not this input is filtered from search results and appearing in stack due to visibility metadata*/
 	bool GetShouldPassFilterForVisibleCondition() const;
+	
+	TArray<UNiagaraScript*> GetPossibleConversionScripts(const FNiagaraTypeDefinition& FromType) const;
 
 	void ChangeScriptVersion(FGuid NewScriptVersion);
 
@@ -252,6 +254,8 @@ public:
 	void SetValueFromClipboardFunctionInput(const UNiagaraClipboardFunctionInput& ClipboardFunctionInput);
 
 	bool IsScratchDynamicInput() const;
+
+	TArray<UNiagaraStackFunctionInput*> GetChildInputs() const;
 
 	virtual bool IsSemanticChild() const;
 	void SetSemanticChild(bool IsSemanticChild);
@@ -345,8 +349,6 @@ private:
 
 	/** Handles the message manager refreshing messages. */
 	void OnMessageManagerRefresh(const TArray<TSharedRef<const INiagaraMessage>>& NewMessages);
-
-	TArray<UNiagaraStackFunctionInput*> GetChildInputs() const;
 
 	void GetCurrentChangeIds(FGuid& OutOwningGraphChangeId, FGuid& OutFunctionGraphChangeId) const;
 

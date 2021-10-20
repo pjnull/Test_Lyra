@@ -745,7 +745,40 @@ FReply SNiagaraStackFunctionInputValue::OnFunctionInputDrop(const FGeometry& InG
 		TSharedPtr<FNiagaraParameterAction> Action = StaticCastSharedPtr<FNiagaraParameterAction>(InputDragDropOperation->GetSourceAction());
 		if (Action.IsValid())
 		{
-			FunctionInput->SetLinkedValueHandle(FNiagaraParameterHandle(Action->GetParameter().GetName()));
+			FNiagaraTypeDefinition FromType = Action->GetParameter().GetType();
+			if (FromType == FunctionInput->GetInputType())
+			{
+				// the types are the same, so we can just link the value directly
+				FunctionInput->SetLinkedValueHandle(FNiagaraParameterHandle(Action->GetParameter().GetName()));
+			}
+			else
+			{
+				// the types don't match, so we use a dynamic input to convert from one to the other
+				TArray<UNiagaraScript*> NiagaraScripts = FunctionInput->GetPossibleConversionScripts(FromType);
+				int32 ScriptCount = NiagaraScripts.Num();
+				if (ensure(ScriptCount > 0))
+				{
+					if (ScriptCount > 1)
+					{
+						FString ScriptNames;
+						for (UNiagaraScript* NiagaraScript : NiagaraScripts)
+						{
+							ScriptNames += NiagaraScript->GetPathName() + "\n";
+						}
+						FNiagaraEditorUtilities::WarnWithToastAndLog(FText::Format(LOCTEXT("TooManyConversionScripts", "There is more than one dynamic input script available auto-convert the dragged parameter. Please fix this by disabling conversion for all but one of them:\n{0}"), FText::FromString(ScriptNames)));
+					}
+					FScopedTransaction ScopedTransaction(LOCTEXT("SetConversionInput", "Make auto-convert dynamic input"));
+					FunctionInput->SetDynamicInput(NiagaraScripts[0]);
+					for (UNiagaraStackFunctionInput* ChildInput : FunctionInput->GetChildInputs())
+					{
+						if (FromType == ChildInput->GetInputType())
+						{
+							ChildInput->SetLinkedValueHandle(FNiagaraParameterHandle(Action->GetParameter().GetName()));
+							break;
+						}
+					}
+				}
+			}
 			return FReply::Handled();
 		}
 	}
@@ -764,7 +797,16 @@ bool SNiagaraStackFunctionInputValue::OnFunctionInputAllowDrop(TSharedPtr<FDragD
 
 		TSharedPtr<FNiagaraParameterDragOperation> InputDragDropOperation = StaticCastSharedPtr<FNiagaraParameterDragOperation>(DragDropOperation);
 		TSharedPtr<FNiagaraParameterAction> Action = StaticCastSharedPtr<FNiagaraParameterAction>(InputDragDropOperation->GetSourceAction());
-		if (Action->GetParameter().GetType() == FunctionInput->GetInputType() && FNiagaraStackGraphUtilities::ParameterAllowedInExecutionCategory(Action->GetParameter().GetName(), FunctionInput->GetExecutionCategoryName()))
+		bool bAllowedInExecutionCategory = FNiagaraStackGraphUtilities::ParameterAllowedInExecutionCategory(Action->GetParameter().GetName(), FunctionInput->GetExecutionCategoryName());
+
+		// check if we can simply link the input directly
+		if (bAllowedInExecutionCategory && Action->GetParameter().GetType() == FunctionInput->GetInputType())
+		{
+			return true;
+		}
+
+		// check if we can use a conversion script
+		if (bAllowedInExecutionCategory && FunctionInput->GetPossibleConversionScripts(Action->GetParameter().GetType()).Num() > 0)
 		{
 			return true;
 		}

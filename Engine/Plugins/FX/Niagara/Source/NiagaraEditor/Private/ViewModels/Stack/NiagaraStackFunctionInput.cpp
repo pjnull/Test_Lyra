@@ -2072,6 +2072,67 @@ bool UNiagaraStackFunctionInput::GetShouldPassFilterForVisibleCondition() const
 	return GetHasVisibleCondition() == false || GetVisibleConditionEnabled();
 }
 
+TArray<UNiagaraScript*> UNiagaraStackFunctionInput::GetPossibleConversionScripts(const FNiagaraTypeDefinition& FromType) const
+{
+	TArray<FAssetData> DynamicInputAssets;
+    FNiagaraEditorUtilities::FGetFilteredScriptAssetsOptions DynamicInputScriptFilterOptions;
+    DynamicInputScriptFilterOptions.ScriptUsageToInclude = ENiagaraScriptUsage::DynamicInput;
+    FNiagaraEditorUtilities::GetFilteredScriptAssets(DynamicInputScriptFilterOptions, DynamicInputAssets);
+
+    FPinCollectorArray InputPins;
+    TArray<UNiagaraNodeOutput*> OutputNodes;
+    auto MatchesTypeConversion = [this, &InputPins, &OutputNodes, &FromType](UNiagaraScript* Script)
+    {
+    	UNiagaraScriptSource* DynamicInputScriptSource = Cast<UNiagaraScriptSource>(Script->GetLatestSource());
+    	if (DynamicInputScriptSource == nullptr || Script->GetLatestScriptData()->bCanBeUsedForTypeConversions == false)
+    	{
+    		return false;
+    	}
+    	
+    	OutputNodes.Reset();
+    	DynamicInputScriptSource->NodeGraph->GetNodesOfClass<UNiagaraNodeOutput>(OutputNodes);
+    	if (OutputNodes.Num() == 1)
+    	{
+    		// checking via metadata is not really correct, but it's super fast and good enough for the prefiltered list of scripts
+    		TArray<FNiagaraVariable> AvailableVars;
+    		DynamicInputScriptSource->NodeGraph->GetAllMetaData().GetKeys(AvailableVars);
+    		int MatchingVars = 0;
+    		for (const FNiagaraVariable& Var : AvailableVars)
+    		{
+    			if (Var.IsInNameSpace(FNiagaraConstants::ModuleNamespaceString) && Var.GetType() == FromType)
+    			{
+    				MatchingVars++;
+    			}
+    		}
+
+    		// check that the output matches as well
+    		InputPins.Reset();
+    		OutputNodes[0]->GetInputPins(InputPins);
+    		if (InputPins.Num() == 1 && MatchingVars == 1)
+    		{
+    			const UEdGraphSchema_Niagara* NiagaraSchema = GetDefault<UEdGraphSchema_Niagara>();
+    			FNiagaraTypeDefinition PinTypeIn = NiagaraSchema->PinToTypeDefinition(InputPins[0]);
+    			if (PinTypeIn == InputType)
+    			{
+    				return true;
+    			}
+    		}
+    	}
+    	return false;
+    };
+
+	TArray<UNiagaraScript*> AvailableDynamicInputs;
+    for (const FAssetData& DynamicInputAsset : DynamicInputAssets)
+    {
+    	UNiagaraScript* DynamicInputScript = Cast<UNiagaraScript>(DynamicInputAsset.GetAsset());
+    	if (DynamicInputScript != nullptr && MatchesTypeConversion(DynamicInputScript))
+    	{
+    		AvailableDynamicInputs.Add(DynamicInputScript);
+    	}
+    }
+	return AvailableDynamicInputs;
+}
+
 void UNiagaraStackFunctionInput::ChangeScriptVersion(FGuid NewScriptVersion)
 {
 	FScopedTransaction ScopedTransaction(LOCTEXT("NiagaraChangeVersion_Transaction", "Changing dynamic input version"));
