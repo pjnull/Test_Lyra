@@ -210,23 +210,26 @@ void FAnimGraphNodeDetails::CustomizeDetails(class IDetailLayoutBuilder& DetailB
 							ValueWidget.ToSharedRef()
 						];
 
-						// Set visibility of children based on parent
-						uint32 NumChildren = 0;
-						TargetPropertyHandle->GetNumChildren(NumChildren);
-						for(uint32 ChildIndex = 0; ChildIndex < NumChildren; ++ChildIndex)
+						// Set visibility of children based on parent if this is an array property
+						if(TargetPropertyHandle->AsArray().IsValid())
 						{
-							TSharedPtr<IPropertyHandle> ChildHandle = TargetPropertyHandle->GetChildHandle(ChildIndex);
-							IDetailPropertyRow& ChildRow = DetailBuilder.AddPropertyToCategory(ChildHandle);
-
-							ChildRow.Visibility(MakeAttributeLambda([this, WeakShowHidePropertyHandle = TWeakPtr<IPropertyHandle>(ShowHidePropertyHandle)]()
+							uint32 NumChildren = 0;
+							TargetPropertyHandle->GetNumChildren(NumChildren);
+							for(uint32 ChildIndex = 0; ChildIndex < NumChildren; ++ChildIndex)
 							{
-								if(TSharedPtr<IPropertyHandle> PinnedShowHidePropertyHandle = WeakShowHidePropertyHandle.Pin())
-								{
-									return GetVisibilityOfProperty(PinnedShowHidePropertyHandle.ToSharedRef());
-								}
+								TSharedPtr<IPropertyHandle> ChildHandle = TargetPropertyHandle->GetChildHandle(ChildIndex);
+								IDetailPropertyRow& ChildRow = DetailBuilder.AddPropertyToCategory(ChildHandle);
 
-								return EVisibility::Visible;
-							}));
+								ChildRow.Visibility(MakeAttributeLambda([this, WeakShowHidePropertyHandle = TWeakPtr<IPropertyHandle>(ShowHidePropertyHandle)]()
+								{
+									if(TSharedPtr<IPropertyHandle> PinnedShowHidePropertyHandle = WeakShowHidePropertyHandle.Pin())
+									{
+										return GetVisibilityOfProperty(PinnedShowHidePropertyHandle.ToSharedRef());
+									}
+
+									return EVisibility::Visible;
+								}));
+							}
 						}
 					}
 					else if (InternalCustomWidget != SNullWidget::NullWidget)
@@ -1186,7 +1189,18 @@ void FAnimGraphNodeBindingExtension::GetOptionalPinData(const IPropertyHandle& P
 		{
 			OutOptionalPinIndex = OutAnimGraphNode->ShowPinForProperties.IndexOfByPredicate([Property](const FOptionalPinFromProperty& InOptionalPin)
 			{
-				return Property->GetFName() == InOptionalPin.PropertyName;
+				UStruct* OwnerStruct = Property->GetOwnerStruct();
+				if(OwnerStruct)
+				{
+					// Checking the owner struct here avoids placing binding widgets on inner structs that have properties
+					// that share the same name as the anim node we are customizing
+					if(OwnerStruct->IsChildOf(FAnimNode_Base::StaticStruct()))
+					{
+						return Property->GetFName() == InOptionalPin.PropertyName;
+					}
+				}
+				
+				return false;
 			});
 		}
 	}
