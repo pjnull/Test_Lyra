@@ -129,6 +129,14 @@ static FAutoConsoleVariableRef CVarShadowOffsetDataStructure(
 	TEXT("Which data structure to store offset in, 0 - base, 1 - buffer, 2 - texture"),
 	ECVF_RenderThreadSafe | ECVF_ReadOnly);
 
+int32 GDFShadowCompactCulledObjects = 1;
+static FAutoConsoleVariableRef CVarCompactCulledObjects(
+	TEXT("r.DFShadowCompactCulledObjects"),
+	GDFShadowCompactCulledObjects,
+	TEXT("Whether to compact culled object indices when using scattered tile culling. ")
+	TEXT("Note that each tile can only hold up to r.DFShadowAverageObjectsPerCullTile number of objects when compaction is not used."),
+	ECVF_RenderThreadSafe);
+
 int32 const GDistanceFieldShadowTileSizeX = 8;
 int32 const GDistanceFieldShadowTileSizeY = 8;
 
@@ -215,10 +223,18 @@ class FShadowObjectCullPS : public FGlobalShader
 
 	class FPrimitiveType : SHADER_PERMUTATION_INT("DISTANCEFIELD_PRIMITIVE_TYPE", 2);
 	class FCountingPass : SHADER_PERMUTATION_BOOL("SCATTER_CULLING_COUNT_PASS");
-	using FPermutationDomain = TShaderPermutationDomain<FPrimitiveType, FCountingPass>;
+	class FCompactCulledObjects : SHADER_PERMUTATION_BOOL("COMPACT_CULLED_SHADOW_OBJECTS");
+	using FPermutationDomain = TShaderPermutationDomain<FPrimitiveType, FCountingPass, FCompactCulledObjects>;
 
 	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
 	{
+		const FPermutationDomain PermutationVector(Parameters.PermutationId);
+		if (!PermutationVector.Get<FCompactCulledObjects>() && PermutationVector.Get<FCountingPass>())
+		{
+			// We don't need a counting pass if we don't compact culled objects
+			return false;
+		}
+
 		return DoesPlatformSupportDistanceFieldShadowing(Parameters.Platform);
 	}
 
@@ -281,10 +297,18 @@ class FDistanceFieldShadowingCS : public FGlobalShader
 	class FPrimitiveType : SHADER_PERMUTATION_INT("DISTANCEFIELD_PRIMITIVE_TYPE", 2);
 	class FHasPreviousOutput : SHADER_PERMUTATION_BOOL("HAS_PREVIOUS_OUTPUT");
 	class FOffsetDataStructure : SHADER_PERMUTATION_INT("OFFSET_DATA_STRUCT", 3);
-	using FPermutationDomain = TShaderPermutationDomain<FCullingType, FShadowQuality, FPrimitiveType, FHasPreviousOutput, FOffsetDataStructure>;
+	class FCompactCulledObjects : SHADER_PERMUTATION_BOOL("COMPACT_CULLED_SHADOW_OBJECTS");
+	using FPermutationDomain = TShaderPermutationDomain<FCullingType, FShadowQuality, FPrimitiveType, FHasPreviousOutput, FOffsetDataStructure, FCompactCulledObjects>;
 
 	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
 	{
+		const FPermutationDomain PermutationVector(Parameters.PermutationId);
+		if (!PermutationVector.Get<FCompactCulledObjects>() && PermutationVector.Get<FCullingType>() != 0)
+		{
+			// Compacting culled objects is only relevant when we do scattered tile culling
+			return false;
+		}
+
 		return DoesPlatformSupportDistanceFieldShadowing(Parameters.Platform);
 	}
 
@@ -399,6 +423,7 @@ void ScatterObjectsToShadowTiles(
 		FShadowObjectCullPS::FPermutationDomain PermutationVector;
 		PermutationVector.Set< FShadowObjectCullPS::FPrimitiveType >(PrimitiveType);
 		PermutationVector.Set< FShadowObjectCullPS::FCountingPass >(bCountingPass);
+		PermutationVector.Set<FShadowObjectCullPS::FCompactCulledObjects>(GDFShadowCompactCulledObjects != 0);
 		auto PixelShader = View.ShaderMap->GetShader< FShadowObjectCullPS >(PermutationVector);
 
 		const bool bReverseCulling = View.bReverseCulling;
@@ -566,43 +591,55 @@ void CullDistanceFieldObjectsForLight(
 		LightTileIntersectionParameters.RWShadowTileNumCulledObjects = GraphBuilder.CreateUAV(ShadowTileNumCulledObjects, PF_R32_UINT);
 		LightTileIntersectionParameters.ShadowTileNumCulledObjects = GraphBuilder.CreateSRV(ShadowTileNumCulledObjects, PF_R32_UINT);
 
-		FRDGBufferRef ShadowTileStartOffsets = GraphBuilder.CreateBuffer(FRDGBufferDesc::CreateBufferDesc(sizeof(uint32), LightTileDimensions.X * LightTileDimensions.Y), TEXT("ShadowTileStartOffsets"));
-		LightTileIntersectionParameters.RWShadowTileStartOffsets = GraphBuilder.CreateUAV(ShadowTileStartOffsets, PF_R32_UINT);
-		LightTileIntersectionParameters.ShadowTileStartOffsets = GraphBuilder.CreateSRV(ShadowTileStartOffsets, PF_R32_UINT);
-
-		FRDGBufferRef NextStartOffset = GraphBuilder.CreateBuffer(FRDGBufferDesc::CreateBufferDesc(sizeof(uint32), 1), TEXT("ShadowNextStartOffset"));
-		LightTileIntersectionParameters.RWNextStartOffset = GraphBuilder.CreateUAV(NextStartOffset, PF_R32_UINT);
-		LightTileIntersectionParameters.NextStartOffset = GraphBuilder.CreateSRV(NextStartOffset, PF_R32_UINT);
-
 		const uint32 MaxNumObjectsPerTile = bIsHeightfield ? GAverageHeightFieldObjectsPerShadowCullTile : GAverageObjectsPerShadowCullTile;
 		FRDGBufferRef ShadowTileArrayData = GraphBuilder.CreateBuffer(FRDGBufferDesc::CreateBufferDesc(b16BitObjectIndices ? sizeof(uint16) : sizeof(uint32), MaxNumObjectsPerTile * LightTileDimensions.X * LightTileDimensions.Y), TEXT("ShadowTileArrayData"));
 		LightTileIntersectionParameters.RWShadowTileArrayData = GraphBuilder.CreateUAV(ShadowTileArrayData, b16BitObjectIndices ? PF_R16_UINT : PF_R32_UINT);
 		LightTileIntersectionParameters.ShadowTileArrayData = GraphBuilder.CreateSRV(ShadowTileArrayData, b16BitObjectIndices ? PF_R16_UINT : PF_R32_UINT);
 		LightTileIntersectionParameters.ShadowTileListGroupSize = LightTileDimensions;
+		LightTileIntersectionParameters.ShadowMaxObjectsPerTile = MaxNumObjectsPerTile;
 
-		// Start at 0 tiles per object
-		AddClearUAVPass(GraphBuilder, LightTileIntersectionParameters.RWShadowTileNumCulledObjects, 0);
-
-		// Rasterize object bounding shapes and intersect with shadow tiles to compute how many objects intersect each tile
-		ScatterObjectsToShadowTiles(GraphBuilder, View, WorldToShadowValue, ShadowBoundingRadius, true, PrimitiveType, LightTileDimensions, ObjectIndirectArguments, ObjectBufferParameters, CulledObjectBufferParameters, LightTileIntersectionParameters);
-
-		AddClearUAVPass(GraphBuilder, LightTileIntersectionParameters.RWNextStartOffset, 0);
-
-		// Compute the start offset for each tile's culled object data
+		if (GDFShadowCompactCulledObjects != 0)
 		{
-			FComputeCulledObjectStartOffsetCS::FParameters* PassParameters = GraphBuilder.AllocParameters<FComputeCulledObjectStartOffsetCS::FParameters>();
-			
-			PassParameters->LightTileIntersectionParameters = LightTileIntersectionParameters;
-			auto ComputeShader = View.ShaderMap->GetShader<FComputeCulledObjectStartOffsetCS>();
-			uint32 GroupSizeX = FMath::DivideAndRoundUp<int32>(LightTileDimensions.X, ComputeCulledObjectStartOffsetGroupSize);
-			uint32 GroupSizeY = FMath::DivideAndRoundUp<int32>(LightTileDimensions.Y, ComputeCulledObjectStartOffsetGroupSize);
+			FRDGBufferRef ShadowTileStartOffsets = GraphBuilder.CreateBuffer(FRDGBufferDesc::CreateBufferDesc(sizeof(uint32), LightTileDimensions.X * LightTileDimensions.Y), TEXT("ShadowTileStartOffsets"));
+			LightTileIntersectionParameters.RWShadowTileStartOffsets = GraphBuilder.CreateUAV(ShadowTileStartOffsets, PF_R32_UINT);
+			LightTileIntersectionParameters.ShadowTileStartOffsets = GraphBuilder.CreateSRV(ShadowTileStartOffsets, PF_R32_UINT);
 
-			FComputeShaderUtils::AddPass(
-				GraphBuilder,
-				RDG_EVENT_NAME("ComputeCulledObjectStartOffset"),
-				ComputeShader,
-				PassParameters,
-				FIntVector(GroupSizeX, GroupSizeY, 1));
+			FRDGBufferRef NextStartOffset = GraphBuilder.CreateBuffer(FRDGBufferDesc::CreateBufferDesc(sizeof(uint32), 1), TEXT("ShadowNextStartOffset"));
+			LightTileIntersectionParameters.RWNextStartOffset = GraphBuilder.CreateUAV(NextStartOffset, PF_R32_UINT);
+			LightTileIntersectionParameters.NextStartOffset = GraphBuilder.CreateSRV(NextStartOffset, PF_R32_UINT);
+
+			// Start at 0 tiles per object
+			AddClearUAVPass(GraphBuilder, LightTileIntersectionParameters.RWShadowTileNumCulledObjects, 0);
+
+			// Rasterize object bounding shapes and intersect with shadow tiles to compute how many objects intersect each tile
+			ScatterObjectsToShadowTiles(GraphBuilder, View, WorldToShadowValue, ShadowBoundingRadius, true, PrimitiveType, LightTileDimensions, ObjectIndirectArguments, ObjectBufferParameters, CulledObjectBufferParameters, LightTileIntersectionParameters);
+
+			AddClearUAVPass(GraphBuilder, LightTileIntersectionParameters.RWNextStartOffset, 0);
+
+			// Compute the start offset for each tile's culled object data
+			{
+				FComputeCulledObjectStartOffsetCS::FParameters* PassParameters = GraphBuilder.AllocParameters<FComputeCulledObjectStartOffsetCS::FParameters>();
+
+				PassParameters->LightTileIntersectionParameters = LightTileIntersectionParameters;
+				auto ComputeShader = View.ShaderMap->GetShader<FComputeCulledObjectStartOffsetCS>();
+				uint32 GroupSizeX = FMath::DivideAndRoundUp<int32>(LightTileDimensions.X, ComputeCulledObjectStartOffsetGroupSize);
+				uint32 GroupSizeY = FMath::DivideAndRoundUp<int32>(LightTileDimensions.Y, ComputeCulledObjectStartOffsetGroupSize);
+
+				FComputeShaderUtils::AddPass(
+					GraphBuilder,
+					RDG_EVENT_NAME("ComputeCulledObjectStartOffset"),
+					ComputeShader,
+					PassParameters,
+					FIntVector(GroupSizeX, GroupSizeY, 1));
+			}
+		}
+		else
+		{
+			LightTileIntersectionParameters.RWShadowTileStartOffsets = nullptr;
+			LightTileIntersectionParameters.ShadowTileStartOffsets = nullptr;
+
+			LightTileIntersectionParameters.RWNextStartOffset = nullptr;
+			LightTileIntersectionParameters.NextStartOffset = nullptr;
 		}
 
 		// Start at 0 tiles per object
@@ -776,6 +813,7 @@ void RayTraceShadows(
 		PermutationVector.Set< FDistanceFieldShadowingCS::FPrimitiveType >(PrimitiveType);
 		PermutationVector.Set< FDistanceFieldShadowingCS::FHasPreviousOutput >(bHasPrevOutput);
 		PermutationVector.Set< FDistanceFieldShadowingCS::FOffsetDataStructure >(GDFShadowOffsetDataStructure);
+		PermutationVector.Set<FDistanceFieldShadowingCS::FCompactCulledObjects>(GDFShadowCompactCulledObjects != 0);
 		auto ComputeShader = View.ShaderMap->GetShader< FDistanceFieldShadowingCS >(PermutationVector);
 
 		uint32 GroupSizeX = FMath::DivideAndRoundUp(ScissorRect.Size().X / GetDFShadowDownsampleFactor(), GDistanceFieldShadowTileSizeX);

@@ -206,6 +206,7 @@ BEGIN_SHADER_PARAMETER_STRUCT(FLightTileIntersectionParameters, )
 	SHADER_PARAMETER_RDG_BUFFER_SRV(Buffer<uint>, ShadowTileArrayData)
 
 	SHADER_PARAMETER(FIntPoint, ShadowTileListGroupSize)
+	SHADER_PARAMETER(uint32, ShadowMaxObjectsPerTile)
 END_SHADER_PARAMETER_STRUCT()
 
 extern void CullDistanceFieldObjectsForLight(
