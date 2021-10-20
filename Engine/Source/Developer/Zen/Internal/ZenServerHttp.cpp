@@ -80,7 +80,6 @@ namespace UE::Zen {
 		// Options that are always set for all connections.
 		curl_easy_setopt(Curl, CURLOPT_CONNECTTIMEOUT, UE_ZENDDC_HTTP_REQUEST_TIMEOUT_SECONDS);
 		curl_easy_setopt(Curl, CURLOPT_EXPECT_100_TIMEOUT_MS, 0);
-		curl_easy_setopt(Curl, CURLOPT_FOLLOWLOCATION, 1L);
 		curl_easy_setopt(Curl, CURLOPT_NOSIGNAL, 1L);
 		curl_easy_setopt(Curl, CURLOPT_BUFFERSIZE, 256 * 1024L);
 		//curl_easy_setopt(Curl, CURLOPT_UPLOAD_BUFFERSIZE, 256 * 1024L);
@@ -90,12 +89,12 @@ namespace UE::Zen {
 		curl_easy_setopt(Curl, CURLOPT_WRITEDATA, this);
 		curl_easy_setopt(Curl, CURLOPT_WRITEFUNCTION, &FZenHttpRequest::FStatics::StaticWriteBodyFn);
 		// Rewind method, handle special error case where request need to rewind data stream
-		curl_easy_setopt(Curl, CURLOPT_SEEKFUNCTION, &FZenHttpRequest::FStatics::StaticSeekFn);
 		curl_easy_setopt(Curl, CURLOPT_SEEKDATA, this);
+		curl_easy_setopt(Curl, CURLOPT_SEEKFUNCTION, &FZenHttpRequest::FStatics::StaticSeekFn);
 		// Debug hooks
 #if UE_ZENDDC_HTTP_DEBUG
 		curl_easy_setopt(Curl, CURLOPT_DEBUGDATA, this);
-		curl_easy_setopt(Curl, CURLOPT_DEBUGFUNCTION, StaticDebugCallback);
+		curl_easy_setopt(Curl, CURLOPT_DEBUGFUNCTION, &FZenHttpRequest::FStatics::StaticDebugCallback);
 		curl_easy_setopt(Curl, CURLOPT_VERBOSE, 1L);
 #endif
 	}
@@ -400,7 +399,6 @@ namespace UE::Zen {
 
 	FZenHttpRequest::Result FZenHttpRequest::PerformBlockingDelete(const FStringView Uri)
 	{
-		curl_easy_setopt(Curl, CURLOPT_POST, 1L);
 		curl_easy_setopt(Curl, CURLOPT_CUSTOMREQUEST, "DELETE");
 
 		return PerformBlocking(Uri, RequestVerb::Delete, 0u);
@@ -434,13 +432,8 @@ namespace UE::Zen {
 		const char* CommonHeaders[] = {
 			GetSessionIdHeader(),
 			RequestIdHeader.GetData(),
-#if 0
 			// Strip any Expect: 100-Continue header since this just introduces latency
-			//
-			// This causes stalls in some cases when using the http.sys server implementation
-			// so this is currently disabled until we can debug it properly
 			"Expect:",	
-#endif
 			nullptr
 		};
 
@@ -457,8 +450,10 @@ namespace UE::Zen {
 			WriteDataBufferPtr = &ResponseBuffer;
 		}
 
-		// Content-Length should always be set
-		Headers.Add(FString::Printf(TEXT("Content-Length: %d"), ContentLength));
+		if ((Verb != RequestVerb::Delete) && (Verb != RequestVerb::Get))
+		{
+			Headers.Add(FString::Printf(TEXT("Content-Length: %d"), ContentLength));
+		}
 
 		// Build headers list
 		curl_slist* CurlHeaders = nullptr;
@@ -613,35 +608,49 @@ namespace UE::Zen {
 
 		switch (DebugInfoType)
 		{
-		case CURLINFO_TEXT:
-		{
-			// Truncate at 1023 characters. This is just an arbitrary number based on a buffer size seen in
-			// the libcurl code.
-			DebugInfoSize = FMath::Min(DebugInfoSize, (size_t)1023);
+			case CURLINFO_TEXT:
+				{
+					// Truncate at 1023 characters. This is just an arbitrary number based on a buffer size seen in
+					// the libcurl code.
+					DebugInfoSize = FMath::Min(DebugInfoSize, (size_t)1023);
 
-			// Calculate the actual length of the string due to incorrect use of snprintf() in lib/vtls/openssl.c.
-			char* FoundNulPtr = (char*)memchr(DebugInfo, 0, DebugInfoSize);
-			int CalculatedSize = FoundNulPtr != nullptr ? FoundNulPtr - DebugInfo : DebugInfoSize;
+					// Calculate the actual length of the string due to incorrect use of snprintf() in lib/vtls/openssl.c.
+					char* FoundNulPtr = (char*)memchr(DebugInfo, 0, DebugInfoSize);
+					int CalculatedSize = FoundNulPtr != nullptr ? FoundNulPtr - DebugInfo : DebugInfoSize;
 
-			auto ConvertedString = StringCast<TCHAR>(static_cast<const ANSICHAR*>(DebugInfo), CalculatedSize);
-			FString DebugText(ConvertedString.Length(), ConvertedString.Get());
-			DebugText.ReplaceInline(TEXT("\n"), TEXT(""), ESearchCase::CaseSensitive);
-			DebugText.ReplaceInline(TEXT("\r"), TEXT(""), ESearchCase::CaseSensitive);
-			UE_LOG(LogZenHttp, VeryVerbose, TEXT("%p: '%s'"), Request, *DebugText);
-		}
-		break;
+					auto ConvertedString = StringCast<TCHAR>(static_cast<const ANSICHAR*>(DebugInfo), CalculatedSize);
+					FString DebugText(ConvertedString.Length(), ConvertedString.Get());
+					DebugText.ReplaceInline(TEXT("\n"), TEXT(""), ESearchCase::CaseSensitive);
+					DebugText.ReplaceInline(TEXT("\r"), TEXT(""), ESearchCase::CaseSensitive);
+					UE_LOG(LogZenHttp, VeryVerbose, TEXT("CURL %p: '%s'"), Request, *DebugText);
+				}
+				break;
 
-		case CURLINFO_HEADER_IN:
-			UE_LOG(LogZenHttp, VeryVerbose, TEXT("%p: Received header (%d bytes)"), Request, DebugInfoSize);
-			break;
+			case CURLINFO_HEADER_IN:
+				UE_LOG(LogZenHttp, VeryVerbose, TEXT("CURL %p: Received header (%d bytes)"), Request, DebugInfoSize);
+				UE_LOG(LogZenHttp, VeryVerbose, TEXT("CURL HEADER <<< %*S"), DebugInfoSize, DebugInfo);
+				break;
 
-		case CURLINFO_DATA_IN:
-			UE_LOG(LogZenHttp, VeryVerbose, TEXT("%p: Received data (%d bytes)"), Request, DebugInfoSize);
-			break;
+			case CURLINFO_HEADER_OUT:
+				UE_LOG(LogZenHttp, VeryVerbose, TEXT("CURL %p: Send header (%d bytes)"), Request, DebugInfoSize);
+				UE_LOG(LogZenHttp, VeryVerbose, TEXT("CURL HEADER >>> %*S"), DebugInfoSize, DebugInfo);
+				break;
 
-		case CURLINFO_DATA_OUT:
-			UE_LOG(LogZenHttp, VeryVerbose, TEXT("%p: Sent data (%d bytes)"), Request, DebugInfoSize);
-			break;
+			case CURLINFO_DATA_IN:
+				UE_LOG(LogZenHttp, VeryVerbose, TEXT("CURL %p: Received data (%d bytes)"), Request, DebugInfoSize);
+				break;
+
+			case CURLINFO_DATA_OUT:
+				UE_LOG(LogZenHttp, VeryVerbose, TEXT("CURL %p: Sent data (%d bytes)"), Request, DebugInfoSize);
+				break;
+
+			case CURLINFO_SSL_DATA_IN:
+				UE_LOG(LogZenHttp, VeryVerbose, TEXT("CURL %p: Received SSL data (%d bytes)"), Request, DebugInfoSize);
+				break;
+
+			case CURLINFO_SSL_DATA_OUT:
+				UE_LOG(LogZenHttp, VeryVerbose, TEXT("CURL %p: Sent SSL data (%d bytes)"), Request, DebugInfoSize);
+				break;
 		}
 
 		return 0;
@@ -728,9 +737,15 @@ namespace UE::Zen {
 
 		switch (Origin)
 		{
-		case SEEK_SET: NewPosition = Offset; break;
-		case SEEK_CUR: NewPosition = Request->BytesSent + Offset; break;
-		case SEEK_END: NewPosition = ReadDataSize + Offset; break;
+			case SEEK_SET: 
+				NewPosition = Offset; 
+				break;
+			case SEEK_CUR: 
+				NewPosition = Request->BytesSent + Offset; 
+				break;
+			case SEEK_END: 
+				NewPosition = ReadDataSize + Offset; 
+				break;
 		}
 
 		// Make sure we don't seek outside of the buffer
