@@ -3326,13 +3326,21 @@ void USkinnedMeshComponent::GetCPUSkinnedVertices(TArray<FFinalSkinVertex>& OutV
 	check(MeshObject);
 	check(MeshObject->IsCPUSkinned());
 		
-	// Copy our vertices out. We know we are using CPU skinning now, so this cast is safe
-	OutVertices = static_cast<FSkeletalMeshObjectCPUSkin*>(MeshObject)->GetCachedFinalVertices();
+	GetCPUSkinnedCachedFinalVertices(OutVertices);
 	
 	// switch skinning mode, LOD, bRenderStatic, etc. back
 	PoseComponent->SetForcedLOD(CachedForcedLOD);
 	MutableThis->bRenderStatic = bCachedRenderStatic;
 	MutableThis->SetCPUSkinningEnabled(bCachedCPUSkinning, bRecreateRenderStateImmediately);
+}
+
+void USkinnedMeshComponent::GetCPUSkinnedCachedFinalVertices(TArray<FFinalSkinVertex>& OutVertices) const
+{
+	if (MeshObject && MeshObject->IsCPUSkinned())
+	{
+		// Copy our vertices out. We know we are using CPU skinning now, so this cast is safe
+		OutVertices = static_cast<FSkeletalMeshObjectCPUSkin*>(MeshObject)->GetCachedFinalVertices();
+	}
 }
 
 void USkinnedMeshComponent::ReleaseResources()

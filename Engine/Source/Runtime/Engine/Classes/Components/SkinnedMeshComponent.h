@@ -379,6 +379,8 @@ public:
 	 */
 	void GetCPUSkinnedVertices(TArray<struct FFinalSkinVertex>& OutVertices, int32 InLODIndex) const;
 
+	void GetCPUSkinnedCachedFinalVertices(TArray<FFinalSkinVertex>& OutVertices) const;
+
 #if UE_ENABLE_DEBUG_DRAWING
 	/** Get whether to draw this mesh's debug skeleton */
 	bool ShouldDrawDebugSkeleton() const { return bDrawDebugSkeleton; }
