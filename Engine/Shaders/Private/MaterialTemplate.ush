@@ -21,7 +21,9 @@
 #include "/Engine/Private/DeferredShadingCommon.ush"
 #include "/Engine/Private/DBufferDecalShared.ush"
 
-// Bump!!!!!!!!!!!!!!
+// Update this GUID to force all material shaders to recompile
+// Merge conflicts on this line should be resolved by generating a new GUID
+// GUID = 4E3A3611-FB00-4498-AF79-80F57CBC06A8
 
 #define USE_ANALYTIC_DERIVATIVES	(IS_NANITE_FACTORY)
 
