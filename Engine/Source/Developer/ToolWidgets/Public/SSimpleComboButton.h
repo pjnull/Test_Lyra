@@ -11,6 +11,7 @@ class TOOLWIDGETS_API SSimpleComboButton : public SComboButton
 public:
 
 	SLATE_BEGIN_ARGS(SSimpleComboButton)
+		: _HasDownArrow(false)
 	{}
 		/** The text to display in the button. */
 		SLATE_ATTRIBUTE(FText, Text)
@@ -23,6 +24,7 @@ public:
 		SLATE_EVENT(FOnGetContent, OnGetMenuContent)
 		SLATE_EVENT(FOnComboBoxOpened, OnComboBoxOpened)
 		SLATE_EVENT(FOnIsOpenChanged, OnMenuOpenChanged)
+		SLATE_ARGUMENT(bool, HasDownArrow)
 
 	SLATE_END_ARGS()
 

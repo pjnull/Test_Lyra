@@ -33,7 +33,7 @@ void SSimpleComboButton::Construct(const FArguments& InArgs)
 		];
 
 	SComboButton::Construct(SComboButton::FArguments()
-		.HasDownArrow(false)
+		.HasDownArrow(InArgs._HasDownArrow)
 		.ContentPadding(FMargin(2.0f, 2.0f))
 		.ComboButtonStyle(FAppStyle::Get(), "SimpleComboButton")
 		.ForegroundColor(FSlateColor::UseStyle())
