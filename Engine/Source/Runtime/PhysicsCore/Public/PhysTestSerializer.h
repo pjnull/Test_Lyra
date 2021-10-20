@@ -143,6 +143,7 @@ private:
 
 	TUniquePtr<Chaos::FPBDRigidsEvolution> ChaosEvolution;
 	Chaos::FPBDRigidsSOAs Particles;
+	Chaos::FParticleUniqueIndicesMultithreaded UniqueIndices;
 	Chaos::THandleArray<Chaos::FChaosPhysicsMaterial> PhysicalMaterials;
 	TArray <TUniquePtr<Chaos::FGeometryParticle>> GTParticles;
 
