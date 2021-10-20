@@ -73,6 +73,7 @@
 #include "RenderCore/Public/RenderUtils.h"
 #include "Engine/Font.h"
 #include "UObject/UE5MainStreamObjectVersion.h"
+#include "UObject/UE5ReleaseStreamObjectVersion.h"
 #include "Materials/MaterialExpressionAdd.h"
 #include "Materials/MaterialExpressionDivide.h"
 #include "Materials/MaterialExpressionComponentMask.h"
@@ -2342,6 +2343,7 @@ void UMaterial::Serialize(FArchive& Ar)
 	Ar.UsingCustomVersion(FRenderingObjectVersion::GUID);
 	Ar.UsingCustomVersion(FFortniteMainBranchObjectVersion::GUID);
 	Ar.UsingCustomVersion(FUE5MainStreamObjectVersion::GUID);
+	Ar.UsingCustomVersion(FUE5ReleaseStreamObjectVersion::GUID);
 
 	Super::Serialize(Ar);
 
