@@ -1535,6 +1535,11 @@ public:
 		return Parents.IsValidIndex(Index) ? Parents[Index].Condition : COND_None;
 	}
 
+	const bool IsCustomDeltaProperty(int32 Index) const
+	{
+		return Parents.IsValidIndex(Index) ? EnumHasAnyFlags(Parents[Index].Flags, ERepParentFlags::IsCustomDelta) : false;
+	}
+
 #if WITH_PUSH_MODEL
 	const bool IsPushModelProperty(int32 Index) const
 	{

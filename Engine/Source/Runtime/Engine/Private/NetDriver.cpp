@@ -3148,7 +3148,7 @@ bool UNetDriver::HandleDumpRepLayoutFlagsCommand(const TCHAR* Cmd, FOutputDevice
 
 				for (int32 i = 0; i < ParentCount; ++i)
 				{
-					if ((RepLayout->GetParentCondition(i) != COND_Never) && !RepLayout->IsPushModelProperty(i) && (RepLayout->GetParentArrayIndex(i) == 0))
+					if ((RepLayout->GetParentCondition(i) != COND_Never) && !RepLayout->IsPushModelProperty(i) && !RepLayout->IsCustomDeltaProperty(i) && (RepLayout->GetParentArrayIndex(i) == 0))
 					{
 						if (const FProperty* Property = RepLayout->GetParentProperty(i))
 						{
