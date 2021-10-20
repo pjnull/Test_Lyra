@@ -649,7 +649,7 @@ TIoStatusOr<uint64> FZenStoreHttpClient::EndBuildPass(FCbPackage OpEntry)
 
 TIoStatusOr<uint64> FZenStoreHttpClient::AppendOp(FCbPackage OpEntry)
 {
-	return TFuture<TIoStatusOr<uint64>>();
+	return TIoStatusOr<uint64>();
 }
 
 TFuture<TIoStatusOr<FCbObject>> FZenStoreHttpClient::GetOplog()
