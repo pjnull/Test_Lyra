@@ -3,6 +3,7 @@
 #include "Components/AudioComponent.h"
 #include "ActiveSound.h"
 #include "Audio.h"
+#include "Audio/ActorSoundParameterInterface.h"
 #include "Audio/SoundGeneratorParameterInterface.h"
 #include "AudioDevice.h"
 #include "AudioThread.h"
@@ -790,7 +791,19 @@ void UAudioComponent::PlayInternal(const PlayInternalRequestData& InPlayRequestD
 		AudioDevice->SetCanHaveMultipleActiveSounds(AudioComponentID, bCanPlayMultipleInstances);
 	}
 
-	AudioDevice->AddNewActiveSound(NewActiveSound, &InstanceParameters);
+	TArray<FAudioParameter> SoundParams = InstanceParameters;
+
+	if (AActor* Owner = GetOwner())
+	{
+		TArray<FAudioParameter> ActorParams;
+		UActorSoundParameterInterface::Fill(Owner, ActorParams);
+		FAudioParameter::Merge(MoveTemp(ActorParams), SoundParams);
+	}
+
+	TArray<FAudioParameter> DefaultParamsCopy = DefaultParameters;
+	FAudioParameter::Merge(MoveTemp(DefaultParamsCopy), SoundParams);
+
+	AudioDevice->AddNewActiveSound(NewActiveSound, MoveTemp(SoundParams));
 
 	// In editor, the audio thread is not run separate from the game thread, and can result in calling PlaybackComplete prior
 	// to bIsActive being set. Therefore, we assign to the current state of ActiveCount as opposed to just setting to true.
