@@ -61,8 +61,11 @@ struct ENGINE_API FAnimNode_TransitionPoseEvaluator : public FAnimNode_Base
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Pose, meta=(NeverAsPin))
 	TEnumAsByte<EEvaluatorMode::Mode> EvaluatorMode;
 
+	FGraphTraversalCounter CachedBonesCounter;
+
 public:	
 	FAnimNode_TransitionPoseEvaluator();
+	void SetupCacheFrames();
 
 	// FAnimNode_Base interface
 	virtual void Initialize_AnyThread(const FAnimationInitializeContext& Context) override;
@@ -72,7 +75,7 @@ public:
 	virtual void GatherDebugData(FNodeDebugData& DebugData) override;
 	// End of FAnimNode_Base interface
 
-	bool InputNodeNeedsUpdate() const;
+	bool InputNodeNeedsUpdate(const FAnimationUpdateContext& Context) const;
 	bool InputNodeNeedsEvaluate() const;
 	void CachePose(const FPoseContext& PoseToCache);
 };
