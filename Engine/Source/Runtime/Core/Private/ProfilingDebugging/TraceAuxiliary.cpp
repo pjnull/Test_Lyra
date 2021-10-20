@@ -377,9 +377,9 @@ void FTraceAuxiliaryImpl::UpdateCsvStats() const
 		UE::Trace::FStatistics Stats;
 		UE::Trace::GetStatistics(Stats);
 
-		CSV_CUSTOM_STAT(Trace, MemoryUsedMb,	Stats.MemoryUsed / 1024.0 / 1024.0, ECsvCustomStatOp::Set);
-		CSV_CUSTOM_STAT(Trace, CacheUsedMb,		Stats.CacheUsed / 1024.0 / 1024.0, ECsvCustomStatOp::Set);
-		CSV_CUSTOM_STAT(Trace, CacheWasteMb,	Stats.CacheWaste / 1024.0 / 1024.0, ECsvCustomStatOp::Set);
+		CSV_CUSTOM_STAT(Trace, MemoryUsedMb,	double(Stats.MemoryUsed) / 1024.0 / 1024.0, ECsvCustomStatOp::Set);
+		CSV_CUSTOM_STAT(Trace, CacheUsedMb,		double(Stats.CacheUsed) / 1024.0 / 1024.0, ECsvCustomStatOp::Set);
+		CSV_CUSTOM_STAT(Trace, CacheWasteMb,	double(Stats.CacheWaste) / 1024.0 / 1024.0, ECsvCustomStatOp::Set);
 	}
 #endif
 }
