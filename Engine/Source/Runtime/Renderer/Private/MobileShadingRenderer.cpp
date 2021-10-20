@@ -454,7 +454,7 @@ void FMobileSceneRenderer::InitViews(FRDGBuilder& GraphBuilder, FSceneTexturesCo
 		(bDeferredShading && bPostProcessUsesSceneDepth) ||
 		bShouldRenderVelocities ||
 		bRequireSeparateViewPass ||
-		bIsFullPrepassEnabled ||
+		bIsFullDepthPrepassEnabled ||
         bIsSimulatedLDR;
 	// never keep MSAA depth
 	bKeepDepthContent = ((NumMSAASamples > 1) && MobileRequiresSceneDepthAux(ShaderPlatform)) ? false : bKeepDepthContent;
