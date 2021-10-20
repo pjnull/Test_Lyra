@@ -332,7 +332,7 @@ URigVMMemoryStorageGeneratorClass* URigVMMemoryStorageGeneratorClass::CreateStor
 	Class->ClassWithin = UObject::StaticClass();
 
 	// make sure that it cannot be placed / used for class selectors
-	Class->ClassFlags |= CLASS_NotPlaceable | CLASS_Hidden;
+	Class->ClassFlags |= CLASS_Hidden;
 
 	// store our custom state
 	Class->MemoryType = InMemoryType;

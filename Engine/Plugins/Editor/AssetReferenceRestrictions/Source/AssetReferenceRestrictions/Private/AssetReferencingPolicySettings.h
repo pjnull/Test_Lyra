@@ -170,7 +170,7 @@ struct FARPDomainDefinitionByContentRoot
 };
 
 /** Settings for the Asset Referencing Policy, these settings are used to determine which plugins and game folders can reference content from each other */
-UCLASS(config=Game, defaultconfig, notplaceable, meta=(DisplayName="Asset Referencing Policy"))
+UCLASS(config=Game, defaultconfig, meta=(DisplayName="Asset Referencing Policy"))
 class UAssetReferencingPolicySettings : public UDeveloperSettings
 {
 	GENERATED_BODY()
