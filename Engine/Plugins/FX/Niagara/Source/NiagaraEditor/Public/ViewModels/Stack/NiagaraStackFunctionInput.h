@@ -247,6 +247,9 @@ public:
 	
 	TArray<UNiagaraScript*> GetPossibleConversionScripts(const FNiagaraTypeDefinition& FromType) const;
 
+	void SetLinkedInputViaConversionScript(const FName& LinkedInputName, const FNiagaraTypeDefinition& FromType);
+	void SetClipboardContentViaConversionScript(const UNiagaraClipboardFunctionInput& ClipboardFunctionInput);
+
 	void ChangeScriptVersion(FGuid NewScriptVersion);
 
 	const UNiagaraClipboardFunctionInput* ToClipboardFunctionInput(UObject* InOuter) const;

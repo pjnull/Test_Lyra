@@ -308,25 +308,28 @@ bool UNiagaraStackFunctionInput::TestCanPasteWithMessage(const UNiagaraClipboard
 		const UNiagaraClipboardFunctionInput* ClipboardFunctionInput = ClipboardContent->FunctionInputs[0];
 		if (ClipboardFunctionInput != nullptr)
 		{
+			if (ClipboardFunctionInput->ValueMode == ENiagaraClipboardFunctionInputValueMode::Dynamic)
+			{
+				UNiagaraScript* ClipboardFunctionScript = ClipboardFunctionInput->Dynamic->Script.LoadSynchronous();
+				if (ClipboardFunctionScript == nullptr)
+				{
+					OutMessage = LOCTEXT("CantPasteInvalidDynamicInputScript", "Can not paste the dynamic input because its script is no longer valid.");
+					return false;
+				}
+			}
 			if (ClipboardFunctionInput->InputType == InputType)
 			{
-				if (ClipboardFunctionInput->ValueMode == ENiagaraClipboardFunctionInputValueMode::Dynamic)
-				{
-					UNiagaraScript* ClipboardFunctionScript = ClipboardFunctionInput->Dynamic->Script.LoadSynchronous();
-					if (ClipboardFunctionScript == nullptr)
-					{
-						OutMessage = LOCTEXT("CantPasteInvalidDynamicInputScript", "Can not paste the dynamic input because its script is no longer valid.");
-						return false;
-					}
-				}
 				OutMessage = LOCTEXT("PastMessage", "Paste the input from the clipboard here.");
 				return true;
 			}
-			else
+			if (GetPossibleConversionScripts(ClipboardFunctionInput->InputType).Num() > 0)
 			{
-				OutMessage = LOCTEXT("CantPasteIncorrectType", "Can not paste inputs with mismatched types.");
-				return false;
+				OutMessage = LOCTEXT("PastMessage", "Paste the input from the clipboard here and auto-convert it with a dynamic input.");
+				return true;
 			}
+			
+			OutMessage = LOCTEXT("CantPasteIncorrectType", "Can not paste inputs with mismatched types.");
+			return false;
 		}
 		return false;
 	}
@@ -346,10 +349,16 @@ void UNiagaraStackFunctionInput::Paste(const UNiagaraClipboardContent* Clipboard
 {
 	if (ensureMsgf(ClipboardContent != nullptr && ClipboardContent->FunctionInputs.Num() == 1, TEXT("Clipboard must not be null, and must contain a single input.  Call TestCanPasteWithMessage to validate")))
 	{
-		const UNiagaraClipboardFunctionInput* ClipboardInput = ClipboardContent->FunctionInputs[0];
-		if (ClipboardInput != nullptr && ClipboardInput->InputType == InputType)
+		if (const UNiagaraClipboardFunctionInput* ClipboardInput = ClipboardContent->FunctionInputs[0])
 		{
-			SetValueFromClipboardFunctionInput(*ClipboardInput);
+			if (ClipboardInput->InputType == InputType)
+			{
+				SetValueFromClipboardFunctionInput(*ClipboardInput);	
+			}
+			else
+			{
+				SetClipboardContentViaConversionScript(*ClipboardInput);
+			}			
 		}
 	}
 }
@@ -2131,6 +2140,64 @@ TArray<UNiagaraScript*> UNiagaraStackFunctionInput::GetPossibleConversionScripts
     	}
     }
 	return AvailableDynamicInputs;
+}
+
+void UNiagaraStackFunctionInput::SetLinkedInputViaConversionScript(const FName& LinkedInputName, const FNiagaraTypeDefinition& FromType)
+{
+	TArray<UNiagaraScript*> NiagaraScripts = GetPossibleConversionScripts(FromType);
+	int32 ScriptCount = NiagaraScripts.Num();
+	if (ScriptCount == 0)
+	{
+		return;
+	}
+	if (ScriptCount > 1)
+	{
+		FString ScriptNames;
+		for (UNiagaraScript* NiagaraScript : NiagaraScripts)
+		{
+			ScriptNames += NiagaraScript->GetPathName() + "\n";
+		}
+		FNiagaraEditorUtilities::WarnWithToastAndLog(FText::Format(LOCTEXT("TooManyConversionScripts", "There is more than one dynamic input script available auto-convert the dragged parameter. Please fix this by disabling conversion for all but one of them:\n{0}"), FText::FromString(ScriptNames)));
+	}
+	FScopedTransaction ScopedTransaction(LOCTEXT("SetConversionInput", "Make auto-convert dynamic input"));
+	SetDynamicInput(NiagaraScripts[0]);
+	for (UNiagaraStackFunctionInput* ChildInput : GetChildInputs())
+	{
+		if (FromType == ChildInput->GetInputType())
+		{
+			ChildInput->SetLinkedValueHandle(FNiagaraParameterHandle(LinkedInputName));
+			break;
+		}
+	}
+}
+
+void UNiagaraStackFunctionInput::SetClipboardContentViaConversionScript(const UNiagaraClipboardFunctionInput& ClipboardFunctionInput)
+{
+	TArray<UNiagaraScript*> NiagaraScripts = GetPossibleConversionScripts(ClipboardFunctionInput.InputType);
+	int32 ScriptCount = NiagaraScripts.Num();
+	if (ScriptCount == 0)
+	{
+		return;
+	}
+	if (ScriptCount > 1)
+	{
+		FString ScriptNames;
+		for (UNiagaraScript* NiagaraScript : NiagaraScripts)
+		{
+			ScriptNames += NiagaraScript->GetPathName() + "\n";
+		}
+		FNiagaraEditorUtilities::WarnWithToastAndLog(FText::Format(LOCTEXT("TooManyConversionScripts", "There is more than one dynamic input script available auto-convert the pasted parameter. Please fix this by disabling conversion for all but one of them:\n{0}"), FText::FromString(ScriptNames)));
+	}
+	FScopedTransaction ScopedTransaction(LOCTEXT("SetConversionInput", "Make auto-convert dynamic input"));
+	SetDynamicInput(NiagaraScripts[0]);
+	for (UNiagaraStackFunctionInput* ChildInput : GetChildInputs())
+	{
+		if (ClipboardFunctionInput.InputType == ChildInput->GetInputType())
+		{
+			ChildInput->SetValueFromClipboardFunctionInput(ClipboardFunctionInput);
+			break;
+		}
+	}
 }
 
 void UNiagaraStackFunctionInput::ChangeScriptVersion(FGuid NewScriptVersion)
