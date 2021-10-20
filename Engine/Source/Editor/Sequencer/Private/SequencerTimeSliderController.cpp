@@ -1453,13 +1453,15 @@ TSharedRef<SWidget> FSequencerTimeSliderController::OpenSetPlaybackRangeMenu(con
 			public:
 				UMovieScene* MovieSceneToModify;
 				TSharedPtr<IStructureDetailsView> DetailsView;
+				TWeakPtr<FSequencer> WeakSequencer;
 
 				SLATE_BEGIN_ARGS(SMarkedFramePropertyWidget){}
 				SLATE_END_ARGS()
 
-				void Construct(const FArguments& InArgs, UMovieScene* InMovieScene, int32 InMarkedFrameIndex)
+				void Construct(const FArguments& InArgs, UMovieScene* InMovieScene, int32 InMarkedFrameIndex, TWeakPtr<FSequencer> InWeakSequencer)
 				{
 					MovieSceneToModify = InMovieScene;
+					WeakSequencer = InWeakSequencer;
 
 					FPropertyEditorModule& PropertyEditorModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>("PropertyEditor");
 					FDetailsViewArgs DetailsViewArgs;
@@ -1477,6 +1479,8 @@ TSharedRef<SWidget> FSequencerTimeSliderController::OpenSetPlaybackRangeMenu(con
 					TSharedPtr<FStructOnScope> StructOnScope = MakeShared<FStructOnScope>(FMovieSceneMarkedFrame::StaticStruct(), (uint8 *)&InMovieScene->GetMarkedFrames()[InMarkedFrameIndex]);
 
 					DetailsView = PropertyEditorModule.CreateStructureDetailView(DetailsViewArgs, StructureDetailsViewArgs, nullptr);
+					DetailsView->GetDetailsView()->RegisterInstancedCustomPropertyTypeLayout("FrameNumber", FOnGetPropertyTypeCustomizationInstance::CreateLambda([=]() {
+						return MakeShared<FFrameNumberDetailsCustomization>(WeakSequencer.Pin()->GetNumericTypeInterface()); }));
 					DetailsView->SetStructureData(StructOnScope);
 
 					ChildSlot
@@ -1496,8 +1500,7 @@ TSharedRef<SWidget> FSequencerTimeSliderController::OpenSetPlaybackRangeMenu(con
 				}
 			};
 
-			TSharedRef<SMarkedFramePropertyWidget> Widget = SNew(SMarkedFramePropertyWidget, MovieScene, MarkedIndex);
-			Widget->DetailsView->GetDetailsView()->RegisterInstancedCustomPropertyTypeLayout("FrameNumber", FOnGetPropertyTypeCustomizationInstance::CreateSP(this, &FSequencerTimeSliderController::CreateFrameNumberCustomization));
+			TSharedRef<SMarkedFramePropertyWidget> Widget = SNew(SMarkedFramePropertyWidget, MovieScene, MarkedIndex, WeakSequencer);
 			MenuBuilder.AddWidget(Widget, FText::GetEmpty(), false);
 		}
 
@@ -1557,13 +1560,6 @@ void FSequencerTimeSliderController::ClampViewRange(double& NewRangeMin, double&
 		SetClampRange(NewClampRangeMin, NewClampRangeMax);
 	}
 }
-
-TSharedRef<IPropertyTypeCustomization> FSequencerTimeSliderController::CreateFrameNumberCustomization()
-{
-	TSharedPtr<ISequencer> SequencerPtr = WeakSequencer.Pin();
-	return MakeShared<FFrameNumberDetailsCustomization>(SequencerPtr->GetNumericTypeInterface());
-}
-
 
 void FSequencerTimeSliderController::SetViewRange( double NewRangeMin, double NewRangeMax, EViewRangeInterpolation Interpolation )
 {

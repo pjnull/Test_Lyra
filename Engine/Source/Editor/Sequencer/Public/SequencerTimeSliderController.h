@@ -278,8 +278,6 @@ private:
 
 	FScrubberMetrics GetHitTestScrubPixelMetrics(const FScrubRangeToScreen& RangeToScreen) const;
 
-	TSharedRef<IPropertyTypeCustomization> CreateFrameNumberCustomization();
-
 private:
 
 	/** Pointer back to the sequencer object */
