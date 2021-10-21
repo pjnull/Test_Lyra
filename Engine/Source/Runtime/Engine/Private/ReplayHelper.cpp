@@ -28,31 +28,6 @@ extern TAutoConsoleVariable<float> CVarCheckpointSaveMaxMSPerFrameOverride;
 
 CSV_DECLARE_CATEGORY_EXTERN(Demo);
 
-PRAGMA_DISABLE_DEPRECATION_WARNINGS
-FScopedPacketManager::FScopedPacketManager(UNetConnection& InConnection, TArray<FQueuedDemoPacket>& InPackets, const uint32 InSeenLevelIndex) :
-	Connection(InConnection),
-	Packets(InPackets),
-	SeenLevelIndex(InSeenLevelIndex)
-{
-	FReplayHelper::FlushNetChecked(Connection);
-	StartPacketCount = Packets.Num();
-}
-
-FScopedPacketManager::~FScopedPacketManager()
-{
-	FReplayHelper::FlushNetChecked(Connection);
-	AssociatePacketsWithLevel();
-}
-
-void FScopedPacketManager::AssociatePacketsWithLevel()
-{
-	for (int32 i = StartPacketCount; i < Packets.Num(); i++)
-	{
-		Packets[i].SeenLevelIndex = SeenLevelIndex;
-	}
-}
-PRAGMA_ENABLE_DEPRECATION_WARNINGS
-
 FReplayHelper::FReplayHelper()
 	: CurrentLevelIndex(0)
 	, DemoFrameNum(0)
