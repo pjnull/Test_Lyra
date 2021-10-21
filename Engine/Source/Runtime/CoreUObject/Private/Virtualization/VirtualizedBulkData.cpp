@@ -15,7 +15,6 @@
 #include "UObject/LinkerSave.h"
 #include "UObject/Object.h"
 #include "UObject/ObjectSaveContext.h"
-#include "Virtualization/IVirtualizationSourceControlUtilities.h"
 #include "Virtualization/VirtualizationSystem.h"
 
 //#if WITH_EDITORONLY_DATA
@@ -113,9 +112,9 @@ bool IsValid(const FVirtualizedUntypedBulkData& BulkData, const FCompressedBuffe
 }
 
 /** Utility for accessing IVirtualizationSourceControlUtilities from the modular feature system. */
-IVirtualizationSourceControlUtilities* GetSourceControlInterface()
+Experimental::IVirtualizationSourceControlUtilities* GetSourceControlInterface()
 {
-	return (IVirtualizationSourceControlUtilities*)IModularFeatures::Get().GetModularFeatureImplementation(FName("VirtualizationSourceControlUtilities"), 0);
+	return (Experimental::IVirtualizationSourceControlUtilities*)IModularFeatures::Get().GetModularFeatureImplementation(FName("VirtualizationSourceControlUtilities"), 0);
 }
 
 namespace Private
@@ -937,7 +936,7 @@ FCompressedBuffer FVirtualizedUntypedBulkData::LoadFromSidecarFile() const
 			UE_LOG(LogVirtualization, Verbose, TEXT("Initial load from sidecar failed, attempting to sync the file: '%s'"), 
 				*PackagePath.GetLocalFullPath(EPackageSegment::PayloadSidecar));
 
-			if (IVirtualizationSourceControlUtilities* SourceControlInterface = GetSourceControlInterface())
+			if (Experimental::IVirtualizationSourceControlUtilities* SourceControlInterface = GetSourceControlInterface())
 			{
 				// SyncPayloadSidecarFile should log failure cases, so there is no need for us to add log messages here
 				if (SourceControlInterface->SyncPayloadSidecarFile(PackagePath))

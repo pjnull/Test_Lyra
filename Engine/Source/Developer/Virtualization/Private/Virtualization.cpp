@@ -43,7 +43,7 @@ public:
 	}
 
 private:
-	FVirtualizationSourceControlUtilities SourceControlutility;
+	Experimental::FVirtualizationSourceControlUtilities SourceControlutility;
 
 	FDelegateHandle PackageSubmissionHandle;
 };
