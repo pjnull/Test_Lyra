@@ -322,7 +322,7 @@ USceneComponent* FUsdGeomXformableTranslator::CreateComponentsEx( TOptional< TSu
 			{
 				ComponentType = UsdUtils::GetComponentTypeForPrim( Prim );
 
-				// For now only upgrade actual scene components to static mesh components (important because poseable mesh components will also fit this
+				// For now only upgrade actual scene components to static mesh components (important because skeletal mesh components will also fit this
 				// criteria but we don't want to use a static mesh component for those)
 				if ( CollapsesChildren( ECollapsingType::Assets ) && ComponentType.IsSet() && ComponentType.GetValue() == USceneComponent::StaticClass() )
 				{

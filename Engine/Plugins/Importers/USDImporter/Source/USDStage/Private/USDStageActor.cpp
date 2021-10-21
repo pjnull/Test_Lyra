@@ -35,8 +35,8 @@
 #include "Components/LightComponent.h"
 #include "Components/LightComponentBase.h"
 #include "Components/PointLightComponent.h"
-#include "Components/PoseableMeshComponent.h"
 #include "Components/RectLightComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Components/SkyLightComponent.h"
 #include "Components/SpotLightComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -98,8 +98,8 @@ struct FUsdStageActorImpl
 		// Its more convenient to toggle between variants using the USDStage window, as opposed to parsing LODs
 		TranslationContext->bAllowInterpretingLODs = false;
 
-		// No point in baking these UAnimSequence assets if we're going to be sampling the stage in real time anyway
-		TranslationContext->bAllowParsingSkeletalAnimations = false;
+		// We parse these even when opening the stage now, as they are used in the skeletal animation tracks
+		TranslationContext->bAllowParsingSkeletalAnimations = true;
 
 		UE::FSdfPath UsdPrimPath( *PrimPath );
 		UUsdPrimTwin* ParentUsdPrimTwin = StageActor->GetRootPrimTwin()->Find( UsdPrimPath.GetParentPath().GetString() );
@@ -2238,7 +2238,7 @@ void AUsdStageActor::OnObjectPropertyChanged( UObject* ObjectBeingModified, FPro
 					// ACineCameraActor (see UE-120826)
 					if ( UCineCameraComponent* RecreatedCameraComponent = Cast<UCineCameraComponent>( PrimSceneComponent ) )
 					{
-						UnrealToUsd::ConvertCameraComponent( UsdStage, RecreatedCameraComponent, UsdPrim );
+						UnrealToUsd::ConvertCameraComponent( *RecreatedCameraComponent, UsdPrim );
 					}
 					// Or it could have been just a generic Camera prim, at which case we'll have spawned an entire new
 					// ACineCameraActor for it. In this scenario our prim twin is pointing at the root component, so we need
@@ -2250,7 +2250,7 @@ void AUsdStageActor::OnObjectPropertyChanged( UObject* ObjectBeingModified, FPro
 					{
 						if ( UCineCameraComponent* CameraComponent = CameraActor->GetCineCameraComponent() )
 						{
-							UnrealToUsd::ConvertCameraComponent( UsdStage, CameraComponent, UsdPrim );
+							UnrealToUsd::ConvertCameraComponent( *CameraComponent, UsdPrim );
 						}
 					}
 				}

@@ -170,7 +170,7 @@ UUsdPrimTwin* UUsdPrimTwin::Find( const USceneComponent* InSceneComponent )
 	return nullptr;
 }
 
-USceneComponent* UUsdPrimTwin::GetSceneComponent()
+USceneComponent* UUsdPrimTwin::GetSceneComponent() const
 {
 	if ( SceneComponent.IsValid() )
 	{
@@ -183,9 +183,4 @@ USceneComponent* UUsdPrimTwin::GetSceneComponent()
 	}
 
 	return nullptr;
-}
-
-const USceneComponent* UUsdPrimTwin::GetSceneComponent() const
-{
-	return static_cast< const USceneComponent* >( const_cast< UUsdPrimTwin* >( this )->GetSceneComponent() );
 }
