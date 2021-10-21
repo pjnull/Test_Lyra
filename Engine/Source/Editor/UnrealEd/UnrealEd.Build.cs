@@ -214,6 +214,7 @@ public class UnrealEd : ModuleRules
 				"CookOnTheFly",
 				"RemoteExecution",
 				"HordeExecutor",
+				"Zen",
 			}
 		);
 

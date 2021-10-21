@@ -627,29 +627,29 @@ namespace UE::Zen {
 				break;
 
 			case CURLINFO_HEADER_IN:
-				UE_LOG(LogZenHttp, VeryVerbose, TEXT("CURL %p: Received header (%d bytes)"), Request, DebugInfoSize);
+				UE_LOG(LogZenHttp, VeryVerbose, TEXT("CURL %p: Received header (%zd bytes)"), Request, DebugInfoSize);
 				UE_LOG(LogZenHttp, VeryVerbose, TEXT("CURL HEADER <<< %*S"), DebugInfoSize, DebugInfo);
 				break;
 
 			case CURLINFO_HEADER_OUT:
-				UE_LOG(LogZenHttp, VeryVerbose, TEXT("CURL %p: Send header (%d bytes)"), Request, DebugInfoSize);
+				UE_LOG(LogZenHttp, VeryVerbose, TEXT("CURL %p: Send header (%zd bytes)"), Request, DebugInfoSize);
 				UE_LOG(LogZenHttp, VeryVerbose, TEXT("CURL HEADER >>> %*S"), DebugInfoSize, DebugInfo);
 				break;
 
 			case CURLINFO_DATA_IN:
-				UE_LOG(LogZenHttp, VeryVerbose, TEXT("CURL %p: Received data (%d bytes)"), Request, DebugInfoSize);
+				UE_LOG(LogZenHttp, VeryVerbose, TEXT("CURL %p: Received data (%zd bytes)"), Request, DebugInfoSize);
 				break;
 
 			case CURLINFO_DATA_OUT:
-				UE_LOG(LogZenHttp, VeryVerbose, TEXT("CURL %p: Sent data (%d bytes)"), Request, DebugInfoSize);
+				UE_LOG(LogZenHttp, VeryVerbose, TEXT("CURL %p: Sent data (%zd bytes)"), Request, DebugInfoSize);
 				break;
 
 			case CURLINFO_SSL_DATA_IN:
-				UE_LOG(LogZenHttp, VeryVerbose, TEXT("CURL %p: Received SSL data (%d bytes)"), Request, DebugInfoSize);
+				UE_LOG(LogZenHttp, VeryVerbose, TEXT("CURL %p: Received SSL data (%zd bytes)"), Request, DebugInfoSize);
 				break;
 
 			case CURLINFO_SSL_DATA_OUT:
-				UE_LOG(LogZenHttp, VeryVerbose, TEXT("CURL %p: Sent SSL data (%d bytes)"), Request, DebugInfoSize);
+				UE_LOG(LogZenHttp, VeryVerbose, TEXT("CURL %p: Sent SSL data (%zd bytes)"), Request, DebugInfoSize);
 				break;
 		}
 
