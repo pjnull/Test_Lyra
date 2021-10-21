@@ -3,7 +3,6 @@
 #include "AnimGraphNode_LookAt.h"
 #include "Animation/AnimInstance.h"
 #include "UObject/AnimPhysObjectVersion.h"
-#include "AnimNodeEditModes.h"
 
 /////////////////////////////////////////////////////
 // UAnimGraphNode_LookAt
@@ -134,11 +133,6 @@ void UAnimGraphNode_LookAt::GetOnScreenDebugInfo(TArray<FText>& DebugInfo, FAnim
 
 		DebugInfo.Add(FText::Format(LOCTEXT("DebugOnScreenTargetLocation", "	TargetLocation: {0}"), FText::FromString(LookatRuntimeNode->GetCachedTargetLocation().ToString())));
 	}
-}
-
-FEditorModeID UAnimGraphNode_LookAt::GetEditorMode() const
-{
-	return AnimNodeEditModes::LookAt;
 }
 
 #undef LOCTEXT_NAMESPACE

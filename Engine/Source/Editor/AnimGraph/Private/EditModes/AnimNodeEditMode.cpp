@@ -252,6 +252,8 @@ bool FAnimNodeEditMode::InputDelta(FEditorViewportClient* InViewportClient, FVie
 
 	bool bHandled = false;
 
+	UDebugSkelMeshComponent* PreviewMeshComponent = GetAnimPreviewScene().GetPreviewMeshComponent();
+
 	if (bManipulating && CurrentAxis != EAxisList::None)
 	{
 		bHandled = true;
@@ -275,8 +277,6 @@ bool FAnimNodeEditMode::InputDelta(FEditorViewportClient* InViewportClient, FVie
 			DoScale(InScale);
 		}
 
-		AnimNode->PostEditRefreshDebuggedComponent();
-		
 		InViewport->Invalidate();
 	}
 
