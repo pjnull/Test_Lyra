@@ -4,6 +4,10 @@
 	DistanceFieldShadowingShared.usf
 =============================================================================*/
 
+#ifndef COMPACT_CULLED_SHADOW_OBJECTS
+#define COMPACT_CULLED_SHADOW_OBJECTS 1
+#endif
+
 Buffer<uint> ShadowTileNumCulledObjects;
 Buffer<uint> ShadowTileStartOffsets;
 
