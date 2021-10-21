@@ -410,14 +410,14 @@ TIoStatusOr<uint64> FZenStoreHttpClient::GetChunkSize(const FIoChunkId& Id)
 	check(bAllowRead);
 
 	UE::Zen::FZenScopedRequestPtr Request(RequestPool.Get());
-	TArray64<uint8> GetBuffer;
 	TStringBuilder<128> ChunkUri;
-	ChunkUri << OplogPath << '/' << Id;
-	UE::Zen::FZenHttpRequest::Result Res = Request->PerformBlockingHead(ChunkUri, Zen::EContentType::Binary);
-	FString ContentLengthStr;
-	if (Res == Zen::FZenHttpRequest::Result::Success && Request->GetResponseCode() == 200 && Request->GetHeader("Content-Length", ContentLengthStr))
+	ChunkUri << OplogPath << '/' << Id << "/info";
+	UE::Zen::FZenHttpRequest::Result Res = Request->PerformBlockingHead(ChunkUri, Zen::EContentType::CbObject);
+	if (Res == Zen::FZenHttpRequest::Result::Success && Request->GetResponseCode() == 200)
 	{
-		return FCStringWide::Atoi64(*ContentLengthStr);
+		FCbObjectView ResponseObj = Request->GetResponseAsObject();
+		const uint64 ChunkSize = ResponseObj["size"].AsUInt64(0);
+		return ChunkSize;
 	}
 	return FIoStatus(EIoErrorCode::NotFound);
 }
