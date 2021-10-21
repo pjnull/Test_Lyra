@@ -695,10 +695,10 @@ public:
 	 * @param OutMipData -	Must point to an array of pointers with at least
 	 *						Texture.Mips.Num() - FirstMipToLoad + 1 entries. Upon
 	 *						return those pointers will contain mip data.
-	 * @param Texture - The texture to load mips for.
+	 * @param DebugContext - A string used for debug tracking and logging. Usually Texture->GetPathName()
 	 * @returns true if all requested mips have been loaded.
 	 */
-	bool TryLoadMips(int32 FirstMipToLoad, void** OutMipData, UTexture* Texture);
+	bool TryLoadMips(int32 FirstMipToLoad, void** OutMipData, FStringView DebugContext);
 
 	/** Serialization. */
 	void Serialize(FArchive& Ar, class UTexture* Owner);
@@ -786,7 +786,7 @@ public:
 	void FinishCache();
 	bool TryCancelCache();
 	void CancelCache();
-	ENGINE_API bool TryInlineMipData(int32 FirstMipToLoad = 0, UTexture* Texture = nullptr);
+	ENGINE_API bool TryInlineMipData(int32 FirstMipToLoad = 0, FStringView DebugContext=FStringView());
 	bool AreDerivedMipsAvailable(FStringView Context) const;
 	bool AreDerivedVTChunksAvailable(FStringView Context) const;
 	UE_DEPRECATED(5.00, "Use AreDerivedMipsAvailable with the context instead.")
