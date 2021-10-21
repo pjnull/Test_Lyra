@@ -17,7 +17,6 @@
 #include "Editor.h"
 #include "Misc/ScopedSlowTask.h"
 #include "EditorSupportDelegates.h"
-#include "Factories/TextureImportSettings.h"
 #include "MaterialGraph/MaterialGraph.h"
 #include "MaterialEditingLibrary.h"
 

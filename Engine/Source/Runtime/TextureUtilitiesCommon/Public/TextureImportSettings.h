@@ -12,7 +12,7 @@
 struct FPropertyChangedEvent;
 
 UCLASS(config=Editor, defaultconfig, meta=(DisplayName="Texture Import"))
-class UNREALED_API UTextureImportSettings : public UDeveloperSettings
+class TEXTUREUTILITIESCOMMON_API UTextureImportSettings : public UDeveloperSettings
 {
 	GENERATED_UCLASS_BODY()
 

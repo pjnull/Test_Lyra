@@ -274,7 +274,7 @@
 #include "IDesktopPlatform.h"
 #include "DesktopPlatformModule.h"
 #include "Interfaces/IMainFrameModule.h"
-#include "Factories/TextureImportSettings.h"
+#include "TextureImportSettings.h"
 #include "AssetImportTask.h"
 #include "ObjectTools.h"
 
@@ -2716,7 +2716,7 @@ UTextureFactory::UTextureFactory(const FObjectInitializer& ObjectInitializer)
 	bCreateNew = false;
 	bEditorImport = true;
 
-	UdimRegexPattern = TEXT(R"((.+?)[._](\d{4})$)");
+	UdimRegexPattern = UE::TextureUtilitiesCommon::DefaultUdimRegexPattern;
 
 	ColorSpaceMode = ETextureSourceColorSpace::Auto;
 }

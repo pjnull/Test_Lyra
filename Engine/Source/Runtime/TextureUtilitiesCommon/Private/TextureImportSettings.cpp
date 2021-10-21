@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "Factories/TextureImportSettings.h"
+#include "TextureImportSettings.h"
 #include "HAL/IConsoleManager.h"
 #include "UObject/UnrealType.h"
 #include "UObject/PropertyPortFlags.h"
