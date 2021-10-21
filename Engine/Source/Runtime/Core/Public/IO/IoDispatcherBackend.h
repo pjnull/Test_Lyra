@@ -22,8 +22,8 @@ public:
 	FIoReadOptions Options;
 	int32 Priority = 0;
 
-	FIoRequestImpl(FIoDispatcherImpl& InDispatcher)
-		: Dispatcher(InDispatcher)
+	FIoRequestImpl(class FIoRequestAllocator& InAllocator)
+		: Allocator(InAllocator)
 	{
 		LLM(InheritedLLMTag = FLowLevelMemTracker::bIsDisabled ? nullptr : FLowLevelMemTracker::Get().GetActiveTagData(ELLMTracker::Default));
 #if UE_MEMORY_TAGS_TRACE_ENABLED
@@ -78,7 +78,7 @@ private:
 
 	void FreeRequest();
 
-	FIoDispatcherImpl& Dispatcher;
+	FIoRequestAllocator& Allocator;
 	struct IIoDispatcherBackend* Backend = nullptr;
 	FIoBatchImpl* Batch = nullptr;
 	TOptional<FIoBuffer> Buffer;
