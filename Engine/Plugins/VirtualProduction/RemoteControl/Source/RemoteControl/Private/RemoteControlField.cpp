@@ -16,6 +16,31 @@
 #include "UObject/StructOnScope.h"
 #include "UObject/UnrealType.h"
 
+namespace RemoteControlResolvers
+{
+	FName DisplayClusterActorName = "DisplayClusterRootActor";
+	FName ConfigDataPropertyName = "CurrentConfigData";
+
+	UObject* NDisplayConfigDataResolver(UObject* NDisplayActor)
+	{
+		if (NDisplayActor)
+		{
+			UClass* SuperClass = NDisplayActor->GetClass()->GetSuperClass();
+			if (SuperClass && SuperClass->GetFName() == DisplayClusterActorName)
+			{
+				if (FObjectProperty* ConfigData = CastField<FObjectProperty>(SuperClass->FindPropertyByName(ConfigDataPropertyName)))
+				{
+					return ConfigData->GetObjectPropertyValue_InContainer(NDisplayActor);
+				}
+			}
+		}
+
+		return nullptr;
+	}
+}
+
+TMap<FName, TFunction<UObject* (UObject*)>> FRemoteControlField::CustomResolvers = { TPair<FName, TFunction<UObject* (UObject*)>>{RemoteControlResolvers::DisplayClusterActorName, RemoteControlResolvers::NDisplayConfigDataResolver} };
+
 FRemoteControlField::FRemoteControlField(URemoteControlPreset* InPreset, EExposedFieldType InType, FName InLabel, FRCFieldPathInfo InFieldPathInfo, const TArray<URemoteControlBinding*> InBindings)
 	: FRemoteControlEntity(InPreset, InLabel, InBindings)
 	, FieldType(InType)
@@ -63,6 +88,20 @@ void FRemoteControlField::BindObject(UObject* InObjectToBind)
 			}
 			else
 			{
+				UClass* Class = InObjectToBind->GetClass();
+				if (Class->GetSuperClass())
+				{
+					if (TFunction<UObject* (UObject*)>* Resolver = CustomResolvers.Find(Class->GetSuperClass()->GetFName()))
+					{
+						UObject* CustomResolvedObject = (*Resolver)(InObjectToBind);
+						if (CustomResolvedObject && CustomResolvedObject->GetClass() == ResolvedOwnerClass)
+						{
+							FRemoteControlEntity::BindObject(CustomResolvedObject);
+							return;
+						}
+					}
+				}
+
 				// Search for a matching component if the root component was not a match.
 				FRemoteControlEntity::BindObject(Actor->GetComponentByClass(ResolvedOwnerClass));
 			}
@@ -88,6 +127,16 @@ bool FRemoteControlField::CanBindObject(const UObject* InObjectToBind) const
 					return !!Actor->GetComponentByClass(ResolvedOwnerClass);
 				}
 				return false;
+			}
+
+			UClass* Class = InObjectToBind->GetClass();
+			if (Class->GetSuperClass())
+			{
+				if (TFunction<UObject* (UObject*)>* Resolver = CustomResolvers.Find(Class->GetSuperClass()->GetFName()))
+				{
+					UObject* CustomResolvedObject = (*Resolver)(const_cast<UObject*>(InObjectToBind));
+					return CustomResolvedObject && CustomResolvedObject->GetClass() == ResolvedOwnerClass;
+				}
 			}
 		}
 	}
