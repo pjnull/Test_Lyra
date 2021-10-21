@@ -2083,28 +2083,18 @@ bool UNiagaraStackFunctionInput::GetShouldPassFilterForVisibleCondition() const
 
 TArray<UNiagaraScript*> UNiagaraStackFunctionInput::GetPossibleConversionScripts(const FNiagaraTypeDefinition& FromType) const
 {
-	TArray<FAssetData> DynamicInputAssets;
-    FNiagaraEditorUtilities::FGetFilteredScriptAssetsOptions DynamicInputScriptFilterOptions;
-    DynamicInputScriptFilterOptions.ScriptUsageToInclude = ENiagaraScriptUsage::DynamicInput;
-    FNiagaraEditorUtilities::GetFilteredScriptAssets(DynamicInputScriptFilterOptions, DynamicInputAssets);
-
     FPinCollectorArray InputPins;
     TArray<UNiagaraNodeOutput*> OutputNodes;
     auto MatchesTypeConversion = [this, &InputPins, &OutputNodes, &FromType](UNiagaraScript* Script)
     {
-    	UNiagaraScriptSource* DynamicInputScriptSource = Cast<UNiagaraScriptSource>(Script->GetLatestSource());
-    	if (DynamicInputScriptSource == nullptr || Script->GetLatestScriptData()->bCanBeUsedForTypeConversions == false)
-    	{
-    		return false;
-    	}
-    	
-    	OutputNodes.Reset();
-    	DynamicInputScriptSource->NodeGraph->GetNodesOfClass<UNiagaraNodeOutput>(OutputNodes);
+	    OutputNodes.Reset();
+	    UNiagaraGraph* NodeGraph = Cast<UNiagaraScriptSource>(Script->GetLatestSource())->NodeGraph;
+	    NodeGraph->GetNodesOfClass<UNiagaraNodeOutput>(OutputNodes);
     	if (OutputNodes.Num() == 1)
     	{
     		// checking via metadata is not really correct, but it's super fast and good enough for the prefiltered list of scripts
     		TArray<FNiagaraVariable> AvailableVars;
-    		DynamicInputScriptSource->NodeGraph->GetAllMetaData().GetKeys(AvailableVars);
+    		NodeGraph->GetAllMetaData().GetKeys(AvailableVars);
     		int MatchingVars = 0;
     		for (const FNiagaraVariable& Var : AvailableVars)
     		{
@@ -2130,16 +2120,16 @@ TArray<UNiagaraScript*> UNiagaraStackFunctionInput::GetPossibleConversionScripts
     	return false;
     };
 
-	TArray<UNiagaraScript*> AvailableDynamicInputs;
-    for (const FAssetData& DynamicInputAsset : DynamicInputAssets)
+	const TArray<UNiagaraScript*>& AllConversionScripts = FNiagaraEditorModule::Get().GetCachedTypeConversionScripts();
+	TArray<UNiagaraScript*> MatchingDynamicInputs;
+    for (UNiagaraScript* DynamicInputScript : AllConversionScripts)
     {
-    	UNiagaraScript* DynamicInputScript = Cast<UNiagaraScript>(DynamicInputAsset.GetAsset());
-    	if (DynamicInputScript != nullptr && MatchesTypeConversion(DynamicInputScript))
+    	if (MatchesTypeConversion(DynamicInputScript))
     	{
-    		AvailableDynamicInputs.Add(DynamicInputScript);
+    		MatchingDynamicInputs.Add(DynamicInputScript);
     	}
     }
-	return AvailableDynamicInputs;
+	return MatchingDynamicInputs;
 }
 
 void UNiagaraStackFunctionInput::SetLinkedInputViaConversionScript(const FName& LinkedInputName, const FNiagaraTypeDefinition& FromType)
