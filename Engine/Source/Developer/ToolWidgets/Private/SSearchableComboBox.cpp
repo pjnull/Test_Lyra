@@ -1,7 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reservekd.
 
 #include "SSearchableComboBox.h"
-#include "DetailLayoutBuilder.h"
 #include "Framework/Application/SlateUser.h"
 
 #define LOCTEXT_NAMESPACE "SearchableComboBox"

@@ -13,7 +13,7 @@
 /**
  * A searchable text combo box
  */
-class EDITORWIDGETS_API SSearchableComboBox : public SComboButton
+class TOOLWIDGETS_API SSearchableComboBox : public SComboButton
 {
 public:
 	/** Type of list used for showing menu options. */
