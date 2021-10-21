@@ -10,6 +10,7 @@
 #include "Algo/Sort.h"
 #include "AssetRegistry/AssetRegistryState.h"
 #include "Async/Async.h"
+#include "Compression/CompressedBuffer.h"
 #include "Serialization/ArrayReader.h"
 #include "Serialization/CompactBinaryPackage.h"
 #include "Serialization/CompactBinaryWriter.h"
@@ -297,6 +298,9 @@ FZenStoreWriter::FZenStoreWriter(
 	ZenFileSystemManifest = MakeUnique<FZenFileSystemManifest>(TargetPlatform, OutputPath);
 	
 	HttpQueue = MakeUnique<FZenStoreHttpQueue>(*HttpClient);
+	
+	Compressor = FOodleDataCompression::ECompressor::Mermaid;
+	CompressionLevel = FOodleDataCompression::ECompressionLevel::VeryFast;
 }
 
 FZenStoreWriter::~FZenStoreWriter()
@@ -687,7 +691,7 @@ void FZenStoreWriter::CommitPackage(const FCommitPackageInfo& Info)
 
 			const int64 PkgDiskSize = PkgData.Payload.DataSize();
 
-			FCbAttachment PkgDataAttachment(IoBufferToSharedBuffer(PkgData.Payload));
+			FCbAttachment PkgDataAttachment = CreateAttachment(PkgData.Payload);
 			Pkg.AddAttachment(PkgDataAttachment);
 
 			CommitEventArgs.EntryIndex = PackageNameToIndex.FindOrAdd(Info.PackageName, PackageStoreEntries.Num());
@@ -722,7 +726,7 @@ void FZenStoreWriter::CommitPackage(const FCommitPackageInfo& Info)
 				for (const FCommitAttachmentInfo* AttachmentInfo : SortedAttachments)
 				{
 					check(!IsReservedOplogKey(AttachmentInfo->Key));
-					const FCbAttachment& CbAttachment = CbAttachments.Emplace_GetRef(AttachmentInfo->Value);
+					const FCbAttachment& CbAttachment = CbAttachments.Add_GetRef(CreateAttachment(AttachmentInfo->Value.GetBuffer().ToShared()));
 					Pkg.AddAttachment(CbAttachment);
 					CookInfo.Attachments.Add(FOplogCookInfo::FAttachment{
 						UE::FZenStoreHttpClient::FindOrAddAttachmentId(AttachmentInfo->Key), CbAttachment.GetHash() });
@@ -751,7 +755,7 @@ void FZenStoreWriter::CommitPackage(const FCommitPackageInfo& Info)
 
 				for (FBulkDataEntry& Bulk : PackageState->BulkData)
 				{
-					FCbAttachment BulkAttachment(IoBufferToSharedBuffer(Bulk.Payload));
+					FCbAttachment BulkAttachment = CreateAttachment(Bulk.Payload);
 					Pkg.AddAttachment(BulkAttachment);
 
 					PackageObj.BeginObject();
@@ -770,7 +774,7 @@ void FZenStoreWriter::CommitPackage(const FCommitPackageInfo& Info)
 
 				for (FFileDataEntry& File : PackageState->FileData)
 				{
-					FCbAttachment FileDataAttachment(IoBufferToSharedBuffer(File.Payload));
+					FCbAttachment FileDataAttachment = CreateAttachment(File.Payload);
 					Pkg.AddAttachment(FileDataAttachment);
 
 					PackageObj.BeginObject();
@@ -1054,7 +1058,7 @@ void FZenStoreWriter::CreateProjectMetaData(FCbPackage& Pkg, FCbWriter& PackageO
 		FIoBuffer ScriptObjectsBuffer = PackageStoreOptimizer->CreateScriptObjectsBuffer();
 		FCbObjectId ScriptOid = ToObjectId(CreateIoChunkId(0, 0, EIoChunkType::ScriptObjects));
 
-		FCbAttachment ScriptAttachment(FSharedBuffer::MakeView(ScriptObjectsBuffer.Data(), ScriptObjectsBuffer.DataSize()));
+		FCbAttachment ScriptAttachment = CreateAttachment(ScriptObjectsBuffer); 
 		Pkg.AddAttachment(ScriptAttachment);
 
 		PackageObj.BeginObject();
@@ -1077,7 +1081,7 @@ void FZenStoreWriter::CreateProjectMetaData(FCbPackage& Pkg, FCbWriter& PackageO
 				HeaderBuffer = FIoBuffer(FIoBuffer::AssumeOwnership, HeaderAr.ReleaseOwnership(), DataSize);
 			}
 
-			FCbAttachment HeaderAttachment(FSharedBuffer::MakeView(HeaderBuffer.Data(), HeaderBuffer.DataSize()));
+			FCbAttachment HeaderAttachment = CreateAttachment(HeaderBuffer);
 			Pkg.AddAttachment(HeaderAttachment);
 			
 			PackageObj.BeginObject();
@@ -1117,3 +1121,15 @@ void FZenStoreWriter::BroadcastMarkUpToDate(IPackageStoreWriter::FMarkUpToDateEv
 	}
 }
 
+FCbAttachment FZenStoreWriter::CreateAttachment(FSharedBuffer AttachmentData)
+{
+	check(AttachmentData.GetSize() > 0);
+	FCompressedBuffer CompressedBuffer = FCompressedBuffer::Compress(AttachmentData, Compressor, CompressionLevel);
+	check(!CompressedBuffer.IsNull());
+	return FCbAttachment(CompressedBuffer);
+}
+
+FCbAttachment FZenStoreWriter::CreateAttachment(FIoBuffer AttachmentData)
+{
+	return CreateAttachment(IoBufferToSharedBuffer(AttachmentData));
+}

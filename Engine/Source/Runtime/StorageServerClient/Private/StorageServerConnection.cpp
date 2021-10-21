@@ -11,10 +11,14 @@
 #include "Misc/ScopeLock.h"
 #include "Serialization/CompactBinary.h"
 #include "Serialization/CompactBinarySerialization.h"
+#include "Memory/SharedBuffer.h"
+#include "ProfilingDebugging/CountersTrace.h"
 
 #if !UE_BUILD_SHIPPING
 
 DEFINE_LOG_CATEGORY_STATIC(LogStorageServerConnection, Log, All);
+
+TRACE_DECLARE_MEMORY_COUNTER(ZenHttpClientSerializedBytes, TEXT("ZenClient/SerializedBytes"));
 
 static TArray<TSharedPtr<FInternetAddr>> GetAddressFromString(ISocketSubsystem& SocketSubsystem, TArrayView<const FString> HostAddresses, const int32 Port)
 {
@@ -43,12 +47,28 @@ static TArray<TSharedPtr<FInternetAddr>> GetAddressFromString(ISocketSubsystem& 
 	return InterntAddresses;
 }
 
-FStorageServerRequest::FStorageServerRequest(FAnsiStringView Verb, FAnsiStringView Resource, FAnsiStringView Hostname)
+static uint64 GetCompressedOffset(const FCompressedBuffer& Buffer, uint64 RawOffset)
+{
+	if (RawOffset > 0)
+	{
+		uint32 BlockSize = 0;
+		const bool bOk = Buffer.TryGetBlockSize(BlockSize);
+		check(bOk);
+
+		return BlockSize > 0 ? RawOffset % uint64(BlockSize) : 0;
+	}
+
+	return 0;
+}
+
+FStorageServerRequest::FStorageServerRequest(FAnsiStringView Verb, FAnsiStringView Resource, FAnsiStringView Hostname, EStorageServerContentType Accept)
+: AcceptType(Accept)
 {
 	SetIsSaving(true);
 	HeaderBuffer << Verb << " " << Resource << " HTTP/1.1\r\n" 
 		<< "Host: " << Hostname << "\r\n"
-		<< "Connection: Keep-Alive\r\n";
+		<< "Connection: Keep-Alive\r\n"
+		<< "Accept: " << GetMimeTypeString(Accept) << "\r\n";
 }
 
 FSocket* FStorageServerRequest::Send(FStorageServerConnection& Owner)
@@ -146,6 +166,10 @@ FStorageServerResponse::FStorageServerResponse(FStorageServerConnection& InOwner
 		if (ResponseLine.StartsWith("Content-Length: "))
 		{
 			ContentLength = TCString<ANSICHAR>::Atoi64(ResponseLine.GetData() + 16);
+		}
+		else if (ResponseLine.StartsWith("Content-Type: "))
+		{
+			ContentType = GetMimeType(ResponseLine.RightChop(14));
 		}
 	}
 	if (!bIsOk && ContentLength)
@@ -269,11 +293,102 @@ void FStorageServerResponse::Serialize(void* V, int64 Length)
 		Destination += BytesRead;
 		Position += BytesRead;
 	}
+
+	TRACE_COUNTER_ADD(ZenHttpClientSerializedBytes, Length);
 	
 	if (Position == ContentLength)
 	{
 		ReleaseSocket(true);
 	}
+}
+
+int64 FStorageServerResponse::SerializeChunk(FStorageServerSerializationContext& Context, FIoBuffer& OutChunk, void* TargetVa, uint64 RawOffset, uint64 RawSize)
+{
+	if (ContentLength == 0)
+	{
+		return 0;
+	}
+
+	if (!Socket)
+	{
+		UE_LOG(LogStorageServerConnection, Fatal, TEXT("Trying to read %lld bytes from released socket"), ContentLength);
+		return 0;
+	}
+
+	if (ContentType == EStorageServerContentType::Binary)
+	{
+		const uint64 ChunkSize = FMath::Min(ContentLength, RawSize);
+		OutChunk = TargetVa ? FIoBuffer(FIoBuffer::Wrap, TargetVa, ChunkSize) : FIoBuffer(ChunkSize);
+		Serialize(OutChunk.Data(), OutChunk.DataSize());
+		return ChunkSize;
+	}
+	else if (ContentType == EStorageServerContentType::CompressedBinary)
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(ZenClient::SerializeCompressedChunk);
+
+		Context.CompressedBuffer.Reset(ContentLength);
+		Serialize(Context.CompressedBuffer.GetData(), ContentLength);
+
+		if (FCompressedBuffer Compressed = FCompressedBuffer::FromCompressed(FSharedBuffer::MakeView(Context.CompressedBuffer.GetData(), ContentLength)))
+		{
+			const uint64 ChunkSize = FMath::Min(Compressed.GetRawSize(), RawSize);
+			OutChunk = TargetVa ? FIoBuffer(FIoBuffer::Wrap, TargetVa, ChunkSize) : FIoBuffer(ChunkSize);
+			const uint64 CompressedOffset = GetCompressedOffset(Compressed, RawOffset);
+			if (Context.Decoder.TryDecompressTo(Compressed, OutChunk.GetMutableView(), CompressedOffset))
+			{
+				return ChunkSize;
+			}
+
+			return 0;
+		}
+	}
+
+	UE_LOG(LogStorageServerConnection, Fatal, TEXT("Received unknown chunk type from storage server"));
+	return 0;
+}
+
+int64 FStorageServerResponse::SerializeChunkTo(FMutableMemoryView Memory, uint64 RawOffset)
+{
+	if (ContentLength == 0)
+	{
+		return 0;
+	}
+
+	if (!Socket)
+	{
+		UE_LOG(LogStorageServerConnection, Fatal, TEXT("Trying to read %lld bytes from released socket"), ContentLength);
+		return 0;
+	}
+
+	if (ContentType == EStorageServerContentType::Binary)
+	{
+		FMutableMemoryView Dst = Memory.Left(FMath::Min(Memory.GetSize(), ContentLength));
+		Serialize(Dst.GetData(), Dst.GetSize());
+		return Dst.GetSize();
+	}
+	else if (ContentType == EStorageServerContentType::CompressedBinary)
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(ZenClient::SerializeCompressedChunk);
+		
+		TArray<uint8> CompressedBuffer;
+		CompressedBuffer.Reset(ContentLength);
+		Serialize(CompressedBuffer.GetData(), ContentLength);
+		
+		if (FCompressedBuffer Compressed = FCompressedBuffer::FromCompressed(FSharedBuffer::MakeView(CompressedBuffer.GetData(), ContentLength)))
+		{
+			FMutableMemoryView Dst = Memory.Left(FMath::Min(Memory.GetSize(), Compressed.GetRawSize()));
+			const uint64 CompressedOffset = GetCompressedOffset(Compressed, RawOffset);
+			if (Compressed.TryDecompressTo(Dst, CompressedOffset))
+			{
+				return Dst.GetSize();
+			}
+
+			return 0;
+		}
+	}
+	
+	UE_LOG(LogStorageServerConnection, Fatal, TEXT("Received unknown chunk type from storage server"));
+	return 0;
 }
 
 FStorageServerConnection::FStorageServerConnection()
@@ -376,7 +491,7 @@ void FStorageServerConnection::FileManifestRequest(TFunctionRef<void(FIoChunkId 
 {
 	TAnsiStringBuilder<256> ResourceBuilder;
 	ResourceBuilder.Append(OplogPath).Append("/files?filter=client");
-	FStorageServerRequest Request("GET", *ResourceBuilder, Hostname);
+	FStorageServerRequest Request("GET", *ResourceBuilder, Hostname, EStorageServerContentType::CbObject);
 	FSocket* Socket = Request.Send(*this);
 	if (!Socket)
 	{
@@ -415,7 +530,7 @@ int64 FStorageServerConnection::ChunkSizeRequest(const FIoChunkId& ChunkId)
 	ResourceBuilder.Append(OplogPath);
 	ResourceBuilder << "/" << ChunkId << "/info";
 
-	FStorageServerRequest Request("GET", *ResourceBuilder, Hostname);
+	FStorageServerRequest Request("GET", *ResourceBuilder, Hostname, EStorageServerContentType::CbObject);
 	FSocket* Socket = Request.Send(*this);
 	if (!Socket)
 	{
@@ -444,6 +559,8 @@ int64 FStorageServerConnection::ChunkSizeRequest(const FIoChunkId& ChunkId)
 
 bool FStorageServerConnection::ReadChunkRequest(const FIoChunkId& ChunkId, uint64 Offset, uint64 Size, TFunctionRef<void(FStorageServerResponse&)> OnResponse)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(ZenHttpClient::ReadChunkRequest);
+
 	TAnsiStringBuilder<256> ResourceBuilder;
 	ResourceBuilder.Append(OplogPath) << "/" << ChunkId;
 
@@ -474,7 +591,7 @@ bool FStorageServerConnection::ReadChunkRequest(const FIoChunkId& ChunkId, uint6
 		ResourceBuilder.Appendf("size=%" UINT64_FMT, Size);
 	}
 
-	FStorageServerRequest Request("GET", *ResourceBuilder, Hostname);
+	FStorageServerRequest Request("GET", *ResourceBuilder, Hostname, EStorageServerContentType::CompressedBinary);
 	FSocket* Socket = Request.Send(*this);
 	if (!Socket)
 	{

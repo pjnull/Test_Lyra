@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "Compression/OodleDataCompression.h"
 #include "Containers/Map.h"
 #include "Containers/StringView.h"
 #include "IO/IoDispatcher.h"
@@ -19,6 +20,7 @@ namespace UE {
 class FPackageStoreOptimizer;
 class FZenFileSystemManifest;
 class FCbPackage;
+class FCbAttachment;
 class FCbWriter;
 
 /** 
@@ -76,6 +78,8 @@ private:
 	void CreateProjectMetaData(FCbPackage& Pkg, FCbWriter& PackageObj, bool bGenerateContainerHeader);
 	void BroadcastCommit(IPackageStoreWriter::FCommitEventArgs& EventArgs);
 	void BroadcastMarkUpToDate(IPackageStoreWriter::FMarkUpToDateEventArgs& EventArgs);
+	FCbAttachment CreateAttachment(FSharedBuffer Buffer);
+	FCbAttachment CreateAttachment(FIoBuffer Buffer);
 
 	struct FBulkDataEntry
 	{
@@ -141,6 +145,9 @@ private:
 	TUniquePtr<FZenStoreHttpQueue>		HttpQueue;
 	
 	ICookedPackageWriter::FCookInfo::ECookMode CookMode;
+
+	FOodleDataCompression::ECompressor			Compressor;				
+	FOodleDataCompression::ECompressionLevel	CompressionLevel;	
 
 	FZenStats							ZenStats;
 

@@ -53,6 +53,11 @@ public:
 		return Buffer.GetValue();
 	}
 
+	void SetResult(FIoBuffer InBuffer)
+	{
+		Buffer.Emplace(InBuffer);
+	}
+
 private:
 	friend class FIoDispatcherImpl;
 	friend class FIoRequest;

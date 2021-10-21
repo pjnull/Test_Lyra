@@ -13,15 +13,9 @@ namespace UE::Zen {
 
 void SaveCbAttachment(const FCbAttachment& Attachment, FCbWriter& Writer)
 {
-	if (Attachment.IsObject())
+	if (Attachment.IsCompressedBinary())
 	{
-		FCbObject Object = Attachment.AsObject();
-		Writer.AddBinary(Object.GetBuffer().ToShared());
-		Writer.AddObjectAttachment(Attachment.GetHash());
-	}
-	else if (Attachment.IsBinary())
-	{
-		Writer.AddBinary(Attachment.AsBinary());
+		Writer.AddBinary(Attachment.AsCompressedBinary().GetCompressed());
 		Writer.AddBinaryAttachment(Attachment.GetHash());
 	}
 	else if (Attachment.IsNull())
@@ -30,7 +24,7 @@ void SaveCbAttachment(const FCbAttachment& Attachment, FCbWriter& Writer)
 	}
 	else
 	{
-		// NOTE: Compressed binary is not supported in this serialization format
+		// NOTE: All attachments needs to be compressed
 		checkNoEntry();
 	}
 }

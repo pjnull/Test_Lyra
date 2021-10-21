@@ -54,6 +54,13 @@ private:
 	};
 
 	void InitializeRead();
+	
+	FCbAttachment CreateAttachment(FSharedBuffer AttachmentData);
+	FCbAttachment CreateAttachment(FCbObject AttachmentData)
+	{
+		return CreateAttachment(AttachmentData.GetBuffer().ToShared());
+	}
+
 	static void StaticInit();
 	static bool IsReservedOplogKey(FUtf8StringView Key);
 
@@ -464,6 +471,13 @@ void FEditorDomainOplog::InitializeRead()
 	bInitializedRead = true;
 }
 
+FCbAttachment FEditorDomainOplog::CreateAttachment(FSharedBuffer AttachmentData)
+{
+	FCompressedBuffer CompressedBuffer = FCompressedBuffer::Compress(AttachmentData);
+	check(!CompressedBuffer.IsNull());
+	return FCbAttachment(CompressedBuffer);
+}
+
 void FEditorDomainOplog::StaticInit()
 {
 	if (ReservedOplogKeys.Num() > 0)
@@ -519,7 +533,7 @@ void FEditorDomainOplog::CommitPackage(FName PackageName, TArrayView<IPackageWri
 		CbAttachments.Reserve(NumAttachments);
 		for (const IPackageWriter::FCommitAttachmentInfo* AttachmentInfo : SortedAttachments)
 		{
-			const FCbAttachment& CbAttachment = CbAttachments.Emplace_GetRef(AttachmentInfo->Value);
+			const FCbAttachment& CbAttachment = CbAttachments.Add_GetRef(CreateAttachment(AttachmentInfo->Value));
 			check(!IsReservedOplogKey(AttachmentInfo->Key));
 			Pkg.AddAttachment(CbAttachment);
 			Entry.Attachments.Add(FOplogEntry::FAttachment{

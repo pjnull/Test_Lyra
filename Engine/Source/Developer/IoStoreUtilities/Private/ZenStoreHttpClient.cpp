@@ -63,7 +63,7 @@ FZenStoreHttpClient::TryCreateProject(FStringView InProjectId,
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(ZenStoreHttp_Initialize);
 
-	UE_LOG(LogZenStore, Display, TEXT("Establishing oplog %s / %s"), *FString(InProjectId), *FString(InOplogId));
+	UE_LOG(LogZenStore, Display, TEXT("Establishing oplog '%s/%s'"), *FString(InProjectId), *FString(InOplogId));
 
 	// Establish project
 
@@ -139,7 +139,7 @@ bool FZenStoreHttpClient::TryCreateOplog(FStringView InProjectId, FStringView In
 
 	if (bFullBuild)
 	{
-		UE_LOG(LogZenStore, Display, TEXT("Deleting oplog '%s'/'%s' if it exists"), *FString(InProjectId), *FString(InOplogId));
+		UE_LOG(LogZenStore, Display, TEXT("Deleting oplog '%s/%s' if it exists"), *FString(InProjectId), *FString(InOplogId));
 		Request->PerformBlockingDelete(OplogPath);
 		Request->Reset();
 	}
@@ -150,7 +150,7 @@ bool FZenStoreHttpClient::TryCreateOplog(FStringView InProjectId, FStringView In
 
 	if (Res == Zen::FZenHttpRequest::Result::Success && Request->GetResponseCode() == 200)
 	{
-		UE_LOG(LogZenStore, Display, TEXT("Zen oplog '%s'/'%s' already exists"), *FString(InProjectId), *FString(InOplogId));
+		UE_LOG(LogZenStore, Display, TEXT("Zen oplog '%s/%s' already exists"), *FString(InProjectId), *FString(InOplogId));
 
 		OplogInfo = FCbObjectView(GetBuffer.GetData());
 	}
@@ -163,18 +163,18 @@ bool FZenStoreHttpClient::TryCreateOplog(FStringView InProjectId, FStringView In
 
 		if (Res != Zen::FZenHttpRequest::Result::Success)
 		{
-			UE_LOG(LogZenStore, Error, TEXT("Zen oplog '%s'/'%s' creation FAILED"), *FString(InProjectId), *FString(InOplogId));
+			UE_LOG(LogZenStore, Error, TEXT("Zen oplog '%s/%s' creation FAILED"), *FString(InProjectId), *FString(InOplogId));
 			// Demote the connection status back to not connected
 			bConnectionSucceeded = false;
 			return false;
 		}
 		else if (Request->GetResponseCode() == 201)
 		{
-			UE_LOG(LogZenStore, Display, TEXT("Zen oplog '%s'/'%s' created"), *FString(InProjectId), *FString(InOplogId));
+			UE_LOG(LogZenStore, Display, TEXT("Zen oplog '%s/%s' created"), *FString(InProjectId), *FString(InOplogId));
 		}
 		else
 		{
-			UE_LOG(LogZenStore, Warning, TEXT("Zen oplog '%s'/'%s' creation returned success but not HTTP 201"), *FString(InProjectId), *FString(InOplogId));
+			UE_LOG(LogZenStore, Warning, TEXT("Zen oplog '%s/%s' creation returned success but not HTTP 201"), *FString(InProjectId), *FString(InOplogId));
 		}
 
 		// Issue another GET to retrieve information
@@ -254,7 +254,7 @@ TIoStatusOr<uint64> FZenStoreHttpClient::AppendOp(FCbPackage OpEntry)
 		FLargeMemoryWriter SerializedPackage;
 
 		const uint32 Salt = ++GOpCounter;
-		bool IsUsingTempFiles = false;
+		bool bIsUsingTempFiles = false;
 
 		UE::Zen::FZenScopedRequestPtr Request(RequestPool.Get());
 
@@ -325,46 +325,47 @@ TIoStatusOr<uint64> FZenStoreHttpClient::AppendOp(FCbPackage OpEntry)
 
 			for (const FCbAttachment& Attachment : Attachments)
 			{
-				bool IsSerialized = false;
+				if (!Attachment.IsCompressedBinary())
+				{
+					return TIoStatusOr<uint64>((FIoStatus)(FIoStatusBuilder(EIoErrorCode::CompressionError) << TEXT("Attachment is not compressed")));
+				}
 
 				const FIoHash AttachmentHash = Attachment.GetHash();
+				bool bIsSerialized = false;
 
 				if (NeedChunks.Contains(AttachmentHash))
 				{
-					if (FSharedBuffer AttachView = Attachment.AsBinary())
+					FSharedBuffer AttachmentData = Attachment.AsCompressedBinary().GetCompressed().ToShared();
+					if (AttachmentData.GetSize() >= StandaloneThresholdBytes)
 					{
-						if (AttachView.GetSize() >= StandaloneThresholdBytes)
+						// Write to temporary file. To avoid race conditions we derive
+						// the file name from a salt value and the attachment hash
+
+						FIoHash AttachmentSpec[] { FIoHash::HashBuffer(&Salt, sizeof Salt), AttachmentHash };
+						FIoHash AttachmentId = FIoHash::HashBuffer(MakeMemoryView(AttachmentSpec));
+
+						FString TempFilePath = TempDirPath / LexToString(AttachmentId);
+						IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
+
+						if (IFileHandle* FileHandle = PlatformFile.OpenWrite(*TempFilePath))
 						{
-							// Write to temporary file. To avoid race conditions we derive
-							// the file name from a salt value and the attachment hash
+							FileHandle->Write((const uint8*)AttachmentData.GetData(), AttachmentData.GetSize());
+							delete FileHandle;
 
-							FIoHash AttachmentSpec[] { FIoHash::HashBuffer(&Salt, sizeof Salt), AttachmentHash };
-							FIoHash AttachmentId = FIoHash::HashBuffer(MakeMemoryView(AttachmentSpec));
+							Writer.AddHash(AttachmentHash);
+							bIsSerialized = true;
+							bIsUsingTempFiles = true;
+						}
+						else
+						{
+							// Take the slow path if we can't open the payload file in the
+							// large attachment directory
 
-							FString TempFilePath = TempDirPath / LexToString(AttachmentId);
-							IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
-
-							if (IFileHandle* FileHandle = PlatformFile.OpenWrite(*TempFilePath))
-							{
-								FileHandle->Write((const uint8*)AttachView.GetData(), AttachView.GetSize());
-								delete FileHandle;
-
-								Writer.AddHash(AttachmentHash);
-
-								IsSerialized = true;
-								IsUsingTempFiles = true;
-							}
-							else
-							{
-								// Take the slow path if we can't open the payload file in the
-								// large attachment directory
-
-								UE_LOG(LogZenStore, Warning, TEXT("Could not create file '%s', taking slow path for large attachment"), *TempFilePath);
-							}
+							UE_LOG(LogZenStore, Warning, TEXT("Could not create file '%s', taking slow path for large attachment"), *TempFilePath);
 						}
 					}
 
-					if (!IsSerialized)
+					if (!bIsSerialized)
 					{
 						UE::Zen::SaveCbAttachment(Attachment, Writer);
 					}
@@ -384,7 +385,7 @@ TIoStatusOr<uint64> FZenStoreHttpClient::AppendOp(FCbPackage OpEntry)
 		TStringBuilder<64> NewOpPostUri;
 		NewOpPostUri << OplogNewEntryPath;
 
-		if (IsUsingTempFiles)
+		if (bIsUsingTempFiles)
 		{
 			NewOpPostUri << "?salt=" << Salt;
 		}
@@ -470,12 +471,39 @@ TIoStatusOr<FIoBuffer> FZenStoreHttpClient::ReadOpLogUri(FStringBuilderBase& Chu
 		ChunkUri.Appendf(TEXT("size=%" UINT64_FMT), Size);
 	}
 
-
-	UE::Zen::FZenHttpRequest::Result Res = Request->PerformBlockingDownload(ChunkUri, &GetBuffer, Zen::EContentType::Binary);
+	UE::Zen::FZenHttpRequest::Result Res = Request->PerformBlockingDownload(ChunkUri, &GetBuffer, Zen::EContentType::CompressedBinary);
 
 	if (Res == Zen::FZenHttpRequest::Result::Success && Request->GetResponseCode() == 200)
 	{
-		return FIoBuffer(FIoBuffer::Clone, GetBuffer.GetData(), GetBuffer.Num());
+		if (FCompressedBuffer Compressed = FCompressedBuffer::FromCompressed(FSharedBuffer::MakeView(GetBuffer.GetData(), GetBuffer.Num())))
+		{
+			uint64 CompressedOffset = 0;
+			if (Offset > 0)
+			{
+				uint32 BlockSize = 0;
+				if  (!Compressed.TryGetBlockSize(BlockSize))
+				{
+					return FIoStatus(EIoErrorCode::CompressionError);
+				}
+
+				if (BlockSize > 0)
+				{
+					CompressedOffset = Offset % uint64(BlockSize);
+				}
+			}
+
+			FIoBuffer Decompressed(Compressed.GetRawSize());
+			if (!Compressed.TryDecompressTo(Decompressed.GetMutableView(), CompressedOffset))
+			{
+				return FIoStatus(EIoErrorCode::CompressionError);
+			}
+
+			return Decompressed;
+		}
+		else
+		{
+			return FIoBuffer(FIoBuffer::Clone, GetBuffer.GetData(), GetBuffer.Num());
+		}
 	}
 	return FIoStatus(EIoErrorCode::NotFound);
 }
