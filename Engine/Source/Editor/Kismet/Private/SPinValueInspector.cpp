@@ -236,7 +236,7 @@ void SPinValueInspector::PopulateTreeView()
 
 	if (ensureMsgf(DebugInfo.IsValid(), TEXT("GetDebugInfo returned EWTR_Valid, but DebugInfo wasn't valid")))
 	{
-		TreeViewWidget->AddTreeItemUnique(SKismetDebugTreeView::MakeWatchChildItem(DebugInfo));
+		TreeViewWidget->AddTreeItemUnique(SKismetDebugTreeView::MakeWatchLineItem(GraphPin, Blueprint->GetObjectBeingDebugged()));
 	}
 }
 

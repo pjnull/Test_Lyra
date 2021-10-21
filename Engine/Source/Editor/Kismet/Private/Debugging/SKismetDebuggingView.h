@@ -57,10 +57,6 @@ protected:
 
 	static TSharedRef<SHorizontalBox> GetDebugLineTypeToggle(FDebugLineItem::EDebugLineType Type, const FText& Text);
 	
-	TSharedPtr<SWidget> OnMakeDebugTreeContextMenu() const;
-	TSharedPtr<SWidget> OnMakeOtherTreeContextMenu() const;
-	static TSharedPtr<SWidget> OnMakeTreeContextMenu(const TSharedPtr<SKismetDebugTreeView>& Tree);
-
 	// called when SearchBox query is changed by user
 	void OnSearchTextChanged(const FText& Text);
 protected:

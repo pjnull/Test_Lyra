@@ -125,7 +125,6 @@
 
 // Debugging
 #include "Debugging/SKismetDebuggingView.h"
-#include "Debugging/KismetDebugCommands.h"
 #include "WatchPointViewer.h"
 // End of debugging
 
@@ -3922,22 +3921,32 @@ void FBlueprintEditor::FindInBlueprints_OnClicked()
 
 void FBlueprintEditor::ClearAllBreakpoints()
 {
-	FDebuggingActionCallbacks::ClearBreakpoints(GetBlueprintObj());
+	FKismetDebugUtilities::ClearBreakpoints(GetBlueprintObj());
 }
 
 void FBlueprintEditor::DisableAllBreakpoints()
 {
-	FDebuggingActionCallbacks::SetEnabledOnAllBreakpoints(GetBlueprintObj(), false);
+	FKismetDebugUtilities::ForeachBreakpoint(GetBlueprintObj(),
+		[](FBlueprintBreakpoint& Breakpoint)
+		{
+			FKismetDebugUtilities::SetBreakpointEnabled(Breakpoint, false);
+		}
+	);
 }
 
 void FBlueprintEditor::EnableAllBreakpoints()
 {
-	FDebuggingActionCallbacks::SetEnabledOnAllBreakpoints(GetBlueprintObj(), true);
+	FKismetDebugUtilities::ForeachBreakpoint(GetBlueprintObj(),
+		[](FBlueprintBreakpoint& Breakpoint)
+		{
+			FKismetDebugUtilities::SetBreakpointEnabled(Breakpoint, true);
+		}
+	);
 }
 
 void FBlueprintEditor::ClearAllWatches()
 {
-	FDebuggingActionCallbacks::ClearWatches(GetBlueprintObj());
+	FKismetDebugUtilities::ClearPinWatches(GetBlueprintObj());
 }
 
 void FBlueprintEditor::OpenBlueprintDebugger()

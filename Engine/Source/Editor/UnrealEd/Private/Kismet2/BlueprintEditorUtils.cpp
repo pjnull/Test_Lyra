@@ -7562,15 +7562,16 @@ void FBlueprintEditorUtils::UpdateTransactionalFlags(UBlueprint* Blueprint)
 
 void FBlueprintEditorUtils::UpdateStalePinWatches( UBlueprint* Blueprint )
 {
-	TSet<UEdGraphPin*> AllPins;
+	TSet<FBlueprintWatchedPin> AllPins;
 	uint16 WatchCount = 0;
 	
 	// Find all unique pins being watched
 	FKismetDebugUtilities::ForeachPinWatch(
 		Blueprint,
-		[&AllPins, &WatchCount](UEdGraphPin* Pin)
+		[&AllPins, &WatchCount](const FBlueprintWatchedPin& WatchedPin)
 		{
 			++WatchCount;
+			UEdGraphPin* Pin = WatchedPin.Get();
 			if (Pin == nullptr)
 			{
 				return; // ~continue
@@ -7589,7 +7590,7 @@ void FBlueprintEditorUtils::UpdateStalePinWatches( UBlueprint* Blueprint )
 				return; // ~continue
 			}
 
-			AllPins.Add(Pin);
+			AllPins.Add(WatchedPin);
 		}
 	);
 
@@ -7597,9 +7598,9 @@ void FBlueprintEditorUtils::UpdateStalePinWatches( UBlueprint* Blueprint )
 	if (WatchCount != AllPins.Num())
 	{
 		FKismetDebugUtilities::ClearPinWatches(Blueprint);
-		for (UEdGraphPin* Pin : AllPins)
+		for (FBlueprintWatchedPin& WatchedPin : AllPins)
 		{
-			FKismetDebugUtilities::AddPinWatch(Blueprint, Pin);
+			FKismetDebugUtilities::AddPinWatch(Blueprint, MoveTemp(WatchedPin));
 		}
 	}
 }
