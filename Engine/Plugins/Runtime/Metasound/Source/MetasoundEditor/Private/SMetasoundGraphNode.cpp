@@ -87,8 +87,7 @@ void SMetasoundGraphNode::ExecuteInputTrigger(UMetasoundEditorGraphInputLiteral&
 
 	if (UAudioComponent* PreviewComponent = GEditor->GetPreviewAudioComponent())
 	{
-		Metasound::Frontend::FConstNodeHandle NodeHandle = Input->GetConstNodeHandle();
-		PreviewComponent->SetTriggerParameter(NodeHandle->GetNodeName());
+		PreviewComponent->SetTriggerParameter(Input->GetMemberName());
 	}
 }
 

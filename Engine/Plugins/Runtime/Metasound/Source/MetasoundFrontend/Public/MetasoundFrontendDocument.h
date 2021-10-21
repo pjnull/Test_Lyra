@@ -265,9 +265,17 @@ struct FMetasoundFrontendVariable
 {
 	GENERATED_BODY()
 
+	// Name of the vertex. Unique amongst other vertices on the same interface.
+	UPROPERTY(VisibleAnywhere, Category = CustomView)
+	FName Name;
+
 	// Variable display name
 	UPROPERTY()
 	FText DisplayName;
+
+	// Variable description
+	UPROPERTY()
+	FText Description;
 
 	// Variable data type name
 	UPROPERTY()

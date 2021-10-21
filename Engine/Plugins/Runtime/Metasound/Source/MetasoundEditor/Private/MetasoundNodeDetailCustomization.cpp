@@ -51,27 +51,11 @@ namespace Metasound
 	{
 		namespace MemberCustomizationPrivate
 		{
-			/** Minimum size of the details title panel */
-			static const float DetailsTitleMinWidth = 125.f;
-			/** Maximum size of the details title panel */
-			static const float DetailsTitleMaxWidth = 300.f;
-			/** magic number retrieved from SGraphNodeComment::GetWrapAt() */
-			static const float DetailsTitleWrapPadding = 32.0f;
-
-			static const FString ArrayIdentifier = TEXT(":Array");
-
-			static const FText DataTypeNameText = LOCTEXT("Node_DataTypeName", "Type");
-			static const FText DefaultPropertyText = LOCTEXT("Node_DefaultPropertyName", "Default Value");
-			static const FText NodeTooltipText = LOCTEXT("Node_Tooltip", "Tooltip");
-
 			static const FText InputNameText = LOCTEXT("Input_Name", "Input Name");
 			static const FText InputDisplayNameText = LOCTEXT("InputDisplay_Name", "Input Display Name");
 
 			static const FText OutputNameText = LOCTEXT("Output_Name", "Output Name");
 			static const FText OutputDisplayNameText = LOCTEXT("OutputDisplay_Name", "Output Display Name");
-
-			static const FName DataTypeNameIdentifier = "DataTypeName";
-			static const FName ProxyGeneratorClassNameIdentifier = "GeneratorClass";
 
 			/** Set of input types which are valid registered types, but should
 			 * not show up as an input type option in the MetaSound editor. */
@@ -751,13 +735,6 @@ namespace Metasound
 
 			AddDataTypeSelector(DetailLayout, MemberCustomizationPrivate::DataTypeNameText, GraphMember, !bIsRequired && bIsGraphEditable);
 
-			FNodeHandle NodeHandle = GraphMember->GetNodeHandle();
-			const TArray<FOutputHandle>& Outputs = NodeHandle->GetOutputs();
-			if (!ensure(!Outputs.IsEmpty()))
-			{
-				return;
-			}
-
 			IDetailCategoryBuilder& DefaultCategoryBuilder = DetailLayout.EditCategory("DefaultValue");
 			TSharedPtr<IPropertyHandle> LiteralHandle = DetailLayout.GetProperty(GET_MEMBER_NAME_CHECKED(UMetasoundEditorGraphInput, Literal));
 			if (ensure(GraphMember.IsValid()) && ensure(LiteralHandle.IsValid()))
@@ -944,18 +921,7 @@ namespace Metasound
 
 		FName FMetasoundInputDetailCustomization::GetLiteralDataType() const
 		{
-			using namespace Frontend;
-
-			FName TypeName;
-
-			// Just take last type.  If more than one, all types are the same.
-			FConstNodeHandle NodeHandle = GraphMember->GetConstNodeHandle();
-			NodeHandle->IterateConstOutputs([InTypeName = &TypeName](FConstOutputHandle OutputHandle)
-			{
-				*InTypeName = OutputHandle->GetDataType();
-			});
-
-			return TypeName;
+			return GraphMember->TypeName;
 		}
 
 		void FMetasoundOutputDetailCustomization::CustomizeDetails(IDetailLayoutBuilder& DetailLayout)
@@ -1104,18 +1070,7 @@ namespace Metasound
 
 		FName FMetasoundOutputDetailCustomization::GetLiteralDataType() const
 		{
-			using namespace Frontend;
-
-			FName TypeName;
-
-			// Just take last type.  If more than one, all types are the same.
-			FConstNodeHandle NodeHandle = GraphMember->GetConstNodeHandle();
-			NodeHandle->IterateConstInputs([InTypeName = &TypeName](FConstInputHandle InputHandle)
-			{
-				*InTypeName = InputHandle->GetDataType();
-			});
-
-			return TypeName;
+			return GraphMember->TypeName;
 		}
 	} // namespace Editor
 } // namespace Metasound

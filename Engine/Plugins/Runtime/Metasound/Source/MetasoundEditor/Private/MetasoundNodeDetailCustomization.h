@@ -33,6 +33,26 @@ namespace Metasound
 {
 	namespace Editor
 	{
+		namespace MemberCustomizationPrivate
+		{
+			/** Minimum size of the details title panel */
+			static constexpr float DetailsTitleMinWidth = 125.f;
+			/** Maximum size of the details title panel */
+			static constexpr float DetailsTitleMaxWidth = 300.f;
+			/** magic number retrieved from SGraphNodeComment::GetWrapAt() */
+			static constexpr float DetailsTitleWrapPadding = 32.0f;
+
+			static const FString ArrayIdentifier = TEXT(":Array");
+
+			static const FText DataTypeNameText = LOCTEXT("Node_DataTypeName", "Type");
+			static const FText DefaultPropertyText = LOCTEXT("Node_DefaultPropertyName", "Default Value");
+			static const FText NodeTooltipText = LOCTEXT("Node_Tooltip", "Tooltip");
+
+			static const FName DataTypeNameIdentifier = "DataTypeName";
+			static const FName ProxyGeneratorClassNameIdentifier = "GeneratorClass";
+
+		} // namespace MemberCustomizationPrivate
+
 		class FMetasoundFloatLiteralCustomization : public IMetaSoundInputLiteralCustomization
 		{
 			IDetailCategoryBuilder* InputCategoryBuilder = nullptr;
@@ -191,7 +211,7 @@ namespace Metasound
 
 				if (GraphMember.IsValid())
 				{
-					return GraphMember->GetConstNodeHandle()->GetDisplayName();
+					return GraphMember->GetDisplayName();
 				}
 
 				return FText::GetEmpty();
@@ -199,11 +219,9 @@ namespace Metasound
 
 			FText GetName() const
 			{
-				using namespace Frontend;
-
 				if (GraphMember.IsValid())
 				{
-					return FText::FromName(GraphMember->GetConstNodeHandle()->GetNodeName());
+					return FText::FromName(GraphMember->GetMemberName());
 				}
 
 				return FText::GetEmpty();
@@ -213,8 +231,10 @@ namespace Metasound
 			{
 				if (GraphMember.IsValid())
 				{
-					Metasound::Frontend::FConstNodeHandle NodeHandle = GraphMember->GetConstNodeHandle();
-					return NodeHandle->GetOwningGraph()->GetGraphStyle().bIsGraphEditable;
+					if (const UMetasoundEditorGraph* OwningGraph = GraphMember->GetOwningGraph())
+					{
+						return OwningGraph->IsEditable();
+					}
 				}
 
 				return false;
@@ -242,11 +262,9 @@ namespace Metasound
 
 			FText GetTooltip() const
 			{
-				using namespace Frontend;
 				if (GraphMember.IsValid())
 				{
-					FNodeHandle NodeHandle = GraphMember->GetNodeHandle();
-					return NodeHandle->GetDescription();
+					return GraphMember->GetDescription();
 				}
 
 				return FText::GetEmpty();
@@ -258,7 +276,7 @@ namespace Metasound
 
 				if (!bIsNameInvalid && GraphMember.IsValid())
 				{
-					GraphMember->SetDisplayName(InNewName);
+					GraphMember->SetDisplayName(FText::GetEmpty());
 				}
 
 				DisplayNameEditableTextBox->SetError(FText::GetEmpty());
@@ -272,7 +290,7 @@ namespace Metasound
 				if (!bIsNameInvalid && GraphMember.IsValid())
 				{
 					GraphMember->SetDisplayName(FText::GetEmpty());
-					GraphMember->SetName(*InNewName.ToString());
+					GraphMember->SetMemberName(*InNewName.ToString());
 				}
 
 				DisplayNameEditableTextBox->SetError(FText::GetEmpty());
@@ -340,6 +358,7 @@ namespace Metasound
 
 			FName GetLiteralDataType() const;
 		};
+
 	} // namespace Editor
 } // namespace Metasound
 #undef LOCTEXT_NAMESPACE

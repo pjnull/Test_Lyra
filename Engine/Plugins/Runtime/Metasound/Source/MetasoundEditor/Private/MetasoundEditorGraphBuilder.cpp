@@ -2,6 +2,8 @@
 #include "MetasoundEditorGraphBuilder.h"
 
 #include "Algo/Sort.h"
+#include "Algo/Transform.h"
+#include "Algo/AnyOf.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "EdGraph/EdGraph.h"
 #include "EdGraph/EdGraphNode.h"
@@ -12,6 +14,7 @@
 #include "MetasoundAssetBase.h"
 #include "MetasoundEditor.h"
 #include "MetasoundEditorGraph.h"
+#include "MetasoundEditorGraphBuilder.h"
 #include "MetasoundEditorGraphNode.h"
 #include "MetasoundEditorGraphInputNodes.h"
 #include "MetasoundEditorGraphSchema.h"
@@ -85,6 +88,61 @@ namespace Metasound
 
 				return false;
 			}
+
+			FName GenerateUniqueName(const TArray<FName>& InExistingNames, const FString& InBaseName)
+			{
+				int32 PostFixInt = 0;
+				FString NewName = InBaseName;
+
+				while (InExistingNames.Contains(*NewName))
+				{
+					PostFixInt++;
+					NewName = FString::Format(TEXT("{0} {1}"), { InBaseName, PostFixInt });
+				}
+
+				return FName(*NewName);
+			}
+		}
+
+		FText FGraphBuilder::GetDisplayName(const Frontend::INodeController& InFrontendNode)
+		{
+			FText DisplayName = InFrontendNode.GetDisplayName();
+			if (DisplayName.IsEmptyOrWhitespace())
+			{
+				DisplayName = FText::FromName(InFrontendNode.GetNodeName());
+			}
+			return DisplayName;
+		}
+
+		FText FGraphBuilder::GetDisplayName(const Frontend::IInputController& InFrontendInput)
+		{
+			FText DisplayName = InFrontendInput.GetDisplayName();
+			if (DisplayName.IsEmptyOrWhitespace())
+			{
+				DisplayName = FText::FromName(InFrontendInput.GetName());
+			}
+			return DisplayName;
+				
+		}
+
+		FText FGraphBuilder::GetDisplayName(const Frontend::IOutputController& InFrontendOutput)
+		{
+			FText DisplayName = InFrontendOutput.GetDisplayName();
+			if (DisplayName.IsEmptyOrWhitespace())
+			{
+				DisplayName = FText::FromName(InFrontendOutput.GetName());
+			}
+			return DisplayName;
+		}
+
+		FText FGraphBuilder::GetDisplayName(const Frontend::IVariableController& InFrontendVariable)
+		{
+			FText DisplayName = InFrontendVariable.GetDisplayName();
+			if (DisplayName.IsEmptyOrWhitespace())
+			{
+				DisplayName = FText::FromName(InFrontendVariable.GetName());
+			}
+			return DisplayName;
 		}
 
 		UMetasoundEditorGraphExternalNode* FGraphBuilder::AddExternalNode(UObject& InMetaSound, Frontend::FNodeHandle& InNodeHandle, FVector2D InLocation, bool bInSelectNewNode)
@@ -222,39 +280,19 @@ namespace Metasound
 			return Categories;
 		}
 
-		FName FGraphBuilder::GenerateUniqueNameByClassType(const UObject& InMetaSound, EMetasoundFrontendClassType InClassType, const FName& InBaseName)
+		FName FGraphBuilder::GenerateUniqueNameByClassType(const UObject& InMetaSound, EMetasoundFrontendClassType InClassType, const FString& InBaseName)
 		{
 			const FMetasoundAssetBase* MetaSoundAsset = IMetasoundUObjectRegistry::Get().GetObjectAsAssetBase(&InMetaSound);
 			check(MetaSoundAsset);
 
-			const Frontend::FConstGraphHandle GraphHandle = MetaSoundAsset->GetRootGraphHandle();
-
-			auto InNameIsValidFilter = [&](FName NameToTest)
+			// Get existing names.
+			TArray<FName> ExistingNames;
+			MetaSoundAsset->GetRootGraphHandle()->IterateConstNodes([&](const Frontend::FConstNodeHandle& Node)
 			{
-				using namespace Metasound;
+				ExistingNames.Add(Node->GetNodeName());
+			}, InClassType);
 
-				bool bIsNameInvalid = false;
-				GraphHandle->IterateConstNodes([&](Frontend::FConstNodeHandle Node)
-				{
-					bIsNameInvalid |= NameToTest == Node->GetNodeName();
-				}, InClassType);
-				return !bIsNameInvalid;
-			};
-
-			if (InNameIsValidFilter(InBaseName))
-			{
-				return InBaseName;
-			}
-
-			int32 i = 1;
-			FName NewName;
-			do
-			{
-				NewName = *FString::Format(TEXT("{0} {1}"), { *InBaseName.ToString(), ++i });
-			}
-			while (!InNameIsValidFilter(NewName));
-
-			return NewName;
+			return GraphBuilderPrivate::GenerateUniqueName(ExistingNames, InBaseName);
 		}
 
 		TSharedPtr<FEditor> FGraphBuilder::GetEditorForMetasound(const UObject& Metasound)
@@ -623,7 +661,7 @@ namespace Metasound
 			FMetasoundAssetBase* MetaSoundAsset = IMetasoundUObjectRegistry::Get().GetObjectAsAssetBase(&InMetaSound);
 			check(MetaSoundAsset);
 
-			const FName NewName = GenerateUniqueNameByClassType(InMetaSound, EMetasoundFrontendClassType::Input, InNameBase ? *InNameBase : "Input");
+			const FName NewName = GenerateUniqueNameByClassType(InMetaSound, EMetasoundFrontendClassType::Input, InNameBase ? InNameBase->ToString() : TEXT("Input"));
 			return MetaSoundAsset->GetRootGraphHandle()->AddInputVertex(NewName, InTypeName, InToolTip, InDefaultValue);
 		}
 
@@ -632,8 +670,47 @@ namespace Metasound
 			FMetasoundAssetBase* MetaSoundAsset = IMetasoundUObjectRegistry::Get().GetObjectAsAssetBase(&InMetaSound);
 			check(MetaSoundAsset);
 
-			const FName NewName = GenerateUniqueNameByClassType(InMetaSound, EMetasoundFrontendClassType::Output, InNameBase ? *InNameBase : "Output");
+			const FName NewName = GenerateUniqueNameByClassType(InMetaSound, EMetasoundFrontendClassType::Output, InNameBase ? InNameBase->ToString() : TEXT("Output"));
 			return MetaSoundAsset->GetRootGraphHandle()->AddOutputVertex(NewName, InTypeName, InToolTip);
+		}
+
+		FName FGraphBuilder::GenerateUniqueVariableName(const Frontend::FConstGraphHandle& InFrontendGraph, const FString& InBaseName)
+		{
+			using namespace Frontend;
+
+			TArray<FName> ExistingVariableNames;
+
+			// Get all the names from the existing variables on the graph
+			// and place into the ExistingVariableNames array.
+			Algo::Transform(InFrontendGraph->GetVariables(), ExistingVariableNames, [](const FConstVariableHandle& Var) { return Var->GetName(); });
+
+			return GraphBuilderPrivate::GenerateUniqueName(ExistingVariableNames, InBaseName);
+		}
+
+		Frontend::FVariableHandle FGraphBuilder::AddVariableHandle(UObject& InMetaSound, const FName& InTypeName)
+		{
+			using namespace Frontend;
+
+			FMetasoundAssetBase* MetaSoundAsset = IMetasoundUObjectRegistry::Get().GetObjectAsAssetBase(&InMetaSound);
+			check(MetaSoundAsset);
+
+			FGraphHandle FrontendGraph = MetaSoundAsset->GetRootGraphHandle();
+
+			FText BaseDisplayName = LOCTEXT("VariableDefaultDisplayName", "Variable");
+			FDataTypeRegistryInfo Info;
+			if (ensure(IDataTypeRegistry::Get().GetDataTypeInfo(InTypeName, Info)))
+			{
+				BaseDisplayName = Info.DataTypeDisplayText;
+			}
+
+			FString BaseName = BaseDisplayName.ToString();
+			FName VariableName = GenerateUniqueVariableName(FrontendGraph, BaseName);
+			FVariableHandle Variable = FrontendGraph->AddVariable(InTypeName);
+
+			Variable->SetDisplayName(FText::GetEmpty());
+			Variable->SetName(VariableName);
+
+			return Variable;
 		}
 
 		UMetasoundEditorGraphNode* FGraphBuilder::AddNode(UObject& InMetaSound, Frontend::FNodeHandle InNodeHandle, FVector2D InLocation, bool bInSelectNewNode)
@@ -837,30 +914,6 @@ namespace Metasound
 
 			FRebuildPresetRootGraph(ReferencedAsset->GetDocumentHandle()).Transform(PresetAsset->GetDocumentHandle());
 			PresetAsset->ConformObjectDataToArchetype();
-		}
-
-		void FGraphBuilder::DeleteGraphVertexNodeHandle(UMetasoundEditorGraphVertex& InGraphVertex)
-		{
-			using namespace Frontend;
-
-			FNodeHandle NodeHandle = InGraphVertex.GetNodeHandle();
-			TArray<UMetasoundEditorGraphNode*> Nodes = InGraphVertex.GetNodes();
-			for (UMetasoundEditorGraphNode* Node : Nodes)
-			{
-				if (ensure(Node))
-				{
-					// Remove the give node's location from the frontend node
-					FMetasoundFrontendNodeStyle Style = NodeHandle->GetNodeStyle();
-					Style.Display.Locations.Remove(Node->NodeGuid);
-					NodeHandle->SetNodeStyle(Style);
-
-					FGraphBuilder::DeleteNode(*Node);
-				}
-			}
-
-			const Metasound::FVertexName NodeName = NodeHandle->GetNodeName();
-			FGraphHandle GraphHandle = NodeHandle->GetOwningGraph();
-			GraphHandle->RemoveNode(*NodeHandle);
 		}
 
 		bool FGraphBuilder::DeleteNode(UEdGraphNode& InNode)
@@ -1165,7 +1218,7 @@ namespace Metasound
 			{
 				if (const UMetasoundEditorGraphNode* Node = Cast<UMetasoundEditorGraphNode>(InPin.GetOwningNodeUnchecked()))
 				{
-					const FString NodeName = Node->GetConstNodeHandle()->GetDisplayName().ToString();
+					const FString NodeName = Node->GetDisplayName().ToString();
 					UE_LOG(LogMetasoundEditor, Display, TEXT("Synchronizing Pin '%s' on Node '%s': Type converted to '%s'"), *NodeName, *InPin.GetName(), *InDataType.ToString());
 				}
 				InPin.PinType = DataType.PinType;
@@ -1261,7 +1314,7 @@ namespace Metasound
 								if (ensure(!OutputEditorNode->IsEmpty()))
 								{
 									UEdGraphPin* OutputPin = (*OutputEditorNode)[0]->FindPinChecked(OutputHandle->GetName(), EEdGraphPinDirection::EGPD_Output);
-									const FText& OwningNodeName = NodeInput->GetOwningNode()->GetDisplayName();
+									const FText& OwningNodeName = EditorNode->GetDisplayName();
 
 									UE_LOG(LogMetasoundEditor, Display, TEXT("Synchronizing Node '%s' Connection: Linking Pin '%s' to '%s'"), *OwningNodeName.ToString(), *MatchingPin->GetName(), *OutputPin->GetName());
 									MatchingPin->MakeLinkTo(OutputPin);
@@ -1276,8 +1329,8 @@ namespace Metasound
 						if (!MatchingPin->LinkedTo.IsEmpty())
 						{
 							MatchingPin->BreakAllPinLinks();
-							const FText OwningNodeName = NodeInput->GetOwningNode()->GetDisplayName();
-							const FText InputName = NodeInput->GetDisplayName();
+							const FText OwningNodeName = EditorNode->GetDisplayName();
+							const FText InputName = FGraphBuilder::GetDisplayName(*NodeInput);
 							UE_LOG(LogMetasoundEditor, Display, TEXT("Synchronizing Node '%s' Connection: Breaking all pin links to '%s'"), *OwningNodeName.ToString(), *InputName.ToString());
 							bIsNodeDirty = true;
 						}
@@ -1342,7 +1395,8 @@ namespace Metasound
 
 								// Requery handle as the id has been fixed up
 								NodeHandle = Node->GetConstNodeHandle();
-								UE_LOG(LogMetasoundEditor, Verbose, TEXT("Editor Input Node '%s' interface versioned"), *NodeHandle->GetDisplayName().ToString());
+								FText InputDisplayName = Node->GetDisplayName();
+								UE_LOG(LogMetasoundEditor, Verbose, TEXT("Editor Input Node '%s' interface versioned"), *InputDisplayName.ToString());
 
 								bIsEditorGraphDirty = true;
 							}
@@ -1371,7 +1425,8 @@ namespace Metasound
 
 								// Requery handle as the id has been fixed up
 								NodeHandle = Node->GetConstNodeHandle();
-								UE_LOG(LogMetasoundEditor, Verbose, TEXT("Editor Output Node '%s' interface versioned"), *NodeHandle->GetDisplayName().ToString());
+								FText OutputDisplayName = Node->GetDisplayName();
+								UE_LOG(LogMetasoundEditor, Verbose, TEXT("Editor Output Node '%s' interface versioned"), *OutputDisplayName.ToString());
 
 								bIsEditorGraphDirty = true;
 							}
@@ -1575,7 +1630,8 @@ namespace Metasound
 				{
 					if (bLogChanges)
 					{
-						UE_LOG(LogMetasoundEditor, Display, TEXT("Synchronizing Node '%s' Pins: Removing Excess Editor Pin '%s'"), *InNode->GetDisplayName().ToString(), *Pin->GetName());
+						FText NodeDisplayName = FGraphBuilder::GetDisplayName(*InNode);
+						UE_LOG(LogMetasoundEditor, Display, TEXT("Synchronizing Node '%s' Pins: Removing Excess Editor Pin '%s'"), *NodeDisplayName.ToString(), *Pin->GetName());
 					}
 					InEditorNode.RemovePin(Pin);
 				}
@@ -1596,7 +1652,9 @@ namespace Metasound
 					{
 						if (bLogChanges)
 						{
-							UE_LOG(LogMetasoundEditor, Display, TEXT("Synchronizing Node '%s' Pins: Adding missing Editor Input Pin '%s'"), *InNode->GetDisplayName().ToString(), *InputHandle->GetDisplayName().ToString());
+							FText NodeDisplayName = FGraphBuilder::GetDisplayName(*InNode);
+							FText InputDisplayName = FGraphBuilder::GetDisplayName(*InputHandle);
+							UE_LOG(LogMetasoundEditor, Display, TEXT("Synchronizing Node '%s' Pins: Adding missing Editor Input Pin '%s'"), *NodeDisplayName.ToString(), *InputDisplayName.ToString());
 						}
 						AddPinToNode(InEditorNode, InputHandle);
 					}
@@ -1616,7 +1674,9 @@ namespace Metasound
 					{
 						if (bLogChanges)
 						{
-							UE_LOG(LogMetasoundEditor, Display, TEXT("Synchronizing Node '%s' Pins: Adding missing Editor Output Pin '%s'"), *InNode->GetDisplayName().ToString(), *OutputHandle->GetDisplayName().ToString());
+							FText NodeDisplayName = FGraphBuilder::GetDisplayName(*InNode);
+							FText OutputDisplayName = FGraphBuilder::GetDisplayName(*OutputHandle);
+							UE_LOG(LogMetasoundEditor, Display, TEXT("Synchronizing Node '%s' Pins: Adding missing Editor Output Pin '%s'"), *NodeDisplayName.ToString(), *OutputDisplayName.ToString());
 						}
 						AddPinToNode(InEditorNode, OutputHandle);
 					}
@@ -1666,11 +1726,12 @@ namespace Metasound
 			FMetasoundAssetBase* MetaSoundAsset = IMetasoundUObjectRegistry::Get().GetObjectAsAssetBase(&InMetaSound);
 			check(MetaSoundAsset);
 			UMetasoundEditorGraph* Graph = CastChecked<UMetasoundEditorGraph>(MetaSoundAsset->GetGraph());
+			FGraphHandle GraphHandle = MetaSoundAsset->GetRootGraphHandle();
 
 			TSet<UMetasoundEditorGraphInput*> Inputs;
 			TSet<UMetasoundEditorGraphOutput*> Outputs;
 
-			FGraphHandle GraphHandle = MetaSoundAsset->GetRootGraphHandle();
+			// Collect all editor graph inputs with corresponding frontend inputs. 
 			GraphHandle->IterateNodes([&](FNodeHandle NodeHandle)
 			{
 				if (UMetasoundEditorGraphInput* Input = Graph->FindInput(NodeHandle->GetID()))
@@ -1679,11 +1740,14 @@ namespace Metasound
 					return;
 				}
 
+				// Add an editor input if none exist for a frontend input.
 				Inputs.Add(Graph->FindOrAddInput(NodeHandle));
-				UE_LOG(LogMetasoundEditor, Display, TEXT("Synchronizing Inputs: Added missing input '%s'."), *NodeHandle->GetDisplayName().ToString());
+				FText NodeDisplayName = FGraphBuilder::GetDisplayName(*NodeHandle);
+				UE_LOG(LogMetasoundEditor, Display, TEXT("Synchronizing Inputs: Added missing input '%s'."), *NodeDisplayName.ToString());
 				bIsEditorGraphDirty = true;
 			}, EMetasoundFrontendClassType::Input);
 
+			// Collect all editor graph outputs with corresponding frontend outputs. 
 			GraphHandle->IterateNodes([&](FNodeHandle NodeHandle)
 			{
 				if (UMetasoundEditorGraphOutput* Output = Graph->FindOutput(NodeHandle->GetID()))
@@ -1692,11 +1756,14 @@ namespace Metasound
 					return;
 				}
 
+				// Add an editor output if none exist for a frontend output.
 				Outputs.Add(Graph->FindOrAddOutput(NodeHandle));
-				UE_LOG(LogMetasoundEditor, Display, TEXT("Synchronizing Outputs: Added missing output '%s'."), *NodeHandle->GetDisplayName().ToString());
+				FText NodeDisplayName = FGraphBuilder::GetDisplayName(*NodeHandle);
+				UE_LOG(LogMetasoundEditor, Display, TEXT("Synchronizing Outputs: Added missing output '%s'."), *NodeDisplayName.ToString());
 				bIsEditorGraphDirty = true;
 			}, EMetasoundFrontendClassType::Output);
 
+			// Collect editor inputs and outputs to remove which have no corresponding frontend input or output.
 			TArray<UMetasoundEditorGraphMember*> ToRemove;
 			Graph->IterateInputs([&](UMetasoundEditorGraphInput& Input)
 			{
@@ -1715,24 +1782,27 @@ namespace Metasound
 				}
 			});
 
+			// Remove stale inputs and outputs. 
 			bIsEditorGraphDirty |= !ToRemove.IsEmpty();
 			for (UMetasoundEditorGraphMember* GraphMember: ToRemove)
 			{
-				Graph->RemoveGraphMember(*GraphMember);
+				Graph->RemoveMember(*GraphMember);
 			}
 
+			// Synchronize data types of input nodes. 
 			GraphHandle->IterateNodes([&](FNodeHandle NodeHandle)
 			{
 				if (UMetasoundEditorGraphInput* Input = Graph->FindInput(NodeHandle->GetID()))
 				{
 					TArray<FConstInputHandle> InputHandles = NodeHandle->GetConstInputs();
-					if (ensure(!InputHandles.IsEmpty()))
+					if (ensure(InputHandles.Num() == 1))
 					{
 						FConstInputHandle InputHandle = InputHandles[0];
 						const FName NewDataType = InputHandle->GetDataType();
 						if (Input->TypeName != NewDataType)
 						{
-							UE_LOG(LogMetasoundEditor, Display, TEXT("Synchronizing Input '%s': Updating DataType to '%s'."), *NodeHandle->GetDisplayName().ToString(), *NewDataType.ToString());
+							FText NodeDisplayName = FGraphBuilder::GetDisplayName(*NodeHandle);
+							UE_LOG(LogMetasoundEditor, Display, TEXT("Synchronizing Input '%s': Updating DataType to '%s'."), *NodeDisplayName.ToString(), *NewDataType.ToString());
 
 							FMetasoundFrontendLiteral DefaultLiteral;
 							DefaultLiteral.SetFromLiteral(IDataTypeRegistry::Get().CreateDefaultLiteral(NewDataType));
@@ -1758,17 +1828,19 @@ namespace Metasound
 				}
 			}, EMetasoundFrontendClassType::Input);
 
+			// Synchronize data types of output nodes. 
 			GraphHandle->IterateNodes([&](FNodeHandle NodeHandle)
 			{
 				if (UMetasoundEditorGraphOutput* Output = Graph->FindOutput(NodeHandle->GetID()))
 				{
 					TArray<FConstOutputHandle> OutputHandles = NodeHandle->GetConstOutputs();
-					if (ensure(!OutputHandles.IsEmpty()))
+					if (ensure(OutputHandles.Num() == 1))
 					{
 						const FName NewDataType = OutputHandles[0]->GetDataType();
 						if (Output->TypeName != NewDataType)
 						{
-							UE_LOG(LogMetasoundEditor, Display, TEXT("Synchronizing Output '%s': Updating DataType to '%s'."), *NodeHandle->GetDisplayName().ToString(), *NewDataType.ToString());
+							FText NodeDisplayName = FGraphBuilder::GetDisplayName(*NodeHandle);
+							UE_LOG(LogMetasoundEditor, Display, TEXT("Synchronizing Output '%s': Updating DataType to '%s'."), *NodeDisplayName.ToString(), *NewDataType.ToString());
 
 							Output->ClassName = NodeHandle->GetClassMetadata().GetClassName();
 							Output->TypeName = NewDataType;
