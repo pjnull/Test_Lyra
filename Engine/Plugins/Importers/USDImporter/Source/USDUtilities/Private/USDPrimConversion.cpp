@@ -1832,9 +1832,12 @@ bool UnrealToUsd::Convert3DTransformTrack( const UMovieScene3DTransformTrack& Mo
 					ScaleZChannel->Evaluate( UntransformedBakeTime, ScaleZ );
 				}
 
-				FVector Location{ LocX, LocY, LocZ };
+				// Casting this to float right now because depending on the build and the LWC status FVectors contain FLargeWorldCoordinatesReal,
+				// which can be floats and turn these into narrowing conversions, which require explicit casts.
+				// TODO: Replace these casts with the underlying FVector type later
+				FVector Location{ ( float ) LocX, ( float ) LocY, ( float ) LocZ };
 				FRotator Rotation{ ( float ) RotY, ( float ) RotZ, ( float ) RotX };
-				FVector Scale{ ScaleX, ScaleY, ScaleZ };
+				FVector Scale{ ( float ) ScaleX, ( float ) ScaleY, ( float ) ScaleZ };
 				FTransform Transform{ Rotation, Location, Scale };
 
 				FFrameTime TransformedBakedKeyTime{ UntransformedBakeTime };
@@ -2794,7 +2797,8 @@ UnrealToUsd::FPropertyTrackWriter UnrealToUsd::CreatePropertyTrackWriter( const 
 		{
 			if ( pxr::UsdGeomImageable Imageable{ UsdPrim } )
 			{
-				if ( Attr = Imageable.CreateVisibilityAttr() )
+				Attr = Imageable.CreateVisibilityAttr();
+				if ( Attr )
 				{
 					Result.BoolWriter = [Imageable]( bool UEValue, double UsdTimeCode )
 					{
@@ -2860,7 +2864,8 @@ UnrealToUsd::FPropertyTrackWriter UnrealToUsd::CreatePropertyTrackWriter( const 
 	{
 		if ( PropertyPath == UnrealIdentifiers::LightColorPropertyName )
 		{
-			if ( Attr = Light.GetColorAttr() )
+			Attr = Light.GetColorAttr();
+			if ( Attr )
 			{
 				Result.ColorWriter = [Attr]( const FLinearColor& UEValue, double UsdTimeCode )
 				{
@@ -2871,7 +2876,8 @@ UnrealToUsd::FPropertyTrackWriter UnrealToUsd::CreatePropertyTrackWriter( const 
 		}
 		else if ( PropertyPath == UnrealIdentifiers::UseTemperaturePropertyName )
 		{
-			if ( Attr = Light.GetEnableColorTemperatureAttr() )
+			Attr = Light.GetEnableColorTemperatureAttr();
+			if ( Attr )
 			{
 				Result.BoolWriter = [Attr]( bool UEValue, double UsdTimeCode )
 				{
@@ -2881,7 +2887,8 @@ UnrealToUsd::FPropertyTrackWriter UnrealToUsd::CreatePropertyTrackWriter( const 
 		}
 		else if ( PropertyPath == UnrealIdentifiers::TemperaturePropertyName )
 		{
-			if ( Attr = Light.GetColorTemperatureAttr() )
+			Attr = Light.GetColorTemperatureAttr();
+			if ( Attr )
 			{
 				Result.FloatWriter = [Attr]( float UEValue, double UsdTimeCode )
 				{
@@ -2896,7 +2903,8 @@ UnrealToUsd::FPropertyTrackWriter UnrealToUsd::CreatePropertyTrackWriter( const 
 			{
 				OutPropertyPathsToRefresh.Add( UnrealIdentifiers::IntensityPropertyName );
 
-				if ( Attr = SphereLight.GetRadiusAttr() )
+				Attr = SphereLight.GetRadiusAttr();
+				if ( Attr )
 				{
 					Result.FloatWriter = [Attr, StageInfo]( float UEValue, double UsdTimeCode )
 					{
@@ -2952,7 +2960,8 @@ UnrealToUsd::FPropertyTrackWriter UnrealToUsd::CreatePropertyTrackWriter( const 
 				}
 				else if ( PropertyPath == UnrealIdentifiers::OuterConeAnglePropertyName )
 				{
-					if ( Attr = ShapingAPI.GetShapingConeAngleAttr() )
+					Attr = ShapingAPI.GetShapingConeAngleAttr();
+					if ( Attr )
 					{
 						// InnerConeAngle is calculated based on ConeAngleAttr, so we need to refresh it
 						OutPropertyPathsToRefresh.Add( UnrealIdentifiers::InnerConeAnglePropertyName );
@@ -3018,7 +3027,8 @@ UnrealToUsd::FPropertyTrackWriter UnrealToUsd::CreatePropertyTrackWriter( const 
 		{
 			if ( PropertyPath == UnrealIdentifiers::SourceWidthPropertyName )
 			{
-				if ( Attr = RectLight.GetWidthAttr() )
+				Attr = RectLight.GetWidthAttr();
+				if ( Attr )
 				{
 					OutPropertyPathsToRefresh.Add( UnrealIdentifiers::IntensityPropertyName );
 
@@ -3030,7 +3040,8 @@ UnrealToUsd::FPropertyTrackWriter UnrealToUsd::CreatePropertyTrackWriter( const 
 			}
 			else if ( PropertyPath == UnrealIdentifiers::SourceHeightPropertyName )
 			{
-				if ( Attr = RectLight.GetHeightAttr() )
+				Attr = RectLight.GetHeightAttr();
+				if ( Attr )
 				{
 					OutPropertyPathsToRefresh.Add( UnrealIdentifiers::IntensityPropertyName );
 
@@ -3076,7 +3087,8 @@ UnrealToUsd::FPropertyTrackWriter UnrealToUsd::CreatePropertyTrackWriter( const 
 		{
 			if ( PropertyPath == UnrealIdentifiers::SourceWidthPropertyName || PropertyPath == UnrealIdentifiers::SourceHeightPropertyName )
 			{
-				if ( Attr = DiskLight.GetRadiusAttr() )
+				Attr = DiskLight.GetRadiusAttr();
+				if ( Attr )
 				{
 					OutPropertyPathsToRefresh.Add( UnrealIdentifiers::IntensityPropertyName );
 
@@ -3126,7 +3138,8 @@ UnrealToUsd::FPropertyTrackWriter UnrealToUsd::CreatePropertyTrackWriter( const 
 		{
 			if ( PropertyPath == UnrealIdentifiers::LightSourceAnglePropertyName )
 			{
-				if ( Attr = DistantLight.GetAngleAttr() )
+				Attr = DistantLight.GetAngleAttr();
+				if ( Attr )
 				{
 					Result.FloatWriter = [Attr]( float UEValue, double UsdTimeCode )
 					{
