@@ -1765,7 +1765,7 @@ FText SSubobject_RowWidget::GetObjectContextText() const
     const FSubobjectData* Data = NodePtr ? NodePtr->GetDataSource() : nullptr;
 	
 	// We want to display (Self) or (Instance) only if the data is an actor
-    if (Data->IsActor())
+    if (Data && Data->IsActor())
     {
 	   return Data->GetDisplayNameContextModifiers(GetDefault<UEditorStyleSettings>()->bShowNativeComponentNames);
     }
