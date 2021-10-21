@@ -24,6 +24,9 @@
 void SPropertyAccessNode::Construct(const FArguments& InArgs, UK2Node_PropertyAccess* InNode)
 {
 	GraphNode = InNode;
+
+	SetCursor( EMouseCursor::CardinalCross );
+	
 	UpdateGraphNode();
 
 	// Centre the pin slot
@@ -302,6 +305,8 @@ TSharedRef<SWidget> SPropertyAccessNode::UpdateTitleWidget(FText InTitleText, TS
 				]
 			]
 		];
+
+	InTitleWidget->SetCursor( EMouseCursor::Default );
 
 	InOutTitleHAlign = HAlign_Left;
 	InOutTitleMargin = FMargin(40.0f, 14.0f, 40.0f, 14.0f);
