@@ -4546,10 +4546,7 @@ void FEngineLoop::Exit()
 	}
 #endif
 
-#if WITH_COREUOBJECT
-	// PackageResourceManager depends on AssetRegistry, so must be shutdown before we unload the AssetRegistry module
-	IPackageResourceManager::Shutdown();
-#endif
+
 
 #if WITH_EDITOR
 	// These module must be shut down first because other modules may try to access them during shutdown.
@@ -4558,13 +4555,20 @@ void FEngineLoop::Exit()
 
 #endif // WITH_EDITOR
 	FModuleManager::Get().UnloadModule("WorldBrowser", true);
-	FModuleManager::Get().UnloadModule("AssetRegistry", true);
 
 #if !PLATFORM_ANDROID 	// AppPreExit doesn't work on Android
 	AppPreExit();
 
 	TermGamePhys();
-#else
+#endif
+
+#if WITH_COREUOBJECT
+	// PackageResourceManager depends on AssetRegistry, so must be shutdown before we unload the AssetRegistry module
+	IPackageResourceManager::Shutdown();
+#endif
+	FModuleManager::Get().UnloadModule("AssetRegistry", true);
+
+#if PLATFORM_ANDROID
 	// AppPreExit() stops malloc profiler, do it here instead
 	MALLOC_PROFILER( GMalloc->Exec(nullptr, TEXT("MPROF STOP"), *GLog);	);
 #endif // !ANDROID
@@ -6132,12 +6136,6 @@ void FEngineLoop::AppPreExit( )
 		GetDerivedDataCacheRef().WaitForQuiescence(true);
 	}
 #endif
-#if !WITH_ENGINE
-#if WITH_COREUOBJECT
-	// Shutdown the PackageResourceManager in AppPreExit for programs that do not call FEngineLoop::Exit
-	IPackageResourceManager::Shutdown();
-#endif
-#endif
 
 #if WITH_EDITOR
 	FRemoteConfig::Flush();
@@ -6198,6 +6196,11 @@ void FEngineLoop::AppPreExit( )
 	}
 #endif
 
+#else
+#if WITH_COREUOBJECT
+	// Shutdown the PackageResourceManager in AppPreExit for programs that do not call FEngineLoop::Exit
+	IPackageResourceManager::Shutdown();
+#endif
 #endif
 
 }
