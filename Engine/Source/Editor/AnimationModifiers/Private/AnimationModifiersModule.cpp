@@ -39,8 +39,11 @@ void FAnimationModifiersModule::StartupModule()
 	// Register delegates during PostEngineInit as this module is part of preload phase and GEditor is not valid yet
 	FCoreDelegates::OnPostEngineInit.AddLambda([this]()
 	{
-		GEditor->GetEditorSubsystem<UImportSubsystem>()->OnAssetPostImport.AddRaw(this, &FAnimationModifiersModule::OnAssetPostImport);
-		GEditor->GetEditorSubsystem<UImportSubsystem>()->OnAssetReimport.AddRaw(this, &FAnimationModifiersModule::OnAssetPostReimport);
+		if (GEditor)
+		{
+			GEditor->GetEditorSubsystem<UImportSubsystem>()->OnAssetPostImport.AddRaw(this, &FAnimationModifiersModule::OnAssetPostImport);
+			GEditor->GetEditorSubsystem<UImportSubsystem>()->OnAssetReimport.AddRaw(this, &FAnimationModifiersModule::OnAssetPostReimport);
+		}
 	});
 }
 
