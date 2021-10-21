@@ -328,8 +328,6 @@ void UCommonActivatableWidgetStack::OnWidgetAddedToList(UCommonActivatableWidget
 {
 	if (MySwitcher)
 	{
-		ensure(MySwitcher->GetNumWidgets() <= 1);
-
 		//@todo DanH: Rig up something to skip to an index immediately but still play the intro portion of the transition on the new index
 		//		Might be as simple as changing the properties to separate intro and outro durations?
 		//		Eh, but even in this case we only want to skip when we're going from an empty 0th entry. Every other transition should still do the full fade.
