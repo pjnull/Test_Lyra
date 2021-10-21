@@ -188,6 +188,9 @@ public:
 	/** returns true if this mode is to be deleted at the next convenient opportunity (FEditorModeTools::Tick) */
 	bool IsPendingDeletion() const { return bPendingDeletion; }
 
+	/** Resets pending deletion flag (in cases where modes are re-entered within a tick) */
+	void ClearPendingDeletion() { bPendingDeletion = false; }
+	
 protected:
 	/** true if this mode is pending removal from its owner */
 	bool bPendingDeletion;

@@ -815,7 +815,12 @@ void FEditorModeTools::ActivateMode(FEditorModeID InID, bool bToggle)
 		{
 			DeactivateMode(InID);
 		}
-		// Nothing more to do
+		else
+		{
+			// Make sure pending delete is cleared here, we dont want this to go away now
+			GetActiveScriptableMode(InID)->ClearPendingDeletion();
+		}
+
 		return;
 	}
 
