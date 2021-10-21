@@ -6057,6 +6057,7 @@ void FStarshipEditorStyle::FStyle::SetupClassIconsAndThumbnails()
 			{TEXT("MaterialInstanceConstant")},
 			{TEXT("MediaPlayer")},
 			{TEXT("MediaTexture")},
+			{TEXT("MirrorDataTable")},
 			{TEXT("ModularSynthPresetBank")},
 			{TEXT("NavLink")},
 			{TEXT("NavLinkProxy")},
