@@ -28,7 +28,7 @@ namespace CADKernel
 			Serialize(Archive);
 		}
 
-		virtual void Serialize(FCADKernelArchive& Ar) override
+		virtual void Serialize(FCADKernelArchive& Ar) override final
 		{
 			FEntityGeom::Serialize(Ar);
 			SerializeIdent(Ar, TopologicalLink);

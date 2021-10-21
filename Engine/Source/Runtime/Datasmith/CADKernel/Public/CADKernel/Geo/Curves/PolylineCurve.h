@@ -57,7 +57,7 @@ namespace CADKernel
 
 	public:
 
-		virtual void Serialize(FCADKernelArchive& Ar) override
+		virtual void Serialize(FCADKernelArchive& Ar) override final
 		{
 			FCurve::Serialize(Ar);
 			TPolyline<PointType>::Serialize(Ar);

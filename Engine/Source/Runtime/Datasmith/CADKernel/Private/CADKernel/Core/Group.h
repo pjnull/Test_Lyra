@@ -45,7 +45,7 @@ namespace CADKernel
 
 	public:
 
-		virtual void Serialize(FCADKernelArchive& Ar) override
+		virtual void Serialize(FCADKernelArchive& Ar) override final
 		{
 			FEntity::Serialize(Ar);
 			Ar << Origin;

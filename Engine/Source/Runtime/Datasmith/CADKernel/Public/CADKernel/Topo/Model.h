@@ -42,7 +42,7 @@ namespace CADKernel
 
 	public:
 
-		virtual void Serialize(FCADKernelArchive& Ar) override
+		virtual void Serialize(FCADKernelArchive& Ar) override final
 		{
 			FEntityGeom::Serialize(Ar);
 			SerializeIdents(Ar, (TArray<TSharedPtr<FEntity>>&) Bodies);

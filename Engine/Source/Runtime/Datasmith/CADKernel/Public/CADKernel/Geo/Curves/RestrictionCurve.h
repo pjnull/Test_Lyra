@@ -44,7 +44,7 @@ namespace CADKernel
 
 	public:
 
-		virtual void Serialize(FCADKernelArchive& Ar) override
+		virtual void Serialize(FCADKernelArchive& Ar) override final
 		{
 			FSurfacicCurve::Serialize(Ar);
 			Polyline.Serialize(Ar);

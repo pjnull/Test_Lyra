@@ -27,7 +27,7 @@ namespace CADKernel
 
 	public:
 
-		void Serialize(FCADKernelArchive& Ar)
+		void Serialize(FCADKernelArchive& Ar) final
 		{
 			FCriterion::Serialize(Ar);
 		}

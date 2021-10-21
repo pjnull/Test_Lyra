@@ -35,7 +35,7 @@ namespace CADKernel
 
 	public:
 
-		virtual void Serialize(FCADKernelArchive& Ar) override
+		virtual void Serialize(FCADKernelArchive& Ar) override final
 		{
 			TLinkable<FTopologicalVertex, FVertexLink>::Serialize(Ar);
 			Ar.Serialize(Coordinates);

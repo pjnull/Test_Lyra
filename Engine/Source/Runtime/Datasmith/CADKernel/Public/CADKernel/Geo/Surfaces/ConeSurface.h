@@ -60,7 +60,7 @@ namespace CADKernel
 			Serialize(Archive);
 		}
 
-		virtual void SetMinToleranceIso() override
+		virtual void SetMinToleranceIso() override final
 		{
 			FPoint Origin = Matrix.Multiply(FPoint::ZeroPoint);
 

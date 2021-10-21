@@ -36,7 +36,7 @@ namespace CADKernel
 			Serialize(Archive);
 		}
 
-		virtual void SetMinToleranceIso() override
+		virtual void SetMinToleranceIso() override final
 		{
 			FPoint Origin = Matrix.Multiply(FPoint::ZeroPoint);
 
@@ -54,7 +54,7 @@ namespace CADKernel
 
 	public:
 
-		virtual void Serialize(FCADKernelArchive& Ar) override
+		virtual void Serialize(FCADKernelArchive& Ar) override final
 		{
 			FSurface::Serialize(Ar);
 			Ar << Matrix;
