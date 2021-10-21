@@ -804,6 +804,13 @@ TArray<TSharedPtr<FNiagaraMenuAction_Generic>> SNiagaraStackFunctionInputValue::
 	const FText CategoryName = LOCTEXT("DynamicInputValueCategory", "Dynamic Inputs");
 	TArray<UNiagaraScript*> DynamicInputScripts;
 	FunctionInput->GetAvailableDynamicInputs(DynamicInputScripts, true);
+	
+	TSet<UNiagaraScript*> ScratchPadDynamicInputs;
+	for (TSharedRef<FNiagaraScratchPadScriptViewModel> ScratchPadScriptViewModel : FunctionInput->GetSystemViewModel()->GetScriptScratchPadViewModel()->GetScriptViewModels())
+	{
+		ScratchPadDynamicInputs.Add(ScratchPadScriptViewModel->GetOriginalScript());
+	}
+	
 	for (UNiagaraScript* DynamicInputScript : DynamicInputScripts)
 	{
 		FVersionedNiagaraScriptData* ScriptData = DynamicInputScript->GetLatestScriptData();
@@ -811,13 +818,20 @@ TArray<TSharedPtr<FNiagaraMenuAction_Generic>> SNiagaraStackFunctionInputValue::
 		const FText DisplayName = FNiagaraEditorUtilities::FormatScriptName(DynamicInputScript->GetFName(), bIsInLibrary);
 		const FText Tooltip = FNiagaraEditorUtilities::FormatScriptDescription(ScriptData->Description, *DynamicInputScript->GetPathName(), bIsInLibrary);
 		TTuple<EScriptSource, FText> Source = FNiagaraEditorUtilities::GetScriptSource(FAssetData(DynamicInputScript));
+
+		// scratch pad dynamic inputs are always considered to be in the library and will have Niagara as the source
+		if(ScratchPadDynamicInputs.Contains(DynamicInputScript))
+		{
+			Source = TTuple<EScriptSource, FText>(EScriptSource::Niagara, FText::FromString("Scratch Pad"));
+			bIsInLibrary = true;
+		}
 		
 		TSharedPtr<FNiagaraMenuAction_Generic> DynamicInputAction(new FNiagaraMenuAction_Generic(
 			FNiagaraMenuAction_Generic::FOnExecuteAction::CreateStatic(&ReassignDynamicInputScript, FunctionInput, DynamicInputScript),
 			DisplayName, ScriptData->bSuggested ? ENiagaraMenuSections::Suggested : ENiagaraMenuSections::General, {CategoryName.ToString()}, Tooltip, ScriptData->Keywords
             ));
 		DynamicInputAction->SourceData = FNiagaraActionSourceData(Source.Key, Source.Value, true);
-		DynamicInputAction->bIsInLibrary = ScriptData->LibraryVisibility == ENiagaraScriptLibraryVisibility::Library;
+		DynamicInputAction->bIsInLibrary = bIsInLibrary;
 
 		DynamicInputActions.Add(DynamicInputAction);
 	}
@@ -941,6 +955,13 @@ TArray<TSharedPtr<FNiagaraMenuAction_Generic>> SNiagaraStackFunctionInputValue::
 		TArray<UNiagaraScript*> DynamicInputScripts;
 		FunctionInput->GetAvailableDynamicInputs(DynamicInputScripts, bLibraryOnly == false);
 
+		// we add scratch pad scripts here so we can check if an available dynamic input is a scratch pad script or asset based
+		TSet<UNiagaraScript*> ScratchPadDynamicInputs;
+		for (TSharedRef<FNiagaraScratchPadScriptViewModel> ScratchPadScriptViewModel : FunctionInput->GetSystemViewModel()->GetScriptScratchPadViewModel()->GetScriptViewModels())
+		{
+			ScratchPadDynamicInputs.Add(ScratchPadScriptViewModel->GetOriginalScript());
+		}
+		
 		for (UNiagaraScript* DynamicInputScript : DynamicInputScripts)
 		{
 			TTuple<EScriptSource, FText> Source = FNiagaraEditorUtilities::GetScriptSource(DynamicInputScript);
@@ -950,11 +971,21 @@ TArray<TSharedPtr<FNiagaraMenuAction_Generic>> SNiagaraStackFunctionInputValue::
 			const FText DisplayName = FNiagaraEditorUtilities::FormatScriptName(DynamicInputScript->GetFName(), bIsInLibrary);
 			const FText Tooltip = FNiagaraEditorUtilities::FormatScriptDescription(ScriptData->Description, *DynamicInputScript->GetPathName(), bIsInLibrary);
 
+			// scratch pad dynamic inputs are always considered to be in the library and will have Niagara as the source
+			if(ScratchPadDynamicInputs.Contains(DynamicInputScript))
+			{
+				Source = TTuple<EScriptSource, FText>(EScriptSource::Niagara, FText::FromString("Scratch Pad"));
+				bIsInLibrary = true;
+			}
+			
 			TSharedPtr<FNiagaraMenuAction_Generic> DynamicInputAction(new FNiagaraMenuAction_Generic(
                 FNiagaraMenuAction_Generic::FOnExecuteAction::CreateSP(this, &SNiagaraStackFunctionInputValue::DynamicInputScriptSelected, DynamicInputScript),
                 DisplayName, ScriptData->bSuggested ? ENiagaraMenuSections::Suggested : ENiagaraMenuSections::General, {CategoryName.ToString()}, Tooltip, ScriptData->Keywords));
 			
 			DynamicInputAction->SourceData = FNiagaraActionSourceData(Source.Key, Source.Value, true);
+
+			
+			
 			DynamicInputAction->bIsExperimental = ScriptData->bExperimental;
 			DynamicInputAction->bIsInLibrary = bIsInLibrary;
 			OutAllActions.Add(DynamicInputAction);
