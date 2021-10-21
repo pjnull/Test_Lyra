@@ -1125,7 +1125,7 @@ bool FUserManagerEOS::GetEpicAccountIdFromProductUserId(const EOS_ProductUserId&
 	}
 	else
 	{
-		UE_LOG_ONLINE(Warning, TEXT("[FUserManagerEOS::GetEpicAccountIdFromProductUserId] EOS_Connect_GetProductUserIdMapping not successful. Finished with EOS_EResult %s"), ANSI_TO_TCHAR(EOS_EResult_ToString(Result)));
+		UE_LOG_ONLINE(Verbose, TEXT("[FUserManagerEOS::GetEpicAccountIdFromProductUserId] EOS_Connect_GetProductUserIdMapping not successful. Finished with EOS_EResult %s"), ANSI_TO_TCHAR(EOS_EResult_ToString(Result)));
 	}
 
 	return bResult;
@@ -1159,6 +1159,10 @@ void FUserManagerEOS::GetEpicAccountIdAsync(const EOS_ProductUserId& ProductUser
 				if (GetEpicAccountIdFromProductUserId(ProductUserId, AccountId))
 				{
 					Callback(ProductUserId, AccountId);
+				}
+				else
+				{
+					UE_LOG_ONLINE(Warning, TEXT("[FUserManagerEOS::GetEpicAccountIdAsync] Unable to get Epic account for ProductUserId (%s)."), *LexToString(ProductUserId));
 				}
 			}
 			else
