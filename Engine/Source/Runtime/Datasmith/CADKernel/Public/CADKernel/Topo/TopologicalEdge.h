@@ -135,7 +135,7 @@ namespace CADKernel
 
 		void Delete();
 
-		virtual void Serialize(FCADKernelArchive& Ar) override final
+		virtual void Serialize(FCADKernelArchive& Ar) override
 		{
 			TLinkable<FTopologicalEdge, FEdgeLink>::Serialize(Ar);
 			SerializeIdent(Ar, StartVertex);

@@ -36,7 +36,7 @@ namespace CADKernel
 
 	public:
 
-		virtual void Serialize(FCADKernelArchive& Ar) override final
+		virtual void Serialize(FCADKernelArchive& Ar) override
 		{
 			FSurface::Serialize(Ar);
 			SerializeIdent(Ar, BaseSurface);

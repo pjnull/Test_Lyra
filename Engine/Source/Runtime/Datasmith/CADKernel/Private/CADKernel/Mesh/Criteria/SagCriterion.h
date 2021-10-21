@@ -27,7 +27,7 @@ namespace CADKernel
 
 	public:
 
-		void Serialize(FCADKernelArchive& Ar) final
+		void Serialize(FCADKernelArchive& Ar)
 		{
 			FCriterion::Serialize(Ar);
 			Ar << MaxSag;

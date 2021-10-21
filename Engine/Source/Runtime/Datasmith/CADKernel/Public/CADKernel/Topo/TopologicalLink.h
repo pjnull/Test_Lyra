@@ -41,7 +41,7 @@ namespace CADKernel
 			Serialize(Ar);
 		}
 
-		virtual void Serialize(FCADKernelArchive& Ar) override final
+		virtual void Serialize(FCADKernelArchive& Ar) override
 		{
 			FEntity::Serialize(Ar);
 			SerializeIdent(Ar, &ActiveEntity, false);
@@ -201,7 +201,7 @@ namespace CADKernel
 			Serialize(Ar);
 		}
 
-		virtual void Serialize(FCADKernelArchive& Ar) override final
+		virtual void Serialize(FCADKernelArchive& Ar) override
 		{
 			TTopologicalLink<FTopologicalVertex>::Serialize(Ar);
 			Ar << Barycenter;

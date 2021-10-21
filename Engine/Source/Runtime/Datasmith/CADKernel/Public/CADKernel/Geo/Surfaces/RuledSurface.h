@@ -8,7 +8,7 @@ namespace CADKernel
 	class FCurve;
 	class FNURBSSurface;
 
-	class CADKERNEL_API FRuledSurface final : public FSurface
+	class CADKERNEL_API FRuledSurface : public FSurface
 	{
 		friend FEntity;
 
@@ -31,7 +31,7 @@ namespace CADKernel
 
 	public:
 
-		virtual void Serialize(FCADKernelArchive& Ar) override final
+		virtual void Serialize(FCADKernelArchive& Ar) override
 		{
 			FSurface::Serialize(Ar);
 			SerializeIdent(Ar, Curves[0]);

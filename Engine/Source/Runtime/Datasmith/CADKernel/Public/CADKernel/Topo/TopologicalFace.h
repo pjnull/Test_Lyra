@@ -94,7 +94,7 @@ namespace CADKernel
 
 	public:
 
-		virtual void Serialize(FCADKernelArchive& Ar) override final
+		virtual void Serialize(FCADKernelArchive& Ar) override
 		{
 			FTopologicalEntity::Serialize(Ar);
 			SerializeIdent(Ar, CarrierSurface);

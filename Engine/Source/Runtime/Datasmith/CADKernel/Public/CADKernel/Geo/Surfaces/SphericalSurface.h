@@ -52,7 +52,7 @@ namespace CADKernel
 			Serialize(Archive);
 		}
 
-		virtual void SetMinToleranceIso() override final
+		virtual void SetMinToleranceIso() override
 		{
 			double Tolerance2D = Tolerance3D / Radius;
 
@@ -69,7 +69,7 @@ namespace CADKernel
 	
 	public:
 
-		virtual void Serialize(FCADKernelArchive& Ar) override final
+		virtual void Serialize(FCADKernelArchive& Ar) override
 		{
 			FSurface::Serialize(Ar);
 			Ar << Matrix;

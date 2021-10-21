@@ -120,7 +120,7 @@ namespace CADKernel
 
 	public:
 
-		virtual void Serialize(FCADKernelArchive& Ar) override final
+		virtual void Serialize(FCADKernelArchive& Ar) override
 		{
 			FSurface::Serialize(Ar);
 			Ar << PoleUCount;
@@ -217,7 +217,7 @@ namespace CADKernel
 			BSpline::FindNotDerivableParameters(*this, InDerivativeOrder, InBoundary, OutNotDerivableCoordinates);
 		}
 
-		virtual void SetMinToleranceIso() override final;
+		virtual void SetMinToleranceIso() override;
 
 	private:
 		void Finalize();

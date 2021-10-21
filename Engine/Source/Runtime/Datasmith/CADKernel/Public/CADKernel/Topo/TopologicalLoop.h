@@ -83,7 +83,7 @@ namespace CADKernel
 
 		void DeleteLoopEdges();
 
-		virtual void Serialize(FCADKernelArchive& Ar) override final
+		virtual void Serialize(FCADKernelArchive& Ar) override
 		{
 			FTopologicalEntity::Serialize(Ar);
 			SerializeIdents(Ar, (TArray<TOrientedEntity<FEntity>>&) Edges);
