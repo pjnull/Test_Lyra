@@ -17,7 +17,6 @@
 #include "ScopedTransaction.h"
 #include "SlateOptMacros.h"
 #include "Styling/SlateIconFinder.h"
-#include "Styling/StyleColors.h"
 #include "SubobjectEditorExtensionContext.h"
 #include "Subsystems/PanelExtensionSubsystem.h"	// SExtensionPanel
 #include "Widgets/Images/SImage.h"
@@ -508,54 +507,6 @@ FMenuBuilder SSubobjectInstanceEditor::CreateMenuBuilder()
 	);
 
 	return EditBlueprintMenuBuilder;
-}
-
-FSlateColor SSubobjectInstanceEditor::GetColorTintForIcon(FSubobjectEditorTreeNodePtrType Node) const
-{
-	USlateThemeManager& ThemeManager = USlateThemeManager::Get();
-
-	const FLinearColor& IntroducedHereColor = ThemeManager.GetColor(EStyleColor::AccentWhite);
-
-	// A blue-ish tint
-	const FLinearColor& InheritedBlueprintComponentColor = ThemeManager.GetColor(EStyleColor::AccentBlue);
-	const FLinearColor& InstancedInheritedBlueprintComponentColor = ThemeManager.GetColor(EStyleColor::AccentBlue);
-
-	// A green-ish tint
-	const FLinearColor& InheritedNativeComponentColor = ThemeManager.GetColor(EStyleColor::AccentGreen);
-
-	const FSubobjectData* Data = Node ? Node->GetDataSource() : nullptr;
-	if(!Data)
-	{
-		return IntroducedHereColor;
-	}
-
-	if (Data->IsInheritedComponent())
-	{
-		// Native C++ components will be tinted green
-		if (Data->IsNativeComponent())
-		{
-			return InheritedNativeComponentColor;
-		}
-		else if (Data->IsInstancedComponent())
-		{
-			return InstancedInheritedBlueprintComponentColor;
-		}
-		else
-		{
-			return InheritedBlueprintComponentColor;
-		}
-	}
-	// If its not an actor, instanced, or native inherited component then it must be inherited from a BP
-	else if(!Data->IsActor() && !Data->IsInstancedComponent())
-	{
-		return InheritedBlueprintComponentColor;
-	}
-	else if(Data->IsActor())
-	{
-		return ThemeManager.GetColor(EStyleColor::AccentWhite);
-	}
-	
-	return IntroducedHereColor;
 }
 
 FText SSubobjectInstanceEditor::OnGetApplyChangesToBlueprintTooltip() const
