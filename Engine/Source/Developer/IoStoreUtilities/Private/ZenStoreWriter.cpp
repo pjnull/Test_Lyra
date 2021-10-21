@@ -459,12 +459,20 @@ void FZenStoreWriter::SetCookOutputLocation(EOutputLocation Location)
 	checkNoEntry();
 }
 
-void FZenStoreWriter::BeginCook(const FCookInfo& Info)
+void FZenStoreWriter::Initialize(const FCookInfo& Info)
 {
 	CookMode = Info.CookMode;
 
 	if (!bInitialized)
 	{
+		if (Info.bFullBuild)
+		{
+			UE_LOG(LogZenStoreWriter, Display, TEXT("Deleting %s..."), *OutputPath);
+			const bool bRequireExists = false;
+			const bool bTree = true;
+			IFileManager::Get().DeleteDirectory(*OutputPath, bRequireExists, bTree);
+		}
+
 		FString ProjectId = FApp::GetProjectName();
 		FString OplogId = TargetPlatform.PlatformName();
 		bool bOplogEstablished = HttpClient->TryCreateOplog(ProjectId, OplogId, Info.bFullBuild);
@@ -578,8 +586,11 @@ void FZenStoreWriter::BeginCook(const FCookInfo& Info)
 			RemoveCookedPackages();
 		}
 	}
+}
 
-	if (Info.CookMode == ICookedPackageWriter::FCookInfo::CookOnTheFlyMode)
+void FZenStoreWriter::BeginCook()
+{
+	if (CookMode == ICookedPackageWriter::FCookInfo::CookOnTheFlyMode)
 	{
 		FCbPackage Pkg;
 		FCbWriter PackageObj;

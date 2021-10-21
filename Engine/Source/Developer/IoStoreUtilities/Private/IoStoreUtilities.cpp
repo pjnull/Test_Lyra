@@ -4346,7 +4346,8 @@ int32 Staged2Zen(const FString& BuildPath, const FKeyChain& KeyChain, const FStr
 	
 	ICookedPackageWriter::FCookInfo CookInfo;
 	CookInfo.bFullBuild = true;
-	ZenStoreWriter->BeginCook(CookInfo);
+	ZenStoreWriter->Initialize(CookInfo);
+	ZenStoreWriter->BeginCook();
 	int32 LocalPackageIndex = 0;
 	TArray<FPackageInfo> PackagesArray;
 	CollectedData.Packages.GenerateValueArray(PackagesArray);

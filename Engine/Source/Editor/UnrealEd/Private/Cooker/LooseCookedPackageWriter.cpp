@@ -99,7 +99,7 @@ FDateTime FLooseCookedPackageWriter::GetPreviousCookTime() const
 	return IFileManager::Get().GetTimeStamp(*PreviousAssetRegistry);
 }
 
-void FLooseCookedPackageWriter::BeginCook(const FCookInfo& Info)
+void FLooseCookedPackageWriter::Initialize(const FCookInfo& Info)
 {
 	bIterateSharedBuild = Info.bIterateSharedBuild;
 	if (Info.bFullBuild)

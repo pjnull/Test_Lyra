@@ -39,7 +39,8 @@ public:
 	void WriteLinkerAdditionalData(const FLinkerAdditionalDataInfo& Info, const FIoBuffer& Data, const TArray<FFileRegion>& FileRegions) override;
 
 	FDateTime GetPreviousCookTime() const override;
-	void BeginCook(const FCookInfo& Info) override;
+	void Initialize(const FCookInfo& Info) override;
+	void BeginCook() override {};
 	void EndCook() override;
 	void Flush() override;
 	TUniquePtr<FAssetRegistryState> LoadPreviousAssetRegistry() override;

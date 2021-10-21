@@ -171,12 +171,16 @@ public:
 		bool bIterateSharedBuild = false;
 	};
 
+	/** Delete outdated cooked data, etc.
+	  */
+	virtual void Initialize(const FCookInfo& Info) = 0;
+
 	/** Signal the start of a cooking pass
 
 		Package data may only be produced after BeginCook() has been called and
 		before EndCook() is called
 	  */
-	virtual void BeginCook(const FCookInfo& Info) = 0;
+	virtual void BeginCook() = 0;
 
 	/** Signal the end of a cooking pass.
 	  */

@@ -44,7 +44,8 @@ public:
 	IOSTOREUTILITIES_API virtual void WriteLinkerAdditionalData(const FLinkerAdditionalDataInfo& Info, const FIoBuffer& Data, const TArray<FFileRegion>& FileRegions) override;
 
 	IOSTOREUTILITIES_API virtual void WriteBulkdata(const FBulkDataInfo& Info, const FIoBuffer& BulkData, const TArray<FFileRegion>& FileRegions) override;
-	IOSTOREUTILITIES_API virtual void BeginCook(const FCookInfo& Info) override;
+	IOSTOREUTILITIES_API virtual void Initialize(const FCookInfo& Info) override;
+	IOSTOREUTILITIES_API virtual void BeginCook() override;
 	IOSTOREUTILITIES_API virtual void EndCook() override;
 
 	IOSTOREUTILITIES_API virtual void GetEntries(TFunction<void(TArrayView<const FPackageStoreEntryResource>, TArrayView<const FOplogCookInfo>)>&& Callback) override;

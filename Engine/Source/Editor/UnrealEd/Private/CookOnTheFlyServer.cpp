@@ -687,6 +687,8 @@ void UCookOnTheFlyServer::AddCookOnTheFlyPlatformFromGameThread(ITargetPlatform*
 	FAssetRegistryGenerator& Generator = *PlatformData->RegistryGenerator;
 	Generator.SaveAssetRegistry(GetSandboxAssetRegistryFilename(), true);
 	check(PlatformData->bIsSandboxInitialized); // This should have been set by BeginCookSandbox, and it is what we use to determine whether a platform has been initialized
+
+	FindOrCreatePackageWriter(TargetPlatform).BeginCook();
 }
 
 void UCookOnTheFlyServer::OnTargetPlatformsInvalidated()
@@ -7362,7 +7364,7 @@ void UCookOnTheFlyServer::BeginCookSandbox(TConstArrayView<const ITargetPlatform
 					PopulatePlatforms.Add(TargetPlatform);
 				}
 			}
-			PackageWriter.BeginCook(CookInfo);
+			PackageWriter.Initialize(CookInfo);
 			PlatformData->bFullBuild = CookInfo.bFullBuild;
 			PlatformData->bIsSandboxInitialized = true;
 			ResetPlatforms.Emplace(TargetPlatform, bResetResults);
@@ -8003,6 +8005,11 @@ void UCookOnTheFlyServer::StartCookByTheBook( const FCookByTheBookStartupOptions
 	{
 		// Discoveries during the processing of the initial cluster are expected, so LogDiscoveredPackages must be off.
 		PackageDatas->SetLogDiscoveredPackages(false);
+	}
+
+	for (const ITargetPlatform* TargetPlatform : TargetPlatforms)
+	{
+		FindOrCreatePackageWriter(TargetPlatform).BeginCook();
 	}
 }
 
