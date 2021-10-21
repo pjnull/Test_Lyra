@@ -92,8 +92,8 @@ enum ESaveFlags
 	SAVE_CutdownPackage	= 0x00000040,	///< Saving cutdown packages in a temp location WITHOUT renaming the package.
 	SAVE_KeepEditorOnlyCookedPackages = 0x00000080,  ///< Keep packages which are marked as editor only even though we are cooking
 	SAVE_Concurrent		= 0x00000100,	///< We are save packages in multiple threads at once and should not call non-threadsafe functions or rely on globals. GIsSavingPackage should be set and PreSave/Postsave functions should be called before/after the entire concurrent save.
-	SAVE_DiffOnly       = 0x00000200,	///< Serializes the package to a special memory archive that performs a diff with an existing file on disk
-	SAVE_DiffCallstack  = 0x00000400,	///< Serializes the package to a special memory archive that compares all differences against a file on disk and dumps relevant callstacks
+	SAVE_DiffOnly		UE_DEPRECATED(5.0, "Diffing is now done using FDiffPackageWriter.") = 0x00000200,
+	SAVE_DiffCallstack  UE_DEPRECATED(5.0, "Diffing is now done using FDiffPackageWriter.") = 0x00000400,
 	SAVE_ComputeHash    = 0x00000800,	///< Compute the MD5 hash of the cooked data
 	SAVE_CompareLinker	= 0x00001000,	///< Return the linker save to compare against another
 	SAVE_BulkDataByReference = 0x00002000, ///< When saving to a different file than the package's LoadedPath, point bulkdata in the new file to be loaded from the original file.

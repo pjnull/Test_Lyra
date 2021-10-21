@@ -25,6 +25,7 @@
 #include "Misc/Paths.h"
 #include "GenericPlatform/GenericPlatformFile.h"
 #include "Misc/ScopeRWLock.h"
+#include "UObject/SavePackage.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogZenStoreWriter, Log, All);
 
@@ -313,9 +314,10 @@ FZenStoreWriter::~FZenStoreWriter()
 	}
 }
 
-void FZenStoreWriter::WritePackageData(const FPackageInfo& Info, const FIoBuffer& PackageData, const TArray<FFileRegion>& FileRegions)
+void FZenStoreWriter::WritePackageData(const FPackageInfo& Info, FLargeMemoryWriter& ExportsArchive, const TArray<FFileRegion>& FileRegions)
 {
 	check(Info.ChunkId.IsValid());
+	FIoBuffer PackageData(FIoBuffer::AssumeOwnership, ExportsArchive.ReleaseOwnership(), ExportsArchive.TotalSize());
 
 	TRACE_CPUPROFILER_EVENT_SCOPE(FZenStoreWriter::WritePackageData);
 
@@ -386,7 +388,7 @@ void FZenStoreWriter::WriteIoStorePackageData(const FPackageInfo& Info, const FI
 	Entry.IsValid = true;
 }
 
-void FZenStoreWriter::WriteBulkdata(const FBulkDataInfo& Info, const FIoBuffer& BulkData, const TArray<FFileRegion>& FileRegions)
+void FZenStoreWriter::WriteBulkData(const FBulkDataInfo& Info, const FIoBuffer& BulkData, const TArray<FFileRegion>& FileRegions)
 {
 	check(Info.ChunkId.IsValid());
 
@@ -397,7 +399,7 @@ void FZenStoreWriter::WriteBulkdata(const FBulkDataInfo& Info, const FIoBuffer& 
 
 	FPendingPackageState* ExistingState = PendingPackages.Find(Info.PackageName);
 
-	checkf(ExistingState != nullptr, TEXT("WriteBulkdata called for package which is not pending: '%s'"), *Info.PackageName.ToString());
+	checkf(ExistingState != nullptr, TEXT("WriteBulkData called for package which is not pending: '%s'"), *Info.PackageName.ToString());
 
 	BulkData.MakeOwned();
 
@@ -415,7 +417,7 @@ void FZenStoreWriter::WriteBulkdata(const FBulkDataInfo& Info, const FIoBuffer& 
 	//	WriteFileRegions(*(Info.LooseFilePath + FFileRegion::RegionsFileExtension), FileRegions);
 }
 
-bool FZenStoreWriter::WriteAdditionalFile(const FAdditionalFileInfo& Info, const FIoBuffer& FileData)
+void FZenStoreWriter::WriteAdditionalFile(const FAdditionalFileInfo& Info, const FIoBuffer& FileData)
 {
 	const FZenFileSystemManifest::FManifestEntry& ManifestEntry = ZenFileSystemManifest->CreateManifestEntry(Info.Filename);
 
@@ -435,27 +437,11 @@ bool FZenStoreWriter::WriteAdditionalFile(const FAdditionalFileInfo& Info, const
 	checkf(ExistingState != nullptr, TEXT("WriteAdditionalFile called for package which is not pending: '%s'"), *Info.PackageName.ToString());
 
 	ExistingState->FileData.Add(MoveTemp(FileEntry));
-
-	return true;
 }
 
 void FZenStoreWriter::WriteLinkerAdditionalData(const FLinkerAdditionalDataInfo& Info, const FIoBuffer& Data, const TArray<FFileRegion>& FileRegions)
 {
 	// LinkerAdditionalData is not yet implemented in this writer; it is only used for VirtualizedBulkData which is not used in cooked content
-	checkNoEntry();
-}
-
-bool FZenStoreWriter::GetPreviousCookedBytes(FName PackageName, const ITargetPlatform* InTargetPlatform,
-	const TCHAR* SandboxFilename, FPreviousCookedBytesData& OutData)
-{
-	// GetCookCapabilities returns bDiffModeSupported == false, so GetPreviousCookedBytes should never be called
-	checkNoEntry();
-	return false;
-}
-
-void FZenStoreWriter::SetCookOutputLocation(EOutputLocation Location)
-{
-	// GetCookCapabilities returns bDiffModeSupported == false, so SetCookOutputLocation should never be called
 	checkNoEntry();
 }
 
@@ -674,7 +660,7 @@ bool FZenStoreWriter::IsReservedOplogKey(FUtf8StringView Key)
 		FUtf8StringView(ReservedOplogKeys[Index]).Equals(Key, ESearchCase::IgnoreCase);
 }
 
-void FZenStoreWriter::CommitPackage(const FCommitPackageInfo& Info)
+TFuture<FMD5Hash> FZenStoreWriter::CommitPackage(FCommitPackageInfo&& Info)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FZenStoreWriter::CommitPackage);
 
@@ -686,6 +672,7 @@ void FZenStoreWriter::CommitPackage(const FCommitPackageInfo& Info)
 	
 	FCbPackage Pkg;
 	bool bIsValid = Info.bSucceeded;
+	TFuture<FMD5Hash> CookedHash;
 
 	{
 		FWriteScopeLock _(PackagesLock);
@@ -694,8 +681,10 @@ void FZenStoreWriter::CommitPackage(const FCommitPackageInfo& Info)
 
 		checkf(PackageState != nullptr, TEXT("CommitPackage called for package which is not pending: '%s'"), *Info.PackageName.ToString());
 
-		if (bIsValid)
+		if (bIsValid && EnumHasAnyFlags(Info.WriteOptions, EWriteOptions::Write))
 		{
+			checkf(EnumHasAllFlags(Info.WriteOptions, EWriteOptions::Write), TEXT("Partial EWriteOptions::Write options are not yet implemented."));
+			checkf(!EnumHasAnyFlags(Info.WriteOptions, EWriteOptions::SaveForDiff), TEXT("-diffonly -savefordiff is not yet implemented."));
 			check(PackageState->PackageData.IsValid);
 
 			FPackageDataEntry& PkgData = PackageState->PackageData;
@@ -771,7 +760,7 @@ void FZenStoreWriter::CommitPackage(const FCommitPackageInfo& Info)
 
 					PackageObj.BeginObject();
 					PackageObj << "id" << Bulk.ChunkId;
-					PackageObj << "type" << LexToString(Bulk.Info.BulkdataType);
+					PackageObj << "type" << LexToString(Bulk.Info.BulkDataType);
 					PackageObj << "data" << BulkAttachment;
 					PackageObj.EndObject();
 				}
@@ -819,6 +808,11 @@ void FZenStoreWriter::CommitPackage(const FCommitPackageInfo& Info)
 
 			Pkg.SetObject(Obj);
 		}
+
+		if (bIsValid && EnumHasAnyFlags(Info.WriteOptions, EWriteOptions::ComputeHash))
+		{
+			CookedHash = AsyncComputeCookedHash(*PackageState);
+		}
 	}
 
 	if (bIsValid)
@@ -839,7 +833,52 @@ void FZenStoreWriter::CommitPackage(const FCommitPackageInfo& Info)
 		FWriteScopeLock _(PackagesLock);
 		PendingPackages.Remove(Info.PackageName);
 	}
+
+	return CookedHash;
 }
+
+TFuture<FMD5Hash> FZenStoreWriter::AsyncComputeCookedHash(const FPendingPackageState& PackageState)
+{
+	check(PackageState.PackageData.IsValid);
+
+	TArray<FIoBuffer> Payloads;
+	Payloads.Reserve(PackageState.BulkData.Num() + PackageState.FileData.Num() + 1);
+	for (const FBulkDataEntry& BulkData : PackageState.BulkData)
+	{
+		const FIoBuffer& Payload = BulkData.Payload;
+		Payloads.Add(FIoBuffer(Payload.Data(), Payload.DataSize(), Payload));
+	}
+
+	for (const FFileDataEntry& FileData : PackageState.FileData)
+	{
+		const FIoBuffer& Payload = FileData.Payload;
+		Payloads.Add(FIoBuffer(Payload.Data(), Payload.DataSize(), Payload));
+	}
+	{
+		const FIoBuffer& Payload = PackageState.PackageData.Payload;
+		Payloads.Add(FIoBuffer(Payload.Data(), Payload.DataSize(), Payload));
+	}
+
+	UE::SavePackageUtilities::IncrementOutstandingAsyncWrites();
+	return Async(EAsyncExecution::TaskGraph, [Payloads = MoveTemp(Payloads)]() mutable
+	{
+		FMD5 AccumulatedHash;
+
+		for (FIoBuffer& Payload : Payloads)
+		{
+			// Moving the Payload to a local variable so that after the update its possibly heavyweight data
+			// is cleaned up instead of waiting to clean them all up at the end.
+			FIoBuffer LocalPayload = MoveTemp(Payload);
+			AccumulatedHash.Update(LocalPayload.Data(), LocalPayload.DataSize());
+		}
+
+		UE::SavePackageUtilities::DecrementOutstandingAsyncWrites();
+		FMD5Hash OutputHash;
+		OutputHash.Set(AccumulatedHash);
+		return OutputHash;
+	});
+}
+
 void FZenStoreWriter::GetEntries(TFunction<void(TArrayView<const FPackageStoreEntryResource>, TArrayView<const FOplogCookInfo>)>&& Callback)
 {
 	FReadScopeLock _(PackagesLock);

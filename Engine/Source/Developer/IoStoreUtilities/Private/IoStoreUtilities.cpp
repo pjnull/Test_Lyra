@@ -4294,7 +4294,7 @@ int32 Staged2Zen(const FString& BuildPath, const FKeyChain& KeyChain, const FStr
 							}
 							else
 							{
-								BulkDataInfo.BulkDataType = IPackageWriter::FBulkDataInfo::Standard;
+								BulkDataInfo.BulkDataType = IPackageWriter::FBulkDataInfo::BulkSegment;
 							}
 						}
 					}
@@ -4375,14 +4375,15 @@ int32 Staged2Zen(const FString& BuildPath, const FKeyChain& KeyChain, const FStr
 			PackageStoreBulkDataInfo.PackageName = PackageInfo.PackageName;
 			PackageStoreBulkDataInfo.LooseFilePath = BulkDataInfo.FileName;
 			PackageStoreBulkDataInfo.ChunkId = BulkDataInfo.Chunk.Value;
-			PackageStoreBulkDataInfo.BulkdataType = BulkDataInfo.BulkDataType;
+			PackageStoreBulkDataInfo.BulkDataType = BulkDataInfo.BulkDataType;
 			FIoBuffer BulkDataBuffer = BulkDataInfo.Chunk.Key->Read(BulkDataInfo.Chunk.Value, FIoReadOptions()).ValueOrDie();
-			ZenStoreWriter->WriteBulkdata(PackageStoreBulkDataInfo, BulkDataBuffer, TArray<FFileRegion>());
+			ZenStoreWriter->WriteBulkData(PackageStoreBulkDataInfo, BulkDataBuffer, TArray<FFileRegion>());
 		}
 		
 		IPackageWriter::FCommitPackageInfo CommitInfo;
 		CommitInfo.PackageName = PackageInfo.PackageName;
-		ZenStoreWriter->CommitPackage(CommitInfo);
+		CommitInfo.WriteOptions = IPackageWriter::EWriteOptions::Write;
+		ZenStoreWriter->CommitPackage(MoveTemp(CommitInfo));
 
 		int32 LocalUploadCount = UploadCount.IncrementExchange() + 1;
 		UE_CLOG(LocalUploadCount % 1000 == 0, LogIoStore, Display, TEXT("Uploading package %d/%d"), LocalUploadCount, PackagesArray.Num());
