@@ -4,6 +4,7 @@
 
 #include "Memory/CompositeBuffer.h"
 #include "Memory/MemoryFwd.h"
+#include "Templates/UniquePtr.h"
 
 class FArchive;
 struct FBlake3Hash;
