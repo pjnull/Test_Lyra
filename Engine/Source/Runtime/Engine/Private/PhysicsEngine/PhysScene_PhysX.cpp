@@ -351,6 +351,7 @@ class FPhysXCPUDispatcherSingleThread : public PxCpuDispatcher
 	{
 		SCOPE_CYCLE_COUNTER(STAT_PhysXSingleThread);
 		CSV_SCOPED_TIMING_STAT_EXCLUSIVE(Physics);
+		CSV_SCOPED_TIMING_STAT(PhysicsVerbose, StepSolver);
 
 		TaskStack.Push(&Task);
 		if (TaskStack.Num() > 1)
@@ -1497,6 +1498,7 @@ FAutoConsoleTaskPriority CPrio_PhyXSceneCompletion(
 
 void FPhysScene_PhysX::StartFrame()
 {
+	CSV_SCOPED_TIMING_STAT(PhysicsVerbose, StartFrame);
 	FGraphEventArray FinishPrerequisites;
 
 	//Update the collision disable table before ticking
@@ -1553,6 +1555,7 @@ void FPhysScene_PhysX::StartFrame()
 
 void FPhysScene_PhysX::EndFrame(ULineBatchComponent* InLineBatcher)
 {
+	CSV_SCOPED_TIMING_STAT(PhysicsVerbose, EndFrame);
 	check(IsInGameThread());
 
 	PhysicsSceneCompletion = NULL;
