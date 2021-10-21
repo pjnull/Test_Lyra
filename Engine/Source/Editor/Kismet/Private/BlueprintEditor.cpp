@@ -2628,11 +2628,6 @@ void FBlueprintEditor::CreateDefaultTabContents(const TArray<UBlueprint*>& InBlu
 
 	if (InBlueprint)
 	{
-		this->DebuggingView =
-			SNew(SKismetDebuggingView)
-			. BlueprintToWatch(InBlueprint)
-			. IsEnabled(!bIsInterface && !bIsMacro);
-
 		this->Palette = 
 			SNew(SBlueprintPalette, SharedThis(this))
 				.IsEnabled(this, &FBlueprintEditor::IsFocusedGraphEditable);
@@ -3951,7 +3946,18 @@ void FBlueprintEditor::ClearAllWatches()
 
 void FBlueprintEditor::OpenBlueprintDebugger()
 {
-	FGlobalTabmanager::Get()->TryInvokeTab(FBlueprintEditorTabs::BlueprintDebuggerID);
+	TSharedPtr<SDockTab> DebuggerTab = FGlobalTabmanager::Get()->TryInvokeTab(FBlueprintEditorTabs::BlueprintDebuggerID);
+	TSharedPtr<FTabManager> DebuggerTabManager = FGlobalTabmanager::Get()->GetTabManagerForMajorTab(DebuggerTab);
+	if (TabManager.IsValid())
+	{
+		const FName DataFlowTabName(TEXT("ExecutionFlowApp"));
+		TSharedPtr<SDockTab> DataFlowTab = DebuggerTabManager->TryInvokeTab(DataFlowTabName);
+		if (DataFlowTab.IsValid())
+		{
+			TSharedRef<SKismetDebuggingView> DebuggingView = StaticCastSharedRef<SKismetDebuggingView>(DataFlowTab->GetContent());
+			DebuggingView->SetBlueprintToWatch(GetBlueprintObj());
+		}
+	}
 }
 
 bool FBlueprintEditor::CanOpenBlueprintDebugger() const

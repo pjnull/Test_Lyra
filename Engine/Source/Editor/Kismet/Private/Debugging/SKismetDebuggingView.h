@@ -47,6 +47,8 @@ public:
 
 	/** Registers the Kismet.DebuggingViewToolBar if it hasn't already been registered */
 	static void TryRegisterDebugToolbar();
+
+	void SetBlueprintToWatch(TWeakObjectPtr<UBlueprint> InBlueprintToWatch);
 protected:
 	FText GetTopText() const;
 	bool CanDisableAllBreakpoints() const;

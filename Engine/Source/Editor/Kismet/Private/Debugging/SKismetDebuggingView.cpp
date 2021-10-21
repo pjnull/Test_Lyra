@@ -452,4 +452,10 @@ void SKismetDebuggingView::Tick( const FGeometry& AllottedGeometry, const double
 	OtherTreeView->RequestUpdateFilteredItems();
 }
 
+void SKismetDebuggingView::SetBlueprintToWatch(TWeakObjectPtr<UBlueprint> InBlueprintToWatch)
+{
+	BlueprintToWatchPtr = InBlueprintToWatch;
+	FDebugLineItem::SetBreakpointParentItemBlueprint(BreakpointParentItem, BlueprintToWatchPtr);
+}
+
 #undef LOCTEXT_NAMESPACE
