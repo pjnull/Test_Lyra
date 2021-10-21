@@ -292,6 +292,7 @@ struct FMaterialInstanceCachedData
 #if WITH_EDITOR
 	void Initialize(FMaterialCachedExpressionData&& InCachedExpressionData, const FMaterialLayersFunctions* Layers, const FMaterialLayersFunctions* ParentLayers);
 #endif // WITH_EDITOR
+	void InitializeForDynamic(const FMaterialLayersFunctions* ParentLayers);
 
 	void AddReferencedObjects(FReferenceCollector& Collector);
 
