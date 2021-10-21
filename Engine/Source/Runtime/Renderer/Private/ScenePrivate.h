@@ -1616,7 +1616,7 @@ struct FReflectionCaptureSortData
 	{
 		if (Radius != Other.Radius)
 		{
-			return Radius < Radius;
+			return Radius < Other.Radius;
 		}
 		else
 		{
