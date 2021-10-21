@@ -6,7 +6,7 @@
 #include "ISourceControlModule.h"
 #include "Misc/DelayedAutoRegister.h"
 #include "PackageSubmissionChecks.h"
-#include "Virtualization/VirtualizedBulkData.h"
+#include "Serialization/VirtualizedBulkData.h"
 #include "VirtualizationSourceControlUtilities.h"
 
 namespace UE::Virtualization

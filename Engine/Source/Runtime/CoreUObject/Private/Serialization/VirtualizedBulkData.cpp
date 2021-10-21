@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "Virtualization/VirtualizedBulkData.h"
+#include "Serialization/VirtualizedBulkData.h"
 
 #include "Compression/OodleDataCompression.h"
 #include "HAL/FileManager.h"

@@ -6,9 +6,10 @@
 #include "Serialization/LargeMemoryWriter.h"
 #include "Serialization/MemoryReader.h"
 #include "Serialization/MemoryWriter.h"
+#include "Serialization/VirtualizedBulkData.h"
+#include "Serialization/VirtualizedBulkDataReader.h"
+#include "Serialization/VirtualizedBulkDataWriter.h"
 #include "Templates/UniquePtr.h"
-#include "Virtualization/VirtualizationUtilities.h"
-#include "Virtualization/VirtualizedBulkData.h"
 
 #include "Misc/AutomationTest.h"
 

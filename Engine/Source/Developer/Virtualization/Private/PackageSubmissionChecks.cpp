@@ -4,8 +4,8 @@
 
 #include "Containers/UnrealString.h"
 #include "Misc/PackageName.h"
+#include "Serialization/VirtualizedBulkData.h"
 #include "Virtualization/VirtualizationSystem.h"
-#include "Virtualization/VirtualizedBulkData.h"
 
 #define LOCTEXT_NAMESPACE "Virtualization"
 
