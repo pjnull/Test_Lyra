@@ -29,6 +29,21 @@
 #include "UObject/SavePackage.h"
 #include "UObject/UObjectHash.h"
 
+/** Modify the masked bits in the output: set them to A & B. */
+template<typename Enum>
+static void EnumSetFlagsAnd(Enum& Output, Enum Mask, Enum A, Enum B)
+{
+	Output = (Output & ~Mask) | (Mask & A & B);
+}
+
+template <typename KeyType, typename ValueType, typename SetAllocator, typename KeyFuncs>
+static ValueType MapFindRef(const TMap<KeyType, ValueType, SetAllocator, KeyFuncs>& Map,
+	typename TMap<KeyType, ValueType, SetAllocator, KeyFuncs>::KeyConstPointerType Key, ValueType DefaultValue)
+{
+	const ValueType* FoundValue = Map.Find(Key);
+	return FoundValue ? *FoundValue : DefaultValue;
+}
+
 namespace UE::EditorDomain
 {
 
@@ -38,8 +53,8 @@ FClassDigestMap& GetClassDigests()
 	return GClassDigests;
 }
 
-TSet<FName> GEditorClassBlockList;
-TSet<FName> GEditorPackageBlockList;
+TMap<FName, EDomainUse> GClassBlockedUses;
+TMap<FName, EDomainUse> GPackageBlockedUses;
 TSet<FName> GTargetDomainClassBlockList;
 bool GTargetDomainClassUseAllowList = true;
 bool GTargetDomainClassEmptyAllowList = false;
@@ -68,10 +83,10 @@ static bool GetEditorDomainSaveUnversioned()
 	return bEditorDomainSaveUnversioned;
 }
 
-EPackageDigestResult AppendPackageDigest(FCbWriter& Writer, bool& bOutEditorDomainEnabled, FString& OutErrorMessage,
+EPackageDigestResult AppendPackageDigest(FCbWriter& Writer, EDomainUse& OutEditorDomainUse, FString& OutErrorMessage,
 	const FAssetPackageData& PackageData, FName PackageName)
 {
-	bOutEditorDomainEnabled = true;
+	OutEditorDomainUse = EDomainUse::LoadEnabled | EDomainUse::SaveEnabled;
 	
 	FPackageFileVersion CurrentFileVersionUE = GPackageFileUEVersion;
 	int32 CurrentFileVersionLicenseeUE = GPackageFileLicenseeUEVersion;
@@ -129,7 +144,8 @@ EPackageDigestResult AppendPackageDigest(FCbWriter& Writer, bool& bOutEditorDoma
 			{
 				Writer << ExistingData->SchemaHash;
 			}
-			bOutEditorDomainEnabled &= ExistingData->bEditorDomainEnabled;
+			EnumSetFlagsAnd(OutEditorDomainUse, EDomainUse::LoadEnabled | EDomainUse::SaveEnabled,
+				OutEditorDomainUse, ExistingData->EditorDomainUse);
 		}
 	}
 	return EPackageDigestResult::Success;
@@ -201,10 +217,11 @@ void PrecacheClassDigests(TConstArrayView<FName> ClassNames, TMap<FName, FClassD
 		
 		FClassData& ClassData = ClassDatas.Emplace_GetRef();
 		ClassData.Name = ClassName;
-		ClassData.DigestData.bEditorDomainEnabled = !GEditorClassBlockList.Contains(ClassName);
+		ClassData.DigestData.EditorDomainUse = EDomainUse::LoadEnabled | EDomainUse::SaveEnabled;
+		ClassData.DigestData.EditorDomainUse &= ~MapFindRef(GClassBlockedUses, ClassName, EDomainUse::None);
 		if (LookupName != ClassName)
 		{
-			ClassData.DigestData.bEditorDomainEnabled &= !GEditorClassBlockList.Contains(LookupName);
+			ClassData.DigestData.EditorDomainUse &= ~MapFindRef(GClassBlockedUses, LookupName, EDomainUse::None);
 		}
 		if (!GTargetDomainClassUseAllowList)
 		{
@@ -275,7 +292,8 @@ void PrecacheClassDigests(TConstArrayView<FName> ClassNames, TMap<FName, FClassD
 				FClassDigestData* ParentDigest = ClassDigests.Map.Find(ClassData.ParentName);
 				if (ParentDigest)
 				{
-					ClassData.DigestData.bEditorDomainEnabled &= ParentDigest->bEditorDomainEnabled;
+					EnumSetFlagsAnd(ClassData.DigestData.EditorDomainUse, EDomainUse::LoadEnabled | EDomainUse::SaveEnabled,
+						ClassData.DigestData.EditorDomainUse, ParentDigest->EditorDomainUse);
 					if (!GTargetDomainClassUseAllowList)
 					{
 						ClassData.DigestData.bTargetIterativeEnabled &= ParentDigest->bTargetIterativeEnabled;
@@ -362,7 +380,8 @@ void PrecacheClassDigests(TConstArrayView<FName> ClassNames, TMap<FName, FClassD
 		// If the superclass was not found, due to a bad redirect or a missing blueprint assetregistry entry, then give up and treat the class as having no parent
 		if (ParentDigest)
 		{
-			ClassData.DigestData.bEditorDomainEnabled &= ParentDigest->bEditorDomainEnabled;
+			EnumSetFlagsAnd(ClassData.DigestData.EditorDomainUse, EDomainUse::LoadEnabled | EDomainUse::SaveEnabled,
+				ClassData.DigestData.EditorDomainUse, ParentDigest->EditorDomainUse);
 			if (!GTargetDomainClassUseAllowList)
 			{
 				ClassData.DigestData.bTargetIterativeEnabled &= ParentDigest->bTargetIterativeEnabled;
@@ -388,34 +407,54 @@ void PrecacheClassDigests(TConstArrayView<FName> ClassNames, TMap<FName, FClassD
 	}
 }
 
-TSet<FName> ConstructClassBlockList()
+TMap<FName, EDomainUse> ConstructClassBlockedUses()
 {
-	TSet<FName> Result;
+	TMap<FName, EDomainUse> Result;
 	TArray<FString> BlockListArray;
+	TArray<FString> LoadBlockListArray;
+	TArray<FString> SaveBlockListArray;
 	GConfig->GetArray(TEXT("EditorDomain"), TEXT("ClassBlockList"), BlockListArray, GEditorIni);
-	for (const FString& ClassPathName : BlockListArray)
+	GConfig->GetArray(TEXT("EditorDomain"), TEXT("ClassLoadBlockList"), LoadBlockListArray, GEditorIni);
+	GConfig->GetArray(TEXT("EditorDomain"), TEXT("ClassSaveBlockList"), SaveBlockListArray, GEditorIni);
+	for (TArray<FString>* Array : { &BlockListArray, &LoadBlockListArray, &SaveBlockListArray })
 	{
-		Result.Add(FName(*ClassPathName));
+		EDomainUse BlockedUse = Array == &BlockListArray	?	(EDomainUse::LoadEnabled | EDomainUse::SaveEnabled) : (
+			Array == &LoadBlockListArray					?	EDomainUse::LoadEnabled : (
+																EDomainUse::SaveEnabled));
+		for (const FString& ClassPathName : *Array)
+		{
+			Result.FindOrAdd(FName(*ClassPathName), EDomainUse::None) |= BlockedUse;
+		}
 	}
 	return Result;
 }
 
-TSet<FName> ConstructPackageNameBlockList()
+TMap<FName, EDomainUse> ConstructPackageNameBlockedUses()
 {
-	TSet<FName> Result;
+	TMap<FName, EDomainUse> Result;
 	TArray<FString> BlockListArray;
+	TArray<FString> LoadBlockListArray;
+	TArray<FString> SaveBlockListArray;
 	GConfig->GetArray(TEXT("EditorDomain"), TEXT("PackageBlockList"), BlockListArray, GEditorIni);
+	GConfig->GetArray(TEXT("EditorDomain"), TEXT("PackageLoadBlockList"), LoadBlockListArray, GEditorIni);
+	GConfig->GetArray(TEXT("EditorDomain"), TEXT("PackageSaveBlockList"), SaveBlockListArray, GEditorIni);
 	FString PackageName;
 	FString ErrorReason;
-	for (const FString& PackageNameOrFilename : BlockListArray)
+	for (TArray<FString>* Array : { &BlockListArray, &LoadBlockListArray, &SaveBlockListArray })
 	{
-		if (!FPackageName::TryConvertFilenameToLongPackageName(PackageNameOrFilename, PackageName, &ErrorReason))
+		EDomainUse BlockedUse = Array == &BlockListArray	?	(EDomainUse::LoadEnabled | EDomainUse::SaveEnabled) : (
+				Array == &LoadBlockListArray				?	EDomainUse::LoadEnabled : (
+																EDomainUse::SaveEnabled));
+		for (const FString& PackageNameOrFilename : *Array)
 		{
-			UE_LOG(LogEditorDomain, Warning, TEXT("Editor.ini:[EditorDomain]:PackageBlocklist: Could not convert %s to a LongPackageName: %s"),
-				*PackageNameOrFilename, *ErrorReason);
-			continue;
+			if (!FPackageName::TryConvertFilenameToLongPackageName(PackageNameOrFilename, PackageName, &ErrorReason))
+			{
+				UE_LOG(LogEditorDomain, Warning, TEXT("Editor.ini:[EditorDomain]:PackageBlocklist: Could not convert %s to a LongPackageName: %s"),
+					*PackageNameOrFilename, *ErrorReason);
+				continue;
+			}
+			Result.FindOrAdd(FName(*PackageName), EDomainUse::None) |= BlockedUse;
 		}
-		Result.Add(FName(*PackageName));
 	}
 	return Result;
 }
@@ -519,8 +558,8 @@ void UtilsPostEngineInit();
 
 void UtilsInitialize()
 {
-	GEditorClassBlockList = ConstructClassBlockList();
-	GEditorPackageBlockList = ConstructPackageNameBlockList();
+	GClassBlockedUses = ConstructClassBlockedUses();
+	GPackageBlockedUses = ConstructPackageNameBlockedUses();
 
 	bool bTargetDomainClassUseBlockList = true;
 	if (FParse::Param(FCommandLine::Get(), TEXT("fullcook")))
@@ -565,10 +604,10 @@ void UtilsPostEngineInit()
 }
 
 EPackageDigestResult GetPackageDigest(IAssetRegistry& AssetRegistry, FName PackageName,
-	FPackageDigest& OutPackageDigest, bool& bOutEditorDomainEnabled, FString& OutErrorMessage)
+	FPackageDigest& OutPackageDigest, EDomainUse& OutEditorDomainUse, FString& OutErrorMessage)
 {
 	FCbWriter Builder;
-	EPackageDigestResult Result = AppendPackageDigest(AssetRegistry, PackageName, Builder, bOutEditorDomainEnabled, OutErrorMessage);
+	EPackageDigestResult Result = AppendPackageDigest(AssetRegistry, PackageName, Builder, OutEditorDomainUse, OutErrorMessage);
 	if (Result == EPackageDigestResult::Success)
 	{
 		OutPackageDigest = Builder.Save().GetRangeHash();
@@ -577,7 +616,7 @@ EPackageDigestResult GetPackageDigest(IAssetRegistry& AssetRegistry, FName Packa
 }
 
 EPackageDigestResult AppendPackageDigest(IAssetRegistry& AssetRegistry, FName PackageName,
-	FCbWriter& Builder, bool& bOutEditorDomainEnabled, FString& OutErrorMessage)
+	FCbWriter& Builder, EDomainUse& OutEditorDomainUse, FString& OutErrorMessage)
 {
 	AssetRegistry.WaitForPackage(PackageName.ToString());
 	TOptional<FAssetPackageData> PackageData = AssetRegistry.GetAssetPackageDataCopy(PackageName);
@@ -585,11 +624,12 @@ EPackageDigestResult AppendPackageDigest(IAssetRegistry& AssetRegistry, FName Pa
 	{
 		OutErrorMessage = FString::Printf(TEXT("Package %s does not exist in the AssetRegistry"),
 			*PackageName.ToString());
-		bOutEditorDomainEnabled = true;
+		OutEditorDomainUse = EDomainUse::LoadEnabled | EDomainUse::SaveEnabled;
 		return EPackageDigestResult::FileDoesNotExist;
 	}
-	EPackageDigestResult Result = AppendPackageDigest(Builder, bOutEditorDomainEnabled, OutErrorMessage, *PackageData, PackageName);
-	bOutEditorDomainEnabled &= !GEditorPackageBlockList.Contains(PackageName);
+	EPackageDigestResult Result = AppendPackageDigest(Builder, OutEditorDomainUse, OutErrorMessage, *PackageData, PackageName);
+	EnumSetFlagsAnd(OutEditorDomainUse, EDomainUse::LoadEnabled | EDomainUse::SaveEnabled,
+		OutEditorDomainUse, ~MapFindRef(GPackageBlockedUses, PackageName, EDomainUse::None));
 	return Result;
 }
 
@@ -754,9 +794,9 @@ bool TrySavePackage(UPackage* Package)
 
 	FString ErrorMessage;
 	FPackageDigest PackageDigest;
-	bool bEditorDomainEnabled;
+	EDomainUse EditorDomainUse;
 	EPackageDigestResult FindHashResult = GetPackageDigest(*IAssetRegistry::Get(), Package->GetFName(), PackageDigest,
-		bEditorDomainEnabled, ErrorMessage);
+		EditorDomainUse, ErrorMessage);
 	switch (FindHashResult)
 	{
 	case EPackageDigestResult::Success:
@@ -765,7 +805,7 @@ bool TrySavePackage(UPackage* Package)
 		UE_LOG(LogEditorDomain, Warning, TEXT("Could not save package to EditorDomain: %s."), *ErrorMessage)
 		return false;
 	}
-	if (!bEditorDomainEnabled)
+	if (!EnumHasAnyFlags(EditorDomainUse, EDomainUse::SaveEnabled))
 	{
 		UE_LOG(LogEditorDomain, Verbose, TEXT("Skipping save of blocked package to EditorDomain: %s."), *Package->GetName())
 		return false;
@@ -874,9 +914,9 @@ void GetBulkDataList(FName PackageName, UE::DerivedData::IRequestOwner& Owner, T
 {
 	FString ErrorMessage;
 	FPackageDigest PackageDigest;
-	bool bEditorDomainEnabled;
+	EDomainUse EditorDomainUse;
 	EPackageDigestResult FindHashResult = GetPackageDigest(*IAssetRegistry::Get(), PackageName, PackageDigest,
-		bEditorDomainEnabled, ErrorMessage);
+		EditorDomainUse, ErrorMessage);
 	switch (FindHashResult)
 	{
 	case EPackageDigestResult::Success:
@@ -887,7 +927,7 @@ void GetBulkDataList(FName PackageName, UE::DerivedData::IRequestOwner& Owner, T
 		return;
 	}
 	}
-	if (!bEditorDomainEnabled)
+	if (!EnumHasAnyFlags(EditorDomainUse, EDomainUse::LoadEnabled))
 	{
 		Callback(FSharedBuffer());
 		return;
@@ -908,9 +948,9 @@ void PutBulkDataList(FName PackageName, FSharedBuffer Buffer)
 {
 	FString ErrorMessage;
 	FPackageDigest PackageDigest;
-	bool bEditorDomainEnabled;
+	EDomainUse EditorDomainUse;
 	EPackageDigestResult FindHashResult = GetPackageDigest(*IAssetRegistry::Get(), PackageName, PackageDigest,
-		bEditorDomainEnabled, ErrorMessage);
+		EditorDomainUse, ErrorMessage);
 	switch (FindHashResult)
 	{
 	case EPackageDigestResult::Success:
@@ -920,7 +960,7 @@ void PutBulkDataList(FName PackageName, FSharedBuffer Buffer)
 		return;
 	}
 	}
-	if (!bEditorDomainEnabled)
+	if (!EnumHasAnyFlags(EditorDomainUse, EDomainUse::SaveEnabled))
 	{
 		return;
 	}
@@ -945,8 +985,8 @@ void GetBulkDataPayloadId(FName PackageName, const FGuid& BulkDataId, UE::Derive
 {
 	FString ErrorMessage;
 	FCbWriter Builder;
-	bool bEditorDomainEnabled;
-	EPackageDigestResult FindHashResult = AppendPackageDigest(*IAssetRegistry::Get(), PackageName, Builder, bEditorDomainEnabled, ErrorMessage);
+	EDomainUse EditorDomainUse;
+	EPackageDigestResult FindHashResult = AppendPackageDigest(*IAssetRegistry::Get(), PackageName, Builder, EditorDomainUse, ErrorMessage);
 	switch (FindHashResult)
 	{
 	case EPackageDigestResult::Success:
@@ -957,7 +997,7 @@ void GetBulkDataPayloadId(FName PackageName, const FGuid& BulkDataId, UE::Derive
 		return;
 	}
 	}
-	if (!bEditorDomainEnabled)
+	if (!EnumHasAnyFlags(EditorDomainUse, EDomainUse::LoadEnabled))
 	{
 		Callback(FSharedBuffer());
 		return;
@@ -979,8 +1019,8 @@ void PutBulkDataPayloadId(FName PackageName, const FGuid& BulkDataId, FSharedBuf
 {
 	FString ErrorMessage;
 	FCbWriter Builder;
-	bool bEditorDomainEnabled;
-	EPackageDigestResult FindHashResult = AppendPackageDigest(*IAssetRegistry::Get(), PackageName, Builder, bEditorDomainEnabled, ErrorMessage);
+	EDomainUse EditorDomainUse;
+	EPackageDigestResult FindHashResult = AppendPackageDigest(*IAssetRegistry::Get(), PackageName, Builder, EditorDomainUse, ErrorMessage);
 	switch (FindHashResult)
 	{
 	case EPackageDigestResult::Success:
@@ -990,7 +1030,7 @@ void PutBulkDataPayloadId(FName PackageName, const FGuid& BulkDataId, FSharedBuf
 		return;
 	}
 	}
-	if (!bEditorDomainEnabled)
+	if (!EnumHasAnyFlags(EditorDomainUse, EDomainUse::SaveEnabled))
 	{
 		return;
 	}

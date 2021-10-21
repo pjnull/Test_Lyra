@@ -85,8 +85,8 @@ bool TryCreateKey(FName PackageName, TArrayView<FName> SortedBuildDependencies, 
 	FCbWriter KeyBuilder;
 	UE::EditorDomain::EPackageDigestResult Result;
 	FString ErrorMessage;
-	bool bEditorDomainEnabled;
-	Result = UE::EditorDomain::AppendPackageDigest(*AssetRegistry, PackageName, KeyBuilder, bEditorDomainEnabled, ErrorMessage);
+	UE::EditorDomain::EDomainUse EditorDomainUse;
+	Result = UE::EditorDomain::AppendPackageDigest(*AssetRegistry, PackageName, KeyBuilder, EditorDomainUse, ErrorMessage);
 	if (Result != UE::EditorDomain::EPackageDigestResult::Success)
 	{
 		if (OutErrorMessage) *OutErrorMessage = MoveTemp(ErrorMessage);
@@ -95,7 +95,7 @@ bool TryCreateKey(FName PackageName, TArrayView<FName> SortedBuildDependencies, 
 
 	for (FName DependencyName : SortedBuildDependencies)
 	{
-		Result = UE::EditorDomain::AppendPackageDigest(*AssetRegistry, DependencyName, KeyBuilder, bEditorDomainEnabled, ErrorMessage);
+		Result = UE::EditorDomain::AppendPackageDigest(*AssetRegistry, DependencyName, KeyBuilder, EditorDomainUse, ErrorMessage);
 		if (Result != UE::EditorDomain::EPackageDigestResult::Success)
 		{
 			if (OutErrorMessage)
