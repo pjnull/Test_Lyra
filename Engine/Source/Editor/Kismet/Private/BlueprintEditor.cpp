@@ -3948,7 +3948,7 @@ void FBlueprintEditor::OpenBlueprintDebugger()
 {
 	TSharedPtr<SDockTab> DebuggerTab = FGlobalTabmanager::Get()->TryInvokeTab(FBlueprintEditorTabs::BlueprintDebuggerID);
 	TSharedPtr<FTabManager> DebuggerTabManager = FGlobalTabmanager::Get()->GetTabManagerForMajorTab(DebuggerTab);
-	if (TabManager.IsValid())
+	if (DebuggerTabManager.IsValid())
 	{
 		const FName DataFlowTabName(TEXT("ExecutionFlowApp"));
 		TSharedPtr<SDockTab> DataFlowTab = DebuggerTabManager->TryInvokeTab(DataFlowTabName);
