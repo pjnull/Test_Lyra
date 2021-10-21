@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
 #include "GameplayTagsManager.h"
+#include <string>
 
 enum class ENativeGameplayTagToken { PRIVATE_USE_MACRO_INSTEAD };
 
