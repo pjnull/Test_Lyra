@@ -1601,6 +1601,7 @@ struct FObjectNetPushIdHelper
 {
 private:
 	friend struct FNetPrivatePushIdHelper;
+	friend struct FNetObjectManagerPushIdHelper;
 
 	static void SetNetPushIdDynamic(UObject* Object, const int32 NewNetPushId)
 	{
