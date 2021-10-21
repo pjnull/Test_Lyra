@@ -104,8 +104,6 @@ private:
 	 */
 	TArray<UObject*> ResolveFieldOwnersUsingComponentHierarchy(const TArray<UObject*>& SectionObjects) const;
 #endif
-
-	static TMap<FName, TFunction<UObject* (UObject*)>> CustomResolvers;
 };
 
 /**
@@ -200,6 +198,7 @@ private:
 	/** Cached edit condition path used to enable the exposed property's edit condition. */
 	FRCFieldPathInfo CachedEditConditionPath;
 #endif
+	
 };
 
 /**
