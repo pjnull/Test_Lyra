@@ -121,6 +121,7 @@ void FShaderCookerStats::Initialize(uint32 Index)
 	for (int32 Platform = 0; Platform < SP_NumPlatforms; ++Platform)
 	{
 		// ShaderPlatformToShaderFormatName asserts if it's passed a deprecated value, so we'll filter out the removed platforms here.
+		PRAGMA_DISABLE_DEPRECATION_WARNINGS
 		switch (Platform)
 		{
 			case SP_OPENGL_SM4_REMOVED:
@@ -134,12 +135,16 @@ void FShaderCookerStats::Initialize(uint32 Index)
 			case SP_OPENGL_ES2_WEBGL_REMOVED:
 			case SP_OPENGL_ES2_IOS_REMOVED:
 			case SP_OPENGL_ES31_EXT_REMOVED:
+			case SP_METAL_SM5_NOTESS_REMOVED:
 			case SP_VULKAN_SM4_REMOVED:
 			case SP_METAL_MACES2_REMOVED:
 			case SP_SWITCH_REMOVED:
 			case SP_SWITCH_FORWARD_REMOVED:
+			case SP_VULKAN_SM5_LUMIN_REMOVED:
+			case SP_VULKAN_ES3_1_LUMIN_REMOVED:
 				continue;
 		}
+		PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 		FString FormatName = ShaderPlatformToShaderFormatName((EShaderPlatform)Platform).ToString();
 		if (FormatName.Len() > 0)
