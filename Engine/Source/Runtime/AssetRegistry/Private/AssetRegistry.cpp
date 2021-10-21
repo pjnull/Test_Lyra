@@ -962,6 +962,11 @@ UAssetRegistryImpl::~UAssetRegistryImpl()
 	{
 		FCoreUObjectDelegates::OnAssetLoaded.RemoveAll(this);
 	}
+
+	if (bAddMetaDataTagsToOnGetExtraObjectTags)
+	{
+		UObject::FAssetRegistryTag::OnGetExtraObjectTags.RemoveAll(this);
+	}
 #endif // WITH_EDITOR
 
 	if (HasAnyFlags(RF_ClassDefaultObject))
