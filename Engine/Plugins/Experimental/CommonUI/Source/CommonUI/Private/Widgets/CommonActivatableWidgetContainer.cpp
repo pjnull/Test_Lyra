@@ -192,6 +192,7 @@ void UCommonActivatableWidgetContainerBase::HandleSwitcherIsTransitioningChanged
 {
 	// While the switcher is transitioning, put up the guard to intercept all input
 	MyInputGuard->SetVisibility(bIsTransitioning ? EVisibility::Visible : EVisibility::Collapsed);
+	OnTransitioningChanged.Broadcast(this, bIsTransitioning);
 }
 
 void UCommonActivatableWidgetContainerBase::HandleActiveWidgetDeactivated(UCommonActivatableWidget* DeactivatedWidget)
@@ -274,14 +275,28 @@ void UCommonActivatableWidgetContainerBase::HandleActiveIndexChanged(int32 Activ
 	OnDisplayedWidgetChanged().Broadcast(DisplayedWidget);
 }
 
-UCommonActivatableWidget* UCommonActivatableWidgetStack::GetRootContent() const
+void UCommonActivatableWidgetContainerBase::SetTransitionDuration(float Duration)
 {
-	return RootContentWidget;
+	TransitionDuration = Duration;
+	if (MySwitcher.IsValid())
+	{
+		MySwitcher->SetTransition(TransitionDuration, TransitionCurveType);
+	}
+}
+
+float UCommonActivatableWidgetContainerBase::GetTransitionDuration() const
+{
+	return TransitionDuration;
 }
 
 //////////////////////////////////////////////////////////////////////////
 // UCommonActivatableWidgetStack
 //////////////////////////////////////////////////////////////////////////
+
+UCommonActivatableWidget* UCommonActivatableWidgetStack::GetRootContent() const
+{
+	return RootContentWidget;
+}
 
 void UCommonActivatableWidgetStack::SynchronizeProperties()
 {
@@ -313,6 +328,8 @@ void UCommonActivatableWidgetStack::OnWidgetAddedToList(UCommonActivatableWidget
 {
 	if (MySwitcher)
 	{
+		ensure(MySwitcher->GetNumWidgets() <= 1);
+
 		//@todo DanH: Rig up something to skip to an index immediately but still play the intro portion of the transition on the new index
 		//		Might be as simple as changing the properties to separate intro and outro durations?
 		//		Eh, but even in this case we only want to skip when we're going from an empty 0th entry. Every other transition should still do the full fade.
