@@ -6834,7 +6834,7 @@ void FStarshipEditorStyle::FStyle::SetupToolkitStyles()
 	{
 		// Tab icons
 		{
-			Set( "FontEditor.Tabs.Preview", new IMAGE_BRUSH( "/Icons/icon_Genericfinder_16x", Icon16x16 ) );
+			Set( "FontEditor.Tabs.Preview", new IMAGE_BRUSH_SVG( "Starship/Common/Search", Icon16x16 ) );
 			Set( "FontEditor.Tabs.Properties", new IMAGE_BRUSH( "/Icons/icon_tab_SelectionDetails_16x", Icon16x16 ) );
 			Set( "FontEditor.Tabs.PageProperties", new IMAGE_BRUSH( "/Icons/properties_16x", Icon16x16 ) );
 		}
