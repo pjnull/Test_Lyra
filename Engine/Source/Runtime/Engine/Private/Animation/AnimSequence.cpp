@@ -672,8 +672,9 @@ void UAnimSequence::Serialize(FArchive& Ar)
 			MaxNumberOfTrackKeys = FMath::Max(MaxNumberOfTrackKeys, Track.ScaleKeys.Num());
 		}
 
-		// Test whether or not there are more track keys than the value stored, only check for greater then as uniform tracks will have a single key and identity scaling with result in zero keys
-		if (MaxNumberOfTrackKeys > NumberOfKeys)
+		const bool bUniformOrIdentityKeys = MaxNumberOfTrackKeys == 0 || MaxNumberOfTrackKeys == 1;
+		// Test whether or not there are more track keys than the value stored, check for greater than or less than if the # of keys does not indicate single key or identity tracks
+		if (MaxNumberOfTrackKeys > NumberOfKeys	|| (!bUniformOrIdentityKeys && MaxNumberOfTrackKeys < NumberOfKeys))
 		{
 			UE_LOG(LogAnimation, Warning, TEXT("Animation %s needs resaving - Invalid number of keys %i stored according to maximum number animation data track keys. Setting new number of keys %i."), *GetName(), NumberOfKeys, MaxNumberOfTrackKeys);
 			NumberOfKeys = MaxNumberOfTrackKeys;
