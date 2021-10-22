@@ -148,6 +148,46 @@ void FDisplayClusterViewportManager::ResetScene()
 	}
 }
 
+bool FDisplayClusterViewportManager::ShouldUseFullSizeFrameTargetableResource() const
+{
+	check(IsInGameThread());
+
+	if (PostProcessManager->ShouldUseFullSizeFrameTargetableResource())
+	{
+		return true;
+	}
+
+	for (const FDisplayClusterViewport* Viewport : Viewports)
+	{
+		if (Viewport && Viewport->ShouldUseFullSizeFrameTargetableResource())
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool FDisplayClusterViewportManager::ShouldUseAdditionalFrameTargetableResource() const
+{
+	check(IsInGameThread());
+
+	if (PostProcessManager->ShouldUseAdditionalFrameTargetableResource())
+	{
+		return true;
+	}
+
+	for (const FDisplayClusterViewport* Viewport : Viewports)
+	{
+		if (Viewport && Viewport->ShouldUseAdditionalFrameTargetableResource())
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
 bool FDisplayClusterViewportManager::UpdateConfiguration(EDisplayClusterRenderFrameMode InRenderMode, const FString& InClusterNodeId, ADisplayClusterRootActor* InRootActorPtr)
 {
 	if (InRootActorPtr)
@@ -166,7 +206,14 @@ bool FDisplayClusterViewportManager::UpdateConfiguration(EDisplayClusterRenderFr
 	return false;
 }
 
-bool FDisplayClusterViewportManager::BeginNewFrame(class FViewport* InViewport, UWorld* InWorld, FDisplayClusterRenderFrame& OutRenderFrame)
+const FDisplayClusterRenderFrameSettings& FDisplayClusterViewportManager::GetRenderFrameSettings() const
+{
+	check(IsInGameThread());
+
+	return Configuration->GetRenderFrameSettings();
+}
+
+bool FDisplayClusterViewportManager::BeginNewFrame(FViewport* InViewport, UWorld* InWorld, FDisplayClusterRenderFrame& OutRenderFrame)
 {
 	check(IsInGameThread());
 
@@ -200,28 +247,31 @@ bool FDisplayClusterViewportManager::BeginNewFrame(class FViewport* InViewport, 
 	// Initialize viewports from new render settings, and create new contexts, reset prev frame resources
 	for (FDisplayClusterViewport* Viewport : Viewports)
 	{
-		if (Viewport->UpdateFrameContexts(ViewPassNum, Configuration->GetRenderFrameSettings()))
+		if (Viewport->UpdateFrameContexts(ViewPassNum, GetRenderFrameSettings()))
 		{
 			ViewPassNum += Viewport->Contexts.Num();
 		}
 	}
 
 	// Build new frame structure
-	if (!RenderFrameManager->BuildRenderFrame(InViewport, Configuration->GetRenderFrameSettings(), Viewports, OutRenderFrame))
+	if (!RenderFrameManager->BuildRenderFrame(InViewport, GetRenderFrameSettings(), Viewports, OutRenderFrame))
 	{
 		return false;
 	}
 
 	// Allocate resources for frame
-	if (!RenderTargetManager->AllocateRenderFrameResources(InViewport, Configuration->GetRenderFrameSettings(), Viewports, OutRenderFrame))
+	if (!RenderTargetManager->AllocateRenderFrameResources(InViewport, GetRenderFrameSettings(), Viewports, OutRenderFrame))
 	{
 		return false;
 	}
 
-	// Update TextureShare links
 	for (FDisplayClusterViewport* Viewport : Viewports)
 	{
-		Viewport->TextureShare.UpdateLinkSceneContextToShare(*Viewport);
+		if (Viewport)
+		{
+			// Update TextureShare links
+			Viewport->TextureShare.UpdateLinkSceneContextToShare(*Viewport);
+		}
 	}
 
 	// Update desired views number
@@ -255,7 +305,7 @@ void FDisplayClusterViewportManager::FinalizeNewFrame()
 	}
 
 	// Send render frame settings to rendering thread
-	ViewportManagerProxy->ImplUpdateRenderFrameSettings(Configuration->GetRenderFrameSettings());
+	ViewportManagerProxy->ImplUpdateRenderFrameSettings(GetRenderFrameSettings());
 
 	// Send updated viewports data to render thread proxy
 	ViewportManagerProxy->ImplUpdateViewports(Viewports);

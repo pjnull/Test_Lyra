@@ -24,6 +24,7 @@ class IDisplayClusterProjectionPolicy;
 
 class  UDisplayClusterConfigurationViewport;
 struct FDisplayClusterConfigurationProjection;
+struct FDisplayClusterRenderFrameSettings;
 
 class FViewport;
 
@@ -50,7 +51,7 @@ public:
 
 	virtual bool UpdateConfiguration(EDisplayClusterRenderFrameMode InRenderMode, const FString& InClusterNodeId, class ADisplayClusterRootActor* InRootActorPtr) override;
 
-	virtual bool BeginNewFrame(class FViewport* InViewport, UWorld* InWorld, FDisplayClusterRenderFrame& OutRenderFrame) override;
+	virtual bool BeginNewFrame(FViewport* InViewport, UWorld* InWorld, FDisplayClusterRenderFrame& OutRenderFrame) override;
 	virtual void FinalizeNewFrame() override;
 
 	virtual void ConfigureViewFamily(const FDisplayClusterRenderFrame::FFrameRenderTarget& InFrameTarget, const FDisplayClusterRenderFrame::FFrameViewFamily& InFrameViewFamily, FSceneViewFamilyContext& InOutViewFamily) override;
@@ -102,8 +103,13 @@ public:
 		return *ViewportManagerProxy;
 	}
 
+	const FDisplayClusterRenderFrameSettings& GetRenderFrameSettings() const;
+
 	TSharedPtr<FDisplayClusterViewportPostProcessManager, ESPMode::ThreadSafe> GetPostProcessManager() const
 	{ return PostProcessManager; }
+
+	bool ShouldUseAdditionalFrameTargetableResource() const;
+	bool ShouldUseFullSizeFrameTargetableResource() const;
 
 protected:
 	friend FDisplayClusterViewportManagerProxy;
@@ -124,4 +130,5 @@ private:
 	FDisplayClusterViewportManagerProxy* ViewportManagerProxy = nullptr;
 
 	// Pointer to the current scene
-	TWeakObjectPtr<UWorld> CurrentWorldRef;};
+	TWeakObjectPtr<UWorld> CurrentWorldRef;
+};
