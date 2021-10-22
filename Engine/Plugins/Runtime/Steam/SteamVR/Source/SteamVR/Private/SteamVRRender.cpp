@@ -66,7 +66,7 @@ void FSteamVRHMD::PostRenderView_RenderThread(FRHICommandListImmediate& RHICmdLi
 
 bool FSteamVRHMD::IsActiveThisFrame_Internal(const FSceneViewExtensionContext& Context) const
 {
-	return Context.IsStereoSupported() && !IsMetalPlatform(GMaxRHIShaderPlatform);
+	return FHMDSceneViewExtension::IsActiveThisFrame_Internal(Context) && !IsMetalPlatform(GMaxRHIShaderPlatform);
 }
 
 static void DrawOcclusionMesh(FRHICommandList& RHICmdList, EStereoscopicPass StereoPass, const FHMDViewMesh MeshAssets[])

@@ -1956,16 +1956,10 @@ namespace OculusHMD
 	}
 
 
-	bool FOculusHMD::IsActiveThisFrame_Internal(const FSceneViewExtensionContext& Context) const
-	{
-		// We need to check the Context and Context-contained viewport for explicit stereo disallowment.
-		return Context.IsStereoSupported();
-	}
-
 
 	FOculusHMD::FOculusHMD(const FAutoRegister& AutoRegister)
 		: FHeadMountedDisplayBase(nullptr)
-		, FSceneViewExtensionBase(AutoRegister)
+		, FHMDSceneViewExtension(AutoRegister)
 		, ConsoleCommands(this)
 		, bShutdownRequestQueued(false)
 	{

@@ -48,7 +48,7 @@ namespace
 }
 
 FDefaultStereoLayers::FDefaultStereoLayers(const FAutoRegister& AutoRegister, FHeadMountedDisplayBase* InHMDDevice) 
-	: FSceneViewExtensionBase(AutoRegister)
+	: FHMDSceneViewExtension(AutoRegister)
 	, HMDDevice(InHMDDevice)
 {
 
@@ -292,10 +292,6 @@ void FDefaultStereoLayers::PostRenderView_RenderThread(FRHICommandListImmediate&
 	RHICmdList.EndRenderPass();
 }
 
-bool FDefaultStereoLayers::IsActiveThisFrame_Internal(const FSceneViewExtensionContext& Context) const
-{
-	return Context.IsStereoSupported();
-}
 
 void FDefaultStereoLayers::SetupViewFamily(FSceneViewFamily& InViewFamily)
 {
