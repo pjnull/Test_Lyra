@@ -67,6 +67,8 @@ namespace ENavigationCoordSystem
 	};
 }
 
+// LWC_TODO_AI: Most the FVector3fs in this file should probably be FVector. Should be done prior to 5.0!
+
 /** Area modifier: cylinder shape */
 struct FCylinderNavAreaData
 {
@@ -89,6 +91,7 @@ struct FConvexNavAreaData
 	float MaxZ;
 };
 
+// LWC_TODO_AI: This struct and related structs should be using FVector not FVector3f! Should be done prior to 5.0!
 /** Area modifier: base */
 struct ENGINE_API FAreaNavModifier : public FNavigationModifier
 {
