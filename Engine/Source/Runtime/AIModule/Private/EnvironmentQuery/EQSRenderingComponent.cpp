@@ -281,7 +281,7 @@ UEQSRenderingComponent::UEQSRenderingComponent(const FObjectInitializer& ObjectI
 {
 }
 
-#if USE_EQS_DEBUGGER
+#if UE_ENABLE_DEBUG_DRAWING && USE_EQS_DEBUGGER
 FDebugRenderSceneProxy* UEQSRenderingComponent::CreateDebugSceneProxy()
 {
 	FEQSSceneProxy* NewSceneProxy = new FEQSSceneProxy(*this, DrawFlagName, DebugDataSolidSpheres, DebugDataTexts);
