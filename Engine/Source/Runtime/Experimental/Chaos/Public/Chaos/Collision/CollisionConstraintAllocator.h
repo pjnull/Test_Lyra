@@ -462,8 +462,13 @@ namespace Chaos
 			if(Constraints.Num())
 			{
 				// We need to sort constraints for solver stability
+				// We have to use StableSort so that constraints of the same pair stay in the same order
+				// Otherwise the order within each pair can change due to where they start out in the array
+				// @todo(chaos): we should label each contact (and shape) for things like warm starting GJK
+				// and so we could use that label as part of the key
+				// and then we could use regular Sort (which is faster)			
 				// @todo(chaos): this can be moved to the island and therefoe done in parallel
-				Constraints.Sort(ContactConstraintSortPredicate);
+				Constraints.StableSort(ContactConstraintSortPredicate);
 			}
 		}
 
