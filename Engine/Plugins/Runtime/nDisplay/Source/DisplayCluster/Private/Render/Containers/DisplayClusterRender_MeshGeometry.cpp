@@ -367,6 +367,7 @@ int32 FDisplayCluster_MeshGeometryLoaderOBJ::ExtractFaceVertex(const FString& Li
 	else
 	{
 		return -1;
+	}
 
 	int32 OutIndex = Faces.Find(OutFaceIdx);
 	if (OutIndex >= 0)
