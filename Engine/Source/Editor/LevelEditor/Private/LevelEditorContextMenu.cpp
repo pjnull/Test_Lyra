@@ -148,6 +148,14 @@ public:
 	 */
 	static void FillSourceControlMenu(UToolMenu* Menu);
 
+	/**
+	 * Adds the entry for Select Immediate Children depending on the current selection
+	 * 
+	 * @param Section			The section to add items to
+	 * @param SelectedActors	Current list of selected actors
+	 * @param Context			Menu context, used to determine whether entry is needed
+	 */
+	static void AddSelectChildrenEntry(FToolMenuSection& Section, const TArray<AActor*>& SelectedActors, ULevelEditorContextMenuContext* Context);
 };
 
 FSelectedActorInfo FLevelEditorContextMenuImpl::SelectionInfo;
@@ -381,6 +389,8 @@ void FLevelEditorContextMenu::RegisterActorContextMenu()
 			// Options for editing, transforming, and manipulating this actor
 			// In most cases, you DO NOT want to extend this section; look at ActorUETools or ActorTypeTools below
 			FToolMenuSection& Section = InMenu->AddSection("ActorOptions", LOCTEXT("ActorOptionsHeading", "Actor Options"));
+
+			FLevelEditorContextMenuImpl::AddSelectChildrenEntry(Section, SelectedActors, LevelEditorContext);
 
 			Section.AddSubMenu(
 				"EditSubMenu",
@@ -1384,6 +1394,33 @@ void FLevelEditorContextMenuImpl::FillSourceControlMenu(UToolMenu* Menu)
 	FToolMenuSection& Section = Menu->AddSection(TEXT("Source Control"));
 
 	Section.AddMenuEntry(FLevelEditorCommands::Get().ShowActorHistory);
+}
+
+void FLevelEditorContextMenuImpl::AddSelectChildrenEntry(FToolMenuSection& Section, const TArray<AActor*>& SelectedActors, ULevelEditorContextMenuContext* Context)
+{
+	// Don't show in main Actor menu because it's already available from the Select pulldown menu.
+	if (Context->ContextType == ELevelEditorMenuContext::MainMenu)
+	{
+		return;
+	}
+
+	bool bHasAttachedChildren = false;
+	for (AActor* Actor : SelectedActors)
+	{
+		TArray<AActor*> AttachedActors;
+		Actor->GetAttachedActors(AttachedActors);
+		if (!AttachedActors.IsEmpty())
+		{
+			bHasAttachedChildren = true;
+			break;
+		}
+	}
+
+	// Only show if there are attached children to prevent crowding the context menu all the time.
+	if (bHasAttachedChildren)
+	{
+		Section.AddMenuEntry(FLevelEditorCommands::Get().SelectImmediateChildren);
+	}
 }
 
 void FLevelScriptEventMenuHelper::FillLevelBlueprintEventsMenu(FToolMenuSection& Section, const TArray<AActor*>& SelectedActors)
