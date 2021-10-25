@@ -412,7 +412,7 @@ TIoStatusOr<uint64> FZenStoreHttpClient::GetChunkSize(const FIoChunkId& Id)
 	UE::Zen::FZenScopedRequestPtr Request(RequestPool.Get());
 	TStringBuilder<128> ChunkUri;
 	ChunkUri << OplogPath << '/' << Id << "/info";
-	UE::Zen::FZenHttpRequest::Result Res = Request->PerformBlockingHead(ChunkUri, Zen::EContentType::CbObject);
+	UE::Zen::FZenHttpRequest::Result Res = Request->PerformBlockingDownload(ChunkUri, nullptr, Zen::EContentType::CbObject);
 	if (Res == Zen::FZenHttpRequest::Result::Success && Request->GetResponseCode() == 200)
 	{
 		FCbObjectView ResponseObj = Request->GetResponseAsObject();
