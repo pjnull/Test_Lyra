@@ -5370,7 +5370,7 @@ void FEngineLoop::Tick()
 
 		if (ConcurrentTask.GetReference())
 		{
-			CSV_SCOPED_SET_WAIT_STAT(Slate);
+			CSV_SCOPED_SET_WAIT_STAT(ConcurrentWithSlate);
 
 			QUICK_SCOPE_CYCLE_COUNTER(STAT_ConcurrentWithSlateTickTasks_Wait);
 			check(ConcurrentTaskCompleteEvent);
