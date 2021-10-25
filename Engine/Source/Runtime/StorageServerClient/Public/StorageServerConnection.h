@@ -197,7 +197,8 @@ private:
 	friend class FStorageServerChunkBatchRequest;
 
 	int32 HandshakeRequest(TArrayView<const TSharedPtr<FInternetAddr>> HostAddresses);
-	FSocket* AcquireSocket();
+	FSocket* AcquireSocketFromPool();
+	FSocket* AcquireNewSocket();
 	void ReleaseSocket(FSocket* Socket, bool bKeepAlive);
 
 	ISocketSubsystem& SocketSubsystem;

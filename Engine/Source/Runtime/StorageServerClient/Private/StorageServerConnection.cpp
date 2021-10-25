@@ -98,23 +98,34 @@ FSocket* FStorageServerRequest::Send(FStorageServerConnection& Owner)
 	};
 
 	int32 Attempts = 0;
-	while (Attempts++ < 10)
+	while (Attempts < 10)
 	{
-		FSocket* Socket = Owner.AcquireSocket();
-
+		FSocket* Socket;
+		FSocket* SocketFromPool;
+		Socket = SocketFromPool = Owner.AcquireSocketFromPool();
 		if (!Socket)
 		{
-			break;
+			Socket = Owner.AcquireNewSocket();
+			if (!Socket)
+			{
+				++Attempts;
+				continue;
+			}
 		}
 
-		if (Send(Socket, reinterpret_cast<const uint8*>(HeaderBuffer.GetData()), HeaderBuffer.Len()) &&
-			Send(Socket, BodyBuffer.GetData(), BodyBuffer.Num()))
+		if (!Send(Socket, reinterpret_cast<const uint8*>(HeaderBuffer.GetData()), HeaderBuffer.Len()) ||
+			!Send(Socket, BodyBuffer.GetData(), BodyBuffer.Num()))
 		{
-			return Socket;
+			Owner.ReleaseSocket(Socket, false);
+			if (!SocketFromPool)
+			{
+				++Attempts;
+			}
+			continue;
 		}
-		UE_LOG(LogStorageServerConnection, Warning, TEXT("Failed to send request to storage server. Retrying..."));
-		Owner.ReleaseSocket(Socket, false);
+		return Socket;
 	}
+	UE_LOG(LogStorageServerConnection, Fatal, TEXT("Failed sending request to storage server."));
 	return nullptr;
 }
 
@@ -622,31 +633,27 @@ FStorageServerChunkBatchRequest FStorageServerConnection::NewChunkBatchRequest()
 	return FStorageServerChunkBatchRequest(*this, *ResourceBuilder, Hostname);
 }
 
-FSocket* FStorageServerConnection::AcquireSocket()
+FSocket* FStorageServerConnection::AcquireSocketFromPool()
 {
+	FScopeLock Lock(&SocketPoolCritical);
+	if (!SocketPool.IsEmpty())
 	{
-		FScopeLock Lock(&SocketPoolCritical);
-		if (!SocketPool.IsEmpty())
-		{
-			return SocketPool.Pop(false);
-		}
+		return SocketPool.Pop(false);
+	}
+	return nullptr;
+}
+
+FSocket* FStorageServerConnection::AcquireNewSocket()
+{
+	FSocket* Socket = SocketSubsystem.CreateSocket(NAME_Stream, TEXT("StorageServer"), ServerAddr->GetProtocolType());
+	check(Socket);
+
+	if (Socket->Connect(*ServerAddr))
+	{
+		return Socket;
 	}
 
-	for (int32 Attempt = 0, MaxAttempts = 10; Attempt < MaxAttempts; Attempt++)
-	{
-		FSocket* Socket = SocketSubsystem.CreateSocket(NAME_Stream, TEXT("StorageServer"), ServerAddr->GetProtocolType());
-		check(Socket);
-
-		if (Socket->Connect(*ServerAddr))
-		{
-			return Socket;
-		}
-
-		delete Socket;
-	}
-
-	UE_LOG(LogStorageServerConnection, Log, TEXT("Failed to connect to storage server at %s."), *ServerAddr->ToString(true));
-
+	delete Socket;
 	return nullptr;
 }
 
