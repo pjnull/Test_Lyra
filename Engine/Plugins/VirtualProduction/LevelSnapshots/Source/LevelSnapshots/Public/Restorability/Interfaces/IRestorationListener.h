@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "ComponentInstanceDataCache.h"
+#include "Engine/World.h"
+#include "Templates/SubclassOf.h"
 
 class AActor;
 class UActorComponent;
@@ -22,7 +24,7 @@ struct FApplySnapshotPropertiesParams
 	/** Only valid when bWasRecreated = false */
 	TOptional<const FPropertySelection*> PropertySelection;
 	
-	/** Whether Object did not yet exist in the world and was recreated as result. */
+	/** Whether Object did not yet exist in the world and was recreated */
 	bool bWasRecreated;
 
 	FApplySnapshotPropertiesParams(UObject* Object, const FPropertySelectionMap& SelectedProperties, TOptional<const FPropertySelection*> PropertySelection, bool bWasRecreated)
@@ -41,7 +43,7 @@ struct FApplySnapshotToActorParams
 	/** All of the user's selected properties */
 	const FPropertySelectionMap& SelectedProperties;
 	
-	/** Whether Object did not yet exist in the world and was recreated as result. */
+	/** Whether Object did not yet exist in the world and was recreated */
 	bool bWasRecreated;
 
 	FApplySnapshotToActorParams(AActor* Actor, const FPropertySelectionMap& SelectedProperties, bool bWasRecreated)
@@ -136,6 +138,21 @@ public:
 	 * Called after PostApplySnapshotProperties, PostRecreateComponent, and PostRemoveComponent.
 	 */
 	virtual void PostApplySnapshotToActor(const FApplySnapshotToActorParams& Params) {}
+
+
+	/**
+	 * Called before an actor is recreated to the world and gives the opportunity to override settings.
+	 * You cannot override the Name.
+	 */
+	virtual void PreRecreateActor(UWorld* World, TSubclassOf<AActor> ActorClass, FActorSpawnParameters& InOutSpawnParameters) {}
+	
+	/** Called after an actor is recreated to the world (but before any data is applied to it) */
+	virtual void PostRecreateActor(AActor* RecreatedActor) {}
+
+
+	
+	/** Called before an actor is removed from the world. */
+	virtual void PreRemoveActor(AActor* ActorToRemove) {}
 
 	
 	

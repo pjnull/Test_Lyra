@@ -46,7 +46,7 @@ namespace
 		}
 		
 	
-		UClass* Class = SubobjectData->Class.ResolveClass();
+		UClass* Class = SubobjectData->Class.TryLoadClass<UObject>();
 		if (!Class)
 		{
 			UE_LOG(LogLevelSnapshots, Warning, TEXT("Class '%s' not found. Maybe it was removed?"), *SubobjectData->Class.ToString());
@@ -169,10 +169,12 @@ namespace
 				UE_LOG(LogLevelSnapshots, Error, TEXT("Failed to resolve object '%s' because its outer '%s' could not be resolved"), *OriginalObjectPath.ToString(), *WorldData.SerializedObjectReferences[SubobjectData.OuterIndex].ToString());
 				return nullptr;
 			}
-			
-			ResolvedObject = NewObject<UObject>(Outer, ExpectedClass, *ExtractLastSubobjectName(OriginalObjectPath));
+
+			// Must set RF_Transactional so object creation is transacted
+			ResolvedObject = NewObject<UObject>(Outer, ExpectedClass, *ExtractLastSubobjectName(OriginalObjectPath), SubobjectData.GetObjectFlags() | RF_Transactional);
 			if (ensureMsgf(ResolvedObject, TEXT("Failed to allocate '%s'"), *OriginalObjectPath.ToString()))
 			{
+				ResolvedObject->SetFlags(SubobjectData.GetObjectFlags());
 				FApplySnapshotToEditorArchive::ApplyToRecreatedEditorWorldObject(SubobjectData, WorldData, ResolvedObject, SnapshotVersion, SelectionMap);
 			}
 		}

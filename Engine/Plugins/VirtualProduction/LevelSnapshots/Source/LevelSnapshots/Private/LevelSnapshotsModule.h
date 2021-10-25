@@ -66,6 +66,11 @@ public:
 
 	void OnPreApplySnapshotToActor(const FApplySnapshotToActorParams& Params);
 	void OnPostApplySnapshotToActor(const FApplySnapshotToActorParams& Params);
+
+	void OnPreCreateActor(UWorld* World, TSubclassOf<AActor> ActorClass, FActorSpawnParameters& InOutSpawnParams);
+	void OnPostRecreateActor(AActor* Actor);
+	
+	void OnPreRemoveActor(AActor* Actor);
 	
 	void OnPreRecreateComponent(const FPreRecreateComponentParams& Params);
 	void OnPostRecreateComponent(UActorComponent* RecreatedComponent);

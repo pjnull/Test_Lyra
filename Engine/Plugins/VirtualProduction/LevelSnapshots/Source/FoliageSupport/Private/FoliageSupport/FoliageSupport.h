@@ -29,7 +29,7 @@ class FFoliageSupport
 	
 public:
 
-	using IRestorationListener::PostApplySnapshotProperties; 
+	using ICustomObjectSnapshotSerializer::PreApplySnapshotProperties; 
 	
 	static void Register(ILevelSnapshotsModule& Module);
 
@@ -47,6 +47,11 @@ public:
 	
 	//~ Begin IRestorationListener Interface
 	virtual void PostApplySnapshotToActor(const FApplySnapshotToActorParams& Params) override;
+	virtual void PreApplySnapshotProperties(const FApplySnapshotPropertiesParams& Params) override;
+	virtual void PostApplySnapshotProperties(const FApplySnapshotPropertiesParams& Params) override;
+	virtual void PreRecreateActor(UWorld* World, TSubclassOf<AActor> ActorClass, FActorSpawnParameters& InOutSpawnParameters) override;
+	virtual void PostRecreateActor(AActor* RecreatedActor) override;
+	virtual void PreRemoveActor(AActor* ActorToRemove) override;
 	virtual void PreRemoveComponent(UActorComponent* ComponentToRemove) override;
 	//~ End IRestorationListener Interface
 };

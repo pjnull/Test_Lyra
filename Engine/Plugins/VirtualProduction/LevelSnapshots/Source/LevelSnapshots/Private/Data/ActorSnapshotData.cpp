@@ -66,9 +66,23 @@ namespace
 			UClass* ComponentClass = SubobjectData.Class.TryLoadClass<UActorComponent>();
 			const FName ComponentName = *SnapshotUtil::ExtractLastSubobjectName(ComponentPath);
 			
-			PreCreateComponent(ComponentName, ComponentClass, ComponentData.CreationMethod);
-			Component = NewObject<UActorComponent>(ComponentOuter, ComponentClass, ComponentName);
-			PostCreateComponent(SubobjectData, Component);
+			const EObjectFlags ObjectFlags = SubobjectData.GetObjectFlags();
+			const bool bIsObjectFromSnapshotWorld = ComponentOuter->GetPackage()->HasAnyFlags(RF_Transient);
+			if (bIsObjectFromSnapshotWorld)
+			{
+				PreCreateComponent(ComponentName, ComponentClass, ComponentData.CreationMethod);
+				// Objects in transient snapshot world should not transact
+				Component = NewObject<UActorComponent>(ComponentOuter, ComponentClass, ComponentName, ObjectFlags & ~RF_Transactional);
+				PostCreateComponent(SubobjectData, Component);
+			}
+			else
+			{
+				PreCreateComponent(ComponentName, ComponentClass, ComponentData.CreationMethod);
+				// RF_Transactional must be set when the object is created so the creation transacted correctly
+				Component = NewObject<UActorComponent>(ComponentOuter, ComponentClass, ComponentName, ObjectFlags | RF_Transactional);
+				Component->SetFlags(ObjectFlags);
+				PostCreateComponent(SubobjectData, Component);
+			}
 		}
 			
 		// UActorComponent::PostInitProperties implicitly calls AddOwnedComponent but we have to manually add it to the other arrays
@@ -179,9 +193,13 @@ namespace
 			// Evil user might have manually deleted the component between filtering and applying the snapshot
 			if (ComponentToRemove.IsValid())
 			{
-				const FRemoveComponentScope NotifySnapshotListeners(ComponentToRemove.Get());
 				ComponentToRemove->Modify();
-				ComponentToRemove->DestroyComponent();
+				const FRemoveComponentScope NotifySnapshotListeners(ComponentToRemove.Get());
+				// Subscribers to ISnapshotListener::PreRemoveComponent are allowed to manually remove the component
+				if (ComponentToRemove.IsValid())
+				{
+					ComponentToRemove->DestroyComponent();
+				}
 			}
 		}
 	}
@@ -607,7 +625,7 @@ void FActorSnapshotData::DeserializeIntoEditorWorldActor(UWorld* SnapshotWorld, 
 			
 				// We may have modified render information, e.g. for lights we may have changed intensity or colour
 				// It may be more efficient to track whether we actually changed render state
-				Comp->MarkRenderStateDirty();
+				Comp->ReregisterComponent();
 	        }
 	    }
 	);

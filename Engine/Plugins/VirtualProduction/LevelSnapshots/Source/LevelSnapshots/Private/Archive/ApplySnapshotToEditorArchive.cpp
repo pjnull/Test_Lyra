@@ -171,13 +171,6 @@ void FApplySnapshotToEditorArchive::ApplyToExistingEditorWorldObject(FObjectSnap
 void FApplySnapshotToEditorArchive::ApplyToRecreatedEditorWorldObject(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InOriginalObject, UObject* InDeserializedVersion, const FPropertySelectionMap& InSelectionMapForResolvingSubobjects)
 {
 	const FApplySnapshotPropertiesScope NotifySnapshotListeners({ InOriginalObject, InSelectionMapForResolvingSubobjects, {}, true });
-#if WITH_EDITOR
-	InOriginalObject->PreEditChange(nullptr);
-	ON_SCOPE_EXIT
-	{
-		InOriginalObject->PostEditChange();	
-	};
-#endif
 	
 	// Apply all properties that we saved into the target actor.
 	// We assume that InOriginalObject was already created with the snapshot CDO as template: we do not need Step 2 from ApplyToExistingWorldObject.

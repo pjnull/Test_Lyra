@@ -440,6 +440,36 @@ void FLevelSnapshotsModule::OnPostApplySnapshotToActor(const FApplySnapshotToAct
 	}
 }
 
+void FLevelSnapshotsModule::OnPreCreateActor(UWorld* World, TSubclassOf<AActor> ActorClass, FActorSpawnParameters& InOutSpawnParams)
+{
+	SCOPED_SNAPSHOT_CORE_TRACE(RestorationListeners);
+	
+	for (const TSharedRef<IRestorationListener>& Listener : RestorationListeners)
+	{
+		Listener->PreRecreateActor(World, ActorClass, InOutSpawnParams);
+	}
+}
+
+void FLevelSnapshotsModule::OnPostRecreateActor(AActor* Actor)
+{
+	SCOPED_SNAPSHOT_CORE_TRACE(RestorationListeners);
+	
+	for (const TSharedRef<IRestorationListener>& Listener : RestorationListeners)
+	{
+		Listener->PostRecreateActor(Actor);
+	}
+}
+
+void FLevelSnapshotsModule::OnPreRemoveActor(AActor* Actor)
+{
+	SCOPED_SNAPSHOT_CORE_TRACE(RestorationListeners);
+	
+	for (const TSharedRef<IRestorationListener>& Listener : RestorationListeners)
+	{
+		Listener->PreRemoveActor(Actor);
+	}
+}
+
 void FLevelSnapshotsModule::OnPreRecreateComponent(const FPreRecreateComponentParams& Params)
 {
 	SCOPED_SNAPSHOT_CORE_TRACE(RestorationListeners);
