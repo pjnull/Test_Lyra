@@ -522,8 +522,7 @@ void UNiagaraSystem::BeginDestroy()
 	}
 #endif
 
-	//Should we just destroy all system sims here to simplify cleanup?
-	//FNiagaraWorldManager::DestroyAllSystemSimulations(this);
+	FNiagaraWorldManager::DestroyAllSystemSimulations(this);
 }
 
 void UNiagaraSystem::PreSave(const class ITargetPlatform* TargetPlatform)
