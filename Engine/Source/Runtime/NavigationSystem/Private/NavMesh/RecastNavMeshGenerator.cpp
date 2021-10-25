@@ -6669,7 +6669,7 @@ void FRecastNavMeshGenerator::ExportNavigationData(const FString& FileName) cons
 									ExportInfo.Convex.MinZ -= NavData->CellHeight;
 									ExportInfo.Convex.MaxZ += NavData->CellHeight;
 
-									ExportInfo.Convex.Points = LWC::ConvertArrayType<FVector3f>(ConvexVerts);
+									ExportInfo.Convex.Points = LWC::ConvertArrayType<FVector>(ConvexVerts);
 
 									AreaExport.Add(ExportInfo);
 								}								
