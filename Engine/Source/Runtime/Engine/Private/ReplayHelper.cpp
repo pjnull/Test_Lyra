@@ -1147,15 +1147,29 @@ void FReplayHelper::SaveExternalData(UNetConnection* Connection, FArchive& Ar)
 			{
 				if (ExternalData->NumBits > 0)
 				{
-					// Save payload size (in bits)
-					uint32 NumBits = ExternalData->NumBits;
-					Ar.SerializeIntPacked(NumBits);
+					FNetworkGUID NetworkGUID = ExternalData->NetGUID;
+					if (!NetworkGUID.IsValid())
+					{
+						// try the lookup again, it may not have been registered when the data was added
+						NetworkGUID = Connection->Driver->GuidCache->NetGUIDLookup.FindRef(Object);
+					}
 
-					// Save GUID
-					Ar << ExternalData->NetGUID;
+					if (NetworkGUID.IsValid())
+					{
+						// Save payload size (in bits)
+						uint32 NumBits = ExternalData->NumBits;
+						Ar.SerializeIntPacked(NumBits);
 
-					// Save payload
-					Ar.Serialize(ExternalData->Data.GetData(), ExternalData->Data.Num());
+						// Save GUID
+						Ar << NetworkGUID;
+
+						// Save payload
+						Ar.Serialize(ExternalData->Data.GetData(), ExternalData->Data.Num());
+					}
+					else
+					{
+						UE_LOG(LogDemo, Warning, TEXT("SaveExternalData: Discarding external data for object with no net guid: %s"), *GetNameSafe(Object));
+					}
 				}
 			}
 			else
@@ -1381,32 +1395,28 @@ bool FReplayHelper::SetExternalDataForObject(UNetConnection* Connection, UObject
 {
 	check(Connection && Connection->Driver);
 
-	if (FNetworkGUID* NetworkGUID = Connection->Driver->GuidCache->NetGUIDLookup.Find(OwningObject))
+	// It's fine if we don't find the guid, we may replicate the actor later this frame which will register it
+	FNetworkGUID NetworkGUID = Connection->Driver->GuidCache->NetGUIDLookup.FindRef(OwningObject);
+
+	if (!ExternalDataMap.Contains(OwningObject))
 	{
-		if (!ExternalDataMap.Contains(OwningObject))
-		{
-			ObjectsWithExternalDataMap.Add(OwningObject, *NetworkGUID);
+		ObjectsWithExternalDataMap.Add(OwningObject, NetworkGUID);
 
-			FExternalDataWrapper ExternalData;
-			ExternalData.NetGUID = *NetworkGUID;
-			ExternalData.NumBits = NumBits;
+		FExternalDataWrapper ExternalData;
+		ExternalData.NetGUID = NetworkGUID;
+		ExternalData.NumBits = NumBits;
 
-			const int32 NumBytes = (NumBits + 7) >> 3;
+		const int32 NumBytes = (NumBits + 7) >> 3;
 
-			ExternalData.Data.AddUninitialized(NumBytes);
-			FMemory::Memcpy(ExternalData.Data.GetData(), Src, NumBytes);
+		ExternalData.Data.AddUninitialized(NumBytes);
+		FMemory::Memcpy(ExternalData.Data.GetData(), Src, NumBytes);
 
-			ExternalDataMap.Emplace(OwningObject, MoveTemp(ExternalData));
-			return true;
-		}
-		else
-		{
-			UE_LOG(LogDemo, Warning, TEXT("SetExternalDataForObject: Discarding external data for object, already exists: %s"), *GetNameSafe(OwningObject));
-		}
+		ExternalDataMap.Emplace(OwningObject, MoveTemp(ExternalData));
+		return true;
 	}
 	else
 	{
-		UE_LOG(LogDemo, Warning, TEXT("SetExternalDataForObject: Discarding external data for object with no net guid: %s"), *GetNameSafe(OwningObject));
+		UE_LOG(LogDemo, Warning, TEXT("SetExternalDataForObject: Discarding external data for object, already exists: %s"), *GetNameSafe(OwningObject));
 	}
 
 	return false;
