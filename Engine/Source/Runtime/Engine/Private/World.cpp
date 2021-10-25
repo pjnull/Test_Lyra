@@ -8134,15 +8134,15 @@ void UWorld::GetAssetRegistryTags(TArray<FAssetRegistryTag>& OutTags) const
 			Blueprint->GetAssetRegistryTags(OutTags);
 		}
 		// If there are no blueprints FiBData will be empty, the search manager will treat this as indexed
-
-		FBox LevelBounds;
-
-		if (UWorldPartition* WorldPartition = GetWorldPartition())
+								
+		if(IsPartitionedWorld())
 		{
-			LevelBounds = WorldPartition->GetWorldBounds();
+			static const FName NAME_LevelIsPartitioned(TEXT("LevelIsPartitioned"));
+			OutTags.Add(FAssetRegistryTag(NAME_LevelIsPartitioned, TEXT("1"), FAssetRegistryTag::TT_Hidden));
 		}
 		else
 		{
+			FBox LevelBounds;
 			if (PersistentLevel->LevelBoundsActor.IsValid())
 			{
 				LevelBounds = PersistentLevel->LevelBoundsActor.Get()->GetComponentsBoundingBox();
@@ -8151,24 +8151,18 @@ void UWorld::GetAssetRegistryTags(TArray<FAssetRegistryTag>& OutTags) const
 			{
 				LevelBounds = ALevelBounds::CalculateLevelBounds(PersistentLevel);
 			}
+
+			FVector LevelBoundsLocation;
+			FVector LevelBoundsExtent;
+			LevelBounds.GetCenterAndExtents(LevelBoundsLocation, LevelBoundsExtent);
+
+			static const FName NAME_LevelBoundsLocation(TEXT("LevelBoundsLocation"));
+			OutTags.Add(FAssetRegistryTag(NAME_LevelBoundsLocation, LevelBoundsLocation.ToCompactString(), FAssetRegistryTag::TT_Hidden));
+
+			static const FName NAME_LevelBoundsExtent(TEXT("LevelBoundsExtent"));
+			OutTags.Add(FAssetRegistryTag(NAME_LevelBoundsExtent, LevelBoundsExtent.ToCompactString(), FAssetRegistryTag::TT_Hidden));
 		}
-
-		FVector LevelBoundsLocation;
-		FVector LevelBoundsExtent;
-		LevelBounds.GetCenterAndExtents(LevelBoundsLocation, LevelBoundsExtent);
-
-		static const FName NAME_LevelBoundsLocation(TEXT("LevelBoundsLocation"));
-		OutTags.Add(FAssetRegistryTag(NAME_LevelBoundsLocation, LevelBoundsLocation.ToCompactString(), FAssetRegistryTag::TT_Hidden));
-
-		static const FName NAME_LevelBoundsExtent(TEXT("LevelBoundsExtent"));
-		OutTags.Add(FAssetRegistryTag(NAME_LevelBoundsExtent, LevelBoundsExtent.ToCompactString(), FAssetRegistryTag::TT_Hidden));
-
-		if (PersistentLevel->GetWorldPartition())
-		{
-			static const FName NAME_LevelIsPartitioned(TEXT("LevelIsPartitioned"));
-			OutTags.Add(FAssetRegistryTag(NAME_LevelIsPartitioned, TEXT("1"), FAssetRegistryTag::TT_Hidden));
-		}
-
+	
 		if (PersistentLevel->IsUsingExternalActors())
 		{
 			static const FName NAME_LevelIsUsingExternalActors(TEXT("LevelIsUsingExternalActors"));
