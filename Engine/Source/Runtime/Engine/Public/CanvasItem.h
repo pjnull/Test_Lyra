@@ -882,7 +882,7 @@ public:
 	 }
 
 	 /* Set the Color of the item. */
-	 virtual void SetColor( const FLinearColor& InColor ) override;
+	 virtual void SetColor( const FLinearColor& InColor ) override final;
 
 private:
 	

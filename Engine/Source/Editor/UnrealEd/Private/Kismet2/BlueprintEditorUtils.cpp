@@ -388,7 +388,7 @@ void FBasePinChangeHelper::Broadcast(UBlueprint* InBlueprint, UK2Node_EditablePi
 					{
 						const UClass* MemberParentClass = CallSite->FunctionReference.GetMemberParentClass(CallSite->GetBlueprintClassFromNode());
 						const bool bClassMatchesEasy = (MemberParentClass != nullptr)
-							&& (MemberParentClass->IsChildOf(SignatureClass) || MemberParentClass->IsChildOf(InBlueprint->GeneratedClass));
+							&& ((SignatureClass != nullptr && MemberParentClass->IsChildOf(SignatureClass)) || MemberParentClass->IsChildOf(InBlueprint->GeneratedClass));
 						const bool bClassMatchesHard = !bClassMatchesEasy && CallSite->FunctionReference.IsSelfContext() && (SignatureClass == nullptr)
 							&& (CallSiteBlueprint == InBlueprint || CallSiteBlueprint->SkeletonGeneratedClass->IsChildOf(InBlueprint->SkeletonGeneratedClass));
 
@@ -10057,7 +10057,7 @@ namespace
 
 				if (bReconstruct)
 				{
-					UBlueprint* FoundBlueprint = Node->HasValidBlueprint() ? FoundBlueprint = Node->GetBlueprint() : nullptr;
+					UBlueprint* FoundBlueprint = Node->HasValidBlueprint() ? Node->GetBlueprint() : nullptr;
 					InOnNodeFoundOrUpdated(FoundBlueprint, Node);
 				}
 			}

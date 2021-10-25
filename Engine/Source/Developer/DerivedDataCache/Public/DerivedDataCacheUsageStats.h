@@ -149,7 +149,7 @@ public:
 			}
 		}
 		else
-		{
+		{ //-V523
 			for (const auto& KVP : Stats)
 			{
 				COOK_STAT(UsageStatsMap.Add(FString::Printf(TEXT("%s: %s.%s"), *GraphPath, *GetCacheName(), *KVP.Key), KVP.Value));
