@@ -303,6 +303,7 @@ public:
 public:
 	FLidarPointCloudNormal() { Reset(); }
 	FLidarPointCloudNormal(const FVector3f& Normal) { SetFromVector(Normal); }
+	FLidarPointCloudNormal(const FPlane& Normal) { SetFromFloats(Normal.X, Normal.Y, Normal.Z); }
 	FLidarPointCloudNormal(const float& X, const float& Y, const float& Z) { SetFromFloats(X, Y, Z); }
 
 	bool operator==(const FLidarPointCloudNormal& Other) const { return X == Other.X && Y == Other.Y && Z == Other.Z; }
