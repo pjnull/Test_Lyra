@@ -1127,7 +1127,7 @@ public:
 	 *  @param bWarnIfFail If unable to update the Ini file due to incorrect path or unable to write will log a warning
 	 *  @return true if it was able to write false otherwise
 	 */
-	bool TryUpdateDefaultConfigFile(const FString& SpecificFileLocation = "", bool bWarnIfFail = false);
+	bool TryUpdateDefaultConfigFile(const FString& SpecificFileLocation = "", bool bWarnIfFail = true);
 
 	/**
 	 * Saves just the section(s) for this class into the global user ini file for the class (with just the changes from base)
