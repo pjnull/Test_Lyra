@@ -316,8 +316,7 @@ void FUnrealEdMisc::OnInit()
 	const double InitialEditorStartupTime = (FStudioAnalytics::GetAnalyticSeconds() - GStartTime);
 	UE_LOG(LogUnrealEdMisc, Log, TEXT("Loading editor; pre map load, took %.3f"), InitialEditorStartupTime);
 
-	FStudioAnalytics::FireEvent_Loading(TEXT("InitializeEditor"), InitialEditorStartupTime);
-
+	FStudioAnalytics::FireEvent_Loading(TEXT("InitializeEditor"), InitialEditorStartupTime, { FAnalyticsEventAttribute(TEXT("FirstTime"), true )});
 	// Check for automated build/submit option
 	const bool bDoAutomatedMapBuild = FParse::Param( ParsedCmdLine, TEXT("AutomatedMapBuild") );
 
@@ -535,7 +534,7 @@ void FUnrealEdMisc::OnInit()
 
 	TRACE_BOOKMARK(TEXT("Editor Startup"));
 
-	FStudioAnalytics::FireEvent_Loading(TEXT("TotalEditorStartup"), TotalEditorStartupTime);
+	FStudioAnalytics::FireEvent_Loading(TEXT("TotalEditorStartup"), TotalEditorStartupTime, { FAnalyticsEventAttribute(TEXT("FirstTime"), true ) } );
 
 	GShaderCompilingManager->PrintStats(true);
 }

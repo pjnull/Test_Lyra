@@ -72,7 +72,7 @@ TSharedRef<SWidget> SDerivedDataRemoteStoreDialog::GetGridPanel()
 	// Accumulate Totals
 	for (const FDerivedDataCacheResourceStat& Stat : DDCResourceStats)
 	{
-		DDCResourceStatsTotal.Accumulate(Stat);
+		DDCResourceStatsTotal += Stat;
 	}
 
 	const int64 TotalCount = DDCResourceStatsTotal.LoadCount + DDCResourceStatsTotal.BuildCount;
@@ -244,7 +244,7 @@ TSharedRef<SWidget> SDerivedDataResourceUsageDialog::GetGridPanel()
 	// Accumulate Totals
 	for (const FDerivedDataCacheResourceStat& Stat : DDCResourceStats)
 	{
-		DDCResourceStatsTotal.Accumulate(Stat);
+		DDCResourceStatsTotal += Stat;
 	}
 
 	PRAGMA_DISABLE_DEPRECATION_WARNINGS
