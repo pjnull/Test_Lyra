@@ -7,6 +7,7 @@
 #include "Actions/OptimusVariableActions.h"
 #include "Containers/Queue.h"
 #include "OptimusActionStack.h"
+#include "OptimusKernelSource.h"
 #include "OptimusDataTypeRegistry.h"
 #include "OptimusNodeGraph.h"
 #include "OptimusResourceDescription.h"
@@ -18,7 +19,8 @@
 #include "OptimusObjectVersion.h"
 #include "ComputeFramework/ComputeKernel.h"
 #include "DataInterfaces/DataInterfaceRawBuffer.h"
-#include "Nodes/OptimusNode_ComputeKernel.h"
+// FIXME: Use the interface instead.
+#include "Nodes/OptimusNode_CustomComputeKernel.h"
 #include "Nodes/OptimusNode_DataInterface.h"
 #include "Misc/UObjectToken.h"
 
@@ -636,7 +638,7 @@ bool UOptimusDeformer::Compile()
 
 			NodeDataInterfaceMap.Add(Node, DataInterface);
 		}
-		else if (const UOptimusNode_ComputeKernel* KernelNode = Cast<const UOptimusNode_ComputeKernel>(Node))
+		else if (const UOptimusNode_CustomComputeKernel* KernelNode = Cast<const UOptimusNode_CustomComputeKernel>(Node))
 		{
 			for (const UOptimusNodePin* Pin: KernelNode->GetPins())
 			{
@@ -647,7 +649,7 @@ bool UOptimusDeformer::Compile()
 					for (const UOptimusNodePin* ConnectedPin: UpdateGraph->GetConnectedPins(Pin))
 					{
 						// Make sure it connects to another kernel node.
-						if (Cast<const UOptimusNode_ComputeKernel>(ConnectedPin->GetNode()) &&
+						if (Cast<const UOptimusNode_CustomComputeKernel>(ConnectedPin->GetNode()) &&
 							ensure(Pin->GetDataType().IsValid()))
 						{
 							UTransientBufferDataInterface* TransientBufferDI =
@@ -680,7 +682,7 @@ bool UOptimusDeformer::Compile()
 	TArray<FKernelWithDataBindings> BoundKernels;
 	for (const UOptimusNode* Node: ConnectedNodes)
 	{
-		if (const UOptimusNode_ComputeKernel *KernelNode = Cast<const UOptimusNode_ComputeKernel>(Node))
+		if (const UOptimusNode_CustomComputeKernel *KernelNode = Cast<const UOptimusNode_CustomComputeKernel>(Node))
 		{
 			FOptimus_KernelParameterBindingList KernelParameterBindings;
 			FKernelWithDataBindings BoundKernel;
@@ -830,7 +832,7 @@ void UOptimusDeformer::OnKernelCompilationComplete(int32 InKernelIndex, const TA
 			UOptimusNodeGraph const* Graph = Graphs[GraphIndex];
 			if (ensure(Graph != nullptr && NodeIndex < Graph->Nodes.Num()))
 			{
-				UOptimusNode_ComputeKernel* KernelNode = Cast<UOptimusNode_ComputeKernel>(Graph->Nodes[NodeIndex]);
+				UOptimusNode_CustomComputeKernel* KernelNode = Cast<UOptimusNode_CustomComputeKernel>(Graph->Nodes[NodeIndex]);
 				if (ensure(KernelNode != nullptr))
 				{
 					KernelNode->ShaderSource.Diagnostics.Reset();
@@ -861,7 +863,7 @@ void UOptimusDeformer::OnKernelCompilationComplete(int32 InKernelIndex, const TA
 }
 
 
-EOptimusDiagnosticLevel UOptimusDeformer::ProcessCompilationMessage(UOptimusNode_ComputeKernel* InKernelNode, const FString& InMessage)
+EOptimusDiagnosticLevel UOptimusDeformer::ProcessCompilationMessage(UOptimusNode_CustomComputeKernel* InKernelNode, const FString& InMessage)
 {
 	// "/Engine/Generated/ComputeFramework/Kernel_LinearBlendSkinning.usf(19,39-63):  error X3013: 'DI000_ReadNumVertices': no matching 1 parameter function"	
 	// "OptimusNode_ComputeKernel_2(1,42):  error X3004: undeclared identifier 'a'"

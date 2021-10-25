@@ -1,0 +1,113 @@
+// Copyright Epic Games, Inc. All Rights Reserved.
+
+#pragma once
+
+#include "OptimusDataDomain.h"
+#include "OptimusNode_ComputeKernelBase.h"
+#include "OptimusDataType.h"
+#include "ComputeFramework/ComputeKernelSource.h"
+
+#include "Types/OptimusType_ShaderText.h"
+
+#include "OptimusNode_CustomComputeKernel.generated.h"
+
+
+class UOptimusComputeDataInterface;
+class USkeletalMesh;
+enum class EOptimusNodePinDirection : uint8;
+
+
+USTRUCT()
+struct FOptimus_ShaderBinding
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, Category=Binding)
+	FName Name;
+
+	UPROPERTY(EditAnywhere, Category = Binding, meta=(UseInResource))
+	FOptimusDataTypeRef DataType;
+};
+
+
+USTRUCT()
+struct FOptimus_ShaderDataBinding :
+	public FOptimus_ShaderBinding
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, Category = Binding)
+	FOptimusMultiLevelDataDomain DataDomain;
+};
+
+
+
+UCLASS()
+class UOptimusNode_CustomComputeKernel :
+	public UOptimusNode_ComputeKernelBase
+{
+	GENERATED_BODY()
+
+public:
+	UOptimusNode_CustomComputeKernel();
+
+	// UOptimusNode overrides
+	FName GetNodeCategory() const override 
+	{
+		return CategoryName::Deformers;
+	}
+
+	// UOptimusNode_ComputeKernelBase overrides
+	FString GetKernelName() const override;
+
+	/** Implement this to return the complete HLSL code for this kernel */
+	FString GetKernelSourceText() const override;
+	
+	UPROPERTY(EditAnywhere, Category=KernelConfiguration)
+	FString KernelName = "MyKernel";
+
+	UPROPERTY(EditAnywhere, Category = KernelConfiguration, meta=(Min=1))
+	int32 ThreadCount = 64;
+
+	UPROPERTY(EditAnywhere, Category = KernelConfiguration)
+	FOptimusDataDomain ExecutionDomain;
+
+	UPROPERTY(EditAnywhere, Category=Bindings)
+	TArray<FOptimus_ShaderBinding> Parameters;
+	
+	UPROPERTY(EditAnywhere, Category=Bindings)
+	TArray<FOptimus_ShaderDataBinding> InputBindings;
+
+	UPROPERTY(EditAnywhere, Category=Bindings)
+	TArray<FOptimus_ShaderDataBinding> OutputBindings;
+
+	UPROPERTY(EditAnywhere, Category = ShaderSource)
+	FOptimusType_ShaderText ShaderSource;
+
+#if defined(WITH_EDITOR)
+	void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
+
+	void PostLoad() override;
+	
+protected:
+	void ConstructNode() override;;
+
+private:
+	void UpdatePinTypes(
+		EOptimusNodePinDirection InPinDirection
+		);
+
+	void UpdatePinNames(
+	    EOptimusNodePinDirection InPinDirection);
+
+	void UpdatePinDataDomains(
+		EOptimusNodePinDirection InPinDirection
+		);
+	
+	void UpdatePreamble();
+
+	TArray<UOptimusNodePin *> GetKernelPins(
+		EOptimusNodePinDirection InPinDirection
+		) const;
+};

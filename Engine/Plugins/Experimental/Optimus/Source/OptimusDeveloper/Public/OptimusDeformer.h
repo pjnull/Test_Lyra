@@ -19,7 +19,7 @@ class UOptimusActionStack;
 class UOptimusDeformer;
 class UOptimusResourceDescription;
 class UOptimusVariableDescription;
-class UOptimusNode_ComputeKernel;
+class UOptimusNode_CustomComputeKernel;
 enum class EOptimusDiagnosticLevel : uint8;
 
 
@@ -238,7 +238,7 @@ private:
 	
 	void Notify(EOptimusGlobalNotifyType InNotifyType, UObject *InObject);
 
-	EOptimusDiagnosticLevel ProcessCompilationMessage(UOptimusNode_ComputeKernel* InKernelNode, const FString& InMessage);
+	EOptimusDiagnosticLevel ProcessCompilationMessage(UOptimusNode_CustomComputeKernel* InKernelNode, const FString& InMessage);
 
 	UPROPERTY()
 	TArray<TObjectPtr<UOptimusNodeGraph>> Graphs;
