@@ -999,7 +999,7 @@ static FHairStrandsVoxelResources AllocateVirtualVoxelResources(
 
 		// Update state data
 		OutViewStateData->VoxelWorldSize = VoxelWorldSize;
-		OutViewStateData->AllocatedPageCount = AllocatedPageCount;
+		OutViewStateData->VoxelAllocatedPageCount = AllocatedPageCount;
 	}
 
 	FHairStrandsVoxelResources Out;
