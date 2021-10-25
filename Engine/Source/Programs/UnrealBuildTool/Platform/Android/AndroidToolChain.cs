@@ -163,6 +163,12 @@ namespace UnrealBuildTool
 			return string.Format("{0}.{1}.{2}", ClangVersionMajor, ClangVersionMinor, ClangVersionPatch);
 		}
 
+		public bool IsNewNDKModel()
+		{
+			// Google changed NDK structure in r22+
+			return NDKVersionInt >= 220000;
+		}
+
 		/// <summary>
 		/// Checks if compiler version matches the requirements
 		/// </summary>
@@ -300,10 +306,14 @@ namespace UnrealBuildTool
 			ClangPath = Utils.CollapseRelativeDirectories(Path.Combine(NDKPath, @"toolchains/llvm", ArchitecturePath, @"bin/clang++" + ExeExtension));
 
 			// Android (6317467 based on r365631c1) clang version 9.0.8 
-			AndroidClangBuild = Utils.RunLocalProcessAndReturnStdOut(ClangPath, "--version");			
+			AndroidClangBuild = Utils.RunLocalProcessAndReturnStdOut(ClangPath, "--version");
 			try
 			{
 				AndroidClangBuild = Regex.Match(AndroidClangBuild, @"(\w+) based on").Groups[1].ToString();
+				if (String.IsNullOrEmpty(AndroidClangBuild))
+				{
+					AndroidClangBuild = Regex.Match(AndroidClangBuild, @"(\w+), based on").Groups[1].ToString();
+				}
 			}
 			catch
 			{
@@ -340,9 +350,15 @@ namespace UnrealBuildTool
 			ToolchainLinkParamsArm64 = " --target=aarch64-none-linux-android" + NDKApiLevel64Int + " --gcc-toolchain=\"" + GCCToolchainPath + "\" --sysroot=\"" + SysrootPath + "\" -DANDROID=1";
 			ToolchainLinkParamsx64 = " --target=x86_64-none-linux-android" + NDKApiLevel64Int + " --gcc-toolchain=\"" + GCCToolchainPath + "\" --sysroot=\"" + SysrootPath + "\" -DANDROID=1";
 
-			// use NDK version -D__ANDROID_API__ for r14b+
-			ToolchainParamsArm64 = ToolchainLinkParamsArm64 + " -D__ANDROID_API__=" + NDKApiLevel64Int;
-			ToolchainParamsx64 = ToolchainLinkParamsx64 + " -D__ANDROID_API__=" + NDKApiLevel64Int;
+			ToolchainParamsArm64 = ToolchainLinkParamsArm64;
+			ToolchainParamsx64 = ToolchainLinkParamsx64;
+
+			if (!IsNewNDKModel())
+			{
+				// We need to manually provide -D__ANDROID_API__ only for NDK versions prior to r22
+				ToolchainParamsArm64 += " -D__ANDROID_API__=" + NDKApiLevel64Int;
+				ToolchainParamsx64 += " -D__ANDROID_API__=" + NDKApiLevel64Int;
+			}
 		}
 
 		public virtual void ParseArchitectures()
@@ -581,36 +597,21 @@ namespace UnrealBuildTool
 			return NDKLevel;
 		}
 
-		public string GetLargestApiLevel(string[] ApiLevels)
+		public string GetLargestApiLevel()
 		{
-			int LargestLevel = 0;
-			string LargestString = null;
-
-			// look for largest integer
-			foreach (string Level in ApiLevels)
+			string PlatformsFilename = Environment.ExpandEnvironmentVariables("%NDKROOT%/meta/platforms.json");
+			if (!File.Exists(PlatformsFilename))
 			{
-				string LocalLevel = Path.GetFileName(Level);
-				string[] Tokens = LocalLevel.Split("-".ToCharArray());
-				if (Tokens.Length >= 2)
-				{
-					try
-					{
-						int ParsedLevel = int.Parse(Tokens[1]);
-						// bigger? remember it
-						if (ParsedLevel > LargestLevel)
-						{
-							LargestLevel = ParsedLevel;
-							LargestString = LocalLevel;
-						}
-					}
-					catch (Exception)
-					{
-						// ignore poorly formed string
-					}
-				}
+				throw new BuildException("No NDK platforms found in {0}", PlatformsFilename);
 			}
 
-			return LargestString;
+			int MinPlatform, MaxPlatform;
+			if (!ReadMinMaxPlatforms(PlatformsFilename, out MinPlatform, out MaxPlatform))
+			{
+				throw new BuildException("No NDK platforms found in {0}", PlatformsFilename);
+			}
+
+			return "android-" + MaxPlatform.ToString();
 		}
 
 		protected virtual string GetCLArguments_Global(CppCompileEnvironment CompileEnvironment, string Architecture)
