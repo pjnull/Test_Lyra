@@ -46,7 +46,7 @@ void FDisplayClusterViewportConfigurationHelpers::UpdateViewportStereoMode(FDisp
 
 void FDisplayClusterViewportConfigurationHelpers::UpdateViewportSetting_OverlayRenderSettings(FDisplayClusterViewport& DstViewport, const FDisplayClusterConfigurationICVFX_OverlayAdvancedRenderSettings& InOverlaySettings)
 {
-	DstViewport.RenderSettings.BufferRatio = InOverlaySettings.BufferRatio;
+	DstViewport.Owner.SetViewportBufferRatio(DstViewport, InOverlaySettings.BufferRatio);
 	DstViewport.RenderSettings.RenderTargetRatio = InOverlaySettings.RenderTargetRatio;
 
 	DstViewport.RenderSettings.GPUIndex = InOverlaySettings.GPUIndex;
@@ -64,7 +64,7 @@ void FDisplayClusterViewportConfigurationHelpers::UpdateViewportSetting_Override
 	if (InOverride.bAllowReplace && InOverride.SourceTexture != nullptr)
 	{
 		FTextureResource* TextureResource = InOverride.SourceTexture->GetResource();
-		if (TextureResource)
+		if(TextureResource)
 		{
 			FTextureRHIRef& TextureRHI = TextureResource->TextureRHI;
 
@@ -180,7 +180,7 @@ void FDisplayClusterViewportConfigurationHelpers::UpdateBaseViewportSetting(FDis
 	FDisplayClusterViewportConfigurationHelpers_Postprocess::UpdatePerViewportPostProcessSettings(DstViewport, RootActor);
 
 	{
-		DstViewport.RenderSettings.BufferRatio = InRenderSettings.BufferRatio;
+		DstViewport.Owner.SetViewportBufferRatio(DstViewport, InRenderSettings.BufferRatio);
 
 		UpdateViewportSetting_Overscan(DstViewport, InRenderSettings.Overscan);
 
