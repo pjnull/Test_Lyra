@@ -45,7 +45,7 @@ namespace Private
 /** InOutResult = Value, but without shrinking the string to fit. */
 void AssignStringWithoutShrinking(FString& InOutResult, FStringView Value)
 {
-	TArray<TCHAR>& Result = InOutResult.GetCharArray();
+	TArray<TCHAR, FString::AllocatorType>& Result = InOutResult.GetCharArray();
 	if (Value.IsEmpty())
 	{
 		Result.Reset();

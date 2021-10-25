@@ -1015,7 +1015,7 @@ void FCanvasTextItem::DrawStringInternal_OfflineCache( FCanvas* InCanvas, const 
 
 	const float CharIncrement = ( (float)Font->Kerning + HorizSpacingAdjust ) * Scale.X;
 
-	const TArray< TCHAR >& Chars = TextString.GetCharArray();
+	const TArray< TCHAR, FString::AllocatorType >& Chars = TextString.GetCharArray();
 	// Draw all characters in string.
 	const int32 TextLen = TextString.Len();
 	for( int32 i=0; i < TextLen; i++ )

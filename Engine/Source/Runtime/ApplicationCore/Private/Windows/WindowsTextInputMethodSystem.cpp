@@ -30,7 +30,7 @@ namespace
 	{
 		// Get the internal buffer of the string, we're going to use it as scratch space
 		FString OutString;
-		TArray<TCHAR>& OutStringBuffer = OutString.GetCharArray();
+		TArray<TCHAR, FString::AllocatorType>& OutStringBuffer = OutString.GetCharArray();
 				
 		// Work out the maximum size required and resize the buffer so it can hold enough data
 		const LONG StringNeededSizeBytes = ::ImmGetCompositionString(IMMContext, StringType, nullptr, 0);
@@ -48,7 +48,7 @@ namespace
 	{
 		// Get the internal buffer of the string, we're going to use it as scratch space
 		FString OutString;
-		TArray<TCHAR>& OutStringBuffer = OutString.GetCharArray();
+		TArray<TCHAR, FString::AllocatorType>& OutStringBuffer = OutString.GetCharArray();
 
 		// Work out the maximum size required and resize the buffer so it can hold enough data
 		const int32 StringNeededSize = ::GetLocaleInfo(lcid, LOCALE_SLANGUAGE, nullptr, 0);

@@ -7103,7 +7103,7 @@ void UEditorEngine::HandleNetworkFailure(UWorld *World, UNetDriver *NetDriver, E
 bool FActorLabelUtilities::SplitActorLabel(FString& InOutLabel, int32& OutIdx)
 {
 	// Look at the label and see if it ends in a number and separate them
-	const TArray<TCHAR>& LabelCharArray = InOutLabel.GetCharArray();
+	const TArray<TCHAR, FString::AllocatorType>& LabelCharArray = InOutLabel.GetCharArray();
 	for (int32 CharIdx = LabelCharArray.Num() - 1; CharIdx >= 0; CharIdx--)
 	{
 		if (CharIdx == 0 || !FChar::IsDigit(LabelCharArray[CharIdx - 1]))

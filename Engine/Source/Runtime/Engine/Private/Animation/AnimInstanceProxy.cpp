@@ -316,7 +316,7 @@ void FAnimInstanceProxy::InitializeRootNode_WithRoot(FAnimNode_Base* InRootNode)
 FGuid MakeGuidForMessage(const FText& Message)
 {
 	FString MessageString = Message.ToString();
-	const TArray<TCHAR> CharArray = MessageString.GetCharArray();
+	const TArray<TCHAR, FString::AllocatorType> CharArray = MessageString.GetCharArray();
 
 	FSHA1 Sha;
 

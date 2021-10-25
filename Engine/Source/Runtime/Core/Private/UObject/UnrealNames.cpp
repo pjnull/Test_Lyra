@@ -1665,7 +1665,7 @@ FNameEntry const* FName::GetEntry(FNameEntryId Id)
 FString FName::NameToDisplayString( const FString& InDisplayName, const bool bIsBool )
 {
 	// Copy the characters out so that we can modify the string in place
-	const TArray< TCHAR >& Chars = InDisplayName.GetCharArray();
+	const TArray< TCHAR, FString::AllocatorType >& Chars = InDisplayName.GetCharArray();
 
 	// This is used to indicate that we are in a run of uppercase letter and/or digits.  The code attempts to keep
 	// these characters together as breaking them up often looks silly (i.e. "Draw Scale 3 D" as opposed to "Draw Scale 3D"

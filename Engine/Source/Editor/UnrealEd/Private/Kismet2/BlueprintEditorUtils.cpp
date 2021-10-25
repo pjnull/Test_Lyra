@@ -1651,7 +1651,7 @@ void FBlueprintEditorUtils::RecreateClassMetaData(UBlueprint* Blueprint, UClass*
 
 	for (FString HideCategory : Blueprint->HideCategories)
 	{
-		TArray<TCHAR>& CharArray = HideCategory.GetCharArray();
+		TArray<TCHAR, FString::AllocatorType>& CharArray = HideCategory.GetCharArray();
 
 		int32 SpaceIndex = CharArray.Find(TEXT(' '));
 		while (SpaceIndex != INDEX_NONE)
