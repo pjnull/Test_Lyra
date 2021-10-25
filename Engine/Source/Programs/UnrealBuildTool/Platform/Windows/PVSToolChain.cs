@@ -489,11 +489,6 @@ namespace UnrealBuildTool
 
 		public override CPPOutput CompileCPPFiles(CppCompileEnvironment CompileEnvironment, List<FileItem> InputFiles, DirectoryReference OutputDir, string ModuleName, IActionGraphBuilder Graph)
 		{
-			if (ModuleName.Equals("WebBrowser", StringComparison.OrdinalIgnoreCase))
-			{
-				return new CPPOutput();
-			}
-
 			// Use a subdirectory for PVS output, to avoid clobbering regular build artifacts
 			OutputDir = DirectoryReference.Combine(OutputDir, "PVS");
 
