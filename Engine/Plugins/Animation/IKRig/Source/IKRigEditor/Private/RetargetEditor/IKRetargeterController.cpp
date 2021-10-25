@@ -1,10 +1,8 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "RetargetEditor/IKRetargeterController.h"
 
-#include "Engine/SkeletalMesh.h"
-#include "ScopedTransaction.h"
 #include "Algo/LevenshteinDistance.h"
+#include "Engine/SkeletalMesh.h"
 #include "Retargeter/IKRetargeter.h"
 
 #define LOCTEXT_NAMESPACE "IKRetargeterController"
