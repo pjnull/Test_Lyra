@@ -11,6 +11,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Math/Color.h"
 
 
 extern NAVIGATIONSYSTEM_API FVector Unreal2RecastPoint(const FVector::FReal* UnrealPoint);
@@ -36,3 +37,4 @@ extern NAVIGATIONSYSTEM_API FBox Recast2UnrealBox(const float* RecastMin, const 
 #endif // !UE_LARGE_WORLD_COORDINATES_DISABLED
 extern NAVIGATIONSYSTEM_API FBox Recast2UnrealBox(const FBox& RecastBox);
 extern NAVIGATIONSYSTEM_API FMatrix Recast2UnrealMatrix();
+extern NAVIGATIONSYSTEM_API FColor Recast2UnrealColor(const unsigned int RecastColor);
