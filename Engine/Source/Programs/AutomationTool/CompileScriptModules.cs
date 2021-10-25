@@ -55,7 +55,7 @@ namespace AutomationToolDriver
 			
 			HashSet<FileReference> FoundAutomationProjects = FindAutomationProjects(ScriptsForProjectFileName, AdditionalScriptsFolders);
 
-			bool bInitializeFromScriptMdodulesManifest = Unreal.IsEngineInstalled() || (bNoCompile && !bUseBuildRecords);
+			bool bInitializeFromScriptMdodulesManifest = Unreal.IsEngineInstalled() || (bNoCompile && !bUseBuildRecords) || (FoundAutomationProjects.Count == 0);
 			if (bInitializeFromScriptMdodulesManifest)
 			{
 				Log.TraceLog($"Loading script module manifest from {ScriptModuleManifestPath}");
