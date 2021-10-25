@@ -322,6 +322,7 @@ struct ENGINE_API FWorldPartitionStreamingSource
 		: bBlockOnSlowLoading(false)
 		, Priority(EStreamingSourcePriority::Default)
 		, Velocity(0.f)
+		, DebugColor(ForceInit)
 		, TargetGrid(NAME_None)
 	{}
 
@@ -333,10 +334,19 @@ struct ENGINE_API FWorldPartitionStreamingSource
 		, bBlockOnSlowLoading(bInBlockOnSlowLoading)
 		, Priority(InPriority)
 		, Velocity(InVelocity)
+		, DebugColor(ForceInit)
 		, TargetGrid(NAME_None)
 	{}
 
-	FColor GetDebugColor() const { return FColor::MakeRedToGreenColorFromScalar(FRandomStream(Name).GetFraction()); }
+	FColor GetDebugColor() const
+	{
+		if (!DebugColor.ToPackedBGRA())
+		{
+			return FColor::MakeRedToGreenColorFromScalar(FRandomStream(Name).GetFraction());
+		}
+
+		return FColor(DebugColor.R, DebugColor.G, DebugColor.B, 255);
+	}
 
 	/** Source unique name. */
 	FName Name;
@@ -358,6 +368,9 @@ struct ENGINE_API FWorldPartitionStreamingSource
 
 	/** Source velocity (computed automatically). */
 	float Velocity;
+
+	/** Color used for debugging. */
+	FColor DebugColor;
 
 	/** When set, will only affect streaming on the provided target runtime streaming grid. */
 	FName TargetGrid;
