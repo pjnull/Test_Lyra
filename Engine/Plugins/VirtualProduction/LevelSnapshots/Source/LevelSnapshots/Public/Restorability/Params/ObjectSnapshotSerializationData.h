@@ -47,7 +47,7 @@ public:
 	 * You need to make sure of the following, or this function will fail:
 	 *	1. 'Subobject' must be of a subobject of GetSerializedObject()
 	 *	2. 'Subobject' cannot be visible to standard Level Snapshots serialisation. A subobject is visible if it contained
-	 *	  within a uproperty (object reference or collection of references) with the CPF_Edit flag. You can blacklist uproperties
+	 *	  within a uproperty (object reference or collection of references) with the CPF_Edit flag. You can explicitly disallow uproperties
 	 *	  using the Level Snapshots module.
 	 */
 	virtual int32 AddSubobjectSnapshot(UObject* Subobject) = 0;

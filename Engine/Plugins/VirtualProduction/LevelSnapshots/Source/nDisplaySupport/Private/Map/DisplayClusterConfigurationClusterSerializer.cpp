@@ -13,18 +13,18 @@ UClass* FDisplayClusterConfigurationClusterSerializer::GetSupportedClass()
 	return ClassPath.ResolveClass();
 }
 
-void FDisplayClusterConfigurationClusterSerializer::BlacklistCustomProperties(ILevelSnapshotsModule& Module)
+void FDisplayClusterConfigurationClusterSerializer::MarkPropertiesAsExplicitlyUnsupported(ILevelSnapshotsModule& Module)
 {
 	const FProperty* NodesProperty = GetMapProperty();
 	if (ensure(NodesProperty))
 	{
-		Module.AddBlacklistedProperties( { NodesProperty } );
+		Module.AddExplicitlyUnsupportedProperties( { NodesProperty } );
 	}
 }
 
 void FDisplayClusterConfigurationClusterSerializer::Register(ILevelSnapshotsModule& Module)
 {
-	BlacklistCustomProperties(Module);
+	MarkPropertiesAsExplicitlyUnsupported(Module);
 	Module.RegisterCustomObjectSerializer(GetSupportedClass(), MakeShared<FDisplayClusterConfigurationClusterSerializer>());
 }
 

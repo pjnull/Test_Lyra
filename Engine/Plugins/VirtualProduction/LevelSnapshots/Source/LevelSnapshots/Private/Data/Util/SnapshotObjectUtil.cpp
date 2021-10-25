@@ -36,7 +36,7 @@ namespace
 	UObject* CreateSubobjectForSnapshotWorld(FWorldSnapshotData& WorldData, int32 ObjectPathIndex, const FSoftObjectPath& SnapshotPathToSubobject, const FProcessObjectDependency& ProcessObjectDependency, const FString& LocalisationNamespace)
 	{
 		FSubobjectSnapshotData* SubobjectData = WorldData.Subobjects.Find(ObjectPathIndex);
-		if (!SubobjectData || SubobjectData->bWasBlacklisted)
+		if (!SubobjectData || SubobjectData->bWasSkippedClass)
 		{
 			return nullptr;
 		}
@@ -103,7 +103,7 @@ namespace
 			return SubobjectData.EditorObject.Get();
 		}
 
-		if (SubobjectData.bWasBlacklisted)
+		if (SubobjectData.bWasSkippedClass)
 		{
 			return !IsValid(ResolvedObject) || ResolvedObject->IsUnreachable() ? nullptr : ResolvedObject;
 		}
@@ -187,7 +187,7 @@ namespace
 	{
 		if (!FSnapshotRestorability::IsSubobjectDesirableForCapture(ReferenceFromOriginalObject))
 		{
-			WorldData.Subobjects.Add(ObjectIndex, FSubobjectSnapshotData::MakeBlacklisted());
+			WorldData.Subobjects.Add(ObjectIndex, FSubobjectSnapshotData::MakeSkippedSubobjectData());
 			return;
 		}
 		
@@ -222,7 +222,7 @@ namespace
 	void EnsureSubobjectIsSerialized(FWorldSnapshotData& WorldData, UObject* ExistingObject, int32 ObjectPathIndex, const FProcessObjectDependency& ProcessObjectDependency, const FString& LocalisationNamespace)
 	{
 		FSubobjectSnapshotData* SubobjectData = WorldData.Subobjects.Find(ObjectPathIndex);
-		if (!SubobjectData || SubobjectData->bWasBlacklisted)
+		if (!SubobjectData || SubobjectData->bWasSkippedClass)
 		{
 			return;
 		}

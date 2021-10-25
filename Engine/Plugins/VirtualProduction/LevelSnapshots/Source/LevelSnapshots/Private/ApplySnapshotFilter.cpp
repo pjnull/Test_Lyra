@@ -582,11 +582,11 @@ TOptional<FApplySnapshotFilter::EPropertySearchResult> FApplySnapshotFilter::Ana
 
 	if (SnapshotObject == nullptr || WorldObject == nullptr)
 	{
-		// Are they subobjects
+		// Are they subobjects?
 		const bool bSnapshotObjectIsSubobject = bPropertyMarkedAsSubobject || (SnapshotObject && SnapshotObject->IsIn(DeserializedSnapshotActor));
 		const bool bWorldObjectIsSubobject = bPropertyMarkedAsSubobject || (WorldObject && WorldObject->IsIn(WorldActor));
 
-		// Blacklisted
+		// Skipped?
 		const bool bIsSnapshotSupportedSubobject = SnapshotObject && bSnapshotObjectIsSubobject && !FSnapshotRestorability::IsSubobjectDesirableForCapture(SnapshotObject);
 		const bool bIsWorldSupportedSubobject = WorldObject && bWorldObjectIsSubobject && !FSnapshotRestorability::IsSubobjectDesirableForCapture(WorldObject);
 

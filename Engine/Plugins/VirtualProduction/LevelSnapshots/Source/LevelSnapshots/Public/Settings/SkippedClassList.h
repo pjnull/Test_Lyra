@@ -6,10 +6,10 @@
 #include "Templates/SubclassOf.h"
 #include "GameFramework/Actor.h"
 #include "Components/ActorComponent.h"
-#include "RestorationBlacklist.generated.h"
+#include "SkippedClassList.generated.h"
 
 USTRUCT()
-struct LEVELSNAPSHOTS_API FRestorationBlacklist
+struct LEVELSNAPSHOTS_API FSkippedClassList
 {
 	GENERATED_BODY()
 

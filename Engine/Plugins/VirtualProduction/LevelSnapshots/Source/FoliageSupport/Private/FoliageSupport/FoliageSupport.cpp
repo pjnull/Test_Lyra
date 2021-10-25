@@ -38,7 +38,7 @@ namespace FoliageSupport
 		
 		if (ensure(InstanceReorderTable))
 		{
-			Module.AddWhitelistedProperties({
+			Module.AddExplicitilySupportedProperties({
 				InstanceReorderTable,
 				SortedInstances,
 				NumBuiltInstances,

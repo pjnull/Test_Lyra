@@ -275,8 +275,8 @@ void FWorldSnapshotData::AddClassDefault(UClass* Class)
 	}
 	
 	FClassDefaultObjectSnapshotData ClassData;
-	ClassData.bWasBlacklistedCDO = FLevelSnapshotsModule::GetInternalModuleInstance().IsClassDefaultBlacklisted(Class); 
-	if (!ClassData.bWasBlacklistedCDO)	
+	ClassData.bSerializationSkippedCDO = FLevelSnapshotsModule::GetInternalModuleInstance().ShouldSkipClassDefaultSerialization(Class); 
+	if (!ClassData.bSerializationSkippedCDO)	
 	{
 		FTakeClassDefaultObjectSnapshotArchive::SaveClassDefaultObject(ClassData, *this, ClassDefault);
 	}
@@ -294,7 +294,7 @@ UObject* FWorldSnapshotData::GetClassDefault(UClass* Class)
 		return Class->GetDefaultObject();
 	}
 	
-	if (ClassDefaultData->bWasBlacklistedCDO)
+	if (ClassDefaultData->bSerializationSkippedCDO)
 	{
 		return Class->GetDefaultObject();
 	}
@@ -318,7 +318,7 @@ UObject* FWorldSnapshotData::GetClassDefault(UClass* Class)
 void FWorldSnapshotData::SerializeClassDefaultsInto(UObject* Object)
 {
 	FClassDefaultObjectSnapshotData* ClassDefaultData = ClassDefaults.Find(Object->GetClass());
-	if (ClassDefaultData && !ClassDefaultData->bWasBlacklistedCDO && !FLevelSnapshotsModule::GetInternalModuleInstance().IsClassDefaultBlacklisted(Object->GetClass()))
+	if (ClassDefaultData && !ClassDefaultData->bSerializationSkippedCDO && !FLevelSnapshotsModule::GetInternalModuleInstance().ShouldSkipClassDefaultSerialization(Object->GetClass()))
 	{
 		FApplyClassDefaulDataArchive::RestoreChangedClassDefaults(*ClassDefaultData, *this, Object);
 	}
