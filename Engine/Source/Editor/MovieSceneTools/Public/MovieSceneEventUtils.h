@@ -4,6 +4,7 @@
 
 #include "CoreTypes.h"
 #include "Containers/UnrealString.h"
+#include "UObject/WeakObjectPtrTemplates.h"
 
 struct FGuid;
 struct FMovieSceneEvent;
