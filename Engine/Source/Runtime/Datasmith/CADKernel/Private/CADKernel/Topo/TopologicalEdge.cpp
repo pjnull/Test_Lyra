@@ -17,9 +17,7 @@
 #include "CADKernel/Topo/TopologicalFace.h"
 #include "CADKernel/Topo/TopologicalVertex.h"
 
-using namespace CADKernel;
-
-FTopologicalEdge::FTopologicalEdge(const TSharedRef<FRestrictionCurve>& InCurve, const TSharedRef<FTopologicalVertex>& InVertex1, const TSharedRef<FTopologicalVertex>& InVertex2, const FLinearBoundary& InBoundary)
+CADKernel::FTopologicalEdge::FTopologicalEdge(const TSharedRef<FRestrictionCurve>& InCurve, const TSharedRef<FTopologicalVertex>& InVertex1, const TSharedRef<FTopologicalVertex>& InVertex2, const FLinearBoundary& InBoundary)
 	: StartVertex(InVertex1)
 	, EndVertex(InVertex2)
 	, Boundary(InBoundary)
@@ -29,7 +27,7 @@ FTopologicalEdge::FTopologicalEdge(const TSharedRef<FRestrictionCurve>& InCurve,
 	ensureCADKernel(Boundary.IsValid());
 }
 
-FTopologicalEdge::FTopologicalEdge(const TSharedRef<FRestrictionCurve>& InCurve, const TSharedRef<FTopologicalVertex>& InVertex1, const TSharedRef<FTopologicalVertex>& InVertex2)
+CADKernel::FTopologicalEdge::FTopologicalEdge(const TSharedRef<FRestrictionCurve>& InCurve, const TSharedRef<FTopologicalVertex>& InVertex1, const TSharedRef<FTopologicalVertex>& InVertex2)
 	: StartVertex(InVertex1)
 	, EndVertex(InVertex2)
 	, Curve(InCurve)
@@ -39,7 +37,7 @@ FTopologicalEdge::FTopologicalEdge(const TSharedRef<FRestrictionCurve>& InCurve,
 	ensureCADKernel(Boundary.IsValid());
 }
 
-FTopologicalEdge::FTopologicalEdge(const TSharedRef<FRestrictionCurve>& InCurve, const FLinearBoundary& InBoundary)
+CADKernel::FTopologicalEdge::FTopologicalEdge(const TSharedRef<FRestrictionCurve>& InCurve, const FLinearBoundary& InBoundary)
 	: Boundary(InBoundary)
 	, Curve(InCurve)
 	, Length3D(-1)
@@ -52,7 +50,7 @@ FTopologicalEdge::FTopologicalEdge(const TSharedRef<FRestrictionCurve>& InCurve,
 	EndVertex = FEntity::MakeShared<FTopologicalVertex>(Points[1].Point);
 }
 
-FTopologicalEdge::FTopologicalEdge(const TSharedRef<FSurface>& InSurface, const FPoint2D& InCoordinateVertex1, const TSharedRef<FTopologicalVertex>& InVertex1, const FPoint2D& InCoordinateVertex2, const TSharedRef<FTopologicalVertex>& InVertex2)
+CADKernel::FTopologicalEdge::FTopologicalEdge(const TSharedRef<FSurface>& InSurface, const FPoint2D& InCoordinateVertex1, const TSharedRef<FTopologicalVertex>& InVertex1, const FPoint2D& InCoordinateVertex2, const TSharedRef<FTopologicalVertex>& InVertex2)
 	: StartVertex(InVertex1)
 	, EndVertex(InVertex2)
 	, Length3D(-1)
@@ -61,12 +59,12 @@ FTopologicalEdge::FTopologicalEdge(const TSharedRef<FSurface>& InSurface, const 
 	Curve = FEntity::MakeShared<FRestrictionCurve>(InSurface, Curve2D);
 }
 
-FTopologicalEdge::FTopologicalEdge(const TSharedRef<FRestrictionCurve>& InCurve)
+CADKernel::FTopologicalEdge::FTopologicalEdge(const TSharedRef<FRestrictionCurve>& InCurve)
 	: FTopologicalEdge(InCurve, InCurve->GetBoundary())
 {
 }
 
-void FTopologicalEdge::LinkVertex()
+void CADKernel::FTopologicalEdge::LinkVertex()
 {
 	StartVertex->AddConnectedEdge(*this);
 	EndVertex->AddConnectedEdge(*this);
@@ -77,7 +75,7 @@ void FTopologicalEdge::LinkVertex()
 	}
 }
 
-bool FTopologicalEdge::CheckVertices()
+bool CADKernel::FTopologicalEdge::CheckVertices()
 {
 	TArray<double> Coordinates = { Boundary.Min, Boundary.Max };
 	TArray<FPoint> Points;
@@ -102,12 +100,12 @@ bool FTopologicalEdge::CheckVertices()
 	return CheckExtremityGap(EndVertex, Points[1]);
 }
 
-double FTopologicalEdge::GetTolerance3D()
+double CADKernel::FTopologicalEdge::GetTolerance3D()
 {
 	return GetCurve()->GetCarrierSurface()->Get3DTolerance();
 }
 
-bool FTopologicalEdge::CheckIfDegenerated()
+bool CADKernel::FTopologicalEdge::CheckIfDegenerated()
 {
 	bool bDegeneration2D = false;
 	bool bDegeneration3D = false;
@@ -122,7 +120,7 @@ bool FTopologicalEdge::CheckIfDegenerated()
 	return bDegeneration2D;
 }
 
-TSharedPtr<FTopologicalEdge> FTopologicalEdge::Make(const TSharedRef<FRestrictionCurve>& InCurve, const TSharedRef<FTopologicalVertex>& InVertex1, const TSharedRef<FTopologicalVertex>& InVertex2, const FLinearBoundary& InBoundary)
+TSharedPtr<CADKernel::FTopologicalEdge> CADKernel::FTopologicalEdge::Make(const TSharedRef<FRestrictionCurve>& InCurve, const TSharedRef<FTopologicalVertex>& InVertex1, const TSharedRef<FTopologicalVertex>& InVertex2, const FLinearBoundary& InBoundary)
 {
 	TSharedRef<FTopologicalEdge> Edge = FEntity::MakeShared<FTopologicalEdge>(InCurve, InVertex1, InVertex2, InBoundary);
 	if (Edge->CheckIfDegenerated())
@@ -139,7 +137,7 @@ TSharedPtr<FTopologicalEdge> FTopologicalEdge::Make(const TSharedRef<FRestrictio
 	return Edge;
 }
 
-TSharedPtr<FTopologicalEdge> FTopologicalEdge::Make(const TSharedRef<FRestrictionCurve>& InCurve, const TSharedRef<FTopologicalVertex>& InVertex1, const TSharedRef<FTopologicalVertex>& InVertex2)
+TSharedPtr<CADKernel::FTopologicalEdge> CADKernel::FTopologicalEdge::Make(const TSharedRef<FRestrictionCurve>& InCurve, const TSharedRef<FTopologicalVertex>& InVertex1, const TSharedRef<FTopologicalVertex>& InVertex2)
 {
 	TSharedRef<FTopologicalEdge> Edge = FEntity::MakeShared<FTopologicalEdge>(InCurve, InVertex1, InVertex2);
 	if (Edge->CheckIfDegenerated())
@@ -156,7 +154,7 @@ TSharedPtr<FTopologicalEdge> FTopologicalEdge::Make(const TSharedRef<FRestrictio
 	return Edge;
 }
 
-TSharedPtr<FTopologicalEdge> FTopologicalEdge::Make(const TSharedRef<FRestrictionCurve>& InCurve, const FLinearBoundary& InBoundary)
+TSharedPtr<CADKernel::FTopologicalEdge> CADKernel::FTopologicalEdge::Make(const TSharedRef<FRestrictionCurve>& InCurve, const FLinearBoundary& InBoundary)
 {
 	TSharedRef<FTopologicalEdge> Edge = FEntity::MakeShared<FTopologicalEdge>(InCurve, InBoundary);
 	if (Edge->CheckIfDegenerated())
@@ -168,7 +166,7 @@ TSharedPtr<FTopologicalEdge> FTopologicalEdge::Make(const TSharedRef<FRestrictio
 	return Edge;
 }
 
-TSharedPtr<FTopologicalEdge> FTopologicalEdge::Make(const TSharedRef<FRestrictionCurve>& InCurve)
+TSharedPtr<CADKernel::FTopologicalEdge> CADKernel::FTopologicalEdge::Make(const TSharedRef<FRestrictionCurve>& InCurve)
 {
 	TSharedRef<FTopologicalEdge> Edge = FEntity::MakeShared<FTopologicalEdge>(InCurve);
 	if (Edge->CheckIfDegenerated())
@@ -180,7 +178,7 @@ TSharedPtr<FTopologicalEdge> FTopologicalEdge::Make(const TSharedRef<FRestrictio
 	return Edge;
 }
 
-TSharedPtr<FTopologicalEdge> FTopologicalEdge::Make(const TSharedRef<FSurface>& InSurface, const FPoint2D& InCoordinateVertex1, const TSharedRef<FTopologicalVertex>& InVertex1, const FPoint2D& InCoordinateVertex2, const TSharedRef<FTopologicalVertex>& InVertex2)
+TSharedPtr<CADKernel::FTopologicalEdge> CADKernel::FTopologicalEdge::Make(const TSharedRef<FSurface>& InSurface, const FPoint2D& InCoordinateVertex1, const TSharedRef<FTopologicalVertex>& InVertex1, const FPoint2D& InCoordinateVertex2, const TSharedRef<FTopologicalVertex>& InVertex2)
 {
 	TSharedRef<FTopologicalEdge> Edge = FEntity::MakeShared<FTopologicalEdge>(InSurface, InCoordinateVertex1, InVertex1, InCoordinateVertex2, InVertex2);
 	if (Edge->CheckIfDegenerated())
@@ -192,7 +190,7 @@ TSharedPtr<FTopologicalEdge> FTopologicalEdge::Make(const TSharedRef<FSurface>& 
 	return Edge;
 }
 
-void FTopologicalEdge::Link(FTopologicalEdge& Twin, double SquareJoiningTolerance)
+void CADKernel::FTopologicalEdge::Link(FTopologicalEdge& Twin, double SquareJoiningTolerance)
 {
 	// Degenerated twin edges are not linked
 	if (IsDegenerated() || Twin.IsDegenerated())
@@ -268,7 +266,7 @@ void FTopologicalEdge::Link(FTopologicalEdge& Twin, double SquareJoiningToleranc
 	}
 }
 
-void FTopologicalEdge::Delete()
+void CADKernel::FTopologicalEdge::Delete()
 {
 	StartVertex->RemoveConnectedEdge(*this);
 	EndVertex->RemoveConnectedEdge(*this);
@@ -287,13 +285,13 @@ void FTopologicalEdge::Delete()
 	SetDeleted();
 }
 
-TSharedRef<FTopologicalFace> FTopologicalEdge::GetFace() const
+TSharedRef<CADKernel::FTopologicalFace> CADKernel::FTopologicalEdge::GetFace() const
 {
 	ensureCADKernel(Loop != nullptr);
 	return Loop->GetFace();
 }
 
-void FTopologicalEdge::ComputeCrossingPointCoordinates()
+void CADKernel::FTopologicalEdge::ComputeCrossingPointCoordinates()
 {
 	double Tolerance = GetTolerance3D();
 
@@ -352,7 +350,7 @@ void FTopologicalEdge::ComputeCrossingPointCoordinates()
 	}
 }
 
-void FTopologicalEdge::SetStartVertex(const double NewCoordinate)
+void CADKernel::FTopologicalEdge::SetStartVertex(const double NewCoordinate)
 {
 	ensureCADKernel(Curve->GetUMax() > NewCoordinate);
 	Boundary.SetMin(NewCoordinate);
@@ -361,7 +359,7 @@ void FTopologicalEdge::SetStartVertex(const double NewCoordinate)
 	StartVertex->SetCoordinates(OutPoint.Point);
 }
 
-void FTopologicalEdge::SetEndVertex(const double NewCoordinate)
+void CADKernel::FTopologicalEdge::SetEndVertex(const double NewCoordinate)
 {
 	ensureCADKernel(Curve->GetUMin() < NewCoordinate);
 	Boundary.SetMax(NewCoordinate);
@@ -370,21 +368,21 @@ void FTopologicalEdge::SetEndVertex(const double NewCoordinate)
 	EndVertex->SetCoordinates(OutPoint.Point);
 }
 
-void FTopologicalEdge::SetStartVertex(const double NewCoordinate, const FPoint& NewPoint3D)
+void CADKernel::FTopologicalEdge::SetStartVertex(const double NewCoordinate, const FPoint& NewPoint3D)
 {
 	ensureCADKernel(Curve->GetUMin() < NewCoordinate);
 	Boundary.SetMin(NewCoordinate);
 	StartVertex->SetCoordinates(NewPoint3D);
 }
 
-void FTopologicalEdge::SetEndVertex(const double NewCoordinate, const FPoint& NewPoint3D)
+void CADKernel::FTopologicalEdge::SetEndVertex(const double NewCoordinate, const FPoint& NewPoint3D)
 {
 	ensureCADKernel(Curve->GetUMax() > NewCoordinate);
 	Boundary.SetMax(NewCoordinate);
 	EndVertex->SetCoordinates(NewPoint3D);
 }
 
-double FTopologicalEdge::Length() const
+double CADKernel::FTopologicalEdge::Length() const
 {
 	if (Length3D < 0)
 	{
@@ -393,7 +391,7 @@ double FTopologicalEdge::Length() const
 	return Length3D;
 }
 
-void FTopologicalEdge::GetTangentsAtExtremities(FPoint& StartTangent, FPoint& EndTangent, bool bForward) const
+void CADKernel::FTopologicalEdge::GetTangentsAtExtremities(FPoint& StartTangent, FPoint& EndTangent, bool bForward) const
 {
 	ensureCADKernel(Curve->Polyline.Size());
 
@@ -415,12 +413,12 @@ void FTopologicalEdge::GetTangentsAtExtremities(FPoint& StartTangent, FPoint& En
 }
 
 
-void FTopologicalEdge::Sample(const double DesiredSegmentLength, TArray<double>& OutCoordinates) const
+void CADKernel::FTopologicalEdge::Sample(const double DesiredSegmentLength, TArray<double>& OutCoordinates) const
 {
 	Curve->Sample(Boundary, DesiredSegmentLength, OutCoordinates);
 }
 
-int32 FTopologicalEdge::EvaluateCuttingPointNum()
+int32 CADKernel::FTopologicalEdge::EvaluateCuttingPointNum()
 {
 	double Num = 0;
 	for (int32 Index = 0; Index < CrossingPointUs.Num() - 1; Index++)
@@ -431,7 +429,7 @@ int32 FTopologicalEdge::EvaluateCuttingPointNum()
 	return (int32)Num;
 }
 
-double FTopologicalEdge::TransformLocalCoordinateToActiveEdgeCoordinate(const double InLocalCoordinate)
+double CADKernel::FTopologicalEdge::TransformLocalCoordinateToActiveEdgeCoordinate(const double InLocalCoordinate)
 {
 	if (IsActiveEntity())
 	{
@@ -444,7 +442,7 @@ double FTopologicalEdge::TransformLocalCoordinateToActiveEdgeCoordinate(const do
 	return ActiveEdge->GetCurve()->GetCoordinateOfProjectedPoint(Boundary, PointOnEdge, ProjectedPoint);
 }
 
-double FTopologicalEdge::TransformActiveEdgeCoordinateToLocalCoordinate(const double InActiveEdgeCoordinate)
+double CADKernel::FTopologicalEdge::TransformActiveEdgeCoordinateToLocalCoordinate(const double InActiveEdgeCoordinate)
 {
 	if (IsActiveEntity())
 	{
@@ -457,7 +455,7 @@ double FTopologicalEdge::TransformActiveEdgeCoordinateToLocalCoordinate(const do
 	return Curve->GetCoordinateOfProjectedPoint(Boundary, PointOnEdge, ProjectedPoint);
 }
 
-void FTopologicalEdge::TransformLocalCoordinatesToActiveEdgeCoordinates(const TArray<double>& InLocalCoordinate, TArray<double>& OutActiveEdgeCoordinates)
+void CADKernel::FTopologicalEdge::TransformLocalCoordinatesToActiveEdgeCoordinates(const TArray<double>& InLocalCoordinate, TArray<double>& OutActiveEdgeCoordinates)
 {
 	if (IsActiveEntity())
 	{
@@ -470,7 +468,7 @@ void FTopologicalEdge::TransformLocalCoordinatesToActiveEdgeCoordinates(const TA
 	ActiveEdge->GetCurve()->ProjectPoints(Boundary, EdgePoints, OutActiveEdgeCoordinates, ProjectedPoints);
 }
 
-void FTopologicalEdge::TransformActiveEdgeCoordinatesToLocalCoordinates(const TArray<double>& InActiveEdgeCoordinate, TArray<double>& OutLocalCoordinates)
+void CADKernel::FTopologicalEdge::TransformActiveEdgeCoordinatesToLocalCoordinates(const TArray<double>& InActiveEdgeCoordinate, TArray<double>& OutLocalCoordinates)
 {
 	if (IsActiveEntity())
 	{
@@ -484,7 +482,7 @@ void FTopologicalEdge::TransformActiveEdgeCoordinatesToLocalCoordinates(const TA
 	Curve->ProjectPoints(Boundary, ActiveEdgePoint, OutLocalCoordinates, ProjectedPoints);
 }
 
-void FTopologicalEdge::AddImposedCuttingPointU(const double ImposedCuttingPointU, int32 OppositeNodeIndex)
+void CADKernel::FTopologicalEdge::AddImposedCuttingPointU(const double ImposedCuttingPointU, int32 OppositeNodeIndex)
 {
 	if (!IsActiveEntity())
 	{
@@ -498,7 +496,7 @@ void FTopologicalEdge::AddImposedCuttingPointU(const double ImposedCuttingPointU
 	ImposedCuttingPointUs.Emplace(ImposedCuttingPointU, OppositeNodeIndex);
 }
 
-void FTopologicalEdge::ProjectTwinEdgePointsOn2DCurve(const TSharedRef<FTopologicalEdge>& InTwinEdge, const TArray<double>& InTwinEdgePointCoords, TArray<FPoint2D>& OutPoints2D)
+void CADKernel::FTopologicalEdge::ProjectTwinEdgePointsOn2DCurve(const TSharedRef<FTopologicalEdge>& InTwinEdge, const TArray<double>& InTwinEdgePointCoords, TArray<FPoint2D>& OutPoints2D)
 {
 	if (&InTwinEdge.Get() == this)
 	{
@@ -516,7 +514,7 @@ void FTopologicalEdge::ProjectTwinEdgePointsOn2DCurve(const TSharedRef<FTopologi
 	}
 }
 
-bool FTopologicalEdge::IsSameDirection(const FTopologicalEdge& Edge) const
+bool CADKernel::FTopologicalEdge::IsSameDirection(const FTopologicalEdge& Edge) const
 {
 	if (!TopologicalLink)
 	{
@@ -552,7 +550,7 @@ bool FTopologicalEdge::IsSameDirection(const FTopologicalEdge& Edge) const
 	return vertex1Edge == Edge.GetStartVertex()->GetLink();
 }
 
-TSharedPtr<FEntityGeom> FTopologicalEdge::ApplyMatrix(const FMatrixH& InMatrix) const
+TSharedPtr<CADKernel::FEntityGeom> CADKernel::FTopologicalEdge::ApplyMatrix(const FMatrixH& InMatrix) const
 {
 	TSharedPtr<FTopologicalVertex> v1Transformed = StaticCastSharedPtr<FTopologicalVertex>(StartVertex->ApplyMatrix(InMatrix));
 	if (!v1Transformed.IsValid())
@@ -576,7 +574,7 @@ TSharedPtr<FEntityGeom> FTopologicalEdge::ApplyMatrix(const FMatrixH& InMatrix) 
 }
 
 #ifdef CADKERNEL_DEV
-FInfoEntity& FTopologicalEdge::GetInfo(FInfoEntity& Info) const
+CADKernel::FInfoEntity& CADKernel::FTopologicalEdge::GetInfo(FInfoEntity& Info) const
 {
 	return FTopologicalEntity::GetInfo(Info)
 		.Add(TEXT("Link"), TopologicalLink)
@@ -590,7 +588,7 @@ FInfoEntity& FTopologicalEdge::GetInfo(FInfoEntity& Info) const
 }
 #endif
 
-TSharedRef<FEdgeMesh> FTopologicalEdge::GetOrCreateMesh(const TSharedRef<FModelMesh>& ShellMesh)
+TSharedRef<CADKernel::FEdgeMesh> CADKernel::FTopologicalEdge::GetOrCreateMesh(const TSharedRef<FModelMesh>& ShellMesh)
 {
 	if (!IsActiveEntity())
 	{
@@ -604,7 +602,7 @@ TSharedRef<FEdgeMesh> FTopologicalEdge::GetOrCreateMesh(const TSharedRef<FModelM
 	return Mesh.ToSharedRef();
 }
 
-void FTopologicalEdge::ChooseFinalDeltaUs()
+void CADKernel::FTopologicalEdge::ChooseFinalDeltaUs()
 {
 	for (int32 Index = 0; Index < CrossingPointDeltaUMins.Num(); ++Index)
 	{
@@ -615,7 +613,7 @@ void FTopologicalEdge::ChooseFinalDeltaUs()
 	}
 }
 
-TSharedPtr<FTopologicalEdge> FTopologicalEdge::CreateEdgeByMergingEdges(TArray<FOrientedEdge>& Edges, const TSharedRef<FTopologicalVertex> StartVertex, const TSharedRef<FTopologicalVertex> EndVertex)
+TSharedPtr<CADKernel::FTopologicalEdge> CADKernel::FTopologicalEdge::CreateEdgeByMergingEdges(TArray<FOrientedEdge>& Edges, const TSharedRef<FTopologicalVertex> StartVertex, const TSharedRef<FTopologicalVertex> EndVertex)
 {
 	// Make merged 2d Nurbs ===================================================
 
@@ -812,7 +810,7 @@ TSharedPtr<FTopologicalEdge> FTopologicalEdge::CreateEdgeByMergingEdges(TArray<F
 	return NewEdge;
 }
 
-bool FTopologicalEdge::ExtendTo(bool bStartExtremity, const FPoint2D& NewExtremityCoordinate, TSharedRef<FTopologicalVertex> NewVertex)
+bool CADKernel::FTopologicalEdge::ExtendTo(bool bStartExtremity, const FPoint2D& NewExtremityCoordinate, TSharedRef<FTopologicalVertex> NewVertex)
 {
 	TFunction<void(TSharedPtr<FTopologicalVertex>&)> UpdateVertex = [&](TSharedPtr<FTopologicalVertex>& EdgeVertex)
 	{
@@ -861,7 +859,7 @@ bool FTopologicalEdge::ExtendTo(bool bStartExtremity, const FPoint2D& NewExtremi
 	return true;
 }
 
-void FTopologicalEdge::ComputeEdge2DProperties(FEdge2DProperties& EdgeCharacteristics)
+void CADKernel::FTopologicalEdge::ComputeEdge2DProperties(FEdge2DProperties& EdgeCharacteristics)
 {
 	const TArray<FPoint2D>& Polyline2D = Curve->Polyline.Get2DPoints();
 	const TArray<FPoint>& Polyline3D = Curve->Polyline.GetPoints();
@@ -882,7 +880,7 @@ void FTopologicalEdge::ComputeEdge2DProperties(FEdge2DProperties& EdgeCharacteri
 	}
 }
 
-FPoint FTopologicalEdge::GetTangentAt(const FTopologicalVertex& InVertex)
+CADKernel::FPoint CADKernel::FTopologicalEdge::GetTangentAt(const FTopologicalVertex& InVertex)
 {
 	if (&InVertex == StartVertex.Get())
 	{
@@ -911,7 +909,7 @@ FPoint FTopologicalEdge::GetTangentAt(const FTopologicalVertex& InVertex)
 	}
 }
 
-FPoint2D FTopologicalEdge::GetTangent2DAt(const FTopologicalVertex& InVertex)
+CADKernel::FPoint2D CADKernel::FTopologicalEdge::GetTangent2DAt(const FTopologicalVertex& InVertex)
 {
 	if (&InVertex == StartVertex.Get())
 	{
@@ -940,7 +938,7 @@ FPoint2D FTopologicalEdge::GetTangent2DAt(const FTopologicalVertex& InVertex)
 	}
 }
 
-void FTopologicalEdge::SpawnIdent(FDatabase& Database)
+void CADKernel::FTopologicalEdge::SpawnIdent(FDatabase& Database)
 {
 	if (!FEntity::SetId(Database))
 	{
@@ -961,7 +959,7 @@ void FTopologicalEdge::SpawnIdent(FDatabase& Database)
 	}
 }
 
-TSharedPtr<FTopologicalVertex> FTopologicalEdge::SplitAt(double SplittingCoordinate, const FPoint& NewVertexCoordinate, bool bKeepStartVertexConnectivity, TSharedPtr<FTopologicalEdge>& NewEdge)
+TSharedPtr<CADKernel::FTopologicalVertex> CADKernel::FTopologicalEdge::SplitAt(double SplittingCoordinate, const FPoint& NewVertexCoordinate, bool bKeepStartVertexConnectivity, TSharedPtr<FTopologicalEdge>& NewEdge)
 {
 	if (GetTwinsEntityCount() > 1)
 	{
@@ -1006,7 +1004,7 @@ TSharedPtr<FTopologicalVertex> FTopologicalEdge::SplitAt(double SplittingCoordin
 	return MiddelVertex;
 }
 
-bool FTopologicalEdge::IsSharpEdge()
+bool CADKernel::FTopologicalEdge::IsSharpEdge()
 {
 	double EdgeLength = Length();
 	double Step = Boundary.Length() / 7;
@@ -1045,7 +1043,7 @@ bool FTopologicalEdge::IsSharpEdge()
 
 
 #ifdef CADKERNEL_DEV
-FInfoEntity& FEdgeLink::GetInfo(FInfoEntity& Info) const
+CADKernel::FInfoEntity& CADKernel::FEdgeLink::GetInfo(FInfoEntity& Info) const
 {
 	return FEntity::GetInfo(Info)
 		.Add(TEXT("Active Entity"), ActiveEntity)

@@ -5,9 +5,7 @@
 #include "CADKernel/Geo/GeoPoint.h"
 #include "CADKernel/Math/Aabb.h"
 
-using namespace CADKernel;
-
-TSharedPtr<FEntityGeom> FNURBSSurface::ApplyMatrix(const FMatrixH& InMatrix) const
+TSharedPtr<CADKernel::FEntityGeom> CADKernel::FNURBSSurface::ApplyMatrix(const FMatrixH& InMatrix) const
 {
 	TArray<FPoint> TransformedPoles;
 	TransformedPoles.Reserve(Poles.Num());
@@ -21,7 +19,7 @@ TSharedPtr<FEntityGeom> FNURBSSurface::ApplyMatrix(const FMatrixH& InMatrix) con
 }
 
 #ifdef CADKERNEL_DEV
-FInfoEntity& FNURBSSurface::GetInfo(FInfoEntity& Info) const
+CADKernel::FInfoEntity& CADKernel::FNURBSSurface::GetInfo(FInfoEntity& Info) const
 {
 	return FSurface::GetInfo(Info)
 		.Add(TEXT("Degre"), UDegree, VDegree)
@@ -34,7 +32,7 @@ FInfoEntity& FNURBSSurface::GetInfo(FInfoEntity& Info) const
 }
 #endif
 
-void FNURBSSurface::Finalize()
+void CADKernel::FNURBSSurface::Finalize()
 {
 	if (bIsRational && Weights.IsEmpty())
 	{
@@ -94,7 +92,7 @@ void FNURBSSurface::Finalize()
 	SetMinToleranceIso();
 }
 
-void FNURBSSurface::FillNurbs(FNurbsSurfaceHomogeneousData& NurbsData)
+void CADKernel::FNURBSSurface::FillNurbs(FNurbsSurfaceHomogeneousData& NurbsData)
 {
 	bIsRational = NurbsData.bIsRational;
 
@@ -138,7 +136,7 @@ void FNURBSSurface::FillNurbs(FNurbsSurfaceHomogeneousData& NurbsData)
 	Finalize();
 }
 
-void FNURBSSurface::SetMinToleranceIso()
+void CADKernel::FNURBSSurface::SetMinToleranceIso()
 {
 	double LengthU = 0;
 	double LengthV = 0;

@@ -17,21 +17,19 @@
 #include "CADKernel/Topo/TopologicalFace.h"
 #include "CADKernel/Utils/Util.h"
 
-using namespace CADKernel;
-
 //#define DEBUG_MESH_EDGE
 
-FMesherParameters::FMesherParameters()
+CADKernel::FMesherParameters::FMesherParameters()
 	: InconsistencyAngle(TEXT("inconsistencyAngle"), 20., *this)
 {}
 
-FParametricMesher::FParametricMesher(TSharedRef<FModelMesh> InMeshModel)
+CADKernel::FParametricMesher::FParametricMesher(TSharedRef<FModelMesh> InMeshModel)
 	: MeshModel(InMeshModel)
 	, Parameters(MakeShared<FMesherParameters>())
 {
 }
 
-void FParametricMesher::MeshEntities(TArray<TSharedPtr<FEntity>>& InEntities)
+void CADKernel::FParametricMesher::MeshEntities(TArray<TSharedPtr<FEntity>>& InEntities)
 {
 	int32 FaceCount = 0;
 
@@ -96,7 +94,7 @@ void FParametricMesher::MeshEntities(TArray<TSharedPtr<FEntity>>& InEntities)
 	MeshEntities();
 }
 
-void FParametricMesher::MeshEntities()
+void CADKernel::FParametricMesher::MeshEntities()
 {
 	FTimePoint StartTime = FChrono::Now();
 	FTimePoint ApplyCriteriaStartTime = FChrono::Now();
@@ -154,7 +152,7 @@ void FParametricMesher::MeshEntities()
 	Chronos.PrintTimeElapse();
 }
 
-void FParametricMesher::ApplyFaceCriteria(TSharedRef<FTopologicalFace> Face)
+void CADKernel::FParametricMesher::ApplyFaceCriteria(TSharedRef<FTopologicalFace> Face)
 {
 	if (Face->IsApplyCriteria())
 	{
@@ -168,7 +166,7 @@ void FParametricMesher::ApplyFaceCriteria(TSharedRef<FTopologicalFace> Face)
 	Face->SetApplyCriteria();
 }
 
-void FParametricMesher::ApplyEdgeCriteria(FTopologicalEdge& Edge)
+void CADKernel::FParametricMesher::ApplyEdgeCriteria(FTopologicalEdge& Edge)
 {
 	FTopologicalEdge& ActiveEdge = *Edge.GetLinkActiveEdge();
 	ensureCADKernel(!ActiveEdge.IsApplyCriteria());
@@ -200,7 +198,7 @@ void FParametricMesher::ApplyEdgeCriteria(FTopologicalEdge& Edge)
 	ActiveEdge.SetApplyCriteria();
 }
 
-void FParametricMesher::Mesh(TSharedRef<FTopologicalFace> Face)
+void CADKernel::FParametricMesher::Mesh(TSharedRef<FTopologicalFace> Face)
 {
 	ensureCADKernel(!Face->IsDeleted());
 	ensureCADKernel(!Face->IsMeshed());
@@ -266,7 +264,7 @@ void FParametricMesher::Mesh(TSharedRef<FTopologicalFace> Face)
 	}
 }
 
-void FParametricMesher::GenerateCloud(FGrid& Grid)
+void CADKernel::FParametricMesher::GenerateCloud(FGrid& Grid)
 {
 	Grid.DefineCuttingParameters();
 	if(!Grid.GeneratePointCloud())
@@ -303,7 +301,7 @@ void FParametricMesher::GenerateCloud(FGrid& Grid)
 	Chronos.GlobalMeshAndGetLoopNodes += FChrono::Elapse(StartTime);
 }
 
-void FParametricMesher::MeshFaceLoops(FGrid& Grid)
+void CADKernel::FParametricMesher::MeshFaceLoops(FGrid& Grid)
 {
 	TSharedRef<FTopologicalFace> Face = Grid.GetFace();
 
@@ -320,7 +318,7 @@ void FParametricMesher::MeshFaceLoops(FGrid& Grid)
 	Chronos.GlobalMeshEdges += FChrono::Elapse(StartTime);
 }
 
-void FillImposedIsoCuttingPoints(TArray<double>& UEdgeSetOfIntersectionWithIso, ECoordinateType CoordinateType, double ToleranceGeoEdge, const FTopologicalEdge& Edge, TArray<FCuttingPoint>& OutImposedIsoVertexSet)
+static void FillImposedIsoCuttingPoints(TArray<double>& UEdgeSetOfIntersectionWithIso, CADKernel::ECoordinateType CoordinateType, double ToleranceGeoEdge, const CADKernel::FTopologicalEdge& Edge, TArray<CADKernel::FCuttingPoint>& OutImposedIsoVertexSet)
 {
 	int32 StartIndex = OutImposedIsoVertexSet.Num();
 
@@ -362,12 +360,12 @@ void FillImposedIsoCuttingPoints(TArray<double>& UEdgeSetOfIntersectionWithIso, 
 	}
 }
 
-void FParametricMesher::Mesh(TSharedRef<FTopologicalVertex> InVertex)
+void CADKernel::FParametricMesher::Mesh(TSharedRef<FTopologicalVertex> InVertex)
 {
 	InVertex->GetOrCreateMesh(GetMeshModel());
 }
 
-void FParametricMesher::Mesh(FTopologicalEdge& InEdge, FTopologicalFace& Face)
+void CADKernel::FParametricMesher::Mesh(FTopologicalEdge& InEdge, FTopologicalFace& Face)
 {
 	FTopologicalEdge& ActiveEdge = *InEdge.GetLinkActiveEntity();
 	if (ActiveEdge.IsMeshed())
@@ -646,7 +644,7 @@ void FParametricMesher::Mesh(FTopologicalEdge& InEdge, FTopologicalFace& Face)
 
 }
 
-void FParametricMesher::GenerateEdgeElements(FTopologicalEdge& Edge)
+void CADKernel::FParametricMesher::GenerateEdgeElements(FTopologicalEdge& Edge)
 {
 	FTopologicalEdge& ActiveEdge = *Edge.GetLinkActiveEntity();
 
@@ -694,7 +692,7 @@ void FParametricMesher::GenerateEdgeElements(FTopologicalEdge& Edge)
 	ActiveEdge.SetMeshed();
 }
 
-void FParametricMesher::IsolateQuadFace(TArray<FCostToFace>& QuadSurfaces, TArray<TSharedPtr<FTopologicalFace>>& OtherSurfaces) const
+void CADKernel::FParametricMesher::IsolateQuadFace(TArray<FCostToFace>& QuadSurfaces, TArray<TSharedPtr<FTopologicalFace>>& OtherSurfaces) const
 {
 	TArray<TSharedPtr<FTopologicalFace>> FlatQuadsAndTriangles;
 	FlatQuadsAndTriangles.Reserve(Faces.Num());
@@ -791,7 +789,7 @@ void FParametricMesher::IsolateQuadFace(TArray<FCostToFace>& QuadSurfaces, TArra
 #endif
 }
 
-void FParametricMesher::LinkQuadSurfaceForMesh(TArray<FCostToFace>& QuadTrimmedSurfaceSet, TArray<TArray<TSharedPtr<FTopologicalFace>>>& OutStrips)
+void CADKernel::FParametricMesher::LinkQuadSurfaceForMesh(TArray<FCostToFace>& QuadTrimmedSurfaceSet, TArray<TArray<TSharedPtr<FTopologicalFace>>>& OutStrips)
 {
 	const double GeometricTolerance = 20. * MeshModel->GetGeometricTolerance();
 
@@ -949,7 +947,7 @@ void FParametricMesher::LinkQuadSurfaceForMesh(TArray<FCostToFace>& QuadTrimmedS
 	}
 }
 
-void FParametricMesher::MeshSurfaceByFront(TArray<FCostToFace>& QuadTrimmedSurfaceSet)
+void CADKernel::FParametricMesher::MeshSurfaceByFront(TArray<FCostToFace>& QuadTrimmedSurfaceSet)
 {
 	// Processed3 : Surfaces that have to be meshed are set Processed3
 	// Processed1 : Surfaces added in CandidateSurfacesForMesh
@@ -1227,7 +1225,7 @@ void FParametricMesher::DebugIntersectEdgeIsos(const FTopologicalEdge& Edge, con
 }
 #endif
 
-void FParametricMesher::IntersectEdgeIsos(const FTopologicalEdge& Edge, const TArray<FPoint2D>& EdgeCrossingPoints2D, const double ToleranceIso, const TArray<double>& IsoCoordinates, EIso TypeIso, TArray<double>& Intersection)
+void CADKernel::FParametricMesher::IntersectEdgeIsos(const FTopologicalEdge& Edge, const TArray<FPoint2D>& EdgeCrossingPoints2D, const double ToleranceIso, const TArray<double>& IsoCoordinates, EIso TypeIso, TArray<double>& Intersection)
 {
 	Intersection.Reserve(IsoCoordinates.Num());
 
@@ -1311,7 +1309,7 @@ void FParametricMesher::IntersectEdgeIsos(const FTopologicalEdge& Edge, const TA
 // =========================================================================================================================================================================================================
 // =========================================================================================================================================================================================================
 
-void FParametricMesher::MeshThinZoneEdges(FGrid& Grid)
+void CADKernel::FParametricMesher::MeshThinZoneEdges(FGrid& Grid)
 {
 #ifdef DEBUG_MESHTHINSURF
 	Open3DDebugSession(FString::Printf(TEXT("thin Surfaces cutting on surf %d"), Grid.GetFace()->GetId()));
@@ -1425,7 +1423,7 @@ void FParametricMesher::MeshThinZoneEdges(FGrid& Grid)
 
 }
 
-void AddActiveEdgeThinZone(TSharedPtr<FTopologicalEdge> Edge, TSharedPtr<FTopologicalEdge> ActiveEdge, FLinearBoundary& SideEdgeCoordinate)
+static void AddActiveEdgeThinZone(TSharedPtr<CADKernel::FTopologicalEdge> Edge, TSharedPtr<CADKernel::FTopologicalEdge> ActiveEdge, CADKernel::FLinearBoundary& SideEdgeCoordinate)
 {
 	TArray<double> SideEdgeBound;
 	SideEdgeBound.SetNum(2);
@@ -1434,11 +1432,11 @@ void AddActiveEdgeThinZone(TSharedPtr<FTopologicalEdge> Edge, TSharedPtr<FTopolo
 
 	TArray<double> ActiveEdgeThinZone;
 	Edge->TransformActiveEdgeCoordinatesToLocalCoordinates(SideEdgeBound, ActiveEdgeThinZone);
-	FLinearBoundary ThinZoneBoundary(ActiveEdgeThinZone[0], ActiveEdgeThinZone[1]);
+	CADKernel::FLinearBoundary ThinZoneBoundary(ActiveEdgeThinZone[0], ActiveEdgeThinZone[1]);
 	ActiveEdge->AddThinZone(ThinZoneBoundary);
 };
 
-void FParametricMesher::GetThinZoneBoundary(const FThinZoneSide& Side)
+void CADKernel::FParametricMesher::GetThinZoneBoundary(const FThinZoneSide& Side)
 {
 	TSharedPtr<FTopologicalEdge> Edge = nullptr;
 	TSharedPtr<FTopologicalEdge> ActiveEdge = nullptr;
@@ -1470,7 +1468,7 @@ void FParametricMesher::GetThinZoneBoundary(const FThinZoneSide& Side)
 	AddActiveEdgeThinZone(Edge, ActiveEdge, SideEdgeCoordinate);
 }
 
-void FParametricMesher::MeshThinZoneSide(const FThinZoneSide& Side)
+void CADKernel::FParametricMesher::MeshThinZoneSide(const FThinZoneSide& Side)
 {
 	typedef TFunction<bool(double, double)> CompareMethode;
 
@@ -1668,7 +1666,7 @@ void FParametricMesher::MeshThinZoneSide(const FThinZoneSide& Side)
 }
 
 
-void FParametricMesher::InitParameters(const FString& ParametersString)
+void CADKernel::FParametricMesher::InitParameters(const FString& ParametersString)
 {
 	Parameters->SetFromString(ParametersString);
 }

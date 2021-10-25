@@ -6,9 +6,7 @@
 #include "CADKernel/Geo/Sampling/SurfacicSampling.h"
 
 
-using namespace CADKernel;
-
-void FSphericalSurface::EvaluatePointGridInCylindricalSpace(const FCoordinateGrid& Coordinates, TArray<FPoint2D>& OutPoints) const
+void CADKernel::FSphericalSurface::EvaluatePointGridInCylindricalSpace(const FCoordinateGrid& Coordinates, TArray<FPoint2D>& OutPoints) const
 {
 	int32 PointNum = Coordinates.Count();
 	OutPoints.Empty(PointNum);
@@ -43,7 +41,7 @@ void FSphericalSurface::EvaluatePointGridInCylindricalSpace(const FCoordinateGri
 	}
 }
 
-void FSphericalSurface::EvaluatePointGrid(const FCoordinateGrid& Coordinates, FSurfacicSampling& OutPoints, bool bComputeNormals) const
+void CADKernel::FSphericalSurface::EvaluatePointGrid(const FCoordinateGrid& Coordinates, FSurfacicSampling& OutPoints, bool bComputeNormals) const
 {
 	OutPoints.bWithNormals = bComputeNormals;
 	
@@ -98,7 +96,7 @@ void FSphericalSurface::EvaluatePointGrid(const FCoordinateGrid& Coordinates, FS
 	}
 }
 
-TSharedPtr<FEntityGeom> FSphericalSurface::ApplyMatrix(const FMatrixH& InMatrix) const
+TSharedPtr<CADKernel::FEntityGeom> CADKernel::FSphericalSurface::ApplyMatrix(const FMatrixH& InMatrix) const
 {
 	FMatrixH NewMatrix = InMatrix * Matrix;
 	return FEntity::MakeShared<FSphericalSurface>(Tolerance3D, NewMatrix, Radius, 
@@ -107,7 +105,7 @@ TSharedPtr<FEntityGeom> FSphericalSurface::ApplyMatrix(const FMatrixH& InMatrix)
 }
 
 #ifdef CADKERNEL_DEV
-FInfoEntity& FSphericalSurface::GetInfo(FInfoEntity& Info) const
+CADKernel::FInfoEntity& CADKernel::FSphericalSurface::GetInfo(FInfoEntity& Info) const
 {
 	return FSurface::GetInfo(Info)
 		.Add(TEXT("Matrix"), Matrix)

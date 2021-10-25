@@ -5,16 +5,14 @@
 #include "CADKernel/Geo/GeoPoint.h"
 #include "CADKernel/Geo/Sampling/SurfacicSampling.h"
 
-using namespace CADKernel;
-
-TSharedPtr<FEntityGeom> FTorusSurface::ApplyMatrix(const FMatrixH& InMatrix) const
+TSharedPtr<CADKernel::FEntityGeom> CADKernel::FTorusSurface::ApplyMatrix(const FMatrixH& InMatrix) const
 {
 	FMatrixH NewMatrix = InMatrix * Matrix;
 	return FEntity::MakeShared<FTorusSurface>(Tolerance3D, NewMatrix, MajorRadius, MinorRadius, Boundary[EIso::IsoU].Min, Boundary[EIso::IsoU].Max, Boundary[EIso::IsoV].Min, Boundary[EIso::IsoV].Max);
 }
 
 #ifdef CADKERNEL_DEV
-FInfoEntity& FTorusSurface::GetInfo(FInfoEntity& Info) const
+CADKernel::FInfoEntity& CADKernel::FTorusSurface::GetInfo(FInfoEntity& Info) const
 {
 	return FSurface::GetInfo(Info)
 		.Add(TEXT("Matrix"), Matrix)
@@ -27,7 +25,7 @@ FInfoEntity& FTorusSurface::GetInfo(FInfoEntity& Info) const
 }
 #endif
 
-void FTorusSurface::EvaluatePointGridInCylindricalSpace(const FCoordinateGrid& Coordinates, TArray<FPoint2D>& OutPoints) const
+void CADKernel::FTorusSurface::EvaluatePointGridInCylindricalSpace(const FCoordinateGrid& Coordinates, TArray<FPoint2D>& OutPoints) const
 {
 	int32 PointNum = Coordinates.Count();
 
@@ -63,7 +61,7 @@ void FTorusSurface::EvaluatePointGridInCylindricalSpace(const FCoordinateGrid& C
 	}
 }
 
-void FTorusSurface::EvaluatePointGrid(const FCoordinateGrid& Coordinates, FSurfacicSampling& OutPoints, bool bComputeNormals) const
+void CADKernel::FTorusSurface::EvaluatePointGrid(const FCoordinateGrid& Coordinates, FSurfacicSampling& OutPoints, bool bComputeNormals) const
 {
 	int32 PointNum = Coordinates.Count();
 
