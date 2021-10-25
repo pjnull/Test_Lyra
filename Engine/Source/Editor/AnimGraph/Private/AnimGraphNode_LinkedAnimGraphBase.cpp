@@ -198,36 +198,40 @@ void UAnimGraphNode_LinkedAnimGraphBase::ValidateAnimNodeDuringCompilation(USkel
 	}
 }
 
-void UAnimGraphNode_LinkedAnimGraphBase::CreateOutputPins()
+void UAnimGraphNode_LinkedAnimGraphBase::ReallocatePinsDuringReconstruction(TArray<UEdGraphPin*>& OldPins)
 {
-	Super::CreateOutputPins();
-	
 	// Grab the SKELETON class here as when we are reconstructed during during BP compilation
 	// the full generated class is not yet present built.
 	UClass* TargetClass = GetTargetSkeletonClass();
 
-	if(TargetClass)
+	if(!TargetClass)
 	{
-		IAnimClassInterface* AnimClassInterface = IAnimClassInterface::GetFromClass(TargetClass);
+		// Nothing to search for properties
+		return;
+	}
 
-		const FAnimNode_LinkedAnimGraph& Node = *GetLinkedAnimGraphNode();
+	IAnimClassInterface* AnimClassInterface = IAnimClassInterface::GetFromClass(TargetClass);
 
-		// Add any pose pins
-		for(const FAnimBlueprintFunction& AnimBlueprintFunction : AnimClassInterface->GetAnimBlueprintFunctions())
+	const FAnimNode_LinkedAnimGraph& Node = *GetLinkedAnimGraphNode();
+
+	// Add any pose pins
+	for(const FAnimBlueprintFunction& AnimBlueprintFunction : AnimClassInterface->GetAnimBlueprintFunctions())
+	{
+		if(AnimBlueprintFunction.Name == Node.GetDynamicLinkFunctionName())
 		{
-			if(AnimBlueprintFunction.Name == Node.GetDynamicLinkFunctionName())
+			for(const FName& PoseName : AnimBlueprintFunction.InputPoseNames)
 			{
-				for(const FName& PoseName : AnimBlueprintFunction.InputPoseNames)
-				{
-					UEdGraphPin* NewPin = CreatePin(EEdGraphPinDirection::EGPD_Input, UAnimationGraphSchema::MakeLocalSpacePosePin(), PoseName);
-					NewPin->PinFriendlyName = FText::FromName(PoseName);
-					CustomizePinData(NewPin, PoseName, INDEX_NONE);
-				}
-
-				break;
+				UEdGraphPin* NewPin = CreatePin(EEdGraphPinDirection::EGPD_Input, UAnimationGraphSchema::MakeLocalSpacePosePin(), PoseName);
+				NewPin->PinFriendlyName = FText::FromName(PoseName);
+				CustomizePinData(NewPin, PoseName, INDEX_NONE);
 			}
+
+			break;
 		}
 	}
+
+	// Call super to add properties
+	Super::ReallocatePinsDuringReconstruction(OldPins);
 }
 
 void UAnimGraphNode_LinkedAnimGraphBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
@@ -329,6 +333,12 @@ void UAnimGraphNode_LinkedAnimGraphBase::GenerateExposedPinsDetails(IDetailLayou
 	if(DetailBuilder.GetSelectedObjects().Num() > 1)
 	{
 		DetailBuilder.HideCategory(TEXT("Settings"));
+		return;
+	}
+
+	UClass* TargetClass = GetTargetClass();
+	if(TargetClass == nullptr)
+	{
 		return;
 	}
 	
