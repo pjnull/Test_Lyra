@@ -1369,7 +1369,7 @@ void FLevelEditorToolBar::RegisterLevelEditorToolBar( const TSharedRef<FUIComman
 				FOnGetContent::CreateStatic(&FLevelEditorToolBar::GenerateOpenBlueprintMenuContent, InCommandList, TWeakPtr<SLevelEditor>(InLevelEditor)),
 				LOCTEXT("OpenBlueprint_Label", "Blueprints"),
 				LOCTEXT("OpenBlueprint_ToolTip", "List of world Blueprints available to the user for editing or creation."),
-				FSlateIcon(FAppStyle::Get().GetStyleSetName(), "LevelEditor.OpenLevelBlueprint")
+				FSlateIcon(FAppStyle::Get().GetStyleSetName(), "LevelEditor.CreateBlankBlueprintClass")
 			);
 			BlueprintEntry.StyleNameOverride = "AssetEditorToolbar";
 			Section.AddEntry(BlueprintEntry);
