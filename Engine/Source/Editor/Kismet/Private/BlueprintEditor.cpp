@@ -109,6 +109,7 @@
 #include "BlueprintEditorContext.h"
 
 #include "Interfaces/IProjectManager.h"
+#include "BlueprintDebugger.h"
 
 // Core kismet tabs
 #include "SGraphNode.h"
@@ -3946,18 +3947,9 @@ void FBlueprintEditor::ClearAllWatches()
 
 void FBlueprintEditor::OpenBlueprintDebugger()
 {
-	TSharedPtr<SDockTab> DebuggerTab = FGlobalTabmanager::Get()->TryInvokeTab(FBlueprintEditorTabs::BlueprintDebuggerID);
-	TSharedPtr<FTabManager> DebuggerTabManager = FGlobalTabmanager::Get()->GetTabManagerForMajorTab(DebuggerTab);
-	if (DebuggerTabManager.IsValid())
-	{
-		const FName DataFlowTabName(TEXT("ExecutionFlowApp"));
-		TSharedPtr<SDockTab> DataFlowTab = DebuggerTabManager->TryInvokeTab(DataFlowTabName);
-		if (DataFlowTab.IsValid())
-		{
-			TSharedRef<SKismetDebuggingView> DebuggingView = StaticCastSharedRef<SKismetDebuggingView>(DataFlowTab->GetContent());
-			DebuggingView->SetBlueprintToWatch(GetBlueprintObj());
-		}
-	}
+	FGlobalTabmanager::Get()->TryInvokeTab(FBlueprintEditorTabs::BlueprintDebuggerID);
+	FBlueprintEditorModule& BlueprintEditorModule = FModuleManager::Get().LoadModuleChecked<FBlueprintEditorModule>(TEXT("Kismet"));
+	BlueprintEditorModule.GetBlueprintDebugger()->SetDebuggedBlueprint(GetBlueprintObj());
 }
 
 bool FBlueprintEditor::CanOpenBlueprintDebugger() const
