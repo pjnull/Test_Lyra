@@ -38,7 +38,7 @@ public:
 		UpdateSourceValue(InitialValue);
 	}
 
-	virtual void UpdateSourceValue(const T& NewValue)
+	virtual void UpdateSourceValue(const T& NewValue) override final
 	{
 		Value->SetData(NewValue);
 		SetOutput(OutParamValue(), Value);

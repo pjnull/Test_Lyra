@@ -506,12 +506,12 @@ public:
 	{
 	}
 
-	~FBufferReaderWithSHA()
+	~FBufferReaderWithSHA() override final
 	{
 		Close();
 	}
 
-	bool Close() final
+	bool Close() override final
 	{
 		// don't redo if we were already closed
 		if (ReaderData)
