@@ -969,7 +969,7 @@ bool UWorldPartitionRuntimeSpatialHash::CreateStreamingGrid(const FSpatialHashRu
 					const FWorldPartitionActorDescView& ActorDescView = ActorInstance.GetActorDescView();
 					if (AActor* Actor = FindObject<AActor>(nullptr, *ActorDescView.GetActorPath().ToString()))
 					{
-						if (Actor->GetPackage()->IsDirty())
+						if (ModifiedActorDescListForPIE.GetActorDesc(ActorDescView.GetGuid()) != nullptr)
 						{
 							// Create an actor container to make sure duplicated actors will share an outer to properly remap inter-actors references
 							StreamingCell->ActorContainer = NewObject<UActorContainer>(StreamingCell);
