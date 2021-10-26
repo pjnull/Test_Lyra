@@ -2937,9 +2937,9 @@ void FStarshipEditorStyle::FStyle::SetupTutorialStyles()
 			Set("TutorialLaunch.Button", FButtonStyle()
 				.SetNormalPadding(0)
 				.SetPressedPadding(0)
-				.SetNormal(IMAGE_BRUSH("Tutorials/TutorialButton_Default_16x", Icon16x16))
-				.SetHovered(IMAGE_BRUSH("Tutorials/TutorialButton_Hovered_16x", Icon16x16))
-				.SetPressed(IMAGE_BRUSH("Tutorials/TutorialButton_Pressed_16x", Icon16x16))
+				.SetNormal(IMAGE_BRUSH_SVG("Starship/Common/Tutorials", Icon16x16, FStyleColors::Foreground))
+				.SetHovered(IMAGE_BRUSH_SVG("Starship/Common/Tutorials", Icon16x16, FStyleColors::ForegroundHover))
+				.SetPressed(IMAGE_BRUSH_SVG("Starship/Common/Tutorials", Icon16x16, FStyleColors::ForegroundHover))
 				);
 
 			Set("TutorialLaunch.Circle", new IMAGE_BRUSH("Tutorials/Circle_128x", Icon128x128, FLinearColor::White));
