@@ -1921,6 +1921,7 @@ void UControlRigBlueprint::PostDuplicate(bool bDuplicateForPIE)
 	}
 
 	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(this);
+	RecompileVM();
 }
 
 FRigVMGraphModifiedEvent& UControlRigBlueprint::OnModified()
