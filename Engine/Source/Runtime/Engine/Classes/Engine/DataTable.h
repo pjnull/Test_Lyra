@@ -353,6 +353,12 @@ public:
 	 */
 	ENGINE_API TArray<FString> CreateTableFromOtherTable(const UDataTable* InTable);
 
+	/**
+	 *	Create table from a raw data map with a given script struct
+	 *	@return	Set of problems encountered while processing input
+	 */
+	ENGINE_API TArray<FString> CreateTableFromRawData(TMap<FName, const uint8*>& DataMap, UScriptStruct* InRowStruct);
+
 #if WITH_EDITOR
 	/** Get an array of all the column titles, using the friendly display name from the property */
 	ENGINE_API TArray<FString> GetColumnTitles() const;
