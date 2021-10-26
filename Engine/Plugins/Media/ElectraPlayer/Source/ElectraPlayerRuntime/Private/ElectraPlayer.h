@@ -105,10 +105,14 @@ public:
 	bool IsLive() const override;
 	FTimespan GetSeekableDuration() const override;
 
+	void SetPlaybackRange(const FPlaybackRange& InPlaybackRange) override;
+	void GetPlaybackRange(FPlaybackRange& OutPlaybackRange) const override;
+
 	float GetRate() const override;
 	bool SetRate(float Rate) override;
 
 	bool Seek(const FTimespan& Time) override;
+	void SetFrameAccurateSeekMode(bool bEnableFrameAccuracy) override;
 
 	bool GetAudioTrackFormat(int32 TrackIndex, int32 FormatIndex, FAudioTrackFormat& OutFormat) const override;
 	bool GetVideoTrackFormat(int32 TrackIndex, int32 FormatIndex, FVideoTrackFormat& OutFormat) const override;
@@ -363,6 +367,9 @@ private:
 	mutable bool									bSubtitleTrackIndexDirty;
 
 	bool											bInitialSeekPerformed;
+
+	FPlaybackRange									CurrentPlaybackRange;
+	TOptional<bool>									bFrameAccurateSeeking;
 
 	FIntPoint										LastPresentedFrameDimension;
 

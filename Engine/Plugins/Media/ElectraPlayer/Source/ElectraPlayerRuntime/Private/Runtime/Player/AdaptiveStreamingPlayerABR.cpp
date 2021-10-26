@@ -218,6 +218,7 @@ namespace Electra
 		TSharedPtrTS<IManifest::IPlayPeriod>				CurrentPlayPeriodVideo;
 		TSharedPtrTS<IManifest::IPlayPeriod>				CurrentPlayPeriodAudio;
 		bool												bPlayerIsBuffering;
+		bool												bPlayerIsRebuffering;
 		bool												bCanSwitchToAlternateStreams;
 
 		TArray<TSharedPtrTS<FStreamInformation>>			StreamInformationVideo;
@@ -262,6 +263,7 @@ namespace Electra
 		DiscardSmallBandwidthSamplesLess = 64 << 10;
 		FudgeSmallBandwidthSamplesLess = 128 << 10;
 		FudgeSmallBandwidthSamplesFactor = 1000;
+		bRebufferingJustResumesLoading = false;
 	}
 
 
@@ -304,6 +306,7 @@ namespace Electra
 		: PlayerSessionServices(InPlayerSessionServices)
 		, Config(config)
 		, bPlayerIsBuffering(true)
+		, bPlayerIsRebuffering(false)
 		, BandwidthCeiling(0x7fffffff)
 		, ForcedInitialBandwidth(0)
 	{
@@ -438,7 +441,7 @@ namespace Electra
 								// Sort the representations by ascending bitrate
 								StreamInformationAudio.Sort([](const TSharedPtrTS<FStreamInformation>& a, const TSharedPtrTS<FStreamInformation>& b)
 								{
-									return a->Bitrate > b->Bitrate;
+									return a->Bitrate < b->Bitrate;
 								});
 
 								break;
@@ -629,6 +632,18 @@ namespace Electra
 			{
 				MaxSegmentDownloadDuration *= 2.0;
 			}
+			// When buffering we allow for some more time as well.
+			else if (bPlayerIsRebuffering)
+			{
+				MaxSegmentDownloadDuration *= 2.0;
+			}
+
+			// Rebuffering is set to just continue loading data? No timeout then.
+			if (bPlayerIsRebuffering && Config.bRebufferingJustResumesLoading)
+			{
+				MaxSegmentDownloadDuration = 1e30;
+			}
+
 			if (SegmentDownloadStats.TimeToDownload >= MaxSegmentDownloadDuration)
 			{
 				// If the estimate to complete download is longer than what is currently in the buffer abort the download and hope
@@ -651,7 +666,7 @@ namespace Electra
 						, SegmentDownloadStats.PresentationTime
 						, secondsInBuffer
 						, SegmentDownloadStats.DurationDownloaded
-						, MaxSegmentDownloadDuration
+						, SegmentDownloadStats.Duration
 						, SegmentDownloadStats.TimeToDownload
 						, EstimatedTotalDownloadTime);
 					LogMessage(IInfoLog::ELevel::Info, Decision.Reason);
@@ -716,6 +731,7 @@ namespace Electra
 
 		if (BufferingReason == Metrics::EBufferingReason::Rebuffering)
 		{
+			bPlayerIsRebuffering = true;
 			double Scale = 0.6;
 			double avgCurrent = AverageBandwidth.GetLastSample();
 			AverageBandwidth.InitializeTo(avgCurrent * Scale);
@@ -727,6 +743,7 @@ namespace Electra
 	void FAdaptiveStreamSelector::ReportBufferingEnd(Metrics::EBufferingReason BufferingReason)
 	{
 		bPlayerIsBuffering = false;
+		bPlayerIsRebuffering = false;
 	}
 
 	TSharedPtrTS<FAdaptiveStreamSelector::FStreamInformation> FAdaptiveStreamSelector::GetStreamInformation(const Metrics::FSegmentDownloadStats& FromDownloadStats)
@@ -938,12 +955,20 @@ namespace Electra
 						}
 						else
 						{
-							// Take a video stream offline for a brief moment. Audio is usually the only one with no alternative to switch to, so don't do that!
+							// Take a video stream offline for a brief moment unless it is the only one. Audio is usually the only one with no alternative to switch to, so don't do that!
 							if (Stats.StreamType == EStreamType::Video)
 							{
-								if (CurrentStreamInfo->Health.BecomesAvailableAgainAtUTC == FTimeValue::GetZero())
+								if (StreamInformationVideo.Num() > 1)
 								{
-									CurrentStreamInfo->Health.BecomesAvailableAgainAtUTC = TimeNow + FTimeValue().SetFromMilliseconds(1000);
+									if (CurrentStreamInfo->Health.BecomesAvailableAgainAtUTC == FTimeValue::GetZero())
+									{
+										CurrentStreamInfo->Health.BecomesAvailableAgainAtUTC = TimeNow + FTimeValue().SetFromMilliseconds(1000);
+									}
+								}
+								else
+								{
+									// Need to insert filler data instead.
+									bRetryIfPossible = false;
 								}
 							}
 							else
@@ -1110,8 +1135,8 @@ namespace Electra
 				Swap(PossibleRepresentations, RemainingCandidates);
 			}
 
-			// Filter out streams that are currently not healthy
-			//if (1)
+			// Filter out streams that are currently not healthy.
+			if (1)
 			{
 				TArray<TSharedPtrTS<FStreamInformation>> RemainingCandidates;
 				for(int32 j=0, jMax=PossibleRepresentations.Num(); j<jMax; ++j)

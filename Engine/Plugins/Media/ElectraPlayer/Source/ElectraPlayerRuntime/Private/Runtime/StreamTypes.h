@@ -785,21 +785,17 @@ namespace Electra
 
 
 
-	struct FPlayerLoopState
+	struct FPlayerSequenceState
 	{
-		FPlayerLoopState()
+		FPlayerSequenceState()
 		{
 			Reset();
 		}
 		void Reset()
 		{
-			LoopBasetime.SetToZero();
-			LoopCount = 0;
-			bLoopEnabled = false;
+			SequenceIndex = 0;
 		}
-		FTimeValue	LoopBasetime;				//!< Base time added to the play position to have it monotonously increasing. Subtract this from the current play position to get the local time into the media.
-		int32		LoopCount;					//!< Number of times playback jumped back to loop. 0 on first playthrough, 1 on first loop, etc.
-		bool		bLoopEnabled;
+		int64	SequenceIndex;
 	};
 
 

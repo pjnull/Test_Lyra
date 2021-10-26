@@ -14,18 +14,19 @@ namespace Electra
 class IPlayerSessionServices;
 
 
-class IAndroidJavaH264VideoDecoder
+class IAndroidJavaH265VideoDecoder
 {
 public:
 
-	static TSharedPtr<IAndroidJavaH264VideoDecoder, ESPMode::ThreadSafe> Create(IPlayerSessionServices* InPlayerSessionServices);
+	static TSharedPtr<IAndroidJavaH265VideoDecoder, ESPMode::ThreadSafe> Create(IPlayerSessionServices* InPlayerSessionServices);
 
-	virtual ~IAndroidJavaH264VideoDecoder() = default;
+	virtual ~IAndroidJavaH265VideoDecoder() = default;
 
 	struct FCreateParameters
 	{
 		int32 MaxWidth = 0;
 		int32 MaxHeight = 0;
+		int32 MaxTier = 0;
 		int32 MaxProfile = 0;
 		int32 MaxProfileLevel = 0;
 		int32 MaxFrameRate= 0;
@@ -113,7 +114,7 @@ public:
 
 
 	/**
-	 * Creates a Java instance of an H.264 video decoder.
+	 * Creates a Java instance of an H.265 video decoder.
 	 *
 	 * @return 0 if successful, 1 on error.
 	 */
@@ -130,9 +131,9 @@ public:
 
 	/**
 	 * Attempts to set a new output surface on an existing and configured decoder.
-	 * 
+	 *
 	 * @param InNewOutputSurface
-	 * 
+	 *
 	 * @return 0 if successful, 1 on error.
 	 */
 	virtual int32 SetOutputSurface(jobject InNewOutputSurface) = 0;

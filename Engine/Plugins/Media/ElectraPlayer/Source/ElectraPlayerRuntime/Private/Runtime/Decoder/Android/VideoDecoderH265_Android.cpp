@@ -4,7 +4,7 @@
 #include "PlayerRuntimeGlobal.h"
 
 #include "StreamAccessUnitBuffer.h"
-#include "Decoder/VideoDecoderH264.h"
+#include "Decoder/VideoDecoderH265.h"
 #include "Decoder/Android/DecoderOptionNames_Android.h"
 #include "Renderer/RendererBase.h"
 #include "Player/PlayerSessionServices.h"
@@ -15,7 +15,7 @@
 #include "Android/AndroidPlatformMisc.h"
 #include "ElectraPlayerPrivate.h"
 
-#include "VideoDecoderH264_JavaWrapper_Android.h"
+#include "VideoDecoderH265_JavaWrapper_Android.h"
 #include "MediaVideoDecoderOutputAndroid.h"
 #include "Renderer/RendererVideo.h"
 #include "ElectraVideoDecoder_Android.h"
@@ -24,20 +24,20 @@
 #include "Android/AndroidJava.h"
 
 
-DECLARE_CYCLE_STAT(TEXT("FVideoDecoderH264::Decode()"), STAT_ElectraPlayer_VideoH264Decode, STATGROUP_ElectraPlayer);
-DECLARE_CYCLE_STAT(TEXT("FVideoDecoderH264::ConvertOutput()"), STAT_ElectraPlayer_VideoH264ConvertOutput, STATGROUP_ElectraPlayer);
+DECLARE_CYCLE_STAT(TEXT("FVideoDecoderH265::Decode()"), STAT_ElectraPlayer_VideoH265Decode, STATGROUP_ElectraPlayer);
+DECLARE_CYCLE_STAT(TEXT("FVideoDecoderH265::ConvertOutput()"), STAT_ElectraPlayer_VideoH265ConvertOutput, STATGROUP_ElectraPlayer);
 
 
 namespace Electra
 {
 
 /**
- * H264 video decoder class implementation.
+ * H265 video decoder class implementation.
 **/
-class FVideoDecoderH264 : public IVideoDecoderH264, public FMediaThread
+class FVideoDecoderH265 : public IVideoDecoderH265, public FMediaThread
 {
 public:
-	static bool Startup(const IVideoDecoderH264::FSystemConfiguration& InConfig);
+	static bool Startup(const FParamDict& Options);
 	static void Shutdown();
 
 	static FParamDict& Android_Workarounds()
@@ -46,8 +46,8 @@ public:
 		return Workarounds;
 	}
 
-	FVideoDecoderH264();
-	virtual ~FVideoDecoderH264();
+	FVideoDecoderH265();
+	virtual ~FVideoDecoderH265();
 
 	virtual void SetPlayerSessionServices(IPlayerSessionServices* SessionServices) override;
 
@@ -55,7 +55,7 @@ public:
 	virtual void Close() override;
 	virtual void DrainForCodecChange() override;
 
-	virtual void SetMaximumDecodeCapability(int32 MaxWidth, int32 MaxHeight, int32 MaxProfile, int32 MaxProfileLevel, const FParamDict& AdditionalOptions) override;
+	virtual void SetMaximumDecodeCapability(int32 MaxTier, int32 MaxWidth, int32 MaxHeight, int32 MaxProfile, int32 MaxProfileLevel, const FParamDict& AdditionalOptions) override;
 
 	virtual void SetAUInputBufferListener(IAccessUnitBufferListener* Listener) override;
 
@@ -123,8 +123,8 @@ private:
 	struct FDecodedImage
 	{
 		TSharedPtrTS<FDecoderInput> SourceInfo;
-		IAndroidJavaH264VideoDecoder::FOutputFormatInfo	OutputFormat;
-		IAndroidJavaH264VideoDecoder::FOutputBufferInfo	OutputBufferInfo;
+		IAndroidJavaH265VideoDecoder::FOutputFormatInfo	OutputFormat;
+		IAndroidJavaH265VideoDecoder::FOutputBufferInfo	OutputBufferInfo;
 		bool bIsDummy = false;
 	};
 
@@ -132,8 +132,8 @@ private:
 	{
 		FOutputBufferInfo()
 		{ }
-		FOutputBufferInfo(const FDecoderTimeStamp& InTimeStamp, int32 InBufferIndex, int32 InValidCount) 
-			: Timestamp(InTimeStamp), BufferIndex(InBufferIndex), ValidCount(InValidCount) 
+		FOutputBufferInfo(const FDecoderTimeStamp& InTimeStamp, int32 InBufferIndex, int32 InValidCount)
+			: Timestamp(InTimeStamp), BufferIndex(InBufferIndex), ValidCount(InValidCount)
 		{ }
 
 		FDecoderTimeStamp Timestamp;
@@ -237,8 +237,8 @@ private:
 	IDecoderOutputBufferListener*													ReadyBufferListener = nullptr;
 
 	FDecoderFormatInfo																CurrentStreamFormatInfo;
-	TSharedPtrTS<IAndroidJavaH264VideoDecoder>										DecoderInstance;
-	IAndroidJavaH264VideoDecoder::FDecoderInformation								DecoderInfo;
+	TSharedPtrTS<IAndroidJavaH265VideoDecoder>										DecoderInstance;
+	IAndroidJavaH265VideoDecoder::FDecoderInformation								DecoderInfo;
 	TSharedPtrTS<FDecoderInput>														CurrentAccessUnit;
 	bool																			bMustSendCSD = false;
 	EDecodingState																	DecodingState = EDecodingState::Regular;
@@ -259,81 +259,66 @@ private:
 
 	static int32																	NextNativeDecoderID;
 	static FCriticalSection															NativeDecoderMapCS;
-	static TMap<uint32, FVideoDecoderH264*>											NativeDecoderMap;
-
-public:
-	static FSystemConfiguration														SystemConfig;
+	static TMap<uint32, FVideoDecoderH265*>											NativeDecoderMap;
 };
 
-IVideoDecoderH264::FSystemConfiguration	FVideoDecoderH264::SystemConfig;
-
-int32									FVideoDecoderH264::NextNativeDecoderID = 0;
-FCriticalSection						FVideoDecoderH264::NativeDecoderMapCS;
-TMap<uint32, FVideoDecoderH264*>		FVideoDecoderH264::NativeDecoderMap;
+int32									FVideoDecoderH265::NextNativeDecoderID = 0;
+FCriticalSection						FVideoDecoderH265::NativeDecoderMapCS;
+TMap<uint32, FVideoDecoderH265*>		FVideoDecoderH265::NativeDecoderMap;
 
 /***************************************************************************************************************************************************/
 /***************************************************************************************************************************************************/
 /***************************************************************************************************************************************************/
 
-bool IVideoDecoderH264::Startup(const IVideoDecoderH264::FSystemConfiguration& InConfig)
+bool IVideoDecoderH265::Startup(const FParamDict& Options)
 {
-	return FVideoDecoderH264::Startup(InConfig);
+	return FVideoDecoderH265::Startup(Options);
 }
 
-void IVideoDecoderH264::Shutdown()
+void IVideoDecoderH265::Shutdown()
 {
-	FVideoDecoderH264::Shutdown();
+	FVideoDecoderH265::Shutdown();
 }
 
-bool IVideoDecoderH264::GetStreamDecodeCapability(FStreamDecodeCapability& OutResult, const FStreamDecodeCapability& InStreamParameter)
+bool IVideoDecoderH265::GetStreamDecodeCapability(FStreamDecodeCapability& OutResult, const FStreamDecodeCapability& InStreamParameter)
 {
 	return false;
 }
 
-IVideoDecoderH264::FSystemConfiguration::FSystemConfiguration()
-{
-	ThreadConfig.Decoder.Priority = TPri_Normal;
-	ThreadConfig.Decoder.StackSize = 64 << 10;
-	ThreadConfig.Decoder.CoreAffinity = -1;
-}
-
-IVideoDecoderH264::FInstanceConfiguration::FInstanceConfiguration()
-	: ThreadConfig(FVideoDecoderH264::SystemConfig.ThreadConfig)
-	, MaxDecodedFrames(8)
+IVideoDecoderH265::FInstanceConfiguration::FInstanceConfiguration()
+	: MaxDecodedFrames(8)
 {
 }
 
-IVideoDecoderH264* IVideoDecoderH264::Create()
+IVideoDecoderH265* IVideoDecoderH265::Create()
 {
-	return new FVideoDecoderH264;
+	return new FVideoDecoderH265;
 }
 
-FParamDict& IVideoDecoderH264::Android_Workarounds()
+FParamDict& IVideoDecoderH265::Android_Workarounds()
 {
-	return FVideoDecoderH264::Android_Workarounds();
+	return FVideoDecoderH265::Android_Workarounds();
 }
 
 
 /***************************************************************************************************************************************************/
 /***************************************************************************************************************************************************/
 /***************************************************************************************************************************************************/
-
 //-----------------------------------------------------------------------------
 /**
  * Decoder system startup
  *
- * @param InConfig
+ * @param InOptions
  *
  * @return
  */
-bool FVideoDecoderH264::Startup(const IVideoDecoderH264::FSystemConfiguration& InConfig)
+bool FVideoDecoderH265::Startup(const FParamDict& InOptions)
 {
-	SystemConfig = InConfig;
 	// Create a temporary instance of the decoder wrapper. This will initialize the Java class singletons for later use.
-	TSharedPtrTS<IAndroidJavaH264VideoDecoder> Temp = IAndroidJavaH264VideoDecoder::Create(nullptr);
+	TSharedPtrTS<IAndroidJavaH265VideoDecoder> Temp = IAndroidJavaH265VideoDecoder::Create(nullptr);
 	if (Temp.IsValid())
 	{
-		const IAndroidJavaH264VideoDecoder::FDecoderInformation* DecInf = Temp->GetDecoderInformation();
+		const IAndroidJavaH265VideoDecoder::FDecoderInformation* DecInf = Temp->GetDecoderInformation();
 		if (DecInf)
 		{
 			Android_Workarounds().SetOrUpdate(TEXT("setOutputSurface"), FVariantValue(DecInf->bCanUse_SetOutputSurface));
@@ -347,7 +332,7 @@ bool FVideoDecoderH264::Startup(const IVideoDecoderH264::FSystemConfiguration& I
 /**
  * Decoder system shutdown.
  */
-void FVideoDecoderH264::Shutdown()
+void FVideoDecoderH265::Shutdown()
 {
 }
 
@@ -356,8 +341,8 @@ void FVideoDecoderH264::Shutdown()
 /**
  * Constructor
  */
-FVideoDecoderH264::FVideoDecoderH264()
-	: FMediaThread("ElectraPlayer::H264 decoder")
+FVideoDecoderH265::FVideoDecoderH265()
+	: FMediaThread("ElectraPlayer::H265 decoder")
 {
 	NativeDecoderID = (uint32)FPlatformAtomics::InterlockedIncrement(&NextNativeDecoderID);
 	FScopeLock Lock(&NativeDecoderMapCS);
@@ -369,7 +354,7 @@ FVideoDecoderH264::FVideoDecoderH264()
 /**
  * Destructor
  */
-FVideoDecoderH264::~FVideoDecoderH264()
+FVideoDecoderH265::~FVideoDecoderH265()
 {
 	Close();
 	FScopeLock Lock(&NativeDecoderMapCS);
@@ -383,7 +368,7 @@ FVideoDecoderH264::~FVideoDecoderH264()
  *
  * @param InListener
  */
-void FVideoDecoderH264::SetAUInputBufferListener(IAccessUnitBufferListener* InListener)
+void FVideoDecoderH265::SetAUInputBufferListener(IAccessUnitBufferListener* InListener)
 {
 	FMediaCriticalSection::ScopedLock lock(ListenerMutex);
 	InputBufferListener = InListener;
@@ -396,7 +381,7 @@ void FVideoDecoderH264::SetAUInputBufferListener(IAccessUnitBufferListener* InLi
  *
  * @param InListener
  */
-void FVideoDecoderH264::SetReadyBufferListener(IDecoderOutputBufferListener* InListener)
+void FVideoDecoderH265::SetReadyBufferListener(IDecoderOutputBufferListener* InListener)
 {
 	FMediaCriticalSection::ScopedLock lock(ListenerMutex);
 	ReadyBufferListener = InListener;
@@ -409,7 +394,7 @@ void FVideoDecoderH264::SetReadyBufferListener(IDecoderOutputBufferListener* InL
  *
  * @param InSessionServices
  */
-void FVideoDecoderH264::SetPlayerSessionServices(IPlayerSessionServices* InSessionServices)
+void FVideoDecoderH265::SetPlayerSessionServices(IPlayerSessionServices* InSessionServices)
 {
 	PlayerSessionServices = InSessionServices;
 }
@@ -421,7 +406,7 @@ void FVideoDecoderH264::SetPlayerSessionServices(IPlayerSessionServices* InSessi
  *
  * @param InConfig
  */
-void FVideoDecoderH264::Open(const IVideoDecoderH264::FInstanceConfiguration& InConfig)
+void FVideoDecoderH265::Open(const IVideoDecoderH265::FInstanceConfiguration& InConfig)
 {
 	Config = InConfig;
 	StartThread();
@@ -432,7 +417,7 @@ void FVideoDecoderH264::Open(const IVideoDecoderH264::FInstanceConfiguration& In
 /**
  * Closes the decoder instance.
  */
-void FVideoDecoderH264::Close()
+void FVideoDecoderH265::Close()
 {
 	StopThread();
 }
@@ -443,7 +428,7 @@ void FVideoDecoderH264::Close()
  * Drains the decoder of all enqueued input and ends it, after which the decoder must send an FDecoderMessage to the player
  * to signal completion.
  */
-void FVideoDecoderH264::DrainForCodecChange()
+void FVideoDecoderH265::DrainForCodecChange()
 {
 	bDrainForCodecChange = true;
 }
@@ -458,13 +443,14 @@ void FVideoDecoderH264::DrainForCodecChange()
  * but if it does, any access unit requiring a better decoder will take
  * precedence and force a decoder capable of decoding it!
  *
+ * @param MaxTier
  * @param MaxWidth
  * @param MaxHeight
  * @param MaxProfile
  * @param MaxProfileLevel
  * @param AdditionalOptions
  */
-void FVideoDecoderH264::SetMaximumDecodeCapability(int32 MaxWidth, int32 MaxHeight, int32 MaxProfile, int32 MaxProfileLevel, const FParamDict& AdditionalOptions)
+void FVideoDecoderH265::SetMaximumDecodeCapability(int32 MaxTier, int32 MaxWidth, int32 MaxHeight, int32 MaxProfile, int32 MaxProfileLevel, const FParamDict& AdditionalOptions)
 {
 	// Not implemented
 }
@@ -476,7 +462,7 @@ void FVideoDecoderH264::SetMaximumDecodeCapability(int32 MaxWidth, int32 MaxHeig
  *
  * @param InRenderer
  */
-void FVideoDecoderH264::SetRenderer(TSharedPtr<IMediaRenderer, ESPMode::ThreadSafe> InRenderer)
+void FVideoDecoderH265::SetRenderer(TSharedPtr<IMediaRenderer, ESPMode::ThreadSafe> InRenderer)
 {
 	Renderer = InRenderer;
 }
@@ -486,7 +472,7 @@ void FVideoDecoderH264::SetRenderer(TSharedPtr<IMediaRenderer, ESPMode::ThreadSa
 /**
  * Sets a resource delegate.
  */
-void FVideoDecoderH264::SetResourceDelegate(const TSharedPtr<IVideoDecoderResourceDelegate, ESPMode::ThreadSafe>& InResourceDelegate)
+void FVideoDecoderH265::SetResourceDelegate(const TSharedPtr<IVideoDecoderResourceDelegate, ESPMode::ThreadSafe>& InResourceDelegate)
 {
 	ResourceDelegate = InResourceDelegate;
 }
@@ -496,12 +482,9 @@ void FVideoDecoderH264::SetResourceDelegate(const TSharedPtr<IVideoDecoderResour
 /**
  * Creates and runs the decoder thread.
  */
-void FVideoDecoderH264::StartThread()
+void FVideoDecoderH265::StartThread()
 {
-	ThreadSetPriority(Config.ThreadConfig.Decoder.Priority);
-	ThreadSetCoreAffinity(Config.ThreadConfig.Decoder.CoreAffinity);
-	ThreadSetStackSize(Config.ThreadConfig.Decoder.StackSize);
-	ThreadStart(Electra::MakeDelegate(this, &FVideoDecoderH264::WorkerThread));
+	ThreadStart(Electra::MakeDelegate(this, &FVideoDecoderH265::WorkerThread));
 	bThreadStarted = true;
 }
 
@@ -510,7 +493,7 @@ void FVideoDecoderH264::StartThread()
 /**
  * Stops the decoder thread.
  */
-void FVideoDecoderH264::StopThread()
+void FVideoDecoderH265::StopThread()
 {
 	if (bThreadStarted)
 	{
@@ -530,14 +513,14 @@ void FVideoDecoderH264::StopThread()
  * @param Code
  * @param Error
  */
-void FVideoDecoderH264::PostError(int32_t ApiReturnValue, const FString& Message, uint16 Code, UEMediaError Error)
+void FVideoDecoderH265::PostError(int32_t ApiReturnValue, const FString& Message, uint16 Code, UEMediaError Error)
 {
 	check(PlayerSessionServices);
 	if (PlayerSessionServices)
 	{
 		FErrorDetail err;
 		err.SetError(Error != UEMEDIA_ERROR_OK ? Error : UEMEDIA_ERROR_DETAIL);
-		err.SetFacility(Facility::EFacility::H264Decoder);
+		err.SetFacility(Facility::EFacility::H265Decoder);
 		err.SetCode(Code);
 		err.SetMessage(Message);
 		err.SetPlatformMessage(FString::Printf(TEXT("%d (0x%08x)"), ApiReturnValue, ApiReturnValue));
@@ -554,11 +537,11 @@ void FVideoDecoderH264::PostError(int32_t ApiReturnValue, const FString& Message
  * @param Level
  * @param Message
  */
-void FVideoDecoderH264::LogMessage(IInfoLog::ELevel Level, const FString& Message)
+void FVideoDecoderH265::LogMessage(IInfoLog::ELevel Level, const FString& Message)
 {
 	if (PlayerSessionServices)
 	{
-		PlayerSessionServices->PostLog(Facility::EFacility::H264Decoder, Level, Message);
+		PlayerSessionServices->PostLog(Facility::EFacility::H265Decoder, Level, Message);
 	}
 }
 
@@ -569,7 +552,7 @@ void FVideoDecoderH264::LogMessage(IInfoLog::ELevel Level, const FString& Messag
  *
  * @return
  */
-bool FVideoDecoderH264::CreateDecodedImagePool()
+bool FVideoDecoderH265::CreateDecodedImagePool()
 {
 	check(Renderer);
 	FParamDict poolOpts;
@@ -594,7 +577,7 @@ bool FVideoDecoderH264::CreateDecodedImagePool()
 /**
  * Destroys the pool of decoded images.
  */
-void FVideoDecoderH264::DestroyDecodedImagePool()
+void FVideoDecoderH265::DestroyDecodedImagePool()
 {
 	Renderer->ReleaseBufferPool();
 }
@@ -606,7 +589,7 @@ void FVideoDecoderH264::DestroyDecodedImagePool()
  *
  * @param InAccessUnit
  */
-void FVideoDecoderH264::AUdataPushAU(FAccessUnit* InAccessUnit)
+void FVideoDecoderH265::AUdataPushAU(FAccessUnit* InAccessUnit)
 {
 	InAccessUnit->AddRef();
 
@@ -620,7 +603,7 @@ void FVideoDecoderH264::AUdataPushAU(FAccessUnit* InAccessUnit)
 /**
  * "Pushes" an End Of Data marker indicating no further access units will be added.
  */
-void FVideoDecoderH264::AUdataPushEOD()
+void FVideoDecoderH265::AUdataPushEOD()
 {
 	NextAccessUnits.SetEOD();
 }
@@ -630,7 +613,7 @@ void FVideoDecoderH264::AUdataPushEOD()
 /**
  * Notifies the decoder that there may be further access units.
  */
-void FVideoDecoderH264::AUdataClearEOD()
+void FVideoDecoderH265::AUdataClearEOD()
 {
 	NextAccessUnits.ClearEOD();
 }
@@ -640,7 +623,7 @@ void FVideoDecoderH264::AUdataClearEOD()
 /**
  * Flushes the decoder and clears the input access unit buffer.
  */
-void FVideoDecoderH264::AUdataFlushEverything()
+void FVideoDecoderH265::AUdataFlushEverything()
 {
 	FlushDecoderSignal.Signal();
 	DecoderFlushedSignal.WaitAndReset();
@@ -653,14 +636,14 @@ void FVideoDecoderH264::AUdataFlushEverything()
  *
  * @return true if successful, false on error
  */
-bool FVideoDecoderH264::InternalDecoderCreate()
+bool FVideoDecoderH265::InternalDecoderCreate()
 {
 	int32 Result;
 
 	// Check if there is an existing decoder instance we can re purpose
 	if (!DecoderInstance.IsValid())
 	{
-		DecoderInstance = IAndroidJavaH264VideoDecoder::Create(PlayerSessionServices);
+		DecoderInstance = IAndroidJavaH265VideoDecoder::Create(PlayerSessionServices);
 		// Create
 		Result = DecoderInstance->CreateDecoder();
 		if (Result)
@@ -676,12 +659,13 @@ bool FVideoDecoderH264::InternalDecoderCreate()
 	}
 
 	// Configure
-	IAndroidJavaH264VideoDecoder::FCreateParameters cp;
+	IAndroidJavaH265VideoDecoder::FCreateParameters cp;
 	cp.CodecData = CurrentAccessUnit->AccessUnit->AUCodecData;
 	cp.MaxWidth = Config.MaxFrameWidth;
 	cp.MaxHeight = Config.MaxFrameHeight;
-	cp.MaxProfile = Config.ProfileIdc;
-	cp.MaxProfileLevel = Config.LevelIdc;
+	cp.MaxTier = Config.Tier;
+	cp.MaxProfile = Config.Profile;
+	cp.MaxProfileLevel = Config.Level;
 	cp.MaxFrameRate = 60;
 	cp.NativeDecoderID = NativeDecoderID;
 
@@ -720,7 +704,7 @@ bool FVideoDecoderH264::InternalDecoderCreate()
 		return false;
 	}
 	// Get the decoder information.
-	const IAndroidJavaH264VideoDecoder::FDecoderInformation* DecInf = DecoderInstance->GetDecoderInformation();
+	const IAndroidJavaH265VideoDecoder::FDecoderInformation* DecInf = DecoderInstance->GetDecoderInformation();
 	check(DecInf);
 	if (DecInf)
 	{
@@ -747,7 +731,7 @@ bool FVideoDecoderH264::InternalDecoderCreate()
 /**
  * Destroys the current decoder instance.
  */
-void FVideoDecoderH264::InternalDecoderDestroy()
+void FVideoDecoderH265::InternalDecoderDestroy()
 {
 	if (DecoderInstance.IsValid())
 	{
@@ -769,7 +753,7 @@ void FVideoDecoderH264::InternalDecoderDestroy()
  * from the last IDR frame needs to be decoded again.
  * To speed this up AUs that have no dependencies are not added to the replay data.
  */
-void FVideoDecoderH264::RecreateDecoderSession()
+void FVideoDecoderH265::RecreateDecoderSession()
 {
 	if (DecoderInstance.IsValid())
 	{
@@ -908,7 +892,7 @@ void FVideoDecoderH264::RecreateDecoderSession()
  *
  * @param bHaveOutput
  */
-void FVideoDecoderH264::NotifyReadyBufferListener(bool bHaveOutput)
+void FVideoDecoderH265::NotifyReadyBufferListener(bool bHaveOutput)
 {
 	if (ReadyBufferListener)
 	{
@@ -933,7 +917,7 @@ void FVideoDecoderH264::NotifyReadyBufferListener(bool bHaveOutput)
  *
  * @param AU
  */
-void FVideoDecoderH264::PrepareAU(TSharedPtrTS<FDecoderInput> AU)
+void FVideoDecoderH265::PrepareAU(TSharedPtrTS<FDecoderInput> AU)
 {
 	if (!AU->bHasBeenPrepared)
 	{
@@ -955,41 +939,29 @@ void FVideoDecoderH264::PrepareAU(TSharedPtrTS<FDecoderInput> AU)
 
 			// Process NALUs
 			AU->bIsIDR = AU->AccessUnit->bIsSyncSample;
-			AU->bIsDiscardable = !AU->bIsIDR;
+			AU->bIsDiscardable = false;
 			// Replace the NALU lengths with the startcode.
-			uint32* NALU = (uint32 *)AU->AccessUnit->AUData;
-			uint32* End  = (uint32 *)Electra::AdvancePointer(NALU, AU->AccessUnit->AUSize);
+			uint32* NALU = (uint32*)AU->AccessUnit->AUData;
+			uint32* End  = (uint32*)Electra::AdvancePointer(NALU, AU->AccessUnit->AUSize);
 			while(NALU < End)
 			{
-				// Check the nal_ref_idc in the NAL unit for dependencies.
-				uint8 nal = *(const uint8 *)(NALU + 1);
-				check((nal & 0x80) == 0);
-				if ((nal >> 5) != 0)
-				{
-					AU->bIsDiscardable = false;
-				}
+				uint8 nut = *(const uint8 *)(NALU + 1);
+				nut >>= 1;
 				// IDR frame?
-				if ((nal & 0x1f) == 5)
+				if (nut == 19 /*IDR_W_RADL*/ || nut == 20 /*IDR_N_LP*/ || nut == 21 /*CRA_NUT*/)
 				{
 					AU->bIsIDR = true;
 				}
-
-				// SEI message(s)?
-				if ((nal & 0x1f) == 6)
+				// One of TRAIL_N, TSA_N, STSA_N, RADL_N, RASL_N, RSV_VCL_N10, RSV_VCL_N12 or RSV_VCL_N14 ?
+				else if (nut == 0 || nut == 2 || nut == 4 || nut == 6 || nut == 8 || nut == 10 || nut == 12 || nut == 14)
 				{
-					// TODO: we might need to set aside any SEI messages carrying 608 or 708 caption data.
+					AU->bIsDiscardable = true;
 				}
 
 				uint32 naluLen = MEDIA_FROM_BIG_ENDIAN(*NALU) + 4;
 				*NALU = MEDIA_TO_BIG_ENDIAN(0x00000001U);
 				NALU = Electra::AdvancePointer(NALU, naluLen);
 			}
-
-			// Note #1: SPS and PPS may need to be removed for some decoders and only sent in a dedicated CSD buffer.
-			//          We are not expecting inband SPS/PPS at the moment.
-			
-			// Note #2: There might be decoder implementations that do not like NALUs other than slice NALUs, or at
-			//          least none preceding any SPS/PPS (if they are there and not removed), possible even AUD NALUs.
 		}
 
 		// Does this AU fall (partially) outside the range for rendering?
@@ -1036,19 +1008,19 @@ void FVideoDecoderH264::PrepareAU(TSharedPtrTS<FDecoderInput> AU)
 /**
  * Gets an input access unit and prepares it for use.
  */
-void FVideoDecoderH264::GetAndPrepareInputAU()
+void FVideoDecoderH265::GetAndPrepareInputAU()
 {
 	if (bDrainForCodecChange)
 	{
 		return;
 	}
-	
+
 	// Need new input?
 	if (!CurrentAccessUnit.IsValid() && InputBufferListener && NextAccessUnits.IsEmpty())
 	{
 		{
-			SCOPE_CYCLE_COUNTER(STAT_ElectraPlayer_VideoH264Decode);
-			CSV_SCOPED_TIMING_STAT(ElectraPlayer, VideoH264Decode);
+			SCOPE_CYCLE_COUNTER(STAT_ElectraPlayer_VideoH265Decode);
+			CSV_SCOPED_TIMING_STAT(ElectraPlayer, VideoH265Decode);
 
 			IAccessUnitBufferListener::FBufferStats	stats;
 			stats.bEODSignaled = NextAccessUnits.GetEOD();
@@ -1065,8 +1037,8 @@ void FVideoDecoderH264::GetAndPrepareInputAU()
 		bool bHaveData = NextAccessUnits.Wait(1000);
 		if (bHaveData)
 		{
-			SCOPE_CYCLE_COUNTER(STAT_ElectraPlayer_VideoH264Decode);
-			CSV_SCOPED_TIMING_STAT(ElectraPlayer, VideoH264Decode);
+			SCOPE_CYCLE_COUNTER(STAT_ElectraPlayer_VideoH265Decode);
+			CSV_SCOPED_TIMING_STAT(ElectraPlayer, VideoH265Decode);
 
 			bool bOk = NextAccessUnits.Dequeue(CurrentAccessUnit);
 			MEDIA_UNUSED_VAR(bOk);
@@ -1092,7 +1064,7 @@ void FVideoDecoderH264::GetAndPrepareInputAU()
  *
  * @return true if successful, false on error
  */
-bool FVideoDecoderH264::AcquireOutputBuffer(IMediaRenderer::IBuffer*& RenderOutputBuffer)
+bool FVideoDecoderH265::AcquireOutputBuffer(IMediaRenderer::IBuffer*& RenderOutputBuffer)
 {
 	RenderOutputBuffer = nullptr;
 	FParamDict BufferAcquireOptions;
@@ -1131,7 +1103,7 @@ bool FVideoDecoderH264::AcquireOutputBuffer(IMediaRenderer::IBuffer*& RenderOutp
  *
  * @return
  */
-FVideoDecoderH264::EDecodeResult FVideoDecoderH264::DecodeDummy()
+FVideoDecoderH265::EDecodeResult FVideoDecoderH265::DecodeDummy()
 {
 	if (CurrentAccessUnit.IsValid() && CurrentAccessUnit->AdjustedPTS.IsValid())
 	{
@@ -1154,7 +1126,7 @@ FVideoDecoderH264::EDecodeResult FVideoDecoderH264::DecodeDummy()
  *
  * @return false if the format is still the same, true if it has changed.
  */
-bool FVideoDecoderH264::FDecoderFormatInfo::IsDifferentFrom(TSharedPtrTS<FDecoderInput> AU)
+bool FVideoDecoderH265::FDecoderFormatInfo::IsDifferentFrom(TSharedPtrTS<FDecoderInput> AU)
 {
 	// If there is no current CSD set, set it initially.
 	if (!CurrentCodecData.IsValid())
@@ -1169,7 +1141,7 @@ bool FVideoDecoderH264::FDecoderFormatInfo::IsDifferentFrom(TSharedPtrTS<FDecode
 /**
  * Sets the last used codec specific data.
  */
-void FVideoDecoderH264::FDecoderFormatInfo::SetFrom(TSharedPtrTS<FDecoderInput> AU)
+void FVideoDecoderH265::FDecoderFormatInfo::SetFrom(TSharedPtrTS<FDecoderInput> AU)
 {
 	if (AU.IsValid() && AU->AccessUnit && AU->AccessUnit->AUCodecData.IsValid())
 	{
@@ -1184,7 +1156,7 @@ void FVideoDecoderH264::FDecoderFormatInfo::SetFrom(TSharedPtrTS<FDecoderInput> 
  *
  * @return
  */
-FVideoDecoderH264::EDecodeResult FVideoDecoderH264::Decode()
+FVideoDecoderH265::EDecodeResult FVideoDecoderH265::Decode()
 {
 	// No input AU to decode?
 	if (!CurrentAccessUnit.IsValid())
@@ -1290,7 +1262,7 @@ FVideoDecoderH264::EDecodeResult FVideoDecoderH264::Decode()
  *
  * @return
  */
-FVideoDecoderH264::EDecodeResult FVideoDecoderH264::DrainDecoder()
+FVideoDecoderH265::EDecodeResult FVideoDecoderH265::DrainDecoder()
 {
 	// If there is no decoder we cannot send and EOS. We need to fail this since without a decoder
 	// we will not get the EOS back to stay in the regular flow.
@@ -1336,13 +1308,13 @@ FVideoDecoderH264::EDecodeResult FVideoDecoderH264::DrainDecoder()
  * If we already have one that must be reconfigured we go through the same sequence
  * where creation will be skipped.
  */
-bool FVideoDecoderH264::PrepareDecoder()
+bool FVideoDecoderH265::PrepareDecoder()
 {
 	// Need to create a decoder instance?
 	if (!DecoderInstance.IsValid() || CurrentDecoderState == EDecoderState::NeedReconfig)
 	{
-		SCOPE_CYCLE_COUNTER(STAT_ElectraPlayer_VideoH264Decode);
-		CSV_SCOPED_TIMING_STAT(ElectraPlayer, VideoH264Decode);
+		SCOPE_CYCLE_COUNTER(STAT_ElectraPlayer_VideoH265Decode);
+		CSV_SCOPED_TIMING_STAT(ElectraPlayer, VideoH265Decode);
 		if (!InternalDecoderCreate())
 		{
 			return false;
@@ -1357,7 +1329,7 @@ bool FVideoDecoderH264::PrepareDecoder()
  * Clears the decoder.
  * If possible a simple flush will be made, otherwise a reconfiguration will be requested.
  */
-void FVideoDecoderH264::UnprepareDecoder()
+void FVideoDecoderH265::UnprepareDecoder()
 {
 	if (DecoderInstance.IsValid())
 	{
@@ -1389,7 +1361,7 @@ void FVideoDecoderH264::UnprepareDecoder()
  *
  * @return
  */
-bool FVideoDecoderH264::GetMatchingDecoderInput(TSharedPtrTS<FDecoderInput>& OutMatchingInput, int64 InPTSFromDecoder)
+bool FVideoDecoderH265::GetMatchingDecoderInput(TSharedPtrTS<FDecoderInput>& OutMatchingInput, int64 InPTSFromDecoder)
 {
 	if (InDecoderInput.Num())
 	{
@@ -1412,7 +1384,7 @@ bool FVideoDecoderH264::GetMatchingDecoderInput(TSharedPtrTS<FDecoderInput>& Out
  *
  * @return
  */
-FVideoDecoderH264::EOutputResult FVideoDecoderH264::GetOutput()
+FVideoDecoderH265::EOutputResult FVideoDecoderH265::GetOutput()
 {
 	// When there is no decoder yet there will be no output so all is well!
 	if (!DecoderInstance.IsValid())
@@ -1421,7 +1393,7 @@ FVideoDecoderH264::EOutputResult FVideoDecoderH264::GetOutput()
 	}
 
 	int32 Result = -1;
-	IAndroidJavaH264VideoDecoder::FOutputBufferInfo OutputBufferInfo;
+	IAndroidJavaH265VideoDecoder::FOutputBufferInfo OutputBufferInfo;
 	Result = DecoderInstance->DequeueOutputBuffer(OutputBufferInfo, 0);
 	if (Result != 0)
 	{
@@ -1447,7 +1419,7 @@ FVideoDecoderH264::EOutputResult FVideoDecoderH264::GetOutput()
 			return EOutputResult::Ok;
 		}
 
-		IAndroidJavaH264VideoDecoder::FOutputFormatInfo OutputFormatInfo;
+		IAndroidJavaH265VideoDecoder::FOutputFormatInfo OutputFormatInfo;
 		Result = DecoderInstance->GetOutputFormatInfo(OutputFormatInfo, OutputBufferInfo.BufferIndex);
 		if (Result == 0)
 		{
@@ -1489,17 +1461,17 @@ FVideoDecoderH264::EOutputResult FVideoDecoderH264::GetOutput()
 			return EOutputResult::Fail;
 		}
 	}
-	else if (OutputBufferInfo.BufferIndex == IAndroidJavaH264VideoDecoder::FOutputBufferInfo::EBufferIndexValues::MediaCodec_INFO_TRY_AGAIN_LATER)
+	else if (OutputBufferInfo.BufferIndex == IAndroidJavaH265VideoDecoder::FOutputBufferInfo::EBufferIndexValues::MediaCodec_INFO_TRY_AGAIN_LATER)
 	{
 		return EOutputResult::TryAgainLater;
 	}
-	else if (OutputBufferInfo.BufferIndex == IAndroidJavaH264VideoDecoder::FOutputBufferInfo::EBufferIndexValues::MediaCodec_INFO_OUTPUT_FORMAT_CHANGED)
+	else if (OutputBufferInfo.BufferIndex == IAndroidJavaH265VideoDecoder::FOutputBufferInfo::EBufferIndexValues::MediaCodec_INFO_OUTPUT_FORMAT_CHANGED)
 	{
 		// We do not care about the global format change here. When we need the format we get it from the actual buffer then.
 		// Instead let's try to get the following output right away.
 		return GetOutput();
 	}
-	else if (OutputBufferInfo.BufferIndex == IAndroidJavaH264VideoDecoder::FOutputBufferInfo::EBufferIndexValues::MediaCodec_INFO_OUTPUT_BUFFERS_CHANGED)
+	else if (OutputBufferInfo.BufferIndex == IAndroidJavaH265VideoDecoder::FOutputBufferInfo::EBufferIndexValues::MediaCodec_INFO_OUTPUT_BUFFERS_CHANGED)
 	{
 		// No-op as this is the Result of a deprecated API we are not using.
 		// Let's try to get the following output right away.
@@ -1520,10 +1492,10 @@ FVideoDecoderH264::EOutputResult FVideoDecoderH264::GetOutput()
  * Processes the next decoded image to be output.
  *
  * @param NextImage
- * 
+ *
  * @return
  */
-FVideoDecoderH264::EOutputResult FVideoDecoderH264::ProcessOutput(const FDecodedImage& NextImage)
+FVideoDecoderH265::EOutputResult FVideoDecoderH265::ProcessOutput(const FDecodedImage& NextImage)
 {
 	// Get an output buffer from the renderer to pass the image to.
 	IMediaRenderer::IBuffer* RenderOutputBuffer = nullptr;
@@ -1622,7 +1594,7 @@ FVideoDecoderH264::EOutputResult FVideoDecoderH264::ProcessOutput(const FDecoded
  * would mandate a multi-threaded control of the decoder... which seems impossible
  * to get to be reliable.
  */
-void FVideoDecoderH264::ProcessReadyOutputBuffersToSurface()
+void FVideoDecoderH265::ProcessReadyOutputBuffersToSurface()
 {
 	if (!DecoderInstance.IsValid())
 	{
@@ -1682,9 +1654,9 @@ void FVideoDecoderH264::ProcessReadyOutputBuffersToSurface()
 //-----------------------------------------------------------------------------
 /**
 */
-void FVideoDecoderH264::ReleaseToSurface(uint32 NativeDecoderID, const FDecoderTimeStamp& Time)
+void FVideoDecoderH265::ReleaseToSurface(uint32 NativeDecoderID, const FDecoderTimeStamp& Time)
 {
-	FVideoDecoderH264** NativeDecoder = NativeDecoderMap.Find(NativeDecoderID);
+	FVideoDecoderH265** NativeDecoder = NativeDecoderMap.Find(NativeDecoderID);
 	if (NativeDecoder)
 	{
 		FScopeLock Lock(&(*NativeDecoder)->OutputSurfaceTargetCS);
@@ -1696,7 +1668,7 @@ void FVideoDecoderH264::ReleaseToSurface(uint32 NativeDecoderID, const FDecoderT
 //-----------------------------------------------------------------------------
 /**
 */
-void FVideoDecoderH264::Android_UpdateSurface(const TSharedPtr<IOptionPointerValueContainer, ESPMode::ThreadSafe>& Surface)
+void FVideoDecoderH265::Android_UpdateSurface(const TSharedPtr<IOptionPointerValueContainer, ESPMode::ThreadSafe>& Surface)
 {
 	if (bSurfaceIsView)
 	{
@@ -1715,7 +1687,7 @@ void FVideoDecoderH264::Android_UpdateSurface(const TSharedPtr<IOptionPointerVal
 /**
  * Application has entered foreground.
  */
-void FVideoDecoderH264::HandleApplicationHasEnteredForeground()
+void FVideoDecoderH265::HandleApplicationHasEnteredForeground()
 {
 	ApplicationRunningSignal.Signal();
 }
@@ -1725,7 +1697,7 @@ void FVideoDecoderH264::HandleApplicationHasEnteredForeground()
 /**
  * Application goes into background.
  */
-void FVideoDecoderH264::HandleApplicationWillEnterBackground()
+void FVideoDecoderH265::HandleApplicationWillEnterBackground()
 {
 	ApplicationSuspendConfirmedSignal.Reset();
 	ApplicationRunningSignal.Reset();
@@ -1733,9 +1705,9 @@ void FVideoDecoderH264::HandleApplicationWillEnterBackground()
 
 //-----------------------------------------------------------------------------
 /**
- * H264 video decoder main threaded decode loop
+ * H265 video decoder main threaded decode loop
  */
-void FVideoDecoderH264::WorkerThread()
+void FVideoDecoderH265::WorkerThread()
 {
 	LLM_SCOPE(ELLMTag::ElectraPlayer);
 
@@ -1780,12 +1752,12 @@ void FVideoDecoderH264::WorkerThread()
 		// If in background, wait until we get activated again.
 		if (!ApplicationRunningSignal.IsSignaled())
 		{
-			UE_LOG(LogElectraPlayer, Log, TEXT("FVideoDecoderH264(%p): OnSuspending"), this);
+			UE_LOG(LogElectraPlayer, Log, TEXT("FVideoDecoderH265(%p): OnSuspending"), this);
 			ApplicationSuspendConfirmedSignal.Signal();
 			while(!ApplicationRunningSignal.WaitTimeout(100 * 1000) && !TerminateThreadSignal.IsSignaled())
 			{
 			}
-			UE_LOG(LogElectraPlayer, Log, TEXT("FVideoDecoderH264(%p): OnResuming"), this);
+			UE_LOG(LogElectraPlayer, Log, TEXT("FVideoDecoderH265(%p): OnResuming"), this);
 			if (bCfgReconfigureSurfaceOnWakeup)
 			{
 				bForceDecoderRefresh = true;
@@ -1826,8 +1798,8 @@ void FVideoDecoderH264::WorkerThread()
 		// Try to pull output. Do this first to make room in the decoder for new input data.
 		EOutputResult OutputResult;
 		{
-			SCOPE_CYCLE_COUNTER(STAT_ElectraPlayer_VideoH264ConvertOutput);
-			CSV_SCOPED_TIMING_STAT(ElectraPlayer, VideoH264ConvertOutput);
+			SCOPE_CYCLE_COUNTER(STAT_ElectraPlayer_VideoH265ConvertOutput);
+			CSV_SCOPED_TIMING_STAT(ElectraPlayer, VideoH265ConvertOutput);
 			ProcessReadyOutputBuffersToSurface();
 
 			bool bIsBlocked = false;
@@ -1859,8 +1831,8 @@ void FVideoDecoderH264::WorkerThread()
 			// Did we get the final output?
 			if (OutputResult == EOutputResult::EOS)
 			{
-				SCOPE_CYCLE_COUNTER(STAT_ElectraPlayer_VideoH264Decode);
-				CSV_SCOPED_TIMING_STAT(ElectraPlayer, VideoH264Decode);
+				SCOPE_CYCLE_COUNTER(STAT_ElectraPlayer_VideoH265Decode);
+				CSV_SCOPED_TIMING_STAT(ElectraPlayer, VideoH265Decode);
 
 				// Done draining, clear all remaining stray inputs/outputs, if any.
 				bGotEOS = true;
@@ -2022,8 +1994,8 @@ void FVideoDecoderH264::WorkerThread()
 					// Decode.
 					if (!bError && DecoderInstance.IsValid())
 					{
-						SCOPE_CYCLE_COUNTER(STAT_ElectraPlayer_VideoH264Decode);
-						CSV_SCOPED_TIMING_STAT(ElectraPlayer, VideoH264Decode);
+						SCOPE_CYCLE_COUNTER(STAT_ElectraPlayer_VideoH265Decode);
+						CSV_SCOPED_TIMING_STAT(ElectraPlayer, VideoH265Decode);
 
 						DecodeResult = Decode();
 						if (DecodeResult == EDecodeResult::Ok)
@@ -2150,12 +2122,12 @@ void FVideoDecoderH264::WorkerThread()
 		// Flush?
 		if (FlushDecoderSignal.IsSignaled())
 		{
-			SCOPE_CYCLE_COUNTER(STAT_ElectraPlayer_VideoH264Decode);
-			CSV_SCOPED_TIMING_STAT(ElectraPlayer, VideoH264Decode);
-			
+			SCOPE_CYCLE_COUNTER(STAT_ElectraPlayer_VideoH265Decode);
+			CSV_SCOPED_TIMING_STAT(ElectraPlayer, VideoH265Decode);
+
 			// Flush and stop the decoder.
 			UnprepareDecoder();
-			
+
 			// Flush all pending input
 			CurrentAccessUnit.Reset();
 			NextAccessUnits.Empty();
@@ -2164,7 +2136,7 @@ void FVideoDecoderH264::WorkerThread()
 			CurrentSequenceIndex.Reset();
 			LastPushedPresentationTimeUs = 0;
 			DecodingState = EDecodingState::Regular;
-			
+
 			// Flush all pending output
 			OutputSurfaceTargetPTS.Time = -1.0;
 			OutputSurfaceTargetPTS.SequenceIndex = 0;
@@ -2192,7 +2164,7 @@ void FVideoDecoderH264::WorkerThread()
 	if (bDrainForCodecChange)
 	{
 		// Notify the player that we have finished draining.
-		PlayerSessionServices->SendMessageToPlayer(FDecoderMessage::Create(FDecoderMessage::EReason::DrainingFinished, this, EStreamType::Video, FStreamCodecInformation::ECodec::H264));
+		PlayerSessionServices->SendMessageToPlayer(FDecoderMessage::Create(FDecoderMessage::EReason::DrainingFinished, this, EStreamType::Video, FStreamCodecInformation::ECodec::H265));
 		// We need to wait to get terminated. Also check if flushing is requested and acknowledge if it is.
 		while(!TerminateThreadSignal.IsSignaled())
 		{
@@ -2210,10 +2182,10 @@ void FVideoDecoderH264::WorkerThread()
  * Callback triggered when we release a decoder output buffer to the output surface
  * (currently here from completeness, but not currently used! - the signal that is)
  */
-void FVideoDecoderH264::JavaCallback_NewDataAvailable(uint32 NativeDecoderID)
+void FVideoDecoderH265::JavaCallback_NewDataAvailable(uint32 NativeDecoderID)
 {
 	FScopeLock Lock(&NativeDecoderMapCS);
-	FVideoDecoderH264 **NativeDecoder = NativeDecoderMap.Find(NativeDecoderID);
+	FVideoDecoderH265 **NativeDecoder = NativeDecoderMap.Find(NativeDecoderID);
 	if (NativeDecoder)
 	{
 		(*NativeDecoder)->NewDataAvailable.Signal();
@@ -2225,8 +2197,8 @@ void FVideoDecoderH264::JavaCallback_NewDataAvailable(uint32 NativeDecoderID)
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 #if USE_ANDROID_JNI
-JNI_METHOD void Java_com_epicgames_unreal_ElectraVideoDecoderH264_nativeSignalNewDataAvailable(JNIEnv* jenv, jobject thiz, jint NativeDecoderID)
+JNI_METHOD void Java_com_epicgames_unreal_ElectraVideoDecoderH265_nativeSignalNewDataAvailable(JNIEnv* jenv, jobject thiz, jint NativeDecoderID)
 {
-	Electra::FVideoDecoderH264::JavaCallback_NewDataAvailable(NativeDecoderID);
+	Electra::FVideoDecoderH265::JavaCallback_NewDataAvailable(NativeDecoderID);
 }
 #endif

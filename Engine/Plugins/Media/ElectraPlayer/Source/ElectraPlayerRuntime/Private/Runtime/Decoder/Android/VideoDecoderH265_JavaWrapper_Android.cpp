@@ -4,7 +4,7 @@
 
 #if PLATFORM_ANDROID
 
-#include "VideoDecoderH264_JavaWrapper_Android.h"
+#include "VideoDecoderH265_JavaWrapper_Android.h"
 #include "Utilities/UtilsMPEGVideo.h"
 #include "Player/PlayerSessionServices.h"
 
@@ -54,7 +54,7 @@ namespace Electra
 			{
 				FErrorDetail err;
 				err.SetError(Error != UEMEDIA_ERROR_OK ? Error : UEMEDIA_ERROR_DETAIL);
-				err.SetFacility(Facility::EFacility::H264Decoder);
+				err.SetFacility(Facility::EFacility::H265Decoder);
 				err.SetCode(Code);
 				err.SetMessage(Message);
 				err.SetPlatformMessage(FString::Printf(TEXT("%d (0x%08x)"), ApiReturnValue, ApiReturnValue));
@@ -75,7 +75,7 @@ namespace Electra
 		{
 			if (PlayerSessionServices)
 			{
-				PlayerSessionServices->PostLog(Facility::EFacility::H264Decoder, Level, Message);
+				PlayerSessionServices->PostLog(Facility::EFacility::H265Decoder, Level, Message);
 			}
 		}
 
@@ -100,13 +100,13 @@ namespace Electra
 
 
 
-	class FAndroidJavaH264VideoDecoder : public IAndroidJavaH264VideoDecoder
+	class FAndroidJavaH265VideoDecoder : public IAndroidJavaH265VideoDecoder
 		, public FJavaClassObject
 	{
 	public:
 
-		FAndroidJavaH264VideoDecoder(IPlayerSessionServices* InPlayerSessionServices);
-		virtual ~FAndroidJavaH264VideoDecoder();
+		FAndroidJavaH265VideoDecoder(IPlayerSessionServices* InPlayerSessionServices);
+		virtual ~FAndroidJavaH265VideoDecoder();
 
 		virtual int32 CreateDecoder() override;
 		virtual int32 InitializeDecoder(const FCreateParameters& InCreateParams) override;
@@ -129,7 +129,7 @@ namespace Electra
 	private:
 		static FName GetClassName()
 		{
-			return FName("com/epicgames/unreal/ElectraVideoDecoderH264");
+			return FName("com/epicgames/unreal/ElectraVideoDecoderH265");
 		}
 
 		void PostError(int32_t ApiReturnValue, const FString& Message, uint16 Code, UEMediaError Error = UEMEDIA_ERROR_OK)
@@ -203,7 +203,6 @@ namespace Electra
 		jfieldID			FCreateParameters_bNeedSecure;
 		jfieldID			FCreateParameters_bNeedTunneling;
 		jfieldID			FCreateParameters_CSD0;
-		jfieldID			FCreateParameters_CSD1;
 		jfieldID			FCreateParameters_NativeDecoderID;
 		jfieldID			FCreateParameters_VideoCodecSurface;
 		jfieldID			FCreateParameters_bSurfaceIsView;
@@ -249,9 +248,9 @@ namespace Electra
 	 *
 	 * @return Decoder wrapper instance.
 	 */
-	TSharedPtr<IAndroidJavaH264VideoDecoder, ESPMode::ThreadSafe> IAndroidJavaH264VideoDecoder::Create(IPlayerSessionServices* InPlayerSessionServices)
+	TSharedPtr<IAndroidJavaH265VideoDecoder, ESPMode::ThreadSafe> IAndroidJavaH265VideoDecoder::Create(IPlayerSessionServices* InPlayerSessionServices)
 	{
-		return MakeShared<FAndroidJavaH264VideoDecoder>(InPlayerSessionServices);
+		return MakeShared<FAndroidJavaH265VideoDecoder>(InPlayerSessionServices);
 	}
 
 
@@ -259,12 +258,12 @@ namespace Electra
 	/**
 	 * CTOR
 	 */
-	FAndroidJavaH264VideoDecoder::FAndroidJavaH264VideoDecoder(IPlayerSessionServices* InPlayerSessionServices)
+	FAndroidJavaH265VideoDecoder::FAndroidJavaH265VideoDecoder(IPlayerSessionServices* InPlayerSessionServices)
 		: FJavaClassObject(GetClassName(), "()V")
 		, PlayerSessionServices(InPlayerSessionServices)
 		, CreateDecoderFN(GetClassMethod("CreateDecoder", "()I"))
 		, ReleaseDecoderFN(GetClassMethod("ReleaseDecoder", "()I"))
-		, ConfigureDecoderFN(GetClassMethod("ConfigureDecoder", "(Lcom/epicgames/unreal/ElectraVideoDecoderH264$FCreateParameters;)I"))
+		, ConfigureDecoderFN(GetClassMethod("ConfigureDecoder", "(Lcom/epicgames/unreal/ElectraVideoDecoderH265$FCreateParameters;)I"))
 		, SetOutputSurfaceFN(GetClassMethod("SetOutputSurface", "(Landroid/view/Surface;)I"))
 		, ReleaseFN(GetClassMethod("release", "()I"))
 		, StartFN(GetClassMethod("Start", "()I"))
@@ -275,16 +274,16 @@ namespace Electra
 		, QueueInputBufferFN(GetClassMethod("QueueInputBuffer", "(IJ[B)I"))
 		, QueueCSDInputBufferFN(GetClassMethod("QueueCSDInputBuffer", "(IJ[B)I"))
 		, QueueEOSInputBufferFN(GetClassMethod("QueueEOSInputBuffer", "(IJ)I"))
-		, GetDecoderInformationFN(GetClassMethod("GetDecoderInformation", "()Lcom/epicgames/unreal/ElectraVideoDecoderH264$FDecoderInformation;"))
-		, GetOutputFormatInfoFN(GetClassMethod("GetOutputFormatInfo", "(I)Lcom/epicgames/unreal/ElectraVideoDecoderH264$FOutputFormatInfo;"))
-		, DequeueOutputBufferFN(GetClassMethod("DequeueOutputBuffer", "(I)Lcom/epicgames/unreal/ElectraVideoDecoderH264$FOutputBufferInfo;"))
+		, GetDecoderInformationFN(GetClassMethod("GetDecoderInformation", "()Lcom/epicgames/unreal/ElectraVideoDecoderH265$FDecoderInformation;"))
+		, GetOutputFormatInfoFN(GetClassMethod("GetOutputFormatInfo", "(I)Lcom/epicgames/unreal/ElectraVideoDecoderH265$FOutputFormatInfo;"))
+		, DequeueOutputBufferFN(GetClassMethod("DequeueOutputBuffer", "(I)Lcom/epicgames/unreal/ElectraVideoDecoderH265$FOutputBufferInfo;"))
 		, GetOutputBufferFN(GetClassMethod("GetOutputBuffer", "(I)[B"))
 		, ReleaseOutputBufferFN(GetClassMethod("ReleaseOutputBuffer", "(IZJ)I"))
 	{
 		JNIEnv* JEnv = AndroidJavaEnv::GetJavaEnv();
 
 		// Get field IDs for FCreateParameters class members
-		jclass localCreateParametersClass = AndroidJavaEnv::FindJavaClass("com/epicgames/unreal/ElectraVideoDecoderH264$FCreateParameters");
+		jclass localCreateParametersClass = AndroidJavaEnv::FindJavaClass("com/epicgames/unreal/ElectraVideoDecoderH265$FCreateParameters");
 		FCreateParametersClass = (jclass)JEnv->NewGlobalRef(localCreateParametersClass);
 		JEnv->DeleteLocalRef(localCreateParametersClass);
 		FCreateParametersCTOR = FindMethod(JEnv, FCreateParametersClass, "<init>", "()V", false);
@@ -296,13 +295,12 @@ namespace Electra
 		FCreateParameters_bNeedSecure = FindField(JEnv, FCreateParametersClass, "bNeedSecure", "Z", false);
 		FCreateParameters_bNeedTunneling = FindField(JEnv, FCreateParametersClass, "bNeedTunneling", "Z", false);
 		FCreateParameters_CSD0 = FindField(JEnv, FCreateParametersClass, "CSD0", "[B", false);
-		FCreateParameters_CSD1 = FindField(JEnv, FCreateParametersClass, "CSD1", "[B", false);
 		FCreateParameters_NativeDecoderID = FindField(JEnv, FCreateParametersClass, "NativeDecoderID", "I", false);
 		FCreateParameters_VideoCodecSurface = FindField(JEnv, FCreateParametersClass, "VideoCodecSurface", "Landroid/view/Surface;", false);
 		FCreateParameters_bSurfaceIsView = FindField(JEnv, FCreateParametersClass, "bSurfaceIsView", "Z", false);
 
 		// Get field IDs for FDecoderInformation class members
-		jclass localDecoderInformationClass = AndroidJavaEnv::FindJavaClass("com/epicgames/unreal/ElectraVideoDecoderH264$FDecoderInformation");
+		jclass localDecoderInformationClass = AndroidJavaEnv::FindJavaClass("com/epicgames/unreal/ElectraVideoDecoderH265$FDecoderInformation");
 		FDecoderInformationClass = (jclass)JEnv->NewGlobalRef(localDecoderInformationClass);
 		JEnv->DeleteLocalRef(localDecoderInformationClass);
 		FDecoderInformation_bIsAdaptive = FindField(JEnv, FDecoderInformationClass, "bIsAdaptive", "Z", false);
@@ -310,7 +308,7 @@ namespace Electra
 		FDecoderInformation_bCanUse_SetOutputSurface = FindField(JEnv, FDecoderInformationClass, "bCanUse_SetOutputSurface", "Z", false);
 
 		// Get field IDs for FOutputFormatInfo class members
-		jclass localOutputFormatInfoClass = AndroidJavaEnv::FindJavaClass("com/epicgames/unreal/ElectraVideoDecoderH264$FOutputFormatInfo");
+		jclass localOutputFormatInfoClass = AndroidJavaEnv::FindJavaClass("com/epicgames/unreal/ElectraVideoDecoderH265$FOutputFormatInfo");
 		FOutputFormatInfoClass = (jclass)JEnv->NewGlobalRef(localOutputFormatInfoClass);
 		JEnv->DeleteLocalRef(localOutputFormatInfoClass);
 		FOutputFormatInfo_Width = FindField(JEnv, FOutputFormatInfoClass, "Width", "I", false);
@@ -324,7 +322,7 @@ namespace Electra
 		FOutputFormatInfo_ColorFormat = FindField(JEnv, FOutputFormatInfoClass, "ColorFormat", "I", false);
 
 		// Get field IDs for FOutputBufferInfo class members
-		jclass localOutputBufferInfoClass = AndroidJavaEnv::FindJavaClass("com/epicgames/unreal/ElectraVideoDecoderH264$FOutputBufferInfo");
+		jclass localOutputBufferInfoClass = AndroidJavaEnv::FindJavaClass("com/epicgames/unreal/ElectraVideoDecoderH265$FOutputBufferInfo");
 		FOutputBufferInfoClass = (jclass)JEnv->NewGlobalRef(localOutputBufferInfoClass);
 		JEnv->DeleteLocalRef(localOutputBufferInfoClass);
 		FOutputBufferInfo_BufferIndex = FindField(JEnv, FOutputBufferInfoClass, "BufferIndex", "I", false);
@@ -342,7 +340,7 @@ namespace Electra
 	/**
 	 * DTOR
 	 */
-	FAndroidJavaH264VideoDecoder::~FAndroidJavaH264VideoDecoder()
+	FAndroidJavaH265VideoDecoder::~FAndroidJavaH265VideoDecoder()
 	{
 		FMediaCriticalSection::ScopedLock Lock(MutexLock);
 		release();
@@ -361,7 +359,7 @@ namespace Electra
 	/**
 	 * Sets up the current decoder information.
 	 */
-	void FAndroidJavaH264VideoDecoder::SetupDecoderInformation()
+	void FAndroidJavaH265VideoDecoder::SetupDecoderInformation()
 	{
 		// Create an instance of the init param structure and fill in the members.
 		JNIEnv* JEnv = AndroidJavaEnv::GetJavaEnv();
@@ -382,11 +380,11 @@ namespace Electra
 
 	//-----------------------------------------------------------------------------
 	/**
-	 * Creates a Java instance of an H.264 video decoder.
+	 * Creates a Java instance of an H.265 video decoder.
 	 *
 	 * @return 0 if successful, 1 on error.
 	 */
-	int32 FAndroidJavaH264VideoDecoder::CreateDecoder()
+	int32 FAndroidJavaH265VideoDecoder::CreateDecoder()
 	{
 		FMediaCriticalSection::ScopedLock Lock(MutexLock);
 		int32 result = -1;
@@ -418,7 +416,7 @@ namespace Electra
 	 *
 	 * @return 0 if successful, 1 on error.
 	 */
-	int32 FAndroidJavaH264VideoDecoder::InitializeDecoder(const FCreateParameters& InCreateParams)
+	int32 FAndroidJavaH265VideoDecoder::InitializeDecoder(const FCreateParameters& InCreateParams)
 	{
 		FMediaCriticalSection::ScopedLock Lock(MutexLock);
 		if (bHaveDecoder)
@@ -442,17 +440,9 @@ namespace Electra
 				JEnv->SetIntField(CreateParams, FCreateParameters_Width, InCreateParams.CodecData->ParsedInfo.GetResolution().Width);
 				JEnv->SetIntField(CreateParams, FCreateParameters_Height, InCreateParams.CodecData->ParsedInfo.GetResolution().Height);
 
-				MPEG::FAVCDecoderConfigurationRecord avc;
-				avc.SetRawData(InCreateParams.CodecData->RawCSD.GetData(), InCreateParams.CodecData->RawCSD.Num());
-				if (avc.Parse())
-				{
-					jbyteArray CSD0 = MakeJavaByteArray(avc.GetCodecSpecificDataSPS().GetData(), avc.GetCodecSpecificDataSPS().Num());
-					jbyteArray CSD1 = MakeJavaByteArray(avc.GetCodecSpecificDataPPS().GetData(), avc.GetCodecSpecificDataPPS().Num());
-					JEnv->SetObjectField(CreateParams, FCreateParameters_CSD0, CSD0);
-					JEnv->SetObjectField(CreateParams, FCreateParameters_CSD1, CSD1);
-					JEnv->DeleteLocalRef(CSD0);
-					JEnv->DeleteLocalRef(CSD1);
-				}
+				jbyteArray CSD0 = MakeJavaByteArray(InCreateParams.CodecData->CodecSpecificData.GetData(), InCreateParams.CodecData->CodecSpecificData.Num());
+				JEnv->SetObjectField(CreateParams, FCreateParameters_CSD0, CSD0);
+				JEnv->DeleteLocalRef(CSD0);
 			}
 
 			// Pass along decoder output surface
@@ -479,12 +469,12 @@ namespace Electra
 	//-----------------------------------------------------------------------------
 	/**
 	 * Attempts to set a new output surface on an existing and configured decoder.
-	 * 
+	 *
 	 * @param InNewOutputSurface
-	 * 
+	 *
 	 * @return 0 if successful, 1 on error.
 	 */
-	int32 FAndroidJavaH264VideoDecoder::SetOutputSurface(jobject InNewOutputSurface)
+	int32 FAndroidJavaH265VideoDecoder::SetOutputSurface(jobject InNewOutputSurface)
 	{
 		FMediaCriticalSection::ScopedLock Lock(MutexLock);
 		if (bHaveDecoder)
@@ -511,7 +501,7 @@ namespace Electra
 	 *
 	 * @return 0 if successful, 1 on error.
 	 */
-	int32 FAndroidJavaH264VideoDecoder::ReleaseDecoder()
+	int32 FAndroidJavaH265VideoDecoder::ReleaseDecoder()
 	{
 		FMediaCriticalSection::ScopedLock Lock(MutexLock);
 		if (bHaveDecoder)
@@ -531,7 +521,7 @@ namespace Electra
 	 *
 	 * @return 0 if successful, 1 on error.
 	 */
-	int32 FAndroidJavaH264VideoDecoder::release()
+	int32 FAndroidJavaH265VideoDecoder::release()
 	{
 		Stop();
 
@@ -547,7 +537,7 @@ namespace Electra
 	 *
 	 * @return Pointer to decoder information or null when no decoder has been created.
 	 */
-	const IAndroidJavaH264VideoDecoder::FDecoderInformation* FAndroidJavaH264VideoDecoder::GetDecoderInformation()
+	const IAndroidJavaH265VideoDecoder::FDecoderInformation* FAndroidJavaH265VideoDecoder::GetDecoderInformation()
 	{
 		return CurrentDecoderInformation.Get();
 	}
@@ -559,7 +549,7 @@ namespace Electra
 	 *
 	 * @return 0 if successful, 1 on error.
 	 */
-	int32 FAndroidJavaH264VideoDecoder::Start()
+	int32 FAndroidJavaH265VideoDecoder::Start()
 	{
 		FMediaCriticalSection::ScopedLock Lock(MutexLock);
 		if (bHaveDecoder && !bIsStarted)
@@ -583,7 +573,7 @@ namespace Electra
 	 *
 	 * @return 0 if successful, 1 on error.
 	 */
-	int32 FAndroidJavaH264VideoDecoder::Stop()
+	int32 FAndroidJavaH265VideoDecoder::Stop()
 	{
 		FMediaCriticalSection::ScopedLock Lock(MutexLock);
 		if (bHaveDecoder && bIsStarted)
@@ -607,7 +597,7 @@ namespace Electra
 	 *
 	 * @return 0 if successful, 1 on error.
 	 */
-	int32 FAndroidJavaH264VideoDecoder::Flush()
+	int32 FAndroidJavaH265VideoDecoder::Flush()
 	{
 		FMediaCriticalSection::ScopedLock Lock(MutexLock);
 
@@ -632,7 +622,7 @@ namespace Electra
 	 *
 	 * @return 0 if successful, 1 on error.
 	 */
-	int32 FAndroidJavaH264VideoDecoder::Reset()
+	int32 FAndroidJavaH265VideoDecoder::Reset()
 	{
 		FMediaCriticalSection::ScopedLock Lock(MutexLock);
 		// Synchronously operating decoders should (must?) be in the stopped state to be reset.
@@ -654,7 +644,7 @@ namespace Electra
 	 *
 	 * @return >= 0 returns the index of the successfully dequeued buffer, negative values indicate an error.
 	 */
-	int32 FAndroidJavaH264VideoDecoder::DequeueInputBuffer(int32 InTimeoutUsec)
+	int32 FAndroidJavaH265VideoDecoder::DequeueInputBuffer(int32 InTimeoutUsec)
 	{
 		FMediaCriticalSection::ScopedLock Lock(MutexLock);
 		if (bHaveDecoder)
@@ -678,7 +668,7 @@ namespace Electra
 	 *
 	 * @return 0 if successful, 1 on error.
 	 */
-	int32 FAndroidJavaH264VideoDecoder::QueueInputBuffer(int32 InBufferIndex, const void* InAccessUnitData, int32 InAccessUnitSize, int64 InTimestampUSec)
+	int32 FAndroidJavaH265VideoDecoder::QueueInputBuffer(int32 InBufferIndex, const void* InAccessUnitData, int32 InAccessUnitSize, int64 InTimestampUSec)
 	{
 		FMediaCriticalSection::ScopedLock Lock(MutexLock);
 		if (bHaveDecoder)
@@ -705,7 +695,7 @@ namespace Electra
 	 *
 	 * @return 0 if successful, 1 on error.
 	 */
-	int32 FAndroidJavaH264VideoDecoder::QueueCSDInputBuffer(int32 InBufferIndex, const void* InCSDData, int32 InCSDSize, int64 InTimestampUSec)
+	int32 FAndroidJavaH265VideoDecoder::QueueCSDInputBuffer(int32 InBufferIndex, const void* InCSDData, int32 InCSDSize, int64 InTimestampUSec)
 	{
 		FMediaCriticalSection::ScopedLock Lock(MutexLock);
 		if (bHaveDecoder)
@@ -730,7 +720,7 @@ namespace Electra
 	 *
 	 * @return 0 if successful, 1 on error.
 	 */
-	int32 FAndroidJavaH264VideoDecoder::QueueEOSInputBuffer(int32 InBufferIndex, int64 InTimestampUSec)
+	int32 FAndroidJavaH265VideoDecoder::QueueEOSInputBuffer(int32 InBufferIndex, int64 InTimestampUSec)
 	{
 		FMediaCriticalSection::ScopedLock Lock(MutexLock);
 		if (bHaveDecoder)
@@ -752,7 +742,7 @@ namespace Electra
 	 *
 	 * @return 0 if successful, 1 on error.
 	 */
-	int32 FAndroidJavaH264VideoDecoder::GetOutputFormatInfo(FOutputFormatInfo& OutFormatInfo, int32 InOutputBufferIndex)
+	int32 FAndroidJavaH265VideoDecoder::GetOutputFormatInfo(FOutputFormatInfo& OutFormatInfo, int32 InOutputBufferIndex)
 	{
 		FMediaCriticalSection::ScopedLock Lock(MutexLock);
 		if (bHaveDecoder)
@@ -788,7 +778,7 @@ namespace Electra
 	 *
 	 * @return 0 on success, 1 on failure. The OutBufferInfo.BufferIndex indicates the buffer index.
 	 */
-	int32 FAndroidJavaH264VideoDecoder::DequeueOutputBuffer(FOutputBufferInfo& OutBufferInfo, int32 InTimeoutUsec)
+	int32 FAndroidJavaH265VideoDecoder::DequeueOutputBuffer(FOutputBufferInfo& OutBufferInfo, int32 InTimeoutUsec)
 	{
 		FMediaCriticalSection::ScopedLock Lock(MutexLock);
 		if (bHaveDecoder)
@@ -823,7 +813,7 @@ namespace Electra
 	 *
 	 * @return 0 on success, 1 on failure.
 	 */
-	int32 FAndroidJavaH264VideoDecoder::GetOutputBuffer(void*& OutBufferDataPtr, int32 OutBufferDataSize, const FOutputBufferInfo& InOutBufferInfo)
+	int32 FAndroidJavaH265VideoDecoder::GetOutputBuffer(void*& OutBufferDataPtr, int32 OutBufferDataSize, const FOutputBufferInfo& InOutBufferInfo)
 	{
 		FMediaCriticalSection::ScopedLock Lock(MutexLock);
 		if (bHaveDecoder)
@@ -871,7 +861,7 @@ namespace Electra
 	 *
 	 * @return 0 on success, 1 on failure.
 	 */
-	int32 FAndroidJavaH264VideoDecoder::ReleaseOutputBuffer(int32 BufferIndex, int32 ValidCount, bool bRender, int64 releaseAt)
+	int32 FAndroidJavaH265VideoDecoder::ReleaseOutputBuffer(int32 BufferIndex, int32 ValidCount, bool bRender, int64 releaseAt)
 	{
 		FMediaCriticalSection::ScopedLock Lock(MutexLock);
 		if (bHaveDecoder)

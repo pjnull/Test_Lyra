@@ -278,10 +278,19 @@ bool FElectraPlayer::OpenInternal(const FString& Url, const FParamDict& PlayerOp
 
 	// Set the player member variable to the new player now that it has been fully initialized.
 	CurrentPlayer = MoveTemp(NewPlayer);
+	// Apply options that may have been set prior to calling Open().
+	// Set these only if they have defined values as to not override what might have been set in the PlayerOptions.
+	if (bFrameAccurateSeeking.IsSet())
+	{
+		SetFrameAccurateSeekMode(bFrameAccurateSeeking.GetValue());
+	}
+	if (CurrentPlaybackRange.Start.IsSet() || CurrentPlaybackRange.End.IsSet())
+	{
+		SetPlaybackRange(CurrentPlaybackRange);
+	}
 
 	// Issue load of the playlist.
 	CurrentPlayer->AdaptivePlayer->LoadManifest(MediaUrl);
-
  	return true;
 }
 
@@ -319,6 +328,8 @@ void FElectraPlayer::CloseInternal(bool bKillAfterClose)
 	MediaUrl = FString();
 	PlaystartOptions.TimeOffset.Reset();
 	PlaystartOptions.InitialAudioTrackAttributes.Reset();
+	CurrentPlaybackRange.Start.Reset();
+	CurrentPlaybackRange.End.Reset();
 
 	// Next we detach ourselves from the renderers. This ensures we do not get any further data from them
 	// via OnVideoDecoded() and OnAudioDecoded(). It also means we do not get any calls to OnVideoFlush() and OnAudioFlush()
@@ -820,9 +831,9 @@ bool FElectraPlayer::IsLooping() const
 {
 	if (CurrentPlayer.Get())
 	{
-		FPlayerLoopState loopState;
+		IAdaptiveStreamingPlayer::FLoopState loopState;
 		CurrentPlayer->AdaptivePlayer->GetLoopState(loopState);
-		return loopState.bLoopEnabled;
+		return loopState.bIsEnabled;
 	}
 	return false;
 }
@@ -844,7 +855,7 @@ FTimespan FElectraPlayer::GetTime() const
 	if (CurrentPlayer.Get())
 	{
 		Electra::FTimeValue playerTime = CurrentPlayer->AdaptivePlayer->GetPlayPosition();
-		return FTimespan(playerTime.GetAsHNS());
+		return playerTime.GetAsTimespan();
 	}
 	else
 	{
@@ -857,14 +868,9 @@ FTimespan FElectraPlayer::GetDuration() const
 	if (CurrentPlayer.Get())
 	{
 		Electra::FTimeValue playDuration = CurrentPlayer->AdaptivePlayer->GetDuration();
-	// HACK: When looping the stream is of infinite duration!
-		if (IsLooping())
-		{
-			return FTimespan::MaxValue();
-		}
 		if (playDuration.IsValid())
 		{
-			return playDuration.IsInfinity() ? FTimespan::MaxValue() : FTimespan(playDuration.GetAsHNS());
+			return playDuration.IsInfinity() ? FTimespan::MaxValue() : playDuration.GetAsTimespan();
 		}
 	}
 	return FTimespan::Zero();
@@ -1033,12 +1039,12 @@ bool FElectraPlayer::Seek(const FTimespan& Time)
 		FTimespan CurrentPos = GetTime();
 		double Distance = (Time - CurrentPos).GetTotalSeconds();
 		// If the new position is close to the current position do not perform a seek.
-		if (Distance < -1.0 || Distance > 1.0)
+		if (Distance < -0.01 || Distance > 0.01)
 		{
 			FTimespan Target;
 			CalculateTargetSeekTime(Target, Time);
 			Electra::IAdaptiveStreamingPlayer::FSeekParam seek;
-			seek.Time.SetFromHNS(Target.GetTicks());
+			seek.Time.SetFromTimespan(Target);
 			bInitialSeekPerformed = true;
 			CurrentPlayer->AdaptivePlayer->SeekTo(seek);
 			return true;
@@ -1050,6 +1056,63 @@ bool FElectraPlayer::Seek(const FTimespan& Time)
 	}
 	return false;
 }
+
+void FElectraPlayer::SetFrameAccurateSeekMode(bool bEnableFrameAccuracy)
+{
+	bFrameAccurateSeeking = bEnableFrameAccuracy;
+	TSharedPtr<FInternalPlayerImpl, ESPMode::ThreadSafe> LockedPlayer = CurrentPlayer;
+	if (LockedPlayer.IsValid() && LockedPlayer->AdaptivePlayer.IsValid())
+	{
+		LockedPlayer->AdaptivePlayer->EnableFrameAccurateSeeking(bFrameAccurateSeeking.GetValue());
+	}
+}
+
+void FElectraPlayer::SetPlaybackRange(const FPlaybackRange& InPlaybackRange)
+{
+	CurrentPlaybackRange = InPlaybackRange;
+	TSharedPtr<FInternalPlayerImpl, ESPMode::ThreadSafe> LockedPlayer = CurrentPlayer;
+	if (LockedPlayer.IsValid() && LockedPlayer->AdaptivePlayer.IsValid())
+	{
+		Electra::IAdaptiveStreamingPlayer::FPlaybackRange Range;
+		if (CurrentPlaybackRange.Start.IsSet())
+		{
+			Range.Start = Electra::FTimeValue().SetFromTimespan(CurrentPlaybackRange.Start.GetValue());
+		}
+		if (CurrentPlaybackRange.End.IsSet())
+		{
+			Range.End = Electra::FTimeValue().SetFromTimespan(CurrentPlaybackRange.End.GetValue());
+		}
+		LockedPlayer->AdaptivePlayer->SetPlaybackRange(Range);
+	}
+}
+
+void FElectraPlayer::GetPlaybackRange(FPlaybackRange& OutPlaybackRange) const
+{
+	OutPlaybackRange = CurrentPlaybackRange;
+	TSharedPtr<FInternalPlayerImpl, ESPMode::ThreadSafe> LockedPlayer = CurrentPlayer;
+	if (LockedPlayer.IsValid() && LockedPlayer->AdaptivePlayer.IsValid())
+	{
+		Electra::IAdaptiveStreamingPlayer::FPlaybackRange Range;
+		LockedPlayer->AdaptivePlayer->GetPlaybackRange(Range);
+		if (Range.Start.IsSet())
+		{
+			OutPlaybackRange.Start = Range.Start.GetValue().GetAsTimespan();
+		}
+		else
+		{
+			OutPlaybackRange.Start.Reset();
+		}
+		if (Range.End.IsSet())
+		{
+			OutPlaybackRange.End = Range.End.GetValue().GetAsTimespan();
+		}
+		else
+		{
+			OutPlaybackRange.End.Reset();
+		}
+	}
+}
+
 
 TSharedPtr<Electra::FTrackMetadata, ESPMode::ThreadSafe> FElectraPlayer::GetTrackStreamMetadata(EPlayerTrackType TrackType, int32 TrackIndex) const
 {
@@ -2277,9 +2340,9 @@ void FElectraPlayer::HandlePlayerEventJumpInPlayPosition(const Electra::FTimeVal
 	else if (TimejumpReason == Electra::Metrics::ETimeJumpReason::Looping)
 	{
 		++Statistics.NumTimesLooped;
-		Electra::FPlayerLoopState loopState;
+		Electra::IAdaptiveStreamingPlayer::FLoopState loopState;
 		CurrentPlayer->AdaptivePlayer->GetLoopState(loopState);
-		UE_LOG(LogElectraPlayer, Log, TEXT("[%p][%p] Looping (%d) from %.3f to %.3f"), this, CurrentPlayer.Get(), loopState.LoopCount, FromTime.GetAsSeconds(), (ToNewTime - loopState.LoopBasetime).GetAsSeconds());
+		UE_LOG(LogElectraPlayer, Log, TEXT("[%p][%p] Looping (%d) from %.3f to %.3f"), this, CurrentPlayer.Get(), loopState.Count, FromTime.GetAsSeconds(), ToNewTime.GetAsSeconds());
 	}
 
 	// Enqueue a "PositionJump" event.

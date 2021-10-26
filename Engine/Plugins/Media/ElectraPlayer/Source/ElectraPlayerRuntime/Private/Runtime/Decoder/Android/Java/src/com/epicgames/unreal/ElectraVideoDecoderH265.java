@@ -26,10 +26,10 @@ import com.epicgames.unreal.ElectraDecoderQuirks;
 
 
 /**
- * H.264 video decoder
+ * H.265 video decoder
  *
  */
-public class ElectraVideoDecoderH264
+public class ElectraVideoDecoderH265
 {
 	private static final String TAG = "[ElectraPlayerSDK]";
 	/**
@@ -47,7 +47,6 @@ public class ElectraVideoDecoderH264
 		public boolean bNeedSecure;
 		public boolean bNeedTunneling;
 		public byte[] CSD0;
-		public byte[] CSD1;
 		public int NativeDecoderID;
 		public android.view.Surface VideoCodecSurface;
 		public boolean bSurfaceIsView;
@@ -101,13 +100,13 @@ public class ElectraVideoDecoderH264
 	}
 
 
-	private static class FH264DecoderInfo
+	private static class FH265DecoderInfo
 	{
-		private static final FH264DecoderInfo Singleton = new FH264DecoderInfo();
+		private static final FH265DecoderInfo Singleton = new FH265DecoderInfo();
 		private FCodecInformation CodecInfo;
-		private FH264DecoderInfo()
+		private FH265DecoderInfo()
 		{
-			CodecInfo = selectCodec("video/avc");
+			CodecInfo = selectCodec("video/hevc");
 		}
 		private static final FCodecInformation selectCodec(String mimeType)
 		{
@@ -168,9 +167,9 @@ public class ElectraVideoDecoderH264
 	private boolean bDecoderHasSurface;
 
 
-	public ElectraVideoDecoderH264()
+	public ElectraVideoDecoderH265()
 	{
-		PlatformCodecInfo = FH264DecoderInfo.GetDecoderInfo();
+		PlatformCodecInfo = FH265DecoderInfo.GetDecoderInfo();
 		PlatformCodecQuirks =  ElectraDecoderQuirks.GetDecoderQuirks();
 		CreationParameters = null;
 		DecoderHandle = null;
@@ -229,32 +228,32 @@ public class ElectraVideoDecoderH264
 				}
 				else
 				{
-					Log.w(TAG, "ElectraVideoDecoderH264: Failed to create decoder by name");
+					Log.w(TAG, "ElectraVideoDecoderH265: Failed to create decoder by name");
 					return 1;
 				}
 			}
 			else
 			{
 				// No decoder found.
-				Log.w(TAG, "ElectraVideoDecoderH264: No suitable decoder found");
+				Log.w(TAG, "ElectraVideoDecoderH265: No suitable decoder found");
 				return 1;
 			}
 		}
 		catch(Exception e)
 		{
-			Log.w(TAG, "ElectraVideoDecoderH264: Failed to create decoder");
+			Log.w(TAG, "ElectraVideoDecoderH265: Failed to create decoder");
 			e.printStackTrace();
 			return 1;
 		}
 		return 0;
 	}
 
-	
+
 	public int ConfigureDecoder(FCreateParameters InCreateParams)
 	{
 		if (DecoderHandle == null || DecoderInformation == null || PlatformCodecInfo == null)
 		{
-			Log.w(TAG, "ElectraVideoDecoderH264: No decoder instance to configure has been created yet");
+			Log.w(TAG, "ElectraVideoDecoderH265: No decoder instance to configure has been created yet");
 			return 1;
 		}
 
@@ -267,7 +266,7 @@ public class ElectraVideoDecoderH264
 			int MaxHeight = InCreateParams.MaxHeight > 0 ? InCreateParams.MaxHeight : 1088;
 			int Width  = InCreateParams.Width > 0  ? InCreateParams.Width : MaxWidth;
 			int Height = InCreateParams.Height > 0 ? InCreateParams.Height : MaxHeight;
-			MediaFormat Format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, Width, Height);
+			MediaFormat Format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_HEVC, Width, Height);
 			// Add additional keys
 			if (DecoderInformation.bIsAdaptive)
 			{
@@ -282,12 +281,6 @@ public class ElectraVideoDecoderH264
 				{
 					ByteBuffer Csd0 = ByteBuffer.wrap(InCreateParams.CSD0);
 					Format.setByteBuffer("csd-0", Csd0);
-					// Set CSD1 only when it exists and we have set CSD0
-					if (InCreateParams.CSD1 != null && InCreateParams.CSD1.length != 0)
-					{
-						ByteBuffer Csd1 = ByteBuffer.wrap(InCreateParams.CSD1);
-						Format.setByteBuffer("csd-1", Csd1);
-					}
 				}
 			}
 
@@ -303,7 +296,7 @@ public class ElectraVideoDecoderH264
 		}
 		catch(Exception e)
 		{
-			Log.w(TAG, "ElectraVideoDecoderH264: Failed to configure the decoder");
+			Log.w(TAG, "ElectraVideoDecoderH265: Failed to configure the decoder");
 			e.printStackTrace();
 			return 1;
 		}
@@ -323,7 +316,7 @@ public class ElectraVideoDecoderH264
 			}
 			catch(Exception e)
 			{
-				Log.w(TAG, "ElectraVideoDecoderH264: Failed to set decoder output surface");
+				Log.w(TAG, "ElectraVideoDecoderH265: Failed to set decoder output surface");
 				e.printStackTrace();
 				return 1;
 			}
@@ -349,7 +342,7 @@ public class ElectraVideoDecoderH264
 			}
 			catch(Exception e)
 			{
-				Log.w(TAG, "ElectraVideoDecoderH264: Failed to release decoder");
+				Log.w(TAG, "ElectraVideoDecoderH265: Failed to release decoder");
 				e.printStackTrace();
 				return 1;
 			}
@@ -380,7 +373,7 @@ public class ElectraVideoDecoderH264
 			}
 			catch(Exception e)
 			{
-				Log.w(TAG,"ElectraVideoDecoderH264: Failed to start decoder");
+				Log.w(TAG,"ElectraVideoDecoderH265: Failed to start decoder");
 				e.printStackTrace();
 				return 1;
 			}
@@ -404,7 +397,7 @@ public class ElectraVideoDecoderH264
 			}
 			catch(Exception e)
 			{
-				Log.w(TAG,"ElectraVideoDecoderH264: Failed to stop decoder");
+				Log.w(TAG,"ElectraVideoDecoderH265: Failed to stop decoder");
 				e.printStackTrace();
 				return 1;
 			}
@@ -428,7 +421,7 @@ public class ElectraVideoDecoderH264
 			}
 			catch(Exception e)
 			{
-				Log.w(TAG,"ElectraVideoDecoderH264: Failed to flush decoder");
+				Log.w(TAG,"ElectraVideoDecoderH265: Failed to flush decoder");
 				e.printStackTrace();
 				return 1;
 			}
@@ -445,7 +438,7 @@ public class ElectraVideoDecoderH264
 		}
 	}
 
-	
+
 	public int Reset()
 	{
 		if (bIsInitialized)
@@ -457,7 +450,7 @@ public class ElectraVideoDecoderH264
 			}
 			catch(Exception e)
 			{
-				Log.w(TAG,"ElectraVideoDecoderH264: Failed to reset decoder");
+				Log.w(TAG,"ElectraVideoDecoderH265: Failed to reset decoder");
 				e.printStackTrace();
 				return 1;
 			}
@@ -481,7 +474,7 @@ public class ElectraVideoDecoderH264
 			}
 			catch(Exception e)
 			{
-				Log.w(TAG,"ElectraVideoDecoderH264: Failed to dequeue input buffer");
+				Log.w(TAG,"ElectraVideoDecoderH265: Failed to dequeue input buffer");
 				e.printStackTrace();
 				return -10000;
 			}
@@ -509,7 +502,7 @@ public class ElectraVideoDecoderH264
 				}
 				catch(Exception e)
 				{
-					Log.w(TAG,"ElectraVideoDecoderH264: Failed to queue input buffer");
+					Log.w(TAG,"ElectraVideoDecoderH265: Failed to queue input buffer");
 					e.printStackTrace();
 					return -10000;
 				}
@@ -542,7 +535,7 @@ public class ElectraVideoDecoderH264
 				}
 				catch(Exception e)
 				{
-					Log.w(TAG,"ElectraVideoDecoderH264: Failed to queue CSD input buffer");
+					Log.w(TAG,"ElectraVideoDecoderH265: Failed to queue CSD input buffer");
 					e.printStackTrace();
 					return -10000;
 				}
@@ -574,7 +567,7 @@ public class ElectraVideoDecoderH264
 				}
 				catch(Exception e)
 				{
-					Log.w(TAG,"ElectraVideoDecoderH264: Failed to queue EOS input buffer");
+					Log.w(TAG,"ElectraVideoDecoderH265: Failed to queue EOS input buffer");
 					e.printStackTrace();
 					return -10000;
 				}
@@ -689,7 +682,7 @@ public class ElectraVideoDecoderH264
 			}
 			catch(Exception e)
 			{
-				Log.w(TAG,"ElectraVideoDecoderH264: Failed to dequeue output buffer");
+				Log.w(TAG,"ElectraVideoDecoderH265: Failed to dequeue output buffer");
 				e.printStackTrace();
 				return null;
 			}
@@ -715,7 +708,7 @@ public class ElectraVideoDecoderH264
 				}
 				catch(Exception e)
 				{
-					Log.w(TAG,"ElectraVideoDecoderH264: Failed to get output buffer");
+					Log.w(TAG,"ElectraVideoDecoderH265: Failed to get output buffer");
 					e.printStackTrace();
 					return null;
 				}
@@ -724,7 +717,7 @@ public class ElectraVideoDecoderH264
 		return Data;
 	}
 
-	
+
 	public int ReleaseOutputBuffer(int InOutputBufferIndex, boolean bRender, long releaseAt)
 	{
 		if (bIsInitialized && InOutputBufferIndex >= 0)
@@ -762,7 +755,7 @@ public class ElectraVideoDecoderH264
 				}
 				catch(Exception e)
 				{
-					Log.w(TAG,"ElectraVideoDecoderH264: Failed to release buffer to surface");
+					Log.w(TAG,"ElectraVideoDecoderH265: Failed to release buffer to surface");
 					e.printStackTrace();
 					return 1;
 				}
