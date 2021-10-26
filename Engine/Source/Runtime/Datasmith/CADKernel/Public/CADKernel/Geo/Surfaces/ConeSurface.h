@@ -54,11 +54,7 @@ namespace CADKernel
 			SetMinToleranceIso();
 		}
 
-		FConeSurface(FCADKernelArchive& Archive)
-			: FSurface()
-		{
-			Serialize(Archive);
-		}
+		FConeSurface() = default;
 
 		virtual void SetMinToleranceIso() override
 		{

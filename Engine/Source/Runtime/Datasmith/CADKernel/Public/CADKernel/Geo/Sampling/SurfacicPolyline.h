@@ -28,11 +28,6 @@ namespace CADKernel
 		bool bWithNormals;
 		bool bWithTangent;
 
-		FSurfacicPolyline(FCADKernelArchive& Archive)
-		{
-			Serialize(Archive);
-		}
-
 		FSurfacicPolyline(TSharedRef<FSurface> InCarrierSurface, TSharedRef<FCurve> InCurve2D);
 
 		FSurfacicPolyline(TSharedRef<FSurface> InCarrierSurface, TSharedRef<FCurve> InCurve2D, const double Tolerance);

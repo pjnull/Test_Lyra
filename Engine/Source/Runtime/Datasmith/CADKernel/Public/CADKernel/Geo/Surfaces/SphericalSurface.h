@@ -46,11 +46,7 @@ namespace CADKernel
 			SetMinToleranceIso();
 		}
 
-		FSphericalSurface(FCADKernelArchive& Archive)
-			: FSurface()
-		{
-			Serialize(Archive);
-		}
+		FSphericalSurface() = default;
 
 		virtual void SetMinToleranceIso() override
 		{

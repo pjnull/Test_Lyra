@@ -50,11 +50,7 @@ namespace CADKernel
 			SetMinToleranceIso();
 		}
 
-		FTorusSurface(FCADKernelArchive& Archive)
-			: FSurface()
-		{
-			Serialize(Archive);
-		}
+		FTorusSurface() = default;
 
 		virtual void SetMinToleranceIso() override
 		{

@@ -36,16 +36,9 @@ namespace CADKernel
 		{
 		}
 
-		TPolyline(FCADKernelArchive& Archive)
-			: Approximator(Coordinates, Points)
-		{
-			Serialize(Archive);
-		}
-
 		TPolyline()
 			: Approximator(Coordinates, Points)
 		{
-
 		}
 
 		void Serialize(FCADKernelArchive& Ar)

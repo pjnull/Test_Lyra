@@ -33,11 +33,7 @@ namespace CADKernel
 			SetMinToleranceIso();
 		}
 
-		FTabulatedCylinderSurface(FCADKernelArchive& Archive)
-			: FSurface()
-		{
-			Serialize(Archive);
-		}
+		FTabulatedCylinderSurface() = default;
 
 	public:
 

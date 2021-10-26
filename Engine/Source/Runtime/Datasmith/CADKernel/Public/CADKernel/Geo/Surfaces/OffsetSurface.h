@@ -23,11 +23,7 @@ namespace CADKernel
 			SetMinToleranceIso();
 		}
 
-		FOffsetSurface(FCADKernelArchive& Archive)
-			: FSurface()
-		{
-			Serialize(Archive);
-		}
+		FOffsetSurface() = default;
 
 		virtual void SetMinToleranceIso() override
 		{

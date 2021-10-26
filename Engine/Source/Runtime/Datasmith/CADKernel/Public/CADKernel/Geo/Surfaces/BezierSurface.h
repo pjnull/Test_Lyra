@@ -33,11 +33,7 @@ namespace CADKernel
 			SetMinToleranceIso();
 		}
 
-		FBezierSurface(FCADKernelArchive& Archive)
-			: FSurface()
-		{
-			Serialize(Archive);
-		}
+		FBezierSurface() = default;
 
 	public:
 

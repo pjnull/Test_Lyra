@@ -23,11 +23,7 @@ namespace CADKernel
 			SetMinToleranceIso();
 		}
 
-		FRuledSurface(FCADKernelArchive& Archive)
-			: FSurface()
-		{
-			Serialize(Archive);
-		}
+		FRuledSurface() = default;
 
 	public:
 
