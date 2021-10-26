@@ -60,6 +60,12 @@ FOptimusEditor::~FOptimusEditor()
 		DeformerObject->GetCompileMessageDelegate().RemoveAll(this);
 		DeformerObject->GetNotifyDelegate().RemoveAll(this);
 	}
+
+	if (PersonaToolkit.IsValid())
+	{
+		constexpr bool bSetPreviewMeshInAsset = false;
+		PersonaToolkit->SetPreviewMesh(nullptr, bSetPreviewMeshInAsset);
+	}
 }
 
 
