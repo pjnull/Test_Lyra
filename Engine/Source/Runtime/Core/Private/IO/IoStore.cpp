@@ -558,10 +558,9 @@ public:
 		return 1 + uint8(Toc.CompressionMethods.Add(CompressionMethod));
 	}
 
-	void AddToFileIndex(FString FileName, int32 TocEntryIndex)
+	void AddToFileIndex(const FIoChunkId& ChunkId, const FString& FileName)
 	{
-		FilesToIndex.Emplace(MoveTemp(FileName));
-		FileTocEntryIndices.Add(TocEntryIndex);
+		ChunkIdToFileName.Emplace(ChunkId, FileName);
 	}
 
 	FIoStoreTocResource& GetTocResource()
@@ -589,21 +588,20 @@ public:
 		return nullptr;
 	}
 
-	const TArray<FString>& GetFilesToIndex() const
+	void GetFileNamesToIndex(TArray<FString>& OutFileNames) const
 	{
-		return FilesToIndex;
+		ChunkIdToFileName.GenerateValueArray(OutFileNames);
 	}
 
-	const TArray<uint32>& GetFileTocEntryIndices() const
+	const FString* GetFileName(const FIoChunkId& ChunkId) const
 	{
-		return FileTocEntryIndices;
+		return ChunkIdToFileName.Find(ChunkId);
 	}
 
 private:
 	TMap<FIoChunkId, int32> ChunkIdToIndex;
 	FIoStoreTocResource Toc;
-	TArray<FString> FilesToIndex;
-	TArray<uint32> FileTocEntryIndices;
+	TMap<FIoChunkId, FString> ChunkIdToFileName;
 };
 
 class FIoStoreWriter
@@ -1036,19 +1034,24 @@ public:
 		if (ContainerSettings.IsIndexed())
 		{
 			TRACE_CPUPROFILER_EVENT_SCOPE(BuildIndex);
-			const TArray<FString>& FilesToIndex = Toc.GetFilesToIndex();
-			const TArray<uint32>& FileTocEntryIndices = Toc.GetFileTocEntryIndices();
-
+			TArray<FString> FilesToIndex;
+			Toc.GetFileNamesToIndex(FilesToIndex);
+			
 			FString MountPoint = IoDirectoryIndexUtils::GetCommonRootPath(FilesToIndex);
 			FIoDirectoryIndexWriter DirectoryIndexWriter;
 			DirectoryIndexWriter.SetMountPoint(MountPoint);
 
-			check(FilesToIndex.Num() == FileTocEntryIndices.Num());
-			for (int32 FileIndex = 0; FileIndex < FilesToIndex.Num(); ++FileIndex)
+			uint32 TocEntryIndex = 0;
+			for (const FIoChunkId& ChunkId : TocResource.ChunkIds)
 			{
-				const uint32 FileEntryIndex = DirectoryIndexWriter.AddFile(FilesToIndex[FileIndex]);
-				check(FileEntryIndex != ~uint32(0));
-				DirectoryIndexWriter.SetFileUserData(FileEntryIndex, FileTocEntryIndices[FileIndex]);
+				const FString* ChunkFileName = Toc.GetFileName(ChunkId);
+				if (ChunkFileName)
+				{
+					const uint32 FileEntryIndex = DirectoryIndexWriter.AddFile(*ChunkFileName);
+					check(FileEntryIndex != ~uint32(0));
+					DirectoryIndexWriter.SetFileUserData(FileEntryIndex, TocEntryIndex);
+				}
+				++TocEntryIndex;
 			}
 
 			DirectoryIndexWriter.Flush(
@@ -1585,7 +1588,7 @@ private:
 
 		if (ContainerSettings.IsIndexed() && Entry->Options.FileName.Len() > 0)
 		{
-			Toc.AddToFileIndex(Entry->Options.FileName, TocEntryIndex);
+			Toc.AddToFileIndex(Entry->ChunkId, Entry->Options.FileName);
 		}
 
 		const uint64 RegionStartOffset = TargetPartition->Offset;
