@@ -2401,34 +2401,7 @@ struct FHeightmapInfo
 
 TArray<FName> ALandscapeProxy::GetLayersFromMaterial(UMaterialInterface* MaterialInterface)
 {
-	TArray<FName> Result;
-
-	if (MaterialInterface)
-	{
-		TArray<FMaterialParameterInfo> OutParameterInfo;
-		TArray<FGuid> Guids;
-		if (UMaterialInstance* Instance = Cast<UMaterialInstance>(MaterialInterface))
-		{
-			Instance->GetAllParameterInfo<UMaterialExpressionLandscapeLayerBlend>(OutParameterInfo, Guids);
-			Instance->GetAllParameterInfo<UMaterialExpressionLandscapeLayerWeight>(OutParameterInfo, Guids);
-			Instance->GetAllParameterInfo<UMaterialExpressionLandscapeLayerSwitch>(OutParameterInfo, Guids);
-			Instance->GetAllParameterInfo<UMaterialExpressionLandscapeLayerSample>(OutParameterInfo, Guids);
-		}
-		else if (UMaterial* Material = MaterialInterface->GetMaterial())
-		{
-			Material->GetAllParameterInfo<UMaterialExpressionLandscapeLayerBlend>(OutParameterInfo, Guids);
-			Material->GetAllParameterInfo<UMaterialExpressionLandscapeLayerWeight>(OutParameterInfo, Guids);
-			Material->GetAllParameterInfo<UMaterialExpressionLandscapeLayerSwitch>(OutParameterInfo, Guids);
-			Material->GetAllParameterInfo<UMaterialExpressionLandscapeLayerSample>(OutParameterInfo, Guids);
-		}
-
-		for (const FMaterialParameterInfo& ParameterInfo : OutParameterInfo)
-		{
-			Result.AddUnique(ParameterInfo.Name);
-		}
-	}
-
-	return Result;
+	return FGetLayersFromMaterialCache::GetLayersFromMaterial(MaterialInterface);
 }
 
 TArray<FName> ALandscapeProxy::GetLayersFromMaterial() const

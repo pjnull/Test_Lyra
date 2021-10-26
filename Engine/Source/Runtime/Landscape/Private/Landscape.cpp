@@ -2146,6 +2146,7 @@ void ALandscapeProxy::AddReferencedObjects(UObject* InThis, FReferenceCollector&
 }
 
 #if WITH_EDITOR
+
 FName FLandscapeInfoLayerSettings::GetLayerName() const
 {
 	checkSlow(LayerInfoObj == nullptr || LayerInfoObj->LayerName == LayerName);
@@ -2234,6 +2235,8 @@ int32 ULandscapeInfo::GetLayerInfoIndex(FName LayerName, ALandscapeProxy* Owner 
 
 bool ULandscapeInfo::UpdateLayerInfoMapInternal(ALandscapeProxy* Proxy, bool bInvalidate)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(ULandscapeInfo::UpdateLayerInfoMapInternal);
+
 	bool bHasCollision = false;
 	if (GIsEditor)
 	{
@@ -2307,12 +2310,10 @@ bool ULandscapeInfo::UpdateLayerInfoMapInternal(ALandscapeProxy* Proxy, bool bIn
 							int32 LayerInfoIndex = GetLayerInfoIndex(LayerInfo);
 							bool bValid = LayerNames.Contains(LayerInfo->LayerName);
 
-#if WITH_EDITORONLY_DATA
 							if (bValid)
 							{
 								//LayerInfo->IsReferencedFromLoadedData = true;
 							}
-#endif
 
 							if (LayerInfoIndex != INDEX_NONE)
 							{
@@ -2390,6 +2391,8 @@ bool ULandscapeInfo::UpdateLayerInfoMapInternal(ALandscapeProxy* Proxy, bool bIn
 
 			if (!bInvalidate)
 			{
+				// Use a scoped cache to fasten the operation (lots of redundant material analysis) : 
+				FScopedGetLayersFromMaterialCache GetLayersFromMaterialCache;
 				ForAllLandscapeProxies([this](ALandscapeProxy* EachProxy)
 				{
 					if (!EachProxy->IsPendingKillPending())
@@ -2422,7 +2425,8 @@ bool ULandscapeInfo::UpdateLayerInfoMap(ALandscapeProxy* Proxy /*= nullptr*/, bo
 	}
 	return bResult;
 }
-#endif
+
+#endif // WITH_EDITOR
 
 void ALandscapeProxy::PostLoad()
 {
