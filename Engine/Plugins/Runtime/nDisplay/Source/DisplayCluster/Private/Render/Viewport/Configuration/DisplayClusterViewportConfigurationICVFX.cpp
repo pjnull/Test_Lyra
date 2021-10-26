@@ -296,7 +296,7 @@ void FDisplayClusterViewportConfigurationICVFX::Update()
 	if (ViewportManager)
 	{
 		ImplBeginReallocateViewports(*ViewportManager);
-		
+
 		TArray<FDisplayClusterViewport*> TargetViewports;
 		const EDisplayClusterViewportICVFXFlags TargetViewportsFlags = ImplGetTargetViewports(*ViewportManager, TargetViewports);
 
@@ -324,8 +324,8 @@ void FDisplayClusterViewportConfigurationICVFX::Update()
 						// Add this target to all cameras visible on it
 						for (FDisplayClusterViewportConfigurationCameraICVFX& CameraIt : StageCameras)
 						{
-							if (CameraIt.IsCameraProjectionVisibleOnViewport(TargetIt)
-								&& !CameraIt.GetCameraSettings().HiddenICVFXViewports.ItemNames.Contains(TargetIt->GetId()))
+						if (CameraIt.IsCameraProjectionVisibleOnViewport(TargetIt)
+							&& !CameraIt.GetCameraSettings().HiddenICVFXViewports.ItemNames.Contains(TargetIt->GetId()))
 							{
 								CameraIt.VisibleTargets.Add(TargetIt);
 							}
@@ -368,7 +368,7 @@ void FDisplayClusterViewportConfigurationICVFX::Update()
 					TargetIt->RenderSettingsICVFX.ICVFX.SortCamerasRenderOrder();
 				}
 			}
-		}		
+		}
 
 		ImplFinishReallocateViewports(*ViewportManager);
 	}

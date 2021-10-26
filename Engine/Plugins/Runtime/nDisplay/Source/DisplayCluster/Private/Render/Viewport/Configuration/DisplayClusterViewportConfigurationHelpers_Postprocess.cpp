@@ -168,7 +168,7 @@ static bool ImplUpdateIncameraAllNodesColorGrading(FDisplayClusterViewport& DstV
 
 bool FDisplayClusterViewportConfigurationHelpers_Postprocess::ImplUpdateInnerFrustumColorGrading(FDisplayClusterViewport& DstViewport, ADisplayClusterRootActor& RootActor, UDisplayClusterICVFXCameraComponent& InCameraComponent)
 {
-	const FDisplayClusterConfigurationICVFX_CameraSettings& CameraSettings = InCameraComponent.GetCameraSettingsICVFX();	
+	const FDisplayClusterConfigurationICVFX_CameraSettings& CameraSettings = InCameraComponent.GetCameraSettingsICVFX();
 	const FDisplayClusterRenderFrameSettings& RenderFrameSettings = DstViewport.Owner.GetRenderFrameSettings();	
 
 	// per node color grading first (it includes all nodes blending too)
@@ -225,7 +225,7 @@ bool FDisplayClusterViewportConfigurationHelpers_Postprocess::UpdateLightcardPos
 bool FDisplayClusterViewportConfigurationHelpers_Postprocess::ImplUpdateViewportColorGrading(FDisplayClusterViewport& DstViewport, ADisplayClusterRootActor& RootActor, const FString& InClusterViewportId)
 {
 	const FDisplayClusterConfigurationICVFX_StageSettings& StageSettings = RootActor.GetStageSettings();
-	
+
 	
 	for (const FDisplayClusterConfigurationViewport_PerViewportColorGrading& ColorGradingProfileIt : StageSettings.PerViewportColorGrading)
 	{
@@ -241,7 +241,7 @@ bool FDisplayClusterViewportConfigurationHelpers_Postprocess::ImplUpdateViewport
 			}
 		}
 	}
-	
+
 	// per viewport color grading is empty, entire cluster only
 	return ImplUpdateEntireClusterColorGrading(DstViewport, RootActor);
 }
@@ -489,4 +489,4 @@ void FDisplayClusterViewportConfigurationHelpers_Postprocess::CopyPPSStructCondi
 void FDisplayClusterViewportConfigurationHelpers_Postprocess::CopyPPSStruct(FDisplayClusterConfigurationViewport_ColorGradingRenderingSettings* OutViewportPPSettings, FPostProcessSettings* InPPS)
 {
 	ImplCopyPPSStruct(false, OutViewportPPSettings, InPPS);
-}
+	}
