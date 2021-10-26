@@ -610,8 +610,8 @@ void FCurveEditor::ZoomToFitInternal(EAxisList::Type Axes, const TMap<FCurveMode
 		}
 		else
 		{
-			FCurveEditorScreenSpaceH InputSpace = GetPanelInputSpace();
-			double InputPercentage = Settings->GetFrameInputPadding() / InputSpace.GetPhysicalWidth();
+			const float PanelWidth = WeakPanel.Pin()->GetViewContainerGeometry().GetLocalSize().Y;
+			double InputPercentage = FMath::Min(Settings->GetFrameInputPadding() / PanelWidth, 50.0); // Cannot pad more than half the width
 
 			const double MinInputZoom = InputSnapEnabledAttribute.Get() ? InputSnapRateAttribute.Get().AsInterval() : 0.00001;
 			const double InputPadding = FMath::Max((InputMax - InputMin) * InputPercentage, MinInputZoom);
@@ -640,7 +640,8 @@ void FCurveEditor::ZoomToFitInternal(EAxisList::Type Axes, const TMap<FCurveMode
 		}
 		else
 		{
-			double OutputPercentage = Settings->GetFrameOutputPadding() / View->GetViewSpace().GetPhysicalHeight();
+			const float PanelHeight = WeakPanel.Pin()->GetViewContainerGeometry().GetLocalSize().Y;
+			double OutputPercentage = FMath::Min(Settings->GetFrameOutputPadding() / PanelHeight, 50.0); // Cannot pad more than half the height
 
 			constexpr double MinOutputZoom = 0.00001;
 			const double OutputPadding = FMath::Max((OutputMax - OutputMin) * OutputPercentage, MinOutputZoom);
