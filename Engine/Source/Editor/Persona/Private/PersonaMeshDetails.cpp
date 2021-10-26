@@ -2759,7 +2759,6 @@ void FPersonaMeshDetails::AddLODLevelCategories(IDetailLayoutBuilder& DetailLayo
 				//Avoid offering re-generate if the LOD is reduce on himself and do not have the original data, the user in this case has to re-import the asset to generate the data 
 				bool LodCannotRegenerate = (SkelMesh->GetLODInfo(LODIndex) != nullptr
 					&& LODIndex == SkelMesh->GetLODInfo(LODIndex)->ReductionSettings.BaseLOD
-					&& SkelMesh->GetLODInfo(LODIndex)->bHasBeenSimplified
 					&& !bIsbuildAvailable);
 
 				bool bShowGenerateButtons = !LodCannotRegenerate;
