@@ -169,7 +169,7 @@ void FCameraCalibrationEditorModule::RegisterOverlayMaterials()
 	{
 		// Register all overlay materials defined in this module
 		UCameraCalibrationSubsystem* SubSystem = GEngine->GetEngineSubsystem<UCameraCalibrationSubsystem>();
-		SubSystem->RegisterOverlayMaterial(TEXT("Crosshair"), TEXT("/CameraCalibration/Materials/Crosshair/M_CrosshairDynamic.M_CrosshairDynamic"));
+		SubSystem->RegisterOverlayMaterial(TEXT("Crosshair"), TEXT("/CameraCalibration/Materials/M_Crosshair.M_Crosshair"));
 	};
 
 	if (FApp::CanEverRender())
