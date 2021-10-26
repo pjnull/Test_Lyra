@@ -35,7 +35,7 @@ class ENGINE_API UWorldPartitionRuntimeHash : public UObject
 	virtual void ImportFromWorldComposition(class UWorldComposition* WorldComposition) {}
 	virtual bool PopulateGeneratedPackageForCook(UPackage* InPackage, const FString& InPackageRelativePath) { return false; }
 	virtual bool FinalizeGeneratorPackageForCook(const TArray<ICookPackageSplitter::FGeneratedPackageForPreSave>& InGeneratedPackages) { return false; }
-	virtual bool GenerateStreaming(EWorldPartitionStreamingMode Mode, class UWorldPartitionStreamingPolicy* Policy, TArray<FString>* OutPackagesToGenerate) { return false; }
+	virtual bool GenerateStreaming(class UWorldPartitionStreamingPolicy* Policy, TArray<FString>* OutPackagesToGenerate) { return false; }
 	virtual void FlushStreaming() {}
 	virtual bool GenerateHLOD(ISourceControlHelper* SourceControlHelper, bool bCreateActorsOnly) { return false; }
 	virtual bool GenerateNavigationData(const FBox& LoadedBounds) { return false; }
@@ -45,7 +45,7 @@ class ENGINE_API UWorldPartitionRuntimeHash : public UObject
 	void CheckForErrors() const;
 
 	// PIE/Game methods
-	void OnBeginPlay(EWorldPartitionStreamingMode Mode);
+	void OnBeginPlay();
 	void OnEndPlay();
 #endif
 

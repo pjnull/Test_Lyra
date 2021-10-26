@@ -299,7 +299,7 @@ void UWorldPartition::OnPreBeginPIE(bool bStartSimulate)
 
 	check(IsMainWorldPartition());
 
-	OnBeginPlay(EWorldPartitionStreamingMode::PIE);
+	OnBeginPlay();
 }
 
 void UWorldPartition::OnPrePIEEnded(bool bWasSimulatingInEditor)
@@ -308,10 +308,10 @@ void UWorldPartition::OnPrePIEEnded(bool bWasSimulatingInEditor)
 	bIsPIE = false;
 }
 
-void UWorldPartition::OnBeginPlay(EWorldPartitionStreamingMode Mode)
+void UWorldPartition::OnBeginPlay()
 {
-	GenerateStreaming(Mode);
-	RuntimeHash->OnBeginPlay(Mode);
+	GenerateStreaming();
+	RuntimeHash->OnBeginPlay();
 }
 
 void UWorldPartition::OnCancelPIE()
@@ -504,7 +504,7 @@ void UWorldPartition::Initialize(UWorld* InWorld, const FTransform& InTransform)
 	{
 		if (IsRunningGame() || bPIEWorldTravel)
 		{
-			OnBeginPlay(EWorldPartitionStreamingMode::EditorStandalone);
+			OnBeginPlay();
 		}
 
 		// Apply remapping of Persistent Level's SoftObjectPaths
@@ -1247,13 +1247,13 @@ void UWorldPartition::DrawRuntimeHashPreview()
 	RuntimeHash->DrawPreview();
 }
 
-bool UWorldPartition::GenerateStreaming(EWorldPartitionStreamingMode Mode, TArray<FString>* OutPackagesToGenerate)
+bool UWorldPartition::GenerateStreaming(TArray<FString>* OutPackagesToGenerate)
 {
 	check(!StreamingPolicy);
 	StreamingPolicy = NewObject<UWorldPartitionStreamingPolicy>(const_cast<UWorldPartition*>(this), WorldPartitionStreamingPolicyClass.Get());
 
 	check(RuntimeHash);
-	bool Result = RuntimeHash->GenerateStreaming(Mode, StreamingPolicy, OutPackagesToGenerate);
+	bool Result = RuntimeHash->GenerateStreaming(StreamingPolicy, OutPackagesToGenerate);
 
 	// Prepare actor to cell remapping
 	StreamingPolicy->PrepareActorToCellRemapping();

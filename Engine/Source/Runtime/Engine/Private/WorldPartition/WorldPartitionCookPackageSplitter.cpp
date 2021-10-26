@@ -98,7 +98,7 @@ TArray<ICookPackageSplitter::FGeneratedPackage> FWorldPartitionCookPackageSplitt
 	WorldPartition->Initialize(PartitionedWorld, FTransform::Identity);
 
 	TArray<FString> WorldPartitionGeneratedPackages;
-	WorldPartition->GenerateStreaming(EWorldPartitionStreamingMode::Cook, &WorldPartitionGeneratedPackages);
+	WorldPartition->GenerateStreaming(&WorldPartitionGeneratedPackages);
 
 	TArray<ICookPackageSplitter::FGeneratedPackage> PackagesToGenerate;
 	PackagesToGenerate.Reserve(WorldPartitionGeneratedPackages.Num());
