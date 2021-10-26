@@ -2186,15 +2186,21 @@ void ULevel::SetWorldSettings(AWorldSettings* NewWorldSettings)
 			}
 		}
 
-		// Assign the new world settings before destroying the old one
-		// since level will prevent destruction of the world settings if it matches the cached value;
-		AWorldSettings* OldWorldSettings = WorldSettings;
+		// Assign the new world settings before destroying the old ones
+		// since level will prevent destruction of the world settings if it matches the cached value
 		WorldSettings = NewWorldSettings;
 
-		if (OldWorldSettings)
+		// Makes no sense to have several WorldSettings so destroy existing ones
+		for (int32 ActorIndex=1; ActorIndex<Actors.Num(); ActorIndex++)
 		{
-			// Makes no sense to have two WorldSettings so destroy existing one
-			OldWorldSettings->Destroy();
+			if (AActor* Actor = Actors[ActorIndex])
+			{
+				if (AWorldSettings* ExistingWorldSettings = Cast<AWorldSettings>(Actor))
+				{
+					check(ExistingWorldSettings != WorldSettings);
+					ExistingWorldSettings->Destroy();
+				}
+			}
 		}
 	}
 }
