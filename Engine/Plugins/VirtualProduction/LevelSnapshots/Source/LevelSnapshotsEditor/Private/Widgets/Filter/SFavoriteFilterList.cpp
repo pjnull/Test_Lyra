@@ -69,34 +69,15 @@ SFavoriteFilterList::~SFavoriteFilterList()
 	}
 }
 
-void SFavoriteFilterList::Construct(const FArguments& InArgs, UFavoriteFilterContainer* InModel, TWeakObjectPtr<ULevelSnapshotsEditorData> InEditorData)
+void SFavoriteFilterList::Construct(const FArguments& InArgs, UFavoriteFilterContainer* InModel, ULevelSnapshotsEditorData* InEditorData)
 {
 	if (!ensure(InModel))
 	{
 		return;
 	}
+	
 	FavoriteModel = InModel;
-
-	ChangedFavoritesDelegateHandle = InModel->OnFavoritesChanged.AddLambda(
-		[this, InEditorData]()
-		{
-			if (ensure(FavoriteModel.IsValid()) && ensure(FilterList.IsValid()))
-			{
-				FilterList->ClearChildren();
-				
-				const TArray<TSubclassOf<ULevelSnapshotFilter>>& FavoriteFilters = FavoriteModel->GetFavorites();
-				for (const TSubclassOf<ULevelSnapshotFilter>& FavoriteFilter : FavoriteFilters)
-				{
-					FilterList->AddSlot()
-						.Padding(3.f, 3.f)
-						[
-							SNew(SFavoriteFilter, FavoriteFilter, InEditorData)
-								.FilterName(FavoriteFilter->GetDisplayNameText())
-						];
-				}
-			}
-		}
-	);
+	ChangedFavoritesDelegateHandle = InModel->OnFavoritesChanged.AddSP(this, &SFavoriteFilterList::UpdateFilterList, InEditorData);
 	
 	ChildSlot
 	[
@@ -173,6 +154,27 @@ void SFavoriteFilterList::Construct(const FArguments& InArgs, UFavoriteFilterCon
 		    ]
 		]
 	];
+
+	UpdateFilterList(InEditorData);
+}
+
+void SFavoriteFilterList::UpdateFilterList(ULevelSnapshotsEditorData* InEditorData)
+{
+	if (ensure(FavoriteModel.IsValid()) && ensure(FilterList.IsValid()))
+	{
+		FilterList->ClearChildren();
+				
+		const TArray<TSubclassOf<ULevelSnapshotFilter>>& FavoriteFilters = FavoriteModel->GetFavorites();
+		for (const TSubclassOf<ULevelSnapshotFilter>& FavoriteFilter : FavoriteFilters)
+		{
+			FilterList->AddSlot()
+				.Padding(3.f, 3.f)
+				[
+					SNew(SFavoriteFilter, FavoriteFilter, InEditorData)
+						.FilterName(FavoriteFilter->GetDisplayNameText())
+				];
+		}
+	}
 }
 
 #undef LOCTEXT_NAMESPACE
