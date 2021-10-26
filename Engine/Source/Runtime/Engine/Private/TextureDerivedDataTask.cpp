@@ -1043,7 +1043,7 @@ public:
 						{
 						default:
 						case EStatus::Ok:
-							return EndBuild(Params.CacheKey, MoveTemp(Params.Output), Params.BuildStatus);
+							return EndBuild(MoveTemp(Params));
 						case EStatus::Error:
 							this->UsedEncodeSpeed = FetchOrBuildEncodeSpeed;
 							return BeginBuild(FetchOrBuildDefinition, Flags);
@@ -1088,20 +1088,20 @@ private:
 			EnumRemoveFlags(BuildPolicy, EBuildPolicy::CacheQuery);
 		}
 		BuildSession.Get().Build(Definition, {}, BuildPolicy, *Owner,
-			[this](FBuildCompleteParams&& Params)
-			{
-				EndBuild(Params.CacheKey, MoveTemp(Params.Output), Params.BuildStatus);
-			});
+			[this](FBuildCompleteParams&& Params) { EndBuild(MoveTemp(Params)); });
 	}
 
-	void EndBuild(const UE::DerivedData::FCacheKey& CacheKey, UE::DerivedData::FBuildOutput&& Output, UE::DerivedData::EBuildStatus Status)
+	void EndBuild(UE::DerivedData::FBuildCompleteParams&& Params)
 	{
 		using namespace UE::DerivedData;
-		DerivedData.DerivedDataKey.Emplace<FCacheKeyProxy>(CacheKey);
-		bCacheHit = EnumHasAnyFlags(Status, EBuildStatus::CacheQueryHit);
-		BuildOutputSize = Algo::TransformAccumulate(Output.GetPayloads(),
+		DerivedData.DerivedDataKey.Emplace<FCacheKeyProxy>(Params.CacheKey);
+		bCacheHit = EnumHasAnyFlags(Params.BuildStatus, EBuildStatus::CacheQueryHit);
+		BuildOutputSize = Algo::TransformAccumulate(Params.Output.GetPayloads(),
 			[](const FPayload& Payload) { return Payload.GetData().GetRawSize(); }, uint64(0));
-		WriteDerivedData(MoveTemp(Output));
+		if (Params.Status != EStatus::Canceled)
+		{
+			WriteDerivedData(MoveTemp(Params.Output));
+		}
 		StatusMessage.Reset();
 	}
 
