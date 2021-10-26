@@ -13,7 +13,7 @@
 /**
  * Custom archive class for reading directly from bulk data.
  */
-class FBulkDataReader : public FBufferReaderBase
+class FBulkDataReader final : public FBufferReaderBase
 {
 public:
 	FBulkDataReader( FByteBulkData& InBulkData, bool bIsPersistent = false )
@@ -22,16 +22,11 @@ public:
 	{
 	}
 
-	~FBulkDataReader() override final
+	~FBulkDataReader() override
 	{
 		BulkData.Unlock();
 		Close();
 	}
-
-	virtual bool Close() override final
-	{
-		return FBufferReaderBase::Close();
-	} 
 
 	using FArchive::operator<<; // For visibility of the overloads we don't override
 
