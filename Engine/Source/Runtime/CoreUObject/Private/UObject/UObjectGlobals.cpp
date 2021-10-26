@@ -2603,6 +2603,16 @@ UObject* StaticAllocateObject
 			// Check that the object hasn't been destroyed yet.
 			if(!Obj->HasAnyFlags(RF_FinishDestroyed))
 			{
+				if (FPlatformProperties::RequiresCookedData())
+				{
+					ensureAlwaysMsgf(!Obj->HasAnyFlags(RF_NeedLoad|RF_WasLoaded),
+						TEXT("Replacing a loaded public object is not supported with cooked data: %s (Flags=0x%08x, InternalObjectFlags=0x%08x)"),
+						*Obj->GetFullName(),
+						InOuter ? *InOuter->GetFullName() : TEXT("NULL"),
+						(int32)Obj->GetFlags(),
+						(int32)Obj->GetInternalFlags());
+				}
+
 				// Get the name before we start the destroy, as destroy renames it
 				FString OldName = Obj->GetFullName();
 
