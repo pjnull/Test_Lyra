@@ -22,6 +22,8 @@
 #include "Framework/Commands/UIAction.h"
 #include "Editor/EditorEngine.h"
 #include "EditorStyleSet.h"
+#include "BlueprintEditorTabs.h"
+#include "BlueprintDebugger.h"
 
 #define LOCTEXT_NAMESPACE "DebugViewUI"
 
@@ -31,6 +33,9 @@ DEFINE_LOG_CATEGORY_STATIC(LogBlueprintDebugTreeView, Log, All);
 
 /** The editor object */
 extern UNREALED_API class UEditorEngine* GEditor;
+
+static const FText ViewInDebuggerText = LOCTEXT("ViewInDebugger", "View in Blueprint Debugger");
+static const FText ViewInDebuggerTooltipText = LOCTEXT("ViewInDebugger_Tooltip", "Opens the Blueprint Debugger and starts watching this variable if it isn't already watched");
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -101,7 +106,7 @@ TSharedRef<SWidget> FDebugLineItem::GenerateValueWidget(TSharedPtr<FString> InSe
 		];
 }
 
-void FDebugLineItem::MakeMenu(FMenuBuilder& MenuBuilder)
+void FDebugLineItem::MakeMenu(FMenuBuilder& MenuBuilder, bool bInDebuggerTab)
 {
 	const FUIAction CopyName(
 		FExecuteAction::CreateRaw(this, &FDebugLineItem::CopyNameToClipboard),
@@ -127,10 +132,10 @@ void FDebugLineItem::MakeMenu(FMenuBuilder& MenuBuilder)
 		CopyValue
 	);
 
-	ExtendContextMenu(MenuBuilder);
+	ExtendContextMenu(MenuBuilder, bInDebuggerTab);
 }
 
-void FDebugLineItem::ExtendContextMenu(class FMenuBuilder& MenuBuilder)
+void FDebugLineItem::ExtendContextMenu(class FMenuBuilder& MenuBuilder, bool bInDebuggerTab)
 {
 }
 
@@ -864,7 +869,7 @@ public:
 			];
 	}
 
-	virtual void ExtendContextMenu(FMenuBuilder& MenuBuilder) override
+	virtual void ExtendContextMenu(FMenuBuilder& MenuBuilder, bool bInDebuggerTab) override
 	{
 		//Navigate to Class source
 
@@ -893,6 +898,22 @@ public:
 			FSlateIcon(),
 			ClearThisWatch
 		);
+
+		if (!bInDebuggerTab)
+		{
+			//View in Debugger
+			FUIAction ViewInDebugger(
+				FExecuteAction::CreateSP(this, &FWatchChildLineItem::ViewInDebugger),
+				FCanExecuteAction::CreateSP(this, &FWatchChildLineItem::CanViewInDebugger)
+			);
+
+			MenuBuilder.AddMenuEntry(
+				ViewInDebuggerText,
+				ViewInDebuggerTooltipText,
+				FSlateIcon(),
+				ViewInDebugger
+			);
+		}
 
 	}
 
@@ -991,6 +1012,8 @@ protected:
 	bool CanAddWatch() const;
 	void ClearWatch();
 	bool CanClearWatch() const;
+	void ViewInDebugger();
+	bool CanViewInDebugger() const;
 	UEdGraphPin* BuildPathToProperty(TArray<FName>& OutPathToProperty) const;
 };
 
@@ -1100,7 +1123,7 @@ public:
 		return HashCombine(GetTypeHash(ParentObjectRef), GetTypeHash(ObjectRef));
 	}
 
-	virtual void ExtendContextMenu(class FMenuBuilder& MenuBuilder) override
+	virtual void ExtendContextMenu(class FMenuBuilder& MenuBuilder, bool bInDebuggerTab) override
 	{
 		if (UEdGraphPin* WatchedPin = ObjectRef.Get())
 		{
@@ -1125,6 +1148,21 @@ public:
 				LOCTEXT("ClearWatch_ToolTip", "Stop watching this variable"),
 				FSlateIcon(),
 				ClearThisWatch);
+
+			if (bInDebuggerTab)
+			{
+				FUIAction ViewInDebugger(
+					FExecuteAction::CreateSP(this, &FWatchLineItem::ViewInDebugger),
+					FCanExecuteAction::CreateSP(this, &FWatchLineItem::CanViewInDebugger)
+				);
+
+				MenuBuilder.AddMenuEntry(
+					ViewInDebuggerText,
+					ViewInDebuggerTooltipText,
+					FSlateIcon(),
+					ViewInDebugger
+				);
+			}
 		}
 	}
 
@@ -1222,7 +1260,30 @@ private:
 		return false;
 	}
 
+	void ViewInDebugger() const
+	{
+		// If this isn't already watched, add it as a watch
+		if (CanAddWatch())
+		{
+			AddWatch();
+		}
 
+		FGlobalTabmanager::Get()->TryInvokeTab(FBlueprintEditorTabs::BlueprintDebuggerID);
+		FBlueprintEditorModule& BlueprintEditorModule = FModuleManager::Get().LoadModuleChecked<FBlueprintEditorModule>(TEXT("Kismet"));
+		BlueprintEditorModule.GetBlueprintDebugger()->SetDebuggedBlueprint(GetBlueprintForObject(ParentObjectRef.Get()));
+	}
+
+	bool CanViewInDebugger() const
+	{
+		if (UEdGraphPin* PinToWatch = ObjectRef.Get())
+		{
+			UBlueprint* ParentBlueprint = GetBlueprintForObject(ParentObjectRef.Get());
+			return FKismetDebugUtilities::IsPinBeingWatched(ParentBlueprint, PinToWatch, PathToProperty) ||
+				FKismetDebugUtilities::CanWatchPin(ParentBlueprint, PinToWatch, PathToProperty);
+		}
+
+		return false;
+	}
 };
 
 FText FWatchLineItem::GetDisplayName() const
@@ -1544,6 +1605,36 @@ bool FWatchChildLineItem::CanClearWatch() const
 	return false;
 }
 
+void FWatchChildLineItem::ViewInDebugger()
+{
+	// If this isn't already watched, add it as a watch
+	if (CanAddWatch())
+	{
+		AddWatch();
+	}
+
+	TArray<FName> PathToProperty;
+	if (UEdGraphPin* PinToWatch = BuildPathToProperty(PathToProperty))
+	{
+		UBlueprint* Blueprint = FBlueprintEditorUtils::FindBlueprintForNode(PinToWatch->GetOwningNode());
+		FGlobalTabmanager::Get()->TryInvokeTab(FBlueprintEditorTabs::BlueprintDebuggerID);
+		FBlueprintEditorModule& BlueprintEditorModule = FModuleManager::Get().LoadModuleChecked<FBlueprintEditorModule>(TEXT("Kismet"));
+		BlueprintEditorModule.GetBlueprintDebugger()->SetDebuggedBlueprint(Blueprint);
+	}
+}
+
+bool FWatchChildLineItem::CanViewInDebugger() const
+{
+	TArray<FName> PathToProperty;
+	if (UEdGraphPin* PinToWatch = BuildPathToProperty(PathToProperty))
+	{
+		UBlueprint* Blueprint = FBlueprintEditorUtils::FindBlueprintForNode(PinToWatch->GetOwningNode());
+		return FKismetDebugUtilities::IsPinBeingWatched(Blueprint, PinToWatch, PathToProperty) || FKismetDebugUtilities::CanWatchPin(Blueprint, PinToWatch, PathToProperty);
+	}
+
+	return false;
+}
+
 UEdGraphPin* FWatchChildLineItem::BuildPathToProperty(TArray<FName>& OutPathToProperty) const
 {
 	UEdGraphPin* PinToWatch = nullptr;
@@ -1612,7 +1703,7 @@ public:
 		return HashCombine(GetTypeHash(ParentObjectRef), GetTypeHash(BreakpointNode));
 	}
 
-	virtual void ExtendContextMenu(class FMenuBuilder& MenuBuilder) override
+	virtual void ExtendContextMenu(class FMenuBuilder& MenuBuilder, bool bInDebuggerTab) override
 	{
 		FBlueprintBreakpoint* Breakpoint = GetBreakpoint();
 		const UBlueprint* ParentBlueprint = GetBlueprintForObject(ParentObjectRef.Get());
@@ -1839,7 +1930,7 @@ public:
 		}
 	}
 
-	virtual void ExtendContextMenu(FMenuBuilder& MenuBuilder) override
+	virtual void ExtendContextMenu(FMenuBuilder& MenuBuilder, bool bInDebuggerTab) override
 	{
 		if (FKismetDebugUtilities::BlueprintHasBreakpoints(Blueprint.Get()))
 		{
@@ -2110,7 +2201,7 @@ protected:
 			.ToolTipText(this, &FParentLineItem::GetStatusTooltip);
 	}
 
-	virtual void ExtendContextMenu(class FMenuBuilder& MenuBuilder) override
+	virtual void ExtendContextMenu(class FMenuBuilder& MenuBuilder, bool bInDebuggerTab) override
 	{
 		if (UBlueprint* BP = Cast<UBlueprint>(ObjectRef.Get()))
 		{
@@ -2634,7 +2725,7 @@ TSharedPtr<SWidget> SKismetDebugTreeView::OnMakeContextMenu() const
 
 		for (FDebugTreeItemPtr& Item : SelectedItems)
 		{
-			Item->MakeMenu(MenuBuilder);
+			Item->MakeMenu(MenuBuilder, bInDebuggerTab);
 		}
 	}
 	MenuBuilder.EndSection();

@@ -277,6 +277,7 @@ void SKismetDebuggingView::Construct(const FArguments& InArgs)
 					+SSplitter::Slot()
 					[
 						SAssignNew( DebugTreeView, SKismetDebugTreeView )
+							.InDebuggerTab(true)
 							.HeaderRow
 							(
 								SNew(SHeaderRow)
@@ -289,6 +290,7 @@ void SKismetDebuggingView::Construct(const FArguments& InArgs)
 					+SSplitter::Slot()
 					[
 						SAssignNew( OtherTreeView, SKismetDebugTreeView )
+							.InDebuggerTab(true)
 							.HeaderRow
 							(
 								SNew(SHeaderRow)
