@@ -3,6 +3,8 @@
 #include "JsonBlueprintFunctionLibrary.h"
 
 #include "JsonObjectConverter.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
 
 #define LOCTEXT_NAMESPACE "JsonBlueprintFunctionLibrary"
 

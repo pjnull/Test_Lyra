@@ -12,11 +12,11 @@ public class JsonBlueprintUtilities : ModuleRules
 			new string[] {
 				"Core",
                 "CoreUObject",
+                "Engine",
             });
 
 		PrivateDependencyModuleNames.AddRange(
 			new string[] {
-				"Engine",
 				"Json",
 				"JsonUtilities"
 			});
