@@ -91,11 +91,10 @@ TArray<ICookPackageSplitter::FGeneratedPackage> FWorldPartitionCookPackageSplitt
 	// that is necessary for populate 
 	ReferencedWorld = PartitionedWorld;
 
-	// World is not initialized
-	ensure(!PartitionedWorld->bIsWorldInitialized);
-
 	// Manually initialize WorldPartition
 	UWorldPartition* WorldPartition = PartitionedWorld->PersistentLevel->GetWorldPartition();
+	// We expect the WorldPartition has not yet been initialized
+	ensure(!WorldPartition->IsInitialized());
 	WorldPartition->Initialize(PartitionedWorld, FTransform::Identity);
 
 	TArray<FString> WorldPartitionGeneratedPackages;
