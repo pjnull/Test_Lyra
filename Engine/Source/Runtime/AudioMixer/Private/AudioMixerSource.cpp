@@ -306,7 +306,6 @@ namespace Audio
 
 		FSoundSource::InitCommon();
 
-
 		if (!ensure(InWaveInstance))
 		{
 			return false;
@@ -739,6 +738,8 @@ namespace Audio
 			return;
 		}
 
+		AUDIO_MIXER_TRACE_CPUPROFILER_EVENT_SCOPE(FMixerSource::Update);
+
 		// if MarkPendingKill() was called, WaveInstance->WaveData is null
 		if (!WaveInstance->WaveData)
 		{
@@ -876,6 +877,7 @@ namespace Audio
 	bool FMixerSource::IsPreparedToInit()
 	{
 		LLM_SCOPE(ELLMTag::AudioMixer);
+		AUDIO_MIXER_TRACE_CPUPROFILER_EVENT_SCOPE(AudioMixerSource::IsPreparedToInit);
 
 		if (MixerBuffer && MixerBuffer->IsRealTimeSourceReady())
 		{
@@ -956,6 +958,8 @@ namespace Audio
 			UE_LOG(LogAudioMixer, Warning, TEXT("Restarting a source which was stopping. Stopping now."));
 			return;
 		}
+
+		AUDIO_MIXER_TRACE_CPUPROFILER_EVENT_SCOPE(AudioMixerSource::Play);
 
 		// It's possible if Pause and Play are called while a sound is async initializing. In this case
 		// we'll just not actually play the source here. Instead we'll call play when the sound finishes loading.

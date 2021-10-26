@@ -26,6 +26,7 @@
 #include "Misc/Paths.h"
 #include "PhysicsEngine/BodyInstance.h"
 #include "ProfilingDebugging/ProfilingHelpers.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Sound/AudioSettings.h"
 #include "Sound/ReverbEffect.h"
 #include "Sound/SoundEffectPreset.h"
@@ -818,7 +819,7 @@ void FAudioDevice::CountBytes(FArchive& Ar)
 
 void FAudioDevice::UpdateAudioPluginSettingsObjectCache()
 {
-	SCOPED_NAMED_EVENT(FAudioDevice_UpdatePluginSettingsObjectCache, FColor::Blue);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FAudioDevice_UpdatePluginSettingsObjectCache);
 
 	PluginSettingsObjects.Reset();
 
@@ -2512,6 +2513,8 @@ void FAudioDevice::UpdateSoundMix(USoundMix* SoundMix, FSoundMixState* SoundMixS
 
 void FAudioDevice::UpdatePassiveSoundMixModifiers(TArray<FWaveInstance*>& WaveInstances, int32 FirstActiveIndex)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(FAudioDevice_UpdatePassiveSoundMixModifiers);
+
 	TArray<USoundMix*> CurrPassiveSoundMixModifiers;
 
 	// Find all passive SoundMixes from currently active wave instances
@@ -2916,7 +2919,7 @@ void FAudioDevice::ApplyClassAdjusters(USoundMix* SoundMix, float InterpValue, f
 
 void FAudioDevice::UpdateSoundClassProperties(float DeltaTime)
 {
-	SCOPED_NAMED_EVENT(FAudioDevice_UpdateSoundClasses, FColor::Blue);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FAudioDevice_UpdateSoundClasses);
 
 	// Remove SoundMix modifications and propagate the properties down the hierarchy
 	ParseSoundClasses(DeltaTime);
@@ -2983,6 +2986,8 @@ void FAudioDevice::VirtualizeInactiveLoops()
 	{
 		return;
 	}
+
+	TRACE_CPUPROFILER_EVENT_SCOPE(FAudioDevice_VirtualizeLoops);
 
 	const bool bDoRangeCheck = true;
 	for (FActiveSound* ActiveSound : ActiveSounds)
@@ -4022,7 +4027,7 @@ void FAudioDevice::StopOldestStoppingSource()
 
 void FAudioDevice::StopSources(TArray<FWaveInstance*>& WaveInstances, int32 FirstActiveIndex)
 {
-	SCOPED_NAMED_EVENT(FAudioDevice_StopSources, FColor::Blue);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FAudioDevice_StopSources);
 
 	for (int32 InstanceIndex = FirstActiveIndex; InstanceIndex < WaveInstances.Num(); InstanceIndex++)
 	{
@@ -4109,6 +4114,7 @@ void FAudioDevice::StartSources(TArray<FWaveInstance*>& WaveInstances, int32 Fir
 	check(IsInAudioThread());
 
 	SCOPE_CYCLE_COUNTER(STAT_AudioStartSources);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FAudioDevice_StartSources);
 
 	TArray<USoundWave*> StartingSoundWaves;
 
@@ -4316,7 +4322,7 @@ void FAudioDevice::Update(bool bGameTicking)
 		return;
 	}
 
-	SCOPED_NAMED_EVENT(FAudioDevice_Update, FColor::Blue);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FAudioDevic_Update);
 
 	DECLARE_CYCLE_STAT(TEXT("FAudioThreadTask.AudioUpdateTime"), STAT_AudioUpdateTime, STATGROUP_AudioThreadCommands);
 	FScopeCycleCounter AudioUpdateTimeCounter(GET_STATID(STAT_AudioUpdateTime));
@@ -4345,7 +4351,7 @@ void FAudioDevice::Update(bool bGameTicking)
 	UpdateAudioPluginSettingsObjectCache();
 
 	{
-		SCOPED_NAMED_EVENT(FAudioDevice_UpdateDeviceTiming, FColor::Blue);
+		TRACE_CPUPROFILER_EVENT_SCOPE(FAudioDevice_UpdateDeviceTiming);
 
 		// Updates hardware timing logic. Only implemented in audio mixer.
 		UpdateHardwareTiming();
@@ -4355,7 +4361,7 @@ void FAudioDevice::Update(bool bGameTicking)
 	}
 
 	{
-		SCOPED_NAMED_EVENT(FAudioDevice_UpdateVirtualLoops, FColor::Blue);
+		TRACE_CPUPROFILER_EVENT_SCOPE(FAudioDevice_UpdateVirtualLoops);
 		// Update which loops should re-trigger due to coming back into proximity
 		// or allowed by concurrency re-evaluating in context of other sounds stopping
 		const bool bForceUpdate = false;
@@ -4374,7 +4380,7 @@ void FAudioDevice::Update(bool bGameTicking)
 	CurrentTick++;
 
 	{
-		SCOPED_NAMED_EVENT(FAudioDevice_HandlePause, FColor::Blue);
+		TRACE_CPUPROFILER_EVENT_SCOPE(FAudioDevice_HandlePause);
 
 		// Handle pause/unpause for the game and editor.
 		HandlePause(bGameTicking);
@@ -4383,7 +4389,7 @@ void FAudioDevice::Update(bool bGameTicking)
 	UpdateAudioVolumeEffects();
 
 	{
-		SCOPED_NAMED_EVENT(FAudioDevice_UpdateAudioEngineSubsystems, FColor::Blue);
+		TRACE_CPUPROFILER_EVENT_SCOPE(FAudioDevice_UpdateAudioEngineSubsystems);
 
 		// Updates our audio engine subsystems 
 		UpdateAudioEngineSubsystems();
@@ -4429,6 +4435,8 @@ void FAudioDevice::Update(bool bGameTicking)
 
 	if (Sources.Num())
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(FAudioDevice_UpdateSources);
+
 		// Kill any sources that have finished
 		for (int32 SourceIndex = 0; SourceIndex < Sources.Num(); SourceIndex++)
 		{
@@ -4468,7 +4476,10 @@ void FAudioDevice::Update(bool bGameTicking)
 	}
 
 	// now let the platform perform anything it needs to handle
-	UpdateHardware();
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(FAudioDevice_UpdateHardware);
+		UpdateHardware();
+	}
 
 	// send any needed information back to the game thread
 	SendUpdateResultsToGameThread(FirstActiveIndex);
@@ -4476,6 +4487,8 @@ void FAudioDevice::Update(bool bGameTicking)
 
 void FAudioDevice::UpdateAudioVolumeEffects()
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(FAudioDevice_UpdateAudioVolumeEffects);
+
 	bool bHasVolumeSettings = false;
 	FAudioVolumeSettings PlayerAudioVolumeSettings;
 	FAudioVolumeSettings PreviousPlayerAudioVolumeSettings;
@@ -5038,7 +5051,7 @@ bool FAudioDevice::RemoveVirtualLoop(FActiveSound& InActiveSound)
 
 void FAudioDevice::ProcessingPendingActiveSoundStops(bool bForceDelete)
 {
-	SCOPED_NAMED_EVENT(FAudioDevice_PendingActiveSoundStops, FColor::Blue);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FAudioDevice_PendingActiveSoundStops);
 
 	// Process the PendingSoundsToDelete. These may have
 	// had their deletion deferred due to an async operation
@@ -6426,7 +6439,7 @@ bool FAudioDevice::ShouldUseRealtimeDecompression(bool bForceFullDecompression, 
 
 void FAudioDevice::StopSourcesUsingBuffer(FSoundBuffer* SoundBuffer)
 {
-	SCOPED_NAMED_EVENT(FAudioDevice_StopSourcesUsingBuffer, FColor::Blue);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FAudioDevice_StopSourcesUsingBuffer);
 
 	check(IsInAudioThread());
 

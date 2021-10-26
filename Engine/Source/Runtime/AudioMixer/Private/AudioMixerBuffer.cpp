@@ -5,6 +5,7 @@
 #include "AudioDecompress.h"
 #include "Interfaces/IAudioFormat.h"
 #include "AudioMixerSourceDecode.h"
+#include "AudioMixerTrace.h"
 #include "AudioStreaming.h"
 
 namespace Audio
@@ -151,6 +152,8 @@ namespace Audio
 			return false;
 		}
 
+		AUDIO_MIXER_TRACE_CPUPROFILER_EVENT_SCOPE(FMixerBuffer::ReadCompressedInfo);
+
 		FSoundQualityInfo QualityInfo;
 
 		if (!SoundWave->ResourceData || !SoundWave->ResourceSize)
@@ -173,6 +176,8 @@ namespace Audio
 
 	void FMixerBuffer::Seek(const float SeekTime)
 	{
+		AUDIO_MIXER_TRACE_CPUPROFILER_EVENT_SCOPE(FMixerBuffer::Seek);
+
 		if (ensure(DecompressionState))
 		{
 			DecompressionState->SeekToTime(SeekTime);
@@ -186,6 +191,8 @@ namespace Audio
 		{
 			return nullptr;
 		}
+
+		AUDIO_MIXER_TRACE_CPUPROFILER_EVENT_SCOPE(FMixerBuffer::Init);
 
 #if WITH_EDITOR
 		InWave->InvalidateSoundWaveIfNeccessary();
@@ -324,6 +331,7 @@ namespace Audio
 			return nullptr;
 		}
 
+		AUDIO_MIXER_TRACE_CPUPROFILER_EVENT_SCOPE(FMixerBuffer::CreateStreamingBuffer);
 
 		FMixerBuffer* Buffer = new FMixerBuffer(AudioDevice, InWave, EBufferType::Streaming);
 
