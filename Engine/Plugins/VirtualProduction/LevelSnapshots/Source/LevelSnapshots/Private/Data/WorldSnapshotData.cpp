@@ -65,6 +65,8 @@ void FWorldSnapshotData::SnapshotWorld(UWorld* World)
 	SerializedObjectReferences.Empty();
 	Subobjects.Empty();
 	CustomSubobjectSerializationData.Empty();
+	NameToIndex.Empty();
+	ReferenceToIndex.Empty();
 	
 	SnapshotVersionInfo.Initialize();
 
@@ -200,65 +202,6 @@ TOptional<FObjectSnapshotData*> FWorldSnapshotData::GetSerializedClassDefaults(U
 {
 	FObjectSnapshotData* ClassDefaultData = ClassDefaults.Find(Class);
 	return ClassDefaultData ? ClassDefaultData : TOptional<FObjectSnapshotData*>();
-}
-
-int32 FWorldSnapshotData::AddCustomSubobjectDependency(UObject* ReferenceFromOriginalObject)
-{
-	if (!ensure(ReferenceFromOriginalObject))
-	{
-		return INDEX_NONE;
-	}
-
-	int32 SubobjectIndex = SerializedObjectReferences.Find(ReferenceFromOriginalObject);
-	if (SubobjectIndex == INDEX_NONE)
-	{
-		SubobjectIndex = SerializedObjectReferences.AddUnique(ReferenceFromOriginalObject);
-	}
-	
-	if (CustomSubobjectSerializationData.Find(SubobjectIndex) == nullptr)
-	{
-		CustomSubobjectSerializationData.Add(SubobjectIndex);
-	}
-	else
-	{
-		UE_LOG(LogLevelSnapshots, Warning, TEXT("Object %s was already added as dependency. Investigate"), *ReferenceFromOriginalObject->GetName());
-		UE_DEBUG_BREAK();
-	}
-		
-	return SubobjectIndex;
-}
-
-FCustomSerializationData* FWorldSnapshotData::GetCustomSubobjectData_ForSubobject(const FSoftObjectPath& ReferenceFromOriginalObject)
-{
-	const int32 SubobjectIndex = SerializedObjectReferences.Find(ReferenceFromOriginalObject);
-	if (FCustomSerializationData* Data = CustomSubobjectSerializationData.Find(SubobjectIndex))
-	{
-		return Data;
-	}
-	return nullptr;
-}
-
-const FCustomSerializationData* FWorldSnapshotData::GetCustomSubobjectData_ForActorOrSubobject(UObject* OriginalObject) const
-{
-	// Is it an actor?
-	if (const FActorSnapshotData* SavedActorData = ActorData.Find(OriginalObject))
-	{
-		return &SavedActorData->GetCustomActorSerializationData();
-	}
-	if (Cast<AActor>(OriginalObject))
-	{
-		// Return immediately to avoid searching the entire array below.
-		return nullptr;
-	}
-
-	// If not an actor, it is a subobject
-	const int32 ObjectReferenceIndex = SerializedObjectReferences.Find(OriginalObject);
-	if (ObjectReferenceIndex != INDEX_NONE)
-	{
-		return CustomSubobjectSerializationData.Find(ObjectReferenceIndex);
-	}
-
-	return nullptr;
 }
 
 void FWorldSnapshotData::AddClassDefault(UClass* Class)

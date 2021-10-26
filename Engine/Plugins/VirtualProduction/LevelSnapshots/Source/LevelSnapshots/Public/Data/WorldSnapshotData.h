@@ -44,15 +44,6 @@ struct LEVELSNAPSHOTS_API FWorldSnapshotData
 	
 public: /* Serialisation functions */
 	
-	/**
-	 * Adds a subobject to SerializedObjectReferences and CustomSubobjectSerializationData.
-	 * @return A valid index in SerializedObjectReferences and the corresponding subobject data.
-	 */
-	int32 AddCustomSubobjectDependency(UObject* ReferenceFromOriginalObject);
-	FCustomSerializationData* GetCustomSubobjectData_ForSubobject(const FSoftObjectPath& ReferenceFromOriginalObject);
-	const FCustomSerializationData* GetCustomSubobjectData_ForActorOrSubobject(UObject* OriginalObject) const;
-
-	
 	void AddClassDefault(UClass* Class);
 	UObject* GetClassDefault(UClass* Class);
 	
@@ -77,6 +68,7 @@ public:
 	
 	
 	/* The world we will be adding temporary actors to */
+	UPROPERTY(Transient)
 	TWeakObjectPtr<UWorld> TempActorWorld;
 
 	/**
@@ -102,6 +94,7 @@ public:
 	UPROPERTY()
 	TMap<FSoftObjectPath, FActorSnapshotData> ActorData;
 
+	
 
 	
 	/** Whenever an object needs to serialize a name, we add it to this array and serialize an index to this array. */
@@ -136,6 +129,15 @@ public:
 	 */
 	UPROPERTY()
 	TMap<int32, FCustomSerializationData> CustomSubobjectSerializationData;
+
+
+	/** Binds every entry in SerializedNames to its index. Speeds up adding unique names. */
+	UPROPERTY(Transient)
+	TMap<FName, int32> NameToIndex;
+	
+	/** Binds every entry in SerializedObjectReferences to its index. Speeds up adding unique references. */
+    UPROPERTY(Transient)
+    TMap<FSoftObjectPath, int32> ReferenceToIndex;
 };
 
 template<>
