@@ -828,7 +828,7 @@ namespace UnrealBuildTool
 
 					Writer.WriteObjectStart();
 					Writer.WriteValue("file", MakePathString(File, bInAbsolute: true, bForceSkipQuotes: true));
-					Writer.WriteValue("command", String.Format("{0} @\"{1}\"", CompilerPath, ResponseFile.FullName));
+					Writer.WriteValue("command", String.Format("@\"{0}\" @\"{1}\"", CompilerPath, ResponseFile.FullName));
 					Writer.WriteValue("directory", UnrealBuildTool.EngineSourceDirectory.ToString());
 					Writer.WriteObjectEnd();
 				}
