@@ -59,7 +59,7 @@ TOnlineAsyncOpHandle<FQueryFriends> FFriendsEOS::QueryFriends(FQueryFriends::Par
 		if (!Services.Get<FAuthEOS>()->IsLoggedIn(Params.LocalUserId))
 		{
 			// TODO: Error codes
-			Op.SetError(Errors::UnknownError());
+			Op.SetError(Errors::Unknown());
 			return Op.GetHandle();
 		}
 
@@ -164,7 +164,7 @@ TOnlineAsyncOpHandle<FQueryFriends> FFriendsEOS::QueryFriends(FQueryFriends::Par
 				}
 				else
 				{
-					InAsyncOp.SetError(Errors::UnknownError()); // TODO: Error codes
+					InAsyncOp.SetError(Errors::Unknown()); // TODO: Error codes
 				}
 			})
 			.Enqueue();
@@ -180,7 +180,7 @@ TOnlineResult<FGetFriends::Result> FFriendsEOS::GetFriends(FGetFriends::Params&&
 		FriendsList->GenerateValueArray(Result.Friends);
 		return TOnlineResult<FGetFriends::Result>(MoveTemp(Result));
 	}
-	return TOnlineResult<FGetFriends::Result>(Errors::UnknownError()); // TODO: error codes
+	return TOnlineResult<FGetFriends::Result>(Errors::Unknown()); // TODO: error codes
 }
 
 TOnlineAsyncOpHandle<FAddFriend> FFriendsEOS::AddFriend(FAddFriend::Params&& InParams)
@@ -221,7 +221,7 @@ TOnlineAsyncOpHandle<FAddFriend> FFriendsEOS::AddFriend(FAddFriend::Params&& InP
 				// TODO:  Handle response
 			}).Enqueue();
 #else
-		Op.SetError(Errors::UnknownError());
+		Op.SetError(Errors::Unknown());
 #endif
 	}
 	return Op.GetHandle();

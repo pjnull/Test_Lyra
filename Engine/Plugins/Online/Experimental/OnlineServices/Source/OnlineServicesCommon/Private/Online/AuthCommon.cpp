@@ -3,6 +3,7 @@
 #include "Online/AuthCommon.h"
 
 #include "Online/OnlineAsyncOp.h"
+#include "Online/OnlineErrorDefinitions.h"
 #include "Online/OnlineServicesCommon.h"
 
 namespace UE::Online {
@@ -15,32 +16,32 @@ FAuthCommon::FAuthCommon(FOnlineServicesCommon& InServices)
 TOnlineAsyncOpHandle<FAuthLogin> FAuthCommon::Login(FAuthLogin::Params&& Params)
 {
 	TOnlineAsyncOp<FAuthLogin>& Operation = GetOp<FAuthLogin>(MoveTemp(Params));
-	Operation.SetError(Errors::Unimplemented());
+	Operation.SetError(Errors::NotImplemented());  
 	return Operation.GetHandle();
 }
 
 TOnlineAsyncOpHandle<FAuthLogout> FAuthCommon::Logout(FAuthLogout::Params&& Params)
 {
 	TOnlineAsyncOp<FAuthLogout>& Operation = GetOp<FAuthLogout>(MoveTemp(Params));
-	Operation.SetError(Errors::Unimplemented());
+	Operation.SetError(Errors::NotImplemented());
 	return Operation.GetHandle();
 }
 
 TOnlineAsyncOpHandle<FAuthGenerateAuth> FAuthCommon::GenerateAuth(FAuthGenerateAuth::Params&& Params)
 {
 	TOnlineAsyncOp<FAuthGenerateAuth>& Operation = GetOp<FAuthGenerateAuth>(MoveTemp(Params));
-	Operation.SetError(Errors::Unimplemented());
+	Operation.SetError(Errors::NotImplemented());
 	return Operation.GetHandle();
 }
 
 TOnlineResult<FAuthGetAccountByLocalUserNum::Result> FAuthCommon::GetAccountByLocalUserNum(FAuthGetAccountByLocalUserNum::Params&& Params)
 {
-	return TOnlineResult<FAuthGetAccountByLocalUserNum::Result>(Errors::Unimplemented());
+	return TOnlineResult<FAuthGetAccountByLocalUserNum::Result>(Errors::NotImplemented());
 }
 
 TOnlineResult<FAuthGetAccountByAccountId::Result> FAuthCommon::GetAccountByAccountId(FAuthGetAccountByAccountId::Params&& Params)
 {
-	return TOnlineResult<FAuthGetAccountByAccountId::Result>(Errors::Unimplemented());
+	return TOnlineResult<FAuthGetAccountByAccountId::Result>(Errors::NotImplemented());
 }
 
 TOnlineEvent<void(const FLoginStatusChanged&)> FAuthCommon::OnLoginStatusChanged()

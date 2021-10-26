@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Online/OnlineError.h"
 #include "Online/OnlineResult.h"
+#include "Online/OnlineErrorDefinitions.h"
 #include "Templates/Models.h"
 
 #include "Templates/SharedPointer.h"

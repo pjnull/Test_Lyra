@@ -4,7 +4,7 @@
 
 #include "Online/OnlineAsyncOpHandle.h"
 #include "Online/OnlineTypeInfo.h"
-
+#include "Online/OnlineErrorDefinitions.h"
 #include "Containers/Map.h"
 #include "Templates/UniquePtr.h"
 #include "Async/Future.h"
@@ -13,13 +13,6 @@
 namespace UE::Online {
 
 class FOnlineServicesCommon;
-
-// TEMP
-namespace Errors
-{
-	inline FOnlineError Unknown() { return FOnlineError();  }
-}
-// END TEMP
 
 class FOnlineAsyncOp;
 template <typename OpType> class TOnlineAsyncOp;

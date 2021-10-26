@@ -14,19 +14,19 @@ FFriendsCommon::FFriendsCommon(FOnlineServicesCommon& InServices)
 TOnlineAsyncOpHandle<FQueryFriends> FFriendsCommon::QueryFriends(FQueryFriends::Params&& Params)
 {
 	TOnlineAsyncOp<FQueryFriends>& Operation = GetOp<FQueryFriends>(MoveTemp(Params));
-	Operation.SetError(Errors::Unimplemented());
+	Operation.SetError(Errors::NotImplemented());
 	return Operation.GetHandle();
 }
 
 TOnlineResult<FGetFriends::Result> FFriendsCommon::GetFriends(FGetFriends::Params&& Params)
 {
-	return TOnlineResult<FGetFriends::Result>(Errors::Unimplemented());
+	return TOnlineResult<FGetFriends::Result>(Errors::NotImplemented());
 }
 
 TOnlineAsyncOpHandle<FAddFriend> FFriendsCommon::AddFriend(FAddFriend::Params&& Params)
 {
 	TOnlineAsyncOp<FAddFriend>& Operation = GetOp<FAddFriend>(MoveTemp(Params));
-	Operation.SetError(Errors::Unimplemented());
+	Operation.SetError(Errors::NotImplemented());
 	return Operation.GetHandle();
 }
 

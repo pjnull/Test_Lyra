@@ -5,6 +5,7 @@
 #include "OnlineServicesEOS.h"
 #include "OnlineServicesEOSTypes.h"
 #include "Online/AuthErrors.h"
+#include "Online/OnlineErrorDefinitions.h"
 
 #include "eos_auth.h"
 #include "eos_types.h"
@@ -189,7 +190,7 @@ TOnlineAsyncOpHandle<FAuthLogin> FAuthEOS::Login(FAuthLogin::Params&& Params)
 		else
 		{
 			UE_LOG(LogTemp, Warning, TEXT("Invalid ScopeFlag=[%s]"), *Scope);
-			Op.SetError(Errors::UnknownError());
+			Op.SetError(Errors::Unknown());
 			return Op.GetHandle();
 		}
 	}
@@ -230,14 +231,14 @@ TOnlineAsyncOpHandle<FAuthLogin> FAuthEOS::Login(FAuthLogin::Params&& Params)
 			break;
 		default:
 			UE_LOG(LogTemp, Warning, TEXT("Unsupported CredentialsType=[%s]"), *Op.GetParams().CredentialsType);
-			Op.SetError(Errors::UnknownError()); // TODO
+			Op.SetError(Errors::Unknown()); // TODO
 			return Op.GetHandle();
 		}
 	}
 	else
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Invalid CredentialsType=[%s]"), *Op.GetParams().CredentialsType);
-		Op.SetError(Errors::UnknownError()); // TODO
+		Op.SetError(Errors::Unknown()); // TODO
 		return Op.GetHandle();
 	}
 
@@ -277,14 +278,10 @@ TOnlineAsyncOpHandle<FAuthLogin> FAuthEOS::Login(FAuthLogin::Params&& Params)
 			}
 			else
 			{
-				FOnlineError Error;
+				FOnlineError Error = Errors::Unknown();
 				if (Data->ResultCode == EOS_EResult::EOS_InvalidAuth)
 				{
-					Error = Errors::InvalidCredentials();
-				}
-				else
-				{
-					Error = Errors::Unknown();
+					Error = Errors::InvalidCreds();
 				}
 
 				InAsyncOp.SetError(MoveTemp(Error));
@@ -338,7 +335,7 @@ TOnlineAsyncOpHandle<FAuthLogout> FAuthEOS::Logout(FAuthLogout::Params&& Params)
 				else
 				{
 					// TODO: Error codes
-					FOnlineError Error;
+					FOnlineError Error = Errors::Unknown();
 					InAsyncOp.SetError(MoveTemp(Error));
 				}
 			}).Enqueue();
@@ -346,7 +343,7 @@ TOnlineAsyncOpHandle<FAuthLogout> FAuthEOS::Logout(FAuthLogout::Params&& Params)
 	else
 	{
 		// TODO: Error codes
-		Op.SetError(Errors::UnknownError());
+		Op.SetError(Errors::Unknown());
 	}
 	
 	return Op.GetHandle();
@@ -383,7 +380,7 @@ TOnlineResult<FAuthGetAccountByAccountId::Result> FAuthEOS::GetAccountByAccountI
 	else
 	{
 		// TODO: proper error
-		return TOnlineResult<FAuthGetAccountByAccountId::Result>(Errors::UnknownError());
+		return TOnlineResult<FAuthGetAccountByAccountId::Result>(Errors::Unknown());
 	}
 }
 
@@ -403,7 +400,7 @@ TOnlineResult<FAccountId> FAuthEOS::GetAccountIdByLocalUserNum(int32 LocalUserNu
 			return Result;
 		}
 	}
-	TOnlineResult<FAccountId> Result(Errors::UnknownError()); // TODO: error code
+	TOnlineResult<FAccountId> Result(Errors::Unknown()); // TODO: error code
 	return Result;
 }
 
