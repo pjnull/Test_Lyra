@@ -55,26 +55,29 @@ TArray<FName> FGetLayersFromMaterialCache::ComputeLayersFromMaterial(const UMate
 	TRACE_CPUPROFILER_EVENT_SCOPE(ALandscapeProxy::ComputeLayersFromMaterial);
 	TArray<FName> Result;
 
-	TArray<FMaterialParameterInfo> OutParameterInfo;
-	TArray<FGuid> Guids;
-	if (const UMaterialInstance* Instance = Cast<const UMaterialInstance>(InMaterialInterface))
+	if (InMaterialInterface)
 	{
-		Instance->GetAllParameterInfo<UMaterialExpressionLandscapeLayerBlend>(OutParameterInfo, Guids);
-		Instance->GetAllParameterInfo<UMaterialExpressionLandscapeLayerWeight>(OutParameterInfo, Guids);
-		Instance->GetAllParameterInfo<UMaterialExpressionLandscapeLayerSwitch>(OutParameterInfo, Guids);
-		Instance->GetAllParameterInfo<UMaterialExpressionLandscapeLayerSample>(OutParameterInfo, Guids);
-	}
-	else if (const UMaterial* Material = InMaterialInterface->GetMaterial())
-	{
-		Material->GetAllParameterInfo<UMaterialExpressionLandscapeLayerBlend>(OutParameterInfo, Guids);
-		Material->GetAllParameterInfo<UMaterialExpressionLandscapeLayerWeight>(OutParameterInfo, Guids);
-		Material->GetAllParameterInfo<UMaterialExpressionLandscapeLayerSwitch>(OutParameterInfo, Guids);
-		Material->GetAllParameterInfo<UMaterialExpressionLandscapeLayerSample>(OutParameterInfo, Guids);
-	}
+		TArray<FMaterialParameterInfo> OutParameterInfo;
+		TArray<FGuid> Guids;
+		if (const UMaterialInstance* Instance = Cast<const UMaterialInstance>(InMaterialInterface))
+		{
+			Instance->GetAllParameterInfo<UMaterialExpressionLandscapeLayerBlend>(OutParameterInfo, Guids);
+			Instance->GetAllParameterInfo<UMaterialExpressionLandscapeLayerWeight>(OutParameterInfo, Guids);
+			Instance->GetAllParameterInfo<UMaterialExpressionLandscapeLayerSwitch>(OutParameterInfo, Guids);
+			Instance->GetAllParameterInfo<UMaterialExpressionLandscapeLayerSample>(OutParameterInfo, Guids);
+		}
+		else if (const UMaterial* Material = InMaterialInterface->GetMaterial())
+		{
+			Material->GetAllParameterInfo<UMaterialExpressionLandscapeLayerBlend>(OutParameterInfo, Guids);
+			Material->GetAllParameterInfo<UMaterialExpressionLandscapeLayerWeight>(OutParameterInfo, Guids);
+			Material->GetAllParameterInfo<UMaterialExpressionLandscapeLayerSwitch>(OutParameterInfo, Guids);
+			Material->GetAllParameterInfo<UMaterialExpressionLandscapeLayerSample>(OutParameterInfo, Guids);
+		}
 
-	for (const FMaterialParameterInfo& ParameterInfo : OutParameterInfo)
-	{
-		Result.AddUnique(ParameterInfo.Name);
+		for (const FMaterialParameterInfo& ParameterInfo : OutParameterInfo)
+		{
+			Result.AddUnique(ParameterInfo.Name);
+		}
 	}
 
 	return Result;
