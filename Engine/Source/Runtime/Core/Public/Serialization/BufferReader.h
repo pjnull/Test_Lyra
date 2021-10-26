@@ -35,7 +35,7 @@ public:
 	}
 
 	// Abstract to force implementors to call Close() themselves, since it's a virtual function.
-	virtual ~FBufferReaderBase() = 0 { }
+	virtual ~FBufferReaderBase() = 0;
 
 	virtual bool Close() override
 	{
@@ -84,6 +84,10 @@ protected:
 	int64		ReaderSize;
 	bool	bFreeOnClose;
 };
+
+FBufferReaderBase::~FBufferReaderBase()
+{
+}
 
 /**
  * Similar to FMemoryReader, but able to internally
