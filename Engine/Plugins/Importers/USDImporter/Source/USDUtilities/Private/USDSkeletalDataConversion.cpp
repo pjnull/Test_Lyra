@@ -681,8 +681,8 @@ namespace UnrealToUsdImpl
 		pxr::UsdPrim MeshPrim = UsdLODPrimGeomMesh.GetPrim();
 		pxr::UsdStageRefPtr Stage = MeshPrim.GetStage();
 
-		// In 21.05 we now must apply the skel binding API to this mesh prim, or else the joints/etc. attributes may be ignored
-		if ( !pxr::UsdSkelBindingAPI::Apply( MeshPrim ) )
+		pxr::UsdSkelBindingAPI SkelBindingAPI = pxr::UsdSkelBindingAPI::Apply( MeshPrim );
+		if ( !SkelBindingAPI )
 		{
 			return;
 		}
@@ -794,7 +794,6 @@ namespace UnrealToUsdImpl
 
 			// Joint indices & weights
 			{
-				pxr::UsdSkelBindingAPI SkelBindingAPI{ UsdLODPrimGeomMesh };
 				const int32 NumInfluencesPerVertex = LODModel.GetMaxBoneInfluences();
 
 				const bool bConstantPrimvar = false;
@@ -1152,7 +1151,7 @@ bool UsdToUnreal::ConvertSkinnedMesh(const pxr::UsdSkelSkinningQuery& SkinningQu
 	using namespace pxr;
 
 	const UsdPrim& SkinningPrim = SkinningQuery.GetPrim();
-	UsdSkelBindingAPI SkelBinding(SkinningPrim);
+	UsdSkelBindingAPI SkelBindingAPI(SkinningPrim);
 
 	// Ref. FFbxImporter::FillSkelMeshImporterFromFbx
 	UsdGeomMesh UsdMesh = UsdGeomMesh(SkinningPrim);
@@ -1635,7 +1634,7 @@ bool UsdToUnreal::ConvertSkinnedMesh(const pxr::UsdSkelSkinningQuery& SkinningQu
 	if ( pxr::UsdSkelAnimMapperRefPtr AnimMapper = SkinningQuery.GetJointMapper() )
 	{
 		VtArray<int> SkeletonBoneIndices;
-		if ( pxr::UsdSkelSkeleton BoundSkeleton = SkelBinding.GetInheritedSkeleton() )
+		if ( pxr::UsdSkelSkeleton BoundSkeleton = SkelBindingAPI.GetInheritedSkeleton() )
 		{
 			if ( pxr::UsdAttribute SkeletonJointsAttr = BoundSkeleton.GetJointsAttr() )
 			{
@@ -2597,7 +2596,7 @@ bool UnrealToUsd::ConvertSkeletalMesh( const USkeletalMesh* SkeletalMesh, pxr::U
 	}
 
 	// Create and fill skeleton
-	pxr::UsdSkelBindingAPI SkelBindingAPI{ SkelRoot };
+	pxr::UsdSkelBindingAPI SkelBindingAPI = pxr::UsdSkelBindingAPI::Apply( SkelRootPrim );
 	{
 		pxr::UsdPrim SkeletonPrim = Stage->DefinePrim(
 			SkelRootPrim.GetPath().AppendChild( UnrealToUsd::ConvertToken(TEXT("Skel")).Get() ),
@@ -2709,9 +2708,9 @@ bool UnrealToUsd::ConvertSkeletalMesh( const USkeletalMesh* SkeletalMesh, pxr::U
 				EditContext.Emplace( VariantSets.GetVariantSet( UnrealIdentifiers::LOD ).GetVariantEditContext() );
 			}
 
-			pxr::UsdSkelBindingAPI LODMeshBindingAPI{ UsdLODPrimGeomMesh };
-			LODMeshBindingAPI.CreateBlendShapeTargetsRel().SetTargets( AddedBlendShapeTargets );
-			LODMeshBindingAPI.CreateBlendShapesAttr().Set( AddedBlendShapes );
+			pxr::UsdSkelBindingAPI LODMeshSkelBindingAPI = pxr::UsdSkelBindingAPI::Apply( UsdLODPrim );
+			LODMeshSkelBindingAPI.CreateBlendShapeTargetsRel().SetTargets( AddedBlendShapeTargets );
+			LODMeshSkelBindingAPI.CreateBlendShapesAttr().Set( AddedBlendShapes );
 		}
 	}
 
