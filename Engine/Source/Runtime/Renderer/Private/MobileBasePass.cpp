@@ -14,6 +14,21 @@
 #include "MeshPassProcessor.inl"
 #include "Engine/TextureCube.h"
 
+bool MobileUsesNoLightMapPermutation(const FMeshMaterialShaderPermutationParameters& Parameters)
+{
+	const FReadOnlyCVARCache& ReadOnlyCVARCache = FReadOnlyCVARCache::Get();
+	const bool bIsLitMaterial = Parameters.MaterialParameters.ShadingModels.IsLit();
+	const bool bDeferredShading = IsMobileDeferredShadingEnabled(Parameters.Platform);
+
+	if (!bDeferredShading && !ReadOnlyCVARCache.bAllowStaticLighting && bIsLitMaterial && !IsTranslucentBlendMode(Parameters.MaterialParameters.BlendMode))
+	{
+		// We don't need NoLightMap permutation if CSM shader can handle no-CSM case with a branch inside shader
+		return !MobileUseCSMShaderBranch();
+	}
+		
+	return true;
+}
+
 template <ELightMapPolicyType Policy, int32 NumMovablePointLights>
 bool GetUniformMobileBasePassShaders(
 	const FMaterial& Material, 
