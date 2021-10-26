@@ -11,6 +11,8 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 using JetBrains.Annotations;
+using System.Buffers;
+using System.Text.Json;
 
 namespace EpicGames.Core
 {
@@ -727,6 +729,14 @@ namespace EpicGames.Core
 		}
 
 		/// <summary>
+		/// Whether to write JSON to stdout
+		/// </summary>
+		public bool WriteJsonToStdOut
+		{
+			get; set;
+		}
+
+		/// <summary>
 		/// When true, a timestamp will be written to the log file when the first listener is added
 		/// </summary>
 		public bool IncludeStartingTimestamp
@@ -771,6 +781,9 @@ namespace EpicGames.Core
 		/// </summary>
 		private Stopwatch StatusTimer = new Stopwatch();
 
+		ArrayBufferWriter<byte> JsonBufferWriter;
+		Utf8JsonWriter JsonWriter;
+
 		/// <summary>
 		/// Constructor
 		/// </summary>
@@ -779,6 +792,15 @@ namespace EpicGames.Core
 			OutputLevel = LogLevel.Debug;
 			ColorConsoleOutput = true;
 			IncludeStartingTimestamp = true;
+
+			string? EnvVar = Environment.GetEnvironmentVariable("UE_STDOUT_JSON");
+			if(EnvVar != null && int.TryParse(EnvVar, out int Value) && Value != 0)
+			{
+				WriteJsonToStdOut = true;
+			}
+
+			JsonBufferWriter = new ArrayBufferWriter<byte>();
+			JsonWriter = new Utf8JsonWriter(JsonBufferWriter);
 		}
 
 		/// <summary>
@@ -923,9 +945,20 @@ namespace EpicGames.Core
 					}
 					try
 					{
-						foreach (string Line in Lines)
+						if (WriteJsonToStdOut)
 						{
-							Console.WriteLine(Line);
+							JsonBufferWriter.Clear();
+							JsonWriter.Reset();
+							MessageTemplate.Serialize(JsonWriter, LogLevel, EventId, State, Exception, Formatter);
+							JsonWriter.Flush();
+							Console.WriteLine(Encoding.UTF8.GetString(JsonBufferWriter.WrittenSpan));
+						}
+						else
+						{
+							foreach (string Line in Lines)
+							{
+								Console.WriteLine(Line);
+							}
 						}
 					}
 					catch (IOException)
