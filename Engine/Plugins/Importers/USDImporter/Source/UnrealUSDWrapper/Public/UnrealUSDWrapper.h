@@ -83,6 +83,18 @@ enum class EUsdPurpose : int32
 };
 ENUM_CLASS_FLAGS(EUsdPurpose);
 
+UENUM( meta = ( Bitflags, UseEnumValuesAsMaskValuesInEditor = "true" ) )
+enum class EUsdDefaultKind : int32
+{
+	None = 0 UMETA( Hidden ),
+	Model = 1,
+	Component = 2,
+	Group = 4,
+	Assembly = 8,
+	Subcomponent = 16
+};
+ENUM_CLASS_FLAGS( EUsdDefaultKind );
+
 
 struct FUsdVector2Data
 {

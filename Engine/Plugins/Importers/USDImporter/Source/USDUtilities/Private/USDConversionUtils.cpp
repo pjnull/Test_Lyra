@@ -45,6 +45,7 @@
 #include "USDIncludesStart.h"
 	#include "pxr/base/tf/stringUtils.h"
 	#include "pxr/base/tf/token.h"
+	#include "pxr/usd/kind/registry.h"
 	#include "pxr/usd/usd/attribute.h"
 	#include "pxr/usd/usd/editContext.h"
 	#include "pxr/usd/usd/modelAPI.h"
@@ -738,6 +739,47 @@ bool UsdUtils::IsAnimated( const pxr::UsdPrim& Prim )
 	}
 
 	return false;
+}
+
+EUsdDefaultKind UsdUtils::GetDefaultKind( const pxr::UsdPrim& Prim )
+{
+	FScopedUsdAllocs Allocs;
+
+	pxr::UsdModelAPI Model{ pxr::UsdTyped( Prim ) };
+
+	EUsdDefaultKind Result = EUsdDefaultKind::None;
+
+	if ( !Model )
+	{
+		return Result;
+	}
+
+	if ( Model.IsKind( pxr::KindTokens->model, pxr::UsdModelAPI::KindValidationNone ) )
+	{
+		Result |= EUsdDefaultKind::Model;
+	}
+
+	if ( Model.IsKind( pxr::KindTokens->component, pxr::UsdModelAPI::KindValidationNone ) )
+	{
+		Result |= EUsdDefaultKind::Component;
+	}
+
+	if ( Model.IsKind( pxr::KindTokens->group, pxr::UsdModelAPI::KindValidationNone ) )
+	{
+		Result |= EUsdDefaultKind::Group;
+	}
+
+	if ( Model.IsKind( pxr::KindTokens->assembly, pxr::UsdModelAPI::KindValidationNone ) )
+	{
+		Result |= EUsdDefaultKind::Assembly;
+	}
+
+	if ( Model.IsKind( pxr::KindTokens->subcomponent, pxr::UsdModelAPI::KindValidationNone ) )
+	{
+		Result |= EUsdDefaultKind::Subcomponent;
+	}
+
+	return Result;
 }
 
 TArray< TUsdStore< pxr::UsdPrim > > UsdUtils::GetAllPrimsOfType( const pxr::UsdPrim& StartPrim, const pxr::TfType& SchemaType, const TArray< TUsdStore< pxr::TfType > >& ExcludeSchemaTypes )
