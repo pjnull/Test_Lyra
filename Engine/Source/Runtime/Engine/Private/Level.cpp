@@ -466,8 +466,13 @@ void ULevel::Serialize( FArchive& Ar )
 #if WITH_EDITOR
 			if (IsUsingExternalActors() && Actor->IsPackageExternal())
 			{
+				// Some actors needs to be referenced by the level (world settings, default brush, etc...)
+				if (Actor->ShouldLevelKeepRefIfExternal())
+				{
+					return true;
+				}
 				// Don't filter out external actors if duplicating the world to get the actors properly duplicated.
-				if (!(Ar.GetPortFlags() & PPF_Duplicate))
+				else if (!(Ar.GetPortFlags() & PPF_Duplicate))
 				{
 					return false;
 				}

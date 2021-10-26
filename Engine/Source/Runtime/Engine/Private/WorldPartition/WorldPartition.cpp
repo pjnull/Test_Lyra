@@ -453,17 +453,6 @@ void UWorldPartition::Initialize(UWorld* InWorld, const FTransform& InTransform)
 
 	if (bEditorOnly)
 	{
-		// Make sure to preload only AWorldDataLayers actor first (ShouldActorBeLoadedByEditorCells requires it)
-		FWorldPartitionReference WorldDataLayersActor;
-		for (UWorldPartitionEditorCell::FActorHandle& ActorHandle : EditorHash->GetAlwaysLoadedCell()->Actors)
-		{
-			if (ActorHandle->GetActorClass()->IsChildOf<AWorldDataLayers>())
-			{
-				WorldDataLayersActor = ActorHandle.Handle;
-				break;
-			}
-		}
-
 		// Load the always loaded cell, don't call LoadCells to avoid creating a transaction
 		UpdateLoadingEditorCell(EditorHash->GetAlwaysLoadedCell(), true, false);
 
@@ -1264,7 +1253,7 @@ bool UWorldPartition::GenerateStreaming(EWorldPartitionStreamingMode Mode, TArra
 	StreamingPolicy = NewObject<UWorldPartitionStreamingPolicy>(const_cast<UWorldPartition*>(this), WorldPartitionStreamingPolicyClass.Get());
 
 	check(RuntimeHash);
-	bool Result = RuntimeHash->GenerateRuntimeStreaming(Mode, StreamingPolicy, OutPackagesToGenerate);
+	bool Result = RuntimeHash->GenerateStreaming(Mode, StreamingPolicy, OutPackagesToGenerate);
 
 	// Prepare actor to cell remapping
 	StreamingPolicy->PrepareActorToCellRemapping();

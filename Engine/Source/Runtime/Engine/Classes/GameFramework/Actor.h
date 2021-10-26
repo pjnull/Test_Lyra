@@ -825,6 +825,12 @@ public:
 	 */
 	void SetPackageExternal(bool bExternal, bool bShouldDirty = true);
 
+	/**
+	 * Determine how this actor should be referenced by the level when external (saved in its own package).
+	 / @return true if the level should keep a reference to the actor even if it's saved in its own package.
+	 */
+	virtual bool ShouldLevelKeepRefIfExternal() const { return false; }
+
 	FActorOnPackagingModeChanged OnPackagingModeChanged;
 
 	/**

@@ -24,6 +24,8 @@ public:
 	virtual void BeginPlay() override;
 
 #if WITH_EDITOR
+	virtual bool ShouldLevelKeepRefIfExternal() const override { return true; }
+
 	virtual bool IsUserManaged() const override { return false; }
 
 	static AWorldDataLayers* Create(UWorld* World);
