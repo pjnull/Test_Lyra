@@ -528,7 +528,7 @@ struct FGlobalImportStore
 						PublicExportKey.GetPackageId().Value(),
 						PublicExportKey.GetExportHash());
 
-					checkf(ExistingObject && ExistingObject && GCObject,
+					checkf(ExistingObject && ExistingObject == GCObject,
 						TEXT("The serialized GC Object '%s' with flags (ObjectFlags=%x, InternalObjectFlags=%x) and id 0x%llX:%u is not matching the object '%s' in ImportStore. "),
 						TEXT("Reason unknown. Overwritten after it was added? Bug or hash collision?"),
 						*GCObject->GetFullName(),
