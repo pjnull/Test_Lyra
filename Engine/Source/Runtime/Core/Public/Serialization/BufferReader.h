@@ -85,7 +85,7 @@ protected:
 	bool	bFreeOnClose;
 };
 
-FBufferReaderBase::~FBufferReaderBase()
+inline FBufferReaderBase::~FBufferReaderBase()
 {
 }
 
