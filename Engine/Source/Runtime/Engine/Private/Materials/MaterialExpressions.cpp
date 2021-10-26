@@ -16363,23 +16363,22 @@ void UMaterialExpressionNamedRerouteUsage::PostCopyNode(const TArray<UMaterialEx
 {
 	Super::PostCopyNode(CopiedExpressions);
 
-	ensure(!Declaration || Declaration->VariableGuid == DeclarationGuid);
-
+	// First try to find the declaration in the copied expressions
+	Declaration = FindDeclarationInArray(DeclarationGuid, CopiedExpressions);
 	if (!Declaration)
 	{
-		// First try to find the declaration in the copied expressions
-		Declaration = FindDeclarationInArray(DeclarationGuid, CopiedExpressions);
-		if (!Declaration)
-		{
-			// If unsuccessful, try to find it in the whole material
-			Declaration = FindDeclarationInMaterial(DeclarationGuid);
-		}
-		if (Declaration)
-		{
-			// Save that Declaration change
-			MarkPackageDirty();
-		}
+		// If unsuccessful, try to find it in the whole material
+		Declaration = FindDeclarationInMaterial(DeclarationGuid);
 	}
+
+	// Keep GUID in sync. In case this is pasted by itself into another graph, we don't want this node to connect up to a previously connected declaration. 
+	if (Declaration)
+	{
+		DeclarationGuid = Declaration->VariableGuid;
+	}
+
+	// Save that Declaration change
+	MarkPackageDirty();
 }
 #endif // WITH_EDITOR
 
