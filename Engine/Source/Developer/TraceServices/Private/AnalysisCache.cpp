@@ -26,11 +26,18 @@ FAnalysisCache::FFileContents::FFileContents(const TCHAR* FilePath)
 	: CacheFilePath(FilePath)
 {
 	IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
+
+	if (FParse::Param(FCommandLine::Get(), TEXT("disableanalysiscache")))
+	{
+		UE_LOG(LogAnalysisCache, Display, TEXT("Putting cache in transient mode."));
+		bTransientMode = true;
+		return;
+	}
 	
 	// Opening the file we can encounter one of 3 scenarios:
 	// 1. File does not exist, create on first save
 	// 2. File exist, we can read the contents
-	// 3. File exist but we could not open the file for reading. Multiple processes are competing. Put the cache in transient mode.
+	// 3. File exist but we could not open the file for reading. Multiple processes are competing. Put the cache in transient mode
 	if (PlatformFile.FileExists(*CacheFilePath))
 	{
 		if (const TUniquePtr<IFileHandle> File(PlatformFile.OpenRead(*CacheFilePath)); File.IsValid())
