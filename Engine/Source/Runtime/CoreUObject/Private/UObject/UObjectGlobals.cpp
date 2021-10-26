@@ -2777,12 +2777,12 @@ FObjectInitializer::FObjectInitializer(UObject* InObj, const FStaticConstructObj
 	Construct_Internal();
 }	
 
-FObjectInitializer::FObjectInitializer(UObject* InObj, UObject* InObjectArchetype, bool bInCopyTransientsFromClassDefaults, bool bInShouldInitializeProps, struct FObjectInstancingGraph* InInstanceGraph)
+FObjectInitializer::FObjectInitializer(UObject* InObj, UObject* InObjectArchetype, EObjectInitializerOptions InOptions, struct FObjectInstancingGraph* InInstanceGraph)
 	: Obj(InObj)
 	, ObjectArchetype(InObjectArchetype)
 	  // if the SubobjectRoot NULL, then we want to copy the transients from the template, otherwise we are doing a duplicate and we want to copy the transients from the class defaults
-	, bCopyTransientsFromClassDefaults(bInCopyTransientsFromClassDefaults)
-	, bShouldInitializePropsFromArchetype(bInShouldInitializeProps)
+	, bCopyTransientsFromClassDefaults(!!(InOptions & EObjectInitializerOptions::CopyTransientsFromClassDefaults))
+	, bShouldInitializePropsFromArchetype(!!(InOptions & EObjectInitializerOptions::InitializeProperties))
 	, InstanceGraph(InInstanceGraph)
 {
 	Construct_Internal();

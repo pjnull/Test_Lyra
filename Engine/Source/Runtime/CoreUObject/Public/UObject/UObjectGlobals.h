@@ -794,6 +794,15 @@ bool StaticAllocateObjectErrorTests( const UClass* Class, UObject* InOuter, FNam
  */
 COREUOBJECT_API UObject* StaticAllocateObject(const UClass* Class, UObject* InOuter, FName Name, EObjectFlags SetFlags, EInternalObjectFlags InternalSetFlags = EInternalObjectFlags::None, bool bCanReuseSubobjects = false, bool* bOutReusedSubobject = nullptr, UPackage* ExternalPackage = nullptr);
 
+/** FObjectInitializer options */
+enum class EObjectInitializerOptions
+{
+	None							= 0,
+	CopyTransientsFromClassDefaults = 1 << 0, // copy transient from the class defaults instead of the pass in archetype ptr
+	InitializeProperties			= 1 << 1, // initialize property values with the archetype values
+};
+ENUM_CLASS_FLAGS(EObjectInitializerOptions)
+
 /**
  * Internal class to finalize UObject creation (initialize properties) after the real C++ constructor is called.
  **/
@@ -809,11 +818,19 @@ public:
 	 * Constructor
 	 * @param	InObj object to initialize, from static allocate object, after construction
 	 * @param	InObjectArchetype object to initialize properties from
-	 * @param	bInCopyTransientsFromClassDefaults - if true, copy transient from the class defaults instead of the pass in archetype ptr (often these are the same)
-	 * @param	bInShouldInitializeProps false is a special case for changing base classes in UCCMake
+	 * @param	InOptions initialization options, see EObjectInitializerOptions
 	 * @param	InInstanceGraph passed instance graph
 	 */
-	FObjectInitializer(UObject* InObj, UObject* InObjectArchetype, bool bInCopyTransientsFromClassDefaults, bool bInShouldInitializeProps, struct FObjectInstancingGraph* InInstanceGraph = nullptr);
+	FObjectInitializer(UObject* InObj, UObject* InObjectArchetype, EObjectInitializerOptions InOptions, struct FObjectInstancingGraph* InInstanceGraph = nullptr);
+
+	UE_DEPRECATED(5.01, "Use version that takes EObjectInitializerOptions")
+	FObjectInitializer(UObject* InObj, UObject* InObjectArchetype, bool bInCopyTransientsFromClassDefaults, bool bInShouldInitializeProps, struct FObjectInstancingGraph* InInstanceGraph = nullptr)
+		: FObjectInitializer(InObj, InObjectArchetype, 
+			(bInCopyTransientsFromClassDefaults ? EObjectInitializerOptions::CopyTransientsFromClassDefaults : EObjectInitializerOptions::None) |
+			(bInShouldInitializeProps ? EObjectInitializerOptions::InitializeProperties : EObjectInitializerOptions::None),
+			InInstanceGraph)
+	{
+	}
 
 	/** Special constructor for static construct object internal that passes along the params block directly */
 	FObjectInitializer(UObject* InObj, const FStaticConstructObjectParameters& StaticConstructParams);
