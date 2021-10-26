@@ -422,6 +422,8 @@ namespace UnrealBuildTool
 		/// <returns>Zero on success, non-zero on error</returns>
 		private static int Main(string[] ArgumentsArray)
 		{
+			StructuredLogging.Configure();
+
 			SingleInstanceMutex? Mutex = null;
 			JsonTracer? Tracer = null;
 			

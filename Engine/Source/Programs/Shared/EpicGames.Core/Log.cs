@@ -12,8 +12,6 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using JetBrains.Annotations;
 
-#nullable disable
-
 namespace EpicGames.Core
 {
 	/// <summary>
@@ -152,7 +150,7 @@ namespace EpicGames.Core
 		/// <summary>
 		/// Path to the log file being written to. May be null.
 		/// </summary>
-		public static FileReference OutputFile => DefaultLogger.OutputFile;
+		public static FileReference? OutputFile => DefaultLogger?.OutputFile;
 
 
 		/// <summary>
@@ -230,7 +228,7 @@ namespace EpicGames.Core
 		/// <param name="Format">Message format string.</param>
 		/// <param name="Args">Optional arguments</param>
 		[StringFormatMethod("Format")]
-		private static void WriteLinePrivate(bool bWriteOnce, LogEventType Verbosity, LogFormatOptions FormatOptions, string Format, params object[] Args)
+		private static void WriteLinePrivate(bool bWriteOnce, LogEventType Verbosity, LogFormatOptions FormatOptions, string Format, params object?[] Args)
 		{
 			if (Logger.IsEnabled((LogLevel)Verbosity))
 			{
@@ -243,7 +241,7 @@ namespace EpicGames.Core
 					if (Message.Length > 0 && IncludeProgramNameWithSeverityPrefix)
 					{
 						// Include the executable name when running inside MSBuild. If unspecified, MSBuild re-formats them with an "EXEC :" prefix.
-						Message.Insert(0, $"{Path.GetFileNameWithoutExtension(Assembly.GetEntryAssembly().Location)}: ");
+						Message.Insert(0, $"{Path.GetFileNameWithoutExtension(Assembly.GetEntryAssembly()!.Location)}: ");
 					}
 				}
 
@@ -304,7 +302,7 @@ namespace EpicGames.Core
 		/// <param name="Format"></param>
 		/// <param name="Args"></param>
 		[StringFormatMethod("Format")]
-		public static void WriteLineIf(bool Condition, LogEventType Verbosity, string Format, params object[] Args)
+		public static void WriteLineIf(bool Condition, LogEventType Verbosity, string Format, params object?[] Args)
 		{
 			if (Condition)
 			{
@@ -321,7 +319,7 @@ namespace EpicGames.Core
 		/// <param name="Args"></param>
 		[Obsolete("StackFramesToSkip has been deprecated since 5.0. Please call an override without this parameter")]
 		[StringFormatMethod("Format")]
-		public static void WriteLine(int StackFramesToSkip, LogEventType Verbosity, string Format, params object[] Args)
+		public static void WriteLine(int StackFramesToSkip, LogEventType Verbosity, string Format, params object?[] Args)
 		{
 			WriteLinePrivate(false, Verbosity, LogFormatOptions.None, Format, Args);
 		}
@@ -336,7 +334,7 @@ namespace EpicGames.Core
 		/// <param name="Args"></param>
 		[Obsolete("StackFramesToSkip has been deprecated since 5.0. Please call an override without this parameter")]
 		[StringFormatMethod("Format")]
-		public static void WriteLine(int StackFramesToSkip, LogEventType Verbosity, LogFormatOptions FormatOptions, string Format, params object[] Args)
+		public static void WriteLine(int StackFramesToSkip, LogEventType Verbosity, LogFormatOptions FormatOptions, string Format, params object?[] Args)
 		{
 			WriteLinePrivate(false, Verbosity, FormatOptions, Format, Args);
 		}
@@ -348,7 +346,7 @@ namespace EpicGames.Core
 		/// <param name="Format"></param>
 		/// <param name="Args"></param>
 		[StringFormatMethod("Format")]
-		public static void WriteLine(LogEventType Verbosity, string Format, params object[] Args)
+		public static void WriteLine(LogEventType Verbosity, string Format, params object?[] Args)
 		{
 			WriteLinePrivate(false, Verbosity, LogFormatOptions.None, Format, Args);
 		}
@@ -361,7 +359,7 @@ namespace EpicGames.Core
 		/// <param name="Format"></param>
 		/// <param name="Args"></param>
 		[StringFormatMethod("Format")]
-		public static void WriteLine(LogEventType Verbosity, LogFormatOptions FormatOptions, string Format, params object[] Args)
+		public static void WriteLine(LogEventType Verbosity, LogFormatOptions FormatOptions, string Format, params object?[] Args)
 		{
 			WriteLinePrivate(false, Verbosity, FormatOptions, Format, Args);
 		}
@@ -371,7 +369,7 @@ namespace EpicGames.Core
 		/// </summary>
 		/// <param name="Ex">The exception to display</param>
 		/// <param name="LogFileName">The log filename to display, if any</param>
-		public static void WriteException(Exception Ex, string LogFileName)
+		public static void WriteException(Exception Ex, string? LogFileName)
 		{
 			string LogSuffix = (LogFileName == null) ? "" : String.Format("\n(see {0} for full exception trace)", LogFileName);
 			TraceLog("==============================================================================");
@@ -386,7 +384,7 @@ namespace EpicGames.Core
 		/// <param name="Format">Message format string</param>
 		/// <param name="Args">Optional arguments</param>
 		[StringFormatMethod("Format")]
-		public static void TraceError(string Format, params object[] Args)
+		public static void TraceError(string Format, params object?[] Args)
 		{
 			WriteLinePrivate(false, LogEventType.Error, LogFormatOptions.None, Format, Args);
 		}
@@ -398,7 +396,7 @@ namespace EpicGames.Core
 		/// <param name="Format">Message format string</param>
 		/// <param name="Args">Optional arguments</param>
 		[StringFormatMethod("Format")]
-		public static void TraceErrorTask(FileReference File, string Format, params object[] Args)
+		public static void TraceErrorTask(FileReference File, string Format, params object?[] Args)
 		{
 			WriteLinePrivate(false, LogEventType.Error, LogFormatOptions.NoSeverityPrefix, "{0}: error: {1}", File, String.Format(Format, Args));
 		}
@@ -411,7 +409,7 @@ namespace EpicGames.Core
 		/// <param name="Format">Message format string</param>
 		/// <param name="Args">Optional arguments</param>
 		[StringFormatMethod("Format")]
-		public static void TraceErrorTask(FileReference File, int Line, string Format, params object[] Args)
+		public static void TraceErrorTask(FileReference File, int Line, string Format, params object?[] Args)
 		{
 			WriteLinePrivate(false, LogEventType.Error, LogFormatOptions.NoSeverityPrefix, "{0}({1}): error: {2}", File, Line, String.Format(Format, Args));
 		}
@@ -423,7 +421,7 @@ namespace EpicGames.Core
 		/// <param name="Args">Optional arguments</param>
 		[Conditional("TRACE")]
 		[StringFormatMethod("Format")]
-		public static void TraceVerbose(string Format, params object[] Args)
+		public static void TraceVerbose(string Format, params object?[] Args)
 		{
 			WriteLinePrivate(false, LogEventType.Verbose, LogFormatOptions.None, Format, Args);
 		}
@@ -434,7 +432,7 @@ namespace EpicGames.Core
 		/// <param name="Format">Message format string</param>
 		/// <param name="Args">Optional arguments</param>
 		[StringFormatMethod("Format")]
-		public static void TraceInformation(string Format, params object[] Args)
+		public static void TraceInformation(string Format, params object?[] Args)
 		{
 			WriteLinePrivate(false, LogEventType.Console, LogFormatOptions.None, Format, Args);
 		}
@@ -445,7 +443,7 @@ namespace EpicGames.Core
 		/// <param name="Format">Message format string</param>
 		/// <param name="Args">Optional arguments</param>
 		[StringFormatMethod("Format")]
-		public static void TraceWarning(string Format, params object[] Args)
+		public static void TraceWarning(string Format, params object?[] Args)
 		{
 			WriteLinePrivate(false, LogEventType.Warning, LogFormatOptions.None, Format, Args);
 		}
@@ -457,7 +455,7 @@ namespace EpicGames.Core
 		/// <param name="Format">Message format string</param>
 		/// <param name="Args">Optional arguments</param>
 		[StringFormatMethod("Format")]
-		public static void TraceWarningTask(FileReference File, string Format, params object[] Args)
+		public static void TraceWarningTask(FileReference File, string Format, params object?[] Args)
 		{
 			WriteLinePrivate(false, LogEventType.Warning, LogFormatOptions.NoSeverityPrefix, "{0}: warning: {1}", File, String.Format(Format, Args));
 		}
@@ -470,7 +468,7 @@ namespace EpicGames.Core
 		/// <param name="Format">Message format string</param>
 		/// <param name="Args">Optional arguments</param>
 		[StringFormatMethod("Format")]
-		public static void TraceWarningTask(FileReference File, int Line, string Format, params object[] Args)
+		public static void TraceWarningTask(FileReference File, int Line, string Format, params object?[] Args)
 		{
 			WriteLinePrivate(false, LogEventType.Warning, LogFormatOptions.NoSeverityPrefix, "{0}({1}): warning: {2}", File, Line, String.Format(Format, Args));
 		}
@@ -482,7 +480,7 @@ namespace EpicGames.Core
 		/// <param name="Line">Line number of the message</param>
 		/// <param name="Format">Message format string</param>
 		/// <param name="Args">Optional arguments</param>
-		public static void TraceConsoleTask(FileReference File, int Line, string Format, params object[] Args)
+		public static void TraceConsoleTask(FileReference File, int Line, string Format, params object?[] Args)
 		{
 			WriteLinePrivate(false, LogEventType.Console, LogFormatOptions.NoSeverityPrefix, "{0}({1}): {2}", File, Line, String.Format(Format, Args));
 		}
@@ -495,7 +493,7 @@ namespace EpicGames.Core
 		/// <param name="Args">Optional arguments</param>
 		[Conditional("TRACE")]
 		[StringFormatMethod("Format")]
-		public static void TraceVeryVerbose(string Format, params object[] Args)
+		public static void TraceVeryVerbose(string Format, params object?[] Args)
 		{
 			WriteLinePrivate(false, LogEventType.VeryVerbose, LogFormatOptions.None, Format, Args);
 		}
@@ -507,7 +505,7 @@ namespace EpicGames.Core
 		/// <param name="Args">Optional arguments</param>
 		[Conditional("TRACE")]
 		[StringFormatMethod("Format")]
-		public static void TraceLog(string Format, params object[] Args)
+		public static void TraceLog(string Format, params object?[] Args)
 		{
 			WriteLinePrivate(false, LogEventType.Log, LogFormatOptions.None, Format, Args);
 		}
@@ -519,7 +517,7 @@ namespace EpicGames.Core
 		/// <param name="Format"></param>
 		/// <param name="Args"></param>
 		[StringFormatMethod("Format")]
-		public static void WriteLineOnce(LogEventType Verbosity, string Format, params object[] Args)
+		public static void WriteLineOnce(LogEventType Verbosity, string Format, params object?[] Args)
 		{
 			WriteLinePrivate(true, Verbosity, LogFormatOptions.None, Format, Args);
 		}
@@ -532,7 +530,7 @@ namespace EpicGames.Core
 		/// <param name="Format"></param>
 		/// <param name="Args"></param>
 		[StringFormatMethod("Format")]
-		public static void WriteLineOnce(LogEventType Verbosity, LogFormatOptions Options, string Format, params object[] Args)
+		public static void WriteLineOnce(LogEventType Verbosity, LogFormatOptions Options, string Format, params object?[] Args)
 		{
 			WriteLinePrivate(true, Verbosity, Options, Format, Args);
 		}
@@ -543,7 +541,7 @@ namespace EpicGames.Core
 		/// <param name="Format">Message format string</param>
 		/// <param name="Args">Optional arguments</param>
 		[StringFormatMethod("Format")]
-		public static void TraceErrorOnce(string Format, params object[] Args)
+		public static void TraceErrorOnce(string Format, params object?[] Args)
 		{
 			WriteLinePrivate(true, LogEventType.Error, LogFormatOptions.None, Format, Args);
 		}
@@ -555,7 +553,7 @@ namespace EpicGames.Core
 		/// <param name="Args">Optional arguments</param>
 		[Conditional("TRACE")]
 		[StringFormatMethod("Format")]
-		public static void TraceVerboseOnce(string Format, params object[] Args)
+		public static void TraceVerboseOnce(string Format, params object?[] Args)
 		{
 			WriteLinePrivate(true, LogEventType.Verbose, LogFormatOptions.None, Format, Args);
 		}
@@ -566,7 +564,7 @@ namespace EpicGames.Core
 		/// <param name="Format">Message format string</param>
 		/// <param name="Args">Optional arguments</param>
 		[StringFormatMethod("Format")]
-		public static void TraceInformationOnce(string Format, params object[] Args)
+		public static void TraceInformationOnce(string Format, params object?[] Args)
 		{
 			WriteLinePrivate(true, LogEventType.Console, LogFormatOptions.None, Format, Args);
 		}
@@ -577,7 +575,7 @@ namespace EpicGames.Core
 		/// <param name="Format">Message format string</param>
 		/// <param name="Args">Optional arguments</param>
 		[StringFormatMethod("Format")]
-		public static void TraceWarningOnce(string Format, params object[] Args)
+		public static void TraceWarningOnce(string Format, params object?[] Args)
 		{
 			WriteLinePrivate(true, LogEventType.Warning, LogFormatOptions.None, Format, Args);
 		}
@@ -589,7 +587,7 @@ namespace EpicGames.Core
 		/// <param name="Format">Message format string</param>
 		/// <param name="Args">Optional arguments</param>
 		[StringFormatMethod("Format")]
-		public static void TraceWarningOnce(FileReference File, string Format, params object[] Args)
+		public static void TraceWarningOnce(FileReference File, string Format, params object?[] Args)
 		{
 			WriteLinePrivate( true, LogEventType.Warning, LogFormatOptions.NoSeverityPrefix, "{0}: warning: {1}", File, String.Format(Format, Args));
 		}
@@ -602,7 +600,7 @@ namespace EpicGames.Core
 		/// <param name="Format">Message format string</param>
 		/// <param name="Args">Optional arguments</param>
 		[StringFormatMethod("Format")]
-		public static void TraceWarningOnce(FileReference File, int Line, string Format, params object[] Args)
+		public static void TraceWarningOnce(FileReference File, int Line, string Format, params object?[] Args)
 		{
 			WriteLinePrivate(true, LogEventType.Warning, LogFormatOptions.NoSeverityPrefix, "{0}({1}): warning: {2}", File, Line, String.Format(Format, Args));
 		}
@@ -614,7 +612,7 @@ namespace EpicGames.Core
 		/// <param name="Args">Optional arguments</param>
 		[Conditional("TRACE")]
 		[StringFormatMethod("Format")]
-		public static void TraceVeryVerboseOnce(string Format, params object[] Args)
+		public static void TraceVeryVerboseOnce(string Format, params object?[] Args)
 		{
 			WriteLinePrivate(true, LogEventType.VeryVerbose, LogFormatOptions.None, Format, Args);
 		}
@@ -626,7 +624,7 @@ namespace EpicGames.Core
 		/// <param name="Args">Optional arguments</param>
 		[Conditional("TRACE")]
 		[StringFormatMethod("Format")]
-		public static void TraceLogOnce(string Format, params object[] Args)
+		public static void TraceLogOnce(string Format, params object?[] Args)
 		{
 			WriteLinePrivate(true, LogEventType.Log, LogFormatOptions.None, Format, Args);
 		}
@@ -688,6 +686,15 @@ namespace EpicGames.Core
 			/// Whether the heading has been written to the console. Before the first time that lines are output to the log in the midst of a status scope, the heading will be written on a line of its own first.
 			/// </summary>
 			public bool bHasFlushedHeadingText;
+
+			/// <summary>
+			/// Constructor
+			/// </summary>
+			public StatusMessage(string HeadingText, string CurrentText)
+			{
+				this.HeadingText = HeadingText;
+				this.CurrentText = CurrentText;
+			}
 		}
 
 		/// <summary>
@@ -731,7 +738,7 @@ namespace EpicGames.Core
 		/// <summary>
 		/// Path to the log file being written to. May be null.
 		/// </summary>
-		public FileReference OutputFile
+		public FileReference? OutputFile
 		{
 			get; private set;
 		}
@@ -849,7 +856,7 @@ namespace EpicGames.Core
 		/// <returns>True if a TextWriterTraceListener has been added</returns>
 		public static bool HasFileWriter()
 		{
-			foreach (TraceListener Listener in Trace.Listeners)
+			foreach (TraceListener? Listener in Trace.Listeners)
 			{
 				if (Listener is TextWriterTraceListener)
 				{
@@ -876,19 +883,22 @@ namespace EpicGames.Core
 			{
 				// Output to all the other trace listeners
 				string TimePrefix = String.Format("[{0:hh\\:mm\\:ss\\.fff}] ", Timer.Elapsed);
-				foreach (TraceListener Listener in Trace.Listeners)
+				foreach (TraceListener? Listener in Trace.Listeners)
 				{
-					string TimePrefixActual = 
-						IncludeTimestamps &&
-						!(Listener is DefaultTraceListener) // no timestamps when writing to the Visual Studio debug window
-						? TimePrefix
-						: String.Empty;
-
-					foreach (string Line in Lines)
+					if (Listener != null)
 					{
-						string LineWithTime = TimePrefixActual + Line;
-						Listener.WriteLine(Line);
-						Listener.Flush();
+						string TimePrefixActual =
+							IncludeTimestamps &&
+							!(Listener is DefaultTraceListener) // no timestamps when writing to the Visual Studio debug window
+							? TimePrefix
+							: String.Empty;
+
+						foreach (string Line in Lines)
+						{
+							string LineWithTime = TimePrefixActual + Line;
+							Listener.WriteLine(Line);
+							Listener.Flush();
+						}
 					}
 				}
 
@@ -975,9 +985,7 @@ namespace EpicGames.Core
 			{
 				FlushStatusHeading();
 
-				StatusMessage NewStatusMessage = new StatusMessage();
-				NewStatusMessage.HeadingText = Message;
-				NewStatusMessage.CurrentText = Message;
+				StatusMessage NewStatusMessage = new StatusMessage(Message, Message);
 				StatusMessageStack.Push(NewStatusMessage);
 
 				StatusTimer.Restart();
