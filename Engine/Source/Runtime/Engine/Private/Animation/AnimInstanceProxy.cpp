@@ -43,14 +43,14 @@ const FName NAME_AnimGraph(TEXT("AnimGraph"));
 
 void FAnimInstanceProxy::UpdateAnimationNode(const FAnimationUpdateContext& InContext)
 {
-	TRACE_SCOPED_ANIM_GRAPH(InContext);
-	TRACE_SCOPED_ANIM_NODE(InContext);
-
 	UpdateAnimationNode_WithRoot(InContext, RootNode, NAME_AnimGraph);
 }
 
 void FAnimInstanceProxy::UpdateAnimationNode_WithRoot(const FAnimationUpdateContext& InContext, FAnimNode_Base* InRootNode, FName InLayerName)
 {
+	TRACE_SCOPED_ANIM_GRAPH(InContext)
+	TRACE_SCOPED_ANIM_NODE(InContext)
+	
 	DECLARE_SCOPE_HIERARCHICAL_COUNTER_FUNC()
 	if(InRootNode != nullptr)
 	{
@@ -1202,13 +1202,12 @@ void FAnimInstanceProxy::PreEvaluateAnimation(UAnimInstance* InAnimInstance)
 
 void FAnimInstanceProxy::EvaluateAnimation(FPoseContext& Output)
 {
-	TRACE_SCOPED_ANIM_GRAPH(Output);
-
 	EvaluateAnimation_WithRoot(Output, RootNode);
 }
 
 void FAnimInstanceProxy::EvaluateAnimation_WithRoot(FPoseContext& Output, FAnimNode_Base* InRootNode)
 {
+	TRACE_SCOPED_ANIM_GRAPH(Output);
 	DECLARE_SCOPE_HIERARCHICAL_COUNTER_FUNC()
 
 	ANIM_MT_SCOPE_CYCLE_COUNTER(EvaluateAnimInstance, !IsInGameThread());
@@ -1298,6 +1297,7 @@ void FAnimInstanceProxy::EvaluateAnimationNode_WithRoot(FPoseContext& Output, FA
 
 			if(AnimClassInterface && AnimClassInterface->GetAnimBlueprintFunctions().Num() > 0)
 			{
+				Output.SetNodeId(INDEX_NONE);
 				Output.SetNodeId(AnimClassInterface->GetAnimBlueprintFunctions()[0].OutputPoseNodeIndex);
 			}
 		}
