@@ -84,17 +84,15 @@ void SLevelSnapshotsEditorBrowser::SelectAsset(const FAssetData& InAssetData) co
 
 TSharedRef<SToolTip> SLevelSnapshotsEditorBrowser::CreateCustomTooltip(FAssetData& AssetData)
 {
-	const uint32 ThumbnailSize = 256;
-			
-	const TSharedRef<FAssetThumbnail> AssetThumbnail =
-		MakeShareable(new FAssetThumbnail(
-			AssetData.GetAsset(), ThumbnailSize, ThumbnailSize, UThumbnailManager::Get().GetSharedThumbnailPool()));
+	constexpr uint32 ThumbnailSize = 256;
+	TSharedRef<FAssetThumbnail> AssetThumbnail = MakeShared<FAssetThumbnail>(AssetData, ThumbnailSize, ThumbnailSize, UThumbnailManager::Get().GetSharedThumbnailPool());
+	
 	FAssetThumbnailConfig AssetThumbnailConfig;
 	AssetThumbnailConfig.bAllowFadeIn = false;
 	AssetThumbnailConfig.bAllowRealTimeOnHovered = false;
 	AssetThumbnailConfig.bForceGenericThumbnail = false;
 			
-	TSharedRef<SToolTip> NewTooltip = SNew(SToolTip)
+	return SNew(SToolTip)
 	[
 		SNew(SBox)
 		.WidthOverride(ThumbnailSize)
@@ -104,8 +102,6 @@ TSharedRef<SToolTip> SLevelSnapshotsEditorBrowser::CreateCustomTooltip(FAssetDat
 			AssetThumbnail->MakeThumbnailWidget(AssetThumbnailConfig)
 		]
 	];
-			
-	return NewTooltip;
 }
 
 TArray<FAssetViewCustomColumn> SLevelSnapshotsEditorBrowser::GetCustomColumns() const
