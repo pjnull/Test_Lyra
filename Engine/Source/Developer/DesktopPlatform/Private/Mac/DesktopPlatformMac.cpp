@@ -209,7 +209,7 @@ private:
 	SelectedExtension = index;
 
 	NSString* ExtsToParse = [AllowedFileTypes objectAtIndex:index];
-	if( [ExtsToParse compare:@"*.*"] == NSOrderedSame )
+	if( [ExtsToParse containsString:@"*.*"] )
 	{
 		[DialogPanel setAllowedFileTypes: nil];
 	}
