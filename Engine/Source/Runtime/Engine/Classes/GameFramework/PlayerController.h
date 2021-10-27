@@ -831,6 +831,20 @@ public:
 	virtual void ClientUnmutePlayer(FUniqueNetIdRepl PlayerId);
 
 	/**
+	 * Tell the client to block a player for this controller
+	 * @param PlayerId player id to block
+	 */
+	UFUNCTION(server, reliable, WithValidation)
+	virtual void ServerBlockPlayer(FUniqueNetIdRepl PlayerId);
+
+	/**
+	 * Tell the client to unblock a player for this controller
+	 * @param PlayerId player id to unblock
+	 */
+	UFUNCTION(server, reliable, WithValidation)
+	virtual void ServerUnblockPlayer(FUniqueNetIdRepl PlayerId);
+
+	/**
 	 * Mutes a remote player on the server and then tells the client to mute
 	 *
 	 * @param PlayerNetId the remote player to mute

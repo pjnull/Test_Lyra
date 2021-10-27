@@ -3529,12 +3529,7 @@ void APlayerController::ServerMutePlayer_Implementation(FUniqueNetIdRepl PlayerI
 
 bool APlayerController::ServerMutePlayer_Validate(FUniqueNetIdRepl PlayerId)
 {
-	if (!PlayerId.IsValid())
-	{
-		return false;
-	}
-
-	return true;
+	return PlayerId.IsValid();
 }
 
 void APlayerController::ServerUnmutePlayer_Implementation(FUniqueNetIdRepl PlayerId)
@@ -3544,22 +3539,53 @@ void APlayerController::ServerUnmutePlayer_Implementation(FUniqueNetIdRepl Playe
 
 bool APlayerController::ServerUnmutePlayer_Validate(FUniqueNetIdRepl PlayerId)
 {
-	if (!PlayerId.IsValid())
-	{
-		return false;
-	}
-
-	return true;
+	return PlayerId.IsValid();
 }
 
 void APlayerController::ClientMutePlayer_Implementation(FUniqueNetIdRepl PlayerId)
 {
-	MuteList.ClientMutePlayer(this, PlayerId);
+	// Use the local player to determine the controller id
+	ULocalPlayer* LP = Cast<ULocalPlayer>(Player);
+	UWorld* World = GetWorld();
+
+	if (LP != NULL && World)
+	{
+		// Have the voice subsystem mute this player
+		UOnlineEngineInterface::Get()->MuteRemoteTalker(World, LP->GetControllerId(), *PlayerId, false);
+	}
 }
 
 void APlayerController::ClientUnmutePlayer_Implementation(FUniqueNetIdRepl PlayerId)
 {
-	MuteList.ClientUnmutePlayer(this, PlayerId);
+	// Use the local player to determine the controller id
+	ULocalPlayer* LP = Cast<ULocalPlayer>(Player);
+	UWorld* World = GetWorld();
+
+	if (LP != NULL && World)
+	{
+		// Have the voice subsystem unmute this player
+		UOnlineEngineInterface::Get()->UnmuteRemoteTalker(World, LP->GetControllerId(), *PlayerId, false);
+	}
+}
+
+void APlayerController::ServerBlockPlayer_Implementation(FUniqueNetIdRepl PlayerId)
+{
+	MuteList.ServerBlockPlayer(this, PlayerId);
+}
+
+bool APlayerController::ServerBlockPlayer_Validate(FUniqueNetIdRepl PlayerId)
+{
+	return PlayerId.IsValid() && PlayerState->GetUniqueId().IsValid();
+}
+
+void APlayerController::ServerUnblockPlayer_Implementation(FUniqueNetIdRepl PlayerId)
+{
+	MuteList.ServerUnblockPlayer(this, PlayerId);
+}
+
+bool APlayerController::ServerUnblockPlayer_Validate(FUniqueNetIdRepl PlayerId)
+{
+	return PlayerId.IsValid() && PlayerState->GetUniqueId().IsValid();
 }
 
 /// @endcond
