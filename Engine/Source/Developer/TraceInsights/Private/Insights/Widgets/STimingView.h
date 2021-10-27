@@ -485,6 +485,7 @@ protected:
 
 	TSharedRef<SDockTab> SpawnQuickFindTab(const FSpawnTabArgs& Args);
 	void PopulateTrackSuggestionList(const FString& Text, TArray<FString>& OutSuggestions);
+	void PopulateTimerNameSuggestionList(const FString& Text, TArray<FString>& OutSuggestions);
 
 	typedef TFunctionRef<void(TSharedPtr<FBaseTimingTrack>& Track)> EnumerateFilteredTracksCallback;
 	void EnumerateFilteredTracks(TSharedPtr<Insights::FFilterConfigurator> FilterConfigurator, EnumerateFilteredTracksCallback Callback);

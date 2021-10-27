@@ -25,6 +25,7 @@ enum class EFilterDataType : uint32
 	Int64,
 	Double,
 	String,
+	StringInt64Pair, // Displayed as a string but translates to a Int64 key.
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

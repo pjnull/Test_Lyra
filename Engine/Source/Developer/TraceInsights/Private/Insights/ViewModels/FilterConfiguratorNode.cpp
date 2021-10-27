@@ -198,6 +198,14 @@ void FFilterConfiguratorNode::ProcessFilter()
 			FilterValue.Set<FString>(TextBoxValue);
 			break;
 		}
+		case EFilterDataType::StringInt64Pair:
+		{
+			checkf(SelectedFilter->Convertor.IsValid(), TEXT("StringToInt64Pair filters must have a convertor set"));
+			int64 Value = 0;
+			FText Errors;
+			bool Result = SelectedFilter->Convertor->Convert(TextBoxValue, Value, Errors);
+			FilterValue.Set<int64>(Result ? Value : -1);
+		}
 		}
 	}
 }
@@ -256,6 +264,7 @@ bool FFilterConfiguratorNode::ApplyFilters(const FFilterContext& Context) const
 			break;
 		}
 		case EFilterDataType::Int64:
+		case EFilterDataType::StringInt64Pair:
 		{
 			FFilterOperator<int64>* Operator = (FFilterOperator<int64>*) SelectedFilterOperator.Get();
 			int64 Value = 0;

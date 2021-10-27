@@ -48,6 +48,7 @@
 #include "Insights/Tests/TimingProfilerTests.h"
 #include "Insights/TimingProfilerCommon.h"
 #include "Insights/TimingProfilerManager.h"
+#include "Insights/TimingProfiler/QuickFindFilterConverters.h"
 #include "Insights/ViewModels/BaseTimingTrack.h"
 #include "Insights/ViewModels/DrawHelpers.h"
 #include "Insights/ViewModels/FileActivityTimingTrack.h"
@@ -4750,21 +4751,35 @@ void STimingView::QuickFind_Execute()
 		AvailableFilters->Add(MakeShared<FFilter>(static_cast<int32>(EFilterField::StartTime), LOCTEXT("StartTime", "Start Time"), LOCTEXT("StartTime", "Start Time"), EFilterDataType::Double, FFilterService::Get()->GetDoubleOperators()));
 		AvailableFilters->Add(MakeShared<FFilter>(static_cast<int32>(EFilterField::EndTime), LOCTEXT("EndTime", "End Time"), LOCTEXT("EndTime", "End Time"), EFilterDataType::Double, FFilterService::Get()->GetDoubleOperators()));
 		AvailableFilters->Add(MakeShared<FFilter>(static_cast<int32>(EFilterField::Duration), LOCTEXT("Duration", "Duration"), LOCTEXT("Duration", "Duration"), EFilterDataType::Double, FFilterService::Get()->GetDoubleOperators()));
-		AvailableFilters->Add(MakeShared<FFilter>(static_cast<int32>(EFilterField::EventType), LOCTEXT("Type", "Type"), LOCTEXT("Type", "Type"), EFilterDataType::Int64, FFilterService::Get()->GetIntegerOperators()));
 
-		TSharedPtr<TArray<TSharedPtr<IFilterOperator>>>  TrackNameFilterOperators = MakeShared<TArray<TSharedPtr<IFilterOperator>>>();
-		TrackNameFilterOperators->Add(StaticCastSharedRef<IFilterOperator>(MakeShared<FFilterOperator<FString>>(EFilterOperator::Eq, TEXT("Is"), [](const FString& lhs, const FString& rhs) { return lhs.Equals(rhs); })));
-		TrackNameFilterOperators->Add(StaticCastSharedRef<IFilterOperator>(MakeShared<FFilterOperator<FString>>(EFilterOperator::Contains, TEXT("Contains"), [](const FString& lhs, const FString& rhs) { return lhs.Contains(rhs); })));
-		TrackNameFilterOperators->Add(StaticCastSharedRef<IFilterOperator>(MakeShared<FFilterOperator<FString>>(EFilterOperator::Contains, TEXT("Is Not"), [](const FString& lhs, const FString& rhs) { return !lhs.Equals(rhs); })));
-		TrackNameFilterOperators->Add(StaticCastSharedRef<IFilterOperator>(MakeShared<FFilterOperator<FString>>(EFilterOperator::Contains, TEXT("Does Not Contain"), [](const FString& lhs, const FString& rhs) { return !lhs.Contains(rhs); })));
+		TSharedPtr<TArray<TSharedPtr<IFilterOperator>>> StringFilterWithSuggestionsOperators = MakeShared<TArray<TSharedPtr<IFilterOperator>>>();
+		StringFilterWithSuggestionsOperators->Add(StaticCastSharedRef<IFilterOperator>(MakeShared<FFilterOperator<FString>>(EFilterOperator::Eq, TEXT("Is"), [](const FString& lhs, const FString& rhs) { return lhs.Equals(rhs); })));
+		StringFilterWithSuggestionsOperators->Add(StaticCastSharedRef<IFilterOperator>(MakeShared<FFilterOperator<FString>>(EFilterOperator::Contains, TEXT("Contains"), [](const FString& lhs, const FString& rhs) { return lhs.Contains(rhs); })));
+		StringFilterWithSuggestionsOperators->Add(StaticCastSharedRef<IFilterOperator>(MakeShared<FFilterOperator<FString>>(EFilterOperator::Contains, TEXT("Is Not"), [](const FString& lhs, const FString& rhs) { return !lhs.Equals(rhs); })));
+		StringFilterWithSuggestionsOperators->Add(StaticCastSharedRef<IFilterOperator>(MakeShared<FFilterOperator<FString>>(EFilterOperator::Contains, TEXT("Does Not Contain"), [](const FString& lhs, const FString& rhs) { return !lhs.Contains(rhs); })));
 
-		TSharedPtr<FFilterWithSuggestions> TrackFilter = MakeShared<FFilterWithSuggestions>(static_cast<int32>(EFilterField::TrackName), LOCTEXT("Track", "Track"), LOCTEXT("Track", "Track"), EFilterDataType::String, TrackNameFilterOperators);
+		TSharedPtr<FFilterWithSuggestions> TrackFilter = MakeShared<FFilterWithSuggestions>(static_cast<int32>(EFilterField::TrackName), LOCTEXT("Track", "Track"), LOCTEXT("Track", "Track"), EFilterDataType::String, StringFilterWithSuggestionsOperators);
 		TrackFilter->Callback = [this](const FString& Text, TArray<FString>& OutSuggestions)
 		{
 			this->PopulateTrackSuggestionList(Text, OutSuggestions);
 		};
 
 		AvailableFilters->Add(TrackFilter);
+
+		AvailableFilters->Add(MakeShared<FFilter>(static_cast<int32>(EFilterField::TimerId), LOCTEXT("TimerId", "Timer Id"), LOCTEXT("TimerId", "Timer Id"), EFilterDataType::Int64, FFilterService::Get()->GetIntegerOperators()));
+
+		TSharedPtr<TArray<TSharedPtr<IFilterOperator>>> EventNameFilterOperators = MakeShared<TArray<TSharedPtr<IFilterOperator>>>();
+		EventNameFilterOperators->Add(StaticCastSharedRef<IFilterOperator>(MakeShared<FFilterOperator<int64>>(EFilterOperator::Eq, TEXT("Is"), [](int64 lhs, int64 rhs) { return lhs == rhs; })));
+
+		TSharedPtr<FFilterWithSuggestions> TimerNameFilter = MakeShared<FFilterWithSuggestions>(static_cast<int32>(EFilterField::TimerName), LOCTEXT("TimerName", "Timer Name"), LOCTEXT("TimerName", "Timer Name"), EFilterDataType::StringInt64Pair, EventNameFilterOperators);
+		TimerNameFilter->Callback = [this](const FString& Text, TArray<FString>& OutSuggestions)
+		{
+			this->PopulateTimerNameSuggestionList(Text, OutSuggestions);
+		};
+
+		TimerNameFilter->Convertor = MakeShared<FEventNameFilterValueConverter>();
+
+		AvailableFilters->Add(TimerNameFilter);
 
 		QuickFindVm = MakeShared<FQuickFind>(FilterConfigurator);
 		QuickFindVm->GetOnFindNextEvent().AddSP(this, &STimingView::FindNextEvent);
@@ -5008,6 +5023,36 @@ void STimingView::PopulateTrackSuggestionList(const FString& Text, TArray<FStrin
 		if (Entry.Value->GetName().Contains(Text))
 		{
 			OutSuggestions.Add(Entry.Value->GetName());
+		}
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void STimingView::PopulateTimerNameSuggestionList(const FString& Text, TArray<FString>& OutSuggestions)
+{
+	TSharedPtr<const TraceServices::IAnalysisSession> Session = FInsightsManager::Get()->GetSession();
+	if (Session.IsValid() && TraceServices::ReadTimingProfilerProvider(*Session.Get()))
+	{
+		TraceServices::FAnalysisSessionReadScope SessionReadScope(*Session.Get());
+
+		const TraceServices::ITimingProfilerProvider& TimingProfilerProvider = *TraceServices::ReadTimingProfilerProvider(*Session.Get());
+
+		const TraceServices::ITimingProfilerTimerReader* TimerReader;
+		TimingProfilerProvider.ReadTimers([&TimerReader](const TraceServices::ITimingProfilerTimerReader& Out) { TimerReader = &Out; });
+
+		uint32 TimerCount = TimerReader->GetTimerCount();
+		for (uint32 TimerIndex = 0; TimerIndex < TimerCount; ++TimerIndex)
+		{
+			const TraceServices::FTimingProfilerTimer* Timer = TimerReader->GetTimer(TimerIndex);
+			if (Timer && Timer->Name)
+			{
+				const TCHAR* FoundString = FCString::Stristr(Timer->Name, *Text);
+				if (FoundString)
+				{
+					OutSuggestions.Add(Timer->Name);
+				}
+			}
 		}
 	}
 }
