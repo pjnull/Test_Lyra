@@ -3817,6 +3817,46 @@ static void TickLiveLink(ILiveLinkClient* LiveLinkClient, TMap<FGuid, ELiveLinkS
 		LiveLinkClient->ForceTick();
 	}
 }
+
+static void TickFrame(const FFrameNumber& FrameNumber,float DeltaTime, UMovieScene* MovieScene, UnFbx::FLevelSequenceAnimTrackAdapter& AnimTrackAdapter,
+	const TArray<IMovieSceneToolsAnimationBakeHelper*>& BakeHelpers, const TArray< USkeletalMeshComponent*>& SkelMeshComps, 
+	ILiveLinkClient* LiveLinkClient, TMap<FGuid, ELiveLinkSourceMode>& SourceAndMode)
+{
+	//Begin records a frame so need to set things up first
+	for (IMovieSceneToolsAnimationBakeHelper* BakeHelper : BakeHelpers)
+	{
+		if (BakeHelper)
+		{
+			BakeHelper->PreEvaluation(MovieScene, FrameNumber);
+		}
+	}
+	// This will call UpdateSkelPose on the skeletal mesh component to move bones based on animations in the matinee group
+	int32 Index = FrameNumber.Value;
+	AnimTrackAdapter.UpdateAnimation(Index);
+	for (IMovieSceneToolsAnimationBakeHelper* BakeHelper : BakeHelpers)
+	{
+		if (BakeHelper)
+		{
+			BakeHelper->PostEvaluation(MovieScene, FrameNumber);
+		}
+	}
+	//Live Link source can show up at any time so we unfortunately need to check for it
+	TickLiveLink(LiveLinkClient, SourceAndMode);
+
+	// Update space bases so new animation position has an effect.
+	for (USkeletalMeshComponent* SkelMeshComp : SkelMeshComps)
+	{
+		SkelMeshComp->TickAnimation(DeltaTime, false);
+
+		SkelMeshComp->RefreshBoneTransforms();
+		SkelMeshComp->RefreshSlaveComponents();
+		SkelMeshComp->UpdateComponentToWorld();
+		SkelMeshComp->FinalizeBoneTransform();
+		SkelMeshComp->MarkRenderTransformDirty();
+		SkelMeshComp->MarkRenderDynamicDataDirty();
+	}
+
+}
 bool MovieSceneToolHelpers::BakeToSkelMeshToCallbacks(UMovieScene* MovieScene, IMovieScenePlayer* Player,
 	USkeletalMeshComponent* InSkelMeshComp, FMovieSceneSequenceIDRef& Template, FMovieSceneSequenceTransform& RootToLocalTransform, UAnimSeqExportOption* ExportOptions,
 	FInitAnimationCB InitCallback, FStartAnimationCB StartCallback, FTickAnimationCB TickCallback, FEndAnimationCB EndCallback)
@@ -3883,116 +3923,35 @@ bool MovieSceneToolHelpers::BakeToSkelMeshToCallbacks(UMovieScene* MovieScene, I
 	}
 
 	InitCallback.ExecuteIfBound();
+	//if we have delay frames run them first at the LocalStartFrame - ExportOptions->WarmupFrames;
+	if (ExportOptions->DelayBeforeStart > 0)
+	{
+		FFrameNumber FrameNumber = FFrameNumber(LocalStartFrame) - ExportOptions->WarmUpFrames;
+		for (int32 Index = 0; Index < ExportOptions->DelayBeforeStart; ++Index)
+		{
+			TickFrame(FrameNumber, DeltaTime, MovieScene, AnimTrackAdapter, BakeHelpers, SkelMeshComps, LiveLinkClient, SourceAndMode);
+		}
 
+	}
 	//if we have warmup frames
 	if (ExportOptions->WarmUpFrames > 0)
 	{
 		for (int32 Index = -ExportOptions->WarmUpFrames.Value; Index < 0; ++Index)
 		{
-			//Begin records a frame so need to set things up first
-			for (IMovieSceneToolsAnimationBakeHelper* BakeHelper : BakeHelpers)
-			{
-				if (BakeHelper)
-				{
-					BakeHelper->PreEvaluation(MovieScene,Index);
-				}
-			}
-			// This will call UpdateSkelPose on the skeletal mesh component to move bones based on animations in the matinee group
-			AnimTrackAdapter.UpdateAnimation(Index);
-			for (IMovieSceneToolsAnimationBakeHelper* BakeHelper : BakeHelpers)
-			{
-				if (BakeHelper)
-				{
-					BakeHelper->PostEvaluation(MovieScene,Index);
-				}
-			}
-			//Live Link sourcer can show up at any time so we unfortunately need to check for it
-			TickLiveLink(LiveLinkClient, SourceAndMode);
-
-			// Update space bases so new animation position has an effect.
-			for (USkeletalMeshComponent* SkelMeshComp : SkelMeshComps)
-			{
-				SkelMeshComp->TickAnimation(DeltaTime, false);
-
-				SkelMeshComp->RefreshBoneTransforms();
-				SkelMeshComp->RefreshSlaveComponents();
-				SkelMeshComp->UpdateComponentToWorld();
-				SkelMeshComp->FinalizeBoneTransform();
-				SkelMeshComp->MarkRenderTransformDirty();
-				SkelMeshComp->MarkRenderDynamicDataDirty();
-			}
-
+			FFrameNumber FrameNumber = FFrameNumber(LocalStartFrame) - FFrameNumber(Index);
+			TickFrame(FrameNumber, DeltaTime, MovieScene, AnimTrackAdapter, BakeHelpers, SkelMeshComps, LiveLinkClient, SourceAndMode);
 		}
 	}
 	
-	//Begin records a frame so need to set things up first
-	for (IMovieSceneToolsAnimationBakeHelper* BakeHelper : BakeHelpers)
-	{
-		if (BakeHelper)
-		{
-			BakeHelper->PreEvaluation(MovieScene,LocalStartFrame);
-		}
-	}
-	// This evaluates the MoviePlayer
-	AnimTrackAdapter.UpdateAnimation(LocalStartFrame);
-	for (IMovieSceneToolsAnimationBakeHelper* BakeHelper : BakeHelpers)
-	{		
-		if (BakeHelper)
-		{
-			BakeHelper->PostEvaluation(MovieScene,LocalStartFrame);
-		}
-	}
-	for (USkeletalMeshComponent* SkelMeshComp : SkelMeshComps)
-	{
-		SkelMeshComp->TickAnimation(DeltaTime, false);
-		SkelMeshComp->RefreshBoneTransforms();
-		SkelMeshComp->RefreshSlaveComponents();
-		SkelMeshComp->UpdateComponentToWorld();
-		SkelMeshComp->FinalizeBoneTransform();
-		SkelMeshComp->MarkRenderTransformDirty();
-		SkelMeshComp->MarkRenderDynamicDataDirty();
-	}
-	
-	TickLiveLink(LiveLinkClient, SourceAndMode);
-
+	//BeginRecording, which happens in the Start Callback below, records a frame so need to set things up first at first frame, even if we had any delay or warmup
+	TickFrame(LocalStartFrame, DeltaTime, MovieScene, AnimTrackAdapter, BakeHelpers, SkelMeshComps, LiveLinkClient, SourceAndMode);
 	StartCallback.ExecuteIfBound();
+
 	for (int32 FrameCount = 1; FrameCount <= AnimationLength; ++FrameCount)
 	{
-		int32 LocalFrame = LocalStartFrame + FrameCount;
-
-		for (IMovieSceneToolsAnimationBakeHelper* BakeHelper : BakeHelpers)
-		{
-			if (BakeHelper)
-			{
-				BakeHelper->PreEvaluation(MovieScene, LocalStartFrame);
-			}
-		}
-		// This will call UpdateSkelPose on the skeletal mesh component to move bones based on animations in the matinee group
-		AnimTrackAdapter.UpdateAnimation(LocalFrame);
-		for (IMovieSceneToolsAnimationBakeHelper* BakeHelper : BakeHelpers)
-		{
-			if (BakeHelper)
-			{
-				BakeHelper->PostEvaluation(MovieScene, LocalStartFrame);
-			}
-		}
-
-		//Live Link sourcer can show up at any time so we unfortunately need to check for it
-		TickLiveLink(LiveLinkClient, SourceAndMode);
-
-		// Update space bases so new animation position has an effect.
-		for (USkeletalMeshComponent* SkelMeshComp : SkelMeshComps)
-		{
-			SkelMeshComp->TickAnimation(DeltaTime, false);
-
-			SkelMeshComp->RefreshBoneTransforms();
-			SkelMeshComp->RefreshSlaveComponents();
-			SkelMeshComp->UpdateComponentToWorld();
-			SkelMeshComp->FinalizeBoneTransform();
-			SkelMeshComp->MarkRenderTransformDirty();
-			SkelMeshComp->MarkRenderDynamicDataDirty();
-		}
-
+		int32 LocalIndex = LocalStartFrame + FrameCount;
+		FFrameNumber LocalFrame(LocalIndex);
+		TickFrame(LocalFrame, DeltaTime, MovieScene, AnimTrackAdapter, BakeHelpers, SkelMeshComps, LiveLinkClient, SourceAndMode);
 		TickCallback.ExecuteIfBound(DeltaTime);
 	}
 
