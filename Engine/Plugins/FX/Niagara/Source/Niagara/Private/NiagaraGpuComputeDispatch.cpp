@@ -470,7 +470,7 @@ void FNiagaraGpuComputeDispatch::ProcessPendingTicksFlush(FRHICommandListImmedia
 			ViewInitOptions.ViewRotationMatrix = FMatrix::Identity;
 			ViewInitOptions.ProjectionMatrix = FMatrix::Identity;
 
-			FViewInfo* DummyView = new(FMemStack::Get().Alloc(sizeof(FViewInfo), alignof(FViewInfo))) FViewInfo(ViewInitOptions);
+			FViewInfo* DummyView = new(FMemStack::Get()) FViewInfo(ViewInitOptions);
 
 			DummyView->ViewRect = DummyView->UnscaledViewRect;
 			DummyView->CachedViewUniformShaderParameters = MakeUnique<FViewUniformShaderParameters>();
