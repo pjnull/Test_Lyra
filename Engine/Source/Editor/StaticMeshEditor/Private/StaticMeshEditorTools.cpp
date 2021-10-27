@@ -3274,7 +3274,7 @@ void FLevelOfDetailSettingsLayout::AddToDetailsPanel( IDetailLayoutBuilder& Deta
 	}
 
 	LODSettingsCategory.AddCustomRow(LOCTEXT("QualityLevelMinLOD", "Quality Level Min LOD"))
-	.Visibility(bDisablePerPlatformMinLod ? EVisibility::Visible : EVisibility::Collapsed)
+	.Visibility(GEngine->UseStaticMeshMinLODPerQualityLevels ? EVisibility::Visible : EVisibility::Collapsed)
 	.RowTag("QualityLevelMinLOD")
 	.IsEnabled(IsMinLODEnabled)
 	.NameContent()
