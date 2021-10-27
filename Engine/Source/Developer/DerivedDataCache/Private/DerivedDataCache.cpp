@@ -127,6 +127,7 @@ namespace DerivedDataCacheCookStats
 					RootStats.PutStats.GetAccumulatedValue(FCookStats::CallStats::EHitOrMiss::Miss, FCookStats::CallStats::EStatType::Counter, false);
 				int64 TotalPuts = TotalPutHits + TotalPutMisses;
 
+#if UE_WITH_ZEN
 				if (ZenDDCKey)
 				{
 					LocalDDCKey = ZenDDCKey;
@@ -144,7 +145,8 @@ namespace DerivedDataCacheCookStats
 						SharedHits = ZenStats.CacheStats.UpstreamHits;
 					}
 				}
-	
+#endif // UE_WITH_ZEN
+
 				AddStat(TEXT("DDC.Summary"), FCookStatsManager::CreateKeyValueArray(
 					TEXT("BackEnd"), FDerivedDataBackend::Get().GetGraphName(),
 					TEXT("HasLocalCache"), LocalDDCKey != nullptr,
