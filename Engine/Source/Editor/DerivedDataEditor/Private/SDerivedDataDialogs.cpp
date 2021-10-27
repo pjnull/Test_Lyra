@@ -639,6 +639,9 @@ TSharedRef<SWidget> SDerivedDataCacheStatisticsDialog::GetGridPanel()
 
 		const int64 TotalRequests = TotalGets_Hit + TotalGets_Miss;
 
+		if (Backend->GetDisplayName().Equals("InflightMemoryCache"))
+			continue;
+
 		//if (TotalGetBytes > 0 || TotalPutBytes > 0)
 		{
 			Panel->AddSlot(0, Row)
