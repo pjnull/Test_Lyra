@@ -218,8 +218,12 @@ namespace Chaos
 		bUseManifold = bInUseManifold && CanUseManifold(Particle[0], Particle[1]);
 		bUseIncrementalManifold = true;	// This will get changed later if we call AddOneShotManifoldContact
 
-		SetIsSleeping(false);
-		SetWasAwakened(false);
+		GetContainerCookie().SetIsSleeping(false);
+	}
+
+	void FPBDCollisionConstraint::SetIsSleeping(const bool bInIsSleeping)
+	{
+		ConcreteContainer()->SetConstraintIsSleeping(*this, bInIsSleeping);
 	}
 
 	// Are the two manifold points the same point?

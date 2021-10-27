@@ -136,6 +136,10 @@ public:
 	*/
 	void RemoveConstraint(FPBDCollisionConstraintHandle* ConstraintHandle);
 
+	/**
+	 * Set the sleeping state of the constraint. When awaking, reactivates the constraint.
+	*/
+	void SetConstraintIsSleeping(FPBDCollisionConstraint& Constraint, bool bInIsSleeping);
 
 	//
 	// General Rule API

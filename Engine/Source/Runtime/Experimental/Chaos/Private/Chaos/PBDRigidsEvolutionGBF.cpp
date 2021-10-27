@@ -167,37 +167,6 @@ void FPBDRigidsEvolutionGBF::Advance(const FReal Dt,const FReal MaxStepDt,const 
 		UnprepareTick();
 	}
 }
-	
-void FPBDRigidsEvolutionGBF::AddSleepingContacts()
-{
-	FCollisionConstraintAllocator& ConstraintAllocator = CollisionDetector.GetCollisionContainer().GetConstraintAllocator();
-
-	
-	for(int32 IslandIndex = 0; IslandIndex < ConstraintGraph.NumIslands(); ++IslandIndex)
-	{
-		if( FPBDIslandSolver* IslandSolver = ConstraintGraph.GetSolverIsland(IslandIndex))
-		{
-			//bool bNeedsResorting = false;
-			for( auto& ConstraintHandle : IslandSolver->GetConstraints())
-			{
-				if(ConstraintHandle->WasAwakened())
-				{
-					if( FPBDCollisionConstraint* CollisionConstraint = ConstraintHandle->As<FPBDCollisionConstraint>())
-					{
-						ConstraintAllocator.AddConstraintHandle(CollisionConstraint);
-						//bNeedsResorting = true;
-					}
-				}
-			}
-			// For now we don't need to sort the constraints twice since they are already sorted before pushing them to the graph
-			// @todo : remove the allocator sorting to use the island one. but will need to sort the graph as well which for now requires some overhead
-			// if(!IslandSolver->IsSleeping() && bNeedsResorting)
-			// {
-			// 	IslandSolver->SortConstraints();
-			// }
-		}
-	}
-}
 
 void FPBDRigidsEvolutionGBF::AdvanceOneTimeStep(const FReal Dt,const FSubStepInfo& SubStepInfo)
 {
@@ -296,10 +265,6 @@ void FPBDRigidsEvolutionGBF::AdvanceOneTimeStepImpl(const FReal Dt, const FSubSt
 	{
 		SCOPE_CYCLE_COUNTER(STAT_Evolution_CreateIslands);
 		CreateIslands();
-	}
-	{
-		SCOPE_CYCLE_COUNTER(STAT_Evolution_AddSleepingContacts);
-		AddSleepingContacts();
 	}
 	if (PreApplyCallback != nullptr)
 	{

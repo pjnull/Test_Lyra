@@ -211,7 +211,9 @@ namespace Chaos
 
 
 	/**
-	 * @brief Information used by the constraint allocator to determine which parts of a previous tick's contact can be reused (if any)
+	 * @brief Information used by the constraint allocator
+	 * This includes any information used for optimizations like array indexes etc
+	 * as well as data for managing lifetime and pruning.
 	*/
 	class FPBDCollisionConstraintContainerCookie
 	{
@@ -221,6 +223,7 @@ namespace Chaos
 			, CreationEpoch(INDEX_NONE)
 			, LastUsedEpoch(INDEX_NONE)
 			, ConstraintIndex(INDEX_NONE)
+			, bIsInShapePairMap(false)
 			, bIsSleeping(false)
 		{
 		}
@@ -242,7 +245,7 @@ namespace Chaos
 		{
 			Key = InKey;
 			CreationEpoch = InEpoch;
-			LastUsedEpoch = InEpoch;
+			LastUsedEpoch = INDEX_NONE;
 			bIsSleeping = false;
 		}
 
@@ -264,14 +267,6 @@ namespace Chaos
 			bIsSleeping = bInIsSleeping;
 		}
 
-		/**
-		* @brief Change the awaken state (used by the Island Manager)
-		*/
-		void SetWasAwakened(const bool bInWasAwakened)
-		{
-			bWasAwakened = bInWasAwakened;
-		}
-
 		// A hash of the colliding object pair to uniquely identify a contact and allow recovery next tick
 		FRigidBodyContactKey Key;
 
@@ -284,11 +279,11 @@ namespace Chaos
 		// The index in the container - this changes every tick
 		int32 ConstraintIndex;
 
+		// Whether the Constraint is in the container's maps
+		bool bIsInShapePairMap;
+
 		// Whether the constraint is in a sleeping island (this is used to prevent culling because Epoch is not updated for sleepers)
 		bool bIsSleeping;
-
-		// Whether the constraint has just been awaken in an island
-		bool bWasAwakened;
 	};
 
 
@@ -396,11 +391,8 @@ namespace Chaos
 		void SetDisabled(bool bInDisabled) { Manifold.bDisabled = bInDisabled; }
 		bool GetDisabled() const { return Manifold.bDisabled; }
 
-		void SetIsSleeping(const bool bInIsSleeping) override { ContainerCookie.SetIsSleeping(bInIsSleeping); }
-		bool IsSleeping() const override { return ContainerCookie.bIsSleeping; }
-
-		void SetWasAwakened(const bool bInWasAwakened) override { ContainerCookie.SetWasAwakened(bInWasAwakened); }
-		bool WasAwakened() const override { return ContainerCookie.bWasAwakened; }
+		virtual void SetIsSleeping(const bool bInIsSleeping) override;
+		virtual bool IsSleeping() const override { return ContainerCookie.bIsSleeping; }
 
 		void SetNormal(const FVec3& InNormal) { Manifold.Normal = InNormal; }
 		FVec3 GetNormal() const { return Manifold.Normal; }

@@ -98,19 +98,20 @@ namespace Chaos
 		}
 
 		/**
+		 * @brief Update the epoch counter used for pruning unused pairs
+		*/
+		void Restored(const int32 InEpoch)
+		{
+			Epoch = InEpoch;
+			Constraints.Reset();
+		}
+
+		/**
 		 * @brief Get the epoch counter used for pruning unused pairs
 		*/
 		int32 GetEpoch() const
 		{
 			return Epoch;
-		}
-
-		/**
-		 * @brief Update the epoch counter used for pruning unused pairs
-		*/
-		void SetEpoch(const int32 InEpoch)
-		{
-			Epoch = InEpoch;
 		}
 
 		/**
@@ -281,6 +282,12 @@ namespace Chaos
 			// Clear the collision list for this tick - we are about to rebuild it
 			Constraints.Reset();
 
+			// Update the tick counter
+			// NOTE: We do this here rather than in EndDetectionCollisions so that any contacts injected
+			// before collision detection count as the previous frame's collisions, e.g., from Islands
+			// that are manually awoken by modifying a particle on the game thread.
+			++Epoch;
+
 			// Note: we do not reset the shape-pair or particle-pair maps. They may be used to reinstate or reuse
 			// contacts. If they do not (because the pair is no longer overlapping) they will be pruned at the end of the tick.
 
@@ -300,9 +307,6 @@ namespace Chaos
 			PruneShapePairs();
 
 			PruneParticlePairs();
-
-			// Update the tick counter
-			++Epoch;
 		}
 
 		/**
@@ -357,21 +361,14 @@ namespace Chaos
 				}
 				else
 				{
-					// Create a new constraint and add it to the array
+					// Create a new constraint and copy the source data
 					Constraint = CreateConstraint(SourceConstraint);
-
-					if (Constraint != nullptr)
-					{
-						const int32 ConstraintIndex = Constraints.Add(Constraint);
-						Constraint->GetContainerCookie().Update(ConstraintIndex, Epoch);
-					}
 				}
 
-				// Keep track of all contacts between a particle pair (for fast restore)
-				FParticlePairCollisionConstraints* ParticlePairConstraints = FindOrCreateParticlePairConstraints(SourceConstraint.Particle[0], SourceConstraint.Particle[1]);
-				if (ParticlePairConstraints != nullptr)
+				// If this is a new constraint, or was already created but not reused this frame, activate it
+				if (Constraint->GetContainerCookie().LastUsedEpoch != Epoch)
 				{
-					ParticlePairConstraints->AddConstraint(Constraint);
+					AddConstraintImp(Constraint);
 				}
 			}
 		}
@@ -403,8 +400,6 @@ namespace Chaos
 		{
 			if (ParticlePairConstraints != nullptr)
 			{
-				ParticlePairConstraints->SetEpoch(Epoch);
-
 				for (FPBDCollisionConstraint* Constraint : ParticlePairConstraints->GetConstraints())
 				{
 					// Restore the manifold
@@ -413,6 +408,9 @@ namespace Chaos
 
 				// Enqueue for adding to active array etc
 				EnqueueNewConstraints(ParticlePairConstraints->GetConstraints());
+
+				// Reset the active collision list for the particle pair - it gets rebuilt
+				ParticlePairConstraints->Restored(Epoch);
 			}
 		}
 
@@ -432,26 +430,17 @@ namespace Chaos
 		/**
 		 * @brief Add a constraint to the active list
 		 * @param CollisionConstraint collision constraint to be added
+		 * This injects a constraint into the active list that was not generated (or restored)
+		 * by the collision detection phase. It is used by the Islands to restore contacts
+		 * when an island wakes up but could also be used to inject custom or user-created contacts
+		 * with a bit of extra work (see comments in the code).
 		 */
-		void AddConstraintHandle(FPBDCollisionConstraint* CollisionConstraint )
+		void AddConstraint(FPBDCollisionConstraint* CollisionConstraint)
 		{
-			{
-				const int32 ConstraintIndex = Constraints.Add(CollisionConstraint);
-				CollisionConstraint->GetContainerCookie().Update(ConstraintIndex, Epoch);
+			// This is only intended to be called outside the collision detection phase
+			check(!bInCollisionDetectionPhase);
 
-				// Contacts that were fully restored are already in the maps (see RestoreParticlePairConstraints()) and cannot be swept constraints
-				if (!CollisionConstraint->WasManifoldRestored())
-				{
-					ShapePairConstraintMap.Add(CollisionConstraint->GetKey().GetKey(), CollisionConstraint);
-
-					// @todo(chaos): only store the particle pair contact list when we might want to retore it next frame (small movement)
-					FParticlePairCollisionConstraints* ParticlePairConstraints = FindOrCreateParticlePairConstraints(CollisionConstraint->Particle[0], CollisionConstraint->Particle[1]);
-					if (ParticlePairConstraints != nullptr)
-					{
-						ParticlePairConstraints->AddConstraint(CollisionConstraint);
-					}
-				}
-			}
+			AddConstraintImp(CollisionConstraint);
 		}
 		
 		/**
@@ -503,7 +492,7 @@ namespace Chaos
 			return Constraint;
 		}
 
-		void DestroyConstraint(const FRigidBodyContactKey& Key, const int32 Index, FPBDCollisionConstraint* Constraint)
+		void DestroyConstraint(const FRigidBodyContactKey& Key, const int32 ConstraintIndex, FPBDCollisionConstraint* Constraint)
 		{
 			FParticlePairCollisionConstraints** ParticlePairConstraintsPtr = ParticlePairConstraintMap.Find(FParticlePairCollisionsKey(Constraint->Particle[0], Constraint->Particle[1]).GetKey());
 			if (ParticlePairConstraintsPtr != nullptr)
@@ -513,7 +502,7 @@ namespace Chaos
 			}
 
 			ShapePairConstraintMap.Remove(Key.GetKey());
-			Constraints[Index] = nullptr;
+			Constraints[ConstraintIndex] = nullptr;
 
 			FreeConstraint(Constraint);
 		}
@@ -567,9 +556,43 @@ namespace Chaos
 			{
 				while (FPBDCollisionConstraint* NewConstraint = DequeueNewConstraint())
 				{
-					AddConstraintHandle(NewConstraint);
+					AddConstraintImp(NewConstraint);
 				}
 				SortConstraintsHandles();
+			}
+		}
+
+		void AddConstraintImp(FPBDCollisionConstraint* CollisionConstraint)
+		{
+			// If we hit this, the constraint was already added this tick
+			// @todo(chaos): we can't currently enable this because we don't clear the constraint list
+			// at the end of the frame and we may restore constraints before collision detection begins.
+			// We should not be adding constraints to the active list when calling this before Collision 
+			// Detection, but islands can be awoken both before and after that...
+			// The Constraints array gets cleared in BeginDetectCollisions.
+			//checkSlow(Constraints.Find(CollisionConstraint) == INDEX_NONE);
+			
+			// Add the constraint to the active list and update its epoch
+			const int32 ConstraintIndex = Constraints.Add(CollisionConstraint);
+			CollisionConstraint->GetContainerCookie().Update(ConstraintIndex, Epoch);
+
+			// If this is a new contact, we must add it to the particle-shape-collision maps.
+			// This will be false when we are reactivating a collision from the previous frame (it would have been pulled from the maps)
+			// but true when restoring a sleeping contact or injecting a user-generated contact for example.
+			if (!CollisionConstraint->GetContainerCookie().bIsInShapePairMap)
+			{
+				CollisionConstraint->GetContainerCookie().bIsInShapePairMap = true;
+				ShapePairConstraintMap.Add(CollisionConstraint->GetKey().GetKey(), CollisionConstraint);
+			}
+
+			// NOTE: ParticlePairConstraints contains only the constraints that are active this frame, hence it is rebuilt. Alternatively we could
+			// remove constraints that aren't refreshed in the pruning phase if that is faster.
+			// @todo(chaos): only store the particle pair contact list when we might want to retore it next frame (small movement)
+			// @todo(chaos): store this pointer on the constraint, but make sure it gets reset when put to sleep
+			FParticlePairCollisionConstraints* ParticlePairConstraints = FindOrCreateParticlePairConstraints(CollisionConstraint->Particle[0], CollisionConstraint->Particle[1]);
+			if (ParticlePairConstraints != nullptr)
+			{
+				ParticlePairConstraints->AddConstraint(CollisionConstraint);
 			}
 		}
 
@@ -588,10 +611,13 @@ namespace Chaos
 				
 				if (Constraint->GetContainerCookie().LastUsedEpoch < Epoch)
 				{
+					Constraint->GetContainerCookie().bIsInShapePairMap = false;
+
 					if(!Constraint->IsSleeping())
 					{
-						FreeConstraint(KeyValuePair.Value);
+						FreeConstraint(Constraint);
 					}
+
 					PrunedKeyList.Add(KeyValuePair.Key);
 				}
 			}
