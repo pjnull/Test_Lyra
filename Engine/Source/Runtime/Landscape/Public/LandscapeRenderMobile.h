@@ -41,11 +41,6 @@ public:
 	{
 	}
 
-	virtual ~FLandscapeVertexFactoryMobile()
-	{
-		ReleaseResource();
-	}
-
 	/**
 	* Should we cache the material's shadertype on this platform with this vertex factory? 
 	*/

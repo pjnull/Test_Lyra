@@ -76,7 +76,7 @@ namespace Metasound
 			AssetArray.Add(AssetActionBase);
 		}
 
-		class FSlateStyle : public FSlateStyleSet
+		class FSlateStyle final : public FSlateStyleSet
 		{
 		public:
 			FSlateStyle()
