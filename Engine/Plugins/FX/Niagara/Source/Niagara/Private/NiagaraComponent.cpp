@@ -270,8 +270,23 @@ FRHIUniformBuffer* FNiagaraSceneProxy::GetCustomUniformBuffer(bool bHasVelocity,
 		return GetUniformBuffer();
 	}
 
+	bool bHasPrecomputedVolumetricLightmap;
+	FMatrix PreviousLocalToWorld;
+	int32 SingleCaptureIndex;
+	bool bOutputVelocity;
+	FPrimitiveSceneInfo* LocalPrimitiveSceneInfo = GetPrimitiveSceneInfo();
+	GetScene().GetPrimitiveUniformShaderParameters_RenderThread(LocalPrimitiveSceneInfo, bHasPrecomputedVolumetricLightmap, PreviousLocalToWorld, SingleCaptureIndex, bOutputVelocity);
+
 	// Custom UB we need to create
 	uint64 KeyHash = HashCombine(bHasVelocity, PreSkinnedBounds.IsValid);
+
+	// we need to incorporate the transform of the PreviousLocalToWorld because it stopping moving is relevant
+	// and we need to be able to generate a new UB for that case
+	const auto PreviousOrigin = PreviousLocalToWorld.GetOrigin();
+	KeyHash = HashCombine(KeyHash, PreviousOrigin.X);
+	KeyHash = HashCombine(KeyHash, PreviousOrigin.Y);
+	KeyHash = HashCombine(KeyHash, PreviousOrigin.Z);
+
 	if ( PreSkinnedBounds.IsValid )
 	{
 		KeyHash = HashCombine(KeyHash, PreSkinnedBounds.Min.X);
@@ -285,13 +300,6 @@ FRHIUniformBuffer* FNiagaraSceneProxy::GetCustomUniformBuffer(bool bHasVelocity,
 	TUniformBuffer<FPrimitiveUniformShaderParameters>& CustomUB = CustomUniformBuffers.FindOrAdd(KeyHash);
 	if (!CustomUB.IsInitialized())
 	{
-		bool bHasPrecomputedVolumetricLightmap;
-		FMatrix PreviousLocalToWorld;
-		int32 SingleCaptureIndex;
-		bool bOutputVelocity;
-		FPrimitiveSceneInfo* LocalPrimitiveSceneInfo = GetPrimitiveSceneInfo();
-		GetScene().GetPrimitiveUniformShaderParameters_RenderThread(LocalPrimitiveSceneInfo, bHasPrecomputedVolumetricLightmap, PreviousLocalToWorld, SingleCaptureIndex, bOutputVelocity);
-
 		FPrimitiveUniformShaderParametersBuilder UBBuilder;
 		UBBuilder.Defaults();
 		UBBuilder.LocalToWorld(GetLocalToWorld());
