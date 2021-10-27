@@ -728,7 +728,7 @@ namespace UnrealBuildTool
 				// Build the target
 				using (GlobalTracer.Instance.BuildSpan("UEBuildTarget.Build()").StartActive())
 				{
-					Makefile = Target.Build(BuildConfiguration, WorkingSet, TargetDescriptor.SpecificFilesToCompile);
+					Makefile = Target.Build(BuildConfiguration, WorkingSet, TargetDescriptor);
 				}
 
 				Makefile.MemoryPerActionGB = Target.Rules.MemoryPerActionGB;
@@ -770,6 +770,15 @@ namespace UnrealBuildTool
 				{
 					ExternalExecution.ExecuteHeaderToolIfNecessary(BuildConfiguration, TargetDescriptor.ProjectFile, Makefile, TargetDescriptor.Name, WorkingSet);
 				}
+
+#if __VPROJECT_AVAILABLE__
+				// Same for VNI
+				if (Makefile.VNIModules.Count > 0)
+				{
+
+					VNIExecution.ExecuteVNITool(Makefile, TargetDescriptor);
+				}
+#endif
 			}
 			return Makefile;
 		}

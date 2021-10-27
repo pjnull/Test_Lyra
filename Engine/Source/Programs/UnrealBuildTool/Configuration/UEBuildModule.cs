@@ -173,6 +173,22 @@ namespace UnrealBuildTool
 		public readonly Dictionary<string, string> AliasRestrictedFolders;
 
 		/// <summary>
+		/// The Verse source code directory associated with this module if any
+		/// </summary>
+		public virtual DirectoryReference? VerseDirectory
+		{
+			get { return null; }
+		}
+
+		/// <summary>
+		/// If this module has Verse code associated with it (convenience function)
+		/// </summary>
+		public bool bHasVerse
+		{
+			get { return VerseDirectory != null; }
+		}
+
+		/// <summary>
 		/// Constructor
 		/// </summary>
 		/// <param name="Rules">Rules for this module</param>
