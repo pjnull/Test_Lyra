@@ -2279,85 +2279,103 @@ void APlayerController::FlushPressedKeys()
 
 bool APlayerController::InputKey(FKey Key, EInputEvent EventType, float AmountDepressed, bool bGamepad)
 {
+	FInputKeyParams Params;
+	Params.Key = Key;
+	Params.Event = EventType;
+	Params.Delta.X = AmountDepressed;
 	
-	if (GEngine->XRSystem.IsValid())
-	{
-		auto XRInput = GEngine->XRSystem->GetXRInput();
-		if (XRInput && XRInput->HandleInputKey(PlayerInput, Key, EventType, AmountDepressed, bGamepad))
-		{
-			return true;
-		}
-	}
+	return InputKey(Params);
+}
 
+bool APlayerController::InputKey(const FInputKeyParams& Params)
+{
 	bool bResult = false;
-	if (PlayerInput)
+
+	// Any analog values can simply be passed to the UPlayerInput
+	if(Params.Key.IsAnalog())
 	{
-		bResult = PlayerInput->InputKey(Key, EventType, AmountDepressed, bGamepad);
-		if (bEnableClickEvents && (ClickEventKeys.Contains(Key) || ClickEventKeys.Contains(EKeys::AnyKey)))
+		bResult = PlayerInput->InputKey(Params);
+	}
+	// But we need special case XR handling for non-analog values...
+	else
+	{
+		if (GEngine->XRSystem.IsValid())
 		{
-			FVector2D MousePosition;
-			UGameViewportClient* ViewportClient = CastChecked<ULocalPlayer>(Player)->ViewportClient;
-			if (ViewportClient && ViewportClient->GetMousePosition(MousePosition))
+			auto XRInput = GEngine->XRSystem->GetXRInput();
+			if (XRInput && XRInput->HandleInputKey(PlayerInput, Params.Key, Params.Event, Params.Delta.X, Params.Key.IsGamepadKey()))
 			{
-				UPrimitiveComponent* ClickedPrimitive = NULL;
-				if (bEnableMouseOverEvents)
+				return true;
+			}
+		}
+
+		if (PlayerInput)
+		{
+			bResult = PlayerInput->InputKey(Params);
+			if (bEnableClickEvents && (ClickEventKeys.Contains(Params.Key) || ClickEventKeys.Contains(EKeys::AnyKey)))
+			{
+				FVector2D MousePosition;
+				UGameViewportClient* ViewportClient = CastChecked<ULocalPlayer>(Player)->ViewportClient;
+				if (ViewportClient && ViewportClient->GetMousePosition(MousePosition))
 				{
-					ClickedPrimitive = CurrentClickablePrimitive.Get();
-				}
-				else
-				{
-					FHitResult HitResult;
-					const bool bHit = GetHitResultAtScreenPosition(MousePosition, CurrentClickTraceChannel, true, HitResult);
-					if (bHit)
+					UPrimitiveComponent* ClickedPrimitive = nullptr;
+					if (bEnableMouseOverEvents)
 					{
-						ClickedPrimitive = HitResult.Component.Get();
+						ClickedPrimitive = CurrentClickablePrimitive.Get();
 					}
-				}
-				if( GetHUD() )
-				{
-					if (GetHUD()->UpdateAndDispatchHitBoxClickEvents(MousePosition, EventType))
+					else
 					{
-						ClickedPrimitive = NULL;
+						FHitResult HitResult;
+						const bool bHit = GetHitResultAtScreenPosition(MousePosition, CurrentClickTraceChannel, true, HitResult);
+						if (bHit)
+						{
+							ClickedPrimitive = HitResult.Component.Get();
+						}
 					}
-				}
-
-				if (ClickedPrimitive)
-				{
-					switch(EventType)
+					if(GetHUD())
 					{
-					case IE_Pressed:
-					case IE_DoubleClick:
-						ClickedPrimitive->DispatchOnClicked(Key);
-						break;
-
-					case IE_Released:
-						ClickedPrimitive->DispatchOnReleased(Key);
-						break;
-
-					case IE_Axis:
-					case IE_Repeat:
-						break;
+						if (GetHUD()->UpdateAndDispatchHitBoxClickEvents(MousePosition, Params.Event))
+						{
+							ClickedPrimitive = nullptr;
+						}
 					}
-				}
 
-				bResult = true;
+					if (ClickedPrimitive)
+					{
+						switch(Params.Event)
+						{
+						case IE_Pressed:
+						case IE_DoubleClick:
+							ClickedPrimitive->DispatchOnClicked(Params.Key);
+							break;
+
+						case IE_Released:
+							ClickedPrimitive->DispatchOnReleased(Params.Key);
+							break;
+
+						case IE_Axis:
+						case IE_Repeat:
+							break;
+						}
+					}
+
+					bResult = true;
+				}
 			}
 		}
 	}
-
+	
 	return bResult;
 }
 
 bool APlayerController::InputAxis(FKey Key, float Delta, float DeltaTime, int32 NumSamples, bool bGamepad)
 {
-	bool bResult = false;
-	
-	if (PlayerInput)
-	{
-		bResult = PlayerInput->InputAxis(Key, Delta, DeltaTime, NumSamples, bGamepad);
-	}
+	FInputKeyParams Params;
+	Params.Key = Key;
+	Params.Delta = FVector(static_cast<double>(Delta), 0.0, 0.0);
+	Params.NumSamples = NumSamples;
+	Params.DeltaTime = DeltaTime;
 
-	return bResult;
+	return InputKey(Params);
 }
 
 bool APlayerController::InputTouch(uint32 Handle, ETouchType::Type Type, const FVector2D& TouchLocation, float Force, FDateTime DeviceTimestamp, uint32 TouchpadIndex)
