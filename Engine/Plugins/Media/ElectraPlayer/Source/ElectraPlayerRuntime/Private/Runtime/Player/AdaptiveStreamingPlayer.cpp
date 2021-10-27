@@ -4384,6 +4384,9 @@ void FAdaptiveStreamingPlayerEventHandler::WorkerThreadFN()
 						case FMetricEvent::EType::VideoQualityChange:
 							MetricListeners[i]->ReportVideoQualityChange(pEvt->Param.QualityChange.NewBitrate, pEvt->Param.QualityChange.PrevBitrate, pEvt->Param.QualityChange.bIsDrastic);
 							break;
+						case FMetricEvent::EType::CodecFormatChange:
+							MetricListeners[i]->ReportDecodingFormatChange(pEvt->Param.CodecFormatChange);
+							break;
 						case FMetricEvent::EType::PrerollStart:
 							MetricListeners[i]->ReportPrerollStart();
 							break;

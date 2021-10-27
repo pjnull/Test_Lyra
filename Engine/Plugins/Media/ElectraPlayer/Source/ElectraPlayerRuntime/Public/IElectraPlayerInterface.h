@@ -211,6 +211,16 @@ public:
 	virtual FString GetTrackName(EPlayerTrackType TrackType, int32 TrackIndex) const = 0;
 	virtual bool SelectTrack(EPlayerTrackType TrackType, int32 TrackIndex) = 0;
 
+	struct FVideoStreamFormat
+	{
+		FIntPoint Resolution;
+		double FrameRate;
+		int32 Bitrate;
+	};
+	virtual int32 GetNumVideoStreams(int32 TrackIndex) const = 0;
+	virtual bool GetVideoStreamFormat(FVideoStreamFormat& OutFormat, int32 InTrackIndex, int32 InStreamIndex) const = 0;
+	virtual bool GetActiveVideoStreamFormat(FVideoStreamFormat& OutFormat) const = 0;
+
 	virtual void NotifyOfOptionChange() = 0;
 
 	enum {

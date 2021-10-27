@@ -126,6 +126,10 @@ public:
 	FString GetTrackName(EPlayerTrackType TrackType, int32 TrackIndex) const override;
 	bool SelectTrack(EPlayerTrackType TrackType, int32 TrackIndex) override;
 
+	int32 GetNumVideoStreams(int32 TrackIndex) const override;
+	bool GetVideoStreamFormat(FVideoStreamFormat& OutFormat, int32 InTrackIndex, int32 InStreamIndex) const override;
+	bool GetActiveVideoStreamFormat(FVideoStreamFormat& OutFormat) const override;
+
 	void NotifyOfOptionChange() override;
 
 private:
@@ -180,6 +184,7 @@ private:
 			LicenseKey,
 			DataAvailabilityChange,
 			VideoQualityChange,
+			CodecFormatChange,
 			PrerollStart,
 			PrerollEnd,
 			PlaybackStart,
@@ -256,6 +261,11 @@ private:
 		int32 PreviousBitrate;
 		bool bIsDrasticDownswitch;
 	};
+	struct FPlayerMetricEvent_CodecFormatChange : public FPlayerMetricEventBase
+	{
+		FPlayerMetricEvent_CodecFormatChange(const FStreamCodecInformation& InNewDecodingFormat) : FPlayerMetricEventBase(EType::CodecFormatChange), NewDecodingFormat(InNewDecodingFormat) {}
+		FStreamCodecInformation NewDecodingFormat;
+	};
 	struct FPlayerMetricEvent_JumpInPlayPosition : public FPlayerMetricEventBase
 	{
 		FPlayerMetricEvent_JumpInPlayPosition(const FTimeValue& InToNewTime, const FTimeValue& InFromTime, Metrics::ETimeJumpReason InTimejumpReason) : FPlayerMetricEventBase(EType::JumpInPlayPosition), ToNewTime(InToNewTime), FromTime(InFromTime), TimejumpReason(InTimejumpReason) {}
@@ -314,6 +324,8 @@ private:
 	{ DeferredPlayerEvents.Enqueue(MakeSharedTS<FPlayerMetricEvent_DataAvailabilityChange>(DataAvailability)); }
 	virtual void ReportVideoQualityChange(int32 NewBitrate, int32 PreviousBitrate, bool bIsDrasticDownswitch) override
 	{ DeferredPlayerEvents.Enqueue(MakeSharedTS<FPlayerMetricEvent_VideoQualityChange>(NewBitrate, PreviousBitrate, bIsDrasticDownswitch)); }
+	virtual void ReportDecodingFormatChange(const FStreamCodecInformation& NewDecodingFormat) override
+	{ DeferredPlayerEvents.Enqueue(MakeSharedTS<FPlayerMetricEvent_CodecFormatChange>(NewDecodingFormat)); }
 	virtual void ReportPrerollStart() override
 	{ DeferredPlayerEvents.Enqueue(MakeSharedTS<FPlayerMetricEventBase>(FPlayerMetricEventBase::EType::PrerollStart)); }
 	virtual void ReportPrerollEnd() override
@@ -370,6 +382,8 @@ private:
 
 	FPlaybackRange									CurrentPlaybackRange;
 	TOptional<bool>									bFrameAccurateSeeking;
+
+	TOptional<FVideoStreamFormat>					CurrentlyActiveVideoStreamFormat;
 
 	FIntPoint										LastPresentedFrameDimension;
 
@@ -443,7 +457,7 @@ private:
 		static void DoCloseAsync(TSharedPtr<FInternalPlayerImpl, ESPMode::ThreadSafe> && Player, TSharedPtr<IAsyncResourceReleaseNotifyContainer, ESPMode::ThreadSafe> AsyncDestructNotification);
 	};
 
-	FCriticalSection												PlayerLock;
+	mutable FCriticalSection										PlayerLock;
 	TSharedPtr<FInternalPlayerImpl, ESPMode::ThreadSafe>			CurrentPlayer;
 	FEvent*															WaitForPlayerDestroyedEvent;
 
@@ -725,6 +739,7 @@ private:
 	void HandlePlayerEventLicenseKey(const Metrics::FLicenseKeyStats& LicenseKeyStats);
 	void HandlePlayerEventDataAvailabilityChange(const Metrics::FDataAvailabilityChange& DataAvailability);
 	void HandlePlayerEventVideoQualityChange(int32 NewBitrate, int32 PreviousBitrate, bool bIsDrasticDownswitch);
+	void HandlePlayerEventCodecFormatChange(const Electra::FStreamCodecInformation& NewDecodingFormat);
 	void HandlePlayerEventPrerollStart();
 	void HandlePlayerEventPrerollEnd();
 	void HandlePlayerEventPlaybackStart();

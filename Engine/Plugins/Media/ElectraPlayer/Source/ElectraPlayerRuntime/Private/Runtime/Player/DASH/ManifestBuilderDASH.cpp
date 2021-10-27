@@ -1471,6 +1471,7 @@ void FManifestDASHInternal::PreparePeriodAdaptationSets(TSharedPtrTS<FPeriod> Pe
 
 				Representation->ID = MPDRepresentation->GetID();
 				Representation->Bitrate = MPDRepresentation->GetBandwidth();
+				Representation->CodecInfo.SetBitrate(Representation->Bitrate);
 
 				// Propagate the language code from the AdaptationSet into the codec info
 				Representation->CodecInfo.SetStreamLanguageCode(AdaptationSet->Language);

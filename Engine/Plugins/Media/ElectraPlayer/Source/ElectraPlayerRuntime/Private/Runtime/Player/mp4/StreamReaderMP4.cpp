@@ -471,6 +471,7 @@ void FStreamReaderMP4::HandleRequest()
 				{
 					st.bIsSelectedTrack = true;
 					st.StreamType = SelectedTrackMetadata->Type;
+					st.Bitrate = SelectedTrackMetadata->Bitrate;
 					meta->Kind = SelectedTrackMetadata->Kind;
 					meta->Language = SelectedTrackMetadata->Language;
 					meta->PeriodAdaptationSetID = SelectedTrackMetadata->PeriodID + TEXT(".") + SelectedTrackMetadata->AdaptationSetID;
@@ -484,6 +485,8 @@ void FStreamReaderMP4::HandleRequest()
 				CSD->CodecSpecificData = Track->GetCodecSpecificData();
 				CSD->RawCSD			   = Track->GetCodecSpecificDataRAW();
 				CSD->ParsedInfo		   = Track->GetCodecInformation();
+				// Set information not necessarily available on the CSD.
+				CSD->ParsedInfo.SetBitrate(st.Bitrate);
 				st.CSD = MoveTemp(CSD);
 			}
 			return st;

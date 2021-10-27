@@ -412,6 +412,7 @@ struct FMetricEvent
 		SegmentDownload,
 		DataAvailabilityChange,
 		VideoQualityChange,
+		CodecFormatChange,
 		PrerollStart,
 		PrerollEnd,
 		PlaybackStart,
@@ -461,6 +462,7 @@ struct FMetricEvent
 		Metrics::FDataAvailabilityChange	DataAvailability;
 		FBandwidth							Bandwidth;
 		FQualityChange						QualityChange;
+		FStreamCodecInformation				CodecFormatChange;
 		FTimeJumped							TimeJump;
 		FErrorDetail						ErrorDetail;
 		FLogMessage							LogMessage;
@@ -562,6 +564,13 @@ struct FMetricEvent
 		Evt->Param.QualityChange.NewBitrate = NewBitrate;
 		Evt->Param.QualityChange.PrevBitrate = PreviousBitrate;
 		Evt->Param.QualityChange.bIsDrastic = bIsDrasticDownswitch;
+		return Evt;
+	}
+	static TSharedPtrTS<FMetricEvent> ReportCodecFormatChange(const FStreamCodecInformation& NewDecodingFormat)
+	{
+		TSharedPtrTS<FMetricEvent> Evt = MakeSharedTS<FMetricEvent>();
+		Evt->Type = EType::CodecFormatChange;
+		Evt->Param.CodecFormatChange = NewDecodingFormat;
 		return Evt;
 	}
 	static TSharedPtrTS<FMetricEvent> ReportPrerollStart()
@@ -931,6 +940,7 @@ private:
 			}
 			delete Decoder;
 			Decoder = nullptr;
+			LastSentAUCodecData.Reset();
 		}
 		void Flush()
 		{
@@ -962,21 +972,17 @@ private:
 			}
 		}
 
-		FStreamCodecInformation			CurrentCodecInfo;
-		FAdaptiveStreamingPlayer*		Parent = nullptr;
-		IVideoDecoderBase*				Decoder = nullptr;
-		bool							bDrainingForCodecChange = false;
-		bool							bDrainingForCodecChangeDone = false;
-		bool							bApplyNewLimits = false;
+		FStreamCodecInformation CurrentCodecInfo;
+		TSharedPtrTS<FAccessUnit::CodecData> LastSentAUCodecData;
+		FAdaptiveStreamingPlayer* Parent = nullptr;
+		IVideoDecoderBase* Decoder = nullptr;
+		bool bDrainingForCodecChange = false;
+		bool bDrainingForCodecChangeDone = false;
+		bool bApplyNewLimits = false;
 	};
 
 	struct FAudioDecoder : public IAccessUnitBufferListener, public IDecoderOutputBufferListener
 	{
-		FAudioDecoder()
-			: Parent(nullptr)
-			, Decoder(nullptr)
-		{
-		}
 		void Close()
 		{
 			if (Decoder)
@@ -986,6 +992,7 @@ private:
 			}
 			delete Decoder;
 			Decoder = nullptr;
+			LastSentAUCodecData.Reset();
 		}
 		void Flush()
 		{
@@ -1017,9 +1024,10 @@ private:
 			}
 		}
 
-		FStreamCodecInformation			CurrentCodecInfo;
-		FAdaptiveStreamingPlayer*		Parent;
-		IAudioDecoderAAC*				Decoder;
+		FStreamCodecInformation CurrentCodecInfo;
+		TSharedPtrTS<FAccessUnit::CodecData> LastSentAUCodecData;
+		FAdaptiveStreamingPlayer* Parent = nullptr;
+		IAudioDecoderAAC* Decoder = nullptr;
 	};
 
 	struct FSubtitleDecoder
@@ -1036,6 +1044,7 @@ private:
 				Decoder = nullptr;
 				bIsRunning = false;
 			}
+			LastSentAUCodecData.Reset();
 		}
 		void Flush()
 		{
@@ -1076,10 +1085,11 @@ private:
 			}
 		}
 
-		FStreamCodecInformation			CurrentCodecInfo;
-		ISubtitleDecoder*				Decoder = nullptr;
-		bool							bIsRunning = false;
-		bool							bRequireCodecChange = false;
+		FStreamCodecInformation CurrentCodecInfo;
+		TSharedPtrTS<FAccessUnit::CodecData> LastSentAUCodecData;
+		ISubtitleDecoder* Decoder = nullptr;
+		bool bIsRunning = false;
+		bool bRequireCodecChange = false;
 	};
 
 	class FWorkerThreadMessages

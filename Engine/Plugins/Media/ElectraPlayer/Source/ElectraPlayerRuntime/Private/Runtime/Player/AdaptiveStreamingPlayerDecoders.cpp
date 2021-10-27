@@ -332,6 +332,8 @@ int32 FAdaptiveStreamingPlayer::CreateDecoder(EStreamType type)
 				if (AccessUnit->AUCodecData.IsValid())
 				{
 					VideoDecoder.CurrentCodecInfo = AccessUnit->AUCodecData->ParsedInfo;
+					VideoDecoder.LastSentAUCodecData = AccessUnit->AUCodecData;
+					DispatchEvent(FMetricEvent::ReportCodecFormatChange(VideoDecoder.CurrentCodecInfo));
 				}
 				FAccessUnit::Release(AccessUnit);
 
@@ -454,6 +456,8 @@ int32 FAdaptiveStreamingPlayer::CreateDecoder(EStreamType type)
 				if (AccessUnit->AUCodecData.IsValid())
 				{
 					AudioDecoder.CurrentCodecInfo = AccessUnit->AUCodecData->ParsedInfo;
+					AudioDecoder.LastSentAUCodecData = AccessUnit->AUCodecData;
+					DispatchEvent(FMetricEvent::ReportCodecFormatChange(AudioDecoder.CurrentCodecInfo));
 				}
 				FAccessUnit::Release(AccessUnit);
 
@@ -497,6 +501,8 @@ int32 FAdaptiveStreamingPlayer::CreateDecoder(EStreamType type)
 				if (AccessUnit->AUCodecData.IsValid())
 				{
 					SubtitleDecoder.CurrentCodecInfo = AccessUnit->AUCodecData->ParsedInfo;
+					SubtitleDecoder.LastSentAUCodecData = AccessUnit->AUCodecData;
+					DispatchEvent(FMetricEvent::ReportCodecFormatChange(SubtitleDecoder.CurrentCodecInfo));
 				}
 				FAccessUnit::Release(AccessUnit);
 
@@ -698,6 +704,7 @@ void FAdaptiveStreamingPlayer::FeedDecoder(EStreamType Type, IAccessUnitBufferIn
 	FBufferStats* pStats = nullptr;
 	Metrics::FDataAvailabilityChange* pAvailability = nullptr;
 	FStreamCodecInformation* CurrentCodecInfo = nullptr;
+	TSharedPtrTS<FAccessUnit::CodecData>* LastSentAUCodecData = nullptr;
 	bool bCodecChangeDetected = false;
 	bool bIsDeselected = false;
 
@@ -707,18 +714,21 @@ void FAdaptiveStreamingPlayer::FeedDecoder(EStreamType Type, IAccessUnitBufferIn
 			pStats = &VideoBufferStats;
 			pAvailability = &DataAvailabilityStateVid;
 			CurrentCodecInfo = &VideoDecoder.CurrentCodecInfo;
+			LastSentAUCodecData = &VideoDecoder.LastSentAUCodecData;
 			bIsDeselected = bIsVideoDeselected;
 			break;
 		case EStreamType::Audio:
 			pStats = &AudioBufferStats;
 			pAvailability = &DataAvailabilityStateAud;
 			CurrentCodecInfo = &AudioDecoder.CurrentCodecInfo;
+			LastSentAUCodecData = &AudioDecoder.LastSentAUCodecData;
 			bIsDeselected = bIsAudioDeselected;
 			break;
 		case EStreamType::Subtitle:
 			pStats = &TextBufferStats;
 			pAvailability = &DataAvailabilityStateTxt;
 			CurrentCodecInfo = &SubtitleDecoder.CurrentCodecInfo;
+			LastSentAUCodecData = &SubtitleDecoder.LastSentAUCodecData;
 			bIsDeselected = bIsTextDeselected;
 			break;
 		default:
@@ -832,6 +842,18 @@ void FAdaptiveStreamingPlayer::FeedDecoder(EStreamType Type, IAccessUnitBufferIn
 					Decoder->AUdataPushAU(AccessUnit);
 				}
 
+				// If there is any pertinent format change, emit an event.
+				if (AccessUnit->AUCodecData.IsValid() && LastSentAUCodecData && LastSentAUCodecData->IsValid() && *LastSentAUCodecData != AccessUnit->AUCodecData)
+				{
+					bool bFormatChanged = AccessUnit->AUCodecData->ParsedInfo.GetBitrate() != (*LastSentAUCodecData)->ParsedInfo.GetBitrate() || !AccessUnit->AUCodecData->ParsedInfo.Equals((*LastSentAUCodecData)->ParsedInfo);
+					if (bFormatChanged)
+					{
+						DispatchEvent(FMetricEvent::ReportCodecFormatChange(AccessUnit->AUCodecData->ParsedInfo));
+					}
+					*LastSentAUCodecData = AccessUnit->AUCodecData;
+				}
+				
+				// Notify of any change in data availability.
 				if (pAvailability)
 				{
 					UpdateDataAvailabilityState(*pAvailability, Metrics::FDataAvailabilityChange::EAvailability::DataAvailable);

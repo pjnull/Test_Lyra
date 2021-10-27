@@ -863,6 +863,8 @@ void FStreamReaderFMP4DASH::FStreamHandler::HandleRequest()
 				CSD->CodecSpecificData = Track->GetCodecSpecificData();
 				CSD->RawCSD = Track->GetCodecSpecificDataRAW();
 				CSD->ParsedInfo = Track->GetCodecInformation();
+				// Set information from the MPD codec information that is not available on the init segment.
+				CSD->ParsedInfo.SetBitrate(Request->CodecInfo.GetBitrate());
 			}
 		}
 	}
@@ -992,6 +994,8 @@ void FStreamReaderFMP4DASH::FStreamHandler::HandleRequest()
 								CSD->CodecSpecificData = Track->GetCodecSpecificData();
 								CSD->RawCSD = Track->GetCodecSpecificDataRAW();
 								CSD->ParsedInfo = Track->GetCodecInformation();
+								// Set information from the MPD codec information that is not available on the init segment.
+								CSD->ParsedInfo.SetBitrate(Request->CodecInfo.GetBitrate());
 
 								IParserISO14496_12::ITrackIterator* TrackIterator = Track->CreateIterator();
 								TrackTimescale = TrackIterator->GetTimescale();

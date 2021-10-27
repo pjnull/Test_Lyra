@@ -461,6 +461,16 @@ namespace Electra
 			return CSD;
 		}
 
+		void SetBitrate(int32 InBitrate)
+		{
+			Bitrate = InBitrate;
+		}
+		
+		int32 GetBitrate() const
+		{
+			return Bitrate;
+		}
+
 		FParamDict& GetExtras()
 		{
 			return Extras;
@@ -484,6 +494,7 @@ namespace Electra
 			FrameRate = FTimeFraction::GetInvalid();
 			ProfileLevel.Clear();
 			StreamLanguageCode.Empty();
+			Bitrate = 0;
 			SampleRate = 0;
 			NumChannels = 0;
 			ChannelConfiguration = 0;
@@ -574,6 +585,7 @@ namespace Electra
 		FTimeFraction	FrameRate;					//!< Frame rate, if this is a video stream
 		FProfileLevel	ProfileLevel;
 		FString			StreamLanguageCode;			//!< Language code from the stream itself, if present.
+		int32			Bitrate;
 		int32			SampleRate;					//!< Decoded sample rate, if this is an audio stream.
 		int32			NumChannels;				//!< Number of decoded channels, if this is an audio stream.
 		uint32			ChannelConfiguration;		//!< Format specific audio channel configuration

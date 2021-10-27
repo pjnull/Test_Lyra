@@ -197,6 +197,7 @@ void FElectraPlayer::ClearToDefaultState()
 	bSubtitleTrackIndexDirty = true;
 	bInitialSeekPerformed = false;
 	LastPresentedFrameDimension = FIntPoint::ZeroValue;
+	CurrentlyActiveVideoStreamFormat.Reset();
 	DeferredPlayerEvents.Empty();
 	MediaUrl.Empty();
 }
@@ -1181,6 +1182,39 @@ bool FElectraPlayer::GetVideoTrackFormat(int32 TrackIndex, int32 FormatIndex, FV
 }
 
 
+int32 FElectraPlayer::GetNumVideoStreams(int32 TrackIndex) const
+{
+	TSharedPtr<Electra::FTrackMetadata, ESPMode::ThreadSafe> Meta = GetTrackStreamMetadata(EPlayerTrackType::Video, TrackIndex);
+	return Meta.IsValid() ? Meta->StreamDetails.Num() : 0;
+}
+
+bool FElectraPlayer::GetVideoStreamFormat(FVideoStreamFormat& OutFormat, int32 InTrackIndex, int32 InStreamIndex) const
+{
+	TSharedPtr<Electra::FTrackMetadata, ESPMode::ThreadSafe> Meta = GetTrackStreamMetadata(EPlayerTrackType::Video, InTrackIndex);
+	if (Meta.IsValid() && InStreamIndex < Meta->StreamDetails.Num())
+	{
+		const Electra::FStreamCodecInformation& ci = Meta->StreamDetails[InStreamIndex].CodecInformation;
+		OutFormat.Bitrate = Meta->StreamDetails[InStreamIndex].Bandwidth;
+		OutFormat.Resolution.X = ci.GetResolution().Width;
+		OutFormat.Resolution.Y = ci.GetResolution().Height;
+		OutFormat.FrameRate = (float)ci.GetFrameRate().GetAsDouble();
+		return true;
+	}
+	return false;
+}
+
+
+bool FElectraPlayer::GetActiveVideoStreamFormat(FVideoStreamFormat& OutFormat) const
+{
+	FScopeLock lock(&PlayerLock);
+	if (CurrentlyActiveVideoStreamFormat.IsSet())
+	{
+		OutFormat = CurrentlyActiveVideoStreamFormat.GetValue();
+	}
+	return false;
+}
+
+
 int32 FElectraPlayer::GetNumTracks(EPlayerTrackType TrackType) const
 {
 	if (TrackType == EPlayerTrackType::Audio)
@@ -1675,6 +1709,12 @@ void FElectraPlayer::HandleDeferredPlayerEvents()
 			{
 				FPlayerMetricEvent_VideoQualityChange* Ev = static_cast<FPlayerMetricEvent_VideoQualityChange*>(Event.Get());
 				HandlePlayerEventVideoQualityChange(Ev->NewBitrate, Ev->PreviousBitrate, Ev->bIsDrasticDownswitch);
+				break;
+			}
+			case FPlayerMetricEventBase::EType::CodecFormatChange:
+			{
+				FPlayerMetricEvent_CodecFormatChange* Ev = static_cast<FPlayerMetricEvent_CodecFormatChange*>(Event.Get());
+				HandlePlayerEventCodecFormatChange(Ev->NewDecodingFormat);
 				break;
 			}
 			case FPlayerMetricEventBase::EType::PrerollStart:
@@ -2190,6 +2230,23 @@ void FElectraPlayer::HandlePlayerEventVideoQualityChange(int32 NewBitrate, int32
 
 	CSV_EVENT(ElectraPlayer, TEXT("QualityChange %d -> %d"), PreviousBitrate, NewBitrate);
 }
+
+void FElectraPlayer::HandlePlayerEventCodecFormatChange(const Electra::FStreamCodecInformation& NewDecodingFormat)
+{
+	if (NewDecodingFormat.IsVideoCodec())
+	{
+		FVideoStreamFormat fmt;
+		fmt.Bitrate = NewDecodingFormat.GetBitrate();
+		fmt.Resolution.X = NewDecodingFormat.GetResolution().Width;
+		fmt.Resolution.Y = NewDecodingFormat.GetResolution().Height;
+		fmt.FrameRate = NewDecodingFormat.GetFrameRate().IsValid() ? NewDecodingFormat.GetFrameRate().GetAsDouble() : 0.0;
+		{
+		FScopeLock lock(&PlayerLock);
+		CurrentlyActiveVideoStreamFormat = fmt;
+		}
+	}
+}
+
 
 void FElectraPlayer::HandlePlayerEventPrerollStart()
 {

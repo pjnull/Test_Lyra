@@ -580,6 +580,7 @@ IManifest::FResult FPlayPeriodHLS::FindSegment(TSharedPtrTS<FStreamSegmentReques
 	else if (StreamType == EStreamType::Audio)
 	{
 		Req->SourceBufferInfo = CurrentSourceBufferInfoAudio;
+		Req->Bitrate = InPlaylist->GetBitrate();
 	}
 
 	const TArray<FManifestHLSInternal::FMediaStream::FMediaSegment>& SegmentList = InStream->SegmentList;

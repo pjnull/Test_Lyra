@@ -154,6 +154,7 @@ namespace Electra
 		virtual void ReportLicenseKey(const Metrics::FLicenseKeyStats& LicenseKeyStats) override {}
 		virtual void ReportDataAvailabilityChange(const Metrics::FDataAvailabilityChange& DataAvailability) override {}
 		virtual void ReportVideoQualityChange(int32 NewBitrate, int32 PreviousBitrate, bool bIsDrasticDownswitch) override {}
+		virtual void ReportDecodingFormatChange(const FStreamCodecInformation& NewDecodingFormat) override {}
 		virtual void ReportPrerollStart() override {}
 		virtual void ReportPrerollEnd() override {}
 		virtual void ReportPlaybackStart() override {}

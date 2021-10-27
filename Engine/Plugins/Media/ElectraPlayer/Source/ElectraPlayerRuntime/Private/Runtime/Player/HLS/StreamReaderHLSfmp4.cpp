@@ -692,6 +692,8 @@ void FStreamReaderHLSfmp4::FStreamHandler::HandleRequest()
 						CSD->CodecSpecificData = Track->GetCodecSpecificData();
 						CSD->RawCSD = Track->GetCodecSpecificDataRAW();
 						CSD->ParsedInfo = Track->GetCodecInformation();
+						// Set information from the master playlist that is not available on the init segment.
+						CSD->ParsedInfo.SetBitrate(Request->Bitrate);
 					}
 				}
 			}
@@ -850,6 +852,8 @@ void FStreamReaderHLSfmp4::FStreamHandler::HandleRequest()
 									CSD->CodecSpecificData = Track->GetCodecSpecificData();
 									CSD->RawCSD = Track->GetCodecSpecificDataRAW();
 									CSD->ParsedInfo = Track->GetCodecInformation();
+									// Set information from the master playlist that is not available on the init segment.
+									CSD->ParsedInfo.SetBitrate(Request->Bitrate);
 
 									// TODO: Check that the track format matches the one we're expecting (video, audio, etc)
 									IParserISO14496_12::ITrackIterator* TrackIterator = Track->CreateIterator();
