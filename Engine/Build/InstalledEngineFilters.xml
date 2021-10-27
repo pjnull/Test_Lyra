@@ -294,6 +294,9 @@
 
 		<!-- Binaries required to make Bink2 videos -->
 		Engine/Binaries/ThirdParty/Bink/...
+		
+		<!-- UnrealTraceServer is the tool that records Unreal Insights trace files -->
+		Engine/Binaries/Win64/UnrealTraceServer.exe
 	</Property>
 
 	<Property Name="CopyEditorExceptionsWin64" Value="$(CopyEditorExceptions)">
