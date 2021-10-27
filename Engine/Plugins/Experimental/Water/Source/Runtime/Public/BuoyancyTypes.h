@@ -284,6 +284,7 @@ struct FBuoyancyData
 		, MaxShorePushForce(300.0f)
 		, WaterVelocityStrength(0.01f)
 		, MaxWaterForce(10000.f)
+		, DownstreamAxisOfRotation(FVector::ZeroVector)
 	{
 	}
 
