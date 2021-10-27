@@ -204,7 +204,7 @@ namespace Audio
 
 		EDecompressionType DecompressionType = InWave->DecompressionType;
 
-		if (bForceRealtime  && DecompressionType != DTYPE_Setup && DecompressionType != DTYPE_Streaming)
+		if (bForceRealtime  && DecompressionType != DTYPE_Setup && DecompressionType != DTYPE_Streaming && DecompressionType != DTYPE_Procedural)
 		{
 			DecompressionType = DTYPE_RealTime;
 		}
