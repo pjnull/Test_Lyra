@@ -885,11 +885,6 @@ public:
 	/** Interface for communication network state to others (ie World usually, but anything that implements FNetworkNotify) */
 	class FNetworkNotify*		Notify;
 	
-	/** Accumulated time for the net driver, updated by Tick */
-	UE_DEPRECATED(4.25, "Time is being replaced with a double precision value, please use GetElapsedTime() instead.")
-	UPROPERTY()
-	float						Time;
-
 	double GetElapsedTime() const { return ElapsedTime; }
 	void ResetElapsedTime() { ElapsedTime = 0.0; }
 
