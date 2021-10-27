@@ -1955,7 +1955,7 @@ namespace Chaos
 				Constraint->SetManifold(Implicit0, Simplicial0, Implicit1, Simplicial1);
 			}
 
-			if (T_TRAITS::bImmediateUpdate && (Constraint != nullptr) && !Constraint->WasManifoldRestored())
+			if (T_TRAITS::bImmediateUpdate && !Constraint->WasManifoldRestored())
 			{
 				FRigidTransform3 WorldTransform0 = Constraint->ImplicitTransform[0] * ParticleWorldTransform0;
 				FRigidTransform3 WorldTransform1 = Constraint->ImplicitTransform[1] * ParticleWorldTransform1;

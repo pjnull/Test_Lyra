@@ -942,7 +942,6 @@ public:
 
 	virtual ~FGroomCacheBuffers()
 	{
-		Reset();
 	}
 
 	virtual void Reset()
@@ -1148,7 +1147,18 @@ public:
 	{
 	}
 
+	virtual ~FGroomCacheStreamedBuffers()
+	{
+		ResetInternal();
+	}
+
 	virtual void Reset() override
+	{
+		ResetInternal();
+	}
+
+private:
+	void ResetInternal()
 	{
 		// Unmap the frames that are currently mapped
 		if (CurrentFrameIndex != -1)
@@ -1166,6 +1176,7 @@ public:
 		}
 	}
 
+public:
 	virtual const FGroomCacheAnimationData& GetCurrentFrameBuffer() override
 	{
 		if (CurrentFramePtr)

@@ -1146,7 +1146,7 @@ namespace Chaos
 				const FRigidTransform3 Transform1 = FParticleUtilities::GetCoMWorldTransform(FConstGenericParticleHandle(Constraint->GetConstrainedParticles()[1])) * SpaceTransform;
 
 				FVec3 ContactPos = Constraint->GetContactLocation();
-				if ((Constraint != nullptr) && (Constraint->GetManifoldPoints().Num() > 0))
+				if (Constraint->GetManifoldPoints().Num() > 0)
 				{
 					ContactPos = FVec3(0);
 					for (const FManifoldPoint& ManifoldPoint : Constraint->GetManifoldPoints())

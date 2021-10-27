@@ -93,7 +93,7 @@ namespace UE
 
 			UInterchangeAssetImportData* AssetImportData = Private::ImportCommon::BeginSetupAssetData(Parameters);
 
-			if (Parameters.AssetImportData)
+			if (Parameters.AssetImportData) //-V1051
 			{
 				if (!Parameters.AssetImportData->IsA<UInterchangeAssetImportData>())
 				{

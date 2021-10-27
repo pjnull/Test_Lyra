@@ -321,8 +321,8 @@ namespace Chaos
 		bool bIsFloorAnalytic;
 		FReal FloorHeight;
 
-		FParticlesType Particles;
 		FParticleUniqueIndicesMultithreaded UniqueIndices;
+		FParticlesType Particles;
 		TUniquePtr<FPBDRigidsEvolution> MEvolution;
 		TUniquePtr<FEventManager> MEventManager;
 		TUniquePtr<FSolverEventFilters> MSolverEventFilters;
