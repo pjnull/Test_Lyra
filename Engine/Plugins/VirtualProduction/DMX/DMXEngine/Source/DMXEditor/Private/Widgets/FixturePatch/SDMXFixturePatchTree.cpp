@@ -44,12 +44,13 @@ void SDMXFixturePatchTree::Construct(const FArguments& InArgs)
 
 	if (TSharedPtr<FDMXEditor> PinnedEditor = DMXEditor.Pin())
 	{
+		// Bind to fixture patch shared data selection changes
 		FixturePatchSharedData = PinnedEditor->GetFixturePatchSharedData();
-	}
-	check(FixturePatchSharedData.IsValid());
+		FixturePatchSharedData->OnFixturePatchSelectionChanged.AddSP(this, &SDMXFixturePatchTree::OnSharedDataSelectedFixturePatches);
 
-	// Bind to fixture patch shared data selection changes
-	FixturePatchSharedData->OnFixturePatchSelectionChanged.AddSP(this, &SDMXFixturePatchTree::OnSharedDataSelectedFixturePatches);
+		// Bind to library changes
+		PinnedEditor->GetDMXLibrary()->GetOnEntitiesUpdated().AddSP(this, &SDMXFixturePatchTree::OnEntitiesUpdated);
+	}
 
 	OnAutoAssignAddressChanged = InArgs._OnAutoAssignAddressChanged;
 }
@@ -557,6 +558,14 @@ void SDMXFixturePatchTree::OnRenameNode()
 bool SDMXFixturePatchTree::CanRenameNode() const
 {
 	return EntitiesTreeWidget->GetSelectedItems().Num() == 1 && EntitiesTreeWidget->GetSelectedItems()[0]->CanRename();
+}
+
+void SDMXFixturePatchTree::OnEntitiesUpdated(UDMXLibrary* DMXLibrary)
+{
+	if (DMXLibrary && AddButtonDropdownList.IsValid())
+	{
+		AddButtonDropdownList->RefreshEntitiesList();
+	}
 }
 
 TSharedPtr<SDMXFixturePatchTreeFixturePatchRow> SDMXFixturePatchTree::FindEntityRowByNode(const TSharedRef<FDMXEntityTreeEntityNode>& EntityNode)

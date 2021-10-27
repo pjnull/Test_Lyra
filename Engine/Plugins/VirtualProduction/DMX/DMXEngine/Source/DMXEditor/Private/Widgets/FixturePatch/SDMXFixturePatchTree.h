@@ -75,6 +75,9 @@ protected:
 	//~ End SDMXEntityTreeViewBase interface
 
 private:
+	/** Called when the Entities in the DMX Library changed */
+	void OnEntitiesUpdated(UDMXLibrary* DMXLibrary);
+
 	/** Returns the row that corresponds to the node */
 	TSharedPtr<SDMXFixturePatchTreeFixturePatchRow> FindEntityRowByNode(const TSharedRef<FDMXEntityTreeEntityNode>& EntityNode);
 
