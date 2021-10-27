@@ -2956,7 +2956,7 @@ void UGeometryCollectionComponent::SelectEmbeddedGeometry()
 	const TManagedArray<int32>& ExemplarIndex = GetExemplarIndexArray();
 	for (int32 SelectedBone : SelectedBones)
 	{
-		if (ExemplarIndex[SelectedBone] > INDEX_NONE)
+		if (EmbeddedGeometryComponents.IsValidIndex(ExemplarIndex[SelectedBone]))
 		{
 			EmbeddedGeometryComponents[ExemplarIndex[SelectedBone]]->SelectInstance(true, EmbeddedInstanceIndex[SelectedBone], 1);
 		}
