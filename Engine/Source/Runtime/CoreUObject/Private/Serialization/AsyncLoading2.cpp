@@ -2256,7 +2256,6 @@ public:
 		const FPackagePath& InPackagePath,
 		FName InCustomName,
 		FLoadPackageAsyncDelegate InCompletionDelegate,
-		const FGuid* InGuid,
 		EPackageFlags InPackageFlags,
 		int32 InPIEInstanceID,
 		int32 InPackagePriority,
@@ -5934,7 +5933,7 @@ void FAsyncPackage2::AddCompletionCallback(TUniquePtr<FLoadPackageAsyncDelegate>
 	CompletionCallbacks.Emplace(MoveTemp(Callback));
 }
 
-int32 FAsyncLoadingThread2::LoadPackage(const FPackagePath& InPackagePath, FName InCustomName, FLoadPackageAsyncDelegate InCompletionDelegate, const FGuid* InGuid, EPackageFlags InPackageFlags, int32 InPIEInstanceID, int32 InPackagePriority, const FLinkerInstancingContext*)
+int32 FAsyncLoadingThread2::LoadPackage(const FPackagePath& InPackagePath, FName InCustomName, FLoadPackageAsyncDelegate InCompletionDelegate, EPackageFlags InPackageFlags, int32 InPIEInstanceID, int32 InPackagePriority, const FLinkerInstancingContext*)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(LoadPackage);
 

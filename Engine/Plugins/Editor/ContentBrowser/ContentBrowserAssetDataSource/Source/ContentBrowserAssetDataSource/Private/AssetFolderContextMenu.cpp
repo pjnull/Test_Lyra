@@ -306,7 +306,7 @@ void FAssetFolderContextMenu::ExecuteSCCOpenForAdd()
 
 			// Make sure the file actually exists on disk before adding it
 			FString Filename;
-			if ( !FPackageName::DoesPackageExist(*PackageIt, NULL, &Filename) )
+			if ( !FPackageName::DoesPackageExist(*PackageIt, &Filename) )
 			{
 				UPackage* Package = FindPackage(NULL, **PackageIt);
 				if ( Package )

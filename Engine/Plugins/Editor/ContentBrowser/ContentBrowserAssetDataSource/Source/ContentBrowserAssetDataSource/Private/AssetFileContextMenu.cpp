@@ -809,7 +809,7 @@ void FAssetFileContextMenu::MakeAssetLocalizationSubMenu(UToolMenu* Menu)
 	if (SelectedAssets.Num() == 1)
 	{
 		FString PackageFilename;
-		if (FPackageName::DoesPackageExist(SelectedAssets[0].PackageName.ToString(), nullptr, &PackageFilename))
+		if (FPackageName::DoesPackageExist(SelectedAssets[0].PackageName.ToString(), &PackageFilename))
 		{
 			FToolMenuSection& Section = Menu->AddSection("LocalizationCache", LOCTEXT("LocalizationCacheHeading", "Localization Cache"));
 			{
@@ -2090,7 +2090,7 @@ void FAssetFileContextMenu::ExecuteSCCOpenForAdd()
 
 			// Make sure the file actually exists on disk before adding it
 			FString Filename;
-			if ( !FPackageName::DoesPackageExist(*PackageIt, NULL, &Filename) )
+			if ( !FPackageName::DoesPackageExist(*PackageIt, &Filename) )
 			{
 				UPackage* Package = FindPackage(NULL, **PackageIt);
 				if ( Package )

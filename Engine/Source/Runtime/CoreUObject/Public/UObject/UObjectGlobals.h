@@ -471,14 +471,13 @@ DECLARE_DELEGATE_ThreeParams(FLoadPackageAsyncDelegate, const FName& /*PackageNa
  * @param	InPackagePath			PackagePath to load. Must be a mounted path. The package is created if it does not already exist.
  * @param	InPackageNameToCreate	If not none, this is the name of the package to load the bytes on disk into (and create if not yet existing). If none, the name is taken from PackagePath.
  * @param	InCompletionDelegate	Delegate to be invoked when the packages has finished streaming
- * @param	InGuid					GUID of the package to load, or nullptr for "don't care"
  * @param	InPackageFlags			Package flags used to construct loaded package in memory
  * @param	InPIEInstanceID			Play in Editor instance ID
  * @param	InPackagePriority		Loading priority
  * @param   InstancingContext		Additional context to map object names to their instanced counterpart when loading an instanced package
  * @return Unique ID associated with this load request (the same package can be associated with multiple IDs).
  */
-COREUOBJECT_API int32 LoadPackageAsync(const FPackagePath& InPackagePath, FName InPackageNameToCreate = NAME_None, FLoadPackageAsyncDelegate InCompletionDelegate = FLoadPackageAsyncDelegate(), const FGuid* InGuid = nullptr, EPackageFlags InPackageFlags = PKG_None, int32 InPIEInstanceID = INDEX_NONE, TAsyncLoadPriority InPackagePriority = 0, const FLinkerInstancingContext* InstancingContext = nullptr);
+COREUOBJECT_API int32 LoadPackageAsync(const FPackagePath& InPackagePath, FName InPackageNameToCreate = NAME_None, FLoadPackageAsyncDelegate InCompletionDelegate = FLoadPackageAsyncDelegate(), EPackageFlags InPackageFlags = PKG_None, int32 InPIEInstanceID = INDEX_NONE, TAsyncLoadPriority InPackagePriority = 0, const FLinkerInstancingContext* InstancingContext = nullptr);
 
 /**
  * Asynchronously load a package and all contained objects that match context flags. Non-blocking.
@@ -503,7 +502,7 @@ COREUOBJECT_API int32 LoadPackageAsync(const FString& InName, const FGuid* InGui
  */
 COREUOBJECT_API int32 LoadPackageAsync(const FString& InName, FLoadPackageAsyncDelegate InCompletionDelegate, TAsyncLoadPriority InPackagePriority = 0, EPackageFlags InPackageFlags = PKG_None, int32 InPIEInstanceID = INDEX_NONE);
 
-UE_DEPRECATED(5.0, "Use version that takes a PackagePath")
+UE_DEPRECATED(5.0, "Use version that takes a FPackagePath without a FGuid")
 COREUOBJECT_API int32 LoadPackageAsync(const FString& InName, const FGuid* InGuid, const TCHAR* InPackageToLoadFrom, FLoadPackageAsyncDelegate InCompletionDelegate = FLoadPackageAsyncDelegate(), EPackageFlags InPackageFlags = PKG_None, int32 InPIEInstanceID = INDEX_NONE, TAsyncLoadPriority InPackagePriority = 0, const FLinkerInstancingContext* InstancingContext = nullptr);
 
 /**

@@ -10027,7 +10027,7 @@ FGuid UEngine::GetPackageGuid(FName PackageName, bool bForPIE)
 	}
 	UPackage* PackageToReset = nullptr;
 
-	FLinkerLoad* Linker = LoadPackageLinker(nullptr, PackagePath, LoadFlags, nullptr, nullptr, nullptr, [&PackageToReset, &Result](FLinkerLoad* InLinker)
+	FLinkerLoad* Linker = LoadPackageLinker(nullptr, PackagePath, LoadFlags, nullptr, nullptr, [&PackageToReset, &Result](FLinkerLoad* InLinker)
 	{
 		if (InLinker != nullptr && InLinker->LinkerRoot != nullptr)
 		{
@@ -14133,11 +14133,11 @@ void UEngine::LoadPackagesFully(UWorld * InWorld, EFullyLoadPackageType FullyLoa
 				FString SFPackageName = PackagesInfo.PackagesToLoad[PackageIndex].ToString() + STANDALONE_SEEKFREE_SUFFIX;
 				bool bFoundFile = false;
 				FString PackagePath;
-				if (FPackageName::DoesPackageExist(SFPackageName, NULL, &PackagePath))
+				if (FPackageName::DoesPackageExist(SFPackageName, &PackagePath))
 				{
 					bFoundFile = true;
 				}
-				else if ( (FPackageName::DoesPackageExist(PackagesInfo.PackagesToLoad[PackageIndex].ToString(), NULL, &PackagePath)) )
+				else if ( (FPackageName::DoesPackageExist(PackagesInfo.PackagesToLoad[PackageIndex].ToString(), &PackagePath)) )
 				{
 					bFoundFile = true;
 				}

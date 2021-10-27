@@ -6356,7 +6356,7 @@ void FSeamlessTravelHandler::SeamlessTravelLoadCallback(const FName& PackageName
 	TRACE_BOOKMARK(TEXT("StartTravelComplete - %s"), *PackageName.ToString());
 }
 
-bool FSeamlessTravelHandler::StartTravel(UWorld* InCurrentWorld, const FURL& InURL, const FGuid& InGuid)
+bool FSeamlessTravelHandler::StartTravel(UWorld* InCurrentWorld, const FURL& InURL)
 {
 	FWorldContext &Context = GEngine->GetWorldContextFromWorldChecked(InCurrentWorld);
 	WorldContextHandle = Context.ContextHandle;
@@ -6373,7 +6373,7 @@ bool FSeamlessTravelHandler::StartTravel(UWorld* InCurrentWorld, const FURL& InU
 		FLoadTimeTracker::Get().ResetRawLoadTimes();
 		UE_LOG(LogWorld, Log, TEXT("SeamlessTravel to: %s"), *InURL.Map);
 		FString MapName = UWorld::RemovePIEPrefix(InURL.Map);
-		if (!FPackageName::DoesPackageExist(MapName, InGuid.IsValid() ? &InGuid : NULL))
+		if (!FPackageName::DoesPackageExist(MapName))
 		{
 			UE_LOG(LogWorld, Error, TEXT("Unable to travel to '%s' - file not found"), *MapName);
 			return false;
@@ -6404,7 +6404,6 @@ bool FSeamlessTravelHandler::StartTravel(UWorld* InCurrentWorld, const FURL& InU
 			checkSlow(LoadedWorld == NULL);
 
 			PendingTravelURL = InURL;
-			PendingTravelGuid = InGuid;
 			bSwitchedToDefaultMap = false;
 			bTransitionInProgress = true;
 			bPauseAtMidpoint = false;
@@ -6471,12 +6470,20 @@ bool FSeamlessTravelHandler::StartTravel(UWorld* InCurrentWorld, const FURL& InU
 				// first, load the entry level package
 				STAT_ADD_CUSTOMMESSAGE_NAME( STAT_NamedMarker, *(FString( TEXT( "StartTravel - " ) + TransitionMap )) );
 				TRACE_BOOKMARK(TEXT("StartTravel - %s"), *TransitionMap);
-				LoadPackageAsync(TransitionMap, 
-					FLoadPackageAsyncDelegate::CreateRaw(this, &FSeamlessTravelHandler::SeamlessTravelLoadCallback),
-					0, 
-					(CurrentWorld->WorldType == EWorldType::PIE ? PKG_PlayInEditor : PKG_None),
-					Context.PIEInstance
-					);
+				FPackagePath PackagePath;
+				if (FPackagePath::TryFromMountedName(TransitionMap, PackagePath))
+				{
+					LoadPackageAsync(PackagePath, 
+						FName(),
+						FLoadPackageAsyncDelegate::CreateRaw(this, &FSeamlessTravelHandler::SeamlessTravelLoadCallback),
+						(CurrentWorld->WorldType == EWorldType::PIE ? PKG_PlayInEditor : PKG_None),
+						Context.PIEInstance
+						);
+				}
+				else
+				{
+					UE_LOG(LogWorld, Error, TEXT("StartTravel: Invalid TransitionMap \"%s\""), *TransitionMap);
+				}
 			}
 
 			return true;
@@ -6590,7 +6597,6 @@ void FSeamlessTravelHandler::StartLoadingDestination()
 				PackagePath,
 				PackageName,
 				FLoadPackageAsyncDelegate::CreateRaw(this, &FSeamlessTravelHandler::SeamlessTravelLoadCallback),
-				PendingTravelGuid.IsValid() ? &PendingTravelGuid : NULL,
 				PackageFlags,
 				PIEInstanceID
 			);
@@ -7098,10 +7104,8 @@ UWorld* FSeamlessTravelHandler::Tick()
  * is reset/reloaded when transitioning. (like UT)
  * @param URL the URL to travel to; must be relative to the current URL (same server)
  * @param bAbsolute (opt) - if true, URL is absolute, otherwise relative
- * @param MapPackageGuid (opt) - the GUID of the map package to travel to - this is used to find the file when it has been autodownloaded,
- * 				so it is only needed for clients
  */
-void UWorld::SeamlessTravel(const FString& SeamlessTravelURL, bool bAbsolute, FGuid MapPackageGuid)
+void UWorld::SeamlessTravel(const FString& SeamlessTravelURL, bool bAbsolute)
 {
 	// construct the URL
 	FURL NewURL(&GEngine->LastURLFromWorld(this), *SeamlessTravelURL, bAbsolute ? TRAVEL_Absolute : TRAVEL_Relative);
@@ -7119,9 +7123,7 @@ void UWorld::SeamlessTravel(const FString& SeamlessTravelURL, bool bAbsolute, FG
 		}
 		// tell the handler to start the transition
 		FSeamlessTravelHandler &SeamlessTravelHandler = GEngine->SeamlessTravelHandlerForWorld( this );
-		PRAGMA_DISABLE_DEPRECATION_WARNINGS
-		if (!SeamlessTravelHandler.StartTravel(this, NewURL, MapPackageGuid) && !SeamlessTravelHandler.IsInTransition())
-		PRAGMA_ENABLE_DEPRECATION_WARNINGS
+		if (!SeamlessTravelHandler.StartTravel(this, NewURL) && !SeamlessTravelHandler.IsInTransition())
 		{
 			const FString Error = FText::Format( NSLOCTEXT("Engine", "InvalidUrl", "Invalid URL: {0}"), FText::FromString( SeamlessTravelURL ) ).ToString();
 			GEngine->BroadcastTravelFailure(this, ETravelFailure::InvalidURL, Error);

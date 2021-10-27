@@ -2492,7 +2492,7 @@ bool UEditorEngine::Map_Load(const TCHAR* Str, FOutputDevice& Ar)
 			}
 
 			FString UnusedAlteredPath;
-			if ( ExistingWorld || FPackageName::DoesPackageExist(LongTempFname, nullptr, &UnusedAlteredPath) )
+			if ( ExistingWorld || FPackageName::DoesPackageExist(LongTempFname, &UnusedAlteredPath) )
 			{
 				FText NotMapReason;
 				if( !ExistingWorld && !PackageIsAMapFile( *TempFname, NotMapReason ) )
@@ -4005,7 +4005,7 @@ bool UEditorEngine::Map_Check( UWorld* InWorld, const TCHAR* Str, FOutputDevice&
 		ULevel* Level = InWorld->GetLevel( LevelIndex );
 		UPackage* LevelPackage = Level->GetOutermost();
 		FString PackageFilename;
-		if( FPackageName::DoesPackageExist( LevelPackage->GetName(), NULL, &PackageFilename ) && 
+		if( FPackageName::DoesPackageExist( LevelPackage->GetName(), &PackageFilename ) && 
 			FPaths::GetBaseFilename(PackageFilename).Len() > MaxFilenameLen )
 		{
 			const FString BaseFilenameOfPackageFilename = FPaths::GetBaseFilename(PackageFilename);

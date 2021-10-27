@@ -1200,7 +1200,7 @@ UPackageTools::UPackageTools(const FObjectInitializer& ObjectInitializer)
 	bool UPackageTools::IsPackageExternal(const UPackage& Package)
 	{
 		FString FileString;
-		FPackageName::DoesPackageExist(Package.GetName(), NULL, &FileString);
+		FPackageName::DoesPackageExist(Package.GetName(), &FileString);
 
 		return IsPackagePathExternal( FileString );
 	}
@@ -1227,7 +1227,7 @@ UPackageTools::UPackageTools(const FObjectInitializer& ObjectInitializer)
 	bool UPackageTools::IsSingleAssetPackage(const FString& PackageName)
 	{
 		FString PackageFileName;
-		if ( FPackageName::DoesPackageExist(PackageName, NULL, &PackageFileName) )
+		if ( FPackageName::DoesPackageExist(PackageName, &PackageFileName) )
 		{
 			return FPaths::GetExtension(PackageFileName, /*bIncludeDot=*/true) == FPackageName::GetAssetPackageExtension();
 		}

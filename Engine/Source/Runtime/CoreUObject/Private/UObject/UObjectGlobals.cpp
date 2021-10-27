@@ -1246,7 +1246,7 @@ UPackage* LoadPackageInternal(UPackage* InOuter, const FPackagePath& PackagePath
 
 		{
 			FUObjectSerializeContext* InOutLoadContext = LoadContext;
-			Linker = GetPackageLinker(InOuter, PackagePath, LoadFlags, nullptr, nullptr, InReaderOverride, &InOutLoadContext, ImportLinker, InstancingContext);
+			Linker = GetPackageLinker(InOuter, PackagePath, LoadFlags, nullptr, InReaderOverride, &InOutLoadContext, ImportLinker, InstancingContext);
 			if (InOutLoadContext != LoadContext && InOutLoadContext)
 			{
 				// The linker already existed and was associated with another context
@@ -4261,7 +4261,7 @@ FString FAssetMsg::FormatPathForAssetLog(const TCHAR* InPath)
 	}
 
 	// Try to convert this to a file path
-	if (FPackageName::DoesPackageExist(AssetPath, 0, &FilePath) == false)
+	if (FPackageName::DoesPackageExist(AssetPath, &FilePath) == false)
 	{
 		// if failed, assume we were given something that's a file path (e.g. ../../../Game/Whatever)
 		FilePath = AssetPath;

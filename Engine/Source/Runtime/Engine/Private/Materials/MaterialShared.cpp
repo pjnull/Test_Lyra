@@ -188,7 +188,7 @@ static void GetReloadInfo(const FString& PackageName, FString* OutFilename)
 	FString LocalizedName;
 	LocalizedName = FPackageName::GetDelegateResolvedPackagePath(RedirectedName.PackageName.ToString());
 	LocalizedName = FPackageName::GetLocalizedPackagePath(LocalizedName);
-	bool bSucceed = FPackageName::DoesPackageExist(LocalizedName, nullptr, &Filename);
+	bool bSucceed = FPackageName::DoesPackageExist(LocalizedName, &Filename);
 	Filename = FPaths::ChangeExtension(Filename, TEXT(".uexp"));
 
 	// Dynamic material resource loading requires split export to work

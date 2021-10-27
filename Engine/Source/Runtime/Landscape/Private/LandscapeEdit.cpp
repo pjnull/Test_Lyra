@@ -2420,7 +2420,7 @@ ULandscapeLayerInfoObject* ALandscapeProxy::CreateLayerInfo(const TCHAR* LayerNa
 	FString PackageName = Path + LayerObjectName.ToString();
 	FString PackageFilename;
 	int32 Suffix = 1;
-	while (FPackageName::DoesPackageExist(PackageName, nullptr, &PackageFilename))
+	while (FPackageName::DoesPackageExist(PackageName, &PackageFilename))
 	{
 		LayerObjectName = FName(*FString::Printf(TEXT("LayerInfoObject_%s_%d"), LayerName, Suffix));
 		PackageName = Path + LayerObjectName.ToString();

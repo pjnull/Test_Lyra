@@ -1301,7 +1301,7 @@ void FLevelCollectionModel::SCCDiffAgainstDepot(const FLevelModelList& InList, U
 		{
 			// Get the file name of package
 			FString RelativeFileName;
-			if(FPackageName::DoesPackageExist(PackageName, NULL, &RelativeFileName))
+			if(FPackageName::DoesPackageExist(PackageName, &RelativeFileName))
 			{
 				if (SourceControlState->GetHistorySize() > 0)
 				{

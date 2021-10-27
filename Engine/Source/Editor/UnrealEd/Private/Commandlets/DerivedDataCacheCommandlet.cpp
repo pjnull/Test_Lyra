@@ -587,7 +587,7 @@ int32 UDerivedDataCacheCommandlet::Main( const FString& Params )
 				}
 
 				FString SoftRefFilename;
-				if (FPackageName::DoesPackageExist(SoftRefName.ToString(), nullptr, &SoftRefFilename))
+				if (FPackageName::DoesPackageExist(SoftRefName.ToString(), &SoftRefFilename))
 				{
 					PackagePaths.Push(TPair<FString, FName>(SoftRefFilename, SoftRefName));
 					PackagesToProcess.Add(SoftRefName);
@@ -692,7 +692,7 @@ int32 UDerivedDataCacheCommandlet::Main( const FString& Params )
 					{
 						PackagesToProcess.Add(SoftRefName);
 						FString SoftRefFilename;
-						if (FPackageName::DoesPackageExist(SoftRefName.ToString(), nullptr, &SoftRefFilename))
+						if (FPackageName::DoesPackageExist(SoftRefName.ToString(), &SoftRefFilename))
 						{
 							UE_LOG(LogDerivedDataCacheCommandlet, Log, TEXT("Queueing soft reference '%s' for later processing"), *SoftRefName.ToString());
 							PackagePaths.Push(TPair<FString, FName>(SoftRefFilename, SoftRefName));

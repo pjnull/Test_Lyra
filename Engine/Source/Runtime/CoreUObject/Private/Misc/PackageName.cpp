@@ -1317,7 +1317,7 @@ bool FPackageName::FixPackageNameCase(FString& LongPackageName, FStringView Exte
 	return true;
 }
 
-bool FPackageName::DoesPackageExist(const FString& LongPackageName, const FGuid* Guid, FString* OutFilename, bool InAllowTextFormats)
+bool FPackageName::DoesPackageExist(const FString& LongPackageName, FString* OutFilename, bool InAllowTextFormats)
 {
 	// Make sure interpreting LongPackageName as a filename is supported.
 	FPackagePath PackagePath;
@@ -1338,7 +1338,7 @@ bool FPackageName::DoesPackageExist(const FString& LongPackageName, const FGuid*
 		}
 		PackagePath = FPackagePath::FromMountedComponents(PackageNameRoot, FilePathRoot, RelPath, Extension, CustomExtension);
 	}
-	if (!DoesPackageExist(PackagePath, Guid, false /* bMatchCaseOnDisk */, &PackagePath))
+	if (!DoesPackageExist(PackagePath, false /* bMatchCaseOnDisk */, &PackagePath))
 	{
 		return false;
 	}
@@ -1355,10 +1355,10 @@ bool FPackageName::DoesPackageExist(const FString& LongPackageName, const FGuid*
 
 bool FPackageName::DoesPackageExist(const FPackagePath& PackagePath, FPackagePath* OutPackagePath)
 {
-	return DoesPackageExist(PackagePath, nullptr, false, OutPackagePath);
+	return DoesPackageExist(PackagePath, false, OutPackagePath);
 }
 
-bool FPackageName::DoesPackageExist(const FPackagePath& PackagePath, const FGuid* Guid, bool bMatchCaseOnDisk, FPackagePath* OutPackagePath)
+bool FPackageName::DoesPackageExist(const FPackagePath& PackagePath, bool bMatchCaseOnDisk, FPackagePath* OutPackagePath)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FPackageName::DoesPackageExist);
 
@@ -1403,67 +1403,24 @@ bool FPackageName::DoesPackageExist(const FPackagePath& PackagePath, const FGuid
 			}
 			return true;
 		}
-	
+
 		// Try to find uncooked packages on disk when I/O store is enabled in editor builds
 #if !WITH_IOSTORE_IN_EDITOR
 		return false; 
 #endif
 	}
 
-	// On consoles, we don't support package downloading, so no need to waste any extra cycles/disk io dealing with it
-	if (!FPlatformProperties::RequiresCookedData() && Guid != nullptr)
+	if (bMatchCaseOnDisk)
 	{
-		// @todo: If we could get to list of linkers here, it would be faster to check
-		// then to open the file and read it
-		FPackagePath LocalPackagePath;
-		FOpenPackageResult Result = IPackageResourceManager::Get().OpenReadPackage(PackagePath, &LocalPackagePath);
-		TUniquePtr<FArchive>& PackageReader = Result.Archive;
-		if (!PackageReader || Result.Format != EPackageFormat::Binary)
-		{
-			if (PackageReader)
-			{
-				UE_LOG(LogPackageName, Error, TEXT("DoesPackageExist: DoesPackageExist with Guid FAILED: '%s' exists on disk with TextFormat, and we cannot read guids from TextFormat packages."),
-					*PackagePath.GetDebugName());
-			}
-			return false;
-		}
-		// Read in the package summary
-		FPackageFileSummary Summary;
-		*PackageReader << Summary;
-
-		// Compare Guids
-		PRAGMA_DISABLE_DEPRECATION_WARNINGS
-		if (PackageReader->IsError() || Summary.Guid != *Guid)
-		PRAGMA_ENABLE_DEPRECATION_WARNINGS
-		{
-			return false;
-		}
-		PackageReader.Reset();
-
-		if (bMatchCaseOnDisk)
-		{
-			IPackageResourceManager::Get().TryMatchCaseOnDisk(LocalPackagePath, &LocalPackagePath);
-		}
-		if (OutPackagePath)
-		{
-			*OutPackagePath = LocalPackagePath;
-		}
-		return true;
+		return IPackageResourceManager::Get().TryMatchCaseOnDisk(PackagePath, OutPackagePath);
 	}
 	else
 	{
-		if (bMatchCaseOnDisk)
-		{
-			return IPackageResourceManager::Get().TryMatchCaseOnDisk(PackagePath, OutPackagePath);
-		}
-		else
-		{
-			return IPackageResourceManager::Get().DoesPackageExist(PackagePath, OutPackagePath);
-		}
+		return IPackageResourceManager::Get().DoesPackageExist(PackagePath, OutPackagePath);
 	}
 }
 
-FPackageName::EPackageLocationFilter FPackageName::DoesPackageExistEx(const FPackagePath& PackagePath, EPackageLocationFilter Filter, const FGuid* Guid, bool bMatchCaseOnDisk, FPackagePath* OutPackagePath)
+FPackageName::EPackageLocationFilter FPackageName::DoesPackageExistEx(const FPackagePath& PackagePath, EPackageLocationFilter Filter, bool bMatchCaseOnDisk, FPackagePath* OutPackagePath)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FPackageName::DoesPackageExistEx);
 
@@ -1525,59 +1482,13 @@ FPackageName::EPackageLocationFilter FPackageName::DoesPackageExistEx(const FPac
 	if ((uint8)Filter & (uint8)EPackageLocationFilter::Uncooked)
 	{
 		bool bFoundUncooked = false;
-		// On consoles, we don't support package downloading, so no need to waste any extra cycles/disk io dealing with it
-		if (!FPlatformProperties::RequiresCookedData() && Guid != nullptr)
+		if (bMatchCaseOnDisk)
 		{
-			// @todo: If we could get to list of linkers here, it would be faster to check
-			// then to open the file and read it
-			FPackagePath LocalPackagePath;
-			FOpenPackageResult OpenPackageResult = IPackageResourceManager::Get().OpenReadPackage(PackagePath, &LocalPackagePath);
-			TUniquePtr<FArchive>& PackageReader = OpenPackageResult.Archive;
-			if (!PackageReader || OpenPackageResult.Format != EPackageFormat::Binary)
-			{
-				if (PackageReader)
-				{
-					UE_LOG(LogPackageName, Error, TEXT("DoesPackageExist: DoesPackageExist with Guid FAILED: '%s' exists on disk with TextFormat, and we cannot read guids from TextFormat packages."),
-						*PackagePath.GetDebugName());
-				}
-			}
-			else
-			{
-				// Read in the package summary
-				FPackageFileSummary Summary;
-				*PackageReader << Summary;
-
-				// Compare Guids
-				PRAGMA_DISABLE_DEPRECATION_WARNINGS
-				if (!PackageReader->IsError() && Summary.Guid == *Guid)
-				PRAGMA_ENABLE_DEPRECATION_WARNINGS
-				{
-					PackageReader.Reset();
-
-					if (bMatchCaseOnDisk)
-					{
-						IPackageResourceManager::Get().TryMatchCaseOnDisk(LocalPackagePath, &LocalPackagePath);
-					}
-					if (OutPackagePath)
-					{
-						*OutPackagePath = LocalPackagePath;
-					}
-				}
-
-				// note that we found it uncooked (on disk/pak) location
-				bFoundUncooked = true;
-			}
+			bFoundUncooked = IPackageResourceManager::Get().TryMatchCaseOnDisk(PackagePath, OutPackagePath);
 		}
 		else
 		{
-			if (bMatchCaseOnDisk)
-			{
-				bFoundUncooked = IPackageResourceManager::Get().TryMatchCaseOnDisk(PackagePath, OutPackagePath);
-			}
-			else
-			{
-				bFoundUncooked = IPackageResourceManager::Get().DoesPackageExist(PackagePath, OutPackagePath);
-			}
+			bFoundUncooked = IPackageResourceManager::Get().DoesPackageExist(PackagePath, OutPackagePath);
 		}
 
 		if (bFoundUncooked)
@@ -1603,7 +1514,7 @@ bool FPackageName::SearchForPackageOnDisk(const FString& PackageName, FString* O
 	{
 		// If this is long package name, revert to using DoesPackageExist because it's a lot faster.
 		FString Filename;
-		if (DoesPackageExist(PackageName, NULL, &Filename))
+		if (DoesPackageExist(PackageName, &Filename))
 		{
 			if (OutLongPackageName)
 			{

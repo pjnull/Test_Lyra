@@ -300,7 +300,22 @@ public:
 	 * @param InAllowTextFormats Detect text format packages as well as binary (priority to text)
 	 * @return true if the specified package name points to an existing package, false otherwise.
 	 **/
-	static bool DoesPackageExist(const FString& LongPackageName, const FGuid* Guid = nullptr, FString* OutFilename = nullptr, bool InAllowTextFormats = true);
+	UE_DEPRECATED(5.0, "Deprecated. UPackage::Guid has not been used by the engine for a long time. Call DoesPackageExist without a Guid.")
+	static bool DoesPackageExist(const FString& LongPackageName, const FGuid* Guid, FString* OutFilename, bool InAllowTextFormats = true)
+	{
+		return DoesPackageExist(LongPackageName, OutFilename, InAllowTextFormats);
+	}
+
+
+	/**
+	 * Checks if the package exists on disk.
+	 * 
+	 * @param LongPackageName Package name.
+	 * @param OutFilename Package filename on disk.
+	 * @param InAllowTextFormats Detect text format packages as well as binary (priority to text)
+	 * @return true if the specified package name points to an existing package, false otherwise.
+	 **/
+	static bool DoesPackageExist(const FString& LongPackageName, FString* OutFilename = nullptr, bool InAllowTextFormats = true);
 
 	/**
 	 * Checks if the package exists on disk. PackagePath must be a mounted path, otherwise returns false
@@ -311,7 +326,7 @@ public:
 	 * @param OutPackagePath If nonnull and the package exists, set to a copy of PackagePath with the HeaderExtension set to the extension that exists on disk (and if bMatchCaseOnDisk is true, capitalization changed to match). If not found, this variable is not written
 	 * @return true if the specified package name points to an existing package, false otherwise.
 	 **/
-	static bool DoesPackageExist(const FPackagePath& PackagePath, const FGuid* Guid = nullptr, bool bMatchCaseOnDisk = false, FPackagePath* OutPackagePath = nullptr);
+	static bool DoesPackageExist(const FPackagePath& PackagePath, bool bMatchCaseOnDisk = false, FPackagePath* OutPackagePath = nullptr);
 
 	/**
 	 * Checks if the package exists on disk. PackagePath must be a mounted path, otherwise returns false
@@ -340,7 +355,7 @@ public:
 	 * @param OutPackagePath If nonnull and the package exists, set to a copy of PackagePath with the HeaderExtension set to the extension that exists on disk (and if bMatchCaseOnDisk is true, capitalization changed to match). If not found, this variable is not written
 	 * @return the set of locations where the package exists (cooked or uncooked, both or neither)
 	 **/
-	static EPackageLocationFilter DoesPackageExistEx(const FPackagePath& PackagePath, EPackageLocationFilter Filterconst, const FGuid* Guid = nullptr, bool bMatchCaseOnDisk = false, FPackagePath* OutPackagePath = nullptr);
+	static EPackageLocationFilter DoesPackageExistEx(const FPackagePath& PackagePath, EPackageLocationFilter Filterconst, bool bMatchCaseOnDisk = false, FPackagePath* OutPackagePath = nullptr);
 
 	/**
 	 * Attempts to find a package given its short name on disk (very slow).

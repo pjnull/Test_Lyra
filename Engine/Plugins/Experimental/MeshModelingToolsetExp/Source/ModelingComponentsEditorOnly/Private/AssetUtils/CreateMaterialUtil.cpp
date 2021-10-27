@@ -35,7 +35,7 @@ UE::AssetUtils::ECreateMaterialResult UE::AssetUtils::CreateDuplicateMaterial(
 	}
 
 	// cannot create new package if path already exists
-	if (FPackageName::DoesPackageExist(Options.NewAssetPath, nullptr, nullptr))
+	if (FPackageName::DoesPackageExist(Options.NewAssetPath))
 	{
 		ensure(false);
 		return ECreateMaterialResult::NameError;
@@ -91,7 +91,7 @@ UE::AssetUtils::ECreateMaterialResult UE::AssetUtils::CreateDerivedMaterialInsta
 	}
 
 	// cannot create new package if path already exists
-	if (FPackageName::DoesPackageExist(Options.NewAssetPath, nullptr, nullptr))
+	if (FPackageName::DoesPackageExist(Options.NewAssetPath))
 	{
 		ensure(false);
 		return ECreateMaterialResult::NameError;
