@@ -1801,7 +1801,7 @@ bool VerifyPayload(const FSHAHash& Hash, const TArray<uint8>& Payload)
 	if (Hash != PayloadHash)
 	{
 		UE_LOG(LogDerivedDataCache,
-			Warning,
+			Display,
 			TEXT("Checksum from server did not match received data (%s vs %s). Discarding cached result."),
 			*WriteToString<48>(Hash),
 			*WriteToString<48>(PayloadHash)
@@ -1825,7 +1825,7 @@ bool VerifyPayload(const FIoHash& Hash, const TArray<uint8>& Payload)
 	if (Hash != PayloadHash)
 	{
 		UE_LOG(LogDerivedDataCache,
-			Warning,
+			Display,
 			TEXT("Checksum from server did not match received data (%s vs %s). Discarding cached result."),
 			*WriteToString<48>(Hash),
 			*WriteToString<48>(PayloadHash)
