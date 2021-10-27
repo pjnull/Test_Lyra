@@ -474,7 +474,41 @@ void UDrawPolygonTool::UpdatePreviewVertex(const FVector3d& PreviewVertexIn)
 	if (PolygonVertices.Num() > 0)
 	{
 		const FVector3d LastVertex = PolygonVertices[PolygonVertices.Num() - 1];
-		PolygonProperties->Distance = Distance(LastVertex, PreviewVertex);
+		if (bInFixedPolygonMode)
+		{
+			double FixedDistance = 0; // get a representative distance for the shape, to show to the user
+			if (FixedPolygonClickPoints.Num() > 0)
+			{
+				// Build standard polygon parameters
+				TArray<FVector3d> PreviewClickPoints = FixedPolygonClickPoints;
+				PreviewClickPoints.Add(PreviewVertex);
+				FVector2d FirstReferencePt, BoxSize;
+				double YSign, AngleRad;
+				GetPolygonParametersFromFixedPoints(PreviewClickPoints, FirstReferencePt, BoxSize, YSign, AngleRad);
+				double Width = BoxSize.X, Height = BoxSize.Y;
+				// For rectangles, interface uses width for earlier click, height for later
+				if (PolygonProperties->PolygonDrawMode == EDrawPolygonDrawMode::Rectangle || PolygonProperties->PolygonDrawMode == EDrawPolygonDrawMode::RoundedRectangle)
+				{
+					if (PreviewClickPoints.Num() == 2)
+					{
+						FixedDistance = Width;
+					}
+					else
+					{
+						FixedDistance = Height;
+					}
+				}
+				else // For all else (circles, discs and squares), only width is used
+				{
+					FixedDistance = Width;
+				}
+			}
+			PolygonProperties->Distance = (float)FixedDistance;
+		}
+		else
+		{
+			PolygonProperties->Distance = Distance(LastVertex, PreviewVertex);
+		}
 	}
 }
 
