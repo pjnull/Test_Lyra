@@ -1627,6 +1627,16 @@ void FNiagaraEditorModule::GetDataInterfaceFeedbackSafe(UNiagaraDataInterface* I
 
 }
 
+void FNiagaraEditorModule::EnsureReservedDefinitionUnique(FGuid& UniqueId)
+{
+	if (!UniqueId.IsValid() || ReservedDefinitionIds.Contains(UniqueId))
+	{
+		UniqueId = FGuid::NewGuid();
+	}
+
+	ReservedDefinitionIds.Add(UniqueId);
+}
+
 void FNiagaraEditorModule::GetTargetSystemAndEmitterForDataInterface(UNiagaraDataInterface* InDataInterface, UNiagaraSystem*& OutOwningSystem, UNiagaraEmitter*& OutOwningEmitter)
 {
 	OutOwningSystem = InDataInterface->GetTypedOuter<UNiagaraSystem>();
