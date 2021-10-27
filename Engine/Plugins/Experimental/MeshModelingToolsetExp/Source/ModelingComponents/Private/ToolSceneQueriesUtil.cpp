@@ -235,6 +235,20 @@ bool ToolSceneQueriesUtil::FindWorldGridSnapPoint(const UInteractiveTool* Tool, 
 	return false;
 }
 
+double ToolSceneQueriesUtil::SnapDistanceToWorldGridSize(const UInteractiveTool* Tool, const double Distance)
+{
+	IToolsContextQueriesAPI* QueryAPI = Tool->GetToolManager()->GetContextQueriesAPI();
+	FToolContextSnappingConfiguration SnapConfig = QueryAPI->GetCurrentSnappingSettings();
+
+	double DX = SnapConfig.PositionGridDimensions.GetMax();
+	if (DX > 0.0)
+	{
+		int N = FMath::RoundToInt(Distance / DX);
+		return N * DX;
+	}
+
+	return Distance;
+}
 
 
 

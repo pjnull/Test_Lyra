@@ -364,8 +364,18 @@ bool UDrawPolyPathTool::OnUpdateHover(const FInputDeviceRay& DevicePos)
 	else if (CurveDistMechanic != nullptr)
 	{
 		CurveDistMechanic->UpdateCurrentDistance(DevicePos.WorldRay);
-		TransformProps->Width = CurveDistMechanic->CurrentDistance * 2.0;
-		CurOffsetDistance = CurveDistMechanic->CurrentDistance;
+
+		if (TransformProps->bSnapToWorldGrid)
+		{
+			double QuantizedDistance = ToolSceneQueriesUtil::SnapDistanceToWorldGridSize(this, CurveDistMechanic->CurrentDistance);
+			TransformProps->Width = QuantizedDistance * 2.0;
+			CurOffsetDistance = QuantizedDistance;
+		}
+		else
+		{
+			TransformProps->Width = CurveDistMechanic->CurrentDistance * 2.0;
+			CurOffsetDistance = CurveDistMechanic->CurrentDistance;
+		}
 		UpdatePathPreview();
 	}
 	else if (ExtrudeHeightMechanic != nullptr)

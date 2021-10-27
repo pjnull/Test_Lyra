@@ -132,6 +132,11 @@ namespace ToolSceneQueriesUtil
 	MODELINGCOMPONENTS_API bool FindWorldGridSnapPoint(const UInteractiveTool* Tool, const FVector3d& QueryPoint, FVector3d& GridSnapPointOut);
 
 	/**
+	 * Round the given distance to the nearest multiple of the world grid cell size
+	 */
+	MODELINGCOMPONENTS_API double SnapDistanceToWorldGridSize(const UInteractiveTool* Tool, const double Distance);
+
+	/**
 	 * @return true if HitResult is a hit on a visible Component of a visible Actor (provides correct result in Editor)
 	 */
 	MODELINGCOMPONENTS_API bool IsVisibleObjectHit(const FHitResult& HitResult);
