@@ -107,17 +107,7 @@ namespace DetailLayoutHelpers
 					// Children of arrays are not visible directly,
 					bVisibleByDefault &= !bIsChildOfContainer;
 
-					TArray< TWeakObjectPtr< UObject> > Objects;
-					if (CurObjectNode && CurObjectNode->AsObjectNode())
-					{
-						for (int32 ObjectIndex = 0; ObjectIndex < CurObjectNode->AsObjectNode()->GetNumObjects(); ++ObjectIndex)
-						{
-							Objects.Add(CurObjectNode->AsObjectNode()->GetUObject(ObjectIndex));
-						}
-					}
-
-					TSharedPtr<IPropertyHandle> ChildHandle = PropertyEditorHelpers::GetPropertyHandle(ChildNodePtr.ToSharedRef(), nullptr, nullptr);
-					FPropertyAndParent PropertyAndParent(ChildHandle.ToSharedRef(), Objects);
+					FPropertyAndParent PropertyAndParent(ChildNodePtr.ToSharedRef());
 					const bool bIsUserVisible = InUpdateArgs.IsPropertyVisible(PropertyAndParent);
 
 					// Inners of customized in structs should not be taken into consideration for customizing.  They are not designed to be individually customized when their parent is already customized
