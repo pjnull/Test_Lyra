@@ -2,6 +2,10 @@
 
 #include "Misc/Fork.h"
 #include "HAL/ThreadManager.h"
+#include "HAL/RunnableThread.h"
+
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 
 #ifndef DEFAULT_SERVER_FAKE_FORKS
 	// Defines if the server process should always simulate forking even on platforms that do not support it.
