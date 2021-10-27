@@ -720,7 +720,7 @@ void FOculusInput::SendControllerEvents()
 								State.bIsDominantHand = (HandState.Status & ovrpHandStatus_DominantHand) != 0;
 								
 								// Poll for finger confidence
-								for (uint32 FingerIndex = 0; FingerIndex < (uint32)EOculusHandButton::TotalButtonCount; FingerIndex++)
+								for (uint32 FingerIndex = 0; FingerIndex < (int32)EOculusHandAxes::TotalAxisCount; FingerIndex++)
 								{
 									State.FingerConfidences[FingerIndex] = FOculusHandTracking::ToETrackingConfidence(HandState.FingerConfidences[FingerIndex]);
 								}
