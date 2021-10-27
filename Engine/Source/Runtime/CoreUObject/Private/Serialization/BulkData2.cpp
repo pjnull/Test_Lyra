@@ -1313,6 +1313,19 @@ IBulkDataIORequest* FBulkDataBase::CreateStreamingRequest(EAsyncIOPriorityAndFla
 
 IBulkDataIORequest* FBulkDataBase::CreateStreamingRequest(int64 OffsetInBulkData, int64 BytesToRead, EAsyncIOPriorityAndFlags Priority, FBulkDataIORequestCallBack* CompleteCallback, uint8* UserSuppliedMemory) const
 {
+#if !UE_KEEP_INLINE_RELOADING_CONSISTENT	
+	// Note that we only want the ensure to trigger if we have a valid offset (the bulkdata references data from disk)
+	ensureMsgf(	!IsInlined() || BulkDataOffset == INDEX_NONE || ShouldIgnoreInlineDataReloadEnsures(),
+				TEXT("Attempting to stream inline BulkData! This operation is not supported by the IoDispatcher and so will eventually stop working."
+				" The calling code should be fixed to retain the inline data in memory and re-use it rather than discard it and then try to reload from disk!"));
+#endif //!UE_KEEP_INLINE_RELOADING_CONSISTENT
+
+	if (!CanLoadFromDisk())
+	{
+		UE_LOG(LogSerialization, Error, TEXT("Attempting to stream a BulkData object that cannot be loaded from disk"));
+		return nullptr;
+	}
+
 	if (IsUsingIODispatcher())
 	{
 		checkf(OffsetInBulkData + BytesToRead <= BulkDataSize, TEXT("Attempting to read past the end of BulkData"));
