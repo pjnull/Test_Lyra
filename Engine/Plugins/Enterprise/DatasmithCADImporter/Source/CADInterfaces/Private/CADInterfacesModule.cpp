@@ -108,10 +108,6 @@ void FCADInterfacesModule::StartupModule()
 		{
 			UE_LOG(CADInterfaces, Warning, TEXT("Failed to load required library %s. Plug-in will not be functional."), *TechSoftDll);
 		}
-		else
-		{
-			CADLibrary::InitializeTechSoftInterface();
-		}
 
 		FPlatformProcess::PopDllDirectory(*TechSoftDllPath);
 	}

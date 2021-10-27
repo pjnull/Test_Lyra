@@ -4,77 +4,13 @@
 
 #ifdef USE_TECHSOFT_SDK
 
+#include "TechSoftInterface.h"
 #include "TUniqueTechSoftObj.h"
 
-#undef TEXT
-#ifdef WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#endif
-
-#pragma warning(push)
-#pragma warning(disable:4505)
-#pragma warning(disable:4191)
-#include "A3DSDKIncludes.h"
-#pragma warning(pop)
-
-// redefine UE TEXT
-#undef TEXT
-#if !defined(TEXT) && !UE_BUILD_DOCS
-#if PLATFORM_TCHAR_IS_CHAR16
-#define TEXT_PASTE(x) u ## x
-#else
-#define TEXT_PASTE(x) L ## x
-#endif
-#define TEXT(x) TEXT_PASTE(x)
-#endif
-
-
+namespace CADLibrary
+{
 namespace TechSoftFileParserImpl
 {
-	// Specific initialization function used by TUniqueTechSoftObj
-
-	void InitializeData(A3DAsmPartDefinitionData& sData)
-	{
-		A3D_INITIALIZE_DATA(A3DAsmPartDefinitionData, sData);
-	}
-
-	void InitializeData(A3DMiscCartesianTransformationData& sData)
-	{
-		A3D_INITIALIZE_DATA(A3DMiscCartesianTransformationData, sData);
-	}
-
-	void InitializeData(A3DRiDirectionData& sData)
-	{
-		A3D_INITIALIZE_DATA(A3DRiDirectionData, sData);
-	}
-
-	void InitializeData(A3DTopoUniqueVertexData& sData)
-	{
-		A3D_INITIALIZE_DATA(A3DTopoUniqueVertexData, sData);
-	}
-
-	void InitializeData(A3DTopoWireEdgeData& sData)
-	{
-		A3D_INITIALIZE_DATA(A3DTopoWireEdgeData, sData);
-	}
-
-	void InitializeData(A3DTopoEdgeData& sData)
-	{
-		A3D_INITIALIZE_DATA(A3DTopoEdgeData, sData);
-	}
-
-	void InitializeData(A3DTopoFaceData& sData)
-	{
-		A3D_INITIALIZE_DATA(A3DTopoFaceData, sData);
-	}
-
-	void InitializeData(A3DTopoBrepDataData& sData)
-	{
-		A3D_INITIALIZE_DATA(A3DTopoBrepDataData, sData);
-	}
-
-
 	// Functions to clean metadata
 
 	inline void RemoveUnwantedChar(FString& StringToClean, TCHAR UnwantedChar)
@@ -183,7 +119,7 @@ namespace TechSoftFileParserImpl
 		}
 		else if (PrototypeData.m_pPrototype)
 		{
-			TechSoft::TUniqueTSObj<A3DAsmProductOccurrenceData, A3DAsmProductOccurrence> SubPrototypeData(PrototypeData.m_pPrototype, A3DAsmProductOccurrenceGet);
+			TUniqueTSObj<A3DAsmProductOccurrenceData> SubPrototypeData(PrototypeData.m_pPrototype);
 			if (SubPrototypeData.IsValid())
 			{
 				bIsUnloaded = TechSoftFileParserImpl::IsUnloadedPrototype(*SubPrototypeData);
@@ -305,20 +241,16 @@ namespace TechSoftFileParserImpl
 			break;
 		};
 	}
-
-
 }
 
-
-
-namespace CADLibrary
-{
+	FTechSoftFileParser::FTechSoftFileParser(FCADFileData& InCADData, const FString& EnginePluginsPath)
+		: CADFileData(InCADData)
+		, TechSoftInterface(GetTechSoftInterface())
+	{
+	}
 
 	ECADParsingResult FTechSoftFileParser::Process()
 	{
-		TechSoftInterface.Reset();
-		TechSoftInterface = GetTechSoftInterface();
-
 		// Process the file
 		ECADParsingResult Result = ECADParsingResult::ProcessOk;
 
@@ -337,7 +269,7 @@ namespace CADLibrary
 		ECADFormat Format = File.GetFileFormat();
 		TechSoftFileParserImpl::UpdateIOOptionAccordingToFormat(Format, Import);
 
-		A3DStatus IRet = TechSoftInterface->Import(Import);
+		A3DStatus IRet = TechSoftInterface.Import(Import);
 		if (IRet != A3D_SUCCESS && IRet != A3D_LOAD_MULTI_MODELS_CADFILE && IRet != A3D_LOAD_MISSING_COMPONENTS)
 		{
 			return ECADParsingResult::ProcessFailed;
@@ -356,19 +288,19 @@ namespace CADLibrary
 		if (CADFileData.GetImportParameters().GetStitchingTechnique() != StitchingNone && !FImportParameters::bGDisableCADKernelTessellation)
 		{
 			// todo
-			//TechSoftInterface->Repair(CADFileData.GetStitchingTechnique());
+			//TechSoftInterface.Repair(CADFileData.GetStitchingTechnique());
 		}
 
 		ReserveCADFileData();
 
 		ReadMaterialsAndColors();
 
-		return TraverseModel(TechSoftInterface->GetModelFile());
+		return TraverseModel(TechSoftInterface.GetModelFile());
 	}
 
 	void FTechSoftFileParser::ReserveCADFileData()
 	{
-		CountUnderModel(TechSoftInterface->GetModelFile());
+		CountUnderModel(TechSoftInterface.GetModelFile());
 
 		CADFileData.ReserveBodyMeshes(ComponentCount[EComponentType::Body]);
 
@@ -390,7 +322,7 @@ namespace CADLibrary
 
 	ECADParsingResult FTechSoftFileParser::TraverseModel(const A3DAsmModelFile* ModelFile)
 	{
-		TechSoft::TUniqueTSObj<A3DAsmModelFileData, A3DAsmModelFile> ModelFileData(ModelFile, A3DAsmModelFileGet);
+		TUniqueTSObj<A3DAsmModelFileData> ModelFileData(ModelFile);
 		if (!ModelFileData.IsValid())
 		{
 			return ECADParsingResult::ProcessFailed;
@@ -438,7 +370,7 @@ namespace CADLibrary
 		FArchiveComponent& Component = CADFileData.GetComponentAt(Index);
 		Component.MetaData = MoveTemp(MetaData.MetaData);
 
-		TechSoft::TUniqueTSObj<A3DAsmProductOccurrenceData, A3DAsmProductOccurrence> ReferenceData(ReferencePtr, A3DAsmProductOccurrenceGet);
+		TUniqueTSObj<A3DAsmProductOccurrenceData> ReferenceData(ReferencePtr);
 		if (!ReferenceData.IsValid())
 		{
 			return;
@@ -548,7 +480,7 @@ namespace CADLibrary
 		TraverseMaterialProperties(OccurrencePtr);
 		TraverseLayer(OccurrencePtr);
 
-		TechSoft::TUniqueTSObj<A3DAsmProductOccurrenceData, A3DAsmProductOccurrence> OccurrenceData(OccurrencePtr, A3DAsmProductOccurrenceGet);
+		TUniqueTSObj<A3DAsmProductOccurrenceData> OccurrenceData(OccurrencePtr);
 		if (!OccurrenceData.IsValid())
 		{
 			return 0;
@@ -593,7 +525,7 @@ namespace CADLibrary
 
 	FFileDescriptor FTechSoftFileParser::GetOccurrenceFileName(const A3DAsmProductOccurrence* OccurrencePtr)
 	{
-		TechSoft::TUniqueTSObj<A3DAsmProductOccurrenceData, A3DAsmProductOccurrence> OccurrenceData(OccurrencePtr, A3DAsmProductOccurrenceGet);
+		TUniqueTSObj<A3DAsmProductOccurrenceData> OccurrenceData(OccurrencePtr);
 		if (!OccurrenceData.IsValid())
 		{
 			return FFileDescriptor();
@@ -635,7 +567,7 @@ namespace CADLibrary
 
 	void FTechSoftFileParser::TraversePrototype(const A3DAsmProductOccurrence* InPrototypePtr, FEntityMetaData& OutPrototypeMetaData, FMatrix& OutPrototypeMatrix)
 	{
-		TechSoft::TUniqueTSObj<A3DAsmProductOccurrenceData, A3DAsmProductOccurrence> PrototypeData(InPrototypePtr, A3DAsmProductOccurrenceGet);
+		TUniqueTSObj<A3DAsmProductOccurrenceData> PrototypeData(InPrototypePtr);
 		if (!PrototypeData.IsValid())
 		{
 			return;
@@ -672,7 +604,7 @@ namespace CADLibrary
 		TraverseMaterialProperties(PartDefinitionPtr);
 		TraverseLayer(PartDefinitionPtr);
 
-		TechSoft::TUniqueTSObj<A3DAsmPartDefinitionData, A3DAsmPartDefinition> PartData(PartDefinitionPtr, A3DAsmPartDefinitionGet, TechSoftFileParserImpl::InitializeData);
+		TUniqueTSObj<A3DAsmPartDefinitionData> PartData(PartDefinitionPtr);
 		if (!PartData.IsValid())
 		{
 			return 0;
@@ -711,7 +643,7 @@ namespace CADLibrary
 
 	FCadId FTechSoftFileParser::TraverseRepresentationSet(const A3DRiSet* RepresentationSetPtr)
 	{
-		TechSoft::TUniqueTSObj<A3DRiSetData, A3DRiSet> RepresentationSetData(RepresentationSetPtr, A3DRiSetGet);
+		TUniqueTSObj<A3DRiSetData> RepresentationSetData(RepresentationSetPtr);
 		if (!RepresentationSetData.IsValid())
 		{
 			return 0;
@@ -740,7 +672,7 @@ namespace CADLibrary
 
 	FCadId FTechSoftFileParser::TraverseBRepModel(A3DRiBrepModel* BRepModelPtr)
 	{
-		TechSoft::TUniqueTSObj<A3DRiBrepModelData, A3DRiBrepModel> BodyData(BRepModelPtr, A3DRiBrepModelGet);
+		TUniqueTSObj<A3DRiBrepModelData> BodyData(BRepModelPtr);
 		if (!BodyData.IsValid())
 		{
 			return 0;
@@ -772,7 +704,7 @@ namespace CADLibrary
 
 	void FTechSoftFileParser::TraverseRepresentationContent(const A3DRiRepresentationItem* RepresentationItemPtr, FArchiveBody& Body)
 	{
-		TechSoft::TUniqueTSObj<A3DRiRepresentationItemData, A3DRiRepresentationItem> RepresentationItemData(RepresentationItemPtr, A3DRiRepresentationItemGet);
+		TUniqueTSObj<A3DRiRepresentationItemData> RepresentationItemData(RepresentationItemPtr);
 		if (!RepresentationItemData.IsValid())
 		{
 			return;
@@ -791,7 +723,7 @@ namespace CADLibrary
 
 	FCadId FTechSoftFileParser::TraversePolyBRepModel(const A3DRiPolyBrepModel* PolygonalPtr)
 	{
-		TechSoft::TUniqueTSObj<A3DRiPolyBrepModelData, A3DRiPolyBrepModel> BodyData(PolygonalPtr, A3DRiPolyBrepModelGet);
+		TUniqueTSObj<A3DRiPolyBrepModelData> BodyData(PolygonalPtr);
 		if (!BodyData.IsValid())
 		{
 			return 0;
@@ -815,7 +747,7 @@ namespace CADLibrary
 
 	void FTechSoftFileParser::TraverseMetaData(const A3DEntity* Entity, FEntityMetaData& OutMetaData)
 	{
-		TechSoft::TUniqueTSObj<A3DRootBaseData, A3DEntity> MetaData(Entity, A3DRootBaseGet);
+		TUniqueTSObj<A3DRootBaseData> MetaData(Entity);
 		if (MetaData.IsValid())
 		{
 			if (false && MetaData->m_uiPersistentId > 0)
@@ -833,10 +765,10 @@ namespace CADLibrary
 
 			if (MetaData->m_pcName && MetaData->m_pcName[0] != '\0')
 			{
-				OutMetaData.MetaData.Emplace(TEXT("TechSoftName"), UTF8_TO_TCHAR(MetaData->m_pcName));
+				OutMetaData.MetaData.Emplace(TEXT("SDKName"), UTF8_TO_TCHAR(MetaData->m_pcName));
 			}
 
-			TechSoft::TUniqueTSObj<A3DMiscAttributeData, A3DMiscAttribute> AttributeData(A3DMiscAttributeGet);
+			TUniqueTSObj<A3DMiscAttributeData> AttributeData;
 			for (A3DUns32 Index = 0; Index < MetaData->m_uiSize; ++Index)
 			{
 				AttributeData.Get(MetaData->m_ppAttributes[Index]);
@@ -849,7 +781,7 @@ namespace CADLibrary
 
 		if (A3DEntityIsBaseWithGraphicsType(Entity))
 		{
-			TechSoft::TUniqueTSObj<A3DRootBaseWithGraphicsData, A3DEntity> MetaDataWithGraphics(Entity, A3DRootBaseWithGraphicsGet);
+			TUniqueTSObj<A3DRootBaseWithGraphicsData> MetaDataWithGraphics(Entity);
 			if (MetaDataWithGraphics.IsValid())
 			{
 				if (MetaDataWithGraphics->m_pGraphics != NULL)
@@ -863,11 +795,11 @@ namespace CADLibrary
 		}
 	}
 
-	FString FTechSoftFileParser::DefineEntityName(TMap<FString, FString>& MetaData, EComponentType EntityType)
+	void FTechSoftFileParser::DefineEntityName(TMap<FString, FString>& MetaData, EComponentType EntityType)
 	{
 		if (MetaData.IsEmpty())
 		{
-			return FString();
+			return;
 		}
 
 		ECADFormat Format = CADFileData.GetCADFileDescription().GetFileFormat();
@@ -879,14 +811,14 @@ namespace CADLibrary
 			FString* Name = MetaData.Find(TEXT("Name"));
 			if (Name)
 			{
-				return *Name;
+				return;
 			}
 
 			FString* InstanceName = MetaData.Find(TEXT("InstanceName"));
 			if (InstanceName)
 			{
 				MetaData.Emplace(TEXT("Name"), *InstanceName);
-				return *InstanceName;
+				return;
 			}
 
 			FString* OriginalName = MetaData.Find(TEXT("OriginalName"));
@@ -926,7 +858,6 @@ namespace CADLibrary
 			{
 				MetaData.Emplace(TEXT("Name"), *OriginalName);
 			}
-			return MetaData[TEXT("Name")];
 		}
 		break;
 
@@ -935,7 +866,7 @@ namespace CADLibrary
 			FString* Name = MetaData.Find(TEXT("Name"));
 			FString* OriginalName = MetaData.Find(TEXT("OriginalName"));
 			FString* PartNumber = MetaData.Find(TEXT("PartNumber"));
-			FString* TechSoftName = MetaData.Find(TEXT("TechSoftName"));
+			FString* TechSoftName = MetaData.Find(TEXT("SDKName"));
 
 			if (!OriginalName && !PartNumber && TechSoftName)
 			{
@@ -971,17 +902,14 @@ namespace CADLibrary
 				MetaData.Emplace(TEXT("Name"), *OriginalName);
 			}
 
-			FString OutName = MetaData[TEXT("Name")];
-			if (!OriginalName)
+			Name = MetaData.Find(TEXT("Name"));
+			if (!OriginalName && Name)
 			{
-				MetaData.Emplace(TEXT("OriginalName"), OutName);
+				MetaData.Emplace(TEXT("OriginalName"), *Name);
 			}
-			return OutName;
 		}
 		break;
 		}
-
-		return FString();
 	}
 
 	void FTechSoftFileParser::TraverseSpecificMetaData(const A3DAsmProductOccurrence* Occurrence, FEntityMetaData& OutMetaData)
@@ -991,7 +919,7 @@ namespace CADLibrary
 		{
 		case kA3DModellerSlw:
 		{
-			TechSoft::TUniqueTSObj<A3DAsmProductOccurrenceDataSLW, A3DAsmProductOccurrence> SolidWorksSpecificData(Occurrence, A3DAsmProductOccurrenceGetSLW);
+			TUniqueTSObj<A3DAsmProductOccurrenceDataSLW> SolidWorksSpecificData(Occurrence);
 			if (SolidWorksSpecificData.IsValid())
 			{
 				if (SolidWorksSpecificData->m_psCfgName)
@@ -1006,7 +934,7 @@ namespace CADLibrary
 		}
 		case kA3DModellerUnigraphics:
 		{
-			TechSoft::TUniqueTSObj<A3DAsmProductOccurrenceDataUg, A3DAsmProductOccurrence> UnigraphicsSpecificData(Occurrence, A3DAsmProductOccurrenceGetUg);
+			TUniqueTSObj<A3DAsmProductOccurrenceDataUg> UnigraphicsSpecificData(Occurrence);
 			if (UnigraphicsSpecificData.IsValid())
 			{
 				if (UnigraphicsSpecificData->m_psPartUID)
@@ -1031,7 +959,7 @@ namespace CADLibrary
 
 		case kA3DModellerCatiaV5:
 		{
-			TechSoft::TUniqueTSObj<A3DAsmProductOccurrenceDataCV5, A3DAsmProductOccurrence> CatiaV5SpecificData(Occurrence, A3DAsmProductOccurrenceGetCV5);
+			TUniqueTSObj<A3DAsmProductOccurrenceDataCV5> CatiaV5SpecificData(Occurrence);
 			if (CatiaV5SpecificData.IsValid())
 			{
 				if (CatiaV5SpecificData->m_psVersion)
@@ -1058,7 +986,7 @@ namespace CADLibrary
 	{
 		// TODO
 
-		TechSoft::TUniqueTSObj<A3DGraphicsData, A3DGraphics> GraphicsData(Graphics, A3DGraphicsGet);
+		TUniqueTSObj<A3DGraphicsData> GraphicsData(Graphics);
 		if (!GraphicsData.IsValid())
 		{
 			return;
@@ -1084,7 +1012,7 @@ namespace CADLibrary
 	{
 		// TODO
 
-		TechSoft::TUniqueTSObj<A3DMiscMaterialPropertiesData, A3DEntity> MaterialPropertiesData(Entity, A3DMiscGetMaterialProperties);
+		TUniqueTSObj<A3DMiscMaterialPropertiesData> MaterialPropertiesData(Entity);
 		if (!MaterialPropertiesData.IsValid())
 		{
 			return;
@@ -1112,7 +1040,7 @@ namespace CADLibrary
 	{
 		if (CartesianTransformation)
 		{
-			TechSoft::TUniqueTSObj<A3DMiscCartesianTransformationData, A3DEntity> CartesianTransformationData(CartesianTransformation, A3DMiscCartesianTransformationGet, TechSoftFileParserImpl::InitializeData);
+			TUniqueTSObj<A3DMiscCartesianTransformationData> CartesianTransformationData(CartesianTransformation);
 
 			if (CartesianTransformationData.IsValid())
 			{
@@ -1139,7 +1067,7 @@ namespace CADLibrary
 
 	FMatrix FTechSoftFileParser::TraverseGeneralTransformation(const A3DMiscGeneralTransformation* GeneralTransformation)
 	{
-		TechSoft::TUniqueTSObj<A3DMiscGeneralTransformationData, A3DMiscGeneralTransformation> GeneralTransformationData(GeneralTransformation, A3DMiscGeneralTransformationGet);
+		TUniqueTSObj<A3DMiscGeneralTransformationData> GeneralTransformationData(GeneralTransformation);
 		if (GeneralTransformationData.IsValid())
 		{
 			FMatrix Matrix;
@@ -1179,7 +1107,7 @@ namespace CADLibrary
 
 	FMatrix FTechSoftFileParser::TraverseCoordinateSystem(const A3DRiCoordinateSystem* CoordinateSystem)
 	{
-		TechSoft::TUniqueTSObj<A3DRiCoordinateSystemData, A3DRiCoordinateSystem> CoordinateSystemData(CoordinateSystem, A3DRiCoordinateSystemGet);
+		TUniqueTSObj<A3DRiCoordinateSystemData> CoordinateSystemData(CoordinateSystem);
 		if (CoordinateSystemData.IsValid())
 		{
 			return TraverseTransformation3D(CoordinateSystemData->m_pTransformation);
@@ -1209,7 +1137,7 @@ namespace CADLibrary
 
 	bool FTechSoftFileParser::IsConfigurationSet(const A3DAsmProductOccurrence* Occurrence)
 	{
-		TechSoft::TUniqueTSObj<A3DAsmProductOccurrenceData, A3DAsmProductOccurrence> OccurrenceData(Occurrence, A3DAsmProductOccurrenceGet);
+		TUniqueTSObj<A3DAsmProductOccurrenceData> OccurrenceData(Occurrence);
 		if (!OccurrenceData.IsValid())
 		{
 			return false;
@@ -1218,7 +1146,7 @@ namespace CADLibrary
 		bool bIsConfiguration = false;
 		if (OccurrenceData->m_uiPOccurrencesSize)
 		{
-			TechSoft::TUniqueTSObj<A3DAsmProductOccurrenceData, A3DAsmProductOccurrence> ChildData(A3DAsmProductOccurrenceGet);
+			TUniqueTSObj<A3DAsmProductOccurrenceData> ChildData;
 			for (uint32 Index = 0; Index < OccurrenceData->m_uiPOccurrencesSize; ++Index)
 			{
 				if (ChildData.Get(OccurrenceData->m_ppPOccurrences[Index]) == A3D_SUCCESS)
@@ -1236,7 +1164,7 @@ namespace CADLibrary
 
 	void FTechSoftFileParser::CountUnderModel(const A3DAsmModelFile* AsmModel)
 	{
-		TechSoft::TUniqueTSObj<A3DAsmModelFileData, A3DAsmModelFile> ModelFileData(AsmModel, A3DAsmModelFileGet);
+		TUniqueTSObj<A3DAsmModelFileData> ModelFileData(AsmModel);
 		if (!ModelFileData.IsValid())
 		{
 			return;
@@ -1259,7 +1187,7 @@ namespace CADLibrary
 
 	void FTechSoftFileParser::CountUnderOccurrence(const A3DAsmProductOccurrence* Occurrence)
 	{
-		TechSoft::TUniqueTSObj<A3DAsmProductOccurrenceData, A3DAsmProductOccurrence> OccurrenceData(Occurrence, A3DAsmProductOccurrenceGet);
+		TUniqueTSObj<A3DAsmProductOccurrenceData> OccurrenceData(Occurrence);
 		if (!OccurrenceData.IsValid())
 		{
 			return;
@@ -1291,7 +1219,7 @@ namespace CADLibrary
 		}
 		PrototypeCounted.Add(Prototype);
 
-		TechSoft::TUniqueTSObj<A3DAsmProductOccurrenceData, A3DAsmProductOccurrence> PrototypeData(Prototype, A3DAsmProductOccurrenceGet);
+		TUniqueTSObj<A3DAsmProductOccurrenceData> PrototypeData(Prototype);
 		if (!PrototypeData.IsValid())
 		{
 			return;
@@ -1307,7 +1235,7 @@ namespace CADLibrary
 
 	void FTechSoftFileParser::CountUnderPartDefinition(const A3DAsmPartDefinition* PartDefinition)
 	{
-		TechSoft::TUniqueTSObj<A3DAsmPartDefinitionData, A3DAsmPartDefinition> PartData(PartDefinition, A3DAsmPartDefinitionGet);
+		TUniqueTSObj<A3DAsmPartDefinitionData> PartData(PartDefinition);
 		if (!PartData.IsValid())
 		{
 			return;
@@ -1342,7 +1270,7 @@ namespace CADLibrary
 
 	void FTechSoftFileParser::CountUnderRepresentationSet(const A3DRiSet* RepresentationSet)
 	{
-		TechSoft::TUniqueTSObj<A3DRiSetData, A3DRiSet> RepresentationSetData(RepresentationSet, A3DRiSetGet);
+		TUniqueTSObj<A3DRiSetData> RepresentationSetData(RepresentationSet);
 		if (!RepresentationSetData.IsValid())
 		{
 			return;
@@ -1371,7 +1299,7 @@ namespace CADLibrary
 
 	void FTechSoftFileParser::MeshRepresentationWithTechSoft(A3DRiRepresentationItem* RepresentationItemPtr, FArchiveBody& Body)
 	{
-		TechSoft::TUniqueTSObj<A3DRiRepresentationItemData, A3DEntity> RepresentationItemData(A3DRiRepresentationItemGet);
+		TUniqueTSObj<A3DRiRepresentationItemData> RepresentationItemData;
 
 		// TUniqueTechSoftObj does not work in this case
 		A3DRWParamsTessellationData TessellationParameters;
@@ -1402,7 +1330,7 @@ namespace CADLibrary
 
 		TessellationParameters.m_bKeepUVPoints = A3D_TRUE; /*!< Keep parametric points as texture points. */
 
-		// Get the tesselation
+		// Get the tessellation
 		A3DStatus Status = A3DRiRepresentationItemComputeTessellation(RepresentationItemPtr, &TessellationParameters);
 		Status = A3DRiRepresentationItemGet(RepresentationItemPtr, RepresentationItemData.GetEmptyDataPtr());
 		TraverseTessellationBase(RepresentationItemData->m_pTessBase, Body);
@@ -1654,7 +1582,7 @@ namespace CADLibrary
 		const int TessellationFaceDataWithOneNormal = 0xE0E0;
 
 		// Coordinates
-		TechSoft::TUniqueTSObj<A3DTessBaseData, A3DTess3D> TessellationBaseData(TessellationPtr, A3DTessBaseGet);
+		TUniqueTSObj<A3DTessBaseData> TessellationBaseData(TessellationPtr);
 		{
 			if (TessellationBaseData.IsValid() && TessellationBaseData->m_uiCoordSize > 0)
 			{
@@ -1679,7 +1607,7 @@ namespace CADLibrary
 			}
 		}
 
-		TechSoft::TUniqueTSObj<A3DTess3DData, A3DTess3D> Tessellation3DData(TessellationPtr, A3DTess3DGet);
+		TUniqueTSObj<A3DTess3DData> Tessellation3DData(TessellationPtr);
 		if (Tessellation3DData.IsValid())
 		{
 			for (unsigned int Index = 0; Index < Tessellation3DData->m_uiFaceTessSize; ++Index)

@@ -1,12 +1,13 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 #pragma once
 
+#ifdef USE_TECHSOFT_SDK
+
 #include "CADData.h"
 
-#include "A3DSDKErrorCodes.h"
-#include "A3DSDKInitializeFunctions.h"
+#include "TechSoftInterface.h"
 
-namespace TechSoft
+namespace CADLibrary
 {
 
 	// Single-ownership smart TeshSoft object
@@ -30,72 +31,44 @@ namespace TechSoft
 	// A3D_INITIALIZE_DATA, and all A3DXXXXXXGet methods are TechSoft macro
 	//
 
-	template< class ObjectType, class PtrType>
+	template<class ObjectType>
 	class TUniqueTSObj
 	{
 	public:
 
 		/**
 		 * Constructor of an initialized ObjectType object
-		 * @param InGetter: Function Pointer of the A3DXXXXXXGet function.
 		 */
-		explicit TUniqueTSObj(A3DStatus (*InGetter)(const PtrType*, ObjectType*))
+		explicit TUniqueTSObj()
 		{
-			Getter = InGetter;
-			memset(&Data, 0, sizeof(Data)); 
-			Data.m_usStructSize = sizeof(Data);
+			InitializeData(Data);
 		}
 
 		/**
 		 * Constructor of an filled ObjectType object with the data of DataPtr
 		 * @param DataPtr: the pointer of the data to copy
-		 * @param InGetter: Function pointer of the A3DXXXXXXGet function.
 		 */
-		explicit TUniqueTSObj(const PtrType* DataPtr, A3DStatus (*InGetter)(const PtrType*, ObjectType*))
-			:TUniqueTSObj(InGetter)
+		explicit TUniqueTSObj(const A3DEntity* DataPtr)
 		{
-			Get(DataPtr);
-		}
+			//TechSoftInterfaceImpl::InitializeData(Data);
+			InitializeData(Data);
 
-		/**
-		 * Constructor of an filled ObjectType object with the data of DataPtr
-		 * This type of structure need a specific initialization method
-		 * @param DataPtr: the pointer of the data to copy
-		 * @param InGetter: Function pointer of the A3DXXXXXXGet function.
-		 * @param Initializer: Initialization function pointer for ObjectType.
-		 */
-		explicit TUniqueTSObj(A3DStatus(*InGetter)(const PtrType*, ObjectType*), void(*Initializer)(ObjectType&))
-		{
-			Getter = InGetter;
-			Initializer(Data);
-		}
-
-		/**
-		 * Constructor of an initialized ObjectType object
-		 * This type of structure need a specific initialization method
-		 * @param DataPtr: the pointer of the data to copy
-		 * @param InGetter: Function pointer of the A3DXXXXXXGet function.
-		 * @param Initializer: Initialization function pointer for ObjectType.
-		 */
-		explicit TUniqueTSObj(const PtrType* DataPtr, A3DStatus(*InGetter)(const PtrType*, ObjectType*), void(*Initializer)(ObjectType&))
-			:TUniqueTSObj(InGetter, Initializer)
-		{
-			Get(DataPtr);
+			Status = GetData(DataPtr, Data);
 		}
 
 		~TUniqueTSObj()
 		{
-			Getter(NULL, &Data);
+			GetData(NULL, Data);
 		}
 
 		/**
 		 * Fill the structure with the data of a new DataPtr
 		 */
-		A3DStatus Get(const PtrType* DataPtr)
+		A3DStatus Get(const A3DEntity* DataPtr)
 		{
 			if (IsValid())
 			{
-				Status = Getter(NULL, &Data);
+				Status = GetData(NULL, Data);
 			}
 			else
 			{
@@ -108,7 +81,7 @@ namespace TechSoft
 				return Status;
 			}
 
-			Status = Getter(DataPtr, &Data);
+			Status = GetData(DataPtr, Data);
 			return Status;
 		}
 
@@ -121,7 +94,7 @@ namespace TechSoft
 		}
 
 		/**
-		 * Return 
+		 * Return
 		 *  - A3DStatus::A3D_SUCCESS if the data is filled
 		 *  - A3DStatus::A3D_ERROR if the data is empty
 		 */
@@ -178,10 +151,29 @@ namespace TechSoft
 		}
 
 
+
 	private:
 		ObjectType Data;
 		A3DStatus Status = A3DStatus::A3D_ERROR;
-		A3DStatus (*Getter)(const PtrType*, ObjectType*);
-	};
 
+		void InitializeData(ObjectType& Data)
+#ifdef USE_TECHSOFT_SDK
+			;
+#else
+		{
+		}
+#endif
+
+		A3DStatus GetData(const A3DEntity* AsmModelFilePtr, ObjectType& OutData)
+#ifdef USE_TECHSOFT_SDK
+			;
+#else
+		{
+			return A3DStatus::A3D_ERROR;
+		}
+#endif
+
+	};
 }
+
+#endif
