@@ -1927,11 +1927,9 @@ void UEditorEngine::RebuildAlteredBSP()
 			AActor* Actor = static_cast<AActor*>(*It);
 			checkSlow(Actor->IsA(AActor::StaticClass()));
 
-			ABrush* SelectedBrush = Cast< ABrush >(Actor);
-			if (SelectedBrush && !FActorEditorUtils::IsABuilderBrush(Actor))
+			if (Actor->GetClass() == ABrush::StaticClass() && !FActorEditorUtils::IsABuilderBrush(Actor))
 			{
-				ULevel* Level = SelectedBrush->GetLevel();
-				if (Level)
+				if(ULevel* Level = Actor->GetLevel())
 				{
 					LevelsToRebuild.AddUnique(Level);
 				}
