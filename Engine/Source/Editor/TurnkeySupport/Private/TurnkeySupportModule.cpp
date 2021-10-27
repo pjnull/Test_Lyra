@@ -44,6 +44,9 @@
 #include "ToolMenus.h"
 #include "TurnkeyEditorSupport.h"
 #include "ITurnkeyIOModule.h"
+#if WITH_EDITOR
+#include "ZenServerInterface.h"
+#endif
 
 #include "Misc/App.h"
 #include "Framework/Application/SlateApplication.h"
@@ -352,6 +355,9 @@ public:
 
 		if (PackagingSettings->bUseZenStore)
 		{
+#if WITH_EDITOR && UE_WITH_ZEN
+			static UE::Zen::FScopeZenService TurnkeyStaticZenService;
+#endif
 			BuildCookRunParams += TEXT(" -zenstore");
 		}
 
