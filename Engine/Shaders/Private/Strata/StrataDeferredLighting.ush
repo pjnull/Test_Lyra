@@ -76,6 +76,8 @@ void StrataPreprocessAreaLightIntegration(
 			break;
 		}
 
+		BSDFContext.DiffuseMicroReflWeight = GetAreaLightDiffuseMicroReflWeight(LightContext.AreaLight);
+
 		// Currently anistropic material don't support area lighting and will fallback on punctual lighting (that is a2Override == 0)
 		const bool bAnistropy = BSDF_GETANISOTROPY(BSDFContext.BSDF);
 		const bool bHaziness = BSDF_GETHASHAZINESS(BSDFContext.BSDF);

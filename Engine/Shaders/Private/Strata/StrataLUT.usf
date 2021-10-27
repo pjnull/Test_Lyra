@@ -120,7 +120,8 @@ void MainPS(
 			const float  NoH = saturate(H.z);
 			if (S.w > 0)
 			{
-				E_D += Diffuse_Chan(DiffuseColor.xxx, m2, SatNoV, SatNoL, VoH, NoH).x * SatNoL / S.w;
+				const float DiffuseMicroReflWeight = 1.0f;
+				E_D += Diffuse_Chan(DiffuseColor.xxx, m2, SatNoV, SatNoL, VoH, NoH, DiffuseMicroReflWeight).x * SatNoL / S.w;
 			}
 		}
 

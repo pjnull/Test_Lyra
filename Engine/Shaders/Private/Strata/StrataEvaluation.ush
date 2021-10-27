@@ -140,6 +140,8 @@ struct FStrataBSDFContext
 	// Preprocessed roughness override used for specular BSDF evaluation when integration area light (using MRP integrator)
 	float a2Override;
 	float a2OverrideHazy;
+
+	float DiffuseMicroReflWeight;
 };
 
 void StrataGetBSDFRoughness(in FStrataBSDF BSDF, inout float R)
@@ -196,6 +198,8 @@ FStrataBSDFContext StrataCreateBSDFContext(float3x3 TangentBasis, FStrataBSDF BS
 
 	BSDFContext.SatNoL = saturate(BSDFContext.Context.NoL);
 	BSDFContext.SatNoV = saturate(BSDFContext.Context.NoV);
+
+	BSDFContext.DiffuseMicroReflWeight = 1.0f;
 
 	return BSDFContext;
 }
@@ -286,7 +290,7 @@ FStrataEvaluateResult StrataEvaluateBSDF(FStrataBSDFContext BSDFContext, FShadow
 			float a2 = Pow4(SafeRoughness);
 
 		#if STRATA_DIFFUSE_CHAN
-			Sample.DiffusePathValue = Diffuse_Chan(DiffuseColor, a2, BSDFContext.SatNoV, BSDFContext.SatNoL, BSDFContext.Context.VoH, BSDFContext.Context.NoH);
+			Sample.DiffusePathValue = Diffuse_Chan(DiffuseColor, a2, BSDFContext.SatNoV, BSDFContext.SatNoL, BSDFContext.Context.VoH, BSDFContext.Context.NoH, BSDFContext.DiffuseMicroReflWeight);
 		#else
 			Sample.DiffusePathValue = Diffuse_Lambert(DiffuseColor);
 		#endif
