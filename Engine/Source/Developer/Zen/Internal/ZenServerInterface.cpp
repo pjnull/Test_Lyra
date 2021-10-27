@@ -575,14 +575,14 @@ FZenServiceInstance::GetStats( FZenStats& stats ) const
 		UpstreamStats.TotalUploadedMB = 0.0;
 		UpstreamStats.TotalDownloadedMB = 0.0;
 
-		FCbObjectView UpstreamGetsObjectView = RootObjectView["upstream_gets"].AsObjectView();
-		FZenRequestStats& UpstreamGetsStats = stats.UpstreamGetsStats;
+		FCbObjectView UpstreamRequestObjectView = RootObjectView["upstream_gets"].AsObjectView();
+		FZenRequestStats& UpstreamRequestStats = stats.UpstreamRequestStats;
 
-		UpstreamGetsStats.Count = UpstreamGetsObjectView["count"].AsInt64();
-		UpstreamGetsStats.RateMean = UpstreamGetsObjectView["rate_mean"].AsDouble();
-		UpstreamGetsStats.TAverage = UpstreamGetsObjectView["t_avg"].AsDouble();
-		UpstreamGetsStats.TMin = UpstreamGetsObjectView["t_min"].AsDouble();
-		UpstreamGetsStats.TMax = UpstreamGetsObjectView["t_max"].AsDouble();
+		UpstreamRequestStats.Count = UpstreamRequestObjectView["count"].AsInt64();
+		UpstreamRequestStats.RateMean = UpstreamRequestObjectView["rate_mean"].AsDouble();
+		UpstreamRequestStats.TAverage = UpstreamRequestObjectView["t_avg"].AsDouble();
+		UpstreamRequestStats.TMin = UpstreamRequestObjectView["t_min"].AsDouble();
+		UpstreamRequestStats.TMax = UpstreamRequestObjectView["t_max"].AsDouble();
 
 		FCbArrayView EndpPointArrayView = UpstreamObjectView["endpoints"].AsArrayView();
 
