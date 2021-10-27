@@ -43,6 +43,209 @@ const FName SKismetDebugTreeView::ColumnId_Name("Name");
 const FName SKismetDebugTreeView::ColumnId_Value("Value");
 
 //////////////////////////////////////////////////////////////////////////
+// SPropertyValueWidget
+
+class SPropertyValueWidget : public SCompoundWidget
+{
+public:
+	SLATE_BEGIN_ARGS(SPropertyValueWidget)
+		: _PropertyInfo(nullptr)
+		, _TreeItem(nullptr)
+	{}
+
+	SLATE_ATTRIBUTE(TSharedPtr<FPropertyInstanceInfo>, PropertyInfo)
+	SLATE_ARGUMENT(FDebugTreeItemPtr, TreeItem)
+
+	SLATE_END_ARGS()
+
+public:
+
+	void Construct(const FArguments& InArgs, TSharedPtr<FString> InSearchString)
+	{
+		PropertyInfo = InArgs._PropertyInfo;
+		TreeItem = InArgs._TreeItem;
+		check(TreeItem.IsValid());
+
+		TSharedPtr<FPropertyInstanceInfo> Data = PropertyInfo.Get();
+		if (Data.IsValid())
+		{
+			if (Data->Property->IsA<FObjectProperty>())
+			{
+				ChildSlot
+				[
+					SNew(SHorizontalBox)
+					+SHorizontalBox::Slot()
+						.AutoWidth()
+						.VAlign(VAlign_Center)
+						[
+							SNew(PropertyInfoViewStyle::STextHighlightOverlay)
+								.FullText(this, &SPropertyValueWidget::GetObjectValueText)
+								.HighlightText(this, &SPropertyValueWidget::GetHighlightText, InSearchString)
+								[
+									SNew(STextBlock)
+										.ToolTipText(this, &SPropertyValueWidget::GetValueTooltipText)
+										.Text(this, &SPropertyValueWidget::GetObjectValueText)
+								]
+						]
+					+SHorizontalBox::Slot()
+						.AutoWidth()
+						.VAlign(VAlign_Center)
+						[
+							SNew(SSpacer)
+								.Size(FVector2D(2.0f, 1.0f))
+						]
+					+SHorizontalBox::Slot()
+						.AutoWidth()
+						.VAlign(VAlign_Center)
+						[
+							SNew(SHyperlink)
+								.ToolTipText(this, &SPropertyValueWidget::GetClassLinkTooltipText)
+								.Text(this, &SPropertyValueWidget::GetObjectClassText)
+								.OnNavigate(this, &SPropertyValueWidget::OnNavigateToClass)
+						]
+					+SHorizontalBox::Slot()
+						.AutoWidth()
+						.VAlign(VAlign_Center)
+						[
+							SNew(SSpacer)
+								.Size(FVector2D(2.0f, 1.0f))
+						]
+					+SHorizontalBox::Slot()
+						.AutoWidth()
+						.VAlign(VAlign_Center)
+						[
+							SNew(STextBlock)
+								.Text(LOCTEXT("ObjectValueEnd", ")"))
+						]
+					];
+			}
+			else
+			{
+				ChildSlot
+				[
+					SNew(PropertyInfoViewStyle::STextHighlightOverlay)
+						.FullText(this, &SPropertyValueWidget::GetDescription)
+						.HighlightText(this, &SPropertyValueWidget::GetHighlightText, InSearchString)
+						[
+							SNew(STextBlock)
+								.ToolTipText(this, &SPropertyValueWidget::GetDescription)
+								.Text(this, &SPropertyValueWidget::GetDescription)
+						]
+				];
+			}
+		}
+	}
+
+private:
+
+	FText GetDescription() const
+	{
+		return TreeItem->GetDescription();
+	}
+
+	FText GetHighlightText(TSharedPtr<FString> InSearchString) const
+	{
+		return TreeItem->GetHighlightText(InSearchString);
+	}
+
+	FText GetObjectValueText() const
+	{
+		TSharedPtr<FPropertyInstanceInfo> Data = PropertyInfo.Get();
+		if (Data.IsValid())
+		{
+			if (const UObject* Object = Data->Object.Get())
+			{
+				return FText::Format(LOCTEXT("ObjectValueBegin", "{0} (Class: "), FText::FromString(Object->GetName()));
+			}
+		}
+
+		return LOCTEXT("UnknownObjectValueBegin", "[Unknown] (Class: ");
+	}
+
+	FText GetValueTooltipText() const
+	{
+		TSharedPtr<FPropertyInstanceInfo> Data = PropertyInfo.Get();
+		if (Data.IsValid())
+		{
+			// if this is an Object property, tooltip text should include its full name
+			if (const UObject* Object = Data->Object.Get())
+			{
+				return FText::Format(LOCTEXT("ObjectValueTooltip", "{0}\nClass: {1}"),
+					FText::FromString(Object->GetFullName()),
+					FText::FromString(Object->GetClass()->GetFullName()));
+			}
+		}
+
+		return GetDescription();
+	}
+
+	FText GetClassLinkTooltipText() const
+	{
+		TSharedPtr<FPropertyInstanceInfo> Data = PropertyInfo.Get();
+		if (Data.IsValid())
+		{
+			if (const UObject* Object = Data->Object.Get())
+			{
+				if (UClass* Class = Object->GetClass())
+				{
+					if (UBlueprint* Blueprint = Cast<UBlueprint>(Class->ClassGeneratedBy))
+					{
+						return LOCTEXT("OpenBlueprintClass", "Opens this Class in the Blueprint Editor");
+					}
+					else
+					{
+						// this is a native class
+						return LOCTEXT("OpenNativeClass", "Navigates to this class' source file");
+					}
+				}
+			}
+		}
+
+		return LOCTEXT("UnknownClassName", "[Unknown]");
+	}
+
+	FText GetObjectClassText() const
+	{
+		TSharedPtr<FPropertyInstanceInfo> Data = PropertyInfo.Get();
+		if (Data.IsValid())
+		{
+			if (const UObject* Object = Data->Object.Get())
+			{
+				return FText::FromString(Object->GetClass()->GetName());
+			}
+		}
+
+		return LOCTEXT("UnknownClassName", "[Unknown]");
+	}
+
+	void OnNavigateToClass() const
+	{
+		TSharedPtr<FPropertyInstanceInfo> Data = PropertyInfo.Get();
+		if (Data.IsValid())
+		{
+			if (const UObject* Object = Data->Object.Get())
+			{
+				if (UClass* Class = Object->GetClass())
+				{
+					if (UBlueprint* Blueprint = Cast<UBlueprint>(Class->ClassGeneratedBy))
+					{
+						GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(Blueprint);
+					}
+					else
+					{
+						// this is a native class
+						FSourceCodeNavigation::NavigateToClass(Class);
+					}
+				}
+			}
+		}
+	}
+
+	FDebugTreeItemPtr TreeItem;
+	TAttribute<TSharedPtr<FPropertyInstanceInfo>> PropertyInfo;
+};
+
+//////////////////////////////////////////////////////////////////////////
 // FDebugLineItem
 
 uint16 FDebugLineItem::ActiveTypeBitset = TNumericLimits<uint16>::Max(); // set all to active by default
@@ -612,12 +815,12 @@ void FLatentActionLineItem::OnNavigateToLatentNode()
 struct FWatchChildLineItem : public FLineItemWithChildren
 {
 protected:
-	FPropertyInstanceInfo Data;
+	TSharedRef<FPropertyInstanceInfo> Data;
 	TWeakPtr<FDebugLineItem> ParentTreeItem;
 private:
 	bool bIconHovered = false;
 public:
-	FWatchChildLineItem(const FPropertyInstanceInfo& Child, const FDebugTreeItemPtr& InParentTreeItem) :
+	FWatchChildLineItem(TSharedRef<FPropertyInstanceInfo> Child, const FDebugTreeItemPtr& InParentTreeItem) :
 		FLineItemWithChildren(DLT_WatchChild),
 		Data(Child),
 		ParentTreeItem(InParentTreeItem)
@@ -627,8 +830,8 @@ public:
 	{
 		FWatchChildLineItem* Other = (FWatchChildLineItem*)BaseOther;
 
-		return Data.Property == Other->Data.Property &&
-			Data.DisplayName.CompareTo(Other->Data.DisplayName) == 0;
+		return Data->Property == Other->Data->Property &&
+			Data->DisplayName.CompareTo(Other->Data->DisplayName) == 0;
 	}
 
 	virtual void UpdateData(const FDebugLineItem& NewerData) override
@@ -647,38 +850,38 @@ public:
 
 	virtual uint32 GetHash() override
 	{
-		return HashCombine(GetTypeHash(Data.Property), GetTypeHash(Data.DisplayName.ToString()));
+		return HashCombine(GetTypeHash(Data->Property), GetTypeHash(Data->DisplayName.ToString()));
 	}
 
 	virtual FText GetName() const override
 	{
-		return Data.Name;
+		return Data->Name;
 	}
 
 	virtual FText GetDescription() const override
 	{
-		const FString ValStr = Data.Value.ToString();
+		const FString ValStr = Data->Value.ToString();
 		return FText::FromString(ValStr.Replace(TEXT("\n"), TEXT(" ")));
 	}
 
 	virtual FText GetDisplayName() const override
 	{
-		return Data.DisplayName;
+		return Data->DisplayName;
 	}
 
 	// if data is pointing to an asset, get it's UPackage
 	const UPackage* GetDataPackage() const
 	{
-		if (Data.Object.IsValid())
+		if (Data->Object.IsValid())
 		{
-			if (const UBlueprintGeneratedClass* GeneratedClass = Cast<UBlueprintGeneratedClass>(Data.Object->GetClass()))
+			if (const UBlueprintGeneratedClass* GeneratedClass = Cast<UBlueprintGeneratedClass>(Data->Object->GetClass()))
 			{
 				if (const UPackage* Package = GeneratedClass->GetPackage())
 				{
 					return Package;
 				}
 			}
-			if (const UPackage* Package = Data.Object->GetPackage())
+			if (const UPackage* Package = Data->Object->GetPackage())
 			{
 				return Package;
 			}
@@ -712,12 +915,12 @@ public:
 		FLinearColor LinearRGB = BaseColor.GetSpecifiedColor();
 
 		// check if Data is a UObject
-		if (CastField<FObjectPropertyBase>(Data.Property.Get()))
+		if (CastField<FObjectPropertyBase>(Data->Property.Get()))
 		{
 			FLinearColor LinearHSV = LinearRGB.LinearRGBToHSV();
 
 			// if it's a null object, darken the icon so it's clear that it's not a button
-			if (Data.Object == nullptr)
+			if (Data->Object == nullptr)
 			{
 				LinearHSV.B *= 0.5f; // decrease value
 				LinearHSV.A *= 0.5f; // decrease alpha
@@ -754,7 +957,7 @@ public:
 		{
 			return FText::Format(LOCTEXT("OpenPackage", "Open: {0}"), FText::FromString(Package->GetName()));
 		}
-		return Data.Type;
+		return Data->Type;
 	}
 
 	// uses the icon and color associated with the property type
@@ -764,7 +967,7 @@ public:
 		FSlateColor SecondaryColor;
 		FSlateBrush const* SecondaryIcon;
 		const FSlateBrush* Icon = FBlueprintEditor::GetVarIconAndColorFromProperty(
-			Data.Property.Get(),
+			Data->Property.Get(),
 			BaseColor,
 			SecondaryIcon,
 			SecondaryColor
@@ -803,70 +1006,17 @@ public:
 
 	virtual void GatherChildren(TArray<FDebugTreeItemPtr>& OutChildren, const FString& InSearchString, bool bRespectSearch) override
 	{
-		for (const TSharedPtr<FPropertyInstanceInfo>& ChildData : Data.Children)
+		for (const TSharedPtr<FPropertyInstanceInfo>& ChildData : Data->Children)
 		{
-			EnsureChildIsAdded(OutChildren, FWatchChildLineItem(*ChildData, AsShared()), InSearchString, bRespectSearch);
+			EnsureChildIsAdded(OutChildren, FWatchChildLineItem(ChildData.ToSharedRef(), AsShared()), InSearchString, bRespectSearch);
 		}
 	}
 
 	virtual TSharedRef<SWidget> GenerateValueWidget(TSharedPtr<FString> InSearchString) override
 	{
-		if (const UObject* Object = Data.Object.Get())
-		{
-			return SNew(SHorizontalBox)
-				+SHorizontalBox::Slot()
-				.AutoWidth()
-				.VAlign(VAlign_Center)
-				[
-					SNew(PropertyInfoViewStyle::STextHighlightOverlay)
-						.FullText(this, &FWatchChildLineItem::GetObjectValueText)
-						.HighlightText(this, &FWatchChildLineItem::GetHighlightText, InSearchString)
-						[
-							SNew(STextBlock)
-								.ToolTipText(this, &FWatchChildLineItem::GetValueTooltipText)
-								.Text(this, &FWatchChildLineItem::GetObjectValueText)
-						]
-				]
-				+SHorizontalBox::Slot()
-				.AutoWidth()
-				.VAlign(VAlign_Center)
-				[
-					SNew(SSpacer)
-						.Size(FVector2D(2.0f, 1.0f))
-				]
-				+SHorizontalBox::Slot()
-				.AutoWidth()
-				.VAlign(VAlign_Center)
-				[
-					SNew(SHyperlink)
-						.ToolTipText(this, &FWatchChildLineItem::GetClassLinkTooltipText)
-						.Text(this, &FWatchChildLineItem::GetObjectClassText)
-						.OnNavigate(this, &FWatchChildLineItem::OnNavigateToClass)
-				]
-				+SHorizontalBox::Slot()
-				.AutoWidth()
-				.VAlign(VAlign_Center)
-				[
-					SNew(SSpacer)
-						.Size(FVector2D(2.0f, 1.0f))
-				]
-				+SHorizontalBox::Slot()
-				.AutoWidth()
-				.VAlign(VAlign_Center)
-				[
-					SNew(STextBlock)
-						.Text(LOCTEXT("ObjectValueEnd", ")"))
-				];
-		}
-
-		return SNew(PropertyInfoViewStyle::STextHighlightOverlay)
-			.FullText(this, &FWatchChildLineItem::GetDescription)
-			.HighlightText(this, &FWatchChildLineItem::GetHighlightText, InSearchString)
-			[
-				SNew(STextBlock)
-					.ToolTipText(this, &FWatchChildLineItem::GetDescription)
-					.Text(this, &FWatchChildLineItem::GetDescription)
-			];
+		return SNew(SPropertyValueWidget, InSearchString)
+			.PropertyInfo(this, &FWatchChildLineItem::GetPropertyInfo)
+			.TreeItem(AsShared());
 	}
 
 	virtual void ExtendContextMenu(FMenuBuilder& MenuBuilder, bool bInDebuggerTab) override
@@ -920,80 +1070,7 @@ public:
 protected:
 	virtual bool IsContainer() const override
 	{
-		return Data.Property->IsA<FSetProperty>() || Data.Property->IsA<FArrayProperty>() || Data.Property->IsA<FMapProperty>();
-	}
-
-	FText GetObjectValueText() const
-	{
-		if (const UObject* Object = Data.Object.Get())
-		{
-			return FText::Format(LOCTEXT("ObjectValueBegin", "{0} (Class: "), FText::FromString(Object->GetName()));
-		}
-
-		return LOCTEXT("UnknownObjectValueBegin", "[Unknown] (Class: ");
-	}
-
-	FText GetObjectClassText() const
-	{
-		if (const UObject* Object = Data.Object.Get())
-		{
-			return FText::FromString(Object->GetClass()->GetName());
-		}
-
-		return LOCTEXT("UnknownClassName", "[Unknown]");
-	}
-
-	void OnNavigateToClass() const
-	{
-		if (const UObject* Object = Data.Object.Get())
-		{
-			if (UClass* Class = Object->GetClass())
-			{
-				if (UBlueprint* Blueprint = Cast<UBlueprint>(Class->ClassGeneratedBy))
-				{
-					GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(Blueprint);
-				}
-				else
-				{
-					// this is a native class
-					FSourceCodeNavigation::NavigateToClass(Class);
-				}
-			}
-		}
-	}
-
-	FText GetClassLinkTooltipText() const
-	{
-		if (const UObject* Object = Data.Object.Get())
-		{
-			if (UClass* Class = Object->GetClass())
-			{
-				if (UBlueprint* Blueprint = Cast<UBlueprint>(Class->ClassGeneratedBy))
-				{
-					return LOCTEXT("OpenBlueprintClass", "Opens this Class in the Blueprint Editor");
-				}
-				else
-				{
-					// this is a native class
-					return LOCTEXT("OpenNativeClass", "Navigates to this class' source file");
-				}
-			}
-		}
-
-		return LOCTEXT("UnknownClassName", "[Unknown]");
-	}
-
-	FText GetValueTooltipText() const
-	{
-		// if this is an Object property, tooltip text should include its full name
-		if (const UObject* Object = Data.Object.Get())
-		{
-			return FText::Format(LOCTEXT("ObjectValueTooltip", "{0}\nClass: {1}"),
-				FText::FromString(Object->GetFullName()),
-				FText::FromString(Object->GetClass()->GetFullName()));
-		}
-
-		return GetDescription();
+		return Data->Property->IsA<FSetProperty>() || Data->Property->IsA<FArrayProperty>() || Data->Property->IsA<FMapProperty>();
 	}
 
 	EVisibility GetWatchIconVisibility() const
@@ -1006,6 +1083,11 @@ protected:
 		}
 
 		return bPinWatched ? EVisibility::Visible : EVisibility::Collapsed;
+	}
+
+	TSharedPtr<FPropertyInstanceInfo> GetPropertyInfo() const
+	{
+		return Data;
 	}
 
 	void AddWatch();
@@ -1059,7 +1141,7 @@ public:
 					void* Value = Property->ContainerPtrToValuePtr<void*>(Object);
 					FKismetDebugUtilities::GetDebugInfoInternal(DebugInfo, Property, Value);
 
-					EnsureChildIsAdded(OutChildren, FWatchChildLineItem(*DebugInfo, AsShared()), InSearchString, bRespectSearch);
+					EnsureChildIsAdded(OutChildren, FWatchChildLineItem(DebugInfo.ToSharedRef(), AsShared()), InSearchString, bRespectSearch);
 				}
 			}
 		}
@@ -1190,7 +1272,7 @@ public:
 					{
 						for (const TSharedPtr<FPropertyInstanceInfo>& ChildData : ThisDebugInfo->Children)
 						{
-							EnsureChildIsAdded(OutChildren, FWatchChildLineItem(*ChildData, AsShared()), InSearchString, bRespectSearch);
+							EnsureChildIsAdded(OutChildren, FWatchChildLineItem(ChildData.ToSharedRef(), AsShared()), InSearchString, bRespectSearch);
 						}
 					}
 				}
@@ -1207,6 +1289,7 @@ protected:
 	virtual FText GetDescription() const override;
 	virtual FText GetDisplayName() const override;
 	virtual TSharedRef<SWidget> GenerateNameWidget(TSharedPtr<FString> InSearchString) override;
+	virtual TSharedRef<SWidget> GenerateValueWidget(TSharedPtr<FString> InSearchString) override;
 	virtual TSharedRef<SWidget> GetNameIcon() override;
 	const FSlateBrush* GetPinIcon() const;
 	FSlateColor GetPinIconColor() const;
@@ -1217,6 +1300,9 @@ protected:
 
 	// Finds the DebugInfo for the property pointed to by PathToProperty from the Pin's debuginfo
 	TSharedPtr<FPropertyInstanceInfo> GetWatchedPropertyDebugInfo(const TSharedPtr<FPropertyInstanceInfo>& InPinInfo) const;
+
+
+	TSharedPtr<FPropertyInstanceInfo> GetPropertyInfo() const;
 
 private:
 	void AddWatch() const
@@ -1373,6 +1459,13 @@ TSharedRef<SWidget> FWatchLineItem::GenerateNameWidget(TSharedPtr<FString> InSea
 				.Text(this, &FWatchLineItem::GetDisplayName)
 				.ToolTipText(LOCTEXT("NavWatchLoc", "Navigate to the watch location"))
 		];
+}
+
+TSharedRef<SWidget> FWatchLineItem::GenerateValueWidget(TSharedPtr<FString> InSearchString)
+{
+	return SNew(SPropertyValueWidget, InSearchString)
+		.PropertyInfo(this, &FWatchLineItem::GetPropertyInfo)
+		.TreeItem(AsShared());
 }
 
 // overlays the watch icon on top of a faded icon associated with the pin type
@@ -1562,6 +1655,31 @@ TSharedPtr<FPropertyInstanceInfo> FWatchLineItem::GetWatchedPropertyDebugInfo(co
 	return ThisDebugInfo;
 }
 
+TSharedPtr<FPropertyInstanceInfo> FWatchLineItem::GetPropertyInfo() const
+{
+	if (UEdGraphPin* ObjectToFocus = ObjectRef.Get())
+	{
+		// Try to determine the blueprint that generated the watch
+		UBlueprint* ParentBlueprint = GetBlueprintForObject(ParentObjectRef.Get());
+
+		// Find a valid property mapping and display the current value
+		UObject* ParentObject = ParentObjectRef.Get();
+		if ((ParentBlueprint != ParentObject) && (ParentBlueprint != nullptr))
+		{
+			TSharedPtr<FPropertyInstanceInfo> DebugInfo;
+			const FKismetDebugUtilities::EWatchTextResult WatchStatus = FKismetDebugUtilities::GetDebugInfo(DebugInfo, ParentBlueprint, ParentObject, ObjectToFocus);
+
+			if (WatchStatus == FKismetDebugUtilities::EWTR_Valid)
+			{
+				check(DebugInfo);
+				return GetWatchedPropertyDebugInfo(DebugInfo);
+			}
+		}
+	}
+	
+	return nullptr;
+}
+
 //////////////////////////////////////////////////////////////////////////
 // FWatchChildLineItem (some functions that need the definition of FWatchLineItem)
 
@@ -1639,7 +1757,7 @@ UEdGraphPin* FWatchChildLineItem::BuildPathToProperty(TArray<FName>& OutPathToPr
 {
 	UEdGraphPin* PinToWatch = nullptr;
 	OutPathToProperty.Reset();
-	OutPathToProperty.Emplace(Data.Property->GetFName());
+	OutPathToProperty.Emplace(Data->Property->GetFName());
 	FDebugTreeItemPtr Parent = ParentTreeItem.Pin();
 	while (Parent.IsValid())
 	{
@@ -1655,7 +1773,7 @@ UEdGraphPin* FWatchChildLineItem::BuildPathToProperty(TArray<FName>& OutPathToPr
 		{
 			// This is a FWatchChildLineItem
 			TSharedPtr<FWatchChildLineItem> ParentAsChild = StaticCastSharedPtr<FWatchChildLineItem>(Parent);
-			OutPathToProperty.Emplace(ParentAsChild->Data.Property->GetFName());
+			OutPathToProperty.Emplace(ParentAsChild->Data->Property->GetFName());
 			Parent = ParentAsChild->ParentTreeItem.Pin();
 		}
 		else

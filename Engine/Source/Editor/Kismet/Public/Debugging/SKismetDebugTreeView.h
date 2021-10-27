@@ -111,6 +111,9 @@ public:
 
 	bool IsVisible();
 	bool DoParentsMatchSearch();
+
+	// @return The text to display in the value column, unless GenerateValueWidget is overridden
+	virtual FText GetDescription() const;
 protected:
 
 	// Cannot create an instance of this class, it's just for use as a base class
@@ -137,9 +140,6 @@ protected:
 
 	// @return The text to display in the name column, unless GenerateNameWidget is overridden
 	virtual FText GetDisplayName() const;
-
-	// @return The text to display in the value column, unless GenerateValueWidget is overridden
-	virtual FText GetDescription() const;
 
 	bool HasName() const;
 	bool HasValue() const;
