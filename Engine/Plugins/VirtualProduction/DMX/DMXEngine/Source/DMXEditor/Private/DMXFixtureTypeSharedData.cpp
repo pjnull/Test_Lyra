@@ -531,11 +531,6 @@ void FDMXFixtureTypeSharedData::PasteClipboardToModes(const TArray<int32>& ModeI
 
 	for (int32 PasteOntoElementIndex = 0; PasteOntoElementIndex < ModeIndices.Num(); PasteOntoElementIndex++)
 	{
-		if (!ModesClipboard.IsValidIndex(IndexOfMode))
-		{
-			return;
-		}
-
 		const int32 PasteOntoIndex = ModeIndices[PasteOntoElementIndex];
 
 		const FString& ClipboardString = [PasteOntoElementIndex, this]()
