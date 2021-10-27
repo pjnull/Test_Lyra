@@ -271,7 +271,9 @@ bool UDMXEntityFixturePatch::IsValidEntity(FText& OutReason) const
 			FText::FromString(ParentFixtureTypeTemplate->GetDisplayName())
 		);
 	}
-	else if (ParentFixtureTypeTemplate->Modes[ActiveMode].Functions.Num() == 0)
+	else if (
+		ParentFixtureTypeTemplate->Modes[ActiveMode].Functions.Num() == 0 && 
+		ParentFixtureTypeTemplate->Modes[ActiveMode].FixtureMatrixConfig.CellAttributes.Num() == 0)
 	{
 		OutReason = FText::Format(
 			LOCTEXT("InvalidReason_NoFunctionsDefined", "'{0}' cannot be assigned as its parent Fixture Type '{1}' does not define any Functions in the Active Mode."),
