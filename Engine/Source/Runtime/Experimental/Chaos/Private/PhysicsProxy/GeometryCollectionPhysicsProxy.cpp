@@ -2807,7 +2807,6 @@ void FGeometryCollectionPhysicsProxy::FieldParameterUpdateCallback(Chaos::FPBDRi
 						}
 					}
 					else if (FieldCommand.RootNode->Type() == FFieldNodeBase::EFieldType::EField_Float)
-					{
 						TArray<float>& FinalResults = ExecutionDatas.ScalarResults[(uint8)EFieldCommandResultType::FinalResult];
 						ResetResultsArray<float>(ExecutionDatas.SamplePositions.Num(), FinalResults, 0.0f);
 
@@ -2815,7 +2814,6 @@ void FGeometryCollectionPhysicsProxy::FieldParameterUpdateCallback(Chaos::FPBDRi
 						
 						Chaos::FieldScalarParameterUpdate(RigidSolver, FieldCommand, ParticleHandles,
 							FieldContext, PositionTarget, TargetedParticles, FinalResults);
-					}
 				}
 				CommandsToRemove.Add(CommandIndex);
 			}
