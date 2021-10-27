@@ -6438,8 +6438,8 @@ void FStarshipEditorStyle::FStyle::SetupContentBrowserStyle()
 		Set("ReferenceViewer.PathText", FEditableTextBoxStyle(NormalEditableTextBoxStyle)
 			.SetFont(DEFAULT_FONT("Bold", 11)));
 
-		Set( "ContentBrowser.ShowSourcesView", new IMAGE_BRUSH( "ContentBrowser/sourcestoggle_16x_collapsed", Icon16x16 ) );
-		Set( "ContentBrowser.HideSourcesView", new IMAGE_BRUSH( "ContentBrowser/sourcestoggle_16x_expanded", Icon16x16 ) );
+		Set( "ContentBrowser.ShowSourcesView", new IMAGE_BRUSH_SVG( "Starship/ContentBrowser/file-tree", Icon16x16 ) );
+		Set( "ContentBrowser.HideSourcesView", new IMAGE_BRUSH_SVG( "Starship/ContentBrowser/file-tree-open", Icon16x16 ) );
 
 		Set( "ContentBrowser.DirectoryUp", new IMAGE_BRUSH("Icons/icon_folder_up_16x", Icon16x16) );
 		Set( "ContentBrowser.PathPickerButton", new IMAGE_BRUSH("Icons/ellipsis_12x", Icon12x12, FLinearColor::Black) );

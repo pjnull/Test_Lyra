@@ -20,6 +20,7 @@
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/Notifications/SNotificationList.h"
 #include "Widgets/Text/STextBlock.h"
+#include "SPrimaryButton.h"
 
 #define LOCTEXT_NAMESPACE "LevelSnapshotsEditor"
 
@@ -90,7 +91,7 @@ void SLevelSnapshotsEditorResults::Construct(const FArguments& InArgs, ULevelSna
 					SNew(SComboButton)
 					.ContentPadding(0)
 					.ForegroundColor(FSlateColor::UseForeground())
-					.ButtonStyle(FEditorStyle::Get(), "ToggleButton")
+					.ButtonStyle(FAppStyle::Get(), "ToggleButton")
 					.AddMetaData<FTagMetaData>(FTagMetaData(TEXT("ViewOptions")))
 					.MenuContent()
 					[
@@ -99,7 +100,7 @@ void SLevelSnapshotsEditorResults::Construct(const FArguments& InArgs, ULevelSna
 					.ButtonContent()
 					[
 						SNew(SImage)
-						.Image(FEditorStyle::GetBrush("GenericViewButton"))
+						.Image(FAppStyle::Get().GetBrush("Icons.Settings"))
 					]
 				]
 			]
@@ -193,16 +194,11 @@ void SLevelSnapshotsEditorResults::Construct(const FArguments& InArgs, ULevelSna
 						.VAlign(VAlign_Fill)
 						.Padding(5.f, 2.f)
 						[
-							SNew(SButton)
-							.VAlign(VAlign_Center)
+							SNew(SPrimaryButton)
+							.Text(LOCTEXT("RestoreLevelSnapshot", "Restore Level Snapshot"))
 							.IsEnabled_Lambda([this]()
 							{
 								return EditorDataPtr.IsValid() && EditorDataPtr->GetEditorWorld() && EditorDataPtr->GetActiveSnapshot() && TreeViewRootHeaderObjects.Num();
-							})
-							.ButtonColorAndOpacity_Lambda([this]() 
-							{
-								return IsEnabled() && EditorDataPtr->IsFilterDirty() ? 
-									FLinearColor(1.f, 1.f, 5.f) : FLinearColor(1.f, 1.f, 1.f);
 							})
 							.ToolTipText_Lambda([this]() 
 							{
@@ -210,18 +206,7 @@ void SLevelSnapshotsEditorResults::Construct(const FArguments& InArgs, ULevelSna
 									FText(LOCTEXT("RestoreSnapshotTooltip_DirtyState", "Please refresh filters. Restore selected snapshot properties and actors to the world.")) :
 									FText(LOCTEXT("RestoreSnapshotTooltip", "Restore selected snapshot properties and actors to the world."));
 							})
-							.ButtonStyle(FEditorStyle::Get(), "FlatButton.Success")
-							.ForegroundColor(FSlateColor::UseForeground())
 							.OnClicked_Raw(this, &SLevelSnapshotsEditorResults::OnClickApplyToWorld)
-							[
-								SNew(STextBlock)
-								.Justification(ETextJustify::Center)
-								.Font(FCoreStyle::GetDefaultFontStyle("Bold", 12))
-								.ColorAndOpacity(FLinearColor(1.0f, 1.0f, 1.0f))
-								.ShadowOffset(FVector2D(1, 1))
-								.ShadowColorAndOpacity(FLinearColor(0, 0, 0, 0.9f))
-								.Text(LOCTEXT("RestoreLevelSnapshot", "Restore Level Snapshot"))
-							]
 						]
 				]
 			]

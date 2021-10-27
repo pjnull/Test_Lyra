@@ -20,6 +20,7 @@
 #include "Widgets/Input/SMultiLineEditableTextBox.h"
 #include "Widgets/SWindow.h"
 #include "Widgets/Text/STextBlock.h"
+#include "SPrimaryButton.h"
 
 TSharedRef<SWindow> SLevelSnapshotsEditorCreationForm::MakeAndShowCreationWindow(
 	const FCloseCreationFormDelegate& CallOnClose, 
@@ -216,16 +217,9 @@ void SLevelSnapshotsEditorCreationForm::Construct(
 				+SHorizontalBox::Slot()
 				.HAlign(HAlign_Right)
 				[
-					SNew(SButton)
-					.ButtonStyle(FEditorStyle::Get(), "FlatButton.Success")
-					.ForegroundColor(FSlateColor::UseForeground())
+					SNew(SPrimaryButton)
 					.OnClicked(this, &SLevelSnapshotsEditorCreationForm::OnCreateButtonPressed)
-					[
-						SNew(STextBlock)
-						.Justification(ETextJustify::Center)
-						.TextStyle(FEditorStyle::Get(), "NormalText.Important")
-						.Text(NSLOCTEXT("LevelSnapshots", "NotificationFormatText_CreationForm_CreateSnapshotButton", "Create Level Snapshot"))
-					]
+					.Text(NSLOCTEXT("LevelSnapshots", "NotificationFormatText_CreationForm_CreateSnapshotButton", "Create Level Snapshot"))
 				]
 			]
 		]

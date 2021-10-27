@@ -24,6 +24,7 @@
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/Text/STextBlock.h"
+#include "SPositiveActionButton.h"
 
 #define LOCTEXT_NAMESPACE "FLevelSnapshotsToolkit"
 
@@ -245,14 +246,11 @@ TSharedRef<SDockTab> FLevelSnapshotsEditorToolkit::SpawnTab_CustomToolbar(const 
 				.HAlign(HAlign_Left)
 				.Padding(2.f, 2.f)
 				[
-					SNew(SButton)
-					.VAlign(VAlign_Center)
-	                .ButtonStyle(FEditorStyle::Get(), "FlatButton.Success")
-	                .ForegroundColor(FSlateColor::UseForeground())
+					SNew(SPositiveActionButton)
+					.OnClicked(this, &FLevelSnapshotsEditorToolkit::OnClickTakeSnapshot)
+					.Text(LOCTEXT("TakeSnapshot", "Take Snapshot"))
+					//.VAlign(VAlign_Center)
 	                .OnClicked(this, &FLevelSnapshotsEditorToolkit::OnClickTakeSnapshot)
-	                [
-						Local::CreatePlusText(LOCTEXT("TakeSnapshot", "Take Snapshot"))
-	                ]
 				]
 
 				// Open Settings
@@ -276,9 +274,8 @@ TSharedRef<SDockTab> FLevelSnapshotsEditorToolkit::SpawnTab_CustomToolbar(const 
 							SettingsButtonPtr->SetIsChecked(false);
 						})
 		                [
-							SNew(STextBlock)
-							.Font(FEditorStyle::Get().GetFontStyle("FontAwesome.14"))
-							.Text(FEditorFontGlyphs::Cogs)
+							SNew(SImage)
+							.Image(FAppStyle::Get().GetBrush("Icons.Settings"))
 		                ]
 					]
                 ]

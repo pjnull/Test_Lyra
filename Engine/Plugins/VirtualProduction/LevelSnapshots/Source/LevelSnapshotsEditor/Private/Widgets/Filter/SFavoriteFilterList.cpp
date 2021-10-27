@@ -12,6 +12,7 @@
 
 #include "Widgets/Input/SSearchBox.h"
 #include "Widgets/Layout/SWrapBox.h"
+#include "Widgets/Images/SImage.h"
 
 
 #define LOCTEXT_NAMESPACE "LevelSnapshotsEditor"
@@ -99,7 +100,7 @@ void SFavoriteFilterList::Construct(const FArguments& InArgs, UFavoriteFilterCon
 		        .AutoWidth()
 		        [
 		            SAssignNew(ComboButton, SComboButton)
-		            .ComboButtonStyle( FEditorStyle::Get(), "GenericFilters.ComboButtonStyle" )
+		            .ComboButtonStyle( FAppStyle::Get(), "GenericFilters.ComboButtonStyle" )
 		            .ForegroundColor(FLinearColor::White)
 		            .ContentPadding(0)
 		            .ToolTipText( LOCTEXT( "SelectFilterToUseToolTip", "Select filters you want to use." ) )
@@ -127,17 +128,16 @@ void SFavoriteFilterList::Construct(const FArguments& InArgs, UFavoriteFilterCon
 		                + SHorizontalBox::Slot()
 		                .AutoWidth()
 		                [
-		                    SNew(STextBlock)
-		                    .TextStyle(FEditorStyle::Get(), "GenericFilters.TextStyle")
-		                    .Font(FEditorStyle::Get().GetFontStyle("FontAwesome.9"))
-		                    .Text(FText::FromString(FString(TEXT("\xf0b0"))) /*fa-filter*/)
-		                ]
+		                    SNew(SImage)
+							.Image(FAppStyle::Get().GetBrush("Icons.Filter"))
+						]
 
 		                + SHorizontalBox::Slot()
 		                .AutoWidth()
+						.Padding(2, 0, 0, 0)
 		                [
 		                    SNew(STextBlock)
-		                    .TextStyle(FEditorStyle::Get(), "GenericFilters.TextStyle")
+		                    .TextStyle(FAppStyle::Get(), "GenericFilters.TextStyle")
 		                    .Text(LOCTEXT("FavoriteFilters", "Favorite filters"))
 		                ]
 		            ]

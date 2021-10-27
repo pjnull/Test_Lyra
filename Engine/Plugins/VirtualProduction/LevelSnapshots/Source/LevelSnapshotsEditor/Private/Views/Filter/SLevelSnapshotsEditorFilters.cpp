@@ -23,6 +23,7 @@
 #include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/Notifications/SNotificationList.h"
 #include "Widgets/SBoxPanel.h"
+#include "SPrimaryButton.h"
 
 #define LOCTEXT_NAMESPACE "LevelSnapshotsEditor"
 
@@ -165,9 +166,8 @@ void SLevelSnapshotsEditorFilters::Construct(const FArguments& InArgs, const TSh
 				.AutoWidth()
 				.Padding(0.f, 0.f, 2.f, 0.f)
 				[
-					SNew(SButton)
-					.ButtonStyle(FEditorStyle::Get(), "FlatButton.Success")
-					.ForegroundColor(FSlateColor::UseForeground())
+					SNew(SPrimaryButton)
+					.Text(LOCTEXT("UpdateResults", "Refresh Results"))
 					.IsEnabled_Lambda([this]() 
 					{
 						return EditorDataPtr->IsFilterDirty() && EditorDataPtr->GetActiveSnapshot();
@@ -179,19 +179,6 @@ void SLevelSnapshotsEditorFilters::Construct(const FArguments& InArgs, const TSh
 						FText(LOCTEXT("RefreshResultsTooltip_CleanState", "Results are up to date, no refresh required."));
 					})
 					.OnClicked(this, &SLevelSnapshotsEditorFilters::OnClickUpdateResultsView)
-					[
-						SNew(SHorizontalBox)
-						+SHorizontalBox::Slot()
-							.AutoWidth()
-							.VAlign(VAlign_Center)
-						[
-							SNew(STextBlock)
-							.Justification(ETextJustify::Center)
-							.TextStyle(FEditorStyle::Get(), "NormalText.Important")
-							.Text(FEditorFontGlyphs::Plus)
-							.Text(LOCTEXT("UpdateResults", "Refresh Results"))
-						]
-					]
 				]
 
 				// Save and load
