@@ -844,10 +844,8 @@ namespace UnrealBuildTool
 		/// </summary>
 		public List<string> AllowedRestrictedFolders = new List<string>();
 
-		/// <summary>
-		/// List of folders which are allowed to be referenced when compiling this binary, without propagating restricted folder names
-		/// </summary>
-		[Obsolete("WhitelistRestrictedFolders has been deprecated in 5.0. Use AllowedRestrictedFolders instead.")]
+		/// <exclude/>
+		[Obsolete("Deprecated in 5.0, use AllowedRestrictedFolders instead.")]
 		public List<string> WhitelistRestrictedFolders = new List<string>();
 
 		/// <summary>
