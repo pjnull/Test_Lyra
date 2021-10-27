@@ -225,7 +225,7 @@ TSharedPtr<FJsonValue> FJsonObjectConverter::ObjectJsonCallback(FProperty* Prope
 
 			void** PtrToValuePtr = (void**)Value;
 
-			if (FJsonObjectConverter::UStructToJsonObject(ObjectProperty->PropertyClass, (*PtrToValuePtr), Out, 0, 0, &CustomCB))
+			if (FJsonObjectConverter::UStructToJsonObject(ObjectProperty->PropertyClass, (*PtrToValuePtr), Out, 0, 0, &CustomCB)) //-V549
 			{
 				return MakeShared<FJsonValueObject>(Out);
 			}

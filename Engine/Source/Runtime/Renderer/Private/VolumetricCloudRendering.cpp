@@ -898,7 +898,7 @@ public:
 
 static TGlobalResource<FSingleTriangleMeshVertexBuffer> GSingleTriangleMeshVertexBuffer;
 
-class FSingleTriangleMeshVertexFactory : public FLocalVertexFactory
+class FSingleTriangleMeshVertexFactory final : public FLocalVertexFactory
 {
 public:
 	FSingleTriangleMeshVertexFactory(ERHIFeatureLevel::Type InFeatureLevel)

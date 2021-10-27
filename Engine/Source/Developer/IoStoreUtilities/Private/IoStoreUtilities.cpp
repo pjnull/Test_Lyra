@@ -4335,7 +4335,7 @@ int32 Staged2Zen(const FString& BuildPath, const FKeyChain& KeyChain, const FStr
 				PackageStoreEntryResource.ExportInfo.ExportBundleCount = StoreEntry->ExportBundleCount;
 				PackageStoreEntryResource.ExportInfo.ExportCount = StoreEntry->ExportCount;
 				PackageStoreEntryResource.ImportedPackageIds.SetNum(StoreEntry->ImportedPackages.Num());
-				FMemory::Memcpy(PackageStoreEntryResource.ImportedPackageIds.GetData(), StoreEntry->ImportedPackages.Data(), sizeof(FPackageId) * StoreEntry->ImportedPackages.Num());
+				FMemory::Memcpy(PackageStoreEntryResource.ImportedPackageIds.GetData(), StoreEntry->ImportedPackages.Data(), sizeof(FPackageId) * StoreEntry->ImportedPackages.Num()); //-V575
 			}
 			++StoreEntry;
 		}

@@ -427,7 +427,7 @@ private:
 };
 static FCriticalSection FBulkDataIoDispatcherRequestEvent;
 
-class FBulkDataIoDispatcherRequest : public IBulkDataIORequest
+class FBulkDataIoDispatcherRequest final : public IBulkDataIORequest
 {
 public:
 	FBulkDataIoDispatcherRequest(const FIoChunkId& InChunkID, int64 InOffsetInBulkData, int64 InBytesToRead, int32 Priority, FBulkDataIORequestCallBack* InCompleteCallback, uint8* InUserSuppliedMemory)

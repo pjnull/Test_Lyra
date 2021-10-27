@@ -1371,6 +1371,7 @@ private:
 				const FPayload& StreamingMipPayload = Output.GetPayload(FTexturePlatformData::MakeMipId(MipIndex));
 				if (!StreamingMipPayload)
 				{
+					delete NewMip;
 					UE_LOG(LogTexture, Error, TEXT("Missing texture streaming mip '%d' for build of '%s' by %s."),
 						MipIndex, *WriteToString<128>(Output.GetName()), *WriteToString<32>(Output.GetFunction()));
 					return false;

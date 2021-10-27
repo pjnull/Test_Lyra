@@ -707,7 +707,7 @@ void SReplaceNodeReferences::FindAllReplacementsComplete(TArray<FImaginaryFiBDat
 
 					FReplaceNodeReferencesHelper::ReplaceReferences(SourceVariableReference, TargetVariableReference, Blueprint, InRawDataList);
 
-					if (SourceProperty && bShowReplacementsWhenFinished)
+					if (bShowReplacementsWhenFinished)
 					{
 						TSharedPtr<SFindInBlueprints> GlobalResults = FFindInBlueprintSearchManager::Get().GetGlobalFindResults();
 						if (GlobalResults)

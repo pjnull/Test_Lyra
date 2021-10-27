@@ -16,7 +16,7 @@ public:
 		IModularFeatures::Get().RegisterModularFeature(IEngineCrypto::GetFeatureName(), this);
 	}
 
-	virtual ~FPlatformCryptoModularFeature()
+	~FPlatformCryptoModularFeature()
 	{
 		Shutdown();
 	}

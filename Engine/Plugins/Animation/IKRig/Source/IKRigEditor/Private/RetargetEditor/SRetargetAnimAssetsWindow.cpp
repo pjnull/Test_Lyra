@@ -709,8 +709,8 @@ void SRetargetAnimAssetsWindow::RetargeterAssigned(const FAssetData& InAssetData
 {
 	UIKRetargeter* InRetargeter = Cast<UIKRetargeter>(InAssetData.GetAsset());
 	BatchContext.IKRetargetAsset = InRetargeter;
-	const UIKRigDefinition* SourceIKRig = InRetargeter ? InRetargeter->SourceIKRigAsset : nullptr;
-	const UIKRigDefinition* TargetIKRig = InRetargeter ? InRetargeter->TargetIKRigAsset : nullptr;
+	const UIKRigDefinition* SourceIKRig = InRetargeter ? InRetargeter->SourceIKRigAsset.Get() : nullptr;
+	const UIKRigDefinition* TargetIKRig = InRetargeter ? InRetargeter->TargetIKRigAsset.Get() : nullptr;
 	USkeletalMesh* SourceMesh =  SourceIKRig ? SourceIKRig->GetPreviewMesh() : nullptr;
 	USkeletalMesh* TargetMesh =  TargetIKRig ? TargetIKRig->GetPreviewMesh() : nullptr;
 	SourceMeshAssigned(FAssetData(SourceMesh));

@@ -974,7 +974,7 @@ private:
 	TDatasmithReferenceArrayProxy<IDatasmithKeyValueProperty> Properties;
 };
 
-class DATASMITHCORE_API FDatasmithLandscapeElementImpl : public FDatasmithActorElementImpl< IDatasmithLandscapeElement >
+class DATASMITHCORE_API FDatasmithLandscapeElementImpl final : public FDatasmithActorElementImpl< IDatasmithLandscapeElement >
 {
 public:
 	explicit FDatasmithLandscapeElementImpl(const TCHAR* InName)
