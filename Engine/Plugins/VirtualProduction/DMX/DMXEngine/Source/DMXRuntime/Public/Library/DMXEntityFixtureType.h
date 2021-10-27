@@ -78,8 +78,8 @@ struct DMXRUNTIME_API FDMXFixtureFunction
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (DisplayPriority = "30"), Category = "Function Settings")
 	int64 DefaultValue;
 
-	/** This function's starting channel */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (DisplayName = "Channel Assignment", DisplayPriority = "2"), Category = "Function Settings")
+	/** This function's starting channel (use editor above to make changes) */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (DisplayName = "Channel Assignment", DisplayPriority = "2"), Category = "Function Settings")
 	int32 Channel;
 
 	/** DEPRECATED 5.0. Instead the 'Channel' property is EditAnywhere so any function can be assigned freely */
