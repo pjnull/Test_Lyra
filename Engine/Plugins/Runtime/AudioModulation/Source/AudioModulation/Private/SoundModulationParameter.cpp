@@ -175,7 +175,7 @@ Audio::FModulationNormalizedConversionFunction USoundModulationParameterVolume::
 {
 	return [InUnitMin = GetUnitMin()](float& InOutValue)
 	{
-		InOutValue = InOutValue < InUnitMin
+		InOutValue = InOutValue < InUnitMin || FMath::IsNearlyEqual(InOutValue, InUnitMin)
 			? 0.0f
 			: Audio::ConvertToLinear(InOutValue);
 	};
