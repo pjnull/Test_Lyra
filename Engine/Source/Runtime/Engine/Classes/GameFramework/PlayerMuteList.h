@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "UObject/ObjectMacros.h"
 #include "Online/CoreOnline.h"
+#include "Misc/EnumRange.h"
 #include "PlayerMuteList.generated.h"
 
 struct FUniqueNetIdRepl;
