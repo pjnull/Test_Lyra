@@ -3609,7 +3609,7 @@ void FScene::DumpUnbuiltLightInteractions( FOutputDevice& Ar ) const
 	TSet<FString> PrimitivesWithUnbuiltInteractions;
 
 	// if want to print out all of the lights
-	for( TSparseArray<FLightSceneInfoCompact>::TConstIterator It(Lights); It; ++It )
+	for( auto It = Lights.CreateConstIterator(); It; ++It )
 	{
 		const FLightSceneInfoCompact& LightCompactInfo = *It;
 		FLightSceneInfo* LightSceneInfo = LightCompactInfo.LightSceneInfo;
@@ -3885,7 +3885,7 @@ void FScene::ProcessAtmosphereLightRemoval_RenderThread(FLightSceneInfo* LightSc
 		AtmosphereLights[Index] = nullptr;
 		float SelectedLightLuminance = 0.0f;
 
-		for (TSparseArray<FLightSceneInfoCompact>::TConstIterator It(Lights); It; ++It)
+		for (auto It = Lights.CreateConstIterator(); It; ++It)
 		{
 			const FLightSceneInfoCompact& LightInfo = *It;
 			float LightLuminance = LightInfo.LightSceneInfo->Proxy->GetColor().GetLuminance();

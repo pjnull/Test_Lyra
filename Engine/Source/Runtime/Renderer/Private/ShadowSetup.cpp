@@ -3793,7 +3793,7 @@ void FSceneRenderer::InitProjectedShadowVisibility()
 	int32 NumBufferedFrames = FOcclusionQueryHelpers::GetNumBufferedFrames(FeatureLevel);
 
 	// Initialize the views' ProjectedShadowVisibilityMaps and remove shadows without subjects.
-	for(TSparseArray<FLightSceneInfoCompact>::TConstIterator LightIt(Scene->Lights);LightIt;++LightIt)
+	for(auto LightIt = Scene->Lights.CreateConstIterator();LightIt;++LightIt)
 	{
 		FVisibleLightInfo& VisibleLightInfo = VisibleLightInfos[LightIt.GetIndex()];
 
@@ -3939,7 +3939,7 @@ void FSceneRenderer::InitProjectedShadowVisibility()
 			UE_LOG(LogRenderer, Display, TEXT(" View  %d/%d"), ViewIndex, Views.Num());
 
 			uint32 LightIndex = 0;
-			for(TSparseArray<FLightSceneInfoCompact>::TConstIterator LightIt(Scene->Lights); LightIt; ++LightIt, ++LightIndex)
+			for(auto LightIt = Scene->Lights.CreateConstIterator(); LightIt; ++LightIt, ++LightIndex)
 			{
 				FVisibleLightInfo& VisibleLightInfo = VisibleLightInfos[LightIt.GetIndex()];
 				FVisibleLightViewInfo& VisibleLightViewInfo = View.VisibleLightInfos[LightIt.GetIndex()];
@@ -4891,7 +4891,7 @@ void FSceneRenderer::AllocateShadowDepthTargets(FRHICommandListImmediate& RHICmd
 
 	const bool bMobile = FeatureLevel < ERHIFeatureLevel::SM5;
 
-	for (TSparseArray<FLightSceneInfoCompact>::TConstIterator LightIt(Scene->Lights); LightIt; ++LightIt)
+	for (auto LightIt = Scene->Lights.CreateConstIterator(); LightIt; ++LightIt)
 	{
 		const FLightSceneInfoCompact& LightSceneInfoCompact = *LightIt;
 		FLightSceneInfo* LightSceneInfo = LightSceneInfoCompact.LightSceneInfo;
@@ -5520,7 +5520,7 @@ FDynamicShadowsTaskData* FSceneRenderer::BeginInitDynamicShadows(bool bRunningEa
 
 		if (GetShadowQuality() > 0)
 		{
-			for (TSparseArray<FLightSceneInfoCompact>::TConstIterator LightIt(Scene->Lights); LightIt; ++LightIt)
+			for (auto LightIt = Scene->Lights.CreateConstIterator(); LightIt; ++LightIt)
 			{
 				const FLightSceneInfoCompact& LightSceneInfoCompact = *LightIt;
 				FLightSceneInfo* LightSceneInfo = LightSceneInfoCompact.LightSceneInfo;

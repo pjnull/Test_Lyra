@@ -379,7 +379,7 @@ public:
 		/** Default constructor. */
 		ForElementType()
 		{
-			//UE_STATIC_DEPRECATE(5.0, alignof(ElementType) > MinimumAlignment, "Using TAlignedHeapAllocator with an alignment lower than the element type's alignment - please update the alignment parameter");
+			UE_STATIC_DEPRECATE(5.0, alignof(ElementType) > MinimumAlignment, "Using TAlignedHeapAllocator with an alignment lower than the element type's alignment - please update the alignment parameter");
 		}
 
 		FORCEINLINE ElementType* GetAllocation() const
@@ -526,7 +526,7 @@ public:
 		/** Default constructor. */
 		ForElementType()
 		{
-			//UE_STATIC_DEPRECATE(5.0, alignof(ElementType) > __STDCPP_DEFAULT_NEW_ALIGNMENT__, "TSizedHeapAllocator uses GMalloc's default alignment, which is lower than the element type's alignment - please use TAlignedHeapAllocator with an appropriate alignment");
+			UE_STATIC_DEPRECATE(5.0, alignof(ElementType) > __STDCPP_DEFAULT_NEW_ALIGNMENT__, "TSizedHeapAllocator uses GMalloc's default alignment, which is lower than the element type's alignment - please use TAlignedHeapAllocator with an appropriate alignment");
 		}
 
 		FORCEINLINE ElementType* GetAllocation() const
@@ -723,7 +723,7 @@ public:
 		ForElementType()
 			: Data(GetInlineElements())
 		{
-			//UE_STATIC_DEPRECATE(5.0, alignof(ElementType) > __STDCPP_DEFAULT_NEW_ALIGNMENT__, "TNonRelocatableInlineAllocator uses GMalloc's default alignment, which is lower than the element type's alignment - please consider a different approach");
+			UE_STATIC_DEPRECATE(5.0, alignof(ElementType) > __STDCPP_DEFAULT_NEW_ALIGNMENT__, "TNonRelocatableInlineAllocator uses GMalloc's default alignment, which is lower than the element type's alignment - please consider a different approach");
 		}
 
 		/**
@@ -967,6 +967,14 @@ class TSparseArrayAllocator
 {
 public:
 
+	typedef InElementAllocator ElementAllocator;
+	typedef InBitArrayAllocator BitArrayAllocator;
+};
+
+template <uint32 Alignment = DEFAULT_ALIGNMENT, typename InElementAllocator = TAlignedHeapAllocator<Alignment>,typename InBitArrayAllocator = FDefaultBitArrayAllocator>
+class TAlignedSparseArrayAllocator
+{
+public:
 	typedef InElementAllocator ElementAllocator;
 	typedef InBitArrayAllocator BitArrayAllocator;
 };

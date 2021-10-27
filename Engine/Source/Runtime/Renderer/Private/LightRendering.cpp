@@ -939,7 +939,7 @@ void FSceneRenderer::GatherAndSortLights(FSortedLightSetSceneInfo& OutSortedLigh
 	float DebugDiscardCounter = 0.0f;
 #endif // ENABLE_DEBUG_DISCARD_PROP
 	// Build a list of visible lights.
-	for (TSparseArray<FLightSceneInfoCompact>::TConstIterator LightIt(Scene->Lights); LightIt; ++LightIt)
+	for (auto LightIt = Scene->Lights.CreateConstIterator(); LightIt; ++LightIt)
 	{
 		const FLightSceneInfoCompact& LightSceneInfoCompact = *LightIt;
 		const FLightSceneInfo* const LightSceneInfo = LightSceneInfoCompact.LightSceneInfo;
@@ -1962,9 +1962,9 @@ void FDeferredShadingSceneRenderer::RenderLights(
 void FDeferredShadingSceneRenderer::RenderLightArrayForOverlapViewmode(
 	FRHICommandList& RHICmdList,
 	FRHITexture* LightingChannelsTexture,
-	const TSparseArray<FLightSceneInfoCompact>& LightArray)
+	const TSparseArray<FLightSceneInfoCompact, TAlignedSparseArrayAllocator<alignof(FLightSceneInfoCompact)>>& LightArray)
 {
-	for (TSparseArray<FLightSceneInfoCompact>::TConstIterator LightIt(LightArray); LightIt; ++LightIt)
+	for (auto LightIt = LightArray.CreateConstIterator(); LightIt; ++LightIt)
 	{
 		const FLightSceneInfoCompact& LightSceneInfoCompact = *LightIt;
 		const FLightSceneInfo* LightSceneInfo = LightSceneInfoCompact.LightSceneInfo;

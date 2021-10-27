@@ -1677,7 +1677,7 @@ void FMobileSceneRenderer::UpdateMovablePointLightUniformBufferAndShadowInfo()
 			&& GetShadowQuality() > 0
 			&& EnableMovableSpotlightShadows != 0;
 
-		for (TSparseArray<FLightSceneInfoCompact>::TConstIterator LightIt(Scene->Lights); LightIt; ++LightIt)
+		for (auto LightIt = Scene->Lights.CreateConstIterator(); LightIt; ++LightIt)
 		{
 			const FLightSceneInfoCompact& LightSceneInfoCompact = *LightIt;
 			FLightSceneInfo* LightSceneInfo = LightSceneInfoCompact.LightSceneInfo;
