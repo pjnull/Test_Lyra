@@ -1342,11 +1342,11 @@ TMap<FName, FText> SDetailsView::GetAllSections() const
 
 	// for every category, check every base struct and find the associated section
 	// if one exists, add it to the set of valid section names
-	// we fetch the list from the layouts since AllTreeNodes gets filtered
+	// we fetch the list of categories from the layouts since AllTreeNodes gets filtered
 	TArray<FName> LayoutCategories;
 	for (const FDetailLayoutData& Layout : DetailLayouts)
 	{
-		for (const TSharedPtr<FDetailTreeNode>& TreeNode : Layout.DetailLayout->GetAllRootTreeNodes())
+		for (const TSharedRef<FDetailTreeNode>& TreeNode : Layout.DetailLayout->GetAllRootTreeNodes())
 		{
 			if (TreeNode->GetNodeType() == EDetailNodeType::Category)
 			{
