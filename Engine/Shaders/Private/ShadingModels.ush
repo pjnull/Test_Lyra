@@ -124,7 +124,7 @@ float3 SpecularGGX(float Roughness, float Anisotropy, float3 SpecularColor, BxDF
 	Punctual.SphereSinAlphaSoft = 0;
 	Punctual.LineCosSubtended = 1;
 	Punctual.Rect = (FRect)0;
-	Punctual.bIsRect = false;
+	Punctual.IsRectAndDiffuseMicroReflWeight = 0;
 
 	float Energy = EnergyNormalization(a2, Context.VoH, Punctual);
 
@@ -173,6 +173,7 @@ float3 DualSpecularGGX(float AverageRoughness, float Lobe0Roughness, float Lobe1
 FDirectLighting DefaultLitBxDF( FGBufferData GBuffer, half3 N, half3 V, half3 L, float Falloff, float NoL, FAreaLight AreaLight, FShadowTerms Shadow )
 {
 	BxDFContext Context;
+	FDirectLighting Lighting;
 
 #if SUPPORTS_ANISOTROPIC_MATERIALS
 	bool bHasAnisotropy = HasAnisotropy(GBuffer.SelectiveOutputMask);
@@ -180,23 +181,39 @@ FDirectLighting DefaultLitBxDF( FGBufferData GBuffer, half3 N, half3 V, half3 L,
 	bool bHasAnisotropy = false;
 #endif
 
+	float NoV, VoH, NoH;
 	BRANCH
 	if (bHasAnisotropy)
 	{
 		half3 X = GBuffer.WorldTangent;
 		half3 Y = normalize(cross(N, X));
 		Init(Context, N, X, Y, V, L);
+
+		NoV = Context.NoV;
+		VoH = Context.VoH;
+		NoH = Context.NoH;
 	}
 	else
 	{
 		Init(Context, N, V, L);
+
+		NoV = Context.NoV;
+		VoH = Context.VoH;
+		NoH = Context.NoH;
+
 		SphereMaxNoH(Context, AreaLight.SphereSinAlpha, true);
 	}
 
 	Context.NoV = saturate(abs( Context.NoV ) + 1e-5);
 
-	FDirectLighting Lighting;
-	Lighting.Diffuse  = AreaLight.FalloffColor * (Falloff * NoL) * Diffuse_Lambert( GBuffer.DiffuseColor );
+#if MATERIAL_ROUGHDIFFUSE
+	// Chan diffuse model with roughness == specular roughness. This is not necessarily a good modelisation of reality because when the mean free path is super small, the diffuse can in fact looks rougher. But this is a start.
+	// Also we cannot use the morphed context maximising NoH as this is causing visual artefact when interpolating rough/smooth diffuse response. 
+	Lighting.Diffuse = Diffuse_Chan(GBuffer.DiffuseColor, Pow4(GBuffer.Roughness), NoV, NoL, VoH, NoH, GetAreaLightDiffuseMicroReflWeight(AreaLight));
+#else
+	Lighting.Diffuse = Diffuse_Lambert(GBuffer.DiffuseColor);
+#endif
+	Lighting.Diffuse *= AreaLight.FalloffColor * (Falloff * NoL);
 
 	BRANCH
 	if (bHasAnisotropy)
@@ -206,7 +223,7 @@ FDirectLighting DefaultLitBxDF( FGBufferData GBuffer, half3 N, half3 V, half3 L,
 	}
 	else
 	{
-		if( AreaLight.bIsRect )
+		if( IsRectLight(AreaLight) )
 		{
 			Lighting.Specular = RectGGXApproxLTC(GBuffer.Roughness, GBuffer.SpecularColor, N, V, AreaLight.Rect, AreaLight.Texture);
 		}
@@ -344,14 +361,15 @@ FDirectLighting ClearCoatBxDF( FGBufferData GBuffer, half3 N, half3 V, half3 L, 
 
 	SphereMaxNoH(Context, AreaLight.SphereSinAlpha, CLEAR_COAT_BOTTOM_NORMAL == 0);
 	Context.NoV = saturate(abs(Context.NoV) + 1e-5);
-	Context.VoH = AreaLight.bIsRect ? Context.NoV : Context.VoH;
+	const bool bIsRect = IsRectLight(AreaLight);
+	Context.VoH = bIsRect ? Context.NoV : Context.VoH;
 
 	// Hard-coded Fresnel evaluation with IOR = 1.5 (for polyurethane cited by Disney BRDF)
 	float F0 = 0.04;
 	float Fc = Pow5(1 - Context.VoH);
 	float F = Fc + (1 - Fc) * F0;
 
-	if (AreaLight.bIsRect)
+	if (bIsRect)
 	{
 		Lighting.Specular = ClearCoat * RectGGXApproxLTC(ClearCoatRoughness, F0, Nspec, V, AreaLight.Rect, AreaLight.Texture);
 	}
@@ -436,7 +454,7 @@ FDirectLighting ClearCoatBxDF( FGBufferData GBuffer, half3 N, half3 V, half3 L, 
 		Init(Context, Nspec, X, Y, V, L);
 	}
 	BxDFContext BottomContext = RefractClearCoatContext(Context);
-	BottomContext.VoH = AreaLight.bIsRect ? BottomContext.NoV : BottomContext.VoH;
+	BottomContext.VoH = bIsRect ? BottomContext.NoV : BottomContext.VoH;
 
 	// Absorption
 	float3 Transmission = CalcThinTransmission(BottomContext.NoL, BottomContext.NoV, GBuffer);
@@ -446,7 +464,7 @@ FDirectLighting ClearCoatBxDF( FGBufferData GBuffer, half3 N, half3 V, half3 L, 
 	float3 RefractedDiffuse = FresnelCoeff * Transmission * DefaultDiffuse;
 	Lighting.Diffuse = lerp(DefaultDiffuse, RefractedDiffuse, ClearCoat);
 
-	if (!bHasAnisotropy && AreaLight.bIsRect)
+	if (!bHasAnisotropy && bIsRect)
 	{
 		// Note: V is used instead of V2 because LTC integration is not tuned to handle refraction direction
 		float3 DefaultSpecular = RectGGXApproxLTC(GBuffer.Roughness, GBuffer.SpecularColor, N, V, AreaLight.Rect, AreaLight.Texture);
@@ -488,7 +506,7 @@ FDirectLighting ClearCoatBxDF( FGBufferData GBuffer, half3 N, half3 V, half3 L, 
 			Punctual.SphereSinAlphaSoft = 0;
 			Punctual.LineCosSubtended = 1;
 			Punctual.Rect = (FRect)0;
-			Punctual.bIsRect = false;
+			Punctual.IsRectAndDiffuseMicroReflWeight = 0;
 			
 			Energy = EnergyNormalization(a2, Context.VoH, Punctual);
 		}
@@ -562,7 +580,7 @@ FDirectLighting SubsurfaceProfileBxDF( FGBufferData GBuffer, half3 N, half3 V, h
 	FDirectLighting Lighting;
 	Lighting.Diffuse  = AreaLight.FalloffColor * (Falloff * NoL) * Diffuse_Burley( GBuffer.DiffuseColor, GBuffer.Roughness, Context.NoV, NoL, Context.VoH );
 
-	if (AreaLight.bIsRect)
+	if (IsRectLight(AreaLight))
 	{
 		float3 Lobe0Specular = RectGGXApproxLTC(Lobe0Roughness, GBuffer.SpecularColor, N, V, AreaLight.Rect, AreaLight.Texture);
 		float3 Lobe1Specular = RectGGXApproxLTC(Lobe1Roughness, GBuffer.SpecularColor, N, V, AreaLight.Rect, AreaLight.Texture);
@@ -607,7 +625,7 @@ FDirectLighting ClothBxDF( FGBufferData GBuffer, half3 N, half3 V, half3 L, floa
 	Context.NoV = saturate( abs( Context.NoV ) + 1e-5 );
 
 	float3 Spec1;
-	if( AreaLight.bIsRect )
+	if(IsRectLight(AreaLight))
 		Spec1 = RectGGXApproxLTC( GBuffer.Roughness, GBuffer.SpecularColor, N, V, AreaLight.Rect, AreaLight.Texture );
 	else
 		Spec1 = AreaLight.FalloffColor * (Falloff * NoL) * SpecularGGX( GBuffer.Roughness, GBuffer.SpecularColor, Context, NoL, AreaLight );
@@ -693,7 +711,8 @@ FDirectLighting EyeBxDF( FGBufferData GBuffer, half3 N, half3 V, half3 L, float 
 	Init( Context, N, V, L );
 	SphereMaxNoH( Context, AreaLight.SphereSinAlpha, false );
 	Context.NoV = saturate( abs( Context.NoV ) + 1e-5 );
-	Context.VoH = AreaLight.bIsRect ? Context.NoV : Context.VoH;
+	const bool bIsRect = IsRectLight(AreaLight);
+	Context.VoH = bIsRect ? Context.NoV : Context.VoH;
 	
 	// F_Schlick
 	float F0 = GBuffer.Specular * 0.08;
@@ -702,7 +721,7 @@ FDirectLighting EyeBxDF( FGBufferData GBuffer, half3 N, half3 V, half3 L, float 
 	
 	FDirectLighting Lighting;
 
-	if( AreaLight.bIsRect )
+	if( bIsRect )
 	{
 		Lighting.Specular = RectGGXApproxLTC( GBuffer.Roughness, F0, N, V, AreaLight.Rect, AreaLight.Texture );
 	}
@@ -779,7 +798,7 @@ FDirectLighting EvaluateBxDF( FGBufferData GBuffer, half3 N, half3 V, half3 L, f
 	AreaLight.LineCosSubtended = 1;
 	AreaLight.FalloffColor = 1;
 	AreaLight.Rect = (FRect)0;
-	AreaLight.bIsRect = false;
+	AreaLight.IsRectAndDiffuseMicroReflWeight = 0;
     AreaLight.Texture = InitRectTexture(LTCAmpTexture); // Dummy
 
 	return IntegrateBxDF( GBuffer, N, V, L, 1, NoL, AreaLight, Shadow );

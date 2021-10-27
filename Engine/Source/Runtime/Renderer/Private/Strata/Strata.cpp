@@ -87,6 +87,16 @@ static TAutoConsoleVariable<int32> CVarStrataFurnaceTestSampleCount(
 	TEXT("Number of sample used for furnace test."),
 	ECVF_RenderThreadSafe);
 
+// Transition render settings that will disapear when strata gets enabled
+
+static TAutoConsoleVariable<int32> CVarMaterialRoughDiffuse(
+	TEXT("r.Material.RoughDiffuse"),
+	0,
+	TEXT("Enable rough diffuse material."),
+	ECVF_ReadOnly | ECVF_RenderThreadSafe);
+
+
+
 IMPLEMENT_GLOBAL_SHADER_PARAMETER_STRUCT(FStrataGlobalUniformParameters, "Strata");
 
 

@@ -82,7 +82,7 @@ void StrataPreprocessAreaLightIntegration(
 		if (!bAnistropy)
 		{
 			// Evaluate area-light preintegration
-			if (LightContext.AreaLight.bIsRect)
+			if (IsRectLight(LightContext.AreaLight))
 			{
 				// Using a single SpecularColor and roughness so haziness is ignored for LTC rect lights
 
