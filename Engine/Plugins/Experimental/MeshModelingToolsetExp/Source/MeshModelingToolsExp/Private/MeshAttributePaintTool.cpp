@@ -241,7 +241,10 @@ void UMeshAttributePaintTool::Setup()
 	}
 
 	InitializeAttributes();
-	PendingNewSelectedIndex = 0;
+	if (AttribProps->Attributes.Num() > 0)
+	{
+		PendingNewSelectedIndex = 0;
+	}
 
 	SelectedAttributeWatcher.Initialize([this]() { AttribProps->ValidateSelectedAttribute(true);  return AttribProps->GetSelectedAttributeIndex(); },
 		[this](int32 NewValue) { PendingNewSelectedIndex = NewValue; }, AttribProps->GetSelectedAttributeIndex());
