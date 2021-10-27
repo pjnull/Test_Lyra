@@ -183,17 +183,11 @@ bool FTypePromotion::IsFunctionPromotionReady(const UFunction* const FuncToConsi
 
 bool FTypePromotion::IsFunctionPromotionReady_Internal(const UFunction* const FuncToConsider) const
 {
-	// This could be better served as just keeping all known UFunctions in a TArray or TSet, and
-	// using that index in the Map so we don't need to iterate table pairs and arrays inside of them
-	for (const TPair<FName, FFunctionsList>& Pair : OperatorTable)
+	const FName FuncOpName = GetOpNameFromFunction(FuncToConsider);
+	
+	if(const FFunctionsList* FuncList = OperatorTable.Find(FuncOpName))
 	{
-		for(const UFunction* const Func : Pair.Value)
-		{
-			if(Func == FuncToConsider)
-			{
-				return true;
-			}
-		}
+		return FuncList->Contains(FuncToConsider);
 	}
 
 	return false;
