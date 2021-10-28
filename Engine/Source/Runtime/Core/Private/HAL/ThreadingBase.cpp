@@ -1120,7 +1120,7 @@ public:
 		return bWasSuccessful;
 	}
 
-	virtual void Destroy() override
+	virtual void Destroy() override final
 	{
 		if (SynchQueue)
 		{

@@ -398,7 +398,7 @@ FString FShaderValueType::GetZeroValueAsString() const
 		FundamentalZeroConstant = TEXT("0.0f");
 		break;
 	case EShaderFundamentalType::Struct:
-		checkf(Type != EShaderFundamentalType::Struct, TEXT("Structs not supported yet."));
+		checkf(Type != EShaderFundamentalType::Struct, TEXT("Structs not supported yet.")); //-V547
 		break;
 	}
 
