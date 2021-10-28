@@ -23,7 +23,7 @@ namespace CheckBoxList
 }
 
 /** A widget that can be used inside a CustomDialog to display a list of checkboxes */
-class EDITORWIDGETS_API SCheckBoxList: public SCompoundWidget
+class TOOLWIDGETS_API SCheckBoxList: public SCompoundWidget
 {
 	SLATE_BEGIN_ARGS(SCheckBoxList)
 		: _CheckBoxStyle(&FCoreStyle::Get().GetWidgetStyle<FCheckBoxStyle>("Checkbox"))
