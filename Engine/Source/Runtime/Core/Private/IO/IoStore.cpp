@@ -778,6 +778,8 @@ public:
 		OutTocChunkIds.SetNum(ChunkCount);
 		TArray<FIoOffsetAndLength> OutTocOffsetAndLengths;
 		OutTocOffsetAndLengths.SetNum(ChunkCount);
+		TArray<FIoStoreTocEntryMeta> OutTocChunkMetas;
+		OutTocChunkMetas.SetNum(ChunkCount);
 		TArray<int32> OutTocChunkHashSeeds;
 		OutTocChunkHashSeeds.SetNumZeroed(SeedCount);
 		TArray<int32> OutTocChunkIndicesWithoutPerfectHash;
@@ -936,6 +938,7 @@ public:
 					FreeSlots[Slot] = false;
 					OutTocChunkIds[Slot] = ChunkId;
 					OutTocOffsetAndLengths[Slot] = TocResource.ChunkOffsetLengths[ChunkIndex];
+					OutTocChunkMetas[Slot] = TocResource.ChunkMetas[ChunkIndex];
 				}
 			}
 		}
@@ -956,6 +959,7 @@ public:
 				OutTocChunkHashSeeds[BucketHash % SeedCount] = -static_cast<int32>(Slot) - 1;
 				OutTocChunkIds[Slot] = ChunkId;
 				OutTocOffsetAndLengths[Slot] = TocResource.ChunkOffsetLengths[ChunkIndex];
+				OutTocChunkMetas[Slot] = TocResource.ChunkMetas[ChunkIndex];
 			}
 		}
 
@@ -970,6 +974,7 @@ public:
 				const FIoChunkId& ChunkId = TocResource.ChunkIds[OverflowEntryIndex];
 				OutTocChunkIds[Slot] = ChunkId;
 				OutTocOffsetAndLengths[Slot] = TocResource.ChunkOffsetLengths[OverflowEntryIndex];
+				OutTocChunkMetas[Slot] = TocResource.ChunkMetas[OverflowEntryIndex];
 				OverflowEntryIndex = Slot;
 			}
 		}
@@ -982,6 +987,7 @@ public:
 
 		TocResource.ChunkIds = MoveTemp(OutTocChunkIds);
 		TocResource.ChunkOffsetLengths = MoveTemp(OutTocOffsetAndLengths);
+		TocResource.ChunkMetas = MoveTemp(OutTocChunkMetas);
 		TocResource.ChunkPerfectHashSeeds = MoveTemp(OutTocChunkHashSeeds);
 		TocResource.ChunkIndicesWithoutPerfectHash = MoveTemp(OutTocChunkIndicesWithoutPerfectHash);
 
