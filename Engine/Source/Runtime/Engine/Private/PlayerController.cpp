@@ -2294,7 +2294,10 @@ bool APlayerController::InputKey(const FInputKeyParams& Params)
 	// Any analog values can simply be passed to the UPlayerInput
 	if(Params.Key.IsAnalog())
 	{
-		bResult = PlayerInput->InputKey(Params);
+		if(PlayerInput)
+		{
+			bResult = PlayerInput->InputKey(Params);
+		}
 	}
 	// But we need special case XR handling for non-analog values...
 	else

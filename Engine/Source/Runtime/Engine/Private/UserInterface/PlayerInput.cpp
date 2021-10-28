@@ -112,17 +112,11 @@ void UPlayerInput::FlushPressedKeys()
 		if ( PressedKeys.Num() > 0 )
 		{
 			bExecutingBindCommand = false;
-
-			FInputKeyParams Params;
-			Params.Delta = FVector::ZeroVector;
-			Params.Event = EInputEvent::IE_Released;
 			
 			for ( int32 KeyIndex = 0; KeyIndex < PressedKeys.Num(); KeyIndex++ )
 			{
 				FKey& Key = PressedKeys[KeyIndex];
-				Params.Key = Key;
-
-				InputKey(Params);
+				InputKey(FInputKeyParams(Key, IE_Released, 0.0));
 			}
 		}
 	}
@@ -177,15 +171,11 @@ void UPlayerInput::FlushPressedActionBindingKeys(FName ActionName)
 		// we may have gotten here as a result of executing an input bind.  in order to ensure that the simulated IE_Released events
 		// we're about to fire are actually propagated to the game, we need to clear the bExecutingBindCommand flag
 		bExecutingBindCommand = false;
-		FInputKeyParams Params;
-		Params.Delta = FVector::ZeroVector;
-		Params.Event = EInputEvent::IE_Released;
 		
 		//go through all the keys, releasing them
 		for (const FKey& Key : AssociatedPressedKeys)
 		{
-			Params.Key = Key;
-			InputKey(Params);
+			InputKey(FInputKeyParams(Key, IE_Released, 0.0));
 		}
 
 		UWorld* World = GetWorld();
