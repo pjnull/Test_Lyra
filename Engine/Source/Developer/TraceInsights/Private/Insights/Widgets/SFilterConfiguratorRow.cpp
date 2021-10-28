@@ -507,7 +507,7 @@ void SFilterConfiguratorRow::OnTextBoxValueCommitted(const FText& InNewText, ETe
 
 FText SFilterConfiguratorRow::GetTextBoxTooltipText() const
 {
-	TSharedPtr<IFilterValueConvertor> Converter = FilterConfiguratorNodePtr->GetSelectedFilter()->Convertor;
+	TSharedPtr<IFilterValueConverter> Converter = FilterConfiguratorNodePtr->GetSelectedFilter()->Converter;
 	if (Converter.IsValid())
 	{
 		return Converter->GetTooltipText();
@@ -520,7 +520,7 @@ FText SFilterConfiguratorRow::GetTextBoxTooltipText() const
 
 FText SFilterConfiguratorRow::GetTextBoxHintText() const
 {
-	TSharedPtr<IFilterValueConvertor> Converter = FilterConfiguratorNodePtr->GetSelectedFilter()->Convertor;
+	TSharedPtr<IFilterValueConverter> Converter = FilterConfiguratorNodePtr->GetSelectedFilter()->Converter;
 	if (Converter.IsValid())
 	{
 		return Converter->GetHintText();
@@ -533,7 +533,7 @@ FText SFilterConfiguratorRow::GetTextBoxHintText() const
 
 bool SFilterConfiguratorRow::TextBox_OnVerifyTextChanged(const FText& InText, FText& OutErrorMessage)
 {
-	TSharedPtr<IFilterValueConvertor> Converter = FilterConfiguratorNodePtr->GetSelectedFilter()->Convertor;
+	TSharedPtr<IFilterValueConverter> Converter = FilterConfiguratorNodePtr->GetSelectedFilter()->Converter;
 	if (Converter.IsValid())
 	{
 		int64 Value;

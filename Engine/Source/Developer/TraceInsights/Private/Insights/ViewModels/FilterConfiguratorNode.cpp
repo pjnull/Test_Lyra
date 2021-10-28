@@ -158,11 +158,11 @@ void FFilterConfiguratorNode::ProcessFilter()
 		{
 		case EFilterDataType::Double:
 		{
-			if (SelectedFilter->Convertor.IsValid())
+			if (SelectedFilter->Converter.IsValid())
 			{
 				double Value = 0.0;
 				FText Errors;
-				bool Result = SelectedFilter->Convertor->Convert(TextBoxValue, Value, Errors);
+				bool Result = SelectedFilter->Converter->Convert(TextBoxValue, Value, Errors);
 				FilterValue.Set<double>(Result ? Value : 0.0);
 			}
 			else
@@ -173,11 +173,11 @@ void FFilterConfiguratorNode::ProcessFilter()
 		}
 		case EFilterDataType::Int64:
 		{
-			if (SelectedFilter->Convertor.IsValid())
+			if (SelectedFilter->Converter.IsValid())
 			{
 				int64 Value = 0;
 				FText Errors;
-				bool Result = SelectedFilter->Convertor->Convert(TextBoxValue, Value, Errors);
+				bool Result = SelectedFilter->Converter->Convert(TextBoxValue, Value, Errors);
 				FilterValue.Set<int64>(Result ? Value : 0);
 			}
 			else
@@ -200,10 +200,10 @@ void FFilterConfiguratorNode::ProcessFilter()
 		}
 		case EFilterDataType::StringInt64Pair:
 		{
-			checkf(SelectedFilter->Convertor.IsValid(), TEXT("StringToInt64Pair filters must have a convertor set"));
+			checkf(SelectedFilter->Converter.IsValid(), TEXT("StringToInt64Pair filters must have a converter set"));
 			int64 Value = 0;
 			FText Errors;
-			bool Result = SelectedFilter->Convertor->Convert(TextBoxValue, Value, Errors);
+			bool Result = SelectedFilter->Converter->Convert(TextBoxValue, Value, Errors);
 			FilterValue.Set<int64>(Result ? Value : -1);
 		}
 		}

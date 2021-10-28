@@ -4777,7 +4777,7 @@ void STimingView::QuickFind_Execute()
 			this->PopulateTimerNameSuggestionList(Text, OutSuggestions);
 		};
 
-		TimerNameFilter->Convertor = MakeShared<FEventNameFilterValueConverter>();
+		TimerNameFilter->Converter = MakeShared<FEventNameFilterValueConverter>();
 
 		AvailableFilters->Add(TimerNameFilter);
 

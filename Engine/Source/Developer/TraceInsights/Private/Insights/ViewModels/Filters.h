@@ -100,7 +100,7 @@ struct FFilterGroupOperator
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-class IFilterValueConvertor
+class IFilterValueConverter
 {
 public:
 	virtual bool Convert(const FString& Input, int64& Output, FText& OutError) const { unimplemented(); return false; }
@@ -133,7 +133,7 @@ public:
 	FText Name;
 	FText Desc;
 	EFilterDataType DataType;
-	TSharedPtr<IFilterValueConvertor> Convertor;
+	TSharedPtr<IFilterValueConverter> Converter;
 	SupportedOperatorsArrayPtr SupportedOperators;
 };
 

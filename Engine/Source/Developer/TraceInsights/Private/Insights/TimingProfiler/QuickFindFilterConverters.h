@@ -6,7 +6,7 @@
 
 namespace Insights
 {
-class FEventNameFilterValueConverter : public IFilterValueConvertor
+class FEventNameFilterValueConverter : public IFilterValueConverter
 {
 public:
 	virtual bool Convert(const FString& Input, int64& Output, FText& OutError) const override;
