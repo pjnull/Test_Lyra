@@ -4,7 +4,6 @@
 
 #include "Containers/ArrayBuilder.h"
 #include "Containers/MapBuilder.h"
-#include "EditorStyleSet.h"
 #include "Features/IModularFeatures.h"
 #include "Fonts/FontMeasure.h"
 #include "Fonts/SlateFontInfo.h"
@@ -19,7 +18,7 @@
 #include "Misc/Paths.h"
 #include "Rendering/DrawElements.h"
 #include "SlateOptMacros.h"
-#include "Styling/CoreStyle.h"
+#include "Styling/AppStyle.h"
 #include "Styling/SlateBrush.h"
 #include "Styling/StyleColors.h"
 #include "Styling/ToolBarStyle.h"
@@ -103,7 +102,7 @@ STimingView::STimingView()
 	, MarkersTrack(MakeShared<FMarkersTimingTrack>())
 	, GraphTrack(MakeShared<FTimingGraphTrack>())
 	, WhiteBrush(FInsightsStyle::Get().GetBrush("WhiteBrush"))
-	, MainFont(FCoreStyle::GetDefaultFontStyle("Regular", 8))
+	, MainFont(FAppStyle::Get().GetFontStyle("SmallFont"))
 	, QuickFindTabId(TEXT("QuickFind"), TimingViewId++)
 {
 	DefaultTimeMarker->SetName(TEXT(""));
@@ -155,32 +154,32 @@ void STimingView::Construct(const FArguments& InArgs)
 		FUIAction(),
 		FOnGetContent::CreateSP(this, &STimingView::MakeAllTracksMenu),
 		LOCTEXT("AllTracksMenu", "All Tracks"),
-		LOCTEXT("AllTracksMenuToolTip", "Filter all tracks."),
-		FSlateIcon(FInsightsStyle::GetStyleSetName(), "Icon.AllTracksMenu"));
+		LOCTEXT("AllTracksMenuToolTip", "The list of all available tracks"),
+		FSlateIcon(FInsightsStyle::GetStyleSetName(), "Icons.AllTracksMenu.ToolBar"));
 	LeftToolbar.AddComboButton(
 		FUIAction(),
 		FOnGetContent::CreateSP(this, &STimingView::MakeCpuGpuTracksFilterMenu),
 		LOCTEXT("CpuGpuTracksMenu", "CPU/GPU"),
-		LOCTEXT("CpuGpuTracksMenuToolTip", "Filter CPU/GPU timing tracks."),
-		FSlateIcon(FInsightsStyle::GetStyleSetName(), "Icon.CpuGpuTracksMenu"));
+		LOCTEXT("CpuGpuTracksMenuToolTip", "The CPU/GPU timing tracks"),
+		FSlateIcon(FInsightsStyle::GetStyleSetName(), "Icons.CpuGpuTracksMenu.ToolBar"));
 	LeftToolbar.AddComboButton(
 		FUIAction(),
 		FOnGetContent::CreateSP(this, &STimingView::MakeOtherTracksFilterMenu),
 		LOCTEXT("OtherTracksMenu", "Other"),
-		LOCTEXT("OtherTracksMenuToolTip", "Filter other tracks."),
-		FSlateIcon(FInsightsStyle::GetStyleSetName(), "Icon.OtherTracksMenu"));
+		LOCTEXT("OtherTracksMenuToolTip", "Other type of tracks"),
+		FSlateIcon(FInsightsStyle::GetStyleSetName(), "Icons.OtherTracksMenu.ToolBar"));
 	LeftToolbar.AddComboButton(
 		FUIAction(),
 		FOnGetContent::CreateSP(this, &STimingView::MakePluginTracksFilterMenu),
 		LOCTEXT("PluginTracksMenu", "Plugins"),
-		LOCTEXT("PluginTracksMenuToolTip", "Filter tracks added by plugins."),
-		FSlateIcon(FInsightsStyle::GetStyleSetName(), "Icon.OtherTracksMenu"));
+		LOCTEXT("PluginTracksMenuToolTip", "Tracks added by plugins"),
+		FSlateIcon(FInsightsStyle::GetStyleSetName(), "Icons.PluginTracksMenu.ToolBar"));
 	LeftToolbar.AddComboButton(
 		FUIAction(),
 		FOnGetContent::CreateSP(this, &STimingView::MakeViewModeMenu),
 		LOCTEXT("ViewModeMenu", "View Mode"),
-		LOCTEXT("ViewModeMenuToolTip", "Various options for the Timing view."),
-		FSlateIcon(FInsightsStyle::GetStyleSetName(), "Icon.OtherTracksMenu"));
+		LOCTEXT("ViewModeMenuToolTip", "Various options for the Timing view"),
+		FSlateIcon(FInsightsStyle::GetStyleSetName(), "Icons.ViewModeMenu.ToolBar"));
 	LeftToolbar.EndSection();
 
 	//////////////////////////////////////////////////
@@ -205,7 +204,7 @@ void STimingView::Construct(const FArguments& InArgs)
 		NAME_None,
 		TAttribute<FText>(),
 		LOCTEXT("AutoScrollToolTip", "Auto-Scroll"),
-		FSlateIcon(FInsightsStyle::GetStyleSetName(),"AutoScroll.Icon.Small"),
+		FSlateIcon(FInsightsStyle::GetStyleSetName(),"Icons.AutoScroll"),
 		EUserInterfaceActionType::ToggleButton);
 	RightToolbar.AddComboButton(
 		FUIAction(),
@@ -283,7 +282,7 @@ void STimingView::Construct(const FArguments& InArgs)
 		FOnSpawnTab::CreateSP(this, &STimingView::SpawnQuickFindTab))
 		.SetDisplayName(LOCTEXT("QuickFindTabTitle", "Quick Find"))
 		.SetMenuType(ETabSpawnerMenuType::Hidden)
-		.SetIcon(FSlateIcon(FInsightsStyle::GetStyleSetName(), "FolderExplore.Icon.Large"));
+		.SetIcon(FSlateIcon(FInsightsStyle::GetStyleSetName(), "Icons.Find"));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2834,7 +2833,7 @@ void STimingView::ShowContextMenu(const FPointerEvent& MouseEvent)
 			FName("QuickFind"),
 			TAttribute<FText>(),
 			TAttribute<FText>(),
-			FSlateIcon(FInsightsStyle::GetStyleSetName(), "Icon.Find"));
+			FSlateIcon(FInsightsStyle::GetStyleSetName(), "Icons.Find"));
 		bHasAnyActions = true;
 	}
 	MenuBuilder.EndSection();
@@ -4530,7 +4529,7 @@ void AddMenuEntryRadioButton(
 			.FillWidth(1.0f)
 			[
 				SNew(STextBlock)
-				.TextStyle(FCoreStyle::Get(), "Menu.Label")
+				.TextStyle(FAppStyle::Get(), "Menu.Label")
 				.Text(InLabel)
 			]
 			+ SHorizontalBox::Slot()
@@ -4539,7 +4538,7 @@ void AddMenuEntryRadioButton(
 			.AutoWidth()
 			[
 				SNew(STextBlock)
-				.TextStyle(FCoreStyle::Get(), "Menu.Keybinding")
+				.TextStyle(FAppStyle::Get(), "Menu.Keybinding")
 				.ColorAndOpacity(FSlateColor::UseSubduedForeground())
 				.Text(InKeybinding)
 			]

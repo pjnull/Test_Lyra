@@ -1445,7 +1445,7 @@ void FThreadTimingTrack::BuildContextMenu(FMenuBuilder& MenuBuilder)
 		MenuBuilder.AddMenuEntry(
 			LOCTEXT("FilterTrack", "Filter Track..."),
 			FText(),
-			FSlateIcon(FInsightsStyle::GetStyleSetName(), "Icon.Filter"),
+			FSlateIcon(FAppStyle::Get().GetStyleSetName(), "Icons.Filter"),
 			FUIAction(FilterTrackAction, FCanExecuteAction::CreateLambda([]() { return true; })),
 			NAME_None,
 			EUserInterfaceActionType::Button

@@ -3,7 +3,6 @@
 #include "SMemInvestigationView.h"
 
 #include "DesktopPlatformModule.h"
-#include "EditorStyleSet.h"
 #include "SlateOptMacros.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SEditableTextBox.h"
@@ -51,7 +50,7 @@ void SMemInvestigationView::Construct(const FArguments& InArgs, TSharedPtr<SMemo
 	ChildSlot
 	[
 		SNew(SBorder)
-		.BorderImage(FEditorStyle::GetBrush("NoBorder"))
+		.BorderImage(FAppStyle::Get().GetBrush("NoBorder"))
 		.Padding(8.0f)
 		[
 			ConstructInvestigationWidgetArea()
@@ -208,7 +207,7 @@ TSharedRef<SWidget> SMemInvestigationView::QueryRule_OnGenerateWidget(TSharedPtr
 		[
 			SNew(SImage)
 			.Visibility_Lambda([Widget]() { return Widget->GetParentWidget()->IsHovered() ? EVisibility::Visible : EVisibility::Hidden; })
-			.Image(FEditorStyle::GetBrush("Profiler.Tooltip.HintIcon10"))
+			.Image(FInsightsStyle::GetBrush("Icons.Hint.TreeItem"))
 			.ToolTipText(InRule->GetDescription())
 		];
 
@@ -436,7 +435,7 @@ TSharedRef<SWidget> SMemInvestigationView::QueryTarget_OnGenerateWidget(TSharedP
 		.Padding(2.0f, 2.0f, 0.0f, 2.0f)
 		[
 			SNew(SImage)
-			.Image(FEditorStyle::GetBrush("Profiler.Tooltip.HintIcon10"))
+			.Image(FInsightsStyle::GetBrush("Icons.Hint.TreeItem"))
 			.Visibility_Lambda([Widget]() { return Widget->GetParentWidget()->IsHovered() ? EVisibility::Visible : EVisibility::Hidden; })
 		];
 

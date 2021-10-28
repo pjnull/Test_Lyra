@@ -3,7 +3,6 @@
 #include "SMemTagTreeView.h"
 
 #include "DesktopPlatformModule.h"
-#include "EditorStyleSet.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "SlateOptMacros.h"
 #include "Templates/UniquePtr.h"
@@ -198,7 +197,7 @@ TSharedRef<SWidget> SMemTagTreeView::ConstructTagsFilteringWidgetArea()
 	//.AutoWidth()
 	//[
 	//	SNew(SCheckBox)
-	//	.Style(FCoreStyle::Get(), "ToggleButtonCheckbox")
+	//	.Style(FAppStyle::Get(), "ToggleButtonCheckbox")
 	//	.HAlign(HAlign_Center)
 	//	.Padding(3.0f)
 	//	.OnCheckStateChanged(this, &SMemTagTreeView::FilterOutZeroCountMemTags_OnCheckStateChanged)
@@ -206,7 +205,7 @@ TSharedRef<SWidget> SMemTagTreeView::ConstructTagsFilteringWidgetArea()
 	//	.ToolTipText(LOCTEXT("FilterOutZeroCountMemTags_Tooltip", "Filter out the LLM tags having zero total instance count (aggregated stats)."))
 	//	[
 	//		SNew(SImage)
-	//		.Image(FInsightsStyle::Get().GetBrush("ZeroCountFilter.Icon.Small"))
+	//		.Image(FInsightsStyle::Get().GetBrush("Icons.ZeroCountFilter"))
 	//	]
 	//]
 
@@ -217,7 +216,7 @@ TSharedRef<SWidget> SMemTagTreeView::ConstructTagsFilteringWidgetArea()
 	.AutoWidth()
 	[
 		SNew(SCheckBox)
-		.Style(FCoreStyle::Get(), "ToggleButtonCheckbox")
+		.Style(FAppStyle::Get(), "ToggleButtonCheckbox")
 		.HAlign(HAlign_Center)
 		.Padding(2.0f)
 		.OnCheckStateChanged(this, &SMemTagTreeView::FilterByTracker_OnCheckStateChanged)
@@ -317,7 +316,7 @@ TSharedRef<SWidget> SMemTagTreeView::ConstructTracksMiniToolbar()
 				SNew(SImage)
 				//.ColorAndOpacity(FSlateColor::UseForeground())
 				.ColorAndOpacity(FSlateColor(FLinearColor(1.0f, 0.5f, 0.5f, 1.0f)))
-				.Image(FInsightsStyle::Get().GetBrush("Mem.Remove.Small"))
+				.Image(FInsightsStyle::Get().GetBrush("Icons.RemoveAllMemTagGraphs"))
 			]
 		]
 	]
@@ -340,7 +339,7 @@ TSharedRef<SWidget> SMemTagTreeView::ConstructTracksMiniToolbar()
 				SNew(SImage)
 				//.ColorAndOpacity(FSlateColor::UseForeground())
 				.ColorAndOpacity(FSlateColor(FLinearColor(0.5f, 1.0f, 0.5f, 1.0f)))
-				.Image(FInsightsStyle::Get().GetBrush("Mem.Add.Small"))
+				.Image(FInsightsStyle::Get().GetBrush("Icons.AddAllMemTagGraphs"))
 			]
 		]
 	]
@@ -363,7 +362,7 @@ TSharedRef<SWidget> SMemTagTreeView::ConstructTracksMiniToolbar()
 			[
 				SNew(SImage)
 				.ColorAndOpacity(FSlateColor::UseForeground())
-				.Image(FInsightsStyle::Get().GetBrush("Mem.LoadXML.Small"))
+				.Image(FAppStyle::Get().GetBrush("Icons.FolderOpen"))
 			]
 			+ SHorizontalBox::Slot()
 			.VAlign(VAlign_Center)
@@ -486,7 +485,7 @@ TSharedPtr<SWidget> SMemTagTreeView::TreeView_GetMenuContent()
 		(
 			LOCTEXT("ContextMenu_Header_Misc_CopySelectedToClipboard", "Copy To Clipboard"),
 			LOCTEXT("ContextMenu_Header_Misc_CopySelectedToClipboard_Desc", "Copies selection to clipboard"),
-			FSlateIcon(FCoreStyle::Get().GetStyleSetName(), "GenericCommands.Copy"),
+			FSlateIcon(FAppStyle::Get().GetStyleSetName(), "GenericCommands.Copy"),
 			Action_CopySelectedToClipboard,
 			NAME_None,
 			EUserInterfaceActionType::Button
@@ -547,7 +546,7 @@ TSharedPtr<SWidget> SMemTagTreeView::TreeView_GetMenuContent()
 			LOCTEXT("ContextMenu_Header_Misc_Sort_Desc", "Sort by column"),
 			FNewMenuDelegate::CreateSP(this, &SMemTagTreeView::TreeView_BuildSortByMenu),
 			false,
-			FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.Misc.SortBy")
+			FSlateIcon(FInsightsStyle::GetStyleSetName(), "Icons.SortBy")
 		);
 	}
 	MenuBuilder.EndSection();
@@ -560,7 +559,7 @@ TSharedPtr<SWidget> SMemTagTreeView::TreeView_GetMenuContent()
 			LOCTEXT("ContextMenu_Header_Columns_View_Desc", "Hides or shows columns"),
 			FNewMenuDelegate::CreateSP(this, &SMemTagTreeView::TreeView_BuildViewColumnMenu),
 			false,
-			FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.EventGraph.ViewColumn")
+			FSlateIcon(FInsightsStyle::GetStyleSetName(), "Icons.ViewColumn")
 		);
 
 		FUIAction Action_ShowAllColumns
@@ -572,7 +571,7 @@ TSharedPtr<SWidget> SMemTagTreeView::TreeView_GetMenuContent()
 		(
 			LOCTEXT("ContextMenu_Header_Columns_ShowAllColumns", "Show All Columns"),
 			LOCTEXT("ContextMenu_Header_Columns_ShowAllColumns_Desc", "Resets tree view to show all columns"),
-			FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.EventGraph.ResetColumn"),
+			FSlateIcon(FInsightsStyle::GetStyleSetName(), "Icons.ResetColumn"),
 			Action_ShowAllColumns,
 			NAME_None,
 			EUserInterfaceActionType::Button
@@ -587,7 +586,7 @@ TSharedPtr<SWidget> SMemTagTreeView::TreeView_GetMenuContent()
 		//(
 		//	LOCTEXT("ContextMenu_Header_Columns_ShowMinMaxMedColumns", "Reset Columns to Min/Max/Median Preset"),
 		//	LOCTEXT("ContextMenu_Header_Columns_ShowMinMaxMedColumns_Desc", "Resets columns to Min/Max/Median preset"),
-		//	FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.EventGraph.ResetColumn"),
+		//	FSlateIcon(FInsightsStyle::GetStyleSetName(), "Icons.ResetColumn"),
 		//	Action_ShowMinMaxMedColumns,
 		//	NAME_None,
 		//	EUserInterfaceActionType::Button
@@ -602,7 +601,7 @@ TSharedPtr<SWidget> SMemTagTreeView::TreeView_GetMenuContent()
 		(
 			LOCTEXT("ContextMenu_Header_Columns_ResetColumns", "Reset Columns to Default"),
 			LOCTEXT("ContextMenu_Header_Columns_ResetColumns_Desc", "Resets columns to default"),
-			FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.EventGraph.ResetColumn"),
+			FSlateIcon(FInsightsStyle::GetStyleSetName(), "Icons.ResetColumn"),
 			Action_ResetColumns,
 			NAME_None,
 			EUserInterfaceActionType::Button
@@ -775,7 +774,7 @@ void SMemTagTreeView::TreeView_BuildSortByMenu(FMenuBuilder& MenuBuilder)
 		(
 			LOCTEXT("ContextMenu_Header_Misc_Sort_SortAscending", "Sort Ascending"),
 			LOCTEXT("ContextMenu_Header_Misc_Sort_SortAscending_Desc", "Sorts ascending"),
-			FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.Misc.SortAscending"),
+			FSlateIcon(FAppStyle::Get().GetStyleSetName(), "Icons.SortUp"),
 			Action_SortAscending,
 			NAME_None,
 			EUserInterfaceActionType::RadioButton
@@ -791,7 +790,7 @@ void SMemTagTreeView::TreeView_BuildSortByMenu(FMenuBuilder& MenuBuilder)
 		(
 			LOCTEXT("ContextMenu_Header_Misc_Sort_SortDescending", "Sort Descending"),
 			LOCTEXT("ContextMenu_Header_Misc_Sort_SortDescending_Desc", "Sorts descending"),
-			FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.Misc.SortDescending"),
+			FSlateIcon(FAppStyle::Get().GetStyleSetName(), "Icons.SortDown"),
 			Action_SortDescending,
 			NAME_None,
 			EUserInterfaceActionType::RadioButton
@@ -903,7 +902,7 @@ TSharedRef<SWidget> SMemTagTreeView::TreeViewHeaderRow_GenerateColumnMenu(const 
 			(
 				LOCTEXT("ContextMenu_Header_Misc_Sort_SortAscending", "Sort Ascending"),
 				LOCTEXT("ContextMenu_Header_Misc_Sort_SortAscending_Desc", "Sorts ascending"),
-				FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.Misc.SortAscending"),
+				FSlateIcon(FAppStyle::Get().GetStyleSetName(), "Icons.SortUp"),
 				Action_SortAscending,
 				NAME_None,
 				EUserInterfaceActionType::RadioButton
@@ -919,7 +918,7 @@ TSharedRef<SWidget> SMemTagTreeView::TreeViewHeaderRow_GenerateColumnMenu(const 
 			(
 				LOCTEXT("ContextMenu_Header_Misc_Sort_SortDescending", "Sort Descending"),
 				LOCTEXT("ContextMenu_Header_Misc_Sort_SortDescending_Desc", "Sorts descending"),
-				FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.Misc.SortDescending"),
+				FSlateIcon(FAppStyle::Get().GetStyleSetName(), "Icons.SortDown"),
 				Action_SortDescending,
 				NAME_None,
 				EUserInterfaceActionType::RadioButton
