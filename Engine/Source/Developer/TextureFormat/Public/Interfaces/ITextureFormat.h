@@ -265,6 +265,14 @@ public:
 		return FCbObject();
 	}
 
+	/**
+	 * If this is an Alternate Texture Format, return the prefix to apply 
+	 */
+	virtual FString GetAlternateTextureFormatPrefix() const
+	{
+		return FString();
+	}
+
 public:
 
 	/** Virtual destructor. */

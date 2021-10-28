@@ -42,7 +42,7 @@ Oodle Texture can encode BC1-7.  It does not currently encode ASTC or other mobi
 
 =====================
 
-TextureFormatOodle handles formats OODLE_DXT1,etc.
+TextureFormatOodle handles formats TFO_DXT1,etc.
 
 Use of this format (instead of DXT1) is enabled with TextureFormatPrefix in config, such as :
 
@@ -50,9 +50,9 @@ Use of this format (instead of DXT1) is enabled with TextureFormatPrefix in conf
 
 [AlternateTextureCompression]
 TextureCompressionFormat="TextureFormatOodle"
-TextureFormatPrefix="OODLE_"
+TextureFormatPrefix="TFO_"
 
-When this is enabled, the formats like "DXT1" are renamed to "OODLE_DXT1" and are handled by this encoder.
+When this is enabled, the formats like "DXT1" are renamed to "TFO_DXT1" and are handled by this encoder.
 
 Oodle Texture RDO encoding can be slow, but is cached in the DDC so should only be slow the first time.  
 A fast local network shared DDC is recommended.
@@ -195,8 +195,9 @@ static void *OodleJobifyUserPointer = nullptr;
 	op(BC6H) \
 	op(BC7)
 
-// register support for OODLE_ prefixed names like "OODLE_DXT1"
-#define DECL_FORMAT_NAME(FormatName) static FName GTextureFormatName##FormatName = FName(TEXT("OODLE_" #FormatName));
+// register support for TFO_ prefixed names like "TFO_DXT1"
+#define TEXTURE_FORMAT_PREFIX	"TFO_"
+#define DECL_FORMAT_NAME(FormatName) static FName GTextureFormatName##FormatName = FName(TEXT(TEXTURE_FORMAT_PREFIX #FormatName));
 
 ENUSUPPORTED_FORMATS(DECL_FORMAT_NAME);
 #undef DECL_FORMAT_NAME
@@ -633,6 +634,12 @@ public:
 		return DDC_OODLE_TEXTURE_VERSION; 
 	}
 	
+	virtual FString GetAlternateTextureFormatPrefix() const override
+	{
+		static const FString Prefix(TEXT(TEXTURE_FORMAT_PREFIX));
+		return Prefix;
+	}
+
 	virtual FString GetDerivedDataKeyString(const FTextureBuildSettings& InBuildSettings) const override
 	{
 		// return all parameters that affect our output Texture

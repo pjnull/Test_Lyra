@@ -2102,33 +2102,30 @@ static FName ConditionalGetPrefixedFormat(FName TextureFormatName, const ITarget
 #if WITH_EDITOR
 
 	// Prepend a texture format to allow a module to override the compression (Ex: this allows you to replace TextureFormatDXT with a different compressor)
-	FString FormatPrefix;
-	bool bHasPrefix = TargetPlatform->GetConfigSystem()->GetString(TEXT("AlternateTextureCompression"), TEXT("TextureFormatPrefix"), FormatPrefix, GEngineIni);
-	bHasPrefix = bHasPrefix && ! FormatPrefix.IsEmpty();
 
-	if ( bHasPrefix )
-	{
-		FString TextureCompressionFormat;
-		bool bHasFormat = TargetPlatform->GetConfigSystem()->GetString(TEXT("AlternateTextureCompression"), TEXT("TextureCompressionFormat"), TextureCompressionFormat, GEngineIni);
-		bHasFormat = bHasFormat && ! TextureCompressionFormat.IsEmpty();
+	FString TextureCompressionFormat;
+	bool bHasFormat = TargetPlatform->GetConfigSystem()->GetString(TEXT("AlternateTextureCompression"), TEXT("TextureCompressionFormat"), TextureCompressionFormat, GEngineIni);
+	bHasFormat = bHasFormat && ! TextureCompressionFormat.IsEmpty();
 	
-		if ( bHasFormat )
+	if ( bHasFormat )
+	{
+		ITextureFormatModule * TextureFormatModule = FModuleManager::LoadModulePtr<ITextureFormatModule>(*TextureCompressionFormat);
+
+		if ( TextureFormatModule )
 		{
-			ITextureFormatModule * TextureFormatModule = FModuleManager::LoadModulePtr<ITextureFormatModule>(*TextureCompressionFormat);
+			ITextureFormat* TextureFormat = TextureFormatModule->GetTextureFormat();
+					
+			FString FormatPrefix = TextureFormat->GetAlternateTextureFormatPrefix();
+			check( ! FormatPrefix.IsEmpty() );
+			
+			FName NewFormatName(FormatPrefix + TextureFormatName.ToString());
 
-			if ( TextureFormatModule )
+			TArray<FName> SupportedFormats;
+			TextureFormat->GetSupportedFormats(SupportedFormats);
+
+			if (SupportedFormats.Contains(NewFormatName))
 			{
-				ITextureFormat* TextureFormat = TextureFormatModule->GetTextureFormat();
-
-				TArray<FName> SupportedFormats;
-				TextureFormat->GetSupportedFormats(SupportedFormats);
-
-				FName NewFormatName(FormatPrefix + TextureFormatName.ToString());
-
-				if (SupportedFormats.Contains(NewFormatName))
-				{
-					return NewFormatName;
-				}
+				return NewFormatName;
 			}
 		}
 	}
