@@ -1345,6 +1345,16 @@ void StrataSanitizeBSDF(inout FStrataBSDF BSDF)
 	}
 }
 
+// This is used to respect artistic desire, e.g. shutdown diffuse or specular.
+float3 DitherIfNonBlack(float3 Input, float3 Dither)
+{
+	return float3(
+		Input.x == 0.0 ? Input.x : Input.x + Dither.x,
+		Input.y == 0.0 ? Input.y : Input.y + Dither.y,
+		Input.z == 0.0 ? Input.z : Input.z + Dither.z
+	);
+}
+
 void StrataDitherBSDF(inout FStrataBSDF BSDF, in float Dither)
 {
 	if (BSDF_GETTYPE(BSDF) == STRATA_BSDF_TYPE_SLAB)
@@ -1356,8 +1366,8 @@ void StrataDitherBSDF(inout FStrataBSDF BSDF, in float Dither)
 		const float Dither6bits = CenteredDither * 1.0f / 63.0f;
 		const float3 Dither776 = float3(Dither7bits, Dither7bits, Dither6bits);
 
-		SLAB_DIFFUSEALBEDO(BSDF) += Dither776;
-		SLAB_F0(BSDF) += Dither776;
+		SLAB_DIFFUSEALBEDO(BSDF) = DitherIfNonBlack(SLAB_DIFFUSEALBEDO(BSDF), Dither776);
+		SLAB_F0(BSDF) = DitherIfNonBlack(SLAB_F0(BSDF), Dither776);
 		SLAB_THINFILM_THICKNESS(BSDF) += BSDF_GETHASTHINFILM(BSDF) ? Dither8bits : 0.0f;
 	}
 }
