@@ -908,13 +908,13 @@ void GatherPhysXStats_AssumesLocked(PxScene* PSyncScene)
 		SET_DWORD_STAT(STAT_NumMobileBodies, SimStats.nbDynamicBodies);
 
 		
-		CSV_CUSTOM_STAT(PhysicsVerbose, NumPotentialContacts, (int32)SimStats.nbDiscreteContactPairsTotal, ECsvCustomStatOp::Set);
-		CSV_CUSTOM_STAT(PhysicsVerbose, NumContacts, (int32)SimStats.nbDiscreteContactPairsWithContacts, ECsvCustomStatOp::Set);
+		CSV_CUSTOM_STAT(PhysicsCounters, NumPotentialContacts, (int32)SimStats.nbDiscreteContactPairsTotal, ECsvCustomStatOp::Set);
+		CSV_CUSTOM_STAT(PhysicsCounters, NumContacts, (int32)SimStats.nbDiscreteContactPairsWithContacts, ECsvCustomStatOp::Set);
 		//CSV_CUSTOM_STAT(PhysicsVerbose, NumActiveConstraints, (int32)SimStats.nbActiveConstraints, ECsvCustomStatOp::Set);
-		CSV_CUSTOM_STAT(PhysicsVerbose, NumActiveDynamicBodies, (int32)SimStats.nbActiveDynamicBodies, ECsvCustomStatOp::Set);
-		CSV_CUSTOM_STAT(PhysicsVerbose, NumActiveKinematicBodies, (int32)SimStats.nbActiveKinematicBodies, ECsvCustomStatOp::Set);
-		CSV_CUSTOM_STAT(PhysicsVerbose, NumStaticBodies, (int32)SimStats.nbStaticBodies, ECsvCustomStatOp::Set);
-		CSV_CUSTOM_STAT(PhysicsVerbose, NumDynamicBodies, (int32)SimStats.nbDynamicBodies, ECsvCustomStatOp::Set);
+		CSV_CUSTOM_STAT(PhysicsCounters, NumActiveDynamicBodies, (int32)SimStats.nbActiveDynamicBodies, ECsvCustomStatOp::Set);
+		CSV_CUSTOM_STAT(PhysicsCounters, NumActiveKinematicBodies, (int32)SimStats.nbActiveKinematicBodies, ECsvCustomStatOp::Set);
+		CSV_CUSTOM_STAT(PhysicsCounters, NumStaticBodies, (int32)SimStats.nbStaticBodies, ECsvCustomStatOp::Set);
+		CSV_CUSTOM_STAT(PhysicsCounters, NumDynamicBodies, (int32)SimStats.nbDynamicBodies, ECsvCustomStatOp::Set);
 
 		//SET_DWORD_STAT(STAT_NumBroadphaseAdds, SimStats.getNbBroadPhaseAdds(PxSimulationStatistics::VolumeType::eRIGID_BODY));	//TODO: These do not seem to work
 		//SET_DWORD_STAT(STAT_NumBroadphaseRemoves, SimStats.getNbBroadPhaseRemoves(PxSimulationStatistics::VolumeType::eRIGID_BODY));
@@ -926,7 +926,7 @@ void GatherPhysXStats_AssumesLocked(PxScene* PSyncScene)
 		}
 
 		SET_DWORD_STAT(STAT_NumShapes, NumShapes);
-		CSV_CUSTOM_STAT(PhysicsVerbose, NumShapes, (int32)NumShapes, ECsvCustomStatOp::Set);
+		CSV_CUSTOM_STAT(PhysicsCounters, NumShapes, (int32)NumShapes, ECsvCustomStatOp::Set);
 
 	}
 }
@@ -1508,7 +1508,6 @@ FAutoConsoleTaskPriority CPrio_PhyXSceneCompletion(
 
 void FPhysScene_PhysX::StartFrame()
 {
-	CSV_SCOPED_TIMING_STAT(PhysicsVerbose, StartFrame);
 	FGraphEventArray FinishPrerequisites;
 
 	//Update the collision disable table before ticking
@@ -1565,7 +1564,6 @@ void FPhysScene_PhysX::StartFrame()
 
 void FPhysScene_PhysX::EndFrame(ULineBatchComponent* InLineBatcher)
 {
-	CSV_SCOPED_TIMING_STAT(PhysicsVerbose, EndFrame);
 	check(IsInGameThread());
 
 	PhysicsSceneCompletion = NULL;
