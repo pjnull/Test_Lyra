@@ -208,11 +208,13 @@ void FPBDRigidsEvolutionGBF::AdvanceOneTimeStepImpl(const FReal Dt, const FSubSt
 
 	{
 		SCOPE_CYCLE_COUNTER(STAT_Evolution_Integrate);
+		CSV_SCOPED_TIMING_STAT(PhysicsVerbose, Integrate);
 		Integrate(Particles.GetActiveParticlesView(), Dt);
 	}
 
 	{
 		SCOPE_CYCLE_COUNTER(STAT_Evolution_KinematicTargets);
+		CSV_SCOPED_TIMING_STAT(PhysicsVerbose, KinematicTargets);
 		ApplyKinematicTargets(Dt, SubStepInfo.PseudoFraction);
 	}
 
@@ -224,15 +226,18 @@ void FPBDRigidsEvolutionGBF::AdvanceOneTimeStepImpl(const FReal Dt, const FSubSt
 
 	{
 		SCOPE_CYCLE_COUNTER(STAT_Evolution_UpdateConstraintPositionBasedState);
+		CSV_SCOPED_TIMING_STAT(PhysicsVerbose, UpdateConstraintPositionBasedState);
 		UpdateConstraintPositionBasedState(Dt);
 	}
 	{
 		SCOPE_CYCLE_COUNTER(STAT_Evolution_ComputeIntermediateSpatialAcceleration);
+		CSV_SCOPED_TIMING_STAT(PhysicsVerbose, ComputeIntermediateSpatialAcceleration);
 		Base::ComputeIntermediateSpatialAcceleration();
 	}
 
 	{
 		SCOPE_CYCLE_COUNTER(STAT_Evolution_DetectCollisions);
+		CSV_SCOPED_TIMING_STAT(PhysicsVerbose, DetectCollisions);
 		CollisionDetector.GetBroadPhase().SetSpatialAcceleration(InternalAcceleration);
 
 		CollisionDetector.DetectCollisions(Dt, GetCurrentStepResimCache());
@@ -259,11 +264,13 @@ void FPBDRigidsEvolutionGBF::AdvanceOneTimeStepImpl(const FReal Dt, const FSubSt
 
 	{
 		SCOPE_CYCLE_COUNTER(STAT_Evolution_CreateConstraintGraph);
+		CSV_SCOPED_TIMING_STAT(PhysicsVerbose, CreateConstraintGraph);
 		CreateConstraintGraph();
 	}
 	//CollisionDetector.GetCollisionContainer().GetConstraintAllocator().SortConstraintsHandles();
 	{
 		SCOPE_CYCLE_COUNTER(STAT_Evolution_CreateIslands);
+		CSV_SCOPED_TIMING_STAT(PhysicsVerbose, CreateIslands);
 		CreateIslands();
 	}
 	if (PreApplyCallback != nullptr)
@@ -312,17 +319,20 @@ void FPBDRigidsEvolutionGBF::AdvanceOneTimeStepImpl(const FReal Dt, const FSubSt
 				// Update constraint graphs, coloring etc as required by the different constraint types in this island
 				{
 					SCOPE_CYCLE_COUNTER(STAT_Evolution_GraphColor);
+					CSV_SCOPED_TIMING_STAT(PhysicsVerbose, GraphColor);
 					UpdateAccelerationStructures(Dt, Island);
 				}
 
 				// Collect all the data that the constraint solvers operate on
 				{
 					SCOPE_CYCLE_COUNTER(STAT_Evolution_Gather);
+					CSV_SCOPED_TIMING_STAT(PhysicsVerbose, Gather);
 					GatherSolverInput(Dt, Island);
 				}
 
 				{
 					SCOPE_CYCLE_COUNTER(STAT_Evolution_ApplyConstraintsPhase0);
+					CSV_SCOPED_TIMING_STAT(PhysicsVerbose, CCD);
 					ApplyConstraintsPhase0(Dt, Island);
 				}
 
@@ -332,6 +342,7 @@ void FPBDRigidsEvolutionGBF::AdvanceOneTimeStepImpl(const FReal Dt, const FSubSt
 				{
 					SCOPE_CYCLE_COUNTER(STAT_Evolution_ApplyConstraintsPhase1);
 					CSV_SCOPED_TIMING_STAT(Chaos, ApplyConstraints);
+					CSV_SCOPED_TIMING_STAT(PhysicsVerbose, Apply);
 					ApplyConstraintsPhase1(Dt, Island);
 				}
 
@@ -343,6 +354,7 @@ void FPBDRigidsEvolutionGBF::AdvanceOneTimeStepImpl(const FReal Dt, const FSubSt
 				// Update implicit velocities from results of constraint solver phase 1
 				{
 					SCOPE_CYCLE_COUNTER(STAT_Evolution_UpdateVelocites);
+					CSV_SCOPED_TIMING_STAT(PhysicsVerbose, UpdateVelocities);
 					SetImplicitVelocities(Dt, Island);
 				}
 
@@ -352,6 +364,7 @@ void FPBDRigidsEvolutionGBF::AdvanceOneTimeStepImpl(const FReal Dt, const FSubSt
 				// For QPBD this is the velocity solve step
 				{
 					SCOPE_CYCLE_COUNTER(STAT_Evolution_ApplyConstraintsPhase2);
+					CSV_SCOPED_TIMING_STAT(PhysicsVerbose, ApplyPushOut);
 					ApplyConstraintsPhase2(Dt, Island);
 				}
 
@@ -359,6 +372,7 @@ void FPBDRigidsEvolutionGBF::AdvanceOneTimeStepImpl(const FReal Dt, const FSubSt
 				// that is accessed externally (net impusles, break info, etc)
 				{
 					SCOPE_CYCLE_COUNTER(STAT_Evolution_Scatter);
+					CSV_SCOPED_TIMING_STAT(PhysicsVerbose, Scatter);
 					ScatterSolverOutput(Dt, Island);
 				}
 
@@ -408,6 +422,7 @@ void FPBDRigidsEvolutionGBF::AdvanceOneTimeStepImpl(const FReal Dt, const FSubSt
 
 	{
 		SCOPE_CYCLE_COUNTER(STAT_Evolution_SavePostSolve);
+		CSV_SCOPED_TIMING_STAT(PhysicsVerbose, SavePostSolve);
 		FEvolutionResimCache* ResimCache = GetCurrentStepResimCache();
 		if (ResimCache)
 		{
@@ -429,6 +444,7 @@ void FPBDRigidsEvolutionGBF::AdvanceOneTimeStepImpl(const FReal Dt, const FSubSt
 
 	{
 		SCOPE_CYCLE_COUNTER(STAT_Evolution_DeactivateSleep);
+		CSV_SCOPED_TIMING_STAT(PhysicsVerbose, DeactivateSleep);
 		for (int32 Island = 0; Island < GetConstraintGraph().NumIslands(); ++Island)
 		{
 			if (SleepedIslands[Island])
