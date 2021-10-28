@@ -7007,6 +7007,9 @@ void UCookOnTheFlyServer::PrintFinishStats()
 
 	const FPlatformMemoryStats MemStats = FPlatformMemory::GetStats();
 	UE_LOG(LogCook, Display, TEXT("Peak Used virtual %u MiB Peak Used physical %u MiB"), MemStats.PeakUsedVirtual / 1024 / 1024, MemStats.PeakUsedPhysical / 1024 / 1024);
+
+	COOK_STAT(UE_LOG(LogCook, Display, TEXT("Packages Cooked: %d, Packages Iteratively Skipped: %d, Total Packages: %d"),
+		UE::SavePackageUtilities::GetNumPackagesSaved(), DetailedCookStats::NumPackagesIterativelySkipped, PackageDatas->GetNumCooked()));
 }
 
 void UCookOnTheFlyServer::BuildMapDependencyGraph(const ITargetPlatform* TargetPlatform)
@@ -7299,6 +7302,7 @@ void UCookOnTheFlyServer::BeginCookSandbox(TConstArrayView<const ITargetPlatform
 		const bool bIsSharedIterativeCook = IsCookFlagSet(ECookInitializationFlags::IterateSharedBuild);
 		TArray<TPair<const ITargetPlatform*,bool>, TInlineAllocator<ExpectedMaxNumPlatforms>> ResetPlatforms;
 		TArray<const ITargetPlatform*, TInlineAllocator<ExpectedMaxNumPlatforms>> PopulatePlatforms;
+		TArray<const ITargetPlatform*, TInlineAllocator<ExpectedMaxNumPlatforms>> AlreadyCookedPlatforms;
 
 		for (const ITargetPlatform* TargetPlatform : TargetPlatforms)
 		{
@@ -7385,6 +7389,10 @@ void UCookOnTheFlyServer::BeginCookSandbox(TConstArrayView<const ITargetPlatform
 					PopulatePlatforms.Add(TargetPlatform);
 				}
 			}
+			else
+			{
+				AlreadyCookedPlatforms.Add(TargetPlatform);
+			}
 			PackageWriter.Initialize(CookInfo);
 			PlatformData->bFullBuild = CookInfo.bFullBuild;
 			PlatformData->bIsSandboxInitialized = true;
@@ -7395,6 +7403,19 @@ void UCookOnTheFlyServer::BeginCookSandbox(TConstArrayView<const ITargetPlatform
 		if (PopulatePlatforms.Num())
 		{
 			PopulateCookedPackages(PopulatePlatforms);
+		}
+		else if (AlreadyCookedPlatforms.Num())
+		{
+			// Set the NumPackagesIterativelySkipped field to include all of the already CookedPackages
+			COOK_STAT(DetailedCookStats::NumPackagesIterativelySkipped = 0);
+			const ITargetPlatform* TargetPlatform = AlreadyCookedPlatforms[0];
+			for (UE::Cook::FPackageData* PackageData : *PackageDatas)
+			{
+				if (PackageData->HasCookedPlatform(TargetPlatform, true /* bIncludeFailed */))
+				{
+					COOK_STAT(++DetailedCookStats::NumPackagesIterativelySkipped);
+				}
+			}
 		}
 	}
 
@@ -7601,6 +7622,7 @@ void UCookOnTheFlyServer::StartCookByTheBook( const FCookByTheBookStartupOptions
 		CookByTheBookOptions->bSkipSoftReferences = true;
 	}
 	SetBeginCookConfigSettings();
+	COOK_STAT(UE::SavePackageUtilities::ResetCookStats());
 
 	GenerateAssetRegistry();
 	if (!IsCookingInEditor())
