@@ -96,7 +96,7 @@ namespace DatasmithImportFactoryImpl
 
 	static void SetupSceneViewport(FDatasmithImportContext& InContext)
 	{
-		if ( !InContext.ShouldImportActors() || !InContext.SceneAsset || InContext.ActorsContext.FinalSceneActors.Num() == 0)
+		if ( !InContext.ShouldImportActors() || !InContext.SceneAsset || InContext.ActorsContext.FinalSceneActors.Num() == 0 || InContext.bIsAReimport)
 		{
 			return;
 		}
