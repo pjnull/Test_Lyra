@@ -3886,6 +3886,10 @@ void UControlRigBlueprint::OnVariableRenamed(const FName& InOldVarName, const FN
 
 void UControlRigBlueprint::OnVariableTypeChanged(const FName& InVarName, FEdGraphPinType InOldPinType, FEdGraphPinType InNewPinType)
 {
+	FString CPPType;
+	UObject* CPPTypeObject;
+	FRigVMGraphVariableDescription::CPPTypeFromPinType(InNewPinType, CPPType, CPPTypeObject);
+	
 	TArray<URigVMGraph*> AllGraphs = GetAllModels();
 	for (URigVMGraph* Graph : AllGraphs)
 	{
@@ -3897,10 +3901,9 @@ void UControlRigBlueprint::OnVariableTypeChanged(const FName& InVarName, FEdGrap
 			const bool bSetupUndoRedo = false;
 #endif
 
-			FRigVMExternalVariable NewVariable = UControlRig::GetExternalVariableFromPinType(InVarName, InNewPinType);
-			if (NewVariable.IsValid(true)) // allow nullptr
+			if (!CPPType.IsEmpty())
 			{
-				Controller->OnExternalVariableTypeChanged(InVarName, NewVariable.TypeName.ToString(), NewVariable.TypeObject, bSetupUndoRedo);
+				Controller->OnExternalVariableTypeChanged(InVarName, CPPType, CPPTypeObject, bSetupUndoRedo);
 			}
 			else
 			{
@@ -3909,25 +3912,23 @@ void UControlRigBlueprint::OnVariableTypeChanged(const FName& InVarName, FEdGrap
 		}
 	}
 
-	FRigVMExternalVariable NewVariable = UControlRig::GetExternalVariableFromPinType(InVarName, InNewPinType);
-	FString PinType = NewVariable.TypeName.ToString();
-	if(UScriptStruct* ScriptStruct = Cast<UScriptStruct>(NewVariable.TypeObject))
+	if(UScriptStruct* ScriptStruct = Cast<UScriptStruct>(CPPTypeObject))
 	{
 		for (auto Var : NewVariables)
 		{
 			if (Var.VarName == InVarName)
 			{
-				PinType = ScriptStruct->GetName();
+				CPPType = ScriptStruct->GetName();
 			}
 		}
 	}
-	else if (UEnum* Enum = Cast<UEnum>(NewVariable.TypeObject))
+	else if (UEnum* Enum = Cast<UEnum>(CPPTypeObject))
 	{
 		for (auto Var : NewVariables)
 		{
 			if (Var.VarName == InVarName)
 			{
-				PinType = Enum->GetName();
+				CPPType = Enum->GetName();
 			}
 		}
 	}
@@ -3935,7 +3936,7 @@ void UControlRigBlueprint::OnVariableTypeChanged(const FName& InVarName, FEdGrap
 	RigVMPythonUtils::Print(GetFName().ToString(),
 		FString::Printf(TEXT("blueprint.change_member_variable_type('%s', '%s')"),
 		*InVarName.ToString(),
-		NewVariable.bIsArray ? *RigVMUtilities::ArrayTypeFromBaseType(PinType) : *PinType));
+		*CPPType));
 
 	BroadcastExternalVariablesChangedEvent();
 }
