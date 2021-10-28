@@ -23,7 +23,7 @@ OSCPacketType FBackChannelOSCPacket::GetType(const void* Data, int32 DataLength)
 
 	if (DataLength >= FCStringAnsi::Strlen(BundleIdentifier))
 	{
-		if (FCStringAnsi::Stricmp(CharData, BundleIdentifier) == 0)
+		if (FCStringAnsi::Stricmp(CharData, BundleIdentifier) == 0) //-V575
 		{
 			return OSCPacketType::Bundle;
 		}
