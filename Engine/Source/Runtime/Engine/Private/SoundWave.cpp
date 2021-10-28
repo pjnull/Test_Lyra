@@ -1063,11 +1063,10 @@ void USoundWave::PostLoad()
 	// If our loading behavior is defined by a sound class, we need to update whether this sound wave actually needs to retain its audio data or not.
 	ESoundWaveLoadingBehavior ActualLoadingBehavior = GetLoadingBehavior();
 
-	if (!InternalProxy.IsValid())
+	if (!InternalProxy.IsValid() && ActualLoadingBehavior != ESoundWaveLoadingBehavior::ForceInline)
 	{
 		InternalProxy = CreateSoundWaveProxy();
 	}
-	
 
 	if (ShouldUseStreamCaching() && ActualLoadingBehavior != GetLoadingBehavior(false))
 	{
@@ -1179,8 +1178,17 @@ void USoundWave::PostLoad()
 	INC_FLOAT_STAT_BY(STAT_AudioBufferTimeChannels, NumChannels * Duration);
 
 	// cache current state as a proxy
-	InternalProxy = CreateSoundWaveProxy();
-	check(InternalProxy.IsValid());
+	if (ActualLoadingBehavior != ESoundWaveLoadingBehavior::ForceInline)
+
+	{
+		// cache current state as a proxy
+		InternalProxy = CreateSoundWaveProxy();
+		if (InternalProxy.IsValid())
+		{
+			// release dupe handle already held by 'this'
+			InternalProxy->ReleaseCompressedAudio();
+		}
+	}
 }
 
 void USoundWave::EnsureZerothChunkIsLoaded()
@@ -1825,6 +1833,7 @@ void USoundWave::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEv
 	static const FName StreamingFName = GET_MEMBER_NAME_CHECKED(USoundWave, bStreaming);
 	static const FName SeekableStreamingFName = GET_MEMBER_NAME_CHECKED(USoundWave, bSeekableStreaming);
 	static const FName UseBinkAudioFName = GET_MEMBER_NAME_CHECKED(USoundWave, bUseBinkAudio);
+	static const FName LoadingBehaviorFName = GET_MEMBER_NAME_CHECKED(USoundWave, LoadingBehavior);
 
 	// force proxy flags to be up to date
 	*bUseBinkAudioProxyFlag = bUseBinkAudio;
@@ -1839,7 +1848,16 @@ void USoundWave::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEv
 		if (FProperty* PropertyThatChanged = PropertyChangedEvent.Property)
 		{
 			const FName& Name = PropertyThatChanged->GetFName();
-			if (Name == CompressionQualityFName || Name == SampleRateFName || Name == StreamingFName || Name == SeekableStreamingFName || Name == UseBinkAudioFName)
+
+			if (Name == LoadingBehaviorFName)
+			{
+				// Update and cache new loading behavior if it has changed. This
+				// must be called before a new FSoundWaveProxy is created. 
+				CachedSoundWaveLoadingBehavior = ESoundWaveLoadingBehavior::Uninitialized;
+				CacheInheritedLoadingBehavior();
+			}
+
+			if (Name == CompressionQualityFName || Name == SampleRateFName || Name == StreamingFName || Name == SeekableStreamingFName || Name == UseBinkAudioFName || Name == LoadingBehaviorFName)
 			{
 				InvalidateCompressedData();
 				FreeResources();
@@ -1984,11 +2002,18 @@ bool USoundWave::IsReadyForFinishDestroy()
 		}
 	}
 
-	if (!InternalProxy.IsValid())
+	// Only checking to see if it is set to ForceInline. ForceInline is not supported on 
+	// USoundClasses, so it is safe to ignore USoundClasses when calling `GetLoadingBehavior(...)`
+	const ESoundWaveLoadingBehavior CurrentLoadingBehavior = GetLoadingBehavior(false /* bCheckSoundClasses */);
+	bool bIsStreamingInProgress = false;
+	if (CurrentLoadingBehavior != ESoundWaveLoadingBehavior::ForceInline)
 	{
-		InternalProxy = CreateSoundWaveProxy();
+		if (!InternalProxy.IsValid())
+		{
+			InternalProxy = CreateSoundWaveProxy();
+		}
+		bIsStreamingInProgress = IStreamingManager::Get().GetAudioStreamingManager().IsStreamingInProgress(InternalProxy);
 	}
-	const bool bIsStreamingInProgress = IStreamingManager::Get().GetAudioStreamingManager().IsStreamingInProgress(InternalProxy);
 
 	check(GetPrecacheState() != ESoundWavePrecacheState::InProgress);
 
@@ -2408,20 +2433,18 @@ bool USoundWave::IsStreaming(const FPlatformAudioCookOverrides& Overrides) const
 {
 	// We stream if (A) bStreaming is set to true, (B) bForceInline is false and either bUseLoadOnDemand was set to true in
 	// our cook overrides, or the AutoStreamingThreshold was set and this sound is longer than the auto streaming threshold.
-	if (bStreaming)
+
+	const bool bIsForceInline = LoadingBehavior == ESoundWaveLoadingBehavior::ForceInline;
+
+	if (bIsForceInline || bProcedural)
+	{
+		*bIsStreamingProxyFlag = false;
+		return false;
+	}
+	else if (bStreaming)
 	{
 		*bIsStreamingProxyFlag = true;
 		return true;
-	}
-	else if (LoadingBehavior == ESoundWaveLoadingBehavior::ForceInline) // TODO: Support setting ESoundWaveLoadingBehavior to ForceInline on a USoundClass.
-	{
-		*bIsStreamingProxyFlag = false;
-		return false;
-	}
-	else if (bProcedural)
-	{
-		*bIsStreamingProxyFlag = false;
-		return false;
 	}
 
 	// For stream caching, the auto streaming threshold is used to force sounds to be inlined:
@@ -2568,9 +2591,12 @@ void USoundWave::RemovePlayingSource(const FSoundWaveClientPtr& Source)
 
 void USoundWave::UpdatePlatformData()
 {
-	if (!InternalProxy.IsValid())
+	if (IsStreaming(nullptr))
 	{
-		InternalProxy = CreateSoundWaveProxy();
+		if (!InternalProxy.IsValid())
+		{
+			InternalProxy = CreateSoundWaveProxy();
+		}
 	}
 
 	if (IsStreaming(nullptr))
@@ -2593,7 +2619,7 @@ void USoundWave::UpdatePlatformData()
 		IStreamingManager::Get().GetAudioStreamingManager().AddStreamingSoundWave(InternalProxy);
 #endif
 	}
-	else
+	else if (InternalProxy.IsValid())
 	{
 		IStreamingManager::Get().GetAudioStreamingManager().RemoveStreamingSoundWave(InternalProxy);
 	}
@@ -3163,7 +3189,7 @@ ESoundWaveLoadingBehavior USoundWave::GetLoadingBehavior(bool bCheckSoundClasses
 {
 	checkf(!bCheckSoundClasses || CachedSoundWaveLoadingBehavior != ESoundWaveLoadingBehavior::Uninitialized,
 		TEXT("Calling GetLoadingBehavior() is only valid if bCheckSoundClasses is false (which it %s) or CacheInheritedLoadingBehavior has already been called on the game thread. (SoundWave: %s)")
-		, bCheckSoundClasses? "is not":"is", *GetFullName());
+		, bCheckSoundClasses ? TEXT("is not") : TEXT("is"), *GetFullName());
 
 	if (!bCheckSoundClasses)
 	{
