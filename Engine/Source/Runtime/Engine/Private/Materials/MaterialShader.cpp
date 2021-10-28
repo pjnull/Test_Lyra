@@ -1355,7 +1355,10 @@ void FMaterialShaderMap::LoadFromDerivedDataCache(const FMaterial* Material, con
 				}
 			}
 
-			if (CheckCache && GetDerivedDataCacheRef().GetSynchronous(*DataKey, CachedData, Material->GetFriendlyName()))
+			// Do not check the DD cache if the material isn't persistent, because
+			//   - this results in a lot of DDC requests when editing materials which are almost always going to return nothing.
+			//   - since the get call is synchronous, this can cause a hitch if there's network latency
+			if (CheckCache && Material->IsPersistent() && GetDerivedDataCacheRef().GetSynchronous(*DataKey, CachedData, Material->GetFriendlyName()))
 			{
 				COOK_STAT(Timer.AddHit(CachedData.Num()));
 				InOutShaderMap = new FMaterialShaderMap();
