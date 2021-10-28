@@ -482,6 +482,69 @@ public:
 		return SearchRecursive(InSearchString, DebugTreeView, Parents);
 	}
 
+	// ensures that ChildrenMirrors are set up for calls to EnsureChildIsAdded
+	virtual void GatherChildrenBase(TArray<FDebugTreeItemPtr>& OutChildren, const FString& InSearchString, bool bRespectSearch) override
+	{
+		Swap(PrevChildrenMirrors, ChildrenMirrors);
+		ChildrenMirrors.Empty();
+		GatherChildren(OutChildren, InSearchString, bRespectSearch);
+	}
+
+	// allows FDebugTreeItemPtr to be stored in TSets 
+	class FDebugTreeItemKeyFuncs
+	{
+	public:
+		typedef FDebugTreeItemPtr ElementType;
+		typedef TTypeTraits<ElementType>::ConstPointerType KeyInitType;
+		typedef TCallTraits<ElementType>::ParamType ElementInitType;
+		enum { bAllowDuplicateKeys = false };
+
+		/**
+		* @return The key used to index the given element.
+		*/
+		static FORCEINLINE KeyInitType GetSetKey(ElementInitType Element)
+		{
+			return Element;
+		}
+
+		/**
+		* @return True if the keys match.
+		*/
+		static FORCEINLINE bool Matches(KeyInitType A, KeyInitType B)
+		{
+			FDebugLineItem* APtr = A.Get();
+			FDebugLineItem* BPtr = B.Get();
+			if (APtr && BPtr)
+			{
+				return (APtr->Type == BPtr->Type) && APtr->Compare(BPtr);
+			}
+			return APtr == BPtr;
+		}
+
+		/** Calculates a hash index for a key. */
+		static FORCEINLINE uint32 GetKeyHash(KeyInitType Key)
+		{
+			if (FDebugLineItem* KeyPtr = Key.Get())
+			{
+				return KeyPtr->GetHash();
+			}
+			return GetTypeHash(Key);
+		}
+	};
+protected:
+	// Last frames cached children
+	TSet<FDebugTreeItemPtr, FDebugTreeItemKeyFuncs> PrevChildrenMirrors;
+	// This frames children
+	TSet<FDebugTreeItemPtr, FDebugTreeItemKeyFuncs> ChildrenMirrors;
+
+	/** @returns whether this item represents a container property */
+	virtual bool IsContainer() const
+	{
+		return false;
+	}
+
+	virtual void GatherChildren(TArray<FDebugTreeItemPtr>& OutChildren, const FString& InSearchString, bool bRespectSearch) {}
+
 	/**
 	* returns whether this node should be visible according to the users
 	* search query
@@ -570,69 +633,6 @@ public:
 		return bVisible;
 	}
 
-	// ensures that ChildrenMirrors are set up for calls to EnsureChildIsAdded
-	virtual void GatherChildrenBase(TArray<FDebugTreeItemPtr>& OutChildren, const FString& InSearchString, bool bRespectSearch) override
-	{
-		Swap(PrevChildrenMirrors, ChildrenMirrors);
-		ChildrenMirrors.Empty();
-		GatherChildren(OutChildren, InSearchString, bRespectSearch);
-	}
-
-	// allows FDebugTreeItemPtr to be stored in TSets 
-	class FDebugTreeItemKeyFuncs
-	{
-	public:
-		typedef FDebugTreeItemPtr ElementType;
-		typedef TTypeTraits<ElementType>::ConstPointerType KeyInitType;
-		typedef TCallTraits<ElementType>::ParamType ElementInitType;
-		enum { bAllowDuplicateKeys = false };
-
-		/**
-		* @return The key used to index the given element.
-		*/
-		static FORCEINLINE KeyInitType GetSetKey(ElementInitType Element)
-		{
-			return Element;
-		}
-
-		/**
-		* @return True if the keys match.
-		*/
-		static FORCEINLINE bool Matches(KeyInitType A, KeyInitType B)
-		{
-			FDebugLineItem* APtr = A.Get();
-			FDebugLineItem* BPtr = B.Get();
-			if (APtr && BPtr)
-			{
-				return (APtr->Type == BPtr->Type) && APtr->Compare(BPtr);
-			}
-			return APtr == BPtr;
-		}
-
-		/** Calculates a hash index for a key. */
-		static FORCEINLINE uint32 GetKeyHash(KeyInitType Key)
-		{
-			if (FDebugLineItem* KeyPtr = Key.Get())
-			{
-				return KeyPtr->GetHash();
-			}
-			return GetTypeHash(Key);
-		}
-	};
-protected:
-	// Last frames cached children
-	TSet<FDebugTreeItemPtr, FDebugTreeItemKeyFuncs> PrevChildrenMirrors;
-	// This frames children
-	TSet<FDebugTreeItemPtr, FDebugTreeItemKeyFuncs> ChildrenMirrors;
-
-	/** @returns whether this item represents a container property */
-	virtual bool IsContainer() const
-	{
-		return false;
-	}
-
-	virtual void GatherChildren(TArray<FDebugTreeItemPtr>& OutChildren, const FString& InSearchString, bool bRespectSearch) {}
-
 	/**
 	 * Adds either Item or an identical node that was previously
 	 * created (present in ChildrenMirrors) as a child to OutChildren.
@@ -677,21 +677,22 @@ public:
 		, Message(InMessage)
 	{
 	}
-protected:
-	virtual bool Compare(const FDebugLineItem* BaseOther) const override
+
+	virtual FText GetDescription() const override
 	{
-		FMessageLineItem* Other = (FMessageLineItem*)BaseOther;
-		return Message == Other->Message;
+		return FText::FromString(Message);
 	}
 
+protected:
 	virtual FDebugLineItem* Duplicate() const override
 	{
 		return new FMessageLineItem(Message);
 	}
 
-	virtual FText GetDescription() const override
+	virtual bool Compare(const FDebugLineItem* BaseOther) const override
 	{
-		return FText::FromString(Message);
+		FMessageLineItem* Other = (FMessageLineItem*)BaseOther;
+		return Message == Other->Message;
 	}
 
 	virtual uint32 GetHash() override
@@ -708,6 +709,7 @@ struct FLatentActionLineItem : public FDebugLineItem
 protected:
 	int32 UUID;
 	TWeakObjectPtr< UObject > ParentObjectRef;
+
 public:
 	FLatentActionLineItem(int32 InUUID, UObject* ParentObject)
 		: FDebugLineItem(DLT_LatentAction)
@@ -717,7 +719,16 @@ public:
 		ParentObjectRef = ParentObject;
 	}
 
+	virtual TSharedRef<SWidget> GenerateNameWidget(TSharedPtr<FString> InSearchString) override;
+	virtual TSharedRef<SWidget> GetNameIcon() override;
+	virtual FText GetDescription() const override;
+
 protected:
+	virtual FDebugLineItem* Duplicate() const override
+	{
+		return new FLatentActionLineItem(UUID, ParentObjectRef.Get());
+	}
+
 	virtual bool Compare(const FDebugLineItem* BaseOther) const override
 	{
 		FLatentActionLineItem* Other = (FLatentActionLineItem*)BaseOther;
@@ -725,19 +736,12 @@ protected:
 			(UUID == Other->UUID);
 	}
 
-	virtual FDebugLineItem* Duplicate() const override
-	{
-		return new FLatentActionLineItem(UUID, ParentObjectRef.Get());
-	}
-
 	virtual uint32 GetHash() override
 	{
 		return HashCombine(GetTypeHash(UUID), GetTypeHash(ParentObjectRef));
 	}
+
 protected:
-	virtual TSharedRef<SWidget> GenerateNameWidget(TSharedPtr<FString> InSearchString) override;
-	virtual TSharedRef<SWidget> GetNameIcon() override;
-	virtual FText GetDescription() const override;
 	virtual FText GetDisplayName() const override;
 	void OnNavigateToLatentNode();
 
@@ -812,6 +816,9 @@ void FLatentActionLineItem::OnNavigateToLatentNode()
 	}
 }
 
+//////////////////////////////////////////////////////////////////////////
+// FWatchChildLineItem
+
 struct FWatchChildLineItem : public FLineItemWithChildren
 {
 protected:
@@ -826,12 +833,128 @@ public:
 		ParentTreeItem(InParentTreeItem)
 	{}
 
+	virtual TSharedRef<SWidget> GenerateValueWidget(TSharedPtr<FString> InSearchString) override
+	{
+		return SNew(SPropertyValueWidget, InSearchString)
+			.PropertyInfo(this, &FWatchChildLineItem::GetPropertyInfo)
+			.TreeItem(AsShared());
+	}
+
+	virtual void ExtendContextMenu(FMenuBuilder& MenuBuilder, bool bInDebuggerTab) override
+	{
+		//Navigate to Class source
+
+		//Add Watch
+		FUIAction AddThisWatch(
+			FExecuteAction::CreateSP(this, &FWatchChildLineItem::AddWatch),
+			FCanExecuteAction::CreateSP(this, &FWatchChildLineItem::CanAddWatch)
+		);
+
+		MenuBuilder.AddMenuEntry(
+			LOCTEXT("AddPropertyWatch", "Start Watching"),
+			LOCTEXT("AddPropertyWatchTooltip", "Start Watching This Variable"),
+			FSlateIcon(),
+			AddThisWatch
+		);
+
+		//Add Watch
+		FUIAction ClearThisWatch(
+			FExecuteAction::CreateSP(this, &FWatchChildLineItem::ClearWatch),
+			FCanExecuteAction::CreateSP(this, &FWatchChildLineItem::CanClearWatch)
+		);
+
+		MenuBuilder.AddMenuEntry(
+			LOCTEXT("ClearPropertyWatch", "Stop Watching"),
+			LOCTEXT("ClearPropertyWatchTooltip", "Stop Watching This Variable"),
+			FSlateIcon(),
+			ClearThisWatch
+		);
+
+		if (!bInDebuggerTab)
+		{
+			//View in Debugger
+			FUIAction ViewInDebugger(
+				FExecuteAction::CreateSP(this, &FWatchChildLineItem::ViewInDebugger),
+				FCanExecuteAction::CreateSP(this, &FWatchChildLineItem::CanViewInDebugger)
+			);
+
+			MenuBuilder.AddMenuEntry(
+				ViewInDebuggerText,
+				ViewInDebuggerTooltipText,
+				FSlateIcon(),
+				ViewInDebugger
+			);
+		}
+
+	}
+
+	// uses the icon and color associated with the property type
+	virtual TSharedRef<SWidget> GetNameIcon() override
+	{
+		FSlateColor BaseColor;
+		FSlateColor SecondaryColor;
+		FSlateBrush const* SecondaryIcon;
+		const FSlateBrush* Icon = FBlueprintEditor::GetVarIconAndColorFromProperty(
+			Data->Property.Get(),
+			BaseColor,
+			SecondaryIcon,
+			SecondaryColor
+		);
+
+		// make the icon a button so the user can open the asset in editor if there is one
+		return SNew(SButton)
+			.OnClicked(this, &FWatchChildLineItem::OnFocusAsset)
+			.ButtonStyle(FEditorStyle::Get(), "NoBorder")
+			.ContentPadding(0.0f)
+			.OnHovered_Lambda(
+				[&bIconHovered = bIconHovered]() {bIconHovered = true; }
+			)
+			.OnUnhovered_Lambda(
+				[&bIconHovered = bIconHovered]() {bIconHovered = false; }
+			)
+			[
+				SNew(SOverlay)
+				.ToolTipText(this, &FWatchChildLineItem::IconTooltipText)
+				+ SOverlay::Slot()
+				.Padding(FMargin(10.f, 0.f, 0.f, 0.f))
+				[
+					SNew(SImage)
+						.Image(Icon)
+						.ColorAndOpacity(this, &FWatchChildLineItem::ModifiedIconColor, BaseColor)
+				]
+				+ SOverlay::Slot()
+				.HAlign(HAlign_Left)
+				[
+					SNew(SImage)
+						.Image(FEditorStyle::GetBrush(TEXT("Kismet.WatchIcon")))
+						.Visibility(this, &FWatchChildLineItem::GetWatchIconVisibility)
+				]
+			];
+	}
+
+	virtual FText GetDescription() const override
+	{
+		const FString ValStr = Data->Value.ToString();
+		return FText::FromString(ValStr.Replace(TEXT("\n"), TEXT(" ")));
+	}
+
+protected:
+	virtual FDebugLineItem* Duplicate() const override
+	{
+		return new FWatchChildLineItem(Data, ParentTreeItem.Pin());
+	}
+
 	virtual bool Compare(const FDebugLineItem* BaseOther) const override
 	{
 		FWatchChildLineItem* Other = (FWatchChildLineItem*)BaseOther;
 
 		return Data->Property == Other->Data->Property &&
 			Data->DisplayName.CompareTo(Other->Data->DisplayName) == 0;
+	}
+
+	virtual uint32 GetHash() override
+	{
+		return HashCombine(GetTypeHash(Data->Property), GetTypeHash(Data->DisplayName.ToString()));
 	}
 
 	virtual void UpdateData(const FDebugLineItem& NewerData) override
@@ -843,25 +966,9 @@ public:
 		Data = Other.Data;
 	}
 
-	virtual FDebugLineItem* Duplicate() const override
-	{
-		return new FWatchChildLineItem(Data, ParentTreeItem.Pin());
-	}
-
-	virtual uint32 GetHash() override
-	{
-		return HashCombine(GetTypeHash(Data->Property), GetTypeHash(Data->DisplayName.ToString()));
-	}
-
 	virtual FText GetName() const override
 	{
 		return Data->Name;
-	}
-
-	virtual FText GetDescription() const override
-	{
-		const FString ValStr = Data->Value.ToString();
-		return FText::FromString(ValStr.Replace(TEXT("\n"), TEXT(" ")));
 	}
 
 	virtual FText GetDisplayName() const override
@@ -960,50 +1067,6 @@ public:
 		return Data->Type;
 	}
 
-	// uses the icon and color associated with the property type
-	virtual TSharedRef<SWidget> GetNameIcon() override
-	{
-		FSlateColor BaseColor;
-		FSlateColor SecondaryColor;
-		FSlateBrush const* SecondaryIcon;
-		const FSlateBrush* Icon = FBlueprintEditor::GetVarIconAndColorFromProperty(
-			Data->Property.Get(),
-			BaseColor,
-			SecondaryIcon,
-			SecondaryColor
-		);
-
-		// make the icon a button so the user can open the asset in editor if there is one
-		return SNew(SButton)
-			.OnClicked(this, &FWatchChildLineItem::OnFocusAsset)
-			.ButtonStyle(FEditorStyle::Get(), "NoBorder")
-			.ContentPadding(0.0f)
-			.OnHovered_Lambda(
-				[&bIconHovered = bIconHovered]() {bIconHovered = true; }
-			)
-			.OnUnhovered_Lambda(
-				[&bIconHovered = bIconHovered]() {bIconHovered = false; }
-			)
-			[
-				SNew(SOverlay)
-				.ToolTipText(this, &FWatchChildLineItem::IconTooltipText)
-				+ SOverlay::Slot()
-				.Padding(FMargin(10.f, 0.f, 0.f, 0.f))
-				[
-					SNew(SImage)
-						.Image(Icon)
-						.ColorAndOpacity(this, &FWatchChildLineItem::ModifiedIconColor, BaseColor)
-				]
-				+ SOverlay::Slot()
-				.HAlign(HAlign_Left)
-				[
-					SNew(SImage)
-						.Image(FEditorStyle::GetBrush(TEXT("Kismet.WatchIcon")))
-						.Visibility(this, &FWatchChildLineItem::GetWatchIconVisibility)
-				]
-			];
-	}
-
 	virtual void GatherChildren(TArray<FDebugTreeItemPtr>& OutChildren, const FString& InSearchString, bool bRespectSearch) override
 	{
 		for (const TSharedPtr<FPropertyInstanceInfo>& ChildData : Data->Children)
@@ -1012,62 +1075,6 @@ public:
 		}
 	}
 
-	virtual TSharedRef<SWidget> GenerateValueWidget(TSharedPtr<FString> InSearchString) override
-	{
-		return SNew(SPropertyValueWidget, InSearchString)
-			.PropertyInfo(this, &FWatchChildLineItem::GetPropertyInfo)
-			.TreeItem(AsShared());
-	}
-
-	virtual void ExtendContextMenu(FMenuBuilder& MenuBuilder, bool bInDebuggerTab) override
-	{
-		//Navigate to Class source
-
-		//Add Watch
-		FUIAction AddThisWatch(
-			FExecuteAction::CreateSP(this, &FWatchChildLineItem::AddWatch),
-			FCanExecuteAction::CreateSP(this, &FWatchChildLineItem::CanAddWatch)
-		);
-
-		MenuBuilder.AddMenuEntry(
-			LOCTEXT("AddPropertyWatch", "Start Watching"),
-			LOCTEXT("AddPropertyWatchTooltip", "Start Watching This Variable"),
-			FSlateIcon(),
-			AddThisWatch
-		);
-
-		//Add Watch
-		FUIAction ClearThisWatch(
-			FExecuteAction::CreateSP(this, &FWatchChildLineItem::ClearWatch),
-			FCanExecuteAction::CreateSP(this, &FWatchChildLineItem::CanClearWatch)
-		);
-
-		MenuBuilder.AddMenuEntry(
-			LOCTEXT("ClearPropertyWatch", "Stop Watching"),
-			LOCTEXT("ClearPropertyWatchTooltip", "Stop Watching This Variable"),
-			FSlateIcon(),
-			ClearThisWatch
-		);
-
-		if (!bInDebuggerTab)
-		{
-			//View in Debugger
-			FUIAction ViewInDebugger(
-				FExecuteAction::CreateSP(this, &FWatchChildLineItem::ViewInDebugger),
-				FCanExecuteAction::CreateSP(this, &FWatchChildLineItem::CanViewInDebugger)
-			);
-
-			MenuBuilder.AddMenuEntry(
-				ViewInDebuggerText,
-				ViewInDebuggerTooltipText,
-				FSlateIcon(),
-				ViewInDebugger
-			);
-		}
-
-	}
-
-protected:
 	virtual bool IsContainer() const override
 	{
 		return Data->Property->IsA<FSetProperty>() || Data->Property->IsA<FArrayProperty>() || Data->Property->IsA<FMapProperty>();
@@ -1101,6 +1108,7 @@ protected:
 
 //////////////////////////////////////////////////////////////////////////\
 // FSelfWatchLineItem
+
 struct FSelfWatchLineItem : public FLineItemWithChildren
 {
 protected:
@@ -1112,20 +1120,32 @@ public:
 		ObjectToWatch(Object)
 	{}
 
+	virtual TSharedRef<SWidget> GetNameIcon() override
+	{
+		return SNew(SImage)
+			.Image(FEditorStyle::GetBrush(TEXT("Kismet.WatchIcon")));
+	}
+
+protected:
+	virtual FDebugLineItem* Duplicate() const override
+	{
+		return new FSelfWatchLineItem(ObjectToWatch.Get());
+	}
+
 	virtual bool Compare(const FDebugLineItem* BaseOther) const override
 	{
 		FSelfWatchLineItem* Other = (FSelfWatchLineItem*)BaseOther;
 		return (ObjectToWatch.Get() == Other->ObjectToWatch.Get());
 	}
 
-	virtual FDebugLineItem* Duplicate() const override
-	{
-		return new FSelfWatchLineItem(ObjectToWatch.Get());
-	}
-
 	virtual uint32 GetHash() override
 	{
 		return GetTypeHash(ObjectToWatch);
+	}
+
+	virtual FText GetDisplayName() const override
+	{
+		return LOCTEXT("SelfName", "Self");
 	}
 
 	virtual void GatherChildren(TArray<FDebugTreeItemPtr>& OutChildren, const FString& InSearchString, bool bRespectSearch) override
@@ -1147,22 +1167,10 @@ public:
 		}
 	}
 
-protected:
-	virtual FText GetDisplayName() const override
-	{
-		return LOCTEXT("SelfName", "Self");
-	}
-
-	virtual TSharedRef<SWidget> GetNameIcon() override
-	{
-		return SNew(SImage)
-			.Image(FEditorStyle::GetBrush(TEXT("Kismet.WatchIcon")));
-	}
 };
 
 //////////////////////////////////////////////////////////////////////////
 // FWatchLineItem 
-
 
 struct FWatchLineItem : public FLineItemWithChildren
 {
@@ -1185,24 +1193,6 @@ public:
 		, PathToProperty(InPathToProperty)
 	{
 		ParentObjectRef = ParentObject;
-	}
-
-	virtual bool Compare(const FDebugLineItem* BaseOther) const override
-	{
-		FWatchLineItem* Other = (FWatchLineItem*)BaseOther;
-		return (ParentObjectRef == Other->ParentObjectRef) &&
-			(ObjectRef == Other->ObjectRef) && 
-			(PathToProperty == Other->PathToProperty);
-	}
-
-	virtual FDebugLineItem* Duplicate() const override
-	{
-		return new FWatchLineItem(ObjectRef.Get(), ParentObjectRef.Get(), PathToProperty);
-	}
-
-	virtual uint32 GetHash() override
-	{
-		return HashCombine(GetTypeHash(ParentObjectRef), GetTypeHash(ObjectRef));
 	}
 
 	virtual void ExtendContextMenu(class FMenuBuilder& MenuBuilder, bool bInDebuggerTab) override
@@ -1248,6 +1238,36 @@ public:
 		}
 	}
 
+
+	const FEdGraphPinReference& GetPin() const
+	{
+		return ObjectRef;
+	}
+
+	virtual FText GetDescription() const override;
+	virtual TSharedRef<SWidget> GenerateNameWidget(TSharedPtr<FString> InSearchString) override;
+	virtual TSharedRef<SWidget> GenerateValueWidget(TSharedPtr<FString> InSearchString) override;
+	virtual TSharedRef<SWidget> GetNameIcon() override;
+
+protected:
+	virtual FDebugLineItem* Duplicate() const override
+	{
+		return new FWatchLineItem(ObjectRef.Get(), ParentObjectRef.Get(), PathToProperty);
+	}
+
+	virtual bool Compare(const FDebugLineItem* BaseOther) const override
+	{
+		FWatchLineItem* Other = (FWatchLineItem*)BaseOther;
+		return (ParentObjectRef == Other->ParentObjectRef) &&
+			(ObjectRef == Other->ObjectRef) && 
+			(PathToProperty == Other->PathToProperty);
+	}
+
+	virtual uint32 GetHash() override
+	{
+		return HashCombine(GetTypeHash(ParentObjectRef), GetTypeHash(ObjectRef));
+	}
+
 	virtual void GatherChildren(TArray<FDebugTreeItemPtr>& OutChildren, const FString& InSearchString, bool bRespectSearch) override
 	{
 		if (UEdGraphPin* PinToWatch = ObjectRef.Get())
@@ -1279,18 +1299,8 @@ public:
 			}
 		}
 	}
-
-	const FEdGraphPinReference& GetPin() const
-	{
-		return ObjectRef;
-	}
-
-protected:
-	virtual FText GetDescription() const override;
+	
 	virtual FText GetDisplayName() const override;
-	virtual TSharedRef<SWidget> GenerateNameWidget(TSharedPtr<FString> InSearchString) override;
-	virtual TSharedRef<SWidget> GenerateValueWidget(TSharedPtr<FString> InSearchString) override;
-	virtual TSharedRef<SWidget> GetNameIcon() override;
 	const FSlateBrush* GetPinIcon() const;
 	FSlateColor GetPinIconColor() const;
 	EVisibility GetWatchIconVisibility() const;
@@ -1300,7 +1310,6 @@ protected:
 
 	// Finds the DebugInfo for the property pointed to by PathToProperty from the Pin's debuginfo
 	TSharedPtr<FPropertyInstanceInfo> GetWatchedPropertyDebugInfo(const TSharedPtr<FPropertyInstanceInfo>& InPinInfo) const;
-
 
 	TSharedPtr<FPropertyInstanceInfo> GetPropertyInfo() const;
 
@@ -1804,21 +1813,18 @@ public:
 		ParentObjectRef = ParentObject;
 	}
 
-	virtual bool Compare(const FDebugLineItem* BaseOther) const override
+	virtual TSharedRef<SWidget> GenerateNameWidget(TSharedPtr<FString> InSearchString) override
 	{
-		FBreakpointLineItem* Other = (FBreakpointLineItem*)BaseOther;
-		return (ParentObjectRef.Get() == Other->ParentObjectRef.Get()) &&
-			(BreakpointNode == Other->BreakpointNode);
-	}
-
-	virtual FDebugLineItem* Duplicate() const override
-	{
-		return new FBreakpointLineItem(BreakpointNode, ParentObjectRef.Get());
-	}
-
-	virtual uint32 GetHash() override
-	{
-		return HashCombine(GetTypeHash(ParentObjectRef), GetTypeHash(BreakpointNode));
+		return SNew(PropertyInfoViewStyle::STextHighlightOverlay)
+			.FullText(this, &FBreakpointLineItem::GetDisplayName)
+			.HighlightText(this, &FBreakpointLineItem::GetHighlightText, InSearchString)
+			[
+				SNew(SHyperlink)
+					.Style(FEditorStyle::Get(), "HoverOnlyHyperlink")
+					.Text(this, &FBreakpointLineItem::GetDisplayName)
+					.ToolTipText(LOCTEXT("NavBreakpointLoc", "Navigate to the breakpoint location"))
+					.OnNavigate(this, &FBreakpointLineItem::OnNavigateToBreakpointLocation)
+			];
 	}
 
 	virtual void ExtendContextMenu(class FMenuBuilder& MenuBuilder, bool bInDebuggerTab) override
@@ -1873,32 +1879,6 @@ public:
 				ClearThisBreakpoint);
 		}
 	}
-protected:
-	FBlueprintBreakpoint* GetBreakpoint() const
-	{
-		if (UEdGraphNode* Node = BreakpointNode.Get())
-		{
-			if (const UBlueprint* Blueprint = GetBlueprintForObject(Node))
-			{
-				return FKismetDebugUtilities::FindBreakpointForNode(Node, Blueprint);
-			}
-		}
-		return nullptr;
-	}
-
-	virtual TSharedRef<SWidget> GenerateNameWidget(TSharedPtr<FString> InSearchString) override
-	{
-		return SNew(PropertyInfoViewStyle::STextHighlightOverlay)
-			.FullText(this, &FBreakpointLineItem::GetDisplayName)
-			.HighlightText(this, &FBreakpointLineItem::GetHighlightText, InSearchString)
-			[
-				SNew(SHyperlink)
-					.Style(FEditorStyle::Get(), "HoverOnlyHyperlink")
-					.Text(this, &FBreakpointLineItem::GetDisplayName)
-					.ToolTipText(LOCTEXT("NavBreakpointLoc", "Navigate to the breakpoint location"))
-					.OnNavigate(this, &FBreakpointLineItem::OnNavigateToBreakpointLocation)
-			];
-	}
 
 	virtual TSharedRef<SWidget> GetNameIcon() override
 	{
@@ -1914,6 +1894,35 @@ protected:
 			];
 	}
 
+protected:
+	FBlueprintBreakpoint* GetBreakpoint() const
+	{
+		if (UEdGraphNode* Node = BreakpointNode.Get())
+		{
+			if (const UBlueprint* Blueprint = GetBlueprintForObject(Node))
+			{
+				return FKismetDebugUtilities::FindBreakpointForNode(Node, Blueprint);
+			}
+		}
+		return nullptr;
+	}
+
+	virtual FDebugLineItem* Duplicate() const override
+	{
+		return new FBreakpointLineItem(BreakpointNode, ParentObjectRef.Get());
+	}
+
+	virtual bool Compare(const FDebugLineItem* BaseOther) const override
+	{
+		FBreakpointLineItem* Other = (FBreakpointLineItem*)BaseOther;
+		return (ParentObjectRef.Get() == Other->ParentObjectRef.Get()) &&
+			(BreakpointNode == Other->BreakpointNode);
+	}
+
+	virtual uint32 GetHash() override
+	{
+		return HashCombine(GetTypeHash(ParentObjectRef), GetTypeHash(BreakpointNode));
+	}
 
 	virtual FText GetDisplayName() const override;
 
@@ -2020,34 +2029,6 @@ public:
 	{
 	}
 
-	virtual void GatherChildren(TArray<FDebugTreeItemPtr>& OutChildren, const FString& InSearchString, bool bRespectSearch) override
-	{
-		// update search flags to match that of a root node
-		UpdateSearch(InSearchString, FDebugLineItem::SF_RootNode);
-
-		if (!Blueprint.IsValid())
-		{
-			return;
-		}
-
-		// Create children for each breakpoint
-		FKismetDebugUtilities::ForeachBreakpoint(
-			Blueprint.Get(),
-			[this, &OutChildren, &InSearchString, bRespectSearch](FBlueprintBreakpoint& Breakpoint)
-			{
-				EnsureChildIsAdded(OutChildren,
-					FBreakpointLineItem(Breakpoint.GetLocation(), Blueprint.Get()), InSearchString, bRespectSearch);
-			}
-		);
-
-		// Make sure there is something there, to let the user know if there is nothing
-		if (OutChildren.Num() == 0)
-		{
-			EnsureChildIsAdded(OutChildren,
-				FMessageLineItem(LOCTEXT("NoBreakpoints", "No breakpoints").ToString()), InSearchString, bRespectSearch);
-		}
-	}
-
 	virtual void ExtendContextMenu(FMenuBuilder& MenuBuilder, bool bInDebuggerTab) override
 	{
 		if (FKismetDebugUtilities::BlueprintHasBreakpoints(Blueprint.Get()))
@@ -2110,21 +2091,49 @@ public:
 	}
 
 protected:
+	virtual void GatherChildren(TArray<FDebugTreeItemPtr>& OutChildren, const FString& InSearchString, bool bRespectSearch) override
+	{
+		// update search flags to match that of a root node
+		UpdateSearch(InSearchString, FDebugLineItem::SF_RootNode);
+
+		if (!Blueprint.IsValid())
+		{
+			return;
+		}
+
+		// Create children for each breakpoint
+		FKismetDebugUtilities::ForeachBreakpoint(
+			Blueprint.Get(),
+			[this, &OutChildren, &InSearchString, bRespectSearch](FBlueprintBreakpoint& Breakpoint)
+			{
+				EnsureChildIsAdded(OutChildren,
+					FBreakpointLineItem(Breakpoint.GetLocation(), Blueprint.Get()), InSearchString, bRespectSearch);
+			}
+		);
+
+		// Make sure there is something there, to let the user know if there is nothing
+		if (OutChildren.Num() == 0)
+		{
+			EnsureChildIsAdded(OutChildren,
+				FMessageLineItem(LOCTEXT("NoBreakpoints", "No breakpoints").ToString()), InSearchString, bRespectSearch);
+		}
+	}
+
 	virtual FText GetDisplayName() const override
 	{
 		return LOCTEXT("Breakpoints", "Breakpoints");
-	}
-
-	virtual bool Compare(const FDebugLineItem* BaseOther) const override
-	{
-		check(false);
-		return false;
 	}
 
 	virtual FDebugLineItem* Duplicate() const override
 	{
 		check(false);
 		return nullptr;
+	}
+
+	virtual bool Compare(const FDebugLineItem* BaseOther) const override
+	{
+		check(false);
+		return false;
 	}
 
 	virtual uint32 GetHash() override
@@ -2247,6 +2256,14 @@ public:
 		}
 	}
 
+	virtual TSharedRef<SWidget> GetNameIcon() override
+	{
+		return SNew(SImage)
+			.Image(this, &FParentLineItem::GetStatusImage)
+			.ColorAndOpacity_Raw(this, &FParentLineItem::GetStatusColor)
+			.ToolTipText(this, &FParentLineItem::GetStatusTooltip);
+	}
+
 	const FSlateBrush* GetStatusImage() const
 	{
 		if (SKismetDebuggingView::CurrentActiveObject == ObjectRef)
@@ -2279,16 +2296,35 @@ public:
 		return FText::GetEmpty();
 	}
 
+	virtual void ExtendContextMenu(class FMenuBuilder& MenuBuilder, bool bInDebuggerTab) override
+	{
+		if (UBlueprint* BP = Cast<UBlueprint>(ObjectRef.Get()))
+		{
+			if (FKismetDebugUtilities::BlueprintHasPinWatches(BP))
+			{
+				FUIAction ClearAllWatches(
+					FExecuteAction::CreateSP(this, &FParentLineItem::ClearAllWatches),
+					FCanExecuteAction() // always allow
+				);
+
+				MenuBuilder.AddMenuEntry(
+					LOCTEXT("ClearWatches", "Clear all watches"),
+					LOCTEXT("ClearWatches_ToolTip", "Clear all watches in this blueprint"),
+					FSlateIcon(),
+					ClearAllWatches);
+			}
+		}
+	}
 protected:
+	virtual FDebugLineItem* Duplicate() const override
+	{
+		return new FParentLineItem(ObjectRef.Get());
+	}
+
 	virtual bool Compare(const FDebugLineItem* BaseOther) const override
 	{
 		FParentLineItem* Other = (FParentLineItem*)BaseOther;
 		return ObjectRef.Get() == Other->ObjectRef.Get();
-	}
-
-	virtual FDebugLineItem* Duplicate() const override
-	{
-		return new FParentLineItem(ObjectRef.Get());
 	}
 
 	virtual uint32 GetHash() override
@@ -2308,34 +2344,6 @@ protected:
 		else
 		{
 			return (Object != nullptr) ? FText::FromString(Object->GetName()) : LOCTEXT("nullptr", "(nullptr)");
-		}
-	}
-
-	virtual TSharedRef<SWidget> GetNameIcon() override
-	{
-		return SNew(SImage)
-			.Image(this, &FParentLineItem::GetStatusImage)
-			.ColorAndOpacity_Raw(this, &FParentLineItem::GetStatusColor)
-			.ToolTipText(this, &FParentLineItem::GetStatusTooltip);
-	}
-
-	virtual void ExtendContextMenu(class FMenuBuilder& MenuBuilder, bool bInDebuggerTab) override
-	{
-		if (UBlueprint* BP = Cast<UBlueprint>(ObjectRef.Get()))
-		{
-			if (FKismetDebugUtilities::BlueprintHasPinWatches(BP))
-			{
-				FUIAction ClearAllWatches(
-					FExecuteAction::CreateSP(this, &FParentLineItem::ClearAllWatches),
-					FCanExecuteAction() // always allow
-				);
-
-				MenuBuilder.AddMenuEntry(
-					LOCTEXT("ClearWatches", "Clear all watches"),
-					LOCTEXT("ClearWatches_ToolTip", "Clear all watches in this blueprint"),
-					FSlateIcon(),
-					ClearAllWatches);
-			}
 		}
 	}
 
@@ -2363,60 +2371,6 @@ public:
 	{
 		StackIndex = InStackIndex;
 	}
-protected:
-	virtual bool Compare(const FDebugLineItem* BaseOther) const override
-	{
-		check(false);
-		return false;
-	}
-
-	virtual FDebugLineItem* Duplicate() const override
-	{
-		check(false);
-		return nullptr;
-	}
-
-	virtual uint32 GetHash() override
-	{
-		check(false);
-		return 0;
-	}
-
-	UEdGraphNode* GetNode() const
-	{
-		const TSimpleRingBuffer<FKismetTraceSample>& TraceStack = FKismetDebugUtilities::GetTraceStack();
-		if (StackIndex < TraceStack.Num())
-		{
-			const FKismetTraceSample& Sample = TraceStack(StackIndex);
-			UObject* ObjectContext = Sample.Context.Get();
-
-			FString ContextName = (ObjectContext != nullptr) ? ObjectContext->GetName() : LOCTEXT("ObjectDoesNotExist", "(object no longer exists)").ToString();
-			FString NodeName = TEXT(" ");
-
-			if (ObjectContext != nullptr)
-			{
-				// Try to find the node that got executed
-				UEdGraphNode* Node = FKismetDebugUtilities::FindSourceNodeForCodeLocation(ObjectContext, Sample.Function.Get(), Sample.Offset);
-				return Node;
-			}
-		}
-
-		return nullptr;
-	}
-
-	virtual FText GetDisplayName() const override
-	{
-		UEdGraphNode* Node = GetNode();
-		if (Node != nullptr)
-		{
-			return Node->GetNodeTitle(ENodeTitleType::ListView);
-		}
-		else
-		{
-			return LOCTEXT("Unknown", "(unknown)");
-		}
-	}
-
 	virtual TSharedRef<SWidget> GenerateNameWidget(TSharedPtr<FString> InSearchString) override
 	{
 		return SNew(PropertyInfoViewStyle::STextHighlightOverlay)
@@ -2429,16 +2383,6 @@ protected:
 					.ToolTipText(LOCTEXT("NavigateToDebugTraceLocationHyperlink_ToolTip", "Navigate to the trace location"))
 					.OnNavigate(this, &FTraceStackChildItem::OnNavigateToNode)
 			];
-	}
-
-	virtual TSharedRef<SWidget> GetNameIcon() override
-	{
-		return SNew(SImage)
-			.Image(FEditorStyle::GetBrush(
-				(StackIndex > 0) ?
-				TEXT("Kismet.Trace.PreviousIndex") :
-				TEXT("Kismet.Trace.CurrentIndex"))
-			);
 	}
 
 	// Visit time and actor name
@@ -2467,6 +2411,75 @@ protected:
 			];
 	}
 
+	virtual TSharedRef<SWidget> GetNameIcon() override
+	{
+		return SNew(SImage)
+			.Image(FEditorStyle::GetBrush(
+				(StackIndex > 0) ?
+				TEXT("Kismet.Trace.PreviousIndex") :
+				TEXT("Kismet.Trace.CurrentIndex"))
+			);
+	}
+
+	virtual FText GetDescription() const override
+	{
+		return FText::FromString(GetContextObjectName().ToString() + GetVisitTime().ToString());
+	}
+
+protected:
+	virtual FDebugLineItem* Duplicate() const override
+	{
+		check(false);
+		return nullptr;
+	}
+
+	virtual bool Compare(const FDebugLineItem* BaseOther) const override
+	{
+		check(false);
+		return false;
+	}
+
+	virtual uint32 GetHash() override
+	{
+		check(false);
+		return 0;
+	}
+
+	virtual FText GetDisplayName() const override
+	{
+		UEdGraphNode* Node = GetNode();
+		if (Node != nullptr)
+		{
+			return Node->GetNodeTitle(ENodeTitleType::ListView);
+		}
+		else
+		{
+			return LOCTEXT("Unknown", "(unknown)");
+		}
+	}
+
+	UEdGraphNode* GetNode() const
+	{
+		const TSimpleRingBuffer<FKismetTraceSample>& TraceStack = FKismetDebugUtilities::GetTraceStack();
+		if (StackIndex < TraceStack.Num())
+		{
+			const FKismetTraceSample& Sample = TraceStack(StackIndex);
+			UObject* ObjectContext = Sample.Context.Get();
+
+			FString ContextName = (ObjectContext != nullptr) ? ObjectContext->GetName() : LOCTEXT("ObjectDoesNotExist", "(object no longer exists)").ToString();
+			FString NodeName = TEXT(" ");
+
+			if (ObjectContext != nullptr)
+			{
+				// Try to find the node that got executed
+				UEdGraphNode* Node = FKismetDebugUtilities::FindSourceNodeForCodeLocation(ObjectContext, Sample.Function.Get(), Sample.Offset);
+				return Node;
+			}
+		}
+
+		return nullptr;
+	}
+
 	FText GetVisitTime() const
 	{
 		const TSimpleRingBuffer<FKismetTraceSample>& TraceStack = FKismetDebugUtilities::GetTraceStack();
@@ -2488,11 +2501,6 @@ protected:
 		UObject* ObjectContext = (StackIndex < TraceStack.Num()) ? TraceStack(StackIndex).Context.Get() : nullptr;
 
 		return (ObjectContext != nullptr) ? FText::FromString(ObjectContext->GetName()) : LOCTEXT("ObjectDoesNotExist", "(object no longer exists)");
-	}
-
-	virtual FText GetDescription() const override
-	{
-		return FText::FromString(GetContextObjectName().ToString() + GetVisitTime().ToString());
 	}
 
 	void OnNavigateToNode()
@@ -2519,7 +2527,6 @@ protected:
 			UE_LOG(LogBlueprintDebugTreeView, Warning, TEXT("Cannot select the non-actor object '%s'"), (ObjectContext != nullptr) ? *ObjectContext->GetName() : TEXT("(nullptr)"));
 		}
 	}
-
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -2536,6 +2543,30 @@ public:
 	virtual bool HasChildren() const override
 	{
 		return !ChildrenMirrorsArr.IsEmpty();
+	}
+
+protected:
+	virtual FDebugLineItem* Duplicate() const override
+	{
+		check(false);
+		return nullptr;
+	}
+
+	virtual bool Compare(const FDebugLineItem* BaseOther) const override
+	{
+		check(false);
+		return false;
+	}
+
+	virtual uint32 GetHash() override
+	{
+		check(false);
+		return 0;
+	}
+
+	virtual FText GetDisplayName() const override
+	{
+		return LOCTEXT("ExecutionTrace", "Execution Trace");
 	}
 
 	virtual void GatherChildren(TArray<FDebugTreeItemPtr>& OutChildren, const FString& InSearchString, bool bRespectSearch) override
@@ -2557,30 +2588,6 @@ public:
 		{
 			OutChildren.Add(ChildrenMirrorsArr[i]);
 		}
-	}
-
-protected:
-	virtual FText GetDisplayName() const override
-	{
-		return LOCTEXT("ExecutionTrace", "Execution Trace");
-	}
-
-	virtual bool Compare(const FDebugLineItem* BaseOther) const override
-	{
-		check(false);
-		return false;
-	}
-
-	virtual FDebugLineItem* Duplicate() const override
-	{
-		check(false);
-		return nullptr;
-	}
-
-	virtual uint32 GetHash() override
-	{
-		check(false);
-		return 0;
 	}
 
 	// use an array to store children mirrors instead of a set so it's ordered
