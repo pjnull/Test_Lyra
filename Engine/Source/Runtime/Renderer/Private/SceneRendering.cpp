@@ -1417,9 +1417,9 @@ void FViewInfo::SetupUniformBufferParameters(
 		}
 
 		// Regular view sampling of the SkyViewLUT. This is only changed when sampled from a sky material for the real time reflection capture around sky light position)
-		FVector SkyWorldCameraOrigin;
-		FMatrix SkyViewLutReferential;
-		FVector4 TempSkyPlanetData;
+		FVector3f SkyWorldCameraOrigin;
+		FMatrix44f SkyViewLutReferential;
+		FVector4f TempSkyPlanetData;
 		AtmosphereSetup.ComputeViewData(InViewMatrices.GetViewOrigin(), ViewUniformShaderParameters.ViewForward, ViewUniformShaderParameters.ViewRight,
 			SkyWorldCameraOrigin, TempSkyPlanetData, SkyViewLutReferential);
 		// LWC_TODO: Precision loss
