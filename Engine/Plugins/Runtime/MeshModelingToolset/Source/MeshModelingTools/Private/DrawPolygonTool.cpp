@@ -236,6 +236,11 @@ void UDrawPolygonTool::ApplyUndoPoints(const TArray<FVector3d>& ClickPointsIn, c
 
 void UDrawPolygonTool::OnTick(float DeltaTime)
 {
+	if (PlaneTransformGizmo)
+	{
+		// faster to do this as an override rather than destroying/recreating the gizmo via UpdateShowGizmoState
+		PlaneTransformGizmo->SetVisibility(AllowDrawPlaneUpdates());
+	}
 }
 
 
@@ -978,9 +983,31 @@ void UDrawPolygonTool::EndInteractiveExtrude()
 }
 
 
+bool UDrawPolygonTool::AllowDrawPlaneUpdates()
+{
+	if (bInInteractiveExtrude)
+	{
+		return false;
+	}
+	if (bInFixedPolygonMode)
+	{
+		return FixedPolygonClickPoints.IsEmpty();
+	}
+	else
+	{
+		return PolygonVertices.IsEmpty();
+	}
+}
+
+
 
 void UDrawPolygonTool::SetDrawPlaneFromWorldPos(const FVector3d& Position, const FVector3d& Normal)
 {
+	if (!AllowDrawPlaneUpdates())
+	{
+		return;
+	}
+
 	DrawPlaneOrigin = Position;
 
 	FFrame3d DrawPlane(Position, DrawPlaneOrientation);
