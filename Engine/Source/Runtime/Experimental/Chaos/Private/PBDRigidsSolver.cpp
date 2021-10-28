@@ -43,8 +43,6 @@ DECLARE_DWORD_ACCUMULATOR_STAT(TEXT("NumContacts"), STAT_ChaosCounter_NumContact
 DECLARE_DWORD_ACCUMULATOR_STAT(TEXT("NumActiveConstraints"), STAT_ChaosCounter_NumActiveConstraints, STATGROUP_ChaosCounters);
 DECLARE_DWORD_ACCUMULATOR_STAT(TEXT("NumJoints"), STAT_ChaosCounter_NumJoints, STATGROUP_ChaosCounters);
 
-CSV_DEFINE_CATEGORY(ChaosCounters, true);
-
 // Stat Iteration counters
 DECLARE_DWORD_ACCUMULATOR_STAT(TEXT("NumIterations"), STAT_ChaosCounter_NumIterations, STATGROUP_ChaosCounters);
 DECLARE_DWORD_ACCUMULATOR_STAT(TEXT("NumCollisionIterations"), STAT_ChaosCounter_NumCollisionIterations, STATGROUP_ChaosCounters);
@@ -1380,7 +1378,7 @@ namespace Chaos
 #ifndef CHAOS_COUNTER_STAT
 #define CHAOS_COUNTER_STAT(Name, Value)\
 SET_DWORD_STAT(STAT_ChaosCounter_##Name, Value); \
-CSV_CUSTOM_STAT(PhysicsVerbose, Name, Value, ECsvCustomStatOp::Set);
+CSV_CUSTOM_STAT(PhysicsCounters, Name, Value, ECsvCustomStatOp::Set);
 #endif
 
 
