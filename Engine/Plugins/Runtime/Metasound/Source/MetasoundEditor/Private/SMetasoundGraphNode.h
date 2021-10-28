@@ -32,6 +32,7 @@ public:
 protected:
 
 	// SGraphNode Interface
+	virtual void CreateInputSideAddButton(TSharedPtr<SVerticalBox> InputBox) override;
 	virtual void CreateOutputSideAddButton(TSharedPtr<SVerticalBox> OutputBox) override;
 	virtual TSharedPtr<SGraphPin> CreatePinWidget(UEdGraphPin* InPin) const override;
 	virtual void CreateStandardPinWidget(UEdGraphPin* InPin) override;

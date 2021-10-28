@@ -121,11 +121,30 @@ TSharedRef<SWidget> SMetasoundGraphNode::CreateTriggerSimulationWidget(UMetasoun
 	];
 }
 
+void SMetasoundGraphNode::CreateInputSideAddButton(TSharedPtr<SVerticalBox> InputBox)
+{
+	TSharedRef<SWidget> AddPinButton = AddPinButtonContent(
+		LOCTEXT("MetasoundGraphNode_AddPinInputButton", "Add Input"),
+		LOCTEXT("MetasoundGraphNode_AddPinInputButton_Tooltip", "Add an input to the parent Metasound node.")
+	);
+
+	FMargin AddPinPadding = Settings->GetOutputPinPadding();
+	AddPinPadding.Top += 6.0f;
+
+	InputBox->AddSlot()
+	.AutoHeight()
+	.VAlign(VAlign_Center)
+	.Padding(AddPinPadding)
+	[
+		AddPinButton
+	];
+}
+
 void SMetasoundGraphNode::CreateOutputSideAddButton(TSharedPtr<SVerticalBox> OutputBox)
 {
 	TSharedRef<SWidget> AddPinButton = AddPinButtonContent(
-		LOCTEXT("MetasoundGraphNode_AddPinButton", "Add input"),
-		LOCTEXT("MetasoundGraphNode_AddPinButton_Tooltip", "Add an input to the parent Metasound node.")
+		LOCTEXT("MetasoundGraphNode_AddPinOutputButton", "Add Output"),
+		LOCTEXT("MetasoundGraphNode_AddPinOutputButton_Tooltip", "Add an output to the parent Metasound node.")
 	);
 
 	FMargin AddPinPadding = Settings->GetOutputPinPadding();
