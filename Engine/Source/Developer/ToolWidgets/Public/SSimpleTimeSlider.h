@@ -12,7 +12,7 @@ class FPaintArgs;
 class FSlateWindowElementList;
 class FTimeSliderController;
 
-class EDITORWIDGETS_API SSimpleTimeSlider : public SCompoundWidget
+class TOOLWIDGETS_API SSimpleTimeSlider : public SCompoundWidget
 {
 public:
 	DECLARE_DELEGATE_OneParam( FOnRangeChanged, TRange<double> )

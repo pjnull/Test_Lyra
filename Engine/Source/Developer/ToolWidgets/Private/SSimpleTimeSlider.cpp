@@ -1,7 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "SSimpleTimeSlider.h"
-#include "EditorStyleSet.h"
 #include "Fonts/FontMeasure.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Rendering/DrawElements.h"
@@ -31,9 +30,9 @@ void SSimpleTimeSlider::Construct( const SSimpleTimeSlider::FArguments& InArgs )
 	// set clipping on by default, since the OnPaint function is drawing outside the bounds
 	Clipping = EWidgetClipping::ClipToBounds;
 
-	ScrubHandleUp = FEditorStyle::GetBrush( TEXT( "Sequencer.Timeline.VanillaScrubHandleUp" ) ); 
-	ScrubHandleDown = FEditorStyle::GetBrush( TEXT( "Sequencer.Timeline.VanillaScrubHandleDown" ) );
-	CursorBackground = FEditorStyle::GetBrush("Sequencer.SectionArea.Background");
+	ScrubHandleUp = FAppStyle::Get().GetBrush( TEXT( "Sequencer.Timeline.VanillaScrubHandleUp" ) ); 
+	ScrubHandleDown = FAppStyle::Get().GetBrush( TEXT( "Sequencer.Timeline.VanillaScrubHandleDown" ) );
+	CursorBackground = FAppStyle::Get().GetBrush("Sequencer.SectionArea.Background");
 }
 
 int32 SSimpleTimeSlider::OnPaint( const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled ) const
