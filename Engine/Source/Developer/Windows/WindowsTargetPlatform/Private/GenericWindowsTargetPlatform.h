@@ -216,7 +216,7 @@ public:
 		}
 	}
 
-	virtual void GetAllTargetedShaderFormats( TArray<FName>& OutFormats ) const override final
+	virtual void GetAllTargetedShaderFormats( TArray<FName>& OutFormats ) const override 
 	{
 		// Get the Target RHIs for this platform, we do not always want all those that are supported. (reload in case user changed in the editor)
 		TArray<FString>TargetedShaderFormats;
