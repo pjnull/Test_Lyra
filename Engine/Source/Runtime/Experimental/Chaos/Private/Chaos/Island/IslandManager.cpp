@@ -37,8 +37,9 @@ FORCEINLINE bool IsDynamicParticle(const FGeometryParticleHandle* ParticleHandle
 /** Check if a particle is not moving */
 FORCEINLINE bool IsStationaryParticle(const FGeometryParticleHandle* ParticleHandle)
 {
-	if (const FKinematicGeometryParticleHandle* KinematicParticle = ParticleHandle->CastToKinematicParticle())
+	if (ParticleHandle->ObjectState() == EObjectStateType::Kinematic)
 	{
+		const FKinematicGeometryParticleHandle* KinematicParticle = ParticleHandle->CastToKinematicParticle();
 		return KinematicParticle->V().IsZero();
 	}
 	else
