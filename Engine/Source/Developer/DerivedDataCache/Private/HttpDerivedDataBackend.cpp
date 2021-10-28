@@ -3,8 +3,6 @@
 
 #if WITH_HTTP_DDC_BACKEND
 
-#include <memory>
-
 #if PLATFORM_WINDOWS || PLATFORM_HOLOLENS
 #include "Windows/WindowsHWrapper.h"
 #include "Windows/AllowWindowsPlatformTypes.h"
@@ -1118,15 +1116,23 @@ struct FDataRequestHelper
 
 	static void StaticInitialize()
 	{
-		static bool Initialized = false;
-		check(!Initialized);
-		for (int32 i = 0; i < UE_HTTPDDC_BATCH_NUM; i++)
+		static bool bInitialized = false;
+		check(!bInitialized);
+		for (FBatch& Batch : Batches)
 		{
-			Batches[i].Reserved = 0;
-			Batches[i].Ready = 0;
-			Batches[i].Complete = std::unique_ptr<FEvent, FBatch::EventDeleter>(FPlatformProcess::GetSynchEventFromPool(true));
+			Batch.Reserved = 0;
+			Batch.Ready = 0;
+			Batch.Complete = TUniquePtr<FEvent, FBatch::FEventDeleter>(FPlatformProcess::GetSynchEventFromPool(true));
 		}
-		Initialized = true;
+		bInitialized = true;
+	}
+
+	static void StaticShutdown()
+	{
+		for (FBatch& Batch : Batches)
+		{
+			Batch.Complete.Reset();
+		}
 	}
 
 	bool IsSuccess() const
@@ -1158,7 +1164,7 @@ private:
 
 	struct FBatch
 	{
-		struct EventDeleter
+		struct FEventDeleter
 		{
 			void operator()(FEvent* Event)
 			{
@@ -1171,7 +1177,7 @@ private:
 		std::atomic<uint32> Ready;
 		std::atomic<uint32> WeightHint;
 		FHttpRequest* Request;
-		std::unique_ptr<FEvent, EventDeleter> Complete;
+		TUniquePtr<FEvent, FEventDeleter> Complete;
 	};
 
 	FHttpRequest* Request;
@@ -1949,6 +1955,9 @@ FHttpDerivedDataBackend::~FHttpDerivedDataBackend()
 	{
 		AnyInstance = nullptr;
 	}
+#if WITH_DATAREQUEST_HELPER
+	FDataRequestHelper::StaticShutdown();
+#endif
 }
 
 FString FHttpDerivedDataBackend::GetDisplayName() const
