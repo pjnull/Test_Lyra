@@ -631,7 +631,7 @@ public:
 
 	void SetResult(ResultType&& InResult)
 	{
-		SharedState->Result = TOnlineResult<ResultType>(MoveTemp(InResult));
+		SharedState->Result = TOnlineResult<OpType>(MoveTemp(InResult));
 		SharedState->State = EAsyncOpState::Complete;
 
 		TriggerOnComplete(SharedState->Result);
@@ -639,7 +639,7 @@ public:
 
 	virtual void SetError(FOnlineError&& Error)
 	{
-		SharedState->Result = TOnlineResult<ResultType>(MoveTemp(Error));
+		SharedState->Result = TOnlineResult<OpType>(MoveTemp(Error));
 		SharedState->State = EAsyncOpState::Complete;
 
 		TriggerOnComplete(SharedState->Result);
@@ -719,7 +719,7 @@ public:
 protected:
 	FOnlineServicesCommon& Services;
 
-	void TriggerOnComplete(const TOnlineResult<ResultType>& Result)
+	void TriggerOnComplete(const TOnlineResult<OpType>& Result)
 	{
 		TArray<TSharedRef<FAsyncOpSharedHandleState>> SharedHandleStatesCopy(SharedHandleStates);
 		for (TSharedRef<FAsyncOpSharedHandleState>& SharedHandleState : SharedHandleStatesCopy)
@@ -740,7 +740,7 @@ protected:
 
 		ParamsType Params;
 		// This will need to be protected with a mutex if we want to allow this to be set from multiple threads (eg, set result from a task graph thread, while allowing this to be cancelled from the game thread)
-		TOnlineResult<ResultType> Result{ Errors::Unknown() };
+		TOnlineResult<OpType> Result{ Errors::Unknown() };
 		EAsyncOpState State = EAsyncOpState::Invalid;
 
 		bool IsComplete() const
@@ -769,7 +769,7 @@ protected:
 			if (PinnedOP.IsValid())
 			{
 				bCancelled = true;
-				TriggerOnComplete(TOnlineResult<ResultType>(Reason));
+				TriggerOnComplete(TOnlineResult<OpType>(Reason));
 			}
 		}
 
@@ -788,7 +788,7 @@ protected:
 			OnWillRetryFn = MoveTemp(Function);
 		}
 
-		virtual void SetOnComplete(TDelegate<void(const TOnlineResult<ResultType>&)>&& Function) override
+		virtual void SetOnComplete(TDelegate<void(const TOnlineResult<OpType>&)>&& Function) override
 		{
 			OnCompleteFn = MoveTemp(Function);
 			if (SharedState->IsComplete())
@@ -797,7 +797,7 @@ protected:
 			}
 		}
 
-		void TriggerOnComplete(const TOnlineResult<ResultType>& Result)
+		void TriggerOnComplete(const TOnlineResult<OpType>& Result)
 		{
 			// TODO: Execute OnCompleteFn next tick on game thread
 			if (OnCompleteFn.IsBound())
@@ -821,7 +821,7 @@ protected:
 
 		TDelegate<void(const FAsyncProgress&)> OnProgressFn;
 		TDelegate<void(TOnlineAsyncOpHandle<OpType>& Handle, const FWillRetry&)> OnWillRetryFn;
-		TDelegate<void(const TOnlineResult<ResultType>&)> OnCompleteFn;
+		TDelegate<void(const TOnlineResult<OpType>&)> OnCompleteFn;
 
 		bool bCancelled = false;
 		TSharedRef<FAsyncOpSharedState> SharedState;
@@ -843,8 +843,7 @@ protected:
 	TSharedRef<FAsyncOpSharedState> SharedState;
 	TArray<TSharedRef<FAsyncOpSharedHandleState>> SharedHandleStates;
 	TArray<TUniquePtr<Private::IStep>> Steps;
-	TPromise<void> StartExecutionPromise;
-	TOnlineEventCallable<void(const TOnlineResult<ResultType>&)> OnCompleteEvent;
+	TOnlineEventCallable<void(const TOnlineResult<OpType>&)> OnCompleteEvent;
 	int NextStep = 0;
 
 	friend class FOnlineAsyncOpCache;

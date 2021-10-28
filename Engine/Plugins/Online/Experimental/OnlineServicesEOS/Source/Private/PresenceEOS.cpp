@@ -61,7 +61,13 @@ static inline EOS_Presence_EStatus ToEOS_Presence_EStatus(EPresenceState InState
 FPresenceEOS::FPresenceEOS(FOnlineServicesEOS& InServices)
 	: FPresenceCommon(InServices)
 {
-	PresenceHandle = EOS_Platform_GetPresenceInterface(InServices.GetEOSPlatformHandle());
+}
+
+void FPresenceEOS::Initialize()
+{
+	FPresenceCommon::Initialize();
+
+	PresenceHandle = EOS_Platform_GetPresenceInterface(static_cast<FOnlineServicesEOS&>(GetServices()).GetEOSPlatformHandle());
 	check(PresenceHandle != nullptr);
 
 	// Register for friend updates
@@ -145,7 +151,7 @@ TOnlineAsyncOpHandle<FQueryPresence> FPresenceEOS::QueryPresence(FQueryPresence:
 	return Op.GetHandle();
 }
 
-TOnlineResult<FGetPresence::Result> FPresenceEOS::GetPresence(FGetPresence::Params&& Params)
+TOnlineResult<FGetPresence> FPresenceEOS::GetPresence(FGetPresence::Params&& Params)
 {
 	if (TMap<FAccountId, TSharedRef<FUserPresence>>* PresenceList = PresenceLists.Find(Params.LocalUserId))
 	{
@@ -153,10 +159,10 @@ TOnlineResult<FGetPresence::Result> FPresenceEOS::GetPresence(FGetPresence::Para
 		if (PresencePtr)
 		{
 			FGetPresence::Result Result = { *PresencePtr };
-			return TOnlineResult<FGetPresence::Result>(MoveTemp(Result));
+			return TOnlineResult<FGetPresence>(MoveTemp(Result));
 		}
 	}
-	return TOnlineResult<FGetPresence::Result>(Errors::Unknown()); // TODO: error codes
+	return TOnlineResult<FGetPresence>(Errors::Unknown()); // TODO: error codes
 }
 
 TOnlineAsyncOpHandle<FUpdatePresence> FPresenceEOS::UpdatePresence(FUpdatePresence::Params&& InParams)

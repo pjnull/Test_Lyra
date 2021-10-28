@@ -75,7 +75,13 @@ struct FEOSAuthCredentials :
 FAuthEOS::FAuthEOS(FOnlineServicesEOS& InServices)
 	: FAuthCommon(InServices)
 {
-	AuthHandle = EOS_Platform_GetAuthInterface(InServices.GetEOSPlatformHandle());
+}
+
+void FAuthEOS::Initialize()
+{
+	FAuthCommon::Initialize();
+
+	AuthHandle = EOS_Platform_GetAuthInterface(static_cast<FOnlineServicesEOS&>(GetServices()).GetEOSPlatformHandle());
 	check(AuthHandle != nullptr);
 
 	// Register for login status changes
@@ -89,6 +95,10 @@ FAuthEOS::FAuthEOS(FOnlineServicesEOS& InServices)
 		ELoginStatus CurrentStatus = ToELoginStatus(Data->CurrentStatus);
 		This->OnEOSLoginStatusChanged(LocalUserId, PreviousStatus, CurrentStatus);
 	});
+}
+
+void FAuthEOS::PreShutdown()
+{
 }
 
 bool LexFromString(EOS_EAuthScopeFlags& OutEnum, const TCHAR* InString)
@@ -163,10 +173,6 @@ bool LexFromString(EOS_ELoginCredentialType& OutEnum, const TCHAR* const InStrin
 		return false;
 	}
 	return true;
-}
-
-void FAuthEOS::PreShutdown()
-{
 }
 
 TOnlineAsyncOpHandle<FAuthLogin> FAuthEOS::Login(FAuthLogin::Params&& Params)
@@ -355,32 +361,32 @@ TOnlineAsyncOpHandle<FAuthGenerateAuth> FAuthEOS::GenerateAuth(FAuthGenerateAuth
 	return AsyncOperation->GetHandle();
 }
 
-TOnlineResult<FAuthGetAccountByLocalUserNum::Result> FAuthEOS::GetAccountByLocalUserNum(FAuthGetAccountByLocalUserNum::Params&& Params)
+TOnlineResult<FAuthGetAccountByLocalUserNum> FAuthEOS::GetAccountByLocalUserNum(FAuthGetAccountByLocalUserNum::Params&& Params)
 {
-	TOnlineResult<FAccountId> LocalUserIdResult = GetAccountIdByLocalUserNum(Params.LocalUserNum);
+	TResult<FAccountId, FOnlineError> LocalUserIdResult = GetAccountIdByLocalUserNum(Params.LocalUserNum);
 	if (LocalUserIdResult.IsOk())
 	{
 		FAuthGetAccountByLocalUserNum::Result Result = { AccountInfos.FindChecked(LocalUserIdResult.GetOkValue()) };
-		return TOnlineResult<FAuthGetAccountByLocalUserNum::Result>(Result);
+		return TOnlineResult<FAuthGetAccountByLocalUserNum>(Result);
 	}
 	else
 	{
-		return TOnlineResult<FAuthGetAccountByLocalUserNum::Result>(LocalUserIdResult.GetErrorValue());
+		return TOnlineResult<FAuthGetAccountByLocalUserNum>(LocalUserIdResult.GetErrorValue());
 	}
 }
 
-TOnlineResult<FAuthGetAccountByAccountId::Result> FAuthEOS::GetAccountByAccountId(FAuthGetAccountByAccountId::Params&& Params)
+TOnlineResult<FAuthGetAccountByAccountId> FAuthEOS::GetAccountByAccountId(FAuthGetAccountByAccountId::Params&& Params)
 {
 	if (TSharedRef<FAccountInfoEOS>* const FoundAccount = AccountInfos.Find(Params.LocalUserId))
 	{
 		FAuthGetAccountByAccountId::Result Result;
 		Result.AccountInfo = *FoundAccount;
-		return TOnlineResult<FAuthGetAccountByAccountId::Result>(Result);
+		return TOnlineResult<FAuthGetAccountByAccountId>(Result);
 	}
 	else
 	{
 		// TODO: proper error
-		return TOnlineResult<FAuthGetAccountByAccountId::Result>(Errors::Unknown());
+		return TOnlineResult<FAuthGetAccountByAccountId>(Errors::Unknown());
 	}
 }
 
@@ -390,17 +396,17 @@ bool FAuthEOS::IsLoggedIn(const FAccountId& AccountId) const
 	return AccountInfos.Contains(AccountId);
 }
 
-TOnlineResult<FAccountId> FAuthEOS::GetAccountIdByLocalUserNum(int32 LocalUserNum) const
+TResult<FAccountId, FOnlineError> FAuthEOS::GetAccountIdByLocalUserNum(int32 LocalUserNum) const
 {
 	for (const TPair<FAccountId, TSharedRef<FAccountInfoEOS>>& AccountPair : AccountInfos)
 	{
 		if (AccountPair.Value->LocalUserNum == LocalUserNum)
 		{
-			TOnlineResult<FAccountId> Result(AccountPair.Key);
+			TResult<FAccountId, FOnlineError> Result(AccountPair.Key);
 			return Result;
 		}
 	}
-	TOnlineResult<FAccountId> Result(Errors::Unknown()); // TODO: error code
+	TResult<FAccountId, FOnlineError> Result(Errors::Unknown()); // TODO: error code
 	return Result;
 }
 

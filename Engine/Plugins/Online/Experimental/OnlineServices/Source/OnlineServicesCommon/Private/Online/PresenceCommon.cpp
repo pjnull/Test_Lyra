@@ -19,9 +19,9 @@ TOnlineAsyncOpHandle<FQueryPresence> FPresenceCommon::QueryPresence(FQueryPresen
 	return Operation.GetHandle();
 }
 
-TOnlineResult<FGetPresence::Result> FPresenceCommon::GetPresence(FGetPresence::Params&& Params)
+TOnlineResult<FGetPresence> FPresenceCommon::GetPresence(FGetPresence::Params&& Params)
 {
-	return TOnlineResult<FGetPresence::Result>(Errors::NotImplemented());
+	return TOnlineResult<FGetPresence>(Errors::NotImplemented());
 }
 
 TOnlineAsyncOpHandle<FUpdatePresence> FPresenceCommon::UpdatePresence(FUpdatePresence::Params&& Params)

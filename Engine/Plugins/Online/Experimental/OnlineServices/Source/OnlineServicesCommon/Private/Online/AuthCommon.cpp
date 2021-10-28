@@ -13,6 +13,15 @@ FAuthCommon::FAuthCommon(FOnlineServicesCommon& InServices)
 {
 }
 
+void FAuthCommon::RegisterCommands()
+{
+	RegisterCommand(&FAuthCommon::Login);
+	RegisterCommand(&FAuthCommon::Logout);
+	RegisterCommand(&FAuthCommon::GenerateAuth);
+	RegisterCommand(&FAuthCommon::GetAccountByLocalUserNum);
+	RegisterCommand(&FAuthCommon::GetAccountByAccountId);
+}
+
 TOnlineAsyncOpHandle<FAuthLogin> FAuthCommon::Login(FAuthLogin::Params&& Params)
 {
 	TOnlineAsyncOp<FAuthLogin>& Operation = GetOp<FAuthLogin>(MoveTemp(Params));
@@ -34,14 +43,14 @@ TOnlineAsyncOpHandle<FAuthGenerateAuth> FAuthCommon::GenerateAuth(FAuthGenerateA
 	return Operation.GetHandle();
 }
 
-TOnlineResult<FAuthGetAccountByLocalUserNum::Result> FAuthCommon::GetAccountByLocalUserNum(FAuthGetAccountByLocalUserNum::Params&& Params)
+TOnlineResult<FAuthGetAccountByLocalUserNum> FAuthCommon::GetAccountByLocalUserNum(FAuthGetAccountByLocalUserNum::Params&& Params)
 {
-	return TOnlineResult<FAuthGetAccountByLocalUserNum::Result>(Errors::NotImplemented());
+	return TOnlineResult<FAuthGetAccountByLocalUserNum>(Errors::NotImplemented());
 }
 
-TOnlineResult<FAuthGetAccountByAccountId::Result> FAuthCommon::GetAccountByAccountId(FAuthGetAccountByAccountId::Params&& Params)
+TOnlineResult<FAuthGetAccountByAccountId> FAuthCommon::GetAccountByAccountId(FAuthGetAccountByAccountId::Params&& Params)
 {
-	return TOnlineResult<FAuthGetAccountByAccountId::Result>(Errors::NotImplemented());
+	return TOnlineResult<FAuthGetAccountByAccountId>(Errors::NotImplemented());
 }
 
 TOnlineEvent<void(const FLoginStatusChanged&)> FAuthCommon::OnLoginStatusChanged()

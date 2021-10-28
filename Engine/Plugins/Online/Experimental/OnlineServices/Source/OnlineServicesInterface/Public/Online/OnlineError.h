@@ -148,8 +148,13 @@ private:
 
 
 // the comparison with ErrorCodeType is the one I would expect to see in almost every case
-bool operator==(const FOnlineError& Lhs, const FOnlineError& Rhs);
-bool operator==(const FOnlineError& Lhs, ErrorCodeType OtherErrorCode);
+ONLINESERVICESINTERFACE_API bool operator==(const FOnlineError& Lhs, const FOnlineError& Rhs);
+ONLINESERVICESINTERFACE_API bool operator==(const FOnlineError& Lhs, ErrorCodeType OtherErrorCode);
+
+inline FString ToLogString(const FOnlineError& Error)
+{
+	return Error.GetLogString();
+}
 
 } // namespace UE::Online
 

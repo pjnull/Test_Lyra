@@ -16,7 +16,7 @@ namespace ErrorCode
 {
 	static constexpr ErrorCodeType Success = ErrorCodeType(0);
 
-	FString ToString(ErrorCodeType ErrorCode);
+	ONLINESERVICESINTERFACE_API FString ToString(ErrorCodeType ErrorCode);
 
 	constexpr ErrorCodeType Create(uint32 Source, uint32 Category, uint32 Code)
 	{
