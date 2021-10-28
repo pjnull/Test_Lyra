@@ -43,207 +43,210 @@ const FName SKismetDebugTreeView::ColumnId_Name("Name");
 const FName SKismetDebugTreeView::ColumnId_Value("Value");
 
 //////////////////////////////////////////////////////////////////////////
-// SPropertyValueSkismetWidget
+// SKismetDebugTreePropertyValueWidget
 
-class SPropertyValueSkismetWidget : public SCompoundWidget
+namespace
 {
-public:
-	SLATE_BEGIN_ARGS(SPropertyValueSkismetWidget)
-		: _PropertyInfo(nullptr)
-		, _TreeItem(nullptr)
-	{}
-
-	SLATE_ATTRIBUTE(TSharedPtr<FPropertyInstanceInfo>, PropertyInfo)
-	SLATE_ARGUMENT(FDebugTreeItemPtr, TreeItem)
-
-	SLATE_END_ARGS()
-
-public:
-
-	void Construct(const FArguments& InArgs, TSharedPtr<FString> InSearchString)
+	class SKismetDebugTreePropertyValueWidget : public SCompoundWidget
 	{
-		PropertyInfo = InArgs._PropertyInfo;
-		TreeItem = InArgs._TreeItem;
-		check(TreeItem.IsValid());
+	public:
+		SLATE_BEGIN_ARGS(SKismetDebugTreePropertyValueWidget)
+			: _PropertyInfo(nullptr)
+			, _TreeItem(nullptr)
+		{}
 
-		TSharedPtr<FPropertyInstanceInfo> Data = PropertyInfo.Get();
-		if (Data.IsValid())
+		SLATE_ATTRIBUTE(TSharedPtr<FPropertyInstanceInfo>, PropertyInfo)
+			SLATE_ARGUMENT(FDebugTreeItemPtr, TreeItem)
+
+			SLATE_END_ARGS()
+
+	public:
+
+		void Construct(const FArguments& InArgs, TSharedPtr<FString> InSearchString)
 		{
-			if (Data->Property->IsA<FObjectProperty>())
+			PropertyInfo = InArgs._PropertyInfo;
+			TreeItem = InArgs._TreeItem;
+			check(TreeItem.IsValid());
+
+			TSharedPtr<FPropertyInstanceInfo> Data = PropertyInfo.Get();
+			if (Data.IsValid())
 			{
-				ChildSlot
-				[
-					SNew(SHorizontalBox)
-					+SHorizontalBox::Slot()
+				if (Data->Property->IsA<FObjectProperty>())
+				{
+					ChildSlot
+						[
+							SNew(SHorizontalBox)
+							+ SHorizontalBox::Slot()
 						.AutoWidth()
 						.VAlign(VAlign_Center)
 						[
 							SNew(PropertyInfoViewStyle::STextHighlightOverlay)
-								.FullText(this, &SPropertyValueSkismetWidget::GetObjectValueText)
-								.HighlightText(this, &SPropertyValueSkismetWidget::GetHighlightText, InSearchString)
-								[
-									SNew(STextBlock)
-										.ToolTipText(this, &SPropertyValueSkismetWidget::GetValueTooltipText)
-										.Text(this, &SPropertyValueSkismetWidget::GetObjectValueText)
-								]
+							.FullText(this, &SKismetDebugTreePropertyValueWidget::GetObjectValueText)
+						.HighlightText(this, &SKismetDebugTreePropertyValueWidget::GetHighlightText, InSearchString)
+						[
+							SNew(STextBlock)
+							.ToolTipText(this, &SKismetDebugTreePropertyValueWidget::GetValueTooltipText)
+						.Text(this, &SKismetDebugTreePropertyValueWidget::GetObjectValueText)
 						]
-					+SHorizontalBox::Slot()
+						]
+					+ SHorizontalBox::Slot()
 						.AutoWidth()
 						.VAlign(VAlign_Center)
 						[
 							SNew(SSpacer)
-								.Size(FVector2D(2.0f, 1.0f))
+							.Size(FVector2D(2.0f, 1.0f))
 						]
-					+SHorizontalBox::Slot()
+					+ SHorizontalBox::Slot()
 						.AutoWidth()
 						.VAlign(VAlign_Center)
 						[
 							SNew(SHyperlink)
-								.ToolTipText(this, &SPropertyValueSkismetWidget::GetClassLinkTooltipText)
-								.Text(this, &SPropertyValueSkismetWidget::GetObjectClassText)
-								.OnNavigate(this, &SPropertyValueSkismetWidget::OnNavigateToClass)
+							.ToolTipText(this, &SKismetDebugTreePropertyValueWidget::GetClassLinkTooltipText)
+						.Text(this, &SKismetDebugTreePropertyValueWidget::GetObjectClassText)
+						.OnNavigate(this, &SKismetDebugTreePropertyValueWidget::OnNavigateToClass)
 						]
-					+SHorizontalBox::Slot()
+					+ SHorizontalBox::Slot()
 						.AutoWidth()
 						.VAlign(VAlign_Center)
 						[
 							SNew(SSpacer)
-								.Size(FVector2D(2.0f, 1.0f))
+							.Size(FVector2D(2.0f, 1.0f))
 						]
-					+SHorizontalBox::Slot()
+					+ SHorizontalBox::Slot()
 						.AutoWidth()
 						.VAlign(VAlign_Center)
 						[
 							SNew(STextBlock)
-								.Text(LOCTEXT("ObjectValueEnd", ")"))
+							.Text(LOCTEXT("ObjectValueEnd", ")"))
 						]
-					];
-			}
-			else
-			{
-				ChildSlot
-				[
-					SNew(PropertyInfoViewStyle::STextHighlightOverlay)
-						.FullText(this, &SPropertyValueSkismetWidget::GetDescription)
-						.HighlightText(this, &SPropertyValueSkismetWidget::GetHighlightText, InSearchString)
+						];
+				}
+				else
+				{
+					ChildSlot
+						[
+							SNew(PropertyInfoViewStyle::STextHighlightOverlay)
+							.FullText(this, &SKismetDebugTreePropertyValueWidget::GetDescription)
+						.HighlightText(this, &SKismetDebugTreePropertyValueWidget::GetHighlightText, InSearchString)
 						[
 							SNew(STextBlock)
-								.ToolTipText(this, &SPropertyValueSkismetWidget::GetDescription)
-								.Text(this, &SPropertyValueSkismetWidget::GetDescription)
+							.ToolTipText(this, &SKismetDebugTreePropertyValueWidget::GetDescription)
+						.Text(this, &SKismetDebugTreePropertyValueWidget::GetDescription)
 						]
-				];
-			}
-		}
-	}
-
-private:
-
-	FText GetDescription() const
-	{
-		return TreeItem->GetDescription();
-	}
-
-	FText GetHighlightText(TSharedPtr<FString> InSearchString) const
-	{
-		return TreeItem->GetHighlightText(InSearchString);
-	}
-
-	FText GetObjectValueText() const
-	{
-		TSharedPtr<FPropertyInstanceInfo> Data = PropertyInfo.Get();
-		if (Data.IsValid())
-		{
-			if (const UObject* Object = Data->Object.Get())
-			{
-				return FText::Format(LOCTEXT("ObjectValueBegin", "{0} (Class: "), FText::FromString(Object->GetName()));
+						];
+				}
 			}
 		}
 
-		return LOCTEXT("UnknownObjectValueBegin", "[Unknown] (Class: ");
-	}
+	private:
 
-	FText GetValueTooltipText() const
-	{
-		TSharedPtr<FPropertyInstanceInfo> Data = PropertyInfo.Get();
-		if (Data.IsValid())
+		FText GetDescription() const
 		{
-			// if this is an Object property, tooltip text should include its full name
-			if (const UObject* Object = Data->Object.Get())
-			{
-				return FText::Format(LOCTEXT("ObjectValueTooltip", "{0}\nClass: {1}"),
-					FText::FromString(Object->GetFullName()),
-					FText::FromString(Object->GetClass()->GetFullName()));
-			}
+			return TreeItem->GetDescription();
 		}
 
-		return GetDescription();
-	}
-
-	FText GetClassLinkTooltipText() const
-	{
-		TSharedPtr<FPropertyInstanceInfo> Data = PropertyInfo.Get();
-		if (Data.IsValid())
+		FText GetHighlightText(TSharedPtr<FString> InSearchString) const
 		{
-			if (const UObject* Object = Data->Object.Get())
+			return TreeItem->GetHighlightText(InSearchString);
+		}
+
+		FText GetObjectValueText() const
+		{
+			TSharedPtr<FPropertyInstanceInfo> Data = PropertyInfo.Get();
+			if (Data.IsValid())
 			{
-				if (UClass* Class = Object->GetClass())
+				if (const UObject* Object = Data->Object.Get())
 				{
-					if (UBlueprint* Blueprint = Cast<UBlueprint>(Class->ClassGeneratedBy))
+					return FText::Format(LOCTEXT("ObjectValueBegin", "{0} (Class: "), FText::FromString(Object->GetName()));
+				}
+			}
+
+			return LOCTEXT("UnknownObjectValueBegin", "[Unknown] (Class: ");
+		}
+
+		FText GetValueTooltipText() const
+		{
+			TSharedPtr<FPropertyInstanceInfo> Data = PropertyInfo.Get();
+			if (Data.IsValid())
+			{
+				// if this is an Object property, tooltip text should include its full name
+				if (const UObject* Object = Data->Object.Get())
+				{
+					return FText::Format(LOCTEXT("ObjectValueTooltip", "{0}\nClass: {1}"),
+						FText::FromString(Object->GetFullName()),
+						FText::FromString(Object->GetClass()->GetFullName()));
+				}
+			}
+
+			return GetDescription();
+		}
+
+		FText GetClassLinkTooltipText() const
+		{
+			TSharedPtr<FPropertyInstanceInfo> Data = PropertyInfo.Get();
+			if (Data.IsValid())
+			{
+				if (const UObject* Object = Data->Object.Get())
+				{
+					if (UClass* Class = Object->GetClass())
 					{
-						return LOCTEXT("OpenBlueprintClass", "Opens this Class in the Blueprint Editor");
+						if (UBlueprint* Blueprint = Cast<UBlueprint>(Class->ClassGeneratedBy))
+						{
+							return LOCTEXT("OpenBlueprintClass", "Opens this Class in the Blueprint Editor");
+						}
+						else
+						{
+							// this is a native class
+							return LOCTEXT("OpenNativeClass", "Navigates to this class' source file");
+						}
 					}
-					else
+				}
+			}
+
+			return LOCTEXT("UnknownClassName", "[Unknown]");
+		}
+
+		FText GetObjectClassText() const
+		{
+			TSharedPtr<FPropertyInstanceInfo> Data = PropertyInfo.Get();
+			if (Data.IsValid())
+			{
+				if (const UObject* Object = Data->Object.Get())
+				{
+					return FText::FromString(Object->GetClass()->GetName());
+				}
+			}
+
+			return LOCTEXT("UnknownClassName", "[Unknown]");
+		}
+
+		void OnNavigateToClass() const
+		{
+			TSharedPtr<FPropertyInstanceInfo> Data = PropertyInfo.Get();
+			if (Data.IsValid())
+			{
+				if (const UObject* Object = Data->Object.Get())
+				{
+					if (UClass* Class = Object->GetClass())
 					{
-						// this is a native class
-						return LOCTEXT("OpenNativeClass", "Navigates to this class' source file");
+						if (UBlueprint* Blueprint = Cast<UBlueprint>(Class->ClassGeneratedBy))
+						{
+							GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(Blueprint);
+						}
+						else
+						{
+							// this is a native class
+							FSourceCodeNavigation::NavigateToClass(Class);
+						}
 					}
 				}
 			}
 		}
 
-		return LOCTEXT("UnknownClassName", "[Unknown]");
-	}
-
-	FText GetObjectClassText() const
-	{
-		TSharedPtr<FPropertyInstanceInfo> Data = PropertyInfo.Get();
-		if (Data.IsValid())
-		{
-			if (const UObject* Object = Data->Object.Get())
-			{
-				return FText::FromString(Object->GetClass()->GetName());
-			}
-		}
-
-		return LOCTEXT("UnknownClassName", "[Unknown]");
-	}
-
-	void OnNavigateToClass() const
-	{
-		TSharedPtr<FPropertyInstanceInfo> Data = PropertyInfo.Get();
-		if (Data.IsValid())
-		{
-			if (const UObject* Object = Data->Object.Get())
-			{
-				if (UClass* Class = Object->GetClass())
-				{
-					if (UBlueprint* Blueprint = Cast<UBlueprint>(Class->ClassGeneratedBy))
-					{
-						GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(Blueprint);
-					}
-					else
-					{
-						// this is a native class
-						FSourceCodeNavigation::NavigateToClass(Class);
-					}
-				}
-			}
-		}
-	}
-
-	FDebugTreeItemPtr TreeItem;
-	TAttribute<TSharedPtr<FPropertyInstanceInfo>> PropertyInfo;
-};
+		FDebugTreeItemPtr TreeItem;
+		TAttribute<TSharedPtr<FPropertyInstanceInfo>> PropertyInfo;
+	};
+}
 
 //////////////////////////////////////////////////////////////////////////
 // FDebugLineItem
@@ -835,7 +838,7 @@ public:
 
 	virtual TSharedRef<SWidget> GenerateValueWidget(TSharedPtr<FString> InSearchString) override
 	{
-		return SNew(SPropertyValueSkismetWidget, InSearchString)
+		return SNew(SKismetDebugTreePropertyValueWidget, InSearchString)
 			.PropertyInfo(this, &FWatchChildLineItem::GetPropertyInfo)
 			.TreeItem(AsShared());
 	}
@@ -1472,7 +1475,7 @@ TSharedRef<SWidget> FWatchLineItem::GenerateNameWidget(TSharedPtr<FString> InSea
 
 TSharedRef<SWidget> FWatchLineItem::GenerateValueWidget(TSharedPtr<FString> InSearchString)
 {
-	return SNew(SPropertyValueSkismetWidget, InSearchString)
+	return SNew(SKismetDebugTreePropertyValueWidget, InSearchString)
 		.PropertyInfo(this, &FWatchLineItem::GetPropertyInfo)
 		.TreeItem(AsShared());
 }
