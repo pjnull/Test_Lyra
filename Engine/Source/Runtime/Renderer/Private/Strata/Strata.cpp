@@ -124,6 +124,16 @@ void FStrataSceneData::Reset()
 	StrataGlobalUniformParameters = nullptr;
 }
 
+const TCHAR* ToString(EStrataTileMaterialType Type)
+{
+	switch (Type)
+	{
+	case EStrataTileMaterialType::ESimple:		return TEXT("Simple");
+	case EStrataTileMaterialType::EComplex:		return TEXT("Complex");
+	}
+	return TEXT("Unknown");
+}
+
 
 
 namespace Strata

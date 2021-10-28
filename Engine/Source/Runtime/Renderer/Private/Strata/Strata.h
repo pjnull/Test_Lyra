@@ -43,6 +43,8 @@ enum EStrataTileMaterialType : uint32
 	ECount
 };
 
+const TCHAR* ToString(EStrataTileMaterialType Type);
+
 struct FStrataSceneData
 {
 	uint32 MaxBytesPerPixel;

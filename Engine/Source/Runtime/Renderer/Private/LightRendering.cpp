@@ -2406,8 +2406,14 @@ void FDeferredShadingSceneRenderer::RenderLight(
 		const bool bEnableStrataTiledPass = true;
 		const bool bEnableStrataStencilTest = false;
 
-		RenderInternalLight(bEnableStrataStencilTest, bEnableStrataTiledPass, EStrataTileMaterialType::ESimple);
-		RenderInternalLight(bEnableStrataStencilTest, bEnableStrataTiledPass, EStrataTileMaterialType::EComplex);
+		{
+			SCOPED_DRAW_EVENT(RHICmdList, StrataSimpleMaterial);
+			RenderInternalLight(bEnableStrataStencilTest, bEnableStrataTiledPass, EStrataTileMaterialType::ESimple);
+		}
+		{
+			SCOPED_DRAW_EVENT(RHICmdList, StrataComplexMaterial);
+			RenderInternalLight(bEnableStrataStencilTest, bEnableStrataTiledPass, EStrataTileMaterialType::EComplex);
+		}
 	}
 	else
 	{
@@ -2419,7 +2425,6 @@ void FDeferredShadingSceneRenderer::RenderLight(
 		{
 			RenderInternalLight(bEnableStrataStencilTest, bEnableStrataTiledPass, EStrataTileMaterialType::ESimple);
 		}
-
 	}
 }
 
