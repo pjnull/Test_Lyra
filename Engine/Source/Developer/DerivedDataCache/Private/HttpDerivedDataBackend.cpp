@@ -730,9 +730,9 @@ private:
 //----------------------------------------------------------------------------------------------------------
 // Forward declarations
 //----------------------------------------------------------------------------------------------------------
-bool VerifyPayload(const FSHAHash& Hash, const TArray<uint8>& Payload);
-bool VerifyPayload(const FIoHash& Hash, const TArray<uint8>& Payload);
-bool VerifyRequest(const class FHttpRequest* Request, const TArray<uint8>& Payload);
+bool VerifyPayload(const FSHAHash& Hash, const TCHAR* Namespace, const TCHAR* Bucket, const TCHAR* CacheKey, const TArray<uint8>& Payload);
+bool VerifyPayload(const FIoHash& Hash, const TCHAR* Namespace, const TCHAR* Bucket, const TCHAR* CacheKey, const TArray<uint8>& Payload);
+bool VerifyRequest(const class FHttpRequest* Request, const TCHAR* Namespace, const TCHAR* Bucket, const TCHAR* CacheKey, const TArray<uint8>& Payload);
 bool HashPayload(class FHttpRequest* Request, const TArrayView<const uint8> Payload);
 bool ShouldAbortForShutdown();
 
@@ -993,7 +993,7 @@ struct FDataRequestHelper
 			const FHttpRequest::Result Result = Request->PerformBlockingDownload(*Uri, OutData);
 			if (FHttpRequest::IsSuccessResponse(Request->GetResponseCode()))
 			{
-				if (VerifyRequest(Request, *OutData))
+				if (VerifyRequest(Request, InNamespace, InBucket, InCacheKey, *OutData))
 				{
 					TRACE_COUNTER_ADD(HttpDDC_GetHit, int64(1));
 					TRACE_COUNTER_ADD(HttpDDC_BytesReceived, int64(Request->GetBytesReceived()));
@@ -1535,7 +1535,7 @@ private:
 								OutData->Append(Response, PayloadSize);
 								Response += PayloadSize;
 								// Verify the received and parsed payload
-								if (VerifyPayload(PayloadHash, *OutData))
+								if (VerifyPayload(PayloadHash, RequestOp.Namespace, RequestOp.Bucket, RequestOp.CacheKeys[KeyIdx], *OutData))
 								{
 									TRACE_COUNTER_ADD(HttpDDC_GetHit, int64(1));
 									TRACE_COUNTER_ADD(HttpDDC_BytesReceived, int64(PayloadSize));
@@ -1796,10 +1796,13 @@ static CURLcode sslctx_function(CURL * curl, void * sslctx, void * parm)
 /**
  * Verifies the integrity of the received data using supplied checksum.
  * @param Hash received hash value.
+ * @param Namespace The namespace string used when originally fetching the request.
+ * @param Bucket The bucket string used when originally fetching the request.
+ * @param CacheKey The cache key string used when originally fetching the request.
  * @param Payload Payload received.
  * @return True if the data is correct, false if checksums doesn't match.
  */
-bool VerifyPayload(const FSHAHash& Hash, const TArray<uint8>& Payload)
+bool VerifyPayload(const FSHAHash& Hash, const TCHAR* Namespace, const TCHAR* Bucket, const TCHAR* CacheKey, const TArray<uint8>& Payload)
 {
 	FSHAHash PayloadHash;
 	FSHA1::HashBuffer(Payload.GetData(), Payload.Num(), PayloadHash.Hash);
@@ -1808,9 +1811,12 @@ bool VerifyPayload(const FSHAHash& Hash, const TArray<uint8>& Payload)
 	{
 		UE_LOG(LogDerivedDataCache,
 			Display,
-			TEXT("Checksum from server did not match received data (%s vs %s). Discarding cached result."),
+			TEXT("Checksum from server did not match received data (%s vs %s). Discarding cached result. Namespace: %s, Bucket: %s, Key: %s."),
 			*WriteToString<48>(Hash),
-			*WriteToString<48>(PayloadHash)
+			*WriteToString<48>(PayloadHash),
+			Namespace,
+			Bucket,
+			CacheKey
 		);
 		return false;
 	}
@@ -1821,10 +1827,13 @@ bool VerifyPayload(const FSHAHash& Hash, const TArray<uint8>& Payload)
 /**
  * Verifies the integrity of the received data using supplied checksum.
  * @param Hash received hash value.
+ * @param Namespace The namespace string used when originally fetching the request.
+ * @param Bucket The bucket string used when originally fetching the request.
+ * @param CacheKey The cache key string used when originally fetching the request.
  * @param Payload Payload received.
  * @return True if the data is correct, false if checksums doesn't match.
  */
-bool VerifyPayload(const FIoHash& Hash, const TArray<uint8>& Payload)
+bool VerifyPayload(const FIoHash& Hash, const TCHAR* Namespace, const TCHAR* Bucket, const TCHAR* CacheKey, const TArray<uint8>& Payload)
 {
 	FIoHash PayloadHash = FIoHash::HashBuffer(Payload.GetData(), Payload.Num());
 
@@ -1832,9 +1841,12 @@ bool VerifyPayload(const FIoHash& Hash, const TArray<uint8>& Payload)
 	{
 		UE_LOG(LogDerivedDataCache,
 			Display,
-			TEXT("Checksum from server did not match received data (%s vs %s). Discarding cached result."),
+			TEXT("Checksum from server did not match received data (%s vs %s). Discarding cached result. Namespace: %s, Bucket: %s, Key: %s."),
 			*WriteToString<48>(Hash),
-			*WriteToString<48>(PayloadHash)
+			*WriteToString<48>(PayloadHash),
+			Namespace,
+			Bucket,
+			CacheKey
 		);
 		return false;
 	}
@@ -1846,22 +1858,25 @@ bool VerifyPayload(const FIoHash& Hash, const TArray<uint8>& Payload)
 /**
  * Verifies the integrity of the received data using supplied checksum.
  * @param Request Request that the data was be received with.
+ * @param Namespace The namespace string used when originally fetching the request.
+ * @param Bucket The bucket string used when originally fetching the request.
+ * @param CacheKey The cache key string used when originally fetching the request.
  * @param Payload Payload received.
  * @return True if the data is correct, false if checksums doesn't match.
  */
-bool VerifyRequest(const FHttpRequest* Request, const TArray<uint8>& Payload)
+bool VerifyRequest(const FHttpRequest* Request, const TCHAR* Namespace, const TCHAR* Bucket, const TCHAR* CacheKey, const TArray<uint8>& Payload)
 {
 	FString ReceivedHashStr;
 	if (Request->GetHeader("X-Jupiter-Sha1", ReceivedHashStr))
 	{
 		FSHAHash ReceivedHash;
 		ReceivedHash.FromString(ReceivedHashStr);
-		return VerifyPayload(ReceivedHash, Payload);
+		return VerifyPayload(ReceivedHash, Namespace, Bucket, CacheKey, Payload);
 	}
 	if (Request->GetHeader("X-Jupiter-IoHash", ReceivedHashStr))
 	{
 		FIoHash ReceivedHash(ReceivedHashStr);
-		return VerifyPayload(ReceivedHash, Payload);
+		return VerifyPayload(ReceivedHash, Namespace, Bucket, CacheKey, Payload);
 	}
 	UE_LOG(LogDerivedDataCache, Warning, TEXT("HTTP server did not send a content hash. Wrong server version?"));
 	return true;
@@ -2308,7 +2323,7 @@ bool FHttpDerivedDataBackend::GetCachedData(const TCHAR* CacheKey, TArray<uint8>
 			const uint64 ResponseCode = Request->GetResponseCode();
 
 			// Request was successful, make sure we got all the expected data.
-			if (FHttpRequest::IsSuccessResponse(ResponseCode) && VerifyRequest(Request.Get(), OutData))
+			if (FHttpRequest::IsSuccessResponse(ResponseCode) && VerifyRequest(Request.Get(), *Namespace, *DefaultBucket, CacheKey, OutData))
 			{
 				TRACE_COUNTER_ADD(HttpDDC_GetHit, int64(1));
 				TRACE_COUNTER_ADD(HttpDDC_BytesReceived, int64(Request->GetBytesReceived()));
