@@ -41,7 +41,7 @@
 #include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "IAssetTools.h"
 #include "IDirectLinkManager.h"
-#include "IURIManager.h"
+#include "IUriManager.h"
 #include "LevelEditor.h"
 #include "Materials/Material.h"
 #include "Materials/MaterialInstance.h"
