@@ -222,7 +222,7 @@ void UMeshAttributePaintTool::Setup()
 
 	SetToolDisplayName(LOCTEXT("ToolName", "Paint WeightMaps"));
 	GetToolManager()->DisplayMessage(
-		LOCTEXT("OnStartAttribPaint", "Paint per-vertex attribute maps. Ctrl to Erase/Subtract, Shift to Smooth"),
+		LOCTEXT("OnStartAttribPaint", "Paint per-vertex attribute maps. Ctrl to Erase/Subtract, Shift to Smooth. [/] and S/D change Size (+Shift to small-step)."),
 		EToolMessageLevel::UserNotification);
 
 	ColorMapper = MakeUnique<FFloatAttributeColorMapper>();
