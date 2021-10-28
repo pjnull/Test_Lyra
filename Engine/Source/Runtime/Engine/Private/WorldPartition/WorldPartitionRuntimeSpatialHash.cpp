@@ -199,7 +199,7 @@ void FSpatialHashStreamingGrid::GetCells(const TArray<FWorldPartitionStreamingSo
 					const FSpatialHashStreamingGridLayerCell& LayerCell = GridLevels[Coords.Z].LayerCells[*LayerCellIndexPtr];
 					for (const UWorldPartitionRuntimeCell* Cell : LayerCell.GridCells)
 					{
-						if (!Cell->HasDataLayers() || (DataLayerSubsystem && DataLayerSubsystem->IsAnyDataLayerInState(Cell->GetDataLayers(), EDataLayerState::Activated)))
+						if (!Cell->HasDataLayers() || (DataLayerSubsystem && DataLayerSubsystem->IsAnyDataLayerInEffectiveRuntimeState(Cell->GetDataLayers(), EDataLayerRuntimeState::Activated)))
 						{
 							if (Source.TargetState == EStreamingSourceTargetState::Loaded)
 							{
@@ -211,7 +211,7 @@ void FSpatialHashStreamingGrid::GetCells(const TArray<FWorldPartitionStreamingSo
 								OutActivateCells.AddCell(Cell, Info);
 							}
 						}
-						else if (DataLayerSubsystem && DataLayerSubsystem->IsAnyDataLayerInState(Cell->GetDataLayers(), EDataLayerState::Loaded))
+						else if (DataLayerSubsystem && DataLayerSubsystem->IsAnyDataLayerInEffectiveRuntimeState(Cell->GetDataLayers(), EDataLayerRuntimeState::Loaded))
 						{
 							OutLoadCells.AddCell(Cell, Info);
 						}
@@ -233,12 +233,12 @@ void FSpatialHashStreamingGrid::GetAlwaysLoadedCells(const UDataLayerSubsystem* 
 		{
 			for (const UWorldPartitionRuntimeCell* Cell : LayerCell.GridCells)
 			{
-				if (!Cell->HasDataLayers() || (DataLayerSubsystem && DataLayerSubsystem->IsAnyDataLayerInState(Cell->GetDataLayers(), EDataLayerState::Activated)))
+				if (!Cell->HasDataLayers() || (DataLayerSubsystem && DataLayerSubsystem->IsAnyDataLayerInEffectiveRuntimeState(Cell->GetDataLayers(), EDataLayerRuntimeState::Activated)))
 				{
 					check(Cell->IsAlwaysLoaded() || Cell->HasDataLayers());
 					OutActivateCells.Add(Cell);
 				}
-				else if(DataLayerSubsystem && DataLayerSubsystem->IsAnyDataLayerInState(Cell->GetDataLayers(), EDataLayerState::Loaded))
+				else if(DataLayerSubsystem && DataLayerSubsystem->IsAnyDataLayerInEffectiveRuntimeState(Cell->GetDataLayers(), EDataLayerRuntimeState::Loaded))
 				{
 					check(Cell->HasDataLayers());
 					OutLoadCells.Add(Cell);
@@ -260,8 +260,8 @@ void FSpatialHashStreamingGrid::GetFilteredCellsForDebugDraw(const FSpatialHashS
 				EStreamingStatus StreamingStatus = GridCell->GetStreamingStatus();
 				const TArray<FName>& DataLayers = GridCell->GetDataLayers();
 				return (!DataLayers.Num() || 
-						DataLayerSubsystem->IsAnyDataLayerInState(DataLayers, EDataLayerState::Loaded) || 
-						DataLayerSubsystem->IsAnyDataLayerInState(DataLayers, EDataLayerState::Activated) ||
+						DataLayerSubsystem->IsAnyDataLayerInEffectiveRuntimeState(DataLayers, EDataLayerRuntimeState::Loaded) ||
+						DataLayerSubsystem->IsAnyDataLayerInEffectiveRuntimeState(DataLayers, EDataLayerRuntimeState::Activated) ||
 						((StreamingStatus != LEVEL_Unloaded) && (StreamingStatus != LEVEL_UnloadedButStillAround)));
 			}
 			return false;

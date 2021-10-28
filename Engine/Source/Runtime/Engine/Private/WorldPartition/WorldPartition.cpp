@@ -189,14 +189,27 @@ struct FWorldPartionCellUpdateContext
 {
 	FWorldPartionCellUpdateContext(UWorldPartition* InWorldPartition)
 		: WorldPartition(InWorldPartition)
+		, bCancelled(false)
 	{
+		WorldPartition->OnCancelWorldPartitionUpdateEditorCells.AddRaw(this, &FWorldPartionCellUpdateContext::OnCancelUpdateEditorCells);
+
 		UpdatesInProgress++;
+	}
+
+	void OnCancelUpdateEditorCells(UWorldPartition* InWorldPartition)
+	{
+		if (WorldPartition == InWorldPartition)
+		{
+			bCancelled = true;
+		}
 	}
 
 	~FWorldPartionCellUpdateContext()
 	{
+		WorldPartition->OnCancelWorldPartitionUpdateEditorCells.RemoveAll(this);
+
 		UpdatesInProgress--;
-		if (UpdatesInProgress == 0)
+		if (UpdatesInProgress == 0 && !bCancelled)
 		{
 			// @todo_ow: Once Metadata is removed from external actor's package, testing WorldPartition->IsInitialized() won't be necessary anymore.
 			if (WorldPartition->IsInitialized())
@@ -219,6 +232,7 @@ struct FWorldPartionCellUpdateContext
 
 	static int32 UpdatesInProgress;
 	UWorldPartition* WorldPartition;
+	bool bCancelled;
 };
 
 int32 FWorldPartionCellUpdateContext::UpdatesInProgress = 0;
@@ -881,6 +895,7 @@ bool UWorldPartition::UpdateEditorCells(TFunctionRef<bool(TArray<UWorldPartition
 		RetCode = FEditorFileUtils::PromptForCheckoutAndSave(ModifiedPackages.Array(), bCheckDirty, bPromptToSave, Title, Message, nullptr, bAlreadyCheckedOut, bCanBeDeclined);
 		if (RetCode == FEditorFileUtils::PR_Cancelled)
 		{
+			OnCancelWorldPartitionUpdateEditorCells.Broadcast(this);
 			return false;
 		}
 
@@ -921,7 +936,7 @@ bool UWorldPartition::ShouldActorBeLoadedByEditorCells(const FWorldPartitionActo
 			for (const FName& DataLayerName : ActorDesc->GetDataLayers())
 			{
 				const UDataLayer* DataLayer = WorldDataLayers->GetDataLayerFromName(DataLayerName);
-				if (DataLayer && DataLayer->IsDynamicallyLoaded())
+				if (DataLayer && DataLayer->IsRuntime())
 				{
 					return false;
 				}
@@ -934,7 +949,7 @@ bool UWorldPartition::ShouldActorBeLoadedByEditorCells(const FWorldPartitionActo
 			{
 				if (const UDataLayer* DataLayer = WorldDataLayers->GetDataLayerFromName(DataLayerName))
 				{
-					if (DataLayer->IsDynamicallyLoadedInEditor())
+					if (DataLayer->IsEffectiveLoadedInEditor())
 					{
 						return true;
 					}

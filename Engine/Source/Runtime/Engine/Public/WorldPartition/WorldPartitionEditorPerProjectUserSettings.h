@@ -41,6 +41,20 @@ class UWorldPartitionEditorPerProjectUserSettings : public UObject
 	GENERATED_BODY()
 
 public:
+
+	UWorldPartitionEditorPerProjectUserSettings(const FObjectInitializer& ObjectInitializer)
+		: Super(ObjectInitializer)
+#if WITH_EDITORONLY_DATA
+		, bHideEditorDataLayers(false)
+		, bHideRuntimeDataLayers(false)
+		, bHideDataLayerActors(true)
+		, bHideUnloadedActors(false)
+		, bAllowRuntimeDataLayerEditing(false)
+		, EditorGridConfigHash(0)
+		, bDisableLoadingOfLastLoadedCells(false)
+#endif
+	{ }
+
 #if WITH_EDITOR
 	uint32 GetEditorGridConfigHash() const
 	{ 
@@ -76,20 +90,6 @@ public:
 		}
 	}
 
-	bool GetShowDataLayerContent() const
-	{
-		return bShowDataLayerContent;
-	}
-
-	void SetShowDataLayerContent(bool bInShowDataLayerContent)
-	{
-		if (bShowDataLayerContent != bInShowDataLayerContent)
-		{
-			bShowDataLayerContent = bInShowDataLayerContent;
-			SaveConfig();
-		}
-	}
-
 	bool GetEnableLoadingOfLastLoadedCells() const
 	{
 		return !bDisableLoadingOfLastLoadedCells;
@@ -118,8 +118,29 @@ public:
 	}
 #endif
 
-private:
 #if WITH_EDITORONLY_DATA
+public:
+	/** True when the Data Layer Outliner is displaying Editor Data Layers */
+	UPROPERTY(config)
+	uint32 bHideEditorDataLayers : 1;
+
+	/** True when the Data Layer Outliner is displaying Runtime Data Layers */
+	UPROPERTY(config)
+	uint32 bHideRuntimeDataLayers : 1;
+
+	/** True when the DataLayer Outliner is not displaying actors */
+	UPROPERTY(config)
+	uint32 bHideDataLayerActors : 1;
+
+	/** True when the DataLayer Outliner is not displaying unloaded actors */
+	UPROPERTY(config)
+	uint32 bHideUnloadedActors : 1;
+
+	/** True when Runtime DataLayer editing is allowed. */
+	UPROPERTY(config)
+	uint32 bAllowRuntimeDataLayerEditing : 1;
+
+private:
 	bool ShouldSaveSettings(const UWorld* InWorld) const
 	{
 		return InWorld && !InWorld->IsGameWorld();
@@ -127,9 +148,6 @@ private:
 
 	UPROPERTY(config)
 	uint32 EditorGridConfigHash;
-
-	UPROPERTY(config)
-	uint32 bShowDataLayerContent : 1;
 
 	UPROPERTY(config)
 	uint32 bDisableLoadingOfLastLoadedCells : 1;

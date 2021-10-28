@@ -23,7 +23,7 @@ TSet<const UDataLayer*> GetDataLayers(UWorld* InWorld, const LayerNameContainer&
 		{
 			if (const UDataLayer* DataLayer = WorldDataLayers->GetDataLayerFromName(DataLayerName))
 			{
-				if (DataLayer->IsDynamicallyLoaded())
+				if (DataLayer->IsRuntime())
 				{
 					DataLayers.Add(DataLayer);
 				}
@@ -115,7 +115,7 @@ void FActorCluster::Add(const FActorCluster& InActorCluster, const FActorContain
 			// Merge Data Layers
 			for (const UDataLayer* DataLayer : InActorCluster.DataLayers)
 			{
-				check(DataLayer->IsDynamicallyLoaded());
+				check(DataLayer->IsRuntime());
 				DataLayers.Add(DataLayer);
 			}
 		}

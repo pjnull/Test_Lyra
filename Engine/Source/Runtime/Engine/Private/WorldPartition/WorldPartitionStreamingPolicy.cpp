@@ -256,12 +256,12 @@ void UWorldPartitionStreamingPolicy::UpdateStreamingState()
 		DataLayersStatesServerEpoch = AWorldDataLayers::GetDataLayersStateEpoch();
 
 		// Non Data Layer Cells + Active Data Layers
-		WorldPartition->RuntimeHash->GetAllStreamingCells(ActivateStreamingCells, /*bAllDataLayers=*/ false, /*bDataLayersOnly=*/ false, DataLayerSubsystem->GetActiveDataLayerNames());
+		WorldPartition->RuntimeHash->GetAllStreamingCells(ActivateStreamingCells, /*bAllDataLayers=*/ false, /*bDataLayersOnly=*/ false, DataLayerSubsystem->GetEffectiveActiveDataLayerNames());
 
 		// Loaded Data Layers Cells only
-		if (DataLayerSubsystem->GetLoadedDataLayerNames().Num())
+		if (DataLayerSubsystem->GetEffectiveLoadedDataLayerNames().Num())
 		{
-			WorldPartition->RuntimeHash->GetAllStreamingCells(LoadStreamingCells, /*bAllDataLayers=*/ false, /*bDataLayersOnly=*/ true, DataLayerSubsystem->GetLoadedDataLayerNames());
+			WorldPartition->RuntimeHash->GetAllStreamingCells(LoadStreamingCells, /*bAllDataLayers=*/ false, /*bDataLayersOnly=*/ true, DataLayerSubsystem->GetEffectiveLoadedDataLayerNames());
 		}
 	}
 
@@ -631,7 +631,7 @@ bool UWorldPartitionStreamingPolicy::IsStreamingCompleted(EWorldPartitionRuntime
 				{
 					for (const FName& CellDataLayer : Cell->GetDataLayers())
 					{
-						if (!QuerySource.DataLayers.Contains(CellDataLayer) && DataLayerSubsystem->GetDataLayerStateByName(CellDataLayer) > EDataLayerState::Unloaded)
+						if (!QuerySource.DataLayers.Contains(CellDataLayer) && DataLayerSubsystem->GetDataLayerEffectiveRuntimeStateByName(CellDataLayer) > EDataLayerRuntimeState::Unloaded)
 						{
 							bSkipCell = true;
 							break;

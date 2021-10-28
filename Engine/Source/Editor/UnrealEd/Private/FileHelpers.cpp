@@ -754,13 +754,13 @@ static bool SaveWorld(UWorld* World,
 					if (AWorldDataLayers* WorldDataLayers = World->GetWorldDataLayers())
 					{
 						WorldDataLayers->ForEachDataLayer([](UDataLayer* DataLayer)
+						{
+							if (!DataLayer->IsLoadedInEditor())
 							{
-								if (!DataLayer->IsDynamicallyLoadedInEditor())
-								{
-									DataLayer->SetIsDynamicallyLoadedInEditor(true, false);
-								}
-								return true;
-							});
+								DataLayer->SetIsLoadedInEditor(true, /*bFromUserChange*/false);
+							}
+							return true;
+						});
 					}
 					// Make sure AlwaysLoaded DL cells get loaded
 					WorldPartition->RefreshLoadedEditorCells(false);

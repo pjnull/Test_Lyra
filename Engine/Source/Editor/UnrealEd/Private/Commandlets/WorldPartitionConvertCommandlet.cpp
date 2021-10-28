@@ -1029,7 +1029,7 @@ int32 UWorldPartitionConvertCommandlet::Main(const FString& Params)
 							{
 								DataLayer = MainWorldDataLayers->CreateDataLayer();
 								DataLayer->SetDataLayerLabel(Layer);
-								DataLayer->SetIsDynamicallyLoaded(false);
+								DataLayer->SetIsRuntime(false);
 							}
 							Actor->AddDataLayer(DataLayer);
 						}

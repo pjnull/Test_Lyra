@@ -800,6 +800,8 @@ protected:
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = DataLayers)
 	TArray<FActorDataLayer> DataLayers;
 
+	TArray<FActorDataLayer> PreEditChangeDataLayers;
+
 public:
 	/** The copy/paste id used to remap actors during copy operations */
 	uint32 CopyPasteId;
@@ -1130,7 +1132,7 @@ public:
 	TArray<const UDataLayer*> GetDataLayerObjects(const AWorldDataLayers* WorldDataLayers) const;
 	bool IsPropertyChangedAffectingDataLayers(FPropertyChangedEvent& PropertyChangedEvent) const;
 	bool IsValidForDataLayer() const;
-	void FixupDataLayers();
+	void FixupDataLayers(bool bRevertChangesOnLockedDataLayer = false);
 #endif
 
 	//~=============================================================================
