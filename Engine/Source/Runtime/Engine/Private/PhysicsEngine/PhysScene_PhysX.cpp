@@ -1592,7 +1592,6 @@ void FPhysScene_PhysX::EndFrame(ULineBatchComponent* InLineBatcher)
 		AddDebugLines(InLineBatcher);
 	}
 #endif // !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
-	}
 }
 
 #if WITH_PHYSX
