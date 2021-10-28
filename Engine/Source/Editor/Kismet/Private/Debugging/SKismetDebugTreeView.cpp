@@ -43,12 +43,12 @@ const FName SKismetDebugTreeView::ColumnId_Name("Name");
 const FName SKismetDebugTreeView::ColumnId_Value("Value");
 
 //////////////////////////////////////////////////////////////////////////
-// SPropertyValueWidget
+// SPropertyValueSkismetWidget
 
-class SPropertyValueWidget : public SCompoundWidget
+class SPropertyValueSkismetWidget : public SCompoundWidget
 {
 public:
-	SLATE_BEGIN_ARGS(SPropertyValueWidget)
+	SLATE_BEGIN_ARGS(SPropertyValueSkismetWidget)
 		: _PropertyInfo(nullptr)
 		, _TreeItem(nullptr)
 	{}
@@ -79,12 +79,12 @@ public:
 						.VAlign(VAlign_Center)
 						[
 							SNew(PropertyInfoViewStyle::STextHighlightOverlay)
-								.FullText(this, &SPropertyValueWidget::GetObjectValueText)
-								.HighlightText(this, &SPropertyValueWidget::GetHighlightText, InSearchString)
+								.FullText(this, &SPropertyValueSkismetWidget::GetObjectValueText)
+								.HighlightText(this, &SPropertyValueSkismetWidget::GetHighlightText, InSearchString)
 								[
 									SNew(STextBlock)
-										.ToolTipText(this, &SPropertyValueWidget::GetValueTooltipText)
-										.Text(this, &SPropertyValueWidget::GetObjectValueText)
+										.ToolTipText(this, &SPropertyValueSkismetWidget::GetValueTooltipText)
+										.Text(this, &SPropertyValueSkismetWidget::GetObjectValueText)
 								]
 						]
 					+SHorizontalBox::Slot()
@@ -99,9 +99,9 @@ public:
 						.VAlign(VAlign_Center)
 						[
 							SNew(SHyperlink)
-								.ToolTipText(this, &SPropertyValueWidget::GetClassLinkTooltipText)
-								.Text(this, &SPropertyValueWidget::GetObjectClassText)
-								.OnNavigate(this, &SPropertyValueWidget::OnNavigateToClass)
+								.ToolTipText(this, &SPropertyValueSkismetWidget::GetClassLinkTooltipText)
+								.Text(this, &SPropertyValueSkismetWidget::GetObjectClassText)
+								.OnNavigate(this, &SPropertyValueSkismetWidget::OnNavigateToClass)
 						]
 					+SHorizontalBox::Slot()
 						.AutoWidth()
@@ -124,12 +124,12 @@ public:
 				ChildSlot
 				[
 					SNew(PropertyInfoViewStyle::STextHighlightOverlay)
-						.FullText(this, &SPropertyValueWidget::GetDescription)
-						.HighlightText(this, &SPropertyValueWidget::GetHighlightText, InSearchString)
+						.FullText(this, &SPropertyValueSkismetWidget::GetDescription)
+						.HighlightText(this, &SPropertyValueSkismetWidget::GetHighlightText, InSearchString)
 						[
 							SNew(STextBlock)
-								.ToolTipText(this, &SPropertyValueWidget::GetDescription)
-								.Text(this, &SPropertyValueWidget::GetDescription)
+								.ToolTipText(this, &SPropertyValueSkismetWidget::GetDescription)
+								.Text(this, &SPropertyValueSkismetWidget::GetDescription)
 						]
 				];
 			}
@@ -835,7 +835,7 @@ public:
 
 	virtual TSharedRef<SWidget> GenerateValueWidget(TSharedPtr<FString> InSearchString) override
 	{
-		return SNew(SPropertyValueWidget, InSearchString)
+		return SNew(SPropertyValueSkismetWidget, InSearchString)
 			.PropertyInfo(this, &FWatchChildLineItem::GetPropertyInfo)
 			.TreeItem(AsShared());
 	}
@@ -1472,7 +1472,7 @@ TSharedRef<SWidget> FWatchLineItem::GenerateNameWidget(TSharedPtr<FString> InSea
 
 TSharedRef<SWidget> FWatchLineItem::GenerateValueWidget(TSharedPtr<FString> InSearchString)
 {
-	return SNew(SPropertyValueWidget, InSearchString)
+	return SNew(SPropertyValueSkismetWidget, InSearchString)
 		.PropertyInfo(this, &FWatchLineItem::GetPropertyInfo)
 		.TreeItem(AsShared());
 }
