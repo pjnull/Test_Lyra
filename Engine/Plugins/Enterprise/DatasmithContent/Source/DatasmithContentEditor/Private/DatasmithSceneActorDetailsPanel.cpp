@@ -18,7 +18,6 @@
 #include "DetailWidgetRow.h"
 #include "DetailCategoryBuilder.h"
 #include "IDetailsView.h"
-#include "D:\P4\BDeschenes_YUL_UE5_Release-5.0\Engine\Source\Editor\PropertyEditor\Private\UserInterface\PropertyEditor\PropertyEditorConstants.h"
 
 #include "ScopedTransaction.h"
 
