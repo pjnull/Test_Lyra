@@ -817,7 +817,8 @@ FReply SControlRigEditModeTools::OnBakeControlsToNewSpaceButtonClicked()
 					FScopedTransaction Transaction(LOCTEXT("BakeControlToSpace", "Bake Control In Space"));
 					for (const FRigElementKey& ControlKey : InControls)
 					{
-						FSpaceChannelAndSection SpaceChannelAndSection = FControlRigSpaceChannelHelpers::FindSpaceChannelAndSectionForControl(ControlRig, ControlKey.Name, Sequencer, false /*bCreateIfNeeded*/);
+						//when baking we will now create a channel if one doesn't exist, was causing confusion
+						FSpaceChannelAndSection SpaceChannelAndSection = FControlRigSpaceChannelHelpers::FindSpaceChannelAndSectionForControl(ControlRig, ControlKey.Name, Sequencer, true /*bCreateIfNeeded*/);
 						if (SpaceChannelAndSection.SpaceChannel)
 						{
 							FControlRigSpaceChannelHelpers::SequencerBakeControlInSpace(ControlRig, Sequencer, SpaceChannelAndSection.SpaceChannel, SpaceChannelAndSection.SectionToKey,

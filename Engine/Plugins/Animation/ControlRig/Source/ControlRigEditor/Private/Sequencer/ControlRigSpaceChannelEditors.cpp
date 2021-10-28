@@ -264,6 +264,15 @@ FSpaceChannelAndSection FControlRigSpaceChannelHelpers::FindSpaceChannelAndSecti
 	return SpaceChannelAndSection;
 }
 
+/*
+*  Situations to handle\
+*  0) New space sames as current space do nothing
+*  1) First space switch, so no existing space keys, if at start frame, just create space key, if not at start frame create current(parent) at start frame then new
+*  2) Creating space that was the same as the one just before the current time. In that case we need to delete the current space key and the previous(-1) transform keys
+*  3) Creating different space than previous or current, at (-1) curren ttime set space key as current, and set transforms in that space, then at current time set new space and new transforms
+*  4) For 1-3 we always compensate any transform keys to the new space
+*/
+
 FKeyHandle FControlRigSpaceChannelHelpers::SequencerKeyControlRigSpaceChannel(UControlRig* ControlRig, ISequencer* Sequencer, FMovieSceneControlRigSpaceChannel* Channel, UMovieSceneSection* SectionToKey, FFrameNumber Time, URigHierarchy* RigHierarchy, const FRigElementKey& ControlKey, const FRigElementKey& SpaceKey)
 {
 	FKeyHandle Handle = FKeyHandle::Invalid();
@@ -273,9 +282,11 @@ FKeyHandle FControlRigSpaceChannelHelpers::SequencerKeyControlRigSpaceChannel(UC
 	}
 
 	URigHierarchy* Hierarchy = ControlRig->GetHierarchy();
-	FMovieSceneControlRigSpaceBaseKey ExistingValue;
+	FMovieSceneControlRigSpaceBaseKey ExistingValue, PreviousValue;
 	using namespace UE::MovieScene;
 	EvaluateChannel(Channel, Time, ExistingValue);
+	EvaluateChannel(Channel, Time -1, PreviousValue);
+
 	FMovieSceneControlRigSpaceBaseKey Value = ExistingValue;
 
 	if (SpaceKey == RigHierarchy->GetWorldSpaceReferenceKey())
@@ -309,27 +320,25 @@ FKeyHandle FControlRigSpaceChannelHelpers::SequencerKeyControlRigSpaceChannel(UC
 		
 		TMovieSceneChannelData<FMovieSceneControlRigSpaceBaseKey> ChannelInterface = Channel->GetData();
 		bool bSetPreviousKey = true;
+		//find all of the times in the space after this time we now need to compensate for
+		TSortedMap<FFrameNumber, FFrameNumber> ExtraFrames;
+		FControlRigSpaceChannelHelpers::GetFramesInThisSpaceAfterThisTime(ControlRig, ControlKey.Name, ExistingValue,
+			Channel, SectionToKey, Time, ExtraFrames);
+		if (ExtraFrames.Num() > 0)
+		{
+			for (const TPair<FFrameNumber, FFrameNumber>& Frame : ExtraFrames)
+			{
+				Frames.Add(Frame.Value);
+			}
+		}
 		//if we have no keys need to set key for current space at start frame, unless setting key at start time, where then don't do previous compensation
 		if (Channel->GetNumKeys() == 0 && Sequencer->GetFocusedMovieSceneSequence() && Sequencer->GetFocusedMovieSceneSequence()->GetMovieScene())
 		{
 			FFrameNumber StartFrame = Sequencer->GetFocusedMovieSceneSequence()->GetMovieScene()->GetPlaybackRange().GetLowerBoundValue();
 			if (StartFrame != Time)
 			{
-				//find all of the times in the space after this time we now need to compensate for
-				TSortedMap<FFrameNumber,FFrameNumber> ExtraFrames;
-				FControlRigSpaceChannelHelpers::GetFramesInThisSpaceAfterThisTime(ControlRig, ControlKey.Name, ExistingValue,
-					Channel, SectionToKey, Time, ExtraFrames);
-				if (ExtraFrames.Num() > 0)
-				{
-					for (const TPair<FFrameNumber,FFrameNumber>& Frame : ExtraFrames)
-					{
-						Frames.Add(Frame.Value);
-					}
-				}
-
 				FMovieSceneControlRigSpaceBaseKey Original = ExistingValue;
 				ChannelInterface.AddKey(StartFrame, Forward<FMovieSceneControlRigSpaceBaseKey>(Original));
-
 			}
 			else
 			{
@@ -347,19 +356,44 @@ FKeyHandle FControlRigSpaceChannelHelpers::SequencerKeyControlRigSpaceChannel(UC
 		FControlRigSnapper Snapper;
 		Snapper.GetControlRigControlTransforms(Sequencer, ControlRig, ControlKey.Name, Frames, ControlRigParentWorldTransforms, ControlWorldTransforms);
 
-		int32 ExistingIndex = ChannelInterface.FindKey(Time);
-		if (ExistingIndex != INDEX_NONE)
+		// if current Value not the same as the previous add new space kehy
+		if (PreviousValue != Value)
 		{
-			Handle = ChannelInterface.GetHandle(ExistingIndex);
-			using namespace UE::MovieScene;
-			AssignValue(Channel, Handle, Forward<FMovieSceneControlRigSpaceBaseKey>(Value));
+			int32 ExistingIndex = ChannelInterface.FindKey(Time);
+			if (ExistingIndex != INDEX_NONE)
+			{
+				Handle = ChannelInterface.GetHandle(ExistingIndex);
+				using namespace UE::MovieScene;
+				AssignValue(Channel, Handle, Forward<FMovieSceneControlRigSpaceBaseKey>(Value));
+			}
+			else
+			{
+				ExistingIndex = ChannelInterface.AddKey(Time, Forward<FMovieSceneControlRigSpaceBaseKey>(Value));
+				Handle = ChannelInterface.GetHandle(ExistingIndex);
+			}
 		}
-		else
+		else //same as previous
 		{
-			ExistingIndex = ChannelInterface.AddKey(Time, Forward<FMovieSceneControlRigSpaceBaseKey>(Value));
-			Handle = ChannelInterface.GetHandle(ExistingIndex);
+			if (UMovieSceneControlRigParameterSection* Section = Cast<UMovieSceneControlRigParameterSection>(SectionToKey))
+			{
+				TArray<FFrameNumber> OurKeyTimes;
+				TArray<FKeyHandle> OurKeyHandles;
+				TRange<FFrameNumber> CurrentFrameRange;
+				CurrentFrameRange.SetLowerBound(TRangeBound<FFrameNumber>(Time));
+				CurrentFrameRange.SetUpperBound(TRangeBound<FFrameNumber>(Time));
+				ChannelInterface.GetKeys(CurrentFrameRange, &OurKeyTimes, &OurKeyHandles);
+				if (OurKeyHandles.Num() > 0)
+				{
+					ChannelInterface.DeleteKeys(OurKeyHandles);
+				}
+				//now delete any extra TimeOfDelete -1
+				FControlRigSpaceChannelHelpers::DeleteTransformKeysAtThisTime(ControlRig, Section, ControlKey.Name, Time - 1);
+				bSetPreviousKey = false; //also don't set previous
+			}
+
 		}
 
+		//do any compensation or previous key adding
 		FRigControlModifiedContext Context;
 		Context.SetKey = EControlRigSetKey::Always;
 		FFrameRate TickResolution = Sequencer->GetFocusedTickResolution();
@@ -663,6 +697,7 @@ void FControlRigSpaceChannelHelpers::SequencerBakeControlInSpace(UControlRig* Co
 		//now set all of the key values
 		FRigControlModifiedContext Context;
 		Context.SetKey = EControlRigSetKey::Always;
+
 		FFrameRate TickResolution = Sequencer->GetFocusedTickResolution();
 
 		URigHierarchy::TElementDependencyMap Dependencies = RigHierarchy->GetDependenciesForVM(ControlRig->GetVM());
@@ -673,6 +708,14 @@ void FControlRigSpaceChannelHelpers::SequencerBakeControlInSpace(UControlRig* Co
 		{
 			const FTransform GlobalTransform = ControlWorldTransforms[Index];
 			const FFrameNumber Frame = Frames[Index];
+
+			//evaluate sequencer
+			const FFrameTime GlobalTime(Frame);
+			FMovieSceneContext SceneContext = FMovieSceneContext(FMovieSceneEvaluationRange(GlobalTime, TickResolution), Sequencer->GetPlaybackStatus()).SetHasJumped(true);
+			Sequencer->GetEvaluationTemplate().Evaluate(SceneContext, *Sequencer);
+
+			//evaluate control rig
+			ControlRig->Evaluate_AnyThread();
 			Context.LocalTime = TickResolution.AsSeconds(FFrameTime(Frame));
 			ControlRig->SetControlGlobalTransform(ControlKey.Name, GlobalTransform, true, Context);
 		}
@@ -693,6 +736,13 @@ void FControlRigSpaceChannelHelpers::SequencerBakeControlInSpace(UControlRig* Co
 				RigHierarchy->SwitchToParent(ControlKey, EndFrameValue.ControlRigElement, false, true, Dependencies, nullptr);
 				break;
 			}
+
+			//evaluate sequencer
+			const FFrameTime GlobalTime(EndFrame);
+			FMovieSceneContext SceneContext = FMovieSceneContext(FMovieSceneEvaluationRange(GlobalTime, TickResolution), Sequencer->GetPlaybackStatus()).SetHasJumped(true);
+			Sequencer->GetEvaluationTemplate().Evaluate(SceneContext, *Sequencer);
+		
+			//evaluate control rig
 			ControlRig->Evaluate_AnyThread();
 
 			TMovieSceneChannelData<FMovieSceneControlRigSpaceBaseKey> ChannelInterface = Channel->GetData();
