@@ -907,6 +907,15 @@ void GatherPhysXStats_AssumesLocked(PxScene* PSyncScene)
 		SET_DWORD_STAT(STAT_NumStaticBodies, SimStats.nbStaticBodies);
 		SET_DWORD_STAT(STAT_NumMobileBodies, SimStats.nbDynamicBodies);
 
+		
+		CSV_CUSTOM_STAT(PhysicsVerbose, NumPotentialContacts, (int32)SimStats.nbDiscreteContactPairsTotal, ECsvCustomStatOp::Set);
+		CSV_CUSTOM_STAT(PhysicsVerbose, NumContacts, (int32)SimStats.nbDiscreteContactPairsWithContacts, ECsvCustomStatOp::Set);
+		//CSV_CUSTOM_STAT(PhysicsVerbose, NumActiveConstraints, (int32)SimStats.nbActiveConstraints, ECsvCustomStatOp::Set);
+		CSV_CUSTOM_STAT(PhysicsVerbose, NumActiveDynamicBodies, (int32)SimStats.nbActiveDynamicBodies, ECsvCustomStatOp::Set);
+		CSV_CUSTOM_STAT(PhysicsVerbose, NumActiveKinematicBodies, (int32)SimStats.nbActiveKinematicBodies, ECsvCustomStatOp::Set);
+		CSV_CUSTOM_STAT(PhysicsVerbose, NumStaticBodies, (int32)SimStats.nbStaticBodies, ECsvCustomStatOp::Set);
+		CSV_CUSTOM_STAT(PhysicsVerbose, NumDynamicBodies, (int32)SimStats.nbDynamicBodies, ECsvCustomStatOp::Set);
+
 		//SET_DWORD_STAT(STAT_NumBroadphaseAdds, SimStats.getNbBroadPhaseAdds(PxSimulationStatistics::VolumeType::eRIGID_BODY));	//TODO: These do not seem to work
 		//SET_DWORD_STAT(STAT_NumBroadphaseRemoves, SimStats.getNbBroadPhaseRemoves(PxSimulationStatistics::VolumeType::eRIGID_BODY));
 
@@ -917,6 +926,7 @@ void GatherPhysXStats_AssumesLocked(PxScene* PSyncScene)
 		}
 
 		SET_DWORD_STAT(STAT_NumShapes, NumShapes);
+		CSV_CUSTOM_STAT(PhysicsVerbose, NumShapes, (int32)NumShapes, ECsvCustomStatOp::Set);
 
 	}
 }
@@ -1572,6 +1582,8 @@ void FPhysScene_PhysX::EndFrame(ULineBatchComponent* InLineBatcher)
 
 	// Perform any collision notification events
 	DispatchPhysNotifications_AssumesLocked();
+	
+	GatherPhysXStats_AssumesLocked(GetPxScene());
 
 #if !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
 	// Handle debug rendering
@@ -1580,6 +1592,7 @@ void FPhysScene_PhysX::EndFrame(ULineBatchComponent* InLineBatcher)
 		AddDebugLines(InLineBatcher);
 	}
 #endif // !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
+	}
 }
 
 #if WITH_PHYSX
