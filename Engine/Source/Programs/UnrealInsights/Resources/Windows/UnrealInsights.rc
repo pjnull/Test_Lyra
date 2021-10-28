@@ -22,8 +22,8 @@
 #define VER_FILEFLAGS           0x0L
 #endif
 
-#define IDI_INSIGHTS            IDICON_UEGame
-#define IDI_UTRACE              IDICON_UEGame+1
+#define IDI_INSIGHTS            IDICON_UEGame // 123
+#define IDI_UTRACE              124
 
 /////////////////////////////////////////////////////////////////////////////
 #undef APSTUDIO_READONLY_SYMBOLS
