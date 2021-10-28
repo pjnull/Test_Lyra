@@ -537,7 +537,12 @@ bool UDrawPolygonTool::FindDrawPlaneHitPoint(const FInputDeviceRay& ClickPos, FV
 	// if we found a scene snap point, add to snap set
 	if (bIgnoreSnappingToggle || SnapProperties->bEnableSnapping == false)
 	{
+		// if snapping is disabled, still snap to the first vertex (so the polygon can be closed)
 		SnapEngine.Reset();
+		if (bInFixedPolygonMode == false && PolygonVertices.Num() > 0)
+		{
+			SnapEngine.AddPointTarget(PolygonVertices[0], StartPointSnapID, 1);
+		}
 	}
 	else 
 	{
@@ -569,6 +574,18 @@ bool UDrawPolygonTool::FindDrawPlaneHitPoint(const FInputDeviceRay& ClickPos, FV
 			SnapEngine.RegenerateTargetLines(true, true);
 		}
 		SnapEngine.bEnableSnapToKnownLengths = SnapProperties->bSnapToLengths;
+	}
+	// ignore snapping to start point unless we have at least 3 vertices
+	if (bInFixedPolygonMode == false && PolygonVertices.Num() > 0)
+	{
+		if (PolygonVertices.Num() < 3)
+		{
+			SnapEngine.AddIgnoreTarget(StartPointSnapID);
+		}
+		else
+		{
+			SnapEngine.RemoveIgnoreTarget(StartPointSnapID);
+		}
 	}
 
 	SnapEngine.UpdateSnappedPoint(HitPos);
@@ -772,15 +789,11 @@ bool UDrawPolygonTool::OnNextSequenceClick(const FInputDeviceRay& ClickPos)
 
 	AppendVertex(HitPos);
 
-	// if we are starting a freehand poly, add start point as snap target, but then ignore it until we get 3 verts
+	// if we are starting a freehand poly, add start point as snap target.
+	// Note that logic in FindDrawPlaneHitPoint will ignore it until we get 3 verts
 	if (bInFixedPolygonMode == false && PolygonVertices.Num() == 1)
 	{
 		SnapEngine.AddPointTarget(PolygonVertices[0], StartPointSnapID, 1);
-		SnapEngine.AddIgnoreTarget(StartPointSnapID);
-	}
-	if (PolygonVertices.Num() > 2)
-	{
-		SnapEngine.RemoveIgnoreTarget(StartPointSnapID);
 	}
 
 	UpdatePreviewVertex(HitPos);
