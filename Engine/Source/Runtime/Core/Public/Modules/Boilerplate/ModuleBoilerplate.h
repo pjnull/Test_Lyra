@@ -29,7 +29,7 @@ class FChunkedFixedUObjectArray;
 #endif
 
 #if !FORCE_ANSI_ALLOCATOR
-static_assert(__STDCPP_DEFAULT_NEW_ALIGNMENT__ == 16, "Expecting 16-byte default operator new alignment - alignments > 16 may have bloat");
+static_assert(__STDCPP_DEFAULT_NEW_ALIGNMENT__ <= 16, "Expecting 16-byte default operator new alignment - alignments > 16 may have bloat");
 #define REPLACEMENT_OPERATOR_NEW_AND_DELETE \
 	OPERATOR_NEW_MSVC_PRAGMA void* operator new  ( size_t Size                                                    ) OPERATOR_NEW_THROW_SPEC      { return FMemory::Malloc( Size ? Size : 1, __STDCPP_DEFAULT_NEW_ALIGNMENT__ ); } \
 	OPERATOR_NEW_MSVC_PRAGMA void* operator new[]( size_t Size                                                    ) OPERATOR_NEW_THROW_SPEC      { return FMemory::Malloc( Size ? Size : 1, __STDCPP_DEFAULT_NEW_ALIGNMENT__ ); } \
