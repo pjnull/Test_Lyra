@@ -525,7 +525,7 @@ void FIslandGraph<NodeType, EdgeType, IslandType>::InitIslands()
 			RemoveEdge(EdgeIndex);
 		}
 	} 
-	}
+
 	// Reset of the sleeping flag for the graph islands
 	for (auto& GraphIsland : GraphIslands)
 	{
