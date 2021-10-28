@@ -92,7 +92,8 @@ namespace Chaos
 
 			for (int32 ManifoldPointIndex = BeginPointIndex; ManifoldPointIndex < EndPointIndex; ++ManifoldPointIndex)
 			{
-				const FManifoldPoint& ManifoldPoint = Constraint->GetManifoldPoints()[ManifoldPointIndex];
+				TArrayView<FManifoldPoint> ManifoldPoints = Constraint->GetManifoldPoints();
+				const FManifoldPoint& ManifoldPoint = ManifoldPoints[ManifoldPointIndex];
 
 				// The world-space contact normal
 				FVec3 WorldContactNormal;
@@ -145,7 +146,9 @@ namespace Chaos
 			for (int32 PointIndex = 0; PointIndex < Solver.NumManifoldPoints(); ++PointIndex)
 			{
 				const FPBDCollisionSolver::FSolverManifoldPoint& SolverManifoldPoint = Solver.GetManifoldPoint(PointIndex);
-				FManifoldPoint& ManifoldPoint = Constraint->GetManifoldPoints()[PointIndex];
+
+				TArrayView<FManifoldPoint> ManifoldPoints = Constraint->GetManifoldPoints();
+				FManifoldPoint& ManifoldPoint = ManifoldPoints[PointIndex];
 
 				ManifoldPoint.NetPushOut = SolverManifoldPoint.NetPushOut;
 				ManifoldPoint.NetPushOutNormal = FVec3::DotProduct(SolverManifoldPoint.NetPushOut, SolverManifoldPoint.WorldContactNormal);

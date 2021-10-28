@@ -91,7 +91,7 @@ public:
 	/** Destructor. */
 	virtual ~FLandscapeVertexBufferMobile()
 	{
-		ReleaseResource();
+		FVertexBuffer::ReleaseResource();
 		DEC_DWORD_STAT_BY(STAT_LandscapeVertexMem, DataSize);
 	}
 

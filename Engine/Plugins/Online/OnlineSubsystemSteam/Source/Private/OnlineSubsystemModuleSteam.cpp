@@ -29,7 +29,7 @@ private:
 	/** Single instantiation of the STEAM interface */
 	static FOnlineSubsystemSteamPtr SteamSingleton;
 
-	virtual void DestroySubsystem()
+	void DestroySubsystem()
 	{
 		if (SteamSingleton.IsValid())
 		{
