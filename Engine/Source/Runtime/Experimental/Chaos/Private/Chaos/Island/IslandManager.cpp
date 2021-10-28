@@ -34,6 +34,20 @@ FORCEINLINE bool IsDynamicParticle(const FGeometryParticleHandle* ParticleHandle
 		   (ParticleHandle->ObjectState() == EObjectStateType::Sleeping);
 }
 
+/** Check if a particle is not moving */
+FORCEINLINE bool IsStationaryParticle(const FGeometryParticleHandle* ParticleHandle)
+{
+	if (const FKinematicGeometryParticleHandle* KinematicParticle = ParticleHandle->CastToKinematicParticle())
+	{
+		return KinematicParticle->V().IsZero();
+	}
+	else
+	{
+		return (ParticleHandle->ObjectState() == EObjectStateType::Static) ||
+			   (ParticleHandle->ObjectState() == EObjectStateType::Sleeping);
+	}
+}
+
 /** Check if a particle is dynamic or sleeping */
 inline const FChaosPhysicsMaterial* GetPhysicsMaterial(const TArrayCollectionArray<TSerializablePtr<FChaosPhysicsMaterial>>& ParticleMaterialAttributes,
 														    const THandleArray<FChaosPhysicsMaterial>& SolverPhysicsMaterials, FPBDRigidParticleHandle* RigidParticleHandle)
@@ -248,9 +262,9 @@ inline bool ComputeSleepingThresholds(FPBDIslandSolver* IslandSolver,
 FPBDIslandManager::FPBDIslandManager() : IslandSolvers(), IslandGraph(MakeUnique<GraphType>()), MaxParticleIndex(INDEX_NONE)
 {}
 
-FPBDIslandManager::FPBDIslandManager(const TParticleView<FGeometryParticles>& GeometryParticles) : IslandSolvers(), IslandGraph(MakeUnique<GraphType>())
+FPBDIslandManager::FPBDIslandManager(const TParticleView<FPBDRigidParticles>& PBDRigids) : IslandSolvers(), IslandGraph(MakeUnique<GraphType>())
 {
-	InitializeGraph(GeometryParticles);
+	InitializeGraph(PBDRigids);
 }
 
 FPBDIslandManager::~FPBDIslandManager()
@@ -269,15 +283,27 @@ FPBDIslandManager::~FPBDIslandManager()
 	}
 }
 
-void FPBDIslandManager::InitializeGraph(const TParticleView<FGeometryParticles>& GeometryParticles)
+void FPBDIslandManager::InitializeGraph(const TParticleView<FPBDRigidParticles>& PBDRigids)
 {
 	MaxParticleIndex = 0;
-	ReserveParticles(GeometryParticles.Num());
+	ReserveParticles(PBDRigids.Num());
 	// We are adding all the particles from the solver in
 	// case some were just created/activated
-	for (auto& GeometryParticle : GeometryParticles)
+	for (auto& RigidParticle : PBDRigids)
 	{
-		AddParticle(GeometryParticle.Handle());
+		AddParticle(RigidParticle.Handle());
+	}
+	// we update the valid/steady state of the nodes in case any state changed
+	for(int32 NodeIndex = 0, NumNodes = IslandGraph->GraphNodes.GetMaxIndex(); NodeIndex < NumNodes; ++NodeIndex)
+	{
+		if (IslandGraph->GraphNodes.IsValidIndex(NodeIndex))
+		{
+			GraphType::FGraphNode& GraphNode = IslandGraph->GraphNodes[NodeIndex];
+
+			FGeometryParticleHandle* ParticleHandle = GraphNode.NodeItem;
+			IslandGraph->UpdateNode(ParticleHandle, IsDynamicParticle(ParticleHandle), GraphNode.IslandIndex,
+													IsStationaryParticle(ParticleHandle), NodeIndex);
+		}
 	}
 	// For now we are resetting all the constraints but we should keep the
 	// persistent collisions, joints...over time
@@ -307,37 +333,40 @@ void FPBDIslandManager::ReserveConstraints(const int32 NumConstraints)
 	IslandGraph->ReserveEdges(NumConstraints);
 }
 
-int32 FPBDIslandManager::AddParticle(FGeometryParticleHandle* ParticleHandle, const int32 IslandIndex)
+int32 FPBDIslandManager::AddParticle(FGeometryParticleHandle* ParticleHandle, const int32 IslandIndex, const bool bOnlyDynamic)
 {
 	if (ParticleHandle)
 	{
-		MaxParticleIndex = FMath::Max(MaxParticleIndex, ParticleHandle->UniqueIdx().Idx);
-		if(FPBDRigidParticleHandle* PBDRigid = ParticleHandle->CastToRigidParticle())
+		const bool bIsDynamic = IsDynamicParticle(ParticleHandle);
+		if( !bOnlyDynamic || (bOnlyDynamic && bIsDynamic) )
 		{
-			// If the rigid already have a graph index we just update the node information based on the new particles state...
-			if(PBDRigid->ConstraintGraphIndex() != INDEX_NONE)
+			MaxParticleIndex = FMath::Max(MaxParticleIndex, ParticleHandle->UniqueIdx().Idx);
+			if(FPBDRigidParticleHandle* PBDRigid = ParticleHandle->CastToRigidParticle())
 			{
-				IslandGraph->UpdateNode(ParticleHandle, IsDynamicParticle(ParticleHandle), IslandIndex,
-			(ParticleHandle->ObjectState() == EObjectStateType::Static) || ParticleHandle->Sleeping(), PBDRigid->ConstraintGraphIndex());
-				return PBDRigid->ConstraintGraphIndex();
+				// If the rigid already have a graph index we just update the node information based on the new particles state...
+				if(PBDRigid->ConstraintGraphIndex() != INDEX_NONE)
+				{
+					IslandGraph->UpdateNode(ParticleHandle, bIsDynamic, IslandIndex,
+						IsStationaryParticle(ParticleHandle), PBDRigid->ConstraintGraphIndex());
+					return PBDRigid->ConstraintGraphIndex();
+				}
 			}
-		}
-		// It could be nice to have a graph index on the particle handle the same way
-		// we have one on the constraint handle. It will allow us to skip the query on the TSet to
-		// check if the particle is already there, which could be quite slow
-		
-		const int32 NodeIndex = IslandGraph->AddNode(ParticleHandle, IsDynamicParticle(ParticleHandle), IslandIndex,
-			(ParticleHandle->ObjectState() == EObjectStateType::Static) || ParticleHandle->Sleeping());
+			// It could be nice to have a graph index on the particle handle the same way
+			// we have one on the constraint handle. It will allow us to skip the query on the TSet to
+			// check if the particle is already there, which could be quite slow
+			const int32 NodeIndex = IslandGraph->AddNode(ParticleHandle, bIsDynamic, IslandIndex,
+				IsStationaryParticle(ParticleHandle));
 
-		if(FPBDRigidParticleHandle* PBDRigid = ParticleHandle->CastToRigidParticle())
-		{
-			PBDRigid->SetConstraintGraphIndex(NodeIndex);
+			if(FPBDRigidParticleHandle* PBDRigid = ParticleHandle->CastToRigidParticle())
+			{
+				PBDRigid->SetConstraintGraphIndex(NodeIndex);
+			}
+			return NodeIndex;
 		}
-		return NodeIndex;
 	}
 	return INDEX_NONE;
 }
-
+	
 int32 FPBDIslandManager::AddConstraint(const uint32 ContainerId, FConstraintHandle* ConstraintHandle, const TVec2<FGeometryParticleHandle*>& ConstrainedParticles)
 {
 	if (ConstraintHandle)
@@ -349,8 +378,8 @@ int32 FPBDIslandManager::AddConstraint(const uint32 ContainerId, FConstraintHand
 		// Will discard constraints in between 2 sleeping particles. Huge gain but potential side effect?
 		if(bValidParticle0 || bValidParticle1)
 		{
-			const int32 NodeIndex0 = AddParticle(ConstrainedParticles[0]);
-			const int32 NodeIndex1 = AddParticle(ConstrainedParticles[1]);
+			const int32 NodeIndex0 = AddParticle(ConstrainedParticles[0], INDEX_NONE, false);
+			const int32 NodeIndex1 = AddParticle(ConstrainedParticles[1], INDEX_NONE, false);
 
 			const int32 EdgeIndex = IslandGraph->AddEdge(ConstraintHandle, ContainerId, NodeIndex0, NodeIndex1);
 			ConstraintHandle->SetConstraintGraphIndex(EdgeIndex);
@@ -378,7 +407,7 @@ void FPBDIslandManager::RemoveConstraint(const uint32 ContainerId, FConstraintHa
 {
 	if (ConstraintHandle)
 	{
-		IslandGraph->RemoveEdge(ConstraintHandle);
+		IslandGraph->RemoveEdge(ConstraintHandle->ConstraintGraphIndex());
 		ConstraintHandle->SetConstraintGraphIndex(INDEX_NONE);
 	}
 }

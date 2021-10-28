@@ -298,9 +298,6 @@ namespace Chaos
 		FNarrowPhase NarrowPhase;
 		FSpatialAccelerationCollisionDetector CollisionDetector;
 
-		// @todo(chaos): these are transient and the arrays should belong in the Island when we have one...
-		TArray<FSolverBodyContainer> IslandSolverBodies;
-
 		FPBDRigidsEvolutionCallback PostIntegrateCallback;
 		FPBDRigidsEvolutionCallback PostDetectCollisionsCallback;
 		FPBDRigidsEvolutionCallback PreApplyCallback;

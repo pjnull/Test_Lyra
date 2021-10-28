@@ -53,14 +53,14 @@ public:
 	  * Default island manager constructor
 	  * @param Particles List of particles to be used to fill the graph nodes
 	  */
-	FPBDIslandManager(const TParticleView<FGeometryParticles>& Particles);
+	FPBDIslandManager(const TParticleView<FPBDRigidParticles>& PBDRigids);
 
 	/**
 	* Clear the manager and set up the particle-to-graph-node mapping for the specified particles
 	* Should be called before AddConstraint.
 	* @param Particles List of particles to be used to fill the graph nodes
 	*/
-	void InitializeGraph(const TParticleView<TGeometryParticles<FReal, 3>>& Particles);
+	void InitializeGraph(const TParticleView<FPBDRigidParticles>& Particles);
 
 	/**
 	  * Reserve space in the graph for NumConstraints additional constraints.
@@ -79,7 +79,7 @@ public:
 
 	/**
 	  * Remove a constraint from the graph
-	  * @param ContainerId Contaner id the constraint is belonging to
+	  * @param ContainerId Container id the constraint is belonging to
 	  * @param ConstraintHandle Constraint Handle that will be used for the edge item
 	  * @param ConstrainedParticles List of 2 particles handles that are used within the constraint
 	  */
@@ -93,12 +93,13 @@ public:
 	int32 ReserveParticles(const int32 NumParticles);
 
 	/**
-	  * Add a particle to the sialnd graph
+	  * Add a particle to the Island graph
 	  * @param AddedParticle Particle to be added to the graph
 	  * @param IslandIndex Potential island index in which the particle will be added
+	  * @param bOnlyDynamic Boolean to add only dynamic particle into the islands
 	  * @return Sparse graph node index
 	  */
-	int32 AddParticle(FGeometryParticleHandle* AddedParticle, const int32 IslandIndex = INDEX_NONE);
+	int32 AddParticle(FGeometryParticleHandle* AddedParticle, const int32 IslandIndex = INDEX_NONE, const bool bOnlyDynamic = true);
 
 	/**
 	  * Remove a particle from the graph
@@ -110,7 +111,7 @@ public:
 	  * Adds \p ChildParticle to the constraint graph.  Copies the sleeping
 	  * state and island of \p ParentParticle to \p ChildParticle.  Does nothing
 	  * if \p ParentParticle is not supplied.
-	  * @param ChildParticle Particle oni which the sleeping state and island index will be copied
+	  * @param ChildParticle Particle on which the sleeping state and island index will be copied
 	  * @param ParentParticle Particle from which the sleeping state and island index will be extracted
 	  */
 	void EnableParticle(FGeometryParticleHandle* ChildParticle, const FGeometryParticleHandle* ParentParticle);
