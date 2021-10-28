@@ -101,6 +101,23 @@ public:
 	TMap<FName, UWidgetSlotPair*> MissingSlotData;
 };
 
+FName SanitizeWidgetName(const FString& NewName, const FName CurrentName)
+{
+	FString GeneratedName = SlugStringForValidName(NewName);
+
+	// If the new name is empty (for example, because it was composed entirely of invalid characters).
+	// then we'll use the current name
+	if (GeneratedName.IsEmpty())
+	{
+		return CurrentName;
+	}
+
+	const FName GeneratedFName(*GeneratedName);
+	check(GeneratedFName.IsValidXName(INVALID_OBJECTNAME_CHARACTERS));
+
+	return GeneratedFName;
+}
+
 bool FWidgetBlueprintEditorUtils::VerifyWidgetRename(TSharedRef<class FWidgetBlueprintEditor> BlueprintEditor, FWidgetReference Widget, const FText& NewName, FText& OutErrorMessage)
 {
 	if (NewName.IsEmptyOrWhitespace())
@@ -126,7 +143,7 @@ bool FWidgetBlueprintEditorUtils::VerifyWidgetRename(TSharedRef<class FWidgetBlu
 	}
 
 	// Slug the new name down to a valid object name
-	const FName NewNameSlug = MakeObjectNameFromDisplayLabel(NewNameString, RenamedTemplateWidget->GetFName());
+	const FName NewNameSlug = SanitizeWidgetName(NewNameString, RenamedTemplateWidget->GetFName());
 
 	UWidgetBlueprint* Blueprint = BlueprintEditor->GetWidgetBlueprintObj();
 	UWidget* ExistingTemplate = Blueprint->WidgetTree->FindWidget(NewNameSlug);
@@ -213,8 +230,7 @@ bool FWidgetBlueprintEditorUtils::RenameWidget(TSharedRef<FWidgetBlueprintEditor
 
 	TSharedPtr<INameValidatorInterface> NameValidator = MakeShareable(new FKismetNameValidator(Blueprint));
 
-	// Get the new FName slug from the given display name
-	const FName NewFName = MakeObjectNameFromDisplayLabel(NewDisplayName, Widget->GetFName());
+	const FName NewFName = SanitizeWidgetName(NewDisplayName, Widget->GetFName());
 
 	FObjectPropertyBase* ExistingProperty = CastField<FObjectPropertyBase>(ParentClass->FindPropertyByName(NewFName));
 	const bool bBindWidget = ExistingProperty && FWidgetBlueprintEditorUtils::IsBindWidgetProperty(ExistingProperty) && Widget->IsA(ExistingProperty->PropertyClass);
