@@ -344,7 +344,7 @@ protected:
 	/** A mapping of type names to detail layout delegates, called when querying for custom detail layouts in this instance of the details view only */
 	FCustomPropertyTypeLayoutMap InstancedTypeToLayoutMap;
 	/** The current detail layout based on objects in this details panel.  There is one layout for each top level object node.*/
-	FDetailLayoutList DetailLayouts;
+	TArray<FDetailLayoutData> DetailLayouts;
 	/** Row for searching and view options */
 	TSharedPtr<SWidget> FilterRow;
 	/** Search box */
