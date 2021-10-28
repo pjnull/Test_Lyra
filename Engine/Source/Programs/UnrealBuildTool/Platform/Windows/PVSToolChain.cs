@@ -489,6 +489,12 @@ namespace UnrealBuildTool
 
 		public override CPPOutput CompileCPPFiles(CppCompileEnvironment CompileEnvironment, List<FileItem> InputFiles, DirectoryReference OutputDir, string ModuleName, IActionGraphBuilder Graph)
 		{
+			// Ignore generated files
+			if (InputFiles.All(x => x.Location.GetFileName().EndsWith(".gen.cpp")))
+			{
+				return new CPPOutput();
+			}
+
 			// Use a subdirectory for PVS output, to avoid clobbering regular build artifacts
 			OutputDir = DirectoryReference.Combine(OutputDir, "PVS");
 
