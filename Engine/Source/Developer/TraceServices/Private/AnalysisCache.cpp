@@ -10,6 +10,7 @@
 #include "HAL/PlatformFileManager.h"
 #include "Logging/LogMacros.h"
 #include "Memory/SharedBuffer.h"
+#include "Misc/CommandLine.h"
 #include "Misc/Paths.h"
 #include "Misc/PathViews.h"
 #include "Serialization/BufferArchive.h"
