@@ -8,6 +8,7 @@
 #include "Internationalization/Regex.h"
 #include "Misc/MessageDialog.h"
 #include "Widgets/Layout/SExpandableArea.h"
+#include "Widgets/Images/SImage.h"
 #include "HAL/FileManagerGeneric.h"
 #include "DOM/JsonObject.h"
 #include "Serialization/JsonSerializer.h"
