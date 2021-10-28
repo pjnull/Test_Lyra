@@ -879,23 +879,6 @@ void UNiagaraEmitter::PostEditChangeProperty(struct FPropertyChangedEvent& Prope
 
 		bNeedsRecompile = true;
 	}
-	else if (PropertyName == GET_MEMBER_NAME_CHECKED(UNiagaraEmitter, bSimulationStagesEnabled))
-	{
-		if (GraphSource != nullptr)
-		{
-			GraphSource->MarkNotSynchronized(TEXT("SimulationStagesEnabled changed."));
-		}
-		bNeedsRecompile = true;
-	}
-	else if (PropertyName == GET_MEMBER_NAME_CHECKED(UNiagaraEmitter, bDeprecatedShaderStagesEnabled))
-	{
-		//ERROR
-		//if (GraphSource != nullptr)
-		//{
-		//	GraphSource->MarkNotSynchronized(TEXT("DeprecatedShaderStagesEnabled changed."));
-		//}
-		//bNeedsRecompile = true;
-	}
 	else if (PropertyName == GET_MEMBER_NAME_CHECKED(FNiagaraEventScriptProperties, SourceEmitterID))
 	{
 		bRecomputeExecutionOrder = true;
@@ -1130,8 +1113,8 @@ void UNiagaraEmitter::GetScripts(TArray<UNiagaraScript*>& OutScripts, bool bComp
 		{
 			if (SimulationStages[i] && SimulationStages[i]->Script)
 			{
-				if (bEnabledOnly && (!SimulationStages[i]->bEnabled || !bSimulationStagesEnabled))
-					continue;
+				//if (bEnabledOnly && (!SimulationStages[i]->bEnabled || !bSimulationStagesEnabled))
+				//	continue;
 				OutScripts.Add(SimulationStages[i]->Script);
 			}
 		}

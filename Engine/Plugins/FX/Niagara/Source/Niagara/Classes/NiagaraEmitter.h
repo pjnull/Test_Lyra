@@ -379,13 +379,6 @@ public:
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Emitter", meta = (EditCondition = "bLimitDeltaTime"))
 	float MaxDeltaTimePerTick;
 
-	/** Get whether or not to use old shader stages, these are no longer supported and content must be updated to use simulation stages! */
-	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Simulation Stages", meta = (DisplayName = "Enable Deprecated Shader Stages (Experimental GPU Only)"))
-	uint32 bDeprecatedShaderStagesEnabled : 1;
-
-	/** Get whether or not to use simulation stages. */
-	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Simulation Stages", meta = (DisplayName = "Enable Simulation Stages (Experimental GPU Only)"))
-	uint32 bSimulationStagesEnabled : 1;
 
 	/** Whether to limit the max tick delta time or not. */
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Emitter", meta = (InlineEditConditionToggle))

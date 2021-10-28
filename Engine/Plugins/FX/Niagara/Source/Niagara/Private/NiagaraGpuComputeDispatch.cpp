@@ -315,7 +315,7 @@ void FNiagaraGpuComputeDispatch::BuildConstantBuffers(FNiagaraGPUSystemTick& Tic
 	for (const FNiagaraComputeInstanceData& Instance : InstanceData)
 	{
 		HasInterpolationParameters = HasInterpolationParameters || Instance.Context->HasInterpolationParameters;
-		HasMultipleStages = HasMultipleStages || Instance.bUsesSimStages;
+		HasMultipleStages = HasMultipleStages || Instance.bHasMultipleStages;
 	}
 
 	int32 BoundParameterCounts[FNiagaraGPUSystemTick::UBT_NumTypes][2];

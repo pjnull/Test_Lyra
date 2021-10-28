@@ -842,12 +842,6 @@ void UNiagaraScript::ComputeVMCompilationId(FNiagaraVMExecutableDataId& Id, FGui
 						break;
 					}
 				}
-
-				// disable attribute trimming if shader stages are enabled
-				if (OuterEmitter->bDeprecatedShaderStagesEnabled)
-				{
-					TrimAttributes = false;
-				}
 			}
 
 			if (TrimAttributes)
@@ -928,9 +922,8 @@ void UNiagaraScript::ComputeVMCompilationId(FNiagaraVMExecutableDataId& Id, FGui
 			Id.bUsesRapidIterationParams = true;
 		}
 
-		if (Emitter->bSimulationStagesEnabled)
+		// Has simulation stages
 		{
-			Id.AdditionalDefines.Add(TEXT("Emitter.UseSimulationStages"));
 
 			FSHA1 HashState;
 			FNiagaraCompileHashVisitor Visitor(HashState);

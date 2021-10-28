@@ -157,7 +157,7 @@ void UNiagaraStackRoot::RefreshChildrenInternal(const TArray<UNiagaraStackEntry*
 		AddEventHandlerGroup->SetOnItemAdded(UNiagaraStackEventHandlerGroup::FOnItemAdded::CreateUObject(this, &UNiagaraStackRoot::EmitterArraysChanged));
 	}
 
-	if (bIncludeEmitterInformation && AddSimulationStageGroup == nullptr && GetEmitterViewModel()->GetEmitter()->bSimulationStagesEnabled)
+	if (bIncludeEmitterInformation && AddSimulationStageGroup == nullptr)
 	{
 		AddSimulationStageGroup = NewObject<UNiagaraStackSimulationStagesGroup>(this);
 		FRequiredEntryData RequiredEntryData(GetSystemViewModel(), GetEmitterViewModel(),
@@ -165,12 +165,6 @@ void UNiagaraStackRoot::RefreshChildrenInternal(const TArray<UNiagaraStackEntry*
 			GetEmitterViewModel()->GetOrCreateEditorData().GetStackEditorData());
 		AddSimulationStageGroup->Initialize(RequiredEntryData);
 		AddSimulationStageGroup->SetOnItemAdded(UNiagaraStackSimulationStagesGroup::FOnItemAdded::CreateUObject(this, &UNiagaraStackRoot::EmitterArraysChanged));
-	}
-
-	if (bIncludeEmitterInformation && AddSimulationStageGroup != nullptr && GetEmitterViewModel()->GetEmitter()->bSimulationStagesEnabled == false)
-	{
-		// If this is no longer needed it needs to be nulled out since it will have been finalized, and reusing finalized entries is not supported.
-		AddSimulationStageGroup = nullptr;
 	}
 
 	if (bIncludeEmitterInformation && RenderGroup == nullptr)
@@ -219,28 +213,24 @@ void UNiagaraStackRoot::RefreshChildrenInternal(const TArray<UNiagaraStackEntry*
 
 		NewChildren.Add(AddEventHandlerGroup);
 
-		if (GetEmitterViewModel()->GetEmitter()->bSimulationStagesEnabled)
+		for (UNiagaraSimulationStageBase* SimulationStage : GetEmitterViewModel()->GetEmitter()->GetSimulationStages())
 		{
-			for (UNiagaraSimulationStageBase* SimulationStage : GetEmitterViewModel()->GetEmitter()->GetSimulationStages())
+			UNiagaraStackSimulationStageGroup* SimulationStageGroup = FindCurrentChildOfTypeByPredicate<UNiagaraStackSimulationStageGroup>(CurrentChildren,
+				[SimulationStage](UNiagaraStackSimulationStageGroup* CurrentSimulationStageGroup) { return CurrentSimulationStageGroup->GetSimulationStage() == SimulationStage; });
+
+			if (SimulationStageGroup == nullptr)
 			{
-				UNiagaraStackSimulationStageGroup* SimulationStageGroup = FindCurrentChildOfTypeByPredicate<UNiagaraStackSimulationStageGroup>(CurrentChildren,
-					[SimulationStage](UNiagaraStackSimulationStageGroup* CurrentSimulationStageGroup) { return CurrentSimulationStageGroup->GetSimulationStage() == SimulationStage; });
-
-				if (SimulationStageGroup == nullptr)
-				{
-					SimulationStageGroup = NewObject<UNiagaraStackSimulationStageGroup>(this);
-					FRequiredEntryData RequiredEntryData(GetSystemViewModel(), GetEmitterViewModel(),
-						FExecutionCategoryNames::Particle, FExecutionSubcategoryNames::SimulationStage,
-						GetEmitterViewModel()->GetEditorData().GetStackEditorData());
-					SimulationStageGroup->Initialize(RequiredEntryData, GetEmitterViewModel()->GetSharedScriptViewModel(), SimulationStage);
-					SimulationStageGroup->SetOnModifiedSimulationStages(UNiagaraStackSimulationStageGroup::FOnModifiedSimulationStages::CreateUObject(this, &UNiagaraStackRoot::EmitterArraysChanged));
-				}
-
-				NewChildren.Add(SimulationStageGroup);
+				SimulationStageGroup = NewObject<UNiagaraStackSimulationStageGroup>(this);
+				FRequiredEntryData RequiredEntryData(GetSystemViewModel(), GetEmitterViewModel(),
+					FExecutionCategoryNames::Particle, FExecutionSubcategoryNames::SimulationStage,
+					GetEmitterViewModel()->GetEditorData().GetStackEditorData());
+				SimulationStageGroup->Initialize(RequiredEntryData, GetEmitterViewModel()->GetSharedScriptViewModel(), SimulationStage);
+				SimulationStageGroup->SetOnModifiedSimulationStages(UNiagaraStackSimulationStageGroup::FOnModifiedSimulationStages::CreateUObject(this, &UNiagaraStackRoot::EmitterArraysChanged));
 			}
 
-			NewChildren.Add(AddSimulationStageGroup);
+			NewChildren.Add(SimulationStageGroup);
 		}
+		NewChildren.Add(AddSimulationStageGroup);
 
 		NewChildren.Add(RenderGroup);
 	}

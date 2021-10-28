@@ -104,7 +104,6 @@ public:
 	TWeakObjectPtr<UNiagaraScriptSource> Source;
 	FString SourceName;
 	bool bUseRapidIterationParams = true;
-	bool bSimulationStagesEnabled = false;
 
 	UEnum* ENiagaraScriptCompileStatusEnum;
 	UEnum* ENiagaraScriptUsageEnum;
@@ -150,7 +149,6 @@ public:
 	TArray<FNiagaraVariable> ChangedFromNumericVars;
 	FString EmitterUniqueName;
 	TArray<TSharedPtr<FNiagaraCompileRequestDuplicateData, ESPMode::ThreadSafe>> EmitterData;
-	bool bSimulationStagesEnabled = false;
 
 	struct FDuplicatedGraphData
 	{
@@ -586,7 +584,6 @@ public:
 	{
 		return CompilationTarget;
 	}
-	bool GetUsesSimulationStages() const;
 
 	static bool IsBuiltInHlslType(const FNiagaraTypeDefinition& Type);
 	static FString GetStructHlslTypeName(const FNiagaraTypeDefinition& Type);
