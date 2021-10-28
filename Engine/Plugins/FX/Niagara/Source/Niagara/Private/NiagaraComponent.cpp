@@ -2895,12 +2895,14 @@ void UNiagaraComponent::FixInvalidUserParameterOverrideData()
 
 void UNiagaraComponent::AssetExposedParametersChanged()
 {
-	// don't worry about doing anything based on the change broadcast if we haven't finished loading
-	if (!HasAnyFlags(RF_NeedPostLoad))
+	if (HasAnyFlags(RF_NeedPostLoad))
 	{
-		SynchronizeWithSourceSystem();
-		ReinitializeSystem();
+		// Since we register the change delegate in multiple places, it's possible that this is called before the component was able to go through PostLoad().
+		// In that case we skip the sync with the system, as that happens in PostLoad anyways.
+		return;
 	}
+	SynchronizeWithSourceSystem();
+	ReinitializeSystem();
 }
 
 #if WITH_EDITOR
