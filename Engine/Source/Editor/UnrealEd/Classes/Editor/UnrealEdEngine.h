@@ -79,7 +79,7 @@ struct FClassMoveInfo
 
 };
 
-/** Used by New Level Dialog. */
+/** Used during asset renaming/duplication to specify class-specific package/group targets. */
 USTRUCT()
 struct FTemplateMapInfo
 {
@@ -87,7 +87,7 @@ struct FTemplateMapInfo
 
 	/** The Texture2D associated with this map template */
 	UPROPERTY()
-	TSoftObjectPtr<UTexture2D> ThumbnailTexture;
+	TObjectPtr<UTexture2D> ThumbnailTexture;
 
 	/** The object path to the template map */
 	UPROPERTY(config)
@@ -98,6 +98,7 @@ struct FTemplateMapInfo
 	FText DisplayName;
 
 	FTemplateMapInfo()
+		: ThumbnailTexture(NULL)
 	{
 	}
 };

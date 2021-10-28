@@ -335,7 +335,7 @@ private:
 			Item->Type = FNewLevelTemplateItem::NewLevelType::Template;
 			Item->Name = TemplateMapInfo.DisplayName;
 			
-			if (UTexture2D* ThumbnailTexture = TemplateMapInfo.ThumbnailTexture.LoadSynchronous())
+			if (const TObjectPtr<UTexture2D>& ThumbnailTexture = TemplateMapInfo.ThumbnailTexture)
 			{
 				// Level with thumbnail
 				Item->ThumbnailBrush = MakeUnique<FSlateImageBrush>(
