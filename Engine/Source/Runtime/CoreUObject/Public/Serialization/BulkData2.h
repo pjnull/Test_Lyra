@@ -77,8 +77,10 @@ DECLARE_INTRINSIC_TYPE_LAYOUT(EBulkDataFlags);
 class FBulkDataAllocation
 {
 public:
-	// Misc
-	bool IsLoaded() const { return Allocation != nullptr; }
+	FBulkDataAllocation() = default;
+	~FBulkDataAllocation() = default;
+
+	bool IsLoaded() const;
 	void Free(FBulkDataBase* Owner);
 
 	// Set as a raw buffer
@@ -95,8 +97,18 @@ public:
 
 	FOwnedBulkDataPtr* StealFileMapping(FBulkDataBase* Owner);
 	void Swap(FBulkDataBase* Owner, void** DstBuffer);
+
 private:
-	void* Allocation = nullptr; // Will either be the data allocation or a FOwnedBulkDataPtr if memory mapped
+
+	union FAllocation
+	{
+		/** Raw memory allocations, allocated via FMemory::Malloc/Realloc */
+		void* RawData;
+		/** Wrapper around memory mapped allocations allocated via new */
+		FOwnedBulkDataPtr* MemoryMappedData;
+	};
+
+	FAllocation Allocation{ nullptr };
 };
 DECLARE_INTRINSIC_TYPE_LAYOUT(FBulkDataAllocation);
 

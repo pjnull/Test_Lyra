@@ -641,7 +641,8 @@ void FVirtualizedUntypedBulkData::Serialize(FArchive& Ar, UObject* Owner, bool b
 					{
 						SerializePayload(&ExportsArchive, ExportsArchive, DataArchive, DataStartOffset);
 					};
-					LinkerSave->AdditionalDataToAppend.Add(MoveTemp(AdditionalDataCallback));
+					LinkerSave->AdditionalDataToAppend.Add(MoveTemp(AdditionalDataCallback));	// -V595 PVS believes that LinkerSave can potentially be nullptr at 
+																								// this point however we test LinkerSave != nullptr to enter this branch.
 				}
 				else
 				{
