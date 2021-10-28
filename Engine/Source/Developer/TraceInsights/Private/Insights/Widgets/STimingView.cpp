@@ -15,6 +15,7 @@
 #include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "HAL/PlatformTime.h"
 #include "Layout/WidgetPath.h"
+#include "Logging/MessageLog.h"
 #include "Misc/Paths.h"
 #include "Rendering/DrawElements.h"
 #include "SlateOptMacros.h"
@@ -4945,6 +4946,12 @@ void STimingView::FindNextEvent()
 
 		OnSelectedTimingEventChanged();
 	}
+	else
+	{
+		FMessageLog ReportMessageLog(FTimingProfilerManager::Get()->GetLogListingName());
+		ReportMessageLog.Error(LOCTEXT("NoEventFound", "No event found!"));
+		ReportMessageLog.Notify();
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -4991,6 +4998,12 @@ void STimingView::FindPrevEvent()
 		}
 
 		OnSelectedTimingEventChanged();
+	}
+	else
+	{
+		FMessageLog ReportMessageLog(FTimingProfilerManager::Get()->GetLogListingName());
+		ReportMessageLog.Error(LOCTEXT("NoEventFound", "No event found!"));
+		ReportMessageLog.Notify();
 	}
 }
 
