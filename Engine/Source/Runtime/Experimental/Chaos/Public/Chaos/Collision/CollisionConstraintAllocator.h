@@ -285,7 +285,9 @@ namespace Chaos
 			// Update the tick counter
 			// NOTE: We do this here rather than in EndDetectionCollisions so that any contacts injected
 			// before collision detection count as the previous frame's collisions, e.g., from Islands
-			// that are manually awoken by modifying a particle on the game thread.
+			// that are manually awoken by modifying a particle on the game thread. This also needs to be
+			// done where we reset the Constraints array so that we can tell we have a valid index from
+			// the Epoch.
 			++Epoch;
 
 			// Note: we do not reset the shape-pair or particle-pair maps. They may be used to reinstate or reuse
@@ -378,7 +380,7 @@ namespace Chaos
 		*/
 		void DestroyConstraint(FPBDCollisionConstraint* Constraint)
 		{
-			DestroyConstraint(Constraint->GetContainerCookie().Key, Constraint->GetContainerCookie().ConstraintIndex, Constraint);
+			DestroyConstraintImp(Constraint);
 		}
 
 
@@ -492,8 +494,10 @@ namespace Chaos
 			return Constraint;
 		}
 
-		void DestroyConstraint(const FRigidBodyContactKey& Key, const int32 ConstraintIndex, FPBDCollisionConstraint* Constraint)
+		void DestroyConstraintImp(FPBDCollisionConstraint* Constraint)
 		{
+			const FPBDCollisionConstraintContainerCookie& Cookie = Constraint->GetContainerCookie();
+
 			FParticlePairCollisionConstraints** ParticlePairConstraintsPtr = ParticlePairConstraintMap.Find(FParticlePairCollisionsKey(Constraint->Particle[0], Constraint->Particle[1]).GetKey());
 			if (ParticlePairConstraintsPtr != nullptr)
 			{
@@ -501,8 +505,15 @@ namespace Chaos
 				ParticlePairConstraints->RemoveConstraint(Constraint);
 			}
 
-			ShapePairConstraintMap.Remove(Key.GetKey());
-			Constraints[ConstraintIndex] = nullptr;
+			if (Cookie.bIsInShapePairMap)
+			{
+				ShapePairConstraintMap.Remove(Cookie.Key.GetKey());
+			}
+
+			if ((Cookie.LastUsedEpoch == Epoch) && (Cookie.ConstraintIndex != INDEX_NONE))
+			{
+				Constraints[Cookie.ConstraintIndex] = nullptr;
+			}
 
 			FreeConstraint(Constraint);
 		}
@@ -564,25 +575,30 @@ namespace Chaos
 
 		void AddConstraintImp(FPBDCollisionConstraint* CollisionConstraint)
 		{
+			FPBDCollisionConstraintContainerCookie& Cookie = CollisionConstraint->GetContainerCookie();
+
 			// If we hit this, the constraint was already added this tick
-			// @todo(chaos): we can't currently enable this because we don't clear the constraint list
-			// at the end of the frame and we may restore constraints before collision detection begins.
-			// We should not be adding constraints to the active list when calling this before Collision 
-			// Detection, but islands can be awoken both before and after that...
-			// The Constraints array gets cleared in BeginDetectCollisions.
-			//checkSlow(Constraints.Find(CollisionConstraint) == INDEX_NONE);
-			
+			check(Cookie.LastUsedEpoch != Epoch);
+
+			// Destroy an contacts beyond the cull distance
+			// @todo(chaos): this should not be necessary - we should not create them in the first place
+			if (CollisionConstraint->GetPhi() > CollisionConstraint->GetCullDistance())
+			{
+				DestroyConstraint(CollisionConstraint);
+				return;
+			}
+
 			// Add the constraint to the active list and update its epoch
 			const int32 ConstraintIndex = Constraints.Add(CollisionConstraint);
-			CollisionConstraint->GetContainerCookie().Update(ConstraintIndex, Epoch);
+			Cookie.Update(ConstraintIndex, Epoch);
 
 			// If this is a new contact, we must add it to the particle-shape-collision maps.
 			// This will be false when we are reactivating a collision from the previous frame (it would have been pulled from the maps)
 			// but true when restoring a sleeping contact or injecting a user-generated contact for example.
-			if (!CollisionConstraint->GetContainerCookie().bIsInShapePairMap)
+			if (!Cookie.bIsInShapePairMap)
 			{
-				CollisionConstraint->GetContainerCookie().bIsInShapePairMap = true;
-				ShapePairConstraintMap.Add(CollisionConstraint->GetKey().GetKey(), CollisionConstraint);
+				Cookie.bIsInShapePairMap = true;
+				ShapePairConstraintMap.Add(Cookie.Key.GetKey(), CollisionConstraint);
 			}
 
 			// NOTE: ParticlePairConstraints contains only the constraints that are active this frame, hence it is rebuilt. Alternatively we could

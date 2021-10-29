@@ -2061,12 +2061,25 @@ namespace Chaos
 
 					if (Chaos_Collision_NarrowPhase_AABBBoundsCheck)
 					{
-						const FRigidTransform3 Box2ToBox1TM = WorldTransform1.GetRelativeTransform(WorldTransform0);
 						const FAABB3 Box1 = Implicit0->BoundingBox();
-						const FAABB3 Box2In1 = Implicit1->BoundingBox().TransformedAABB(Box2ToBox1TM).Thicken(CullDistance);
-						if (!Box1.Intersects(Box2In1))
+						const FAABB3 Box2 = Implicit1->BoundingBox();
+						//if (Box1.GetVolume() >= Box2.GetVolume())
 						{
-							return;
+							const FRigidTransform3 Box2ToBox1TM = WorldTransform1.GetRelativeTransform(WorldTransform0);
+							const FAABB3 Box2In1 = Box2.TransformedAABB(Box2ToBox1TM).Thicken(CullDistance);
+							if (!Box1.Intersects(Box2In1))
+							{
+								return;
+							}
+						}
+						//else
+						{
+							const FRigidTransform3 Box1ToBox2TM = WorldTransform0.GetRelativeTransform(WorldTransform1);
+							const FAABB3 Box1In2 = Box1.TransformedAABB(Box1ToBox2TM).Thicken(CullDistance);
+							if (!Box2.Intersects(Box1In2))
+							{
+								return;
+							}
 						}
 					}
 				}
@@ -2594,12 +2607,8 @@ namespace Chaos
 		{
 			INC_DWORD_STAT(STAT_ChaosCollisionCounter_NumParticlePairs);
 
+			// @todo(chaos): remove defer update - it is not a valid option with the new solver
 			bool bDeferUpdate = Context.bDeferUpdate;
-			// Skip constraint update for sleeping particles
-			if(Particle0 && Particle1)
-			{
-				bDeferUpdate |= (Particle0->ObjectState() == EObjectStateType::Sleeping) || (Particle1->ObjectState() == EObjectStateType::Sleeping);
-			}
 			if (bDeferUpdate)
 			{
 				using TTraits = TConstructCollisionTraits<false>;

@@ -25,31 +25,33 @@
 #include "Chaos/PhysicsSolverBaseImpl.h"
 
 #include "ProfilingDebugging/CsvProfiler.h"
+#include "ChaosLog.h"
 
 //PRAGMA_DISABLE_OPTIMIZATION
 
 DEFINE_LOG_CATEGORY_STATIC(LogPBDRigidsSolver, Log, All);
 
 // Stat Counters
-DECLARE_DWORD_ACCUMULATOR_STAT(TEXT("NumDisabledBodies"), STAT_ChaosCounter_NumDisabledBodies, STATGROUP_ChaosCounters);
-DECLARE_DWORD_ACCUMULATOR_STAT(TEXT("NumBodies"), STAT_ChaosCounter_NumBodies, STATGROUP_ChaosCounters);
-DECLARE_DWORD_ACCUMULATOR_STAT(TEXT("NumDynamicBodies"), STAT_ChaosCounter_NumDynamicBodies, STATGROUP_ChaosCounters);
-DECLARE_DWORD_ACCUMULATOR_STAT(TEXT("NumActiveDynamicBodies"), STAT_ChaosCounter_NumActiveDynamicBodies, STATGROUP_ChaosCounters);
-DECLARE_DWORD_ACCUMULATOR_STAT(TEXT("NumKinematicBodies"), STAT_ChaosCounter_NumKinematicBodies, STATGROUP_ChaosCounters);
-DECLARE_DWORD_ACCUMULATOR_STAT(TEXT("NumStaticBodies"), STAT_ChaosCounter_NumStaticBodies, STATGROUP_ChaosCounters);
-DECLARE_DWORD_ACCUMULATOR_STAT(TEXT("NumGeomCollBodies"), STAT_ChaosCounter_NumGeometryCollectionBodies, STATGROUP_ChaosCounters);
-DECLARE_DWORD_ACCUMULATOR_STAT(TEXT("NumIslands"), STAT_ChaosCounter_NumIslands, STATGROUP_ChaosCounters);
-DECLARE_DWORD_ACCUMULATOR_STAT(TEXT("NumContacts"), STAT_ChaosCounter_NumContacts, STATGROUP_ChaosCounters);
-DECLARE_DWORD_ACCUMULATOR_STAT(TEXT("NumActiveConstraints"), STAT_ChaosCounter_NumActiveConstraints, STATGROUP_ChaosCounters);
-DECLARE_DWORD_ACCUMULATOR_STAT(TEXT("NumJoints"), STAT_ChaosCounter_NumJoints, STATGROUP_ChaosCounters);
+DECLARE_DWORD_COUNTER_STAT(TEXT("NumDisabledBodies"), STAT_ChaosCounter_NumDisabledBodies, STATGROUP_ChaosCounters);
+DECLARE_DWORD_COUNTER_STAT(TEXT("NumBodies"), STAT_ChaosCounter_NumBodies, STATGROUP_ChaosCounters);
+DECLARE_DWORD_COUNTER_STAT(TEXT("NumDynamicBodies"), STAT_ChaosCounter_NumDynamicBodies, STATGROUP_ChaosCounters);
+DECLARE_DWORD_COUNTER_STAT(TEXT("NumActiveDynamicBodies"), STAT_ChaosCounter_NumActiveDynamicBodies, STATGROUP_ChaosCounters);
+DECLARE_DWORD_COUNTER_STAT(TEXT("NumKinematicBodies"), STAT_ChaosCounter_NumKinematicBodies, STATGROUP_ChaosCounters);
+DECLARE_DWORD_COUNTER_STAT(TEXT("NumStaticBodies"), STAT_ChaosCounter_NumStaticBodies, STATGROUP_ChaosCounters);
+DECLARE_DWORD_COUNTER_STAT(TEXT("NumGeomCollBodies"), STAT_ChaosCounter_NumGeometryCollectionBodies, STATGROUP_ChaosCounters);
+DECLARE_DWORD_COUNTER_STAT(TEXT("NumIslands"), STAT_ChaosCounter_NumIslands, STATGROUP_ChaosCounters);
+DECLARE_DWORD_COUNTER_STAT(TEXT("NumContacts"), STAT_ChaosCounter_NumContacts, STATGROUP_ChaosCounters);
+DECLARE_DWORD_COUNTER_STAT(TEXT("NumValidConstraints"), STAT_ChaosCounter_NumValidConstraints, STATGROUP_ChaosCounters);
+DECLARE_DWORD_COUNTER_STAT(TEXT("NumActiveConstraints"), STAT_ChaosCounter_NumActiveConstraints, STATGROUP_ChaosCounters);
+DECLARE_DWORD_COUNTER_STAT(TEXT("NumJoints"), STAT_ChaosCounter_NumJoints, STATGROUP_ChaosCounters);
 
 // Stat Iteration counters
-DECLARE_DWORD_ACCUMULATOR_STAT(TEXT("NumIterations"), STAT_ChaosCounter_NumIterations, STATGROUP_ChaosCounters);
-DECLARE_DWORD_ACCUMULATOR_STAT(TEXT("NumCollisionIterations"), STAT_ChaosCounter_NumCollisionIterations, STATGROUP_ChaosCounters);
-DECLARE_DWORD_ACCUMULATOR_STAT(TEXT("NumJointIterations"), STAT_ChaosCounter_NumJointIterations, STATGROUP_ChaosCounters);
-DECLARE_DWORD_ACCUMULATOR_STAT(TEXT("NumPushOutIterations"), STAT_ChaosCounter_NumPushOutIterations, STATGROUP_ChaosCounters);
-DECLARE_DWORD_ACCUMULATOR_STAT(TEXT("NumPushOutCollisionIterations"), STAT_ChaosCounter_NumPushOutCollisionIterations, STATGROUP_ChaosCounters);
-DECLARE_DWORD_ACCUMULATOR_STAT(TEXT("NumPushOutJointIterations"), STAT_ChaosCounter_NumPushOutJointIterations, STATGROUP_ChaosCounters);
+DECLARE_DWORD_COUNTER_STAT(TEXT("NumIterations"), STAT_ChaosCounter_NumIterations, STATGROUP_ChaosCounters);
+DECLARE_DWORD_COUNTER_STAT(TEXT("NumCollisionIterations"), STAT_ChaosCounter_NumCollisionIterations, STATGROUP_ChaosCounters);
+DECLARE_DWORD_COUNTER_STAT(TEXT("NumJointIterations"), STAT_ChaosCounter_NumJointIterations, STATGROUP_ChaosCounters);
+DECLARE_DWORD_COUNTER_STAT(TEXT("NumPushOutIterations"), STAT_ChaosCounter_NumPushOutIterations, STATGROUP_ChaosCounters);
+DECLARE_DWORD_COUNTER_STAT(TEXT("NumPushOutCollisionIterations"), STAT_ChaosCounter_NumPushOutCollisionIterations, STATGROUP_ChaosCounters);
+DECLARE_DWORD_COUNTER_STAT(TEXT("NumPushOutJointIterations"), STAT_ChaosCounter_NumPushOutJointIterations, STATGROUP_ChaosCounters);
 
 
 // DebugDraw CVars
@@ -1362,19 +1364,6 @@ namespace Chaos
 		return GetEvolution()->GetCollisionConstraints().NumConstraints();
 	}
 
-	int32 FPBDRigidsSolver::NumActiveCollisionConstraints() const
-	{
-		int32 NumActiveCollisions =  0;
-		for (const FPBDCollisionConstraintHandle* Collision : GetEvolution()->GetCollisionConstraints().GetConstraints())
-		{
-			if (Collision->GetContact().IsEnabled() && !Collision->GetContact().AccumulatedImpulse.IsNearlyZero())
-			{
-				++NumActiveCollisions;
-			}
-		}
-		return NumActiveCollisions;
-	}
-
 #ifndef CHAOS_COUNTER_STAT
 #define CHAOS_COUNTER_STAT(Name, Value)\
 SET_DWORD_STAT(STAT_ChaosCounter_##Name, Value); \
@@ -1399,7 +1388,7 @@ CSV_CUSTOM_STAT(PhysicsCounters, Name, Value, ECsvCustomStatOp::Set);
 		CHAOS_COUNTER_STAT(NumJoints, NumJointConstraints());
 
 #if !UE_BUILD_SHIPPING
-		CHAOS_COUNTER_STAT(NumActiveConstraints, NumActiveCollisionConstraints());
+		UpdateExpensiveStatCounters();
 #endif
 
 		// Iterations
@@ -1409,6 +1398,29 @@ CSV_CUSTOM_STAT(PhysicsCounters, Name, Value, ECsvCustomStatOp::Set);
 		CHAOS_COUNTER_STAT(NumPushOutIterations, GetEvolution()->GetNumPushOutIterations());
 		CHAOS_COUNTER_STAT(NumPushOutCollisionIterations, GetEvolution()->GetCollisionConstraints().GetPushOutPairIterations());
 		CHAOS_COUNTER_STAT(NumPushOutJointIterations, GetJointConstraints().GetSettings().ApplyPushOutPairIterations);
+	}
+
+	void FPBDRigidsSolver::UpdateExpensiveStatCounters() const
+	{
+		int32 NumValidCollisions = 0;
+		int32 NumActiveCollisions = 0;
+		for (const FPBDCollisionConstraintHandle* Collision : GetEvolution()->GetCollisionConstraints().GetConstraints())
+		{
+			if (Collision->GetContact().IsEnabled())
+			{
+				if (Collision->GetContact().GetManifoldPoints().Num() > 0)
+				{
+					++NumValidCollisions;
+				}
+				if (!Collision->GetContact().AccumulatedImpulse.IsNearlyZero())
+				{
+					++NumActiveCollisions;
+				}
+			}
+		}
+
+		CHAOS_COUNTER_STAT(NumValidConstraints, NumValidCollisions);
+		CHAOS_COUNTER_STAT(NumActiveConstraints, NumActiveCollisions);
 	}
 
 	void FPBDRigidsSolver::PostTickDebugDraw(FReal Dt) const

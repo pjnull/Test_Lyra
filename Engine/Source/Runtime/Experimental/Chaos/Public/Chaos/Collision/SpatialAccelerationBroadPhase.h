@@ -383,13 +383,12 @@ namespace Chaos
 						PHYSICS_CSV_SCOPED_EXPENSIVE(PhysicsVerbose, DetectCollisions_NarrowPhase);
 
 						// We move the bodies during contact resolution and it may be in any direction
-						// @todo(chaos): this expansion can be very large for some objects - we may want to consider extending only along
-						// the velocity direction if CCD is not enabled for either object.
-						const FReal CullDistance1 = ComputeBoundsThickness(Particle1, Dt, BoundsThickness, BoundsThicknessVelocityInflation).Size();
+						// NOTE: We use 0 BoundsThickness here - it is already accounted for in CullDistance
+						const FReal CullDistance1 = ComputeBoundsThickness(Particle1, Dt, FReal(0), BoundsThicknessVelocityInflation).Size();
 						FReal CullDistance2 = 0.0f;
 						if (FKinematicGeometryParticleHandle* KinematicParticle2 = Particle2.CastToKinematicParticle())
 						{
-							CullDistance2 = ComputeBoundsThickness(*KinematicParticle2, Dt, BoundsThickness, BoundsThicknessVelocityInflation).Size();
+							CullDistance2 = ComputeBoundsThickness(*KinematicParticle2, Dt, FReal(0), BoundsThicknessVelocityInflation).Size();
 						}
 						const FReal NetCullDistance = CullDistance + CullDistance1 + CullDistance2;
 

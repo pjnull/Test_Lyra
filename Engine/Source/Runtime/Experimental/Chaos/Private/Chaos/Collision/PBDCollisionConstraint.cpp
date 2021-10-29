@@ -145,6 +145,12 @@ namespace Chaos
 		return Constraint;
 	}
 
+	void FPBDCollisionConstraint::Destroy(
+		FPBDCollisionConstraint* Constraint,
+		FCollisionConstraintAllocator& Allocator)
+	{
+		Allocator.DestroyConstraint(Constraint);
+	}
 
 	FPBDCollisionConstraint::FPBDCollisionConstraint()
 		: ImplicitTransform{ FRigidTransform3(), FRigidTransform3() }

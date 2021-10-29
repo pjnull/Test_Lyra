@@ -359,6 +359,9 @@ namespace Chaos
 		static FPBDCollisionConstraint MakeResimCache(
 			const FPBDCollisionConstraint& Source);
 
+		static void Destroy(
+			FPBDCollisionConstraint* Constraint,
+			FCollisionConstraintAllocator& Allocator);
 
 		FPBDCollisionConstraint();
 

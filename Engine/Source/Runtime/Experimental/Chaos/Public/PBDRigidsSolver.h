@@ -151,7 +151,6 @@ namespace Chaos
 
 		int32 NumJointConstraints() const;
 		int32 NumCollisionConstraints() const;
-		int32 NumActiveCollisionConstraints() const;
 
 		//Make friend with unit test code so we can verify some behavior
 		template <typename TSolver>
@@ -300,6 +299,7 @@ namespace Chaos
 
 		// Update the counter in Stats and the CSV profiler
 		void UpdateStatCounters() const;
+		void UpdateExpensiveStatCounters() const;
 
 	private:
 

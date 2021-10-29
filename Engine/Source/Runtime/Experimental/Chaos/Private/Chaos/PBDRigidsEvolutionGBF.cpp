@@ -49,7 +49,7 @@ namespace Chaos
 		FAutoConsoleVariableRef CVarDisableCulledContacts(TEXT("p.CollisionDisableCulledContacts"), CollisionDisableCulledContacts, TEXT("Allow the PBDRigidsEvolutionGBF collision constraints to throw out contacts mid solve if they are culled."));
 
 		// @todo(chaos): this should be 0 but we need it for CCD atm
-		FRealSingle BoundsThicknessVelocityMultiplier = 1.0f;	// @todo(chaos): more to FChaosSolverConfiguration. The required value depends on the solver type
+		FRealSingle BoundsThicknessVelocityMultiplier = 0.0f;
 		FAutoConsoleVariableRef CVarBoundsThicknessVelocityMultiplier(TEXT("p.CollisionBoundsVelocityInflation"), BoundsThicknessVelocityMultiplier, TEXT("Collision velocity inflation for speculatibe contact generation.[def:2.0]"));
 
 		FRealSingle SmoothedPositionLerpRate = 0.1f;
@@ -589,7 +589,7 @@ FPBDRigidsEvolutionGBF::FPBDRigidsEvolutionGBF(FPBDRigidsSOAs& InParticles,THand
 	, SuspensionConstraintRule(SuspensionConstraints, ChaosSolverSuspensionPriority)
 	, CollisionConstraints(InParticles, Collided, PhysicsMaterials, PerParticlePhysicsMaterials, DefaultNumCollisionPairIterations, DefaultNumCollisionPushOutPairIterations, DefaultRestitutionThreshold)
 	, CollisionRule(CollisionConstraints, ChaosSolverCollisionPriority)
-	, BroadPhase(InParticles, DefaultCollisionCullDistance, BoundsThicknessVelocityMultiplier, DefaultCollisionCullDistance)
+	, BroadPhase(InParticles, FReal(0.5) * DefaultCollisionCullDistance, BoundsThicknessVelocityMultiplier, DefaultCollisionCullDistance)
 	, NarrowPhase()
 	, CollisionDetector(BroadPhase, NarrowPhase, CollisionConstraints)
 	, PostIntegrateCallback(nullptr)
@@ -634,7 +634,7 @@ FPBDRigidsEvolutionGBF::FPBDRigidsEvolutionGBF(FPBDRigidsSOAs& InParticles,THand
 	SetInternalParticleInitilizationFunction([](const FGeometryParticleHandle*, const FGeometryParticleHandle*) {});
 
 	NarrowPhase.GetContext().bFilteringEnabled = true;
-	NarrowPhase.GetContext().bDeferUpdate = true;
+	NarrowPhase.GetContext().bDeferUpdate = false;
 	NarrowPhase.GetContext().bAllowManifolds = false;
 	NarrowPhase.GetContext().CollisionAllocator = &CollisionConstraints.GetConstraintAllocator();
 }
