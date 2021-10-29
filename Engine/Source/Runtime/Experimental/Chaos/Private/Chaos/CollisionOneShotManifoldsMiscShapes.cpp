@@ -20,17 +20,6 @@
 
 //PRAGMA_DISABLE_OPTIMIZATION
 
-#if 0
-DECLARE_CYCLE_STAT(TEXT("Collisions::Manifold"), STAT_Collisions_Manifold, STATGROUP_ChaosCollision);
-DECLARE_CYCLE_STAT(TEXT("Collisions::ManifoldGJK"), STAT_Collisions_ManifoldGJK, STATGROUP_ChaosCollision);
-#define SCOPE_CYCLE_COUNTER_MANIFOLD() SCOPE_CYCLE_COUNTER(STAT_Collisions_Manifold)
-#define SCOPE_CYCLE_COUNTER_MANIFOLDGJK() SCOPE_CYCLE_COUNTER(STAT_Collisions_ManifoldGJK)
-#else
-#define SCOPE_CYCLE_COUNTER_MANIFOLD()
-#define SCOPE_CYCLE_COUNTER_MANIFOLDGJK()
-#endif
-
-
 namespace Chaos
 {
 
