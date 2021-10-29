@@ -709,7 +709,12 @@ namespace Metasound
 				]
 			];
 
-// 			DataTypeActionMenu->SelectItemByName(GraphMember->TypeName);
+			auto NameMatchesPredicate = [CurrentTypeName](const TSharedPtr<FString>& Item) { return *Item == CurrentTypeName; };
+			const TSharedPtr<FString>* SelectedItem = ComboOptions.FindByPredicate(NameMatchesPredicate);
+			if (ensure(SelectedItem))
+			{
+				DataTypeComboBox->SetSelectedItem(*SelectedItem);
+			}
 		}
 
 		ECheckBoxState FMetasoundDataTypeSelector::OnGetDataTypeArrayCheckState(TWeakObjectPtr<UMetasoundEditorGraphMember> InGraphMember) const
