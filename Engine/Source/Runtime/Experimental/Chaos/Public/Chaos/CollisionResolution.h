@@ -7,6 +7,9 @@
 #include "Chaos/Collision/PBDCollisionConstraint.h"
 #include "Chaos/ParticleHandleFwd.h"
 
+
+extern bool CCDUseInitialRotationForSweptUpdate;
+
 namespace Chaos
 {
 	template <typename T, int d>
