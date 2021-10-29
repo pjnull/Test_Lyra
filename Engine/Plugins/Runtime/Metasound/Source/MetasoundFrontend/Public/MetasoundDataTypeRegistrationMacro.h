@@ -225,14 +225,14 @@ namespace Metasound
 			RegistryInfo.DataTypeDisplayText = GetMetasoundDataTypeDisplayText<TDataType>();
 			RegistryInfo.PreferredLiteralType = PreferredArgType;
 
-			RegistryInfo.bIsDefaultParsable = TIsParsable<TDataType, FLiteral::FNone>::Value;		
+			RegistryInfo.bIsDefaultParsable = TIsParsable<TDataType, FLiteral::FNone>::Value;
 			RegistryInfo.bIsBoolParsable = TIsParsable<TDataType, bool>::Value;
 			RegistryInfo.bIsIntParsable = TIsParsable<TDataType, int32>::Value;
 			RegistryInfo.bIsFloatParsable = TIsParsable<TDataType, float>::Value;
 			RegistryInfo.bIsStringParsable = TIsParsable<TDataType, FString>::Value;
 			RegistryInfo.bIsProxyParsable = TIsParsable<TDataType, const Audio::IProxyDataPtr&>::Value;
 
-			RegistryInfo.bIsDefaultArrayParsable = TIsParsable<TDataType, TArray<FLiteral::FNone>>::Value;		
+			RegistryInfo.bIsDefaultArrayParsable = TIsParsable<TDataType, TArray<FLiteral::FNone>>::Value;
 			RegistryInfo.bIsBoolArrayParsable = TIsParsable<TDataType, TArray<bool>>::Value;
 			RegistryInfo.bIsIntArrayParsable = TIsParsable<TDataType, TArray<int32>>::Value;
 			RegistryInfo.bIsFloatArrayParsable = TIsParsable<TDataType, TArray<float>>::Value;

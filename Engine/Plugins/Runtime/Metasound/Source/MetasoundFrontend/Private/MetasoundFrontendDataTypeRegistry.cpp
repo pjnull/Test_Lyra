@@ -730,7 +730,18 @@ namespace Metasound
 					return false;
 				}
 
-				return RegisteredObjectClasses.Contains(InObject->GetClass());
+				UClass* ObjectClass = InObject->GetClass();
+				while (ObjectClass != UObject::StaticClass())
+				{
+					if (RegisteredObjectClasses.Contains(ObjectClass))
+					{
+						return true;
+					}
+
+					ObjectClass = ObjectClass->GetSuperClass();
+				}
+
+				return false;
 			}
 
 			Audio::IProxyDataPtr FDataTypeRegistry::CreateProxyFromUObject(const FName& InDataType, UObject* InObject) const

@@ -292,6 +292,8 @@ TSet<FString> UMetasoundEditorGraphNode::GetDisallowedPinClassNames(const UEdGra
 	using namespace Metasound::Editor;
 	using namespace Metasound::Frontend;
 
+	const IMetasoundEditorModule& EditorModule = FModuleManager::GetModuleChecked<IMetasoundEditorModule>("MetaSoundEditor");
+
 	const FDataTypeRegistryInfo DataTypeInfo = GetPinDataTypeInfo(InPin);
 	if (DataTypeInfo.PreferredLiteralType != Metasound::ELiteralType::UObjectProxy)
 	{
@@ -324,7 +326,7 @@ TSet<FString> UMetasoundEditorGraphNode::GetDisallowedPinClassNames(const UEdGra
 			continue;
 		}
 
-		if (Class->IsChildOf(ProxyGenClass))
+		if (EditorModule.IsExplicitProxyClass(*Class) && Class->IsChildOf(ProxyGenClass))
 		{
 			DisallowedClasses.Add(ClassIt->GetName());
 		}

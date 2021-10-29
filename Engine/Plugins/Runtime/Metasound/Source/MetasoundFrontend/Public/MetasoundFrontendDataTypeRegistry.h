@@ -44,7 +44,7 @@ namespace Metasound
 			// Determines whether the type can be used with send/receive transmitters
 			bool bIsTransmittable = false;
 
-			// If this datatype was registered with a specific UClass to use to filter with, that will be used here:
+			// If provided in registration call, UClass this datatype was registered with
 			UClass* ProxyGeneratorClass = nullptr;
 
 			FORCEINLINE bool IsArrayType() const

@@ -17,6 +17,7 @@
 #include "MetasoundEditorGraphBuilder.h"
 #include "MetasoundEditorGraphNode.h"
 #include "MetasoundEditorGraphInputNodes.h"
+#include "MetasoundEditorGraphSchema.h"
 #include "MetasoundEditorModule.h"
 #include "MetasoundFrontend.h"
 #include "MetasoundFrontendController.h"
@@ -27,7 +28,9 @@
 #include "PropertyHandle.h"
 #include "PropertyRestriction.h"
 #include "SlateCore/Public/Styling/SlateColor.h"
+#include "SMetasoundActionMenu.h"
 #include "SMetasoundGraphNode.h"
+#include "SSearchableComboBox.h"
 #include "Templates/Casts.h"
 #include "Templates/SharedPointer.h"
 #include "UObject/WeakObjectPtr.h"
@@ -318,7 +321,7 @@ namespace Metasound
 					continue;
 				}
 				
-				if (Class->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists))
+				if (Class->HasAnyClassFlags(CLASS_Deprecated | CLASS_NewerVersionExists))
 				{
 					continue;
 				}
@@ -339,22 +342,31 @@ namespace Metasound
 		{
 			TSharedPtr<IPropertyHandle> PropertyHandle = StructPropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FMetasoundEditorGraphInputObjectRef, Object));
 
-			auto ValidateAsset = [InProxyGenClass = ProxyGenClass](const FAssetData& InAsset)
+			const IMetasoundEditorModule& EditorModule = FModuleManager::GetModuleChecked<IMetasoundEditorModule>("MetaSoundEditor");
+			auto FilterAsset = [InEditorModule = &EditorModule, InProxyGenClass = ProxyGenClass](const FAssetData& InAsset)
 			{
-				if (!InProxyGenClass.IsValid())
+				if (InProxyGenClass.IsValid())
 				{
-					return false;
-				}
-
-				if (UObject* Object = InAsset.GetAsset())
-				{
-					if (UClass* Class = Object->GetClass())
+					if (UObject* Object = InAsset.GetAsset())
 					{
-						return Class == InProxyGenClass.Get();
+						if (UClass* Class = Object->GetClass())
+						{
+							if (InEditorModule->IsExplicitProxyClass(*InProxyGenClass.Get()))
+							{
+								return Class != InProxyGenClass.Get();
+							}
+
+							return !Class->IsChildOf(InProxyGenClass.Get());
+						}
 					}
 				}
 
-				return false;
+				return true;
+			};
+
+			auto ValidateAsset = [FilterAsset](const FAssetData& InAsset)
+			{
+				return !FilterAsset(InAsset);
 			};
 
 			auto GetAssetPath = [PropertyHandle = PropertyHandle]()
@@ -365,22 +377,6 @@ namespace Metasound
 					return Object->GetPathName();
 				}
 				return FString();
-			};
-
-			auto FilterAsset = [InProxyGenClass = ProxyGenClass](const FAssetData& InAsset)
-			{
-				if (InProxyGenClass.IsValid())
-				{
-					if (UObject* Object = InAsset.GetAsset())
-					{
-						if (UClass* Class = Object->GetClass())
-						{
-							return Class != InProxyGenClass.Get();
-						}
-					}
-				}
-
-				return true;
 			};
 
 			return SNew(SObjectPropertyEntryBox)
@@ -534,14 +530,84 @@ namespace Metasound
 		{
 		}
 
+		FName FMetasoundDataTypeSelector::GetDataType() const
+		{
+			if (GraphMember.IsValid())
+			{
+				return GraphMember->TypeName;
+			}
+
+			return FName();
+		}
+
+		void FMetasoundDataTypeSelector::OnDataTypeSelected(FName InSelectedTypeName)
+		{
+			FName ArrayDataTypeName = FName(*InSelectedTypeName.ToString() + MemberCustomizationPrivate::ArrayIdentifier);
+			FName NewDataTypeName;
+
+			// Update data type based on "Is Array" checkbox and support for arrays.
+			// If an array type is not supported, default to the base data type.
+			IMetasoundEditorModule& EditorModule = FModuleManager::GetModuleChecked<IMetasoundEditorModule>("MetaSoundEditor");
+			if (DataTypeArrayCheckbox->GetCheckedState() == ECheckBoxState::Checked)
+			{
+				if (EditorModule.IsRegisteredDataType(ArrayDataTypeName))
+				{
+					NewDataTypeName = ArrayDataTypeName;
+				}
+				else
+				{
+					check(EditorModule.IsRegisteredDataType(InSelectedTypeName));
+					NewDataTypeName = InSelectedTypeName;
+				}
+			}
+			else
+			{
+				if (EditorModule.IsRegisteredDataType(InSelectedTypeName))
+				{
+					NewDataTypeName = InSelectedTypeName;
+				}
+				else
+				{
+					check(EditorModule.IsRegisteredDataType(ArrayDataTypeName));
+					NewDataTypeName = ArrayDataTypeName;
+				}
+			}
+
+			if (NewDataTypeName == GraphMember->TypeName)
+			{
+				return;
+			}
+
+			// Have to stop playback to avoid attempting to change live edit data on invalid input type.
+			check(GEditor);
+			GEditor->ResetPreviewAudioComponent();
+
+			if (GraphMember.IsValid())
+			{
+				GraphMember->SetDataType(NewDataTypeName);
+			}
+
+			// Required to rebuild the literal details customization.
+			// This is seemingly dangerous (as the Builder's raw ptr is cached),
+			// but the builder cannot be accessed any other way and instances of
+			// this type are always built from and managed by the parent DetailLayoutBuilder.
+			check(DetailLayoutBuilder);
+			DetailLayoutBuilder->ForceRefreshDetails();
+		}
+
 		void FMetasoundDataTypeSelector::AddDataTypeSelector(IDetailLayoutBuilder& InDetailLayout, const FText& InRowName, TWeakObjectPtr<UMetasoundEditorGraphMember> InGraphMember, bool bIsEnabled)
 		{
+			if (!InGraphMember.IsValid())
+			{
+				return;
+			}
+
 			DetailLayoutBuilder = &InDetailLayout;
+			GraphMember = InGraphMember;
 
 			IDetailCategoryBuilder& CategoryBuilder = InDetailLayout.EditCategory("General");
+			FString CurrentTypeName = GraphMember->TypeName.ToString();
 
-			TSharedPtr<FString> CurrentTypeString;
-			FString CurrentTypeName = InGraphMember->TypeName.ToString();
 			bool bCurrentTypeIsArray = CurrentTypeName.EndsWith(MemberCustomizationPrivate::ArrayIdentifier);
 			if (bCurrentTypeIsArray)
 			{
@@ -556,44 +622,31 @@ namespace Metasound
 			const bool bIsArrayTypeRegistered = EditorModule.IsRegisteredDataType(ArrayType);
 			const bool bIsArrayTypeRegisteredHidden = MemberCustomizationPrivate::HiddenInputTypeNames.Contains(ArrayType);
 
-			DataTypeNames.Reset();
+			TArray<FName> DataTypeNames;
 			EditorModule.IterateDataTypes([&](const FEditorDataType& EditorDataType)
 			{
-				const FString TypeName = EditorDataType.RegistryInfo.DataTypeName.ToString(); 
+				const FName& TypeName = EditorDataType.RegistryInfo.DataTypeName;
+				FString TypeNameString = TypeName.ToString();
 
 				// Array types are handled separately via checkbox
-				if (TypeName.EndsWith(MemberCustomizationPrivate::ArrayIdentifier))
+				if (TypeNameString.EndsWith(MemberCustomizationPrivate::ArrayIdentifier))
 				{
 					return;
-				}
-
-
-				TSharedPtr<FString> TypeStrPtr = MakeShared<FString>(TypeName);
-				if (TypeName == CurrentTypeName)
-				{
-					CurrentTypeString = TypeStrPtr;
 				}
 
 				// Hidden input types should be omitted from the drop down.
 				if (!MemberCustomizationPrivate::HiddenInputTypeNames.Contains(EditorDataType.RegistryInfo.DataTypeName))
 				{
-					DataTypeNames.Add(TypeStrPtr);
+					DataTypeNames.Add(TypeName);
 				}
 			});
 
-			if (!ensure(CurrentTypeString.IsValid()))
+			DataTypeNames.Sort([](const FName& DataTypeNameL, const FName& DataTypeNameR)
 			{
-				return;
-			}
-
-			DataTypeNames.Sort([](const TSharedPtr<FString>& DataTypeNameL, const TSharedPtr<FString>& DataTypeNameR)
-			{
-				if (DataTypeNameL.IsValid() && DataTypeNameR.IsValid())
-				{
-					return DataTypeNameR->Compare(*DataTypeNameL.Get()) > 0;
-				}
-				return false;
+				return DataTypeNameL.LexicalLess(DataTypeNameR);
 			});
+
+			Algo::Transform(DataTypeNames, ComboOptions, [](const FName& Name) { return MakeShared<FString>(Name.ToString()); });
 
 			CategoryBuilder.AddCustomRow(InRowName)
 			.IsEnabled(bIsEnabled)
@@ -607,23 +660,39 @@ namespace Metasound
 			[
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot()
-				.FillWidth(0.60f)
-				.Padding(1.0f, 0.0f, 0.0f, 0.0f)
+				.AutoWidth()
+				.HAlign(HAlign_Left)
 				.VAlign(VAlign_Center)
+				.Padding(1.0f, 0.0f, 0.0f, 0.0f)
 				[
-					SAssignNew(DataTypeComboBox, STextComboBox)
-					.OptionsSource(&DataTypeNames)
-					.InitiallySelectedItem(CurrentTypeString)
-					.OnSelectionChanged_Lambda([this, InGraphMember](TSharedPtr<FString> ItemSelected, ESelectInfo::Type SelectInfo)
+					SAssignNew(DataTypeComboBox, SSearchableComboBox)
+					.OptionsSource(&ComboOptions)
+					.OnGenerateWidget_Lambda([](TSharedPtr<FString> InItem)
 					{
-						OnBaseDataTypeChanged(InGraphMember, ItemSelected, SelectInfo);
+						return SNew(STextBlock)
+							.Text(FText::FromString(*InItem));
 					})
-					.IsEnabled(bIsEnabled)
+					.OnSelectionChanged_Lambda([this](TSharedPtr<FString> InNewName, ESelectInfo::Type InSelectInfo)
+					{
+						if (InSelectInfo != ESelectInfo::OnNavigation)
+						{
+							OnDataTypeSelected(FName(*InNewName));
+						}
+					})
+					.Content()
+					[
+						SNew(STextBlock)
+						.Text_Lambda([this]()
+						{
+							return FText::FromName(GetDataType());
+						})
+					]
 				]
 				+ SHorizontalBox::Slot()
-				.FillWidth(0.40f)
-				.Padding(2.0f, 0.0f, 0.0f, 0.0f)
+				.AutoWidth()
+				.HAlign(HAlign_Right)
 				.VAlign(VAlign_Center)
+				.Padding(2.0f, 0.0f, 0.0f, 0.0f)
 				[
 					SAssignNew(DataTypeArrayCheckbox, SCheckBox)
 					.IsEnabled(bIsArrayTypeRegistered && !bIsArrayTypeRegisteredHidden)
@@ -642,6 +711,8 @@ namespace Metasound
 					]
 				]
 			];
+
+// 			DataTypeActionMenu->SelectItemByName(GraphMember->TypeName);
 		}
 
 		ECheckBoxState FMetasoundDataTypeSelector::OnGetDataTypeArrayCheckState(TWeakObjectPtr<UMetasoundEditorGraphMember> InGraphMember) const
@@ -733,7 +804,7 @@ namespace Metasound
 				.Font(IDetailLayoutBuilder::GetDetailFont())
 			];
 
-			AddDataTypeSelector(DetailLayout, MemberCustomizationPrivate::DataTypeNameText, GraphMember, !bIsRequired && bIsGraphEditable);
+			DataTypeSelector->AddDataTypeSelector(DetailLayout, MemberCustomizationPrivate::DataTypeNameText, GraphMember, !bIsRequired && bIsGraphEditable);
 
 			IDetailCategoryBuilder& DefaultCategoryBuilder = DetailLayout.EditCategory("DefaultValue");
 			TSharedPtr<IPropertyHandle> LiteralHandle = DetailLayout.GetProperty(GET_MEMBER_NAME_CHECKED(UMetasoundEditorGraphInput, Literal));
@@ -791,7 +862,7 @@ namespace Metasound
 
 		void FMetasoundDataTypeSelector::OnDataTypeArrayChanged(TWeakObjectPtr<UMetasoundEditorGraphMember> InGraphMember, ECheckBoxState InNewState)
 		{
-			if (InGraphMember.IsValid())
+			if (InGraphMember.IsValid() && DataTypeComboBox.IsValid())
 			{
 				TSharedPtr<FString> DataTypeRoot = DataTypeComboBox->GetSelectedItem();
 				if (ensure(DataTypeRoot.IsValid()))
@@ -815,59 +886,6 @@ namespace Metasound
 					check(DetailLayoutBuilder);
 					DetailLayoutBuilder->ForceRefreshDetails();
 				}
-			}
-		}
-
-		void FMetasoundDataTypeSelector::OnBaseDataTypeChanged(TWeakObjectPtr<UMetasoundEditorGraphMember> InGraphMember, TSharedPtr<FString> ItemSelected, ESelectInfo::Type SelectInfo)
-		{
-			if (ItemSelected.IsValid() && !ItemSelected->IsEmpty() && InGraphMember.IsValid())
-			{
-				IMetasoundEditorModule& EditorModule = FModuleManager::GetModuleChecked<IMetasoundEditorModule>("MetaSoundEditor");
-
-				FName BaseDataTypeName = FName(*ItemSelected.Get());
-				FName ArrayDataTypeName = FName(*ItemSelected.Get() + MemberCustomizationPrivate::ArrayIdentifier);
-
-				FName NewDataTypeName;
-
-				// Update data type based on "Is Array" checkbox and support for arrays.
-				// If an array type is not supported, default to the base data type.
-				if (DataTypeArrayCheckbox->GetCheckedState() == ECheckBoxState::Checked)
-				{
-					if (EditorModule.IsRegisteredDataType(ArrayDataTypeName))
-					{
-						NewDataTypeName = ArrayDataTypeName;
-					}
-					else
-					{
-						check(EditorModule.IsRegisteredDataType(BaseDataTypeName));
-						NewDataTypeName = BaseDataTypeName;
-					}
-				}
-				else
-				{
-					if (EditorModule.IsRegisteredDataType(BaseDataTypeName))
-					{
-						NewDataTypeName = BaseDataTypeName;
-					}
-					else
-					{
-						check(EditorModule.IsRegisteredDataType(ArrayDataTypeName));
-						NewDataTypeName = ArrayDataTypeName;
-					}
-				}
-
-				// Have to stop playback to avoid attempting to change live edit data on invalid input type.
-				check(GEditor);
-				GEditor->ResetPreviewAudioComponent();
-
-				InGraphMember->SetDataType(NewDataTypeName);
-
-				// Required to rebuild the literal details customization.
-				// This is seemingly dangerous (as the Builder's raw ptr is cached),
-				// but the builder cannot be accessed any other way and instances of
-				// this type are always built from and managed by the parent DetailLayoutBuilder.
-				check(DetailLayoutBuilder);
-				DetailLayoutBuilder->ForceRefreshDetails();
 			}
 		}
 
@@ -1002,22 +1020,7 @@ namespace Metasound
 				.Font(IDetailLayoutBuilder::GetDetailFont())
 			];
 
-			AddDataTypeSelector(DetailLayout, MemberCustomizationPrivate::DataTypeNameText, GraphMember, !bIsRequired && bIsGraphEditable);
-
-// 			CategoryBuilder.AddCustomRow(LOCTEXT("OutputPrivate", "Private"))
-// 			.Visibility(TAttribute<EVisibility>(EVisibility::Hidden))
-// 			.NameContent()
-// 			[
-// 				SNew(STextBlock)
-// 				.Text(LOCTEXT("OutputPrivate", "Private"))
-// 				.Font(IDetailLayoutBuilder::GetDetailFont())
-// 			]
-// 			.ValueContent()
-// 			[
-// 				SNew(SCheckBox)
-// 				.IsChecked(this, &FMetasoundOutputDetailCustomization::OnGetPrivateCheckboxState)
-// 				.OnCheckStateChanged(this, &FMetasoundOutputDetailCustomization::OnPrivateChanged)
-// 			];
+			DataTypeSelector->AddDataTypeSelector(DetailLayout, MemberCustomizationPrivate::DataTypeNameText, GraphMember, !bIsRequired && bIsGraphEditable);
 		}
 
 		void FMetasoundOutputDetailCustomization::SetDefaultPropertyMetaData(TSharedRef<IPropertyHandle> InDefaultPropertyHandle) const
