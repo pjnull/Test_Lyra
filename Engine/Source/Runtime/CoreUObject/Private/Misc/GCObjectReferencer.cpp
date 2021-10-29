@@ -11,6 +11,7 @@
 #include "Templates/Casts.h"
 #include "UObject/GCObject.h"
 #include "UObject/GarbageCollectionVerification.h"
+#include "HAL/IConsoleManager.h"
 
 static int32 GVerifyGCObjectNames = 1;
 static FAutoConsoleVariableRef CVerifyGCObjectNames(
