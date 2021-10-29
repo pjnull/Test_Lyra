@@ -21,9 +21,9 @@
 #endif
 
 #pragma warning(push, 0)     
-#include "far/topologyRefiner.h"
-#include "far/topologyDescriptor.h"
-#include "far/primvarRefiner.h"
+#include "opensubdiv/far/topologyRefiner.h"
+#include "opensubdiv/far/topologyDescriptor.h"
+#include "opensubdiv/far/primvarRefiner.h"
 #pragma warning(pop)     
 
 #if LOCAL_M_PI
