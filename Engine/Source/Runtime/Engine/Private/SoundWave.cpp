@@ -76,6 +76,15 @@ FAutoConsoleVariableRef CVarDispatchToGameThreadOnChunkRequest(
 	TEXT("0: as soon as the chunk is loaded, capture the audio chunk. 1: As soon as the chunk is loaded, dispatch a callback to the gamethread."),
 	ECVF_Default);
 
+static int32 AllowReverbForMultichannelSources = 1;
+FAutoConsoleVariableRef CvarAllowReverbForMultichannelSources(
+	TEXT("au.AllowReverbForMultichannelSources"),
+	AllowReverbForMultichannelSources,
+	TEXT("Controls if we allow Reverb processing for sources with channel counts > 2.\n")
+	TEXT("0: Disable, >0: Enable"),
+	ECVF_Default);
+
+
 #if !UE_BUILD_SHIPPING
 static void DumpBakedAnalysisData(const TArray<FString>& Args)
 {
@@ -2131,6 +2140,7 @@ void USoundWave::Parse(FAudioDevice* AudioDevice, const UPTRINT NodeWaveInstance
 	WaveInstance->SetVolume(ParseParams.Volume * Volume);
 	WaveInstance->SetVolumeMultiplier(ParseParams.VolumeMultiplier);
 	WaveInstance->SetDistanceAttenuation(ParseParams.DistanceAttenuation);
+	WaveInstance->SetOcclusionAttenuation(ParseParams.OcclusionAttenuation);
 	WaveInstance->SetPitch(ParseParams.Pitch * Pitch);
 	WaveInstance->bEnableLowPassFilter = ParseParams.bEnableLowPassFilter;
 	WaveInstance->bIsOccluded = ParseParams.bIsOccluded;
@@ -2271,12 +2281,32 @@ void USoundWave::Parse(FAudioDevice* AudioDevice, const UPTRINT NodeWaveInstance
 		}
 	}
 
-	// Copy reverb send settings
-	WaveInstance->ReverbSendMethod = ParseParams.ReverbSendMethod;
-	WaveInstance->ManualReverbSendLevel = ParseParams.ManualReverbSendLevel;
-	WaveInstance->CustomRevebSendCurve = ParseParams.CustomReverbSendCurve;
-	WaveInstance->ReverbSendLevelRange = ParseParams.ReverbSendLevelRange;
-	WaveInstance->ReverbSendLevelDistanceRange = ParseParams.ReverbSendLevelDistanceRange;
+	// Update reverb send levels. 
+	WaveInstance->bReverb = WaveInstance->bReverb && !WaveInstance->bIsMusic && (AllowReverbForMultichannelSources || WaveInstance->WaveData->NumChannels <= 2);
+	if (WaveInstance->bReverb)
+	{
+		if (ParseParams.ReverbSendMethod == EReverbSendMethod::Manual)
+		{
+			WaveInstance->ReverbSendLevel = FMath::Clamp(ParseParams.ManualReverbSendLevel, 0.0f, 1.0f);
+		}
+		else
+		{
+			// The alpha value is determined identically between manual and custom curve methods
+			const FVector2D& ReverbSendRadialRange = ParseParams.ReverbSendLevelDistanceRange;
+			const float Denom = FMath::Max(ReverbSendRadialRange.Y - ReverbSendRadialRange.X, 1.0f);
+			const float Alpha = FMath::Clamp((WaveInstance->ListenerToSoundDistance - ReverbSendRadialRange.X) / Denom, 0.0f, 1.0f);
+
+			if (ParseParams.ReverbSendMethod == EReverbSendMethod::Linear)
+			{
+				WaveInstance->ReverbSendLevel = FMath::Clamp(FMath::Lerp(ParseParams.ReverbSendLevelRange.X, ParseParams.ReverbSendLevelRange.Y, Alpha), 0.0f, 1.0f);
+			}
+			else
+			{
+				WaveInstance->ReverbSendLevel = FMath::Clamp(ParseParams.CustomReverbSendCurve.GetRichCurveConst()->Eval(Alpha), 0.0f, 1.0f);
+			}
+		}
+	}
+
 
  	// Copy the submix send settings
  	WaveInstance->SubmixSendSettings = ParseParams.SubmixSendSettings;
