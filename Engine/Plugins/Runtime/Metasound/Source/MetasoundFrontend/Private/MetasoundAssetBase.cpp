@@ -216,9 +216,11 @@ void FMetasoundAssetBase::RegisterGraphWithFrontend(FMetaSoundAssetRegistrationO
 
 		AssetClassInfo.InputTypes.Reset();
 		Algo::Transform(GraphClass.Interface.Inputs, AssetClassInfo.InputTypes, [] (const FMetasoundFrontendClassInput& Input) { return Input.TypeName; });
+		AssetClassInfo.InputTypes.Sort();
 
 		AssetClassInfo.OutputTypes.Reset();
 		Algo::Transform(GraphClass.Interface.Outputs, AssetClassInfo.OutputTypes, [](const FMetasoundFrontendClassOutput& Output) { return Output.TypeName; });
+		AssetClassInfo.OutputTypes.Sort();
 
 		SetRegistryAssetClassInfo(MoveTemp(AssetClassInfo));
 #endif // WITH_EDITORONLY_DATA

@@ -48,7 +48,7 @@ namespace Metasound
 			OutInfo.Version.Minor = RegistryVersionMinor;
 
 #if WITH_EDITORONLY_DATA
-			auto ParseTypesString = [&](const FName AssetTag, TArray<FName>& OutTypes)
+			auto ParseTypesString = [&](const FName AssetTag, TSet<FName>& OutTypes)
 			{
 				FString TypesString;
 				if (InAssetData.GetTagValue(AssetTag, TypesString))
