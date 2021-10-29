@@ -222,8 +222,12 @@ namespace Chaos
 						const FReal Box1Thickness = ComputeBoundsThickness(Particle1, Dt, BoundsThickness, BoundsThicknessVelocityInflation).Size();
 						const FAABB3 Box1 = ComputeWorldSpaceBoundingBox<FReal>(Particle1).ThickenSymmetrically(FVec3(Box1Thickness));
 
-						FSimOverlapVisitor OverlapVisitor(Particle1.UniqueIdx(), ParticleSimData, PotentialIntersections);
-						InSpatialAcceleration.Overlap(Box1, OverlapVisitor);
+						{
+							PHYSICS_CSV_SCOPED_EXPENSIVE(PhysicsVerbose, DetectCollisions_BroadPhase);
+							FSimOverlapVisitor OverlapVisitor(Particle1.UniqueIdx(), ParticleSimData, PotentialIntersections);
+							InSpatialAcceleration.Overlap(Box1, OverlapVisitor);
+						}
+						
 					}
 					else
 					{
@@ -239,6 +243,7 @@ namespace Chaos
 
 				SCOPE_CYCLE_COUNTER(STAT_Collisions_Filtering);
 				const int32 NumPotentials = PotentialIntersections.Num();
+				int32 NumIntoNarrowPhase = 0;
 				for (int32 i = 0; i < NumPotentials; ++i)
 				{
 					auto& Particle2 = *PotentialIntersections[i].GetGeometryParticleHandle_PhysicsThread();
@@ -375,6 +380,7 @@ namespace Chaos
 					// If we get here, we need to run the narrow phase to possibly generate new contacts, or refresh existing ones
 					{
 						SCOPE_CYCLE_COUNTER(STAT_Collisions_GenerateCollisions);
+						PHYSICS_CSV_SCOPED_EXPENSIVE(PhysicsVerbose, DetectCollisions_NarrowPhase);
 
 						// We move the bodies during contact resolution and it may be in any direction
 						// @todo(chaos): this expansion can be very large for some objects - we may want to consider extending only along
@@ -390,8 +396,13 @@ namespace Chaos
 						// Generate constraints for the potentially overlapping shape pairs. Also run collision detection to generate
 						// the contact position and normal (for contacts within CullDistance) for use in collision callbacks.
 						NarrowPhase.GenerateCollisions(Dt, Particle1.Handle(), Particle2.Handle(), NetCullDistance, false);
+						++NumIntoNarrowPhase;
 					}
 				}
+
+				PHYSICS_CSV_CUSTOM_EXPENSIVE(PhysicsCounters, NumPotentialContacts, NumIntoNarrowPhase, ECsvCustomStatOp::Accumulate);
+				PHYSICS_CSV_CUSTOM_EXPENSIVE(PhysicsCounters, NumFromBroadphase, NumPotentials, ECsvCustomStatOp::Accumulate);
+
 			}
 		}
 
