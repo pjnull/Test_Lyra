@@ -347,17 +347,14 @@ namespace Metasound
 			{
 				if (InProxyGenClass.IsValid())
 				{
-					if (UObject* Object = InAsset.GetAsset())
+					if (UClass* Class = InAsset.GetClass())
 					{
-						if (UClass* Class = Object->GetClass())
+						if (InEditorModule->IsExplicitProxyClass(*InProxyGenClass.Get()))
 						{
-							if (InEditorModule->IsExplicitProxyClass(*InProxyGenClass.Get()))
-							{
-								return Class != InProxyGenClass.Get();
-							}
-
-							return !Class->IsChildOf(InProxyGenClass.Get());
+							return Class != InProxyGenClass.Get();
 						}
+
+						return !Class->IsChildOf(InProxyGenClass.Get());
 					}
 				}
 
