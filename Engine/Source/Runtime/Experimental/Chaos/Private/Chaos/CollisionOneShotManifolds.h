@@ -4,6 +4,7 @@
 
 #include "Chaos/Collision/PBDCollisionConstraint.h"
 #include "Chaos/Convex.h"
+#include "Chaos/ImplicitFwd.h"
 #include "Chaos/Defines.h"
 #include "Chaos/Transform.h"
 
@@ -14,6 +15,7 @@ namespace Chaos
 	{
 		uint32 BoxBoxClipVerticesAgainstPlane(const FVec3* InputVertexBuffer, FVec3* outputVertexBuffer, uint32 ClipPointCount, int32 ClippingAxis, FReal Distance);
 		uint32 ReduceManifoldContactPoints(FVec3* Points, uint32 PointCount);
+		void ReduceManifoldContactPointsTriangeMesh(TArray<FContactPoint>& ContactPoints);
 
 		void ConstructBoxBoxOneShotManifold(
 			const FImplicitBox3& Box1,
