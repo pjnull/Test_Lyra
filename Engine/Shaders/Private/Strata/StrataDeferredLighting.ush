@@ -9,16 +9,18 @@ struct FStrataLightIntegrationContext
 	float3 IncidentRadianceNoShadow;
 	float3 IncidentTransmittedRadianceNoShadow;
 	float3 IncidentIrradianceNoShadow;	// Modified incident irradiance, based on custom are light integrator
-	float3 OutgoingRadianceNoShadow;	// Continue the outgoing radiance if the BSDF evaluation/integration has been done with the custom area light integrator
+	float3 RectLightDiffuseFactor;
+	float3 RectLightOutgoingSpecularRadianceNoShadow; // Continue the outgoing radiance if the BSDF evaluation/integration has been done with the custom area light integrator
 	float3 IncidentIrradianceNoShadowHaze;
-	bool bEvaluateBSDF;					// True if the BSDF need to be evalued, false, if the integration has already been done
+	bool bRectLight;					// Rect light need special treatment
 };
 
 FStrataLightIntegrationContext StrataIniLightIntegrationContext()
 {
 	FStrataLightIntegrationContext Out;
-	Out.bEvaluateBSDF = true;
-	Out.OutgoingRadianceNoShadow = 0;
+	Out.bRectLight = false;
+	Out.RectLightDiffuseFactor = 0;
+	Out.RectLightOutgoingSpecularRadianceNoShadow = 0;
 	Out.IncidentIrradianceNoShadow = 0;
 	Out.IncidentIrradianceNoShadowHaze = 0;
 	Out.IncidentRadianceNoShadow = 0;
@@ -35,8 +37,9 @@ void StrataPreprocessAreaLightIntegration(
 	inout FStrataBSDFContext BSDFContext,
 	inout FStrataLightIntegrationContext Out)
 {
-	Out.bEvaluateBSDF = true;
-	Out.OutgoingRadianceNoShadow = 0;
+	Out.bRectLight = false;
+	Out.RectLightDiffuseFactor = 0;
+	Out.RectLightOutgoingSpecularRadianceNoShadow = 0;
 
 	// Special area lighting integration
 	bool bIsValid = true;
@@ -47,7 +50,6 @@ void StrataPreprocessAreaLightIntegration(
 	{
 		FRect Rect = GetRect(ToLight, LightData);
 		bIsValid = IsRectVisible(Rect);
-		Out.bEvaluateBSDF = false;
 		// No-visible rect light due to barn door occlusion
 		LightContext = CreateRectIntegrateContext(Roughness, BSDFContext.N, BSDFContext.V, Rect, RectTexture);
 	}
@@ -90,23 +92,38 @@ void StrataPreprocessAreaLightIntegration(
 
 				// Rect light uses LTC integrator, which computes the full BDSD x Area light integration. 
 				// This is why there is no need to evaluate the BSDF. The result is stored into a local 
-				// OutgoingRadianceNoShadow, which will be accumulated outside of this function
-				float3 LocalOutgoingRadianceNoShadow =
+				// OutgoingAreaLightSpecularRadianceNoShadow, which will be accumulated outside of this function
+				float3 LocalRectLightOutgoingSpecularRadianceNoShadow =
 					Out.IncidentRadianceNoShadow *
 					RectGGXApproxLTC(SafeRoughnessX, SpecularColor, BSDFContext.N, BSDFContext.V, LightContext.AreaLight.Rect, LightContext.AreaLight.Texture);
 
 				if (bHaziness)
 				{
-					Out.IncidentIrradianceNoShadow =
-						(1.0f - SPECULAR_HAZINESS_WEIGHT) * LocalOutgoingRadianceNoShadow +
+					Out.RectLightOutgoingSpecularRadianceNoShadow =
+						(1.0f - SPECULAR_HAZINESS_WEIGHT) * LocalRectLightOutgoingSpecularRadianceNoShadow +
 						SPECULAR_HAZINESS_WEIGHT * Out.IncidentRadianceNoShadow * RectGGXApproxLTC(SafeRoughnessX, SpecularColor, BSDFContext.N, BSDFContext.V, LightContext.AreaLight.Rect, LightContext.AreaLight.Texture);
 				}
 				else
 				{
-					Out.OutgoingRadianceNoShadow = LocalOutgoingRadianceNoShadow;
+					Out.RectLightOutgoingSpecularRadianceNoShadow = LocalRectLightOutgoingSpecularRadianceNoShadow;
 				}
 
-				Out.bEvaluateBSDF = false;
+				Out.bRectLight = true;
+
+				// Now use StrataEvaluateBSDF to gather the diffuse contribution only.
+				StrataUpdateBSDFContext(BSDFContext, LightContext.L);
+
+				// Update the context according to SphereSinAlpha but original data to not cause visual artefact with the Chan model.
+				float NoV = BSDFContext.Context.NoV;
+				float VoH = BSDFContext.Context.VoH;
+				float NoH = BSDFContext.Context.NoH;
+				SphereMaxNoH(BSDFContext.Context, LightContext.AreaLight.SphereSinAlpha, true);
+				BSDFContext.Context.NoV = NoV;
+				BSDFContext.Context.VoH = VoH;
+				BSDFContext.Context.NoH = NoH;
+
+				//																						LightContext.NoL here is wrong because it only work for Slab, we will fix.
+				Out.RectLightDiffuseFactor = LightContext.AreaLight.FalloffColor * LightContext.Falloff * LightContext.NoL;
 			}
 			else
 			{
@@ -143,7 +160,7 @@ void StrataPreprocessAreaLightIntegration(
 						LightContext.AreaLight.FalloffColor * (LightContext.Falloff * LightContext.NoL);
 				}
 
-				Out.bEvaluateBSDF = true;
+				Out.bRectLight = false;
 			}
 		}
 	}
@@ -203,7 +220,8 @@ float4 StrataDeferredLighting(
 		StrataPreprocessAreaLightIntegration(ToLight, LightData, RectTexture, BSDFContext, IntegrationContext);
 
 		// Evaluate BSDF
-		if (IntegrationContext.bEvaluateBSDF)
+		const float IdentityCommonMultiplier = 1.0f;
+		if (!IntegrationContext.bRectLight)
 		{
 			FStrataEvaluateResult BSDFEvaluate = StrataEvaluateBSDF(BSDFContext, ShadowTerms);
 
@@ -224,17 +242,26 @@ float4 StrataDeferredLighting(
 			DiffuseTotalLight  *= BSDF.FinalWeight;
 			SpecularTotalLight *= BSDF.FinalWeight;
 
-			const float IdentityCommonMultiplier = 1.0f;
-			LightAccumulator_AddSplit(Out, DiffuseTotalLight, SpecularTotalLight, DiffuseTotalLight, IdentityCommonMultiplier, bNeedsSeparateSubsurfaceLightAccumulation);
+			LightAccumulator_AddSplit(Out, DiffuseTotalLight,		SpecularTotalLight,			DiffuseTotalLight,			IdentityCommonMultiplier,	bNeedsSeparateSubsurfaceLightAccumulation);
 		}
 		else
 		{
-			// STRATA_TODO Find a better solution for special of are lighting which handles specular path only, so we can hardcode weight.
-			const float3 DiffuseRadiance  = 0;
-			const float3 SpecularRadiance = 1;
-			const bool bNeedsSeparateSubsurfaceLightAccumulation = false;
+			FStrataEvaluateResult BSDFEvaluate = StrataEvaluateBSDF(BSDFContext, ShadowTerms);
 
-			LightAccumulator_AddSplit(Out, DiffuseRadiance,				SpecularRadiance,					DiffuseRadiance,			IntegrationContext.OutgoingRadianceNoShadow * ShadowTerms.SurfaceShadow,					bNeedsSeparateSubsurfaceLightAccumulation);
+			const float3 DiffusePathValue			= BSDFEvaluate.DiffusePathValue;
+			const float3 TransmissionPathValue		= BSDFEvaluate.TransmissionPathValue;
+			const float3 ThinTransmissionPathValue	= BSDFEvaluate.ThinTransmissionPathValue * StrataBSDFBackFaceProjectedSolidAngleFactor(BSDFContext); // Separated because it is back face shading with -N, while StrataBSDFProjectedSolidAngleFactor account for front face.
+
+			const bool bNeedsSeparateSubsurfaceLightAccumulation = BSDFEvaluate.bSubsurface;
+
+			//																													Here, IntegrationContext.IncidentRadianceNoShadow is important
+			float3 DiffuseTotalLight	= ShadowTerms.SurfaceShadow			* (DiffusePathValue			* IntegrationContext.IncidentRadianceNoShadow					+	ThinTransmissionPathValue	* IntegrationContext.IncidentRadianceNoShadow)
+										+ ShadowTerms.TransmissionShadow	* (TransmissionPathValue	* IntegrationContext.IncidentTransmittedRadianceNoShadow);
+
+			const float3 DiffuseRadiance  = DiffuseTotalLight * IntegrationContext.RectLightDiffuseFactor;
+			const float3 SpecularRadiance = IntegrationContext.RectLightOutgoingSpecularRadianceNoShadow * ShadowTerms.SurfaceShadow;
+
+			LightAccumulator_AddSplit(Out, DiffuseRadiance,			SpecularRadiance,			DiffuseRadiance,			IdentityCommonMultiplier,	bNeedsSeparateSubsurfaceLightAccumulation);
 		}
 	}
 
