@@ -59,6 +59,9 @@ void FDatasmithSceneReceiver::FinalSnapshot(const DirectLink::FSceneSnapshot& Sc
 	Nodes.Reserve(SceneSnapshot.Elements.Num());
 
 	TSharedPtr<FDatasmithSceneGraphSharedState> SceneSharedState = MakeShared<FDatasmithSceneGraphSharedState>(SceneSnapshot.SceneId);
+	
+	const EDatasmithElementType UnsupportedTypes = EDatasmithElementType::Material;
+	EDatasmithElementType FoundUnsupportedTypes =  EDatasmithElementType::None;
 
 	for (const auto& KV : SceneSnapshot.Elements)
 	{
@@ -92,6 +95,13 @@ void FDatasmithSceneReceiver::FinalSnapshot(const DirectLink::FSceneSnapshot& Sc
 		// Well, of course it's not exact...
 		// Type &= (uint64)~EDatasmithElementType::BaseMaterial; // remove that flag as it always has a child anyway, and its order is impractical.
 		EDatasmithElementType PureType = EDatasmithElementType(uint64(1) << FPlatformMath::FloorLog2_64(Type));
+
+		if (EnumHasAnyFlags(PureType, UnsupportedTypes))
+		{
+			// We can't skip any unsupported type, because DirectLink needs to validate that each exported node is also imported.
+			// So we must remove those types in a latter step.
+			FoundUnsupportedTypes |= PureType;
+		}
 
 		TSharedPtr<IDatasmithElement> Element = FDatasmithSceneFactory::CreateElement(PureType, Subtype, *Name);
 		check(Element);
@@ -132,6 +142,24 @@ void FDatasmithSceneReceiver::FinalSnapshot(const DirectLink::FSceneSnapshot& Sc
 				DumpDatasmithScene(Current->Scene.ToSharedRef(), TEXT("received"));
 			}
 			break;
+		}
+	}
+
+	if (FoundUnsupportedTypes != EDatasmithElementType::None && Current->Scene)
+	{
+		IDatasmithScene& Scene = *Current->Scene;
+
+		if (EnumHasAllFlags(FoundUnsupportedTypes, EDatasmithElementType::Material))
+		{
+			UE_LOG(LogDatasmith, Warning, TEXT("Datasmith scene \"%s\" imported with DirectLink contains deprecated IDatasmithMaterialElement, they will be ignored."), *Scene.GetName());
+			for (int MaterialIndex = Scene.GetMaterialsCount() - 1; 0 <= MaterialIndex; --MaterialIndex)
+			{
+				TSharedPtr<IDatasmithBaseMaterialElement> CurrentMaterial = Scene.GetMaterial(MaterialIndex);
+				if (CurrentMaterial && CurrentMaterial->IsA(UnsupportedTypes))
+				{
+					Scene.RemoveMaterialAt(MaterialIndex);
+				}
+			}
 		}
 	}
 
