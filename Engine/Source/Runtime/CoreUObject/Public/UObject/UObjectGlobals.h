@@ -802,6 +802,8 @@ enum class EObjectInitializerOptions
 };
 ENUM_CLASS_FLAGS(EObjectInitializerOptions)
 
+class FGCObject;
+
 /**
  * Internal class to finalize UObject creation (initialize properties) after the real C++ constructor is called.
  **/
@@ -1236,6 +1238,16 @@ private:
 	UObject* LastConstructedObject = nullptr;
 
 	friend struct FStaticConstructObjectParameters;
+
+#if WITH_EDITORONLY_DATA
+	/** Detects when a new GC object was created */
+	void OnGCObjectCreated(FGCObject* InObject);
+
+	/** Delegate handle for OnGCObjectCreated callback */
+	FDelegateHandle OnGCObjectCreatedHandle;
+	/** List of FGCObjects created during UObject construction */
+	TArray<FGCObject*> CreatedGCObjects;
+#endif // WITH_EDITORONLY_DATA
 };
 
 /**

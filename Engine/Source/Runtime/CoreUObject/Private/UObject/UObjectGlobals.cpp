@@ -2751,6 +2751,13 @@ UObject::UObject(const FObjectInitializer& ObjectInitializer)
 }
 
 
+static int32 GVerifyUObjectsAreNotFGCObjects = 1;
+static FAutoConsoleVariableRef CVerifyGCObjectNames(
+	TEXT("gc.VerifyUObjectsAreNotFGCObjects"),
+	GVerifyUObjectsAreNotFGCObjects,
+	TEXT("If true, the engine will throw a warning when it detects a UObject-derived class which also derives from FGCObject or any of its members is derived from FGCObject"),
+	ECVF_Default
+);
 
 FObjectInitializer::FObjectInitializer()
 	: Obj(nullptr)
@@ -2801,13 +2808,50 @@ void FObjectInitializer::Construct_Internal()
 	{
 		Obj->GetClass()->SetupObjectInitializer(*this);
 	}
+
+#if WITH_EDITORONLY_DATA
+	if (GIsEditor && GVerifyUObjectsAreNotFGCObjects && FGCObject::GGCObjectReferencer && 
+		// We can limit the test to native CDOs only
+		Obj && Obj->HasAnyFlags(RF_ClassDefaultObject) && !Obj->GetClass()->HasAnyClassFlags(CLASS_CompiledFromBlueprint))
+	{
+		OnGCObjectCreatedHandle = FGCObject::GGCObjectReferencer->GetGCObjectAddedDelegate().AddRaw(this, &FObjectInitializer::OnGCObjectCreated);
+	}
+#endif // WITH_EDITORONLY_DATA
 }
+
+#if WITH_EDITORONLY_DATA
+void FObjectInitializer::OnGCObjectCreated(FGCObject* InGCObject)
+{
+	check(Obj);
+	uint8* ObjectAddress = (uint8*)Obj;
+	uint8* GCObjectAddress = (uint8*)InGCObject;
+
+	// Look for FGCObjects whose address is within the memory bounds of the object being initialized 
+	if (GCObjectAddress >= ObjectAddress && GCObjectAddress < (ObjectAddress + Obj->GetClass()->GetPropertiesSize()))
+	{
+		// We can't report this FGCObject immediately as it's not fully constructed yet, so we're going to store it in a list for processing later
+		CreatedGCObjects.Add(InGCObject);
+	}
+}
+#endif // WITH_EDITORONLY_DATA
 
 /**
  * Destructor for internal class to finalize UObject creation (initialize properties) after the real C++ constructor is called.
  **/
 FObjectInitializer::~FObjectInitializer()
 {
+#if WITH_EDITORONLY_DATA
+	if (OnGCObjectCreatedHandle.IsValid())
+	{
+		FGCObject::GGCObjectReferencer->GetGCObjectAddedDelegate().Remove(OnGCObjectCreatedHandle);
+		for (FGCObject* CreatedObj : CreatedGCObjects)
+		{
+			// FObjectInitializer destructor runs after the UObject it initialized has had its constructors called so it's now safe to 
+			// access GetReferencerName() function
+			UE_LOG(LogUObjectGlobals, Warning, TEXT("Class %s contains an FGCObject (%s) member or is derived from it"), *Obj->GetClass()->GetPathName(), *CreatedObj->GetReferencerName());
+		}
+	}
+#endif // WITH_EDITORONLY_DATA
 
 #if USE_CIRCULAR_DEPENDENCY_LOAD_DEFERRING
 	// if we're not at the top of ObjectInitializers, then this is most 
