@@ -83,6 +83,7 @@ TSharedRef<SWidget> STimerTableCell::GenerateWidgetForNameColumn(const FArgument
 			[
 				SNew(SImage)
 				.Visibility(this, &STimerTableCell::GetHotPathIconVisibility)
+				.ColorAndOpacity(FLinearColor(1.0f, 0.3f, 0.3f, 1.0f))
 				.Image(FInsightsStyle::GetBrush("Icons.HotPath.TreeItem"))
 			]
 

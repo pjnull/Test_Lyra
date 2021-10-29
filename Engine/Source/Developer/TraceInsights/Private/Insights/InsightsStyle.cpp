@@ -82,8 +82,9 @@ void FInsightsStyle::FStyle::SyncParentStyles()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#define EDITOR_IMAGE_BRUSH(RelativePath, ...) IMAGE_BRUSH("../../Editor/Slate/" RelativePath, __VA_ARGS__)
-#define EDITOR_IMAGE_BRUSH_SVG(RelativePath, ...) IMAGE_BRUSH_SVG("../../Editor/Slate/" RelativePath, __VA_ARGS__)
+#define EDITOR_IMAGE_BRUSH(RelativePath, ...) IMAGE_BRUSH("../../../Editor/Slate/" RelativePath, __VA_ARGS__)
+#define EDITOR_IMAGE_BRUSH_SVG(RelativePath, ...) IMAGE_BRUSH_SVG("../../../Editor/Slate/" RelativePath, __VA_ARGS__)
+#define EDITOR_BOX_BRUSH(RelativePath, ...) BOX_BRUSH("../../../Editor/Slate/" RelativePath, __VA_ARGS__)
 #define TODO_IMAGE_BRUSH(...) EDITOR_IMAGE_BRUSH_SVG("Starship/Common/StaticMesh", __VA_ARGS__)
 
 void FInsightsStyle::FStyle::Initialize()
@@ -93,17 +94,17 @@ void FInsightsStyle::FStyle::Initialize()
 	// Sync styles from the parent style that will be used as templates for styles defined here
 	SyncParentStyles();
 
-	SetContentRoot(FPaths::EngineContentDir() / TEXT("Editor/Slate"));
+	SetContentRoot(FPaths::EngineContentDir() / TEXT("Slate/Starship/Insights"));
 	SetCoreContentRoot(FPaths::EngineContentDir() / TEXT("Slate"));
 
 	const FVector2D Icon12x12(12.0f, 12.0f); // for TreeItem icons
 	const FVector2D Icon16x16(16.0f, 16.0f); // for regular icons
 	const FVector2D Icon20x20(20.0f, 20.0f); // for ToolBar icons
 
-	Set("AppIcon", new CORE_IMAGE_BRUSH_SVG("Starship/Insights/insights", FVector2D(45.0f, 45.0f)));
+	Set("AppIcon", new IMAGE_BRUSH_SVG("UnrealInsights", FVector2D(45.0f, 45.0f)));
 	Set("AppIconPadding", FMargin(5.0f, 5.0f, 5.0f, 5.0f));
 
-	Set("AppIcon.Small", new CORE_IMAGE_BRUSH_SVG("Starship/Insights/insights", FVector2D(24.0f, 24.0f)));
+	Set("AppIcon.Small", new IMAGE_BRUSH_SVG("UnrealInsights", FVector2D(24.0f, 24.0f)));
 	Set("AppIconPadding.Small", FMargin(4.0f, 4.0f, 0.0f, 0.0f));
 
 	//////////////////////////////////////////////////
@@ -118,92 +119,93 @@ void FInsightsStyle::FStyle::Initialize()
 
 	Set("RoundedBackground", new FSlateRoundedBoxBrush(FLinearColor(1.0f, 1.0f, 1.0f, 1.0f), Icon16x16));
 
-	Set("Border.TB", new BOX_BRUSH("Icons/Profiler/Profiler_Border_TB_16x", FMargin(4.0f / 16.0f)));
-	Set("Border.L", new BOX_BRUSH("Icons/Profiler/Profiler_Border_L_16x", FMargin(4.0f / 16.0f)));
-	Set("Border.R", new BOX_BRUSH("Icons/Profiler/Profiler_Border_R_16x", FMargin(4.0f / 16.0f)));
+	Set("Border.TB", new EDITOR_BOX_BRUSH("Icons/Profiler/Profiler_Border_TB_16x", FMargin(4.0f / 16.0f)));
+	Set("Border.L", new EDITOR_BOX_BRUSH("Icons/Profiler/Profiler_Border_L_16x", FMargin(4.0f / 16.0f)));
+	Set("Border.R", new EDITOR_BOX_BRUSH("Icons/Profiler/Profiler_Border_R_16x", FMargin(4.0f / 16.0f)));
 
-	Set("Graph.Point", new IMAGE_BRUSH("Old/Graph/ExecutionBubble", Icon16x16));
+	Set("Graph.Point", new EDITOR_IMAGE_BRUSH("Old/Graph/ExecutionBubble", Icon16x16));
 
 	//////////////////////////////////////////////////
 	// Icons for major components
 
-	Set("Icons.SessionInfo", new CORE_IMAGE_BRUSH_SVG("Starship/Common/Info", Icon16x16));
+	//Set("Icons.SessionInfo", new CORE_IMAGE_BRUSH_SVG("Starship/Common/Info", Icon16x16));
+	Set("Icons.SessionInfo", new IMAGE_BRUSH_SVG("Session", Icon16x16));
 
 	//////////////////////////////////////////////////
 	// Trace Store, Connection, Launcher
 
-	Set("Icons.TraceStore", new EDITOR_IMAGE_BRUSH_SVG("Starship/Common/Home", Icon16x16));
-	Set("Icons.Connection", new TODO_IMAGE_BRUSH(Icon16x16));
+	Set("Icons.TraceStore", new IMAGE_BRUSH_SVG("TraceStore", Icon16x16));
+	Set("Icons.Connection", new IMAGE_BRUSH_SVG("Connection", Icon16x16));
 	Set("Icons.Launcher", new TODO_IMAGE_BRUSH(Icon16x16));
 
 	//////////////////////////////////////////////////
 	// Timing Insights
 
-	Set("Icons.TimingProfiler", new EDITOR_IMAGE_BRUSH_SVG("Starship/Common/Recent", Icon16x16));
+	Set("Icons.TimingProfiler", new IMAGE_BRUSH_SVG("Timing", Icon16x16));
 
-	Set("Icons.FramesTrack", new EDITOR_IMAGE_BRUSH_SVG("Starship/Common/Statistics", Icon16x16));
-	Set("Icons.FramesTrack.ToolBar", new EDITOR_IMAGE_BRUSH_SVG("Starship/Common/Statistics", Icon20x20));
+	Set("Icons.FramesTrack", new IMAGE_BRUSH_SVG("Frames", Icon16x16));
+	Set("Icons.FramesTrack.ToolBar", new IMAGE_BRUSH_SVG("Frames_20", Icon20x20));
 
-	Set("Icons.TimingView", new EDITOR_IMAGE_BRUSH_SVG("Starship/Common/Timeline", Icon16x16));
-	Set("Icons.TimingView.ToolBar", new EDITOR_IMAGE_BRUSH_SVG("Starship/Common/Timeline", Icon20x20));
+	Set("Icons.TimingView", new IMAGE_BRUSH_SVG("Timing", Icon16x16));
+	Set("Icons.TimingView.ToolBar", new IMAGE_BRUSH_SVG("Timing_20", Icon20x20));
 
-	Set("Icons.TimersView", new EDITOR_IMAGE_BRUSH_SVG("Starship/Common/Realtime", Icon16x16));
-	Set("Icons.TimersView.ToolBar", new EDITOR_IMAGE_BRUSH_SVG("Starship/Common/Realtime", Icon20x20));
+	Set("Icons.TimersView", new IMAGE_BRUSH_SVG("Timer", Icon16x16));
+	Set("Icons.TimersView.ToolBar", new IMAGE_BRUSH_SVG("Timer_20", Icon20x20));
 
-	Set("Icons.CountersView", new EDITOR_IMAGE_BRUSH_SVG("Starship/Common/Profile", Icon16x16));
-	Set("Icons.CountersView.ToolBar", new EDITOR_IMAGE_BRUSH_SVG("Starship/Common/Profile", Icon20x20));
+	Set("Icons.CountersView", new IMAGE_BRUSH_SVG("Counter", Icon16x16));
+	Set("Icons.CountersView.ToolBar", new IMAGE_BRUSH_SVG("Counter_20", Icon20x20));
 
-	Set("Icons.CallersView", new EDITOR_IMAGE_BRUSH_SVG("Starship/Common/Realtime", Icon16x16));
-	Set("Icons.CallersView.ToolBar", new EDITOR_IMAGE_BRUSH_SVG("Starship/Common/Realtime", Icon20x20));
+	Set("Icons.CallersView", new IMAGE_BRUSH_SVG("Callers", Icon16x16));
+	Set("Icons.CallersView.ToolBar", new IMAGE_BRUSH_SVG("Callers_20", Icon20x20));
 
-	Set("Icons.CalleesView", new EDITOR_IMAGE_BRUSH_SVG("Starship/Common/Realtime", Icon16x16));
-	Set("Icons.CalleesView.ToolBar", new EDITOR_IMAGE_BRUSH_SVG("Starship/Common/Realtime", Icon20x20));
+	Set("Icons.CalleesView", new IMAGE_BRUSH_SVG("Callees", Icon16x16));
+	Set("Icons.CalleesView.ToolBar", new IMAGE_BRUSH_SVG("Callees_20", Icon20x20));
 
-	Set("Icons.LogView", new EDITOR_IMAGE_BRUSH_SVG("Starship/Common/Log", Icon16x16));
-	Set("Icons.LogView.ToolBar", new EDITOR_IMAGE_BRUSH_SVG("Starship/Common/Log", Icon20x20));
+	Set("Icons.LogView", new IMAGE_BRUSH_SVG("Log", Icon16x16));
+	Set("Icons.LogView.ToolBar", new IMAGE_BRUSH_SVG("Log_20", Icon20x20));
 
-	Set("Icons.TableTreeView", new TODO_IMAGE_BRUSH(Icon16x16));
-	Set("Icons.TableTreeView.ToolBar", new TODO_IMAGE_BRUSH(Icon20x20));
+	Set("Icons.TableTreeView", new EDITOR_IMAGE_BRUSH_SVG("Starship/Common/Spreadsheet", Icon16x16));
+	Set("Icons.TableTreeView.ToolBar", new EDITOR_IMAGE_BRUSH_SVG("Starship/Common/Spreadsheet", Icon20x20));
 
-	Set("Icons.TasksView", new TODO_IMAGE_BRUSH(Icon16x16));
+	Set("Icons.TasksView", new IMAGE_BRUSH_SVG("Tasks", Icon16x16));
 
-	Set("Icons.AllTracksMenu.ToolBar", new CORE_IMAGE_BRUSH_SVG("Starship/Common/menu", Icon20x20));
-	Set("Icons.CpuGpuTracksMenu.ToolBar", new CORE_IMAGE_BRUSH_SVG("Starship/Common/menu", Icon20x20));
-	Set("Icons.OtherTracksMenu.ToolBar", new CORE_IMAGE_BRUSH_SVG("Starship/Common/menu", Icon20x20));
-	Set("Icons.PluginTracksMenu.ToolBar", new CORE_IMAGE_BRUSH_SVG("Starship/Common/menu", Icon20x20));
-	Set("Icons.ViewModeMenu.ToolBar", new CORE_IMAGE_BRUSH_SVG("Starship/Common/menu", Icon20x20));
+	Set("Icons.AllTracksMenu.ToolBar", new IMAGE_BRUSH_SVG("AllTracks_20", Icon20x20));
+	Set("Icons.CpuGpuTracksMenu.ToolBar", new IMAGE_BRUSH_SVG("CpuGpuTracks_20", Icon20x20));
+	Set("Icons.OtherTracksMenu.ToolBar", new IMAGE_BRUSH_SVG("SpecialTracks_20", Icon20x20));
+	Set("Icons.PluginTracksMenu.ToolBar", new IMAGE_BRUSH_SVG("PluginTracks_20", Icon20x20));
+	Set("Icons.ViewModeMenu.ToolBar", new IMAGE_BRUSH_SVG("ViewMode_20", Icon20x20));
 
 	//////////////////////////////////////////////////
 	// Asset Loading Insights
 
-	Set("Icons.LoadingProfiler", new TODO_IMAGE_BRUSH(Icon16x16));
+	Set("Icons.LoadingProfiler", new CORE_IMAGE_BRUSH_SVG("Starship/Common/file", Icon16x16));
 
 	//////////////////////////////////////////////////
 	// Networking Insights
 
-	Set("Icons.NetworkingProfiler", new TODO_IMAGE_BRUSH(Icon16x16));
+	Set("Icons.NetworkingProfiler", new IMAGE_BRUSH_SVG("Networking", Icon16x16));
 
-	Set("Icons.PacketView", new TODO_IMAGE_BRUSH(Icon16x16));
-	Set("Icons.PacketView.ToolBar", new TODO_IMAGE_BRUSH(Icon20x20));
+	Set("Icons.PacketView", new IMAGE_BRUSH_SVG("Packets", Icon16x16));
+	Set("Icons.PacketView.ToolBar", new IMAGE_BRUSH_SVG("Packets_20", Icon20x20));
 
-	Set("Icons.PacketContentView", new TODO_IMAGE_BRUSH(Icon16x16));
-	Set("Icons.PacketContentView.ToolBar", new TODO_IMAGE_BRUSH(Icon20x20));
+	Set("Icons.PacketContentView", new IMAGE_BRUSH_SVG("PacketContent", Icon16x16));
+	Set("Icons.PacketContentView.ToolBar", new IMAGE_BRUSH_SVG("PacketContent_20", Icon20x20));
 
-	Set("Icons.NetStatsView", new TODO_IMAGE_BRUSH(Icon16x16));
-	Set("Icons.NetStatsView.ToolBar", new TODO_IMAGE_BRUSH(Icon20x20));
+	Set("Icons.NetStatsView", new IMAGE_BRUSH_SVG("NetStats", Icon16x16));
+	Set("Icons.NetStatsView.ToolBar", new IMAGE_BRUSH_SVG("NetStats_20", Icon20x20));
 
 	//////////////////////////////////////////////////
 	// Memory Insights
 
-	Set("Icons.MemoryProfiler", new TODO_IMAGE_BRUSH(Icon16x16));
+	Set("Icons.MemoryProfiler", new IMAGE_BRUSH_SVG("Memory", Icon16x16));
 
-	Set("Icons.MemTagTreeView", new TODO_IMAGE_BRUSH(Icon16x16));
-	Set("Icons.MemTagTreeView.ToolBar", new TODO_IMAGE_BRUSH(Icon20x20));
+	Set("Icons.MemTagTreeView", new IMAGE_BRUSH_SVG("MemTags", Icon16x16));
+	Set("Icons.MemTagTreeView.ToolBar", new IMAGE_BRUSH_SVG("MemTags_20", Icon20x20));
 
-	Set("Icons.MemInvestigationView", new TODO_IMAGE_BRUSH(Icon16x16));
-	Set("Icons.MemInvestigationView.ToolBar", new TODO_IMAGE_BRUSH(Icon20x20));
+	Set("Icons.MemInvestigationView", new IMAGE_BRUSH_SVG("MemInvestigation", Icon16x16));
+	Set("Icons.MemInvestigationView.ToolBar", new IMAGE_BRUSH_SVG("MemInvestigation_20", Icon20x20));
 
-	Set("Icons.MemAllocTableTreeView", new TODO_IMAGE_BRUSH(Icon16x16));
+	Set("Icons.MemAllocTableTreeView", new IMAGE_BRUSH_SVG("MemAllocTable", Icon16x16));
 
 	Set("Icons.AddAllMemTagGraphs", new CORE_IMAGE_BRUSH_SVG("Starship/Common/plus-circle", Icon16x16));
 	Set("Icons.RemoveAllMemTagGraphs", new CORE_IMAGE_BRUSH_SVG("Starship/Common/Delete", Icon16x16));
@@ -211,23 +213,23 @@ void FInsightsStyle::FStyle::Initialize()
 	//////////////////////////////////////////////////
 	// Tasks
 
-	Set("Icons.GoToTask", new IMAGE_BRUSH("Icons/Profiler/profiler_ViewColumn_32x", Icon16x16));
-	Set("Icons.ShowTaskCriticalPath", new IMAGE_BRUSH("Icons/Profiler/profiler_HotPath_32x", Icon16x16));
-	Set("Icons.ShowTaskDependencies", new IMAGE_BRUSH("Icons/Profiler/profiler_Calls_32x", Icon16x16));
-	Set("Icons.ShowTaskPrerequisites", new IMAGE_BRUSH("Icons/Profiler/profiler_Calls_32x", Icon16x16));
-	Set("Icons.ShowTaskSubsequents", new IMAGE_BRUSH("Icons/Profiler/profiler_Calls_32x", Icon16x16));
-	Set("Icons.ShowNestedTasks", new IMAGE_BRUSH("Icons/Profiler/profiler_Calls_32x", Icon16x16));
+	Set("Icons.GoToTask", new EDITOR_IMAGE_BRUSH("Icons/Profiler/profiler_ViewColumn_32x", Icon16x16));
+	Set("Icons.ShowTaskCriticalPath", new EDITOR_IMAGE_BRUSH("Icons/Profiler/profiler_HotPath_32x", Icon16x16));
+	Set("Icons.ShowTaskDependencies", new EDITOR_IMAGE_BRUSH("Icons/Profiler/profiler_Calls_32x", Icon16x16));
+	Set("Icons.ShowTaskPrerequisites", new EDITOR_IMAGE_BRUSH("Icons/Profiler/profiler_Calls_32x", Icon16x16));
+	Set("Icons.ShowTaskSubsequents", new EDITOR_IMAGE_BRUSH("Icons/Profiler/profiler_Calls_32x", Icon16x16));
+	Set("Icons.ShowNestedTasks", new EDITOR_IMAGE_BRUSH("Icons/Profiler/profiler_Calls_32x", Icon16x16));
 
 	//////////////////////////////////////////////////
 
-	Set("Icons.FindFirst.ToolBar", new CORE_IMAGE_BRUSH_SVG("Starship/Common/arrow-left", Icon20x20));
-	Set("Icons.FindPrevious.ToolBar", new EDITOR_IMAGE_BRUSH("Icons/GeneralTools/Previous_40x", Icon20x20));
-	Set("Icons.FindNext.ToolBar", new EDITOR_IMAGE_BRUSH("Icons/GeneralTools/Next_40x", Icon20x20));
-	Set("Icons.FindLast.ToolBar", new CORE_IMAGE_BRUSH_SVG("Starship/Common/arrow-right", Icon20x20));
+	Set("Icons.FindFirst.ToolBar", new IMAGE_BRUSH_SVG("ControlsFirst", Icon20x20));
+	Set("Icons.FindPrevious.ToolBar", new IMAGE_BRUSH_SVG("ControlsPrevious", Icon20x20));
+	Set("Icons.FindNext.ToolBar", new IMAGE_BRUSH_SVG("ControlsNext", Icon20x20));
+	Set("Icons.FindLast.ToolBar", new IMAGE_BRUSH_SVG("ControlsLast", Icon20x20));
 
 	//////////////////////////////////////////////////
 
-	Set("Icons.ResetToDefault", new IMAGE_BRUSH("Icons/Profiler/profiler_ResetToDefault_32x", Icon16x16));
+	Set("Icons.ResetToDefault", new EDITOR_IMAGE_BRUSH("Icons/Profiler/profiler_ResetToDefault_32x", Icon16x16));
 	Set("Icons.DiffersFromDefault", new EDITOR_IMAGE_BRUSH_SVG("Starship/Common/ResetToDefault", Icon16x16));
 
 	//Set("Icons.Filter", new CORE_IMAGE_BRUSH_SVG("Starship/Common/filter", Icon16x16));	//-> use FAppStyle "Icons.Filter"
@@ -239,19 +241,19 @@ void FInsightsStyle::FStyle::Initialize()
 	//Set("Icons.FolderOpen", new CORE_IMAGE_BRUSH_SVG("Starship/Common/folder-open", Icon16x16));		//-> use FAppStyle "Icons.FolderOpen"
 	//Set("Icons.FolderClosed", new CORE_IMAGE_BRUSH_SVG("Starship/Common/folder-closed", Icon16x16));	//-> use FAppStyle "Icons.FolderClosed"
 
-	Set("Icons.SortBy", new IMAGE_BRUSH("Icons/Profiler/profiler_SortBy_32x", Icon16x16));
+	Set("Icons.SortBy", new EDITOR_IMAGE_BRUSH("Icons/Profiler/profiler_SortBy_32x", Icon16x16));
 	//Set("Icons.SortAscending", new CORE_IMAGE_BRUSH_SVG("Starship/Common/SortUp", Icon16x16));	//-> use FAppStyle "Icons.SortUp"
 	//Set("Icons.SortDescending", new CORE_IMAGE_BRUSH_SVG("Starship/Common/SortDown", Icon16x16));	//-> use FAppStyle "Icons.SortDown"
 
-	Set("Icons.ViewColumn", new IMAGE_BRUSH("Icons/Profiler/profiler_ViewColumn_32x", Icon16x16));
-	Set("Icons.ResetColumn", new IMAGE_BRUSH("Icons/Profiler/profiler_ResetColumn_32x", Icon16x16));
+	Set("Icons.ViewColumn", new EDITOR_IMAGE_BRUSH("Icons/Profiler/profiler_ViewColumn_32x", Icon16x16));
+	Set("Icons.ResetColumn", new EDITOR_IMAGE_BRUSH("Icons/Profiler/profiler_ResetColumn_32x", Icon16x16));
 
-	Set("Icons.ExpandAll", new IMAGE_BRUSH("Icons/Profiler/profiler_ExpandAll_32x", Icon16x16));
-	Set("Icons.CollapseAll", new IMAGE_BRUSH("Icons/Profiler/profiler_CollapseAll_32x", Icon16x16));
-	Set("Icons.ExpandSelection", new IMAGE_BRUSH("Icons/Profiler/profiler_ExpandSelection_32x", Icon16x16));
-	Set("Icons.CollapseSelection", new IMAGE_BRUSH("Icons/Profiler/profiler_CollapseSelection_32x", Icon16x16));
+	Set("Icons.ExpandAll", new EDITOR_IMAGE_BRUSH("Icons/Profiler/profiler_ExpandAll_32x", Icon16x16));
+	Set("Icons.CollapseAll", new EDITOR_IMAGE_BRUSH("Icons/Profiler/profiler_CollapseAll_32x", Icon16x16));
+	Set("Icons.ExpandSelection", new EDITOR_IMAGE_BRUSH("Icons/Profiler/profiler_ExpandSelection_32x", Icon16x16));
+	Set("Icons.CollapseSelection", new EDITOR_IMAGE_BRUSH("Icons/Profiler/profiler_CollapseSelection_32x", Icon16x16));
 
-	Set("Icons.ToggleShowGraphSeries", new IMAGE_BRUSH("Icons/Profiler/profiler_ShowGraphData_32x", Icon16x16));
+	Set("Icons.ToggleShowGraphSeries", new EDITOR_IMAGE_BRUSH("Icons/Profiler/profiler_ShowGraphData_32x", Icon16x16));
 
 	Set("Icons.TestAutomation", new EDITOR_IMAGE_BRUSH_SVG("Starship/Common/TestAutomation", Icon16x16));
 	Set("Icons.Test", new EDITOR_IMAGE_BRUSH_SVG("Starship/Common/Test", Icon16x16));
@@ -259,16 +261,16 @@ void FInsightsStyle::FStyle::Initialize()
 	Set("Icons.Debug", new EDITOR_IMAGE_BRUSH_SVG("Starship/Common/bug", Icon16x16));
 	Set("Icons.Debug.ToolBar", new EDITOR_IMAGE_BRUSH_SVG("Starship/Common/bug", Icon20x20));
 
-	Set("Icons.AutoScroll", new EDITOR_IMAGE_BRUSH_SVG("Starship/MainToolbar/play", Icon16x16));
+	Set("Icons.AutoScroll", new IMAGE_BRUSH_SVG("AutoScrollRight_20", Icon16x16));
 
-	Set("Icons.ZeroCountFilter", new CORE_IMAGE_BRUSH_SVG("Starship/Common/filter", Icon16x16));
+	Set("Icons.ZeroCountFilter", new IMAGE_BRUSH_SVG("ZeroCountFilter", Icon16x16));
 
 	//////////////////////////////////////////////////
 
-	Set("TreeTable.RowBackground", new IMAGE_BRUSH("Old/White", Icon16x16, FLinearColor(1.0f, 1.0f, 1.0f, 0.25f)));
+	Set("TreeTable.RowBackground", new EDITOR_IMAGE_BRUSH("Old/White", Icon16x16, FLinearColor(1.0f, 1.0f, 1.0f, 0.25f)));
 
-	Set("Icons.Hint.TreeItem", new IMAGE_BRUSH("Icons/Profiler/Profiler_Custom_Tooltip_12x", Icon12x12));
-	Set("Icons.HotPath.TreeItem", new IMAGE_BRUSH("Icons/Profiler/profiler_HotPath_32x", Icon12x12));
+	Set("Icons.Hint.TreeItem", new IMAGE_BRUSH_SVG("InfoTag_12", Icon12x12));
+	Set("Icons.HotPath.TreeItem", new IMAGE_BRUSH_SVG("HotPath_12", Icon12x12));
 	Set("Icons.Group.TreeItem", new CORE_IMAGE_BRUSH_SVG("Starship/Common/folder-closed", Icon12x12));
 	Set("Icons.Leaf.TreeItem", new CORE_IMAGE_BRUSH_SVG("Starship/Common/file", Icon12x12));
 	Set("Icons.GpuTimer.TreeItem", new TODO_IMAGE_BRUSH(Icon12x12));
@@ -360,6 +362,7 @@ void FInsightsStyle::FStyle::Initialize()
 }
 
 #undef TODO_IMAGE_BRUSH
+#undef EDITOR_BOX_BRUSH
 #undef EDITOR_IMAGE_BRUSH_SVG
 #undef EDITOR_IMAGE_BRUSH
 
