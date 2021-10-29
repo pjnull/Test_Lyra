@@ -1117,7 +1117,7 @@ namespace AutomationTool
 							// Some exceptions may be caused by networking hiccups. We want to retry in those cases.
 							if ((Ex is IOException || Ex is InvalidDataException))
 							{
-								Log.TraceWarning("Failed to unzip entries from '{0}' from '{1}' to '{2}', retrying.. (Error: {3})", ZipFile.FullName, RootDir.FullName, Ex.Message);
+								Log.TraceWarning("Failed to unzip entries from '{0}' to '{1}', retrying.. (Error: {2})", ZipFile.FullName, RootDir.FullName, Ex.Message);
 							}
 						}
 					}
