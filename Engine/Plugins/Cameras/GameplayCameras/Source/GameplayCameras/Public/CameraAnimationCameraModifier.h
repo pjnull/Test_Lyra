@@ -55,17 +55,17 @@ struct FCameraAnimationParams
 
 	/** Ease-in function type */
 	UPROPERTY(BlueprintReadWrite, Category="Camera Animation")
-	ECameraAnimationEasingType EaseInType;
+	ECameraAnimationEasingType EaseInType = ECameraAnimationEasingType::Linear;
 	/** Ease-in duration in seconds */
 	UPROPERTY(BlueprintReadWrite, Category="Camera Animation")
-	float EaseInDuration;
+	float EaseInDuration = 0.f;
 
 	/** Ease-out function type */
 	UPROPERTY(BlueprintReadWrite, Category="Camera Animation")
-	ECameraAnimationEasingType EaseOutType;
+	ECameraAnimationEasingType EaseOutType = ECameraAnimationEasingType::Linear;
 	/** Ease-out duration in seconds */
 	UPROPERTY(BlueprintReadWrite, Category="Camera Animation")
-	float EaseOutDuration;
+	float EaseOutDuration = 0.f;
 
 	/** Whether the camera animation should loop */
 	UPROPERTY(BlueprintReadWrite, Category="Camera Animation")
@@ -79,10 +79,10 @@ struct FCameraAnimationParams
 
 	/** The transform space to use for the new camera shake */
 	UPROPERTY(BlueprintReadWrite, Category="Camera Animation")
-	ECameraAnimationPlaySpace PlaySpace;
+	ECameraAnimationPlaySpace PlaySpace = ECameraAnimationPlaySpace::CameraLocal;
 	/** User space to use when PlaySpace is UserDefined */
 	UPROPERTY(BlueprintReadWrite, Category="Camera Animation")
-	FRotator UserPlaySpaceRot;
+	FRotator UserPlaySpaceRot = FRotator::ZeroRotator;
 };
 
 /** A handle to a camera animation running in UCameraAnimationCameraModifier */
