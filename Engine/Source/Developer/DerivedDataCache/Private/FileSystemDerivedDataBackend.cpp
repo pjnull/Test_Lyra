@@ -462,7 +462,7 @@ public:
 	/** Return a type for this interface */
 	virtual FString GetDisplayName() const override
 	{
-		return FString(TEXT("FileSystem"));
+		return FString(TEXT("File System"));
 	}
 
 

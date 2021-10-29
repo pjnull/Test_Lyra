@@ -1975,14 +1975,14 @@ FHttpDerivedDataBackend::~FHttpDerivedDataBackend()
 #endif
 }
 
-FString FHttpDerivedDataBackend::GetDisplayName() const
-{
-	return FString(TEXT("Http"));
-}
-
 FString FHttpDerivedDataBackend::GetName() const
 {
 	return Domain;
+}
+
+FString FHttpDerivedDataBackend::GetDisplayName() const
+{
+	return TEXT("Horde Storage");
 }
 
 bool FHttpDerivedDataBackend::TryToPrefetch(TConstArrayView<FString> CacheKeys)
