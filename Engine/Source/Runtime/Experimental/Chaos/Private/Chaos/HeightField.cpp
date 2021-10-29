@@ -1339,7 +1339,7 @@ namespace Chaos
 		}
 
 		// Remove all points (except for the deepest one, and ones with phis similar to it)
-		const FReal CullMargin = 0.1;
+		const FReal CullMargin = 0.1f;
 		int32 NewContactPointCount = ContactPoints.Num() > 0 ? 1 : 0;
 		for (int32 Index = 1; Index < ContactPoints.Num(); Index++)
 		{
