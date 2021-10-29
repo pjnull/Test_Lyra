@@ -2548,8 +2548,15 @@ void SContentBrowser::OnNewItemRequested(const FContentBrowserItem& NewItem)
 	// Make sure we are showing the location of the new file (we may have created it in a folder)
 	TArray<FString> SelectedPaths;
 	SelectedPaths.Add(FPaths::GetPath(NewItem.GetVirtualPath().ToString()));
-	PathViewPtr->SetSelectedPaths(SelectedPaths);
-	PathSelected(SelectedPaths[0]);
+
+	const TArray<FString> CurrentlySelectedPath = PathViewPtr->GetSelectedPaths();
+
+	// Only change the selected paths if needed. (To avoid adding an entry to navigation history when it is not needed)
+	if (SelectedPaths != CurrentlySelectedPath)
+	{
+		PathViewPtr->SetSelectedPaths(SelectedPaths);
+		PathSelected(SelectedPaths[0]);
+	}
 }
 
 void SContentBrowser::OnItemSelectionChanged(const FContentBrowserItem& SelectedItem, ESelectInfo::Type SelectInfo, EContentBrowserViewContext ViewContext)
