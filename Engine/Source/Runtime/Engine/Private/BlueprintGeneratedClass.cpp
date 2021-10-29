@@ -714,7 +714,7 @@ bool UBlueprintGeneratedClass::BuildCustomArrayPropertyListForPostConstruction(F
 			// Create a temp default array as a placeholder to compare against the remaining elements in the value.
 			FScriptArray TempDefaultArray;
 			const int32 Count = ArrayValueHelper.Num() - DefaultArrayValueHelper.Num();
-			TempDefaultArray.Add(Count, ArrayProperty->Inner->ElementSize);
+			TempDefaultArray.Add(Count, ArrayProperty->Inner->ElementSize, ArrayProperty->Inner->GetMinAlignment());
 			uint8 *Dest = (uint8*)TempDefaultArray.GetData();
 			if (ArrayProperty->Inner->PropertyFlags & CPF_ZeroConstructor)
 			{
