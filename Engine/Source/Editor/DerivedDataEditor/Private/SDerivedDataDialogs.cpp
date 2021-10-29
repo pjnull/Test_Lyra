@@ -567,7 +567,6 @@ TSharedRef<SWidget> SDerivedDataCacheStatisticsDialog::GetGridPanel()
 		.Font(FCoreStyle::GetDefaultFontStyle("Bold", 10))
 		.Text(LOCTEXT("Cache", "Cache"))
 		.ColorAndOpacity(TitleColor)
-		.ColorAndOpacity(TitleColor)
 		.Text(LOCTEXT("CacheType", "Cache Type"))
 	];
 
