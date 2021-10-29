@@ -4782,8 +4782,10 @@ void STimingView::QuickFind_Execute()
 		AvailableFilters->Add(TimerNameFilter);
 
 		QuickFindVm = MakeShared<FQuickFind>(FilterConfigurator);
-		QuickFindVm->GetOnFindNextEvent().AddSP(this, &STimingView::FindNextEvent);
+		QuickFindVm->GetOnFindFirstEvent().AddSP(this, &STimingView::FindFirstEvent);
 		QuickFindVm->GetOnFindPreviousEvent().AddSP(this, &STimingView::FindPrevEvent);
+		QuickFindVm->GetOnFindNextEvent().AddSP(this, &STimingView::FindNextEvent);
+		QuickFindVm->GetOnFindLastEvent().AddSP(this, &STimingView::FindLastEvent);
 		QuickFindVm->GetOnFilterAllEvent().AddSP(this, &STimingView::FilterAllTracks);
 		QuickFindVm->GetOnClearFiltersEvent().AddSP(this, &STimingView::ClearFilters);
 	}
@@ -4902,55 +4904,10 @@ void STimingView::ClearRelations()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void STimingView::FindNextEvent()
+void STimingView::FindFirstEvent()
 {
-	TSharedPtr<const ITimingEvent> BestMatchEvent;
-	double StartTime = SelectedEvent.IsValid() ? SelectedEvent->GetStartTime() : std::numeric_limits<double>::lowest();
-
-	auto EventFilter = [StartTime](double EventStartTime, double EventEndTime, uint32 EventDepth)
-	{
-		return EventStartTime > StartTime;
-	};
-	FTimingEventSearchParameters Params(StartTime, std::numeric_limits<double>::max(), ETimingEventSearchFlags::StopAtFirstMatch, EventFilter);
-	Params.FilterExecutor = QuickFindVm->GetFilterConfigurator();
-
-	EnumerateFilteredTracks(QuickFindVm->GetFilterConfigurator(), [&Params, &BestMatchEvent](TSharedPtr<FBaseTimingTrack>& Track)
-	{
-		if (!Track->IsVisible())
-		{
-			return;
-		}
-
-		Params.EndTime = BestMatchEvent.IsValid() ? BestMatchEvent->GetStartTime() : std::numeric_limits<double>::max();
-
-		TSharedPtr<const ITimingEvent> FoundEvent = Track->SearchEvent(Params);
-		if (FoundEvent.IsValid())
-		{
-			if (BestMatchEvent.IsValid())
-			{
-				ensure(FoundEvent->GetStartTime() < BestMatchEvent->GetStartTime());
-			}
-			BestMatchEvent = FoundEvent;
-		}
-	});
-
-	if (BestMatchEvent)
-	{
-		SelectedEvent = BestMatchEvent;
-		BringIntoView(SelectedEvent->GetStartTime(), SelectedEvent->GetEndTime());
-		if (SelectedEvent->GetTrack()->GetLocation() == ETimingTrackLocation::Scrollable)
-		{
-			BringScrollableTrackIntoView(*SelectedEvent->GetTrack());
-		}
-
-		OnSelectedTimingEventChanged();
-	}
-	else
-	{
-		FMessageLog ReportMessageLog(FTimingProfilerManager::Get()->GetLogListingName());
-		ReportMessageLog.Error(LOCTEXT("NoEventFound", "No event found!"));
-		ReportMessageLog.Notify();
-	}
+	SelectedEvent.Reset();
+	FindNextEvent();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -5004,6 +4961,67 @@ void STimingView::FindPrevEvent()
 		ReportMessageLog.Error(LOCTEXT("NoEventFound", "No event found!"));
 		ReportMessageLog.Notify();
 	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void STimingView::FindNextEvent()
+{
+	TSharedPtr<const ITimingEvent> BestMatchEvent;
+	double StartTime = SelectedEvent.IsValid() ? SelectedEvent->GetStartTime() : std::numeric_limits<double>::lowest();
+
+	auto EventFilter = [StartTime](double EventStartTime, double EventEndTime, uint32 EventDepth)
+	{
+		return EventStartTime > StartTime;
+	};
+	FTimingEventSearchParameters Params(StartTime, std::numeric_limits<double>::max(), ETimingEventSearchFlags::StopAtFirstMatch, EventFilter);
+	Params.FilterExecutor = QuickFindVm->GetFilterConfigurator();
+
+	EnumerateFilteredTracks(QuickFindVm->GetFilterConfigurator(), [&Params, &BestMatchEvent](TSharedPtr<FBaseTimingTrack>& Track)
+	{
+		if (!Track->IsVisible())
+		{
+			return;
+		}
+
+		Params.EndTime = BestMatchEvent.IsValid() ? BestMatchEvent->GetStartTime() : std::numeric_limits<double>::max();
+
+		TSharedPtr<const ITimingEvent> FoundEvent = Track->SearchEvent(Params);
+		if (FoundEvent.IsValid())
+		{
+			if (BestMatchEvent.IsValid())
+			{
+				ensure(FoundEvent->GetStartTime() < BestMatchEvent->GetStartTime());
+			}
+			BestMatchEvent = FoundEvent;
+		}
+	});
+
+	if (BestMatchEvent)
+	{
+		SelectedEvent = BestMatchEvent;
+		BringIntoView(SelectedEvent->GetStartTime(), SelectedEvent->GetEndTime());
+		if (SelectedEvent->GetTrack()->GetLocation() == ETimingTrackLocation::Scrollable)
+		{
+			BringScrollableTrackIntoView(*SelectedEvent->GetTrack());
+		}
+
+		OnSelectedTimingEventChanged();
+	}
+	else
+	{
+		FMessageLog ReportMessageLog(FTimingProfilerManager::Get()->GetLogListingName());
+		ReportMessageLog.Error(LOCTEXT("NoEventFound", "No event found!"));
+		ReportMessageLog.Notify();
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void STimingView::FindLastEvent()
+{
+	SelectedEvent.Reset();
+	FindPrevEvent();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

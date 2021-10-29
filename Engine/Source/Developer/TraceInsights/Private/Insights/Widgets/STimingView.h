@@ -478,8 +478,10 @@ protected:
 
 	void SetTrackPosY(TSharedPtr<FBaseTimingTrack>& TrackPtr, float TrackPosY) const;
 	
-	void FindNextEvent();
+	void FindFirstEvent();
 	void FindPrevEvent();
+	void FindNextEvent();
+	void FindLastEvent();
 	void FilterAllTracks();
 	void ClearFilters();
 
