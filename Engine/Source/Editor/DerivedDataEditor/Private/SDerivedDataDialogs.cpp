@@ -592,6 +592,7 @@ TSharedRef<SWidget> SDerivedDataCacheStatisticsDialog::GetGridPanel()
 	];
 
 	Panel->AddSlot(3, Row)
+	[
 		SNew(STextBlock)
 		.Margin(FMargin(ColumnMargin, RowMargin, 0.0f, TitleMargin))
 		.ColorAndOpacity(TitleColor)
@@ -601,23 +602,24 @@ TSharedRef<SWidget> SDerivedDataCacheStatisticsDialog::GetGridPanel()
 	];
 
 	Panel->AddSlot(4, Row)
+	[
 		SNew(STextBlock)
 		.Margin(FMargin(ColumnMargin, RowMargin, 0.0f, TitleMargin))
 		.ColorAndOpacity(TitleColor)
 		.Font(TitleFont)
 		.Justification(ETextJustify::Left)
 		.Text(LOCTEXT("Write", "Write"))
-		];
+	];
 
 	Panel->AddSlot(5, Row)
-		[
+	[
 		SNew(STextBlock)
 		.Margin(FMargin(ColumnMargin, RowMargin, 0.0f, TitleMargin))
 		.ColorAndOpacity(TitleColor)
 		.Font(TitleFont)
 		.Justification(ETextJustify::Left)
 		.Text(LOCTEXT("Details", "Details"))
-		];
+	];
 
 	Row++;
 
@@ -654,81 +656,78 @@ TSharedRef<SWidget> SDerivedDataCacheStatisticsDialog::GetGridPanel()
 		if (Backend->GetDisplayName().Equals("Memory"))
 			continue;
 
-		//if (TotalGetBytes > 0 || TotalPutBytes > 0)
-		{
-			Panel->AddSlot(0, Row)
-				.HAlign(HAlign_Left)
-			[
-				SNew(STextBlock)
-				.Margin(FMargin(ColumnMargin, RowMargin))
-				.Justification(ETextJustify::Left)
-				.Text(FText::FromString(Backend->GetDisplayName()))
-			];
+		Panel->AddSlot(0, Row)
+			.HAlign(HAlign_Left)
+		[
+			SNew(STextBlock)
+			.Margin(FMargin(ColumnMargin, RowMargin))
+			.Justification(ETextJustify::Left)
+			.Text(FText::FromString(Backend->GetDisplayName()))
+		];
 
-			Panel->AddSlot(1, Row)
-			[
-				SNew(STextBlock)
-				.Margin(FMargin(ColumnMargin, RowMargin))
-				.Justification(ETextJustify::Left)
-				.Text( FText::FromString((Backend->GetSpeedClass() == FDerivedDataBackendInterface::ESpeedClass::Local) ? "Local" : "Remote" ))
-			];
+		Panel->AddSlot(1, Row)
+		[
+			SNew(STextBlock)
+			.Margin(FMargin(ColumnMargin, RowMargin))
+			.Justification(ETextJustify::Left)
+			.Text( FText::FromString((Backend->GetSpeedClass() == FDerivedDataBackendInterface::ESpeedClass::Local) ? "Local" : "Remote" ))
+		];
 
-			const double HitPercentage = TotalRequests > 0 ? (100.0 * (TotalGets_Hit / (double)TotalRequests)) : 0.0;
+		const double HitPercentage = TotalRequests > 0 ? (100.0 * (TotalGets_Hit / (double)TotalRequests)) : 0.0;
 
-			Panel->AddSlot(1, Row)
-				.HAlign(HAlign_Left)
-				[
-				SNew(STextBlock)
-				.Margin(FMargin(ColumnMargin, RowMargin))
-				.Justification(ETextJustify::Left)
-				.Text(FText::FromString(SingleDecimalFormat(HitPercentage) + TEXT(" %")))
-				];
-
-			const double TotalGetMB = FUnitConversion::Convert(TotalGetBytes, EUnit::Bytes, EUnit::Megabytes);
-
-			SumTotalGetMB += TotalGetMB;
-
-			Panel->AddSlot(2, Row)
+		Panel->AddSlot(1, Row)
 			.HAlign(HAlign_Left)
 			[
-				SNew(STextBlock)
-				.Margin(FMargin(ColumnMargin, RowMargin))
-				.Justification(ETextJustify::Left)
-				.Text(FText::FromString(SingleDecimalFormat(TotalGetMB) + TEXT(" MB")))
+			SNew(STextBlock)
+			.Margin(FMargin(ColumnMargin, RowMargin))
+			.Justification(ETextJustify::Left)
+			.Text(FText::FromString(SingleDecimalFormat(HitPercentage) + TEXT(" %")))
 			];
 
-			const double TotalPutMB = FUnitConversion::Convert(TotalPutBytes, EUnit::Bytes, EUnit::Megabytes);
+		const double TotalGetMB = FUnitConversion::Convert(TotalGetBytes, EUnit::Bytes, EUnit::Megabytes);
 
-			SumTotalPutMB += TotalPutMB;
+		SumTotalGetMB += TotalGetMB;
 
-			Panel->AddSlot(3, Row)
-			.HAlign(HAlign_Left)
-			[
-				SNew(STextBlock)
-				.Margin(FMargin(ColumnMargin, RowMargin))
-				.Justification(ETextJustify::Left)
-				.Text(FText::FromString(SingleDecimalFormat(TotalPutMB) + TEXT(" MB")))
-			];
+		Panel->AddSlot(2, Row)
+		.HAlign(HAlign_Left)
+		[
+			SNew(STextBlock)
+			.Margin(FMargin(ColumnMargin, RowMargin))
+			.Justification(ETextJustify::Left)
+			.Text(FText::FromString(SingleDecimalFormat(TotalGetMB) + TEXT(" MB")))
+		];
 
-			Panel->AddSlot(4, Row)
-			[
-				SNew(STextBlock)
-				.Margin(FMargin(ColumnMargin, RowMargin))
-				.Justification(ETextJustify::Right)
-				.Text(FText::FromString(SingleDecimalFormat(TotalPutMB) + TEXT(" MB")))
-			];
+		const double TotalPutMB = FUnitConversion::Convert(TotalPutBytes, EUnit::Bytes, EUnit::Megabytes);
 
-			Panel->AddSlot(5, Row)
-			.HAlign(HAlign_Left)
-			[
-				SNew(STextBlock)
-				.Margin(FMargin(ColumnMargin, RowMargin))
-				.Justification(ETextJustify::Left)
-				.Text(FText::FromString(Backend->GetName()))
-			];
+		SumTotalPutMB += TotalPutMB;
 
-			Row++;
-		}
+		Panel->AddSlot(3, Row)
+		.HAlign(HAlign_Left)
+		[
+			SNew(STextBlock)
+			.Margin(FMargin(ColumnMargin, RowMargin))
+			.Justification(ETextJustify::Left)
+			.Text(FText::FromString(SingleDecimalFormat(TotalPutMB) + TEXT(" MB")))
+		];
+
+		Panel->AddSlot(4, Row)
+		[
+			SNew(STextBlock)
+			.Margin(FMargin(ColumnMargin, RowMargin))
+			.Justification(ETextJustify::Right)
+			.Text(FText::FromString(SingleDecimalFormat(TotalPutMB) + TEXT(" MB")))
+		];
+
+		Panel->AddSlot(5, Row)
+		.HAlign(HAlign_Left)
+		[
+			SNew(STextBlock)
+			.Margin(FMargin(ColumnMargin, RowMargin))
+			.Justification(ETextJustify::Left)
+			.Text(FText::FromString(Backend->GetName()))
+		];
+
+		Row++;
 	}
 
 	Panel->AddSlot(0, Row)
