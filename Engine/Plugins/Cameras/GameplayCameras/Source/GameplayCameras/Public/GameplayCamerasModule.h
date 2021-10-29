@@ -5,15 +5,15 @@
 #include "CoreMinimal.h"
 #include "Modules/ModuleInterface.h"
 
-/**
- * Implements the Cameras module.
- */
-class FGameplayCamerasModule : public IModuleInterface
-{
-public:
+DECLARE_STATS_GROUP(TEXT("Camera Animation Evaluation"), STATGROUP_CameraAnimation, STATCAT_Advanced)
 
-	// IModuleInterface interface
-	virtual void StartupModule() override;
-	virtual void ShutdownModule() override;
+class IGameplayCamerasModule : public IModuleInterface
+{
+	/**
+	 * Singleton-like access to ICameraModule
+	 *
+	 * @return The ICameraModule instance, loading the module on demand if needed
+	 */
+	static IGameplayCamerasModule& Get();
 };
 
