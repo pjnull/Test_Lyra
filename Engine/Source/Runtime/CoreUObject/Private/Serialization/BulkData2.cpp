@@ -1908,11 +1908,6 @@ EPackageSegment FBulkDataBase::GetPackageSegmentFromFlags() const
 	}
 }
 
-bool FBulkDataAllocation::IsLoaded() const
-{
-	return Allocation.RawData != nullptr; // Doesn't matter which allocation we test
-}
-
 void FBulkDataAllocation::Free(FBulkDataBase* Owner)
 {
 	if (!Owner->IsDataMemoryMapped())

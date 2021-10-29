@@ -80,7 +80,10 @@ public:
 	FBulkDataAllocation() = default;
 	~FBulkDataAllocation() = default;
 
-	bool IsLoaded() const;
+	bool IsLoaded() const
+	{
+		return Allocation.RawData != nullptr; // Doesn't matter which allocation we test
+	}
 	void Free(FBulkDataBase* Owner);
 
 	// Set as a raw buffer
