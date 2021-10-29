@@ -5006,6 +5006,11 @@ namespace UECodeGen_Private
 		PRAGMA_DISABLE_DEPRECATION_WARNINGS
 		NewPackage->SetGuid(FGuid(Params.BodyCRC, Params.DeclarationsCRC, 0u, 0u));
 		PRAGMA_ENABLE_DEPRECATION_WARNINGS
+#if WITH_EDITORONLY_DATA
+		// Store the CRC in UPackage::PersistentGuid since UPackage::Guid will be removed.
+		// Replace the PersistentGuid generated from UPackage::PostInitProperties() that changes every time.
+		NewPackage->SetPersistentGuid(FGuid(Params.BodyCRC, Params.DeclarationsCRC, 0u, 0u));
+#endif
 
 #if WITH_RELOAD
 		TArray<UFunction*> Delegates;
