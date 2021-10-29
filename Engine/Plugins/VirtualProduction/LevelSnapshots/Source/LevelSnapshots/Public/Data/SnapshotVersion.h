@@ -28,7 +28,7 @@ struct LEVELSNAPSHOTS_API FSnapshotFileVersionInfo
 	
 	/* Licensee file version */
 	UPROPERTY()
-	int32 FileVersionLicensee;
+	int32 FileVersionLicensee = 0;
 };
 
 /** Holds engine version information */
