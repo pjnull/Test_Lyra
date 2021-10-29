@@ -127,7 +127,7 @@ public:
 	/** Relative size of brush */
 	UPROPERTY(EditAnywhere, Category = ActionType, meta = (DisplayName = "Brush Size", UIMin = "0.0", UIMax = "1.0", ClampMin = "0.0", ClampMax = "10.0", 
 		HideEditConditionToggle, EditConditionHides, EditCondition = "SubToolType != EMeshGroupPaintInteractionType::PolyLasso"))
-	float BrushSize;
+	float BrushSize = 0.25f;
 
 	/** When Volumetric, all faces inside the brush sphere are selected, otherwise only connected faces are selected */
 	UPROPERTY(EditAnywhere, Category = ActionType, meta = (DisplayName = "Brush Area Mode",
@@ -335,6 +335,12 @@ public:
 	bool HaveVisibilityFilter() const;
 	void ApplyVisibilityFilter(const TArray<int32>& Triangles, TArray<int32>& VisibleTriangles);
 	void ApplyVisibilityFilter(TSet<int32>& Triangles, TArray<int32>& ROIBuffer, TArray<int32>& OutputBuffer);
+
+	// we override these so we can update the separate BrushSize property added for this tool
+	virtual void IncreaseBrushRadiusAction();
+	virtual void DecreaseBrushRadiusAction();
+	virtual void IncreaseBrushRadiusSmallStepAction();
+	virtual void DecreaseBrushRadiusSmallStepAction();
 
 protected:
 	// UMeshSculptToolBase API

@@ -302,6 +302,31 @@ void UMeshGroupPaintTool::OnPropertyModified(UObject* PropertySet, FProperty* Pr
 }
 
 
+void UMeshGroupPaintTool::IncreaseBrushRadiusAction()
+{
+	Super::IncreaseBrushRadiusAction();
+	FilterProperties->BrushSize = BrushProperties->BrushSize.AdaptiveSize;
+}
+
+void UMeshGroupPaintTool::DecreaseBrushRadiusAction()
+{
+	Super::DecreaseBrushRadiusAction();
+	FilterProperties->BrushSize = BrushProperties->BrushSize.AdaptiveSize;
+}
+
+void UMeshGroupPaintTool::IncreaseBrushRadiusSmallStepAction()
+{
+	Super::IncreaseBrushRadiusSmallStepAction();
+	FilterProperties->BrushSize = BrushProperties->BrushSize.AdaptiveSize;
+}
+
+void UMeshGroupPaintTool::DecreaseBrushRadiusSmallStepAction()
+{
+	Super::DecreaseBrushRadiusSmallStepAction();
+	FilterProperties->BrushSize = BrushProperties->BrushSize.AdaptiveSize;
+}
+
+
 bool UMeshGroupPaintTool::IsInBrushSubMode() const
 {
 	return FilterProperties->SubToolType == EMeshGroupPaintInteractionType::Brush
