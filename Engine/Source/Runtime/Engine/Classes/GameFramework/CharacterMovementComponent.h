@@ -864,6 +864,9 @@ private:
 	UPROPERTY(Transient)
 	TEnumAsByte<enum EMovementMode> GroundMovementMode;
 
+	/** Remember last server movement base so we can detect mounts/dismounts and respond accordingly. */
+	TWeakObjectPtr<UPrimitiveComponent> LastServerMovementBase = nullptr;
+
 public:
 	/**
 	 * If true, walking movement always maintains horizontal velocity when moving up ramps, which causes movement up ramps to be faster parallel to the ramp surface.
@@ -1111,9 +1114,6 @@ public:
 
 	/** Last valid projected hit result from raycast to geometry from navmesh */
 	FHitResult CachedProjectedNavMeshHitResult;
-
-	/** Remember last server movement base so we can detect mounts/dismounts and respond accordingly. */
-	UPrimitiveComponent* LastServerMovementBase = nullptr;
 
 	/** Remember last server movement base bone so we can detect mounts/dismounts and respond accordingly. */
 	FName LastServerMovementBaseBoneName = NAME_None;
