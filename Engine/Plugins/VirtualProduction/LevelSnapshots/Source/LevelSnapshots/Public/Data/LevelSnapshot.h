@@ -85,6 +85,8 @@ public:
 	
 private:
 
+	FString GenerateDebugLogInfo() const;
+
 	void EnsureWorldInitialised();
 	void DestroyWorld();
 

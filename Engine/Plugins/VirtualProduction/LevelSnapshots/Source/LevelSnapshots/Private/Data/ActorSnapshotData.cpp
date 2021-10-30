@@ -141,11 +141,11 @@ TOptional<AActor*> FActorSnapshotData::GetPreallocated(UWorld* SnapshotWorld, FW
 TOptional<AActor*> FActorSnapshotData::GetDeserialized(UWorld* SnapshotWorld, FWorldSnapshotData& WorldData, const FSoftObjectPath& OriginalActorPath, UPackage* InLocalisationSnapshotPackage)
 {
 	SCOPED_SNAPSHOT_CORE_TRACE(GetDeserialized);
-	
 	if (bReceivedSerialisation && CachedSnapshotActor.IsValid())
 	{
 		return CachedSnapshotActor.Get();
 	}
+	UE_LOG(LogLevelSnapshots, Verbose, TEXT("========== Get Deserialized %s =========="), *OriginalActorPath.ToString());
 
 	const TOptional<AActor*> Preallocated = GetPreallocated(SnapshotWorld, WorldData);
 	if (!Preallocated)
@@ -162,6 +162,7 @@ TOptional<AActor*> FActorSnapshotData::GetDeserialized(UWorld* SnapshotWorld, FW
 	{
 		const FRestoreObjectScope FinishRestore = FCustomObjectSerializationWrapper::PreActorRestore_SnapshotWorld(PreallocatedActor, CustomActorSerializationData, WorldData, ProcessObjectDependency, InLocalisationSnapshotPackage);
 		FLoadSnapshotObjectArchive::ApplyToSnapshotWorldObject(SerializedActorData, WorldData, PreallocatedActor, ProcessObjectDependency, InLocalisationSnapshotPackage);
+		UE_LOG(LogLevelSnapshots, Verbose, TEXT("ActorLabel is \"%s\" for \"%s\" (editor object path \"%s\")"), *PreallocatedActor->GetActorLabel(), *PreallocatedActor->GetPathName(), *OriginalActorPath.ToString());
 	}
 
 	DeserializeComponents(PreallocatedActor, WorldData,
@@ -297,6 +298,7 @@ namespace ActorSnapshotData
 
 void FActorSnapshotData::DeserializeIntoExistingWorldActor(UWorld* SnapshotWorld, AActor* OriginalActor, FWorldSnapshotData& WorldData, UPackage* InLocalisationSnapshotPackage, const FPropertySelectionMap& SelectedProperties)
 {
+	UE_LOG(LogLevelSnapshots, Verbose, TEXT("========== Apply existing %s =========="), *OriginalActor->GetPathName());
 	const bool bWasRecreated = false;
 	const FApplySnapshotToActorScope NotifyExternalListeners({ OriginalActor, SelectedProperties, bWasRecreated });
 	
@@ -326,6 +328,7 @@ void FActorSnapshotData::DeserializeIntoExistingWorldActor(UWorld* SnapshotWorld
 
 void FActorSnapshotData::DeserializeIntoRecreatedEditorWorldActor(UWorld* SnapshotWorld, AActor* OriginalActor, FWorldSnapshotData& WorldData, UPackage* InLocalisationSnapshotPackage, const FPropertySelectionMap& SelectedProperties)
 {
+	UE_LOG(LogLevelSnapshots, Verbose, TEXT("========== Apply recreated %s =========="), *OriginalActor->GetPathName());
 	const bool bWasRecreated = true;
 	const FApplySnapshotToActorScope NotifyExternalListeners({ OriginalActor, SelectedProperties, bWasRecreated });
 	
@@ -355,6 +358,7 @@ void FActorSnapshotData::DeserializeIntoEditorWorldActor(UWorld* SnapshotWorld, 
 
 	const AActor* AttachParentBeforeRestore = OriginalActor->GetAttachParentActor();
 	SerializeActor(OriginalActor, *Deserialized);
+	UE_LOG(LogLevelSnapshots, Verbose, TEXT("ActorLabel is \"%s\" for \"%s\""), *OriginalActor->GetActorLabel(), *OriginalActor->GetPathName());
 
 	TInlineComponentArray<UActorComponent*> DeserializedComponents;
 	Deserialized.GetValue()->GetComponents(DeserializedComponents);

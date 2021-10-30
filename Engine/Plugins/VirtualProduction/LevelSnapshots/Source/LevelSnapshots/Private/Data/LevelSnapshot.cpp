@@ -36,7 +36,7 @@ void ULevelSnapshot::ApplySnapshotToWorld(UWorld* TargetWorld, const FPropertySe
 		return;
 	}
 	
-	UE_LOG(LogLevelSnapshots, Log, TEXT("Applying snapshot %s to world %s"), *GetPathName(), *TargetWorld->GetPathName());
+	UE_LOG(LogLevelSnapshots, Log, TEXT("Applying snapshot %s to world %s. %s"), *GetPathName(), *TargetWorld->GetPathName(), *GenerateDebugLogInfo());
 	UE_CLOG(MapPath != FSoftObjectPath(TargetWorld), LogLevelSnapshots, Log, TEXT("Snapshot was taken for different world called '%s'"), *MapPath.ToString());
 	ON_SCOPE_EXIT
 	{
@@ -177,7 +177,7 @@ void ULevelSnapshot::DiffWorld(UWorld* World, FActorPathConsumer HandleMatchedAc
 	{
 		return;
 	}
-	UE_LOG(LogLevelSnapshots, Log, TEXT("Diffing snapshot %s in world %s"), *GetPathName(), *World->GetPathName());
+	UE_LOG(LogLevelSnapshots, Log, TEXT("Diffing snapshot %s in world %s. %s"), *GetPathName(), *World->GetPathName(), *GenerateDebugLogInfo());
 	ON_SCOPE_EXIT
 	{
 		UE_LOG(LogLevelSnapshots, Log, TEXT("Finished diffing snapshot"));
@@ -286,6 +286,14 @@ void ULevelSnapshot::BeginDestroy()
 	}
 	
 	Super::BeginDestroy();
+}
+
+FString ULevelSnapshot::GenerateDebugLogInfo() const
+{
+	FSnapshotVersionInfo Current;
+	Current.Initialize();
+	
+	return FString::Printf(TEXT("CaptureTime: %s. SnapshotVersionInfo: %s. Current engine version: %s."), *CaptureTime.ToString(), *GetSerializedData().SnapshotVersionInfo.ToString(), *Current.ToString());
 }
 
 void ULevelSnapshot::EnsureWorldInitialised()
