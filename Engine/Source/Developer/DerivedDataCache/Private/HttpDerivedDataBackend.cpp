@@ -2002,7 +2002,8 @@ FHttpDerivedDataBackend::ESpeedClass FHttpDerivedDataBackend::GetSpeedClass() co
 
 bool FHttpDerivedDataBackend::ApplyDebugOptions(FBackendDebugOptions& InOptions)
 {
-	return false;
+	DebugOptions = InOptions;
+	return true;
 }
 
 
@@ -2149,11 +2150,42 @@ bool FHttpDerivedDataBackend::ShouldRetryOnError(int64 ResponseCode)
 	return false;
 }
 
+bool FHttpDerivedDataBackend::ShouldSimulateMiss(const TCHAR* InKey)
+{
+	if (DebugOptions.RandomMissRate == 0 && DebugOptions.SimulateMissTypes.IsEmpty())
+	{
+		return false;
+	}
+
+	const FName Key(InKey);
+	const uint32 Hash = GetTypeHash(Key);
+
+	if (FScopeLock Lock(&MissedKeysCS); DebugMissedKeys.ContainsByHash(Hash, Key))
+	{
+		return true;
+	}
+
+	if (DebugOptions.ShouldSimulateMiss(InKey))
+	{
+		FScopeLock Lock(&MissedKeysCS);
+		UE_LOG(LogDerivedDataCache, Verbose, TEXT("Simulating miss in %s for %s"), *GetName(), InKey);
+		DebugMissedKeys.AddByHash(Hash, Key);
+		return true;
+	}
+
+	return false;
+}
+
 bool FHttpDerivedDataBackend::CachedDataProbablyExists(const TCHAR* CacheKey)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(HttpDDC_Exist);
 	TRACE_COUNTER_ADD(HttpDDC_Exist, int64(1));
 	COOK_STAT(auto Timer = UsageStats.TimeProbablyExists());
+
+	if (ShouldSimulateMiss(CacheKey))
+	{
+		return false;
+	}
 
 #if WITH_DATAREQUEST_HELPER
 	// Retry request until we get an accepted response or exhaust allowed number of attempts.
@@ -2218,12 +2250,34 @@ TBitArray<> FHttpDerivedDataBackend::CachedDataProbablyExistsBatch(TConstArrayVi
 		if (FHttpRequest::IsSuccessResponse(ResponseCode) && RequestHelper.IsSuccess())
 		{
 			COOK_STAT(Timer.AddHit(0));
-			return RequestHelper.IsBatchSuccess();
+			TBitArray<> Results = RequestHelper.IsBatchSuccess();
+			int32 ResultIndex = 0;
+			for (const FString& CacheKey : CacheKeys)
+			{
+				if (ShouldSimulateMiss(*CacheKey))
+				{
+					Results[ResultIndex] = false;
+				}
+				ResultIndex++;
+			}
+
+			return Results;
 		}
 
 		if (!ShouldRetryOnError(ResponseCode))
 		{
-			return RequestHelper.IsBatchSuccess();
+			TBitArray<> Results = RequestHelper.IsBatchSuccess();
+			int32 ResultIndex = 0;
+			for (const FString& CacheKey : CacheKeys)
+			{
+				if (ShouldSimulateMiss(*CacheKey))
+				{
+					Results[ResultIndex] = false;
+				}
+				ResultIndex++;
+			}
+
+			return Results;
 		}
 	}
 #else
@@ -2258,13 +2312,20 @@ TBitArray<> FHttpDerivedDataBackend::CachedDataProbablyExistsBatch(TConstArrayVi
 			Exists.Reserve(CacheKeys.Num());
 			for (const FString& CacheKey : CacheKeys)
 			{
-				const TSharedPtr<FJsonValue>* FoundResponse = Algo::FindByPredicate(ResponseArray, [&CacheKey](const TSharedPtr<FJsonValue>& Response) {
-					FString Key;
-					Response->TryGetString(Key);
-					return Key == CacheKey;
-				});
+				if (ShouldSimulateMiss(*CacheKey))
+				{
+					Exists.Add(false);
+				}
+				else
+				{
+					const TSharedPtr<FJsonValue>* FoundResponse = Algo::FindByPredicate(ResponseArray, [&CacheKey](const TSharedPtr<FJsonValue>& Response) {
+						FString Key;
+						Response->TryGetString(Key);
+						return Key == CacheKey;
+					});
 
-				Exists.Add(FoundResponse != nullptr);
+					Exists.Add(FoundResponse != nullptr);
+				}
 			}
 
 			if (Exists.CountSetBits() == CacheKeys.Num())
@@ -2290,6 +2351,14 @@ bool FHttpDerivedDataBackend::GetCachedData(const TCHAR* CacheKey, TArray<uint8>
 	TRACE_CPUPROFILER_EVENT_SCOPE(HttpDDC_Get);
 	TRACE_COUNTER_ADD(HttpDDC_Get, int64(1));
 	COOK_STAT(auto Timer = UsageStats.TimeGet());
+
+	if (ShouldSimulateMiss(CacheKey))
+	{
+		FScopeLock Lock(&MissedKeysCS);
+		UE_LOG(LogDerivedDataCache, Verbose, TEXT("Simulating miss in %s for %s"), *GetName(), CacheKey);
+		DebugMissedKeys.Add(FName(CacheKey));
+		return false;
+	}
 
 #if WITH_DATAREQUEST_HELPER
 	// Retry request until we get an accepted response or exhaust allowed number of attempts.
@@ -2350,6 +2419,12 @@ FDerivedDataBackendInterface::EPutStatus FHttpDerivedDataBackend::PutCachedData(
 	{
 		UE_LOG(LogDerivedDataCache, Verbose, TEXT("%s is read only. Skipping put of %s"), *GetName(), CacheKey);
 		return EPutStatus::NotCached;
+	}
+
+	// don't put anything we pretended didn't exist
+	if (ShouldSimulateMiss(CacheKey))
+	{
+		return EPutStatus::Skipped;
 	}
 
 #if WITH_DATAREQUEST_HELPER
