@@ -162,7 +162,9 @@ TOptional<AActor*> FActorSnapshotData::GetDeserialized(UWorld* SnapshotWorld, FW
 	{
 		const FRestoreObjectScope FinishRestore = FCustomObjectSerializationWrapper::PreActorRestore_SnapshotWorld(PreallocatedActor, CustomActorSerializationData, WorldData, ProcessObjectDependency, InLocalisationSnapshotPackage);
 		FLoadSnapshotObjectArchive::ApplyToSnapshotWorldObject(SerializedActorData, WorldData, PreallocatedActor, ProcessObjectDependency, InLocalisationSnapshotPackage);
+#if WITH_EDITOR
 		UE_LOG(LogLevelSnapshots, Verbose, TEXT("ActorLabel is \"%s\" for \"%s\" (editor object path \"%s\")"), *PreallocatedActor->GetActorLabel(), *PreallocatedActor->GetPathName(), *OriginalActorPath.ToString());
+#endif
 	}
 
 	DeserializeComponents(PreallocatedActor, WorldData,
@@ -358,7 +360,9 @@ void FActorSnapshotData::DeserializeIntoEditorWorldActor(UWorld* SnapshotWorld, 
 
 	const AActor* AttachParentBeforeRestore = OriginalActor->GetAttachParentActor();
 	SerializeActor(OriginalActor, *Deserialized);
+#if WITH_EDITOR
 	UE_LOG(LogLevelSnapshots, Verbose, TEXT("ActorLabel is \"%s\" for \"%s\""), *OriginalActor->GetActorLabel(), *OriginalActor->GetPathName());
+#endif
 
 	TInlineComponentArray<UActorComponent*> DeserializedComponents;
 	Deserialized.GetValue()->GetComponents(DeserializedComponents);
