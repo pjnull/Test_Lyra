@@ -256,7 +256,6 @@ namespace Chaos
 		{
 			ConstraintIndex = InIndex;
 			LastUsedEpoch = InEpoch;
-			bIsSleeping = false;
 		}
 
 		/**
@@ -283,6 +282,8 @@ namespace Chaos
 		bool bIsInShapePairMap;
 
 		// Whether the constraint is in a sleeping island (this is used to prevent culling because Epoch is not updated for sleepers)
+		// NOTE: this variable is managed by the IslandManager. It should probably not be in the Container Cookie (but currently
+		// it is used by the container to prevent pruning).
 		bool bIsSleeping;
 	};
 
