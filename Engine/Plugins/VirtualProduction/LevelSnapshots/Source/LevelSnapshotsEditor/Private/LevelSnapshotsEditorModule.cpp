@@ -6,10 +6,9 @@
 #include "Data/LevelSnapshotsEditorData.h"
 #include "LevelSnapshotsEditorCommands.h"
 #include "LevelSnapshotsEditorStyle.h"
-#include "LevelSnapshotsUserSettings.h"
 #include "Settings/LevelSnapshotsEditorProjectSettings.h"
 #include "Settings/LevelSnapshotsEditorDataManagementSettings.h"
-#include "Toolkits/LevelSnapshotsEditorToolkit.h"
+#include "Views/SLevelSnapshotsEditor.h"
 
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetToolsModule.h"
@@ -19,9 +18,15 @@
 #include "LevelEditor.h"
 #include "Util/TakeSnapshotUtil.h"
 #include "ToolMenus.h"
-#include "Misc/ScopeExit.h"
+#include "WorkspaceMenuStructure.h"
+#include "WorkspaceMenuStructureModule.h"
 
 #define LOCTEXT_NAMESPACE "FLevelSnapshotsEditorModule"
+
+namespace LevelSnapshotsEditor
+{
+	const FName LevelSnapshotsTabName("LevelSnapshots");
+}
 
 FLevelSnapshotsEditorModule& FLevelSnapshotsEditorModule::Get()
 {
@@ -42,14 +47,12 @@ void FLevelSnapshotsEditorModule::StartupModule()
 	FLevelSnapshotsEditorStyle::Initialize();
 	FLevelSnapshotsEditorCommands::Register();
 	
-	// add the menu subsection
-	FCoreDelegates::OnPostEngineInit.AddRaw(this, &FLevelSnapshotsEditorModule::PostEngineInit);
+	RegisterTabSpawner();
 }
 
 void FLevelSnapshotsEditorModule::ShutdownModule()
 {
 	UToolMenus::UnregisterOwner(this);
-
 	FCoreDelegates::OnPostEngineInit.RemoveAll(this);
 
 	FLevelSnapshotsEditorStyle::Shutdown();
@@ -61,9 +64,10 @@ void FLevelSnapshotsEditorModule::ShutdownModule()
 
 		UToolMenus::Get()->RemoveSection("LevelEditor.LevelEditorToolBar.User", "LevelSnapshots");
 	}
-	
-	FLevelSnapshotsEditorCommands::Unregister();
 
+	UnregisterTabSpawner();
+	FLevelSnapshotsEditorCommands::Unregister();
+	
 	// Unregister project settings
 	ISettingsModule& SettingsModule = FModuleManager::LoadModuleChecked<ISettingsModule>("Settings");
 	{
@@ -92,47 +96,60 @@ void FLevelSnapshotsEditorModule::SetUseCreationForm(bool bInUseCreationForm)
 	}
 }
 
-void FLevelSnapshotsEditorModule::PostEngineInit()
+void FLevelSnapshotsEditorModule::RegisterTabSpawner()
 {
-	RegisterMenuItem();
+	FTabSpawnerEntry& TabSpawnerEntry = FGlobalTabmanager::Get()->RegisterNomadTabSpawner(LevelSnapshotsEditor::LevelSnapshotsTabName, FOnSpawnTab::CreateRaw(this, &FLevelSnapshotsEditorModule::SpawnLevelSnapshotsTab))
+			.SetDisplayName(NSLOCTEXT("LevelSnapshots", "LevelSnapshotsTabTitle", "Level Snapshots"))
+			.SetTooltipText(NSLOCTEXT("LevelSnapshots", "LevelSnapshotsTooltipText", "Open the Level Snapshots tab"))
+			.SetIcon(FSlateIcon(FLevelSnapshotsEditorStyle::GetStyleSetName(), "LevelSnapshots.ToolbarButton", "LevelSnapshots.ToolbarButton.Small")
+			);
+	TabSpawnerEntry.SetGroup(WorkspaceMenu::GetMenuStructure().GetLevelEditorVirtualProductionCategory());
+}
 
-	if (RegisterProjectSettings() && ProjectSettingsObjectPtr->bEnableLevelSnapshotsToolbarButton)
+void FLevelSnapshotsEditorModule::UnregisterTabSpawner()
+{
+	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(LevelSnapshotsEditor::LevelSnapshotsTabName);
+}
+
+TSharedRef<SDockTab> FLevelSnapshotsEditorModule::SpawnLevelSnapshotsTab(const FSpawnTabArgs& SpawnTabArgs)
+{
+	const TSharedRef<SDockTab> DockTab = SNew(SDockTab)
+		.TabRole(NomadTab);
+
+	TSharedRef<SLevelSnapshotsEditor> SnapshotsEditor = SNew(SLevelSnapshotsEditor, AllocateTransientPreset(), DockTab, SpawnTabArgs.GetOwnerWindow());
+	WeakSnapshotEditor = SnapshotsEditor;
+	DockTab->SetContent(SnapshotsEditor);
+
+	return DockTab;
+}
+
+ULevelSnapshotsEditorData* FLevelSnapshotsEditorModule::AllocateTransientPreset()
+{
+	ULevelSnapshotsEditorData* ExistingPreset = FindObject<ULevelSnapshotsEditorData>(nullptr, TEXT("/Temp/LevelSnapshots/PendingSnapshots.PendingSnapshots"));
+	if (ExistingPreset)
 	{
-		// todo: Skip toolbar for UE5 for now; we will reimplement toolbar at a later date
-		//RegisterEditorToolbar();
+		return ExistingPreset;
+	}
+	
+	UPackage* NewPackage = CreatePackage(TEXT("/Temp/LevelSnapshots/PendingSnapshots"));
+	NewPackage->SetFlags(RF_Transient);
+	NewPackage->AddToRoot();
+
+	return NewObject<ULevelSnapshotsEditorData>(NewPackage, TEXT("PendingSnapshots"), RF_Transient | RF_Transactional | RF_Standalone);
+}
+
+void FLevelSnapshotsEditorModule::OpenLevelSnapshotsDialogWithAssetSelected(const FAssetData& InAssetData)
+{
+	OpenSnapshotsEditor();
+	if (WeakSnapshotEditor.IsValid())
+	{
+		WeakSnapshotEditor.Pin()->OpenLevelSnapshotsDialogWithAssetSelected(InAssetData);
 	}
 }
 
-void FLevelSnapshotsEditorModule::RegisterMenuItem()
+void FLevelSnapshotsEditorModule::OpenSnapshotsEditor()
 {
-	if (FSlateApplication::IsInitialized())
-	{
-		if (IsRunningGame())
-		{
-			return;
-		}
-		
-		const TSharedRef<FUICommandList> MenuItemCommandList = MakeShared<FUICommandList>();
-
-		MenuItemCommandList->MapAction(
-			FLevelSnapshotsEditorCommands::Get().OpenLevelSnapshotsEditorMenuItem,
-			FExecuteAction::CreateRaw(this, &FLevelSnapshotsEditorModule::OpenSnapshotsEditor)
-		);
-		
-		TSharedPtr<FExtender> NewMenuExtender = MakeShareable(new FExtender);
-		NewMenuExtender->AddMenuExtension("ExperimentalTabSpawners", 
-		                                  EExtensionHook::After, 
-		                                  MenuItemCommandList, 
-		                                  FMenuExtensionDelegate::CreateLambda([this] (FMenuBuilder& MenuBuilder)
-		                                  {
-			                                  MenuBuilder.AddMenuEntry(FLevelSnapshotsEditorCommands::Get().OpenLevelSnapshotsEditorMenuItem);
-		                                  }));
-	
-		// Get the Level Editor so we can insert our item into the Level Editor menu subsection
-		FLevelEditorModule& LevelEditorModule = FModuleManager::LoadModuleChecked<FLevelEditorModule>("LevelEditor");
-
-		LevelEditorModule.GetMenuExtensibilityManager()->AddExtender(NewMenuExtender);
-	}
+	FGlobalTabmanager::Get()->TryInvokeTab(LevelSnapshotsEditor::LevelSnapshotsTabName);
 }
 
 bool FLevelSnapshotsEditorModule::RegisterProjectSettings()
@@ -148,7 +165,6 @@ bool FLevelSnapshotsEditorModule::RegisterProjectSettings()
 		if (ProjectSettingsSectionPtr.IsValid() && ProjectSettingsSectionPtr->GetSettingsObject().IsValid())
 		{
 			ProjectSettingsObjectPtr = Cast<ULevelSnapshotsEditorProjectSettings>(ProjectSettingsSectionPtr->GetSettingsObject());
-
 			ProjectSettingsSectionPtr->OnModified().BindRaw(this, &FLevelSnapshotsEditorModule::HandleModifiedProjectSettings);
 		}
 
@@ -161,7 +177,6 @@ bool FLevelSnapshotsEditorModule::RegisterProjectSettings()
 		if (DataMangementSettingsSectionPtr.IsValid() && DataMangementSettingsSectionPtr->GetSettingsObject().IsValid())
 		{
 			DataMangementSettingsObjectPtr = Cast<ULevelSnapshotsEditorDataManagementSettings>(DataMangementSettingsSectionPtr->GetSettingsObject());
-
 			DataMangementSettingsSectionPtr->OnModified().BindRaw(this, &FLevelSnapshotsEditorModule::HandleModifiedProjectSettings);
 		}
 	}
@@ -257,62 +272,6 @@ TSharedRef<SWidget> FLevelSnapshotsEditorModule::FillEditorToolbarComboButtonMen
 
 	// Create the widget so it can be attached to the combo button
 	return MenuBuilder.MakeWidget();
-}
-
-void FLevelSnapshotsEditorModule::OpenLevelSnapshotsDialogWithAssetSelected(const FAssetData& InAssetData)
-{
-	OpenSnapshotsEditor();
-
-	if (SnapshotEditorToolkit.IsValid())
-	{
-		SnapshotEditorToolkit.Pin()->OpenLevelSnapshotsDialogWithAssetSelected(InAssetData);
-	}
-}
-
-void FLevelSnapshotsEditorModule::OpenSnapshotsEditor()
-{
-	if (SnapshotEditorToolkit.IsValid())
-	{
-		SnapshotEditorToolkit.Pin()->BringToolkitToFront();
-	}
-	else
-	{
-		ULevelSnapshotsEditorData* EditingObject = AllocateTransientPreset();
-		SnapshotEditorToolkit = FLevelSnapshotsEditorToolkit::CreateSnapshotEditor(EditingObject);
-	}
-}
-
-ULevelSnapshotsEditorData* FLevelSnapshotsEditorModule::AllocateTransientPreset()
-{
-	static const TCHAR* PackageName = TEXT("/Temp/LevelSnapshots/PendingSnapshots");
-
-	ULevelSnapshotsEditorData* ExistingPreset = FindObject<ULevelSnapshotsEditorData>(nullptr, TEXT("/Temp/LevelSnapshots/PendingSnapshots.PendingSnapshots"));
-	if (ExistingPreset)
-	{
-		return ExistingPreset;
-	}
-
-	ULevelSnapshotsEditorData* TemplatePreset = GetDefault<ULevelSnapshotsUserSettings>()->LastEditorData.Get();
-
-	static FName DesiredName = "PendingSnapshots";
-
-	UPackage* NewPackage = CreatePackage(PackageName);
-	NewPackage->SetFlags(RF_Transient);
-	NewPackage->AddToRoot();
-
-	ULevelSnapshotsEditorData* NewPreset = nullptr;
-
-	if (TemplatePreset)
-	{
-		NewPreset = DuplicateObject<ULevelSnapshotsEditorData>(TemplatePreset, NewPackage, DesiredName);
-		NewPreset->SetFlags(RF_Transient | RF_Transactional | RF_Standalone);
-	}
-	else
-	{
-		NewPreset = NewObject<ULevelSnapshotsEditorData>(NewPackage, DesiredName, RF_Transient | RF_Transactional | RF_Standalone);
-	}
-
-	return NewPreset;
 }
 
 #undef LOCTEXT_NAMESPACE

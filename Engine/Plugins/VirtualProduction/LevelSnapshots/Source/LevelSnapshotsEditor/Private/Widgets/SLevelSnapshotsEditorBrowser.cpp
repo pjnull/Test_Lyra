@@ -4,7 +4,6 @@
 
 #include "LevelSnapshot.h"
 #include "Data/LevelSnapshotsEditorData.h"
-#include "Views/SnapshotEditorViewData.h"
 
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetThumbnail.h"
@@ -24,10 +23,10 @@
 
 #define LOCTEXT_NAMESPACE "LevelSnapshotsEditor"
 
-void SLevelSnapshotsEditorBrowser::Construct(const FArguments& InArgs, const FSnapshotEditorViewData& InViewBuildData)
+void SLevelSnapshotsEditorBrowser::Construct(const FArguments& InArgs, ULevelSnapshotsEditorData* InEditorData)
 {
 	OwningWorldPathAttribute = InArgs._OwningWorldPath;
-	ViewBuildData = InViewBuildData;
+	EditorData = InEditorData;
 
 	check(OwningWorldPathAttribute.IsSet());
 
@@ -76,9 +75,9 @@ void SLevelSnapshotsEditorBrowser::SelectAsset(const FAssetData& InAssetData) co
 	ULevelSnapshot* Snapshot = Cast<ULevelSnapshot>(InAssetData.GetAsset());
 
 	SelectSnapshot.EnterProgressFrame(40.f);
-	if (ensure(Snapshot))
+	if (ensure(Snapshot && EditorData.IsValid()))
 	{
-		ViewBuildData.EditorDataPtr->SetActiveSnapshot(Snapshot);
+		EditorData->SetActiveSnapshot(Snapshot);
 	}
 }
 

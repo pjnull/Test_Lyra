@@ -6,9 +6,7 @@
 #include "Data/FilteredResults.h"
 #include "Data/Filters/LevelSnapshotsFilterPreset.h"
 #include "Data/LevelSnapshotsEditorData.h"
-#include "Views/Filter/LevelSnapshotsEditorFilters.h"
 #include "LevelSnapshotsEditorStyle.h"
-#include "Views/SnapshotEditorViewData.h"
 #include "Widgets/Filter/SFavoriteFilterList.h"
 #include "Widgets/SLevelSnapshotsEditorFilterRow.h"
 #include "Widgets/Filter/SSaveAndLoadFilters.h"
@@ -85,7 +83,7 @@ SLevelSnapshotsEditorFilters::~SLevelSnapshotsEditorFilters()
 	}
 }
 
-void SLevelSnapshotsEditorFilters::Construct(const FArguments& InArgs, const TSharedRef<FLevelSnapshotsEditorFilters>& InFilters)
+void SLevelSnapshotsEditorFilters::Construct(const FArguments& InArgs, ULevelSnapshotsEditorData* EditorData)
 {
 	struct Local
 	{
@@ -116,9 +114,7 @@ void SLevelSnapshotsEditorFilters::Construct(const FArguments& InArgs, const TSh
 		}
 	};
 	
-	
-	FiltersModelPtr = InFilters;
-	EditorDataPtr = InFilters->GetViewBuildData().EditorDataPtr;
+	EditorDataPtr = EditorData;
 
 	// Create a property view
 	FPropertyEditorModule& EditModule = FModuleManager::Get().GetModuleChecked<FPropertyEditorModule>("PropertyEditor");
@@ -195,7 +191,7 @@ void SLevelSnapshotsEditorFilters::Construct(const FArguments& InArgs, const TSh
             .Padding(5.f, 0.f)
             .HAlign(HAlign_Fill)
             [
-				SAssignNew(FavoriteList, SFavoriteFilterList, InFilters->GetViewBuildData().EditorDataPtr->GetFavoriteFilters(), GetEditorData())
+				SAssignNew(FavoriteList, SFavoriteFilterList, EditorData->GetFavoriteFilters(), GetEditorData())
             ]
 
             // Rows 
@@ -274,11 +270,6 @@ void SLevelSnapshotsEditorFilters::Construct(const FArguments& InArgs, const TSh
 ULevelSnapshotsEditorData* SLevelSnapshotsEditorFilters::GetEditorData() const
 {
 	return EditorDataPtr.IsValid() ? EditorDataPtr.Get() : nullptr;
-}
-
-TSharedPtr<FLevelSnapshotsEditorFilters> SLevelSnapshotsEditorFilters::GetFiltersModel() const
-{
-	return FiltersModelPtr.Pin();
 }
 
 const TSharedPtr<IDetailsView>& SLevelSnapshotsEditorFilters::GetFilterDetailsView() const

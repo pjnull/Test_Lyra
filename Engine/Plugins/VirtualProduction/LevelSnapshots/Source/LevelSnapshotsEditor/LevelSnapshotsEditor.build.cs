@@ -38,8 +38,9 @@ public class LevelSnapshotsEditor : ModuleRules
 				"Slate",
 				"SlateCore",
 				"ToolMenus",
+				"ToolWidgets",
 				"UnrealEd",
-				"ToolWidgets"
+				"WorkspaceMenuStructure"
 			}
 			);
 	}
