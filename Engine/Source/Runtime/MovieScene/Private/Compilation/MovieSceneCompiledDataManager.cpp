@@ -151,13 +151,13 @@ struct FGatherParameters
 	{
 		FGatherParameters SubParams = *this;
 
-		SubParams.RootToSequenceTransform	= SubData.RootToSequenceTransform;
+		SubParams.RootToSequenceTransform   = SubData.RootToSequenceTransform;
 		SubParams.HierarchicalBias          = SubData.HierarchicalBias;
 		SubParams.bHasHierarchicalEasing    = SubData.bHasHierarchicalEasing;
 		SubParams.SequenceID                = InSubSequenceID;
 		SubParams.RootToSequenceWarpCounter = WarpCounter;
 
-		SubParams.LocalClampRange			= SubData.RootToSequenceTransform.TransformRangeUnwarped(SubParams.RootClampRange);
+		SubParams.LocalClampRange           = SubData.RootToSequenceTransform.TransformRangeUnwarped(SubParams.RootClampRange);
 
 		return SubParams;
 	}
@@ -823,7 +823,7 @@ void UMovieSceneCompiledDataManager::Compile(FMovieSceneCompiledDataID DataID, U
 	else
 	{
 		UE_LOG(LogMovieScene, Log, TEXT("No sequence hierarchy"));
-	}
+}
 #endif
 #endif
 }
@@ -1571,10 +1571,10 @@ void UMovieSceneCompiledDataManager::PopulateSubSequenceTree(UMovieSceneSubTrack
 			// Recurse into the sub sequence
 			RootPath->PushGeneration(SubSequenceID, SubData->DeterministicSequenceID);
 			{
-				PopulateSubSequenceTree(SubData->GetSequence(), SubParams, RootPath, InOutHierarchy);
-			}
-			RootPath->PopGenerations(1);
+			PopulateSubSequenceTree(SubData->GetSequence(), SubParams, RootPath, InOutHierarchy);
 		}
+		RootPath->PopGenerations(1);
+	}
 		else
 		{
 			// The section is looping so we need to add its contents to the tree as many times as it has loops.
