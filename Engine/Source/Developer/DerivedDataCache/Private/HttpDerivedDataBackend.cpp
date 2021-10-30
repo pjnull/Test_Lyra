@@ -2427,7 +2427,7 @@ FDerivedDataBackendInterface::EPutStatus FHttpDerivedDataBackend::PutCachedData(
 		return EPutStatus::Skipped;
 	}
 
-#if WITH_DATAREQUEST_HELPER
+#if 0 // No longer WITH_DATAREQUEST_HELPER as async puts are unsupported except through the AsyncPutWrapper which expects the inner backend to perform the put synchronously
 	for (int32 Attempts = 0; Attempts < UE_HTTPDDC_MAX_ATTEMPTS; ++Attempts)
 	{
 		FDataUploadHelper Request(PutRequestPools[IsInGameThread()].Get(), *Namespace, *DefaultBucket,	CacheKey, InData, UsageStats);
@@ -2469,10 +2469,10 @@ FDerivedDataBackendInterface::EPutStatus FHttpDerivedDataBackend::PutCachedData(
 			// Append the content hash to the header
 			HashPayload(Request.Get(), InData);
 
-			FHttpRequest::Result Result = Request->PerformBlockingUpload<FHttpRequest::Put>(*Uri, InData);
+			Request->PerformBlockingUpload<FHttpRequest::Put>(*Uri, InData);
 			ResponseCode = Request->GetResponseCode();
 
-			if (ResponseCode == 200)
+			if (FHttpRequest::IsSuccessResponse(ResponseCode))
 			{
 				TRACE_COUNTER_ADD(HttpDDC_BytesSent, int64(Request->GetBytesSent()));
 				COOK_STAT(Timer.AddHit(Request->GetBytesSent()));
