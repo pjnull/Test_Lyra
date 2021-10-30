@@ -3273,10 +3273,12 @@ void FLevelOfDetailSettingsLayout::AddToDetailsPanel( IDetailLayoutBuilder& Deta
 		LODSettingsCategory.AddCustomBuilder(MakeShared<FPerPlatformPropertyCustomNodeBuilder>(MoveTemp(Args)));
 	}
 
+	TAttribute<bool> IsQualityLevelLODEnabled = TAttribute<bool>::CreateLambda([this]() { return FLevelOfDetailSettingsLayout::GetLODCount() > 1 && GEngine->UseStaticMeshMinLODPerQualityLevels; });
+
 	LODSettingsCategory.AddCustomRow(LOCTEXT("QualityLevelMinLOD", "Quality Level Min LOD"))
 	.Visibility(GEngine->UseStaticMeshMinLODPerQualityLevels ? EVisibility::Visible : EVisibility::Collapsed)
 	.RowTag("QualityLevelMinLOD")
-	.IsEnabled(IsMinLODEnabled)
+	.IsEnabled(IsQualityLevelLODEnabled)
 	.NameContent()
 		[
 			SNew(STextBlock)
