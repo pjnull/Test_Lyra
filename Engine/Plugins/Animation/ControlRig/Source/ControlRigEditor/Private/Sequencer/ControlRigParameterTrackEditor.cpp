@@ -2467,18 +2467,19 @@ FKeyPropertyResult FControlRigParameterTrackEditor::AddKeysToControlRigHandle(US
 				KeyPropertyResult |= AddKeysToSection(SectionToKey, KeyTime, GeneratedKeys, KeyMode);
 			}
 		}
-	}
 
-	KeyPropertyResult.bTrackCreated |= bTrackCreated || bSectionCreated;
-	//if we create a key then compensate
-	if (KeyPropertyResult.bKeyCreated)
-	{
-		UMovieSceneControlRigParameterSection* ParamSection = Cast<UMovieSceneControlRigParameterSection>(Track->GetSectionToKey());
-		if (ParamSection && ParamSection->GetControlRig())
+
+		KeyPropertyResult.bTrackCreated |= bTrackCreated || bSectionCreated;
+		//if we create a key then compensate
+		if (KeyPropertyResult.bKeyCreated)
 		{
-			TOptional<FFrameNumber> OptionalKeyTime = KeyTime;
-			FControlRigSpaceChannelHelpers::CompensateIfNeeded(ParamSection->GetControlRig(), GetSequencer().Get(), ParamSection,
-				RigControlName, OptionalKeyTime);
+			UMovieSceneControlRigParameterSection* ParamSection = Cast<UMovieSceneControlRigParameterSection>(Track->GetSectionToKey());
+			if (ParamSection && ParamSection->GetControlRig())
+			{
+				TOptional<FFrameNumber> OptionalKeyTime = KeyTime;
+				FControlRigSpaceChannelHelpers::CompensateIfNeeded(ParamSection->GetControlRig(), GetSequencer().Get(), ParamSection,
+					RigControlName, OptionalKeyTime);
+			}
 		}
 	}
 	return KeyPropertyResult;
