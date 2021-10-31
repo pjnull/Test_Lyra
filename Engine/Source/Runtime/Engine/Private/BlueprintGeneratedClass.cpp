@@ -1832,8 +1832,10 @@ void UBlueprintGeneratedClass::AddReferencedObjectsInUbergraphFrame(UObject* InT
 
 						UE_ADD_CRASH_CONTEXT_SCOPE([&](FCrashContextExtendedWriter& Writer) { WriteBPGCBreadcrumbs(Writer, Params); });
 #endif // WITH_ADDITIONAL_CRASH_CONTEXTS
-
+						// All encountered references should be treated as non-native by GC
+						Collector.SetIsProcessingNativeReferences(false);
 						BPGC->UberGraphFunction->SerializeBin(CollectorScope.GetArchive(), PointerToUberGraphFrame->RawPointer);
+						Collector.SetIsProcessingNativeReferences(true);
 					}
 
 				}

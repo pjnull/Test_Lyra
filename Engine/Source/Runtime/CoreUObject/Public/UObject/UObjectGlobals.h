@@ -2204,6 +2204,10 @@ public:
 	 * The default behavior returns false as weak references must be explicitly supported
 	 */
 	virtual bool MarkWeakObjectReferenceForClearing(UObject** WeakReference) { return false; }
+	/**
+	 * Sets whether this collector is currently processing native references or not.
+	 */
+	virtual void SetIsProcessingNativeReferences(bool bIsNative) {}
 
 	/**
 	* Returns the collector archive associated with this collector.
