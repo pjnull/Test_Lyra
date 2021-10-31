@@ -2983,6 +2983,7 @@ public:
 	virtual void ReleasePrimitive(UPrimitiveComponent* Primitive) override;
 	virtual void UpdateAllPrimitiveSceneInfos(FRDGBuilder& GraphBuilder, bool bAsyncCreateLPIs = false) override;
 	virtual void UpdatePrimitiveTransform(UPrimitiveComponent* Primitive) override;
+	virtual void UpdatePrimitiveOcclusionBoundsSlack(UPrimitiveComponent* Primitive, float NewSlack) override;
 	virtual void UpdatePrimitiveAttachment(UPrimitiveComponent* Primitive) override;
 	virtual void UpdateCustomPrimitiveData(UPrimitiveComponent* Primitive) override;
 	virtual void UpdatePrimitiveDistanceFieldSceneData_GameThread(UPrimitiveComponent* Primitive) override;
@@ -3331,6 +3332,8 @@ private:
 	/** Updates a primitive's transform, called on the rendering thread. */
 	void UpdatePrimitiveTransform_RenderThread(FPrimitiveSceneProxy* PrimitiveSceneProxy, const FBoxSphereBounds& WorldBounds, const FBoxSphereBounds& LocalBounds, const FMatrix& LocalToWorld, const FVector& OwnerPosition, const TOptional<FTransform>& PreviousTransform);
 
+	void UpdatePrimitiveOcclusionBoundsSlack_RenderThread(const FPrimitiveSceneProxy* PrimitiveSceneProxy, float NewSlack);
+
 	/** Updates a single primitive's lighting attachment root. */
 	void UpdatePrimitiveLightingAttachmentRoot(UPrimitiveComponent* Primitive);
 
@@ -3416,6 +3419,7 @@ private:
 	TMap<FPrimitiveSceneProxy*, FCustomPrimitiveData> UpdatedCustomPrimitiveParams;
 	TMap<FPrimitiveSceneProxy*, FUpdateTransformCommand> UpdatedTransforms;
 	TMap<FPrimitiveSceneInfo*, FMatrix> OverridenPreviousTransforms;
+	TMap<const FPrimitiveSceneProxy*, float> UpdatedOcclusionBoundsSlacks;
 	TSet<FPrimitiveSceneInfo*> AddedPrimitiveSceneInfos;
 	TSet<FPrimitiveSceneInfo*> RemovedPrimitiveSceneInfos;
 	TSet<FPrimitiveSceneInfo*> DistanceFieldSceneDataUpdates;

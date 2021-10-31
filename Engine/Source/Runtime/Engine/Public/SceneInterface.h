@@ -82,6 +82,7 @@ public:
 	 * @param Primitive - primitive component to update
 	 */
 	virtual void UpdatePrimitiveTransform(UPrimitiveComponent* Primitive) = 0;
+	virtual void UpdatePrimitiveOcclusionBoundsSlack(UPrimitiveComponent* Primitive, float NewSlack) = 0;
 	/** Updates primitive attachment state. */
 	virtual void UpdatePrimitiveAttachment(UPrimitiveComponent* Primitive) = 0;
 	/** 
