@@ -990,8 +990,8 @@ void FDetailCategoryImpl::FilterNode(const FDetailFilter& InFilter)
 		return;
 	}
 
-	// only apply the section filter if the user hasn't typed anything
-	if (InFilter.FilterStrings.IsEmpty() && !InFilter.VisibleSections.IsEmpty())
+	// only apply the section filter if the user hasn't typed anything and this isn't the favorites category
+	if (InFilter.FilterStrings.IsEmpty() && !InFilter.VisibleSections.IsEmpty() && !bFavoriteCategory)
 	{
 		const UStruct* BaseStruct = GetParentBaseStructure();
 		if (BaseStruct != nullptr)
