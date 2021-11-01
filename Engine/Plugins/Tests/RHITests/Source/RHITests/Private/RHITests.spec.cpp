@@ -8,7 +8,7 @@
 #include "RHITextureTests.h"
 
 
-BEGIN_DEFINE_SPEC(FAutomationRHITest, "System.Automation.RHI", EAutomationTestFlags::EngineFilter | EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::Disabled)
+BEGIN_DEFINE_SPEC(FAutomationRHITest, "System.Automation.RHI", EAutomationTestFlags::EngineFilter | EAutomationTestFlags::ApplicationContextMask)
 END_DEFINE_SPEC(FAutomationRHITest)
 void FAutomationRHITest::Define()
 {
