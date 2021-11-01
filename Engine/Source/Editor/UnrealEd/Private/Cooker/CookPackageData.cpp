@@ -11,7 +11,9 @@
 #include "CookOnTheSide/CookOnTheFlyServer.h"
 #include "Containers/StringView.h"
 #include "EditorDomain/EditorDomain.h"
+#include "Engine/Console.h"
 #include "HAL/FileManager.h"
+#include "HAL/PlatformTime.h"
 #include "Misc/CoreMiscDefines.h"
 #include "Misc/Paths.h"
 #include "Misc/PreloadableFile.h"
@@ -22,12 +24,16 @@
 #include "UObject/UObjectGlobals.h"
 #include "UObject/UObjectHash.h"
 
-namespace UE
-{
-namespace Cook
+namespace UE::Cook
 {
 
-
+	float GPollAsyncPeriod = .100f;
+	static FAutoConsoleVariableRef CVarPollAsyncPeriod(
+		TEXT("cook.PollAsyncPeriod"),
+		GPollAsyncPeriod,
+		TEXT("Minimum time in seconds between PollPendingCookedPlatformDatas."),
+		ECVF_Default);
+	
 	//////////////////////////////////////////////////////////////////////////
 	// FPackageData
 	FPackageData::FPlatformData::FPlatformData()
@@ -1521,6 +1527,7 @@ namespace Cook
 
 	FPackageDatas::FPackageDatas(UCookOnTheFlyServer& InCookOnTheFlyServer)
 		: CookOnTheFlyServer(InCookOnTheFlyServer)
+		, LastPollAsyncTime(0)
 	{
 	}
 
@@ -1858,6 +1865,15 @@ namespace Cook
 			return;
 		}
 
+		// ProcessAsyncResults and IsCachedCookedPlatformDataLoaded can be expensive to call
+		// Cap the frequency at which we call them.
+		double CurrentTime = FPlatformTime::Seconds();
+		if (CurrentTime < LastPollAsyncTime + GPollAsyncPeriod)
+		{
+			return;
+		}
+		LastPollAsyncTime = CurrentTime;
+
 		GShaderCompilingManager->ProcessAsyncResults(true /* bLimitExecutionTime */,
 			false /* bBlockOnGlobalShaderCompletion */);
 		FAssetCompilingManager::Get().ProcessAsyncTasks(true);
@@ -2062,5 +2078,4 @@ namespace Cook
 	}
 #endif
 
-}
 }

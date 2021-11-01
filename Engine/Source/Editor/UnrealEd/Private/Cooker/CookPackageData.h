@@ -995,6 +995,7 @@ namespace UE::Cook
 		FPackageDataQueue LoadReadyQueue;
 		FPackageDataQueue SaveQueue;
 		UCookOnTheFlyServer& CookOnTheFlyServer;
+		double LastPollAsyncTime;
 		bool bLogDiscoveredPackages = false;
 	};
 
