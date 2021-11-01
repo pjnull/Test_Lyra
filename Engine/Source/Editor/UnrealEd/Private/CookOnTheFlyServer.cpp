@@ -1394,13 +1394,14 @@ void UCookOnTheFlyServer::SetSaveBusy(bool bInBusy)
 		{
 			// Issue a status update. For each UObject we're still waiting on, check whether the long duration is expected using type-specific checks
 			// Make the status update a warning if the long duration is not reported as expected.
-			TArray<UObject*> PendingObjects;
-			TSet<UPackage*> PackagesOfPendingObjects;
+			TArray<UObject*> NonExpectedObjects;
+			TSet<UPackage*> NonExpectedPackages;
+			TArray<UObject*> ExpectedObjects;
+			TSet<UPackage*> ExpectedPackages;
 			FPackageDataQueue& SaveQueue = PackageDatas->GetSaveQueue();
 			const TArray<FPendingCookedPlatformData>& PendingCookedPlatformDatas = PackageDatas->GetPendingCookedPlatformDatas();
-			TArray<FName> CompilationUsers({ FName(TEXT("Material")), FName(TEXT("MaterialInstance")), FName(TEXT("NiagaraScript")) });
+			TArray<UClass*> CompilationUsers({ UMaterialInterface::StaticClass(), FindObject<UClass>(ANY_PACKAGE, TEXT("NiagaraScript")) });
 
-			bool bAllExpected = !PendingCookedPlatformDatas.IsEmpty();
 			for (const FPendingCookedPlatformData& Data : PendingCookedPlatformDatas)
 			{
 				UObject* Object = Data.Object.Get();
@@ -1408,16 +1409,41 @@ void UCookOnTheFlyServer::SetSaveBusy(bool bInBusy)
 				{
 					continue;
 				}
-				PackagesOfPendingObjects.Add(Object->GetPackage());
-				bool bExpected = false;
-				if (Algo::Find(CompilationUsers, Object->GetClass()->GetFName()) && GShaderCompilingManager->IsCompiling())
+				bool bCompilationUser = false;
+				for (UClass* CompilationUserClass : CompilationUsers)
 				{
-					bExpected = true;
+					if (Object->IsA(CompilationUserClass))
+					{
+						bCompilationUser = true;
+						break;
+					}
 				}
-				bAllExpected &= bExpected;
+				if (bCompilationUser && GShaderCompilingManager->IsCompiling())
+				{
+					ExpectedObjects.Add(Object);
+					ExpectedPackages.Add(Object->GetPackage());
+				}
+				else
+				{
+					NonExpectedObjects.Add(Object);
+					NonExpectedPackages.Add(Object->GetPackage());
+				}
 			}
+			TArray<UPackage*> RemovePackages;
+			for (UPackage* Package : ExpectedPackages)
+			{
+				if (NonExpectedPackages.Contains(Package))
+				{
+					RemovePackages.Add(Package);
+				}
+			}
+			for (UPackage* Package : RemovePackages)
+			{
+				ExpectedPackages.Remove(Package);
+			}
+			
 			FString Message = FString::Printf(TEXT("Cooker has been blocked from saving the current packages for %f seconds."), GCookProgressWarnBusyTime);
-			if (bAllExpected)
+			if (NonExpectedObjects.IsEmpty())
 			{
 				UE_LOG(LogCook, Display, TEXT("%s"), *Message);
 			}
@@ -1429,15 +1455,18 @@ void UCookOnTheFlyServer::SetSaveBusy(bool bInBusy)
 			UE_LOG(LogCook, Display, TEXT("%d packages in the savequeue: "), SaveQueue.Num());
 			int DisplayCount = 0;
 			const int DisplayMax = 10;
-			for (UE::Cook::FPackageData* PackageData: SaveQueue)
+			for (TSet<UPackage*>* PackageSet : { &NonExpectedPackages, &ExpectedPackages })
 			{
-				if (DisplayCount == DisplayMax)
+				for (UPackage* Package : *PackageSet)
 				{
-					UE_LOG(LogCook, Display, TEXT("    ..."));
-					break;
+					if (DisplayCount == DisplayMax)
+					{
+						UE_LOG(LogCook, Display, TEXT("    ..."));
+						break;
+					}
+					UE_LOG(LogCook, Display, TEXT("    %s"), *Package->GetName());
+					++DisplayCount;
 				}
-				UE_LOG(LogCook, Display, TEXT("    %s"), *PackageData->GetFileName().ToString());
-				++DisplayCount;
 			}
 			if (DisplayCount == 0)
 			{
@@ -1446,16 +1475,16 @@ void UCookOnTheFlyServer::SetSaveBusy(bool bInBusy)
 
 			UE_LOG(LogCook, Display, TEXT("%d objects that have not yet returned true from IsCachedCookedPlatformDataLoaded:"), PackageDatas->GetPendingCookedPlatformDatas().Num());
 			DisplayCount = 0;
-			for (const FPendingCookedPlatformData& Data : PendingCookedPlatformDatas)
+			for (TArray<UObject*>* ObjectArray : {  &NonExpectedObjects, &ExpectedObjects })
 			{
-				if (Data.Object.IsValid())
+				for (UObject* Object : *ObjectArray)
 				{
 					if (DisplayCount == DisplayMax)
 					{
 						UE_LOG(LogCook, Display, TEXT("    ..."));
 						break;
 					}
-					UE_LOG(LogCook, Display, TEXT("    %s"), *Data.Object.Get()->GetFullName());
+					UE_LOG(LogCook, Display, TEXT("    %s"), *Object->GetFullName());
 					++DisplayCount;
 				}
 			}
