@@ -35,7 +35,7 @@ void ICookedEditorPackageManager::AddPackagesFromPath(TArray<FName>& Packages, c
 	AssetRegistry.GetAssetsByPath(Path, AssetDatas, SearchMode == EPackageSearchMode::Recurse, true);
 	for (const FAssetData& AssetData : AssetDatas)
 	{
-		if (AssetData.IsUAsset() && AssetManager.VerifyCanCookPackage(AssetData.PackageName, false))
+		if (AssetData.IsUAsset() && AssetManager.VerifyCanCookPackage(nullptr, AssetData.PackageName, false))
 		{
 			if (AllowAssetToBeGathered(AssetData))
 			{

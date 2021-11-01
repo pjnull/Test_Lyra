@@ -43,8 +43,8 @@ FRequestCluster::FRequestCluster(UCookOnTheFlyServer& COTFS, TConstArrayView<con
 {
 }
 
-void FRequestCluster::AddClusters(UCookOnTheFlyServer& COTFS, TArray<FFilePlatformRequest>&& InRequests, bool bRequestsAreUrgent,
-	TRingBuffer<FRequestCluster>& OutClusters)
+void FRequestCluster::AddClusters(UCookOnTheFlyServer& COTFS, TArray<FFilePlatformRequest>&& InRequests,
+	bool bRequestsAreUrgent, TRingBuffer<FRequestCluster>& OutClusters)
 {
 	if (InRequests.Num() == 0)
 	{
@@ -52,7 +52,8 @@ void FRequestCluster::AddClusters(UCookOnTheFlyServer& COTFS, TArray<FFilePlatfo
 	}
 
 	TArray<FRequestCluster, TInlineAllocator<1>> AddedClusters;
-	auto FindOrAddClusterForPlatforms = [&AddedClusters, &COTFS](TArray<const ITargetPlatform*>&& InPlatforms)
+	auto FindOrAddClusterForPlatforms =
+		[&AddedClusters, &COTFS](TArray<const ITargetPlatform*>&& InPlatforms)
 	{
 		for (FRequestCluster& Existing : AddedClusters)
 		{
@@ -93,8 +94,10 @@ void FRequestCluster::AddClusters(UCookOnTheFlyServer& COTFS, TArray<FFilePlatfo
 	}
 }
 
-void FRequestCluster::AddClusters(UCookOnTheFlyServer& COTFS, FPackageDataSet& UnclusteredRequests, TRingBuffer<FRequestCluster>& OutClusters,
-	FRequestQueue& QueueForReadyRequests)
+FName GInstigatorRequestCluster(TEXT("RequestCluster"));
+
+void FRequestCluster::AddClusters(UCookOnTheFlyServer& COTFS, FPackageDataSet& UnclusteredRequests,
+	TRingBuffer<FRequestCluster>& OutClusters, FRequestQueue& QueueForReadyRequests)
 {
 	if (UnclusteredRequests.Num() == 0)
 	{
@@ -177,6 +180,7 @@ void FRequestCluster::AddClusters(UCookOnTheFlyServer& COTFS, FPackageDataSet& U
 
 FRequestCluster::FFileNameRequest::FFileNameRequest(FFilePlatformRequest&& FileRequest, bool bInUrgent)
 	: FileName(FileRequest.GetFilename())
+	, Instigator(MoveTemp(FileRequest.GetInstigator()))
 	, CompletionCallback(MoveTemp(FileRequest.GetCompletionCallback()))
 	, bUrgent(bInUrgent)
 {
@@ -305,7 +309,7 @@ void FRequestCluster::FetchPackageNames(const FCookerTimer& CookerTimer, bool& b
 		else
 		{
 			FPackageData& PackageData = PackageDatas.FindOrAddPackageData(*PackageName, Request.FileName);
-			if (TryTakeOwnership(PackageData, Request.bUrgent, MoveTemp(Request.CompletionCallback)))
+			if (TryTakeOwnership(PackageData, Request.bUrgent, MoveTemp(Request.CompletionCallback), Request.Instigator))
 			{
 				bool bAlreadyExists;
 				OwnedPackageDatas.Add(&PackageData, &bAlreadyExists);
@@ -327,7 +331,8 @@ void FRequestCluster::FetchPackageNames(const FCookerTimer& CookerTimer, bool& b
 	bPackageNamesComplete = true;
 }
 
-bool FRequestCluster::TryTakeOwnership(FPackageData& PackageData, bool bUrgent, UE::Cook::FCompletionCallback && CompletionCallback)
+bool FRequestCluster::TryTakeOwnership(FPackageData& PackageData, bool bUrgent, UE::Cook::FCompletionCallback && CompletionCallback,
+	const FInstigator& InInstigator)
 {
 	if (!PackageData.IsInProgress())
 	{
@@ -343,7 +348,7 @@ bool FRequestCluster::TryTakeOwnership(FPackageData& PackageData, bool bUrgent, 
 		}
 		else
 		{
-			PackageData.SetRequestData(GetPlatforms(), bUrgent, MoveTemp(CompletionCallback));
+			PackageData.SetRequestData(GetPlatforms(), bUrgent, MoveTemp(CompletionCallback), FInstigator(InInstigator));
 			PackageData.SendToState(EPackageState::Request, ESendFlags::QueueRemove);
 			return true;
 		}
@@ -355,7 +360,7 @@ bool FRequestCluster::TryTakeOwnership(FPackageData& PackageData, bool bUrgent, 
 			// Leave it where it is - it's already been processed by a cluster - but update with our request data
 			// This might demote it back to Request, and add it to Normal or Urgent request, but that will not
 			// impact this RequestCluster
-			PackageData.UpdateRequestData(GetPlatforms(), bUrgent, MoveTemp(CompletionCallback));
+			PackageData.UpdateRequestData(GetPlatforms(), bUrgent, MoveTemp(CompletionCallback), FInstigator(InInstigator));
 			return false;
 		}
 		else
@@ -366,7 +371,7 @@ bool FRequestCluster::TryTakeOwnership(FPackageData& PackageData, bool bUrgent, 
 				// This might steal it from another RequestCluster or from the UnclusteredRequests if it's in request
 				// Doing that steal is wasteful but okay; one of the RequestClusters will win it and keep it
 				PackageData.SendToState(EPackageState::Request, ESendFlags::QueueRemove);
-				PackageData.UpdateRequestData(GetPlatforms(), bUrgent, MoveTemp(CompletionCallback), false /* bAllowUpdateUrgency */);
+				PackageData.UpdateRequestData(GetPlatforms(), bUrgent, MoveTemp(CompletionCallback), FInstigator(InInstigator), false /* bAllowUpdateUrgency */);
 			}
 			return true;
 		}
@@ -430,7 +435,8 @@ void FRequestCluster::FetchDependencies(const FCookerTimer& CookerTimer, bool& b
 			bool bPushedStack = false;
 			while (CurrentTop.NextDependency < CurrentTop.Dependencies.Num())
 			{
-				AddVertex(CurrentTop.Dependencies[CurrentTop.NextDependency++], nullptr, bPushedStack, TimerCounter);
+				AddVertex(CurrentTop.Dependencies[CurrentTop.NextDependency++], nullptr, bPushedStack, TimerCounter,
+					FInstigator(EInstigator::Dependency, CurrentTop.PackageName));
 				if (bPushedStack)
 				{
 					// CurrentTop is now invalid
@@ -457,7 +463,8 @@ void FRequestCluster::FetchDependencies(const FCookerTimer& CookerTimer, bool& b
 			FPackageData* PackageData = Requests[NextRequest++];
 			bool bPushedStack = false;
 			FName PackageName = PackageData->GetPackageName();
-			EVisitStatus& Status = AddVertex(PackageName, PackageData, bPushedStack, TimerCounter);
+			EVisitStatus& Status = AddVertex(PackageName, PackageData, bPushedStack, TimerCounter,
+				FInstigator(EInstigator::Unspecified, GInstigatorRequestCluster));
 			if (bPushedStack)
 			{
 				check(Status == EVisitStatus::Visited && !IsStackEmpty());
@@ -471,7 +478,8 @@ void FRequestCluster::FetchDependencies(const FCookerTimer& CookerTimer, bool& b
 					// cookable, it was skipped. We need to reprocess it with the information that it is an initial vertex.
 					check(Status == EVisitStatus::Skipped);
 					Visited.Remove(PackageData->GetPackageName());
-					Status = AddVertex(PackageName, PackageData, bPushedStack, TimerCounter);
+					Status = AddVertex(PackageName, PackageData, bPushedStack, TimerCounter,
+						FInstigator(EInstigator::Unspecified, GInstigatorRequestCluster));
 					check(Status == EVisitStatus::Visited);
 				}
 				while (!Segment.IsEmpty())
@@ -602,7 +610,7 @@ void FRequestCluster::ClearAndDetachOwnedPackageDatas(TArray<FPackageData*>& Out
 }
 
 FRequestCluster::EVisitStatus& FRequestCluster::AddVertex(FName PackageName, FPackageData* PackageData,
-	bool& bOutPushedStack, int32& TimerCounter)
+	bool& bOutPushedStack, int32& TimerCounter, const FInstigator& InInstigator)
 {
 	EVisitStatus& Status = Visited.FindOrAdd(PackageName, EVisitStatus::New);
 	if (Status != EVisitStatus::New)
@@ -635,7 +643,7 @@ FRequestCluster::EVisitStatus& FRequestCluster::AddVertex(FName PackageName, FPa
 		{
 			PackageData = &PackageDatas.FindOrAddPackageData(PackageName, FileName);
 		}
-		if (!TryTakeOwnership(*PackageData, false /* bUrgent */, FCompletionCallback()))
+		if (!TryTakeOwnership(*PackageData, false /* bUrgent */, FCompletionCallback(), InInstigator))
 		{
 			Status = EVisitStatus::Skipped;
 			bOutPushedStack = false;

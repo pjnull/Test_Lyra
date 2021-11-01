@@ -43,7 +43,8 @@ namespace UE::Cook
 
 	FPackageData::FPackageData(FPackageDatas& PackageDatas, const FName& InPackageName, const FName& InFileName)
 		: GeneratedOwner(nullptr), PackageName(InPackageName), FileName(InFileName), PackageDatas(PackageDatas)
-		, PreloadableFileFormat(EPackageFormat::Binary), bIsUrgent(0), bIsVisited(0), bIsPreloadAttempted(0)
+		, PreloadableFileFormat(EPackageFormat::Binary), Instigator(EInstigator::NotYetRequested), bIsUrgent(0)
+		, bIsVisited(0), bIsPreloadAttempted(0)
 		, bIsPreloaded(0), bHasSaveCache(0), bHasBeginPrepareSaveFailed(0), bCookedPlatformDataStarted(0)
 		, bCookedPlatformDataCalled(0), bCookedPlatformDataComplete(0), bMonitorIsCooked(0)
 		, bInitializedGeneratorSave(0), bCompletedGeneration(0), bGenerated(0)
@@ -187,7 +188,7 @@ namespace UE::Cook
 	}
 
 	void FPackageData::UpdateRequestData(const TConstArrayView<const ITargetPlatform*> InRequestedPlatforms,
-		bool bInIsUrgent, FCompletionCallback&& InCompletionCallback, bool bAllowUpdateUrgency)
+		bool bInIsUrgent, FCompletionCallback&& InCompletionCallback, FInstigator&& InInstigator, bool bAllowUpdateUrgency)
 	{
 		if (IsInProgress())
 		{
@@ -216,13 +217,13 @@ namespace UE::Cook
 		}
 		else if (InRequestedPlatforms.Num() > 0)
 		{
-			SetRequestData(InRequestedPlatforms, bInIsUrgent, MoveTemp(InCompletionCallback));
+			SetRequestData(InRequestedPlatforms, bInIsUrgent, MoveTemp(InCompletionCallback), MoveTemp(Instigator));
 			SendToState(EPackageState::Request, ESendFlags::QueueAddAndRemove);
 		}
 	}
 
 	void FPackageData::SetRequestData(const TArrayView<const ITargetPlatform* const>& InRequestedPlatforms,
-		bool bInIsUrgent, FCompletionCallback&& InCompletionCallback)
+		bool bInIsUrgent, FCompletionCallback&& InCompletionCallback, FInstigator&& InInstigator)
 	{
 		check(!CompletionCallback);
 		check(GetNumRequestedPlatforms() == 0)
@@ -232,6 +233,10 @@ namespace UE::Cook
 		SetPlatformsRequested(InRequestedPlatforms, true);
 		SetIsUrgent(bInIsUrgent);
 		AddCompletionCallback(MoveTemp(InCompletionCallback));
+		if (Instigator.Category == EInstigator::NotYetRequested)
+		{
+			Instigator = MoveTemp(InInstigator);
+		}
 	}
 
 	void FPackageData::ClearInProgressData()

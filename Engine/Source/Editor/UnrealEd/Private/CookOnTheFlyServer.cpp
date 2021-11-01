@@ -326,7 +326,8 @@ public:
 
 	virtual bool EnqueueCookRequest(UE::Cook::FCookPackageRequest CookPackageRequest) override
 	{
-		UE::Cook::FPlatformManager::FReadScopeLock PlatformsScopeLock(Cooker.PlatformManager->ReadLockPlatforms());
+		using namespace UE::Cook;
+		FPlatformManager::FReadScopeLock PlatformsScopeLock(Cooker.PlatformManager->ReadLockPlatforms());
 
 		if (const ITargetPlatform* TargetPlatform = Cooker.AddCookOnTheFlyPlatform(CookPackageRequest.PlatformName))
 		{
@@ -335,13 +336,13 @@ public:
 			FRequest* Request = AllocRequest();
 			Request->CookPackageRequest = MoveTemp(CookPackageRequest);
 
-			UE::Cook::FCompletionCallback CookCompleted = [this, Request](UE::Cook::FPackageData* PackageData)
+			FCompletionCallback CookCompleted = [this, Request](FPackageData* PackageData)
 			{
-				const UE::Cook::FPlatformData* PlatformData = Cooker.PlatformManager->GetPlatformDataByName(Request->CookPackageRequest.PlatformName);
+				const FPlatformData* PlatformData = Cooker.PlatformManager->GetPlatformDataByName(Request->CookPackageRequest.PlatformName);
 				check(PlatformData);
-				const UE::Cook::ECookResult CookResult = PackageData
+				const ECookResult CookResult = PackageData
 					? PackageData->GetCookResults(PlatformData->TargetPlatform)
-					: UE::Cook::ECookResult::Failed;
+					: ECookResult::Failed;
 				
 				UE_LOG(LogCook, Verbose, TEXT("Cook request completed, Filename='%s', Platform='%s', CookResult='%d'"),
 					*Request->CookPackageRequest.Filename, *Request->CookPackageRequest.PlatformName.ToString(), uint32(CookResult));
@@ -356,7 +357,9 @@ public:
 			};
 
 			UE_LOG(LogCook, Verbose, TEXT("Enqueing cook request, Filename='%s', Platform='%s'"), *Request->CookPackageRequest.Filename, *Request->CookPackageRequest.PlatformName.ToString());
-			Cooker.ExternalRequests->EnqueueUnique(UE::Cook::FFilePlatformRequest(StandardFileName, TargetPlatform, MoveTemp(CookCompleted)), true);
+			Cooker.ExternalRequests->EnqueueUnique(
+				FFilePlatformRequest(StandardFileName, EInstigator::CookOnTheFly, TargetPlatform, MoveTemp(CookCompleted)),
+				true);
 			if (Cooker.ExternalRequests->CookRequestEvent)
 			{
 				Cooker.ExternalRequests->CookRequestEvent->Trigger();
@@ -1179,6 +1182,8 @@ bool UCookOnTheFlyServer::HasRemainingWork() const
 
 bool UCookOnTheFlyServer::RequestPackage(const FName& StandardFileName, const TArrayView<const ITargetPlatform* const>& TargetPlatforms, const bool bForceFrontOfQueue)
 {
+	using namespace UE::Cook;
+
 	if (!IsCookByTheBookMode())
 	{
 		bCookOnTheFlyExternalRequests = true;
@@ -1189,7 +1194,9 @@ bool UCookOnTheFlyServer::RequestPackage(const FName& StandardFileName, const TA
 		}
 	}
 
-	ExternalRequests->EnqueueUnique(UE::Cook::FFilePlatformRequest(StandardFileName, TargetPlatforms), bForceFrontOfQueue);
+	ExternalRequests->EnqueueUnique(
+		FFilePlatformRequest(StandardFileName, EInstigator::RequestPackageFunction, TargetPlatforms),
+		bForceFrontOfQueue);
 	return true;
 }
 
@@ -1983,11 +1990,13 @@ void UCookOnTheFlyServer::LoadPackageInQueue(UE::Cook::FPackageData& PackageData
 			// Mark the original PackageName as cooked for all platforms and send a request to cook the new FileName
 			check(NewPackageFileName != PackageFileName);
 
-			UE_LOG(LogCook, Verbose, TEXT("Request for %s received going to save %s"), *PackageFileName.ToString(), *NewPackageFileName.ToString());
+			UE_LOG(LogCook, Verbose, TEXT("Request for %s received going to save %s"), *PackageFileName.ToString(),
+				*NewPackageFileName.ToString());
 			FPackageData& OtherPackageData = PackageDatas->AddPackageDataByPackageNameChecked(LoadedPackage->GetFName());
 			TArray<const ITargetPlatform*, TInlineAllocator<ExpectedMaxNumPlatforms>> RequestedPlatforms;
 			PackageData.GetRequestedPlatforms(RequestedPlatforms);
-			OtherPackageData.UpdateRequestData(RequestedPlatforms, PackageData.GetIsUrgent(), FCompletionCallback());
+			OtherPackageData.UpdateRequestData(RequestedPlatforms, PackageData.GetIsUrgent(), FCompletionCallback(),
+				FInstigator(PackageData.GetInstigator()));
 
 			PackageData.SetPlatformsCooked(PlatformManager->GetSessionPlatforms(), true);
 			RejectPackageToLoad(PackageData, TEXT("is redirected to another filename"));
@@ -2110,7 +2119,8 @@ void UCookOnTheFlyServer::RejectPackageToLoad(UE::Cook::FPackageData& PackageDat
 
 //////////////////////////////////////////////////////////////////////////
 
-UE::Cook::FPackageData* UCookOnTheFlyServer::QueueDiscoveredPackage(UPackage* Package, bool* bOutWasInProgress)
+UE::Cook::FPackageData* UCookOnTheFlyServer::QueueDiscoveredPackage(UPackage* Package,
+	UE::Cook::FInstigator&& Instigator, bool* bOutWasInProgress)
 {
 	check(Package != nullptr);
 
@@ -2124,11 +2134,12 @@ UE::Cook::FPackageData* UCookOnTheFlyServer::QueueDiscoveredPackage(UPackage* Pa
 	{
 		*bOutWasInProgress = PackageData.IsInProgress();
 	}
-	QueueDiscoveredPackageData(PackageData, true /* bIsLoadReady */);
+	QueueDiscoveredPackageData(PackageData, MoveTemp(Instigator), true /* bIsLoadReady */);
 	return &PackageData;
 }
 
-void UCookOnTheFlyServer::QueueDiscoveredPackageData(UE::Cook::FPackageData& PackageData, bool bLoadReady)
+void UCookOnTheFlyServer::QueueDiscoveredPackageData(UE::Cook::FPackageData& PackageData,
+	UE::Cook::FInstigator&& Instigator, bool bLoadReady)
 {
 	const TArray<const ITargetPlatform*>& TargetPlatforms = PlatformManager->GetSessionPlatforms();
 	if (PackageData.HasAllCookedPlatforms(TargetPlatforms, true /* bIncludeFailed */))
@@ -2140,7 +2151,8 @@ void UCookOnTheFlyServer::QueueDiscoveredPackageData(UE::Cook::FPackageData& Pac
 	if (!PackageData.IsInProgress() &&
 		(PackageData.IsGenerated() || !IsCookByTheBookMode() || !CookByTheBookOptions->bSkipHardReferences))
 	{
-		PackageData.SetRequestData(TargetPlatforms, /*bIsUrgent*/ false, UE::Cook::FCompletionCallback());
+		PackageData.SetRequestData(TargetPlatforms, /*bIsUrgent*/ false, UE::Cook::FCompletionCallback(),
+			MoveTemp(Instigator));
 		if (bLoadReady)
 		{
 			// Send this package into the LoadReadyQueue to fully load it and send it on to the SaveQueue
@@ -2155,6 +2167,8 @@ void UCookOnTheFlyServer::QueueDiscoveredPackageData(UE::Cook::FPackageData& Pac
 	}
 }
 
+FName GInstigatorUpdatePackageFilter(TEXT("UpdatePackageFilter"));
+
 void UCookOnTheFlyServer::UpdatePackageFilter()
 {
 	if (!bPackageFilterDirty)
@@ -2167,10 +2181,12 @@ void UCookOnTheFlyServer::UpdatePackageFilter()
 	const TArray<const ITargetPlatform*>& TargetPlatforms = PlatformManager->GetSessionPlatforms();
 	for (UPackage* Package : PackageTracker->LoadedPackages)
 	{
-		UE::Cook::FPackageData* PackageData = QueueDiscoveredPackage(Package);
+		UE::Cook::FPackageData* PackageData = QueueDiscoveredPackage(Package,
+			UE::Cook::FInstigator(UE::Cook::EInstigator::Unspecified, GInstigatorUpdatePackageFilter));
 		if (PackageData && PackageData->IsInProgress())
 		{
-			PackageData->UpdateRequestData(TargetPlatforms, /*bIsUrgent*/ false, UE::Cook::FCompletionCallback());
+			PackageData->UpdateRequestData(TargetPlatforms, /*bIsUrgent*/ false, UE::Cook::FCompletionCallback(),
+				UE::Cook::FInstigator(UE::Cook::EInstigator::Unspecified, GInstigatorUpdatePackageFilter));
 		}
 	}
 }
@@ -2348,6 +2364,7 @@ void UCookOnTheFlyServer::SplitPackage(UE::Cook::FGeneratorPackage* GeneratorStr
 	}
 
 	UPackage* Owner = GeneratorStruct->GetOwner().GetPackage();
+	FName OwnerName = Owner->GetFName();
 	if (!GeneratorStruct->HasQueuedGeneratedPackages())
 	{
 		if (Splitter->UseDeferredPopulate())
@@ -2356,7 +2373,7 @@ void UCookOnTheFlyServer::SplitPackage(UE::Cook::FGeneratorPackage* GeneratorStr
 			{
 				FPackageData* GeneratedPackageData = GeneratedStruct.PackageData;
 				GeneratedPackageData->ClearCookedPlatformData();
-				QueueDiscoveredPackageData(*GeneratedPackageData);
+				QueueDiscoveredPackageData(*GeneratedPackageData, FInstigator(EInstigator::GeneratedPackage, OwnerName));
 			}
 		}
 		else
@@ -2393,7 +2410,8 @@ void UCookOnTheFlyServer::SplitPackage(UE::Cook::FGeneratorPackage* GeneratorStr
 				}
 
 				// Queue the generated package
-				QueueDiscoveredPackageData(*GeneratedPackageData, true /* bLoadReady */);
+				QueueDiscoveredPackageData(*GeneratedPackageData, FInstigator(EInstigator::GeneratedPackage, OwnerName),
+					true /* bLoadReady */);
 
 				if (HasExceededMaxMemory())
 				{
@@ -2962,28 +2980,38 @@ bool UCookOnTheFlyServer::LoadPackageForCooking(UE::Cook::FPackageData& PackageD
 	return bSuccess;
 }
 
-void UCookOnTheFlyServer::ProcessUnsolicitedPackages(TArray<FName>* OutDiscoveredPackageNames)
+void UCookOnTheFlyServer::ProcessUnsolicitedPackages(TArray<FName>* OutDiscoveredPackageNames,
+	TMap<FName, UE::Cook::FInstigator>* OutInstigators)
 {
+	using namespace UE::Cook;
+
 	// Ensure sublevels are loaded by iterating all recently loaded packages and invoking
 	// PostLoadPackageFixup
 
 	{
 		UE_SCOPED_HIERARCHICAL_COOKTIMER(PostLoadPackageFixup);
 
-		TArray<UPackage*> NewPackages = PackageTracker->GetNewPackages();
+		TArray<UE::Cook::FPackageWithInstigator> NewPackages = PackageTracker->GetNewPackages();
 
-		for (UPackage* Package : NewPackages)
+		for (FPackageWithInstigator& PackageWithInstigator : NewPackages)
 		{
+			UPackage* Package = PackageWithInstigator.Package;
+			FInstigator& Instigator = PackageWithInstigator.Instigator;
 			if (!IsCookByTheBookMode() || !CookByTheBookOptions->bSkipSoftReferences)
 			{
-				PostLoadPackageFixup(Package, OutDiscoveredPackageNames);
+				PostLoadPackageFixup(Package, OutDiscoveredPackageNames, OutInstigators);
 			}
 
 			bool bWasInProgress;
-			UE::Cook::FPackageData* PackageData = QueueDiscoveredPackage(Package, &bWasInProgress);
+			FPackageData* PackageData = QueueDiscoveredPackage(Package, FInstigator(Instigator), &bWasInProgress);
 			if (OutDiscoveredPackageNames && PackageData && !bWasInProgress)
 			{
-				OutDiscoveredPackageNames->Add(PackageData->GetPackageName());
+				FInstigator& Existing = OutInstigators->FindOrAdd(PackageData->GetPackageName());
+				if (Existing.Category == EInstigator::InvalidCategory)
+				{
+					OutDiscoveredPackageNames->Add(PackageData->GetPackageName());
+					Existing = Instigator;
+				}
 			}
 		}
 	}
@@ -3246,7 +3274,8 @@ void UCookOnTheFlyServer::PumpSaves(UE::Cook::FTickStackData& StackData, uint32 
 	}
 }
 
-void UCookOnTheFlyServer::PostLoadPackageFixup(UPackage* Package, TArray<FName>* OutDiscoveredPackageNames)
+void UCookOnTheFlyServer::PostLoadPackageFixup(UPackage* Package, TArray<FName>* OutDiscoveredPackageNames,
+	TMap<FName, UE::Cook::FInstigator>* OutInstigators)
 {
 	if (Package->ContainsMap() == false)
 	{
@@ -3294,6 +3323,7 @@ void UCookOnTheFlyServer::PostLoadPackageFixup(UPackage* Package, TArray<FName>*
 		World->WorldComposition->CollectTilesToCook(NewPackagesToCook);
 	}
 
+	FName OwnerName = Package->GetFName();
 	for (const FString& PackageName : NewPackagesToCook)
 	{
 		FName PackageFName(*PackageName);
@@ -3301,10 +3331,16 @@ void UCookOnTheFlyServer::PostLoadPackageFixup(UPackage* Package, TArray<FName>*
 		if (NewPackageData && !NewPackageData->IsInProgress())
 		{
 			bool bIsUrgent = false;
-			NewPackageData->UpdateRequestData(PlatformManager->GetSessionPlatforms(), bIsUrgent, UE::Cook::FCompletionCallback());
+			NewPackageData->UpdateRequestData(PlatformManager->GetSessionPlatforms(), bIsUrgent, UE::Cook::FCompletionCallback(),
+				UE::Cook::FInstigator(UE::Cook::EInstigator::Dependency, OwnerName));
 			if (OutDiscoveredPackageNames)
 			{
-				OutDiscoveredPackageNames->Add(PackageFName);
+				UE::Cook::FInstigator& Existing = OutInstigators->FindOrAdd(PackageFName);
+				if (Existing.Category == UE::Cook::EInstigator::InvalidCategory)
+				{
+					OutDiscoveredPackageNames->Add(PackageFName);
+					Existing = UE::Cook::FInstigator(UE::Cook::EInstigator::Dependency, OwnerName);
+				}
 			}
 		}
 	}
@@ -3607,6 +3643,7 @@ void UCookOnTheFlyServer::MarkPackageDirtyForCooker(UPackage* Package, bool bAll
 	}
 }
 
+FName GInstigatorMarkPackageDirty(TEXT("MarkPackageDirtyForCooker"));
 void UCookOnTheFlyServer::MarkPackageDirtyForCookerFromSchedulerThread(const FName& PackageName)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(MarkPackageDirtyForCooker);
@@ -3630,7 +3667,8 @@ void UCookOnTheFlyServer::MarkPackageDirtyForCookerFromSchedulerThread(const FNa
 		}
 		else if (IsCookByTheBookRunning() && bHadCookedPlatforms)
 		{
-			PackageData->UpdateRequestData(PlatformManager->GetSessionPlatforms(), false /* bIsUrgent */, UE::Cook::FCompletionCallback());
+			PackageData->UpdateRequestData(PlatformManager->GetSessionPlatforms(), false /* bIsUrgent */, UE::Cook::FCompletionCallback(),
+				UE::Cook::FInstigator(UE::Cook::EInstigator::Unspecified, GInstigatorMarkPackageDirty));
 		}
 
 		if ( IsCookOnTheFlyMode() && FileModifiedDelegate.IsBound())
@@ -4330,7 +4368,7 @@ void UCookOnTheFlyServer::SaveCookedPackage(UE::Cook::FSaveCookedPackageContext&
 			if (Context.SavePackageResult == ESavePackageResult::Success && UAssetManager::IsValid())
 			{
 				UE_SCOPED_HIERARCHICAL_COOKTIMER(VerifyCanCookPackage);
-				if (!UAssetManager::Get().VerifyCanCookPackage(Package->GetFName()))
+				if (!UAssetManager::Get().VerifyCanCookPackage(this, Package->GetFName()))
 				{
 					Context.SavePackageResult = ESavePackageResult::Error;
 				}
@@ -4561,12 +4599,13 @@ void FSaveCookedPackageContext::FinishPlatform()
 void FSaveCookedPackageContext::FinishPackage()
 {
 	// Add soft references discovered from the package
+	FName PackageFName = Package->GetFName();
 	if (!COTFS.IsCookByTheBookMode() || !COTFS.CookByTheBookOptions->bSkipSoftReferences)
 	{
 		// Also request any localized variants of this package
 		if (COTFS.IsCookByTheBookMode() && !FPackageName::IsLocalizedPackage(Package->GetName()))
 		{
-			const TArray<FName>* LocalizedVariants = COTFS.CookByTheBookOptions->SourceToLocalizedPackageVariants.Find(Package->GetFName());
+			const TArray<FName>* LocalizedVariants = COTFS.CookByTheBookOptions->SourceToLocalizedPackageVariants.Find(PackageFName);
 			if (LocalizedVariants)
 			{
 				for (const FName& LocalizedPackageName : *LocalizedVariants)
@@ -4575,7 +4614,8 @@ void FSaveCookedPackageContext::FinishPackage()
 					if (LocalizedPackageData)
 					{
 						bool bIsUrgent = false;
-						LocalizedPackageData->UpdateRequestData(PlatformsForPackage, bIsUrgent, UE::Cook::FCompletionCallback());
+						LocalizedPackageData->UpdateRequestData(PlatformsForPackage, bIsUrgent, UE::Cook::FCompletionCallback(),
+							UE::Cook::FInstigator(UE::Cook::EInstigator::SoftDependency, PackageFName));
 					}
 				}
 			}
@@ -4583,7 +4623,7 @@ void FSaveCookedPackageContext::FinishPackage()
 
 		// Add SoftObjectPaths to the cook. This has to be done after the package save to catch any SoftObjectPaths that were added during save.
 		TSet<FName> SoftObjectPackages;
-		GRedirectCollector.ProcessSoftObjectPathPackageList(Package->GetFName(), false, SoftObjectPackages);
+		GRedirectCollector.ProcessSoftObjectPathPackageList(PackageFName, false, SoftObjectPackages);
 		for (FName SoftObjectPackage : SoftObjectPackages)
 		{
 			TMap<FName, FName> RedirectedPaths;
@@ -4603,7 +4643,8 @@ void FSaveCookedPackageContext::FinishPackage()
 				if (SoftObjectPackageData)
 				{
 					bool bIsUrgent = false;
-					SoftObjectPackageData->UpdateRequestData(PlatformsForPackage, bIsUrgent, UE::Cook::FCompletionCallback());
+					SoftObjectPackageData->UpdateRequestData(PlatformsForPackage, bIsUrgent, UE::Cook::FCompletionCallback(),
+						UE::Cook::FInstigator(UE::Cook::EInstigator::SoftDependency, PackageFName));
 				}
 			}
 		}
@@ -4616,7 +4657,8 @@ void FSaveCookedPackageContext::FinishPackage()
 			// this is an unsolicited package
 			if (FPaths::FileExists(Filename))
 			{
-				COTFS.PackageTracker->UnsolicitedCookedPackages.AddCookedPackage(FFilePlatformRequest(PackageData.GetFileName(), PlatformsForPackage));
+				COTFS.PackageTracker->UnsolicitedCookedPackages.AddCookedPackage(
+					FFilePlatformRequest(PackageData.GetFileName(), EInstigator::Unspecified, PlatformsForPackage));
 
 #if DEBUG_COOKONTHEFLY
 				UE_LOG(LogCook, Display, TEXT("UnsolicitedCookedPackages: %s"), *Filename);
@@ -4861,9 +4903,10 @@ bool UCookOnTheFlyServer::Exec(class UWorld* InWorld, const TCHAR* Cmd, FOutputD
 		FName RawPackageName(*PackageName);
 		TArray<FName> PackageNames;
 		PackageNames.Add(RawPackageName);
+		TMap<FName, UE::Cook::FInstigator> Instigators;
+		Instigators.Add(RawPackageName, UE::Cook::EInstigator::ConsoleCommand);
 
-		GenerateLongPackageNames(PackageNames);
-		
+		GenerateLongPackageNames(PackageNames, Instigators);
 
 		ITargetPlatformManagerModule& TPM = GetTargetPlatformManagerRef();
 		ITargetPlatform* TargetPlatform = TPM.FindTargetPlatform(PlatformName);
@@ -4895,6 +4938,18 @@ bool UCookOnTheFlyServer::Exec(class UWorld* InWorld, const TCHAR* Cmd, FOutputD
 	}
 
 	return false;
+}
+
+UE::Cook::FInstigator UCookOnTheFlyServer::GetInstigator(FName PackageName)
+{
+	using namespace UE::Cook;
+
+	FPackageData* PackageData = PackageDatas->FindPackageDataByPackageName(PackageName);
+	if (!PackageData)
+	{
+		return FInstigator(EInstigator::NotYetRequested);
+	}
+	return PackageData->GetInstigator();
 }
 
 void UCookOnTheFlyServer::DumpStats()
@@ -5790,13 +5845,13 @@ void UCookOnTheFlyServer::PopulateCookedPackages(TArrayView<const ITargetPlatfor
 			{
 				for (const FName& RemovePackageName : Difference.ModifiedPackages)
 				{
-					// cook on the fly will requeue this package when it wants it, but for cook on the book we force cook the modified file
+					// cook on the fly will requeue this package when it wants it, but for cook by the book we force cook the modified file
 					// so that the output set of packages is up to date (even if the user is currently cooking only a subset)
 					FPackageData* PackageData = PackageDatas->TryAddPackageDataByPackageName(RemovePackageName);
 					if (PackageData)
 					{
 						ExternalRequests->EnqueueUnique(FFilePlatformRequest(PackageData->GetFileName(),
-							TConstArrayView<const ITargetPlatform*>{ TargetPlatform }));
+							EInstigator::IterativeCook, TConstArrayView<const ITargetPlatform*>{ TargetPlatform }));
 					}
 				}
 			}
@@ -5963,17 +6018,20 @@ void UCookOnTheFlyServer::RefreshPlatformAssetRegistries(const TArrayView<const 
 	}
 }
 
-void UCookOnTheFlyServer::GenerateLongPackageNames(TArray<FName>& FilesInPath)
+void UCookOnTheFlyServer::GenerateLongPackageNames(TArray<FName>& FilesInPath, TMap<FName, UE::Cook::FInstigator>& Instigators)
 {
 	TSet<FName> FilesInPathSet;
 	TArray<FName> FilesInPathReverse;
+	TMap<FName, UE::Cook::FInstigator> NewInstigators;
 	FilesInPathSet.Reserve(FilesInPath.Num());
 	FilesInPathReverse.Reserve(FilesInPath.Num());
+	NewInstigators.Reserve(Instigators.Num());
 
 	for (int32 FileIndex = 0; FileIndex < FilesInPath.Num(); FileIndex++)
 	{
 		const FName& FileInPathFName = FilesInPath[FilesInPath.Num() - FileIndex - 1];
 		const FString& FileInPath = FileInPathFName.ToString();
+		UE::Cook::FInstigator& Instigator = Instigators.FindChecked(FileInPathFName);
 		if (FPackageName::IsValidLongPackageName(FileInPath))
 		{
 			bool bIsAlreadyAdded;
@@ -5981,6 +6039,7 @@ void UCookOnTheFlyServer::GenerateLongPackageNames(TArray<FName>& FilesInPath)
 			if (!bIsAlreadyAdded)
 			{
 				FilesInPathReverse.Add(FileInPathFName);
+				NewInstigators.Add(FileInPathFName, MoveTemp(Instigator));
 			}
 		}
 		else
@@ -6001,6 +6060,7 @@ void UCookOnTheFlyServer::GenerateLongPackageNames(TArray<FName>& FilesInPath)
 				if (!bIsAlreadyAdded)
 				{
 					FilesInPathReverse.Add(LongPackageFName);
+					NewInstigators.Add(LongPackageFName, MoveTemp(Instigator));
 				}
 			}
 			else
@@ -6012,27 +6072,39 @@ void UCookOnTheFlyServer::GenerateLongPackageNames(TArray<FName>& FilesInPath)
 	}
 	FilesInPath.Empty(FilesInPathReverse.Num());
 	FilesInPath.Append(FilesInPathReverse);
+	Swap(Instigators, NewInstigators);
 }
 
-void UCookOnTheFlyServer::AddFileToCook( TArray<FName>& InOutFilesToCook, const FString &InFilename ) const
+void UCookOnTheFlyServer::AddFileToCook( TArray<FName>& InOutFilesToCook,
+	TMap<FName, UE::Cook::FInstigator>& InOutInstigators,
+	const FString &InFilename, const UE::Cook::FInstigator& Instigator) const
 { 
+	using namespace UE::Cook;
+
 	if (!FPackageName::IsScriptPackage(InFilename) && !FPackageName::IsMemoryPackage(InFilename))
 	{
-		FName InFilenameName = FName(*InFilename );
-		if ( InFilenameName == NAME_None)
+		FName InFilenameName = FName(*InFilename);
+		if (InFilenameName.IsNone())
 		{
 			return;
 		}
 
-		InOutFilesToCook.AddUnique(InFilenameName);
+		FInstigator& ExistingInstigator = InOutInstigators.FindOrAdd(InFilenameName);
+		if (ExistingInstigator.Category == EInstigator::InvalidCategory)
+		{
+			InOutFilesToCook.Add(InFilenameName);
+			ExistingInstigator = Instigator;
+		}
 	}
 }
 
-void UCookOnTheFlyServer::CollectFilesToCook(TArray<FName>& FilesInPath, const TArray<FString>& CookMaps, const TArray<FString>& InCookDirectories,
+void UCookOnTheFlyServer::CollectFilesToCook(TArray<FName>& FilesInPath, TMap<FName, UE::Cook::FInstigator>& Instigators,
+	const TArray<FString>& CookMaps, const TArray<FString>& InCookDirectories,
 	const TArray<FString> &IniMapSections, ECookByTheBookOptions FilesToCookFlags, const TArrayView<const ITargetPlatform* const>& TargetPlatforms,
 	const TMap<FName, TArray<FName>>& GameDefaultObjects)
 {
 	UE_SCOPED_HIERARCHICAL_COOKTIMER(CollectFilesToCook);
+	using namespace UE::Cook;
 
 	UProjectPackagingSettings* PackagingSettings = Cast<UProjectPackagingSettings>(UProjectPackagingSettings::StaticClass()->GetDefaultObject());
 
@@ -6040,10 +6112,19 @@ void UCookOnTheFlyServer::CollectFilesToCook(TArray<FName>& FilesInPath, const T
 	bool bMapsOnly = (!!(FilesToCookFlags & ECookByTheBookOptions::MapsOnly)) || PackagingSettings->bCookMapsOnly;
 	bool bNoDev = !!(FilesToCookFlags & ECookByTheBookOptions::NoDevContent);
 
-	TArray<FName> InitialPackages = FilesInPath;
-
-
-	TArray<FString> CookDirectories = InCookDirectories;
+	int32 InitialNum = FilesInPath.Num();
+	struct FNameWithInstigator
+	{
+		FInstigator Instigator;
+		FName Name;
+	};
+	TArray<FNameWithInstigator> CookDirectories;
+	for (const FString& InCookDirectory : InCookDirectories)
+	{
+		FName InCookDirectoryName(*InCookDirectory);
+		CookDirectories.Add(FNameWithInstigator{
+			FInstigator(EInstigator::CommandLineDirectory, InCookDirectoryName), InCookDirectoryName });
+	}
 	
 	if (!IsCookingDLC() && 
 		!(FilesToCookFlags & ECookByTheBookOptions::NoAlwaysCookMaps))
@@ -6057,7 +6138,7 @@ void UCookOnTheFlyServer::CollectFilesToCook(TArray<FName>& FilesInPath, const T
 			for (int32 MapIdx = 0; MapIdx < MapList.Num(); MapIdx++)
 			{
 				UE_LOG(LogCook, Verbose, TEXT("Maplist contains has %s "), *MapList[MapIdx]);
-				AddFileToCook(FilesInPath, MapList[MapIdx]);
+				AddFileToCook(FilesInPath, Instigators, MapList[MapIdx], EInstigator::AlwaysCookMap);
 			}
 		}
 
@@ -6069,13 +6150,16 @@ void UCookOnTheFlyServer::CollectFilesToCook(TArray<FName>& FilesInPath, const T
 			for (const FString& IniMapSection : IniMapSections)
 			{
 				UE_LOG(LogCook, Verbose, TEXT("Loading map ini section %s"), *IniMapSection);
+				MapList.Reset();
 				GEditor->LoadMapListFromIni(*IniMapSection, MapList);
-			}
-			for (const FString& MapName : MapList)
-			{
-				UE_LOG(LogCook, Verbose, TEXT("Maplist contains %s"), *MapName);
-				AddFileToCook(FilesInPath, MapName);
-				bFoundMapsToCook = true;
+				FName MapSectionName(*IniMapSection);
+				for (const FString& MapName : MapList)
+				{
+					UE_LOG(LogCook, Verbose, TEXT("Maplist contains %s"), *MapName);
+					AddFileToCook(FilesInPath, Instigators, MapName,
+						FInstigator(EInstigator::IniMapSection, MapSectionName));
+					bFoundMapsToCook = true;
+				}
 			}
 		}
 
@@ -6085,7 +6169,7 @@ void UCookOnTheFlyServer::CollectFilesToCook(TArray<FName>& FilesInPath, const T
 			for (const FFilePath& MapToCook : PackagingSettings->MapsToCook)
 			{
 				UE_LOG(LogCook, Verbose, TEXT("Maps to cook list contains %s"), *MapToCook.FilePath);
-				FilesInPath.Add(FName(*MapToCook.FilePath));
+				AddFileToCook(FilesInPath, Instigators, MapToCook.FilePath, EInstigator::PackagingSettingsMapToCook);
 				bFoundMapsToCook = true;
 			}
 		}
@@ -6099,7 +6183,7 @@ void UCookOnTheFlyServer::CollectFilesToCook(TArray<FName>& FilesInPath, const T
 			for (const FString& MapName : AllMapsSection)
 			{
 				UE_LOG(LogCook, Verbose, TEXT("Maplist contains %s"), *MapName);
-				AddFileToCook(FilesInPath, MapName);
+				AddFileToCook(FilesInPath, Instigators, MapName, EInstigator::IniAllMaps);
 			}
 		}
 
@@ -6111,7 +6195,8 @@ void UCookOnTheFlyServer::CollectFilesToCook(TArray<FName>& FilesInPath, const T
 				if (FPackageName::TryConvertGameRelativePackagePathToLocalPath(DirToCook.Path, LocalPath))
 				{
 					UE_LOG(LogCook, Verbose, TEXT("Loading directory to always cook %s"), *DirToCook.Path);
-					CookDirectories.Add(LocalPath);
+					FName LocalPathFName(*LocalPath);
+					CookDirectories.Add(FNameWithInstigator{ FInstigator(EInstigator::DirectoryToAlwaysCook, LocalPathFName), LocalPathFName });
 				}
 				else
 				{
@@ -6121,13 +6206,42 @@ void UCookOnTheFlyServer::CollectFilesToCook(TArray<FName>& FilesInPath, const T
 		}
 	}
 
+	TSet<FName> ScratchNewFiles;
+	TArray<FName> ScratchRemoveFiles;
+	auto UpdateInstigators = [&FilesInPath, &Instigators, &ScratchNewFiles, &ScratchRemoveFiles](const FInstigator& InInstigator)
+	{
+		ScratchNewFiles.Reset();
+		ScratchNewFiles.Reserve(FilesInPath.Num());
+		for (FName FileInPath : FilesInPath)
+		{
+			ScratchNewFiles.Add(FileInPath);
+			FInstigator& Existing = Instigators.FindOrAdd(FileInPath);
+			if (Existing.Category == EInstigator::InvalidCategory)
+			{
+				Existing = InInstigator;
+			}
+		}
+		ScratchRemoveFiles.Reset();
+		for (const TPair<FName, FInstigator>& Pair : Instigators)
+		{
+			if (!ScratchNewFiles.Contains(Pair.Key))
+			{
+				ScratchRemoveFiles.Add(Pair.Key);
+			}
+		}
+		for (FName RemoveFile : ScratchRemoveFiles)
+		{
+			Instigators.Remove(RemoveFile);
+		}
+	};
+
 	if (!(FilesToCookFlags & ECookByTheBookOptions::NoGameAlwaysCookPackages))
 	{
 		UE_SCOPED_HIERARCHICAL_COOKTIMER_AND_DURATION(CookModificationDelegate, DetailedCookStats::GameCookModificationDelegateTimeSec);
 #define DEBUG_COOKMODIFICATIONDELEGATE 0
 #if DEBUG_COOKMODIFICATIONDELEGATE
 		TSet<UPackage*> LoadedPackages;
-		for ( TObjectIterator<UPackage> It; It; ++It)
+		for (TObjectIterator<UPackage> It; It; ++It)
 		{
 			LoadedPackages.Add(*It);
 		}
@@ -6139,7 +6253,7 @@ void UCookOnTheFlyServer::CollectFilesToCook(TArray<FName>& FilesInPath, const T
 
 		for (const FString& FileString : FilesInPathStrings)
 		{
-			FilesInPath.Add(FName(*FileString));
+			AddFileToCook(FilesInPath, Instigators, FileString, EInstigator::CookModificationDelegate);
 		}
 
 		if (UAssetManager::IsValid())
@@ -6147,6 +6261,7 @@ void UCookOnTheFlyServer::CollectFilesToCook(TArray<FName>& FilesInPath, const T
 			TArray<FName> PackagesToNeverCook;
 
 			UAssetManager::Get().ModifyCook(FilesInPath, PackagesToNeverCook);
+			UpdateInstigators(EInstigator::AssetRegistryModifyCook);
 
 			for (FName NeverCookPackage : PackagesToNeverCook)
 			{
@@ -6189,18 +6304,19 @@ void UCookOnTheFlyServer::CollectFilesToCook(TArray<FName>& FilesInPath, const T
 			}
 			else
 			{
-				AddFileToCook( FilesInPath, OutFilename);
+				AddFileToCook(FilesInPath, Instigators, OutFilename, EInstigator::CommandLinePackage);
 			}
 		}
 		else
 		{
-			AddFileToCook( FilesInPath,CurrEntry);
+			AddFileToCook(FilesInPath, Instigators, CurrEntry, EInstigator::CommandLinePackage);
 		}
 	}
 	if (IsCookingDLC())
 	{
 		TArray<FName> PackagesToNeverCook;
 		UAssetManager::Get().ModifyDLCCook(CookByTheBookOptions->DlcName, FilesInPath, PackagesToNeverCook);
+		UpdateInstigators(EInstigator::AssetRegistryModifyDLCCook);
 
 		for (FName NeverCookPackage : PackagesToNeverCook)
 		{
@@ -6217,32 +6333,33 @@ void UCookOnTheFlyServer::CollectFilesToCook(TArray<FName>& FilesInPath, const T
 	{
 		TargetPlatform->GetExtraPackagesToCook(FilesInPath);
 	}
-
+	UpdateInstigators(EInstigator::TargetPlatformExtraPackagesToCook);
 
 	if (!(FilesToCookFlags & ECookByTheBookOptions::SkipSoftReferences))
 	{
 		const FString ExternalMountPointName(TEXT("/Game/"));
-		for (const FString& CurrEntry : CookDirectories)
+		for (const FNameWithInstigator& CurrEntry : CookDirectories)
 		{
 			TArray<FString> Files;
-			IFileManager::Get().FindFilesRecursive(Files, *CurrEntry, *(FString(TEXT("*")) + FPackageName::GetAssetPackageExtension()), true, false);
+			FString DirectoryName = CurrEntry.Name.ToString();
+			IFileManager::Get().FindFilesRecursive(Files, *DirectoryName, *(FString(TEXT("*")) + FPackageName::GetAssetPackageExtension()), true, false);
 			for (int32 Index = 0; Index < Files.Num(); Index++)
 			{
 				FString StdFile = Files[Index];
 				FPaths::MakeStandardFilename(StdFile);
-				AddFileToCook(FilesInPath, StdFile);
+				AddFileToCook(FilesInPath, Instigators, StdFile, CurrEntry.Instigator);
 
 				// this asset may not be in our currently mounted content directories, so try to mount a new one now
 				FString LongPackageName;
 				if (!FPackageName::IsValidLongPackageName(StdFile) && !FPackageName::TryConvertFilenameToLongPackageName(StdFile, LongPackageName))
 				{
-					FPackageName::RegisterMountPoint(ExternalMountPointName, CurrEntry);
+					FPackageName::RegisterMountPoint(ExternalMountPointName, DirectoryName);
 				}
 			}
 		}
 
 		// If no packages were explicitly added by command line or game callback, add all maps
-		if (FilesInPath.Num() == InitialPackages.Num() || bCookAll)
+		if (FilesInPath.Num() == InitialNum || bCookAll)
 		{
 			TArray<FString> Tokens;
 			Tokens.Empty(2);
@@ -6273,7 +6390,7 @@ void UCookOnTheFlyServer::CollectFilesToCook(TArray<FName>& FilesInPath, const T
 
 				for (int32 TokenFileIndex = 0; TokenFileIndex < TokenFiles.Num(); ++TokenFileIndex)
 				{
-					AddFileToCook(FilesInPath, TokenFiles[TokenFileIndex]);
+					AddFileToCook(FilesInPath, Instigators, TokenFiles[TokenFileIndex], EInstigator::FullDepotSearch);
 				}
 			}
 		}
@@ -6304,7 +6421,8 @@ void UCookOnTheFlyServer::CollectFilesToCook(TArray<FName>& FilesInPath, const T
 					LogCookerMessage(ErrorMessage.ToString(), EMessageSeverity::Error);
 				}
 
-				AddFileToCook(FilesInPath, PackagePath.ToString());
+				AddFileToCook(FilesInPath, Instigators, PackagePath.ToString(),
+					FInstigator(EInstigator::GameDefaultObject, GameDefaultSet.Key));
 			}
 		}
 	}
@@ -6320,7 +6438,7 @@ void UCookOnTheFlyServer::CollectFilesToCook(TArray<FName>& FilesInPath, const T
 		{
 			if (InterfaceFile != TEXT("None") && InterfaceFile != TEXT(""))
 			{
-				AddFileToCook(FilesInPath, InterfaceFile);
+				AddFileToCook(FilesInPath, Instigators, InterfaceFile, EInstigator::InputSettingsIni);
 			}
 		}
 	}
@@ -6338,6 +6456,7 @@ void UCookOnTheFlyServer::CollectFilesToCook(TArray<FName>& FilesInPath, const T
 			for (int32 DirIdx = 0; DirIdx < UIContentPaths.Num(); DirIdx++)
 			{
 				FString ContentPath = FPackageName::LongPackageNameToFilename(UIContentPaths[DirIdx]);
+				FName ContentPathName(*ContentPath);
 
 				TArray<FString> Files;
 				IFileManager::Get().FindFilesRecursive(Files, *ContentPath, *(FString(TEXT("*")) + FPackageName::GetAssetPackageExtension()), true, false);
@@ -6347,7 +6466,7 @@ void UCookOnTheFlyServer::CollectFilesToCook(TArray<FName>& FilesInPath, const T
 					FName PackageName = FName(*FPackageName::FilenameToLongPackageName(StdFile));
 					ContentDirectoryAssets.Add(PackageName);
 					FPaths::MakeStandardFilename(StdFile);
-					AddFileToCook( FilesInPath, StdFile);
+					AddFileToCook( FilesInPath, Instigators, StdFile, FInstigator(EInstigator::UIContentDirectory, ContentPathName));
 				}
 			}
 		}
@@ -7962,7 +8081,6 @@ void UCookOnTheFlyServer::StartCookByTheBook( const FCookByTheBookStartupOptions
 		}
 	}
 
-	TArray<FName> FilesInPath;
 	TSet<FName> StartupSoftObjectPackages;
 	if (!IsCookByTheBookMode() || !CookByTheBookOptions->bSkipSoftReferences)
 	{
@@ -7988,12 +8106,14 @@ void UCookOnTheFlyServer::StartCookByTheBook( const FCookByTheBookStartupOptions
 		}
 	}
 	
-	CollectFilesToCook(FilesInPath, CookMaps, CookDirectories, IniMapSections, CookOptions, TargetPlatforms, GameDefaultObjects);
+	TArray<FName> FilesInPath;
+	TMap<FName, UE::Cook::FInstigator> FilesInPathInstigators;
+	CollectFilesToCook(FilesInPath, FilesInPathInstigators, CookMaps, CookDirectories, IniMapSections, CookOptions, TargetPlatforms, GameDefaultObjects);
 
 	// Add soft/hard startup references after collecting requested files and handling empty requests
 	if (bPreexploreDependenciesEnabled && !CookByTheBookOptions->bSkipHardReferences && !CookByTheBookOptions->bFullLoadAndSave)
 	{
-		ProcessUnsolicitedPackages(&FilesInPath);
+		ProcessUnsolicitedPackages(&FilesInPath, &FilesInPathInstigators);
 	}
 	for (FName SoftObjectPackage : StartupSoftObjectPackages)
 	{
@@ -8010,7 +8130,8 @@ void UCookOnTheFlyServer::StartCookByTheBook( const FCookByTheBookStartupOptions
 
 		if (!CookByTheBookOptions->bSkipSoftReferences)
 		{
-			AddFileToCook(FilesInPath, SoftObjectPackage.ToString());
+			AddFileToCook(FilesInPath, FilesInPathInstigators, SoftObjectPackage.ToString(),
+				UE::Cook::EInstigator::StartupSoftObjectPath);
 		}
 	}
 	
@@ -8032,7 +8153,7 @@ void UCookOnTheFlyServer::StartCookByTheBook( const FCookByTheBookStartupOptions
 
 	{
 		UE_SCOPED_HIERARCHICAL_COOKTIMER(GenerateLongPackageName);
-		GenerateLongPackageNames(FilesInPath);
+		GenerateLongPackageNames(FilesInPath, FilesInPathInstigators);
 	}
 	// add all the files to the cook list for the requested platforms
 	for ( const FName& FileFName : FilesInPath )
@@ -8046,7 +8167,8 @@ void UCookOnTheFlyServer::StartCookByTheBook( const FCookByTheBookStartupOptions
 		
 		if (PackageFileFName != NAME_None)
 		{
-			ExternalRequests->EnqueueUnique( UE::Cook::FFilePlatformRequest( PackageFileFName, TargetPlatforms ) );
+			UE::Cook::FInstigator& Instigator = FilesInPathInstigators.FindChecked(FileFName);
+			ExternalRequests->EnqueueUnique( UE::Cook::FFilePlatformRequest( PackageFileFName, MoveTemp(Instigator), TargetPlatforms ) );
 		}
 		else if (!FLinkerLoad::IsKnownMissingPackage(FileFName))
 		{
@@ -8076,7 +8198,8 @@ void UCookOnTheFlyServer::StartCookByTheBook( const FCookByTheBookStartupOptions
 				RequestPlatforms.Add(TargetPlatform);
 				for ( const FName& PackageFilename : PackageFiles )
 				{
-					ExternalRequests->EnqueueUnique( UE::Cook::FFilePlatformRequest( PackageFilename, RequestPlatforms) );
+					ExternalRequests->EnqueueUnique(
+						UE::Cook::FFilePlatformRequest( PackageFilename, UE::Cook::EInstigator::PreviousAssetRegistry, RequestPlatforms) );
 				}
 			}
 		}
@@ -8844,7 +8967,7 @@ uint32 UCookOnTheFlyServer::FullLoadAndSave(uint32& CookedPackageCount)
 
 						if (SaveResult == ESavePackageResult::Success && UAssetManager::IsValid())
 						{
-							if (!UAssetManager::Get().VerifyCanCookPackage(Package->GetFName()))
+							if (!UAssetManager::Get().VerifyCanCookPackage(this, Package->GetFName()))
 							{
 								SaveResult = ESavePackageResult::Error;
 							}

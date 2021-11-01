@@ -32,6 +32,7 @@ public:
 	struct FFileNameRequest
 	{
 		FName FileName;
+		FInstigator Instigator;
 		FCompletionCallback CompletionCallback;
 		bool bUrgent;
 
@@ -95,7 +96,8 @@ private:
 	void FetchPackageNames(const FCookerTimer& CookerTimer, bool& bOutComplete);
 	void FetchDependencies(const FCookerTimer& CookerTimer, bool& bOutComplete);
 	void StartAsync(const FCookerTimer& CookerTimer, bool& bOutComplete);
-	bool TryTakeOwnership(FPackageData& PackageData, bool bUrgent, FCompletionCallback&& CompletionCallback);
+	bool TryTakeOwnership(FPackageData& PackageData, bool bUrgent, FCompletionCallback&& CompletionCallback,
+		const FInstigator& InInstigator);
 	void VisitPackageData(FPackageData* PackageData, TArray<FName>* OutDependencies, bool& bOutAlreadyCooked);
 	bool IsRequestCookable(FName PackageName, FName& InOutFileName, FPackageData*& PackageData);
 	static bool IsRequestCookable(FName PackageName, FName& InOutFileName, FPackageData*& PackageData,
@@ -103,7 +105,8 @@ private:
 		FStringView InDLCPath, bool bInErrorOnEngineContentUse, TConstArrayView<const ITargetPlatform*> RequestPlatforms);
 
 	// Graph Search functions
-	EVisitStatus& AddVertex(FName PackageName, FPackageData* PackageData, bool& bOutPushedStack, int32& TimerCounter);
+	EVisitStatus& AddVertex(FName PackageName, FPackageData* PackageData, bool& bOutPushedStack, int32& TimerCounter,
+		const FInstigator& InInstigator);
 	bool IsStackEmpty() const;
 	FStackData& TopStack();
 	FStackData& PushStack(FName PackageName);
