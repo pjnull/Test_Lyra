@@ -25,6 +25,7 @@ namespace Metasound
 			ELiteralType PreferredLiteralType = ELiteralType::Invalid;
 
 			// Constructor argument support in TDataTypeLiteralFactory<TDataType>;
+			bool bIsParsable = false;
 			bool bIsDefaultParsable = false;
 			bool bIsBoolParsable = false;
 			bool bIsIntParsable = false;
@@ -43,6 +44,9 @@ namespace Metasound
 
 			// Determines whether the type can be used with send/receive transmitters
 			bool bIsTransmittable = false;
+
+			// Is true if is a Variable type
+			bool bIsVariable = false;
 
 			// If provided in registration call, UClass this datatype was registered with
 			UClass* ProxyGeneratorClass = nullptr;
