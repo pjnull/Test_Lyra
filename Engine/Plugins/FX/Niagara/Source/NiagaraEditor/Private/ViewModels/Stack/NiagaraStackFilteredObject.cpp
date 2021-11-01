@@ -82,7 +82,6 @@ struct FInputData
 };
 
 
-#pragma optimize("", off)
 void UNiagaraStackFilteredObject::ProcessInputsForModule(TMap<FGuid, UNiagaraStackFunctionInputCollection*>& NewKnownInputCollections, TArray<UNiagaraStackEntry*>& NewChildren, UNiagaraNodeFunctionCall* InputFunctionCallNode)
 {
 
