@@ -469,6 +469,13 @@ int32 FStorageServerConnection::HandshakeRequest(TArrayView<const TSharedPtr<FIn
 		
 		UE_LOG(LogStorageServerConnection, Display, TEXT("Trying to handshake with Zen at '%s'"), *Addr->ToString(true));
 
+		FSocket* ConnectSocket = AcquireNewSocket();
+		if (!ConnectSocket)
+		{
+			continue;
+		}
+		ReleaseSocket(ConnectSocket, true);
+
 		FStorageServerRequest Request("GET", *ResourceBuilder, Hostname);
 		if (FSocket* Socket = Request.Send(*this))
 		{
