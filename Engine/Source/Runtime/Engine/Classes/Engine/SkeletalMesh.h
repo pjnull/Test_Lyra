@@ -864,7 +864,7 @@ public:
 
 	/** Skeleton of this skeletal mesh **/
 	UE_DEPRECATED(4.27, "Please do not access this member directly; use USkeletalMesh::GetSkeleton() or USkeletalMesh::SetSkeleton().")
-	UPROPERTY(Category=Mesh, AssetRegistrySearchable, VisibleAnywhere, BlueprintGetter = GetSkeleton)
+	UPROPERTY(Category=Mesh, AssetRegistrySearchable, VisibleAnywhere, BlueprintGetter = GetSkeleton, BlueprintSetter = SetSkeleton)
 	TObjectPtr<USkeleton> Skeleton;
 
 	static FName GetSkeletonMemberName()
@@ -891,6 +891,7 @@ public:
 		PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	}
 
+	UFUNCTION(BlueprintSetter)
 	void SetSkeleton(USkeleton* InSkeleton)
 	{
 		WaitUntilAsyncPropertyReleased(ESkeletalMeshAsyncProperties::Skeleton);
