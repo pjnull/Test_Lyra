@@ -173,11 +173,11 @@ namespace CADLibrary
 		// TODO for SW //void TraverseConfiguration(const A3DAsmProductOccurrence* OccurrConfigurationence, FEntityData& ParentMetaData);
 		FCadId TraverseOccurrence(const A3DAsmProductOccurrence* Occurrence);
 		void TraversePrototype(const A3DAsmProductOccurrence* InPrototype, FEntityMetaData& OutMetaData, FMatrix& OutPrototypeMatrix);
-		FCadId TraversePartDefinition(const A3DAsmPartDefinition* PartDefinition);
-		FCadId TraverseRepresentationSet(const A3DRiSet* pSet);
-		FCadId TraverseRepresentationItem(A3DRiRepresentationItem* RepresentationItem);
-		FCadId TraverseBRepModel(A3DRiBrepModel* BrepModel);
-		FCadId TraversePolyBRepModel(const A3DRiPolyBrepModel* PolygonalBrepModel);
+		void TraversePartDefinition(const A3DAsmPartDefinition* PartDefinition, FArchiveComponent& Component);
+		FCadId TraverseRepresentationSet(const A3DRiSet* pSet, FEntityMetaData& PartMetaData);
+		FCadId TraverseRepresentationItem(A3DRiRepresentationItem* RepresentationItem, FEntityMetaData& PartMetaData);
+		FCadId TraverseBRepModel(A3DRiBrepModel* BrepModel, FEntityMetaData& PartMetaData);
+		FCadId TraversePolyBRepModel(const A3DRiPolyBrepModel* PolygonalBrepModel, FEntityMetaData& PartMetaData);
 
 		// Tessellation methods
 		void MeshRepresentationWithTechSoft(A3DRiRepresentationItem* RepresentationItem, FArchiveBody& Body);
@@ -188,7 +188,11 @@ namespace CADLibrary
 		// MetaData
 		void TraverseMetaData(const A3DEntity* Entity, FEntityMetaData& OutMetaData);
 		void TraverseSpecificMetaData(const A3DAsmProductOccurrence* Occurrence, FEntityMetaData& OutMetaData);
-		void DefineEntityName(TMap<FString, FString>& OutMetaData, EComponentType EntityType);
+
+		void BuildInstanceName(TMap<FString, FString>& MetaData);
+		void BuildReferenceName(TMap<FString, FString>& MetaData);
+		void BuildPartName(TMap<FString, FString>& MetaData);
+		void BuildBodyName(TMap<FString, FString>& MetaData);
 
 		// Graphic properties
 		void TraverseGraphics(const A3DGraphics* Graphics, FEntityBehaviour& GraphicsBehaviour);
@@ -219,6 +223,8 @@ namespace CADLibrary
 
 		FCADFileData& CADFileData;
 		FTechSoftInterface& TechSoftInterface;
+
+		ECADFormat Format;
 
 		EModellerType ModellerType;
 		double FileUnit = 1;

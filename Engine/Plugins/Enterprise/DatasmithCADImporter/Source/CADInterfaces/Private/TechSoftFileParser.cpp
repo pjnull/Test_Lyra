@@ -27,7 +27,7 @@ namespace TechSoftFileParserImpl
 		StringToClean = MoveTemp(NewString);
 	}
 
-	FString GetOriginalName(const FString& Name)
+	FString CleanSdkName(const FString& Name)
 	{
 		int32 Index;
 		if (Name.FindLastChar(TEXT('['), Index))
@@ -37,7 +37,7 @@ namespace TechSoftFileParserImpl
 		return Name;
 	}
 
-	FString Get3dxmlOriginalName(const FString& Name)
+	FString CleanCatiaInstanceSdkName(const FString& Name)
 	{
 		int32 Index;
 		if (Name.FindChar(TEXT('('), Index))
@@ -52,7 +52,18 @@ namespace TechSoftFileParserImpl
 		return Name;
 	}
 
-	FString GetSWOriginalName(const FString& Name)
+	FString Clean3dxmlReferenceSdkName(const FString& Name)
+	{
+		int32 Index;
+		if (Name.FindChar(TEXT('('), Index))
+		{
+			FString NewName = Name.Left(Index);
+			return NewName;
+		}
+		return Name;
+	}
+
+	FString CleanSwInstanceSdkName(const FString& Name)
 	{
 		int32 Position;
 		if (Name.FindLastChar(TEXT('-'), Position))
@@ -63,42 +74,68 @@ namespace TechSoftFileParserImpl
 		return Name;
 	}
 
-	FString GetJTOriginalName(const FString& Name)
+	FString CleanSwReferenceSdkName(const FString& Name)
 	{
 		int32 Position;
-		if (Name.FindLastChar(TEXT(';'), Position))
+		if (Name.FindLastChar(TEXT('-'), Position))
 		{
 			FString NewName = Name.Left(Position);
-			if (Name.FindLastChar(TEXT('.'), Position))
-			{
-				NewName = NewName.Left(Position);
-			}
 			return NewName;
 		}
 		return Name;
 	}
 
-	FString GetCatiaBodyOriginalName(const FString& Name)
-	{
-		if (Name.Left(14) == TEXT("MechanicalTool"))
-		{
-			FString NewName = L"Body" + Name.Right(14);
-			return NewName;
-		}
-		return Name;
-	}
-
-	FString GetCreoBodyOriginalName(const FString& Name)
+	FString CleanCatiaReferenceName(const FString& Name)
 	{
 		int32 Position;
 		if (Name.FindLastChar(TEXT('.'), Position))
 		{
-			FString NewName = Name.Left(Position);
-			return NewName;
+			FString Indice = Name.Right(Position + 1);
+			if (Indice.IsNumeric())
+			{
+				FString NewName = Name.Left(Position);
+				return NewName;
+			}
 		}
 		return Name;
 	}
 
+	FString CleanNameByRemoving_prt(const FString& Name)
+	{
+		int32 Position;
+		if (Name.FindLastChar(TEXT('.'), Position))
+		{
+			FString Extension = Name.Right(Position);
+			if (Extension.Equals(TEXT("prt"), ESearchCase::IgnoreCase))
+			{
+				FString NewName = Name.Left(Position);
+				return NewName;
+			}
+		}
+		return Name;
+	}
+
+	bool CheckIfNameExists(TMap<FString, FString>& MetaData)
+	{
+		FString* NamePtr = MetaData.Find(TEXT("Name"));
+		if (NamePtr != nullptr)
+		{
+			return true;
+		}
+		return false;
+	}
+
+	bool ReplaceOrAddNameValue(TMap<FString, FString>& MetaData, TCHAR* Key)
+	{
+		FString* NamePtr = MetaData.Find(Key);
+		if (NamePtr != nullptr)
+		{
+			FString& Name = MetaData.FindOrAdd(TEXT("Name"));
+			Name = *NamePtr;
+			return true;
+		}
+		return false;
+	}
 
 	// Functions used in traverse model process
 	bool IsUnloadedPrototype(const A3DAsmProductOccurrenceData& PrototypeData)
@@ -255,7 +292,7 @@ namespace TechSoftFileParserImpl
 		ECADParsingResult Result = ECADParsingResult::ProcessOk;
 
 		const FFileDescriptor& File = CADFileData.GetCADFileDescription();
-
+		
 		if (File.GetPathOfFileToLoad().IsEmpty())
 		{
 			return ECADParsingResult::FileNotFound;
@@ -266,7 +303,7 @@ namespace TechSoftFileParserImpl
 		TechSoftFileParserImpl::SetIOOption(Import);
 
 		// Add specific options according to format
-		ECADFormat Format = File.GetFileFormat();
+		Format = File.GetFileFormat();
 		TechSoftFileParserImpl::UpdateIOOptionAccordingToFormat(Format, Import);
 
 		A3DStatus IRet = TechSoftInterface.Import(Import);
@@ -361,7 +398,7 @@ namespace TechSoftFileParserImpl
 		}
 
 		TraverseSpecificMetaData(ReferencePtr, MetaData);
-		DefineEntityName(MetaData.MetaData, EComponentType::Reference);
+		BuildReferenceName(MetaData.MetaData);
 
 		TraverseMaterialProperties(ReferencePtr);
 
@@ -384,8 +421,7 @@ namespace TechSoftFileParserImpl
 
 		if (ReferenceData->m_pPart)
 		{
-			int32 ChildrenId = TraversePartDefinition(ReferenceData->m_pPart);
-			Component.Children.Add(ChildrenId);
+			TraversePartDefinition(ReferenceData->m_pPart, Component);
 		}
 	}
 
@@ -423,7 +459,6 @@ namespace TechSoftFileParserImpl
 
 		Instance.ExternalReference = ComponentMetaData.ExternalFile;
 
-		ECADFormat Format = Instance.ExternalReference.GetFileFormat();
 		if (Format == ECADFormat::SOLIDWORKS /*|| CADFileData.FileFormat() == ECADFormat::JT*/)
 		{
 			if (FString* ConfigurationName = ComponentMetaData.MetaData.Find(TEXT("ConfigurationName")))
@@ -475,7 +510,7 @@ namespace TechSoftFileParserImpl
 		}
 
 		TraverseSpecificMetaData(OccurrencePtr, InstanceMetaData);
-		DefineEntityName(InstanceMetaData.MetaData, EComponentType::Occurrence);
+		BuildInstanceName(InstanceMetaData.MetaData);
 
 		TraverseMaterialProperties(OccurrencePtr);
 		TraverseLayer(OccurrencePtr);
@@ -515,8 +550,7 @@ namespace TechSoftFileParserImpl
 
 			if (OccurrenceData->m_pPart)
 			{
-				int32 ChildrenId = TraversePartDefinition(OccurrenceData->m_pPart);
-				Component.Children.Add(ChildrenId);
+				TraversePartDefinition(OccurrenceData->m_pPart, Component);
 			}
 		}
 
@@ -575,7 +609,6 @@ namespace TechSoftFileParserImpl
 
 		TraverseMetaData(InPrototypePtr, OutPrototypeMetaData);
 		TraverseSpecificMetaData(InPrototypePtr, OutPrototypeMetaData);
-		DefineEntityName(OutPrototypeMetaData.MetaData, EComponentType::Reference);
 
 		TraverseMaterialProperties(InPrototypePtr);
 
@@ -585,44 +618,40 @@ namespace TechSoftFileParserImpl
 		if (OutPrototypeMetaData.bUnloaded)
 		{
 			OutPrototypeMetaData.ExternalFile = GetOccurrenceFileName(InPrototypePtr);
+			OutPrototypeMetaData.MetaData.Add(TEXT("Name"), OutPrototypeMetaData.ExternalFile.GetFileName());
 		}
+
+		BuildReferenceName(OutPrototypeMetaData.MetaData);
 	}
 
-	FCadId FTechSoftFileParser::TraversePartDefinition(const A3DAsmPartDefinition* PartDefinitionPtr)
+	void FTechSoftFileParser::TraversePartDefinition(const A3DAsmPartDefinition* PartDefinitionPtr, FArchiveComponent& Part)
 	{
 		FEntityMetaData PartMetaData;
 		TraverseMetaData(PartDefinitionPtr, PartMetaData);
 
 		if (PartMetaData.bRemoved || !PartMetaData.bShow)
 		{
-			return 0;
+			return;
 		}
 
 		TraverseSpecificMetaData(PartDefinitionPtr, PartMetaData);
-		DefineEntityName(PartMetaData.MetaData, EComponentType::Occurrence);
+		BuildPartName(PartMetaData.MetaData);
 
 		TraverseMaterialProperties(PartDefinitionPtr);
 		TraverseLayer(PartDefinitionPtr);
 
 		TUniqueTSObj<A3DAsmPartDefinitionData> PartData(PartDefinitionPtr);
-		if (!PartData.IsValid())
+		if (PartData.IsValid())
 		{
-			return 0;
+			for (unsigned int Index = 0; Index < PartData->m_uiRepItemsSize; ++Index)
+			{
+				int32 ChildId = TraverseRepresentationItem(PartData->m_ppRepItems[Index], PartMetaData);
+				Part.Children.Add(ChildId);
+			}
 		}
-
-		FCadId PartId = 0;
-		FArchiveComponent& Part = AddOccurence(PartMetaData, PartId);
-
-		for (unsigned int Index = 0; Index < PartData->m_uiRepItemsSize; ++Index)
-		{
-			int32 ChildId = TraverseRepresentationItem(PartData->m_ppRepItems[Index]);
-			Part.Children.Add(ChildId);
-		}
-
-		return PartId;
 	}
 
-	FCadId FTechSoftFileParser::TraverseRepresentationItem(A3DRiRepresentationItem* RepresentationItem)
+	FCadId FTechSoftFileParser::TraverseRepresentationItem(A3DRiRepresentationItem* RepresentationItem, FEntityMetaData& PartMetaData)
 	{
 		A3DEEntityType Type;
 		A3DEntityGetType(RepresentationItem, &Type);
@@ -630,18 +659,18 @@ namespace TechSoftFileParserImpl
 		switch (Type)
 		{
 		case kA3DTypeRiSet:
-			return TraverseRepresentationSet(RepresentationItem);
+			return TraverseRepresentationSet(RepresentationItem, PartMetaData);
 		case kA3DTypeRiBrepModel:
-			return TraverseBRepModel(RepresentationItem);
+			return TraverseBRepModel(RepresentationItem, PartMetaData);
 		case kA3DTypeRiPolyBrepModel:
-			return TraversePolyBRepModel(RepresentationItem);
+			return TraversePolyBRepModel(RepresentationItem, PartMetaData);
 		default:
 			break;
 		}
 		return 0;
 	}
 
-	FCadId FTechSoftFileParser::TraverseRepresentationSet(const A3DRiSet* RepresentationSetPtr)
+	FCadId FTechSoftFileParser::TraverseRepresentationSet(const A3DRiSet* RepresentationSetPtr, FEntityMetaData& PartMetaData)
 	{
 		TUniqueTSObj<A3DRiSetData> RepresentationSetData(RepresentationSetPtr);
 		if (!RepresentationSetData.IsValid())
@@ -664,13 +693,13 @@ namespace TechSoftFileParserImpl
 
 		for (A3DUns32 ui = 0; ui < RepresentationSetData->m_uiRepItemsSize; ++ui)
 		{
-			int32 ChildId = TraverseRepresentationItem(RepresentationSetData->m_ppRepItems[ui]);
+			int32 ChildId = TraverseRepresentationItem(RepresentationSetData->m_ppRepItems[ui], RepresentationSetMetaData);
 			RepresentationSet.Children.Add(ChildId);
 		}
 		return RepresentationSetId;
 	}
 
-	FCadId FTechSoftFileParser::TraverseBRepModel(A3DRiBrepModel* BRepModelPtr)
+	FCadId FTechSoftFileParser::TraverseBRepModel(A3DRiBrepModel* BRepModelPtr, FEntityMetaData& PartMetaData)
 	{
 		TUniqueTSObj<A3DRiBrepModelData> BodyData(BRepModelPtr);
 		if (!BodyData.IsValid())
@@ -721,7 +750,7 @@ namespace TechSoftFileParserImpl
 		}
 	}
 
-	FCadId FTechSoftFileParser::TraversePolyBRepModel(const A3DRiPolyBrepModel* PolygonalPtr)
+	FCadId FTechSoftFileParser::TraversePolyBRepModel(const A3DRiPolyBrepModel* PolygonalPtr, FEntityMetaData& PartMetaData)
 	{
 		TUniqueTSObj<A3DRiPolyBrepModelData> BodyData(PolygonalPtr);
 		if (!BodyData.IsValid())
@@ -756,16 +785,11 @@ namespace TechSoftFileParserImpl
 				OutMetaData.MetaData.Emplace(TEXT("PersistentId"), PersistentId);
 			}
 
-			if (false && MetaData->m_pcPersistentId)
-			{
-				FString PersistentUuid = UTF8_TO_TCHAR(MetaData->m_pcPersistentId);
-				TechSoftFileParserImpl::RemoveUnwantedChar(PersistentUuid, TEXT('-'));
-				OutMetaData.MetaData.Emplace(TEXT("UUID"), PersistentUuid);
-			}
-
 			if (MetaData->m_pcName && MetaData->m_pcName[0] != '\0')
 			{
-				OutMetaData.MetaData.Emplace(TEXT("SDKName"), UTF8_TO_TCHAR(MetaData->m_pcName));
+				FString SDKName = UTF8_TO_TCHAR(MetaData->m_pcName);
+				SDKName = TechSoftFileParserImpl::CleanSdkName(SDKName);
+				OutMetaData.MetaData.Emplace(TEXT("SDKName"), SDKName);
 			}
 
 			TUniqueTSObj<A3DMiscAttributeData> AttributeData;
@@ -795,121 +819,167 @@ namespace TechSoftFileParserImpl
 		}
 	}
 
-	void FTechSoftFileParser::DefineEntityName(TMap<FString, FString>& MetaData, EComponentType EntityType)
+	void FTechSoftFileParser::BuildReferenceName(TMap<FString, FString>& MetaData)
 	{
 		if (MetaData.IsEmpty())
 		{
 			return;
 		}
 
-		ECADFormat Format = CADFileData.GetCADFileDescription().GetFileFormat();
+		FString* NamePtr = MetaData.Find(TEXT("InstanceName"));
+		if (NamePtr != nullptr)
+		{
+			FString& Name = MetaData.FindOrAdd(TEXT("Name"));
+			Name = *NamePtr;
+			if (Format == ECADFormat::CATIA)
+			{
+				Name = TechSoftFileParserImpl::CleanCatiaReferenceName(Name);
+			}
+			return;
+		}
 
-		switch (EntityType)
+		if (Format == ECADFormat::JT)
 		{
-		case EComponentType::Reference:
-		{
-			FString* Name = MetaData.Find(TEXT("Name"));
-			if (Name)
+			if(TechSoftFileParserImpl::ReplaceOrAddNameValue(MetaData, TEXT("SDKName")))
 			{
 				return;
 			}
-
-			FString* InstanceName = MetaData.Find(TEXT("InstanceName"));
-			if (InstanceName)
-			{
-				MetaData.Emplace(TEXT("Name"), *InstanceName);
-				return;
-			}
-
-			FString* OriginalName = MetaData.Find(TEXT("OriginalName"));
-			FString* TechSoftName = MetaData.Find(TEXT("TechSoftName"));
-
-			if (!OriginalName && TechSoftName)
-			{
-				FString PartNumberStr = TechSoftFileParserImpl::GetOriginalName(*TechSoftName);
-
-				switch (Format)
-				{
-				case ECADFormat::CATIA_3DXML:
-					PartNumberStr = TechSoftFileParserImpl::Get3dxmlOriginalName(PartNumberStr);
-					break;
-
-				case ECADFormat::SOLIDWORKS:
-					PartNumberStr = TechSoftFileParserImpl::GetSWOriginalName(PartNumberStr);
-					break;
-
-				case ECADFormat::JT:
-					PartNumberStr = TechSoftFileParserImpl::GetJTOriginalName(PartNumberStr);
-					break;
-
-				default:
-					break;
-				}
-
-				MetaData.Emplace(TEXT("PartNumber"), PartNumberStr);
-			}
-
-			FString* PartNumber = MetaData.Find(TEXT("PartNumber"));
-			if (PartNumber)
-			{
-				MetaData.Emplace(TEXT("Name"), *PartNumber);
-			}
-			else if (OriginalName)
-			{
-				MetaData.Emplace(TEXT("Name"), *OriginalName);
-			}
 		}
-		break;
 
-		default:
+		if(TechSoftFileParserImpl::CheckIfNameExists(MetaData))
 		{
-			FString* Name = MetaData.Find(TEXT("Name"));
-			FString* OriginalName = MetaData.Find(TEXT("OriginalName"));
-			FString* PartNumber = MetaData.Find(TEXT("PartNumber"));
-			FString* TechSoftName = MetaData.Find(TEXT("SDKName"));
-
-			if (!OriginalName && !PartNumber && TechSoftName)
-			{
-				FString OriginalNameStr = TechSoftFileParserImpl::GetOriginalName(*TechSoftName);
-
-				if (EntityType == EComponentType::Body)
-				{
-					switch (Format)
-					{
-					case ECADFormat::CATIA:
-						OriginalNameStr = TechSoftFileParserImpl::GetCatiaBodyOriginalName(OriginalNameStr);
-						break;
-
-					case ECADFormat::CREO:
-						OriginalNameStr = TechSoftFileParserImpl::GetCreoBodyOriginalName(OriginalNameStr);
-						break;
-
-					default:
-						break;
-					}
-				}
-
-				MetaData.Emplace(TEXT("OriginalName"), OriginalNameStr);
-				OriginalName = MetaData.Find(TEXT("OriginalName"));
-			}
-
-			if (PartNumber)
-			{
-				MetaData.Emplace(TEXT("Name"), *PartNumber);
-			}
-			else if (OriginalName)
-			{
-				MetaData.Emplace(TEXT("Name"), *OriginalName);
-			}
-
-			Name = MetaData.Find(TEXT("Name"));
-			if (!OriginalName && Name)
-			{
-				MetaData.Emplace(TEXT("OriginalName"), *Name);
-			}
+			return;
 		}
-		break;
+
+		if (TechSoftFileParserImpl::ReplaceOrAddNameValue(MetaData, TEXT("PartNumber")))
+		{
+			return;
 		}
+
+		NamePtr = MetaData.Find(TEXT("SDKName"));
+		if (NamePtr != nullptr)
+		{
+			FString SdkName = *NamePtr;
+
+			switch (Format)
+			{
+			case ECADFormat::CATIA_3DXML:
+				SdkName = TechSoftFileParserImpl::Clean3dxmlReferenceSdkName(SdkName);
+				break;
+
+			case ECADFormat::SOLIDWORKS:
+				SdkName = TechSoftFileParserImpl::CleanSwReferenceSdkName(SdkName);
+				break;
+
+			default:
+				break;
+			}
+
+			FString& Name = MetaData.FindOrAdd(TEXT("Name"));
+			Name = SdkName;
+			return;
+		}
+	}
+
+	void FTechSoftFileParser::BuildInstanceName(TMap<FString, FString>& MetaData)
+	{
+		if (MetaData.IsEmpty())
+		{
+			return;
+		}
+
+		if (TechSoftFileParserImpl::ReplaceOrAddNameValue(MetaData, TEXT("InstanceName")))
+		{
+			return;
+		}
+
+		if (TechSoftFileParserImpl::CheckIfNameExists(MetaData))
+		{
+			return;
+		}
+
+		FString* NamePtr = MetaData.Find(TEXT("SDKName"));
+		if (NamePtr != nullptr)
+		{
+			FString SdkName = *NamePtr;
+
+			switch (Format)
+			{
+			case ECADFormat::CATIA:
+			case ECADFormat::CATIA_3DXML:
+				SdkName = TechSoftFileParserImpl::CleanCatiaInstanceSdkName(SdkName);
+				break;
+
+			case ECADFormat::SOLIDWORKS:
+				SdkName = TechSoftFileParserImpl::CleanSwInstanceSdkName(SdkName);
+				break;
+
+			default:
+				break;
+			}
+
+			FString& Name = MetaData.FindOrAdd(TEXT("Name"));
+			Name = SdkName;
+			return;
+		}
+
+		if (TechSoftFileParserImpl::ReplaceOrAddNameValue(MetaData, TEXT("PartNumber")))
+		{
+			return;
+		}
+
+	}
+
+	void FTechSoftFileParser::BuildPartName(TMap<FString, FString>& MetaData)
+	{
+		if (MetaData.IsEmpty())
+		{
+			return;
+		}
+
+		if (TechSoftFileParserImpl::CheckIfNameExists(MetaData))
+		{
+			return;
+		}
+
+		if (TechSoftFileParserImpl::ReplaceOrAddNameValue(MetaData, TEXT("PartNumber")))
+		{
+			return;
+		}
+
+		if (TechSoftFileParserImpl::ReplaceOrAddNameValue(MetaData, TEXT("SDKName")))
+		{
+			return;
+		}
+	}
+
+	void FTechSoftFileParser::BuildBodyName(TMap<FString, FString>& MetaData)
+	{
+		if (MetaData.IsEmpty())
+		{
+			return;
+		}
+
+		if (TechSoftFileParserImpl::CheckIfNameExists(MetaData))
+		{
+			return;
+		}
+
+		FString* NamePtr = MetaData.Find(TEXT("SDKName"));
+		if (NamePtr != nullptr)
+		{
+			FString SdkName = *NamePtr;
+			if (Format == ECADFormat::CREO)
+			{
+				SdkName = TechSoftFileParserImpl::CleanNameByRemoving_prt(SdkName);
+			}
+
+			FString& Name = MetaData.FindOrAdd(TEXT("Name"));
+			Name = SdkName;
+			return;
+		}
+
+		MetaData.Add(TEXT("Name"), TEXT("NoName"));
 	}
 
 	void FTechSoftFileParser::TraverseSpecificMetaData(const A3DAsmProductOccurrence* Occurrence, FEntityMetaData& OutMetaData)
