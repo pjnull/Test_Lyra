@@ -1237,6 +1237,9 @@ private:
 	/**  Previously constructed object in the callstack */
 	UObject* LastConstructedObject = nullptr;
 
+	/** Callback for custom property initialization before PostInitProperties gets called */
+	TFunction<void()> PropertyInitCallback;
+
 	friend struct FStaticConstructObjectParameters;
 
 #if WITH_EDITORONLY_DATA
@@ -1288,6 +1291,9 @@ struct FStaticConstructObjectParameters
 
 	/** Assign an external Package to the created object if non-null */
 	UPackage* ExternalPackage = nullptr;
+
+	/** Callback for custom code to initialize properties before PostInitProperties runs */
+	TFunction<void()> PropertyInitCallback;
 
 private:
 	FObjectInitializer::FOverrides* SubobjectOverrides = nullptr;

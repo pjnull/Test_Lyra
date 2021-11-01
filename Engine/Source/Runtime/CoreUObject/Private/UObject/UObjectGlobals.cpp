@@ -2765,6 +2765,7 @@ FObjectInitializer::FObjectInitializer()
 	, bCopyTransientsFromClassDefaults(false)
 	, bShouldInitializePropsFromArchetype(false)
 	, InstanceGraph(nullptr)
+	, PropertyInitCallback([](){})
 {
 	Construct_Internal();
 }	
@@ -2775,6 +2776,7 @@ FObjectInitializer::FObjectInitializer(UObject* InObj, const FStaticConstructObj
 	, bCopyTransientsFromClassDefaults(StaticConstructParams.bCopyTransientsFromClassDefaults)
 	, bShouldInitializePropsFromArchetype(true)
 	, InstanceGraph(StaticConstructParams.InstanceGraph)
+	, PropertyInitCallback(StaticConstructParams.PropertyInitCallback)
 {
 	if (StaticConstructParams.SubobjectOverrides)
 	{
@@ -2791,6 +2793,7 @@ FObjectInitializer::FObjectInitializer(UObject* InObj, UObject* InObjectArchetyp
 	, bCopyTransientsFromClassDefaults(!!(InOptions & EObjectInitializerOptions::CopyTransientsFromClassDefaults))
 	, bShouldInitializePropsFromArchetype(!!(InOptions & EObjectInitializerOptions::InitializeProperties))
 	, InstanceGraph(InInstanceGraph)
+	, PropertyInitCallback([](){})
 {
 	Construct_Internal();
 }
@@ -2853,17 +2856,12 @@ FObjectInitializer::~FObjectInitializer()
 	}
 #endif // WITH_EDITORONLY_DATA
 
+	FUObjectThreadContext& ThreadContext = FUObjectThreadContext::Get();
+
 #if USE_CIRCULAR_DEPENDENCY_LOAD_DEFERRING
-	// if we're not at the top of ObjectInitializers, then this is most 
-	// likely a deferred FObjectInitializer that's a copy of one that was used 
-	// in a constructor (that has already been popped)
 	if (!bIsDeferredInitializer)
 	{
 #endif // USE_CIRCULAR_DEPENDENCY_LOAD_DEFERRING
-		FUObjectThreadContext& ThreadContext = FUObjectThreadContext::Get();
-		check(ThreadContext.TopInitializer() == this);
-		ThreadContext.PopInitializer();
-		
 		// Let the FObjectFinders know we left the constructor.
 		ThreadContext.IsInConstructor--;
 		check(ThreadContext.IsInConstructor >= 0);
@@ -2921,6 +2919,19 @@ FObjectInitializer::~FObjectInitializer()
 #endif // USE_CIRCULAR_DEPENDENCY_LOAD_DEFERRING
 	{
 		PostConstructInit();
+	}
+
+#if USE_CIRCULAR_DEPENDENCY_LOAD_DEFERRING
+	// if we're not at the top of ObjectInitializers, then this is most 
+	// likely a deferred FObjectInitializer that's a copy of one that was used 
+	// in a constructor (that has already been popped)
+	// We're not popping this initializer from the stack in the same place where we decrement IsInConstructor
+	// because we still want to be able to access the current initializer from PostConstructInit or any of its callbacks
+	if (!bIsDeferredInitializer)
+	{
+#endif // USE_CIRCULAR_DEPENDENCY_LOAD_DEFERRING		
+		check(ThreadContext.TopInitializer() == this);
+		ThreadContext.PopInitializer();
 	}
 }
 
@@ -3063,6 +3074,12 @@ void FObjectInitializer::PostConstructInit()
 	if (bNeedInstancing || bNeedSubobjectInstancing)
 	{
 		InstanceSubobjects(Class, bNeedInstancing, bNeedSubobjectInstancing);
+	}
+
+	// Allow custom property initialization to happen before PostInitProperties is called
+	if (PropertyInitCallback)
+	{
+		PropertyInitCallback();
 	}
 
 	// Make sure subobjects knows that they had their properties overwritten
