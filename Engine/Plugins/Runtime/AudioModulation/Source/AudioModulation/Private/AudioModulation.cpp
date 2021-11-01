@@ -6,14 +6,16 @@
 #include "CanvasTypes.h"
 #include "Features/IModularFeatures.h"
 #include "IAudioModulation.h"
+#include "MetasoundDataTypeRegistrationMacro.h"
 #include "Modules/ModuleManager.h"
 #include "SoundControlBusMix.h"
+#include "SoundModulationParameter.h"
 #include "SoundModulationPatch.h"
-#include "UnrealClient.h"
+#include "SoundModulatorAsset.h"
 
 
-DEFINE_STAT(STAT_AudioModulationProcessControls);
-DEFINE_STAT(STAT_AudioModulationProcessModulators);
+REGISTER_METASOUND_DATATYPE(AudioModulation::FSoundModulatorAsset, "Modulator", Metasound::ELiteralType::UObjectProxy, USoundModulatorBase);
+REGISTER_METASOUND_DATATYPE(AudioModulation::FSoundModulationParameterAsset, "ModulationParameter", Metasound::ELiteralType::UObjectProxy, USoundModulationParameter);
 
 namespace AudioModulation
 {
@@ -174,7 +176,6 @@ namespace AudioModulation
 
 	void FAudioModulation::ProcessModulators(const double InElapsed)
 	{
-		SCOPE_CYCLE_COUNTER(STAT_AudioModulationProcessModulators);
 		ModSystem->ProcessModulators(InElapsed);
 	}
 
@@ -191,6 +192,11 @@ namespace AudioModulation
 	bool FAudioModulation::GetModulatorValue(const Audio::FModulatorHandle& ModulatorHandle, float& OutValue) const
 	{
 		return ModSystem->GetModulatorValue(ModulatorHandle, OutValue);
+	}
+
+	bool FAudioModulation::GetModulatorValueThreadSafe(const Audio::FModulatorHandle& ModulatorHandle, float& OutValue) const
+	{
+		return ModSystem->GetModulatorValueThreadSafe(ModulatorHandle, OutValue);
 	}
 
 	void FAudioModulation::UnregisterModulator(const Audio::FModulatorHandle& InHandle)
