@@ -99,7 +99,7 @@ void SDetailsView::Construct(const FArguments& InArgs, const FDetailsViewArgs& I
 				FIsActionChecked::CreateSP( this, &SDetailsView::IsShowOnlyModifiedChecked )
 			),
 			NAME_None,
-			EUserInterfaceActionType::ToggleButton 
+			EUserInterfaceActionType::Check 
 		);
 	}
 
@@ -117,7 +117,7 @@ void SDetailsView::Construct(const FArguments& InArgs, const FDetailsViewArgs& I
 				FIsActionChecked::CreateSP(this, &SDetailsView::IsCustomFilterChecked)
 			),
 			NAME_None,
-			EUserInterfaceActionType::ToggleButton
+			EUserInterfaceActionType::Check
 		);
 	}
 
@@ -133,7 +133,7 @@ void SDetailsView::Construct(const FArguments& InArgs, const FDetailsViewArgs& I
 				FIsActionChecked::CreateSP(this, &SDetailsView::IsShowOnlyAllowedChecked)
 			),
 			NAME_None,
-			EUserInterfaceActionType::ToggleButton
+			EUserInterfaceActionType::Check
 		);
 	}
 
@@ -149,7 +149,7 @@ void SDetailsView::Construct(const FArguments& InArgs, const FDetailsViewArgs& I
 				FIsActionChecked::CreateSP(this, &SDetailsView::IsShowKeyableChecked)
 			),
 			NAME_None,
-			EUserInterfaceActionType::ToggleButton 
+			EUserInterfaceActionType::Check
 		);
 	}
 
@@ -165,7 +165,7 @@ void SDetailsView::Construct(const FArguments& InArgs, const FDetailsViewArgs& I
 				FIsActionChecked::CreateSP(this, &SDetailsView::IsShowAnimatedChecked)
 			),
 			NAME_None,
-			EUserInterfaceActionType::ToggleButton
+			EUserInterfaceActionType::Check
 		);
 	}
 
@@ -179,7 +179,7 @@ void SDetailsView::Construct(const FArguments& InArgs, const FDetailsViewArgs& I
 		FIsActionChecked::CreateSP( this, &SDetailsView::IsShowAllAdvancedChecked )
 			),
 		NAME_None,
-		EUserInterfaceActionType::ToggleButton 
+		EUserInterfaceActionType::Check
 	);
 
 	if (DetailsViewArgs.bShowHiddenPropertiesWhilePlayingOption)
@@ -194,7 +194,7 @@ void SDetailsView::Construct(const FArguments& InArgs, const FDetailsViewArgs& I
 				FIsActionChecked::CreateSP(this, &SDetailsView::IsShowHiddenPropertiesWhilePlayingChecked)
 			),
 			NAME_None,
-			EUserInterfaceActionType::ToggleButton
+			EUserInterfaceActionType::Check
 		);
 	}
 
@@ -208,7 +208,7 @@ void SDetailsView::Construct(const FArguments& InArgs, const FDetailsViewArgs& I
 			FIsActionChecked::CreateSP( this, &SDetailsView::IsShowAllChildrenIfCategoryMatchesChecked )
 		),
 		NAME_None,
-		EUserInterfaceActionType::ToggleButton 
+		EUserInterfaceActionType::Check
 	);
 
 	DetailViewOptions.AddMenuEntry(
@@ -221,7 +221,7 @@ void SDetailsView::Construct(const FArguments& InArgs, const FDetailsViewArgs& I
 			FIsActionChecked::CreateSP(this, &SDetailsView::IsShowSectionsChecked)
 		),
 		NAME_None,
-		EUserInterfaceActionType::ToggleButton 
+		EUserInterfaceActionType::Check
 	);		
 
 	DetailViewOptions.AddMenuEntry(
