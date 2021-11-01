@@ -762,7 +762,7 @@ void FDataLayerMode::RegisterContextMenu()
 
 			SSceneOutliner* SceneOutliner = Context->SceneOutliner.Pin().Get();
 			TArray<UDataLayer*> SelectedDataLayers = GetSelectedDataLayers(SceneOutliner);
-			const bool bSelectedDataLayersContainsLocked = !!SelectedDataLayers.FindByPredicate([&](const UDataLayer* DataLayer) { return DataLayer->IsLocked(); });
+			const bool bSelectedDataLayersContainsLocked = !!SelectedDataLayers.FindByPredicate([](const UDataLayer* DataLayer) { return DataLayer->IsLocked(); });
 
 			TArray<const UDataLayer*> AllDataLayers;
 			if (const AWorldDataLayers* WorldDataLayers = RepresentingWorld.IsValid() ? RepresentingWorld->GetWorldDataLayers() : nullptr)
@@ -778,7 +778,7 @@ void FDataLayerMode::RegisterContextMenu()
 				FToolMenuSection& Section = InMenu->AddSection("DataLayers", LOCTEXT("DataLayers", "Data Layers"));
 				Section.AddMenuEntry("CreateEmptyDataLayer", LOCTEXT("CreateEmptyDataLayer", "Create Empty Data Layer"), FText(), FSlateIcon(),
 					FUIAction(
-						FExecuteAction::CreateLambda([&]()
+						FExecuteAction::CreateLambda([this]()
 						{
 							const FScopedDataLayerTransaction Transaction(LOCTEXT("CreateEmptyDataLayer", "Create Empty Data Layer"), RepresentingWorld.Get());
 							const UDataLayer* ParentDataLayer = (SelectedDataLayersSet.Num() == 1) ? SelectedDataLayersSet.CreateIterator()->Get() : nullptr;
@@ -801,7 +801,7 @@ void FDataLayerMode::RegisterContextMenu()
 
 				Section.AddMenuEntry("AddSelectedActorsToNewDataLayer", LOCTEXT("AddSelectedActorsToNewDataLayer", "Add Selected Actors to New Data Layer"), FText(), FSlateIcon(),
 					FUIAction(
-						FExecuteAction::CreateLambda([&]() {
+						FExecuteAction::CreateLambda([this]() {
 							const FScopedDataLayerTransaction Transaction(LOCTEXT("AddSelectedActorsToNewDataLayer", "Add Selected Actors to New Data Layer"), RepresentingWorld.Get());
 							if (UDataLayer* NewDataLayer = DataLayerEditorSubsystem->CreateDataLayer())
 							{
@@ -812,13 +812,13 @@ void FDataLayerMode::RegisterContextMenu()
 
 				Section.AddMenuEntry("AddSelectedActorsToSelectedDataLayers", LOCTEXT("AddSelectedActorsToSelectedDataLayers", "Add Selected Actors to Selected Data Layers"), FText(), FSlateIcon(),
 					FUIAction(
-						FExecuteAction::CreateLambda([&]() {
+						FExecuteAction::CreateLambda([this,SelectedDataLayers]() {
 							check(!SelectedDataLayers.IsEmpty());
 							{
 								const FScopedDataLayerTransaction Transaction(LOCTEXT("AddSelectedActorsToSelectedDataLayers", "Add Selected Actors to Selected Data Layers"), RepresentingWorld.Get());
 								DataLayerEditorSubsystem->AddSelectedActorsToDataLayers(SelectedDataLayers);
 							}}),
-						FCanExecuteAction::CreateLambda([&] { return !SelectedDataLayers.IsEmpty() && GEditor->GetSelectedActorCount() > 0 && !bSelectedDataLayersContainsLocked; })
+						FCanExecuteAction::CreateLambda([SelectedDataLayers,bSelectedDataLayersContainsLocked] { return !SelectedDataLayers.IsEmpty() && GEditor->GetSelectedActorCount() > 0 && !bSelectedDataLayersContainsLocked; })
 					));
 
 				if (!SelectedDataLayerActors.IsEmpty())
@@ -863,29 +863,29 @@ void FDataLayerMode::RegisterContextMenu()
 
 				Section.AddMenuEntry("RemoveSelectedActorsFromSelectedDataLayers", LOCTEXT("RemoveSelectedActorsFromSelectedDataLayers", "Remove Selected Actors from Selected Data Layers"), FText(), FSlateIcon(),
 					FUIAction(
-						FExecuteAction::CreateLambda([&]() {
+						FExecuteAction::CreateLambda([this,SelectedDataLayers]() {
 							check(!SelectedDataLayers.IsEmpty());
 							{
 								const FScopedDataLayerTransaction Transaction(LOCTEXT("RemoveSelectedActorsFromSelectedDataLayers", "Remove Selected Actors from Selected Data Layers"), RepresentingWorld.Get());
 								DataLayerEditorSubsystem->RemoveSelectedActorsFromDataLayers(SelectedDataLayers);
 							}}),
-						FCanExecuteAction::CreateLambda([&] { return !SelectedDataLayers.IsEmpty() && GEditor->GetSelectedActorCount() > 0 && !bSelectedDataLayersContainsLocked; })
+						FCanExecuteAction::CreateLambda([SelectedDataLayers,bSelectedDataLayersContainsLocked] { return !SelectedDataLayers.IsEmpty() && GEditor->GetSelectedActorCount() > 0 && !bSelectedDataLayersContainsLocked; })
 					));
 
 				Section.AddMenuEntry("DeleteSelectedDataLayers", LOCTEXT("DeleteSelectedDataLayers", "Delete Selected Data Layers"), FText(), FSlateIcon(),
 					FUIAction(
-						FExecuteAction::CreateLambda([&]() {
+						FExecuteAction::CreateLambda([this,SelectedDataLayers]() {
 							check(!SelectedDataLayers.IsEmpty());
 							{
 								const FScopedDataLayerTransaction Transaction(LOCTEXT("DeleteSelectedDataLayers", "Delete Selected Data Layers"), RepresentingWorld.Get());
 								DataLayerEditorSubsystem->DeleteDataLayers(SelectedDataLayers);
 							}}),
-						FCanExecuteAction::CreateLambda([&] { return !SelectedDataLayers.IsEmpty() && !bSelectedDataLayersContainsLocked; })
+						FCanExecuteAction::CreateLambda([SelectedDataLayers,bSelectedDataLayersContainsLocked] { return !SelectedDataLayers.IsEmpty() && !bSelectedDataLayersContainsLocked; })
 					));
 
 				Section.AddMenuEntry("RenameSelectedDataLayer", LOCTEXT("RenameSelectedDataLayer", "Rename Selected Data Layer"), FText(), FSlateIcon(),
 					FUIAction(
-						FExecuteAction::CreateLambda([&]() {
+						FExecuteAction::CreateLambda([this,SceneOutliner,SelectedDataLayers]() {
 							if (SelectedDataLayers.Num() == 1)
 							{
 								FSceneOutlinerTreeItemPtr ItemToRename = SceneOutliner->GetTreeItem(SelectedDataLayers[0]);
@@ -895,7 +895,7 @@ void FDataLayerMode::RegisterContextMenu()
 									SceneOutliner->ScrollItemIntoView(ItemToRename);
 								}
 							}}),
-						FCanExecuteAction::CreateLambda([&] { return (SelectedDataLayers.Num() == 1) && !SelectedDataLayers[0]->IsLocked(); })
+						FCanExecuteAction::CreateLambda([SelectedDataLayers] { return (SelectedDataLayers.Num() == 1) && !SelectedDataLayers[0]->IsLocked(); })
 					));
 
 				Section.AddSeparator("SectionsSeparator");
@@ -906,36 +906,36 @@ void FDataLayerMode::RegisterContextMenu()
 
 				Section.AddMenuEntry("SelectActorsInDataLayers", LOCTEXT("SelectActorsInDataLayers", "Select Actors in Data Layers"), FText(), FSlateIcon(),
 					FUIAction(
-						FExecuteAction::CreateLambda([&]() {
+						FExecuteAction::CreateLambda([this,SelectedDataLayers]() {
 							check(!SelectedDataLayers.IsEmpty());
 							{
 								const FScopedDataLayerTransaction Transaction(LOCTEXT("SelectActorsInDataLayers", "Select Actors in Data Layers"), RepresentingWorld.Get());
 								GEditor->SelectNone(/*bNoteSelectionChange*/false, /*bDeselectBSPSurfs*/true);
 								DataLayerEditorSubsystem->SelectActorsInDataLayers(SelectedDataLayers, /*bSelect*/true, /*bNotify*/true, /*bSelectEvenIfHidden*/true);
 							}}),
-						FCanExecuteAction::CreateLambda([&] { return !SelectedDataLayers.IsEmpty(); })
+						FCanExecuteAction::CreateLambda([SelectedDataLayers] { return !SelectedDataLayers.IsEmpty(); })
 					));
 
 				Section.AddMenuEntry("AppendActorsToSelection", LOCTEXT("AppendActorsToSelection", "Append Actors in Data Layer to Selection"), FText(), FSlateIcon(),
 					FUIAction(
-						FExecuteAction::CreateLambda([&]() {
+						FExecuteAction::CreateLambda([this,SelectedDataLayers]() {
 							check(!SelectedDataLayers.IsEmpty());
 							{
 								const FScopedDataLayerTransaction Transaction(LOCTEXT("AppendActorsToSelection", "Append Actors in Data Layer to Selection"), RepresentingWorld.Get());
 								DataLayerEditorSubsystem->SelectActorsInDataLayers(SelectedDataLayers, /*bSelect*/true, /*bNotify*/true, /*bSelectEvenIfHidden*/true);
 							}}),
-						FCanExecuteAction::CreateLambda([&] { return !SelectedDataLayers.IsEmpty() && !bSelectedDataLayersContainsLocked; })
+						FCanExecuteAction::CreateLambda([SelectedDataLayers,bSelectedDataLayersContainsLocked] { return !SelectedDataLayers.IsEmpty() && !bSelectedDataLayersContainsLocked; })
 					));
 
 				Section.AddMenuEntry("DeselectActors", LOCTEXT("DeselectActors", "Deselect Actors in Data Layer"), FText(), FSlateIcon(),
 					FUIAction(
-						FExecuteAction::CreateLambda([&]() {
+						FExecuteAction::CreateLambda([this,SelectedDataLayers]() {
 							check(!SelectedDataLayers.IsEmpty());
 							{
 								const FScopedDataLayerTransaction Transaction(LOCTEXT("DeselectActors", "Deselect Actors in Data Layer"), RepresentingWorld.Get());
 								DataLayerEditorSubsystem->SelectActorsInDataLayers(SelectedDataLayers, /*bSelect*/false, /*bNotifySelectActors*/true);
 							}}),
-						FCanExecuteAction::CreateLambda([&] { return !SelectedDataLayers.IsEmpty(); })
+						FCanExecuteAction::CreateLambda([SelectedDataLayers] { return !SelectedDataLayers.IsEmpty(); })
 					));
 			}
 
@@ -944,24 +944,24 @@ void FDataLayerMode::RegisterContextMenu()
 
 				Section.AddMenuEntry("CollapseAllDataLayers", LOCTEXT("CollapseAllDataLayers", "Collapse All Data Layers"), FText(), FSlateIcon(),
 					FUIAction(
-						FExecuteAction::CreateLambda([&]() {
+						FExecuteAction::CreateLambda([SceneOutliner,SelectedDataLayers]() {
 							check(!SelectedDataLayers.IsEmpty());
 							{
 								GEditor->SelectNone(/*bNoteSelectionChange*/false, /*bDeselectBSPSurfs*/true);
 								SceneOutliner->CollapseAll();
 							}}),
-						FCanExecuteAction::CreateLambda([&] { return !SelectedDataLayers.IsEmpty(); })
+						FCanExecuteAction::CreateLambda([SelectedDataLayers] { return !SelectedDataLayers.IsEmpty(); })
 					));
 
 				Section.AddMenuEntry("ExpandAllDataLayers", LOCTEXT("ExpandAllDataLayers", "Expand All Data Layers"), FText(), FSlateIcon(),
 					FUIAction(
-						FExecuteAction::CreateLambda([&]() {
+						FExecuteAction::CreateLambda([SceneOutliner,SelectedDataLayers]() {
 							check(!SelectedDataLayers.IsEmpty());
 							{
 								GEditor->SelectNone(/*bNoteSelectionChange*/false, /*bDeselectBSPSurfs*/true);
 								SceneOutliner->ExpandAll();
 							}}),
-						FCanExecuteAction::CreateLambda([&] { return !SelectedDataLayers.IsEmpty(); })
+						FCanExecuteAction::CreateLambda([SelectedDataLayers] { return !SelectedDataLayers.IsEmpty(); })
 					));
 			}
 
@@ -970,13 +970,13 @@ void FDataLayerMode::RegisterContextMenu()
 
 				Section.AddMenuEntry("MakeAllDataLayersVisible", LOCTEXT("MakeAllDataLayersVisible", "Make All Data Layers Visible"), FText(), FSlateIcon(),
 					FUIAction(
-						FExecuteAction::CreateLambda([&]() {
+						FExecuteAction::CreateLambda([this,AllDataLayers]() {
 							check(!AllDataLayers.IsEmpty());
 							{
 								const FScopedDataLayerTransaction Transaction(LOCTEXT("MakeAllDataLayersVisible", "Make All Data Layers Visible"), RepresentingWorld.Get());
 								DataLayerEditorSubsystem->MakeAllDataLayersVisible();
 							}}),
-						FCanExecuteAction::CreateLambda([&] { return !AllDataLayers.IsEmpty(); })
+						FCanExecuteAction::CreateLambda([AllDataLayers] { return !AllDataLayers.IsEmpty(); })
 					));
 			}
 
@@ -985,13 +985,13 @@ void FDataLayerMode::RegisterContextMenu()
 
 				Section.AddMenuEntry("ResetDataLayerUserSettings", LOCTEXT("ResetDataLayerUserSettings", "Reset User Settings"), FText(), FSlateIcon(),
 					FUIAction(
-						FExecuteAction::CreateLambda([&]() {
+						FExecuteAction::CreateLambda([this,SelectedDataLayers]() {
 							check(!SelectedDataLayers.IsEmpty());
 							{
 								const FScopedDataLayerTransaction Transaction(LOCTEXT("ResetDataLayerUserSettings", "Reset User Settings"), RepresentingWorld.Get());
 								DataLayerEditorSubsystem->ResetUserSettings(SelectedDataLayers);
 							}}),
-						FCanExecuteAction::CreateLambda([&] { return !SelectedDataLayers.IsEmpty(); })
+						FCanExecuteAction::CreateLambda([SelectedDataLayers] { return !SelectedDataLayers.IsEmpty(); })
 					));
 			}
 		}));
