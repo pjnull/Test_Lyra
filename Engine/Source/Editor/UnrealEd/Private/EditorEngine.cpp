@@ -1046,7 +1046,8 @@ void UEditorEngine::Init(IEngineLoop* InEngineLoop)
 			TEXT("WorldPartitionEditor"),
 			TEXT("WorldPartitionHLODUtilities"),
 			TEXT("EditorConfig"),
-			TEXT("DerivedDataEditor")
+			TEXT("DerivedDataEditor"),
+			TEXT("CSVtoSVG"),
 		};
 
 		FScopedSlowTask ModuleSlowTask(UE_ARRAY_COUNT(ModuleNames));
