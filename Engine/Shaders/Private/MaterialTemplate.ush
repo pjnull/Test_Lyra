@@ -383,7 +383,7 @@ struct FMaterialPixelParameters
 #endif
 
 #if HAS_INSTANCE_LOCAL_TO_WORLD_PS
-	float4x4 InstanceLocalToWorld;
+	FLWCMatrix InstanceLocalToWorld;
 #endif
 #if HAS_INSTANCE_WORLD_TO_LOCAL_PS
 	FLWCInverseMatrix InstanceWorldToLocal;
