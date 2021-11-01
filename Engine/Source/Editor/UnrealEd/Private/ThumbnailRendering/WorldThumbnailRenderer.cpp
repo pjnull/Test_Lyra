@@ -10,12 +10,6 @@
 #include "Engine/LevelBounds.h"
 #include "ContentStreaming.h"
 
-namespace WorldThumbnailRenderer
-{
-	static int32 OverrideAllowWorldThumbnails = -1;
-	FAutoConsoleVariableRef CVarOverrideAllowWorldThumbnails(TEXT("WorldThumbnailRenderer.OverrideAllowWorldThumbnails"), OverrideAllowWorldThumbnails, TEXT("-1: No Override, 0: Override to false, 1: Override to true"), ECVF_Default);
-}
-
 UWorldThumbnailRenderer::UWorldThumbnailRenderer(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
@@ -27,7 +21,7 @@ UWorldThumbnailRenderer::UWorldThumbnailRenderer(const FObjectInitializer& Objec
 
 bool UWorldThumbnailRenderer::CanVisualizeAsset(UObject* Object)
 {
-	if ((WorldThumbnailRenderer::OverrideAllowWorldThumbnails != -1) ? (WorldThumbnailRenderer::OverrideAllowWorldThumbnails == 1) : bAllowWorldThumbnails)
+	if (bAllowWorldThumbnails)
 	{
 		UWorld* World = Cast<UWorld>(Object);
 		if (World && World->PersistentLevel)
