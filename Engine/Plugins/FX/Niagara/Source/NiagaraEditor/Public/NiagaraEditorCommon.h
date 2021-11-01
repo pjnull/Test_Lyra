@@ -3,7 +3,7 @@
 #pragma once
 
 #include "NiagaraCommon.h"
-#include "NiagaraEditorcommon.generated.h"
+#include "NiagaraEditorCommon.generated.h"
 
 NIAGARAEDITOR_API DECLARE_LOG_CATEGORY_EXTERN(LogNiagaraEditor, Log, All);
 

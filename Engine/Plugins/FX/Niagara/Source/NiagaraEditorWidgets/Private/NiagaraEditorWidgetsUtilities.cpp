@@ -528,7 +528,6 @@ UNiagaraStackFunctionInput* FNiagaraStackEditorWidgetsUtilities::FindTopMostPare
 	return CurrentTopMost;
 }
 
-PRAGMA_DISABLE_OPTIMIZATION
 TOptional<FFunctionInputSummaryViewKey> FNiagaraStackEditorWidgetsUtilities::GetSummaryViewInputKeyForFunctionInput(UNiagaraStackFunctionInput* FunctionInput)
 {
 	FGuid NodeGuid = FunctionInput->GetInputFunctionCallNode().NodeGuid;
