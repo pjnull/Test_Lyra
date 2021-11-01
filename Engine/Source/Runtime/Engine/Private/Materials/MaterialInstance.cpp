@@ -565,11 +565,11 @@ bool UMaterialInstance::UpdateParameters()
 
 		if (StaticParameters.bHasMaterialLayers && Parent)
 		{
-			const FMaterialLayersFunctions* ParentLayers = Parent->GetMaterialLayers();
-			if (ParentLayers)
+			FMaterialLayersFunctions ParentLayers;
+			if (Parent->GetMaterialLayers(ParentLayers))
 			{
 				TArray<int32> RemapLayerIndices;
-				if (StaticParameters.MaterialLayers.ResolveParent(*ParentLayers, RemapLayerIndices))
+				if (StaticParameters.MaterialLayers.ResolveParent(ParentLayers, RemapLayerIndices))
 				{
 					RemapLayerParameterIndicesArray(ScalarParameterValues, RemapLayerIndices);
 					RemapLayerParameterIndicesArray(VectorParameterValues, RemapLayerIndices);
@@ -1685,12 +1685,7 @@ void UMaterialInstance::GetStaticParameterValues(FStaticParameterSet& OutStaticP
 		}
 	}
 
-	const FMaterialLayersFunctions* Layers = GetMaterialLayers();
-	if (Layers)
-	{
-		OutStaticParameters.bHasMaterialLayers = true;
-		OutStaticParameters.MaterialLayers = *Layers;
-	}
+	OutStaticParameters.bHasMaterialLayers = GetMaterialLayers(OutStaticParameters.MaterialLayers);
 
 	// Custom parameters.
 	CustomStaticParametersGetters.Broadcast(OutStaticParameters, this);
@@ -2162,21 +2157,28 @@ void UMaterialInstance::CacheShadersForResources(EShaderPlatform ShaderPlatform,
 	}
 }
 
-const FMaterialLayersFunctions* UMaterialInstance::GetMaterialLayers(TMicRecursionGuard RecursionGuard) const
+bool UMaterialInstance::GetMaterialLayers(FMaterialLayersFunctions& OutLayers, TMicRecursionGuard RecursionGuard) const
 {
 	if (StaticParameters.bHasMaterialLayers)
 	{
-		return &StaticParameters.MaterialLayers;
+		OutLayers = StaticParameters.MaterialLayers;
+		return true;
 	}
+
 	if (Parent)
 	{
 		if (!RecursionGuard.Contains(this))
 		{
 			RecursionGuard.Set(this);
-			return Parent->GetMaterialLayers(RecursionGuard);
+			if (Parent->GetMaterialLayers(OutLayers, RecursionGuard))
+			{
+				// If we got layers from our parent, mark them as linked to our parent
+				OutLayers.LinkAllLayersToParent();
+				return true;
+			}
 		}
 	}
-	return nullptr;
+	return false;
 }
 
 bool UMaterialInstance::GetTerrainLayerWeightParameterValue(const FHashedMaterialParameterInfo& ParameterInfo, int32& OutWeightmapIndex, FGuid &OutExpressionGuid) const
@@ -3315,20 +3317,24 @@ void UMaterialInstance::UpdateCachedLayerParameters()
 			ParentInstance = Cast<UMaterialInstance>(Parent);
 		}
 
-		const FMaterialLayersFunctions* Layers = GetMaterialLayers();
-		const FMaterialLayersFunctions* ParentLayers = Parent ? Parent->GetMaterialLayers() : nullptr;
-
-		if (Layers)
+		FMaterialLayersFunctions Layers;
+		const bool bHasLayers = GetMaterialLayers(Layers);
+		if (bHasLayers)
 		{
 			FMaterialCachedExpressionContext Context;
-			CachedExpressionData.UpdateForLayerFunctions(Context, *Layers);
+			CachedExpressionData.UpdateForLayerFunctions(Context, Layers);
 		}
 
 		if (!CachedData)
 		{
 			CachedData = new FMaterialInstanceCachedData();
 		}
-		CachedData->Initialize(MoveTemp(CachedExpressionData), Layers, ParentLayers);
+
+		FMaterialLayersFunctions ParentLayers;
+		const bool bParentHasLayers = Parent->GetMaterialLayers(ParentLayers);
+		CachedData->Initialize(MoveTemp(CachedExpressionData),
+			bHasLayers ? &Layers : nullptr,
+			bParentHasLayers ? &ParentLayers : nullptr);
 		if (Resource)
 		{
 			Resource->GameThread_UpdateCachedData(*CachedData);

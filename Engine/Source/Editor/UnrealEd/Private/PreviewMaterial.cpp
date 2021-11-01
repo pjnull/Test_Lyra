@@ -328,13 +328,15 @@ void UMaterialEditorPreviewParameters::RegenerateArrays()
 		}
 
 		// Static Material Layers
-		const FMaterialLayersFunctions* MaterialLayers = ParentMaterial->GetMaterialLayers();
-		if (MaterialLayers)
 		{
-			UDEditorMaterialLayersParameterValue* ParameterValue = NewObject<UDEditorMaterialLayersParameterValue>(this);
-			ParameterValue->bOverride = true;
-			ParameterValue->ParameterValue = *MaterialLayers;
-			AssignParameterToGroup(ParameterValue, FName());
+			FMaterialLayersFunctions MaterialLayers;
+			if (ParentMaterial->GetMaterialLayers(MaterialLayers))
+			{
+				UDEditorMaterialLayersParameterValue* ParameterValue = NewObject<UDEditorMaterialLayersParameterValue>(this);
+				ParameterValue->bOverride = true;
+				ParameterValue->ParameterValue = MoveTemp(MaterialLayers);
+				AssignParameterToGroup(ParameterValue, FName());
+			}
 		}
 	}
 	// sort contents of groups
@@ -580,13 +582,15 @@ void UMaterialEditorInstanceConstant::RegenerateArrays()
 		SourceInstance->UpdateCachedLayerParameters();
 
 		// Need to get layer info first as other params are collected from layers
-		const FMaterialLayersFunctions* MaterialLayers = SourceInstance->GetMaterialLayers();
-		if (MaterialLayers)
 		{
-			UDEditorMaterialLayersParameterValue& ParameterValue = *(NewObject<UDEditorMaterialLayersParameterValue>(this));
-			ParameterValue.bOverride = true;
-			ParameterValue.ParameterValue = *MaterialLayers;
-			AssignParameterToGroup(&ParameterValue, FName());
+			FMaterialLayersFunctions MaterialLayers;
+			if (SourceInstance->GetMaterialLayers(MaterialLayers))
+			{
+				UDEditorMaterialLayersParameterValue& ParameterValue = *(NewObject<UDEditorMaterialLayersParameterValue>(this));
+				ParameterValue.bOverride = true;
+				ParameterValue.ParameterValue = MoveTemp(MaterialLayers);
+				AssignParameterToGroup(&ParameterValue, FName());
+			}
 		}
 
 		TMap<FMaterialParameterInfo, FMaterialParameterMetadata> ParameterValues;
