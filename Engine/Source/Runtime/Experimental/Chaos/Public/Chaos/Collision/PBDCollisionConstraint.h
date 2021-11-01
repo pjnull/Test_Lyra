@@ -421,6 +421,9 @@ namespace Chaos
 		
 		bool GetUseIncrementalCollisionDetection() const { return !bUseManifold || bUseIncrementalManifold; }
 
+		void SetNumActivePositionIterations(const int32 InNumActivePositionIterations) { NumActivePositionIterations = InNumActivePositionIterations; }
+		int32 GetNumActivePositionIterations() const { return NumActivePositionIterations; }
+
 		/**
 		 * @brief Clear the current and previous manifolds
 		*/
@@ -575,6 +578,8 @@ namespace Chaos
 		TArray<FManifoldPoint> PrevManifoldPoints;
 
 		bool bWasManifoldRestored;
+
+		int32 NumActivePositionIterations;
 	};
 
 
