@@ -2172,8 +2172,10 @@ bool UMaterialInstance::GetMaterialLayers(FMaterialLayersFunctions& OutLayers, T
 			RecursionGuard.Set(this);
 			if (Parent->GetMaterialLayers(OutLayers, RecursionGuard))
 			{
+#if WITH_EDITOR
 				// If we got layers from our parent, mark them as linked to our parent
 				OutLayers.LinkAllLayersToParent();
+#endif // WITH_EDITOR
 				return true;
 			}
 		}
