@@ -114,13 +114,11 @@ FText SDataLayerTreeLabel::GetDisplayText() const
 
 FText SDataLayerTreeLabel::GetTooltipText() const
 {
-	if (const UDataLayer* DataLayer = DataLayerPtr.Get())
+	if (const FSceneOutlinerTreeItemPtr TreeItem = TreeItemPtr.Pin())
 	{
-		FFormatNamedArguments Args;
-		Args.Add(TEXT("ID_Name"), LOCTEXT("CustomColumnMode_InternalName", "ID Name"));
-		Args.Add(TEXT("Name"), FText::FromName(DataLayer->GetFName()));
-		return FText::Format(LOCTEXT("DataLayerNameTooltip", "{ID_Name}: {Name}"), Args);
+		return FText::FromString(TreeItem->GetDisplayString());
 	}
+
 	return FText();
 }
 

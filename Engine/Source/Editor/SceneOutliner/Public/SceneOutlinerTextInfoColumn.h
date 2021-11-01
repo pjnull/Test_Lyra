@@ -10,7 +10,6 @@
 #include "Widgets/Views/STableRow.h"
 #include "SceneOutlinerPublicTypes.h"
 #include "ISceneOutlinerColumn.h"
-#include "SceneOutlinerActorInfoColumn.h"
 #include "Misc/CoreDelegates.h"
 
 class ISceneOutliner;
@@ -23,7 +22,7 @@ DECLARE_DELEGATE_RetVal_OneParam(FString, FGetTextForItem, const ISceneOutlinerT
 * A custom column for the SceneOutliner which is capable of displaying any text based information related to items
 * Note: Only has support for text, any other requirements should have a custom column made
 */
-class FTextInfoColumn : public ISceneOutlinerColumn
+class SCENEOUTLINER_API FTextInfoColumn : public ISceneOutlinerColumn
 {
 
 	public:

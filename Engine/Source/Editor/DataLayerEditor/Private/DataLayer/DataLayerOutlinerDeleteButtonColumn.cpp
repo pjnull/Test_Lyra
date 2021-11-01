@@ -17,7 +17,7 @@
 
 FName FDataLayerOutlinerDeleteButtonColumn::GetID()
 {
-	static FName DataLayeDeleteButton("Remove Actor From Data Layer");
+	static FName DataLayeDeleteButton("Remove Actor");
 	return DataLayeDeleteButton;
 }
 
