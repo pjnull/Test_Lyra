@@ -45,12 +45,12 @@ uint64 ErrorCodeValue(ErrorCodeType ErrorCode);
 
 // needs to be inside Online::V2::Errors namespace
 // define an error category
-#define ONLINE_ERROR_CATEGORY(Name, InSystem, Value, Description) \
+#define UE_ONLINE_ERROR_CATEGORY(Name, InSystem, Value, Description) \
 namespace ErrorCode { namespace Category { static constexpr int Name = Value; } }\
 namespace ErrorCode { namespace Category { static constexpr int Name##_System = UE::Online::Errors::ErrorCode::System::InSystem; } }  
 
 // reserve an error category range
-#define ONLINE_ERROR_CATEGORY_RANGE(Name, System, StartValue, EndValue, Description) \
+#define UE_ONLINE_ERROR_CATEGORY_RANGE(Name, System, StartValue, EndValue, Description) \
 namespace ErrorCode { namespace Category { \
     static constexpr Name##_Start = StartValue; \
     static constexpr Name##_End = EndValue; \
@@ -66,7 +66,7 @@ namespace ErrorCode { namespace Category { \
 	// - ErrorMessage: Message displayed in the log when this error is printed
 	// - ErrorText: End-User-facing message shown when this error occurs
 	// todo: Do we need to add a value in here to have a "System" other than "Engine"? Maybe we can tie this to the category?
-#define ONLINE_ERROR_INTERNAL(CategoryName, Name, ErrorCodeValue, ErrorMessage, ErrorText) \
+#define UE_ONLINE_ERROR_INTERNAL(CategoryName, Name, ErrorCodeValue, ErrorMessage, ErrorText) \
 	inline UE::Online::FOnlineError Name(const TOptional<UE::Online::FOnlineError>& Inner = TOptional<UE::Online::FOnlineError>()) \
 		{ \
 			TSharedPtr<UE::Online::FOnlineError, ESPMode::ThreadSafe> InnerPtr; \
@@ -77,15 +77,15 @@ namespace ErrorCode { namespace Category { \
 			return UE::Online::FOnlineError( ErrorCode::Create(UE::Online::Errors::ErrorCode::Category::CategoryName##_System, UE::Online::Errors::ErrorCode::Category::CategoryName, ErrorCodeValue), MakeShared<UE::Online::FOnlineErrorDetails, ESPMode::ThreadSafe>(ErrorMessage, ErrorText), InnerPtr); \
 		}
 
-#define ONLINE_ERROR(CategoryName, Name, ErrorCodeValue, ErrorMessage, ErrorText) \
+#define UE_ONLINE_ERROR(CategoryName, Name, ErrorCodeValue, ErrorMessage, ErrorText) \
     namespace ErrorCode { namespace CategoryName { static constexpr ErrorCodeType Name = Create(ErrorCodeValue, Category::CategoryName); } } \
 	namespace CategoryName { \
-		ONLINE_ERROR_INTERNAL(CategoryName, Name, ErrorCodeValue, ErrorMessage, ErrorText)\
+		UE_ONLINE_ERROR_INTERNAL(CategoryName, Name, ErrorCodeValue, ErrorMessage, ErrorText)\
 	}
 
 // Same as above except no namespace around the error, e.g. Errors::NotImplemented instead of Errors::OnlineServices::NotImplemented
-#define ONLINE_ERROR_COMMON(CategoryName, Name, ErrorCodeValue, ErrorMessage, ErrorText) \
+#define UE_ONLINE_ERROR_COMMON(CategoryName, Name, ErrorCodeValue, ErrorMessage, ErrorText) \
     namespace ErrorCode { namespace CategoryName { static constexpr ErrorCodeType Name = Create(ErrorCodeValue, Category::CategoryName); } } \
-	ONLINE_ERROR_INTERNAL(CategoryName, Name, ErrorCodeValue, ErrorMessage, ErrorText)
+	UE_ONLINE_ERROR_INTERNAL(CategoryName, Name, ErrorCodeValue, ErrorMessage, ErrorText)
 
 } /* namespace UE::Online::Errors */
