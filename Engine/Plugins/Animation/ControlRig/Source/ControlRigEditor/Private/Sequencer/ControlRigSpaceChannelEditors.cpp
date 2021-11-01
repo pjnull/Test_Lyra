@@ -294,15 +294,20 @@ FKeyHandle FControlRigSpaceChannelHelpers::SequencerKeyControlRigSpaceChannel(UC
 	EvaluateChannel(Channel, Time, ExistingValue);
 	EvaluateChannel(Channel, Time -1, PreviousValue);
 
+	TArray<FRigElementKey> BeforeKeys, AfterKeys;
+	Channel->GetUniqueSpaceList(&BeforeKeys);
+
 	FMovieSceneControlRigSpaceBaseKey Value = ExistingValue;
 
 	if (SpaceKey == RigHierarchy->GetWorldSpaceReferenceKey())
 	{
 		Value.SpaceType = EMovieSceneControlRigSpaceType::World;
+		Value.ControlRigElement = URigHierarchy::GetWorldSpaceReferenceKey();
 	}
 	else if (SpaceKey == RigHierarchy->GetDefaultParentKey())
 	{
 		Value.SpaceType = EMovieSceneControlRigSpaceType::Parent;
+		Value.ControlRigElement = RigHierarchy->GetFirstParent(ControlKey);
 	}
 	else
 	{
@@ -310,7 +315,7 @@ FKeyHandle FControlRigSpaceChannelHelpers::SequencerKeyControlRigSpaceChannel(UC
 		if (DefaultParent == SpaceKey)
 		{
 			Value.SpaceType = EMovieSceneControlRigSpaceType::Parent;
-
+			Value.ControlRigElement = DefaultParent;
 		}
 		else  //support all types
 		{
@@ -434,6 +439,8 @@ FKeyHandle FControlRigSpaceChannelHelpers::SequencerKeyControlRigSpaceChannel(UC
 		}
 		Sequencer->NotifyMovieSceneDataChanged(EMovieSceneDataChangeType::MovieSceneStructureItemAdded);
 
+		Channel->GetUniqueSpaceList(&AfterKeys);
+		Channel->BroadcastSpaceNoLongerUsed(BeforeKeys, AfterKeys);
 	}
 
 	return Handle;
