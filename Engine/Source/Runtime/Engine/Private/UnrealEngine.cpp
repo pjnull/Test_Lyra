@@ -15501,9 +15501,11 @@ void UEngine::CopyPropertiesForUnrelatedObjects(UObject* OldObject, UObject* New
 	FFindInstancedReferenceSubobjectHelper::Duplicate(OldObject, NewObject, ReferenceReplacementMap, ComponentsOnNewObject);
 
 	// Replace anything with an outer of the old object with NULL, unless it already has a replacement or is marked pending kill
-	ForEachObjectWithOuter(OldObject, [&ReferenceReplacementMap](UObject* ObjectInOuter)
+	// Also, if requested, leave pointers to instances of renewed classes intact, assuming we are in the midst of reinstancing, and those will be reinstanced
+	ForEachObjectWithOuter(OldObject, [&ReferenceReplacementMap, &Params](UObject* ObjectInOuter)
 	{
-		if (!ReferenceReplacementMap.Contains(ObjectInOuter))
+		if (!ReferenceReplacementMap.Contains(ObjectInOuter)
+			&& (!Params.bDontClearReferenceIfNewerClassExists || !ObjectInOuter->GetClass()->HasAnyClassFlags(CLASS_NewerVersionExists)))
 		{
 			ReferenceReplacementMap.Add(ObjectInOuter, nullptr);
 		}
