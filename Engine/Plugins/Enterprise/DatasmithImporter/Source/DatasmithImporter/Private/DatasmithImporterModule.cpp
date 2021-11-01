@@ -749,7 +749,7 @@ void FDatasmithImporterModule::SetupDatasmithContentDelegates()
 					return false;
 				}
 
-				return IDirectLinkExtensionModule::Get().GetManager()->SetAssetAutoReimport(Asset, bEnabled);
+				return IDirectLinkExtensionModule::Get().GetManager().SetAssetAutoReimport(Asset, bEnabled);
 			});
 		SetAssetAutoReimportHandle = SetAssetAutoReimport.GetHandle();
 		DatasmithContentEditorModule.RegisterSetAssetAutoReimportHandler(MoveTemp(SetAssetAutoReimport));
@@ -768,7 +768,7 @@ void FDatasmithImporterModule::SetupDatasmithContentDelegates()
 					return false;
 				}
 
-				TSharedPtr<FExternalSource> ExternalSource = IExternalSourceModule::Get().GetManager()->GetOrCreateExternalSource(SourceUri);
+				TSharedPtr<FExternalSource> ExternalSource = IExternalSourceModule::GetOrCreateExternalSource(SourceUri);
 				return ExternalSource && ExternalSource->IsAvailable();
 			});
 		IsAssetAutoReimportSupportedHandle = IsAssetAutoReimportAvailable.GetHandle();
@@ -788,7 +788,7 @@ void FDatasmithImporterModule::SetupDatasmithContentDelegates()
 					return false;
 				}
 
-				return IDirectLinkExtensionModule::Get().GetManager()->IsAssetAutoReimportEnabled(Asset);
+				return IDirectLinkExtensionModule::Get().GetManager().IsAssetAutoReimportEnabled(Asset);
 			});
 		IsAssetAutoReimportEnabledHandle = IsAssetAutoReimportEnabled.GetHandle();
 		DatasmithContentEditorModule.RegisterIsAssetAutoReimportEnabledHandler(MoveTemp(IsAssetAutoReimportEnabled));

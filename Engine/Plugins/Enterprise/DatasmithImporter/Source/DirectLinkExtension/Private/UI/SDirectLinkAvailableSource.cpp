@@ -190,7 +190,7 @@ namespace UE::DatasmithImporter
 
 	void SDirectLinkAvailableSource::GenerateDirectLinkExternalSourceInfos()
 	{
-		for (const TSharedRef<FDirectLinkExternalSource>& ExternalSource : IDirectLinkExtensionModule::Get().GetManager()->GetExternalSourceList())
+		for (const TSharedRef<FDirectLinkExternalSource>& ExternalSource : IDirectLinkExtensionModule::Get().GetManager().GetExternalSourceList())
 		{
 			DirectLinkExternalSourceInfos.Add(MakeShared<FDirectLinkExternalSourceInfo>(ExternalSource));
 		}
