@@ -577,10 +577,7 @@ namespace Chaos
 		{
 			FPBDCollisionConstraintContainerCookie& Cookie = CollisionConstraint->GetContainerCookie();
 
-			// If we hit this, the constraint was already added this tick
-			check(Cookie.LastUsedEpoch != Epoch);
-
-			// Destroy an contacts beyond the cull distance
+			// Destroy any contacts beyond the cull distance
 			// @todo(chaos): this should not be necessary - we should not create them in the first place
 			if (CollisionConstraint->GetPhi() > CollisionConstraint->GetCullDistance())
 			{
@@ -589,8 +586,17 @@ namespace Chaos
 			}
 
 			// Add the constraint to the active list and update its epoch
-			const int32 ConstraintIndex = Constraints.Add(CollisionConstraint);
-			Cookie.Update(ConstraintIndex, Epoch);
+			// but only if it has not already been added since we reset the constraints array.
+			// We may attempt to add again if an island is awoken by user interaction (for example)
+			// where islands get awoken at the start of the tick, before we have cleared the array
+			// and updated the epoch.
+			// @todo(chaos): this is messy - we should probably have a different path for pre-collision
+			// detection awakenings? Either way, it should be an error to try to Add() twice in the same Epoch
+			if (Cookie.LastUsedEpoch != Epoch)
+			{
+				const int32 ConstraintIndex = Constraints.Add(CollisionConstraint);
+				Cookie.Update(ConstraintIndex, Epoch);
+			}
 
 			// If this is a new contact, we must add it to the particle-shape-collision maps.
 			// This will be false when we are reactivating a collision from the previous frame (it would have been pulled from the maps)
