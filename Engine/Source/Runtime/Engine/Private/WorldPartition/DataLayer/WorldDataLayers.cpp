@@ -616,6 +616,27 @@ void AWorldDataLayers::PostLoad()
 	GetWorld()->SetWorldDataLayers(this);
 
 #if WITH_EDITOR
+	// Remove all Editor Data Layers when cooking or when in a game world
+	if (IsRunningCookCommandlet() || GetWorld()->IsGameWorld())
+	{
+		ForEachDataLayer([](UDataLayer* DataLayer)
+		{
+			DataLayer->ConditionalPostLoad();
+			return true;
+		});
+
+		TArray<UDataLayer*> EditorDataLayers;
+		ForEachDataLayer([&EditorDataLayers](UDataLayer* DataLayer)
+		{
+			if (DataLayer && !DataLayer->IsRuntime())
+			{
+				EditorDataLayers.Add(DataLayer);
+			}
+			return true;
+		});
+		RemoveDataLayers(EditorDataLayers);
+	}
+
 	// Setup defaults before overriding with user settings
 	for (UDataLayer* DataLayer : WorldDataLayers)
 	{
@@ -638,7 +659,7 @@ void AWorldDataLayers::PostLoad()
 		if (UDataLayer* DataLayer = const_cast<UDataLayer*>(GetDataLayerFromName(DataLayerName)))
 		{
 			DataLayer->SetIsLoadedInEditor(true, /*bFromUserChange*/false);
-}
+		}
 	}
 
 	bListedInSceneOutliner = true;
