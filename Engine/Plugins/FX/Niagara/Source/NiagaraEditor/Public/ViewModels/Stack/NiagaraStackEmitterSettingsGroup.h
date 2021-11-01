@@ -74,7 +74,7 @@ private:
 	TWeakObjectPtr<UNiagaraEmitter> Emitter;
 
 	UPROPERTY()
-	UNiagaraStackSummaryViewObject* FilteredObject;
+	TObjectPtr<UNiagaraStackSummaryViewObject> FilteredObject;
 };
 
 
