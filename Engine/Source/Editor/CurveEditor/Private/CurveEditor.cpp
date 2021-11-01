@@ -610,8 +610,20 @@ void FCurveEditor::ZoomToFitInternal(EAxisList::Type Axes, const TMap<FCurveMode
 		}
 		else
 		{
-			const float PanelWidth = WeakPanel.Pin()->GetViewContainerGeometry().GetLocalSize().Y;
-			double InputPercentage = FMath::Min(Settings->GetFrameInputPadding() / PanelWidth, 50.0); // Cannot pad more than half the width
+			TSharedPtr<SCurveEditorPanel> Panel = WeakPanel.Pin();
+			TSharedPtr<SCurveEditorView> View = WeakView.Pin();
+
+			int32 PanelWidth = 0;
+			if (Panel.IsValid())
+			{
+				PanelWidth = WeakPanel.Pin()->GetViewContainerGeometry().GetLocalSize().X;
+			}
+			else if (View.IsValid())
+			{
+				PanelWidth = View->GetViewSpace().GetPhysicalWidth();
+			}
+			
+			double InputPercentage = PanelWidth != 0 ? FMath::Min(Settings->GetFrameInputPadding() / (float)PanelWidth, 50.0) : 0.1; // Cannot pad more than half the width
 
 			const double MinInputZoom = InputSnapEnabledAttribute.Get() ? InputSnapRateAttribute.Get().AsInterval() : 0.00001;
 			const double InputPadding = FMath::Max((InputMax - InputMin) * InputPercentage, MinInputZoom);
@@ -640,8 +652,19 @@ void FCurveEditor::ZoomToFitInternal(EAxisList::Type Axes, const TMap<FCurveMode
 		}
 		else
 		{
-			const float PanelHeight = WeakPanel.Pin()->GetViewContainerGeometry().GetLocalSize().Y;
-			double OutputPercentage = FMath::Min(Settings->GetFrameOutputPadding() / PanelHeight, 50.0); // Cannot pad more than half the height
+			TSharedPtr<SCurveEditorPanel> Panel = WeakPanel.Pin();
+
+			int32 PanelHeight = 0;
+			if (Panel.IsValid())
+			{
+				PanelHeight = WeakPanel.Pin()->GetViewContainerGeometry().GetLocalSize().Y;
+			}
+			else 
+			{
+				PanelHeight = View->GetViewSpace().GetPhysicalHeight();
+			}
+
+			double OutputPercentage = PanelHeight != 0 ? FMath::Min(Settings->GetFrameOutputPadding() / (float)PanelHeight, 50.0) : 0.1; // Cannot pad more than half the height
 
 			constexpr double MinOutputZoom = 0.00001;
 			const double OutputPadding = FMath::Max((OutputMax - OutputMin) * OutputPercentage, MinOutputZoom);
