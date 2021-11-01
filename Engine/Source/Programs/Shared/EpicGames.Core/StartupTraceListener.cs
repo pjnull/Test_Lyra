@@ -12,7 +12,7 @@ using System.Reflection;
 using System.Diagnostics;
 using EpicGames.Core;
 
-namespace UnrealBuildBase
+namespace EpicGames.Core
 {
 	/// <summary>
 	/// Captures all log output during startup until a log file writer has been created
@@ -20,13 +20,6 @@ namespace UnrealBuildBase
 	public class StartupTraceListener : TraceListener
 	{
 		StringBuilder Buffer = new StringBuilder();
-
-		/// <summary>
-		/// Constructor
-		/// </summary>
-		public StartupTraceListener()
-		{
-		}
 
 		/// <summary>
 		/// Copy the contents of the buffered output to another trace listener

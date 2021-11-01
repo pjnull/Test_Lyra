@@ -119,23 +119,19 @@ namespace UnrealBuildTool
 				BaseLogFileName = FileReference.Combine(UnrealBuildTool.EngineProgramSavedDirectory, "UnrealBuildTool", "Log.txt").FullName;
 			}
 
-			// find the StartupTraceListener in the listeners that was added super early on
-			StartupTraceListener StartupListener = Trace.Listeners.OfType<StartupTraceListener>().First();
-
 			// Create the log file, and flush the startup listener to it
 			if (!Arguments.HasOption("-NoLog") && !Log.HasFileWriter())
 			{
-				FileReference LogFile = new FileReference(BaseLogFileName);
-				foreach(string LogSuffix in Arguments.GetValues("-LogSuffix="))
-				{
-					LogFile = LogFile.ChangeExtension(null) + "_" + LogSuffix + LogFile.GetExtension();
-				}
-
-				Log.TraceInformation($"Log will be written to {LogFile}");
-				TextWriterTraceListener LogTraceListener = Log.AddFileWriter("DefaultLogTraceListener", LogFile);
-				StartupListener.CopyTo(LogTraceListener);
+				Log.AddFileWriter("DefaultLogTraceListener", FileReference.FromString(BaseLogFileName));
 			}
-			Trace.Listeners.Remove(StartupListener);
+			else
+			{
+				IEnumerable<StartupTraceListener> StartupListeners = Trace.Listeners.OfType<StartupTraceListener>();
+				if (StartupListeners.Any())
+				{
+					Trace.Listeners.Remove(StartupListeners.First());
+				}
+			}
 
 			// Create the build configuration object, and read the settings
 			BuildConfiguration BuildConfiguration = new BuildConfiguration();

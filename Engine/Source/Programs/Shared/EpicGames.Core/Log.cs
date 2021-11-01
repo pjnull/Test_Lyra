@@ -12,7 +12,9 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using JetBrains.Annotations;
 using System.Buffers;
+using System.ComponentModel.Design;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace EpicGames.Core
 {
@@ -150,6 +152,19 @@ namespace EpicGames.Core
 		}
 
 		/// <summary>
+		/// When true, create a backup of any log file that would be overwritten by a new log
+		/// Log.txt will be backed up with its UTC creation time in the name e.g.
+		/// Log-backup-2021.10.29-19.53.17.txt
+		/// </summary>
+		public static bool BackupLogFiles = true;
+		
+		/// <summary>
+		/// The number of backups to be preserved - when there are more than this, the oldest backups will be deleted.
+		/// Backups will not be deleted if BackupLogFiles is false.
+		/// </summary>
+		public static int LogFileBackupCount = 10;
+		
+		/// <summary>
 		/// Path to the log file being written to. May be null.
 		/// </summary>
 		public static FileReference? OutputFile => DefaultLogger?.OutputFile;
@@ -161,13 +176,71 @@ namespace EpicGames.Core
 		private static HashSet<string> WriteOnceSet = new HashSet<string>();
 
 		/// <summary>
-		/// Adds a trace listener that writes to a log file
+		/// Adds a trace listener that writes to a log file.
+		/// If Log.DuplicateLogFiles is true, two files will be created - one with the requested name,
+		/// another with a timestamp appended before any extension.
+		/// If a StartupTraceListener was in use, this function will copy its captured data to the log file(s)
+		/// and remove the startup listener from the list of registered listeners.
 		/// </summary>
 		/// <param name="OutputFile">The file to write to</param>
 		/// <returns>The created trace listener</returns>
-		public static TextWriterTraceListener AddFileWriter(string Name, FileReference OutputFile)
+		public static void AddFileWriter(string Name, FileReference OutputFile)
 		{
-			return DefaultLogger.AddFileWriter(Name, OutputFile);
+			Log.TraceInformation($"Log file: {OutputFile}");
+
+			if (Log.BackupLogFiles && FileReference.Exists(OutputFile))
+			{
+				// before creating a new backup, cap the number of existing files
+				string FilenameWithoutExtension = OutputFile.GetFileNameWithoutExtension();
+				string Extension = OutputFile.GetExtension();
+
+				Regex BackupForm =
+					new Regex(FilenameWithoutExtension + @"-backup-\d\d\d\d\.\d\d\.\d\d-\d\d\.\d\d\.\d\d" + Extension);
+
+				foreach (FileReference OldBackup in DirectoryReference
+					.EnumerateFiles(OutputFile.Directory)
+					// find files that match the way that we name backup files
+					.Where(x => BackupForm.IsMatch(x.GetFileName()))
+					// sort them from newest to oldest
+					.OrderByDescending(x => x.GetFileName())
+					// skip the newest ones that are to be kept; -1 because we're about to create another backup.
+					.Skip(Log.LogFileBackupCount - 1))
+				{
+					Log.TraceLog($"Deleting old log file: {OldBackup}");
+					FileReference.Delete(OldBackup);
+				}
+
+				// Ensure that the backup gets a unique name, in the extremely unlikely case that UBT was run twice during
+				// the same second.
+				DateTime FileTime = File.GetCreationTimeUtc(OutputFile.FullName);
+					
+				FileReference BackupFile;
+				for (;;)
+				{
+					string Timestamp = $"{FileTime:yyyy.MM.dd-HH.mm.ss}";
+					BackupFile = FileReference.Combine(OutputFile.Directory,
+						$"{FilenameWithoutExtension}-backup-{Timestamp}{Extension}");
+					if (!FileReference.Exists(BackupFile))
+					{
+						break;
+					}
+
+					FileTime = FileTime.AddSeconds(1);
+				}
+
+				FileReference.Move(OutputFile, BackupFile);
+			}
+			
+			TextWriterTraceListener FirstTextWriter = DefaultLogger.AddFileWriter(Name, OutputFile);
+			
+			// find the StartupTraceListener in the listeners that was added early on
+			IEnumerable<StartupTraceListener> StartupListeners = Trace.Listeners.OfType<StartupTraceListener>();
+			if (StartupListeners.Any())
+			{
+				StartupTraceListener StartupListener = StartupListeners.First();
+				StartupListener.CopyTo(FirstTextWriter);
+				Trace.Listeners.Remove(StartupListener);
+			}
 		}
 
 		/// <summary>
@@ -806,6 +879,7 @@ namespace EpicGames.Core
 		/// <summary>
 		/// Adds a trace listener that writes to a log file
 		/// </summary>
+		/// <param name="Name">Listener name</param>
 		/// <param name="OutputFile">The file to write to</param>
 		/// <returns>The created trace listener</returns>
 		public TextWriterTraceListener AddFileWriter(string Name, FileReference OutputFile)
@@ -824,7 +898,7 @@ namespace EpicGames.Core
 			}
 			catch (Exception Ex)
 			{
-				throw new Exception(String.Format("Unable to open log file for writing ({0})", OutputFile), Ex);
+				throw new Exception($"Error while creating log file \"{OutputFile}\"", Ex);
 			}
 		}
 
