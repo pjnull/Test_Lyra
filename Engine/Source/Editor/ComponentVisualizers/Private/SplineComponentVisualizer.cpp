@@ -1149,12 +1149,15 @@ bool FSplineComponentVisualizer::HandleInputDelta(FEditorViewportClient* Viewpor
 
 				if (bAllowDuplication)
 				{
-					if (DuplicateDelay < MaxDuplicationDelay)
+					float SmallestGridSize = 1.0f;
+					const TArray<float>& PosGridSizes = GEditor->GetCurrentPositionGridArray();
+					if (PosGridSizes.IsValidIndex(0))
 					{
-						DuplicateDelay++;
-						DuplicateDelayAccumulatedDrag += DeltaTranslate;
+						SmallestGridSize = PosGridSizes[0];
 					}
-					else
+
+					// When grid size is set to a value other than the smallest grid size, do not delay duplication
+					if (DuplicateDelay >= MaxDuplicationDelay || GEditor->GetGridSize() > SmallestGridSize)
 					{
 						Drag += DuplicateDelayAccumulatedDrag;
 						DuplicateDelayAccumulatedDrag = FVector::ZeroVector;
@@ -1163,6 +1166,11 @@ bool FSplineComponentVisualizer::HandleInputDelta(FEditorViewportClient* Viewpor
 						bDuplicatingSplineKey = true;
 
 						DuplicateKeyForAltDrag(Drag);
+					}
+					else
+					{ 
+						DuplicateDelay++;
+						DuplicateDelayAccumulatedDrag += DeltaTranslate;
 					}
 				}
 				else
