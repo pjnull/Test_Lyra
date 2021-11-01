@@ -14,10 +14,9 @@ namespace Chaos
 	{
 		if(Geometry)
 		{
+			const int32 OldShapeNum = ShapesArray.Num();
 			if(const auto* Union = Geometry->template GetObject<FImplicitObjectUnion>())
 			{
-				const int32 OldShapeNum = ShapesArray.Num();
-
 				ShapesArray.SetNum(Union->GetObjects().Num());
 
 				for (int32 ShapeIndex = 0; ShapeIndex < ShapesArray.Num(); ++ShapeIndex)
@@ -34,7 +33,10 @@ namespace Chaos
 			else
 			{
 				ShapesArray.SetNum(1);
-				ShapesArray[0] = FPerShapeData::CreatePerShapeData(0);
+				if (OldShapeNum == 0)
+				{
+					ShapesArray[0] = FPerShapeData::CreatePerShapeData(0);
+				}
 				ShapesArray[0]->SetGeometry(Geometry);
 			}
 
