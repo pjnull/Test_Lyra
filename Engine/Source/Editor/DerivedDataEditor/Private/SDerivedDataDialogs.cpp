@@ -35,7 +35,6 @@ void SDerivedDataRemoteStoreDialog::Construct(const FArguments& InArgs)
 	this->ChildSlot
 	[
 		SNew(SVerticalBox)
-
 		+ SVerticalBox::Slot()
 		.AutoHeight()
 		.Padding(0, 20, 0, 0)
@@ -505,13 +504,34 @@ TSharedRef<SWidget> SDerivedDataResourceUsageDialog::GetGridPanel()
 
 void SDerivedDataCacheStatisticsDialog::Construct(const FArguments& InArgs)
 {
+	const float RowMargin = 0.0f;
+	const float TitleMargin = 10.0f;
+	const float ColumnMargin = 10.0f;
+	const FSlateColor TitleColour = FStyleColors::AccentWhite;
+	const FSlateFontInfo TitleFont = FCoreStyle::GetDefaultFontStyle("Bold", 10);
+
 	this->ChildSlot
 	[
 		SNew(SVerticalBox)
-
+		+ SVerticalBox::Slot()
+		.Padding(0, 20, 0, 0)
+		.AutoHeight()
+		[
+			SNew(SHorizontalBox)		
+			+SHorizontalBox::Slot()
+			.FillWidth(1.0f)
+			[
+				SNew(STextBlock)
+				.Margin(FMargin(ColumnMargin, RowMargin, 0.0f, TitleMargin))
+				.ColorAndOpacity(TitleColour)
+				.Font(TitleFont)
+				.Justification(ETextJustify::Left)
+				.Text( FText::FromString(GetDerivedDataCache()->GetGraphName()))
+			]		
+		]
 		+ SVerticalBox::Slot()
 		.AutoHeight()
-		.Padding(0, 20, 0, 0)
+		.Padding(0, 5, 0, 0)
 		.Expose(GridSlot)
 		[
 			GetGridPanel()
@@ -627,9 +647,12 @@ TSharedRef<SWidget> SDerivedDataCacheStatisticsDialog::GetGridPanel()
 
 	for (TSharedRef<const FDerivedDataCacheStatsNode> Node : LeafUsageStats)
 	{
-		FDerivedDataCacheUsageStats Stats;
-
 		const FDerivedDataBackendInterface* Backend = Node->GetBackendInterface();
+
+		if (Backend->GetDisplayName().Equals("Memory"))
+			continue;
+
+		FDerivedDataCacheUsageStats Stats;
 
 		if (Backend->IsWrapper())
 		{
@@ -651,9 +674,6 @@ TSharedRef<SWidget> SDerivedDataCacheStatisticsDialog::GetGridPanel()
 		const int64 TotalGets_Miss = Stats.GetStats.GetAccumulatedValueAnyThread(FCookStats::CallStats::EHitOrMiss::Miss, FCookStats::CallStats::EStatType::Counter);
 
 		const int64 TotalRequests = TotalGets_Hit + TotalGets_Miss;
-
-		if (Backend->GetDisplayName().Equals("Memory"))
-			continue;
 
 		Panel->AddSlot(0, Row)
 			.HAlign(HAlign_Left)

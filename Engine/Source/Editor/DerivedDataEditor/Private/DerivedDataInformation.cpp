@@ -219,10 +219,10 @@ void FDerivedDataInformation::UpdateRemoteCacheState()
 
 		if (EditorSettings)
 		{
-			if (DDCProjectSettings->RecommendEveryoneUseHordeStorage && GetHasHordeStorageCache()==false )
+			if (DDCProjectSettings->RecommendEveryoneUseHordeStorage && GetHasHordeStorageCache()==false && (FCString::Stricmp(GetDerivedDataCache()->GetGraphName(), TEXT("NoJupiter"))!=0))
 			{
 				RemoteCacheState = ERemoteCacheState::Warning;
-				RemoteCacheWarningMessage = FText(LOCTEXT("HordeStorageWarning", "You are using a DDC graph that does not support Horde Storage. Please disable any -ddc commandline overrides."));
+				RemoteCacheWarningMessage = FText(LOCTEXT("HordeStorageWarning", "It is recommended that you use a DDC graph that supports Horde Storage. Please check any -ddc commandline overrides."));
 			}
 			else if (DDCProjectSettings->RecommendEveryoneSetupAGlobalLocalDDCPath && EditorSettings->GlobalLocalDDCPath.Path.IsEmpty())
 			{
