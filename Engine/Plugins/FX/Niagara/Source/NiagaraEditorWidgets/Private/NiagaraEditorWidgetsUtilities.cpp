@@ -511,4 +511,31 @@ FString FNiagaraStackEditorWidgetsUtilities::StackEntryToStringForListDebug(UNia
 	return FString::Printf(TEXT("0x%08x - %s - %s"), StackEntry, *StackEntry->GetClass()->GetName(), *StackEntry->GetDisplayName().ToString());
 }
 
+UNiagaraStackFunctionInput* FNiagaraStackEditorWidgetsUtilities::FindTopMostParentFunctionInput(UNiagaraStackFunctionInput* FunctionInput)
+{
+	UNiagaraStackFunctionInput* CurrentTopMost = FunctionInput;
+	UObject* CurrentParent = FunctionInput->GetOuter();
+	while (CurrentParent)
+	{
+		if (CurrentParent->IsA<UNiagaraStackFunctionInput>())
+		{
+			CurrentTopMost = CastChecked<UNiagaraStackFunctionInput>(CurrentParent);
+		}
+		
+		CurrentParent = CurrentParent->GetOuter();
+	}
+
+	return CurrentTopMost;
+}
+
+PRAGMA_DISABLE_OPTIMIZATION
+TOptional<FFunctionInputSummaryViewKey> FNiagaraStackEditorWidgetsUtilities::GetSummaryViewInputKeyForFunctionInput(UNiagaraStackFunctionInput* FunctionInput)
+{
+	FGuid NodeGuid = FunctionInput->GetInputFunctionCallNode().NodeGuid;
+	TOptional<FGuid> VariableGuid = FunctionInput->GetMetadataGuid();
+	return VariableGuid.IsSet()
+		       ? FFunctionInputSummaryViewKey(NodeGuid, VariableGuid.GetValue())
+		       : TOptional<FFunctionInputSummaryViewKey>();
+}
+
 #undef LOCTEXT_NAMESPACE

@@ -31,6 +31,8 @@ protected:
 	void StackViewModelDataObjectChanged(TArray<UObject*> ChangedObjects, ENiagaraDataObjectChange ChangeType);
 	void FillTopContentBar();
 	void OnMaterialCompiled(class UMaterialInterface* MaterialInterface);
+
+	void CreateBottomSummaryExpander();
 private:
 	EVisibility GetIssueIconVisibility() const;
 	EVisibility GetEnabledCheckBoxVisibility() const;
@@ -59,6 +61,8 @@ private:
 	FReply OpenParentEmitter();
 	EVisibility GetOpenParentEmitterVisibility() const;
 
+	FText GetSummaryExpanderButtonText() const;
+	FReply OnSummaryExpanderClicked();
 private:
 	UNiagaraOverviewNode* OverviewStackNode;
 	UNiagaraStackViewModel* StackViewModel;
@@ -66,6 +70,7 @@ private:
 	TWeakPtr<FNiagaraEmitterHandleViewModel> EmitterHandleViewModelWeak;
 	/** The top content bar houses the isolate button and the thumbnails */
 	TSharedPtr<SHorizontalBox> TopContentBar;
+	TSharedPtr<SWidget> BottomSummaryExpander;
 
 	TArray<UNiagaraStackEntry*> PreviewStackEntries;
 	bool bIsHoveringThumbnail;
