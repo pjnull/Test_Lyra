@@ -5306,7 +5306,17 @@ void UCookOnTheFlyServer::ProcessAccessedIniSettings(const FConfigFile* Config, 
 	FString PlatformName;
 	bool bFoundPlatformName = false;
 
-	if (!GConfig->ContainsConfigFile(Config)) // If the ConfigFile is in GConfig, then it is the editor's config and is not platform specific
+	if (GConfig->ContainsConfigFile(Config))
+	{
+		// If the ConfigFile is in GConfig, then it is the editor's config and is not platform specific
+	}
+	else if (Config->bHasPlatformName)
+	{
+		// The platform that was passed to LoadExternalIniFile
+		PlatformName = Config->PlatformName;
+		bFoundPlatformName = !PlatformName.IsEmpty();
+	}
+	else
 	{
 		// For the config files not in GConfig, we assume they were loaded from LoadConfigFile, and we match these to a platform
 		// By looking for a platform-specific filepath in their SourceIniHierarchy.
