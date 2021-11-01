@@ -86,6 +86,8 @@ public:
 	virtual bool PathExists(const FString& PathToTest) const override;
 	virtual bool PathExists(const FName PathToTest) const override;
 	virtual void SearchAllAssets(bool bSynchronousSearch) override;
+	virtual bool IsSearchAllAssets() const override;
+	virtual bool IsSearchAsync() const override;
 	virtual void WaitForCompletion() override;
 	virtual void WaitForPackage(const FString& PackageName) override;
 	virtual void ScanPathsSynchronous(const TArray<FString>& InPaths, bool bForceRescan = false, bool bIgnoreDenyListScanFilters = false) override;

@@ -1050,6 +1050,18 @@ void UAssetRegistryImpl::SearchAllAssets(bool bSynchronousSearch)
 	Broadcast(EventContext);
 }
 
+bool UAssetRegistryImpl::IsSearchAllAssets() const
+{
+	FReadScopeLock InterfaceScopeLock(InterfaceLock);
+	return GuardedData.IsSearchAllAssets();
+}
+
+bool UAssetRegistryImpl::IsSearchAsync() const
+{
+	FReadScopeLock InterfaceScopeLock(InterfaceLock);
+	return GuardedData.IsInitialSearchStarted();
+}
+
 namespace UE::AssetRegistry
 {
 

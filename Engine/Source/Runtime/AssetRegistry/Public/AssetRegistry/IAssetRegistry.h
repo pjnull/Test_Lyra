@@ -435,6 +435,17 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "AssetRegistry")
 	virtual void SearchAllAssets(bool bSynchronousSearch) = 0;
 
+	/**
+	 * Whether SearchAllAssets has been called, or was auto-called at startup. When async (editor or cooking), if SearchAllAssets has ever been called,
+	 * any newly-mounted directory will be automatically searched.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "AssetRegistry")
+	virtual bool IsSearchAllAssets() const = 0;
+
+	/** Whether searching is done async (and was started at startup), or synchronously and on-demand, requiring ScanPathsSynchronous or SearchAllAssets. */
+	UFUNCTION(BlueprintCallable, Category = "AssetRegistry")
+	virtual bool IsSearchAsync() const = 0;
+
 	/** Wait for scan to be complete */
 	UFUNCTION(BlueprintCallable, Category = "AssetRegistry")
 	virtual void WaitForCompletion() = 0;

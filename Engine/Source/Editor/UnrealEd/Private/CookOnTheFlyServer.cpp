@@ -5953,46 +5953,35 @@ void UCookOnTheFlyServer::GenerateAssetRegistry()
 		UE_LOG(LogCook, Display, TEXT("Creating asset registry"));
 
 		ModifiedAssetFilenames.Reset();
-
-		// Perform a synchronous search of any .ini based asset paths (note that the per-game delegate may
-		// have already scanned paths on its own)
-		// We want the registry to be fully initialized when generating streaming manifests too.
-
-		// editor will scan asset registry automagically 
-		bool bCanDelayAssetregistryProcessing = IsRealtimeMode();
-
-		// if we are running in the editor we need the asset registry to be finished loaded before we process any iterative cook requests
-		bCanDelayAssetregistryProcessing &= !IsCookFlagSet(ECookInitializationFlags::Iterative);
-
-		if (!bCanDelayAssetregistryProcessing)
+		if (ShouldPopulateFullAssetRegistry())
 		{
+			// Trigger or waitfor completion the primary AssetRegistry scan.
+			// Additionally scan any cook-specific paths from ini
 			TArray<FString> ScanPaths;
-			if (ShouldPopulateFullAssetRegistry())
+			GConfig->GetArray(TEXT("AssetRegistry"), TEXT("PathsToScanForCook"), ScanPaths, GEngineIni);
+			AssetRegistry->ScanPathsSynchronous(ScanPaths);
+			if (AssetRegistry->IsSearchAsync() && AssetRegistry->IsSearchAllAssets())
 			{
-				GConfig->GetArray(TEXT("AssetRegistry"), TEXT("PathsToScanForCook"), ScanPaths, GEngineIni);
-			}
-			else if (IsCookingDLC())
-			{
-				ScanPaths.Add(FString::Printf(TEXT("/%s/"), *CookByTheBookOptions->DlcName));
-			}
-
-			if (ScanPaths.Num() > 0 && !AssetRegistry->IsLoadingAssets())
-			{
-				AssetRegistry->ScanPathsSynchronous(ScanPaths);
+				AssetRegistry->WaitForCompletion();
 			}
 			else
 			{
-				// This will flush the background gather if we're in the editor
-				AssetRegistry->SearchAllAssets(true);
+				AssetRegistry->SearchAllAssets(true /* bSynchronousSearch */);
 			}
+		}
+		else if (IsCookingDLC())
+		{
+			TArray<FString> ScanPaths;
+			ScanPaths.Add(FString::Printf(TEXT("/%s/"), *CookByTheBookOptions->DlcName));
+			AssetRegistry->ScanPathsSynchronous(ScanPaths);
+		}
 
 #if ASSET_REGISTRY_STATE_DUMPING_ENABLED
-			if (FParse::Param(FCommandLine::Get(), TEXT("DumpAssetRegistry")))
-			{
-				DumpAssetRegistryForCooker(AssetRegistry);
-			}
-#endif
+		if (FParse::Param(FCommandLine::Get(), TEXT("DumpAssetRegistry")))
+		{
+			DumpAssetRegistryForCooker(AssetRegistry);
 		}
+#endif
 
 		GetPackageNameCache().SetAssetRegistry(AssetRegistry);
 	}
