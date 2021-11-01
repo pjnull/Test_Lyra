@@ -1,3 +1,5 @@
+// Copyright Epic Games, Inc. All Rights Reserved.
+
 #ifdef NEW_DIRECTLINK_PLUGIN
 
 #include "CoreMinimal.h"
