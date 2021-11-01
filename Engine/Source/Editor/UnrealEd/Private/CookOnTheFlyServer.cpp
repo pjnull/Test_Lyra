@@ -64,6 +64,7 @@
 #include "Interfaces/ITargetPlatformManagerModule.h"
 #include "Interfaces/ITextureFormat.h"
 #include "Internationalization/Culture.h"
+#include "Internationalization/PackageLocalizationManager.h"
 #include "IPAddress.h"
 #include "LocalizationChunkDataGenerator.h"
 #include "Logging/MessageLog.h"
@@ -8634,12 +8635,15 @@ uint32 UCookOnTheFlyServer::FullLoadAndSave(uint32& CookedPackageCount)
 
 	ProcessedPackages.Empty();
 
-	// When saving concurrently, flush async loading since that is normally done internally in SavePackage
+	// When saving concurrently, before starting the concurrent saves, do tasks which are normally done in SavePackage that
+	// cannot be done from other threads or during FScopedSavingFlag in SavePackage.
 	if (bSaveConcurrent)
 	{
 		UE_LOG(LogCook, Display, TEXT("Flushing async loading..."));
 		UE_SCOPED_HIERARCHICAL_COOKTIMER(FullLoadAndSave_FlushAsyncLoading);
 		FlushAsyncLoading();
+
+		FPackageLocalizationManager::Get().ConditionalUpdateCache();
 	}
 
 	if (bSaveConcurrent)
