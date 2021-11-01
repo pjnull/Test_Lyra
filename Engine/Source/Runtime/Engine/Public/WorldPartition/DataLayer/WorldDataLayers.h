@@ -26,7 +26,8 @@ public:
 
 #if WITH_EDITOR
 	virtual bool ShouldLevelKeepRefIfExternal() const override { return true; }
-
+	virtual bool ShouldImport(FString* ActorPropString, bool IsMovingLevel) override { return false; }
+	virtual bool IsLockLocation() const { return true; }
 	virtual bool IsUserManaged() const override { return false; }
 
 	static AWorldDataLayers* Create(UWorld* World);
