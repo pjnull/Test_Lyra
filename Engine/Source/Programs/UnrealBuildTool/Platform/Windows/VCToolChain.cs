@@ -294,9 +294,6 @@ namespace UnrealBuildTool
 			{
 				Arguments.Add("/analyze");
 
-				// Don't cause analyze warnings to be errors
-				Arguments.Add("/analyze:WX-");
-
 				// Report functions that use a LOT of stack space. You can lower this value if you
 				// want more aggressive checking for functions that use a lot of stack memory.
 				Arguments.Add("/analyze:stacksize" + CompileEnvironment.AnalyzeStackSizeWarning);
