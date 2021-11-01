@@ -1151,10 +1151,10 @@ void FStarshipEditorStyle::FStyle::SetupGeneralStyles()
 
 	// DataLayer
 	{
-		Set("ClassIcon.DataLayer", new IMAGE_BRUSH("Icons/datalayer_16x", Icon16x16));
-		Set("DataLayer.Icon16x", new IMAGE_BRUSH("Icons/datalayer_16x", Icon16x16));
-		Set("DataLayer.LoadedInEditor", new IMAGE_BRUSH("Icons/datalayer_loaded_in_editor_16x", Icon16x16));
-		Set("DataLayer.Runtime", new IMAGE_BRUSH("Icons/datalayer_runtime_16x", Icon16x16));
+		Set("ClassIcon.DataLayer", new IMAGE_BRUSH_SVG("Icons/DataLayerEditor", Icon16x16));
+		Set("DataLayer.Editor", new IMAGE_BRUSH_SVG("Icons/DataLayerEditor", Icon16x16));
+		Set("DataLayer.Runtime", new IMAGE_BRUSH_SVG("Icons/DataLayerRuntime", Icon16x16));
+		Set("DataLayer.LoadedInEditor", new IMAGE_BRUSH_SVG("Icons/DataLayerLoadedInEditor", Icon16x16));
 		Set("DataLayerBrowser.DataLayerContentsQuickbarBackground", new CORE_BOX_BRUSH("Common/DarkGroupBorder", 4.f / 16.f));
 		Set("DataLayerBrowser.Actor.RemoveFromDataLayer", new IMAGE_BRUSH("Icons/Cross_12x", Icon12x12));
 		Set("DataLayerBrowserButton", FButtonStyle(Button)

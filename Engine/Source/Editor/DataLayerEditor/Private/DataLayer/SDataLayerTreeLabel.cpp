@@ -173,13 +173,14 @@ FSlateColor SDataLayerTreeLabel::GetForegroundColor() const
 			{
 				const UDataLayerSubsystem* DataLayerSubsystem = DataLayer->GetWorld()->GetSubsystem<UDataLayerSubsystem>();
 				EDataLayerRuntimeState State = DataLayerSubsystem->GetDataLayerEffectiveRuntimeState(DataLayer);
-				if (State == EDataLayerRuntimeState::Activated)
+				switch (State)
 				{
+				case EDataLayerRuntimeState::Activated:
 					return FColorList::LimeGreen;
-				}
-				else if (State == EDataLayerRuntimeState::Loaded)
-				{
+				case EDataLayerRuntimeState::Loaded:
 					return FColorList::NeonBlue;
+				case EDataLayerRuntimeState::Unloaded:
+					return FColorList::Red;
 				}
 			}
 			else

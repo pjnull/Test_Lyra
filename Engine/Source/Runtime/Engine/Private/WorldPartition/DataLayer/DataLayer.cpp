@@ -215,7 +215,7 @@ void UDataLayer::RemoveChild(UDataLayer* InDataLayer)
 
 const TCHAR* UDataLayer::GetDataLayerIconName() const
 {
-	return IsRuntime() ? TEXT("DataLayer.Runtime") : TEXT("DataLayer.Icon16x");
+	return IsRuntime() ? TEXT("DataLayer.Runtime") : TEXT("DataLayer.Editor");
 }
 
 void UDataLayer::SetDataLayerLabel(FName InDataLayerLabel)

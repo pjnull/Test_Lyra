@@ -22,7 +22,7 @@ FName FDataLayerOutlinerIsLoadedInEditorColumn::GetID()
 SHeaderRow::FColumn::FArguments FDataLayerOutlinerIsLoadedInEditorColumn::ConstructHeaderRowColumn()
 {
 	return SHeaderRow::Column(GetColumnID())
-		.FixedWidth(18.f)
+		.FixedWidth(24.f)
 		.HAlignHeader(HAlign_Center)
 		.VAlignHeader(VAlign_Center)
 		.HAlignCell(HAlign_Center)

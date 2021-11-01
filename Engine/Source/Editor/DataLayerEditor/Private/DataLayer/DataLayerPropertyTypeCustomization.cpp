@@ -156,7 +156,7 @@ const FSlateBrush* FDataLayerPropertyTypeCustomization::GetDataLayerIcon() const
 	const UDataLayer* DataLayer = GetDataLayerFromPropertyHandle(&PropertyAccessResult);
 	if (!DataLayer)
 	{
-		return FEditorStyle::GetBrush(TEXT("DataLayer.Icon16x"));
+		return FEditorStyle::GetBrush(TEXT("DataLayer.Editor"));
 	}
 	if (PropertyAccessResult == FPropertyAccess::MultipleValues)
 	{
