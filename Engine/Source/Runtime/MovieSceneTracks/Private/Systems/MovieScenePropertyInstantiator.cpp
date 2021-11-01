@@ -9,6 +9,11 @@
 #include "Systems/MovieScenePiecewiseFloatBlenderSystem.h"
 
 #include "Algo/IndexOf.h"
+#include "ProfilingDebugging/CountersTrace.h"
+
+DECLARE_CYCLE_STAT(TEXT("DiscoverInvalidatedProperties"), MovieSceneEval_DiscoverInvalidatedProperties, STATGROUP_MovieSceneECS);
+DECLARE_CYCLE_STAT(TEXT("ProcessInvalidatedProperties"), MovieSceneEval_ProcessInvalidatedProperties, STATGROUP_MovieSceneECS);
+DECLARE_CYCLE_STAT(TEXT("InitializePropertyMetaData"), MovieSceneEval_InitializePropertyMetaData, STATGROUP_MovieSceneECS);
 
 UMovieScenePropertyInstantiatorSystem::UMovieScenePropertyInstantiatorSystem(const FObjectInitializer& ObjInit)
 	: Super(ObjInit)
@@ -93,6 +98,8 @@ void UMovieScenePropertyInstantiatorSystem::DiscoverInvalidatedProperties(TBitAr
 {
 	using namespace UE::MovieScene;
 
+	MOVIESCENE_DETAILED_SCOPE_CYCLE_COUNTER(MovieSceneEval_DiscoverInvalidatedProperties);
+
 	TBitArray<> InvalidatedProperties;
 
 	TArrayView<const FPropertyDefinition> Properties = this->BuiltInComponents->PropertyRegistry.GetProperties();
@@ -169,6 +176,8 @@ void UMovieScenePropertyInstantiatorSystem::DiscoverInvalidatedProperties(TBitAr
 void UMovieScenePropertyInstantiatorSystem::ProcessInvalidatedProperties(const TBitArray<>& InvalidatedProperties)
 {
 	using namespace UE::MovieScene;
+
+	MOVIESCENE_DETAILED_SCOPE_CYCLE_COUNTER(MovieSceneEval_ProcessInvalidatedProperties);
 
 	TBitArray<> StaleProperties;
 
@@ -595,6 +604,8 @@ UE::MovieScene::FPropertyRecomposerPropertyInfo UMovieScenePropertyInstantiatorS
 void UMovieScenePropertyInstantiatorSystem::InitializePropertyMetaData(FSystemTaskPrerequisites& InPrerequisites, FSystemSubsequentTasks& Subsequents)
 {
 	using namespace UE::MovieScene;
+
+	MOVIESCENE_DETAILED_SCOPE_CYCLE_COUNTER(MovieSceneEval_InitializePropertyMetaData);
 
 	for (TConstSetBitIterator<> TypesToCache(InitializePropertyMetaDataTasks); TypesToCache; ++TypesToCache)
 	{
