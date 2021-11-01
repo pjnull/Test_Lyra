@@ -464,7 +464,7 @@ namespace UnrealBuildTool
 
 				List<(string Name, string BMI)>? ImportedModules = null;
 
-				if (String.Equals(Version, "1.1") && InputFile.HasExtension(".md.json"))
+				if (String.Equals(Version, "1.1") && !InputFile.HasExtension(".md.json"))
 				{
 					if (Data.TryGetObjectArrayField("ImportedModules", out JsonObject[] ImportedModulesJson))
 					{
