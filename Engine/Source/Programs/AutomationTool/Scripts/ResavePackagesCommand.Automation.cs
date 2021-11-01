@@ -78,7 +78,7 @@ namespace AutomationScripts.Automation
 			try
 			{
 				UnrealBuild Builder = new UnrealBuild(this);
-				Builder.Build(Agenda, InDeleteBuildProducts: true, InUpdateVersionFiles: true, InForceNoXGE: false, InChangelistNumberOverride: GetLatestCodeChange());
+				Builder.Build(Agenda, OverrideCleanBehavior: true, bUpdateVersionFiles: true, bForceNoXGE: false, ChangelistNumberOverride: GetLatestCodeChange());
 				UnrealBuild.CheckBuildProducts(Builder.BuildProductFiles);
 			}
 			catch (AutomationException)

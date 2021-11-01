@@ -1063,7 +1063,7 @@ public class IOSPlatform : Platform
 			if (Unreal.IsEngineInstalled())
 			{
 				// Get the path to UBT
-				string InstalledUBT = UnrealBuild.GetUBTExecutable();
+				string InstalledUBT = UnrealBuild.UBTExecutable;
 				Arguments = "-XcodeProjectFiles " + Arguments;
 				RunUBT(CmdEnv, InstalledUBT, Arguments);
 			}
