@@ -38,6 +38,7 @@
 #include "WorldPartition/WorldPartitionRuntimeHash.h"
 #include "WorldPartition/WorldPartitionEditorPerProjectUserSettings.h"
 #include "WorldPartition/DataLayer/WorldDataLayers.h"
+#include "WorldPartition/WorldPartitionActorDescViewProxy.h"
 #include "Modules/ModuleManager.h"
 #include "GameDelegates.h"
 #endif //WITH_EDITOR
@@ -930,10 +931,13 @@ bool UWorldPartition::ShouldActorBeLoadedByEditorCells(const FWorldPartitionActo
 {
 	if (const AWorldDataLayers* WorldDataLayers = GetWorld()->GetWorldDataLayers())
 	{
+		// Use DataLayers of loaded/dirty Actor if available to handle dirtied actors
+		FWorldPartitionActorViewProxy ActorDescProxy(ActorDesc);
+
 		if (IsRunningCookCommandlet())
 		{
 			// When running cook commandlet, dont allow loading of actors with dynamically loaded data layers
-			for (const FName& DataLayerName : ActorDesc->GetDataLayers())
+			for (const FName& DataLayerName : ActorDescProxy.GetDataLayers())
 			{
 				const UDataLayer* DataLayer = WorldDataLayers->GetDataLayerFromName(DataLayerName);
 				if (DataLayer && DataLayer->IsRuntime())
@@ -945,7 +949,7 @@ bool UWorldPartition::ShouldActorBeLoadedByEditorCells(const FWorldPartitionActo
 		else
 		{
 			uint32 NumValidLayers = 0;
-			for (const FName& DataLayerName : ActorDesc->GetDataLayers())
+			for (const FName& DataLayerName : ActorDescProxy.GetDataLayers())
 			{
 				if (const UDataLayer* DataLayer = WorldDataLayers->GetDataLayerFromName(DataLayerName))
 				{
