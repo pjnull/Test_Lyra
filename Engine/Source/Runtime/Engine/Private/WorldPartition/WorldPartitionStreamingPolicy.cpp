@@ -650,11 +650,6 @@ bool UWorldPartitionStreamingPolicy::IsStreamingCompleted(EWorldPartitionRuntime
 	return true;
 }
 
-FVector2D UWorldPartitionStreamingPolicy::GetDrawRuntimeHash2DDesiredFootprint(const FVector2D& CanvasSize)
-{
-	return WorldPartition->RuntimeHash->GetDraw2DDesiredFootprint(CanvasSize);
-}
-
 void UWorldPartitionStreamingPolicy::DrawRuntimeHash2D(class UCanvas* Canvas, const FVector2D& PartitionCanvasSize, FVector2D& Offset)
 {
 	if (StreamingSources.Num() > 0)

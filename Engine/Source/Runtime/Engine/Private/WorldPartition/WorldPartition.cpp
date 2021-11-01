@@ -526,12 +526,6 @@ void UWorldPartition::Initialize(UWorld* InWorld, const FTransform& InTransform)
 		FWorldPartitionLevelHelper::RemapLevelSoftObjectPaths(World->PersistentLevel, this);
 	}
 #endif
-
-	if (!IsRunningCookCommandlet())
-	{
-		UWorldPartitionSubsystem* WorldPartitionSubsystem = World->GetSubsystem<UWorldPartitionSubsystem>();
-		WorldPartitionSubsystem->RegisterWorldPartition(this);
-	}
 }
 
 void UWorldPartition::RegisterStreamingSourceProvider(IWorldPartitionStreamingSourceProvider* StreamingSource)
@@ -606,21 +600,10 @@ void UWorldPartition::Uninitialize()
 		EditorHash = nullptr;
 #endif		
 
-		if (!IsRunningCookCommandlet())
-		{
-			UWorldPartitionSubsystem* WorldPartitionSubsystem = World->GetSubsystem<UWorldPartitionSubsystem>();
-			WorldPartitionSubsystem->UnregisterWorldPartition(this);
-		}
-
 		InitState = EWorldPartitionInitState::Uninitialized;
 	}
 
 	Super::Uninitialize();
-}
-
-void UWorldPartition::CleanupWorldPartition()
-{
-	Uninitialize();
 }
 
 bool UWorldPartition::IsInitialized() const
@@ -1225,12 +1208,6 @@ bool UWorldPartition::IsStreamingCompleted(EWorldPartitionRuntimeCellState Query
 bool UWorldPartition::CanDrawRuntimeHash() const
 {
 	return GetWorld()->IsGameWorld() || UWorldPartition::IsSimulating();
-}
-
-FVector2D UWorldPartition::GetDrawRuntimeHash2DDesiredFootprint(const FVector2D& CanvasSize)
-{
-	check(CanDrawRuntimeHash());
-	return StreamingPolicy->GetDrawRuntimeHash2DDesiredFootprint(CanvasSize);
 }
 
 void UWorldPartition::DrawRuntimeHash2D(class UCanvas* Canvas, const FVector2D& PartitionCanvasSize, FVector2D& Offset)

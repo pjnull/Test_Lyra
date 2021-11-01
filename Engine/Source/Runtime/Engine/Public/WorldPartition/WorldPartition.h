@@ -153,8 +153,6 @@ public:
 	bool IsInitialized() const;
 	virtual void Uninitialize() override;
 
-	void CleanupWorldPartition();
-
 	const FTransform& GetInstanceTransform() const { return InstanceTransform; }
 
 	void Tick(float DeltaSeconds);
@@ -169,7 +167,6 @@ public:
 
 	// Debugging Methods
 	bool CanDrawRuntimeHash() const;
-	FVector2D GetDrawRuntimeHash2DDesiredFootprint(const FVector2D& CanvasSize);
 	void DrawRuntimeHash2D(UCanvas* Canvas, const FVector2D& PartitionCanvasSize, FVector2D& Offset);
 	void DrawRuntimeHash3D();
 	void DrawRuntimeCellsDetails(UCanvas* Canvas, FVector2D& Offset);

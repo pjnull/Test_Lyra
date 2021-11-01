@@ -396,11 +396,6 @@ void ULevel::CleanupLevel(bool bCleanupResources)
 				}
 			}, false);
 	}
-
-	if (UWorldPartition* WorldPartition = GetWorldPartition())
-	{
-		WorldPartition->CleanupWorldPartition();
-	}
 }
 
 void ULevel::PostInitProperties()
