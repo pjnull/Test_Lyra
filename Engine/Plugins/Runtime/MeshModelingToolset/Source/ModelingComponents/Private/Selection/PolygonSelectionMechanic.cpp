@@ -71,6 +71,8 @@ void UPolygonSelectionMechanic::Setup(UInteractiveTool* ParentToolIn)
 	HilightRenderer.LineThickness = 4.0f;
 	SelectionRenderer.LineColor = LinearColors::Gold3f();
 	SelectionRenderer.LineThickness = 4.0f;
+	SelectionRenderer.PointColor = LinearColors::Gold3f();
+	SelectionRenderer.PointSize = 4.0f;
 
 	float HighlightedFacePercentDepthOffset = 0.5f;
 	HighlightedFaceMaterial = ToolSetupUtil::GetSelectionMaterial(FLinearColor::Green, ParentToolIn->GetToolManager(), HighlightedFacePercentDepthOffset);
