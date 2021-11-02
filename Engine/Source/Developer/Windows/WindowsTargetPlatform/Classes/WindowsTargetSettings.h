@@ -56,10 +56,9 @@ public:
 	TArray<FString> TargetedRHIs;
 
 	/** 
-	 * Default Graphics RHI. Select which RHIto use. Make sure its also selected as a Targeted RHI
-	 * Requires Editor restart
+	 * Select which RHI to use. Make sure its also selected as a Targeted RHI. Requires Editor restart.
 	 */
-	UPROPERTY(EditAnywhere, config, Category="Targeted RHIs", Meta = (DisplayName = "Default RHI"))
+	UPROPERTY(EditAnywhere, config, Category="Targeted RHIs", Meta = (DisplayName = "Default RHI", ConfigRestartRequired = true))
 	EDefaultGraphicsRHI DefaultGraphicsRHI;
 
 	/** Sample rate to run the audio mixer with. */
