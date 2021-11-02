@@ -274,6 +274,7 @@ void UWorldPartitionSubsystem::Draw(UCanvas* Canvas, class APlayerController* PC
 		UWorldPartition* Partition = GetWorldPartition();
 		FVector2D PartitionCanvasSize = FVector2D(CanvasMaxScreenSize.X, CanvasMaxScreenSize.Y);
 		Partition->DrawRuntimeHash2D(Canvas, PartitionCanvasSize, CurrentOffset);
+		CurrentOffset.X = CanvasBottomRightPadding.X;
 	}
 	
 	if (GDrawStreamingPerfs || GDrawRuntimeHash2D)
