@@ -194,6 +194,7 @@ namespace UnrealBuildTool
 			if (DirectoryReference.Exists(MaybeVerseDirectory))
 			{
 				this.AssociatedVerseDirectory = MaybeVerseDirectory;
+				this.bDependsOnVerse = true;
 			}
 
 			foreach (string Def in PublicDefinitions)

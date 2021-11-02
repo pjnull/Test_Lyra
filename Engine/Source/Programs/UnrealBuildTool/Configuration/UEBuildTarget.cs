@@ -2891,7 +2891,10 @@ namespace UnrealBuildTool
 				const string PrecompileReferenceChain = "allmodules option";
 				UEBuildModuleCPP Module = (UEBuildModuleCPP)FindOrCreateModuleByName(ModuleName, PrecompileReferenceChain);
 				Module.RecursivelyCreateModules(FindOrCreateModuleByName, PrecompileReferenceChain);
-				ValidModules.Add(Module);
+				if (!Module.bDependsOnVerse || Rules.bUseVerse)
+				{
+					ValidModules.Add(Module);
+				}
 			}
 
 			// Make sure precompiled modules don't reference any non-precompiled modules
@@ -3658,6 +3661,15 @@ namespace UnrealBuildTool
 				GlobalCompileEnvironment.Definitions.Add("WITH_COREUOBJECT=0");
 			}
 
+			if (Rules.bUseVerse)
+			{
+				GlobalCompileEnvironment.Definitions.Add("WITH_VERSE=1");
+			}
+			else
+			{
+				GlobalCompileEnvironment.Definitions.Add("WITH_VERSE=0");
+			}
+
 			if (Rules.bCompileWithStatsWithoutEngine)
 			{
 				GlobalCompileEnvironment.Definitions.Add("USE_STATS_WITHOUT_ENGINE=1");
@@ -4094,7 +4106,7 @@ namespace UnrealBuildTool
 				Modules.Add(Module.Name, Module);
 
 				// Module must not have Verse if Verse is not enabled
-				if (Module.bHasVerse && !Rules.bUseVerse && !ProjectFileGenerator.bGenerateProjectFiles)
+				if (Module.bHasVerse && !Rules.bUseVerse && !Rules.bBuildAllModules && !ProjectFileGenerator.bGenerateProjectFiles)
 				{
 					Log.TraceWarning("Module '{0}' has associated Verse code but target '{1}' does not have Verse enabled. C++ include errors are likely to follow.", Module.Name, TargetName);
 				}
