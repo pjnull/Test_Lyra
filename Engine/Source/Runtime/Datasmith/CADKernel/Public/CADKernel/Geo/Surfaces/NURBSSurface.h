@@ -84,7 +84,7 @@ namespace CADKernel
 			, Poles(InPoles)
 			, bIsRational(true)
 		{
-			SetMinToleranceIso();
+			ComputeMinToleranceIso();
 			Finalize();
 		}
 
@@ -205,7 +205,7 @@ namespace CADKernel
 			BSpline::FindNotDerivableParameters(*this, InDerivativeOrder, InBoundary, OutNotDerivableCoordinates);
 		}
 
-		virtual void SetMinToleranceIso() override;
+		void ComputeMinToleranceIso();
 
 	private:
 		void Finalize();

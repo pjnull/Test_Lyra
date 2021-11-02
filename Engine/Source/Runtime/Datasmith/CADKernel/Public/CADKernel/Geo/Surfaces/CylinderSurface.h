@@ -32,7 +32,7 @@ namespace CADKernel
 
 		FCylinderSurface() = default;
 
-		virtual void SetMinToleranceIso() override
+		void ComputeMinToleranceIso()
 		{
 			FPoint Origin = Matrix.Multiply(FPoint::ZeroPoint);
 

@@ -20,12 +20,12 @@ namespace CADKernel
 			, BaseSurface(InBaseSurface)
 			, Offset(InOffset)
 		{
-			SetMinToleranceIso();
+			ComputeMinToleranceIso();
 		}
 
 		FOffsetSurface() = default;
 
-		virtual void SetMinToleranceIso() override
+		void ComputeMinToleranceIso()
 		{
 			MinToleranceIso = BaseSurface->GetIsoTolerances();
 		}

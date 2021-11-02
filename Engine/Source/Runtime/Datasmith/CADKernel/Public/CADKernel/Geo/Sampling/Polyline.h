@@ -77,6 +77,11 @@ namespace CADKernel
 			Approximator.ProjectPointsToPolyline(InBoundary, InPointsToProject, ProjectedPointCoordinates, ProjectedPoints);
 		}
 
+		const PointType& GetPointAt(int32 Index) const
+		{
+			return Points[Index];
+		}
+
 		const TArray<PointType>& GetPoints() const
 		{
 			return Points;

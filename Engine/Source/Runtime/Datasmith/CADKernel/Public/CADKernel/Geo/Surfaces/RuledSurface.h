@@ -20,7 +20,7 @@ namespace CADKernel
 		{
 			Curves[0] = InCurveU;
 			Curves[1] = InCurveV;
-			SetMinToleranceIso();
+			ComputeDefaultMinToleranceIso();
 		}
 
 		FRuledSurface() = default;

@@ -40,7 +40,7 @@ namespace CADKernel
 
 		FPlaneSurface() = default;
 		
-		virtual void SetMinToleranceIso() override
+		void ComputeMinToleranceIso()
 		{
 			FPoint Origin = Matrix.Multiply(FPoint::ZeroPoint);
 

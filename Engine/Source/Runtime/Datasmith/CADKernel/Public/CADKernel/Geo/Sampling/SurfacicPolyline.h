@@ -259,6 +259,11 @@ namespace CADKernel
 			return Points2D;
 		}
 
+		const FPoint& GetPointAt(int32 Index) const
+		{
+			return Points3D[Index];
+		}
+
 		const TArray<FPoint>& GetPoints() const
 		{
 			return Points3D;
