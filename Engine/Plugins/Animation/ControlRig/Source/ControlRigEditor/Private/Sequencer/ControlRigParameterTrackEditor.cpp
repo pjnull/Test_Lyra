@@ -2083,15 +2083,6 @@ void FControlRigParameterTrackEditor::HandleControlSelected(UControlRig* Subject
 		});
 	}
 
-	//if fk rig show hierarchy.
-	if (Subject->IsA<UFKControlRig>())
-	{
-		if (UControlRigEditModeSettings* Settings = GetMutableDefault<UControlRigEditModeSettings>())
-		{
-			Settings->bDisplayHierarchy = true;
-		}
-	}
-
 	if (bIsDoingSelection)
 	{
 		return;
