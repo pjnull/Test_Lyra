@@ -1,6 +1,5 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-
 #include "USDSkeletalDataConversion.h"
 
 #include "UnrealUSDWrapper.h"
@@ -331,23 +330,6 @@ namespace SkelDataConversionImpl
 		}
 
 		return true;
-	}
-
-	FString GetUniqueName( FString Prefix, TSet<FString>& UsedNames)
-	{
-		if ( !UsedNames.Contains( Prefix ) )
-		{
-			return Prefix;
-		}
-
-		int32 Suffix = 0;
-		FString Result;
-		do
-		{
-			Result = FString::Printf( TEXT( "%s_%d" ), *Prefix, Suffix++ );
-		} while ( UsedNames.Contains( Result ) );
-
-		return Result;
 	}
 
 	/**
@@ -2058,7 +2040,7 @@ bool UsdToUnreal::ConvertBlendShape( const pxr::UsdSkelBlendShape& UsdBlendShape
 	// Note that we can't just use the prim path here and need an index to guarantee uniqueness,
 	// because although the path is usually unique, USD has case sensitive paths and the FNames of the
 	// UMorphTargets are case insensitive
-	FString PrimaryName = SkelDataConversionImpl::GetUniqueName(
+	FString PrimaryName = UsdUtils::GetUniqueName(
 		SkelDataConversionImpl::SanitizeObjectName( UsdToUnreal::ConvertString( UsdBlendShape.GetPrim().GetName() ) ),
 		UsedMorphTargetNames );
 	FString PrimaryPath = UsdToUnreal::ConvertPath( UsdBlendShape.GetPrim().GetPath() );
@@ -2091,7 +2073,7 @@ bool UsdToUnreal::ConvertBlendShape( const pxr::UsdSkelBlendShape& UsdBlendShape
 
 		FString OrigInbetweenName = UsdToUnreal::ConvertString( Inbetween.GetAttr().GetName() );
 		FString InbetweenPath = FString::Printf(TEXT("%s_%s"), *PrimaryPath, *OrigInbetweenName );
-		FString InbetweenName = SkelDataConversionImpl::GetUniqueName(
+		FString InbetweenName = UsdUtils::GetUniqueName(
 			SkelDataConversionImpl::SanitizeObjectName( FPaths::GetCleanFilename( InbetweenPath ) ),
 			UsedMorphTargetNames );
 
