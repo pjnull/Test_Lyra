@@ -722,12 +722,7 @@ void FMaterialInstanceCachedData::InitializeForConstant(FMaterialCachedExpressio
 	for (int32 LayerIndex = 0; LayerIndex < NumLayers; ++LayerIndex)
 	{
 		int32 ParentLayerIndex = INDEX_NONE;
-		if (Layers == ParentLayers)
-		{
-			// No overriden layers for this instance, just pass-thru
-			ParentLayerIndex = LayerIndex;
-		}
-		else if (ParentLayers && Layers->LayerLinkStates[LayerIndex] == EMaterialLayerLinkState::LinkedToParent)
+		if (ParentLayers && Layers->LayerLinkStates[LayerIndex] == EMaterialLayerLinkState::LinkedToParent)
 		{
 			const FGuid& LayerGuid = Layers->LayerGuids[LayerIndex];
 			ParentLayerIndex = ParentLayers->LayerGuids.Find(LayerGuid);

@@ -2205,13 +2205,33 @@ bool UMaterialInstance::GetTerrainLayerWeightParameterValue(const FHashedMateria
 #if WITH_EDITOR
 bool UMaterialInstance::SetMaterialLayers(const FMaterialLayersFunctions& LayersValue)
 {
+	bool bUpdatedLayers = false;
 	if (!StaticParameters.bHasMaterialLayers || StaticParameters.MaterialLayers != LayersValue)
 	{
-		StaticParameters.bHasMaterialLayers = true;
-		StaticParameters.MaterialLayers = LayersValue;
-		return true;
+		bool bMatchesParentLayers = false;
+		if (Parent)
+		{
+			FMaterialLayersFunctions ParentLayers;
+			if (Parent->GetMaterialLayers(ParentLayers))
+			{
+				bMatchesParentLayers = LayersValue.MatchesParent(ParentLayers);
+			}
+		}
+
+		if (bMatchesParentLayers)
+		{
+			bUpdatedLayers = StaticParameters.bHasMaterialLayers; // if we previously had layers, but are now clearing them to match parent
+			StaticParameters.bHasMaterialLayers = false;
+			StaticParameters.MaterialLayers.Empty();
+		}
+		else
+		{
+			bUpdatedLayers = true;
+			StaticParameters.bHasMaterialLayers = true;
+			StaticParameters.MaterialLayers = LayersValue;
+		}
 	}
-	return false;
+	return bUpdatedLayers;
 }
 #endif // WITH_EDITOR
 
@@ -2828,7 +2848,7 @@ FMaterialInstanceParameterUpdateContext::FMaterialInstanceParameterUpdateContext
 	}
 	else
 	{
-		StaticParameters = InInstance->GetStaticParameters();
+		InInstance->GetStaticParameterValues(StaticParameters);
 	}
 
 	BasePropertyOverrides = InInstance->BasePropertyOverrides;
@@ -3225,6 +3245,20 @@ void UMaterialInstance::UpdateStaticPermutation(const FStaticParameterSet& NewPa
 	TrimToOverriddenOnly(CompareParameters.StaticSwitchParameters);
 	TrimToOverriddenOnly(CompareParameters.StaticComponentMaskParameters);
 	TrimToOverriddenOnly(CompareParameters.TerrainLayerWeightParameters);
+
+	// Check to see if the material layers being assigned match values from the parent
+	if (CompareParameters.bHasMaterialLayers && Parent)
+	{
+		FMaterialLayersFunctions ParentLayers;
+		if (Parent->GetMaterialLayers(ParentLayers))
+		{
+			if (CompareParameters.MaterialLayers.MatchesParent(ParentLayers))
+			{
+				CompareParameters.bHasMaterialLayers = false;
+				CompareParameters.MaterialLayers.Empty();
+			}
+		}
+	}
 
 	const bool bParamsHaveChanged = StaticParameters != CompareParameters;
 	const bool bBasePropertyOverridesHaveChanged = BasePropertyOverrides != NewBasePropertyOverrides;
