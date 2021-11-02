@@ -45,14 +45,6 @@
 
 #define LOCTEXT_NAMESPACE "BlueprintDebugging"
 
-// Temporary console variable to toggle pin value inspection in PIE.
-// @todo - Migrate this to a user-facing editor setting at some point.
-static TAutoConsoleVariable<bool> CVarBPEnablePinValueInspectionDuringPIE(
-	TEXT("BP.EnablePinValueInspectionDuringPIE"),
-	false,
-	TEXT("Enables pin value inspection tooltips during PIE (experimental).")
-);
-
 /** Per-thread data for use by FKismetDebugUtilities functions */
 class FKismetDebugUtilitiesData : public TThreadSingleton<FKismetDebugUtilitiesData>
 {
@@ -1599,7 +1591,8 @@ FKismetDebugUtilities::EWatchTextResult FKismetDebugUtilities::GetWatchText(FStr
 
 bool FKismetDebugUtilities::CanInspectPinValue(const UEdGraphPin* Pin)
 {
-	if (!CVarBPEnablePinValueInspectionDuringPIE.GetValueOnGameThread())
+	const UBlueprintEditorSettings* BlueprintEditorSettings = GetDefault<UBlueprintEditorSettings>();
+	if (!BlueprintEditorSettings->bEnablePinValueInspectionTooltips)
 	{
 		return false;
 	}
