@@ -618,6 +618,8 @@ private:
 	FThreadSafeBool ReleasedByRT;
 
 public:
+	virtual ENGINE_API ~UMaterialInstance() {};
+
 	// Begin UMaterialInterface interface.
 	virtual ENGINE_API UMaterial* GetMaterial() override;
 	virtual ENGINE_API const UMaterial* GetMaterial() const override;

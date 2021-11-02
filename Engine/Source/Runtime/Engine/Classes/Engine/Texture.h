@@ -1166,6 +1166,10 @@ public:
 	UE_DEPRECATED(5.00, "Use GetResource() / SetResource() accessors instead.")
 	TFieldPtrAccessor<FTextureResource> Resource;
 
+	PRAGMA_DISABLE_DEPRECATION_WARNINGS
+	ENGINE_API virtual ~UTexture() {};
+	PRAGMA_ENABLE_DEPRECATION_WARNINGS
+	
 	/** Set texture's resource, can be NULL */
 	ENGINE_API void SetResource(FTextureResource* Resource);
 

@@ -695,6 +695,9 @@ private:
 
 public:
 
+	/** Destructor */
+	ENGINE_API virtual ~UNetDriver() {};
+
 	/** Used to specify the class to use for connections */
 	UPROPERTY(Config)
 	FString NetConnectionClassName;

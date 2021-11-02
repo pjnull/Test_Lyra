@@ -68,6 +68,8 @@ class UDataTable
 {
 	GENERATED_UCLASS_BODY()
 
+	ENGINE_API virtual ~UDataTable() {};
+
 	DECLARE_MULTICAST_DELEGATE(FOnDataTableChanged);
 	DECLARE_MULTICAST_DELEGATE(FOnDataTableImport);
 	

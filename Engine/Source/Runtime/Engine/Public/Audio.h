@@ -475,7 +475,7 @@ public:
 
 	ENGINE_API virtual ~FSoundBuffer();
 
-	virtual int32 GetSize() PURE_VIRTUAL(FSoundBuffer::GetSize,return 0;);
+	ENGINE_API virtual int32 GetSize() PURE_VIRTUAL(FSoundBuffer::GetSize,return 0;);
 
 	/**
 	 * Describe the buffer (platform can override to add to the description, but should call the base class version)
@@ -541,7 +541,7 @@ class FSoundSource
 {
 public:
 	/** Constructor */
-	FSoundSource(FAudioDevice* InAudioDevice)
+	ENGINE_API FSoundSource(FAudioDevice* InAudioDevice)
 		: AudioDevice(InAudioDevice)
 		, WaveInstance(nullptr)
 		, Buffer(nullptr)
@@ -573,7 +573,7 @@ public:
 	}
 
 	/** Destructor */
-	virtual ~FSoundSource() {}
+	ENGINE_API virtual ~FSoundSource() {}
 
 	/* Prepares the source voice for initialization. This may parse a compressed asset header on some platforms */
 	virtual bool PrepareForInitialization(FWaveInstance* InWaveInstance) { return true; }

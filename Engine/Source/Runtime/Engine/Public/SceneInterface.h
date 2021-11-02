@@ -50,7 +50,7 @@ enum EBasePassDrawListType
 class FSceneInterface
 {
 public:
-	FSceneInterface(ERHIFeatureLevel::Type InFeatureLevel)
+	ENGINE_API FSceneInterface(ERHIFeatureLevel::Type InFeatureLevel)
 		: FeatureLevel(InFeatureLevel)
 	{}
 
