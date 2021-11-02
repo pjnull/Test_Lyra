@@ -891,6 +891,14 @@ void UNiagaraEmitter::PostEditChangeProperty(struct FPropertyChangedEvent& Prope
 		}
 		bNeedsRecompile = true;
 	}
+	else if (PropertyName == GET_MEMBER_NAME_CHECKED(UNiagaraEmitter, MaxDeltaTimePerTick))
+	{
+		if (GraphSource != nullptr)
+		{
+			GraphSource->MarkNotSynchronized(TEXT("MaxDeltaTimePerTick changed."));
+		}
+		bNeedsRecompile = true;
+	}
 
 	ResolveScalabilitySettings();
 
