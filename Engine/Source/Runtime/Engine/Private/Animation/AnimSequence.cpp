@@ -4886,12 +4886,12 @@ void UAnimSequence::SynchronousAnimatedBoneAttributesCompression()
 
 void UAnimSequence::MoveAttributesToModel()
 {
-	WaitOnExistingCompression(false);
-
 	USkeleton* TargetSkeleton = GetSkeleton();
 	PRAGMA_DISABLE_DEPRECATION_WARNINGS
 	if (TargetSkeleton && PerBoneCustomAttributeData.Num())
 	{
+		WaitOnExistingCompression();
+
 		IAnimationDataController::FScopedBracket Bracket(Controller, LOCTEXT("MoveAttributesToModel", "Moving legacy Custom Attributes to Model"));
 
 		for (const FCustomAttributePerBoneData& PerBoneData : PerBoneCustomAttributeData)
