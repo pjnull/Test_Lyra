@@ -137,8 +137,6 @@ public:
 	void GenerateHLOD(ISourceControlHelper* SourceControlHelper, bool bCreateActorsOnly);
 	void GenerateNavigationData(const FBox& LoadedBounds);
 
-	const UActorDescContainer* RegisterActorDescContainer(FName PackageName);
-
 	// Debugging Methods
 	void DrawRuntimeHashPreview();
 	void DumpActorDescs(const FString& Path);
@@ -200,8 +198,6 @@ public:
 	TObjectPtr<class UHLODLayer> DefaultHLODLayer;
 
 	TArray<FWorldPartitionReference> LoadedSubobjects;
-
-	TMap<FName, TWeakObjectPtr<UActorDescContainer>> ActorDescContainers;
 #endif
 
 private:

@@ -571,15 +571,6 @@ void UWorldPartition::Uninitialize()
 			GEditor->OnEditorClose().RemoveAll(this);
 		}
 
-		for (auto& Pair : ActorDescContainers)
-		{
-			if (UActorDescContainer* Container = Pair.Value.Get())
-			{
-				Container->Uninitialize();
-			}
-		}
-		ActorDescContainers.Empty();
-
 		if (World->IsGameWorld())
 		{
 			OnEndPlay();
@@ -1312,24 +1303,6 @@ void UWorldPartition::GenerateHLOD(ISourceControlHelper* SourceControlHelper, bo
 void UWorldPartition::GenerateNavigationData(const FBox& LoadedBounds)
 {
 	RuntimeHash->GenerateNavigationData(LoadedBounds);
-}
-
-const UActorDescContainer* UWorldPartition::RegisterActorDescContainer(FName PackageName)
-{
-	TWeakObjectPtr<UActorDescContainer>* ExistingContainerPtr = ActorDescContainers.Find(PackageName);
-	if (ExistingContainerPtr)
-	{
-		if (UActorDescContainer* LevelContainer = ExistingContainerPtr->Get())
-		{
-			return LevelContainer;
-		}
-	}
-		
-	UActorDescContainer* NewContainer = NewObject<UActorDescContainer>(GetTransientPackage());
-	NewContainer->Initialize(GetWorld(), PackageName);
-	ActorDescContainers.Add(PackageName, TWeakObjectPtr<UActorDescContainer>(NewContainer));
-
-	return NewContainer;
 }
 
 void UWorldPartition::DumpActorDescs(const FString& Path)

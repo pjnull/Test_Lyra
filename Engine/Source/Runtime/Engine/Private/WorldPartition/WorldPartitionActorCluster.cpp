@@ -303,7 +303,7 @@ void FActorClusterContext::CreateContainerInstanceRecursive(uint64 ID, const FTr
 		const UActorDescContainer* OutContainer = nullptr;
 		FTransform OutTransform;
 		EContainerClusterMode OutClusterMode;
-		if (bIncludeChildContainers && ActorDescView.GetContainerInstance(WorldPartition, OutContainer, OutTransform, OutClusterMode))
+		if (bIncludeChildContainers && ActorDescView.GetContainerInstance(OutContainer, OutTransform, OutClusterMode))
 		{
 			// Add Child Container Guid so we can discard the actor later
 			ChildContainers.Add(ActorDescView.GetGuid());
