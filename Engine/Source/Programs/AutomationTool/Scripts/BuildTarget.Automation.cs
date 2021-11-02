@@ -172,7 +172,7 @@ namespace AutomationTool
 
 				if (!Preview)
 				{
-					Build.Build(Agenda, bUpdateVersionFiles: false);
+					Build.Build(Agenda, InUpdateVersionFiles: false);
 				}
 			}
 			else

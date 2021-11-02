@@ -163,7 +163,8 @@ namespace AutomationTool
 			Dictionary<UnrealBuild.BuildTarget, BuildManifest> TargetToManifest = new Dictionary<UnrealBuild.BuildTarget,BuildManifest>();
 			UnrealBuild Builder = new UnrealBuild(Job.OwnerCommand);
 
-			Builder.Build(Agenda, OverrideCleanBehavior: null, bUpdateVersionFiles: false, bForceNoXGE: !bAllowXGE, TargetToManifest: TargetToManifest);
+			bool bCanUseParallelExecutor = (BuildHostPlatform.Current.Platform == UnrealTargetPlatform.Win64 && bAllowParallelExecutor);	// parallel executor is only available on Windows as of 2016-09-22
+			Builder.Build(Agenda, InDeleteBuildProducts: null, InUpdateVersionFiles: false, InForceNoXGE: !bAllowXGE, InUseParallelExecutor: bCanUseParallelExecutor, InTargetToManifest: TargetToManifest);
 
 			UnrealBuild.CheckBuildProducts(Builder.BuildProductFiles);
 

@@ -299,7 +299,7 @@ class SyncProject : SyncProjectBase
 			if (!Unversioned && !ProjectOnly)
 			{
 				LogInformation("Updating Version files to CL: {0}", CL);
-				Build.UpdateVersionFiles(ChangelistNumberOverride: CL, IsPromotedOverride: false);
+				Build.UpdateVersionFiles(ActuallyUpdateVersionFiles: true, ChangelistNumberOverride: CL, IsPromotedOverride: false);
 			}
 
 			// Build everything
