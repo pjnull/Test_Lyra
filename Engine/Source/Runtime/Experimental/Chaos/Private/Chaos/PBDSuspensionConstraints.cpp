@@ -122,11 +122,14 @@ namespace Chaos
 
 			// \todo(chaos): we can cache the CoM-relative connector once per frame rather than recalculate per iteration
 			// (we should not be accessing particle state in the solver methods, although this one actually is ok because it only uses frame constrants)
-			const FVec3 SuspensionCoMOffset = FParticleUtilities::ParticleLocalToCoMLocal(FGenericParticleHandle(ConstrainedParticles[ConstraintIndex]), SuspensionLocalOffset[ConstraintIndex]);
+			const FGenericParticleHandle Particle = ConstrainedParticles[ConstraintIndex];
+			const FVec3& SuspensionActorOffset = SuspensionLocalOffset[ConstraintIndex];
+			const FVec3 SuspensionCoMOffset = Particle->RotationOfMass().UnrotateVector(SuspensionActorOffset - Particle->CenterOfMass());
+			const FVec3 SuspensionCoMAxis = Particle->RotationOfMass().UnrotateVector(Setting.Axis);
 
 			const FVec3 WorldSpaceX = Body.Q().RotateVector(SuspensionCoMOffset) + Body.P();
 
-			FVec3 AxisWorld = Body.Q() * Setting.Axis;
+			FVec3 AxisWorld = Body.Q().RotateVector(SuspensionCoMAxis);
 
 			const float MPHToCmS = 100000.f / 2236.94185f;
 			const float SpeedThreshold = 10.0f * MPHToCmS;
