@@ -224,7 +224,7 @@ public:
 
 		if (bNullTerminate)
 		{
-			Dest[Count * 2] = 0;
+			Dest[Count * 2] = TEXT('\0');
 		}
 	}
 
