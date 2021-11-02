@@ -166,6 +166,7 @@ void UDataLayer::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEv
 	{
 		PropagateIsRuntime();
 	}
+	Super::PostEditChangeProperty(PropertyChangedEvent);
 }
 
 bool UDataLayer::CanParent(const UDataLayer* InParent) const
