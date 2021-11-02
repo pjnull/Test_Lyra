@@ -110,16 +110,33 @@ void UNiagaraStackSimulationStagePropertiesItem::RefreshChildrenInternal(const T
 		UNiagaraEmitter* Emitter = GetEmitterViewModel()->GetEmitter();
 		if ( Emitter && (Emitter->SimTarget != ENiagaraSimTarget::GPUComputeSim) && SimulationStage->bEnabled )
 		{
+			TArray<FStackIssueFix> IssueFixes;
+			IssueFixes.Emplace(
+				LOCTEXT("DisableSimulationStageFix", "Disable Simulation Stage"),
+				FStackIssueFixDelegate::CreateUObject(this, &UNiagaraStackSimulationStagePropertiesItem::SetSimulationStageEnabled, false)
+			);
+			IssueFixes.Emplace(
+				LOCTEXT("SetGpuSimulationFix", "Set GPU simulation"),
+				FStackIssueFixDelegate::CreateLambda(
+					[WeakEmitter=TWeakObjectPtr<UNiagaraEmitter>(GetEmitterViewModel()->GetEmitter())]()
+					{
+						if ( UNiagaraEmitter* NiagaraEmitter = WeakEmitter.Get() )
+						{
+							FScopedTransaction Transaction(LOCTEXT("SetGpuSimulation", "Set Gpu Simulation"));
+							NiagaraEmitter->Modify();
+							NiagaraEmitter->SimTarget = ENiagaraSimTarget::GPUComputeSim;
+						}
+					}
+				)
+			);
+
 			NewIssues.Emplace(
 				EStackIssueSeverity::Error,
 				LOCTEXT("SimulationStagesNotSupportedOnCPU", "Simulation stages are not supported on CPU"),
 				LOCTEXT("SimulationStagesNotSupportedOnCPULong", "Simulations stages are currently not supported on CPU, please disable or remove."),
 				GetStackEditorDataKey(),
 				false,
-				FStackIssueFix(
-					LOCTEXT("DisableSimulationStageFix", "Disable Simulation Stage"),
-					FStackIssueFixDelegate::CreateUObject(this, &UNiagaraStackSimulationStagePropertiesItem::SetSimulationStageEnabled, false)
-				)
+				IssueFixes
 			);
 		}
 	}
