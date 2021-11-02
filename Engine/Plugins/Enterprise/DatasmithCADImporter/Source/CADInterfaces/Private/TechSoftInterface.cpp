@@ -69,265 +69,302 @@ namespace CADLibrary
 	}
 
 
-	void TUniqueTSObj<A3DAsmModelFileData>::InitializeData(A3DAsmModelFileData& OutData)
+	void TUniqueTSObj<A3DAsmModelFileData>::InitializeData()
 	{
-		A3D_INITIALIZE_DATA(A3DAsmModelFileData, OutData);
+		A3D_INITIALIZE_DATA(A3DAsmModelFileData, Data);
 	}
 
-	void TUniqueTSObj<A3DAsmPartDefinitionData>::InitializeData(A3DAsmPartDefinitionData& OutData)
+	void TUniqueTSObj<A3DAsmPartDefinitionData>::InitializeData()
 	{
-		A3D_INITIALIZE_DATA(A3DAsmPartDefinitionData, OutData);
+		A3D_INITIALIZE_DATA(A3DAsmPartDefinitionData, Data);
 	}
 
-	void TUniqueTSObj<A3DAsmProductOccurrenceData>::InitializeData(A3DAsmProductOccurrenceData& OutData)
+	void TUniqueTSObj<A3DAsmProductOccurrenceData>::InitializeData()
 	{
-		A3D_INITIALIZE_DATA(A3DAsmProductOccurrenceData, OutData);
+		A3D_INITIALIZE_DATA(A3DAsmProductOccurrenceData, Data);
 	}
 
-	void TUniqueTSObj<A3DAsmProductOccurrenceDataCV5>::InitializeData(A3DAsmProductOccurrenceDataCV5& OutData)
+	void TUniqueTSObj<A3DAsmProductOccurrenceDataCV5>::InitializeData()
 	{
-		A3D_INITIALIZE_DATA(A3DAsmProductOccurrenceDataCV5, OutData);
+		A3D_INITIALIZE_DATA(A3DAsmProductOccurrenceDataCV5, Data);
 	}
 
-	void TUniqueTSObj<A3DAsmProductOccurrenceDataSLW>::InitializeData(A3DAsmProductOccurrenceDataSLW& OutData)
+	void TUniqueTSObj<A3DAsmProductOccurrenceDataSLW>::InitializeData()
 	{
-		A3D_INITIALIZE_DATA(A3DAsmProductOccurrenceDataSLW, OutData);
+		A3D_INITIALIZE_DATA(A3DAsmProductOccurrenceDataSLW, Data);
 	}
 
-	void TUniqueTSObj<A3DAsmProductOccurrenceDataUg>::InitializeData(A3DAsmProductOccurrenceDataUg& OutData)
+	void TUniqueTSObj<A3DAsmProductOccurrenceDataUg>::InitializeData()
 	{
-		A3D_INITIALIZE_DATA(A3DAsmProductOccurrenceDataUg, OutData);
+		A3D_INITIALIZE_DATA(A3DAsmProductOccurrenceDataUg, Data);
 	}
 
-	void TUniqueTSObj<A3DGraphicsData>::InitializeData(A3DGraphicsData& OutData)
+	void TUniqueTSObj<A3DGraphicsData>::InitializeData()
 	{
-		A3D_INITIALIZE_DATA(A3DGraphicsData, OutData);
+		A3D_INITIALIZE_DATA(A3DGraphicsData, Data);
 	}
 
-	void TUniqueTSObj<A3DMiscAttributeData>::InitializeData(A3DMiscAttributeData& OutData)
+	void TUniqueTSObjFromIndex<A3DGraphMaterialData>::InitializeData()
 	{
-		A3D_INITIALIZE_DATA(A3DMiscAttributeData, OutData);
+		A3D_INITIALIZE_DATA(A3DGraphMaterialData, Data);
 	}
 
-	void TUniqueTSObj<A3DMiscCartesianTransformationData>::InitializeData(A3DMiscCartesianTransformationData& OutData)
+	void TUniqueTSObjFromIndex<A3DGraphRgbColorData>::InitializeData()
 	{
-		A3D_INITIALIZE_DATA(A3DMiscCartesianTransformationData, OutData);
+		A3D_INITIALIZE_DATA(A3DGraphRgbColorData, Data);
 	}
 
-	void TUniqueTSObj<A3DMiscGeneralTransformationData>::InitializeData(A3DMiscGeneralTransformationData& OutData)
+	void TUniqueTSObjFromIndex<A3DGraphStyleData>::InitializeData()
 	{
-		A3D_INITIALIZE_DATA(A3DMiscGeneralTransformationData, OutData);
+		A3D_INITIALIZE_DATA(A3DGraphStyleData, Data);
 	}
 
-	void TUniqueTSObj<A3DMiscMaterialPropertiesData>::InitializeData(A3DMiscMaterialPropertiesData& OutData)
+	void TUniqueTSObj<A3DMiscAttributeData>::InitializeData()
 	{
-		A3D_INITIALIZE_DATA(A3DMiscMaterialPropertiesData, OutData);
+		A3D_INITIALIZE_DATA(A3DMiscAttributeData, Data);
 	}
 
-	void TUniqueTSObj<A3DRiBrepModelData>::InitializeData(A3DRiBrepModelData& OutData)
+	void TUniqueTSObj<A3DMiscCartesianTransformationData>::InitializeData()
 	{
-		A3D_INITIALIZE_DATA(A3DRiBrepModelData, OutData);
+		A3D_INITIALIZE_DATA(A3DMiscCartesianTransformationData, Data);
 	}
 
-	void TUniqueTSObj<A3DRiCoordinateSystemData>::InitializeData(A3DRiCoordinateSystemData& OutData)
+	void TUniqueTSObj<A3DMiscGeneralTransformationData>::InitializeData()
 	{
-		A3D_INITIALIZE_DATA(A3DRiCoordinateSystemData, OutData);
+		A3D_INITIALIZE_DATA(A3DMiscGeneralTransformationData, Data);
 	}
 
-	void TUniqueTSObj<A3DRiDirectionData>::InitializeData(A3DRiDirectionData& OutData)
+	void TUniqueTSObj<A3DMiscMaterialPropertiesData>::InitializeData()
 	{
-		A3D_INITIALIZE_DATA(A3DRiDirectionData, OutData);
+		A3D_INITIALIZE_DATA(A3DMiscMaterialPropertiesData, Data);
 	}
 
-	void TUniqueTSObj<A3DRiPolyBrepModelData>::InitializeData(A3DRiPolyBrepModelData& OutData)
+	void TUniqueTSObj<A3DRiBrepModelData>::InitializeData()
 	{
-		A3D_INITIALIZE_DATA(A3DRiPolyBrepModelData, OutData);
+		A3D_INITIALIZE_DATA(A3DRiBrepModelData, Data);
 	}
 
-	void TUniqueTSObj<A3DRiRepresentationItemData>::InitializeData(A3DRiRepresentationItemData& OutData)
+	void TUniqueTSObj<A3DRiCoordinateSystemData>::InitializeData()
 	{
-		A3D_INITIALIZE_DATA(A3DRiRepresentationItemData, OutData);
+		A3D_INITIALIZE_DATA(A3DRiCoordinateSystemData, Data);
 	}
 
-	void TUniqueTSObj<A3DRiSetData>::InitializeData(A3DRiSetData& OutData)
+	void TUniqueTSObj<A3DRiDirectionData>::InitializeData()
 	{
-		A3D_INITIALIZE_DATA(A3DRiSetData, OutData);
+		A3D_INITIALIZE_DATA(A3DRiDirectionData, Data);
 	}
 
-	void TUniqueTSObj<A3DRootBaseData>::InitializeData(A3DRootBaseData& OutData)
+	void TUniqueTSObj<A3DRiPolyBrepModelData>::InitializeData()
 	{
-		A3D_INITIALIZE_DATA(A3DRootBaseData, OutData);
+		A3D_INITIALIZE_DATA(A3DRiPolyBrepModelData, Data);
 	}
 
-	void TUniqueTSObj<A3DRootBaseWithGraphicsData>::InitializeData(A3DRootBaseWithGraphicsData& OutData)
+	void TUniqueTSObj<A3DRiRepresentationItemData>::InitializeData()
 	{
-		A3D_INITIALIZE_DATA(A3DRootBaseWithGraphicsData, OutData);
+		A3D_INITIALIZE_DATA(A3DRiRepresentationItemData, Data);
 	}
 
-	void TUniqueTSObj<A3DTess3DData>::InitializeData(A3DTess3DData& OutData)
+	void TUniqueTSObj<A3DRiSetData>::InitializeData()
 	{
-		A3D_INITIALIZE_DATA(A3DTess3DData, OutData);
+		A3D_INITIALIZE_DATA(A3DRiSetData, Data);
 	}
 
-	void TUniqueTSObj<A3DTessBaseData>::InitializeData(A3DTessBaseData& OutData)
+	void TUniqueTSObj<A3DRootBaseData>::InitializeData()
 	{
-		A3D_INITIALIZE_DATA(A3DTessBaseData, OutData);
+		A3D_INITIALIZE_DATA(A3DRootBaseData, Data);
 	}
 
-	void TUniqueTSObj<A3DTopoBrepDataData>::InitializeData(A3DTopoBrepDataData& OutData)
+	void TUniqueTSObj<A3DRootBaseWithGraphicsData>::InitializeData()
 	{
-		A3D_INITIALIZE_DATA(A3DTopoBrepDataData, OutData);
+		A3D_INITIALIZE_DATA(A3DRootBaseWithGraphicsData, Data);
 	}
 
-	void TUniqueTSObj<A3DTopoEdgeData>::InitializeData(A3DTopoEdgeData& OutData)
+	void TUniqueTSObj<A3DTess3DData>::InitializeData()
 	{
-		A3D_INITIALIZE_DATA(A3DTopoEdgeData, OutData);
+		A3D_INITIALIZE_DATA(A3DTess3DData, Data);
 	}
 
-	void TUniqueTSObj<A3DTopoFaceData>::InitializeData(A3DTopoFaceData& OutData)
+	void TUniqueTSObj<A3DTessBaseData>::InitializeData()
 	{
-		A3D_INITIALIZE_DATA(A3DTopoFaceData, OutData);
+		A3D_INITIALIZE_DATA(A3DTessBaseData, Data);
 	}
 
-	void TUniqueTSObj<A3DTopoUniqueVertexData>::InitializeData(A3DTopoUniqueVertexData& OutData)
+	void TUniqueTSObj<A3DTopoBrepDataData>::InitializeData()
 	{
-		A3D_INITIALIZE_DATA(A3DTopoUniqueVertexData, OutData);
+		A3D_INITIALIZE_DATA(A3DTopoBrepDataData, Data);
 	}
 
-	void TUniqueTSObj<A3DTopoWireEdgeData>::InitializeData(A3DTopoWireEdgeData& OutData)
+	void TUniqueTSObj<A3DTopoEdgeData>::InitializeData()
 	{
-		A3D_INITIALIZE_DATA(A3DTopoWireEdgeData, OutData);
+		A3D_INITIALIZE_DATA(A3DTopoEdgeData, Data);
 	}
 
-	A3DStatus TUniqueTSObj<A3DAsmModelFileData>::GetData(const A3DAsmModelFile* InAsmModelFilePtr, A3DAsmModelFileData& OutData)
+	void TUniqueTSObj<A3DTopoFaceData>::InitializeData()
 	{
-		return A3DAsmModelFileGet(InAsmModelFilePtr, &OutData);
+		A3D_INITIALIZE_DATA(A3DTopoFaceData, Data);
 	}
 
-	A3DStatus TUniqueTSObj<A3DAsmPartDefinitionData>::GetData(const A3DAsmPartDefinition* InAsmPartDefinitionPtr, A3DAsmPartDefinitionData& OutData)
+	void TUniqueTSObj<A3DTopoUniqueVertexData>::InitializeData()
 	{
-		return A3DAsmPartDefinitionGet(InAsmPartDefinitionPtr, &OutData);
+		A3D_INITIALIZE_DATA(A3DTopoUniqueVertexData, Data);
 	}
 
-	A3DStatus TUniqueTSObj<A3DAsmProductOccurrenceData>::GetData(const A3DAsmProductOccurrence* InAsmProductOccurrencePtr, A3DAsmProductOccurrenceData& OutData)
+	void TUniqueTSObj<A3DTopoWireEdgeData>::InitializeData()
 	{
-		return A3DAsmProductOccurrenceGet(InAsmProductOccurrencePtr, &OutData);
+		A3D_INITIALIZE_DATA(A3DTopoWireEdgeData, Data);
 	}
 
-	A3DStatus TUniqueTSObj<A3DAsmProductOccurrenceDataCV5>::GetData(const A3DAsmProductOccurrence* InAsmProductOccurrencePtr, A3DAsmProductOccurrenceDataCV5& OutData)
+	A3DStatus TUniqueTSObj<A3DAsmModelFileData>::GetData(const A3DAsmModelFile* InAsmModelFilePtr)
 	{
-		return A3DAsmProductOccurrenceGetCV5(InAsmProductOccurrencePtr, &OutData);
+		return A3DAsmModelFileGet(InAsmModelFilePtr, &Data);
 	}
 
-	A3DStatus TUniqueTSObj<A3DAsmProductOccurrenceDataSLW>::GetData(const A3DAsmProductOccurrence* InAsmProductOccurrencePtr, A3DAsmProductOccurrenceDataSLW& OutData)
+	A3DStatus TUniqueTSObj<A3DAsmPartDefinitionData>::GetData(const A3DAsmPartDefinition* InAsmPartDefinitionPtr)
 	{
-		return A3DAsmProductOccurrenceGetSLW(InAsmProductOccurrencePtr, &OutData);
+		return A3DAsmPartDefinitionGet(InAsmPartDefinitionPtr, &Data);
 	}
 
-	A3DStatus TUniqueTSObj<A3DAsmProductOccurrenceDataUg>::GetData(const A3DAsmProductOccurrence* InAsmProductOccurrencePtr, A3DAsmProductOccurrenceDataUg& OutData)
+	A3DStatus TUniqueTSObj<A3DAsmProductOccurrenceData>::GetData(const A3DAsmProductOccurrence* InAsmProductOccurrencePtr)
 	{
-		return A3DAsmProductOccurrenceGetUg(InAsmProductOccurrencePtr, &OutData);
+		return A3DAsmProductOccurrenceGet(InAsmProductOccurrencePtr, &Data);
 	}
 
-	A3DStatus TUniqueTSObj<A3DGraphicsData>::GetData(const A3DGraphics* InGraphicsPtr, A3DGraphicsData& OutData)
+	A3DStatus TUniqueTSObj<A3DAsmProductOccurrenceDataCV5>::GetData(const A3DAsmProductOccurrence* InAsmProductOccurrencePtr)
 	{
-		return A3DGraphicsGet(InGraphicsPtr, &OutData);
+		return A3DAsmProductOccurrenceGetCV5(InAsmProductOccurrencePtr, &Data);
 	}
 
-	A3DStatus TUniqueTSObj<A3DMiscAttributeData>::GetData(const A3DMiscAttribute* InMiscAttributePtr, A3DMiscAttributeData& OutData)
+	A3DStatus TUniqueTSObj<A3DAsmProductOccurrenceDataSLW>::GetData(const A3DAsmProductOccurrence* InAsmProductOccurrencePtr)
 	{
-		return A3DMiscAttributeGet(InMiscAttributePtr, &OutData);
+		return A3DAsmProductOccurrenceGetSLW(InAsmProductOccurrencePtr, &Data);
 	}
 
-	A3DStatus TUniqueTSObj<A3DMiscCartesianTransformationData>::GetData(const A3DMiscCartesianTransformation* InMiscCartesianTransformationPtr, A3DMiscCartesianTransformationData& OutData)
+	A3DStatus TUniqueTSObj<A3DAsmProductOccurrenceDataUg>::GetData(const A3DAsmProductOccurrence* InAsmProductOccurrencePtr)
 	{
-		return A3DMiscCartesianTransformationGet(InMiscCartesianTransformationPtr, &OutData);
+		return A3DAsmProductOccurrenceGetUg(InAsmProductOccurrencePtr, &Data);
 	}
 
-	A3DStatus TUniqueTSObj<A3DMiscGeneralTransformationData>::GetData(const A3DMiscGeneralTransformation* InMiscGeneralTransformationPtr, A3DMiscGeneralTransformationData& OutData)
+	A3DStatus TUniqueTSObj<A3DGraphicsData>::GetData(const A3DGraphics* InGraphicsPtr)
 	{
-		return A3DMiscGeneralTransformationGet(InMiscGeneralTransformationPtr, &OutData);
+		return A3DGraphicsGet(InGraphicsPtr, &Data);
 	}
 
-	A3DStatus TUniqueTSObj<A3DMiscMaterialPropertiesData>::GetData(const A3DEntity* InMiscMaterialPropertiesPtr, A3DMiscMaterialPropertiesData& OutData)
+	A3DStatus TUniqueTSObjFromIndex<A3DGraphMaterialData>::GetData(uint32 InGraphicsIndex)
 	{
-		return A3DMiscGetMaterialProperties(InMiscMaterialPropertiesPtr, &OutData);
+		return A3DGlobalGetGraphMaterialData(InGraphicsIndex, &Data);
 	}
 
-	A3DStatus TUniqueTSObj<A3DRiBrepModelData>::GetData(const A3DRiBrepModel* InRiBrepModelPtr, A3DRiBrepModelData& OutData)
+	A3DStatus TUniqueTSObjFromIndex<A3DGraphRgbColorData>::GetData(uint32 ObjectIndex)
 	{
-		return A3DRiBrepModelGet(InRiBrepModelPtr, &OutData);
+		return A3DGlobalGetGraphRgbColorData(ObjectIndex, &Data);
 	}
 
-	A3DStatus TUniqueTSObj<A3DRiCoordinateSystemData>::GetData(const A3DRiCoordinateSystem* InRiCoordinateSystemPtr, A3DRiCoordinateSystemData& OutData)
+	A3DStatus TUniqueTSObjFromIndex<A3DGraphStyleData>::GetData(uint32 ObjectIndex)
 	{
-		return A3DRiCoordinateSystemGet(InRiCoordinateSystemPtr, &OutData);
+		return A3DGlobalGetGraphStyleData(ObjectIndex, &Data);
 	}
 
-	A3DStatus TUniqueTSObj<A3DRiDirectionData>::GetData(const A3DRiDirection* InRiDirectionPtr, A3DRiDirectionData& OutData)
+	A3DStatus TUniqueTSObj<A3DMiscAttributeData>::GetData(const A3DMiscAttribute* InMiscAttributePtr)
 	{
-		return A3DRiDirectionGet(InRiDirectionPtr, &OutData);
+		return A3DMiscAttributeGet(InMiscAttributePtr, &Data);
 	}
 
-	A3DStatus TUniqueTSObj<A3DRiPolyBrepModelData>::GetData(const A3DRiPolyBrepModel* InRiPolyBrepModelPtr, A3DRiPolyBrepModelData& OutData)
+	A3DStatus TUniqueTSObj<A3DMiscCartesianTransformationData>::GetData(const A3DMiscCartesianTransformation* InMiscCartesianTransformationPtr)
 	{
-		return A3DRiPolyBrepModelGet(InRiPolyBrepModelPtr, &OutData);
+		return A3DMiscCartesianTransformationGet(InMiscCartesianTransformationPtr, &Data);
 	}
 
-	A3DStatus TUniqueTSObj<A3DRiRepresentationItemData>::GetData(const A3DRiRepresentationItem* InRiRepresentationItemPtr, A3DRiRepresentationItemData& OutData)
+	A3DStatus TUniqueTSObj<A3DMiscGeneralTransformationData>::GetData(const A3DMiscGeneralTransformation* InMiscGeneralTransformationPtr)
 	{
-		return A3DRiRepresentationItemGet(InRiRepresentationItemPtr, &OutData);
+		return A3DMiscGeneralTransformationGet(InMiscGeneralTransformationPtr, &Data);
 	}
 
-	A3DStatus TUniqueTSObj<A3DRiSetData>::GetData(const A3DRiSet* InRiSetPtr, A3DRiSetData& OutData)
+	A3DStatus TUniqueTSObj<A3DMiscMaterialPropertiesData>::GetData(const A3DEntity* InMiscMaterialPropertiesPtr)
 	{
-		return A3DRiSetGet(InRiSetPtr, &OutData);
+		return A3DMiscGetMaterialProperties(InMiscMaterialPropertiesPtr, &Data);
 	}
 
-	A3DStatus TUniqueTSObj<A3DRootBaseData>::GetData(const A3DRootBase* InRootBasePtr, A3DRootBaseData& OutData)
+	A3DStatus TUniqueTSObj<A3DRiBrepModelData>::GetData(const A3DRiBrepModel* InRiBrepModelPtr)
 	{
-		return A3DRootBaseGet(InRootBasePtr, &OutData);
+		return A3DRiBrepModelGet(InRiBrepModelPtr, &Data);
 	}
 
-	A3DStatus TUniqueTSObj<A3DRootBaseWithGraphicsData>::GetData(const A3DRootBaseWithGraphics* InRootBaseWithGraphicsPtr, A3DRootBaseWithGraphicsData& OutData)
+	A3DStatus TUniqueTSObj<A3DRiCoordinateSystemData>::GetData(const A3DRiCoordinateSystem* InRiCoordinateSystemPtr)
 	{
-		return A3DRootBaseWithGraphicsGet(InRootBaseWithGraphicsPtr, &OutData);
+		return A3DRiCoordinateSystemGet(InRiCoordinateSystemPtr, &Data);
 	}
 
-	A3DStatus TUniqueTSObj<A3DTess3DData>::GetData(const A3DTess3D* InTess3DPtr, A3DTess3DData& OutData)
+	A3DStatus TUniqueTSObj<A3DRiDirectionData>::GetData(const A3DRiDirection* InRiDirectionPtr)
 	{
-		return A3DTess3DGet(InTess3DPtr, &OutData);
+		return A3DRiDirectionGet(InRiDirectionPtr, &Data);
 	}
 
-	A3DStatus TUniqueTSObj<A3DTessBaseData>::GetData(const A3DTessBase* InTessBasePtr, A3DTessBaseData& OutData)
+	A3DStatus TUniqueTSObj<A3DRiPolyBrepModelData>::GetData(const A3DRiPolyBrepModel* InRiPolyBrepModelPtr)
 	{
-		return A3DTessBaseGet(InTessBasePtr, &OutData);
+		return A3DRiPolyBrepModelGet(InRiPolyBrepModelPtr, &Data);
 	}
 
-	A3DStatus TUniqueTSObj<A3DTopoBrepDataData>::GetData(const A3DTopoBrepData* InTopoBrepDataPtr, A3DTopoBrepDataData& OutData)
+	A3DStatus TUniqueTSObj<A3DRiRepresentationItemData>::GetData(const A3DRiRepresentationItem* InRiRepresentationItemPtr)
 	{
-		return A3DTopoBrepDataGet(InTopoBrepDataPtr, &OutData);
+		return A3DRiRepresentationItemGet(InRiRepresentationItemPtr, &Data);
 	}
 
-	A3DStatus TUniqueTSObj<A3DTopoEdgeData>::GetData(const A3DTopoEdge* InTopoEdgePtr, A3DTopoEdgeData& OutData)
+	A3DStatus TUniqueTSObj<A3DRiSetData>::GetData(const A3DRiSet* InRiSetPtr)
 	{
-		return A3DTopoEdgeGet(InTopoEdgePtr, &OutData);
+		return A3DRiSetGet(InRiSetPtr, &Data);
 	}
 
-	A3DStatus TUniqueTSObj<A3DTopoFaceData>::GetData(const A3DTopoFace* InTopoFacePtr, A3DTopoFaceData& OutData)
+	A3DStatus TUniqueTSObj<A3DRootBaseData>::GetData(const A3DRootBase* InRootBasePtr)
 	{
-		return A3DTopoFaceGet(InTopoFacePtr, &OutData);
+		return A3DRootBaseGet(InRootBasePtr, &Data);
 	}
 
-	A3DStatus TUniqueTSObj<A3DTopoUniqueVertexData>::GetData(const A3DTopoUniqueVertex* InTopoUniqueVertexPtr, A3DTopoUniqueVertexData& OutData)
+	A3DStatus TUniqueTSObj<A3DRootBaseWithGraphicsData>::GetData(const A3DRootBaseWithGraphics* InRootBaseWithGraphicsPtr)
 	{
-		return A3DTopoUniqueVertexGet(InTopoUniqueVertexPtr, &OutData);
+		return A3DRootBaseWithGraphicsGet(InRootBaseWithGraphicsPtr, &Data);
 	}
 
-	A3DStatus TUniqueTSObj<A3DTopoWireEdgeData>::GetData(const A3DTopoWireEdge* InTopoWireEdgePtr, A3DTopoWireEdgeData& OutData)
+	A3DStatus TUniqueTSObj<A3DTess3DData>::GetData(const A3DTess3D* InTess3DPtr)
 	{
-		return A3DTopoWireEdgeGet(InTopoWireEdgePtr, &OutData);
+		return A3DTess3DGet(InTess3DPtr, &Data);
 	}
+
+	A3DStatus TUniqueTSObj<A3DTessBaseData>::GetData(const A3DTessBase* InTessBasePtr)
+	{
+		return A3DTessBaseGet(InTessBasePtr, &Data);
+	}
+
+	A3DStatus TUniqueTSObj<A3DTopoBrepDataData>::GetData(const A3DTopoBrepData* InTopoBrepDataPtr)
+	{
+		return A3DTopoBrepDataGet(InTopoBrepDataPtr, &Data);
+	}
+
+	A3DStatus TUniqueTSObj<A3DTopoEdgeData>::GetData(const A3DTopoEdge* InTopoEdgePtr)	
+	{
+		return A3DTopoEdgeGet(InTopoEdgePtr, &Data);
+	}
+
+	A3DStatus TUniqueTSObj<A3DTopoFaceData>::GetData(const A3DTopoFace* InTopoFacePtr)
+	{
+		return A3DTopoFaceGet(InTopoFacePtr, &Data);
+	}
+
+	A3DStatus TUniqueTSObj<A3DTopoUniqueVertexData>::GetData(const A3DTopoUniqueVertex* InTopoUniqueVertexPtr)
+	{
+		return A3DTopoUniqueVertexGet(InTopoUniqueVertexPtr, &Data);
+	}
+
+	A3DStatus TUniqueTSObj<A3DTopoWireEdgeData>::GetData(const A3DTopoWireEdge* InTopoWireEdgePtr)
+	{
+		return A3DTopoWireEdgeGet(InTopoWireEdgePtr, &Data);
+	}
+
+
+	uint32 TUniqueTSObjFromIndex<A3DGraphMaterialData>::DefaultValue = A3D_DEFAULT_MATERIAL_INDEX;
+	uint32 TUniqueTSObjFromIndex<A3DGraphPictureData>::DefaultValue = A3D_DEFAULT_MATERIAL_INDEX;
+	uint32 TUniqueTSObjFromIndex<A3DGraphRgbColorData>::DefaultValue = A3D_DEFAULT_COLOR_INDEX;
+	uint32 TUniqueTSObjFromIndex<A3DGraphStyleData>::DefaultValue = A3D_DEFAULT_STYLE_INDEX;
+
 #endif
 
 }

@@ -31,57 +31,57 @@ namespace CADLibrary
 	// A3D_INITIALIZE_DATA, and all A3DXXXXXXGet methods are TechSoft macro
 	//
 
-	template<class ObjectType>
-	class TUniqueTSObj
+	template<class ObjectType, class IndexerType>
+	class TUniqueTSObjBase
 	{
 	public:
 
 		/**
 		 * Constructor of an initialized ObjectType object
 		 */
-		explicit TUniqueTSObj()
+		explicit TUniqueTSObjBase()
 		{
-			InitializeData(Data);
+			InitializeData();
 		}
 
 		/**
 		 * Constructor of an filled ObjectType object with the data of DataPtr
 		 * @param DataPtr: the pointer of the data to copy
 		 */
-		explicit TUniqueTSObj(const A3DEntity* DataPtr)
+		explicit TUniqueTSObjBase(IndexerType DataPtr)
 		{
 			//TechSoftInterfaceImpl::InitializeData(Data);
-			InitializeData(Data);
+			InitializeData();
 
-			Status = GetData(DataPtr, Data);
+			Status = GetData(DataPtr);
 		}
 
-		~TUniqueTSObj()
+		~TUniqueTSObjBase()
 		{
-			GetData(NULL, Data);
+			ResetData();
 		}
 
 		/**
 		 * Fill the structure with the data of a new DataPtr
 		 */
-		A3DStatus Get(const A3DEntity* DataPtr)
+		A3DStatus Get(IndexerType DataPtr)
 		{
 			if (IsValid())
 			{
-				Status = GetData(NULL, Data);
+				Status = ResetData();
 			}
 			else
 			{
 				Status = A3DStatus::A3D_SUCCESS;
 			}
 
-			if (!IsValid() || (DataPtr == NULL))
+			if (!IsValid() || (DataPtr == DefaultValue))
 			{
 				Status = A3DStatus::A3D_ERROR;
 				return Status;
 			}
 
-			Status = GetData(DataPtr, Data);
+			Status = GetData(DataPtr);
 			return Status;
 		}
 
@@ -90,7 +90,7 @@ namespace CADLibrary
 		 */
 		void Reset()
 		{
-			Get(NULL);
+			ResetData();
 		}
 
 		/**
@@ -112,8 +112,8 @@ namespace CADLibrary
 		}
 
 		// Non-copyable
-		TUniqueTSObj(const TUniqueTSObj&) = delete;
-		TUniqueTSObj& operator=(const TUniqueTSObj&) = delete;
+		TUniqueTSObjBase(const TUniqueTSObjBase&) = delete;
+		TUniqueTSObjBase& operator=(const TUniqueTSObjBase&) = delete;
 
 		// Conversion methods
 
@@ -150,21 +150,18 @@ namespace CADLibrary
 			return &Data;
 		}
 
-
-
 	private:
 		ObjectType Data;
 		A3DStatus Status = A3DStatus::A3D_ERROR;
 
-		void InitializeData(ObjectType& Data)
-#ifdef USE_TECHSOFT_SDK
-			;
-#else
-		{
-		}
-#endif
+		/**
+		 * DefaultValue is used to initialize "Data" with GetData method
+		 * According to IndexerType, the value is either nullptr for const A3DEntity* either something like "A3D_DEFAULT_MATERIAL_INDEX" ((A3DUns16)-1) for uint32
+		 * @see ResetData
+		 */
+		static IndexerType DefaultValue;
 
-		A3DStatus GetData(const A3DEntity* AsmModelFilePtr, ObjectType& OutData)
+		void InitializeData()
 #ifdef USE_TECHSOFT_SDK
 			;
 #else
@@ -173,7 +170,30 @@ namespace CADLibrary
 		}
 #endif
 
+		A3DStatus GetData(IndexerType AsmModelFilePtr);
+#ifdef USE_TECHSOFT_SDK
+		;
+#else
+		{
+			return A3DStatus::A3D_ERROR;
+		}
+#endif
+
+		A3DStatus ResetData()
+		{
+			return GetData(DefaultValue);
+		}
 	};
+
+	template<class ObjectType>
+	using TUniqueTSObj = TUniqueTSObjBase<ObjectType, const A3DEntity*>;
+
+	template<class ObjectType>
+	using TUniqueTSObjFromIndex = TUniqueTSObjBase<ObjectType, uint32>;
+
+	template<class ObjectType, class IndexerType>
+	IndexerType TUniqueTSObjBase<ObjectType, IndexerType>::DefaultValue = (IndexerType) nullptr;
+
 }
 
 #endif
