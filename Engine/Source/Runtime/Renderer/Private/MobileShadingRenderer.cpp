@@ -167,7 +167,7 @@ static void RenderOpaqueFX(
 	}
 }
 
-BEGIN_SHADER_PARAMETER_STRUCT(FMobileRenderPassParameters, )
+BEGIN_SHADER_PARAMETER_STRUCT(FMobileRenderPassParameters, RENDERER_API)
 	SHADER_PARAMETER_STRUCT_INCLUDE(FViewShaderParameters, View)
 	SHADER_PARAMETER_RDG_UNIFORM_BUFFER(FMobileBasePassUniformParameters, MobileBasePass)
 	RDG_BUFFER_ACCESS_ARRAY(DrawIndirectArgsBuffers)

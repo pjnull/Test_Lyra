@@ -233,7 +233,7 @@ bool FDeferredShadingSceneRenderer::ShouldRenderDistortion() const
 	return false;
 }
 
-BEGIN_SHADER_PARAMETER_STRUCT(FDistortionPassParameters, )
+BEGIN_SHADER_PARAMETER_STRUCT(FDistortionPassParameters, RENDERER_API)
 	SHADER_PARAMETER_STRUCT_INCLUDE(FViewShaderParameters, View)
 	SHADER_PARAMETER_RDG_UNIFORM_BUFFER(FDistortionPassUniformParameters, Pass)
 	SHADER_PARAMETER_STRUCT_INCLUDE(FInstanceCullingDrawParams, InstanceCullingDrawParams)
