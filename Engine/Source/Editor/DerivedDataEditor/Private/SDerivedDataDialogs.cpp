@@ -597,7 +597,7 @@ TSharedRef<SWidget> SDerivedDataCacheStatisticsDialog::GetGridPanel()
 		.ColorAndOpacity(TitleColor)
 		.Font(TitleFont)
 		.Justification(ETextJustify::Left)
-		.Text(LOCTEXT("HitPercentage", "Hit%"))
+		.Text(LOCTEXT("Location", "Location"))
 	];
 
 	Panel->AddSlot(2, Row)
@@ -607,7 +607,7 @@ TSharedRef<SWidget> SDerivedDataCacheStatisticsDialog::GetGridPanel()
 		.ColorAndOpacity(TitleColor)
 		.Font(TitleFont)
 		.Justification(ETextJustify::Left)
-		.Text(LOCTEXT("Read", "Read"))
+		.Text(LOCTEXT("HitPercentage", "Hit%"))
 	];
 
 	Panel->AddSlot(3, Row)
@@ -616,7 +616,7 @@ TSharedRef<SWidget> SDerivedDataCacheStatisticsDialog::GetGridPanel()
 		.Margin(FMargin(ColumnMargin, RowMargin, 0.0f, TitleMargin))
 		.ColorAndOpacity(TitleColor)
 		.Font(TitleFont)
-		.Justification(ETextJustify::Center)
+		.Justification(ETextJustify::Left)
 		.Text(LOCTEXT("Read", "Read"))
 	];
 
@@ -626,11 +626,21 @@ TSharedRef<SWidget> SDerivedDataCacheStatisticsDialog::GetGridPanel()
 		.Margin(FMargin(ColumnMargin, RowMargin, 0.0f, TitleMargin))
 		.ColorAndOpacity(TitleColor)
 		.Font(TitleFont)
+		.Justification(ETextJustify::Center)
+		.Text(LOCTEXT("Read", "Read"))
+	];
+
+	Panel->AddSlot(5, Row)
+	[
+		SNew(STextBlock)
+		.Margin(FMargin(ColumnMargin, RowMargin, 0.0f, TitleMargin))
+		.ColorAndOpacity(TitleColor)
+		.Font(TitleFont)
 		.Justification(ETextJustify::Left)
 		.Text(LOCTEXT("Write", "Write"))
 	];
 
-	Panel->AddSlot(5, Row)
+	Panel->AddSlot(6, Row)
 	[
 		SNew(STextBlock)
 		.Margin(FMargin(ColumnMargin, RowMargin, 0.0f, TitleMargin))
@@ -649,23 +659,18 @@ TSharedRef<SWidget> SDerivedDataCacheStatisticsDialog::GetGridPanel()
 	{
 		const FDerivedDataBackendInterface* Backend = Node->GetBackendInterface();
 
-		if (Backend->GetDisplayName().Equals("Memory"))
+		if (Backend->GetDisplayName().Equals("Memory") || Backend->IsWrapper())
 			continue;
-
-		FDerivedDataCacheUsageStats Stats;
-
-		if (Backend->IsWrapper())
-		{
-			// Skip over wrappers
-			continue;
-		}
 
 		TSharedRef<FDerivedDataCacheStatsNode> Usage = Backend->GatherUsageStats();
+		FDerivedDataCacheUsageStats Stats;
+
 		for (const auto& KVP : Usage->Stats)
 		{
 			Stats.Combine(KVP.Value);
 		}
 
+		
 		const int64 TotalGetBytes = Stats.GetStats.GetAccumulatedValueAnyThread(FCookStats::CallStats::EHitOrMiss::Hit, FCookStats::CallStats::EStatType::Bytes);
 		const int64 TotalPutBytes = Stats.PutStats.GetAccumulatedValueAnyThread(FCookStats::CallStats::EHitOrMiss::Hit, FCookStats::CallStats::EStatType::Bytes);
 		const int64 TotalPrefetchBytes = Stats.PrefetchStats.GetAccumulatedValueAnyThread(FCookStats::CallStats::EHitOrMiss::Hit, FCookStats::CallStats::EStatType::Bytes);
@@ -694,7 +699,7 @@ TSharedRef<SWidget> SDerivedDataCacheStatisticsDialog::GetGridPanel()
 
 		const double HitPercentage = TotalRequests > 0 ? (100.0 * (TotalGets_Hit / (double)TotalRequests)) : 0.0;
 
-		Panel->AddSlot(1, Row)
+		Panel->AddSlot(2, Row)
 			.HAlign(HAlign_Left)
 			[
 			SNew(STextBlock)
@@ -707,7 +712,7 @@ TSharedRef<SWidget> SDerivedDataCacheStatisticsDialog::GetGridPanel()
 
 		SumTotalGetMB += TotalGetMB;
 
-		Panel->AddSlot(2, Row)
+		Panel->AddSlot(3, Row)
 		.HAlign(HAlign_Left)
 		[
 			SNew(STextBlock)
@@ -720,7 +725,7 @@ TSharedRef<SWidget> SDerivedDataCacheStatisticsDialog::GetGridPanel()
 
 		SumTotalPutMB += TotalPutMB;
 
-		Panel->AddSlot(3, Row)
+		Panel->AddSlot(4, Row)
 		.HAlign(HAlign_Left)
 		[
 			SNew(STextBlock)
@@ -729,7 +734,7 @@ TSharedRef<SWidget> SDerivedDataCacheStatisticsDialog::GetGridPanel()
 			.Text(FText::FromString(SingleDecimalFormat(TotalPutMB) + TEXT(" MB")))
 		];
 
-		Panel->AddSlot(4, Row)
+		Panel->AddSlot(5, Row)
 		[
 			SNew(STextBlock)
 			.Margin(FMargin(ColumnMargin, RowMargin))
@@ -737,7 +742,7 @@ TSharedRef<SWidget> SDerivedDataCacheStatisticsDialog::GetGridPanel()
 			.Text(FText::FromString(SingleDecimalFormat(TotalPutMB) + TEXT(" MB")))
 		];
 
-		Panel->AddSlot(5, Row)
+		Panel->AddSlot(6, Row)
 		.HAlign(HAlign_Left)
 		[
 			SNew(STextBlock)
@@ -759,7 +764,7 @@ TSharedRef<SWidget> SDerivedDataCacheStatisticsDialog::GetGridPanel()
 			.Text(FText::FromString(TEXT("Total")))	
 		];
 
-	Panel->AddSlot(2, Row)
+	Panel->AddSlot(3, Row)
 		.HAlign(HAlign_Right)
 		[
 		SNew(STextBlock)
@@ -770,7 +775,7 @@ TSharedRef<SWidget> SDerivedDataCacheStatisticsDialog::GetGridPanel()
 		.Text(FText::FromString(SingleDecimalFormat(SumTotalGetMB) + TEXT(" MB")))
 		];
 
-	Panel->AddSlot(3, Row)
+	Panel->AddSlot(4, Row)
 		.HAlign(HAlign_Right)
 		[
 		SNew(STextBlock)
