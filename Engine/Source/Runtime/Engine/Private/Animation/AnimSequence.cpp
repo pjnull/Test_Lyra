@@ -2320,18 +2320,8 @@ void UAnimSequence::BakeOutVirtualBoneTracks(TArray<FRawAnimSequenceTrack>& NewR
 	
 	const TArray<FBoneAnimationTrack>& BoneAnimationTracks = ResampledAnimationTrackData;
 
-	// Presize outgoing arrays
-	const int32 NumAnimationTracks = DataModel->GetNumBoneTracks();
-	NewRawTracks.Reset(NumAnimationTracks);
-	NewAnimationTrackNames.Reset(NumAnimationTracks);
-	NewTrackToSkeletonMapTable.Reset(NumAnimationTracks);
-
-	for (const FBoneAnimationTrack& Track : BoneAnimationTracks)
+	for (FRawAnimSequenceTrack& RawTrack : NewRawTracks)
 	{
-		FRawAnimSequenceTrack& RawTrack = NewRawTracks.Add_GetRef(Track.InternalTrackData);
-		NewAnimationTrackNames.Add(Track.Name);
-		NewTrackToSkeletonMapTable.Add(Track.BoneTreeIndex);
-
 		UE::Anim::Compression::SanitizeRawAnimSequenceTrack(RawTrack);
 	}
 
