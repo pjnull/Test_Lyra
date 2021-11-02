@@ -1066,6 +1066,8 @@ namespace Metasound
 
 		void FGraphBuilder::RegisterGraphWithFrontend(UObject& InMetaSound)
 		{
+			using namespace Frontend;
+
 			FMetasoundAssetBase* MetaSoundAsset = IMetasoundUObjectRegistry::Get().GetObjectAsAssetBase(&InMetaSound);
 			check(MetaSoundAsset);
 

@@ -11,7 +11,6 @@
 #include "MetasoundGraph.h"
 #include "MetasoundVertex.h"
 
-class IMetaSoundAssetManager;
 
 /* Metasound Controllers and Handles provide a object oriented interface for  manipulating Metasound Documents. 
  *
@@ -40,12 +39,13 @@ namespace Metasound
 	namespace Frontend
 	{
 		// Forward declare 
+		class IDocumentController;
+		class IGraphController;
 		class IInputController;
+		class IMetaSoundAssetManager;
+		class INodeController;
 		class IOutputController;
 		class IVariableController;
-		class INodeController;
-		class IGraphController;
-		class IDocumentController;
 
 		// Metasound Frontend Handles are all TSharedRefs of various Metasound Frontend Controllers.
 		using FInputHandle = TSharedRef<IInputController>;

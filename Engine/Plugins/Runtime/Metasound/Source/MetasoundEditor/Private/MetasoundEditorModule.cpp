@@ -15,6 +15,7 @@
 #include "IDetailCustomization.h"
 #include "ISettingsModule.h"
 #include "Metasound.h"
+#include "MetasoundAssetSubsystem.h"
 #include "MetasoundAssetTypeActions.h"
 #include "MetasoundAudioBuffer.h"
 #include "MetasoundDetailCustomization.h"
