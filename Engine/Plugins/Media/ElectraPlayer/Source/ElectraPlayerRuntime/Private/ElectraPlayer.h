@@ -382,6 +382,7 @@ private:
 
 	FPlaybackRange									CurrentPlaybackRange;
 	TOptional<bool>									bFrameAccurateSeeking;
+	TOptional<bool>									bEnableLooping;
 
 	TOptional<FVideoStreamFormat>					CurrentlyActiveVideoStreamFormat;
 

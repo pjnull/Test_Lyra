@@ -36,8 +36,33 @@
 namespace Electra
 {
 
-	namespace
+	class FAndroidJavaH265VideoDecoder : public IAndroidJavaH265VideoDecoder
+		, public FJavaClassObject
 	{
+	public:
+
+		FAndroidJavaH265VideoDecoder(IPlayerSessionServices* InPlayerSessionServices);
+		virtual ~FAndroidJavaH265VideoDecoder();
+
+		virtual int32 CreateDecoder() override;
+		virtual int32 InitializeDecoder(const FCreateParameters& InCreateParams) override;
+		virtual int32 SetOutputSurface(jobject InNewOutputSurface) override;
+		virtual int32 ReleaseDecoder() override;
+		virtual const FDecoderInformation* GetDecoderInformation() override;
+		virtual int32 Start() override;
+		virtual int32 Stop() override;
+		virtual int32 Flush() override;
+		virtual int32 Reset() override;
+		virtual int32 DequeueInputBuffer(int32 InTimeoutUsec) override;
+		virtual int32 QueueInputBuffer(int32 InBufferIndex, const void* InAccessUnitData, int32 InAccessUnitSize, int64 InTimestampUSec) override;
+		virtual int32 QueueCSDInputBuffer(int32 InBufferIndex, const void* InCSDData, int32 InCSDSize, int64 InTimestampUSec) override;
+		virtual int32 QueueEOSInputBuffer(int32 InBufferIndex, int64 InTimestampUSec) override;
+		virtual int32 GetOutputFormatInfo(FOutputFormatInfo& OutFormatInfo, int32 InOutputBufferIndex) override;
+		virtual int32 DequeueOutputBuffer(FOutputBufferInfo& OutBufferInfo, int32 InTimeoutUsec) override;
+		virtual int32 GetOutputBuffer(void*& OutBufferDataPtr, int32 OutBufferDataSize, const FOutputBufferInfo& InOutBufferInfo) override;
+		virtual int32 ReleaseOutputBuffer(int32 BufferIndex, int32 ValidCount, bool bRender, int64 releaseAt) override;
+
+	private:
 		//-----------------------------------------------------------------------------
 		/**
 		 * Posts an error to the session service error listeners.
@@ -94,39 +119,7 @@ namespace Electra
 				JEnv->ExceptionClear();
 			}
 		}
-	}
 
-
-
-
-
-	class FAndroidJavaH265VideoDecoder : public IAndroidJavaH265VideoDecoder
-		, public FJavaClassObject
-	{
-	public:
-
-		FAndroidJavaH265VideoDecoder(IPlayerSessionServices* InPlayerSessionServices);
-		virtual ~FAndroidJavaH265VideoDecoder();
-
-		virtual int32 CreateDecoder() override;
-		virtual int32 InitializeDecoder(const FCreateParameters& InCreateParams) override;
-		virtual int32 SetOutputSurface(jobject InNewOutputSurface) override;
-		virtual int32 ReleaseDecoder() override;
-		virtual const FDecoderInformation* GetDecoderInformation() override;
-		virtual int32 Start() override;
-		virtual int32 Stop() override;
-		virtual int32 Flush() override;
-		virtual int32 Reset() override;
-		virtual int32 DequeueInputBuffer(int32 InTimeoutUsec) override;
-		virtual int32 QueueInputBuffer(int32 InBufferIndex, const void* InAccessUnitData, int32 InAccessUnitSize, int64 InTimestampUSec) override;
-		virtual int32 QueueCSDInputBuffer(int32 InBufferIndex, const void* InCSDData, int32 InCSDSize, int64 InTimestampUSec) override;
-		virtual int32 QueueEOSInputBuffer(int32 InBufferIndex, int64 InTimestampUSec) override;
-		virtual int32 GetOutputFormatInfo(FOutputFormatInfo& OutFormatInfo, int32 InOutputBufferIndex) override;
-		virtual int32 DequeueOutputBuffer(FOutputBufferInfo& OutBufferInfo, int32 InTimeoutUsec) override;
-		virtual int32 GetOutputBuffer(void*& OutBufferDataPtr, int32 OutBufferDataSize, const FOutputBufferInfo& InOutBufferInfo) override;
-		virtual int32 ReleaseOutputBuffer(int32 BufferIndex, int32 ValidCount, bool bRender, int64 releaseAt) override;
-
-	private:
 		static FName GetClassName()
 		{
 			return FName("com/epicgames/unreal/ElectraVideoDecoderH265");

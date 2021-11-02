@@ -285,6 +285,10 @@ bool FElectraPlayer::OpenInternal(const FString& Url, const FParamDict& PlayerOp
 	{
 		SetFrameAccurateSeekMode(bFrameAccurateSeeking.GetValue());
 	}
+	if (bEnableLooping.IsSet())
+	{
+		SetLooping(bEnableLooping.GetValue());
+	}
 	if (CurrentPlaybackRange.Start.IsSet() || CurrentPlaybackRange.End.IsSet())
 	{
 		SetPlaybackRange(CurrentPlaybackRange);
@@ -331,6 +335,8 @@ void FElectraPlayer::CloseInternal(bool bKillAfterClose)
 	PlaystartOptions.InitialAudioTrackAttributes.Reset();
 	CurrentPlaybackRange.Start.Reset();
 	CurrentPlaybackRange.End.Reset();
+	bFrameAccurateSeeking.Reset();
+	bEnableLooping.Reset();
 
 	// Next we detach ourselves from the renderers. This ensures we do not get any further data from them
 	// via OnVideoDecoded() and OnAudioDecoded(). It also means we do not get any calls to OnVideoFlush() and OnAudioFlush()
@@ -836,11 +842,12 @@ bool FElectraPlayer::IsLooping() const
 		CurrentPlayer->AdaptivePlayer->GetLoopState(loopState);
 		return loopState.bIsEnabled;
 	}
-	return false;
+	return bEnableLooping.IsSet() ? bEnableLooping.GetValue() : false;
 }
 
 bool FElectraPlayer::SetLooping(bool bLooping)
 {
+	bEnableLooping = bLooping;
 	if (CurrentPlayer.Get())
 	{
 		IAdaptiveStreamingPlayer::FLoopParam loop;
