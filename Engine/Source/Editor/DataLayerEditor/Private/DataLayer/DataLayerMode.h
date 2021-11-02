@@ -68,6 +68,8 @@ public:
 	void DeleteItems(const TArray<TWeakPtr<ISceneOutlinerTreeItem>>& Items);
 	SDataLayerBrowser* GetDataLayerBrowser() const;
 
+	void BuildWorldPickerMenu(FMenuBuilder& MenuBuilder);
+
 protected:
 	virtual TUniquePtr<ISceneOutlinerHierarchy> CreateHierarchy() override;
 
@@ -86,6 +88,8 @@ private:
 	/* Private Helpers */
 	void RegisterContextMenu();
 	void ChooseRepresentingWorld();
+	void OnSelectWorld(TWeakObjectPtr<UWorld> World);
+	bool IsWorldChecked(TWeakObjectPtr<UWorld> World) const;
 	TArray<AActor*> GetActorsFromOperation(const FDragDropOperation& Operation, bool bOnlyFindFirst = false) const;
 	TArray<UDataLayer*> GetDataLayersFromOperation(const FDragDropOperation& Operation, bool bOnlyFindFirst = false) const;
 	TArray<UDataLayer*> GetSelectedDataLayers(SSceneOutliner* InSceneOutliner) const;

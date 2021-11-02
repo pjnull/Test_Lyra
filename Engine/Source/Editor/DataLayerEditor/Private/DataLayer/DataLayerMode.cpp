@@ -10,6 +10,7 @@
 #include "DataLayerHierarchy.h"
 #include "DataLayerActorTreeItem.h"
 #include "DataLayerTreeItem.h"
+#include "WorldTreeItem.h"
 #include "WorldPartition/WorldPartitionEditorPerProjectUserSettings.h"
 #include "DataLayerDragDropOp.h"
 #include "ActorDescTreeItem.h"
@@ -1054,6 +1055,65 @@ void FDataLayerMode::CreateViewContent(FMenuBuilder& MenuBuilder)
 		EUserInterfaceActionType::ToggleButton
 	);
 	MenuBuilder.EndSection();
+
+	MenuBuilder.BeginSection("AssetThumbnails", LOCTEXT("ShowWorldHeading", "World"));
+	MenuBuilder.AddSubMenu(
+		LOCTEXT("ChooseWorldSubMenu", "Choose World"),
+		LOCTEXT("ChooseWorldSubMenuToolTip", "Choose the world to display in the outliner."),
+		FNewMenuDelegate::CreateRaw(this, &FDataLayerMode::BuildWorldPickerMenu)
+	);
+	MenuBuilder.EndSection();
+}
+
+void FDataLayerMode::BuildWorldPickerMenu(FMenuBuilder& MenuBuilder)
+{
+	MenuBuilder.BeginSection("Worlds", LOCTEXT("WorldsHeading", "Worlds"));
+	{
+		MenuBuilder.AddMenuEntry(
+			LOCTEXT("AutoWorld", "Auto"),
+			LOCTEXT("AutoWorldToolTip", "Automatically pick the world to display based on context."),
+			FSlateIcon(),
+			FUIAction(
+				FExecuteAction::CreateRaw(this, &FDataLayerMode::OnSelectWorld, TWeakObjectPtr<UWorld>()),
+				FCanExecuteAction(),
+				FIsActionChecked::CreateRaw(this, &FDataLayerMode::IsWorldChecked, TWeakObjectPtr<UWorld>())
+			),
+			NAME_None,
+			EUserInterfaceActionType::RadioButton
+		);
+
+		for (const FWorldContext& Context : GEngine->GetWorldContexts())
+		{
+			UWorld* World = Context.World();
+			if (World && (World->WorldType == EWorldType::PIE || Context.WorldType == EWorldType::Editor))
+			{
+				MenuBuilder.AddMenuEntry(
+					SceneOutliner::GetWorldDescription(World),
+					LOCTEXT("ChooseWorldToolTip", "Display actors for this world."),
+					FSlateIcon(),
+					FUIAction(
+						FExecuteAction::CreateRaw(this, &FDataLayerMode::OnSelectWorld, MakeWeakObjectPtr(World)),
+						FCanExecuteAction(),
+						FIsActionChecked::CreateRaw(this, &FDataLayerMode::IsWorldChecked, MakeWeakObjectPtr(World))
+					),
+					NAME_None,
+					EUserInterfaceActionType::RadioButton
+				);
+			}
+		}
+	}
+	MenuBuilder.EndSection();
+}
+
+void FDataLayerMode::OnSelectWorld(TWeakObjectPtr<UWorld> World)
+{
+	UserChosenWorld = World;
+	SceneOutliner->FullRefresh();
+}
+
+bool FDataLayerMode::IsWorldChecked(TWeakObjectPtr<UWorld> World) const
+{
+	return (UserChosenWorld == World) || (World.IsExplicitlyNull() && !UserChosenWorld.IsValid());
 }
 
 TUniquePtr<ISceneOutlinerHierarchy> FDataLayerMode::CreateHierarchy()
