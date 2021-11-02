@@ -935,7 +935,7 @@ void SControlRigEditModeTools::CustomizeToolBarPalette(FToolBarBuilder& ToolBarB
 		NAME_None,
 		LOCTEXT("MotionTrails", "Trails"),
 		LOCTEXT("MotionTrailsTooltip", "Display motion trails for animated objects"),
-		FSlateIcon(TEXT("ControlRigEditorStyle"), TEXT("ControlRig.SnapperTool")),
+		FSlateIcon(TEXT("ControlRigEditorStyle"), TEXT("ControlRig.EditableMotionTrails")),
 		EUserInterfaceActionType::Button
 	);
 	//Pivot
@@ -964,7 +964,7 @@ void SControlRigEditModeTools::CustomizeToolBarPalette(FToolBarBuilder& ToolBarB
 		NAME_None,
 		LOCTEXT("TempPivot", "Pivot"),
 		LOCTEXT("TempPivotTooltip", "Create a temporary pivot to rotate the selected Control"),
-		FSlateIcon(TEXT("ControlRigEditorStyle"), TEXT("ControlRig.SnapperTool")),
+		FSlateIcon(TEXT("ControlRigEditorStyle"), TEXT("ControlRig.TemporaryPivot")),
 		EUserInterfaceActionType::ToggleButton
 		);
 	
