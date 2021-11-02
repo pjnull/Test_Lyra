@@ -81,6 +81,7 @@ bool UMaterialExporterUsd::ExportBinary( UObject* Object, const TCHAR* Type, FAr
 
 bool UMaterialExporterUsd::ExportMaterial( const UMaterialInterface& Material, const FUsdMaterialBakingOptions& Options, const FFilePath& FilePath )
 {
+#if USE_USD_SDK
 	UE::FUsdStage UsdStage = UnrealUSDWrapper::NewStage( *FilePath.FilePath );
 	if ( !UsdStage )
 	{
@@ -108,6 +109,9 @@ bool UMaterialExporterUsd::ExportMaterial( const UMaterialInterface& Material, c
 	UsdStage.GetRootLayer().Save();
 
 	return true;
+#else
+	return false;
+#endif // USE_USD_SDK
 }
 
 bool UMaterialExporterUsd::ExportMaterialsForStage(
@@ -118,6 +122,7 @@ bool UMaterialExporterUsd::ExportMaterialsForStage(
 	bool bUsePayload,
 	bool bRemoveUnrealMaterials )
 {
+#if USE_USD_SDK
 	if ( !Stage )
 	{
 		return false;
@@ -174,4 +179,7 @@ bool UMaterialExporterUsd::ExportMaterialsForStage(
 	);
 
 	return true;
+#else
+	return false;
+#endif // USE_USD_SDK
 }
