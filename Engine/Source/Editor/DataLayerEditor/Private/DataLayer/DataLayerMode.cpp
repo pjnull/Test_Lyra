@@ -777,28 +777,32 @@ void FDataLayerMode::RegisterContextMenu()
 
 			{
 				FToolMenuSection& Section = InMenu->AddSection("DataLayers", LOCTEXT("DataLayers", "Data Layers"));
-				Section.AddMenuEntry("CreateEmptyDataLayer", LOCTEXT("CreateEmptyDataLayer", "Create Empty Data Layer"), FText(), FSlateIcon(),
-					FUIAction(
-						FExecuteAction::CreateLambda([this]()
+				
+				auto CreateNewDataLayer = [this](UDataLayer* ParentDataLayer = nullptr)
+				{
+					const FScopedDataLayerTransaction Transaction(LOCTEXT("CreateNewDataLayer", "Create New Data Layer"), RepresentingWorld.Get());
+					SelectedDataLayersSet.Empty();
+					SelectedDataLayerActors.Empty();
+					if (UDataLayer* NewDataLayer = DataLayerEditorSubsystem->CreateDataLayer())
+					{
+						SelectedDataLayersSet.Add(NewDataLayer);
+						DataLayerEditorSubsystem->SetParentDataLayer(NewDataLayer, ParentDataLayer);
+						if (DataLayerBrowser)
 						{
-							const FScopedDataLayerTransaction Transaction(LOCTEXT("CreateEmptyDataLayer", "Create Empty Data Layer"), RepresentingWorld.Get());
-							const UDataLayer* ParentDataLayer = (SelectedDataLayersSet.Num() == 1) ? SelectedDataLayersSet.CreateIterator()->Get() : nullptr;
-							SelectedDataLayersSet.Empty();
-							SelectedDataLayerActors.Empty();
-							if (UDataLayer* NewDataLayer = DataLayerEditorSubsystem->CreateDataLayer())
-							{
-								SelectedDataLayersSet.Add(NewDataLayer);
-								if (ParentDataLayer)
-								{
-									DataLayerEditorSubsystem->SetParentDataLayer(NewDataLayer, const_cast<UDataLayer*>(ParentDataLayer));
-								}
-								if (DataLayerBrowser)
-								{
-									DataLayerBrowser->OnSelectionChanged(SelectedDataLayersSet);
-								}
-							}
-						})
-					));
+							DataLayerBrowser->OnSelectionChanged(SelectedDataLayersSet);
+						}
+					}
+				};
+
+				Section.AddMenuEntry("CreateNewDataLayer", LOCTEXT("CreateNewDataLayer", "Create New Data Layer"), FText(), FSlateIcon(),
+					FUIAction(FExecuteAction::CreateLambda([this, CreateNewDataLayer]() { CreateNewDataLayer(); })));
+
+				UDataLayer* ParentDataLayer = (SelectedDataLayersSet.Num() == 1) ? const_cast<UDataLayer*>(SelectedDataLayersSet.CreateIterator()->Get()) : nullptr;
+				if (ParentDataLayer)
+				{
+					Section.AddMenuEntry("CreateNewDataLayerUnderDataLayer", FText::Format(LOCTEXT("CreateNewDataLayerUnderDataLayer", "Create New Data Layer under \"{0}\""), FText::FromName(ParentDataLayer->GetDataLayerLabel())), FText(), FSlateIcon(),
+					FUIAction(FExecuteAction::CreateLambda([this, CreateNewDataLayer, ParentDataLayer]() { CreateNewDataLayer(ParentDataLayer); })));
+				}
 
 				Section.AddMenuEntry("AddSelectedActorsToNewDataLayer", LOCTEXT("AddSelectedActorsToNewDataLayer", "Add Selected Actors to New Data Layer"), FText(), FSlateIcon(),
 					FUIAction(
