@@ -653,6 +653,9 @@ private:
 	//Retreives the code for this chunk being used as a source for another chunk
 	FString GetCodeAsSource(int32 ChunkIdx);
 
+	// Generate a structure initializer string
+	// Returns true if we generated the structure successfully or false if we encounter something we could not handle
+	bool GenerateStructInitializer(TStringBuilder<128>& InitializerString, UStruct* UserDefinedStruct, const void* StructData);
 	// Convert a variable with actual data into a constant string
 	FString GenerateConstantString(const FNiagaraVariable& Constant);
 

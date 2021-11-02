@@ -4367,6 +4367,48 @@ int32 FHlslNiagaraTranslator::GetConstantDirect(bool InConstantValue)
 	return GetConstant(Constant);
 }
 
+bool FHlslNiagaraTranslator::GenerateStructInitializer(TStringBuilder<128>& InitializerString, UStruct* UserDefinedStruct, const void* StructData)
+{
+	InitializerString.Append('{');
+	for (FField* ChildProperty = UserDefinedStruct->ChildProperties; ChildProperty; ChildProperty = ChildProperty->Next)
+	{
+		if (ChildProperty != UserDefinedStruct->ChildProperties)
+		{
+			InitializerString.Append(',');
+		}
+
+		if (FFloatProperty* FloatProperty = CastField<FFloatProperty>(ChildProperty))
+		{
+			const float Value = FloatProperty->GetPropertyValue_InContainer(StructData);
+			InitializerString.Appendf(TEXT("%g"), Value);
+		}
+		else if (FIntProperty* IntProperty = CastField<FIntProperty>(ChildProperty))
+		{
+			const int32 Value = IntProperty->GetPropertyValue_InContainer(StructData);
+			InitializerString.Appendf(TEXT("%d"), Value);
+		}
+		else if (FBoolProperty* BoolProperty = CastField<FBoolProperty>(ChildProperty))
+		{
+			const bool bValue = BoolProperty->GetPropertyValue_InContainer(StructData);
+			InitializerString.Append(bValue ? TEXT("true") : TEXT("false"));
+		}
+		else if (FStructProperty* StructProperty = CastField<FStructProperty>(ChildProperty))
+		{
+			if ( !GenerateStructInitializer(InitializerString, StructProperty->Struct, StructProperty->ContainerPtrToValuePtr<const void>(StructData)) )
+			{
+				return false;
+			}
+		}
+		else
+		{
+			Error(FText::Format(LOCTEXT("GenerateConstantStructInitializeTypeError", "Unknown type '{0}' member '{1}' in structure '{2}' when generating initializer struct."), FText::FromString(ChildProperty->GetClass()->GetName()), FText::FromString(ChildProperty->GetName()), FText::FromString(UserDefinedStruct->GetName())), nullptr, nullptr);
+			return false;
+		}
+	}
+	InitializerString.Append('}');
+	return true;
+}
+
 FString FHlslNiagaraTranslator::GenerateConstantString(const FNiagaraVariable& Constant)
 {
 	FNiagaraTypeDefinition Type = Constant.GetType();
@@ -4437,14 +4479,19 @@ FString FHlslNiagaraTranslator::GenerateConstantString(const FNiagaraVariable& C
 				ConstantStr = bValue ? TEXT("true") : TEXT("false");
 			}
 		}
+		else if (UStruct* UserDefinedStruct = Type.GetStruct())
+		{
+			TStringBuilder<128> InitializerString;
+			if ( !GenerateStructInitializer(InitializerString, UserDefinedStruct, Constant.GetData()) )
+			{
+				Error(FText::Format(LOCTEXT("FailedToGenerateConstantInitialiezrError", "Type '{0}' constant '{1}' failed to create structure initializer. Defaulting to 0."), FText::FromString(Type.GetName()), FText::FromName(Constant.GetName())), nullptr, nullptr);
+				return ConstantStr;
+			}
+			return InitializerString.ToString();
+		}
 		else
 		{
-			//This is easily doable, just need to keep track of all structs used and define them as well as a ctor function signature with all values decomposed into float1/2/3/4 etc
-			//Then call said function here with the same decomposition literal values.
-
-			//For now lets allow this but just ignore the value and take the default ctor.
-// 			Error(LOCTEXT("StructContantsUnsupportedError", "Constants of struct types are currently unsupported."), nullptr, nullptr);
-// 			return FString();
+			Warning(FText::Format(LOCTEXT("GenerateConstantUnknownTypeError", "Type '{0}' constant '{1}' is unknown.  Defaulting to 0."), FText::FromString(Type.GetName()), FText::FromName(Constant.GetName())), nullptr, nullptr);
 			return ConstantStr;
 		}
 	}
