@@ -17,8 +17,8 @@ namespace SnapshotUtil
 			Continue,
 			Break
 		};
-		using FHandleValuePtr = TFunction<EBreakBehaviour(void* ValuePtr)>;
-		using FValuePtrPredicate = TFunction<bool(void* ValuePtr)>;
+		using FHandleValuePtr = TFunctionRef<EBreakBehaviour(void* ValuePtr)>;
+		using FValuePtrPredicate = TFunctionRef<bool(void* ValuePtr)>;
 		
 		/**
 		 * Follow a property chain to its leaf property and call a function with the value pointers.
