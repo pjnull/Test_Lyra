@@ -8854,8 +8854,16 @@ uint32 UCookOnTheFlyServer::FullLoadAndSave(uint32& CookedPackageCount)
 			GIsSavingPackage = true;
 		}
 
+		TArray<FAssetRegistryGenerator*> Generators;
+		Generators.Reserve(TargetPlatforms.Num());
+		for (const ITargetPlatform* Target : TargetPlatforms)
+		{
+			Generators.Add(PlatformManager->GetPlatformData(Target)->RegistryGenerator.Get());
+		}
+
 		int64 ParallelSavedPackages = 0;
-		ParallelFor(PackagesToSave.Num(), [this, &PackagesToSave, &TargetPlatforms ,&ParallelSavedPackages, SaveFlags, bSaveConcurrent](int32 PackageIdx)
+		ParallelFor(PackagesToSave.Num(),
+			[this, &PackagesToSave, &TargetPlatforms, &Generators, &ParallelSavedPackages, SaveFlags, bSaveConcurrent](int32 PackageIdx)
 		{
 			UE::Cook::FPackageData& PackageData = *PackagesToSave[PackageIdx];
 			UPackage* Package = PackageData.GetPackage();
@@ -8924,6 +8932,8 @@ uint32 UCookOnTheFlyServer::FullLoadAndSave(uint32& CookedPackageCount)
 				for (int32 PlatformIndex = 0; PlatformIndex < TargetPlatforms.Num(); ++PlatformIndex)
 				{
 					const ITargetPlatform* Target = TargetPlatforms[PlatformIndex];
+					FAssetRegistryGenerator& Generator = *Generators[PlatformIndex]; 
+
 
 					// don't save Editor resources from the Engine if the target doesn't have editoronly data
 					bool bCookPackage = (!bExcludeFromNonEditorTargets || Target->HasEditorOnlyData());
@@ -8949,7 +8959,12 @@ uint32 UCookOnTheFlyServer::FullLoadAndSave(uint32& CookedPackageCount)
 						}
 								
 						GIsCookerLoadingPackage = true;
+						check(SavePackageContexts.Num() > 0);
 						FSavePackageContext* const SavePackageContext = (IsCookByTheBookMode() && SavePackageContexts.Num() > 0) ? &SavePackageContexts[PlatformIndex]->SaveContext : nullptr;
+						IPackageWriter::FBeginPackageInfo BeginInfo;
+						BeginInfo.PackageName = Package->GetFName();
+						BeginInfo.LooseFilePath = PlatFilename;
+						SavePackageContext->PackageWriter->BeginPackage(BeginInfo);
 						FSavePackageResultStruct SaveResult = GEditor->Save(Package, World, FlagsToCook, *PlatFilename, GError, NULL, bSwap, false, SaveFlags, Target, FDateTime::MinValue(), 
 																			false, /*DiffMap*/ nullptr,	SavePackageContext);
 						GIsCookerLoadingPackage = false;
@@ -8963,8 +8978,18 @@ uint32 UCookOnTheFlyServer::FullLoadAndSave(uint32& CookedPackageCount)
 						}
 
 						// Update asset registry
-						FAssetRegistryGenerator& Generator = *(PlatformManager->GetPlatformData(Target)->RegistryGenerator);
 						Generator.UpdateAssetRegistryPackageData(*Package, SaveResult, SaveResult.CookedHash);
+						FAssetPackageData* AssetPackageData = Generator.GetAssetPackageData(Package->GetFName());
+						check(AssetPackageData);
+
+						ICookedPackageWriter::FCommitPackageInfo CommitInfo;
+						CommitInfo.bSucceeded = SaveResult.IsSuccessful();
+						CommitInfo.PackageName = Package->GetFName();
+						PRAGMA_DISABLE_DEPRECATION_WARNINGS;
+						CommitInfo.PackageGuid = AssetPackageData->PackageGuid;
+						PRAGMA_ENABLE_DEPRECATION_WARNINGS;
+						CommitInfo.WriteOptions = IPackageWriter::EWriteOptions::Write;
+						SavePackageContext->PackageWriter->CommitPackage(MoveTemp(CommitInfo));
 
 						if (SaveResult.IsSuccessful())
 						{
