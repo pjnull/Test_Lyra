@@ -4037,7 +4037,7 @@ FMaterialUpdateContext::~FMaterialUpdateContext()
 		}
 
 #if WITH_EDITOR
-		MI->UpdateCachedLayerParameters();
+		MI->UpdateCachedData();
 #endif
 		MI->RecacheUniformExpressions(true);
 		MI->InitStaticPermutation(EMaterialShaderPrecompileMode::None);//bHasStaticPermutation can change.

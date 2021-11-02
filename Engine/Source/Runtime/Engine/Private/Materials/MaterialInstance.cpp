@@ -50,21 +50,6 @@
 #include "UObject/UE5MainStreamObjectVersion.h"
 #include "ShaderCompilerCore.h"
 
-#if ENABLE_COOK_STATS
-#include "ProfilingDebugging/ScopedTimers.h"
-namespace MaterialInstanceCookStats
-{
-	static double UpdateCachedExpressionDataSec = 0.0;
-
-	static FCookStatsManager::FAutoRegisterCallback RegisterCookStats([](FCookStatsManager::AddStatFuncRef AddStat)
-		{
-			AddStat(TEXT("MaterialInstance"), FCookStatsManager::CreateKeyValueArray(
-				TEXT("UpdateCachedExpressionDataSec"), UpdateCachedExpressionDataSec
-			));
-		});
-}
-#endif
-
 DECLARE_CYCLE_STAT(TEXT("MaterialInstance CopyMatInstParams"), STAT_MaterialInstance_CopyMatInstParams, STATGROUP_Shaders);
 DECLARE_CYCLE_STAT(TEXT("MaterialInstance Serialize"), STAT_MaterialInstance_Serialize, STATGROUP_Shaders);
 DECLARE_CYCLE_STAT(TEXT("MaterialInstance CopyUniformParamsInternal"), STAT_MaterialInstance_CopyUniformParamsInternal, STATGROUP_Shaders);
@@ -725,10 +710,15 @@ void UMaterialInstance::InitResources()
 
 	checkf(SafeParent, TEXT("Invalid parent on %s"), *GetFullName());
 
+	// TODO - should merge all of render commands sent to initialize resource into a single command
 	// Set the material instance's parent on its resources.
 	if (Resource != nullptr)
 	{
 		Resource->GameThread_SetParent(SafeParent);
+		if (CachedData)
+		{
+			Resource->GameThread_UpdateCachedData(*CachedData);
+		}
 	}
 
 	GameThread_InitMIParameters(*this);
@@ -1859,7 +1849,7 @@ void UMaterialInstance::GetDependentFunctions(TArray<UMaterialFunctionInterface*
 #if WITH_EDITOR
 void UMaterialInstance::ForceRecompileForRendering()
 {
-	UpdateCachedLayerParameters();
+	UpdateCachedData();
 	CacheResourceShadersForRendering();
 }
 #endif // WITH_EDITOR
@@ -2129,7 +2119,7 @@ void UMaterialInstance::CacheShadersForResources(EShaderPlatform ShaderPlatform,
 #endif
 
 #if WITH_EDITOR
-	UpdateCachedLayerParameters();
+	UpdateCachedData();
 #endif
 
 	for (int32 ResourceIndex = 0; ResourceIndex < ResourcesToCache.Num(); ResourceIndex++)
@@ -2604,7 +2594,7 @@ void UMaterialInstance::PostLoad()
 	}
 
 #if WITH_EDITOR
-	UpdateCachedLayerParameters();
+	UpdateCachedData();
 #endif
 
 	// called before we cache the uniform expression as a call to SubsurfaceProfileRT affects the dta in there
@@ -2749,13 +2739,13 @@ void UMaterialInstance::AddReferencedObjects(UObject* InThis, FReferenceCollecto
 	Super::AddReferencedObjects(This, Collector);
 }
 
-void UMaterialInstance::SetParentInternal(UMaterialInterface* NewParent, bool RecacheShaders)
+bool UMaterialInstance::SetParentInternal(UMaterialInterface* NewParent, bool RecacheShaders)
 {
+	bool bSetParent = false;
 	if (!Parent || Parent != NewParent)
 	{
 		// Check if the new parent is already an existing child
 		UMaterialInstance* ParentAsMaterialInstance = Cast<UMaterialInstance>(NewParent);
-		bool bSetParent = false;
 
 		if (ParentAsMaterialInstance != nullptr && ParentAsMaterialInstance->IsChildOf(this))
 		{
@@ -2802,10 +2792,8 @@ void UMaterialInstance::SetParentInternal(UMaterialInterface* NewParent, bool Re
 		{
 			InitResources();
 		}
-#if WITH_EDITOR
-		UpdateCachedLayerParameters();
-#endif
 	}
+	return bSetParent;
 }
 
 bool UMaterialInstance::SetVectorParameterByIndexInternal(int32 ParameterIndex, FLinearColor Value)
@@ -3258,7 +3246,7 @@ void UMaterialInstance::UpdateStaticPermutation(const FStaticParameterSet& NewPa
 		bHasStaticPermutationResource = bWantsStaticPermutationResource;
 		StaticParameters = CompareParameters;
 
-		UpdateCachedLayerParameters();
+		UpdateCachedData();
 		CacheResourceShadersForRendering(EMaterialShaderPrecompileMode::None);
 		RecacheUniformExpressions(true);
 
@@ -3303,47 +3291,9 @@ void UMaterialInstance::GetReferencedTexturesAndOverrides(TSet<const UTexture*>&
 	}
 }
 
-void UMaterialInstance::UpdateCachedLayerParameters()
+void UMaterialInstance::UpdateCachedData()
 {
-	COOK_STAT(FScopedDurationTimer BlockingTimer(MaterialInstanceCookStats::UpdateCachedExpressionDataSec));
-
-	// Don't need to rebuild cached data if it was serialized
-	if (!bLoadedCachedData)
-	{
-		UMaterialInstance* ParentInstance = nullptr;
-		FMaterialCachedExpressionData CachedExpressionData;
-		CachedExpressionData.Reset();
-		if (Parent)
-		{
-			CachedExpressionData.ReferencedTextures = Parent->GetReferencedTextures();
-			ParentInstance = Cast<UMaterialInstance>(Parent);
-		}
-
-		FMaterialLayersFunctions Layers;
-		const bool bHasLayers = GetMaterialLayers(Layers);
-		if (bHasLayers)
-		{
-			FMaterialCachedExpressionContext Context;
-			CachedExpressionData.UpdateForLayerFunctions(Context, Layers);
-		}
-
-		if (!CachedData)
-		{
-			CachedData = new FMaterialInstanceCachedData();
-		}
-
-		FMaterialLayersFunctions ParentLayers;
-		const bool bParentHasLayers = Parent->GetMaterialLayers(ParentLayers);
-		CachedData->Initialize(MoveTemp(CachedExpressionData),
-			bHasLayers ? &Layers : nullptr,
-			bParentHasLayers ? &ParentLayers : nullptr);
-		if (Resource)
-		{
-			Resource->GameThread_UpdateCachedData(*CachedData);
-		}
-	}
-
-	FObjectCacheEventSink::NotifyReferencedTextureChanged_Concurrent(this);
+	// Overriden for MIC/MID
 }
 
 void UMaterialInstance::UpdateStaticPermutation(const FStaticParameterSet& NewParameters, FMaterialUpdateContext* MaterialUpdateContext)
@@ -3399,7 +3349,7 @@ void UMaterialInstance::PostEditChangeProperty(FPropertyChangedEvent& PropertyCh
 		RecacheMaterialInstanceUniformExpressions(this, false);
 	}
 
-	UpdateCachedLayerParameters();
+	UpdateCachedData();
 
 	if (GIsEditor)
 	{

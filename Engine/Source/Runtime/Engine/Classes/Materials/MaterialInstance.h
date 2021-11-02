@@ -590,10 +590,11 @@ private:
 	bool bSavedCachedData_DEPRECATED;
 #endif
 
+protected:
 	bool bLoadedCachedData;
-
 	FMaterialInstanceCachedData* CachedData;
 
+private:
 #if WITH_EDITOR
 	mutable TOptional<FStaticParameterSet> CachedStaticParameterValues;
 	mutable uint8 AllowCachingStaticParameterValuesCounter = 0;
@@ -783,7 +784,7 @@ public:
 	/** Add to the set any texture referenced by expressions, including nested functions, as well as any overrides from parameters. */
 	ENGINE_API virtual void GetReferencedTexturesAndOverrides(TSet<const UTexture*>& InOutTextures) const;
 
-	ENGINE_API void UpdateCachedLayerParameters();
+	ENGINE_API virtual void UpdateCachedData();
 #endif
 
 	void GetBasePropertyOverridesHash(FSHAHash& OutHash)const;
@@ -857,7 +858,7 @@ protected:
 	 */
 	bool UpdateParameters();
 
-	ENGINE_API void SetParentInternal(class UMaterialInterface* NewParent, bool RecacheShaders);
+	ENGINE_API bool SetParentInternal(class UMaterialInterface* NewParent, bool RecacheShaders);
 
 	void GetTextureExpressionValues(const FMaterialResource* MaterialResource, TArray<UTexture*>& OutTextures, TArray< TArray<int32> >* OutIndices = nullptr) const;
 

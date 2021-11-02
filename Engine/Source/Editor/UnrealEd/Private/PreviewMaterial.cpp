@@ -579,7 +579,7 @@ void UMaterialEditorInstanceConstant::RegenerateArrays()
 		// Only operate on base materials
 		UMaterial* ParentMaterial = Parent->GetMaterial();
 		SourceInstance->UpdateParameterNames();	// Update any parameter names that may have changed.
-		SourceInstance->UpdateCachedLayerParameters();
+		SourceInstance->UpdateCachedData();
 
 		// Need to get layer info first as other params are collected from layers
 		{
