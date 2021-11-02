@@ -210,12 +210,12 @@ namespace UnrealBuildTool
 
 			public void AddField(string Name, string Value)
 			{
-				Lines.Add(TabString + Quoted(Name) + ": " + Quoted(Json.EscapeString(Value)) + ",");
+				Lines.Add(TabString + Quoted(Name) + ": " + Quoted(JsonWriter.EscapeString(Value)) + ",");
 			}
 
 			public void AddUnnamedField(string Value)
 			{
-				Lines.Add(TabString + Quoted(Json.EscapeString(Value)) + ",");
+				Lines.Add(TabString + Quoted(JsonWriter.EscapeString(Value)) + ",");
 			}
 
 			public void Write(FileReference File)
