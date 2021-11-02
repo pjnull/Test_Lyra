@@ -14,6 +14,8 @@
 #include "Misc/ScopeLock.h"
 #include "ProfilingDebugging/CookStats.h"
 
+#include "VirtualizationFilterSettings.h"
+
 namespace UE::Virtualization
 {
 UE_REGISTER_VIRTUALIZATION_SYSTEM(UE::Virtualization::FVirtualizationManager, Default);
@@ -326,8 +328,8 @@ bool FVirtualizationManager::PushData(const FPayloadId& Id, const FCompressedBuf
 
 	if (!ShouldVirtualizePackage(PackageContext))
 	{
-		UE_LOG(LogVirtualization, Verbose, TEXT("Payload '%s' for package '%s' will not be virtualized due to filtering"), 
-			*Id.ToString(), *PackageContext.GetDebugName());
+		UE_LOG(	LogVirtualization, Verbose, TEXT("Payload '%s' for package '%s' will not be virtualized due to filtering"), 
+				*Id.ToString(), *PackageContext.GetDebugName());
 		return false;
 	}
 
@@ -765,7 +767,10 @@ FCompressedBuffer FVirtualizationManager::PullDataFromBackend(IVirtualizationBac
 
 bool FVirtualizationManager::ShouldVirtualizePackage(const FPackagePath& PackagePath) const
 {
-	if (!PackagePath.HasPackageName())
+	TRACE_CPUPROFILER_EVENT_SCOPE(FVirtualizationManager::ShouldVirtualizePackage);
+
+	// We require a valid mounted path for filtering
+	if (!PackagePath.IsMountedPath())
 	{
 		return true;
 	}
@@ -800,6 +805,32 @@ bool FVirtualizationManager::ShouldVirtualizePackage(const FPackagePath& Package
 		}
 	}
 
+	const UVirtualizationFilterSettings* Settings = GetDefault<UVirtualizationFilterSettings>();
+	if (Settings != nullptr)
+	{
+		const FStringView PackageNameView = PackageName.ToView();
+
+		for (const FString& Exclusion : Settings->ExcludePackagePaths)
+		{
+			if (Exclusion.EndsWith(TEXT("/")))
+			{
+				// Directory path, exclude everything under it
+				if (PackageNameView.StartsWith(Exclusion))
+				{
+					return false;
+				}
+			}
+			else
+			{
+				// Path to an asset, exclude if it matches exactly
+				if (PackageNameView == Exclusion)
+				{
+					return false;
+				}
+			}			
+		}
+	}
+	
 	return true;
 }
 

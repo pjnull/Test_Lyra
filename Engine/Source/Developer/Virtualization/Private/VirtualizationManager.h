@@ -52,11 +52,24 @@
  * package the next time that it is saved.
  * @see ShouldVirtualizePackage for implementation details.
  * 
- * Setup:
+ * Basic Setup:
  * 
  * [Core.ContentVirtualization]
  * FilterEngineContent=True/False			When true any payload from a package under Engine/Content/.. will be excluded from virtualization
  * FilterEnginePluginContent=True/False		When true any payload from a package under Engine/Plugins/../Content/.. will be excluded from virtualization
+ * 
+ * PackagePath Setup:
+ * 
+ * The path given can either be to a directory or a specific package. It can be added to the config files for
+ * a GameFeature (commonly used to exclude all content in that game feature from being virtualized) in addition 
+ * to the project's config files.
+ * Note that these paths will be stored in the ini files under the Saved directory. To remove a path make sure to 
+ * use the - syntax to remove the entry from the array, rather than removing the line itself. Otherwise it will
+ * persist until the saved config file has been reset.
+ *
+ * [/Script/Virtualization.VirtualizationFilterSettings]
+ * +ExcludePackagePaths="/MountPoint/PathToExclude/"				Excludes any package found under '/MountPoint/PathToExclude/'
+ * +ExcludePackagePaths="/MountPoint/PathTo/ThePackageToExclude"	Excludes the specific package '/MountPoint/PathTo/ThePackageToExclude'
  */
 
 namespace UE::Virtualization
