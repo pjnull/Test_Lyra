@@ -631,13 +631,7 @@ bool FBaseParser::GetRawStringRespectingQuotes(FTokenString& String, TCHAR StopC
 
 	while( !IsEOL(c) && ((c != StopChar) || bInQuote) )
 	{
->>>> ORIGINAL //Fortnite/Main/Engine/Source/Programs/UnrealHeaderTool/Private/BaseParser.cpp#17
-		if( (c=='/' && PeekChar()=='/') || (c=='/' && PeekChar()=='*') )
-==== THEIRS //Fortnite/Main/Engine/Source/Programs/UnrealHeaderTool/Private/BaseParser.cpp#18
-		if( (c == TEXT('/') && PeekChar() == TEXT('/')) || (c == TEXT('/') && PeekChar() == TEXT('*')) )
-==== YOURS //steve.robb_Fortnite_Dev_EngineMerge/Engine/Source/Programs/UnrealHeaderTool/Private/BaseParser.cpp
-		if( !bInQuote && ( (c=='/' && PeekChar()=='/') || (c=='/' && PeekChar()=='*') ) )
-<<<<
+		if( !bInQuote && ( (c == TEXT('/') && PeekChar() == TEXT('/')) || (c == TEXT('/') && PeekChar() == TEXT('*')) ) )
 		{
 			break;
 		}
