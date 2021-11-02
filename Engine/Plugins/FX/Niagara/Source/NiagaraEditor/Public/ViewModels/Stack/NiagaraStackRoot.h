@@ -76,7 +76,7 @@ private:
 	TObjectPtr<UNiagaraStackRenderItemGroup> RenderGroup;
 
 	UPROPERTY()
-	UNiagaraStackSummaryViewCollapseButton* SummaryCollapseButton;
+	TObjectPtr<UNiagaraStackSummaryViewCollapseButton> SummaryCollapseButton;
 
 	bool bIncludeSystemInformation;
 	bool bIncludeEmitterInformation;

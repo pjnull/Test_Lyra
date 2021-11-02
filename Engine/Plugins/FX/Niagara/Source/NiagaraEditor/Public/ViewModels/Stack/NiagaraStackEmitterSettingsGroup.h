@@ -109,7 +109,7 @@ protected:
 
 private:
 	UPROPERTY()
-	UNiagaraStackEmitterSummaryItem* SummaryItem;
+	TObjectPtr<UNiagaraStackEmitterSummaryItem> SummaryItem;
 };
 
 
