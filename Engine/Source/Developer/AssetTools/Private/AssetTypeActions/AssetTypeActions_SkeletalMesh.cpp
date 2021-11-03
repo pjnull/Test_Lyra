@@ -680,6 +680,7 @@ void FAssetTypeActions_SkeletalMesh::GetLODMenu(class FMenuBuilder& MenuBuilder,
 	check(Objects.Num() > 0);
 	//Use the first object
 	USkeletalMesh* SkeletalMesh = Objects[0].Get();
+
 	int32 LODMax = SkeletalMesh->GetLODNum();
 	for(int32 LOD = 1; LOD <= LODMax; ++LOD)
 	{
@@ -715,6 +716,11 @@ void FAssetTypeActions_SkeletalMesh::ExecuteNewPhysicsAsset(TArray<TWeakObjectPt
 		auto Object = (*ObjIt).Get();
 		if ( Object )
 		{
+			if (Object->GetOutermost()->bIsCookedForEditor)
+			{
+				FAssetNotifications::CannotEditCookedAsset(Object);
+				continue;
+			}
 			if(UObject* PhysicsAsset = UPhysicsAssetFactory::CreatePhysicsAssetFromMesh(NAME_None, nullptr, Object, bSetAssetToMesh))
 			{
 				CreatedObjects.Add(PhysicsAsset);
@@ -742,6 +748,12 @@ void FAssetTypeActions_SkeletalMesh::ExecuteNewSkeleton(TArray<TWeakObjectPtr<US
 
 		if ( Object )
 		{
+			if (Object->GetOutermost()->bIsCookedForEditor)
+			{
+				FAssetNotifications::CannotEditCookedAsset(Object);
+				return;
+			}
+
 			// Determine an appropriate name
 			FString Name;
 			FString PackagePath;
@@ -762,6 +774,11 @@ void FAssetTypeActions_SkeletalMesh::ExecuteNewSkeleton(TArray<TWeakObjectPtr<US
 			auto Object = (*ObjIt).Get();
 			if ( Object )
 			{
+				if (Object->GetOutermost()->bIsCookedForEditor)
+				{
+					FAssetNotifications::CannotEditCookedAsset(Object);
+					continue;
+				}
 				// Determine an appropriate name
 				FString Name;
 				FString PackageName;
@@ -825,10 +842,16 @@ void FAssetTypeActions_SkeletalMesh::ExecuteFindSkeleton(TArray<TWeakObjectPtr<U
 
 void FAssetTypeActions_SkeletalMesh::ExecuteImportMeshLOD(UObject* Mesh, int32 LOD)
 {
+	if (Mesh->GetOutermost()->bIsCookedForEditor)
+	{
+		FAssetNotifications::CannotEditCookedAsset(Mesh);
+		return;
+	}
+
 	if (LOD == 0)
 	{
 		//re-import of the asset
-		TArray<UObject *> AssetArray;
+		TArray<UObject*> AssetArray;
 		AssetArray.Add(Mesh);
 		FReimportManager::Instance()->ValidateAllSourceFileAndReimport(AssetArray);
 	}
@@ -889,6 +912,12 @@ void FAssetTypeActions_SkeletalMesh::FillSkeletonMenu(FMenuBuilder& MenuBuilder,
 
 void FAssetTypeActions_SkeletalMesh::AssignSkeletonToMesh(USkeletalMesh* SkelMesh) const
 {
+	if (!SkelMesh || SkelMesh->GetOutermost()->bIsCookedForEditor)
+	{
+		FAssetNotifications::CannotEditCookedAsset(SkelMesh);
+		return;
+	}
+
 	// Create a skeleton asset from the selected skeletal mesh. Defaults to being in the same package/group as the skeletal mesh.
 	TSharedRef<SWindow> WidgetWindow = SNew(SWindow)
 		.Title(LOCTEXT("ChooseSkeletonWindowTitle", "Choose Skeleton"))
