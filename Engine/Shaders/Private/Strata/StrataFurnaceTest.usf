@@ -162,7 +162,6 @@ void MainPS(
 
 		// Sample uniformly the upper hemisphere of each pixel
 		float3 Acc = 0;
-		const FShadowTerms ShadowTerms = { 1.0f, 1.0, 1.0, InitHairTransmittanceData() };
 		float3x3 TangentBasis = GetTangentBasis(N);
 		if (BSDF_GETANISOTROPY(BSDF))
 		{
@@ -182,7 +181,7 @@ void MainPS(
 				const float SatNoL = saturate(dot(L, N));
 
 				FStrataBSDFContext BSDFContext = StrataCreateBSDFContext(TangentBasis, BSDF, V, L, true);
-				FStrataEvaluateResult BSDFEvaluate = StrataEvaluateBSDF(BSDFContext, ShadowTerms);
+				FStrataEvaluateResult BSDFEvaluate = StrataEvaluateBSDF(BSDFContext);
 
 				const float3 DiffusePathWeight  = BSDF.FinalWeight * BSDFEvaluate.DiffusePathValue;
 				const float3 SpecularPathWeight = BSDF.FinalWeight * BSDFEvaluate.SpecularPathValue;
@@ -211,7 +210,7 @@ void MainPS(
 
 				const float SatNoL = saturate(dot(L, N));
 				FStrataBSDFContext BSDFContext = StrataCreateBSDFContext(TangentBasis, BSDF, V, L, true);
-				FStrataEvaluateResult BSDFEvaluate = StrataEvaluateBSDF(BSDFContext, ShadowTerms);
+				FStrataEvaluateResult BSDFEvaluate = StrataEvaluateBSDF(BSDFContext);
 
 				const float3 DiffusePathWeight  = BSDF.FinalWeight * BSDFEvaluate.DiffusePathValue;
 				const float3 SpecularPathWeight = BSDF.FinalWeight * BSDFEvaluate.SpecularPathValue;
