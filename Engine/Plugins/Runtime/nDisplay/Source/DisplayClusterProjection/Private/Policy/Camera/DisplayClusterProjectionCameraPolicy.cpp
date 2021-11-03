@@ -116,7 +116,7 @@ bool FDisplayClusterProjectionCameraPolicy::ImplGetProjectionMatrix(const float 
 
 	// Clamp camera fov to valid range [1.f, 178.f]
 	const float ClampedCameraFOV = FMath::Clamp(ScaledCameraFOV, 1.f, 178.f);
-	if (ClampedCameraFOV != ScaledCameraFOVV && !IsEditorOperationMode())
+	if (ClampedCameraFOV != ScaledCameraFOV && !IsEditorOperationMode())
 	{
 		UE_LOG(LogDisplayClusterProjectionCamera, Warning, TEXT("CameraFOV clamped: '%d' -> '%d'. (FieldOfView='%d', FOVMultiplier='%d'"), ScaledCameraFOV, ClampedCameraFOV, InCameraFOV, CameraSettings.FOVMultiplier);
 	}
