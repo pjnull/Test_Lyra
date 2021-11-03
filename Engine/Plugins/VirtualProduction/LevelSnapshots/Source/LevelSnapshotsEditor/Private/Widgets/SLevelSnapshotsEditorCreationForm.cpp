@@ -2,6 +2,7 @@
 
 #include "Widgets/SLevelSnapshotsEditorCreationForm.h"
 
+#include "DetailLayoutBuilder.h"
 #include "Data/LevelSnapshotsEditorData.h"
 #include "LevelSnapshotsEditorStyle.h"
 #include "LevelSnapshotsEditorSettings.h"
@@ -9,7 +10,9 @@
 #include "EditorStyleSet.h"
 #include "Engine/World.h"
 #include "Framework/Application/SlateApplication.h"
+#include "IDetailCustomization.h"
 #include "IDetailsView.h"
+#include "LevelSnapshotsSettings.h"
 #include "Modules/ModuleManager.h"
 #include "PropertyEditorModule.h"
 #include "Widgets/Images/SImage.h"
@@ -20,6 +23,29 @@
 #include "Widgets/SWindow.h"
 #include "Widgets/Text/STextBlock.h"
 #include "SPrimaryButton.h"
+
+namespace LevelSnapshotsEditor
+{
+	class FShowOnlyDataManagementsDetailsCustomization : public IDetailCustomization
+	{
+	public:
+		
+		virtual void CustomizeDetails(IDetailLayoutBuilder& DetailBuilder) override
+		{
+			// Iterate through all categories in case somebody adds a new category and forgets to update this
+			const FString DataCategory("Data");
+			for (TFieldIterator<FProperty> PropertyIt(ULevelSnapshotsEditorSettings::StaticClass()); PropertyIt; ++PropertyIt)
+			{
+				const FString Category = PropertyIt->HasMetaData(TEXT("Category")) ? PropertyIt->GetMetaData(TEXT("Category")) : FString();
+				if (!Category.Equals(DataCategory))
+				{
+					DetailBuilder.HideCategory(*Category);
+				}
+			}
+		}
+	};
+}
+
 
 TSharedRef<SWindow> SLevelSnapshotsEditorCreationForm::MakeAndShowCreationWindow(const FCloseCreationFormDelegate& CallOnClose)
 {
@@ -222,6 +248,11 @@ TSharedRef<SWidget> SLevelSnapshotsEditorCreationForm::MakeDataManagementSetting
 
 	TSharedRef<IDetailsView> Details = PropertyEditorModule.CreateDetailView(DetailsViewArgs);
 	const TArray<UObject*> ProjectSettingsObjects = { ULevelSnapshotsEditorSettings::Get() };
+	// By requirement, we're only supposed to show the data management settings
+	Details->RegisterInstancedCustomPropertyLayout(
+		ULevelSnapshotsEditorSettings::StaticClass(),
+		FOnGetDetailCustomizationInstance::CreateLambda([](){ return MakeShared<LevelSnapshotsEditor::FShowOnlyDataManagementsDetailsCustomization>(); })
+		);
 	Details->SetObjects(ProjectSettingsObjects);
 	Details->SetEnabled(true);
 
