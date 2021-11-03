@@ -985,36 +985,8 @@ void FAnimInstanceProxy::RecalcRequiredBones(USkeletalMeshComponent* Component, 
 	RequiredBones.InitializeTo(Component->RequiredBones, FCurveEvaluationOption(Component->GetAllowedAnimCurveEvaluate(), &Component->GetDisallowedAnimCurvesEvaluation(), Component->GetPredictedLODLevel()), *Asset);
 
 	// If there is a ref pose override, we want to replace ref pose in RequiredBones
-	const FSkelMeshRefPoseOverride* RefPoseOverride = Component->GetRefPoseOverride();
-	if (RefPoseOverride)
-	{
-		// Get ref pose override info
-		// Get indices of required bones
-		const TArray<FBoneIndexType>& BoneIndicesArray = RequiredBones.GetBoneIndicesArray();
-		// Get number of required bones
-		int32 NumReqBones = BoneIndicesArray.Num();
-
-		// Build new array of ref pose transforms for required bones
-		TArray<FTransform> NewCompactRefPose;
-		NewCompactRefPose.AddUninitialized(NumReqBones);
-
-		for (int32 CompactBoneIndex = 0; CompactBoneIndex < NumReqBones; ++CompactBoneIndex)
-		{
-			FBoneIndexType MeshPoseIndex = BoneIndicesArray[CompactBoneIndex];
-
-			if (RefPoseOverride->RefBonePoses.IsValidIndex(MeshPoseIndex))
-			{
-				NewCompactRefPose[CompactBoneIndex] = RefPoseOverride->RefBonePoses[MeshPoseIndex];
-			}
-			else
-			{
-				NewCompactRefPose[CompactBoneIndex] = FTransform::Identity;
-			}
-		}
-
-		// Update ref pose in required bones structure
-		RequiredBones.SetRefPoseCompactArray(NewCompactRefPose);
-	}
+	// Update ref pose in required bones structure (either set it, or clear it, depending on if one is set on the Component)
+	RequiredBones.SetRefPoseOverride(Component->GetRefPoseOverride());
 
 	// If this instance can accept input poses, initialise the input pose container
 	if(DefaultLinkedInstanceInputNode)
