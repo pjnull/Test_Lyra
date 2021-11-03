@@ -1,5 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
+#pragma once
+
 #include "HAL/CriticalSection.h"
 #include "Math/Vector2D.h"
 #include "DSP/AudioLinearCurve.h"
