@@ -503,6 +503,10 @@ public:
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Asset Options", AssetRegistrySearchable, meta = (SkipSystemResetOnChange = "true"))
 	FText TemplateAssetDescription;
 
+	/** Category of this system. */
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Asset Options", AssetRegistrySearchable, meta = (SkipSystemResetOnChange = "true"))
+	FText Category;
+
 	UPROPERTY()
 	TArray<TObjectPtr<UNiagaraScript>> ScratchPadScripts;
 
@@ -792,9 +796,6 @@ protected:
 	TArray<FNiagaraSystemCompileRequest> ActiveCompilations;
 #endif
 
-// 	/** Category of this system. */
-// 	UPROPERTY(EditAnywhere, Category = System)
-// 	UNiagaraSystemCategory* Category;
 
 	/** The script which defines the System parameters, and which generates the bindings from System
 		parameter to emitter parameter. */

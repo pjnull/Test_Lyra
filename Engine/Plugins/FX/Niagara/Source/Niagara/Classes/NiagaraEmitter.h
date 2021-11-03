@@ -450,7 +450,7 @@ public:
 	FText TemplateAssetDescription;
 
 	/** Category to collate this emitter into for "add new emitter" dialogs.*/
-	UPROPERTY(AssetRegistrySearchable, EditAnywhere, Category = Script)
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Asset Options", AssetRegistrySearchable)
 	FText Category;
 
 	UPROPERTY()
