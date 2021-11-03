@@ -103,7 +103,7 @@ namespace Metasound
 			// Returns asset associated with the given key (null if key is not registered with the AssetManager or was not loaded from asset)
 			virtual FMetasoundAssetBase* TryLoadAssetFromKey(const Metasound::Frontend::FNodeRegistryKey& InRegistryKey) const = 0;
 
-			// Try to load referenced assets of the given asset or return them if they are already loaded.
+			// Try to load referenced assets of the given asset or return them if they are already loaded (non-recursive).
 			// @return - True if all referenced assets successfully loaded, false if not.
 			virtual bool TryLoadReferencedAssets(const FMetasoundAssetBase& InAssetBase, TArray<FMetasoundAssetBase*>& OutReferencedAssets) const = 0;
 		};
