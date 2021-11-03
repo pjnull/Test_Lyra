@@ -856,6 +856,11 @@ struct FEntityAllocationProxy
 		return GetAllocationType();
 	}
 	
+	friend bool operator==(const FEntityAllocationProxy& A, const FEntityAllocationProxy& B)
+	{
+		return A.Manager == B.Manager && A.AllocationIndex == B.AllocationIndex;
+	}
+	
 	/** Hashing function for storing handles in maps */
 	friend uint32 GetTypeHash(FEntityAllocationProxy Proxy)
 	{
