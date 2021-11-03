@@ -9,6 +9,8 @@
 #include "CoreMinimal.h"
 #include "RendererInterface.h"
 
+class FViewInfo;
+
 struct FShadingEnergyConservationStateData
 {
 	bool bEnergyConservation = false;
