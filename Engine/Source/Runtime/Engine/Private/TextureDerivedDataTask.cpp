@@ -576,6 +576,8 @@ FTextureCacheDerivedDataWorker::FTextureCacheDerivedDataWorker(
 	UTexture* InTexture,
 	const FTextureBuildSettings* InSettingsPerLayerFetchFirst,
 	const FTextureBuildSettings* InSettingsPerLayerFetchOrBuild,
+	const FTexturePlatformData::FTextureEncodeResultMetadata* InFetchFirstMetadata, // can be nullptr if not needed
+	const FTexturePlatformData::FTextureEncodeResultMetadata* InFetchOrBuildMetadata, // can be nullptr if not needed
 	ETextureCacheFlags InCacheFlags
 	)
 	: Compressor(InCompressor)
@@ -596,12 +598,20 @@ FTextureCacheDerivedDataWorker::FTextureCacheDerivedDataWorker(
 		{
 			BuildSettingsPerLayerFetchFirst[LayerIndex] = InSettingsPerLayerFetchFirst[LayerIndex];
 		}
+		if (InFetchFirstMetadata)
+		{
+			FetchFirstMetadata = *InFetchFirstMetadata;
+		}
 	}
 	
 	BuildSettingsPerLayerFetchOrBuild.SetNum(InTexture->Source.GetNumLayers());
 	for (int32 LayerIndex = 0; LayerIndex < BuildSettingsPerLayerFetchOrBuild.Num(); ++LayerIndex)
 	{
 		BuildSettingsPerLayerFetchOrBuild[LayerIndex] = InSettingsPerLayerFetchOrBuild[LayerIndex];
+	}
+	if (InFetchOrBuildMetadata)
+	{
+		FetchOrBuildMetadata = *InFetchOrBuildMetadata;
 	}
 
 	// FetchOrBuildDerivedDataKey needs to be assigned on the create thread.
@@ -750,7 +760,7 @@ void FTextureCacheDerivedDataWorker::DoWork()
 	KeySuffix = LocalDerivedDataKeySuffix;
 	DerivedData->DerivedDataKey.Emplace<FString>(LocalDerivedDataKey);
 	TArray<FTextureBuildSettings>& ActiveBuildSettingsPerLayer = bUsedFetchFirst ? BuildSettingsPerLayerFetchFirst : BuildSettingsPerLayerFetchOrBuild;
-	UsedEncodeSpeed = (ETextureEncodeSpeed)ActiveBuildSettingsPerLayer[0].RepresentsEncodeSpeedNoSend;
+	DerivedData->ResultMetadata = bUsedFetchFirst ? FetchFirstMetadata : FetchOrBuildMetadata;
 
 	if (bLoadedFromDDC)
 	{
@@ -971,6 +981,8 @@ public:
 		FTexturePlatformData& InDerivedData,
 		const FTextureBuildSettings* InSettingsFetchFirst, // can be nullptr
 		const FTextureBuildSettings& InSettingsFetchOrBuild,
+		const FTexturePlatformData::FTextureEncodeResultMetadata* InFetchFirstMetadata, // can be nullptr
+		const FTexturePlatformData::FTextureEncodeResultMetadata* InFetchOrBuildMetadata, // can be nullptr
 		EQueuedWorkPriority InPriority,
 		ETextureCacheFlags Flags)
 		: DerivedData(InDerivedData)
@@ -1033,18 +1045,25 @@ public:
 			if (FetchDefinition.GetKey() != FetchOrBuildDefinition.GetKey())
 			{
 				bBuildKicked = true;
-				this->UsedEncodeSpeed = (ETextureEncodeSpeed)InSettingsFetchFirst->RepresentsEncodeSpeedNoSend;
+				if (InFetchFirstMetadata)
+				{
+					this->DerivedData.ResultMetadata = *InFetchFirstMetadata;
+				}
 
 				BuildSession.Get().Build(FetchDefinition, {}, EBuildPolicy::Cache, *Owner,
-					[this, FetchOrBuildDefinition = MoveTemp(FetchOrBuildDefinition), Flags, FetchOrBuildEncodeSpeed = (ETextureEncodeSpeed)InSettingsFetchOrBuild.RepresentsEncodeSpeedNoSend](FBuildCompleteParams&& Params)
+					[this, 
+					 FetchOrBuildDefinition = MoveTemp(FetchOrBuildDefinition), 
+					 Flags,
+					 FetchOrBuildMetadata = InFetchOrBuildMetadata ? *InFetchOrBuildMetadata : FTexturePlatformData::FTextureEncodeResultMetadata()
+					](FBuildCompleteParams&& Params)
 					{
 						switch (Params.Status)
 						{
 						default:
 						case EStatus::Ok:
 							return EndBuild(MoveTemp(Params));
-						case EStatus::Error:
-							this->UsedEncodeSpeed = FetchOrBuildEncodeSpeed;
+						case EStatus::Error:							
+							this->DerivedData.ResultMetadata = FetchOrBuildMetadata;
 							return BeginBuild(FetchOrBuildDefinition, Flags);
 						}
 					});
@@ -1054,6 +1073,10 @@ public:
 		if (bBuildKicked == false)
 		{
 			// we didn't use the fetch first path.
+			if (InFetchOrBuildMetadata)
+			{
+				this->DerivedData.ResultMetadata = *InFetchOrBuildMetadata;
+			}
 			BeginBuild(FetchOrBuildDefinition, Flags);
 		}
 	}
@@ -1104,9 +1127,8 @@ private:
 		StatusMessage.Reset();
 	}
 
-	void Finalize(bool& bOutFoundInCache, ETextureEncodeSpeed& OutUsedEncodeSpeed, uint64& OutProcessedByteCount) final
+	void Finalize(bool& bOutFoundInCache, uint64& OutProcessedByteCount) final
 	{
-		OutUsedEncodeSpeed = UsedEncodeSpeed;
 		bOutFoundInCache = bCacheHit;
 		OutProcessedByteCount = BuildOutputSize;
 	}
@@ -1462,9 +1484,6 @@ private:
 		return true;
 	}
 
-	// The settings we used for the build -- this can change when we look for the final
-	// and fall back to the fast.
-	ETextureEncodeSpeed UsedEncodeSpeed;
 	FTexturePlatformData& DerivedData;
 	TOptional<UE::DerivedData::FRequestOwner> Owner;
 	UE::DerivedData::FOptionalBuildSession BuildSession;
@@ -1483,13 +1502,15 @@ FTextureAsyncCacheDerivedDataTask* CreateTextureBuildTask(
 	FTexturePlatformData& DerivedData,
 	const FTextureBuildSettings* SettingsFetch,
 	const FTextureBuildSettings& SettingsFetchOrBuild,
+	const FTexturePlatformData::FTextureEncodeResultMetadata* FetchMetadata,
+	const FTexturePlatformData::FTextureEncodeResultMetadata* FetchOrBuildMetadata,
 	EQueuedWorkPriority Priority,
 	ETextureCacheFlags Flags)
 {
 	TStringBuilder<64> FunctionName;
 	if (TryFindTextureBuildFunction(FunctionName, SettingsFetchOrBuild.TextureFormatName))
 	{
-		return new FTextureBuildTask(Texture, FunctionName, DerivedData, SettingsFetch, SettingsFetchOrBuild, Priority, Flags);
+		return new FTextureBuildTask(Texture, FunctionName, DerivedData, SettingsFetch, SettingsFetchOrBuild, FetchMetadata, FetchOrBuildMetadata, Priority, Flags);
 	}
 	return nullptr;
 }

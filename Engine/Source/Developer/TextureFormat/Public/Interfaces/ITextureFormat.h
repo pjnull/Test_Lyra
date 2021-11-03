@@ -42,6 +42,13 @@ public:
 		return false;
 	}
 
+	/**
+	*	Return the name of the encoder used for the given format.
+	* 
+	*	Used for debugging and UI.
+	* */
+	virtual FName GetEncoderName(FName Format) const = 0;
+
 	/** 
 		Exposes whether the format supports the fast/final encode speed switching in project settings. 
 		Needs the Format so that we can thunk through the child texture formats correctly.

@@ -600,6 +600,12 @@ public:
 	{
 		return true;
 	}
+
+	virtual FName GetEncoderName(FName Format) const override
+	{
+		static const FName OodleName("EngineOodle");
+		return OodleName;
+	}
 	
 	virtual bool UsesTaskGraph() const override
 	{

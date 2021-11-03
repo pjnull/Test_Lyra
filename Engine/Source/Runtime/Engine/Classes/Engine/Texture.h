@@ -657,6 +657,45 @@ struct FTexturePlatformData
 	/** The key associated with this derived data. */
 	TVariant<FString, UE::DerivedData::FCacheKeyProxy> DerivedDataKey;
 
+	// Stores information about how we generated this encoded texture.
+	// Mostly relevant to Oodle, however notably does actually tell
+	// you _which_ encoder was used.
+	struct FTextureEncodeResultMetadata
+	{
+		// Returned from ITextureFormat
+		FName Encoder;
+
+		// This struct is not always filled out, allow us to check for invalid data.
+		bool bIsValid = false;
+
+		// If this is false, the remaining fields are invalid (as encode speed governs
+		// the various Oodle specific values right now.)
+		bool bSupportsEncodeSpeed = false;
+
+		enum class OodleRDOSource : uint8
+		{
+			Default,	// We defaulted back to the project settings
+			LODGroup,	// We used the LCA off the LOD group to generate a lambda
+			Texture,	// We used the LCA off the texture to generate a lambda.
+		};
+
+		OodleRDOSource RDOSource = OodleRDOSource::Default;
+
+		// The resulting RDO lambda, 0 means no RDO.
+		uint8 OodleRDO = 0;
+
+		// enum ETextureEncodeEffort
+		uint8 OodleEncodeEffort = 0;
+
+		// enum ETextureUniversalTiling
+		uint8 OodleUniversalTiling = 0;
+
+		// Which encode speed we ended up using. Must be either ETextureEncodeSpeed::Final or ETextureEncodeSpeed::Fast.
+		uint8 EncodeSpeed = 0;
+	};
+
+	FTextureEncodeResultMetadata ResultMetadata;
+
 	struct FStructuredDerivedDataKey
 	{
 		FIoHash BuildDefinitionKey;
@@ -686,8 +725,6 @@ struct FTexturePlatformData
 	/** Async cache task if one is outstanding. */
 	struct FTextureAsyncCacheDerivedDataTask* AsyncTask;
 
-	// Which encode speed we ended up using. Must be either ETextureEncodeSpeed::Final or ETextureEncodeSpeed::Fast.
-	uint8 UsedEncodeSpeed;
 #endif
 
 	/** Default constructor. */
@@ -797,6 +834,8 @@ public:
 		class UTexture& InTexture,
 		const struct FTextureBuildSettings* InSettingsPerLayerFetchFirst,
 		const struct FTextureBuildSettings* InSettingsPerLayerFetchOrBuild,
+		const FTexturePlatformData::FTextureEncodeResultMetadata* OutResultMetadataPerLayerFetchFirst,
+		const FTexturePlatformData::FTextureEncodeResultMetadata* OutResultMetadataPerLayerFetchOrBuild,
 		uint32 InFlags,
 		class ITextureCompressorModule* Compressor);
 	void FinishCache();
