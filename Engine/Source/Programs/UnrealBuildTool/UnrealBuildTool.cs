@@ -333,18 +333,12 @@ namespace UnrealBuildTool
 			
 			/// <summary>
 			/// Whether to backup an existing log file, rather than overwriting it.
-			///
-			/// Prevent duplication in BuildConfiguration.xml with e.g. 
-			/// <Log><bBackupLogFiles>false</bBackupLogFiles></Log>
 			/// </summary>
 			[XmlConfigFile(Category = "Log")] 
 			public bool bBackupLogFiles = Log.BackupLogFiles;
 			
 			/// <summary>
 			/// The number of log file backups to preserve. Older backups will be deleted.
-			///
-			/// This can be changed in BuildConfiguration.xml with e.g. 
-			/// <Log><LogFileBackupCount>9</LogFileBackupCount></Log>
 			/// </summary>
 			[XmlConfigFile(Category = "Log")]
 			public int LogFileBackupCount = Log.LogFileBackupCount;
