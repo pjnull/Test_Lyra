@@ -22,6 +22,7 @@ public:
 	/** Constructs this widget with InArgs */
 	void Construct(const FArguments& InArgs, UNiagaraOverviewNode* InNode);
 	virtual void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
+	virtual bool ShouldAllowCulling() const override { return false; }
 
 protected:
 	virtual TSharedRef<SWidget> CreateTitleWidget(TSharedPtr<SNodeTitle> NodeTitle) override;
