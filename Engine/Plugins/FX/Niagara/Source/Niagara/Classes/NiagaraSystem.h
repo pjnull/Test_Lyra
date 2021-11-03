@@ -422,6 +422,8 @@ public:
 	FORCEINLINE float GetWarmupTime()const { return WarmupTime; }
 	FORCEINLINE int32 GetWarmupTickCount()const { return WarmupTickCount; }
 	FORCEINLINE float GetWarmupTickDelta()const { return WarmupTickDelta; }
+	FORCEINLINE bool HasFixedTickDelta() const { return bFixedTickDelta; }
+	FORCEINLINE float GetFixedTickDeltaTime()const { return FixedTickDeltaTime; }
 	virtual void GetAssetRegistryTags(TArray<FAssetRegistryTag>& OutTags)  const override;
 
 	FORCEINLINE bool NeedsDeterminism() const { return bDeterminism; }
@@ -862,6 +864,19 @@ protected:
 	/** Delta time to use for warmup ticks. */
 	UPROPERTY(EditAnywhere, Category = Warmup)
 	float WarmupTickDelta;
+
+	UPROPERTY(EditAnywhere, Category = "System", meta = (InlineEditConditionToggle))
+	bool bFixedTickDelta = false;
+
+	/**
+	If activated, the system ticks with a fixed delta time instead of the varying game thread delta time. This leads to much more stable simulations.
+	When the fixed tick delta is smaller than the game thread tick time the simulation is substepping by executing multiple ticks per frame.
+	Note that activating this feature forces the system to tick on the game thread instead of an async task in parallel.
+
+	The max number of substeps per frame can be set via fx.Niagara.SystemSimulation.MaxTickSubsteps
+	*/
+	UPROPERTY(EditAnywhere, Category = "System", meta = (EditCondition = "bFixedTickDelta"))
+	float FixedTickDeltaTime = 0.01667;
 
 #if WITH_EDITORONLY_DATA
 	/** Settings used inside the baker */
