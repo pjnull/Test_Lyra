@@ -10,6 +10,7 @@
 #include "AreaLightCommon.ush"
 #include "TransmissionCommon.ush"
 #include "HairBsdf.ush"
+#include "ShadingEnergyConservation.ush"
 
 #if 0
 void StandardShadingShared( float3 DiffuseColor, float3 SpecularColor, float Roughness, float3 V, half3 N )
@@ -233,12 +234,24 @@ FDirectLighting DefaultLitBxDF( FGBufferData GBuffer, half3 N, half3 V, half3 L,
 		}
 	}
 
+	FBxDFEnergyTerms EnergyTerms = ComputeGGXSpecEnergyTerms(GBuffer.Roughness, Context.NoV, GBuffer.SpecularColor);
+
+	// Add energy presevation (i.e. attenuation of the specular layer onto the diffuse component
+	Lighting.Diffuse *= ComputeEnergyPreservation(EnergyTerms);
+
+	// Add specular microfacet multiple scattering term (energy-conservation)
+	Lighting.Specular *= ComputeEnergyConservation(EnergyTerms);
+
 	Lighting.Transmission = 0;
 	return Lighting;
 }
 
+// Simple default lit model used by Lumen
 float3 SimpleShading( float3 DiffuseColor, float3 SpecularColor, float Roughness, float3 L, float3 V, half3 N )
 {
+	const float NoV = saturate(dot(N, V));
+	const FBxDFEnergyTerms EnergyTerms = ComputeGGXSpecEnergyTerms(Roughness, NoV, SpecularColor);
+
 	float3 H = normalize(V + L);
 	float NoH = saturate( dot(N, H) );
 	
@@ -247,7 +260,9 @@ float3 SimpleShading( float3 DiffuseColor, float3 SpecularColor, float Roughness
 	float Vis = Vis_Implicit();
 	float3 F = F_None( SpecularColor );
 
-	return Diffuse_Lambert( DiffuseColor ) + (D * Vis) * F;
+	return 
+		Diffuse_Lambert( DiffuseColor ) * ComputeEnergyPreservation(EnergyTerms) +
+		(D * Vis) * F * ComputeEnergyConservation(EnergyTerms);
 }
 
 float3 CalcThinTransmission(float NoL, float NoV, FGBufferData GBuffer)
@@ -369,6 +384,8 @@ FDirectLighting ClearCoatBxDF( FGBufferData GBuffer, half3 N, half3 V, half3 L, 
 	float Fc = Pow5(1 - Context.VoH);
 	float F = Fc + (1 - Fc) * F0;
 
+	FBxDFEnergyTerms EnergyTermsCoat   = ComputeGGXSpecEnergyTerms(ClearCoatRoughness, Context.NoV, F0);
+
 	if (bIsRect)
 	{
 		Lighting.Specular = ClearCoat * RectGGXApproxLTC(ClearCoatRoughness, F0, Nspec, V, AreaLight.Rect, AreaLight.Texture);
@@ -384,6 +401,7 @@ FDirectLighting ClearCoatBxDF( FGBufferData GBuffer, half3 N, half3 V, half3 L, 
 		float Fr1 = D * Vis * F;
 		Lighting.Specular = ClearCoat * AreaLight.FalloffColor * (Falloff * NoL * Fr1);
 	}
+	Lighting.Specular *= ComputeEnergyConservation(EnergyTermsCoat);
 
 	// Restore previously changed SphereSinAlpha for the top layer. 
 	// Alpha needs to also be restored to the bottom layer roughness.
@@ -392,7 +410,7 @@ FDirectLighting ClearCoatBxDF( FGBufferData GBuffer, half3 N, half3 V, half3 L, 
 
 	// Incoming and exiting Fresnel terms are identical to incoming Fresnel term (VoH == HoL)
 	// float FresnelCoeff = (1.0 - F1) * (1.0 - F2);
-	float FresnelCoeff = 1.0 - F;
+	float3 FresnelCoeff = ComputeEnergyPreservation(EnergyTermsCoat); // 1.0 - F;
 	FresnelCoeff *= FresnelCoeff;
 
 	//////////////////////////////
@@ -456,11 +474,13 @@ FDirectLighting ClearCoatBxDF( FGBufferData GBuffer, half3 N, half3 V, half3 L, 
 	BxDFContext BottomContext = RefractClearCoatContext(Context);
 	BottomContext.VoH = bIsRect ? BottomContext.NoV : BottomContext.VoH;
 
+	FBxDFEnergyTerms EnergyTermsBottom = ComputeGGXSpecEnergyTerms(GBuffer.Roughness, BottomContext.NoV, GBuffer.SpecularColor);
+
 	// Absorption
 	float3 Transmission = CalcThinTransmission(BottomContext.NoL, BottomContext.NoV, GBuffer);
 
 	// Default Lit
-	float3 DefaultDiffuse = (Falloff * NoL) * AreaLight.FalloffColor * Diffuse_Lambert(GBuffer.DiffuseColor);
+	float3 DefaultDiffuse = (Falloff * NoL) * AreaLight.FalloffColor * Diffuse_Lambert(GBuffer.DiffuseColor) * ComputeEnergyPreservation(EnergyTermsBottom);
 	float3 RefractedDiffuse = FresnelCoeff * Transmission * DefaultDiffuse;
 	Lighting.Diffuse = lerp(DefaultDiffuse, RefractedDiffuse, ClearCoat);
 
@@ -577,6 +597,9 @@ FDirectLighting SubsurfaceProfileBxDF( FGBufferData GBuffer, half3 N, half3 V, h
 	Lobe0Roughness = lerp(1.0f, Lobe0Roughness, saturate(Opacity * 10.0f));
 	Lobe1Roughness = lerp(1.0f, Lobe1Roughness, saturate(Opacity * 10.0f));
 
+	// Take the average roughness instead of compute a separate energy term for each roughness
+	const FBxDFEnergyTerms EnergyTerms = ComputeGGXSpecEnergyTerms(AverageRoughness, Context.NoV, GBuffer.SpecularColor);
+
 	FDirectLighting Lighting;
 	Lighting.Diffuse  = AreaLight.FalloffColor * (Falloff * NoL) * Diffuse_Burley( GBuffer.DiffuseColor, GBuffer.Roughness, Context.NoV, NoL, Context.VoH );
 
@@ -591,6 +614,8 @@ FDirectLighting SubsurfaceProfileBxDF( FGBufferData GBuffer, half3 N, half3 V, h
 		Lighting.Specular = AreaLight.FalloffColor * (Falloff * NoL) * DualSpecularGGX(AverageRoughness, Lobe0Roughness, Lobe1Roughness, LobeMix, GBuffer.SpecularColor, Context, NoL, AreaLight);
 	}
 
+	Lighting.Diffuse  *= ComputeEnergyPreservation(EnergyTerms);
+	Lighting.Specular *= ComputeEnergyConservation(EnergyTerms);
 
 #if USE_TRANSMISSION
 
@@ -630,16 +655,25 @@ FDirectLighting ClothBxDF( FGBufferData GBuffer, half3 N, half3 V, half3 L, floa
 	else
 		Spec1 = AreaLight.FalloffColor * (Falloff * NoL) * SpecularGGX( GBuffer.Roughness, GBuffer.SpecularColor, Context, NoL, AreaLight );
 
+	const FBxDFEnergyTerms EnergyTerms1 = ComputeGGXSpecEnergyTerms(GBuffer.Roughness, Context.NoV, GBuffer.SpecularColor);
+	Spec1 *= ComputeEnergyConservation(EnergyTerms1);
+
 	// Cloth - Asperity Scattering - Inverse Beckmann Layer
 	float D2 = D_InvGGX( Pow4( GBuffer.Roughness ), Context.NoH );
 	float Vis2 = Vis_Cloth( Context.NoV, NoL );
 	float3 F2 = F_Schlick( FuzzColor, Context.VoH );
 	float3 Spec2 = AreaLight.FalloffColor * (Falloff * NoL) * (D2 * Vis2) * F2;
 	
+	const FBxDFEnergyTerms EnergyTerms2 = ComputeClothEnergyTerms(GBuffer.Roughness, Context.NoV, FuzzColor);
+	Spec2 *= ComputeEnergyConservation(EnergyTerms2);
+
 	FDirectLighting Lighting;
-	Lighting.Diffuse  = AreaLight.FalloffColor * (Falloff * NoL) * Diffuse_Lambert( GBuffer.DiffuseColor );
+	Lighting.Diffuse  = AreaLight.FalloffColor * (Falloff * NoL) * Diffuse_Lambert( GBuffer.DiffuseColor ); 
 	Lighting.Specular = lerp( Spec1, Spec2, Cloth );
 	Lighting.Transmission = 0;
+
+	Lighting.Diffuse *= lerp(ComputeEnergyPreservation(EnergyTerms1), ComputeEnergyPreservation(EnergyTerms2), Cloth);
+
 	return Lighting;
 }
 
@@ -719,6 +753,8 @@ FDirectLighting EyeBxDF( FGBufferData GBuffer, half3 N, half3 V, half3 L, float 
 	float Fc = Pow5( 1 - Context.VoH );
 	float F = Fc + (1 - Fc) * F0;
 	
+	const FBxDFEnergyTerms EnergyTerms = ComputeGGXSpecEnergyTerms(GBuffer.Roughness, Context.NoV, F0);
+
 	FDirectLighting Lighting;
 
 	if( bIsRect )
@@ -743,8 +779,10 @@ FDirectLighting EyeBxDF( FGBufferData GBuffer, half3 N, half3 V, half3 L, float 
 	float Iris = IrisNoL * Caustic;
 	float Sclera = NoL;
 	
+	Lighting.Specular *= ComputeEnergyConservation(EnergyTerms);
+
 	Lighting.Diffuse = 0;
-	Lighting.Transmission = AreaLight.FalloffColor * ( Falloff * lerp( Sclera, Iris, IrisMask ) * (1 - F) ) * Diffuse_Lambert( GBuffer.DiffuseColor );
+	Lighting.Transmission = AreaLight.FalloffColor * ( Falloff * lerp( Sclera, Iris, IrisMask ) * ComputeEnergyPreservation(EnergyTerms) ) * Diffuse_Lambert( GBuffer.DiffuseColor );
 	return Lighting;
 }
 

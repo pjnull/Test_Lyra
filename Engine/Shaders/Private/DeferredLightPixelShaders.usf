@@ -11,6 +11,7 @@
 
 #include "LargeWorldCoordinates.ush"
 
+#define USE_ENERGY_CONSERVATION 0 
 #include "DeferredShadingCommon.ush"
 #include "DeferredLightingCommon.ush"
 
