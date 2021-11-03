@@ -116,7 +116,7 @@ bool FDisplayClusterProjectionCameraPolicy::ImplGetProjectionMatrix(const float 
 
 	// Clamp camera fov to valid range [1.f, 178.f]
 	const float ClampedCameraFOV = FMath::Clamp(ScaledCameraFOV, 1.f, 178.f);
-	if (ClampedCameraFOV != ScaledCameraFOV)
+	if (ClampedCameraFOV != ScaledCameraFOVV && !IsEditorOperationMode())
 	{
 		UE_LOG(LogDisplayClusterProjectionCamera, Warning, TEXT("CameraFOV clamped: '%d' -> '%d'. (FieldOfView='%d', FOVMultiplier='%d'"), ScaledCameraFOV, ClampedCameraFOV, InCameraFOV, CameraSettings.FOVMultiplier);
 	}
@@ -172,7 +172,10 @@ void FDisplayClusterProjectionCameraPolicy::SetCamera(UCameraComponent* NewCamer
 	else
 	{
 		CameraRef.ResetSceneComponent();
-		UE_LOG(LogDisplayClusterProjectionCamera, Warning, TEXT("Trying to set nullptr camera pointer"));
+		if (!IsEditorOperationMode())
+		{
+			UE_LOG(LogDisplayClusterProjectionCamera, Warning, TEXT("Trying to set nullptr camera pointer"));
+		}
 	}
 
 	CameraSettings = InCameraSettings;
