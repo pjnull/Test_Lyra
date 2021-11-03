@@ -1048,6 +1048,10 @@ FLinkerLoad::ELinkerStatus FLinkerLoad::CreateLoader(
 			// If want to be able to load cooked data in the editor we need to use FAsyncArchive which supports EDL cooked packages,
 			// otherwise the generic file reader is faster in the editor so use that
 			bool bCanUseAsyncLoader = FPlatformProperties::RequiresCookedData() || GAllowCookedDataInEditorBuilds;
+#if WITH_TEXT_ARCHIVE_SUPPORT
+			bCanUseAsyncLoader &= !FPackageName::IsTextPackageExtension(PackagePath.GetHeaderExtension());
+#endif //if WITH_TEXT_ARCHIVE_SUPPORT
+
 			if (bCanUseAsyncLoader)
 			{
 				Loader = new FAsyncArchive(GetPackagePath(), this,
