@@ -3534,11 +3534,14 @@ EAsyncPackageState::Type FAsyncPackage2::Event_SetupDependencies(FAsyncLoadingTh
 	TRACE_CPUPROFILER_EVENT_SCOPE(Event_SetupDependencies);
 	check(Package->AsyncPackageLoadingState == EAsyncPackageLoadingState2::SetupDependencies);
 	
-	if (GIsInitialLoad)
+	if (!Package->bLoadHasFailed)
 	{
-		Package->SetupScriptDependencies();
+		if (GIsInitialLoad)
+		{
+			Package->SetupScriptDependencies();
+		}
+		Package->SetupSerializedArcs();
 	}
-	Package->SetupSerializedArcs();
 	Package->AsyncPackageLoadingState = EAsyncPackageLoadingState2::ProcessExportBundles;
 	for (int32 ExportBundleIndex = 0, ExportBundleCount = Package->Data.ExportInfo.ExportBundleCount; ExportBundleIndex < ExportBundleCount; ++ExportBundleIndex)
 	{
