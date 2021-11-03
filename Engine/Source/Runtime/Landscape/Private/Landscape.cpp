@@ -3549,11 +3549,13 @@ void FLandscapeComponentDerivedData::Serialize(FArchive& Ar, UObject* Owner)
 		FByteBulkData& LODData = StreamingLODDataArray[Idx];
 		LODData.Serialize(Ar, Owner, Idx);
 #endif
+#if USE_BULKDATA_STREAMING_TOKEN
 		if (CachedLODDataPackagePath.IsEmpty() && !!(LODData.GetBulkDataFlags() & BULKDATA_Force_NOT_InlinePayload))
 		{
 			CachedLODDataPackagePath = LODData.GetPackagePath();
 			CachedLODDataPackageSegment = LODData.GetPackageSegment();
 		}
+#endif
 	}
 }
 
