@@ -7,11 +7,9 @@
 #endif
 
 THIRD_PARTY_INCLUDES_START
-#include <Alembic/AbcCoreHDF5/All.h>
-#include <Alembic/AbcCoreOgawa/All.h>
-#include <Alembic/AbcCoreFactory/All.h>
 #include <Alembic/AbcCoreAbstract/TimeSampling.h>
-#include <Alembic/AbcCoreHDF5/All.h>
+#include <Alembic/AbcCoreFactory/All.h>
+#include <Alembic/AbcCoreOgawa/All.h>
 THIRD_PARTY_INCLUDES_END
 
 #include "Misc/Paths.h"
