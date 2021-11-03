@@ -211,7 +211,10 @@ FRestoreObjectScope FCustomObjectSerializationWrapper::PreActorRestore_EditorWor
 	SCOPED_SNAPSHOT_CORE_TRACE(CustomObjectSerialization_PreEditorRestore);
 	
 	const TOptional<AActor*> SnapshotActor = WorldData.GetDeserializedActor(EditorActor, LocalisationSnapshotPackage);
-	check(SnapshotActor);
+	if (!ensure(SnapshotActor))
+	{
+		return FRestoreObjectScope([](){});
+	}
 	
 	return PreObjectRestore_EditorWorld(
 		*SnapshotActor,

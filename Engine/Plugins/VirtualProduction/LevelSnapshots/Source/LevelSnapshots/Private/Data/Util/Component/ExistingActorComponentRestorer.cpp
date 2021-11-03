@@ -66,6 +66,7 @@ namespace LevelSnapshots
 		};
 
 		mutable TArray<FDeferredComponentSerializationTask> DeferredSerializationsTasks;
+		mutable TArray<UActorComponent*> CompsWithMissingSnapshotCounterpart;
 	};
 
 	FExistingActorComponentRestorer::FExistingActorComponentRestorer(AActor* MatchedEditorActor, const FActorSnapshotData& SnapshotData, FWorldSnapshotData& WorldData)
@@ -82,14 +83,20 @@ namespace LevelSnapshots
 		TOptional<AActor*> SnapshotActor = GetSnapshotData().GetPreallocatedIfValidButDoNotAllocate();
 		checkf(SnapshotActor, TEXT("Snapshot actor was expected to be allocated at this point"));
 		
-		UActorComponent* SnapshotComponent = SnapshotUtil::FindMatchingComponent(*SnapshotActor, RecreatedComponent);
-		check(SnapshotComponent);
-						
-		SubobjectData.EditorObject = RecreatedComponent;
-		FLevelSnapshotsModule::GetInternalModuleInstance().OnPostRecreateComponent(RecreatedComponent);
-		DeferredSerializationsTasks.Add({ &SubobjectData, SnapshotComponent, RecreatedComponent });
-						
-		RecreatedComponent->RegisterComponent();
+		const FSoftObjectPath RecreatedComponentPath(RecreatedComponent);
+		UActorComponent* SnapshotComponent = SnapshotUtil::FindMatchingComponent(*SnapshotActor, RecreatedComponentPath);
+		if (ensure(SnapshotComponent))
+		{
+			SubobjectData.EditorObject = RecreatedComponent;
+			FLevelSnapshotsModule::GetInternalModuleInstance().OnPostRecreateComponent(RecreatedComponent);
+			DeferredSerializationsTasks.Add({ &SubobjectData, SnapshotComponent, RecreatedComponent });
+			RecreatedComponent->RegisterComponent();
+		}
+		else
+		{
+			UE_LOG(LogLevelSnapshots, Warning, TEXT("Failed to find snapshot counterpart for %s"), *RecreatedComponentPath.ToString());
+			CompsWithMissingSnapshotCounterpart.Add(RecreatedComponent);
+		}
 	}
 
 	void FExistingActorComponentRestorer::RemovedNewComponents(const FAddedAndRemovedComponentInfo& ComponentSelection) const
@@ -121,6 +128,7 @@ namespace LevelSnapshots
 		for (const TWeakObjectPtr<UActorComponent>& CurrentComponentToRestore : ComponentSelection.SnapshotComponentsToAdd)
 		{
 			const FName NameOfComponentToRecreate = CurrentComponentToRestore->GetFName();
+			// TODO: Look at outer chain like SnapshotUtil::FindMatchingComponent instead of just by component name in FindMatchingSubobjectIndex
 			const TPair<int32, const FComponentSnapshotData*> ComponentInfo = FindMatchingSubobjectIndex(NameOfComponentToRecreate.ToString());
 			const int32 ReferenceIndex = ComponentInfo.Key;
 			FSubobjectSnapshotData* SubobjectData = GetWorldData().Subobjects.Find(ReferenceIndex); 
@@ -137,6 +145,10 @@ namespace LevelSnapshots
 			const FRestoreObjectScope FinishRestore = FCustomObjectSerializationWrapper::PreSubobjectRestore_EditorWorld(Task.Snapshot, Task.Original, GetWorldData(), SelectionMap, LocalisationSnapshotPackage);
 			FApplySnapshotToEditorArchive::ApplyToRecreatedEditorWorldObject(*Task.SubobjectData, GetWorldData(), Task.Original, Task.Snapshot, SelectionMap); 
 		}
+		for (UActorComponent* Fail : CompsWithMissingSnapshotCounterpart)
+		{
+			Fail->DestroyComponent();
+		}
 	}
 
 	void FExistingActorComponentRestorer::UpdateDetailsViewAfterUpdatingComponents() const
@@ -145,6 +157,18 @@ namespace LevelSnapshots
 		FLevelEditorModule& LevelEditor = FModuleManager::LoadModuleChecked<FLevelEditorModule>("LevelEditor");
 		LevelEditor.BroadcastComponentsEdited();
 #endif
+	}
+
+	FString ComponentListToString(const FActorSnapshotData& SnapshotData, const FWorldSnapshotData& WorldData)
+	{
+		FString Result;
+		for (auto CompIt = SnapshotData.ComponentData.CreateConstIterator(); CompIt; ++CompIt)
+		{
+			const int32 ReferenceIndex = CompIt->Key;
+			const FSoftObjectPath& SavedComponentPath = WorldData.SerializedObjectReferences[ReferenceIndex];
+			Result += FString::Printf(TEXT("%s "), *SavedComponentPath.ToString());
+		}
+		return Result;
 	}
 
 	TPair<int32, const FComponentSnapshotData*> FExistingActorComponentRestorer::FindMatchingSubobjectIndex(const FString& ComponentName) const
@@ -160,6 +184,7 @@ namespace LevelSnapshots
 			}
 		}
 
+		UE_LOG(LogLevelSnapshots, Warning, TEXT("Failed to component data for %s (Components: [%s])"), *ComponentName, *ComponentListToString(GetSnapshotData(), GetWorldData()));
 		return TPair<int32, const FComponentSnapshotData*>(INDEX_NONE, nullptr);
 	}
 }
