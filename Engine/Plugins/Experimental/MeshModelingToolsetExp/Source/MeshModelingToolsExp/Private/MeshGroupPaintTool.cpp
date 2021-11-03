@@ -296,6 +296,19 @@ void UMeshGroupPaintTool::RegisterActions(FInteractiveToolActionSet& ActionSet)
 };
 
 
+TUniquePtr<FMeshSculptBrushOp>& UMeshGroupPaintTool::GetActiveBrushOp()
+{
+	if (GetInEraseStroke())
+	{
+		return SecondaryBrushOp;
+	}
+	else
+	{
+		return PrimaryBrushOp;
+	}
+}
+
+
 void UMeshGroupPaintTool::OnPropertyModified(UObject* PropertySet, FProperty* Property)
 {
 	CalculateBrushRadius();
@@ -389,7 +402,7 @@ void UMeshGroupPaintTool::UpdateROI(const FSculptBrushStamp& BrushStamp)
 {
 	SCOPE_CYCLE_COUNTER(GroupPaintTool_UpdateROI);
 
-	int32 SetGroupID = GetInInvertStroke() ? FilterProperties->EraseGroup : FilterProperties->SetGroup;
+	int32 SetGroupID = GetInEraseStroke() ? FilterProperties->EraseGroup : FilterProperties->SetGroup;
 
 	const FVector3d& BrushPos = BrushStamp.LocalFrame.Origin;
 	const FDynamicMesh3* Mesh = GetSculptMesh();
@@ -840,8 +853,8 @@ void UMeshGroupPaintTool::OnPolyLassoFinished(const FCameraPolyLasso& Lasso, boo
 		return;
 	}
 
-	int32 SetGroupID = GetInInvertStroke() ? FilterProperties->EraseGroup : FilterProperties->SetGroup;
-	SetTrianglesToGroupID(FaceSelection.AsSet(), SetGroupID, GetInInvertStroke());
+	int32 SetGroupID = GetInEraseStroke() ? FilterProperties->EraseGroup : FilterProperties->SetGroup;
+	SetTrianglesToGroupID(FaceSelection.AsSet(), SetGroupID, GetInEraseStroke());
 }
 
 
@@ -1049,6 +1062,8 @@ void UMeshGroupPaintTool::DrawHUD(FCanvas* Canvas, IToolsContextRenderAPI* Rende
 {
 	if (PolyLassoMechanic)
 	{
+		// because the actual group change is deferred until mouse release, color the lasso to let the user know whether it will erase
+		PolyLassoMechanic->LineColor = GetInEraseStroke() ? FLinearColor::Red : FLinearColor::Green;
 		PolyLassoMechanic->DrawHUD(Canvas, RenderAPI);
 	}
 }

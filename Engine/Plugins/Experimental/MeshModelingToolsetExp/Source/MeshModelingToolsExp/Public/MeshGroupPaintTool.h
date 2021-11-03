@@ -353,6 +353,8 @@ protected:
 
 	virtual void OnBeginStroke(const FRay& WorldRay) override;
 	virtual void OnEndStroke() override;
+
+	virtual TUniquePtr<FMeshSculptBrushOp>& GetActiveBrushOp();
 	// end UMeshSculptToolBase API
 
 
@@ -428,6 +430,12 @@ protected:
 	UE::Geometry::FDynamicMeshOctree3 Octree;
 
 	bool UpdateBrushPosition(const FRay& WorldRay);
+
+	bool GetInEraseStroke()
+	{
+		// Re-use the smoothing stroke key (shift) for erase stroke in the group paint tool
+		return GetInSmoothingStroke();
+	}
 
 
 	bool bPendingPickGroup = false;
