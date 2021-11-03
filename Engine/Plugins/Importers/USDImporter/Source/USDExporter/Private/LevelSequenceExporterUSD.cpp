@@ -841,6 +841,9 @@ bool ULevelSequenceExporterUsd::ExportBinary( UObject* Object, const TCHAR* Type
 
 	LevelSequenceExporterImpl::ExportMovieSceneSequence( Context, *LevelSequence, TargetFileName );
 
+	// Set this back to Stopped or else it will keep the editor viewport controls permanently hidden
+	TempSequencer->SetPlaybackStatus( EMovieScenePlayerStatus::Stopped );
+
 	return true;
 #else
 	return false;
