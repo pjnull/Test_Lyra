@@ -1230,6 +1230,7 @@ class DeviceUnreal(Device):
                               f'-CONCERTDISPLAYNAME={self.name}')
 
         if CONFIG.INSIGHTS_TRACE_ENABLE.get_value():
+            LOGGER.warning(f"Unreal Insight Tracing is enabled for {self.name}. This may effect Unreal Engine performance.")
             remote_utrace_path = self.get_utrace_filepath()
             command_line_args += ' -statnamedevents' if CONFIG.INSIGHTS_STAT_EVENTS.get_value() else ''
             command_line_args += ' -tracefile={} -trace={}'.format(
