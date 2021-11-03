@@ -755,6 +755,8 @@ bool ULevelSequenceExporterUsd::ExportBinary( UObject* Object, const TCHAR* Type
 		Options = GetMutableDefault<ULevelSequenceExporterUsdOptions>();
 		if ( Options )
 		{
+			Options->TimeCodesPerSecond = MovieScene->GetDisplayRate().AsDecimal();
+
 			const bool bIsImport = false;
 			const bool bContinue = SUsdOptionsWindow::ShowOptions( *Options, bIsImport );
 			if ( !bContinue )
