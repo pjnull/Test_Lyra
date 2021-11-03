@@ -24,9 +24,6 @@
 #if WITH_EDITOR && !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
 #include "Logging/MessageLog.h"
 #endif
-#if WITH_EDITOR
-#include "ScopedTransaction.h"
-#endif
 
 void ULevelSnapshot::ApplySnapshotToWorld(UWorld* TargetWorld, const FPropertySelectionMap& SelectionSet)
 {
@@ -44,10 +41,6 @@ void ULevelSnapshot::ApplySnapshotToWorld(UWorld* TargetWorld, const FPropertySe
 	};
 	
 	EnsureWorldInitialised();
-	
-#if WITH_EDITOR
-	FScopedTransaction Transaction(FText::FromString("Loading Level Snapshot."));
-#endif
 	SerializedData.ApplyToWorld(TargetWorld, GetPackage(), SelectionSet);
 }
 

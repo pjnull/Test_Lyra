@@ -27,6 +27,7 @@
 #include "Engine/Selection.h"
 #include "Internationalization/Internationalization.h"
 #include "Misc/ScopedSlowTask.h"
+#include "ScopedTransaction.h"
 #include "UnrealEdGlobals.h"
 #endif
 
@@ -95,6 +96,12 @@ void FWorldSnapshotData::SnapshotWorld(UWorld* World)
 
 void FWorldSnapshotData::ApplyToWorld(UWorld* WorldToApplyTo, UPackage* LocalisationSnapshotPackage, const FPropertySelectionMap& PropertiesToSerialize)
 {
+	// Certain custom compilers, such as nDisplay, may reset the transaction context. That would cause a crash.
+	PreloadClassesForRestore(PropertiesToSerialize);
+#if WITH_EDITOR
+	FScopedTransaction Transaction(FText::FromString("Loading Level Snapshot."));
+#endif
+	
 	if (WorldToApplyTo == nullptr)
 	{
 		return;
@@ -357,6 +364,22 @@ void FWorldSnapshotData::CollectClassDefaultReferences(FArchive& Ar)
 		FSoftClassPath Class = ClassDefaultIt->Key;
 		Ar << Class;
 	}
+}
+
+void FWorldSnapshotData::PreloadClassesForRestore(const FPropertySelectionMap& SelectionMap)
+{
+	// Class required for respawning
+	for (const FSoftObjectPath& OriginalRemovedActorPath : SelectionMap.GetDeletedActorsToRespawn())
+	{
+		FActorSnapshotData* ActorSnapshot = ActorData.Find(OriginalRemovedActorPath);
+		if (ensure(ActorSnapshot))
+		{
+			UClass* ActorClass = ActorSnapshot->GetActorClass().TryLoadClass<AActor>();
+			UE_CLOG(ActorClass != nullptr, LogLevelSnapshots, Warning, TEXT("Failed to resolve class '%s'. Was it removed?"), *ActorSnapshot->GetActorClass().ToString());
+		}
+	}
+
+	// Technically we also have to load all component classes... we can skip it for now because the only problematic compiler right now is the nDisplay one.
 }
 
 void FWorldSnapshotData::ApplyToWorld_HandleRemovingActors(UWorld* WorldToApplyTo, const FPropertySelectionMap& PropertiesToSerialize)
