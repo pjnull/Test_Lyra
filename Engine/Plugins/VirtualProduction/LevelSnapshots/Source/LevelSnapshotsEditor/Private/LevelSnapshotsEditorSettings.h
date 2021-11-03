@@ -2,16 +2,23 @@
 
 #pragma once
 
-#include "Engine/EngineTypes.h"
-#include "LevelSnapshotsEditorDataManagementSettings.generated.h"
+#include "CoreMinimal.h"
+#include "UObject/Object.h"
+#include "LevelSnapshotsEditorSettings.generated.h"
 
 UCLASS(config = Engine, defaultconfig)
-class LEVELSNAPSHOTS_API ULevelSnapshotsEditorDataManagementSettings : public UObject
+class LEVELSNAPSHOTSEDITOR_API ULevelSnapshotsEditorSettings : public UObject
 {
 	GENERATED_BODY()
 public:
+
+	static ULevelSnapshotsEditorSettings* Get();
 	
-	ULevelSnapshotsEditorDataManagementSettings(const FObjectInitializer& ObjectInitializer);
+	ULevelSnapshotsEditorSettings(const FObjectInitializer& ObjectInitializer);
+
+	FVector2D GetLastCreationWindowSize() const;
+	/* Setting the Window Size through code will not save the size to the config. To make sure it's saved, call SaveConfig(). */
+	void SetLastCreationWindowSize(const FVector2D InLastSize);
 
 	const FString& GetNameOverride() const;
 	void SetNameOverride(const FString& InName);
@@ -31,7 +38,7 @@ public:
 	bool IsNameOverridden() const;
 
 	// Must be a directory in the Game Content folder ("/Game/"). For best results, use the picker.  
-	UPROPERTY(config, EditAnywhere, Category = "Level Snapshots", meta = (RelativeToGameContentDir, ContentDir))
+	UPROPERTY(config, EditAnywhere, Category = "Level Snapshots|Data", meta = (RelativeToGameContentDir, ContentDir))
 	FDirectoryPath RootLevelSnapshotSaveDir;
 
 	/** The format to use for the resulting filename. Extension will be added automatically. Any tokens of the form {token} will be replaced with the corresponding value:
@@ -43,7 +50,7 @@ public:
 	 * {date}       - The current date from the local computer in the format of {year}-{month}-{day}
 	 * {time}       - The current time from the local computer in the format of hours-minutes-seconds
 	 */
-	UPROPERTY(config, EditAnywhere, Category = "Level Snapshots")
+	UPROPERTY(config, EditAnywhere, Category = "Level Snapshots|Data")
 	FString LevelSnapshotSaveDir;
 
 	/** The format to use for the resulting filename. Extension will be added automatically. Any tokens of the form {token} will be replaced with the corresponding value:
@@ -55,8 +62,25 @@ public:
 	 * {date}       - The current date from the local computer in the format of {year}-{month}-{day}
 	 * {time}       - The current time from the local computer in the format of hours-minutes-seconds
 	 */
-	UPROPERTY(config, EditAnywhere, Category = "Level Snapshots")
+	UPROPERTY(config, EditAnywhere, Category = "Level Snapshots|Data")
 	FString DefaultLevelSnapshotName;
+	
+	
+	UPROPERTY(config, EditAnywhere, Category = "Level Snapshots|Editor", meta = (ConfigRestartRequired = true))
+	bool bEnableLevelSnapshotsToolbarButton;
+
+	UPROPERTY(config, EditAnywhere, Category = "Level Snapshots|Editor")
+	bool bUseCreationForm;
+
+	/* If true, clicking on an actor group under 'Modified Actors' will select the actor in the scene. The previous selection will be deselected. */
+	UPROPERTY(config, EditAnywhere, Category = "Level Snapshots|Editor")
+	bool bClickActorGroupToSelectActorInScene;
+
+	UPROPERTY(config, EditAnywhere, Category = "Level Snapshots|Editor")
+	float PreferredCreationFormWindowWidth;
+
+	UPROPERTY(config, EditAnywhere, Category = "Level Snapshots|Editor")
+	float PreferredCreationFormWindowHeight;
 
 private:
 	

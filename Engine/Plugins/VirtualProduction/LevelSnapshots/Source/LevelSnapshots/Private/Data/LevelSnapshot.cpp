@@ -6,7 +6,7 @@
 #include "Data/SnapshotCustomVersion.h"
 #include "Data/Util/ActorHashUtil.h"
 #include "Data/Util/EquivalenceUtil.h"
-#include "LevelSnapshotsEditorProjectSettings.h"
+#include "LevelSnapshotsSettings.h"
 #include "LevelSnapshotsLog.h"
 #include "LevelSnapshotsModule.h"
 #include "Restorability/SnapshotRestorability.h"
@@ -214,7 +214,7 @@ void ULevelSnapshot::DiffWorld(UWorld* World, FActorPathConsumer HandleMatchedAc
 	// Try to find world actors and call appropriate callback
 	{
 		SCOPED_SNAPSHOT_CORE_TRACE(DiffWorld_IteratorAllActors);
-		ULevelSnapshotsEditorProjectSettings* Settings = GetMutableDefault<ULevelSnapshotsEditorProjectSettings>();
+		ULevelSnapshotsSettings* Settings = GetMutableDefault<ULevelSnapshotsSettings>();
 		
 		const bool bShouldLogDiffWorldTimes = SnapshotCVars::CVarLogTimeDiffingMatchedActors.GetValueOnAnyThread();
 		const FString DebugActorName = SnapshotCVars::CVarBreakOnDiffMatchedActor.GetValueOnAnyThread();

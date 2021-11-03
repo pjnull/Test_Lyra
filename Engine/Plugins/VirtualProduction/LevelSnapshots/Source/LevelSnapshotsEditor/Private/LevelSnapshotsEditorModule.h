@@ -5,12 +5,13 @@
 #include "CoreMinimal.h"
 
 #include "ISettingsSection.h"
+#include "LevelSnapshotsEditorSettings.h"
 #include "Modules/ModuleManager.h"
 #include "Widgets/SWidget.h"
 #include "Widgets/Docking/SDockTab.h"
 
-class ULevelSnapshotsEditorProjectSettings;
-class ULevelSnapshotsEditorDataManagementSettings;
+class ULevelSnapshotsSettings;
+class ULevelSnapshotsEditorSettings;
 class FToolBarBuilder;
 class SLevelSnapshotsEditor;
 class ULevelSnapshotsEditorData;
@@ -27,15 +28,12 @@ public:
 	virtual void ShutdownModule() override;
 	//~ End IModuleInterface Interface
 
-	bool GetUseCreationForm() const;
-	void SetUseCreationForm(bool bInUseCreationForm);
-	void ToggleUseCreationForm() { SetUseCreationForm(!GetUseCreationForm()); }
+	static bool GetUseCreationForm() { return ULevelSnapshotsEditorSettings::Get()->bUseCreationForm; }
+	static void SetUseCreationForm(bool bInUseCreationForm) { ULevelSnapshotsEditorSettings::Get()->bUseCreationForm = bInUseCreationForm; }
+	static void ToggleUseCreationForm() { SetUseCreationForm(!GetUseCreationForm()); }
 
 	void OpenLevelSnapshotsDialogWithAssetSelected(const FAssetData& InAssetData);
 	void OpenSnapshotsEditor();
-
-	TWeakObjectPtr<ULevelSnapshotsEditorProjectSettings> GetLevelSnapshotsUserSettings() const { return ProjectSettingsObjectPtr; }
-	TWeakObjectPtr<ULevelSnapshotsEditorDataManagementSettings> GetLevelSnapshotsDataManagementSettings() const { return DataMangementSettingsObjectPtr; }
 
 private:
 
@@ -45,7 +43,6 @@ private:
 	TSharedRef<SDockTab> SpawnLevelSnapshotsTab(const FSpawnTabArgs& SpawnTabArgs);
 	ULevelSnapshotsEditorData* AllocateTransientPreset();
 	
-	bool RegisterProjectSettings();
 	bool HandleModifiedProjectSettings();
 	
 	void RegisterEditorToolbar();
@@ -59,9 +56,5 @@ private:
 	/** Lives for as long as the UI is open. */
 	TWeakPtr<SLevelSnapshotsEditor> WeakSnapshotEditor;
 
-	TSharedPtr<ISettingsSection> ProjectSettingsSectionPtr;
-	TWeakObjectPtr<ULevelSnapshotsEditorProjectSettings> ProjectSettingsObjectPtr;
-	
 	TSharedPtr<ISettingsSection> DataMangementSettingsSectionPtr;
-	TWeakObjectPtr<ULevelSnapshotsEditorDataManagementSettings> DataMangementSettingsObjectPtr;
 };

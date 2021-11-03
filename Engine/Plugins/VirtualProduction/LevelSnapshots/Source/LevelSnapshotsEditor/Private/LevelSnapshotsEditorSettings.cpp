@@ -1,28 +1,62 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "Settings/LevelSnapshotsEditorDataManagementSettings.h"
-
+#include "LevelSnapshotsEditorSettings.h"
 #include "Misc/Paths.h"
 
-ULevelSnapshotsEditorDataManagementSettings::ULevelSnapshotsEditorDataManagementSettings(const FObjectInitializer& ObjectInitializer)
+#include "Application/SlateApplicationBase.h"
+#include "HAL/PlatformApplicationMisc.h"
+
+ULevelSnapshotsEditorSettings* ULevelSnapshotsEditorSettings::Get()
+{
+	return GetMutableDefault<ULevelSnapshotsEditorSettings>();
+}
+
+ULevelSnapshotsEditorSettings::ULevelSnapshotsEditorSettings(const FObjectInitializer& ObjectInitializer)
 {
 	RootLevelSnapshotSaveDir.Path = "/Game/LevelSnapshots";
 	LevelSnapshotSaveDir = "{map}/{year}-{month}-{day}";
 	DefaultLevelSnapshotName = "{map}_{user}_{time}";
 	LevelSnapshotNameOverride = DefaultLevelSnapshotName;
+
+	bEnableLevelSnapshotsToolbarButton = true;
+	bUseCreationForm = true;
+	
+	const FVector2D DefaultClientSize = FVector2D(400.f, 400.f);
+
+	float DPIScale = 1.0f;
+
+	if (FSlateApplicationBase::IsInitialized())
+	{
+		const FSlateRect WorkAreaRect = FSlateApplicationBase::Get().GetPreferredWorkArea();
+		DPIScale = FPlatformApplicationMisc::GetDPIScaleFactorAtPoint(WorkAreaRect.Left, WorkAreaRect.Top);
+	}
+
+	PreferredCreationFormWindowWidth = DefaultClientSize.X * DPIScale;
+	PreferredCreationFormWindowHeight = DefaultClientSize.Y * DPIScale;
 }
 
-const FString& ULevelSnapshotsEditorDataManagementSettings::GetNameOverride() const
+FVector2D ULevelSnapshotsEditorSettings::GetLastCreationWindowSize() const
+{
+	return FVector2D(PreferredCreationFormWindowWidth, PreferredCreationFormWindowHeight);
+}
+
+void ULevelSnapshotsEditorSettings::SetLastCreationWindowSize(const FVector2D InLastSize)
+{
+	PreferredCreationFormWindowWidth = InLastSize.X;
+	PreferredCreationFormWindowHeight = InLastSize.Y;
+}
+
+const FString& ULevelSnapshotsEditorSettings::GetNameOverride() const
 {
 	return LevelSnapshotNameOverride;
 }
 
-void ULevelSnapshotsEditorDataManagementSettings::SetNameOverride(const FString& InName)
+void ULevelSnapshotsEditorSettings::SetNameOverride(const FString& InName)
 {
 	LevelSnapshotNameOverride = InName;
 }
 
-void ULevelSnapshotsEditorDataManagementSettings::ValidateRootLevelSnapshotSaveDirAsGameContentRelative()
+void ULevelSnapshotsEditorSettings::ValidateRootLevelSnapshotSaveDirAsGameContentRelative()
 {
 	// Enforce Game Content Dir
 	if (!RootLevelSnapshotSaveDir.Path.StartsWith("/Game/"))
@@ -31,7 +65,7 @@ void ULevelSnapshotsEditorDataManagementSettings::ValidateRootLevelSnapshotSaveD
 	}
 }
 
-void ULevelSnapshotsEditorDataManagementSettings::SanitizePathInline(FString& InPath, const bool bSkipForwardSlash)
+void ULevelSnapshotsEditorSettings::SanitizePathInline(FString& InPath, const bool bSkipForwardSlash)
 {
 	FString IllegalChars = FPaths::GetInvalidFileSystemChars().ReplaceEscapedCharWithChar() + " .";
 
@@ -49,14 +83,14 @@ void ULevelSnapshotsEditorDataManagementSettings::SanitizePathInline(FString& In
 	}
 }
 
-void ULevelSnapshotsEditorDataManagementSettings::SanitizeAllProjectSettingsPaths(const bool bSkipForwardSlash)
+void ULevelSnapshotsEditorSettings::SanitizeAllProjectSettingsPaths(const bool bSkipForwardSlash)
 {
 	SanitizePathInline(RootLevelSnapshotSaveDir.Path, bSkipForwardSlash);
 	SanitizePathInline(LevelSnapshotSaveDir, bSkipForwardSlash);
 	SanitizePathInline(DefaultLevelSnapshotName, bSkipForwardSlash);
 }
 
-FFormatNamedArguments ULevelSnapshotsEditorDataManagementSettings::GetFormatNamedArguments(const FString& InWorldName)
+FFormatNamedArguments ULevelSnapshotsEditorSettings::GetFormatNamedArguments(const FString& InWorldName)
 {
 	FNumberFormattingOptions IntOptions;
 	IntOptions.MinimumIntegralDigits = 2;
@@ -78,14 +112,14 @@ FFormatNamedArguments ULevelSnapshotsEditorDataManagementSettings::GetFormatName
 	return FormatArguments;
 }
 
-FText ULevelSnapshotsEditorDataManagementSettings::ParseLevelSnapshotsTokensInText(const FText& InTextToParse, const FString& InWorldName)
+FText ULevelSnapshotsEditorSettings::ParseLevelSnapshotsTokensInText(const FText& InTextToParse, const FString& InWorldName)
 {
 	const FFormatNamedArguments& FormatArguments = GetFormatNamedArguments(InWorldName);
 
 	return FText::Format(InTextToParse, FormatArguments);
 }
 
-bool ULevelSnapshotsEditorDataManagementSettings::IsNameOverridden() const
+bool ULevelSnapshotsEditorSettings::IsNameOverridden() const
 {
 	return !LevelSnapshotNameOverride.Equals(DefaultLevelSnapshotName);
 }

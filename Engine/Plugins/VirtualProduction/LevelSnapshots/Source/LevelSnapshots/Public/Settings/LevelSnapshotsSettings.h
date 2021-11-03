@@ -4,19 +4,15 @@
 
 #include "HashSettings.h"
 #include "Settings/SkippedClassList.h"
-#include "LevelSnapshotsEditorProjectSettings.generated.h"
+#include "LevelSnapshotsSettings.generated.h"
 
 UCLASS(config = Engine, defaultconfig)
-class LEVELSNAPSHOTS_API ULevelSnapshotsEditorProjectSettings : public UObject
+class LEVELSNAPSHOTS_API ULevelSnapshotsSettings : public UObject
 {
 	GENERATED_BODY()
 public:
-	
-	ULevelSnapshotsEditorProjectSettings(const FObjectInitializer& ObjectInitializer);
 
-	FVector2D GetLastCreationWindowSize() const;
-	/* Setting the Window Size through code will not save the size to the config. To make sure it's saved, call SaveConfig(). */
-	void SetLastCreationWindowSize(const FVector2D InLastSize);
+	static ULevelSnapshotsSettings* Get(); 
 
 	//~ Begin UObject Interface
 	virtual void PostInitProperties() override;
@@ -57,22 +53,4 @@ public:
 	 */
 	UPROPERTY(Config, EditAnywhere, Category = "Level Snapshots|Performance", meta = (ClampMin = "1"))
 	FHashSettings HashSettings;
-	
-	
-	
-	UPROPERTY(config, EditAnywhere, Category = "Level Snapshots|Editor", meta = (ConfigRestartRequired = true))
-	bool bEnableLevelSnapshotsToolbarButton;
-
-	UPROPERTY(config, EditAnywhere, Category = "Level Snapshots|Editor")
-	bool bUseCreationForm;
-
-	/* If true, clicking on an actor group under 'Modified Actors' will select the actor in the scene. The previous selection will be deselected. */
-	UPROPERTY(config, EditAnywhere, Category = "Level Snapshots|Editor")
-	bool bClickActorGroupToSelectActorInScene;
-
-	UPROPERTY(config, EditAnywhere, Category = "Level Snapshots|Editor")
-	float PreferredCreationFormWindowWidth;
-
-	UPROPERTY(config, EditAnywhere, Category = "Level Snapshots|Editor")
-	float PreferredCreationFormWindowHeight;
 };

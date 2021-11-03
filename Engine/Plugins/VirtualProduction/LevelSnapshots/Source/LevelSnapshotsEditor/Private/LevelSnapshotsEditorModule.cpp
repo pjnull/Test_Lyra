@@ -6,8 +6,7 @@
 #include "Data/LevelSnapshotsEditorData.h"
 #include "LevelSnapshotsEditorCommands.h"
 #include "LevelSnapshotsEditorStyle.h"
-#include "Settings/LevelSnapshotsEditorProjectSettings.h"
-#include "Settings/LevelSnapshotsEditorDataManagementSettings.h"
+#include "LevelSnapshotsEditorSettings.h"
 #include "Views/SLevelSnapshotsEditor.h"
 
 #include "AssetRegistry/AssetRegistryModule.h"
@@ -48,6 +47,15 @@ void FLevelSnapshotsEditorModule::StartupModule()
 	FLevelSnapshotsEditorCommands::Register();
 	
 	RegisterTabSpawner();
+	
+	ISettingsModule& SettingsModule = FModuleManager::LoadModuleChecked<ISettingsModule>("Settings");
+	{
+		DataMangementSettingsSectionPtr = SettingsModule.RegisterSettings("Project", "Plugins", "Level Snapshots Editor",
+			NSLOCTEXT("LevelSnapshots", "LevelSnapshotsEditorSettingsCategoryDisplayName", "Level Snapshots Editor"),
+			NSLOCTEXT("LevelSnapshots", "LevelSnapshotsEditorSettingsDescription", "Configure the Level Snapshots Editor settings"),
+			GetMutableDefault<ULevelSnapshotsEditorSettings>());
+		DataMangementSettingsSectionPtr->OnModified().BindRaw(this, &FLevelSnapshotsEditorModule::HandleModifiedProjectSettings);
+	}
 }
 
 void FLevelSnapshotsEditorModule::ShutdownModule()
@@ -68,31 +76,9 @@ void FLevelSnapshotsEditorModule::ShutdownModule()
 	UnregisterTabSpawner();
 	FLevelSnapshotsEditorCommands::Unregister();
 	
-	// Unregister project settings
 	ISettingsModule& SettingsModule = FModuleManager::LoadModuleChecked<ISettingsModule>("Settings");
 	{
-		SettingsModule.UnregisterSettings("Project", "Plugins", "Level Snapshots");
-		SettingsModule.UnregisterSettings("Project", "Plugins", "Level Snapshots Data Management");
-	}
-}
-
-bool FLevelSnapshotsEditorModule::GetUseCreationForm() const
-{
-	if (ensureMsgf(ProjectSettingsObjectPtr.IsValid(), 
-		TEXT("ProjectSettingsObjectPtr was not valid. Returning false for bUseCreationForm. Check to ensure that Project Settings have been registered for LevelSnapshots.")))
-	{
-		return ProjectSettingsObjectPtr.Get()->bUseCreationForm;
-	}
-	
-	return false;
-}
-
-void FLevelSnapshotsEditorModule::SetUseCreationForm(bool bInUseCreationForm)
-{
-	if (ensureMsgf(ProjectSettingsObjectPtr.IsValid(),
-		TEXT("ProjectSettingsObjectPtr was not valid. Returning false for bUseCreationForm. Check to ensure that Project Settings have been registered for LevelSnapshots.")))
-	{
-		ProjectSettingsObjectPtr.Get()->bUseCreationForm = bInUseCreationForm;
+		SettingsModule.UnregisterSettings("Project", "Plugins", "Level Snapshots Editor");
 	}
 }
 
@@ -152,49 +138,13 @@ void FLevelSnapshotsEditorModule::OpenSnapshotsEditor()
 	FGlobalTabmanager::Get()->TryInvokeTab(LevelSnapshotsEditor::LevelSnapshotsTabName);
 }
 
-bool FLevelSnapshotsEditorModule::RegisterProjectSettings()
-{
-	ISettingsModule& SettingsModule = FModuleManager::LoadModuleChecked<ISettingsModule>("Settings");
-	{
-		// User Project Settings
-		ProjectSettingsSectionPtr = SettingsModule.RegisterSettings("Project", "Plugins", "Level Snapshots",
-			NSLOCTEXT("LevelSnapshots", "LevelSnapshotsSettingsCategoryDisplayName", "Level Snapshots"),
-			NSLOCTEXT("LevelSnapshots", "LevelSnapshotsSettingsDescription", "Configure the Level Snapshots user settings"),
-			GetMutableDefault<ULevelSnapshotsEditorProjectSettings>());
-
-		if (ProjectSettingsSectionPtr.IsValid() && ProjectSettingsSectionPtr->GetSettingsObject().IsValid())
-		{
-			ProjectSettingsObjectPtr = Cast<ULevelSnapshotsEditorProjectSettings>(ProjectSettingsSectionPtr->GetSettingsObject());
-			ProjectSettingsSectionPtr->OnModified().BindRaw(this, &FLevelSnapshotsEditorModule::HandleModifiedProjectSettings);
-		}
-
-		// Data Management Project Settings
-		DataMangementSettingsSectionPtr = SettingsModule.RegisterSettings("Project", "Plugins", "Level Snapshots Data Management",
-			NSLOCTEXT("LevelSnapshots", "LevelSnapshotsDataManagementSettingsCategoryDisplayName", "Level Snapshots Data Management"),
-			NSLOCTEXT("LevelSnapshots", "LevelSnapshotsDataManagementSettingsDescription", "Configure the Level Snapshots path and data settings"),
-			GetMutableDefault<ULevelSnapshotsEditorDataManagementSettings>());
-
-		if (DataMangementSettingsSectionPtr.IsValid() && DataMangementSettingsSectionPtr->GetSettingsObject().IsValid())
-		{
-			DataMangementSettingsObjectPtr = Cast<ULevelSnapshotsEditorDataManagementSettings>(DataMangementSettingsSectionPtr->GetSettingsObject());
-			DataMangementSettingsSectionPtr->OnModified().BindRaw(this, &FLevelSnapshotsEditorModule::HandleModifiedProjectSettings);
-		}
-	}
-
-	return ProjectSettingsObjectPtr.IsValid();
-}
-
 bool FLevelSnapshotsEditorModule::HandleModifiedProjectSettings()
 {
-	if (ensureMsgf(DataMangementSettingsObjectPtr.IsValid(),
-		TEXT("ProjectSettingsObjectPtr was not valid. Check to ensure that Project Settings have been registered for LevelSnapshots.")))
-	{
-		DataMangementSettingsObjectPtr->ValidateRootLevelSnapshotSaveDirAsGameContentRelative();
-		DataMangementSettingsObjectPtr->SanitizeAllProjectSettingsPaths(true);
+	ULevelSnapshotsEditorSettings* Settings = ULevelSnapshotsEditorSettings::Get();
+	Settings->ValidateRootLevelSnapshotSaveDirAsGameContentRelative();
+	Settings->SanitizeAllProjectSettingsPaths(true);
 		
-		DataMangementSettingsObjectPtr.Get()->SaveConfig();
-	}
-	
+	Settings->SaveConfig();
 	return true;
 }
 
@@ -240,9 +190,9 @@ void FLevelSnapshotsEditorModule::MapEditorToolbarActions()
 	EditorToolbarButtonCommandList->MapAction(
 		FLevelSnapshotsEditorCommands::Get().UseCreationFormToggle,
 		FUIAction(
-			FExecuteAction::CreateRaw(this, &FLevelSnapshotsEditorModule::ToggleUseCreationForm),
+			FExecuteAction::CreateStatic(&FLevelSnapshotsEditorModule::ToggleUseCreationForm),
 			FCanExecuteAction(),
-			FIsActionChecked::CreateRaw(this, &FLevelSnapshotsEditorModule::GetUseCreationForm)
+			FIsActionChecked::CreateStatic(&FLevelSnapshotsEditorModule::GetUseCreationForm)
 		)
 	);
 

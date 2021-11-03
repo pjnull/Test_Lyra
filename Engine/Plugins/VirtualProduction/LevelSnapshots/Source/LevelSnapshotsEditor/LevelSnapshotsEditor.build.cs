@@ -20,6 +20,7 @@ public class LevelSnapshotsEditor : ModuleRules
 		PrivateDependencyModuleNames.AddRange(
 			new string[]
 			{
+				"ApplicationCore",
 				"AssetRegistry",
 				"AssetTools",
 				"CoreUObject",
