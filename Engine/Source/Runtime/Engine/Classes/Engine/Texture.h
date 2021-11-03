@@ -489,6 +489,8 @@ private:
 
 	int64 CalcBlockSize(int32 BlockIndex) const;
 	int64 CalcLayerSize(int32 BlockIndex, int32 LayerIndex) const;
+	int64 CalcBlockSize(const FTextureSourceBlock& Block) const;
+	int64 CalcLayerSize(const FTextureSourceBlock& Block, int32 LayerIndex) const;
 
 	void InitLayeredImpl(
 		int32 NewSizeX,
@@ -502,6 +504,8 @@ private:
 		const FTextureSourceBlock* InBlocks,
 		int32 InNumLayers,
 		int32 InNumBlocks);
+
+	bool EnsureBlocksAreSorted();
 
 public:
 	/** Uses a hash as the GUID, useful to prevent creating new GUIDs on load for legacy assets. */
@@ -580,6 +584,14 @@ private:
 	 */
 	UPROPERTY(VisibleAnywhere, Category = TextureSource)
 	TArray<FTextureSourceBlock> Blocks;
+
+	/**
+	 * Offsets of each block (including Block0) in the bulk data.
+	 * Blocks are not necessarily stored in order, since block indices are sorted by X/Y location.
+	 * For non-UDIM textures, this will always have a single entry equal to 0
+	 */
+	UPROPERTY()
+	TArray<int64> BlockDataOffsets;
 
 #endif // WITH_EDITORONLY_DATA
 };
