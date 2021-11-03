@@ -133,6 +133,7 @@ public:
 
 	DECLARE_DERIVED_EVENT( UAssetRegistryImpl, IAssetRegistry::FAssetUpdatedEvent, FAssetUpdatedEvent );
 	virtual FAssetUpdatedEvent& OnAssetUpdated() override;
+	virtual FAssetUpdatedEvent& OnAssetUpdatedOnDisk() override;
 
 	DECLARE_DERIVED_EVENT( UAssetRegistryImpl, IAssetRegistry::FInMemoryAssetCreatedEvent, FInMemoryAssetCreatedEvent );
 	virtual FInMemoryAssetCreatedEvent& OnInMemoryAssetCreated() override;
@@ -260,6 +261,9 @@ private:
 
 	/** The delegate to execute when an asset is updated in the registry */
 	FAssetUpdatedEvent AssetUpdatedEvent;
+
+	/** The delegate to execute when an asset is updated on disk and has been reloaded in assetregistry */
+	FAssetUpdatedEvent AssetUpdatedOnDiskEvent;
 
 	/** The delegate to execute when an in-memory asset was just created */
 	FInMemoryAssetCreatedEvent InMemoryAssetCreatedEvent;

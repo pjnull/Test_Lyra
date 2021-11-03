@@ -983,6 +983,7 @@ UAssetRegistryImpl::~UAssetRegistryImpl()
 	AssetRemovedEvent.Clear();
 	AssetRenamedEvent.Clear();
 	AssetUpdatedEvent.Clear();
+	AssetUpdatedOnDiskEvent.Clear();
 	InMemoryAssetCreatedEvent.Clear();
 	InMemoryAssetDeletedEvent.Clear();
 	FileLoadedEvent.Clear();
@@ -4371,6 +4372,16 @@ void FAssetRegistryImpl::ScanModifiedAssetFiles(Impl::FEventContext& EventContex
 				}
 			}
 		}
+
+		// Send ModifiedOnDisk event for every Asset that was modified
+		for (FName FoundAsset : FoundAssets)
+		{
+			FAssetData** AssetData = State.CachedAssetsByObjectPath.Find(FoundAsset);
+			if (AssetData)
+			{
+				EventContext.AssetEvents.Emplace(**AssetData, Impl::FEventContext::EEvent::UpdatedOnDisk);
+			}
+		}
 	}
 }
 
@@ -5293,6 +5304,9 @@ void UAssetRegistryImpl::Broadcast(UE::AssetRegistry::Impl::FEventContext& Event
 			case FEventContext::EEvent::Updated:
 				AssetUpdatedEvent.Broadcast(AssetData);
 				break;
+			case FEventContext::EEvent::UpdatedOnDisk:
+				AssetUpdatedOnDiskEvent.Broadcast(AssetData);
+				break;
 			default:
 				checkNoEntry();
 				break;
@@ -5345,6 +5359,12 @@ UAssetRegistryImpl::FAssetUpdatedEvent& UAssetRegistryImpl::OnAssetUpdated()
 {
 	checkf(IsInGameThread(), TEXT("Registering to AssetRegistry events is not supported from multiple threads."));
 	return AssetUpdatedEvent;
+}
+
+UAssetRegistryImpl::FAssetUpdatedEvent& UAssetRegistryImpl::OnAssetUpdatedOnDisk()
+{
+	checkf(IsInGameThread(), TEXT("Registering to AssetRegistry events is not supported from multiple threads."));
+	return AssetUpdatedOnDiskEvent;
 }
 
 UAssetRegistryImpl::FInMemoryAssetCreatedEvent& UAssetRegistryImpl::OnInMemoryAssetCreated()
