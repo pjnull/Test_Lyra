@@ -1962,13 +1962,12 @@ namespace UnrealBuildTool
 			if(bIsBuildingLibraryOrImportLibrary)
 			{
 				LinkAction.CommandPath = EnvVars.LibraryManagerPath;
-				LinkAction.CommandArguments = String.Format("@\"{0}\"", ResponseFileName);
 			}
 			else
 			{
-				LinkAction.CommandPath = FileReference.Combine(Unreal.EngineDirectory, "Build", "Windows", "link-filter", "link-filter.exe");
-				LinkAction.CommandArguments = String.Format("-- \"{0}\" @\"{1}\"", EnvVars.LinkerPath, ResponseFileName);
+				LinkAction.CommandPath = EnvVars.LinkerPath;
 			}
+			LinkAction.CommandArguments = String.Format("@\"{0}\"", ResponseFileName);
 			LinkAction.CommandVersion = EnvVars.ToolChainVersion.ToString();
 			LinkAction.ProducedItems.AddRange(ProducedItems);
 			LinkAction.PrerequisiteItems.AddRange(PrerequisiteItems);
