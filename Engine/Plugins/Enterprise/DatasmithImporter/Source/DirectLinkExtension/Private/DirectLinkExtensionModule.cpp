@@ -38,8 +38,6 @@ namespace UE::DatasmithImporter
 				IUriManager& UriManager = IExternalSourceModule::Get().GetManager();
 				UriManager.UnregisterResolver(DirectLinkUriResolverName);
 			}
-
-			DirectLinkManager.Reset();
 		}
 
 		virtual IDirectLinkManager& GetManager() const override

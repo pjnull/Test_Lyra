@@ -84,15 +84,13 @@ namespace UE::DatasmithImporter
 
 	void FDirectLinkExternalSource::Invalidate()
 	{
-		CloseStream();
-		ClearOnExternalSourceLoadedDelegates();
-
 		if (IDirectLinkExtensionModule::IsAvailable())
 		{
-			IDirectLinkManager& DirectLinkManager = IDirectLinkExtensionModule::Get().GetManager();
-			DirectLinkManager.GetEndpoint().RemoveDestination(DestinationHandle);
+			IDirectLinkExtensionModule::GetEndpoint().RemoveDestination(DestinationHandle);
+			CloseStream();
 		}
-		SourceHandle.Invalidate();
+
+		ClearOnExternalSourceLoadedDelegates();
 		DestinationHandle.Invalidate();
 	}
 
