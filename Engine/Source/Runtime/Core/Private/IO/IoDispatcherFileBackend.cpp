@@ -942,6 +942,15 @@ TIoStatusOr<FIoContainerHeader> FFileIoStoreReader::ReadContainerHeader() const
 	return ContainerHeader;
 }
 
+void FFileIoStoreReader::ReopenAllFileHandles()
+{
+	for (FFileIoStoreContainerFilePartition& Partition : ContainerFile.Partitions)
+	{
+		PlatformImpl.CloseContainer(Partition.FileHandle);
+		PlatformImpl.OpenContainer(*Partition.FilePath, Partition.FileHandle, Partition.FileSize);
+	}
+}
+
 FFileIoStoreResolvedRequest::FFileIoStoreResolvedRequest(
 	FIoRequestImpl& InDispatcherRequest,
 	const FFileIoStoreContainerFile& InContainerFile,
@@ -1178,6 +1187,11 @@ void FFileIoStoreRequestTracker::ReleaseIoRequestReferences(FFileIoStoreResolved
 	ResolvedRequest.ReadRequestsHead = nullptr;
 	ResolvedRequest.ReadRequestsTail = nullptr;
 	RequestAllocator.Free(&ResolvedRequest);
+}
+
+int64 FFileIoStoreRequestTracker::GetLiveReadRequestsCount() const
+{
+	return RequestAllocator.GetLiveReadRequestsCount();
 }
 
 FFileIoStore::FFileIoStore(TUniquePtr<IPlatformFileIoStore>&& InPlatformImpl)
@@ -1824,6 +1838,16 @@ TIoStatusOr<FIoMappedRegion> FFileIoStore::OpenMapped(const FIoChunkId& ChunkId,
 
 	// We didn't find any entry for the ChunkId.
 	return FIoStatus(EIoErrorCode::NotFound);
+}
+
+void FFileIoStore::ReopenAllFileHandles()
+{
+	UE_CLOG(RequestTracker.GetLiveReadRequestsCount(), LogIoDispatcher, Warning, TEXT("Calling ReopenAllFileHandles with read requests in flight"));
+	FWriteScopeLock _(IoStoreReadersLock);
+	for (const TUniquePtr<FFileIoStoreReader>& Reader : IoStoreReaders)
+	{
+		Reader->ReopenAllFileHandles();
+	}
 }
 
 void FFileIoStore::OnNewPendingRequestsAdded()

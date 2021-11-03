@@ -7736,6 +7736,11 @@ bool FPakPlatformFile::ReloadPakReaders()
 		}
 	}
 
+	if (IoDispatcherFileBackend)
+	{
+		IoDispatcherFileBackend->ReopenAllFileHandles();
+	}
+
 	return true;
 }
 
