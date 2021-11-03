@@ -177,7 +177,7 @@ void UMaterialInstanceConstant::UpdateCachedData()
 		}
 
 		FMaterialLayersFunctions ParentLayers;
-		const bool bParentHasLayers = Parent->GetMaterialLayers(ParentLayers);
+		const bool bParentHasLayers = Parent && Parent->GetMaterialLayers(ParentLayers);
 		CachedData->InitializeForConstant(MoveTemp(CachedExpressionData),
 			bHasLayers ? &Layers : nullptr,
 			bParentHasLayers ? &ParentLayers : nullptr);
