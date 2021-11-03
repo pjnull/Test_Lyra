@@ -58,6 +58,7 @@
 #include "GPUScene.h"
 #include "DynamicBVH.h"
 #include "OIT/OIT.h"
+#include "ShadingEnergyConservation.h"
 
 /** Factor by which to grow occlusion tests **/
 #define OCCLUSION_SLOP (1.0f)
@@ -1105,6 +1106,8 @@ public:
 	FHairStrandsViewStateData HairStrandsViewStateData;
 
 	FShaderDrawDebugStateData ShaderDrawDebugStateData;
+
+	FShadingEnergyConservationStateData ShadingEnergyConservationData;
 
 	// call after OnFrameRenderingSetup()
 	virtual uint32 GetCurrentTemporalAASampleIndex() const

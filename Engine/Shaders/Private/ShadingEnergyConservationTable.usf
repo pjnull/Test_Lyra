@@ -1,10 +1,12 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "../Common.ush"
+#include "Common.ush"
 #include "/Engine/Shared/PathTracingDefinitions.h"
-#include "Material/PathTracingGlossy.ush"
-#include "Material/PathTracingFresnel.ush"
-#include "Utilities/PathTracingRandomSequence.ush"
+
+// Move these utility functions into a common/non-path-tracer specific place
+#include "PathTracing/Material/PathTracingGlossy.ush"
+#include "PathTracing/Material/PathTracingFresnel.ush"
+#include "PathTracing/Utilities/PathTracingRandomSequence.ush"
 
 // This shader computes the directional albedo (basically a furnace test) of a given BxDF to determine how much energy is "missing"
 // from a given viewing direction and roughness. These tables can later be used to compensate for the missing energy during shading.
@@ -18,9 +20,9 @@ RWTexture2D<float2> OutputTexture2D;
 RWTexture3D<float2> OutputTexture3D;
 
 [numthreads(THREADGROUPSIZE_X, THREADGROUPSIZE_Y, 1)]
-void PathTracingBuildEnergyTableCS(uint3 DispatchThreadId : SV_DispatchThreadID)
+void BuildEnergyTableCS(uint3 DispatchThreadId : SV_DispatchThreadID)
 {
-	float3 Index = (float3(DispatchThreadId) + 0.5) / float(PATHTRACER_ENERGY_TABLE_RESOLUTION);
+	float3 Index = (float3(DispatchThreadId) + 0.5) / float(ENERGY_TABLE_RESOLUTION);
 
 	// Map from thread ID to the exact roughness/viewing angle we want to compute
 	float NoV = max(Index.x, 1e-8);
@@ -81,7 +83,7 @@ void PathTracingBuildEnergyTableCS(uint3 DispatchThreadId : SV_DispatchThreadID)
 			}
 		}
 #elif BUILD_ENERGY_TABLE == 2
-		const float3 L = CosineSampleHemisphere(RandSample.xy);
+		const float3 L = CosineSampleHemisphere(RandSample.xy).xyz;
 		const float NoV = V.z;
 		const float NoL = L.z;
 		const float3 H = normalize(V + L);
