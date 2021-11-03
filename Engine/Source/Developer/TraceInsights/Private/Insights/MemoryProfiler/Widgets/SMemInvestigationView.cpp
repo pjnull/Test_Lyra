@@ -203,7 +203,7 @@ TSharedRef<SWidget> SMemInvestigationView::QueryRule_OnGenerateWidget(TSharedPtr
 		.AutoWidth()
 		.HAlign(HAlign_Center)
 		.VAlign(VAlign_Center)
-		.Padding(2.0f, 2.0f, 0.0f, 2.0f)
+		.Padding(0.0f, 2.0f, 2.0f, 2.0f)
 		[
 			SNew(SImage)
 			.Visibility_Lambda([Widget]() { return Widget->GetParentWidget()->IsHovered() ? EVisibility::Visible : EVisibility::Hidden; })
@@ -426,28 +426,9 @@ void SMemInvestigationView::QueryTarget_OnSelectionChanged(TSharedPtr<Insights::
 
 TSharedRef<SWidget> SMemInvestigationView::QueryTarget_OnGenerateWidget(TSharedPtr<Insights::FQueryTargetWindowSpec> InTarget)
 {
-	TSharedRef<SHorizontalBox> Widget = SNew(SHorizontalBox);
-
-	Widget->AddSlot()
-		.AutoWidth()
-		.HAlign(HAlign_Center)
-		.VAlign(VAlign_Center)
-		.Padding(2.0f, 2.0f, 0.0f, 2.0f)
-		[
-			SNew(SImage)
-			.Image(FInsightsStyle::GetBrush("Icons.Hint.TreeItem"))
-			.Visibility_Lambda([Widget]() { return Widget->GetParentWidget()->IsHovered() ? EVisibility::Visible : EVisibility::Hidden; })
-		];
-
-	Widget->AddSlot()
-		.AutoWidth()
-		[
-			SNew(STextBlock)
-			.Text(InTarget->GetText())
-			.Margin(2.0f)
-		];
-
-	return Widget;
+	return SNew(STextBlock)
+		.Text(InTarget->GetText())
+		.Margin(2.0f);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
