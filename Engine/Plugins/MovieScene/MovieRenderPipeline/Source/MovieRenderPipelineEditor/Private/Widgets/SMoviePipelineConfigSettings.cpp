@@ -323,6 +323,9 @@ void SMoviePipelineConfigSettings::Construct(const FArguments& InArgs)
 	[
 		TreeView.ToSharedRef()
 	];
+
+	// When undo occurs, get a notification so we can make sure our view is up to date
+	GEditor->RegisterForUndo(this);
 }
 
 void SMoviePipelineConfigSettings::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
@@ -417,6 +420,12 @@ void SMoviePipelineConfigSettings::SetShotConfigObject(UMoviePipelineConfigBase*
 	WeakShotConfig = InShotConfig;
 	ReconstructTree();
 }
+
+void SMoviePipelineConfigSettings::PostUndo(bool bSuccess)
+{
+	CachedSettingsSerialNumber++;
+}
+
 
 void SMoviePipelineConfigSettings::ReconstructTree()
 {
