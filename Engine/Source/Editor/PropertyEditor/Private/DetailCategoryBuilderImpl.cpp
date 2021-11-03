@@ -1010,7 +1010,8 @@ void FDetailCategoryImpl::FilterNode(const FDetailFilter& InFilter)
 			bool bFound = false;
 			for (const TSharedPtr<FPropertySection>& Section : PropertySections)
 			{
-				if (InFilter.VisibleSections.Contains(Section->GetName()))
+				if (Section->HasAddedCategory(CategoryName) &&
+					InFilter.VisibleSections.Contains(Section->GetName()))
 				{
 					bFound = true; 
 					break;
