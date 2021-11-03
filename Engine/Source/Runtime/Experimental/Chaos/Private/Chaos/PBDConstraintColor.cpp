@@ -192,7 +192,7 @@ void FPBDConstraintColor::ComputeIslandColoring(const int32 Island, const FPBDCo
 void FPBDConstraintColor::ComputeContactGraph(const int32 Island, const FPBDConstraintGraph& ConstraintGraph, uint32 ContainerId)
 {
 	SCOPE_CYCLE_COUNTER(STAT_Constraint_ComputeContactGraph);
-	const TArray<FConstraintHandle*>& IslandConstraints = ConstraintGraph.GetIslandConstraints(Island);
+	const TArray<FConstraintHandleHolder>& IslandConstraints = ConstraintGraph.GetIslandConstraints(Island);
 
 	IslandData[Island].MaxLevel = IslandConstraints.Num() ? 0 : -1;
 	

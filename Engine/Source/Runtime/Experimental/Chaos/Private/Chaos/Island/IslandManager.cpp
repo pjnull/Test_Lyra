@@ -404,12 +404,23 @@ void FPBDIslandManager::RemoveParticle(FGeometryParticleHandle* ParticleHandle)
 	}
 }
 
-void FPBDIslandManager::RemoveConstraint(const uint32 ContainerId, FConstraintHandle* ConstraintHandle, const TVec2<FGeometryParticleHandle*>& ConstrainedParticles)
+void FPBDIslandManager::RemoveConstraint(const uint32 ContainerId, FConstraintHandle* ConstraintHandle)
 {
 	if (ConstraintHandle)
 	{
-		IslandGraph->RemoveEdge(ConstraintHandle->ConstraintGraphIndex());
-		ConstraintHandle->SetConstraintGraphIndex(INDEX_NONE);
+		const int32 EdgeIndex = ConstraintHandle->ConstraintGraphIndex();
+		if (EdgeIndex != INDEX_NONE)
+		{
+			const int32 IslandIndex = IslandGraph->GraphEdges[EdgeIndex].IslandIndex;
+			if (IslandIndex != INDEX_NONE)
+			{
+				IslandSolvers[IslandIndex]->RemoveConstraint(ConstraintHandle);
+			}
+
+			IslandGraph->RemoveEdge(EdgeIndex);
+
+			ConstraintHandle->SetConstraintGraphIndex(INDEX_NONE);
+		}
 	}
 }
 	
@@ -605,7 +616,7 @@ const TArray<FGeometryParticleHandle*>& FPBDIslandManager::GetIslandParticles(co
 	return IslandSolvers[GetGraphIndex(IslandIndex)]->GetParticles();
 }
 
-const TArray<FConstraintHandle*>& FPBDIslandManager::GetIslandConstraints(const int32 IslandIndex) const
+const TArray<FConstraintHandleHolder>& FPBDIslandManager::GetIslandConstraints(const int32 IslandIndex) const
 {
 	return IslandSolvers[GetGraphIndex(IslandIndex)]->GetConstraints();
 }

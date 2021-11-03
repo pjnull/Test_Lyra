@@ -490,6 +490,15 @@ public:
 		}*/
 	}
 
+	/** remove a constraint from the constraint graph (see AddConstraintsToConstraintGraph) */
+	CHAOS_API void RemoveConstraintFromConstraintGraph(FConstraintHandle* ConstraintHandle)
+	{
+		if (ConstraintHandle->IsInConstraintGraph())
+		{
+			ConstraintGraph.RemoveConstraint(ConstraintHandle->GetContainerId(), ConstraintHandle);
+		}
+	}
+
 	/** remove a list of constraints from the constraint graph (see AddConstraintsToConstraintGraph) */
 	CHAOS_API void RemoveConstraintsFromConstraintGraph(const FConstraintHandleArray& Constraints)
 	{
@@ -497,11 +506,7 @@ public:
 		{
 			if (FPBDJointConstraintHandle* ConstraintHandle = BaseConstraintHandle->As<FPBDJointConstraintHandle>())
 			{
-				// if it is already disabled then it will have already been removed from the graph
-				if (ConstraintHandle->IsInConstraintGraph())
-				{
-					ConstraintGraph.RemoveConstraint(ConstraintHandle->GetContainerId(), ConstraintHandle, ConstraintHandle->GetConstrainedParticles());
-				}
+				RemoveConstraintFromConstraintGraph(ConstraintHandle);
 			}
 		}
 	}
@@ -520,6 +525,8 @@ public:
 			}
 		}
 	}
+
+
 
 	/** Disconnect constraints from a set of particles to be removed (or destroyed) 
 	* this will set the constraints to Enbaled = false and set their respective bodies handles to nullptr

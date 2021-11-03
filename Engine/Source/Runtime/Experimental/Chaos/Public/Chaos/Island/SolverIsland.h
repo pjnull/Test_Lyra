@@ -11,7 +11,7 @@ namespace Chaos
 	
 /** Forward Declaration */
 class FPBDIslandManager;
-	
+
 /**
 * List of per island datas that will created bu the island manager
 */
@@ -90,8 +90,8 @@ class CHAOS_API FPBDIslandSolver : public FPBDIslandSolverData
 	/**
 	* Return the list of constraints within the island
 	*/
-	FORCEINLINE const TArray<FConstraintHandle*>& GetConstraints() const { return IslandConstraints; }
-	
+	FORCEINLINE const TArray<FConstraintHandleHolder>& GetConstraints() const { return IslandConstraints; }
+
 	/**
 	* Get the number of particles within the island
 	*/
@@ -142,7 +142,7 @@ class CHAOS_API FPBDIslandSolver : public FPBDIslandSolverData
 	TArray<FGeometryParticleHandle*> IslandParticles;
 
 	/** List of all the island constraints handles */
-	TArray<FConstraintHandle*> IslandConstraints;
+	TArray<FConstraintHandleHolder> IslandConstraints;
 };
 	
 // template<typename ConstraintType>

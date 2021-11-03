@@ -141,7 +141,7 @@ namespace Chaos
 	{
 		if(FPBDIslandSolver* IslandSolver = ConstraintGraph->GetSolverIsland(Island))
 		{
-			const TArray<FConstraintHandle*>& IslandConstraints = ConstraintGraph->GetIslandConstraints(Island);
+			const TArray<FConstraintHandleHolder>& IslandConstraints = ConstraintGraph->GetIslandConstraints(Island);
 
 			// This will reset the number od constraints inside the solver datas. For now we keep this function since according
 			// to the constraints we can use the handles, the indices or the container. when only the container will be used

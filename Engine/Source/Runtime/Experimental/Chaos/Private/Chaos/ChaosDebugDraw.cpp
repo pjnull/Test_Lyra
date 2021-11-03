@@ -1216,7 +1216,7 @@ namespace Chaos
 
 				if (bChaosDebugDebugDrawContactGraph || bChaosDebugDebugDrawContactGraphUnused || bChaosDebugDebugDrawContactGraphUsed)
 				{
-					const FConstraintHandleArray& Constraints = Island->GetConstraints();
+					const auto& Constraints = Island->GetConstraints();
 					for (int32 ConstraintIndex = 0; ConstraintIndex < Constraints.Num(); ++ConstraintIndex)
 					{
 						const FConstraintHandle* Constraint = Constraints[ConstraintIndex];

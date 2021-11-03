@@ -30,12 +30,13 @@ class FConstraintHandle;
 class FChaosPhysicsMaterial;
 
 using FPBDRigidParticles = TPBDRigidParticles<FReal, 3>;
-	
+
+
 /** Island manager responsible to create the list of solver islands that will be persistent over time */
 class CHAOS_API FPBDIslandManager
 {
 public:
-	using GraphType = FIslandGraph<FGeometryParticleHandle*, FConstraintHandle*, FPBDIslandSolver*>;
+	using GraphType = FIslandGraph<FGeometryParticleHandle*, FConstraintHandleHolder, FPBDIslandSolver*>;
 	using FGraphNode = GraphType::FGraphNode;
 	using FGraphEdge = GraphType::FGraphEdge;
 	
@@ -83,7 +84,7 @@ public:
 	  * @param ConstraintHandle Constraint Handle that will be used for the edge item
 	  * @param ConstrainedParticles List of 2 particles handles that are used within the constraint
 	  */
-	void RemoveConstraint(const uint32 ContainerId, FConstraintHandle* ConstraintHandle, const TVector<FGeometryParticleHandle*, 2>& ConstrainedParticles);
+	void RemoveConstraint(const uint32 ContainerId, FConstraintHandle* ConstraintHandle);
 	
 	/**
 	  * Preallocate buffers for \p Num particles.
@@ -170,7 +171,7 @@ public:
 	  * @param IslandIndex Island index
 	  * @return List of constraints handles in the island
 	  */
-	const TArray<FConstraintHandle*>& GetIslandConstraints(const int32 IslandIndex) const;
+	const TArray<FConstraintHandleHolder>& GetIslandConstraints(const int32 IslandIndex) const;
 
 	/**
 	 * When resim is used, tells us whether we need to resolve island
@@ -252,7 +253,7 @@ public:
 	const TMap<FGeometryParticleHandle*, int32>& GetParticleNodes() const { return IslandGraph->ItemNodes; }
 	
 	/** Get the constraints edges */
-	const TMap<FConstraintHandle*, int32>& GetConstraintEdges() const { return IslandGraph->ItemEdges; }
+	const TMap<FConstraintHandleHolder, int32>& GetConstraintEdges() const { return IslandGraph->ItemEdges; }
 	
 protected:
 

@@ -66,6 +66,7 @@ void FPBDIslandSolver::AddConstraint(FConstraintHandle* ConstraintHandle)
 
 void FPBDIslandSolver::RemoveConstraint(FConstraintHandle* ConstraintHandle)
 {
+	// @todo(chaos): store the Island Constraint Index as a cookie on the constraint
 	if (ConstraintHandle)
 	{
 		IslandConstraints.Remove(ConstraintHandle);
@@ -119,11 +120,17 @@ inline bool ConstraintSortPredicate(const FConstraintHandle& L, const FConstrain
 	return false;
 }
 
+inline bool ConstraintHolderSortPredicate(const FConstraintHandleHolder& L, const FConstraintHandleHolder& R)
+{
+	return ConstraintSortPredicate(*L.Get(), *R.Get());
+}
+
+
 void FPBDIslandSolver::SortConstraints()
 {
 	if(!IsSleeping())
 	{
-		IslandConstraints.Sort(ConstraintSortPredicate);
+		IslandConstraints.Sort(ConstraintHolderSortPredicate);
 	}
 }
 
