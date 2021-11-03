@@ -6,12 +6,23 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "Containers/Array.h"
 #include "Containers/ArrayView.h"
+#include "Containers/StringFwd.h"
 #include "Containers/StringView.h"
+#include "Containers/UnrealString.h"
+#include "Delegates/Delegate.h"
+#include "HAL/Platform.h"
+#include "Internationalization/Text.h"
+#include "Logging/LogMacros.h"
 #include "Misc/PackagePath.h"
+#include "Templates/Function.h"
+#include "UObject/NameTypes.h"
 
+class FPackagePath;
+class UPackage;
 struct FFileStatData;
+struct FGuid;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogPackageName, Log, All);
 
@@ -32,7 +43,7 @@ public:
 		PackageNameEmptyPath,
 		PackageNamePathNotMounted,
 		PackageNamePathIsMemoryOnly,
-		PackageNameFullObjectPathNotAllowed,
+		PackageNameSpacesNotAllowed,
 		PackageNameContainsInvalidCharacters,
 		LongPackageNames_PathTooShort,
 		LongPackageNames_PathWithNoStartingSlash,
@@ -62,6 +73,10 @@ public:
 	 * @return Long package name.
 	 */
 	static FString ConvertToLongScriptPackageName(const TCHAR* InShortName);
+
+	/** Return the LongPackageName of module's native script package. Does not check whether module is native. */
+	static FName GetModuleScriptPackageName(FName ModuleName);
+	static FString GetModuleScriptPackageName(FStringView ModuleName);
 
 	/**
 	 * Registers all short package names found in ini files.
@@ -161,14 +176,20 @@ public:
 	/**
 	 * Split a full object path (Class /Path/To/A/Package.Object:SubObject) into its constituent pieces
 	 *  
-	 * @param InFullObjectPath			Full object path we want to split
-	 * @param OutClassName				The extracted class name (Class)
-	 * @param OutPackageName			The extracted package name (/Path/To/A/Package)
-	 * @param OutObjectName				The extracted object name (Object)
-	 * @param OutSubObjectName			The extracted subobject name (SubObject)
+	 * @param InFullObjectPath  Full object path we want to split
+	 * @param OutClassName      The extracted class name (Class)
+	 * @param OutPackageName    The extracted package name (/Path/To/A/Package)
+	 * @param OutObjectName     The extracted object name (Object)
+	 * @param OutSubObjectName  The extracted subobject name (SubObject)
+	 * @param bDetectClassName  If true, the optional Class will be detected and separated based on a space.
+	 *                          If false, and there is a space, the space and text before it will be included in the
+	 *                          other names. Spaces in those names is invalid, but some code ignores the
+	 *                          invalidity in ObjectName if it only cares about packageName.
 	 */
-	static void SplitFullObjectPath(const FString& InFullObjectPath, FString& OutClassName, FString& OutPackageName, FString& OutObjectName, FString& OutSubObjectName);
-	static void SplitFullObjectPath(FStringView InFullObjectPath, FStringView& OutClassName, FStringView& OutPackageName, FStringView& OutObjectName, FStringView& OutSubObjectName);
+	static void SplitFullObjectPath(const FString& InFullObjectPath, FString& OutClassName,
+		FString& OutPackageName, FString& OutObjectName, FString& OutSubObjectName, bool bDetectClassName = true);
+	static void SplitFullObjectPath(FStringView InFullObjectPath, FStringView& OutClassName,
+		FStringView& OutPackageName, FStringView& OutObjectName, FStringView& OutSubObjectName, bool bDetectClassName=true);
 
 	/** 
 	 * Returns true if the path starts with a valid root (i.e. /Game/, /Engine/, etc) and contains no illegal characters.
