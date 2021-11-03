@@ -1273,8 +1273,6 @@ void FPixelShaderInOut_MainPS(
 			float2 NDC = MaterialParameters.ScreenPosition.xy / MaterialParameters.ScreenPosition.w;
 			float2 ScreenUV = NDC * ResolvedView.ScreenPositionScaleBias.xy + ResolvedView.ScreenPositionScaleBias.wz;
 			NearestResolvedDepthScreenUV = CalculateNearestResolvedDepthScreenUV(ScreenUV, MaterialParameters.ScreenPosition.w);
-			float2 ScreenPositionToBufferUV(float4 ScreenPosition)
-
 
 			IndirectOcclusion = GetIndirectOcclusion(NearestResolvedDepthScreenUV, GBuffer);
 			DiffuseIndirectLighting *= IndirectOcclusion;
