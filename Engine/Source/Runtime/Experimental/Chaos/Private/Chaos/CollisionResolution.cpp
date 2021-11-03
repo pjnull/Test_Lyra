@@ -1669,6 +1669,8 @@ namespace Chaos
 				return;
 			}
 
+			// NOTE: We are assuming that if only one body has collision particles, it is the first one. This implies
+			// that the first body is dynamic.
 			const FBVHParticles* SampleParticles = Constraint.Manifold.Simplicial[0];
 			if (!SampleParticles)
 			{
@@ -2300,7 +2302,16 @@ namespace Chaos
 			}
 			else
 			{
-				ConstructLevelsetLevelsetConstraints<T_TRAITS>(Particle0, Particle1, Implicit0, Simplicial0, Implicit1, Simplicial1, ParticleWorldTransform0, LocalTransform0, ParticleWorldTransform1, LocalTransform1, CullDistance, Dt, Context);
+				// LevelSets assume that the first or both particles are dynamic
+				bool bSwap = (!FConstGenericParticleHandle(Particle0)->IsDynamic() && FConstGenericParticleHandle(Particle1)->IsDynamic());
+				if (!bSwap)
+				{
+					ConstructLevelsetLevelsetConstraints<T_TRAITS>(Particle0, Particle1, Implicit0, Simplicial0, Implicit1, Simplicial1, ParticleWorldTransform0, LocalTransform0, ParticleWorldTransform1, LocalTransform1, CullDistance, Dt, Context);
+				}
+				else
+				{
+					ConstructLevelsetLevelsetConstraints<T_TRAITS>(Particle1, Particle0, Implicit1, Simplicial1, Implicit0, Simplicial0, ParticleWorldTransform1, LocalTransform1, ParticleWorldTransform0, LocalTransform0, CullDistance, Dt, Context);
+				}
 			}
 		}
 
