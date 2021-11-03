@@ -166,6 +166,19 @@ bool FWorldSnapshotData::HasMatchingSavedActor(const FSoftObjectPath& OriginalOb
 	return ActorData.Contains(OriginalObjectPath);
 }
 
+FString FWorldSnapshotData::GetActorLabel(const FSoftObjectPath& OriginalObjectPath) const
+{
+#if WITH_EDITORONLY_DATA
+	const FActorSnapshotData* SerializedActor = ActorData.Find(OriginalObjectPath);
+	if (SerializedActor && !SerializedActor->ActorLabel.IsEmpty())
+	{
+		return SerializedActor->ActorLabel;
+	}
+#endif
+
+	return SnapshotUtil::ExtractLastSubobjectName(OriginalObjectPath); 
+}
+
 namespace WorldSnapshotData
 {
 	static void ConditionallyRerunConstructionScript(FWorldSnapshotData& This, const TOptional<AActor*>& RequiredActor, const TArray<int32>& OriginalObjectDependencies, UPackage* LocalisationSnapshotPackage)

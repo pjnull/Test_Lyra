@@ -77,6 +77,9 @@ FActorSnapshotData FActorSnapshotData::SnapshotActor(AActor* OriginalActor, FWor
 	}
 
 	SnapshotUtil::PopulateActorHash(Result.Hash, OriginalActor);
+#if WITH_EDITORONLY_DATA
+	Result.ActorLabel = OriginalActor->GetActorLabel();
+#endif
 	return Result;
 }
 

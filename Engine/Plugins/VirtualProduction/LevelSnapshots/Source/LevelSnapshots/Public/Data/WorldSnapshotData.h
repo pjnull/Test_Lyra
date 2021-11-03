@@ -36,6 +36,9 @@ struct LEVELSNAPSHOTS_API FWorldSnapshotData
 	int32 GetNumSavedActors() const;
 	void ForEachOriginalActor(TFunction<void(const FSoftObjectPath& ActorPath, const FActorSnapshotData& SavedData)> HandleOriginalActorPath) const;
 	bool HasMatchingSavedActor(const FSoftObjectPath& OriginalObjectPath) const;
+
+	/** Gets the actor's display label */
+	FString GetActorLabel(const FSoftObjectPath& OriginalObjectPath) const;
 	
 	/** Same as GetPreallocatedActor, only that all data will be serialized into it. */
 	TOptional<AActor*> GetDeserializedActor(const FSoftObjectPath& OriginalObjectPath, UPackage* LocalisationSnapshotPackage);

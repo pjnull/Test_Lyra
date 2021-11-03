@@ -132,6 +132,11 @@ bool ULevelSnapshot::HasOriginalChangedPropertiesSinceSnapshotWasTaken(AActor* S
 	return SnapshotUtil::HasOriginalChangedPropertiesSinceSnapshotWasTaken(SerializedData, SnapshotActor, WorldActor);
 }
 
+FString ULevelSnapshot::GetActorLabel(const FSoftObjectPath& OriginalActorPath) const
+{
+	return SerializedData.GetActorLabel(OriginalActorPath);
+}
+
 TOptional<AActor*> ULevelSnapshot::GetDeserializedActor(const FSoftObjectPath& OriginalActorPath)
 {
 	EnsureWorldInitialised();
