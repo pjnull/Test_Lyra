@@ -3,13 +3,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Templates/SubclassOf.h"
+#include "SequencerPlaylistItem.h"
 #include "SequencerPlaylistPlayer.generated.h"
 
 
 class ISequencer;
 class ISequencerPlaylistItemPlayer;
 class USequencerPlaylist;
-class USequencerPlaylistItem;
 class UTakeRecorder;
 
 

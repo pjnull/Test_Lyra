@@ -3,10 +3,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Templates/SubclassOf.h"
+#include "UObject/StrongObjectPtr.h"
 #include "ISequencerPlaylistsModule.h"
 #include "SequencerPlaylistItem.h"
 
 
+class FUICommandList;
+class SDockTab;
 class USequencerPlaylist;
 
 

@@ -9,14 +9,10 @@
 #include "SequencerPlaylistsStyle.h"
 #include "SequencerPlaylistsWidgets.h"
 
-//#include "ITakeRecorderModule.h"
-//#include "LevelEditor.h"
-//#include "Recorder/TakeRecorderBlueprintLibrary.h"
-//#include "Recorder/TakeRecorder.h"
+#include "ToolMenus.h"
 #include "Widgets/Docking/SDockTab.h"
 #include "WorkspaceMenuStructure.h"
 #include "WorkspaceMenuStructureModule.h"
-#include "ToolMenus.h"
 
 
 static const FName SequencerPlaylistsTabName("SequencerPlaylists");

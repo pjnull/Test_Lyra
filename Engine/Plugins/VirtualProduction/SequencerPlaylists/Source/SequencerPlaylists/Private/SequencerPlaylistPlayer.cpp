@@ -10,6 +10,7 @@
 #include "LevelSequence.h"
 #include "LevelSequenceEditorBlueprintLibrary.h"
 #include "Recorder/TakeRecorder.h"
+#include "ScopedTransaction.h"
 
 
 #define LOCTEXT_NAMESPACE "SequencerPlaylists"
