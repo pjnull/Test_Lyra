@@ -1180,7 +1180,7 @@ public:
 		if (!Ar.IsError() && SerializeNum > 0 && ensure(!Ar.IsNetArchive() || SerializeNum <= MaxNetArraySerialize))
 		{
 			// if we don't need to perform per-item serialization, just read it in bulk
-			if (sizeof(ElementType) == 1 || TCanBulkSerialize<ElementType>::Value)
+			if constexpr (sizeof(ElementType) == 1 || TCanBulkSerialize<ElementType>::Value)
 			{
 				A.ArrayNum = SerializeNum;
 
