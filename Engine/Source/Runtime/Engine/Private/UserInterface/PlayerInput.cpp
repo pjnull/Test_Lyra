@@ -94,7 +94,7 @@ void UPlayerInput::FlushPressedKeys()
 {
 	APlayerController* PlayerController = GetOuterAPlayerController();
 	ULocalPlayer* LocalPlayer = Cast<ULocalPlayer>(PlayerController->Player);
-	if ( LocalPlayer != nullptr )
+	if (LocalPlayer != nullptr)
 	{
 		TArray<FKey> PressedKeys;
 
@@ -109,11 +109,11 @@ void UPlayerInput::FlushPressedKeys()
 
 		// we may have gotten here as a result of executing an input bind.  in order to ensure that the simulated IE_Released events
 		// we're about to fire are actually propagated to the game, we need to clear the bExecutingBindCommand flag
-		if ( PressedKeys.Num() > 0 )
+		if (PressedKeys.Num() > 0)
 		{
 			bExecutingBindCommand = false;
 			
-			for ( int32 KeyIndex = 0; KeyIndex < PressedKeys.Num(); KeyIndex++ )
+			for (int32 KeyIndex = 0; KeyIndex < PressedKeys.Num(); KeyIndex++)
 			{
 				FKey& Key = PressedKeys[KeyIndex];
 				InputKey(FInputKeyParams(Key, IE_Released, 0.0));
@@ -210,8 +210,14 @@ bool UPlayerInput::InputKey(FKey Key, EInputEvent Event, float AmountDepressed, 
 bool UPlayerInput::InputKey(const FInputKeyParams& Params)
 {
 	const bool bGamepad = Params.IsGamepad();
+
+	// MouseX and MouseY should not be treated as analog if there are no samples, as they need their EventAccumulator to be incremented 
+	// in the case of a IE_Pressed or IE_Released
+	const bool bTreatAsAnalog =
+		Params.Key.IsAnalog() &&
+		((Params.Key != EKeys::MouseX && Params.Key != EKeys::MouseY) || Params.NumSamples > 0);
 	
-	if(Params.Key.IsAnalog())
+	if(bTreatAsAnalog)
 	{
 		ensure((Params.Key != EKeys::MouseX && Params.Key != EKeys::MouseY) || Params.NumSamples > 0);
 
