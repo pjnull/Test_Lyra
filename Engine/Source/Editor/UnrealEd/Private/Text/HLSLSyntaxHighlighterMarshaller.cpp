@@ -11,7 +11,7 @@
 // NOTE: Since FSyntaxTokenizer matches on a first-token-encountered basis, it's important that
 // tokens with the same prefix are ordered by longest-prefix-first. Ideally FSyntaxTokenizer 
 // should be using a prefix tree structure for longest prefix matching.
-const TCHAR* Keywords[] =
+const TCHAR* HlslKeywords[] =
 {
     TEXT("bool2"),
     TEXT("bool3"),
@@ -229,7 +229,7 @@ TSharedPtr<FSyntaxTokenizer> FHLSLSyntaxHighlighterMarshaller::CreateTokenizer()
 	}	
 
 	// keywords
-	for(const auto& Keyword : Keywords)
+	for(const auto& Keyword : HlslKeywords)
 	{
 		TokenizerRules.Emplace(FSyntaxTokenizer::FRule(Keyword));
 	}
