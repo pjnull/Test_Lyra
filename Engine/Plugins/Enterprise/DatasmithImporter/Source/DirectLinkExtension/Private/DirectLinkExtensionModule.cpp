@@ -64,7 +64,10 @@ namespace UE::DatasmithImporter
 
 		TSharedRef<SWindow> Window = SNew(SWindow)
 			.Title(LOCTEXT("DirectLinkEditorAvailableSourcesTitle", "DirectLink Available Sources"))
-			.SizingRule(ESizingRule::Autosized);
+			.SizingRule(ESizingRule::UserSized)
+			.AutoCenter(EAutoCenter::PreferredWorkArea)
+			.ClientSize(FVector2D(600, 200))
+			.SupportsMinimize(false);
 
 		TSharedPtr<SDirectLinkAvailableSource> AvailableSourceWindow;
 		Window->SetContent
