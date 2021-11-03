@@ -19,6 +19,7 @@
 #include "Chaos/PBDConstraintGraph.h"
 #include "Chaos/PBDJointConstraints.h"
 #include "Chaos/PBDRigidParticles.h"
+#include "Chaos/PBDSuspensionConstraints.h"
 #include "Chaos/Sphere.h"
 #include "Chaos/Utilities.h"
 
@@ -224,31 +225,31 @@ namespace Chaos
 			};
 		}
 
-		// default colors by shaep type for shapes
-		FChaosDebugDrawColorsByShapeType ChaosDefaultShapesColorsByShapeType(
-			/* InSimpleTypeColor,   */ FColor(0, 255, 0),
-			/* InConvexColor,		*/ FColor(0, 255, 255),
-			/* InHeightFieldColor,	*/ FColor(0, 0, 255),
-			/* InTriangleMeshColor,	*/ FColor(255, 0, 0),
-			/* InLevelSetColor		*/ FColor(255, 0, 128)
-		);
-
 		CHAOS_API const FChaosDebugDrawColorsByShapeType& GetDefaultShapesColorsByShapeType()
 		{
+			// default colors by shaep type for shapes
+			static FChaosDebugDrawColorsByShapeType ChaosDefaultShapesColorsByShapeType(
+				/* InSimpleTypeColor,   */ FColor(0, 255, 0),
+				/* InConvexColor,		*/ FColor(0, 255, 255),
+				/* InHeightFieldColor,	*/ FColor(0, 0, 255),
+				/* InTriangleMeshColor,	*/ FColor(255, 0, 0),
+				/* InLevelSetColor		*/ FColor(255, 0, 128)
+			);
+
 			return ChaosDefaultShapesColorsByShapeType;
 		}
 
-		// default colors by shape type for bounds ( darker version of the shapes colors - see above )
-		FChaosDebugDrawColorsByShapeType ChaosDefaultBoundsColorsByShapeType(
-			/* InSimpleTypeColor,   */ FColor(0, 128, 0),
-			/* InConvexColor,		*/ FColor(0, 128, 128),
-			/* InHeightFieldColor,	*/ FColor(0, 0, 128),
-			/* InTriangleMeshColor,	*/ FColor(128, 0, 0),
-			/* InLevelSetColor		*/ FColor(128, 0, 64)
-		);
-
 		CHAOS_API const FChaosDebugDrawColorsByShapeType& GetDefaultBoundsColorsByShapeType()
 		{
+			// default colors by shape type for bounds ( darker version of the shapes colors - see above )
+			static FChaosDebugDrawColorsByShapeType ChaosDefaultBoundsColorsByShapeType(
+				/* InSimpleTypeColor,   */ FColor(0, 128, 0),
+				/* InConvexColor,		*/ FColor(0, 128, 128),
+				/* InHeightFieldColor,	*/ FColor(0, 0, 128),
+				/* InTriangleMeshColor,	*/ FColor(128, 0, 0),
+				/* InLevelSetColor		*/ FColor(128, 0, 64)
+			);
+
 			return ChaosDefaultBoundsColorsByShapeType;
 		}
 
@@ -725,7 +726,6 @@ namespace Chaos
 
 			const FVec3 P = SpaceTransform.TransformPosition(Box.GetCenter());
 			const FRotation3 Q = SpaceTransform.GetRotation();
-			const FMatrix33 Qm = Q.ToMatrix();
 			FColor Color = Settings.BoundsColorsPerState.GetColorFromState(InParticle->ObjectState());
 
 			if (bChaosDebugDebugDrawColorBoundsByShapeType)
@@ -1234,6 +1234,33 @@ namespace Chaos
 			}
 		}
 
+		void DrawSuspensionConstraintsImpl(const FRigidTransform3& SpaceTransform, const FPBDSuspensionConstraints& Constraints, int32 ConstraintIndex, const FChaosDebugDrawSettings& Settings)
+		{
+			FConstGenericParticleHandle Particle = Constraints.GetConstrainedParticles(ConstraintIndex)[0];
+			const FPBDSuspensionSettings& ConstraintSettings = Constraints.GetSettings(ConstraintIndex);
+			const FPBDSuspensionResults& ConstraintResults = Constraints.GetResults(ConstraintIndex);
+			const FVec3& PLocal = Constraints.GetConstraintPosition(ConstraintIndex);
+			const FRigidTransform3 ParticleTransform = FParticleUtilitiesPQ::GetActorWorldTransform(Particle);
+
+			const FVec3 PWorld = ParticleTransform.TransformPosition(PLocal);
+			const FVec3 AxisWorld = ParticleTransform.TransformVector(ConstraintSettings.Axis);
+			const FReal AxisLen = ConstraintResults.Length;
+			const FVec3 PushOutWorld = ConstraintResults.NetPushOut;
+
+			FDebugDrawQueue::GetInstance().DrawDebugLine(
+				SpaceTransform.TransformPosition(PWorld), 
+				SpaceTransform.TransformPosition(PWorld + AxisLen * AxisWorld), 
+				FColor::Green, false, KINDA_SMALL_NUMBER, Settings.DrawPriority, Settings.LineThickness);
+
+			if (Settings.PushOutScale > 0)
+			{
+				FDebugDrawQueue::GetInstance().DrawDebugLine(
+					SpaceTransform.TransformPosition(PWorld),
+					SpaceTransform.TransformPosition(PWorld + Settings.PushOutScale * PushOutWorld),
+					FColor::Blue, false, KINDA_SMALL_NUMBER, Settings.DrawPriority, Settings.LineThickness);
+			}
+		}
+
 
 		void DrawParticleShapes(const FRigidTransform3& SpaceTransform, const TParticleView<FGeometryParticles>& ParticlesView, FReal ColorScale, const FChaosDebugDrawSettings* Settings)
 		{
@@ -1480,6 +1507,18 @@ namespace Chaos
 			InSpatialAccelerationStructure.DebugDraw(&DebugDrawInterface);
 		#endif
 		}
+
+		void DrawSuspensionConstraints(const FRigidTransform3& SpaceTransform, const FPBDSuspensionConstraints& Constraints, const FChaosDebugDrawSettings* Settings)
+		{
+			if (FDebugDrawQueue::IsDebugDrawingEnabled())
+			{
+				for (int32 ConstraintIndex = 0; ConstraintIndex < Constraints.NumConstraints(); ++ConstraintIndex)
+				{
+					DrawSuspensionConstraintsImpl(SpaceTransform, Constraints, ConstraintIndex, GetChaosDebugDrawSettings(Settings));
+				}
+			}
+		}
+
 #endif
 	}
 }
