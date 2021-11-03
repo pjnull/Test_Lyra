@@ -312,16 +312,30 @@ void FWorldSnapshotData::CollectReferencesAndNames(FArchive& Ar)
 	// Names
 	Ar << SerializedNames;
 	Ar << SnapshotVersionInfo.CustomVersions;
-	FPropertyIterator(StaticStruct(), [&Ar](const FProperty* Property)
-	    {
-    		FName PropertyName = Property->GetFName();
-    		Ar << PropertyName;
-	    },
-	    [&Ar](UStruct* Struct)
-	    {
-    		FName StructName = Struct->GetFName();
-			Ar << StructName;
-	    });
+
+	// They're required... these names are for some reason not discovered by default...
+	TArray<FName> RequiredNames = { FName("UInt16Property"), EName::DoubleProperty};
+	for (FName Name : RequiredNames)
+	{
+		Ar << Name;
+	}
+
+	auto ProcessProperty = [&Ar](const FProperty* Property)
+	{
+		FName PropertyName = Property->GetFName();
+		Ar << PropertyName;
+	};
+	auto ProcessStruct = [&Ar](UStruct* Struct)
+	{
+		FName StructName = Struct->GetFName();
+		Ar << StructName;
+	};
+	
+	FPropertyIterator(StaticStruct(), ProcessProperty, ProcessStruct);
+	FPropertyIterator(FSnapshotVersionInfo::StaticStruct(), ProcessProperty, ProcessStruct);
+	FPropertyIterator(FActorSnapshotData::StaticStruct(), ProcessProperty, ProcessStruct);
+	FPropertyIterator(FSubobjectSnapshotData::StaticStruct(), ProcessProperty, ProcessStruct);
+	FPropertyIterator(FCustomSerializationData::StaticStruct(), ProcessProperty, ProcessStruct);
 }
 
 void FWorldSnapshotData::CollectActorReferences(FArchive& Ar)
