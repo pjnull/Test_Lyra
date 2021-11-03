@@ -563,7 +563,7 @@ UCharacterMovementComponent::UCharacterMovementComponent(const FObjectInitialize
 	
 	Mass = 100.0f;
 	bJustTeleported = true;
-	CrouchedHalfHeight = 40.0f;
+	SetCrouchedHalfHeight(40.0f);
 	Buoyancy = 1.0f;
 	LastUpdateRotation = FQuat::Identity;
 	LastUpdateVelocity = FVector::ZeroVector;
@@ -2770,6 +2770,20 @@ bool UCharacterMovementComponent::CanCrouchInCurrentState() const
 	return (IsFalling() || IsMovingOnGround()) && UpdatedComponent && !UpdatedComponent->IsSimulatingPhysics();
 }
 
+void UCharacterMovementComponent::SetCrouchedHalfHeight(const float NewValue)
+{
+	CrouchedHalfHeight = NewValue;
+
+	if (CharacterOwner != nullptr)
+	{
+		CharacterOwner->RecalculateCrouchedEyeHeight();
+	}
+}
+
+float UCharacterMovementComponent::GetCrouchedHalfHeight() const
+{ 
+	return CrouchedHalfHeight; 
+}
 
 void UCharacterMovementComponent::Crouch(bool bClientSimulation)
 {
