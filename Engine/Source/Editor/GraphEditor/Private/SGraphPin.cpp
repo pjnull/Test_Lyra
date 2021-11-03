@@ -883,9 +883,12 @@ FVector2D SGraphPin::GetNodeOffset() const
 FText SGraphPin::GetPinLabel() const
 {
 	UEdGraphPin* GraphPin = GetPinObj();
-	if (UEdGraphNode* GraphNode = GraphPin ? GraphPin->GetOwningNodeUnchecked() : nullptr)
+	if (GraphPin && !GraphPin->IsPendingKill())
 	{
-		return GraphNode->GetPinDisplayName(GetPinObj());
+		if (UEdGraphNode* GraphNode = GraphPin->GetOwningNodeUnchecked())
+		{
+			return GraphNode->GetPinDisplayName(GraphPin);
+		}
 	}
 	return FText::GetEmpty();
 }
@@ -939,7 +942,7 @@ bool SGraphPin::IsConnected() const
 const FSlateBrush* SGraphPin::GetPinIcon() const
 {
 	UEdGraphPin* GraphPin = GetPinObj();
-	if (GraphPin == nullptr)
+	if (!GraphPin || GraphPin->IsPendingKill() || !GraphPin->GetOwningNodeUnchecked())
 	{
 		return CachedImg_Pin_Disconnected;
 	}
