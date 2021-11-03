@@ -1035,7 +1035,7 @@ TSharedPtr<FNiagaraCompileRequestDuplicateDataBase, ESPMode::ThreadSafe> FNiagar
 		}
 	}
 
-	UE_LOG(LogNiagaraEditor, Verbose, TEXT("'%s' PrecompileDuplicate took %f sec."), *LogPackage->GetName(),
+	UE_LOG(LogNiagaraEditor, Verbose, TEXT("'%s' PrecompileDuplicate took %f sec."), *GetNameSafe(LogPackage),
 		(float)(FPlatformTime::Seconds() - StartTime));
 
 	return BasePtr;
