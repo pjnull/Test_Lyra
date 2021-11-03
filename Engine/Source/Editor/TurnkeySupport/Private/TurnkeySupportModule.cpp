@@ -1345,7 +1345,7 @@ static void GenerateDeviceProxyMenuParams(TSharedPtr<ITargetDeviceProxy> DeviceP
 	OutAction = FUIAction(
 		FExecuteAction::CreateLambda([DeviceProxy, PlatformName, ExternalOnClickDelegate]()
 			{
-				// only game and client devices are supported for launch on but devices only signal if they target client builds by their name e.g. "PS4Client"
+				// only game and client devices are supported for launch on but devices only signal if they target client builds by their name e.g. "WindowsClient"
 				// if the user has a EBuildTargetType::Client target selected we will launch on a client device, otherwise we fall back to the default game device
 
 				// We need to use flavors to launch on correctly on Android_ASTC / Android_ETC2, etc
