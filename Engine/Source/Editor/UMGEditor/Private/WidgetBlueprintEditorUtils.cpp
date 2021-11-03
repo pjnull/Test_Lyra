@@ -786,6 +786,28 @@ void FWidgetBlueprintEditorUtils::WrapWidgets(TSharedRef<FWidgetBlueprintEditor>
 	const FScopedTransaction Transaction(LOCTEXT("WrapWidgets", "Wrap Widgets"));
 
 	TSharedPtr<FWidgetTemplateClass> Template = MakeShareable(new FWidgetTemplateClass(WidgetClass));
+	
+	// When selecting multiple widgets, we only want to create a new wrapping widget around the root-most set of widgets
+	// So find any that children of other selected widgets, and skip them (because their parents will be wrapped)
+	TSet<FWidgetReference> WidgetsToRemove;
+	for (FWidgetReference& Item : Widgets)
+	{
+		int32 OutIndex;
+		UPanelWidget* CurrentParent = BP->WidgetTree->FindWidgetParent(Item.GetTemplate(), OutIndex);
+		for (FWidgetReference& OtherItem : Widgets)
+		{
+			if (OtherItem.GetTemplate() == CurrentParent)
+			{
+				WidgetsToRemove.Add(Item);
+				break;
+			}
+		}
+	}
+	for (FWidgetReference& Item : WidgetsToRemove)
+	{
+		Widgets.Remove(Item);
+	}
+	WidgetsToRemove.Empty();
 
 	// Old Parent -> New Parent Map
 	TMap<UPanelWidget*, UPanelWidget*> OldParentToNewParent;
@@ -835,7 +857,11 @@ void FWidgetBlueprintEditorUtils::WrapWidgets(TSharedRef<FWidgetBlueprintEditor>
 				CurrentParent->SetFlags(RF_Transactional);
 				CurrentParent->Modify();
 				CurrentParent->ReplaceChildAt(OutIndex, NewWrapperWidget);
+			}
 
+			if (NewWrapperWidget != nullptr && NewWrapperWidget->CanAddMoreChildren())
+			{
+				NewWrapperWidget->Modify();
 				NewWrapperWidget->AddChild(Widget);
 			}
 		}
