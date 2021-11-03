@@ -455,14 +455,6 @@ int32 UDerivedDataCacheCommandlet::Main( const FString& Params )
 		{
 			ICollectionManager& CollectionManager = FModuleManager::LoadModuleChecked<FCollectionManagerModule>("CollectionManager").Get();
 
-			TArray<FCollectionNameType> AllCollections;
-			CollectionManager.GetCollections(AllCollections);
-			UE_LOG(LogDerivedDataCacheCommandlet, Display, TEXT("%d collections"), AllCollections.Num());
-			for( const FCollectionNameType& Collection : AllCollections)
-			{ 
-				UE_LOG(LogDerivedDataCacheCommandlet, Display, TEXT("  %s : %s"), ECollectionShareType::ToString(Collection.Type), *Collection.Name.ToString());
-			}
-
 			TArray<FString> Collections;
 			CollectionArg.ParseIntoArray(Collections, TEXT("+"));
 			for (const FString& CollectionName : Collections)
@@ -486,7 +478,7 @@ int32 UDerivedDataCacheCommandlet::Main( const FString& Params )
 		}
 
 		// Add defaults if we haven't specifically found anything on the command line 
-		if(Tokens.IsEmpty() && CommandLinePackageNames.IsEmpty())
+		if (Tokens.IsEmpty() && CommandLinePackageNames.IsEmpty())
 		{
 			UE_LOG(LogDerivedDataCacheCommandlet, Display, TEXT("Adding default search tokens for all assets and maps"));
 
@@ -540,7 +532,7 @@ int32 UDerivedDataCacheCommandlet::Main( const FString& Params )
 			FString FailureReason;
 			if (!FPackageName::TryConvertFilenameToLongPackageName(Filename, PackageName, &FailureReason))
 			{
-				UE_LOG(LogDerivedDataCacheCommandlet, Warning, TEXT("Unable to resolve filename %s to package name because: %s"), *Filename, *FailureReason);
+				UE_LOG(LogDerivedDataCacheCommandlet, Error, TEXT("Unable to resolve filename %s to package name because: %s"), *Filename, *FailureReason);
 				continue;
 			}
 			PackagePaths.Emplace(MoveTemp(Filename), FName(*PackageName));
@@ -680,6 +672,7 @@ int32 UDerivedDataCacheCommandlet::Main( const FString& Params )
 			}
 		}
 
+		// Sort maps to the end of the list of packages to process to maximize the chance of sharded instances populating the DDC from individual packages.
 		Algo::StableSortBy(PackagePaths, 
 			[](TPair<FString, FName>& Pair){ return Pair.Get<0>().EndsWith(FPackageName::GetMapPackageExtension()); },
 			TLess<bool>()
