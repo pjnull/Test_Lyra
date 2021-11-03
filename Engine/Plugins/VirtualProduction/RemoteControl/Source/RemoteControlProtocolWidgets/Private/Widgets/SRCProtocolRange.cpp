@@ -2,7 +2,7 @@
 
 #include "SRCProtocolRange.h"
 
-#include "EditorStyle.h"
+#include "EditorStyleSet.h"
 #include "IDetailPropertyRow.h"
 #include "IDetailTreeNode.h"
 #include "IStructureDetailsView.h"
