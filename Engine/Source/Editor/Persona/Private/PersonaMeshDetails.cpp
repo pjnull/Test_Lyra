@@ -2759,6 +2759,7 @@ void FPersonaMeshDetails::AddLODLevelCategories(IDetailLayoutBuilder& DetailLayo
 				//Avoid offering re-generate if the LOD is reduce on himself and do not have the original data, the user in this case has to re-import the asset to generate the data 
 				bool LodCannotRegenerate = (SkelMesh->GetLODInfo(LODIndex) != nullptr
 					&& LODIndex == SkelMesh->GetLODInfo(LODIndex)->ReductionSettings.BaseLOD
+					&& SkelMesh->GetLODInfo(LODIndex)->bHasBeenSimplified
 					&& !bIsbuildAvailable);
 
 				bool bShowGenerateButtons = !LodCannotRegenerate;
@@ -3538,10 +3539,12 @@ FReply FPersonaMeshDetails::RegenerateLOD(int32 LODIndex)
 	USkeletalMesh* SkelMesh = GetPersonaToolkit()->GetMesh();
 	check(SkelMesh);
 
+	bool bIsReductionActive = false;
+
 	if (SkelMesh->IsValidLODIndex(LODIndex))
 	{
 		FSkeletalMeshLODInfo& CurrentLODInfo = *(SkelMesh->GetLODInfo(LODIndex));
-		bool bIsReductionActive = SkelMesh->IsReductionActive(LODIndex);
+		bIsReductionActive = SkelMesh->IsReductionActive(LODIndex);
 		if (CurrentLODInfo.bHasBeenSimplified == false && (LODIndex > 0 || bIsReductionActive))
 		{
 			if (LODIndex > 0)
@@ -3561,6 +3564,19 @@ FReply FPersonaMeshDetails::RegenerateLOD(int32 LODIndex)
 				if (Ret == EAppReturnType::No)
 				{
 					return FReply::Handled();
+				}
+			}
+		}
+
+		if (bIsReductionActive && !SkelMesh->IsLODImportedDataBuildAvailable(LODIndex))
+		{
+			if (const FSkeletalMeshLODInfo* LodInfoPtr = SkelMesh->GetLODInfo(LODIndex))
+			{
+				if (LodInfoPtr->ReductionSettings.BaseLOD == LODIndex)
+				{
+					IMeshUtilities& MeshUtilities = FModuleManager::Get().LoadModuleChecked<IMeshUtilities>("MeshUtilities");
+					//We create the import data for all LOD that do not have import data except for the generated LODs.
+					MeshUtilities.CreateImportDataFromLODModel(SkelMesh);
 				}
 			}
 		}
