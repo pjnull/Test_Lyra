@@ -1121,9 +1121,10 @@ void UNiagaraEmitter::GetScripts(TArray<UNiagaraScript*>& OutScripts, bool bComp
 		{
 			if (SimulationStages[i] && SimulationStages[i]->Script)
 			{
-				//if (bEnabledOnly && (!SimulationStages[i]->bEnabled || !bSimulationStagesEnabled))
-				//	continue;
-				OutScripts.Add(SimulationStages[i]->Script);
+				if (!bEnabledOnly || SimulationStages[i]->bEnabled)
+				{
+					OutScripts.Add(SimulationStages[i]->Script);
+				}
 			}
 		}
 	}
