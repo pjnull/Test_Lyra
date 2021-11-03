@@ -560,7 +560,7 @@ namespace ChaosTest {
 			int Index = 0;
 			for (int32 Island : CalculatedIslandIndices)
 			{
-				const TArray<FConstraintHandle*>& IslandConstraints = Graph.GetIslandConstraints(Island);
+				const TArray<FConstraintHandleHolder>& IslandConstraints = Graph.GetIslandConstraints(Island);
 				EXPECT_EQ(IslandConstraints.Num(), IterData.ExpectedIslandEdges[Index++]);
 			}
 
