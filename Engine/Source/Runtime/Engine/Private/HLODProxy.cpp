@@ -6,6 +6,7 @@
 #include "GameFramework/WorldSettings.h"
 
 #if WITH_EDITOR
+#include "Algo/ForEach.h"
 #include "DerivedDataCacheKey.h"
 #include "Misc/ConfigCacheIni.h"
 #include "Serialization/ArchiveCrc32.h"
@@ -701,6 +702,8 @@ void UHLODProxy::RemoveAssets(const FHLODProxyMesh& ProxyMesh)
 	UStaticMesh* StaticMesh = const_cast<UStaticMesh*>(ProxyMesh.GetStaticMesh());
 	if (StaticMesh)
 	{
+		FStaticMeshComponentRecreateRenderStateContext RecreateRenderStateContext(StaticMesh);
+
 		// Destroy every materials
 		for (const FStaticMaterial& StaticMaterial : StaticMesh->GetStaticMaterials())
 		{
@@ -729,13 +732,11 @@ void UHLODProxy::RemoveAssets(const FHLODProxyMesh& ProxyMesh)
 		if (StaticMesh->GetOutermost() == Outermost)
 		{
 			DestroyObject(StaticMesh);
-		}
 
-		// Notify the LOD Actor that the static mesh just marked for deletion is no longer usable,
-		// so that it regenerates its render thread state to no longer point to the deleted mesh.
-		if (ALODActor* LODActor = ProxyMesh.GetLODActor().Get())
-		{
-			LODActor->SetStaticMesh(nullptr);
+			Algo::ForEach(RecreateRenderStateContext.GetComponentsUsingMesh(StaticMesh), [](UStaticMeshComponent* Component)
+			{
+				Component->SetStaticMesh(nullptr);
+			});
 		}
 	}
 }
