@@ -112,6 +112,12 @@ bool FSnapshotRestorability::IsActorDesirableForCapture(const AActor* Actor)
         ;	
 }
 
+bool FSnapshotRestorability::IsActorRestorable(const AActor* Actor)
+{
+	const bool bIsChildActor = Actor->GetParentComponent() != nullptr;
+	return !bIsChildActor && IsActorDesirableForCapture(Actor);
+}
+
 bool FSnapshotRestorability::IsComponentDesirableForCapture(const UActorComponent* Component)
 {
 	SCOPED_SNAPSHOT_CORE_TRACE(IsComponentDesirableForCapture);

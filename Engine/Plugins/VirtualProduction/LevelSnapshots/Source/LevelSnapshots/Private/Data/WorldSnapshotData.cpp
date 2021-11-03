@@ -561,16 +561,14 @@ void FWorldSnapshotData::ApplyToWorld_HandleSerializingMatchingActors(TSet<AActo
 				OriginalWorldActor = ResolvedObject->GetTypedOuter<AActor>();
 			}
 
-			if (ensure(OriginalWorldActor))
+			if (ensure(OriginalWorldActor)
+				&& FSnapshotRestorability::IsActorRestorable(OriginalWorldActor) && !EvaluatedActors.Contains(OriginalWorldActor))
 			{
-				if (!EvaluatedActors.Contains(OriginalWorldActor))
+				EvaluatedActors.Add(OriginalWorldActor);
+				FActorSnapshotData* ActorSnapshot = ActorData.Find(OriginalWorldActor);
+				if (ensure(ActorSnapshot))
 				{
-					if (FActorSnapshotData* ActorSnapshot = ActorData.Find(OriginalWorldActor))
-					{
-						ActorSnapshot->DeserializeIntoExistingWorldActor(TempActorWorld.Get(), OriginalWorldActor, *this, LocalisationSnapshotPackage, PropertiesToSerialize);
-					}
-					
-					EvaluatedActors.Add(OriginalWorldActor);
+					ActorSnapshot->DeserializeIntoExistingWorldActor(TempActorWorld.Get(), OriginalWorldActor, *this, LocalisationSnapshotPackage, PropertiesToSerialize);
 				}
 			}
 		}

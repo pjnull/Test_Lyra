@@ -66,7 +66,7 @@ void FApplySnapshotFilter::ApplyFilterToFindSelectedProperties(FPropertySelectio
 {
 	SCOPED_SNAPSHOT_CORE_TRACE(ApplyFilters);
 	
-	if (EnsureParametersAreValid() && FSnapshotRestorability::IsActorDesirableForCapture(WorldActor) && EFilterResult::CanInclude(Filter->IsActorValid({ DeserializedSnapshotActor, WorldActor })))
+	if (EnsureParametersAreValid() && FSnapshotRestorability::IsActorRestorable(WorldActor) && EFilterResult::CanInclude(Filter->IsActorValid({ DeserializedSnapshotActor, WorldActor })))
 	{
 		const FConditionalHeaderAndFooterLog ConditionalHeader(WorldActor);
 		const FConditionalScopeLogTime LogTime(SnapshotCVars::CVarLogSelectionMap.GetValueOnAnyThread(), TEXT("Total Time"));
