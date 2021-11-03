@@ -10,6 +10,7 @@
 #include "SnapshotRestorability.h"
 
 #include "Algo/Find.h"
+#include "Developer/ToolWidgets/Public/SPrimaryButton.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "Framework/Notifications/NotificationManager.h"
 #include "IPropertyRowGenerator.h"
@@ -20,7 +21,6 @@
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/Notifications/SNotificationList.h"
 #include "Widgets/Text/STextBlock.h"
-#include "SPrimaryButton.h"
 
 #define LOCTEXT_NAMESPACE "LevelSnapshotsEditor"
 
@@ -41,176 +41,176 @@ void SLevelSnapshotsEditorResults::Construct(const FArguments& InArgs, ULevelSna
 	FMenuBuilder ShowOptionsMenuBuilder = BuildShowOptionsMenu();
 
 	ChildSlot
-		[
-			SNew(SVerticalBox)
+	[
+		SNew(SVerticalBox)
 
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(5.f, 10.f)
-			.HAlign(HAlign_Fill)
+		+ SVerticalBox::Slot()
+		.AutoHeight()
+		.Padding(5.f, 10.f)
+		.HAlign(HAlign_Fill)
+		[
+			SNew(SHorizontalBox)
+		
+			+ SHorizontalBox::Slot()
+			.AutoWidth()
+			.Padding(2.f, 0.f)
+			.VAlign(VAlign_Center)
 			[
-				SNew(SHorizontalBox)
-			
-				+ SHorizontalBox::Slot()
-				.AutoWidth()
-				.Padding(2.f, 0.f)
-				.VAlign(VAlign_Center)
+				SNew(SImage)
+				.Image(FLevelSnapshotsEditorStyle::GetBrush(TEXT("LevelSnapshots.ToolbarButton")))
+			]
+
+			+ SHorizontalBox::Slot()
+			.AutoWidth()
+			.Padding(2.f, 0.f)
+			.VAlign(VAlign_Center)
+			[
+				SAssignNew(SelectedSnapshotNamePtr, STextBlock)
+				.Text(DefaultNameText)
+				.Font(FCoreStyle::GetDefaultFontStyle("Bold", 16))
+			]
+		]	
+		
+		+ SVerticalBox::Slot()
+		.VAlign(VAlign_Top)
+		.AutoHeight()
+		[
+			SNew(SHorizontalBox)
+
+			+SHorizontalBox::Slot()
+			[
+				SAssignNew(ResultsSearchBoxPtr, SSearchBox)
+				.HintText(LOCTEXT("LevelSnapshotsEditorResults_SearchHintText", "Search actors, components, properties..."))
+				.OnTextChanged_Raw(this, &SLevelSnapshotsEditorResults::OnResultsViewSearchTextChanged)
+			]
+
+			+SHorizontalBox::Slot()
+			.HAlign(HAlign_Right)
+			.AutoWidth()
+			[
+				SNew(SComboButton)
+				.ContentPadding(0)
+				.ForegroundColor(FSlateColor::UseForeground())
+				.ButtonStyle(FAppStyle::Get(), "ToggleButton")
+				.AddMetaData<FTagMetaData>(FTagMetaData(TEXT("ViewOptions")))
+				.MenuContent()
+				[
+					ShowOptionsMenuBuilder.MakeWidget()
+				]
+				.ButtonContent()
 				[
 					SNew(SImage)
-					.Image(FLevelSnapshotsEditorStyle::GetBrush(TEXT("LevelSnapshots.ToolbarButton")))
+					.Image(FAppStyle::Get().GetBrush("Icons.Settings"))
 				]
+			]
+		]
 
-				+ SHorizontalBox::Slot()
-				.AutoWidth()
-				.Padding(2.f, 0.f)
-				.VAlign(VAlign_Center)
-				[
-					SAssignNew(SelectedSnapshotNamePtr, STextBlock)
-					.Text(DefaultNameText)
-					.Font(FCoreStyle::GetDefaultFontStyle("Bold", 16))
-				]
-			]	
+		+ SVerticalBox::Slot()
+		[
+			SNew(SOverlay)
 			
-			+ SVerticalBox::Slot()
-			.VAlign(VAlign_Top)
-			.AutoHeight()
+			+ SOverlay::Slot()
+			.HAlign(HAlign_Fill)
+			.Padding(2.0f, 2.0f, 2.0f, 2.0f)
 			[
-				SNew(SHorizontalBox)
+				SAssignNew(TreeViewPtr, STreeView<FLevelSnapshotsEditorResultsRowPtr>)
+				.SelectionMode(ESelectionMode::None)
+				.TreeItemsSource(&TreeViewRootHeaderObjects)
+				.OnGenerateRow_Lambda([this](FLevelSnapshotsEditorResultsRowPtr Row, const TSharedRef<STableViewBase>& OwnerTable)
+					{
+						check(Row.IsValid());
+					
+						return SNew(STableRow<FLevelSnapshotsEditorResultsRowPtr>, OwnerTable)
+							[
+								SNew(SLevelSnapshotsEditorResultsRow, Row, SplitterManagerPtr)
+							]
+							.Visibility_Raw(Row.Get(), &FLevelSnapshotsEditorResultsRow::GetDesiredVisibility);
+					})
+				.OnGetChildren_Raw(this, &SLevelSnapshotsEditorResults::OnGetRowChildren)
+				.OnExpansionChanged_Raw(this, &SLevelSnapshotsEditorResults::OnRowChildExpansionChange, false)
+				.OnSetExpansionRecursive(this, &SLevelSnapshotsEditorResults::OnRowChildExpansionChange, true)
+				.Visibility_Lambda([this]()
+					{
+						return this->DoesTreeViewHaveVisibleChildren() ? EVisibility::Visible : EVisibility::Collapsed;
+					})
+			]
 
-				+SHorizontalBox::Slot()
-				[
-					SAssignNew(ResultsSearchBoxPtr, SSearchBox)
-					.HintText(LOCTEXT("LevelSnapshotsEditorResults_SearchHintText", "Search actors, components, properties..."))
-					.OnTextChanged_Raw(this, &SLevelSnapshotsEditorResults::OnResultsViewSearchTextChanged)
-				]
+			+ SOverlay::Slot()
+			.HAlign(HAlign_Center)
+			.Padding(2.0f, 24.0f, 2.0f, 2.0f)
+			[
+				SNew(STextBlock)
+				.Text(LOCTEXT("LevelSnapshotsEditorResults_NoResults", "No results to show. Try selecting a snapshot, changing your active filters, or clearing any active search."))
+				.Visibility_Lambda([this]()
+					{
+						return DoesTreeViewHaveVisibleChildren() ? EVisibility::Collapsed : EVisibility::HitTestInvisible;
+					})
+			]
+		]
+
+		+SVerticalBox::Slot()
+		.VAlign(VAlign_Bottom)
+		.AutoHeight()
+		[
+			SNew(SBorder)
+			.HAlign(HAlign_Fill)
+			.BorderBackgroundColor(FLinearColor::Black)
+			[
+				// Snapshot Information Text
+				SNew(SHorizontalBox)
 
 				+SHorizontalBox::Slot()
 				.HAlign(HAlign_Right)
+				.Padding(FMargin(5.f, 5.f))
+				[
+					SAssignNew(InfoTextBox, SVerticalBox)
+					.Visibility_Lambda([this]()
+					{
+						return EditorDataPtr.IsValid() && EditorDataPtr->GetEditorWorld() && EditorDataPtr->GetActiveSnapshot() && TreeViewRootHeaderObjects.Num() ? 
+							EVisibility::HitTestInvisible : EVisibility::Hidden;
+					})
+
+					+SVerticalBox::Slot()
+					.AutoHeight()
+					[
+						SAssignNew(SelectedActorCountText, STextBlock)
+						.Font(FCoreStyle::GetDefaultFontStyle("Bold", 14))
+						.Justification(ETextJustify::Right)
+					]
+
+					+ SVerticalBox::Slot()
+					.AutoHeight()
+					[
+						SAssignNew(MiscActorCountText, STextBlock)
+						.Font(FCoreStyle::GetDefaultFontStyle("Regular", 10))
+						.Justification(ETextJustify::Right)
+					]
+				]
+
+				// Apply to World
+				+SHorizontalBox::Slot()
 				.AutoWidth()
+				.HAlign(HAlign_Right)
+				.VAlign(VAlign_Fill)
+				.Padding(5.f, 2.f)
 				[
-					SNew(SComboButton)
-					.ContentPadding(0)
-					.ForegroundColor(FSlateColor::UseForeground())
-					.ButtonStyle(FAppStyle::Get(), "ToggleButton")
-					.AddMetaData<FTagMetaData>(FTagMetaData(TEXT("ViewOptions")))
-					.MenuContent()
-					[
-						ShowOptionsMenuBuilder.MakeWidget()
-					]
-					.ButtonContent()
-					[
-						SNew(SImage)
-						.Image(FAppStyle::Get().GetBrush("Icons.Settings"))
-					]
+					SNew(SPrimaryButton)
+					.Text(LOCTEXT("RestoreLevelSnapshot", "Restore Level Snapshot"))
+					.IsEnabled_Lambda([this]()
+					{
+						return EditorDataPtr.IsValid() && EditorDataPtr->GetEditorWorld() && EditorDataPtr->GetActiveSnapshot() && TreeViewRootHeaderObjects.Num();
+					})
+					.ToolTipText_Lambda([this]() 
+					{
+						return IsEnabled() && EditorDataPtr->IsFilterDirty() ? 
+							FText(LOCTEXT("RestoreSnapshotTooltip_DirtyState", "Please refresh filters. Restore selected snapshot properties and actors to the world.")) :
+							FText(LOCTEXT("RestoreSnapshotTooltip", "Restore selected snapshot properties and actors to the world."));
+					})
+					.OnClicked_Raw(this, &SLevelSnapshotsEditorResults::OnClickApplyToWorld)
 				]
 			]
-
-			+ SVerticalBox::Slot()
-			[
-				SNew(SOverlay)
-				
-				+ SOverlay::Slot()
-				.HAlign(HAlign_Fill)
-				.Padding(2.0f, 2.0f, 2.0f, 2.0f)
-				[
-					SAssignNew(TreeViewPtr, STreeView<FLevelSnapshotsEditorResultsRowPtr>)
-					.SelectionMode(ESelectionMode::None)
-					.TreeItemsSource(&TreeViewRootHeaderObjects)
-					.OnGenerateRow_Lambda([this](FLevelSnapshotsEditorResultsRowPtr Row, const TSharedRef<STableViewBase>& OwnerTable)
-						{
-							check(Row.IsValid());
-						
-							return SNew(STableRow<FLevelSnapshotsEditorResultsRowPtr>, OwnerTable)
-								[
-									SNew(SLevelSnapshotsEditorResultsRow, Row, SplitterManagerPtr)
-								]
-								.Visibility_Raw(Row.Get(), &FLevelSnapshotsEditorResultsRow::GetDesiredVisibility);
-						})
-					.OnGetChildren_Raw(this, &SLevelSnapshotsEditorResults::OnGetRowChildren)
-					.OnExpansionChanged_Raw(this, &SLevelSnapshotsEditorResults::OnRowChildExpansionChange, false)
-					.OnSetExpansionRecursive(this, &SLevelSnapshotsEditorResults::OnRowChildExpansionChange, true)
-					.Visibility_Lambda([this]()
-						{
-							return this->DoesTreeViewHaveVisibleChildren() ? EVisibility::Visible : EVisibility::Collapsed;
-						})
-				]
-
-				+ SOverlay::Slot()
-				.HAlign(HAlign_Center)
-				.Padding(2.0f, 24.0f, 2.0f, 2.0f)
-				[
-					SNew(STextBlock)
-					.Text(LOCTEXT("LevelSnapshotsEditorResults_NoResults", "No results to show. Try selecting a snapshot, changing your active filters, or clearing any active search."))
-					.Visibility_Lambda([this]()
-						{
-							return DoesTreeViewHaveVisibleChildren() ? EVisibility::Collapsed : EVisibility::HitTestInvisible;
-						})
-				]
-			]
-
-			+SVerticalBox::Slot()
-			.VAlign(VAlign_Bottom)
-			.AutoHeight()
-			[
-				SNew(SBorder)
-				.HAlign(HAlign_Fill)
-				.BorderBackgroundColor(FLinearColor::Black)
-				[
-					// Snapshot Information Text
-					SNew(SHorizontalBox)
-
-					+SHorizontalBox::Slot()
-					.HAlign(HAlign_Right)
-					.Padding(FMargin(5.f, 5.f))
-					[
-						SAssignNew(InfoTextBox, SVerticalBox)
-						.Visibility_Lambda([this]()
-						{
-							return EditorDataPtr.IsValid() && EditorDataPtr->GetEditorWorld() && EditorDataPtr->GetActiveSnapshot() && TreeViewRootHeaderObjects.Num() ? 
-								EVisibility::HitTestInvisible : EVisibility::Hidden;
-						})
-
-						+SVerticalBox::Slot()
-						.AutoHeight()
-						[
-							SAssignNew(SelectedActorCountText, STextBlock)
-							.Font(FCoreStyle::GetDefaultFontStyle("Bold", 14))
-							.Justification(ETextJustify::Right)
-						]
-
-						+ SVerticalBox::Slot()
-						.AutoHeight()
-						[
-							SAssignNew(MiscActorCountText, STextBlock)
-							.Font(FCoreStyle::GetDefaultFontStyle("Regular", 10))
-							.Justification(ETextJustify::Right)
-						]
-					]
-
-					// Apply to World
-					+SHorizontalBox::Slot()
-						.AutoWidth()
-						.HAlign(HAlign_Right)
-						.VAlign(VAlign_Fill)
-						.Padding(5.f, 2.f)
-						[
-							SNew(SPrimaryButton)
-							.Text(LOCTEXT("RestoreLevelSnapshot", "Restore Level Snapshot"))
-							.IsEnabled_Lambda([this]()
-							{
-								return EditorDataPtr.IsValid() && EditorDataPtr->GetEditorWorld() && EditorDataPtr->GetActiveSnapshot() && TreeViewRootHeaderObjects.Num();
-							})
-							.ToolTipText_Lambda([this]() 
-							{
-								return IsEnabled() && EditorDataPtr->IsFilterDirty() ? 
-									FText(LOCTEXT("RestoreSnapshotTooltip_DirtyState", "Please refresh filters. Restore selected snapshot properties and actors to the world.")) :
-									FText(LOCTEXT("RestoreSnapshotTooltip", "Restore selected snapshot properties and actors to the world."));
-							})
-							.OnClicked_Raw(this, &SLevelSnapshotsEditorResults::OnClickApplyToWorld)
-						]
-				]
-			]
-		];
+		]
+	];
 }
 
 SLevelSnapshotsEditorResults::~SLevelSnapshotsEditorResults()
@@ -1006,15 +1006,15 @@ bool SLevelSnapshotsEditorResults::GenerateTreeViewChildren_AddedActors(FLevelSn
 bool SLevelSnapshotsEditorResults::GenerateTreeViewChildren_RemovedActors(FLevelSnapshotsEditorResultsRowPtr RemovedActorsHeader)
 {
 	check(RemovedActorsHeader);
+	check (EditorDataPtr.IsValid());
+	check (EditorDataPtr->GetActiveSnapshot().IsSet());
+	
+	TObjectPtr<ULevelSnapshot> ActiveSnapshot = EditorDataPtr->GetActiveSnapshot().GetValue();
+	check(ActiveSnapshot);
 	
 	for (const FSoftObjectPath& ActorPath : FilterListData.GetRemovedOriginalActorPaths_AllowedByFilter())
 	{
-		FString ActorName = ActorPath.GetSubPathString().IsEmpty() ? ActorPath.GetAssetName() : ActorPath.GetSubPathString();
-
-		if (ActorName.Contains("."))
-		{
-			ActorName = ActorName.Right(ActorName.Len() - ActorName.Find(".", ESearchCase::IgnoreCase, ESearchDir::FromEnd) - 1);
-		}
+		FString ActorName = ActiveSnapshot->GetActorLabel(ActorPath);
 		
 		// Create group
 		FLevelSnapshotsEditorResultsRowPtr NewActorRow = MakeShared<FLevelSnapshotsEditorResultsRow>(

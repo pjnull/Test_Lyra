@@ -88,59 +88,31 @@ TSharedPtr<SWidget> LevelSnapshotsEditorCustomWidgetGenerator::GenerateGenericPr
 
 		const FName OwnerObjectName = ParentObject->GetFName();
 
-		// Owning object is an FProperty (usually for members of a collection
+		// Owning object is an FProperty (usually for members of a collection)
 		// I.E., Property is an item in array/set/map, so OwnerProperty is the collection property)
 		if (const FProperty* OwnerProperty = FindFProperty<FProperty>(InObject->GetClass(), OwnerObjectName))
 		{
 			void* OwnerPropertyValue = OwnerProperty->ContainerPtrToValuePtr<void>(InObject);
 			PropertyValue = OwnerProperty->ContainerPtrToValuePtr<void>(OwnerPropertyValue);
 		}
-		else if (const UScriptStruct* ParentScriptStruct = Cast<UScriptStruct>(ParentObject)) 
-		{
-			// For members of a struct, the struct is a UScriptStruct object rather than the FStructProperty.
-			// In this case, we need to go through the Class tree an generate a PropertyChain, e.g. FStructProperty->FStructProperty->LeafProperty
-
-			UStruct* IterableStruct;
-
-			if (UScriptStruct* AsScriptStruct = Cast<UScriptStruct>(InObject))
-			{
-				IterableStruct = AsScriptStruct;
-			}
-			else
-			{
-				IterableStruct = InObject->GetClass();
-			}
-			check(IterableStruct);
-
-			TOptional<FLevelSnapshotPropertyChain> OutChain = FLevelSnapshotPropertyChain::FindPathToProperty(Property, IterableStruct);
-
-			if (OutChain.IsSet())
-			{
-				void* ChainIterationPropertyPtr = InObject;
-
-				const int32 ChainLength = OutChain.GetValue().GetNumProperties(); 
-
-				for (int32 ChainIndex = 0; ChainIndex < ChainLength; ChainIndex++)
-				{
-					const FProperty* IteratedProperty = OutChain.GetValue().GetPropertyFromRoot(ChainIndex);
-
-					ChainIterationPropertyPtr = IteratedProperty->ContainerPtrToValuePtr<void>(ChainIterationPropertyPtr);
-				}
-
-				PropertyValue = ChainIterationPropertyPtr;
-			}
-			
-		}
-		else if (Property->GetOwner<UClass>()) // This means the property is a surface-level property in a class, so it's not in a struct or collection
+		else if (UClass* OwnerClass = Property->GetOwner<UClass>()) // Owning object is something else, make sure it has UClass
 		{
 			PropertyValue = Property->ContainerPtrToValuePtr<void>(InObject);
+		}
+		else
+		{
+			const UObject* Owner = Property->GetOwner<UObject>();
+			const FString OwnerName = Owner ? Owner->GetName() : "None";
+			UE_LOG(LogLevelSnapshots, Warning,
+				TEXT("%hs: Property named %s with owner named '%s' does not have an owning FProperty or an owning UClass."),
+				__FUNCTION__, *Property->GetName(), *OwnerName);
 		}
 
 		// We should have found a value ptr in the methods above, but we ensure in case of a missed scenario
 		if (ensure(PropertyValue != nullptr))
 		{
 			FString ValueText;
-			Property->ExportTextItem(ValueText, PropertyValue, nullptr, ParentObject, PPF_None);
+			Property->ExportTextItem(ValueText, PropertyValue, 0, ParentObject, PPF_None);
 
 			if (InWidgetTextEditLambda)
 			{
