@@ -99,7 +99,7 @@ void FSuspensionConstraintPhysicsProxy::DestroyOnPhysicsThread(FPBDRigidsSolver*
 	if (Constraint_PT)
 	{
 		// @todo(chaos): clean up constraint management
-		RBDSolver->GetEvolution()->RemoveConstraintFromConstraintGraph(Handle);
+		RBDSolver->GetEvolution()->RemoveConstraintFromConstraintGraph(Constraint_PT);
 		auto& SuspensionConstraints = RBDSolver->GetSuspensionConstraints();
 		SuspensionConstraints.RemoveConstraint(Constraint_PT->GetConstraintIndex());
 		Constraint_PT = nullptr;
