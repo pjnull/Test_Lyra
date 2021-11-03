@@ -5,8 +5,7 @@
 #include "Styling/SlateTypes.h"
 #include "Framework/Text/SyntaxTokenizer.h"
 #include "Framework/Text/SyntaxHighlighterTextLayoutMarshaller.h"
-
-class FTextLayout;
+#include "Framework/Text/TextLayout.h"
 
 /**
  * Syntax highlighting for hlsl text
