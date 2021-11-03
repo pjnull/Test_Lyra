@@ -442,7 +442,10 @@ bool FStorageServerConnection::Initialize(TArrayView<const FString> InHostAddres
 	}
 	else
 	{
-		OplogPath.Append(FPlatformProperties::PlatformName());
+		TArray<FString> TargetPlatformNames;
+		FPlatformMisc::GetValidTargetPlatforms(TargetPlatformNames);
+		check(TargetPlatformNames.Num() > 0);
+		OplogPath.Append(TCHAR_TO_ANSI(*TargetPlatformNames[0]));
 	}
 
 	const int32 ServerVersion = HandshakeRequest(HostAddresses);
