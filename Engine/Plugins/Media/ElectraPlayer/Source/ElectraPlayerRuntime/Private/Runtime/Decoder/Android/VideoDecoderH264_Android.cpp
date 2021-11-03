@@ -824,76 +824,81 @@ void FVideoDecoderH264::RecreateDecoderSession()
 		return;
 	}
 
-	// Create a new decoder
-	if (InternalDecoderCreate())
+	TSharedPtrTS<FDecoderInput> PreviouslyActiveAU = MoveTemp(CurrentAccessUnit);
+	TAccessUnitQueue<TSharedPtrTS<FDecoderInput>> ReplayedAUs;
+	while(!ReplayAccessUnits.IsEmpty() && !TerminateThreadSignal.IsSignaled() && !FlushDecoderSignal.IsSignaled())
 	{
-		TSharedPtrTS<FDecoderInput> PreviouslyActiveAU = MoveTemp(CurrentAccessUnit);
-
-		TAccessUnitQueue<TSharedPtrTS<FDecoderInput>> ReplayedAUs;
-		while(!ReplayAccessUnits.IsEmpty() && !TerminateThreadSignal.IsSignaled() && !FlushDecoderSignal.IsSignaled())
-		{
-			if (!CurrentAccessUnit.IsValid())
-			{
-				TSharedPtrTS<FDecoderInput> ReplayAU;
-				ReplayAccessUnits.Dequeue(ReplayAU);
-				ReplayedAUs.Enqueue(ReplayAU);
-				// Make a copy of the replay AU as the current AU.
-				CurrentAccessUnit = MakeSharedTS<FDecoderInput>();
-				// Copy all members across.
-				*CurrentAccessUnit = *ReplayAU;
-				// Increase the actual AU's ref count since it is now shared.
-				CurrentAccessUnit->AccessUnit->AddRef();
-				// Set the adjusted PTS to invalid to prevent this from being rendered again.
-				// This is why we had to make a copy of the replay AU so we can modify it!
-				CurrentAccessUnit->AdjustedPTS.SetToInvalid();
-			}
-
-			EOutputResult OutputResult = GetOutput();
-			if (OutputResult == EOutputResult::Fail)
-			{
-				bError = true;
-				break;
-			}
-
-			EDecodeResult DecodeResult = Decode();
-			if (DecodeResult == EDecodeResult::Ok)
-			{
-				// Update the sequence index.
-				CurrentSequenceIndex = CurrentAccessUnit->AccessUnit->PTS.GetSequenceIndex();
-				CurrentAccessUnit.Reset();
-			}
-			else if (DecodeResult == EDecodeResult::Fail)
-			{
-				bError = true;
-				break;
-			}
-		}
-
-		// Get any remaining unreplayed AUs over into the replayed AU queue.
-		while(!ReplayAccessUnits.IsEmpty())
+		if (!CurrentAccessUnit.IsValid())
 		{
 			TSharedPtrTS<FDecoderInput> ReplayAU;
 			ReplayAccessUnits.Dequeue(ReplayAU);
 			ReplayedAUs.Enqueue(ReplayAU);
-		}
-		// Move all replayed AUs back into the replay queue in case we have to do this over again.
-		while(!ReplayedAUs.IsEmpty())
-		{
-			TSharedPtrTS<FDecoderInput> ReplayAU;
-			ReplayedAUs.Dequeue(ReplayAU);
-			ReplayAccessUnits.Enqueue(ReplayAU);
+			// Make a copy of the replay AU as the current AU.
+			CurrentAccessUnit = MakeSharedTS<FDecoderInput>();
+			// Copy all members across.
+			*CurrentAccessUnit = *ReplayAU;
+			// Increase the actual AU's ref count since it is now shared.
+			CurrentAccessUnit->AccessUnit->AddRef();
+			// Set the adjusted PTS to invalid to prevent this from being rendered again.
+			// This is why we had to make a copy of the replay AU so we can modify it!
+			CurrentAccessUnit->AdjustedPTS.SetToInvalid();
 		}
 
-		// Reinstate what was the current AU before.
-		CurrentAccessUnit = MoveTemp(PreviouslyActiveAU);
-
-		// Get and discard as much output as possible
-		while(!TerminateThreadSignal.IsSignaled() && !FlushDecoderSignal.IsSignaled())
+		// Need new decoder?
+		if (!DecoderInstance.IsValid())
 		{
-			if (GetOutput() != EOutputResult::Ok)
+			if (!InternalDecoderCreate())
 			{
+				bError = true;
 				break;
 			}
+		}
+
+		EOutputResult OutputResult = GetOutput();
+		if (OutputResult == EOutputResult::Fail)
+		{
+			bError = true;
+			break;
+		}
+
+		EDecodeResult DecodeResult = Decode();
+		if (DecodeResult == EDecodeResult::Ok)
+		{
+			// Update the sequence index.
+			CurrentSequenceIndex = CurrentAccessUnit->AccessUnit->PTS.GetSequenceIndex();
+			CurrentAccessUnit.Reset();
+		}
+		else if (DecodeResult == EDecodeResult::Fail)
+		{
+			bError = true;
+			break;
+		}
+	}
+
+	// Get any remaining unreplayed AUs over into the replayed AU queue.
+	while(!ReplayAccessUnits.IsEmpty())
+	{
+		TSharedPtrTS<FDecoderInput> ReplayAU;
+		ReplayAccessUnits.Dequeue(ReplayAU);
+		ReplayedAUs.Enqueue(ReplayAU);
+	}
+	// Move all replayed AUs back into the replay queue in case we have to do this over again.
+	while(!ReplayedAUs.IsEmpty())
+	{
+		TSharedPtrTS<FDecoderInput> ReplayAU;
+		ReplayedAUs.Dequeue(ReplayAU);
+		ReplayAccessUnits.Enqueue(ReplayAU);
+	}
+
+	// Reinstate what was the current AU before.
+	CurrentAccessUnit = MoveTemp(PreviouslyActiveAU);
+
+	// Get and discard as much output as possible
+	while(!TerminateThreadSignal.IsSignaled() && !FlushDecoderSignal.IsSignaled())
+	{
+		if (GetOutput() != EOutputResult::Ok)
+		{
+			break;
 		}
 	}
 }
