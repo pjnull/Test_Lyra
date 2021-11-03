@@ -31,6 +31,136 @@ ENGINE_PATH = "../../../../.."
 RELATIVE_PATH = os.path.dirname(__file__)
 EMPTY_SYNC_ENTRY = "-- None --"
 
+class TraceSettings(QtWidgets.QDialog):
+    """
+    Custom class to prompt user for the trace arguments to use for Unreal Insights trace collection.
+    """
+    def __init__(self, trace_settings, parent=None):
+        super().__init__(parent=parent, f=QtCore.Qt.WindowCloseButtonHint)
+
+        self.setWindowTitle("Trace Settings")
+
+        self.arguments_field = QtWidgets.QLineEdit(self)
+        self.arguments_field.setText(trace_settings)
+
+        self.form_layout = QtWidgets.QFormLayout()
+        self.form_layout.addRow("Arguments", self.arguments_field)
+
+        layout = QtWidgets.QVBoxLayout()
+        layout.insertLayout(0, self.form_layout)
+
+        button_box = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
+        button_box.accepted.connect(lambda: self.accept())
+        button_box.rejected.connect(lambda: self.reject())
+        layout.addWidget(button_box)
+
+        self.setLayout(layout)
+
+    def trace_settings(self):
+        """
+        Return the current trace settings.
+        """
+        return self.arguments_field.text()
+
+class DeviceAdditionalSettingsUI(QtCore.QObject):
+    signal_device_widget_tracing = QtCore.Signal(object)
+
+    enable_insight_trace = False
+    insight_trace_args = "log,cpu,gpu,frame,concert,messaging"
+
+    def __init__(self, name, parent = None):
+        super().__init__(parent)
+        self.name = name
+
+    def _update_enable_state(self):
+        """
+        The button assigned for the settings UI should be "checked" when the user has modified a default.
+        """
+        tracing_different = self.enable_insights_menu().isChecked() is not DeviceAdditionalSettingsUI.enable_insight_trace
+        tracing_values_different = self.insight_trace_args != DeviceAdditionalSettingsUI.insight_trace_args
+
+        self._button.setChecked(tracing_different or tracing_values_different)
+
+    def set_insight_trace_state(self, is_checked):
+        """
+        External setter for the current tracing state.  This is applied by the device one loading the setting from the global
+        configuration.
+        """
+        if is_checked is not self.enable_insights_menu().isChecked():
+            self.enable_insights_menu().setChecked(is_checked)
+            self._update_enable_state()
+            self.signal_device_widget_tracing.emit(self)
+
+    def set_insight_tracing_args(self, value):
+        """
+        External setter for tracing arguments. This is applied by the device one loading the setting from the global
+        configuration.
+        """
+        if value != self.insight_trace_args:
+            self.insight_trace_args = value
+            self._update_enable_state()
+
+    def enable_insights_menu(self):
+        return self._tracing_action
+
+    def trace_settings(self):
+        return (self.enable_insights_menu().isChecked(), self.insight_trace_args)
+
+    def _set_tracing(self, is_checked):
+        self.signal_device_widget_tracing.emit(self)
+        self._update_enable_state()
+
+    def _set_trace_settings(self, is_checked):
+        self._tracing_settings.setChecked(False)
+        settings = TraceSettings(self.insight_trace_args)
+        settings.exec()
+        self.insight_trace_args = settings.trace_settings()
+        self.signal_device_widget_tracing.emit(self)
+        self._update_enable_state()
+
+    def _generate_trace_menu_item(self, menu):
+        action_item = QtWidgets.QAction("Enable Unreal Insights Tracing",
+                                        menu, checked=DeviceAdditionalSettingsUI.enable_insight_trace, checkable=True)
+        action_item.setChecked(DeviceAdditionalSettingsUI.enable_insight_trace)
+        action_item.triggered.connect(self._set_tracing)
+        self._tracing_action = action_item
+        return action_item
+
+    def _generate_trace_settings_item(self, menu):
+        action_item = QtWidgets.QAction("Unreal Insights Trace Settings...",
+                                        menu, checked=DeviceAdditionalSettingsUI.enable_insight_trace, checkable=True)
+        action_item.setChecked(DeviceAdditionalSettingsUI.enable_insight_trace)
+        action_item.triggered.connect(self._set_trace_settings)
+        self._tracing_settings = action_item
+        return action_item
+
+    def _generate_settings_menu_items(self, menu):
+        self.settings_menu.addAction(self._generate_trace_menu_item(menu))
+        self.settings_menu.addAction(self._generate_trace_settings_item(menu))
+
+    def get_button(self):
+        return self._button
+
+    def assign_button(self, button, parent):
+        self._button = button
+        self.settings_menu = QtWidgets.QMenu(parent)
+        self._generate_settings_menu_items(self.settings_menu)
+        self._button.setMenu(self.settings_menu)
+        self._button.setStyleSheet("QPushButton::menu-indicator{image:none;}");
+        self._button.setDisabled(False)
+
+    def make_button(self, parent):
+        """
+        Make a new device setting push button.
+        """
+        button = sb_widgets.ControlQPushButton.create(
+                icon_size=QtCore.QSize(21, 21),
+                tool_tip=f'Change device settings',
+                hover_focus=False,
+                name='settings')
+
+        self.assign_button(button,parent)
+        return button
 
 class SwitchboardDialog(QtCore.QObject):
     STYLESHEET_PATH = os.path.join(RELATIVE_PATH, 'ui/switchboard.qss')
@@ -182,6 +312,12 @@ class SwitchboardDialog(QtCore.QObject):
         self.window.connect_all_button.clicked.connect(self.connect_all_button_clicked)
         self.window.launch_all_button.clicked.connect(self.launch_all_button_clicked)
 
+        self.window.additional_settings = DeviceAdditionalSettingsUI("global")
+        self.window.additional_settings.assign_button(self.window.device_settings_button, self.window)
+
+        self.window.additional_settings.signal_device_widget_tracing.connect(self.on_tracing_settings_changed)
+        self.refresh_trace_settings()
+
         # Stylesheet-related: Object names used for selectors, no focus forcing
         def configure_ctrl_btn(btn: sb_widgets.ControlQPushButton, name: str):
             btn.setObjectName(name)
@@ -242,6 +378,19 @@ class SwitchboardDialog(QtCore.QObject):
         CONFIG.P4_ENABLED.signal_setting_changed.connect(lambda _, enabled: self.toggle_p4_controls(enabled))
         CONFIG.MAPS_PATH.signal_setting_changed.connect(lambda: self.refresh_levels())
         CONFIG.MAPS_FILTER.signal_setting_changed.connect(lambda: self.refresh_levels())
+        CONFIG.INSIGHTS_TRACE_ENABLE.signal_setting_changed.connect(lambda: self.reference_trace_settings())
+        CONFIG.INSIGHTS_TRACE_ARGS.signal_setting_changed.connect(lambda: self.reference_trace_settings())
+        CONFIG.INSIGHTS_STAT_EVENTS.signal_setting_changed.connect(lambda: self.reference_trace_settings())
+
+    def refresh_trace_settings(self):
+        self.window.additional_settings.set_insight_trace_state(CONFIG.INSIGHTS_TRACE_ENABLE.get_value())
+        self.window.additional_settings.set_insight_tracing_args(CONFIG.INSIGHTS_TRACE_ARGS.get_value())
+
+    def on_tracing_settings_changed(self):
+        settings = self.window.additional_settings
+        trace_tuple = settings.trace_settings()
+        CONFIG.INSIGHTS_TRACE_ENABLE.update_value(trace_tuple[0])
+        CONFIG.INSIGHTS_TRACE_ARGS.update_value(trace_tuple[1])
 
     def show_device_add_menu(self):
         self.device_add_menu.clear()
@@ -481,8 +630,8 @@ class SwitchboardDialog(QtCore.QObject):
         settings_dialog.set_mu_server_endpoint(CONFIG.MUSERVER_ENDPOINT)
         settings_dialog.set_mu_cmd_line_args(CONFIG.MUSERVER_COMMAND_LINE_ARGUMENTS)
         settings_dialog.set_mu_clean_history(CONFIG.MUSERVER_CLEAN_HISTORY)
-        settings_dialog.set_mu_auto_launch(CONFIG.MUSERVER_AUTO_LAUNCH)
         settings_dialog.set_mu_auto_join(CONFIG.MUSERVER_AUTO_JOIN)
+        settings_dialog.set_mu_auto_launch(CONFIG.MUSERVER_AUTO_LAUNCH)
         settings_dialog.set_mu_server_exe(CONFIG.MULTIUSER_SERVER_EXE)
         settings_dialog.set_mu_server_auto_build(CONFIG.MUSERVER_AUTO_BUILD)
         settings_dialog.set_mu_server_auto_endpoint(CONFIG.MUSERVER_AUTO_ENDPOINT)

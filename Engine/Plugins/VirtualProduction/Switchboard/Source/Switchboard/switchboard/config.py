@@ -1339,6 +1339,8 @@ class Config(object):
             value=p4_settings['p4_engine_path']
         )
 
+        self.init_unreal_insights()
+
         self.CURRENT_LEVEL = DEFAULT_MAP_TEXT
 
         self.OSC_SERVER_PORT = IntSetting(
@@ -1369,6 +1371,28 @@ class Config(object):
 
         SETTINGS.CONFIG = self.file_path
         SETTINGS.save()
+
+    def init_unreal_insights(self, data={}):
+        self.INSIGHTS_TRACE_ENABLE = BoolSetting(
+            "tracing_enabled",
+            "Unreal Insights Tracing State",
+            data.get("tracing_enabled", False),
+        )
+        self.INSIGHTS_TRACE_ARGS = StringSetting(
+            "tracing_args",
+            "Unreal Insights Tracing Args",
+            data.get('tracing_arg', 'log,cpu,gpu,frame,concert,messaging')
+        )
+        self.INSIGHTS_STAT_EVENTS = BoolSetting(
+            "tracing_stat_events",
+            "Unreal Insights Tracing with Stat Events",
+            data.get('tracing_stat_events', True)
+        )
+
+    def save_unreal_insights(self, data):
+        data['tracing_enabled'] = self.INSIGHTS_TRACE_ENABLE.get_value()
+        data['tracing_args'] = self.INSIGHTS_TRACE_ARGS.get_value()
+        data['tracing_stat_events'] = self.INSIGHTS_STAT_EVENTS.get_value()
 
     def init_with_file_path(self, file_path: typing.Union[str, pathlib.Path]):
         if file_path:
@@ -1456,6 +1480,13 @@ class Config(object):
         project_settings.extend(
             [self.P4_ENABLED, self.SOURCE_CONTROL_WORKSPACE,
              self.P4_PROJECT_PATH, self.P4_ENGINE_PATH])
+
+        self.init_unreal_insights(data)
+
+        project_settings.extend([
+            self.INSIGHTS_TRACE_ENABLE,
+            self.INSIGHTS_STAT_EVENTS,
+            self.INSIGHTS_TRACE_ARGS])
 
         # EXE names
         self.MULTIUSER_SERVER_EXE = data.get(
@@ -1574,6 +1605,8 @@ class Config(object):
         data["maps_path"] = self.MAPS_PATH.get_value()
         data["maps_filter"] = self.MAPS_FILTER.get_value()
         data["listener_exe"] = self.LISTENER_EXE
+
+        self.save_unreal_insights(data)
 
         # OSC settings
         data["osc_server_port"] = self.OSC_SERVER_PORT.get_value()

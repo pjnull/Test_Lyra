@@ -25,7 +25,6 @@ class DeviceWidgetItem(QtWidgets.QWidget):
         painter = QtGui.QPainter(self)
         self.style().drawPrimitive(QtWidgets.QStyle.PE_Widget, opt, painter, self)
 
-
 class DeviceWidget(QtWidgets.QWidget):
     signal_device_widget_connect = QtCore.Signal(object)
     signal_device_widget_disconnect = QtCore.Signal(object)
@@ -248,14 +247,16 @@ class DeviceWidget(QtWidgets.QWidget):
         else:
             self.ip_address_line_edit.show()
 
+    def assign_button_to_name(self, name, button):
+        if name:
+            self.control_buttons[name] = button
+
     def add_control_button(self, *args, name: Optional[str] = None, **kwargs):
         button = sb_widgets.ControlQPushButton.create(*args, name=name,
                                                       **kwargs)
         self.add_widget_to_layout(button)
 
-        if name:
-            self.control_buttons[name] = button
-
+        self.assign_button_to_name(name, button)
         return button
 
 

@@ -844,12 +844,14 @@ class DevicenDisplay(DeviceUnreal):
         if CONFIG.MUSERVER_AUTO_JOIN:
             args.extend([
                 '-CONCERTRETRYAUTOCONNECTONERROR',
-                '-CONCERTAUTOCONNECT',
-                f'-CONCERTSERVER={CONFIG.MUSERVER_SERVER_NAME}',
-                f'-CONCERTSESSION={SETTINGS.MUSERVER_SESSION_NAME}',
-                f'-CONCERTDISPLAYNAME={self.name}',
-                '-CONCERTISHEADLESS',
-            ])
+                '-CONCERTAUTOCONNECT'])
+
+        args.extend([
+            f'-CONCERTSERVER={CONFIG.MUSERVER_SERVER_NAME}',
+            f'-CONCERTSESSION={SETTINGS.MUSERVER_SESSION_NAME}',
+            f'-CONCERTDISPLAYNAME={self.name}',
+            '-CONCERTISHEADLESS',
+        ])
 
         args.append(self.csettings['logging'].get_command_line_arg(
             override_device_name=self.name))

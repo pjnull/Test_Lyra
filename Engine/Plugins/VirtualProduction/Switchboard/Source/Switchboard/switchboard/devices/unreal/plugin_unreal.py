@@ -476,6 +476,7 @@ class DeviceUnreal(Device):
 
         self.auto_connect = False
 
+        self.runtime_str = ""
         self.inflight_project_cl = None
         self.inflight_engine_cl = None
 
@@ -581,7 +582,7 @@ class DeviceUnreal(Device):
 
         log_xfer_devices = [
             dev for dev in DeviceUnreal.active_unreal_devices
-            if dev.log_transfer_in_progress]
+            if dev.transfer_in_progress]
 
         if len(log_xfer_devices) == 0:
             return True
@@ -662,7 +663,9 @@ class DeviceUnreal(Device):
         ]
 
     def device_settings(self):
-        return super().device_settings() + [self.setting_roles]
+        return super().device_settings() + [
+            self.setting_roles,
+        ]
 
     def check_settings_valid(self) -> bool:
         valid = True
@@ -703,7 +706,8 @@ class DeviceUnreal(Device):
         return (
             super().plugin_header_widget_config() |
             PluginHeaderWidgets.OPEN_BUTTON |
-            PluginHeaderWidgets.CHANGELIST_LABEL)
+            PluginHeaderWidgets.CHANGELIST_LABEL
+        )
 
     def on_setting_ip_address_changed(self, _, new_address):
         LOGGER.info(f"Updating IP address for ListenerClient to {new_address}")
@@ -1194,7 +1198,7 @@ class DeviceUnreal(Device):
         endpoints: List[str] = []
 
         # Multi-user server.
-        if CONFIG.MUSERVER_AUTO_JOIN and CONFIG.MUSERVER_AUTO_ENDPOINT:
+        if CONFIG.MUSERVER_AUTO_ENDPOINT:
             endpoints.append(DeviceUnreal.get_muserver_endpoint())
 
         # Any additional endpoints manually specified via settings.
@@ -1206,18 +1210,31 @@ class DeviceUnreal(Device):
 
         return endpoints
 
+    def get_utrace_filepath(self):
+        return self.get_remote_log_path() / f'{self.name}_{self.runtime_str}.utrace'
+
     def generate_unreal_command_line_args(self, map_name):
         command_line_args = f'{self.extra_cmdline_args_setting}'
 
         command_line_args += f' Log={self.log_filename}'
 
+        command_line_args += " ";
+
         if CONFIG.MUSERVER_AUTO_JOIN:
             command_line_args += (
-                ' -CONCERTRETRYAUTOCONNECTONERROR '
-                '-CONCERTAUTOCONNECT '
-                f'-CONCERTSERVER={CONFIG.MUSERVER_SERVER_NAME} '
-                f'-CONCERTSESSION={SETTINGS.MUSERVER_SESSION_NAME} '
-                f'-CONCERTDISPLAYNAME={self.name}')
+                '-CONCERTRETRYAUTOCONNECTONERROR '
+                '-CONCERTAUTOCONNECT ')
+
+        command_line_args += (f'-CONCERTSERVER={CONFIG.MUSERVER_SERVER_NAME} '
+                              f'-CONCERTSESSION={SETTINGS.MUSERVER_SESSION_NAME} '
+                              f'-CONCERTDISPLAYNAME={self.name}')
+
+        if CONFIG.INSIGHTS_TRACE_ENABLE.get_value():
+            remote_utrace_path = self.get_utrace_filepath()
+            command_line_args += ' -statnamedevents' if CONFIG.INSIGHTS_STAT_EVENTS.get_value() else ''
+            command_line_args += ' -tracefile={} -trace={}'.format(
+                remote_utrace_path,
+                CONFIG.INSIGHTS_TRACE_ARGS)
 
         exec_cmds = str(
             DeviceUnreal.csettings["exec_cmds"].get_value(self.name)).strip()
@@ -1313,6 +1330,7 @@ class DeviceUnreal(Device):
 
             DeviceUnreal.mu_server.launch(mu_args)
 
+        self.compute_runtime_str()
         engine_path, args = self.generate_unreal_command_line(map_name)
         LOGGER.info(f"Launching UE4: {engine_path} {args}")
 
@@ -1396,7 +1414,7 @@ class DeviceUnreal(Device):
                 self.project_changelist = self.project_changelist
             elif program_name == 'unreal':
                 self.status = DeviceStatus.CLOSED
-            elif program_name == 'retrieve_log':
+            elif program_name == 'retrieve':
                 self.status = DeviceStatus.CLOSED
 
             return
@@ -1469,14 +1487,18 @@ class DeviceUnreal(Device):
         remaining_homonyms = self.program_start_queue.running_puuids_named(
             program_name)
         for prog_id in remaining_homonyms:
-            LOGGER.warning(
-                f'{self.name}: But ({prog_id}) with the same name '
-                f'"{program_name}" is still in the list, which is unusual')
+            if program_name is not 'retrieve':
+                LOGGER.warning(
+                    f'{self.name}: But ({prog_id}) with the same name '
+                    f'"{program_name}" is still in the list, which is unusual')
 
         if program_name == 'unreal' and not len(remaining_homonyms):
-            self.start_retrieve_log(unreal_exit_code=returncode)
+            log_success = self.start_retrieve_log(unreal_exit_code=returncode)
+            utrace_success = self.start_retrieve_utrace(unreal_exit_code=returncode)
+            if not log_success and not utrace_success:
+                self.status = DeviceStatus.CLOSED
 
-        elif program_name == 'retrieve_log':
+        elif program_name == 'retrieve' and not self.transfer_in_progress:
             self.status = DeviceStatus.CLOSED
 
         elif program_name == 'sync':
@@ -1728,6 +1750,14 @@ class DeviceUnreal(Device):
     def log_filename(self):
         return f'{self.name}.log'
 
+    def compute_runtime_str(self):
+        """
+        Insight tracing requires a unique file name.  We use the current time
+        from the start of the build.
+        """
+        now = datetime.now()
+        self.runtime_str = now.strftime('%Y.%m.%d-%H.%M.%S')
+
     @classmethod
     def get_log_download_dir(cls) -> Optional[pathlib.Path]:
         log_download_dir_setting = \
@@ -1756,13 +1786,13 @@ class DeviceUnreal(Device):
         DeviceUnreal.rsync_server.register_client(
             self, self.name, self.ip_address)
 
-    def backup_downloaded_log(self):
-        ''' Rotate existing log to a timestamped backup, ala Unreal. '''
+    def backup_file(self, filename):
+        ''' Rotate existing filename to a timestamped backup, a la Unreal. '''
         log_download_path = self.get_log_download_dir()
         if not log_download_path:
             return
 
-        src = log_download_path / self.log_filename
+        src = log_download_path / filename
         if not src.is_file():
             return
 
@@ -1772,28 +1802,30 @@ class DeviceUnreal(Device):
 
         src.rename(log_download_path / dest_filename)
 
-    def start_retrieve_log(self, unreal_exit_code: int):
-        self.backup_downloaded_log()
+    def get_remote_log_path(self):
+        remote_project_path = \
+            pathlib.Path(CONFIG.UPROJECT_PATH.get_value(self.name)).parent
+        return remote_project_path / 'Saved' / 'Logs'
 
-        program_name = 'retrieve_log'
-
-        rsync_path = pathlib.Path(
+    def get_rsync_path(self):
+        return pathlib.Path(
             CONFIG.ENGINE_DIR.get_value(self.name),
             'Extras', 'ThirdPartyNotUE', 'cwrsync', 'bin', 'rsync.exe')
 
-        remote_project_path = \
-            pathlib.Path(CONFIG.UPROJECT_PATH.get_value(self.name)).parent
-        remote_log_path = \
-            remote_project_path / 'Saved' / 'Logs' / self.log_filename
-        remote_log_cygpath = \
-            DeviceUnreal.rsync_server.make_cygdrive_path(remote_log_path)
+    def fetch_file(self, remote_path):
+        program_name = 'retrieve'
+
+        rsync_path = self.get_rsync_path()
+
+        remote_cygpath = \
+            DeviceUnreal.rsync_server.make_cygdrive_path(remote_path)
 
         dest_endpoint = \
             f'{SETTINGS.IP_ADDRESS}:{DeviceUnreal.rsync_server.port}'
         dest_module = DeviceUnreal.rsync_server.INCOMING_LOGS_MODULE
         dest_path = f'rsync://{dest_endpoint}/{dest_module}/'
 
-        rsync_args = f'{remote_log_cygpath} {dest_path}'
+        rsync_args = f'{remote_cygpath} {dest_path}'
 
         puuid, msg = message_protocol.create_start_process_message(
             prog_path=str(rsync_path),
@@ -1811,21 +1843,41 @@ class DeviceUnreal(Device):
             ),
             unreal_client=self.unreal_client,
         )
+        # TODO: sync crash log?
+        return True
 
-        # if unreal_exit_code != 0:
-        #     TODO: sync crash log?
+    def start_retrieve_utrace(self, unreal_exit_code:int ):
+        """
+        Retrieve the utrace file if tracing is enabled.
+        """
+        if not CONFIG.INSIGHTS_TRACE_ENABLE.get_value():
+            return False
+
+        remote_path = self.get_utrace_filepath()
+
+        self.backup_file(os.path.basename(remote_path))
+        return self.fetch_file(remote_path)
+
+    def start_retrieve_log(self, unreal_exit_code: int):
+        """
+        Retrieve the log file if logging is enabled.
+        """
+        self.backup_file(self.log_filename)
+
+        remote_log_path = self.get_remote_log_path() / self.log_filename
+        return self.fetch_file(remote_log_path)
 
     @property
-    def log_transfer_in_progress(self) -> bool:
+    def transfer_in_progress(self) -> bool:
         return len(
-            self.program_start_queue.running_puuids_named('retrieve_log')) > 0
+            self.program_start_queue.running_puuids_named('retrieve')) > 0
 
     def get_widget_classes(self):
         widget_classes = list(self._widget_classes)
 
         widget_classes.append(f'status_{self.status.name.lower()}')
 
-        if self.log_transfer_in_progress:
+        if self.transfer_in_progress:
             widget_classes.append('download')
 
         return widget_classes
@@ -1853,7 +1905,6 @@ class DeviceUnreal(Device):
             self._widget_classes.remove(widget_class)
             self._update_widget_classes()
 
-
 def parse_unreal_tag_file(file_content):
     tags = []
     for line in file_content:
@@ -1864,9 +1915,10 @@ def parse_unreal_tag_file(file_content):
             tags.append(tag)
     return tags
 
-
 class DeviceWidgetUnreal(DeviceWidget):
     def __init__(self, name, device_hash, ip_address, icons, parent=None):
+        self._settings_visible = True
+
         super().__init__(name, device_hash, ip_address, icons, parent=parent)
 
         CONFIG.P4_ENABLED.signal_setting_changed.connect(
