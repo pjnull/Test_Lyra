@@ -11,6 +11,7 @@
 #include "Templates/Models.h"
 #include "Chaos/BoundingVolume.h"
 #include "ProfilingDebugging/CsvProfiler.h"
+#include "ChaosStats.h"
 
 CSV_DECLARE_CATEGORY_EXTERN(ChaosPhysicsTimers);
 
@@ -229,6 +230,8 @@ struct TAABBTreeLeafArray : public TBoundsWrapperHelper<TPayloadType, T, bComput
 	template <typename TSQVisitor>
 	bool OverlapFast(const FAABB3& QueryBounds, TSQVisitor& Visitor) const
 	{
+		PHYSICS_CSV_CUSTOM_VERY_EXPENSIVE(PhysicsCounters, MaxLeafSize, Elems.Num(), ECsvCustomStatOp::Max);
+
 		for (const auto& Elem : Elems)
 		{
 			if (PrePreFilterHelper(Elem.Payload, Visitor))
@@ -252,6 +255,7 @@ struct TAABBTreeLeafArray : public TBoundsWrapperHelper<TPayloadType, T, bComput
 	template <bool bSweep, typename TQueryFastData, typename TSQVisitor>
 	FORCEINLINE_DEBUGGABLE bool RaycastSweepImp(const TVec3<T>& Start, TQueryFastData& QueryFastData, const TVec3<T>& QueryHalfExtents, TSQVisitor& Visitor, const TVec3<T>& Dir, const TVec3<T> InvDir, const bool bParallel[3]) const
 	{
+		PHYSICS_CSV_CUSTOM_VERY_EXPENSIVE(PhysicsCounters, MaxLeafSize, Elems.Num(), ECsvCustomStatOp::Max);
 		FVec3 TmpPosition;
 		FReal TOI;
 		for (const auto& Elem : Elems)
@@ -1285,12 +1289,15 @@ private:
 	template <EAABBQueryType Query, typename TQueryFastData, typename SQVisitor>
 	bool QueryImp(const FVec3& RESTRICT Start, TQueryFastData& CurData, const FVec3& QueryHalfExtents, const FAABB3& QueryBounds, SQVisitor& Visitor, const FVec3& Dir, const FVec3& InvDir, const bool bParallel[3]) const
 	{
+		PHYSICS_CSV_CUSTOM_VERY_EXPENSIVE(PhysicsCounters, MaxDirtyElements, DirtyElements.Num(), ECsvCustomStatOp::Max);
+		PHYSICS_CSV_CUSTOM_VERY_EXPENSIVE(PhysicsCounters, MaxNumLeaves, Leaves.Num(), ECsvCustomStatOp::Max);
+		PHYSICS_CSV_SCOPED_VERY_EXPENSIVE(PhysicsVerbose, QueryImp);
 		//QUICK_SCOPE_CYCLE_COUNTER(AABBTreeQueryImp);
 		FVec3 TmpPosition;
 		FReal TOI = 0;
 		{
 			//QUICK_SCOPE_CYCLE_COUNTER(QueryGlobal);
-
+			PHYSICS_CSV_SCOPED_VERY_EXPENSIVE(PhysicsVerbose, QueryImp_Global);
 			for(const auto& Elem : GlobalPayloads)
 			{
 				if (PrePreFilterHelper(Elem.Payload, Visitor))
@@ -1371,6 +1378,7 @@ private:
 			
 			if (bUseGrid)
 			{
+				PHYSICS_CSV_SCOPED_VERY_EXPENSIVE(PhysicsVerbose, QueryImp_DirtyElementsGrid);
 				TArray<DirtyGridHashEntry> HashEntryForOverlappedCells;
 				auto AddHashEntry = [&](int32 QueryCellHash)
 				{
@@ -1410,11 +1418,15 @@ private:
 				}
 			}  // end overlap
 
-			else for (const auto& Elem : DirtyElements)
+			else
 			{
-				if (!IntersectAndVisit(Elem))
+				PHYSICS_CSV_SCOPED_VERY_EXPENSIVE(PhysicsVerbose, QueryImp_DirtyElements);
+				for (const auto& Elem : DirtyElements)
 				{
-					return false;
+					if (!IntersectAndVisit(Elem))
+					{
+						return false;
+					}
 				}
 			}
 		}
@@ -1433,6 +1445,8 @@ private:
 
 		while (NodeStack.Num())
 		{
+			PHYSICS_CSV_SCOPED_VERY_EXPENSIVE(PhysicsVerbose, QueryImp_NodeTraverse);
+
 			const FNodeQueueEntry NodeEntry = NodeStack.Pop(false);
 			if (Query != EAABBQueryType::Overlap)
 			{
@@ -1445,6 +1459,7 @@ private:
 			const FNode& Node = Nodes[NodeEntry.NodeIdx];
 			if (Node.bLeaf)
 			{
+				PHYSICS_CSV_SCOPED_VERY_EXPENSIVE(PhysicsVerbose, NodeTraverse_Leaf);
 				const auto& Leaf = Leaves[Node.ChildrenNodes[0]];
 				if (Query == EAABBQueryType::Overlap)
 				{
@@ -1467,6 +1482,7 @@ private:
 			}
 			else
 			{
+				PHYSICS_CSV_SCOPED_VERY_EXPENSIVE(PhysicsVerbose, NodeTraverse_Branch);
 				int32 Idx = 0;
 				for (const TAABB<T, 3>& AABB : Node.ChildrenBounds)
 				{
@@ -1595,15 +1611,6 @@ private:
 				++Idx;
 				//todo: payload info
 			}
-
-			if(WorkSnapshot.Elems.Num())
-			{
-				WorkSnapshot.AverageCenter = CenterSum * ((T)1 / (T)WorkSnapshot.Elems.Num());
-			}
-			else
-			{
-				WorkSnapshot.AverageCenter = TVec3<T>(0);
-			}
 		}
 
 		NumProcessedThisSlice = Particles.Num();	//todo: give chance to time slice out of next phase
@@ -1657,10 +1664,8 @@ private:
 
 	struct FSplitInfo
 	{
-		TAABB<T, 3> SplitBounds;	//Even split of parent bounds
 		TAABB<T, 3> RealBounds;	//Actual bounds as children are added
 		int32 WorkSnapshotIdx;	//Idx into work snapshot pool
-		T SplitBoundsSize2;
 	};
 
 	struct FWorkSnapshot
@@ -1688,40 +1693,28 @@ private:
 		FSplitInfo SplitInfos[2];
 	};
 
-	void FindBestBounds(const int32 StartElemIdx, const int32 LastElem, FWorkSnapshot& CurrentSnapshot)
+	void FindBestBounds(const int32 StartElemIdx, const int32 LastElem, FWorkSnapshot& CurrentSnapshot, int32 MaxAxis, const TVec3<T>& SplitCenter)
 	{
+		const T SplitVal = SplitCenter[MaxAxis];
+
 		// add all elements to one of the two split infos at this level - root level [ not taking into account the max number allowed or anything
 		for(int32 ElemIdx = StartElemIdx; ElemIdx < LastElem; ++ElemIdx)
 		{
 			const FElement& Elem = CurrentSnapshot.Elems[ElemIdx];
-			int32 MinBoxIdx = INDEX_NONE;
-			T MinDelta2 = TNumericLimits<T>::Max();
 			int32 BoxIdx = 0;
-			for (const FSplitInfo& SplitInfo : CurrentSnapshot.SplitInfos)
-			{
-				TAABB<T, 3> NewBox = SplitInfo.SplitBounds;
-				NewBox.GrowToInclude(Elem.Bounds);
-				const T Delta2 = NewBox.Extents().SizeSquared() - SplitInfo.SplitBoundsSize2;
-				if (Delta2 < MinDelta2)
-				{
-					MinDelta2 = Delta2;
-					MinBoxIdx = BoxIdx;
-				}
-				++BoxIdx;
-			}
+			const TVec3<T> ElemCenter = Elem.Bounds.Center();
+			const T CenterVal = ElemCenter[MaxAxis];
+			const int32 MinBoxIdx = CenterVal <= SplitVal ? 0 : 1;
+			
+			FSplitInfo& SplitInfo = CurrentSnapshot.SplitInfos[MinBoxIdx];
+			FWorkSnapshot& WorkSnapshot = WorkPool[SplitInfo.WorkSnapshotIdx];
+			T NumElems = (T)(WorkSnapshot.Elems.Add(Elem) + 1);
+			SplitInfo.RealBounds.GrowToInclude(Elem.Bounds);
 
-			if (CHAOS_ENSURE(MinBoxIdx != INDEX_NONE))
-			{
-				FSplitInfo& SplitInfo = CurrentSnapshot.SplitInfos[MinBoxIdx];
-				FWorkSnapshot& WorkSnapshot = WorkPool[SplitInfo.WorkSnapshotIdx];
-				FReal NumElems = (FReal)(WorkSnapshot.Elems.Add(Elem) + 1);
-				SplitInfo.RealBounds.GrowToInclude(Elem.Bounds);
-
-				// Include the current particle in the average and scaled variance of the particle centers using Welford's method.
-				FVec3 CenterDelta = Elem.Bounds.Center() - WorkSnapshot.AverageCenter;
-				WorkSnapshot.AverageCenter += CenterDelta / NumElems;
-				WorkSnapshot.ScaledCenterVariance += (Elem.Bounds.Center() - WorkSnapshot.AverageCenter) * CenterDelta;
-			}
+			// Include the current particle in the average and scaled variance of the particle centers using Welford's method.
+			TVec3<T> CenterDelta = ElemCenter - WorkSnapshot.AverageCenter;
+			WorkSnapshot.AverageCenter += CenterDelta / NumElems;
+			WorkSnapshot.ScaledCenterVariance += (ElemCenter - WorkSnapshot.AverageCenter) * CenterDelta;
 		}
 
 		NumProcessedThisSlice += LastElem - StartElemIdx;
@@ -1789,12 +1782,6 @@ private:
 
 			if (WorkPool[CurIdx].TimeslicePhase == eTimeSlicePhase::PreFindBestBounds)
 			{
-				// Determine the axis to split the AABB on based on the SplitOnVarianceAxis console variable. If it is not 1, simply use the largest axis
-				// of the work snapshot bounds; otherwise, select the axis with the greatest center variance. Note that the variance times the number of
-				// elements is actually used but since all that is needed is the axis with the greatest variance the scale factor is irrelevant.
-				const int32 MaxAxis = (FAABBTreeCVars::SplitOnVarianceAxis != 1) ? WorkPool[CurIdx].Bounds.LargestAxis() :
-					(WorkPool[CurIdx].ScaledCenterVariance[0] > WorkPool[CurIdx].ScaledCenterVariance[1] ? (WorkPool[CurIdx].ScaledCenterVariance[0] > WorkPool[CurIdx].ScaledCenterVariance[2] ? 0 : 2) : (WorkPool[CurIdx].ScaledCenterVariance[1] > WorkPool[CurIdx].ScaledCenterVariance[2] ? 1 : 2));
-
 				//Add two children, remember this invalidates any pointers to current snapshot
 				const int32 FirstChildIdx = GetNewWorkSnapshot();
 				const int32 SecondChildIdx = GetNewWorkSnapshot();
@@ -1803,32 +1790,9 @@ private:
 				WorkPool[CurIdx].SplitInfos[0].WorkSnapshotIdx = FirstChildIdx;
 				WorkPool[CurIdx].SplitInfos[1].WorkSnapshotIdx = SecondChildIdx;
 
-				//these are the hypothetical bounds for the perfect 50/50 split
-				WorkPool[CurIdx].SplitInfos[0].SplitBounds = TAABB<T, 3>(WorkPool[CurIdx].Bounds.Min(), WorkPool[CurIdx].Bounds.Min());
-				WorkPool[CurIdx].SplitInfos[1].SplitBounds = TAABB<T, 3>(WorkPool[CurIdx].Bounds.Max(), WorkPool[CurIdx].Bounds.Max());
-
-				// Find the point where the AABB will be split based on the SplitAtAverageCenter console variable. If it is not 1, just use the center
-				// of the AABB; otherwise, use the average of the element centers.
-				const TVec3<T> Center = (FAABBTreeCVars::SplitAtAverageCenter != 1) ? WorkPool[CurIdx].Bounds.Center() : WorkPool[CurIdx].AverageCenter;
-
 				for (FSplitInfo& SplitInfo : WorkPool[CurIdx].SplitInfos)
 				{
 					SplitInfo.RealBounds = TAABB<T, 3>::EmptyAABB();
-
-					for (int32 Axis = 0; Axis < 3; ++Axis)
-					{
-						TVec3<T> NewPt0 = Center;
-						TVec3<T> NewPt1 = Center;
-						if (Axis != MaxAxis)
-						{
-							NewPt0[Axis] = WorkPool[CurIdx].Bounds.Min()[Axis];
-							NewPt1[Axis] = WorkPool[CurIdx].Bounds.Max()[Axis];
-							SplitInfo.SplitBounds.GrowToInclude(NewPt0);
-							SplitInfo.SplitBounds.GrowToInclude(NewPt1);
-						}
-					}
-
-					SplitInfo.SplitBoundsSize2 = SplitInfo.SplitBounds.Extents().SizeSquared();
 				}
 
 				WorkPool[CurIdx].BestBoundsCurIdx = 0;
@@ -1850,7 +1814,20 @@ private:
 			{
 				const int32 NumWeCanProcess = MaxNumToProcess - NumProcessedThisSlice;
 				const int32 LastIdxToProcess = WeAreTimeslicing ? FMath::Min(WorkPool[CurIdx].BestBoundsCurIdx + NumWeCanProcess, WorkPool[CurIdx].Elems.Num()) : WorkPool[CurIdx].Elems.Num();
-				FindBestBounds(WorkPool[CurIdx].BestBoundsCurIdx, LastIdxToProcess, WorkPool[CurIdx]);
+
+				// Determine the axis to split the AABB on based on the SplitOnVarianceAxis console variable. If it is not 1, simply use the largest axis
+				// of the work snapshot bounds; otherwise, select the axis with the greatest center variance. Note that the variance times the number of
+				// elements is actually used but since all that is needed is the axis with the greatest variance the scale factor is irrelevant.
+				const int32 MaxAxis = (FAABBTreeCVars::SplitOnVarianceAxis != 1) ? WorkPool[CurIdx].Bounds.LargestAxis() :
+					(WorkPool[CurIdx].ScaledCenterVariance[0] > WorkPool[CurIdx].ScaledCenterVariance[1] ?
+						(WorkPool[CurIdx].ScaledCenterVariance[0] > WorkPool[CurIdx].ScaledCenterVariance[2] ? 0 : 2) :
+						(WorkPool[CurIdx].ScaledCenterVariance[1] > WorkPool[CurIdx].ScaledCenterVariance[2] ? 1 : 2));
+
+				// Find the point where the AABB will be split based on the SplitAtAverageCenter console variable. If it is not 1, just use the center
+				// of the AABB; otherwise, use the average of the element centers.
+				const TVec3<T>& Center = (FAABBTreeCVars::SplitAtAverageCenter != 1) ? WorkPool[CurIdx].Bounds.Center() : WorkPool[CurIdx].AverageCenter;
+
+				FindBestBounds(WorkPool[CurIdx].BestBoundsCurIdx, LastIdxToProcess, WorkPool[CurIdx], MaxAxis, Center);
 				WorkPool[CurIdx].BestBoundsCurIdx = LastIdxToProcess;
 
 				if (WeAreTimeslicing && (NumProcessedThisSlice >= MaxNumToProcess))
@@ -1883,9 +1860,6 @@ private:
 
 				WorkPool[FirstChildIdx].NewNodeIdx = Nodes[NewNodeIdx].ChildrenNodes[0];
 				WorkPool[SecondChildIdx].NewNodeIdx = Nodes[NewNodeIdx].ChildrenNodes[1];
-
-				WorkPool[FirstChildIdx].AverageCenter *= ((T)1 / (T)WorkPool[FirstChildIdx].Elems.Num());
-				WorkPool[SecondChildIdx].AverageCenter *= ((T)1 / (T)WorkPool[SecondChildIdx].Elems.Num());
 
 				//push these two new nodes onto the stack
 				WorkStack.Add(SecondChildIdx);

@@ -122,3 +122,11 @@ DECLARE_CYCLE_STAT_EXTERN(TEXT("[Field Update] AngularTorque"), STAT_ForceUpdate
 #define PHYSICS_CSV_SCOPED_EXPENSIVE(Category, Name) 
 #define PHYSICS_CSV_CUSTOM_EXPENSIVE(Category, Name, Value, Op) 
 #endif
+
+#if 0
+#define PHYSICS_CSV_SCOPED_VERY_EXPENSIVE(Category, Name) CSV_SCOPED_TIMING_STAT(Category, Name)
+#define PHYSICS_CSV_CUSTOM_VERY_EXPENSIVE(Category, Name, Value, Op) CSV_CUSTOM_STAT(Category, Name, Value, Op)
+#else
+#define PHYSICS_CSV_SCOPED_VERY_EXPENSIVE(Category, Name) 
+#define PHYSICS_CSV_CUSTOM_VERY_EXPENSIVE(Category, Name, Value, Op) 
+#endif
