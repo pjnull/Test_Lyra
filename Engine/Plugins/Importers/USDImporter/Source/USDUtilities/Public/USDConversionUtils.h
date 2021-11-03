@@ -13,6 +13,7 @@
 #if USE_USD_SDK
 #include "USDIncludesStart.h"
 	#include "pxr/pxr.h"
+	#include "pxr/usd/usdShade/tokens.h"
 #include "USDIncludesEnd.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -138,9 +139,10 @@ namespace UsdUtils
 	 * This overload will only return primvars with 'texcoord2f' role.	 *
 	 * @param UsdMesh - Mesh that contains primvars that can be used as texture coordinates.
 	 * @param MaterialToPrimvarsUVSetNames - Maps from a material prim path, to pairs indicating which primvar names are used as 'st' coordinates, and which UVIndex the imported material will sample from (e.g. ["st0", 0], ["myUvSet2", 2], etc). These are supposed to be the materials used by the mesh, and we do this because it helps identify which primvars are valid/used as texture coordinates, as the user may have these named as 'myUvSet2' and still expect it to work
+	 * @param RenderContext - Render context to use when traversing through material shaders looking for used primvars
 	 * @return Array where each index gives the primvar that should be used for that UV index
 	 */
-	USDUTILITIES_API TArray< TUsdStore< pxr::UsdGeomPrimvar > > GetUVSetPrimvars( const pxr::UsdGeomMesh& UsdMesh, const TMap< FString, TMap< FString, int32 > >& MaterialToPrimvarsUVSetNames );
+	USDUTILITIES_API TArray< TUsdStore< pxr::UsdGeomPrimvar > > GetUVSetPrimvars( const pxr::UsdGeomMesh& UsdMesh, const TMap< FString, TMap< FString, int32 > >& MaterialToPrimvarsUVSetNames, const pxr::TfToken& RenderContext = pxr::UsdShadeTokens->universalRenderContext );
 
 	USDUTILITIES_API bool IsAnimated( const pxr::UsdPrim& Prim );
 
