@@ -2752,7 +2752,7 @@ UObject::UObject(const FObjectInitializer& ObjectInitializer)
 
 
 static int32 GVerifyUObjectsAreNotFGCObjects = 1;
-static FAutoConsoleVariableRef CVerifyGCObjectNames(
+static FAutoConsoleVariableRef CVarVerifyUObjectsAreNotFGCObjects(
 	TEXT("gc.VerifyUObjectsAreNotFGCObjects"),
 	GVerifyUObjectsAreNotFGCObjects,
 	TEXT("If true, the engine will throw a warning when it detects a UObject-derived class which also derives from FGCObject or any of its members is derived from FGCObject"),
