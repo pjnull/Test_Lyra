@@ -106,7 +106,7 @@ class CHAOS_API FPBDIslandSolver : public FPBDIslandSolverData
 	* Members accessors
 	*/
 	FORCEINLINE bool IsSleeping() const {return bIsSleeping;}
-	FORCEINLINE void SetIsSleeping(const bool bIsSleepingIn ) { bIsSleeping = bIsSleepingIn; }
+	FORCEINLINE void SetIsSleeping(const bool bIsSleepingIn ) { bSleepingChanged = (bIsSleeping != bIsSleepingIn); bIsSleeping = bIsSleepingIn; }
 	FORCEINLINE bool IsPersistent() const { return bIsPersistent; }
 	FORCEINLINE void SetIsPersistent(const bool bIsPersistentIn) { bIsPersistent = bIsPersistentIn; }
 	FORCEINLINE bool NeedsResim() const { return bNeedsResim; }
@@ -114,7 +114,6 @@ class CHAOS_API FPBDIslandSolver : public FPBDIslandSolverData
 	FORCEINLINE int32 GetSleepCounter() const { return SleepCounter; }
 	FORCEINLINE void SetSleepCounter(const int32 SleepCounterIn) { SleepCounter = SleepCounterIn; }
 	FORCEINLINE bool SleepingChanged() const { return bSleepingChanged; }
-	FORCEINLINE void SetSleepingChanged(const bool bSleepingChanedIn) { bSleepingChanged = bSleepingChanedIn; }
 	
 	// template<typename ConstraintType>
 	// void GatherSolverInput(const FReal Dt, const int32 IslandIndex, const int32 ContainerId);

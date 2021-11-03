@@ -6,7 +6,7 @@
 #include "Chaos/Core.h"
 #include "Chaos/CollisionResolutionTypes.h"
 #include "Chaos/Collision/PBDCollisionConstraint.h"
-
+#include "Chaos/ParticleHandle.h"
 #include "ChaosStats.h"
 
 extern bool bChaos_Collision_EnableManifoldRestore;
@@ -34,8 +34,9 @@ namespace Chaos
 	private:
 		uint32 GenerateHash(const FGeometryParticleHandle* Particle0, const FGeometryParticleHandle* Particle1)
 		{
-			// @todo(chaos): Particle handles can be reused - this needs to use a global ID or something (not available in this stream)
-			return HashCombine(::GetTypeHash(Particle0), ::GetTypeHash(Particle1));
+			uint32 Hash0 = HashCombine(::GetTypeHash(Particle0->ParticleID().GlobalID), ::GetTypeHash(Particle0->ParticleID().LocalID));
+			uint32 Hash1 = HashCombine(::GetTypeHash(Particle1->ParticleID().GlobalID), ::GetTypeHash(Particle1->ParticleID().LocalID));
+			return HashCombine(Hash0, Hash1);
 		}
 
 		uint32 Key;
@@ -279,6 +280,9 @@ namespace Chaos
 		*/
 		void BeginDetectCollisions()
 		{
+			check(!bInCollisionDetectionPhase);
+			bInCollisionDetectionPhase = true;
+
 			// Clear the collision list for this tick - we are about to rebuild it
 			Constraints.Reset();
 
@@ -291,9 +295,8 @@ namespace Chaos
 			++Epoch;
 
 			// Note: we do not reset the shape-pair or particle-pair maps. They may be used to reinstate or reuse
-			// contacts. If they do not (because the pair is no longer overlapping) they will be pruned at the end of the tick.
-
-			bInCollisionDetectionPhase = true;
+			// constraints. Any constraints that are not reactivated (because the pair is no longer overlapping) 
+			// will be pruned at the end of the tick.
 		}
 
 		/**
@@ -302,6 +305,7 @@ namespace Chaos
 		*/
 		void EndDetectCollisions()
 		{
+			check(bInCollisionDetectionPhase);
 			bInCollisionDetectionPhase = false;
 
 			ProcessNewConstraints();
@@ -313,6 +317,7 @@ namespace Chaos
 
 		/**
 		 * @brief If we add new constraints after collision detection, do what needs to be done to add them to the system
+		 * @note this may destroy the constraints if beyond the cull distance.
 		*/
 		void ProcessInjectedConstraints()
 		{
@@ -437,12 +442,12 @@ namespace Chaos
 		 * when an island wakes up but could also be used to inject custom or user-created contacts
 		 * with a bit of extra work (see comments in the code).
 		 */
-		void AddConstraint(FPBDCollisionConstraint* CollisionConstraint)
+		void AddConstraint(FPBDCollisionConstraint* Constraint)
 		{
 			// This is only intended to be called outside the collision detection phase
 			check(!bInCollisionDetectionPhase);
 
-			AddConstraintImp(CollisionConstraint);
+			AddConstraintImp(Constraint);
 		}
 		
 		/**
@@ -497,6 +502,7 @@ namespace Chaos
 		void DestroyConstraintImp(FPBDCollisionConstraint* Constraint)
 		{
 			const FPBDCollisionConstraintContainerCookie& Cookie = Constraint->GetContainerCookie();
+			check(!Cookie.bIsSleeping);
 
 			FParticlePairCollisionConstraints** ParticlePairConstraintsPtr = ParticlePairConstraintMap.Find(FParticlePairCollisionsKey(Constraint->Particle[0], Constraint->Particle[1]).GetKey());
 			if (ParticlePairConstraintsPtr != nullptr)
@@ -567,6 +573,21 @@ namespace Chaos
 			{
 				while (FPBDCollisionConstraint* NewConstraint = DequeueNewConstraint())
 				{
+					// Destroy any contacts beyond the cull distance
+					// @todo(chaos): this should not be necessary - we should not create/restore them in the first place
+					if (NewConstraint->GetPhi() > NewConstraint->GetCullDistance())
+					{
+						// NOTE: We cannot remove constraints that are part of a sleeping island - they get restored later.
+						// In principle we should never see sleeping constraints in the active list, but it can happen
+						// if a dynamic particle gets flipped to a kinematic.
+						if (!NewConstraint->IsSleeping())
+						{
+							DestroyConstraint(NewConstraint);
+						}
+						continue;
+					}
+
+					// Add the constraint to the maps and active list (if not already present)
 					AddConstraintImp(NewConstraint);
 				}
 				SortConstraintsHandles();
@@ -576,14 +597,6 @@ namespace Chaos
 		void AddConstraintImp(FPBDCollisionConstraint* CollisionConstraint)
 		{
 			FPBDCollisionConstraintContainerCookie& Cookie = CollisionConstraint->GetContainerCookie();
-
-			// Destroy any contacts beyond the cull distance
-			// @todo(chaos): this should not be necessary - we should not create them in the first place
-			if (CollisionConstraint->GetPhi() > CollisionConstraint->GetCullDistance())
-			{
-				DestroyConstraint(CollisionConstraint);
-				return;
-			}
 
 			// Add the constraint to the active list and update its epoch
 			// but only if it has not already been added since we reset the constraints array.
@@ -687,10 +700,7 @@ namespace Chaos
 		{
 			for (FPBDCollisionConstraint* Constraint : InConstraints)
 			{
-				if (Constraint != nullptr)
-				{
-					NewConstraints.Push(Constraint);
-				}
+				EnqueueNewConstraint(Constraint);
 			}
 		}
 

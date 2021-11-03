@@ -9,6 +9,7 @@
 #include "Chaos/Collision/PBDCollisionConstraintHandle.h"
 #include "Chaos/GJK.h"
 #include "Chaos/ParticleHandleFwd.h"
+#include "Chaos/ParticleHandle.h"
 #include "Chaos/Vector.h"
 #include "Chaos/BVHParticles.h"
 
@@ -39,8 +40,9 @@ namespace Chaos
 		}
 
 		FRigidBodyContactKey(const FGeometryParticleHandle* Particle0, const FImplicitObject* Implicit0, const FBVHParticles* Simplicial0, const FGeometryParticleHandle* Particle1, const FImplicitObject* Implicit1, const FBVHParticles* Simplicial1)
-			: Key(GenerateHash(Particle0, Implicit0, Simplicial0, Particle1, Implicit1, Simplicial1))
+			: Key(0)
 		{
+			GenerateHash(Particle0, Implicit0, Simplicial0, Particle1, Implicit1, Simplicial1);
 		}
 
 		uint32 GetKey() const
@@ -64,14 +66,16 @@ namespace Chaos
 		}
 
 	private:
-		uint32 GenerateHash(const FGeometryParticleHandle* Particle0, const FImplicitObject* Implicit0, const FBVHParticles* Simplicial0, const FGeometryParticleHandle* Particle1, const FImplicitObject* Implicit1, const FBVHParticles* Simplicial1)
+		void GenerateHash(const FGeometryParticleHandle* Particle0, const FImplicitObject* Implicit0, const FBVHParticles* Simplicial0, const FGeometryParticleHandle* Particle1, const FImplicitObject* Implicit1, const FBVHParticles* Simplicial1)
 		{
-			// @todo(chaos): Particle handles can be reused - this needs to use a global ID or something (not available in this stream)
-			const uint32 ParticlesHash = HashCombine(::GetTypeHash(Particle0), ::GetTypeHash(Particle1));
+			// @todo(chaos): We should use ShapeIndex rather than Implicit/Simplicial pointers
+			const uint32 Particle0Hash = HashCombine(::GetTypeHash(Particle0->ParticleID().GlobalID), ::GetTypeHash(Particle0->ParticleID().LocalID));
+			const uint32 Particle1Hash = HashCombine(::GetTypeHash(Particle1->ParticleID().GlobalID), ::GetTypeHash(Particle1->ParticleID().LocalID));
+			const uint32 ParticlesHash = HashCombine(::GetTypeHash(Particle0Hash), ::GetTypeHash(Particle1Hash));
 			const uint32 ImplicitHash = HashCombine(::GetTypeHash(Implicit0), ::GetTypeHash(Implicit1));
 			const uint32 SimplicialHash = HashCombine(::GetTypeHash(Simplicial0), ::GetTypeHash(Simplicial1));
-			const uint32 ParticleImplicitHash = HashCombine(ParticlesHash, ImplicitHash);
-			return HashCombine(ParticleImplicitHash, SimplicialHash);
+			const uint32 ShapesHash = HashCombine(ImplicitHash, SimplicialHash);
+			Key = HashCombine(ParticlesHash, ShapesHash);
 		}
 
 		uint32 Key;

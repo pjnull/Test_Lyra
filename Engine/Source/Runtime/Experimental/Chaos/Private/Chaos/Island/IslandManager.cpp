@@ -495,7 +495,6 @@ void FPBDIslandManager::SyncIslands(FPBDRigidsSOAs& Particles)
 			IslandSolver = IslandSolvers[IslandIndex].Get();
 		
 			// We then transfer the persistent flag and the graph dense index to the solver island
-			IslandSolver->SetSleepingChanged( IslandSolver->IsSleeping() != IslandGraph->GraphIslands[IslandIndex].bIsSleeping);
 			IslandSolver->SetIsPersistent(IslandGraph->GraphIslands[IslandIndex].bIsPersistent);
 			IslandSolver->SetIsSleeping(IslandGraph->GraphIslands[IslandIndex].bIsSleeping);
 			IslandSolver->GetIslandIndex() = LocalIsland;

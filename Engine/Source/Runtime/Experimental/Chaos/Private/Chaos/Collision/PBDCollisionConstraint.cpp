@@ -224,8 +224,6 @@ namespace Chaos
 
 		bUseManifold = bInUseManifold && CanUseManifold(Particle[0], Particle[1]);
 		bUseIncrementalManifold = true;	// This will get changed later if we call AddOneShotManifoldContact
-
-		GetContainerCookie().SetIsSleeping(false);
 	}
 
 	void FPBDCollisionConstraint::SetIsSleeping(const bool bInIsSleeping)
