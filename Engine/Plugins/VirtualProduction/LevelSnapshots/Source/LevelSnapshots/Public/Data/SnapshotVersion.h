@@ -70,6 +70,12 @@ struct LEVELSNAPSHOTS_API FSnapshotCustomVersionInfo
 	/** Initialize this version info from the given version */
 	void Initialize(const FCustomVersion& InVersion);
 
+	friend FArchive& operator<<(FArchive& Archive, FSnapshotCustomVersionInfo& VersionInfo)
+	{
+		Archive << VersionInfo.FriendlyName;
+		return Archive;
+	}
+	
 	/** Friendly name of the version */
 	UPROPERTY()
 	FName FriendlyName;

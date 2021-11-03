@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Templates/Function.h"
+#include "UObject/ObjectMacros.h"
 
 class FProperty;
 struct FArchiveSerializedPropertyChain;
@@ -33,5 +34,8 @@ namespace SnapshotUtil
 		 * Runs a predicate function on the found value pointer until one returns true.
 		 */
 		bool FollowPropertyChainUntilPredicateIsTrue(void* ContainerPtr, const FArchiveSerializedPropertyChain* PropertyChain, const FProperty* LeafProperty, FValuePtrPredicate Callback);
+
+		/** Iterates all properties of Struct including properties contained struct sub-properties and collections of structs */
+		void ForEachProperty(UStruct* Struct, TUniqueFunction<void(FProperty*)> Callback, EPropertyFlags SkipFlags = CPF_Transient | CPF_Deprecated);
 	}
 }

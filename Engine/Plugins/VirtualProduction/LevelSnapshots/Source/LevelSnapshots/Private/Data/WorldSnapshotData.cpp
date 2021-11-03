@@ -18,6 +18,7 @@
 #include "Serialization/BufferArchive.h"
 #include "Stats/StatsMisc.h"
 #include "UObject/Package.h"
+#include "Util/PropertyIterator.h"
 #include "Util/SnapshotUtil.h"
 #if WITH_EDITOR
 #include "Editor.h"
@@ -278,6 +279,18 @@ const FSnapshotVersionInfo& FWorldSnapshotData::GetSnapshotVersionInfo() const
 	return SnapshotVersionInfo;
 }
 
+bool FWorldSnapshotData::Serialize(FArchive& Ar)
+{
+	// When this struct is saved, the save algorithm collects references. It's faster if we just give it the info directly.
+	if (Ar.IsObjectReferenceCollector())
+	{
+		CollectReferencesAndNames(Ar);
+		return true;
+	}
+	
+	return false;
+}
+
 void FWorldSnapshotData::PostSerialize(const FArchive& Ar)
 {
 	if (Ar.IsLoading() && !SnapshotVersionInfo.IsInitialized())
@@ -289,6 +302,48 @@ void FWorldSnapshotData::PostSerialize(const FArchive& Ar)
 	}
 }
 
+void FWorldSnapshotData::CollectReferencesAndNames(FArchive& Ar)
+{
+	// References
+	Ar << SerializedObjectReferences;
+	CollectActorReferences(Ar);
+	CollectClassDefaultReferences(Ar);
+
+	// Names
+	Ar << SerializedNames;
+	Ar << SnapshotVersionInfo.CustomVersions;
+	FPropertyIterator(StaticStruct(), [&Ar](const FProperty* Property)
+	    {
+    		FName PropertyName = Property->GetFName();
+    		Ar << PropertyName;
+	    },
+	    [&Ar](UStruct* Struct)
+	    {
+    		FName StructName = Struct->GetFName();
+			Ar << StructName;
+	    });
+}
+
+void FWorldSnapshotData::CollectActorReferences(FArchive& Ar)
+{
+	for (auto ActorIt = ActorData.CreateConstIterator(); ActorIt; ++ActorIt)
+	{
+		FSoftObjectPath SavedActorPath = ActorIt->Key; 
+		Ar << SavedActorPath;
+
+		FSoftClassPath ActorClass = ActorIt->Value.ActorClass;
+		Ar << ActorClass;
+	}
+}
+
+void FWorldSnapshotData::CollectClassDefaultReferences(FArchive& Ar)
+{
+	for (auto ClassDefaultIt = ClassDefaults.CreateConstIterator(); ClassDefaultIt; ++ClassDefaultIt)
+	{
+		FSoftClassPath Class = ClassDefaultIt->Key;
+		Ar << Class;
+	}
+}
 
 void FWorldSnapshotData::ApplyToWorld_HandleRemovingActors(UWorld* WorldToApplyTo, const FPropertySelectionMap& PropertiesToSerialize)
 {

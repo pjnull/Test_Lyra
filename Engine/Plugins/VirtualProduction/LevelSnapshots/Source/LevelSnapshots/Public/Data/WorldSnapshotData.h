@@ -56,8 +56,13 @@ public: /* Serialisation functions */
 	const FSnapshotVersionInfo& GetSnapshotVersionInfo() const;
 	
 	//~ Begin TStructOpsTypeTraits Interface
+	bool Serialize(FArchive& Ar);
 	void PostSerialize(const FArchive& Ar);
 	//~ End TStructOpsTypeTraits Interface
+
+	void CollectReferencesAndNames(FArchive& Ar);
+	void CollectActorReferences(FArchive& Ar);
+	void CollectClassDefaultReferences(FArchive& Ar);
 	
 public:
 	
@@ -144,7 +149,8 @@ template<>
 struct TStructOpsTypeTraits<FWorldSnapshotData> : public TStructOpsTypeTraitsBase2<FWorldSnapshotData>
 {
 	enum 
-	{ 
+	{
+		WithSerializer = true,
 		WithPostSerialize = true
 	};
 };
