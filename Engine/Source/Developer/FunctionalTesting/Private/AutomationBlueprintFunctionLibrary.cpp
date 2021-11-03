@@ -1219,6 +1219,7 @@ UAutomationEditorTask* UAutomationBlueprintFunctionLibrary::TakeHighResScreensho
 
 bool UAutomationBlueprintFunctionLibrary::CompareImageAgainstReference(FString InImagePath, FString ComparisonName, EComparisonTolerance InTolerance, FString InNotes, UObject* WorldContextObject)
 {
+#if WITH_AUTOMATION_TESTS
 	if (GIsAutomationTesting)
 	{
 		const FString ImageExtension = FPaths::GetExtension(InImagePath);
@@ -1283,7 +1284,7 @@ bool UAutomationBlueprintFunctionLibrary::CompareImageAgainstReference(FString I
 
 		return true;
 	}
-
+#endif
 	UE_LOG(AutomationFunctionLibrary, Warning, TEXT("Can compare image only during test automation."));
 	return false;
 }
