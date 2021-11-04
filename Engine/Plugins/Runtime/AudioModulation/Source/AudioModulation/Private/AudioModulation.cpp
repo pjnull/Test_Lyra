@@ -7,6 +7,7 @@
 #include "Features/IModularFeatures.h"
 #include "IAudioModulation.h"
 #include "MetasoundDataTypeRegistrationMacro.h"
+#include "MetasoundFrontendRegistries.h"
 #include "Modules/ModuleManager.h"
 #include "SoundControlBusMix.h"
 #include "SoundModulationParameter.h"
@@ -217,16 +218,18 @@ TAudioModulationPtr FAudioModulationPluginFactory::CreateNewModulationPlugin(FAu
 
 void FAudioModulationModule::StartupModule()
 {
-	UE_LOG(LogAudioModulation, Log, TEXT("Starting Audio Modulation Module"));
-
 	IModularFeatures::Get().RegisterModularFeature(FAudioModulationPluginFactory::GetModularFeatureName(), &ModulationPluginFactory);
+
+	// flush node registration queue to guarantee AudioModulation DataTypes/Nodes are ready prior to assets loading
+	FMetasoundFrontendRegistryContainer::Get()->RegisterPendingNodes();
+
+	UE_LOG(LogAudioModulation, Log, TEXT("Audio Modulation Initialized"));
 }
 
 void FAudioModulationModule::ShutdownModule()
 {
-	UE_LOG(LogAudioModulation, Log, TEXT("Shutting Down Audio Modulation Module"));
-
 	IModularFeatures::Get().UnregisterModularFeature(FAudioModulationPluginFactory::GetModularFeatureName(), &ModulationPluginFactory);
+	UE_LOG(LogAudioModulation, Log, TEXT("Audio Modulation Shutdown"));
 }
 
 IMPLEMENT_MODULE(FAudioModulationModule, AudioModulation);

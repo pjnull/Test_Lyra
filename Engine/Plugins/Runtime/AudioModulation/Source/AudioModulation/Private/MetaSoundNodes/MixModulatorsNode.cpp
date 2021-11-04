@@ -67,7 +67,7 @@ namespace AudioModulation
 			FSoundModulatorAssetReadRef Modulator1ReadRef = InputCollection.GetDataReadReferenceOrConstruct<FSoundModulatorAsset>("In1");
 			FSoundModulatorAssetReadRef Modulator2ReadRef = InputCollection.GetDataReadReferenceOrConstruct<FSoundModulatorAsset>("In2");
 			FSoundModulationParameterAssetReadRef ParameterReadRef = InputCollection.GetDataReadReferenceOrConstruct<FSoundModulationParameterAsset>("MixParameter");
-			FBoolReadRef NormalizedReadRef = InputCollection.GetDataReadReferenceOrConstruct<bool>("Normalized");
+			FBoolReadRef NormalizedReadRef = InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<bool>(InputInterface, "Normalized", InParams.OperatorSettings);
 
 			return MakeUnique<FMixModulatorsNodeOperator>(InParams.OperatorSettings, Modulator1ReadRef, Modulator2ReadRef, ParameterReadRef, NormalizedReadRef);
 		}

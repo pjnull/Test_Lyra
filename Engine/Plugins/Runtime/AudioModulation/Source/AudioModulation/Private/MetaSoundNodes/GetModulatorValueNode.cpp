@@ -62,7 +62,7 @@ namespace AudioModulation
 			const FDataReferenceCollection& InputCollection = InParams.InputDataReferences;
 
 			FSoundModulatorAssetReadRef ModulatorReadRef = InputCollection.GetDataReadReferenceOrConstruct<FSoundModulatorAsset>("Modulator");
-			FBoolReadRef NormalizedReadRef = InputCollection.GetDataReadReferenceOrConstruct<bool>("Normalized");
+			FBoolReadRef NormalizedReadRef = InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<bool>(InputInterface, "Normalized", InParams.OperatorSettings);
 
 			return MakeUnique<FGetModulatorValueNodeOperator>(InParams.OperatorSettings, ModulatorReadRef, NormalizedReadRef);
 		}
