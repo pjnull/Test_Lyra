@@ -27,6 +27,7 @@
 
 // UnrealEd includes
 #include "ScopedTransaction.h"
+#include "Editor.h"
 #include "EditorStyleSet.h"
 #include "EditorFontGlyphs.h"
 #include "MovieRenderPipelineStyle.h"
