@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Common.ush"
+#include "BRDF.ush"
 #include "/Engine/Shared/PathTracingDefinitions.h"
 
 // Move these utility functions into a common/non-path-tracer specific place
@@ -13,9 +14,11 @@
 // "Energy" here refers to the directional albedo. Energy loss is simply 1-Energy since we assume the raw BxDF should reflect all
 // incoming light.
 
+// x: directional albedo for rough diffuse
+RWTexture2D<float>  Output1Texture2D;
 // x: directional albedo of pure GGX lobe
 // y: directional albedo of GGX+Schlick fresnel term
-RWTexture2D<float2> OutputTexture2D;
+RWTexture2D<float2> Output2Texture2D;
 // x: directional albedo from outside->in, y: directional albedo from inside->out
 RWTexture3D<float2> OutputTexture3D;
 
@@ -92,6 +95,16 @@ void BuildEnergyTableCS(uint3 DispatchThreadId : SV_DispatchThreadID)
 		const float ClothWeight = NoL > 0 && NoV > 0 ? (PI * DCloth * Vis_Cloth(NoV, NoL)) : 0.0;
 
 		Weight = float2(ClothWeight, ClothWeight * Pow5(1 - dot(V, H)));
+#elif BUILD_ENERGY_TABLE == 3
+		const float3 L = CosineSampleHemisphere(RandSample.xy).xyz;
+		const float NoV = V.z;
+		const float NoL = L.z;
+		const float3 H = normalize(V + L);
+		const float VoH = dot(V, H);
+		const float NoH = H.z;
+		const float DiffuseWeight = NoL > 0 && NoV > 0 ? Diffuse_Chan(float3(1, 1, 1), Alpha.x, NoV, NoL, VoH, NoH, 1.0f) : 0.0f;
+
+		Weight = float2(DiffuseWeight, 1.f);
 #endif
 
 		// average in
@@ -99,10 +112,14 @@ void BuildEnergyTableCS(uint3 DispatchThreadId : SV_DispatchThreadID)
 	}
 
 #if BUILD_ENERGY_TABLE == 0 || BUILD_ENERGY_TABLE == 2
-	OutputTexture2D[DispatchThreadId.xy] = Result;
+	Output2Texture2D[DispatchThreadId.xy] = Result;
 #endif
 
 #if BUILD_ENERGY_TABLE == 1
 	OutputTexture3D[DispatchThreadId] = Result;
 #endif
+
+#if BUILD_ENERGY_TABLE == 3
+	Output1Texture2D[DispatchThreadId.xy] = Result.x;
+#endif	
 }

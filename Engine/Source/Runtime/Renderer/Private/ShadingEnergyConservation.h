@@ -19,6 +19,7 @@ struct FShadingEnergyConservationStateData
 	TRefCountPtr<IPooledRenderTarget> GGXSpecEnergyTexture = nullptr;
 	TRefCountPtr<IPooledRenderTarget> GGXGlassEnergyTexture = nullptr;
 	TRefCountPtr<IPooledRenderTarget> ClothEnergyTexture = nullptr;
+	TRefCountPtr<IPooledRenderTarget> DiffuseEnergyTexture = nullptr;
 };
 
 namespace ShadingEnergyConservation

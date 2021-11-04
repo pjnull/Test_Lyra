@@ -796,6 +796,7 @@ FViewUniformShaderParameters::FViewUniformShaderParameters()
 	ShadingEnergyGGXSpecTexture = GBlackTextureWithSRV->TextureRHI;
 	ShadingEnergyGGXGlassTexture = BlackVolume;
 	ShadingEnergyClothSpecTexture = GBlackTextureWithSRV->TextureRHI;
+	ShadingEnergyDiffuseTexture = GBlackTextureWithSRV->TextureRHI;
 
 	//this can be deleted once sm4 support is removed.
 	if (!PrimitiveSceneData)

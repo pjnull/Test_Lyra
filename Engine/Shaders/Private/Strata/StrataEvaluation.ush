@@ -12,8 +12,6 @@
 #include "../ThinFilmBSDF.ush"
 #include "../AreaLightCommon.ush"
 
-
-
 #ifndef STRATA_FASTPATH 
 #define STRATA_FASTPATH 0
 #endif
@@ -24,14 +22,6 @@
 
 #ifndef STRATA_TRANSLUCENT_ENABLED
 #define STRATA_TRANSLUCENT_ENABLED 0
-#endif
-
-#ifndef STRATA_MICROFACET_MULTIPLESCATTERING
-	#if PROJECT_STRATA_BACKCOMPATIBILITY > 0
-		#define STRATA_MICROFACET_MULTIPLESCATTERING 0
-	#else
-		#define STRATA_MICROFACET_MULTIPLESCATTERING 1
-	#endif
 #endif
 
 #ifndef STRATA_DIFFUSE_CHAN
@@ -55,51 +45,6 @@ float3 StrataEnvBRDF(float3 F0, float3 F90, float SafeRoughnessX, float SatNoV)
 	return EnvBRDF(F0, F90, SafeRoughnessX, SatNoV);
 #endif
 }
-
-
-#if STRATA_MICROFACET_MULTIPLESCATTERING
-
-FStrataGGXLUTResult StrataEvaluateGGXLUT(float3 DiffuseAlbedo, float3 F0, float3 F90, float NoV, float Metallic, float SafeRoughnessX, float SafeRoughnessY)
-{
-#if STRATA_TRANSLUCENT_ENABLED
-	return StrataSampleGGXLUT(
-		TranslucentBasePass.Strata.GGXEnergyLUT2DTexture, TranslucentBasePass.Strata.GGXEnergyLUT3DTexture, TranslucentBasePass.Strata.GGXEnergyLUTSampler,
-		TranslucentBasePass.Strata.GGXEnergyLUTScaleBias, NoV, SafeRoughnessX, SafeRoughnessY, F0, F90, Metallic, DiffuseAlbedo);
-#else
-	return StrataSampleGGXLUT(
-		Strata.GGXEnergyLUT2DTexture, Strata.GGXEnergyLUT3DTexture, Strata.GGXEnergyLUTSampler,
-		Strata.GGXEnergyLUTScaleBias, NoV, SafeRoughnessX, SafeRoughnessY, F0, F90, Metallic, DiffuseAlbedo);
-#endif
-}
-
-#else // STRATA_MICROFACET_MULTIPLESCATTERING
-
-FStrataGGXLUTResult StrataEvaluateGGXLUT(float3 DiffuseAlbedo, float3 F0, float3 F90, float NoV, float Metallic, float SafeRoughnessX, float SafeRoughnessY)
-{
-	const float SatNoV = saturate(NoV);
-
-	FStrataGGXLUTResult Out;
-	Out.A_R = 0.0f;
-	Out.B_R = 0.0f;
-	Out.E_R = 0.0f;
-	Out.E_T = 0.0f;
-	Out.E_TChan = 0.0f;
-	Out.E_D = 0.0f;
-
-	Out.SpecularMultipleScatteringScale = 1.0f;
-
-	const float3 ApproxFresnelForSpecularTransmittance = F_Schlick(F0, F90, SatNoV);
-	float3 AppoxDirectionalAlbedo_SpecularTransmission = 1.0f - ApproxFresnelForSpecularTransmittance;
-
-	Out.DirectionalAlbedo.SpecularR = StrataEnvBRDF(F0, F90, SafeRoughnessX, SatNoV);
-	Out.DirectionalAlbedo.SpecularT = AppoxDirectionalAlbedo_SpecularTransmission;
-	Out.DirectionalAlbedo.SpecularTChan = 1.0f;
-	Out.DirectionalAlbedo.Diffuse = DiffuseAlbedo;
-
-	return Out;
-}
-
-#endif // STRATA_MICROFACET_MULTIPLESCATTERING
 
 // STRATA_TODO put in a common file
 // Point lobe in off-specular peak direction
@@ -333,33 +278,41 @@ FStrataEvaluateResult StrataEvaluateBSDFCommon(FStrataBSDFContext BSDFContext, F
 			float3 HazeMSScale = 1;
 			float3 DirectionalAlbedo_SpecularTransmission = 1.0f;
 			{
-				FStrataGGXLUTResult StrataGGXLUTResult = StrataEvaluateGGXLUT(DiffuseColor, F0, F90, BSDFContext.Context.NoV, Metallic, SafeRoughnessX, SafeRoughnessY);
-				MSScale = StrataGGXLUTResult.SpecularMultipleScatteringScale;
+				{
+					FBxDFEnergyTerms EnergyTerms = ComputeGGXSpecEnergyTerms(SafeRoughnessX, BSDFContext.Context.NoV, F0, F90);
+					DirectionalAlbedo_SpecularTransmission = ComputeEnergyPreservation(EnergyTerms);
+					MSScale = ComputeEnergyConservation(EnergyTerms);
+				}
+
 #if STRATA_FASTPATH==0
 				if (bHaziness)
 				{
 					HazeSafeRoughnessX = ComputeHazyLobeRoughness(SafeRoughnessX, SLAB_HAZINESS(BSDFContext.BSDF));
 					HazeSafeRoughnessY = ComputeHazyLobeRoughness(SafeRoughnessY, SLAB_HAZINESS(BSDFContext.BSDF));
-					HazeMSScale = StrataEvaluateGGXLUT(DiffuseColor, F0, F90, BSDFContext.Context.NoV, Metallic, HazeSafeRoughnessX, HazeSafeRoughnessY).SpecularMultipleScatteringScale;
+
+					FBxDFEnergyTerms EnergyTerms = ComputeGGXSpecEnergyTerms(HazeSafeRoughnessX, BSDFContext.Context.NoV, F0, F90);
+					HazeMSScale = ComputeEnergyConservation(EnergyTerms);
 				}
 #endif
 
-				// We ignore Haziness influence on the specular transmission.
-				DirectionalAlbedo_SpecularTransmission = StrataGGXLUTResult.DirectionalAlbedo.SpecularT;
-
-#if STRATA_MICROFACET_MULTIPLESCATTERING > 0 && STRATA_DIFFUSE_CHAN > 0
 				// We remove the Chan model baked transmittance specular directional albedo assuming F=0.04.
 				// Then we apply the transmittance according to the current surface setup.
 				// To make this a safe operation:
 				//	- We clamp SpecularTChan to a threshold to avoid div by 0 when the material is a metal. 
 				//	- When the material tends to be metal, DirectionalAlbedo_SpecularTransmission will naturally tend to be 0
-				if (Strata.bRoughDiffuse)
+				if (STRATA_DIFFUSE_CHAN > 0 && Strata.bRoughDiffuse)
 				{
-					const float3 SpecularTransmitionChanF0ToMaterialF0 = DirectionalAlbedo_SpecularTransmission / max(1e-8f, StrataGGXLUTResult.DirectionalAlbedo.SpecularTChan);
+					const float ChanF0 = 0.04;
+					FBxDFEnergyTerms EnergyTerms = ComputeGGXSpecEnergyTerms(SafeRoughnessX, BSDFContext.Context.NoV, ChanF0, 1.0f);
+					const float3 SpecularTransmitionChanF0ToMaterialF0 = DirectionalAlbedo_SpecularTransmission / max(1e-8f, ComputeEnergyPreservation(EnergyTerms));
 					Sample.DiffusePathValue *= SpecularTransmitionChanF0ToMaterialF0;
 					Sample.IntegratedDiffuseValue *= SpecularTransmitionChanF0ToMaterialF0;
 				}
-#endif
+				else
+				{
+					Sample.DiffusePathValue *= DirectionalAlbedo_SpecularTransmission;
+					Sample.IntegratedDiffuseValue *= DirectionalAlbedo_SpecularTransmission;
+				}
 			}
 
 
@@ -534,11 +487,13 @@ FStrataEvaluateResult StrataEvaluateBSDFCommon(FStrataBSDFContext BSDFContext, F
 				const float Fuzz = SLAB_FUZZ_AMOUNT(BSDFContext.BSDF);
 				const float3 FuzzF0  = SLAB_FUZZ_COLOR(BSDFContext.BSDF);
 				
+				FBxDFEnergyTerms EnergyTerms = ComputeClothEnergyTerms(SafeRoughnessX, BSDFContext.Context.NoV, F0, F90);
+
 				// Generalized inverse microfacet specular
 				float ClothD   = D_InvGGX(a2, BSDFContext.Context.NoH);
 				float ClothVis = Vis_Cloth(BSDFContext.Context.NoV, AreaLightContext.NoL);
 				float3 ClothF  = F_Schlick(FuzzF0, BSDFContext.Context.VoH);
-				float3 ClothSpecularPathValue = ClothD * ClothVis * ClothF;
+				float3 ClothSpecularPathValue = ClothD * ClothVis * ClothF * ComputeEnergyConservation(EnergyTerms);
 
 				// Area light are not supported by the cloth BRDF
 				float3 ClothIntegratedSpecularValue = ShadowTerms.SurfaceShadow * AreaLightContext.NoL * AreaLightContext.AreaLight.FalloffColor * AreaLightContext.Falloff * ClothSpecularPathValue;
@@ -865,10 +820,15 @@ FStrataEnvLightResult StrataEvaluateForEnvLight(FStrataBSDFContext BSDFContext, 
 			float SafeRoughnessX = MakeRoughnessSafe(SLAB_ROUGHNESSX(BSDFContext.BSDF));
 			float3 ThinFilmFresnelWeight = 1;
 
-			FStrataGGXLUTResult GGXLUT							= StrataEvaluateGGXLUT(DiffuseColor, F0, F90, BSDFContext.Context.NoV, Metallic, SafeRoughnessX, SafeRoughnessX);
-			StrataEnvLightResult.DiffuseWeight					= GGXLUT.DirectionalAlbedo.Diffuse;		// This already accounts for specular transmittance
-			float3 EvalEnvBRDF									= GGXLUT.DirectionalAlbedo.SpecularR;
-			const float3 DirectionalAlbedo_SpecularTransmission	= GGXLUT.DirectionalAlbedo.SpecularT;	// We ignore Haziness influence
+			float3 EvalEnvBRDF = 0;
+			float3 DirectionalAlbedo_SpecularTransmission = 0;
+			{
+				FBxDFEnergyTerms SpecularEnergyTerms = ComputeGGXSpecEnergyTerms(SafeRoughnessX, BSDFContext.Context.NoV, F0, F90);
+				FBxDFEnergyTerms DiffuseEnergyTerms  = ComputeDiffuseEnergyTerms(SafeRoughnessX, BSDFContext.Context.NoV);
+				EvalEnvBRDF									= SpecularEnergyTerms.E;
+				DirectionalAlbedo_SpecularTransmission		= ComputeEnergyPreservation(SpecularEnergyTerms);
+				StrataEnvLightResult.DiffuseWeight			= DiffuseEnergyTerms.E * DirectionalAlbedo_SpecularTransmission;
+			}
 
 			BRANCH
 			if (bEnableSpecular)
@@ -926,13 +886,8 @@ FStrataEnvLightResult StrataEvaluateForEnvLight(FStrataBSDFContext BSDFContext, 
 					float SafeRoughnessHaze = ComputeHazyLobeRoughness(SafeRoughnessX, Haziness);
 
 					// Compute the directional albedo for hazy specular
-				#if STRATA_MICROFACET_MULTIPLESCATTERING
-					FStrataGGXLUTResult GGXLUTHaze = StrataEvaluateGGXLUT(DiffuseColor, F0, F90, BSDFContext.Context.NoV, Metallic, SafeRoughnessHaze, SafeRoughnessHaze);
-					const float3 EvalEnvBRDFHaze = ThinFilmFresnelWeight * GGXLUTHaze.DirectionalAlbedo.SpecularR;
-				#else
-					const float3 EvalEnvBRDFHaze = ThinFilmFresnelWeight * StrataEnvBRDF(F0, F90, SafeRoughnessX, BSDFContext.SatNoV);
-				#endif
-
+					FBxDFEnergyTerms EnergyTerms = ComputeGGXSpecEnergyTerms(SafeRoughnessHaze, BSDFContext.Context.NoV, F0, F90);
+					const float3 EvalEnvBRDFHaze = ThinFilmFresnelWeight * EnergyTerms.E;
 					StrataEnvLightResult.SpecularHazeWeight = lerp(0.0f, SPECULAR_HAZINESS_WEIGHT, HazinessFadeIn) * EvalEnvBRDFHaze * SpecularMicroOcclusion;
 					StrataEnvLightResult.SpecularHazeSafeRoughness = SafeRoughnessHaze;
 				}

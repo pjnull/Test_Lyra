@@ -9,6 +9,7 @@
 #include "SceneRendering.h"
 #include "ScenePrivate.h"
 #include "PixelShaderUtils.h"
+#include "Strata/Strata.h"
 
 static TAutoConsoleVariable<int32> CVarShadingEnergyConservation(
 	TEXT("r.Shading.EnergyConservation"),
@@ -57,6 +58,7 @@ class FShadingFurnaceTestPassPS : public FGlobalShader
 
 	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
 		SHADER_PARAMETER_STRUCT_REF(FViewUniformShaderParameters, ViewUniformBuffer)
+		SHADER_PARAMETER_RDG_UNIFORM_BUFFER(FStrataGlobalUniformParameters, Strata)
 		SHADER_PARAMETER_RDG_UNIFORM_BUFFER(FSceneTextureUniformParameters, SceneTexturesStruct)
 		SHADER_PARAMETER_TEXTURE(Texture2D, SSProfilesTexture)
 		SHADER_PARAMETER_SAMPLER(SamplerState, TransmissionProfilesLinearSampler)
@@ -80,6 +82,7 @@ class FShadingFurnaceTestPassPS : public FGlobalShader
 	{
 		FGlobalShader::ModifyCompilationEnvironment(Parameters, OutEnvironment);
 		OutEnvironment.SetDefine(TEXT("SHADER_FURNACE_ANALYTIC"), 1);
+		OutEnvironment.SetDefine(TEXT("STRATA_ENABLED"), Strata::IsStrataEnabled()); 
 	}
 };
 
@@ -99,6 +102,10 @@ static void AddShadingFurnacePass(
 	Parameters->RenderTargets[0]				= FRenderTargetBinding(OutTexture, ERenderTargetLoadAction::ELoad);
 	Parameters->SSProfilesTexture				= GetSubsurfaceProfileTextureWithFallback();
 	Parameters->TransmissionProfilesLinearSampler = TStaticSamplerState<SF_Bilinear, AM_Clamp, AM_Clamp, AM_Clamp>::GetRHI();
+	if (Strata::IsStrataEnabled())
+	{
+		Parameters->Strata = Strata::BindStrataGlobalUniformParameters(View.StrataSceneData);
+	}
 
 	ShaderPrint::SetParameters(GraphBuilder, View, Parameters->ShaderPrintUniformBuffer);
 	ShaderDrawDebug::SetParameters(GraphBuilder, View.ShaderDrawData, Parameters->ShaderDrawUniformBuffer);
@@ -124,6 +131,7 @@ class FBuildShadingEnergyConservationTableCS : public FGlobalShader
 		GGXSpecular = 0,
 		GGXGlass = 1,
 		Cloth = 2,
+		Diffuse = 3,
 		MAX
 	};
 
@@ -144,7 +152,8 @@ class FBuildShadingEnergyConservationTableCS : public FGlobalShader
 	}
 
 	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
-		SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D, OutputTexture2D)
+		SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D, Output1Texture2D)
+		SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D, Output2Texture2D)
 		SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture3D, OutputTexture3D)
 	END_SHADER_PARAMETER_STRUCT()
 };
@@ -166,6 +175,7 @@ void Init(FRDGBuilder& GraphBuilder, FViewInfo& View)
 	FRDGTextureRef GGXSpecEnergyTexture = nullptr;
 	FRDGTextureRef GGXGlassEnergyTexture = nullptr;
 	FRDGTextureRef ClothEnergyTexture = nullptr;
+	FRDGTextureRef DiffuseEnergyTexture = nullptr;
 
 	// Enabled based on settings, or forced if the view is using path-tracing
 	const bool bIsEnergyConservationEnabled = (CVarShadingEnergyConservation.GetValueOnRenderThread() || View.Family->EngineShowFlags.PathTracing) && View.ViewState != nullptr;
@@ -177,7 +187,8 @@ void Init(FRDGBuilder& GraphBuilder, FViewInfo& View)
 			View.ViewState->ShadingEnergyConservationData.Format != Format ||
 			View.ViewState->ShadingEnergyConservationData.GGXSpecEnergyTexture == nullptr ||
 			View.ViewState->ShadingEnergyConservationData.GGXGlassEnergyTexture == nullptr ||
-			View.ViewState->ShadingEnergyConservationData.ClothEnergyTexture ==  nullptr;
+			View.ViewState->ShadingEnergyConservationData.ClothEnergyTexture ==  nullptr ||
+			View.ViewState->ShadingEnergyConservationData.DiffuseEnergyTexture == nullptr;
 
 		if (bBuildTable)
 		{
@@ -197,16 +208,21 @@ void Init(FRDGBuilder& GraphBuilder, FViewInfo& View)
 				Format,
 				FClearValueBinding::None,
 				TexCreate_ShaderResource | TexCreate_UAV), TEXT("Shading.ClothSpecEnergy"), ERDGTextureFlags::MultiFrame);
-
+			DiffuseEnergyTexture = GraphBuilder.CreateTexture(FRDGTextureDesc::Create2D(
+				FIntPoint(Size, Size),
+				PF_R16F,
+				FClearValueBinding::None,
+				TexCreate_ShaderResource | TexCreate_UAV), TEXT("Shading.DiffuseEnergy"), ERDGTextureFlags::MultiFrame);
+			
 			{
 				FBuildShadingEnergyConservationTableCS::FPermutationDomain PermutationVector;
 				PermutationVector.Set<FBuildShadingEnergyConservationTableCS::FEnergyTableDim>(FBuildShadingEnergyConservationTableCS::EEnergyTableType::GGXSpecular);
 				TShaderMapRef<FBuildShadingEnergyConservationTableCS> ComputeShader(View.ShaderMap, PermutationVector);
 				FBuildShadingEnergyConservationTableCS::FParameters* PassParameters = GraphBuilder.AllocParameters<FBuildShadingEnergyConservationTableCS::FParameters>();
-				PassParameters->OutputTexture2D = GraphBuilder.CreateUAV(FRDGTextureUAVDesc(GGXSpecEnergyTexture, 0));
+				PassParameters->Output2Texture2D = GraphBuilder.CreateUAV(FRDGTextureUAVDesc(GGXSpecEnergyTexture, 0));
 				FComputeShaderUtils::AddPass(
 					GraphBuilder,
-					RDG_EVENT_NAME("ShadingEnergyConservation::BuildGGXSpecTable"),
+					RDG_EVENT_NAME("ShadingEnergyConservation::BuildTable(GGXSpec)"),
 					ComputeShader,
 					PassParameters,
 					FComputeShaderUtils::GetGroupCount(FIntPoint(Size, Size), FComputeShaderUtils::kGolden2DGroupSize));
@@ -219,7 +235,7 @@ void Init(FRDGBuilder& GraphBuilder, FViewInfo& View)
 				PassParameters->OutputTexture3D = GraphBuilder.CreateUAV(FRDGTextureUAVDesc(GGXGlassEnergyTexture, 0));
 				FComputeShaderUtils::AddPass(
 					GraphBuilder,
-					RDG_EVENT_NAME("ShadingEnergyConservation::BuildGGXGlassTable"),
+					RDG_EVENT_NAME("ShadingEnergyConservation::BuildTable(GGXGlass)"),
 					ComputeShader,
 					PassParameters,
 					FComputeShaderUtils::GetGroupCount(FIntVector(Size, Size, Size), FIntVector(FComputeShaderUtils::kGolden2DGroupSize, FComputeShaderUtils::kGolden2DGroupSize, 1)));
@@ -229,10 +245,23 @@ void Init(FRDGBuilder& GraphBuilder, FViewInfo& View)
 				PermutationVector.Set<FBuildShadingEnergyConservationTableCS::FEnergyTableDim>(FBuildShadingEnergyConservationTableCS::EEnergyTableType::Cloth);
 				TShaderMapRef<FBuildShadingEnergyConservationTableCS> ComputeShader(View.ShaderMap, PermutationVector);
 				FBuildShadingEnergyConservationTableCS::FParameters* PassParameters = GraphBuilder.AllocParameters<FBuildShadingEnergyConservationTableCS::FParameters>();
-				PassParameters->OutputTexture2D = GraphBuilder.CreateUAV(FRDGTextureUAVDesc(ClothEnergyTexture, 0));
+				PassParameters->Output2Texture2D = GraphBuilder.CreateUAV(FRDGTextureUAVDesc(ClothEnergyTexture, 0));
 				FComputeShaderUtils::AddPass(
 					GraphBuilder,
-					RDG_EVENT_NAME("ShadingEnergyConservation::BuildClothTable"),
+					RDG_EVENT_NAME("ShadingEnergyConservation::BuildTable(Cloth)"),
+					ComputeShader,
+					PassParameters,
+					FComputeShaderUtils::GetGroupCount(FIntPoint(Size, Size), FComputeShaderUtils::kGolden2DGroupSize));
+			}
+			{
+				FBuildShadingEnergyConservationTableCS::FPermutationDomain PermutationVector;
+				PermutationVector.Set<FBuildShadingEnergyConservationTableCS::FEnergyTableDim>(FBuildShadingEnergyConservationTableCS::EEnergyTableType::Diffuse);
+				TShaderMapRef<FBuildShadingEnergyConservationTableCS> ComputeShader(View.ShaderMap, PermutationVector);
+				FBuildShadingEnergyConservationTableCS::FParameters* PassParameters = GraphBuilder.AllocParameters<FBuildShadingEnergyConservationTableCS::FParameters>();
+				PassParameters->Output1Texture2D = GraphBuilder.CreateUAV(FRDGTextureUAVDesc(DiffuseEnergyTexture, 0));
+				FComputeShaderUtils::AddPass(
+					GraphBuilder,
+					RDG_EVENT_NAME("ShadingEnergyConservation::BuildTable(Diffuse)"),
 					ComputeShader,
 					PassParameters,
 					FComputeShaderUtils::GetGroupCount(FIntPoint(Size, Size), FComputeShaderUtils::kGolden2DGroupSize));
@@ -241,6 +270,7 @@ void Init(FRDGBuilder& GraphBuilder, FViewInfo& View)
 			GraphBuilder.QueueTextureExtraction(GGXSpecEnergyTexture,	&View.ViewState->ShadingEnergyConservationData.GGXSpecEnergyTexture);
 			GraphBuilder.QueueTextureExtraction(GGXGlassEnergyTexture,	&View.ViewState->ShadingEnergyConservationData.GGXGlassEnergyTexture);
 			GraphBuilder.QueueTextureExtraction(ClothEnergyTexture,		&View.ViewState->ShadingEnergyConservationData.ClothEnergyTexture);
+			GraphBuilder.QueueTextureExtraction(DiffuseEnergyTexture,	&View.ViewState->ShadingEnergyConservationData.DiffuseEnergyTexture);
 			View.ViewState->ShadingEnergyConservationData.Format = Format;
 		}
 		else
@@ -248,6 +278,7 @@ void Init(FRDGBuilder& GraphBuilder, FViewInfo& View)
 			GGXSpecEnergyTexture	= GraphBuilder.RegisterExternalTexture(View.ViewState->ShadingEnergyConservationData.GGXSpecEnergyTexture);
 			GGXGlassEnergyTexture	= GraphBuilder.RegisterExternalTexture(View.ViewState->ShadingEnergyConservationData.GGXGlassEnergyTexture);
 			ClothEnergyTexture		= GraphBuilder.RegisterExternalTexture(View.ViewState->ShadingEnergyConservationData.ClothEnergyTexture);
+			DiffuseEnergyTexture	= GraphBuilder.RegisterExternalTexture(View.ViewState->ShadingEnergyConservationData.DiffuseEnergyTexture);
 		}
 
 		View.ViewState->ShadingEnergyConservationData.bEnergyConservation = bIsEnergyConservationEnabled;
@@ -261,7 +292,6 @@ void Init(FRDGBuilder& GraphBuilder, FViewInfo& View)
 
 
 void Debug(FRDGBuilder& GraphBuilder, const FViewInfo& View, FSceneTextures& SceneTextures)
-//FScreenPassTexture AddStrataDebugPasses(FRDGBuilder& GraphBuilder, const FViewInfo& View, FScreenPassTexture& ScreenPassSceneColor)
 {
 	if (CVarShadingFurnaceTest.GetValueOnAnyThread() > 0)
 	{

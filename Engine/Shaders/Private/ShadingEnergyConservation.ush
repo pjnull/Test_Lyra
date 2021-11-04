@@ -2,8 +2,15 @@
 
 #pragma once
 
+// If EnergyConservation flag is not enabled explicitly then:
+// * If strata is enabled: ON by default
+// * If strata is disnabled: OFF by default
 #ifndef USE_ENERGY_CONSERVATION
-#define USE_ENERGY_CONSERVATION 0
+	#if PROJECT_STRATA
+		#define USE_ENERGY_CONSERVATION 1
+	#else
+		#define USE_ENERGY_CONSERVATION 0
+	#endif
 #endif
 
 // Energy compensation/preservation for the various BxDFs. This file provides utility functions to tweak lobe weights
@@ -76,6 +83,18 @@ float2 ClothEnergyLookup(float Roughness, float NoV)
 #endif
 }
 
+float DiffuseEnergyLookup(float Roughness, float NoV)
+{
+#if USE_ENERGY_CONSERVATION == 1
+	return View.ShadingEnergyDiffuseTexture.SampleLevel(View.ShadingEnergySampler, float2(NoV, Roughness), 0);
+#elif USE_ENERGY_CONSERVATION == 2
+	// TODO
+	return 1.f;
+#else
+	return 1.f;
+#endif
+}
+
 struct FBxDFEnergyTerms {
 	float3 W; // overall weight to scale the lobe BxDF by to ensure energy conservation
 	float3 E; // Directional albedo of the lobe for energy preservation and lobe picking
@@ -96,21 +115,36 @@ FBxDFEnergyTerms ComputeFresnelEnergyTerms(float2 E, float3 F0, float3 F90)
 	return Result;
 }
 
-// Given a split-sum approximation of directional albedo for a BxDF, compute multiple scattering weight and multiple scattering directional albedo
-// while taking into account the fresnel term (assumed to be F_Schlick)
-FBxDFEnergyTerms ComputeFresnelEnergyTerms(float2 E, float3 F0)
-{
-	const float F90 = saturate(50.0 * F0.g); // See F_Schlick implementation
-	return ComputeFresnelEnergyTerms(E, F0, F90);
-}
-
-FBxDFEnergyTerms ComputeGGXSpecEnergyTerms(float Roughness, float NoV, float3 F0)
+FBxDFEnergyTerms ComputeGGXSpecEnergyTerms(float Roughness, float NoV, float3 F0, float3 F90)
 {
 	FBxDFEnergyTerms Out;
 #if USE_ENERGY_CONSERVATION > 0
 	if (View.bShadingEnergyConservation)
 	{
-		Out = ComputeFresnelEnergyTerms(GGXEnergyLookup(Roughness, NoV), F0);
+		Out = ComputeFresnelEnergyTerms(GGXEnergyLookup(Roughness, NoV), F0, F90);
+	}
+	else
+#endif
+	{
+		Out.W = 1.0f;
+		Out.E = F0;
+	}
+	return Out;
+}
+
+FBxDFEnergyTerms ComputeGGXSpecEnergyTerms(float Roughness, float NoV, float3 F0)
+{
+	const float F90 = saturate(50.0 * F0.g); // See F_Schlick implementation
+	return ComputeGGXSpecEnergyTerms(Roughness, NoV, F0, F90);
+}
+
+FBxDFEnergyTerms ComputeClothEnergyTerms(float Roughness, float NoV, float3 F0, float3 F90)
+{
+	FBxDFEnergyTerms Out;
+#if USE_ENERGY_CONSERVATION > 0
+	if (View.bShadingEnergyConservation)
+	{
+		Out = ComputeFresnelEnergyTerms(ClothEnergyLookup(Roughness, NoV), F0, F90);
 	}
 	else
 #endif
@@ -123,18 +157,24 @@ FBxDFEnergyTerms ComputeGGXSpecEnergyTerms(float Roughness, float NoV, float3 F0
 
 FBxDFEnergyTerms ComputeClothEnergyTerms(float Roughness, float NoV, float3 F0)
 {
+	const float F90 = saturate(50.0 * F0.g); // See F_Schlick implementation
+	return ComputeClothEnergyTerms(Roughness, NoV, F0, F90);
+}
+
+FBxDFEnergyTerms ComputeDiffuseEnergyTerms(float Roughness, float NoV)
+{
 	FBxDFEnergyTerms Out;
 #if USE_ENERGY_CONSERVATION > 0
 	if (View.bShadingEnergyConservation)
 	{
-		Out = ComputeFresnelEnergyTerms(ClothEnergyLookup(Roughness, NoV), F0);
+		Out.E = DiffuseEnergyLookup(Roughness, NoV);
 	}
 	else
 #endif
 	{
-		Out.W = 1.0f;
-		Out.E = F0;
+		Out.E = 1.0f;
 	}
+	Out.W = 1.0f;
 	return Out;
 }
 

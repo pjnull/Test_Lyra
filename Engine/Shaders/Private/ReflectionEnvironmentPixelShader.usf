@@ -6,7 +6,11 @@
   
 #include "Common.ush"
 
-#define USE_ENERGY_CONSERVATION 0
+#if STRATA_ENABLED
+	#define USE_ENERGY_CONSERVATION 1
+#else
+	#define USE_ENERGY_CONSERVATION 0
+#endif
 
 #include "DeferredShadingCommon.ush"  
 #include "BRDF.ush"
