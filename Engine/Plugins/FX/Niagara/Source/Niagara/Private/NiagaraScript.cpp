@@ -2196,11 +2196,6 @@ FVersionedNiagaraScript FVersionedNiagaraScriptWeakPtr::Pin()
 	return FVersionedNiagaraScript();
 }
 
-FVersionedNiagaraScriptWeakPtr::~FVersionedNiagaraScriptWeakPtr()
-{
-	CleanupDefinitionsSubscriptions();
-}
-
 TArray<UNiagaraScriptSourceBase*> FVersionedNiagaraScriptWeakPtr::GetAllSourceScripts()
 {
 	if (Script.IsValid())
@@ -2213,11 +2208,6 @@ TArray<UNiagaraScriptSourceBase*> FVersionedNiagaraScriptWeakPtr::GetAllSourceSc
 FString FVersionedNiagaraScriptWeakPtr::GetSourceObjectPathName() const
 {
 	return Script.IsValid() ? Script.Get()->GetPathName() : FString();
-}
-
-FVersionedNiagaraScript::~FVersionedNiagaraScript()
-{
-	CleanupDefinitionsSubscriptions();
 }
 
 TArray<UNiagaraScriptSourceBase*> FVersionedNiagaraScript::GetAllSourceScripts()
@@ -2627,6 +2617,13 @@ void UNiagaraScript::BeginDestroy()
 			// if there was nothing to release, then we don't need to wait for anything
 			ReleasedByRT = true;
 		}
+
+#if WITH_EDITORONLY_DATA
+		for (FVersionedNiagaraScript& VersionedScript : VersionedScriptAdapters)
+		{
+			VersionedScript.CleanupDefinitionsSubscriptions();
+		}
+#endif
 	}
 	else
 	{
