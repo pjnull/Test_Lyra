@@ -1056,7 +1056,6 @@ void FSceneRenderState::SetupRayTracingScene(int32 LODIndex)
 					RayTracingGeometryInstances,
 					SceneWithGeometryInstances.InstanceGeometryIndices,
 					SceneWithGeometryInstances.BaseUploadBufferOffsets,
-					SceneWithGeometryInstances.NumNativeGPUSceneInstances,
 					SceneWithGeometryInstances.NumNativeCPUInstances,
 					MakeArrayView(InstanceUploadData, SceneInitializer.NumNativeInstances),
 					MakeArrayView(TransformUploadData, SceneWithGeometryInstances.NumNativeCPUInstances * 3));
@@ -1082,12 +1081,10 @@ void FSceneRenderState::SetupRayTracingScene(int32 LODIndex)
 
 			BuildRayTracingInstanceBuffer(
 				RHICmdList,
-				nullptr,
 				InstanceBuffer.UAV,
 				InstanceUploadSRV,
 				AccelerationStructureAddressesBuffer.SRV,
 				TransformUploadSRV,
-				SceneWithGeometryInstances.NumNativeGPUSceneInstances,
 				SceneWithGeometryInstances.NumNativeCPUInstances,
 				{});
 

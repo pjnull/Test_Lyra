@@ -24,7 +24,7 @@ FRayTracingScene::~FRayTracingScene()
 	WaitForTasks();
 }
 
-void FRayTracingScene::Create(FRDGBuilder& GraphBuilder, const FGPUScene& GPUScene)
+void FRayTracingScene::Create(FRDGBuilder& GraphBuilder)
 {
 	QUICK_SCOPE_CYCLE_COUNTER(FRayTracingScene_BeginCreate);
 
@@ -136,7 +136,6 @@ void FRayTracingScene::Create(FRDGBuilder& GraphBuilder, const FGPUScene& GPUSce
 		FillInstanceUploadBufferTask = FFunctionGraphTask::CreateAndDispatchWhenReady(
 			[InstanceUploadData = MakeArrayView(InstanceUploadData, SceneInitializer.NumNativeInstances),
 			TransformUploadData = MakeArrayView(TransformUploadData, SceneWithGeometryInstances.NumNativeCPUInstances * 3),
-			NumNativeGPUSceneInstances = SceneWithGeometryInstances.NumNativeGPUSceneInstances,
 			NumNativeCPUInstances = SceneWithGeometryInstances.NumNativeCPUInstances,
 			Instances = MakeArrayView(Instances),
 			InstanceGeometryIndices = MoveTemp(SceneWithGeometryInstances.InstanceGeometryIndices),
@@ -149,7 +148,6 @@ void FRayTracingScene::Create(FRDGBuilder& GraphBuilder, const FGPUScene& GPUSce
 				Instances,
 				InstanceGeometryIndices,
 				BaseUploadBufferOffsets,
-				NumNativeGPUSceneInstances,
 				NumNativeCPUInstances,
 				InstanceUploadData,
 				TransformUploadData);
@@ -164,9 +162,7 @@ void FRayTracingScene::Create(FRDGBuilder& GraphBuilder, const FGPUScene& GPUSce
 			ERDGPassFlags::Compute,
 			[PassParams,
 			this,
-			GPUScene = &GPUScene,
 			&SceneInitializer,
-			NumNativeGPUSceneInstances = SceneWithGeometryInstances.NumNativeGPUSceneInstances,
 			NumNativeCPUInstances = SceneWithGeometryInstances.NumNativeCPUInstances,
 			GPUInstances = MoveTemp(SceneWithGeometryInstances.GPUInstances)
 			](FRHICommandListImmediate& RHICmdList)
@@ -195,12 +191,10 @@ void FRayTracingScene::Create(FRDGBuilder& GraphBuilder, const FGPUScene& GPUSce
 
 				BuildRayTracingInstanceBuffer(
 					RHICmdList,
-					GPUScene,
 					PassParams->InstanceBuffer->GetRHI(),
 					InstanceUploadSRV,
 					AccelerationStructureAddressesBuffer.SRV,
 					TransformUploadSRV,
-					NumNativeGPUSceneInstances,
 					NumNativeCPUInstances,
 					GPUInstances);
 			});

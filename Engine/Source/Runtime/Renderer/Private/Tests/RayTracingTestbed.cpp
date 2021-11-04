@@ -170,7 +170,6 @@ bool RunRayTracingTestbed_RenderThread(const FString& Parameters)
 			Instances,
 			RayTracingScene.InstanceGeometryIndices,
 			RayTracingScene.BaseUploadBufferOffsets,
-			RayTracingScene.NumNativeGPUSceneInstances,
 			RayTracingScene.NumNativeCPUInstances,
 			MakeArrayView(InstanceUploadData, SceneInitializer.NumNativeInstances),
 			MakeArrayView(TransformUploadData, RayTracingScene.NumNativeCPUInstances * 3));
@@ -196,12 +195,10 @@ bool RunRayTracingTestbed_RenderThread(const FString& Parameters)
 
 	BuildRayTracingInstanceBuffer(
 		RHICmdList,
-		nullptr,
 		InstanceBuffer.UAV,
 		InstanceUploadSRV,
 		AccelerationStructureAddressesBuffer.SRV,
 		TransformUploadSRV,
-		RayTracingScene.NumNativeGPUSceneInstances,
 		RayTracingScene.NumNativeCPUInstances,
 		{});
 
