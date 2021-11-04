@@ -5,7 +5,7 @@
 #include "Containers/UnrealString.h"
 
 struct FAssetData;
-struct FPropertyChagedEvent;
+struct FPropertyChangedEvent;
 class UObject;
 
 namespace UE::DatasmithImporter
