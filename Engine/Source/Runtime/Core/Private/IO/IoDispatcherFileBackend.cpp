@@ -107,6 +107,13 @@ static FAutoConsoleVariableRef CVar_IoDispatcherRequestLatencyCircuitBreakerMS(
 	TEXT("If s.IoDispatcherSortRequestsByOffset is enabled and this is >0, if the oldest request has been in the queue for this long, read it instead of the most optimal read")
 );
 
+int32 GIoDispatcherTocsEnablePerfectHashing = 0;
+static FAutoConsoleVariableRef CVar_IoDispatcherTocsEnablePerfectHashing(
+	TEXT("s.IoDispatcherTocsEnablePerfectHashing"),
+	GIoDispatcherTocsEnablePerfectHashing,
+	TEXT("Enable perfect hashmap lookups for iostore tocs")
+);
+
 uint32 FFileIoStoreReadRequest::NextSequence = 0;
 #if CHECK_IO_STORE_READ_REQUEST_LIST_MEMBERSHIP
 uint32 FFileIoStoreReadRequestList::NextListCookie = 0;
@@ -700,7 +707,7 @@ FIoStatus FFileIoStoreReader::Initialize(const TCHAR* InContainerPath, int32 InO
 		Partition.ContainerFileIndex = GlobalPartitionIndex++;
 	}
 
-	if (!TocResource.ChunkPerfectHashSeeds.IsEmpty())
+	if (GIoDispatcherTocsEnablePerfectHashing && !TocResource.ChunkPerfectHashSeeds.IsEmpty())
 	{
 		for (int32 ChunkIndexWithoutPerfectHash : TocResource.ChunkIndicesWithoutPerfectHash)
 		{
