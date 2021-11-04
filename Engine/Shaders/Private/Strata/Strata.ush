@@ -1263,6 +1263,7 @@ FStrataData StrataVerticalLayeringParameterBlending(FStrataData Top, FStrataData
 ///////////////////////////////////////////////////////////////////////////////
 // Functions used to sanitize BSDF before they are used for lighting (when forward) or stored to memory (base pass).
 // We do not normalize normals, this is done before the lighting step.
+// This step is obligatory so we apply View.MinRoughness here for forward and deferred.
 
 void SanitizeStrataSlab(inout FStrataBSDF BSDF)
 {
@@ -1271,8 +1272,8 @@ void SanitizeStrataSlab(inout FStrataBSDF BSDF)
 	SLAB_F0(BSDF) = saturate(SLAB_F0(BSDF));
 	SLAB_F90(BSDF) = saturate(SLAB_F90(BSDF));
 	SLAB_METALLIC(BSDF) = saturate(SLAB_METALLIC(BSDF));
-	SLAB_ROUGHNESSX(BSDF) = saturate(SLAB_ROUGHNESSX(BSDF));
-	SLAB_ROUGHNESSY(BSDF) = saturate(SLAB_ROUGHNESSY(BSDF));
+	SLAB_ROUGHNESSX(BSDF) = saturate(max(View.MinRoughness, SLAB_ROUGHNESSX(BSDF)));
+	SLAB_ROUGHNESSY(BSDF) = saturate(max(View.MinRoughness, SLAB_ROUGHNESSY(BSDF)));
 	SLAB_HAZINESS(BSDF) = saturate(SLAB_HAZINESS(BSDF));
 	SLAB_THINFILM_THICKNESS(BSDF) = saturate(SLAB_THINFILM_THICKNESS(BSDF));
 #if STRATA_INLINE_SHADING
@@ -1301,7 +1302,7 @@ void SanitizeStrataHair(inout FStrataBSDF BSDF)
 	BSDF_SETEMISSIVE(BSDF, clamp(BSDF_GETEMISSIVE(BSDF), 0.0, Max10BitsFloat));
 	HAIR_BASECOLOR(BSDF) = saturate(HAIR_BASECOLOR(BSDF));
 	HAIR_SCATTER(BSDF) = saturate(HAIR_SCATTER(BSDF));
-	HAIR_ROUGHNESS(BSDF) = saturate(HAIR_ROUGHNESS(BSDF));
+	HAIR_ROUGHNESS(BSDF) = saturate(max(View.MinRoughness, HAIR_ROUGHNESS(BSDF)));
 	HAIR_SPECULAR(BSDF) = saturate(HAIR_SPECULAR(BSDF));
 	HAIR_BACKLIT(BSDF) = saturate(HAIR_BACKLIT(BSDF));
 }
@@ -1312,7 +1313,7 @@ void SanitizeStrataSingleLayerWater(inout FStrataBSDF BSDF)
 	SLW_BASECOLOR(BSDF) = saturate(SLW_BASECOLOR(BSDF));
 	SLW_METALLIC(BSDF) = saturate(SLW_METALLIC(BSDF));
 	SLW_SPECULAR(BSDF) = saturate(SLW_SPECULAR(BSDF));
-	SLW_ROUGHNESS(BSDF) = saturate(SLW_ROUGHNESS(BSDF));
+	SLW_ROUGHNESS(BSDF) = saturate(max(View.MinRoughness, SLW_ROUGHNESS(BSDF)));
 	SLW_TOPMATERIALOPACITY(BSDF) = saturate(SLW_TOPMATERIALOPACITY(BSDF));
 #if STRATA_INLINE_SINGLELAYERWATER
 	SLW_WATERALBEDO(BSDF) = saturate(SLW_WATERALBEDO(BSDF));
