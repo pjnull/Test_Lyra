@@ -410,6 +410,49 @@ static FAutoConsoleVariableRef GDelayTrimMemoryDuringMapLoadModeCVar(
 	ECVF_Default
 );
 
+#if !UE_BUILD_SHIPPING
+class FDisplayCVarListExecHelper : public FSelfRegisteringExec
+{
+	virtual bool Exec(class UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar)
+	{
+		if (FParse::Command(&Cmd, TEXT("DisplayCVarList")))
+		{
+			ConsoleVariablesToVisualize.Empty();
+
+			FString CVarList(Cmd);
+			if (!CVarList.IsEmpty())
+			{
+				TArray<FString> CVars;
+				CVarList.ParseIntoArray(CVars, TEXT(","));
+
+				for (FString& CVarString : CVars)
+				{
+					CVarString.TrimStartAndEndInline();
+
+					IConsoleManager::Get().ForEachConsoleObjectThatStartsWith(FConsoleObjectVisitor::CreateLambda(
+						[this](const TCHAR* Key, IConsoleObject* ConsoleObject)
+						{
+							if (IConsoleVariable* AsVariable = ConsoleObject->AsVariable())
+							{
+								ConsoleVariablesToVisualize.Add(FString(Key), AsVariable);
+							}
+
+						}),
+						*CVarString);
+				}
+			}
+
+			return true;
+		}
+		return false;
+	}
+
+public:
+	TMap<FString, IConsoleVariable*> ConsoleVariablesToVisualize;
+};
+static FDisplayCVarListExecHelper GDisplayCVarListExecHelper;
+#endif // !UE_BUILD_SHIPPING
+
 /** Whether texture memory has been corrupted because we ran out of memory in the pool. */
 bool GIsTextureMemoryCorrupted = false;
 
@@ -11286,6 +11329,18 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 			SmallTextItem.Text = LOCTEXT("DisableAllScreenMessagesToSuppress", "'DisableAllScreenMessages' to suppress");
 			Canvas->DrawItem(SmallTextItem, FVector2D(MessageX + 50, MessageY));
 			MessageY += 16;
+		}
+
+		// Draw the specified CVars values
+		{
+			if (GDisplayCVarListExecHelper.ConsoleVariablesToVisualize.Num())
+			{
+				for (const auto& CVarToVisualize : GDisplayCVarListExecHelper.ConsoleVariablesToVisualize)
+				{
+					Canvas->DrawShadowedString(MessageX, MessageY, *FString::Printf(TEXT("%s : %s"), *CVarToVisualize.Key, *CVarToVisualize.Value->GetString()), GEngine->GetSmallFont(), FLinearColor::White);
+ 					MessageY += FontSizeY;
+				}
+			}
 		}
 	}
 #endif // UE_BUILD_SHIPPING 
