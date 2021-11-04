@@ -44,28 +44,61 @@ void MainPS(
 	const float2 ScreenUV = SvPositionToBufferUV(SVPos);
 	const float2 ScreenPosition = SvPositionToScreenPosition(SVPos).xy;
 	const float2 PixelPos = SVPos.xy;
-	FScreenSpaceData ScreenSpaceData = GetScreenSpaceData(ScreenUV);
-	ScreenSpaceData.AmbientOcclusion = 1.0f;
-	ScreenSpaceData.GBuffer.Roughness = max(ScreenSpaceData.GBuffer.Roughness, View.MinRoughness* 2.f);
-
-	const bool bIsClearCoat = ScreenSpaceData.GBuffer.ShadingModelID == SHADINGMODELID_CLEAR_COAT;
-	const float ClearCoatRoughness = bIsClearCoat ? max(ScreenSpaceData.GBuffer.CustomData.y, 0.02f) : ScreenSpaceData.GBuffer.Roughness;
 
 	const FRectTexture RectTexture = (FRectTexture)0;
 	const float Dither = InterleavedGradientNoise(PixelPos, View.StateFrameIndexMod8);
+
+	bool bIsValid = false;
+	float Roughness = 0.5f;
+	float ClearCoatRoughness = 0.5f;
+	float3 N = float3(0, 0, 1);
+	float SceneDepth = 0;
+#if STRATA_ENABLED
+	{
+		// Fetch the first layer of roughness & normal only. This fine for simple material but will not work for clear coat.
+		FStrataAddressing StrataAddressing = GetStrataPixelDataByteOffset(PixelPos, uint2(View.BufferSizeAndInvSize.xy), Strata.MaxBytesPerPixel);
+		FStrataPixelHeader StrataPixelHeader = UnpackStrataHeaderIn(Strata.MaterialLobesBuffer, StrataAddressing);
+		bIsValid = StrataPixelHeader.BSDFCount > 0;
+		if (bIsValid)
+		{
+			const float3 DummyV = float3(0, 0, 1);
+			const float3 DummyL = float3(0, 0, 1);
+			FStrataBSDF BSDF = UnpackStrataBSDFIn(Strata.MaterialLobesBuffer, StrataAddressing);
+			FStrataBSDFContext BSDFContext = StrataCreateBSDFContext(StrataPixelHeader, BSDF, StrataAddressing, DummyV, DummyL);
+
+			SceneDepth = CalcSceneDepth(ScreenUV);
+			N = BSDFContext.N;
+			StrataGetBSDFRoughness(BSDFContext.BSDF, Roughness);
+			ClearCoatRoughness = Roughness;
+		}
+	}
+#else // STRATA_ENABLED
+	FScreenSpaceData ScreenSpaceData;
+	{
+		ScreenSpaceData = GetScreenSpaceData(ScreenUV);
+		ScreenSpaceData.AmbientOcclusion = 1.0f;
+		ScreenSpaceData.GBuffer.Roughness = max(ScreenSpaceData.GBuffer.Roughness, View.MinRoughness* 2.f);
+
+		N = ScreenSpaceData.GBuffer.WorldNormal;
+		SceneDepth = ScreenSpaceData.GBuffer.Depth;
+
+		bIsValid = SceneDepth > 0 && ScreenSpaceData.GBuffer.ShadingModelID != SHADINGMODELID_UNLIT;
+		Roughness = ScreenSpaceData.GBuffer.Roughness;
+		const bool bIsClearCoat = ScreenSpaceData.GBuffer.ShadingModelID == SHADINGMODELID_CLEAR_COAT;
+		ClearCoatRoughness = bIsClearCoat ? max(ScreenSpaceData.GBuffer.CustomData.y, 0.02f) : ScreenSpaceData.GBuffer.Roughness;
+	
+	}
+#endif // STRATA_ENABLED
+
 	const float4 PixelLightAttenuation = 1.0f;
 	const float3 InRadiance = 0.5f;
-
-	const float3 N = ScreenSpaceData.GBuffer.WorldNormal;
-	const float3x3 TangentBasis = GetTangentBasis(ScreenSpaceData.GBuffer.WorldNormal);
-
-	const float SceneDepth = ScreenSpaceData.GBuffer.Depth;
 	const float3 WorldPosition = mul(float4(ScreenPosition * SceneDepth, SceneDepth, 1), LWCHackToFloat(PrimaryView.ScreenToWorld)).xyz;
 	const float3 CameraVector = normalize(WorldPosition - LWCHackToFloat(PrimaryView.WorldCameraOrigin));
 	const float3 TranslatedWorldPosition = WorldPosition;
 	const float3 V = -CameraVector;
 
 #if DEBUG_ENABLE
+	const float3x3 TangentBasis = GetTangentBasis(N);
 	const uint2 CursorCoord = GetCursorPos();
 	const bool bDebugEnabled = all(CursorCoord == uint2(PixelPos));
 	if (bDebugEnabled)
@@ -75,7 +108,6 @@ void MainPS(
 	}
 #endif
 
-	const bool bIsValid = SceneDepth > 0 && ScreenSpaceData.GBuffer.ShadingModelID != SHADINGMODELID_UNLIT;
 	if (bIsValid)
 	{
 		const uint NumSets = 3;
@@ -104,7 +136,7 @@ void MainPS(
 				float3 L, H;
 				if (Set == 0)
 				{
-					H = TangentToWorld(ImportanceSampleGGX(E, Pow4(ScreenSpaceData.GBuffer.Roughness)).xyz, N);
+					H = TangentToWorld(ImportanceSampleGGX(E, Pow4(Roughness)).xyz, N);
 					L = 2 * dot(V, H) * H - V;
 				}
 				else if (Set == 1)
@@ -125,7 +157,7 @@ void MainPS(
 				// PDFs
 				float PDFs[] =
 				{
-					NoH > 0 && VoH > 0 ? D_GGX(Pow4(ScreenSpaceData.GBuffer.Roughness), NoH) * NoH / (4 * VoH) : 0.f,
+					NoH > 0 && VoH > 0 ? D_GGX(Pow4(Roughness), NoH) * NoH / (4 * VoH) : 0.f,
 					NoL / PI,
 					NoH > 0 && VoH > 0 ? D_GGX(Pow4(ClearCoatRoughness), NoH) * NoH / (4 * VoH) : 0.f,
 				};
