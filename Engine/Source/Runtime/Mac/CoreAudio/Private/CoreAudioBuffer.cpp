@@ -170,7 +170,7 @@ FCoreAudioSoundBuffer* FCoreAudioSoundBuffer::CreateQueuedBuffer( FCoreAudioDevi
 		Wave->InitAudioResource(CoreAudioDevice->GetRuntimeFormat(Wave));
 	}
 
-	if (Buffer->DecompressionState->ReadCompressedInfo( Wave->ResourceData, Wave->ResourceSize, &QualityInfo ))
+	if (Buffer->DecompressionState->ReadCompressedInfo(Wave->GetResourceData(), Wave->GetResourceSize(), &QualityInfo ))
 	{
 		// Clear out any dangling pointers
 		Buffer->PCMData = NULL;

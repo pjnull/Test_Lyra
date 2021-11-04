@@ -1704,14 +1704,12 @@ bool FAudioDevice::HandleAudioMemoryInfo(const TCHAR* Cmd, FOutputDevice& Ar)
 
 			uint32 MaxUnevictableSize = 0;
 			uint32 MaxSizeInCache = 0;
-
-			if (SoundWave->RunningPlatformData)
+			
+			check(SoundWave->SoundWaveDataPtr);
+			for (auto& Chunk : SoundWave->SoundWaveDataPtr->RunningPlatformData.Chunks)
 			{
-				for (auto& Chunk : SoundWave->RunningPlatformData->Chunks)
-				{
-					MaxUnevictableSize = FMath::Max<uint32>(MaxUnevictableSize, Chunk.AudioDataSize);
-					MaxSizeInCache += Chunk.AudioDataSize;
-				}
+				MaxUnevictableSize = FMath::Max<uint32>(MaxUnevictableSize, Chunk.AudioDataSize);
+				MaxSizeInCache += Chunk.AudioDataSize;
 			}
 
 			// Add the info to the SoundWaveObjects array

@@ -156,13 +156,13 @@ namespace Audio
 
 		FSoundQualityInfo QualityInfo;
 
-		if (!SoundWave->ResourceData || !SoundWave->ResourceSize)
+		if (!SoundWave->GetResourceData() || !SoundWave->GetResourceSize())
 		{
 			UE_LOG(LogAudioMixer, Warning, TEXT("Failed to read compressed info of '%s' because there was no resource data or invalid resource size."), *ResourceName);
 			return false;
 		}
 
-		if (DecompressionState->ReadCompressedInfo(SoundWave->ResourceData, SoundWave->ResourceSize, &QualityInfo))
+		if (DecompressionState->ReadCompressedInfo(SoundWave->GetResourceData(), SoundWave->GetResourceSize(), &QualityInfo))
 		{
 			NumFrames = QualityInfo.SampleDataSize / (QualityInfo.NumChannels * sizeof(int16));
 			return true;
@@ -384,7 +384,7 @@ namespace Audio
 		// Create a new buffer for real-time sounds
 		FMixerBuffer* Buffer = new FMixerBuffer(AudioDevice, InWave, EBufferType::PCMRealTime);
 
-		if (InWave->ResourceData == nullptr)
+		if (InWave->GetResourceData() == nullptr)
 		{
 			InWave->InitAudioResource(AudioDevice->GetRuntimeFormat(InWave));
 		}
