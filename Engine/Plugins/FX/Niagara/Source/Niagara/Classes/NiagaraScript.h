@@ -1210,6 +1210,8 @@ public:
 	{
 	};
 
+	~FVersionedNiagaraScript();
+
 	//~ Begin INiagaraParameterDefinitionsSubscriber Interface
 	virtual const TArray<FParameterDefinitionsSubscription>& GetParameterDefinitionsSubscriptions() const override { return GetScriptData()->ParameterDefinitionsSubscriptions; };
 	virtual TArray<FParameterDefinitionsSubscription>& GetParameterDefinitionsSubscriptions() override { return GetScriptData()->ParameterDefinitionsSubscriptions; };
@@ -1241,6 +1243,8 @@ public:
 		, Version(InVersion)
 	{
 	};
+
+	~FVersionedNiagaraScriptWeakPtr();
 
 	//~ Begin INiagaraParameterDefinitionsSubscriber Interface
 	virtual const TArray<FParameterDefinitionsSubscription>& GetParameterDefinitionsSubscriptions() const override { return Pin().GetScriptData()->ParameterDefinitionsSubscriptions; };

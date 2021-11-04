@@ -522,6 +522,10 @@ void UNiagaraSystem::BeginDestroy()
 	}
 #endif
 
+#if WITH_EDITOR
+	CleanupDefinitionsSubscriptions();
+#endif
+
 	FNiagaraWorldManager::DestroyAllSystemSimulations(this);
 }
 

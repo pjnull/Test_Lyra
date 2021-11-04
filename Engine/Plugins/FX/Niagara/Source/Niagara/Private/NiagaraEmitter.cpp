@@ -2032,6 +2032,7 @@ void UNiagaraEmitter::BeginDestroy()
 	{
 		GPUComputeScript->OnGPUScriptCompiled().RemoveAll(this);
 	}
+	CleanupDefinitionsSubscriptions();
 #endif
 	Super::BeginDestroy();
 }

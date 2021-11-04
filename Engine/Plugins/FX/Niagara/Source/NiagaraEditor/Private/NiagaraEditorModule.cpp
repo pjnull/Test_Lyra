@@ -1246,9 +1246,6 @@ void FNiagaraEditorModule::OnPostEngineInit()
 
 		PreviewPlatformChangedHandle = CastChecked<UEditorEngine>(GEngine)->OnPreviewPlatformChanged().AddRaw(this, &FNiagaraEditorModule::OnPreviewPlatformChanged);
 
-		// Preload all parameter definitions assets so that they will be postloaded before postload calls to scripts/emitters/systems that rely on them.
-		FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
-		AssetRegistryModule.Get().OnFilesLoaded().AddRaw(this, &FNiagaraEditorModule::PreloadAllParameterDefinitions);
 
 		// Handle a re-import for mesh renderers
 		if (UImportSubsystem* ImportSubsystem = GEditor->GetEditorSubsystem<UImportSubsystem>())
@@ -1784,17 +1781,6 @@ bool FNiagaraEditorModule::DeferredDestructObjects(float InDeltaTime)
 	QUICK_SCOPE_CYCLE_COUNTER(STAT_FNiagaraEditorModule_DeferredDestructObjects);
 	EnqueuedForDeferredDestruction.Empty();
 	return false;
-}
-
-void FNiagaraEditorModule::PreloadAllParameterDefinitions()
-{
-	const FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"));
-	TArray<FAssetData> ParameterDefinitionsAssetData;
-	AssetRegistryModule.GetRegistry().GetAssetsByClass(UNiagaraParameterDefinitions::StaticClass()->GetFName(), ParameterDefinitionsAssetData);
-	for (const FAssetData& ParameterDefinitionsAssetDatum : ParameterDefinitionsAssetData)
-	{
-		ParameterDefinitionsAssetDatum.GetAsset();
-	}
 }
 
 #if NIAGARA_PERF_BASELINES

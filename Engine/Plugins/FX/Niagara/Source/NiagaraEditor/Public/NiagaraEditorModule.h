@@ -261,8 +261,6 @@ private:
 		StackIssueGenerators.Add(StructName) = Generator;
 	}
 
-	void PreloadAllParameterDefinitions();
-
 private:
 	TSharedPtr<FExtensibilityManager> MenuExtensibilityManager;
 	TSharedPtr<FExtensibilityManager> ToolBarExtensibilityManager;
