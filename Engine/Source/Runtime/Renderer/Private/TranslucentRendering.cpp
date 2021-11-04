@@ -284,13 +284,9 @@ FSeparateTranslucencyDimensions UpdateTranslucencyTimers(FRHICommandListImmediat
 {
 	bool bAnyViewWantsDownsampledSeparateTranslucency = false;
 
-#if STATS
 	const bool bSeparateTranslucencyAutoDownsample = CVarSeparateTranslucencyAutoDownsample.GetValueOnRenderThread() != 0;
-#else
-	const bool bSeparateTranslucencyAutoDownsample = false;
-#endif
 
-	if (bSeparateTranslucencyAutoDownsample)
+	if (GSupportsTimestampRenderQueries && (bSeparateTranslucencyAutoDownsample || STATS))
 	{
 		for (int32 ViewIndex = 0; ViewIndex < Views.Num(); ViewIndex++)
 		{
