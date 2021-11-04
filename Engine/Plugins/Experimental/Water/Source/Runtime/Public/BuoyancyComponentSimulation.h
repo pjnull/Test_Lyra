@@ -282,17 +282,18 @@ public:
 
 			const FVector WaterVelocity = WaterBody->GetWaterVelocityVectorAtSplineInputKey(InputKey) * BuoyancyData.WaterVelocityStrength;
 			const float RiverWaterSpeed = WaterBody->GetWaterVelocityAtSplineInputKey(InputKey);
-			const float BodySpeedInWaterDir = FMath::Abs(FVector::DotProduct(BodyVelocity, WaterVelocity.GetSafeNormal()));
-			const bool bMovingSlowerThanRiverCurrent = (BodySpeedInWaterDir < RiverWaterSpeed);
+			const float BodySpeedInWater = FVector::DotProduct(BodyVelocity, WaterVelocity.GetSafeNormal());
+			const float BodySpeedInWaterDir = BuoyancyData.bAllowCurrentWhenMovingFastUpstream ? BodySpeedInWater : FMath::Abs(BodySpeedInWater);
+			const bool bApplyRiverForces = (BodySpeedInWaterDir < RiverWaterSpeed);
 
-			if (bMovingSlowerThanRiverCurrent || BuoyancyData.bAlwaysAllowLateralPush)
+			if (bApplyRiverForces || BuoyancyData.bAlwaysAllowLateralPush)
 			{
 				const FVector LateralVelocity = LateralPushDirection * LateralDistanceScale * FMath::Abs(BuoyancyData.WaterShorePushFactor);
 				const FVector LateralAcceleration = LateralVelocity / DeltaTime;
 				FinalAcceleration = FinalAcceleration + LateralAcceleration.GetClampedToSize(-BuoyancyData.MaxShorePushForce, BuoyancyData.MaxShorePushForce);
 			}
 
-			if (bMovingSlowerThanRiverCurrent)
+			if (bApplyRiverForces)
 			{
 				const FVector WaterAcceleration = (WaterVelocity / DeltaTime);
 				FinalAcceleration = FinalAcceleration + WaterAcceleration.GetClampedToSize(-BuoyancyData.MaxWaterForce, BuoyancyData.MaxWaterForce);

@@ -250,6 +250,10 @@ struct FBuoyancyData
 	/** Allow an object to be pushed laterally regardless of the forward movement speed through the river */
 	UPROPERTY(EditDefaultsOnly, Category = "Buoyancy | River Behavior", Meta = (EditCondition = "bApplyRiverForces"))
 	bool bAlwaysAllowLateralPush = false;
+	
+	/** Apply the current when moving at high speeds upstream. Disable for vehicles to have more control*/
+	UPROPERTY(EditDefaultsOnly, Category = "Buoyancy | River Behavior", Meta = (EditCondition = "bApplyRiverForces"))
+	bool bAllowCurrentWhenMovingFastUpstream = false;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Buoyancy | River Behavior", Meta = (EditCondition = "bApplyRiverForces"))
 	bool bApplyDownstreamAngularRotation = false;
@@ -317,6 +321,8 @@ struct FBuoyancyData
 		Ar << WaterShorePushFactor;
 		Ar << WaterVelocityStrength;
 		Ar << MaxWaterForce;
+		Ar << bAlwaysAllowLateralPush;
+		Ar << bAllowCurrentWhenMovingFastUpstream;
 		Ar << RiverTraversalPathWidth;
 		Ar << bApplyDownstreamAngularRotation;
 		Ar << DownstreamAxisOfRotation;
