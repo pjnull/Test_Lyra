@@ -44,7 +44,7 @@ namespace CADLibrary
 		const A3DStatus IRet = ExchangeLoader->m_eSDKStatus;
 		if (IRet != A3D_SUCCESS)
 		{
-			UE_LOG(CADInterfaces, Warning, TEXT("Failed to load required library in %s. Plug-in will not be functional."), *TechSoftDllPath);
+			UE_LOG(LogCADInterfaces, Warning, TEXT("Failed to load required library in %s. Plug-in will not be functional."), *TechSoftDllPath);
 		}
 		else
 		{
