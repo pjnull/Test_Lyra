@@ -723,6 +723,7 @@ TSharedPtr<FMemoryGraphSeries> FMemorySharedState::ToggleMemTagGraphSeries(TShar
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Create graphs from LLMReportTypes.xml file
 void FMemorySharedState::CreateTracksFromReport(const FString& Filename)
 {
 	Insights::FReportConfig ReportConfig;
@@ -795,8 +796,23 @@ TSharedPtr<FMemoryGraphTrack> FMemorySharedState::CreateGraphTrack(const Insight
 
 	const Insights::FGraphConfig& GraphConfig = *ReportTypeGraphConfig.GraphConfig;
 
+	int32 CharIndex;
+	const TCHAR* DelimStr;
+
+	if (GraphConfig.StatString.FindChar(TEXT(','), CharIndex))
+	{
+		DelimStr = TEXT(",");
+	}
+	else if (GraphConfig.StatString.FindChar(TEXT(';'), CharIndex))
+	{
+		DelimStr = TEXT(";");
+	}
+	else
+	{
+		DelimStr = TEXT(" ");
+	}
 	TArray<FString> IncludeStats;
-	GraphConfig.StatString.ParseIntoArray(IncludeStats, TEXT(" ")); // TODO: names enclosed in quotes
+	GraphConfig.StatString.ParseIntoArray(IncludeStats, DelimStr);
 
 	if (IncludeStats.Num() == 0)
 	{
@@ -804,8 +820,20 @@ TSharedPtr<FMemoryGraphTrack> FMemorySharedState::CreateGraphTrack(const Insight
 		return nullptr;
 	}
 
+	if (GraphConfig.IgnoreStats.FindChar(TEXT(';'), CharIndex))
+	{
+		DelimStr = TEXT(";");
+	}
+	else if (GraphConfig.IgnoreStats.FindChar(TEXT(','), CharIndex))
+	{
+		DelimStr = TEXT(",");
+	}
+	else
+	{
+		DelimStr = TEXT(" ");
+	}
 	TArray<FString> IgnoreStats;
-	GraphConfig.IgnoreStats.ParseIntoArray(IgnoreStats, TEXT(";"));
+	GraphConfig.IgnoreStats.ParseIntoArray(IgnoreStats, DelimStr);
 
 	TArray<Insights::FMemoryTag*> Tags;
 	TagList.FilterTags(IncludeStats, IgnoreStats, Tags);
