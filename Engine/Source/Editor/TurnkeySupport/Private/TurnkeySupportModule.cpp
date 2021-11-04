@@ -1515,7 +1515,7 @@ void FTurnkeySupportModule::MakeQuickLaunchItems(class UToolMenu* Menu, FOnQuick
 				NAME_None,
 				LOCTEXT("CookOnTheFlyOnLaunch", "Enable cooking on the fly"),
 				LOCTEXT("CookOnTheFlyOnLaunchDescription", "Cook on the fly instead of cooking upfront when launching"),
-				FSlateIcon(),
+				FSlateIcon(FAppStyle::GetAppStyleSetName(), "MainFrame.CookContent"),
 				FUIAction(
 					FExecuteAction::CreateStatic(&FTurnkeySupportCallbacks::SetCookOnTheFly),
 					FCanExecuteAction::CreateStatic(&FTurnkeySupportCallbacks::CanSetCookOnTheFly),
