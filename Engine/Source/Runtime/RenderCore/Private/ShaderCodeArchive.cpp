@@ -1164,7 +1164,7 @@ bool FIoStoreShaderCodeArchive::PreloadShader(int32 ShaderIndex, FGraphEventArra
 
 		ShaderPreloadEntry.PreloadEvent = FGraphEvent::CreateGraphEvent();
 		FIoBatch IoBatch = IoDispatcher.NewBatch();
-		IoBatch.Read(GetShaderCodeChunkId(ShaderHashes[ShaderIndex]), FIoReadOptions(), IoDispatcherPriority_Medium);
+		ShaderPreloadEntry.IoRequest = IoBatch.Read(GetShaderCodeChunkId(ShaderHashes[ShaderIndex]), FIoReadOptions(), IoDispatcherPriority_Medium);
 		IoBatch.IssueAndDispatchSubsequents(ShaderPreloadEntry.PreloadEvent);
 		INC_DWORD_STAT_BY(STAT_Shaders_ShaderPreloadMemory, ShaderEntry.CompressedSize);
 	}
