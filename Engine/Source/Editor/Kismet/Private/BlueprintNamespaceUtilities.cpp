@@ -9,10 +9,10 @@
 namespace UE::Editor::Kismet::Private
 {
 	// The default Blueprint namespace to use for objects/assets if not explicitly assigned.
-	EDefaultBlueprintNamespaceType DefaultBlueprintNamespaceType = EDefaultBlueprintNamespaceType::DefaultToGlobalNamespace;
+	static EDefaultBlueprintNamespaceType DefaultBlueprintNamespaceType = EDefaultBlueprintNamespaceType::DefaultToGlobalNamespace;
 
 	// Delegate invoked whenever the default Blueprint namespace type is set to a different value.
-	FBlueprintNamespaceUtilities::FOnDefaultBlueprintNamespaceTypeChanged OnDefaultBlueprintNamespaceTypeChangedDelegate;
+	static FBlueprintNamespaceUtilities::FOnDefaultBlueprintNamespaceTypeChanged OnDefaultBlueprintNamespaceTypeChangedDelegate;
 
 	// Helper method to convert a package path to a Blueprint namespace identifier string.
 	static void ConvertPackagePathToNamespacePath(const FString& InPackagePath, FString& OutNamespacePath)
