@@ -2,10 +2,7 @@
 
 #ifdef NEW_DIRECTLINK_PLUGIN
 
-#include "CoreMinimal.h"
-
 #include "DatasmithMaxDirectLink.h"
-
 
 #include "DatasmithMaxExporter.h"
 
@@ -46,7 +43,6 @@
 
 #include "Async/Async.h"
 
-
 #include "Windows/AllowWindowsPlatformTypes.h"
 MAX_INCLUDES_START
 	#include "Max.h"
@@ -62,11 +58,6 @@ MAX_INCLUDES_START
 	#include "maxicon.h" // for toolbar
 
 MAX_INCLUDES_END
-
-
-DECLARE_LOG_CATEGORY_EXTERN(LogDatasmithMaxExporter, Log, All);
-DEFINE_LOG_CATEGORY(LogDatasmithMaxExporter);
-
 
 namespace DatasmithMaxDirectLink
 {

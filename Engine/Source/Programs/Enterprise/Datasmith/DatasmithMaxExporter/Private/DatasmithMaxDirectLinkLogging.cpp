@@ -4,6 +4,9 @@
 
 #include "DatasmithMaxDirectLink.h"
 
+#include "Logging/LogMacros.h"
+
+DEFINE_LOG_CATEGORY(LogDatasmithMaxExporter);
 
 #include "Async/Async.h"
 
@@ -12,17 +15,35 @@
 #include "Logging/LogMacros.h"
 
 
-DECLARE_LOG_CATEGORY_EXTERN(LogDatasmithMaxExporter, Log, All);
-
 #include "Windows/AllowWindowsPlatformTypes.h"
 MAX_INCLUDES_START
 	#include "max.h"
 
+	#include "maxscript/maxscript.h"
+
 	#include "ISceneEventManager.h"
 MAX_INCLUDES_END
 
+
+
 namespace DatasmithMaxDirectLink
 {
+
+void LogDebug(const TCHAR* Msg)
+{
+	mprintf(L"[%s]%s\n", *FDateTime::UtcNow().ToString(TEXT("%Y.%m.%d-%H.%M.%S:%s")), Msg);
+	UE_LOG(LogDatasmithMaxExporter, Error, TEXT("%s"), Msg);
+	LogFlush();
+}
+
+void LogInfo(const TCHAR* Msg)
+{
+	mprintf(L"[%s]%s\n", *FDateTime::UtcNow().ToString(TEXT("%Y.%m.%d-%H.%M.%S:%s")), Msg);
+	UE_LOG(LogDatasmithMaxExporter, Error, TEXT("%s"), Msg);
+}
+
+
+
 
 void LogFlush()
 {

@@ -7,11 +7,6 @@
 #include "DatasmithSceneFactory.h"
 
 
-#include "Logging/LogMacros.h"
-
-
-DECLARE_LOG_CATEGORY_EXTERN(LogDatasmithMaxExporter, Log, All);
-
 #include "Windows/AllowWindowsPlatformTypes.h"
 MAX_INCLUDES_START
 	#include "impexp.h"

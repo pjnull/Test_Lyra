@@ -2,11 +2,11 @@
 
 #ifdef NEW_DIRECTLINK_PLUGIN
 
+#include "DatasmithMaxDirectLink.h"
+
 #include "CoreMinimal.h"
 
 #include "DatasmithMaxExporterDefines.h"
-
-DECLARE_LOG_CATEGORY_EXTERN(LogDatasmithMaxExporter, Log, All);
 
 #include "Windows/AllowWindowsPlatformTypes.h"
 MAX_INCLUDES_START
