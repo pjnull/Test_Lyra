@@ -85,6 +85,8 @@ UTextureRenderTarget2D* FCompElementRenderTargetPool::AssignTarget(UObject* Owne
 
 	int32 MaxResolution = static_cast<int32>(GetMax2DTextureDimension());
 
+	bool bMaxSizeExceededWarning = false;
+
 	// Scale down dimensions if they exceed the maximum allowed resolution, while maintaining the aspect ratio.
 	if (Dimensions.GetMax() > MaxResolution)
 	{
@@ -99,8 +101,8 @@ UTextureRenderTarget2D* FCompElementRenderTargetPool::AssignTarget(UObject* Owne
 		}
 		Dimensions.X = static_cast<int32>(Scale * Dimensions.X);
 		Dimensions.Y = static_cast<int32>(Scale * Dimensions.Y);
-
-		UE_LOG(Composure, Warning, TEXT("Requested texture exceeds the maximum allowed dimensions, resizing to: %dx%d"), Dimensions.X, Dimensions.Y);
+		
+		bMaxSizeExceededWarning = true;
 	}
 
 	FRenderTargetDesc TargetDesc = { Dimensions, Format };
@@ -119,6 +121,11 @@ UTextureRenderTarget2D* FCompElementRenderTargetPool::AssignTarget(UObject* Owne
 		if (ensure(CVarRenderTargetLimit.GetValueOnGameThread() <= 0 || GetTargetCount() < CVarRenderTargetLimit.GetValueOnGameThread()))
 		{
 			ensureAlways(!CVarBreakOnTargetAlloc.GetValueOnGameThread());
+
+			if (bMaxSizeExceededWarning)
+			{
+				UE_LOG(Composure, Warning, TEXT("Requested texture exceeds the maximum allowed dimensions, resized to: %dx%d"), Dimensions.X, Dimensions.Y);
+			}
 
 			// don't use the passed in Owner as the outer, since this will be repooled and shared
 			UObject* Outer = ensure(PoolOwner.IsValid()) ? PoolOwner.Get() : GetTransientPackage();
