@@ -547,7 +547,7 @@ void SLevelSnapshotsEditorResults::BuildSelectionSetFromSelectedPropertiesInEach
 				{
 					UncheckedChildPropertyNodes.Add(ChildRow);
 				}
-				else if (ChildRowType == FLevelSnapshotsEditorResultsRow::StructGroup && !ChildRow->GetIsNodeChecked())
+				else if (ChildRowType == FLevelSnapshotsEditorResultsRow::StructGroup && ChildRow->GetWidgetCheckedState() == ECheckBoxState::Unchecked)
 				{
 					UncheckedChildPropertyNodes.Add(ChildRow);
 					ChildRow->GetAllUncheckedChildProperties(UncheckedChildPropertyNodes); 
@@ -629,6 +629,16 @@ void SLevelSnapshotsEditorResults::BuildSelectionSetFromSelectedPropertiesInEach
 					{
 						PropertySelectionMap.RemoveObjectPropertiesFromMap(Component);
 					}
+
+					TArray<UObject*> Subobjects;
+					GetObjectsWithOuter(WorldActor, Subobjects, true);
+
+					for (UObject* Subobject : Subobjects)
+					{
+						PropertySelectionMap.RemoveObjectPropertiesFromMap(Subobject);
+					}
+
+					PropertySelectionMap.RemoveComponentSelection(WorldActor);
 				}
 			}
 			else
