@@ -444,6 +444,34 @@ class FDisplayCVarListExecHelper : public FSelfRegisteringExec
 
 			return true;
 		}
+		else if (FParse::Command(&Cmd, TEXT("LogCVarList")))
+		{
+			FString CVarList(Cmd);
+			if (!CVarList.IsEmpty())
+			{
+				TArray<FString> CVars;
+				CVarList.ParseIntoArray(CVars, TEXT(","));
+
+				Ar.Logf(TEXT("Name, Value"));
+
+				for (FString& CVarString : CVars)
+				{
+					CVarString.TrimStartAndEndInline();
+
+					IConsoleManager::Get().ForEachConsoleObjectThatStartsWith(FConsoleObjectVisitor::CreateLambda(
+						[this, &Ar](const TCHAR* Key, IConsoleObject* ConsoleObject)
+						{
+							if (IConsoleVariable* AsVariable = ConsoleObject->AsVariable())
+							{
+								Ar.Logf(TEXT("%s, %s"), Key, *AsVariable->GetString());
+							}
+						}),
+						*CVarString);
+				}
+			}
+
+			return true;
+		}
 		return false;
 	}
 
