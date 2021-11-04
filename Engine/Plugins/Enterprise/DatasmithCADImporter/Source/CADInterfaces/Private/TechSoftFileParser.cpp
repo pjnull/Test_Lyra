@@ -292,7 +292,7 @@ namespace TechSoftFileParserImpl
 		ECADParsingResult Result = ECADParsingResult::ProcessOk;
 
 		const FFileDescriptor& File = CADFileData.GetCADFileDescription();
-		
+
 		if (File.GetPathOfFileToLoad().IsEmpty())
 		{
 			return ECADParsingResult::FileNotFound;
@@ -795,7 +795,7 @@ namespace TechSoftFileParserImpl
 			TUniqueTSObj<A3DMiscAttributeData> AttributeData;
 			for (A3DUns32 Index = 0; Index < MetaData->m_uiSize; ++Index)
 			{
-				AttributeData.Get(MetaData->m_ppAttributes[Index]);
+				AttributeData.FillFrom(MetaData->m_ppAttributes[Index]);
 				if (AttributeData.IsValid())
 				{
 					TechSoftFileParserImpl::TraverseAttribute(*AttributeData, OutMetaData.MetaData);
@@ -810,10 +810,7 @@ namespace TechSoftFileParserImpl
 			{
 				if (MetaDataWithGraphics->m_pGraphics != NULL)
 				{
-					FEntityBehaviour GraphicsBehaviour;
-					TraverseGraphics(MetaDataWithGraphics->m_pGraphics, GraphicsBehaviour);
-					OutMetaData.bRemoved = GraphicsBehaviour.bRemoved;
-					OutMetaData.bShow = GraphicsBehaviour.bShow;
+					TraverseGraphics(MetaDataWithGraphics->m_pGraphics, OutMetaData);
 				}
 			}
 		}
@@ -840,13 +837,13 @@ namespace TechSoftFileParserImpl
 
 		if (Format == ECADFormat::JT)
 		{
-			if(TechSoftFileParserImpl::ReplaceOrAddNameValue(MetaData, TEXT("SDKName")))
+			if (TechSoftFileParserImpl::ReplaceOrAddNameValue(MetaData, TEXT("SDKName")))
 			{
 				return;
 			}
 		}
 
-		if(TechSoftFileParserImpl::CheckIfNameExists(MetaData))
+		if (TechSoftFileParserImpl::CheckIfNameExists(MetaData))
 		{
 			return;
 		}
@@ -1052,15 +1049,96 @@ namespace TechSoftFileParserImpl
 		}
 	}
 
-	void FTechSoftFileParser::TraverseGraphics(const A3DGraphics* Graphics, FEntityBehaviour& GraphicsBehaviour)
+	FArchiveColor& FTechSoftFileParser::FindOrAddColor(uint32 ColorIndex, uint8 Alpha)
 	{
-		// TODO
+		uint32 ColorHId = BuildColorId(ColorIndex, Alpha);
+		if (FArchiveColor* Color = CADFileData.FindColor(ColorHId))
+		{
+			return *Color;
+		}
 
+		FArchiveColor& NewColor = CADFileData.AddColor(ColorHId);
+		FColor& Color = NewColor.Color;
+		TUniqueTSObjFromIndex<A3DGraphRgbColorData> ColorData(ColorIndex);
+		if (ColorData.IsValid())
+		{
+			Color.R = (uint8)(ColorData->m_dRed * 255);
+			Color.G = (uint8)(ColorData->m_dGreen * 255);
+			Color.B = (uint8)(ColorData->m_dBlue * 255);
+			Color.A = Alpha;
+		}
+		else
+		{
+			Color = FColor(200, 200, 200);
+		}
+
+		NewColor.UEMaterialName = BuildColorName(NewColor.Color);
+		return NewColor;
+	}
+
+	FArchiveMaterial& FTechSoftFileParser::FindOrAddMaterial(uint32 MaterialIndex)
+	{
+		if (FArchiveMaterial* MaterialArchive = CADFileData.FindMaterial(MaterialIndex))
+		{
+			return *MaterialArchive;
+		}
+
+		TUniqueTSObjFromIndex<A3DGraphRgbColorData> ColorData;
+		TFunction<const FColor(uint32)> GetColor = [&](uint32 ColorIndex) -> const FColor
+		{
+			ColorData.FillFrom(ColorIndex);
+			if (ColorData.IsValid())
+			{
+				return FColor((uint8)ColorData->m_dRed * 255,
+					(uint8)ColorData->m_dGreen * 255,
+					(uint8)ColorData->m_dBlue * 255);
+			}
+			else
+			{
+				return FColor(200, 200, 200);
+			}
+		};
+
+		FArchiveMaterial& NewMaterial = CADFileData.AddMaterial(MaterialIndex);
+		FCADMaterial& Material = NewMaterial.Material;
+
+		A3DBool bIsTexture = false;
+		A3DGlobalIsMaterialTexture(MaterialIndex, &bIsTexture);
+		if (bIsTexture)
+		{
+#ifdef NOTYETDEFINE
+			// style is a texture
+			TUniqueTSObj<A3DGraphTextureDefinitionData> TextureDefinitionData(TextureIndex);
+			if (TextureDefinitionData.IsValid())
+			{
+				TUniqueTSObj<A3DGraphPictureData> PictureData(TextureDefinitionData->m_uiPictureIndex);
+			}
+#endif
+		}
+		else
+		{
+			TUniqueTSObjFromIndex<A3DGraphMaterialData> MaterialData(MaterialIndex);
+			Material.Diffuse = GetColor(MaterialData->m_uiDiffuse);
+			Material.Ambient = GetColor(MaterialData->m_uiAmbient);
+			Material.Specular = GetColor(MaterialData->m_uiSpecular);
+			Material.Shininess = MaterialData->m_dShininess;
+			Material.Transparency = MaterialData->m_dAmbientAlpha;
+			// todo: find how to convert Emissive color into ? reflexion coef...
+			// Material.Emissive = GetColor(MaterialData->m_uiEmissive);
+			// Material.Reflexion;
+		}
+
+		return NewMaterial;
+	}
+
+	void FTechSoftFileParser::TraverseGraphics(const A3DGraphics* Graphics, FEntityMetaData& OutMetaData)
+	{
 		TUniqueTSObj<A3DGraphicsData> GraphicsData(Graphics);
 		if (!GraphicsData.IsValid())
 		{
 			return;
 		}
+		FEntityBehaviour GraphicsBehaviour;
 
 		GraphicsBehaviour.bFatherHeritColor = GraphicsData->m_usBehaviour & kA3DGraphicsFatherHeritColor;
 		GraphicsBehaviour.bFatherHeritLayer = GraphicsData->m_usBehaviour & kA3DGraphicsFatherHeritLayer;
@@ -1076,12 +1154,56 @@ namespace TechSoftFileParserImpl
 		GraphicsBehaviour.bSonHeritLineWidth = GraphicsData->m_usBehaviour & kA3DGraphicsSonHeritLineWidth;
 		GraphicsBehaviour.bSonHeritShow = GraphicsData->m_usBehaviour & kA3DGraphicsSonHeritShow;
 		GraphicsBehaviour.bSonHeritTransparency = GraphicsData->m_usBehaviour & kA3DGraphicsSonHeritTransparency;
+
+		OutMetaData.bRemoved = GraphicsBehaviour.bRemoved;
+		OutMetaData.bShow = GraphicsBehaviour.bShow;
+
+		FCADUUID ColorName;
+		FCADUUID MaterialName;
+
+		TraverseGraphStyleData(GraphicsData->m_uiStyleIndex, ColorName, MaterialName);
+
+		if (ColorName)
+		{
+			OutMetaData.MetaData.Add(TEXT("ColorName"), FString::Printf(TEXT("%u"), ColorName));
+		}
+
+		if (MaterialName)
+		{
+			OutMetaData.MetaData.Add(TEXT("MaterialName"), FString::Printf(TEXT("%u"), MaterialName));
+		}
+	}
+
+	void FTechSoftFileParser::TraverseGraphStyleData(uint32 StyleIndex, FCADUUID& OutColorName, FCADUUID& OutMaterialName)
+	{
+		OutColorName = 0;
+		OutMaterialName = 0;
+
+		TUniqueTSObjFromIndex<A3DGraphStyleData> GraphStyleData(StyleIndex);
+
+		if (GraphStyleData.IsValid())
+		{
+			if (GraphStyleData->m_bMaterial)
+			{
+				FArchiveMaterial& MaterialArchive = FindOrAddMaterial(GraphStyleData->m_uiRgbColorIndex);
+				OutMaterialName = MaterialArchive.UEMaterialName;
+			}
+			else
+			{
+				uint8 Alpha = 255;
+				if (GraphStyleData->m_bIsTransparencyDefined)
+				{
+					Alpha = GraphStyleData->m_ucTransparency;
+				}
+
+				FArchiveColor& ColorArchive = FindOrAddColor(GraphStyleData->m_uiRgbColorIndex, Alpha);
+				OutColorName = ColorArchive.UEMaterialName;
+			}
+		}
 	}
 
 	void FTechSoftFileParser::TraverseMaterialProperties(const A3DEntity* Entity)
 	{
-		// TODO
-
 		TUniqueTSObj<A3DMiscMaterialPropertiesData> MaterialPropertiesData(Entity);
 		if (!MaterialPropertiesData.IsValid())
 		{
@@ -1126,9 +1248,9 @@ namespace TechSoftFileParserImpl
 				Scale.M[1][1] = CartesianTransformationData->m_sScale.m_dY;
 				Scale.M[2][2] = CartesianTransformationData->m_sScale.m_dZ;
 				Matrix = Matrix * Scale;
-				
+
 				Matrix = Matrix.ConcatTranslation(Origin);
-				
+
 				return Matrix;
 			}
 		}
@@ -1219,7 +1341,7 @@ namespace TechSoftFileParserImpl
 			TUniqueTSObj<A3DAsmProductOccurrenceData> ChildData;
 			for (uint32 Index = 0; Index < OccurrenceData->m_uiPOccurrencesSize; ++Index)
 			{
-				if (ChildData.Get(OccurrenceData->m_ppPOccurrences[Index]) == A3D_SUCCESS)
+				if (ChildData.FillFrom(OccurrenceData->m_ppPOccurrences[Index]) == A3D_SUCCESS)
 				{
 					if (ChildData->m_uiProductFlags & A3D_PRODUCT_FLAG_CONFIG)
 					{
@@ -1685,6 +1807,25 @@ namespace TechSoftFileParserImpl
 				const A3DTessFaceData& FaceTessData = Tessellation3DData->m_psFaceTessData[Index];
 				FTessellationData& Tessellation = BodyMesh.Faces.Emplace_GetRef();
 
+				if (FaceTessData.m_uiStyleIndexesSize == 1)
+				{
+					A3DUns32 StyleIndex = FaceTessData.m_puiStyleIndexes[0];
+					FCADUUID ColorName;
+					FCADUUID MaterialName;
+					TraverseGraphStyleData(StyleIndex, ColorName, MaterialName);
+					if (ColorName)
+					{
+						Tessellation.ColorName = ColorName;
+						BodyMesh.ColorSet.Add(ColorName);
+					}
+
+					if (MaterialName)
+					{
+						Tessellation.MaterialName = MaterialName;
+						BodyMesh.MaterialSet.Add(MaterialName);
+					}
+				}
+
 				unsigned int UsedEntitiesFlags = FaceTessData.m_usUsedEntitiesFlags;
 				long StartTriangulated = FaceTessData.m_uiStartTriangulated;
 
@@ -1750,8 +1891,10 @@ namespace TechSoftFileParserImpl
 
 			}
 		}
-	}
 
+		Body.ColorFaceSet = BodyMesh.ColorSet;
+		Body.MaterialFaceSet = BodyMesh.MaterialSet;
+	}
 }
 
 #endif

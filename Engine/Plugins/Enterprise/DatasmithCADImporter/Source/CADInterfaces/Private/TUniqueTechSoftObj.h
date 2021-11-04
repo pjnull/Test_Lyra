@@ -64,7 +64,7 @@ namespace CADLibrary
 		/**
 		 * Fill the structure with the data of a new DataPtr
 		 */
-		A3DStatus Get(IndexerType DataPtr)
+		A3DStatus FillFrom(IndexerType DataPtr)
 		{
 			if (IsValid())
 			{
@@ -145,7 +145,7 @@ namespace CADLibrary
 		 */
 		ObjectType* GetEmptyDataPtr()
 		{
-			Get(NULL);
+			FillFrom(DefaultValue);
 			Status = A3DStatus::A3D_SUCCESS;
 			return &Data;
 		}

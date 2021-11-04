@@ -181,6 +181,8 @@ FDatasmithSceneBaseGraphBuilder::FDatasmithSceneBaseGraphBuilder(CADLibrary::FAr
 	, ImportParameters(InImportParameters)
 	, ImportParametersHash(ImportParameters.GetHash())
 	, RootFileDescription(*InSource.GetSourceFile())
+	, bPreferMaterial(false)
+	, bMaterialPropagationIsTopDown(ImportParameters.GetPropagation() == CADLibrary::EDisplayDataPropagationMode::TopDown)
 {
 	if (InSceneGraph)
 	{

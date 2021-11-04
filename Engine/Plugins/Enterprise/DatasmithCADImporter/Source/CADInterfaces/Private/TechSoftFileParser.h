@@ -195,9 +195,12 @@ namespace CADLibrary
 		void BuildBodyName(TMap<FString, FString>& MetaData);
 
 		// Graphic properties
-		void TraverseGraphics(const A3DGraphics* Graphics, FEntityBehaviour& GraphicsBehaviour);
+		void TraverseGraphics(const A3DGraphics* Graphics, FEntityMetaData& OutMetaData);
+		void TraverseGraphStyleData(uint32 StyleIndex, FCADUUID& ColorName, FCADUUID& MaterialName);
 		void TraverseMaterialProperties(const A3DEntity* Entity);
 		void TraverseLayer(const A3DAsmProductOccurrence* Occurrence);
+		FArchiveColor& FindOrAddColor(uint32 ColorIndex, uint8 Alpha);
+		FArchiveMaterial& FindOrAddMaterial(uint32 MaterialIndex);
 
 		// Transform
 		FMatrix TraverseCoordinateSystem(const A3DRiCoordinateSystem* CoordinateSystem);
