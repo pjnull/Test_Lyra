@@ -67,7 +67,7 @@ void Main(
 	FPixelMaterialInputs PixelMaterialInputs;
 	CalcMaterialParameters(MaterialParameters, PixelMaterialInputs, SvPosition, bIsFrontFace);
 
-#if SHADING_PATH_MOBILE
+#if SHADING_PATH_MOBILE && MATERIAL_SHOULD_DISABLE_DEPTH_TEST==0
 	// Mobile specific: 
 	// distortion primtitives rendered without depth testing
 	// discard pixels that are hidden by manually comparing them to a scene depth

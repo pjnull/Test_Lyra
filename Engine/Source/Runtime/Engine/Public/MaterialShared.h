@@ -3303,6 +3303,7 @@ struct FMaterialShaderParameters
 			uint64 bIsUsedWithNanite : 1;
 			uint64 bIsStencilTestEnabled : 1;
 			uint64 bIsTranslucencySurface : 1;
+			uint64 bShouldDisableDepthTest : 1;
 		};
 	};
 
@@ -3367,6 +3368,7 @@ struct FMaterialShaderParameters
 		bIsUsedWithNanite = InMaterial->IsUsedWithNanite();
 		bIsStencilTestEnabled = InMaterial->IsStencilTestEnabled();
 		bIsTranslucencySurface = InMaterial->GetTranslucencyLightingMode() == ETranslucencyLightingMode::TLM_Surface || InMaterial->GetTranslucencyLightingMode() == ETranslucencyLightingMode::TLM_SurfacePerPixelLighting;
+		bShouldDisableDepthTest = InMaterial->ShouldDisableDepthTest();
 	}
 };
 

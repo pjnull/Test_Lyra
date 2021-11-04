@@ -77,11 +77,17 @@ class FDistortionMeshProcessor : public FMeshPassProcessor
 {
 public:
 
-	FDistortionMeshProcessor(const FScene* Scene, const FSceneView* InViewIfDynamicMeshCommand, const FMeshPassProcessorRenderState& InPassDrawRenderState, FMeshPassDrawListContext* InDrawListContext);
+	FDistortionMeshProcessor(
+		const FScene* Scene, 
+		const FSceneView* InViewIfDynamicMeshCommand, 
+		const FMeshPassProcessorRenderState& InPassDrawRenderState, 
+		const FMeshPassProcessorRenderState& InDistortionPassStateNoDepthTest,
+		FMeshPassDrawListContext* InDrawListContext);
 
 	virtual void AddMeshBatch(const FMeshBatch& RESTRICT MeshBatch, uint64 BatchElementMask, const FPrimitiveSceneProxy* RESTRICT PrimitiveSceneProxy, int32 StaticMeshId = -1) override final;
 
 	FMeshPassProcessorRenderState PassDrawRenderState;
+	FMeshPassProcessorRenderState PassDrawRenderStateNoDepthTest;
 
 private:
 	bool TryAddMeshBatch(
