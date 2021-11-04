@@ -456,7 +456,7 @@ namespace Audio
 			ICompressedAudioInfo* CompressedInfo = new FVorbisAudioInfo();
 			if (!CompressedInfo)
 			{
-				UE_LOG(LogAudio, Error, TEXT("Failed to create new FVorbisAudioInfo for SoundWave %s: out of memory."), *InSoundWave->GetName());
+				UE_LOG(LogAudio, Error, TEXT("Failed to create new FVorbisAudioInfo for SoundWave %s: out of memory."), *InSoundWave->GetFName().ToString());
 				return nullptr;
 			}
 			return CompressedInfo;
