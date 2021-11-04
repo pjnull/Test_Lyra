@@ -136,7 +136,7 @@ TSharedPtr<SToolTip> SMemTagTreeViewTooltip::GetRowTooltip(const TSharedPtr<FMem
 					.Padding(2.0f)
 					[
 						SNew(STextBlock)
-						.Text(FText::AsNumber(MemTagNodePtr->GetMemTagId()))
+						.Text(FText::FromString(FString::Printf(TEXT("0x%X"), MemTagNodePtr->GetMemTagId())))
 						.TextStyle(FInsightsStyle::Get(), TEXT("TreeTable.Tooltip"))
 					]
 
@@ -176,7 +176,7 @@ TSharedPtr<SToolTip> SMemTagTreeViewTooltip::GetRowTooltip(const TSharedPtr<FMem
 					//	.TextStyle(FInsightsStyle::Get(), TEXT("TreeTable.Tooltip"))
 					//]
 
-					// Net Event Type: [Type]
+					// Type: [Type]
 					+ SGridPanel::Slot(0, 3)
 					.Padding(2.0f)
 					[
@@ -192,12 +192,12 @@ TSharedPtr<SToolTip> SMemTagTreeViewTooltip::GetRowTooltip(const TSharedPtr<FMem
 						.TextStyle(FInsightsStyle::Get(), TEXT("TreeTable.Tooltip"))
 					]
 
-					// Trackers: [Trackers]
+					// Tracker: [Tracker]
 					+ SGridPanel::Slot(0, 4)
 					.Padding(2.0f)
 					[
 						SNew(STextBlock)
-						.Text(LOCTEXT("TT_Trackers", "Trackers:"))
+						.Text(LOCTEXT("TT_Tracker", "Tracker:"))
 						.TextStyle(FInsightsStyle::Get(), TEXT("TreeTable.TooltipBold"))
 					]
 					+ SGridPanel::Slot(1, 4)

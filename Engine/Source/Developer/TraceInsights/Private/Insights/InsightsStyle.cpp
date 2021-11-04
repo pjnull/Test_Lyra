@@ -128,7 +128,6 @@ void FInsightsStyle::FStyle::Initialize()
 	//////////////////////////////////////////////////
 	// Icons for major components
 
-	//Set("Icons.SessionInfo", new CORE_IMAGE_BRUSH_SVG("Starship/Common/Info", Icon16x16));
 	Set("Icons.SessionInfo", new IMAGE_BRUSH_SVG("Session", Icon16x16));
 
 	//////////////////////////////////////////////////
@@ -229,6 +228,15 @@ void FInsightsStyle::FStyle::Initialize()
 	Set("Icons.FindPrevious.ToolBar", new IMAGE_BRUSH_SVG("ControlsPrevious", Icon20x20));
 	Set("Icons.FindNext.ToolBar", new IMAGE_BRUSH_SVG("ControlsNext", Icon20x20));
 	Set("Icons.FindLast.ToolBar", new IMAGE_BRUSH_SVG("ControlsLast", Icon20x20));
+
+	//////////////////////////////////////////////////
+
+	Set("Icons.SizeSmall", new IMAGE_BRUSH_SVG("SizeSmall", Icon16x16));
+	Set("Icons.SizeSmall.ToolBar", new IMAGE_BRUSH_SVG("SizeSmall_20", Icon20x20));
+	Set("Icons.SizeMedium", new IMAGE_BRUSH_SVG("SizeMedium", Icon16x16));
+	Set("Icons.SizeMedium.ToolBar", new IMAGE_BRUSH_SVG("SizeMedium_20", Icon20x20));
+	Set("Icons.SizeLarge", new IMAGE_BRUSH_SVG("SizeLarge", Icon16x16));
+	Set("Icons.SizeLarge.ToolBar", new IMAGE_BRUSH_SVG("SizeLarge_20", Icon20x20));
 
 	//////////////////////////////////////////////////
 
