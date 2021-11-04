@@ -2441,24 +2441,12 @@ bool FAnimInstanceProxy::WasAnimNotifyNameTriggeredInStateMachine(int32 MachineI
 
 const FAnimNode_AssetPlayerBase* FAnimInstanceProxy::GetRelevantAssetPlayerFromState(int32 MachineIndex, int32 StateIndex) const
 {
-	const FAnimNode_AssetPlayerBase* ResultPlayer = nullptr;
-	if(const FAnimNode_StateMachine* MachineInstance = GetStateMachineInstance(MachineIndex))
+	if(const FAnimNode_StateMachine* StateMachine = GetStateMachineInstance(MachineIndex))
 	{
-		float MaxWeight = 0.0f;
-		const FBakedAnimationState& State = MachineInstance->GetStateInfo(StateIndex);
-		for(const int32& PlayerIdx : State.PlayerNodeIndices)
-		{
-			if(const FAnimNode_AssetPlayerBase* Player = GetNodeFromIndex<FAnimNode_AssetPlayerBase>(PlayerIdx))
-			{
-				if(!Player->GetIgnoreForRelevancyTest() && Player->GetCachedBlendWeight() > MaxWeight)
-				{
-					MaxWeight = Player->GetCachedBlendWeight();
-					ResultPlayer = Player;
-				}
-			}
-		}
+		return StateMachine->GetRelevantAssetPlayerFromState(this, StateMachine->GetStateInfo(StateIndex));
 	}
-	return ResultPlayer;
+
+	return nullptr;
 }
 
 const FAnimNode_StateMachine* FAnimInstanceProxy::GetStateMachineInstance(int32 MachineIndex) const
