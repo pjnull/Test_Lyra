@@ -26,7 +26,7 @@ from switchboard.config import CONFIG, BoolSetting, DirectoryPathSetting, \
     DEFAULT_MAP_TEXT
 from switchboard.devices.device_base import Device, DeviceStatus, \
     PluginHeaderWidgets
-from switchboard.devices.device_widget_base import DeviceWidget
+from switchboard.devices.device_widget_base import DeviceWidget, DeviceAutoJoinMUServerUI
 from switchboard.listener_client import ListenerClient
 from switchboard.switchboard_logging import LOGGER
 import switchboard.switchboard_widgets as sb_widgets
@@ -467,6 +467,14 @@ class DeviceUnreal(Device):
             tool_tip="List of roles for this device"
         )
 
+        autojoin_mu_server = kwargs.get("autojoin_mu_server", True)
+        self.autojoin_mu_server = BoolSetting(
+            attr_name="autojoin_mu_server",
+            nice_name="Auto join Multi-user Server",
+            value=autojoin_mu_server,
+            show_ui=False
+        )
+
         self.setting_ip_address.signal_setting_changed.connect(
             self.on_setting_ip_address_changed)
         DeviceUnreal.csettings['port'].signal_setting_changed.connect(
@@ -665,6 +673,7 @@ class DeviceUnreal(Device):
     def device_settings(self):
         return super().device_settings() + [
             self.setting_roles,
+            self.autojoin_mu_server
         ]
 
     def check_settings_valid(self) -> bool:
@@ -706,8 +715,18 @@ class DeviceUnreal(Device):
         return (
             super().plugin_header_widget_config() |
             PluginHeaderWidgets.OPEN_BUTTON |
-            PluginHeaderWidgets.CHANGELIST_LABEL
+            PluginHeaderWidgets.CHANGELIST_LABEL |
+            PluginHeaderWidgets.AUTOJOIN_MU
         )
+
+    def device_widget_registered(self, device_widget):
+        ''' Device interface method '''
+
+        super().device_widget_registered(device_widget)
+
+        self.update_settings_menu_state()
+
+        device_widget.autojoin_mu.signal_device_widget_autojoin_mu.connect(self.on_autojoin_mu_ui_change)
 
     def on_setting_ip_address_changed(self, _, new_address):
         LOGGER.info(f"Updating IP address for ListenerClient to {new_address}")
@@ -1220,7 +1239,7 @@ class DeviceUnreal(Device):
 
         command_line_args += " ";
 
-        if CONFIG.MUSERVER_AUTO_JOIN:
+        if CONFIG.MUSERVER_AUTO_JOIN.get_value() and self.autojoin_mu_server.get_value():
             command_line_args += (
                 '-CONCERTRETRYAUTOCONNECTONERROR '
                 '-CONCERTAUTOCONNECT ')
@@ -1906,6 +1925,15 @@ class DeviceUnreal(Device):
             self._widget_classes.remove(widget_class)
             self._update_widget_classes()
 
+    def update_settings_menu_state(self):
+        autojoin = self.widget.autojoin_mu
+        autojoin.set_autojoin_mu(self.autojoin_mu_server.get_value())
+
+    def on_autojoin_mu_ui_change(self):
+        autojoin = self.widget.autojoin_mu
+        self.autojoin_mu_server.update_value(autojoin.is_autojoin_enabled())
+        self.update_settings_menu_state()
+
 def parse_unreal_tag_file(file_content):
     tags = []
     for line in file_content:
@@ -1918,7 +1946,7 @@ def parse_unreal_tag_file(file_content):
 
 class DeviceWidgetUnreal(DeviceWidget):
     def __init__(self, name, device_hash, ip_address, icons, parent=None):
-        self._settings_visible = True
+        self._autojoin_visible = True
 
         super().__init__(name, device_hash, ip_address, icons, parent=parent)
 
@@ -1962,6 +1990,14 @@ class DeviceWidgetUnreal(DeviceWidget):
             name='build')
 
         self.layout.addItem(spacer)
+
+        self.autojoin_mu = DeviceAutoJoinMUServerUI("")
+        button = self.autojoin_mu.make_button(self)
+        button.setVisible(self._autojoin_visible)
+        self.layout.setAlignment(button, QtCore.Qt.AlignVCenter)
+        self.add_widget_to_layout(button)
+
+        self.assign_button_to_name("autojoin_mu", button)
 
         self.open_button = self.add_control_button(
             icon_size=CONTROL_BUTTON_ICON_SIZE,

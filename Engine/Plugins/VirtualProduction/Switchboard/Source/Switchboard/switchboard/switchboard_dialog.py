@@ -315,6 +315,9 @@ class SwitchboardDialog(QtCore.QObject):
         self.window.additional_settings = DeviceAdditionalSettingsUI("global")
         self.window.additional_settings.assign_button(self.window.device_settings_button, self.window)
 
+        self.window.use_device_autojoin_setting_checkbox.toggled.connect(self.on_device_autojoin_changed)
+        self.refresh_muserver_autojoin()
+
         self.window.additional_settings.signal_device_widget_tracing.connect(self.on_tracing_settings_changed)
         self.refresh_trace_settings()
 
@@ -371,6 +374,10 @@ class SwitchboardDialog(QtCore.QObject):
         # Run the transport queue
         #self.transport_queue_resume()
 
+    def on_device_autojoin_changed(self):
+        CONFIG.MUSERVER_AUTO_JOIN.update_value(
+            self.window.use_device_autojoin_setting_checkbox.isChecked())
+
     def set_config_hooks(self):
         CONFIG.P4_PROJECT_PATH.signal_setting_changed.connect(lambda: self.p4_refresh_project_cl())
         CONFIG.P4_ENGINE_PATH.signal_setting_changed.connect(lambda: self.p4_refresh_engine_cl())
@@ -378,13 +385,17 @@ class SwitchboardDialog(QtCore.QObject):
         CONFIG.P4_ENABLED.signal_setting_changed.connect(lambda _, enabled: self.toggle_p4_controls(enabled))
         CONFIG.MAPS_PATH.signal_setting_changed.connect(lambda: self.refresh_levels())
         CONFIG.MAPS_FILTER.signal_setting_changed.connect(lambda: self.refresh_levels())
-        CONFIG.INSIGHTS_TRACE_ENABLE.signal_setting_changed.connect(lambda: self.reference_trace_settings())
-        CONFIG.INSIGHTS_TRACE_ARGS.signal_setting_changed.connect(lambda: self.reference_trace_settings())
-        CONFIG.INSIGHTS_STAT_EVENTS.signal_setting_changed.connect(lambda: self.reference_trace_settings())
+        CONFIG.INSIGHTS_TRACE_ENABLE.signal_setting_changed.connect(lambda: self.refresh_trace_settings())
+        CONFIG.INSIGHTS_TRACE_ARGS.signal_setting_changed.connect(lambda: self.refresh_trace_settings())
+        CONFIG.INSIGHTS_STAT_EVENTS.signal_setting_changed.connect(lambda: self.refresh_trace_settings())
+        CONFIG.MUSERVER_AUTO_JOIN.signal_setting_changed.connect(lambda: self.refresh_muserver_autojoin())
 
     def refresh_trace_settings(self):
         self.window.additional_settings.set_insight_trace_state(CONFIG.INSIGHTS_TRACE_ENABLE.get_value())
         self.window.additional_settings.set_insight_tracing_args(CONFIG.INSIGHTS_TRACE_ARGS.get_value())
+
+    def refresh_muserver_autojoin(self):
+        self.window.use_device_autojoin_setting_checkbox.setChecked(CONFIG.MUSERVER_AUTO_JOIN.get_value())
 
     def on_tracing_settings_changed(self):
         settings = self.window.additional_settings
@@ -630,7 +641,6 @@ class SwitchboardDialog(QtCore.QObject):
         settings_dialog.set_mu_server_endpoint(CONFIG.MUSERVER_ENDPOINT)
         settings_dialog.set_mu_cmd_line_args(CONFIG.MUSERVER_COMMAND_LINE_ARGUMENTS)
         settings_dialog.set_mu_clean_history(CONFIG.MUSERVER_CLEAN_HISTORY)
-        settings_dialog.set_mu_auto_join(CONFIG.MUSERVER_AUTO_JOIN)
         settings_dialog.set_mu_auto_launch(CONFIG.MUSERVER_AUTO_LAUNCH)
         settings_dialog.set_mu_server_exe(CONFIG.MULTIUSER_SERVER_EXE)
         settings_dialog.set_mu_server_auto_build(CONFIG.MUSERVER_AUTO_BUILD)
@@ -702,10 +712,6 @@ class SwitchboardDialog(QtCore.QObject):
         mu_auto_launch = settings_dialog.mu_auto_launch()
         if mu_auto_launch != CONFIG.MUSERVER_AUTO_LAUNCH:
             CONFIG.MUSERVER_AUTO_LAUNCH = mu_auto_launch
-
-        mu_auto_join = settings_dialog.mu_auto_join()
-        if mu_auto_join != CONFIG.MUSERVER_AUTO_JOIN:
-            CONFIG.MUSERVER_AUTO_JOIN = mu_auto_join
 
         mu_server_exe = settings_dialog.mu_server_exe()
         if mu_server_exe != CONFIG.MULTIUSER_SERVER_EXE:

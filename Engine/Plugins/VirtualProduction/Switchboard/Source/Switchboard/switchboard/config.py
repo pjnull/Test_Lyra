@@ -1350,14 +1350,8 @@ class Config(object):
 
         # MU Settings
         self.MULTIUSER_SERVER_EXE = 'UnrealMultiUserServer'
-        self.MUSERVER_COMMAND_LINE_ARGUMENTS = ""
-        self.MUSERVER_SERVER_NAME = f'{self.PROJECT_NAME}_MU_Server'
-        self.MUSERVER_ENDPOINT = ':9030'
-        self.MUSERVER_AUTO_LAUNCH = True
-        self.MUSERVER_AUTO_JOIN = False
-        self.MUSERVER_CLEAN_HISTORY = True
-        self.MUSERVER_AUTO_BUILD = True
-        self.MUSERVER_AUTO_ENDPOINT = True
+
+        self.init_muserver()
 
         self.LISTENER_EXE = 'SwitchboardListener'
 
@@ -1371,6 +1365,24 @@ class Config(object):
 
         SETTINGS.CONFIG = self.file_path
         SETTINGS.save()
+
+    def init_muserver(self, data={}):
+        # MU Settings
+        self.MUSERVER_COMMAND_LINE_ARGUMENTS = data.get(
+            'muserver_command_line_arguments', '')
+        self.MUSERVER_SERVER_NAME = data.get(
+            'muserver_server_name', f'{self.PROJECT_NAME}_MU_Server')
+        self.MUSERVER_ENDPOINT = data.get('muserver_endpoint', ':9030')
+        self.MUSERVER_AUTO_LAUNCH = data.get('muserver_auto_launch', True)
+        self.MUSERVER_CLEAN_HISTORY = data.get('muserver_clean_history', False)
+        self.MUSERVER_AUTO_BUILD = data.get('muserver_auto_build', True)
+        self.MUSERVER_AUTO_ENDPOINT = data.get('muserver_auto_endpoint', True)
+
+        self.MUSERVER_AUTO_JOIN = BoolSetting(
+            "muserver_auto_join",
+            "Unreal Multi-user Server Auto-join",
+            data.get('muserver_auto_join', True)
+        )
 
     def init_unreal_insights(self, data={}):
         self.INSIGHTS_TRACE_ENABLE = BoolSetting(
@@ -1388,6 +1400,18 @@ class Config(object):
             "Unreal Insights Tracing with Stat Events",
             data.get('tracing_stat_events', True)
         )
+
+    def save_muserver(self, data):
+        data["muserver_command_line_arguments"] = (
+            self.MUSERVER_COMMAND_LINE_ARGUMENTS)
+        data["muserver_server_name"] = self.MUSERVER_SERVER_NAME
+        data["muserver_endpoint"] = self.MUSERVER_ENDPOINT
+        data["muserver_auto_launch"] = self.MUSERVER_AUTO_LAUNCH
+        data["muserver_clean_history"] = self.MUSERVER_CLEAN_HISTORY
+        data["muserver_auto_build"] = self.MUSERVER_AUTO_BUILD
+        data["muserver_auto_endpoint"] = self.MUSERVER_AUTO_ENDPOINT
+
+        data["muserver_auto_join"] = self.MUSERVER_AUTO_JOIN.get_value()
 
     def save_unreal_insights(self, data):
         data['tracing_enabled'] = self.INSIGHTS_TRACE_ENABLE.get_value()
@@ -1493,20 +1517,13 @@ class Config(object):
             'multiuser_exe', 'UnrealMultiUserServer')
         self.LISTENER_EXE = data.get('listener_exe', 'SwitchboardListener')
 
-        # MU Settings
-        self.MUSERVER_COMMAND_LINE_ARGUMENTS = data.get(
-            'muserver_command_line_arguments', '')
-        self.MUSERVER_SERVER_NAME = data.get(
-            'muserver_server_name', f'{self.PROJECT_NAME}_MU_Server')
-        self.MUSERVER_ENDPOINT = data.get('muserver_endpoint', ':9030')
-        self.MUSERVER_AUTO_LAUNCH = data.get('muserver_auto_launch', True)
-        self.MUSERVER_AUTO_JOIN = data.get('muserver_auto_join', False)
-        self.MUSERVER_CLEAN_HISTORY = data.get('muserver_clean_history', True)
-        self.MUSERVER_AUTO_BUILD = data.get('muserver_auto_build', True)
-        self.MUSERVER_AUTO_ENDPOINT = data.get('muserver_auto_endpoint', True)
+        self.init_muserver(data)
 
         # MISC SETTINGS
         self.CURRENT_LEVEL = data.get('current_level', DEFAULT_MAP_TEXT)
+
+        project_settings.extend([
+            self.MUSERVER_AUTO_JOIN])
 
         # Automatically save whenever a project setting is changed or
         # overridden by a device.
@@ -1621,15 +1638,8 @@ class Config(object):
 
         # MU Settings
         data["multiuser_exe"] = self.MULTIUSER_SERVER_EXE
-        data["muserver_command_line_arguments"] = (
-            self.MUSERVER_COMMAND_LINE_ARGUMENTS)
-        data["muserver_server_name"] = self.MUSERVER_SERVER_NAME
-        data["muserver_endpoint"] = self.MUSERVER_ENDPOINT
-        data["muserver_auto_launch"] = self.MUSERVER_AUTO_LAUNCH
-        data["muserver_auto_join"] = self.MUSERVER_AUTO_JOIN
-        data["muserver_clean_history"] = self.MUSERVER_CLEAN_HISTORY
-        data["muserver_auto_build"] = self.MUSERVER_AUTO_BUILD
-        data["muserver_auto_endpoint"] = self.MUSERVER_AUTO_ENDPOINT
+
+        self.save_muserver(data)
 
         # Current Level
         data["current_level"] = self.CURRENT_LEVEL

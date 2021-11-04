@@ -281,6 +281,10 @@ class DeviceWidgetnDisplay(DeviceWidgetUnreal):
 
     signal_device_widget_master = QtCore.Signal(object)
 
+    def _add_control_buttons(self):
+        self._autojoin_visible = False
+        super()._add_control_buttons()
+
     def add_widget_to_layout(self, widget):
         ''' DeviceWidget base class method override. '''
 
@@ -841,7 +845,7 @@ class DevicenDisplay(DeviceUnreal):
             ])
 
         # MultiUser parameters
-        if CONFIG.MUSERVER_AUTO_JOIN:
+        if CONFIG.MUSERVER_AUTO_JOIN.get_value() and self.autojoin_mu_server.get_value():
             args.extend([
                 '-CONCERTRETRYAUTOCONNECTONERROR',
                 '-CONCERTAUTOCONNECT'])
