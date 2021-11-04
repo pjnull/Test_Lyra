@@ -791,9 +791,9 @@ public:
 			MapImplicitShapes(Index);
 		}
 
-		void MapImplicitShapes();
+		CHAOS_API void MapImplicitShapes();
 
-		void MapImplicitShapes(int32 Index);
+		CHAOS_API void MapImplicitShapes(int32 Index);
 
 		template <typename T2, int d2, EGeometryParticlesSimType SimType2>
 		friend class TGeometryParticlesImp;
@@ -825,13 +825,5 @@ public:
 
 	template<>
 	TGeometryParticlesImp<FReal, 3, EGeometryParticlesSimType::Other>* TGeometryParticlesImp<FReal, 3, EGeometryParticlesSimType::Other>::SerializationFactory(FChaosArchive& Ar, TGeometryParticlesImp<FReal, 3, EGeometryParticlesSimType::Other>* Particles);
-
-#if PLATFORM_MAC || PLATFORM_LINUX
-	extern template class CHAOS_API TGeometryParticlesImp<FReal, 3, EGeometryParticlesSimType::RigidBodySim>;
-	extern template class CHAOS_API TGeometryParticlesImp<FReal, 3, EGeometryParticlesSimType::Other>;
-#else
-	extern template class TGeometryParticlesImp<FReal, 3, EGeometryParticlesSimType::RigidBodySim>;
-	extern template class TGeometryParticlesImp<FReal, 3, EGeometryParticlesSimType::Other>;
-#endif
 
 }

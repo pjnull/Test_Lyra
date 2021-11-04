@@ -1911,9 +1911,9 @@ public:
 		check(false);
 	}
 
-	void MergeGeometry(TArray<TUniquePtr<FImplicitObject>>&& Objects);
+	CHAOS_API void MergeGeometry(TArray<TUniquePtr<FImplicitObject>>&& Objects);
 
-	void RemoveShape(FPerShapeData* InShape, bool bWakeTouching);
+	CHAOS_API void RemoveShape(FPerShapeData* InShape, bool bWakeTouching);
 
 	TSharedPtr<const FImplicitObject,ESPMode::ThreadSafe> SharedGeometryLowLevel() const { return MNonFrequentData.Read().SharedGeometryLowLevel(); }
 
@@ -2004,7 +2004,7 @@ public:
 	}
 
 	void SetIgnoreAnalyticCollisionsImp(FImplicitObject* Implicit, bool bIgnoreAnalyticCollisions);
-	void SetIgnoreAnalyticCollisions(bool bIgnoreAnalyticCollisions);
+	CHAOS_API void SetIgnoreAnalyticCollisions(bool bIgnoreAnalyticCollisions);
 
 	TSerializablePtr<FImplicitObject> Geometry() const { return MakeSerializable(MNonFrequentData.Read().Geometry()); }
 
@@ -2227,7 +2227,7 @@ protected:
 		MNonFrequentData.SyncRemote(Manager, DataIdx, RemoteData);
 	}
 
-	void MapImplicitShapes();
+	CHAOS_API void MapImplicitShapes();
 };
 
 template <typename T, int d>
@@ -2905,15 +2905,5 @@ inline void SetObjectStateHelper(IPhysicsProxyBase& Proxy, FPBDRigidParticle& Ri
 
 CHAOS_API void SetObjectStateHelper(IPhysicsProxyBase& Proxy, FPBDRigidParticleHandle& Rigid, EObjectStateType InState, bool bAllowEvents = false, bool bInvalidate = true);
 
-
-#if PLATFORM_MAC || PLATFORM_LINUX
-extern template class CHAOS_API TGeometryParticle<FReal, 3>;
-extern template class CHAOS_API TKinematicGeometryParticle<FReal, 3>;
-extern template class CHAOS_API TPBDRigidParticle<FReal, 3>;
-#else
-extern template class TGeometryParticle<FReal, 3>;
-extern template class TKinematicGeometryParticle<FReal, 3>;
-extern template class TPBDRigidParticle<FReal, 3>;
-#endif
 } // namespace Chaos
 

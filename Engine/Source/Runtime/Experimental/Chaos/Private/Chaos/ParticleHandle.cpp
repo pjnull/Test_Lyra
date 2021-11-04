@@ -216,11 +216,11 @@ namespace Chaos
 		});
 	}
 
-	template class CHAOS_API TGeometryParticle<FReal, 3>;
+	template class TGeometryParticle<FReal, 3>;
 
-	template class CHAOS_API TKinematicGeometryParticle<FReal, 3>;
+	template class TKinematicGeometryParticle<FReal, 3>;
 
-	template class CHAOS_API TPBDRigidParticle<FReal, 3>;
+	template class TPBDRigidParticle<FReal, 3>;
 
 	template <>
 	void Chaos::TGeometryParticle<FReal, 3>::MarkDirty(const EChaosPropertyFlags DirtyBits, bool bInvalidate )
