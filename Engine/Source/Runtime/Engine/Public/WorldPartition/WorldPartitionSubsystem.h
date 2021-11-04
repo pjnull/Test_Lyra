@@ -53,6 +53,10 @@ public:
 	void DumpStreamingSources(FOutputDevice& OutputDevice) const;
 
 private:
+#if WITH_EDITOR
+	bool IsRunningConvertWorldPartitionCommandlet() const;
+#endif
+
 	UWorldPartition* GetWorldPartition();
 	const UWorldPartition* GetWorldPartition() const;
 	void Draw(class UCanvas* Canvas, class APlayerController* PC);

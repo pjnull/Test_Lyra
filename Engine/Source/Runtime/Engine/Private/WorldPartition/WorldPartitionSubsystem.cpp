@@ -112,18 +112,23 @@ const UWorldPartition* UWorldPartitionSubsystem::GetWorldPartition() const
 	return GetWorld()->GetWorldPartition();
 }
 
+#if WITH_EDITOR
+bool UWorldPartitionSubsystem::IsRunningConvertWorldPartitionCommandlet() const
+{
+	static UClass* WorldPartitionConvertCommandletClass = FindObject<UClass>(ANY_PACKAGE, TEXT("WorldPartitionConvertCommandlet"), true);
+	check(WorldPartitionConvertCommandletClass);
+	static const bool bIsRunningWorldPartitionConvertCommandlet = GetRunningCommandletClass() && GetRunningCommandletClass()->IsChildOf(WorldPartitionConvertCommandletClass);
+	return bIsRunningWorldPartitionConvertCommandlet;
+}
+#endif
+
 void UWorldPartitionSubsystem::PostInitialize()
 {
 	Super::PostInitialize();
 
 #if WITH_EDITOR
-	static UClass* WorldPartitionConvertCommandletClass = FindObject<UClass>(ANY_PACKAGE, TEXT("WorldPartitionConvertCommandlet"), true);
-	check(WorldPartitionConvertCommandletClass);
-	const bool bIsRunningWorldPartitionConvertCommandlet = GetRunningCommandletClass() && GetRunningCommandletClass()->IsChildOf(WorldPartitionConvertCommandletClass);
-	if (bIsRunningWorldPartitionConvertCommandlet)
-	{
+	if (IsRunningConvertWorldPartitionCommandlet())
 		return;
-	}
 #endif
 
 	if (UWorldPartition* WorldPartition = GetWorldPartition())
@@ -151,6 +156,14 @@ void UWorldPartitionSubsystem::PostInitialize()
 
 void UWorldPartitionSubsystem::Deinitialize()
 {
+#if WITH_EDITOR
+	if (IsRunningConvertWorldPartitionCommandlet())
+	{
+		Super::Deinitialize();
+		return;
+	}
+#endif 
+
 	UWorldPartition* WorldPartition = GetWorldPartition();
 	
 	check(WorldPartition);
