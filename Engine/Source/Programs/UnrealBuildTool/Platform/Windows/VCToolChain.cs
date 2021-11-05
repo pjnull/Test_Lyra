@@ -1989,7 +1989,7 @@ namespace UnrealBuildTool
 			// ignored as a prerequisite for other actions
 			LinkAction.bProducesImportLibrary = bBuildImportLibraryOnly || LinkEnvironment.bIsBuildingDLL;
 
-			// Allow remote linking.  Especially in modular builds with many small DLL files, this is almost always very efficient
+			// Allow remote linking. Note that this may be overriden by the executor (eg. XGE.bAllowRemoteLinking)
 			LinkAction.bCanExecuteRemotely = true;
 
 			Log.TraceVerbose("     Linking: " + LinkAction.StatusDescription);
