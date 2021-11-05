@@ -274,6 +274,7 @@ UFunction* FTypePromotion::FindBestMatchingFunc_Internal(FName Operation, const 
 	{
 		int32 FuncScore = -1;
 		CheckedPins.Reset();
+		bool bIsInvalidMatch = false;
 
 		// Track this functions highest input and output types so that if there is a function with
 		// the same score as it we can prefer the correct one. 
@@ -290,6 +291,7 @@ UFunction* FTypePromotion::FindBestMatchingFunc_Internal(FName Operation, const 
 				// Don't bother with this function if there is a struct param, if no pins have any structs
 				if (ParamType.PinCategory == UEdGraphSchema_K2::PC_Struct && !bHasStruct)
 				{
+					bIsInvalidMatch = true;
 					break;
 				}
 
@@ -346,7 +348,7 @@ UFunction* FTypePromotion::FindBestMatchingFunc_Internal(FName Operation, const 
 			OutputCompareRes == ETypeComparisonResult::TypeAHigher));
 
 		// Keep track of the best function!
-		if (bScoresEqualAndPreferred || (FuncScore > BestScore && (bHasInputOutputPreference || bIsComparisonOp)))
+		if (!bIsInvalidMatch && (bScoresEqualAndPreferred || (FuncScore > BestScore && (bHasInputOutputPreference || bIsComparisonOp))))
 		{
 			BestScore = FuncScore;
 			BestFuncLowestInputType = CurFuncHighestInputType;
