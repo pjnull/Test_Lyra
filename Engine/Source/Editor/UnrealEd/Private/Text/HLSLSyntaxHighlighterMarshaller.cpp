@@ -273,7 +273,7 @@ FTextLayout::FNewLineData FHLSLSyntaxHighlighterMarshaller::ProcessTokenizedLine
 	TSharedRef<FString> ModelString = MakeShareable(new FString());
 	TArray< TSharedRef< IRun > > Runs;
 
-	if(ParseState == EParseState::LookingForSingleLineComment)
+	if(ParseState == EParseState::LookingForSingleLineComment) //-V547
 	{
 		ParseState = EParseState::None;
 	}
