@@ -128,13 +128,13 @@ bool FIOSAudioSoundBuffer::ReadCompressedInfo(USoundWave* InWave)
 	}
 
 	InWave->InitAudioResource(FName(TEXT("ADPCM")));
-	if (!InWave->SoundWaveDataPtr->ResourceData || InWave->SoundWaveDataPtr->ResourceSize <= 0)
+	if (InWave->SoundWaveDataPtr->ResourceSize <= 0)
 	{
 		InWave->RemoveAudioResource();
 		return false;
 	}
 
-	return DecompressionState->ReadCompressedInfo(InWave->SoundWaveDataPtr->ResourceData, InWave->SoundWaveDataPtr->ResourceSize, &QualityInfo);
+	return DecompressionState->ReadCompressedInfo(InWave->GetResourceData(), InWave->SoundWaveDataPtr->GetResourceSize(), &QualityInfo);
 }
 
 bool FIOSAudioSoundBuffer::ReadCompressedData( uint8* Destination, int32 NumFramesToDecode, bool bLooping )
