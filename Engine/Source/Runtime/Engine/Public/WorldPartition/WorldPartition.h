@@ -151,8 +151,6 @@ public:
 	bool IsInitialized() const;
 	virtual void Uninitialize() override;
 
-	const FTransform& GetInstanceTransform() const { return InstanceTransform; }
-
 	void Tick(float DeltaSeconds);
 	void UpdateStreamingState();
 	bool CanAddLoadedLevelToWorld(class ULevel* InLevel) const;
@@ -202,7 +200,6 @@ public:
 
 private:
 	EWorldPartitionInitState InitState;
-	FTransform InstanceTransform;
 
 	UPROPERTY()
 	mutable TObjectPtr<UWorldPartitionStreamingPolicy> StreamingPolicy;

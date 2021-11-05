@@ -250,7 +250,6 @@ UWorldPartition::UWorldPartition(const FObjectInitializer& ObjectInitializer)
 	, bIsPIE(false)
 #endif
 	, InitState(EWorldPartitionInitState::Uninitialized)
-	, InstanceTransform(FTransform::Identity)
 	, StreamingPolicy(nullptr)
 #if !UE_BUILD_SHIPPING
 	, Replay(nullptr)
@@ -371,7 +370,6 @@ void UWorldPartition::Initialize(UWorld* InWorld, const FTransform& InTransform)
 
 	check(InWorld);
 	World = InWorld;
-	InstanceTransform = InTransform;
 
 	check(InitState == EWorldPartitionInitState::Uninitialized);
 	InitState = EWorldPartitionInitState::Initializing;
@@ -454,7 +452,7 @@ void UWorldPartition::Initialize(UWorld* InWorld, const FTransform& InTransform)
 
 					InstancingContext.AddMapping(*LongActorPackageName, *InstancedName);
 
-					ActorDesc->TransformInstance(ReplaceFrom, ReplaceTo, InstanceTransform);
+					ActorDesc->TransformInstance(ReplaceFrom, ReplaceTo);
 				}
 
 				if (bEditorOnly)
@@ -1064,7 +1062,6 @@ void UWorldPartition::OnActorDescRegistered(const FWorldPartitionActorDesc& Acto
 {
 	AActor* Actor = ActorDesc.GetActor();
 	check(Actor);
-	ApplyActorTransform(Actor, InstanceTransform);
 	Actor->GetLevel()->AddLoadedActor(Actor);
 }
 
@@ -1074,7 +1071,6 @@ void UWorldPartition::OnActorDescUnregistered(const FWorldPartitionActorDesc& Ac
 	if (IsValidChecked(Actor))
 	{
 		Actor->GetLevel()->RemoveLoadedActor(Actor);
-		ApplyActorTransform(Actor, InstanceTransform.Inverse());
 	}
 }
 

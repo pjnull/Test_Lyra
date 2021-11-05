@@ -144,7 +144,7 @@ public:
 protected:
 	FWorldPartitionActorDesc();
 
-	void TransformInstance(const FString& From, const FString& To, const FTransform& Transform);
+	void TransformInstance(const FString& From, const FString& To);
 
 	inline void TransferRefCounts(const FWorldPartitionActorDesc* From) const
 	{
