@@ -23,6 +23,7 @@
 class FActiveTimerHandle;
 class FSlateWindowElementList;
 class IToolTip;
+class IMenu;
 class UEdGraph;
 
 DECLARE_DELEGATE( FOnUpdateGraphPanel )
