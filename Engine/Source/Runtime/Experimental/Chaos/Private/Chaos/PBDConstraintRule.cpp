@@ -304,15 +304,6 @@ namespace Chaos
 	}
 
 	template<class ConstraintType>
-	void TPBDConstraintColorRule<ConstraintType>::ApplySwept(const FReal Dt, int32 Island)
-	{
-		if(FPBDIslandSolver* IslandSolver = ConstraintGraph->GetSolverIsland(Island))
-		{
-			Constraints.ApplySwept(Dt, *IslandSolver);
-		}
-	}
-
-	template<class ConstraintType>
 	bool TPBDConstraintColorRule<ConstraintType>::ApplyConstraints(const FReal Dt, int32 Island, const int32 It, const int32 NumIts)
 	{
 		bool bNeedsAnotherIteration = false;

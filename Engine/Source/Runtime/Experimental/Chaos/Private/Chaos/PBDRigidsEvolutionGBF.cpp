@@ -58,6 +58,16 @@ namespace Chaos
 		int DisableParticleUpdateVelocityParallelFor = 0;
 		FAutoConsoleVariableRef CVarDisableParticleUpdateVelocityParallelFor(TEXT("p.DisableParticleUpdateVelocityParallelFor"), DisableParticleUpdateVelocityParallelFor, TEXT("Disable Particle Update Velocity ParallelFor and run the update on a single thread"));
 
+		bool bChaosUseCCD = true;
+		FAutoConsoleVariableRef  CVarChaosUseCCD(TEXT("p.Chaos.CCD.UseCCD"), bChaosUseCCD , TEXT("Global flag to turn CCD on or off. Default is true"));
+
+		FRealSingle CCDEnableThresholdBoundsScale = 0.4f;
+		FAutoConsoleVariableRef  CVarCCDEnableThresholdBoundsScale(TEXT("p.Chaos.CCD.EnableThresholdBoundsScale"), CCDEnableThresholdBoundsScale , TEXT("CCD is used when object position is changing > smallest bound's extent * BoundsScale. 0 will always Use CCD. Values < 0 disables CCD."));
+
+		bool bChaosCollisionCCDUseTightBoundingBox = true; 
+		FAutoConsoleVariableRef  CVarChaosCollisionCCDUseTightBoundingBox(TEXT("p.Chaos.Collision.CCD.UseTightBoundingBox"), bChaosCollisionCCDUseTightBoundingBox , TEXT(""));
+
+
 		int32 ChaosSolverCollisionPriority = 0;
 		FAutoConsoleVariableRef CVarChaosSolverCollisionPriority(TEXT("p.Chaos.Solver.Collision.Priority"), ChaosSolverCollisionPriority, TEXT("Set constraint priority. Larger values are evaluated later [def:0]"));
 
@@ -76,10 +86,10 @@ namespace Chaos
 		DECLARE_CYCLE_STAT(TEXT("FPBDRigidsEvolutionGBF::KinematicTargets"), STAT_Evolution_KinematicTargets, STATGROUP_Chaos);
 		DECLARE_CYCLE_STAT(TEXT("FPBDRigidsEvolutionGBF::PostIntegrateCallback"), STAT_Evolution_PostIntegrateCallback, STATGROUP_Chaos);
 		DECLARE_CYCLE_STAT(TEXT("FPBDRigidsEvolutionGBF::CollisionModifierCallback"), STAT_Evolution_CollisionModifierCallback, STATGROUP_Chaos);
+		DECLARE_CYCLE_STAT(TEXT("FPBDRigidsEvolutionGBF::CCD"), STAT_Evolution_CCD, STATGROUP_Chaos);
 		DECLARE_CYCLE_STAT(TEXT("FPBDRigidsEvolutionGBF::GraphColor"), STAT_Evolution_GraphColor, STATGROUP_Chaos);
 		DECLARE_CYCLE_STAT(TEXT("FPBDRigidsEvolutionGBF::Gather"), STAT_Evolution_Gather, STATGROUP_Chaos);
 		DECLARE_CYCLE_STAT(TEXT("FPBDRigidsEvolutionGBF::Scatter"), STAT_Evolution_Scatter, STATGROUP_Chaos);
-		DECLARE_CYCLE_STAT(TEXT("FPBDRigidsEvolutionGBF::ApplyConstraintsPhase0"), STAT_Evolution_ApplyConstraintsPhase0, STATGROUP_Chaos);
 		DECLARE_CYCLE_STAT(TEXT("FPBDRigidsEvolutionGBF::ApplyConstraintsPhase1"), STAT_Evolution_ApplyConstraintsPhase1, STATGROUP_Chaos);
 		DECLARE_CYCLE_STAT(TEXT("FPBDRigidsEvolutionGBF::UpdateVelocities"), STAT_Evolution_UpdateVelocites, STATGROUP_Chaos);
 		DECLARE_CYCLE_STAT(TEXT("FPBDRigidsEvolutionGBF::ApplyConstraintsPhase2"), STAT_Evolution_ApplyConstraintsPhase2, STATGROUP_Chaos);
@@ -260,7 +270,12 @@ void FPBDRigidsEvolutionGBF::AdvanceOneTimeStepImpl(const FReal Dt, const FSubSt
 		CollisionConstraints.ApplyCollisionModifier(*CollisionModifiers);
 	}
 
-	
+	if (bChaosUseCCD)
+	{
+		SCOPE_CYCLE_COUNTER(STAT_Evolution_CCD);
+		CSV_SCOPED_TIMING_STAT(PhysicsVerbose, CCD);
+		CCDManager.ApplyConstraintsPhaseCCD(Dt, NarrowPhase.GetContext().CollisionAllocator, Particles.GetActiveParticlesView().Num());
+	}
 
 	{
 		SCOPE_CYCLE_COUNTER(STAT_Evolution_CreateConstraintGraph);
@@ -328,12 +343,6 @@ void FPBDRigidsEvolutionGBF::AdvanceOneTimeStepImpl(const FReal Dt, const FSubSt
 					SCOPE_CYCLE_COUNTER(STAT_Evolution_Gather);
 					CSV_SCOPED_TIMING_STAT(PhysicsVerbose, StepSolver_Gather);
 					GatherSolverInput(Dt, Island);
-				}
-
-				{
-					SCOPE_CYCLE_COUNTER(STAT_Evolution_ApplyConstraintsPhase0);
-					CSV_SCOPED_TIMING_STAT(PhysicsVerbose, StepSolver_CCD);
-					ApplyConstraintsPhase0(Dt, Island);
 				}
 
 				// Run the first phase of the constraint solvers
@@ -530,14 +539,6 @@ void FPBDRigidsEvolutionGBF::ScatterSolverOutput(FReal Dt, int32 Island)
 	ConstraintGraph.GetSolverIsland(Island)->GetBodyContainer().ScatterOutput();
 }
 
-void FPBDRigidsEvolutionGBF::ApplyConstraintsPhase0(const FReal Dt, int32 Island)
-{
-	for (FPBDConstraintGraphRule* ConstraintRule : PrioritizedConstraintRules)
-	{
-		ConstraintRule->ApplySwept(Dt, Island);
-	}
-}
-
 void FPBDRigidsEvolutionGBF::ApplyConstraintsPhase1(const FReal Dt, int32 Island)
 {
 	int32 LocalNumIterations = ChaosNumContactIterationsOverride >= 0 ? ChaosNumContactIterationsOverride : NumIterations;
@@ -598,6 +599,7 @@ FPBDRigidsEvolutionGBF::FPBDRigidsEvolutionGBF(FPBDRigidsSOAs& InParticles,THand
 	, PostApplyPushOutCallback(nullptr)
 	, CurrentStepResimCacheImp(nullptr)
 	, CollisionModifiers(InCollisionModifiers)
+	, CCDManager()
 {
 	CollisionConstraints.SetCanDisableContacts(!!CollisionDisableCulledContacts);
 

@@ -123,9 +123,6 @@ namespace Chaos
 		/** Called once per tick to allow constraint containers to create/alter their constraints based on particle position */
 		virtual void UpdatePositionBasedState(const FReal Dt) {}
 
-		/** Called once per tick (usually in parallel per island) to handle solving any constraints that must be solved before the main solver loop. Used for CCD. */
-		virtual void ApplySwept(const FReal Dt, int32 Island) {}
-
 		/** Apply all corrections for constraints in the specified island. Return true if more iterations are needed. */
 		virtual bool ApplyConstraints(const FReal Dt, int32 Island, const int32 It, const int32 NumIts) { return false; }
 
@@ -277,8 +274,6 @@ namespace Chaos
 		virtual void GatherSolverInput(const FReal Dt, int32 Island) override;
 
 		virtual void ScatterSolverOutput(const FReal Dt, int32 Island) override;
-
-		virtual void ApplySwept(const FReal Dt, int32 Island) override;
 
 		virtual bool ApplyConstraints(const FReal Dt, int32 Island, const int32 It, const int32 NumIts) override;
 
