@@ -409,10 +409,6 @@ bool FGameplayAbilityRepAnimMontage::NetSerialize(FArchive& Ar, class UPackageMa
 	Ar.SerializeBits(&bIsStopped, 1);
 	IsStopped = bIsStopped & 1;
 
-	uint8 bForcePlayBit = ForcePlayBit;
-	Ar.SerializeBits(&bForcePlayBit, 1);
-	ForcePlayBit = bForcePlayBit & 1;
-
 	uint8 bSkipPositionCorrection = SkipPositionCorrection;
 	Ar.SerializeBits(&bSkipPositionCorrection, 1);
 	SkipPositionCorrection = bSkipPositionCorrection & 1;
@@ -425,6 +421,7 @@ bool FGameplayAbilityRepAnimMontage::NetSerialize(FArchive& Ar, class UPackageMa
 	Ar << PlayRate;
 	Ar << BlendTime;
 	Ar << NextSectionID;
+	Ar << PlayInstanceId;
 	PredictionKey.NetSerialize(Ar, Map, bOutSuccess);
 
 	bOutSuccess = true;
