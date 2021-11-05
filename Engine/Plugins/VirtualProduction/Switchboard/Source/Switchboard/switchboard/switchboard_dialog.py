@@ -11,6 +11,8 @@ from PySide2 import QtGui
 from PySide2 import QtUiTools
 from PySide2 import QtWidgets
 
+from PySide2.QtWidgets import QWidgetAction, QMenu
+
 from switchboard import config
 from switchboard import config_osc as osc
 from switchboard import p4_utils
@@ -26,6 +28,8 @@ from switchboard.devices.device_base import DeviceStatus
 from switchboard.devices.device_manager import DeviceManager
 from switchboard.settings_dialog import SettingsDialog
 from switchboard.switchboard_logging import ConsoleStream, LOGGER
+from switchboard.tools.insights_launcher import InsightsLauncher
+from switchboard.tools.listener_launcher import ListenerLauncher
 
 ENGINE_PATH = "../../../../.."
 RELATIVE_PATH = os.path.dirname(__file__)
@@ -208,6 +212,9 @@ class SwitchboardDialog(QtCore.QObject):
         self.window = loader.load(
             os.path.join(RELATIVE_PATH, "ui/switchboard.ui"))
 
+        # Add Tools Menu
+        self.add_tools_menu()
+
         # used to shut down services cleanly on exit
         self.window.installEventFilter(self)
         self.close_event_counter = 0
@@ -232,6 +239,12 @@ class SwitchboardDialog(QtCore.QObject):
         # DeviceManager
         self.device_manager = DeviceManager()
         self.device_manager.signal_device_added.connect(self.device_added)
+
+        # Convenience UnrealInsights launcher
+        self.init_insights_launcher()
+
+        # Convenience local Switchboard lister launcher
+        self.init_listener_launcher()
 
         # Transport Manager
         #self.transport_queue = recording.TransportQueue(CONFIG.SWITCHBOARD_DIR)
@@ -373,6 +386,83 @@ class SwitchboardDialog(QtCore.QObject):
 
         # Run the transport queue
         #self.transport_queue_resume()
+
+    def init_insights_launcher(self):
+        ''' Initializes insights launcher '''
+
+        self.insights_launcher = InsightsLauncher()
+
+        def launch_insights():
+            try:
+                self.insights_launcher.launch()
+            except Exception as e:
+                LOGGER.error(e)
+
+        action = self.register_tools_menu_action("&Insights")
+        action.triggered.connect(launch_insights)
+
+    def init_listener_launcher(self):
+        ''' Initializes switcboard listener launcher '''
+        
+        self.listener_launcher = ListenerLauncher()
+
+        def launch_listener():
+            try:
+                self.listener_launcher.launch()
+            except Exception as e:
+                LOGGER.error(e)
+
+        action = self.register_tools_menu_action("&Listener")
+        action.triggered.connect(launch_listener)
+
+    def add_tools_menu(self):
+        ''' Adds tools menu to menu bar and populates built-in items '''
+
+        self.tools_menu = self.window.menu_bar.addMenu("&Tools")
+
+    def register_tools_menu_action(self, actionname:str, menunames:List[str] = []) -> QWidgetAction:
+        ''' Registers a QWidgetAction with the tools menu
+
+        Args:
+            actionname: Name of the action to be added
+            menunames: Submenu(s) where to place the given action
+
+        Returns:
+            QWidgetAction: The action that was created.
+        '''
+
+        # Find find submenu, and create the ones that don't exist along the way
+
+        current_menu:QMenu = self.tools_menu
+
+        # iterate over menunames give
+        for menuname in menunames:
+
+            create_menu = True
+
+            # try to find existing menu
+            for current_action in current_menu.actions():
+
+                submenu = current_action.menu()
+
+                if submenu and (menuname == submenu.title()):
+                    current_menu = submenu
+                    create_menu = False
+                    break
+            
+            # if we didn't find the submenu, create it
+            if create_menu:
+                newmenu = QMenu(parent=current_menu)
+                newmenu.setTitle(menuname)
+                current_menu.addMenu(newmenu)
+                current_menu = newmenu
+
+        # add the given action
+        action = QWidgetAction(current_menu)
+        action.setText(actionname)
+        current_menu.addAction(action)
+        
+        return action
 
     def on_device_autojoin_changed(self):
         CONFIG.MUSERVER_AUTO_JOIN.update_value(
