@@ -495,15 +495,6 @@ namespace Chaos
 		}
 	}
 
-	void FPBDCollisionConstraints::ApplySwept(const FReal Dt, FPBDIslandSolverData& SolverData)
-	{
-		if (SolverType == EConstraintSolverType::QuasiPbd)
-		{
-			FPBDCollisionSolverContainer& SolverContainer = GetConstraintSolverContainer(SolverData);
-			SolverContainer.SolveSwept(Dt);
-		}
-	}
-
 	// Simple Rule version
 	bool FPBDCollisionConstraints::ApplyPhase1(const FReal Dt, const int32 It, const int32 NumIts, FPBDIslandSolverData& SolverData)
 	{

@@ -233,6 +233,17 @@ namespace Chaos
 		}
 
 		/**
+		 * @brief The set of sweep collision constraints for the current tick (created or reinstated)
+		 * 
+		 * @note Some elements may be null (constraints that have been deleted)
+		 * @note This is not thread-safe and should not be used during the collision detection phase (i.e., when the list is being built)
+		*/
+		TArrayView<FPBDCollisionConstraint* const> GetSweptConstraints() const
+		{ 
+			return MakeArrayView(SweptConstraints);
+		}
+
+		/**
 		 * @brief The set of collision constraints for the current tick (created or reinstated)
 		 * 
 		 * @note Some elements may be null (constraints that have been deleted)
@@ -249,6 +260,7 @@ namespace Chaos
 		void Reset()
 		{
 			Constraints.Reset();
+			SweptConstraints.Reset();
 
 			for (auto& KeyValuePair : ShapePairConstraintMap)
 			{
@@ -285,6 +297,7 @@ namespace Chaos
 
 			// Clear the collision list for this tick - we are about to rebuild it
 			Constraints.Reset();
+			SweptConstraints.Reset();
 
 			// Update the tick counter
 			// NOTE: We do this here rather than in EndDetectionCollisions so that any contacts injected
@@ -387,7 +400,6 @@ namespace Chaos
 		{
 			DestroyConstraintImp(Constraint);
 		}
-
 
 		/**
 		 * @brief Return the set of contact constraints between the specified particle pair, or null if we have not created any yet.
@@ -521,6 +533,11 @@ namespace Chaos
 				Constraints[Cookie.ConstraintIndex] = nullptr;
 			}
 
+			if ((Constraint->GetType() == ECollisionConstraintType::Swept) && (Cookie.LastUsedEpoch == Epoch) && (Cookie.SweptConstraintIndex != INDEX_NONE))
+			{
+				SweptConstraints[Cookie.SweptConstraintIndex] = nullptr;
+			}
+
 			FreeConstraint(Constraint);
 		}
 
@@ -629,6 +646,12 @@ namespace Chaos
 			{
 				ParticlePairConstraints->AddConstraint(CollisionConstraint);
 			}
+
+			if (CollisionConstraint->GetType() == ECollisionConstraintType::Swept)
+			{
+				const int32 SweptConstraintIndex = SweptConstraints.Add(CollisionConstraint);
+				Cookie.UpdateSweptIndex(SweptConstraintIndex);
+			}
 		}
 
 		void PruneShapePairs()
@@ -723,6 +746,9 @@ namespace Chaos
 
 		// The active constraints (added or recovered this tick)
 		TArray<FPBDCollisionConstraint*> Constraints;
+
+		// The active sweep constraints (added or recovered this tick)
+		TArray<FPBDCollisionConstraint*> SweptConstraints;
 
 		// The current epoch used to track out-of-date contacts. A constraint whose Epoch is
 		// older than the current Epoch at the end of the tick was not refreshed this tick.

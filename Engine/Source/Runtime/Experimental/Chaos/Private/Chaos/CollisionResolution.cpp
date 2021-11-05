@@ -71,10 +71,6 @@ DECLARE_DWORD_ACCUMULATOR_STAT(TEXT("NumShapePairs"), STAT_ChaosCollisionCounter
 DECLARE_DWORD_ACCUMULATOR_STAT(TEXT("NumContactsCreated"), STAT_ChaosCollisionCounter_NumContactsCreated, STATGROUP_ChaosCollisionCounters);
 DECLARE_DWORD_ACCUMULATOR_STAT(TEXT("NumContactUpdates"), STAT_ChaosCollisionCounter_NumContactUpdates, STATGROUP_ChaosCollisionCounters);
 
-
-Chaos::FRealSingle CCDEnableThresholdBoundsScale = 0.4f;
-FAutoConsoleVariableRef  CVarCCDEnableThresholdBoundsScale(TEXT("p.Chaos.CCD.EnableThresholdBoundsScale"), CCDEnableThresholdBoundsScale , TEXT("CCD is used when object position is changing > smallest bound's extent * BoundsScale. 0 will always Use CCD. Values < 0 disables CCD."));
-
 Chaos::FRealSingle CCDAllowedDepthBoundsScale = 0.1f;
 FAutoConsoleVariableRef CVarCCDAllowedDepthBoundsScale(TEXT("p.Chaos.CCD.AllowedDepthBoundsScale"), CCDAllowedDepthBoundsScale, TEXT("When rolling back to TOI, allow (smallest bound's extent) * AllowedDepthBoundsScale, instead of rolling back to exact TOI w/ penetration = 0."));
 
@@ -126,8 +122,17 @@ FAutoConsoleVariableRef CVarChaos_Collision_EnableManifoldRestore(TEXT("p.Chaos.
 FAutoConsoleVariableRef CVarChaos_Collision_ParticlePositionTolerance(TEXT("p.Chaos.Collision.ParticlePositionTolerance"), Chaos_Collision_ParticlePositionTolerance, TEXT("Cms. Particle pairs that move less than this may have their contacts reinstated"));
 FAutoConsoleVariableRef CVarChaos_Collision_ParticleRotationTolerance(TEXT("p.Chaos.Collision.ParticleRotationTolerance"), Chaos_Collision_ParticleRotationTolerance, TEXT("Degrees. Particle pairs that move less than this may have their contacts reinstated"));
 
+
+extern bool bChaosCollisionCCDEnableResweep;
+
 namespace Chaos
 {
+	namespace CVars
+	{
+		Chaos::FRealSingle CCDEnableThresholdBoundsScale = 0.4f;
+		FAutoConsoleVariableRef  CVarCCDEnableThresholdBoundsScale(TEXT("p.Chaos.CCD.EnableThresholdBoundsScale"), CCDEnableThresholdBoundsScale , TEXT("CCD is used when object position is changing > smallest bound's extent * BoundsScale. 0 will always Use CCD. Values < 0 disables CCD."));
+	}
+
 	namespace Collisions
 	{
 		void ResetChaosCollisionCounters()
@@ -165,8 +170,14 @@ namespace Chaos
 			ContactPoint.Phi = Phi;
 		}
 
-		// Determines if body should use CCD. If using CCD, computes Dir and Length of sweep.
-		inline bool UseCCDImpl(const TGeometryParticleHandle<FReal, 3>* SweptParticle, const TGeometryParticleHandle<FReal, 3>* OtherParticle, const FImplicitObject* SweptImplicit, const FVec3& SweptX, const FVec3& SweptP, FVec3& Dir, FReal& Length, const bool bForceDisableCCD)
+		/** Determines if body should use CCD. If using CCD, computes Dir and Length of sweep.
+		* If either of the object is CCD-enabled and fast moving, we enable CCD for the constraint.
+		* We compare P-X and BoundingBox().Extents().Min() to determine if an object is fast-moving or not. Here is how this works:
+		* Think about a box colliding with a static plane. If P-X <= 0.5 * BoundingBox().Extents().Min(), it is impossible for the box to tunnel through the plane. Otherwise, it is possible but not necessary to have tunneling.
+		* Now think about two boxes. If P-X <= 0.5 * BoundingBox().Extents().Min() both boxes, it is impossible for one box to tunnel through the other (it is still possible for a box's corner to move through another box's corner).
+		* So far this is sufficient for us to determine CCD constraints for our primitives. But the caveat is that for arbitrary objects (think about a rod that is not axis aligned), min of a bounding box extent can be too large and tunneling could still happen if P-X falls below this threshold.
+		*/
+		inline bool UseCCDImpl(const TGeometryParticleHandle<FReal, 3>* Particle0,  const FImplicitObject* Implicit0, const FVec3& StartX0, const TGeometryParticleHandle<FReal, 3>* Particle1, const FImplicitObject* Implicit1, const FVec3& StartX1, FVec3& Dir, FReal& Length, const bool bForceDisableCCD)
 		{
 			if (CCDManualForceDisable)
 			{
@@ -178,55 +189,80 @@ namespace Chaos
 				return false;
 			}
 
-			if (CCDOnlyConsiderDynamicStatic > 0 && OtherParticle->ObjectState() != EObjectStateType::Static)
+			if (CCDOnlyConsiderDynamicStatic > 0 && Particle1->ObjectState() != EObjectStateType::Static)
+			{
+				return false;
+			}
+			const TPBDRigidParticleHandle<FReal, 3>* Rigid0 = Particle0->CastToRigidParticle();
+			const bool bIsCCDEnabled0 = Rigid0 && Rigid0->CCDEnabled();
+			const TPBDRigidParticleHandle<FReal, 3>* Rigid1 = Particle1->CastToRigidParticle();
+			const bool bIsCCDEnabled1 = Rigid1 && Rigid1->CCDEnabled();
+			if (!bIsCCDEnabled0 && !bIsCCDEnabled1)
 			{
 				return false;
 			}
 
-			auto* RigidParticle = SweptParticle->CastToRigidParticle();
-			if (RigidParticle && RigidParticle->CCDEnabled())
+			bool bUseCCD = false;
+			const FVec3 D0 = Rigid0 ? Rigid0->P() - StartX0 : FVec3(0.);
+			const FVec3 D1 = Rigid1 ? Rigid1->P() - StartX1 : FVec3(0.);
+
+			// bUseCCD is determined by the difference between P and X rather than V.
+			// This implies that the smaller Dt is, the less likely CCD will be triggered.
+			// This is because CCD is enabled to prevent tunneling. When Dt it small, tunneling is less likely to happen and therefore fewer constraints need to be processed with CCD.
+			if (bIsCCDEnabled0)
 			{
-				Dir = SweptP - SweptX;
-				Length = Dir.Size();
-
-				if (!SweptImplicit->HasBoundingBox())
+				const FReal DSizeSquared0 = D0.SizeSquared();
+				const FReal MinExtent0 = Implicit0->BoundingBox().Extents().Min();
+				const FReal CCDThreshold0 = MinExtent0 * CVars::CCDEnableThresholdBoundsScale;
+				if (DSizeSquared0 > CCDThreshold0 * CCDThreshold0)
 				{
-					return false;
+					bUseCCD = true;
 				}
-
-				FReal MinBoundsAxis = SweptImplicit->BoundingBox().Extents().Min();
-				FReal LengthCCDThreshold = MinBoundsAxis * CCDEnableThresholdBoundsScale;
-
-				if (Length > 0.0f && CCDEnableThresholdBoundsScale >= 0.0f && Length >= LengthCCDThreshold)
+			}
+			if (!bUseCCD && bIsCCDEnabled1)
+			{
+				const FReal DSizeSquared1 = D1.SizeSquared();
+				const FReal MinExtent1 = Implicit1->BoundingBox().Extents().Min();
+				const FReal CCDThreshold1 = MinExtent1 * CVars::CCDEnableThresholdBoundsScale;
+				if (DSizeSquared1 > CCDThreshold1 * CCDThreshold1)
 				{
-					Dir /= Length;
-
-					// Do not perform CCD if the vector is not close to unit length to prevent getting caught in a large or infinite loop when raycasting.
-					if (FMath::IsNearlyEqual((float)Dir.SizeSquared(), 1.f, KINDA_SMALL_NUMBER))
-					{
-						return true;
-					}
+					bUseCCD = true;
 				}
 			}
 
-			return false;
+			if (bUseCCD)
+			{
+				Dir = D0 - D1;
+				Length = Dir.SafeNormalize();
+				if (Length < SMALL_NUMBER) // This is the case where both particles' velocities are high but the relative velocity is low. 
+				{
+					bUseCCD = false;
+				}
+				// Do not perform CCD if the vector is not close to unit length to prevent getting caught in a large or infinite loop when raycasting.
+				if (!FMath::IsNearlyEqual((float)Dir.SizeSquared(), 1.f, KINDA_SMALL_NUMBER))
+				{
+					bUseCCD = false;
+				}
+			}
+
+			return bUseCCD;
 		}
 
 		// UeeCCD function for use in collision detection loop (is uses Particles directly for particle state)
 		// NOTE: should only be called in ConstructConstraint (also see UseCCD_Update)
-		inline bool UseCCD_Init(const TGeometryParticleHandle<FReal, 3>* SweptParticle, const TGeometryParticleHandle<FReal, 3>* OtherParticle, const FImplicitObject* Implicit, FVec3& Dir, FReal& Length, bool bForceDisableCCD)
+		inline bool UseCCD_Init(const TGeometryParticleHandle<FReal, 3>* Particle0,  const FImplicitObject* Implicit0, const FVec3& StartX0, const TGeometryParticleHandle<FReal, 3>* Particle1, const FImplicitObject* Implicit1, const FVec3& StartX1, FVec3& Dir, FReal& Length, bool bForceDisableCCD)
 		{
-			return UseCCDImpl(SweptParticle, OtherParticle, Implicit, FConstGenericParticleHandle(SweptParticle)->X(), FConstGenericParticleHandle(SweptParticle)->P(), Dir, Length, bForceDisableCCD);
+			return UseCCDImpl(Particle0, Implicit0, StartX0, Particle1, Implicit1, StartX1, Dir, Length, bForceDisableCCD);
 		}
 
-		// UeeCCD function for use in solver loop (is uses SolverBody for particle state)
+		// UeeCCD function for use in solver loop
 		// NOTE: should only be called in UpdateConstraint (also see UseCCD_Init)
-		inline bool UseCCD_Update(FPBDCollisionConstraint& Constraint, FVec3& Dir, FReal& Length, bool bForceDisableCCD)
+		inline bool UseCCD_Update(FPBDCollisionConstraint& Constraint, const FVec3& StartX0, const FVec3& StartX1, FVec3& Dir, FReal& Length, bool bForceDisableCCD)
 		{
 			// This function assumes constraint Particle[0] is always the moving one - which is also assumed at the calling site
 			if (Constraint.GetType() == ECollisionConstraintType::Swept)
 			{
-				return UseCCDImpl(Constraint.Particle[0], Constraint.Particle[1], Constraint.GetManifold().Implicit[0], Constraint.GetSolverBody0()->X(), Constraint.GetSolverBody0()->P(), Dir, Length, bForceDisableCCD);
+				return UseCCDImpl(Constraint.Particle[0], Constraint.GetManifold().Implicit[0], StartX0, Constraint.Particle[1], Constraint.GetManifold().Implicit[1], StartX1, Dir, Length, bForceDisableCCD);
 			}
 			return false;
 		}
@@ -238,7 +274,7 @@ namespace Chaos
 
 			if (SweptConstraint.Manifold.Phi > 0.0f)
 			{
-				SweptConstraint.TimeOfImpact = 1.f;
+				SweptConstraint.TimeOfImpact = TNumericLimits<FReal>::Max();
 				return;
 			}
 
@@ -1446,11 +1482,13 @@ namespace Chaos
 			UpdateGenericConvexConvexConstraintHelper(Implicit0, WorldTransform0, Implicit1, WorldTransform1, Dt, Constraint.Manifold.RestitutionPadding, Constraint);
 		}
 
-		void UpdateGenericConvexConvexConstraintSwept(TGeometryParticleHandle<FReal, 3>* Particle0, const FImplicitObject& Implicit0, const FRigidTransform3& WorldTransform0, const FImplicitObject& Implicit1, const FRigidTransform3& WorldTransform1, const FVec3& Dir, const FReal Length, const FReal Dt, FPBDCollisionConstraint& Constraint)
+		void UpdateGenericConvexConvexConstraintSwept(TGeometryParticleHandle<FReal, 3>* Particle0, const FImplicitObject& Implicit0, const FRigidTransform3& StartWorldTransform0, TGeometryParticleHandle<FReal, 3>* Particle1, const FImplicitObject& Implicit1, const FRigidTransform3& StartWorldTransform1, const FVec3& Dir, const FReal Length, const FReal Dt, FPBDCollisionConstraint& Constraint)
 		{
 			CONDITIONAL_SCOPE_CYCLE_COUNTER(STAT_Collisions_UpdateGenericConvexConvexConstraintSwept, ConstraintsDetailedStats);
-			FReal TOI = 1.0f;
-			UpdateContactPointNoCull(Constraint, GenericConvexConvexContactPointSwept(Implicit0, WorldTransform0, Implicit1, WorldTransform1, Dir, Length, TOI), Dt);
+			FReal TOI = TNumericLimits<FReal>::Max();
+			const FRigidTransform3 EndWorldTransform0(FGenericParticleHandle(Particle0)->P(), FGenericParticleHandle(Particle0)->Q());
+			const FRigidTransform3 EndWorldTransform1(FGenericParticleHandle(Particle1)->P(), FGenericParticleHandle(Particle1)->Q());
+			UpdateContactPointNoCull(Constraint, GenericConvexConvexContactPointSwept(Implicit0, StartWorldTransform0, EndWorldTransform0, Implicit1, StartWorldTransform1, EndWorldTransform1, Dir, Length, TOI), Dt);
 			SetSweptConstraintTOI(Particle0, TOI, Length, Dir, Constraint);
 		}
 
@@ -1471,16 +1509,22 @@ namespace Chaos
 			}
 		}
 
-		void ConstructGenericConvexConvexConstraintsSwept(TGeometryParticleHandle<FReal, 3>* Particle0, TGeometryParticleHandle<FReal, 3>* Particle1, const FImplicitObject* Implicit0, const FImplicitObject* Implicit1, const FRigidTransform3& ParticleWorldTransform0, const FRigidTransform3& LocalTransform0, const FRigidTransform3& ParticleWorldTransform1, const FRigidTransform3& LocalTransform1, const FReal CullDistance, const FReal Dt, const FVec3& Dir, FReal Length, const FCollisionContext& Context)
+		void ConstructGenericConvexConvexConstraintsSwept(TGeometryParticleHandle<FReal, 3>* Particle0, TGeometryParticleHandle<FReal, 3>* Particle1, const FImplicitObject* Implicit0, const FImplicitObject* Implicit1, const FRigidTransform3& ParticleWorldTransform0, const FRigidTransform3& LocalTransform0, const FVec3& StartX0, const FRigidTransform3& ParticleWorldTransform1, const FRigidTransform3& LocalTransform1, const FVec3& StartX1, const FReal CullDistance, const FReal Dt, const FVec3& Dir, FReal Length, const FCollisionContext& Context)
 		{
 			CONDITIONAL_SCOPE_CYCLE_COUNTER(STAT_Collisions_ConstructGenericConvexConvexConstraintsSwept, ConstraintsDetailedStats);
-			FGenericParticleHandle RigidParticle = FGenericParticleHandle(Particle0);
+			FGenericParticleHandle RigidParticle0 = FGenericParticleHandle(Particle0);
+			FGenericParticleHandle RigidParticle1 = FGenericParticleHandle(Particle1);
 			FPBDCollisionConstraint* Constraint = FPBDCollisionConstraint::MakeSwept(Particle0, Implicit0, nullptr, ParticleWorldTransform0, LocalTransform0, Particle1, Implicit1, nullptr, ParticleWorldTransform1, LocalTransform1, CullDistance, EContactShapesType::GenericConvexConvex, *Context.CollisionAllocator);
-			// Note: This is unusual but we are using a mix of the previous and current transform
-			// This is due to how CCD only rewinds the position
-			FRigidTransform3 WorldTransformXQ0 = LocalTransform0 * FRigidTransform3(RigidParticle->X(), RigidParticle->Q());
-			FRigidTransform3 WorldTransform1 = LocalTransform1 * ParticleWorldTransform1;
-			UpdateGenericConvexConvexConstraintSwept(Particle0, *Implicit0, WorldTransformXQ0, *Implicit1, WorldTransform1, Dir, Length, Dt, *Constraint);
+			// Rotations of WorldTransformXRx are not actually used in UpdateGenericConvexConvexConstraintSwept.
+			FRigidTransform3 WorldTransformXR0 = LocalTransform0 * FRigidTransform3(StartX0, RigidParticle0->R());
+			FRigidTransform3 WorldTransformXR1 = LocalTransform1 * FRigidTransform3(StartX1, RigidParticle1->R());
+			UpdateGenericConvexConvexConstraintSwept(Particle0, *Implicit0, WorldTransformXR0, Particle1, *Implicit1, WorldTransformXR1, Dir, Length, Dt, *Constraint);
+
+			// @todo(zhenglin): If resweep is not enabled, we don't need to process secondary collision constraints so constraints with TOI > 1.0f can be deleted. This could be a potential optimization but I have not made this work yet.
+			// if (!bChaosCollisionCCDEnableResweep && Constraint->TimeOfImpact > 1.0f)
+			// {
+			// 	Context.CollisionAllocator->DestroyConstraint(Constraint);
+			// }
 		}
 
 		//
@@ -1931,16 +1975,17 @@ namespace Chaos
 		// NOTE: Transforms are world space shape transforms
 		
 		template<ECollisionUpdateType UpdateType>
-		inline void UpdateConstraintFromGeometrySweptImpl(FPBDCollisionConstraint& Constraint, const FRigidTransform3& WorldTransform0, const FRigidTransform3& WorldTransform1, const FReal Dt)
+		inline bool UpdateConstraintFromGeometrySweptImpl(FPBDCollisionConstraint& Constraint, const FRigidTransform3& WorldTransform0, const FRigidTransform3& WorldTransform1, const FReal Dt)
 		{
 			FReal LengthCCD = 0.0f;
 			FVec3 DirCCD(0.0f);
-			bool bUseCCD = UseCCD_Update(Constraint, DirCCD, LengthCCD, false);
+			bool bUseCCD = UseCCD_Update(Constraint, WorldTransform0.GetLocation(), WorldTransform1.GetLocation(), DirCCD, LengthCCD, false);
 
 			const FImplicitObject& Implicit0 = *Constraint.Manifold.Implicit[0];
 			const FImplicitObject& Implicit1 = *Constraint.Manifold.Implicit[1];
 
 			TGeometryParticleHandle<FReal, 3>* Particle0 = Constraint.Particle[0];
+			TGeometryParticleHandle<FReal, 3>* Particle1 = Constraint.Particle[1];
 
 			INC_DWORD_STAT(STAT_ChaosCollisionCounter_NumContactUpdates);
 
@@ -1949,21 +1994,21 @@ namespace Chaos
 				switch (Constraint.Manifold.ShapesType)
 				{
 				case EContactShapesType::GenericConvexConvex:
-					UpdateGenericConvexConvexConstraintSwept(Particle0, Implicit0, WorldTransform0, Implicit1, WorldTransform1, DirCCD, LengthCCD, Dt, Constraint);
-					return;
+					UpdateGenericConvexConvexConstraintSwept(Particle0, Implicit0, WorldTransform0, Particle1, Implicit1, WorldTransform1, DirCCD, LengthCCD, Dt, Constraint);
+					return true;
 				case EContactShapesType::SphereHeightField:
 				{
 					const TSphere<FReal, 3>* Object0 = Implicit0.template GetObject<const TSphere<FReal, 3>>();
 					const FHeightField* Object1 = Implicit1.template GetObject<const FHeightField>();
 					UpdateSphereHeightFieldConstraintSwept(Particle0, *Object0, WorldTransform0, *Object1, WorldTransform1, DirCCD, LengthCCD, Dt, Constraint);
-					return;
+					return true;
 				}
 				case EContactShapesType::CapsuleHeightField:
 				{
 					const FCapsule* Object0 = Implicit0.template GetObject<const FCapsule >();
 					const FHeightField* Object1 = Implicit1.template GetObject<const FHeightField >();
 					UpdateCapsuleHeightFieldConstraintSwept(Particle0, *Object0, WorldTransform0, *Object1, WorldTransform1, DirCCD, LengthCCD, Dt, Constraint);
-					return;
+					return true;
 				}
 				case EContactShapesType::SphereTriMesh:
 				{
@@ -1980,7 +2025,7 @@ namespace Chaos
 					{
 						ensure(false);
 					}
-					return;
+					return true;
 				}
 				case EContactShapesType::CapsuleTriMesh:
 				{
@@ -1997,13 +2042,13 @@ namespace Chaos
 					{
 						ensure(false);
 					}
-					return;
+					return true;
 				}
 				case EContactShapesType::ConvexHeightField:
 				{
 					const FHeightField* Object1 = Implicit1.template GetObject<const FHeightField >();
 					UpdateConvexHeightFieldConstraintSwept(Particle0, Implicit0, WorldTransform0, *Object1, WorldTransform1, DirCCD, LengthCCD, Dt, Constraint);
-					return;
+					return true;
 				}
 				case EContactShapesType::ConvexTriMesh:
 					if (const TImplicitObjectScaled<FTriangleMeshImplicitObject>* ScaledTriangleMesh = Implicit1.template GetObject<const TImplicitObjectScaled<FTriangleMeshImplicitObject>>())
@@ -2018,13 +2063,14 @@ namespace Chaos
 					{
 						ensure(false);
 					}
-					return;
+					return true;
 				}
 			}
 
-			Constraint.TimeOfImpact = 1.0f; // CCD will not be used
+			Constraint.TimeOfImpact = TNumericLimits<FReal>::Max(); // CCD will not be used for this constraint
 			// Do a normal non-swept update if we reach this point - Not required for now, since this will be done in solver
 			// UpdateConstraintFromGeometryImpl<UpdateType>(*(Constraint.As<FPBDCollisionConstraint>()), WorldTransform0, WorldTransform1, Dt);
+			return false;
 		}
 
 		template<typename T_TRAITS>
@@ -2041,48 +2087,65 @@ namespace Chaos
 
 			FReal LengthCCD = 0.0f;
 			FVec3 DirCCD(0.0f);
-			bool bUseCCD = UseCCD_Init(Particle0, Particle1, Implicit0, DirCCD, LengthCCD, Context.bForceDisableCCD);
+			FConstGenericParticleHandle ConstParticle0 = FConstGenericParticleHandle(Particle0);
+			FConstGenericParticleHandle ConstParticle1 = FConstGenericParticleHandle(Particle1);
+			// X is end-frame position for kinematic particles. To get start-frame position, we need to use P - V * Dt.
+			const FVec3 StartX0 = ConstParticle0->ObjectState() == EObjectStateType::Kinematic ? ConstParticle0->P() - ConstParticle0->V() * Dt : ConstParticle0->X();
+			const FVec3 StartX1 = ConstParticle1->ObjectState() == EObjectStateType::Kinematic ? ConstParticle1->P() - ConstParticle1->V() * Dt : ConstParticle1->X();
+			bool bUseCCD = UseCCD_Init(Particle0, Implicit0, StartX0, Particle1, Implicit1, StartX1, DirCCD, LengthCCD, Context.bForceDisableCCD);
 			const bool bUseGenericSweptConstraints = bUseCCD && (CCDUseGenericSweptConvexConstraints > 0) && bIsConvex0 && bIsConvex1;
 #if CHAOS_COLLISION_CREATE_BOUNDSCHECK
 			if ((Implicit0 != nullptr) && (Implicit1 != nullptr))
 			{
-				if (Implicit0->HasBoundingBox() && Implicit1->HasBoundingBox())
+				if (!bUseCCD)
 				{
-					const FRigidTransform3 WorldTransform0 = LocalTransform0 * ParticleWorldTransform0;
-					const FRigidTransform3 WorldTransform1 = LocalTransform1 * ParticleWorldTransform1;
-					if (Chaos_Collision_NarrowPhase_SphereBoundsCheck)
+					if (Implicit0->HasBoundingBox() && Implicit1->HasBoundingBox())
 					{
-						const FReal R1 = Implicit0->BoundingBox().OriginRadius();
-						const FReal R2 = Implicit1->BoundingBox().OriginRadius();
-						const FReal SeparationSq = (WorldTransform1.GetTranslation() - WorldTransform0.GetTranslation()).SizeSquared();
-						if (SeparationSq > FMath::Square(R1 + R2 + CullDistance))
+						const FRigidTransform3 WorldTransform0 = LocalTransform0 * ParticleWorldTransform0;
+						const FRigidTransform3 WorldTransform1 = LocalTransform1 * ParticleWorldTransform1;
+						if (Chaos_Collision_NarrowPhase_SphereBoundsCheck)
 						{
-							return;
+							const FReal R1 = Implicit0->BoundingBox().OriginRadius();
+							const FReal R2 = Implicit1->BoundingBox().OriginRadius();
+							const FReal SeparationSq = (WorldTransform1.GetTranslation() - WorldTransform0.GetTranslation()).SizeSquared();
+							if (SeparationSq > FMath::Square(R1 + R2 + CullDistance))
+							{
+								return;
+							}
+						}
+
+						if (Chaos_Collision_NarrowPhase_AABBBoundsCheck)
+						{
+							const FAABB3 Box1 = Implicit0->BoundingBox();
+							const FAABB3 Box2 = Implicit1->BoundingBox();
+							//if (Box1.GetVolume() >= Box2.GetVolume())
+							{
+								const FRigidTransform3 Box2ToBox1TM = WorldTransform1.GetRelativeTransform(WorldTransform0);
+								const FAABB3 Box2In1 = Box2.TransformedAABB(Box2ToBox1TM).Thicken(CullDistance);
+								if (!Box1.Intersects(Box2In1))
+								{
+									return;
+								}
+							}
+							//else
+							{
+								const FRigidTransform3 Box1ToBox2TM = WorldTransform0.GetRelativeTransform(WorldTransform1);
+								const FAABB3 Box1In2 = Box1.TransformedAABB(Box1ToBox2TM).Thicken(CullDistance);
+								if (!Box2.Intersects(Box1In2))
+								{
+									return;
+								}
+							}
 						}
 					}
-
-					if (Chaos_Collision_NarrowPhase_AABBBoundsCheck)
+				}
+				else
+				{
+					const FAABB3 Box0 = Particle0->WorldSpaceInflatedBounds();
+					const FAABB3 Box1 = Particle1->WorldSpaceInflatedBounds();
+					if (!Box0.Intersects(Box1))
 					{
-						const FAABB3 Box1 = Implicit0->BoundingBox();
-						const FAABB3 Box2 = Implicit1->BoundingBox();
-						//if (Box1.GetVolume() >= Box2.GetVolume())
-						{
-							const FRigidTransform3 Box2ToBox1TM = WorldTransform1.GetRelativeTransform(WorldTransform0);
-							const FAABB3 Box2In1 = Box2.TransformedAABB(Box2ToBox1TM).Thicken(CullDistance);
-							if (!Box1.Intersects(Box2In1))
-							{
-								return;
-							}
-						}
-						//else
-						{
-							const FRigidTransform3 Box1ToBox2TM = WorldTransform0.GetRelativeTransform(WorldTransform1);
-							const FAABB3 Box1In2 = Box1.TransformedAABB(Box1ToBox2TM).Thicken(CullDistance);
-							if (!Box2.Intersects(Box1In2))
-							{
-								return;
-							}
-						}
+						return;
 					}
 				}
 			}
@@ -2294,7 +2357,7 @@ namespace Chaos
 			{
 				if (bUseCCD)
 				{
-					ConstructGenericConvexConvexConstraintsSwept(Particle0, Particle1, Implicit0, Implicit1, ParticleWorldTransform0, LocalTransform0, ParticleWorldTransform1, LocalTransform1, CullDistance, Dt, DirCCD, LengthCCD, Context);
+					ConstructGenericConvexConvexConstraintsSwept(Particle0, Particle1, Implicit0, Implicit1, ParticleWorldTransform0, LocalTransform0, StartX0, ParticleWorldTransform1, LocalTransform1, StartX1, CullDistance, Dt, DirCCD, LengthCCD, Context);
 					return;
 				}
 
@@ -2327,11 +2390,11 @@ namespace Chaos
 		}
 
 		template<ECollisionUpdateType UpdateType>
-		void UpdateConstraintFromGeometrySwept(FPBDCollisionConstraint& Constraint, const FRigidTransform3& ParticleWorldTransform0, const FRigidTransform3& ParticleWorldTransform1, const FReal Dt)
+		bool UpdateConstraintFromGeometrySwept(FPBDCollisionConstraint& Constraint, const FRigidTransform3& ParticleWorldTransform0, const FRigidTransform3& ParticleWorldTransform1, const FReal Dt)
 		{
 			const FRigidTransform3 WorldTransform0 = Constraint.ImplicitTransform[0] * ParticleWorldTransform0;
 			const FRigidTransform3 WorldTransform1 = Constraint.ImplicitTransform[1] * ParticleWorldTransform1;
-			UpdateConstraintFromGeometrySweptImpl<UpdateType>(Constraint, WorldTransform0, WorldTransform1, Dt);
+			return UpdateConstraintFromGeometrySweptImpl<UpdateType>(Constraint, WorldTransform0, WorldTransform1, Dt);
 		}
 
 
@@ -2707,8 +2770,8 @@ namespace Chaos
 		template void UpdateConstraintFromGeometry<ECollisionUpdateType::Any>(FPBDCollisionConstraint& ConstraintBase, const FRigidTransform3& Transform0, const FRigidTransform3& Transform1, const FReal Dt);
 		template void UpdateConstraintFromGeometry<ECollisionUpdateType::Deepest>(FPBDCollisionConstraint& ConstraintBase, const FRigidTransform3& Transform0, const FRigidTransform3& Transform1, const FReal Dt);
 
-		template void UpdateConstraintFromGeometrySwept<ECollisionUpdateType::Any>(FPBDCollisionConstraint& ConstraintBase, const FRigidTransform3& Transform0, const FRigidTransform3& Transform1, const FReal Dt);
-		template void UpdateConstraintFromGeometrySwept<ECollisionUpdateType::Deepest>(FPBDCollisionConstraint& ConstraintBase, const FRigidTransform3& Transform0, const FRigidTransform3& Transform1, const FReal Dt);
+		template bool UpdateConstraintFromGeometrySwept<ECollisionUpdateType::Any>(FPBDCollisionConstraint& ConstraintBase, const FRigidTransform3& Transform0, const FRigidTransform3& Transform1, const FReal Dt);
+		template bool UpdateConstraintFromGeometrySwept<ECollisionUpdateType::Deepest>(FPBDCollisionConstraint& ConstraintBase, const FRigidTransform3& Transform0, const FRigidTransform3& Transform1, const FReal Dt);
 
 	} // Collisions
 
