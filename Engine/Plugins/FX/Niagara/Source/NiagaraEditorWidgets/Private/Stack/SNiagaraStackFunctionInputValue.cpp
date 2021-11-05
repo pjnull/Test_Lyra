@@ -1410,7 +1410,7 @@ FText SNiagaraStackFunctionInputValue::GetFilteredViewDisplayName() const
 		{
 			FName DisplayName = EditorData->GetSummaryViewMetaData(Key.GetValue()).DisplayName;
 
-			return DisplayName != NAME_None ? FText::FromName(DisplayName) : FunctionInput->GetDisplayName();
+			return (DisplayName != NAME_None) ? FText::FromName(DisplayName) : FunctionInput->GetDisplayName();
 		}
 	}
 
@@ -1467,7 +1467,7 @@ FText SNiagaraStackFunctionInputValue::GetFilteredViewCategory() const
 		{
 			FName CategoryName = EditorData->GetSummaryViewMetaData(Key.GetValue()).Category;
 
-			return CategoryName != NAME_None ? FText::FromName(CategoryName) : GetFunctionInputCategory(FunctionInput);
+			return (CategoryName != NAME_None) ? FText::FromName(CategoryName) : GetFunctionInputCategory(FunctionInput);
 		}
 	}
 

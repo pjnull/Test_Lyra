@@ -234,7 +234,7 @@ void UNiagaraStackFunctionInputCollectionBase::RefreshChildrenForFunctionCall(UN
 					InputCategory = InputCategory.EqualTo(UncategorizedName)? FText::FromString(*InputFunctionCallNode->GetFunctionName()) : FText::FromString(*(InputFunctionCallNode->GetFunctionName() + TEXT(" - ") + InputCategory.ToString()));
 				}
 				EditorSortPriority = SummaryViewData.SortIndex;
-				DisplayName = SummaryViewData.DisplayName != NAME_None ? FText::FromName(SummaryViewData.DisplayName) : TOptional<FText>();
+				DisplayName = (SummaryViewData.DisplayName != NAME_None) ? FText::FromName(SummaryViewData.DisplayName) : TOptional<FText>();
 			}
 		}
 
@@ -319,7 +319,7 @@ void UNiagaraStackFunctionInputCollectionBase::RefreshChildrenForFunctionCall(UN
 					InputCategory = InputCategory.EqualTo(UncategorizedName)? FText::FromString(*InputFunctionCallNode->GetFunctionName()) : FText::FromString(*(InputFunctionCallNode->GetFunctionName() + TEXT(" - ") + InputCategory.ToString()));
 				}
 				EditorSortPriority = SummaryViewData.SortIndex;
-				DisplayName = SummaryViewData.DisplayName != NAME_None ? FText::FromName(SummaryViewData.DisplayName) : TOptional<FText>();
+				DisplayName = (SummaryViewData.DisplayName != NAME_None) ? FText::FromName(SummaryViewData.DisplayName) : TOptional<FText>();
 			}
 		}
 
