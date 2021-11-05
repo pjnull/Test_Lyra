@@ -6,6 +6,10 @@
 #include "DatasmithSceneFactory.h"
 #include "DatasmithMesh.h"
 #include "DatasmithUtils.h"
+#include "DatasmithMaxClassIDs.h"
+#include "DatasmithMaxMeshExporter.h"
+#include "DatasmithMaxSceneExporter.h"
+#include "DatasmithMaxAttributes.h"
 
 #include "Logging/LogMacros.h"
 
@@ -14,6 +18,8 @@
 MAX_INCLUDES_START
 	#include "max.h"
 
+	#include "modstack.h"
+	#include "iparamb2.h"
 	#include "MeshNormalSpec.h"
 MAX_INCLUDES_END
 
@@ -35,7 +41,7 @@ public:
 };
 
 
-Mesh* GetMeshForGeomObject(INode* Node, Object* Obj, bool& bOutNeedsDelete)
+FRenderMeshForConversion GetMeshForGeomObject(INode* Node, Object* Obj)
 {
 	// todo: baseline exporter uses GetBaseObject which takes result of EvalWorldState
 	// and searched down DerivedObject pipeline(by taking GetObjRef) 
@@ -46,26 +52,90 @@ Mesh* GetMeshForGeomObject(INode* Node, Object* Obj, bool& bOutNeedsDelete)
 	FNullView View;
 	TimeValue Time = GetCOREInterface()->GetTime();
 	BOOL bNeedsDelete;
-	Mesh* Result = GeomObj->GetRenderMesh(Time, Node, View, bNeedsDelete);
+	Mesh* RenderMesh = GeomObj->GetRenderMesh(Time, Node, View, bNeedsDelete);
 
-	bOutNeedsDelete = bNeedsDelete;
-
-	return Result;
+	return FRenderMeshForConversion(Node, RenderMesh, bNeedsDelete);
 }
 
-bool ConvertGeomNodeToDatasmithMesh(ISceneTracker& Scene, TSharedPtr<IDatasmithMeshElement>& DatasmithMeshElement, FString MeshName, INode* Node, Object* Obj, TSet<uint16>& SupportedChannels)
+FRenderMeshForConversion GetMeshForNode(INode* Node, FTransform Pivot)
 {
-	bool bNeedsDelete;
-	Mesh* RenderMesh = GetMeshForGeomObject(Node, Obj, bNeedsDelete);
-
-	if (!RenderMesh)
+	if (!Node)
 	{
-		return false;
+		return FRenderMeshForConversion();
 	}
-
-	return ConvertMaxMeshToDatasmith(Scene, DatasmithMeshElement, Node, *MeshName, RenderMesh, SupportedChannels, bNeedsDelete); // export might produce anything(e.g. if mesh is empty)
+	BOOL bNeedsDelete;
+	Mesh* RenderMesh = GetMeshFromRenderMesh(Node, bNeedsDelete, GetCOREInterface()->GetTime());
+	return FRenderMeshForConversion(Node, RenderMesh, bNeedsDelete, Pivot);
 }
 
+/** Convert Max to UE coordinates, handle scene master unit
+ * @param MaxTransform      source transform
+ * @param UnitMultiplier    Master scene unit
+ */
+FTransform FTransformFromMatrix3(const Matrix3& MaxTransform, float UnitMultiplier)
+{
+	FVector Translation;
+	FQuat Rotation;
+	FVector Scale;
+	FDatasmithMaxSceneExporter::MaxToUnrealCoordinates( MaxTransform, Translation, Rotation, Scale, UnitMultiplier);
+	return FTransform( Rotation, Translation, Scale );
+}
+
+FRenderMeshForConversion GetMeshForCollision(INode* Node)
+{
+	// source: FDatasmithMaxMeshExporter::ExportMesh
+	FDatasmithConverter Converter;
+	bool bIsCollisionFromDatasmithAttributes;
+	TOptional<FDatasmithMaxStaticMeshAttributes> DatasmithAttributes = FDatasmithMaxStaticMeshAttributes::ExtractStaticMeshAttributes(Node);
+	INode* CollisionNode = FDatasmithMaxMeshExporter::GetCollisionNode(Node, DatasmithAttributes ? &DatasmithAttributes.GetValue() : nullptr, bIsCollisionFromDatasmithAttributes);
+	FTransform CollisionPivot;
+	if (CollisionNode)
+	{
+
+		TSet<uint16> CollisionSupportedChannels;
+
+		bool bBakePivot = false; // todo: bake collision pivot if render mesh pivot is baked
+
+		FTransform ColliderPivot = FDatasmithMaxSceneExporter::GetPivotTransform(CollisionNode, Converter.UnitToCentimeter);
+
+		if (bIsCollisionFromDatasmithAttributes)
+		{
+			if (!bBakePivot)
+			{
+				FTransform RealPivot = FDatasmithMaxSceneExporter::GetPivotTransform(Node, Converter.UnitToCentimeter);
+				ColliderPivot = ColliderPivot * RealPivot.Inverse();
+			}
+			CollisionPivot = ColliderPivot;
+		}
+		else
+		{
+
+			TimeValue Now = GetCOREInterface()->GetTime();
+			FTransform FTransformFromMatrix3(const Matrix3& MaxTransform, float UnitMultiplier); // todo: move to header and rename(F is for class!)
+			FTransform NodeWTM = FTransformFromMatrix3(Node->GetNodeTM(Now), Converter.UnitToCentimeter);
+			FTransform ColliderNodeWTM = FTransformFromMatrix3(CollisionNode->GetNodeTM(Now), Converter.UnitToCentimeter);
+
+			// if object-offset has been baked into the mesh data, we want collision mesh data in the mesh's node space
+			//   MeshVert_Node = RealPivot * max_vert_data
+			//   MeshVert_world = NodeWTM * MeshVert_Node
+			// Collision mesh vertices in world space:
+			//   CollVert_node = ColliderPivot * CollVert_obj
+			//   CollVert_world = ColliderNodeWTM * CollVert_node
+			//   CollVert_mesh = NodeWTM-1 * CollVert_world
+			FTransform BakedTransform = ColliderPivot * ColliderNodeWTM * NodeWTM.Inverse();
+
+			if (!bBakePivot)
+			{
+				// if object-offset has not been baked, we want collision mesh data in the mesh's object space
+				FTransform RealPivot = FDatasmithMaxSceneExporter::GetPivotTransform(Node, Converter.UnitToCentimeter);
+				BakedTransform = BakedTransform * RealPivot.Inverse();
+			}
+
+			CollisionPivot = BakedTransform;
+		}
+	}
+	return GetMeshForNode(CollisionNode, CollisionPivot);
+}
 
 
 
@@ -216,22 +286,14 @@ void FillDatasmithMeshFromMaxMesh(FDatasmithMesh& DatasmithMesh, Mesh& MaxMesh, 
 	}
 }
 
-// todo: paralelize calls to ExportToUObject 
-bool ConvertMaxMeshToDatasmith(ISceneTracker& Scene, TSharedPtr<IDatasmithMeshElement>& DatasmithMeshElement, INode* Node, const TCHAR* MeshName, Mesh* RenderMesh, TSet<uint16>& SupportedChannels, bool bNeedsDelete)
+bool CreateDatasmithMeshFromMaxMesh(FDatasmithMesh& DatasmithMesh, INode* Node, const TCHAR* MeshName, const FRenderMeshForConversion& RenderMesh, TSet<uint16>& SupportedChannels)
 {
-	// Reset old mesh
-	if (DatasmithMeshElement)
-	{
-		// todo: potential mesh reuse - when DatasmithMeshElement allows to reset materials(as well as other params)
-		Scene.ReleaseMeshElement(DatasmithMeshElement);
-	}
-
 	bool bResult = false;
-	if (RenderMesh->getNumFaces())
+	if (RenderMesh.GetMesh()->getNumFaces())
 	{
 		// Copy mesh to clean it before filling Datasmith mesh from it
 		Mesh CachedMesh;
-		CachedMesh.DeepCopy(RenderMesh, TOPO_CHANNEL | GEOM_CHANNEL | TEXMAP_CHANNEL | VERTCOLOR_CHANNEL);
+		CachedMesh.DeepCopy(RenderMesh.GetMesh(), TOPO_CHANNEL | GEOM_CHANNEL | TEXMAP_CHANNEL | VERTCOLOR_CHANNEL);
 
 		CachedMesh.DeleteIsoVerts();
 		CachedMesh.RemoveDegenerateFaces();
@@ -243,29 +305,143 @@ bool ConvertMaxMeshToDatasmith(ISceneTracker& Scene, TSharedPtr<IDatasmithMeshEl
 
 		if (CachedMesh.getNumFaces() > 0)
 		{
-			FDatasmithMesh DatasmithMesh;
-
 			// todo: pivot
-			FillDatasmithMeshFromMaxMesh(DatasmithMesh, CachedMesh, Node, false, SupportedChannels, MeshName, FTransform::Identity);
-
-
-			DatasmithMeshElement = FDatasmithSceneFactory::CreateMesh(MeshName);
-
-			Scene.AddMeshElement(DatasmithMeshElement, DatasmithMesh);
+			FillDatasmithMeshFromMaxMesh(DatasmithMesh, CachedMesh, Node, false, SupportedChannels, MeshName, RenderMesh.GetPivot());
 
 			bResult = true; // Set to true, don't care what ExportToUObject does here - we need to move it to a thread anyway
-
 		}
 		CachedMesh.FreeAll();
 	}
-
-	if (bNeedsDelete)
-	{
-		RenderMesh->DeleteThis();
-	}
-
 	return bResult;
 }
+
+
+
+// todo: paralelize calls to ExportToUObject 
+bool ConvertMaxMeshToDatasmith(ISceneTracker& Scene, TSharedPtr<IDatasmithMeshElement>& DatasmithMeshElement, INode* Node, const TCHAR* MeshName, const FRenderMeshForConversion& RenderMesh, TSet<uint16>& SupportedChannels, const FRenderMeshForConversion& CollisionMesh)
+{
+	// Reset old mesh
+	if (DatasmithMeshElement)
+	{
+		// todo: potential mesh reuse - when DatasmithMeshElement allows to reset materials(as well as other params)
+		Scene.ReleaseMeshElement(DatasmithMeshElement);
+	}
+
+	FDatasmithMesh DatasmithMesh;
+	if (!CreateDatasmithMeshFromMaxMesh(DatasmithMesh, Node, MeshName, RenderMesh, SupportedChannels))
+	{
+		return false;
+	}
+
+	DatasmithMeshElement = FDatasmithSceneFactory::CreateMesh(MeshName);
+
+	FDatasmithMesh* DatasmithCollisionMeshPtr = nullptr;
+	FDatasmithMesh DatasmithCollisionMesh;
+	if (CollisionMesh.IsValid())
+	{
+		if (CreateDatasmithMeshFromMaxMesh(DatasmithCollisionMesh, CollisionMesh.GetNode(), nullptr, CollisionMesh, SupportedChannels))
+		{
+			DatasmithCollisionMeshPtr = &DatasmithCollisionMesh;
+		}
+	}
+
+	Scene.AddMeshElement(DatasmithMeshElement, DatasmithMesh, DatasmithCollisionMeshPtr);
+	return true;
+}
+
+// todo: copied from DatasmithMaxMeshExporter.cpp
+
+Object* GetBaseObject(INode* Node, TimeValue Time)
+{
+	ObjectState ObjState = Node->EvalWorldState(Time);
+	Object* Obj = ObjState.obj;
+
+	if (Obj)
+	{
+		SClass_ID SuperClassID;
+		SuperClassID = Obj->SuperClassID();
+		while (SuperClassID == GEN_DERIVOB_CLASS_ID)
+		{
+			Obj = ((IDerivedObject*)Obj)->GetObjRef();
+			SuperClassID = Obj->SuperClassID();
+		}
+	}
+
+	return Obj;
+}
+#define VRAY_PROXY_DISPLAY_AS_MESH	4	// Value to set on a VRay Mesh Proxy to get the mesh
+
+int SetObjectParamValue(Object *Obj, const FString& ParamName, int DesiredValue)
+{
+	bool bFoundDisplayValue = false;
+	int PrevDisplayValue = DesiredValue; // Display value to see mesh
+	int NumParamBlocks = Obj->NumParamBlocks();
+	for (short BlockIndex = 0; BlockIndex < NumParamBlocks && !bFoundDisplayValue; ++BlockIndex)
+	{
+		IParamBlock2* ParamBlock2 = Obj->GetParamBlockByID(BlockIndex);
+		ParamBlockDesc2* ParamBlockDesc = ParamBlock2->GetDesc();
+		for (int ParamIndex = 0; ParamIndex < ParamBlockDesc->count; ++ParamIndex)
+		{
+			ParamDef& ParamDefinition = ParamBlockDesc->paramdefs[ParamIndex];
+			if (FCString::Stricmp(ParamDefinition.int_name, *ParamName) == 0)
+			{
+				PrevDisplayValue = ParamBlock2->GetInt(ParamDefinition.ID, GetCOREInterface()->GetTime());
+				if (PrevDisplayValue != DesiredValue)
+				{
+					ParamBlock2->SetValue(ParamDefinition.ID, GetCOREInterface()->GetTime(), DesiredValue);
+				}
+				bFoundDisplayValue = true;
+				break;
+			}
+		}
+		ParamBlock2->ReleaseDesc();
+	}
+
+	return PrevDisplayValue;
+}
+
+
+Mesh* GetMeshFromRenderMesh(INode* Node, BOOL& bNeedsDelete, TimeValue CurrentTime)
+{
+	Object* Obj = GetBaseObject(Node, CurrentTime);
+	const Class_ID& ObjectClassID = Obj->ClassID();
+	const FString VRayProxyParamName(TEXT("display"));
+	const FString BodyObjectViewportMeshParamName(TEXT("RenderViewportMeshRA"));
+	int PreviousMeshDisplayValue = 0;
+
+	if (ObjectClassID == VRAYPROXY_CLASS_ID)
+	{
+		// Need the high resolution render mesh associated with the VRay Mesh Proxy for the export
+		PreviousMeshDisplayValue = SetObjectParamValue(Obj, VRayProxyParamName, VRAY_PROXY_DISPLAY_AS_MESH);
+	}
+	else if(ObjectClassID == BODYOBJECT_CLASS_ID)
+	{
+		// Need to make sure we are using the viewport mesh on BodyObject, otherwise the RenderMesh gives a tessellated low resolution mesh.
+		PreviousMeshDisplayValue = SetObjectParamValue(Obj, BodyObjectViewportMeshParamName, 1);
+	}
+
+	GeomObject* GeomObj = static_cast<GeomObject*>(Obj);
+	if (GeomObj == nullptr)
+	{
+		return nullptr;
+	}
+
+	FNullView View;
+	Mesh* RenderMesh = GeomObj->GetRenderMesh(CurrentTime, Node, View, bNeedsDelete);
+
+	// Restore display state if different from mesh display
+	if (ObjectClassID == VRAYPROXY_CLASS_ID && PreviousMeshDisplayValue != VRAY_PROXY_DISPLAY_AS_MESH)
+	{
+		SetObjectParamValue(Obj, VRayProxyParamName, PreviousMeshDisplayValue);
+	}
+	else if(ObjectClassID == BODYOBJECT_CLASS_ID && PreviousMeshDisplayValue != 1)
+	{
+		SetObjectParamValue(Obj, BodyObjectViewportMeshParamName, PreviousMeshDisplayValue);
+	}
+
+	return RenderMesh;
+}
+
 
 }
 

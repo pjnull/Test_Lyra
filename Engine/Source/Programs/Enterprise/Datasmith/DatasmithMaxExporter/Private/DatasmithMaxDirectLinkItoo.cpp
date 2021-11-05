@@ -103,7 +103,7 @@ bool ConvertRailClone(ISceneTracker& SceneTracker, FNodeTracker& NodeTracker, Ob
 		int32 MeshIndex = 0;
 		for (FHismInstances& Instances: InstancesForMesh)
 		{
-			SceneTracker.SetupDatasmithHISMForNode(NodeTracker, NodeTracker.Node, Instances.MaxMesh.Get(), NodeTracker.Node->GetMtl(), MeshIndex, Instances.Transforms, false);
+			SceneTracker.SetupDatasmithHISMForNode(NodeTracker, NodeTracker.Node, FRenderMeshForConversion(NodeTracker.Node, Instances.MaxMesh.Get(), false), NodeTracker.Node->GetMtl(), MeshIndex, Instances.Transforms);
 		}
 	}
 
@@ -177,13 +177,13 @@ bool ConvertForest(ISceneTracker& Scene, FNodeTracker& NodeTracker, Object* Obj)
 		{
 			INode* GeometryNode = Instances.GeometryNode;
 
-			bool bNeedsDelete;
 			Object* GeomObj = GeometryNode->EvalWorldState(GetCOREInterface()->GetTime()).obj;
-			Mesh* RenderMesh = GetMeshForGeomObject(GeometryNode, GeomObj, bNeedsDelete);
+			
+			FRenderMeshForConversion RenderMesh = GetMeshForGeomObject(GeometryNode, GeomObj);
 
-			if (RenderMesh)
+			if (RenderMesh.IsValid())
 			{
-				Scene.SetupDatasmithHISMForNode(NodeTracker, GeometryNode, RenderMesh, NodeTracker.Node->GetMtl(), MeshIndex, Instances.Transforms, bNeedsDelete);
+				Scene.SetupDatasmithHISMForNode(NodeTracker, GeometryNode, RenderMesh, NodeTracker.Node->GetMtl(), MeshIndex, Instances.Transforms);
 			}
 		}
 	}

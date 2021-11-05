@@ -92,7 +92,15 @@ public:
 		}
 	}
 
+	virtual void NameChanged(NodeKeyTab& nodes) override
+	{
+		LogNodeEvent(L"NameChanged", nodes);
 
+		for (int NodeIndex = 0; NodeIndex < nodes.Count(); ++NodeIndex)
+		{
+			SceneTracker.NodePropertiesChanged(nodes[NodeIndex]);
+		}
+	}
 
 	// Not used:
 
@@ -154,11 +162,6 @@ public:
 	virtual void ControllerStructured(NodeKeyTab& nodes) override
 	{
 		LogNodeEvent(L"ControllerStructured", nodes);
-	}
-
-	virtual void NameChanged(NodeKeyTab& nodes) override
-	{
-		LogNodeEvent(L"NameChanged", nodes);
 	}
 
 	virtual void WireColorChanged(NodeKeyTab& nodes) override

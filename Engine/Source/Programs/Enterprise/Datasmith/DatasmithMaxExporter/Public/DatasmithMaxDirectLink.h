@@ -65,10 +65,10 @@ void ShutdownExporter();
 bool Export(const TCHAR* Name, const TCHAR* OutputPath, bool bQuiet); 
 
 // Identifies Max node to track its changes
-class FNodeTracker
+class FNodeTracker: FNoncopyable
 {
 public:
-	explicit FNodeTracker(INode* InNode) : Node(InNode) {}
+	explicit FNodeTracker(INode* InNode) : Node(InNode), Name(Node->GetName()) {}
 
 	void Invalidate()
 	{
@@ -86,7 +86,9 @@ public:
 	}
 
 	INode* const Node;
+	FNodeTracker* Collision = nullptr;
 	AnimHandle InstanceHandle = 0; // todo: rename - this is handle for object this node is instance of
+	FString Name; 
 	bool bInvalidated = true;
 
 	TSharedPtr<IDatasmithActorElement> DatasmithActorElement;
@@ -100,6 +102,53 @@ public:
 // Max nodes are matched by these keys
 typedef NodeEventNamespace::NodeKey FNodeKey;
 typedef MtlBase* FMaterialKey;
+
+class FRenderMeshForConversion: FNoncopyable
+{
+public:
+	explicit FRenderMeshForConversion(){}
+	explicit FRenderMeshForConversion(INode* InNode, Mesh* InMaxMesh, bool bInNeedsDelete, FTransform InPivot=FTransform::Identity)
+		: Node(InNode)
+		, MaxMesh(InMaxMesh)
+		, bNeedsDelete(bInNeedsDelete)
+		, Pivot(InPivot)
+	{}
+	~FRenderMeshForConversion()
+	{
+		if (bNeedsDelete)
+		{
+			MaxMesh->DeleteThis();
+		}
+	}
+
+	bool IsValid() const
+	{
+		return MaxMesh != nullptr;
+	}
+
+	INode* GetNode() const
+	{
+		return Node;
+	}
+
+	Mesh* GetMesh() const
+	{
+		return MaxMesh;
+	}
+
+	const FTransform& GetPivot() const
+	{
+		return Pivot;
+	}
+
+
+private:
+	INode* Node = nullptr;
+	Mesh* MaxMesh = nullptr;
+	bool bNeedsDelete = false;
+	FTransform Pivot;
+
+};
 
 // Modifies Datasmith scene in responce to change notification calls
 // Subscription to various Max notification systems is done separately, see  FNotifications
@@ -119,10 +168,10 @@ public:
 	virtual void NodeMaterialGraphModified(FNodeKey NodeKey) = 0;
 
 	// Scene modification
-	virtual void AddMeshElement(TSharedPtr<IDatasmithMeshElement>& Mesh, FDatasmithMesh& DatasmithMesh) = 0;
+	virtual void AddMeshElement(TSharedPtr<IDatasmithMeshElement>& Mesh, FDatasmithMesh& DatasmithMesh, FDatasmithMesh* CollisionMesh) = 0;
 	virtual void ReleaseMeshElement(TSharedPtr<IDatasmithMeshElement> Mesh) = 0;
 	virtual void SetupActor(FNodeTracker& NodeTracker) = 0;
-	virtual void SetupDatasmithHISMForNode(FNodeTracker& NodeTracker, INode* GeometryNode, Mesh* RenderMesh, Mtl* Material, int32 MeshIndex, const TArray<Matrix3>& Transforms, bool bNeedsDelete) = 0;
+	virtual void SetupDatasmithHISMForNode(FNodeTracker& NodeTracker, INode* GeometryNode, const FRenderMeshForConversion& RenderMesh, Mtl* Material, int32 MeshIndex, const TArray<Matrix3>& Transforms) = 0;
 	virtual void RemoveMaterial(const TSharedPtr<IDatasmithBaseMaterialElement>& DatasmithMaterial) = 0;
 };
 
@@ -130,12 +179,16 @@ public:
 bool ConvertRailClone(ISceneTracker& SceneTracker, FNodeTracker& NodeTracker, Object* Obj);
 bool ConvertForest(ISceneTracker& Scene, FNodeTracker& NodeTracker, Object* Obj);
 
-Mesh* GetMeshForGeomObject(INode* Node, Object* Obj, bool& bOutNeedsDelete);
-bool ConvertGeomNodeToDatasmithMesh(ISceneTracker& Scene, TSharedPtr<IDatasmithMeshElement>& DatasmithMeshElement, FString MeshName, INode* Node, Object* Obj, TSet<uint16>& SupportedChannels);
+Mesh* GetMeshFromRenderMesh(INode* Node, BOOL& bNeedsDelete, TimeValue CurrentTime);
+FRenderMeshForConversion GetMeshForGeomObject(INode* Node, Object* Obj); // Extract mesh using already evaluated object
+FRenderMeshForConversion GetMeshForNode(INode* Node, FTransform Pivot); // Extract mesh evaluating node object
+FRenderMeshForConversion GetMeshForCollision(INode* Node);
+
 void FillDatasmithMeshFromMaxMesh(FDatasmithMesh& DatasmithMesh, Mesh& MaxMesh, INode* ExportedNode, bool bForceSingleMat, TSet<uint16>& SupportedChannels, const TCHAR* MeshName, FTransform Pivot);
 
+
 // Creates Mesh element and converts max mesh into it
-bool ConvertMaxMeshToDatasmith(ISceneTracker& Scene, TSharedPtr<IDatasmithMeshElement>& DatasmithMeshElement, INode* Node, const TCHAR* MeshName, Mesh* RenderMesh, TSet<uint16>& SupportedChannels, bool bNeedsDelete);
+bool ConvertMaxMeshToDatasmith(ISceneTracker& Scene, TSharedPtr<IDatasmithMeshElement>& DatasmithMeshElement, INode* Node, const TCHAR* MeshName, const FRenderMeshForConversion& RenderMesh, TSet<uint16>& SupportedChannels, const FRenderMeshForConversion& CollisionMesh = FRenderMeshForConversion());
 
 bool OpenDirectLinkUI();
 const TCHAR* GetDirectlinkCacheDirectory();

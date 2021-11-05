@@ -16,6 +16,7 @@
 #include "DatasmithMaxCameraExporter.h"
 #include "DatasmithMaxAttributes.h"
 #include "DatasmithMaxProgressManager.h"
+#include "DatasmithMaxMeshExporter.h"
 
 #include "Modules/ModuleManager.h"
 #include "HAL/PlatformFilemanager.h"
@@ -329,6 +330,8 @@ public:
 	void Reset()
 	{
 		NodeTrackers.Reset();
+		NodeTrackersNames.Reset();
+		CollisionNodes.Reset();
 		InvalidatedNodeTrackers.Reset();
 		InvalidatedInstances.Reset();
 		MaterialsCollectionTracker.Reset();
@@ -342,10 +345,35 @@ public:
 		FUpdateProgress ProgressManager(!bQuiet, 6); // Will shutdown on end of Update
 
 		LogDebug("Scene update: start");
+		DatasmithMaxLogger::Get().Purge();
+
+		ProgressManager.ProgressStage(TEXT("Update names"));
+		// todo: move to NameChanged and NodeAdded?
+		for (FNodeTracker* NodeTracker : InvalidatedNodeTrackers)
+		{
+			FString Name = NodeTracker->Node->GetName();
+			if (Name != NodeTracker->Name)
+			{
+				NodeTrackersNames[NodeTracker->Name].Remove(NodeTracker);
+				NodeTracker->Name = Name;
+				NodeTrackersNames.FindOrAdd(NodeTracker->Name).Add(NodeTracker);
+			}
+		}
+
+		ProgressManager.ProgressStage(TEXT("Refresh collisions")); // Update set of nodes used for collision 
+		{
+			FProgressCounter ProgressCounter(ProgressManager, InvalidatedNodeTrackers.Num());
+			TSet<FNodeTracker*> NodesWithChangedCollisionStatus; // Need to invalidate these nodes to make them renderable or to keep them from renderable dependinding on collision status
+			for (FNodeTracker* NodeTracker : InvalidatedNodeTrackers)
+			{
+				ProgressCounter.Next();
+
+				UpdateCollisionStatus(NodeTracker, NodesWithChangedCollisionStatus);
+			}
+			InvalidatedNodeTrackers.Append(NodesWithChangedCollisionStatus);
+		}
 
 		ProgressManager.ProgressStage(TEXT("Process invalidated nodes"));
-
-		DatasmithMaxLogger::Get().Purge();
 		{
 			FProgressCounter ProgressCounter(ProgressManager, InvalidatedNodeTrackers.Num());
 			for (FNodeTracker* NodeTracker : InvalidatedNodeTrackers)
@@ -447,7 +475,10 @@ public:
 	FNodeTrackerHandle& AddNode(FNodeKey NodeKey, INode* Node)
 	{
 		FNodeTrackerHandle& NodeTracker = NodeTrackers.Emplace(NodeKey, Node);
-		InvalidatedNodeTrackers.Add(NodeTracker.GetNodeTracker()); // Add
+		
+		NodeTrackersNames.FindOrAdd(NodeTracker.GetNodeTracker()->Name).Add(NodeTracker.GetNodeTracker());
+		InvalidatedNodeTrackers.Add(NodeTracker.GetNodeTracker());
+
 		return NodeTracker;
 	}
 
@@ -551,6 +582,95 @@ public:
 		ClearNodeFromDatasmithScene(NodeTracker);
 	}
 
+	void UpdateCollisionStatus(FNodeTracker* NodeTracker, TSet<FNodeTracker*>& NodesWithChangedCollisionStatus)
+	{
+		// Check if collision assigned for node changed
+		{
+			TOptional<FDatasmithMaxStaticMeshAttributes> DatasmithAttributes = FDatasmithMaxStaticMeshAttributes::ExtractStaticMeshAttributes(NodeTracker->Node);
+
+			bool bOutFromDatasmithAttributes;
+			INode* CollisionNode = FDatasmithMaxMeshExporter::GetCollisionNode(NodeTracker->Node, DatasmithAttributes ? &DatasmithAttributes.GetValue() : nullptr, bOutFromDatasmithAttributes);
+
+			FNodeTracker* CollisionNodeTracker = nullptr;
+			FNodeKey CollisionNodeKey = NodeEventNamespace::GetKeyByNode(CollisionNode);
+			if (FNodeTrackerHandle* NodeTrackerHandle = NodeTrackers.Find(CollisionNodeKey)) // This node should be tracked
+			{
+				CollisionNodeTracker = NodeTrackerHandle->GetNodeTracker();
+			}
+
+			if (NodeTracker->Collision != CollisionNodeTracker)
+			{
+				// Update usage counters for collision nodes
+
+				// Remove previous
+				if (TSet<FNodeTracker*>* CollisionUsersPtr = CollisionNodes.Find(NodeTracker->Collision))
+				{
+					TSet<FNodeTracker*>& CollisionUsers = *CollisionUsersPtr;
+					CollisionUsers.Remove(NodeTracker);
+
+					if (CollisionUsers.IsEmpty())
+					{
+						CollisionNodes.Remove(NodeTracker->Collision);
+						NodesWithChangedCollisionStatus.Add(NodeTracker->Collision);
+					}
+				}
+
+				// Add new
+				if (CollisionNodeTracker)
+				{
+					if (TSet<FNodeTracker*>* CollisionUsersPtr = CollisionNodes.Find(CollisionNodeTracker))
+					{
+						TSet<FNodeTracker*>& CollisionUsers = *CollisionUsersPtr;
+						CollisionUsers.Add(NodeTracker);
+					}
+					else
+					{
+						TSet<FNodeTracker*>& CollisionUsers = CollisionNodes.Add(CollisionNodeTracker);
+						CollisionUsers.Add(NodeTracker);
+						NodesWithChangedCollisionStatus.Add(CollisionNodeTracker);
+					}
+				}
+				NodeTracker->Collision = CollisionNodeTracker;
+			}
+		}
+
+		// Check if node changed its being assigned as collision
+		{
+			if (FDatasmithMaxSceneParser::HasCollisionName(NodeTracker->Node))
+			{
+				CollisionNodes.Add(NodeTracker); // Always view node with 'collision' name as a collision node(i.e. no render)
+
+				//Check named collision assignment(e.g. 'UCP_<other nothe name>')
+				// Split collision prefix and find node that might use this node as collision mesh
+				FString NodeName = NodeTracker->Node->GetName();
+				FString LeftString, RightString;
+				NodeName.Split(TEXT("_"), &LeftString, &RightString);
+
+				if (TSet<FNodeTracker*>* CollisionUserNodeTrackersPtr = NodeTrackersNames.Find(RightString))
+				{
+					for (FNodeTracker* CollisionUserNodeTracker: *CollisionUserNodeTrackersPtr)
+					{
+						if (CollisionUserNodeTracker->Collision != NodeTracker)
+						{
+							NodesWithChangedCollisionStatus.Add(CollisionUserNodeTracker); // Invalidate each node that has collision changed
+						}
+					}
+				}
+			}
+			else
+			{
+				// Remove from registered collision nodes if there's not other users(i.e. using Datasmith attributes reference)
+				if (TSet<FNodeTracker*>* CollisionUsersPtr = CollisionNodes.Find(NodeTracker))
+				{
+					if (CollisionUsersPtr->IsEmpty())
+					{
+						CollisionNodes.Remove(NodeTracker);
+					}
+				}
+			}
+		}
+	}
+
 	void UpdateNode(FNodeTracker& NodeTracker)
 	{
 		// Forget anything that this node was before update: place in datasmith hierarchy, datasmith objects, instances connection. Updating may change anything 
@@ -560,6 +680,11 @@ public:
 
 	void ConvertNodeObject(FNodeTracker& NodeTracker)
 	{
+		if (CollisionNodes.Contains(&NodeTracker))
+		{
+			return;
+		}
+
 		if (NodeTracker.Node->IsNodeHidden(TRUE) || !NodeTracker.Node->Renderable())
 		{
 			return;
@@ -606,7 +731,14 @@ public:
 			}
 			else
 			{
-				ConvertGeomObj(NodeTracker, Obj);
+				if (FDatasmithMaxSceneParser::HasCollisionName(NodeTracker.Node))
+				{
+					ConvertNamedCollisionNode(NodeTracker);
+				}
+				else
+				{
+					ConvertGeomObj(NodeTracker, Obj);
+				}
 			}
 			break;
 		}
@@ -838,13 +970,13 @@ public:
 		}
 	}
 
-	void AddMeshElement(TSharedPtr<IDatasmithMeshElement>& DatasmithMeshElement, FDatasmithMesh& DatasmithMesh)
+	void AddMeshElement(TSharedPtr<IDatasmithMeshElement>& DatasmithMeshElement, FDatasmithMesh& DatasmithMesh, FDatasmithMesh* CollisionMesh)
 	{
 		ExportedScene.GetDatasmithScene()->AddMesh(DatasmithMeshElement);
 
 		// todo: parallelize this
 		FDatasmithMeshExporter DatasmithMeshExporter;
-		if (DatasmithMeshExporter.ExportToUObject(DatasmithMeshElement, ExportedScene.GetSceneExporter().GetAssetsOutputPath(), DatasmithMesh, nullptr, FDatasmithExportOptions::LightmapUV))
+		if (DatasmithMeshExporter.ExportToUObject(DatasmithMeshElement, ExportedScene.GetSceneExporter().GetAssetsOutputPath(), DatasmithMesh, CollisionMesh, FDatasmithExportOptions::LightmapUV))
 		{
 			// todo: handle error exporting mesh?
 		}
@@ -859,10 +991,16 @@ public:
 		TSet<uint16>& SupportedChannels = Instances.SupportedChannels;
 		FString MeshName = FString::FromInt(Node->GetHandle());
 
-		if (ConvertGeomNodeToDatasmithMesh(*this, DatasmithMeshElement, MeshName, Node, Obj, SupportedChannels))
+		FRenderMeshForConversion RenderMesh = GetMeshForGeomObject(Node, Obj);
+		FRenderMeshForConversion CollisionMesh = GetMeshForCollision(Node);
+
+		if (RenderMesh.GetMesh())
 		{
-			DatasmithMeshElement->SetLabel(Node->GetName());
-			return true;
+			if (ConvertMaxMeshToDatasmith(*this, DatasmithMeshElement, Node, *MeshName, RenderMesh, SupportedChannels, CollisionMesh)) // export might produce anything(e.g. if mesh is empty)
+			{
+				DatasmithMeshElement->SetLabel(Node->GetName());
+				return true;
+			}
 		}
 		DatasmithMeshElement.Reset();
 		return false;
@@ -974,7 +1112,7 @@ public:
 		return true;
 	}
 	
-	void SetupDatasmithHISMForNode(FNodeTracker& NodeTracker, INode* GeometryNode, Mesh* RenderMesh, Mtl* Material, int32 MeshIndex, const TArray<Matrix3>& Transforms, bool bNeedsDelete)
+	void SetupDatasmithHISMForNode(FNodeTracker& NodeTracker, INode* GeometryNode, const FRenderMeshForConversion& RenderMesh, Mtl* Material, int32 MeshIndex, const TArray<Matrix3>& Transforms)
 	{
 		FString MeshName = FString::FromInt(NodeTracker.Node->GetHandle()) + TEXT("_") + FString::FromInt(MeshIndex);
 
@@ -983,7 +1121,7 @@ public:
 		TSharedPtr<IDatasmithMeshElement> DatasmithMeshElement;
 		TSet<uint16> SupportedChannels;
 
-		if (ConvertMaxMeshToDatasmith(*this, DatasmithMeshElement, GeometryNode, *MeshName, RenderMesh, SupportedChannels, bNeedsDelete))
+		if (ConvertMaxMeshToDatasmith(*this, DatasmithMeshElement, GeometryNode, *MeshName, RenderMesh, SupportedChannels))
 		{
 			TUniquePtr<FRailClonesConverted>& RailClonesConverted = RailClones.FindOrAdd(&NodeTracker);
 			if (!RailClonesConverted)
@@ -1046,6 +1184,36 @@ public:
 		return bResult;
 	}
 
+	void ConvertNamedCollisionNode(FNodeTracker& NodeTracker)
+	{
+		// Split collision prefix and find node that might use this node as collision mesh
+		FString NodeName = NodeTracker.Node->GetName();
+		FString LeftString, RightString;
+		NodeName.Split(TEXT("_"), &LeftString, &RightString);
+
+		INode* CollisionUserNode = GetCOREInterface()->GetINodeByName(*RightString);
+		if (!CollisionUserNode)
+		{
+			return;
+		}
+
+		// If some node is using this collision node then invalidate that node's instances
+		FNodeKey CollisionUserNodeKey = NodeEventNamespace::GetKeyByNode(CollisionUserNode);
+		if (FNodeTrackerHandle* NodeTrackerHandle = NodeTrackers.Find(CollisionUserNodeKey)) // This node should be tracked
+		{
+			FNodeTracker& CollisionUserNodeTracker = *NodeTrackerHandle->GetNodeTracker();
+
+			if (CollisionUserNodeTracker.IsInstance())
+			{
+				if (TUniquePtr<FInstances>* InstancesPtr = InstancesForAnimHandle.Find(CollisionUserNodeTracker.InstanceHandle))
+				{
+					FInstances& Instances = **InstancesPtr;
+					InvalidateInstances(Instances);
+				}
+			}
+		}
+	}
+
 	/******************* Events *****************************/
 
 	void NodeAdded(INode* Node)
@@ -1075,6 +1243,22 @@ public:
 			FNodeTracker* NodeTracker = NodeTrackerHandle->GetNodeTracker();
 			InvalidatedNodeTrackers.Remove(NodeTracker);
 			NodeTrackers.Remove(NodeKey);
+
+			if (TSet<FNodeTracker*>* NodeTrackersPtr = NodeTrackersNames.Find(NodeTracker->Name))
+			{
+				NodeTrackersPtr->Remove(NodeTracker);
+			}
+
+			if (TSet<FNodeTracker*>* CollisionUsersPtr = CollisionNodes.Find(NodeTracker->Collision))
+			{
+				TSet<FNodeTracker*>& CollisionUsers = *CollisionUsersPtr;
+				CollisionUsers.Remove(NodeTracker);
+
+				if (CollisionUsers.IsEmpty())
+				{
+					CollisionNodes.Remove(NodeTracker->Collision);
+				}
+			}
 
 			RemoveFromConverted(*NodeTracker);
 		}
@@ -1159,8 +1343,10 @@ public:
 	FDatasmith3dsMaxScene& ExportedScene;
 	FNotifications& NotificationsHandler;
 	TMap<FNodeKey, FNodeTrackerHandle> NodeTrackers; // All scene nodes
-
+	TMap<FString, TSet<FNodeTracker*>> NodeTrackersNames; // Nodes grouped by name
 	TSet<FNodeTracker*> InvalidatedNodeTrackers; // Nodes that need to be rebuilt
+
+	TMap<FNodeTracker*, TSet<FNodeTracker*>> CollisionNodes; // Nodes used as collision meshes for other nodes, counted by each user 
 
 	FMaterialsCollectionTracker MaterialsCollectionTracker;
 
