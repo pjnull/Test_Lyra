@@ -104,13 +104,10 @@ void UWorldPartitionStreamingPolicy::UpdateStreamingSources()
 		// We are in the SIE
 		if (GEnableSimulationStreamingSource && UWorldPartition::IsSimulating())
 		{
-			// Transform to Local
 			const FVector ViewLocation = GCurrentLevelEditingViewportClient->GetViewLocation();
 			const FRotator ViewRotation = GCurrentLevelEditingViewportClient->GetViewRotation();
-			const FVector ViewLocationLocal = ViewLocation;
-			const FRotator ViewRotationLocal = ViewRotation;
 			static const FName NAME_SIE(TEXT("SIE"));
-			StreamingSources.Add(FWorldPartitionStreamingSource(NAME_SIE, ViewLocationLocal, ViewRotationLocal, EStreamingSourceTargetState::Activated, /*bBlockOnSlowLoading=*/false, EStreamingSourcePriority::Default));
+			StreamingSources.Add(FWorldPartitionStreamingSource(NAME_SIE, ViewLocation, ViewRotation, EStreamingSourceTargetState::Activated, /*bBlockOnSlowLoading=*/false, EStreamingSourcePriority::Default));
 		}
 		else
 #endif
@@ -129,7 +126,6 @@ void UWorldPartitionStreamingPolicy::UpdateStreamingSources()
 						FRotator ViewRotation;
 						Player->PlayerController->GetPlayerViewPoint(ViewLocation, ViewRotation);
 
-						// Transform to Local
 						EStreamingSourceTargetState TargetState = Player->PlayerController->StreamingSourceShouldActivate() ? EStreamingSourceTargetState::Activated : EStreamingSourceTargetState::Loaded;
 						StreamingSources.Add(FWorldPartitionStreamingSource(Player->PlayerController->GetFName(), ViewLocation, ViewRotation, TargetState, /*bBlockOnSlowLoading=*/true, EStreamingSourcePriority::Default));
 					}
@@ -144,9 +140,6 @@ void UWorldPartitionStreamingPolicy::UpdateStreamingSources()
 			StreamingSource.Priority = EStreamingSourcePriority::Low;
 			if (StreamingSourceProvider->GetStreamingSource(StreamingSource))
 			{
-				// Transform to Local
-				StreamingSource.Location = StreamingSource.Location;
-				StreamingSource.Rotation = StreamingSource.Rotation;
 				StreamingSources.Add(StreamingSource);
 			}
 		}
