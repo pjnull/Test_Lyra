@@ -32,6 +32,9 @@ struct FWorldPartitionPerWorldSettings
 
 	UPROPERTY()
 	TArray<FName> LoadedDataLayers;
+
+	UPROPERTY()
+	uint32 EditorGridConfigHash;
 #endif
 };
 
@@ -41,7 +44,6 @@ class UWorldPartitionEditorPerProjectUserSettings : public UObject
 	GENERATED_BODY()
 
 public:
-
 	UWorldPartitionEditorPerProjectUserSettings(const FObjectInitializer& ObjectInitializer)
 		: Super(ObjectInitializer)
 #if WITH_EDITORONLY_DATA
@@ -50,28 +52,22 @@ public:
 		, bHideDataLayerActors(true)
 		, bHideUnloadedActors(false)
 		, bAllowRuntimeDataLayerEditing(false)
-		, EditorGridConfigHash(0)
 		, bDisableLoadingOfLastLoadedCells(false)
 #endif
-	{ }
+	{}
 
 #if WITH_EDITOR
-	uint32 GetEditorGridConfigHash() const
+	void SetEditorGridConfigHash(UWorld* InWorld, uint32 InEditorGridConfigHash)
 	{ 
-		return EditorGridConfigHash;
-	}
-
-	void SetEditorGridConfigHash(uint32 InEditorGridConfigHash)
-	{ 
-		if (EditorGridConfigHash != InEditorGridConfigHash)
+		if (ShouldSaveSettings(InWorld))
 		{
-			EditorGridConfigHash = InEditorGridConfigHash;
-
-			for (auto& PerWorldEditorSetting : PerWorldEditorSettings)
+			FWorldPartitionPerWorldSettings& PerWorldSettings = PerWorldEditorSettings.FindOrAdd(TSoftObjectPtr<UWorld>(InWorld));
+			if (PerWorldSettings.EditorGridConfigHash != InEditorGridConfigHash)
 			{
-				PerWorldEditorSetting.Value.LoadedEditorGridCells.Empty();
+				PerWorldSettings.EditorGridConfigHash = InEditorGridConfigHash;
+				PerWorldSettings.LoadedEditorGridCells.Empty();
+				SaveConfig();
 			}
-			SaveConfig();
 		}
 	}
 
@@ -143,11 +139,8 @@ public:
 private:
 	bool ShouldSaveSettings(const UWorld* InWorld) const
 	{
-		return InWorld && !InWorld->IsGameWorld();
+		return InWorld && !InWorld->IsGameWorld() && FPackageName::DoesPackageExist(InWorld->GetPackage()->GetName());
 	}
-
-	UPROPERTY(config)
-	uint32 EditorGridConfigHash;
 
 	UPROPERTY(config)
 	uint32 bDisableLoadingOfLastLoadedCells : 1;

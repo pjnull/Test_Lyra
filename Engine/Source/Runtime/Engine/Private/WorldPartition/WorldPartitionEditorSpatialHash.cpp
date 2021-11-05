@@ -35,7 +35,7 @@ void UWorldPartitionEditorSpatialHash::Initialize()
 		FHashBuilder EditorGridConfigHashBuilder;
 		static uint32 Version = 2;
 		EditorGridConfigHashBuilder << Version << CellSize;
-		GetMutableDefault<UWorldPartitionEditorPerProjectUserSettings>()->SetEditorGridConfigHash(EditorGridConfigHashBuilder.GetHash());
+		GetMutableDefault<UWorldPartitionEditorPerProjectUserSettings>()->SetEditorGridConfigHash(GetWorld(), EditorGridConfigHashBuilder.GetHash());
 	}
 }
 
