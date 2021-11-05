@@ -418,7 +418,7 @@ namespace Audio
 	{
 		if (!ensure(InSoundWave.IsValid()))
 		{
-			return;
+			return nullptr;
 		}
 		else if (InSoundWave->UseBinkAudio())
 		{
