@@ -503,6 +503,12 @@ class DevicenDisplay(DeviceUnreal):
             value=True,
             tool_tip="When checked, disables the handling of ensure errors - which are non-fatal and may cause hitches."
         ),
+        'disable_all_screen_messages': BoolSetting(
+            attr_name='disable_all_screen_messages',
+            nice_name="Disable All Screen Messages",
+            value=True,
+            tool_tip="When checked, adds DisableAllScreenMessages to ExecCmds"
+        ),
     }
 
     ndisplay_monitor_ui = None
@@ -822,7 +828,10 @@ class DevicenDisplay(DeviceUnreal):
         exec_cmds = str(
             self.csettings["ndisplay_exec_cmds"].get_value(
                 self.name)).strip().split(',')
-        exec_cmds.append('DisableAllScreenMessages')
+
+        if DevicenDisplay.csettings['disable_all_screen_messages'].get_value():
+            exec_cmds.append('DisableAllScreenMessages')
+            
         exec_cmds = [cmd for cmd in exec_cmds if len(cmd.strip())]
 
         if len(exec_cmds):
