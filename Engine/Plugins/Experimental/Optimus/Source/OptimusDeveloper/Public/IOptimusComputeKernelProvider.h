@@ -11,6 +11,7 @@ class UOptimusComputeDataInterface;
 class UOptimusKernelSource;
 class UOptimusNode;
 class UOptimusNodePin;
+struct FOptimusType_CompilerDiagnostic;
 
 
 // Maps the data interface's data binding index to the function we would like to have present
@@ -59,6 +60,7 @@ class OPTIMUSDEVELOPER_API IOptimusComputeKernelProvider
 {
 	GENERATED_BODY()
 
+public:
 	/**
 	 * Return an UOptimusKernelSource object, from a compute kernel node state that implements
 	 * this interface.
@@ -78,5 +80,12 @@ class OPTIMUSDEVELOPER_API IOptimusComputeKernelProvider
 		FOptimus_KernelParameterBindingList& OutParameterBindings,
 		FOptimus_InterfaceBindingMap& OutInputDataBindings,
 		FOptimus_InterfaceBindingMap& OutOutputDataBindings
-		) const = 0;	
+		) const = 0;
+
+	/** Set the diagnostics resulting from the kernel compilation.
+	 *  @param InDiagnostics The diagnostics to set for the node. 
+	 */
+	virtual void SetCompilationDiagnostics(
+		const TArray<FOptimusType_CompilerDiagnostic>& InDiagnostics
+		) = 0;
 };

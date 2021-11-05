@@ -26,41 +26,31 @@ FString UOptimusNode_CustomComputeKernel::GetKernelName() const
 
 FString UOptimusNode_CustomComputeKernel::GetKernelSourceText() const
 {
-	// FIXME: Create source range mappings so that we can go from error location to
-	// our source.
-	FString Source = ShaderSource.ShaderText;
+	return GetCookedKernelSource(ShaderSource.ShaderText, KernelName, ThreadCount);
+}
 
-#if PLATFORM_WINDOWS
-	// Remove old-school stuff.
-	Source.ReplaceInline(TEXT("\r"), TEXT(""));
-#endif
 
-	const bool bHasKernelKeyword = Source.Contains(TEXT("KERNEL"));
+void UOptimusNode_CustomComputeKernel::SetCompilationDiagnostics(
+	const TArray<FOptimusType_CompilerDiagnostic>& InDiagnostics
+	)
+{
+	ShaderSource.Diagnostics = InDiagnostics;
 	
-	const FString KernelFunc = FString::Printf(TEXT("[numthreads(%d,1,1)]\nvoid %s(uint3 DTid : SV_DispatchThreadID)"), ThreadCount, *KernelName);
-	
-	if (bHasKernelKeyword)
+	EOptimusDiagnosticLevel NodeLevel = EOptimusDiagnosticLevel::None;
+	for (const FOptimusType_CompilerDiagnostic& Diagnostic: InDiagnostics)
 	{
-		Source.ReplaceInline(TEXT("KERNEL"), TEXT("void __kernel_func(uint Index)"));
-
-		return FString::Printf(
-			TEXT(
-				"#line 1 \"%s\"\n"
-				"%s\n\n"
-				"%s { __kernel_func(DTid.x); }\n"
-				), *GetName(), *Source, *KernelFunc);
+		if (Diagnostic.Level > NodeLevel)
+		{
+			NodeLevel = Diagnostic.Level;
+		}
 	}
-	else
+	SetDiagnosticLevel(NodeLevel);
+
+	FProperty* DiagnosticsProperty = FOptimusType_ShaderText::StaticStruct()->FindPropertyByName(GET_MEMBER_NAME_STRING_CHECKED(FOptimusType_ShaderText, Diagnostics));
+	if (ensure(DiagnosticsProperty))
 	{
-		return FString::Printf(
-		TEXT(
-			"%s\n"
-			"{\n"
-			"uint Index = DTid.x;\n"
-			"#line 1 \"%s\"\n"
-			"%s\n"
-			"}\n"
-			), *KernelFunc, *GetName(), *Source);
+		FPropertyChangedEvent PropertyChangedEvent(DiagnosticsProperty, EPropertyChangeType::ValueSet, {this});
+		PostEditChangeProperty(PropertyChangedEvent);
 	}
 }
 

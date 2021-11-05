@@ -4,42 +4,12 @@
 
 #include "OptimusDataDomain.h"
 #include "OptimusNode_ComputeKernelBase.h"
-#include "OptimusDataType.h"
-#include "ComputeFramework/ComputeKernelSource.h"
-
 #include "Types/OptimusType_ShaderText.h"
 
 #include "OptimusNode_CustomComputeKernel.generated.h"
 
 
-class UOptimusComputeDataInterface;
-class USkeletalMesh;
 enum class EOptimusNodePinDirection : uint8;
-
-
-USTRUCT()
-struct FOptimus_ShaderBinding
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, Category=Binding)
-	FName Name;
-
-	UPROPERTY(EditAnywhere, Category = Binding, meta=(UseInResource))
-	FOptimusDataTypeRef DataType;
-};
-
-
-USTRUCT()
-struct FOptimus_ShaderDataBinding :
-	public FOptimus_ShaderBinding
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, Category = Binding)
-	FOptimusMultiLevelDataDomain DataDomain;
-};
-
 
 
 UCLASS()
@@ -62,6 +32,15 @@ public:
 
 	/** Implement this to return the complete HLSL code for this kernel */
 	FString GetKernelSourceText() const override;
+
+	// IOptiusComputeKernelProvider overrides
+	void SetCompilationDiagnostics(
+		const TArray<FOptimusType_CompilerDiagnostic>& InDiagnostics
+		) override;
+
+	// FIXME: Use drop-down with a preset list + allow custom entry.
+	UPROPERTY(EditAnywhere, Category=Settings)
+	FName Category = CategoryName::Deformers;
 	
 	UPROPERTY(EditAnywhere, Category=KernelConfiguration)
 	FString KernelName = "MyKernel";

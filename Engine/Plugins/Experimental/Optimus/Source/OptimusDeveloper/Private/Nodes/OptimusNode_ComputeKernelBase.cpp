@@ -100,6 +100,52 @@ UOptimusKernelSource* UOptimusNode_ComputeKernelBase::CreateComputeKernel(
 	return KernelSource;
 }
 
+
+FString UOptimusNode_ComputeKernelBase::GetCookedKernelSource(
+	const FString& InShaderSource,
+	const FString& InKernelName,
+	int32 InThreadCount
+	) const
+{
+	// FIXME: Create source range mappings so that we can go from error location to
+	// our source.
+	FString Source = InShaderSource;
+
+#if PLATFORM_WINDOWS
+	// Remove old-school stuff.
+	Source.ReplaceInline(TEXT("\r"), TEXT(""));
+#endif
+
+	const bool bHasKernelKeyword = Source.Contains(TEXT("KERNEL"));
+	
+	const FString KernelFunc = FString::Printf(TEXT("[numthreads(%d,1,1)]\nvoid %s(uint3 DTid : SV_DispatchThreadID)"), InThreadCount, *InKernelName);
+	
+	if (bHasKernelKeyword)
+	{
+		Source.ReplaceInline(TEXT("KERNEL"), TEXT("void __kernel_func(uint Index)"));
+
+		return FString::Printf(
+			TEXT(
+				"#line 1 \"%s\"\n"
+				"%s\n\n"
+				"%s { __kernel_func(DTid.x); }\n"
+				), *GetPathName(), *Source, *KernelFunc);
+	}
+	else
+	{
+		return FString::Printf(
+		TEXT(
+			"%s\n"
+			"{\n"
+			"uint Index = DTid.x;\n"
+			"#line 1 \"%s\"\n"
+			"%s\n"
+			"}\n"
+			), *KernelFunc, *GetPathName(), *Source);
+	}
+}
+
+
 void UOptimusNode_ComputeKernelBase::ProcessInputPinForComputeKernel(
 	const UOptimusNodePin* InInputPin,
 	const UOptimusNodePin* InOutputPin,

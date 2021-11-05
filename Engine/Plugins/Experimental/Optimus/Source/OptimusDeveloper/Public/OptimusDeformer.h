@@ -10,6 +10,7 @@
 #include "ComputeFramework/ComputeGraph.h"
 #include "Interfaces/Interface_PreviewMeshProvider.h"
 #include "Logging/TokenizedMessage.h"
+#include "Types/OptimusType_ShaderText.h"
 
 #include "OptimusDeformer.generated.h"
 
@@ -79,7 +80,6 @@ public:
 	/** Remove a graph and delete it. */
 	UFUNCTION(BlueprintCallable, Category = OptimusNodeGraph)
 	bool RemoveGraph(UOptimusNodeGraph* InGraph);
-
 
 	// Variables
 	UFUNCTION(BlueprintCallable, Category = OptimusVariables)
@@ -238,7 +238,10 @@ private:
 	
 	void Notify(EOptimusGlobalNotifyType InNotifyType, UObject *InObject);
 
-	EOptimusDiagnosticLevel ProcessCompilationMessage(UOptimusNode_CustomComputeKernel* InKernelNode, const FString& InMessage);
+	FOptimusType_CompilerDiagnostic ProcessCompilationMessage(
+		const UOptimusNode* InKernelNode,
+		const FString& InMessage
+		);
 
 	UPROPERTY()
 	TArray<TObjectPtr<UOptimusNodeGraph>> Graphs;

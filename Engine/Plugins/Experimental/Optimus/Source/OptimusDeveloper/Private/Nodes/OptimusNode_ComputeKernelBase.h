@@ -3,9 +3,60 @@
 #pragma once
 
 #include "IOptimusComputeKernelProvider.h"
+#include "OptimusDataDomain.h"
+#include "OptimusDataType.h"
 #include "OptimusNode.h"
 
 #include "OptimusNode_ComputeKernelBase.generated.h"
+
+struct FOptimusType_CompilerDiagnostic;
+
+
+USTRUCT()
+struct FOptimus_ShaderBinding
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, Category=Binding)
+	FName Name;
+
+	UPROPERTY(EditAnywhere, Category = Binding, meta=(UseInResource))
+	FOptimusDataTypeRef DataType;
+
+	/** Returns true if the binding is valid and has defined entries */
+	bool IsValid() const
+	{
+		return !Name.IsNone() && DataType.IsValid();
+	}
+};
+
+
+USTRUCT()
+struct FOptimus_ShaderDataBinding :
+	public FOptimus_ShaderBinding
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, Category = Binding)
+	FOptimusMultiLevelDataDomain DataDomain;
+
+	/** Returns true if the binding is valid and has defined entries */
+	bool IsValid() const
+	{
+		return FOptimus_ShaderBinding::IsValid() && DataDomain.IsValid();
+	}
+};
+
+USTRUCT()
+struct FOptimus_ShaderValuedBinding :
+	public FOptimus_ShaderBinding
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TArray<uint8> RawValue;
+};
+
 
 UCLASS(Abstract)
 class UOptimusNode_ComputeKernelBase :
@@ -30,7 +81,11 @@ public:
 		FOptimus_KernelParameterBindingList& OutParameterBindings,
 		FOptimus_InterfaceBindingMap& OutInputDataBindings,
 		FOptimus_InterfaceBindingMap& OutOutputDataBindings
-		) const override;	
+		) const override;
+
+	void SetCompilationDiagnostics(
+		const TArray<FOptimusType_CompilerDiagnostic>& InDiagnostics
+	) override PURE_VIRTUAL(UOptimusNode_ComputeKernelBase::SetCompilationDiagnostics);
 
 protected:
 	static TArray<FString> GetIndexNamesFromDataDomainLevels(
@@ -45,6 +100,13 @@ protected:
 		}
 		return IndexNames;
 	}
+
+	FString GetCookedKernelSource(
+		const FString& InShaderSource,
+		const FString& InKernelName,
+		int32 InThreadCount
+		) const;
+	
 	
 private:
 	void ProcessInputPinForComputeKernel(
