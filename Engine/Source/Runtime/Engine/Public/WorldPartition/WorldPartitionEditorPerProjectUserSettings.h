@@ -34,7 +34,7 @@ struct FWorldPartitionPerWorldSettings
 	TArray<FName> LoadedDataLayers;
 
 	UPROPERTY()
-	uint32 EditorGridConfigHash;
+	uint32 EditorGridConfigHash = 0;
 #endif
 };
 
