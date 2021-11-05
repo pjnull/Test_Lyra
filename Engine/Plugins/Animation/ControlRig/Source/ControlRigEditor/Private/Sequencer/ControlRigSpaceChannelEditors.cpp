@@ -53,6 +53,11 @@
 #include "ScopedTransaction.h"
 #include "IControlRigEditorModule.h"
 #include "TimerManager.h"
+#include "CommonMovieSceneTools.h"
+#include "SequencerSectionPainter.h"
+#include "Rendering/DrawElements.h"
+#include "Fonts/FontMeasure.h"
+#include "CurveEditorSettings.h"
 
 #define LOCTEXT_NAMESPACE "ControlRigEditMode"
 
@@ -1038,48 +1043,49 @@ void FControlRigSpaceChannelHelpers::CompensateIfNeeded(UControlRig* ControlRig,
 	}
 }
 
-//mz todo, we may want to expose these colors in editor user preferences, okay fo rnow
-static FLinearColor GetNextIndexedColor()
-{
-	static TArray<FLinearColor> IndexedColor;
-	static int32 NextIndex = 0;
-	if (IndexedColor.Num() == 0)
-	{
-		IndexedColor.Add(FLinearColor(FColor::Orange));
-		IndexedColor.Add(FLinearColor(FColor::Silver));
-		IndexedColor.Add(FLinearColor(FColor::Purple));
-		IndexedColor.Add(FLinearColor(FColor::Emerald));
-		IndexedColor.Add(FLinearColor(FColor::Red));
-		IndexedColor.Add(FLinearColor(FColor::Green));
-		IndexedColor.Add(FLinearColor(FColor::Blue));
-	}
-	FLinearColor Color = IndexedColor[NextIndex];
-	int32 TheNextIndex = NextIndex + 1;
-	NextIndex = (TheNextIndex) % IndexedColor.Num();
-	return Color;
-
-}
 FLinearColor FControlRigSpaceChannelHelpers::GetColor(const FMovieSceneControlRigSpaceBaseKey& Key)
 {
+	const UCurveEditorSettings* Settings = GetDefault<UCurveEditorSettings>();
 	static TMap<FName, FLinearColor> ColorsForSpaces;
-
 	switch (Key.SpaceType)
 	{
 		case EMovieSceneControlRigSpaceType::Parent:
-			return FLinearColor(FColor::Magenta);
+		{
+			TOptional<FLinearColor> OptColor = Settings->GetSpaceSwitchColor(FString(TEXT("Parent")));
+			if (OptColor.IsSet())
+			{
+				return OptColor.GetValue();
+			}
+
+			return  FLinearColor(.93, .31, .19); //pastel orange
+
+		}
 		case EMovieSceneControlRigSpaceType::World:
-			return  FLinearColor(FColor::Turquoise);
+		{
+			TOptional<FLinearColor> OptColor = Settings->GetSpaceSwitchColor(FString(TEXT("World")));
+			if (OptColor.IsSet())
+			{
+				return OptColor.GetValue();
+			}
+
+			return  FLinearColor(.198, .610, .558); //pastel teal
+		}
 		case EMovieSceneControlRigSpaceType::ControlRig:
 		{
+			TOptional<FLinearColor> OptColor = Settings->GetSpaceSwitchColor(Key.ControlRigElement.Name.ToString());
+			if (OptColor.IsSet())
+			{
+				return OptColor.GetValue();
+			}
 			if (FLinearColor* Color = ColorsForSpaces.Find(Key.ControlRigElement.Name))
 			{
 				return *Color;
 			}
 			else
 			{
-				FLinearColor RandoColor = GetNextIndexedColor();
-				ColorsForSpaces.Add(Key.ControlRigElement.Name, RandoColor);
-				return RandoColor;
+				FLinearColor RandomColor = UCurveEditorSettings::GetNextRandomColor();
+				ColorsForSpaces.Add(Key.ControlRigElement.Name, RandomColor);
+				return RandomColor;
 			}
 		}
 	};
@@ -1169,8 +1175,133 @@ FReply FControlRigSpaceChannelHelpers::OpenBakeDialog(ISequencer* Sequencer, FMo
 	}
 	return FReply::Unhandled();
 }
+
 TUniquePtr<FCurveModel> CreateCurveEditorModel(const TMovieSceneChannelHandle<FMovieSceneControlRigSpaceChannel>& Channel, UMovieSceneSection* OwningSection, TSharedRef<ISequencer> InSequencer)
 {
 	return MakeUnique<FControlRigSpaceChannelCurveModel>(Channel, OwningSection, InSequencer);
 }
+
+TArray<FKeyBarCurveModel::FBarRange> FControlRigSpaceChannelHelpers::FindRanges(FMovieSceneControlRigSpaceChannel* Channel, const UMovieSceneSection* Section)
+{
+	TArray<FKeyBarCurveModel::FBarRange> Range;
+	if (Channel && Section)
+	{
+		FFrameRate TickResolution = Section->GetTypedOuter<UMovieScene>()->GetTickResolution();
+		TArray<FSpaceRange> SpaceRanges = Channel->FindSpaceIntervals();
+		for (const FSpaceRange& SpaceRange : SpaceRanges)
+		{
+			FKeyBarCurveModel::FBarRange BarRange;
+			double LowerValue = SpaceRange.Range.GetLowerBoundValue() / TickResolution;
+			double UpperValue = SpaceRange.Range.GetUpperBoundValue() / TickResolution;
+
+			BarRange.Range.SetLowerBound(TRangeBound<double>(LowerValue));
+			BarRange.Range.SetUpperBound(TRangeBound<double>(UpperValue));
+
+			BarRange.Name = SpaceRange.Key.GetName();
+			BarRange.Color = FControlRigSpaceChannelHelpers::GetColor(SpaceRange.Key);
+
+			Range.Add(BarRange);
+		}
+	}
+	return  Range;
+}
+
+void DrawExtra(FMovieSceneControlRigSpaceChannel* Channel, const UMovieSceneSection* Owner,const FGeometry& AllottedGeometry, FSequencerSectionPainter& Painter)
+{
+	if (const UMovieSceneControlRigParameterSection* Section = Cast<UMovieSceneControlRigParameterSection>(Owner))
+	{
+		TArray<FKeyBarCurveModel::FBarRange> Ranges = FControlRigSpaceChannelHelpers::FindRanges(Channel, Owner);
+		const FSlateBrush* WhiteBrush = FEditorStyle::GetBrush("WhiteBrush");
+		const ESlateDrawEffect DrawEffects = ESlateDrawEffect::None;
+
+		const FSlateFontInfo FontInfo = FCoreStyle::Get().GetFontStyle("ToolTip.LargerFont");
+		const TSharedRef<FSlateFontMeasure> FontMeasure = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
+
+		const FVector2D LocalSize = AllottedGeometry.GetLocalSize();
+		const float LaneTop = 0;
+
+		const FTimeToPixel& TimeToPixel = Painter.GetTimeConverter();
+		const double InputMin = TimeToPixel.PixelToSeconds(0.f);
+		const double InputMax = TimeToPixel.PixelToSeconds(Painter.SectionGeometry.GetLocalSize().X);
+
+		int32 LastLabelPos = -1;
+		for (int32 Index = 0; Index < Ranges.Num(); ++Index)
+		{
+			const FKeyBarCurveModel::FBarRange& Range = Ranges[Index];
+			const double LowerSeconds = Range.Range.GetLowerBoundValue();
+			const double UpperSeconds = Range.Range.GetUpperBoundValue();
+			const bool bOutsideUpper = (Index != Ranges.Num() - 1) && UpperSeconds < InputMin;
+			if (LowerSeconds > InputMax || bOutsideUpper) //out of range
+			{
+				continue;
+			}
+
+			FLinearColor CurveColor = Range.Color;
+	
+			static FLinearColor ZebraTint = FLinearColor::White.CopyWithNewOpacity(0.01f);
+			if (CurveColor == FLinearColor::White)
+			{
+				CurveColor = ZebraTint;
+			}
+			else
+			{
+				CurveColor = CurveColor * (1.f - ZebraTint.A) + ZebraTint * ZebraTint.A;
+			}
+			
+
+			if (CurveColor != FLinearColor::White)
+			{
+				const double LowerSecondsForBox = (Index == 0 && LowerSeconds > InputMin) ? InputMin : LowerSeconds;
+				const double BoxPos = TimeToPixel.SecondsToPixel(LowerSecondsForBox);
+
+				const FPaintGeometry BoxGeometry = AllottedGeometry.ToPaintGeometry(
+					FVector2D(AllottedGeometry.GetLocalSize().X, AllottedGeometry.GetLocalSize().Y),
+					FSlateLayoutTransform(FVector2D(BoxPos, LaneTop))
+				);
+
+				FSlateDrawElement::MakeBox(Painter.DrawElements, Painter.LayerId, BoxGeometry, WhiteBrush, DrawEffects, CurveColor);
+			}
+			const double LowerSecondsForLabel = (InputMin > LowerSeconds) ? InputMin : LowerSeconds;
+			double LabelPos = TimeToPixel.SecondsToPixel(LowerSecondsForLabel) + 10;
+
+			const FText Label = FText::FromName(Range.Name);
+			const FVector2D TextSize = FontMeasure->Measure(Label, FontInfo);
+			if (Index > 0)
+			{
+				LabelPos = (LabelPos < LastLabelPos) ? LastLabelPos + 5 : LabelPos;
+			}
+			LastLabelPos = LabelPos + TextSize.X + 15;
+			const FVector2D Position(LabelPos, LaneTop + (AllottedGeometry.GetLocalSize().Y - TextSize.Y) * .5f);
+
+			const FPaintGeometry LabelGeometry = AllottedGeometry.ToPaintGeometry(
+				FSlateLayoutTransform(Position)
+			);
+
+			FSlateDrawElement::MakeText(Painter.DrawElements, Painter.LayerId, LabelGeometry, Label, FontInfo, DrawEffects, FLinearColor::White);
+		}	
+	}
+}
+
+void DrawKeys(FMovieSceneControlRigSpaceChannel* Channel, TArrayView<const FKeyHandle> InKeyHandles, const UMovieSceneSection* InOwner, TArrayView<FKeyDrawParams> OutKeyDrawParams)
+{
+	if (const UMovieSceneControlRigParameterSection* Section = Cast<UMovieSceneControlRigParameterSection>(InOwner))
+	{
+		TMovieSceneChannelData<FMovieSceneControlRigSpaceBaseKey> ChannelInterface = Channel->GetData();
+
+		for (int32 Index = 0; Index < InKeyHandles.Num(); ++Index)
+		{
+			FKeyHandle Handle = InKeyHandles[Index];
+
+			FKeyDrawParams Params;
+			static const FName SquareKeyBrushName("Sequencer.KeySquare");
+			const FSlateBrush* SquareKeyBrush = FEditorStyle::GetBrush(SquareKeyBrushName);
+			Params.FillBrush = FEditorStyle::Get().GetBrush("FilledBorder");
+			Params.BorderBrush = SquareKeyBrush;
+			const int32 KeyIndex = ChannelInterface.GetIndex(Handle);
+
+			OutKeyDrawParams[Index] = Params;
+		}
+	}
+}
+
 #undef LOCTEXT_NAMESPACE
