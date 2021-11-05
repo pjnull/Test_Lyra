@@ -692,7 +692,7 @@ void SReplaceNodeReferences::FindAllReplacementsComplete(TArray<FImaginaryFiBDat
 	if (SelectedTargetReferenceItem.IsValid())
 	{
 		FMemberReference SourceVariableReference;
-		SourceVariableReference.SetFromField<FProperty>(SourceProperty, SourceProperty->GetOwnerClass());
+		SourceVariableReference.SetFromField<FProperty>(SourceProperty, SourceProperty? SourceProperty->GetOwnerClass() : nullptr);
 		FMemberReference TargetVariableReference;
 		if (SelectedTargetReferenceItem->GetMemberReference(TargetVariableReference) && SourceVariableReference.ResolveMember<FProperty>(SourceProperty->GetOwnerClass()))
 		{
@@ -707,7 +707,7 @@ void SReplaceNodeReferences::FindAllReplacementsComplete(TArray<FImaginaryFiBDat
 
 					FReplaceNodeReferencesHelper::ReplaceReferences(SourceVariableReference, TargetVariableReference, Blueprint, InRawDataList);
 
-					if (bShowReplacementsWhenFinished)
+					if (SourceProperty && bShowReplacementsWhenFinished)
 					{
 						TSharedPtr<SFindInBlueprints> GlobalResults = FFindInBlueprintSearchManager::Get().GetGlobalFindResults();
 						if (GlobalResults)
