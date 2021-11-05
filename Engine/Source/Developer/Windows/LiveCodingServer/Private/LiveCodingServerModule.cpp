@@ -2,6 +2,7 @@
 
 #include "LiveCodingServerModule.h"
 #include "LiveCodingServer.h"
+#include "Misc/ScopeLock.h"
 #include "Features/IModularFeatures.h"
 #include "Modules/ModuleManager.h"
 #include "External/LC_Logging.h"
