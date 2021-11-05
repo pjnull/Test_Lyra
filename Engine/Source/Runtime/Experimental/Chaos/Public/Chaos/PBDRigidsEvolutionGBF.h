@@ -15,7 +15,6 @@
 #include "Chaos/PerParticleGravity.h"
 #include "Chaos/PerParticleInitForce.h"
 #include "Chaos/PerParticlePBDEulerStep.h"
-#include "Chaos/CCDUtilities.h"
 #include "Chaos/PBDSuspensionConstraints.h"
 
 namespace Chaos
@@ -29,8 +28,6 @@ namespace Chaos
 	{
 		CHAOS_API extern FRealSingle HackMaxAngularVelocity;
 		CHAOS_API extern FRealSingle HackMaxVelocity;
-		CHAOS_API extern FRealSingle CCDEnableThresholdBoundsScale;
-		CHAOS_API extern bool bChaosCollisionCCDUseTightBoundingBox;
 	}
 
 	using FPBDRigidsEvolutionCallback = TFunction<void()>;
@@ -235,25 +232,10 @@ namespace Chaos
 					if (Particle.HasBounds())
 					{
 						const FAABB3& LocalBounds = Particle.LocalBounds();
-						FAABB3 WorldSpaceBounds = LocalBounds.TransformedAABB(FRigidTransform3(Particle.P(), Particle.Q())); // This is the AABB of the transformed AABB rather than the AABB of the transformed object. The result might be bigger than ideal.
-						if (Particle.CCDEnabled() && CVars::CCDEnableThresholdBoundsScale >= 0)
+						FAABB3 WorldSpaceBounds = LocalBounds.TransformedAABB(FRigidTransform3(Particle.P(), Particle.Q()));
+						if (Particle.CCDEnabled())
 						{
-							const FReal MinBoundsAxis = LocalBounds.Extents().Min();
-							const FReal LengthCCDThreshold = MinBoundsAxis *  CVars::CCDEnableThresholdBoundsScale;
-							const FReal PXSizeSquared = (Particle.P() - Particle.X()).SizeSquared();
-							if (PXSizeSquared > LengthCCDThreshold * LengthCCDThreshold)
-							{
-								if (CVars::bChaosCollisionCCDUseTightBoundingBox)
-								{
-									WorldSpaceBounds.GrowToInclude(LocalBounds.TransformedAABB(FRigidTransform3(Particle.X(), Particle.R())));
-								}
-								else
-								{
-									// We use end frame rotation for in GJKRaycast2. For consistency, we should also use Q instead of R for bounds.
-									WorldSpaceBounds = LocalBounds.TransformedAABB(FRigidTransform3(Particle.X(), Particle.Q()));
-									WorldSpaceBounds.ThickenSymmetrically(Particle.V() * Dt);
-								}
-							}
+							WorldSpaceBounds.ThickenSymmetrically(Particle.V() * Dt);
 						}
 						Particle.SetWorldSpaceInflatedBounds(WorldSpaceBounds);
 					}
@@ -265,6 +247,9 @@ namespace Chaos
 				Base::DirtyParticle(Particle);
 			}
 		}
+
+		// Pre-solver phase for handling special constraints (used for CCD)
+		void ApplyConstraintsPhase0(const FReal Dt, int32 Island);
 
 		// First phase of constraint solver
 		// For GBF this is the velocity solve phase
@@ -323,8 +308,6 @@ namespace Chaos
 		FPBDRigidsEvolutionInternalHandleCallback InternalParticleInitilization;
 		FEvolutionResimCache* CurrentStepResimCacheImp;
 		const TArray<ISimCallbackObject*>* CollisionModifiers;
-
-		FCCDManager CCDManager;
 	};
 
 }

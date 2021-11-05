@@ -635,11 +635,12 @@ namespace Chaos
 			//SolverManifoldPoint.UpdateContactPoint(Body0, Body1, State.Constraint->GetManifoldPoints()[PointIndex]);
 			//SolverManifoldPoint.UpdateContactMass(Body0, Body1);
 
+			FVec3 ContactVelocityDelta;
+			FReal ContactVelocityDeltaNormal;
+			SolverManifoldPoint.CalculateContactVelocityError(Body0, Body1, DynamicFriction, Dt, ContactVelocityDelta, ContactVelocityDeltaNormal);
+
 			if (!SolverManifoldPoint.NetPushOut.IsNearlyZero())
 			{
-				FVec3 ContactVelocityDelta;
-				FReal ContactVelocityDeltaNormal;
-				SolverManifoldPoint.CalculateContactVelocityError(Body0, Body1, DynamicFriction, Dt, ContactVelocityDelta, ContactVelocityDeltaNormal);
 				ApplyVelocityCorrection(
 					Stiffness,
 					Dt,

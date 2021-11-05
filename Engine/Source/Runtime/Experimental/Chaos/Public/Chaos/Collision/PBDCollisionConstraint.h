@@ -227,7 +227,6 @@ namespace Chaos
 			, CreationEpoch(INDEX_NONE)
 			, LastUsedEpoch(INDEX_NONE)
 			, ConstraintIndex(INDEX_NONE)
-			, SweptConstraintIndex(INDEX_NONE)
 			, bIsInShapePairMap(false)
 			, bIsSleeping(false)
 		{
@@ -240,8 +239,7 @@ namespace Chaos
 		*/
 		void ClearContainerData()
 		{
-			ConstraintIndex = INDEX_NONE;
-			SweptConstraintIndex = INDEX_NONE;
+			ConstraintIndex = INDEX_NONE;			
 		}
 
 		/**
@@ -266,14 +264,6 @@ namespace Chaos
 		}
 
 		/**
-		 * @brief Called each tick by the container for swept constraints
-		*/
-		void UpdateSweptIndex(const int32 InIndex)
-		{
-			SweptConstraintIndex = InIndex;
-		}
-
-		/**
 		 * @brief Change the sleeping state (used by the Island Manager)
 		*/
 		void SetIsSleeping(const bool bInIsSleeping)
@@ -292,9 +282,6 @@ namespace Chaos
 
 		// The index in the container - this changes every tick
 		int32 ConstraintIndex;
-
-		// The index in swept constraints - this changes every tick
-		int32 SweptConstraintIndex;
 
 		// Whether the Constraint is in the container's maps
 		bool bIsInShapePairMap;
