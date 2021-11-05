@@ -655,9 +655,11 @@ FName UWorldPartitionRuntimeSpatialHash::GetActorRuntimeGrid(const AActor* Actor
 
 void UWorldPartitionRuntimeSpatialHash::SetDefaultValues()
 {
+	check(!Grids.Num());
+
 	FSpatialHashRuntimeGrid& MainGrid = Grids.AddDefaulted_GetRef();
 	MainGrid.GridName = TEXT("MainGrid");
-	MainGrid.CellSize = 3200;
+	MainGrid.CellSize = 12800;
 	MainGrid.LoadingRange = 25600;
 	MainGrid.DebugColor = FLinearColor::Gray;
 }
@@ -677,7 +679,7 @@ void UWorldPartitionRuntimeSpatialHash::ImportFromWorldComposition(UWorldComposi
 			{
 				Grid = &Grids.AddDefaulted_GetRef();
 				Grid->GridName = GridName;
-				Grid->CellSize = 3200;
+				Grid->CellSize = 12800;
 				Grid->DebugColor = FLinearColor::MakeRandomColor();
 			}
 			// World Composition Layer Streaming Distance always wins over existing value (config file)

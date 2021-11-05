@@ -387,24 +387,15 @@ void UWorldPartition::Initialize(UWorld* InWorld, const FTransform& InTransform)
 	bool bEditorOnly = !World->IsGameWorld();
 	if (bEditorOnly)
 	{
-		check(!StreamingPolicy);
+		CreateOrRepairWorldPartition(World->GetWorldSettings());
 
-		if (!EditorHash)
-		{
-			UClass* EditorHashClass = FindObject<UClass>(ANY_PACKAGE, TEXT("WorldPartitionEditorSpatialHash"));
-			EditorHash = NewObject<UWorldPartitionEditorHash>(this, EditorHashClass);
-			EditorHash->SetDefaultValues();
-		}
+		check(!StreamingPolicy);
+		check(EditorHash);
 
 		EditorHash->Initialize();
 	}
 
-	if (!RuntimeHash)
-	{
-		UClass* RuntimeHashClass = FindObject<UClass>(ANY_PACKAGE, TEXT("WorldPartitionRuntimeSpatialHash"));
-		RuntimeHash = NewObject<UWorldPartitionRuntimeHash>(this, RuntimeHashClass);
-		RuntimeHash->SetDefaultValues();
-	}
+	check(RuntimeHash);
 
 	// Did we travel into a WP map in PIE (null StreamingPolicy means GenerateStreaming wasn't called)
 	const bool bPIEWorldTravel = World->WorldType == EWorldType::PIE && !StreamingPolicy;
@@ -679,33 +670,44 @@ void UWorldPartition::OnWorldMatchStarting()
 }
 
 #if WITH_EDITOR
-UWorldPartition* UWorldPartition::CreateWorldPartition(AWorldSettings* WorldSettings, TSubclassOf<UWorldPartitionEditorHash> EditorHashClass, TSubclassOf<UWorldPartitionRuntimeHash> RuntimeHashClass)
+UWorldPartition* UWorldPartition::CreateOrRepairWorldPartition(AWorldSettings* WorldSettings, TSubclassOf<UWorldPartitionEditorHash> EditorHashClass, TSubclassOf<UWorldPartitionRuntimeHash> RuntimeHashClass)
 {
-	if (!EditorHashClass)
+	UWorldPartition* WorldPartition = WorldSettings->GetWorldPartition();
+
+	if (!WorldPartition)
 	{
-		EditorHashClass = FindObject<UClass>(ANY_PACKAGE, TEXT("WorldPartitionEditorSpatialHash"));
+		WorldPartition = NewObject<UWorldPartition>(WorldSettings);
+		WorldSettings->SetWorldPartition(WorldPartition);
+
+		// New maps should include GridSize in name
+		WorldSettings->bIncludeGridSizeInNameForFoliageActors = true;
+		WorldSettings->bIncludeGridSizeInNameForPartitionedActors = true;
+		WorldSettings->MarkPackageDirty();
+
+		WorldPartition->DefaultHLODLayer = nullptr;
 	}
 
-	if (!RuntimeHashClass)
+	if (!WorldPartition->EditorHash)
 	{
-		RuntimeHashClass = FindObject<UClass>(ANY_PACKAGE, TEXT("WorldPartitionRuntimeSpatialHash"));
+		if (!EditorHashClass)
+		{
+			EditorHashClass = FindObject<UClass>(ANY_PACKAGE, TEXT("WorldPartitionEditorSpatialHash"));
+		}
+
+		WorldPartition->EditorHash = NewObject<UWorldPartitionEditorHash>(WorldPartition, EditorHashClass);
+		WorldPartition->EditorHash->SetDefaultValues();
 	}
 
-	UWorldPartition* WorldPartition = NewObject<UWorldPartition>(WorldSettings);
-	WorldSettings->SetWorldPartition(WorldPartition);
-	
-	// New maps should include GridSize in name
-	WorldSettings->bIncludeGridSizeInNameForFoliageActors = true;
-	WorldSettings->bIncludeGridSizeInNameForPartitionedActors = true;
+	if (!WorldPartition->RuntimeHash)
+	{
+		if (!RuntimeHashClass)
+		{
+			RuntimeHashClass = FindObject<UClass>(ANY_PACKAGE, TEXT("WorldPartitionRuntimeSpatialHash"));
+		}
 
-	WorldSettings->MarkPackageDirty();
-
-	WorldPartition->EditorHash = NewObject<UWorldPartitionEditorHash>(WorldPartition, EditorHashClass);
-	WorldPartition->RuntimeHash = NewObject<UWorldPartitionRuntimeHash>(WorldPartition, RuntimeHashClass);
-
-	WorldPartition->EditorHash->SetDefaultValues();
-	WorldPartition->RuntimeHash->SetDefaultValues();
-	WorldPartition->DefaultHLODLayer = nullptr;
+		WorldPartition->RuntimeHash = NewObject<UWorldPartitionRuntimeHash>(WorldPartition, RuntimeHashClass);
+		WorldPartition->RuntimeHash->SetDefaultValues();
+	}
 
 	WorldPartition->GetWorld()->PersistentLevel->bIsPartitioned = true;
 

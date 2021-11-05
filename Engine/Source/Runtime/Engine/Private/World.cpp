@@ -1886,9 +1886,8 @@ void UWorld::InitializeNewWorld(const InitializationValues IVS, bool bInSkipInit
 		PersistentLevel->bUseExternalActors = true;
 		
 		check(!GetStreamingLevels().Num());
-
 		
-		UWorldPartition::CreateWorldPartition(WorldSettings);
+		UWorldPartition::CreateOrRepairWorldPartition(WorldSettings);
 	}
 #endif
 

@@ -216,7 +216,7 @@ UWorldPartition* UWorldPartitionConvertCommandlet::CreateWorldPartition(AWorldSe
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(UWorldPartitionConvertCommandlet::CreateWorldPartition);
 
-	UWorldPartition* WorldPartition = UWorldPartition::CreateWorldPartition(MainWorldSettings, EditorHashClass, RuntimeHashClass);
+	UWorldPartition* WorldPartition = UWorldPartition::CreateOrRepairWorldPartition(MainWorldSettings, EditorHashClass, RuntimeHashClass);
 		
 	// Read the conversion config file
 	if (FPlatformFileManager::Get().GetPlatformFile().FileExists(*LevelConfigFilename))
