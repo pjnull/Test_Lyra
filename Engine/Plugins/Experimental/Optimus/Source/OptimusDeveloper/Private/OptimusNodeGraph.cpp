@@ -467,7 +467,7 @@ UOptimusNode* UOptimusNodeGraph::ConvertCustomKernelToFunction(UOptimusNode* InC
 	UOptimusNode_CustomComputeKernel* CustomKernelNode = Cast<UOptimusNode_CustomComputeKernel>(InCustomKernel);
 	if (!CustomKernelNode)
 	{
-		UE_LOG(LogOptimusDeveloper, Error, TEXT("%s: Not a custom kernel node."), *CustomKernelNode->GetName());
+		UE_LOG(LogOptimusDeveloper, Error, TEXT("%s: Not a custom kernel node."), *InCustomKernel->GetName());
 		return nullptr;
 	}
 
@@ -521,7 +521,7 @@ UOptimusNode* UOptimusNodeGraph::ConvertFunctionToCustomKernel(UOptimusNode* InK
 	UOptimusNode_ComputeKernelFunction* KernelFunctionNode = Cast<UOptimusNode_ComputeKernelFunction>(InKernelFunction);
 	if (!KernelFunctionNode)
 	{
-		UE_LOG(LogOptimusDeveloper, Error, TEXT("%s: Not a kernel function node."), *KernelFunctionNode->GetName());
+		UE_LOG(LogOptimusDeveloper, Error, TEXT("%s: Not a kernel function node."), *InKernelFunction->GetName());
 		return nullptr;
 	}
 
