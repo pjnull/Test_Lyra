@@ -1,5 +1,6 @@
+# Copyright Epic Games, Inc. All Rights Reserved.
 
-import os, sys, subprocess
+import subprocess
 
 from typing import List, Optional
 
