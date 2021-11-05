@@ -1358,74 +1358,78 @@ private:
 			};
 
 			//QUICK_SCOPE_CYCLE_COUNTER(QueryDirty);
-			bool bUseGrid = false;
+			if (DirtyElements.Num() > 0)
+			{
+				bool bUseGrid = false;
 
-			if (DirtyElementGridEnabled())
-			{
-				if (Query == EAABBQueryType::Overlap)
+				if (DirtyElementGridEnabled() && CellHashToFlatArray.Num() > 0)
 				{
-					bUseGrid = !TooManyOverlapQueryCells(QueryBounds, DirtyElementGridCellSizeInv, DirtyElementMaxGridCellQueryCount);
-				}
-				else if (Query == EAABBQueryType::Raycast)
-				{
-					bUseGrid = !TooManyRaycastQueryCells(Start, CurData.Dir, CurData.CurrentLength, DirtyElementGridCellSizeInv, DirtyElementMaxGridCellQueryCount);
-				}
-				else if (Query == EAABBQueryType::Sweep)
-				{
-					bUseGrid = !TooManySweepQueryCells(QueryHalfExtents, Start, CurData.Dir, CurData.CurrentLength, DirtyElementGridCellSizeInv, DirtyElementMaxGridCellQueryCount);
-				}
-			}
-			
-			if (bUseGrid)
-			{
-				PHYSICS_CSV_SCOPED_VERY_EXPENSIVE(PhysicsVerbose, QueryImp_DirtyElementsGrid);
-				TArray<DirtyGridHashEntry> HashEntryForOverlappedCells;
-				auto AddHashEntry = [&](int32 QueryCellHash)
-				{
-					const DirtyGridHashEntry* HashEntry = CellHashToFlatArray.Find(QueryCellHash);
-					if (HashEntry)
+					if (Query == EAABBQueryType::Overlap)
 					{
-						HashEntryForOverlappedCells.Add(*HashEntry);
+						bUseGrid = !TooManyOverlapQueryCells(QueryBounds, DirtyElementGridCellSizeInv, DirtyElementMaxGridCellQueryCount);
 					}
-					return true;
-				};
-
-				if (Query == EAABBQueryType::Overlap)
-				{
-					DoForOverlappedCells(QueryBounds, DirtyElementGridCellSize, DirtyElementGridCellSizeInv, AddHashEntry);
-				}
-				else if (Query == EAABBQueryType::Raycast)
-				{
-					DoForRaycastIntersectCells(Start, CurData.Dir, CurData.CurrentLength, DirtyElementGridCellSize, DirtyElementGridCellSizeInv, AddHashEntry);
-				}
-				else if (Query == EAABBQueryType::Sweep)
-				{
-					DoForSweepIntersectCells(QueryHalfExtents, Start, CurData.Dir, CurData.CurrentLength, DirtyElementGridCellSize , DirtyElementGridCellSizeInv ,
-					[&](FReal X, FReal Y)
+					else if (Query == EAABBQueryType::Raycast)
 					{
-						int32 QueryCellHash = HashCoordinates(X, Y, DirtyElementGridCellSizeInv);
+						bUseGrid = !TooManyRaycastQueryCells(Start, CurData.Dir, CurData.CurrentLength, DirtyElementGridCellSizeInv, DirtyElementMaxGridCellQueryCount);
+					}
+					else if (Query == EAABBQueryType::Sweep)
+					{
+						bUseGrid = !TooManySweepQueryCells(QueryHalfExtents, Start, CurData.Dir, CurData.CurrentLength, DirtyElementGridCellSizeInv, DirtyElementMaxGridCellQueryCount);
+					}
+				}
+
+				if (bUseGrid)
+				{
+					PHYSICS_CSV_SCOPED_VERY_EXPENSIVE(PhysicsVerbose, QueryImp_DirtyElementsGrid);
+					TArray<DirtyGridHashEntry> HashEntryForOverlappedCells;
+
+					auto AddHashEntry = [&](int32 QueryCellHash)
+					{
 						const DirtyGridHashEntry* HashEntry = CellHashToFlatArray.Find(QueryCellHash);
 						if (HashEntry)
 						{
 							HashEntryForOverlappedCells.Add(*HashEntry);
 						}
-					});
-				}
+						return true;
+					};
 
-				if (!DoForHitGridCellsAndOverflow(HashEntryForOverlappedCells, IntersectAndVisit))
-				{
-					return false;
-				}
-			}  // end overlap
+					if (Query == EAABBQueryType::Overlap)
+					{
+						DoForOverlappedCells(QueryBounds, DirtyElementGridCellSize, DirtyElementGridCellSizeInv, AddHashEntry);
+					}
+					else if (Query == EAABBQueryType::Raycast)
+					{
+						DoForRaycastIntersectCells(Start, CurData.Dir, CurData.CurrentLength, DirtyElementGridCellSize, DirtyElementGridCellSizeInv, AddHashEntry);
+					}
+					else if (Query == EAABBQueryType::Sweep)
+					{
+						DoForSweepIntersectCells(QueryHalfExtents, Start, CurData.Dir, CurData.CurrentLength, DirtyElementGridCellSize, DirtyElementGridCellSizeInv,
+							[&](FReal X, FReal Y)
+							{
+								int32 QueryCellHash = HashCoordinates(X, Y, DirtyElementGridCellSizeInv);
+								const DirtyGridHashEntry* HashEntry = CellHashToFlatArray.Find(QueryCellHash);
+								if (HashEntry)
+								{
+									HashEntryForOverlappedCells.Add(*HashEntry);
+								}
+							});
+					}
 
-			else
-			{
-				PHYSICS_CSV_SCOPED_VERY_EXPENSIVE(PhysicsVerbose, QueryImp_DirtyElements);
-				for (const auto& Elem : DirtyElements)
-				{
-					if (!IntersectAndVisit(Elem))
+					if (!DoForHitGridCellsAndOverflow(HashEntryForOverlappedCells, IntersectAndVisit))
 					{
 						return false;
+					}
+				}  // end overlap
+
+				else
+				{
+					PHYSICS_CSV_SCOPED_VERY_EXPENSIVE(PhysicsVerbose, QueryImp_DirtyElements);
+					for (const auto& Elem : DirtyElements)
+					{
+						if (!IntersectAndVisit(Elem))
+						{
+							return false;
+						}
 					}
 				}
 			}
