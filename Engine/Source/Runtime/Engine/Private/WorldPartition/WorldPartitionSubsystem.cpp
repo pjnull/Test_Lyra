@@ -167,7 +167,6 @@ void UWorldPartitionSubsystem::Deinitialize()
 	UWorldPartition* WorldPartition = GetWorldPartition();
 	
 	check(WorldPartition);
-	check(WorldPartition->IsInitialized());
 
 	if (GetWorld()->IsGameWorld())
 	{
