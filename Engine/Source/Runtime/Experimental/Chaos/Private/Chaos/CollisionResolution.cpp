@@ -2857,23 +2857,32 @@ namespace Chaos
 			CONDITIONAL_SCOPE_CYCLE_COUNTER(STAT_Collisions_ConstructConstraintsInternal, ConstraintsDetailedStats);
 			INC_DWORD_STAT(STAT_ChaosCollisionCounter_NumContactsCreated);
 
-			FPBDCollisionConstraint* Constraint = FPBDCollisionConstraint::Make(
-				Particle0,
-				Implicit0,
-				BVHParticles0,
-				ParticleWorldTransform0,
-				ShapeRelativeTransform0,
-				Particle1,
-				Implicit1,
-				BVHParticles1,
-				ParticleWorldTransform1,
-				ShapeRelativeTransform1,
-				CullDistance,
-				ShapePairType,
-				Context.bAllowManifolds,
-				*Context.CollisionAllocator);
+			FPBDCollisionConstraint* Constraint = nullptr;
 
-			UpdateConstraintFromGeometryImpl<ECollisionUpdateType::Deepest>(*Constraint, ShapeWorldTransform0, ShapeWorldTransform1, Dt);
+			{
+				PHYSICS_CSV_SCOPED_EXPENSIVE(PhysicsVerbose, NarrowPhase_CreateConstraint);
+
+				Constraint = FPBDCollisionConstraint::Make(
+					Particle0,
+					Implicit0,
+					BVHParticles0,
+					ParticleWorldTransform0,
+					ShapeRelativeTransform0,
+					Particle1,
+					Implicit1,
+					BVHParticles1,
+					ParticleWorldTransform1,
+					ShapeRelativeTransform1,
+					CullDistance,
+					ShapePairType,
+					Context.bAllowManifolds,
+					*Context.CollisionAllocator);
+			}
+
+			{
+				PHYSICS_CSV_SCOPED_EXPENSIVE(PhysicsVerbose, NarrowPhase_UpdateConstraint);
+				UpdateConstraintFromGeometryImpl<ECollisionUpdateType::Deepest>(*Constraint, ShapeWorldTransform0, ShapeWorldTransform1, Dt);
+			}
 		}
 
 		void ConstructConstraintFromShapePair(
@@ -2906,14 +2915,19 @@ namespace Chaos
 
 			const FRigidTransform3& ShapeWorldTransform1 = Shape1->GetLeafWorldTransform();
 
-			const bool bDoPassFilter = (!Context.bFilteringEnabled || DoCollide(ImplicitType0, Shape0, ImplicitType1, Shape1));
-			if (!bDoPassFilter)
 			{
-				return;
+				PHYSICS_CSV_SCOPED_EXPENSIVE(PhysicsVerbose, NarrowPhase_Filter);
+				const bool bDoPassFilter = (!Context.bFilteringEnabled || DoCollide(ImplicitType0, Shape0, ImplicitType1, Shape1));
+				if (!bDoPassFilter)
+				{
+					return;
+				}
 			}
 
 			if (Implicit0->HasBoundingBox() && Implicit1->HasBoundingBox() && !FConstGenericParticleHandle(Particle0)->CCDEnabled() && !FConstGenericParticleHandle(Particle1)->CCDEnabled())
 			{
+				PHYSICS_CSV_SCOPED_EXPENSIVE(PhysicsVerbose, NarrowPhase_ShapeBounds);
+
 				const FAABB3& ShapeWorldBounds0 = Shape0->GetWorldSpaceInflatedShapeBounds();
 				const FAABB3& ShapeWorldBounds1 = Shape1->GetWorldSpaceInflatedShapeBounds();
 				const bool bDoOverlap = ShapeWorldBounds0.Intersects(ShapeWorldBounds1);
@@ -2938,19 +2952,27 @@ namespace Chaos
 			// @todo(chaos): cache the CCDActive state on the particle based on current speed relative to size
 			// @todo(chaos): Make and MakeSwept are almost the same now - merge them and pass in the type
 			// @todo(chaos): this assumes that Particle0 is the one being swept, but I don't think that's true. See SpatialAccelerationBroadphase.
-			FConstGenericParticleHandle ConstParticle0 = FConstGenericParticleHandle(Particle0);
-			FConstGenericParticleHandle ConstParticle1 = FConstGenericParticleHandle(Particle1);
-			FReal LengthCCD = 0.0f;
-			FVec3 DirCCD(0.0f);
-			const FVec3 StartX0 = ConstParticle0->ObjectState() == EObjectStateType::Kinematic ? ConstParticle0->P() - ConstParticle0->V() * Dt : ConstParticle0->X();
-			const FVec3 StartX1 = ConstParticle1->ObjectState() == EObjectStateType::Kinematic ? ConstParticle1->P() - ConstParticle1->V() * Dt : ConstParticle1->X();
-			bool bUseCCD = UseCCD_Init(Particle0, StartX0, Particle1, StartX1, DirCCD, LengthCCD, Context.bForceDisableCCD);
+			bool bUseCCD = false;
+			{
+				PHYSICS_CSV_SCOPED_EXPENSIVE(PhysicsVerbose, NarrowPhase_CCDCheck);
+				FConstGenericParticleHandle ConstParticle0 = FConstGenericParticleHandle(Particle0);
+				FConstGenericParticleHandle ConstParticle1 = FConstGenericParticleHandle(Particle1);
+				FReal LengthCCD = 0.0f;
+				FVec3 DirCCD(0.0f);
+				const FVec3 StartX0 = ConstParticle0->ObjectState() == EObjectStateType::Kinematic ? ConstParticle0->P() - ConstParticle0->V() * Dt : ConstParticle0->X();
+				const FVec3 StartX1 = ConstParticle1->ObjectState() == EObjectStateType::Kinematic ? ConstParticle1->P() - ConstParticle1->V() * Dt : ConstParticle1->X();
+				bUseCCD = UseCCD_Init(Particle0, StartX0, Particle1, StartX1, DirCCD, LengthCCD, Context.bForceDisableCCD);
+			}
 
 			// Extract the shape pair which is used to decide what collision detection function to use
-			const bool bIsConvex0 = (Shape0->GetLeafGeometry() != nullptr) && Shape0->GetLeafGeometry()->IsConvex() && (ImplicitType0 != ImplicitObjectType::LevelSet);
-			const bool bIsConvex1 = (Shape1->GetLeafGeometry() != nullptr) && Shape1->GetLeafGeometry()->IsConvex() && (ImplicitType1 != ImplicitObjectType::LevelSet);
+			EContactShapesType ShapePairType = EContactShapesType::Unknown;
 			bool bSwap = false;
-			const EContactShapesType ShapePairType = CalculateShapePairType(ImplicitType0, bIsConvex0, ImplicitType1, bIsConvex1, bSwap);
+			{
+				PHYSICS_CSV_SCOPED_EXPENSIVE(PhysicsVerbose, NarrowPhase_CalculateShapeType);
+				const bool bIsConvex0 = (Shape0->GetLeafGeometry() != nullptr) && Shape0->GetLeafGeometry()->IsConvex() && (ImplicitType0 != ImplicitObjectType::LevelSet);
+				const bool bIsConvex1 = (Shape1->GetLeafGeometry() != nullptr) && Shape1->GetLeafGeometry()->IsConvex() && (ImplicitType1 != ImplicitObjectType::LevelSet);
+				ShapePairType = CalculateShapePairType(ImplicitType0, bIsConvex0, ImplicitType1, bIsConvex1, bSwap);
+			}
 
 			// @todo(chaos): make CCD, clusters, unions, levelsets work through the new path
 			const bool bUseLegacyPath = (ShapePairType == EContactShapesType::Unknown) || bUseCCD;

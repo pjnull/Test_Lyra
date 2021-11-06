@@ -397,6 +397,7 @@ namespace Chaos
 			// Try to restore all the contacts for this pair. This will only succeed if they have not moved (within some threshold)
 			{
 				SCOPE_CYCLE_COUNTER(STAT_Collisions_Restore);
+				PHYSICS_CSV_SCOPED_EXPENSIVE(PhysicsVerbose, DetectCollisions_RestoreCollision);
 				if (NarrowPhase.TryRestoreCollisions(Dt, Particle1, Particle2))
 				{
 					return false;
