@@ -9,11 +9,11 @@
 #include "Channels/MovieSceneChannelProxy.h"
 #include "Misc/FrameNumber.h"
 
-struct FKeyHandle;
+struct FGeometry;
 struct FKeyDrawParams;
-struct FSequencerPasteEnvironment;
+struct FKeyHandle;
 struct FMovieSceneClipboardEnvironment;
-struct Geometry;
+struct FSequencerPasteEnvironment;
 
 class SWidget;
 class ISequencer;

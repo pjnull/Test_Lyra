@@ -3,6 +3,7 @@
 #include "PackageSubmissionChecks.h"
 
 #include "Containers/UnrealString.h"
+#include "Internationalization/Internationalization.h"
 #include "Misc/PackageName.h"
 #include "Serialization/VirtualizedBulkData.h"
 #include "Virtualization/VirtualizationSystem.h"

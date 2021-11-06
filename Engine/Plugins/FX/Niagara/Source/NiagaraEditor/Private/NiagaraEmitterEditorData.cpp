@@ -3,6 +3,7 @@
 #include "NiagaraEmitterEditorData.h"
 
 #include "NiagaraStackEditorData.h"
+#include "ScopedTransaction.h"
 
 UNiagaraEmitterEditorData::UNiagaraEmitterEditorData(const FObjectInitializer& ObjectInitializer)
 {
