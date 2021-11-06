@@ -264,7 +264,7 @@ namespace Chaos
 			if (Constraint.GetType() == ECollisionConstraintType::Swept)
 			{
 				// @todo(chaos): This should only be called in Detect Collisions now that we have no incremental manifolds - remove it
-				if ((Constraint.GetSolverBody0() == nullptr) || (Constraint.GetSolverBody0() == nullptr))
+				if ((Constraint.GetSolverBody0() == nullptr) || (Constraint.GetSolverBody1() == nullptr))
 				{
 					return UseCCD_Init(Constraint.Particle[0], StartX0, Constraint.Particle[1], StartX1, Dir, Length, bForceDisableCCD);
 				}
