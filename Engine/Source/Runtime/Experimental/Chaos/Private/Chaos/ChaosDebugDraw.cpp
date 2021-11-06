@@ -720,14 +720,11 @@ namespace Chaos
 		{
 			FConstGenericParticleHandle Particle = InParticle;
 
-			// This matches the calculation in SpatialAccelerationBroadPhase.h
-			const FReal Box1Thickness = ComputeBoundsThickness(*InParticle, Dt, BoundsThickness, BoundsThicknessVelocityInflation).Size();
-			const FAABB3 Box = ComputeWorldSpaceBoundingBox<FReal>(*InParticle).ThickenSymmetrically(FVec3(Box1Thickness));
+			const FAABB3 Box = InParticle->WorldSpaceInflatedBounds();
 
 			const FVec3 P = SpaceTransform.TransformPosition(Box.GetCenter());
 			const FRotation3 Q = SpaceTransform.GetRotation();
 			FColor Color = Settings.BoundsColorsPerState.GetColorFromState(InParticle->ObjectState());
-
 			if (bChaosDebugDebugDrawColorBoundsByShapeType)
 			{
 				if (const FImplicitObject* Shape = Particle->Geometry().Get())
@@ -737,6 +734,21 @@ namespace Chaos
 			}
 
 			FDebugDrawQueue::GetInstance().DrawDebugBox(P, 0.5f * Box.Extents(), Q, Color, false, KINDA_SMALL_NUMBER, Settings.DrawPriority, Settings.LineThickness);
+
+			for (const auto& Shape : InParticle->ShapesArray())
+			{
+				const EImplicitObjectType ShapeType = GetFirstConcreteShapeType(Shape->GetGeometry().Get());
+				const bool bIsComplex = (ShapeType == ImplicitObjectType::TriangleMesh) || (ShapeType == ImplicitObjectType::HeightField);
+				if (!bIsComplex)
+				{
+					const FAABB3 ShapeBox = Shape->GetWorldSpaceInflatedShapeBounds();
+					const FVec3 ShapeP = SpaceTransform.TransformPosition(ShapeBox.GetCenter());
+					const FRotation3 ShapeQ = SpaceTransform.GetRotation();
+					const FColor ShapeColor = (bChaosDebugDebugDrawColorBoundsByShapeType) ? Settings.BoundsColorsPerShapeType.GetColorFromShapeType(ShapeType) : Color;
+
+					FDebugDrawQueue::GetInstance().DrawDebugBox(ShapeP, 0.5f * ShapeBox.Extents(), ShapeQ, ShapeColor, false, KINDA_SMALL_NUMBER, Settings.DrawPriority, Settings.LineThickness);
+				}
+			}
 		}
 
 		void DrawParticleTransformImpl(const FRigidTransform3& SpaceTransform, const FGeometryParticleHandle* InParticle, int32 Index, FRealSingle ColorScale, const FChaosDebugDrawSettings& Settings)

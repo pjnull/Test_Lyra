@@ -226,10 +226,8 @@ void PopulateSimulatedParticle(
 		Handle->SetSharedGeometry(SharedImplicitTS);
 		Handle->SetHasBounds(true);
 		Handle->SetLocalBounds(SharedImplicitTS->BoundingBox());
-		const Chaos::FAABB3& LocalBounds = Handle->LocalBounds();
 		const Chaos::FRigidTransform3 Xf(Handle->X(), Handle->R());
-		const Chaos::FAABB3 TransformedBBox = LocalBounds.TransformedAABB(Xf);
-		Handle->SetWorldSpaceInflatedBounds(TransformedBBox);
+		Handle->UpdateWorldSpaceState(Xf, Chaos::FVec3(0));
 	}
 
 	if (Simplicial && SingleSupportedCollisionTypeData.CollisionType == ECollisionTypeEnum::Chaos_Surface_Volumetric)
@@ -1114,10 +1112,8 @@ FGeometryCollectionPhysicsProxy::BuildClusters(
 	{
 		Parent->SetHasBounds(true);
 		Parent->SetLocalBounds(Parent->Geometry()->BoundingBox());
-		const Chaos::FAABB3& LocalBounds = Parent->LocalBounds();
 		const Chaos::FRigidTransform3 Xf(Parent->X(), Parent->R());
-		const Chaos::FAABB3 TransformedBBox = LocalBounds.TransformedAABB(Xf);
-		Parent->SetWorldSpaceInflatedBounds(TransformedBBox);
+		Parent->UpdateWorldSpaceState(Xf, Chaos::FVec3(0));
 
 		static_cast<Chaos::FPBDRigidsSolver*>(Solver)->GetEvolution()->DirtyParticle(*Parent);
 	}

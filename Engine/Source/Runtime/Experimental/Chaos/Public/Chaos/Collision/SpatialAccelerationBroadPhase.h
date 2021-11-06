@@ -83,22 +83,16 @@ namespace Chaos
 	public:
 		using FAccelerationStructure = ISpatialAcceleration<FAccelerationStructureHandle, FReal, 3>;
 
-		FSpatialAccelerationBroadPhase(const FPBDRigidsSOAs& InParticles, const FReal InBoundsExpansion, const FReal InVelocityInflation, const FReal InCullDistance)
+		FSpatialAccelerationBroadPhase(const FPBDRigidsSOAs& InParticles, const FReal InBoundsExpansion, const FReal InVelocityInflation)
 			: FBroadPhase(InBoundsExpansion, InVelocityInflation)
 			, Particles(InParticles)
 			, SpatialAcceleration(nullptr)
-			, CullDistance(InCullDistance)
 		{
 		}
 
 		void SetSpatialAcceleration(const FAccelerationStructure* InSpatialAcceleration)
 		{
 			SpatialAcceleration = InSpatialAcceleration;
-		}
-
-		void SetCullDistance(FReal InCullDistance)
-		{
-			CullDistance = InCullDistance;
 		}
 
 		/**
@@ -154,7 +148,7 @@ namespace Chaos
 		{
 			OverlapView.ParallelFor([&](auto& Particle1,int32 ActiveIdxIdx)
 			{
-				FGenericParticleHandleHandleImp GenericHandle(Particle1.Handle());
+				FGenericParticleHandleImp GenericHandle(Particle1.Handle());
 				ProduceParticleOverlaps<bNeedsResim,bOnlyRigid>(Dt,GenericHandle, InSpatialAcceleration,NarrowPhase,ActiveIdxIdx);
 			},bDisableCollisionParallelFor);
 		}
@@ -216,11 +210,11 @@ namespace Chaos
 					SCOPE_CYCLE_COUNTER(STAT_Collisions_AABBTree);
 					if (bBody1Bounded)
 					{
+						// @todo(chaos): cache this on the particle?
 						FCollisionFilterData ParticleSimData;
 						FAccelerationStructureHandle::ComputeParticleSimFilterDataFromShapes(Particle1, ParticleSimData);
 
-						const FReal Box1Thickness = ComputeBoundsThickness(Particle1, Dt, BoundsThickness, BoundsThicknessVelocityInflation).Size();
-						const FAABB3 Box1 = ComputeWorldSpaceBoundingBox<FReal>(Particle1).ThickenSymmetrically(FVec3(Box1Thickness));
+						const FAABB3 Box1 = Particle1.WorldSpaceInflatedBounds();
 
 						{
 							PHYSICS_CSV_SCOPED_EXPENSIVE(PhysicsVerbose, DetectCollisions_BroadPhase);
@@ -369,11 +363,13 @@ namespace Chaos
 					}
 
 					// Constraints have a key generated from the Particle IDs and we don't want to have to deal with constraint being created in the two orders.
-					// Since particles can change type (between Kinematic and Dynamic) we may visit them in different orders at different times. 
-					// That would break Resim and constraint re-use.
+					// Since particles can change type (between Kinematic and Dynamic) we may visit them in different orders at different times, but if we allow
+					// that it would break Resim and constraint re-use. Also, if only one particle is Dynamic, we want it in first position. This isn't a strtct 
+					// requirement but some downstream systems assume this is true.
 					TGeometryParticleHandle<FReal, 3>* ParticleA = Particle1.Handle();
 					TGeometryParticleHandle<FReal, 3>* ParticleB = Particle2.Handle();
-					if (!bIsParticle1Preferred)
+					bool bSwapOrder = !FConstGenericParticleHandle(ParticleA)->IsDynamic() || !bIsParticle1Preferred;
+					if (bSwapOrder)
 					{
 						Swap(ParticleA, ParticleB);
 					}
@@ -420,7 +416,7 @@ namespace Chaos
 				{
 					CullDistance2 = ComputeBoundsThickness(*KinematicParticle2, Dt, FReal(0), BoundsThicknessVelocityInflation).Size();
 				}
-				const FReal NetCullDistance = CullDistance + CullDistance1 + CullDistance2;
+				const FReal NetCullDistance = GetBoundsThickness() + CullDistance1 + CullDistance2;
 
 				// Generate constraints for the potentially overlapping shape pairs. Also run collision detection to generate
 				// the contact position and normal (for contacts within CullDistance) for use in collision callbacks.

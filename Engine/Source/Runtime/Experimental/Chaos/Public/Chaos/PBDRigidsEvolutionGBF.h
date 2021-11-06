@@ -191,6 +191,7 @@ namespace Chaos
 			FPerParticleEtherDrag EtherDragRule;
 			FPerParticlePBDEulerStep EulerStepRule;
 
+			const FReal BoundsThickness = GetBroadPhase().GetBoundsThickness();
 			const FReal MaxAngularSpeedSq = CVars::HackMaxAngularVelocity * CVars::HackMaxAngularVelocity;
 			const FReal MaxSpeedSq = CVars::HackMaxVelocity * CVars::HackMaxVelocity;
 			InParticles.ParallelFor([&](auto& GeomParticle, int32 Index) {
@@ -232,30 +233,30 @@ namespace Chaos
 
 					EulerStepRule.Apply(Particle, Dt);
 
-					if (Particle.HasBounds())
+					if (!Particle.CCDEnabled())
 					{
-						const FAABB3& LocalBounds = Particle.LocalBounds();
-						FAABB3 WorldSpaceBounds = LocalBounds.TransformedAABB(FRigidTransform3(Particle.P(), Particle.Q())); // This is the AABB of the transformed AABB rather than the AABB of the transformed object. The result might be bigger than ideal.
-						if (Particle.CCDEnabled() && CVars::CCDEnableThresholdBoundsScale >= 0)
+						Particle.UpdateWorldSpaceState(FRigidTransform3(Particle.P(), Particle.Q()), FVec3(BoundsThickness));
+					}
+					else
+					{
+						const FReal MinBoundsAxis = Particle.LocalBounds().Extents().Min();
+						const FReal LengthCCDThreshold = MinBoundsAxis *  CVars::CCDEnableThresholdBoundsScale;
+						const FReal PXSizeSquared = (Particle.P() - Particle.X()).SizeSquared();
+						if (PXSizeSquared > LengthCCDThreshold * LengthCCDThreshold)
 						{
-							const FReal MinBoundsAxis = LocalBounds.Extents().Min();
-							const FReal LengthCCDThreshold = MinBoundsAxis *  CVars::CCDEnableThresholdBoundsScale;
-							const FReal PXSizeSquared = (Particle.P() - Particle.X()).SizeSquared();
-							if (PXSizeSquared > LengthCCDThreshold * LengthCCDThreshold)
+							if (CVars::bChaosCollisionCCDUseTightBoundingBox)
 							{
-								if (CVars::bChaosCollisionCCDUseTightBoundingBox)
-								{
-									WorldSpaceBounds.GrowToInclude(LocalBounds.TransformedAABB(FRigidTransform3(Particle.X(), Particle.R())));
-								}
-								else
-								{
-									// We use end frame rotation for in GJKRaycast2. For consistency, we should also use Q instead of R for bounds.
-									WorldSpaceBounds = LocalBounds.TransformedAABB(FRigidTransform3(Particle.X(), Particle.Q()));
-									WorldSpaceBounds.ThickenSymmetrically(Particle.V() * Dt);
-								}
+								Particle.UpdateWorldSpaceStateSwept(FRigidTransform3(Particle.P(), Particle.Q()), FVec3(BoundsThickness), Particle.X() - Particle.P());
+							}
+							else
+							{
+								Particle.UpdateWorldSpaceState(FRigidTransform3(Particle.P(), Particle.Q()), FVec3(BoundsThickness) + Particle.V() * Dt);
 							}
 						}
-						Particle.SetWorldSpaceInflatedBounds(WorldSpaceBounds);
+						else
+						{
+							Particle.UpdateWorldSpaceState(FRigidTransform3(Particle.P(), Particle.Q()), FVec3(BoundsThickness));
+						}
 					}
 				}
 			});

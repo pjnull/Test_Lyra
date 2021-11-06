@@ -536,9 +536,27 @@ public:
 	void SetLocalBounds(const TAABB<T, d>& NewBounds) { GeometryParticles->LocalBounds(ParticleIdx) = NewBounds; }
 
 	const TAABB<T, d>& WorldSpaceInflatedBounds() const { return GeometryParticles->WorldSpaceInflatedBounds(ParticleIdx); }
-	void SetWorldSpaceInflatedBounds(const TAABB<T, d>& WorldSpaceInflatedBounds)
+
+	/**
+	 * @brief Update any cached state that depends on world-space transform
+	 * This includes the world space bounds for the particle and all its shapes.
+	*/
+	void UpdateWorldSpaceState(const FRigidTransform3& WorldTransform, const FVec3& BoundsExpansion)
 	{
-		GeometryParticles->SetWorldSpaceInflatedBounds(ParticleIdx, WorldSpaceInflatedBounds);
+		GeometryParticles->UpdateWorldSpaceState(ParticleIdx, WorldTransform, BoundsExpansion);
+	}
+
+	/**
+	 * @brief Update any cached state that depends on world-space transform
+	 * @param EndWorldTransform The transform at the end of the sweep
+	 * @param BoundsExpansion A uniform expansion applied to the bounds of the particle and the all shapes
+	 * @param DeltaX A directional expansion applied to the bounds of the particle, but not the shapes
+	 * This includes the world space bounds for the particle and all its shapes. If DeltaX is not zero,
+	 * the bounds will be equivalent to a union of the bounds at EndWorldTransform and EndWorldTransform + DeltaX.
+	*/
+	void UpdateWorldSpaceStateSwept(const FRigidTransform3& EndWorldTransform, const FVec3& BoundsExpansion, const FVec3& DeltaX)
+	{
+		GeometryParticles->UpdateWorldSpaceStateSwept(ParticleIdx, EndWorldTransform, BoundsExpansion, DeltaX);
 	}
 
 	bool HasBounds() const { return GeometryParticles->HasBounds(ParticleIdx); }
@@ -1261,13 +1279,13 @@ TGeometryParticleHandleImp<T,d,bPersistent>* TGeometryParticleHandleImp<T,d, bPe
 	return Ar.IsLoading() ? new TGeometryParticleHandleImp<T, d, bPersistent>() : nullptr;
 }
 
-class CHAOS_API FGenericParticleHandleHandleImp
+class CHAOS_API FGenericParticleHandleImp
 {
 public:
 	using FDynamicParticleHandleType = FPBDRigidParticleHandle;
 	using FKinematicParticleHandleType = FKinematicGeometryParticleHandle;
 
-	FGenericParticleHandleHandleImp(FGeometryParticleHandle* InHandle) : MHandle(InHandle) {}
+	FGenericParticleHandleImp(FGeometryParticleHandle* InHandle) : MHandle(InHandle) {}
 
 	// Check for the exact type of particle (see also AsKinematic etc, which will work on derived types)
 	bool IsStatic() const { return (MHandle->ObjectState() == EObjectStateType::Static); }
@@ -1342,6 +1360,16 @@ public:
 		}
 
 		return 0;
+	}
+
+	bool CCDEnabled() const
+	{ 
+		if (MHandle->CastToRigidParticle())
+		{
+			return MHandle->CastToRigidParticle()->CCDEnabled();
+		}
+
+		return false;
 	}
 
 	bool HasCollisionConstraintFlag(const ECollisionConstraintFlags Flag)  const
@@ -1518,6 +1546,16 @@ public:
 		return MHandle->WorldSpaceInflatedBounds();
 	}
 
+	const FAABB3& WorldSpaceInflatedBounds() const
+	{ 
+		return MHandle->WorldSpaceInflatedBounds();
+	}
+
+	void UpdateWorldSpaceState(const FRigidTransform3& WorldTransform, const FVec3& BoundsExpansion)
+	{
+		MHandle->UpdateWorldSpaceState(WorldTransform, BoundsExpansion);
+	}
+
 	const FMatrix33& I() const 
 	{ 
 		if (MHandle->CastToRigidParticle() && MHandle->ObjectState() == EObjectStateType::Dynamic)
@@ -1659,7 +1697,7 @@ private:
 };
 
 template <typename T, int d>
-using TGenericParticleHandleHandleImp UE_DEPRECATED(4.27, "Deprecated. this class is to be deleted, use FGenericParticleHandleHandleImp instead") = FGenericParticleHandleHandleImp;
+using TGenericParticleHandleHandleImp UE_DEPRECATED(4.27, "Deprecated. this class is to be deleted, use FGenericParticleHandleImp instead") = FGenericParticleHandleImp;
 
 /**
  * A wrapper around any type of particle handle to provide a consistent (read-only) API for all particle types.
@@ -1675,8 +1713,8 @@ public:
 	FGenericParticleHandle() : Imp(nullptr) {}
 	FGenericParticleHandle(FGeometryParticleHandle* InHandle) : Imp(InHandle) {}
 
-	FGenericParticleHandleHandleImp* operator->() const { return const_cast<FGenericParticleHandleHandleImp*>(&Imp); }
-	FGenericParticleHandleHandleImp* Get() const { return const_cast<FGenericParticleHandleHandleImp*>(&Imp); }
+	FGenericParticleHandleImp* operator->() const { return const_cast<FGenericParticleHandleImp*>(&Imp); }
+	FGenericParticleHandleImp* Get() const { return const_cast<FGenericParticleHandleImp*>(&Imp); }
 
 	bool IsValid() const { return Imp.Handle() != nullptr; }
 
@@ -1696,7 +1734,7 @@ public:
 	}
 
 private:
-	FGenericParticleHandleHandleImp Imp;
+	FGenericParticleHandleImp Imp;
 };
 
 template <typename T, int d>
@@ -1709,8 +1747,8 @@ public:
 	FConstGenericParticleHandle(const FGeometryParticleHandle* InHandle) : Imp(const_cast<FGeometryParticleHandle*>(InHandle)) {}
 	FConstGenericParticleHandle(const FGenericParticleHandle InHandle) : Imp(InHandle->Handle()) {}
 
-	const FGenericParticleHandleHandleImp* operator->() const { return &Imp; }
-	const FGenericParticleHandleHandleImp* Get() const { return &Imp; }
+	const FGenericParticleHandleImp* operator->() const { return &Imp; }
+	const FGenericParticleHandleImp* Get() const { return &Imp; }
 
 	bool IsValid() const { return Imp.Handle() != nullptr; }
 
@@ -1730,7 +1768,7 @@ public:
 	}
 
 private:
-	FGenericParticleHandleHandleImp Imp;
+	FGenericParticleHandleImp Imp;
 };
 
 template <typename T, int d>
