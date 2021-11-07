@@ -11,7 +11,7 @@ class UGameInstance;
  * These actions register themselves with the game instance and need to be explicitly canceled or ended normally to go away.
  * The ExposedAsyncProxy metadata specifies the blueprint node will return this object for later canceling.
  */
-UCLASS(Abstract, meta = (ExposedAsyncProxy = AsyncAction))
+UCLASS(Abstract, BlueprintType, meta = (ExposedAsyncProxy = AsyncAction))
 class ENGINE_API UCancellableAsyncAction : public UBlueprintAsyncActionBase
 {
 	GENERATED_BODY()
