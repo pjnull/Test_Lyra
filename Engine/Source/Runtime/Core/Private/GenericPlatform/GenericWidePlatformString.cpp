@@ -414,18 +414,9 @@ int32 FGenericWidePlatformString::GetVarArgs( WIDECHAR* Dest, SIZE_T DestSize, c
 
 		Src++; // skip the '%' char...
 
-		while (*Src == ' ')
-		{
-			if (!DestIter.Write(' '))
-			{
-				return -1;
-			}
-			Src++;
-		}
-
 		// Skip modifier flags that don't need additional processing;
 		// they still get passed to snprintf() below based on the conversion.
-		while (*Src == '+' || *Src == '#')
+		while (*Src == '+' || *Src == '#' || *Src == TEXT(' ') || *Src == TEXT('0'))
 		{
 			Src++;
 		}

@@ -9622,7 +9622,7 @@ bool UEngine::PerformError(const TCHAR* Cmd, FOutputDevice& Ar)
 	}
 	else if (FParse::Command(&Cmd, TEXT("LONGLOG")))
 	{
-		UE_LOG(LogEngine, Log, TEXT("This is going to be a really long log message to test the code to resize the buffer used to log with. %02048s"), TEXT("HAHA, this isn't really a long string, but it sure has a lot of zeros!"));
+		UE_LOG(LogEngine, Log, TEXT("This is going to be a really long log message to test the code to resize the buffer used to log with. %2048s"), TEXT("HAHA, this isn't really a long string, but it sure has a lot of spaces!"));
 	}
 	else if (FParse::Command(&Cmd, TEXT("RECURSE")))
 	{
