@@ -7,11 +7,14 @@
 #include "LevelSnapshotsEditorCommands.h"
 #include "LevelSnapshotsEditorStyle.h"
 #include "LevelSnapshotsEditorSettings.h"
+#include "LevelSnapshotsLog.h"
 #include "Views/SLevelSnapshotsEditor.h"
 
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetToolsModule.h"
 #include "AssetTypeActions/AssetTypeActions_LevelSnapshot.h"
+#include "CoreGlobals.h"
+#include "Editor.h"
 #include "IAssetTools.h"
 #include "ISettingsModule.h"
 #include "LevelEditor.h"
@@ -116,6 +119,10 @@ ULevelSnapshotsEditorData* FLevelSnapshotsEditorModule::AllocateTransientPreset(
 	{
 		return ExistingPreset;
 	}
+
+	// If for whatever reason we're in a transaction context, we do not want the creation of this object to be tracked. For example, multiuser should not transact this object to other clients.
+	UE_CLOG(GUndo != nullptr || (GEditor && GEditor->IsTransactionActive()), LogLevelSnapshots, Error, TEXT("We shouldn't be transacting right now. Investigate."));
+	TGuardValue<ITransaction*> ClearUndo(GUndo, nullptr);
 	
 	UPackage* NewPackage = CreatePackage(TEXT("/Temp/LevelSnapshots/PendingSnapshots"));
 	NewPackage->SetFlags(RF_Transient);
