@@ -258,11 +258,7 @@ bool Chaos::TUniformGrid<T, 3>::IsValid(const TVector<int32, 3>& X) const
 }
 
 template class Chaos::TUniformGridBase<Chaos::FReal, 3>;
-#if PLATFORM_MAC || PLATFORM_LINUX
-template class CHAOS_API Chaos::TUniformGrid<Chaos::FReal, 3>;
-#else
 template class Chaos::TUniformGrid<Chaos::FReal, 3>;
-#endif
 template class Chaos::TUniformGrid<Chaos::FReal, 2>;
 
 template FVec3 Chaos::TUniformGridBase<Chaos::FReal, 3>::LinearlyInterpolate<FVec3>(const TArrayND<FVec3, 3>&, const FVec3&) const;
