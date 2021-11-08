@@ -23,6 +23,7 @@ class COREUOBJECT_API UObjectBase
 	friend struct Z_Construct_UClass_UObject_Statics;
 	friend class FUObjectArray; // for access to InternalIndex without revealing it to anyone else
 	friend class FUObjectAllocator; // for access to destructor without revealing it to anyone else
+	friend struct FInternalUObjectBaseUtilityIsValidFlagsChecker; // for access to InternalIndex
 	friend COREUOBJECT_API void UObjectForceRegistration(UObjectBase* Object, bool bCheckForModuleRelease);
 	friend COREUOBJECT_API void InitializePrivateStaticClass(
 		class UClass* TClass_Super_StaticClass,
