@@ -2144,9 +2144,8 @@ void FProjectedShadowInfo::SetupMeshDrawCommandsForShadowDepth(FSceneRenderer& R
 	}
 	// GPUCULL_TODO: Pass along any custom culling planes or whatever here (e.g., cacade bounds):
 	// GPUCULL_TODO: Add debug tags to context and views (so compute passes can be understood)
-	extern int32 GShadowUseGS;
 	// GPUCULL_TODO: Needed to support legacy, non-GPU-Scene culled, primitives, this is merely used to allocate enough space for CPU-side replication.
-	const bool bUseGeometryShader = GShadowUseGS && RHISupportsGeometryShaders(Renderer.Scene->GetShaderPlatform());
+	const bool bUseGeometryShader = !RHISupportsVertexShaderLayer(Renderer.Scene->GetShaderPlatform()) && RHISupportsGeometryShaders(Renderer.Scene->GetShaderPlatform());
 	// Note: Iteracts with FShadowDepthPassMeshProcessor::Process and must be an overestimate of the actual replication done there.
 	const uint32 InstanceFactor = !GetShadowDepthType().bOnePassPointLightShadow || bUseGeometryShader ? 1 : 6;
 

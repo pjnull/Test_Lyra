@@ -168,7 +168,7 @@ inline bool RHISupportsVolumeTextures(const FStaticFeatureLevel FeatureLevel)
 
 inline bool RHISupportsVertexShaderLayer(const FStaticShaderPlatform Platform)
 {
-	return IsFeatureLevelSupported(Platform, ERHIFeatureLevel::SM5) && IsMetalPlatform(Platform) && IsPCPlatform(Platform);
+	return IsFeatureLevelSupported(Platform, ERHIFeatureLevel::SM5) && FDataDrivenShaderPlatformInfo::GetSupportsVertexShaderLayer(Platform);
 }
 
 /** Return true if and only if the GPU support rendering to volume textures (2D Array, 3D) is guaranteed supported for a target platform.
