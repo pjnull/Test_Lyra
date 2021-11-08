@@ -6,7 +6,7 @@
 #include "Logging/LogCategory.h"
 #include "Logging/LogMacros.h"
 
-#if PLATFORM_TCHAR_IS_CHAR16
+#if PLATFORM_USE_GENERIC_STRING_IMPLEMENTATION
 
 DEFINE_LOG_CATEGORY_STATIC(LogStandardPlatformString, Log, All);
 
@@ -233,7 +233,12 @@ void RunGetVarArgsTests()
 	checkf(FString(OutputString) == FString(TEXT("Test C|12345|54321|123ABC|f|99|")), OutputString);
 
 	TestGetVarArgs(OutputString, TEXT("Test D|%p|"), 0x12345);
+#ifdef _MSC_VER
+	// MSVC's standard library formats pointers differently
+	checkf(FString(OutputString) == FString(TEXT("Test D|0000000000012345|")), OutputString);
+#else
 	checkf(FString(OutputString) == FString(TEXT("Test D|0x12345|")), OutputString);
+#endif
 
 	TestGetVarArgs(OutputString, TEXT("Test E|%" INT64_FMT "|"), int64(12345678912345LL));
 	checkf(FString(OutputString) == FString(TEXT("Test E|12345678912345|")), OutputString);

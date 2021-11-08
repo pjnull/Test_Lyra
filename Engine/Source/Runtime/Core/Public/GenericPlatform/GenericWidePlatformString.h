@@ -231,19 +231,28 @@ public:
 	 **/
 	CORE_API static FORCEINLINE ANSICHAR* Strcpy(ANSICHAR* Dest, SIZE_T DestCount, const ANSICHAR* Src)
 	{
+// Skip suggestions about using strcpy_s instead.
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
 		return strcpy( Dest, Src );
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	}
 
 	CORE_API static FORCEINLINE ANSICHAR* Strncpy(ANSICHAR* Dest, const ANSICHAR* Src, SIZE_T MaxLen)
 	{
+// Skip suggestions about using strncpy_s instead.
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
 		::strncpy(Dest, Src, MaxLen);
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		Dest[MaxLen-1]=0;
 		return Dest;
 	}
 
 	CORE_API static FORCEINLINE ANSICHAR* Strcat(ANSICHAR* Dest, SIZE_T DestCount, const ANSICHAR* Src)
 	{
+// Skip suggestions about using strcat_s instead.
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
 		return strcat( Dest, Src );
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	}
 
 	CORE_API static FORCEINLINE int32 Strcmp( const ANSICHAR* String1, const ANSICHAR* String2 )
@@ -318,7 +327,10 @@ public:
 
 	CORE_API static FORCEINLINE ANSICHAR* Strtok(ANSICHAR* StrToken, const ANSICHAR* Delim, ANSICHAR** Context)
 	{
+// Skip suggestions about using strtok_s instead.
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
 		return strtok(StrToken, Delim);
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	}
 
 	static CORE_API int32 GetVarArgs( ANSICHAR* Dest, SIZE_T DestSize, const ANSICHAR*& Fmt, va_list ArgPtr )
