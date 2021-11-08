@@ -7545,6 +7545,83 @@ FString FHlslNiagaraTranslator::GetFunctionSignatureSymbol(const FNiagaraFunctio
 	return GetSanitizedSymbolName(SigStr);
 }
 
+FString FHlslNiagaraTranslator::GenerateFunctionHlslPrototype(FStringView InVariableName, const FNiagaraFunctionSignature& FunctionSignature)
+{
+	TStringBuilder<512> StringBuilder;
+	if (FunctionSignature.bMemberFunction)
+	{
+		StringBuilder.Append(InVariableName);
+		StringBuilder.Append(TEXT("."));
+		StringBuilder.Append(FHlslNiagaraTranslator::GetSanitizedSymbolName(FunctionSignature.Name.ToString()));
+
+		// Build specifiers
+		if (FunctionSignature.FunctionSpecifiers.Num())
+		{
+			bool bNeedsComma = false;
+			StringBuilder.Append('<');
+			for (auto SpecifierIt = FunctionSignature.FunctionSpecifiers.CreateConstIterator(); SpecifierIt; ++SpecifierIt)
+			{
+				if (bNeedsComma)
+				{
+					StringBuilder.Append(TEXT(", "));
+				}
+				bNeedsComma = true;
+
+				StringBuilder.Append(SpecifierIt.Key().ToString());
+				StringBuilder.Append('=');
+				StringBuilder.Append('"');
+				StringBuilder.Append(SpecifierIt.Value().IsNone() ? TEXT("Value") : *SpecifierIt.Value().ToString());
+				StringBuilder.Append('"');
+			}
+			StringBuilder.Append('>');
+		}
+
+		// Build function parameters
+		{
+			StringBuilder.Append(TEXT("("));
+			bool bNeedsComma = false;
+
+			// Inputs
+			for (int i = 1; i < FunctionSignature.Inputs.Num(); ++i)
+			{
+				const FNiagaraVariable& InputVar = FunctionSignature.Inputs[i];
+				if (bNeedsComma)
+				{
+					StringBuilder.Append(TEXT(", "));
+				}
+				bNeedsComma = true;
+
+				StringBuilder.Append(TEXT("in "));
+				StringBuilder.Append(FHlslNiagaraTranslator::GetStructHlslTypeName(InputVar.GetType()));
+
+				StringBuilder.Append(TEXT(" In_"));
+				StringBuilder.Append(FHlslNiagaraTranslator::GetSanitizedSymbolName(InputVar.GetName().ToString()));
+			}
+
+			// Outputs
+			for (const FNiagaraVariable& OutputVar : FunctionSignature.Outputs)
+			{
+				if (bNeedsComma)
+				{
+					StringBuilder.Append(TEXT(", "));
+				}
+				bNeedsComma = true;
+				StringBuilder.Append(TEXT("out "));
+				StringBuilder.Append(FHlslNiagaraTranslator::GetStructHlslTypeName(OutputVar.GetType()));
+				StringBuilder.Append(TEXT(" Out_"));
+				StringBuilder.Append(FHlslNiagaraTranslator::GetSanitizedSymbolName(OutputVar.GetName().ToString()));
+			}
+			StringBuilder.Append(TEXT(");"));
+		}
+	}
+	else
+	{
+		ensureAlwaysMsgf(false, TEXT("None member functions not supported currently"));
+	}
+
+	return FString(StringBuilder.ToString());
+}
+
 FName FHlslNiagaraTranslator::GetDataInterfaceName(FName BaseName, const FString& UniqueEmitterName, bool bIsParameterMapDataInterface)
 {
 	if (UniqueEmitterName.IsEmpty() == false)
