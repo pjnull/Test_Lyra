@@ -3541,6 +3541,11 @@ void APlayerController::GameplayUnmutePlayer(const FUniqueNetIdRepl& PlayerNetId
 	}
 }
 
+void APlayerController::GameplayUnmuteAllPlayers()
+{
+	MuteList.GameplayUnmuteAllPlayers(this);
+}
+
 /// @cond DOXYGEN_WARNINGS
 
 void APlayerController::ServerMutePlayer_Implementation(FUniqueNetIdRepl PlayerId)
@@ -3586,6 +3591,25 @@ void APlayerController::ClientUnmutePlayer_Implementation(FUniqueNetIdRepl Playe
 	{
 		// Have the voice subsystem unmute this player
 		UOnlineEngineInterface::Get()->UnmuteRemoteTalker(World, LP->GetControllerId(), *PlayerId, false);
+	}
+}
+
+void APlayerController::ClientUnmutePlayers_Implementation(const TArray<FUniqueNetIdRepl>& PlayerIds)
+{
+	ULocalPlayer* LP = Cast<ULocalPlayer>(Player);
+	UWorld* World = GetWorld();
+
+	// Use the local player to determine the controller id
+	if (LP != NULL && World)
+	{
+		for (const FUniqueNetIdRepl& UnmuteId : PlayerIds)
+		{
+			if (UnmuteId.IsValid())
+			{
+				// Have the voice subsystem mute this player
+				UOnlineEngineInterface::Get()->UnmuteRemoteTalker(World, LP->GetControllerId(), *UnmuteId, false);
+			}
+		}
 	}
 }
 

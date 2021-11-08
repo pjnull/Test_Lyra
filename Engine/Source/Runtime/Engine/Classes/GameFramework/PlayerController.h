@@ -846,6 +846,13 @@ public:
 	virtual void ServerUnblockPlayer(FUniqueNetIdRepl PlayerId);
 
 	/**
+	 * Tell the client to unmute an array of players for this controller
+	 * @param PlayerIds player ids to unmute
+	 */
+	UFUNCTION(Reliable, Client)
+	virtual void ClientUnmutePlayers(const TArray<FUniqueNetIdRepl>& PlayerIds);
+
+	/**
 	 * Mutes a remote player on the server and then tells the client to mute
 	 *
 	 * @param PlayerNetId the remote player to mute
@@ -858,6 +865,11 @@ public:
 	 * @param PlayerNetId the remote player to unmute
 	 */
 	void GameplayUnmutePlayer(const FUniqueNetIdRepl& PlayerNetId);
+
+	/**
+	 * Unmutes all remote players muted due to gameplay rules on the server and then tells the client to unmute
+	 */
+	void GameplayUnmuteAllPlayers();
 
 	/**
 	* Get a remote player controller on the server for muting
