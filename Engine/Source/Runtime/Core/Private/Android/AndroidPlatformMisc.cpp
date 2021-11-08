@@ -315,7 +315,6 @@ void FAndroidMisc::PlatformPreInit()
 	FGenericPlatformMisc::PlatformPreInit();
 	EstablishVulkanDeviceSupport();
 	FAndroidAppEntry::PlatformInit();
-	FPlatformStackWalk::InitStackWalking();
 }
 
 static volatile bool HeadPhonesArePluggedIn = false;
