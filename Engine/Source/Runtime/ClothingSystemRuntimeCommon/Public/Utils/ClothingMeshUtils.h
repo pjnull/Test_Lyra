@@ -166,7 +166,8 @@ namespace ClothingMeshUtils
 	void CLOTHINGSYSTEMRUNTIMECOMMON_API ComputeVertexContributions(
 		TArray<FMeshToMeshVertData> &InOutSkinningData,
 		const FPointWeightMap* const InMaxDistances,
-		const bool bInSmoothTransition );
+		const bool bInSmoothTransition,
+		const bool bInUseMultipleInfluences = false);
 	
 	/**
 	 * Identify vertices that are not influenced by any triangles, and compute a new single attachment for the

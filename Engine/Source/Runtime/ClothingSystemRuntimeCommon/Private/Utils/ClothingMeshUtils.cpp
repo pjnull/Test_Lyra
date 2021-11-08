@@ -986,7 +986,8 @@ namespace ClothingMeshUtils
 	void ComputeVertexContributions(
 		TArray<FMeshToMeshVertData>& InOutSkinningData,
 		const FPointWeightMap* const InMaxDistances,
-		const bool bInSmoothTransition
+		const bool bInSmoothTransition,
+		const bool bInUseMultipleInfluences
 		)
 	{
 		if (InMaxDistances && InMaxDistances->Num())
@@ -998,7 +999,7 @@ namespace ClothingMeshUtils
 				const bool IsStatic2 = InMaxDistances->IsBelowThreshold(VertData.SourceMeshVertIndices[2]);
 
 				// None of the cloth vertices will move due to max distance constraints.
-				if (IsStatic0 && IsStatic1 && IsStatic2)
+				if ((IsStatic0 && IsStatic1 && IsStatic2) || (bInUseMultipleInfluences && VertData.Weight == 0.f))
 				{
 					VertData.SourceMeshVertIndices[3] = 0xFFFF;
 				}

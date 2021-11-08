@@ -348,14 +348,14 @@ bool UClothingAssetCommon::BindToSkeletalMesh(
 		return false;
 	}
 
-	// Calculate the vertex contribution alpha
-	const FPointWeightMap* const MaxDistances = ClothLodData.PhysicalMeshData.FindWeightMap(EWeightMapTargetCommon::MaxDistance);
-	ClothingMeshUtils::ComputeVertexContributions(MeshToMeshData, MaxDistances, ClothLodData.bSmoothTransition);
-
 	if (ClothLodData.bUseMultipleInfluences)
 	{
 		ClothingMeshUtils::FixZeroWeightVertices(MeshToMeshData, TargetMesh, &RenderTangents, SourceMesh, MaxEdgeLength);
 	}
+
+	// Calculate the vertex contribution alpha
+	const FPointWeightMap* const MaxDistances = ClothLodData.PhysicalMeshData.FindWeightMap(EWeightMapTargetCommon::MaxDistance);
+	ClothingMeshUtils::ComputeVertexContributions(MeshToMeshData, MaxDistances, ClothLodData.bSmoothTransition, ClothLodData.bUseMultipleInfluences);
 
 	// We have to copy the bone map to verify we don't exceed the maximum while adding the clothing bones
 	TArray<FBoneIndexType> TempBoneMap = OriginalSection.BoneMap;
@@ -580,7 +580,7 @@ void UClothingAssetCommon::ApplyParameterMasks(bool bUpdateFixedVertData)
 				const FClothLODDataCommon& LodDatum = LodData[Section.ClothingData.AssetLodIndex];
 				const FPointWeightMap* const MaxDistances = LodDatum.PhysicalMeshData.FindWeightMap(EWeightMapTargetCommon::MaxDistance);
 
-				ClothingMeshUtils::ComputeVertexContributions(Section.ClothMappingData, MaxDistances, LodDatum.bSmoothTransition);
+				ClothingMeshUtils::ComputeVertexContributions(Section.ClothMappingData, MaxDistances, LodDatum.bSmoothTransition, LodDatum.bUseMultipleInfluences);
 			}
 		}
 		// We must always dirty the DDC key unless previewing

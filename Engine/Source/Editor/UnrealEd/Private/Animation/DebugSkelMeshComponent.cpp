@@ -966,7 +966,7 @@ void UDebugSkelMeshComponent::RebuildClothingSectionsFixedVerts(bool bInvalidate
 					const FClothLODDataCommon& LodData = ConcreteAsset->LodData[Section.ClothingData.AssetLodIndex];
 					const FPointWeightMap* const MaxDistances = LodData.PhysicalMeshData.FindWeightMap(EWeightMapTargetCommon::MaxDistance);
 
-					ClothingMeshUtils::ComputeVertexContributions(Section.ClothMappingData, MaxDistances, LodData.bSmoothTransition);
+					ClothingMeshUtils::ComputeVertexContributions(Section.ClothMappingData, MaxDistances, LodData.bSmoothTransition, LodData.bUseMultipleInfluences);
 					
 					if (bInvalidateDerivedDataCache)
 					{
