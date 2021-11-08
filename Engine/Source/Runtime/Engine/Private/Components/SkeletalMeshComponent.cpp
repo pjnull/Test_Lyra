@@ -189,6 +189,7 @@ USkeletalMeshComponent::USkeletalMeshComponent(const FObjectInitializer& ObjectI
 
 	bWantsInitializeComponent = true;
 	GlobalAnimRateScale = 1.0f;
+	bDeferKinematicBoneUpdate = true;
 	bNoSkeletonUpdate = false;
 	VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
 	KinematicBonesUpdateType = EKinematicBonesUpdateToPhysics::SkipSimulatingBones;
