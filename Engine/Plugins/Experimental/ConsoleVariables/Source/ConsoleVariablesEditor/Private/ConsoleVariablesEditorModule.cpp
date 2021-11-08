@@ -249,7 +249,7 @@ void FConsoleVariablesEditorModule::OnConsoleVariableChange()
 			else
 			{
 				ConsoleVariablesMasterReference.Add(
-					MakeShared<FConsoleVariablesEditorCommandInfo>((wchar_t*)Key, AsVariable, AsVariable->GetString()));
+					MakeShared<FConsoleVariablesEditorCommandInfo>(Key, AsVariable, AsVariable->GetString()));
 			}
 		}
 	}),
