@@ -433,7 +433,7 @@ void FDatasmithImporterUtils::DeleteActor( AActor& Actor )
 
 void FDatasmithImporterUtils::AddUniqueLayersToWorld(UWorld* World, const TSet< FName >& LayerNames)
 {
-	if (!World || World->IsPendingKillOrUnreachable() || LayerNames.Num() == 0)
+	if (!World || !IsValidChecked(World) || World->IsUnreachable() || LayerNames.Num() == 0)
 	{
 		return;
 	}

@@ -116,7 +116,7 @@ void ULevelInstanceSubsystem::UnregisterLevelInstance(ALevelInstance* LevelInsta
 
 void ULevelInstanceSubsystem::RequestLoadLevelInstance(ALevelInstance* LevelInstanceActor, bool bForce /* = false */)
 {
-	check(LevelInstanceActor && !LevelInstanceActor->IsPendingKillOrUnreachable());
+	check(LevelInstanceActor && IsValidChecked(LevelInstanceActor) && !LevelInstanceActor->IsUnreachable());
 	if (LevelInstanceActor->IsLevelInstancePathValid())
 	{
 #if WITH_EDITOR
@@ -235,7 +235,7 @@ void ULevelInstanceSubsystem::UpdateStreamingState()
 void ULevelInstanceSubsystem::LoadLevelInstance(ALevelInstance* LevelInstanceActor)
 {
 	check(LevelInstanceActor);
-	if (IsLoaded(LevelInstanceActor) || LevelInstanceActor->IsPendingKillOrUnreachable() || !LevelInstanceActor->IsLevelInstancePathValid())
+	if (IsLoaded(LevelInstanceActor) || !IsValidChecked(LevelInstanceActor) || LevelInstanceActor->IsUnreachable() || !LevelInstanceActor->IsLevelInstancePathValid())
 	{
 		return;
 	}

@@ -3823,7 +3823,7 @@ private:
 template <typename ExecuteTickLambda>
 void FActorComponentTickFunction::ExecuteTickHelper(UActorComponent* Target, bool bTickInEditor, float DeltaTime, ELevelTick TickType, const ExecuteTickLambda& ExecuteTickFunc)
 {
-	if (Target && !Target->IsPendingKillOrUnreachable())
+	if (Target && IsValidChecked(Target) && !Target->IsUnreachable())
 	{
 		FScopeCycleCounterUObject ComponentScope(Target);
 		FScopeCycleCounterUObject AdditionalScope(Target->AdditionalStatObject());

@@ -239,7 +239,8 @@ public:
 		return GUObjectArray.IndexToObject(InternalIndex)->IsUnreachable();
 	}
 
-	/** Checks if the object is pending kill or unreachable. */
+	/** Checks if the object is pending kill or unreachable. INTERNAL USE ONLY! If you want to check if your object is valid use IsValid(Object)/IsValidObjectChecked(Object)/GetValid(Object) instead. */
+	UE_DEPRECATED(5.0, "IsPendingKillOrUnreachable() should no longer be used. Use IsValid(Object), IsValidChecked(Object), GetValid(Object) and/or IsUnreachable() instead.")
 	FORCEINLINE bool IsPendingKillOrUnreachable() const
 	{
 		return GUObjectArray.IndexToObject(InternalIndex)->HasAnyFlags(EInternalObjectFlags::PendingKill | EInternalObjectFlags::Unreachable);

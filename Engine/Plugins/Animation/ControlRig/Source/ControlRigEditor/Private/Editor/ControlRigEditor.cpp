@@ -1104,7 +1104,7 @@ void FControlRigEditor::GetCustomDebugObjects(TArray<FCustomDebugObject>& DebugL
 			{
 				if (InObject != nullptr)
 				{
-					if (InObject->IsPendingKillOrUnreachable())
+					if (!IsValidChecked(InObject) || InObject->IsUnreachable())
 					{
 						return true;
 					}

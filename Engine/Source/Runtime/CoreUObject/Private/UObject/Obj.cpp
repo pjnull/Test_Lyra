@@ -1680,7 +1680,7 @@ bool UObject::CanCheckDefaultSubObjects(bool bForceCheck, bool& bResult) const
 		bResult = false; // these aren't in a suitable spot in their lifetime for testing
 		bCanCheck = false;
 	}
-	if (bCanCheck && (HasAnyFlags(RF_NeedLoad | RF_NeedPostLoad | RF_NeedPostLoadSubobjects) || IsPendingKillOrUnreachable() || GIsDuplicatingClassForReinstancing))
+	if (bCanCheck && (HasAnyFlags(RF_NeedLoad | RF_NeedPostLoad | RF_NeedPostLoadSubobjects) || !IsValidChecked(this) || IsUnreachable() || GIsDuplicatingClassForReinstancing))
 	{
 		bResult = true; // these aren't in a suitable spot in their lifetime for testing
 		bCanCheck = false;

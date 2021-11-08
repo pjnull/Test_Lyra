@@ -111,7 +111,7 @@ void FNiagaraScalabilityManager::PreGarbageCollectBeginDestroy()
 			//UE_LOG(LogNiagara, Warning, TEXT("Unregister from PreGCBeginDestroy @%d/%d - %s"), CompIdx, ManagedComponents.Num(), *EffectType->GetName());
 			UnregisterAt(CompIdx);
 		}
-		else if (Comp->IsPendingKillOrUnreachable())
+		else if (!IsValidChecked(Comp) || Comp->IsUnreachable())
 		{
 			Unregister(Comp);
 		}

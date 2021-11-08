@@ -569,7 +569,7 @@ void UNiagaraComponent::ReleaseToPool()
 {
 	// A component may be marked pending kill before the owner has it's reference set to null.
 	// In that case there's a window where it can be released back into the pool incorrectly, so we just skip releasing as we know it will be deleted shortly
-	if ( IsPendingKillOrUnreachable() )
+	if ( !IsValidChecked(this) || IsUnreachable() )
 	{
 		return;
 	}

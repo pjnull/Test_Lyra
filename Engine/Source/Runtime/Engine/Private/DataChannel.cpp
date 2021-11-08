@@ -3076,7 +3076,7 @@ int64 UActorChannel::ReplicateActor()
 	// If our Actor is PendingKill, that's bad. It means that somehow it wasn't properly removed
 	// from the NetDriver or ReplicationDriver.
 	// TODO: Maybe notify the NetDriver / RepDriver about this, and have the channel close?
-	if (Actor->IsPendingKillOrUnreachable())
+	if (!IsValidChecked(Actor) || Actor->IsUnreachable())
 	{
 		bActorIsPendingKill = true;
 		ActorReplicator.Reset();

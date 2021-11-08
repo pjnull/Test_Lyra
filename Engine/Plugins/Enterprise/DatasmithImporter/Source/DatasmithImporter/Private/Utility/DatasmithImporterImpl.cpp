@@ -449,7 +449,7 @@ TArray< FDatasmithImporterImpl::FMigratedTemplatePairType > FDatasmithImporterIm
 
 			Result.Key = SourceTemplate;
 
-			if (DestinationObject && !DestinationObject->IsPendingKillOrUnreachable())
+			if (IsValid(DestinationObject) && !DestinationObject->IsUnreachable())
 			{
 				Result.Value = TStrongObjectPtr< UDatasmithObjectTemplate >(UDatasmithObjectTemplate::GetDifference( DestinationObject, SourceTemplate.Get()));
 			}
@@ -542,7 +542,7 @@ UActorComponent* FDatasmithImporterImpl::PublicizeComponent(UActorComponent& Sou
 
 	if ( !SourceComponent.HasAnyFlags( RF_Transient | RF_TextExportTransient | RF_DuplicateTransient ) )
 	{
-		if (!DestinationComponent || DestinationComponent->IsPendingKillOrUnreachable())
+		if (!DestinationComponent || !IsValidChecked(DestinationComponent) || DestinationComponent->IsUnreachable())
 		{
 			if (DestinationComponent)
 			{
@@ -591,7 +591,7 @@ USceneComponent* FDatasmithImporterImpl::FinalizeSceneComponent(FDatasmithImport
 	if ( SourceComponentDatasmithId.IsNone() )
 	{
 		// This component is not tracked by datasmith
-		if ( !DestinationComponent || DestinationComponent->IsPendingKillOrUnreachable() )
+		if ( !DestinationComponent || !IsValidChecked(DestinationComponent) || DestinationComponent->IsUnreachable() )
 		{
 			DestinationComponent = static_cast<USceneComponent*> ( PublicizeComponent(SourceComponent, DestinationComponent, DestinationActor, ReferencesToRemap, ReusableBuffer) );
 			if ( DestinationComponent )
@@ -711,7 +711,7 @@ void FDatasmithImporterImpl::PublicizeSubObjects(UObject& SourceObject, UObject&
 		{
 			UObject* DestinationSubObject = FindObjectFast<UObject>( &DestinationObject, SourceSubObject->GetFName() );
 
-			if ( !DestinationSubObject || DestinationSubObject->IsPendingKillOrUnreachable() || DestinationSubObject->GetClass() !=  SourceSubObject->GetClass() )
+			if ( !DestinationSubObject || !IsValidChecked(DestinationSubObject) || DestinationSubObject->IsUnreachable() || DestinationSubObject->GetClass() !=  SourceSubObject->GetClass() )
 			{
 				if ( DestinationSubObject )
 				{

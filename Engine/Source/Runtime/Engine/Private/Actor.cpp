@@ -180,7 +180,7 @@ void AActor::InitializeDefaults()
 
 void FActorTickFunction::ExecuteTick(float DeltaTime, enum ELevelTick TickType, ENamedThreads::Type CurrentThread, const FGraphEventRef& MyCompletionGraphEvent)
 {
-	if (Target && !Target->IsPendingKillOrUnreachable())
+	if (Target && IsValidChecked(Target) && !Target->IsUnreachable())
 	{
 		if (TickType != LEVELTICK_ViewportsOnly || Target->ShouldTickIfViewportsOnly())
 		{

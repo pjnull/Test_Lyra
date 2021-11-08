@@ -273,7 +273,7 @@ void FDisplayClusterClusterManager::UnregisterSyncObject(IDisplayClusterClusterS
 void FDisplayClusterClusterManager::AddClusterEventListener(TScriptInterface<IDisplayClusterClusterEventListener> Listener)
 {
 	FScopeLock Lock(&ClusterEventListenersCritSec);
-	if (Listener.GetObject() && !Listener.GetObject()->IsPendingKillOrUnreachable())
+	if (Listener.GetObject() && IsValidChecked(Listener.GetObject()) && !Listener.GetObject()->IsUnreachable())
 	{
 		ClusterEventListeners.Add(Listener);
 	}
@@ -652,7 +652,7 @@ void FDisplayClusterClusterManager::OnClusterEventJsonHandler(const FDisplayClus
 
 	for (auto Listener : ClusterEventListeners)
 	{
-		if (!Listener.GetObject() || Listener.GetObject()->IsPendingKillOrUnreachable()) // Note: .GetInterface() is always returning null when intefrace is added to class in the Blueprint.
+		if (!Listener.GetObject() || !IsValidChecked(Listener.GetObject()) || Listener.GetObject()->IsUnreachable()) // Note: .GetInterface() is always returning null when intefrace is added to class in the Blueprint.
 		{
 			UE_LOG(LogDisplayClusterCluster, Warning, TEXT("Will remove invalid cluster event listener"));
 			InvalidListeners.Add(Listener);
@@ -675,7 +675,7 @@ void FDisplayClusterClusterManager::OnClusterEventBinaryHandler(const FDisplayCl
 
 	for (auto Listener : ClusterEventListeners)
 	{
-		if (!Listener.GetObject() || Listener.GetObject()->IsPendingKillOrUnreachable()) // Note: .GetInterface() is always returning null when intefrace is added to class in the Blueprint.
+		if (!Listener.GetObject() || !IsValidChecked(Listener.GetObject()) || Listener.GetObject()->IsUnreachable()) // Note: .GetInterface() is always returning null when intefrace is added to class in the Blueprint.
 		{
 			UE_LOG(LogDisplayClusterCluster, Warning, TEXT("Will remove invalid cluster event listener"));
 			InvalidListeners.Add(Listener);

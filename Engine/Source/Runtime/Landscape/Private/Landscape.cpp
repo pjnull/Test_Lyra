@@ -1950,7 +1950,7 @@ void ALandscapeProxy::UnregisterAllComponents(const bool bForReregister)
 {
 	// Game worlds don't have landscape infos
 	// On shutdown the world will be unreachable
-	if (GetWorld() && !GetWorld()->IsPendingKillOrUnreachable() &&
+	if (GetWorld() && IsValidChecked(GetWorld()) && !GetWorld()->IsUnreachable() &&
 		// When redoing the creation of a landscape we may get UnregisterAllComponents called when
 		// we are in a "pre-initialized" state (empty guid, etc)
 		LandscapeGuid.IsValid())

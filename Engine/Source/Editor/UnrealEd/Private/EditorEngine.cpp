@@ -5375,7 +5375,7 @@ void UEditorEngine::ConvertLightActors( UClass* ConvertToClass )
 			LayersSubsystem->DisassociateActorFromLayers(ActorToConvert);
 			World->EditorDestroyActor( ActorToConvert, true );
 
-			if (NewActor->IsPendingKillOrUnreachable())
+			if (!IsValidChecked(NewActor) || NewActor->IsUnreachable())
 			{
 				UE_LOG(LogEditor, Log, TEXT("Newly converted actor ('%s') is pending kill"), *NewActor->GetName());
 			}
