@@ -240,7 +240,7 @@ public:
 		bIsEmpty = true;
 	}
 
-	virtual void RemoveElement(const TPayloadType& Payload) override
+	CHAOS_API virtual void RemoveElement(const TPayloadType& Payload) override
 	{
 		SCOPE_CYCLE_COUNTER(STAT_BoundingVolumeRemoveElement);
 		if (const FPayloadInfo* PayloadInfo = MPayloadInfo.Find(Payload))
@@ -258,7 +258,7 @@ public:
 		}
 	}
 
-	virtual void UpdateElement(const TPayloadType& Payload, const TAABB<T,d>& NewBounds, bool bHasBounds) override
+	CHAOS_API virtual void UpdateElement(const TPayloadType& Payload, const TAABB<T,d>& NewBounds, bool bHasBounds) override
 	{
 		SCOPE_CYCLE_COUNTER(STAT_BoundingVolumeUpdateElement);
 		if (FPayloadInfo* PayloadInfo = MPayloadInfo.Find(Payload))
@@ -425,7 +425,7 @@ private:
 	using FCellElement = TBVCellElement<TPayloadType, T, d>;
 	using FPayloadInfo = TBVPayloadInfo<T, d>;
 
-	void RemoveGlobalElement(const TPayloadType& Payload, const FPayloadInfo& PayloadInfo)
+	CHAOS_API void RemoveGlobalElement(const TPayloadType& Payload, const FPayloadInfo& PayloadInfo)
 	{
 		ensure(PayloadInfo.DirtyPayloadIdx == INDEX_NONE);
 		auto LastGlobalPayload = MGlobalPayloads.Last().Payload;
@@ -1111,7 +1111,7 @@ private:
 		UE_LOG(LogChaos, Verbose, TEXT("Generated Tree with (%d, %d, %d) Nodes and %f Per Cell"), MGrid.Counts()[0], MGrid.Counts()[1], MGrid.Counts()[2], NumObjectsInCells / NumObjectsWithBounds);
 	}
 
-	void RemoveElementFromExistingGrid(const TPayloadType& Payload, const FPayloadInfo& PayloadInfo)
+	CHAOS_API void RemoveElementFromExistingGrid(const TPayloadType& Payload, const FPayloadInfo& PayloadInfo)
 	{
 		ensure(PayloadInfo.GlobalPayloadIdx == INDEX_NONE);
 		if (PayloadInfo.DirtyPayloadIdx == INDEX_NONE)
