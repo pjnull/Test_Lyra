@@ -22,9 +22,10 @@ enum class EHttpFlushReason : uint8
 	/** Shorter time limits depending on platform requirements */
 	Shutdown,
 	/** Infinite wait, should only be used in non-game scenarios where longer waits are acceptable */
-	FullFlush
+	FullFlush,
+	Count
 };
-ENUM_RANGE_BY_COUNT(EHttpFlushReason, EHttpFlushReason::FullFlush)
+ENUM_RANGE_BY_COUNT(EHttpFlushReason, EHttpFlushReason::Count)
 
 /**
  * Manages Http request that are currently being processed
