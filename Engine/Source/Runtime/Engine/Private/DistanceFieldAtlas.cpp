@@ -780,6 +780,8 @@ void FDistanceFieldAsyncQueue::ProcessAsyncTasks(bool bLimitExecutionTime)
 				if (PlatformRenderData->LODResources[0].DistanceFieldData)
 				{
 					*PlatformRenderData->LODResources[0].DistanceFieldData = *Task->GeneratedVolumeData;
+					// The old bulk data assignment operator doesn't copy over flags
+					PlatformRenderData->LODResources[0].DistanceFieldData->StreamableMips.ResetBulkDataFlags(Task->GeneratedVolumeData->StreamableMips.GetBulkDataFlags());
 				}
 				PlatformRenderData = PlatformRenderData->NextCachedRenderData.Get();
 			}
