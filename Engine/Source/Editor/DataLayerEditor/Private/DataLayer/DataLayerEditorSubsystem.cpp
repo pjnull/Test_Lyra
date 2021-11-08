@@ -846,12 +846,16 @@ bool UDataLayerEditorSubsystem::ToggleDataLayersIsLoadedInEditor(const TArray<UD
 	return bRefreshNeeded ? RefreshWorldPartitionEditorCells(bIsFromUserChange) : true;
 }
 
-bool UDataLayerEditorSubsystem::ResetUserSettings(const TArray<UDataLayer*>& DataLayers)
+bool UDataLayerEditorSubsystem::ResetUserSettings()
 {
 	bool bRefreshNeeded = false;
-	for (UDataLayer* DataLayer : DataLayers)
+	if (const AWorldDataLayers* WorldDataLayers = GetWorldDataLayers())
 	{
-		bRefreshNeeded |= SetDataLayerIsLoadedInEditorInternal(DataLayer, DataLayer->IsInitiallyLoadedInEditor(), true);
+		WorldDataLayers->ForEachDataLayer([this, &bRefreshNeeded](UDataLayer* DataLayer)
+		{
+			bRefreshNeeded |= SetDataLayerIsLoadedInEditorInternal(DataLayer, DataLayer->IsInitiallyLoadedInEditor(), true);
+			return true;
+		});
 	}
 	return bRefreshNeeded ? RefreshWorldPartitionEditorCells(true) : true;
 }
