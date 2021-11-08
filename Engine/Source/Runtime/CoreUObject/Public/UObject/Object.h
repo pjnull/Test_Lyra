@@ -1614,7 +1614,7 @@ struct FInternalUObjectBaseUtilityIsValidFlagsChecker
 	FORCEINLINE static bool CheckObjectValidBasedOnItsFlags(const UObject* Test)
 	{
 		// Here we don't really check if the flags match but if the end result is the same
-		checkSlow(GUObjectArray.IndexToObject(Test->InternalIndex)->HasAnyFlags(EInternalObjectFlags::PendingKill | EInternalObjectFlags::Garbage) == HasAnyFlags(RF_PendingKill | RF_Garbage));
+		checkSlow(GUObjectArray.IndexToObject(Test->InternalIndex)->HasAnyFlags(EInternalObjectFlags::PendingKill | EInternalObjectFlags::Garbage) == Test->HasAnyFlags(RF_PendingKill | RF_Garbage));
 		return !Test->HasAnyFlags(RF_InternalPendingKill | RF_InternalGarbage);
 	}
 };
