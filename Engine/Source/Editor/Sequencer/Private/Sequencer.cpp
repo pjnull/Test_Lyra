@@ -7329,7 +7329,7 @@ void FSequencer::GetSelectedObjects(TArray<FGuid>& Objects)
 	Objects = GetSelection().GetBoundObjectsGuids();
 }
 
-void FSequencer::GetSelectedKeyAreas(TArray<const IKeyArea*>& OutSelectedKeyAreas)
+void FSequencer::GetSelectedKeyAreas(TArray<const IKeyArea*>& OutSelectedKeyAreas, bool bIncludeSelectedKeys)
 {
 	TSet<TSharedRef<FSequencerDisplayNode>> NodesToKey = Selection.GetSelectedOutlinerNodes();
 	{
@@ -7358,9 +7358,12 @@ void FSequencer::GetSelectedKeyAreas(TArray<const IKeyArea*>& OutSelectedKeyArea
 		}
 	}
 
-	for (FSequencerSelectedKey Key : Selection.GetSelectedKeys())
+	if (bIncludeSelectedKeys)
 	{
-		KeyAreas.Add(Key.KeyArea); 
+		for (FSequencerSelectedKey Key : Selection.GetSelectedKeys())
+		{
+			KeyAreas.Add(Key.KeyArea);
+		}
 	}
 	for (TSharedPtr<IKeyArea> KeyArea : KeyAreas)
 	{

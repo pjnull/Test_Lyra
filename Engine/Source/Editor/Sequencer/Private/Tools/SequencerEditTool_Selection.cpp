@@ -124,7 +124,9 @@ public:
 			PreviewState = ESelectionPreviewState::Selected;
 
 			// @todo: selection in transactions
-			Sequencer.GetSelection().Empty();
+			//leave selections in the tree view alone so that dragging operations act similarly to click operations which don't change treeview selection state.
+			Sequencer.GetSelection().EmptySelectedKeys();
+			Sequencer.GetSelection().EmptySelectedSections();
 		}
 	}
 
