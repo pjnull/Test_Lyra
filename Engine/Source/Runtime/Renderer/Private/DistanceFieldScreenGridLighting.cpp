@@ -28,13 +28,21 @@
 #include "ClearQuad.h"
 #include "VisualizeTexture.h"
 
-int32 GAOUseJitter = 1;
-FAutoConsoleVariableRef CVarAOUseJitter(
+static int32 GAOUseJitter = 1;
+static FAutoConsoleVariableRef CVarAOUseJitter(
 	TEXT("r.AOUseJitter"),
 	GAOUseJitter,
 	TEXT("Whether to use 4x temporal supersampling with Screen Grid DFAO.  When jitter is disabled, a shorter history can be used but there will be more spatial aliasing."),
 	ECVF_RenderThreadSafe
-	);
+);
+
+static int32 GDistanceFieldAOTraverseMips = 1;
+static FAutoConsoleVariableRef CVarDistanceFieldAOTraverseMips(
+	TEXT("r.DistanceFieldAO.TraverseMips"),
+	GDistanceFieldAOTraverseMips,
+	TEXT("Whether to traverse mips while tracing AO cones against object SDFs."),
+	ECVF_RenderThreadSafe
+);
 
 int32 GConeTraceDownsampleFactor = 4;
 
@@ -80,7 +88,8 @@ public:
 	END_SHADER_PARAMETER_STRUCT()
 
 	class FUseGlobalDistanceField : SHADER_PERMUTATION_BOOL("USE_GLOBAL_DISTANCE_FIELD");
-	using FPermutationDomain = TShaderPermutationDomain<FUseGlobalDistanceField>;
+	class FTraverseMips : SHADER_PERMUTATION_BOOL("SDF_TRACING_TRAVERSE_MIPS");
+	using FPermutationDomain = TShaderPermutationDomain<FUseGlobalDistanceField, FTraverseMips>;
 
 	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
 	{
@@ -486,6 +495,7 @@ void FDeferredShadingSceneRenderer::RenderDistanceFieldAOScreenGrid(
 
 		FConeTraceScreenGridObjectOcclusionCS::FPermutationDomain PermutationVector;
 		PermutationVector.Set<FConeTraceScreenGridObjectOcclusionCS::FUseGlobalDistanceField>(bUseGlobalDistanceField);
+		PermutationVector.Set<FConeTraceScreenGridObjectOcclusionCS::FTraverseMips>(GDistanceFieldAOTraverseMips != 0);
 
 		auto ComputeShader = View.ShaderMap->GetShader<FConeTraceScreenGridObjectOcclusionCS>(PermutationVector);
 
