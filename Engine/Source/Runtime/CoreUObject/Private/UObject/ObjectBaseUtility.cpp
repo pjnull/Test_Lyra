@@ -6,6 +6,8 @@
 #include "UObject/UObjectBaseUtility.h"
 #include "UObject/Package.h"
 #include "UObject/LinkerLoad.h"
+#include "HAL/IConsoleManager.h"
+#include "Misc/ConfigCacheIni.h"
 
 /**
  * Returns the UE version of the linker for this object.
