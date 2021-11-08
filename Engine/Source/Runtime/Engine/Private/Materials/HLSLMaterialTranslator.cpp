@@ -8164,6 +8164,18 @@ static FString MultiplyMatrix(const TCHAR* Vector, const TCHAR* Matrix, int AWCo
 	}
 }
 
+static FString MultiplyTransposeMatrix(const TCHAR* Matrix, const TCHAR* Vector, int AWComponent)
+{
+	if (AWComponent)
+	{
+		return FString::Printf(TEXT("mul(%s, MaterialFloat4(%s, 1.0f)).xyz"), Matrix, Vector);
+	}
+	else
+	{
+		return FString::Printf(TEXT("mul((MaterialFloat3x3)(%s), %s)"), Matrix, Vector);
+	}
+}
+
 static FString LWCMultiplyMatrix(const TCHAR* Vector, const TCHAR* Matrix, int AWComponent)
 {
 	if (AWComponent)
@@ -8275,7 +8287,7 @@ int32 FHLSLMaterialTranslator::TransformBase(EMaterialCommonBasis SourceCoordBas
 		{
 			if (DestCoordBasis == MCB_Tangent)
 			{
-				CodeStr = MultiplyMatrix(TEXT("<A>"), TEXT("Parameters.TangentToWorld"), AWComponent);
+				CodeStr = MultiplyTransposeMatrix(TEXT("Parameters.TangentToWorld"), TEXT("<A>"), AWComponent);
 			}
 			else if (DestCoordBasis == MCB_Local)
 			{
