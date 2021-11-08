@@ -2289,7 +2289,9 @@ void FRecastTileGenerator::GatherNavigationDataGeometry(const TSharedRef<FNaviga
 		}
 	}
 
-	const FCompositeNavModifier ModifierInstance = ElementData->GetModifierForAgent(&OwnerNavDataConfig);
+	// Temporary change to help narrow down a rare crash:
+	// Was: const FCompositeNavModifier ModifierInstance = ElementData->GetModifierForAgent(&OwnerNavDataConfig);
+	const FCompositeNavModifier& ModifierInstance = ElementData->Modifiers.HasMetaAreas() ? ElementData->Modifiers.GetInstantiatedMetaModifier(&OwnerNavDataConfig, ElementData->SourceObject) : ElementData->Modifiers;
 
 	const bool bExportGeometry = bGeometryChanged && ElementData->HasGeometry();
 	if (bExportGeometry)
