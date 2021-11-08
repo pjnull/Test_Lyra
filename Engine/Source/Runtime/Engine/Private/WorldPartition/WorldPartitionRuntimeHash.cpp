@@ -37,6 +37,10 @@ void UWorldPartitionRuntimeHash::OnEndPlay()
 	// Release references (will unload actors that were not already loaded in the Editor)
 	AlwaysLoadedActorsForPIE.Empty();
 
+	for (FActorDescList::TIterator<> ActorDescIterator(&ModifiedActorDescListForPIE); ActorDescIterator; ++ActorDescIterator)
+	{
+		ActorDescIterator->OnUnregister();
+	}
 	ModifiedActorDescListForPIE.Empty();
 }
 
@@ -80,6 +84,7 @@ void UWorldPartitionRuntimeHash::CreateActorDescViewMap(const UActorDescContaine
 				if (Actor->GetPackage()->IsDirty())
 				{
 					FWorldPartitionActorDesc* ActorDesc = ModifiedActorDescListForPIE.AddActor(Actor);
+					ActorDesc->OnRegister(Actor->GetWorld());
 					OutActorDescViewMap.Emplace(ActorDesc->GetGuid(), ActorDesc);
 					continue;
 				}
@@ -104,6 +109,7 @@ void UWorldPartitionRuntimeHash::CreateActorDescViewMap(const UActorDescContaine
 					Actor->IsMainPackageActor())
 				{
 					FWorldPartitionActorDesc* ActorDesc = ModifiedActorDescListForPIE.AddActor(Actor);
+					ActorDesc->OnRegister(Actor->GetWorld());
 					OutActorDescViewMap.Emplace(ActorDesc->GetGuid(), ActorDesc);
 				}
 			}

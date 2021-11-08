@@ -43,6 +43,7 @@ class ENGINE_API FWorldPartitionActorDesc
 	friend class AActor;
 	friend class UWorldPartition;
 	friend class UActorDescContainer;
+	friend class UWorldPartitionRuntimeHash;
 	friend struct FWorldPartitionHandleImpl;
 	friend struct FWorldPartitionReferenceImpl;
 	friend struct FWorldPartitionHandleUtils;

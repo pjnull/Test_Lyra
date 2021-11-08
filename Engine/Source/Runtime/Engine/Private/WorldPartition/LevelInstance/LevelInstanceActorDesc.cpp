@@ -12,12 +12,27 @@
 #include "UObject/UE5ReleaseStreamObjectVersion.h"
 #include "UObject/UE5MainStreamObjectVersion.h"
 
-TMap<FName, TWeakObjectPtr<UActorDescContainer>> FLevelInstanceActorDesc::ActorDescContainers;
+struct FActorDescContainerInstance
+{
+	FActorDescContainerInstance()
+	: RefCount(0)
+	{}
+
+	UActorDescContainer* Container;
+	uint32 RefCount;
+};
+
+static TMap<FName, FActorDescContainerInstance> ActorDescContainers;
 
 FLevelInstanceActorDesc::FLevelInstanceActorDesc()
 	: DesiredRuntimeBehavior(ELevelInstanceRuntimeBehavior::Partitioned)
 	, LevelInstanceContainer(nullptr)
 {}
+
+FLevelInstanceActorDesc::~FLevelInstanceActorDesc()
+{
+	check(!LevelInstanceContainer);
+}
 
 void FLevelInstanceActorDesc::Init(const AActor* InActor)
 {
@@ -118,34 +133,26 @@ void FLevelInstanceActorDesc::AddReferencedObjects(FReferenceCollector& Collecto
 
 UActorDescContainer* FLevelInstanceActorDesc::RegisterActorDescContainer(FName PackageName, UWorld* InWorld)
 {
-	TWeakObjectPtr<UActorDescContainer>* ExistingContainerPtr = ActorDescContainers.Find(PackageName);
-	if (ExistingContainerPtr)
+	FActorDescContainerInstance& ExistingContainerInstance = ActorDescContainers.FindOrAdd(PackageName);
+	
+	if (ExistingContainerInstance.RefCount++ == 0)
 	{
-		if (UActorDescContainer* LevelContainer = ExistingContainerPtr->Get())
-		{
-			return LevelContainer;
-		}
+		ExistingContainerInstance.Container = NewObject<UActorDescContainer>(GetTransientPackage());
+		ExistingContainerInstance.Container->Initialize(InWorld, PackageName);
 	}
-		
-	UActorDescContainer* NewContainer = NewObject<UActorDescContainer>(GetTransientPackage());
-	NewContainer->Initialize(InWorld, PackageName);
-	ActorDescContainers.Add(PackageName, TWeakObjectPtr<UActorDescContainer>(NewContainer));
 
-	return NewContainer;
+	return ExistingContainerInstance.Container;
 }
 
-bool FLevelInstanceActorDesc::UnregisterActorDescContainer(UActorDescContainer* Container)
+void FLevelInstanceActorDesc::UnregisterActorDescContainer(UActorDescContainer* Container)
 {
-	TWeakObjectPtr<UActorDescContainer> ExistingContainerPtr;
-	if (ActorDescContainers.RemoveAndCopyValue(Container->GetContainerPackage(), ExistingContainerPtr))
-	{
-		if (UActorDescContainer* LevelContainer = ExistingContainerPtr.Get())
-		{
-			LevelContainer->Uninitialize();
-			return true;
-		}
-	}
+	FName PackageName = Container->GetContainerPackage();
+	FActorDescContainerInstance& ExistingContainerInstance = ActorDescContainers.FindChecked(PackageName);
 
-	return false;
+	if (ExistingContainerInstance.RefCount-- == 1)
+	{
+		ExistingContainerInstance.Container->Uninitialize();
+		ActorDescContainers.FindAndRemoveChecked(PackageName);
+	}
 }
 #endif
