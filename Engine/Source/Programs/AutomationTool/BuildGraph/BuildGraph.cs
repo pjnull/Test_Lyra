@@ -10,6 +10,7 @@ using System.Reflection;
 using System.Text;
 using System.Xml;
 using EpicGames.Core;
+using EpicGames.MCP.Automation;
 using OpenTracing;
 using OpenTracing.Util;
 using UnrealBuildBase;
@@ -231,12 +232,19 @@ namespace AutomationTool
 			ScriptSchema Schema;
 			if (ImportSchemaFileName != null)
 			{
-				Schema = ScriptSchema.Import(FileReference.FromString(ImportSchemaFileName), NameToTask);
+				Schema = ScriptSchema.Import(FileReference.FromString(ImportSchemaFileName));
 			}
 			else
 			{
+				// Add any primitive types
+				List<(Type, ScriptSchemaStandardType)> PrimitiveTypes = new List<(Type, ScriptSchemaStandardType)>();
+				PrimitiveTypes.Add((typeof(FileReference), ScriptSchemaStandardType.BalancedString));
+				PrimitiveTypes.Add((typeof(DirectoryReference), ScriptSchemaStandardType.BalancedString));
+				PrimitiveTypes.Add((typeof(UnrealTargetPlatform), ScriptSchemaStandardType.BalancedString));
+				PrimitiveTypes.Add((typeof(MCPPlatform), ScriptSchemaStandardType.BalancedString));
+
 				// Create a schema for the given tasks
-				Schema = new ScriptSchema(NameToTask);
+				Schema = new ScriptSchema(NameToTask, PrimitiveTypes);
 				if (SchemaFileName != null)
 				{
 					FileReference FullSchemaFileName = new FileReference(SchemaFileName);
@@ -326,7 +334,7 @@ namespace AutomationTool
 				HashSet<FileReference> RequiredTokens = new HashSet<FileReference>(TargetNodes.SelectMany(x => x.RequiredTokens));
 
 				// List out all the required tokens
-				if(SingleNodeName == null)
+				if (SingleNodeName == null)
 				{
 					CommandUtils.LogInformation("Required tokens:");
 					foreach(Node Node in TargetNodes)
@@ -438,7 +446,7 @@ namespace AutomationTool
 			if(bListOnly)
 			{ 
 				HashSet<Node> CompletedNodes = FindCompletedNodes(Graph, Storage);
-				Graph.Print(CompletedNodes, PrintOptions);
+				Graph.Print(CompletedNodes, PrintOptions, Log.Logger);
 			}
 
 			// Print out all the diagnostic messages which still apply, unless we're running a step as part of a build system or just listing the contents of the file. 
@@ -469,7 +477,7 @@ namespace AutomationTool
 			if(ExportFileName != null)
 			{
 				HashSet<Node> CompletedNodes = FindCompletedNodes(Graph, Storage);
-				Graph.Print(CompletedNodes, PrintOptions);
+				Graph.Print(CompletedNodes, PrintOptions, Log.Logger);
 				Graph.Export(new FileReference(ExportFileName), CompletedNodes);
 				return ExitCode.Success;
 			}

@@ -5,12 +5,12 @@ using System.Collections.Generic;
 using System.Text;
 using System.IO;
 using AutomationTool;
-using UnrealBuildTool;
 using System.Reflection;
 using System.Xml;
 using System.Linq;
 using System.Diagnostics;
 using EpicGames.Core;
+using Microsoft.Extensions.Logging;
 
 namespace AutomationTool
 {
@@ -690,7 +690,8 @@ namespace AutomationTool
 		/// </summary>
 		/// <param name="CompletedNodes">Set of nodes which are already complete</param>
 		/// <param name="PrintOptions">Options for how to print the graph</param>
-		public void Print(HashSet<Node> CompletedNodes, GraphPrintOptions PrintOptions)
+		/// <param name="Logger"></param>
+		public void Print(HashSet<Node> CompletedNodes, GraphPrintOptions PrintOptions, ILogger Logger)
 		{
 			// Print the options
 			if((PrintOptions & GraphPrintOptions.ShowCommandLineOptions) != 0)
@@ -713,33 +714,33 @@ namespace AutomationTool
 				// Format them to the log
 				if(Parameters.Count > 0)
 				{
-					CommandUtils.LogInformation("");
-					CommandUtils.LogInformation("Options:");
-					CommandUtils.LogInformation("");
-					HelpUtils.PrintTable(Parameters, 4, 24, Log.Logger);
+					Logger.LogInformation("");
+					Logger.LogInformation("Options:");
+					Logger.LogInformation("");
+					HelpUtils.PrintTable(Parameters, 4, 24, Logger);
 				}
 			}
 
 			// Output all the triggers in order
-			CommandUtils.LogInformation("");
-			CommandUtils.LogInformation("Graph:");
+			Logger.LogInformation("");
+			Logger.LogInformation("Graph:");
 			foreach(Agent Agent in Agents)
 			{
-				CommandUtils.LogInformation("        Agent: {0} ({1})", Agent.Name, String.Join(";", Agent.PossibleTypes));
+				Logger.LogInformation("        Agent: {0} ({1})", Agent.Name, String.Join(";", Agent.PossibleTypes));
 				foreach(Node Node in Agent.Nodes)
 				{
-					CommandUtils.LogInformation("            Node: {0}{1}", Node.Name, CompletedNodes.Contains(Node)? " (completed)" : Node.bRunEarly? " (early)" : "");
+					Logger.LogInformation("            Node: {0}{1}", Node.Name, CompletedNodes.Contains(Node)? " (completed)" : Node.bRunEarly? " (early)" : "");
 					if(PrintOptions.HasFlag(GraphPrintOptions.ShowDependencies))
 					{
 						HashSet<Node> InputDependencies = new HashSet<Node>(Node.GetDirectInputDependencies());
 						foreach(Node InputDependency in InputDependencies)
 						{
-							CommandUtils.LogInformation("                input> {0}", InputDependency.Name);
+							Logger.LogInformation("                input> {0}", InputDependency.Name);
 						}
 						HashSet<Node> OrderDependencies = new HashSet<Node>(Node.GetDirectOrderDependencies());
 						foreach(Node OrderDependency in OrderDependencies.Except(InputDependencies))
 						{
-							CommandUtils.LogInformation("                after> {0}", OrderDependency.Name);
+							Logger.LogInformation("                after> {0}", OrderDependency.Name);
 						}
 					}
 					if(PrintOptions.HasFlag(GraphPrintOptions.ShowNotifications))
@@ -747,27 +748,27 @@ namespace AutomationTool
 						string Label = Node.bNotifyOnWarnings? "warnings" : "errors";
 						foreach(string User in Node.NotifyUsers)
 						{
-							CommandUtils.LogInformation("                {0}> {1}", Label, User);
+							Logger.LogInformation("                {0}> {1}", Label, User);
 						}
 						foreach(string Submitter in Node.NotifySubmitters)
 						{
-							CommandUtils.LogInformation("                {0}> submitters to {1}", Label, Submitter);
+							Logger.LogInformation("                {0}> submitters to {1}", Label, Submitter);
 						}
 					}
 				}
 			}
-			CommandUtils.LogInformation("");
+			Logger.LogInformation("");
 
 			// Print out all the non-empty aggregates
 			Aggregate[] Aggregates = NameToAggregate.Values.OrderBy(x => x.Name).ToArray();
 			if(Aggregates.Length > 0)
 			{
-				CommandUtils.LogInformation("Aggregates:");
+				Logger.LogInformation("Aggregates:");
 				foreach(string AggregateName in Aggregates.Select(x => x.Name))
 				{
-					CommandUtils.LogInformation("    {0}", AggregateName);
+					Logger.LogInformation("    {0}", AggregateName);
 				}
-				CommandUtils.LogInformation("");
+				Logger.LogInformation("");
 			}
 		}
 	}
