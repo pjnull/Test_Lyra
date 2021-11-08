@@ -9,22 +9,22 @@
 struct FSortByDistance
 {
 	int32 Index;
-	float Distance;
-	FSortByDistance(int32 InIndex, float InDistance) 
+	double Distance;
+	FSortByDistance(int32 InIndex, double InDistance) 
 		: Index(InIndex), Distance(InDistance) {}
 };
 
 void FDelaunayTriangleGenerator::SetGridBox(const FBlendParameter& BlendParamX, const FBlendParameter& BlendParamY)
 {
-	FVector2D Min(BlendParamX.Min, BlendParamY.Min);
-	FVector2D Max(BlendParamX.Max, BlendParamY.Max);
-	FVector2D Mid = (Min + Max) * 0.5f;
-	FVector2D Range = Max - Min;
+	FVector2DDouble Min(BlendParamX.Min, BlendParamY.Min);
+	FVector2DDouble Max(BlendParamX.Max, BlendParamY.Max);
+	FVector2DDouble Mid = (Min + Max) * 0.5f;
+	FVector2DDouble Range = Max - Min;
 	Range.X = FMath::Max(Range.X, DELTA);
 	Range.Y = FMath::Max(Range.Y, DELTA);
 
 	GridMin = Mid - Range * 0.5f;
-	RecipGridSize = FVector2D(1.0f, 1.0f) / Range;
+	RecipGridSize = FVector2DDouble(1.0f, 1.0f) / Range;
 }
 
 void FDelaunayTriangleGenerator::EmptyTriangles()
@@ -47,7 +47,7 @@ void FDelaunayTriangleGenerator::Reset()
 	EmptySamplePoints();
 }
 
-void FDelaunayTriangleGenerator::AddSamplePoint(const FVector2D& NewPoint, const int32 SampleIndex)
+void FDelaunayTriangleGenerator::AddSamplePoint(const FVector2DDouble& NewPoint, const int32 SampleIndex)
 {
 	checkf(!SamplePointList.Contains(NewPoint), TEXT("Found duplicate points in blendspace"));
 	SamplePointList.Add(FVertex(NewPoint, SampleIndex));
@@ -154,8 +154,8 @@ void FDelaunayTriangleGenerator::AdjustEdgeDirections(EPreferredTriangulationDir
 		{
 			int32 EdgeIndexNext0 = (EdgeIndex0 + 1) % 3;
 			// Only continue if we would want to flip this edge
-			FVector2D EdgeDir = Triangle0->Vertices[EdgeIndexNext0]->Position - Triangle0->Vertices[EdgeIndex0]->Position;
-			FVector2D EdgePos = (Triangle0->Vertices[EdgeIndexNext0]->Position + Triangle0->Vertices[EdgeIndex0]->Position) * 0.5f;
+			FVector2DDouble EdgeDir = Triangle0->Vertices[EdgeIndexNext0]->Position - Triangle0->Vertices[EdgeIndex0]->Position;
+			FVector2DDouble EdgePos = (Triangle0->Vertices[EdgeIndexNext0]->Position + Triangle0->Vertices[EdgeIndex0]->Position) * 0.5f;
 
 			// Slope is true if we go up from left to right
 			bool bUpSlope = EdgeDir.X * EdgeDir.Y > 0.0f;
@@ -225,43 +225,43 @@ FDelaunayTriangleGenerator::ECircumCircleState FDelaunayTriangleGenerator::GetCi
 	const int32 NumPointsPerTriangle = 3;
 
 	// First off, normalize all the points
-	FVector2D NormalizedPositions[NumPointsPerTriangle];
+	FVector2DDouble NormalizedPositions[NumPointsPerTriangle];
 	
 	// Unrolled loop
 	NormalizedPositions[0] = (T->Vertices[0]->Position - GridMin) * RecipGridSize;
 	NormalizedPositions[1] = (T->Vertices[1]->Position - GridMin) * RecipGridSize;
 	NormalizedPositions[2] = (T->Vertices[2]->Position - GridMin) * RecipGridSize;
 
-	const FVector2D NormalizedTestPoint = ( TestPoint.Position - GridMin ) * RecipGridSize;
+	const FVector2DDouble NormalizedTestPoint = ( TestPoint.Position - GridMin ) * RecipGridSize;
 
 	// ignore Z, eventually this has to be on plane
 	// http://en.wikipedia.org/wiki/Delaunay_triangulation - determinant
-	const float M00 = NormalizedPositions[0].X - NormalizedTestPoint.X;
-	const float M01 = NormalizedPositions[0].Y - NormalizedTestPoint.Y;
-	const float M02 = NormalizedPositions[0].X * NormalizedPositions[0].X - NormalizedTestPoint.X * NormalizedTestPoint.X
+	const double M00 = NormalizedPositions[0].X - NormalizedTestPoint.X;
+	const double M01 = NormalizedPositions[0].Y - NormalizedTestPoint.Y;
+	const double M02 = NormalizedPositions[0].X * NormalizedPositions[0].X - NormalizedTestPoint.X * NormalizedTestPoint.X
 		+ NormalizedPositions[0].Y*NormalizedPositions[0].Y - NormalizedTestPoint.Y * NormalizedTestPoint.Y;
 
-	const float M10 = NormalizedPositions[1].X - NormalizedTestPoint.X;
-	const float M11 = NormalizedPositions[1].Y - NormalizedTestPoint.Y;
-	const float M12 = NormalizedPositions[1].X * NormalizedPositions[1].X - NormalizedTestPoint.X * NormalizedTestPoint.X
+	const double M10 = NormalizedPositions[1].X - NormalizedTestPoint.X;
+	const double M11 = NormalizedPositions[1].Y - NormalizedTestPoint.Y;
+	const double M12 = NormalizedPositions[1].X * NormalizedPositions[1].X - NormalizedTestPoint.X * NormalizedTestPoint.X
 		+ NormalizedPositions[1].Y * NormalizedPositions[1].Y - NormalizedTestPoint.Y * NormalizedTestPoint.Y;
 
-	const float M20 = NormalizedPositions[2].X - NormalizedTestPoint.X;
-	const float M21 = NormalizedPositions[2].Y - NormalizedTestPoint.Y;
-	const float M22 = NormalizedPositions[2].X * NormalizedPositions[2].X - NormalizedTestPoint.X * NormalizedTestPoint.X
+	const double M20 = NormalizedPositions[2].X - NormalizedTestPoint.X;
+	const double M21 = NormalizedPositions[2].Y - NormalizedTestPoint.Y;
+	const double M22 = NormalizedPositions[2].X * NormalizedPositions[2].X - NormalizedTestPoint.X * NormalizedTestPoint.X
 		+ NormalizedPositions[2].Y * NormalizedPositions[2].Y - NormalizedTestPoint.Y * NormalizedTestPoint.Y;
 
-	const float Det = M00*M11*M22+M01*M12*M20+M02*M10*M21 - (M02*M11*M20+M01*M10*M22+M00*M12*M21);
+	const double Det = M00*M11*M22+M01*M12*M20+M02*M10*M21 - (M02*M11*M20+M01*M10*M22+M00*M12*M21);
 	
 	// When the vertices are sorted in a counterclockwise order, the determinant is positive if and only if Testpoint lies inside the circumcircle of T.
-	if (FMath::IsNegativeFloat(Det))
+	if (FMath::IsNegative(Det))
 	{
 		return ECCS_Outside;
 	}
 	else
 	{
 		// On top of the triangle edge
-		if (FMath::IsNearlyZero(Det, SMALL_NUMBER))
+		if (FMath::IsNearlyZero(Det, DOUBLE_SMALL_NUMBER))
 		{
 			return ECCS_On;
 		}
@@ -317,9 +317,14 @@ TArray<struct FBlendSpaceTriangle> FDelaunayTriangleGenerator::CalculateTriangle
 
 		FBlendSpaceTriangle NewTriangle;
 		
-		NewTriangle.Vertices[0] = (Triangle->Vertices[0]->Position - GridMin) * RecipGridSize;
-		NewTriangle.Vertices[1] = (Triangle->Vertices[1]->Position - GridMin) * RecipGridSize;
-		NewTriangle.Vertices[2] = (Triangle->Vertices[2]->Position - GridMin) * RecipGridSize;
+		FVector2DDouble Vertices[3];
+		Vertices[0] = (Triangle->Vertices[0]->Position - GridMin) * RecipGridSize;
+		Vertices[1] = (Triangle->Vertices[1]->Position - GridMin) * RecipGridSize;
+		Vertices[2] = (Triangle->Vertices[2]->Position - GridMin) * RecipGridSize;
+
+		NewTriangle.Vertices[0] = Vertices[0].ToVector2D();
+		NewTriangle.Vertices[1] = Vertices[1].ToVector2D();
+		NewTriangle.Vertices[2] = Vertices[2].ToVector2D();
 		NewTriangle.SampleIndices[0] = Triangle->Vertices[0]->SampleIndex;
 		NewTriangle.SampleIndices[1] = Triangle->Vertices[1]->SampleIndex;
 		NewTriangle.SampleIndices[2] = Triangle->Vertices[2]->SampleIndex;
@@ -331,11 +336,11 @@ TArray<struct FBlendSpaceTriangle> FDelaunayTriangleGenerator::CalculateTriangle
 
 			EdgeInfo.NeighbourTriangleIndex = FindTriangleIndexWithEdge(
 				Triangle->Vertices[IndexNext]->SampleIndex, Triangle->Vertices[Index]->SampleIndex);
-			FVector2D EdgeDir = NewTriangle.Vertices[IndexNext] - NewTriangle.Vertices[Index];
+			FVector2DDouble EdgeDir = Vertices[IndexNext] - Vertices[Index];
 
 			// Triangles are wound anticlockwise as viewed from above - rotate the edge 90 deg clockwise
 			// to make it be the outwards pointing normal.
-			EdgeInfo.Normal = FVector2D(EdgeDir.Y, -EdgeDir.X).GetSafeNormal();
+			EdgeInfo.Normal = FVector2DDouble(EdgeDir.Y, -EdgeDir.X).GetSafeNormal().ToVector2D();
 
 			// Update these if necessary when all triangles have been processed
 			EdgeInfo.AdjacentPerimeterTriangleIndices[0] = INDEX_NONE;
@@ -395,9 +400,9 @@ TArray<struct FBlendSpaceTriangle> FDelaunayTriangleGenerator::CalculateTriangle
 
 bool FDelaunayTriangleGenerator::IsCollinear(const FVertex* A, const FVertex* B, const FVertex* C)
 {
-	const FVector2D Diff1 = B->Position - A->Position;
-	const FVector2D Diff2 = C->Position - A->Position;
-	float Cross = Diff1 ^ Diff2;
+	const FVector2DDouble Diff1 = B->Position - A->Position;
+	const FVector2DDouble Diff2 = C->Position - A->Position;
+	double Cross = Diff1 ^ Diff2;
 	return (Cross == 0.f);
 }
 
@@ -575,7 +580,16 @@ int32 FDelaunayTriangleGenerator::GenerateTriangles(TArray<FVertex>& PointList, 
 	return TriangleList.Num();
 }
 
-bool FBlendSpaceGrid::FindTriangleThisPointBelongsTo(const FVector2D& TestPoint, FVector& OutBarycentricCoords, FTriangle*& OutTriangle, const TArray<FTriangle*>& TriangleList) const
+static FVector GetBaryCentric2D(const FVector2DDouble& Point, const FVector2DDouble& A, const FVector2DDouble& B, const FVector2DDouble& C)
+{
+	double a = ((B.Y - C.Y) * (Point.X - C.X) + (C.X - B.X) * (Point.Y - C.Y)) / ((B.Y - C.Y) * (A.X - C.X) + (C.X - B.X) * (A.Y - C.Y));
+	double b = ((C.Y - A.Y) * (Point.X - C.X) + (A.X - C.X) * (Point.Y - C.Y)) / ((B.Y - C.Y) * (A.X - C.X) + (C.X - B.X) * (A.Y - C.Y));
+
+	return FVector(a, b, 1.0 - a - b);
+}
+
+
+bool FBlendSpaceGrid::FindTriangleThisPointBelongsTo(const FVector2DDouble& TestPoint, FVector& OutBarycentricCoords, FTriangle*& OutTriangle, const TArray<FTriangle*>& TriangleList) const
 {
 	// Calculate distance from point to triangle and sort the triangle list accordingly
 	TArray<FSortByDistance> SortedTriangles;
@@ -592,7 +606,7 @@ bool FBlendSpaceGrid::FindTriangleThisPointBelongsTo(const FVector2D& TestPoint,
 	{
 		FTriangle* Triangle = TriangleList[SortedTriangle.Index];
 
-		FVector Coords = FMath::GetBaryCentric2D(TestPoint, Triangle->Vertices[0]->Position, Triangle->Vertices[1]->Position, Triangle->Vertices[2]->Position);
+		FVector Coords = GetBaryCentric2D(TestPoint, Triangle->Vertices[0]->Position, Triangle->Vertices[1]->Position, Triangle->Vertices[2]->Position);
 
 		// Z coords often has precision error because it's derived from 1-A-B, so do more precise check
 		if (FMath::Abs(Coords.Z) < KINDA_SMALL_NUMBER)
@@ -612,6 +626,30 @@ bool FBlendSpaceGrid::FindTriangleThisPointBelongsTo(const FVector2D& TestPoint,
 	return false;
 }
 
+static FVector2DDouble ClosestPointOnSegment2D(const FVector2DDouble& Point, const FVector2DDouble& StartPoint, const FVector2DDouble& EndPoint)
+{
+	const FVector2DDouble Segment = EndPoint - StartPoint;
+	const FVector2DDouble VectToPoint = Point - StartPoint;
+
+	// See if closest point is before StartPoint
+	const double Dot1 = VectToPoint | Segment;
+	if (Dot1 <= 0)
+	{
+		return StartPoint;
+	}
+
+	// See if closest point is beyond EndPoint
+	const double Dot2 = Segment | Segment;
+	if (Dot2 <= Dot1)
+	{
+		return EndPoint;
+	}
+
+	// Closest Point is within segment
+	return StartPoint + Segment * (Dot1 / Dot2);
+}
+
+
 void FBlendSpaceGrid::GenerateGridElements(const TArray<FVertex>& SamplePoints, const TArray<FTriangle*>& TriangleList)
 {
 	check (NumGridDivisions.X > 0 && NumGridDivisions.Y > 0 );
@@ -628,7 +666,7 @@ void FBlendSpaceGrid::GenerateGridElements(const TArray<FVertex>& SamplePoints, 
 
 	GridPoints.AddDefaulted(TotalNumGridPoints);
 
-	FVector2D GridPointPosition;		
+	FVector2DDouble GridPointPosition;		
 	for (int32 GridPositionX = 0; GridPositionX < NumGridPointsForAxis.X; ++GridPositionX)
 	{
 		for (int32 GridPositionY = 0; GridPositionY < NumGridPointsForAxis.Y; ++GridPositionY)
@@ -659,9 +697,9 @@ void FBlendSpaceGrid::GenerateGridElements(const TArray<FVertex>& SamplePoints, 
 				{
 					// Check if points are collinear
 					const FTriangle* Triangle = TriangleList[TriangleIndex];
-					const FVector2D EdgeA = Triangle->Vertices[1]->Position - Triangle->Vertices[0]->Position;
-					const FVector2D EdgeB = Triangle->Vertices[2]->Position - Triangle->Vertices[0]->Position;
-					const float Result = EdgeA.X * EdgeB.Y - EdgeA.Y * EdgeB.X;
+					const FVector2DDouble EdgeA = Triangle->Vertices[1]->Position - Triangle->Vertices[0]->Position;
+					const FVector2DDouble EdgeB = Triangle->Vertices[2]->Position - Triangle->Vertices[0]->Position;
+					const double Result = EdgeA.X * EdgeB.Y - EdgeA.Y * EdgeB.X;
 					// Only add valid triangles
 					if (Result > 0.0f)
 					{ 
@@ -676,10 +714,10 @@ void FBlendSpaceGrid::GenerateGridElements(const TArray<FVertex>& SamplePoints, 
 
 					// For the closest triangle, determine which of its edges is closest to the grid point
 					TArray<FSortByDistance> Edges;
-					TArray<FVector2D> PointsOnEdges;
+					TArray<FVector2DDouble> PointsOnEdges;
 					for (int32 EdgeIndex = 0; EdgeIndex < 3; ++EdgeIndex)
 					{
-						const FVector2D ClosestPoint = FMath::ClosestPointOnSegment2D(
+						const FVector2DDouble ClosestPoint = ClosestPointOnSegment2D(
 							GridPointPosition,
 							ClosestTriangle->Edges[EdgeIndex].Vertices[0]->Position,
 							ClosestTriangle->Edges[EdgeIndex].Vertices[1]->Position);
@@ -689,7 +727,7 @@ void FBlendSpaceGrid::GenerateGridElements(const TArray<FVertex>& SamplePoints, 
 					Edges.Sort([](const FSortByDistance &A, const FSortByDistance &B) { return A.Distance < B.Distance; });
 					
 					// Calculate weighting using the closest edge points and the clamped grid position on the line
-					const FVector GridWeights = FMath::GetBaryCentric2D(PointsOnEdges[Edges[0].Index], ClosestTriangle->Vertices[0]->Position, ClosestTriangle->Vertices[1]->Position, ClosestTriangle->Vertices[2]->Position);
+					const FVector GridWeights = GetBaryCentric2D(PointsOnEdges[Edges[0].Index], ClosestTriangle->Vertices[0]->Position, ClosestTriangle->Vertices[1]->Position, ClosestTriangle->Vertices[2]->Position);
 					
 					for (int32 Index = 0; Index < 3; ++Index)
 					{
@@ -712,15 +750,15 @@ void FBlendSpaceGrid::GenerateGridElements(const TArray<FVertex>& SamplePoints, 
 						TArray<FSortByDistance> SampleDistances;
 						for (int32 PointIndex = 0; PointIndex < SamplePoints.Num(); ++PointIndex)
 						{
-							const float DistanceFromSampleToPoint= (SamplePoints[PointIndex].Position - GridPointPosition).SizeSquared();
+							const double DistanceFromSampleToPoint= (SamplePoints[PointIndex].Position - GridPointPosition).SizeSquared();
 							SampleDistances.Add(FSortByDistance(PointIndex, DistanceFromSampleToPoint));
 						}
 						SampleDistances.Sort([](const FSortByDistance &A, const FSortByDistance &B) { return A.Distance < B.Distance; });
 
 						// Find closest point on line between the two samples (clamping the grid position to the line, just like clamping to the triangle edges)
 						const FVertex Samples[2] = { SamplePoints[SampleDistances[0].Index], SamplePoints[SampleDistances[1].Index] };
-						const FVector2D ClosestPoint = FMath::ClosestPointOnSegment2D(GridPointPosition, Samples[0].Position, Samples[1].Position);
-						const float LineLength = (Samples[0].Position - Samples[1].Position).SizeSquared();
+						const FVector2DDouble ClosestPoint = ClosestPointOnSegment2D(GridPointPosition, Samples[0].Position, Samples[1].Position);
+						const double LineLength = (Samples[0].Position - Samples[1].Position).SizeSquared();
 
 						// Weight the samples according to the distance from the grid point on the line to the samples
 						for (int32 Index = 0; Index < 2; ++Index)
@@ -738,18 +776,18 @@ void FBlendSpaceGrid::GenerateGridElements(const TArray<FVertex>& SamplePoints, 
 /** 
 * Convert grid index (GridX, GridY) to triangle coords and returns FVector2D
 */
-const FVector2D FBlendSpaceGrid::GetPosFromIndex(const int32 GridX, const int32 GridY) const
+const FVector2DDouble FBlendSpaceGrid::GetPosFromIndex(const int32 GridX, const int32 GridY) const
 {
 	// grid X starts from 0 -> N when N == GridSizeX
 	// grid Y starts from 0 -> N when N == GridSizeY
 	// LeftBottom will map to Grid 0, 0
 	// RightTop will map to Grid N, N
 
-	FVector2D CoordDim = GridMax - GridMin;
-	FVector2D EachGridSize = CoordDim / NumGridDivisions;
+	FVector2DDouble CoordDim = GridMax - GridMin;
+	FVector2DDouble EachGridSize = CoordDim / NumGridDivisions;
 
 	// for now only 2D
-	return FVector2D(GridX*EachGridSize.X+GridMin.X, GridY*EachGridSize.Y+GridMin.Y);
+	return FVector2DDouble(GridX*EachGridSize.X+GridMin.X, GridY*EachGridSize.Y+GridMin.Y);
 }
 
 const FEditorElement& FBlendSpaceGrid::GetElement(const int32 GridX, const int32 GridY) const

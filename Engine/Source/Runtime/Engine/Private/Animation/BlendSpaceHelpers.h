@@ -12,6 +12,53 @@ struct FTriangle;
 
 struct FTriangle;
 
+// Double-precision version of FVector2D, used for accurate Delaunay triangulation. Can/will be replaced by FVector2D when that has the required precision.
+struct FVector2DDouble
+{
+	/** Vector's X component. */
+	double X;
+
+	/** Vector's Y component. */
+	double Y;
+
+public:
+	FVector2DDouble() {}
+	FVector2DDouble(double InX, double InY) : X(InX), Y(InY) {}
+	FVector2DDouble(double InF) : X(InF), Y(InF) { }
+	FVector2DDouble(const FVector2DDouble& Other) { X = Other.X; Y = Other.Y; }
+	FVector2DDouble(const FVector2D& Other) { X = Other.X; Y = Other.Y; }
+	FVector2DDouble(FIntPoint InPos) { X = (double)InPos.X; Y = (double)InPos.Y; }
+
+	FVector2D ToVector2D() const { return FVector2D(X, Y); }
+
+	FVector2DDouble operator+(const FVector2DDouble& V) const { return FVector2DDouble(X + V.X, Y + V.Y); }
+	FVector2DDouble operator-(const FVector2DDouble& V) const { return FVector2DDouble(X - V.X, Y - V.Y); }
+	FVector2DDouble operator*(double Scale) const { return FVector2DDouble(X * Scale, Y * Scale); }
+	FVector2DDouble operator/(double Scale) const { const double RScale = 1.0 / Scale; return FVector2DDouble(X * RScale, Y * RScale); }
+	FVector2DDouble operator/(const FVector2DDouble& V) const { return FVector2DDouble(X / V.X, Y / V.Y); }
+	FVector2DDouble operator*(const FVector2DDouble& V) const { return FVector2DDouble(X * V.X, Y * V.Y); }
+	double operator^(const FVector2DDouble& V) const { return X * V.Y - Y * V.X; }
+	double operator|(const FVector2DDouble& V) const { return X * V.X + Y * V.Y; }
+	bool operator==(const FVector2DDouble& V) const { return X == V.X && Y == V.Y; }
+	bool operator!=(const FVector2DDouble& V) const { return X != V.X || Y != V.Y; }
+	bool operator<(const FVector2DDouble& Other) const { return X < Other.X && Y < Other.Y; }
+	bool operator>(const FVector2DDouble& Other) const { return X > Other.X && Y > Other.Y; }
+	double Size() const { return FMath::Sqrt(X * X + Y * Y); }
+	double SizeSquared() const { return X * X + Y * Y; }
+
+	FVector2DDouble GetSafeNormal(double Tolerance = DOUBLE_SMALL_NUMBER) const
+	{
+		const double SquareSum = X * X + Y * Y;
+		if (SquareSum > Tolerance)
+		{
+			const double Scale = FMath::InvSqrt(SquareSum);
+			return FVector2DDouble(X * Scale, Y * Scale);
+		}
+		return FVector2DDouble(0.0, 0.0);
+	}
+};
+
+
 /**
  * Utility class for FDelaunayTriangleGenerator 
  * This represents Points in FDelaunayTriangleGenerator
@@ -19,7 +66,7 @@ struct FTriangle;
 struct FVertex
 {
 	// position of Point
-	FVector2D Position;
+	FVector2DDouble Position;
 
 	// Triangles this point belongs to
 	TArray<FTriangle *> Triangles;
@@ -27,9 +74,9 @@ struct FVertex
 	// The original animation sample associated with this point
 	int32 SampleIndex;
 	
-	FVertex(FVector2D InPosition, int32 InSampleIndex) : Position(InPosition), SampleIndex(InSampleIndex) {}
+	FVertex(FVector2DDouble InPosition, int32 InSampleIndex) : Position(InPosition), SampleIndex(InSampleIndex) {}
 
-	bool operator==(const FVector2D& Other) const
+	bool operator==(const FVector2DDouble& Other) const
 	{
 		// if same position, it's same point
 		return (Other == Position);
@@ -51,7 +98,7 @@ struct FVertex
 		Triangles.Remove(TriangleToRemove);
 	}
 
-	float GetDistance(const FVertex& Other)
+	double GetDistance(const FVertex& Other)
 	{
 		return (Other.Position-Position).Size();
 	}
@@ -89,7 +136,7 @@ struct FTriangle
 	// 3 vertices in CCW order
 	FVertex* Vertices[3]; 
 	// average points for Vertices
-	FVector2D	Center;
+	FVector2DDouble Center;
 	// FEdges
 	FHalfEdge Edges[3];
 
@@ -186,12 +233,12 @@ struct FTriangle
 		return (Other == *Vertices[0] || Other == *Vertices[1] || Other == *Vertices[2]);
 	}
 
-	float GetDistance(const FVertex& Other) const
+	double GetDistance(const FVertex& Other) const
 	{
 		return (Other.Position-Center).Size();
 	}
 
-	float GetDistance(const FVector2D& Other) const
+	double GetDistance(const FVector2DDouble& Other) const
 	{
 		return (Other-Center).Size();
 	}
@@ -255,10 +302,10 @@ private:
 	{
 		// this eventually has to happen on the plane that contains this 3 points
 		// for now we ignore Z
-		FVector2D Diff1 = Vertices[1]->Position-Vertices[0]->Position;
-		FVector2D Diff2 = Vertices[2]->Position-Vertices[0]->Position;
+		FVector2DDouble Diff1 = Vertices[1]->Position-Vertices[0]->Position;
+		FVector2DDouble Diff2 = Vertices[2]->Position-Vertices[0]->Position;
 
-		float Result = Diff1.X*Diff2.Y - Diff1.Y*Diff2.X;
+		double Result = Diff1.X*Diff2.Y - Diff1.Y*Diff2.X;
 
 		check (Result != 0.f);
 
@@ -307,7 +354,7 @@ public:
 	 * Add new sample point to SamplePointList and its corresponding sample index in the blendspace
 	 * It won't be added if already exists
 	 */
-	void AddSamplePoint(const FVector2D& NewPoint, const int32 SampleIndex);
+	void AddSamplePoint(const FVector2DDouble& NewPoint, const int32 SampleIndex);
 
 	/** 
 	 * This is for debug purpose to step only one to triangulate
@@ -412,8 +459,8 @@ private:
 	 * We need to normalize the points before the circumcircle test, so we need the extents of the grid.
 	 * Store 1 / GridSize to avoid recalculating it every time through GetCircumcircleState
 	*/
-	FVector2D				GridMin;
-	FVector2D				RecipGridSize;
+	FVector2DDouble				GridMin;
+	FVector2DDouble				RecipGridSize;
 };
 
 // @todo fixmelh : this code is mess between fvector2D and fvector
@@ -437,7 +484,7 @@ public:
 	 * 
 	 * @return	true if successfully found the triangle this point is within
 	 */
-	bool FindTriangleThisPointBelongsTo(const FVector2D& TestPoint, FVector& OutBarycentricCoords, FTriangle* & OutTriangle, const TArray<FTriangle*> & TriangleList) const;
+	bool FindTriangleThisPointBelongsTo(const FVector2DDouble& TestPoint, FVector& OutBarycentricCoords, FTriangle* & OutTriangle, const TArray<FTriangle*> & TriangleList) const;
 
 	/**  
 	 * Fill up Grid GridPoints using TriangleList input - Grid information should have been set by SetGridInfo
@@ -483,13 +530,13 @@ public:
 	/** 
 	 * Convert grid index (GridX, GridY) to triangle coords and returns FVector2D
 	*/
-	const FVector2D GetPosFromIndex(const int32 GridX, const int32 GridY) const;
+	const FVector2DDouble GetPosFromIndex(const int32 GridX, const int32 GridY) const;
 
 private:
 	FEditorElement& GetElement(const int32 GridX, const int32 GridY);
 	// Grid Dimension
-	FVector2D GridMin;
-	FVector2D GridMax;
+	FVector2DDouble GridMin;
+	FVector2DDouble GridMax;
 
 	// how many rows/cols for each axis
 	FIntPoint NumGridPointsForAxis;
