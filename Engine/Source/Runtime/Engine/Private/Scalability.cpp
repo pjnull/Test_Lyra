@@ -517,7 +517,7 @@ void InitScalabilitySystem()
 	CVarShadingQuality.AsVariable()->SetOnChangedCallback(FConsoleVariableDelegate::CreateStatic(&OnChangeShadingQuality));
 
 	// Set defaults
-	SetQualityLevels(FQualityLevels());
+	SetQualityLevels(FQualityLevels(), true);
 	GScalabilityBackupQualityLevels = FQualityLevels();
 	GScalabilityQualityLevelsOverride = FQualityLevels();
 	GScalabilityUsingTemporaryQualityLevels = false;
@@ -691,64 +691,69 @@ void ProcessCommand(const TCHAR* Cmd, FOutputDevice& Ar)
 	}
 }
 
-void SetQualityLevels(const FQualityLevels& QualityLevels, bool bForce/* = false*/)
+template<typename T> void SetQualityLevelCVar(TAutoConsoleVariable<T>& CVarToEdit, const T DesiredValue, const T OverrideValue, bool bForce)
 {
-	FQualityLevels ClampedLevels;
-	ClampedLevels.ResolutionQuality = QualityLevels.ResolutionQuality;
-	ClampedLevels.ViewDistanceQuality = FMath::Clamp(QualityLevels.ViewDistanceQuality, 0, CVarViewDistanceQuality_NumLevels->GetInt() - 1);
-	ClampedLevels.AntiAliasingQuality = FMath::Clamp(QualityLevels.AntiAliasingQuality, 0, CVarAntiAliasingQuality_NumLevels->GetInt() - 1);
-	ClampedLevels.ShadowQuality = FMath::Clamp(QualityLevels.ShadowQuality, 0, CVarShadowQuality_NumLevels->GetInt() - 1);
-	ClampedLevels.PostProcessQuality = FMath::Clamp(QualityLevels.PostProcessQuality, 0, CVarPostProcessQuality_NumLevels->GetInt() - 1);
-	ClampedLevels.TextureQuality = FMath::Clamp(QualityLevels.TextureQuality, 0, CVarTextureQuality_NumLevels->GetInt() - 1);
-	ClampedLevels.EffectsQuality = FMath::Clamp(QualityLevels.EffectsQuality, 0, CVarEffectsQuality_NumLevels->GetInt() - 1);
-	ClampedLevels.FoliageQuality = FMath::Clamp(QualityLevels.FoliageQuality, 0, CVarFoliageQuality_NumLevels->GetInt() - 1);
-	ClampedLevels.ShadingQuality = FMath::Clamp(QualityLevels.ShadingQuality, 0, CVarShadingQuality_NumLevels->GetInt() - 1);
-
-	if (GScalabilityUsingTemporaryQualityLevels && !bForce)
+	if (!bForce && GScalabilityUsingTemporaryQualityLevels && (OverrideValue >= T(0)))
 	{
-		// When temporary scalability is active, non-temporary sets are
-		// applied to the backup levels so we can restore them later
-		GScalabilityBackupQualityLevels = ClampedLevels;
-
-		// Apply settings that are not overridden by the active temporary scalability
-		if (GScalabilityQualityLevelsOverride.ResolutionQuality < 0.0f)	CVarResolutionQuality.AsVariable()->SetWithCurrentPriority(ClampedLevels.ResolutionQuality);
-		if (GScalabilityQualityLevelsOverride.ViewDistanceQuality < 0)	CVarViewDistanceQuality.AsVariable()->SetWithCurrentPriority(ClampedLevels.ViewDistanceQuality);
-		if (GScalabilityQualityLevelsOverride.AntiAliasingQuality < 0)	CVarAntiAliasingQuality.AsVariable()->SetWithCurrentPriority(ClampedLevels.AntiAliasingQuality);
-		if (GScalabilityQualityLevelsOverride.ShadowQuality < 0)		CVarShadowQuality.AsVariable()->SetWithCurrentPriority(ClampedLevels.ShadowQuality);
-		if (GScalabilityQualityLevelsOverride.PostProcessQuality < 0)	CVarPostProcessQuality.AsVariable()->SetWithCurrentPriority(ClampedLevels.PostProcessQuality);
-		if (GScalabilityQualityLevelsOverride.TextureQuality < 0)		CVarTextureQuality.AsVariable()->SetWithCurrentPriority(ClampedLevels.TextureQuality);
-		if (GScalabilityQualityLevelsOverride.EffectsQuality < 0)		CVarEffectsQuality.AsVariable()->SetWithCurrentPriority(ClampedLevels.EffectsQuality);
-		if (GScalabilityQualityLevelsOverride.FoliageQuality < 0)		CVarFoliageQuality.AsVariable()->SetWithCurrentPriority(ClampedLevels.FoliageQuality);
-		if (GScalabilityQualityLevelsOverride.ShadingQuality < 0)		CVarShadingQuality.AsVariable()->SetWithCurrentPriority(ClampedLevels.ShadingQuality);
+		// If we are alredy overriding the value with a valid temporary one, don't set it.
+		return;
 	}
-	else if (bForce)
+
+	if (bForce)
 	{
-		CVarResolutionQuality.AsVariable()->SetWithCurrentPriority(ClampedLevels.ResolutionQuality);
-		CVarViewDistanceQuality.AsVariable()->SetWithCurrentPriority(ClampedLevels.ViewDistanceQuality);
-		CVarAntiAliasingQuality.AsVariable()->SetWithCurrentPriority(ClampedLevels.AntiAliasingQuality);
-		CVarShadowQuality.AsVariable()->SetWithCurrentPriority(ClampedLevels.ShadowQuality);
-		CVarPostProcessQuality.AsVariable()->SetWithCurrentPriority(ClampedLevels.PostProcessQuality);
-		CVarTextureQuality.AsVariable()->SetWithCurrentPriority(ClampedLevels.TextureQuality);
-		CVarEffectsQuality.AsVariable()->SetWithCurrentPriority(ClampedLevels.EffectsQuality);
-		CVarFoliageQuality.AsVariable()->SetWithCurrentPriority(ClampedLevels.FoliageQuality);
-		CVarShadingQuality.AsVariable()->SetWithCurrentPriority(ClampedLevels.ShadingQuality);
+		CVarToEdit.AsVariable()->SetWithCurrentPriority(DesiredValue);
 	}
 	else
 	{
-		CVarResolutionQuality.AsVariable()->Set(ClampedLevels.ResolutionQuality, ECVF_SetByScalability);
-		CVarViewDistanceQuality.AsVariable()->Set(ClampedLevels.ViewDistanceQuality, ECVF_SetByScalability);
-		CVarAntiAliasingQuality.AsVariable()->Set(ClampedLevels.AntiAliasingQuality, ECVF_SetByScalability);
-		CVarShadowQuality.AsVariable()->Set(ClampedLevels.ShadowQuality, ECVF_SetByScalability);
-		CVarPostProcessQuality.AsVariable()->Set(ClampedLevels.PostProcessQuality, ECVF_SetByScalability);
-		CVarTextureQuality.AsVariable()->Set(ClampedLevels.TextureQuality, ECVF_SetByScalability);
-		CVarEffectsQuality.AsVariable()->Set(ClampedLevels.EffectsQuality, ECVF_SetByScalability);
-		CVarFoliageQuality.AsVariable()->Set(ClampedLevels.FoliageQuality, ECVF_SetByScalability);
-		CVarShadingQuality.AsVariable()->Set(ClampedLevels.ShadingQuality, ECVF_SetByScalability);
+		T PreviousValue;
+		CVarToEdit.AsVariable()->GetValue(PreviousValue);
+		if (DesiredValue != PreviousValue)
+		{
+			CVarToEdit.AsVariable()->Set(DesiredValue, ECVF_SetByScalability);
+		}
+	}
+}
+
+void SetQualityLevels(const FQualityLevels& QualityLevels, bool bForce/* = false*/)
+{
+	// The setter functions clamp these values internally
+	FQualityLevels ClampedLevels;
+	ClampedLevels.ResolutionQuality = QualityLevels.ResolutionQuality;
+	ClampedLevels.SetViewDistanceQuality(QualityLevels.ViewDistanceQuality);
+	ClampedLevels.SetAntiAliasingQuality(QualityLevels.AntiAliasingQuality);
+	ClampedLevels.SetShadowQuality(QualityLevels.ShadowQuality);
+	ClampedLevels.SetPostProcessQuality(QualityLevels.PostProcessQuality);
+	ClampedLevels.SetTextureQuality(QualityLevels.TextureQuality);
+	ClampedLevels.SetEffectsQuality(QualityLevels.EffectsQuality);
+	ClampedLevels.SetFoliageQuality(QualityLevels.FoliageQuality);
+	ClampedLevels.SetShadingQuality(QualityLevels.ShadingQuality);
+
+	FQualityLevels PreviousLevels;
+	if (PreviousScalabilityLevels.IsValid())
+	{
+		PreviousLevels = *PreviousScalabilityLevels;
 	}
 
-	//Skip the broadcast if the levels were the same.
-	if (!PreviousScalabilityLevels.IsValid() || *PreviousScalabilityLevels != ClampedLevels || bForce)
+	//Skip the broadcast and assignations if the levels were the same.
+	if (!PreviousScalabilityLevels.IsValid() || PreviousLevels != ClampedLevels || bForce)
 	{
+		if (GScalabilityUsingTemporaryQualityLevels && !bForce)
+		{
+			// When temporary scalability is active, non-temporary sets are
+			// applied to the backup levels so we can restore them later
+			GScalabilityBackupQualityLevels = ClampedLevels;
+		}
+
+		SetQualityLevelCVar(CVarResolutionQuality, ClampedLevels.ResolutionQuality, GScalabilityQualityLevelsOverride.ResolutionQuality, bForce);
+		SetQualityLevelCVar(CVarViewDistanceQuality, ClampedLevels.ViewDistanceQuality, GScalabilityQualityLevelsOverride.ViewDistanceQuality, bForce);
+		SetQualityLevelCVar(CVarAntiAliasingQuality, ClampedLevels.AntiAliasingQuality, GScalabilityQualityLevelsOverride.AntiAliasingQuality, bForce);
+		SetQualityLevelCVar(CVarShadowQuality, ClampedLevels.ShadowQuality, GScalabilityQualityLevelsOverride.ShadowQuality, bForce);
+		SetQualityLevelCVar(CVarPostProcessQuality, ClampedLevels.PostProcessQuality, GScalabilityQualityLevelsOverride.PostProcessQuality, bForce);
+		SetQualityLevelCVar(CVarTextureQuality, ClampedLevels.TextureQuality, GScalabilityQualityLevelsOverride.TextureQuality, bForce);
+		SetQualityLevelCVar(CVarEffectsQuality, ClampedLevels.EffectsQuality, GScalabilityQualityLevelsOverride.EffectsQuality, bForce);
+		SetQualityLevelCVar(CVarFoliageQuality, ClampedLevels.FoliageQuality, GScalabilityQualityLevelsOverride.FoliageQuality, bForce);
+		SetQualityLevelCVar(CVarShadingQuality, ClampedLevels.ShadingQuality, GScalabilityQualityLevelsOverride.ShadingQuality, bForce);
+
 		if (!PreviousScalabilityLevels.IsValid())
 		{
 			PreviousScalabilityLevels = MakeUnique<FQualityLevels>();
