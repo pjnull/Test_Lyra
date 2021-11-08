@@ -38,7 +38,7 @@ protected:
 
 	virtual bool Initialize(const FString& ConfigEntry) override;
 
-	virtual EPushResult PushData(const FPayloadId& Id, const FCompressedBuffer& Payload) override;
+	virtual EPushResult PushData(const FPayloadId& Id, const FCompressedBuffer& Payload, const FPackagePath& PackageContext) override;
 
 	virtual FCompressedBuffer PullData(const FPayloadId& Id) override;
 

@@ -8,6 +8,8 @@
 #include "Features/IModularFeatures.h"
 #include "Templates/UniquePtr.h"
 
+class FPackagePath;
+
 namespace UE::Virtualization
 {
 
@@ -80,7 +82,7 @@ public:
 	 * @param Payload	A potentially compressed buffer representing the payload
 	 * @return			The result of the push operation
 	 */
-	virtual EPushResult PushData(const FPayloadId& Id, const FCompressedBuffer& Payload) = 0;
+	virtual EPushResult PushData(const FPayloadId& Id, const FCompressedBuffer& Payload, const FPackagePath& PackageContext) = 0;
 
 	/** 
 	 * The backend will attempt to retrieve the given payload by what ever method the backend uses.

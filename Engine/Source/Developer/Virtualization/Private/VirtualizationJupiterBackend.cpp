@@ -1396,7 +1396,7 @@ private:
 		return true; 
 	}
 
-	virtual EPushResult PushData(const FPayloadId& Id, const FCompressedBuffer& CompressedPayload) override
+	virtual EPushResult PushData(const FPayloadId& Id, const FCompressedBuffer& CompressedPayload, const FPackagePath& PackageContext) override
 	{
 		using namespace Utility;
 

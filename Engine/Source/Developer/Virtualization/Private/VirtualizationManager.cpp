@@ -343,7 +343,7 @@ bool FVirtualizationManager::PushData(const FPayloadId& Id, const FCompressedBuf
 
 	for (IVirtualizationBackend* Backend : Backends)
 	{
-		const EPushResult Result = TryPushDataToBackend(*Backend, Id, Payload) ? EPushResult::Success : EPushResult::Failed;
+		const EPushResult Result = TryPushDataToBackend(*Backend, Id, Payload, PackageContext) ? EPushResult::Success : EPushResult::Failed;
 
 		UE_CLOG(Result != EPushResult::Failed, LogVirtualization, Verbose, TEXT("[%s] Pushed the payload '%s'"), *Backend->GetDebugString(), *Id.ToString());
 		UE_CLOG(Result == EPushResult::Failed, LogVirtualization, Error, TEXT("[%s] Failed to push the payload '%s'"), *Backend->GetDebugString(), *Id.ToString());
@@ -729,7 +729,7 @@ void FVirtualizationManager::CachePayload(const FPayloadId& Id, const FCompresse
 bool FVirtualizationManager::TryCacheDataToBackend(IVirtualizationBackend& Backend, const FPayloadId& Id, const FCompressedBuffer& Payload)
 {
 	COOK_STAT(FCookStats::FScopedStatsCounter Timer(Profiling::GetCacheStats(Backend)));
-	const EPushResult Result = Backend.PushData(Id, Payload);
+	const EPushResult Result = Backend.PushData(Id, Payload, FPackagePath());
 
 	if (Result == EPushResult::Success)
 	{
@@ -739,10 +739,10 @@ bool FVirtualizationManager::TryCacheDataToBackend(IVirtualizationBackend& Backe
 	return Result != EPushResult::Failed;
 }
 
-bool FVirtualizationManager::TryPushDataToBackend(IVirtualizationBackend& Backend, const FPayloadId& Id, const FCompressedBuffer& Payload)
+bool FVirtualizationManager::TryPushDataToBackend(IVirtualizationBackend& Backend, const FPayloadId& Id, const FCompressedBuffer& Payload, const FPackagePath& PackageContext)
 {
 	COOK_STAT(FCookStats::FScopedStatsCounter Timer(Profiling::GetPushStats(Backend)));
-	const EPushResult Result = Backend.PushData(Id, Payload);
+	const EPushResult Result = Backend.PushData(Id, Payload, PackageContext);
 
 	if (Result == EPushResult::Success)
 	{

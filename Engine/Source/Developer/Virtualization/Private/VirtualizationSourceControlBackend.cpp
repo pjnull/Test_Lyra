@@ -21,16 +21,18 @@
 namespace UE::Virtualization
 {
 
-void CreateDescription(TStringBuilder<512>& OutDescription)
+/** Builds a changelist description to be used when submitting a payload to source control */
+void CreateDescription(const FPackagePath& PackageContext, TStringBuilder<512>& OutDescription)
 {
 	// TODO: Maybe make writing out the project name an option or allow for a codename to be set via ini file?
-	OutDescription << TEXT("Submitted for: Project: ");
+	OutDescription << TEXT("Submitted for project: ");
 	OutDescription << FApp::GetProjectName();
 
-	// TODO: When we start passing in the context to ::Push we can write out the PackageName here for 
-	// debugging purposes
-	//OutDescription << TEXT("\nPackage ");
-	//OutDescription << PackageName;
+	if (PackageContext.IsMountedPath())
+	{
+		OutDescription << TEXT("\nPackage: ");
+		PackageContext.AppendPackageName(OutDescription);
+	}
 }
 
 /**
@@ -122,7 +124,7 @@ public:
 		return true;
 	}
 
-	virtual EPushResult PushData(const FPayloadId& Id, const FCompressedBuffer& Payload) override
+	virtual EPushResult PushData(const FPayloadId& Id, const FCompressedBuffer& Payload, const FPackagePath& PackageContext) override
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(FSourceControlBackend::PushData);
 
@@ -273,7 +275,7 @@ public:
 			TSharedRef<FCheckIn, ESPMode::ThreadSafe> CheckInOperation = ISourceControlOperation::Create<FCheckIn>();
 
 			TStringBuilder<512> Description;
-			CreateDescription(Description);
+			CreateDescription(PackageContext, Description);
 
 			CheckInOperation->SetDescription(FText::FromString(Description.ToString()));
 

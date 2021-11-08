@@ -55,7 +55,7 @@ bool FFileSystemBackend::Initialize(const FString& ConfigEntry)
 	return true;
 }
 
-EPushResult FFileSystemBackend::PushData(const FPayloadId& Id, const FCompressedBuffer& Payload)
+EPushResult FFileSystemBackend::PushData(const FPayloadId& Id, const FCompressedBuffer& Payload, const FPackagePath& PackageContext)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FFileSystemBackend::PushData);
 
