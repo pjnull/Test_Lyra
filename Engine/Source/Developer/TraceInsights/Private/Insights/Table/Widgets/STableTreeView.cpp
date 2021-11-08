@@ -243,10 +243,15 @@ void STableTreeView::ConstructWidget(TSharedPtr<FTable> InTablePtr)
 			.VAlign(VAlign_Center)
 			[
 				SNew(SButton)
-				.Text(LOCTEXT("AdvancedFiltersBtn_Text", "Advanced Filters"))
+				.ContentPadding(FMargin(-2.0f, 2.0f, -2.0f, 2.0f))
+				//.Text(LOCTEXT("AdvancedFiltersBtn_Text", "Advanced Filters"))
 				.ToolTipText(this, &STableTreeView::AdvancedFilters_GetTooltipText)
 				.OnClicked(this, &STableTreeView::OnAdvancedFiltersClicked)
 				.IsEnabled(this, &STableTreeView::AdvancedFilters_ShouldBeEnabled)
+				[
+					SNew(SImage)
+					.Image(FInsightsStyle::GetBrush("Icons.ClassicFilterConfig"))
+				]
 			]
 		]
 

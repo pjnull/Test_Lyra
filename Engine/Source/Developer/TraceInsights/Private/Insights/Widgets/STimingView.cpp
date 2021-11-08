@@ -12,6 +12,7 @@
 #include "Framework/Commands/Commands.h"
 #include "Framework/Commands/UICommandList.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
+#include "HAL/PlatformApplicationMisc.h"
 #include "HAL/PlatformTime.h"
 #include "Layout/WidgetPath.h"
 #include "Logging/MessageLog.h"
@@ -4808,7 +4809,8 @@ TSharedRef<SDockTab> STimingView::SpawnQuickFindTab(const FSpawnTabArgs& Args)
 	const TSharedPtr<SWindow>& OwnerWindow = Args.GetOwnerWindow();
 	if (OwnerWindow.IsValid() && OwnerWindow != FSlateApplication::Get().FindWidgetWindow(SharedThis(this)))
 	{
-		OwnerWindow->Resize(FVector2D(600, 400));
+		const float LocalDPIScaleFactor = FPlatformApplicationMisc::GetDPIScaleFactorAtPoint(10.0f, 10.0f);
+		OwnerWindow->Resize(FVector2D(600 * LocalDPIScaleFactor, 400 * LocalDPIScaleFactor));
 	}
 
 	if (!QuickFindWidgetSharedPtr.IsValid())

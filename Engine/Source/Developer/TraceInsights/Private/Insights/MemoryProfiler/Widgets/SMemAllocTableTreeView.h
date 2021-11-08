@@ -27,6 +27,17 @@ private:
 		float Width;
 	};
 
+	class IViewPreset
+	{
+	public:
+		virtual FText GetName() const = 0;
+		virtual FText GetToolTip() const = 0;
+		virtual FName GetSortColumn() const = 0;
+		virtual EColumnSortMode::Type GetSortMode() const = 0;
+		virtual void SetCurrentGroupings(const TArray<TSharedPtr<FTreeNodeGrouping>>& InAvailableGroupings, TArray<TSharedPtr<FTreeNodeGrouping>>& InOutCurrentGroupings) const = 0;
+		virtual void GetColumnConfigSet(TArray<FColumnConfig>& InOutConfigSet) const = 0;
+	};
+
 public:
 	/** Default constructor. */
 	SMemAllocTableTreeView();
@@ -105,25 +116,22 @@ private:
 	void CancelQuery();
 	void ResetAndStartQuery();
 
-	FReply OnDetailedViewClicked();
-	FReply OnSizeViewClicked();
-	FReply OnTagViewClicked();
-	FReply OnMemoryPageClicked();
-	FReply OnCallstackViewClicked(bool bIsInverted);
-	FReply OnHeapViewClicked();
-
 	FText GetSymbolResolutionStatus() const;
 	FText GetSymbolResolutionTooltip() const;
 	FText GetQueryInfo() const;
 	FText GetQueryInfoTooltip() const;
 
-	void ApplyColumnConfig(const TArrayView<FColumnConfig>& Preset);
 	void UpdateQueryInfo();
 	bool virtual ApplyCustomAdvancedFilters(const FTableTreeNodePtr& NodePtr) override;
 	virtual void AddCustomAdvancedFilters() override;
 
 	void CallstackGroupingByFunction_OnCheckStateChanged(ECheckBoxState NewRadioState);
 	ECheckBoxState CallstackGroupingByFunction_IsChecked() const;
+
+	void InitAvailableViewPresets();
+	FReply OnApplyViewPresets(const IViewPreset* InPreset);
+	void ApplyViewPresets(const IViewPreset& InPreset);
+	void ApplyColumnConfig(const TArrayView<FColumnConfig>& InTableConfig);
 
 private:
 	const static int FullCallStackIndex;
@@ -136,6 +144,7 @@ private:
 	FStopwatch QueryStopwatch;
 	bool bHasPendingQueryReset = false;
 	bool bIsCallstackGroupingByFunction = true;
+	TArray<TSharedRef<IViewPreset>> AvailableViewPresets;
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
