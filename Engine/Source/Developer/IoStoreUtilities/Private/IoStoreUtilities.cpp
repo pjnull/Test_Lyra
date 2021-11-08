@@ -619,8 +619,6 @@ struct FIoStoreArguments
 	FKeyChain PatchKeyChain;
 	FString DLCPluginPath;
 	FString DLCName;
-	FString BasedOnReleaseVersionPath;
-	FAssetRegistryState ReleaseAssetRegistry;
 	FReleasedPackages ReleasedPackages;
 	TUniquePtr<FCookedPackageStore> PackageStore;
 	TUniquePtr<FIoBuffer> ScriptObjects;
@@ -1197,7 +1195,7 @@ FLegacyCookedPackage* FindOrAddPackage(
 
 		if (const FName* ReleasedPackageName = Arguments.ReleasedPackages.PackageIdToName.Find(PackageId))
 		{
-			UE_LOG(LogIoStore, Fatal, TEXT("Package name hash collision \"%s\" and \"%s"), *ReleasedPackageName->ToString(), *PackageName.ToString());
+			UE_LOG(LogIoStore, Fatal, TEXT("Package name hash collision with base game package \"%s\" and \"%s"), *ReleasedPackageName->ToString(), *PackageName.ToString());
 		}
 
 		Package = new FLegacyCookedPackage();
@@ -2505,10 +2503,7 @@ int32 CreateTarget(const FIoStoreArguments& Arguments, const FIoStoreWriterSetti
 			FString RedirectedPackageNameStr = TEXT("/Game");
 			RedirectedPackageNameStr.AppendChars(*PackageNameStr + DLCNameLen, PackageNameStr.Len() - DLCNameLen);
 			FName RedirectedPackageName = FName(*RedirectedPackageNameStr);
-			if (Arguments.ReleasedPackages.PackageNames.Contains(RedirectedPackageName))
-			{
-				Package->OptimizedPackage->RedirectFrom(RedirectedPackageName);
-			}
+			Package->OptimizedPackage->RedirectFrom(RedirectedPackageName);
 		}
 	}
 
@@ -5386,44 +5381,34 @@ int32 CreateIoStoreContainerFiles(const TCHAR* CmdLine)
 		UE_LOG(LogIoStore, Display, TEXT("DLC: '%s'"), *Arguments.DLCPluginPath);
 		UE_LOG(LogIoStore, Display, TEXT("Remapping plugin content to game: '%s'"), Arguments.bRemapPluginContentToGame ? TEXT("True") : TEXT("False"));
 
-		if (FParse::Value(FCommandLine::Get(), TEXT("BasedOnReleaseVersionPath="), Arguments.BasedOnReleaseVersionPath))
-		{
-			UE_LOG(LogIoStore, Display, TEXT("Based on release version path: '%s'"), *Arguments.BasedOnReleaseVersionPath);
-		}
-		if (Arguments.BasedOnReleaseVersionPath.IsEmpty())
-		{
-			UE_LOG(LogIoStore, Error, TEXT("Based on release version path is needed for DLC"));
-			return -1;
-		}
-
-		FString DevelopmentAssetRegistryPath = FPaths::Combine(Arguments.BasedOnReleaseVersionPath, TEXT("Metadata"), GetDevelopmentAssetRegistryFilename());
-
 		bool bAssetRegistryLoaded = false;
-		FArrayReader SerializedAssetData;
-		if (FFileHelper::LoadFileToArray(SerializedAssetData, *DevelopmentAssetRegistryPath))
+		FString BasedOnReleaseVersionPath;
+		if (FParse::Value(FCommandLine::Get(), TEXT("BasedOnReleaseVersionPath="), BasedOnReleaseVersionPath))
 		{
-			FAssetRegistrySerializationOptions Options;
-			if (Arguments.ReleaseAssetRegistry.Serialize(SerializedAssetData, Options))
+			UE_LOG(LogIoStore, Display, TEXT("Based on release version path: '%s'"), *BasedOnReleaseVersionPath);
+			FString DevelopmentAssetRegistryPath = FPaths::Combine(BasedOnReleaseVersionPath, TEXT("Metadata"), GetDevelopmentAssetRegistryFilename());
+			FArrayReader SerializedAssetData;
+			if (FFileHelper::LoadFileToArray(SerializedAssetData, *DevelopmentAssetRegistryPath))
 			{
-				UE_LOG(LogIoStore, Display, TEXT("Loaded asset registry '%s'"), *DevelopmentAssetRegistryPath);
-				bAssetRegistryLoaded = true;
-
-				TArray<FName> PackageNames;
-				Arguments.ReleaseAssetRegistry.GetPackageNames(PackageNames);
-				Arguments.ReleasedPackages.PackageNames.Reserve(PackageNames.Num());
-				Arguments.ReleasedPackages.PackageIdToName.Reserve(PackageNames.Num());
-
-				for (FName PackageName : PackageNames)
+				FAssetRegistryState ReleaseAssetRegistry;
+				FAssetRegistrySerializationOptions Options;
+				if (ReleaseAssetRegistry.Serialize(SerializedAssetData, Options))
 				{
-					Arguments.ReleasedPackages.PackageNames.Add(PackageName);
-					Arguments.ReleasedPackages.PackageIdToName.Add(FPackageId::FromName(PackageName), PackageName);
+					UE_LOG(LogIoStore, Display, TEXT("Loaded asset registry '%s'"), *DevelopmentAssetRegistryPath);
+					bAssetRegistryLoaded = true;
+
+					TArray<FName> PackageNames;
+					ReleaseAssetRegistry.GetPackageNames(PackageNames);
+					Arguments.ReleasedPackages.PackageNames.Reserve(PackageNames.Num());
+					Arguments.ReleasedPackages.PackageIdToName.Reserve(PackageNames.Num());
+
+					for (FName PackageName : PackageNames)
+					{
+						Arguments.ReleasedPackages.PackageNames.Add(PackageName);
+						Arguments.ReleasedPackages.PackageIdToName.Add(FPackageId::FromName(PackageName), PackageName);
+					}
 				}
 			}
-		}
-
-		if (!bAssetRegistryLoaded)
-		{
-			UE_LOG(LogIoStore, Warning, TEXT("Failed to load Asset registry '%s'. Needed to verify DLC package names"), *DevelopmentAssetRegistryPath);
 		}
 	}
 	else if (FParse::Value(FCommandLine::Get(), TEXT("CreateGlobalContainer="), Arguments.GlobalContainerPath))
