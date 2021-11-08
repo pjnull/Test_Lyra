@@ -37,7 +37,6 @@ DEFINE_LOG_CATEGORY_STATIC(LogZenHttp, Log, All);
 namespace UE::Zen {
 
 #define UE_ZENDDC_BACKEND_WAIT_INTERVAL			0.01f
-#define UE_ZENDDC_HTTP_REQUEST_TIMEOUT_SECONDS	30L
 #define UE_ZENDDC_HTTP_DEBUG					0
 
 	struct FZenHttpRequest::FStatics
@@ -79,7 +78,7 @@ namespace UE::Zen {
 		curl_easy_reset(Curl);
 
 		// Options that are always set for all connections.
-		curl_easy_setopt(Curl, CURLOPT_CONNECTTIMEOUT, UE_ZENDDC_HTTP_REQUEST_TIMEOUT_SECONDS);
+		curl_easy_setopt(Curl, CURLOPT_CONNECTTIMEOUT_MS, 100L);
 		curl_easy_setopt(Curl, CURLOPT_EXPECT_100_TIMEOUT_MS, 0);
 		curl_easy_setopt(Curl, CURLOPT_NOSIGNAL, 1L);
 		curl_easy_setopt(Curl, CURLOPT_BUFFERSIZE, 256 * 1024L);
