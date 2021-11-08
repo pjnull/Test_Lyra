@@ -854,11 +854,17 @@ bool PassesInlineFilters(FDetailItemNode& Node)
 				// in them before the child properties, so the grandparent node must be queried instead of the parent.
 				if (FObjectPropertyNode* GrandparentAsObjectNode = GrandparentNode->AsObjectNode())
 				{
-					if (FProperty* GrandparentProperty = GrandparentAsObjectNode->GetStoredProperty())
+					// It's not reasonable to expect an Actor to allow all possible components that could be added to it,
+					// so just always allow inlined Components. This means a Component's property will always show up on
+					// an Actor if the property passes the Component's filter rather than both the Component's and the Actor's.
+					if (!GrandparentAsObjectNode->GetBaseStructure()->IsChildOf(UActorComponent::StaticClass()))
 					{
-						if (GrandparentProperty->HasMetaData("EditInline"))
+						if (FProperty* GrandparentProperty = GrandparentAsObjectNode->GetStoredProperty())
 						{
-							return FPropertyEditorPermissionList::Get().DoesPropertyPassFilter(GrandparentProperty->GetOwnerClass(), GrandparentProperty->GetFName());
+							if (GrandparentProperty->HasMetaData("EditInline"))
+							{
+								return FPropertyEditorPermissionList::Get().DoesPropertyPassFilter(GrandparentProperty->GetOwnerClass(), GrandparentProperty->GetFName());
+							}
 						}
 					}
 				}
