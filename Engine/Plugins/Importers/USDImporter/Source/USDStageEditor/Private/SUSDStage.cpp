@@ -366,13 +366,20 @@ TSharedRef< SWidget > SUsdStage::MakeActorPickerMenuContent()
 	}));
 
 	FSceneOutlinerModule& SceneOutlinerModule = FModuleManager::LoadModuleChecked<FSceneOutlinerModule>("SceneOutliner");
-	return SceneOutlinerModule.CreateActorPicker(InitOptions, FOnActorPicked::CreateLambda([this](AActor* Actor)
-	{
-		if ( Actor && Actor->IsA<AUsdStageActor>() )
-		{
-			this->SetActor( Cast<AUsdStageActor>( Actor ) );
-		}
-	}));
+
+	return SNew(SBox)
+		.Padding( FMargin( 1 ) )    // Add a small margin or else we'll get dark gray on dark gray which can look a bit confusing
+		.MinDesiredWidth( 300.0f )  // Force a min width or else the tree view item text will run up right to the very edge pixel of the menu
+		.HAlign( HAlign_Fill )
+		[
+			SceneOutlinerModule.CreateActorPicker(InitOptions, FOnActorPicked::CreateLambda([this](AActor* Actor)
+			{
+				if ( Actor && Actor->IsA<AUsdStageActor>() )
+				{
+					this->SetActor( Cast<AUsdStageActor>( Actor ) );
+				}
+			}))
+		];
 }
 
 void SUsdStage::FillFileMenu( FMenuBuilder& MenuBuilder )
