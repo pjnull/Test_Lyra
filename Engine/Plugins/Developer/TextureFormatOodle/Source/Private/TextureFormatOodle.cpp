@@ -1003,7 +1003,7 @@ public:
 		// verify OodlePF matches Image :
 		check( Image.GetBytesPerPixel() == (VTable->fp_OodleTex_PixelFormat_BytesPerPixel)(OodlePF) );
 		
-		OodleTex_Surface InSurf = { 0 };
+		OodleTex_Surface InSurf = {};
 		InSurf.width  = Image.SizeX;
 		InSurf.height = Image.SizeY;
 		InSurf.pixels = 0;
@@ -1046,6 +1046,11 @@ public:
 		{
 			// fill Texture with solid color based on which BCN we would have output
 			// lets you visually identify BCN textures in the Editor or game
+			const bool IsRDO = RDOLambda != 0;
+			constexpr SSIZE_T CheckerSizeBits = 4;
+			const SSIZE_T NumSlices = Image.NumSlices;
+			const SSIZE_T SizeY = Image.SizeY;
+			const SSIZE_T SizeX = Image.SizeX;
 
 			// use fast encoding settings for debug color :
 			RDOLambda = 0;
@@ -1055,13 +1060,50 @@ public:
 			{
 				//BC6 = purple
 				check(OodleBCN == OodleTex_BC6U);
-				for(float * ptr = (float *) ImageBasePtr; ptr< (float *)(ImageBasePtr + InBytesTotal); ptr += 4)
+
+				if (IsRDO)
 				{
-					// RGBA floats
-					ptr[0] = 0.5f;
-					ptr[1] = 0;
-					ptr[2] = 0.8f;
-					ptr[3] = 1.f;
+					for (SSIZE_T Slice = 0; Slice < NumSlices; Slice++)
+					{
+						float* LineBase = (float*)(ImageBasePtr + InBytesPerSlice * Slice);
+						for (SSIZE_T Y = 0; Y < SizeY; Y++, LineBase += (InSurf.rowStrideBytes / sizeof(float)))
+						{
+							for (SSIZE_T X = 0; X < SizeX; X++)
+							{
+								float* Pixel = LineBase + 4 * X;
+
+								SSIZE_T GridOnY = Y & (1 << CheckerSizeBits);
+								SSIZE_T GridOnX = X & (1 << CheckerSizeBits);
+								SSIZE_T GridOn = GridOnX ^ GridOnY;
+
+								if (GridOn)
+								{
+									Pixel[0] = 0.5f;
+									Pixel[1] = 0;
+									Pixel[2] = 0.8f;
+									Pixel[3] = 1.f;
+								}
+								else
+								{
+									Pixel[0] = 1.0f;
+									Pixel[1] = 1.0f;
+									Pixel[2] = 1.0f;
+									Pixel[3] = 1.f;
+								}
+							}
+						} // each line
+					} // each slice
+				} // end if RDO
+				else
+				{
+					for(float * ptr = (float *) ImageBasePtr; ptr < (float *)(ImageBasePtr + InBytesTotal); ptr += 4)
+					{
+						// RGBA floats
+						ptr[0] = 0.5f;
+						ptr[1] = 0;
+						ptr[2] = 0.8f;
+						ptr[3] = 1.f;
+					}
 				}
 			}
 			else
@@ -1085,9 +1127,39 @@ public:
 					default: break;
 				}
 
-				for(uint8 * ptr = ImageBasePtr; ptr < (ImageBasePtr + InBytesTotal); ptr += 4)
+				if (IsRDO)
 				{
-					*((uint32 *)ptr) = DebugColor;
+					for (SSIZE_T Slice = 0; Slice < NumSlices; Slice++)
+					{
+						uint8* LineBase = ImageBasePtr + InBytesPerSlice * Slice;;
+						for (SSIZE_T Y = 0; Y < SizeY; Y++, LineBase += InSurf.rowStrideBytes)
+						{
+							for (SSIZE_T X = 0; X < SizeX; X++)
+							{
+								uint8* Pixel = LineBase + 4 * X;
+
+								SSIZE_T GridOnY = Y & (1 << CheckerSizeBits);
+								SSIZE_T GridOnX = X & (1 << CheckerSizeBits);
+								SSIZE_T GridOn = GridOnX ^ GridOnY;
+
+								if (GridOn)
+								{
+									*((uint32*)Pixel) = DebugColor;
+								}
+								else
+								{
+									*((uint32*)Pixel) = 0xFFFFFFFF;
+								}
+							}
+						} // each line
+					} // each slice
+				} // end if RDO
+				else
+				{
+					for(uint8 * ptr = ImageBasePtr; ptr < (ImageBasePtr + InBytesTotal); ptr += 4)
+					{
+						*((uint32 *)ptr) = DebugColor;
+					}
 				}
 			}			
 		}
