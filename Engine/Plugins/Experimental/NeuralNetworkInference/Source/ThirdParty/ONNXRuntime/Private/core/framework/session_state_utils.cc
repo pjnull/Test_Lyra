@@ -213,7 +213,7 @@ common::Status SaveInitializedTensors(
     bool constant = graph.IsConstantInitializer(name, /* check_outer_scope */ false);
     ORT_RETURN_IF_ERROR(save_tensor_func(ort_value_index, ort_value, deleter, constant));
 
-    VLOGS(logger, 1) << "Added weight with name : " << name << " with index: " << ort_value_index;
+    //VLOGS(logger, 1) << "Added weight with name : " << name << " with index: " << ort_value_index;
   }
 
   LOGS(logger, INFO) << "Done saving initialized tensors";
