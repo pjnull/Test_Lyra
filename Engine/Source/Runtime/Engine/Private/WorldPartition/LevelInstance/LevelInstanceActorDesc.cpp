@@ -15,7 +15,8 @@
 struct FActorDescContainerInstance
 {
 	FActorDescContainerInstance()
-	: RefCount(0)
+	: Container(nullptr)
+	, RefCount(0)
 	{}
 
 	UActorDescContainer* Container;
@@ -134,14 +135,18 @@ void FLevelInstanceActorDesc::AddReferencedObjects(FReferenceCollector& Collecto
 UActorDescContainer* FLevelInstanceActorDesc::RegisterActorDescContainer(FName PackageName, UWorld* InWorld)
 {
 	FActorDescContainerInstance& ExistingContainerInstance = ActorDescContainers.FindOrAdd(PackageName);
+	UActorDescContainer* ActorDescContainer = ExistingContainerInstance.Container;
 	
 	if (ExistingContainerInstance.RefCount++ == 0)
 	{
-		ExistingContainerInstance.Container = NewObject<UActorDescContainer>(GetTransientPackage());
-		ExistingContainerInstance.Container->Initialize(InWorld, PackageName);
+		ActorDescContainer = NewObject<UActorDescContainer>(GetTransientPackage());
+		ExistingContainerInstance.Container = ActorDescContainer;
+		
+		// This will potentially invalidate ExistingContainerInstance due to ActorDescContainers reallocation
+		ActorDescContainer->Initialize(InWorld, PackageName);
 	}
 
-	return ExistingContainerInstance.Container;
+	return ActorDescContainer;
 }
 
 void FLevelInstanceActorDesc::UnregisterActorDescContainer(UActorDescContainer* Container)
