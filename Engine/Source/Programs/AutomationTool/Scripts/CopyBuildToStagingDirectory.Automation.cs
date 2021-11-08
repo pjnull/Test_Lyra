@@ -2753,6 +2753,42 @@ namespace AutomationScripts
 								}
 							}
 
+							FileReference InUtocFile = SourceOutputLocation.ChangeExtension(".utoc");
+							FileReference InUcasFile = SourceOutputLocation.ChangeExtension(".ucas");
+							if (FileReference.Exists(InUtocFile) || FileReference.Exists(InUcasFile))
+							{
+								if (FileReference.Exists(InUcasFile))
+								{
+									FileReference OutUcasFile = OutputLocation.ChangeExtension(".ucas");
+									LogInformation("Copying ucas from {0} to {1}", InUcasFile, OutUcasFile);
+									if (!InternalUtils.SafeCopyFile(InUcasFile.FullName, OutUcasFile.FullName))
+									{
+										LogInformation("Failed to copy ucas {0} to {1}, creating new pak", InUcasFile, OutUcasFile);
+										bCopiedExistingPak = false;
+									}
+								}
+								else
+								{
+									LogInformation("Missing ucas file {0}, creating new pak", InUcasFile);
+									bCopiedExistingPak = false;
+								}
+
+								if (FileReference.Exists(InUtocFile))
+								{
+									FileReference OutUtocFile = OutputLocation.ChangeExtension(".utoc");
+									LogInformation("Copying utoc from {0} to {1}", InUtocFile, OutUtocFile);
+									if (!InternalUtils.SafeCopyFile(InUtocFile.FullName, OutUtocFile.FullName))
+									{
+										LogInformation("Failed to copy utoc {0} to {1}, creating new pak", InUtocFile, OutUtocFile);
+										bCopiedExistingPak = false;
+									}
+								}
+								else
+								{
+									LogInformation("Missing utoc file {0}, creating new pak", InUtocFile);
+									bCopiedExistingPak = false;
+								}
+							}
 						}
 					}
 					if (!bCopiedExistingPak)
