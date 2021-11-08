@@ -115,14 +115,22 @@ void UDMXLibrary::RegisterEntity(UDMXEntity* Entity)
 {
 	if (ensureMsgf(IsValid(Entity), TEXT("Trying to register Entity with DMX Library, but DMX Entity is not valid.")))
 	{
-		Entities.AddUnique(Entity);
-		LastAddedEntity = Entity;
+		if (!Entities.Contains(Entity))
+		{
+			Entities.Add(Entity);
+			LastAddedEntity = Entity;
+			OnEntitiesAddedDelegate.Broadcast(this, TArray<UDMXEntity*>({ Entity }));
+		}	
 	}
 }
 
 void UDMXLibrary::UnregisterEntity(UDMXEntity* Entity)
 {
-	Entities.RemoveSingle(Entity);
+	if (Entities.Contains(Entity))
+	{
+		Entities.Remove(Entity);
+		OnEntitiesRemovedDelegate.Broadcast(this, TArray<UDMXEntity*>({ Entity }));
+	}
 }
 
 UDMXEntity* UDMXLibrary::GetOrCreateEntityObject(const FString& InName, TSubclassOf<UDMXEntity> DMXEntityClass)
