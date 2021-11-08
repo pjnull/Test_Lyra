@@ -1912,14 +1912,6 @@ bool UMaterial::GetMaterialLayers(FMaterialLayersFunctions& OutLayers, TMicRecur
 	return false;
 }
 
-bool UMaterial::GetTerrainLayerWeightParameterValue(const FHashedMaterialParameterInfo& ParameterInfo, int32& OutWeightmapIndex, FGuid& OutExpressionGuid) const
-{
-	bool bSuccess = false;
-	OutWeightmapIndex = INDEX_NONE;
-	bSuccess = true;
-	return bSuccess;
-}
-
 bool UMaterial::GetRefractionSettings(float& OutBiasValue) const
 {
 	OutBiasValue = RefractionDepthBias;

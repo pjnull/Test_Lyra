@@ -48,6 +48,7 @@
 #include "MaterialShaderQualitySettings.h"
 #include "UObject/ObjectSaveContext.h"
 #include "UObject/UE5MainStreamObjectVersion.h"
+#include "UObject/FortniteMainBranchObjectVersion.h"
 #include "ShaderCompilerCore.h"
 
 DECLARE_CYCLE_STAT(TEXT("MaterialInstance CopyMatInstParams"), STAT_MaterialInstance_CopyMatInstParams, STATGROUP_Shaders);
@@ -474,7 +475,6 @@ void UMaterialInstance::SwapLayerParameterIndices(int32 OriginalIndex, int32 New
 		SwapLayerParameterIndicesArray(FontParameterValues, OriginalIndex, NewIndex);
 		SwapLayerParameterIndicesArray(StaticParameters.StaticSwitchParameters, OriginalIndex, NewIndex);
 		SwapLayerParameterIndicesArray(StaticParameters.StaticComponentMaskParameters, OriginalIndex, NewIndex);
-		SwapLayerParameterIndicesArray(StaticParameters.TerrainLayerWeightParameters, OriginalIndex, NewIndex);
 	}
 }
 
@@ -488,7 +488,6 @@ void UMaterialInstance::RemoveLayerParameterIndex(int32 Index)
 	RemoveLayerParameterIndicesArray(FontParameterValues, Index);
 	RemoveLayerParameterIndicesArray(StaticParameters.StaticSwitchParameters, Index);
 	RemoveLayerParameterIndicesArray(StaticParameters.StaticComponentMaskParameters, Index);
-	RemoveLayerParameterIndicesArray(StaticParameters.TerrainLayerWeightParameters, Index);
 }
 #endif // WITH_EDITOR
 
@@ -542,10 +541,12 @@ bool UMaterialInstance::UpdateParameters()
 			bDirty = UpdateParameterSet<FStaticComponentMaskParameter, UMaterialExpressionStaticComponentMaskParameter>(StaticParameters.StaticComponentMaskParameters, ParentMaterial) || bDirty;
 
 			// Custom parameters
+			PRAGMA_DISABLE_DEPRECATION_WARNINGS
 			for (const auto& CustomParameterSetUpdater : CustomParameterSetUpdaters)
 			{
 				bDirty |= CustomParameterSetUpdater.Execute(StaticParameters, ParentMaterial);
 			}
+			PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		}
 
 		if (StaticParameters.bHasMaterialLayers && Parent)
@@ -564,7 +565,6 @@ bool UMaterialInstance::UpdateParameters()
 					RemapLayerParameterIndicesArray(FontParameterValues, RemapLayerIndices);
 					RemapLayerParameterIndicesArray(StaticParameters.StaticSwitchParameters, RemapLayerIndices);
 					RemapLayerParameterIndicesArray(StaticParameters.StaticComponentMaskParameters, RemapLayerIndices);
-					RemapLayerParameterIndicesArray(StaticParameters.TerrainLayerWeightParameters, RemapLayerIndices);
 					bDirty = true;
 				}
 			}
@@ -1678,7 +1678,9 @@ void UMaterialInstance::GetStaticParameterValues(FStaticParameterSet& OutStaticP
 	OutStaticParameters.bHasMaterialLayers = GetMaterialLayers(OutStaticParameters.MaterialLayers);
 
 	// Custom parameters.
+	PRAGMA_DISABLE_DEPRECATION_WARNINGS
 	CustomStaticParametersGetters.Broadcast(OutStaticParameters, this);
+	PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 	if (AllowCachingStaticParameterValuesCounter > 0)
 	{
@@ -2173,34 +2175,6 @@ bool UMaterialInstance::GetMaterialLayers(FMaterialLayersFunctions& OutLayers, T
 	return false;
 }
 
-bool UMaterialInstance::GetTerrainLayerWeightParameterValue(const FHashedMaterialParameterInfo& ParameterInfo, int32& OutWeightmapIndex, FGuid &OutExpressionGuid) const
-{
-	if(GetReentrantFlag())
-	{
-		return false;
-	}
-
-	for (int32 ValueIndex = 0;ValueIndex < StaticParameters.TerrainLayerWeightParameters.Num();ValueIndex++)
-	{
-		const FStaticTerrainLayerWeightParameter& Param = StaticParameters.TerrainLayerWeightParameters[ValueIndex];
-		if (Param.bOverride && Param.ParameterInfo == ParameterInfo)
-		{
-			OutWeightmapIndex = Param.WeightmapIndex;
-			OutExpressionGuid = Param.ExpressionGUID;
-			return true;
-		}
-	}
-
-	if(Parent)
-	{
-		FMICReentranceGuard	Guard(this);
-		return Parent->GetTerrainLayerWeightParameterValue(ParameterInfo, OutWeightmapIndex, OutExpressionGuid);
-	}
-	else
-	{
-		return false;
-	}
-}
 
 #if WITH_EDITOR
 bool UMaterialInstance::SetMaterialLayers(const FMaterialLayersFunctions& LayersValue)
@@ -2325,6 +2299,7 @@ void UMaterialInstance::Serialize(FArchive& Ar)
 	Ar.UsingCustomVersion(FRenderingObjectVersion::GUID);
 	Ar.UsingCustomVersion(FUE5MainStreamObjectVersion::GUID);
 	Ar.UsingCustomVersion(FUE5ReleaseStreamObjectVersion::GUID);
+	Ar.UsingCustomVersion(FFortniteMainBranchObjectVersion::GUID);
 
 	Super::Serialize(Ar);
 		
@@ -2350,7 +2325,8 @@ void UMaterialInstance::Serialize(FArchive& Ar)
 		}
 	}
 
-	if (Ar.CustomVer(FUE5ReleaseStreamObjectVersion::GUID) < FUE5ReleaseStreamObjectVersion::MaterialLayerStacksAreNotParameters)
+	if (Ar.CustomVer(FUE5ReleaseStreamObjectVersion::GUID) < FUE5ReleaseStreamObjectVersion::MaterialLayerStacksAreNotParameters ||
+		Ar.CustomVer(FFortniteMainBranchObjectVersion::GUID) < FFortniteMainBranchObjectVersion::TerrainLayerWeightsAreNotParameters)
 	{
 		StaticParameters.UpdateLegacyData();
 	}
@@ -2440,7 +2416,6 @@ void UMaterialInstance::Serialize(FArchive& Ar)
 
 			TrimToOverriddenOnly(StaticParameters.StaticSwitchParameters);
 			TrimToOverriddenOnly(StaticParameters.StaticComponentMaskParameters);
-			TrimToOverriddenOnly(StaticParameters.TerrainLayerWeightParameters);
 		}
 #endif // WITH_EDITOR
 	}
@@ -3244,7 +3219,6 @@ void UMaterialInstance::UpdateStaticPermutation(const FStaticParameterSet& NewPa
 
 	TrimToOverriddenOnly(CompareParameters.StaticSwitchParameters);
 	TrimToOverriddenOnly(CompareParameters.StaticComponentMaskParameters);
-	TrimToOverriddenOnly(CompareParameters.TerrainLayerWeightParameters);
 
 	// Check to see if the material layers being assigned match values from the parent
 	if (CompareParameters.bHasMaterialLayers && Parent)
@@ -4281,6 +4255,8 @@ void UMaterialInstance::AppendReferencedParameterCollectionIdsTo(TArray<FGuid>& 
 #endif // WITH_EDITOR
 
 #if WITH_EDITORONLY_DATA
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
 UMaterialInstance::FCustomStaticParametersGetterDelegate UMaterialInstance::CustomStaticParametersGetters;
 TArray<UMaterialInstance::FCustomParameterSetUpdaterDelegate> UMaterialInstance::CustomParameterSetUpdaters;
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 #endif // WITH_EDITORONLY_DATA

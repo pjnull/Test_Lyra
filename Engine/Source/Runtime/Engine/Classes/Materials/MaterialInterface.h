@@ -467,16 +467,6 @@ public:
 	ENGINE_API bool GetStaticComponentMaskParameterValue(const FHashedMaterialParameterInfo& ParameterInfo, bool& R, bool& G, bool& B, bool& A, FGuid& OutExpressionGuid, bool bOveriddenOnly = false) const;
 #endif // WITH_EDITORONLY_DATA
 
-	/**
-	* Get the weightmap index of the given terrain layer weight parameter
-	*
-	* @param	ParameterName	The name of the parameter
-	* @param	OutWeightmapIndex	Will contain the values of the parameter if successful
-	* @return					True if successful
-	*/
-	virtual bool GetTerrainLayerWeightParameterValue(const FHashedMaterialParameterInfo& ParameterInfo, int32& OutWeightmapIndex, FGuid &OutExpressionGuid) const
-		PURE_VIRTUAL(UMaterialInterface::GetTerrainLayerWeightParameterValue,return false;);
-
 #if WITH_EDITOR
 	/**
 	* Get the sort priority index of the given parameter

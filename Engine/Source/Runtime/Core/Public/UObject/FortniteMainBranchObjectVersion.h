@@ -182,6 +182,9 @@ struct CORE_API FFortniteMainBranchObjectVersion
 		// Cooked BPGC storing editor-only asset tags
 		BPGCCookedEditorTags,
 
+		// Terrain layer weights are no longer considered material parameters
+		TerrainLayerWeightsAreNotParameters,
+
 		// -----<new versions can be added above this line>-------------------------------------------------
 		VersionPlusOne,
 		LatestVersion = VersionPlusOne - 1

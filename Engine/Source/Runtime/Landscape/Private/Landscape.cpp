@@ -3580,60 +3580,6 @@ void FLandscapeComponentDerivedData::SaveToDDC(const FGuid& StateId, UObject* Co
 	GetDerivedDataCacheRef().Put(*GetDDCKeyString(StateId), Bytes, Component->GetPathName());
 }
 
-#if WITH_EDITOR
-void LandscapeMaterialsParameterValuesGetter(FStaticParameterSet& OutStaticParameterSet, UMaterialInstance* Material)
-{
-	if (Material->Parent)
-	{
-		UMaterial* ParentMaterial = Material->Parent->GetMaterial();
-
-		TArray<FMaterialParameterInfo> OutParameterInfo;
-		TArray<FGuid> Guids;
-		Material->GetAllParameterInfo<UMaterialExpressionLandscapeLayerWeight>(OutParameterInfo, Guids);
-		Material->GetAllParameterInfo<UMaterialExpressionLandscapeLayerSwitch>(OutParameterInfo, Guids);
-		Material->GetAllParameterInfo<UMaterialExpressionLandscapeLayerSample>(OutParameterInfo, Guids);
-		Material->GetAllParameterInfo<UMaterialExpressionLandscapeLayerBlend>(OutParameterInfo, Guids);
-		Material->GetAllParameterInfo<UMaterialExpressionLandscapeVisibilityMask>(OutParameterInfo, Guids);
-
-		OutStaticParameterSet.TerrainLayerWeightParameters.AddZeroed(OutParameterInfo.Num());
-		for (int32 ParameterIdx = 0; ParameterIdx < OutParameterInfo.Num(); ParameterIdx++)
-		{
-			FStaticTerrainLayerWeightParameter& ParentParameter = OutStaticParameterSet.TerrainLayerWeightParameters[ParameterIdx];
-			const FMaterialParameterInfo& ParameterInfo = OutParameterInfo[ParameterIdx];
-			FGuid ExpressionId = Guids[ParameterIdx];
-			int32 WeightmapIndex = INDEX_NONE;
-
-			ParentParameter.bOverride = false;
-			ParentParameter.ParameterInfo = ParameterInfo;
-			// Get the settings from the parent in the MIC chain
-			Material->Parent->GetTerrainLayerWeightParameterValue(ParameterInfo, ParentParameter.WeightmapIndex, ExpressionId);
-			ParentParameter.ExpressionGUID = ExpressionId;
-
-			// If the SourceInstance is overriding this parameter, use its settings
-			for (int32 WeightParamIdx = 0; WeightParamIdx < Material->GetStaticParameters().TerrainLayerWeightParameters.Num(); WeightParamIdx++)
-			{
-				const FStaticTerrainLayerWeightParameter& TerrainLayerWeightParam = Material->GetStaticParameters().TerrainLayerWeightParameters[WeightParamIdx];
-
-				if (ParameterInfo == TerrainLayerWeightParam.ParameterInfo)
-				{
-					ParentParameter.bOverride = TerrainLayerWeightParam.bOverride;
-					if (TerrainLayerWeightParam.bOverride)
-					{
-						ParentParameter.WeightmapIndex = TerrainLayerWeightParam.WeightmapIndex;
-						ParentParameter.bWeightBasedBlend = TerrainLayerWeightParam.bWeightBasedBlend;
-					}
-				}
-			}
-		}
-	}
-}
-
-bool LandscapeMaterialsParameterSetUpdater(FStaticParameterSet& StaticParameterSet, UMaterial* ParentMaterial)
-{
-	return UpdateParameterSet<FStaticTerrainLayerWeightParameter, UMaterialExpressionLandscapeLayerWeight>(StaticParameterSet.TerrainLayerWeightParameters, ParentMaterial);
-}
-#endif // WITH_EDITOR
-
 ALandscapeProxy::~ALandscapeProxy()
 {
 	for (int32 Index = 0; Index < AsyncFoliageTasks.Num(); Index++)

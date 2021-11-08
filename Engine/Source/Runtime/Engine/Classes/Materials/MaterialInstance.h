@@ -464,9 +464,11 @@ class UMaterialInstance : public UMaterialInterface
 
 #if WITH_EDITORONLY_DATA
 	// Custom static parameters getter delegate.
+	UE_DEPRECATED(5.0, "Custom static parameter delegates no longer supported.")
 	ENGINE_API static FCustomStaticParametersGetterDelegate CustomStaticParametersGetters;
 
 	// An array of custom parameter set updaters.
+	UE_DEPRECATED(5.0, "Custom static parameter delegates no longer supported.")
 	ENGINE_API static TArray<FCustomParameterSetUpdaterDelegate> CustomParameterSetUpdaters;
 #endif // WITH_EDITORONLY_DATA
 
@@ -640,7 +642,6 @@ public:
 	virtual ENGINE_API bool CheckMaterialUsage(const EMaterialUsage Usage) override;
 	virtual ENGINE_API bool CheckMaterialUsage_Concurrent(const EMaterialUsage Usage) const override;
 	virtual ENGINE_API bool GetMaterialLayers(FMaterialLayersFunctions& OutLayers, TMicRecursionGuard RecursionGuard = TMicRecursionGuard()) const override;
-	virtual ENGINE_API bool GetTerrainLayerWeightParameterValue(const FHashedMaterialParameterInfo& ParameterInfo, int32& OutWeightmapIndex, FGuid &OutExpressionGuid) const override;
 	virtual ENGINE_API bool IsDependent(UMaterialInterface* TestDependency) override;
 	virtual ENGINE_API bool IsDependent_Concurrent(UMaterialInterface* TestDependency, TMicRecursionGuard RecursionGuard) override;
 	virtual ENGINE_API void GetDependencies(TSet<UMaterialInterface*>& Dependencies) override;

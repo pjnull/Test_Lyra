@@ -6859,7 +6859,7 @@ bool FHLSLMaterialTranslator::GetStaticBoolValue(int32 BoolIndex, bool& bSucceed
 	return false;
 }
 
-int32 FHLSLMaterialTranslator::StaticTerrainLayerWeight(FName ParameterName,int32 Default)
+int32 FHLSLMaterialTranslator::StaticTerrainLayerWeight(FName LayerName,int32 Default)
 {
 	if (GetFeatureLevel() <= ERHIFeatureLevel::ES3_1 && ShaderFrequency != SF_Pixel)
 	{
@@ -6871,9 +6871,6 @@ int32 FHLSLMaterialTranslator::StaticTerrainLayerWeight(FName ParameterName,int3
 	bool bFoundParameter = false;
 	bool bAtLeastOneWeightBasedBlend = false;
 
-	FMaterialParameterInfo ParameterInfo = GetParameterAssociationInfo();
-	ParameterInfo.Name = ParameterName;
-
 	int32 NumActiveTerrainLayerWeightParameters = 0;
 	for(int32 ParameterIndex = 0;ParameterIndex < StaticParameters.TerrainLayerWeightParameters.Num(); ++ParameterIndex)
 	{
@@ -6882,7 +6879,7 @@ int32 FHLSLMaterialTranslator::StaticTerrainLayerWeight(FName ParameterName,int3
 		{
 			NumActiveTerrainLayerWeightParameters++;
 		}
-		if(Parameter.ParameterInfo == ParameterInfo)
+		if(Parameter.LayerName == LayerName)
 		{
 			WeightmapIndex = Parameter.WeightmapIndex;
 			bFoundParameter = true;
@@ -6920,7 +6917,7 @@ int32 FHLSLMaterialTranslator::StaticTerrainLayerWeight(FName ParameterName,int3
 			WeightmapCode = TextureSample(TextureCodeIndex, TextureCoordinate(3, false, false), SamplerType);
 		}
 
-		FString LayerMaskName = FString::Printf(TEXT("LayerMask_%s"),*ParameterName.ToString());
+		FString LayerMaskName = FString::Printf(TEXT("LayerMask_%s"),*LayerName.ToString());
 		return Dot(WeightmapCode,VectorParameter(FName(*LayerMaskName), FLinearColor(1.f,0.f,0.f,0.f)));
 	}
 }
