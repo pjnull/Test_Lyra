@@ -24,6 +24,8 @@
 #include "EditorStyleSet.h"
 #include "BlueprintEditorTabs.h"
 #include "BlueprintDebugger.h"
+#include "AssetThumbnail.h"
+#include "ThumbnailRendering/ThumbnailManager.h"
 
 #define LOCTEXT_NAMESPACE "DebugViewUI"
 
@@ -36,6 +38,8 @@ extern UNREALED_API class UEditorEngine* GEditor;
 
 static const FText ViewInDebuggerText = LOCTEXT("ViewInDebugger", "View in Blueprint Debugger");
 static const FText ViewInDebuggerTooltipText = LOCTEXT("ViewInDebugger_Tooltip", "Opens the Blueprint Debugger and starts watching this variable if it isn't already watched");
+static constexpr float ThumbnailIconSize = 16.0f;
+static constexpr uint32 ThumbnailIconResolution = 16;
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -935,6 +939,38 @@ public:
 			];
 	}
 
+	virtual TSharedRef<SWidget> GetValueIcon() override
+	{
+		if (UObject* Object = Data->Object.Get())
+		{
+			if (Object->IsAsset())
+			{
+				FAssetThumbnailConfig ThumbnailConfig;
+
+				if (FSlateApplication::Get().InKismetDebuggingMode())
+				{
+					ThumbnailConfig.bForceGenericThumbnail = true;
+				}
+
+				TSharedPtr<FAssetThumbnail> Thumb = MakeShared<FAssetThumbnail>(Object, ThumbnailIconResolution, ThumbnailIconResolution, UThumbnailManager::Get().GetSharedThumbnailPool());
+				return SNew(SButton)
+					.OnClicked(this, &FWatchChildLineItem::OnFocusAsset)
+					.ToolTipText(this, &FWatchChildLineItem::IconTooltipText)
+					.ButtonStyle(FEditorStyle::Get(), "NoBorder")
+					[
+						SNew(SBox)
+						.MaxDesiredHeight(ThumbnailIconSize)
+						.MaxDesiredWidth(ThumbnailIconSize)
+						[
+							Thumb->MakeThumbnailWidget(ThumbnailConfig)
+						]
+					];
+			}
+		}
+
+		return FDebugLineItem::GetValueIcon();
+	}
+
 	virtual FText GetDescription() const override
 	{
 		const FString ValStr = Data->Value.ToString();
@@ -999,9 +1035,31 @@ protected:
 		return {};
 	}
 
+	bool CanOpenAsset() const
+	{
+		if (FSlateApplication::Get().InKismetDebuggingMode())
+		{
+			if (const UPackage* Package = GetDataPackage())
+			{
+
+				UObject* ReferencedAsset = Package->FindAssetInPackage();
+
+				// It is not safe to open asset editors for non-blueprint assets while stopped at a breakpoint
+				return Cast<UBlueprint>(ReferencedAsset) != nullptr;
+			}
+		}
+
+		return true;
+	}
+
 	// opens result of GetDataPackage in editor
 	FReply OnFocusAsset() const
 	{
+		if (!CanOpenAsset())
+		{
+			return FReply::Unhandled();
+		}
+
 		const UPackage* Package = GetDataPackage();
 		if (!Package)
 		{
@@ -1065,7 +1123,10 @@ protected:
 		const UPackage* Package = GetDataPackage();
 		if (Package)
 		{
-			return FText::Format(LOCTEXT("OpenPackage", "Open: {0}"), FText::FromString(Package->GetName()));
+			if (CanOpenAsset())
+			{
+				return FText::Format(LOCTEXT("OpenPackage", "Open: {0}"), FText::FromString(Package->GetName()));
+			}
 		}
 		return Data->Type;
 	}
@@ -1250,6 +1311,7 @@ public:
 	virtual FText GetDescription() const override;
 	virtual TSharedRef<SWidget> GenerateNameWidget(TSharedPtr<FString> InSearchString) override;
 	virtual TSharedRef<SWidget> GenerateValueWidget(TSharedPtr<FString> InSearchString) override;
+	virtual TSharedRef<SWidget> GetValueIcon() override;
 	virtual TSharedRef<SWidget> GetNameIcon() override;
 
 protected:
@@ -1382,6 +1444,89 @@ private:
 
 		return false;
 	}
+
+	bool CanOpenAsset(UObject* AssetObject) const
+	{
+		if (FSlateApplication::Get().InKismetDebuggingMode())
+		{
+			// opening non-blueprint assets while stopped at a breakpoint is unsafe
+			return Cast<UBlueprint>(AssetObject) != nullptr;
+		}
+
+		return false;
+	}
+
+	FReply OpenEditorForAsset() const
+	{
+		TSharedPtr<FPropertyInstanceInfo> PropertyInfo = GetPropertyInfo();
+		if (PropertyInfo.IsValid())
+		{
+			if (UObject* Object = PropertyInfo->Object.Get())
+			{
+				if (Object->IsAsset() && CanOpenAsset(Object))
+				{
+					GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(Object);
+					return FReply::Handled();
+				}
+			}
+		}
+
+		return FReply::Unhandled();
+	}
+
+	FReply OpenEditorForType() const
+	{
+		TSharedPtr<FPropertyInstanceInfo> PropertyInfo = GetPropertyInfo();
+		if (PropertyInfo.IsValid())
+		{
+			if (UObject* Object = PropertyInfo->Object.Get())
+			{
+				if (UBlueprint* Blueprint = Cast<UBlueprint>(PropertyInfo->Object->GetClass()->ClassGeneratedBy))
+				{
+					GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(Blueprint);
+					return FReply::Handled();
+				}
+			}
+		}
+
+		return FReply::Unhandled();
+	}
+
+	FText GetAssetThumbnailTooltip() const
+	{
+		TSharedPtr<FPropertyInstanceInfo> PropertyInfo = GetPropertyInfo();
+		if (PropertyInfo.IsValid())
+		{
+			if (UObject* Object = PropertyInfo->Object.Get())
+			{
+				if (CanOpenAsset(Object))
+				{
+					return FText::Format(LOCTEXT("OpenPackage", "Open: {0}"), FText::FromString(Object->GetFullName()));
+				}
+			}
+			return PropertyInfo->Type;
+		}
+
+		return FText::GetEmpty();
+	}
+
+	FText GetIconTooltipText() const
+	{
+		TSharedPtr<FPropertyInstanceInfo> PropertyInfo = GetPropertyInfo();
+		if (PropertyInfo.IsValid())
+		{
+			if (UObject* Object = PropertyInfo->Object.Get())
+			{
+				if (UBlueprint* Blueprint = Cast<UBlueprint>(Object->GetClass()->ClassGeneratedBy))
+				{
+					return FText::Format(LOCTEXT("OpenPackage", "Open: {0}"), FText::FromString(Blueprint->GetFullName()));
+				}
+			}
+			return PropertyInfo->Type;
+		}
+
+		return FText::GetEmpty();
+	}
 };
 
 FText FWatchLineItem::GetDisplayName() const
@@ -1480,25 +1625,67 @@ TSharedRef<SWidget> FWatchLineItem::GenerateValueWidget(TSharedPtr<FString> InSe
 		.TreeItem(AsShared());
 }
 
+TSharedRef<SWidget> FWatchLineItem::GetValueIcon()
+{
+	TSharedPtr<FPropertyInstanceInfo> PropertyInfo = GetPropertyInfo();
+	if (PropertyInfo.IsValid())
+	{
+		if (UObject* Object = PropertyInfo->Object.Get())
+		{
+			if (Object->IsAsset())
+			{
+				FAssetThumbnailConfig ThumbnailConfig;
+
+				if (FSlateApplication::Get().InKismetDebuggingMode())
+				{
+					ThumbnailConfig.bForceGenericThumbnail = true;
+				}
+
+				TSharedPtr<FAssetThumbnail> Thumb = MakeShared<FAssetThumbnail>(Object, ThumbnailIconResolution, ThumbnailIconResolution, UThumbnailManager::Get().GetSharedThumbnailPool());
+				return SNew(SButton)
+					.OnClicked(this, &FWatchLineItem::OpenEditorForAsset)
+					.ToolTipText(this, &FWatchLineItem::GetAssetThumbnailTooltip)
+					.ButtonStyle(FEditorStyle::Get(), "NoBorder")
+					[
+						SNew(SBox)
+						.MaxDesiredHeight(ThumbnailIconSize)
+						.MaxDesiredWidth(ThumbnailIconSize)
+						[
+							Thumb->MakeThumbnailWidget(ThumbnailConfig)
+						]
+					];
+			}
+		}
+	}
+
+	return FDebugLineItem::GetValueIcon();
+}
+
 // overlays the watch icon on top of a faded icon associated with the pin type
 TSharedRef<SWidget> FWatchLineItem::GetNameIcon()
 {
-	return SNew(SOverlay)
-		.ToolTipText(this, &FWatchLineItem::GetTypename)
-		+ SOverlay::Slot()
+	return SNew(SButton)
+		.ButtonStyle(FEditorStyle::Get(), "NoBorder")
+		.ToolTipText(this, &FWatchLineItem::GetIconTooltipText)
+		.OnClicked(this, &FWatchLineItem::OpenEditorForType)
+		[
+			SNew(SOverlay)
+			.ToolTipText(this, &FWatchLineItem::GetTypename)
+			+ SOverlay::Slot()
 			.Padding(FMargin(10.f, 0.f, 0.f, 0.f))
 			[
 				SNew(SImage)
 					.Image(this, &FWatchLineItem::GetPinIcon)
 					.ColorAndOpacity(this, &FWatchLineItem::GetPinIconColor)
 			]
-		+ SOverlay::Slot()
+			+ SOverlay::Slot()
 			.HAlign(HAlign_Left)
 			[
 				SNew(SImage)
-					.Image(FEditorStyle::GetBrush(TEXT("Kismet.WatchIcon")))
-					.Visibility(this, &FWatchLineItem::GetWatchIconVisibility)
-			];
+				.Image(FEditorStyle::GetBrush(TEXT("Kismet.WatchIcon")))
+				.Visibility(this, &FWatchLineItem::GetWatchIconVisibility)
+			]
+		];
 }
 
 const FSlateBrush* FWatchLineItem::GetPinIcon() const
