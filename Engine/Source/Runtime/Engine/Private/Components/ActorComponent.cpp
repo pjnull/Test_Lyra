@@ -656,7 +656,8 @@ bool UActorComponent::ComponentIsInPersistentLevel(bool bIncludeLevelStreamingPe
 
 FString UActorComponent::GetReadableName() const
 {
-	FString Result = GetNameSafe(GetOwner()) + TEXT(".") + GetName();
+	const AActor* Owner = GetOwner();
+	FString Result = (Owner ? Owner->GetActorNameOrLabel() : TEXT("None")) + TEXT(".") + GetName();
 	UObject const *Add = AdditionalStatObject();
 	if (Add)
 	{
