@@ -3134,9 +3134,23 @@ FRayTracingSceneRHIRef FD3D12DynamicRHI::RHICreateRayTracingScene(const FRayTrac
 	{
 		const FRayTracingGeometryInstance& InstanceDesc = Initializer.Instances[InstanceIndex];
 
-		checkf(InstanceDesc.GPUTransformsSRV || InstanceDesc.NumTransforms <= uint32(InstanceDesc.Transforms.Num()),
-			TEXT("Expected at most %d ray tracing geometry instance transforms, but got %d."),
-			InstanceDesc.NumTransforms, InstanceDesc.Transforms.Num());
+		if (InstanceDesc.GPUTransformsSRV || !InstanceDesc.InstanceSceneDataOffsets.IsEmpty())
+		{
+			static bool bLogged = false; // Only log once
+			if (!bLogged)
+			{
+				bLogged = true;
+				UE_LOG(LogRHI, Warning,
+					TEXT("GPUScene and GPUTransformsSRV instances are not supported in FRayTracingSceneInitializer code path.\n")
+					TEXT("Use FRayTracingSceneInitializer2 and BuildRayTracingInstanceBuffer instead."));
+			}
+		}
+		else
+		{
+			checkf(InstanceDesc.NumTransforms <= uint32(InstanceDesc.Transforms.Num()),
+				TEXT("Expected at most %d ray tracing geometry instance transforms, but got %d."),
+				InstanceDesc.NumTransforms, InstanceDesc.Transforms.Num());
+		}
 
 		checkf(InstanceDesc.GeometryRHI, TEXT("Ray tracing instance must have a valid geometry."));
 
@@ -3183,9 +3197,6 @@ FRayTracingSceneRHIRef FD3D12DynamicRHI::RHICreateRayTracingScene(const FRayTrac
 
 			const bool bUseUniqueUserData = Instance.UserData.Num() != 0;
 
-			const bool bGpuInstance = Instance.GPUTransformsSRV != nullptr;
-			const bool bCpuInstance = !bGpuInstance;
-
 			uint32 DescIndex = Initializer2.BaseInstancePrefixSum[InstanceIndex];
 
 			int32 NumInactiveDxrInstancesThisSceneInstance = 0;
@@ -3194,22 +3205,22 @@ FRayTracingSceneRHIRef FD3D12DynamicRHI::RHICreateRayTracingScene(const FRayTrac
 			{
 				InstanceDesc.InstanceID = bUseUniqueUserData ? Instance.UserData[TransformIndex] : Instance.DefaultUserData;
 
-				if (LIKELY(bCpuInstance))
+				// Set flag for deactivated instances
+				if (!Instance.ActivationMask.IsEmpty())
 				{
-					// Set flag for deactivated instances
-					if (!Instance.ActivationMask.IsEmpty())
+					if ((Instance.ActivationMask[TransformIndex / 32] & (1 << (TransformIndex % 32))) == 0)
 					{
-						if ((Instance.ActivationMask[TransformIndex / 32] & (1 << (TransformIndex % 32))) == 0)
-						{
-							InstanceDesc.AccelerationStructure = 0xFFFFFFFFFFFFFFFF;
-							NumInactiveDxrInstancesThisSceneInstance++;
-						}
-						else
-						{
-							InstanceDesc.AccelerationStructure = 0;
-						}
+						InstanceDesc.AccelerationStructure = 0xFFFFFFFFFFFFFFFF;
+						NumInactiveDxrInstancesThisSceneInstance++;
 					}
+					else
+					{
+						InstanceDesc.AccelerationStructure = 0;
+					}
+				}
 
+				if (TransformIndex < (uint32)Instance.Transforms.Num())
+				{
 					// DXR uses a 3x4 transform matrix in row major layout
 
 					const FMatrix& Transform = Instance.Transforms[TransformIndex];
@@ -3228,6 +3239,10 @@ FRayTracingSceneRHIRef FD3D12DynamicRHI::RHICreateRayTracingScene(const FRayTrac
 					InstanceDesc.Transform[2][1] = Transform.M[1][2];
 					InstanceDesc.Transform[2][2] = Transform.M[2][2];
 					InstanceDesc.Transform[2][3] = Transform.M[3][2];
+				}
+				else
+				{
+					FMemory::Memset(&InstanceDesc.Transform, 0, sizeof(InstanceDesc.Transform));
 				}
 
 				NativeInstances[DescIndex] = InstanceDesc;
