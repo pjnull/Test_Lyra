@@ -176,6 +176,8 @@ void FPBIKSolver::Solve(const FPBIKSolverSettings& Settings)
 	if (RootPin.IsValid())
 	{
 		RootPin.Pin()->bEnabled = Settings.bPinRoot;
+		// pin to animated input root pose
+		RootPin.Pin()->SetGoal(SolverRoot->Position, SolverRoot->Rotation, 1.0f);
 	}
 
 	// blend effectors by Alpha, update pin goals and update effector dist to root
