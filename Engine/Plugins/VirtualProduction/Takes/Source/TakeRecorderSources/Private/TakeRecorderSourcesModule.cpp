@@ -60,7 +60,7 @@ namespace TakeRecorderSources
 #if WITH_EDITOR
 	static bool AllowMenuExtensions = true;
 	FAutoConsoleVariableRef CVarAllowMenuExtensions(TEXT("TakeRecorder.AllowMenuExtensions"), AllowMenuExtensions, TEXT(""), ECVF_Cheat);
-#endif WITH_EDITOR
+#endif // WITH_EDITOR
 }
 
 static void AddActorSources(UTakeRecorderSources* Sources, TArrayView<AActor* const> InActors)
