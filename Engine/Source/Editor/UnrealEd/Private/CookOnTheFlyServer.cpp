@@ -4952,6 +4952,51 @@ UE::Cook::FInstigator UCookOnTheFlyServer::GetInstigator(FName PackageName)
 	return PackageData->GetInstigator();
 }
 
+TArray<UE::Cook::FInstigator> UCookOnTheFlyServer::GetInstigatorChain(FName PackageName)
+{
+	using namespace UE::Cook;
+	TArray<FInstigator> Result;
+	TSet<FName> NamesOnChain;
+	NamesOnChain.Add(PackageName);
+
+	for (;;)
+	{
+		FPackageData* PackageData = PackageDatas->FindPackageDataByPackageName(PackageName);
+		if (!PackageData)
+		{
+			Result.Add(FInstigator(EInstigator::NotYetRequested));
+			return Result;
+		}
+		const FInstigator& Last = Result.Add_GetRef(PackageData->GetInstigator());
+		bool bGetNext = false;
+		switch (Last.Category)
+		{
+			case EInstigator::Dependency: bGetNext = true; break;
+			case EInstigator::HardDependency: bGetNext = true; break;
+			case EInstigator::SoftDependency: bGetNext = true; break;
+			case EInstigator::Unsolicited: bGetNext = true; break;
+			case EInstigator::GeneratedPackage: bGetNext = true; break;
+			default: break;
+		}
+		if (!bGetNext)
+		{
+			return Result;
+		}
+		PackageName = Last.Referencer;
+		if (PackageName.IsNone())
+		{
+			return Result;
+		}
+		bool bAlreadyExists = false;
+		NamesOnChain.Add(PackageName, &bAlreadyExists);
+		if (bAlreadyExists)
+		{
+			return Result;
+		}
+	}
+	return Result; // Unreachable
+}
+
 void UCookOnTheFlyServer::DumpStats()
 {
 	UE_LOG(LogCook, Display, TEXT("IntStats:"));
@@ -6249,7 +6294,7 @@ void UCookOnTheFlyServer::CollectFilesToCook(TArray<FName>& FilesInPath, TMap<FN
 		{
 			TArray<FName> PackagesToNeverCook;
 
-			UAssetManager::Get().ModifyCook(FilesInPath, PackagesToNeverCook);
+			UAssetManager::Get().ModifyCook(TargetPlatforms, FilesInPath, PackagesToNeverCook);
 			UpdateInstigators(EInstigator::AssetRegistryModifyCook);
 
 			for (FName NeverCookPackage : PackagesToNeverCook)
@@ -6304,7 +6349,7 @@ void UCookOnTheFlyServer::CollectFilesToCook(TArray<FName>& FilesInPath, TMap<FN
 	if (IsCookingDLC())
 	{
 		TArray<FName> PackagesToNeverCook;
-		UAssetManager::Get().ModifyDLCCook(CookByTheBookOptions->DlcName, FilesInPath, PackagesToNeverCook);
+		UAssetManager::Get().ModifyDLCCook(CookByTheBookOptions->DlcName, TargetPlatforms, FilesInPath, PackagesToNeverCook);
 		UpdateInstigators(EInstigator::AssetRegistryModifyDLCCook);
 
 		for (FName NeverCookPackage : PackagesToNeverCook)

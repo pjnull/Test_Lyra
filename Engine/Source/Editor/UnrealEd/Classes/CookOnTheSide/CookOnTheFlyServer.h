@@ -396,6 +396,7 @@ public:
 	* ICookInfo interface
 	*/
 	virtual UE::Cook::FInstigator GetInstigator(FName PackageName) override;
+	virtual TArray<UE::Cook::FInstigator> GetInstigatorChain(FName PackageName) override;
 
 	/**
 	 * Dumps cooking stats to the log
