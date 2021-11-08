@@ -397,120 +397,11 @@ static VkGeometryInstanceFlagsKHR TranslateRayTracingInstanceFlags(ERayTracingIn
 	return Result;
 }
 
-FVulkanRayTracingScene::FVulkanRayTracingScene(const FRayTracingSceneInitializer& Initializer, const FVulkanDevice* InDevice)
+FVulkanRayTracingScene::FVulkanRayTracingScene(FRayTracingSceneInitializer2 InInitializer, const FVulkanDevice* InDevice, FVkRtAllocation InInstanceBuffer)
+	: Device(InDevice), Initializer(MoveTemp(InInitializer)), InstanceBuffer(MoveTemp(InInstanceBuffer))
 {
-	Device = InDevice;
-	DebugName = Initializer.DebugName;
-	
-	Experimental::TSherwoodSet<const FVulkanRayTracingGeometry*> UniqueGeometryReferences;
-
-	for (const FRayTracingGeometryInstance& SceneInstance : Initializer.Instances)
-	{
-		// Don't support GPU transforms yet.
-		ensure(SceneInstance.GPUTransformsSRV == nullptr);
-
-		// Hold a reference to each unique geometry object in the scene
-		const FVulkanRayTracingGeometry* const Geometry = ResourceCast(SceneInstance.GeometryRHI);
-		bool bIsAlreadyInSet = false;
-		UniqueGeometryReferences.Add(Geometry, &bIsAlreadyInSet);
-		if (!bIsAlreadyInSet)
-		{
-			ReferencedGeometry.Add(Geometry);
-		}
-
-		NumInstances += SceneInstance.NumTransforms;
-	}
-
-	uint32 InstanceDescIndex = 0;
-	InstanceDescs.SetNumUninitialized(NumInstances);
-	InstanceGeometry.SetNumUninitialized(NumInstances);
-	for (const FRayTracingGeometryInstance& SceneInstance : Initializer.Instances)
-	{
-		const bool bUseUniqueUserData = SceneInstance.UserData.Num() != 0;
-
-		for (int32 TransformIndex = 0; TransformIndex < SceneInstance.Transforms.Num(); ++TransformIndex)
-		{
-			InstanceGeometry[InstanceDescIndex] = ResourceCast(SceneInstance.GeometryRHI);
-
-			const FMatrix& Transform = SceneInstance.Transforms[TransformIndex];
-
-			VkAccelerationStructureInstanceKHR& InstanceDesc = InstanceDescs[InstanceDescIndex];
-			auto& Matrix = InstanceDesc.transform.matrix;
-
-			Matrix[0][0] = Transform.M[0][0];
-			Matrix[0][1] = Transform.M[1][0];
-			Matrix[0][2] = Transform.M[2][0];
-			Matrix[0][3] = Transform.M[3][0];
-
-			Matrix[1][0] = Transform.M[0][1];
-			Matrix[1][1] = Transform.M[1][1];
-			Matrix[1][2] = Transform.M[2][1];
-			Matrix[1][3] = Transform.M[3][1];
-
-			Matrix[2][0] = Transform.M[0][2];
-			Matrix[2][1] = Transform.M[1][2];
-			Matrix[2][2] = Transform.M[2][2];
-			Matrix[2][3] = Transform.M[3][2];
-
-			InstanceDesc.accelerationStructureReference = 0; // Set during TLAS build after the BLAS for the referenced geometry is built.
-
-			// Set flag for deactivated instances
-			if (!SceneInstance.ActivationMask.IsEmpty())
-			{
-				if ((SceneInstance.ActivationMask[TransformIndex / 32] & (1 << (TransformIndex % 32))) == 0)
-				{
-					InstanceDesc.accelerationStructureReference = 0xFFFFFFFFFFFFFFFF;
-				}
-			}
-
-			InstanceDesc.instanceCustomIndex = bUseUniqueUserData ? SceneInstance.UserData[TransformIndex] : SceneInstance.DefaultUserData;
-			InstanceDesc.mask = SceneInstance.Mask;
-			InstanceDesc.instanceShaderBindingTableRecordOffset = 0; // Todo
-			InstanceDesc.flags = TranslateRayTracingInstanceFlags(SceneInstance.Flags);
-
-			++InstanceDescIndex;
-		}
-	}
-
-	// Allocate instance buffer
-	const uint32 InstanceBufferByteSize = static_cast<uint32>(NumInstances) * sizeof(VkAccelerationStructureInstanceKHR);
-
-	FVulkanRayTracingAllocator::Allocate(
-		Device->GetPhysicalHandle(),
-		Device->GetInstanceHandle(),
-		InstanceBufferByteSize,
-		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		InstanceBuffer);
-
-	InstanceBuffer.Address = GetDeviceAddress(Device->GetInstanceHandle(), InstanceBuffer.Buffer);
-
-	// Copy instance data
-	void* pMappedInstanceBufferMemory = nullptr;
-	VERIFYVULKANRESULT(vkMapMemory(Device->GetInstanceHandle(), InstanceBuffer.Memory, 0, InstanceBufferByteSize, 0, &pMappedInstanceBufferMemory));
-	{
-		VkAccelerationStructureInstanceKHR* const InstanceDescBuffer = reinterpret_cast<VkAccelerationStructureInstanceKHR*>(pMappedInstanceBufferMemory);
-		FMemory::Memcpy(InstanceDescBuffer, InstanceDescs.GetData(), InstanceBufferByteSize);
-
-		for (int32 InstanceIndex = 0; InstanceIndex < InstanceDescs.Num(); ++InstanceIndex)
-		{
-			if (InstanceDescBuffer[InstanceIndex].accelerationStructureReference == 0xFFFFFFFFFFFFFFFF)
-			{
-				InstanceDescBuffer[InstanceIndex].accelerationStructureReference = 0;
-			}
-			else
-			{
-				InstanceDescBuffer[InstanceIndex].accelerationStructureReference = InstanceGeometry[InstanceIndex]->GetAccelerationStructureAddress();
-			}
-		}
-	}
-	vkUnmapMemory(Device->GetInstanceHandle(), InstanceBuffer.Memory);
-
-	InstanceDescs.Empty();
-	InstanceGeometry.Empty();
-
 	const ERayTracingAccelerationStructureFlags BuildFlags = ERayTracingAccelerationStructureFlags::FastTrace; // #yuriy_todo: pass this in
-	SizeInfo = RHICalcRayTracingSceneSize(NumInstances, BuildFlags);
+	SizeInfo = RHICalcRayTracingSceneSize(Initializer.NumNativeInstances, BuildFlags);
 }
 
 FVulkanRayTracingScene::~FVulkanRayTracingScene()
@@ -527,15 +418,14 @@ void FVulkanRayTracingScene::BindBuffer(FRHIBuffer* InBuffer, uint32 InBufferOff
 void FVulkanRayTracingScene::BuildAccelerationStructure(
 	FVulkanCommandListContext& CommandContext,
 	FVulkanResourceMultiBuffer* InScratchBuffer, uint32 InScratchOffset,
-	FVulkanResourceMultiBuffer* InInstanceBuffer, uint32 InInstanceOffset,
-	uint32 NumInstanceDescs)
+	FVulkanResourceMultiBuffer* InInstanceBuffer, uint32 InInstanceOffset)
 {
 	check(AccelerationStructureBuffer.IsValid());
 	check(InInstanceBuffer == nullptr); // External instance buffer not supported yet
 	const bool bExternalScratchBuffer = InScratchBuffer != nullptr;
 
 	FVkRtTLASBuildData BuildData;
-	GetTLASBuildData(Device->GetInstanceHandle(), NumInstances, InstanceBuffer.Address, BuildData);
+	GetTLASBuildData(Device->GetInstanceHandle(), Initializer.NumNativeInstances, InstanceBuffer.Address, BuildData);
 
 	if (!bExternalScratchBuffer)
 	{
@@ -570,7 +460,7 @@ void FVulkanRayTracingScene::BuildAccelerationStructure(
 	}
 
 	VkAccelerationStructureBuildRangeInfoKHR TLASBuildRangeInfo;
-	TLASBuildRangeInfo.primitiveCount = NumInstances;
+	TLASBuildRangeInfo.primitiveCount = Initializer.NumNativeInstances;
 	TLASBuildRangeInfo.primitiveOffset = 0;
 	TLASBuildRangeInfo.transformOffset = 0;
 	TLASBuildRangeInfo.firstVertex = 0;
@@ -631,7 +521,165 @@ FRayTracingAccelerationStructureSize FVulkanDynamicRHI::RHICalcRayTracingGeometr
 
 FRayTracingSceneRHIRef FVulkanDynamicRHI::RHICreateRayTracingScene(const FRayTracingSceneInitializer& Initializer)
 {
-	return new FVulkanRayTracingScene(Initializer, GetDevice());
+	TRACE_CPUPROFILER_EVENT_SCOPE(CreateRayTracingScene);
+
+	const uint32 NumSceneInstances = Initializer.Instances.Num();
+
+	FRayTracingSceneInitializer2 Initializer2;
+	Initializer2.DebugName = Initializer.DebugName;
+	Initializer2.ShaderSlotsPerGeometrySegment = Initializer.ShaderSlotsPerGeometrySegment;
+	Initializer2.NumMissShaderSlots = Initializer.NumMissShaderSlots;
+	Initializer2.PerInstanceGeometries.SetNumUninitialized(NumSceneInstances);
+	Initializer2.BaseInstancePrefixSum.SetNumUninitialized(NumSceneInstances);
+	Initializer2.SegmentPrefixSum.SetNumUninitialized(NumSceneInstances);
+	Initializer2.NumNativeInstances = 0;
+	Initializer2.NumTotalSegments = 0;
+
+	TArray<uint32> PerInstanceNumTransforms;
+	PerInstanceNumTransforms.SetNumUninitialized(NumSceneInstances);
+
+	Experimental::TSherwoodSet<FRHIRayTracingGeometry*> UniqueGeometries;
+
+	for (uint32 InstanceIndex = 0; InstanceIndex < NumSceneInstances; ++InstanceIndex)
+	{
+		const FRayTracingGeometryInstance& InstanceDesc = Initializer.Instances[InstanceIndex];
+
+		if (InstanceDesc.GPUTransformsSRV || !InstanceDesc.InstanceSceneDataOffsets.IsEmpty())
+		{
+			static bool bLogged = false; // Only log once
+			if (!bLogged)
+			{
+				bLogged = true;
+				UE_LOG(LogRHI, Warning,
+					TEXT("GPUScene and GPUTransformsSRV instances are not supported in FRayTracingSceneInitializer code path.\n")
+					TEXT("Use FRayTracingSceneInitializer2 and BuildRayTracingInstanceBuffer instead."));
+			}
+		}
+		else
+		{
+			checkf(InstanceDesc.NumTransforms <= uint32(InstanceDesc.Transforms.Num()),
+				TEXT("Expected at most %d ray tracing geometry instance transforms, but got %d."),
+				InstanceDesc.NumTransforms, InstanceDesc.Transforms.Num());
+		}
+
+		checkf(InstanceDesc.GeometryRHI, TEXT("Ray tracing instance must have a valid geometry."));
+
+		Initializer2.PerInstanceGeometries[InstanceIndex] = InstanceDesc.GeometryRHI;
+
+		// Compute geometry segment count prefix sum to be later used in GetHitRecordBaseIndex()
+		Initializer2.SegmentPrefixSum[InstanceIndex] = Initializer2.NumTotalSegments;
+		Initializer2.NumTotalSegments += InstanceDesc.GeometryRHI->GetNumSegments();
+
+		bool bIsAlreadyInSet = false;
+		UniqueGeometries.Add(InstanceDesc.GeometryRHI, &bIsAlreadyInSet);
+		if (!bIsAlreadyInSet)
+		{
+			Initializer2.ReferencedGeometries.Add(InstanceDesc.GeometryRHI);
+		}
+
+		Initializer2.BaseInstancePrefixSum[InstanceIndex] = Initializer2.NumNativeInstances;
+		Initializer2.NumNativeInstances += InstanceDesc.NumTransforms;
+
+		PerInstanceNumTransforms[InstanceIndex] = InstanceDesc.NumTransforms;
+	}
+
+	TArray<VkAccelerationStructureInstanceKHR> NativeInstances;
+	NativeInstances.SetNumUninitialized(Initializer2.NumNativeInstances);
+
+	const EParallelForFlags ParallelForFlags = EParallelForFlags::None; // set ForceSingleThread for testing
+	ParallelFor(NumSceneInstances, [&Initializer2, Instances = Initializer.Instances, &NativeInstances](int32 InstanceIndex)
+	{
+		const FRayTracingGeometryInstance& Instance = Instances[InstanceIndex];
+		FVulkanRayTracingGeometry* Geometry = ResourceCast(Initializer2.PerInstanceGeometries[InstanceIndex]);
+
+		const FRayTracingAccelerationStructureAddress AccelerationStructureAddress = Geometry->GetAccelerationStructureAddress(0);
+		check(AccelerationStructureAddress != 0);
+
+		VkAccelerationStructureInstanceKHR InstanceDesc = {};
+		InstanceDesc.mask = Instance.Mask;
+		InstanceDesc.instanceShaderBindingTableRecordOffset = Initializer2.SegmentPrefixSum[InstanceIndex] * Initializer2.ShaderSlotsPerGeometrySegment; // TODO?
+		InstanceDesc.flags = TranslateRayTracingInstanceFlags(Instance.Flags);
+
+		const uint32 NumTransforms = Instance.NumTransforms;
+
+		checkf(Instance.UserData.Num() == 0 || Instance.UserData.Num() >= int32(NumTransforms),
+			TEXT("User data array must be either be empty (Instance.DefaultUserData is used), or contain one entry per entry in Transforms array."));
+
+		const bool bUseUniqueUserData = Instance.UserData.Num() != 0;
+
+		uint32 DescIndex = Initializer2.BaseInstancePrefixSum[InstanceIndex];
+
+		for (uint32 TransformIndex = 0; TransformIndex < NumTransforms; ++TransformIndex)
+		{
+			InstanceDesc.instanceCustomIndex = bUseUniqueUserData ? Instance.UserData[TransformIndex] : Instance.DefaultUserData;
+
+			InstanceDesc.accelerationStructureReference = AccelerationStructureAddress;
+
+			if (!Instance.ActivationMask.IsEmpty() && (Instance.ActivationMask[TransformIndex / 32] & (1 << (TransformIndex % 32))) == 0)
+			{
+				InstanceDesc.accelerationStructureReference = 0;
+			}
+
+			if (TransformIndex < (uint32)Instance.Transforms.Num())
+			{
+				const FMatrix& Transform = Instance.Transforms[TransformIndex];
+
+				InstanceDesc.transform.matrix[0][0] = Transform.M[0][0];
+				InstanceDesc.transform.matrix[0][1] = Transform.M[1][0];
+				InstanceDesc.transform.matrix[0][2] = Transform.M[2][0];
+				InstanceDesc.transform.matrix[0][3] = Transform.M[3][0];
+
+				InstanceDesc.transform.matrix[1][0] = Transform.M[0][1];
+				InstanceDesc.transform.matrix[1][1] = Transform.M[1][1];
+				InstanceDesc.transform.matrix[1][2] = Transform.M[2][1];
+				InstanceDesc.transform.matrix[1][3] = Transform.M[3][1];
+
+				InstanceDesc.transform.matrix[2][0] = Transform.M[0][2];
+				InstanceDesc.transform.matrix[2][1] = Transform.M[1][2];
+				InstanceDesc.transform.matrix[2][2] = Transform.M[2][2];
+				InstanceDesc.transform.matrix[2][3] = Transform.M[3][2];
+			}
+			else
+			{
+				FMemory::Memset(&InstanceDesc.transform, 0, sizeof(InstanceDesc.transform));
+			}
+
+			NativeInstances[DescIndex] = InstanceDesc;
+
+			++DescIndex;
+		}
+	}, ParallelForFlags);
+
+	// Allocate instance buffer
+	FVkRtAllocation InstanceBuffer;
+
+	const uint32 InstanceBufferByteSize = static_cast<uint32>(Initializer2.NumNativeInstances) * sizeof(VkAccelerationStructureInstanceKHR);
+
+	FVulkanRayTracingAllocator::Allocate(
+		Device->GetPhysicalHandle(),
+		Device->GetInstanceHandle(),
+		InstanceBufferByteSize,
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		InstanceBuffer);
+
+	InstanceBuffer.Address = GetDeviceAddress(Device->GetInstanceHandle(), InstanceBuffer.Buffer);
+
+	// Copy instance data
+	void* pMappedInstanceBufferMemory = nullptr;
+	VERIFYVULKANRESULT(vkMapMemory(Device->GetInstanceHandle(), InstanceBuffer.Memory, 0, InstanceBufferByteSize, 0, &pMappedInstanceBufferMemory));
+	{
+		VkAccelerationStructureInstanceKHR* const InstanceDescBuffer = reinterpret_cast<VkAccelerationStructureInstanceKHR*>(pMappedInstanceBufferMemory);
+		FMemory::Memcpy(InstanceDescBuffer, NativeInstances.GetData(), InstanceBufferByteSize);
+	}
+	vkUnmapMemory(Device->GetInstanceHandle(), InstanceBuffer.Memory);
+
+	return new FVulkanRayTracingScene(MoveTemp(Initializer2), GetDevice(), MoveTemp(InstanceBuffer));
+}
+
+FRayTracingSceneRHIRef FVulkanDynamicRHI::RHICreateRayTracingScene(FRayTracingSceneInitializer2 Initializer)
+{
+	return new FVulkanRayTracingScene(MoveTemp(Initializer), GetDevice(), {});
 }
 
 FRayTracingGeometryRHIRef FVulkanDynamicRHI::RHICreateRayTracingGeometry(const FRayTracingGeometryInitializer& Initializer)
@@ -667,8 +715,7 @@ void FVulkanCommandListContext::RHIBuildAccelerationStructure(const FRayTracingS
 	Scene->BuildAccelerationStructure(
 		*this, 
 		ScratchBuffer, SceneBuildParams.ScratchBufferOffset, 
-		InstanceBuffer, SceneBuildParams.InstanceBufferOffset, 
-		SceneBuildParams.NumInstances);
+		InstanceBuffer, SceneBuildParams.InstanceBufferOffset);
 }
 
 void FVulkanCommandListContext::RHIRayTraceOcclusion(FRHIRayTracingScene* Scene, FRHIShaderResourceView* Rays, FRHIUnorderedAccessView* Output, uint32 NumRays)
@@ -736,7 +783,7 @@ FVulkanRayTracingPipelineState::FVulkanRayTracingPipelineState(FVulkanDevice* co
 		// vkrt todo: How to handle any hit for hit group?
 	}
 
-	DescriptorSetLayoutInfo.FinalizeBindings<false>(UBGatherInfo, TArrayView<FRHISamplerState*>());
+	DescriptorSetLayoutInfo.FinalizeBindings<false>(*InDevice, UBGatherInfo, TArrayView<FRHISamplerState*>());
 
 	Layout = new FVulkanRayTracingLayout(InDevice);
 	Layout->DescriptorSetLayout.CopyFrom(DescriptorSetLayoutInfo);

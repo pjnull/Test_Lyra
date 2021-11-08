@@ -467,7 +467,7 @@ FBufferRHIRef FVulkanDynamicRHI::RHICreateBuffer(uint32 Size, EBufferUsageFlags 
 	LLM_SCOPE_VULKAN(ELLMTagVulkan::VulkanBuffers);
 
 #if VULKAN_RHI_RAYTRACING
-	if (Usage & BUF_AccelerationStructure)
+	if (EnumHasAnyFlags(Usage, BUF_AccelerationStructure))
 	{
 		return new FVulkanAccelerationStructureBuffer(Device, Size, Usage, Stride, CreateInfo);
 	}
