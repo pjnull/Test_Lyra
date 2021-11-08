@@ -2242,8 +2242,20 @@ void FControlRigEditMode::ResetTransforms(bool bSelectionOnly)
 		{
 			ControlsToReset = ControlRig->GetHierarchy()->GetAllKeys(true, ERigElementType::Control);
 		}
+		bool bHasNonDefaultParent = false;
+		TArray<FRigElementKey> Parents;
+		for (const FRigElementKey& ControlKey : ControlsToReset)
+		{
+			FRigElementKey SpaceKey = ControlRig->GetHierarchy()->GetActiveParent(ControlKey);
+			Parents.Add(SpaceKey);
+			if (SpaceKey != ControlRig->GetHierarchy()->GetDefaultParentKey())
+			{
+				bHasNonDefaultParent = true;
+			}
+		}
 
 		FScopedTransaction Transaction(LOCTEXT("HierarchyResetTransforms", "Reset Transforms"));
+
 		for (const FRigElementKey& ControlToReset : ControlsToReset)
 		{
 			if (ControlToReset.Type == ERigElementType::Control)
@@ -2253,15 +2265,76 @@ void FControlRigEditMode::ResetTransforms(bool bSelectionOnly)
 				{
 					const FTransform InitialLocalTransform = ControlRig->GetHierarchy()->GetInitialLocalTransform(ControlToReset);
 					ControlRig->Modify();
+					if (bHasNonDefaultParent == true) //possibly not at default parent so switch to it
+					{
+						ControlRig->GetHierarchy()->SwitchToDefaultParent(ControlElement->GetKey());
+					}
 					ControlRig->GetHierarchy()->SetLocalTransform(ControlToReset, InitialLocalTransform);
-					ControlRig->ControlModified().Broadcast(ControlRig, ControlElement, EControlRigSetKey::DoNotCare);
+					if (bHasNonDefaultParent == false)
+					{
+						ControlRig->ControlModified().Broadcast(ControlRig, ControlElement, EControlRigSetKey::DoNotCare);
+					}
 
+					//@helge not sure what to do if the non-default parent
 					if (UControlRigBlueprint* Blueprint = Cast<UControlRigBlueprint>(ControlRig->GetClass()->ClassGeneratedBy))
 					{
 						Blueprint->Hierarchy->SetLocalTransform(ControlToReset, InitialLocalTransform);
 					}
 				}
 			}
+		}
+
+		if (bHasNonDefaultParent == true) //now we have the initial pose setup we need to get the global transforms as specified now then set them in the current parent space
+		{
+			ControlRig->Evaluate_AnyThread();
+
+			//get global transforms
+			TArray<FTransform> GlobalTransforms;
+			for (const FRigElementKey& ControlToReset : ControlsToReset)
+			{
+				FRigControlElement* ControlElement = ControlRig->FindControl(ControlToReset.Name);
+				if (ControlElement && !ControlElement->Settings.bIsTransientControl)
+				{
+					FTransform GlobalTransform = ControlRig->GetHierarchy()->GetGlobalTransform(ControlToReset);
+					GlobalTransforms.Add(GlobalTransform);
+				}
+			}
+			//switch back to original parent space
+			int32 Index = 0;
+			for (const FRigElementKey& ControlToReset : ControlsToReset)
+			{
+				FRigControlElement* ControlElement = ControlRig->FindControl(ControlToReset.Name);
+				if (ControlElement && !ControlElement->Settings.bIsTransientControl)
+				{
+					ControlRig->GetHierarchy()->SwitchToParent(ControlToReset,Parents[Index]);
+					++Index;
+				}
+			}
+			//set global transforms in this space
+			ControlRig->Evaluate_AnyThread();
+			Index = 0;
+			for (const FRigElementKey& ControlToReset : ControlsToReset)
+
+			{
+				FRigControlElement* ControlElement = ControlRig->FindControl(ControlToReset.Name);
+				if (ControlElement && !ControlElement->Settings.bIsTransientControl)
+				{
+					ControlRig->GetHierarchy()->SetGlobalTransform(ControlToReset,GlobalTransforms[Index]);
+					ControlRig->Evaluate_AnyThread();
+					++Index;
+				}
+			}
+			//send notifies
+
+			for (const FRigElementKey& ControlToReset : ControlsToReset)
+			{
+				FRigControlElement* ControlElement = ControlRig->FindControl(ControlToReset.Name);
+				if (ControlElement && !ControlElement->Settings.bIsTransientControl)
+				{
+					ControlRig->ControlModified().Broadcast(ControlRig, ControlElement, EControlRigSetKey::DoNotCare);
+				}
+			}
+
 		}
 	}
 }

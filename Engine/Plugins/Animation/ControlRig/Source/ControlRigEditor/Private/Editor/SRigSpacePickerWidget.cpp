@@ -28,6 +28,8 @@ FRigElementKey SRigSpacePickerWidget::InValidKey;
 
 void SRigSpacePickerWidget::Construct(const FArguments& InArgs)
 {
+	GEditor->RegisterForUndo(this);
+
 	bShowDefaultSpaces = InArgs._ShowDefaultSpaces;
 	bShowFavoriteSpaces = InArgs._ShowFavoriteSpaces;
 	bShowAdditionalSpaces = InArgs._ShowAdditionalSpaces;
@@ -187,6 +189,8 @@ void SRigSpacePickerWidget::Construct(const FArguments& InArgs)
 
 SRigSpacePickerWidget::~SRigSpacePickerWidget()
 {
+	GEditor->UnregisterForUndo(this);
+
 	if(HierarchyModifiedHandle.IsValid())
 	{
 		if(Hierarchy)
@@ -790,29 +794,7 @@ FRigElementKey SRigSpacePickerWidget::GetActiveSpace_Private(URigHierarchy* InHi
 {
 	if(InHierarchy)
 	{
-		const TArray<FRigElementWeight> ParentWeights = InHierarchy->GetParentWeightArray(InControlKey);
-		if(ParentWeights.Num() > 0)
-		{
-			const TArray<FRigElementKey> ParentKeys = InHierarchy->GetParents(InControlKey);
-			check(ParentKeys.Num() == ParentWeights.Num());
-			for(int32 ParentIndex=0;ParentIndex<ParentKeys.Num();ParentIndex++)
-			{
-				if(ParentWeights[ParentIndex].IsAlmostZero())
-				{
-					continue;
-				}
-
-				if(ParentIndex == 0)
-				{
-					if(!IsDefaultSpace(ParentKeys[ParentIndex]))
-					{
-						return URigHierarchy::GetDefaultParentKey();
-					}
-				}
-
-				return ParentKeys[ParentIndex];
-			}
-		}
+		return InHierarchy->GetActiveParent(InControlKey);
 	}
 	return URigHierarchy::GetDefaultParentKey();
 }
@@ -1022,6 +1004,15 @@ bool SRigSpacePickerWidget::IsDefaultSpace(const FRigElementKey& InKey) const
 		return InKey == URigHierarchy::GetDefaultParentKey() || InKey == URigHierarchy::GetWorldSpaceReferenceKey();
 	}
 	return false;
+}
+
+void SRigSpacePickerWidget::PostUndo(bool bSuccess)
+{
+	RefreshContents();
+}
+void SRigSpacePickerWidget::PostRedo(bool bSuccess)
+{
+	RefreshContents();
 }
 
 //////////////////////////////////////////////////////////////
