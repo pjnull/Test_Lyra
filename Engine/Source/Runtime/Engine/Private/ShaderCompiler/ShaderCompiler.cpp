@@ -5154,7 +5154,11 @@ void ValidateShaderFilePath(const FString& VirtualShaderFilePath, const FString&
 		*VirtualShaderFilePath);
 }
 
-FThreadSafeSharedStringPtr GCachedGeneratedInstancedStereoCode = MakeShareable(new FString());
+/** Lock for the storage of instanced stereo code. */
+FCriticalSection GCachedGeneratedInstancedStereoCodeLock;
+
+/** Storage for instanced stereo code so it is not generated every time we compile a shader. */
+TMap<EShaderPlatform, FThreadSafeSharedStringPtr> GCachedGeneratedInstancedStereoCode;
 
 void GlobalBeginCompileShader(
 	const FString& DebugGroupName,
@@ -5419,13 +5423,21 @@ void GlobalBeginCompileShader(
 	}
 
 	// Add generated instanced stereo code
-	if (GCachedGeneratedInstancedStereoCode.Get()->Len() == 0)
 	{
-		GCachedGeneratedInstancedStereoCode = MakeShareable(new FString());
-		GenerateInstancedStereoCode(*GCachedGeneratedInstancedStereoCode.Get(), ShaderPlatform);
+		// this function may be called on multiple threads, so protect the storage
+		FScopeLock GeneratedInstancedCodeLock(&GCachedGeneratedInstancedStereoCodeLock);
+
+		FThreadSafeSharedStringPtr* Existing = GCachedGeneratedInstancedStereoCode.Find(ShaderPlatform);
+		FThreadSafeSharedStringPtr CachedCodePtr = Existing ? *Existing : nullptr;
+		if (!CachedCodePtr.IsValid())
+		{
+			CachedCodePtr = MakeShareable(new FString());
+			GenerateInstancedStereoCode(*CachedCodePtr.Get(), ShaderPlatform);
+			GCachedGeneratedInstancedStereoCode.Add(ShaderPlatform, CachedCodePtr);
+		}
+
+		Input.Environment.IncludeVirtualPathToExternalContentsMap.Add(TEXT("/Engine/Generated/GeneratedInstancedStereo.ush"), CachedCodePtr);
 	}
-	
-	Input.Environment.IncludeVirtualPathToExternalContentsMap.Add(TEXT("/Engine/Generated/GeneratedInstancedStereo.ush"), GCachedGeneratedInstancedStereoCode);
 
 	{
 		// Check if the compile environment explicitly wants to force optimization
