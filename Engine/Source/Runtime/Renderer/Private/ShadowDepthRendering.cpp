@@ -1691,7 +1691,9 @@ void FSceneRenderer::RenderShadowDepthMapAtlases(FRDGBuilder& GraphBuilder)
 		}
 
 		// Make readable because AtlasDepthTexture is not tracked via RDG yet
-		ShadowMapAtlas.RenderTargets.DepthTarget = ConvertToFinalizedExternalTexture(GraphBuilder, ResourceAccessFinalizer, AtlasDepthTexture);
+		// On mobile CSM atlas sampled only in pixel shaders
+		ERHIAccess AtlasDepthTextureAccessFinal = (FeatureLevel == ERHIFeatureLevel::ES3_1 ? ERHIAccess::SRVGraphics : ERHIAccess::SRVMask);
+		ShadowMapAtlas.RenderTargets.DepthTarget = ConvertToFinalizedExternalTexture(GraphBuilder, ResourceAccessFinalizer, AtlasDepthTexture, AtlasDepthTextureAccessFinal);
 	}
 
 	ResourceAccessFinalizer.Finalize(GraphBuilder);
