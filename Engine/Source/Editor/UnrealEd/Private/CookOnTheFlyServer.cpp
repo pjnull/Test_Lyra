@@ -331,6 +331,7 @@ public:
 
 		if (const ITargetPlatform* TargetPlatform = Cooker.AddCookOnTheFlyPlatform(CookPackageRequest.PlatformName))
 		{
+			Cooker.CookOnTheFlyDeferredInitialize();
 			Cooker.PlatformManager->AddRefCookOnTheFlyPlatform(CookPackageRequest.PlatformName, Cooker);
 			FName StandardFileName(*FPaths::CreateStandardFilename(CookPackageRequest.Filename));
 			FRequest* Request = AllocRequest();
@@ -598,6 +599,16 @@ bool UCookOnTheFlyServer::StartCookOnTheFly(FCookOnTheFlyOptions InCookOnTheFlyO
 #else
 	return false;
 #endif
+}
+
+void UCookOnTheFlyServer::CookOnTheFlyDeferredInitialize()
+{
+	if (bHasDeferredInitializeCookOnTheFly)
+	{
+		return;
+	}
+	bHasDeferredInitializeCookOnTheFly = true;
+	BlockOnAssetRegistry();
 }
 
 const ITargetPlatform* UCookOnTheFlyServer::AddCookOnTheFlyPlatform(const FName& PlatformName)
@@ -5998,38 +6009,46 @@ void UCookOnTheFlyServer::GenerateAssetRegistry()
 		UE_LOG(LogCook, Display, TEXT("Creating asset registry"));
 
 		ModifiedAssetFilenames.Reset();
-		if (ShouldPopulateFullAssetRegistry())
-		{
-			// Trigger or waitfor completion the primary AssetRegistry scan.
-			// Additionally scan any cook-specific paths from ini
-			TArray<FString> ScanPaths;
-			GConfig->GetArray(TEXT("AssetRegistry"), TEXT("PathsToScanForCook"), ScanPaths, GEngineIni);
-			AssetRegistry->ScanPathsSynchronous(ScanPaths);
-			if (AssetRegistry->IsSearchAsync() && AssetRegistry->IsSearchAllAssets())
-			{
-				AssetRegistry->WaitForCompletion();
-			}
-			else
-			{
-				AssetRegistry->SearchAllAssets(true /* bSynchronousSearch */);
-			}
-		}
-		else if (IsCookingDLC())
-		{
-			TArray<FString> ScanPaths;
-			ScanPaths.Add(FString::Printf(TEXT("/%s/"), *CookByTheBookOptions->DlcName));
-			AssetRegistry->ScanPathsSynchronous(ScanPaths);
-		}
-
-#if ASSET_REGISTRY_STATE_DUMPING_ENABLED
-		if (FParse::Param(FCommandLine::Get(), TEXT("DumpAssetRegistry")))
-		{
-			DumpAssetRegistryForCooker(AssetRegistry);
-		}
-#endif
-
 		GetPackageNameCache().SetAssetRegistry(AssetRegistry);
 	}
+}
+
+void UCookOnTheFlyServer::BlockOnAssetRegistry()
+{
+	if (bHasBlockedOnAssetRegistry)
+	{
+		return;
+	}
+	bHasBlockedOnAssetRegistry = true;
+	if (ShouldPopulateFullAssetRegistry())
+	{
+		// Trigger or waitfor completion the primary AssetRegistry scan.
+		// Additionally scan any cook-specific paths from ini
+		TArray<FString> ScanPaths;
+		GConfig->GetArray(TEXT("AssetRegistry"), TEXT("PathsToScanForCook"), ScanPaths, GEngineIni);
+		AssetRegistry->ScanPathsSynchronous(ScanPaths);
+		if (AssetRegistry->IsSearchAsync() && AssetRegistry->IsSearchAllAssets())
+		{
+			AssetRegistry->WaitForCompletion();
+		}
+		else
+		{
+			AssetRegistry->SearchAllAssets(true /* bSynchronousSearch */);
+		}
+	}
+	else if (IsCookingDLC())
+	{
+		TArray<FString> ScanPaths;
+		ScanPaths.Add(FString::Printf(TEXT("/%s/"), *CookByTheBookOptions->DlcName));
+		AssetRegistry->ScanPathsSynchronous(ScanPaths);
+	}
+
+#if ASSET_REGISTRY_STATE_DUMPING_ENABLED
+	if (FParse::Param(FCommandLine::Get(), TEXT("DumpAssetRegistry")))
+	{
+		DumpAssetRegistryForCooker(AssetRegistry);
+	}
+#endif
 }
 
 void UCookOnTheFlyServer::RefreshPlatformAssetRegistries(const TArrayView<const ITargetPlatform* const>& TargetPlatforms)
@@ -7818,6 +7837,7 @@ void UCookOnTheFlyServer::StartCookByTheBook( const FCookByTheBookStartupOptions
 	COOK_STAT(UE::SavePackageUtilities::ResetCookStats());
 
 	GenerateAssetRegistry();
+	BlockOnAssetRegistry();
 	if (!IsCookingInEditor())
 	{
 		FCoreUObjectDelegates::PackageCreatedForLoad.AddUObject(this, &UCookOnTheFlyServer::MaybeMarkPackageAsAlreadyLoaded);

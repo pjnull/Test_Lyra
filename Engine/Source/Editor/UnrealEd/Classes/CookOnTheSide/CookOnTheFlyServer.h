@@ -1036,6 +1036,10 @@ private:
 
 	/** Loads the platform-independent asset registry for use by the cooker */
 	void GenerateAssetRegistry();
+	/** Waits for the AssetRegistry to complete so that we know any missing assets are missing on disk */
+	void BlockOnAssetRegistry();
+	/** Setup necessary only once for CookOnTheFly, but that are not required until the first request. */
+	void CookOnTheFlyDeferredInitialize();
 
 	/** Construct or refresh-for-filechanges the platform-specific asset registry for the given platforms */
 	void RefreshPlatformAssetRegistries(const TArrayView<const ITargetPlatform* const>& TargetPlatforms);
@@ -1102,6 +1106,9 @@ private:
 	bool bPreexploreDependenciesEnabled = true;
 	/** Test mode for the debug of hybrid iterative dependencies. */
 	bool bHybridIterativeDebug = false;
+	bool bHasBlockedOnAssetRegistry = false;
+	bool bHasDeferredInitializeCookOnTheFly = false;
+
 
 	/** Timers for tracking how long we have been busy, to manage retries and warnings of deadlock */
 	float SaveBusyTimeLastRetry = 0.f;
