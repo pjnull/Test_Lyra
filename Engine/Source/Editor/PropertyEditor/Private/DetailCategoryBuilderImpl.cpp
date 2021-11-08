@@ -556,7 +556,7 @@ bool FDetailCategoryImpl::IsAdvancedDropdownEnabled() const
 
 bool FDetailCategoryImpl::ShouldAdvancedBeVisible() const
 {
-	return ShouldAdvancedBeExpanded() && bHasVisibleAdvanced;
+	return bHasVisibleAdvanced;
 }
 
 void FDetailCategoryImpl::RequestItemExpanded(TSharedRef<FDetailTreeNode> TreeNode, bool bShouldBeExpanded)
@@ -993,7 +993,7 @@ void FDetailCategoryImpl::GetGeneratedChildren(FDetailNodeList& OutChildren, boo
 void FDetailCategoryImpl::FilterNode(const FDetailFilter& InFilter)
 {
 	bHasFilterStrings = InFilter.FilterStrings.Num() > 0;
-	bForceAdvanced = bFavoriteCategory || InFilter.bShowAllAdvanced == true || ContainsOnlyAdvanced();
+	bForceAdvanced = bFavoriteCategory || InFilter.bShowAllAdvanced == true || bHasFilterStrings || ContainsOnlyAdvanced();
 
 	bHasVisibleDetails = false;
 	bHasVisibleAdvanced = false;
@@ -1062,7 +1062,6 @@ void FDetailCategoryImpl::FilterNode(const FDetailFilter& InFilter)
 		{
 			bHasVisibleDetails = true;
 			bHasVisibleAdvanced = true;
-			bForceAdvanced = true;
 			RequestItemExpanded(Child, Child->ShouldBeExpanded());
 		}
 	}
