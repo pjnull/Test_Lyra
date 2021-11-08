@@ -571,10 +571,9 @@ void FLinkerLoad::PRIVATE_PatchNewObjectIntoExport(UObject* OldObject, UObject* 
 		const int32 CachedLinkerIndex = OldObject->GetLinkerIndex();
 		FObjectExport& ObjExport = OldObjectLinker->ExportMap[CachedLinkerIndex];
 		
-		PRAGMA_DISABLE_DEPRECATION_WARNINGS
-		// Since we don't copy the internal flags, the mirrored flag needs to be cleared as well
-		const EObjectFlags OldObjectFlags = OldObject->GetFlags() & ~RF_PendingKill;
-		PRAGMA_ENABLE_DEPRECATION_WARNINGS
+		// Since we don't copy the internal flags, the mirrored flags need can't be set on the new object as well
+		const EObjectFlags OldObjectFlags = OldObject->GetFlags() & ~RF_InternalMirroredFlags;
+
 		// Detach the old object to make room for the new
 		OldObject->ClearFlags(RF_NeedLoad|RF_NeedPostLoad|RF_NeedPostLoadSubobjects);
 		OldObject->SetLinker(nullptr, INDEX_NONE, true);

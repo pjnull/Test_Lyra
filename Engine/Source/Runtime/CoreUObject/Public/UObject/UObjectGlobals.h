@@ -2214,6 +2214,10 @@ public:
 	 * Sets whether this collector is currently processing native references or not.
 	 */
 	virtual void SetIsProcessingNativeReferences(bool bIsNative) {}
+	/**
+	 * If true, this collector is currently processing native references (true by default).
+	 */
+	virtual bool IsProcessingNativeReferences() const { return true; }
 
 	/**
 	* Returns the collector archive associated with this collector.

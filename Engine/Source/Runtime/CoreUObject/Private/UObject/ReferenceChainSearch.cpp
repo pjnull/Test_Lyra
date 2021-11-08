@@ -228,6 +228,11 @@ FString FReferenceChainSearch::GetObjectFlags(UObject* InObject)
 		Flags += TEXT("(PendingKill) ");
 	}
 
+	if (InObject->HasAnyInternalFlags(EInternalObjectFlags::Garbage))
+	{
+		Flags += TEXT("(Garbage) ");
+	}
+
 	if (InObject->HasAnyFlags(RF_Standalone))
 	{
 		Flags += TEXT("(standalone) ");

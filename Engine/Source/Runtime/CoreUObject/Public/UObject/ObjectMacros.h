@@ -526,14 +526,23 @@ enum EObjectFlags
 	RF_WillBeLoaded				=0x08000000,	///< This object was constructed during load and will be loaded shortly
 	RF_HasExternalPackage		=0x10000000,	///< This object has an external package assigned and should look it up when getting the outermost package
 
+	// RF_Garbage and RF_PendingKill are mirrored in EInternalObjectFlags because checking the internal flags is much faster for the Garbage Collector
+	// while checking the object flags is much faster outside of it where the Object pointer is already available and most likely cached.
 	// RF_PendingKill is mirrored in EInternalObjectFlags because checking the internal flags is much faster for the Garbage Collector
 	// while checking the object flags is much faster outside of it where the Object pointer is already available and most likely cached.
-	
-	RF_PendingKill UE_DEPRECATED(5.0, "RF_PendingKill should no longer be used. Make sure references to objects are released using one of the existing engine callbacks or use weak object pointers.")  =0x20000000,	///< Objects that are pending destruction (invalid for gameplay but valid objects). This flag is mirrored in EInternalObjectFlags as PendingKill for performance
+
+	RF_PendingKill UE_DEPRECATED(5.0, "RF_PendingKill should not be used directly. Make sure references to objects are released using one of the existing engine callbacks or use weak object pointers.") = 0x20000000,	///< Objects that are pending destruction (invalid for gameplay but valid objects). This flag is mirrored in EInternalObjectFlags as PendingKill for performance
+	RF_Garbage UE_DEPRECATED(5.0, "RF_Garbage should not be used directly. Use MarkAsGarbage and ClearGarbagte instead.") =0x40000000,	///< Garbage from logical point of view and should not be referenced. This flag is mirrored in EInternalObjectFlags as Garbage for performance
 };
 
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
+constexpr EObjectFlags RF_InternalPendingKill = RF_PendingKill;
+constexpr EObjectFlags RF_InternalGarbage = RF_Garbage;
+constexpr EObjectFlags RF_InternalMirroredFlags = (EObjectFlags)(RF_PendingKill | RF_Garbage);
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
+
 /** Mask for all object flags */
-#define RF_AllFlags				(EObjectFlags)0x3fffffff	///< All flags, used mainly for error checking
+#define RF_AllFlags				(EObjectFlags)0x7fffffff	///< All flags, used mainly for error checking
 
 /** Flags to load from unreal asset files */
 #define RF_Load						((EObjectFlags)(RF_Public | RF_Standalone | RF_Transactional | RF_ClassDefaultObject | RF_ArchetypeObject | RF_DefaultSubObject | RF_TextExportTransient | RF_InheritableComponentTemplate | RF_DuplicateTransient | RF_NonPIEDuplicateTransient)) 
@@ -547,8 +556,9 @@ ENUM_CLASS_FLAGS(EObjectFlags);
 enum class EInternalObjectFlags : int32
 {
 	None = 0,
-	//~ All the other bits are reserved, DO NOT ADD NEW FLAGS HERE!
 
+	Garbage = 1 << 21, ///< Garbage from logical point of view and should not be referenced. This flag is mirrored in EObjectFlags as RF_Garbage for performance
+	PersistentGarbage = 1 << 22, ///< Same as above but referenced through a persistent reference so it can't be GC'd
 	ReachableInCluster = 1 << 23, ///< External reference to object in cluster exists
 	ClusterRoot = 1 << 24, ///< Root of a cluster
 	Native = 1 << 25, ///< Native (UClass only). 
@@ -562,7 +572,7 @@ enum class EInternalObjectFlags : int32
 	GarbageCollectionKeepFlags = Native | Async | AsyncLoading,
 
 	//~ Make sure this is up to date!
-	AllFlags = ReachableInCluster | ClusterRoot | Native | Async | AsyncLoading | Unreachable | PendingKill | RootSet | PendingConstruction
+	AllFlags = Garbage | PersistentGarbage | ReachableInCluster | ClusterRoot | Native | Async | AsyncLoading | Unreachable | PendingKill | RootSet | PendingConstruction
 };
 ENUM_CLASS_FLAGS(EInternalObjectFlags);
 

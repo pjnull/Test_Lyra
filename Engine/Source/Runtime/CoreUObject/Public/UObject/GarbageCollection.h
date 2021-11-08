@@ -506,6 +506,48 @@ public:
 };
 
 template <EFastReferenceCollectorOptions Options> class FGCReferenceProcessor;
+class FGCObject;
+
+/** Information about references to objects marked as Garbage that's gather by the Garbage Collector */
+struct FGarbageReferenceInfo
+{
+	/** Object marked as garbage */
+	UObject* GarbageObject;
+	/** Reference to the object marked as garbage */
+	UObject*& GarbageObjectRef;
+	/** Referencing object info */
+	union FReferencerUnion
+	{
+		/** Referencing UObject */
+		UObject* Object;
+		/** Referencing FGCObject */
+		FGCObject* GCObject;
+	} Referencer;
+	/** True if the referencing object is a UObject. If false the referencing object is an FGCObject */
+	bool bReferencerUObject;
+	/** Referencing property name */
+	FName PropertyName;
+
+	FGarbageReferenceInfo(UObject* InReferencingObject, UObject* InGarbageObject, UObject*& InGarbageObjectRef, FName InPropertyName)
+		: GarbageObject(InGarbageObject)
+		, GarbageObjectRef(InGarbageObjectRef)
+		, bReferencerUObject(true)
+		, PropertyName(InPropertyName)
+	{
+		Referencer.Object = InReferencingObject;
+	}
+	FGarbageReferenceInfo(FGCObject* InReferencingObject, UObject* InGarbageObject, UObject*& InGarbageObjectRef)
+		: GarbageObject(InGarbageObject)
+		, GarbageObjectRef(InGarbageObjectRef)
+		, bReferencerUObject(false)
+		, PropertyName(NAME_None)
+	{
+		Referencer.GCObject = InReferencingObject;
+	}
+
+	/** Returns a formatted string with referencing object info */
+	FString GetReferencingObjectInfo() const;
+};
 
 /** Struct to hold the objects to serialize array and the list of weak references. This is allocated by ArrayPool */
 struct FGCArrayStruct
@@ -516,10 +558,19 @@ struct FGCArrayStruct
 	// Arrays filled during Garbage Collectionmn
 	TArray<UObject*> ObjectsToSerialize;
 	TArray<UObject**> WeakReferences;
+	TArray<FGarbageReferenceInfo> GarbageReferences;
 
 	FORCEINLINE UObject* GetReferencingObject()
 	{
 		return ReferencingObject;
+	}
+
+	/** Returns the size of memory allocated by internal arrays */
+	int64 GetAllocatedSize() const
+	{
+		return ObjectsToSerialize.GetAllocatedSize() +
+			WeakReferences.GetAllocatedSize() +
+			GarbageReferences.GetAllocatedSize();
 	}
 
 private:
@@ -592,7 +643,10 @@ class FGarbageCollectionTracer
 public:
 	virtual ~FGarbageCollectionTracer() {}
 
-	virtual void PerformReachabilityAnalysisOnObjects(FGCArrayStruct* ArrayStruct, bool bForceSingleThreaded, bool bWithClusters) = 0;
+	UE_DEPRECATED(5.0, "Use version of PerformReachabilityAnalysisOnObjects that takes EFastReferenceCollectorOptions parameter.")
+	COREUOBJECT_API virtual void PerformReachabilityAnalysisOnObjects(FGCArrayStruct* ArrayStruct, bool bForceSingleThreaded, bool bWithClusters);
+
+	virtual void PerformReachabilityAnalysisOnObjects(FGCArrayStruct* ArrayStruct, const EFastReferenceCollectorOptions InOptions) = 0;
 
 };
 

@@ -1119,6 +1119,9 @@ void UObjectBaseInit()
 	GUObjectAllocator.AllocatePermanentObjectPool(SizeOfPermanentObjectPool);
 	GUObjectArray.AllocateObjectPool(MaxUObjects, MaxObjectsNotConsideredByGC, bPreAllocateUObjectArray);
 
+	void InitNoPendingKill();
+	InitNoPendingKill();
+
 	void InitAsyncThread();
 	InitAsyncThread();
 

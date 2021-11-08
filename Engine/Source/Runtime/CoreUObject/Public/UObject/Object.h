@@ -1609,32 +1609,39 @@ private:
 	}
 };
 
-PRAGMA_DISABLE_DEPRECATION_WARNINGS
+struct FInternalUObjectBaseUtilityIsValidFlagsChecker
+{
+	FORCEINLINE static bool CheckObjectValidBasedOnItsFlags(const UObject* Test)
+	{
+		// Here we don't really check if the flags match but if the end result is the same
+		checkSlow(GUObjectArray.IndexToObject(Test->InternalIndex)->HasAnyFlags(EInternalObjectFlags::PendingKill | EInternalObjectFlags::Garbage) == HasAnyFlags(RF_PendingKill | RF_Garbage));
+		return !Test->HasAnyFlags(RF_InternalPendingKill | RF_InternalGarbage);
+	}
+};
 
 /**
 * Test validity of object
 *
 * @param	Test			The object to test
-* @return	Return true if the object is usable: non-null and not pending kill
+* @return	Return true if the object is usable: non-null and not pending kill or garbage
 */
 FORCEINLINE bool IsValid(const UObject *Test)
 {
-	return Test && !Test->IsPendingKill();
+	return Test && FInternalUObjectBaseUtilityIsValidFlagsChecker::CheckObjectValidBasedOnItsFlags(Test);
 }
 
 /**
 * Test validity of object similar to IsValid(Test) however the null pointer test is skipped
 *
 * @param	Test			The object to test
-* @return	Return true if the object is usable: not pending kill
+* @return	Return true if the object is usable: not pending kill or garbage
 */
 FORCEINLINE bool IsValidChecked(const UObject* Test)
 {
 	check(Test);
-	return !Test->IsPendingKill();
+	return FInternalUObjectBaseUtilityIsValidFlagsChecker::CheckObjectValidBasedOnItsFlags(Test);
 }
 
-PRAGMA_ENABLE_DEPRECATION_WARNINGS
 /**
 * Returns a pointer to a valid object if the Test object passes IsValid() tests, otherwise null
 *
