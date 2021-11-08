@@ -1055,6 +1055,16 @@ public:
 		return Allocation.Buffer;
 	}
 
+	inline VkDeviceAddress GetAddress() const
+	{
+		return Allocation.Address;
+	}
+
+	inline void SetAddress(VkDeviceAddress Address)
+	{
+		Allocation.Address = Address;
+	}
+
 private:
 	FVkRtAllocation Allocation;
 };
