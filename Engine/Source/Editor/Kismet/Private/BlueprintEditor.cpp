@@ -5668,7 +5668,7 @@ void FBlueprintEditor::OnPromoteSelectionToFunction()
 				}
 
 				// Remove the old collapsed graph
-				FBlueprintEditorUtils::RemoveGraph(BP, SourceGraph, EGraphRemoveFlags::Recompile);
+				FBlueprintEditorUtils::RemoveNode(BP, CompositeNode);
 			}
 			else
 			{
@@ -5759,7 +5759,7 @@ void FBlueprintEditor::OnPromoteSelectionToMacro()
 					}
 				}
 
-				FBlueprintEditorUtils::RemoveGraph(BP, SourceGraph, EGraphRemoveFlags::Recompile);
+				FBlueprintEditorUtils::RemoveNode(BP, CompositeNode);
 			}
 			else
 			{
