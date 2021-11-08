@@ -98,6 +98,7 @@ public:
 
 	bool IsLooping() const override;
 	bool SetLooping(bool bLooping) override;
+	int32 GetLoopCount() const override;
 
 	FTimespan GetTime() const override;
 	FTimespan GetDuration() const override;

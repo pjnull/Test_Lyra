@@ -249,8 +249,6 @@ private:
 	volatile bool																	bForceDecoderRefresh = false;
 	bool																			bSkipUntilNextIDR = false;
 
-	FMediaEvent																		NewDataAvailable;
-
 	TArray<FOutputBufferInfo>														ReadyOutputBuffersToSurface;
 	FCriticalSection																OutputSurfaceTargetCS;
 	FDecoderTimeStamp																OutputSurfaceTargetPTS;
@@ -1656,7 +1654,7 @@ void FVideoDecoderH264::ProcessReadyOutputBuffersToSurface()
 		for (; I < Num; ++I)
 		{
 			const FOutputBufferInfo& OI = ReadyOutputBuffersToSurface[I];
-			if (OI.Timestamp.Time > OutputSurfaceTargetPTS.Time || OI.Timestamp.SequenceIndex > OutputSurfaceTargetPTS.SequenceIndex)
+			if ((OI.Timestamp.Time > OutputSurfaceTargetPTS.Time && OI.Timestamp.SequenceIndex == OutputSurfaceTargetPTS.SequenceIndex) || OI.Timestamp.SequenceIndex > OutputSurfaceTargetPTS.SequenceIndex)
 			{
 				// Too new, this one must stay...
 				break;
@@ -2209,29 +2207,4 @@ void FVideoDecoderH264::WorkerThread()
 	}
 }
 
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-/**
- * Callback triggered when we release a decoder output buffer to the output surface
- * (currently here from completeness, but not currently used! - the signal that is)
- */
-void FVideoDecoderH264::JavaCallback_NewDataAvailable(uint32 NativeDecoderID)
-{
-	FScopeLock Lock(&NativeDecoderMapCS);
-	FVideoDecoderH264 **NativeDecoder = NativeDecoderMap.Find(NativeDecoderID);
-	if (NativeDecoder)
-	{
-		(*NativeDecoder)->NewDataAvailable.Signal();
-	}
-}
-
 } // namespace Electra
-
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-#if USE_ANDROID_JNI
-JNI_METHOD void Java_com_epicgames_unreal_ElectraVideoDecoderH264_nativeSignalNewDataAvailable(JNIEnv* jenv, jobject thiz, jint NativeDecoderID)
-{
-	Electra::FVideoDecoderH264::JavaCallback_NewDataAvailable(NativeDecoderID);
-}
-#endif

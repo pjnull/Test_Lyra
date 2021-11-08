@@ -154,6 +154,7 @@ public:
 
 	virtual bool IsLooping() const = 0;
 	virtual bool SetLooping(bool bLooping) = 0;
+	virtual int32 GetLoopCount() const = 0;
 
 	virtual FTimespan GetTime() const = 0;
 	virtual FTimespan GetDuration() const = 0;

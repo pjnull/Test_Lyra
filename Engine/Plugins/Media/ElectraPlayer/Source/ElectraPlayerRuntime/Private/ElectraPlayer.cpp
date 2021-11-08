@@ -858,6 +858,18 @@ bool FElectraPlayer::SetLooping(bool bLooping)
 	return false;
 }
 
+int32 FElectraPlayer::GetLoopCount() const
+{
+	if (CurrentPlayer.Get())
+	{
+		IAdaptiveStreamingPlayer::FLoopState loopState;
+		CurrentPlayer->AdaptivePlayer->GetLoopState(loopState);
+		return (int32) loopState.Count;
+	}
+	return -1;
+}
+
+
 FTimespan FElectraPlayer::GetTime() const
 {
 	if (CurrentPlayer.Get())

@@ -72,8 +72,6 @@ public:
 
 	virtual void Android_UpdateSurface(const TSharedPtr<IOptionPointerValueContainer, ESPMode::ThreadSafe>& Surface) override;
 
-	static void JavaCallback_NewDataAvailable(uint32 NativeDecoderID);
-
 	static void ReleaseToSurface(uint32 NativeDecoderID, const FDecoderTimeStamp& Time);
 
 private:
@@ -248,8 +246,6 @@ private:
 	TArray<TSharedPtrTS<FDecoderInput>>												InDecoderInput;
 	volatile bool																	bForceDecoderRefresh = false;
 	bool																			bSkipUntilNextIDR = false;
-
-	FMediaEvent																		NewDataAvailable;
 
 	TArray<FOutputBufferInfo>														ReadyOutputBuffersToSurface;
 	FCriticalSection																OutputSurfaceTargetCS;
@@ -1628,7 +1624,7 @@ void FVideoDecoderH265::ProcessReadyOutputBuffersToSurface()
 		for (; I < Num; ++I)
 		{
 			const FOutputBufferInfo& OI = ReadyOutputBuffersToSurface[I];
-			if (OI.Timestamp.Time > OutputSurfaceTargetPTS.Time || OI.Timestamp.SequenceIndex > OutputSurfaceTargetPTS.SequenceIndex)
+			if ((OI.Timestamp.Time > OutputSurfaceTargetPTS.Time && OI.Timestamp.SequenceIndex == OutputSurfaceTargetPTS.SequenceIndex) || OI.Timestamp.SequenceIndex > OutputSurfaceTargetPTS.SequenceIndex)
 			{
 				// Too new, this one must stay...
 				break;
@@ -2181,29 +2177,4 @@ void FVideoDecoderH265::WorkerThread()
 	}
 }
 
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-/**
- * Callback triggered when we release a decoder output buffer to the output surface
- * (currently here from completeness, but not currently used! - the signal that is)
- */
-void FVideoDecoderH265::JavaCallback_NewDataAvailable(uint32 NativeDecoderID)
-{
-	FScopeLock Lock(&NativeDecoderMapCS);
-	FVideoDecoderH265 **NativeDecoder = NativeDecoderMap.Find(NativeDecoderID);
-	if (NativeDecoder)
-	{
-		(*NativeDecoder)->NewDataAvailable.Signal();
-	}
-}
-
 } // namespace Electra
-
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-#if USE_ANDROID_JNI
-JNI_METHOD void Java_com_epicgames_unreal_ElectraVideoDecoderH265_nativeSignalNewDataAvailable(JNIEnv* jenv, jobject thiz, jint NativeDecoderID)
-{
-	Electra::FVideoDecoderH265::JavaCallback_NewDataAvailable(NativeDecoderID);
-}
-#endif

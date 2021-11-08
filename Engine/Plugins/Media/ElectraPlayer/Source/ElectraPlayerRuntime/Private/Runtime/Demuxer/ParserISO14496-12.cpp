@@ -6309,6 +6309,13 @@ private:
 								AssignFrom(Best);
 								return UEMEDIA_ERROR_OK;
 							}
+							// It is possible for the PTS to be offset. Check against the DTS.
+							if (Best.GetDTS() <= localTime)
+							{
+								// Yes, get the best values back into this instance and return.
+								AssignFrom(Best);
+								return UEMEDIA_ERROR_OK;
+							}
 							// Didn't find what we're looking for.
 							return UEMEDIA_ERROR_INSUFFICIENT_DATA;
 						}

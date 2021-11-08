@@ -111,8 +111,10 @@ public:
 		void Reset()
 		{
 			Time.SetToInvalid();
+			StartingBitrate.Reset();
 		}
 		FTimeValue	Time;
+		TOptional<int32> StartingBitrate;
 	};
 	//! Seek to a new position and play from there. This includes first playstart.
 	//! Playback is initially paused on first player use and must be resumed to begin.

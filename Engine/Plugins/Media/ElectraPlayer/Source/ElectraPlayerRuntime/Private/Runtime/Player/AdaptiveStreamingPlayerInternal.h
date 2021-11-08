@@ -1338,11 +1338,17 @@ private:
 
 	struct FPendingStartRequest
 	{
+		enum class EStartType
+		{
+			PlayStart,
+			LoopPoint,
+			Seeking,
+		};
 		FPlayStartPosition										StartAt;
-		IManifest::ESearchType									SearchType;
+		TOptional<int32>										StartingBitrate;
+		IManifest::ESearchType									SearchType = IManifest::ESearchType::Closest;
 		FTimeValue												RetryAtTime;
-		bool													bIsPlayStart = false;
-		bool													bForLooping = false;
+		EStartType												StartType = EStartType::PlayStart;
 		TMultiMap<EStreamType, TSharedPtrTS<IStreamSegment>>	FinishedRequests;
 	};
 
@@ -1764,7 +1770,6 @@ private:
 	FPrerollVars														PrerollVars;
 	FPostrollVars														PostrollVars;
 	EPlayerState														LastBufferingState;
-	FSeekParam															StartAtTime;
 	double																PlaybackRate;
 	FTimeValue															RebufferDetectedAtPlayPos;
 	bool																bRebufferPending;
