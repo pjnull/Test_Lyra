@@ -286,10 +286,6 @@ void CADKernel::FDatabase::Deserialize(FCADKernelArchive& Ar)
 	{
 		Progress.Increase();
 		TSharedPtr<FEntity> Entity = FEntity::Deserialize(Ar);
-		if (!Entity.IsValid())
-		{
-			FMessage::Printf(Log, TEXT("Failed at index %d\n"), Index);
-		}
 	}
 
 	// this is a partial archive, a clean of entities has to be performed to remove invalid references in entity descriptions
@@ -325,7 +321,9 @@ void CADKernel::FDatabase::CleanArchiveEntities()
 			{
 				TSharedPtr<FVertexLink> VertexLink = StaticCastSharedPtr<FVertexLink>(Entity);
 				VertexLink->CleanLink();
-				ensureCADKernel(VertexLink->GetTwinsEntitieNum());
+#ifdef CADKERNEL_DEV
+ 				ensureCADKernel(VertexLink->GetTwinsEntitieNum());
+#endif
 				break;
 			}
 			case EEntity::Body:

@@ -255,7 +255,7 @@ namespace CADKernel
 		 * Gets the cutting coordinates of the existing mesh of bordering edges (loop's edges)
 		 * @see DefineCuttingParameters (called in DefineCuttingParameters)
 		 */
-		void GetPreferredUVCoordinatesFromNeighbours(FCuttingGrid& NeighboursCutting);
+		void GetPreferredUVCuttingParametersFromLoops(FCuttingGrid& CuttingFromLoops);
 
 		void ComputeMaxElementSize();
 		void ComputeMaxDeltaUV();

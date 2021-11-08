@@ -14,8 +14,10 @@
 #include "CADKernel/UI/Message.h"
 #include "CADKernel/Utils/Util.h"
 
+namespace CADKernel
+{
 
-TSharedPtr<CADKernel::FTopologicalLoop> CADKernel::FTopologicalLoop::Make(const TArray<TSharedPtr<FTopologicalEdge>>& InEdges, const TArray<EOrientation>& InEdgeDirections, double GeometricTolerance)
+TSharedPtr<FTopologicalLoop> FTopologicalLoop::Make(const TArray<TSharedPtr<FTopologicalEdge>>& InEdges, const TArray<EOrientation>& InEdgeDirections, double GeometricTolerance)
 {
 	TSharedRef<FTopologicalLoop> Loop = FEntity::MakeShared<FTopologicalLoop>(InEdges, InEdgeDirections);
 
@@ -54,7 +56,7 @@ TSharedPtr<CADKernel::FTopologicalLoop> CADKernel::FTopologicalLoop::Make(const 
 	return Loop;
 }
 
-CADKernel::FTopologicalLoop::FTopologicalLoop(const TArray<TSharedPtr<FTopologicalEdge>>& InEdges, const TArray<EOrientation>& InEdgeDirections)
+FTopologicalLoop::FTopologicalLoop(const TArray<TSharedPtr<FTopologicalEdge>>& InEdges, const TArray<EOrientation>& InEdgeDirections)
 	: bExternalLoop(true)
 {
 	Edges.Reserve(InEdges.Num());
@@ -66,7 +68,7 @@ CADKernel::FTopologicalLoop::FTopologicalLoop(const TArray<TSharedPtr<FTopologic
 	}
 }
 
-void CADKernel::FTopologicalLoop::DeleteLoopEdges()
+void FTopologicalLoop::DeleteLoopEdges()
 {
 	for (FOrientedEdge& Edge : Edges)
 	{
@@ -76,7 +78,7 @@ void CADKernel::FTopologicalLoop::DeleteLoopEdges()
 	Edges.Empty();
 }
 
-void CADKernel::FTopologicalLoop::RemoveEdge(TSharedPtr<FTopologicalEdge>& EdgeToRemove)
+void FTopologicalLoop::RemoveEdge(TSharedPtr<FTopologicalEdge>& EdgeToRemove)
 {
 	for (int32 IEdge = 0; IEdge < Edges.Num(); IEdge++)
 	{
@@ -90,7 +92,7 @@ void CADKernel::FTopologicalLoop::RemoveEdge(TSharedPtr<FTopologicalEdge>& EdgeT
 	ensureCADKernel(false);
 }
 
-CADKernel::EOrientation CADKernel::FTopologicalLoop::GetDirection(TSharedPtr<FTopologicalEdge>& InEdge, bool bAllowLinkedEdge) const
+EOrientation FTopologicalLoop::GetDirection(TSharedPtr<FTopologicalEdge>& InEdge, bool bAllowLinkedEdge) const
 {
 	ensureCADKernel(InEdge.IsValid());
 
@@ -112,7 +114,7 @@ CADKernel::EOrientation CADKernel::FTopologicalLoop::GetDirection(TSharedPtr<FTo
 }
 
 
-void CADKernel::FTopologicalLoop::Get2DSampling(TArray<FPoint2D>& LoopSampling)
+void FTopologicalLoop::Get2DSampling(TArray<FPoint2D>& LoopSampling)
 {
 	int32 PointNum = 0;
 	for (const FOrientedEdge& Edge : Edges)
@@ -161,7 +163,7 @@ void CADKernel::FTopologicalLoop::Get2DSampling(TArray<FPoint2D>& LoopSampling)
  *    |   |
  * Not yet cover as if there is 4 sharp case in a loop should be very rare and the loop should be a very bad loop...
  */
-void CADKernel::FTopologicalLoop::Orient()
+void FTopologicalLoop::Orient()
 {
 	ensureCADKernel(Edges.Num() > 0);
 
@@ -367,7 +369,7 @@ void CADKernel::FTopologicalLoop::Orient()
 	}
 }
 
-void CADKernel::FTopologicalLoop::SwapOrientation()
+void FTopologicalLoop::SwapOrientation()
 {
 	TArray<FOrientedEdge> TmpEdges;
 	TmpEdges.Reserve(Edges.Num());
@@ -378,7 +380,7 @@ void CADKernel::FTopologicalLoop::SwapOrientation()
 	Swap(TmpEdges, Edges);
 }
 
-void CADKernel::FTopologicalLoop::ReplaceEdge(TSharedPtr<FTopologicalEdge>& OldEdge, TSharedPtr<FTopologicalEdge>& NewEdge)
+void FTopologicalLoop::ReplaceEdge(TSharedPtr<FTopologicalEdge>& OldEdge, TSharedPtr<FTopologicalEdge>& NewEdge)
 {
 	for (int32 IEdge = 0; IEdge < (int32)Edges.Num(); IEdge++)
 	{
@@ -393,7 +395,7 @@ void CADKernel::FTopologicalLoop::ReplaceEdge(TSharedPtr<FTopologicalEdge>& OldE
 	ensureCADKernel(false);
 }
 
-void CADKernel::FTopologicalLoop::SplitEdge(FTopologicalEdge& SplitEdge, TSharedPtr<FTopologicalEdge> NewEdge, bool bSplitEdgeIsFirst)
+void FTopologicalLoop::SplitEdge(FTopologicalEdge& SplitEdge, TSharedPtr<FTopologicalEdge> NewEdge, bool bSplitEdgeIsFirst)
 {
 	NewEdge->SetLoop(*this);
 
@@ -413,7 +415,7 @@ void CADKernel::FTopologicalLoop::SplitEdge(FTopologicalEdge& SplitEdge, TShared
 	ensureCADKernel(false);
 }
 
-void CADKernel::FTopologicalLoop::ReplaceEdge(TSharedPtr<FTopologicalEdge>& Edge, TArray<TSharedPtr<FTopologicalEdge>>& NewEdges)
+void FTopologicalLoop::ReplaceEdge(TSharedPtr<FTopologicalEdge>& Edge, TArray<TSharedPtr<FTopologicalEdge>>& NewEdges)
 {
 	TArray<FOrientedEdge> TmpEdges;
 	int32 NewEdgeNum = Edges.Num() + NewEdges.Num();
@@ -453,7 +455,7 @@ void CADKernel::FTopologicalLoop::ReplaceEdge(TSharedPtr<FTopologicalEdge>& Edge
 	ensureCADKernel(false);
 }
 
-void CADKernel::FTopologicalLoop::ReplaceEdges(TArray<FOrientedEdge>& OldEdges, TSharedPtr<FTopologicalEdge>& NewEdge)
+void FTopologicalLoop::ReplaceEdges(TArray<FOrientedEdge>& OldEdges, TSharedPtr<FTopologicalEdge>& NewEdge)
 {
 	for (FOrientedEdge& Edge : OldEdges)
 	{
@@ -495,13 +497,13 @@ void CADKernel::FTopologicalLoop::ReplaceEdges(TArray<FOrientedEdge>& OldEdges, 
 	ensureCADKernel(false);
 }
 
-void CADKernel::FTopologicalLoop::FindSurfaceCorners(TArray<TSharedPtr<FTopologicalVertex>>& OutCorners, TArray<int32>& OutStartSideIndex) const
+void FTopologicalLoop::FindSurfaceCorners(TArray<TSharedPtr<FTopologicalVertex>>& OutCorners, TArray<int32>& OutStartSideIndex) const
 {
 	TArray<double> BreakValues;
 	FindBreaks(OutCorners, OutStartSideIndex, BreakValues);
 }
 
-void CADKernel::FTopologicalLoop::ComputeBoundaryProperties(const TArray<int32>& StartSideIndex, TArray<FEdge2DProperties>& OutSideProperties) const
+void FTopologicalLoop::ComputeBoundaryProperties(const TArray<int32>& StartSideIndex, TArray<FEdge2DProperties>& OutSideProperties) const
 {
 	if (StartSideIndex.Num() == 0)
 	{
@@ -529,7 +531,7 @@ void CADKernel::FTopologicalLoop::ComputeBoundaryProperties(const TArray<int32>&
 	}
 }
 
-void CADKernel::FTopologicalLoop::CheckEdgesOrientation()
+void FTopologicalLoop::CheckEdgesOrientation()
 {
 	FOrientedEdge PreviousEdge = Edges.Last();
 	FSurfacicCurveExtremities PreviousExtremities;
@@ -593,7 +595,7 @@ void CADKernel::FTopologicalLoop::CheckEdgesOrientation()
 	}
 }
 
-void CADKernel::FTopologicalLoop::CheckLoopWithTwoEdgesOrientation()
+void FTopologicalLoop::CheckLoopWithTwoEdgesOrientation()
 {
 	FOrientedEdge Edge0 = Edges[0];
 	FSurfacicCurveExtremities Edge0Extremities;
@@ -636,7 +638,7 @@ void CADKernel::FTopologicalLoop::CheckLoopWithTwoEdgesOrientation()
 }
 
 
-void CADKernel::FTopologicalLoop::RemoveDegeneratedEdges()
+void FTopologicalLoop::RemoveDegeneratedEdges()
 {
 #ifdef CADKERNEL_DEV
 	switch (EdgeCount())
@@ -667,7 +669,7 @@ void CADKernel::FTopologicalLoop::RemoveDegeneratedEdges()
 		TSharedRef<FTopologicalVertex> OtherDegeneratedEdgeVertex = (bPrevious == (DegeneratedOrientedEdge.Direction == EOrientation::Front)) ? DegeneratedEdge->GetEndVertex() : DegeneratedEdge->GetStartVertex();
 		FPoint2D DegeneratedEdgeTangent = DegeneratedEdge->GetTangent2DAt(*DegeneratedEdgeVertex);
 
-		TSharedRef<FTopologicalVertex> NearEdgeVertex = (bPrevious == (NearOrientedEdge.Direction == EOrientation::Front)) ? DegeneratedEdge->GetEndVertex() : DegeneratedEdge->GetStartVertex();
+		TSharedRef<FTopologicalVertex> NearEdgeVertex = (bPrevious == (NearOrientedEdge.Direction == EOrientation::Front)) ? NearOrientedEdge.Entity->GetEndVertex() : NearOrientedEdge.Entity->GetStartVertex();
 		FPoint2D NearEdgeTangent = NearOrientedEdge.Entity->GetTangent2DAt(*NearEdgeVertex);
 
 		FPoint2D& NearEdgeExtremity = (bPrevious == (NearOrientedEdge.Direction == EOrientation::Front)) ? NearEdgeExtremities[1].Point2D : NearEdgeExtremities[0].Point2D;
@@ -678,12 +680,8 @@ void CADKernel::FTopologicalLoop::RemoveDegeneratedEdges()
 		double Slop = FMath::Abs(TransformIntoOrientedSlope(ComputePositiveSlope(FPoint2D::ZeroPoint, DegeneratedEdgeTangent, NearEdgeTangent)));
 		if (Slop > 3.5 && Distance < 0.01)
 		{
-			DegeneratedEdge->Delete();
-			DegeneratedEdgeVertex->DeleteIfIsolated();
-
 			NearOrientedEdge.Entity->ExtendTo((bPrevious == (NearOrientedEdge.Direction != EOrientation::Front)), OtherDegeneratedEdgeExtremity, OtherDegeneratedEdgeVertex);
-			NearEdgeVertex->DeleteIfIsolated();
-
+			DegeneratedEdge->Delete();
 			return true;
 		}
 		return false;
@@ -713,7 +711,7 @@ void CADKernel::FTopologicalLoop::RemoveDegeneratedEdges()
 	}
 }
 
-void CADKernel::FTopologicalLoop::EnsureLogicalClosing(const double Tolerance3D)
+void FTopologicalLoop::EnsureLogicalClosing(const double Tolerance3D)
 {
 	const double SquareTolerance3D = FMath::Square(Tolerance3D);
 
@@ -839,7 +837,7 @@ void CADKernel::FTopologicalLoop::EnsureLogicalClosing(const double Tolerance3D)
 }
 
 #ifdef CADKERNEL_DEV
-CADKernel::FInfoEntity& CADKernel::FTopologicalLoop::GetInfo(FInfoEntity& Info) const
+FInfoEntity& FTopologicalLoop::GetInfo(FInfoEntity& Info) const
 {
 	return FEntity::GetInfo(Info)
 		.Add(TEXT("Edges"), (TArray<TOrientedEntity<FEntity>>&) Edges)
@@ -847,7 +845,7 @@ CADKernel::FInfoEntity& CADKernel::FTopologicalLoop::GetInfo(FInfoEntity& Info) 
 }
 #endif
 
-void CADKernel::FTopologicalLoop::FindBreaks(TArray<TSharedPtr<FTopologicalVertex>>& OutBreaks, TArray<int32>& OutStartSideIndex, TArray<double>& OutBreakValues) const
+void FTopologicalLoop::FindBreaks(TArray<TSharedPtr<FTopologicalVertex>>& OutBreaks, TArray<int32>& OutStartSideIndex, TArray<double>& OutBreakValues) const
 {
 	const double MinCosAngleOfBreak = -0.7;  // 135 deg
 	if (Edges.Num() == 0)
@@ -898,4 +896,6 @@ void CADKernel::FTopologicalLoop::FindBreaks(TArray<TSharedPtr<FTopologicalVerte
 		EndTangentPreviousEdge = EndTangentEdge;
 		bPreviousIsSurface = bIsSurface;
 	}
+}
+
 }

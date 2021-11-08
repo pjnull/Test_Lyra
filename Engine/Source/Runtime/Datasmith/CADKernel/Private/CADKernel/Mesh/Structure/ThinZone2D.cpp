@@ -178,7 +178,7 @@ void CADKernel::FThinZone2DFinder::CheckClosedSegments()
 		{
 			double NextSegmentThickness = FMath::Min(Segment->GetPrevious()->GetClosedSquareDistance(), Segment->GetNext()->GetClosedSquareDistance());
 			double SegmentThickness = Segment->GetClosedSquareDistance();
-			Sort(NextSegmentThickness, SegmentThickness);
+			GetMinMax(NextSegmentThickness, SegmentThickness);
 			SegmentThickness = sqrt(SegmentThickness);
 			NextSegmentThickness = sqrt(NextSegmentThickness);
 			double Delta = SegmentThickness - NextSegmentThickness;

@@ -697,12 +697,3 @@ inline uint32 GetTypeHash(const CADKernel::FPointH& Point)
 	return HashCombine(GetTypeHash(Point.X), HashCombine(GetTypeHash(Point.Y), HashCombine(GetTypeHash(Point.Z), GetTypeHash(Point.W))));
 }
 
-inline double ComputeCosinus(FVector Vector, FVector OtherVector)
-{
-	Vector.Normalize();
-	OtherVector.Normalize();
-
-	double Cosinus = Vector.X * OtherVector.X + Vector.Y * OtherVector.Y + Vector.Z * OtherVector.Z;
-
-	return FMath::Max(-1.0, FMath::Min(Cosinus, 1.0));
-}

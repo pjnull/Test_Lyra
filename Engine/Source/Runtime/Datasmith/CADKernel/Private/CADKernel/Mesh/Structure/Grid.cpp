@@ -101,11 +101,11 @@ namespace CADKernel
 	{
 		FTimePoint StartTime = FChrono::Now();
 
-		FCuttingGrid Neighbors;
-		GetPreferredUVCoordinatesFromNeighbours(Neighbors);
+		FCuttingGrid PreferredCuttingParametersFormLoops;
+		GetPreferredUVCuttingParametersFromLoops(PreferredCuttingParametersFormLoops);
 
-		DefineCuttingParameters(EIso::IsoU, Neighbors);
-		DefineCuttingParameters(EIso::IsoV, Neighbors);
+		DefineCuttingParameters(EIso::IsoU, PreferredCuttingParametersFormLoops);
+		DefineCuttingParameters(EIso::IsoV, PreferredCuttingParametersFormLoops);
 
 		CuttingSize = CuttingCoordinates.Count();
 
@@ -196,13 +196,14 @@ namespace CADKernel
 		Chronos.DefineCuttingParametersDuration = FChrono::Elapse(StartTime);
 	}
 
-	void FGrid::GetPreferredUVCoordinatesFromNeighbours(FCuttingGrid& NeighboursCutting)
+//#define DEBUG_GETPREFERREDUVCOORDINATESFROMNEIGHBOURS
+	void FGrid::GetPreferredUVCuttingParametersFromLoops(FCuttingGrid& CuttingParametersFromLoops)
 	{
 #ifdef DEBUG_GETPREFERREDUVCOORDINATESFROMNEIGHBOURS
 		F3DDebugSession _(TEXT("GetPreferredUVCoordinatesFromNeighbours"));
 		{
 			F3DDebugSession _(TEXT("Surface 2D"));
-			Display2D(Face->GetCarrierSurface());
+			CADKernel::Display2D(*Face->GetCarrierSurface());
 		}
 #endif
 
@@ -215,8 +216,8 @@ namespace CADKernel
 			}
 		}
 
-		NeighboursCutting[EIso::IsoU].Reserve(nbPoints);
-		NeighboursCutting[EIso::IsoV].Reserve(nbPoints);
+		CuttingParametersFromLoops[EIso::IsoU].Reserve(nbPoints);
+		CuttingParametersFromLoops[EIso::IsoV].Reserve(nbPoints);
 
 		for (const TSharedPtr<FTopologicalLoop>& Loop : Face->GetLoops())
 		{
@@ -224,36 +225,16 @@ namespace CADKernel
 			{
 				const TSharedPtr<FTopologicalEdge>& Edge = OrientedEdge.Entity;
 
-#ifdef DEBUG_GetPreferredUVCoordinatesFromNeighbours
+#ifdef DEBUG_GETPREFERREDUVCOORDINATESFROMNEIGHBOURS
 				{
 					F3DDebugSession _(FString::Printf(TEXT("Edge %d"), Edge->GetId()));
-					Display2D(Edge);
+					Display2D(*Edge);
 				}
 #endif
 
-				TSharedRef<FTopologicalEdge> ActiveEdge = Edge->GetLinkActiveEdge();
-				if (!ActiveEdge->IsMeshed())
-				{
-					continue;
-				}
-
 				TArray<double> ProjectedPointCoords;
-
-				if (ActiveEdge == Edge)
-				{
-					TArray<FCuttingPoint>& CuttingPoints = Edge->GetCuttingPoints();
-					if (CuttingPoints.Num() == 2)
-					{
-						continue;
-					}
-
-					ProjectedPointCoords.Reserve(CuttingPoints.Num());
-					for (const FCuttingPoint& Cutting : CuttingPoints)
-					{
-						ProjectedPointCoords.Emplace(Cutting.Coordinate);
-					}
-				}
-				else
+				TSharedRef<FTopologicalEdge> ActiveEdge = Edge->GetLinkActiveEdge();
+				if (ActiveEdge->IsMeshed())
 				{
 					const TSharedRef<FMesh> EdgeMesh = ActiveEdge->GetMesh();
 
@@ -270,57 +251,30 @@ namespace CADKernel
 					ProjectedPointCoords.Insert(Edge->GetStartCurvilinearCoordinates(), 0);
 					ProjectedPointCoords.Add(Edge->GetEndCurvilinearCoordinates());
 				}
+				else // Add Vertices
+				{
+					ProjectedPointCoords.Add(Edge->GetBoundary().GetMin());
+					ProjectedPointCoords.Add(Edge->GetBoundary().GetMax());
+				}
 
 				TArray<FPoint2D> EdgePoints2D;
 				Edge->Approximate2DPoints(ProjectedPointCoords, EdgePoints2D);
 
-				const TArray<FCuttingPoint>& CuttingPointTypes = ActiveEdge->GetCuttingPoints();
-				if (ProjectedPointCoords.Num() == CuttingPointTypes.Num())
+#ifdef DEBUG_GETPREFERREDUVCOORDINATESFROMNEIGHBOURS
+				F3DDebugSession _(TEXT("Nodes"));
+#endif
+				for (int32 Index = 0; Index < EdgePoints2D.Num(); ++Index)
 				{
+					CuttingParametersFromLoops[EIso::IsoU].Emplace(EdgePoints2D[Index].U, ECoordinateType::OtherCoordinate);
+					CuttingParametersFromLoops[EIso::IsoV].Emplace(EdgePoints2D[Index].V, ECoordinateType::OtherCoordinate);
 #ifdef DEBUG_GETPREFERREDUVCOORDINATESFROMNEIGHBOURS
-					F3DDebugSession _(TEXT("Nodes"));
+					DisplayPoint(EdgePoints2D[Index]);
 #endif
-					for (int32 Index = 0; Index < EdgePoints2D.Num(); ++Index)
-					{
-						switch (CuttingPointTypes[Index].Type)
-						{
-						case ECoordinateType::VertexCoordinate:
-							NeighboursCutting[EIso::IsoU].Emplace(EdgePoints2D[Index].U, VertexCoordinate);
-							NeighboursCutting[EIso::IsoV].Emplace(EdgePoints2D[Index].V, VertexCoordinate);
-#ifdef DEBUG_GETPREFERREDUVCOORDINATESFROMNEIGHBOURS
-							DisplayPoint(EdgePoints2D[Index], EVisuProperty::GreenPoint);
-#endif
-							break;
-						case ECoordinateType::IsoUCoordinate:
-						case ECoordinateType::IsoVCoordinate:
-						case ECoordinateType::IsoUVCoordinate:
-							NeighboursCutting[EIso::IsoU].Emplace(EdgePoints2D[Index].U, IsoUCoordinate);
-							NeighboursCutting[EIso::IsoV].Emplace(EdgePoints2D[Index].V, IsoVCoordinate);
-#ifdef DEBUG_GETPREFERREDUVCOORDINATESFROMNEIGHBOURS
-							DisplayPoint(EdgePoints2D[Index], EVisuProperty::YellowPoint);
-#endif
-							break;
-						case ECoordinateType::ImposedCoordinate:
-							NeighboursCutting[EIso::IsoU].Emplace(EdgePoints2D[Index].U, OtherCoordinate);
-							NeighboursCutting[EIso::IsoV].Emplace(EdgePoints2D[Index].V, OtherCoordinate);
-#ifdef DEBUG_GETPREFERREDUVCOORDINATESFROMNEIGHBOURS
-							DisplayPoint(EdgePoints2D[Index]);
-#endif
-							break;
-						case ECoordinateType::OtherCoordinate:
-						default:
-							NeighboursCutting[EIso::IsoU].Emplace(EdgePoints2D[Index].U, OtherCoordinate);
-							NeighboursCutting[EIso::IsoV].Emplace(EdgePoints2D[Index].V, OtherCoordinate);
-#ifdef DEBUG_GETPREFERREDUVCOORDINATESFROMNEIGHBOURS
-							DisplayPoint(EdgePoints2D[Index]);
-#endif
-						}
-					}
 				}
 			}
 		}
 
-		TFunction<void(TArray<FCuttingPoint>&)> SortAndRemoveDuplicated = [](TArray<FCuttingPoint>& Neighbours)
+		TFunction<void(TArray<FCuttingPoint>&, double)> SortAndRemoveDuplicated = [](TArray<FCuttingPoint>& Neighbours, double Tolerance)
 		{
 			if (Neighbours.Num() == 0)
 			{
@@ -334,21 +288,28 @@ namespace CADKernel
 			);
 
 			int32 NewIndex = 0;
-			for (int32 Index = 1; Index < Neighbours.Num(); ++Index)
+			for (int32 Index = 1; Index < Neighbours.Num() - 1; ++Index)
 			{
-				if (FMath::Abs(Neighbours[Index].Coordinate - Neighbours[NewIndex].Coordinate) < SMALL_NUMBER)
+				if (FMath::IsNearlyEqual(Neighbours[Index].Coordinate, Neighbours[NewIndex].Coordinate, Tolerance))
 				{
 					continue;
 				}
 				NewIndex++;
 				Neighbours[NewIndex] = Neighbours[Index];
 			}
-			NewIndex++;
+			if (FMath::IsNearlyEqual(Neighbours.Last().Coordinate, Neighbours[NewIndex].Coordinate, Tolerance))
+			{
+				Neighbours[NewIndex] = Neighbours.Last();
+			}
+			else
+			{
+				NewIndex++;
+			}
 			Neighbours.SetNum(NewIndex);
 		};
 
-		SortAndRemoveDuplicated(NeighboursCutting[EIso::IsoU]);
-		SortAndRemoveDuplicated(NeighboursCutting[EIso::IsoV]);
+		SortAndRemoveDuplicated(CuttingParametersFromLoops[EIso::IsoU], FaceTolerance[EIso::IsoU]);
+		SortAndRemoveDuplicated(CuttingParametersFromLoops[EIso::IsoV], FaceTolerance[EIso::IsoV]);
 	}
 
 	bool FGrid::GeneratePointCloud()
@@ -1533,8 +1494,8 @@ namespace CADKernel
 				double VMin = FirstSegmentPoint->V;
 				double Umax = SecondSegmentPoint->U;
 				double Vmax = SecondSegmentPoint->V;
-				Sort(UMin, Umax);
-				Sort(VMin, Vmax);
+				GetMinMax(UMin, Umax);
+				GetMinMax(VMin, Vmax);
 
 				// AB^AP = ABu*APv - ABv*APu
 				// AB^AP = ABu*(Pv-Av) - ABv*(Pu-Au)
@@ -1623,8 +1584,8 @@ namespace CADKernel
 				double VMin = FirstSegmentPoint->V;
 				double Umax = SecondSegmentPoint->U;
 				double Vmax = SecondSegmentPoint->V;
-				Sort(UMin, Umax);
-				Sort(VMin, Vmax);
+				GetMinMax(UMin, Umax);
+				GetMinMax(VMin, Vmax);
 
 				// AB^AP = ABu*APv - ABv*APu
 				// AB^AP = ABu*(Pv-Av) - ABv*(Pu-Au)

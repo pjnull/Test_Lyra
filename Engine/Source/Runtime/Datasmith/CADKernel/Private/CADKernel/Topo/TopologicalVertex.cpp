@@ -6,8 +6,11 @@
 #include "CADKernel/Mesh/Structure/VertexMesh.h"
 #include "CADKernel/Topo/TopologicalEdge.h"
 
+namespace CADKernel
+{
+
 #ifdef CADKERNEL_DEV
-CADKernel::FInfoEntity& CADKernel::FTopologicalVertex::GetInfo(FInfoEntity& Info) const
+FInfoEntity& FTopologicalVertex::GetInfo(FInfoEntity& Info) const
 {
 	return FTopologicalEntity::GetInfo(Info)
 		.Add(TEXT("Link"), TopologicalLink)
@@ -17,13 +20,18 @@ CADKernel::FInfoEntity& CADKernel::FTopologicalVertex::GetInfo(FInfoEntity& Info
 }
 #endif
 
-void CADKernel::FTopologicalVertex::AddConnectedEdge(FTopologicalEdge& Edge)
+void FTopologicalVertex::AddConnectedEdge(FTopologicalEdge& Edge)
 {
 	ConnectedEdges.Add(&Edge);
 }
 
-void CADKernel::FTopologicalVertex::RemoveConnectedEdge(FTopologicalEdge& Edge)
+void FTopologicalVertex::RemoveConnectedEdge(FTopologicalEdge& Edge)
 {
+	if (ConnectedEdges.IsEmpty())
+	{
+		return;
+	}
+	
 	for (int32 EdgeIndex = 0; EdgeIndex < ConnectedEdges.Num(); EdgeIndex++)
 	{
 		if (ConnectedEdges[EdgeIndex] == &Edge)
@@ -35,7 +43,7 @@ void CADKernel::FTopologicalVertex::RemoveConnectedEdge(FTopologicalEdge& Edge)
 	ensureCADKernel(false);
 }
 
-bool CADKernel::FTopologicalVertex::IsBorderVertex()
+bool FTopologicalVertex::IsBorderVertex()
 {
 	for (FTopologicalVertex* Vertex : GetTwinsEntities())
 	{
@@ -50,13 +58,13 @@ bool CADKernel::FTopologicalVertex::IsBorderVertex()
 	return false;
 }
 
-TSharedPtr<CADKernel::FEntityGeom> CADKernel::FTopologicalVertex::ApplyMatrix(const FMatrixH& InMatrix) const
+TSharedPtr<FEntityGeom> FTopologicalVertex::ApplyMatrix(const FMatrixH& InMatrix) const
 {
 	FPoint transformedPoint = InMatrix.Multiply(Coordinates);
 	return FEntity::MakeShared<FTopologicalVertex>(transformedPoint);
 }
 
-void CADKernel::FTopologicalVertex::GetConnectedEdges(const FTopologicalVertex& OtherVertex, TArray<FTopologicalEdge*>& OutEdges) const
+void FTopologicalVertex::GetConnectedEdges(const FTopologicalVertex& OtherVertex, TArray<FTopologicalEdge*>& OutEdges) const
 {
 	OutEdges.Reserve(GetTwinsEntityCount());
 
@@ -75,7 +83,7 @@ void CADKernel::FTopologicalVertex::GetConnectedEdges(const FTopologicalVertex& 
 	}
 }
 
-void CADKernel::FTopologicalVertex::Link(FTopologicalVertex& Twin)
+void FTopologicalVertex::Link(FTopologicalVertex& Twin)
 {
 	// The active vertex is always the closest of the Barycenter
 	if (TopologicalLink.IsValid() && Twin.TopologicalLink.IsValid())
@@ -98,7 +106,7 @@ void CADKernel::FTopologicalVertex::Link(FTopologicalVertex& Twin)
 	GetLink()->DefineActiveEntity();
 }
 
-void CADKernel::FTopologicalVertex::UnlinkTo(FTopologicalVertex& OtherVertex)
+void FTopologicalVertex::UnlinkTo(FTopologicalVertex& OtherVertex)
 {
 	TSharedPtr<FVertexLink> OldLink = GetLink();
 	ResetTopologicalLink();
@@ -125,7 +133,7 @@ void CADKernel::FTopologicalVertex::UnlinkTo(FTopologicalVertex& OtherVertex)
 	}
 }
 
-void CADKernel::FVertexLink::ComputeBarycenter()
+void FVertexLink::ComputeBarycenter()
 {
 	Barycenter = FPoint::ZeroPoint;
 	for (const FTopologicalVertex* Vertex : TwinsEntities)
@@ -135,7 +143,7 @@ void CADKernel::FVertexLink::ComputeBarycenter()
 	Barycenter /= TwinsEntities.Num();
 }
 
-void CADKernel::FVertexLink::DefineActiveEntity()
+void FVertexLink::DefineActiveEntity()
 {
 	if (TwinsEntities.Num() == 0)
 	{
@@ -147,6 +155,8 @@ void CADKernel::FVertexLink::DefineActiveEntity()
 	FTopologicalVertex* ClosedVertex = TwinsEntities.HeapTop();
 	for (FTopologicalVertex* Vertex : TwinsEntities)
 	{
+		ensureCADKernel(!Vertex->IsDeleted());
+
 		double Square = Vertex->SquareDistance(Barycenter);
 		if (Square < DistanceSquare)
 		{
@@ -161,7 +171,7 @@ void CADKernel::FVertexLink::DefineActiveEntity()
 	ActiveEntity = ClosedVertex;
 }
 
-TSharedRef<CADKernel::FVertexMesh> CADKernel::FTopologicalVertex::GetOrCreateMesh(TSharedRef<FModelMesh>& MeshModel)
+TSharedRef<FVertexMesh> FTopologicalVertex::GetOrCreateMesh(TSharedRef<FModelMesh>& MeshModel)
 {
 	if (!IsActiveEntity())
 	{
@@ -180,7 +190,7 @@ TSharedRef<CADKernel::FVertexMesh> CADKernel::FTopologicalVertex::GetOrCreateMes
 	return Mesh.ToSharedRef();
 }
 
-void CADKernel::FTopologicalVertex::SpawnIdent(FDatabase& Database)
+void FTopologicalVertex::SpawnIdent(FDatabase& Database)
 {
 	if (!FEntity::SetId(Database))
 	{
@@ -200,16 +210,18 @@ void CADKernel::FTopologicalVertex::SpawnIdent(FDatabase& Database)
 
 
 #ifdef CADKERNEL_DEV
-CADKernel::FInfoEntity& TTopologicalLink<FTopologicalVertex>::GetInfo(FInfoEntity& Info) const
+FInfoEntity& TTopologicalLink<FTopologicalVertex>::GetInfo(FInfoEntity& Info) const
 {
 	return FEntity::GetInfo(Info)
 		.Add(TEXT("active Entity"), ActiveEntity)
 		.Add(TEXT("twin Entities"), TwinsEntities);
 }
 
-CADKernel::FInfoEntity& CADKernel::FVertexLink::GetInfo(FInfoEntity& Info) const
+FInfoEntity& FVertexLink::GetInfo(FInfoEntity& Info) const
 {
 	return TTopologicalLink<FTopologicalVertex>::GetInfo(Info)
 		.Add(TEXT("barycenter"), Barycenter);
 }
 #endif
+
+} // namespace CADKernel
