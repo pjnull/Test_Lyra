@@ -2245,9 +2245,10 @@ public class GameActivity extends $${gameActivitySuperClass}$$ implements Surfac
 		return containerFrameLayout;
 	}
 
-	protected String FindLineFromStatus(String fieldToReport)
+	protected String[] FindLineFromFile(String Filepath, String[] fieldsToReport)
 	{
-		File file = new File("/proc/self/status");
+		String[] foundStrings = new String[fieldsToReport.length];
+		File file = new File(Filepath);
 		if (file.exists())
 		{
 			try (BufferedReader reader = new BufferedReader(new FileReader(file));)
@@ -2255,9 +2256,12 @@ public class GameActivity extends $${gameActivitySuperClass}$$ implements Surfac
 				String line;
 				while ((line = reader.readLine()) != null)
 				{
-					if(line.contains(fieldToReport))
+					for(int i = 0; i<fieldsToReport.length; i++)
 					{
-						return line;
+						if(line.startsWith(fieldsToReport[i]))
+						{
+							foundStrings[i] = line;
+						}
 					}
 				}
 			}
@@ -2266,7 +2270,7 @@ public class GameActivity extends $${gameActivitySuperClass}$$ implements Surfac
 				Log.debug("failed to read status: " + ie);
 			}
 		}
-		return "";
+		return foundStrings;
 	}
 
 	@Override
@@ -2391,6 +2395,7 @@ public class GameActivity extends $${gameActivitySuperClass}$$ implements Surfac
 
 		// update memory stats every 10 seconds
 		memoryRunnable = new Runnable() {
+			int LastProcessMemoryValue = 0;
 			@Override
 			public void run()
 			{
@@ -2413,7 +2418,20 @@ public class GameActivity extends $${gameActivitySuperClass}$$ implements Surfac
 						}
 					}
 				}
-				Log.debug("Used memory: " + ProcessMemory + " ("+FindLineFromStatus("VmRSS:")+")");
+
+				Log.debug("--- memstats:");
+				String[] statusLines = FindLineFromFile("/proc/self/status",new String[] {"VmSize:","VmHWM:", "VmRSS:", "VmData:", "VmSwap:"});
+				String ProcessMemInfoLine = "Used memory: ";
+				if( LastProcessMemoryValue != ProcessMemory)
+				{
+					ProcessMemInfoLine+=" (updated): ";
+					LastProcessMemoryValue = ProcessMemory;
+				}
+				Log.debug("memstat: "+ProcessMemInfoLine + ProcessMemory);
+				for(String memstatusline : statusLines)
+				{
+					Log.debug("memstat: "+memstatusline);
+				}
 				
 				synchronized(_activity)
 				{
