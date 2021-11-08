@@ -137,15 +137,15 @@ public:
 class ENGINE_API FBatchedElements
 {
 public:
-
 	/**
-	* Constructor 
-	*/
+	 * Constructor 
+	 */
 	FBatchedElements()
-		:	MaxMeshIndicesAllowed(GDrawUPIndexCheckCount / sizeof(int32))
-			// the index buffer is 2 bytes, so make sure we only address 0xFFFF vertices in the index buffer
-		,	MaxMeshVerticesAllowed(FMath::Min<uint32>(0xFFFF, GDrawUPVertexCheckCount / sizeof(FSimpleElementVertex)))
-		,	bEnableHDREncoding(true)
+		: WireTriVerts(/*InNeedsCPUAccess*/true) // Keep vertices on buffer creation
+		, MaxMeshIndicesAllowed(GDrawUPIndexCheckCount / sizeof(int32))
+		  // the index buffer is 2 bytes, so make sure we only address 0xFFFF vertices in the index buffer
+		, MaxMeshVerticesAllowed(FMath::Min<uint32>(0xFFFF, GDrawUPVertexCheckCount / sizeof(FSimpleElementVertex)))
+		, bEnableHDREncoding(true)
 	{
 	}
 
@@ -316,7 +316,8 @@ private:
 		float DepthBias;
 	};
 	TArray<FBatchedWireTris> WireTris;
-	TArray<FSimpleElementVertex> WireTriVerts;
+
+	mutable TResourceArray<FSimpleElementVertex> WireTriVerts;
 
 	struct FBatchedThickLines
 	{
