@@ -152,3 +152,20 @@ def remove_prefix(str, prefix):
     if str.startswith(prefix):
         return str[len(prefix):]
     return str
+
+def expand_endpoint(
+        endpoint: str, default_addr: str = '0.0.0.0',
+        default_port: int = 0) -> str:
+    '''
+    Given an endpoint where either address or port was omitted, use
+    the provided defaults.
+    '''
+    addr_str, _, port_str = endpoint.partition(':')
+
+    if not addr_str:
+        addr_str = default_addr
+
+    if not port_str:
+        port_str = str(default_port)
+
+    return f'{addr_str}:{port_str}'

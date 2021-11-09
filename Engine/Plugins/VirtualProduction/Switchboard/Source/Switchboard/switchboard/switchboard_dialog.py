@@ -4,6 +4,7 @@ import datetime
 import logging
 import os
 import threading
+import time
 from typing import List, Optional, Set
 
 from PySide2 import QtCore
@@ -221,6 +222,7 @@ class SwitchboardDialog(QtCore.QObject):
 
         self.init_stylesheet_watcher()
 
+        self._exiting = False
         self._shoot = None
         self._sequence = None
         self._slate = None
@@ -231,6 +233,7 @@ class SwitchboardDialog(QtCore.QObject):
         self._multiuser_session_name = None
         self._is_recording = False
         self._description = 'description'
+        self._started_mu_server = False
 
         # Recording Manager
         self.recording_manager = recording.RecordingManager(CONFIG.SWITCHBOARD_DIR)
@@ -331,6 +334,9 @@ class SwitchboardDialog(QtCore.QObject):
         self.window.use_device_autojoin_setting_checkbox.toggled.connect(self.on_device_autojoin_changed)
         self.refresh_muserver_autojoin()
 
+        self.window.muserver_start_stop_button.clicked.connect(self.on_muserver_start_stop_click)
+        self.setup_mu_server_poll()
+
         self.window.additional_settings.signal_device_widget_tracing.connect(self.on_tracing_settings_changed)
         self.refresh_trace_settings()
 
@@ -387,6 +393,51 @@ class SwitchboardDialog(QtCore.QObject):
         # Run the transport queue
         #self.transport_queue_resume()
 
+    def _poll_muserver_status(self):
+        '''
+        Poll the status of the Multi-user server on a 1 second timer.
+        '''
+        while not self._exiting:
+            self.update_muserver_button()
+            time.sleep(1.0)
+
+    def update_muserver_button(self):
+        '''
+        Update the status of the Multi-user start/stop button to reflect the status of Multi-user server.
+        '''
+        ServerInstance = switchboard_application.get_multi_user_server_instance()
+        is_checked = self.window.muserver_start_stop_button.isChecked()
+        is_running = ServerInstance.is_running()
+        if  (is_running or self._started_mu_server) and not is_checked:
+            self.window.muserver_start_stop_button.setChecked( True )
+        elif not is_running and is_checked:
+            self.window.muserver_start_stop_button.setChecked( False )
+
+        if is_running and self._started_mu_server:
+            # Server has finished starting so reset our start flag.
+            self._started_mu_server = False
+
+    def setup_mu_server_poll(self):
+        '''
+        Setup a polling thread to query for the latest state of Multi-user server.
+        '''
+        thread = threading.Thread(target=self._poll_muserver_status, args=[], kwargs={})
+        thread.start()
+
+    def on_muserver_start_stop_click(self):
+        '''
+        Handle the multi-user server button click. If we are running we stop the process. If we are not
+        running then we launch the multi-user server.
+        '''
+        ServerInstance =switchboard_application.get_multi_user_server_instance()
+        if ServerInstance.is_running():
+            ServerInstance.terminate(bypolling=True)
+            self._started_mu_server = False
+        else:
+            self._started_mu_server = True
+            ServerInstance.launch()
+        self.update_muserver_button()
+
     def init_insights_launcher(self):
         ''' Initializes insights launcher '''
 
@@ -403,7 +454,6 @@ class SwitchboardDialog(QtCore.QObject):
 
     def init_listener_launcher(self):
         ''' Initializes switcboard listener launcher '''
-        
         self.listener_launcher = ListenerLauncher()
 
         def launch_listener():
@@ -536,6 +586,7 @@ class SwitchboardDialog(QtCore.QObject):
                    for device in self.device_manager.devices())
 
     def on_exit(self):
+        self._exiting = True
         self.osc_server.close()
         for device in self.device_manager.devices():
             device.disconnect_listener()
@@ -729,6 +780,7 @@ class SwitchboardDialog(QtCore.QObject):
         settings_dialog.set_osc_client_port(CONFIG.OSC_CLIENT_PORT.get_value())
         settings_dialog.set_mu_server_name(CONFIG.MUSERVER_SERVER_NAME)
         settings_dialog.set_mu_server_endpoint(CONFIG.MUSERVER_ENDPOINT)
+        settings_dialog.set_mu_server_multicast_endpoint(CONFIG.MUSERVER_MULTICAST_ENDPOINT.get_value())
         settings_dialog.set_mu_cmd_line_args(CONFIG.MUSERVER_COMMAND_LINE_ARGUMENTS)
         settings_dialog.set_mu_clean_history(CONFIG.MUSERVER_CLEAN_HISTORY)
         settings_dialog.set_mu_auto_launch(CONFIG.MUSERVER_AUTO_LAUNCH)
@@ -790,6 +842,10 @@ class SwitchboardDialog(QtCore.QObject):
         mu_server_endpoint = settings_dialog.mu_server_endpoint()
         if mu_server_endpoint != CONFIG.MUSERVER_ENDPOINT:
             CONFIG.MUSERVER_ENDPOINT = mu_server_endpoint
+
+        mu_server_multicast_endpoint = settings_dialog.mu_server_multicast_endpoint()
+        if mu_server_multicast_endpoint != CONFIG.MUSERVER_MULTICAST_ENDPOINT:
+            CONFIG.MUSERVER_MULTICAST_ENDPOINT.update_value(mu_server_multicast_endpoint)
 
         mu_cmd_line_args = settings_dialog.mu_cmd_line_args()
         if mu_cmd_line_args != CONFIG.MUSERVER_COMMAND_LINE_ARGUMENTS:
