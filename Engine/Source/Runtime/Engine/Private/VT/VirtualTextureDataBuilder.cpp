@@ -451,7 +451,7 @@ void FVirtualTextureDataBuilder::BuildPagesMacroBlocks(bool bAllowAsync)
 		bool bInFinalChunk = false;
 
 		OutData.ChunkIndexPerMip.Reserve(OutData.NumMips);
-		OutData.BaseOffsetPerMip.Reserve(OutData.NumMips);
+		OutData.BaseOffsetPerMip.Init(~0u, OutData.NumMips);
 		OutData.TileOffsetData.Reserve(OutData.NumMips);
 
 		OutData.TileOffsetInChunk.Init(~0u, NumTiles * NumLayers);
@@ -852,10 +852,10 @@ void FVirtualTextureDataBuilder::PushDataToChunk(const TArray<FVTSourceTileEntry
 	{
 		const FVTSourceTileEntry& Tile = Tiles[TileIdx];
 		const int32 MipIndex = Tile.MipIndex;
-		if (MipIndex >= OutData.BaseOffsetPerMip.Num())
+		// Set BaseOffsetPerMip from the first tile we find for the MipIndex.
+		if (OutData.BaseOffsetPerMip[MipIndex] == ~0u)
 		{
-			check(MipIndex == OutData.BaseOffsetPerMip.Num());
-			OutData.BaseOffsetPerMip.Add(ChunkOffset);
+			OutData.BaseOffsetPerMip[MipIndex] = ChunkOffset;
 		}
 		int32 TileIndex = Tile.TileIndex;
 		for (int32 Layer = 0; Layer < NumLayers; ++Layer)
