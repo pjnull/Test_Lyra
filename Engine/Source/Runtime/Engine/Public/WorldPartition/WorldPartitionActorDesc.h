@@ -148,7 +148,7 @@ protected:
 
 	void TransformInstance(const FString& From, const FString& To);
 
-	inline void TransferRefCounts(const FWorldPartitionActorDesc* From) const
+	virtual void TransferFrom(const FWorldPartitionActorDesc* From)
 	{
 		SoftRefCount = From->SoftRefCount;
 		HardRefCount = From->HardRefCount;

@@ -93,6 +93,15 @@ bool FLevelInstanceActorDesc::GetContainerInstance(const UActorDescContainer*& O
 	return false;
 }
 
+void FLevelInstanceActorDesc::TransferFrom(const FWorldPartitionActorDesc* From)
+{
+	FWorldPartitionActorDesc::TransferFrom(From);
+
+	FLevelInstanceActorDesc* FromLevelInstanceActorDesc = (FLevelInstanceActorDesc*)From;
+	LevelInstanceContainer = FromLevelInstanceActorDesc->LevelInstanceContainer;
+	FromLevelInstanceActorDesc->LevelInstanceContainer = nullptr;
+}
+
 void FLevelInstanceActorDesc::Serialize(FArchive& Ar)
 {
 	FWorldPartitionActorDesc::Serialize(Ar);
