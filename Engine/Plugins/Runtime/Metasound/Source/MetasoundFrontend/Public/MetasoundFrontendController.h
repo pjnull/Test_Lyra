@@ -327,6 +327,9 @@ namespace Metasound
 			/** Returns the data type name associated with this input. */
 			virtual FText GetDisplayName() const = 0;
 
+			/** Clears the value for the given input instance if set. */
+			virtual bool ClearLiteral() = 0;
+
 			/** Returns the value for the given input instance if set. */
 			virtual const FMetasoundFrontendLiteral* GetLiteral() const = 0;
 

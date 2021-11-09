@@ -93,6 +93,7 @@ namespace Metasound
 			virtual const FVertexName& GetName() const override { return Invalid::GetInvalidName(); }
 			virtual FText GetDisplayName() const override { return Invalid::GetInvalidText(); }
 			virtual const FText& GetTooltip() const override { return Invalid::GetInvalidText(); }
+			virtual bool ClearLiteral() override { return false; }
 			virtual const FMetasoundFrontendVertexMetadata& GetMetadata() const override { return Invalid::GetInvalidVertexMetadata(); }
 			virtual const FMetasoundFrontendLiteral* GetLiteral() const override { return nullptr; }
 			virtual void SetLiteral(const FMetasoundFrontendLiteral& InLiteral) { };

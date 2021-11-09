@@ -67,6 +67,16 @@ namespace Metasound
 			return Invalid::GetInvalidText();
 		}
 
+		bool FBaseInputController::ClearLiteral()
+		{
+			if (const FMetasoundFrontendVertex* Vertex = NodeVertexPtr.Get())
+			{
+				OwningNode->ClearInputLiteral(Vertex->VertexID);
+			}
+
+			return false;
+		}
+
 		const FMetasoundFrontendLiteral* FBaseInputController::GetLiteral() const
 		{
 			if (const FMetasoundFrontendVertex* Vertex = NodeVertexPtr.Get())
@@ -81,17 +91,7 @@ namespace Metasound
 		{
 			if (const FMetasoundFrontendVertex* Vertex = NodeVertexPtr.Get())
 			{
-				if (const FMetasoundFrontendLiteral* ClassLiteral = GetClassDefaultLiteral())
-				{
-					// Clear if equivalent to class default as fallback is the class default
-					if (ClassLiteral->IsEquivalent(InLiteral))
-					{
-						OwningNode->ClearInputLiteral(Vertex->VertexID);
-						return;
-					}
-				}
-
-				OwningNode->SetInputLiteral(FMetasoundFrontendVertexLiteral{ Vertex->VertexID, InLiteral });
+				OwningNode->SetInputLiteral(FMetasoundFrontendVertexLiteral { Vertex->VertexID, InLiteral });
 			}
 		}
 
