@@ -162,6 +162,9 @@ struct FStrataEvaluateResult
 	float3 IntegratedDiffuseValue;
 	float3 IntegratedSpecularValue;
 
+	// Use for forward rendering using translucent lighting volume or per vertex lighting
+	float3 DiffuseColor;
+
 	float3 EmissivePathValue;
 
 	float3 DiffusePathValue;
@@ -254,6 +257,7 @@ FStrataEvaluateResult StrataEvaluateBSDFCommon(FStrataBSDFContext BSDFContext, F
 				Sample.DiffusePathValue = Diffuse_Lambert(DiffuseColor);
 			}
 			Sample.IntegratedDiffuseValue += ShadowTerms.SurfaceShadow * AreaLightContext.NoL * Sample.DiffusePathValue * AreaLightContext.Falloff * AreaLightContext.AreaLight.FalloffColor;
+			Sample.DiffuseColor		= DiffuseColor;
 			Sample.DiffusePDF		= BSDFContext.SatNoL / PI;
 			Sample.bSubsurface		= bHasSubsurface;
 
@@ -607,6 +611,7 @@ FStrataEvaluateResult StrataEvaluateBSDFCommon(FStrataBSDFContext BSDFContext, F
 					Sample.IntegratedDiffuseValue, 
 					ShadowTerms.SurfaceShadow * AreaLightContext.NoL * SlabDirectionalAlbedo * DirectionalAlbedo_SpecularTransmission * AreaLightContext.Falloff * AreaLightContext.AreaLight.FalloffColor,
 					DiffuseToVolumeBlend);
+				Sample.DiffuseColor		= SlabDirectionalAlbedo;
 			}
 			#endif
 
