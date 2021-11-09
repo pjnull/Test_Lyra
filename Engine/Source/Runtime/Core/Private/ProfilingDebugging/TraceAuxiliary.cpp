@@ -17,6 +17,7 @@
 
 #include "CoreGlobals.h"
 #include "Misc/Paths.h"
+#include "Misc/Fork.h"
 
 #if WITH_UNREAL_TRACE_LAUNCH
 #	include "Misc/Parse.h"
@@ -77,6 +78,8 @@ public:
 	void					DisableChannels();
 	void					SetTruncateFile(bool bTruncateFile);
 	void					UpdateCsvStats() const;
+	void					StartWorkerThread();
+	void					StartEndFramePump();
 
 private:
 	enum class EState : uint8
@@ -101,9 +104,11 @@ private:
 	FString					TraceDest;
 	EState					State = EState::Stopped;
 	bool					bTruncateFile = false;
+	bool					bWorkerThreadStarted = false;
 };
 
 static FTraceAuxiliaryImpl GTraceAuxiliary;
+static FDelegateHandle GEndFrameDelegateHandle;
 
 ////////////////////////////////////////////////////////////////////////////////
 void FTraceAuxiliaryImpl::AddChannels(const TCHAR* ChannelList)
@@ -384,6 +389,30 @@ void FTraceAuxiliaryImpl::UpdateCsvStats() const
 #endif
 }
 
+////////////////////////////////////////////////////////////////////////////////
+void FTraceAuxiliaryImpl::StartWorkerThread()
+{
+	if (!bWorkerThreadStarted)
+	{
+		// End frame delegate is no longer needed to pump Trace
+		FCoreDelegates::OnEndFrame.Remove(GEndFrameDelegateHandle);
+		GEndFrameDelegateHandle.Reset();
+		
+		UE::Trace::StartWorkerThread();
+		bWorkerThreadStarted = true;
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+void FTraceAuxiliaryImpl::StartEndFramePump()
+{
+	if (!GEndFrameDelegateHandle.IsValid())
+	{
+		// If the worker thread is disabled, pump the update from end frame
+		GEndFrameDelegateHandle = FCoreDelegates::OnEndFrame.AddStatic(UE::Trace::Update);
+	}
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 static void TraceAuxiliaryConnectEpilogue()
@@ -424,12 +453,9 @@ static void TraceAuxiliarySend(const TArray<FString>& Args)
 		return;
 	}
 
-	if (Args.Num() > 1)
-	{
-		GTraceAuxiliary.AddChannels(*(Args[1]));
-	}
-
-	if (!GTraceAuxiliary.Connect(ETraceConnectType::Network, *Args[0]))
+	const TCHAR* Target = *Args[0];
+	const TCHAR* Channels = Args.Num() > 1 ? *Args[1] : nullptr;
+	if (!FTraceAuxiliary::Start(FTraceAuxiliary::EConnectionType::Network, Target, Channels))
 	{
 		UE_LOG(LogConsoleResponse, Warning, TEXT("Failed to start tracing to '%s'"), *Args[0]);
 		return;
@@ -441,12 +467,8 @@ static void TraceAuxiliarySend(const TArray<FString>& Args)
 ////////////////////////////////////////////////////////////////////////////////
 static void TraceAuxiliaryStart(const TArray<FString>& Args)
 {
-	if (Args.Num() > 0)
-	{
-		GTraceAuxiliary.AddChannels(*(Args[0]));
-	}
-
-	if (!GTraceAuxiliary.Connect(ETraceConnectType::File, nullptr))
+	const TCHAR* Channels = Args.Num() > 0 ? *Args[0] : nullptr;
+	if (!FTraceAuxiliary::Start(FTraceAuxiliary::EConnectionType::File, nullptr, Channels))
 	{
 		UE_LOG(LogConsoleResponse, Warning, TEXT("Failed to start tracing to a file"));
 		return;
@@ -668,6 +690,146 @@ UE_TRACE_EVENT_BEGIN(Diagnostics, Session2, NoSync|Important)
 UE_TRACE_EVENT_END()
 
 ////////////////////////////////////////////////////////////////////////////////
+static bool StartFromCommandlineArguments(const TCHAR* CommandLine)
+{
+#if UE_TRACE_ENABLED
+
+
+	// By default, if any channels are enabled we trace to memory.
+	FTraceAuxiliary::EConnectionType Type = FTraceAuxiliary::EConnectionType::None;
+
+	// Setup options
+	FTraceAuxiliary::Options Opts;
+	Opts.bTruncateFile = FParse::Param(CommandLine, TEXT("tracefiletrunc"));
+	Opts.bNoWorkerThread = !FPlatformProcess::SupportsMultithreading();
+
+	// Find if a connection type is specified
+	FString Parameter;
+	const TCHAR* Target = nullptr;
+	if (FParse::Value(CommandLine, TEXT("-tracehost="), Parameter))
+	{
+		Type = FTraceAuxiliary::EConnectionType::Network;
+		Target = *Parameter;
+	}
+	else if (FParse::Value(CommandLine, TEXT("-tracefile="), Parameter))
+	{
+		Type = FTraceAuxiliary::EConnectionType::File;
+		if (Parameter.IsEmpty())
+		{
+			UE_LOG(LogCore, Warning, TEXT("Empty parameter to 'tracefile' argument. Using default filename."));
+			Target = nullptr;
+		}
+		else
+		{
+			Target = *Parameter;
+		}
+	}
+	else if (FParse::Param(CommandLine, TEXT("tracefile")))
+	{
+		Type = FTraceAuxiliary::EConnectionType::File;
+		Target = nullptr;
+	}
+
+	// Finally start tracing to the requested connection
+	return FTraceAuxiliary::Start(Type, Target, nullptr, &Opts);
+#endif
+	return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+static void SetupChannelsFromCommandline(const TCHAR* CommandLine)
+{
+#if UE_TRACE_ENABLED
+	// Get active channels
+	FString Channels;
+	if (FParse::Value(CommandLine, TEXT("-trace="), Channels, false))
+	{
+	}
+	else if (FParse::Param(CommandLine, TEXT("trace")))
+	{
+		Channels = TEXT("default");
+	}
+	else
+	{
+		return;
+	}
+	
+	GTraceAuxiliary.AddChannels(*Channels);
+	GTraceAuxiliary.EnableChannels();
+	
+	UE_LOG(LogCore, Display, TEXT("Trace channels: %s"), *Channels);
+#endif
+}
+
+////////////////////////////////////////////////////////////////////////////////
+bool FTraceAuxiliary::Start(EConnectionType Type, const TCHAR* Target, const TCHAR* Channels, Options* Options)
+{
+#if UE_TRACE_ENABLED
+	if (Options && Options->bNoWorkerThread)
+	{
+		GTraceAuxiliary.StartEndFramePump();	
+	}
+	else
+	{
+		GTraceAuxiliary.StartWorkerThread();
+	}
+
+	if (Channels)
+	{
+		GTraceAuxiliary.AddChannels(Channels);
+		GTraceAuxiliary.EnableChannels();
+	}
+	
+	if (Options)
+	{
+		// Truncation is only valid when tracing to file and filename is set
+		if (Options->bTruncateFile && Type == EConnectionType::File && Target != nullptr)
+		{
+			GTraceAuxiliary.SetTruncateFile(Options->bTruncateFile);
+		}
+	}
+
+	if (Type == EConnectionType::File)
+	{
+		return GTraceAuxiliary.Connect(ETraceConnectType::File, Target);
+	}
+	else if(Type == EConnectionType::Network)
+	{
+		return GTraceAuxiliary.Connect(ETraceConnectType::Network, Target);	
+	}
+#endif
+	return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+bool FTraceAuxiliary::Stop()
+{
+#if UE_TRACE_ENABLED
+	return GTraceAuxiliary.Stop();
+#else
+	return false;
+#endif
+}
+
+////////////////////////////////////////////////////////////////////////////////
+bool FTraceAuxiliary::Pause()
+{
+#if UE_TRACE_ENABLED
+	GTraceAuxiliary.DisableChannels();
+#endif
+	return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+bool FTraceAuxiliary::Resume()
+{
+#if UE_TRACE_ENABLED
+	GTraceAuxiliary.EnableChannels();
+#endif
+	return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 void FTraceAuxiliary::Initialize(const TCHAR* CommandLine)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FTraceAux_Init);
@@ -719,28 +881,19 @@ void FTraceAuxiliary::Initialize(const TCHAR* CommandLine)
 		<< Session2.ConfigurationType(uint8(FApp::GetBuildConfiguration()))
 		<< Session2.TargetType(uint8(FApp::GetBuildTargetType()));
 
-	FString Parameter;
-
 	// Attempt to send trace data somewhere from the command line. It prehaps
 	// seems odd to do this before initialising Trace, but it is done this way
 	// to support disabling the "important" cache without losing any events.
-	if (FParse::Value(CommandLine, TEXT("-tracehost="), Parameter))
+	// When Forking only the forked child should start the actual tracing
+	const bool bShouldStartTracingNow = !FForkProcessHelper::IsForkRequested();
+	if (bShouldStartTracingNow)
 	{
-		GTraceAuxiliary.Connect(ETraceConnectType::Network, *Parameter);
+		StartFromCommandlineArguments(CommandLine);
 	}
-	else if (FParse::Value(CommandLine, TEXT("-tracefile="), Parameter))
-	{
-		GTraceAuxiliary.SetTruncateFile(FParse::Param(CommandLine, TEXT("tracefiletrunc")));
-		GTraceAuxiliary.Connect(ETraceConnectType::File, *Parameter);
-	}
-	else if (FParse::Param(CommandLine, TEXT("tracefile")))
-	{
-		GTraceAuxiliary.Connect(ETraceConnectType::File, nullptr);
-	}
-
+	
 	// Initialize Trace
 	UE::Trace::FInitializeDesc Desc;
-	Desc.bUseWorkerThread = FPlatformProcess::SupportsMultithreading();
+	Desc.bUseWorkerThread = false; // We decide which update method to use in FTraceAuxiliary::Start method.
 	Desc.bUseImportantCache = (FParse::Param(CommandLine, TEXT("tracenocache")) == false);
 	if (FParse::Value(CommandLine, TEXT("-tracetailmb="), Desc.TailSizeBytes))
 	{
@@ -757,11 +910,10 @@ void FTraceAuxiliary::Initialize(const TCHAR* CommandLine)
 	FParse::Value(CommandLine, TEXT("-samplinginterval="), Microseconds);
 	PlatformEvents_Init(Microseconds);
 
-	FCoreDelegates::OnEndFrame.AddStatic(UE::Trace::Update);
 #if CSV_PROFILER
 	FCoreDelegates::OnEndFrame.AddRaw(&GTraceAuxiliary, &FTraceAuxiliaryImpl::UpdateCsvStats);
 #endif
-
+	
 	FModuleManager::Get().OnModulesChanged().AddLambda([](FName Name, EModuleChangeReason Reason)
 	{
 		if (Reason == EModuleChangeReason::ModuleLoaded)
@@ -769,15 +921,11 @@ void FTraceAuxiliary::Initialize(const TCHAR* CommandLine)
 			GTraceAuxiliary.EnableChannels();
 		}
 	});
-
-	// Extract an explicit channel set from the command line.
-	if (FParse::Value(CommandLine, TEXT("-trace="), Parameter, false))
-	{
-		GTraceAuxiliary.AddChannels(*Parameter);
-		GTraceAuxiliary.EnableChannels();
-	}
-
+	
 	UE::Trace::ThreadRegister(TEXT("GameThread"), FPlatformTLS::GetCurrentThreadId(), -1);
+
+	SetupChannelsFromCommandline(CommandLine);
+
 #endif
 }
 
@@ -818,15 +966,20 @@ void FTraceAuxiliary::EnableChannels()
 void FTraceAuxiliary::TryAutoConnect()
 {
 #if UE_TRACE_ENABLED
+	// Do not attempt to autoconnect when forking is requested.
+	const bool bShouldAutoConnect = !FForkProcessHelper::IsForkRequested();
+	if (bShouldAutoConnect)
+	{
 	#if PLATFORM_WINDOWS
 	// If we can detect a named event it means UnrealInsights (Browser Mode) is running.
 	// In this case, we try to auto-connect with the Trace Server.
-	HANDLE KnownEvent = ::OpenEvent(EVENT_ALL_ACCESS, false, TEXT("Local\\UnrealInsightsBrowser"));
-	if (KnownEvent != nullptr)
-	{
-		GTraceAuxiliary.Connect(ETraceConnectType::Network, TEXT("127.0.0.1"));
-		::CloseHandle(KnownEvent);
-	}
+		HANDLE KnownEvent = ::OpenEvent(EVENT_ALL_ACCESS, false, TEXT("Local\\UnrealInsightsBrowser"));
+		if (KnownEvent != nullptr)
+		{
+			GTraceAuxiliary.Connect(ETraceConnectType::Network, TEXT("127.0.0.1"));
+			::CloseHandle(KnownEvent);
+		}
 	#endif
+	}
 #endif
 }
