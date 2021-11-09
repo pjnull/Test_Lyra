@@ -16,6 +16,27 @@ using EpicGames.Core;
 namespace AutomationTool
 {
 	/// <summary>
+	/// Specifies validation that should be performed on a task parameter.
+	/// </summary>
+	public enum TaskParameterValidationType
+	{
+		/// <summary>
+		/// Allow any valid values for the field type.
+		/// </summary>
+		Default,
+
+		/// <summary>
+		/// A list of tag names separated by semicolons
+		/// </summary>
+		TagList,
+
+		/// <summary>
+		/// A file specification, which may contain tags and wildcards.
+		/// </summary>
+		FileSpec,
+	}
+
+	/// <summary>
 	/// Information about a parameter to a task
 	/// </summary>
 	[DebuggerDisplay("{Name}")]
@@ -24,41 +45,35 @@ namespace AutomationTool
 		/// <summary>
 		/// Name of this parameter
 		/// </summary>
-		public string Name;
-
-		/// <summary>
-		/// Information about this field
-		/// </summary>
-		public FieldInfo FieldInfo;
+		public string Name { get; }
 
 		/// <summary>
 		/// The type for values assigned to this field
 		/// </summary>
-		public Type ValueType;
+		public Type ValueType { get; }
 
 		/// <summary>
 		/// The ICollection interface for this type
 		/// </summary>
-		public Type CollectionType;
+		internal Type CollectionType { get; }
 
 		/// <summary>
 		/// Validation type for this field
 		/// </summary>
-		public TaskParameterValidationType ValidationType;
+		public TaskParameterValidationType ValidationType { get; }
 
 		/// <summary>
 		/// Whether this parameter is optional
 		/// </summary>
-		public bool bOptional;
+		public bool bOptional { get; }
 
 		/// <summary>
 		/// Constructor
 		/// </summary>
-		public ScriptTaskParameter(string InName, FieldInfo InFieldInfo, TaskParameterValidationType InValidationType, bool bInOptional)
+		public ScriptTaskParameter(string InName, Type InValueType, TaskParameterValidationType InValidationType, bool bInOptional)
 		{
 			Name = InName;
-			FieldInfo = InFieldInfo;
-			ValueType = FieldInfo.FieldType;
+			ValueType = InValueType;
 			ValidationType = InValidationType;
 			bOptional = bInOptional;
 
@@ -95,47 +110,22 @@ namespace AutomationTool
 		/// <summary>
 		/// Name of this task
 		/// </summary>
-		public string Name;
+		public string Name { get; }
 
 		/// <summary>
-		/// Type of the task to construct with this info
+		/// Parameters for this task
 		/// </summary>
-		public Type TaskClass;
-
-		/// <summary>
-		/// Type to construct with the parsed parameters
-		/// </summary>
-		public Type ParametersClass;
-
-		/// <summary>
-		/// Mapping of attribute name to field
-		/// </summary>
-		public Dictionary<string, ScriptTaskParameter> NameToParameter = new Dictionary<string,ScriptTaskParameter>();
+		public List<ScriptTaskParameter> Parameters { get; }
 
 		/// <summary>
 		/// Constructor
 		/// </summary>
-		/// <param name="InName">Name of the task</param>
-		/// <param name="InTaskClass">Task class to create</param>
-		/// <param name="InParametersClass">Class type of an object to be constructed and passed as an argument to the task class constructor</param>
-		public ScriptTask(string InName, Type InTaskClass, Type InParametersClass)
+		/// <param name="Name">Name of the task</param>
+		/// <param name="Parameters">Parameters for the task</param>
+		public ScriptTask(string Name, List<ScriptTaskParameter> Parameters)
 		{
-			Name = InName;
-			TaskClass = InTaskClass;
-			ParametersClass = InParametersClass;
-
-			// Find all the fields which are tagged as parameters in ParametersClass
-			foreach(FieldInfo Field in ParametersClass.GetFields())
-			{
-				if(Field.MemberType == MemberTypes.Field)
-				{
-					TaskParameterAttribute ParameterAttribute = Field.GetCustomAttribute<TaskParameterAttribute>();
-					if(ParameterAttribute != null)
-					{
-						NameToParameter.Add(Field.Name, new ScriptTaskParameter(Field.Name, Field, ParameterAttribute.ValidationType, ParameterAttribute.Optional));
-					}
-				}
-			}
+			this.Name = Name;
+			this.Parameters = new List<ScriptTaskParameter>(Parameters);
 		}
 	}
 
@@ -267,7 +257,7 @@ namespace AutomationTool
 		/// Constructor
 		/// </summary>
 		/// <param name="InNameToTask">Mapping of task name to information about how to construct it</param>
-		public ScriptSchema(Dictionary<string, ScriptTask> NameToTask, List<(Type, ScriptSchemaStandardType)> PrimitiveTypes)
+		public ScriptSchema(IEnumerable<ScriptTask> Tasks, List<(Type, ScriptSchemaStandardType)> PrimitiveTypes)
 		{
 			// Create a lookup from standard types to their qualified names
 			Dictionary<Type, XmlQualifiedName> TypeToSchemaTypeName = new Dictionary<Type,XmlQualifiedName>();
@@ -282,10 +272,10 @@ namespace AutomationTool
 			// If a dictionary of tasks was specified, add those to the schema. Otherwise we'll allow any syntactically valid invocation.
 			List<XmlSchemaType> UserTypes = new List<XmlSchemaType>();
 			Dictionary<string, XmlSchemaComplexType> TaskNameToType = null;
-			if (NameToTask != null)
+			if (Tasks != null)
 			{
 				// Create all the custom user types, and add them to the qualified name lookup
-				foreach (Type Type in NameToTask.Values.SelectMany(x => x.NameToParameter.Values).Select(x => x.ValueType))
+				foreach (Type Type in Tasks.SelectMany(x => x.Parameters).Select(x => x.ValueType))
 				{
 					if (!TypeToSchemaTypeName.ContainsKey(Type))
 					{
@@ -305,11 +295,11 @@ namespace AutomationTool
 
 				// Create all the task types
 				TaskNameToType = new Dictionary<string, XmlSchemaComplexType>();
-				foreach (ScriptTask Task in NameToTask.Values)
+				foreach (ScriptTask Task in Tasks)
 				{
 					XmlSchemaComplexType TaskType = new XmlSchemaComplexType();
 					TaskType.Name = Task.Name + "TaskType";
-					foreach (ScriptTaskParameter Parameter in Task.NameToParameter.Values)
+					foreach (ScriptTaskParameter Parameter in Task.Parameters)
 					{
 						XmlQualifiedName SchemaTypeName = GetQualifiedTypeName(Parameter.ValidationType);
 						if (SchemaTypeName == null)

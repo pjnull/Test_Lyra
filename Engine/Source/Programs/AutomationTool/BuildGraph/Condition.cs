@@ -66,8 +66,9 @@ namespace AutomationTool
 		/// Evaluates the given string as a condition. Throws a ConditionException on a type or syntax error.
 		/// </summary>
 		/// <param name="Text">The condition text</param>
+		/// <param name="Context">Context for evaluating the expression</param>
 		/// <returns>The result of evaluating the condition</returns>
-		public static bool Evaluate(string Text)
+		public static bool Evaluate(string Text, IScriptReaderContext Context)
 		{
 			List<string> Tokens = new List<string>();
 			Tokenize(Text, Tokens);
@@ -76,7 +77,7 @@ namespace AutomationTool
 			if(Tokens.Count > 1)
 			{
 				int Idx = 0;
-				string Result = EvaluateOr(Tokens, ref Idx);
+				string Result = EvaluateOr(Tokens, ref Idx, Context);
 				if(Tokens[Idx] != EndToken)
 				{
 					throw new ConditionException("Garbage after expression: {0}", String.Join("", Tokens.Skip(Idx)));
@@ -91,17 +92,18 @@ namespace AutomationTool
 		/// </summary>
 		/// <param name="Tokens">List of tokens in the expression</param>
 		/// <param name="Idx">Current position in the token stream. Will be incremented as tokens are consumed.</param>
+		/// <param name="Context">Context for evaluating the expression</param>
 		/// <returns>A scalar representing the result of evaluating the expression.</returns>
-		static string EvaluateOr(List<string> Tokens, ref int Idx)
+		static string EvaluateOr(List<string> Tokens, ref int Idx, IScriptReaderContext Context)
 		{
 			// <Condition> Or <Condition> Or...
-			string Result = EvaluateAnd(Tokens, ref Idx);
+			string Result = EvaluateAnd(Tokens, ref Idx, Context);
 			while(String.Compare(Tokens[Idx], "Or", true) == 0)
 			{
 				// Evaluate this condition. We use a binary OR here, because we want to parse everything rather than short-circuit it.
 				Idx++;
 				string Lhs = Result;
-				string Rhs = EvaluateAnd(Tokens, ref Idx);
+				string Rhs = EvaluateAnd(Tokens, ref Idx, Context);
 				Result = (CoerceToBool(Lhs) | CoerceToBool(Rhs))? "true" : "false";
 			}
 			return Result;
@@ -112,17 +114,18 @@ namespace AutomationTool
 		/// </summary>
 		/// <param name="Tokens">List of tokens in the expression</param>
 		/// <param name="Idx">Current position in the token stream. Will be incremented as tokens are consumed.</param>
+		/// <param name="Context">Context for evaluating the expression</param>
 		/// <returns>A scalar representing the result of evaluating the expression.</returns>
-		static string EvaluateAnd(List<string> Tokens, ref int Idx)
+		static string EvaluateAnd(List<string> Tokens, ref int Idx, IScriptReaderContext Context)
 		{
 			// <Condition> And <Condition> And...
-			string Result = EvaluateComparison(Tokens, ref Idx);
+			string Result = EvaluateComparison(Tokens, ref Idx, Context);
 			while(String.Compare(Tokens[Idx], "And", true) == 0)
 			{
 				// Evaluate this condition. We use a binary AND here, because we want to parse everything rather than short-circuit it.
 				Idx++;
 				string Lhs = Result;
-				string Rhs = EvaluateComparison(Tokens, ref Idx);
+				string Rhs = EvaluateComparison(Tokens, ref Idx, Context);
 				Result = (CoerceToBool(Lhs) & CoerceToBool(Rhs))? "true" : "false";
 			}
 			return Result;
@@ -133,8 +136,9 @@ namespace AutomationTool
 		/// </summary>
 		/// <param name="Tokens">List of tokens in the expression</param>
 		/// <param name="Idx">Current position in the token stream. Will be incremented as tokens are consumed.</param>
+		/// <param name="Context">Context for evaluating the expression</param>
 		/// <returns>The result of evaluating the expression</returns>
-		static string EvaluateComparison(List<string> Tokens, ref int Idx)
+		static string EvaluateComparison(List<string> Tokens, ref int Idx, IScriptReaderContext Context)
 		{
 			// scalar
 			// scalar == scalar
@@ -144,13 +148,13 @@ namespace AutomationTool
 			// scalar > scalar
 			// scalar >= scalar
 
-			string Result = EvaluateScalar(Tokens, ref Idx);
+			string Result = EvaluateScalar(Tokens, ref Idx, Context);
 			if(Tokens[Idx] == "==")
 			{
 				// Compare two scalars for equality
 				Idx++;
 				string Lhs = Result;
-				string Rhs = EvaluateScalar(Tokens, ref Idx);
+				string Rhs = EvaluateScalar(Tokens, ref Idx, Context);
 				Result = (String.Compare(Lhs, Rhs, true) == 0)? "true" : "false";
 			}
 			else if(Tokens[Idx] == "!=")
@@ -158,7 +162,7 @@ namespace AutomationTool
 				// Compare two scalars for inequality
 				Idx++;
 				string Lhs = Result;
-				string Rhs = EvaluateScalar(Tokens, ref Idx);
+				string Rhs = EvaluateScalar(Tokens, ref Idx, Context);
 				Result = (String.Compare(Lhs, Rhs, true) != 0)? "true" : "false";
 			}
 			else if(Tokens[Idx] == "<")
@@ -166,7 +170,7 @@ namespace AutomationTool
 				// Compares whether the first integer is less than the second
 				Idx++;
 				int Lhs = CoerceToInteger(Result);
-				int Rhs = CoerceToInteger(EvaluateScalar(Tokens, ref Idx));
+				int Rhs = CoerceToInteger(EvaluateScalar(Tokens, ref Idx, Context));
 				Result = (Lhs < Rhs)? "true" : "false";
 			}
 			else if(Tokens[Idx] == "<=")
@@ -174,7 +178,7 @@ namespace AutomationTool
 				// Compares whether the first integer is less than the second
 				Idx++;
 				int Lhs = CoerceToInteger(Result);
-				int Rhs = CoerceToInteger(EvaluateScalar(Tokens, ref Idx));
+				int Rhs = CoerceToInteger(EvaluateScalar(Tokens, ref Idx, Context));
 				Result = (Lhs <= Rhs)? "true" : "false";
 			}
 			else if(Tokens[Idx] == ">")
@@ -182,7 +186,7 @@ namespace AutomationTool
 				// Compares whether the first integer is less than the second
 				Idx++;
 				int Lhs = CoerceToInteger(Result);
-				int Rhs = CoerceToInteger(EvaluateScalar(Tokens, ref Idx));
+				int Rhs = CoerceToInteger(EvaluateScalar(Tokens, ref Idx, Context));
 				Result = (Lhs > Rhs)? "true" : "false";
 			}
 			else if(Tokens[Idx] == ">=")
@@ -190,7 +194,7 @@ namespace AutomationTool
 				// Compares whether the first integer is less than the second
 				Idx++;
 				int Lhs = CoerceToInteger(Result);
-				int Rhs = CoerceToInteger(EvaluateScalar(Tokens, ref Idx));
+				int Rhs = CoerceToInteger(EvaluateScalar(Tokens, ref Idx, Context));
 				Result = (Lhs >= Rhs)? "true" : "false";
 			}
 			return Result;
@@ -251,15 +255,16 @@ namespace AutomationTool
 		/// </summary>
 		/// <param name="Tokens">List of tokens in the expression</param>
 		/// <param name="Idx">Current position in the token stream. Will be incremented as tokens are consumed.</param>
+		/// <param name="Context">Context for evaluating the expression</param>
 		/// <returns>The result of evaluating the expression</returns>
-		static string EvaluateScalar(List<string> Tokens, ref int Idx)
+		static string EvaluateScalar(List<string> Tokens, ref int Idx, IScriptReaderContext Context)
 		{
 			string Result;
 			if(Tokens[Idx] == "(")
 			{
 				// Subexpression
 				Idx++;
-				Result = EvaluateOr(Tokens, ref Idx);
+				Result = EvaluateOr(Tokens, ref Idx, Context);
 				if(Tokens[Idx] != ")")
 				{
 					throw new ConditionException("Expected ')'");
@@ -270,21 +275,21 @@ namespace AutomationTool
 			{
 				// Logical not
 				Idx++;
-				string Rhs = EvaluateScalar(Tokens, ref Idx);
+				string Rhs = EvaluateScalar(Tokens, ref Idx, Context);
 				Result = CoerceToBool(Rhs)? "false" : "true";
 			}
 			else if(String.Compare(Tokens[Idx], "Exists", true) == 0 && Tokens[Idx + 1] == "(")
 			{
 				// Check whether file or directory exists. Evaluate the argument as a subexpression.
 				Idx++;
-				string Argument = EvaluateScalar(Tokens, ref Idx);
-				Result = Exists(Argument)? "true" : "false";
+				string Argument = EvaluateScalar(Tokens, ref Idx, Context);
+				Result = Context.Exists(Argument)? "true" : "false";
 			}
 			else if(String.Compare(Tokens[Idx], "HasTrailingSlash", true) == 0 && Tokens[Idx + 1] == "(")
 			{
 				// Check whether the given string ends with a slash
 				Idx++;
-				string Argument = EvaluateScalar(Tokens, ref Idx);
+				string Argument = EvaluateScalar(Tokens, ref Idx, Context);
 				Result = (Argument.Length > 0 && (Argument[Argument.Length - 1] == Path.DirectorySeparatorChar || Argument[Argument.Length - 1] == Path.AltDirectorySeparatorChar))? "true" : "false";
 			}
 			else if (String.Compare(Tokens[Idx], "Contains", true) == 0 && Tokens[Idx + 1] == "(")
@@ -333,24 +338,6 @@ namespace AutomationTool
 				}
 			}
 			return Result;
-		}
-
-		/// <summary>
-		/// Checks whether a path exists
-		/// </summary>
-		/// <param name="Scalar">The path to check for</param>
-		/// <returns>True if the path exists, false otherwise.</returns>
-		static bool Exists(string Scalar)
-		{
-			try
-			{
-				string FullPath = Path.Combine(Unreal.RootDirectory.FullName, Scalar);
-				return CommandUtils.FileExists(FullPath) || CommandUtils.DirectoryExists(FullPath);
-			}
-			catch
-			{
-				return false;
-			}
 		}
 
 		/// <summary>
@@ -513,7 +500,7 @@ namespace AutomationTool
 		/// <param name="ExpectedResult">The expected result</param>
 		static void TestCondition(string Condition, bool ExpectedResult)
 		{
-			bool Result = Evaluate(Condition);
+			bool Result = Evaluate(Condition, null!);
 			Console.WriteLine("{0}: {1} = {2}", (Result == ExpectedResult)? "PASS" : "FAIL", Condition, Result);
 		}
 	}

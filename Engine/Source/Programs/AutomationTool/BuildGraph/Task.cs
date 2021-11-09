@@ -16,27 +16,6 @@ using UnrealBuildTool;
 namespace AutomationTool
 {
 	/// <summary>
-	/// Specifies validation that should be performed on a task parameter.
-	/// </summary>
-	public enum TaskParameterValidationType
-	{
-		/// <summary>
-		/// Allow any valid values for the field type.
-		/// </summary>
-		Default,
-
-		/// <summary>
-		/// A list of tag names separated by semicolons
-		/// </summary>
-		TagList,
-
-		/// <summary>
-		/// A file specification, which may contain tags and wildcards.
-		/// </summary>
-		FileSpec,
-	}
-
-	/// <summary>
 	/// Attribute to mark parameters to a task, which should be read as XML attributes from the script file.
 	/// </summary>
 	[AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
@@ -120,7 +99,7 @@ namespace AutomationTool
 		/// <summary>
 		/// Line number in a source file that this task was declared. Optional; used for log messages.
 		/// </summary>
-		public Tuple<FileReference, int> SourceLocation
+		public Tuple<string, int> SourceLocation
 		{
 			get;
 			set;
@@ -208,7 +187,7 @@ namespace AutomationTool
 		/// <param name="Prefix">Prefix for metadata entries</param>
 		public virtual void GetTraceMetadata(ITraceSpan Span, string Prefix)
 		{
-			Span.AddMetadata(Prefix + "source.file", SourceLocation.Item1.MakeRelativeTo(Unreal.RootDirectory));
+			Span.AddMetadata(Prefix + "source.file", SourceLocation.Item1);
 			Span.AddMetadata(Prefix + "source.line", SourceLocation.Item2.ToString());
 		}
 		
@@ -219,7 +198,7 @@ namespace AutomationTool
 		/// <param name="Prefix">Prefix for metadata entries</param>
 		public virtual void GetTraceMetadata(ISpan Span, string Prefix)
 		{
-			Span.SetTag(Prefix + "source.file", SourceLocation.Item1.MakeRelativeTo(Unreal.RootDirectory));
+			Span.SetTag(Prefix + "source.file", SourceLocation.Item1);
 			Span.SetTag(Prefix + "source.line", SourceLocation.Item2);
 		}
 

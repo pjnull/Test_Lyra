@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -22,7 +23,12 @@ namespace AutomationTool
 		/// <summary>
 		/// The file being read
 		/// </summary>
-		FileReference File;
+		string File;
+
+		/// <summary>
+		/// Native file representation
+		/// </summary>
+		object NativeFile;
 
 		/// <summary>
 		/// Interface to the LineInfo on the active XmlReader
@@ -42,9 +48,10 @@ namespace AutomationTool
 		/// <summary>
 		/// Private constructor. Use ScriptDocument.Load to read an XML document.
 		/// </summary>
-		ScriptDocument(FileReference InFile, ILogger InLogger)
+		ScriptDocument(string InFile, object InNativeFile, ILogger InLogger)
 		{
 			File = InFile;
+			NativeFile = InNativeFile;
 			Logger = InLogger;
 		}
 
@@ -53,27 +60,30 @@ namespace AutomationTool
 		/// </summary>
 		public override XmlElement CreateElement(string Prefix, string LocalName, string NamespaceUri)
 		{
-			return new ScriptElement(File, LineInfo.LineNumber, Prefix, LocalName, NamespaceUri, this);
+			return new ScriptElement(File, NativeFile, LineInfo.LineNumber, Prefix, LocalName, NamespaceUri, this);
 		}
 
 		/// <summary>
 		/// Loads a script document from the given file
 		/// </summary>
 		/// <param name="File">The file to load</param>
+		/// <param name="NativeFile"></param>
+		/// <param name="Data"></param>
 		/// <param name="Schema">The schema to validate against</param>
 		/// <param name="Logger">Logger for output messages</param>
 		/// <param name="OutDocument">If successful, the document that was read</param>
 		/// <returns>True if the document could be read, false otherwise</returns>
-		public static bool TryRead(FileReference File, ScriptSchema Schema, ILogger Logger, out ScriptDocument OutDocument)
+		public static bool TryRead(string File, object NativeFile, byte[] Data, ScriptSchema Schema, ILogger Logger, out ScriptDocument OutDocument)
 		{
-			ScriptDocument Document = new ScriptDocument(File, Logger);
+			ScriptDocument Document = new ScriptDocument(File, NativeFile, Logger);
 
 			XmlReaderSettings Settings = new XmlReaderSettings();
 			Settings.Schemas.Add(Schema.CompiledSchema);
 			Settings.ValidationType = ValidationType.Schema;
 			Settings.ValidationEventHandler += Document.ValidationEvent;
 
-			using (XmlReader Reader = XmlReader.Create(File.FullName, Settings))
+			using (MemoryStream Stream = new MemoryStream(Data))
+			using (XmlReader Reader = XmlReader.Create(Stream, Settings))
 			{
 				// Read the document
 				Document.LineInfo = (IXmlLineInfo)Reader;
@@ -85,7 +95,7 @@ namespace AutomationTool
 				{
 					if (!Document.bHasErrors)
 					{
-						Log.TraceErrorTask(File, Ex.LineNumber, "{0}", Ex.Message);
+						Logger.LogScriptError(NativeFile, Ex.LineNumber, "{Message}", Ex.Message);
 						Document.bHasErrors = true;
 					}
 				}
@@ -100,13 +110,13 @@ namespace AutomationTool
 				// Check that the root element is valid. If not, we didn't actually validate against the schema.
 				if (Document.DocumentElement.Name != ScriptSchema.RootElementName)
 				{
-					Logger.LogError("Script does not have a root element called '{ElementName}'", ScriptSchema.RootElementName);
+					Logger.LogScriptError(NativeFile, 1, "Script does not have a root element called '{ElementName}'", ScriptSchema.RootElementName);
 					OutDocument = null;
 					return false;
 				}
 				if (Document.DocumentElement.NamespaceURI != ScriptSchema.NamespaceURI)
 				{
-					Logger.LogError("Script root element is not in the '{Namespace}' namespace (add the xmlns=\"{NewNamespace}\" attribute)", ScriptSchema.NamespaceURI, ScriptSchema.NamespaceURI);
+					Logger.LogScriptError(NativeFile, 1, "Script root element is not in the '{Namespace}' namespace (add the xmlns=\"{NewNamespace}\" attribute)", ScriptSchema.NamespaceURI, ScriptSchema.NamespaceURI);
 					OutDocument = null;
 					return false;
 				}
@@ -125,11 +135,11 @@ namespace AutomationTool
 		{
 			if (Args.Severity == XmlSeverityType.Warning)
 			{
-				Logger.LogWarning("{Script}({Line}): {Message}", File.FullName, Args.Exception.LineNumber, Args.Message);
+				Logger.LogScriptWarning(NativeFile, Args.Exception.LineNumber, "{Message}", Args.Message);
 			}
 			else
 			{
-				Logger.LogError("{Script}({Line}): {Message}", File.FullName, Args.Exception.LineNumber, Args.Message);
+				Logger.LogScriptError(NativeFile, Args.Exception.LineNumber, "{Message}", Args.Message);
 				bHasErrors = true;
 			}
 		}
@@ -143,21 +153,27 @@ namespace AutomationTool
 		/// <summary>
 		/// The file containing this element
 		/// </summary>
-		public readonly FileReference File;
+		public string File { get; }
+
+		/// <summary>
+		/// Native file object
+		/// </summary>
+		public object NativeFile { get; }
 
 		/// <summary>
 		/// The line number containing this element
 		/// </summary>
-		public readonly int LineNumber;
+		public int LineNumber { get; }
 
 		/// <summary>
 		/// Constructor
 		/// </summary>
-		public ScriptElement(FileReference InFile, int InLineNumber, string Prefix, string LocalName, string NamespaceUri, ScriptDocument Document)
+		public ScriptElement(string File, object NativeFile, int LineNumber, string Prefix, string LocalName, string NamespaceUri, ScriptDocument Document)
 			: base(Prefix, LocalName, NamespaceUri, Document)
 		{
-			File = InFile;
-			LineNumber = InLineNumber;
+			this.File = File;
+			this.NativeFile = NativeFile;
+			this.LineNumber = LineNumber;
 		}
 	}
 
@@ -208,11 +224,65 @@ namespace AutomationTool
 		}
 	}
 
+	interface IScriptReaderContext
+	{
+		/// <summary>
+		/// Tests whether the given file or directory exists
+		/// </summary>
+		/// <param name="File">Path to a file</param>
+		/// <returns>True if the file exists</returns>
+		bool Exists(string Path);
+
+		/// <summary>
+		/// Tries to read a file from the given path
+		/// </summary>
+		/// <param name="Path">Path of the file to read</param>
+		/// <param name="Data">On success, contains the read data</param>
+		/// <returns></returns>
+		bool TryRead(string Path, out byte[] Data);
+
+		/// <summary>
+		/// Converts a path to its native form, for display to the user
+		/// </summary>
+		/// <param name="Path">Path to format</param>
+		/// <returns></returns>
+		object GetNativePath(string Path);
+	}
+
+	/// <summary>
+	/// Extension methods for writing script error messages
+	/// </summary>
+	static class ScriptExtensions
+	{
+		public static void LogScriptError(this ILogger Logger, object File, int LineNumber, string Format, params object[] Args)
+		{
+			object[] AllArgs = new object[Args.Length + 2];
+			AllArgs[0] = File;
+			AllArgs[1] = LineNumber;
+			Args.CopyTo(AllArgs, 2);
+			Logger.LogError($"{{Script}}({{Line}}): error: {Format}", AllArgs);
+		}
+
+		public static void LogScriptWarning(this ILogger Logger, object File, int LineNumber, string Format, params object[] Args)
+		{
+			object[] AllArgs = new object[Args.Length + 2];
+			AllArgs[0] = File;
+			AllArgs[1] = LineNumber;
+			Args.CopyTo(AllArgs, 2);
+			Logger.LogWarning($"{{Script}}({{Line}}): warning: {Format}", AllArgs);
+		}
+	}
+
 	/// <summary>
 	/// Reader for build graph definitions. Instanced to contain temporary state; public interface is through ScriptReader.TryRead().
 	/// </summary>
 	class ScriptReader
 	{
+		/// <summary>
+		/// Interface used for reading files
+		/// </summary>
+		IScriptReaderContext Context;
+
 		/// <summary>
 		/// The current graph
 		/// </summary>
@@ -263,12 +333,14 @@ namespace AutomationTool
 		/// <summary>
 		/// Private constructor. Use ScriptReader.TryRead() to read a script file.
 		/// </summary>
+		/// <param name="Context">Context object</param>
 		/// <param name="DefaultProperties">Default properties available to the script</param>
 		/// <param name="bPreprocessOnly">Preprocess the file, but do not expand any values that are not portable (eg. paths on the local machine)</param>
 		/// <param name="Schema">Schema for the script</param>
 		/// <param name="Logger">Logger for diagnostic messages</param>
-		private ScriptReader(IDictionary<string, string> DefaultProperties, bool bPreprocessOnly, ScriptSchema Schema, ILogger Logger)
+		private ScriptReader(IScriptReaderContext Context, IDictionary<string, string> DefaultProperties, bool bPreprocessOnly, ScriptSchema Schema, ILogger Logger)
 		{
+			this.Context = Context;
 			this.bPreprocessOnly = bPreprocessOnly;
 			this.Schema = Schema;
 			this.Logger = Logger;
@@ -284,6 +356,7 @@ namespace AutomationTool
 		/// <summary>
 		/// Try to read a script file from the given file.
 		/// </summary>
+		/// <param name="Context">Supplies context about the parse</param>
 		/// <param name="File">File to read from</param>
 		/// <param name="Arguments">Arguments passed in to the graph on the command line</param>
 		/// <param name="DefaultProperties">Default properties available to the script</param>
@@ -293,18 +366,10 @@ namespace AutomationTool
 		/// <param name="Graph">If successful, the graph constructed from the given script</param>
 		/// <param name="SingleNodeName">If a single node will be processed, the name of that node.</param>
 		/// <returns>True if the graph was read, false if there were errors</returns>
-		public static bool TryRead(FileReference File, Dictionary<string, string> Arguments, Dictionary<string, string> DefaultProperties, bool bPreprocessOnly, ScriptSchema Schema, ILogger Logger, out Graph Graph, string SingleNodeName = null)
+		public static bool TryRead(IScriptReaderContext Context, string File, Dictionary<string, string> Arguments, Dictionary<string, string> DefaultProperties, bool bPreprocessOnly, ScriptSchema Schema, ILogger Logger, out Graph Graph, string SingleNodeName = null)
 		{
-			// Check the file exists before doing anything.
-			if (!FileReference.Exists(File))
-			{
-				Logger.LogError("Cannot open '{Script}'", File.FullName);
-				Graph = null;
-				return false;
-			}
-
 			// Read the file and build the graph
-			ScriptReader Reader = new ScriptReader(DefaultProperties, bPreprocessOnly, Schema, Logger);
+			ScriptReader Reader = new ScriptReader(Context, DefaultProperties, bPreprocessOnly, Schema, Logger);
 			if (!Reader.TryRead(File, Arguments, Logger, SingleNodeName) || Reader.NumErrors > 0)
 			{
 				Graph = null;
@@ -319,7 +384,7 @@ namespace AutomationTool
 			{
 				if (!ValidArgumentNames.Contains(ArgumentName))
 				{
-					Logger.LogWarning("Unknown argument '{ArgumentName}' for '{Script}'", ArgumentName, File.FullName);
+					Logger.LogWarning("Unknown argument '{ArgumentName}' for '{Script}'", ArgumentName, Context.GetNativePath(File));
 				}
 			}
 
@@ -335,11 +400,20 @@ namespace AutomationTool
 		/// <param name="Arguments">Arguments passed in to the graph on the command line</param>
 		/// <param name="Logger">Logger for output messages</param>
 		/// <param name="SingleNodeName">The name of the node if only a single node is going to be built, otherwise null.</param>
-		bool TryRead(FileReference File, Dictionary<string, string> Arguments, ILogger Logger, string SingleNodeName = null)
+		bool TryRead(string File, Dictionary<string, string> Arguments, ILogger Logger, string SingleNodeName = null)
 		{
+			// Get the data for this file
+			byte[] Data;
+			if (!Context.TryRead(File, out Data))
+			{
+				Logger.LogError("Unable to open file {File}", File);
+				NumErrors++;
+				return false;
+			}
+
 			// Read the document and validate it against the schema
 			ScriptDocument Document;
-			if (!ScriptDocument.TryRead(File, Schema, Logger, out Document))
+			if (!ScriptDocument.TryRead(File, Context.GetNativePath(File), Data, Schema, Logger, out Document))
 			{
 				NumErrors++;
 				return false;
@@ -347,7 +421,7 @@ namespace AutomationTool
 
 			// Read the root BuildGraph element
 			this.SingleNodeName = SingleNodeName;
-			ReadGraphBody(Document.DocumentElement, File.Directory, Arguments);
+			ReadGraphBody(Document.DocumentElement, Arguments);
 			return true;
 		}
 
@@ -355,16 +429,15 @@ namespace AutomationTool
 		/// Reads the contents of a graph
 		/// </summary>
 		/// <param name="Element">The parent element to read from</param>
-		/// <param name="BaseDirectory">Base directory to resolve includes against</param>
 		/// <param name="Arguments">Arguments passed in to the graph on the command line</param>
-		void ReadGraphBody(XmlElement Element, DirectoryReference BaseDirectory, Dictionary<string, string> Arguments)
+		void ReadGraphBody(XmlElement Element, Dictionary<string, string> Arguments)
 		{
 			foreach (ScriptElement ChildElement in Element.ChildNodes.OfType<ScriptElement>())
 			{
 				switch (ChildElement.Name)
 				{
 					case "Include":
-						ReadInclude(ChildElement, BaseDirectory, Arguments);
+						ReadInclude(ChildElement, Arguments);
 						break;
 					case "Option":
 						ReadOption(ChildElement, Arguments);
@@ -409,16 +482,16 @@ namespace AutomationTool
 						ReadDiagnostic(ChildElement, LogEventType.Error, null, null);
 						break;
 					case "Do":
-						ReadBlock(ChildElement, x => ReadGraphBody(x, BaseDirectory, Arguments));
+						ReadBlock(ChildElement, x => ReadGraphBody(x, Arguments));
 						break;
 					case "Switch":
-						ReadSwitch(ChildElement, x => ReadGraphBody(x, BaseDirectory, Arguments));
+						ReadSwitch(ChildElement, x => ReadGraphBody(x, Arguments));
 						break;
 					case "ForEach":
-						ReadForEach(ChildElement, x => ReadGraphBody(x, BaseDirectory, Arguments));
+						ReadForEach(ChildElement, x => ReadGraphBody(x, Arguments));
 						break;
 					case "Expand":
-						ReadExpand(ChildElement, x => ReadGraphBody(x, BaseDirectory, Arguments));
+						ReadExpand(ChildElement, x => ReadGraphBody(x, Arguments));
 						break;
 					default:
 						LogError(ChildElement, "Invalid element '{0}'", ChildElement.Name);
@@ -540,27 +613,48 @@ namespace AutomationTool
 			return false;
 		}
 
+		static string CombinePaths(string BasePath, string NextPath)
+		{
+			List<string> Fragments = new List<string>(BasePath.Split('/'));
+			Fragments.RemoveAt(Fragments.Count - 1);
+
+			foreach (string AppendFragment in NextPath.Split('/'))
+			{
+				if (AppendFragment.Equals(".", StringComparison.Ordinal))
+				{
+					continue;
+				}
+				else if (AppendFragment.Equals("..", StringComparison.Ordinal))
+				{
+					if (Fragments.Count > 0)
+					{
+						Fragments.RemoveAt(Fragments.Count - 1);
+					}
+					else
+					{
+						throw new Exception($"Path '{NextPath}' cannot be combined with '{BasePath}'");
+					}
+				}
+				else
+				{
+					Fragments.Add(AppendFragment);
+				}
+			}
+			return String.Join('/', Fragments);
+		}
+
 		/// <summary>
 		/// Read an include directive, and the contents of the target file
 		/// </summary>
 		/// <param name="Element">Xml element to read the definition from</param>
-		/// <param name="BaseDir">Base directory to resolve relative include paths from </param>
 		/// <param name="Arguments">Arguments passed in to the graph on the command line</param>
-		void ReadInclude(ScriptElement Element, DirectoryReference BaseDir, Dictionary<string, string> Arguments)
+		void ReadInclude(ScriptElement Element, Dictionary<string, string> Arguments)
 		{
 			if (EvaluateCondition(Element))
 			{
 				foreach (string Script in ReadListAttribute(Element, "Script"))
 				{
-					FileReference ScriptFile = FileReference.Combine(BaseDir, Script);
-					if (!FileReference.Exists(ScriptFile))
-					{
-						LogError(Element, "Cannot find included script '{0}'", ScriptFile.FullName);
-					}
-					else
-					{
-						TryRead(ScriptFile, Arguments, Logger);
-					}
+					TryRead(CombinePaths(Element.File, Script), Arguments, Logger);
 				}
 			}
 		}
@@ -696,7 +790,7 @@ namespace AutomationTool
 						string Input = ReadAttribute(Element, "Input");
 						Match Match = RegexValue.Match(Input);
 
-						bool Optional = Condition.Evaluate(ReadAttribute(Element, "Optional"));
+						bool Optional = Condition.Evaluate(ReadAttribute(Element, "Optional"), Context);
 						if (!Match.Success)
 						{
 							if (!Optional)
@@ -1468,7 +1562,7 @@ namespace AutomationTool
 
 				GraphDiagnostic Diagnostic = new GraphDiagnostic();
 				Diagnostic.EventType = EventType;
-				Diagnostic.Message = String.Format("{0}({1}): {2}", Element.File.FullName, Element.LineNumber, Message);
+				Diagnostic.Message = String.Format("{0}({1}): {2}", Element.File, Element.LineNumber, Message);
 				Diagnostic.EnclosingNode = EnclosingNode;
 				Diagnostic.EnclosingAgent = EnclosingAgent;
 				Graph.Diagnostics.Add(Diagnostic);
@@ -1781,7 +1875,7 @@ namespace AutomationTool
 		/// <param name="Args">Optional arguments</param>
 		void LogError(ScriptElement Element, string Format, params object[] Args)
 		{
-			Logger.LogError("{Script}({Line}): {Message}", Element.File.FullName, Element.LineNumber, String.Format(Format, Args));
+			Logger.LogScriptError(Element.NativeFile, Element.LineNumber, Format, Args);
 			NumErrors++;
 		}
 
@@ -1793,7 +1887,7 @@ namespace AutomationTool
 		/// <param name="Args">Optional arguments</param>
 		void LogWarning(ScriptElement Element, string Format, params object[] Args)
 		{
-			Logger.LogWarning("{Script}({Line}): {Message}", Element.File.FullName, Element.LineNumber, String.Format(Format, Args));
+			Logger.LogScriptWarning(Element.NativeFile, Element.LineNumber, Format, Args);
 		}
 
 		/// <summary>
@@ -1814,7 +1908,7 @@ namespace AutomationTool
 			try
 			{
 				string Text = ExpandProperties(Element, Element.GetAttribute("If"));
-				return Condition.Evaluate(Text);
+				return Condition.Evaluate(Text, Context);
 			}
 			catch (ConditionException Ex)
 			{

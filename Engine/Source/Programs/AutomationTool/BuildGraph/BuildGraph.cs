@@ -11,6 +11,7 @@ using System.Text;
 using System.Xml;
 using EpicGames.Core;
 using EpicGames.MCP.Automation;
+using Microsoft.Extensions.Logging;
 using OpenTracing;
 using OpenTracing.Util;
 using UnrealBuildBase;
@@ -18,6 +19,130 @@ using UnrealBuildTool;
 
 namespace AutomationTool
 {
+	/// <summary>
+	/// Implementation of ScriptTaskParameter corresponding to a field in a parameter class
+	/// </summary>
+	class ScriptTaskParameterBinding : ScriptTaskParameter
+	{
+		/// <summary>
+		/// Field for this parameter
+		/// </summary>
+		public FieldInfo FieldInfo { get; }
+
+		/// <summary>
+		/// Constructor
+		/// </summary>
+		public ScriptTaskParameterBinding(string Name, FieldInfo FieldInfo, TaskParameterValidationType ValidationType, bool bOptional)
+			: base(Name, FieldInfo.FieldType, ValidationType, bOptional)
+		{
+			this.FieldInfo = FieldInfo;
+		}
+	}
+
+	/// <summary>
+	/// Binding of a ScriptTask to a Script
+	/// </summary>
+	class ScriptTaskBinding : ScriptTask
+	{
+		/// <summary>
+		/// Type of the task to construct with this info
+		/// </summary>
+		public Type TaskClass;
+
+		/// <summary>
+		/// Type to construct with the parsed parameters
+		/// </summary>
+		public Type ParametersClass;
+
+		/// <summary>
+		/// Map from name to parameter
+		/// </summary>
+		public IReadOnlyDictionary<string, ScriptTaskParameterBinding> NameToParameter { get; }
+
+		/// <summary>
+		/// Constructor
+		/// </summary>
+		/// <param name="Name">Name of the task</param>
+		/// <param name="TaskClass">Task class to create</param>
+		/// <param name="ParametersClass">Class type of an object to be constructed and passed as an argument to the task class constructor</param>
+		public ScriptTaskBinding(string Name, Type TaskClass, Type ParametersClass)
+			: this(Name, TaskClass, ParametersClass, CreateParameters(ParametersClass))
+		{
+		}
+
+		/// <summary>
+		/// Private constructor
+		/// </summary>
+		private ScriptTaskBinding(string Name, Type TaskClass, Type ParametersClass, List<ScriptTaskParameterBinding> Parameters)
+			: base(Name, Parameters.ConvertAll<ScriptTaskParameter>(x => x))
+		{
+			this.TaskClass = TaskClass;
+			this.ParametersClass = ParametersClass;
+			this.NameToParameter = Parameters.ToDictionary(x => x.Name, x => x);
+		}
+
+		static List<ScriptTaskParameterBinding> CreateParameters(Type ParametersClass)
+		{
+			List<ScriptTaskParameterBinding> ScriptTaskParameters = new List<ScriptTaskParameterBinding>();
+			foreach (FieldInfo Field in ParametersClass.GetFields())
+			{
+				if (Field.MemberType == MemberTypes.Field)
+				{
+					TaskParameterAttribute ParameterAttribute = Field.GetCustomAttribute<TaskParameterAttribute>();
+					if (ParameterAttribute != null)
+					{
+						ScriptTaskParameters.Add(new ScriptTaskParameterBinding(Field.Name, Field, ParameterAttribute.ValidationType, ParameterAttribute.Optional));
+					}
+				}
+			}
+			return ScriptTaskParameters;
+		}
+	}
+
+	/// <summary>
+	/// Implementation of <see cref="IScriptReaderContext"/> which reads files from disk
+	/// </summary>
+	class ScriptReaderFileContext : IScriptReaderContext
+	{
+		/// <inheritdoc/>
+		public object GetNativePath(string Path)
+		{
+			return FileReference.Combine(Unreal.RootDirectory, Path).FullName;
+		}
+
+		/// <inheritdoc/>
+		public bool Exists(string Path)
+		{
+			try
+			{
+				return FileReference.Exists(FileReference.Combine(Unreal.RootDirectory, Path));
+			}
+			catch
+			{
+				return false;
+			}
+		}
+
+		/// <inheritdoc/>
+		public bool TryRead(string Path, out byte[] Data)
+		{
+			try
+			{
+				FileReference File = FileReference.Combine(Unreal.RootDirectory, Path);
+				if (FileReference.Exists(File))
+				{
+					Data = FileReference.ReadAllBytes(File);
+					return true;
+				}
+			}
+			catch
+			{
+			}
+			Data = null;
+			return false;
+		}
+	}
+
 	/// <summary>
 	/// Tool to execute build automation scripts for UE projects, which can be run locally or in parallel across a build farm (assuming synchronization and resource allocation implemented by a separate system).
 	///
@@ -77,6 +202,11 @@ namespace AutomationTool
 	[Help("WriteToSharedStorage", "Allow writing to shared storage. If not set, but -SharedStorageDir is specified, build products will read but not written")]
 	public class BuildGraph : BuildCommand
 	{
+		/// <summary>
+		/// Context object for reading scripts and evaluating conditions
+		/// </summary>
+		ScriptReaderFileContext Context { get; } = new ScriptReaderFileContext();
+
 		/// <summary>
 		/// Main entry point for the BuildGraph command
 		/// </summary>
@@ -215,7 +345,7 @@ namespace AutomationTool
 			}
 
 			// Find all the tasks from the loaded assemblies
-			Dictionary<string, ScriptTask> NameToTask = new Dictionary<string,ScriptTask>();
+			Dictionary<string, ScriptTaskBinding> NameToTask = new Dictionary<string, ScriptTaskBinding>();
 			if(!FindAvailableTasks(NameToTask, bPublicTasksOnly))
 			{
 				return ExitCode.Error_Unknown;
@@ -244,7 +374,7 @@ namespace AutomationTool
 				PrimitiveTypes.Add((typeof(MCPPlatform), ScriptSchemaStandardType.BalancedString));
 
 				// Create a schema for the given tasks
-				Schema = new ScriptSchema(NameToTask, PrimitiveTypes);
+				Schema = new ScriptSchema(NameToTask.Values, PrimitiveTypes);
 				if (SchemaFileName != null)
 				{
 					FileReference FullSchemaFileName = new FileReference(SchemaFileName);
@@ -264,9 +394,18 @@ namespace AutomationTool
 				return ExitCode.Error_Unknown;
 			}
 
+			// Normalize the script filename
+			FileReference FullScriptFile = FileReference.Combine(Unreal.RootDirectory, ScriptFileName);
+			if (!FullScriptFile.IsUnderDirectory(Unreal.RootDirectory))
+			{
+				LogError("BuildGraph scripts must be under the UE root directory");
+				return ExitCode.Error_Unknown;
+			}
+			ScriptFileName = FullScriptFile.MakeRelativeTo(Unreal.RootDirectory).Replace('\\', '/');
+
 			// Read the script from disk
 			Graph Graph;
-			if(!ScriptReader.TryRead(new FileReference(ScriptFileName), Arguments, DefaultProperties, PreprocessedFileName != null, Schema, Logger, out Graph, SingleNodeName))
+			if(!ScriptReader.TryRead(Context, ScriptFileName, Arguments, DefaultProperties, PreprocessedFileName != null, Schema, Logger, out Graph, SingleNodeName))
 			{
 				return ExitCode.Error_Unknown;
 			}
@@ -520,7 +659,7 @@ namespace AutomationTool
 			return ExitCode.Success;
 		}
 
-		bool CreateTaskInstances(Graph Graph, Dictionary<string, ScriptTask> NameToTask, Dictionary<TaskInfo, CustomTask> TaskInfoToTask)
+		bool CreateTaskInstances(Graph Graph, Dictionary<string, ScriptTaskBinding> NameToTask, Dictionary<TaskInfo, CustomTask> TaskInfoToTask)
 		{
 			bool bResult = true;
 			foreach (Agent Agent in Graph.Agents)
@@ -533,12 +672,12 @@ namespace AutomationTool
 			return bResult;
 		}
 
-		bool CreateTaskInstances(Graph Graph, Node Node, Dictionary<string, ScriptTask> NameToTask, Dictionary<TaskInfo, CustomTask> TaskInfoToTask)
+		bool CreateTaskInstances(Graph Graph, Node Node, Dictionary<string, ScriptTaskBinding> NameToTask, Dictionary<TaskInfo, CustomTask> TaskInfoToTask)
 		{
 			bool bResult = true;
 			foreach (TaskInfo TaskInfo in Node.TaskInfos)
 			{
-				CustomTask Task = CreateTask(Node, TaskInfo, NameToTask, Graph.TagNameToNodeOutput);
+				CustomTask Task = BindTask(Node, TaskInfo, NameToTask, Graph.TagNameToNodeOutput);
 				if (Task == null)
 				{
 					bResult = false;
@@ -551,23 +690,23 @@ namespace AutomationTool
 			return bResult;
 		}
 
-		CustomTask CreateTask(Node Node, TaskInfo TaskInfo, Dictionary<string, ScriptTask> NameToTask, IReadOnlyDictionary<string, NodeOutput> TagNameToNodeOutput)
+		CustomTask BindTask(Node Node, TaskInfo TaskInfo, Dictionary<string, ScriptTaskBinding> NameToTask, IReadOnlyDictionary<string, NodeOutput> TagNameToNodeOutput)
 		{
 			// Get the reflection info for this element
-			ScriptTask Task;
+			ScriptTaskBinding Task;
 			if (!NameToTask.TryGetValue(TaskInfo.Name, out Task))
 			{
-				Logger.LogError(TaskInfo, "Unknown task '{TaskName}'", TaskInfo.Name);
+				OutputBindingError(TaskInfo, "Unknown task '{TaskName}'", TaskInfo.Name);
 				return null;
 			}
 
 			// Check all the required parameters are present
 			bool bHasRequiredAttributes = true;
-			foreach (ScriptTaskParameter Parameter in Task.NameToParameter.Values)
+			foreach (ScriptTaskParameterBinding Parameter in Task.NameToParameter.Values)
 			{
 				if (!Parameter.bOptional && !TaskInfo.Arguments.ContainsKey(Parameter.Name))
 				{
-					Logger.LogError(TaskInfo, "Missing required attribute - {AttrName}", Parameter.Name);
+					OutputBindingError(TaskInfo, "Missing required attribute - {AttrName}", Parameter.Name);
 					bHasRequiredAttributes = false;
 				}
 			}
@@ -577,10 +716,10 @@ namespace AutomationTool
 			foreach ((string Name, string Value) in TaskInfo.Arguments)
 			{
 				// Get the field that this attribute should be written to in the parameters object
-				ScriptTaskParameter Parameter;
+				ScriptTaskParameterBinding Parameter;
 				if (!Task.NameToParameter.TryGetValue(Name, out Parameter))
 				{
-					Logger.LogError(TaskInfo, "Unknown attribute '{AttrName}'", Name);
+					OutputBindingError(TaskInfo, "Unknown attribute '{AttrName}'", Name);
 					continue;
 				}
 
@@ -631,7 +770,7 @@ namespace AutomationTool
 				{
 					if (Output != null && Output.ProducingNode != Node && !Node.Inputs.Contains(Output))
 					{
-						Logger.LogError(TaskInfo, "The tag '{TagName}' is not a dependency of node '{Node}'", ReadTagName, Node.Name);
+						OutputBindingError(TaskInfo, "The tag '{TagName}' is not a dependency of node '{Node}'", ReadTagName, Node.Name);
 					}
 				}
 			}
@@ -644,7 +783,7 @@ namespace AutomationTool
 				{
 					if (Output != null && !Node.Outputs.Contains(Output))
 					{
-						Logger.LogError(TaskInfo, "The tag '{0}' is created by '{1}', and cannot be modified downstream", Output.TagName, Output.ProducingNode.Name);
+						OutputBindingError(TaskInfo, "The tag '{0}' is created by '{1}', and cannot be modified downstream", Output.TagName, Output.ProducingNode.Name);
 					}
 				}
 			}
@@ -657,7 +796,7 @@ namespace AutomationTool
 		/// <param name="ValueText">The text to parse</param>
 		/// <param name="ValueType">Type of the value to parse</param>
 		/// <returns>Value that was parsed</returns>
-		static object ParseValue(string ValueText, Type ValueType)
+		object ParseValue(string ValueText, Type ValueType)
 		{
 			// Parse it and assign it to the parameters object
 			if (ValueType.IsEnum)
@@ -666,7 +805,7 @@ namespace AutomationTool
 			}
 			else if (ValueType == typeof(Boolean))
 			{
-				return Condition.Evaluate(ValueText);
+				return Condition.Evaluate(ValueText, Context);
 			}
 			else if (ValueType == typeof(FileReference))
 			{
@@ -688,21 +827,9 @@ namespace AutomationTool
 			}
 		}
 
-		/// <summary>
-		/// Converts a file into a more readable form for diangostic messages
-		/// </summary>
-		/// <param name="File">Path to the file</param>
-		/// <returns>Readable form of the path</returns>
-		static string GetReadablePathForDiagnostics(FileReference File)
+		void OutputBindingError(TaskInfo Task, string Format, params object[] Args)
 		{
-			if (File.IsUnderDirectory(Unreal.RootDirectory))
-			{
-				return File.MakeRelativeTo(Unreal.RootDirectory);
-			}
-			else
-			{
-				return File.FullName;
-			}
+			Logger.LogScriptError(Context.GetNativePath(Task.SourceLocation.Item1), Task.SourceLocation.Item2, Format, Args);
 		}
 
 		/// <summary>
@@ -710,7 +837,7 @@ namespace AutomationTool
 		/// </summary>
 		/// <param name="NameToTask">Mapping from task name to information about how to serialize it</param>
 		/// <param name="bPublicTasksOnly">Whether to include just public tasks, or all the tasks in any loaded assemblies</param>
-		static bool FindAvailableTasks(Dictionary<string, ScriptTask> NameToTask, bool bPublicTasksOnly)
+		static bool FindAvailableTasks(Dictionary<string, ScriptTaskBinding> NameToTask, bool bPublicTasksOnly)
 		{
 			IEnumerable<Assembly> LoadedScriptAssemblies = ScriptManager.AllScriptAssemblies;
 
@@ -745,7 +872,7 @@ namespace AutomationTool
 							CommandUtils.LogError("Found multiple handlers for task elements called '{0}'", ElementAttribute.Name);
 							return false;
 						}
-						NameToTask.Add(ElementAttribute.Name, new ScriptTask(ElementAttribute.Name, Type, ElementAttribute.ParametersType));
+						NameToTask.Add(ElementAttribute.Name, new ScriptTaskBinding(ElementAttribute.Name, Type, ElementAttribute.ParametersType));
 					}
 				}
 			}
@@ -1123,7 +1250,7 @@ namespace AutomationTool
 							ExceptionUtils.AddContext(Ex, "while executing task {0}", Tasks[Idx].GetTraceString());
 							if (Tasks[Idx].SourceLocation != null)
 							{
-								ExceptionUtils.AddContext(Ex, "at {0}({1})", GetReadablePathForDiagnostics(Tasks[Idx].SourceLocation.Item1), Tasks[Idx].SourceLocation.Item2);
+								ExceptionUtils.AddContext(Ex, "at {0}({1})", Tasks[Idx].SourceLocation.Item1, Tasks[Idx].SourceLocation.Item2);
 							}
 							throw;
 						}
@@ -1151,7 +1278,7 @@ namespace AutomationTool
 							}
 							if (Tasks[FirstIdx].SourceLocation != null)
 							{
-								ExceptionUtils.AddContext(Ex, "at {0}({1})", GetReadablePathForDiagnostics(Tasks[FirstIdx].SourceLocation.Item1), Tasks[FirstIdx].SourceLocation.Item2);
+								ExceptionUtils.AddContext(Ex, "at {0}({1})", Tasks[FirstIdx].SourceLocation.Item1, Tasks[FirstIdx].SourceLocation.Item2);
 							}
 							throw;
 						}
@@ -1169,7 +1296,7 @@ namespace AutomationTool
 		/// </summary>
 		/// <param name="NameToTask">Map of task name to implementation</param>
 		/// <param name="OutputFile">Output file</param>
-		static void WriteDocumentation(Dictionary<string, ScriptTask> NameToTask, FileReference OutputFile)
+		static void WriteDocumentation(Dictionary<string, ScriptTaskBinding> NameToTask, FileReference OutputFile)
 		{
 			// Find all the assemblies containing tasks
 			Assembly[] TaskAssemblies = NameToTask.Values.Select(x => x.ParametersClass.Assembly).Distinct().ToArray();
@@ -1225,7 +1352,7 @@ namespace AutomationTool
 		/// <param name="NameToTask">Map of name to script task</param>
 		/// <param name="MemberNameToElement">Map of field name to XML documenation element</param>
 		/// <param name="OutputFile">The output file to write to</param>
-		static void WriteDocumentationUDN(Dictionary<string, ScriptTask> NameToTask, Dictionary<string, XmlElement> MemberNameToElement, FileReference OutputFile)
+		static void WriteDocumentationUDN(Dictionary<string, ScriptTaskBinding> NameToTask, Dictionary<string, XmlElement> MemberNameToElement, FileReference OutputFile)
 		{
 			using (StreamWriter Writer = new StreamWriter(OutputFile.FullName))
 			{
@@ -1239,7 +1366,7 @@ namespace AutomationTool
 				foreach (string TaskName in NameToTask.Keys.OrderBy(x => x))
 				{
 					// Get the task object
-					ScriptTask Task = NameToTask[TaskName];
+					ScriptTaskBinding Task = NameToTask[TaskName];
 
 					// Get the documentation for this task
 					XmlElement TaskElement;
@@ -1256,7 +1383,7 @@ namespace AutomationTool
 						foreach (string ParameterName in Task.NameToParameter.Keys)
 						{
 							// Get the parameter data
-							ScriptTaskParameter Parameter = Task.NameToParameter[ParameterName];
+							ScriptTaskParameterBinding Parameter = Task.NameToParameter[ParameterName];
 
 							// Get the documentation for this parameter
 							XmlElement ParameterElement;
@@ -1322,7 +1449,7 @@ namespace AutomationTool
 		/// <param name="NameToTask">Map of name to script task</param>
 		/// <param name="MemberNameToElement">Map of field name to XML documenation element</param>
 		/// <param name="OutputFile">The output file to write to</param>
-		static void WriteDocumentationHTML(Dictionary<string, ScriptTask> NameToTask, Dictionary<string, XmlElement> MemberNameToElement, FileReference OutputFile)
+		static void WriteDocumentationHTML(Dictionary<string, ScriptTaskBinding> NameToTask, Dictionary<string, XmlElement> MemberNameToElement, FileReference OutputFile)
 		{
 			LogInformation("Writing {0}...", OutputFile);
 			using (StreamWriter Writer = new StreamWriter(OutputFile.FullName))
@@ -1339,7 +1466,7 @@ namespace AutomationTool
 				foreach(string TaskName in NameToTask.Keys.OrderBy(x => x))
 				{
 					// Get the task object
-					ScriptTask Task = NameToTask[TaskName];
+					ScriptTaskBinding Task = NameToTask[TaskName];
 
 					// Get the documentation for this task
 					XmlElement TaskElement;
@@ -1362,7 +1489,7 @@ namespace AutomationTool
 						foreach(string ParameterName in Task.NameToParameter.Keys)
 						{
 							// Get the parameter data
-							ScriptTaskParameter Parameter = Task.NameToParameter[ParameterName];
+							ScriptTaskParameterBinding Parameter = Task.NameToParameter[ParameterName];
 
 							// Get the documentation for this parameter
 							XmlElement ParameterElement;
