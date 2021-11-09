@@ -808,27 +808,24 @@ void UWorldPartitionRuntimeSpatialHash::UpdateActorDescViewMap(TMap<FGuid, FWorl
 	{
 		FWorldPartitionActorDescView& ActorDescView = ActorDescViewPair.Value;
 
-		if (!ActorDescView.GetActorIsEditorOnly())
+		if (ActorDescView.GetActorClass()->GetDefaultObject<AActor>()->GetDefaultGridPlacement() == EActorGridPlacement::None)
 		{
-			if (ActorDescView.GetActorClass()->GetDefaultObject<AActor>()->GetDefaultGridPlacement() == EActorGridPlacement::None)
+			if (ActorDescView.GetGridPlacement() != EActorGridPlacement::AlwaysLoaded)
 			{
-				if (ActorDescView.GetGridPlacement() != EActorGridPlacement::AlwaysLoaded)
-				{
-					const int32* GridIndexPtr = GridsMapping.Find(ActorDescView.GetRuntimeGrid());
-					const int32 GridIndex = GridIndexPtr ? *GridIndexPtr : 0;
-					const FSpatialHashRuntimeGrid& RuntimeGrid = Grids[GridIndex];
-					const float CellArea = RuntimeGrid.CellSize * RuntimeGrid.CellSize;
-					const FBox2D ActorBounds2D = FBox2D(FVector2D(ActorDescView.GetBounds().Min), FVector2D(ActorDescView.GetBounds().Max));
-					const float ActorBoundsArea = ActorBounds2D.GetArea();
+				const int32* GridIndexPtr = GridsMapping.Find(ActorDescView.GetRuntimeGrid());
+				const int32 GridIndex = GridIndexPtr ? *GridIndexPtr : 0;
+				const FSpatialHashRuntimeGrid& RuntimeGrid = Grids[GridIndex];
+				const float CellArea = RuntimeGrid.CellSize * RuntimeGrid.CellSize;
+				const FBox2D ActorBounds2D = FBox2D(FVector2D(ActorDescView.GetBounds().Min), FVector2D(ActorDescView.GetBounds().Max));
+				const float ActorBoundsArea = ActorBounds2D.GetArea();
 
-					if (ActorBoundsArea < 1.0f)
-					{
-						ActorDescView.SetGridPlacement(EActorGridPlacement::Location);
-					}
-					else if (ActorBoundsArea > CellArea)
-					{
-						ActorDescView.SetGridPlacement(EActorGridPlacement::Bounds);
-					}
+				if (ActorBoundsArea < 1.0f)
+				{
+					ActorDescView.SetGridPlacement(EActorGridPlacement::Location);
+				}
+				else if (ActorBoundsArea > CellArea)
+				{
+					ActorDescView.SetGridPlacement(EActorGridPlacement::Bounds);
 				}
 			}
 		}
@@ -884,14 +881,6 @@ bool UWorldPartitionRuntimeSpatialHash::CreateStreamingGrid(const FSpatialHashRu
 				{
 					for (const FActorInstance& ActorInstance : GridCellDataChunk.GetActors())
 					{
-						if (ActorInstance.ShouldStripFromStreaming())
-						{
-							const FWorldPartitionActorDescView& ActorDescView = ActorInstance.GetActorDescView();
-							UE_LOG(LogWorldPartition, Verbose, TEXT("Stripping Actor %s (%s) from streaming grid (Container %08x)"),
-								*(ActorDescView.GetActorPath().ToString()), *ActorInstance.Actor.ToString(EGuidFormats::UniqueObjectGuid), ActorInstance.ContainerInstance->ID);
-							continue;
-						}
-
 						if (bIsMainWorldPartition && !IsRunningCookCommandlet())
 						{
 							const FWorldPartitionActorDescView& ActorDescView = ActorInstance.GetActorDescView();

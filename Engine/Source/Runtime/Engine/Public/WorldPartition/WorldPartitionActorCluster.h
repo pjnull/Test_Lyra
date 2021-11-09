@@ -86,8 +86,6 @@ struct ENGINE_API FActorInstance
 		return A.Actor == B.Actor && A.ContainerInstance == B.ContainerInstance;
 	}
 
-	bool ShouldStripFromStreaming() const;
-
 	const FWorldPartitionActorDescView& GetActorDescView() const;
 };
 

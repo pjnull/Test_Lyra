@@ -36,32 +36,36 @@ class FWorldPartitionStreamingGenerator
 {
 	void CreateActorDescViewMap(const UActorDescContainer* InContainer, TMap<FGuid, FWorldPartitionActorDescView>& OutActorDescViewMap, uint64 InContainerID)
 	{
+		const bool bIncludeUnsavedActors = (bIsPIE && !InContainerID);
+
 		TMap<FGuid, FGuid> ContainerGuidsRemap;
 		for (FActorDescList::TConstIterator<> ActorDescIt(InContainer); ActorDescIt; ++ActorDescIt)
 		{
-			AActor* Actor = ActorDescIt->GetActor();
+			if (!ActorDescIt->GetActorIsEditorOnly())
+			{
+				AActor* Actor = ActorDescIt->GetActor();
 
-			if (bIsPIE && IsValid(Actor) && Actor->GetPackage()->IsDirty())
-			{
-				// Dirty, unsaved actor for PIE
-				check(!InContainerID);
-				FWorldPartitionActorDesc* ActorDesc = RuntimeHash->ModifiedActorDescListForPIE.AddActor(Actor);
-				ActorDesc->OnRegister(Actor->GetWorld());
-				OutActorDescViewMap.Emplace(ActorDescIt->GetGuid(), ActorDesc);
-			}
-			else
-			{
-				// Non-dirty actor
-				OutActorDescViewMap.Emplace(ActorDescIt->GetGuid(), *ActorDescIt);
+				if (bIncludeUnsavedActors && IsValid(Actor) && Actor->GetPackage()->IsDirty())
+				{
+					// Dirty, unsaved actor for PIE
+					FWorldPartitionActorDesc* ActorDesc = RuntimeHash->ModifiedActorDescListForPIE.AddActor(Actor);
+					ActorDesc->OnRegister(Actor->GetWorld());
+					OutActorDescViewMap.Emplace(ActorDescIt->GetGuid(), ActorDesc);
+				}
+				else
+				{
+					// Non-dirty actor
+					OutActorDescViewMap.Emplace(ActorDescIt->GetGuid(), *ActorDescIt);
+				}
 			}
 		}
 
 		// Append new unsaved actors for the persistent level
-		if (bIsPIE && !InContainerID)
+		if (bIncludeUnsavedActors)
 		{
 			for (AActor* Actor : InContainer->GetWorld()->PersistentLevel->Actors)
 			{
-				if (IsValid(Actor) && Actor->IsPackageExternal() && Actor->IsMainPackageActor() &&!InContainer->GetActorDesc(Actor->GetActorGuid()))
+				if (IsValid(Actor) && Actor->IsPackageExternal() && Actor->IsMainPackageActor() && !Actor->IsEditorOnly() && !InContainer->GetActorDesc(Actor->GetActorGuid()))
 				{
 					FWorldPartitionActorDesc* ActorDesc = RuntimeHash->ModifiedActorDescListForPIE.AddActor(Actor);
 					ActorDesc->OnRegister(Actor->GetWorld());

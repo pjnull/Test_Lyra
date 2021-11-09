@@ -214,12 +214,6 @@ FActorInstance::FActorInstance(const FGuid& InActor, const FActorContainerInstan
 	check(ContainerInstance);
 }
 
-bool FActorInstance::ShouldStripFromStreaming() const
-{
-	const FWorldPartitionActorDescView& ActorDescView = GetActorDescView();
-	return ActorDescView.GetActorIsEditorOnly();
-}
-
 FVector FActorInstance::GetOrigin() const
 {
 	return ContainerInstance->Transform.TransformPosition(GetActorDescView().GetOrigin());
@@ -232,51 +226,43 @@ const FWorldPartitionActorDescView& FActorInstance::GetActorDescView() const
 
 void CreateActorCluster(const FWorldPartitionActorDescView& ActorDescView, TMap<FGuid, FActorCluster*>& ActorToActorCluster, TSet<FActorCluster*>& ActorClustersSet, UWorld* World, const TMap<FGuid, FWorldPartitionActorDescView>& ActorDescViewMap)
 {
-	// Don't include references from editor-only actors
-	if (!ActorDescView.GetActorIsEditorOnly())
+	const FGuid& ActorGuid = ActorDescView.GetGuid();
+
+	FActorCluster* ActorCluster = ActorToActorCluster.FindRef(ActorGuid);
+	if (!ActorCluster)
 	{
-		const FGuid& ActorGuid = ActorDescView.GetGuid();
+		ActorCluster = new FActorCluster(World, ActorDescView);
+		ActorClustersSet.Add(ActorCluster);
+		ActorToActorCluster.Add(ActorGuid, ActorCluster);
+	}
 
-		FActorCluster* ActorCluster = ActorToActorCluster.FindRef(ActorGuid);
-		if (!ActorCluster)
+	for (const FGuid& ReferenceGuid : ActorDescView.GetReferences())
+	{
+		if (const FWorldPartitionActorDescView* ReferenceActorDescView = ActorDescViewMap.Find(ReferenceGuid))
 		{
-			ActorCluster = new FActorCluster(World, ActorDescView);
-			ActorClustersSet.Add(ActorCluster);
-			ActorToActorCluster.Add(ActorGuid, ActorCluster);
-		}
-
-		for (const FGuid& ReferenceGuid : ActorDescView.GetReferences())
-		{
-			if (const FWorldPartitionActorDescView* ReferenceActorDescView = ActorDescViewMap.Find(ReferenceGuid))
+			FActorCluster* ReferenceCluster = ActorToActorCluster.FindRef(ReferenceGuid);
+			if (ReferenceCluster)
 			{
-				// Don't include references to editor-only actors
-				if (!ReferenceActorDescView->GetActorIsEditorOnly())
+				if (ReferenceCluster != ActorCluster)
 				{
-					FActorCluster* ReferenceCluster = ActorToActorCluster.FindRef(ReferenceGuid);
-					if (ReferenceCluster)
+					// Merge reference cluster in Actor's cluster
+					ActorCluster->Add(*ReferenceCluster, ActorDescViewMap);
+					for (const FGuid& ReferenceClusterActorGuid : ReferenceCluster->Actors)
 					{
-						if (ReferenceCluster != ActorCluster)
-						{
-							// Merge reference cluster in Actor's cluster
-							ActorCluster->Add(*ReferenceCluster, ActorDescViewMap);
-							for (const FGuid& ReferenceClusterActorGuid : ReferenceCluster->Actors)
-							{
-								ActorToActorCluster[ReferenceClusterActorGuid] = ActorCluster;
-							}
-							ActorClustersSet.Remove(ReferenceCluster);
-							delete ReferenceCluster;
-						}
+						ActorToActorCluster[ReferenceClusterActorGuid] = ActorCluster;
 					}
-					else
-					{
-						// Put Reference in Actor's cluster
-						ActorCluster->Add(FActorCluster(World, *ReferenceActorDescView), ActorDescViewMap);
-					}
-
-					// Map its cluster
-					ActorToActorCluster.Add(ReferenceGuid, ActorCluster);
+					ActorClustersSet.Remove(ReferenceCluster);
+					delete ReferenceCluster;
 				}
 			}
+			else
+			{
+				// Put Reference in Actor's cluster
+				ActorCluster->Add(FActorCluster(World, *ReferenceActorDescView), ActorDescViewMap);
+			}
+
+			// Map its cluster
+			ActorToActorCluster.Add(ReferenceGuid, ActorCluster);
 		}
 	}
 }
