@@ -513,7 +513,7 @@ BEGIN_GLOBAL_SHADER_PARAMETER_STRUCT(FGPUSpriteEmitterUniformParameters,)
 	SHADER_PARAMETER(float, RotationRateScale)
 	SHADER_PARAMETER(float, RotationBias)
 	SHADER_PARAMETER(float, CameraMotionBlurAmount)
-	SHADER_PARAMETER(FVector2D, PivotOffset)
+	SHADER_PARAMETER(FVector2f, PivotOffset)
 END_GLOBAL_SHADER_PARAMETER_STRUCT()
 
 IMPLEMENT_GLOBAL_SHADER_PARAMETER_STRUCT(FGPUSpriteEmitterUniformParameters, "EmitterUniforms");
@@ -524,7 +524,7 @@ typedef TUniformBufferRef<FGPUSpriteEmitterUniformParameters> FGPUSpriteEmitterU
  * Uniform buffer to hold dynamic parameters for GPU particle sprite emitters.
  */
 BEGIN_GLOBAL_SHADER_PARAMETER_STRUCT( FGPUSpriteEmitterDynamicUniformParameters, )
-	SHADER_PARAMETER( FVector2D, LocalToWorldScale )
+	SHADER_PARAMETER( FVector2f, LocalToWorldScale )
 	SHADER_PARAMETER( float, EmitterInstRandom)
 	SHADER_PARAMETER( FVector4f, AxisLockRight )
 	SHADER_PARAMETER( FVector4f, AxisLockUp )
@@ -627,7 +627,7 @@ public:
 		FVertexDeclarationElementList Elements;
 
 		/** The stream to read the texture coordinates from. */
-		Elements.Add(FVertexElement(0, 0, VET_Float2, 0, sizeof(FVector2D), false));
+		Elements.Add(FVertexElement(0, 0, VET_Float2, 0, sizeof(FVector2f), false));
 
 		VertexDeclarationRHI = PipelineStateCache::GetOrCreateVertexDeclaration(Elements);
 	}
@@ -700,7 +700,7 @@ public:
 
 		// Stream 0: Global particle texture coordinate buffer.
 		Stream.VertexBuffer = &GParticleTexCoordVertexBuffer;
-		Stream.Stride = sizeof(FVector2D);
+		Stream.Stride = sizeof(FVector2f);
 		Stream.Offset = 0;
 		Streams.Add( Stream );
 
@@ -841,7 +841,7 @@ struct FParticlePerFrameSimulationParameters
 	/** Position offset (XYZ) to add to particles and strength of the attractor (W). */
 	FVector4f PositionOffsetAndAttractorStrength;
 	/** Amount by which to scale bounds for collision purposes. */
-	FVector2D LocalToWorldScale;
+	FVector2f LocalToWorldScale;
 
 	/** Amount of time by which to simulate particles in the fix dt pass. */
 	float DeltaSecondsInFix;
@@ -1230,7 +1230,7 @@ public:
 	{
 		FVertexDeclarationElementList Elements;
 		// TexCoord.
-		Elements.Add(FVertexElement(0, 0, VET_Float2, 0, sizeof(FVector2D), /*bUseInstanceIndex=*/ false));
+		Elements.Add(FVertexElement(0, 0, VET_Float2, 0, sizeof(FVector2f), /*bUseInstanceIndex=*/ false));
 		VertexDeclarationRHI = PipelineStateCache::GetOrCreateVertexDeclaration( Elements );
 	}
 
@@ -1257,9 +1257,9 @@ public:
 	{
 		FVertexDeclarationElementList Elements;
 		// TexCoord.
-		Elements.Add(FVertexElement(0, 0, VET_Float2, 0, sizeof(FVector2D), /*bUseInstanceIndex=*/ false));
+		Elements.Add(FVertexElement(0, 0, VET_Float2, 0, sizeof(FVector2f), /*bUseInstanceIndex=*/ false));
 		// TileOffsets
-		Elements.Add(FVertexElement(1, 0, VET_Float2, 1, sizeof(FVector2D), /*bUseInstanceIndex=*/ true));
+		Elements.Add(FVertexElement(1, 0, VET_Float2, 1, sizeof(FVector2f), /*bUseInstanceIndex=*/ true));
 		VertexDeclarationRHI = PipelineStateCache::GetOrCreateVertexDeclaration( Elements );
 	}
 
@@ -1300,7 +1300,7 @@ FORCEINLINE int32 ComputeAlignedTileCount(int32 TileCount)
  */
 static void BuildTileVertexBuffer(FParticleBufferParamRef TileOffsetsRef, const uint32* Tiles, int32 TileCount, int32 AlignedTileCount)
 {
-	FVector2D* TileOffset = (FVector2D*)RHILockBuffer( TileOffsetsRef, 0, AlignedTileCount * sizeof(FVector2D), RLM_WriteOnly );
+	FVector2f* TileOffset = (FVector2f*)RHILockBuffer( TileOffsetsRef, 0, AlignedTileCount * sizeof(FVector2f), RLM_WriteOnly );
 	for ( int32 Index = 0; Index < TileCount; ++Index )
 	{
 		const uint32 TileIndex = Tiles[Index];
@@ -1573,7 +1573,7 @@ void ClearTiles(FRHICommandList& RHICmdList, FGraphicsPipelineStateInitializer& 
 
 	SetGraphicsPipelineState(RHICmdList, GraphicsPSOInit, 0);
 	
-	const int32 MaxTilesPerDrawCallUnaligned = GParticleScratchVertexBufferSize / sizeof(FVector2D);
+	const int32 MaxTilesPerDrawCallUnaligned = GParticleScratchVertexBufferSize / sizeof(FVector2f);
 	const int32 MaxTilesPerDrawCall = (FeatureLevel <= ERHIFeatureLevel::ES3_1 ? MaxTilesPerDrawCallUnaligned : MaxTilesPerDrawCallUnaligned & (~(TILES_PER_INSTANCE-1)));
 	int32 TileCount = Tiles.Num();
 	int32 FirstTile = 0;
@@ -1607,7 +1607,7 @@ void ClearTiles(FRHICommandList& RHICmdList, FGraphicsPipelineStateInitializer& 
  * Uniform buffer to hold parameters for particle simulation.
  */
 BEGIN_GLOBAL_SHADER_PARAMETER_STRUCT( FParticleInjectionParameters, )
-	SHADER_PARAMETER( FVector2D, PixelScale )
+	SHADER_PARAMETER( FVector2f, PixelScale )
 END_GLOBAL_SHADER_PARAMETER_STRUCT()
 
 IMPLEMENT_GLOBAL_SHADER_PARAMETER_STRUCT(FParticleInjectionParameters, "ParticleInjection");
@@ -1732,15 +1732,15 @@ public:
 			Offset += sizeof(FVector4f);
 			// ParticleIndex.
 			Elements.Add(FVertexElement(0, Offset, VET_Float2, 4, Stride, /*bUseInstanceIndex=*/ true));
-			Offset += sizeof(FVector2D);
+			Offset += sizeof(FVector2f);
 		}
 
 		// Stream 1.
 		{
 			int32 Offset = 0;
 			// TexCoord.
-			Elements.Add(FVertexElement(1, Offset, VET_Float2, 5, sizeof(FVector2D), /*bUseInstanceIndex=*/ false));
-			Offset += sizeof(FVector2D);
+			Elements.Add(FVertexElement(1, Offset, VET_Float2, 5, sizeof(FVector2f), /*bUseInstanceIndex=*/ false));
+			Offset += sizeof(FVector2f);
 		}
 
 		VertexDeclarationRHI = PipelineStateCache::GetOrCreateVertexDeclaration( Elements );
@@ -1943,7 +1943,7 @@ public:
 	virtual void InitRHI() override
 	{
 		FVertexDeclarationElementList Elements;
-		Elements.Add(FVertexElement(0, 0, VET_Float2, 0, sizeof(FVector2D)));
+		Elements.Add(FVertexElement(0, 0, VET_Float2, 0, sizeof(FVector2f)));
 		VertexDeclarationRHI = PipelineStateCache::GetOrCreateVertexDeclaration( Elements );
 	}
 
@@ -2014,7 +2014,7 @@ static void VisualizeGPUSimulation(
 		VertexShader->SetParameters(RHICmdList, UniformBuffer);
 		PixelShader->SetParameters(RHICmdList, VisualizationMode, StateTextures.PositionTextureRHI, CurveTextureRHI);
 
-		const int32 VertexStride = sizeof(FVector2D);
+		const int32 VertexStride = sizeof(FVector2f);
 
 		// Bind vertex stream.
 		RHICmdList.SetStreamSource(
@@ -2380,11 +2380,11 @@ public:
 		if ( AlignedTileCount > 0 )
 		{
 			int32 BufferAlignedTileCount = (GMaxRHIFeatureLevel <= ERHIFeatureLevel::ES3_1 ? TileCount : AlignedTileCount);
-			const int32 TileBufferSize = BufferAlignedTileCount * sizeof(FVector2D);
+			const int32 TileBufferSize = BufferAlignedTileCount * sizeof(FVector2f);
 			check(TileBufferSize > 0);
 			FRHIResourceCreateInfo CreateInfo(TEXT("FParticleTileVertexBuffer"));
 			VertexBufferRHI = RHICreateVertexBuffer( TileBufferSize, BUF_Static | BUF_KeepCPUAccessible | BUF_ShaderResource, CreateInfo );
-			VertexBufferSRV = RHICreateShaderResourceView( VertexBufferRHI, /*Stride=*/ sizeof(FVector2D), PF_G32R32F );
+			VertexBufferSRV = RHICreateShaderResourceView( VertexBufferRHI, /*Stride=*/ sizeof(FVector2f), PF_G32R32F );
 		}
 	}
 

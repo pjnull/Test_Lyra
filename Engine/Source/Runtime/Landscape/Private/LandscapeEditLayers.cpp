@@ -347,8 +347,8 @@ private:
 
 struct FLandscapeLayersVertex
 {
-	FVector2D Position;
-	FVector2D UV;
+	FVector2f Position;
+	FVector2f UV;
 };
 
 struct FLandscapeLayersTriangle
@@ -519,7 +519,7 @@ public:
 
 		FVector4f LayerInfo(InParams.LayerAlpha, InParams.LayerVisible ? 1.0f : 0.0f, InParams.LayerBlendMode == LSBM_AlphaBlend ? 1.0f : 0.f, 0.f);
 		FVector4f OutputConfig(InParams.ApplyLayerModifiers ? 1.0f : 0.0f, 0.0f /*unused*/, InParams.ReadHeightmap2 ? 1.0f : 0.0f, InParams.GenerateNormals ? 1.0f : 0.0f);
-		FVector2D TextureSize(InParams.HeightmapSize.X, InParams.HeightmapSize.Y);
+		FVector2f TextureSize(InParams.HeightmapSize.X, InParams.HeightmapSize.Y);
 
 		SetShaderValue(RHICmdList, RHICmdList.GetBoundPixelShader(), LayerInfoParam, LayerInfo);
 		SetShaderValue(RHICmdList, RHICmdList.GetBoundPixelShader(), OutputConfigParam, OutputConfig);
@@ -573,8 +573,8 @@ public:
 	{
 		SetTextureParameter(RHICmdList, RHICmdList.GetBoundPixelShader(), ReadTexture1Param, ReadTexture1SamplerParam, TStaticSamplerState<SF_Point, AM_Clamp, AM_Clamp, AM_Clamp>::GetRHI(), InParams.ReadHeightmap1->GetResource()->TextureRHI);
 
-		SetShaderValue(RHICmdList, RHICmdList.GetBoundPixelShader(), CurrentMipSizeParam, FVector2D(InParams.CurrentMipSize.X, InParams.CurrentMipSize.Y));
-		SetShaderValue(RHICmdList, RHICmdList.GetBoundPixelShader(), ParentMipSizeParam, FVector2D(InParams.ParentMipSize.X, InParams.ParentMipSize.Y));
+		SetShaderValue(RHICmdList, RHICmdList.GetBoundPixelShader(), CurrentMipSizeParam, FVector2f(InParams.CurrentMipSize.X, InParams.CurrentMipSize.Y));
+		SetShaderValue(RHICmdList, RHICmdList.GetBoundPixelShader(), ParentMipSizeParam, FVector2f(InParams.ParentMipSize.X, InParams.ParentMipSize.Y));
 		SetShaderValue(RHICmdList, RHICmdList.GetBoundPixelShader(), CurrentMipComponentVertexCountParam, (float)InParams.CurrentMipComponentVertexCount);
 	}
 
@@ -702,8 +702,8 @@ public:
 	{
 		SetTextureParameter(RHICmdList, RHICmdList.GetBoundPixelShader(), ReadTexture1Param, ReadTexture1SamplerParam, TStaticSamplerState<SF_Point, AM_Clamp, AM_Clamp, AM_Clamp>::GetRHI(), InParams.ReadWeightmap1->GetResource()->TextureRHI);
 
-		SetShaderValue(RHICmdList, RHICmdList.GetBoundPixelShader(), CurrentMipSizeParam, FVector2D(InParams.CurrentMipSize.X, InParams.CurrentMipSize.Y));
-		SetShaderValue(RHICmdList, RHICmdList.GetBoundPixelShader(), ParentMipSizeParam, FVector2D(InParams.ParentMipSize.X, InParams.ParentMipSize.Y));
+		SetShaderValue(RHICmdList, RHICmdList.GetBoundPixelShader(), CurrentMipSizeParam, FVector2f(InParams.CurrentMipSize.X, InParams.CurrentMipSize.Y));
+		SetShaderValue(RHICmdList, RHICmdList.GetBoundPixelShader(), ParentMipSizeParam, FVector2f(InParams.ParentMipSize.X, InParams.ParentMipSize.Y));
 		SetShaderValue(RHICmdList, RHICmdList.GetBoundPixelShader(), CurrentMipComponentVertexCountParam, (float)InParams.CurrentMipComponentVertexCount);
 	}
 
@@ -937,7 +937,7 @@ struct FLandscapeLayerWeightmapPackMaterialLayersComponentData
 class FLandscapeLayerWeightmapPackMaterialLayersComputeShaderResource : public FRenderResource
 {
 public:
-	FLandscapeLayerWeightmapPackMaterialLayersComputeShaderResource(const TArray<FLandscapeLayerWeightmapPackMaterialLayersComponentData>& InComponentsData, const TArray<float>& InWeightmapWeightBlendModeData, const TArray<FVector2D>& InTextureOutputOffset)
+	FLandscapeLayerWeightmapPackMaterialLayersComputeShaderResource(const TArray<FLandscapeLayerWeightmapPackMaterialLayersComponentData>& InComponentsData, const TArray<float>& InWeightmapWeightBlendModeData, const TArray<FVector2f>& InTextureOutputOffset)
 		: OriginalComponentsData(InComponentsData)
 		, ComponentsDataCount(OriginalComponentsData.Num())
 		, OriginalWeightmapWeightBlendModeData(InWeightmapWeightBlendModeData)
@@ -974,9 +974,9 @@ public:
 		RHIUnlockBuffer(WeightmapWeightBlendMode);
 
 		FRHIResourceCreateInfo TextureOutputOffsetCreateInfo(TEXT("WeightmapTextureOutputOffset"));
-		uint32 TextureOutputOffsetMemSize = OriginalTextureOutputOffset.Num() * sizeof(FVector2D);
+		uint32 TextureOutputOffsetMemSize = OriginalTextureOutputOffset.Num() * sizeof(FVector2f);
 		WeightmapTextureOutputOffset = RHICreateVertexBuffer(TextureOutputOffsetMemSize, BUF_ShaderResource | BUF_Volatile, TextureOutputOffsetCreateInfo);
-		WeightmapTextureOutputOffsetSRV = RHICreateShaderResourceView(WeightmapTextureOutputOffset, sizeof(FVector2D), PF_G32R32F);
+		WeightmapTextureOutputOffsetSRV = RHICreateShaderResourceView(WeightmapTextureOutputOffset, sizeof(FVector2f), PF_G32R32F);
 
 		void* TextureOutputOffsetPtr = RHILockBuffer(WeightmapTextureOutputOffset, 0, TextureOutputOffsetMemSize, RLM_WriteOnly);
 		FMemory::Memcpy(TextureOutputOffsetPtr, OriginalTextureOutputOffset.GetData(), TextureOutputOffsetMemSize);
@@ -1008,7 +1008,7 @@ private:
 	FBufferRHIRef WeightmapWeightBlendMode;
 	FShaderResourceViewRHIRef WeightmapWeightBlendModeSRV;
 
-	TArray<FVector2D> OriginalTextureOutputOffset;
+	TArray<FVector2f> OriginalTextureOutputOffset;
 	FBufferRHIRef WeightmapTextureOutputOffset;
 	FShaderResourceViewRHIRef WeightmapTextureOutputOffsetSRV;
 };
@@ -2033,7 +2033,7 @@ void ALandscape::CopyTexturePS(const FString& InSourceDebugName, FTextureResourc
 	});
 }
 
-void ALandscape::DrawWeightmapComponentsToRenderTarget(const FString& InDebugName, const TArray<FIntPoint>& InSectionBaseList, const FVector2D& InScaleBias, TArray<FVector2D>* InScaleBiasPerSection, UTexture* InWeightmapRTRead, UTextureRenderTarget2D* InOptionalWeightmapRTRead2, UTextureRenderTarget2D* InWeightmapRTWrite,
+void ALandscape::DrawWeightmapComponentsToRenderTarget(const FString& InDebugName, const TArray<FIntPoint>& InSectionBaseList, const FVector2f& InScaleBias, TArray<FVector2f>* InScaleBiasPerSection, UTexture* InWeightmapRTRead, UTextureRenderTarget2D* InOptionalWeightmapRTRead2, UTextureRenderTarget2D* InWeightmapRTWrite,
 														ERTDrawingType InDrawType, bool InClearRTWrite, FLandscapeLayersWeightmapShaderParameters& InShaderParams, uint8 InMipRender) const
 {
 	check(InWeightmapRTRead != nullptr);
@@ -2056,7 +2056,7 @@ void ALandscape::DrawWeightmapComponentsToRenderTarget(const FString& InDebugNam
 
 	for (int i = 0; i < InSectionBaseList.Num(); ++i)
 	{
-		const FVector2D& WeightmapScaleBias = InScaleBiasPerSection != nullptr ? (*InScaleBiasPerSection)[i] : InScaleBias;
+		const FVector2f& WeightmapScaleBias = InScaleBiasPerSection != nullptr ? (*InScaleBiasPerSection)[i] : InScaleBias;
 		switch (InDrawType)
 		{
 		case ERTDrawingType::RTAtlas:
@@ -2124,12 +2124,12 @@ void ALandscape::DrawWeightmapComponentsToRenderTarget(const FString& InDebugNam
 
 	TArray<FIntPoint> SectionBaseList;
 	SectionBaseList.Reserve(InComponentsToDraw.Num());
-	TArray<FVector2D> WeightmapScaleBiasList;
+	TArray<FVector2f> WeightmapScaleBiasList;
 	WeightmapScaleBiasList.Reserve(InComponentsToDraw.Num());
 
 	for (ULandscapeComponent* Component : InComponentsToDraw)
 	{
-		FVector2D WeightmapScaleBias(Component->WeightmapScaleBias.Z, Component->WeightmapScaleBias.W);
+		FVector2f WeightmapScaleBias(Component->WeightmapScaleBias.Z, Component->WeightmapScaleBias.W);
 		WeightmapScaleBiasList.Add(WeightmapScaleBias);
 
 		FIntPoint ComponentSectionBase = Component->GetSectionBase() - InLandscapeBase;
@@ -2141,7 +2141,7 @@ void ALandscape::DrawWeightmapComponentsToRenderTarget(const FString& InDebugNam
 	PrintLayersDebugRT(InDebugName, InWeightmapRTWrite, InMipRender, false);
 }
 
-void ALandscape::DrawWeightmapComponentToRenderTargetMips(const TArray<FVector2D>& InTexturePositionsToDraw, UTexture* InReadWeightmap, bool InClearRTWrite, struct FLandscapeLayersWeightmapShaderParameters& InShaderParams) const
+void ALandscape::DrawWeightmapComponentToRenderTargetMips(const TArray<FVector2f>& InTexturePositionsToDraw, UTexture* InReadWeightmap, bool InClearRTWrite, struct FLandscapeLayersWeightmapShaderParameters& InShaderParams) const
 {
 	int32 CurrentMip = 1;
 	UTexture* ReadMipRT = InReadWeightmap;
@@ -2153,13 +2153,13 @@ void ALandscape::DrawWeightmapComponentToRenderTargetMips(const TArray<FVector2D
 	TArray<FIntPoint> SectionBaseToDraw;
 	SectionBaseToDraw.Reserve(InTexturePositionsToDraw.Num());
 
-	for (const FVector2D& TexturePosition : InTexturePositionsToDraw)
+	for (const FVector2f& TexturePosition : InTexturePositionsToDraw)
 	{
-		FVector2D PositionOffset(FMath::RoundToInt(TexturePosition.X / LocalComponentSizeVerts), FMath::RoundToInt(TexturePosition.Y / LocalComponentSizeVerts));
+		FVector2f PositionOffset(FMath::RoundToInt(TexturePosition.X / LocalComponentSizeVerts), FMath::RoundToInt(TexturePosition.Y / LocalComponentSizeVerts));
 		SectionBaseToDraw.Add(FIntPoint(PositionOffset.X * LocalComponentSizeQuad, PositionOffset.Y * LocalComponentSizeQuad));
 	}
 
-	FVector2D WeightmapScaleBias(0.0f, 0.0f); // we dont need a scale bias for mip drawing
+	FVector2f WeightmapScaleBias(0.0f, 0.0f); // we dont need a scale bias for mip drawing
 
 	for (int32 MipRTIndex = (int32)EWeightmapRTType::WeightmapRT_Mip1; MipRTIndex < (int32)EWeightmapRTType::WeightmapRT_Count; ++MipRTIndex)
 	{
@@ -2230,7 +2230,7 @@ void ALandscape::DrawHeightmapComponentsToRenderTarget(const FString& InDebugNam
 
 	for (ULandscapeComponent* Component : InComponentsToDraw)
 	{
-		FVector2D HeightmapScaleBias(Component->HeightmapScaleBias.Z, Component->HeightmapScaleBias.W);
+		FVector2f HeightmapScaleBias(Component->HeightmapScaleBias.Z, Component->HeightmapScaleBias.W);
 		FIntPoint ComponentSectionBase = Component->GetSectionBase() - InLandscapeBase;
 
 		switch (InDrawType)
@@ -2299,23 +2299,23 @@ void ALandscape::GenerateLayersRenderQuad(const FIntPoint& InVertexPosition, flo
 {
 	FLandscapeLayersTriangle Tri1;
 
-	Tri1.V0.Position = FVector2D(InVertexPosition.X, InVertexPosition.Y);
-	Tri1.V1.Position = FVector2D(InVertexPosition.X + InVertexSize, InVertexPosition.Y);
-	Tri1.V2.Position = FVector2D(InVertexPosition.X + InVertexSize, InVertexPosition.Y + InVertexSize);
+	Tri1.V0.Position = FVector2f(InVertexPosition.X, InVertexPosition.Y);
+	Tri1.V1.Position = FVector2f(InVertexPosition.X + InVertexSize, InVertexPosition.Y);
+	Tri1.V2.Position = FVector2f(InVertexPosition.X + InVertexSize, InVertexPosition.Y + InVertexSize);
 
-	Tri1.V0.UV = FVector2D(InUVStart.X, InUVStart.Y);
-	Tri1.V1.UV = FVector2D(InUVStart.X + InUVSize.X, InUVStart.Y);
-	Tri1.V2.UV = FVector2D(InUVStart.X + InUVSize.X, InUVStart.Y + InUVSize.Y);
+	Tri1.V0.UV = FVector2f(InUVStart.X, InUVStart.Y);
+	Tri1.V1.UV = FVector2f(InUVStart.X + InUVSize.X, InUVStart.Y);
+	Tri1.V2.UV = FVector2f(InUVStart.X + InUVSize.X, InUVStart.Y + InUVSize.Y);
 	OutTriangles.Add(Tri1);
 
 	FLandscapeLayersTriangle Tri2;
-	Tri2.V0.Position = FVector2D(InVertexPosition.X + InVertexSize, InVertexPosition.Y + InVertexSize);
-	Tri2.V1.Position = FVector2D(InVertexPosition.X, InVertexPosition.Y + InVertexSize);
-	Tri2.V2.Position = FVector2D(InVertexPosition.X, InVertexPosition.Y);
+	Tri2.V0.Position = FVector2f(InVertexPosition.X + InVertexSize, InVertexPosition.Y + InVertexSize);
+	Tri2.V1.Position = FVector2f(InVertexPosition.X, InVertexPosition.Y + InVertexSize);
+	Tri2.V2.Position = FVector2f(InVertexPosition.X, InVertexPosition.Y);
 
-	Tri2.V0.UV = FVector2D(InUVStart.X + InUVSize.X, InUVStart.Y + InUVSize.Y);
-	Tri2.V1.UV = FVector2D(InUVStart.X, InUVStart.Y + InUVSize.Y);
-	Tri2.V2.UV = FVector2D(InUVStart.X, InUVStart.Y);
+	Tri2.V0.UV = FVector2f(InUVStart.X + InUVSize.X, InUVStart.Y + InUVSize.Y);
+	Tri2.V1.UV = FVector2f(InUVStart.X, InUVStart.Y + InUVSize.Y);
+	Tri2.V2.UV = FVector2f(InUVStart.X, InUVStart.Y);
 
 	OutTriangles.Add(Tri2);
 }
@@ -3395,8 +3395,8 @@ void ALandscape::UpdateHeightDirtyData(ULandscapeComponent* InLandscapeComponent
 	TUniquePtr<uint8[]> DirtyData = MakeUnique<uint8[]>(DirtyDataSize);
 	const int32 SizeU = InHeightmap->Source.GetSizeX();
 	const int32 SizeV = InHeightmap->Source.GetSizeY();
-	const int32 HeightmapOffsetX = InLandscapeComponent->HeightmapScaleBias.Z * (float)SizeU;
-	const int32 HeightmapOffsetY = InLandscapeComponent->HeightmapScaleBias.W * (float)SizeV;
+	const int32 HeightmapOffsetX = InLandscapeComponent->HeightmapScaleBias.Z * SizeU;
+	const int32 HeightmapOffsetY = InLandscapeComponent->HeightmapScaleBias.W * SizeV;
 	const uint8 DirtyHeight = 1<<0;
 	LandscapeEdit.GetDirtyData(X1, Y1, X2, Y2, DirtyData.Get(), 0);
 	
@@ -4310,7 +4310,7 @@ int32 ALandscape::RegenerateLayersWeightmaps(FTextureToComponentHelper const& Ma
 						WeightmapLayerWeightBlend[0] = 0.0f; // Blend of Visibility 
 					}
 
-					TArray<FVector2D> WeightmapTextureOutputOffset;
+					TArray<FVector2f> WeightmapTextureOutputOffset;
 
 					// Compute each weightmap location so compute shader will be able to output at expected location
 					int32 ComponentSize = (SubsectionSizeQuads + 1) * NumSubsections;
@@ -4327,7 +4327,7 @@ int32 ALandscape::RegenerateLayersWeightmaps(FTextureToComponentHelper const& Ma
 							ComponentX = 0;
 						}
 
-						WeightmapTextureOutputOffset.Add(FVector2D(ComponentX, ComponentY));
+						WeightmapTextureOutputOffset.Add(FVector2f(ComponentX, ComponentY));
 						ComponentX += ComponentSize;
 					}
 

@@ -210,7 +210,7 @@ FTransform FMovieSceneControlTransformTrail::EvaluateChannelsAtTime(TArrayView<F
 	Channels[0]->Evaluate(Time, TempTranslation.X);
 	Channels[1]->Evaluate(Time, TempTranslation.Y);
 	Channels[2]->Evaluate(Time, TempTranslation.Z);
-	FRotator TempRotation;
+	FRotator3f TempRotation;
 	Channels[3]->Evaluate(Time, TempRotation.Roll);
 	Channels[4]->Evaluate(Time, TempRotation.Pitch);
 	Channels[5]->Evaluate(Time, TempRotation.Yaw);
@@ -218,7 +218,7 @@ FTransform FMovieSceneControlTransformTrail::EvaluateChannelsAtTime(TArrayView<F
 	Channels[6]->Evaluate(Time, TempScale3D.X);
 	Channels[7]->Evaluate(Time, TempScale3D.Y);
 	Channels[8]->Evaluate(Time, TempScale3D.Z);
-	FTransform TempTransform = FTransform(TempRotation, TempTranslation, TempScale3D);
+	FTransform TempTransform = FTransform(FRotator(TempRotation), FVector(TempTranslation), FVector(TempScale3D));
 	TempTransform.NormalizeRotation();
 	return TempTransform;
 }

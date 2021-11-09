@@ -107,7 +107,7 @@ public:
 
 		SetSamplerParameter(RHICmdList, ShaderRHI, BilinearClampTextureSamplerParameter, TStaticSamplerState<SF_Bilinear, AM_Clamp, AM_Clamp, AM_Clamp>::GetRHI());
 		SetTextureParameter(RHICmdList, ShaderRHI, SrcTextureParameter, SourceTexture);
-		SetShaderValue(RHICmdList, ShaderRHI, SampleOffsetParameter, SampleOffset);
+		SetShaderValue(RHICmdList, ShaderRHI, SampleOffsetParameter, FVector2f(SampleOffset));
 		SetShaderValue(RHICmdList, ShaderRHI, KernelRadiusParameter, KernelRadius);
 	}
 };

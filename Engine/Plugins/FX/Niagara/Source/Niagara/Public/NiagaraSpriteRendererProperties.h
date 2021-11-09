@@ -337,7 +337,7 @@ public:
 	void CacheDerivedData();
 #endif
 
-	const TArray<FVector2D>& GetCutoutData() const { return DerivedData.BoundingGeometry; }
+	const TArray<FVector2f>& GetCutoutData() const { return DerivedData.BoundingGeometry; }
 
 	FNiagaraRendererLayout RendererLayoutWithCustomSort;
 	FNiagaraRendererLayout RendererLayoutWithoutCustomSort;

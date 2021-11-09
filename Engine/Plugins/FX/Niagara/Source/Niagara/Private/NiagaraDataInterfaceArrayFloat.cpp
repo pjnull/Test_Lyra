@@ -16,14 +16,37 @@ struct FNDIArrayImplHelper<float> : public FNDIArrayImplHelperBase<float>
 };
 
 template<>
-struct FNDIArrayImplHelper<FVector2D> : public FNDIArrayImplHelperBase<FVector2D>
+struct FNDIArrayImplHelper<FVector2f> : public FNDIArrayImplHelperBase<FVector2f>
 {
-	typedef FVector2D TVMArrayType;
+	typedef FVector2f TVMArrayType;
 	static constexpr TCHAR const* HLSLValueTypeName = TEXT("float2");
 	static constexpr TCHAR const* HLSLBufferTypeName = TEXT("float2");
 	static constexpr EPixelFormat PixelFormat = PF_G32R32F;
 	static const FNiagaraTypeDefinition& GetTypeDefinition() { return FNiagaraTypeDefinition::GetVec2Def(); }
-	static const FVector2D GetDefaultValue() { return FVector2D::ZeroVector; }
+	static const FVector2f GetDefaultValue() { return FVector2f::ZeroVector; }
+};
+
+// LWC_TODO: This is represented as an FVector2f internally (array is converted to floats during PushToRenderThread)
+template<>
+struct FNDIArrayImplHelper<FVector2d> : public FNDIArrayImplHelperBase<FVector2d>
+{
+	typedef FVector2f TVMArrayType;
+	static constexpr TCHAR const* HLSLValueTypeName = TEXT("float2");
+	static constexpr TCHAR const* HLSLBufferTypeName = TEXT("float2");
+	static constexpr EPixelFormat PixelFormat = PF_G32R32F;
+	static const FNiagaraTypeDefinition& GetTypeDefinition() { return FNiagaraTypeDefinition::GetVec2Def(); }
+	static const FVector2f GetDefaultValue() { return FVector2f::ZeroVector; }
+	
+	static int32 GPUGetTypeStride() { return sizeof(FVector2f); }
+	static int32 CPUGetTypeStride() { return sizeof(FVector2f); }
+
+	static void CopyData(void* Dest, const FVector2d* Src, int32 BufferSize)
+	{
+		FVector2f* DestFloats = (FVector2f*)Dest;
+		int32 Num = BufferSize / sizeof(FVector2d);
+		for (int32 i = 0; i < Num; i++)
+			DestFloats[i] = (FVector2f)Src[i];
+	}
 };
 
 template<>

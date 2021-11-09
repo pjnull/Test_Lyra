@@ -764,12 +764,12 @@ struct FNDIInputParam<bool>
 };
 
 template<>
-struct FNDIInputParam<FVector2D>
+struct FNDIInputParam<FVector2f>
 {
 	VectorVM::FExternalFuncInputHandler<float> X;
 	VectorVM::FExternalFuncInputHandler<float> Y;
 	FORCEINLINE FNDIInputParam(FVectorVMExternalFunctionContext& Context) : X(Context), Y(Context) {}
-	FORCEINLINE FVector2D GetAndAdvance() { return FVector2D(X.GetAndAdvance(), Y.GetAndAdvance()); }
+	FORCEINLINE FVector2f GetAndAdvance() { return FVector2f(X.GetAndAdvance(), Y.GetAndAdvance()); }
 	FORCEINLINE bool IsConstant() const { return X.IsConstant() && Y.IsConstant(); }
 };
 
@@ -860,13 +860,13 @@ struct FNDIOutputParam<bool>
 };
 
 template<>
-struct FNDIOutputParam<FVector2D>
+struct FNDIOutputParam<FVector2f>
 {
 	VectorVM::FExternalFuncRegisterHandler<float> X;
 	VectorVM::FExternalFuncRegisterHandler<float> Y;
 	FORCEINLINE FNDIOutputParam(FVectorVMExternalFunctionContext& Context) : X(Context), Y(Context) {}
 	FORCEINLINE bool IsValid() const { return X.IsValid() || Y.IsValid(); }
-	FORCEINLINE void SetAndAdvance(FVector2D Val)
+	FORCEINLINE void SetAndAdvance(FVector2f Val)
 	{
 		*X.GetDestAndAdvance() = Val.X;
 		*Y.GetDestAndAdvance() = Val.Y;

@@ -498,7 +498,7 @@ bool FVectorMaterialInput::Serialize(FArchive& Ar)
 
 bool FVector2MaterialInput::Serialize(FArchive& Ar)
 {
-	return SerializeMaterialInput<FVector2D>(Ar, *this);
+	return SerializeMaterialInput<FVector2f>(Ar, *this);
 }
 
 bool FMaterialAttributesInput::Serialize(FArchive& Ar)

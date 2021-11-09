@@ -57,11 +57,11 @@ namespace MediaShaders
 struct FMediaElementVertex
 {
 	FVector4f Position;
-	FVector2D TextureCoordinate;
+	FVector2f TextureCoordinate;
 
 	FMediaElementVertex() { }
 
-	FMediaElementVertex(const FVector4f& InPosition, const FVector2D& InTextureCoordinate)
+	FMediaElementVertex(const FVector4f& InPosition, const FVector2f& InTextureCoordinate)
 		: Position(InPosition)
 		, TextureCoordinate(InTextureCoordinate)
 	{ }

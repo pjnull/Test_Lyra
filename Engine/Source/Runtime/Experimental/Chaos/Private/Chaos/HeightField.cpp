@@ -626,8 +626,8 @@ namespace Chaos
 		FVec3 Pts[4];
 		InGeomData.GetPointsScaled(SingleIndex, Pts);
 
-		const float FractionX = FMath::Frac(ClampedGridLocationLocal[0]);
-		const float FractionY = FMath::Frac(ClampedGridLocationLocal[1]);
+		const Chaos::FReal FractionX = FMath::Frac(ClampedGridLocationLocal[0]);
+		const Chaos::FReal FractionY = FMath::Frac(ClampedGridLocationLocal[1]);
 
 		if(FractionX > FractionY)
 		{

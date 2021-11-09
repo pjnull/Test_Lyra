@@ -57,9 +57,9 @@ void FGoogleVRHMD::GenerateDistortionCorrectionVertexBuffer(EStereoscopicPass Ey
 	{
 		for(uint32 x = 0; x < DistortionPointsX; ++x)
 		{
-			FVector2D XYNorm = FVector2D(float(x) / float(DistortionPointsX - 1), float(y) / float(DistortionPointsY - 1));
+			FVector2f XYNorm = FVector2f(float(x) / float(DistortionPointsX - 1), float(y) / float(DistortionPointsY - 1));
 			gvr_vec2f DistortedCoords[3];
-			FVector2D UnDistortedCoord = XYNorm;
+			FVector2f UnDistortedCoord = XYNorm;
 			// Approximate the vertex position using the distortion function.
 			for (uint32 i = 0; i < 10; ++i)
 			{

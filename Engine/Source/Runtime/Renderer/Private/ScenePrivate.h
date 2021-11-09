@@ -2583,7 +2583,7 @@ public:
 	bool AddPixelInspectorRequest(FPixelInspectorRequest *PixelInspectorRequest);
 
 	//Hold the buffer array
-	TMap<FVector2D, FPixelInspectorRequest *> Requests;
+	TMap<FVector2f, FPixelInspectorRequest *> Requests;
 
 	FRenderTarget* RenderTargetBufferDepth[2];
 	FRenderTarget* RenderTargetBufferFinalColor[2];

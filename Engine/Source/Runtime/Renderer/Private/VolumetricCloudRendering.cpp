@@ -1816,8 +1816,8 @@ void FSceneRenderer::InitVolumetricCloudsForViews(FRDGBuilder& GraphBuilder, boo
 								else
 								{
 									Parameters->PrevCloudShadowTexture = BlackDummyRDG;
-									Parameters->CurrFrameCloudShadowmapWorldToLightClipMatrixInv = FMatrix::Identity;
-									Parameters->PrevFrameCloudShadowmapWorldToLightClipMatrix = FMatrix::Identity;
+									Parameters->CurrFrameCloudShadowmapWorldToLightClipMatrixInv = FMatrix44f::Identity;
+									Parameters->PrevFrameCloudShadowmapWorldToLightClipMatrix = FMatrix44f::Identity;
 								}
 
 								Parameters->CurrFrameLightPos = CloudGlobalShaderParams.CloudShadowmapLightPos[LightIndex];
@@ -1825,7 +1825,7 @@ void FSceneRenderer::InitVolumetricCloudsForViews(FRDGBuilder& GraphBuilder, boo
 
 								Parameters->PrevFrameLightPos = ViewInfo.ViewState->VolumetricCloudShadowmapPreviousAtmosphericLightPos[LightIndex];
 								Parameters->PrevFrameLightDir = ViewInfo.ViewState->VolumetricCloudShadowmapPreviousAtmosphericLightDir[LightIndex];
-								Parameters->CloudShadowMapAnchorPointMoved = (ViewInfo.ViewState->VolumetricCloudShadowmapPreviousAnchorPoint[LightIndex] - CloudGlobalShaderParams.CloudShadowmapLightAnchorPos[LightIndex]).SizeSquared() < KINDA_SMALL_NUMBER ? 0 : 1;
+								Parameters->CloudShadowMapAnchorPointMoved = (ViewInfo.ViewState->VolumetricCloudShadowmapPreviousAnchorPoint[LightIndex] - FVector4(CloudGlobalShaderParams.CloudShadowmapLightAnchorPos[LightIndex])).SizeSquared() < KINDA_SMALL_NUMBER ? 0 : 1;
 
 								Parameters->CloudTextureSizeInvSize = VolumetricCloudParams.VolumetricCloud.CloudShadowmapSizeInvSize[LightIndex];
 								Parameters->CloudTextureTracingSizeInvSize = VolumetricCloudParams.VolumetricCloud.CloudShadowmapTracingSizeInvSize[LightIndex];
@@ -1893,8 +1893,8 @@ void FSceneRenderer::InitVolumetricCloudsForViews(FRDGBuilder& GraphBuilder, boo
 							// Update the view previous cloud shadow matrix for next frame
 							ViewInfo.ViewState->VolumetricCloudShadowmapPreviousWorldToLightClipMatrix[LightIndex] = CloudGlobalShaderParams.CloudShadowmapWorldToLightClipMatrix[LightIndex];
 							ViewInfo.ViewState->VolumetricCloudShadowmapPreviousAtmosphericLightDir[LightIndex] = AtmosphericLight ? AtmosphericLight->GetDirection() : FVector::ZeroVector;
-							ViewInfo.ViewState->VolumetricCloudShadowmapPreviousAtmosphericLightPos[LightIndex] = CloudGlobalShaderParams.CloudShadowmapLightPos[LightIndex];
-							ViewInfo.ViewState->VolumetricCloudShadowmapPreviousAnchorPoint[LightIndex] = CloudGlobalShaderParams.CloudShadowmapLightAnchorPos[LightIndex];
+							ViewInfo.ViewState->VolumetricCloudShadowmapPreviousAtmosphericLightPos[LightIndex] = FVector4(CloudGlobalShaderParams.CloudShadowmapLightPos[LightIndex]);
+							ViewInfo.ViewState->VolumetricCloudShadowmapPreviousAnchorPoint[LightIndex] = FVector4(CloudGlobalShaderParams.CloudShadowmapLightAnchorPos[LightIndex]);
 						}
 					};
 					GenerateCloudTexture(AtmosphericLight0, 0);

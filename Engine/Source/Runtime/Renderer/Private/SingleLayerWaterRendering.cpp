@@ -236,7 +236,7 @@ class FWaterRefractionCopyPS : public FGlobalShader
 		SHADER_PARAMETER_SAMPLER(SamplerState, SceneColorCopyDownsampleSampler)
 		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, SceneDepthCopyDownsampleTexture)
 		SHADER_PARAMETER_SAMPLER(SamplerState, SceneDepthCopyDownsampleSampler)
-		SHADER_PARAMETER(FVector2D, SVPositionToSourceTextureUV)
+		SHADER_PARAMETER(FVector2f, SVPositionToSourceTextureUV)
 		RENDER_TARGET_BINDING_SLOTS()
 	END_SHADER_PARAMETER_STRUCT()
 

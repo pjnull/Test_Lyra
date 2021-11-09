@@ -152,7 +152,7 @@ namespace UE
 
 							for ( int32 VertexIndex = 0; VertexIndex < VertexCount; ++VertexIndex )
 							{
-								FVector VertexNormal = LODRenderMesh.VertexBuffers.StaticMeshVertexBuffer.VertexTangentZ( VertexIndex );
+								FVector VertexNormal = (FVector4)LODRenderMesh.VertexBuffers.StaticMeshVertexBuffer.VertexTangentZ( VertexIndex );
 								Normals.push_back( UnrealToUsd::ConvertVector( StageInfo, VertexNormal ) );
 							}
 
@@ -377,7 +377,7 @@ namespace UE
 				TPolygonGroupAttributesConstRef<FName> PolygonGroupImportedMaterialSlotNames = Attributes.GetPolygonGroupMaterialSlotNames();
 				TVertexInstanceAttributesConstRef<FVector3f> VertexInstanceNormals = Attributes.GetVertexInstanceNormals();
 				TVertexInstanceAttributesConstRef<FVector4f> VertexInstanceColors = Attributes.GetVertexInstanceColors();
-				TVertexInstanceAttributesConstRef<FVector2D> VertexInstanceUVs = Attributes.GetVertexInstanceUVs();
+				TVertexInstanceAttributesConstRef<FVector2f> VertexInstanceUVs = Attributes.GetVertexInstanceUVs();
 
 				const int32 VertexCount = VertexPositions.GetNumElements();
 				const int32 VertexInstanceCount = VertexInstanceNormals.GetNumElements();
@@ -641,7 +641,7 @@ bool UsdToUnreal::ConvertGeomMesh( const pxr::UsdTyped& UsdSchema, FMeshDescript
 		pxr::TfToken NormalsInterpType = UsdMesh.GetNormalsInterpolation();
 
 		// UVs
-		TVertexInstanceAttributesRef< FVector2D > MeshDescriptionUVs = StaticMeshAttributes.GetVertexInstanceUVs();
+		TVertexInstanceAttributesRef< FVector2f > MeshDescriptionUVs = StaticMeshAttributes.GetVertexInstanceUVs();
 
 		struct FUVSet
 		{

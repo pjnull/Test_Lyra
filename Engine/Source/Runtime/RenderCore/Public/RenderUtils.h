@@ -220,16 +220,16 @@ public:
 	{
 		// create a static vertex buffer
 		FRHIResourceCreateInfo CreateInfo(TEXT("FScreenSpaceVertexBuffer"));
-		VertexBufferRHI = RHICreateVertexBuffer(sizeof(FVector2D) * 4, BUF_Static, CreateInfo);
-		void* VoidPtr = RHILockBuffer(VertexBufferRHI, 0, sizeof(FVector2D) * 4, RLM_WriteOnly);
-		static const FVector2D Vertices[4] =
+		VertexBufferRHI = RHICreateVertexBuffer(sizeof(FVector2f) * 4, BUF_Static, CreateInfo);
+		void* VoidPtr = RHILockBuffer(VertexBufferRHI, 0, sizeof(FVector2f) * 4, RLM_WriteOnly);
+		static const FVector2f Vertices[4] =
 		{
-			FVector2D(-1,-1),
-			FVector2D(-1,+1),
-			FVector2D(+1,-1),
-			FVector2D(+1,+1),
+			FVector2f(-1,-1),
+			FVector2f(-1,+1),
+			FVector2f(+1,-1),
+			FVector2f(+1,+1),
 		};
-		FMemory::Memcpy(VoidPtr, Vertices, sizeof(FVector2D) * 4);
+		FMemory::Memcpy(VoidPtr, Vertices, sizeof(FVector2f) * 4);
 		RHIUnlockBuffer(VertexBufferRHI);
 	}
 };
@@ -247,7 +247,7 @@ public:
 	virtual void InitRHI()
 	{
 		FVertexDeclarationElementList Elements;
-		uint16 Stride = sizeof(FVector2D);
+		uint16 Stride = sizeof(FVector2f);
 		Elements.Add(FVertexElement(0, 0, VET_Float2, 0, Stride, false));
 		VertexDeclarationRHI = RHICreateVertexDeclaration(Elements);
 	}

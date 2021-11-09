@@ -1742,8 +1742,9 @@ static bool IsAlwaysAccessible(FUnrealScriptStructDefinitionInfo& ScriptDef)
 		|| ToTest == NAME_Vector || ToTest == NAME_Vector3f || ToTest == NAME_Vector3d
 		|| ToTest == NAME_Vector4 || ToTest == NAME_Vector4f || ToTest == NAME_Vector4d
 		|| ToTest == NAME_Box || ToTest == NAME_Box3f || ToTest == NAME_Box3d
-		||	ToTest == NAME_Quat || ToTest == NAME_Quat4f || ToTest == NAME_Quat4d
-		||	ToTest == NAME_Color
+		|| ToTest == NAME_Quat || ToTest == NAME_Quat4f || ToTest == NAME_Quat4d
+		|| ToTest == NAME_Rotator || ToTest == NAME_Rotator3f || ToTest == NAME_Rotator3d
+		|| ToTest == NAME_Color
 		)
 	{
 		check(Result);

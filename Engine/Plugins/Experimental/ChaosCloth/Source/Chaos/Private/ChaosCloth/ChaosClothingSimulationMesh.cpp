@@ -236,8 +236,8 @@ bool FClothingSimulationMesh::WrapDeformLOD(
 // Inline function used to force the unrolling of the skinning loop
 FORCEINLINE static void AddInfluence(FVector& OutPosition, FVector& OutNormal, const FVector3f& RefParticle, const FVector3f& RefNormal, const FMatrix44f& BoneMatrix, const FRealSingle Weight)
 {
-	OutPosition += BoneMatrix.TransformPosition(RefParticle) * Weight;
-	OutNormal += BoneMatrix.TransformVector(RefNormal) * Weight;
+	OutPosition += FVector4(BoneMatrix.TransformPosition(RefParticle) * Weight);
+	OutNormal += FVector4(BoneMatrix.TransformVector(RefNormal) * Weight);
 }
 
 void FClothingSimulationMesh::SkinPhysicsMesh(int32 LODIndex, const FVec3& LocalSpaceLocation, FVec3* OutPositions, FVec3* OutNormals) const

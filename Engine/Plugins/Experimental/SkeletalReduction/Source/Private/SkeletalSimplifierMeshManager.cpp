@@ -567,7 +567,7 @@ void  SkeletalSimplifier::FSimplifierMeshManager::WeldNonSplitBasicAttributes(EV
 				return SimpVert->vert.BasicAttributes.Normal;
 			};
 
-			FVector ZeroValue(0, 0, 0);
+			FVector3f ZeroValue(0, 0, 0);
 			Weld(NormalIDAccessor, NormalValueAccessor, ZeroValue);
 		}
 		// Weld Tangents with same TangentID
@@ -583,7 +583,7 @@ void  SkeletalSimplifier::FSimplifierMeshManager::WeldNonSplitBasicAttributes(EV
 				return SimpVert->vert.BasicAttributes.Tangent;
 			};
 
-			FVector ZeroValue(0, 0, 0);
+			FVector3f ZeroValue(0, 0, 0);
 			Weld(TangentIDAccessor, TangentValueAccessor, ZeroValue);
 		}
 		// Weld BiTangent with same BiTangentID
@@ -598,7 +598,7 @@ void  SkeletalSimplifier::FSimplifierMeshManager::WeldNonSplitBasicAttributes(EV
 				return SimpVert->vert.BasicAttributes.BiTangent;
 			};
 
-			FVector ZeroValue(0, 0, 0);
+			FVector3f ZeroValue(0, 0, 0);
 			Weld(BiTangentIDAccessor, BiTangentValueAccessor, ZeroValue);
 		}
 		// Weld Color with same ColorID
@@ -628,12 +628,12 @@ void  SkeletalSimplifier::FSimplifierMeshManager::WeldNonSplitBasicAttributes(EV
 				{
 					return SimpVert->vert.BasicAttributes.ElementIDs.TexCoordsID[t];
 				};
-				auto TexCoordValueAccessor = [t](SimpVertType* SimpVert)->FVector2D&
+				auto TexCoordValueAccessor = [t](SimpVertType* SimpVert)->FVector2f&
 				{
 					return SimpVert->vert.BasicAttributes.TexCoords[t];
 				};
 
-				FVector2D ZeroValue(0, 0);
+				FVector2f ZeroValue(0, 0);
 				Weld(TexCoordIDAccessor, TexCoordValueAccessor, ZeroValue);
 			}
 		}

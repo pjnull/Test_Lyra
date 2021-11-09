@@ -27,7 +27,7 @@ void FMeshDescriptionBuilder::SetMeshDescription(FMeshDescription* Description)
 	// make sure we have at least one UV channel
 	if (!Attributes.GetVertexInstanceUVs().IsValid())
 	{
-		Description->VertexInstanceAttributes().RegisterAttribute<FVector2D>(MeshAttribute::VertexInstance::TextureCoordinate, 1, FVector2D::ZeroVector, EMeshAttributeFlags::Lerpable | EMeshAttributeFlags::Mandatory);
+		Description->VertexInstanceAttributes().RegisterAttribute<FVector2f>(MeshAttribute::VertexInstance::TextureCoordinate, 1, FVector2f::ZeroVector, EMeshAttributeFlags::Lerpable | EMeshAttributeFlags::Mandatory);
 	}
 
 
@@ -115,9 +115,9 @@ void FMeshDescriptionBuilder::ReserveNewUVs(int32 Count, int UVLayerIndex)
 
 FUVID FMeshDescriptionBuilder::AppendUV(const FVector2D& UVvalue, int32 UVLayerIndex)
 {
-	TUVAttributesRef<FVector2D> UVCoordinates = UVCoordinateLayers[UVLayerIndex];
+	TUVAttributesRef<FVector2f> UVCoordinates = UVCoordinateLayers[UVLayerIndex];
 	FUVID UVID = MeshDescription->CreateUV(UVLayerIndex);
-	UVCoordinates[UVID] = UVvalue;
+	UVCoordinates[UVID] = FVector2f(UVvalue);
 	return UVID;
 }
 
@@ -130,7 +130,7 @@ void FMeshDescriptionBuilder::AppendUVTriangle(const FTriangleID& TriangleID, co
 	TempUVBuffer[2] = UVvertexID2;
 	MeshDescription->SetTriangleUVIndices(TriangleID, TempUVBuffer, UVLayerIndex);
 
-	TUVAttributesRef<FVector2D> UVCoordinates = UVCoordinateLayers[UVLayerIndex];
+	TUVAttributesRef<FVector2f> UVCoordinates = UVCoordinateLayers[UVLayerIndex];
 
 	// set per-instance UVs.  
 	// NB: per-instance UVs should go away on MeshDescription.
@@ -138,7 +138,7 @@ void FMeshDescriptionBuilder::AppendUVTriangle(const FTriangleID& TriangleID, co
 	for (int32 j = 0; j < 3; ++j)
 	{
 		const FVertexInstanceID CornerInstanceID = TriVertInstances[j];
-		const FVector2D& UVvalue = UVCoordinates[TempUVBuffer[j]];
+		const FVector2f& UVvalue = UVCoordinates[TempUVBuffer[j]];
 		
 		SetInstanceUV(CornerInstanceID, UVvalue, UVLayerIndex);
 	}
@@ -191,7 +191,7 @@ void FMeshDescriptionBuilder::SetInstanceUV(const FVertexInstanceID& InstanceID,
 {
 	if (InstanceUVs.IsValid() && ensure(UVLayerIndex < InstanceUVs.GetNumChannels()))
 	{
-		InstanceUVs.Set(InstanceID, UVLayerIndex, InstanceUV);
+		InstanceUVs.Set(InstanceID, UVLayerIndex, FVector2f(InstanceUV));
 	}
 }
 
@@ -212,7 +212,7 @@ void FMeshDescriptionBuilder::SetNumUVLayers(int32 NumUVLayers)
 	UVCoordinateLayers.SetNum(NumUVLayers);
 	for (int i = 0; i < NumUVLayers; ++i)
 	{
-		UVCoordinateLayers[i] = MeshDescription->UVAttributes(i).GetAttributesRef<FVector2D>(MeshAttribute::UV::UVCoordinate);
+		UVCoordinateLayers[i] = MeshDescription->UVAttributes(i).GetAttributesRef<FVector2f>(MeshAttribute::UV::UVCoordinate);
 	}
 }
 

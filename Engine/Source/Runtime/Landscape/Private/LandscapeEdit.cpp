@@ -3227,7 +3227,7 @@ bool ALandscapeProxy::ExportToRawMesh(int32 InExportLOD, FMeshDescription& OutRa
 	GetComponents<ULandscapeComponent>(RegisteredLandscapeComponents);
 
 	const FIntRect LandscapeSectionRect = GetBoundingRect();
-	const FVector2D LandscapeUVScale = FVector2D(1.0f, 1.0f) / FVector2D(LandscapeSectionRect.Size());
+	const FVector2f LandscapeUVScale = FVector2f(1.0f, 1.0f) / FVector2f(LandscapeSectionRect.Size());
 
 	FStaticMeshAttributes Attributes(OutRawMesh);
 	TVertexAttributesRef<FVector3f> VertexPositions = Attributes.GetVertexPositions();
@@ -3237,7 +3237,7 @@ bool ALandscapeProxy::ExportToRawMesh(int32 InExportLOD, FMeshDescription& OutRa
 	TVertexInstanceAttributesRef<FVector3f> VertexInstanceTangents = Attributes.GetVertexInstanceTangents();
 	TVertexInstanceAttributesRef<float> VertexInstanceBinormalSigns = Attributes.GetVertexInstanceBinormalSigns();
 	TVertexInstanceAttributesRef<FVector4f> VertexInstanceColors = Attributes.GetVertexInstanceColors();
-	TVertexInstanceAttributesRef<FVector2D> VertexInstanceUVs = Attributes.GetVertexInstanceUVs();
+	TVertexInstanceAttributesRef<FVector2f> VertexInstanceUVs = Attributes.GetVertexInstanceUVs();
 
 	if (VertexInstanceUVs.GetNumChannels() < 2)
 	{
@@ -3266,8 +3266,8 @@ bool ALandscapeProxy::ExportToRawMesh(int32 InExportLOD, FMeshDescription& OutRa
 		const int32 ComponentSizeQuadsLOD = ((Component->ComponentSizeQuads + 1) >> LandscapeLODToExport) - 1;
 		const int32 SubsectionSizeQuadsLOD = ((Component->SubsectionSizeQuads + 1) >> LandscapeLODToExport) - 1;
 		const FIntPoint ComponentOffsetQuads = Component->GetSectionBase() - LandscapeSectionOffset - LandscapeSectionRect.Min;
-		const FVector2D ComponentUVOffsetLOD = FVector2D(ComponentOffsetQuads)*((float)ComponentSizeQuadsLOD / ComponentSizeQuads);
-		const FVector2D ComponentUVScaleLOD = LandscapeUVScale*((float)ComponentSizeQuads / ComponentSizeQuadsLOD);
+		const FVector2f ComponentUVOffsetLOD = FVector2f(ComponentOffsetQuads)*((float)ComponentSizeQuadsLOD / ComponentSizeQuads);
+		const FVector2f ComponentUVScaleLOD = LandscapeUVScale*((float)ComponentSizeQuads / ComponentSizeQuadsLOD);
 
 		const int32 NumFaces = FMath::Square(ComponentSizeQuadsLOD) * 2;
 		const int32 NumVertices = NumFaces * 3;
@@ -3454,7 +3454,7 @@ bool ALandscapeProxy::ExportToRawMesh(int32 InExportLOD, FMeshDescription& OutRa
 								VertexInstanceBinormalSigns[VertexInstanceIDs[i]] = GetBasisDeterminantSign(LocalTangentX, LocalTangentY, LocalTangentZ);
 								VertexInstanceNormals[VertexInstanceIDs[i]] = LocalTangentZ;
 
-								FVector2D UV = (ComponentUVOffsetLOD + FVector2D(VertexX, VertexY))*ComponentUVScaleLOD;
+								FVector2f UV = (ComponentUVOffsetLOD + FVector2f(VertexX, VertexY))*ComponentUVScaleLOD;
 								VertexInstanceUVs.Set(VertexInstanceIDs[i], 0, UV);
 								// Add lightmap UVs
 								VertexInstanceUVs.Set(VertexInstanceIDs[i], 1, UV);
@@ -3611,7 +3611,7 @@ FVector ULandscapeInfo::GetLandscapeCenterPos(float& LengthZ, int32 MinX /*= MAX
 		}
 
 		const int32 Dist = (ComponentSizeQuads + 1) >> 1; // Should be same in ALandscapeGizmoActiveActor::SetTargetLandscape
-		FVector2D MidPoint(((float)(MinX + MaxX)) / 2.0f, ((float)(MinY + MaxY)) / 2.0f);
+		FVector2f MidPoint(((float)(MinX + MaxX)) / 2.0f, ((float)(MinY + MaxY)) / 2.0f);
 		MinX = FMath::FloorToInt(MidPoint.X) - Dist;
 		MaxX = FMath::CeilToInt(MidPoint.X) + Dist;
 		MinY = FMath::FloorToInt(MidPoint.Y) - Dist;
@@ -3863,7 +3863,7 @@ void ALandscapeProxy::EditorApplyScale(const FVector& DeltaScale, const FVector*
 	FVector CurrentScale = GetRootComponent()->GetRelativeScale3D();
 	
 	// Lock X and Y scaling to the same value :
-	FVector2D XYDeltaScaleAbs(FMath::Abs(DeltaScale.X), FMath::Abs(DeltaScale.Y));
+	FVector2f XYDeltaScaleAbs(FMath::Abs(DeltaScale.X), FMath::Abs(DeltaScale.Y));
 	// Preserve the sign of the chosen delta :
 	bool bFavorX = (XYDeltaScaleAbs.X > XYDeltaScaleAbs.Y);
 
@@ -3886,7 +3886,7 @@ void ALandscapeProxy::EditorApplyScale(const FVector& DeltaScale, const FVector*
 	{
 		// The absolute value of X and Y must be preserved so make sure they are preserved in case they flip from positive to negative (e.g.: a (-X, X) scale is accepted) : 
 		float SignMultiplier = FMath::Sign(CurrentScale.X) * FMath::Sign(CurrentScale.Y);
-		FVector2D NewScale(FVector2D::ZeroVector);
+		FVector2f NewScale(FVector2f::ZeroVector);
 		if (bFavorX)
 		{
 			NewScale.X = CurrentScale.X + DeltaScale.X;
@@ -7412,23 +7412,23 @@ bool ALandscapeProxy::LandscapeExportHeightmapToRenderTarget(UTextureRenderTarge
 				float HeightmapOffsetV = Component->HeightmapScaleBias.W + HeightmapSubsectionOffsetV * (float)SubY;
 
 				FCanvasUVTri Tri1;
-				Tri1.V0_Pos = FVector2D(SubSectionSectionBase.X, SubSectionSectionBase.Y);
-				Tri1.V1_Pos = FVector2D(SubSectionSectionBase.X + SubsectionSizeVerts, SubSectionSectionBase.Y);
-				Tri1.V2_Pos = FVector2D(SubSectionSectionBase.X + SubsectionSizeVerts, SubSectionSectionBase.Y + SubsectionSizeVerts);
+				Tri1.V0_Pos = FVector2f(SubSectionSectionBase.X, SubSectionSectionBase.Y);
+				Tri1.V1_Pos = FVector2f(SubSectionSectionBase.X + SubsectionSizeVerts, SubSectionSectionBase.Y);
+				Tri1.V2_Pos = FVector2f(SubSectionSectionBase.X + SubsectionSizeVerts, SubSectionSectionBase.Y + SubsectionSizeVerts);
 
-				Tri1.V0_UV = FVector2D(HeightmapOffsetU, HeightmapOffsetV);
-				Tri1.V1_UV = FVector2D(HeightmapOffsetU + HeightmapSubsectionOffsetU, HeightmapOffsetV);
-				Tri1.V2_UV = FVector2D(HeightmapOffsetU + HeightmapSubsectionOffsetU, HeightmapOffsetV + HeightmapSubsectionOffsetV);
+				Tri1.V0_UV = FVector2f(HeightmapOffsetU, HeightmapOffsetV);
+				Tri1.V1_UV = FVector2f(HeightmapOffsetU + HeightmapSubsectionOffsetU, HeightmapOffsetV);
+				Tri1.V2_UV = FVector2f(HeightmapOffsetU + HeightmapSubsectionOffsetU, HeightmapOffsetV + HeightmapSubsectionOffsetV);
 				TrianglesPerMID->TriangleList.Add(Tri1);
 
 				FCanvasUVTri Tri2;
-				Tri2.V0_Pos = FVector2D(SubSectionSectionBase.X + SubsectionSizeVerts, SubSectionSectionBase.Y + SubsectionSizeVerts);
-				Tri2.V1_Pos = FVector2D(SubSectionSectionBase.X, SubSectionSectionBase.Y + SubsectionSizeVerts);
-				Tri2.V2_Pos = FVector2D(SubSectionSectionBase.X, SubSectionSectionBase.Y);
+				Tri2.V0_Pos = FVector2f(SubSectionSectionBase.X + SubsectionSizeVerts, SubSectionSectionBase.Y + SubsectionSizeVerts);
+				Tri2.V1_Pos = FVector2f(SubSectionSectionBase.X, SubSectionSectionBase.Y + SubsectionSizeVerts);
+				Tri2.V2_Pos = FVector2f(SubSectionSectionBase.X, SubSectionSectionBase.Y);
 
-				Tri2.V0_UV = FVector2D(HeightmapOffsetU + HeightmapSubsectionOffsetU, HeightmapOffsetV + HeightmapSubsectionOffsetV);
-				Tri2.V1_UV = FVector2D(HeightmapOffsetU, HeightmapOffsetV + HeightmapSubsectionOffsetV);
-				Tri2.V2_UV = FVector2D(HeightmapOffsetU, HeightmapOffsetV);
+				Tri2.V0_UV = FVector2f(HeightmapOffsetU + HeightmapSubsectionOffsetU, HeightmapOffsetV + HeightmapSubsectionOffsetV);
+				Tri2.V1_UV = FVector2f(HeightmapOffsetU, HeightmapOffsetV + HeightmapSubsectionOffsetV);
+				Tri2.V2_UV = FVector2f(HeightmapOffsetU, HeightmapOffsetV);
 
 				TrianglesPerMID->TriangleList.Add(Tri2);
 			}

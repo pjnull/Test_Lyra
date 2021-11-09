@@ -4697,12 +4697,12 @@ bool UStaticMesh::SetUVChannel(int32 LODIndex, int32 UVChannelIndex, const TMap<
 
 	FStaticMeshAttributes Attributes(*MeshDescription);
 
-	TMeshAttributesRef<FVertexInstanceID, FVector2D> UVs = Attributes.GetVertexInstanceUVs();
+	TMeshAttributesRef<FVertexInstanceID, FVector2f> UVs = Attributes.GetVertexInstanceUVs();
 	for (const FVertexInstanceID VertexInstanceID : MeshDescription->VertexInstances().GetElementIDs())
 	{
 		if (const FVector2D* UVCoord = TexCoords.Find(VertexInstanceID))
 		{
-			UVs.Set(VertexInstanceID, UVChannelIndex, *UVCoord);
+			UVs.Set(VertexInstanceID, UVChannelIndex, (FVector2f)*UVCoord);		// LWC_TODO: Precision loss? TexCoords should probably be passed as FVector2f.
 		}
 		else
 		{
@@ -5837,7 +5837,7 @@ void UStaticMesh::BuildFromMeshDescription(const FMeshDescription& MeshDescripti
 	TVertexInstanceAttributesConstRef<FVector3f> VertexInstanceTangents = MeshDescriptionAttributes.GetVertexInstanceTangents();
 	TVertexInstanceAttributesConstRef<float> VertexInstanceBinormalSigns = MeshDescriptionAttributes.GetVertexInstanceBinormalSigns();
 	TVertexInstanceAttributesConstRef<FVector4f> VertexInstanceColors = MeshDescriptionAttributes.GetVertexInstanceColors();
-	TVertexInstanceAttributesConstRef<FVector2D> VertexInstanceUVs = MeshDescriptionAttributes.GetVertexInstanceUVs();
+	TVertexInstanceAttributesConstRef<FVector2f> VertexInstanceUVs = MeshDescriptionAttributes.GetVertexInstanceUVs();
 
 	for (FVertexInstanceID VertexInstanceID : MeshDescription.VertexInstances().GetElementIDs())
 	{
@@ -6878,7 +6878,7 @@ void UStaticMesh::EnforceLightmapRestrictions(bool bUseRenderData)
 			{
 				if (const FMeshDescription* MeshDescription = GetMeshDescription(SourceLOD))
 				{
-					TVertexInstanceAttributesConstRef<FVector2D> UVChannels = FStaticMeshConstAttributes(*MeshDescription).GetVertexInstanceUVs();
+					TVertexInstanceAttributesConstRef<FVector2f> UVChannels = FStaticMeshConstAttributes(*MeshDescription).GetVertexInstanceUVs();
 
 					// skip empty/stripped LODs
 					if (UVChannels.GetNumElements() > 0)

@@ -1057,7 +1057,7 @@ template<typename T>
 const FNiagaraTypeDefinition& FNiagaraTypeDefinition::Get()
 {
 	if (TIsSame<T, float>::Value) { return FNiagaraTypeDefinition::GetFloatDef(); }
-	if (TIsSame<T, FVector2D>::Value) { return FNiagaraTypeDefinition::GetVec2Def(); }
+	if (TIsSame<T, FVector2f>::Value) { return FNiagaraTypeDefinition::GetVec2Def(); }
 	if (TIsSame<T, FVector3f>::Value) { return FNiagaraTypeDefinition::GetVec3Def(); }	
 	if (TIsSame<T, FVector4f>::Value) { return FNiagaraTypeDefinition::GetVec4Def(); }
 	if (TIsSame<T, int32>::Value) { return FNiagaraTypeDefinition::GetIntDef(); }

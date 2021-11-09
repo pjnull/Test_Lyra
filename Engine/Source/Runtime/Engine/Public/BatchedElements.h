@@ -40,7 +40,7 @@ struct FSimpleElementVertex
 	// Could also pack this structure to save some space, W component of position is currently unused for example
 	FVector4f RelativePosition;
 	FVector4f TilePosition;
-	FVector2D TextureCoordinate;
+	FVector2f TextureCoordinate;
 	FLinearColor Color;
 	FColor HitProxyIdColor;
 
@@ -57,7 +57,7 @@ struct FSimpleElementVertex
 	FSimpleElementVertex(const FVector3f& InPosition, const FVector2D& InTextureCoordinate, const FLinearColor& InColor, FHitProxyId InHitProxyId) :
 		RelativePosition(InPosition),
 		TilePosition(ForceInitToZero),
-		TextureCoordinate(InTextureCoordinate),
+		TextureCoordinate(FVector2f(InTextureCoordinate)),
 		Color(InColor),
 		HitProxyIdColor(InHitProxyId.GetColor())
 	{}

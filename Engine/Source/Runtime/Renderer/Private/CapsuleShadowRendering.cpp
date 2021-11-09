@@ -205,7 +205,7 @@ public:
 		SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D, RWBentNormalTexture)
 		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, ReceiverBentNormalTexture)
 		SHADER_PARAMETER(FIntPoint, TileDimensions)
-		SHADER_PARAMETER(FVector2D, NumGroups)
+		SHADER_PARAMETER(FVector2f, NumGroups)
 
 		SHADER_PARAMETER(FVector4f, LightPositionAndInvRadius)
 		SHADER_PARAMETER(FVector3f, LightDirection)
@@ -219,7 +219,7 @@ public:
 		SHADER_PARAMETER(uint32, DownsampleFactor)
 		SHADER_PARAMETER(float, MaxOcclusionDistance)
 
-		SHADER_PARAMETER(FVector2D, CosFadeStartAngle)
+		SHADER_PARAMETER(FVector2f, CosFadeStartAngle)
 
 		SHADER_PARAMETER(uint32, NumShadowCapsules)
 		SHADER_PARAMETER_RDG_BUFFER_SRV(StructuredBuffer<FCapsuleShape3f>, ShadowCapsuleShapes)
@@ -306,7 +306,7 @@ public:
 		SHADER_PARAMETER_STRUCT_REF(FViewUniformShaderParameters, View)
 		SHADER_PARAMETER_RDG_BUFFER_SRV(StructuredBuffer<uint>, TileIntersectionCounts)
 		SHADER_PARAMETER(FIntPoint, TileDimensions)
-		SHADER_PARAMETER(FVector2D, TileSize)
+		SHADER_PARAMETER(FVector2f, TileSize)
 		SHADER_PARAMETER(FIntRect, ScissorRectMinAndSize)
 	END_SHADER_PARAMETER_STRUCT()
 

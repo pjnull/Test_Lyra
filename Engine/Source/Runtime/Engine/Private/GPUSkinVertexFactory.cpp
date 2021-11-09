@@ -190,7 +190,7 @@ FVertexBufferAndSRV FClothBufferPoolPolicy::CreateResource(CreationArguments Arg
 	FVertexBufferAndSRV Buffer;
 	FRHIResourceCreateInfo CreateInfo(TEXT("FClothBufferPoolPolicy"));
 	Buffer.VertexBufferRHI = RHICreateVertexBuffer( BufferSize, (BUF_Dynamic | BUF_ShaderResource), CreateInfo );
-	Buffer.VertexBufferSRV = RHICreateShaderResourceView( Buffer.VertexBufferRHI, sizeof(FVector2D), PF_G32R32F );
+	Buffer.VertexBufferSRV = RHICreateShaderResourceView( Buffer.VertexBufferRHI, sizeof(FVector2f), PF_G32R32F );
 	return Buffer;
 }
 

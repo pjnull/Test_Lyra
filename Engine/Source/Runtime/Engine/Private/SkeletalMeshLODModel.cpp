@@ -169,11 +169,11 @@ uint8 FSoftSkinVertex::GetMaximumWeight() const
 /** Legacy 'rigid' skin vertex */
 struct FLegacyRigidSkinVertex
 {
-	FVector			Position;
-	FVector			TangentX;	// Tangent, U-direction
-	FVector			TangentY;	// Binormal, V-direction
-	FVector			TangentZ;	// Normal
-	FVector2D		UVs[MAX_TEXCOORDS]; // UVs
+	FVector3f		Position;
+	FVector3f		TangentX;	// Tangent, U-direction
+	FVector3f		TangentY;	// Binormal, V-direction
+	FVector3f		TangentZ;	// Normal
+	FVector2f		UVs[MAX_TEXCOORDS]; // UVs
 	FColor			Color;		// Vertex color.
 	uint8			Bone;
 
@@ -218,7 +218,10 @@ struct FLegacyRigidSkinVertex
 		DestVertex.TangentZ.W = GetBasisDeterminantSign(TangentX, TangentY, TangentZ);
 
 		// copy all texture coordinate sets
-		FMemory::Memcpy(DestVertex.UVs, UVs, sizeof(FVector2D)*MAX_TEXCOORDS);
+		for(int32 i = 0; i < MAX_TEXCOORDS; ++i)
+		{
+			DestVertex.UVs[i] = FVector2f(UVs[i]);
+		}
 
 		DestVertex.Color = Color;
 		DestVertex.InfluenceBones[0] = Bone;
@@ -1285,7 +1288,7 @@ void FSkeletalMeshLODModel::GetMeshDescription(FMeshDescription& MeshDescription
 	TVertexInstanceAttributesRef<FVector3f> VertexInstanceTangents = MeshAttributes.GetVertexInstanceTangents();
 	TVertexInstanceAttributesRef<float> VertexInstanceBinormalSigns = MeshAttributes.GetVertexInstanceBinormalSigns();
 	TVertexInstanceAttributesRef<FVector4f> VertexInstanceColors = MeshAttributes.GetVertexInstanceColors();
-	TVertexInstanceAttributesRef<FVector2D> VertexInstanceUVs = MeshAttributes.GetVertexInstanceUVs();
+	TVertexInstanceAttributesRef<FVector2f> VertexInstanceUVs = MeshAttributes.GetVertexInstanceUVs();
 
 	TPolygonGroupAttributesRef<FName> PolygonGroupMaterialSlotNames = MeshAttributes.GetPolygonGroupMaterialSlotNames();
 	
@@ -1363,9 +1366,9 @@ void FSkeletalMeshLODModel::GetMeshDescription(FMeshDescription& MeshDescription
 				VertexInstanceNormals.Set(VertexInstanceID, SourceVertex.TangentZ);
 				VertexInstanceTangents.Set(VertexInstanceID, SourceVertex.TangentX);
 				VertexInstanceBinormalSigns.Set(VertexInstanceID, FMatrix(
-					SourceVertex.TangentX.GetSafeNormal(),
-					SourceVertex.TangentY.GetSafeNormal(),
-					SourceVertex.TangentZ.GetSafeNormal(),
+					(FVector)SourceVertex.TangentX.GetSafeNormal(),
+					(FVector)SourceVertex.TangentY.GetSafeNormal(),
+					(FVector)SourceVertex.TangentZ.GetSafeNormal(),
 					FVector::ZeroVector).Determinant() < 0.0f ? -1.0f : +1.0f);
 
 				for (int32 UVIndex = 0; UVIndex < int32(NumTexCoords); UVIndex++)

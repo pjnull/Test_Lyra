@@ -100,8 +100,8 @@ FMeshShapeGenerator& FPolygonEdgeMeshGenerator::Generate()
 		const int NewVertexBIndex = NewVertexAIndex + 1;
 
 		float UParam = (float)CurrentInputVertex / (float)NumInputVertices;	// TODO: Parametrize based on arc length
-		UVs[NewVertexAIndex] = BilinearInterp(UV00, UV01, UV11, UV10, UParam, 0.0);
-		UVs[NewVertexBIndex] = BilinearInterp(UV00, UV01, UV11, UV10, UParam, 1.0);
+		UVs[NewVertexAIndex] = BilinearInterp(UV00, UV01, UV11, UV10, UParam, 0.0f);
+		UVs[NewVertexBIndex] = BilinearInterp(UV00, UV01, UV11, UV10, UParam, 1.0f);
 		UVParentVertex[NewVertexAIndex] = NewVertexAIndex;
 		UVParentVertex[NewVertexBIndex] = NewVertexBIndex;
 	}

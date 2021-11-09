@@ -1014,7 +1014,7 @@ static void SkinVertexSection(
 				FVector SimulatedPositionWorld = ClothCPU::ClothingPosition(*ClothVertData, *ClothSimData);
 
 				// transform back to local space
-				FVector3f SimulatedPosition = WorldToLocal.TransformPosition(SimulatedPositionWorld);
+				FVector3f SimulatedPosition = (FVector4f)WorldToLocal.TransformPosition(SimulatedPositionWorld);
 
 				const float VertexBlend = ClothBlendWeight * (1.0f - (ClothVertData->SourceMeshVertIndices[3] / 65535.0f));
 				

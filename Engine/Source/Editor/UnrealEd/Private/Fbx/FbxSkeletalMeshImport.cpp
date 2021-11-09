@@ -204,7 +204,7 @@ void RemapSkeletalMeshVertexColorToImportData(const USkeletalMesh* SkeletalMesh,
 		VertPosOctree.AddElement(SkinVertex);
 	}
 
-	TMap<int32, FVector> WedgeIndexToNormal;
+	TMap<int32, FVector3f> WedgeIndexToNormal;
 	WedgeIndexToNormal.Reserve(WedgeNumber);
 	for (int32 FaceIndex = 0; FaceIndex < SkelMeshImportData->Faces.Num(); ++FaceIndex)
 	{
@@ -221,8 +221,8 @@ void RemapSkeletalMeshVertexColorToImportData(const USkeletalMesh* SkeletalMesh,
 	{
 		SkeletalMeshImportData::FVertex& Wedge = SkelMeshImportData->Wedges[WedgeIndex];
 		const FVector& Position = SkelMeshImportData->Points[Wedge.VertexIndex];
-		const FVector2D UV = Wedge.UVs[0];
-		const FVector& Normal = WedgeIndexToNormal.FindChecked(WedgeIndex);
+		const FVector2f UV = Wedge.UVs[0];
+		const FVector3f& Normal = WedgeIndexToNormal.FindChecked(WedgeIndex);
 
 		TArray<FSoftSkinVertex> PointsToConsider;
 		VertPosOctree.FindNearbyElements(Position, [&PointsToConsider](const FSoftSkinVertex& Vertex)
@@ -239,8 +239,8 @@ void RemapSkeletalMeshVertexColorToImportData(const USkeletalMesh* SkeletalMesh,
 			for (int32 ConsiderationIndex = 0; ConsiderationIndex < PointsToConsider.Num(); ++ConsiderationIndex)
 			{
 				const FSoftSkinVertex& SkinVertex = PointsToConsider[ConsiderationIndex];
-				const FVector2D& SkinVertexUV = SkinVertex.UVs[0];
-				const float UVDistanceSqr = FVector2D::DistSquared(UV, SkinVertexUV);
+				const FVector2f& SkinVertexUV = SkinVertex.UVs[0];
+				const float UVDistanceSqr = FVector2f::DistSquared(UV, SkinVertexUV);
 				if (UVDistanceSqr < MinUVDistance)
 				{
 					MinUVDistance = FMath::Min(MinUVDistance, UVDistanceSqr);
@@ -3659,7 +3659,7 @@ bool UnFbx::FFbxImporter::FillSkelMeshImporterFromFbx( FSkeletalMeshImportData& 
 			ImportData.Wedges[w].MatIndex = TmpWedges[VertexIndex].MatIndex;
 			ImportData.Wedges[w].Color = TmpWedges[VertexIndex].Color;
 			ImportData.Wedges[w].Reserved = 0;
-			FMemory::Memcpy( ImportData.Wedges[w].UVs, TmpWedges[VertexIndex].UVs, sizeof(FVector2D)*MAX_TEXCOORDS );
+			FMemory::Memcpy( ImportData.Wedges[w].UVs, TmpWedges[VertexIndex].UVs, sizeof(FVector2f)*MAX_TEXCOORDS );
 			
 			Triangle.WedgeIndex[VertexIndex] = w;
 		}
@@ -4174,7 +4174,7 @@ bool UnFbx::FFbxImporter::ImportSkeletalMeshLOD(USkeletalMesh* InSkeletalMesh, U
 		BaseSkeletalMesh->GetRefSkeleton().EnsureParentsExistAndSort(NewLODModel.ActiveBoneIndices);
 	}
 	// To be extra-nice, we apply the difference between the root transform of the meshes to the verts.
-	FMatrix LODToBaseTransform = InSkeletalMesh->GetRefPoseMatrix(0).InverseFast() * BaseSkeletalMesh->GetRefPoseMatrix(0);
+	FMatrix44f LODToBaseTransform = InSkeletalMesh->GetRefPoseMatrix(0).InverseFast() * BaseSkeletalMesh->GetRefPoseMatrix(0);
 
 	for (int32 SectionIndex = 0; SectionIndex < NewLODModel.Sections.Num(); SectionIndex++)
 	{

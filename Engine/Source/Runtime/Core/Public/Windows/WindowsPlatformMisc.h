@@ -10,7 +10,6 @@
 
 class GenericApplication;
 struct FGuid;
-struct FVector2D;
 class IPlatformChunkInstall;
 
 /** Helper struct used to get the string version of the Windows version. */

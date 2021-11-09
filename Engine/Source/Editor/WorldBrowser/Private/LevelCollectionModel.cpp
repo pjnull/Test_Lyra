@@ -765,12 +765,12 @@ void FLevelCollectionModel::TranslateLevels(const FLevelModelList& InLevels, FVe
 {
 }
 
-FVector2D FLevelCollectionModel::SnapTranslationDelta(const FLevelModelList& InLevelList, FVector2D InTranslationDelta, bool bBoundsSnapping, float InSnappingValue)
+FVector2D FLevelCollectionModel::SnapTranslationDelta(const FLevelModelList& InLevelList, FVector2D InTranslationDelta, bool bBoundsSnapping, FVector2D::FReal InSnappingValue)
 {
 	return InTranslationDelta;
 }
 
-void FLevelCollectionModel::UpdateTranslationDelta(const FLevelModelList& InLevelList, FVector2D InTranslationDelta, bool bBoundsSnapping, float InSnappingValue)
+void FLevelCollectionModel::UpdateTranslationDelta(const FLevelModelList& InLevelList, FVector2D InTranslationDelta, bool bBoundsSnapping, FVector2D::FReal InSnappingValue)
 {
 	FLevelModelList EditableLevels;
 	// Only editable levels could be moved

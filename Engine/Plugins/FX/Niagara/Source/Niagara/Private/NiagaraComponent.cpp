@@ -2054,17 +2054,18 @@ void UNiagaraComponent::SetNiagaraVariableVec3(const FString& InVariableName, FV
 
 void UNiagaraComponent::SetVariableVec2(FName InVariableName, FVector2D InValue)
 {
+	FVector2f AsFloat = (FVector2f)InValue;
 	const FNiagaraVariable VariableDesc(FNiagaraTypeDefinition::GetVec2Def(), InVariableName);
 	if (SystemInstanceController.IsValid())
 	{
-		SystemInstanceController->SetVariable_Deferred(InVariableName, InValue);
+		SystemInstanceController->SetVariable_Deferred(InVariableName, AsFloat);
 	}
 	else
 	{
-		OverrideParameters.SetParameterValue(InValue, VariableDesc, true);
+		OverrideParameters.SetParameterValue(AsFloat, VariableDesc, true);
 	}
 #if WITH_EDITOR
-	SetParameterOverride(VariableDesc, FNiagaraVariant(&InValue, sizeof(FVector2D)));
+	SetParameterOverride(VariableDesc, FNiagaraVariant(&AsFloat, sizeof(FVector2f)));
 #endif
 }
 

@@ -204,7 +204,7 @@ namespace Chaos
 				}
 			}
 
-			if(FMath::IsNearlyEqual(LocalLength, 0, KINDA_SMALL_NUMBER))
+			if(FMath::IsNearlyEqual(LocalLength, 0., KINDA_SMALL_NUMBER))
 			{
 				// If LocalLength is 0, this means the ray's endpoint is on the bounding AABB of thickened capsule.
 				// At this point we have determined this point is not on surface of capsule, so the ray has missed.

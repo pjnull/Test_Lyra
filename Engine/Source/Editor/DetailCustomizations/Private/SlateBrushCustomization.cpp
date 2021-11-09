@@ -931,7 +931,7 @@ private:
 	/** Slate Brush properties */
 	TSharedPtr<IPropertyHandle> DrawAsProperty;
 	TSharedPtr<IPropertyHandle> TilingProperty;
-	TSharedPtr<IPropertyHandle> ImageSizeProperty;
+		TSharedPtr<IPropertyHandle> ImageSizeProperty;
 	TSharedPtr<IPropertyHandle> MarginProperty;
 	TSharedPtr<IPropertyHandle> ResourceObjectProperty;
 

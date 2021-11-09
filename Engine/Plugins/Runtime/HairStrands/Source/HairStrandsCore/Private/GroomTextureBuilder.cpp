@@ -314,10 +314,10 @@ static void InternalBuildFollicleTexture_GPU(
 #endif
 			StrandsData.StrandsCurves.CurvesRootUV.GetData();
 			const uint32 DataCount = StrandsData.StrandsCurves.CurvesRootUV.Num();
-			const uint32 DataSizeInBytes = sizeof(FVector2D) * DataCount;
+			const uint32 DataSizeInBytes = sizeof(FVector2f) * DataCount;
 			check(DataSizeInBytes != 0);
 
-			const FRDGBufferDesc Desc = FRDGBufferDesc::CreateBufferDesc(sizeof(FVector2D), DataCount);
+			const FRDGBufferDesc Desc = FRDGBufferDesc::CreateBufferDesc(sizeof(FVector2f), DataCount);
 			FRDGBufferRef RootBuffer = CreateVertexBuffer(
 				GraphBuilder,
 				TEXT("RootUVBuffer"),

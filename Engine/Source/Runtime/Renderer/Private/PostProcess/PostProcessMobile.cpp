@@ -551,7 +551,7 @@ public:
 		SHADER_PARAMETER_STRUCT_REF(FViewUniformShaderParameters, View)
 		SHADER_PARAMETER(FVector4f, BufferASizeAndInvSize)
 		SHADER_PARAMETER(FVector4f, BufferBSizeAndInvSize)
-		SHADER_PARAMETER(FVector2D, BloomUpScales)
+		SHADER_PARAMETER(FVector2f, BloomUpScales)
 	END_SHADER_PARAMETER_STRUCT()
 
 	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
@@ -824,7 +824,7 @@ public:
 
 	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
 		SHADER_PARAMETER_STRUCT_REF(FViewUniformShaderParameters, View)
-		SHADER_PARAMETER(FVector2D, LightShaftCenter)
+		SHADER_PARAMETER(FVector2f, LightShaftCenter)
 	END_SHADER_PARAMETER_STRUCT()
 
 	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
@@ -935,7 +935,7 @@ public:
 
 	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
 		SHADER_PARAMETER_STRUCT_REF(FViewUniformShaderParameters, View)
-		SHADER_PARAMETER(FVector2D, LightShaftCenter)
+		SHADER_PARAMETER(FVector2f, LightShaftCenter)
 	END_SHADER_PARAMETER_STRUCT()
 
 	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
@@ -1068,7 +1068,7 @@ public:
 
 	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
 		SHADER_PARAMETER_STRUCT_REF(FViewUniformShaderParameters, View)
-		SHADER_PARAMETER(FVector2D, LightShaftCenter)
+		SHADER_PARAMETER(FVector2f, LightShaftCenter)
 		SHADER_PARAMETER(FVector4f, BloomUpSizeAndInvSize)
 		SHADER_PARAMETER(FVector4f, ViewportSize)
 	END_SHADER_PARAMETER_STRUCT()

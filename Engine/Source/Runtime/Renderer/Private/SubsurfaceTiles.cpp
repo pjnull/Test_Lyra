@@ -23,7 +23,7 @@ FSubsurfaceTilePassVS::FParameters GetSubsurfaceTileParameters(const FViewInfo& 
 	Out.TileType = uint32(TileType);
 	Out.bRectPrimitive = InTile.bRectPrimitive ? 1 : 0;
 	Out.ViewMin = InView.ViewRect.Min;
-	Out.ExtentInverse = FVector2D(1.f / BufferExtent.X, 1.f / BufferExtent.Y);
+	Out.ExtentInverse = FVector2f(1.f / BufferExtent.X, 1.f / BufferExtent.Y);
 	Out.TileDataBuffer = InTile.GetTileBufferSRV(TileType);
 	Out.TileIndirectBuffer = InTile.TileIndirectDrawBuffer;
 	return Out;

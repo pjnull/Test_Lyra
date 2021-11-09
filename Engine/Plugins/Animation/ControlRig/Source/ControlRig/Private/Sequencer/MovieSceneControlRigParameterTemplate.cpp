@@ -1739,7 +1739,7 @@ void FMovieSceneControlRigParameterTemplate::EvaluateCurvesWithMasks(const FMovi
 		}
 		for (int32 Index = 0; Index < Vector2Ds.Num(); ++Index)
 		{
-			FVector2D Value(ForceInitToZero);
+			FVector2f Value(ForceInitToZero);
 			const FVector2DParameterNameAndCurves& Vector2D = Vector2Ds[Index];
 
 			if (HACK_ChannelMasks->Vector2DCurveMask[Index])
@@ -1843,7 +1843,7 @@ void FMovieSceneControlRigParameterTemplate::EvaluateCurvesWithMasks(const FMovi
 				Scale = FVector3f(0.0f, 0.0f, 0.0f);
 			}
 
-			FRotator Rotator(0.0f, 0.0f, 0.0f);
+			FRotator3f Rotator(0.0f, 0.0f, 0.0f);
 
 			const FTransformParameterNameAndCurves& Transform = Transforms[Index];
 			if (HACK_ChannelMasks->TransformCurveMask[Index])
@@ -1998,7 +1998,7 @@ void FMovieSceneControlRigParameterTemplate::EvaluateCurvesWithMasks(const FMovi
 					}
 				}
 			}
-			FTransformParameterStringAndValue NameAndValue(Transform.ParameterName, Translation, Rotator, Scale);
+			FTransformParameterStringAndValue NameAndValue(Transform.ParameterName, Translation, FRotator(Rotator), Scale);
 			Values.TransformValues.Emplace(NameAndValue);
 		}
 	}

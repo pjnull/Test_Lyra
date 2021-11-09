@@ -726,13 +726,13 @@ extern RHI_API bool GRHISupportsMeshShadersTier1;
 extern RHI_API bool GRHISupportsShaderTimestamp;
 
 /** Tables of all MSAA sample offset for all MSAA supported. Use GetMSAASampleOffsets() to read it. */
-extern RHI_API FVector2D GRHIDefaultMSAASampleOffsets[1 + 2 + 4 + 8 + 16];
+extern RHI_API FVector2f GRHIDefaultMSAASampleOffsets[1 + 2 + 4 + 8 + 16];
 
 // Calculate the index of the sample in GRHIDefaultMSAASampleOffsets
 extern RHI_API int32 CalculateMSAASampleArrayIndex(int32 NumSamples, int32 SampleIndex);
 
 // Gets the MSAA sample's offset from the center of the pixel coordinate.
-inline FVector2D GetMSAASampleOffsets(int32 NumSamples, int32 SampleIndex)
+inline FVector2f GetMSAASampleOffsets(int32 NumSamples, int32 SampleIndex)
 {
 	return GRHIDefaultMSAASampleOffsets[CalculateMSAASampleArrayIndex(NumSamples, SampleIndex)];
 }
@@ -1112,7 +1112,7 @@ private:
 		DeviceZ = FMath::Min(DeviceZ, 1 - Z_PRECISION);
 
 		// for depth to linear conversion
-		const FVector2D InvDeviceZToWorldZ(0.1f, 0.1f);
+		const FVector2f InvDeviceZToWorldZ(0.1f, 0.1f);
 
 		return 1.0f / (DeviceZ * InvDeviceZToWorldZ.X - InvDeviceZToWorldZ.Y);
 	}

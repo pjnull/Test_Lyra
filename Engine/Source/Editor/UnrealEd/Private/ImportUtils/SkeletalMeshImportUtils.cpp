@@ -539,9 +539,9 @@ void SkeletalMeshImportUtils::ApplySkinning(USkeletalMesh* SkeletalMesh, FSkelet
 							MinDistance = VectorDelta;
 							MinNormalAngle = MAX_FLT;
 						}
-						FVector DestTangentZ = DestVertex.TangentZ;
+						FVector DestTangentZ = FVector4(DestVertex.TangentZ);
 						DestTangentZ.Normalize();
-						FVector SrcTangentZ = SrcVertex.TangentZ;
+						FVector SrcTangentZ = FVector4(SrcVertex.TangentZ);
 						SrcTangentZ.Normalize();
 						float AngleDiff = FMath::Abs(FMath::Acos(FVector::DotProduct(DestTangentZ, SrcTangentZ)));
 						if (AngleDiff < MinNormalAngle)

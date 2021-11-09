@@ -1262,7 +1262,7 @@ BEGIN_SHADER_PARAMETER_STRUCT(FLightShaderParameters, ENGINE_API)
 	SHADER_PARAMETER(float, SourceRadius)
 
 	// Dimensions of the light, for spot light, but also
-	SHADER_PARAMETER(FVector2D, SpotAngles)
+	SHADER_PARAMETER(FVector2f, SpotAngles)
 
 	// Radius of the soft source.
 	SHADER_PARAMETER(float, SoftSourceRadius)

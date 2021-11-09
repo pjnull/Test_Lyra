@@ -561,7 +561,7 @@ public:
 		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, LowResColorTexture)
 		SHADER_PARAMETER_RDG_TEXTURE_SRV(Texture2D<float>, LowResDepthTexture)
 		SHADER_PARAMETER_RDG_TEXTURE_SRV(Texture2D<float>, FullResDepthTexture)
-		SHADER_PARAMETER(FVector2D, LowResExtentInverse)
+		SHADER_PARAMETER(FVector2f, LowResExtentInverse)
 		RENDER_TARGET_BINDING_SLOTS()
 	END_SHADER_PARAMETER_STRUCT()
 

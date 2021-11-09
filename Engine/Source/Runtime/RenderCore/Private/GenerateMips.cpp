@@ -19,7 +19,7 @@ public:
 	using FPermutationDomain = TShaderPermutationDomain<FGenMipsSRGB, FGenMipsSwizzle>;
 
 	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
-		SHADER_PARAMETER(FVector2D, TexelSize)
+		SHADER_PARAMETER(FVector2f, TexelSize)
 		SHADER_PARAMETER_RDG_TEXTURE_SRV(Texture2D, MipInSRV)
 		SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D, MipOutUAV)
 		SHADER_PARAMETER_SAMPLER(SamplerState, MipSampler)
@@ -65,7 +65,7 @@ public:
 	SHADER_USE_PARAMETER_STRUCT(FGenerateMipsPS, FGlobalShader);
 
 	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
-		SHADER_PARAMETER(FVector2D, HalfTexelSize)
+		SHADER_PARAMETER(FVector2f, HalfTexelSize)
 		SHADER_PARAMETER(float, Level)
 		SHADER_PARAMETER_RDG_TEXTURE_SRV(Texture2D, MipInSRV)
 		SHADER_PARAMETER_SAMPLER(SamplerState, MipSampler)
@@ -124,7 +124,7 @@ public:
 	using FPermutationDomain = TShaderPermutationDomain<FGenMipsSRGB, FGenMipsSwizzle>;
 
 	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
-		SHADER_PARAMETER(FVector2D, TexelSize)
+		SHADER_PARAMETER(FVector2f, TexelSize)
 		SHADER_PARAMETER_RDG_TEXTURE_SRV(Texture2D, MipInSRV)
 		SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D, MipOutUAV)
 		SHADER_PARAMETER_SAMPLER(SamplerState, MipSampler)
@@ -164,7 +164,7 @@ void FGenerateMips::ExecuteRaster(FRDGBuilder& GraphBuilder, FRDGTextureRef Text
 			FMath::Max(TextureDesc.Extent.Y >> MipLevel, 1));
 
 		FGenerateMipsPS::FParameters* PassParameters = GraphBuilder.AllocParameters<FGenerateMipsPS::FParameters>();
-		PassParameters->HalfTexelSize = FVector2D(0.5f / DestTextureSize.X, 0.5f / DestTextureSize.Y);
+		PassParameters->HalfTexelSize = FVector2f(0.5f / DestTextureSize.X, 0.5f / DestTextureSize.Y);
 		PassParameters->Level = InputMipLevel;
 		PassParameters->MipInSRV = GraphBuilder.CreateSRV(FRDGTextureSRVDesc::CreateForMipLevel(Texture, InputMipLevel));
 		PassParameters->MipSampler = Sampler;
@@ -226,7 +226,7 @@ void FGenerateMips::ExecuteCompute(FRDGBuilder& GraphBuilder, FRDGTextureRef Tex
 			FMath::Max(TextureDesc.Extent.Y >> MipLevel, 1));
 
 		FGenerateMipsCS::FParameters* PassParameters = GraphBuilder.AllocParameters<FGenerateMipsCS::FParameters>();
-		PassParameters->TexelSize  = FVector2D(1.0f / DestTextureSize.X, 1.0f / DestTextureSize.Y);
+		PassParameters->TexelSize  = FVector2f(1.0f / DestTextureSize.X, 1.0f / DestTextureSize.Y);
 		PassParameters->MipInSRV   = GraphBuilder.CreateSRV(FRDGTextureSRVDesc::CreateForMipLevel(Texture, MipLevel - 1));
 		PassParameters->MipOutUAV  = GraphBuilder.CreateUAV(FRDGTextureUAVDesc(Texture, MipLevel));
 		PassParameters->MipSampler = Sampler;
@@ -295,7 +295,7 @@ void FGenerateMips::ExecuteCompute(FRDGBuilder& GraphBuilder, FRDGTextureRef Tex
 			FMath::Max(TextureDesc.Extent.Y >> MipLevel, 1));
 
 		FGenerateMipsIndirectCS::FParameters* PassParameters = GraphBuilder.AllocParameters<FGenerateMipsIndirectCS::FParameters>();
-		PassParameters->TexelSize = FVector2D(1.0f / DestTextureSize.X, 1.0f / DestTextureSize.Y);
+		PassParameters->TexelSize = FVector2f(1.0f / DestTextureSize.X, 1.0f / DestTextureSize.Y);
 		PassParameters->MipInSRV = GraphBuilder.CreateSRV(FRDGTextureSRVDesc::CreateForMipLevel(Texture, MipLevel - 1));
 		PassParameters->MipOutUAV = GraphBuilder.CreateUAV(FRDGTextureUAVDesc(Texture, MipLevel));
 		PassParameters->MipSampler = Sampler;

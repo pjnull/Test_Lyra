@@ -86,7 +86,7 @@ namespace SkelDataConversionImpl
 		TArray< FVector3f > Vertices;
 		TArray< FVector3f> NormalsPerVertex;
 		TArray< uint32 > Indices;
-		TArray< FVector2D > UVs;
+		TArray< FVector2f > UVs;
 		TArray< uint32 > SmoothingGroups;
 		TArray<SkeletalMeshImportData::FTriangle> Faces;
 		TMap< uint32, TArray< uint32 > > VertexIndexToFaceIndices;
@@ -97,7 +97,7 @@ namespace SkelDataConversionImpl
 		TArray< FVector3f > Vertices;
 		TArray< FVector3f> NormalsPerIndex;
 		TArray< uint32 > Indices;
-		TArray< FVector2D > UVs;
+		TArray< FVector2f > UVs;
 		TArray< uint32 > SmoothingGroups;
 		TArray< uint32 > MorphedIndexToSourceIndex;
 	};
@@ -714,7 +714,7 @@ namespace UnrealToUsdImpl
 
 					for ( int32 VertexIndex = 0; VertexIndex < VertexCount; ++VertexIndex )
 					{
-						Normals.push_back( UnrealToUsd::ConvertVector( StageInfo, Vertices[ VertexIndex ].TangentZ ) );
+						Normals.push_back( UnrealToUsd::ConvertVector( StageInfo, FVector4(Vertices[ VertexIndex ].TangentZ) ) );
 					}
 
 					NormalsAttribute.Set( Normals, TimeCode );

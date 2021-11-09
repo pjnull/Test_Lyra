@@ -1500,6 +1500,7 @@ public:
 	/** Retrieves the X and Y screen coordinates of the specified touch key. Returns false if the touch index is not down */
 	UFUNCTION(BlueprintCallable, Category="Game|Player")
 	void GetInputTouchState(ETouchIndex::Type FingerIndex, float& LocationX, float& LocationY, bool& bIsCurrentlyPressed) const;
+	void GetInputTouchState(ETouchIndex::Type FingerIndex, double& LocationX, double& LocationY, bool& bIsCurrentlyPressed) const;	// LWC_TODO: Temp stand in for native calls with FVector2D components.
 
 	/** Retrieves the current motion state of the player's input device */
 	UFUNCTION(BlueprintCallable, Category="Game|Player")
@@ -1508,6 +1509,7 @@ public:
 	/** Retrieves the X and Y screen coordinates of the mouse cursor. Returns false if there is no associated mouse device */
 	UFUNCTION(BlueprintCallable, Category="Game|Player")
 	bool GetMousePosition(float& LocationX, float& LocationY) const;
+	bool GetMousePosition(double& LocationX, double& LocationY) const;	// LWC_TODO: Temp stand in for native calls with FVector2D components.
 
 	/** Returns how long the given key/button has been down.  Returns 0 if it's up or it just went down this frame. */
 	UFUNCTION(BlueprintCallable, Category="Game|Player")
@@ -1516,10 +1518,12 @@ public:
 	/** Retrieves how far the mouse moved this frame. */
 	UFUNCTION(BlueprintCallable, Category="Game|Player")
 	void GetInputMouseDelta(float& DeltaX, float& DeltaY) const;
-
+	void GetInputMouseDelta(double& DeltaX, double& DeltaY) const;	// LWC_TODO: Temp stand in for native calls with FVector2D components.
+	
 	/** Retrieves the X and Y displacement of the given analog stick. */
 	UFUNCTION(BlueprintCallable, Category="Game|Player")
 	void GetInputAnalogStickState(EControllerAnalogStick::Type WhichStick, float& StickX, float& StickY) const;
+	void GetInputAnalogStickState(EControllerAnalogStick::Type WhichStick, double& StickX, double& StickY) const;	// LWC_TODO: Temp stand in for native calls with FVector2D components.
 
 	/** Activates a new touch interface for this player controller */
 	UFUNCTION(BlueprintCallable, Category="Game|Player")

@@ -702,7 +702,7 @@ const int32 GMaxForwardShadowCascades = 4;
 	SHADER_PARAMETER(FVector3f, DirectionalLightColor) \
 	SHADER_PARAMETER(float, DirectionalLightVolumetricScatteringIntensity) \
 	SHADER_PARAMETER(uint32, DirectionalLightShadowMapChannelMask) \
-	SHADER_PARAMETER(FVector2D, DirectionalLightDistanceFadeMAD) \
+	SHADER_PARAMETER(FVector2f, DirectionalLightDistanceFadeMAD) \
 	SHADER_PARAMETER(uint32, NumDirectionalLightCascades) \
 	SHADER_PARAMETER(int32, DirectionalLightVSM) \
 	SHADER_PARAMETER(FVector4f, CascadeEndDepths) \
@@ -774,7 +774,7 @@ BEGIN_GLOBAL_SHADER_PARAMETER_STRUCT_WITH_CONSTRUCTOR(FVolumetricFogGlobalData,)
 	SHADER_PARAMETER(FIntVector, GridSizeInt)
 	SHADER_PARAMETER(FVector3f, GridSize)
 	SHADER_PARAMETER(FVector3f, GridZParams)
-	SHADER_PARAMETER(FVector2D, SVPosToVolumeUV)
+	SHADER_PARAMETER(FVector2f, SVPosToVolumeUV)
 	SHADER_PARAMETER(FIntPoint, FogGridToPixelXY)
 	SHADER_PARAMETER(float, MaxDistance)
 	SHADER_PARAMETER(FVector3f, HeightFogInscatteringColor)
@@ -1320,7 +1320,7 @@ public:
 	FVector3f ExponentialFogColor;
 	float FogMaxOpacity;
 	FVector4f ExponentialFogParameters3;
-	FVector2D SinCosInscatteringColorCubemapRotation;
+	FVector2f SinCosInscatteringColorCubemapRotation;
 
 	UTexture* FogInscatteringColorCubemap;
 	FVector FogInscatteringTextureParameters;

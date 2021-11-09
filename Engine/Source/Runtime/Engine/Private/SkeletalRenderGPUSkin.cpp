@@ -747,7 +747,7 @@ void FGPUMorphUpdateCS::SetParameters(FRHICommandList& RHICmdList, const FVector
 	SetUAVParameter(RHICmdList, CS, MorphVertexBufferParameter, MorphVertexBuffer.GetUAV());
 
 	SetShaderValue(RHICmdList, CS, PositionScaleParameter, (FVector4f)LocalScale);
-	FVector2D Precision = { MorphTargetVertexInfoBuffers.GetPositionPrecision(), MorphTargetVertexInfoBuffers.GetTangentZPrecision() };
+	FVector2f Precision = { MorphTargetVertexInfoBuffers.GetPositionPrecision(), MorphTargetVertexInfoBuffers.GetTangentZPrecision() };
 	SetShaderValue(RHICmdList, CS, PrecisionParameter, Precision);
 
 	SetSRVParameter(RHICmdList, CS, MorphDataBufferParameter, MorphTargetVertexInfoBuffers.MorphDataSRV);

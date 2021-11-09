@@ -87,7 +87,7 @@ void FMeshDescription::Initialize()
 	VertexPositions = VertexElements->Get().GetAttributes().RegisterAttribute(MeshAttribute::Vertex::Position, 1, FVector3f::ZeroVector, EMeshAttributeFlags::Lerpable | EMeshAttributeFlags::Mandatory);
 
 	// Register UVCoordinates attribute for UVs
-	UVElements->Get().GetAttributes().RegisterAttribute(MeshAttribute::UV::UVCoordinate, 1, FVector2D::ZeroVector, EMeshAttributeFlags::Lerpable | EMeshAttributeFlags::Mandatory);
+	UVElements->Get().GetAttributes().RegisterAttribute(MeshAttribute::UV::UVCoordinate, 1, FVector2f::ZeroVector, EMeshAttributeFlags::Lerpable | EMeshAttributeFlags::Mandatory);
 
 	// Associate indexers with element types and their referencing attributes
 	InitializeIndexers();
@@ -1763,7 +1763,7 @@ void FMeshDescription::SetNumUVChannels(const int32 NumUVChannels)
 	// Ensure every UV element channel has a UVCoordinate attribute
 	for (int32 Index = 0; Index < NumUVChannels; Index++)
 	{
-		UVElements->Get(Index).GetAttributes().RegisterAttribute(MeshAttribute::UV::UVCoordinate, 1, FVector2D::ZeroVector, EMeshAttributeFlags::Lerpable);
+		UVElements->Get(Index).GetAttributes().RegisterAttribute(MeshAttribute::UV::UVCoordinate, 1, FVector2f::ZeroVector, EMeshAttributeFlags::Lerpable);
 	}
 }
 

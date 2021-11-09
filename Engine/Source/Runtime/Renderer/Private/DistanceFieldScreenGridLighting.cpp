@@ -51,24 +51,24 @@ FIntPoint GetBufferSizeForConeTracing()
 	return FIntPoint::DivideAndRoundDown(GetBufferSizeForAO(), GConeTraceDownsampleFactor);
 }
 
-FVector2D JitterOffsets[4] = 
+FVector2f JitterOffsets[4] = 
 {
-	FVector2D(.25f, 0),
-	FVector2D(.75f, .25f),
-	FVector2D(.5f, .75f),
-	FVector2D(0, .5f)
+	FVector2f(.25f, 0),
+	FVector2f(.75f, .25f),
+	FVector2f(.5f, .75f),
+	FVector2f(0, .5f)
 };
 
 extern int32 GAOUseHistory;
 
-FVector2D GetJitterOffset(int32 SampleIndex)
+FVector2f GetJitterOffset(int32 SampleIndex)
 {
 	if (GAOUseJitter && GAOUseHistory)
 	{
 		return JitterOffsets[SampleIndex] * GConeTraceDownsampleFactor;
 	}
 
-	return FVector2D(0, 0);
+	return FVector2f(0, 0);
 }
 
 class FConeTraceScreenGridObjectOcclusionCS : public FGlobalShader
@@ -361,7 +361,7 @@ public:
 		SetShaderValue(RHICmdList, ShaderRHI, ConeBufferMax, ConeBufferMaxValue);
 
 		FIntPoint const DFNormalBufferSize = GetBufferSizeForAO();
-		FVector2D const DFNormalBufferUVMaxValue(
+		FVector2f const DFNormalBufferUVMaxValue(
 			(View.ViewRect.Width()  / GAODownsampleFactor - 0.5f) / DFNormalBufferSize.X,
 			(View.ViewRect.Height() / GAODownsampleFactor - 0.5f) / DFNormalBufferSize.Y);
 		SetShaderValue(RHICmdList, ShaderRHI, DFNormalBufferUVMax, DFNormalBufferUVMaxValue);

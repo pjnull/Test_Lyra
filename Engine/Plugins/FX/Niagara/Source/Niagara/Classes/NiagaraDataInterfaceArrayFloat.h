@@ -22,7 +22,7 @@ class NIAGARA_API UNiagaraDataInterfaceArrayFloat2 : public UNiagaraDataInterfac
 	GENERATED_UCLASS_BODY()
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Array")
-	TArray<FVector2D> FloatData;
+	TArray<FVector2D> FloatData;	// LWC_TODO: Should be FVector2f, but only FVector2D is blueprint accessible
 
 	TArray<FVector2D>& GetArrayReference() { return FloatData; }
 };

@@ -115,7 +115,7 @@ void FDynamicMeshToMeshDescription::UpdateAttributes(const FDynamicMesh3* MeshIn
 
 	if (bUpdateUVs)
 	{
-		TVertexInstanceAttributesRef<FVector2D> InstanceAttrib = Attributes.GetVertexInstanceUVs();
+		TVertexInstanceAttributesRef<FVector2f> InstanceAttrib = Attributes.GetVertexInstanceUVs();
 		ensureMsgf(InstanceAttrib.IsValid(), TEXT("Trying to update UVs on a MeshDescription that has no texture coordinate attributes"));
 		if (InstanceAttrib.IsValid())
 		{
@@ -132,7 +132,7 @@ void FDynamicMeshToMeshDescription::UpdateAttributes(const FDynamicMesh3* MeshIn
 				{
 					const FDynamicMeshUVOverlay* UVOverlay = MeshIn->Attributes()->GetUVLayer(UVLayerIndex);
 					// update the vertex Attribute UVs
-					DynamicMeshToMeshDescriptionConversionHelper::SetAttributesFromOverlay(MeshIn, MeshOut, InstanceAttrib, UVOverlay, FVector2D::ZeroVector, UVLayerIndex);
+					DynamicMeshToMeshDescriptionConversionHelper::SetAttributesFromOverlay(MeshIn, MeshOut, InstanceAttrib, UVOverlay, FVector2f::ZeroVector, UVLayerIndex);
 
 					// rebuild the shared UVs
 					FUVArray& UVArray = MeshOut.UVs(UVLayerIndex);
@@ -151,10 +151,9 @@ void FDynamicMeshToMeshDescription::UpdateAttributes(const FDynamicMesh3* MeshIn
 						}
 
 						FVector2f UVValue = UVOverlay->GetElement(ElID);
-						FVector2D UVValue2D(UVValue.X, UVValue.Y);
 						FUVID UVID = UVArray.Add();
 						ElIDToUVIDMap[ElID] = UVID;
-						UVArray.GetAttributes().GetAttributesRef<FVector2D>(MeshAttribute::UV::UVCoordinate)[UVID] = UVValue2D;
+						UVArray.GetAttributes().GetAttributesRef<FVector2f>(MeshAttribute::UV::UVCoordinate)[UVID] = UVValue;
 					}
 
 					for (const FTriangleID TriangleID : MeshOut.Triangles().GetElementIDs())
@@ -173,7 +172,7 @@ void FDynamicMeshToMeshDescription::UpdateAttributes(const FDynamicMesh3* MeshIn
 							for (int j = 0; j < 3; ++j)
 							{
 								FUVID UVID = UVArray.Add();
-								UVArray.GetAttributes().GetAttributesRef<FVector2D>(MeshAttribute::UV::UVCoordinate)[UVID] = FVector2D::ZeroVector;
+								UVArray.GetAttributes().GetAttributesRef<FVector2f>(MeshAttribute::UV::UVCoordinate)[UVID] = FVector2f::ZeroVector;
 								MDTri.Add(UVID);
 							}
 						}
@@ -196,8 +195,8 @@ void FDynamicMeshToMeshDescription::UpdateAttributes(const FDynamicMesh3* MeshIn
 							for (int32 i = 0; i < 3; ++i)
 							{
 								// UV from shared
-								FVector2D SharedUV = MeshOut.UVs(UVLayerIndex).GetAttributes().GetAttributesRef<FVector2D>(MeshAttribute::UV::UVCoordinate)[UVTri[i]];
-								FVector2D WedgeUV = InstanceAttrib.Get(TriWedges[i], UVLayerIndex);
+								FVector2f SharedUV = MeshOut.UVs(UVLayerIndex).GetAttributes().GetAttributesRef<FVector2f>(MeshAttribute::UV::UVCoordinate)[UVTri[i]];
+								FVector2f WedgeUV = InstanceAttrib.Get(TriWedges[i], UVLayerIndex);
 								check(SharedUV == WedgeUV);
 							}
 						}
@@ -210,7 +209,7 @@ void FDynamicMeshToMeshDescription::UpdateAttributes(const FDynamicMesh3* MeshIn
 				check(MeshIn->VertexCount() == MeshOut.Vertices().Num());
 				for (int VertID : MeshIn->VertexIndicesItr())
 				{
-					FVector2D UV = (FVector2D)MeshIn->GetVertexUV(VertID);
+					FVector2f UV = MeshIn->GetVertexUV(VertID);
 					for (FVertexInstanceID InstanceID : MeshOut.GetVertexVertexInstanceIDs(FVertexID(VertID)))
 					{
 						InstanceAttrib.Set(InstanceID, UV);

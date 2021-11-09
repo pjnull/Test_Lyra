@@ -33,7 +33,7 @@ struct FSoftSkinVertex
 	FVector4f			TangentZ;
 
 	// UVs
-	FVector2D		UVs[MAX_TEXCOORDS];
+	FVector2f		UVs[MAX_TEXCOORDS];
 	// VertexColor
 	FColor			Color;
 	FBoneIndexType	InfluenceBones[MAX_TOTAL_INFLUENCES];

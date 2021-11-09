@@ -133,8 +133,8 @@ public:
 
 				if (Pts0.W > 0 && Pts1.W > 0 && Pts2.W > 0)
 				{
-					const FVector N1 = Pts1 - Pts0;
-					const FVector N2 = Pts2 - Pts0;
+					const FVector N1 = FVector4(Pts1 - Pts0);
+					const FVector N2 = FVector4(Pts2 - Pts0);
 					const FVector N = FVector::CrossProduct(N2, N1).GetSafeNormal();
 
 					for (int32 i = 0; i < 3; i++)
@@ -162,8 +162,8 @@ public:
 		const FVector4f& Pts1 = GetValidPoint(Width - 1, 0);
 		const FVector4f& Pts2 = GetValidPoint(0, Height - 1);
 
-		const FVector N1 = Pts1 - Pts0;
-		const FVector N2 = Pts2 - Pts0;
+		const FVector N1 = FVector4(Pts1 - Pts0);
+		const FVector N2 = FVector4(Pts2 - Pts0);
 		return FVector::CrossProduct(N2, N1).GetSafeNormal();
 	}
 

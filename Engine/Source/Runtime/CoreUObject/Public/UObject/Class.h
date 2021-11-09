@@ -30,6 +30,7 @@
 #include "UObject/Script.h"
 #include "UObject/UObjectGlobals.h"
 #include "UObject/FieldPath.h"
+#include "UObject/PropertyTag.h"
 
 struct FBlake3Hash;
 struct FCustomPropertyListNode;
@@ -989,9 +990,15 @@ struct TStructOpsTypeTraits : public TStructOpsTypeTraitsBase2<CPPSTRUCT>
 	}
 
 	template<class CPPSTRUCT>
-	FORCEINLINE typename TEnableIf<TStructOpsTypeTraits<CPPSTRUCT>::WithSerializeFromMismatchedTag, bool>::Type SerializeFromMismatchedTagOrNot(FPropertyTag const& Tag, FArchive& Ar, CPPSTRUCT *Data)
+	FORCEINLINE typename TEnableIf<TStructOpsTypeTraits<CPPSTRUCT>::WithSerializeFromMismatchedTag && !TIsUECoreType<CPPSTRUCT>::Value, bool>::Type SerializeFromMismatchedTagOrNot(FPropertyTag const& Tag, FArchive& Ar, CPPSTRUCT *Data)
 	{
 		return Data->SerializeFromMismatchedTag(Tag, Ar);
+	}
+
+	template<class CPPSTRUCT>
+	FORCEINLINE typename TEnableIf<TStructOpsTypeTraits<CPPSTRUCT>::WithSerializeFromMismatchedTag && TIsUECoreType<CPPSTRUCT>::Value, bool>::Type SerializeFromMismatchedTagOrNot(FPropertyTag const& Tag, FArchive& Ar, CPPSTRUCT *Data)
+	{
+		return Data->SerializeFromMismatchedTag(Tag.StructName, Ar);
 	}
 
 	template<class CPPSTRUCT>
@@ -1001,10 +1008,17 @@ struct TStructOpsTypeTraits : public TStructOpsTypeTraitsBase2<CPPSTRUCT>
 	}
 
 	template<class CPPSTRUCT>
-	FORCEINLINE typename TEnableIf<TStructOpsTypeTraits<CPPSTRUCT>::WithStructuredSerializeFromMismatchedTag, bool>::Type StructuredSerializeFromMismatchedTagOrNot(FPropertyTag const& Tag, FStructuredArchive::FSlot Slot, CPPSTRUCT *Data)
+	FORCEINLINE typename TEnableIf<TStructOpsTypeTraits<CPPSTRUCT>::WithStructuredSerializeFromMismatchedTag && !TIsUECoreType<CPPSTRUCT>::Value, bool>::Type StructuredSerializeFromMismatchedTagOrNot(FPropertyTag const& Tag, FStructuredArchive::FSlot Slot, CPPSTRUCT *Data)
 	{
 		return Data->SerializeFromMismatchedTag(Tag, Slot);
 	}
+
+	template<class CPPSTRUCT>
+	FORCEINLINE typename TEnableIf<TStructOpsTypeTraits<CPPSTRUCT>::WithStructuredSerializeFromMismatchedTag && TIsUECoreType<CPPSTRUCT>::Value, bool>::Type StructuredSerializeFromMismatchedTagOrNot(FPropertyTag const& Tag, FStructuredArchive::FSlot Slot, CPPSTRUCT *Data)
+	{
+		return Data->SerializeFromMismatchedTag(Tag.StructName, Slot);
+	}
+
 
 
 	/**
@@ -1541,7 +1555,15 @@ public:
 #if PLATFORM_COMPILER_HAS_IF_CONSTEXPR
 			if constexpr (TStructOpsTypeTraits<CPPSTRUCT>::WithSerializeFromMismatchedTag)
 			{
-				return ((CPPSTRUCT*)Data)->SerializeFromMismatchedTag(Tag, Ar);
+				if constexpr (TIsUECoreType<CPPSTRUCT>::Value)
+				{
+					// Custom version of SerializeFromMismatchedTag for core types, which don't have access to FPropertyTag.
+					return ((CPPSTRUCT*)Data)->SerializeFromMismatchedTag(Tag.StructName, Ar);
+				}
+				else
+				{
+					return ((CPPSTRUCT*)Data)->SerializeFromMismatchedTag(Tag, Ar);
+				}
 			}
 			else
 			{
@@ -1561,7 +1583,15 @@ public:
 #if PLATFORM_COMPILER_HAS_IF_CONSTEXPR
 			if constexpr (TStructOpsTypeTraits<CPPSTRUCT>::WithStructuredSerializeFromMismatchedTag)
 			{
-				return ((CPPSTRUCT*)Data)->SerializeFromMismatchedTag(Tag, Slot);
+				if constexpr (TIsUECoreType<CPPSTRUCT>::Value)
+				{
+					// Custom version of SerializeFromMismatchedTag for core types, which don't understand FPropertyTag.
+					return ((CPPSTRUCT*)Data)->SerializeFromMismatchedTag(Tag.StructName, Slot);
+				}
+				else
+				{
+					return ((CPPSTRUCT*)Data)->SerializeFromMismatchedTag(Tag, Slot);
+				}
 			}
 			else
 			{
@@ -1639,7 +1669,6 @@ public:
 
 	static COREUOBJECT_API ICppStructOps* FindDeferredCppStructOps(FName StructName);
 #endif
-	bool CanSerializeAsAlias(const struct FPropertyTag& Tag) const;
 
 protected:
 	/** true if we have performed PrepareCppStructOps **/

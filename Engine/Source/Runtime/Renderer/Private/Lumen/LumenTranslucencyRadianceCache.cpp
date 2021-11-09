@@ -42,7 +42,7 @@ BEGIN_GLOBAL_SHADER_PARAMETER_STRUCT(FLumenTranslucencyRadianceCacheMarkPassUnif
 	SHADER_PARAMETER_STRUCT(FSceneTextureUniformParameters, SceneTextures)
 	SHADER_PARAMETER_STRUCT_INCLUDE(LumenRadianceCache::FRadianceCacheMarkParameters, RadianceCacheMarkParameters)
 	SHADER_PARAMETER_RDG_TEXTURE(Texture2D, FurthestHZBTexture)
-	SHADER_PARAMETER(FVector2D, ViewportUVToHZBBufferUV)
+	SHADER_PARAMETER(FVector2f, ViewportUVToHZBBufferUV)
 	SHADER_PARAMETER(float, HZBMipLevel)
 END_GLOBAL_SHADER_PARAMETER_STRUCT()
 

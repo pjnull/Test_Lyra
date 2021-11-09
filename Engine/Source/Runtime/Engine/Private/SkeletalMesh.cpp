@@ -6596,9 +6596,9 @@ void FSkeletalMeshSceneProxy::GetShadowShapes(TArray<FCapsuleShape3f>& CapsuleSh
 
 		FCapsuleShape3f& NewCapsule = CapsuleShapes[CapsuleIndex++];
 
-		NewCapsule.Center = ReferenceToWorld.TransformPosition(CapsuleData.Value.Center);
+		NewCapsule.Center = (FVector4f)ReferenceToWorld.TransformPosition(CapsuleData.Value.Center);
 		NewCapsule.Radius = CapsuleData.Value.Radius * MaxScale;
-		NewCapsule.Orientation = ReferenceToWorld.TransformVector(CapsuleData.Value.Orientation).GetSafeNormal();
+		NewCapsule.Orientation = (FVector4f)ReferenceToWorld.TransformVector(CapsuleData.Value.Orientation).GetSafeNormal();
 		NewCapsule.Length = CapsuleData.Value.Length * MaxScale;
 	}
 }
@@ -7022,9 +7022,9 @@ void GetRefTangentBasisTyped(const USkeletalMesh* Mesh, const FSkelMeshRenderSec
 	const int32 BufferVertIndex = Section.GetVertexBufferIndex() + VertIndex;
 	const int32 MaxBoneInfluences = SkinWeightVertexBuffer.GetMaxBoneInfluences();
 
-	const FVector VertexTangentX = StaticVertexBuffer.VertexTangentX(BufferVertIndex);
-	const FVector VertexTangentY = StaticVertexBuffer.VertexTangentY(BufferVertIndex);
-	const FVector VertexTangentZ = StaticVertexBuffer.VertexTangentZ(BufferVertIndex);
+	const FVector3f VertexTangentX = StaticVertexBuffer.VertexTangentX(BufferVertIndex);
+	const FVector3f VertexTangentY = StaticVertexBuffer.VertexTangentY(BufferVertIndex);
+	const FVector3f VertexTangentZ = StaticVertexBuffer.VertexTangentZ(BufferVertIndex);
 
 #if !PLATFORM_LITTLE_ENDIAN
 	// uint8[] elements in LOD.VertexBufferGPUSkin have been swapped for VET_UBYTE4 vertex stream use
@@ -7034,7 +7034,7 @@ void GetRefTangentBasisTyped(const USkeletalMesh* Mesh, const FSkelMeshRenderSec
 #endif
 	{
 		const float	Weight = (float)SkinWeightVertexBuffer.GetBoneWeight(BufferVertIndex, InfluenceIndex) / 255.0f;
-		const FMatrix BoneTransformMatrix = FMatrix::Identity;
+		const FMatrix44f BoneTransformMatrix = FMatrix44f::Identity;
 		OutTangentX += BoneTransformMatrix.TransformVector(VertexTangentX) * Weight;
 		OutTangentY += BoneTransformMatrix.TransformVector(VertexTangentY) * Weight;
 		OutTangentZ += BoneTransformMatrix.TransformVector(VertexTangentZ) * Weight;

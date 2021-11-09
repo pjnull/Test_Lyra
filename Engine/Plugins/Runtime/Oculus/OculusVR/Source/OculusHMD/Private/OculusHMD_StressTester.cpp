@@ -50,7 +50,7 @@ namespace OculusHMD
 struct FTextureVertex
 {
 	FVector4f	Position;
-	FVector2D	UV;
+	FVector2f	UV;
 };
 
 inline FBufferRHIRef CreateTempOcculusVertexBuffer()

@@ -198,7 +198,7 @@ BEGIN_SHADER_PARAMETER_STRUCT(FIcvfxPixelShaderParameters, )
 
 	SHADER_PARAMETER(float, ChromakeyMarkerScale)
 	SHADER_PARAMETER(float, ChromakeyMarkerDistance)
-	SHADER_PARAMETER(FVector2D, ChromakeyMarkerOffset)
+	SHADER_PARAMETER(FVector2f, ChromakeyMarkerOffset)
 END_SHADER_PARAMETER_STRUCT()
 
 class FIcvfxWarpVS : public FGlobalShader

@@ -2028,7 +2028,7 @@ bool APlayerController::GetHitResultUnderFinger(ETouchIndex::Type FingerIndex, E
 	bool bHit = false;
 	if (PlayerInput)
 	{
-		FVector2D TouchPosition;
+		FVector2f TouchPosition;
 		bool bIsPressed = false;
 		GetInputTouchState(FingerIndex, TouchPosition.X, TouchPosition.Y, bIsPressed);
 		if (bIsPressed)
@@ -2050,7 +2050,7 @@ bool APlayerController::GetHitResultUnderFingerByChannel(ETouchIndex::Type Finge
 	bool bHit = false;
 	if (PlayerInput)
 	{
-		FVector2D TouchPosition;
+		FVector2f TouchPosition;
 		bool bIsPressed = false;
 		GetInputTouchState(FingerIndex, TouchPosition.X, TouchPosition.Y, bIsPressed);
 		if (bIsPressed)
@@ -2072,7 +2072,7 @@ bool APlayerController::GetHitResultUnderFingerForObjects(ETouchIndex::Type Fing
 	bool bHit = false;
 	if (PlayerInput)
 	{
-		FVector2D TouchPosition;
+		FVector2f TouchPosition;
 		bool bIsPressed = false;
 		GetInputTouchState(FingerIndex, TouchPosition.X, TouchPosition.Y, bIsPressed);
 		if (bIsPressed)
@@ -5356,6 +5356,13 @@ void APlayerController::GetInputTouchState(ETouchIndex::Type FingerIndex, float&
 		bIsCurrentlyPressed = false;
 	}
 }
+void APlayerController::GetInputTouchState(ETouchIndex::Type FingerIndex, double& LocationX, double& LocationY, bool& bIsCurrentlyPressed) const
+{
+	float X = (float)LocationX, Y = (float)LocationY;
+	GetInputTouchState(FingerIndex, X, Y, bIsCurrentlyPressed);
+	LocationX = X;
+	LocationY = Y;
+}
 
 void APlayerController::GetInputMotionState(FVector& Tilt, FVector& RotationRate, FVector& Gravity, FVector& Acceleration) const
 {
@@ -5390,6 +5397,17 @@ bool APlayerController::GetMousePosition(float& LocationX, float& LocationY) con
 
 	return bGotMousePosition;
 }
+bool APlayerController::GetMousePosition(double& LocationX, double& LocationY) const
+{
+	float X, Y;
+	if(GetMousePosition(X, Y))
+	{
+		LocationX = X;
+		LocationY = Y;
+		return true;
+	}
+	return false;
+}
 
 void APlayerController::GetInputMouseDelta(float& DeltaX, float& DeltaY) const
 {
@@ -5402,6 +5420,14 @@ void APlayerController::GetInputMouseDelta(float& DeltaX, float& DeltaY) const
 	{
 		DeltaX = DeltaY = 0.f;
 	}
+}
+
+void APlayerController::GetInputMouseDelta(double& DeltaX, double& DeltaY) const
+{
+	float DX, DY;
+	GetInputMouseDelta(DX, DY);
+	DeltaX = DX;
+	DeltaY = DY;
 }
 
 void APlayerController::GetInputAnalogStickState(EControllerAnalogStick::Type WhichStick, float& StickX, float& StickY) const
@@ -5429,6 +5455,13 @@ void APlayerController::GetInputAnalogStickState(EControllerAnalogStick::Type Wh
 	{
 		StickX = StickY = 0.f;
 	}
+}
+void APlayerController::GetInputAnalogStickState(EControllerAnalogStick::Type WhichStick, double& StickX, double& StickY) const
+{
+	float DX, DY;
+	GetInputMouseDelta(DX, DY);
+	StickX = DX;
+	StickY = DY;
 }
 
 void APlayerController::EnableInput(class APlayerController* PlayerController)
