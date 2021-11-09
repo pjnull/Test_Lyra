@@ -2910,23 +2910,6 @@ void FAssetRegistryImpl::TickGatherer(Impl::FEventContext& EventContext, const d
 		HighestPending = FMath::Max(this->HighestPending, NumPending);
 
 		bOutIdle = !bInterrupted && !bIsSearching && NumPending == 0;
-		// Temp
-		// Temporary instrumentation for debugging "Processing Asset Data" UI hangs without info provided in the log
-		if ((0 < NumPending && NumPending < 10) || (bOutIdle && !bGatherIdle))
-		{
-			static int DisplayCount = 0;
-			if (++DisplayCount <= 100)
-			{
-				UE_LOG(LogAssetRegistry, Display, TEXT("AssetRegistryFileLoadProgress nearly complete.")
-					TEXT("\nbInterrupted=%s, bIsSearching=%s, NumPending=%d, NumFilesToSearch=%d, NumPathsToSearch=%d")
-					TEXT("\nBackgroundPathResults.Num()=%d, BackgroundAssetResults.Num()=%d, BackgroundDependencyResults.Num()=%d, BackgroundCookedPackageNamesWithoutAssetDataResults.Num()=%d")
-					TEXT("\nbOutIdle=%s, bGatherIdle=%s"),
-					bInterrupted ? TEXT("true") : TEXT("false"), bIsSearching ? TEXT("true") : TEXT("false"), NumPending, NumFilesToSearch, NumPathsToSearch, BackgroundPathResults.Num(),
-					BackgroundAssetResults.Num(), BackgroundDependencyResults.Num(), BackgroundCookedPackageNamesWithoutAssetDataResults.Num(),
-					bOutIdle ? TEXT("true") : TEXT("false"), bGatherIdle ? TEXT("true") : TEXT("false"));
-			}
-		}
-		// EndTemp
 		// Notify the status change, only when something changed, or when sending the final result before going idle
 		if (bIsSearching || bHadAssetsToProcess || (bOutIdle && !this->bGatherIdle))
 		{
