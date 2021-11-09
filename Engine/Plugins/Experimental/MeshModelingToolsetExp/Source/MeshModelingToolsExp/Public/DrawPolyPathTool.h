@@ -75,6 +75,10 @@ public:
 	UPROPERTY(EditAnywhere, Category = Path, meta = (EditCondition = "WidthMode == EDrawPolyPathWidthMode::Fixed", UIMin = "0.0001", UIMax = "1000", ClampMin = "0", ClampMax = "999999"))
 	float Width = 10.0f;
 
+	/** If true, all quads on the path will belong to the same polygon. If false, each quad gets its own polygon. */
+	UPROPERTY(EditAnywhere, Category = Path)
+	bool bSinglePolygroup = false;
+
 	/** If and how the drawn path gets extruded */
 	UPROPERTY(EditAnywhere, Category = Extrude)
 	EDrawPolyPathExtrudeMode ExtrudeMode = EDrawPolyPathExtrudeMode::Interactive;

@@ -43,7 +43,7 @@ namespace DrawPolyPathToolLocals
 	}
 
 
-	void GeneratePathMesh(FDynamicMesh3& Mesh, const TArray<FFrame3d>& InPathPoints, const TArray<double>& InOffsetScaleFactors, double OffsetDistance, bool bPathIsClosed, bool bRampMode)
+	void GeneratePathMesh(FDynamicMesh3& Mesh, const TArray<FFrame3d>& InPathPoints, const TArray<double>& InOffsetScaleFactors, double OffsetDistance, bool bPathIsClosed, bool bRampMode, bool bSinglePolygroup)
 	{
 		Mesh.Clear();
 
@@ -68,6 +68,7 @@ namespace DrawPolyPathToolLocals
 		if (bPathIsClosed)
 		{
 			FPolygonEdgeMeshGenerator MeshGen(UsePathPoints, UseOffsetScaleFactors, OffsetDistance, FVector3d::UnitZ());
+			MeshGen.bSinglePolygroup = bSinglePolygroup;
 			MeshGen.UVWidth = PathLength;
 			MeshGen.UVHeight = 2 * OffsetDistance;
 			MeshGen.Generate();
@@ -94,6 +95,7 @@ namespace DrawPolyPathToolLocals
 		else
 		{
 			FRectangleMeshGenerator MeshGen;
+			MeshGen.bSinglePolygroup = bSinglePolygroup;
 			MeshGen.Width = PathLength;
 			MeshGen.Height = 2 * OffsetDistance;
 			MeshGen.Normal = FVector3f::UnitZ();
@@ -600,7 +602,7 @@ void UDrawPolyPathTool::GeneratePathMesh(FDynamicMesh3& Mesh)
 	SecondPolyLoop.Reset();
 
 	const bool bRampMode = (TransformProps->ExtrudeMode == EDrawPolyPathExtrudeMode::RampFixed) || (TransformProps->ExtrudeMode == EDrawPolyPathExtrudeMode::RampInteractive);
-	DrawPolyPathToolLocals::GeneratePathMesh(Mesh, CurPathPoints, OffsetScaleFactors, CurOffsetDistance, bPathIsClosed, bRampMode);
+	DrawPolyPathToolLocals::GeneratePathMesh(Mesh, CurPathPoints, OffsetScaleFactors, CurOffsetDistance, bPathIsClosed, bRampMode, TransformProps->bSinglePolygroup);
 
 	FMeshNormals::QuickRecomputeOverlayNormals(Mesh);
 

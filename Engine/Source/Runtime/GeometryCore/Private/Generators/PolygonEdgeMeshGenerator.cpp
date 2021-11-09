@@ -45,6 +45,7 @@ FMeshShapeGenerator& FPolygonEdgeMeshGenerator::Generate()
 	}
 
 	// Triangulate the vertices we just placed
+	int PolyIndex = 0;
 	for (int CurrentVertex = 0; CurrentVertex < NumInputVertices; ++CurrentVertex)
 	{
 		const int NewVertexA = 2 * CurrentVertex;
@@ -58,7 +59,7 @@ FMeshShapeGenerator& FPolygonEdgeMeshGenerator::Generate()
 		SetTriangle(NewTriAIndex, NewTriA);
 		SetTriangleUVs(NewTriAIndex, NewTriA);
 		SetTriangleNormals(NewTriAIndex, NewTriA);
-		SetTrianglePolygon(NewTriAIndex, 0);
+		SetTrianglePolygon(NewTriAIndex, PolyIndex);
 
 		const int NewTriBIndex = NewTriAIndex + 1;
 		FIndex3i NewTriB{ NewVertexC, NewVertexB, NewVertexD };
@@ -66,7 +67,12 @@ FMeshShapeGenerator& FPolygonEdgeMeshGenerator::Generate()
 		SetTriangle(NewTriBIndex, NewTriB);
 		SetTriangleUVs(NewTriBIndex, NewTriB);
 		SetTriangleNormals(NewTriBIndex, NewTriB);
-		SetTrianglePolygon(NewTriBIndex, 0);
+		SetTrianglePolygon(NewTriBIndex, PolyIndex);
+
+		if (!bSinglePolygroup)
+		{
+			PolyIndex++;
+		}
 	}
 
 	for (int NewVertexIndex = 0; NewVertexIndex < NumVertices; ++NewVertexIndex)
