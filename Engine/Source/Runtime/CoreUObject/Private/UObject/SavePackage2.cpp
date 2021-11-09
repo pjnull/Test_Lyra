@@ -2184,7 +2184,7 @@ ESavePackageResult InnerSave(FSaveContext& SaveContext)
 	IPackageWriter* PackageWriter = SaveContext.GetPackageWriter();
 	if (PackageWriter)
 	{
-		int32 ExportsSize = SaveContext.Linker->Tell();
+		const int64 ExportsSize = SaveContext.Linker->Tell();
 		SaveContext.Result = WriteAdditionalFiles(SaveContext, SlowTask, ExportsSize);
 		checkf(SaveContext.Linker->Tell() == ExportsSize, TEXT("The writing of additional files is not allowed to append to the LinkerSave when using a PackageWriter."));
 		if (SaveContext.Result != ESavePackageResult::Success)
@@ -2215,7 +2215,7 @@ ESavePackageResult InnerSave(FSaveContext& SaveContext)
 		return SaveContext.Result;
 	}
 
-	int32 ExportsSize = SaveContext.Linker->Tell();
+	int64 ExportsSize = SaveContext.Linker->Tell();
 	if (PackageWriter)
 	{
 		PackageWriter->AddToExportsSize(ExportsSize);

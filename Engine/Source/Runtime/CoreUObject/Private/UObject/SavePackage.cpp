@@ -2294,7 +2294,7 @@ FSavePackageResultStruct UPackage::Save(UPackage* InOuter, UObject* Base, EObjec
 		TSet<FName> SoftPackagesUsedInGame;
 
 		// Size of serialized out package in bytes. This is before compression.
-		int32 PackageSize = INDEX_NONE;
+		int64 PackageSize = INDEX_NONE;
 		TPimplPtr<FLinkerSave> Linker = nullptr;
 		uint32 SerializedPackageFlags = 0;
 		{
@@ -4206,7 +4206,7 @@ FSavePackageResultStruct UPackage::Save(UPackage* InOuter, UObject* Base, EObjec
 			
 				if (PackageWriter)
 				{
-					int32 ExportsSize = Linker->Tell();
+					const int64 ExportsSize = Linker->Tell();
 					ESavePackageResult AdditionalFilesResult = WriteAdditionalFiles(ExportsSize);
 					checkf(Linker->Tell() == ExportsSize, TEXT("The writing of additional files is not allowed to append to the LinkerSave when using a PackageWriter."));
 					if (AdditionalFilesResult != ESavePackageResult::Success)
