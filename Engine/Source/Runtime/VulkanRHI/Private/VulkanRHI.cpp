@@ -777,6 +777,11 @@ void FVulkanDynamicRHI::InitInstance()
 #if VULKAN_RHI_RAYTRACING
 		GRHISupportsRayTracing = false; // Disable runtime hwrt on vk during development.
 		//GRHISupportsRayTracing = Device->GetOptionalExtensions().HasRaytracingExtensions();
+
+		const FRayTracingProperties& RayTracingProps = Device->GetRayTracingProperties();
+		GRHIRayTracingAccelerationStructureAlignment = 256; // TODO (currently handled by FVulkanAccelerationStructureBuffer)
+		GRHIRayTracingScratchBufferAlignment = RayTracingProps.AccelerationStructure.minAccelerationStructureScratchOffsetAlignment;
+		GRHIRayTracingInstanceDescriptorSize = uint32(sizeof(VkAccelerationStructureInstanceKHR));
 #endif
 #if VULKAN_ENABLE_DUMP_LAYER
 		// Disable RHI thread by default if the dump layer is enabled

@@ -3910,9 +3910,9 @@ void FD3D12RayTracingScene::BuildAccelerationStructure(FD3D12CommandContext& Com
 
 	const D3D12_GPU_VIRTUAL_ADDRESS ScratchAddress = ScratchBuffer->ResourceLocation.GetGPUVirtualAddress() + ScratchBufferOffset;
 
-	checkf(ScratchAddress % GRHIRayTracingAccelerationStructureAlignment == 0,
+	checkf(ScratchAddress % GRHIRayTracingScratchBufferAlignment == 0,
 		TEXT("TLAS scratch buffer (plus offset) must be aligned to %lld bytes."),
-		GRHIRayTracingAccelerationStructureAlignment);
+		GRHIRayTracingScratchBufferAlignment);
 
 	checkf(PrebuildInfo.ScratchDataSizeInBytes + ScratchBufferOffset <= ScratchBuffer->GetSize(),
 		TEXT("TLAS scratch buffer size is %lld bytes with offset %lld (%lld bytes available), but the build requires %lld bytes. ")

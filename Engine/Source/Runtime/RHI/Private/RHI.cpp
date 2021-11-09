@@ -1398,6 +1398,7 @@ bool GRHISupportsRayTracingDispatchIndirect = false;
 bool GRHISupportsRayTracingAsyncBuildAccelerationStructure = false;
 bool GRHISupportsRayTracingAMDHitToken = false;
 uint32 GRHIRayTracingAccelerationStructureAlignment = 0;
+uint32 GRHIRayTracingScratchBufferAlignment = 0;
 uint32 GRHIRayTracingShaderTableAlignment = 0;
 uint32 GRHIRayTracingInstanceDescriptorSize = 0;
 bool GRHISupportsWaveOperations = false;

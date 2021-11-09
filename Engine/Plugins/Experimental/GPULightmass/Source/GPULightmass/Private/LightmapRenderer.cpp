@@ -1021,7 +1021,7 @@ void FSceneRenderState::SetupRayTracingScene(int32 LODIndex)
 			FRHIResourceCreateInfo ScratchBufferCreateInfo(TEXT("LightmassRayTracingScratchBuffer"));
 			FBufferRHIRef ScratchBuffer = RHICreateBuffer(
 				uint32(SizeInfo.BuildScratchSize),
-				BUF_UnorderedAccess, GRHIRayTracingAccelerationStructureAlignment, ERHIAccess::UAVCompute,
+				BUF_UnorderedAccess, GRHIRayTracingScratchBufferAlignment, ERHIAccess::UAVCompute,
 				ScratchBufferCreateInfo);
 
 			FRWBufferStructured InstanceBuffer;

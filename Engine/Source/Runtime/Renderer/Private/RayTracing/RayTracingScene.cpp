@@ -65,7 +65,7 @@ void FRayTracingScene::Create(FRDGBuilder& GraphBuilder, const FGPUScene& GPUSce
 	}
 
 	{
-		const uint64 ScratchAlignment = GRHIRayTracingAccelerationStructureAlignment;
+		const uint64 ScratchAlignment = GRHIRayTracingScratchBufferAlignment;
 		FRDGBufferDesc ScratchBufferDesc;
 		ScratchBufferDesc.UnderlyingType = FRDGBufferDesc::EUnderlyingType::StructuredBuffer;
 		ScratchBufferDesc.Usage = BUF_UnorderedAccess;
