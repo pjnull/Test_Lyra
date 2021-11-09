@@ -286,7 +286,9 @@ void UAnimGraphNode_Base::InternalPinCreation(TArray<UEdGraphPin*>* OldPins)
 
 void UAnimGraphNode_Base::AllocateDefaultPins()
 {
-	InternalPinCreation(NULL);
+	InternalPinCreation(nullptr);
+
+	CreateCustomPins(nullptr);
 }
 
 void UAnimGraphNode_Base::RecalculateBindingType(FAnimGraphNodePropertyBinding& InBinding)
