@@ -102,12 +102,12 @@ struct FBxDFEnergyTerms {
 
 // Given a split-sum approximation of directional albedo for a BxDF, compute multiple scattering weight and multiple scattering directional albedo
 // while taking into account the fresnel term (assumed to be F_Schlick)
-FBxDFEnergyTerms ComputeFresnelEnergyTerms(float2 E, float3 F0, float3 F90)
+FBxDFEnergyTerms ComputeFresnelEnergyTerms(float2 E, float3 F0, float3 F90) 
 {
 	FBxDFEnergyTerms Result;
 	// [2] Eq 16: this restores the missing energy of the bsdf, while also accounting for the fact that the fresnel term causes some energy to be absorbed
 	// NOTE: using F0 here is an approximation, but for schlick fresnel Favg is almost exactly equal to F0
-	Result.W = 1.0 + F0 * ((1 - E.x) / E.x);
+	Result.W = View.bShadingEnergyConservation ? (1.0 + F0 * ((1 - E.x) / E.x)) : 1.0f;
 	// Now estimate the amount of energy reflected off this specular lobe so that we can remove it from underlying BxDF layers (like diffuse)
 	// This relies on the split-sum approximation as in [3] Sec 4.
 	// This term can also be useful to compute the probability of choosing among lobes
@@ -119,16 +119,15 @@ FBxDFEnergyTerms ComputeGGXSpecEnergyTerms(float Roughness, float NoV, float3 F0
 {
 	FBxDFEnergyTerms Out;
 #if USE_ENERGY_CONSERVATION > 0
-	if (View.bShadingEnergyConservation)
 	{
 		Out = ComputeFresnelEnergyTerms(GGXEnergyLookup(Roughness, NoV), F0, F90);
 	}
-	else
-#endif
+#else
 	{
 		Out.W = 1.0f;
 		Out.E = F0;
 	}
+#endif
 	return Out;
 }
 
@@ -142,16 +141,15 @@ FBxDFEnergyTerms ComputeClothEnergyTerms(float Roughness, float NoV, float3 F0, 
 {
 	FBxDFEnergyTerms Out;
 #if USE_ENERGY_CONSERVATION > 0
-	if (View.bShadingEnergyConservation)
 	{
 		Out = ComputeFresnelEnergyTerms(ClothEnergyLookup(Roughness, NoV), F0, F90);
 	}
-	else
-#endif
+#else
 	{
 		Out.W = 1.0f;
 		Out.E = F0;
 	}
+#endif
 	return Out;
 }
 
@@ -165,15 +163,14 @@ FBxDFEnergyTerms ComputeDiffuseEnergyTerms(float Roughness, float NoV)
 {
 	FBxDFEnergyTerms Out;
 #if USE_ENERGY_CONSERVATION > 0
-	if (View.bShadingEnergyConservation)
 	{
 		Out.E = DiffuseEnergyLookup(Roughness, NoV);
 	}
-	else
-#endif
+#else
 	{
 		Out.E = 1.0f;
 	}
+#endif
 	Out.W = 1.0f;
 	return Out;
 }

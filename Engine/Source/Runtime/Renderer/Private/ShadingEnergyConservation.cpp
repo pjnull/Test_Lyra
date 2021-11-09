@@ -185,10 +185,15 @@ void Init(FRDGBuilder& GraphBuilder, FViewInfo& View)
 	FRDGTextureRef ClothEnergyTexture = nullptr;
 	FRDGTextureRef DiffuseEnergyTexture = nullptr;
 
-	// Enabled based on settings, or forced if the view is using path-tracing
-	const bool bIsEnergyConservationEnabled = (CVarShadingEnergyConservation.GetValueOnRenderThread() || View.Family->EngineShowFlags.PathTracing) && View.ViewState != nullptr;
-	const bool bIsEnergyPreservationEnabled = bIsEnergyConservationEnabled && CVarShadingEnergyConservation_Preservation.GetValueOnRenderThread() > 0;
-	if (bIsEnergyConservationEnabled)
+	// Enabled based on settings
+	const bool bIsEnergyConservationEnabled = CVarShadingEnergyConservation.GetValueOnRenderThread() > 0;
+	const bool bIsEnergyPreservationEnabled = CVarShadingEnergyConservation_Preservation.GetValueOnRenderThread() > 0;	
+
+	// Build/bind table if energy conservation is enabled or if strata is enabled in order to have 
+	// the correct tables built & bound. Even if we are not using energy conservation, we want to 
+	// have access to directional albedo information for env. lighting for instance)
+	const bool bBindEnergyData = (View.ViewState != nullptr) && (bIsEnergyPreservationEnabled || bIsEnergyConservationEnabled || Strata::IsStrataEnabled() || View.Family->EngineShowFlags.PathTracing);
+	if (bBindEnergyData)
 	{
 		const EPixelFormat Format = CVarShadingFurnaceTest_TableFormat.GetValueOnRenderThread() > 0 ? PF_G32R32F : PF_G16R16F;
 		const bool bBuildTable = 
