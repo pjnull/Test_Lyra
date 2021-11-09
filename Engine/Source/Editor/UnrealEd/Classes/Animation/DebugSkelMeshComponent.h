@@ -97,7 +97,6 @@ public:
 	bool bDrawClothPaintPreview;
 
 	bool bFlipNormal;
-	bool bCullBackface;
 
 	int32 ClothingSimDataIndexWhenPainting;
 	TArray<uint32> ClothingSimIndices;
@@ -105,8 +104,6 @@ public:
 	TArray<float> ClothingVisiblePropertyValues;
 	float PropertyViewMin;
 	float PropertyViewMax;
-
-	float ClothMeshOpacity;
 
 	TArray<FVector3f> SkinnedPositions;
 	TArray<FVector3f> SkinnedNormals;

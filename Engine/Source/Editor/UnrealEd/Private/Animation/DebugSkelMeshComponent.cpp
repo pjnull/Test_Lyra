@@ -1212,12 +1212,6 @@ void FDebugSkelMeshSceneProxy::GetDynamicMeshElements(const TArray<const FSceneV
 				UMaterialInstanceDynamic* WireMID = GEngine->ClothPaintMaterialWireframeInstance;
 				check(WireMID);
 
-				SurfaceMID->SetScalarParameterValue(FName("ClothOpacity"), DynamicData->ClothMeshOpacity);
-				WireMID->SetScalarParameterValue(FName("ClothOpacity"), DynamicData->ClothMeshOpacity);
-
-				SurfaceMID->SetScalarParameterValue(FName("BackfaceCull"), DynamicData->bCullBackface ? 1.0f : 0.0f);
-				WireMID->SetScalarParameterValue(FName("BackfaceCull"), true);
-
 				FMaterialRenderProxy* MatProxySurface = SurfaceMID->GetRenderProxy();
 				FMaterialRenderProxy* MatProxyWireframe = WireMID->GetRenderProxy();
 
@@ -1243,11 +1237,9 @@ FDebugSkelMeshDynamicData::FDebugSkelMeshDynamicData(UDebugSkelMeshComponent* In
 	, bDrawBinormals(InComponent->bDrawBinormals)
 	, bDrawClothPaintPreview(InComponent->bShowClothData)
 	, bFlipNormal(InComponent->bClothFlipNormal)
-	, bCullBackface(InComponent->bClothCullBackface)
 	, ClothingSimDataIndexWhenPainting(INDEX_NONE)
 	, PropertyViewMin(InComponent->MinClothPropertyView)
 	, PropertyViewMax(InComponent->MaxClothPropertyView)
-	, ClothMeshOpacity(InComponent->ClothMeshOpacity)
 {
 	if(InComponent->SelectedClothingGuidForPainting.IsValid())
 	{
@@ -1285,6 +1277,19 @@ FDebugSkelMeshDynamicData::FDebugSkelMeshDynamicData(UDebugSkelMeshComponent* In
 				}
 			}
 		}
+	}
+
+	// Set material params at construction time (SetScalarParameterValue can't be called in render thread)
+	if (UMaterialInstanceDynamic* const SurfaceMID = GEngine->ClothPaintMaterialInstance)
+	{
+		SurfaceMID->SetScalarParameterValue(FName("ClothOpacity"), InComponent->ClothMeshOpacity);
+		SurfaceMID->SetScalarParameterValue(FName("BackfaceCull"), InComponent->bClothCullBackface ? 1.f : 0.f);
+	}
+
+	if (UMaterialInstanceDynamic* const WireMID = GEngine->ClothPaintMaterialWireframeInstance)
+	{
+		WireMID->SetScalarParameterValue(FName("ClothOpacity"), InComponent->ClothMeshOpacity);
+		WireMID->SetScalarParameterValue(FName("BackfaceCull"), 1.f);
 	}
 }
 
