@@ -7,12 +7,12 @@ using System.Collections.Generic;
 using System.Text;
 using System.Xml;
 
-namespace AutomationTool
+namespace EpicGames.BuildGraph
 {
 	/// <summary>
 	/// A task invocation
 	/// </summary>
-	public class TaskInfo
+	public class BgTask
 	{
 		/// <summary>
 		/// Line number in a source file that this task was declared. Optional; used for log messages.
@@ -36,7 +36,7 @@ namespace AutomationTool
 		/// <summary>
 		/// Constructor
 		/// </summary>
-		public TaskInfo(Tuple<string, int> SourceLocation, string Name)
+		public BgTask(Tuple<string, int> SourceLocation, string Name)
 		{
 			this.SourceLocation = SourceLocation;
 			this.Name = Name;

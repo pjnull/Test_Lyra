@@ -6,21 +6,20 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using UnrealBuildBase;
 
-namespace AutomationTool
+namespace EpicGames.BuildGraph
 {
 	/// <summary>
 	/// Exception class thrown due to type and syntax errors in condition expressions
 	/// </summary>
-	class ConditionException : Exception
+	class BgConditionException : Exception
 	{
 		/// <summary>
 		/// Constructor; formats the exception message with the given String.Format() style parameters.
 		/// </summary>
 		/// <param name="Format">Formatting string, in String.Format syntax</param>
 		/// <param name="Args">Optional arguments for the string</param>
-		public ConditionException(string Format, params object[] Args) : base(String.Format(Format, Args))
+		public BgConditionException(string Format, params object[] Args) : base(String.Format(Format, Args))
 		{
 		}
 	}
@@ -55,7 +54,7 @@ namespace AutomationTool
 	/// The type of each subexpression is always a scalar, which are converted to expression-specific types (eg. booleans, integers) as required.
 	/// Scalar values are case-insensitive strings. The identifier 'true' and the strings "true" and "True" are all identical scalars.
 	/// </summary>
-	static class Condition
+	public static class BgCondition
 	{
 		/// <summary>
 		/// Sentinel added to the end of a sequence of tokens.
@@ -68,7 +67,7 @@ namespace AutomationTool
 		/// <param name="Text">The condition text</param>
 		/// <param name="Context">Context for evaluating the expression</param>
 		/// <returns>The result of evaluating the condition</returns>
-		public static bool Evaluate(string Text, IScriptReaderContext Context)
+		public static bool Evaluate(string Text, IBgScriptReaderContext Context)
 		{
 			List<string> Tokens = new List<string>();
 			Tokenize(Text, Tokens);
@@ -80,7 +79,7 @@ namespace AutomationTool
 				string Result = EvaluateOr(Tokens, ref Idx, Context);
 				if(Tokens[Idx] != EndToken)
 				{
-					throw new ConditionException("Garbage after expression: {0}", String.Join("", Tokens.Skip(Idx)));
+					throw new BgConditionException("Garbage after expression: {0}", String.Join("", Tokens.Skip(Idx)));
 				}
 				bResult = CoerceToBool(Result);
 			}
@@ -94,7 +93,7 @@ namespace AutomationTool
 		/// <param name="Idx">Current position in the token stream. Will be incremented as tokens are consumed.</param>
 		/// <param name="Context">Context for evaluating the expression</param>
 		/// <returns>A scalar representing the result of evaluating the expression.</returns>
-		static string EvaluateOr(List<string> Tokens, ref int Idx, IScriptReaderContext Context)
+		static string EvaluateOr(List<string> Tokens, ref int Idx, IBgScriptReaderContext Context)
 		{
 			// <Condition> Or <Condition> Or...
 			string Result = EvaluateAnd(Tokens, ref Idx, Context);
@@ -116,7 +115,7 @@ namespace AutomationTool
 		/// <param name="Idx">Current position in the token stream. Will be incremented as tokens are consumed.</param>
 		/// <param name="Context">Context for evaluating the expression</param>
 		/// <returns>A scalar representing the result of evaluating the expression.</returns>
-		static string EvaluateAnd(List<string> Tokens, ref int Idx, IScriptReaderContext Context)
+		static string EvaluateAnd(List<string> Tokens, ref int Idx, IBgScriptReaderContext Context)
 		{
 			// <Condition> And <Condition> And...
 			string Result = EvaluateComparison(Tokens, ref Idx, Context);
@@ -138,7 +137,7 @@ namespace AutomationTool
 		/// <param name="Idx">Current position in the token stream. Will be incremented as tokens are consumed.</param>
 		/// <param name="Context">Context for evaluating the expression</param>
 		/// <returns>The result of evaluating the expression</returns>
-		static string EvaluateComparison(List<string> Tokens, ref int Idx, IScriptReaderContext Context)
+		static string EvaluateComparison(List<string> Tokens, ref int Idx, IBgScriptReaderContext Context)
 		{
 			// scalar
 			// scalar == scalar
@@ -213,7 +212,7 @@ namespace AutomationTool
 			// skip opening bracket
 			if (Tokens[Idx++] != "(")
 			{
-				throw new ConditionException("Expected '('");
+				throw new BgConditionException("Expected '('");
 			}
 
 			bool DidCloseBracket = false;
@@ -244,7 +243,7 @@ namespace AutomationTool
 
 			if (!DidCloseBracket)
 			{
-				throw new ConditionException("Expected ')'");
+				throw new BgConditionException("Expected ')'");
 			}
 
 			return Arguments;
@@ -257,7 +256,7 @@ namespace AutomationTool
 		/// <param name="Idx">Current position in the token stream. Will be incremented as tokens are consumed.</param>
 		/// <param name="Context">Context for evaluating the expression</param>
 		/// <returns>The result of evaluating the expression</returns>
-		static string EvaluateScalar(List<string> Tokens, ref int Idx, IScriptReaderContext Context)
+		static string EvaluateScalar(List<string> Tokens, ref int Idx, IBgScriptReaderContext Context)
 		{
 			string Result;
 			if(Tokens[Idx] == "(")
@@ -267,7 +266,7 @@ namespace AutomationTool
 				Result = EvaluateOr(Tokens, ref Idx, Context);
 				if(Tokens[Idx] != ")")
 				{
-					throw new ConditionException("Expected ')'");
+					throw new BgConditionException("Expected ')'");
 				}
 				Idx++;
 			}
@@ -300,7 +299,7 @@ namespace AutomationTool
 
 				if (Arguments.Count() != 2)
 				{
-					throw new ConditionException("Invalid argument count for 'Contains'. Expected (Haystack,Needle)");
+					throw new BgConditionException("Invalid argument count for 'Contains'. Expected (Haystack,Needle)");
 				}
 
 				Result = Contains(Arguments.ElementAt(0), Arguments.ElementAt(1)) ? "true" : "false";
@@ -313,7 +312,7 @@ namespace AutomationTool
 
 				if (Arguments.Count() != 3)
 				{
-					throw new ConditionException("Invalid argument count for 'ContainsItem'. Expected (Haystack,Needle,HaystackSeparator)");
+					throw new BgConditionException("Invalid argument count for 'ContainsItem'. Expected (Haystack,Needle,HaystackSeparator)");
 				}
 
 				Result = ContainsItem(Arguments.ElementAt(0), Arguments.ElementAt(1), Arguments.ElementAt(2)) ? "true" : "false";
@@ -334,7 +333,7 @@ namespace AutomationTool
 				}
 				else
 				{
-					throw new ConditionException("Token '{0}' is not a valid scalar", Token);
+					throw new BgConditionException("Token '{0}' is not a valid scalar", Token);
 				}
 			}
 			return Result;
@@ -396,7 +395,7 @@ namespace AutomationTool
 			}
 			else
 			{
-				throw new ConditionException("Token '{0}' cannot be coerced to a bool", Scalar);
+				throw new BgConditionException("Token '{0}' cannot be coerced to a bool", Scalar);
 			}
 			return Result;
 		}
@@ -411,7 +410,7 @@ namespace AutomationTool
 			int Value;
 			if(!Int32.TryParse(Scalar, out Value))
 			{
-				throw new ConditionException("Token '{0}' cannot be coerced to an integer", Scalar);
+				throw new BgConditionException("Token '{0}' cannot be coerced to an integer", Scalar);
 			}
 			return Value;
 		}

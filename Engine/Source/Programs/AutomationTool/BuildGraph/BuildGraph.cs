@@ -1,5 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
+using EpicGames.BuildGraph;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -22,7 +23,7 @@ namespace AutomationTool
 	/// <summary>
 	/// Implementation of ScriptTaskParameter corresponding to a field in a parameter class
 	/// </summary>
-	class ScriptTaskParameterBinding : ScriptTaskParameter
+	class ScriptTaskParameterBinding : BgScriptTaskParameter
 	{
 		/// <summary>
 		/// Field for this parameter
@@ -42,7 +43,7 @@ namespace AutomationTool
 	/// <summary>
 	/// Binding of a ScriptTask to a Script
 	/// </summary>
-	class ScriptTaskBinding : ScriptTask
+	class ScriptTaskBinding : BgScriptTask
 	{
 		/// <summary>
 		/// Type of the task to construct with this info
@@ -74,7 +75,7 @@ namespace AutomationTool
 		/// Private constructor
 		/// </summary>
 		private ScriptTaskBinding(string Name, Type TaskClass, Type ParametersClass, List<ScriptTaskParameterBinding> Parameters)
-			: base(Name, Parameters.ConvertAll<ScriptTaskParameter>(x => x))
+			: base(Name, Parameters.ConvertAll<BgScriptTaskParameter>(x => x))
 		{
 			this.TaskClass = TaskClass;
 			this.ParametersClass = ParametersClass;
@@ -100,9 +101,9 @@ namespace AutomationTool
 	}
 
 	/// <summary>
-	/// Implementation of <see cref="IScriptReaderContext"/> which reads files from disk
+	/// Implementation of <see cref="IBgScriptReaderContext"/> which reads files from disk
 	/// </summary>
-	class ScriptReaderFileContext : IScriptReaderContext
+	class ScriptReaderFileContext : IBgScriptReaderContext
 	{
 		/// <inheritdoc/>
 		public object GetNativePath(string Path)
@@ -359,10 +360,10 @@ namespace AutomationTool
 			}
 
 			// Import schema if one is passed in
-			ScriptSchema Schema;
+			BgScriptSchema Schema;
 			if (ImportSchemaFileName != null)
 			{
-				Schema = ScriptSchema.Import(FileReference.FromString(ImportSchemaFileName));
+				Schema = BgScriptSchema.Import(FileReference.FromString(ImportSchemaFileName));
 			}
 			else
 			{
@@ -374,7 +375,7 @@ namespace AutomationTool
 				PrimitiveTypes.Add((typeof(MCPPlatform), ScriptSchemaStandardType.BalancedString));
 
 				// Create a schema for the given tasks
-				Schema = new ScriptSchema(NameToTask.Values, PrimitiveTypes);
+				Schema = new BgScriptSchema(NameToTask.Values, PrimitiveTypes);
 				if (SchemaFileName != null)
 				{
 					FileReference FullSchemaFileName = new FileReference(SchemaFileName);
@@ -404,8 +405,8 @@ namespace AutomationTool
 			ScriptFileName = FullScriptFile.MakeRelativeTo(Unreal.RootDirectory).Replace('\\', '/');
 
 			// Read the script from disk
-			Graph Graph;
-			if(!ScriptReader.TryRead(Context, ScriptFileName, Arguments, DefaultProperties, PreprocessedFileName != null, Schema, Logger, out Graph, SingleNodeName))
+			BgScript Graph;
+			if(!BgScriptReader.TryRead(Context, ScriptFileName, Arguments, DefaultProperties, PreprocessedFileName != null, Schema, Logger, out Graph, SingleNodeName))
 			{
 				return ExitCode.Error_Unknown;
 			}
@@ -429,7 +430,7 @@ namespace AutomationTool
 			}
 
 			// Convert the supplied target references into nodes 
-			HashSet<Node> TargetNodes = new HashSet<Node>();
+			HashSet<BgNode> TargetNodes = new HashSet<BgNode>();
 			if(TargetNames.Length == 0)
 			{
 				if (!bListOnly && SingleNodeName == null)
@@ -456,7 +457,7 @@ namespace AutomationTool
 
 				foreach (string TargetName in NodesToResolve)
 				{
-					Node[] Nodes;
+					BgNode[] Nodes;
 					if(!Graph.TryResolveReference(TargetName, out Nodes))
 					{
 						LogError("Target '{0}' is not in graph", TargetName);
@@ -476,7 +477,7 @@ namespace AutomationTool
 				if (SingleNodeName == null)
 				{
 					CommandUtils.LogInformation("Required tokens:");
-					foreach(Node Node in TargetNodes)
+					foreach(BgNode Node in TargetNodes)
 					{
 						foreach(FileReference RequiredToken in Node.RequiredTokens)
 						{
@@ -509,13 +510,13 @@ namespace AutomationTool
 					if(bSkipTargetsWithoutTokens)
 					{
 						// Find all the nodes we're going to skip
-						HashSet<Node> SkipNodes = new HashSet<Node>();
+						HashSet<BgNode> SkipNodes = new HashSet<BgNode>();
 						foreach(IGrouping<string, FileReference> MissingTokensForBuild in MissingTokens.GroupBy(x => x.Value, x => x.Key))
 						{
 							LogInformation("Skipping the following nodes due to {0}:", MissingTokensForBuild.Key);
 							foreach(FileReference MissingToken in MissingTokensForBuild)
 							{
-								foreach(Node SkipNode in TargetNodes.Where(x => x.RequiredTokens.Contains(MissingToken) && SkipNodes.Add(x)))
+								foreach(BgNode SkipNode in TargetNodes.Where(x => x.RequiredTokens.Contains(MissingToken) && SkipNodes.Add(x)))
 								{
 									LogInformation("    {0}", SkipNode);
 								}
@@ -527,7 +528,7 @@ namespace AutomationTool
 						{
 							TargetNodes.ExceptWith(SkipNodes);
 							LogInformation("Remaining target nodes:");
-							foreach(Node TargetNode in TargetNodes)
+							foreach(BgNode TargetNode in TargetNodes)
 							{
 								LogInformation("    {0}", TargetNode);
 							}
@@ -541,7 +542,7 @@ namespace AutomationTool
 					{
 						foreach(KeyValuePair<FileReference, string> Pair in MissingTokens)
 						{
-							List<Node> SkipNodes = TargetNodes.Where(x => x.RequiredTokens.Contains(Pair.Key)).ToList();
+							List<BgNode> SkipNodes = TargetNodes.Where(x => x.RequiredTokens.Contains(Pair.Key)).ToList();
 							LogError("Cannot run {0} due to previous build: {1}", String.Join(", ", SkipNodes), Pair.Value);
 						}
 						foreach(FileReference CreatedToken in CreatedTokens)
@@ -559,7 +560,7 @@ namespace AutomationTool
 			// If a report for the whole build was requested, insert it into the graph
 			if (ReportName != null)
 			{
-				Report NewReport = new Report(ReportName);
+				BgReport NewReport = new BgReport(ReportName);
 				NewReport.Nodes.UnionWith(Graph.Agents.SelectMany(x => x.Nodes));
 				Graph.NameToReport.Add(ReportName, NewReport);
 			}
@@ -574,7 +575,7 @@ namespace AutomationTool
 			}
 
 			// If we're just building a single node, find it 
-			Node SingleNode = null;
+			BgNode SingleNode = null;
 			if(SingleNodeName != null && !Graph.NameToNode.TryGetValue(SingleNodeName, out SingleNode))
 			{
 				LogError("Node '{0}' is not in the trimmed graph", SingleNodeName);
@@ -584,14 +585,14 @@ namespace AutomationTool
 			// If we just want to show the contents of the graph, do so and exit.
 			if(bListOnly)
 			{ 
-				HashSet<Node> CompletedNodes = FindCompletedNodes(Graph, Storage);
+				HashSet<BgNode> CompletedNodes = FindCompletedNodes(Graph, Storage);
 				Graph.Print(CompletedNodes, PrintOptions, Log.Logger);
 			}
 
 			// Print out all the diagnostic messages which still apply, unless we're running a step as part of a build system or just listing the contents of the file. 
 			if(SingleNode == null && (!bListOnly || bShowDiagnostics))
 			{
-				foreach(GraphDiagnostic Diagnostic in Graph.Diagnostics)
+				foreach(BgScriptDiagnostic Diagnostic in Graph.Diagnostics)
 				{
 					if(Diagnostic.EventType == LogEventType.Console)
 					{
@@ -615,14 +616,14 @@ namespace AutomationTool
 			// Export the graph to a file
 			if(ExportFileName != null)
 			{
-				HashSet<Node> CompletedNodes = FindCompletedNodes(Graph, Storage);
+				HashSet<BgNode> CompletedNodes = FindCompletedNodes(Graph, Storage);
 				Graph.Print(CompletedNodes, PrintOptions, Log.Logger);
 				Graph.Export(new FileReference(ExportFileName), CompletedNodes);
 				return ExitCode.Success;
 			}
 
 			// Create tasks for the entire graph
-			Dictionary<TaskInfo, CustomTask> TaskInfoToTask = new Dictionary<TaskInfo, CustomTask>();
+			Dictionary<BgTask, CustomTask> TaskInfoToTask = new Dictionary<BgTask, CustomTask>();
 			if (bSkipValidation && SingleNode != null)
 			{
 				if (!CreateTaskInstances(Graph, SingleNode, NameToTask, TaskInfoToTask))
@@ -659,12 +660,12 @@ namespace AutomationTool
 			return ExitCode.Success;
 		}
 
-		bool CreateTaskInstances(Graph Graph, Dictionary<string, ScriptTaskBinding> NameToTask, Dictionary<TaskInfo, CustomTask> TaskInfoToTask)
+		bool CreateTaskInstances(BgScript Graph, Dictionary<string, ScriptTaskBinding> NameToTask, Dictionary<BgTask, CustomTask> TaskInfoToTask)
 		{
 			bool bResult = true;
-			foreach (Agent Agent in Graph.Agents)
+			foreach (BgAgent Agent in Graph.Agents)
 			{
-				foreach (Node Node in Agent.Nodes)
+				foreach (BgNode Node in Agent.Nodes)
 				{
 					bResult &= CreateTaskInstances(Graph, Node, NameToTask, TaskInfoToTask);
 				}
@@ -672,10 +673,10 @@ namespace AutomationTool
 			return bResult;
 		}
 
-		bool CreateTaskInstances(Graph Graph, Node Node, Dictionary<string, ScriptTaskBinding> NameToTask, Dictionary<TaskInfo, CustomTask> TaskInfoToTask)
+		bool CreateTaskInstances(BgScript Graph, BgNode Node, Dictionary<string, ScriptTaskBinding> NameToTask, Dictionary<BgTask, CustomTask> TaskInfoToTask)
 		{
 			bool bResult = true;
-			foreach (TaskInfo TaskInfo in Node.TaskInfos)
+			foreach (BgTask TaskInfo in Node.TaskInfos)
 			{
 				CustomTask Task = BindTask(Node, TaskInfo, NameToTask, Graph.TagNameToNodeOutput);
 				if (Task == null)
@@ -690,7 +691,7 @@ namespace AutomationTool
 			return bResult;
 		}
 
-		CustomTask BindTask(Node Node, TaskInfo TaskInfo, Dictionary<string, ScriptTaskBinding> NameToTask, IReadOnlyDictionary<string, NodeOutput> TagNameToNodeOutput)
+		CustomTask BindTask(BgNode Node, BgTask TaskInfo, Dictionary<string, ScriptTaskBinding> NameToTask, IReadOnlyDictionary<string, BgNodeOutput> TagNameToNodeOutput)
 		{
 			// Get the reflection info for this element
 			ScriptTaskBinding Task;
@@ -765,7 +766,7 @@ namespace AutomationTool
 			// Make sure all the read tags are local or listed as a dependency
 			foreach (string ReadTagName in NewTask.FindConsumedTagNames())
 			{
-				NodeOutput Output;
+				BgNodeOutput Output;
 				if (TagNameToNodeOutput.TryGetValue(ReadTagName, out Output))
 				{
 					if (Output != null && Output.ProducingNode != Node && !Node.Inputs.Contains(Output))
@@ -778,7 +779,7 @@ namespace AutomationTool
 			// Make sure all the written tags are local or listed as an output
 			foreach (string ModifiedTagName in NewTask.FindProducedTagNames())
 			{
-				NodeOutput Output;
+				BgNodeOutput Output;
 				if (TagNameToNodeOutput.TryGetValue(ModifiedTagName, out Output))
 				{
 					if (Output != null && !Node.Outputs.Contains(Output))
@@ -805,7 +806,7 @@ namespace AutomationTool
 			}
 			else if (ValueType == typeof(Boolean))
 			{
-				return Condition.Evaluate(ValueText, Context);
+				return BgCondition.Evaluate(ValueText, Context);
 			}
 			else if (ValueType == typeof(FileReference))
 			{
@@ -827,7 +828,7 @@ namespace AutomationTool
 			}
 		}
 
-		void OutputBindingError(TaskInfo Task, string Format, params object[] Args)
+		void OutputBindingError(BgTask Task, string Format, params object[] Args)
 		{
 			Logger.LogScriptError(Context.GetNativePath(Task.SourceLocation.Item1), Task.SourceLocation.Item2, Format, Args);
 		}
@@ -973,10 +974,10 @@ namespace AutomationTool
 		/// </summary>
 		/// <param name="Graph">The graph instance</param>
 		/// <param name="Storage">The temp storage backend which stores the shared state</param>
-		HashSet<Node> FindCompletedNodes(Graph Graph, TempStorage Storage)
+		HashSet<BgNode> FindCompletedNodes(BgScript Graph, TempStorage Storage)
 		{
-			HashSet<Node> CompletedNodes = new HashSet<Node>();
-			foreach(Node Node in Graph.Agents.SelectMany(x => x.Nodes))
+			HashSet<BgNode> CompletedNodes = new HashSet<BgNode>();
+			foreach(BgNode Node in Graph.Agents.SelectMany(x => x.Nodes))
 			{
 				if(Storage.IsComplete(Node.Name))
 				{
@@ -993,15 +994,15 @@ namespace AutomationTool
 		/// <param name="Graph">The graph instance</param>
 		/// <param name="Storage">The temp storage backend which stores the shared state</param>
 		/// <returns>True if everything built successfully</returns>
-		bool BuildAllNodes(JobContext Job, Graph Graph, Dictionary<TaskInfo, CustomTask> TaskInfoToTask, TempStorage Storage)
+		bool BuildAllNodes(JobContext Job, BgScript Graph, Dictionary<BgTask, CustomTask> TaskInfoToTask, TempStorage Storage)
 		{
 			// Build a flat list of nodes to execute, in order
-			Node[] NodesToExecute = Graph.Agents.SelectMany(x => x.Nodes).ToArray();
+			BgNode[] NodesToExecute = Graph.Agents.SelectMany(x => x.Nodes).ToArray();
 
 			// Check the integrity of any local nodes that have been completed. It's common to run formal builds locally between regular development builds, so we may have 
 			// stale local state. Rather than failing later, detect and clean them up now.
-			HashSet<Node> CleanedNodes = new HashSet<Node>();
-			foreach(Node NodeToExecute in NodesToExecute)
+			HashSet<BgNode> CleanedNodes = new HashSet<BgNode>();
+			foreach(BgNode NodeToExecute in NodesToExecute)
 			{
 				if(NodeToExecute.InputDependencies.Any(x => CleanedNodes.Contains(x)) || !Storage.CheckLocalIntegrity(NodeToExecute.Name, NodeToExecute.Outputs.Select(x => x.TagName)))
 				{
@@ -1012,7 +1013,7 @@ namespace AutomationTool
 
 			// Execute them in order
 			int NodeIdx = 0;
-			foreach(Node NodeToExecute in NodesToExecute)
+			foreach(BgNode NodeToExecute in NodesToExecute)
 			{
 				LogInformation("****** [{0}/{1}] {2}", ++NodeIdx, NodesToExecute.Length, NodeToExecute.Name);
 				if(!Storage.IsComplete(NodeToExecute.Name))
@@ -1038,7 +1039,7 @@ namespace AutomationTool
 		/// <param name="Storage">The temp storage backend which stores the shared state</param>
 		/// <param name="bWithBanner">Whether to write a banner before and after this node's log output</param>
 		/// <returns>True if the node built successfully, false otherwise.</returns>
-		bool BuildNode(JobContext Job, Graph Graph, Node Node, Dictionary<TaskInfo, CustomTask> TaskInfoToTask, TempStorage Storage, bool bWithBanner)
+		bool BuildNode(JobContext Job, BgScript Graph, BgNode Node, Dictionary<BgTask, CustomTask> TaskInfoToTask, TempStorage Storage, bool bWithBanner)
 		{
 			DirectoryReference RootDir = new DirectoryReference(CommandUtils.CmdEnv.LocalRoot);
 
@@ -1047,7 +1048,7 @@ namespace AutomationTool
 
 			// Read all the input tags for this node, and build a list of referenced input storage blocks
 			HashSet<TempStorageBlock> InputStorageBlocks = new HashSet<TempStorageBlock>();
-			foreach(NodeOutput Input in Node.Inputs)
+			foreach(BgNodeOutput Input in Node.Inputs)
 			{
 				TempStorageFileList FileList = Storage.ReadFileList(Input.ProducingNode.Name, Input.TagName);
 				TagNameToFileSet[Input.TagName] = FileList.ToFileSet(RootDir);
@@ -1084,7 +1085,7 @@ namespace AutomationTool
 			}
 
 			// Add placeholder outputs for the current node
-			foreach(NodeOutput Output in Node.Outputs)
+			foreach(BgNodeOutput Output in Node.Outputs)
 			{
 				TagNameToFileSet.Add(Output.TagName, new HashSet<FileReference>());
 			}
@@ -1122,14 +1123,14 @@ namespace AutomationTool
 
 			// Determine all the output files which are required to be copied to temp storage (because they're referenced by nodes in another agent)
 			HashSet<FileReference> ReferencedOutputFiles = new HashSet<FileReference>();
-			foreach(Agent Agent in Graph.Agents)
+			foreach(BgAgent Agent in Graph.Agents)
 			{
 				bool bSameAgent = Agent.Nodes.Contains(Node);
-				foreach(Node OtherNode in Agent.Nodes)
+				foreach(BgNode OtherNode in Agent.Nodes)
 				{
 					if(!bSameAgent)
 					{
-						foreach(NodeOutput Input in OtherNode.Inputs.Where(x => x.ProducingNode == Node))
+						foreach(BgNodeOutput Input in OtherNode.Inputs.Where(x => x.ProducingNode == Node))
 						{
 							ReferencedOutputFiles.UnionWith(TagNameToFileSet[Input.TagName]);
 						}
@@ -1139,7 +1140,7 @@ namespace AutomationTool
 
 			// Find a block name for all new outputs
 			Dictionary<FileReference, string> FileToOutputName = new Dictionary<FileReference, string>();
-			foreach(NodeOutput Output in Node.Outputs)
+			foreach(BgNodeOutput Output in Node.Outputs)
 			{
 				HashSet<FileReference> Files = TagNameToFileSet[Output.TagName]; 
 				foreach(FileReference File in Files)
@@ -1196,7 +1197,7 @@ namespace AutomationTool
 				}
 
 				// Publish all the output tags
-				foreach (NodeOutput Output in Node.Outputs)
+				foreach (BgNodeOutput Output in Node.Outputs)
 				{
 					HashSet<FileReference> Files = TagNameToFileSet[Output.TagName];
 
@@ -1226,7 +1227,7 @@ namespace AutomationTool
 		/// <param name="TaskInfoToTask">Map from TaskInfo to Task object</param>
 		/// <param name="TagNameToFileSet">Mapping from tag names to the set of files they include. Should be set to contain the node inputs on entry.</param>
 		/// <returns>Whether the task succeeded or not. Exiting with an exception will be caught and treated as a failure.</returns>
-		bool ExecuteTasks(Node Node, JobContext Job, Dictionary<TaskInfo, CustomTask> TaskInfoToTask, Dictionary<string, HashSet<FileReference>> TagNameToFileSet)
+		bool ExecuteTasks(BgNode Node, JobContext Job, Dictionary<BgTask, CustomTask> TaskInfoToTask, Dictionary<string, HashSet<FileReference>> TagNameToFileSet)
 		{
 			List<CustomTask> Tasks = Node.TaskInfos.ConvertAll(x => TaskInfoToTask[x]);
 

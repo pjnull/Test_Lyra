@@ -13,12 +13,12 @@ using System.Xml.Schema;
 using EpicGames.Core;
 using Microsoft.Extensions.Logging;
 
-namespace AutomationTool
+namespace EpicGames.BuildGraph
 {
 	/// <summary>
 	/// Implementation of XmlDocument which preserves line numbers for its elements
 	/// </summary>
-	class ScriptDocument : XmlDocument
+	class BgScriptDocument : XmlDocument
 	{
 		/// <summary>
 		/// The file being read
@@ -48,7 +48,7 @@ namespace AutomationTool
 		/// <summary>
 		/// Private constructor. Use ScriptDocument.Load to read an XML document.
 		/// </summary>
-		ScriptDocument(string InFile, object InNativeFile, ILogger InLogger)
+		BgScriptDocument(string InFile, object InNativeFile, ILogger InLogger)
 		{
 			File = InFile;
 			NativeFile = InNativeFile;
@@ -60,7 +60,7 @@ namespace AutomationTool
 		/// </summary>
 		public override XmlElement CreateElement(string Prefix, string LocalName, string NamespaceUri)
 		{
-			return new ScriptElement(File, NativeFile, LineInfo.LineNumber, Prefix, LocalName, NamespaceUri, this);
+			return new BgScriptElement(File, NativeFile, LineInfo.LineNumber, Prefix, LocalName, NamespaceUri, this);
 		}
 
 		/// <summary>
@@ -73,9 +73,9 @@ namespace AutomationTool
 		/// <param name="Logger">Logger for output messages</param>
 		/// <param name="OutDocument">If successful, the document that was read</param>
 		/// <returns>True if the document could be read, false otherwise</returns>
-		public static bool TryRead(string File, object NativeFile, byte[] Data, ScriptSchema Schema, ILogger Logger, out ScriptDocument OutDocument)
+		public static bool TryRead(string File, object NativeFile, byte[] Data, BgScriptSchema Schema, ILogger Logger, out BgScriptDocument OutDocument)
 		{
-			ScriptDocument Document = new ScriptDocument(File, NativeFile, Logger);
+			BgScriptDocument Document = new BgScriptDocument(File, NativeFile, Logger);
 
 			XmlReaderSettings Settings = new XmlReaderSettings();
 			Settings.Schemas.Add(Schema.CompiledSchema);
@@ -108,15 +108,15 @@ namespace AutomationTool
 				}
 
 				// Check that the root element is valid. If not, we didn't actually validate against the schema.
-				if (Document.DocumentElement.Name != ScriptSchema.RootElementName)
+				if (Document.DocumentElement.Name != BgScriptSchema.RootElementName)
 				{
-					Logger.LogScriptError(NativeFile, 1, "Script does not have a root element called '{ElementName}'", ScriptSchema.RootElementName);
+					Logger.LogScriptError(NativeFile, 1, "Script does not have a root element called '{ElementName}'", BgScriptSchema.RootElementName);
 					OutDocument = null;
 					return false;
 				}
-				if (Document.DocumentElement.NamespaceURI != ScriptSchema.NamespaceURI)
+				if (Document.DocumentElement.NamespaceURI != BgScriptSchema.NamespaceURI)
 				{
-					Logger.LogScriptError(NativeFile, 1, "Script root element is not in the '{Namespace}' namespace (add the xmlns=\"{NewNamespace}\" attribute)", ScriptSchema.NamespaceURI, ScriptSchema.NamespaceURI);
+					Logger.LogScriptError(NativeFile, 1, "Script root element is not in the '{Namespace}' namespace (add the xmlns=\"{NewNamespace}\" attribute)", BgScriptSchema.NamespaceURI, BgScriptSchema.NamespaceURI);
 					OutDocument = null;
 					return false;
 				}
@@ -148,7 +148,7 @@ namespace AutomationTool
 	/// <summary>
 	/// Implementation of XmlElement which preserves line numbers
 	/// </summary>
-	class ScriptElement : XmlElement
+	class BgScriptElement : XmlElement
 	{
 		/// <summary>
 		/// The file containing this element
@@ -168,7 +168,7 @@ namespace AutomationTool
 		/// <summary>
 		/// Constructor
 		/// </summary>
-		public ScriptElement(string File, object NativeFile, int LineNumber, string Prefix, string LocalName, string NamespaceUri, ScriptDocument Document)
+		public BgScriptElement(string File, object NativeFile, int LineNumber, string Prefix, string LocalName, string NamespaceUri, BgScriptDocument Document)
 			: base(Prefix, LocalName, NamespaceUri, Document)
 		{
 			this.File = File;
@@ -180,7 +180,7 @@ namespace AutomationTool
 	/// <summary>
 	/// Stores information about a script function that has been declared
 	/// </summary>
-	class ScriptMacro
+	class BgScriptMacro
 	{
 		/// <summary>
 		/// Name of the function
@@ -190,7 +190,7 @@ namespace AutomationTool
 		/// <summary>
 		/// Element where the function was declared
 		/// </summary>
-		public readonly ScriptElement Element;
+		public readonly BgScriptElement Element;
 
 		/// <summary>
 		/// The total number of arguments
@@ -214,7 +214,7 @@ namespace AutomationTool
 		/// <param name="Element">Element containing the function definition</param>
 		/// <param name="ArgumentNameToIndex">Map of argument name to index</param>
 		/// <param name="NumRequiredArguments">Number of arguments that are required. Indices 0 to NumRequiredArguments - 1 are required.</param>
-		public ScriptMacro(string Name, ScriptElement Element, Dictionary<string, int> ArgumentNameToIndex, int NumRequiredArguments)
+		public BgScriptMacro(string Name, BgScriptElement Element, Dictionary<string, int> ArgumentNameToIndex, int NumRequiredArguments)
 		{
 			this.Name = Name;
 			this.Element = Element;
@@ -224,7 +224,7 @@ namespace AutomationTool
 		}
 	}
 
-	interface IScriptReaderContext
+	public interface IBgScriptReaderContext
 	{
 		/// <summary>
 		/// Tests whether the given file or directory exists
@@ -252,7 +252,7 @@ namespace AutomationTool
 	/// <summary>
 	/// Extension methods for writing script error messages
 	/// </summary>
-	static class ScriptExtensions
+	public static class BgScriptExtensions
 	{
 		public static void LogScriptError(this ILogger Logger, object File, int LineNumber, string Format, params object[] Args)
 		{
@@ -276,17 +276,17 @@ namespace AutomationTool
 	/// <summary>
 	/// Reader for build graph definitions. Instanced to contain temporary state; public interface is through ScriptReader.TryRead().
 	/// </summary>
-	class ScriptReader
+	public class BgScriptReader
 	{
 		/// <summary>
 		/// Interface used for reading files
 		/// </summary>
-		IScriptReaderContext Context;
+		IBgScriptReaderContext Context;
 
 		/// <summary>
 		/// The current graph
 		/// </summary>
-		Graph Graph = new Graph();
+		BgScript Graph = new BgScript();
 
 		/// <summary>
 		/// List of property name to value lookups. Modifications to properties are scoped to nodes and agents. EnterScope() pushes an empty dictionary onto the end of this list, and LeaveScope() removes one. 
@@ -303,7 +303,7 @@ namespace AutomationTool
 		/// <summary>
 		/// Maps from a function name to its definition
 		/// </summary>
-		Dictionary<string, ScriptMacro> MacroNameToDefinition = new Dictionary<string, ScriptMacro>();
+		Dictionary<string, BgScriptMacro> MacroNameToDefinition = new Dictionary<string, BgScriptMacro>();
 
 		/// <summary>
 		/// Preprocess the file, but do not expand any values that are not portable (eg. paths on the local machine)
@@ -313,7 +313,7 @@ namespace AutomationTool
 		/// <summary>
 		/// Schema for the script
 		/// </summary>
-		ScriptSchema Schema;
+		BgScriptSchema Schema;
 
 		/// <summary>
 		/// Logger for diagnostic messages
@@ -338,7 +338,7 @@ namespace AutomationTool
 		/// <param name="bPreprocessOnly">Preprocess the file, but do not expand any values that are not portable (eg. paths on the local machine)</param>
 		/// <param name="Schema">Schema for the script</param>
 		/// <param name="Logger">Logger for diagnostic messages</param>
-		private ScriptReader(IScriptReaderContext Context, IDictionary<string, string> DefaultProperties, bool bPreprocessOnly, ScriptSchema Schema, ILogger Logger)
+		private BgScriptReader(IBgScriptReaderContext Context, IDictionary<string, string> DefaultProperties, bool bPreprocessOnly, BgScriptSchema Schema, ILogger Logger)
 		{
 			this.Context = Context;
 			this.bPreprocessOnly = bPreprocessOnly;
@@ -366,10 +366,10 @@ namespace AutomationTool
 		/// <param name="Graph">If successful, the graph constructed from the given script</param>
 		/// <param name="SingleNodeName">If a single node will be processed, the name of that node.</param>
 		/// <returns>True if the graph was read, false if there were errors</returns>
-		public static bool TryRead(IScriptReaderContext Context, string File, Dictionary<string, string> Arguments, Dictionary<string, string> DefaultProperties, bool bPreprocessOnly, ScriptSchema Schema, ILogger Logger, out Graph Graph, string SingleNodeName = null)
+		public static bool TryRead(IBgScriptReaderContext Context, string File, Dictionary<string, string> Arguments, Dictionary<string, string> DefaultProperties, bool bPreprocessOnly, BgScriptSchema Schema, ILogger Logger, out BgScript Graph, string SingleNodeName = null)
 		{
 			// Read the file and build the graph
-			ScriptReader Reader = new ScriptReader(Context, DefaultProperties, bPreprocessOnly, Schema, Logger);
+			BgScriptReader Reader = new BgScriptReader(Context, DefaultProperties, bPreprocessOnly, Schema, Logger);
 			if (!Reader.TryRead(File, Arguments, Logger, SingleNodeName) || Reader.NumErrors > 0)
 			{
 				Graph = null;
@@ -412,8 +412,8 @@ namespace AutomationTool
 			}
 
 			// Read the document and validate it against the schema
-			ScriptDocument Document;
-			if (!ScriptDocument.TryRead(File, Context.GetNativePath(File), Data, Schema, Logger, out Document))
+			BgScriptDocument Document;
+			if (!BgScriptDocument.TryRead(File, Context.GetNativePath(File), Data, Schema, Logger, out Document))
 			{
 				NumErrors++;
 				return false;
@@ -432,7 +432,7 @@ namespace AutomationTool
 		/// <param name="Arguments">Arguments passed in to the graph on the command line</param>
 		void ReadGraphBody(XmlElement Element, Dictionary<string, string> Arguments)
 		{
-			foreach (ScriptElement ChildElement in Element.ChildNodes.OfType<ScriptElement>())
+			foreach (BgScriptElement ChildElement in Element.ChildNodes.OfType<BgScriptElement>())
 			{
 				switch (ChildElement.Name)
 				{
@@ -542,7 +542,7 @@ namespace AutomationTool
 		/// <param name="Element">Element containing the property assignment. Used for error messages if the property is shadowed in another scope.</param>
 		/// <param name="Name">Name of the property</param>
 		/// <param name="Value">Value for the property</param>
-		void SetPropertyValue(ScriptElement Element, string Name, string Value)
+		void SetPropertyValue(BgScriptElement Element, string Name, string Value)
 		{
 			// Find the scope containing this property, defaulting to the current scope
 			int ScopeIdx = 0;
@@ -648,7 +648,7 @@ namespace AutomationTool
 		/// </summary>
 		/// <param name="Element">Xml element to read the definition from</param>
 		/// <param name="Arguments">Arguments passed in to the graph on the command line</param>
-		void ReadInclude(ScriptElement Element, Dictionary<string, string> Arguments)
+		void ReadInclude(BgScriptElement Element, Dictionary<string, string> Arguments)
 		{
 			if (EvaluateCondition(Element))
 			{
@@ -664,7 +664,7 @@ namespace AutomationTool
 		/// </summary>
 		/// <param name="Element">Xml element to read the definition from</param>
 		/// <param name="Arguments">Arguments passed in to the graph on the command line</param>
-		void ReadOption(ScriptElement Element, IDictionary<string, string> Arguments)
+		void ReadOption(BgScriptElement Element, IDictionary<string, string> Arguments)
 		{
 			if (EvaluateCondition(Element))
 			{
@@ -674,7 +674,7 @@ namespace AutomationTool
 					// Make sure we're at global scope
 					if(ScopedProperties.Count > 1)
 					{
-						throw new AutomationException("Incorrect scope depth for reading option settings");
+						throw new Exception("Incorrect scope depth for reading option settings");
 					}
 
 					// Check if the property already exists. If it does, we don't need to register it as an option.
@@ -693,7 +693,7 @@ namespace AutomationTool
 						// Create a new option object to store the settings
 						string Description = ReadAttribute(Element, "Description");
 						string DefaultValue = ReadAttribute(Element, "DefaultValue");
-						GraphOption Option = new GraphOption(Name, Description, DefaultValue);
+						BgScriptOption Option = new BgScriptOption(Name, Description, DefaultValue);
 						Graph.Options.Add(Option);
 
 						// Get the value of this property
@@ -727,7 +727,7 @@ namespace AutomationTool
 		/// Reads a property assignment.
 		/// </summary>
 		/// <param name="Element">Xml element to read the definition from</param>
-		void ReadProperty(ScriptElement Element)
+		void ReadProperty(BgScriptElement Element)
 		{
 			if (EvaluateCondition(Element))
 			{
@@ -762,7 +762,7 @@ namespace AutomationTool
 		/// Reads a Regex assignment.
 		/// </summary>
 		/// <param name="Element">Xml element to read the definition from</param>
-		void ReadRegex(ScriptElement Element)
+		void ReadRegex(BgScriptElement Element)
 		{
 			if (EvaluateCondition(Element))
 			{
@@ -790,7 +790,7 @@ namespace AutomationTool
 						string Input = ReadAttribute(Element, "Input");
 						Match Match = RegexValue.Match(Input);
 
-						bool Optional = Condition.Evaluate(ReadAttribute(Element, "Optional"), Context);
+						bool Optional = BgCondition.Evaluate(ReadAttribute(Element, "Optional"), Context);
 						if (!Match.Success)
 						{
 							if (!Optional)
@@ -815,7 +815,7 @@ namespace AutomationTool
 		/// Reads a property assignment from an environment variable.
 		/// </summary>
 		/// <param name="Element">Xml element to read the definition from</param>
-		void ReadEnvVar(ScriptElement Element)
+		void ReadEnvVar(BgScriptElement Element)
 		{
 			if (EvaluateCondition(Element))
 			{
@@ -832,14 +832,14 @@ namespace AutomationTool
 		/// Reads a macro definition
 		/// </summary>
 		/// <param name="Element">Xml element to read the definition from</param>
-		void ReadMacro(ScriptElement Element)
+		void ReadMacro(BgScriptElement Element)
 		{
 			if(EvaluateCondition(Element))
 			{
 				string Name = ReadAttribute(Element, "Name");
 				if (ValidateName(Element, Name))
 				{
-					ScriptMacro OriginalDefinition;
+					BgScriptMacro OriginalDefinition;
 					if(MacroNameToDefinition.TryGetValue(Name, out OriginalDefinition))
 					{
 						LogError(Element, "Function '{0}' has already been declared (see {1} line {2})", OriginalDefinition.Element.File, OriginalDefinition.Element.LineNumber);
@@ -852,7 +852,7 @@ namespace AutomationTool
 						int NumRequiredArguments = ArgumentNameToIndex.Count;
 						ReadMacroArguments(Element, "OptionalArguments", ArgumentNameToIndex);
 
-						MacroNameToDefinition.Add(Name, new ScriptMacro(Name, Element, ArgumentNameToIndex, NumRequiredArguments));
+						MacroNameToDefinition.Add(Name, new BgScriptMacro(Name, Element, ArgumentNameToIndex, NumRequiredArguments));
 					}
 				}
 			}
@@ -864,7 +864,7 @@ namespace AutomationTool
 		/// <param name="Element">The element containing the attributes</param>
 		/// <param name="AttributeName">Name of the attribute containing the arguments</param>
 		/// <param name="ArgumentNameToIndex">List of arguments to add to</param>
-		void ReadMacroArguments(ScriptElement Element, string AttributeName, Dictionary<string, int> ArgumentNameToIndex)
+		void ReadMacroArguments(BgScriptElement Element, string AttributeName, Dictionary<string, int> ArgumentNameToIndex)
 		{
 			string AttributeValue = ReadAttribute(Element, AttributeName);
 			if(AttributeValue != null)
@@ -888,7 +888,7 @@ namespace AutomationTool
 		/// </summary>
 		/// <param name="Element">Xml element to read the definition from</param>
 		/// <param name="Trigger">The controlling trigger for nodes in this agent</param>
-		void ReadAgent(ScriptElement Element)
+		void ReadAgent(BgScriptElement Element)
 		{
 			string Name;
 			if (EvaluateCondition(Element) && TryReadObjectName(Element, out Name))
@@ -897,7 +897,7 @@ namespace AutomationTool
 				string[] Types = ReadListAttribute(Element, "Type");
 
 				// Create the agent object, or continue an existing one
-				Agent Agent;
+				BgAgent Agent;
 				if (Graph.NameToAgent.TryGetValue(Name, out Agent))
 				{
 					if (Types.Length > 0 && Agent.PossibleTypes.Length > 0)
@@ -914,7 +914,7 @@ namespace AutomationTool
 					{
 						LogError(Element, "Missing type for agent '{0}'", Name);
 					}
-					Agent = new Agent(Name, Types);
+					Agent = new BgAgent(Name, Types);
 					Graph.NameToAgent.Add(Name, Agent);
 					Graph.Agents.Add(Agent);
 				}
@@ -929,10 +929,10 @@ namespace AutomationTool
 		/// </summary>
 		/// <param name="Element">Xml element to read the definition from</param>
 		/// <param name="ParentAgent">The agent to contain the definition</param>
-		void ReadAgentBody(ScriptElement Element, Agent ParentAgent)
+		void ReadAgentBody(BgScriptElement Element, BgAgent ParentAgent)
 		{
 			EnterScope();
-			foreach (ScriptElement ChildElement in Element.ChildNodes.OfType<ScriptElement>())
+			foreach (BgScriptElement ChildElement in Element.ChildNodes.OfType<BgScriptElement>())
 			{
 				switch (ChildElement.Name)
 				{
@@ -984,15 +984,15 @@ namespace AutomationTool
 		/// Reads the definition for an aggregate
 		/// </summary>
 		/// <param name="Element">Xml element to read the definition from</param>
-		void ReadAggregate(ScriptElement Element)
+		void ReadAggregate(BgScriptElement Element)
 		{
 			string Name;
 			if (EvaluateCondition(Element) && TryReadObjectName(Element, out Name) && CheckNameIsUnique(Element, Name))
 			{
 				string[] RequiredNames = ReadListAttribute(Element, "Requires");
 
-				Aggregate NewAggregate = new Aggregate(Name);
-				foreach (Node ReferencedNode in ResolveReferences(Element, RequiredNames))
+				BgAggregate NewAggregate = new BgAggregate(Name);
+				foreach (BgNode ReferencedNode in ResolveReferences(Element, RequiredNames))
 				{
 					NewAggregate.RequiredNodes.Add(ReferencedNode);
 				}
@@ -1001,21 +1001,21 @@ namespace AutomationTool
 				string LabelCategoryName = ReadAttribute(Element, "Label");
 				if (!String.IsNullOrEmpty(LabelCategoryName))
 				{
-					Label Label;
+					BgLabel Label;
 
 					// Create the label
 					int SlashIdx = LabelCategoryName.IndexOf('/');
 					if (SlashIdx != -1)
 					{
-						Label = new Label(LabelCategoryName.Substring(SlashIdx + 1), LabelCategoryName.Substring(0, SlashIdx), null, null, LabelChange.Current);
+						Label = new BgLabel(LabelCategoryName.Substring(SlashIdx + 1), LabelCategoryName.Substring(0, SlashIdx), null, null, BgLabelChange.Current);
 					}
 					else
 					{
-						Label = new Label(LabelCategoryName, "Other", null, null, LabelChange.Current);
+						Label = new BgLabel(LabelCategoryName, "Other", null, null, BgLabelChange.Current);
 					}
 
 					// Find all the included nodes
-					foreach (Node RequiredNode in NewAggregate.RequiredNodes)
+					foreach (BgNode RequiredNode in NewAggregate.RequiredNodes)
 					{
 						Label.RequiredNodes.Add(RequiredNode);
 						Label.IncludedNodes.Add(RequiredNode);
@@ -1023,14 +1023,14 @@ namespace AutomationTool
 					}
 
 					string[] IncludedNames = ReadListAttribute(Element, "Include");
-					foreach (Node IncludedNode in ResolveReferences(Element, IncludedNames))
+					foreach (BgNode IncludedNode in ResolveReferences(Element, IncludedNames))
 					{
 						Label.IncludedNodes.Add(IncludedNode);
 						Label.IncludedNodes.UnionWith(IncludedNode.OrderDependencies);
 					}
 
 					string[] ExcludedNames = ReadListAttribute(Element, "Exclude");
-					foreach (Node ExcludedNode in ResolveReferences(Element, ExcludedNames))
+					foreach (BgNode ExcludedNode in ResolveReferences(Element, ExcludedNames))
 					{
 						Label.IncludedNodes.Remove(ExcludedNode);
 						Label.IncludedNodes.ExceptWith(ExcludedNode.OrderDependencies);
@@ -1045,15 +1045,15 @@ namespace AutomationTool
 		/// Reads the definition for a report
 		/// </summary>
 		/// <param name="Element">Xml element to read the definition from</param>
-		void ReadReport(ScriptElement Element)
+		void ReadReport(BgScriptElement Element)
 		{
 			string Name;
 			if (EvaluateCondition(Element) && TryReadObjectName(Element, out Name) && CheckNameIsUnique(Element, Name))
 			{
 				string[] RequiredNames = ReadListAttribute(Element, "Requires");
 
-				Report NewReport = new Report(Name);
-				foreach (Node ReferencedNode in ResolveReferences(Element, RequiredNames))
+				BgReport NewReport = new BgReport(Name);
+				foreach (BgNode ReferencedNode in ResolveReferences(Element, RequiredNames))
 				{
 					NewReport.Nodes.Add(ReferencedNode);
 					NewReport.Nodes.UnionWith(ReferencedNode.OrderDependencies);
@@ -1066,7 +1066,7 @@ namespace AutomationTool
 		/// Reads the definition for a badge
 		/// </summary>
 		/// <param name="Element">Xml element to read the definition from</param>
-		void ReadBadge(ScriptElement Element)
+		void ReadBadge(BgScriptElement Element)
 		{
 			string Name;
 			if (EvaluateCondition(Element) && TryReadObjectName(Element, out Name))
@@ -1076,12 +1076,12 @@ namespace AutomationTool
 				string Project = ReadAttribute(Element, "Project");
 				int Change = ReadIntegerAttribute(Element, "Change", 0);
 
-				Badge NewBadge = new Badge(Name, Project, Change);
-				foreach (Node ReferencedNode in ResolveReferences(Element, RequiredNames))
+				BgBadge NewBadge = new BgBadge(Name, Project, Change);
+				foreach (BgNode ReferencedNode in ResolveReferences(Element, RequiredNames))
 				{
 					NewBadge.Nodes.Add(ReferencedNode);
 				}
-				foreach (Node ReferencedNode in ResolveReferences(Element, TargetNames))
+				foreach (BgNode ReferencedNode in ResolveReferences(Element, TargetNames))
 				{
 					NewBadge.Nodes.Add(ReferencedNode);
 					NewBadge.Nodes.UnionWith(ReferencedNode.OrderDependencies);
@@ -1094,7 +1094,7 @@ namespace AutomationTool
 		/// Reads the definition for a label
 		/// </summary>
 		/// <param name="Element">Xml element to read the definition from</param>
-		void ReadLabel(ScriptElement Element)
+		void ReadLabel(BgScriptElement Element)
 		{
 			if (EvaluateCondition(Element))
 			{
@@ -1113,21 +1113,21 @@ namespace AutomationTool
 				string UgsBadge = ReadAttribute(Element, "UgsBadge");
 				string UgsProject = ReadAttribute(Element, "UgsProject");
 
-				LabelChange Change = ReadEnumAttribute<LabelChange>(Element, "Change", LabelChange.Current);
+				BgLabelChange Change = ReadEnumAttribute<BgLabelChange>(Element, "Change", BgLabelChange.Current);
 
-				Label NewLabel = new Label(Name, Category, UgsBadge, UgsProject, Change);
-				foreach (Node ReferencedNode in ResolveReferences(Element, RequiredNames))
+				BgLabel NewLabel = new BgLabel(Name, Category, UgsBadge, UgsProject, Change);
+				foreach (BgNode ReferencedNode in ResolveReferences(Element, RequiredNames))
 				{
 					NewLabel.RequiredNodes.Add(ReferencedNode);
 					NewLabel.IncludedNodes.Add(ReferencedNode);
 					NewLabel.IncludedNodes.UnionWith(ReferencedNode.OrderDependencies);
 				}
-				foreach (Node IncludedNode in ResolveReferences(Element, IncludedNames))
+				foreach (BgNode IncludedNode in ResolveReferences(Element, IncludedNames))
 				{
 					NewLabel.IncludedNodes.Add(IncludedNode);
 					NewLabel.IncludedNodes.UnionWith(IncludedNode.OrderDependencies);
 				}
-				foreach (Node ExcludedNode in ResolveReferences(Element, ExcludedNames))
+				foreach (BgNode ExcludedNode in ResolveReferences(Element, ExcludedNames))
 				{
 					NewLabel.IncludedNodes.Remove(ExcludedNode);
 					NewLabel.IncludedNodes.ExceptWith(ExcludedNode.OrderDependencies);
@@ -1141,7 +1141,7 @@ namespace AutomationTool
 		/// </summary>
 		/// <param name="Element">Xml element to read the definition from</param>
 		/// <param name="ParentAgent">Agent for the node to be added to</param>
-		void ReadNode(ScriptElement Element, Agent ParentAgent)
+		void ReadNode(BgScriptElement Element, BgAgent ParentAgent)
 		{
 			string Name;
 			if (EvaluateCondition(Element) && TryReadObjectName(Element, out Name))
@@ -1154,11 +1154,11 @@ namespace AutomationTool
 				bool bNotifyOnWarnings = ReadBooleanAttribute(Element, "NotifyOnWarnings", true);
 
 				// Resolve all the inputs we depend on
-				HashSet<NodeOutput> Inputs = ResolveInputReferences(Element, RequiresNames);
+				HashSet<BgNodeOutput> Inputs = ResolveInputReferences(Element, RequiresNames);
 
 				// Gather up all the input dependencies, and check they're all upstream of the current node
-				HashSet<Node> InputDependencies = new HashSet<Node>();
-				foreach (Node InputDependency in Inputs.Select(x => x.ProducingNode).Distinct())
+				HashSet<BgNode> InputDependencies = new HashSet<BgNode>();
+				foreach (BgNode InputDependency in Inputs.Select(x => x.ProducingNode).Distinct())
 				{
 					InputDependencies.Add(InputDependency);
 				}
@@ -1167,7 +1167,7 @@ namespace AutomationTool
 				HashSet<FileReference> RequiredTokens = new HashSet<FileReference>(TokenFileNames.Select(x => new FileReference(x)));
 
 				// Recursively include all their dependencies too
-				foreach (Node InputDependency in InputDependencies.ToArray())
+				foreach (BgNode InputDependency in InputDependencies.ToArray())
 				{
 					RequiredTokens.UnionWith(InputDependency.RequiredTokens);
 					InputDependencies.UnionWith(InputDependency.InputDependencies);
@@ -1177,7 +1177,7 @@ namespace AutomationTool
 				List<string> ValidOutputNames = new List<string>();
 				foreach (string ProducesName in ProducesNames)
 				{
-					NodeOutput ExistingOutput;
+					BgNodeOutput ExistingOutput;
 					if(Graph.TagNameToNodeOutput.TryGetValue(ProducesName, out ExistingOutput))
 					{
 						LogError(Element, "Output tag '{0}' is already generated by node '{1}'", ProducesName, ExistingOutput.ProducingNode.Name);
@@ -1193,11 +1193,11 @@ namespace AutomationTool
 				}
 
 				// Gather up all the order dependencies
-				HashSet<Node> OrderDependencies = new HashSet<Node>(InputDependencies);
+				HashSet<BgNode> OrderDependencies = new HashSet<BgNode>(InputDependencies);
 				OrderDependencies.UnionWith(ResolveReferences(Element, AfterNames));
 
 				// Recursively include all their order dependencies too
-				foreach (Node OrderDependency in OrderDependencies.ToArray())
+				foreach (BgNode OrderDependency in OrderDependencies.ToArray())
 				{
 					OrderDependencies.UnionWith(OrderDependency.OrderDependencies);
 				}
@@ -1206,7 +1206,7 @@ namespace AutomationTool
 				int AgentIdx = Graph.Agents.IndexOf(ParentAgent);
 				for (int Idx = AgentIdx + 1; Idx < Graph.Agents.Count; Idx++)
 				{
-					foreach (Node Node in Graph.Agents[Idx].Nodes.Where(x => OrderDependencies.Contains(x)))
+					foreach (BgNode Node in Graph.Agents[Idx].Nodes.Where(x => OrderDependencies.Contains(x)))
 					{
 						LogError(Element, "Node '{0}' has a dependency on '{1}', which was declared after the initial definition of '{2}'.", Name, Node.Name, ParentAgent.Name);
 					}
@@ -1216,15 +1216,15 @@ namespace AutomationTool
 				if (CheckNameIsUnique(Element, Name))
 				{
 					// Add it to the node lookup
-					Node NewNode = new Node(Name, Inputs.ToArray(), ValidOutputNames.ToArray(), InputDependencies.ToArray(), OrderDependencies.ToArray(), RequiredTokens.ToArray());
+					BgNode NewNode = new BgNode(Name, Inputs.ToArray(), ValidOutputNames.ToArray(), InputDependencies.ToArray(), OrderDependencies.ToArray(), RequiredTokens.ToArray());
 					NewNode.bRunEarly = bRunEarly;
 					NewNode.bNotifyOnWarnings = bNotifyOnWarnings;
 					Graph.NameToNode.Add(Name, NewNode);
 
 					// Register all the output tags in the global name table.
-					foreach(NodeOutput Output in NewNode.Outputs)
+					foreach(BgNodeOutput Output in NewNode.Outputs)
 					{
-						NodeOutput ExistingOutput;
+						BgNodeOutput ExistingOutput;
 						if(Graph.TagNameToNodeOutput.TryGetValue(Output.TagName, out ExistingOutput))
 						{
 							LogError(Element, "Node '{0}' already has an output called '{1}'", ExistingOutput.ProducingNode.Name, Output.TagName);
@@ -1250,10 +1250,10 @@ namespace AutomationTool
 		/// <param name="Element">Xml element to read the definition from</param>
 		/// <param name="NewNode">The new node that has been created</param>
 		/// <param name="ParentAgent">Agent for the node to be added to</param>
-		void ReadNodeBody(XmlElement Element, Node NewNode, Agent ParentAgent)
+		void ReadNodeBody(XmlElement Element, BgNode NewNode, BgAgent ParentAgent)
 		{
 			EnterScope();
-			foreach (ScriptElement ChildElement in Element.ChildNodes.OfType<ScriptElement>())
+			foreach (BgScriptElement ChildElement in Element.ChildNodes.OfType<BgScriptElement>())
 			{
 				switch (ChildElement.Name)
 				{
@@ -1297,7 +1297,7 @@ namespace AutomationTool
 		/// </summary>
 		/// <param name="Element">Xml element to read the definition from</param>
 		/// <param name="ReadContents">Delegate to read the contents of the element, if the condition evaluates to true</param>
-		void ReadBlock(ScriptElement Element, Action<ScriptElement> ReadContents)
+		void ReadBlock(BgScriptElement Element, Action<BgScriptElement> ReadContents)
 		{
 			if (EvaluateCondition(Element))
 			{
@@ -1310,9 +1310,9 @@ namespace AutomationTool
 		/// </summary>
 		/// <param name="Element">Xml element to read the definition from</param>
 		/// <param name="ReadContents">Delegate to read the contents of the element, if the condition evaluates to true</param>
-		void ReadSwitch(ScriptElement Element, Action<ScriptElement> ReadContents)
+		void ReadSwitch(BgScriptElement Element, Action<BgScriptElement> ReadContents)
 		{
-			foreach (ScriptElement ChildElement in Element.ChildNodes.OfType<ScriptElement>())
+			foreach (BgScriptElement ChildElement in Element.ChildNodes.OfType<BgScriptElement>())
 			{
 				if (ChildElement.Name == "Default" || EvaluateCondition(ChildElement))
 				{
@@ -1327,7 +1327,7 @@ namespace AutomationTool
 		/// </summary>
 		/// <param name="Element">Xml element to read the definition from</param>
 		/// <param name="ReadContents">Delegate to read the contents of the element, if the condition evaluates to true</param>
-		void ReadForEach(ScriptElement Element, Action<ScriptElement> ReadContents)
+		void ReadForEach(BgScriptElement Element, Action<BgScriptElement> ReadContents)
 		{
 			EnterScope();
 			if(EvaluateCondition(Element))
@@ -1369,13 +1369,13 @@ namespace AutomationTool
 		/// </summary>
 		/// <param name="Element">Xml element to read the definition from</param>
 		/// <param name="ReadContents">Delegate to read the contents of the element, if the condition evaluates to true</param>
-		void ReadExpand(ScriptElement Element, Action<ScriptElement> ReadContents)
+		void ReadExpand(BgScriptElement Element, Action<BgScriptElement> ReadContents)
 		{
 			if(EvaluateCondition(Element))
 			{
 				string Name = ReadAttribute(Element, "Name");
 
-				ScriptMacro Macro;
+				BgScriptMacro Macro;
 				if(!MacroNameToDefinition.TryGetValue(Name, out Macro))
 				{
 					LogError(Element, "Macro '{0}' does not exist", Name);
@@ -1431,7 +1431,7 @@ namespace AutomationTool
 		/// </summary>
 		/// <param name="Element">Xml element to read the definition from</param>
 		/// <param name="ParentNode">The node which owns this task</param>
-		void ReadTask(ScriptElement Element, Node ParentNode)
+		void ReadTask(BgScriptElement Element, BgNode ParentNode)
 		{
 			// If we're running a single node and this element's parent isn't the single node to run, ignore the error and return.
 			if (!string.IsNullOrWhiteSpace(SingleNodeName) && ParentNode.Name != SingleNodeName)
@@ -1441,7 +1441,7 @@ namespace AutomationTool
 
 			if (EvaluateCondition(Element))
 			{
-				TaskInfo Info = new TaskInfo(Tuple.Create(Element.File, Element.LineNumber), Element.Name);
+				BgTask Info = new BgTask(Tuple.Create(Element.File, Element.LineNumber), Element.Name);
 				foreach (XmlAttribute Attribute in Element.Attributes)
 				{
 					if (String.Compare(Attribute.Name, "If", StringComparison.InvariantCultureIgnoreCase) != 0)
@@ -1458,7 +1458,7 @@ namespace AutomationTool
 		/// Reads the definition for an email notifier
 		/// </summary>
 		/// <param name="Element">Xml element to read the definition from</param>
-		void ReadNotifier(ScriptElement Element)
+		void ReadNotifier(BgScriptElement Element)
 		{
 			if (EvaluateCondition(Element))
 			{
@@ -1472,11 +1472,11 @@ namespace AutomationTool
 				bool bAbsolute = Element.HasAttribute("Absolute") ? ReadBooleanAttribute(Element, "Absolute", true) : false;
 
 				// Find the list of targets which are included, and recurse through all their dependencies
-				HashSet<Node> Nodes = new HashSet<Node>();
+				HashSet<BgNode> Nodes = new HashSet<BgNode>();
 				if (TargetNames != null)
 				{
-					HashSet<Node> TargetNodes = ResolveReferences(Element, TargetNames);
-					foreach (Node Node in TargetNodes)
+					HashSet<BgNode> TargetNodes = ResolveReferences(Element, TargetNames);
+					foreach (BgNode Node in TargetNodes)
 					{
 						Nodes.Add(Node);
 						Nodes.UnionWith(Node.InputDependencies);
@@ -1486,19 +1486,19 @@ namespace AutomationTool
 				// Add all the individually referenced nodes
 				if (IndividualNodeNames != null)
 				{
-					HashSet<Node> IndividualNodes = ResolveReferences(Element, IndividualNodeNames);
+					HashSet<BgNode> IndividualNodes = ResolveReferences(Element, IndividualNodeNames);
 					Nodes.UnionWith(IndividualNodes);
 				}
 
 				// Exclude all the exceptions
 				if (ExceptNames != null)
 				{
-					HashSet<Node> ExceptNodes = ResolveReferences(Element, ExceptNames);
+					HashSet<BgNode> ExceptNodes = ResolveReferences(Element, ExceptNames);
 					Nodes.ExceptWith(ExceptNodes);
 				}
 
 				// Update all the referenced nodes with the settings
-				foreach (Node Node in Nodes)
+				foreach (BgNode Node in Nodes)
 				{
 					if (Users != null)
 					{
@@ -1533,7 +1533,7 @@ namespace AutomationTool
 				{
 					foreach (string ReportName in ReportNames)
 					{
-						Report Report;
+						BgReport Report;
 						if (Graph.NameToReport.TryGetValue(ReportName, out Report))
 						{
 							Report.NotifyUsers.UnionWith(Users);
@@ -1554,13 +1554,13 @@ namespace AutomationTool
 		/// <param name="EventType">The diagnostic event type</param>
 		/// <param name="EnclosingNode">The node that this diagnostic is declared in, or null</param>
 		/// <param name="EnclosingAgent">The agent that this diagnostic is declared in, or null</param>
-		void ReadDiagnostic(ScriptElement Element, LogEventType EventType, Node EnclosingNode, Agent EnclosingAgent)
+		void ReadDiagnostic(BgScriptElement Element, LogEventType EventType, BgNode EnclosingNode, BgAgent EnclosingAgent)
 		{
 			if (EvaluateCondition(Element))
 			{
 				string Message = ReadAttribute(Element, "Message");
 
-				GraphDiagnostic Diagnostic = new GraphDiagnostic();
+				BgScriptDiagnostic Diagnostic = new BgScriptDiagnostic();
 				Diagnostic.EventType = EventType;
 				Diagnostic.Message = String.Format("{0}({1}): {2}", Element.File, Element.LineNumber, Message);
 				Diagnostic.EnclosingNode = EnclosingNode;
@@ -1575,7 +1575,7 @@ namespace AutomationTool
 		/// <param name="Element">Xml element to read from</param>
 		/// <param name="Name">Name of the alias</param>
 		/// <returns>True if the name was registered correctly, false otherwise.</returns>
-		bool CheckNameIsUnique(ScriptElement Element, string Name)
+		bool CheckNameIsUnique(BgScriptElement Element, string Name)
 		{
 			// Get the nodes that it maps to
 			if (Graph.ContainsName(Name))
@@ -1592,12 +1592,12 @@ namespace AutomationTool
 		/// <param name="Element">Element used to locate any errors</param>
 		/// <param name="ReferenceNames">Sequence of names to look up</param>
 		/// <returns>Hashset of all the nodes included by the given names</returns>
-		HashSet<Node> ResolveReferences(ScriptElement Element, IEnumerable<string> ReferenceNames)
+		HashSet<BgNode> ResolveReferences(BgScriptElement Element, IEnumerable<string> ReferenceNames)
 		{
-			HashSet<Node> Nodes = new HashSet<Node>();
+			HashSet<BgNode> Nodes = new HashSet<BgNode>();
 			foreach (string ReferenceName in ReferenceNames)
 			{
-				Node[] OtherNodes;
+				BgNode[] OtherNodes;
 				if (Graph.TryResolveReference(ReferenceName, out OtherNodes))
 				{
 					Nodes.UnionWith(OtherNodes);
@@ -1620,12 +1620,12 @@ namespace AutomationTool
 		/// <param name="Element">Element used to locate any errors</param>
 		/// <param name="ReferenceNames">Sequence of names to look up</param>
 		/// <returns>Set of all the nodes included by the given names</returns>
-		HashSet<NodeOutput> ResolveInputReferences(ScriptElement Element, IEnumerable<string> ReferenceNames)
+		HashSet<BgNodeOutput> ResolveInputReferences(BgScriptElement Element, IEnumerable<string> ReferenceNames)
 		{
-			HashSet<NodeOutput> Inputs = new HashSet<NodeOutput>();
+			HashSet<BgNodeOutput> Inputs = new HashSet<BgNodeOutput>();
 			foreach (string ReferenceName in ReferenceNames)
 			{
-				NodeOutput[] ReferenceInputs;
+				BgNodeOutput[] ReferenceInputs;
 				if (Graph.TryResolveInputReference(ReferenceName, out ReferenceInputs))
 				{
 					Inputs.UnionWith(ReferenceInputs);
@@ -1648,7 +1648,7 @@ namespace AutomationTool
 		/// <param name="Element">Element to read the name for</param>
 		/// <param name="Name">Output variable to receive the name of the object</param>
 		/// <returns>True if the object had a valid name (assigned to the Name variable), false if the name was invalid or missing.</returns>
-		bool TryReadObjectName(ScriptElement Element, out string Name)
+		bool TryReadObjectName(BgScriptElement Element, out string Name)
 		{
 			// Check the name attribute is present
 			if (!Element.HasAttribute("Name"))
@@ -1677,7 +1677,7 @@ namespace AutomationTool
 		/// <param name="Element">Element to read the name for</param>
 		/// <param name="QualifiedName">Output variable to receive the name of the object</param>
 		/// <returns>True if the object had a valid name (assigned to the Name variable), false if the name was invalid or missing.</returns>
-		bool TryReadQualifiedObjectName(ScriptElement Element, out string[] QualifiedName)
+		bool TryReadQualifiedObjectName(BgScriptElement Element, out string[] QualifiedName)
 		{
 			// Check the name attribute is present
 			if (!Element.HasAttribute("Name"))
@@ -1709,7 +1709,7 @@ namespace AutomationTool
 		/// <param name="Element">The element that contains the name</param>
 		/// <param name="Name">The name to check</param>
 		/// <returns>True if the name is valid</returns>
-		bool ValidateName(ScriptElement Element, string Name)
+		bool ValidateName(BgScriptElement Element, string Name)
 		{
 			// Check it's not empty
 			if (Name.Length == 0)
@@ -1726,7 +1726,7 @@ namespace AutomationTool
 					LogError(Element, "Consecutive spaces in object name - '{0}'", Name);
 					return false;
 				}
-				if(Char.IsControl(Name[Idx]) || ScriptSchema.IllegalNameCharacters.IndexOf(Name[Idx]) != -1)
+				if(Char.IsControl(Name[Idx]) || BgScriptSchema.IllegalNameCharacters.IndexOf(Name[Idx]) != -1)
 				{
 					LogError(Element, "Invalid character in object name - '{0}'", Name[Idx]);
 					return false;
@@ -1741,7 +1741,7 @@ namespace AutomationTool
 		/// <param name="Element">The element that contains the regex</param>
 		/// <param name="Regex">The pattern to construct</param>
 		/// <returns>The regex if is valid, otherwise null</returns>
-		Regex ParseRegex(ScriptElement Element, string Regex)
+		Regex ParseRegex(BgScriptElement Element, string Regex)
 		{
 			if(Regex.Length == 0)
 			{
@@ -1765,7 +1765,7 @@ namespace AutomationTool
 		/// <param name="Element">Element to read the attribute from</param>
 		/// <param name="Name">Name of the attribute</param>
 		/// <returns>Array of names, with all leading and trailing whitespace removed</returns>
-		string ReadAttribute(ScriptElement Element, string Name)
+		string ReadAttribute(BgScriptElement Element, string Name)
 		{
 			return ExpandProperties(Element, Element.GetAttribute(Name));
 		}
@@ -1777,7 +1777,7 @@ namespace AutomationTool
 		/// <param name="Name"></param>
 		/// <param name="Separator"></param>
 		/// <returns>Array of names, with all leading and trailing whitespace removed</returns>
-		string[] ReadListAttribute(ScriptElement Element, string Name, char Separator = ';')
+		string[] ReadListAttribute(BgScriptElement Element, string Name, char Separator = ';')
 		{
 			string Value = ReadAttribute(Element, Name);
 			return Value.Split(new char[] { Separator }).Select(x => x.Trim()).Where(x => x.Length > 0).ToArray();
@@ -1790,7 +1790,7 @@ namespace AutomationTool
 		/// <param name="Name">Name of the attribute</param>
 		/// <param name="bDefaultValue">Default value if the attribute is missing</param>
 		/// <returns>The value of the attribute field</returns>
-		bool ReadBooleanAttribute(ScriptElement Element, string Name, bool bDefaultValue)
+		bool ReadBooleanAttribute(BgScriptElement Element, string Name, bool bDefaultValue)
 		{
 			bool bResult = bDefaultValue;
 			if (Element.HasAttribute(Name))
@@ -1819,7 +1819,7 @@ namespace AutomationTool
 		/// <param name="Name">Name of the attribute</param>
 		/// <param name="DefaultValue">Default value for the integer, if the attribute is missing</param>
 		/// <returns>The value of the attribute field</returns>
-		int ReadIntegerAttribute(ScriptElement Element, string Name, int DefaultValue)
+		int ReadIntegerAttribute(BgScriptElement Element, string Name, int DefaultValue)
 		{
 			int Result = DefaultValue;
 			if (Element.HasAttribute(Name))
@@ -1847,7 +1847,7 @@ namespace AutomationTool
 		/// <param name="Name">Name of the attribute</param>
 		/// <param name="DefaultValue">Default value for the enum, if the attribute is missing</param>
 		/// <returns>The value of the attribute field</returns>
-		T ReadEnumAttribute<T>(ScriptElement Element, string Name, T DefaultValue) where T : struct
+		T ReadEnumAttribute<T>(BgScriptElement Element, string Name, T DefaultValue) where T : struct
 		{
 			T Result = DefaultValue;
 			if (Element.HasAttribute(Name))
@@ -1873,7 +1873,7 @@ namespace AutomationTool
 		/// <param name="Element">The script element causing the error</param>
 		/// <param name="Format">Standard String.Format()-style format string</param>
 		/// <param name="Args">Optional arguments</param>
-		void LogError(ScriptElement Element, string Format, params object[] Args)
+		void LogError(BgScriptElement Element, string Format, params object[] Args)
 		{
 			Logger.LogScriptError(Element.NativeFile, Element.LineNumber, Format, Args);
 			NumErrors++;
@@ -1885,7 +1885,7 @@ namespace AutomationTool
 		/// <param name="Element">The script element causing the error</param>
 		/// <param name="Format">Standard String.Format()-style format string</param>
 		/// <param name="Args">Optional arguments</param>
-		void LogWarning(ScriptElement Element, string Format, params object[] Args)
+		void LogWarning(BgScriptElement Element, string Format, params object[] Args)
 		{
 			Logger.LogScriptWarning(Element.NativeFile, Element.LineNumber, Format, Args);
 		}
@@ -1895,7 +1895,7 @@ namespace AutomationTool
 		/// </summary>
 		/// <param name="Element">The element to check</param>
 		/// <returns>True if the element's condition evaluates to true (or doesn't have a conditional expression), false otherwise</returns>
-		bool EvaluateCondition(ScriptElement Element)
+		bool EvaluateCondition(BgScriptElement Element)
 		{
 			// Check if the element has a conditional attribute
 			const string AttributeName = "If";
@@ -1908,9 +1908,9 @@ namespace AutomationTool
 			try
 			{
 				string Text = ExpandProperties(Element, Element.GetAttribute("If"));
-				return Condition.Evaluate(Text, Context);
+				return BgCondition.Evaluate(Text, Context);
 			}
-			catch (ConditionException Ex)
+			catch (BgConditionException Ex)
 			{
 				LogError(Element, "Error in condition: {0}", Ex.Message);
 				return false;
@@ -1923,7 +1923,7 @@ namespace AutomationTool
 		/// <param name="Element">The element containing the string. Used for diagnostic messages.</param>
 		/// <param name="Text">The input string to expand properties in</param>
 		/// <returns>The expanded string</returns>
-		string ExpandProperties(ScriptElement Element, string Text)
+		string ExpandProperties(BgScriptElement Element, string Text)
 		{
 			string Result = Text;
 			// Iterate in reverse order to handle cases where there are nested expansions like $(Outer$(Inner))

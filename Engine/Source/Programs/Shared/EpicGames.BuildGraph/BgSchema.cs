@@ -13,7 +13,7 @@ using System.Xml.Schema;
 using System.Xml.Serialization;
 using EpicGames.Core;
 
-namespace AutomationTool
+namespace EpicGames.BuildGraph
 {
 	/// <summary>
 	/// Specifies validation that should be performed on a task parameter.
@@ -40,7 +40,7 @@ namespace AutomationTool
 	/// Information about a parameter to a task
 	/// </summary>
 	[DebuggerDisplay("{Name}")]
-	class ScriptTaskParameter
+	public class BgScriptTaskParameter
 	{
 		/// <summary>
 		/// Name of this parameter
@@ -55,7 +55,7 @@ namespace AutomationTool
 		/// <summary>
 		/// The ICollection interface for this type
 		/// </summary>
-		internal Type CollectionType { get; }
+		public Type CollectionType { get; }
 
 		/// <summary>
 		/// Validation type for this field
@@ -70,7 +70,7 @@ namespace AutomationTool
 		/// <summary>
 		/// Constructor
 		/// </summary>
-		public ScriptTaskParameter(string InName, Type InValueType, TaskParameterValidationType InValidationType, bool bInOptional)
+		public BgScriptTaskParameter(string InName, Type InValueType, TaskParameterValidationType InValidationType, bool bInOptional)
 		{
 			Name = InName;
 			ValueType = InValueType;
@@ -105,7 +105,7 @@ namespace AutomationTool
 	/// Helper class to serialize a task from an xml element
 	/// </summary>
 	[DebuggerDisplay("{Name}")]
-	class ScriptTask
+	public class BgScriptTask
 	{
 		/// <summary>
 		/// Name of this task
@@ -115,24 +115,24 @@ namespace AutomationTool
 		/// <summary>
 		/// Parameters for this task
 		/// </summary>
-		public List<ScriptTaskParameter> Parameters { get; }
+		public List<BgScriptTaskParameter> Parameters { get; }
 
 		/// <summary>
 		/// Constructor
 		/// </summary>
 		/// <param name="Name">Name of the task</param>
 		/// <param name="Parameters">Parameters for the task</param>
-		public ScriptTask(string Name, List<ScriptTaskParameter> Parameters)
+		public BgScriptTask(string Name, List<BgScriptTaskParameter> Parameters)
 		{
 			this.Name = Name;
-			this.Parameters = new List<ScriptTaskParameter>(Parameters);
+			this.Parameters = new List<BgScriptTaskParameter>(Parameters);
 		}
 	}
 
 	/// <summary>
 	/// Enumeration of standard types used in the schema. Avoids hard-coding names.
 	/// </summary>
-	enum ScriptSchemaStandardType
+	public enum ScriptSchemaStandardType
 	{
 		Graph,
 		Agent,
@@ -171,7 +171,7 @@ namespace AutomationTool
 	/// <summary>
 	/// Schema for build graph definitions. Stores information about the supported tasks, and allows validating an XML document.
 	/// </summary>
-	class ScriptSchema
+	public class BgScriptSchema
 	{
 		/// <summary>
 		/// Name of the root element
@@ -248,7 +248,7 @@ namespace AutomationTool
 		/// </summary>
 		const string BalancedStringPattern = "[^\\$]*" + "(" + "(" + PropertyPattern + "|" + "\\$[^\\(]" + ")" + "[^\\$]*" + ")*" + "\\$?";
 
-		private ScriptSchema(XmlSchema Schema)
+		private BgScriptSchema(XmlSchema Schema)
 		{
 			CompiledSchema = Schema;
 		}
@@ -257,7 +257,7 @@ namespace AutomationTool
 		/// Constructor
 		/// </summary>
 		/// <param name="InNameToTask">Mapping of task name to information about how to construct it</param>
-		public ScriptSchema(IEnumerable<ScriptTask> Tasks, List<(Type, ScriptSchemaStandardType)> PrimitiveTypes)
+		public BgScriptSchema(IEnumerable<BgScriptTask> Tasks, List<(Type, ScriptSchemaStandardType)> PrimitiveTypes)
 		{
 			// Create a lookup from standard types to their qualified names
 			Dictionary<Type, XmlQualifiedName> TypeToSchemaTypeName = new Dictionary<Type,XmlQualifiedName>();
@@ -295,11 +295,11 @@ namespace AutomationTool
 
 				// Create all the task types
 				TaskNameToType = new Dictionary<string, XmlSchemaComplexType>();
-				foreach (ScriptTask Task in Tasks)
+				foreach (BgScriptTask Task in Tasks)
 				{
 					XmlSchemaComplexType TaskType = new XmlSchemaComplexType();
 					TaskType.Name = Task.Name + "TaskType";
-					foreach (ScriptTaskParameter Parameter in Task.Parameters)
+					foreach (BgScriptTaskParameter Parameter in Task.Parameters)
 					{
 						XmlQualifiedName SchemaTypeName = GetQualifiedTypeName(Parameter.ValidationType);
 						if (SchemaTypeName == null)
@@ -327,7 +327,7 @@ namespace AutomationTool
 			NewSchema.Items.Add(CreateReportType());
 			NewSchema.Items.Add(CreateBadgeType());
 			NewSchema.Items.Add(CreateLabelType());
-			NewSchema.Items.Add(CreateEnumType(GetTypeName(ScriptSchemaStandardType.LabelChange), typeof(LabelChange)));
+			NewSchema.Items.Add(CreateEnumType(GetTypeName(ScriptSchemaStandardType.LabelChange), typeof(BgLabelChange)));
 			NewSchema.Items.Add(CreateNotifyType());
 			NewSchema.Items.Add(CreateIncludeType());
 			NewSchema.Items.Add(CreateOptionType());
@@ -397,8 +397,8 @@ namespace AutomationTool
 		/// </summary>
 		/// <param name="File">The XML file to import</param>
 		/// <param name="NameToTask">Mapping of task name to information about how to construct it</param>
-		/// <returns>A <see cref="ScriptSchema"/> deserialized from the XML file, or null if file doesn't exist</returns>
-		public static ScriptSchema Import(FileReference File)
+		/// <returns>A <see cref="BgScriptSchema"/> deserialized from the XML file, or null if file doesn't exist</returns>
+		public static BgScriptSchema Import(FileReference File)
 		{
 			if (!FileReference.Exists(File))
 			{
@@ -407,7 +407,7 @@ namespace AutomationTool
 			
 			using (XmlReader SchemaFile = XmlReader.Create(File.FullName))
 			{
-				ScriptSchema ImportedSchema = new ScriptSchema(XmlSchema.Read(SchemaFile, ValidationCallback));
+				BgScriptSchema ImportedSchema = new BgScriptSchema(XmlSchema.Read(SchemaFile, ValidationCallback));
 				return ImportedSchema;
 			}
 		}
@@ -1079,7 +1079,7 @@ namespace AutomationTool
 			}
 			else
 			{
-				throw new AutomationException("Cannot create custom type in schema for '{0}'", Type.Name);
+				throw new Exception($"Cannot create custom type in schema for '{Type.Name}'");
 			}
 		}
 
