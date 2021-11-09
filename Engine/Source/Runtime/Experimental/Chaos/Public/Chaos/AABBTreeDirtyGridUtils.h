@@ -276,8 +276,8 @@ namespace Chaos
 		bool DxTooSmall = AbsDx <= SMALL_NUMBER;
 		bool DyTooSmall = AbsDy <= SMALL_NUMBER;
 
-		int DeltaCelIndexX;
-		int DeltaCelIndexY;
+		int64 DeltaCelIndexX;
+		int64 DeltaCelIndexY;
 		FReal DtDy = 0; // DeltaTime over DeltaX
 		FReal DtDx = 0;
 
@@ -343,7 +343,7 @@ namespace Chaos
 				}
 			}
 
-			for (int CurrentFillCellIndexY = CurrentCellIndexY1; CurrentFillCellIndexY * DeltaCelIndexY <= CurrentCellIndexY0 * DeltaCelIndexY; CurrentFillCellIndexY += DeltaCelIndexY)
+			for (int64 CurrentFillCellIndexY = CurrentCellIndexY1; CurrentFillCellIndexY * DeltaCelIndexY <= CurrentCellIndexY0 * DeltaCelIndexY; CurrentFillCellIndexY += DeltaCelIndexY)
 			{
 				InFunction((FReal)CurrentCellIndexX0 * DirtyElementGridCellSize, (FReal)CurrentFillCellIndexY * DirtyElementGridCellSize);
 			}
