@@ -960,7 +960,7 @@ UOptimusNode* UOptimusDeformer::ResolveNodePath(
 }
 
 
-void UOptimusDeformer::Notify(EOptimusGlobalNotifyType InNotifyType, UObject* InObject)
+void UOptimusDeformer::Notify(EOptimusGlobalNotifyType InNotifyType, UObject* InObject) const
 {
 	switch (InNotifyType)
 	{
@@ -983,7 +983,7 @@ void UOptimusDeformer::Notify(EOptimusGlobalNotifyType InNotifyType, UObject* In
 	case EOptimusGlobalNotifyType::VariableRemoved:
 	case EOptimusGlobalNotifyType::VariableIndexChanged:
 	case EOptimusGlobalNotifyType::VariableRenamed:
-	case EOptimusGlobalNotifyType::VariabelTypeChanged:
+	case EOptimusGlobalNotifyType::VariableTypeChanged:
 		checkSlow(Cast<UOptimusVariableDescription>(InObject) != nullptr);
 		break;
 	default:

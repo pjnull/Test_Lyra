@@ -4,9 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "Modules/ModuleInterface.h"
-#include "Framework/Commands/UICommandList.h"
-#include "Framework/MultiBox/MultiBoxExtender.h"
-#include "Toolkits/AssetEditorToolkit.h"
 #include "Modules/ModuleManager.h"
 
 
@@ -22,7 +19,7 @@ class OPTIMUSEDITOR_API IOptimusEditorModule
 //	, public IHasToolBarExtensibility
 {
 public:
-	static FORCEINLINE IOptimusEditorModule& Get()
+	static IOptimusEditorModule& Get()
 	{
 		return FModuleManager::LoadModuleChecked< IOptimusEditorModule >(TEXT("OptimusEditor"));
 	}
