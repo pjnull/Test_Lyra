@@ -1379,8 +1379,8 @@ FVector UChaosVehicleMovementComponent::LocateBoneOffset(const FName InBoneName,
 				const FVector BonePosition = Mesh->SkeletalMesh->GetComposedRefPoseMatrix(InBoneName).GetOrigin() * Mesh->GetRelativeScale3D();
 				//BonePosition is local for the root BONE of the skeletal mesh - however, we are using the Root BODY which may have its own transform, so we need to return the position local to the root BODY
 				FMatrix RootBodyMTX = FMatrix::Identity;
-				// Body Instance is no longer valid at this point in the code
-				if (Mesh->GetBodyInstance())
+
+				if (Mesh->GetBodyInstance() && Mesh->GetBodyInstance()->BodySetup.IsValid())
 				{
 					RootBodyMTX = Mesh->SkeletalMesh->GetComposedRefPoseMatrix(Mesh->GetBodyInstance()->BodySetup->BoneName);
 				}
