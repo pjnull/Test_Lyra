@@ -49,6 +49,7 @@
 #include "Exporters/FbxExportOption.h"
 #include "Engine/StaticMesh.h"
 #include "Sound/SoundWave.h"
+#include "Sound/SoundWaveProcedural.h"
 #include "Engine/StaticMeshActor.h"
 #include "Engine/BlueprintGeneratedClass.h"
 #include "Engine/Polys.h"
@@ -139,7 +140,10 @@ bool USoundExporterWAV::SupportsObject(UObject* Object) const
 	if (Super::SupportsObject(Object))
 	{
 		USoundWave* SoundWave = CastChecked<USoundWave>(Object);
-		bSupportsObject = (SoundWave->NumChannels <= 2);
+		if (!SoundWave->IsA<USoundWaveProcedural>())
+		{
+			bSupportsObject = (SoundWave->NumChannels <= 2);
+		}
 	}
 	return bSupportsObject;
 }
