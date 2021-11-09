@@ -225,5 +225,5 @@ private:
 	TSharedPtr<FRCPanelWidgetRegistry> WidgetRegistry;
 	
 	/** The toolkit that hosts this panel. */
-	TSharedPtr<IToolkitHost> ToolkitHost;
+	TWeakPtr<IToolkitHost> ToolkitHost;
 };
