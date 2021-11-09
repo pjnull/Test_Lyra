@@ -615,7 +615,6 @@ namespace Chaos
 		
 		return GJKPenetrationImpl<bNegativePenetrationAllowed, T>(AGetters, BGetters, BToATM, OutPenetration, OutClosestA, OutClosestB, OutNormal, OutClosestVertexIndexA, OutClosestVertexIndexB, InThicknessA, InThicknessB, InitialDir, Epsilon);
 	}
-
 	/** Sweeps one geometry against the other
 	 @A The first geometry
 	 @B The second geometry
