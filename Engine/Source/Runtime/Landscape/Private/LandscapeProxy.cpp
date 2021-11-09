@@ -57,26 +57,16 @@ TArray<FName> FGetLayersFromMaterialCache::ComputeLayersFromMaterial(const UMate
 
 	if (InMaterialInterface)
 	{
-		TArray<FMaterialParameterInfo> OutParameterInfo;
-		TArray<FGuid> Guids;
-		if (const UMaterialInstance* Instance = Cast<const UMaterialInstance>(InMaterialInterface))
+		// TODO - Probably should add landscape layers to FMaterialExpressionCachedData, as this code will not properly discover layer names introduced in material layers on an MI
+		if (const UMaterial* Material = InMaterialInterface->GetMaterial())
 		{
-			Instance->GetAllParameterInfo<UMaterialExpressionLandscapeLayerBlend>(OutParameterInfo, Guids);
-			Instance->GetAllParameterInfo<UMaterialExpressionLandscapeLayerWeight>(OutParameterInfo, Guids);
-			Instance->GetAllParameterInfo<UMaterialExpressionLandscapeLayerSwitch>(OutParameterInfo, Guids);
-			Instance->GetAllParameterInfo<UMaterialExpressionLandscapeLayerSample>(OutParameterInfo, Guids);
-		}
-		else if (const UMaterial* Material = InMaterialInterface->GetMaterial())
-		{
-			Material->GetAllParameterInfo<UMaterialExpressionLandscapeLayerBlend>(OutParameterInfo, Guids);
-			Material->GetAllParameterInfo<UMaterialExpressionLandscapeLayerWeight>(OutParameterInfo, Guids);
-			Material->GetAllParameterInfo<UMaterialExpressionLandscapeLayerSwitch>(OutParameterInfo, Guids);
-			Material->GetAllParameterInfo<UMaterialExpressionLandscapeLayerSample>(OutParameterInfo, Guids);
-		}
-
-		for (const FMaterialParameterInfo& ParameterInfo : OutParameterInfo)
-		{
-			Result.AddUnique(ParameterInfo.Name);
+			for (UMaterialExpression* Expression : Material->Expressions)
+			{
+				if (Expression)
+				{
+					Expression->GetLandscapeLayerNames(Result);
+				}
+			}
 		}
 	}
 

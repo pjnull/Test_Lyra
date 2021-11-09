@@ -762,11 +762,14 @@ public:
 	 * Builds a composited set of parameter names, including inherited and overridden values
 	 */
 	template<typename ExpressionType>
+	UE_DEPRECATED(5.0, "Use GetAllParameterInfoOfType or GetAllParametersOfType")
 	void GetAllParameterInfo(TArray<FMaterialParameterInfo>& OutParameterInfo, TArray<FGuid>& OutParameterIds) const
 	{
 		if (const UMaterial* Material = GetMaterial())
 		{
+			PRAGMA_DISABLE_DEPRECATION_WARNINGS
 			Material->GetAllParameterInfo<ExpressionType>(OutParameterInfo, OutParameterIds);
+			PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		}
 	}
 #endif // WITH_EDITORONLY_DATA

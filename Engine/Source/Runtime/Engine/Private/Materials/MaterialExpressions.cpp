@@ -7839,7 +7839,9 @@ void UMaterialExpressionVectorParameter::GetAllParameterInfo(TArray<FMaterialPar
 {
 	if (!bUseCustomPrimitiveData)
 	{
+		PRAGMA_DISABLE_DEPRECATION_WARNINGS
 		Super::GetAllParameterInfo(OutParameterInfo, OutParameterIds, InBaseParameterInfo);
+		PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	}
 }
 
@@ -8224,7 +8226,9 @@ void UMaterialExpressionScalarParameter::GetAllParameterInfo(TArray<FMaterialPar
 {
 	if (!bUseCustomPrimitiveData)
 	{
+		PRAGMA_DISABLE_DEPRECATION_WARNINGS
 		Super::GetAllParameterInfo(OutParameterInfo, OutParameterIds, InBaseParameterInfo);
+		PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	}
 }
 

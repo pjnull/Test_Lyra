@@ -6270,51 +6270,23 @@ bool ALandscapeStreamingProxy::IsValidLandscapeActor(ALandscape* Landscape)
 /* Returns the list of layer names relevant to mobile platforms. Walks the material tree following feature level switch nodes. */
 static void GetAllMobileRelevantLayerNames(TSet<FName>& OutLayerNames, UMaterial* InMaterial)
 {
-	TArray<FMaterialParameterInfo> ParameterInfos;
-	TArray<FGuid> ParameterIds;
+	TArray<FName> LayerNames;
 
 	TArray<UMaterialExpression*> ES31Expressions;
 	InMaterial->GetAllReferencedExpressions(ES31Expressions, nullptr, ERHIFeatureLevel::ES3_1);
 
 	TArray<UMaterialExpression*> MobileExpressions = MoveTemp(ES31Expressions);
-
 	for (UMaterialExpression* Expression : MobileExpressions)
 	{
-		UMaterialExpressionLandscapeLayerWeight* LayerWeightExpression = Cast<UMaterialExpressionLandscapeLayerWeight>(Expression);
-		UMaterialExpressionLandscapeLayerSwitch* LayerSwitchExpression = Cast<UMaterialExpressionLandscapeLayerSwitch>(Expression);
-		UMaterialExpressionLandscapeLayerSample* LayerSampleExpression = Cast<UMaterialExpressionLandscapeLayerSample>(Expression);
-		UMaterialExpressionLandscapeLayerBlend*	LayerBlendExpression = Cast<UMaterialExpressionLandscapeLayerBlend>(Expression);
-		UMaterialExpressionLandscapeVisibilityMask* VisibilityMaskExpression = Cast<UMaterialExpressionLandscapeVisibilityMask>(Expression);
-
-		FMaterialParameterInfo BaseParameterInfo;
-		BaseParameterInfo.Association = EMaterialParameterAssociation::GlobalParameter;
-		BaseParameterInfo.Index = INDEX_NONE;
-
-		if(LayerWeightExpression != nullptr)
+		if (Expression)
 		{
-			LayerWeightExpression->GetAllParameterInfo(ParameterInfos, ParameterIds, BaseParameterInfo);
-		}
-		if (LayerSwitchExpression != nullptr)
-		{
-			LayerSwitchExpression->GetAllParameterInfo(ParameterInfos, ParameterIds, BaseParameterInfo);
-		}
-		if (LayerSampleExpression != nullptr)
-		{
-			LayerSampleExpression->GetAllParameterInfo(ParameterInfos, ParameterIds, BaseParameterInfo);
-		}
-		if (LayerBlendExpression != nullptr)
-		{
-			LayerBlendExpression->GetAllParameterInfo(ParameterInfos, ParameterIds, BaseParameterInfo);
-		}
-		if (VisibilityMaskExpression != nullptr)
-		{
-			VisibilityMaskExpression->GetAllParameterInfo(ParameterInfos, ParameterIds, BaseParameterInfo);
+			Expression->GetLandscapeLayerNames(LayerNames);
 		}
 	}
 
-	for (FMaterialParameterInfo& Info : ParameterInfos)
+	for (const FName& Name : LayerNames)
 	{
-		OutLayerNames.Add(Info.Name);
+		OutLayerNames.Add(Name);
 	}
 }
 

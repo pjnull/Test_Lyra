@@ -1263,6 +1263,7 @@ public:
 	 * @return	Returns a array of parameter names used in this material for the specified expression type.
 	 */
 	template<typename ExpressionType>
+	UE_DEPRECATED(5.0, "Use GetAllParameterInfoOfType or GetAllParametersOfType")
 	void GetAllParameterInfo(TArray<FMaterialParameterInfo>& OutParameterInfo, TArray<FGuid>& OutParameterIds) const
 	{
 		for (const TObjectPtr<UMaterialExpression>& Expression : Expressions)
@@ -1275,13 +1276,17 @@ public:
 			// which are a top-level only parameter without having to deal with the below recursion
 			if (const ExpressionType* ParameterExpression = Cast<const ExpressionType>(Expression))
 			{
+				PRAGMA_DISABLE_DEPRECATION_WARNINGS
 				ParameterExpression->GetAllParameterInfo(OutParameterInfo, OutParameterIds, BaseParameterInfo);
+				PRAGMA_ENABLE_DEPRECATION_WARNINGS
 			}
 			else if (const UMaterialExpressionMaterialFunctionCall* FunctionExpression = Cast<const UMaterialExpressionMaterialFunctionCall>(Expression))
 			{
 				if (FunctionExpression->MaterialFunction)
 				{
+					PRAGMA_DISABLE_DEPRECATION_WARNINGS
 					FunctionExpression->MaterialFunction->GetAllParameterInfo<ExpressionType>(OutParameterInfo, OutParameterIds, BaseParameterInfo);
+					PRAGMA_ENABLE_DEPRECATION_WARNINGS
 				}
 			}
 			else if (const UMaterialExpressionMaterialAttributeLayers* LayersExpression = Cast<const UMaterialExpressionMaterialAttributeLayers>(Expression))
@@ -1295,7 +1300,9 @@ public:
 					{
 						BaseParameterInfo.Association = EMaterialParameterAssociation::LayerParameter;
 						BaseParameterInfo.Index = LayerIndex;
+						PRAGMA_DISABLE_DEPRECATION_WARNINGS
 						Layer->GetAllParameterInfo<ExpressionType>(OutParameterInfo, OutParameterIds, BaseParameterInfo);
+						PRAGMA_ENABLE_DEPRECATION_WARNINGS
 					}
 				}
 
@@ -1305,7 +1312,9 @@ public:
 					{
 						BaseParameterInfo.Association = EMaterialParameterAssociation::BlendParameter;
 						BaseParameterInfo.Index = BlendIndex;
+						PRAGMA_DISABLE_DEPRECATION_WARNINGS
 						Blend->GetAllParameterInfo<ExpressionType>(OutParameterInfo, OutParameterIds, BaseParameterInfo);
+						PRAGMA_ENABLE_DEPRECATION_WARNINGS
 					}
 				}
 			}
