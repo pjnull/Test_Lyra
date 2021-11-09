@@ -16,10 +16,12 @@ public class ImageWrapper : ModuleRules
 		PublicDefinitions.Add("WITH_UNREALJPEG=1");
 
 		PrivateDependencyModuleNames.Add("Core");
+		PublicDependencyModuleNames.Add("LibTiff");
 
 		AddEngineThirdPartyPrivateStaticDependencies(Target,
 			"zlib",
-			"UElibPNG"
+			"UElibPNG",
+			"LibTiff"
 		);
 
 		// Jpeg Decoding

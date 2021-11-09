@@ -40,8 +40,11 @@ enum class EImageFormat : int8
 	/** Truevision TGA / TARGA */
 	TGA,
 
-	/** Hdr file from radiance using RGBE*/
+	/** Hdr file from radiance using RGBE */
 	HDR,
+
+	/** Tag Image File Format files */
+	TIFF,
 };
 
 
