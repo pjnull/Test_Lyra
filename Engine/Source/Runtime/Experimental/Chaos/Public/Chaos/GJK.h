@@ -265,6 +265,8 @@ namespace Chaos
 			return B.SupportCore(VInB, B.GetMargin());
 		};
 
+		TFunctionRef<TVector<T, 3>(const TVec3<T>& V)> SupportAFuncRef(SupportAFunc);
+
 		// V and Simplex are in A-local space
 		TVec3<T> V = TVec3<T>(-1, 0, 0);
 		TVec3<T> Simplex[4];
@@ -352,10 +354,11 @@ namespace Chaos
 				const TVec3<T> SupportBLocal = B.SupportCore(VInB, B.GetMargin());
 				return BToATM.TransformPositionNoScale(SupportBLocal);
 			};
+			TFunctionRef<TVector<T, 3>(const TVec3<T>& V)> SupportBInAFuncRef(SupportBInAFunc);
 
 			T Penetration;
 			TVec3<T> MTD, ClosestA, ClosestBInA;
-			const EEPAResult EPAResult = EPA(VertsA, VertsB, SupportAFunc, SupportBInAFunc, Penetration, MTD, ClosestA, ClosestBInA);
+			const EEPAResult EPAResult = EPA(VertsA, VertsB, SupportAFuncRef, SupportBInAFuncRef, Penetration, MTD, ClosestA, ClosestBInA);
 
 			switch (EPAResult)
 			{
