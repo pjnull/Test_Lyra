@@ -4,6 +4,7 @@
 	WorldPartition.cpp: UWorldPartition implementation
 =============================================================================*/
 #include "WorldPartition/WorldPartition.h"
+#include "WorldPartition/WorldPartitionLog.h"
 #include "WorldPartition/WorldPartitionEditorCell.h"
 #include "WorldPartition/WorldPartitionRuntimeCell.h"
 #include "WorldPartition/WorldPartitionStreamingPolicy.h"
@@ -42,8 +43,6 @@
 #include "Modules/ModuleManager.h"
 #include "GameDelegates.h"
 #endif //WITH_EDITOR
-
-DEFINE_LOG_CATEGORY(LogWorldPartition);
 
 #define LOCTEXT_NAMESPACE "WorldPartition"
 
@@ -1244,20 +1243,6 @@ void UWorldPartition::DrawRuntimeHashPreview()
 	RuntimeHash->DrawPreview();
 }
 
-bool UWorldPartition::GenerateStreaming(TArray<FString>* OutPackagesToGenerate)
-{
-	check(!StreamingPolicy);
-	StreamingPolicy = NewObject<UWorldPartitionStreamingPolicy>(const_cast<UWorldPartition*>(this), WorldPartitionStreamingPolicyClass.Get());
-
-	check(RuntimeHash);
-	bool Result = RuntimeHash->GenerateStreaming(StreamingPolicy, OutPackagesToGenerate);
-
-	// Prepare actor to cell remapping
-	StreamingPolicy->PrepareActorToCellRemapping();
-
-	return Result;
-}
-
 bool UWorldPartition::PopulateGeneratedPackageForCook(UPackage* InPackage, const FString& InPackageRelativePath)
 {
 	check(RuntimeHash);
@@ -1303,11 +1288,6 @@ void UWorldPartition::SavePerUserSettings()
 
 		GetMutableDefault<UWorldPartitionEditorPerProjectUserSettings>()->SetEditorGridLoadedCells(GetWorld(), EditorGridLastLoadedCells);
 	}
-}
-
-void UWorldPartition::GenerateHLOD(ISourceControlHelper* SourceControlHelper, bool bCreateActorsOnly)
-{
-	RuntimeHash->GenerateHLOD(SourceControlHelper, bCreateActorsOnly);
 }
 
 void UWorldPartition::GenerateNavigationData(const FBox& LoadedBounds)

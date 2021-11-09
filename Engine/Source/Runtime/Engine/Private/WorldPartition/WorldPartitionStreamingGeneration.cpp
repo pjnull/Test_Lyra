@@ -1,0 +1,302 @@
+// Copyright Epic Games, Inc. All Rights Reserved.
+
+#include "WorldPartition/WorldPartition.h"
+
+#if WITH_EDITOR
+#include "Engine/World.h"
+#include "Engine/LevelScriptBlueprint.h"
+#include "ActorReferencesUtils.h"
+#include "WorldPartition/WorldPartitionRuntimeHash.h"
+#include "WorldPartition/WorldPartitionStreamingPolicy.h"
+#include "WorldPartition/WorldPartitionActorCluster.h"
+#include "WorldPartition/HLOD/HLODActor.h"
+#endif
+
+#define LOCTEXT_NAMESPACE "WorldPartition"
+
+#if WITH_EDITOR
+
+/*
+	Preparation Phase
+		Actor Descriptor Views Creation
+		Actor Descriptor Views Validation
+		Actor Clusters Creation
+
+	Generation Phase
+		Streaming Grids Generation
+		Data Layers Split Pass
+
+	Output Phase
+		Report Generation
+		SubLevels Generation
+		HLOD Generation
+*/
+
+class FWorldPartitionStreamingGenerator
+{
+	void CreateActorDescViewMap(const UActorDescContainer* InContainer, TMap<FGuid, FWorldPartitionActorDescView>& OutActorDescViewMap, uint64 InContainerID)
+	{
+		TMap<FGuid, FGuid> ContainerGuidsRemap;
+		for (FActorDescList::TConstIterator<> ActorDescIt(InContainer); ActorDescIt; ++ActorDescIt)
+		{
+			AActor* Actor = ActorDescIt->GetActor();
+
+			if (bIsPIE && IsValid(Actor) && Actor->GetPackage()->IsDirty())
+			{
+				// Dirty, unsaved actor for PIE
+				check(!InContainerID);
+				FWorldPartitionActorDesc* ActorDesc = RuntimeHash->ModifiedActorDescListForPIE.AddActor(Actor);
+				ActorDesc->OnRegister(Actor->GetWorld());
+				OutActorDescViewMap.Emplace(ActorDescIt->GetGuid(), ActorDesc);
+			}
+			else
+			{
+				// Non-dirty actor
+				OutActorDescViewMap.Emplace(ActorDescIt->GetGuid(), *ActorDescIt);
+			}
+		}
+
+		// Append new unsaved actors for the persistent level
+		if (bIsPIE && !InContainerID)
+		{
+			for (AActor* Actor : InContainer->GetWorld()->PersistentLevel->Actors)
+			{
+				if (IsValid(Actor) && Actor->IsPackageExternal() && Actor->IsMainPackageActor() &&!InContainer->GetActorDesc(Actor->GetActorGuid()))
+				{
+					FWorldPartitionActorDesc* ActorDesc = RuntimeHash->ModifiedActorDescListForPIE.AddActor(Actor);
+					ActorDesc->OnRegister(Actor->GetWorld());
+					OutActorDescViewMap.Emplace(ActorDesc->GetGuid(), ActorDesc);
+				}
+			}
+		}
+	}
+
+	void CreateActorDescriptorViewsRecursive(const UActorDescContainer* InContainer, const FTransform& InTransform, const TSet<FName>& InDataLayers, uint64 InContainerID, uint64 InParentContainerID, EContainerClusterMode InClusterMode)
+	{
+		TSet<FGuid> ChildContainers;
+		TMap<FGuid, FWorldPartitionActorDescView> ActorDescViewMap;
+		
+		// Gather actor descriptor views for this container
+		CreateActorDescViewMap(InContainer, ActorDescViewMap, InContainerID);		
+
+		// Maintain containers hierarchy
+		ContainersHierarchy.Add(InContainerID, InParentContainerID);
+
+		// Parse actor descriptors
+		for (auto It = ActorDescViewMap.CreateIterator(); It; ++It)
+		{
+			FWorldPartitionActorDescView& ActorDescView = It.Value();
+
+			const UActorDescContainer* SubContainer;
+			EContainerClusterMode SubClusterMode;
+			FTransform SubTransform;
+			if (ActorDescView.GetContainerInstance(SubContainer, SubTransform, SubClusterMode))
+			{
+				check(SubContainer);
+
+				// idea: here we could check InClusterMode and set the actor desc view as editor only instead?
+				ChildContainers.Add(ActorDescView.GetGuid());
+
+				const FGuid ActorGuid = ActorDescView.GetGuid();
+				const uint64 SubContainerID = CityHash64WithSeed((const char*)&ActorGuid, sizeof(ActorGuid), InContainerID);
+
+				// Only propagate data layers from the root container as we don't support sub containers to set their own
+				const TSet<FName>* SubDataLayers = &InDataLayers;
+				TSet<FName> ParentDataLayers;
+
+				if (!InContainerID)
+				{
+					ParentDataLayers.Append(ActorDescView.GetDataLayers());
+					SubDataLayers = &ParentDataLayers;
+				}
+
+				CreateActorDescriptorViewsRecursive(SubContainer, SubTransform * InTransform, *SubDataLayers, SubContainerID, InContainerID, SubClusterMode);
+			}
+
+			if (InContainerID)
+			{
+				ActorDescView.SetContainerID(InContainerID);
+			}
+		}
+
+		// Create container descriptor
+		FContainerDescriptor& ContainerDescriptor = ContainerDescriptorsMap.Add(InContainerID);
+		ContainerDescriptor.Container = InContainer;
+		ContainerDescriptor.Transform = InTransform;
+		ContainerDescriptor.ClusterMode = InClusterMode;
+		ContainerDescriptor.ActorDescViewMap = MoveTemp(ActorDescViewMap);
+		ContainerDescriptor.ChildContainers = MoveTemp(ChildContainers);
+		ContainerDescriptor.DataLayers = InDataLayers;		
+	}
+
+	void CreateActorDescriptorViews(const UActorDescContainer* InContainer)
+	{
+		CreateActorDescriptorViewsRecursive(InContainer, FTransform::Identity, TSet<FName>(), 0, 0, EContainerClusterMode::Partitioned);
+	}
+
+	void ValidateActorDescriptorViews()
+	{
+		for (auto It = ContainerDescriptorsMap.CreateIterator(); It; ++It)
+		{
+			uint64 ContainerID = It.Key();
+			FContainerDescriptor& ContainerDescriptor = It.Value();
+
+			if (!ContainerID)
+			{
+				// Gather all references to external actors from the level script and make them always loaded
+				if (ULevelScriptBlueprint* LevelScriptBlueprint = ContainerDescriptor.Container->GetWorld()->PersistentLevel->GetLevelScriptBlueprint(true))
+				{
+					TArray<AActor*> LevelScriptExternalActorReferences = ActorsReferencesUtils::GetExternalActorReferences(LevelScriptBlueprint);
+
+					for (AActor* Actor : LevelScriptExternalActorReferences)
+					{
+						if (FWorldPartitionActorDescView* ActorDescView = ContainerDescriptor.ActorDescViewMap.Find(Actor->GetActorGuid()))
+						{
+							ActorDescView->SetGridPlacement(EActorGridPlacement::AlwaysLoaded);
+						}
+					}
+				}
+			}
+
+			// Give the associated runtime hash to adjust the grid placement based on its internal settings, etc.
+			RuntimeHash->UpdateActorDescViewMap(ContainerDescriptor.ActorDescViewMap);
+		}
+	}
+
+	void UpdateContainerDescriptors()
+	{
+		for (auto ContainerIt = ContainerDescriptorsMap.CreateIterator(); ContainerIt; ++ContainerIt)
+		{
+			uint64 ContainerID = ContainerIt.Key();
+			FContainerDescriptor& ContainerDescriptor = ContainerIt.Value();
+
+			for (auto ActorDescIt = ContainerDescriptor.ActorDescViewMap.CreateConstIterator(); ActorDescIt; ++ActorDescIt)
+			{
+				const FWorldPartitionActorDescView& ActorDescView = ActorDescIt.Value();
+
+				uint64 CurrentContainerID = ActorDescView.GetContainerID();
+				FContainerDescriptor* CurrentContainerDescriptor = &ContainerDescriptor;
+
+				FBox ActorDescBounds(ForceInit);
+				switch (ActorDescView.GetGridPlacement())
+				{
+					case EActorGridPlacement::Location: ActorDescBounds += ContainerDescriptor.Transform.TransformPosition(ActorDescView.GetOrigin()); break;
+					case EActorGridPlacement::Bounds: ActorDescBounds += ActorDescView.GetBounds().TransformBy(ContainerDescriptor.Transform); break;
+				}
+
+				for(;;)
+				{
+					switch (ActorDescView.GetGridPlacement())
+					{
+						case EActorGridPlacement::Location: CurrentContainerDescriptor->Bounds += ActorDescBounds; break;
+						case EActorGridPlacement::Bounds: CurrentContainerDescriptor->Bounds += ActorDescBounds; break;
+					}
+
+					if (!CurrentContainerID)
+					{
+						break;
+					}
+
+					CurrentContainerID = ContainersHierarchy.FindChecked(CurrentContainerID);
+					CurrentContainerDescriptor = &ContainerDescriptorsMap.FindChecked(CurrentContainerID);
+				}
+			}
+		}
+	}
+
+public:
+	FWorldPartitionStreamingGenerator(bool bInIsPIE, UWorldPartitionRuntimeHash* InRuntimeHash)
+	: bIsPIE(bInIsPIE)
+	, RuntimeHash(InRuntimeHash)
+	{}
+
+	void PreparationPhase(UWorldPartition* WorldPartition)
+	{
+		// Preparation Phase :: Actor Descriptor Views Creation
+		CreateActorDescriptorViews(WorldPartition);
+
+		// Preparation Phase :: Actor Descriptor Views Validation
+		ValidateActorDescriptorViews();
+
+		// Update container descriptors
+		UpdateContainerDescriptors();
+	}
+
+	FActorClusterContext CreateActorClusters(FActorClusterContext::FFilterActorDescViewFunc InFilterActorDescViewFunc = nullptr)
+	{
+		TArray<FActorContainerInstance> ContainerInstances;
+		ContainerInstances.Reserve(ContainerDescriptorsMap.Num());
+
+		for (auto It = ContainerDescriptorsMap.CreateConstIterator(); It; ++It)
+		{
+			const uint64& ContainerID = It.Key();
+			const FContainerDescriptor& ContainerDescriptor = It.Value();
+
+			ContainerInstances.Emplace(ContainerID, ContainerDescriptor.Transform, ContainerDescriptor.Bounds, ContainerDescriptor.DataLayers, ContainerDescriptor.ClusterMode, ContainerDescriptor.Container, ContainerDescriptor.ChildContainers, ContainerDescriptor.ActorDescViewMap);
+		}
+
+		return FActorClusterContext(MoveTemp(ContainerInstances), InFilterActorDescViewFunc);
+	}
+
+private:
+	bool bIsPIE;
+	UWorldPartitionRuntimeHash* RuntimeHash;
+
+	struct FContainerDescriptor
+	{
+		FContainerDescriptor()
+		: Bounds(ForceInit)
+		, Container(nullptr)
+		{}
+
+		FBox Bounds;
+		FTransform Transform;		
+		const UActorDescContainer* Container;
+		EContainerClusterMode ClusterMode;
+		TMap<FGuid, FWorldPartitionActorDescView> ActorDescViewMap;
+		TSet<FGuid> ChildContainers;
+		TSet<FName> DataLayers;
+	};
+
+	/** Maps containers IDs to their container descriptor */
+	TMap<uint64, FContainerDescriptor> ContainerDescriptorsMap;
+
+	/** Maps containers IDs to their parent ID */
+	TMap<uint64, uint64> ContainersHierarchy;
+};
+
+bool UWorldPartition::GenerateStreaming(TArray<FString>* OutPackagesToGenerate)
+{
+	FWorldPartitionStreamingGenerator StreamingGenerator(bIsPIE, RuntimeHash);
+	StreamingGenerator.PreparationPhase(this);
+
+	// Preparation Phase :: Actor Clusters Creation
+	FActorClusterContext ActorClusterContext = StreamingGenerator.CreateActorClusters();
+
+	// Generate streaming
+	check(!StreamingPolicy);
+	StreamingPolicy = NewObject<UWorldPartitionStreamingPolicy>(const_cast<UWorldPartition*>(this), WorldPartitionStreamingPolicyClass.Get());
+
+	check(RuntimeHash);
+	bool Result = RuntimeHash->GenerateStreaming(StreamingPolicy, ActorClusterContext, OutPackagesToGenerate);
+
+	return Result;
+}
+
+void UWorldPartition::GenerateHLOD(ISourceControlHelper* SourceControlHelper, bool bCreateActorsOnly)
+{
+	FWorldPartitionStreamingGenerator StreamingGenerator(bIsPIE, RuntimeHash);
+	StreamingGenerator.PreparationPhase(this);
+
+	// Preparation Phase :: Actor Clusters Creation
+	FActorClusterContext ActorClusterContext = StreamingGenerator.CreateActorClusters([](const FWorldPartitionActorDescView& ActorDescView)
+	{
+		return !ActorDescView.GetActorClass()->IsChildOf<AWorldPartitionHLOD>();
+	});
+
+	RuntimeHash->GenerateHLOD(SourceControlHelper, ActorClusterContext, bCreateActorsOnly);
+}
+
+#endif // WITH_EDITOR
+
+#undef LOCTEXT_NAMESPACE

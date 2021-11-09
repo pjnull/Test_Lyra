@@ -7,6 +7,7 @@
 #include "Misc/CoreDelegates.h"
 #include "GameFramework/Actor.h"
 #include "Templates/SubclassOf.h"
+#include "WorldPartition/WorldPartitionLog.h"
 #include "WorldPartition/WorldPartitionActorDesc.h"
 #include "WorldPartition/WorldPartitionStreamingSource.h"
 #include "WorldPartition/WorldPartitionHandle.h"
@@ -32,8 +33,6 @@ struct IWorldPartitionStreamingSourceProvider;
 
 enum class EWorldPartitionRuntimeCellState : uint8;
 enum class EWorldPartitionStreamingPerformance : uint8;
-
-DECLARE_LOG_CATEGORY_EXTERN(LogWorldPartition, Log, All);
 
 enum class EWorldPartitionInitState
 {

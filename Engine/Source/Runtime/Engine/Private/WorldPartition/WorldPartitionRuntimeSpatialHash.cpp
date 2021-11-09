@@ -700,7 +700,7 @@ void UWorldPartitionRuntimeSpatialHash::ImportFromWorldComposition(UWorldComposi
 	}
 }
 
-bool UWorldPartitionRuntimeSpatialHash::GenerateStreaming(UWorldPartitionStreamingPolicy* StreamingPolicy, TArray<FString>* OutPackagesToGenerate)
+bool UWorldPartitionRuntimeSpatialHash::GenerateStreaming(UWorldPartitionStreamingPolicy* StreamingPolicy, const FActorClusterContext& ActorClusterContext, TArray<FString>* OutPackagesToGenerate)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(UWorldPartitionRuntimeSpatialHash::GenerateStreaming);
 	UWorldPartition* WorldPartition = GetOuterUWorldPartition();
@@ -716,18 +716,16 @@ bool UWorldPartitionRuntimeSpatialHash::GenerateStreaming(UWorldPartitionStreami
 	// Fix case where StreamingGrids might have been persisted.
 	StreamingGrids.Empty();
 
-	// Create actor clusters
-	FActorClusterContext Context(WorldPartition, this);
-
 	// Append grids from ASpatialHashRuntimeGridInfo actors to runtime spatial hash grids
 	TArray<FSpatialHashRuntimeGrid> AllGrids;
 	AllGrids.Append(Grids);
 
-	FActorContainerInstance* ContainerInstance = Context.GetClusterInstance(WorldPartition);
+	const FActorContainerInstance* ContainerInstance = ActorClusterContext.GetClusterInstance(WorldPartition);
 	check(ContainerInstance);
+
 	for (auto& ActorDescViewPair : ContainerInstance->ActorDescViewMap)
 	{
-		FWorldPartitionActorDescView& ActorDescView = ActorDescViewPair.Value;
+		const FWorldPartitionActorDescView& ActorDescView = ActorDescViewPair.Value;
 		if (ActorDescView.GetActorClass()->IsChildOf<ASpatialHashRuntimeGridInfo>())
 		{
 			FWorldPartitionReference Ref(WorldPartition, ActorDescView.GetGuid());
@@ -750,7 +748,7 @@ bool UWorldPartitionRuntimeSpatialHash::GenerateStreaming(UWorldPartitionStreami
 	TArray<TArray<const FActorClusterInstance*>> GridActors;
 	GridActors.InsertDefaulted(0, AllGrids.Num());
 
-	for (const FActorClusterInstance& ClusterInstance : Context.GetClusterInstances())
+	for (const FActorClusterInstance& ClusterInstance : ActorClusterContext.GetClusterInstances())
 	{
 		check(ClusterInstance.Cluster);
 		int32* FoundIndex = GridsMapping.Find(ClusterInstance.Cluster->RuntimeGrid);
@@ -763,7 +761,7 @@ bool UWorldPartitionRuntimeSpatialHash::GenerateStreaming(UWorldPartitionStreami
 		GridActors[GridIndex].Add(&ClusterInstance);
 	}
 	
-	const FBox WorldBounds = Context.GetClusterInstance(WorldPartition)->Bounds;
+	const FBox WorldBounds = ActorClusterContext.GetClusterInstance(WorldPartition)->Bounds;
 	for (int32 GridIndex=0; GridIndex < AllGrids.Num(); GridIndex++)
 	{
 		const FSpatialHashRuntimeGrid& Grid = AllGrids[GridIndex];
@@ -791,11 +789,11 @@ FName UWorldPartitionRuntimeSpatialHash::GetCellName(FName InGridName, const FIn
 	return UWorldPartitionRuntimeSpatialHash::GetCellName(WorldPartition, InGridName, InCellGlobalCoord, InDataLayerID);
 }
 
-void UWorldPartitionRuntimeSpatialHash::UpdateActorDescViewMap(const FBox& WorldBounds, TMap<FGuid, FWorldPartitionActorDescView>& ActorDescViewMap) const
+void UWorldPartitionRuntimeSpatialHash::UpdateActorDescViewMap(TMap<FGuid, FWorldPartitionActorDescView>& ActorDescViewMap) const
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(UpdateActorDescViewMap);
 
-	Super::UpdateActorDescViewMap(WorldBounds, ActorDescViewMap);
+	Super::UpdateActorDescViewMap(ActorDescViewMap);
 
 	TMap<FName, int32> GridsMapping;
 	GridsMapping.Add(NAME_None, 0);
@@ -805,9 +803,6 @@ void UWorldPartitionRuntimeSpatialHash::UpdateActorDescViewMap(const FBox& World
 		check(!GridsMapping.Contains(Grid.GridName));
 		GridsMapping.Add(Grid.GridName, i);
 	}
-
-	const FBox2D WorldBounds2D = FBox2D(FVector2D(WorldBounds.Min), FVector2D(WorldBounds.Max));
-	const float WorldBoundsArea = WorldBounds2D.GetArea();
 
 	for (auto& ActorDescViewPair : ActorDescViewMap)
 	{
@@ -828,15 +823,11 @@ void UWorldPartitionRuntimeSpatialHash::UpdateActorDescViewMap(const FBox& World
 
 					if (ActorBoundsArea < 1.0f)
 					{
-						ChangeActorDescViewGridPlacement(ActorDescView, EActorGridPlacement::Location);
-					}
-					else if (ActorBoundsArea > WorldBoundsArea / 2.0f)
-					{
-						ChangeActorDescViewGridPlacement(ActorDescView, EActorGridPlacement::AlwaysLoaded);
+						ActorDescView.SetGridPlacement(EActorGridPlacement::Location);
 					}
 					else if (ActorBoundsArea > CellArea)
 					{
-						ChangeActorDescViewGridPlacement(ActorDescView, EActorGridPlacement::Bounds);
+						ActorDescView.SetGridPlacement(EActorGridPlacement::Bounds);
 					}
 				}
 			}

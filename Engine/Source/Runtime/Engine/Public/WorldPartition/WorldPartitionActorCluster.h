@@ -8,9 +8,6 @@
 #include "Misc/HashBuilder.h"
 
 class UActorDescContainer;
-class UWorldPartition;
-class FWorldPartitionActorDesc;
-class UWorldPartitionRuntimeHash;
 enum class EContainerClusterMode : uint8;
 
 /**
@@ -107,7 +104,7 @@ public:
 	/**
 	 * Create the actor clusters from the root World Partition. Optionally filtering some actors and including child Containers. 
 	 */
-	FActorClusterContext(UWorldPartition* InWorldPartition, const UWorldPartitionRuntimeHash* InRuntimeHash, FFilterActorDescViewFunc InFilterActorDescViewFunc = nullptr, bool bInIncludeChildContainers = true);
+	FActorClusterContext(TArray<FActorContainerInstance>&& InContainerInstances, FFilterActorDescViewFunc InFilterActorDescViewFunc = nullptr);
 				
 	/**
 	 * Returns the list of cluster instances of this context. 
@@ -115,27 +112,21 @@ public:
 	const TArray<FActorClusterInstance>& GetClusterInstances() const { return ClusterInstances; }
 	
 	FActorContainerInstance* GetClusterInstance(const UActorDescContainer* InContainer);
+	const FActorContainerInstance* GetClusterInstance(const UActorDescContainer* InContainer) const;
 
 	static void CreateActorClusters(UWorld* World, const TMap<FGuid, FWorldPartitionActorDescView>& ActorDescViewMap, TArray<FActorCluster>& OutActorClusters);
 
 private:
-	void CreateActorClusters();
-	void CreateContainerInstanceRecursive(uint64 ID, const FTransform& Transform, EContainerClusterMode ClusterMode, const UActorDescContainer* ActorDescContainer, const TSet<FName>& DataLayers, FBox& ParentBounds);
 	const TArray<FActorCluster>& CreateActorClusters(const FActorContainerInstance& ContainerInstance);
 	static void CreateActorClusters(UWorld* World, const TMap<FGuid, FWorldPartitionActorDescView>& ActorDescViewMap, TArray<FActorCluster>& OutActorClusters, FFilterActorDescViewFunc InFilterActorDescViewFunc);
 	
 	// Init data
-	UWorldPartition* WorldPartition;
-	const UWorldPartitionRuntimeHash* RuntimeHash;
 	FFilterActorDescViewFunc FilterActorDescViewFunc;
-	bool bIncludeChildContainers;
 
 	// Generated data
 	TMap<const UActorDescContainer*, TArray<FActorCluster>> Clusters;
 	TArray<FActorContainerInstance> ContainerInstances;
 	TArray<FActorClusterInstance> ClusterInstances;
-	
-	int32 InstanceCountHint;
 };
 
 #endif // #if WITH_EDITOR
