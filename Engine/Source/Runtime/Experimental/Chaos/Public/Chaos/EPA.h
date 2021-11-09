@@ -289,6 +289,15 @@ bool InitializeEPA(TArray<TVec3<T>>& VertsA, TArray<TVec3<T>>& VertsB, TFunction
 	return bValid;
 }
 
+template <typename T, typename SupportALambda, typename SupportBLambda >
+bool InitializeEPA(TArray<TVec3<T>>& VertsA, TArray<TVec3<T>>& VertsB, const SupportALambda& SupportA, const SupportBLambda& SupportB, TArray<TEPAEntry<T>>& OutEntries, TVec3<T>& OutTouchNormal)
+{
+	TFunctionRef<TVector<T, 3>(const TVec3<T>& V)> SupportARef(SupportA);
+	TFunctionRef<TVector<T, 3>(const TVec3<T>& V)> SupportBRef(SupportB);
+
+	return InitializeEPA<T>(VertsA, VertsB, SupportARef, SupportBRef, OutEntries, OutTouchNormal);
+}
+
 struct FEPAFloodEntry
 {
 	int32 EntryIdx;
@@ -590,4 +599,14 @@ EEPAResult EPA(TArray<TVec3<T>>& VertsABuffer, TArray<TVec3<T>>& VertsBBuffer, T
 	
 	return ResultStatus;
 }
+
+template <typename T, typename SupportALambda, typename SupportBLambda>
+EEPAResult EPA(TArray<TVec3<T>>& VertsABuffer, TArray<TVec3<T>>& VertsBBuffer, const SupportALambda& SupportA, const SupportBLambda& SupportB, T& OutPenetration, TVec3<T>& OutDir, TVec3<T>& WitnessA, TVec3<T>& WitnessB)
+{
+	TFunctionRef<TVector<T, 3>(const TVec3<T>& V)> SupportARef(SupportA);
+	TFunctionRef<TVector<T, 3>(const TVec3<T>& V)> SupportBRef(SupportB);
+
+	return EPA<T>(VertsABuffer, VertsBBuffer, SupportARef, SupportBRef, OutPenetration, OutDir, WitnessA, WitnessB);
+}
+
 }

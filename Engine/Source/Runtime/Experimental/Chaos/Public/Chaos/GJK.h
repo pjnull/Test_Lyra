@@ -416,37 +416,6 @@ namespace Chaos
 	}
 
 
-	// Calculate the penetration depth (or separating distance) of two geometries.
-	//
-	// Set bNegativePenetrationAllowed to false (default) if you do not care about the normal and distance when the shapes are separated. The return value
-	// will be false if the shapes are separated, and the function will be faster because it does not need to determine the closest point.
-	// If the shapes are overlapping, the function will return true and populate the output parameters with the contact information.
-	//
-	// Set bNegativePenetrationAllowed to true if you need to know the closest point on the shapes, even when they are separated. In this case,
-	// we need to iterate to find the best solution even when objects are separated which is more expensive. The return value will be true as long 
-	// as the algorithm was able to find a solution (i.e., the return value is not related to whether the shapes are overlapping) and the output 
-	// parameters will be populated with the contact information.
-	//
-	// In all cases, if the function returns false the output parameters are undefined.
-	//
-	// OutClosestA and OutClosestB are the closest or deepest-penetrating points on the two core geometries, both in the space of A and ignoring the margin.
-	//
-	// Epsilon is the separation at which GJK considers the objects to be in contact or penetrating and then runs EPA. If this is
-	// too small, then the renormalization of the separating vector can lead to arbitrarily wrong normals for almost-touching objects.
-	//
-	// NOTE: OutPenetration is the penetration including the Thickness (i.e., the actual penetration depth), but the closest points
-	// returned are on the core shapes (i.e., ignoring the Thickness). If you want the closest positions on the shape surface (including
-	// the Thickness) use GJKPenetration().
-	//
-	template <bool bNegativePenetrationAllowed = false, typename T, typename TGeometryA, typename TGeometryB>
-	bool GJKPenetration(const TGeometryA& A, const TGeometryB& B, const TRigidTransform<T, 3>& BToATM, T& OutPenetration, TVec3<T>& OutClosestA, TVec3<T>& OutClosestB, TVec3<T>& OutNormal, int32& OutClosestVertexIndexA, int32& OutClosestVertexIndexB, const T InThicknessA = 0.0f, const T InThicknessB = 0.0f, const TVector<T, 3>& InitialDir = TVector<T, 3>(1, 0, 0), const T Epsilon = 1.e-3f)
-	{
-		TGeometryGetters<T, TGeometryA> AGetters(A);
-		TGeometryGetters<T, TGeometryB> BGetters(B);
-		
-		return GJKPenetrationImpl(AGetters, BGetters, BToATM, OutPenetration, OutClosestA, OutClosestB, OutNormal, OutClosestVertexIndexA, OutClosestVertexIndexB, InThicknessA, InThicknessB, InitialDir, Epsilon);
-	}
-
 	template <bool bNegativePenetrationAllowed = false, typename T>
 	bool GJKPenetrationImpl(const TGetters<T>& A, const TGetters<T>& B, const TRigidTransform<T, 3>& BToATM, T& OutPenetration, TVec3<T>& OutClosestA, TVec3<T>& OutClosestB, TVec3<T>& OutNormal, int32& OutClosestVertexIndexA, int32& OutClosestVertexIndexB, const T InThicknessA = 0.0f, const T InThicknessB = 0.0f, const TVector<T, 3>& InitialDir = TVector<T, 3>(1, 0, 0), const T Epsilon = 1.e-3f)
 	{
@@ -616,7 +585,36 @@ namespace Chaos
 		}
 	}
 
-
+	// Calculate the penetration depth (or separating distance) of two geometries.
+	//
+	// Set bNegativePenetrationAllowed to false (default) if you do not care about the normal and distance when the shapes are separated. The return value
+	// will be false if the shapes are separated, and the function will be faster because it does not need to determine the closest point.
+	// If the shapes are overlapping, the function will return true and populate the output parameters with the contact information.
+	//
+	// Set bNegativePenetrationAllowed to true if you need to know the closest point on the shapes, even when they are separated. In this case,
+	// we need to iterate to find the best solution even when objects are separated which is more expensive. The return value will be true as long 
+	// as the algorithm was able to find a solution (i.e., the return value is not related to whether the shapes are overlapping) and the output 
+	// parameters will be populated with the contact information.
+	//
+	// In all cases, if the function returns false the output parameters are undefined.
+	//
+	// OutClosestA and OutClosestB are the closest or deepest-penetrating points on the two core geometries, both in the space of A and ignoring the margin.
+	//
+	// Epsilon is the separation at which GJK considers the objects to be in contact or penetrating and then runs EPA. If this is
+	// too small, then the renormalization of the separating vector can lead to arbitrarily wrong normals for almost-touching objects.
+	//
+	// NOTE: OutPenetration is the penetration including the Thickness (i.e., the actual penetration depth), but the closest points
+	// returned are on the core shapes (i.e., ignoring the Thickness). If you want the closest positions on the shape surface (including
+	// the Thickness) use GJKPenetration().
+	//
+	template <bool bNegativePenetrationAllowed = false, typename T, typename TGeometryA, typename TGeometryB>
+	bool GJKPenetration(const TGeometryA& A, const TGeometryB& B, const TRigidTransform<T, 3>& BToATM, T& OutPenetration, TVec3<T>& OutClosestA, TVec3<T>& OutClosestB, TVec3<T>& OutNormal, int32& OutClosestVertexIndexA, int32& OutClosestVertexIndexB, const T InThicknessA = 0.0f, const T InThicknessB = 0.0f, const TVector<T, 3>& InitialDir = TVector<T, 3>(1, 0, 0), const T Epsilon = 1.e-3f)
+	{
+		TGeometryGetters<T, TGeometryA> AGetters(A);
+		TGeometryGetters<T, TGeometryB> BGetters(B);
+		
+		return GJKPenetrationImpl<bNegativePenetrationAllowed, T>(AGetters, BGetters, BToATM, OutPenetration, OutClosestA, OutClosestB, OutNormal, OutClosestVertexIndexA, OutClosestVertexIndexB, InThicknessA, InThicknessB, InitialDir, Epsilon);
+	}
 
 	/** Sweeps one geometry against the other
 	 @A The first geometry
