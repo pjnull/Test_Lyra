@@ -98,6 +98,9 @@ FAutoConsoleVariableRef CVarChaosCollisionAllowLevelsetManifolds(TEXT("p.Chaos.C
 bool CCDUseInitialRotationForSweptUpdate = false;
 FAutoConsoleVariableRef CVarCCDUseInitialRotationForSweptUpdate(TEXT("p.Chaos.CCD.UseInitialRotationForSweptUpdate"), CCDUseInitialRotationForSweptUpdate, TEXT("Experimental : Use R instead of Q for SweptUpdate. Will lead to incorrect results in some cases."));
 
+bool CCDAlwaysSweepRemainingDT = false;
+FAutoConsoleVariableRef CVarCCDAlwaysSweepRemainingDT(TEXT("p.Chaos.CCD.AlwaysSweepRemainingDT"), CCDAlwaysSweepRemainingDT, TEXT("Even if we are out of iterations, do the sweep for remaining dt instead of adjusting V. Could cause tunnelling in some cases, but prevents loss of momentum."));
+
 //Chaos::FRealSingl Chaos_Collision_ManifoldFaceAngle = 5.0f;
 //Chaos::FRealSingl Chaos_Collision_ManifoldFaceEpsilon = FMath::Sin(FMath::DegreesToRadians(Chaos_Collision_ManifoldFaceAngle));
 //FConsoleVariableDelegate Chaos_Collision_ManifoldFaceDelegate = FConsoleVariableDelegate::CreateLambda([](IConsoleVariable* CVar) { Chaos_Collision_ManifoldFaceEpsilon = FMath::Sin(FMath::DegreesToRadians(Chaos_Collision_ManifoldFaceAngle)); });

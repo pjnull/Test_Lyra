@@ -9,6 +9,7 @@
 
 
 extern bool CCDUseInitialRotationForSweptUpdate;
+extern bool CCDAlwaysSweepRemainingDT;
 
 namespace Chaos
 {

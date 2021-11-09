@@ -285,7 +285,7 @@ namespace Chaos
 			if (IterationParameters.SolverType == EConstraintSolverType::GbfPbd)
 			{
 				// Advance P to end of frame from TOI, and Apply
-				if (IterationParameters.Iteration + 1 < IterationParameters.NumIterations)
+				if (CCDAlwaysSweepRemainingDT || IterationParameters.Iteration + 1 < IterationParameters.NumIterations)
 				{
 					Body0.SetP(Body0.P() + Body0.V() * RemainingDT); // If we are tunneling through something else due to this, it will be resolved in the next iteration
 					ApplyImpl(Constraint, IterationParametersRemainingDT, CCDParticleParamaters);
