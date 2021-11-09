@@ -432,6 +432,35 @@ void FYUVv210ConvertPS::SetParameters(FRHICommandList& CommandList, TRefCountPtr
 }
 
 
+/* FYUVY416ConvertPS shader
+ *****************************************************************************/
+
+BEGIN_GLOBAL_SHADER_PARAMETER_STRUCT(FYUVY416ConvertUB, )
+SHADER_PARAMETER(FMatrix44f, ColorTransform)
+SHADER_PARAMETER(uint32, SrgbToLinear)
+SHADER_PARAMETER_SRV(Texture2D, SRV_Y)
+SHADER_PARAMETER_SAMPLER(SamplerState, BilinearClampedSamplerUV)
+END_GLOBAL_SHADER_PARAMETER_STRUCT()
+
+IMPLEMENT_GLOBAL_SHADER_PARAMETER_STRUCT(FYUVY416ConvertUB, "YUVY416ConvertUB");
+IMPLEMENT_SHADER_TYPE(, FYUVY416ConvertPS, TEXT("/Engine/Private/MediaShaders.usf"), TEXT("YUVY416ConvertPS"), SF_Pixel);
+
+
+void FYUVY416ConvertPS::SetParameters(FRHICommandList& CommandList, FShaderResourceViewRHIRef SRV_Y, const FMatrix& ColorTransform, const FVector& YUVOffset, bool SrgbToLinear)
+{
+	FYUVY416ConvertUB UB;
+	{
+		UB.ColorTransform = (FMatrix44f)MediaShaders::CombineColorTransformAndOffset(ColorTransform, YUVOffset);
+		UB.SrgbToLinear = SrgbToLinear;
+		UB.SRV_Y = SRV_Y;
+		UB.BilinearClampedSamplerUV = TStaticSamplerState<SF_Bilinear, AM_Clamp, AM_Clamp, AM_Clamp>::GetRHI();
+	}
+
+	TUniformBufferRef<FYUVY416ConvertUB> Data = TUniformBufferRef<FYUVY416ConvertUB>::CreateUniformBufferImmediate(UB, UniformBuffer_SingleFrame);
+	SetUniformBufferParameter(CommandList, CommandList.GetBoundPixelShader(), GetUniformBufferParameter<FYUVY416ConvertUB>(), Data);
+}
+
+
 /* FYUY2ConvertPS shader
  *****************************************************************************/
 

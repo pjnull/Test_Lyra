@@ -17,6 +17,7 @@
 
 class FRHITexture2D;
 
+class WmfMediaDecoder;
 class FWmfMediaHardwareVideoDecodingTextureSamplePool;
 class FWmfMediaSink;
 
@@ -70,6 +71,13 @@ public:
 	 * @see Shutdown
 	 */
 	bool Initialize(FWmfMediaSink& InOwner);
+
+	/**
+	 * Call this to set which decoder we belong to.
+	 *
+	 * @param InDecoder
+	 */
+	void SetDecoder(WmfMediaDecoder* InDecoder);
 
 	/**
 	 * Pause the stream.
@@ -246,6 +254,9 @@ private:
 	/** The media sink that owns this stream sink. */
 	TComPtr<FWmfMediaSink> Owner;
 
+	/** The decoder we belong to. */
+	TComPtr<WmfMediaDecoder> Decoder;
+
 	/** Whether the sink is currently prerolling samples. */
 	bool Prerolling;
 
@@ -275,6 +286,9 @@ private:
 
 	/** Make sure we don't spam output with MF_MT_SUBTYPE error message */
 	bool bShowSubTypeErrorMessage;
+
+	/** True if we are running in D3D12. */
+	bool bIsD3D12;
 
 	/** Structure for queued media samples & markers. */
 	struct FQueuedSample
