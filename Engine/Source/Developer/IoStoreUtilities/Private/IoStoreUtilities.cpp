@@ -3053,7 +3053,6 @@ bool LegacyListIoStoreContainer(
 	const TCHAR* InContainerFilename,
 	int64 InSizeFilter,
 	const FString& InCSVFilename,
-	bool bInUseMountPoint,
 	const FKeyChain& InKeyChain)
 {
 	TUniquePtr<FIoStoreReader> Reader = CreateIoStoreReader(InContainerFilename, InKeyChain);
@@ -3099,22 +3098,14 @@ bool LegacyListIoStoreContainer(
 	TArray<FEntry> Entries;
 
 	const uint64 CompressionBlockSize = Reader->GetCompressionBlockSize();
-	int32 StripPrefixLength = !bInUseMountPoint ? IndexReader.GetMountPoint().Len() : 0;
-	Reader->EnumerateChunks([&Entries, CompressionBlockSize, &CompressedBlocks, StripPrefixLength](const FIoStoreTocChunkInfo& ChunkInfo)
+	Reader->EnumerateChunks([&Entries, CompressionBlockSize, &CompressedBlocks](const FIoStoreTocChunkInfo& ChunkInfo)
 		{
 			const int32 FirstBlockIndex = int32(ChunkInfo.Offset / CompressionBlockSize);
 			
 			FEntry& Entry = Entries.AddDefaulted_GetRef();
 			Entry.ChunkId = ChunkInfo.Id;
 			Entry.Hash = ChunkInfo.Hash;
-			if (ChunkInfo.bHasValidFileName)
-			{
-				Entry.FileName = ChunkInfo.FileName.RightChop(StripPrefixLength);
-			}
-			else
-			{
-				Entry.FileName = ChunkInfo.FileName;
-			}
+			Entry.FileName = ChunkInfo.FileName;
 			Entry.Offset = CompressedBlocks[FirstBlockIndex].Offset;
 			Entry.Size = ChunkInfo.CompressedSize;
 			Entry.CompressionMethodIndex = CompressedBlocks[FirstBlockIndex].CompressionMethodIndex;
@@ -4584,7 +4575,6 @@ int32 Staged2Zen(const FString& BuildPath, const FKeyChain& KeyChain, const FStr
 bool ExtractFilesFromIoStoreContainer(
 	const TCHAR* InContainerFilename,
 	const TCHAR* InDestPath,
-	bool bInExtractToMountPoint,
 	const FKeyChain& InKeyChain,
 	const FString* InFilter,
 	TMap<FString, uint64>* OutOrderMap,
@@ -4629,9 +4619,8 @@ bool ExtractFilesFromIoStoreContainer(
 	};
 	TArray<FEntry> Entries;
 	const FIoDirectoryIndexReader& IndexReader = Reader->GetDirectoryIndexReader();
-	FString MountPoint = bInExtractToMountPoint ? IndexReader.GetMountPoint().Replace(TEXT("../../../"), TEXT("")) : TEXT("");
 	FString DestPath(InDestPath);
-	Reader->EnumerateChunks([&Entries, InFilter, &MountPoint, &DestPath](const FIoStoreTocChunkInfo& ChunkInfo)
+	Reader->EnumerateChunks([&Entries, InFilter, &DestPath](const FIoStoreTocChunkInfo& ChunkInfo)
 		{
 			if (!ChunkInfo.bHasValidFileName)
 			{
@@ -4646,7 +4635,7 @@ bool ExtractFilesFromIoStoreContainer(
 			FEntry& Entry = Entries.AddDefaulted_GetRef();
 			Entry.ChunkId = ChunkInfo.Id;
 			Entry.SourceFileName = ChunkInfo.FileName;
-			Entry.DestFileName = DestPath / MountPoint / Entry.SourceFileName;
+			Entry.DestFileName = DestPath / ChunkInfo.FileName.Replace(TEXT("../../../"), TEXT(""));
 			Entry.Offset = ChunkInfo.Offset;
 			Entry.bIsCompressed = ChunkInfo.bIsCompressed;
 
