@@ -7,6 +7,7 @@
 #include "GlobalShader.h"
 #include "CommonRenderResources.h"
 #include "RHIStaticStates.h"
+#include "PixelShaderUtils.h"
 
 class FGenerateMipsCS : public FGlobalShader
 {
@@ -174,7 +175,7 @@ void FGenerateMips::ExecuteRaster(FRDGBuilder& GraphBuilder, FRDGTextureRef Text
 			RDG_EVENT_NAME("GenerateMips DestMipLevel=%d", MipLevel),
 			PassParameters,
 			ERDGPassFlags::Raster,
-			[VertexShader, PixelShader, DestTextureSize](FRHICommandList& RHICmdList)
+			[VertexShader, PixelShader, PassParameters, DestTextureSize](FRHICommandList& RHICmdList)
 		{
 			RHICmdList.SetViewport(0.0f, 0.0f, 0.0f, (float)DestTextureSize.X, (float)DestTextureSize.Y, 1.0f);
 
@@ -188,9 +189,9 @@ void FGenerateMips::ExecuteRaster(FRDGBuilder& GraphBuilder, FRDGTextureRef Text
 			GraphicsPSOInit.BoundShaderState.PixelShaderRHI = PixelShader.GetPixelShader();
 			RHICmdList.ApplyCachedRenderTargets(GraphicsPSOInit);
 			SetGraphicsPipelineState(RHICmdList, GraphicsPSOInit, 0);
+			SetShaderParameters(RHICmdList, PixelShader, PixelShader.GetPixelShader(), *PassParameters);
 
-			RHICmdList.SetStreamSource(0, GScreenRectangleVertexBuffer.VertexBufferRHI, 0);
-			RHICmdList.DrawPrimitive(0, 2, 1);
+			FPixelShaderUtils::DrawFullscreenTriangle(RHICmdList, 1);
 		});
 	}
 }
@@ -204,13 +205,6 @@ void FGenerateMips::ExecuteCompute(FRDGBuilder& GraphBuilder, FRDGTextureRef Tex
 
 	// Select compute shader variant (normal vs. sRGB etc.)
 	bool bMipsSRGB = EnumHasAnyFlags(TextureDesc.Flags, TexCreate_SRGB);
-#if PLATFORM_ANDROID
-	if (IsVulkanPlatform(GMaxRHIShaderPlatform))
-	{
-		// Vulkan Android seems to skip sRGB->Lin conversion when sampling texture in compute
-		bMipsSRGB = false;
-	}
-#endif
 	const bool bMipsSwizzle = false; 
 
 	FGenerateMipsCS::FPermutationDomain PermutationVector;
@@ -273,13 +267,6 @@ void FGenerateMips::ExecuteCompute(FRDGBuilder& GraphBuilder, FRDGTextureRef Tex
 
 	// Select compute shader variant (normal vs. sRGB etc.)
 	bool bMipsSRGB = EnumHasAnyFlags(TextureDesc.Flags, TexCreate_SRGB);
-#if PLATFORM_ANDROID
-	if (IsVulkanPlatform(GMaxRHIShaderPlatform))
-	{
-		// Vulkan Android seems to skip sRGB->Lin conversion when sampling texture in compute
-		bMipsSRGB = false;
-	}
-#endif
 	const bool bMipsSwizzle = false;
 
 	FGenerateMipsIndirectCS::FPermutationDomain PermutationVector;

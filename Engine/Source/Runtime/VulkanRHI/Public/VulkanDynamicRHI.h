@@ -375,6 +375,8 @@ public:
 
 	bool RHIRequiresComputeGenerateMips() const override { return true; };
 
+	virtual bool RHIIsTypedUAVLoadSupported(EPixelFormat PixelFormat) final override;
+
 	inline TArray<FVulkanViewport*>& GetViewports()
 	{
 		return Viewports;
