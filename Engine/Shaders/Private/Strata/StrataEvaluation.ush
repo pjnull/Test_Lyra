@@ -816,7 +816,7 @@ FStrataEnvLightResult StrataEvaluateForEnvLight(FStrataBSDFContext BSDFContext, 
 				FBxDFEnergyTerms DiffuseEnergyTerms  = ComputeDiffuseEnergyTerms(SafeRoughness, BSDFContext.Context.NoV);
 				EvalEnvBRDF									= SpecularEnergyTerms.E;
 				DirectionalAlbedo_SpecularTransmission		= ComputeEnergyPreservation(SpecularEnergyTerms);
-				StrataEnvLightResult.DiffuseWeight			= DiffuseEnergyTerms.E * DirectionalAlbedo_SpecularTransmission;
+				StrataEnvLightResult.DiffuseWeight			= DiffuseColor * DiffuseEnergyTerms.E * DirectionalAlbedo_SpecularTransmission;
 			}
 
 			BRANCH
