@@ -630,7 +630,7 @@ TMap<UBlueprint*, FDelegateHandle> FRecompilationTracker::RecompilingBlueprints;
 
 AUsdStageActor::AUsdStageActor()
 	: InitialLoadSet( EUsdInitialLoadSet::LoadAll )
-	, KindsToCollapse( (int32) EUsdDefaultKind::Component )
+	, KindsToCollapse( ( int32 ) ( EUsdDefaultKind::Component | EUsdDefaultKind::Subcomponent ) )
 	, PurposesToLoad( (int32) EUsdPurpose::Proxy )
 	, Time( 0.0f )
 	, bIsTransitioningIntoPIE( false )

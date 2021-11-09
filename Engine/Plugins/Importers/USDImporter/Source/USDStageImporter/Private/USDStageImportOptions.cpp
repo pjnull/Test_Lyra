@@ -29,7 +29,7 @@ UUsdStageImportOptions::UUsdStageImportOptions(const FObjectInitializer& ObjectI
 	ExistingAssetPolicy = EReplaceAssetPolicy::Replace;
 
 	bPrimPathFolderStructure = false;
-	KindsToCollapse = ( int32 ) ( EUsdDefaultKind::Component );
+	KindsToCollapse = ( int32 ) ( EUsdDefaultKind::Component | EUsdDefaultKind::Subcomponent );
 	bInterpretLODs = true;
 }
 
