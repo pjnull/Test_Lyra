@@ -4,6 +4,8 @@
 
 #include "Components/PrimitiveComponent.h"
 
+class USkeletalMeshSocket;
+
 struct PERSONA_API HPersonaBoneHitProxy : public HHitProxy
 {
 	DECLARE_HIT_PROXY()
