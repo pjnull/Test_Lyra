@@ -16,7 +16,6 @@
 #include "GameFramework/Actor.h"
 #include "GameFramework/DefaultPhysicsVolume.h"
 #include "GameFramework/WorldSettings.h"
-#include "Kismet2/ComponentEditorUtils.h"
 #include "UObject/UnrealType.h"
 #if WITH_EDITOR
 #include "ActorEditorUtils.h"
