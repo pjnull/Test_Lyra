@@ -16,9 +16,11 @@
 #include "GameFramework/Actor.h"
 #include "GameFramework/DefaultPhysicsVolume.h"
 #include "GameFramework/WorldSettings.h"
+#include "Kismet2/ComponentEditorUtils.h"
 #include "UObject/UnrealType.h"
 #if WITH_EDITOR
 #include "ActorEditorUtils.h"
+#include "Kismet2/ComponentEditorUtils.h"
 #endif
 
 namespace
@@ -71,6 +73,19 @@ namespace
 		};
 		
 		return Algo::AllOf(UnsupportedClasses, [Subobject](UClass *Class) { return !Subobject->IsA(Class); });
+	}
+
+	USceneComponent* GetParentComponent(const UActorComponent* Component)
+	{
+		if (const USceneComponent* AsSceneComponent = Cast<USceneComponent>(Component))
+		{
+			const bool bIsParentValid = AsSceneComponent
+				&& AsSceneComponent->GetAttachParent()
+				&& Component->GetOwner() != nullptr
+				&& AsSceneComponent->GetAttachParent()->GetOwner() == Component->GetOwner();
+			return bIsParentValid ? AsSceneComponent->GetAttachParent() : nullptr;
+		}
+		return nullptr;
 	}
 }
 
@@ -139,14 +154,14 @@ bool FSnapshotRestorability::IsComponentDesirableForCapture(const UActorComponen
 		}
 	}
 
+	constexpr bool bAllowUserContructionScriptComps = false;
 	const bool bIsAllowed =
 			// Components created in construction script are not supported
 			Component->CreationMethod != EComponentCreationMethod::UserConstructionScript
 			&& DoesComponentHaveSupportedClassForCapture(Component)
 			&& !Component->HasAnyFlags(RF_Transient)
 #if WITH_EDITORONLY_DATA
-			// E.g. a sprite or camera mesh in viewport
-			&& !Component->IsVisualizationComponent()
+			&& FComponentEditorUtils::CanEditComponentInstance(Component, GetParentComponent(Component), bAllowUserContructionScriptComps)
 #endif
 	;
 	return bSomebodyAllowed || bIsAllowed;
