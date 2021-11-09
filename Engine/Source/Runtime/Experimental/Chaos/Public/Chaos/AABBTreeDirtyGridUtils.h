@@ -27,7 +27,7 @@ namespace Chaos
 		return (int64)(FMath::Floor(CellIndex + FloatingPointMaxCellIndexError));
 	}
 
-	FORCEINLINE_DEBUGGABLE int32 HashCell(int32 XCell, int32 YCell)
+	FORCEINLINE_DEBUGGABLE int32 HashCell(int64 XCell, int64 YCell)
 	{
 		return (int32)(InterleaveWithZeros((uint16)XCell) | (InterleaveWithZeros((uint16)YCell) << 1));
 	}
