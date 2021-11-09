@@ -48,7 +48,7 @@
 //#include "Animation/DebugSkelMeshComponent.h"
 //#include "Persona/Private/AnimationEditorViewportClient.h"
 #include "IPersonaPreviewScene.h"
-#include "PersonaSelectionComponent.h"
+#include "PersonaSelectionProxies.h"
 #include "Framework/Application/SlateApplication.h"
 #include "UnrealEdGlobals.h"
 #include "Editor/UnrealEdEngine.h"
@@ -1135,10 +1135,37 @@ bool FControlRigEditMode::HandleClick(FEditorViewportClient* InViewportClient, H
 			return true;
 		}
 	}
-	else if(HPersonaSelectionHitProxy* CapsuleHitProxy = HitProxyCast<HPersonaSelectionHitProxy>(HitProxy))
+	else if (HPersonaBoneHitProxy* BoneHitProxy = HitProxyCast<HPersonaBoneHitProxy>(HitProxy))
 	{
-		static_cast<HPersonaSelectionHitProxy*>(HitProxy)->BroadcastClicked();
-		return true;
+		if (UControlRig* DebuggedControlRig = GetControlRig(false))
+		{
+			URigHierarchy* Hierarchy = DebuggedControlRig->GetHierarchy();
+
+			// Cache mapping?
+			for (int32 Index = 0; Index < Hierarchy->Num(); Index++)
+			{
+				const FRigElementKey ElementToSelect = Hierarchy->GetKey(Index);
+				if (ElementToSelect.Type == ERigElementType::Bone && ElementToSelect.Name == BoneHitProxy->BoneName)
+				{
+					if (FSlateApplication::Get().GetModifierKeys().IsShiftDown())
+					{
+						Hierarchy->GetController()->SelectElement(ElementToSelect, true);
+					}
+					else if (FSlateApplication::Get().GetModifierKeys().IsControlDown())
+					{
+						const bool bSelect = !Hierarchy->IsSelected(ElementToSelect);
+						Hierarchy->GetController()->SelectElement(ElementToSelect, bSelect);
+					}
+					else
+					{
+						TArray<FRigElementKey> NewSelection;
+						NewSelection.Add(ElementToSelect);
+						Hierarchy->GetController()->SetSelection(NewSelection);
+					}
+					return true;
+				}
+			}
+		}
 	}
 
 	// for now we show this menu all the time if body is selected

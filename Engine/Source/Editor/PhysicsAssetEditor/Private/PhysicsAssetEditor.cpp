@@ -3289,7 +3289,6 @@ void FPhysicsAssetEditor::HandlePreviewSceneCreated(const TSharedRef<IPersonaPre
 	InPersonaPreviewScene->SetPreviewMeshComponent(SharedData->EditorSkelComp);
 	InPersonaPreviewScene->AddComponent(SharedData->EditorSkelComp, FTransform::Identity);
 	InPersonaPreviewScene->SetAdditionalMeshesSelectable(false);
-	InPersonaPreviewScene->SetUsePhysicsBodiesForBoneSelection(false);
 	// set root component, so we can attach to it. 
 	Actor->SetRootComponent(SharedData->EditorSkelComp);
 

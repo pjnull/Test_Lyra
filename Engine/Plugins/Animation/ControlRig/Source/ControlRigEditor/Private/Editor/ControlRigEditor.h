@@ -381,8 +381,6 @@ private:
 
 	bool IsHaltedAtBreakpoint() const;
 
-	void UpdateCapsules();
-
 	void FrameSelection();
 
 protected:
@@ -486,7 +484,6 @@ protected:
 
 	bool bSuspendDetailsPanelRefresh;
 
-	TMap<int32, int32> CapsuleToHierarchyIndex;
 	TArray<TStrongObjectPtr<UDetailsViewWrapperObject>> WrapperObjects;
 	TWeakObjectPtr<AStaticMeshActor> WeakGroundActorPtr;
 	

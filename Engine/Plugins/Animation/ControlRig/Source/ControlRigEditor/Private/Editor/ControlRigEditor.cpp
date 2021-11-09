@@ -534,8 +534,6 @@ void FControlRigEditor::InitControlRigEditor(const EToolkitMode::Type Mode, cons
 		}
 		
 	}, TStatId(), NULL, ENamedThreads::GameThread);
-
-	UpdateCapsules();
 	
 	CreateRigHierarchyToGraphDragAndDropMenu();
 }
@@ -3011,29 +3009,6 @@ void FControlRigEditor::Tick(float DeltaTime)
 		{
 			EditMode->bDrawHierarchyBones = bDrawHierarchyBones;
 		}
-
-		// check if we are supposed to have bones in our map
-		if ((EditMode->ConfigOption != nullptr) && (ControlRig != nullptr))
-		{
-			EBoneDrawMode::Type BoneDrawMode = (EBoneDrawMode::Type)EditMode->ConfigOption->DefaultBoneDrawSelection;
-			const bool bBonesExpectedInCapsules = BoneDrawMode != EBoneDrawMode::None;
-			bool bBonesFoundInCapsules = false;
-
-			for(const TPair<int32, int32>& Pair : CapsuleToHierarchyIndex)
-			{
-				const int32 HierarchyIndex = Pair.Value;
-				if(ControlRig->GetHierarchy()->GetKey(HierarchyIndex).Type == ERigElementType::Bone)
-				{
-					bBonesFoundInCapsules = true;
-					break;
-				}
-			}
-
-			if(bBonesExpectedInCapsules != bBonesFoundInCapsules)
-			{
-				UpdateCapsules();
-			}
-		}
 	}
 
 	if(WeakGroundActorPtr.IsValid())
@@ -3637,7 +3612,6 @@ void FControlRigEditor::OnToolbarDrawNullsChanged(ECheckBoxState InNewValue)
 	if (UControlRigEditModeSettings* Settings = GetMutableDefault<UControlRigEditModeSettings>())
 	{
 		Settings->bDisplayNulls = InNewValue == ECheckBoxState::Checked;
-		UpdateCapsules();
 	}
 }
 
@@ -3847,101 +3821,6 @@ void FControlRigEditor::HandlePreviewSceneCreated(const TSharedRef<IPersonaPrevi
 		}
 	}
 
-	UPersonaSelectionComponent* SelectionComponent = InPersonaPreviewScene->GetSelectionComponent();
-	check(SelectionComponent != nullptr);
-
-	// make sure the selection component ticks after the skeletal mesh comp
-	SelectionComponent->AddTickPrerequisiteComponent(EditorSkelComp);
-
-	SelectionComponent->OnUpdateCapsules().BindLambda([this](UPersonaSelectionComponent*, const TArray<int32>& InIndices, TArray<FPersonaSelectionCapsule>& OutCapsules)
-	{
-		if(UControlRig* DebuggedControlRig = Cast<UControlRig>(GetBlueprintObj()->GetObjectBeingDebugged()))
-		{
-			URigHierarchy* Hierarchy = DebuggedControlRig->GetHierarchy();
-			check(Hierarchy != nullptr);
-			
-			for(int32 Index = 0; Index < InIndices.Num(); Index++)
-			{
-				const int32 CapsuleIndex = InIndices[Index];
-				const int32 HierarchyIndex = CapsuleToHierarchyIndex.FindChecked(CapsuleIndex);
-
-				if (!Hierarchy->IsValidIndex(HierarchyIndex) || !OutCapsules.IsValidIndex(CapsuleIndex))
-				{
-					UpdateCapsules();
-					return;
-				}
-				
-				check(Hierarchy->IsValidIndex(HierarchyIndex));
-				check(OutCapsules.IsValidIndex(CapsuleIndex));
-
-				FPersonaSelectionCapsule& OutCapsule = OutCapsules[CapsuleIndex];
-				OutCapsule.Transform = Hierarchy->GetGlobalTransform(HierarchyIndex);
-				OutCapsule.Radius = 10.f;
-				OutCapsule.HalfHeight = 5.f;
-
-				if(Hierarchy->GetKey(HierarchyIndex).Type == ERigElementType::Bone)
-				{
-					const int32 ParentIndex = Hierarchy->GetFirstParent(HierarchyIndex);
-
-					FVector Start, End;
-					if (ParentIndex >= 0)
-					{
-						Start = Hierarchy->GetGlobalTransform(ParentIndex).GetLocation();
-						End = OutCapsule.Transform.GetLocation();
-					}
-					else
-					{
-						Start = FVector::ZeroVector;
-						End = OutCapsule.Transform.GetLocation();
-					}
-					
-					UPersonaSelectionComponent::ComputeCapsuleFromBonePositions(
-						Start,
-						End,
-						100.f,
-						DebuggedControlRig->GetDebugBoneRadiusMultiplier(),
-						OutCapsule);
-				}
-			}
-		}
-	});
-
-	// setup the capsules in the preview scene
-	SelectionComponent->OnClicked().BindLambda([this] (UPersonaSelectionComponent*, int32 InCapsuleIndex, const FPersonaSelectionCapsule& InCapsule)
-	{
-		const int32 HierarchyIndex = CapsuleToHierarchyIndex.FindChecked(InCapsuleIndex);
-
-		if (UControlRigBlueprint* ControlRigBP = GetControlRigBlueprint())
-		{
-			URigHierarchy* Hierarchy = ControlRigBP->Hierarchy;
-			const FRigElementKey ElementToSelect = Hierarchy->GetKey(HierarchyIndex);
-
-			if (FSlateApplication::Get().GetModifierKeys().IsShiftDown())
-			{
-				Hierarchy->GetController()->SelectElement(ElementToSelect, true);
-			}
-			else if (FSlateApplication::Get().GetModifierKeys().IsControlDown())
-			{
-				const bool bSelect = !Hierarchy->IsSelected(ElementToSelect);
-				Hierarchy->GetController()->SelectElement(ElementToSelect, bSelect);
-			}
-			else
-			{
-				TArray<FRigElementKey> NewSelection;
-				NewSelection.Add(ElementToSelect);
-				Hierarchy->GetController()->SetSelection(NewSelection);
-			}
-
-			/*
-			if (FControlRigEditMode* EditMode = GetEditMode())
-			{
-				EditMode->RequestToRecreateControlShapeActors();
-			}
-			*/
-		}
-	});
-
-	UpdateCapsules();
 }
 
 void FControlRigEditor::UpdateControlRig()
@@ -4751,7 +4630,6 @@ void FControlRigEditor::OnHierarchyChanged()
 	}
 	
 	CacheNameLists();
-	UpdateCapsules();
 }
 
 
@@ -6093,66 +5971,6 @@ void FControlRigEditor::HandleBreakpointActionRequested(const ERigVMBreakpointAc
 bool FControlRigEditor::IsHaltedAtBreakpoint() const
 {
 	return HaltedAtNode != nullptr;
-}
-
-void FControlRigEditor::UpdateCapsules()
-{
-	if(!PersonaToolkit.IsValid())
-	{
-		return;
-	}
-	
-	TSharedRef<IPersonaPreviewScene> CurrentPreviewScene = GetPersonaToolkit()->GetPreviewScene();
-	UPersonaSelectionComponent* SelectionComponent = CurrentPreviewScene->GetSelectionComponent();
-	check(SelectionComponent != nullptr);
-
-	SelectionComponent->Reset();
-	CapsuleToHierarchyIndex.Reset();
-
-	bool bCreateCapsulesForBones = false;
-	if (FControlRigEditorEditMode* EditMode = GetEditMode())
-	{
-		if (EditMode->ConfigOption)
-		{
-			EBoneDrawMode::Type BoneDrawMode = (EBoneDrawMode::Type)EditMode->ConfigOption->DefaultBoneDrawSelection;
-			bCreateCapsulesForBones = BoneDrawMode != EBoneDrawMode::None;
-		}
-	}
-
-	if(UControlRig* DebuggedControlRig = Cast<UControlRig>(GetBlueprintObj()->GetObjectBeingDebugged()))
-	{
-		URigHierarchy* Hierarchy = DebuggedControlRig->GetHierarchy();
-		
-		for(int32 Index = 0; Index < Hierarchy->Num(); Index++)
-		{
-			const FRigElementKey Key = Hierarchy->GetKey(Index);
-			switch(Key.Type)
-			{
-				case ERigElementType::Null:
-				{
-					if(GetToolbarDrawNulls() == ECheckBoxState::Checked)
-					{
-						const int32 CapsuleIndex = SelectionComponent->Add();
-						CapsuleToHierarchyIndex.Add(CapsuleIndex, Index);
-					}
-					break;
-				}
-				case ERigElementType::Bone:
-				{
-					if(bCreateCapsulesForBones)
-					{
-						const int32 CapsuleIndex = SelectionComponent->Add();
-						CapsuleToHierarchyIndex.Add(CapsuleIndex, Index);
-					}
-					break;
-				}
-				default:
-				{
-					break;
-				}						
-			}
-		}
-	}
 }
 
 void FControlRigEditor::FrameSelection()
