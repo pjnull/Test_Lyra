@@ -303,7 +303,7 @@ void FControlRigEditMode::SetObjects_Internal()
 
 bool FControlRigEditMode::UsesToolkits() const
 {
-	return IsInLevelEditor();
+	return true;
 }
 
 void FControlRigEditMode::Enter()
@@ -1594,7 +1594,7 @@ bool FControlRigEditMode::ShouldDrawWidget() const
 
 bool FControlRigEditMode::IsCompatibleWith(FEditorModeID OtherModeID) const
 {
-	return true;
+	return OtherModeID == FName(TEXT("EM_SequencerMode"), FNAME_Find) || OtherModeID == FName(TEXT("MotionTrailEditorMode"), FNAME_Find); /*|| OtherModeID == FName(TEXT("EditMode.ControlRigEditor"), FNAME_Find);*/
 }
 
 void FControlRigEditMode::AddReferencedObjects( FReferenceCollector& Collector )

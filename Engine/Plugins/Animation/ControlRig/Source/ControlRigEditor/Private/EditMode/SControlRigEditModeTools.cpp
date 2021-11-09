@@ -25,7 +25,6 @@
 #include "Rigs/FKControlRig.h"
 #include "SControlRigBaseListWidget.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
-#include "SControlRigTweenWidget.h"
 #include "IControlRigEditorModule.h"
 #include "Framework/Docking/TabManager.h"
 #include "ControlRigEditorStyle.h"
@@ -896,48 +895,8 @@ void SControlRigEditModeTools::CustomizeToolBarPalette(FToolBarBuilder& ToolBarB
 		FSlateIcon(TEXT("ControlRigEditorStyle"), TEXT("ControlRig.OnlySelectControls")),
 		EUserInterfaceActionType::ToggleButton
 		);
-	ToolBarBuilder.AddSeparator();
 
-	//POSES
-	ToolBarBuilder.AddToolBarButton(
-		FExecuteAction::CreateSP(this, &SControlRigEditModeTools::MakePoseDialog),
-		NAME_None,
-		LOCTEXT("Poses", "Poses"),
-		LOCTEXT("PosesTooltip", "Show Poses"),
-		FSlateIcon(TEXT("ControlRigEditorStyle"), TEXT("ControlRig.PoseTool")),
-		EUserInterfaceActionType::Button
-	);
-	ToolBarBuilder.AddSeparator();
 
-	// Tweens
-	ToolBarBuilder.AddToolBarButton(
-		FExecuteAction::CreateSP(this, &SControlRigEditModeTools::MakeTweenDialog),
-		NAME_None,
-		LOCTEXT("Tweens", "Tweens"),
-		LOCTEXT("TweensTooltip", "Create Tweens"),
-		FSlateIcon(TEXT("ControlRigEditorStyle"), TEXT("ControlRig.TweenTool")),
-		EUserInterfaceActionType::Button
-	);
-
-	// Snap
-	ToolBarBuilder.AddToolBarButton(
-		FExecuteAction::CreateSP(this, &SControlRigEditModeTools::MakeSnapperDialog),
-		NAME_None,
-		LOCTEXT("Snapper", "Snapper"),
-		LOCTEXT("SnapperTooltip", "Snap child objects to a parent object over a set of frames"),
-		FSlateIcon(TEXT("ControlRigEditorStyle"), TEXT("ControlRig.SnapperTool")),
-		EUserInterfaceActionType::Button
-	);
-
-	// Motion Trail
-	ToolBarBuilder.AddToolBarButton(
-		FExecuteAction::CreateSP(this, &SControlRigEditModeTools::MakeMotionTrailDialog),
-		NAME_None,
-		LOCTEXT("MotionTrails", "Trails"),
-		LOCTEXT("MotionTrailsTooltip", "Display motion trails for animated objects"),
-		FSlateIcon(TEXT("ControlRigEditorStyle"), TEXT("ControlRig.EditableMotionTrails")),
-		EUserInterfaceActionType::Button
-	);
 	//Pivot
 	ToolBarBuilder.AddToolBarButton(
 		FUIAction(
@@ -967,44 +926,6 @@ void SControlRigEditModeTools::CustomizeToolBarPalette(FToolBarBuilder& ToolBarB
 		FSlateIcon(TEXT("ControlRigEditorStyle"), TEXT("ControlRig.TemporaryPivot")),
 		EUserInterfaceActionType::ToggleButton
 		);
-	
-	ToolBarBuilder.AddSeparator();
-}
-
-void SControlRigEditModeTools::MakePoseDialog()
-{
-	FControlRigEditMode* ControlRigEditMode = static_cast<FControlRigEditMode*>(ModeTools->GetActiveMode(FControlRigEditMode::ModeName));
-	if (ControlRigEditMode)
-	{
-		FGlobalTabmanager::Get()->TryInvokeTab(IControlRigEditorModule::ControlRigPoseTab);
-	}
-}
-
-void SControlRigEditModeTools::MakeTweenDialog()
-{
-	FControlRigEditMode* ControlRigEditMode = static_cast<FControlRigEditMode*>(ModeTools->GetActiveMode(FControlRigEditMode::ModeName));
-	if (ControlRigEditMode)
-	{
-		FGlobalTabmanager::Get()->TryInvokeTab(IControlRigEditorModule::ControlRigTweenTab);
-	}
-}
-
-void SControlRigEditModeTools::MakeSnapperDialog()
-{
-	FControlRigEditMode* ControlRigEditMode = static_cast<FControlRigEditMode*>(ModeTools->GetActiveMode(FControlRigEditMode::ModeName));
-	if (ControlRigEditMode)
-	{
-		FGlobalTabmanager::Get()->TryInvokeTab(IControlRigEditorModule::ControlRigSnapperTab);
-	}
-}
-
-void SControlRigEditModeTools::MakeMotionTrailDialog()
-{
-	FControlRigEditMode* ControlRigEditMode = static_cast<FControlRigEditMode*>(GLevelEditorModeTools().GetActiveMode(FControlRigEditMode::ModeName));
-	if (ControlRigEditMode)
-	{
-		FGlobalTabmanager::Get()->TryInvokeTab(IControlRigEditorModule::ControlRigMotionTrailTab);
-	}
 }
 
 void SControlRigEditModeTools::ToggleEditPivotMode()

@@ -35,7 +35,7 @@ public:
 		return false;
 	}
 	virtual void Init(const TSharedPtr<IToolkitHost>& InitToolkitHost) override;
-
+	~FControlRigEditModeToolkit();
 	/** Mode Toolbar Palettes **/
 	virtual void GetToolPaletteNames(TArray<FName>& InPaletteName) const override;
 	virtual FText GetToolPaletteDisplayName(FName PaletteName) const override;
@@ -46,10 +46,15 @@ public:
 	virtual FText GetActiveToolMessage() const override;
 	virtual void OnToolPaletteChanged(FName PaletteName) override;
 
+protected:
+	/* FModeToolkit Interface */
+	virtual void RequestModeUITabs() override;
+	virtual void InvokeUI() override;
+
 private:
 	/** The edit mode we are bound to */
 	FControlRigEditMode& EditMode;
-
+	TSharedPtr<SWidget> TweenWidget;
 	/** The tools widget */
 	TSharedPtr<SControlRigEditModeTools> ModeTools;
 };
