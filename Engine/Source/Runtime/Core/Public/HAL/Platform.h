@@ -1116,28 +1116,33 @@ namespace TypeTests
 	#else
 		#define TEXT_PASTE(x) WIDETEXT_PASTE(x)
 	#endif
-	#define TEXT(x) TEXT_PASTE(x)
+		#define TEXT(x) TEXT_PASTE(x)
 #endif
 
-#if defined(__cpp_char8_t)
-	#define UTF8TEXT(x) UTF8TEXT_PASTE(x)
-#else
-	namespace UE::Core::Private
+namespace UE::Core::Private
+{
+	// Can't be constexpr because it involves casts
+	template <SIZE_T N>
+	FORCEINLINE auto ToUTF8Literal(const char (&Array)[N]) -> const UTF8CHAR(&)[N]
 	{
-		// Can't be constexpr because it involves casts
-		template <SIZE_T N>
-		FORCEINLINE auto ToUTF8Literal(const char(&Array)[N]) -> const UTF8CHAR(&)[N]
-		{
-			return (const UTF8CHAR(&)[N])Array;
-		}
-
-		FORCEINLINE constexpr UTF8CHAR ToUTF8Literal(unsigned long long Ch)
-		{
-			return (UTF8CHAR)Ch;
-		}
+		return (const UTF8CHAR (&)[N])Array;
 	}
 
-	#define UTF8TEXT(x) (UE::Core::Private::ToUTF8Literal(UTF8TEXT_PASTE(x)))
+#if defined(__cpp_char8_t)
+	// Can't be constexpr because it involves casts
+	template <SIZE_T N>
+	FORCEINLINE auto ToUTF8Literal(const char8_t (&Array)[N]) -> const UTF8CHAR(&)[N]
+	{
+		return (const UTF8CHAR (&)[N])Array;
+	}
 #endif
+
+	FORCEINLINE constexpr UTF8CHAR ToUTF8Literal(unsigned long long Ch)
+	{
+		return (UTF8CHAR)Ch;
+	}
+}
+
+#define UTF8TEXT(x) (UE::Core::Private::ToUTF8Literal(UTF8TEXT_PASTE(x)))
 
 #define WIDETEXT(str) WIDETEXT_PASTE(str)
