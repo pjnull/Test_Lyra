@@ -194,12 +194,12 @@ public:
 	{
 		if (bPendingKillDisabled)
 		{
-			checkSlow(GUObjectArray.IndexToObject(InternalIndex)->HasAnyFlags(EInternalObjectFlags::Garbage) == HasAnyFlags(RF_Garbage));
+			checkSlow(GUObjectArray.IndexToObject(InternalIndex)->HasAnyFlags(EInternalObjectFlags::Garbage) == HasAnyFlags(RF_InternalGarbage));
 			return HasAnyFlags(RF_InternalGarbage);
 		}
 		else
 		{
-			checkSlow(GUObjectArray.IndexToObject(InternalIndex)->HasAnyFlags(EInternalObjectFlags::PendingKill) == HasAnyFlags(RF_PendingKill));
+			checkSlow(GUObjectArray.IndexToObject(InternalIndex)->HasAnyFlags(EInternalObjectFlags::PendingKill) == HasAnyFlags(RF_InternalPendingKill));
 			return HasAnyFlags(RF_InternalPendingKill);
 		}
 	}
