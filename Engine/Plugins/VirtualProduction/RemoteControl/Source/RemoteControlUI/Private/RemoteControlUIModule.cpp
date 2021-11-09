@@ -202,8 +202,8 @@ void FRemoteControlUIModule::HandleCreatePropertyRowExtension(const FOnGenerateG
 			return OnGetExposedIcon(PropertyHandle);
 		});
 
-	ExposeButton.Label = LOCTEXT("ExposeProperty", "Expose Property");
-	ExposeButton.ToolTip = LOCTEXT("ExposePropertyToolTip", "Expose this property to Remote Control.");
+	ExposeButton.Label = TAttribute<FText>::Create(TAttribute<FText>::FGetter::CreateRaw(this, &FRemoteControlUIModule::GetExposePropertyButtonText, InArgs.PropertyHandle));
+	ExposeButton.ToolTip = TAttribute<FText>::Create(TAttribute<FText>::FGetter::CreateRaw(this, &FRemoteControlUIModule::GetExposePropertyButtonTooltip, InArgs.PropertyHandle));
 	ExposeButton.UIAction = FUIAction(
 		FExecuteAction::CreateRaw(this, &FRemoteControlUIModule::OnToggleExposeProperty, InArgs.PropertyHandle),
 		FCanExecuteAction::CreateRaw(this, &FRemoteControlUIModule::CanToggleExposeProperty, InArgs.PropertyHandle),
@@ -428,6 +428,36 @@ void FRemoteControlUIModule::RegisterWidgetFactories()
 	RegisterWidgetFactoryForType(FRemoteControlProperty::StaticStruct(), FOnGenerateRCWidget::CreateStatic(&SRCPanelExposedField::MakeInstance));
 	RegisterWidgetFactoryForType(FRemoteControlFunction::StaticStruct(), FOnGenerateRCWidget::CreateStatic(&SRCPanelExposedField::MakeInstance));
 	RegisterWidgetFactoryForType(FRemoteControlInstanceMaterial::StaticStruct(), FOnGenerateRCWidget::CreateStatic(&SRCPanelExposedField::MakeInstance));
+}
+
+FText FRemoteControlUIModule::GetExposePropertyButtonTooltip(TSharedPtr<IPropertyHandle> Handle) const
+{
+	if (URemoteControlPreset* Preset = GetActivePreset())
+	{
+		const FText PresetName = FText::FromString(Preset->GetName());
+		if (GetPropertyExposeStatus(Handle) == EPropertyExposeStatus::Exposed)
+		{
+			return FText::Format(LOCTEXT("ExposePropertyToolTip", "Unexpose this property from RemoteControl Preset '{0}'."), PresetName);
+		}
+		else
+		{
+			return FText::Format(LOCTEXT("UnexposePropertyToolTip", "Expose this property in RemoteControl Preset '{0}'."), PresetName);
+		}
+	}
+
+	return LOCTEXT("InvalidExposePropertyTooltip", "Invalid Preset");
+}
+
+FText FRemoteControlUIModule::GetExposePropertyButtonText(TSharedPtr<IPropertyHandle> Handle) const
+{
+	if (GetPropertyExposeStatus(Handle) == EPropertyExposeStatus::Exposed)
+	{
+		return LOCTEXT("ExposePropertyToolTip", "Unexpose property");
+	}
+	else
+	{
+		return LOCTEXT("UnexposePropertyToolTip", "Expose property");
+	}
 }
 
 TSharedPtr<SRCPanelTreeNode> FRemoteControlUIModule::GenerateEntityWidget(const FGenerateWidgetArgs& Args)

@@ -131,6 +131,13 @@ private:
 	void OnSettingsModified(UObject*, struct FPropertyChangedEvent&);
 
 	void RegisterWidgetFactories();
+
+	/** Returns expose button tooltip based on exposed state */
+	FText GetExposePropertyButtonTooltip(TSharedPtr<IPropertyHandle> Handle) const;
+
+	/** Returns expose button text based on exposed state */
+	FText GetExposePropertyButtonText(TSharedPtr<IPropertyHandle> Handle) const;
+
 private:
 	/** The custom actions added to the actor context menu. */
 	TSharedPtr<class FRemoteControlPresetActions> RemoteControlPresetActions;
