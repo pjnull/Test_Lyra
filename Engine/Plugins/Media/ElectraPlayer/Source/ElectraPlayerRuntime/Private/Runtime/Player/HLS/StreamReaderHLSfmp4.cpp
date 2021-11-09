@@ -905,7 +905,7 @@ void FStreamReaderHLSfmp4::FStreamHandler::HandleRequest()
 
 										// Offset the AU's DTS and PTS to the time mapping of the segment.
 										AccessUnit->DTS = DTS;
-										AccessUnit->PTS = DTS;
+										AccessUnit->PTS = PTS;
 										AccessUnit->SequenceIndex = Request->TimestampSequenceIndex;
 										AccessUnit->DTS.SetSequenceIndex(Request->TimestampSequenceIndex);
 										AccessUnit->PTS.SetSequenceIndex(Request->TimestampSequenceIndex);
