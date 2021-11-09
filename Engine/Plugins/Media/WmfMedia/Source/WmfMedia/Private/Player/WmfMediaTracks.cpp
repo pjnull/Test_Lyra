@@ -1356,10 +1356,8 @@ bool FWmfMediaTracks::AddTrackToTopology(const FTrack& Track, IMFTopology& Topol
 		WmfMediaDecoder* Decoder = (WmfMediaDecoder*)Transform.Get();
 		if (Decoder != nullptr)
 		{
-			// Is this D3D12?
-			const TCHAR* RHIName = GDynamicRHI->GetName();
-			bool bIsD3D12 = (TCString<TCHAR>::Stricmp(RHIName, TEXT("D3D12")) == 0);
-			Decoder->EnableExternalBuffer(bIsD3D12);
+			// Enable external buffers.
+			Decoder->EnableExternalBuffer(true);
 
 			if (MediaStreamSink.IsValid())
 			{

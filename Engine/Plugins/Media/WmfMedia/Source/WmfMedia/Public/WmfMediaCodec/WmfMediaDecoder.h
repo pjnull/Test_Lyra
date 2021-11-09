@@ -66,6 +66,13 @@ public:
 	void EnableExternalBuffer(bool bInEnable);
 
 	/**
+	 * See if external buffers are enabled.
+	 *
+	 * @return True if so.
+	 */
+	bool IsExternalBufferEnabled() const { return bIsExternalBufferEnabled; }
+
+	/**
 	 * Call this to get a decoded external buffer from the decoder.
 	 * InBuffer does not need to have any space.
 	 * This will move the data to InBuffer.

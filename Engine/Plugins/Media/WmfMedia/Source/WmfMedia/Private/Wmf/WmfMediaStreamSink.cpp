@@ -112,10 +112,6 @@ bool FWmfMediaStreamSink::Initialize(FWmfMediaSink& InOwner)
 
 	Owner = &InOwner;
 
-	// Is this D3D12?
-	const TCHAR* RHIName = GDynamicRHI->GetName();
-	bIsD3D12 = (TCString<TCHAR>::Stricmp(RHIName, TEXT("D3D12")) == 0);
-
 	return true;
 }
 
@@ -913,15 +909,10 @@ void FWmfMediaStreamSink::CopyTextureAndEnqueueSample(IMFSample* pSample)
 			MediaTextureSampleFormat = EMediaTextureSampleFormat::Y416;
 		}
 
-		// Is this D3D12?
-		if (bIsD3D12)
+		// Are we using external buffers?
+		if ((Decoder != nullptr) && (Decoder->IsExternalBufferEnabled()))
 		{
 			// Get buffer from the decoder.
-			if (Decoder == nullptr)
-			{
-				return;
-			}
-
 			TArray<uint8> ExternalBuffer;
 			if (Decoder->GetExternalBuffer(ExternalBuffer, SampleTime) == false)
 			{

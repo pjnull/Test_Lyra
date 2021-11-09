@@ -287,9 +287,6 @@ private:
 	/** Make sure we don't spam output with MF_MT_SUBTYPE error message */
 	bool bShowSubTypeErrorMessage;
 
-	/** True if we are running in D3D12. */
-	bool bIsD3D12;
-
 	/** Structure for queued media samples & markers. */
 	struct FQueuedSample
 	{
