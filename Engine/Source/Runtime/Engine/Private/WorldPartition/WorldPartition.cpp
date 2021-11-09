@@ -455,6 +455,16 @@ void UWorldPartition::Initialize(UWorld* InWorld, const FTransform& InTransform)
 		}
 	}
 
+	// Make sure to preload only AWorldDataLayers actor first (ShouldActorBeLoadedByEditorCells requires it)
+	for (UActorDescContainer::TIterator<> ActorDescIterator(this); ActorDescIterator; ++ActorDescIterator)
+	{
+		if (ActorDescIterator->GetActorClass()->IsChildOf<AWorldDataLayers>())
+		{
+			WorldDataLayersActor = FWorldPartitionReference(this, ActorDescIterator->GetGuid());
+			break;
+		}
+	}
+
 	if (bEditorOnly)
 	{
 		// Load the always loaded cell, don't call LoadCells to avoid creating a transaction
@@ -576,6 +586,8 @@ void UWorldPartition::Uninitialize()
 				});
 			}
 		}
+
+		WorldDataLayersActor = FWorldPartitionReference();
 
 		EditorHash = nullptr;
 #endif		

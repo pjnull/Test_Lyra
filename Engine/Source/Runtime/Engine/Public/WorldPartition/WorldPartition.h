@@ -209,6 +209,8 @@ private:
 #if WITH_EDITORONLY_DATA
 	FLinkerInstancingContext InstancingContext;
 	TUniquePtr<FSoftObjectPathFixupArchive> InstancingSoftObjectPathFixupArchive;
+
+	FWorldPartitionReference WorldDataLayersActor;
 #endif
 
 	bool IsMainWorldPartition() const;
