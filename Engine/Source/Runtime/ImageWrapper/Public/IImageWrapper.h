@@ -109,9 +109,10 @@ public:
 	 * @param InHeight the height of the image data.
 	 * @param InFormat the format the raw data is in, normally RGBA.
 	 * @param InBitDepth the bit-depth per channel, normally 8.
+	 * @param InBytesPerRow the number of bytes between rows, 0 = tightly packed rows with no padding.
 	 * @return true if data was the expected format.
 	 */
-	virtual bool SetRaw(const void* InRawData, int64 InRawSize, const int32 InWidth, const int32 InHeight, const ERGBFormat InFormat, const int32 InBitDepth) = 0;
+	virtual bool SetRaw(const void* InRawData, int64 InRawSize, const int32 InWidth, const int32 InHeight, const ERGBFormat InFormat, const int32 InBitDepth, const int32 InBytesPerRow = 0) = 0;
 
 	/**
 	 * Set information for animated formats

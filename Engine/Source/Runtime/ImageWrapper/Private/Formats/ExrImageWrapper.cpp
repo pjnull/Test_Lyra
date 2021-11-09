@@ -183,12 +183,13 @@ int32 GetChannelNames(ERGBFormat InRGBFormat, const char* const*& OutChannelName
 	return ChannelCount;
 }
 
-bool FExrImageWrapper::SetRaw(const void* InRawData, int64 InRawSize, const int32 InWidth, const int32 InHeight, const ERGBFormat InFormat, const int32 InBitDepth)
+bool FExrImageWrapper::SetRaw(const void* InRawData, int64 InRawSize, const int32 InWidth, const int32 InHeight, const ERGBFormat InFormat, const int32 InBitDepth, const int32 InBytesPerRow)
 {
 	check(InRawData);
 	check(InRawSize > 0);
 	check(InWidth > 0);
 	check(InHeight > 0);
+	check(InBytesPerRow >= 0);
 
 	switch (InBitDepth)
 	{
@@ -216,7 +217,7 @@ bool FExrImageWrapper::SetRaw(const void* InRawData, int64 InRawSize, const int3
 		break;
 	}
 
-	return FImageWrapperBase::SetRaw(InRawData, InRawSize, InWidth, InHeight, InFormat, InBitDepth);
+	return FImageWrapperBase::SetRaw(InRawData, InRawSize, InWidth, InHeight, InFormat, InBitDepth, InBytesPerRow);
 }
 
 bool FExrImageWrapper::SetCompressed(const void* InCompressedData, int64 InCompressedSize)
