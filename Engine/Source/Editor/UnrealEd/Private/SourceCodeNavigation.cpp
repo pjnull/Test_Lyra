@@ -1472,7 +1472,7 @@ void FSourceCodeNavigation::RemoveNavigationHandler(ISourceCodeNavigationHandler
 
 void FSourceCodeNavigation::SetPreferredAccessor(const TCHAR* Name)
 {
-	GConfig->SetString(TEXT("/Script/SourceCodeAccess.SourceCodeAccessSettings"), TEXT("PreferredAccessor"), Name, GEngineIni);
+	GConfig->SetString(TEXT("/Script/SourceCodeAccess.SourceCodeAccessSettings"), TEXT("PreferredAccessor"), Name, GEditorSettingsIni);
 
 	ISourceCodeAccessModule& SourceCodeAccessModule = FModuleManager::LoadModuleChecked<ISourceCodeAccessModule>(TEXT("SourceCodeAccess"));
 	SourceCodeAccessModule.SetAccessor(Name);
