@@ -185,17 +185,12 @@ FActorClusterContext::FActorClusterContext(TArray<FActorContainerInstance>&& InC
 	}
 }
 
-FActorContainerInstance::FActorContainerInstance(const UActorDescContainer* InContainer, TMap<FGuid, FWorldPartitionActorDescView> InActorDescViewMap)
-	: FActorContainerInstance(0, FTransform::Identity, FBox(ForceInit), TSet<FName>(), EContainerClusterMode::Partitioned, InContainer, TSet<FGuid>(), InActorDescViewMap)
-{}
-
-FActorContainerInstance::FActorContainerInstance(uint64 InID, const FTransform& InTransform, const FBox& InBounds, const TSet<FName>& InDataLayers, EContainerClusterMode InClusterMode, const UActorDescContainer* InContainer, TSet<FGuid> InChildContainers, TMap<FGuid, FWorldPartitionActorDescView> InActorDescViewMap)
+FActorContainerInstance::FActorContainerInstance(uint64 InID, const FTransform& InTransform, const FBox& InBounds, const TSet<FName>& InDataLayers, EContainerClusterMode InClusterMode, const UActorDescContainer* InContainer, TMap<FGuid, FWorldPartitionActorDescView> InActorDescViewMap)
 	: ID(InID)
 	, Transform(InTransform)
 	, Bounds(InBounds)
 	, ClusterMode(InClusterMode)
 	, Container(InContainer)
-	, ChildContainers(InChildContainers)
 	, ActorDescViewMap(InActorDescViewMap)
 {
 	DataLayers = GetDataLayers(InContainer->GetWorld(), InDataLayers);
@@ -221,12 +216,6 @@ FActorInstance::FActorInstance(const FGuid& InActor, const FActorContainerInstan
 
 bool FActorInstance::ShouldStripFromStreaming() const
 {
-	// If this Actor instance is a Container itself we strip it
-	if (ContainerInstance->ChildContainers.Contains(Actor))
-	{
-		return true;
-	}
-
 	const FWorldPartitionActorDescView& ActorDescView = GetActorDescView();
 	return ActorDescView.GetActorIsEditorOnly();
 }

@@ -73,7 +73,6 @@ class FWorldPartitionStreamingGenerator
 
 	void CreateActorDescriptorViewsRecursive(const UActorDescContainer* InContainer, const FTransform& InTransform, const TSet<FName>& InDataLayers, uint64 InContainerID, uint64 InParentContainerID, EContainerClusterMode InClusterMode)
 	{
-		TSet<FGuid> ChildContainers;
 		TMap<FGuid, FWorldPartitionActorDescView> ActorDescViewMap;
 		
 		// Gather actor descriptor views for this container
@@ -94,9 +93,6 @@ class FWorldPartitionStreamingGenerator
 			{
 				check(SubContainer);
 
-				// idea: here we could check InClusterMode and set the actor desc view as editor only instead?
-				ChildContainers.Add(ActorDescView.GetGuid());
-
 				const FGuid ActorGuid = ActorDescView.GetGuid();
 				const uint64 SubContainerID = CityHash64WithSeed((const char*)&ActorGuid, sizeof(ActorGuid), InContainerID);
 
@@ -111,6 +107,9 @@ class FWorldPartitionStreamingGenerator
 				}
 
 				CreateActorDescriptorViewsRecursive(SubContainer, SubTransform * InTransform, *SubDataLayers, SubContainerID, InContainerID, SubClusterMode);
+
+				// The container actor can be removed now that its contained actors has been registered
+				It.RemoveCurrent();
 			}
 
 			if (InContainerID)
@@ -125,7 +124,6 @@ class FWorldPartitionStreamingGenerator
 		ContainerDescriptor.Transform = InTransform;
 		ContainerDescriptor.ClusterMode = InClusterMode;
 		ContainerDescriptor.ActorDescViewMap = MoveTemp(ActorDescViewMap);
-		ContainerDescriptor.ChildContainers = MoveTemp(ChildContainers);
 		ContainerDescriptor.DataLayers = InDataLayers;		
 	}
 
@@ -232,7 +230,7 @@ public:
 			const uint64& ContainerID = It.Key();
 			const FContainerDescriptor& ContainerDescriptor = It.Value();
 
-			ContainerInstances.Emplace(ContainerID, ContainerDescriptor.Transform, ContainerDescriptor.Bounds, ContainerDescriptor.DataLayers, ContainerDescriptor.ClusterMode, ContainerDescriptor.Container, ContainerDescriptor.ChildContainers, ContainerDescriptor.ActorDescViewMap);
+			ContainerInstances.Emplace(ContainerID, ContainerDescriptor.Transform, ContainerDescriptor.Bounds, ContainerDescriptor.DataLayers, ContainerDescriptor.ClusterMode, ContainerDescriptor.Container, ContainerDescriptor.ActorDescViewMap);
 		}
 
 		return FActorClusterContext(MoveTemp(ContainerInstances), InFilterActorDescViewFunc);
@@ -254,7 +252,6 @@ private:
 		const UActorDescContainer* Container;
 		EContainerClusterMode ClusterMode;
 		TMap<FGuid, FWorldPartitionActorDescView> ActorDescViewMap;
-		TSet<FGuid> ChildContainers;
 		TSet<FName> DataLayers;
 	};
 
