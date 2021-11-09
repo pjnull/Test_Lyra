@@ -1200,7 +1200,7 @@ class FRealtimeGC : public FGarbageCollectionTracer
 	/** Calculates GC function index based on current settings */
 	static FORCEINLINE int32 GetGCFunctionIndex(EFastReferenceCollectorOptions InOptions)
 	{
-		return !!(InOptions & EFastReferenceCollectorOptions::Parallel) |
+		return (!!(InOptions & EFastReferenceCollectorOptions::Parallel)) |
 			(!!(InOptions & EFastReferenceCollectorOptions::WithClusters) << 1) |
 			(!!(InOptions & EFastReferenceCollectorOptions::WithPendingKill) << 2);
 	}
