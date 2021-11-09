@@ -5,6 +5,7 @@
 #if PLATFORM_MAC || PLATFORM_IOS || PLATFORM_TVOS
 
 #include "PlayerCore.h"
+#include "PlayerRuntimeGlobal.h"
 
 #include "StreamAccessUnitBuffer.h"
 #include "Decoder/VideoDecoderH264.h"
@@ -238,6 +239,9 @@ private:
 	void StopThread();
 	void WorkerThread();
 
+	void HandleApplicationHasEnteredForeground();
+	void HandleApplicationWillEnterBackground();
+
 	bool CreateDecodedImagePool();
 	void DestroyDecodedImagePool();
 
@@ -246,6 +250,7 @@ private:
 	bool AcquireOutputBuffer(IMediaRenderer::IBuffer*& RenderOutputBuffer);
 
 	void PrepareAU(TSharedPtr<FDecoderInput, ESPMode::ThreadSafe> AU);
+	void GetAndPrepareInputAU();
 
 	void ProcessOutput(bool bFlush = false);
 
@@ -276,6 +281,9 @@ private:
 	FMediaEvent											DecoderFlushedSignal;
 	bool												bThreadStarted;
 
+	FMediaEvent											ApplicationRunningSignal;
+	FMediaEvent											ApplicationSuspendConfirmedSignal;
+
 	IPlayerSessionServices*								PlayerSessionServices;
 
 	TSharedPtr<IMediaRenderer, ESPMode::ThreadSafe>		Renderer;
@@ -284,6 +292,7 @@ private:
 
 	TAccessUnitQueue<TSharedPtr<FDecoderInput, ESPMode::ThreadSafe>>		NextAccessUnits;
 	TAccessUnitQueue<TSharedPtr<FDecoderInput, ESPMode::ThreadSafe>>		ReplayAccessUnits;
+	TSharedPtr<FDecoderInput, ESPMode::ThreadSafe>		CurrentAccessUnit;
 	bool												bDrainForCodecChange;
 
 	FMediaCriticalSection								ListenerMutex;
@@ -765,7 +774,7 @@ void FVideoDecoderH264::RecreateDecoderSession()
 		bool bFirst = true;
 		while(!bError && !bDone)
 		{
-			if (ReplayAccessUnits.Dequeue(AU))
+			if (!ReplayAccessUnits.IsEmpty() && ReplayAccessUnits.Dequeue(AU))
 			{
 				ReprocessedAUs.Enqueue(AU);
 				// Create the format description from the first replay AU.
@@ -802,13 +811,17 @@ void FVideoDecoderH264::RecreateDecoderSession()
 		// Even in case of an error we need to get all replay AUs into our processed FIFO and
 		// from there back into the replay buffer. We may need them again and they need to
 		// stay in the original order.
-		while(ReplayAccessUnits.Dequeue(AU))
+		while(!ReplayAccessUnits.IsEmpty())
 		{
-			ReprocessedAUs.Enqueue(AU);
+			TSharedPtrTS<FDecoderInput> ReplayAU;
+			ReplayAccessUnits.Dequeue(ReplayAU);
+			ReprocessedAUs.Enqueue(ReplayAU);
 		}
-		while(ReprocessedAUs.Dequeue(AU))
+		while(!ReprocessedAUs.IsEmpty())
 		{
-			ReplayAccessUnits.Enqueue(AU);
+			TSharedPtrTS<FDecoderInput> ReplayAU;
+			ReprocessedAUs.Dequeue(ReplayAU);
+			ReplayAccessUnits.Enqueue(ReplayAU);
 		}
 	// Flush the decoder to get it idle and discard any accumulated source infos.
 	FlushDecoder();
@@ -969,6 +982,51 @@ void FVideoDecoderH264::PrepareAU(TSharedPtr<FDecoderInput, ESPMode::ThreadSafe>
 				}
 				AU->bIsDiscardable = false;
 			}
+		}
+	}
+}
+
+//-----------------------------------------------------------------------------
+/**
+ * Gets an input access unit and prepares it for use.
+ */
+void FVideoDecoderH264::GetAndPrepareInputAU()
+{
+	if (bDrainForCodecChange)
+	{
+		return;
+	}
+
+	// Need new input?
+	if (!CurrentAccessUnit.IsValid() && InputBufferListener && NextAccessUnits.IsEmpty())
+	{
+		{
+			SCOPE_CYCLE_COUNTER(STAT_ElectraPlayer_VideoH264Decode);
+			CSV_SCOPED_TIMING_STAT(ElectraPlayer, VideoH264Decode);
+
+			IAccessUnitBufferListener::FBufferStats	stats;
+			stats.bEODSignaled = NextAccessUnits.GetEOD();
+			stats.bEODReached = NextAccessUnits.ReachedEOD();
+			ListenerMutex.Lock();
+			if (InputBufferListener)
+			{
+				InputBufferListener->DecoderInputNeeded(stats);
+			}
+			ListenerMutex.Unlock();
+		}
+
+		// Get the AU to be decoded if one is there.
+		bool bHaveData = NextAccessUnits.Wait(1000);
+		if (bHaveData)
+		{
+			SCOPE_CYCLE_COUNTER(STAT_ElectraPlayer_VideoH264Decode);
+			CSV_SCOPED_TIMING_STAT(ElectraPlayer, VideoH264Decode);
+
+			bool bOk = NextAccessUnits.Dequeue(CurrentAccessUnit);
+			MEDIA_UNUSED_VAR(bOk);
+			check(bOk);
+
+			PrepareAU(CurrentAccessUnit);
 		}
 	}
 }
@@ -1307,11 +1365,40 @@ FVideoDecoderH264::EDecodeResult FVideoDecoderH264::Decode(TSharedPtr<FDecoderIn
 
 //-----------------------------------------------------------------------------
 /**
+ * Application has entered foreground.
+ */
+void FVideoDecoderH264::HandleApplicationHasEnteredForeground()
+{
+	ApplicationRunningSignal.Signal();
+}
+
+
+//-----------------------------------------------------------------------------
+/**
+ * Application goes into background.
+ */
+void FVideoDecoderH264::HandleApplicationWillEnterBackground()
+{
+	ApplicationSuspendConfirmedSignal.Reset();
+	ApplicationRunningSignal.Reset();
+}
+
+
+//-----------------------------------------------------------------------------
+/**
  * H264 video decoder main threaded decode loop
  */
 void FVideoDecoderH264::WorkerThread()
 {
 	LLM_SCOPE(ELLMTag::ElectraPlayer);
+
+	ApplicationRunningSignal.Signal();
+	ApplicationSuspendConfirmedSignal.Reset();
+
+	TSharedPtrTS<FFGBGNotificationHandlers> FGBGHandlers = MakeSharedTS<FFGBGNotificationHandlers>();
+	FGBGHandlers->WillEnterBackground = [this]() { HandleApplicationWillEnterBackground(); };
+	FGBGHandlers->HasEnteredForeground = [this]() { HandleApplicationHasEnteredForeground(); };
+	AddBGFGNotificationHandler(FGBGHandlers);
 
 	TOptional<int64> SequenceIndex;
 	bool bDone  = false;
@@ -1328,25 +1415,22 @@ void FVideoDecoderH264::WorkerThread()
 
 	while(!TerminateThreadSignal.IsSignaled())
 	{
+		// If in background, wait until we get activated again.
+		if (!ApplicationRunningSignal.IsSignaled())
+		{
+			UE_LOG(LogElectraPlayer, Log, TEXT("FVideoDecoderH264(%p): OnSuspending"), this);
+			ApplicationSuspendConfirmedSignal.Signal();
+			while(!ApplicationRunningSignal.WaitTimeout(100 * 1000) && !TerminateThreadSignal.IsSignaled())
+			{
+			}
+			UE_LOG(LogElectraPlayer, Log, TEXT("FVideoDecoderH264(%p): OnResuming"), this);
+		}
+
 		if (!bDrainForCodecChange)
 		{
-			// Notify optional buffer listener that we will now be needing an AU for our input buffer.
-			if (!bError && InputBufferListener && NextAccessUnits.IsEmpty())
-			{
-				SCOPE_CYCLE_COUNTER(STAT_ElectraPlayer_VideoH264Decode);
-				CSV_SCOPED_TIMING_STAT(ElectraPlayer, VideoH264Decode);
-				IAccessUnitBufferListener::FBufferStats	stats;
-				stats.bEODSignaled = NextAccessUnits.GetEOD();
-				stats.bEODReached = NextAccessUnits.ReachedEOD();
-				ListenerMutex.Lock();
-				if (InputBufferListener)
-				{
-					InputBufferListener->DecoderInputNeeded(stats);
-				}
-				ListenerMutex.Unlock();
-			}
-			// Wait for data.
-			bool bHaveData = NextAccessUnits.Wait(1000 * 5);
+			GetAndPrepareInputAU();
+
+			bool bHaveData = CurrentAccessUnit.IsValid();
 
 			// Only send new data to the decoder if we know we got enough room (to avoid accumulating too many frames in our internal PTS-sort queue)
 			bool bTooManyImagesWaiting = false;
@@ -1382,12 +1466,6 @@ void FVideoDecoderH264::WorkerThread()
 
 			if (bHaveData && !bTooManyImagesWaiting)
 			{
-				TSharedPtr<FDecoderInput, ESPMode::ThreadSafe> CurrentAccessUnit;
-				bool bOk = NextAccessUnits.Dequeue(CurrentAccessUnit);
-				MEDIA_UNUSED_VAR(bOk);
-				check(bOk);
-
-				PrepareAU(CurrentAccessUnit);
 				if (!CurrentAccessUnit->AccessUnit->bIsDummyData)
 				{
 					bInDummyDecodeMode = false;
@@ -1459,6 +1537,7 @@ void FVideoDecoderH264::WorkerThread()
 							{
 								ReplayAccessUnits.Enqueue(CurrentAccessUnit);
 							}
+						CurrentAccessUnit.Reset();
 						}
 						// Lost the decoder session?
 						else if (DecRes == EDecodeResult::SessionLost)
@@ -1493,16 +1572,15 @@ void FVideoDecoderH264::WorkerThread()
 					FMediaRunnable::SleepMicroseconds(CurrentAccessUnit->AdjustedDuration.GetAsMicroseconds());
 
 					ProcessOutput();
+					CurrentAccessUnit.Reset();
 				}
-
-				CurrentAccessUnit.Reset();
 			}
 			else
 			{
 				ProcessOutput();
 
 				// No data. Is the buffer at EOD?
-				if (NextAccessUnits.ReachedEOD())
+				if (!CurrentAccessUnit.IsValid() && NextAccessUnits.ReachedEOD())
 				{
 					NotifyReadyBufferListener(true);
 					// Are we done yet?
@@ -1543,6 +1621,7 @@ void FVideoDecoderH264::WorkerThread()
 			NextAccessUnits.Empty();
 			ReplayAccessUnits.Empty();
 			SequenceIndex.Reset();
+			CurrentAccessUnit.Reset();
 
 			FlushDecoderSignal.Reset();
 			DecoderFlushedSignal.Signal();
@@ -1558,6 +1637,10 @@ void FVideoDecoderH264::WorkerThread()
 	ClearInDecoderInfos();
 	NextAccessUnits.Empty();
 	ReplayAccessUnits.Empty();
+	CurrentAccessUnit.Reset();
+
+	RemoveBGFGNotificationHandler(FGBGHandlers);
+
 	if (bDrainForCodecChange)
 	{
 		// Notify the player that we have finished draining.
