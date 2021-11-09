@@ -14,7 +14,56 @@
 
 namespace Chaos
 {
+	template <typename T>
+	struct TGetters
+	{
+		TFunction<T()> GetMargin;
+		TFunction<TVector<T, 3>(const TVec3<T>& Direction, T InMargin)> SupportCore;
 
+		TGetters(TFunction<T()>&& InGetMargin, TFunction<TVector<T, 3>(const TVec3<T>& Direction, T InMargin)>&& InSupportCore)
+			: GetMargin(InGetMargin)
+			, SupportCore(InSupportCore)
+		{
+		}
+	};
+
+	template <typename T, typename TGeometry>
+	struct TGeometryGetters : public TGetters<T>
+	{
+		TGeometryGetters(const TGeometry& Geometry)
+			: TGetters<T>(
+				[&Geometry]() { return Geometry.GetMargin(); },
+				[&Geometry](const TVec3<T>& Direction, T InMargin) { return Geometry.SupportCore(Direction, InMargin); })
+		{
+		}
+	};
+
+	template <typename T>
+	struct TGettersWithRadius
+	{
+		TFunction<T()> GetRadius;
+		TFunction<T()> GetMargin;
+		TFunction<TVector<T, 3>(const TVec3<T>& Direction, T InMargin)> SupportCore;
+
+		TGettersWithRadius(TFunction<T()>&& InGetRadius, TFunction<T()>&& InGetMargin, TFunction<TVector<T, 3>(const TVec3<T>& Direction, T InMargin)>&& InSupportCore)
+			: GetRadius(InGetRadius)
+			, GetMargin(InGetMargin)
+			, SupportCore(InSupportCore)
+		{
+		}
+	};
+
+	template <typename T, typename TGeometry>
+	struct TGeometryGettersWithRadius : public TGettersWithRadius<T>
+	{
+		TGeometryGettersWithRadius(const TGeometry& Geometry)
+			: TGettersWithRadius<T>(
+				[&Geometry]() { return Geometry.GetRadius(); },
+				[&Geometry]() { return Geometry.GetMargin(); },
+				[&Geometry](const TVec3<T>& Direction, T InMargin) { return Geometry.SupportCore(Direction, InMargin); })
+		{
+		}
+	};
 	
 	/** Determines if two convex geometries overlap.
 	 @A The first geometry
@@ -389,6 +438,15 @@ namespace Chaos
 	template <bool bNegativePenetrationAllowed = false, typename T, typename TGeometryA, typename TGeometryB>
 	bool GJKPenetration(const TGeometryA& A, const TGeometryB& B, const TRigidTransform<T, 3>& BToATM, T& OutPenetration, TVec3<T>& OutClosestA, TVec3<T>& OutClosestB, TVec3<T>& OutNormal, int32& OutClosestVertexIndexA, int32& OutClosestVertexIndexB, const T InThicknessA = 0.0f, const T InThicknessB = 0.0f, const TVector<T, 3>& InitialDir = TVector<T, 3>(1, 0, 0), const T Epsilon = 1.e-3f)
 	{
+		TGeometryGetters<T, TGeometryA> AGetters(A);
+		TGeometryGetters<T, TGeometryB> BGetters(B);
+		
+		return GJKPenetrationImpl(AGetters, BGetters, BToATM, OutPenetration, OutClosestA, OutClosestB, OutNormal, OutClosestVertexIndexA, OutClosestVertexIndexB, InThicknessA, InThicknessB, InitialDir, Epsilon);
+	}
+
+	template <bool bNegativePenetrationAllowed = false, typename T>
+	bool GJKPenetrationImpl(const TGetters<T>& A, const TGetters<T>& B, const TRigidTransform<T, 3>& BToATM, T& OutPenetration, TVec3<T>& OutClosestA, TVec3<T>& OutClosestB, TVec3<T>& OutNormal, int32& OutClosestVertexIndexA, int32& OutClosestVertexIndexB, const T InThicknessA = 0.0f, const T InThicknessB = 0.0f, const TVector<T, 3>& InitialDir = TVector<T, 3>(1, 0, 0), const T Epsilon = 1.e-3f)
+	{
 		int32 VertexIndexA = INDEX_NONE;
 		int32 VertexIndexB = INDEX_NONE;
 
@@ -407,6 +465,9 @@ namespace Chaos
 			const TVector<T, 3> SupportBLocal = B.SupportCore(VInB, B.GetMargin());
 			return BToATM.TransformPositionNoScale(SupportBLocal);
 		};
+
+		TFunctionRef<TVector<T, 3>(const TVec3<T>& V)> SupportAFuncRef(SupportAFunc);
+		TFunctionRef<TVector<T, 3>(const TVec3<T>& V)> SupportBFuncRef(SupportBFunc);
 
 		//todo: refactor all of these similar functions
 		TVector<T, 3> V = -InitialDir;
@@ -493,7 +554,7 @@ namespace Chaos
 
 			T Penetration;
 			TVec3<T> MTD, ClosestA, ClosestBInA;
-			const EEPAResult EPAResult = EPA(VertsA, VertsB, SupportAFunc, SupportBFunc, Penetration, MTD, ClosestA, ClosestBInA);
+			const EEPAResult EPAResult = EPA(VertsA, VertsB, SupportAFuncRef, SupportBFuncRef, Penetration, MTD, ClosestA, ClosestBInA);
 			
 			switch (EPAResult)
 			{
@@ -713,6 +774,16 @@ namespace Chaos
 	bool GJKRaycast2(const TGeometryA& A, const TGeometryB& B, const TRigidTransform<T, 3>& StartTM, const TVector<T, 3>& RayDir, const T RayLength,
 		T& OutTime, TVector<T, 3>& OutPosition, TVector<T, 3>& OutNormal, const T GivenThicknessA = 0, bool bComputeMTD = false, const TVector<T, 3>& InitialDir = TVector<T, 3>(1, 0, 0), const T GivenThicknessB = 0)
 	{
+		TGeometryGettersWithRadius<T, TGeometryA> AGetters(A);
+		TGeometryGettersWithRadius<T, TGeometryB> BGetters(B);
+
+		return GJKRaycast2Impl(AGetters, BGetters, StartTM, RayDir, RayLength, OutTime, OutPosition, OutNormal, GivenThicknessA, bComputeMTD, InitialDir, GivenThicknessB);
+	}
+
+	template <typename T>
+	bool GJKRaycast2Impl(TGettersWithRadius<T>& A, TGettersWithRadius<T>& B, const TRigidTransform<T, 3>& StartTM, const TVector<T, 3>& RayDir, const T RayLength,
+		T& OutTime, TVector<T, 3>& OutPosition, TVector<T, 3>& OutNormal, const T GivenThicknessA = 0, bool bComputeMTD = false, const TVector<T, 3>& InitialDir = TVector<T, 3>(1, 0, 0), const T GivenThicknessB = 0)
+	{
 		ensure(FMath::IsNearlyEqual(RayDir.SizeSquared(), (T)1, (T)KINDA_SMALL_NUMBER));
 		ensure(RayLength > 0);
 
@@ -761,6 +832,16 @@ namespace Chaos
 			const TVector<T, 3> SupportBLocal = B.SupportCore(VInB, MarginB);
 			return BToARotation * SupportBLocal;
 		};
+		
+		auto SupportBAtOriginFunc = [&B, MarginB, &StartTM, &AToBRotation](const TVec3<T>& Dir)
+		{
+			const TVector<T, 3> DirInB = AToBRotation * Dir;
+			const TVector<T, 3> SupportBLocal = B.SupportCore(DirInB, MarginB);
+			return StartTM.TransformPositionNoScale(SupportBLocal);
+		};
+
+		TFunctionRef<TVector<T, 3>(const TVec3<T>& V)> SupportAFuncRef(SupportAFunc);
+		TFunctionRef<TVector<T, 3>(const TVec3<T>& V)> SupportBAtOriginFuncRef(SupportBAtOriginFunc);
 
 		TVector<T, 3> SupportA = SupportAFunc(InitialDir);
 		As[0] = SupportA;
@@ -940,17 +1021,9 @@ namespace Chaos
 						VertsB.Add(BAtOrigin);
 					}
 
-
-					auto SupportBAtOriginFunc = [&](const TVec3<T>& Dir)
-					{
-						const TVector<T, 3> DirInB = AToBRotation * Dir;
-						const TVector<T, 3> SupportBLocal = B.SupportCore(DirInB, MarginB);
-						return StartTM.TransformPositionNoScale(SupportBLocal);
-					};
-
 					T Penetration;
 					TVec3<T> MTD, ClosestA, ClosestBInA;
-					const EEPAResult EPAResult = EPA(VertsA, VertsB, SupportAFunc, SupportBAtOriginFunc, Penetration, MTD, ClosestA, ClosestBInA);
+					const EEPAResult EPAResult = EPA(VertsA, VertsB, SupportAFuncRef, SupportBAtOriginFuncRef, Penetration, MTD, ClosestA, ClosestBInA);
 					if (IsEPASuccess(EPAResult))
 					{
 						OutNormal = MTD;
