@@ -1335,7 +1335,9 @@ static void BuildShaderOutput(
 	Ar << NEWHeader;
 
 	check(Spirv.Data.Num() != 0);
-	Ar << Spirv.Data;
+	uint32 SpirvCodeSizeBytes = Spirv.Data.Num() * Spirv.Data.GetTypeSize();
+	Ar << SpirvCodeSizeBytes;
+	Ar.Serialize((uint8*)Spirv.Data.GetData(), SpirvCodeSizeBytes);
 
 	// Something to compare.
 	ShaderOutput.NumInstructions = NumLines;

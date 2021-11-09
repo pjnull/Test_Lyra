@@ -1017,6 +1017,8 @@ void FVulkanCommandListContext::RHIEndFrame()
 
 	Device->ReleaseUnusedOcclusionQueryPools();
 
+	Device->GetPipelineStateCache()->TickLRU();
+
 	++FrameCounter;
 }
 
