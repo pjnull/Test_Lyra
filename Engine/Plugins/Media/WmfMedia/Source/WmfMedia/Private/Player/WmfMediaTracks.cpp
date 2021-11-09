@@ -1369,6 +1369,15 @@ bool FWmfMediaTracks::AddTrackToTopology(const FTrack& Track, IMFTopology& Topol
 	}
 	else
 	{
+		// We only support our own decoders in D3D12.
+		const TCHAR* RHIName = GDynamicRHI->GetName();
+		bool bIsD3D12 = (TCString<TCHAR>::Stricmp(RHIName, TEXT("D3D12")) == 0);
+		if (bIsD3D12)
+		{
+			UE_LOG(LogWmfMedia, Error, TEXT("Tracks %p: Format is not supported in D3D12."), this);
+			return false;
+		}
+
 		// connect nodes
 		Result = SourceNode->ConnectOutput(0, OutputNode, 0);
 	}
