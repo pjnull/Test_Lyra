@@ -42,7 +42,7 @@ namespace UE::ImageWrapper::Private
 			else
 			{
 				// Naive linear interpolation
-				return TNumericLimits<DataTypeDest>::Max() * (double(ReadedValue) / TNumericLimits<DataTypeSrc>::Max());
+				return TNumericLimits<DataTypeDest>::Max() * (double(ReadedValue) / double(TNumericLimits<DataTypeSrc>::Max()));
 			}
 		}
 
