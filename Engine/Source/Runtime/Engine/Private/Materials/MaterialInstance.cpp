@@ -715,10 +715,7 @@ void UMaterialInstance::InitResources()
 	if (Resource != nullptr)
 	{
 		Resource->GameThread_SetParent(SafeParent);
-		if (CachedData)
-		{
-			Resource->GameThread_UpdateCachedData(*CachedData);
-		}
+		Resource->GameThread_UpdateCachedData(GetCachedInstanceData());
 	}
 
 	GameThread_InitMIParameters(*this);
@@ -775,18 +772,40 @@ UMaterial* UMaterialInstance::GetMaterial()
 	}
 }
 
-const UMaterial* UMaterialInstance::GetMaterialInheritanceChain(FMaterialParentInstanceArray& OutInstances) const
+void UMaterialInstance::GetMaterialInheritanceChain(FMaterialInheritanceChain& OutChain) const
 {
-	if (!OutInstances.Contains(this))
+	if (!OutChain.MaterialInstances.Contains(this))
 	{
-		OutInstances.Add(this);
+		OutChain.MaterialInstances.Add(this);
+		if (!OutChain.CachedExpressionData)
+		{
+			OutChain.CachedExpressionData = CachedExpressionData.Get();
+		}
+
 		if (Parent)
 		{
-			return Parent->GetMaterialInheritanceChain(OutInstances);
+			return Parent->GetMaterialInheritanceChain(OutChain);
 		}
 	}
 
-	return UMaterial::GetDefaultMaterial(MD_Surface);
+	UMaterial::GetDefaultMaterial(MD_Surface)->GetMaterialInheritanceChain(OutChain);
+}
+
+const FMaterialCachedExpressionData& UMaterialInstance::GetCachedExpressionData(TMicRecursionGuard RecursionGuard) const
+{
+	const FMaterialCachedExpressionData* LocalData = CachedExpressionData.Get();
+	if (LocalData)
+	{
+		return *LocalData;
+	}
+
+	if (Parent && !RecursionGuard.Contains(this))
+	{
+		RecursionGuard.Set(this);
+		return Parent->GetCachedExpressionData(RecursionGuard);
+	}
+
+	return UMaterial::GetDefaultMaterial(MD_Surface)->GetCachedExpressionData();
 }
 
 bool UMaterialInstance::GetParameterOverrideValue(EMaterialParameterType Type, const FMemoryImageMaterialParameterInfo& ParameterInfo, FMaterialParameterMetadata& OutResult) const
@@ -811,22 +830,13 @@ bool UMaterialInstance::GetParameterOverrideValue(EMaterialParameterType Type, c
 
 bool UMaterialInstance::GetParameterValue(EMaterialParameterType Type, const FMemoryImageMaterialParameterInfo& ParameterInfo, FMaterialParameterMetadata& OutResult, EMaterialGetParameterValueFlags Flags) const
 {
-	FMaterialParentInstanceArray InstanceChain;
-	const UMaterial* Material = GetMaterialInheritanceChain(InstanceChain);
+	FMaterialInheritanceChain InstanceChain;
+	GetMaterialInheritanceChain(InstanceChain);
 
 	bool bResult = false;
 	if (EnumHasAnyFlags(Flags, EMaterialGetParameterValueFlags::CheckNonOverrides))
 	{
-		if (ParameterInfo.Association != EMaterialParameterAssociation::GlobalParameter && CachedData)
-		{
-			// Base layer parameters are cached on the instance
-			bResult = CachedData->LayerParameters.GetParameterValue(Type, ParameterInfo, OutResult);
-		}
-		else if (ParameterInfo.Association == EMaterialParameterAssociation::GlobalParameter && Material)
-		{
-			// Base global parameters are cached on the base material
-			bResult = Material->GetParameterValue(Type, ParameterInfo, OutResult, Flags);
-		}
+		bResult = InstanceChain.GetCachedExpressionData().Parameters.GetParameterValue(Type, ParameterInfo, OutResult);
 	}
 
 	const bool bCheckInstanceOverrides = EnumHasAnyFlags(Flags, EMaterialGetParameterValueFlags::CheckInstanceOverrides);
@@ -835,10 +845,9 @@ bool UMaterialInstance::GetParameterValue(EMaterialParameterType Type, const FMe
 
 	// Check instance chain for overriden values
 	int32 ParentIndex = 0;
-	while (bHasValidParameter && ParentIndex < InstanceChain.Num())
+	while (bHasValidParameter && ParentIndex < InstanceChain.MaterialInstances.Num())
 	{
-		const UMaterialInstance* Instance = InstanceChain[ParentIndex];
-		const FMaterialInstanceCachedData* InstanceCachedData = Instance->CachedData;
+		const UMaterialInstance* Instance = InstanceChain.MaterialInstances[ParentIndex];
 
 		// Don't check overrides for Index0, unless CheckInstanceOverrides is set
 		if (ParentIndex > 0 || bCheckInstanceOverrides)
@@ -857,7 +866,7 @@ bool UMaterialInstance::GetParameterValue(EMaterialParameterType Type, const FMe
 			}
 		}
 
-		bHasValidParameter = CurrentParameterInfo.RemapLayerIndex(InstanceCachedData ? MakeArrayView(InstanceCachedData->ParentLayerIndexRemap) : MakeArrayView<int32>(nullptr, 0), CurrentParameterInfo);
+		bHasValidParameter = CurrentParameterInfo.RemapLayerIndex(MakeArrayView(Instance->GetCachedInstanceData().ParentLayerIndexRemap), CurrentParameterInfo);
 		ParentIndex++;
 	}
 
@@ -1690,15 +1699,15 @@ void UMaterialInstance::GetStaticParameterValues(FStaticParameterSet& OutStaticP
 #endif // WITH_EDITORONLY_DATA
 
 template<typename TArrayType>
-static void RemapLayersForParent(TArrayType& LayerIndexRemap, const FMaterialInstanceCachedData* InstanceCachedData)
+static void RemapLayersForParent(TArrayType& LayerIndexRemap, int32 NumParentLayers, TArrayView<const int32> ParentLayerIndexRemap)
 {
 	TArrayType NewLayerIndexRemap;
-	NewLayerIndexRemap.Init(INDEX_NONE, InstanceCachedData->NumParentLayers);
+	NewLayerIndexRemap.Init(INDEX_NONE, NumParentLayers);
 
-	check(LayerIndexRemap.Num() == InstanceCachedData->ParentLayerIndexRemap.Num());
-	for (int32 i = 0; i < InstanceCachedData->ParentLayerIndexRemap.Num(); ++i)
+	check(LayerIndexRemap.Num() == ParentLayerIndexRemap.Num());
+	for (int32 i = 0; i < ParentLayerIndexRemap.Num(); ++i)
 	{
-		const int32 ParentLayerIndex = InstanceCachedData->ParentLayerIndexRemap[i];
+		const int32 ParentLayerIndex = ParentLayerIndexRemap[i];
 		if (ParentLayerIndex != INDEX_NONE)
 		{
 			NewLayerIndexRemap[ParentLayerIndex] = LayerIndexRemap[i];
@@ -1709,41 +1718,22 @@ static void RemapLayersForParent(TArrayType& LayerIndexRemap, const FMaterialIns
 
 void UMaterialInstance::GetAllParametersOfType(EMaterialParameterType Type, TMap<FMaterialParameterInfo, FMaterialParameterMetadata>& OutParameters) const
 {
-	FMaterialParentInstanceArray InstanceChain;
-	const UMaterial* Material = GetMaterialInheritanceChain(InstanceChain);
-
-	TArray<int32, TInlineAllocator<16>> LayerIndexRemap;
-	int32 NumParametersToReserve = 0;
-	if (CachedData)
-	{
-		NumParametersToReserve += CachedData->LayerParameters.GetNumParameters(Type);
-		LayerIndexRemap.Empty(CachedData->ParentLayerIndexRemap.Num());
-		for (int32 LayerIndex = 0; LayerIndex < CachedData->ParentLayerIndexRemap.Num(); ++LayerIndex)
-		{
-			LayerIndexRemap.Add(LayerIndex);
-		}
-	}
-	if (Material)
-	{
-		NumParametersToReserve += Material->GetCachedExpressionData().Parameters.GetNumParameters(Type);
-	}
+	FMaterialInheritanceChain InstanceChain;
+	GetMaterialInheritanceChain(InstanceChain);
 
 	OutParameters.Reset();
-	OutParameters.Reserve(NumParametersToReserve);
+	InstanceChain.GetCachedExpressionData().Parameters.GetAllParametersOfType(Type, OutParameters);
 
-	if (CachedData)
+	TArray<int32, TInlineAllocator<16>> LayerIndexRemap;
+	LayerIndexRemap.Empty(GetCachedInstanceData().ParentLayerIndexRemap.Num());
+	for (int32 LayerIndex = 0; LayerIndex < GetCachedInstanceData().ParentLayerIndexRemap.Num(); ++LayerIndex)
 	{
-		CachedData->LayerParameters.GetAllParametersOfType(Type, OutParameters);
-	}
-	if (Material)
-	{
-		Material->GetCachedExpressionData().Parameters.GetAllGlobalParametersOfType(Type, OutParameters);
+		LayerIndexRemap.Add(LayerIndex);
 	}
 
-	for (int32 Index = 0; Index < InstanceChain.Num(); ++Index)
+	for (int32 Index = 0; Index < InstanceChain.MaterialInstances.Num(); ++Index)
 	{
-		const UMaterialInstance* Instance = InstanceChain[Index];
-		const FMaterialInstanceCachedData* InstanceCachedData = Instance->CachedData;
+		const UMaterialInstance* Instance = InstanceChain.MaterialInstances[Index];
 
 		const bool bSetOverride = (Index == 0); // Only set the override flag for parameters overriden by the current material (always at slot0)
 		switch (Type)
@@ -1761,39 +1751,11 @@ void UMaterialInstance::GetAllParametersOfType(EMaterialParameterType Type, TMap
 		default: checkNoEntry();
 		}
 
-		if (InstanceCachedData)
+		if (Index + 1 < InstanceChain.MaterialInstances.Num())
 		{
-			RemapLayersForParent(LayerIndexRemap, InstanceCachedData);
+			const UMaterialInstance* ParentInstance = InstanceChain.MaterialInstances[Index + 1];
+			RemapLayersForParent(LayerIndexRemap, ParentInstance->GetCachedInstanceData().ParentLayerIndexRemap.Num(), Instance->GetCachedInstanceData().ParentLayerIndexRemap);
 		}
-	}
-}
-
-void UMaterialInstance::GetAllParameterInfoOfType(EMaterialParameterType Type, TArray<FMaterialParameterInfo>& OutParameterInfo, TArray<FGuid>& OutParameterIds) const
-{
-	const UMaterial* Material = GetMaterial_Concurrent();
-
-	int32 NumParametersToReserve = 0;
-	if (CachedData)
-	{
-		NumParametersToReserve += CachedData->LayerParameters.GetNumParameters(Type);
-	}
-	if (Material)
-	{
-		NumParametersToReserve += Material->GetCachedExpressionData().Parameters.GetNumParameters(Type);
-	}
-
-	OutParameterInfo.Reset();
-	OutParameterIds.Reset();
-	OutParameterInfo.Reserve(NumParametersToReserve);
-	OutParameterIds.Reserve(NumParametersToReserve);
-
-	if (CachedData)
-	{
-		CachedData->LayerParameters.GetAllParameterInfoOfType(Type, OutParameterInfo, OutParameterIds);
-	}
-	if (Material)
-	{
-		Material->GetCachedExpressionData().Parameters.GetAllGlobalParameterInfoOfType(Type, OutParameterInfo, OutParameterIds);
 	}
 }
 
@@ -2071,7 +2033,7 @@ void UMaterialInstance::CacheResourceShadersForCooking(EShaderPlatform ShaderPla
 		UMaterial* BaseMaterial = GetMaterial();
 
 		TArray<bool, TInlineAllocator<EMaterialQualityLevel::Num> > QualityLevelsUsed;
-		BaseMaterial->GetQualityLevelUsageForCooking(QualityLevelsUsed, ShaderPlatform);
+		GetQualityLevelUsageForCooking(QualityLevelsUsed, ShaderPlatform);
 
 		const UShaderPlatformQualitySettings* MaterialQualitySettings = UMaterialShaderQualitySettings::Get()->GetShaderPlatformQualitySettings(ShaderPlatform);
 		bool bNeedDefaultQuality = false;
@@ -2367,12 +2329,12 @@ void UMaterialInstance::Serialize(FArchive& Ar)
 	{
 		if (Ar.IsLoading())
 		{
-			CachedData = new FMaterialInstanceCachedData();
+			CachedData.Reset(new FMaterialInstanceCachedData());
 			bLoadedCachedData = true;
 		}
 		check(CachedData);
 		UScriptStruct* Struct = FMaterialInstanceCachedData::StaticStruct();
-		Struct->SerializeTaggedProperties(Ar, (uint8*)CachedData, Struct, nullptr);
+		Struct->SerializeTaggedProperties(Ar, (uint8*)CachedData.Get(), Struct, nullptr);
 	}
 
 	// Only serialize the static permutation resource if one exists
@@ -2705,11 +2667,7 @@ void UMaterialInstance::FinishDestroy()
 		ClearAllCachedCookedPlatformData();
 	}
 #endif
-	if (CachedData)
-	{
-		delete CachedData;
-		CachedData = nullptr;
-	}
+	CachedData.Reset();
 
 	Super::FinishDestroy();
 }
@@ -2717,11 +2675,6 @@ void UMaterialInstance::FinishDestroy()
 void UMaterialInstance::AddReferencedObjects(UObject* InThis, FReferenceCollector& Collector)
 {
 	UMaterialInstance* This = CastChecked<UMaterialInstance>(InThis);
-
-	if (This->CachedData)
-	{
-		This->CachedData->AddReferencedObjects(Collector);
-	}
 
 	if (This->bHasStaticPermutationResource)
 	{
@@ -3273,14 +3226,11 @@ void UMaterialInstance::UpdateStaticPermutation(const FStaticParameterSet& NewPa
 
 void UMaterialInstance::GetReferencedTexturesAndOverrides(TSet<const UTexture*>& InOutTextures) const
 {
-	if (CachedData)
+	for (UObject* UsedObject : GetCachedExpressionData().ReferencedTextures)
 	{
-		for (UObject* UsedObject : CachedData->ReferencedTextures)
+		if (const UTexture* UsedTexture = Cast<UTexture>(UsedObject))
 		{
-			if (const UTexture* UsedTexture = Cast<UTexture>(UsedObject))
-			{
-				InOutTextures.Add(UsedTexture);
-			}
+			InOutTextures.Add(UsedTexture);
 		}
 	}
 
@@ -4214,39 +4164,6 @@ void FindCollectionExpressionRecursive(TArray<FGuid>& OutGuidList, const TArray<
 					{
 						FindCollectionExpressionRecursive(OutGuidList, *FunctionExpressions);
 					}
-				}
-			}
-		}
-	}
-}
-
-void UMaterialInstance::AppendReferencedParameterCollectionIdsTo(TArray<FGuid>& OutIds) const
-{
-	const UMaterial* Material = GetMaterial();
-	if (!Material)
-	{
-		return;
-	}
-
-	if (StaticParameters.bHasMaterialLayers)
-	{
-		for (const TObjectPtr<UMaterialFunctionInterface> Layer : StaticParameters.MaterialLayers.Layers)
-		{
-			if (Layer)
-			{
-				if (const TArray<TObjectPtr<UMaterialExpression>>* FunctionExpressions = Layer->GetFunctionExpressions())
-				{
-					FindCollectionExpressionRecursive(OutIds, *FunctionExpressions);
-				}
-			}
-		}
-		for (const TObjectPtr<UMaterialFunctionInterface> Blend : StaticParameters.MaterialLayers.Blends)
-		{
-			if (Blend)
-			{
-				if (const TArray<TObjectPtr<UMaterialExpression>>* FunctionExpressions = Blend->GetFunctionExpressions())
-				{
-					FindCollectionExpressionRecursive(OutIds, *FunctionExpressions);
 				}
 			}
 		}

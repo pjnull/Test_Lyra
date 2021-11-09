@@ -479,6 +479,8 @@ class UMaterialInstance : public UMaterialInterface
 	 */
 	ENGINE_API const FStaticParameterSet& GetStaticParameters() const;
 
+	const FMaterialInstanceCachedData& GetCachedInstanceData() const { return CachedData ? *CachedData : FMaterialInstanceCachedData::EmptyData; }
+
 	/**
 	 * Indicates whether the instance has static permutation resources (which are required when static parameters are present) 
 	 * Read directly from the rendering thread, can only be modified with the use of a FMaterialUpdateContext.
@@ -594,7 +596,7 @@ private:
 
 protected:
 	bool bLoadedCachedData;
-	FMaterialInstanceCachedData* CachedData;
+	TUniquePtr<FMaterialInstanceCachedData> CachedData;
 
 private:
 #if WITH_EDITOR
@@ -627,7 +629,8 @@ public:
 	virtual ENGINE_API UMaterial* GetMaterial() override;
 	virtual ENGINE_API const UMaterial* GetMaterial() const override;
 	virtual ENGINE_API const UMaterial* GetMaterial_Concurrent(TMicRecursionGuard RecursionGuard = TMicRecursionGuard()) const override;
-	virtual ENGINE_API const UMaterial* GetMaterialInheritanceChain(FMaterialParentInstanceArray& OutInstances) const override;
+	virtual ENGINE_API void GetMaterialInheritanceChain(FMaterialInheritanceChain& OutChain) const override;
+	virtual ENGINE_API const FMaterialCachedExpressionData& GetCachedExpressionData(TMicRecursionGuard RecursionGuard = TMicRecursionGuard()) const override;
 	virtual ENGINE_API FMaterialResource* AllocatePermutationResource();
 	virtual ENGINE_API FMaterialResource* GetMaterialResource(ERHIFeatureLevel::Type InFeatureLevel, EMaterialQualityLevel::Type QualityLevel = EMaterialQualityLevel::Num) override;
 	virtual ENGINE_API const FMaterialResource* GetMaterialResource(ERHIFeatureLevel::Type InFeatureLevel, EMaterialQualityLevel::Type QualityLevel = EMaterialQualityLevel::Num) const override;
@@ -774,15 +777,11 @@ public:
 	}
 #endif // WITH_EDITORONLY_DATA
 
-	ENGINE_API virtual void GetAllParameterInfoOfType(EMaterialParameterType Type, TArray<FMaterialParameterInfo>& OutParameterInfo, TArray<FGuid>& OutParameterIds) const override;
 	ENGINE_API virtual void GetAllParametersOfType(EMaterialParameterType Type, TMap<FMaterialParameterInfo, FMaterialParameterMetadata>& OutParameters) const override;
 #if WITH_EDITORONLY_DATA
 	ENGINE_API virtual bool IterateDependentFunctions(TFunctionRef<bool(UMaterialFunctionInterface*)> Predicate) const override;
 	ENGINE_API virtual void GetDependentFunctions(TArray<class UMaterialFunctionInterface*>& DependentFunctions) const override;
 #endif // WITH_EDITORONLY_DATA
-
-	/** Appends textures referenced by expressions, including nested functions. */
-	ENGINE_API virtual TArrayView<const TObjectPtr<UObject>> GetReferencedTextures() const override { return CachedData ? CachedData->ReferencedTextures : TArrayView<const TObjectPtr<UObject>>(); }
 
 #if WITH_EDITOR
 	/** Add to the set any texture referenced by expressions, including nested functions, as well as any overrides from parameters. */
@@ -844,7 +843,6 @@ public:
 #if WITH_EDITOR
 	void BeginAllowCachingStaticParameterValues();
 	void EndAllowCachingStaticParameterValues();
-	void AppendReferencedParameterCollectionIdsTo(TArray<FGuid>& OutIds) const;
 #endif // WITH_EDITOR
 
 protected:

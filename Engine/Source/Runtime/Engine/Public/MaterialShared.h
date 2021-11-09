@@ -63,6 +63,7 @@ class FMaterialExternalTextureParameterInfo;
 class FMeshMaterialShaderMapLayout;
 struct FMaterialShaderTypes;
 struct FMaterialShaders;
+struct FMaterialCachedExpressionData;
 
 namespace UE
 {
@@ -1813,6 +1814,8 @@ public:
 	 */
 	virtual bool IsPersistent() const = 0;
 	virtual UMaterialInterface* GetMaterialInterface() const { return NULL; }
+
+	ENGINE_API const FMaterialCachedExpressionData& GetCachedExpressionData() const;
 
 	/** Is the material required to be complete? Default materials, special engine materials, etc */
 	ENGINE_API bool IsRequiredComplete() const;

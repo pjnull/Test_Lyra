@@ -40,6 +40,7 @@
 
 const FMaterialCachedParameterEntry FMaterialCachedParameterEntry::EmptyData{};
 const FMaterialCachedExpressionData FMaterialCachedExpressionData::EmptyData{};
+const FMaterialInstanceCachedData FMaterialInstanceCachedData::EmptyData{};
 
 void FMaterialCachedExpressionData::Reset()
 {
@@ -79,10 +80,22 @@ void FMaterialCachedExpressionData::AddReferencedObjects(FReferenceCollector& Co
 	}
 }
 
-void FMaterialInstanceCachedData::AddReferencedObjects(FReferenceCollector& Collector)
+void FMaterialCachedExpressionData::AppendReferencedFunctionIdsTo(TArray<FGuid>& Ids) const
 {
-	LayerParameters.AddReferencedObjects(Collector);
-	Collector.AddReferencedObjects(ReferencedTextures);
+	Ids.Reserve(Ids.Num() + FunctionInfos.Num());
+	for (const FMaterialFunctionInfo& FunctionInfo : FunctionInfos)
+	{
+		Ids.AddUnique(FunctionInfo.StateId);
+	}
+}
+
+void FMaterialCachedExpressionData::AppendReferencedParameterCollectionIdsTo(TArray<FGuid>& Ids) const
+{
+	Ids.Reserve(Ids.Num() + ParameterCollectionInfos.Num());
+	for (const FMaterialParameterCollectionInfo& CollectionInfo : ParameterCollectionInfos)
+	{
+		Ids.AddUnique(CollectionInfo.StateId);
+	}
 }
 
 void FMaterialCachedParameters::AddReferencedObjects(FReferenceCollector& Collector)
@@ -137,14 +150,12 @@ static int32 TryAddParameter(FMaterialCachedParameters& CachedParameters,
 	return INDEX_NONE;
 }
 
-bool FMaterialCachedExpressionData::UpdateForFunction(const FMaterialCachedExpressionContext& Context, UMaterialFunctionInterface* Function, EMaterialParameterAssociation Association, int32 ParameterIndex)
+void FMaterialCachedExpressionData::UpdateForFunction(const FMaterialCachedExpressionContext& Context, UMaterialFunctionInterface* Function, EMaterialParameterAssociation Association, int32 ParameterIndex)
 {
 	if (!Function)
 	{
-		return true;
+		return;
 	}
-
-	bool bResult = true;
 
 	// Update expressions for all dependent functions first, before processing the remaining expressions in this function
 	// This is important so we add parameters in the proper order (parameter values are latched the first time a given parameter name is encountered)
@@ -153,15 +164,12 @@ bool FMaterialCachedExpressionData::UpdateForFunction(const FMaterialCachedExpre
 	LocalContext.bUpdateFunctionExpressions = false; // we update functions explicitly
 	
 	FMaterialCachedExpressionData* Self = this;
-	auto ProcessFunction = [Self, &LocalContext, Association, ParameterIndex, &bResult](UMaterialFunctionInterface* InFunction) -> bool
+	auto ProcessFunction = [Self, &LocalContext, Association, ParameterIndex](UMaterialFunctionInterface* InFunction) -> bool
 	{
 		const TArray<TObjectPtr<UMaterialExpression>>* FunctionExpressions = InFunction->GetFunctionExpressions();
 		if (FunctionExpressions)
 		{
-			if (!Self->UpdateForExpressions(LocalContext, *FunctionExpressions, Association, ParameterIndex))
-			{
-				bResult = false;
-			}
+			Self->UpdateForExpressions(LocalContext, *FunctionExpressions, Association, ParameterIndex);
 		}
 
 		FMaterialFunctionInfo NewFunctionInfo;
@@ -174,40 +182,27 @@ bool FMaterialCachedExpressionData::UpdateForFunction(const FMaterialCachedExpre
 	Function->IterateDependentFunctions(ProcessFunction);
 
 	ProcessFunction(Function);
-
-	return bResult;
 }
 
-bool FMaterialCachedExpressionData::UpdateForLayerFunctions(const FMaterialCachedExpressionContext& Context, const FMaterialLayersFunctions& LayerFunctions)
+void FMaterialCachedExpressionData::UpdateForLayerFunctions(const FMaterialCachedExpressionContext& Context, const FMaterialLayersFunctions& LayerFunctions)
 {
-	bool bResult = true;
 	for (int32 LayerIndex = 0; LayerIndex < LayerFunctions.Layers.Num(); ++LayerIndex)
 	{
-		if (!UpdateForFunction(Context, LayerFunctions.Layers[LayerIndex], LayerParameter, LayerIndex))
-		{
-			bResult = false;
-		}
+		UpdateForFunction(Context, LayerFunctions.Layers[LayerIndex], LayerParameter, LayerIndex);
 	}
 
 	for (int32 BlendIndex = 0; BlendIndex < LayerFunctions.Blends.Num(); ++BlendIndex)
 	{
-		if (!UpdateForFunction(Context, LayerFunctions.Blends[BlendIndex], BlendParameter, BlendIndex))
-		{
-			bResult = false;
-		}
+		UpdateForFunction(Context, LayerFunctions.Blends[BlendIndex], BlendParameter, BlendIndex);
 	}
-
-	return bResult;
 }
 
-bool FMaterialCachedExpressionData::UpdateForExpressions(const FMaterialCachedExpressionContext& Context, const TArray<TObjectPtr<UMaterialExpression>>& Expressions, EMaterialParameterAssociation Association, int32 ParameterIndex)
+void FMaterialCachedExpressionData::UpdateForExpressions(const FMaterialCachedExpressionContext& Context, const TArray<TObjectPtr<UMaterialExpression>>& Expressions, EMaterialParameterAssociation Association, int32 ParameterIndex)
 {
-	bool bResult = true;
 	for (UMaterialExpression* Expression : Expressions)
 	{
 		if (!Expression)
 		{
-			bResult = false;
 			continue;
 		}
 
@@ -378,14 +373,12 @@ bool FMaterialCachedExpressionData::UpdateForExpressions(const FMaterialCachedEx
 			// Only a single layers expression is allowed/expected...creating additional layer expression will cause a compile error
 			if (!bHasMaterialLayers)
 			{
-				if (!UpdateForLayerFunctions(Context, LayersExpression->DefaultLayers))
-				{
-					bResult = false;
-				}
+				const FMaterialLayersFunctions& Layers = Context.LayerOverrides ? *Context.LayerOverrides : LayersExpression->DefaultLayers;
+				UpdateForLayerFunctions(Context, Layers);
 
+				// TODO(?) - Layers for MIs are currently duplicated here and in FStaticParameterSet
 				bHasMaterialLayers = true;
-				MaterialLayers = LayersExpression->DefaultLayers;
-				MaterialLayers.LinkAllLayersToParent(); // Initialize all the link states (there is no parent for base materials)
+				MaterialLayers = Layers;
 				LayersExpression->RebuildLayerGraph(false);
 			}
 		}
@@ -393,10 +386,7 @@ bool FMaterialCachedExpressionData::UpdateForExpressions(const FMaterialCachedEx
 		{
 			if (Context.bUpdateFunctionExpressions)
 			{
-				if (!UpdateForFunction(Context, FunctionCall->MaterialFunction, GlobalParameter, -1))
-				{
-					bResult = false;
-				}
+				UpdateForFunction(Context, FunctionCall->MaterialFunction, GlobalParameter, -1);
 
 				// Update the function call node, so it can relink inputs and outputs as needed
 				// Update even if MaterialFunctionNode->MaterialFunction is NULL, because we need to remove the invalid inputs in that case
@@ -460,8 +450,6 @@ bool FMaterialCachedExpressionData::UpdateForExpressions(const FMaterialCachedEx
 			SetMatAttributeConditionally(EMaterialProperty::MP_ShadingModel, MakeMatAttributes->ShadingModel.IsConnected());
 		}
 	}
-
-	return bResult;
 }
 #endif // WITH_EDITOR
 
@@ -712,11 +700,8 @@ void FMaterialCachedParameters::GetAllGlobalParameterInfoOfType(EMaterialParamet
 }
 
 #if WITH_EDITOR
-void FMaterialInstanceCachedData::InitializeForConstant(FMaterialCachedExpressionData&& InCachedExpressionData, const FMaterialLayersFunctions* Layers, const FMaterialLayersFunctions* ParentLayers)
+void FMaterialInstanceCachedData::InitializeForConstant(const FMaterialLayersFunctions* Layers, const FMaterialLayersFunctions* ParentLayers)
 {
-	LayerParameters = MoveTemp(InCachedExpressionData.Parameters);
-	ReferencedTextures = MoveTemp(InCachedExpressionData.ReferencedTextures);
-
 	const int32 NumLayers = Layers ? Layers->Layers.Num() : 0;
 	ParentLayerIndexRemap.Empty(NumLayers);
 	for (int32 LayerIndex = 0; LayerIndex < NumLayers; ++LayerIndex)
@@ -729,22 +714,15 @@ void FMaterialInstanceCachedData::InitializeForConstant(FMaterialCachedExpressio
 		}
 		ParentLayerIndexRemap.Add(ParentLayerIndex);
 	}
-
-	NumParentLayers = ParentLayers ? ParentLayers->Layers.Num() : 0;
 }
 #endif // WITH_EDITOR
 
 void FMaterialInstanceCachedData::InitializeForDynamic(const FMaterialLayersFunctions* ParentLayers)
 {
-	LayerParameters.Reset();
-	ReferencedTextures.Reset();
-
 	const int32 NumLayers = ParentLayers ? ParentLayers->Layers.Num() : 0;
 	ParentLayerIndexRemap.Empty(NumLayers);
 	for (int32 LayerIndex = 0; LayerIndex < NumLayers; ++LayerIndex)
 	{
 		ParentLayerIndexRemap.Add(LayerIndex);
 	}
-
-	NumParentLayers = NumLayers;
 }

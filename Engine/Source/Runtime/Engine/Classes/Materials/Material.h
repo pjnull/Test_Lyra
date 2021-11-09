@@ -10,7 +10,6 @@
 #include "RenderCommandFence.h"
 #include "Materials/MaterialInterface.h"
 #include "MaterialShared.h"
-#include "MaterialCachedData.h"
 #include "MaterialExpressionIO.h"
 #include "Materials/MaterialExpressionMaterialFunctionCall.h"
 #include "Materials/MaterialExpressionMaterialAttributeLayers.h"
@@ -1018,10 +1017,6 @@ private:
 	bool bSavedCachedExpressionData_DEPRECATED;
 #endif
 
-	bool bLoadedCachedExpressionData;
-
-	FMaterialCachedExpressionData* CachedExpressionData;
-
 #if WITH_EDITORONLY_DATA
 	UPROPERTY()
 	TArray<FGuid> ReferencedTextureGuids;
@@ -1029,14 +1024,11 @@ private:
 #endif // WITH_EDITORONLY_DATA
 public:
 
-	const FMaterialCachedExpressionData& GetCachedExpressionData() const { return CachedExpressionData ? *CachedExpressionData : FMaterialCachedExpressionData::EmptyData; }
-
 	//~ Begin UMaterialInterface Interface.
 	ENGINE_API virtual UMaterial* GetMaterial() override;
 	ENGINE_API virtual const UMaterial* GetMaterial() const override;
 	ENGINE_API virtual const UMaterial* GetMaterial_Concurrent(TMicRecursionGuard RecursionGuard = TMicRecursionGuard()) const override;
-	ENGINE_API virtual const UMaterial* GetMaterialInheritanceChain(FMaterialParentInstanceArray& OutInstances) const override;
-
+	ENGINE_API virtual void GetMaterialInheritanceChain(FMaterialInheritanceChain& OutChain) const override;
 	ENGINE_API virtual bool GetParameterValue(EMaterialParameterType Type, const FMemoryImageMaterialParameterInfo& ParameterInfo, FMaterialParameterMetadata& OutValue, EMaterialGetParameterValueFlags Flags) const override;
 
 	ENGINE_API virtual bool GetRefractionSettings(float& OutBiasValue) const override;
@@ -1324,8 +1316,6 @@ public:
 	}
 #endif // WITH_EDITORONLY_DATA
 
-	ENGINE_API virtual void GetAllParameterInfoOfType(EMaterialParameterType Type, TArray<FMaterialParameterInfo>& OutParameterInfo, TArray<FGuid>& OutParameterIds) const override;
-	ENGINE_API virtual void GetAllParametersOfType(EMaterialParameterType Type, TMap<FMaterialParameterInfo, FMaterialParameterMetadata>& OutParameters) const override;
 #if WITH_EDITORONLY_DATA
 	ENGINE_API virtual bool IterateDependentFunctions(TFunctionRef<bool(UMaterialFunctionInterface*)> Predicate) const override;
 	ENGINE_API virtual void GetDependentFunctions(TArray<class UMaterialFunctionInterface*>& DependentFunctions) const override;
@@ -1456,19 +1446,6 @@ public:
 		return false;
 	}
 #endif // WITH_EDITORONLY_DATA
-
-	/** Determines whether each quality level has different nodes by inspecting the material's expressions. 
-	* Or is required by the material quality setting overrides.
-	* @param	QualityLevelsUsed	output array of used quality levels.
-	* @param	ShaderPlatform	The shader platform to use for the quality settings.
-	* @param	bCooking		During cooking, certain quality levels may be discarded
-	*/
-	void GetQualityLevelUsage(TArray<bool, TInlineAllocator<EMaterialQualityLevel::Num> >& QualityLevelsUsed, EShaderPlatform ShaderPlatform, bool bCooking = false);
-	
-	inline void GetQualityLevelUsageForCooking(TArray<bool, TInlineAllocator<EMaterialQualityLevel::Num> >& QualityLevelsUsed, EShaderPlatform ShaderPlatform)
-	{
-		GetQualityLevelUsage(QualityLevelsUsed, ShaderPlatform, true);
-	}
 
 #if WITH_EDITOR
 	ENGINE_API void UpdateCachedExpressionData();
@@ -1632,12 +1609,6 @@ public:
 	ENGINE_API static bool IsDynamicParameter(const UMaterialExpression* Expression);
 #endif // WITH_EDITOR
 
-	/** Returns an array of the guids of functions used in this material, with the call hierarchy flattened. */
-	void AppendReferencedFunctionIdsTo(TArray<FGuid>& OutIds) const;
-
-	/** Returns an array of the guids of parameter collections used in this material. */
-	void AppendReferencedParameterCollectionIdsTo(TArray<FGuid>& OutIds) const;
-
 	/* Helper functions for text output of properties. */
 	static const TCHAR* GetMaterialShadingModelString(EMaterialShadingModel InMaterialShadingModel);
 	static EMaterialShadingModel GetMaterialShadingModelFromString(const TCHAR* InMaterialShadingModelStr);
@@ -1698,13 +1669,7 @@ public:
 		TArray<UMaterialExpression*>& OutExpressions, struct FStaticParameterSet* InStaticParameterSet,
 		ERHIFeatureLevel::Type InFeatureLevel = ERHIFeatureLevel::Num, EMaterialQualityLevel::Type InQuality = EMaterialQualityLevel::Num, ERHIShadingPath::Type InShadingPath = ERHIShadingPath::Num);
 
-	/** Add to the set any texture referenced by expressions, including nested functions, as well as any overrides from parameters. */
-	ENGINE_API virtual void GetReferencedTexturesAndOverrides(TSet<const UTexture*>& InOutTextures) const;
-
 #endif // WITH_EDITOR
-
-	/** Appends textures referenced by expressions, including nested functions. */
-	ENGINE_API virtual TArrayView<const TObjectPtr<UObject>> GetReferencedTextures() const override final { return GetCachedExpressionData().ReferencedTextures; }
 
 protected:
 

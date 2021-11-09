@@ -50,6 +50,9 @@ struct CORE_API FUE5ReleaseStreamObjectVersion
 
 		// Material layer stacks are no longer considered 'static parameters'
 		MaterialLayerStacksAreNotParameters,
+
+		// CachedExpressionData is moved from UMaterial to UMaterialInterface
+		MaterialInterfaceSavedCachedData,
 		
 		// -----<new versions can be added above this line>-------------------------------------------------
 		VersionPlusOne,

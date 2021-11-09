@@ -697,6 +697,12 @@ ERefractionMode FMaterial::GetRefractionMode() const
 	return RM_IndexOfRefraction; 
 }
 
+const FMaterialCachedExpressionData& FMaterial::GetCachedExpressionData() const
+{
+	const UMaterialInterface* MaterialInterface = GetMaterialInterface();
+	return MaterialInterface ? MaterialInterface->GetCachedExpressionData() : FMaterialCachedExpressionData::EmptyData;
+}
+
 bool FMaterial::IsRequiredComplete() const
 { 
 	return IsDefaultMaterial() || IsSpecialEngineMaterial();
@@ -1708,22 +1714,22 @@ uint32 FMaterialResource::GetStencilCompare() const
 
 bool FMaterialResource::HasPerInstanceCustomData() const
 {
-	return Material->GetCachedExpressionData().bHasPerInstanceCustomData;
+	return GetCachedExpressionData().bHasPerInstanceCustomData;
 }
 
 bool FMaterialResource::HasPerInstanceRandom() const
 {
-	return Material->GetCachedExpressionData().bHasPerInstanceRandom;
+	return GetCachedExpressionData().bHasPerInstanceRandom;
 }
 
 bool FMaterialResource::HasVertexInterpolator() const
 {
-	return Material->GetCachedExpressionData().bHasVertexInterpolator;
+	return GetCachedExpressionData().bHasVertexInterpolator;
 }
 
 bool FMaterialResource::HasRuntimeVirtualTextureOutput() const
 {
-	return Material->GetCachedExpressionData().bHasRuntimeVirtualTextureOutput;
+	return GetCachedExpressionData().bHasRuntimeVirtualTextureOutput;
 }
 
 bool FMaterialResource::CastsRayTracedShadows() const

@@ -331,15 +331,15 @@ void FMaterialResource::GetShaderMapId(EShaderPlatform Platform, const ITargetPl
 {
 	FMaterial::GetShaderMapId(Platform, TargetPlatform, OutId);
 #if WITH_EDITOR
-	Material->AppendReferencedFunctionIdsTo(OutId.ReferencedFunctions);
-	Material->AppendReferencedParameterCollectionIdsTo(OutId.ReferencedParameterCollections);
+	const FMaterialCachedExpressionData& CachedData = GetCachedExpressionData();
+	CachedData.AppendReferencedFunctionIdsTo(OutId.ReferencedFunctions);
+	CachedData.AppendReferencedParameterCollectionIdsTo(OutId.ReferencedParameterCollections);
 
 	Material->GetForceRecompileTextureIdsHash(OutId.TextureReferencesHash);
 
 	if(MaterialInstance)
 	{
 		MaterialInstance->GetBasePropertyOverridesHash(OutId.BasePropertyOverridesHash);
-		MaterialInstance->AppendReferencedParameterCollectionIdsTo(OutId.ReferencedParameterCollections);
 
 		FStaticParameterSet CompositedStaticParameters;
 		MaterialInstance->GetStaticParameterValues(CompositedStaticParameters);
@@ -848,7 +848,14 @@ FMaterialResource* FindOrCreateMaterialResource(TArray<FMaterialResource*>& Mate
 	{
 		// See if we have an explicit resource for the requested quality
 		TArray<bool, TInlineAllocator<EMaterialQualityLevel::Num>> QualityLevelsUsed;
-		OwnerMaterial->GetQualityLevelUsage(QualityLevelsUsed, GShaderPlatformForFeatureLevel[InFeatureLevel]);
+		if (OwnerMaterialInstance)
+		{
+			OwnerMaterialInstance->GetQualityLevelUsage(QualityLevelsUsed, GShaderPlatformForFeatureLevel[InFeatureLevel]);
+		}
+		else
+		{
+			OwnerMaterial->GetQualityLevelUsage(QualityLevelsUsed, GShaderPlatformForFeatureLevel[InFeatureLevel]);
+		}
 		if (!QualityLevelsUsed[InQualityLevel])
 		{
 			// No explicit resource, just use the default
@@ -964,8 +971,6 @@ UMaterial::UMaterial(const FObjectInitializer& ObjectInitializer)
 
 	PhysMaterial = nullptr;
 	PhysMaterialMask = nullptr;
-
-	bLoadedCachedExpressionData = false;
 
 	FloatPrecisionMode = EMaterialFloatPrecisionMode::MFPM_Default;
 }
@@ -1739,19 +1744,6 @@ void UMaterial::FixupMaterialUsageAfterLoad()
 }
 #endif // WITH_EDITOR
 
-void UMaterial::GetAllParametersOfType(EMaterialParameterType Type, TMap<FMaterialParameterInfo, FMaterialParameterMetadata>& OutParameters) const
-{
-	OutParameters.Reset();
-	GetCachedExpressionData().Parameters.GetAllParametersOfType(Type, OutParameters);
-}
-
-void UMaterial::GetAllParameterInfoOfType(EMaterialParameterType Type, TArray<FMaterialParameterInfo>& OutParameterInfo, TArray<FGuid>& OutParameterIds) const
-{
-	OutParameterInfo.Reset();
-	OutParameterIds.Reset();
-	GetCachedExpressionData().Parameters.GetAllParameterInfoOfType(Type, OutParameterInfo, OutParameterIds);
-}
-
 #if WITH_EDITORONLY_DATA
 bool UMaterial::IterateDependentFunctions(TFunctionRef<bool(UMaterialFunctionInterface*)> Predicate) const
 {
@@ -1863,9 +1855,15 @@ const UMaterial* UMaterial::GetMaterial_Concurrent(TMicRecursionGuard) const
 	return this;
 }
 
-const UMaterial* UMaterial::GetMaterialInheritanceChain(FMaterialParentInstanceArray& OutInstances) const
+void UMaterial::GetMaterialInheritanceChain(FMaterialInheritanceChain& OutChain) const
 {
-	return this;
+	check(!OutChain.BaseMaterial);
+	OutChain.BaseMaterial = this;
+	if (!OutChain.CachedExpressionData)
+	{
+		const FMaterialCachedExpressionData* LocalData = CachedExpressionData.Get();
+		OutChain.CachedExpressionData = LocalData ? LocalData : &FMaterialCachedExpressionData::EmptyData;
+	}
 }
 
 #if WITH_EDITOR
@@ -1881,12 +1879,17 @@ void UMaterial::UpdateCachedExpressionData()
 
 	if (!CachedExpressionData)
 	{
-		CachedExpressionData = new FMaterialCachedExpressionData();
+		CachedExpressionData.Reset(new FMaterialCachedExpressionData());
 	}
 
 	CachedExpressionData->Reset();
 	FMaterialCachedExpressionContext Context;
 	CachedExpressionData->UpdateForExpressions(Context, Expressions, EMaterialParameterAssociation::GlobalParameter, -1);
+	if (CachedExpressionData->bHasMaterialLayers)
+	{
+		// Set all layers as linked to parent (there is no parent for base UMaterials)
+		CachedExpressionData->MaterialLayers.LinkAllLayersToParent();
+	}
 
 	FObjectCacheEventSink::NotifyReferencedTextureChanged_Concurrent(this);
 }
@@ -2370,52 +2373,31 @@ void UMaterial::Serialize(FArchive& Ar)
 #endif
 	}
 
-	bool bSavedCachedExpressionData = false;
-	if (Ar.CustomVer(FUE5MainStreamObjectVersion::GUID) >= FUE5MainStreamObjectVersion::MaterialSavedCachedData)
-	{
-		if (Ar.IsCooking() || (FPlatformProperties::RequiresCookedData() && Ar.IsSaving() && (Ar.GetPortFlags() & PPF_Duplicate)))
-		{
-			if (CachedExpressionData)
-			{
-				bSavedCachedExpressionData = true;
-			}
-			else
-			{
-				// ClassDefault object is expected to be missing cached data, but in all other cases it should have been created when the material was loaded, in PostLoad
-				checkf(HasAllFlags(RF_ClassDefaultObject), TEXT("Trying to save cooked material %s, missing CachedExpressionData"), *GetName());
-			}
-		}
-
-		Ar << bSavedCachedExpressionData;
-	}
-
-#if WITH_EDITORONLY_DATA
-	if (Ar.IsLoading() && bSavedCachedExpressionData_DEPRECATED)
-	{
-		bSavedCachedExpressionData_DEPRECATED = false;
-		bSavedCachedExpressionData = true;
-	}
-#endif
-
-#if !WITH_EDITORONLY_DATA
-	checkf(!Ar.IsLoading() || bSavedCachedExpressionData, TEXT("Material %s must have saved cached expression data, if editor-only data is not present"), *GetName());
-#endif
-
-	if (bSavedCachedExpressionData)
-	{
-		if (Ar.IsLoading())
-		{
-			CachedExpressionData = new FMaterialCachedExpressionData();
-			bLoadedCachedExpressionData = true;
-		}
-		check(CachedExpressionData);
-		UScriptStruct* Struct = FMaterialCachedExpressionData::StaticStruct();
-		Struct->SerializeTaggedProperties(Ar, (uint8*)CachedExpressionData, Struct, nullptr);
-
 #if WITH_EDITOR
-		FObjectCacheEventSink::NotifyReferencedTextureChanged_Concurrent(this);
-#endif
+	// CachedExpressionData is moved to UMaterialInterface
+	// Actual data will be regenerated on load in editor, so here we just need to handle skipping over any legacy data that might be in the archive
+	{
+		bool bLocalSavedCachedExpressionData_DEPRECATED = false;
+		if (Ar.CustomVer(FUE5MainStreamObjectVersion::GUID) >= FUE5MainStreamObjectVersion::MaterialSavedCachedData &&
+			Ar.CustomVer(FUE5ReleaseStreamObjectVersion::GUID) < FUE5ReleaseStreamObjectVersion::MaterialInterfaceSavedCachedData)
+		{
+			Ar << bLocalSavedCachedExpressionData_DEPRECATED;
+		}
+
+		if (Ar.IsLoading() && bSavedCachedExpressionData_DEPRECATED)
+		{
+			bSavedCachedExpressionData_DEPRECATED = false;
+			bLocalSavedCachedExpressionData_DEPRECATED = true;
+		}
+
+		if (bLocalSavedCachedExpressionData_DEPRECATED)
+		{
+			FMaterialCachedExpressionData LocalCachedExpressionData;
+			UScriptStruct* Struct = FMaterialCachedExpressionData::StaticStruct();
+			Struct->SerializeTaggedProperties(Ar, (uint8*)&LocalCachedExpressionData, Struct, nullptr);
+		}
 	}
+#endif // WITH_EDITOR
 
 #if WITH_EDITOR
 	if (Ar.UEVer() < VER_UE4_FLIP_MATERIAL_COORDS)
@@ -2734,33 +2716,6 @@ void UMaterial::BackwardsCompatibilityDecalConversion()
 		FMessageLog("AssetCheck").Open(EMessageSeverity::Info);
 	}
 #endif // WITH_EDITOR
-}
-
-void UMaterial::GetQualityLevelUsage(TArray<bool, TInlineAllocator<EMaterialQualityLevel::Num> >& OutQualityLevelsUsed, EShaderPlatform ShaderPlatform, bool bCooking)
-{
-	OutQualityLevelsUsed = GetCachedExpressionData().QualityLevelsUsed;
-	if (OutQualityLevelsUsed.Num() == 0)
-	{
-		OutQualityLevelsUsed.AddDefaulted(EMaterialQualityLevel::Num);
-	}
-	if (ShaderPlatform != SP_NumPlatforms)
-	{
-		const UShaderPlatformQualitySettings* MaterialQualitySettings = UMaterialShaderQualitySettings::Get()->GetShaderPlatformQualitySettings(ShaderPlatform);
-		for (int32 Quality = 0; Quality < EMaterialQualityLevel::Num; ++Quality)
-		{
-			const FMaterialQualityOverrides& QualityOverrides = MaterialQualitySettings->GetQualityOverrides((EMaterialQualityLevel::Type)Quality);
-			if (bCooking && QualityOverrides.bDiscardQualityDuringCook)
-			{
-				OutQualityLevelsUsed[Quality] = false;
-			}
-			else if (QualityOverrides.bEnableOverride &&
-				QualityOverrides.HasAnyOverridesSet() &&
-				QualityOverrides.CanOverride(ShaderPlatform))
-			{
-				OutQualityLevelsUsed[Quality] = true;
-			}
-		}
-	}
 }
 
 void UMaterial::ConvertMaterialToStrataMaterial()
@@ -3372,11 +3327,11 @@ void UMaterial::PostLoad()
 
 	checkf(CachedExpressionData, TEXT("Missing cached expression data for material, should have been either serialized or created during PostLoad"));
 
-	for (int32 CollectionIndex = 0; CollectionIndex < CachedExpressionData->ParameterCollectionInfos.Num(); CollectionIndex++)
+	for (const FMaterialParameterCollectionInfo& CollectionInfo : CachedExpressionData->ParameterCollectionInfos)
 	{
-		if (CachedExpressionData->ParameterCollectionInfos[CollectionIndex].ParameterCollection)
+		if (CollectionInfo.ParameterCollection)
 		{
-			CachedExpressionData->ParameterCollectionInfos[CollectionIndex].ParameterCollection->ConditionalPostLoad();
+			CollectionInfo.ParameterCollection->ConditionalPostLoad();
 		}
 	}
 
@@ -4269,11 +4224,6 @@ void UMaterial::ReleaseResources()
 		DefaultMaterialInstance->GameThread_Destroy();
 		DefaultMaterialInstance = nullptr;
 	}
-	if (CachedExpressionData)
-	{
-		delete CachedExpressionData;
-		CachedExpressionData = nullptr;
-	}
 }
 
 void UMaterial::FinishDestroy()
@@ -4302,11 +4252,6 @@ void UMaterial::AddReferencedObjects(UObject* InThis, FReferenceCollector& Colle
 {
 	UMaterial* This = CastChecked<UMaterial>(InThis);
 
-	if (This->CachedExpressionData)
-	{
-		This->CachedExpressionData->AddReferencedObjects(Collector);
-	}
-
 	for (FMaterialResource* CurrentResource : This->MaterialResources)
 	{
 		CurrentResource->AddReferencedObjects(Collector);
@@ -4325,23 +4270,6 @@ bool UMaterial::CanBeClusterRoot() const
 
 void UMaterial::GetAssetRegistryTags(TArray<FAssetRegistryTag>& OutTags) const
 {
-	// CachedExpressionData may be nullptr here for default objects
-	{
-		const bool bHasSceneColor = CachedExpressionData ? CachedExpressionData->bHasSceneColor : false;
-		OutTags.Add(FAssetRegistryTag("HasSceneColor", bHasSceneColor ? TEXT("True") : TEXT("False"), FAssetRegistryTag::TT_Alphabetical));
-	}
-	{
-		const bool bHasPerInstanceRandom = CachedExpressionData ? CachedExpressionData->bHasPerInstanceRandom : false;
-		OutTags.Add(FAssetRegistryTag("HasPerInstanceRandom", bHasPerInstanceRandom ? TEXT("True") : TEXT("False"), FAssetRegistryTag::TT_Alphabetical));
-	}
-	{
-		const bool bHasPerInstanceCustomData = CachedExpressionData ? CachedExpressionData->bHasPerInstanceCustomData : false;
-		OutTags.Add(FAssetRegistryTag("HasPerInstanceCustomData", bHasPerInstanceCustomData ? TEXT("True") : TEXT("False"), FAssetRegistryTag::TT_Alphabetical));
-	}
-	{
-		const bool bHasVertexInterpolator = CachedExpressionData ? CachedExpressionData->bHasVertexInterpolator : false;
-		OutTags.Add(FAssetRegistryTag("HasVertexInterpolator", bHasVertexInterpolator ? TEXT("True") : TEXT("False"), FAssetRegistryTag::TT_Alphabetical));
-	}
 	Super::GetAssetRegistryTags(OutTags);
 }
 
@@ -4616,20 +4544,6 @@ bool UMaterial::UpdateLightmassTextureTracking()
 }
 
 #if WITH_EDITOR
-
-void UMaterial::GetReferencedTexturesAndOverrides(TSet<const UTexture*>& InOutTextures) const
-{
-	if (CachedExpressionData)
-	{
-		for (UObject* UsedObject : CachedExpressionData->ReferencedTextures)
-		{
-			if (const UTexture* UsedTexture = Cast<UTexture>(UsedObject))
-			{
-				InOutTextures.Add(UsedTexture);
-			}
-		}
-	}
-}
 
 FExpressionInput* UMaterial::GetExpressionInputForProperty(EMaterialProperty InProperty)
 {
@@ -5177,28 +5091,6 @@ void UMaterial::RecursiveUpdateRealtimePreview( UMaterialExpression* InExpressio
 	}
 }
 #endif // WITH_EDITOR
-
-void UMaterial::AppendReferencedFunctionIdsTo(TArray<FGuid>& Ids) const
-{
-	if (CachedExpressionData)
-	{
-		for (int32 FunctionIndex = 0; FunctionIndex < CachedExpressionData->FunctionInfos.Num(); FunctionIndex++)
-		{
-			Ids.AddUnique(CachedExpressionData->FunctionInfos[FunctionIndex].StateId);
-		}
-	}
-}
-
-void UMaterial::AppendReferencedParameterCollectionIdsTo(TArray<FGuid>& Ids) const
-{
-	if (CachedExpressionData)
-	{
-		for (int32 CollectionIndex = 0; CollectionIndex < CachedExpressionData->ParameterCollectionInfos.Num(); CollectionIndex++)
-		{
-			Ids.AddUnique(CachedExpressionData->ParameterCollectionInfos[CollectionIndex].StateId);
-		}
-	}
-}
 
 #if WITH_EDITOR
 int32 UMaterial::CompilePropertyEx( FMaterialCompiler* Compiler, const FGuid& AttributeID )
@@ -5759,8 +5651,7 @@ void UMaterial::GetLightingGuidChain(bool bIncludeTextures, TArray<FGuid>& OutGu
 	{
 		OutGuids.Append(ReferencedTextureGuids);
 	}
-	AppendReferencedFunctionIdsTo(OutGuids);
-	AppendReferencedParameterCollectionIdsTo(OutGuids);
+
 	OutGuids.Add(StateId);
 	Super::GetLightingGuidChain(bIncludeTextures, OutGuids);
 #endif

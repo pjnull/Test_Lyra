@@ -2324,9 +2324,9 @@ void ALandscapeProxy::GetGrassTypes(const UWorld* World, UMaterialInterface* Lan
 	OutMaxDiscardDistance = 0.0f;
 	if (LandscapeMat)
 	{
-		GrassTypesOut.Append(LandscapeMat->GetMaterial()->GetCachedExpressionData().GrassTypes);
+		GrassTypesOut.Append(LandscapeMat->GetCachedExpressionData().GrassTypes);
 
-		for (const ULandscapeGrassType* GrassType : LandscapeMat->GetMaterial()->GetCachedExpressionData().GrassTypes)
+		for (const ULandscapeGrassType* GrassType : LandscapeMat->GetCachedExpressionData().GrassTypes)
 		{
 			if (GrassType != nullptr)
 			{

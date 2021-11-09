@@ -9,6 +9,7 @@
 #include "UObject/ObjectMacros.h"
 #include "UObject/Object.h"
 #include "Misc/Guid.h"
+#include "Templates/UniquePtr.h"
 #include "Engine/EngineTypes.h"
 #include "UObject/SoftObjectPath.h"
 #include "UObject/ScriptMacros.h"
@@ -20,6 +21,7 @@
 #include "Interfaces/Interface_AssetUserData.h"
 #include "MaterialSceneTextureId.h"
 #include "Materials/MaterialRelevance.h"
+#include "MaterialCachedData.h"
 #if WITH_CHAOS
 #include "Physics/PhysicsInterfaceCore.h"
 #endif
@@ -205,7 +207,19 @@ private:
 	TMicRecursionGuard const* PreviousLink = nullptr;
 };
 
-using FMaterialParentInstanceArray = TArray<const class UMaterialInstance*, TInlineAllocator<16>>;
+/** Holds information about a hierarchy of materials */
+struct FMaterialInheritanceChain
+{
+	/** Base material at the root of the hierarchy */
+	const UMaterial* BaseMaterial = nullptr;
+	/** Cached expression data to use */
+	const FMaterialCachedExpressionData* CachedExpressionData = nullptr;
+	/** All the instances in the chain, starting with the current instance, and ending with the instance closest to the root material */
+	TArray<const class UMaterialInstance*, TInlineAllocator<16>> MaterialInstances;
+
+	inline const UMaterial* GetBaseMaterial() const { checkSlow(BaseMaterial); return BaseMaterial; }
+	inline const FMaterialCachedExpressionData& GetCachedExpressionData() const { checkSlow(CachedExpressionData); return *CachedExpressionData; }
+};
 
 UCLASS(abstract, BlueprintType, MinimalAPI, HideCategories = (Thumbnail))
 class UMaterialInterface : public UObject, public IBlendableInterface, public IInterface_AssetUserData
@@ -297,10 +311,13 @@ public:
 
 	//~ Begin UObject Interface.
 	ENGINE_API virtual void BeginDestroy() override;
+	ENGINE_API virtual void FinishDestroy() override;
 	ENGINE_API virtual bool IsReadyForFinishDestroy() override;
+	ENGINE_API virtual void Serialize(FArchive& Ar) override;
 	ENGINE_API virtual void PostLoad() override;
 	ENGINE_API virtual void PostDuplicate(bool bDuplicateForPIE) override;
 	ENGINE_API virtual void PostCDOContruct() override;
+	ENGINE_API static void AddReferencedObjects(UObject* InThis, FReferenceCollector& Collector);
 
 #if WITH_EDITOR
 	ENGINE_API virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
@@ -332,7 +349,9 @@ public:
 	 */
 	virtual const class UMaterial* GetMaterial_Concurrent(TMicRecursionGuard RecursionGuard = TMicRecursionGuard()) const PURE_VIRTUAL(UMaterialInterface::GetMaterial_Concurrent,return NULL;);
 
-	virtual const class UMaterial* GetMaterialInheritanceChain(FMaterialParentInstanceArray & OutInstances) const { return nullptr; }
+	virtual void GetMaterialInheritanceChain(FMaterialInheritanceChain& OutChain) const PURE_VIRTUAL(UMaterialInterface::GetMaterialInheritanceChain, return;);
+
+	ENGINE_API virtual const FMaterialCachedExpressionData& GetCachedExpressionData(TMicRecursionGuard RecursionGuard = TMicRecursionGuard()) const;
 
 	/**
 	* Test this material for dependency on a given material.
@@ -380,6 +399,19 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Physics|Material")
 	virtual UPhysicalMaterial* GetPhysicalMaterialFromMap(int32 Index) const PURE_VIRTUAL(UMaterialInterface::GetPhysicalMaterialFromMap, return nullptr;);
+
+	/** Determines whether each quality level has different nodes by inspecting the material's expressions.
+	* Or is required by the material quality setting overrides.
+	* @param	QualityLevelsUsed	output array of used quality levels.
+	* @param	ShaderPlatform	The shader platform to use for the quality settings.
+	* @param	bCooking		During cooking, certain quality levels may be discarded
+	*/
+	void GetQualityLevelUsage(TArray<bool, TInlineAllocator<EMaterialQualityLevel::Num> >& QualityLevelsUsed, EShaderPlatform ShaderPlatform, bool bCooking = false);
+
+	inline void GetQualityLevelUsageForCooking(TArray<bool, TInlineAllocator<EMaterialQualityLevel::Num> >& QualityLevelsUsed, EShaderPlatform ShaderPlatform)
+	{
+		GetQualityLevelUsage(QualityLevelsUsed, ShaderPlatform, true);
+	}
 
 	/** Return the textures used to render this material. */
 	virtual void GetUsedTextures(TArray<UTexture*>& OutTextures, EMaterialQualityLevel::Type QualityLevel, bool bAllQualityLevels, ERHIFeatureLevel::Type FeatureLevel, bool bAllFeatureLevels) const
@@ -488,10 +520,8 @@ public:
 		PURE_VIRTUAL(UMaterialInterface::GetGroupSortPriority, return false;);
 #endif // WITH_EDITOR
 
-	virtual void GetAllParameterInfoOfType(EMaterialParameterType Type, TArray<FMaterialParameterInfo>& OutParameterInfo, TArray<FGuid>& OutParameterIds) const
-		PURE_VIRTUAL(UMaterialInterface::GetAllParameterInfoOfType, return;);
-	virtual void GetAllParametersOfType(EMaterialParameterType Type, TMap<FMaterialParameterInfo, FMaterialParameterMetadata>& OutParameters) const
-		PURE_VIRTUAL(UMaterialInterface::GetAllParametersOfType, return;);
+	ENGINE_API virtual void GetAllParameterInfoOfType(EMaterialParameterType Type, TArray<FMaterialParameterInfo>& OutParameterInfo, TArray<FGuid>& OutParameterIds) const;
+	ENGINE_API virtual void GetAllParametersOfType(EMaterialParameterType Type, TMap<FMaterialParameterInfo, FMaterialParameterMetadata>& OutParameters) const;
 	ENGINE_API void GetAllScalarParameterInfo(TArray<FMaterialParameterInfo>& OutParameterInfo, TArray<FGuid>& OutParameterIds) const;
 	ENGINE_API void GetAllVectorParameterInfo(TArray<FMaterialParameterInfo>& OutParameterInfo, TArray<FGuid>& OutParameterIds) const;
 	ENGINE_API void GetAllTextureParameterInfo(TArray<FMaterialParameterInfo>& OutParameterInfo, TArray<FGuid>& OutParameterIds) const;
@@ -520,13 +550,11 @@ public:
 	ENGINE_API bool GetStaticComponentMaskParameterDefaultValue(const FHashedMaterialParameterInfo& ParameterInfo, bool& OutR, bool& OutG, bool& OutB, bool& OutA, FGuid& OutExpressionGuid) const;
 
 	/** Add to the set any texture referenced by expressions, including nested functions, as well as any overrides from parameters. */
-	virtual void GetReferencedTexturesAndOverrides(TSet<const UTexture*>& InOutTextures) const
-		PURE_VIRTUAL(UMaterialInterface::GetReferencedTexturesAndOverrides, );
+	ENGINE_API virtual void GetReferencedTexturesAndOverrides(TSet<const UTexture*>& InOutTextures) const;
 #endif // WITH_EDITOR
 
 	/** Get textures referenced by expressions, including nested functions. */
-	virtual TArrayView<const TObjectPtr<UObject>> GetReferencedTextures() const
-		PURE_VIRTUAL(UMaterialInterface::GetReferencedTextures,return TArrayView<const TObjectPtr<UObject>>(););
+	ENGINE_API TArrayView<const TObjectPtr<UObject>> GetReferencedTextures() const;
 
 	virtual void SaveShaderStableKeysInner(const class ITargetPlatform* TP, const struct FStableShaderKeyAndValue& SaveKeyVal)
 		PURE_VIRTUAL(UMaterialInterface::SaveShaderStableKeysInner, );
@@ -905,6 +933,16 @@ protected:
 	ENGINE_API uint32 GetFeatureLevelsToCompileForRendering() const;
 
 	void UpdateMaterialRenderProxy(FMaterialRenderProxy& Proxy);
+
+	/**
+	 * Cached data generated from the material's expressions, may be nullptr
+	 * UMaterials should always have cached data
+	 * UMaterialInstances will have cached data if they have overriden material layers (possibly for other reasons in the future)
+	 */
+	TUniquePtr<FMaterialCachedExpressionData> CachedExpressionData;
+
+	/** Set if CachedExpressionData was loaded from disk, should typically be true when running with cooked data, and false in the editor */
+	bool bLoadedCachedExpressionData = false;
 
 private:
 	/**
