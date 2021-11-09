@@ -276,7 +276,7 @@ void SSceneOutliner::HandleHiddenColumnsChanged()
 {
 	const TArray<FName> HiddenColumns = HeaderRowWidget->GetHiddenColumnIds();
 	FSceneOutlinerConfig* OutlinerConfig = GetMutableConfig();
-	TMap<FName, bool> ColumnVisibilities;
+	TMap<FName, bool> ColumnVisibilities = OutlinerConfig->ColumnVisibilities;
 
 	if (OutlinerConfig != nullptr)
 	{
