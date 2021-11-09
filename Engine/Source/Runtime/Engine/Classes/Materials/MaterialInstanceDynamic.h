@@ -17,12 +17,6 @@ class ENGINE_API UMaterialInstanceDynamic : public UMaterialInstance
 	virtual void UpdateCachedData() override;
 #endif
 
-	/** MID can just grab referenced textures from parent */
-	virtual TArrayView<const TObjectPtr<UObject>> GetReferencedTextures() const override
-	{
-		return Parent ? Parent->GetReferencedTextures() : TArrayView<const TObjectPtr<UObject>>();
-	}
-
 	/** Set a MID scalar (float) parameter value */
 	UFUNCTION(BlueprintCallable, meta=(Keywords = "SetFloatParameterValue"), Category="Rendering|Material")
 	void SetScalarParameterValue(FName ParameterName, float Value);
