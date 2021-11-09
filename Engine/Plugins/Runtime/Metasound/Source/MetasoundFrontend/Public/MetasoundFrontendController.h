@@ -634,6 +634,20 @@ namespace Metasound
 			 */
 			virtual FConstVariableHandle FindVariable(const FGuid& InVariableID) const = 0;
 
+			/** Finds a variable inspecting the nodes associated with the variable.
+			 *
+			 * @param InNodeID - ID of node associated with variable.
+			 * @return If found, returns valid variable handle. An invalid handle otherwise. 
+			 */
+			virtual FVariableHandle FindVariableContainingNode(const FGuid& InNodeID) = 0;
+
+			/** Finds a variable inspecting the nodes associated with the variable.
+			 *
+			 * @param InNodeID - ID of node associated with variable.
+			 * @return If found, returns valid variable handle. An invalid handle otherwise. 
+			 */
+			virtual FConstVariableHandle FindVariableContainingNode(const FGuid& InNodeID) const = 0;
+
 			/** Removes the variable with the given ID. 
 			 *
 			 * @param InVariableID - ID of existing variable.
@@ -663,6 +677,7 @@ namespace Metasound
 			 * @param InVariableID - ID of existing variable.
 			 */
 			virtual FNodeHandle AddVariableDeferredAccessorNode(const FGuid& InVariableID) = 0;
+
 
 			/** Clears the graph, its associated interface, and synchronizes removed dependencies with the owning graph. */
 			virtual void ClearGraph() = 0;

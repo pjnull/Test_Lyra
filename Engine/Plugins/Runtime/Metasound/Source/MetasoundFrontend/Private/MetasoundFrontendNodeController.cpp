@@ -1598,6 +1598,7 @@ namespace Metasound
 		{
 			const bool bIsVariableNode = (InClassType == EMetasoundFrontendClassType::Variable)
 				|| (InClassType == EMetasoundFrontendClassType::VariableAccessor)
+				|| (InClassType == EMetasoundFrontendClassType::VariableDeferredAccessor)
 				|| (InClassType == EMetasoundFrontendClassType::VariableMutator);
 			return bIsVariableNode;
 		}

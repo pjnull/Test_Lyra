@@ -286,6 +286,8 @@ namespace Metasound
 			virtual FVariableHandle AddVariable(const FName& InDataTypeName) override { return IVariableController::GetInvalidHandle(); }
 			virtual FVariableHandle FindVariable(const FGuid& InVariableID) override { return IVariableController::GetInvalidHandle(); }
 			virtual FConstVariableHandle FindVariable(const FGuid& InVariableID) const { return IVariableController::GetInvalidHandle(); }
+			virtual FVariableHandle FindVariableContainingNode(const FGuid& InNodeID) override { return IVariableController::GetInvalidHandle(); }
+			virtual FConstVariableHandle FindVariableContainingNode(const FGuid& InNodeID) const override { return IVariableController::GetInvalidHandle(); }
 			virtual bool RemoveVariable(const FGuid& InVariableID) override { return false; }
 			virtual TArray<FVariableHandle> GetVariables() override { return TArray<FVariableHandle>(); }
 			virtual TArray<FConstVariableHandle> GetVariables() const override { return TArray<FConstVariableHandle>(); }

@@ -5,6 +5,7 @@
 #include "Internationalization/Text.h"
 #include "MetasoundFrontendController.h"
 #include "MetasoundFrontendDocumentAccessPtr.h"
+#include "MetasoundFrontendGraphLinter.h"
 #include "MetasoundFrontendInvalidController.h"
 #include "Misc/Guid.h"
 
@@ -178,30 +179,42 @@ namespace Metasound
 		{
 			FConnectability OutConnectability;
 			OutConnectability.Connectable = FConnectability::EConnectable::No;
+			OutConnectability.Reason = FConnectability::EReason::None;
 
 			const FName& DataType = GetDataType();
 			const FName& OtherDataType = InController.GetDataType();
 
 			if (DataType == Invalid::GetInvalidName())
 			{
-				return OutConnectability;
+				OutConnectability.Connectable = FConnectability::EConnectable::No;
+				OutConnectability.Reason = FConnectability::EReason::IncompatibleDataTypes;
 			}
-
-			if (OtherDataType == DataType)
+			else if (OtherDataType == DataType)
 			{
 				// If data types are equal, connection can happen.
 				OutConnectability.Connectable = FConnectability::EConnectable::Yes;
-				return OutConnectability;
+				OutConnectability.Reason = FConnectability::EReason::None;
+			}
+			else
+			{
+				// If data types are not equal, check for converter nodes which could
+				// convert data type.
+				OutConnectability.PossibleConverterNodeClasses = FRegistry::Get()->GetPossibleConverterNodes(OtherDataType, DataType);
+
+				if (OutConnectability.PossibleConverterNodeClasses.Num() > 0)
+				{
+					OutConnectability.Connectable = FConnectability::EConnectable::YesWithConverterNode;
+				}
 			}
 
-			// If data types are not equal, check for converter nodes which could
-			// convert data type.
-			OutConnectability.PossibleConverterNodeClasses = FRegistry::Get()->GetPossibleConverterNodes(OtherDataType, DataType);
-
-			if (OutConnectability.PossibleConverterNodeClasses.Num() > 0)
+			// If data types are connectable, check if causes loop.
+			if (FConnectability::EConnectable::No != OutConnectability.Connectable)
 			{
-				OutConnectability.Connectable = FConnectability::EConnectable::YesWithConverterNode;
-				return OutConnectability;
+				if (FGraphLinter::DoesConnectionCauseLoop(*this, InController))
+				{
+					OutConnectability.Connectable = FConnectability::EConnectable::No;
+					OutConnectability.Reason = FConnectability::EReason::CausesLoop;
+				}
 			}
 
 			return OutConnectability;

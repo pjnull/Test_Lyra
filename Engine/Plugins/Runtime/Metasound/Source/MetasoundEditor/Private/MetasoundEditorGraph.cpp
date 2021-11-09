@@ -148,6 +148,11 @@ void UMetasoundEditorGraphVertex::SetDescription(const FText& InDescription)
 	}
 }
 
+FGuid UMetasoundEditorGraphVertex::GetMemberID() const 
+{ 
+	return NodeID;
+}
+
 FName UMetasoundEditorGraphVertex::GetMemberName() const
 {
 	using namespace Metasound::Frontend;
@@ -474,7 +479,7 @@ void UMetasoundEditorGraphInput::OnDataTypeChanged()
 	using namespace Metasound::Frontend;
 
 	IMetasoundEditorModule& EditorModule = FModuleManager::GetModuleChecked<IMetasoundEditorModule>("MetaSoundEditor");
-	const FEditorDataType& EditorDataType = EditorModule.FindDataType(TypeName);
+	const FEditorDataType& EditorDataType = EditorModule.FindDataTypeChecked(TypeName);
 	const EMetasoundFrontendLiteralType LiteralType = static_cast<EMetasoundFrontendLiteralType>(EditorDataType.RegistryInfo.PreferredLiteralType);
 
 	TSubclassOf<UMetasoundEditorGraphInputLiteral> InputLiteralClass = EditorModule.FindInputLiteralClass(LiteralType);
@@ -567,6 +572,11 @@ void UMetasoundEditorGraphVariable::SetMemberName(const FName& InNewName)
 
 	GetVariableHandle()->SetName(InNewName);
 	NameChanged.Broadcast(VariableID);
+}
+
+FGuid UMetasoundEditorGraphVariable::GetMemberID() const 
+{ 
+	return VariableID;
 }
 
 FName UMetasoundEditorGraphVariable::GetMemberName() const

@@ -101,6 +101,9 @@ public:
 	/** Gets the members name */
 	virtual FName GetMemberName() const;
 
+	/** Get ID for this member */
+	virtual FGuid GetMemberID() const PURE_VIRTUAL(UMetasoundEditorGraphMember::GetMemberID, return FGuid(); );
+
 	/** Set the member description */
 	virtual void SetDescription(const FText& InDescription);
 	/** Get the member description */
@@ -143,6 +146,7 @@ public:
 	FMetasoundFrontendClassName ClassName;
 
 	/* ~Begin UMetasoundEditorGraphMember interface */
+	virtual FGuid GetMemberID() const override;
 	virtual FName GetMemberName() const override; 
 	virtual FText GetDescription() const override;
 	virtual FText GetDisplayName() const override;
@@ -226,6 +230,7 @@ public:
 	virtual FText GetDescription() const override;
 	virtual void SetDescription(const FText& InDescription) override;
 
+	virtual FGuid GetMemberID() const override;
 	virtual bool CanRename(const FText& InNewName, FText& OutError) const override;
 	virtual void SetMemberName(const FName& InNewName) override; 
 	virtual FName GetMemberName() const override; 
