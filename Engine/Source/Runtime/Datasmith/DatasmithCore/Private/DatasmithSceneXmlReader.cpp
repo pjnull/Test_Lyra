@@ -1139,6 +1139,7 @@ bool FDatasmithSceneXmlReader::ParseBuffer(const FString& XmlBuffer, TSharedRef<
 
 bool FDatasmithSceneXmlReader::ParseXmlFile(TSharedRef< IDatasmithScene >& OutScene, bool bInAppend)
 {
+	using namespace DatasmithSceneXmlReaderImpl;
 	if (!XmlFile.IsValid())
 	{
 		return false;
@@ -1169,7 +1170,7 @@ bool FDatasmithSceneXmlReader::ParseXmlFile(TSharedRef< IDatasmithScene >& OutSc
 		// HOST
 		if (Nodes[i]->GetTag() == DATASMITH_HOSTNAME)
 		{
-			OutScene->SetHost(*Nodes[i]->GetContent());
+			OutScene->SetHost(*UnsanitizeXMLText(Nodes[i]->GetContent()));
 		}
 		// VERSION
 		else if (Nodes[i]->GetTag() == DATASMITH_EXPORTERVERSION)
@@ -1189,9 +1190,9 @@ bool FDatasmithSceneXmlReader::ParseXmlFile(TSharedRef< IDatasmithScene >& OutSc
 		// APPLICATION INFO
 		else if (Nodes[i]->GetTag() == DATASMITH_APPLICATION)
 		{
-			OutScene->SetVendor(*Nodes[i]->GetAttribute(DATASMITH_VENDOR));
-			OutScene->SetProductName(*Nodes[i]->GetAttribute(DATASMITH_PRODUCTNAME));
-			OutScene->SetProductVersion(*Nodes[i]->GetAttribute(DATASMITH_PRODUCTVERSION));
+			OutScene->SetVendor(*UnsanitizeXMLText(Nodes[i]->GetAttribute(DATASMITH_VENDOR)));
+			OutScene->SetProductName(*UnsanitizeXMLText(Nodes[i]->GetAttribute(DATASMITH_PRODUCTNAME)));
+			OutScene->SetProductVersion(*UnsanitizeXMLText(Nodes[i]->GetAttribute(DATASMITH_PRODUCTVERSION)));
 		}
 		// USER INFO
 		else if (Nodes[i]->GetTag() == DATASMITH_USER)
