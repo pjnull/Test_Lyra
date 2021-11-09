@@ -81,6 +81,7 @@ public:
 	DECLARE_MULTICAST_DELEGATE_OneParam(FCancelWorldPartitionUpdateEditorCellsDelegate, UWorldPartition*);
 	FCancelWorldPartitionUpdateEditorCellsDelegate OnCancelWorldPartitionUpdateEditorCells;
 
+	TArray<FName> GetUserLoadedEditorGridCells() const;
 private:
 
 	void SavePerUserSettings();

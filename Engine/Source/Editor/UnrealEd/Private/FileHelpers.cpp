@@ -76,6 +76,7 @@
 #include "WorldPartition/WorldPartition.h"
 #include "WorldPartition/DataLayer/WorldDataLayers.h"
 #include "WorldPartition/DataLayer/DataLayer.h"
+#include "WorldPartition/WorldPartitionEditorPerProjectUserSettings.h"
 #include "PackageSourceControlHelper.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogFileHelpers, Log, All);
@@ -737,6 +738,9 @@ static bool SaveWorld(UWorld* World,
 		UWorld* DuplicatedWorld = nullptr;
 		bool bRenamedWorldPartition = false;
 
+		// Save Loaded cells
+		TArray<FName> LoadedEditorCells;
+
 		if ( bRenamePackageToFile )
 		{
 			if (bPackageNeedsRename)
@@ -751,6 +755,7 @@ static bool SaveWorld(UWorld* World,
 				if (UWorldPartition* WorldPartition = World->GetWorldPartition())
 				{
 					bRenamedWorldPartition = true;
+					LoadedEditorCells = WorldPartition->GetUserLoadedEditorGridCells();
 					if (AWorldDataLayers* WorldDataLayers = World->GetWorldDataLayers())
 					{
 						WorldDataLayers->ForEachDataLayer([](UDataLayer* DataLayer)
@@ -883,6 +888,9 @@ static bool SaveWorld(UWorld* World,
 			{
 				// Force rescan to make sure assets are found on map open or world partition initialize
 				AssetRegistry.ScanPathsSynchronous({ ULevel::GetExternalActorsPath(NewPackageName) }, true);
+
+				// Save Snapshot of loaded Editor Cells
+				GetMutableDefault<UWorldPartitionEditorPerProjectUserSettings>()->SetEditorGridLoadedCells(SaveWorld, LoadedEditorCells);
 
 				// No need to initialize if we have a DuplicatedWorld since the map will get loaded by a subsequent LoadMap call
 				if (!DuplicatedWorld)

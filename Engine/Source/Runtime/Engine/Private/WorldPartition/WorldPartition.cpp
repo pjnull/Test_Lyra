@@ -1261,32 +1261,37 @@ bool UWorldPartition::FinalizeGeneratorPackageForCook(const TArray<ICookPackageS
 	return false;
 }
 
+TArray<FName> UWorldPartition::GetUserLoadedEditorGridCells() const
+{
+	// Save last loaded cells settings
+	const TArray<FName>& LastEditorGridLoadedCells = GetMutableDefault<UWorldPartitionEditorPerProjectUserSettings>()->GetEditorGridLoadedCells(GetWorld());
+
+	TArray<FName> EditorGridLastLoadedCells;
+	EditorHash->ForEachCell([this, &LastEditorGridLoadedCells, &EditorGridLastLoadedCells](UWorldPartitionEditorCell* Cell)
+	{
+		FName CellName = Cell->GetFName();
+
+		if (Cell != EditorHash->GetAlwaysLoadedCell())
+		{
+			if (Cell->IsLoaded() && Cell->IsLoadedChangedByUserOperation())
+			{
+				EditorGridLastLoadedCells.Add(CellName);
+			}
+			else if (!Cell->IsLoaded() && !Cell->IsLoadedChangedByUserOperation() && LastEditorGridLoadedCells.Contains(CellName))
+			{
+				EditorGridLastLoadedCells.Add(CellName);
+			}
+		}
+	});
+
+	return EditorGridLastLoadedCells;
+}
+
 void UWorldPartition::SavePerUserSettings()
 {
 	if (GIsEditor && !World->IsGameWorld() && !IsRunningCommandlet() && !IsEngineExitRequested())
 	{
-		// Save last loaded cells settings
-		const TArray<FName>& LastEditorGridLoadedCells = GetMutableDefault<UWorldPartitionEditorPerProjectUserSettings>()->GetEditorGridLoadedCells(GetWorld());
-
-		TArray<FName> EditorGridLastLoadedCells;
-		EditorHash->ForEachCell([this, &LastEditorGridLoadedCells, &EditorGridLastLoadedCells](UWorldPartitionEditorCell* Cell)
-		{
-			FName CellName = Cell->GetFName();
-
-			if (Cell != EditorHash->GetAlwaysLoadedCell())
-			{
-				if (Cell->IsLoaded() && Cell->IsLoadedChangedByUserOperation())
-				{
-					EditorGridLastLoadedCells.Add(CellName);
-				}
-				else if (!Cell->IsLoaded() && !Cell->IsLoadedChangedByUserOperation() && LastEditorGridLoadedCells.Contains(CellName))
-				{
-					EditorGridLastLoadedCells.Add(CellName);
-				}
-			}
-		});
-
-		GetMutableDefault<UWorldPartitionEditorPerProjectUserSettings>()->SetEditorGridLoadedCells(GetWorld(), EditorGridLastLoadedCells);
+		GetMutableDefault<UWorldPartitionEditorPerProjectUserSettings>()->SetEditorGridLoadedCells(GetWorld(), GetUserLoadedEditorGridCells());
 	}
 }
 

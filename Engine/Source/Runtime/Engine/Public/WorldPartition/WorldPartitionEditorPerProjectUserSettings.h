@@ -64,8 +64,12 @@ public:
 			FWorldPartitionPerWorldSettings& PerWorldSettings = PerWorldEditorSettings.FindOrAdd(TSoftObjectPtr<UWorld>(InWorld));
 			if (PerWorldSettings.EditorGridConfigHash != InEditorGridConfigHash)
 			{
+				// don't reset LoadedEditorGridCells if Hash is default value.
+				if (PerWorldSettings.EditorGridConfigHash != 0)
+				{
+					PerWorldSettings.LoadedEditorGridCells.Empty();
+				}
 				PerWorldSettings.EditorGridConfigHash = InEditorGridConfigHash;
-				PerWorldSettings.LoadedEditorGridCells.Empty();
 				SaveConfig();
 			}
 		}
@@ -76,7 +80,7 @@ public:
 		return PerWorldEditorSettings.FindOrAdd(TSoftObjectPtr<UWorld>(InWorld)).LoadedEditorGridCells;
 	}
 
-	void SetEditorGridLoadedCells(UWorld* InWorld, TArray<FName>& InEditorGridLoadedCells)
+	void SetEditorGridLoadedCells(UWorld* InWorld, const TArray<FName>& InEditorGridLoadedCells)
 	{
 		if (ShouldSaveSettings(InWorld))
 		{
