@@ -6194,7 +6194,7 @@ bool RecompileShaders(const TCHAR* Cmd, FOutputDevice& Ar)
 		return 1;
 	}
 
-	UE_LOG(LogShaderCompilers, Warning, TEXT("Invalid parameter. Options are: \n'Changed', 'Global', 'Material [name]', 'All' 'Platform [name]'\nNote: Platform implies Changed, and requires the proper target platform modules to be compiled."));
+	UE_LOG(LogShaderCompilers, Warning, TEXT("Invalid parameter. Options are: \n'Changed', 'Global', 'Material [name]', 'All'."));
 	return 1;
 }
 
