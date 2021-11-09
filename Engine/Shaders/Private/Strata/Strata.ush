@@ -2,9 +2,7 @@
 
 #pragma once
 
-#define USE_ENERGY_CONSERVATION 1
 #include "../ShadingEnergyConservation.ush"
-
 #include "../BRDF.ush"
 #include "../ColorSpace.ush"
 #include "../Common.ush"

@@ -45,6 +45,14 @@ static TAutoConsoleVariable<int32> CVarShadingFurnaceTest_TableFormat(
 	TEXT("Energy conservation table format 0: 16bits, 1: 32bits."),
 	ECVF_RenderThreadSafe);
 
+// Transition render settings that will disapear when strata gets enabled
+
+static TAutoConsoleVariable<int32> CVarMaterialEnergyConservation(
+	TEXT("r.Material.EnergyConservation"),
+	0,
+	TEXT("Enable energy conservation for material (project settings, read only)."),
+	ECVF_ReadOnly | ECVF_RenderThreadSafe);
+
 #define SHADING_ENERGY_CONSERVATION_TABLE_RESOLUTION 32
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

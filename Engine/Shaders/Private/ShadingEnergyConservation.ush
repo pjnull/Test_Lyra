@@ -5,12 +5,12 @@
 // If EnergyConservation flag is not enabled explicitly then:
 // * If strata is enabled: ON by default
 // * If strata is disnabled: OFF by default
-#ifndef USE_ENERGY_CONSERVATION
-	#if PROJECT_STRATA
-		#define USE_ENERGY_CONSERVATION 1
-	#else
-		#define USE_ENERGY_CONSERVATION 0
-	#endif
+#if PROJECT_STRATA || MATERIAL_ENERGYCONSERVATION
+	#undef USE_ENERGY_CONSERVATION
+	#define USE_ENERGY_CONSERVATION 1
+#else
+	#undef USE_ENERGY_CONSERVATION
+	#define USE_ENERGY_CONSERVATION 0
 #endif
 
 // Energy compensation/preservation for the various BxDFs. This file provides utility functions to tweak lobe weights
