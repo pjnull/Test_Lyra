@@ -1091,7 +1091,7 @@ void UMetasoundEditorGraphSchema::BreakNodeLinks(UEdGraphNode& TargetNode, bool 
 	TArray<UEdGraphPin*> Pins = TargetNode.GetAllPins();
 	for (UEdGraphPin* Pin : Pins)
 	{
-		FGraphBuilder::DisconnectPin(*Pin);
+		FGraphBuilder::DisconnectPinVertex(*Pin);
 		Super::BreakPinLinks(*Pin, false /* bSendsNodeNotifcation */);
 	}
 	Super::BreakNodeLinks(TargetNode);
@@ -1107,7 +1107,7 @@ void UMetasoundEditorGraphSchema::BreakPinLinks(UEdGraphPin& TargetPin, bool bSe
 	Graph->GetMetasoundChecked().Modify();
 	TargetPin.Modify();
 
-	FGraphBuilder::DisconnectPin(TargetPin);
+	FGraphBuilder::DisconnectPinVertex(TargetPin);
 	Super::BreakPinLinks(TargetPin, bSendsNodeNotifcation);
 }
 

@@ -3,7 +3,6 @@
 
 #include "AudioMeterStyle.h"
 #include "AudioSynesthesia/Classes/Meter.h"
-#include "CoreMinimal.h"
 #include "EditorUndoClient.h"
 #include "Framework/Commands/UICommandList.h"
 #include "GraphEditor.h"
@@ -18,9 +17,10 @@
 #include "SMetasoundPalette.h"
 #include "Sound/AudioBus.h"
 #include "Textures/SlateIcon.h"
+#include "TickableEditorObject.h"
+#include "Toolkits/AssetEditorToolkit.h"
 #include "Toolkits/IToolkitHost.h"
 #include "UObject/GCObject.h"
-#include "Toolkits/AssetEditorToolkit.h"
 #include "UObject/StrongObjectPtr.h"
 #include "Widgets/SPanel.h"
 #include "WorkflowOrientedApp/WorkflowTabFactory.h"
@@ -63,7 +63,7 @@ namespace Metasound
 			COUNT
 		};
 
-		class FEditor : public IMetasoundEditor, public FGCObject, public FNotifyHook, public FEditorUndoClient
+		class FEditor : public IMetasoundEditor, public FGCObject, public FNotifyHook, public FEditorUndoClient, public FTickableEditorObject
 		{
 		public:
 			virtual ~FEditor();
@@ -100,10 +100,14 @@ namespace Metasound
 				return TEXT("Metasound::Editor::FEditor");
 			}
 
-			//~ Begin FEditorUndoClient Interface
+			/** FEditorUndoClient Interface */
 			virtual void PostUndo(bool bSuccess) override;
 			virtual void PostRedo(bool bSuccess) override { PostUndo(bSuccess); }
-			// End of FEditorUndoClient
+
+			/** FTickableEditorObject Interface */
+			virtual void Tick(float DeltaTime) override;
+			virtual TStatId GetStatId() const override;
+			virtual ETickableTickType GetTickableTickType() const override { return ETickableTickType::Always; }
 
 			/** Whether pasting the currently selected nodes is permissible */
 			bool CanPasteNodes();
@@ -176,7 +180,7 @@ namespace Metasound
 			/** Deletes from the Metasound Menu (i.e. input or output) if in focus, or the currently selected nodes if the graph editor is in focus. */
 			void DeleteSelected();
 
-			void DeleteInterfaceItem(TSharedPtr<FMetasoundGraphMemberSchemaAction> ActionToDelete, UMetasoundEditorGraph* Graph);
+			void DeleteInterfaceItem(TSharedPtr<FMetasoundGraphMemberSchemaAction> ActionToDelete);
 
 			/** Delete the currently selected nodes */
 			void DeleteSelectedNodes();
@@ -278,7 +282,6 @@ namespace Metasound
 			void EditObjectSettings();
 
 			void NotifyNodePasteFailure_ReferenceLoop();
-			void NotifyUserModifiedBySync();
 
 			bool IsPlaying() const;
 

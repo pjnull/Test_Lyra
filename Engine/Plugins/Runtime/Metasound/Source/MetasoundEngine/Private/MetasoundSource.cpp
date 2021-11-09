@@ -87,7 +87,7 @@ UMetaSoundSource::UMetaSoundSource(const FObjectInitializer& ObjectInitializer)
 void UMetaSoundSource::PostEditUndo()
 {
 	Super::PostEditUndo();
-	Metasound::PostAssetUndo(*this);
+	SetSynchronizationRequired();
 }
 
 void UMetaSoundSource::PostDuplicate(EDuplicateMode::Type InDuplicateMode)

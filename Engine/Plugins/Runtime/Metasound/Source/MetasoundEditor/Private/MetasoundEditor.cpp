@@ -53,6 +53,7 @@
 #include "Widgets/Notifications/SNotificationList.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/SOverlay.h"
+#include "Stats/Stats.h"
 
 struct FGraphActionNode;
 
@@ -182,8 +183,12 @@ namespace Metasound
 				{
 					if (UMetasoundEditorGraphMember* GraphMember = MetasoundAction->GetGraphMember())
 					{
-						GraphMember->SetDisplayName(FText::GetEmpty());
-						GraphMember->SetMemberName(FName(*InNewText.ToString()));
+						const FText TransactionLabel = FText::Format(LOCTEXT("Rename Graph Member", "Set MetaSound {0}'s Name"), GraphMember->GetGraphMemberLabel());
+						const FScopedTransaction Transaction(TransactionLabel);
+
+						constexpr bool bPostTransaction = false;
+						GraphMember->SetDisplayName(FText::GetEmpty(), bPostTransaction);
+						GraphMember->SetMemberName(FName(*InNewText.ToString()), bPostTransaction);
 					}
 				}
 			}
@@ -365,7 +370,6 @@ namespace Metasound
 			Metasound = ObjectToEdit;
 
 			FGraphBuilder::RegisterGraphWithFrontend(*Metasound);
-			FGraphBuilder::ValidateGraph(*Metasound);
 
 			GEditor->RegisterForUndo(this);
 
@@ -497,34 +501,18 @@ namespace Metasound
 			MetasoundGraphEditor->AddNotification(Info, false /* bSuccess */);
 		}
 
-		void FEditor::NotifyUserModifiedBySync()
-		{
-			FNotificationInfo Info(LOCTEXT("SynchronizationRequired", "Operation modified pin(s), connection(s), and/or node(s).  Please refer to graph."));
-			Info.bFireAndForget = true;
-			Info.bUseSuccessFailIcons = false;
-			Info.ExpireDuration = 5.0f;
-
-			MetasoundGraphEditor->AddNotification(Info, false /* bSuccess */);
-		}
-
 		void FEditor::NotifyPostChange(const FPropertyChangedEvent& PropertyChangedEvent, FProperty* PropertyThatChanged)
-		{	
+		{
 			if (MetasoundGraphEditor.IsValid() && PropertyChangedEvent.ChangeType != EPropertyChangeType::Interactive)
 			{
-				// If a property change event occurs outside of the metasound UEdGraph and results in the metasound document changing, 
+				// If a property change event occurs outside of the metasound UEdGraph and results in the metasound document changing,
 				// then the document and the UEdGraph need to be synchronized. There may be a better trigger for this call to reduce
 				// the number of times the graph is synchronized.
 				if (Metasound)
 				{
-					if (IMetasoundUObjectRegistry::Get().IsRegisteredClass(Metasound))
+					if (FMetasoundAssetBase* Asset = IMetasoundUObjectRegistry::Get().GetObjectAsAssetBase(Metasound))
 					{
-						if (FGraphBuilder::SynchronizeGraph(*Metasound))
-						{
-							NotifyUserModifiedBySync();
-							Metasound->MarkPackageDirty();
-						}
-						MetasoundGraphEditor->NotifyGraphChanged();
-						RefreshInterface();
+						Asset->SetSynchronizationRequired();
 					}
 				}
 			}
@@ -804,7 +792,7 @@ namespace Metasound
 		{
 			if (USoundBase* MetasoundToPlay = Cast<USoundBase>(Metasound))
 			{
-				if (!FGraphBuilder::ValidateGraph(*Metasound))
+				if (!FGraphBuilder::SynchronizeGraph(*Metasound))
 				{
 					return;
 				}
@@ -1181,7 +1169,7 @@ namespace Metasound
 								if (MajorUpdateVersion.IsValid() && MajorUpdateVersion > NodeHandle->GetClassMetadata().GetVersion())
 								{
 									ExternalNode->UpdateToVersion(MajorUpdateVersion, false /* bInPropagateErrorMessages */);
-									FGraphBuilder::SynchronizeGraph(*Metasound);
+									Graph.SetSynchronizationRequired();
 								}
 							}
 						}
@@ -1262,19 +1250,27 @@ namespace Metasound
 			}
 		}
 
-		void FEditor::DeleteInterfaceItem(TSharedPtr<FMetasoundGraphMemberSchemaAction> ActionToDelete, UMetasoundEditorGraph* Graph)
+		void FEditor::DeleteInterfaceItem(TSharedPtr<FMetasoundGraphMemberSchemaAction> ActionToDelete)
 		{
 			using namespace Metasound::Frontend;
+			check(Metasound);
 
 			UMetasoundEditorGraphMember* GraphMember = ActionToDelete->GetGraphMember();
 			if (ensure(GraphMember))
 			{
-				UMetasoundEditorGraphMember* NextToSelect = Graph->FindAdjacentMember(*GraphMember);
+				UMetasoundEditorGraph& Graph = GetMetaSoundGraphChecked();
+				UMetasoundEditorGraphMember* NextToSelect = Graph.FindAdjacentMember(*GraphMember);
 
-				Graph->RemoveMember(*GraphMember);
+				{
+					const FScopedTransaction Transaction(LOCTEXT("MetaSoundEditorDeleteSelectedNode", "Delete MetaSound GraphMember"));
+					Metasound->Modify();
+					Graph.Modify();
+					Graph.RemoveMember(*GraphMember);
+				}
+
 				RefreshInterface();
 
-				if (nullptr != NextToSelect)
+				if (NextToSelect)
 				{
 					if (MetasoundInterfaceMenu->SelectItemByName(NextToSelect->GetMemberName(), ESelectInfo::Direct, static_cast<int32>(NextToSelect->GetSectionID())))
 					{
@@ -1284,7 +1280,7 @@ namespace Metasound
 				}
 			}
 
-			FGraphBuilder::RegisterGraphWithFrontend(Graph->GetMetasoundChecked());
+			FGraphBuilder::RegisterGraphWithFrontend(*Metasound);
 		}
 
 		void FEditor::DeleteSelected()
@@ -1303,16 +1299,6 @@ namespace Metasound
 
 				if (!Actions.IsEmpty())
 				{
-					check(Metasound);
-					const FScopedTransaction Transaction(LOCTEXT("MetaSoundEditorDeleteSelectedNode", "Delete MetaSound GraphMember"));
-					Metasound->Modify();
-
-					UMetasoundEditorGraph& Graph = GetMetaSoundGraphChecked();
-					Graph.Modify();
-
-					FMetasoundAssetBase* MetasoundAsset = IMetasoundUObjectRegistry::Get().GetObjectAsAssetBase(Metasound);
-					check(MetasoundAsset);
-					
 					TSharedPtr<FMetasoundGraphMemberSchemaAction> ActionToDelete;
 					for (const TSharedPtr<FEdGraphSchemaAction>& Action : Actions)
 					{
@@ -1346,7 +1332,7 @@ namespace Metasound
 
 					if (ActionToDelete.IsValid())
 					{
-						DeleteInterfaceItem(ActionToDelete, &Graph);
+						DeleteInterfaceItem(ActionToDelete);
 					}
 					return;
 				}
@@ -1706,12 +1692,7 @@ namespace Metasound
 				MetasoundGraphEditor->SetNodeSelection(GraphNode, true);
 			}
 
-			if (FGraphBuilder::SynchronizeGraph(*Metasound))
-			{
-				NotifyUserModifiedBySync();
-			}
-
-			FGraphBuilder::ValidateGraph(*Metasound);
+			MetasoundAsset->SetSynchronizationRequired();
 
 			if (bNotifyReferenceLoop)
 			{
@@ -2031,6 +2012,27 @@ namespace Metasound
 		TSharedRef<SWidget> FEditor::OnCreateWidgetForAction(FCreateWidgetForActionData* const InCreateData)
 		{
 			return SNew(SMetaSoundGraphPaletteItem, InCreateData);
+		}
+
+		void FEditor::Tick(float DeltaTime)
+		{
+			if (!Metasound)
+			{
+				return;
+			}
+
+			FMetasoundAssetBase* MetasoundAsset = IMetasoundUObjectRegistry::Get().GetObjectAsAssetBase(Metasound);
+			check(MetasoundAsset);
+
+			if (MetasoundAsset->GetSynchronizationPending())
+			{
+				FGraphBuilder::SynchronizeGraph(*Metasound);
+			}
+		}
+
+		TStatId FEditor::GetStatId() const
+		{
+			RETURN_QUICK_DECLARE_CYCLE_STAT(FMetasoundEditor, STATGROUP_Tickables);
 		}
 
 		FText FEditor::GetSectionTitle(ENodeSection InSection) const

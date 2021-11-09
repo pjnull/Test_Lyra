@@ -97,6 +97,9 @@ public:
 	virtual FGuid GetNodeID() const { return FGuid(); }
 	virtual FText GetDisplayName() const;
 
+	// Whether or not to refresh given node in associated graph editor.
+	bool bRefreshNode = false;
+
 protected:
 	virtual void SetNodeID(FGuid InNodeID) { }
 

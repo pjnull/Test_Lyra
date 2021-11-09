@@ -634,6 +634,7 @@ UMetasoundEditorGraphExternalNode* UMetasoundEditorGraphExternalNode::UpdateToVe
 		}
 	}
 
+	bRefreshNode = true;
 	return ReplacementEdNode;
 }
 

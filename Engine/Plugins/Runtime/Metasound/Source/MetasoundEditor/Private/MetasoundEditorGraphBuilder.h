@@ -37,6 +37,9 @@ namespace Metasound
 		{
 			static void InitGraphNode(Frontend::FNodeHandle& InNodeHandle, UMetasoundEditorGraphNode* NewGraphNode, UObject& InMetaSound);
 
+			// Validates MetaSound graph.
+			static bool ValidateGraph(UObject& InMetaSound);
+
 		public:
 			static const FName PinCategoryAudio;
 			static const FName PinCategoryBoolean;
@@ -61,8 +64,8 @@ namespace Metasound
 			static TSharedPtr<FEditor> GetEditorForMetasound(const UObject& MetaSound);
 			static TSharedPtr<FEditor> GetEditorForGraph(const UEdGraph& EdGraph);
 
-			// Validates MetaSound graph.
-			static bool ValidateGraph(UObject& InMetaSound, bool bInClearUpdateNotes = false);
+			// Initializes editor graph for given MetaSound
+			static bool InitGraph(UObject& InMetaSound);
 
 			// Wraps RegisterGraphWithFrontend logic in Frontend with any additional logic required to refresh editor & respective editor object state.
 			static void RegisterGraphWithFrontend(UObject& InMetaSound);
@@ -151,11 +154,10 @@ namespace Metasound
 			// the Editor Graph representation of the pins.
 			static bool ConnectNodes(UEdGraphPin& InInputPin, UEdGraphPin& InOutputPin, bool bInConnectEdPins);
 
-			// Disconnects pin from any linked input or output nodes, and reflects change
-			// in the Frontend graph.  (Handles generation of literal inputs where needed).
-			// If bAddLiteralInputs true, will attempt to connect literal inputs where
-			// applicable post disconnection.
-			static void DisconnectPin(UEdGraphPin& InPin, bool bAddLiteralInputs = true);
+			// Disconnects pin's associated frontend vertex from any linked input
+			// or output nodes, and reflects change in the Frontend graph. Does *not*
+			// disconnect the EdGraph pins.
+			static void DisconnectPinVertex(UEdGraphPin& InPin, bool bAddLiteralInputs = true);
 
 			// Generates a unique output name for the given MetaSound object
 			static FName GenerateUniqueNameByClassType(const UObject& InMetaSound, EMetasoundFrontendClassType InClassType, const FString& InBaseName);
@@ -205,13 +207,12 @@ namespace Metasound
 
 			// Adds and removes nodes, pins and connections so that the UEdGraph of the MetaSound matches the FMetasoundFrontendDocumentModel
 			//
-			// @return True if the UEdGraph was altered, false otherwise. 
+			// @return True if the UEdGraph is synchronized and is in valid state, false otherwise.
 			static bool SynchronizeGraph(UObject& InMetaSound);
 
-			// Synchronizes editor nodes with frontend nodes, removing editor nodes that not represented in the frontend, and adding editor nodes that are not associated with a frontend node.
+			// Synchronizes editor nodes with frontend nodes, removing editor nodes that are not represented in the frontend, and adding editor nodes to represent missing frontend nodes.
 			//
 			// @return True if the UMetasoundEditorGraphNode was altered. False otherwise.
-
 			static bool SynchronizeNodes(UObject& InMetaSound);
 
 			// Synchronizes and reports to log whether or not an editor member node's associated FrontendNode ID has changed and therefore been updated through node versioning.
