@@ -95,7 +95,7 @@ private:
 class FVulkanRayTracingScene : public FRHIRayTracingScene
 {
 public:
-	FVulkanRayTracingScene(FRayTracingSceneInitializer2 Initializer, FVulkanDevice* InDevice, FVkRtAllocation InInstanceBuffer);
+	FVulkanRayTracingScene(FRayTracingSceneInitializer2 Initializer, FVulkanDevice* InDevice, FVulkanResourceMultiBuffer* InInstanceBuffer);
 	~FVulkanRayTracingScene();
 
 	const FRayTracingSceneInitializer2& GetInitializer() const override final { return Initializer; }
@@ -113,8 +113,7 @@ private:
 
 	const FRayTracingSceneInitializer2 Initializer;
 
-	FVkRtAllocation InstanceBuffer;
-	FVkRtAllocation Scratch;
+	TRefCountPtr<FVulkanResourceMultiBuffer> InstanceBuffer;
 
 	uint32 BufferOffset = 0;
 

@@ -260,7 +260,8 @@ FVulkanRayTracingGeometry::FVulkanRayTracingGeometry(FRayTracingGeometryInitiali
 		EAccelerationStructureBuildMode::Build,
 		BuildData);
 
-	FRHIResourceCreateInfo BlasBufferCreateInfo(*Initializer.DebugName.ToString());
+	FString DebugNameString = Initializer.DebugName.ToString();
+	FRHIResourceCreateInfo BlasBufferCreateInfo(*DebugNameString);
 	AccelerationStructureBuffer = static_cast<FVulkanAccelerationStructureBuffer*>(RHICreateBuffer(BuildData.SizesInfo.accelerationStructureSize, BUF_AccelerationStructure, 0, ERHIAccess::BVHWrite, BlasBufferCreateInfo).GetReference());
 
 	FRHIResourceCreateInfo ScratchBufferCreateInfo(TEXT("BuildScratchBLAS"));
@@ -376,8 +377,8 @@ static VkGeometryInstanceFlagsKHR TranslateRayTracingInstanceFlags(ERayTracingIn
 	return Result;
 }
 
-FVulkanRayTracingScene::FVulkanRayTracingScene(FRayTracingSceneInitializer2 InInitializer, FVulkanDevice* InDevice, FVkRtAllocation InInstanceBuffer)
-	: Device(InDevice), Initializer(MoveTemp(InInitializer)), InstanceBuffer(MoveTemp(InInstanceBuffer))
+FVulkanRayTracingScene::FVulkanRayTracingScene(FRayTracingSceneInitializer2 InInitializer, FVulkanDevice* InDevice, FVulkanResourceMultiBuffer* InInstanceBuffer)
+	: Device(InDevice), Initializer(MoveTemp(InInitializer)), InstanceBuffer(InInstanceBuffer)
 {
 	const ERayTracingAccelerationStructureFlags BuildFlags = ERayTracingAccelerationStructureFlags::FastTrace; // #yuriy_todo: pass this in
 	SizeInfo = RHICalcRayTracingSceneSize(Initializer.NumNativeInstances, BuildFlags);
@@ -400,22 +401,30 @@ void FVulkanRayTracingScene::BuildAccelerationStructure(
 	FVulkanResourceMultiBuffer* InInstanceBuffer, uint32 InInstanceOffset)
 {
 	check(AccelerationStructureBuffer.IsValid());
-	check(InInstanceBuffer == nullptr); // External instance buffer not supported yet
 	const bool bExternalScratchBuffer = InScratchBuffer != nullptr;
 
+	VkDeviceAddress InstanceBufferAddress = 0;
+
+	if (InInstanceBuffer != nullptr)
+	{
+		checkf(InstanceBuffer == nullptr, TEXT("High level instance buffer is only supported when using FRayTracingSceneInitializer2."));
+		InstanceBufferAddress = InInstanceBuffer->GetDeviceAddress() + InInstanceOffset;
+	}
+	else
+	{
+		InstanceBufferAddress = InstanceBuffer->GetDeviceAddress();
+	}
+
 	FVkRtTLASBuildData BuildData;
-	GetTLASBuildData(Device->GetInstanceHandle(), Initializer.NumNativeInstances, InstanceBuffer.Address, BuildData);
+	GetTLASBuildData(Device->GetInstanceHandle(), Initializer.NumNativeInstances, InstanceBufferAddress, BuildData);
+
+	TRefCountPtr<FVulkanResourceMultiBuffer> ScratchBuffer;
 
 	if (!bExternalScratchBuffer)
 	{
-		FVulkanRayTracingAllocator::Allocate(
-			Device,
-			BuildData.SizesInfo.buildScratchSize,
-			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-			Scratch);
-
-		Scratch.Address = GetDeviceAddress(Device->GetInstanceHandle(), Scratch.Buffer);
+		FRHIResourceCreateInfo ScratchBufferCreateInfo(TEXT("BuildScratchTLAS"));
+		ScratchBuffer = ResourceCast(RHICreateBuffer(BuildData.SizesInfo.buildScratchSize, BUF_UnorderedAccess, 0, ERHIAccess::UAVCompute, ScratchBufferCreateInfo).GetReference());
+		InScratchBuffer = ScratchBuffer.GetReference();
 	}
 
 	VkAccelerationStructureCreateInfoKHR TLASCreateInfo;
@@ -428,13 +437,10 @@ void FVulkanRayTracingScene::BuildAccelerationStructure(
 
 	BuildData.GeometryInfo.dstAccelerationStructure = Handle;
 
+	BuildData.GeometryInfo.scratchData.deviceAddress = InScratchBuffer->GetDeviceAddress();
 	if (bExternalScratchBuffer)
 	{
-		BuildData.GeometryInfo.scratchData.deviceAddress = InScratchBuffer->GetDeviceAddress() + InScratchOffset;
-	}
-	else
-	{
-		BuildData.GeometryInfo.scratchData.deviceAddress = Scratch.Address;
+		BuildData.GeometryInfo.scratchData.deviceAddress += InScratchOffset;
 	}
 
 	VkAccelerationStructureBuildRangeInfoKHR TLASBuildRangeInfo;
@@ -452,12 +458,7 @@ void FVulkanRayTracingScene::BuildAccelerationStructure(
 	CommandBufferManager.SubmitActiveCmdBuffer();
 	CommandBufferManager.PrepareForNewActiveCommandBuffer();
 
-	FVulkanRayTracingAllocator::Free(InstanceBuffer);
-
-	if (!bExternalScratchBuffer)
-	{
-		FVulkanRayTracingAllocator::Free(Scratch);
-	}
+	InstanceBuffer = nullptr;
 }
 
 FRayTracingAccelerationStructureSize FVulkanDynamicRHI::RHICalcRayTracingSceneSize(uint32 MaxInstances, ERayTracingAccelerationStructureFlags Flags)
@@ -630,29 +631,17 @@ FRayTracingSceneRHIRef FVulkanDynamicRHI::RHICreateRayTracingScene(const FRayTra
 	}, ParallelForFlags);
 
 	// Allocate instance buffer
-	FVkRtAllocation InstanceBuffer;
-
+	// TODO: VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR
 	const uint32 InstanceBufferByteSize = static_cast<uint32>(Initializer2.NumNativeInstances) * sizeof(VkAccelerationStructureInstanceKHR);
-
-	FVulkanRayTracingAllocator::Allocate(
-		Device,
-		InstanceBufferByteSize,
-		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		InstanceBuffer);
-
-	InstanceBuffer.Address = GetDeviceAddress(Device->GetInstanceHandle(), InstanceBuffer.Buffer);
+	FRHIResourceCreateInfo TempRTInstanceBufferCreateInfo(TEXT("TempRTInstanceBuffer"));
+	TRefCountPtr<FVulkanResourceMultiBuffer> InstanceUploadBuffer = ResourceCast(RHICreateBuffer(InstanceBufferByteSize, BUF_Volatile, 0, ERHIAccess::SRVCompute, TempRTInstanceBufferCreateInfo).GetReference());
 
 	// Copy instance data
-	void* pMappedInstanceBufferMemory = nullptr;
-	VERIFYVULKANRESULT(vkMapMemory(Device->GetInstanceHandle(), InstanceBuffer.Memory, 0, InstanceBufferByteSize, 0, &pMappedInstanceBufferMemory));
-	{
-		VkAccelerationStructureInstanceKHR* const InstanceDescBuffer = reinterpret_cast<VkAccelerationStructureInstanceKHR*>(pMappedInstanceBufferMemory);
-		FMemory::Memcpy(InstanceDescBuffer, NativeInstances.GetData(), InstanceBufferByteSize);
-	}
-	vkUnmapMemory(Device->GetInstanceHandle(), InstanceBuffer.Memory);
+	void* pMappedInstanceBufferMemory = ::RHILockBuffer(InstanceUploadBuffer, 0, InstanceBufferByteSize, RLM_WriteOnly);
+	FMemory::Memcpy(pMappedInstanceBufferMemory, NativeInstances.GetData(), InstanceBufferByteSize);
+	::RHIUnlockBuffer(InstanceUploadBuffer);
 
-	return new FVulkanRayTracingScene(MoveTemp(Initializer2), GetDevice(), MoveTemp(InstanceBuffer));
+	return new FVulkanRayTracingScene(MoveTemp(Initializer2), GetDevice(), InstanceUploadBuffer.GetReference());
 }
 
 FRayTracingSceneRHIRef FVulkanDynamicRHI::RHICreateRayTracingScene(FRayTracingSceneInitializer2 Initializer)
@@ -663,6 +652,11 @@ FRayTracingSceneRHIRef FVulkanDynamicRHI::RHICreateRayTracingScene(FRayTracingSc
 FRayTracingGeometryRHIRef FVulkanDynamicRHI::RHICreateRayTracingGeometry(const FRayTracingGeometryInitializer& Initializer)
 {
 	return new FVulkanRayTracingGeometry(Initializer, GetDevice());
+}
+
+void FVulkanCommandListContext::RHIClearRayTracingBindings(FRHIRayTracingScene* Scene)
+{
+	 // TODO
 }
 
 void FVulkanCommandListContext::RHIBindAccelerationStructureMemory(FRHIRayTracingScene* Scene, FRHIBuffer* Buffer, uint32 BufferOffset)
