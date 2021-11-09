@@ -8,8 +8,11 @@
 
 // This code should map to GetForwardDirectLightingSplit
 float3 StrataForwardLighting(
+	uint EyeIndex,
 	uint2 PixelPos,
+	uint PrimitiveId,
 	float3 AbsoluteWorldPosition,
+	float3 TranslatedWorldPosition,
 	float SceneDepth,
 	float2 ScreenUV,
 	float3 V,
@@ -36,16 +39,16 @@ float3 StrataForwardLighting(
 #endif
 
 	float SpecularScale = 1;
-//#if TRANSLUCENCY_ANY_VOLUMETRIC
-//	// No specular on volumetric translucency lighting modes
-//	SpecularScale = 0;
-//#endif
+#if TRANSLUCENCY_ANY_VOLUMETRIC
+	// No specular on volumetric translucency lighting modes
+	SpecularScale = 0;
+#endif
 
-	uint LightingChannelMask = 0xFFFFFFFF; // STRATA_TODO GetPrimitive_LightingChannelMask(PrimitiveId);
+	uint LightingChannelMask = GetPrimitive_LightingChannelMask(PrimitiveId);
 
 #if FORWARD_PER_PIXEL_SHADING
 
-	const FDirectionalLightData DirectionalLightData = GetDirectionalLightData(0); // STRATA_TODO EyeIndex);
+	const FDirectionalLightData DirectionalLightData = GetDirectionalLightData(EyeIndex);
 	FRectTexture RectTexture = InitRectTexture(ForwardLightData.DummyRectLightSourceTexture);
 	
 	FDeferredLightData LightData = (FDeferredLightData)0;
@@ -63,7 +66,7 @@ float3 StrataForwardLighting(
 	#if USE_HAIR_COMPLEX_TRANSMITTANCE
 	if (GBufferData.ShadingModelID == SHADINGMODELID_HAIR)
 	{
-		LightData.HairTransmittance = 0.0;// EvaluateDualScattering(GBufferData, -CameraVector, LightData.Direction);	// STRATA_TODO
+		LightData.HairTransmittance = 0.0;////  EvaluateDualScattering(GBufferData, -CameraVector, LightData.Direction);	// STRATA_TODO
 	}
 	#endif
 	// We want to force the directional light shadow when using water material to see shadow on the water. This could be an option later.
@@ -83,12 +86,6 @@ float3 StrataForwardLighting(
 	#else
 		LightData.ShadowedBits = 1;
 		LightData.ShadowMapChannelMask.x = 1;
-		// STRATA_TODO forward shading PrecomputedShadowFactors
-//		#if TRANSLUCENCY_LIGHTING_SURFACE_FORWARDSHADING
-//			GBufferData.PrecomputedShadowFactors.x = ComputeDirectionalLightStaticShadowing(WorldPosition).x;
-//		#else
-//			GBufferData.PrecomputedShadowFactors.x = 1;
-//		#endif
 		bool bUnused = false;
 		float DynamicShadowFactor = ComputeDirectionalLightDynamicShadowing(AbsoluteWorldPosition, SceneDepth, bUnused);
 			
@@ -145,7 +142,15 @@ float3 StrataForwardLighting(
 
 #elif FORWARD_PER_PIXEL_SHADING
 
-			if (DirectionalLightData.HasDirectionalLight)
+			float3 L = LightData.Direction;	// Already normalized
+			float3 ToLight = L;
+			float LightMask = 1;
+			if (LightData.bRadialLight)
+			{
+				LightMask = GetLocalLightAttenuation(AbsoluteWorldPosition, LightData, ToLight, L);
+			}
+
+			if (DirectionalLightData.HasDirectionalLight && LightMask > 0.0)
 			{
 				// Compute some common factors
 				const float3 ColoredVisibility = OutThroughput * BSDFCoverage;
@@ -164,57 +169,72 @@ float3 StrataForwardLighting(
 					Color += GetSkyLightReflection(StrataEnvLight.SpecularDirection, StrataEnvLight.SpecularSafeRoughness, SkyAverageBrightness) * StrataEnvLight.SpecularWeight * SkyLightCommonFactor;
 				}
 
-			#if 0
+				// Evaluate the ShadowTerm that can then be used when integrating the lighting
 				FShadowTerms ShadowTerms = { DynamicShadowFactor, 1.0, 1.0, InitHairTransmittanceData() };
 				float Dither = InterleavedGradientNoise(PixelPos, View.StateFrameIndexMod8);
-				float4 PrecomputedShadowFactors = StrataPixelHeader.ZeroPrecShadowMask ? 0.0f : 1.0f;// STRATA_TODO StrataReadPrecomputedShadowFactors(StrataPixelHeader, PixelPos);
+
+				float4 PrecomputedShadowFactors = StrataPixelHeader.ZeroPrecShadowMask ? 0.0f : 1.0f;
+			#if TRANSLUCENCY_LIGHTING_SURFACE_FORWARDSHADING
+				PrecomputedShadowFactors.x = ComputeDirectionalLightStaticShadowing(AbsoluteWorldPosition).x;
+			#else
+				PrecomputedShadowFactors.x = 1;
+			#endif
+
 				const uint FakeShadingModelID = 0;
 				const float FakeContactShadowOpacity = 1.0f;
-				const float3 FakeTranslatedWorldPosition = 0.0f; // DerivedParams.TranslatedWorldPosition
 				GetShadowTerms(SceneDepth, PrecomputedShadowFactors, FakeShadingModelID, FakeContactShadowOpacity,
-					LightData, FakeTranslatedWorldPosition, LightData.Direction, LightAttenuation, Dither, ShadowTerms);
-			#else
-				FShadowTerms ShadowTerms = { 1.0, 1.0, 1.0, InitHairTransmittanceData() };
-			#endif
+					LightData, TranslatedWorldPosition, LightData.Direction, LightAttenuation, Dither, ShadowTerms);
+
 
 			#if NON_DIRECTIONAL_DIRECT_LIGHTING
 				// TODO
 			#else
-
 				float Roughness = 0;
 				StrataGetBSDFRoughness(StrataBSDFContext.BSDF, Roughness);
 				FAreaLightIntegrateContext AreaLightContext = InitAreaLightIntegrateContext();
-				FStrataEvaluateResult BSDFEvaluate = (FStrataEvaluateResult)0;
-				if (LightData.bRectLight)
+				BRANCH
+				if (ShadowTerms.SurfaceShadow + ShadowTerms.TransmissionShadow > 0)
 				{
-					FRect Rect = GetRect(LightData.Direction, LightData);
-					if (!IsRectVisible(Rect))
+					FStrataEvaluateResult BSDFEvaluate = (FStrataEvaluateResult)0;
+					if (LightData.bRectLight)
 					{
-						return 0.0f; // Rect light can be non visible due to barn door occlusion
-					}
-					AreaLightContext = CreateRectIntegrateContext(Roughness, StrataBSDFContext.N, StrataBSDFContext.V, Rect, RectTexture);
+						FRect Rect = GetRect(ToLight, LightData);
+						if (!IsRectVisible(Rect))
+						{
+							return 0.0f; // Rect light can be non visible due to barn door occlusion
+						}
+						AreaLightContext = CreateRectIntegrateContext(Roughness, StrataBSDFContext.N, StrataBSDFContext.V, Rect, RectTexture);
 
-					// We must have the evaluate inside the if due to the rectlight texture: it must be now be ambiguous which texture is going ot be used.
-					// After te compilation, a local resource must map to a unique global resource (the default or the actual rect light texture).
-					BSDFEvaluate = StrataIntegrateBSDF(StrataBSDFContext, ShadowTerms, AreaLightContext);
+						// We must have the evaluate inside the if due to the rectlight texture: it must be now be ambiguous which texture is going ot be used.
+						// After te compilation, a local resource must map to a unique global resource (the default or the actual rect light texture).
+						BSDFEvaluate = StrataIntegrateBSDF(StrataBSDFContext, ShadowTerms, AreaLightContext);
+					}
+					else
+					{
+						FCapsuleLight Capsule = GetCapsule(ToLight, LightData);
+						AreaLightContext = CreateCapsuleIntegrateContext(Roughness, StrataBSDFContext.N, StrataBSDFContext.V, Capsule, LightData.bInverseSquared);
+
+						BSDFEvaluate = StrataIntegrateBSDF(StrataBSDFContext, ShadowTerms, AreaLightContext);
+					}
+
+					FLATTEN
+					if ((DirectionalLightData.DirectionalLightShadowMapChannelMask >> 8) & LightingChannelMask)
+					{
+						float3 DiffuseLuminance = BSDFEvaluate.IntegratedDiffuseValue;
+						float3 SpecularLuminance = BSDFEvaluate.IntegratedSpecularValue * LightData.SpecularScale;
+						const float3 LightCommonMultiplier = LightData.Color * LightMask;
+						Color += ((DiffuseLuminance + SpecularLuminance) * LightCommonMultiplier + BSDFEvaluate.EmissivePathValue) * ColoredVisibility;
+					}
+
+					LayerThroughput += BSDFCoverage * BSDFEvaluate.Throughput;
 				}
 				else
 				{
-					FCapsuleLight Capsule = GetCapsule(LightData.Direction, LightData);
-					AreaLightContext = CreateCapsuleIntegrateContext(Roughness, StrataBSDFContext.N, StrataBSDFContext.V, Capsule, LightData.bInverseSquared);
-
-					BSDFEvaluate = StrataIntegrateBSDF(StrataBSDFContext, ShadowTerms, AreaLightContext);
+					// Only update the throughput
+					FStrataEvaluateResult BSDFEvaluate = StrataIntegrateBSDF(StrataBSDFContext, ShadowTerms, AreaLightContext);
+					LayerThroughput += BSDFCoverage * BSDFEvaluate.Throughput;
 				}
-
-				float LightMask = 1.0;	// for a directional light
-				float3 DiffuseLuminance = BSDFEvaluate.IntegratedDiffuseValue;
-				float3 SpecularLuminance = BSDFEvaluate.IntegratedSpecularValue;
-				const float3 LightCommonMultiplier = LightData.Color * LightMask;
-				Color += ( (DiffuseLuminance + SpecularLuminance) * LightCommonMultiplier + BSDFEvaluate.EmissivePathValue ) * ColoredVisibility;
-
 			#endif
-
-			LayerThroughput += BSDFCoverage * BSDFEvaluate.Throughput;
 
 			}
 

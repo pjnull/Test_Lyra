@@ -1599,8 +1599,11 @@ void FPixelShaderInOut_MainPS(
 
 		float3 Throughput = 1.0f;
 		Color = StrataForwardLighting(
+			EyeIndex,
 			In.SvPosition.xy,
+			MaterialParameters.PrimitiveId,
 			LWCToFloat(MaterialParameters.AbsoluteWorldPosition),
+			MaterialParameters.WorldPosition_CamRelative,
 			GBuffer.Depth,
 			NearestResolvedDepthScreenUV,
 			V,
