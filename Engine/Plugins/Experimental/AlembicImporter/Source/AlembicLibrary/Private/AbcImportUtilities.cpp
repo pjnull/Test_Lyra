@@ -19,14 +19,13 @@
 #endif
 
 THIRD_PARTY_INCLUDES_START
-#include <Alembic/AbcCoreHDF5/All.h>
-#include <Alembic/AbcCoreOgawa/All.h>
-#include <Alembic/AbcCoreFactory/All.h>
-#include <Alembic/AbcCoreAbstract/TimeSampling.h>
-#include <Alembic/AbcCoreHDF5/All.h>
 #include <Alembic/Abc/All.h>
-#include <Alembic/AbcGeom/All.h>
 #include <Alembic/Abc/IObject.h>
+#include <Alembic/AbcCoreAbstract/TimeSampling.h>
+#include <Alembic/AbcCoreFactory/All.h>
+#include <Alembic/AbcCoreOgawa/All.h>
+#include <Alembic/AbcGeom/All.h>
+#include <Imath/ImathVec.h>
 THIRD_PARTY_INCLUDES_END
 
 #if PLATFORM_WINDOWS
