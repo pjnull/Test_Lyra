@@ -17,6 +17,7 @@
 #include "DatasmithMaxAttributes.h"
 #include "DatasmithMaxProgressManager.h"
 #include "DatasmithMaxMeshExporter.h"
+#include "DatasmithMaxExporterUtils.h"
 
 #include "Modules/ModuleManager.h"
 #include "HAL/PlatformFilemanager.h"
@@ -52,12 +53,12 @@ MAX_INCLUDES_START
 
 	#include "notify.h"
 
+	#include "ilayer.h"
+	#include "ilayermanager.h"
+
 	#include "ISceneEventManager.h"
 
 	#include "IFileResolutionManager.h" // for GetActualPath
-
-	#include "maxicon.h" // for toolbar
-
 MAX_INCLUDES_END
 
 namespace DatasmithMaxDirectLink
@@ -166,6 +167,41 @@ struct FInstances
 	TSharedPtr<IDatasmithMeshElement> DatasmithMeshElement;
 };
 
+class FLayerTracker
+{
+public:
+	FLayerTracker(const FString& InName, bool bInIsHidden): Name(InName), bIsHidden(bInIsHidden)
+	{
+	}
+
+	void SetName(const FString& InName)
+	{
+		if (Name == InName)
+		{
+			return;
+		}
+		bIsInvalidated = true;
+		Name = InName;
+	}
+
+	void SetIsHidden(bool bInIsHidden)
+	{
+		if (bIsHidden == bInIsHidden)
+		{
+			return;
+		}
+		bIsInvalidated = true;
+		bIsHidden = bInIsHidden;
+	}
+
+	FString Name;
+	bool bIsHidden = false;
+
+	bool bIsInvalidated = true;
+};
+
+
+
 class FUpdateProgress
 {
 	TUniquePtr<FDatasmithMaxProgressManager> ProgressManager;
@@ -229,6 +265,24 @@ private:
 	double SecondsOfLastUpdate;
 };
 
+// Convert various node data to Datasmith tags
+class FTagsConverter
+{
+public:
+	void ConvertNodeTags(FNodeTracker& NodeTracker)
+	{
+		INode* Node = NodeTracker.Node;
+		INode* ParentNode = Node->GetParentNode();
+		DatasmithMaxExporterUtils::ExportMaxTagsForDatasmithActor( NodeTracker.DatasmithActorElement, Node, ParentNode, KnownMaxDesc, KnownMaxSuperClass );
+	}
+
+private:
+	// We don't know how the 3ds max lookup_MaxClass is implemented so we use this map to skip it when we can
+	TMap<TPair<uint32, TPair<uint32, uint32>>, MAXClass*> KnownMaxDesc;
+	// Same for the lookup_MAXSuperClass.
+	TMap<uint32, MAXSuperClass*> KnownMaxSuperClass;
+	
+};
 
 
 // Holds states of entities for syncronization and handles change events
@@ -335,8 +389,52 @@ public:
 		InvalidatedNodeTrackers.Reset();
 		InvalidatedInstances.Reset();
 		MaterialsCollectionTracker.Reset();
+		LayersForAnimHandle.Reset();
+		NodesPerLayer.Reset();
+		NodeDatasmithMetadata.Reset();
 
 		InstancesForAnimHandle.Reset();
+	}
+
+	// Check every layer and if it's modified invalidate nodes assigned to it
+	// 3ds Max doesn't have events for all Layer changes(e.g. Name seems to be just an UI thing and has no notifications) so
+	// we need to go through all layers every update to see what's changed
+	void UpdateLayers()
+	{
+		ILayerManager* LayerManager = GetCOREInterface13()->GetLayerManager();
+		int LayerCount = LayerManager->GetLayerCount();
+
+		for (int LayerIndex = 0; LayerIndex < LayerCount; ++LayerIndex)
+		{
+			ILayer* Layer = LayerManager->GetLayer(LayerIndex);
+
+			AnimHandle Handle = Animatable::GetHandleByAnim(Layer);
+
+			TUniquePtr<FLayerTracker>& LayerTracker = LayersForAnimHandle.FindOrAdd(Handle);
+
+			BOOL bIsHidden = Layer->IsHidden(TRUE);
+			FString Name = Layer->GetName().data();
+
+			if (!LayerTracker)
+			{
+				LayerTracker = MakeUnique<FLayerTracker>(Name, bIsHidden);
+			}
+
+			LayerTracker->SetName(Name);
+			LayerTracker->SetIsHidden(bIsHidden);
+
+			if (LayerTracker->bIsInvalidated)
+			{
+				if (TSet<FNodeTracker*>* NodeTrackersPtr = NodesPerLayer.Find(LayerTracker.Get()))
+				{
+					for(FNodeTracker* NodeTracker:* NodeTrackersPtr)
+					{
+						InvalidateNode(*NodeTracker);
+					}
+				}
+				LayerTracker->bIsInvalidated = false;
+			}
+		}
 	}
 
 	// Applies all recorded changes to Datasmith scene
@@ -347,7 +445,12 @@ public:
 		LogDebug("Scene update: start");
 		DatasmithMaxLogger::Get().Purge();
 
-		ProgressManager.ProgressStage(TEXT("Update names"));
+		ProgressManager.ProgressStage(TEXT("Refresh layers"));
+		{
+			UpdateLayers();
+		}
+
+		ProgressManager.ProgressStage(TEXT("Update node names"));
 		// todo: move to NameChanged and NodeAdded?
 		for (FNodeTracker* NodeTracker : InvalidatedNodeTrackers)
 		{
@@ -487,14 +590,19 @@ public:
 		ExportedScene.DatasmithSceneRef->RemoveMaterial(DatasmithMaterial);		
 	}
 
+	void InvalidateNode(FNodeTracker& NodeTracker)
+	{
+		NodeTracker.Invalidate();
+		InvalidatedNodeTrackers.Add(&NodeTracker);
+	}
+
 	// todo: make fine invalidates - full only something like geometry change, but finer for transform, name change and more
 	void InvalidateNode(FNodeKey NodeKey)
 	{
 		if (FNodeTrackerHandle* NodeTrackerHandle = NodeTrackers.Find(NodeKey))
 		{
 			FNodeTracker* NodeTracker = NodeTrackerHandle->GetNodeTracker();
-			NodeTracker->Invalidate();
-			InvalidatedNodeTrackers.Add(NodeTracker);
+			InvalidateNode(*NodeTracker);
 		}
 	}
 
@@ -543,6 +651,21 @@ public:
 	void RemoveFromConverted(FNodeTracker& NodeTracker)
 	{
 		// todo: record previous converter Node type to speed up cleanup. Or just add 'unconverted' flag to speed up this for nodes that weren't converted yet
+
+		if (NodeTracker.Layer)
+		{
+			if (TSet<FNodeTracker*>* NodeTrackerPtr = NodesPerLayer.Find(NodeTracker.Layer))
+			{
+				NodeTrackerPtr->Remove(&NodeTracker);
+			}
+			NodeTracker.Layer = nullptr;
+		}
+
+		TSharedPtr<IDatasmithMetaDataElement> DatasmithMetadata;
+		if (NodeDatasmithMetadata.RemoveAndCopyValue(&NodeTracker, DatasmithMetadata))
+		{
+			ExportedScene.GetDatasmithScene()->RemoveMetaData(DatasmithMetadata);
+		}
 
 		Helpers.Remove(&NodeTracker);
 		Cameras.Remove(&NodeTracker);
@@ -680,6 +803,18 @@ public:
 
 	void ConvertNodeObject(FNodeTracker& NodeTracker)
 	{
+		// Update layer connection
+		ILayer* Layer = (ILayer*)NodeTracker.Node->GetReference(NODE_LAYER_REF);
+		if (Layer)
+		{
+			if (TUniquePtr<FLayerTracker>* LayerPtr = LayersForAnimHandle.Find(Animatable::GetHandleByAnim(Layer)))
+			{
+				FLayerTracker* LayerTracker =  LayerPtr->Get();
+				NodeTracker.Layer = LayerTracker;
+				NodesPerLayer.FindOrAdd(LayerTracker).Add(&NodeTracker);
+			}
+		}
+
 		if (CollisionNodes.Contains(&NodeTracker))
 		{
 			return;
@@ -770,13 +905,19 @@ public:
 					bGeometryUpdated = true;
 				}
 
-				AssignDatasmithMeshToNodeTracker(NodeTracker, Instances, bMaterialsAssignToStaticMesh);
+				UpdateGeometryNode(NodeTracker, Instances, bMaterialsAssignToStaticMesh);
 				bMaterialsAssignToStaticMesh = false;
 
 			 	// Mark node as updated as soon as it is - in order for next nodes to be able to use its DatasmithActor
 				NodeTracker.bInvalidated = false;
 			 }
 		 }
+	}
+
+	void UpdateNodeMetadata(FNodeTracker& NodeTracker)
+	{
+		TSharedPtr<IDatasmithMetaDataElement> MetadataElement = FDatasmithMaxSceneExporter::ParseUserProperties(NodeTracker.Node, NodeTracker.DatasmithActorElement.ToSharedRef(), ExportedScene.GetDatasmithScene());
+		NodeDatasmithMetadata.Add(&NodeTracker, MetadataElement);
 	}
 
 	void AttachNodeToDatasmithScene(FNodeTracker& NodeTracker)
@@ -868,10 +1009,9 @@ public:
 		}
 	}
 
-	void AssignDatasmithMeshToNodeTracker(FNodeTracker& NodeTracker, FInstances& Instances, bool bMaterialsAssignToStaticMesh)
+	void UpdateGeometryNode(FNodeTracker& NodeTracker, FInstances& Instances, bool bMaterialsAssignToStaticMesh)
 	{
 		FDatasmithConverter Converter;
-
 
 		FTransform ObjectTransform;
 		GetNodeObjectTransform(NodeTracker, Converter, ObjectTransform);
@@ -901,6 +1041,12 @@ public:
 			FString MeshActorLabel = FString((const TCHAR*)NodeTracker.Node->GetName());
 			DatasmithMeshActor = FDatasmithSceneFactory::CreateMeshActor(*MeshActorName);
 			DatasmithMeshActor->SetLabel(*Label);
+
+			TOptional<FDatasmithMaxStaticMeshAttributes> DatasmithAttributes = FDatasmithMaxStaticMeshAttributes::ExtractStaticMeshAttributes(NodeTracker.Node);
+			if (DatasmithAttributes &&  (DatasmithAttributes->GetExportMode() == EStaticMeshExportMode::BoundingBox))
+			{
+				DatasmithMeshActor->AddTag(TEXT("Datasmith.Attributes.Geometry: BoundingBox"));
+			}
 
 			DatasmithMeshActor->SetStaticMeshPathName(DatasmithMeshElement->GetName());
 		}
@@ -933,6 +1079,12 @@ public:
 		NodeTracker.DatasmithMeshActor = DatasmithMeshActor;
 
 		AttachNodeToDatasmithScene(NodeTracker);
+		UpdateNodeMetadata(NodeTracker);
+		TagsConverter.ConvertNodeTags(NodeTracker);
+		if (NodeTracker.Layer)
+		{
+			NodeTracker.DatasmithActorElement->SetLayer(*NodeTracker.Layer->Name);
+		}
 
 		// Apply material 
 		if (DatasmithMeshElement)
@@ -1011,13 +1163,19 @@ public:
 		NodeTracker.DatasmithActorElement->SetLabel(NodeTracker.Node->GetName());
 
 		AttachNodeToDatasmithScene(NodeTracker);
+		UpdateNodeMetadata(NodeTracker);
+		TagsConverter.ConvertNodeTags(NodeTracker);
+		if (NodeTracker.Layer)
+		{
+			NodeTracker.DatasmithActorElement->SetLayer(*NodeTracker.Layer->Name);
+		}
 
 		FDatasmithConverter Converter;
 		FTransform ObjectTransform;
 		GetNodeObjectTransform(NodeTracker, Converter, ObjectTransform);
 
 		FTransform NodeTransform = ObjectTransform;
-		TSharedPtr<IDatasmithActorElement> DatasmithActorElement = NodeTracker.DatasmithActorElement;
+		TSharedRef<IDatasmithActorElement> DatasmithActorElement = NodeTracker.DatasmithActorElement.ToSharedRef();
 		DatasmithActorElement->SetTranslation(NodeTransform.GetTranslation());
 		DatasmithActorElement->SetScale(NodeTransform.GetScale3D());
 		DatasmithActorElement->SetRotation(NodeTransform.GetRotation());
@@ -1345,6 +1503,7 @@ public:
 	TMap<FNodeKey, FNodeTrackerHandle> NodeTrackers; // All scene nodes
 	TMap<FString, TSet<FNodeTracker*>> NodeTrackersNames; // Nodes grouped by name
 	TSet<FNodeTracker*> InvalidatedNodeTrackers; // Nodes that need to be rebuilt
+	TMap<FNodeTracker*, TSharedPtr<IDatasmithMetaDataElement>> NodeDatasmithMetadata; // All scene nodes
 
 	TMap<FNodeTracker*, TSet<FNodeTracker*>> CollisionNodes; // Nodes used as collision meshes for other nodes, counted by each user 
 
@@ -1356,6 +1515,9 @@ public:
 	TSet<FNodeTracker*> Helpers;
 	TSet<FNodeTracker*> Lights;
 	TSet<FNodeTracker*> Cameras;
+
+	TMap<AnimHandle, TUniquePtr<FLayerTracker>> LayersForAnimHandle;
+	TMap<FLayerTracker*, TSet<FNodeTracker*>> NodesPerLayer;
 	
 	struct FRailClonesConverted
 	{
@@ -1365,6 +1527,8 @@ public:
 	TMap<FNodeTracker*, TUniquePtr<FRailClonesConverted>> RailClones;
 
 	TSet<FInstances*> InvalidatedInstances;
+
+	FTagsConverter TagsConverter; // Converts max node information to Datasmith tags
 };
 
 

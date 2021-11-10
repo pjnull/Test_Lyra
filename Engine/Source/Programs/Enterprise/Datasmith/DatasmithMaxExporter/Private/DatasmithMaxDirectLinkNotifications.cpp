@@ -92,9 +92,29 @@ public:
 		}
 	}
 
+	virtual void UserPropertiesChanged(NodeKeyTab& nodes) override
+	{
+		LogNodeEvent(L"UserPropertiesChanged", nodes);
+		// Handle user properties change for metadata update
+		for (int NodeIndex = 0; NodeIndex < nodes.Count(); ++NodeIndex)
+		{
+			SceneTracker.NodePropertiesChanged(nodes[NodeIndex]);
+		}
+	}
+
 	virtual void NameChanged(NodeKeyTab& nodes) override
 	{
 		LogNodeEvent(L"NameChanged", nodes);
+
+		for (int NodeIndex = 0; NodeIndex < nodes.Count(); ++NodeIndex)
+		{
+			SceneTracker.NodePropertiesChanged(nodes[NodeIndex]);
+		}
+	}
+
+	virtual void LayerChanged(NodeKeyTab& nodes) override
+	{
+		LogNodeEvent(L"LayerChanged", nodes);
 
 		for (int NodeIndex = 0; NodeIndex < nodes.Count(); ++NodeIndex)
 		{
@@ -117,11 +137,6 @@ public:
 	virtual void LinkChanged(NodeKeyTab& nodes) override
 	{
 		LogNodeEvent(L"LinkChanged", nodes);
-	}
-
-	virtual void LayerChanged(NodeKeyTab& nodes) override
-	{
-		LogNodeEvent(L"LayerChanged", nodes);
 	}
 
 	virtual void GroupChanged(NodeKeyTab& nodes) override
@@ -172,11 +187,6 @@ public:
 	virtual void DisplayPropertiesChanged(NodeKeyTab& nodes) override
 	{
 		LogNodeEvent(L"DisplayPropertiesChanged", nodes);
-	}
-
-	virtual void UserPropertiesChanged(NodeKeyTab& nodes) override
-	{
-		LogNodeEvent(L"UserPropertiesChanged", nodes);
 	}
 
 	virtual void PropertiesOtherEvent(NodeKeyTab& nodes) override

@@ -24,6 +24,7 @@ MAX_INCLUDES_END
 
 // Log all messages
 // #define LOG_DEBUG_HEAVY_ENABLE 1
+// #define LOG_DEBUG_ENABLE 1
 
 void AssignMeshMaterials(TSharedPtr<IDatasmithMeshElement>&MeshElement, Mtl * Material, const TSet<uint16>&SupportedChannels);
 
@@ -31,6 +32,7 @@ namespace DatasmithMaxDirectLink
 {
 
 class ISceneTracker;
+class FLayerTracker;
 
 //---- Main class for export/change tracking
 class IExporter
@@ -87,6 +89,7 @@ public:
 
 	INode* const Node;
 	FNodeTracker* Collision = nullptr;
+	FLayerTracker* Layer = nullptr;
 	AnimHandle InstanceHandle = 0; // todo: rename - this is handle for object this node is instance of
 	FString Name; 
 	bool bInvalidated = true;
