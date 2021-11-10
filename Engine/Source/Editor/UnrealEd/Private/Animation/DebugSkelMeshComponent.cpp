@@ -895,8 +895,7 @@ void UDebugSkelMeshComponent::ToggleClothSectionsVisibility(bool bShowOnlyClothS
 
 void UDebugSkelMeshComponent::RestoreClothSectionsVisibility()
 {
-	// if this skeletal mesh doesn't have any clothing assets, just return
-	if (!SkeletalMesh || SkeletalMesh->GetMeshClothingAssets().Num() == 0)
+	if (!SkeletalMesh)
 	{
 		return;
 	}
