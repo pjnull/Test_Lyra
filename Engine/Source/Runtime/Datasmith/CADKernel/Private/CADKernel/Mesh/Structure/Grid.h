@@ -349,6 +349,11 @@ namespace CADKernel
 			return Points2D[(int32)Space][Index];
 		}
 
+		void SetInner2DPoint(EGridSpace Space, int32 Index, const FPoint2D& NewCoordinate)
+		{
+			Points2D[(int32)Space][Index] = NewCoordinate;
+		}
+
 		/**
 		 * @return the FPoint2D (parametric coordinates) of the point at the Index of the grid in the defined grid space @see EGridSpace
 		 */
@@ -454,6 +459,11 @@ namespace CADKernel
 		const FPoint2D& GetLoop2DPoint(EGridSpace Space, int32 LoopIndex, int32 Index) const
 		{
 			return FaceLoops2D[(int32)Space][LoopIndex][Index];
+		}
+
+		void SetLoop2DPoint(EGridSpace Space, int32 LoopIndex, int32 Index, const FPoint2D& NewCoordinate)
+		{
+			FaceLoops2D[(int32)Space][LoopIndex][Index] = NewCoordinate;
 		}
 
 		const FPoint& GetLoop3DPoint(int32 LoopIndex, int32 Index) const

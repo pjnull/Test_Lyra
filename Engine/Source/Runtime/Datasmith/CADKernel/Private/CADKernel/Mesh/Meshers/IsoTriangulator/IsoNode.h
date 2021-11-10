@@ -210,6 +210,7 @@ namespace CADKernel
 		 * Return the 2d coordinate of the node according to the space
 		 */
 		virtual const FPoint2D& Get2DPoint(EGridSpace Space, const FGrid& Grid) const = 0;
+		virtual void Set2DPoint(EGridSpace Space, FGrid& Grid, const FPoint2D& NewCoordinate) = 0;
 
 		virtual const FPoint& Get3DPoint(const FGrid& Grid) const = 0;
 		virtual const FVector& GetNormal(const FGrid& Grid) const = 0;
@@ -273,6 +274,11 @@ namespace CADKernel
 		virtual const FPoint2D& Get2DPoint(EGridSpace Space, const FGrid& Grid) const override
 		{
 			return Grid.GetLoop2DPoint(Space, LoopIndex, Index);
+		}
+
+		virtual void Set2DPoint(EGridSpace Space, FGrid& Grid, const FPoint2D& NewCoordinate) override
+		{
+			Grid.SetLoop2DPoint(Space, LoopIndex, Index, NewCoordinate);
 		}
 
 		virtual const FPoint& Get3DPoint(const FGrid& Grid) const override
@@ -420,6 +426,11 @@ namespace CADKernel
 		virtual const FPoint2D& Get2DPoint(EGridSpace Space, const FGrid& Grid) const override
 		{
 			return Grid.GetInner2DPoint(Space, Index);
+		}
+
+		virtual void Set2DPoint(EGridSpace Space, FGrid& Grid, const FPoint2D& NewCoordinate) override
+		{
+			return Grid.SetInner2DPoint(Space, Index, NewCoordinate);
 		}
 
 		virtual const FPoint& Get3DPoint(const FGrid& Grid) const override

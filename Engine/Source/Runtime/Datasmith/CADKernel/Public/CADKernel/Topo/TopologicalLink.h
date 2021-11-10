@@ -55,9 +55,9 @@ namespace CADKernel
 			SetDeleted();
 		}
 
-		TWeakPtr<const EntityType>& GetActiveEntity() const
+		const EntityType* GetActiveEntity() const
 		{
-			ensureCADKernel(ActiveEntity.IsValid());
+			ensureCADKernel(ActiveEntity);
 			return ActiveEntity;
 		}
 

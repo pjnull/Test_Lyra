@@ -585,7 +585,7 @@ namespace CADKernel
 																   
 				ABv = PointB->V - PointA->V;					   
 				ABu = PointB->U - PointA->U;
-				if (fabs(ABu) > fabs(ABv))
+				if (FMath::Abs(ABu) > FMath::Abs(ABv))
 				{
 					Slop = ABv / ABu;
 					Origin = PointA->V - Slop * PointA->U;
@@ -677,8 +677,8 @@ namespace CADKernel
 				EndPointWeight = EndPoint->U + EndPoint->V;
 				if (StartPointWeight > EndPointWeight)
 				{
-					std::swap(StartPointWeight, EndPointWeight);
-					std::swap(StartPoint, EndPoint);
+					Swap(StartPointWeight, EndPointWeight);
+					Swap(StartPoint, EndPoint);
 				}
 				if (StartPoint->U < EndPoint->U)
 				{

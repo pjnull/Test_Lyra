@@ -106,7 +106,7 @@ namespace CADKernel
 	
 	protected:
 
-		const FGrid& Grid;
+		FGrid& Grid;
 		TSharedRef<FFaceMesh> Mesh;
 
 		TArray<int32> LoopStartIndex;
@@ -180,7 +180,7 @@ namespace CADKernel
 
 	public:
 
-		FIsoTriangulator(const FGrid& InGrid, TSharedRef<FFaceMesh> EntityMesh);
+		FIsoTriangulator(FGrid& InGrid, TSharedRef<FFaceMesh> EntityMesh);
 
 		/**
 		 * Main method
@@ -340,6 +340,8 @@ namespace CADKernel
 		 */
 		void MeshCycle(const EGridSpace Space, const TArray<FIsoSegment*>& cycle, const TArray<bool>& cycleOrientation);
 
+		void RemoveIntersectionByMovingTheClosedPoint(FIntersectionSegmentTool& CycleIntersectionTool, const TArray<FIsoSegment*>& Cycle, const FIsoSegment* Segment, const FIsoSegment* IntersectingSegment);
+
 		/**
 		 * Finalization of the mesh by the tessellation of the inner grid
 		 */
@@ -426,6 +428,8 @@ namespace CADKernel
 		void Display(EGridSpace Space, const FIsoNode& NodeA, const FIsoNode& NodeB, FIdent Ident = 0, EVisuProperty Property = EVisuProperty::Element) const;
 		void Display(EGridSpace Space, const FIsoSegment& Segment, FIdent Ident = 0, EVisuProperty Property = EVisuProperty::Element, bool bDisplayOrientation = false) const;
 		void Display(EGridSpace Space, const TCHAR* Message, const TArray<FIsoSegment*>& Segment, bool bDisplayNode, bool bDisplayOrientation = false, EVisuProperty Property = EVisuProperty::Element) const;
+
+		void DisplayCycle(const TArray<FIsoSegment*>& Cycle, const TCHAR* Message) const;
 
 		void DisplayCells(const TArray<FCell>& Cells) const;
 		void DisplayCell(const FCell& Cell) const;

@@ -7,7 +7,7 @@
 namespace CADKernel
 {
 
-#ifdef CADKERNEL_DEV
+#if defined(CADKERNEL_DEV) || defined(CADKERNEL_STDA)
 FSession FSession::Session(0.01);
 #endif
 
@@ -80,5 +80,4 @@ void FSession::SetGeometricTolerance(double NewTolerance)
 	ensure(Database.GetModel()->EntityCount() == 0);
 	GeometricTolerance = NewTolerance;
 }
-
 } // namespace CADKernel

@@ -1050,7 +1050,7 @@ void FParametricMesher::MeshSurfaceByFront(TArray<FCostToFace>& QuadTrimmedSurfa
 			SecondChoiceOfCandidateFacesForMesh.RemoveSingle(Face);
 		}
 
-		const TSharedPtr<FTopologicalLoop> Loop = Face->GetLoops()[0];
+		const TSharedPtr<FTopologicalLoop>& Loop = Face->GetLoops()[0];
 		for (const FOrientedEdge& OrientedEdge : Loop->GetEdges())
 		{
 			const TSharedPtr<FTopologicalEdge>& Edge = OrientedEdge.Entity;

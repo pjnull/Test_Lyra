@@ -24,7 +24,7 @@ namespace CADKernel
 //#define ADD_TRIANGLE_2D
 //#define DEBUG_ISOTRIANGULATOR
 
-FIsoTriangulator::FIsoTriangulator(const FGrid& InGrid, TSharedRef<FFaceMesh> EntityMesh)
+FIsoTriangulator::FIsoTriangulator(FGrid& InGrid, TSharedRef<FFaceMesh> EntityMesh)
 	: Grid(InGrid)
 	, Mesh(EntityMesh)
 	, LoopSegmentsIntersectionTool(InGrid)
@@ -1800,6 +1800,75 @@ void FIsoTriangulator::ConnectUnconnectedInnerSegments()
 	}
 }
 
+void FIsoTriangulator::RemoveIntersectionByMovingTheClosedPoint(FIntersectionSegmentTool& CycleIntersectionTool, const TArray<FIsoSegment*>& Cycle, const FIsoSegment* Segment, const FIsoSegment* IntersectingSegment)
+{
+	const FPoint2D& IntersectingStartPoint = IntersectingSegment->GetFirstNode().Get2DPoint(EGridSpace::UniformScaled, Grid);
+	const FPoint2D& IntersectingEndPoint = IntersectingSegment->GetSecondNode().Get2DPoint(EGridSpace::UniformScaled, Grid);
+
+	const FPoint2D& SegmentStartPoint = Segment->GetFirstNode().Get2DPoint(EGridSpace::UniformScaled, Grid);
+	const FPoint2D& SegmentEndPoint = Segment->GetSecondNode().Get2DPoint(EGridSpace::UniformScaled, Grid);
+
+	TFunction<void(const FIsoNode&, const FPoint2D&, const FPoint2D&)> MoveNode = [&](const FIsoNode& Node, const FPoint2D& InitialPosition, const FPoint2D& NewPosition)
+	{
+		FPoint2D MoveDirection = NewPosition - InitialPosition;
+		MoveDirection.Normalize();
+		MoveDirection *= 1.01;
+		FPoint2D NewCoordinate = NewPosition + MoveDirection;
+
+		const_cast<FIsoNode&>(Node).Set2DPoint(EGridSpace::UniformScaled, Grid, NewCoordinate);
+
+#ifdef ADD_TRIANGLE_2D
+		if (bDisplay)
+		{
+			DisplayCycle(Cycle, TEXT("New Cycle"));
+		}
+#endif
+	};
+
+	TFunction<void(const FIsoNode&, const FPoint2D&, const FIsoNode&, const FPoint2D&)> FindClosedPointAndMoveIt = [&](const FIsoNode& OutsideNode1, const FPoint2D& OutsidePoint1, const FIsoNode& OutsideNode2, const FPoint2D& OutsidePoint2)
+	{
+		double Coordinate1;
+		double Coordinate2;
+		FPoint2D ProjectedPoint1 = ProjectPointOnSegment(OutsidePoint1, IntersectingStartPoint, IntersectingEndPoint, Coordinate1, false);
+		FPoint2D ProjectedPoint2 = ProjectPointOnSegment(OutsidePoint2, SegmentStartPoint, SegmentEndPoint, Coordinate2, false);
+
+		bool bProjectedPoint1IsInside = (Coordinate1 >= -SMALL_NUMBER && Coordinate1 <= 1 + SMALL_NUMBER);
+		bool bProjectedPoint2IsInside = (Coordinate2 >= -SMALL_NUMBER && Coordinate2 <= 1 + SMALL_NUMBER);
+
+		if (bProjectedPoint1IsInside && bProjectedPoint2IsInside)
+		{
+			double SquareDistance1 = ProjectedPoint1.SquareDistance(OutsidePoint1);
+			double SquareDistance2 = ProjectedPoint2.SquareDistance(OutsidePoint2);
+			if (SquareDistance1 < SquareDistance2)
+			{
+				MoveNode(OutsideNode1, OutsidePoint1, ProjectedPoint1);
+			}
+			else
+			{
+				MoveNode(OutsideNode2, OutsidePoint2, ProjectedPoint2);
+			}
+		}
+		else if (bProjectedPoint1IsInside)
+		{
+			MoveNode(OutsideNode1, OutsidePoint1, ProjectedPoint1);
+		}
+		else if (bProjectedPoint2IsInside)
+		{
+			MoveNode(OutsideNode2, OutsidePoint2, ProjectedPoint2);
+		}
+	};
+
+	double OrientedSlop = ComputeOrientedSlope(IntersectingStartPoint, IntersectingEndPoint, SegmentStartPoint);
+	if (OrientedSlop < 0)
+	{
+		FindClosedPointAndMoveIt(Segment->GetFirstNode(), SegmentStartPoint, IntersectingSegment->GetSecondNode(), IntersectingEndPoint);
+	}
+	else
+	{
+		FindClosedPointAndMoveIt(Segment->GetSecondNode(), SegmentEndPoint, IntersectingSegment->GetFirstNode(), IntersectingStartPoint);
+	}
+}
+
 void FIsoTriangulator::MeshCycle(const EGridSpace Space, const TArray<FIsoSegment*>& Cycle, const TArray<bool>& CycleOrientation)
 {
 	int32 NodeCycleNum = (int32)Cycle.Num();
@@ -1908,29 +1977,43 @@ void FIsoTriangulator::MeshCycle(const EGridSpace Space, const TArray<FIsoSegmen
 	CycleIntersectionTool.AddSegments(Cycle);
 	CycleIntersectionTool.Sort();
 
-	// check if the cycle is self intersecting. 
-	for (const FIsoSegment* Segment : Cycle)
-	{
-		if (CycleIntersectionTool.DoesIntersect(*Segment))
-		{
-			FMessage::Printf(Log, TEXT("A cycle of the surface %d is in self intersecting. The mesh of this sector is canceled.\n"), Grid.GetFace()->GetId());
-			return;
-		}
-	}
-
 #ifdef ADD_TRIANGLE_2D
 	if (bDisplay)
 	{
 		Open3DDebugSession(TEXT("Mesh cycle"));
-
-		F3DDebugSession _(FString::Printf(TEXT("Cycle")));
-		for (const FIsoSegment* Segment : Cycle)
-		{
-			Display(EGridSpace::UniformScaled, *Segment);
-		}
-		Wait();
+		DisplayCycle(Cycle, TEXT("Cycle"));
 	}
 #endif
+
+	// Check if the cycle is in self intersecting and fix it. 
+	bool bHasSelfIntersection = false;
+	for (const FIsoSegment* Segment : Cycle)
+	{
+		if (const FIsoSegment* IntersectingSegment = CycleIntersectionTool.DoesIntersect(*Segment))
+		{
+			FMessage::Printf(Debug, TEXT("A cycle of the surface %d is in self intersecting.\n"), Grid.GetFace()->GetId());
+			RemoveIntersectionByMovingTheClosedPoint(CycleIntersectionTool, Cycle, Segment, IntersectingSegment);
+			bHasSelfIntersection = true;
+		}
+	}
+
+	if (bHasSelfIntersection)
+	{
+		for (const FIsoSegment* Segment : Cycle)
+		{
+			if (CycleIntersectionTool.DoesIntersect(*Segment))
+			{
+				FMessage::Printf(Log, TEXT("A cycle of the surface %d is in self intersecting. The mesh of this sector is canceled.\n"), Grid.GetFace()->GetId());
+				return;
+			}
+#ifdef ADD_TRIANGLE_2D
+			//if (Grid.bDisplay)
+			//{
+			//	Close3DDebugSession();
+			//}
+#endif 
+		}
+	}
 
 	TArray<FIsoNode*> CycleNodes;
 	CycleNodes.Reserve(NodeCycleNum);
@@ -2319,7 +2402,7 @@ void FIsoTriangulator::MeshCycle(const EGridSpace Space, const TArray<FIsoSegmen
 	}
 
 #ifdef ADD_TRIANGLE_2D
-	if (Grid.GetFace()->GetId() == FaceToDebug)
+	if (bDisplay)
 	{
 		Close3DDebugSession();
 	}

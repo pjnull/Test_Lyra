@@ -11,12 +11,12 @@
 namespace CADKernel
 { 
 
-bool FIntersectionSegmentTool::DoesIntersect(const FIsoSegment& Segment) const
+const FIsoSegment* FIntersectionSegmentTool::DoesIntersect(const FIsoSegment& Segment) const
 {
 	return DoesIntersect(Segment.GetFirstNode(), Segment.GetSecondNode());
 }
 
-bool FIntersectionSegmentTool::DoesIntersect(const FIsoNode& StartNode, const FIsoNode& EndNode) const
+const FIsoSegment* FIntersectionSegmentTool::DoesIntersect(const FIsoNode& StartNode, const FIsoNode& EndNode) const
 {
 	const FPoint2D& StartPoint = StartNode.Get2DPoint(EGridSpace::UniformScaled, Grid);
 	const FPoint2D& EndPoint = EndNode.Get2DPoint(EGridSpace::UniformScaled, Grid);
@@ -43,11 +43,11 @@ bool FIntersectionSegmentTool::DoesIntersect(const FIsoNode& StartNode, const FI
 
 		if (IntersectSegments2D(Segment.Segment2D, StartEndSegment.Segment2D))
 		{
-			return true;
+			return Segment.IsoSegment;
 		}
 	}
 
-	return false;
+	return nullptr;
 }
 
 bool FIntersectionSegmentTool::DoesIntersect(const FIsoNode& StartNode, const FPoint2D& EndPoint) const

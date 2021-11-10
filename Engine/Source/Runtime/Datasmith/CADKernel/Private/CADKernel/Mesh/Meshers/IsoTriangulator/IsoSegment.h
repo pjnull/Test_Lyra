@@ -91,7 +91,7 @@ namespace CADKernel
 			{
 				if(IsItAlreadyDefined(FirstNode, SecondNode))
 				{
-					Wait();
+					//Wait();
 					return false;
 				}
 				return true;

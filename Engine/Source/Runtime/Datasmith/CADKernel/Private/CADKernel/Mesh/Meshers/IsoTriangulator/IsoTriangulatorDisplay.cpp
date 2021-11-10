@@ -129,6 +129,16 @@ void FIsoTriangulator::DisplayPixels(TArray<uint8>& Pixel) const
 	Close3DDebugSession();
 }
 
+void FIsoTriangulator::DisplayCycle(const TArray<FIsoSegment*>& Cycle, const TCHAR* Message) const
+{
+	F3DDebugSession _(Message);
+	for (const FIsoSegment* Segment : Cycle)
+	{
+		Display(EGridSpace::UniformScaled, *Segment);
+	}
+}
+
+
 void FIsoTriangulator::DisplayCells(const TArray<FCell>& Cells) const
 {
 	if (!bDisplay)
