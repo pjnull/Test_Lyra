@@ -276,10 +276,11 @@ void SSceneOutliner::HandleHiddenColumnsChanged()
 {
 	const TArray<FName> HiddenColumns = HeaderRowWidget->GetHiddenColumnIds();
 	FSceneOutlinerConfig* OutlinerConfig = GetMutableConfig();
-	TMap<FName, bool> ColumnVisibilities = OutlinerConfig->ColumnVisibilities;
 
 	if (OutlinerConfig != nullptr)
 	{
+		TMap<FName, bool> ColumnVisibilities = OutlinerConfig->ColumnVisibilities;
+
 		for (const TPair<FName, bool> Pair : Columns)
 		{
 			ColumnVisibilities.Add(Pair.Key, HiddenColumns.Find(Pair.Key) == INDEX_NONE);
