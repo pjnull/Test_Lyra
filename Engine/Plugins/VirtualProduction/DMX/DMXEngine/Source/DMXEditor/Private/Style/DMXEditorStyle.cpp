@@ -32,6 +32,7 @@ FName FDMXEditorStyle::GetStyleSetName()
 }
 
 #define IMAGE_BRUSH(RelativePath, ...) FSlateImageBrush(Style->RootToContentDir(RelativePath, TEXT(".png")), __VA_ARGS__)
+#define BOX_BRUSH(RelativePath, ...) FSlateBoxBrush(Style->RootToContentDir(RelativePath, TEXT(".png") ), __VA_ARGS__)
 
 TSharedRef<FSlateStyleSet> FDMXEditorStyle::Create()
 {
@@ -98,16 +99,35 @@ TSharedRef<FSlateStyleSet> FDMXEditorStyle::Create()
 		Style->Set("DMXEditor.PixelMapping.DistributionGrid.3.3", new IMAGE_BRUSH("Icons/DistributionGrid/icon_PixelDirection_3_3_161x160", Icon34x29));
 	}
 
-	// OutputConsole icons
+	// Output Console
 	{
+		Style->Set("DMXEditor.OutputConsole.Fader", new FSlateColorBrush(FLinearColor(.2f, .2f, .2f, .2f)));
+		Style->Set("DMXEditor.OutputConsole.Fader_Highlighted", new FSlateColorBrush(FLinearColor(.4f, .4f, .4f, .4f)));
+
 		Style->Set("DMXEditor.OutputConsole.MacroSineWave", new IMAGE_BRUSH("Icons/icon_MacroSineWave_51x31", Icon51x31));
 		Style->Set("DMXEditor.OutputConsole.MacroMin", new IMAGE_BRUSH("Icons/icon_MacroMin_51x30", Icon51x30));
 		Style->Set("DMXEditor.OutputConsole.MacroMax", new IMAGE_BRUSH("Icons/icon_MacroMax_51x30", Icon51x30));
+
+		static const FLinearColor DefaultFaderBackColor = FLinearColor::Black;
+		static const FLinearColor DefaultFaderFillColor = FLinearColor::FromSRGBColor(FColor::FromHex("00aeef"));
+		static const FLinearColor DefeaultFaderForeColor = FLinearColor::FromSRGBColor(FColor::FromHex("ffffff"));
+
+		static FSlateBrush FaderBackBrush = BOX_BRUSH("Common/Spinbox", FMargin(4.0f / 16.0f), DefaultFaderBackColor);
+		static FSlateBrush FaderFillBrush = BOX_BRUSH("Common/Spinbox_Fill", FMargin(4.0f / 16.0f), DefaultFaderFillColor);
+
+		Style->Set("DMXEditor.OutputConsole.Fader", FSpinBoxStyle(FEditorStyle::GetWidgetStyle<FSpinBoxStyle>("SpinBox"))
+			.SetBackgroundBrush(FaderBackBrush)
+			.SetHoveredBackgroundBrush(FaderBackBrush)
+			.SetActiveFillBrush(FaderFillBrush)
+			.SetInactiveFillBrush(FaderFillBrush)
+			.SetForegroundColor(DefeaultFaderForeColor)
+			.SetArrowsImage(FSlateNoResource()));
 	}
 
 	return Style;
 }
 #undef IMAGE_BRUSH
+#undef BOX_BRUSH
 
 void FDMXEditorStyle::ReloadTextures()
 {
@@ -122,4 +142,3 @@ const ISlateStyle& FDMXEditorStyle::Get()
 	check(StyleInstance.IsValid());
 	return *StyleInstance;
 }
-
