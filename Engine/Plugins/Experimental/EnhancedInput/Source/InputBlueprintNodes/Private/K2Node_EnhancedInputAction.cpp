@@ -249,6 +249,13 @@ void UK2Node_EnhancedInputAction::ExpandNode(FKismetCompilerContext& CompilerCon
 {
 	Super::ExpandNode(CompilerContext, SourceGraph);
 
+	if(!InputAction)
+	{
+		static const FText InvalidActionWarning = LOCTEXT("InvalidInputActionDuringExpansion", "@@ does not have a valid Input Action asset!!");
+		CompilerContext.MessageLog.Warning(*InvalidActionWarning.ToString(), this);
+		return;
+	}
+	
 	// Establish active pins
 	struct ActivePinData
 	{
@@ -257,7 +264,7 @@ void UK2Node_EnhancedInputAction::ExpandNode(FKismetCompilerContext& CompilerCon
 		ETriggerEvent TriggerEvent;
 	};
 
-	const ETriggerEventsSupported SupportedTriggerEvents = InputAction ? InputAction->GetSupportedTriggerEvents() : ETriggerEventsSupported::None;
+	const ETriggerEventsSupported SupportedTriggerEvents = InputAction->GetSupportedTriggerEvents();
 	
 	TArray<ActivePinData> ActivePins;
 	ForEachEventPinName([this, &ActivePins, &SupportedTriggerEvents, &CompilerContext](ETriggerEvent Event, FName PinName) 
