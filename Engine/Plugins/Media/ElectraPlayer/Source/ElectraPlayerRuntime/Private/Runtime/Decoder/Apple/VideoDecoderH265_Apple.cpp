@@ -982,8 +982,8 @@ void FVideoDecoderH265::GetAndPrepareInputAU()
 	if (!CurrentAccessUnit.IsValid() && InputBufferListener && NextAccessUnits.IsEmpty())
 	{
 		{
-			SCOPE_CYCLE_COUNTER(STAT_ElectraPlayer_VideoH264Decode);
-			CSV_SCOPED_TIMING_STAT(ElectraPlayer, VideoH264Decode);
+			SCOPE_CYCLE_COUNTER(STAT_ElectraPlayer_VideoH265Decode);
+			CSV_SCOPED_TIMING_STAT(ElectraPlayer, VideoH265Decode);
 
 			IAccessUnitBufferListener::FBufferStats	stats;
 			stats.bEODSignaled = NextAccessUnits.GetEOD();
