@@ -96,6 +96,8 @@ void FNativeGameplayTag::ValidateTagRegistration() const
 
 	bValidated = true;
 
+	// Programs don't have a Project that I can use to figure out this information.
+#if !IS_PROGRAM
 	const FProjectDescriptor* const CurrentProject = IProjectManager::Get().GetCurrentProject();
 	check(CurrentProject);
 
@@ -119,6 +121,7 @@ void FNativeGameplayTag::ValidateTagRegistration() const
 			ensureAlwaysMsgf(false, TEXT("Unable to find information about module '%s' in plugin '%s'"), *ModuleName.ToString(), *PluginName.ToString());
 		}
 	}
+#endif
 }
 
 #endif
