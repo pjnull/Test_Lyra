@@ -592,17 +592,18 @@ namespace Chaos
 				{
 					// Destroy any contacts beyond the cull distance
 					// @todo(chaos): this should not be necessary - we should not create/restore them in the first place
-					if (NewConstraint->GetPhi() > NewConstraint->GetCullDistance())
-					{
-						// NOTE: We cannot remove constraints that are part of a sleeping island - they get restored later.
-						// In principle we should never see sleeping constraints in the active list, but it can happen
-						// if a dynamic particle gets flipped to a kinematic.
-						if (!NewConstraint->IsSleeping())
-						{
-							DestroyConstraint(NewConstraint);
-						}
-						continue;
-					}
+					// @todo(chaos) disabled for now as this seems to cause (indirectly) some crashes
+					//if (NewConstraint->GetPhi() > NewConstraint->GetCullDistance())
+					//{
+					//	// NOTE: We cannot remove constraints that are part of a sleeping island - they get restored later.
+					//	// In principle we should never see sleeping constraints in the active list, but it can happen
+					//	// if a dynamic particle gets flipped to a kinematic.
+					//	if (!NewConstraint->IsSleeping())
+					//	{
+					//		DestroyConstraint(NewConstraint);
+					//	}
+					//	continue;
+					//}
 
 					// Add the constraint to the maps and active list (if not already present)
 					AddConstraintImp(NewConstraint);

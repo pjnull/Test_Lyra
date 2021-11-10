@@ -385,6 +385,13 @@ int32 FPBDIslandManager::AddConstraint(const uint32 ContainerId, FConstraintHand
 			const int32 EdgeIndex = IslandGraph->AddEdge(ConstraintHandle, ContainerId, NodeIndex0, NodeIndex1);
 			ConstraintHandle->SetConstraintGraphIndex(EdgeIndex);
 
+			// Make sure to sync the state of the constraint with its owning island, otherwise the constraint may be flag as destroyable and leave a dangling pointer in the islands
+			const int32 IslandIndex = IslandGraph->GraphEdges[EdgeIndex].IslandIndex;
+			if (IslandGraph->GraphIslands.IsValidIndex(IslandIndex) && IslandGraph->GraphIslands[IslandIndex].bIsSleeping)
+			{
+				ConstraintHandle->SetIsSleeping(true);
+			}
+
 			return EdgeIndex;
 		}
 		return INDEX_NONE;
@@ -396,6 +403,14 @@ void FPBDIslandManager::RemoveParticle(FGeometryParticleHandle* ParticleHandle)
 {
 	if (ParticleHandle)
 	{
+		// @todo(chaos) : this is sub-optimal fix for a crash where trying to remove a particle from the data in the graph is not enough 
+		// edgelist is empty and particle is in multiple island solver 
+		// could possibly be because of the order we delete constraint before removing the particle
+		for (auto& IslandSolver : IslandSolvers)
+		{
+			IslandSolver->RemoveParticle(ParticleHandle);
+		}
+
 		IslandGraph->RemoveNode(ParticleHandle);
 		if(FPBDRigidParticleHandle* PBDRigid = ParticleHandle->CastToRigidParticle())
 		{
@@ -409,10 +424,10 @@ void FPBDIslandManager::RemoveConstraint(const uint32 ContainerId, FConstraintHa
 	if (ConstraintHandle)
 	{
 		const int32 EdgeIndex = ConstraintHandle->ConstraintGraphIndex();
-		if (EdgeIndex != INDEX_NONE)
+		if (IslandGraph->GraphEdges.IsValidIndex(EdgeIndex))
 		{
 			const int32 IslandIndex = IslandGraph->GraphEdges[EdgeIndex].IslandIndex;
-			if (IslandIndex != INDEX_NONE)
+			if (IslandGraph->GraphIslands.IsValidIndex(IslandIndex))
 			{
 				IslandSolvers[IslandIndex]->RemoveConstraint(ConstraintHandle);
 			}
