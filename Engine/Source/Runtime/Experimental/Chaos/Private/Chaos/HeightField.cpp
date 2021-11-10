@@ -35,7 +35,13 @@ namespace Chaos
 			, Start(InStart)
 			, Dir(InDir)
 			, Thickness(InThickness)
-		{}
+		{
+			for (int Axis = 0; Axis < 3; ++Axis)
+			{
+				bParallel[Axis] = FMath::IsNearlyZero(Dir[Axis], (FReal)1.e-8);
+				InvDir[Axis] = bParallel[Axis] ? 0 : 1 / Dir[Axis];
+			}
+		}
 
 		enum class ERaycastType
 		{
@@ -177,12 +183,20 @@ namespace Chaos
 			};
 
 			FVec3 Points[4];
-			GeomData->GetPointsScaled(FullIndex, Points);
+			FAABB3 CellBounds;
+			GeomData->GetPointsAndBoundsScaled(FullIndex, Points, CellBounds);
+			CellBounds.Thicken(Thickness);
 
-			// Test both triangles that are in this cell, as we could hit both in any order
-			TestTriangle(Payload * 2, Points[0], Points[1], Points[3]);
-			TestTriangle(Payload * 2 + 1, Points[0], Points[3], Points[2]);
-
+			// Check cell bounds
+			//todo: can do it without raycast
+			FReal TOI;
+			FVec3 HitPoint;
+			if (CellBounds.RaycastFast(Start, Dir, InvDir, bParallel, CurrentLength, 1.0f / CurrentLength, TOI, HitPoint))
+			{
+				// Test both triangles that are in this cell, as we could hit both in any order
+				TestTriangle(Payload * 2, Points[0], Points[1], Points[3]);
+				TestTriangle(Payload * 2 + 1, Points[0], Points[3], Points[2]);
+			}
 			return OutTime > 0;
 		}
 
@@ -207,6 +221,8 @@ namespace Chaos
 
 		FVec3 Start;
 		FVec3 Dir;
+		FVec3 InvDir;
+		bool  bParallel[3];
 		FReal Thickness;
 	};
 
@@ -224,7 +240,16 @@ namespace Chaos
 			, Dir(InDir)
 			, Thickness(InThickness)
 			, bComputeMTD(InComputeMTD)
-		{}
+		{
+			const FAABB3 QueryBounds = InQueryGeom.BoundingBox();
+			StartPoint = StartTM.TransformPositionNoScale(QueryBounds.Center());
+			Inflation3D = QueryBounds.Extents() * 0.5 + FVec3(Thickness);
+			for (int Axis = 0; Axis < 3; ++Axis)
+			{
+				bParallel[Axis] = FMath::IsNearlyZero(Dir[Axis], (FReal)1.e-8);
+				InvDir[Axis] = bParallel[Axis] ? 0 : 1 / Dir[Axis];
+			}
+		}
 
 		bool VisitSweep(int32 Payload, FReal& CurrentLength)
 		{
@@ -293,14 +318,22 @@ namespace Chaos
 			};
 
 			FVec3 Points[4];
-			HfData->GetPointsScaled(FullIndex, Points);
+			FAABB3 CellBounds;
+			HfData->GetPointsAndBoundsScaled(FullIndex, Points, CellBounds);
+			CellBounds.ThickenSymmetrically(Inflation3D);
 
-			bool bContinue = TestTriangle(Payload * 2, Points[0], Points[1], Points[3]);
-			if (bContinue)
+			// Check cell bounds
+			//todo: can do it without raycast
+			FReal TOI;
+			FVec3 HitPoint;
+			if (CellBounds.RaycastFast(StartPoint, Dir, InvDir, bParallel, CurrentLength, 1.0f / CurrentLength, TOI, HitPoint))
 			{
-				TestTriangle(Payload * 2 + 1, Points[0], Points[3], Points[2]);
+				bool bContinue = TestTriangle(Payload * 2, Points[0], Points[1], Points[3]);
+				if (bContinue)
+				{
+					TestTriangle(Payload * 2 + 1, Points[0], Points[3], Points[2]);
+				}
 			}
-
 			return OutTime > 0;
 		}
 
@@ -315,8 +348,12 @@ namespace Chaos
 		const FRigidTransform3 StartTM;
 		const GeomQueryType& OtherGeom;
 		const FVec3& Dir;
+		FVec3 InvDir;
+		bool  bParallel[3];
 		const FReal Thickness;
 		bool bComputeMTD;
+		FVec3 StartPoint;
+		FVec3 Inflation3D;
 
 	};
 
@@ -807,21 +844,16 @@ namespace Chaos
 			//START
 			do
 			{
-				if(GetCellBounds3DScaled(CellIdx,Min,Max))
+				if (FlatGrid.IsValid(CellIdx))
 				{
-					// Check cell bounds
-					//todo: can do it without raycast
-					if(FAABB3(Min,Max).RaycastFast(StartPoint,Dir,InvDir,bParallel,CurrentLength,InvCurrentLength,TOI,HitPoint))
+					// Test for the cell bounding box is done in the visitor at the same time as fetching the points for the triangles
+					// this avoid fetching the points twice ( here and in the visitor ) 
+					bool bContinue = Visitor.VisitRaycast(CellIdx[1] * (GeomData.NumCols - 1) + CellIdx[0], CurrentLength);
+					if (!bContinue)
 					{
-						// Visit the selected cell
-						bool bContinue = Visitor.VisitRaycast(CellIdx[1] * (GeomData.NumCols - 1) + CellIdx[0],CurrentLength);
-						if(!bContinue)
-						{
-							return false;
-						}
+						return false;
 					}
 				}
-
 
 				//find next cell
 
@@ -1065,12 +1097,10 @@ namespace Chaos
 
 					// Check the current cell, if we hit its 3D bound we can move on to narrow phase
 					const TVec2<int32> Coord = CellCoord.Index;
-					if(GetCellBounds3DScaled(Coord, Min, Max, HalfExtents3D) &&
-						FAABB3(Min,Max).RaycastFast(StartPoint, Dir, InvDir, bParallel, CurrentLength, InvCurrentLength, ToI, HitPoint))
+					if (FlatGrid.IsValid(Coord))
 					{
 						bool bContinue = Visitor.VisitSweep(CellCoord.Index[1] * (GeomData.NumCols - 1) + CellCoord.Index[0], CurrentLength);
-
-						if(!bContinue)
+						if (!bContinue)
 						{
 							return true;
 						}
