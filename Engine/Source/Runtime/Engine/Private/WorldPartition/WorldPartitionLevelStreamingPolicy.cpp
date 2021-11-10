@@ -94,11 +94,6 @@ void UWorldPartitionLevelStreamingPolicy::PrepareActorToCellRemapping()
 	}
 }
 
-void UWorldPartitionLevelStreamingPolicy::ClearActorToCellRemapping()
-{
-	ActorToCellRemapping.Empty();
-}
-
 void UWorldPartitionLevelStreamingPolicy::RemapSoftObjectPath(FSoftObjectPath& ObjectPath)
 {
 	// Make sure to work on non-PIE path (can happen for modified actors in PIE)

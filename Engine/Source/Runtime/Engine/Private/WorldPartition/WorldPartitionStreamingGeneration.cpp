@@ -280,6 +280,11 @@ bool UWorldPartition::GenerateStreaming(TArray<FString>* OutPackagesToGenerate)
 
 	check(RuntimeHash);
 	bool Result = RuntimeHash->GenerateStreaming(StreamingPolicy, ActorClusterContext, OutPackagesToGenerate);
+	
+	if (Result)
+	{
+		StreamingPolicy->PrepareActorToCellRemapping();
+	}
 
 	return Result;
 }
