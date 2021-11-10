@@ -64,6 +64,7 @@ Landscape.cpp: Terrain rendering
 #include "MaterialUtilities.h"
 #include "Editor.h"
 #include "Algo/Transform.h"
+#include "Algo/BinarySearch.h"
 #include "Engine/Texture2D.h"
 #endif
 #include "LandscapeVersion.h"
@@ -3295,7 +3296,20 @@ TArray<TScriptInterface<ILandscapeSplineInterface>> ULandscapeInfo::GetSplineAct
 void ULandscapeInfo::RegisterSplineActor(TScriptInterface<ILandscapeSplineInterface> SplineActor)
 {
 	Modify();
-	SplineActors.AddUnique(SplineActor);
+
+	// Sort on insert to ensure spline actors are always processed in the same order, regardless of variation in the
+	// sub level streaming/registration sequence.
+	auto SortPredicate = [](const TScriptInterface<ILandscapeSplineInterface>& A, const TScriptInterface<ILandscapeSplineInterface>& B)
+	{
+		return Cast<UObject>(A.GetInterface())->GetPathName() < Cast<UObject>(B.GetInterface())->GetPathName();
+	};
+
+	// Add a unique entry, sorted
+	const int32 LBoundIdx = Algo::LowerBound(SplineActors, SplineActor, SortPredicate);
+	if (LBoundIdx == SplineActors.Num() || SplineActors[LBoundIdx] != SplineActor)
+	{
+		SplineActors.Insert(SplineActor, LBoundIdx);
+	}
 
 	if (SplineActor->GetSplinesComponent())
 	{
