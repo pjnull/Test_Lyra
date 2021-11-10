@@ -75,86 +75,82 @@ namespace Metasound
 			virtual TSharedRef<SWidget> GetDefaultValueWidget() override
 			{
 				using namespace Frontend;
-				TSharedRef<SWidget> ValueWidget = ParentPinType::GetDefaultValueWidget();
-
-				FConstInputHandle InputHandle = GetConstInputHandle();
-				if (!InputHandle->IsValid() || ParentPinType::IsArray())
-				{
-					return ValueWidget;
-				}
+				TSharedRef<SWidget> DefaultWidget = ParentPinType::GetDefaultValueWidget();
 
 				// For now, arrays do not support literals.
 				// TODO: Support array literals by displaying
 				// default literals (non-array too) in inspector window.
+				FConstInputHandle InputHandle = GetConstInputHandle();
+				if (!InputHandle->IsValid() || ParentPinType::IsArray())
+				{
+					return DefaultWidget;
+				}
 
-				TSharedPtr<SHorizontalBox> ChildContent = SNew(SHorizontalBox)
+				return SNew(SHorizontalBox)
 					+ SHorizontalBox::Slot()
 					.VAlign(VAlign_Center)
 					[
-						ValueWidget
-					];
-
-				ChildContent->AddSlot()
-				.AutoWidth()
-				.VAlign(VAlign_Center)
-				[
-					SNew(SButton)
-					.ToolTipText(LOCTEXT("ResetToClassDefaultToolTip", "Reset to class default"))
-					.ButtonStyle(FEditorStyle::Get(), TEXT("NoBorder"))
-					.ContentPadding(0.0f)
-					.Visibility(TAttribute<EVisibility>::Create([this]
-					{
-						using namespace Frontend;
-						if (!ParentPinType::IsConnected())
-						{
-							FConstInputHandle InputHandle = GetConstInputHandle();
-							if (const FMetasoundFrontendLiteral* Literal = InputHandle->GetLiteral())
-							{
-								if (Literal->GetType() != EMetasoundFrontendLiteralType::None)
-								{
-									return EVisibility::Visible;
-								}
-							}
-						}
-
-						return EVisibility::Hidden;
-					}))
-					.OnClicked(FOnClicked::CreateLambda([this]()
-					{
-						using namespace Frontend;
-
-						if (UEdGraphPin* Pin = ParentPinType::GetPinObj())
-						{
-							if (UEdGraphNode* Node = Pin->GetOwningNode())
-							{
-								if (UMetasoundEditorGraph* MetaSoundGraph = CastChecked<UMetasoundEditorGraph>(Node->GetGraph()))
-								{
-									UObject& MetaSound = MetaSoundGraph->GetMetasoundChecked();
-
-									{
-										const FScopedTransaction Transaction(LOCTEXT("MetaSoundEditorSetLiteralToClassDefault", "Set Literal to Class Default"));
-										MetaSound.Modify();
-										MetaSoundGraph->Modify();
-
-										FInputHandle InputHandle = GetInputHandle();
-										InputHandle->ClearLiteral();
-									}
-
-									FGraphBuilder::SynchronizePinLiteral(*Pin);
-								}
-							}
-						}
-
-						return FReply::Handled();
-					}))
-					.Content()
-					[
-						SNew(SImage)
-						.Image(FEditorStyle::GetBrush("PropertyWindow.DiffersFromDefault"))
+						DefaultWidget
 					]
-				];
+					+ SHorizontalBox::Slot()
+					.AutoWidth()
+					.VAlign(VAlign_Center)
+					[
+						SNew(SButton)
+						.ToolTipText(LOCTEXT("ResetToClassDefaultToolTip", "Reset to class default"))
+						.ButtonStyle(FEditorStyle::Get(), TEXT("NoBorder"))
+						.ContentPadding(0.0f)
+						.Visibility(TAttribute<EVisibility>::Create([this]
+						{
+							using namespace Frontend;
+							if (!ParentPinType::IsConnected())
+							{
+								FConstInputHandle InputHandle = GetConstInputHandle();
+								if (const FMetasoundFrontendLiteral* Literal = InputHandle->GetLiteral())
+								{
+									if (Literal->GetType() != EMetasoundFrontendLiteralType::None)
+									{
+										return EVisibility::Visible;
+									}
+								}
+							}
 
-				return ChildContent->AsShared();
+							return EVisibility::Hidden;
+						}))
+						.OnClicked(FOnClicked::CreateLambda([this]()
+						{
+							using namespace Frontend;
+
+							if (UEdGraphPin* Pin = ParentPinType::GetPinObj())
+							{
+								if (UEdGraphNode* Node = Pin->GetOwningNode())
+								{
+									if (UMetasoundEditorGraph* MetaSoundGraph = CastChecked<UMetasoundEditorGraph>(Node->GetGraph()))
+									{
+										UObject& MetaSound = MetaSoundGraph->GetMetasoundChecked();
+
+										{
+											const FScopedTransaction Transaction(LOCTEXT("MetaSoundEditorSetLiteralToClassDefault", "Set Literal to Class Default"));
+											MetaSound.Modify();
+											MetaSoundGraph->Modify();
+
+											FInputHandle InputHandle = GetInputHandle();
+											InputHandle->ClearLiteral();
+										}
+
+										FGraphBuilder::SynchronizePinLiteral(*Pin);
+									}
+								}
+							}
+
+							return FReply::Handled();
+						}))
+						.Content()
+						[
+							SNew(SImage)
+							.Image(FEditorStyle::GetBrush("PropertyWindow.DiffersFromDefault"))
+						]
+					];
 			}
 		};
 
