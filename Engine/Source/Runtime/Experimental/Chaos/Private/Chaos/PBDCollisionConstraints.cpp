@@ -5,6 +5,7 @@
 #include "Chaos/Capsule.h"
 #include "Chaos/ChaosPerfTest.h"
 #include "Chaos/ChaosDebugDraw.h"
+#include "Chaos/ContactModification.h"
 #include "Chaos/PBDCollisionConstraintsContact.h"
 #include "Chaos/CollisionResolutionUtil.h"
 #include "Chaos/CollisionResolution.h"
@@ -328,24 +329,19 @@ namespace Chaos
 		}
 	}
 
-	void FPBDCollisionConstraints::ApplyCollisionModifier(const TArray<ISimCallbackObject*>& CollisionModifiers)
+	void FPBDCollisionConstraints::ApplyCollisionModifier(const TArray<ISimCallbackObject*>& CollisionModifiers, FReal Dt)
 	{
 		if (GetConstraints().Num() > 0)
 		{
-			for(ISimCallbackObject* Modifier : CollisionModifiers)
-			{
-				TArray<FPBDCollisionConstraintHandleModification> ModificationResults;
-				ModificationResults.Reserve(GetConstraints().Num());
-				for (FPBDCollisionConstraintHandle* Handle : GetConstraintHandles())
-				{
-					if (Handle)
-					{
-						ModificationResults.Emplace(Handle);
-					}
-				}
+			TArrayView<FPBDCollisionConstraint* const> ConstraintHandles = GetConstraintHandles();
+			FCollisionContactModifier Modifier(ConstraintHandles, Dt);
 
-				Modifier->ContactModification_Internal(TArrayView<FPBDCollisionConstraintHandleModification>(ModificationResults.GetData(), ModificationResults.Num()));
+			for(ISimCallbackObject* ModifierCallback : CollisionModifiers)
+			{
+				ModifierCallback->ContactModification_Internal(Modifier);
 			}
+
+			Modifier.UpdateConstraintManifolds();
 		}
 	}
 

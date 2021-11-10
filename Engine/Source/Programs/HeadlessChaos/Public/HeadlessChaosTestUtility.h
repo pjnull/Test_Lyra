@@ -161,6 +161,16 @@ namespace ChaosTest {
 	}
 
 
+	template <typename TParticle>
+	void SetCubeInertiaTensor(TParticle& Particle, float Dimension, float Mass)
+	{
+		float Element = Mass * Dimension * Dimension / 6.0f;
+		float InvElement = 1.f / Element;
+		Particle.SetI(FMatrix33(Element, Element, Element));
+		Particle.SetInvI(FMatrix33(InvElement, InvElement, InvElement));
+	}
+
+
 	extern FImplicitConvex3 CreateConvexBox(const FVec3& BoxSize, const FReal Margin);
 	extern FImplicitConvex3 CreateConvexBox(const FVec3& BoxMin, const FVec3& BoxMax, const FReal Margin);
 	extern TImplicitObjectInstanced<FImplicitConvex3> CreateInstancedConvexBox(const FVec3& BoxSize, const FReal Margin);

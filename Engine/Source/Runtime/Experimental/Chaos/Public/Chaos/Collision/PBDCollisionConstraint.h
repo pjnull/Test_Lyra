@@ -169,6 +169,8 @@ namespace Chaos
 			, Restitution(0)
 			, RestitutionPadding(0)
 			, RestitutionThreshold(0)
+			, InvMassScale0(1.f)
+			, InvMassScale1(1.f)
 			, InvInertiaScale0(1.f)
 			, InvInertiaScale1(1.f)
 			, ContactMoveSQRDistance(0)
@@ -192,6 +194,8 @@ namespace Chaos
 		FReal Restitution;
 		FReal RestitutionPadding; // For PBD implementation of resitution, we pad constraints on initial contact to enforce outward velocity
 		FReal RestitutionThreshold;
+		FReal InvMassScale0;
+		FReal InvMassScale1;
 		FReal InvInertiaScale0;
 		FReal InvInertiaScale1;
 		FReal ContactMoveSQRDistance; // How much the contact position moved after the last update
@@ -420,6 +424,12 @@ namespace Chaos
 		void SetLocation(const FVec3& InLocation) { Manifold.Location = InLocation; }
 		FVec3 GetLocation() const { return Manifold.Location; }
 
+		void SetInvMassScale0(const FReal InInvMassScale) { Manifold.InvMassScale0 = InInvMassScale; }
+		FReal GetInvMassScale0() const { return Manifold.InvMassScale0; }
+
+		void SetInvMassScale1(const FReal InInvMassScale) { Manifold.InvMassScale1 = InInvMassScale; }
+		FReal GetInvMassScale1() const { return Manifold.InvMassScale1; }
+
 		void SetInvInertiaScale0(const FReal InInvInertiaScale) { Manifold.InvInertiaScale0 = InInvInertiaScale; }
 		FReal GetInvInertiaScale0() const { return Manifold.InvInertiaScale0; }
 
@@ -470,6 +480,11 @@ namespace Chaos
 		//@ todo(chaos): These are for the collision forwarding system - this should use the collision modifier system (which should be extended to support adding collisions)
 		void SetManifoldPoints(const TArray<FManifoldPoint>& InManifoldPoints) { ManifoldPoints = InManifoldPoints; }
 		void UpdateManifoldPointFromContact(FManifoldPoint& ManifoldPoint);
+
+		// Helpers for interacting with constraint from world space
+		static void GetWorldSpaceContactPositions(const FManifoldPoint& ManifoldPoint, const FVec3& PCoM0, const FRotation3& QCoM0, const FVec3& PCoM1, const FRotation3& QCoM1, FVec3& OutWorldPosition0, FVec3& OutWorldPosition1);
+		static void GetCoMContactPositionsFromWorld(const FManifoldPoint& ManifoldPoint, const FVec3& PCoM0, const FRotation3& QCoM0, const FVec3& PCoM1, const FRotation3& QCoM1, const FVec3& WorldPoint0, const FVec3& WorldPoint1, FVec3& OutCoMPoint0, FVec3& OutCoMPoint1);
+
 
 		// The GJK warm-start data. This is updated directly in the narrow phase
 		FGJKSimplexData& GetGJKWarmStartData() { return GJKWarmStartData; }

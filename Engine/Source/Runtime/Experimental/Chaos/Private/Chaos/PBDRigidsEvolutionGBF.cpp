@@ -267,7 +267,7 @@ void FPBDRigidsEvolutionGBF::AdvanceOneTimeStepImpl(const FReal Dt, const FSubSt
 	if(CollisionModifiers)
 	{
 		SCOPE_CYCLE_COUNTER(STAT_Evolution_CollisionModifierCallback);
-		CollisionConstraints.ApplyCollisionModifier(*CollisionModifiers);
+		CollisionConstraints.ApplyCollisionModifier(*CollisionModifiers, Dt);
 	}
 
 	if (bChaosUseCCD)

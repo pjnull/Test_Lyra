@@ -642,6 +642,44 @@ namespace Chaos
 		Manifold.Phi = ContactPoint.Phi;
 	}
 
+	void FPBDCollisionConstraint::GetWorldSpaceContactPositions(
+		const FManifoldPoint& ManifoldPoint,
+		const FVec3& P0,			// World-Space CoM
+		const FRotation3& Q0,		// World-Space CoM
+		const FVec3& P1,			// World-Space CoM
+		const FRotation3& Q1,		// World-Space CoM
+		FVec3& OutWorldPosition0,
+		FVec3& OutWorldPosition1)
+	{
+		const FReal Margin0 = ManifoldPoint.ContactPoint.ShapeMargins[0];
+		const FReal Margin1 = ManifoldPoint.ContactPoint.ShapeMargins[1];
+		const FVec3& ContactNormal = ManifoldPoint.ManifoldContactNormal;
+		OutWorldPosition0 = P0 + Q0.RotateVector(ManifoldPoint.CoMContactPoints[0]) - Margin0 * ContactNormal;
+		OutWorldPosition1 = P1 + Q1.RotateVector(ManifoldPoint.CoMContactPoints[1]) + Margin1 * ContactNormal;
+	}
+
+	void FPBDCollisionConstraint::GetCoMContactPositionsFromWorld(
+		const FManifoldPoint& ManifoldPoint,
+		const FVec3& PCoM0,
+		const FRotation3& QCoM0,
+		const FVec3& PCoM1,
+		const FRotation3& QCoM1,
+		const FVec3& WorldPoint0,
+		const FVec3& WorldPoint1,
+		FVec3& OutCoMPoint0,
+		FVec3& OutCoMPoint1)
+	{
+
+		// Invert the transformation in GetWorldSpaceContactPositions() and return CoM space contact locations.
+
+		const FVec3 ContactNormal = ManifoldPoint.ManifoldContactNormal;
+		const FReal Margin0 = ManifoldPoint.ContactPoint.ShapeMargins[0];
+		const FReal Margin1 = ManifoldPoint.ContactPoint.ShapeMargins[1];
+
+		OutCoMPoint0 = QCoM0.UnrotateVector(WorldPoint0 - PCoM0 + Margin0 * ContactNormal);
+		OutCoMPoint1 = QCoM1.UnrotateVector(WorldPoint1 - PCoM1 - Margin1 * ContactNormal);
+	}
+
 	void FPBDCollisionConstraint::GetWorldSpaceManifoldPoint(
 		const FManifoldPoint& ManifoldPoint,
 		const FVec3& P0,			// World-Space CoM
@@ -652,27 +690,14 @@ namespace Chaos
 		FVec3& OutContactNormal,
 		FReal& OutContactPhi)
 	{
-		const FReal Margin0 = ManifoldPoint.ContactPoint.ShapeMargins[0];
-		const FReal Margin1 = ManifoldPoint.ContactPoint.ShapeMargins[1];
-		FVec3 ContactNormal;
-		if (bChaos_Collision_Manifold_FixNormalsInWorldSpace)
-		{
-			ContactNormal = ManifoldPoint.ManifoldContactNormal;
-		}
-		else
-		{
-			const FRotation3& PlaneQ = (ManifoldPoint.ContactPoint.ContactNormalOwnerIndex == 0) ? Q0 : Q1;
-			ContactNormal = PlaneQ.RotateVector(ManifoldPoint.ManifoldContactNormal);
-		}
-		
-		const FVec3 ContactPos0 = P0 + Q0.RotateVector(ManifoldPoint.CoMContactPoints[0]) - Margin0 * ContactNormal;
-		const FVec3 ContactPos1 = P1 + Q1.RotateVector(ManifoldPoint.CoMContactPoints[1]) + Margin1 * ContactNormal;
+		FVec3 ContactPos0;
+		FVec3 ContactPos1;
+		FPBDCollisionConstraint::GetWorldSpaceContactPositions(ManifoldPoint, P0, Q0, P1, Q1, ContactPos0, ContactPos1);
 
 		OutContactLocation = 0.5f * (ContactPos0 + ContactPos1);
-		OutContactNormal = ContactNormal;
-		OutContactPhi = FVec3::DotProduct(ContactPos0 - ContactPos1, ContactNormal);
+		OutContactNormal = ManifoldPoint.ManifoldContactNormal;
+		OutContactPhi = FVec3::DotProduct(ContactPos0 - ContactPos1, ManifoldPoint.ManifoldContactNormal);
 	}
-
 
 	FManifoldPoint& FPBDCollisionConstraint::SetActiveManifoldPoint(
 		int32 ManifoldPointIndex,
