@@ -1430,10 +1430,152 @@ void FControlRigParameterTrackEditor::OnAddTransformKeysForSelectedObjects(EMovi
 	}
 }
 
+//function to evaluate a Control and Set it on the ControlRig
+static void EvaluateThisControl(UMovieSceneControlRigParameterSection* Section, const FName& ControlName, const FFrameTime& FrameTime)
+{
+	if (!Section)
+	{
+		return;
+	}
+	UControlRig* ControlRig = Section->GetControlRig();
+	if (!ControlRig)
+	{
+		return;
+	}
+	if(FRigControlElement* ControlElement = ControlRig->FindControl(ControlName))
+	{ 
+		FControlRigInteractionScope InteractionScope(ControlRig);
+		//eval any space for this channel, if not additive section
+		if (Section->GetBlendType().Get() != EMovieSceneBlendType::Additive)
+		{
+			TOptional<FMovieSceneControlRigSpaceBaseKey> SpaceKey = Section->EvaluateSpaceChannel(FrameTime, ControlName);
+			if (SpaceKey.IsSet())
+			{
+				URigHierarchy* RigHierarchy = ControlRig->GetHierarchy();
+				switch (SpaceKey.GetValue().SpaceType)
+				{
+				case EMovieSceneControlRigSpaceType::Parent:
+					RigHierarchy->SwitchToDefaultParent(ControlElement->GetKey());
+					break;
+				case EMovieSceneControlRigSpaceType::World:
+					RigHierarchy->SwitchToWorldSpace(ControlElement->GetKey());
+					break;
+				case EMovieSceneControlRigSpaceType::ControlRig:
+					URigHierarchy::TElementDependencyMap Dependencies = RigHierarchy->GetDependenciesForVM(ControlRig->GetVM());
+					RigHierarchy->SwitchToParent(ControlElement->GetKey(), SpaceKey.GetValue().ControlRigElement, false, true, Dependencies, nullptr);
+					break;
+				}
+			}
+		}
+		const bool bSetupUndo = false;
+		switch (ControlElement->Settings.ControlType)
+		{
+			case ERigControlType::Bool:
+			{
+				if (Section->GetBlendType().Get() != EMovieSceneBlendType::Additive)
+				{
+					TOptional <bool> Value = Section->EvaluateBoolParameter(FrameTime, ControlName);
+					if (Value.IsSet())
+					{
+						ControlRig->SetControlValue<bool>(ControlName, Value.GetValue(), true, EControlRigSetKey::Never, bSetupUndo);
+					}
+				}
+				break;
+			}
+			case ERigControlType::Integer:
+			{
+				if (Section->GetBlendType().Get() != EMovieSceneBlendType::Additive)
+				{
+					if (ControlElement->Settings.ControlEnum)
+					{
+						TOptional<uint8> Value = Section->EvaluateEnumParameter(FrameTime, ControlName);
+						if (Value.IsSet())
+						{
+							int32 IVal = (int32)Value.GetValue();
+							ControlRig->SetControlValue<int32>(ControlName, IVal, true, EControlRigSetKey::Never, bSetupUndo);
+						}
+					}
+					else
+					{
+						TOptional <int32> Value = Section->EvaluateIntegerParameter(FrameTime, ControlName);
+						if (Value.IsSet())
+						{
+							ControlRig->SetControlValue<int32>(ControlName, Value.GetValue(), true, EControlRigSetKey::Never, bSetupUndo);
+						}
+					}
+				}
+				break;
+
+			}
+			case ERigControlType::Float:
+			{
+				TOptional <float> Value = Section->EvaluateScalarParameter(FrameTime, ControlName);
+				if (Value.IsSet())
+				{
+					ControlRig->SetControlValue<float>(ControlName, Value.GetValue(), true, EControlRigSetKey::Never, bSetupUndo);
+				}
+				break;
+			}
+			case ERigControlType::Vector2D:
+			{
+				TOptional <FVector2D> Value = Section->EvaluateVector2DParameter(FrameTime, ControlName);
+				if (Value.IsSet())
+				{
+					ControlRig->SetControlValue<FVector2D>(ControlName, Value.GetValue(), true, EControlRigSetKey::Never, bSetupUndo);
+				}
+				break;
+			}
+			case ERigControlType::Position:
+			case ERigControlType::Scale:
+			case ERigControlType::Rotator:
+			{
+				TOptional <FVector> Value = Section->EvaluateVectorParameter(FrameTime, ControlName);
+				if (Value.IsSet())
+				{
+					FVector3f FloatVal = Value.GetValue();
+					ControlRig->SetControlValue<FVector3f>(ControlName, FloatVal, true, EControlRigSetKey::Never, bSetupUndo);
+				}
+				break;
+			}
+
+			case ERigControlType::Transform:
+			case ERigControlType::TransformNoScale:
+			case ERigControlType::EulerTransform:
+			{
+				TOptional <FTransform> Value = Section->EvaluateTransformParameter(FrameTime, ControlName);
+				if (Value.IsSet())
+				{
+					if (ControlElement->Settings.ControlType == ERigControlType::Transform)
+					{
+						ControlRig->SetControlValue<FRigControlValue::FTransform_Float>(ControlName, Value.GetValue(), true, EControlRigSetKey::Never, bSetupUndo);
+					}
+					else if (ControlElement->Settings.ControlType == ERigControlType::TransformNoScale)
+					{
+						FTransformNoScale NoScale = Value.GetValue();
+						ControlRig->SetControlValue<FRigControlValue::FTransformNoScale_Float>(ControlName, NoScale, true, EControlRigSetKey::Never, bSetupUndo);
+					}
+					else if (ControlElement->Settings.ControlType == ERigControlType::EulerTransform)
+					{
+						FEulerTransform Euler = Value.GetValue();
+						ControlRig->SetControlValue<FRigControlValue::FEulerTransform_Float>(ControlName, Euler, true, EControlRigSetKey::Never, bSetupUndo);
+					}
+				}
+				break;
+
+			}
+		}
+		ControlRig->Evaluate_AnyThread();
+	}
+}
+		
+//When a channel is changed via Sequencer we need to call SetControlValue on it so that Control Rig can handle seeing that this is a change, but just on this value
+//and then send back a key even if needed, which happens with IK/FK switches. Hopefully new IK/FK system will remove need for this at some point.
 void FControlRigParameterTrackEditor::OnChannelChanged(const FMovieSceneChannelMetaData* MetaData, UMovieSceneSection* InSection)
 {
 	UMovieSceneControlRigParameterSection* Section = Cast<UMovieSceneControlRigParameterSection>(InSection);
-	if (Section && Section->GetControlRig() && MetaData)
+	TSharedPtr<ISequencer> SequencerPtr = GetSequencer();
+
+	if (Section && Section->GetControlRig() && MetaData && SequencerPtr.IsValid())
 	{
 		Section->ControlsToSet.Empty();
 		TArray<FString> StringArray;
@@ -1443,9 +1585,8 @@ void FControlRigParameterTrackEditor::OnChannelChanged(const FMovieSceneChannelM
 		{
 			FName ControlName(*StringArray[0]);
 			Section->ControlsToSet.Add(ControlName);
-			FControlRigInteractionScope InteractionScope(Section->GetControlRig());
-			GetSequencer()->ForceEvaluate(); //now run sequencer...
-			Section->GetControlRig()->Evaluate_AnyThread();
+			FFrameTime Time = SequencerPtr->GetLocalTime().Time;
+			EvaluateThisControl(Section,ControlName, Time);
 			Section->ControlsToSet.Empty();
 
 			TOptional<FFrameNumber> Optional;
@@ -2677,7 +2818,7 @@ bool FControlRigParameterTrackEditor::ModifyOurGeneratedKeysByCurrentAndWeight(U
 						}
 						
 						FVector3f CurrentPos = Val.Val.GetTranslation();
-						FRotator CurrentRot = Val.Val.GetRotation().Rotator();
+						FRotator3f CurrentRot = FRotator3f(Val.Val.GetRotation().Rotator());
 						GeneratedTotalKeys[ChannelIndex]->ModifyByCurrentAndWeight(Proxy, KeyTime, (void*)&CurrentPos.X, Weight);
 						GeneratedTotalKeys[ChannelIndex + 1]->ModifyByCurrentAndWeight(Proxy, KeyTime, (void*)&CurrentPos.Y, Weight);
 						GeneratedTotalKeys[ChannelIndex + 2]->ModifyByCurrentAndWeight(Proxy, KeyTime, (void*)&CurrentPos.Z, Weight);

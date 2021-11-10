@@ -739,7 +739,9 @@ struct FControlRigParameterPreAnimatedTokenProducer : IMovieScenePreAnimatedToke
 						{
 							if (ControlRig->FindControl(Value.Name))
 							{
-								ControlRig->SetControlValue<FVector2D>(Value.Name, Value.Value, true, FRigControlModifiedContext(EControlRigSetKey::Never),bSetupUndo);
+								const FVector3f Vector3(Value.Value.X, Value.Value.Y, 0.f);
+								//okay to use vector3 for 2d here
+								ControlRig->SetControlValue<FVector3f>(Value.Name, Vector3, true, FRigControlModifiedContext(EControlRigSetKey::Never),bSetupUndo);
 							}
 						}
 
@@ -747,7 +749,7 @@ struct FControlRigParameterPreAnimatedTokenProducer : IMovieScenePreAnimatedToke
 						{
 							if (ControlRig->FindControl(Value.Name))
 							{
-								ControlRig->SetControlValue<FVector>(Value.Name, Value.Value, true, FRigControlModifiedContext(EControlRigSetKey::Never),bSetupUndo);
+								ControlRig->SetControlValue<FVector3f>(Value.Name, Value.Value, true, FRigControlModifiedContext(EControlRigSetKey::Never),bSetupUndo);
 							}
 						}
 
@@ -759,19 +761,19 @@ struct FControlRigParameterPreAnimatedTokenProducer : IMovieScenePreAnimatedToke
 								{
 								case ERigControlType::Transform:
 								{
-									ControlRig->SetControlValue<FTransform>(Value.Name, Value.Value, true, FRigControlModifiedContext(EControlRigSetKey::Never),bSetupUndo);
+									ControlRig->SetControlValue<FRigControlValue::FTransform_Float>(Value.Name, Value.Value, true, FRigControlModifiedContext(EControlRigSetKey::Never),bSetupUndo);
 									break;
 								}
 								case ERigControlType::TransformNoScale:
 								{
 									FTransformNoScale NoScale = Value.Value;
-									ControlRig->SetControlValue<FTransformNoScale>(Value.Name, NoScale, true, FRigControlModifiedContext(EControlRigSetKey::Never),bSetupUndo);
+									ControlRig->SetControlValue<FRigControlValue::FTransformNoScale_Float>(Value.Name, NoScale, true, FRigControlModifiedContext(EControlRigSetKey::Never),bSetupUndo);
 									break;
 								}
 								case ERigControlType::EulerTransform:
 								{
 									FEulerTransform EulerTransform = Value.Value;
-									ControlRig->SetControlValue<FEulerTransform>(Value.Name, EulerTransform, true, FRigControlModifiedContext(EControlRigSetKey::Never),bSetupUndo);
+									ControlRig->SetControlValue<FRigControlValue::FEulerTransform_Float>(Value.Name, EulerTransform, true, FRigControlModifiedContext(EControlRigSetKey::Never),bSetupUndo);
 									break;
 								}
 
