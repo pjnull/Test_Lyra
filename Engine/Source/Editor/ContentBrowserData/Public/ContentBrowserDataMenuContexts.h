@@ -29,6 +29,9 @@ public:
 	TArray<FName> SelectedPaths;
 
 	UPROPERTY()
+	bool bCanBeModified = true;
+
+	UPROPERTY()
 	EContentBrowserDataMenuContext_AddNewMenuDomain OwnerDomain = EContentBrowserDataMenuContext_AddNewMenuDomain::Toolbar;
 
 	FOnBeginItemCreation OnBeginItemCreation;

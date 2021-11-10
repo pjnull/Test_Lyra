@@ -22,6 +22,7 @@
 #include "ToolMenus.h"
 #include "ToolMenuSection.h"
 #include "Misc/MessageDialog.h"
+#include "ContentBrowserDataMenuContexts.h"
 
 #define LOCTEXT_NAMESPACE "Bridge"
 #define LEVELEDITOR_MODULE_NAME TEXT("LevelEditor")
@@ -98,13 +99,21 @@ void FBridgeUIManagerImpl::SetupMenuItem()
 	//FToolMenuSection& ContextMenuSection = ContextMenu->AddSection("ContentBrowserMegascans", LOCTEXT("GetContentMenuHeading", "Quixel Content"));
 	FToolMenuSection& ContextMenuSection = ContextMenu->FindOrAddSection("ContentBrowserGetContent");
 	
-	ContextMenuSection.AddMenuEntry(
-		"GetMegascans",
-		LOCTEXT("OpenBridgeTabText", "Add Quixel Content"),
-		LOCTEXT("GetBridgeTooltip", "Add Megascans and DHI assets to project."),
-		FSlateIcon(FBridgeStyle::GetStyleSetName(), "Bridge.MenuLogo"),
-		FUIAction(FExecuteAction::CreateRaw(this, &FBridgeUIManagerImpl::CreateWindow), FCanExecuteAction())
-	);
+	TWeakPtr<FBridgeUIManagerImpl> WeakPtr = AsShared();
+	ContextMenuSection.AddDynamicEntry("GetMegascans", FNewToolMenuSectionDelegate::CreateLambda([WeakPtr](FToolMenuSection& InSection)
+	{
+		UContentBrowserDataMenuContext_AddNewMenu* AddNewMenuContext = InSection.FindContext<UContentBrowserDataMenuContext_AddNewMenu>();
+		if (AddNewMenuContext && AddNewMenuContext->bCanBeModified && WeakPtr.IsValid())
+		{
+			InSection.AddMenuEntry(
+				"GetMegascans",
+				LOCTEXT("OpenBridgeTabText", "Add Quixel Content"),
+				LOCTEXT("GetBridgeTooltip", "Add Megascans and DHI assets to project."),
+				FSlateIcon(FBridgeStyle::GetStyleSetName(), "Bridge.MenuLogo"),
+				FUIAction(FExecuteAction::CreateSP(WeakPtr.Pin().ToSharedRef(), &FBridgeUIManagerImpl::CreateWindow), FCanExecuteAction())
+			);
+		}
+	}));
 
 	/*TSharedPtr<FExtender> NewMenuExtender = MakeShareable(new FExtender);
 	NewMenuExtender->AddMenuExtension("LevelEditor",
