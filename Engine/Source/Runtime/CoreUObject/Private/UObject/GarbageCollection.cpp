@@ -1209,17 +1209,17 @@ public:
 	/** Default constructor, initializing all members. */
 	FRealtimeGC()
 	{
-		MarkObjectsFunctions[GetGCFunctionIndex(EFastReferenceCollectorOptions::None | EFastReferenceCollectorOptions::None)] = &FRealtimeGC::MarkObjectsAsUnreachable<false, false>;
+		MarkObjectsFunctions[GetGCFunctionIndex(EFastReferenceCollectorOptions::None)] = &FRealtimeGC::MarkObjectsAsUnreachable<false, false>;
 		MarkObjectsFunctions[GetGCFunctionIndex(EFastReferenceCollectorOptions::Parallel | EFastReferenceCollectorOptions::None)] = &FRealtimeGC::MarkObjectsAsUnreachable<true, false>;
 		MarkObjectsFunctions[GetGCFunctionIndex(EFastReferenceCollectorOptions::None | EFastReferenceCollectorOptions::WithClusters)] = &FRealtimeGC::MarkObjectsAsUnreachable<false, true>;
 		MarkObjectsFunctions[GetGCFunctionIndex(EFastReferenceCollectorOptions::Parallel | EFastReferenceCollectorOptions::WithClusters)] = &FRealtimeGC::MarkObjectsAsUnreachable<true, true>;
 
-		ReachabilityAnalysisFunctions[GetGCFunctionIndex(EFastReferenceCollectorOptions::None | EFastReferenceCollectorOptions::None)] = &FRealtimeGC::PerformReachabilityAnalysisOnObjectsInternal<EFastReferenceCollectorOptions::None | EFastReferenceCollectorOptions::None>;
+		ReachabilityAnalysisFunctions[GetGCFunctionIndex(EFastReferenceCollectorOptions::None)] = &FRealtimeGC::PerformReachabilityAnalysisOnObjectsInternal<EFastReferenceCollectorOptions::None | EFastReferenceCollectorOptions::None>;
 		ReachabilityAnalysisFunctions[GetGCFunctionIndex(EFastReferenceCollectorOptions::Parallel | EFastReferenceCollectorOptions::None)] = &FRealtimeGC::PerformReachabilityAnalysisOnObjectsInternal<EFastReferenceCollectorOptions::Parallel | EFastReferenceCollectorOptions::None>;
 		ReachabilityAnalysisFunctions[GetGCFunctionIndex(EFastReferenceCollectorOptions::None | EFastReferenceCollectorOptions::WithClusters)] = &FRealtimeGC::PerformReachabilityAnalysisOnObjectsInternal<EFastReferenceCollectorOptions::None | EFastReferenceCollectorOptions::WithClusters>;
 		ReachabilityAnalysisFunctions[GetGCFunctionIndex(EFastReferenceCollectorOptions::Parallel | EFastReferenceCollectorOptions::WithClusters)] = &FRealtimeGC::PerformReachabilityAnalysisOnObjectsInternal<EFastReferenceCollectorOptions::Parallel | EFastReferenceCollectorOptions::WithClusters>;
 
-		ReachabilityAnalysisFunctions[GetGCFunctionIndex(EFastReferenceCollectorOptions::None | EFastReferenceCollectorOptions::None | EFastReferenceCollectorOptions::WithPendingKill)] = &FRealtimeGC::PerformReachabilityAnalysisOnObjectsInternal<EFastReferenceCollectorOptions::None | EFastReferenceCollectorOptions::None | EFastReferenceCollectorOptions::WithPendingKill>;
+		ReachabilityAnalysisFunctions[GetGCFunctionIndex(EFastReferenceCollectorOptions::None | EFastReferenceCollectorOptions::WithPendingKill)] = &FRealtimeGC::PerformReachabilityAnalysisOnObjectsInternal<EFastReferenceCollectorOptions::None | EFastReferenceCollectorOptions::None | EFastReferenceCollectorOptions::WithPendingKill>;
 		ReachabilityAnalysisFunctions[GetGCFunctionIndex(EFastReferenceCollectorOptions::Parallel | EFastReferenceCollectorOptions::None | EFastReferenceCollectorOptions::WithPendingKill)] = &FRealtimeGC::PerformReachabilityAnalysisOnObjectsInternal<EFastReferenceCollectorOptions::Parallel | EFastReferenceCollectorOptions::None | EFastReferenceCollectorOptions::WithPendingKill>;
 		ReachabilityAnalysisFunctions[GetGCFunctionIndex(EFastReferenceCollectorOptions::None | EFastReferenceCollectorOptions::WithClusters | EFastReferenceCollectorOptions::WithPendingKill)] = &FRealtimeGC::PerformReachabilityAnalysisOnObjectsInternal<EFastReferenceCollectorOptions::None | EFastReferenceCollectorOptions::WithClusters | EFastReferenceCollectorOptions::WithPendingKill>;
 		ReachabilityAnalysisFunctions[GetGCFunctionIndex(EFastReferenceCollectorOptions::Parallel | EFastReferenceCollectorOptions::WithClusters | EFastReferenceCollectorOptions::WithPendingKill)] = &FRealtimeGC::PerformReachabilityAnalysisOnObjectsInternal<EFastReferenceCollectorOptions::Parallel | EFastReferenceCollectorOptions::WithClusters | EFastReferenceCollectorOptions::WithPendingKill>;
