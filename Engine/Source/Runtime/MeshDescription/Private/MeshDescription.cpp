@@ -3,7 +3,6 @@
 #include "MeshDescription.h"
 
 #include "Algo/Copy.h"
-#include "DerivedDataBuildVersion.h"
 #include "MeshAttributes.h"
 #include "Misc/SecureHash.h"
 #include "Serialization/BulkData.h"
@@ -14,6 +13,10 @@
 #include "UObject/EnterpriseObjectVersion.h"
 #include "UObject/UE5CookerObjectVersion.h"
 #include "UObject/UE5MainStreamObjectVersion.h"
+
+#if WITH_EDITORONLY_DATA
+#include "DerivedDataBuildVersion.h"
+#endif
 
 #if WITH_EDITOR
 #include "Misc/ScopeRWLock.h"

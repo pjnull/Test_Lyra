@@ -16,12 +16,11 @@ namespace UnrealBuildTool.Rules
 					"CoreUObject"
 				}
 			);
-			PrivateDependencyModuleNames.AddRange(
-				new string[]
-				{
-					"DerivedDataCache"
-				}
-			);
+
+			if (Target.bBuildWithEditorOnlyData)
+			{
+				PrivateDependencyModuleNames.Add("DerivedDataCache");
+			}
 		}
 	}
 }
