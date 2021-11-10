@@ -1003,7 +1003,7 @@ bool SLevelSnapshotsEditorResults::GenerateTreeViewChildren_AddedActors(FLevelSn
 		// Create group
 		FLevelSnapshotsEditorResultsRowPtr NewActorRow = MakeShared<FLevelSnapshotsEditorResultsRow>(
 			FLevelSnapshotsEditorResultsRow(
-				FText::FromString(Actor.Get()->GetName()), FLevelSnapshotsEditorResultsRow::AddedActorToRemove, ECheckBoxState::Checked, SharedThis(this), AddedActorsHeader));
+				FText::FromString(Actor.Get()->GetActorLabel()), FLevelSnapshotsEditorResultsRow::AddedActorToRemove, ECheckBoxState::Checked, SharedThis(this), AddedActorsHeader));
 		NewActorRow->InitAddedActorRow(Actor.Get());
 
 		AddedActorsHeader->AddToChildRows(NewActorRow);
