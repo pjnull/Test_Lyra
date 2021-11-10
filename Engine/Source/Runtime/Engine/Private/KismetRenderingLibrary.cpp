@@ -303,14 +303,20 @@ EPixelFormat ReadRenderTargetHelper(
 		{
 			OutFormat = PF_Unknown;
 		}
-		check(OutLDRValues.Num() == NumPixelsToRead);
+		else
+		{
+			check(OutLDRValues.Num() == NumPixelsToRead);
+		}
 		break;
 	case PF_FloatRGBA:
 		if (!RenderTarget->ReadLinearColorPixels(OutHDRValues, ReadSurfaceDataFlags, SampleRect))
 		{
 			OutFormat = PF_Unknown;
 		}
-		check(OutHDRValues.Num() == NumPixelsToRead);
+		else
+		{
+			check(OutHDRValues.Num() == NumPixelsToRead);
+		}
 		break;
 	default:
 		OutFormat = PF_Unknown;
