@@ -8,7 +8,7 @@
 #include "Data/Util/SnapshotObjectUtil.h"
 #include "Data/WorldSnapshotData.h"
 #include "LevelSnapshotsLog.h"
-#include "Selection//PropertySelection.h"
+#include "Selection/PropertySelection.h"
 
 #include "Components/ActorComponent.h"
 #include "Engine/World.h"
