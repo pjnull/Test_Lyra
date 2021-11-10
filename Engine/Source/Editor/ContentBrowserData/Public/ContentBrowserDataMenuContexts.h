@@ -28,6 +28,10 @@ public:
 	UPROPERTY()
 	TArray<FName> SelectedPaths;
 
+	// At least one of the selected paths maps to a mounted content root
+	UPROPERTY()
+	bool bContainsValidPackagePath = false;
+
 	UPROPERTY()
 	bool bCanBeModified = true;
 

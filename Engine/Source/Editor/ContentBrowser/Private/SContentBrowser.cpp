@@ -2356,11 +2356,27 @@ void SContentBrowser::AppendNewMenuContextObjects(const EContentBrowserDataMenuC
 	}
 
 	{
+		bool bContainsValidPackagePath = false;
+		for (const FName SelectedPath : InSelectedPaths)
+		{
+			FString ConvertedPath;
+			if (IContentBrowserDataModule::Get().GetSubsystem()->TryConvertVirtualPath(FNameBuilder(SelectedPath), ConvertedPath) == EContentBrowserPathType::Internal)
+			{
+				if (FPackageName::IsValidPath(ConvertedPath))
+				{
+					bContainsValidPackagePath = true;
+					break;
+				}
+			}
+		}
+
 		UContentBrowserDataMenuContext_AddNewMenu* DataContextObject = NewObject<UContentBrowserDataMenuContext_AddNewMenu>();
 		DataContextObject->SelectedPaths = InSelectedPaths;
 		DataContextObject->OwnerDomain = InDomain;
 		DataContextObject->OnBeginItemCreation = UContentBrowserDataMenuContext_AddNewMenu::FOnBeginItemCreation::CreateSP(this, &SContentBrowser::NewFileItemRequested);
 		DataContextObject->bCanBeModified = bCanBeModified;
+		DataContextObject->bContainsValidPackagePath = bContainsValidPackagePath;
+
 		InOutMenuContext.AddObject(DataContextObject);
 	}
 }

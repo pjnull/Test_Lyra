@@ -103,7 +103,7 @@ void FBridgeUIManagerImpl::SetupMenuItem()
 	ContextMenuSection.AddDynamicEntry("GetMegascans", FNewToolMenuSectionDelegate::CreateLambda([WeakPtr](FToolMenuSection& InSection)
 	{
 		UContentBrowserDataMenuContext_AddNewMenu* AddNewMenuContext = InSection.FindContext<UContentBrowserDataMenuContext_AddNewMenu>();
-		if (AddNewMenuContext && AddNewMenuContext->bCanBeModified && WeakPtr.IsValid())
+		if (AddNewMenuContext && AddNewMenuContext->bCanBeModified && AddNewMenuContext->bContainsValidPackagePath && WeakPtr.IsValid() && AddNewMenuContext->OnBeginItemCreation.IsBound())
 		{
 			InSection.AddMenuEntry(
 				"GetMegascans",

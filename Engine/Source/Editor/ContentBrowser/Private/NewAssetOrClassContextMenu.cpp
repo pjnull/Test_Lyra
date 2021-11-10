@@ -49,7 +49,7 @@ void FNewAssetOrClassContextMenu::MakeContextMenu(
 	if ( InOnGetContentRequested.IsBound() )
 	{
 		UContentBrowserDataMenuContext_AddNewMenu* AddNewMenuContext = Menu->FindContext<UContentBrowserDataMenuContext_AddNewMenu>();
-		if (AddNewMenuContext && AddNewMenuContext->bCanBeModified)
+		if (AddNewMenuContext && AddNewMenuContext->bCanBeModified && AddNewMenuContext->bContainsValidPackagePath)
 		{
 			GetContentSection.AddMenuEntry(
 				"GetContent",
