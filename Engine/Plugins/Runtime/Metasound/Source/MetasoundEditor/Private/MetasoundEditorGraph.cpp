@@ -6,6 +6,7 @@
 #include "Components/AudioComponent.h"
 #include "EdGraph/EdGraphNode.h"
 #include "Interfaces/ITargetPlatform.h"
+#include "MetasoundAssetBase.h"
 #include "MetasoundEditorGraphBuilder.h"
 #include "MetasoundEditorGraphInputNodes.h"
 #include "MetasoundEditorGraphNode.h"
@@ -25,6 +26,25 @@ UMetasoundEditorGraph* UMetasoundEditorGraphMember::GetOwningGraph()
 const UMetasoundEditorGraph* UMetasoundEditorGraphMember::GetOwningGraph() const
 {
 	return Cast<const UMetasoundEditorGraph>(GetOuter());
+}
+
+void UMetasoundEditorGraphMember::MarkNodesForRefresh()
+{
+	using namespace Metasound;
+
+	UMetasoundEditorGraph* Graph = GetOwningGraph();
+	if (ensure(Graph))
+	{
+		FMetasoundAssetBase* MetasoundAsset = IMetasoundUObjectRegistry::Get().GetObjectAsAssetBase(&Graph->GetMetasoundChecked());
+		check(MetasoundAsset);
+		MetasoundAsset->SetSynchronizationRequired();
+
+		const TArray<UMetasoundEditorGraphNode*> Nodes = GetNodes();
+		for (UMetasoundEditorGraphNode* Node : Nodes)
+		{
+			Node->bRefreshNode = true;
+		}
+	}
 }
 
 void UMetasoundEditorGraphVertex::OnDataTypeChanged()
@@ -1330,13 +1350,18 @@ bool UMetasoundEditorGraph::ValidateInternal(Metasound::Editor::FGraphValidation
 
 	OutResults = FGraphValidationResults();
 
-	TArray<UMetasoundEditorGraphExternalNode*> ExternalNodes;
-	GetNodesOfClass<UMetasoundEditorGraphExternalNode>(ExternalNodes);
-	for (UMetasoundEditorGraphExternalNode* ExternalNode : ExternalNodes)
+	TArray<UMetasoundEditorGraphNode*> NodesToValidate;
+	GetNodesOfClass<UMetasoundEditorGraphNode>(NodesToValidate);
+	for (UMetasoundEditorGraphNode* Node : NodesToValidate)
 	{
-		FGraphNodeValidationResult NodeResult(*ExternalNode);
-		bIsValid &= ExternalNode->Validate(NodeResult, bClearUpgradeMessaging);
-		bMarkDirty |= NodeResult.bIsDirty;
+		FGraphNodeValidationResult NodeResult(*Node);
+
+		if (UMetasoundEditorGraphExternalNode* ExternalNode = Cast<UMetasoundEditorGraphExternalNode>(Node))
+		{
+			bIsValid &= ExternalNode->Validate(NodeResult, bClearUpgradeMessaging);
+			bMarkDirty |= NodeResult.bIsDirty;
+		}
+
 		OutResults.NodeResults.Add(NodeResult);
 	}
 

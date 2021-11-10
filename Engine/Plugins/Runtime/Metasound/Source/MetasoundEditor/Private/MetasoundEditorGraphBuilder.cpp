@@ -1866,7 +1866,7 @@ namespace Metasound
 			if (bRemoveUnusedPins)
 			{
 				bIsNodeDirty |= !EditorPins.IsEmpty();
-				InEditorNode.bRefreshNode = !EditorPins.IsEmpty();
+				InEditorNode.bRefreshNode |= !EditorPins.IsEmpty();
 				for (UEdGraphPin* Pin : EditorPins)
 				{
 					if (bLogChanges)

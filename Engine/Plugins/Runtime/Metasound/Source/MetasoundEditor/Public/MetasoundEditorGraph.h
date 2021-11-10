@@ -60,6 +60,16 @@ public:
 	}
 
 	virtual void PostEditUndo() override;
+
+	const UMetasoundEditorGraphInput& GetParentInput() const
+	{
+		return *CastChecked<UMetasoundEditorGraphInput>(GetOuter());
+	}
+
+	UMetasoundEditorGraphInput& GetParentInput()
+	{
+		return *CastChecked<UMetasoundEditorGraphInput>(GetOuter());
+	}
 };
 
 /** UMetasoundEditorGraphMember is a base class for non-node graph level members 
@@ -124,6 +134,8 @@ public:
 	/** Returns the parent MetaSound Graph. If the Outer object of the member is non
 	 * a UMetasoundEditorGraph, returns a nullptr. */
 	const UMetasoundEditorGraph* GetOwningGraph() const;
+
+	void MarkNodesForRefresh();
 };
 
 /** Base class for an input or output of the graph. */

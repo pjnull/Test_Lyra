@@ -232,6 +232,7 @@ void UMetasoundEditorGraphInputFloat::PostEditChangeProperty(FPropertyChangedEve
 {
 	if (PropertyChangedEvent.GetPropertyName().IsEqual(GET_MEMBER_NAME_CHECKED(UMetasoundEditorGraphInputFloat, Default)))
 	{
+		GetParentInput().MarkNodesForRefresh();
 		OnDefaultValueChanged.Broadcast(Default);
 	}
 	else if (PropertyChangedEvent.GetPropertyName().IsEqual(GET_MEMBER_NAME_CHECKED(UMetasoundEditorGraphInputFloat, InputWidgetType)) || PropertyChangedEvent.GetPropertyName().IsEqual(GET_MEMBER_NAME_CHECKED(UMetasoundEditorGraphInputFloat, InputWidgetValueType)))
@@ -248,6 +249,8 @@ void UMetasoundEditorGraphInputFloat::PostEditChangeProperty(FPropertyChangedEve
 		{
 			Range = FVector2D(-100.0f, 0.0f);
 		}
+
+		GetParentInput().MarkNodesForRefresh();
 		OnRangeChanged.Broadcast(Range);
 		// If the widget type is changed to none, we need to refresh clamping the value or not, since if the widget was a slider before, the value was clamped
 		OnClampInputChanged.Broadcast(ClampDefault);
@@ -262,6 +265,7 @@ void UMetasoundEditorGraphInputFloat::PostEditChangeProperty(FPropertyChangedEve
 			{
 				OnRangeChanged.Broadcast(Range);
 				SetDefault(FMath::Clamp(Default, Min, Max));
+				GetParentInput().MarkNodesForRefresh();
 			}
 		}
 	}
@@ -269,6 +273,8 @@ void UMetasoundEditorGraphInputFloat::PostEditChangeProperty(FPropertyChangedEve
 	{
 		// set range to reasonable limit given current value
 		Range = FVector2D(FMath::Min(0.0f, Default), FMath::Max(0.0f, Default));
+
+		GetParentInput().MarkNodesForRefresh();
 		OnClampInputChanged.Broadcast(ClampDefault);
 	}
 }
