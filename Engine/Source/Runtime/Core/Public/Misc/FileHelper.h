@@ -200,8 +200,7 @@ struct CORE_API FFileHelper
 	*/
 	static bool IsFilenameValidForSaving(const FString& Filename, FText& OutError);
 
-	UE_DEPRECATED(5.0, "EChannelMask has been deprecated in favor of EColorChannel")
-	enum class EChannelMask
+	enum class UE_DEPRECATED(5.0, "EChannelMask has been deprecated in favor of EColorChannel") EChannelMask
 	{
 		R = STRUCT_OFFSET(FColor, R),
 		G = STRUCT_OFFSET(FColor, G),
