@@ -302,7 +302,8 @@ void FPinValueInspectorTooltip::CreatePinValueTooltipWindow()
 		.SupportsMaximize(false)
 		.SupportsMinimize(false)
 		.IsPopupWindow(true)
-		.SizingRule(ESizingRule::Autosized);
+		.SizingRule(ESizingRule::Autosized)
+		.ActivationPolicy(EWindowActivationPolicy::Never);
 
 	FSlateApplication::Get().AddWindow(TooltipWindow.ToSharedRef());
 	TooltipWindow->SetContent(SAssignNew(TooltipWidget, SToolTip));
