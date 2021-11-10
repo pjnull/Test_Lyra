@@ -1003,7 +1003,7 @@ void FSkeletalMeshEditor::OnCreateClothingAssetMenuItemClicked(FSkeletalMeshClot
 			int32 SectionIndex = -1, AssetLodIndex = -1;
 			if (Params.bRemapParameters)
 			{
-				if (TargetAssetPtr)
+				if (TargetAssetPtr && Mesh->GetImportedModel()->LODModels.IsValidIndex(Params.TargetLod))
 				{
 					//Cache the section and asset LOD this asset was bound at before unbinding
 					FSkeletalMeshLODModel& SkelLod = Mesh->GetImportedModel()->LODModels[Params.TargetLod];

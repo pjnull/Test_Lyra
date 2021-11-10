@@ -1225,7 +1225,9 @@ bool UClothingAssetFactory::ImportToLodInternal(
 	FClothPhysicalMeshData& PhysMesh = DestLod.PhysicalMeshData;
 	PhysMesh.Reset(NumUniqueVerts, NumIndices);
 
-	const FSkeletalMeshLODModel& DestLodModel = SkeletalResource->LODModels[DestLodIndex];
+	const FSkeletalMeshLODModel* const DestLodModel =
+		SkeletalResource->LODModels.IsValidIndex(DestLodIndex) ?  // The dest section LOD level might not exist yet, that shouldn't prevent a cloth asset LOD creation
+		&SkeletalResource->LODModels[DestLodIndex] : nullptr;
 
 	for(int32 VertexIndex = 0; VertexIndex < NumUniqueVerts; ++VertexIndex)
 	{
@@ -1241,7 +1243,7 @@ bool UClothingAssetFactory::ImportToLodInternal(
 			uint16 SourceIndex = SourceSection.BoneMap[SourceVert.InfluenceBones[InfluenceIndex]];
 
 			// If the current bone is not active in the destination LOD, then remap to the first ancestor bone that is
-			while (!DestLodModel.ActiveBoneIndices.Contains(SourceIndex))
+			while (DestLodModel && !DestLodModel->ActiveBoneIndices.Contains(SourceIndex))
 			{
 				SourceIndex = SourceMesh->GetRefSkeleton().GetParentIndex(SourceIndex);
 			}
