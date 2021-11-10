@@ -37,7 +37,7 @@ public:
 	bool bScaleUVByAspectRatio = true;
 
 	/** If true, output mesh has a single polygroup, otherwise each quad gets a separate group */
-	bool bSinglePolygroup = false;
+	bool bSinglePolyGroup = false;
 
 	FPolygonEdgeMeshGenerator(const TArray<FFrame3d>& InPolygon,
 		const TArray<double>& InOffsetScaleFactors,

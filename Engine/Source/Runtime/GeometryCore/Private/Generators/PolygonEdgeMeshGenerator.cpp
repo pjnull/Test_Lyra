@@ -69,7 +69,7 @@ FMeshShapeGenerator& FPolygonEdgeMeshGenerator::Generate()
 		SetTriangleNormals(NewTriBIndex, NewTriB);
 		SetTrianglePolygon(NewTriBIndex, PolyIndex);
 
-		if (!bSinglePolygroup)
+		if (!bSinglePolyGroup)
 		{
 			PolyIndex++;
 		}

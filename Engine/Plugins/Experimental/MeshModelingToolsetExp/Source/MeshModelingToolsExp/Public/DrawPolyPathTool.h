@@ -77,7 +77,7 @@ public:
 
 	/** If true, all quads on the path will belong to the same polygon. If false, each quad gets its own polygon. */
 	UPROPERTY(EditAnywhere, Category = Path)
-	bool bSinglePolygroup = false;
+	bool bSinglePolyGroup = false;
 
 	/** If and how the drawn path gets extruded */
 	UPROPERTY(EditAnywhere, Category = Extrude)
