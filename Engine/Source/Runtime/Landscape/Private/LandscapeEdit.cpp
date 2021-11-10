@@ -2400,7 +2400,11 @@ struct FHeightmapInfo
 
 const TArray<FName>& ALandscapeProxy::GetLayersFromMaterial(UMaterialInterface* MaterialInterface)
 {
-	return MaterialInterface->GetCachedExpressionData().LandscapeLayerNames;
+	if (MaterialInterface)
+	{
+		return MaterialInterface->GetCachedExpressionData().LandscapeLayerNames;
+	}
+	return FMaterialCachedExpressionData::EmptyData.LandscapeLayerNames;
 }
 
 const TArray<FName>& ALandscapeProxy::GetLayersFromMaterial() const
