@@ -353,11 +353,16 @@ TSharedPtr<FExistingSkelMeshData> SkeletalMeshImportUtils::SaveExistingSkelMeshD
 		// Copy LOD models and LOD Infos.
 		check(SourceMeshModel->LODModels.Num() == SourceSkeletalMesh->GetLODInfoArray().Num());
 		ExistingMeshDataPtr->ExistingLODModels.Empty(SourceMeshModel->LODModels.Num());
+		ExistingMeshDataPtr->ExistingLODImportDatas.Reserve(SourceMeshModel->LODModels.Num());
 		for ( int32 LODIndex = 0; LODIndex < SourceMeshModel->LODModels.Num() ; ++LODIndex)
 		{
 			//Add a new LOD Model to the existing LODModels data
 			const FSkeletalMeshLODModel& LODModel = SourceMeshModel->LODModels[LODIndex];
 			ExistingMeshDataPtr->ExistingLODModels.Add(FSkeletalMeshLODModel::CreateCopy(&LODModel));
+			//Store the import data for every LODs
+			FSkeletalMeshLodImportDataBackup& LodMeshImportData = ExistingMeshDataPtr->ExistingLODImportDatas.AddDefaulted_GetRef();
+			SourceSkeletalMesh->LoadLODImportedData(LODIndex, LodMeshImportData.MeshImportData);
+			SourceSkeletalMesh->GetLODImportedDataVersions(LODIndex, LodMeshImportData.MeshGeoImportVersion, LodMeshImportData.MeshSkinningImportVersion);
 		}
 		check(ExistingMeshDataPtr->ExistingLODModels.Num() == SourceMeshModel->LODModels.Num());
 
@@ -824,7 +829,12 @@ void SkeletalMeshImportUtils::RestoreExistingSkelMeshData(const TSharedPtr<const
 						//We need to add LODInfo
 						SkeletalMeshImportedModel->LODModels.Add(LODModelCopy);
 						SkeletalMesh->AddLODInfo(LODInfo);
-						
+						//Restore custom LOD import data
+						FSkeletalMeshLodImportDataBackup* LodMeshImportData = const_cast<FSkeletalMeshLodImportDataBackup*>(&(MeshData->ExistingLODImportDatas[LODIndex]));
+						//SaveLODImportdData cannot take a const structure because it use serialization(which cannot be const because same function read and write)
+						SkeletalMesh->SaveLODImportedData(LODIndex, LodMeshImportData->MeshImportData);
+						SkeletalMesh->SetLODImportedDataVersions(LODIndex, LodMeshImportData->MeshGeoImportVersion, LodMeshImportData->MeshSkinningImportVersion);
+
 						auto FillInlineReductionData = [&MeshData, &SkeletalMeshImportedModel, LODIndex]()
 						{
 							if (MeshData->ExistingInlineReductionCacheDatas.IsValidIndex(LODIndex))
