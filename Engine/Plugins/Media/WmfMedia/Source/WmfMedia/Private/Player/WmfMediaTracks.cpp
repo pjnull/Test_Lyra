@@ -1357,11 +1357,14 @@ bool FWmfMediaTracks::AddTrackToTopology(const FTrack& Track, IMFTopology& Topol
 		if (Decoder != nullptr)
 		{
 			// Enable external buffers.
-			Decoder->EnableExternalBuffer(true);
-
-			if (MediaStreamSink.IsValid())
+			if (Decoder->IsExternalBufferSupported())
 			{
-				MediaStreamSink->SetDecoder(Decoder);
+				Decoder->EnableExternalBuffer(true);
+
+				if (MediaStreamSink.IsValid())
+				{
+					MediaStreamSink->SetDecoder(Decoder);
+				}
 			}
 		}
 	}

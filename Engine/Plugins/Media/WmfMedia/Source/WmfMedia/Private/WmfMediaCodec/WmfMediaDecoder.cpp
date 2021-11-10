@@ -552,6 +552,11 @@ TArray<uint8>* WmfMediaDecoder::AllocateExternalBuffer(uint64 InTimeStamp, int32
 	return pBuffer;
 }
 
+bool WmfMediaDecoder::IsExternalBufferSupported() const
+{
+	return false;
+}
+
 void WmfMediaDecoder::EnableExternalBuffer(bool bInEnable)
 {
 	bIsExternalBufferEnabled = bInEnable;

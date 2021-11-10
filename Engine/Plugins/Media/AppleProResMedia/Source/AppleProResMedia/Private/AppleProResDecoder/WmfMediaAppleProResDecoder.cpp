@@ -299,6 +299,10 @@ HRESULT WmfMediaAppleProResDecoder::ProcessOutput(DWORD dwFlags, DWORD cOutputBu
 	return hr;
 }
 
+bool WmfMediaAppleProResDecoder::IsExternalBufferSupported() const
+{
+	return true;
+}
 
 HRESULT WmfMediaAppleProResDecoder::InternalProcessOutput(IMFSample* InSample)
 {

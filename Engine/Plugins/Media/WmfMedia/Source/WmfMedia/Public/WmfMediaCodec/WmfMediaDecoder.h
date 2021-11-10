@@ -59,6 +59,13 @@ public:
 	virtual HRESULT OnDiscontinuity();
 
 	/**
+	 * See if this decoder supports external buffers.
+	 *
+	 * @return True if so.
+	 */
+	virtual bool IsExternalBufferSupported() const;
+
+	/**
 	 * Call this to use our external buffers and not Windows.
 	 * 
 	 * @param bInEnable True to use external.
