@@ -528,9 +528,9 @@ void FFileHelper::GenerateDateTimeBasedBitmapFilename(const FString& Pattern, co
  *
  * @return true if success
  */
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
 bool FFileHelper::CreateBitmap(const TCHAR* Pattern, int32 SourceWidth, int32 SourceHeight, const FColor* Data, struct FIntRect* SubRectangle, IFileManager* FileManager /*= &IFileManager::Get()*/, FString* OutFilename /*= NULL*/, bool bInWriteAlpha /*= false*/, EChannelMask ChannelMask /*= All */)
 {
-PRAGMA_DISABLE_DEPRECATION_WARNINGS
 	EColorChannel ColorChannel = EColorChannel::All;
 	if (ChannelMask != EChannelMask::All)
 	{
@@ -544,8 +544,8 @@ PRAGMA_DISABLE_DEPRECATION_WARNINGS
 	}
 
 	return CreateBitmap(Pattern, SourceWidth, SourceHeight, Data, SubRectangle, FileManager, OutFilename, bInWriteAlpha, ColorChannel);
-PRAGMA_ENABLE_DEPRECATION_WARNINGS
 }
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 bool FFileHelper::CreateBitmap( const TCHAR* Pattern, int32 SourceWidth, int32 SourceHeight, const FColor* Data, struct FIntRect* SubRectangle, IFileManager* FileManager, FString* OutFilename, bool bInWriteAlpha, EColorChannel ColorChannel)
 {
