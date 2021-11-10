@@ -866,6 +866,21 @@ class DevicenDisplay(DeviceUnreal):
             '-CONCERTISHEADLESS',
         ])
 
+        # Insights traces parameters
+        if CONFIG.INSIGHTS_TRACE_ENABLE.get_value():
+
+            LOGGER.warning(f"Unreal Insight Tracing is enabled for '{self.name}'. This may effect Unreal Engine performance.")
+
+            remote_utrace_path = self.get_utrace_filepath()
+
+            args.extend([
+                f'-tracefile="{remote_utrace_path}"',
+                f'-trace="{CONFIG.INSIGHTS_TRACE_ARGS.get_value()}"'
+            ])
+
+            if CONFIG.INSIGHTS_STAT_EVENTS.get_value():
+                args.append("-statnamedevents")
+
         args.append(self.csettings['logging'].get_command_line_arg(
             override_device_name=self.name))
 

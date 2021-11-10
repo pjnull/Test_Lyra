@@ -1221,7 +1221,7 @@ class DeviceUnreal(Device):
 
         command_line_args += f' Log={self.log_filename}'
 
-        command_line_args += " ";
+        command_line_args += " "
 
         if CONFIG.MUSERVER_AUTO_JOIN.get_value() and self.autojoin_mu_server.get_value():
             command_line_args += (
@@ -1233,12 +1233,12 @@ class DeviceUnreal(Device):
                               f'-CONCERTDISPLAYNAME={self.name}')
 
         if CONFIG.INSIGHTS_TRACE_ENABLE.get_value():
-            LOGGER.warning(f"Unreal Insight Tracing is enabled for {self.name}. This may effect Unreal Engine performance.")
+            LOGGER.warning(f"Unreal Insight Tracing is enabled for '{self.name}'. This may effect Unreal Engine performance.")
             remote_utrace_path = self.get_utrace_filepath()
             command_line_args += ' -statnamedevents' if CONFIG.INSIGHTS_STAT_EVENTS.get_value() else ''
-            command_line_args += ' -tracefile={} -trace={}'.format(
+            command_line_args += ' -tracefile="{}" -trace="{}"'.format(
                 remote_utrace_path,
-                CONFIG.INSIGHTS_TRACE_ARGS)
+                CONFIG.INSIGHTS_TRACE_ARGS.get_value())
 
         exec_cmds = str(
             DeviceUnreal.csettings["exec_cmds"].get_value(self.name)).strip()
