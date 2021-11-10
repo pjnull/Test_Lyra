@@ -21,7 +21,7 @@
 #include "Metasound.generated.h"
 
 
-UCLASS()
+UCLASS(Abstract)
 class METASOUNDENGINE_API UMetasoundEditorGraphBase : public UEdGraph
 {
 	GENERATED_BODY()
