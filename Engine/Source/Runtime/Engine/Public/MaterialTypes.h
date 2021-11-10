@@ -61,6 +61,7 @@ enum class EMaterialGetParameterValueFlags : uint32
 	CheckInstanceOverrides = (1u << 1),
 
 	CheckAll = CheckNonOverrides | CheckInstanceOverrides,
+	Default = CheckAll,
 };
 ENUM_CLASS_FLAGS(EMaterialGetParameterValueFlags);
 

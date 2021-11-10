@@ -816,7 +816,7 @@ bool UMaterialInterface::GetParameterDesc(const FHashedMaterialParameterInfo& Pa
 	for (int32 TypeIndex = 0; TypeIndex < NumMaterialParameterTypes; ++TypeIndex)
 	{
 		FMaterialParameterMetadata Meta;
-		if (GetParameterValue((EMaterialParameterType)TypeIndex, ParameterInfo, Meta, EMaterialGetParameterValueFlags::CheckAll))
+		if (GetParameterValue((EMaterialParameterType)TypeIndex, ParameterInfo, Meta, EMaterialGetParameterValueFlags::CheckNonOverrides))
 		{
 			OutDesc = Meta.Description;
 			return true;
@@ -830,7 +830,7 @@ bool UMaterialInterface::GetGroupName(const FHashedMaterialParameterInfo& Parame
 	for (int32 TypeIndex = 0; TypeIndex < NumMaterialParameterTypes; ++TypeIndex)
 	{
 		FMaterialParameterMetadata Meta;
-		if (GetParameterValue((EMaterialParameterType)TypeIndex, ParameterInfo, Meta, EMaterialGetParameterValueFlags::CheckAll))
+		if (GetParameterValue((EMaterialParameterType)TypeIndex, ParameterInfo, Meta, EMaterialGetParameterValueFlags::CheckNonOverrides))
 		{
 			OutDesc = Meta.Group;
 			return true;
@@ -844,7 +844,7 @@ bool UMaterialInterface::GetParameterSortPriority(const FHashedMaterialParameter
 	for (int32 TypeIndex = 0; TypeIndex < NumMaterialParameterTypes; ++TypeIndex)
 	{
 		FMaterialParameterMetadata Meta;
-		if (GetParameterValue((EMaterialParameterType)TypeIndex, ParameterInfo, Meta, EMaterialGetParameterValueFlags::CheckAll))
+		if (GetParameterValue((EMaterialParameterType)TypeIndex, ParameterInfo, Meta, EMaterialGetParameterValueFlags::CheckNonOverrides))
 		{
 			OutSortPriority = Meta.SortPriority;
 			return true;

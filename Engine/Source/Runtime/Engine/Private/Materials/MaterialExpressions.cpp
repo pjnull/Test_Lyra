@@ -525,7 +525,7 @@ void ValidateParameterNameInternal(class UMaterialExpression* ExpressionToValida
 					if (Expression != ExpressionToValidate && Expression->GetParameterName() == PotentialName && Expression->GetClass() == ExpressionToValidate->GetClass())
 					{
 						FMaterialParameterMetadata Meta;
-						if (OwningMaterial->GetParameterValue(Expression->GetParameterType(), PotentialName, Meta, EMaterialGetParameterValueFlags::CheckAll))
+						if (OwningMaterial->GetParameterValue(Expression->GetParameterType(), PotentialName, Meta))
 						{
 							const EMaterialExpressionSetParameterValueFlags Flags =
 								EMaterialExpressionSetParameterValueFlags::SendPostEditChangeProperty |

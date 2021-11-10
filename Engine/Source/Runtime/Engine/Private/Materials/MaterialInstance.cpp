@@ -1559,7 +1559,7 @@ void UMaterialInstance::CopyMaterialInstanceParameters(UMaterialInterface* Sourc
 				for (const FMaterialParameterInfo& ParameterInfo : OutParameterInfo)
 				{
 					FMaterialParameterMetadata SourceValue;
-					if (Source->GetParameterValue(ParameterType, ParameterInfo, SourceValue, EMaterialGetParameterValueFlags::CheckAll))
+					if (Source->GetParameterValue(ParameterType, ParameterInfo, SourceValue))
 					{
 						AddParameterValueInternal(ParameterInfo, SourceValue, EMaterialSetParameterValueFlags::SetCurveAtlas);
 					}
