@@ -33,6 +33,7 @@
 #include "SceneOutlinerModule.h"
 #include "ScopedTransaction.h"
 #include "UObject/StrongObjectPtr.h"
+#include "Widgets/Input/SSpinBox.h"
 #include "Widgets/Layout/SSplitter.h"
 
 #define LOCTEXT_NAMESPACE "SUsdStage"
@@ -519,6 +520,14 @@ void SUsdStage::FillOptionsMenu(FMenuBuilder& MenuBuilder)
 			LOCTEXT( "SelectionText", "Selection" ),
 			LOCTEXT( "SelectionText_ToolTip", "How the selection of prims, actors and components should behave" ),
 			FNewMenuDelegate::CreateSP( this, &SUsdStage::FillSelectionSubMenu ) );
+
+		MenuBuilder.AddSubMenu(
+			LOCTEXT( "NaniteSettings", "Nanite" ),
+			LOCTEXT( "NaniteSettings_ToolTip", "Configure how to use Nanite for generated assets" ),
+			FNewMenuDelegate::CreateSP( this, &SUsdStage::FillNaniteThresholdSubMenu ),
+			false,
+			FSlateIcon(),
+			false );
 	}
 	MenuBuilder.EndSection();
 }
@@ -805,6 +814,28 @@ void SUsdStage::FillSelectionSubMenu( FMenuBuilder& MenuBuilder )
 	);
 }
 
+void SUsdStage::FillNaniteThresholdSubMenu( FMenuBuilder& MenuBuilder )
+{
+	if ( AUsdStageActor* StageActor = ViewModel.UsdStageActor.Get() )
+	{
+		CurrentNaniteThreshold = StageActor->NaniteTriangleThreshold;
+	}
+
+	TSharedRef<SSpinBox<int32>> Slider = SNew( SSpinBox<int32> )
+		.MinValue( 0 )
+		.ToolTipText( LOCTEXT( "TriangleThresholdTooltip", "Try enabling Nanite for static meshes that are generated with at least this many triangles" ) )
+		.Value( this, &SUsdStage::GetNaniteTriangleThresholdValue )
+		.OnValueChanged(this, &SUsdStage::OnNaniteTriangleThresholdValueChanged )
+		.SupportDynamicSliderMaxValue( true )
+		.IsEnabled_Lambda( [this]() -> bool
+		{
+			return ViewModel.UsdStageActor.Get() != nullptr;
+		})
+		.OnValueCommitted( this, &SUsdStage::OnNaniteTriangleThresholdValueCommitted );
+
+	MenuBuilder.AddWidget( Slider, FText::FromString( TEXT( "Triangle threshold: " ) ) );
+}
+
 void SUsdStage::OnNew()
 {
 	ViewModel.NewStage( nullptr );
@@ -1026,6 +1057,33 @@ void SUsdStage::OnViewportSelectionChanged( UObject* NewSelection )
 	{
 		UsdStageTreeView->SelectPrims( PrimPaths );
 	}
+}
+
+int32 SUsdStage::GetNaniteTriangleThresholdValue() const
+{
+	return CurrentNaniteThreshold;
+}
+
+void SUsdStage::OnNaniteTriangleThresholdValueChanged( int32 InValue )
+{
+	CurrentNaniteThreshold = InValue;
+}
+
+void SUsdStage::OnNaniteTriangleThresholdValueCommitted( int32 InValue, ETextCommit::Type InCommitType )
+{
+	AUsdStageActor* StageActor = ViewModel.UsdStageActor.Get();
+	if ( !StageActor )
+	{
+		return;
+	}
+
+	FScopedTransaction Transaction( FText::Format(
+		LOCTEXT( "NaniteTriangleThresholdCommittedTransaction", "Change Nanite triangle threshold for USD stage actor '{0}'" ),
+		FText::FromString( StageActor->GetActorLabel() )
+	) );
+
+	StageActor->SetNaniteTriangleThreshold( InValue );
+	CurrentNaniteThreshold = InValue;
 }
 
 #endif // #if USE_USD_SDK

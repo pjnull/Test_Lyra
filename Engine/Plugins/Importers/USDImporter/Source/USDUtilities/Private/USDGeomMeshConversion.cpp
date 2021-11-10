@@ -1448,6 +1448,31 @@ bool UnrealToUsd::ConvertStaticMesh( const UStaticMesh* StaticMesh, pxr::UsdPrim
 	// Make sure it's at least 1 LOD level
 	NumLODs = FMath::Max( HighestMeshLOD - LowestMeshLOD + 1, 1 );
 
+	// If exporting a Nanite mesh, just use the lowest LOD and write the unrealNanite override attribute,
+	// this way we can guarantee it will have Nanite when it's imported back.
+#if WITH_EDITOR
+	if ( StaticMesh->NaniteSettings.bEnabled )
+	{
+		if ( NumLODs > 1 )
+		{
+			UE_LOG( LogUsd, Log, TEXT( "Not exporting multiple LODs for mesh '%s' onto prim '%s' since the mesh has Nanite enabled: LOD '%d' will be used and the '%s' attribute will be written out instead" ),
+				*StaticMesh->GetName(),
+				*UsdToUnreal::ConvertPath( UsdPrim.GetPrimPath() ),
+				LowestMeshLOD,
+				*UsdToUnreal::ConvertToken( UnrealIdentifiers::UnrealNaniteOverride )
+			);
+		}
+
+		HighestMeshLOD = LowestMeshLOD;
+		NumLODs = 1;
+
+		if ( pxr::UsdAttribute Attr = UsdPrim.CreateAttribute( UnrealIdentifiers::UnrealNaniteOverride, pxr::SdfValueTypeNames->Token ) )
+		{
+			Attr.Set( UnrealIdentifiers::UnrealNaniteOverrideEnable );
+		}
+	}
+#endif // WITH_EDITOR
+
 	pxr::UsdVariantSets VariantSets = UsdPrim.GetVariantSets();
 	if ( NumLODs > 1 && VariantSets.HasVariantSet( UnrealIdentifiers::LOD ) )
 	{

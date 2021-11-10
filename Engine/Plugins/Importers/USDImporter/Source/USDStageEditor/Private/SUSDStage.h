@@ -46,6 +46,7 @@ protected:
 	void FillRenderContextSubMenu( FMenuBuilder& MenuBuilder );
 	void FillCollapsingSubMenu( FMenuBuilder& MenuBuilder );
 	void FillSelectionSubMenu( FMenuBuilder& MenuBuilder );
+	void FillNaniteThresholdSubMenu( FMenuBuilder& MenuBuilder );
 
 	void OnNew();
 	void OnOpen();
@@ -70,6 +71,10 @@ protected:
 
 	void OnViewportSelectionChanged( UObject* NewSelection );
 
+	int32 GetNaniteTriangleThresholdValue() const;
+	void OnNaniteTriangleThresholdValueChanged( int32 InValue );
+	void OnNaniteTriangleThresholdValueCommitted( int32 InValue, ETextCommit::Type InCommitType );
+
 protected:
 	TSharedPtr< class SUsdStageTreeView > UsdStageTreeView;
 	TSharedPtr< class SUsdPrimInfo > UsdPrimInfoWidget;
@@ -91,6 +96,8 @@ protected:
 
 	// True while we're in the middle of setting the viewport selection from the prim selection
 	bool bUpdatingViewportSelection;
+
+	int32 CurrentNaniteThreshold = INT32_MAX;
 };
 
 #endif // #if USE_USD_SDK
