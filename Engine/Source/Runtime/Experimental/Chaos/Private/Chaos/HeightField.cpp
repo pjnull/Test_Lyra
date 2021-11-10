@@ -1352,23 +1352,27 @@ namespace Chaos
 			}
 
 			// The triangle is solid so proceed to test it
-			GeomData.GetPointsScaled(SingleIndex, Points);
-			// First Triangle
+			FAABB3 CellBounds;
+			GeomData.GetPointsAndBoundsScaled(SingleIndex, Points, CellBounds);
+			if (CellBounds.Intersects(QueryBounds))
 			{
-				FPBDCollisionConstraint Constraint;
-				OverlapTriangle(Points[0], Points[1], Points[3], Constraint);
-				for (const FManifoldPoint& ManifoldPoint : Constraint.GetManifoldPoints())
+				// First Triangle
 				{
-					InsertSorted(ManifoldPoint.ContactPoint);
+					FPBDCollisionConstraint Constraint;
+					OverlapTriangle(Points[0], Points[1], Points[3], Constraint);
+					for (const FManifoldPoint& ManifoldPoint : Constraint.GetManifoldPoints())
+					{
+						InsertSorted(ManifoldPoint.ContactPoint);
+					}
 				}
-			}
-			// Second Triangle
-			{
-				FPBDCollisionConstraint Constraint;
-				OverlapTriangle(Points[0], Points[3], Points[2], Constraint);
-				for (const FManifoldPoint& ManifoldPoint : Constraint.GetManifoldPoints())
+				// Second Triangle
 				{
-					InsertSorted(ManifoldPoint.ContactPoint);
+					FPBDCollisionConstraint Constraint;
+					OverlapTriangle(Points[0], Points[3], Points[2], Constraint);
+					for (const FManifoldPoint& ManifoldPoint : Constraint.GetManifoldPoints())
+					{
+						InsertSorted(ManifoldPoint.ContactPoint);
+					}
 				}
 			}
 		}
