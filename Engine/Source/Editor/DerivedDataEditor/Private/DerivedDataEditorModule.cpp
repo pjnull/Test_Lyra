@@ -49,7 +49,7 @@ void FDerivedDataEditorModule::StartupModule()
 	const FSlateIcon VirtaulAssetsStatisticsIcon(FEditorStyle::GetStyleSetName(), "DerivedData.Cache.Statistics");
 
 	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(VirtualAssetsStatisticsTabName, FOnSpawnTab::CreateRaw(this, &FDerivedDataEditorModule::CreateVirtualAssetsStatisticsTab))
-		.SetDisplayName(LOCTEXT("VirtualAssetsStatisticsTabTitle", "Virtual Assets Statistics"))
+		.SetDisplayName(LOCTEXT("VirtualAssetsStatisticsTabTitle", "Virtual Assets"))
 		.SetTooltipText(LOCTEXT("VirtualAssetsStatisticsTabToolTipText", "Virtual Assets  Statistics"))
 		.SetGroup(WorkspaceMenu::GetMenuStructure().GetToolsCategory())
 		.SetIcon(CacheStatisticsIcon);
