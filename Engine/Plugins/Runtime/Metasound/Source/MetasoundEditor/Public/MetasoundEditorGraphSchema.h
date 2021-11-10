@@ -194,7 +194,7 @@ struct METASOUNDEDITOR_API FMetasoundGraphSchemaAction_NewVariableNode : public 
 protected:
 
 	// Derived classes should override this method to create the desired frontend node.
-	virtual Metasound::Frontend::FNodeHandle CreateFrontendVariableNode(const Metasound::Frontend::FGraphHandle& InFrontendGraph, const FGuid& InVariableID) const PURE_VIRTUAL(FMetasoundGraphSchemaAction_NewVariableNode::CreateFrontendVariableNode, return Metasound::Frontend::INodeController::GetInvalidHandle(); );
+	virtual Metasound::Frontend::FNodeHandle CreateFrontendVariableNode(const Metasound::Frontend::FGraphHandle& InFrontendGraph, const FGuid& InVariableID) const { return Metasound::Frontend::INodeController::GetInvalidHandle(); }
 
 };
 
