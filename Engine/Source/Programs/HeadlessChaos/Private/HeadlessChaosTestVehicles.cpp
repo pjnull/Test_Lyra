@@ -275,10 +275,10 @@ namespace ChaosTest
 		EXPECT_EQ(FTransmissionUtility::IsWheelPowered(EDifferentialType::RearWheelDrive, Wheels[2]), true); // rear
 		EXPECT_EQ(FTransmissionUtility::IsWheelPowered(EDifferentialType::RearWheelDrive, Wheels[5]), true); // rear
 
-		EXPECT_EQ(FTransmissionUtility::IsWheelPowered(EDifferentialType::Undefined, Wheels[0]), false); // front
-		EXPECT_EQ(FTransmissionUtility::IsWheelPowered(EDifferentialType::Undefined, Wheels[1]), false); // front
-		EXPECT_EQ(FTransmissionUtility::IsWheelPowered(EDifferentialType::Undefined, Wheels[2]), true); // rear
-		EXPECT_EQ(FTransmissionUtility::IsWheelPowered(EDifferentialType::Undefined, Wheels[5]), true); // rear
+		EXPECT_EQ(FTransmissionUtility::IsWheelPowered(EDifferentialType::UndefinedDrive, Wheels[0]), false); // front
+		EXPECT_EQ(FTransmissionUtility::IsWheelPowered(EDifferentialType::UndefinedDrive, Wheels[1]), false); // front
+		EXPECT_EQ(FTransmissionUtility::IsWheelPowered(EDifferentialType::UndefinedDrive, Wheels[2]), true); // rear
+		EXPECT_EQ(FTransmissionUtility::IsWheelPowered(EDifferentialType::UndefinedDrive, Wheels[5]), true); // rear
 
 	}
 
@@ -337,7 +337,7 @@ namespace ChaosTest
 		EXPECT_NEAR(FTransmissionUtility::GetTorqueRatioForWheel(Differential, 4, Wheels), 0.25f, Error); // rear
 		EXPECT_NEAR(FTransmissionUtility::GetTorqueRatioForWheel(Differential, 5, Wheels), 0.25f, Error); // rear
 
-		DiffSetup.DifferentialType = EDifferentialType::Undefined;
+		DiffSetup.DifferentialType = EDifferentialType::UndefinedDrive;
 		EXPECT_NEAR(FTransmissionUtility::GetTorqueRatioForWheel(Differential, 0, Wheels), 0.0f, Error); // front
 		EXPECT_NEAR(FTransmissionUtility::GetTorqueRatioForWheel(Differential, 1, Wheels), 0.0f, Error); // front
 		EXPECT_NEAR(FTransmissionUtility::GetTorqueRatioForWheel(Differential, 2, Wheels), 0.25f, Error); // rear
@@ -356,7 +356,7 @@ namespace ChaosTest
 
 		for (int I = 0; I < 6; I++)
 		{
-			Wheels[I].AccessSetup().AxleType = FSimpleWheelConfig::EAxleType::Undefined;
+			Wheels[I].AccessSetup().AxleType = FSimpleWheelConfig::EAxleType::UndefinedAxle;
 		}
 		// front 2 have SetupFront.EngineEnabled = false, the rest are true
 		EXPECT_EQ(FTransmissionUtility::GetNumDrivenWheels(Wheels), 4);
