@@ -568,7 +568,6 @@ static void AddStrataInternalClassificationTilePass(
 			{
 				// Use premultiplied alpha blending, pixel shader and depth/stencil is off
 				GraphicsPSOInit.BoundShaderState.PixelShaderRHI = PixelShader.GetPixelShader();
-				SetShaderParameters(RHICmdList, PixelShader, PixelShader.GetPixelShader(), *ParametersPS);
 				GraphicsPSOInit.BlendState = TStaticBlendState<CW_RGBA, BO_Add, BF_One, BF_InverseSourceAlpha, BO_Add, BF_Zero, BF_One>::GetRHI();
 				GraphicsPSOInit.DepthStencilState = TStaticDepthStencilState<false, CF_Always>::GetRHI();
 			}
@@ -588,6 +587,10 @@ static void AddStrataInternalClassificationTilePass(
 			GraphicsPSOInit.PrimitiveType = StrataTilePrimitiveType;
 			SetGraphicsPipelineState(RHICmdList, GraphicsPSOInit, StencilBit);
 			SetShaderParameters(RHICmdList, VertexShader, VertexShader.GetVertexShader(), ParametersPS->VS);
+			if (bDebug)
+			{
+				SetShaderParameters(RHICmdList, PixelShader, PixelShader.GetPixelShader(), *ParametersPS);
+			}
 
 			RHICmdList.SetViewport(0, 0, 0.0f, OutputResolution.X, OutputResolution.Y, 1.0f);
 			RHICmdList.SetStreamSource(0, nullptr, 0);
@@ -715,14 +718,14 @@ FScreenPassTexture AddStrataDebugPasses(FRDGBuilder& GraphBuilder, const FViewIn
 
 	if (FVisualizeMaterialPS::CanRunStrataVizualizeMaterial(Platform))
 	{
-		RDG_EVENT_SCOPE(GraphBuilder, "StrataVisualizeMaterial");
+		RDG_EVENT_SCOPE(GraphBuilder, "Strata::VisualizeMaterial");
 		AddVisualizeMaterialPasses(GraphBuilder, View, ScreenPassSceneColor.Texture, Platform);
 	}
 
 	const int32 StrataClassificationDebug = CVarStrataClassificationDebug.GetValueOnAnyThread();
 	if (IsClassificationEnabled() && StrataClassificationDebug > 0)
 	{
-		RDG_EVENT_SCOPE(GraphBuilder, "StrataVisualizeClassification");
+		RDG_EVENT_SCOPE(GraphBuilder, "Strata::VisualizeClassification");
 		const bool bDebugPass = true;
 		AddStrataInternalClassificationTilePass(
 			GraphBuilder, View, nullptr, &ScreenPassSceneColor.Texture, EStrataTileMaterialType::ESimple, bDebugPass);
