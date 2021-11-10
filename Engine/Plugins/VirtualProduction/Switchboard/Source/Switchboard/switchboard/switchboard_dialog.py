@@ -342,10 +342,12 @@ class SwitchboardDialog(QtCore.QObject):
         self.refresh_muserver_autojoin()
 
         self.window.muserver_start_stop_button.clicked.connect(self.on_muserver_start_stop_click)
-        self.setup_mu_server_poll()
 
         self.window.additional_settings.signal_device_widget_tracing.connect(self.on_tracing_settings_changed)
         self.refresh_trace_settings()
+
+        # set up a thread that does periodic maintenace tasks
+        self.setup_periodic_tasks_thread()
 
         # Stylesheet-related: Object names used for selectors, no focus forcing
         def configure_ctrl_btn(btn: sb_widgets.ControlQPushButton, name: str):
@@ -424,19 +426,44 @@ class SwitchboardDialog(QtCore.QObject):
             # Server has finished starting so reset our start flag.
             self._started_mu_server = False
 
-    def setup_mu_server_poll(self):
+    def setup_periodic_tasks_thread(self):
         '''
-        Setup a polling thread to query for the latest state of Multi-user server.
+        Sets up a thread for performing maintenance tasks
         '''
-        thread = threading.Thread(target=self._poll_muserver_status, args=[], kwargs={})
+        thread = threading.Thread(target=self._do_periodic_tasks, args=[], kwargs={})
         thread.start()
+
+    def _do_periodic_tasks(self):
+        ''' Performs periodic tasks, like updating certain parts of the UI '''
+
+        while not self._exiting:
+
+            self.update_muserver_button()
+            self.update_locallistener_menuitem()
+            self.update_insights_menuitem()
+
+            time.sleep(1.0)
+
+    def update_locallistener_menuitem(self):
+        ''' 
+        Enables/disables the local listener launch menu item depending on whether 
+        it is already running or not.
+        '''
+        self.locallistener_launcher_menuitem.setEnabled(not self.listener_launcher.is_running())
+
+    def update_insights_menuitem(self):
+        ''' 
+        Enables/disables the UnrealInsights launch menu item depending on whether 
+        it is already running or not.
+        '''
+        self.insights_launcher_menuitem.setEnabled(not self.insights_launcher.is_running())
 
     def on_muserver_start_stop_click(self):
         '''
         Handle the multi-user server button click. If we are running we stop the process. If we are not
         running then we launch the multi-user server.
         '''
-        ServerInstance =switchboard_application.get_multi_user_server_instance()
+        ServerInstance = switchboard_application.get_multi_user_server_instance()
         if ServerInstance.is_running():
             ServerInstance.terminate(bypolling=True)
             self._started_mu_server = False
@@ -459,6 +486,8 @@ class SwitchboardDialog(QtCore.QObject):
         action = self.register_tools_menu_action("&Insights")
         action.triggered.connect(launch_insights)
 
+        self.insights_launcher_menuitem = action
+
     def init_listener_launcher(self):
         ''' Initializes switcboard listener launcher '''
         self.listener_launcher = ListenerLauncher()
@@ -471,6 +500,8 @@ class SwitchboardDialog(QtCore.QObject):
 
         action = self.register_tools_menu_action("&Listener")
         action.triggered.connect(launch_listener)
+
+        self.locallistener_launcher_menuitem = action
 
     def register_open_logs_menuitem(self):
         ''' Registers convenience "Open Logs Folder" menu item '''
