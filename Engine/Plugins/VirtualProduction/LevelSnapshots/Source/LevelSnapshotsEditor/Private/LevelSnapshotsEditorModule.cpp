@@ -50,6 +50,7 @@ void FLevelSnapshotsEditorModule::StartupModule()
 	FLevelSnapshotsEditorCommands::Register();
 	
 	RegisterTabSpawner();
+	RegisterEditorToolbar();
 	
 	ISettingsModule& SettingsModule = FModuleManager::LoadModuleChecked<ISettingsModule>("Settings");
 	{
