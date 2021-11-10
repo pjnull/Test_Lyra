@@ -25,7 +25,7 @@
 #include "PhysicsEngine/PhysicsAsset.h"
 #include "StaticMeshResources.h"
 
-static const int32 DrawCollisionSides = 16;
+static const int32 DrawCollisionSides = 32;
 static const int32 DrawConeLimitSides = 40;
 
 static const float DebugJointPosSize = 5.0f;
