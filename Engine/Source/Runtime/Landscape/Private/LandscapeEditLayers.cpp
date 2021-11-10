@@ -211,6 +211,20 @@ struct FTextureToComponentHelper
 	TSet< UTexture2D* > Weightmaps;
 	TMap< UTexture2D*, TArray<ULandscapeComponent*> > WeightmapToComponents;
 };
+
+static FFileHelper::EColorChannel GetWeightmapColorChannel(const FWeightmapLayerAllocationInfo& AllocInfo)
+{
+	FFileHelper::EColorChannel ColorChannelMapping[] = { FFileHelper::EColorChannel::R, FFileHelper::EColorChannel::G, FFileHelper::EColorChannel::B, FFileHelper::EColorChannel::A };
+	FFileHelper::EColorChannel ColorChannel = FFileHelper::EColorChannel::All;
+
+	if (ensure(AllocInfo.WeightmapTextureChannel < 4))
+	{
+		ColorChannel = ColorChannelMapping[AllocInfo.WeightmapTextureChannel];
+	}
+
+	return ColorChannel;
+}
+
 #endif
 
 // Custom Resources
@@ -3369,11 +3383,11 @@ void ALandscape::OnDirtyWeightmap(FTextureToComponentHelper const& MapHelper, UT
 
 					if (bWriteDiff)
 					{
-						size_t ChannelOffset = ChannelOffsets[AllocInfo.WeightmapTextureChannel];
+						FFileHelper::EColorChannel ColorChannel = GetWeightmapColorChannel(AllocInfo);
 						FString LevelName = FPackageName::GetShortName(Component->GetOutermost());
 						FString FilePattern = FString::Format(TEXT("LandscapeLayers/{0}-{1}-{2}-WM"), { LevelName, Component->GetName(), AllocInfo.GetLayerName().ToString() });
-						FFileHelper::CreateBitmap(*(FilePattern + "-Pre.bmp"), InWeightmap->Source.GetSizeX(), InWeightmap->Source.GetSizeY(), InOldData, nullptr, &IFileManager::Get(), nullptr, true, (FFileHelper::EChannelMask)ChannelOffset);
-						FFileHelper::CreateBitmap(*(FilePattern + "-Post.bmp"), InWeightmap->Source.GetSizeX(), InWeightmap->Source.GetSizeY(), InNewData, nullptr, &IFileManager::Get(), nullptr, true, (FFileHelper::EChannelMask)ChannelOffset);
+						FFileHelper::CreateBitmap(*(FilePattern + "-Pre.bmp"), InWeightmap->Source.GetSizeX(), InWeightmap->Source.GetSizeY(), InOldData, nullptr, nullptr, nullptr, true, ColorChannel);
+						FFileHelper::CreateBitmap(*(FilePattern + "-Post.bmp"), InWeightmap->Source.GetSizeX(), InWeightmap->Source.GetSizeY(), InNewData, nullptr, nullptr, nullptr, true, ColorChannel);
 					}
 				}
 			}
