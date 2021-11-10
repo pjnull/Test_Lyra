@@ -32,7 +32,6 @@
 #include "Misc/ScopeExit.h"
 #include "ScopedTransaction.h"
 #include "UnrealEdMisc.h"
-#include "WorldPartition/IWorldPartitionEditorModule.h"
 #include "WorldPartition/WorldPartitionLevelHelper.h"
 #include "WorldPartition/WorldPartitionLevelStreamingDynamic.h"
 #include "WorldPartition/WorldPartitionEditorHash.h"
@@ -483,21 +482,6 @@ void UWorldPartition::Initialize(UWorld* InWorld, const FTransform& InTransform)
 		// Skipped when running from a commandlet
 		if (!IsRunningCommandlet())
 		{
-			// Autoload all cells if the world is smaller than the project setting's value
-			IWorldPartitionEditorModule& WorldPartitionEditorModule = FModuleManager::LoadModuleChecked<IWorldPartitionEditorModule>("WorldPartitionEditor");
-			const float AutoCellLoadingMaxWorldSize = WorldPartitionEditorModule.GetAutoCellLoadingMaxWorldSize();
-			FVector WorldSize = GetEditorWorldBounds().GetSize();
-			const bool bItsASmallWorld = WorldSize.X <= AutoCellLoadingMaxWorldSize && WorldSize.Y <= AutoCellLoadingMaxWorldSize && WorldSize.Z <= AutoCellLoadingMaxWorldSize;
-			
-			// When considered as a small world, load all actors
-			if (bItsASmallWorld)
-			{
-				EditorHash->ForEachCell([this](UWorldPartitionEditorCell* Cell)
-				{
-					UpdateLoadingEditorCell(Cell, true, false);
-				});
-			}
-
 			// Load last loaded cells
 			if (GetMutableDefault<UWorldPartitionEditorPerProjectUserSettings>()->GetEnableLoadingOfLastLoadedCells())
 			{

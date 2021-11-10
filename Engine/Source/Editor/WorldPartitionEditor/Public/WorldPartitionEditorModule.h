@@ -26,11 +26,6 @@ public:
 	virtual TSharedRef<class SWidget> CreateWorldPartitionEditor();
 
 	/**
-	 *
-	 */
-	virtual float GetAutoCellLoadingMaxWorldSize() const override;
-
-	/**
 	 * 
 	 */
 	virtual bool ConvertMap(const FString& InLongPackageName) override;

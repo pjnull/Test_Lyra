@@ -151,11 +151,6 @@ TSharedRef<SWidget> FWorldPartitionEditorModule::CreateWorldPartitionEditor()
 	return SNew(SWorldPartitionEditor).InWorld(EditorWorld);
 }
 
-float FWorldPartitionEditorModule::GetAutoCellLoadingMaxWorldSize() const
-{
-	return GetDefault<UWorldPartitionEditorSettings>()->AutoCellLoadingMaxWorldSize;
-}
-
 void FWorldPartitionEditorModule::OnConvertMap()
 {
 	IContentBrowserSingleton& ContentBrowserSingleton = FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser").Get();
