@@ -557,6 +557,11 @@ UDatasmithSceneElement* UDatasmithSceneElement::ConstructDatasmithSceneFromFile(
 	UDatasmithSceneElement* DatasmithSceneElement = NewObject<UDatasmithSceneElement>();
 	DatasmithSceneElement->ExternalSourcePtr = ExternalSource;
 
+	// Creating an empty scene so that UDatasmithSceneElement's functions can safely be called.
+	// This scene is overriden when UDatasmithSceneElement::TranslateScene() is called.
+	TSharedRef<IDatasmithScene> Scene = FDatasmithSceneFactory::CreateScene(*ExternalSource->GetSourceName());
+	DatasmithSceneElement->SetDatasmithSceneElement(Scene);
+
 	const bool bLoadConfig = false; // don't load values from ini files
 	DatasmithSceneElement->ImportContextPtr.Reset(new FDatasmithImportContext(ExternalSource.ToSharedRef(), bLoadConfig, GetLoggerName(), GetDisplayName()));
 
@@ -610,6 +615,11 @@ UDatasmithSceneElement* UDatasmithSceneElement::GetExistingDatasmithScene(const 
 		DatasmithSceneElement->ExternalSourcePtr = ExternalSource;
 		
 		ExternalSource->SetSceneName(*SceneAsset->GetName()); // keep initial name
+
+		// Creating an empty scene so that UDatasmithSceneElement's functions can safely be called.
+		// This scene is overriden when UDatasmithSceneElement::TranslateScene() is called.
+		TSharedRef<IDatasmithScene> Scene = FDatasmithSceneFactory::CreateScene(*SceneAsset->GetName());
+		DatasmithSceneElement->SetDatasmithSceneElement(Scene);
 
 		// Setup pipe for reimport
 		const bool bLoadConfig = false;
