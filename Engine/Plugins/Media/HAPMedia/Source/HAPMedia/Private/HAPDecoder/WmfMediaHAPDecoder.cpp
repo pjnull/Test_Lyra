@@ -9,7 +9,7 @@
 #include "HAPMediaModule.h"
 
 #include "GenericPlatform/GenericPlatformAtomics.h"
-
+#include "Misc/Paths.h"
 #include "Windows/AllowWindowsPlatformTypes.h"
 
 #include <d3d11.h>
