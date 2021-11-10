@@ -23,6 +23,8 @@ FText UAnimGraphNode_AnimDynamics::GetTooltipText() const
 
 void UAnimGraphNode_AnimDynamics::Draw(FPrimitiveDrawInterface* PDI, USkeletalMeshComponent * PreviewSkelMeshComp) const
 {
+	check(PreviewSkelMeshComp);
+
 	if(LastPreviewComponent != PreviewSkelMeshComp)
 	{
 		LastPreviewComponent = PreviewSkelMeshComp;
@@ -41,18 +43,15 @@ void UAnimGraphNode_AnimDynamics::Draw(FPrimitiveDrawInterface* PDI, USkeletalMe
 				FTransform BodyTransform(Body.Pose.Orientation, Body.Pose.Position);
 
 				// Physics bodies are in Simulation Space. Transform into component space before rendering in the viewport.
-				if (PreviewSkelMeshComp)
+				if (ActivePreviewNode->SimulationSpace == AnimPhysSimSpaceType::RootRelative)
 				{
-					if (ActivePreviewNode->SimulationSpace == AnimPhysSimSpaceType::RootRelative)
-					{
-						const FTransform RelativeBoneTransform = PreviewSkelMeshComp->GetBoneTransform(0);
-						BodyTransform = BodyTransform * RelativeBoneTransform;
-					}
-					else if (ActivePreviewNode->SimulationSpace == AnimPhysSimSpaceType::BoneRelative)
-					{
-						const FTransform RelativeBoneTransform = PreviewSkelMeshComp->GetBoneTransform(PreviewSkelMeshComp->GetBoneIndex(ActivePreviewNode->RelativeSpaceBone.BoneName));
-						BodyTransform = BodyTransform * RelativeBoneTransform;
-					}
+					const FTransform RelativeBoneTransform = PreviewSkelMeshComp->GetBoneTransform(0);
+					BodyTransform = BodyTransform * RelativeBoneTransform;
+				}
+				else if (ActivePreviewNode->SimulationSpace == AnimPhysSimSpaceType::BoneRelative)
+				{
+					const FTransform RelativeBoneTransform = PreviewSkelMeshComp->GetBoneTransform(PreviewSkelMeshComp->GetBoneIndex(ActivePreviewNode->RelativeSpaceBone.BoneName));
+					BodyTransform = BodyTransform * RelativeBoneTransform;
 				}
 
 				for(const FAnimPhysShape& Shape : Body.Shapes)
