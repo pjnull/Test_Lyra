@@ -61,9 +61,12 @@ void LevelSnapshotsEditorCustomWidgetGenerator::CreateRowsForPropertiesNotHandle
 
 			return LOCTEXT("LevelSnapshotsEditorResults_AttachParentInvalidText","No Attach Parent found.").ToString();
 		};
-		
-		CustomSnapshotWidget = GenerateObjectPropertyWidget(SnapshotPropertyValue, WidgetTextEditLambda);
-		CustomWorldWidget = GenerateObjectPropertyWidget(WorldPropertyValue, WidgetTextEditLambda);
+
+		if (const TObjectPtr<FObjectPropertyBase> ObjectProperty = CastField<FObjectPropertyBase>(Property))
+		{
+			CustomSnapshotWidget = GenerateObjectPropertyWidget(ObjectProperty->GetObjectPropertyValue(SnapshotPropertyValue), WidgetTextEditLambda);
+			CustomWorldWidget = GenerateObjectPropertyWidget(ObjectProperty->GetObjectPropertyValue(WorldPropertyValue), WidgetTextEditLambda);
+		}
 	}
 	else
 	{
@@ -160,15 +163,15 @@ TSharedPtr<SWidget> LevelSnapshotsEditorCustomWidgetGenerator::GenerateGenericPr
 }
 
 TSharedPtr<SWidget> LevelSnapshotsEditorCustomWidgetGenerator::GenerateObjectPropertyWidget(
-	const void* InPropertyValue, const TFunction<FString(const FString&, const UObject*)> InWidgetTextEditLambda)
+	const TObjectPtr<UObject> InObject, const TFunction<FString(const FString&, const UObject*)> InWidgetTextEditLambda)
 {
-	if (const TObjectPtr<UObject> PropertyObject = (UObject*)InPropertyValue)
+	if (InObject)
 	{
-		FString WidgetText = PropertyObject->GetName();
+		FString WidgetText = InObject->GetName();
 
 		if (InWidgetTextEditLambda)
 		{
-			WidgetText = InWidgetTextEditLambda(WidgetText, PropertyObject);
+			WidgetText = InWidgetTextEditLambda(WidgetText, InObject);
 		}
 
 		return MakeComboBoxWithSelection(WidgetText, FText::FromString(WidgetText));
@@ -228,9 +231,9 @@ TSharedPtr<SWidget> LevelSnapshotsEditorCustomWidgetGenerator::DetermineProperty
 				.IsChecked(BoolProperty->GetPropertyValue(InPropertyValue))
 				.ToolTipText(ToolTipText);
 	}
-	else if (CastField<FObjectPropertyBase>(InProperty))
+	else if (const TObjectPtr<FObjectPropertyBase> ObjectProperty = CastField<FObjectPropertyBase>(InProperty))
 	{
-		return GenerateObjectPropertyWidget(InPropertyValue);
+		return GenerateObjectPropertyWidget(ObjectProperty->GetObjectPropertyValue(InPropertyValue));
 	}
 	else
 	{
