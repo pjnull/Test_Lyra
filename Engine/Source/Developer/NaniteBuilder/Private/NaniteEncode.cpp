@@ -971,7 +971,7 @@ static void CalculateEncodingInfo(FEncodingInfo& Info, const Nanite::FCluster& C
 				}
 				QuantizationScale *= 0.5f;
 				TexCoordPrecision--;
-				check(++Iterations < 100);	// Endless loop?
+				check(++Iterations < 256);	// Endless loop?
 			}
 		}
 	}
