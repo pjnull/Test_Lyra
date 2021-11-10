@@ -299,18 +299,18 @@ EPixelFormat ReadRenderTargetHelper(
 	switch (OutFormat)
 	{
 	case PF_B8G8R8A8:
-		OutLDRValues.SetNumUninitialized(NumPixelsToRead);
-		if (!RenderTarget->ReadPixelsPtr(OutLDRValues.GetData(), ReadSurfaceDataFlags, SampleRect))
+		if (!RenderTarget->ReadPixels(OutLDRValues, ReadSurfaceDataFlags, SampleRect))
 		{
 			OutFormat = PF_Unknown;
 		}
+		check(OutLDRValues.Num() == NumPixelsToRead);
 		break;
 	case PF_FloatRGBA:
-		OutHDRValues.SetNumUninitialized(NumPixelsToRead);
-		if (!RenderTarget->ReadLinearColorPixelsPtr(OutHDRValues.GetData(), ReadSurfaceDataFlags, SampleRect))
+		if (!RenderTarget->ReadLinearColorPixels(OutHDRValues, ReadSurfaceDataFlags, SampleRect))
 		{
 			OutFormat = PF_Unknown;
 		}
+		check(OutHDRValues.Num() == NumPixelsToRead);
 		break;
 	default:
 		OutFormat = PF_Unknown;
