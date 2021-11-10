@@ -32,17 +32,22 @@ void UWorldPartitionEditorSpatialHash::Initialize()
 
 	if (!IsRunningCommandlet())
 	{
-		FHashBuilder EditorGridConfigHashBuilder;
-		static uint32 Version = 2;
-		EditorGridConfigHashBuilder << Version << CellSize;
-		GetMutableDefault<UWorldPartitionEditorPerProjectUserSettings>()->SetEditorGridConfigHash(GetWorld(), EditorGridConfigHashBuilder.GetHash());
+		GetMutableDefault<UWorldPartitionEditorPerProjectUserSettings>()->UpdateEditorGridConfigHash(GetWorld());
 	}
 }
 
 void UWorldPartitionEditorSpatialHash::SetDefaultValues()
 {}
 
-FName UWorldPartitionEditorSpatialHash::GetWorldPartitionEditorName()
+int32 UWorldPartitionEditorSpatialHash::GetEditorGridConfigHash() const
+{
+	FHashBuilder EditorGridConfigHashBuilder;
+	static uint32 Version = 2;
+	EditorGridConfigHashBuilder << Version << CellSize;
+	return EditorGridConfigHashBuilder.GetHash();
+}
+
+FName UWorldPartitionEditorSpatialHash::GetWorldPartitionEditorName() const
 {
 	return TEXT("SpatialHash");
 }

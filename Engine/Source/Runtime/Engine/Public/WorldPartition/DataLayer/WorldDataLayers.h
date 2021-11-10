@@ -43,6 +43,9 @@ public:
 
 	// Allows overriding of DataLayers with PlayFromHere
 	void OverwriteDataLayerRuntimeStates(TArray<FActorDataLayer>* InActiveDataLayers = nullptr, TArray<FActorDataLayer>* InLoadedDataLayers = nullptr);
+
+	// Returns the DataLayer user loaded editor states
+	void GetUserLoadedInEditorStates(TArray<FName>& OutDataLayersLoadedInEditor, TArray<FName>& OutDataLayersNotLoadedInEditor) const;
 #endif
 	
 	void DumpDataLayers(FOutputDevice& OutputDevice) const;

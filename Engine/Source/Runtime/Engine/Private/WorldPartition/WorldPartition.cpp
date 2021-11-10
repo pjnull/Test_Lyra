@@ -345,9 +345,19 @@ void UWorldPartition::OnEndPlay()
 	StreamingPolicy = nullptr;
 }
 
-FName UWorldPartition::GetWorldPartitionEditorName()
+FName UWorldPartition::GetWorldPartitionEditorName() const
 {
 	return EditorHash->GetWorldPartitionEditorName();
+}
+
+int32 UWorldPartition::GetEditorGridConfigHash() const
+{
+	if (EditorHash)
+	{
+		return EditorHash->GetEditorGridConfigHash();
+	}
+
+	return 0;
 }
 #endif
 
@@ -491,7 +501,7 @@ void UWorldPartition::Initialize(UWorld* InWorld, const FTransform& InTransform)
 			// Load last loaded cells
 			if (GetMutableDefault<UWorldPartitionEditorPerProjectUserSettings>()->GetEnableLoadingOfLastLoadedCells())
 			{
-				const TArray<FName>& EditorGridLastLoadedCells = GetMutableDefault<UWorldPartitionEditorPerProjectUserSettings>()->GetEditorGridLoadedCells(InWorld);
+				TArray<FName> EditorGridLastLoadedCells = GetMutableDefault<UWorldPartitionEditorPerProjectUserSettings>()->GetEditorGridLoadedCells(InWorld);
 
 				for (FName EditorGridLastLoadedCell : EditorGridLastLoadedCells)
 				{
@@ -1264,7 +1274,7 @@ bool UWorldPartition::FinalizeGeneratorPackageForCook(const TArray<ICookPackageS
 TArray<FName> UWorldPartition::GetUserLoadedEditorGridCells() const
 {
 	// Save last loaded cells settings
-	const TArray<FName>& LastEditorGridLoadedCells = GetMutableDefault<UWorldPartitionEditorPerProjectUserSettings>()->GetEditorGridLoadedCells(GetWorld());
+	TArray<FName> LastEditorGridLoadedCells = GetMutableDefault<UWorldPartitionEditorPerProjectUserSettings>()->GetEditorGridLoadedCells(GetWorld());
 
 	TArray<FName> EditorGridLastLoadedCells;
 	EditorHash->ForEachCell([this, &LastEditorGridLoadedCells, &EditorGridLastLoadedCells](UWorldPartitionEditorCell* Cell)

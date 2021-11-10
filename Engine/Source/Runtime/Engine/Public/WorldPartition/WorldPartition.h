@@ -117,7 +117,8 @@ public:
 	//~ End UObject Interface
 
 #if WITH_EDITOR
-	FName GetWorldPartitionEditorName();
+	FName GetWorldPartitionEditorName() const;
+	int32 GetEditorGridConfigHash() const;
 
 	void LoadEditorCells(const FBox& Box, bool bIsFromUserChange);
 	void UnloadEditorCells(const FBox& Box, bool bIsFromUserChange);

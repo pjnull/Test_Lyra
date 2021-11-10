@@ -41,6 +41,7 @@
 #include "Settings/EditorExperimentalSettings.h"
 #include "Landscape.h"
 #include "Rendering/StaticLightingSystemInterface.h"
+#include "WorldPartition/DataLayer/WorldDataLayers.h"
 #endif 
 
 #define LOCTEXT_NAMESPACE "ErrorChecking"
@@ -466,6 +467,40 @@ void AWorldSettings::ResetHierarchicalLODSetup()
 	OverrideBaseMaterial = nullptr;
 	HierarchicalLODSetup.Reset();
 	NumHLODLevels = 0;
+}
+
+void AWorldSettings::SaveDefaultWorldPartitionSettings()
+{
+	Modify();
+	DefaultWorldPartitionSettings.Reset();
+	if (WorldPartition)
+	{
+		DefaultWorldPartitionSettings.LoadedEditorGridCells = WorldPartition->GetUserLoadedEditorGridCells();		
+		if (AWorldDataLayers* WorldDataLayers = GetWorld()->GetWorldDataLayers())
+		{
+			WorldDataLayers->GetUserLoadedInEditorStates(DefaultWorldPartitionSettings.LoadedDataLayers, DefaultWorldPartitionSettings.NotLoadedDataLayers);
+		}
+		DefaultWorldPartitionSettings.EditorGridConfigHash = WorldPartition->GetEditorGridConfigHash();
+	}
+}
+
+void AWorldSettings::ResetDefaultWorldPartitionSettings()
+{
+	Modify();
+	DefaultWorldPartitionSettings.Reset();
+}
+
+const FWorldPartitionPerWorldSettings* AWorldSettings::GetDefaultWorldPartitionSettings() const
+{
+	if (WorldPartition)
+	{
+		if (DefaultWorldPartitionSettings.EditorGridConfigHash == WorldPartition->GetEditorGridConfigHash())
+		{
+			return &DefaultWorldPartitionSettings;
+		}
+	}
+
+	return nullptr;
 }
 #endif // WITH_EDITOR
 

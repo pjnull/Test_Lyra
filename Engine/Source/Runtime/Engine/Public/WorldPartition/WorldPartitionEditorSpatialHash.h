@@ -209,7 +209,8 @@ public:
 	// UWorldPartitionEditorHash interface begin
 	virtual void Initialize() override;
 	virtual void SetDefaultValues() override;
-	virtual FName GetWorldPartitionEditorName() override;
+	virtual int32 GetEditorGridConfigHash() const override;
+	virtual FName GetWorldPartitionEditorName() const override;
 	virtual FBox GetEditorWorldBounds() const override;
 	virtual void Tick(float DeltaSeconds) override;
 

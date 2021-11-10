@@ -44,11 +44,8 @@ void FWorldSettingsDetails::CustomizeDetails( IDetailLayoutBuilder& DetailBuilde
 
 	AddLightmapCustomization(DetailBuilder);
 
-	if (GetDefault<UEditorExperimentalSettings>()->bEnableOneFilePerActorSupport)
-	{
-		AddLevelExternalActorsCustomization(DetailBuilder);
-	}
-
+	AddWorldCustomization(DetailBuilder);
+	
 	DetailBuilder.HideProperty(AActor::GetHiddenPropertyName(), AActor::StaticClass());
 }
 
@@ -81,7 +78,7 @@ void FWorldSettingsDetails::AddLightmapCustomization( IDetailLayoutBuilder& Deta
 	Category.AddCustomBuilder(LightMapGroupBuilder, bForAdvanced);
 }
 
-void FWorldSettingsDetails::AddLevelExternalActorsCustomization(IDetailLayoutBuilder& DetailBuilder)
+void FWorldSettingsDetails::AddWorldCustomization(IDetailLayoutBuilder& DetailBuilder)
 {
 	TArray<TWeakObjectPtr<UObject>> CustomizedObjects;
 	DetailBuilder.GetObjectsBeingCustomized(CustomizedObjects);
@@ -99,22 +96,75 @@ void FWorldSettingsDetails::AddLevelExternalActorsCustomization(IDetailLayoutBui
 		const bool bIsPartitionedWorld = UWorld::HasSubsystem<UWorldPartitionSubsystem>(CustomizedLevel->GetWorld());
 
 		IDetailCategoryBuilder& WorldCategory = DetailBuilder.EditCategory("World");
-		WorldCategory.AddCustomRow(LOCTEXT("LevelUseExternalActorsRow", "LevelUseExternalActors"), true)
-		.NameContent()
-		[
-			SNew(STextBlock)
-			.Text(LOCTEXT("LevelUseExternalActors", "Use External Actors"))
-			.ToolTipText(LOCTEXT("ActorPackagingMode_ToolTip", "Use external actors, new actor spawned in this level will be external and existing external actors will be loaded on load."))
-			.Font(IDetailLayoutBuilder::GetDetailFont())
-			.IsEnabled(!bIsPartitionedWorld)
-		]
-		.ValueContent()
-		[
-			SNew(SCheckBox)
-			.OnCheckStateChanged(this, &FWorldSettingsDetails::OnUseExternalActorsChanged, CustomizedLevel)
-			.IsChecked(this, &FWorldSettingsDetails::IsUseExternalActorsChecked, CustomizedLevel)
-			.IsEnabled(!bIsPartitionedWorld)
-		];
+		if (GetDefault<UEditorExperimentalSettings>()->bEnableOneFilePerActorSupport)
+		{
+			WorldCategory.AddCustomRow(LOCTEXT("LevelUseExternalActorsRow", "LevelUseExternalActors"), true)
+				.NameContent()
+				[
+					SNew(STextBlock)
+					.Text(LOCTEXT("LevelUseExternalActors", "Use External Actors"))
+					.ToolTipText(LOCTEXT("ActorPackagingMode_ToolTip", "Use external actors, new actor spawned in this level will be external and existing external actors will be loaded on load."))
+					.Font(IDetailLayoutBuilder::GetDetailFont())
+					.IsEnabled(!bIsPartitionedWorld)
+				]
+				.ValueContent()
+				[
+					SNew(SCheckBox)
+					.OnCheckStateChanged(this, &FWorldSettingsDetails::OnUseExternalActorsChanged, CustomizedLevel)
+					.IsChecked(this, &FWorldSettingsDetails::IsUseExternalActorsChecked, CustomizedLevel)
+					.IsEnabled(!bIsPartitionedWorld)
+				];
+		}
+
+		if (bIsPartitionedWorld)
+		{
+			WorldCategory.AddCustomRow(LOCTEXT("DefaultWorldPartitionSettingsRow", "DefaultWorldPartitionSettings"), true)
+				.NameContent()
+				[
+					SNew(STextBlock)
+					.Text(LOCTEXT("DefaultWorldPartitionSettings", "Default World Partition Settings"))
+					.ToolTipText(LOCTEXT("DefaultWorldPartitionSettings_ToolTip", "Save or Reset the current World Partition default editor state"))
+					.Font(IDetailLayoutBuilder::GetDetailFont())
+					.IsEnabled(bIsPartitionedWorld)
+				]
+				.ValueContent()
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot()
+					[
+						SNew(SButton)
+						.OnClicked_Lambda([CustomizedLevel]()
+							{
+								FScopedTransaction Transaction(LOCTEXT("ResetDefaultWorldPartitionSettings", "Reset Default World Partition Settings"));
+								CustomizedLevel->GetWorldSettings()->ResetDefaultWorldPartitionSettings();
+								return FReply::Handled();
+							})
+						[
+							SNew(STextBlock)
+							.Text(LOCTEXT("ResetButtonText", "Reset"))
+							.ToolTipText(LOCTEXT("ResetButtonToolTip", "Reset World Partition default editor state"))
+							.Font(IDetailLayoutBuilder::GetDetailFont())
+						]
+					]
+					+ SHorizontalBox::Slot()
+					[
+						SNew(SButton)
+						.OnClicked_Lambda([CustomizedLevel]()
+							{
+								FScopedTransaction Transaction(LOCTEXT("SaveDefaultWorldPartitionSettings", "Save Default World Partition Settings"));
+								CustomizedLevel->GetWorldSettings()->SaveDefaultWorldPartitionSettings();
+								return FReply::Handled();
+							})
+						[
+							SNew(STextBlock)
+							.Text(LOCTEXT("SaveButtonText", "Save"))
+							.ToolTipText(LOCTEXT("SaveButtonToolTip", "Save current World Partition editor state as map default"))
+							.Font(IDetailLayoutBuilder::GetDetailFont())
+							.IsEnabled(bIsPartitionedWorld)
+						]
+					]
+				];
+		}
 	}
 }
 

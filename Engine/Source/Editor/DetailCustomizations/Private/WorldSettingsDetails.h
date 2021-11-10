@@ -62,10 +62,10 @@ protected:
 	void AddLightmapCustomization( IDetailLayoutBuilder& DetailBuilder );
 
 	/**
-	 * Add the level external actors customization to the World section
+	 * Add customization to the World section
 	 * @param DetailBuilder the detail builder.
 	 */
-	void AddLevelExternalActorsCustomization(IDetailLayoutBuilder& DetailBuilder);
+	void AddWorldCustomization(IDetailLayoutBuilder& DetailBuilder);
 
 private:
 	// Called when `ULevel::bUseExternalActors` changes.
