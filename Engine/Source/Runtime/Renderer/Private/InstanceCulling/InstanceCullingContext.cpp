@@ -945,7 +945,16 @@ void FInstanceCullingContext::SetupDrawCommands(
 		{
 			LoadBalancer = new FInstanceProcessingGPULoadBalancer;
 		}
-		check(LoadBalancer->IsEmpty());
+#if DO_CHECK
+		if (InstanceCullingMode == EInstanceCullingMode::Stereo)
+		{
+			check(ViewIds.Num() == 2);
+		}
+		else
+		{
+			check(LoadBalancer->IsEmpty());
+		}
+#endif
 	}
 
 	int32 CurrentStateBucketId = -1;
