@@ -10,6 +10,7 @@
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SCheckBox.h"
+#include "Widgets/Input/SNumericEntryBox.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "Misc/MessageDialog.h"
 #include "GameFramework/Actor.h"
@@ -24,6 +25,7 @@
 #include "GameModeInfoCustomizer.h"
 #include "Settings/EditorExperimentalSettings.h"
 #include "GameFramework/WorldSettings.h"
+#include "WorldPartition/WorldPartition.h"
 #include "WorldPartition/WorldPartitionSubsystem.h"
 #include "ScopedTransaction.h"
 
@@ -85,9 +87,10 @@ void FWorldSettingsDetails::AddWorldCustomization(IDetailLayoutBuilder& DetailBu
 	ULevel* CustomizedLevel = nullptr;
 	if (CustomizedObjects.Num() > 0)
 	{
-		if (AActor* WorldSettings = Cast<AWorldSettings>(CustomizedObjects[0]))
+		if (AWorldSettings* WorldSettings = Cast<AWorldSettings>(CustomizedObjects[0]))
 		{
 			CustomizedLevel = WorldSettings->GetLevel();
+			SelectedWorldSettings = WorldSettings;
 		}
 	}
 
@@ -164,8 +167,57 @@ void FWorldSettingsDetails::AddWorldCustomization(IDetailLayoutBuilder& DetailBu
 						]
 					]
 				];
+
+			WorldCategory.AddCustomRow(LOCTEXT("WorldPartitionEditorCellSizeRow", "WorldPartitionEditorCellSize"), true)
+				.NameContent()
+				[
+					SNew(STextBlock)
+					.Text(LOCTEXT("WorldPartitionCellSize", "World Partition Editor Cell Size"))
+					.ToolTipText(LOCTEXT("WorldPartitionEditorCellSize_ToolTip", "Set the world partition editor cell size, will take effect on the next world reload."))
+					.Font(IDetailLayoutBuilder::GetDetailFont())
+					.IsEnabled(bIsPartitionedWorld)
+				]
+				.ValueContent()
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot()
+					.AutoWidth()
+					.VAlign(VAlign_Center)
+					[
+						SNew(SNumericEntryBox<uint32>)
+						.AllowSpin(false)
+						.MinSliderValue(100)
+						.MaxSliderValue(100000)
+						.OnValueChanged(this, &FWorldSettingsDetails::HandlWorldPartitionEditorCellSizeChanged)
+						.Value(this, &FWorldSettingsDetails::HandleWorldPartitionEditorCellSizeValue)
+					]
+				];
 		}
 	}
+}
+
+void FWorldSettingsDetails::HandlWorldPartitionEditorCellSizeChanged(uint32 NewValue)
+{
+	if (SelectedWorldSettings.IsValid())
+	{
+		if (UWorldPartition* WorldPartition = SelectedWorldSettings->GetWorldPartition())
+		{
+			WorldPartition->SetEditorWantedCellSize(NewValue);
+		}
+	}
+}
+
+TOptional<uint32> FWorldSettingsDetails::HandleWorldPartitionEditorCellSizeValue() const
+{
+	if (SelectedWorldSettings.IsValid())
+	{
+		if (UWorldPartition* WorldPartition = SelectedWorldSettings->GetWorldPartition())
+		{
+			return WorldPartition->GetWantedEditorCellSize();
+		}
+	}
+
+	return TOptional<uint32>();
 }
 
 void FWorldSettingsDetails::OnUseExternalActorsChanged(ECheckBoxState BoxState, ULevel* Level)

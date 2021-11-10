@@ -29,23 +29,10 @@ void UWorldPartitionEditorSpatialHash::Initialize()
 
 	AlwaysLoadedCell = NewObject<UWorldPartitionEditorCell>(this, TEXT("AlwaysLoadedCell"), RF_Transient);
 	AlwaysLoadedCell->Bounds.Init();
-
-	if (!IsRunningCommandlet())
-	{
-		GetMutableDefault<UWorldPartitionEditorPerProjectUserSettings>()->UpdateEditorGridConfigHash(GetWorld());
-	}
 }
 
 void UWorldPartitionEditorSpatialHash::SetDefaultValues()
 {}
-
-int32 UWorldPartitionEditorSpatialHash::GetEditorGridConfigHash() const
-{
-	FHashBuilder EditorGridConfigHashBuilder;
-	static uint32 Version = 2;
-	EditorGridConfigHashBuilder << Version << CellSize;
-	return EditorGridConfigHashBuilder.GetHash();
-}
 
 FName UWorldPartitionEditorSpatialHash::GetWorldPartitionEditorName() const
 {
@@ -177,7 +164,7 @@ void UWorldPartitionEditorSpatialHash::HashActor(FWorldPartitionHandle& InActorH
 			}
 			else
 			{
-				EditorCell = NewObject<UWorldPartitionEditorCell>(this, *FString::Printf(TEXT("EditorCell_X%lld_Y%lld_Z%lld"), CellCoord.X, CellCoord.Y, CellCoord.Z), RF_Transient);
+				EditorCell = NewObject<UWorldPartitionEditorCell>(this, *FString::Printf(TEXT("EditorCell_S%d_X%lld_Y%lld_Z%lld"), CellSize, CellCoord.X, CellCoord.Y, CellCoord.Z), RF_Transient);
 				EditorCell->Bounds = GetCellBounds(CellCoord);
 
 				Cells.Add(EditorCell);
@@ -568,6 +555,29 @@ UWorldPartitionEditorCell* UWorldPartitionEditorSpatialHash::GetAlwaysLoadedCell
 {
 	return AlwaysLoadedCell;
 }
+
+uint32 UWorldPartitionEditorSpatialHash::GetWantedEditorCellSize() const
+{
+	return WantedCellSize ? WantedCellSize : CellSize;
+}
+
+void UWorldPartitionEditorSpatialHash::SetEditorWantedCellSize(uint32 InCellSize)
+{
+	Modify();
+	WantedCellSize = InCellSize;
+}
+
+void UWorldPartitionEditorSpatialHash::PostLoad()
+{
+	Super::PostLoad();
+
+	if (WantedCellSize && (CellSize != WantedCellSize))
+	{
+		CellSize = WantedCellSize;
+		WantedCellSize = 0;
+	}
+}
+
 #endif
 
 #undef LOCTEXT_NAMESPACE

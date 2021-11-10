@@ -471,8 +471,8 @@ void AWorldSettings::ResetHierarchicalLODSetup()
 
 void AWorldSettings::SaveDefaultWorldPartitionSettings()
 {
-	Modify();
-	DefaultWorldPartitionSettings.Reset();
+	ResetDefaultWorldPartitionSettings();
+
 	if (WorldPartition)
 	{
 		DefaultWorldPartitionSettings.LoadedEditorGridCells = WorldPartition->GetUserLoadedEditorGridCells();		
@@ -480,7 +480,6 @@ void AWorldSettings::SaveDefaultWorldPartitionSettings()
 		{
 			WorldDataLayers->GetUserLoadedInEditorStates(DefaultWorldPartitionSettings.LoadedDataLayers, DefaultWorldPartitionSettings.NotLoadedDataLayers);
 		}
-		DefaultWorldPartitionSettings.EditorGridConfigHash = WorldPartition->GetEditorGridConfigHash();
 	}
 }
 
@@ -494,10 +493,7 @@ const FWorldPartitionPerWorldSettings* AWorldSettings::GetDefaultWorldPartitionS
 {
 	if (WorldPartition)
 	{
-		if (DefaultWorldPartitionSettings.EditorGridConfigHash == WorldPartition->GetEditorGridConfigHash())
-		{
-			return &DefaultWorldPartitionSettings;
-		}
+		return &DefaultWorldPartitionSettings;
 	}
 
 	return nullptr;

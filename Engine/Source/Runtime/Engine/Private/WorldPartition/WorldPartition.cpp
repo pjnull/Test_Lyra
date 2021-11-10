@@ -348,16 +348,6 @@ FName UWorldPartition::GetWorldPartitionEditorName() const
 {
 	return EditorHash->GetWorldPartitionEditorName();
 }
-
-int32 UWorldPartition::GetEditorGridConfigHash() const
-{
-	if (EditorHash)
-	{
-		return EditorHash->GetEditorGridConfigHash();
-	}
-
-	return 0;
-}
 #endif
 
 void UWorldPartition::Initialize(UWorld* InWorld, const FTransform& InTransform)
@@ -1328,6 +1318,16 @@ void UWorldPartition::CheckForErrors() const
 	{
 		RuntimeHash->CheckForErrors();
 	}
+}
+
+uint32 UWorldPartition::GetWantedEditorCellSize() const
+{
+	return EditorHash->GetWantedEditorCellSize();
+}
+
+void UWorldPartition::SetEditorWantedCellSize(uint32 InCellSize)
+{
+	EditorHash->SetEditorWantedCellSize(InCellSize);
 }
 
 void UWorldPartition::RemapSoftObjectPath(FSoftObjectPath& ObjectPath)

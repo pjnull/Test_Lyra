@@ -80,6 +80,12 @@ private:
 	// Handles dropping an asset.
 	void HandleAssetDropped( UObject* Object, TSharedRef<IPropertyHandle> GameInfoProperty );
 
+	// Callback for changes in the world partition editor cell size.
+	void HandlWorldPartitionEditorCellSizeChanged(uint32 NewValue);
+
+	// Callback for getting the world partition editor cell size.
+	TOptional<uint32> HandleWorldPartitionEditorCellSizeValue() const;
+
 	/** Helper class to customizer GameMode property */
 	TSharedPtr<FGameModeInfoCustomizer>	GameInfoModeCustomizer;
 

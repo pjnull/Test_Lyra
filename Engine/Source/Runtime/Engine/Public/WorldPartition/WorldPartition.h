@@ -118,7 +118,6 @@ public:
 
 #if WITH_EDITOR
 	FName GetWorldPartitionEditorName() const;
-	int32 GetEditorGridConfigHash() const;
 
 	void LoadEditorCells(const FBox& Box, bool bIsFromUserChange);
 	void UnloadEditorCells(const FBox& Box, bool bIsFromUserChange);
@@ -143,6 +142,9 @@ public:
 	void DumpActorDescs(const FString& Path);
 
 	void CheckForErrors() const;
+
+	uint32 GetWantedEditorCellSize() const;
+	void SetEditorWantedCellSize(uint32 InCellSize);
 #endif
 
 public:
