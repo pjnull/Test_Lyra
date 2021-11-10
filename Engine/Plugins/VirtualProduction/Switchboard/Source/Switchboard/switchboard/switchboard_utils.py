@@ -124,7 +124,7 @@ class PollProcess(object):
 
     def kill(self):
         try:
-            subprocess.check_output(f"taskkill.exe /F /IM {self.task_name}")
+            subprocess.check_output(f"taskkill.exe /F /IM {self.task_name}", startupinfo=get_hidden_sp_startupinfo())
         except:
             pass
 
