@@ -2391,8 +2391,6 @@ bool ULandscapeInfo::UpdateLayerInfoMapInternal(ALandscapeProxy* Proxy, bool bIn
 
 			if (!bInvalidate)
 			{
-				// Use a scoped cache to fasten the operation (lots of redundant material analysis) : 
-				FScopedGetLayersFromMaterialCache GetLayersFromMaterialCache;
 				ForAllLandscapeProxies([this](ALandscapeProxy* EachProxy)
 				{
 					if (!EachProxy->IsPendingKillPending())

@@ -288,6 +288,11 @@ struct FMaterialCachedExpressionData
 	/** Each bit corresponds to EMaterialProperty connection status. */
 	UPROPERTY()
 	uint32 MaterialAttributesPropertyConnectedBitmask = 0;
+
+#if WITH_EDITORONLY_DATA
+	UPROPERTY()
+	TArray<FName> LandscapeLayerNames;
+#endif // WITH_EDITORONLY_DATA
 };
 
 USTRUCT()

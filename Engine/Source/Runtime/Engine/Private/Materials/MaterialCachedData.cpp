@@ -60,6 +60,10 @@ void FMaterialCachedExpressionData::Reset()
 	bHasVertexInterpolator = false;
 	MaterialAttributesPropertyConnectedBitmask = 0;
 
+#if WITH_EDITORONLY_DATA
+	LandscapeLayerNames.Reset();
+#endif // WITH_EDITORONLY_DATA
+
 	static_assert((uint32)(EMaterialProperty::MP_MAX)-1 <= (8 * sizeof(MaterialAttributesPropertyConnectedBitmask)), "MaterialAttributesPropertyConnectedBitmask cannot contain entire EMaterialProperty enumeration.");
 }
 
@@ -301,6 +305,8 @@ void FMaterialCachedExpressionData::UpdateForExpressions(const FMaterialCachedEx
 			checkf(bCanReferenceTexture, TEXT("CanReferenceTexture() returned false, but found a referenced texture"));
 			ReferencedTextures.AddUnique(ReferencedTexture);
 		}
+
+		Expression->GetLandscapeLayerNames(LandscapeLayerNames);
 
 		if (UMaterialExpressionCollectionParameter* ExpressionCollectionParameter = Cast<UMaterialExpressionCollectionParameter>(Expression))
 		{

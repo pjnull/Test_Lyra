@@ -2398,12 +2398,12 @@ struct FHeightmapInfo
 	TArray<FColor*> HeightmapTextureMipData;
 };
 
-TArray<FName> ALandscapeProxy::GetLayersFromMaterial(UMaterialInterface* MaterialInterface)
+const TArray<FName>& ALandscapeProxy::GetLayersFromMaterial(UMaterialInterface* MaterialInterface)
 {
-	return FGetLayersFromMaterialCache::GetLayersFromMaterial(MaterialInterface);
+	return MaterialInterface->GetCachedExpressionData().LandscapeLayerNames;
 }
 
-TArray<FName> ALandscapeProxy::GetLayersFromMaterial() const
+const TArray<FName>& ALandscapeProxy::GetLayersFromMaterial() const
 {
 	return GetLayersFromMaterial(LandscapeMaterial);
 }
