@@ -9,7 +9,7 @@
 #include "Components/ActorComponent.h"
 #include "GameFramework/Actor.h"
 
-namespace LevelSnapshots
+namespace UE::LevelSnapshots::Private::Internal
 {
 	/** Recreates component on actors in the snapshot world. */
 	class FSnapshotActorComponentRestorer final : public TBaseComponentRestorer<FSnapshotActorComponentRestorer>
@@ -38,8 +38,8 @@ namespace LevelSnapshots
 	
 }
 
-void SnapshotUtil::Component::AllocateMissingComponentsForSnapshotActor(AActor* SnapshotActor, const FActorSnapshotData& SnapshotData, FWorldSnapshotData& WorldData)
+void UE::LevelSnapshots::Private::AllocateMissingComponentsForSnapshotActor(AActor* SnapshotActor, const FActorSnapshotData& SnapshotData, FWorldSnapshotData& WorldData)
 {
-	LevelSnapshots::FSnapshotActorComponentRestorer Restorer(SnapshotActor, SnapshotData, WorldData);
+	Internal::FSnapshotActorComponentRestorer Restorer(SnapshotActor, SnapshotData, WorldData);
 	Restorer.RecreateSavedComponents();
 }

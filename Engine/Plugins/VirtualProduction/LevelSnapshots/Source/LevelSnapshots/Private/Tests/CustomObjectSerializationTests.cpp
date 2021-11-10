@@ -1,14 +1,14 @@
 ﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "CustomSubobjectRestorationInfo.h"
 #include "LevelSnapshotsModule.h"
-#include "PropertySelectionMap.h"
 #include "Interfaces/ICustomObjectSnapshotSerializer.h"
 #include "Params/ObjectSnapshotSerializationData.h"
-#include "Util/SnapshotTestRunner.h"
+#include "Selection/CustomSubobjectRestorationInfo.h"
+#include "Selection/PropertySelectionMap.h"
 #include "Types/SnapshotTestActor.h"
-#include "Engine/StaticMeshActor.h"
+#include "Util/SnapshotTestRunner.h"
 
+#include "Engine/StaticMeshActor.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/ScopeExit.h"
 
@@ -797,7 +797,7 @@ bool FRestoreSubobjectsMissingFromEditorWorld::RunTest(const FString& Parameters
 		})
 		.FilterProperties(Stub->TestActor, [&](const FPropertySelectionMap& SelectionMap)
 		{
-			const FRestorableObjectSelection ObjectSelection = SelectionMap.GetObjectSelection(Stub->TestActor);
+			const UE::LevelSnapshots::FRestorableObjectSelection ObjectSelection = SelectionMap.GetObjectSelection(Stub->TestActor);
 			TestTrue(TEXT("No changed actor properties"), ObjectSelection.GetPropertySelection() && ObjectSelection.GetPropertySelection()->GetSelectedProperties().Num() == 0 && ObjectSelection.GetPropertySelection()->HasCustomSerializedSubobjects());
 			TestTrue(TEXT("No component selection"), ObjectSelection.GetComponentSelection() == nullptr);
 			TestTrue(TEXT("Needs to restore custom subobject"), ObjectSelection.GetCustomSubobjectSelection() && ObjectSelection.GetCustomSubobjectSelection()->CustomSnapshotSubobjectsToRestore.Num() == 1);

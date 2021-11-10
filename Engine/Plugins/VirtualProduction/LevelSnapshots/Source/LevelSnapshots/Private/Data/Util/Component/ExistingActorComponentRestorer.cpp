@@ -5,20 +5,21 @@
 
 #include "Archive/ApplySnapshotToEditorArchive.h"
 #include "Data/ActorSnapshotData.h"
+#include "Data/Util/EquivalenceUtil.h"
+#include "Data/Util/Restoration/ActorUtil.h"
 #include "Data/WorldSnapshotData.h"
 #include "CustomSerialization/CustomObjectSerializationWrapper.h"
 #include "Data/Util/SnapshotUtil.h"
 #include "LevelSnapshotsModule.h"
-#include "PropertySelectionMap.h"
 #include "RestorationEvents/ApplySnapshotToActorScope.h"
 #include "RestorationEvents/RemoveComponentScope.h"
+#include "Selection/PropertySelectionMap.h"
 
 #include "Components/ActorComponent.h"
 #include "GameFramework/Actor.h"
 #include "Modules/ModuleManager.h"
 #include "Templates/NonNullPointer.h"
 #include "UObject/Package.h"
-#include "Util/EquivalenceUtil.h"
 
 #if USE_STABLE_LOCALIZATION_KEYS
 #include "Internationalization/TextPackageNamespaceUtil.h"
@@ -28,7 +29,7 @@
 #include "LevelEditor.h"
 #endif
 
-namespace LevelSnapshots
+namespace UE::LevelSnapshots::Private::Internal
 {
 	/** Recreates and removes components on actors that were matched in the editor world. */
 	class FExistingActorComponentRestorer final : public TBaseComponentRestorer<FExistingActorComponentRestorer>
@@ -80,11 +81,11 @@ namespace LevelSnapshots
 
 	void FExistingActorComponentRestorer::PostCreateComponent(FSubobjectSnapshotData& SubobjectData, UActorComponent* RecreatedComponent) const 
 	{
-		TOptional<AActor*> SnapshotActor = GetSnapshotData().GetPreallocatedIfValidButDoNotAllocate();
+		const TOptional<TNonNullPtr<AActor>> SnapshotActor = UE::LevelSnapshots::Private::GetPreallocatedIfValidButDoNotAllocate(GetSnapshotData());
 		checkf(SnapshotActor, TEXT("Snapshot actor was expected to be allocated at this point"));
 		
 		const FSoftObjectPath RecreatedComponentPath(RecreatedComponent);
-		UActorComponent* SnapshotComponent = SnapshotUtil::FindMatchingComponent(*SnapshotActor, RecreatedComponentPath);
+		UActorComponent* SnapshotComponent = UE::LevelSnapshots::Private::FindMatchingComponent(SnapshotActor.GetValue(), RecreatedComponentPath);
 		if (ensure(SnapshotComponent))
 		{
 			SubobjectData.EditorObject = RecreatedComponent;
@@ -142,7 +143,7 @@ namespace LevelSnapshots
 		// 2. Serialize saved data into components
 		for (const FDeferredComponentSerializationTask& Task : DeferredSerializationsTasks)
 		{
-			const FRestoreObjectScope FinishRestore = FCustomObjectSerializationWrapper::PreSubobjectRestore_EditorWorld(Task.Snapshot, Task.Original, GetWorldData(), SelectionMap, LocalisationSnapshotPackage);
+			const FRestoreObjectScope FinishRestore = PreSubobjectRestore_EditorWorld(Task.Snapshot, Task.Original, GetWorldData(), SelectionMap, LocalisationSnapshotPackage);
 			FApplySnapshotToEditorArchive::ApplyToRecreatedEditorWorldObject(*Task.SubobjectData, GetWorldData(), Task.Original, Task.Snapshot, SelectionMap); 
 		}
 		for (UActorComponent* Fail : CompsWithMissingSnapshotCounterpart)
@@ -177,7 +178,7 @@ namespace LevelSnapshots
 		{
 			const int32 ReferenceIndex = CompIt->Key;
 			const FSoftObjectPath& SavedComponentPath = GetWorldData().SerializedObjectReferences[ReferenceIndex];
-			const FString SavedComponentName = SnapshotUtil::ExtractLastSubobjectName(SavedComponentPath);
+			const FString SavedComponentName = UE::LevelSnapshots::Private::ExtractLastSubobjectName(SavedComponentPath);
 			if (SavedComponentName.Equals(ComponentName))
 			{
 				return TPair<int32, const FComponentSnapshotData*>(ReferenceIndex, &CompIt->Value);
@@ -189,11 +190,11 @@ namespace LevelSnapshots
 	}
 }
 
-void SnapshotUtil::Component::AddAndRemoveComponentsSelectedForRestore(AActor* MatchedEditorActor, const FActorSnapshotData& SnapshotData, FWorldSnapshotData& WorldData, const FPropertySelectionMap& SelectionMap, UPackage* LocalisationSnapshotPackage)
+void UE::LevelSnapshots::Private::AddAndRemoveComponentsSelectedForRestore(AActor* MatchedEditorActor, const FActorSnapshotData& SnapshotData, FWorldSnapshotData& WorldData, const FPropertySelectionMap& SelectionMap, UPackage* LocalisationSnapshotPackage)
 {
 	if (const FAddedAndRemovedComponentInfo* ComponentSelection = SelectionMap.GetObjectSelection(MatchedEditorActor).GetComponentSelection())
 	{
-		LevelSnapshots::FExistingActorComponentRestorer Restorer(MatchedEditorActor, SnapshotData, WorldData);
+		Internal::FExistingActorComponentRestorer Restorer(MatchedEditorActor, SnapshotData, WorldData);
 		Restorer.RemovedNewComponents(*ComponentSelection);
 		Restorer.RecreateMissingComponents(*ComponentSelection, SelectionMap, LocalisationSnapshotPackage);
 

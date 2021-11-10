@@ -11,7 +11,7 @@ struct FActorSnapshotData;
 struct FPropertySelectionMap;
 struct FWorldSnapshotData;
 
-namespace SnapshotUtil::Component
+namespace UE::LevelSnapshots::Private
 {
 	/** Adds and removes components on an actor that exists in the snapshot world (and existed the snapshot were applied). */
 	void AddAndRemoveComponentsSelectedForRestore(AActor* MatchedEditorActor, const FActorSnapshotData& SnapshotData, FWorldSnapshotData& WorldData, const FPropertySelectionMap& SelectionMap, UPackage* LocalisationSnapshotPackage);

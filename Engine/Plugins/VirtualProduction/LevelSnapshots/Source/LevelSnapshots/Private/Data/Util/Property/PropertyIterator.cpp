@@ -4,13 +4,13 @@
 
 #include "UObject/UnrealType.h"
 
-FPropertyIterator::FPropertyIterator(UStruct* RootStruct, TFunctionRef<void(FProperty*)> PropertyCallback, TFunctionRef<void(UStruct*)> StructCallback, EPropertyFlags SkipFlags)
+UE::LevelSnapshots::Private::FPropertyIterator::FPropertyIterator(UStruct* RootStruct, TFunctionRef<void(FProperty*)> PropertyCallback, TFunctionRef<void(UStruct*)> StructCallback, EPropertyFlags SkipFlags)
 	: SkipFlags(SkipFlags)
 {
 	IterateProperties(RootStruct, PropertyCallback, StructCallback);
 }
 
-void FPropertyIterator::IterateProperties(UStruct* Struct, TFunctionRef<void(FProperty*)> PropertyCallback, TFunctionRef<void(UStruct*)> StructCallback)
+void UE::LevelSnapshots::Private::FPropertyIterator::IterateProperties(UStruct* Struct, TFunctionRef<void(FProperty*)> PropertyCallback, TFunctionRef<void(UStruct*)> StructCallback)
 {
 	if (VisitedSet.Contains(Struct))
 	{
@@ -35,7 +35,7 @@ void FPropertyIterator::IterateProperties(UStruct* Struct, TFunctionRef<void(FPr
 	}
 }
 
-bool FPropertyIterator::HandleStructProperty(FProperty* Property, TFunctionRef<void(FProperty*)> PropertyCallback, TFunctionRef<void(UStruct*)> StructCallback)
+bool UE::LevelSnapshots::Private::FPropertyIterator::HandleStructProperty(FProperty* Property, TFunctionRef<void(FProperty*)> PropertyCallback, TFunctionRef<void(UStruct*)> StructCallback)
 {
 	if (FStructProperty* StructProperty = CastField<FStructProperty>(Property))
 	{
@@ -45,7 +45,7 @@ bool FPropertyIterator::HandleStructProperty(FProperty* Property, TFunctionRef<v
 	return false;
 }
 
-void FPropertyIterator::HandleCollectionPropeties(FProperty* Property, TFunctionRef<void(FProperty*)> PropertyCallback, TFunctionRef<void(UStruct*)> StructCallback)
+void UE::LevelSnapshots::Private::FPropertyIterator::HandleCollectionPropeties(FProperty* Property, TFunctionRef<void(FProperty*)> PropertyCallback, TFunctionRef<void(UStruct*)> StructCallback)
 {
 	if (FArrayProperty* ArrayProperty = CastField<FArrayProperty>(Property))
 	{

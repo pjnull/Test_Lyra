@@ -519,8 +519,8 @@ void SLevelSnapshotsEditorResults::BuildSelectionSetFromSelectedPropertiesInEach
 
 			TArray<FLevelSnapshotsEditorResultsRowPtr> UncheckedChildPropertyNodes;
 
-			FAddedAndRemovedComponentInfo NewComponentSelection;
-			const FAddedAndRemovedComponentInfo* OldComponentSelection = SelectionMap.GetObjectSelection(WorldObject).GetComponentSelection();
+			UE::LevelSnapshots::FAddedAndRemovedComponentInfo NewComponentSelection;
+			const UE::LevelSnapshots::FAddedAndRemovedComponentInfo* OldComponentSelection = SelectionMap.GetObjectSelection(WorldObject).GetComponentSelection();
 
 			if (OldComponentSelection)
 			{
@@ -913,7 +913,7 @@ bool SLevelSnapshotsEditorResults::GenerateTreeViewChildren_ModifiedActors(FLeve
 	for (const TWeakObjectPtr<AActor>& WeakWorldActor : ActorsToConsider)
 	{
 		AActor* WorldActor = WeakWorldActor.IsValid() ? WeakWorldActor.Get() : nullptr;
-		if (!ensure(WorldActor) || !FSnapshotRestorability::IsActorDesirableForCapture(WorldActor))
+		if (!ensure(WorldActor) || !UE::LevelSnapshots::Restorability::IsActorDesirableForCapture(WorldActor))
 		{
 			continue;
 		}

@@ -5,7 +5,7 @@
 #include "Components/ActorComponent.h"
 #include "GameFramework/Actor.h"
 
-ISnapshotRestorabilityOverrider::ERestorabilityOverride FClassRestorationSkipper::IsActorDesirableForCapture(const AActor* Actor)
+ISnapshotRestorabilityOverrider::ERestorabilityOverride UE::LevelSnapshots::Restorability::FClassRestorationSkipper::IsActorDesirableForCapture(const AActor* Actor)
 {
 	const FSkippedClassList& SkippedClasses = GetSkippedClassListCallback.Execute();
 	for (UClass* ActorClass = Actor->GetClass(); ActorClass; ActorClass = ActorClass->GetSuperClass())
@@ -19,7 +19,7 @@ ISnapshotRestorabilityOverrider::ERestorabilityOverride FClassRestorationSkipper
 	return ERestorabilityOverride::DoNotCare;
 }
 
-ISnapshotRestorabilityOverrider::ERestorabilityOverride FClassRestorationSkipper::IsComponentDesirableForCapture(const UActorComponent* Component)
+ISnapshotRestorabilityOverrider::ERestorabilityOverride UE::LevelSnapshots::Restorability::FClassRestorationSkipper::IsComponentDesirableForCapture(const UActorComponent* Component)
 {
 	const FSkippedClassList& SkippedClasses = GetSkippedClassListCallback.Execute();
 	for (UClass* ComponentClass = Component->GetClass(); ComponentClass; ComponentClass = ComponentClass->GetSuperClass())

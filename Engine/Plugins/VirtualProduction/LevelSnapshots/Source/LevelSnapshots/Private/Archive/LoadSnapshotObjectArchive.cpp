@@ -11,7 +11,7 @@
 #include "Internationalization/TextNamespaceUtil.h"
 #include "Internationalization/TextPackageNamespaceUtil.h"
 
-void FLoadSnapshotObjectArchive::ApplyToSnapshotWorldObject(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InObjectToRestore, FProcessObjectDependency ProcessObjectDependency, UPackage* InLocalisationSnapshotPackage)
+void UE::LevelSnapshots::Private::FLoadSnapshotObjectArchive::ApplyToSnapshotWorldObject(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InObjectToRestore, FProcessObjectDependency ProcessObjectDependency, UPackage* InLocalisationSnapshotPackage)
 {
 	ApplyToSnapshotWorldObject(
 		InObjectData,
@@ -26,7 +26,7 @@ void FLoadSnapshotObjectArchive::ApplyToSnapshotWorldObject(FObjectSnapshotData&
 		);
 }
 
-void FLoadSnapshotObjectArchive::ApplyToSnapshotWorldObject(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InObjectToRestore, FProcessObjectDependency ProcessObjectDependency, const FString& InLocalisationNamespace)
+void UE::LevelSnapshots::Private::FLoadSnapshotObjectArchive::ApplyToSnapshotWorldObject(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InObjectToRestore, FProcessObjectDependency ProcessObjectDependency, const FString& InLocalisationNamespace)
 {
 	UE_LOG(LogLevelSnapshots, Verbose, TEXT("Loading snapshot object %s (class %s)"), *InObjectToRestore->GetPathName(), *InObjectToRestore->GetClass()->GetPathName());
 	
@@ -39,7 +39,7 @@ void FLoadSnapshotObjectArchive::ApplyToSnapshotWorldObject(FObjectSnapshotData&
 	FLevelSnapshotsModule::GetInternalModuleInstance().OnPostLoadSnapshotObject({ InObjectToRestore, InSharedData });
 }
 
-UObject* FLoadSnapshotObjectArchive::ResolveObjectDependency(int32 ObjectIndex) const
+UObject* UE::LevelSnapshots::Private::FLoadSnapshotObjectArchive::ResolveObjectDependency(int32 ObjectIndex) const
 {
 	FString LocalizationNamespace;
 #if USE_STABLE_LOCALIZATION_KEYS
@@ -47,10 +47,10 @@ UObject* FLoadSnapshotObjectArchive::ResolveObjectDependency(int32 ObjectIndex) 
 #endif
 
 	ProcessObjectDependency(ObjectIndex);
-	return SnapshotUtil::Object::ResolveObjectDependencyForSnapshotWorld(GetSharedData(), ObjectIndex, ProcessObjectDependency, LocalizationNamespace);
+	return ResolveObjectDependencyForSnapshotWorld(GetSharedData(), ObjectIndex, ProcessObjectDependency, LocalizationNamespace);
 }
 
-FLoadSnapshotObjectArchive::FLoadSnapshotObjectArchive(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InSerializedObject, FProcessObjectDependency ProcessObjectDependency)
+UE::LevelSnapshots::Private::FLoadSnapshotObjectArchive::FLoadSnapshotObjectArchive(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InSerializedObject, FProcessObjectDependency ProcessObjectDependency)
 	:
 	Super(InObjectData, InSharedData, true, InSerializedObject),
 	ProcessObjectDependency(ProcessObjectDependency)

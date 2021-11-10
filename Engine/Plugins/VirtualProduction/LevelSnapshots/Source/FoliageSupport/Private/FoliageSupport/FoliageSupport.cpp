@@ -3,8 +3,8 @@
 #include "FoliageSupport/FoliageSupport.h"
 
 #include "FoliageSupport/InstancedFoliageActorData.h"
-#include "PropertySelection.h"
-#include "PropertySelectionMap.h"
+#include "Selection/PropertySelection.h"
+#include "Selection/PropertySelectionMap.h"
 #include "Params/ObjectSnapshotSerializationData.h"
 
 #include "Components/InstancedStaticMeshComponent.h"
@@ -13,7 +13,6 @@
 #include "ILevelSnapshotsModule.h"
 #include "InstancedFoliageActor.h"
 #include "ActorPartition/ActorPartitionSubsystem.h"
-#include "libJPG/jpge.h"
 #if WITH_EDITOR
 #include "FoliageEditModule.h"
 #endif
@@ -103,7 +102,7 @@ void FFoliageSupport::PostApplySnapshotProperties(UObject* Object, const ICustom
 	// Rest is done in PostApplySnapshotToActor (need access to the property selection map)
 }
 
-namespace FoliageSupport
+namespace UE::LevelSnapshots::FoliageSupport::Internal
 {
 	static void RebuildChangedFoliageComponents(AInstancedFoliageActor* FoliageActor, const FPropertySelectionMap& SelectionMap, bool bWasRecreated)
 	{
@@ -165,10 +164,10 @@ void FFoliageSupport::PostApplySnapshotToActor(const FApplySnapshotToActorParams
 #endif
 
 		CurrentFoliageData.ApplyTo(CurrentVersionInfo, FoliageActor, Params.SelectedProperties, Params.bWasRecreated);
-		FoliageSupport::RebuildChangedFoliageComponents(FoliageActor, Params.SelectedProperties, Params.bWasRecreated);
+		UE::LevelSnapshots::FoliageSupport::Internal::RebuildChangedFoliageComponents(FoliageActor, Params.SelectedProperties, Params.bWasRecreated);
 
 		FoliageTypesToRemove.Reset();
-		FoliageSupport::UpdateFoliageUI();
+		UE::LevelSnapshots::FoliageSupport::Internal::UpdateFoliageUI();
 	}
 }
 

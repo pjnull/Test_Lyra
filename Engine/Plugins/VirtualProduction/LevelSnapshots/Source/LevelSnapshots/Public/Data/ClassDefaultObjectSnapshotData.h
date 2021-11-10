@@ -6,6 +6,7 @@
 #include "ObjectSnapshotData.h"
 #include "ClassDefaultObjectSnapshotData.generated.h"
 
+/** We save the CDO of every object to save space. This holds the CDO's saved data. */
 USTRUCT()
 struct LEVELSNAPSHOTS_API FClassDefaultObjectSnapshotData : public FObjectSnapshotData
 {

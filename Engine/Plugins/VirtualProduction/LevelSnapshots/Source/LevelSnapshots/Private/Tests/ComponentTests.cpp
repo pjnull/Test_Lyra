@@ -1,7 +1,7 @@
 ﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "Data/PropertySelection.h"
-#include "PropertySelectionMap.h"
+#include "Selection/PropertySelection.h"
+#include "Selection/PropertySelectionMap.h"
 #include "Util/SnapshotTestRunner.h"
 #include "Types/SnapshotTestActor.h"
 
@@ -66,9 +66,9 @@ bool FAddedAndRemovedComponentsCorrectOnSnapshotActorAndGenerateDiff::RunTest(co
 	
 		.FilterProperties(Actor, [&](const FPropertySelectionMap& PropertySelectionMap)
 		{
-			const FRestorableObjectSelection ObjectSelection = PropertySelectionMap.GetObjectSelection(Actor);
+			const UE::LevelSnapshots::FRestorableObjectSelection ObjectSelection = PropertySelectionMap.GetObjectSelection(Actor);
 			
-			const FAddedAndRemovedComponentInfo* Selection = ObjectSelection.GetComponentSelection();
+			const UE::LevelSnapshots::FAddedAndRemovedComponentInfo* Selection = ObjectSelection.GetComponentSelection();
 			TestTrue(TEXT("Has Component Diff"), Selection != nullptr);
 			if (!Selection)
 			{
@@ -114,15 +114,15 @@ bool FAddedAndRemovedComponentsCorrectOnSnapshotActorAndGenerateDiff::RunTest(co
 		})
 		.AccessSnapshot([&](ULevelSnapshot* Snapshot)
 		{
-			TOptional<AActor*> SnapshotActorWithAddedComponent = Snapshot->GetDeserializedActor(ActorWithAddedComponent);
-			TOptional<AActor*> SnapshotActorWithRemovedComponent = Snapshot->GetDeserializedActor(ActorWithRemovedComponent);
+			const TOptional<TNonNullPtr<AActor>> SnapshotActorWithAddedComponent = Snapshot->GetDeserializedActor(ActorWithAddedComponent);
+			const TOptional<TNonNullPtr<AActor>> SnapshotActorWithRemovedComponent = Snapshot->GetDeserializedActor(ActorWithRemovedComponent);
 			if (!ensure(SnapshotActorWithAddedComponent.IsSet() && SnapshotActorWithRemovedComponent.IsSet()))
 			{
 				return;
 			}
 
-			TestTrue(TEXT("ActorWithAddedComponent: HasOriginalChangedPropertiesSinceSnapshotWasTaken"), SnapshotUtil::HasOriginalChangedPropertiesSinceSnapshotWasTaken(Snapshot->GetSerializedData(), *SnapshotActorWithAddedComponent , ActorWithAddedComponent));
-			TestTrue(TEXT("ActorWithRemovedComponent: HasOriginalChangedPropertiesSinceSnapshotWasTaken"), SnapshotUtil::HasOriginalChangedPropertiesSinceSnapshotWasTaken(Snapshot->GetSerializedData(), *SnapshotActorWithRemovedComponent , ActorWithRemovedComponent));
+			TestTrue(TEXT("ActorWithAddedComponent: HasOriginalChangedPropertiesSinceSnapshotWasTaken"), UE::LevelSnapshots::Private::HasOriginalChangedPropertiesSinceSnapshotWasTaken(Snapshot->GetSerializedData(), SnapshotActorWithAddedComponent.GetValue(), ActorWithAddedComponent));
+			TestTrue(TEXT("ActorWithRemovedComponent: HasOriginalChangedPropertiesSinceSnapshotWasTaken"), UE::LevelSnapshots::Private::HasOriginalChangedPropertiesSinceSnapshotWasTaken(Snapshot->GetSerializedData(), SnapshotActorWithRemovedComponent.GetValue(), ActorWithRemovedComponent));
 		});
 	
 	return true;
@@ -261,7 +261,7 @@ bool FRestoreInstancedComponent::RunTest(const FString& Parameters)
 		// Exists on snapshot?
 		.AccessSnapshot([&](ULevelSnapshot* Snapshot)
 		{
-			TOptional<AActor*> CounterpartActor = Snapshot->GetDeserializedActor(Actor);
+			const TOptional<TNonNullPtr<AActor>> CounterpartActor = Snapshot->GetDeserializedActor(Actor);
 			if (!ensureAlways(CounterpartActor))
 			{
 				return;
@@ -278,7 +278,7 @@ bool FRestoreInstancedComponent::RunTest(const FString& Parameters)
 			}
 
 			USceneComponent* AsSceneComponent = Cast<USceneComponent>(*CounterpartComponent);
-			ASnapshotTestActor* CastedCounterpartActor = Cast<ASnapshotTestActor>(*CounterpartActor);
+			ASnapshotTestActor* CastedCounterpartActor = Cast<ASnapshotTestActor>(CounterpartActor.GetValue());
 			check(AsSceneComponent);
 			TestTrue(TEXT("Snapshot attach parent correct"), AsSceneComponent->GetAttachParent() == CastedCounterpartActor->GetMesh());
 		})

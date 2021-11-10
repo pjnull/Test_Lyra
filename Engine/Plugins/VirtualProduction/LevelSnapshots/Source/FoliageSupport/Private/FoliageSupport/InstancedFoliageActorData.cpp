@@ -3,9 +3,10 @@
 #include "FoliageSupport/InstancedFoliageActorData.h"
 
 #include "FoliageRestorationInfo.h"
-#include "InstancedFoliageActor.h"
 #include "LevelSnapshotsLog.h"
-#include "PropertySelectionMap.h"
+#include "Selection/PropertySelectionMap.h"
+
+#include "InstancedFoliageActor.h"
 
 namespace
 {

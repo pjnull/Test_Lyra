@@ -1,8 +1,9 @@
 ﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "Data/PropertySelection.h"
+#include "Selection/PropertySelection.h"
 
 #include "PropertyInfoHelpers.h"
+#include "Util/ActorHashUtil.h"
 
 namespace
 {
@@ -87,9 +88,9 @@ TOptional<FLevelSnapshotPropertyChain> FLevelSnapshotPropertyChain::FindPathToPr
 	
 	FLevelSnapshotPropertyChain Result;
 	
-	if (FPropertyInfoHelpers::IsPropertyInCollection(InLeafProperty))
+	if (UE::LevelSnapshots::IsPropertyInCollection(InLeafProperty))
 	{
-		if (const FProperty* ParentProperty = FPropertyInfoHelpers::GetParentProperty(InLeafProperty))
+		if (const FProperty* ParentProperty = UE::LevelSnapshots::GetParentProperty(InLeafProperty))
 		{
 			bSuccess = Local::MakePropertyChainFromLeafProperty(ParentProperty, InStructToSearch, Result, true);
 			if (bIncludeLeafPropertyInChain)
@@ -226,7 +227,7 @@ bool FPropertySelection::ShouldSerializeProperty(const FArchiveSerializedPropert
 		}
 		
 		// Always serialize all properties inside of collections
-		if (FPropertyInfoHelpers::IsPropertyCollection(ParentProperty))
+		if (UE::LevelSnapshots::IsPropertyCollection(ParentProperty))
 		{
 			// We assume this function is called by FArchive::ShouldSkipProperty,
 			// i.e. ShouldSerializeProperty would return true the previous elements

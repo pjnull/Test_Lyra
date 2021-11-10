@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 
-#include "PropertySelectionMap.h"
+#include "Selection/PropertySelectionMap.h"
 #include "Util/SnapshotTestRunner.h"
 #include "Types/SnapshotTestActor.h"
 #include "Types/ActorWithReferencesInCDO.h"

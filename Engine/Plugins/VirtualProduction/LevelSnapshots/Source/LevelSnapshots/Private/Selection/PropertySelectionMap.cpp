@@ -1,9 +1,9 @@
 ﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "PropertySelectionMap.h"
+#include "Selection/PropertySelectionMap.h"
 
 #include "LevelSnapshotsLog.h"
-#include "Data/RestorableObjectSelection.h"
+#include "Selection/RestorableObjectSelection.h"
 
 #include "GameFramework/Actor.h"
 #include "UObject/UObjectHash.h"
@@ -61,7 +61,7 @@ void FPropertySelectionMap::RemoveObjectPropertiesFromMap(UObject* WorldObject)
 	EditorWorldObjectToSelectedProperties.Remove(WorldObject);
 }
 
-void FPropertySelectionMap::AddComponentSelection(AActor* EditorWorldActor, const FAddedAndRemovedComponentInfo& ComponentSelection)
+void FPropertySelectionMap::AddComponentSelection(AActor* EditorWorldActor, const UE::LevelSnapshots::FAddedAndRemovedComponentInfo& ComponentSelection)
 {
 	const bool bIsEmpty = ComponentSelection.SnapshotComponentsToAdd.Num() == 0 && ComponentSelection.EditorWorldComponentsToRemove.Num() == 0;
 	if (ensure(EditorWorldActor && !bIsEmpty))
@@ -82,7 +82,7 @@ void FPropertySelectionMap::AddCustomEditorSubobjectToRecreate(UObject* EditorWo
 
 void FPropertySelectionMap::RemoveCustomEditorSubobjectToRecreate(UObject* EditorWorldOwner, UObject* SnapshotSubobject)
 {
-	if (FCustomSubobjectRestorationInfo* RestorationInfo = EditorWorldObjectToCustomSubobjectSelection.Find(EditorWorldOwner))
+	if (UE::LevelSnapshots::FCustomSubobjectRestorationInfo* RestorationInfo = EditorWorldObjectToCustomSubobjectSelection.Find(EditorWorldOwner))
 	{
 		if (RestorationInfo->CustomSnapshotSubobjectsToRestore.Num() == 1)
 		{
@@ -100,9 +100,9 @@ const FPropertySelection* FPropertySelectionMap::GetSelectedProperties(const FSo
 	return EditorWorldObjectToSelectedProperties.Find(WorldObjectPath); 
 }
 
-FRestorableObjectSelection FPropertySelectionMap::GetObjectSelection(const FSoftObjectPath& EditorWorldObject) const
+UE::LevelSnapshots::FRestorableObjectSelection FPropertySelectionMap::GetObjectSelection(const FSoftObjectPath& EditorWorldObject) const
 {
-	return FRestorableObjectSelection(EditorWorldObject, *this);
+	return UE::LevelSnapshots::FRestorableObjectSelection(EditorWorldObject, *this);
 }
 
 TArray<FSoftObjectPath> FPropertySelectionMap::GetKeys() const
@@ -122,6 +122,8 @@ TArray<FSoftObjectPath> FPropertySelectionMap::GetKeys() const
 
 bool FPropertySelectionMap::HasChanges(AActor* EditorWorldActor) const
 {
+	using namespace UE::LevelSnapshots;
+	
 	const FRestorableObjectSelection Selection = GetObjectSelection(EditorWorldActor);
 	
 	const FPropertySelection* PropertySelection = Selection.GetPropertySelection();
@@ -151,6 +153,8 @@ bool FPropertySelectionMap::HasChanges(AActor* EditorWorldActor) const
 
 bool FPropertySelectionMap::HasChanges(UActorComponent* EditorWorldComponent) const
 {
+	using namespace UE::LevelSnapshots;
+	
 	const FRestorableObjectSelection Selection = GetObjectSelection(EditorWorldComponent);
 	const FPropertySelection* PropertySelection = Selection.GetPropertySelection();
 	const FCustomSubobjectRestorationInfo* CustomSubobjectInfo = Selection.GetCustomSubobjectSelection();
@@ -159,6 +163,7 @@ bool FPropertySelectionMap::HasChanges(UActorComponent* EditorWorldComponent) co
 
 bool FPropertySelectionMap::HasChanges(UObject* EditorWorldObject) const
 {
+	using namespace UE::LevelSnapshots;
 	if (AActor* Actor = Cast<AActor>(EditorWorldObject))
 	{
 		return HasChanges(Actor);

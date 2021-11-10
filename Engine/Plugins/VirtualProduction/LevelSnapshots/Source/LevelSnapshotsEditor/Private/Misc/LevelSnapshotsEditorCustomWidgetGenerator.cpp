@@ -2,8 +2,9 @@
 
 #include "Misc/LevelSnapshotsEditorCustomWidgetGenerator.h"
 
-#include "Data/PropertySelection.h"
 #include "LevelSnapshotsLog.h"
+#include "Selection/PropertySelection.h"
+
 #include "Styling/AppStyle.h"
 #include "Views/Results/LevelSnapshotsEditorResultsRow.h"
 #include "Widgets/Input/SCheckBox.h"

@@ -1,6 +1,6 @@
 ﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "PropertySelectionMap.h"
+#include "Selection/PropertySelectionMap.h"
 #include "Util/SnapshotTestRunner.h"
 #include "Util/EquivalenceUtil.h"
 #include "Types/SnapshotTestActor.h"
@@ -284,17 +284,17 @@ bool FActorAttachParentRestores::RunTest(const FString& Parameters)
 
 		.AccessSnapshot([&](ULevelSnapshot* Snapshot)
 		{
-			TOptional<AActor*> SnapshotChild = Snapshot->GetDeserializedActor(Child);
-			TOptional<AActor*> SnapshotParentOne = Snapshot->GetDeserializedActor(ParentOne);
+			const TOptional<TNonNullPtr<AActor>> SnapshotChild = Snapshot->GetDeserializedActor(Child);
+			const TOptional<TNonNullPtr<AActor>> SnapshotParentOne = Snapshot->GetDeserializedActor(ParentOne);
 
 			const bool bParentsWereDeserialized = SnapshotChild && SnapshotParentOne;
 			TestTrue(TEXT("Parents were deserialized"), bParentsWereDeserialized);
 			if (bParentsWereDeserialized)
 			{
-				const bool bHasOriginalChanged = SnapshotUtil::HasOriginalChangedPropertiesSinceSnapshotWasTaken(Snapshot->GetSerializedData(), *SnapshotChild, Child);
+				const bool bHasOriginalChanged = UE::LevelSnapshots::Private::HasOriginalChangedPropertiesSinceSnapshotWasTaken(Snapshot->GetSerializedData(), SnapshotChild.GetValue(), Child);
 				TestTrue(TEXT("HasOriginalChangedPropertiesSinceSnapshotWasTaken == true"), bHasOriginalChanged);
 				
-				TestTrue(TEXT("Snapshot has correct attach parent"), SnapshotChild.GetValue()->GetAttachParentActor() == SnapshotParentOne);
+				TestTrue(TEXT("Snapshot has correct attach parent"), SnapshotChild.GetValue()->GetAttachParentActor() == SnapshotParentOne.GetValue());
 			}
 		})
 

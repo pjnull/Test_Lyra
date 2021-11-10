@@ -10,10 +10,10 @@ class UObject;
 
 struct FWorldSnapshotData;
 
-namespace SnapshotUtil
+namespace UE::LevelSnapshots::Private
 {
-	typedef TFunction<void(UActorComponent* SnapshotComponent, UActorComponent* WorldComponent)> FHandleMatchedActorComponent;
-	typedef TFunction<void(UActorComponent*)> FHandleUnmatchedActorComponent;
+	typedef TFunctionRef<void(UActorComponent* SnapshotComponent, UActorComponent* WorldComponent)> FHandleMatchedActorComponent;
+	typedef TFunctionRef<void(UActorComponent*)> FHandleUnmatchedActorComponent;
 	
 	/**
 	 * Iterates through both actors' component lists and calls the appropriate callback.

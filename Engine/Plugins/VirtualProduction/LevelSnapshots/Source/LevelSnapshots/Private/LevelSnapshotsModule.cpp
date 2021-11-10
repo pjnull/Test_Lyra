@@ -21,9 +21,9 @@
 #include "ISettingsModule.h"
 #endif
 
-namespace
+namespace UE::LevelSnapshots::Private::Internal
 {
-	void AddSoftObjectPathSupport(FLevelSnapshotsModule& Module)
+	static void AddSoftObjectPathSupport(FLevelSnapshotsModule& Module)
 	{
 		// FSnapshotRestorability::IsRestorableProperty requires properties to have the CPF_Edit specifier
 		// FSoftObjectPath does not have this so we need to explicitly allow its properties
@@ -39,7 +39,7 @@ namespace
 		Module.AddExplicitilySupportedProperties(SoftObjectPathProperties);
 	}
 
-	void AddAttachParentSupport(FLevelSnapshotsModule& Module)
+	static void AddAttachParentSupport(FLevelSnapshotsModule& Module)
 	{
 		// These properties are not visible by default because they're not CPF_Edit
 		const FProperty* AttachParent = USceneComponent::StaticClass()->FindPropertyByName(FName("AttachParent"));
@@ -52,7 +52,7 @@ namespace
 		}
 	}
 
-	void DisableIrrelevantBrushSubobjects(FLevelSnapshotsModule& Module)
+	static void DisableIrrelevantBrushSubobjects(FLevelSnapshotsModule& Module)
 	{
 #if WITH_EDITORONLY_DATA
 		// ABrush::BrushBuilder is CPF_Edit but no user ever cares about it. We don't want it to make volumes to show up as changed.
@@ -64,7 +64,7 @@ namespace
 #endif
 	}
 
-	void DisableIrrelevantWorldSettings(FLevelSnapshotsModule& Module)
+	static void DisableIrrelevantWorldSettings(FLevelSnapshotsModule& Module)
 	{
 		// AWorldSettings::NavigationSystemConfig is CPF_Edit but no user ever cares about it.
 		const FProperty* NavigationSystemConfig = AWorldSettings::StaticClass()->FindPropertyByName(FName("NavigationSystemConfig"));
@@ -74,7 +74,7 @@ namespace
 		}
 	}
 
-	void DisableIrrelevantMaterialInstanceProperties(FLevelSnapshotsModule& Module)
+	static void DisableIrrelevantMaterialInstanceProperties(FLevelSnapshotsModule& Module)
 	{
 		// This property causes diffs sometimes for unexplained reasons when creating in construction script... does not seem to be important
 		const FProperty* BasePropertyOverrides = UMaterialInstance::StaticClass()->FindPropertyByName(GET_MEMBER_NAME_CHECKED(UMaterialInstance, BasePropertyOverrides));
@@ -84,7 +84,7 @@ namespace
 		}
 	}
 
-	void DisableIrrelevantActorProperties(FLevelSnapshotsModule& Module)
+	static void DisableIrrelevantActorProperties(FLevelSnapshotsModule& Module)
 	{
 		const FProperty* ActorGuid = AActor::StaticClass()->FindPropertyByName(FName("ActorGuid"));
 		if (ensure(ActorGuid))
@@ -106,6 +106,9 @@ FLevelSnapshotsModule& FLevelSnapshotsModule::GetInternalModuleInstance()
 
 void FLevelSnapshotsModule::StartupModule()
 {
+	using namespace UE::LevelSnapshots::Restorability;
+	using namespace UE::LevelSnapshots::Restorability::Private;
+	
 	// Hook up project settings
 	const TSharedRef<FClassRestorationSkipper> ClassSkipper = MakeShared<FClassRestorationSkipper>(
 		FClassRestorationSkipper::FGetSkippedClassList::CreateLambda([]() -> const FSkippedClassList&
@@ -117,12 +120,12 @@ void FLevelSnapshotsModule::StartupModule()
 	RegisterRestorabilityOverrider(ClassSkipper);
 
 	// Enable / disable troublesome properties
-	AddSoftObjectPathSupport(*this);
-	AddAttachParentSupport(*this);
-	DisableIrrelevantBrushSubobjects(*this);
-	DisableIrrelevantWorldSettings(*this);
-	DisableIrrelevantMaterialInstanceProperties(*this);
-	DisableIrrelevantActorProperties(*this);
+	UE::LevelSnapshots::Private::Internal::AddSoftObjectPathSupport(*this);
+	UE::LevelSnapshots::Private::Internal::AddAttachParentSupport(*this);
+	UE::LevelSnapshots::Private::Internal::DisableIrrelevantBrushSubobjects(*this);
+	UE::LevelSnapshots::Private::Internal::DisableIrrelevantWorldSettings(*this);
+	UE::LevelSnapshots::Private::Internal::DisableIrrelevantMaterialInstanceProperties(*this);
+	UE::LevelSnapshots::Private::Internal::DisableIrrelevantActorProperties(*this);
 
 	// Interact with special engine features
 	FCollisionRestoration::Register(*this);

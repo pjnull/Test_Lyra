@@ -6,11 +6,9 @@
 #include "UObject/UnrealType.h"
 #include "Serialization/ArchiveSerializedPropertyChain.h"
 
-namespace LevelSnapshots
+namespace UE::LevelSnapshots::Private::Internal
 {
-	using namespace SnapshotUtil::Property;
-	
-	EBreakBehaviour RecursiveFollowPropertyChain(int32 ChainIndex, void* ContainerPtr, const FArchiveSerializedPropertyChain* PropertyChain, const FProperty* LeafProperty, const FHandleValuePtr& Callback)
+	static EBreakBehaviour RecursiveFollowPropertyChain(int32 ChainIndex, void* ContainerPtr, const FArchiveSerializedPropertyChain* PropertyChain, const FProperty* LeafProperty, const FHandleValuePtr& Callback)
 	{
 		const bool bHasReachLeafProperty = !PropertyChain || PropertyChain->GetNumProperties() <= ChainIndex; 
 		if (bHasReachLeafProperty)
@@ -66,12 +64,12 @@ namespace LevelSnapshots
 	}
 }
 
-void SnapshotUtil::Property::FollowPropertyChain(void* ContainerPtr, const FArchiveSerializedPropertyChain* PropertyChain, const FProperty* LeafProperty, FHandleValuePtr Callback)
+void UE::LevelSnapshots::Private::FollowPropertyChain(void* ContainerPtr, const FArchiveSerializedPropertyChain* PropertyChain, const FProperty* LeafProperty, UE::LevelSnapshots::Private::FHandleValuePtr Callback)
 {
-	LevelSnapshots::RecursiveFollowPropertyChain(0, ContainerPtr, PropertyChain, LeafProperty, Callback);
+	Internal::RecursiveFollowPropertyChain(0, ContainerPtr, PropertyChain, LeafProperty, Callback);
 }
 
-bool SnapshotUtil::Property::FollowPropertyChainUntilPredicateIsTrue(void* ContainerPtr, const FArchiveSerializedPropertyChain* PropertyChain, const FProperty* LeafProperty, FValuePtrPredicate Callback)
+bool UE::LevelSnapshots::Private::FollowPropertyChainUntilPredicateIsTrue(void* ContainerPtr, const FArchiveSerializedPropertyChain* PropertyChain, const FProperty* LeafProperty, UE::LevelSnapshots::Private::FValuePtrPredicate Callback)
 {
 	bool bResult = false;
 	FollowPropertyChain(ContainerPtr, PropertyChain, LeafProperty, [Callback = MoveTemp(Callback), &bResult](void* ValuePtr)

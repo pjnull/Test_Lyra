@@ -6,6 +6,7 @@
 #include "ObjectSnapshotData.h"
 #include "SubobjectSnapshotData.generated.h"
 
+/** Data saved for subobjects, such as components. */
 USTRUCT()
 struct LEVELSNAPSHOTS_API FSubobjectSnapshotData : public FObjectSnapshotData
 {

@@ -6,24 +6,27 @@
 #include "SnapshotArchive.h"
 #include "Misc/ObjectDependencyCallback.h"
 
-/* For writing data into an editor object. */
-class FLoadSnapshotObjectArchive : public FSnapshotArchive
+namespace UE::LevelSnapshots::Private
 {
-	using Super = FSnapshotArchive;
-public:
+	/* For writing data into an editor object. */
+	class FLoadSnapshotObjectArchive : public FSnapshotArchive
+	{
+		using Super = FSnapshotArchive;
+	public:
 	
-	static void ApplyToSnapshotWorldObject(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InObjectToRestore, FProcessObjectDependency ProcessObjectDependency, UPackage* InLocalisationSnapshotPackage);
-    static void ApplyToSnapshotWorldObject(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InObjectToRestore, FProcessObjectDependency ProcessObjectDependency, const FString& InLocalisationNamespace);
+		static void ApplyToSnapshotWorldObject(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InObjectToRestore, FProcessObjectDependency ProcessObjectDependency, UPackage* InLocalisationSnapshotPackage);
+		static void ApplyToSnapshotWorldObject(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InObjectToRestore, FProcessObjectDependency ProcessObjectDependency, const FString& InLocalisationNamespace);
 
-protected:
+	protected:
 
-	//~ Begin FSnapshotArchive Interface
-	virtual UObject* ResolveObjectDependency(int32 ObjectIndex) const override;
-	//~ End FSnapshotArchive Interface
+		//~ Begin FSnapshotArchive Interface
+		virtual UObject* ResolveObjectDependency(int32 ObjectIndex) const override;
+		//~ End FSnapshotArchive Interface
 
-private:
+	private:
 
-	FLoadSnapshotObjectArchive(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InSerializedObject, FProcessObjectDependency ProcessObjectDependency);
+		FLoadSnapshotObjectArchive(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InSerializedObject, FProcessObjectDependency ProcessObjectDependency);
 
-	FProcessObjectDependency ProcessObjectDependency;
-};
+		FProcessObjectDependency ProcessObjectDependency;
+	};
+}

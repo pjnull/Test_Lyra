@@ -2,10 +2,10 @@
 
 #include "FoliageSupport/FoliageRestorationInfo.h"
 
-#include "Data/AddedAndRemovedComponentInfo.h"
-#include "Data/RestorableObjectSelection.h"
 #include "FoliageSupport/FoliageInfoData.h"
-#include "PropertySelectionMap.h"
+#include "Selection/AddedAndRemovedComponentInfo.h"
+#include "Selection/RestorableObjectSelection.h"
+#include "Selection/PropertySelectionMap.h"
 
 #include "InstancedFoliageActor.h"
 #include "LevelSnapshotsLog.h"
@@ -15,8 +15,8 @@ FFoliageRestorationInfo FFoliageRestorationInfo::From(AInstancedFoliageActor* Ob
 	FFoliageRestorationInfo Result;
 	Result.bWasRecreated = bWasRecreated;
 	
-	const FRestorableObjectSelection ObjectSelection = SelectionMap.GetObjectSelection(Object);
-	if (const FAddedAndRemovedComponentInfo* ComponentInfo = ObjectSelection.GetComponentSelection())
+	const UE::LevelSnapshots::FRestorableObjectSelection ObjectSelection = SelectionMap.GetObjectSelection(Object);
+	if (const UE::LevelSnapshots::FAddedAndRemovedComponentInfo* ComponentInfo = ObjectSelection.GetComponentSelection())
 	{
 		Result.EditorWorldComponentsToRemove = ComponentInfo->EditorWorldComponentsToRemove.Array();
 		Result.SnapshotComponentsToAdd = ComponentInfo->SnapshotComponentsToAdd.Array();

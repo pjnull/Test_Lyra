@@ -14,59 +14,54 @@ struct FCustomSerializationData;
 struct FPropertySelectionMap;
 struct FWorldSnapshotData;
 
-/* Utility for calling final functions when using custom object serialization. */
-class FRestoreObjectScope
+namespace UE::LevelSnapshots::Private
 {
-	friend class FCustomObjectSerializationWrapper;
-	using FFinaliseRestorationCallback = TFunction<void()>;
-
-	FFinaliseRestorationCallback Callback;
-
-	FRestoreObjectScope() = delete;
-	FRestoreObjectScope(const FRestoreObjectScope& Other) = delete;
-
-public:
-
-	FRestoreObjectScope(FFinaliseRestorationCallback Callback)
-		: Callback(MoveTemp(Callback))
-	{}
-
-	~FRestoreObjectScope()
+	/* Utility for calling final functions when using custom object serialization. */
+	class FRestoreObjectScope
 	{
-		if (Callback)
+		friend class FCustomObjectSerializationWrapper;
+		using FFinaliseRestorationCallback = TFunction<void()>;
+
+		FFinaliseRestorationCallback Callback;
+
+		FRestoreObjectScope() = delete;
+		FRestoreObjectScope(const FRestoreObjectScope& Other) = delete;
+
+	public:
+
+		FRestoreObjectScope(FFinaliseRestorationCallback Callback)
+			: Callback(MoveTemp(Callback))
+		{}
+
+		~FRestoreObjectScope()
 		{
-			Callback();
+			if (Callback)
+			{
+				Callback();
+			}
 		}
-	}
 
-	FRestoreObjectScope(FRestoreObjectScope&& Other)
-		: Callback(Other.Callback)
-	{
-		Other.Callback = nullptr;
-	}
-};
+		FRestoreObjectScope(FRestoreObjectScope&& Other)
+			: Callback(Other.Callback)
+		{
+			Other.Callback = nullptr;
+		}
+	};
 
-/**
- * Encapsulates ICustomObjectSnapshotSerializer from places that serialize objects.
- */
-class FCustomObjectSerializationWrapper
-{
-public:
+	void TakeSnapshotForActor(
+			AActor* EditorActor,
+			FCustomSerializationData& ActorSerializationData,
+			FWorldSnapshotData& WorldData
+			);
 	
-	static void TakeSnapshotForActor(
-		AActor* EditorActor,
-		FCustomSerializationData& ActorSerializationData,
-		FWorldSnapshotData& WorldData
-		);
-	
-	static void TakeSnapshotForSubobject(
+	void TakeSnapshotForSubobject(
 		UObject* Subobject,
 		FWorldSnapshotData& WorldData
 		);
 
 
 	
-	UE_NODISCARD static FRestoreObjectScope PreActorRestore_SnapshotWorld(
+	UE_NODISCARD FRestoreObjectScope PreActorRestore_SnapshotWorld(
 		AActor* EditorActor,
 		FCustomSerializationData& ActorSerializationData,
 		FWorldSnapshotData& WorldData,
@@ -74,7 +69,7 @@ public:
 		UPackage* LocalisationSnapshotPackage
 		);
 
-	UE_NODISCARD static FRestoreObjectScope PreActorRestore_EditorWorld(
+	UE_NODISCARD FRestoreObjectScope PreActorRestore_EditorWorld(
 		AActor* EditorActor,
 		FCustomSerializationData& ActorSerializationData,
 		FWorldSnapshotData& WorldData,
@@ -83,7 +78,7 @@ public:
 		);
 	
 
-	UE_NODISCARD static FRestoreObjectScope PreSubobjectRestore_SnapshotWorld(
+	UE_NODISCARD FRestoreObjectScope PreSubobjectRestore_SnapshotWorld(
 		UObject* Subobject,
 		const FSoftObjectPath& OriginalSubobjectPath,
 		FWorldSnapshotData& WorldData,
@@ -91,7 +86,7 @@ public:
 		UPackage* LocalisationSnapshotPackage
 		);
 	
-	UE_NODISCARD static FRestoreObjectScope PreSubobjectRestore_EditorWorld(
+	UE_NODISCARD FRestoreObjectScope PreSubobjectRestore_EditorWorld(
 		UObject* SnapshotObject,
 		UObject* EditorObject,
 		FWorldSnapshotData& WorldData,
@@ -103,6 +98,7 @@ public:
 	using FHandleCustomSubobjectPair = TFunction<void(UObject* SnapshotSubobject, UObject* EditorSubobject)>;
 	using FHandleUnmatchedCustomSnapshotSubobject = TFunction<void(UObject* UnmatchedSnapshotSubobject)>;
 	
-	static void ForEachMatchingCustomSubobjectPair(const FWorldSnapshotData& WorldData, UObject* SnapshotObject, UObject* WorldObject, FHandleCustomSubobjectPair HandleCustomSubobjectPair, FHandleUnmatchedCustomSnapshotSubobject HandleUnmachtedCustomSnapshotSubobject);
-};
+	void ForEachMatchingCustomSubobjectPair(const FWorldSnapshotData& WorldData, UObject* SnapshotObject, UObject* WorldObject, FHandleCustomSubobjectPair HandleCustomSubobjectPair, FHandleUnmatchedCustomSnapshotSubobject HandleUnmachtedCustomSnapshotSubobject);
+}
+
 	

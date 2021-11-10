@@ -3,7 +3,7 @@
 #include "ConstantFilter.h"
 #include "ILevelSnapshotsModule.h"
 #include "Interfaces/ISnapshotRestorabilityOverrider.h"
-#include "PropertySelectionMap.h"
+#include "Selection/PropertySelectionMap.h"
 #include "Util/SnapshotTestRunner.h"
 #include "Types/SnapshotTestActor.h"
 
@@ -57,7 +57,7 @@ bool FRestoreSubobjectProperties::RunTest(const FString& Parameters)
 				.FilterProperties(Actor, [&](const FPropertySelectionMap& SelectionMap)
 				{
 					Test.TestEqual(TEXT("Selection map contains only actor and subobjects"), SelectionMap.GetKeyCount(), 7);
-					const FRestorableObjectSelection ActorSelection = SelectionMap.GetObjectSelection(Actor);
+					const UE::LevelSnapshots::FRestorableObjectSelection ActorSelection = SelectionMap.GetObjectSelection(Actor);
 					if (const FPropertySelection* ActorProperties = ActorSelection.GetPropertySelection())
 					{
 						Test.TestEqual(TEXT("Only subobject properties are selected"), ActorProperties->GetSelectedProperties().Num(), 6);
@@ -83,7 +83,7 @@ bool FRestoreSubobjectProperties::RunTest(const FString& Parameters)
 
 					// Does every changed subobject show up with the changed property?
 					const FProperty* IntProperty = USubobject::StaticClass()->FindPropertyByName(GET_MEMBER_NAME_CHECKED(USubobject, IntProperty));
-					const TArray<FRestorableObjectSelection> ChangedSubobjects = {
+					const TArray<UE::LevelSnapshots::FRestorableObjectSelection> ChangedSubobjects = {
 						SelectionMap.GetObjectSelection(Actor->EditableInstancedSubobject_DefaultSubobject),
 						SelectionMap.GetObjectSelection(Actor->EditOnlySubobject_OptionalSubobject),
 						SelectionMap.GetObjectSelection(Actor->EditableInstancedSubobjectArray_OptionalSubobject[0]),
@@ -91,7 +91,7 @@ bool FRestoreSubobjectProperties::RunTest(const FString& Parameters)
 						SelectionMap.GetObjectSelection(Actor->EditableInstancedSubobjectMap_OptionalSubobject["First"]),
 						SelectionMap.GetObjectSelection(Actor->EditOnlySubobjectMap_OptionalSubobject["First"])
 					};
-					for (const FRestorableObjectSelection& ObjectSelection : ChangedSubobjects)
+					for (const UE::LevelSnapshots::FRestorableObjectSelection& ObjectSelection : ChangedSubobjects)
 					{
 						if (const FPropertySelection* PropertySelection = ObjectSelection.GetPropertySelection())
 						{
@@ -105,13 +105,13 @@ bool FRestoreSubobjectProperties::RunTest(const FString& Parameters)
 					}
 
 					// Special case for subobjects: for collections, unchanged subobjects must show up with an empty set (see SnapshotUtil::Object::ResolveObjectDependencyForEditorWorld)
-					const TArray<FRestorableObjectSelection> UnchangedSubobjects = {
+					const TArray<UE::LevelSnapshots::FRestorableObjectSelection> UnchangedSubobjects = {
 						SelectionMap.GetObjectSelection(Actor->EditableInstancedSubobjectArray_OptionalSubobject[1]),
 						SelectionMap.GetObjectSelection(Actor->EditOnlySubobjectArray_OptionalSubobject[1]),
 						SelectionMap.GetObjectSelection(Actor->EditableInstancedSubobjectMap_OptionalSubobject["Second"]),
 						SelectionMap.GetObjectSelection(Actor->EditOnlySubobjectMap_OptionalSubobject["Second"])
 					};
-					for (const FRestorableObjectSelection& ObjectSelection : UnchangedSubobjects)
+					for (const UE::LevelSnapshots::FRestorableObjectSelection& ObjectSelection : UnchangedSubobjects)
 					{
 						if (const FPropertySelection* PropertySelection = ObjectSelection.GetPropertySelection())
 						{
@@ -816,7 +816,7 @@ bool FSkippedSubobjectsDoNotDiff::RunTest(const FString& Parameters)
 		// Since they collections are non-equal sizes, they're expected to diff.
 		.AccessSnapshot([&](ULevelSnapshot* Snapshot)
 		{
-			TOptional<AActor*> OptionalActorB_Snapshot = Snapshot->GetDeserializedActor(ActorB);
+			const TOptional<TNonNullPtr<AActor>> OptionalActorB_Snapshot = Snapshot->GetDeserializedActor(ActorB);
 			if (!ensure(OptionalActorB_Snapshot))
 			{
 				return;

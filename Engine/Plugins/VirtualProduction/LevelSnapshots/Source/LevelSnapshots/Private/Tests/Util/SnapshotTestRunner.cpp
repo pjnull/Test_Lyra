@@ -124,11 +124,11 @@ FSnapshotTestRunner& FSnapshotTestRunner::FilterProperties(AActor* OriginalActor
 {
 	return AccessSnapshot([OriginalActor, &Callback, Filter](ULevelSnapshot* Snapshot)
 	{
-		TOptional<AActor*> SnapshotCounterpart = Snapshot->GetDeserializedActor(OriginalActor);
+		const TOptional<TNonNullPtr<AActor>> SnapshotCounterpart = Snapshot->GetDeserializedActor(OriginalActor);
 		if (ensure(SnapshotCounterpart))
 		{
 			FPropertySelectionMap SelectedProperties;
-			ULevelSnapshotsFunctionLibrary::ApplyFilterToFindSelectedProperties(Snapshot, SelectedProperties, OriginalActor, *SnapshotCounterpart, Filter);
+			ULevelSnapshotsFunctionLibrary::ApplyFilterToFindSelectedProperties(Snapshot, SelectedProperties, OriginalActor, SnapshotCounterpart.GetValue(), Filter);
 			Callback(SelectedProperties);
 		}
 	}, SnapshotId);
