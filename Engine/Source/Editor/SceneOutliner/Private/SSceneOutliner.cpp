@@ -281,7 +281,7 @@ void SSceneOutliner::HandleHiddenColumnsChanged()
 	{
 		TMap<FName, bool> ColumnVisibilities = OutlinerConfig->ColumnVisibilities;
 
-		for (const TPair<FName, bool> Pair : Columns)
+		for (const TPair<FName, TSharedPtr<ISceneOutlinerColumn>>& Pair : Columns)
 		{
 			ColumnVisibilities.Add(Pair.Key, HiddenColumns.Find(Pair.Key) == INDEX_NONE);
 		}
