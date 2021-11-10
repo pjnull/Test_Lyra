@@ -1548,7 +1548,7 @@ FText FWatchLineItem::GetDisplayName() const
 		}
 
 		FFormatNamedArguments Args;
-		Args.Add(TEXT("PinWatchName"), FText::FromString(PinToWatch->GetName()));
+		Args.Add(TEXT("PinWatchName"), PinToWatch->GetDisplayName());
 		return FText::Format(LOCTEXT("DisplayNameNoProperty", "{PinWatchName} (no prop)"), Args);
 	}
 	else
