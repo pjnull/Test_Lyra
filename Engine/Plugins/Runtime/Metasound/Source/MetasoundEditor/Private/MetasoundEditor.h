@@ -66,6 +66,8 @@ namespace Metasound
 		class FEditor : public IMetasoundEditor, public FGCObject, public FNotifyHook, public FEditorUndoClient, public FTickableEditorObject
 		{
 		public:
+			static const FName EditorName;
+
 			virtual ~FEditor();
 
 			virtual void RegisterTabSpawners(const TSharedRef<FTabManager>& TabManager) override;
@@ -87,6 +89,9 @@ namespace Metasound
 			virtual FText GetBaseToolkitName() const override;
 			virtual FString GetWorldCentricTabPrefix() const override;
 			virtual FLinearColor GetWorldCentricTabColorScale() const override;
+
+			/** IAssetEditorInstance interface */
+			virtual FName GetEditorName() const override;
 
 			virtual FString GetDocumentationLink() const override
 			{

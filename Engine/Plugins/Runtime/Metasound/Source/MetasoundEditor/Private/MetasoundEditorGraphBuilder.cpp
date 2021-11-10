@@ -410,8 +410,16 @@ namespace Metasound
 
 		TSharedPtr<FEditor> FGraphBuilder::GetEditorForMetasound(const UObject& Metasound)
 		{
-			TSharedPtr<IToolkit> FoundAssetEditor = FToolkitManager::Get().FindEditorForAsset(&Metasound);
-			return StaticCastSharedPtr<FEditor, IToolkit>(FoundAssetEditor);
+			// TODO: FToolkitManager is deprecated. Replace with UAssetEditorSubsystem.
+			if (TSharedPtr<IToolkit> FoundAssetEditor = FToolkitManager::Get().FindEditorForAsset(&Metasound))
+			{
+				if (FEditor::EditorName == FoundAssetEditor->GetToolkitFName())
+				{
+					return StaticCastSharedPtr<FEditor, IToolkit>(FoundAssetEditor);
+				}
+			}
+
+			return TSharedPtr<FEditor>(nullptr);
 		}
 
 		TSharedPtr<FEditor> FGraphBuilder::GetEditorForGraph(const UEdGraph& EdGraph)

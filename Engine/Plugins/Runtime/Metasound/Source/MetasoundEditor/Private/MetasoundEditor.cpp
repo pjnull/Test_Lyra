@@ -207,6 +207,8 @@ namespace Metasound
 			}
 		};
 
+		const FName FEditor::EditorName = "MetaSoundEditor";
+
 		void FEditor::RegisterTabSpawners(const TSharedRef<FTabManager>& InTabManager)
 		{
 			WorkspaceMenuCategory = InTabManager->AddLocalWorkspaceMenuCategory(LOCTEXT("WorkspaceMenu_MetasoundEditor", "MetaSound Editor"));
@@ -455,7 +457,7 @@ namespace Metasound
 
 		FName FEditor::GetToolkitFName() const
 		{
-			return "MetaSoundEditor";
+			return FEditor::EditorName;
 		}
 
 		FText FEditor::GetBaseToolkitName() const
@@ -471,6 +473,11 @@ namespace Metasound
 		FLinearColor FEditor::GetWorldCentricTabColorScale() const
 		{
 			return FLinearColor(0.3f, 0.2f, 0.5f, 0.5f);
+		}
+
+		FName FEditor::GetEditorName() const 
+		{
+			return FEditor::EditorName;
 		}
 
 		void FEditor::AddReferencedObjects(FReferenceCollector& Collector)
