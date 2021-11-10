@@ -75,7 +75,7 @@ namespace Chaos
 
 	void FContactPairModifier::ModifySeparation(FReal Separation, int32 ContactPointIdx)
 	{
-		FManifoldPoint& ManifoldPoint = Constraint->GetManifoldPoints()[ContactPointIdx];
+		FManifoldPoint ManifoldPoint = Constraint->GetManifoldPoints()[ContactPointIdx];
 
 		FVec3 WorldPos0, WorldPos1;
 		GetWorldContactLocations(ContactPointIdx, WorldPos0, WorldPos1);
@@ -99,7 +99,7 @@ namespace Chaos
 
 	void FContactPairModifier::ModifyWorldNormal(const FVec3& Normal, int32 ContactPointIdx)
 	{
-		FManifoldPoint& ManifoldPoint = Constraint->GetManifoldPoints()[ContactPointIdx];
+		FManifoldPoint ManifoldPoint = Constraint->GetManifoldPoints()[ContactPointIdx];
 		ManifoldPoint.ContactPoint.Normal = Normal;
 		ManifoldPoint.ManifoldContactNormal = Normal;
 		Modifier->MarkConstraintForManifoldUpdate(*Constraint);
@@ -107,7 +107,7 @@ namespace Chaos
 
 	void FContactPairModifier::GetWorldContactLocations(int32 ContactPointIdx, FVec3& OutLocation0, FVec3& OutLocation1) const
 	{
-		FManifoldPoint& ManifoldPoint = Constraint->GetManifoldPoints()[ContactPointIdx];
+		FManifoldPoint ManifoldPoint = Constraint->GetManifoldPoints()[ContactPointIdx];
 		FGeometryParticleHandle* Particle0 = Constraint->Particle[0];
 		FGeometryParticleHandle* Particle1 = Constraint->Particle[1];
 
@@ -128,7 +128,7 @@ namespace Chaos
 
 	void FContactPairModifier::ModifyWorldContactLocations(const FVec3& Location0, const FVec3& Location1, int32 ContactPointIdx)
 	{
-		FManifoldPoint& ManifoldPoint = Constraint->GetManifoldPoints()[ContactPointIdx];
+		FManifoldPoint ManifoldPoint = Constraint->GetManifoldPoints()[ContactPointIdx];
 		FGeometryParticleHandle* Particle0 = Constraint->Particle[0];
 		FGeometryParticleHandle* Particle1 = Constraint->Particle[1];
 
@@ -153,7 +153,7 @@ namespace Chaos
 
 	void FContactPairModifier::GetCoMContactLocations(int32 ContactPointIdx, FVec3& OutLocation0, FVec3& OutLocation1) const
 	{
-		FManifoldPoint& ManifoldPoint = Constraint->GetManifoldPoints()[ContactPointIdx];
+		FManifoldPoint ManifoldPoint = Constraint->GetManifoldPoints()[ContactPointIdx];
 
 		OutLocation0 = ManifoldPoint.CoMContactPoints[0];
 		OutLocation1 = ManifoldPoint.CoMContactPoints[1];
@@ -161,7 +161,7 @@ namespace Chaos
 
 	void FContactPairModifier::ModifyCoMContactLocations(const FVec3& Location0, const FVec3& Location1, int32 ContactPointIdx)
 	{
-		FManifoldPoint& ManifoldPoint = Constraint->GetManifoldPoints()[ContactPointIdx];
+		FManifoldPoint ManifoldPoint = Constraint->GetManifoldPoints()[ContactPointIdx];
 
 		ManifoldPoint.CoMContactPoints[0] = Location0;
 		ManifoldPoint.CoMContactPoints[1] = Location1;
@@ -244,11 +244,13 @@ namespace Chaos
 		KinematicHandle->SetV(Velocity);
 
 		// Simulated object must update implicit velocity
-		FPBDRigidParticleHandle* RigidHandle = Particle->CastToRigidParticle();
-		EObjectStateType State(RigidHandle->ObjectState());
-		if (RigidHandle && (State == EObjectStateType::Dynamic || State == EObjectStateType::Sleeping))
+		if (FPBDRigidParticleHandle* RigidHandle = Particle->CastToRigidParticle())
 		{
-			RigidHandle->SetX(RigidHandle->P() - Velocity * Modifier->Dt);
+			EObjectStateType State(RigidHandle->ObjectState());
+			if (State == EObjectStateType::Dynamic || State == EObjectStateType::Sleeping)
+			{
+				RigidHandle->SetX(RigidHandle->P() - Velocity * Modifier->Dt);
+			}
 		}
 	}
 
@@ -278,11 +280,13 @@ namespace Chaos
 		KinematicHandle->SetW(AngularVelocity);
 
 		// Simulated object must update implicit velocity
-		FPBDRigidParticleHandle* RigidHandle = Particle->CastToRigidParticle();
-		EObjectStateType State(RigidHandle->ObjectState());
-		if (RigidHandle && (State == EObjectStateType::Dynamic || State == EObjectStateType::Sleeping))
+		if (FPBDRigidParticleHandle* RigidHandle = Particle->CastToRigidParticle())
 		{
-			RigidHandle->SetR(FRotation3::IntegrateRotationWithAngularVelocity(RigidHandle->Q(), -RigidHandle->W(), Modifier->Dt));
+			EObjectStateType State(RigidHandle->ObjectState());
+			if (State == EObjectStateType::Dynamic || State == EObjectStateType::Sleeping)
+			{
+				RigidHandle->SetR(FRotation3::IntegrateRotationWithAngularVelocity(RigidHandle->Q(), -RigidHandle->W(), Modifier->Dt));
+			}
 		}
 	}
 
@@ -305,29 +309,31 @@ namespace Chaos
 
 		Modifier->MarkConstraintForManifoldUpdate(*Constraint);
 
-		FPBDRigidParticleHandle* RigidHandle = Particle->CastToRigidParticle();
-		EObjectStateType State(RigidHandle->ObjectState());
-		if (RigidHandle && (State == EObjectStateType::Dynamic || State == EObjectStateType::Sleeping))
+		if (FPBDRigidParticleHandle* RigidHandle = Particle->CastToRigidParticle())
 		{
-			RigidHandle->SetP(Position);
+			EObjectStateType State(RigidHandle->ObjectState());
+			if (State == EObjectStateType::Dynamic || State == EObjectStateType::Sleeping)
+			{
+				RigidHandle->SetP(Position);
 
-			if (bMaintainVelocity)
-			{
-				RigidHandle->SetX(RigidHandle->P() - RigidHandle->V() * Modifier->Dt);
+				if (bMaintainVelocity)
+				{
+					RigidHandle->SetX(RigidHandle->P() - RigidHandle->V() * Modifier->Dt);
+				}
+				else if(Modifier->Dt > 0.0f)
+				{
+					// Update V to new implicit velocity
+					RigidHandle->SetV((RigidHandle->P() - RigidHandle->X()) / Modifier->Dt);
+				}
+				return;
 			}
-			else if(Modifier->Dt > 0.0f)
+			else
 			{
-				// Update V to new implicit velocity
-				RigidHandle->SetV((RigidHandle->P() - RigidHandle->X()) / Modifier->Dt);
+				// Kinematic must keep P/X in sync
+				RigidHandle->SetX(Position);
+				RigidHandle->SetP(Position);
+				return;
 			}
-			return;
-		}
-		else if(RigidHandle)
-		{
-			// Kinematic must keep P/X in sync
-			RigidHandle->SetX(Position);
-			RigidHandle->SetP(Position);
-			return;
 		}
 		
 		// Handle kinematic that is not PBDRigid type
@@ -363,31 +369,32 @@ namespace Chaos
 
 		Modifier->MarkConstraintForManifoldUpdate(*Constraint);
 
-		FPBDRigidParticleHandle* RigidHandle = Particle->CastToRigidParticle();
-		EObjectStateType State(RigidHandle->ObjectState());
-		if (RigidHandle && (State == EObjectStateType::Dynamic || State == EObjectStateType::Sleeping))
+		if (FPBDRigidParticleHandle* RigidHandle = Particle->CastToRigidParticle())
 		{
-			RigidHandle->SetQ(Rotation);
-
-			if (bMaintainVelocity)
+			EObjectStateType State(RigidHandle->ObjectState());
+			if (State == EObjectStateType::Dynamic || State == EObjectStateType::Sleeping)
 			{
-				RigidHandle->SetR(FRotation3::IntegrateRotationWithAngularVelocity(RigidHandle->Q(), -RigidHandle->W(), Modifier->Dt));
-			}
-			else if (Modifier->Dt > 0.0f)
-			{
-				// Update W to new implicit velocity
-				RigidHandle->SetW(FRotation3::CalculateAngularVelocity(RigidHandle->R(), RigidHandle->Q(), Modifier->Dt));
-			}
-			return;
-		}
-		else if (RigidHandle)
-		{
-			// Kinematic must keep Q/R in sync
-			RigidHandle->SetR(Rotation);
-			RigidHandle->SetQ(Rotation);
-			return;
-		}
+				RigidHandle->SetQ(Rotation);
 
+				if (bMaintainVelocity)
+				{
+					RigidHandle->SetR(FRotation3::IntegrateRotationWithAngularVelocity(RigidHandle->Q(), -RigidHandle->W(), Modifier->Dt));
+				}
+				else if (Modifier->Dt > 0.0f)
+				{
+					// Update W to new implicit velocity
+					RigidHandle->SetW(FRotation3::CalculateAngularVelocity(RigidHandle->R(), RigidHandle->Q(), Modifier->Dt));
+				}
+				return;
+			}
+			else
+			{
+				// Kinematic must keep Q/R in sync
+				RigidHandle->SetR(Rotation);
+				RigidHandle->SetQ(Rotation);
+				return;
+			}
+		}
 		// Handle kinematic that is not PBDRigid type
 		FKinematicGeometryParticleHandle* KinematicHandle = Particle->CastToKinematicParticle();
 		if (KinematicHandle)
