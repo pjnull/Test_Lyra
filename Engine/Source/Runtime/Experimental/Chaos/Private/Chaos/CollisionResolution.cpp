@@ -361,7 +361,7 @@ namespace Chaos
 		}
 
 		// Same as UpdateContact Point but without checking CullDistance. Used by CCD because sweeps do not set the separation unless the sweep actually hits
-		void UpdateContactPointNoCull(FPBDCollisionConstraint& Constraint, const FContactPoint& ContactPoint, const FReal Dt, const bool bNoCull)
+		void UpdateContactPointNoCull(FPBDCollisionConstraint& Constraint, const FContactPoint& ContactPoint, const FReal Dt, const bool bNoCull = true)
 		{
 			if (!bNoCull)
 			{
