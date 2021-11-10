@@ -169,3 +169,15 @@ def expand_endpoint(
         port_str = str(default_port)
 
     return f'{addr_str}:{port_str}'
+
+def explore_path(path:str):
+    ''' Opens the os file browser at the specified folder path '''
+
+    if sys.platform.startswith('win'):
+        subprocess.Popen(f'explorer {path}')
+    elif sys.platform.startswith('linux'):
+        subprocess.Popen(f'xdg-open {path}')
+    elif sys.platform.startswith('darwin'):
+        subprocess.Popen(f'open {path}')
+    else:
+        LOGGER.error(f"explore_path not supported in platform '{sys.platform}'")

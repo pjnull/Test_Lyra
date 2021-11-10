@@ -5,6 +5,7 @@ import logging
 import os
 import threading
 import time
+
 from typing import List, Optional, Set
 
 from PySide2 import QtCore
@@ -31,6 +32,9 @@ from switchboard.settings_dialog import SettingsDialog
 from switchboard.switchboard_logging import ConsoleStream, LOGGER
 from switchboard.tools.insights_launcher import InsightsLauncher
 from switchboard.tools.listener_launcher import ListenerLauncher
+from switchboard.devices.unreal.plugin_unreal import DeviceUnreal
+
+from . import switchboard_utils as sb_utils
 
 ENGINE_PATH = "../../../../.."
 RELATIVE_PATH = os.path.dirname(__file__)
@@ -249,6 +253,9 @@ class SwitchboardDialog(QtCore.QObject):
         # Convenience local Switchboard lister launcher
         self.init_listener_launcher()
 
+        # Convenience Open Logs Folder menu item
+        self.register_open_logs_menuitem()
+
         # Transport Manager
         #self.transport_queue = recording.TransportQueue(CONFIG.SWITCHBOARD_DIR)
         #self.transport_queue.signal_transport_queue_job_started.connect(self.transport_queue_job_started)
@@ -464,6 +471,15 @@ class SwitchboardDialog(QtCore.QObject):
 
         action = self.register_tools_menu_action("&Listener")
         action.triggered.connect(launch_listener)
+
+    def register_open_logs_menuitem(self):
+        ''' Registers convenience "Open Logs Folder" menu item '''
+
+        def open_logs_folder():
+            sb_utils.explore_path(DeviceUnreal.get_log_download_dir())
+
+        action = self.register_tools_menu_action("&Open Logs Folder")
+        action.triggered.connect(open_logs_folder)
 
     def add_tools_menu(self):
         ''' Adds tools menu to menu bar and populates built-in items '''
