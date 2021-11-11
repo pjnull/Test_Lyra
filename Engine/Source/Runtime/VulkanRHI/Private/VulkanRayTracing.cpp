@@ -161,6 +161,8 @@ static void GetBLASBuildData(
 	const EAccelerationStructureBuildMode BuildMode,
 	FVkRtBLASBuildData& BuildData)
 {
+	static constexpr uint32 IndicesPerPrimitive = 3; // Only triangle meshes are supported
+
 	FVulkanResourceMultiBuffer* const IndexBuffer = ResourceCast(IndexBufferRHI.GetReference());
 	VkDeviceOrHostAddressConstKHR IndexBufferDeviceAddress = {};
 	IndexBufferDeviceAddress.deviceAddress = IndexBufferRHI ? IndexBuffer->GetDeviceAddress() + IndexBufferOffset : 0;
@@ -177,9 +179,16 @@ static void GetBLASBuildData(
 
 		VkAccelerationStructureGeometryKHR SegmentGeometry;
 		ZeroVulkanStruct(SegmentGeometry, VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR);
+
 		if (Segment.bForceOpaque)
 		{
-			SegmentGeometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+			SegmentGeometry.flags |= VK_GEOMETRY_OPAQUE_BIT_KHR;
+		}
+
+		if (!Segment.bAllowDuplicateAnyHitShaderInvocation)
+		{
+			// Allow only a single any-hit shader invocation per primitive
+			SegmentGeometry.flags |= VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR;
 		}
 
 		// Only support triangles
@@ -192,17 +201,31 @@ static void GetBLASBuildData(
 		SegmentGeometry.geometry.triangles.vertexStride = Segment.VertexBufferStride;
 		SegmentGeometry.geometry.triangles.indexData = IndexBufferDeviceAddress;
 
+		switch (Segment.VertexBufferElementType)
+		{
+		case VET_Float3:
+			SegmentGeometry.geometry.triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
+			break;
+		default:
+			checkNoEntry();
+			break;
+		}
+
 		// No support for segment transform
 		SegmentGeometry.geometry.triangles.transformData.deviceAddress = 0;
 		SegmentGeometry.geometry.triangles.transformData.hostAddress = nullptr;
 
+		uint32 PrimitiveStride = 0;
+
 		if (IndexBufferRHI)
 		{
 			SegmentGeometry.geometry.triangles.indexType = (IndexStrideInBytes == 2) ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32;
+			PrimitiveStride = IndicesPerPrimitive * IndexStrideInBytes;
 		}
 		else
 		{
 			SegmentGeometry.geometry.triangles.indexType = VK_INDEX_TYPE_NONE_KHR;
+			PrimitiveStride = IndicesPerPrimitive * Segment.VertexBufferStride;
 		}
 
 		BuildData.Segments.Add(SegmentGeometry);
@@ -213,7 +236,9 @@ static void GetBLASBuildData(
 		// Disabled segments use an empty range. We still build them to keep the sbt valid.
 		RangeInfo.primitiveCount = (Segment.bEnabled) ? Segment.NumPrimitives : 0;
 
-		RangeInfo.primitiveOffset = Segment.FirstPrimitive;
+		// primitiveOffset defines an offset in bytes into the index buffer where primitive data for the current segment is defined.
+		// (for non-indexed geometry the offset is applied when reading from vertex buffer)
+		RangeInfo.primitiveOffset = Segment.FirstPrimitive * PrimitiveStride;
 		RangeInfo.transformOffset = 0;
 
 		BuildData.Ranges.Add(RangeInfo);
