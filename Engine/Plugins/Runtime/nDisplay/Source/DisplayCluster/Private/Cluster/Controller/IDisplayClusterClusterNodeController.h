@@ -15,25 +15,21 @@
 /**
  * Node controller interface
  */
-class IDisplayClusterNodeController
+class IDisplayClusterClusterNodeController
 	: public IDisplayClusterProtocolEventsJson
 	, public IDisplayClusterProtocolEventsBinary
 	, public IDisplayClusterProtocolClusterSync
 	, public IDisplayClusterProtocolRenderSync
 {
 public:
-	virtual ~IDisplayClusterNodeController() = default;
+	virtual ~IDisplayClusterClusterNodeController() = default;
 
 public:
 	/** Initialize controller instance */
 	virtual bool Initialize() = 0;
 
-	/** Release controller instance */
-	virtual void Release() = 0;
-
-	/** Clear per-frame cache */
-	virtual void ClearCache()
-	{ }
+	/** Stop  clients/servers/etc */
+	virtual void Shutdown() = 0;
 
 	/** Returns cluster role of the controller */
 	virtual EDisplayClusterNodeRole GetClusterRole() const = 0;
@@ -44,11 +40,17 @@ public:
 	/** Return controller name */
 	virtual FString GetControllerName() const = 0;
 
+	/** Drop specific cluster node */
+	virtual bool DropClusterNode(const FString& NodeId)
+	{
+		return false;
+	}
+
 	/** Send binary event to a specific target outside of the cluster */
-	virtual void SendClusterEventTo(const FString& Address, const int32 Port, const FDisplayClusterClusterEventBinary& Event, bool bMasterOnly)
+	virtual void SendClusterEventTo(const FString& Address, const uint16 Port, const FDisplayClusterClusterEventBinary& Event, bool bMasterOnly)
 	{ }
 
 	/** Send JSON event to a specific target outside of the cluster */
-	virtual void SendClusterEventTo(const FString& Address, const int32 Port, const FDisplayClusterClusterEventJson& Event, bool bMasterOnly)
+	virtual void SendClusterEventTo(const FString& Address, const uint16 Port, const FDisplayClusterClusterEventJson& Event, bool bMasterOnly)
 	{ }
 };

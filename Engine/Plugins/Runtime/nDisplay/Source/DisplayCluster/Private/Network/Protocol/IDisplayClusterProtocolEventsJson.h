@@ -4,6 +4,8 @@
 
 struct FDisplayClusterClusterEventJson;
 
+#include "Network/DisplayClusterNetworkTypes.h"
+
 
 /**
  * JSON cluster events protocol
@@ -14,5 +16,5 @@ public:
 	virtual ~IDisplayClusterProtocolEventsJson() = default;
 
 public:
-	virtual void EmitClusterEventJson(const FDisplayClusterClusterEventJson& Event) = 0;
+	virtual EDisplayClusterCommResult EmitClusterEventJson(const FDisplayClusterClusterEventJson& Event) = 0;
 };

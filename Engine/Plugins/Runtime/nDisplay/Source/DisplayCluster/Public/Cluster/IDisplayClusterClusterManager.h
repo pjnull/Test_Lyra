@@ -46,6 +46,8 @@ public:
 	/** Returns IDs of available cluster nodes. */
 	virtual void GetNodeIds(TArray<FString>& OutNodeIds) const = 0;
 
+	/** Drop specific cluster node */
+	virtual bool DropClusterNode(const FString& NodeId) = 0;
 
 	/** Registers object to synchronize. */
 	virtual void RegisterSyncObject(IDisplayClusterClusterSyncObject* SyncObj, EDisplayClusterSyncGroup SyncGroup) = 0;

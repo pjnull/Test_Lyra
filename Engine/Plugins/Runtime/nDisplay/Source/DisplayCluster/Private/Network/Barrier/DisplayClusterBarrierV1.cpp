@@ -1,41 +1,56 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "Misc/DisplayClusterBarrier.h"
+#include "Network/Barrier/DisplayClusterBarrierV1.h"
 
 #include "Misc/DisplayClusterLog.h"
 
-#include "Engine/EngineTypes.h"
 #include <chrono>
 
 
-FDisplayClusterBarrier::FDisplayClusterBarrier(uint32 InThreadsAmount, const FString& InName, uint32 InTimeout) :
-	Name(InName),
-	ThreadsAmount(InThreadsAmount),
-	ThreadsLeft(InThreadsAmount),
-	IterationCounter(0),
-	Timeout(InTimeout)
+FDisplayClusterBarrierV1::FDisplayClusterBarrierV1(const uint32 InThreadsAmount, const uint32 InTimeout, const FString& InName)
+	: Name(InName)
+	, ThreadsAmount(InThreadsAmount)
+	, ThreadsLeft(InThreadsAmount)
+	, IterationCounter(0)
+	, Timeout(InTimeout)
+	, WatchdogTimer(FString("stub_watchdog_not_used"))
 {
 	UE_LOG(LogDisplayClusterNetwork, Log, TEXT("Initialized barrier %s with timeout %u for threads count: %u"), *Name, Timeout, ThreadsAmount);
 }
 
-FDisplayClusterBarrier::FDisplayClusterBarrier(uint32 ThreadsAmount, uint32 Timeout) :
-	FDisplayClusterBarrier(ThreadsAmount, FString("noname_barrier"), Timeout)
-{
-}
-
-
-FDisplayClusterBarrier::~FDisplayClusterBarrier()
+FDisplayClusterBarrierV1::~FDisplayClusterBarrierV1()
 {
 	// Free currently blocked threads
 	Deactivate();
 }
 
-FDisplayClusterBarrier::WaitResult FDisplayClusterBarrier::Wait(double* ThreadWaitTime /*= nullptr*/, double* BarrierWaitTime /*= nullptr*/)
+
+bool FDisplayClusterBarrierV1::Activate()
+{
+	std::unique_lock<std::mutex> lock{ Mutex };
+
+	IterationCounter = 0;
+	ThreadsLeft = ThreadsAmount;
+	bEnabled = true;
+	CondVar.notify_all();
+
+	return true;
+}
+
+void FDisplayClusterBarrierV1::Deactivate()
+{
+	std::unique_lock<std::mutex> lock{ Mutex };
+
+	bEnabled = false;
+	CondVar.notify_all();
+}
+
+EDisplayClusterBarrierWaitResult FDisplayClusterBarrierV1::Wait(const FString& ThreadMarker, double* ThreadWaitTime /*= nullptr*/, double* BarrierWaitTime /*= nullptr*/)
 {
 	if (bEnabled == false)
 	{
 		UE_LOG(LogDisplayClusterNetwork, Verbose, TEXT("%s barrier is not active"), *Name);
-		return WaitResult::NotActive;
+		return EDisplayClusterBarrierWaitResult::NotActive;
 	}
 
 	const double ThreadWaitTimeStart = FPlatformTime::Seconds();
@@ -73,9 +88,8 @@ FDisplayClusterBarrier::WaitResult FDisplayClusterBarrier::Wait(double* ThreadWa
 			// Not all of threads have came here. Wait.
 			if (!CondVar.wait_for(lock, std::chrono::milliseconds(Timeout), [this, curIter] { return curIter != IterationCounter || bEnabled == false; }))
 			{
-				//@todo: no timeout result if barrier has been disabled
 				UE_LOG(LogDisplayClusterNetwork, Warning, TEXT("%s barrier waiting timeout"), *Name);
-				return WaitResult::Timeout;
+				return EDisplayClusterBarrierWaitResult::TimeOut;
 			}
 		}
 	}
@@ -83,29 +97,15 @@ FDisplayClusterBarrier::WaitResult FDisplayClusterBarrier::Wait(double* ThreadWa
 	const double ThreadWaitTimeFinish = FPlatformTime::Seconds();
 
 	if (BarrierWaitTime)
+	{
 		*BarrierWaitTime = WaitTimeOverall;
+	}
 
 	if (ThreadWaitTime)
+	{
 		*ThreadWaitTime = ThreadWaitTimeFinish - ThreadWaitTimeStart;
+	}
 
 	// Go ahead
-	return WaitResult::Ok;
-}
-
-void FDisplayClusterBarrier::Activate()
-{
-	std::unique_lock<std::mutex> lock{ Mutex };
-
-	IterationCounter = 0;
-	ThreadsLeft = ThreadsAmount;
-	bEnabled = true;
-	CondVar.notify_all();
-}
-
-void FDisplayClusterBarrier::Deactivate()
-{
-	std::unique_lock<std::mutex> lock{ Mutex };
-
-	bEnabled = false;
-	CondVar.notify_all();
+	return EDisplayClusterBarrierWaitResult::Ok;
 }

@@ -668,7 +668,7 @@ void ADisplayClusterRootActor::Tick(float DeltaSeconds)
 				{
 					if (CurPlayerController->WasInputKeyJustPressed(EKeys::Escape))
 					{
-						FDisplayClusterAppExit::ExitApplication(FDisplayClusterAppExit::EExitType::NormalSoft, FString("Exit on ESC requested"));
+						FDisplayClusterAppExit::ExitApplication(FString("Exit on ESC requested"));
 					}
 				}
 			}

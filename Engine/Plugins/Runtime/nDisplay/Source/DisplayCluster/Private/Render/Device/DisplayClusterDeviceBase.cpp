@@ -2,8 +2,10 @@
 
 #include "Render/Device/DisplayClusterDeviceBase.h"
 
+#include "IPDisplayCluster.h"
+#include "IDisplayClusterCallbacks.h"
 #include "Cluster/IPDisplayClusterClusterManager.h"
-#include "Cluster/Controller/IDisplayClusterNodeController.h"
+#include "Cluster/Controller/IDisplayClusterClusterNodeController.h"
 #include "Config/IPDisplayClusterConfigManager.h"
 #include "Game/IPDisplayClusterGameManager.h"
 #include "Render/IPDisplayClusterRenderManager.h"
@@ -105,7 +107,7 @@ void FDisplayClusterDeviceBase::PreTick(float DeltaSeconds)
 			{
 				MainViewportRHI->SetCustomPresent(CustomPresentHandler);
 				bIsCustomPresentSet = true;
-				OnDisplayClusterRenderCustomPresentCreated().Broadcast();
+				GDisplayCluster->GetCallbacks().OnDisplayClusterCustomPresentSet().Broadcast();
 			}
 			else
 			{
@@ -155,7 +157,7 @@ void FDisplayClusterDeviceBase::InitCanvasFromView(class FSceneView* InView, cla
 
 			MainViewport->GetViewportRHI()->SetCustomPresent(CustomPresentHandler);
 
-			OnDisplayClusterRenderCustomPresentCreated().Broadcast();
+			GDisplayCluster->GetCallbacks().OnDisplayClusterCustomPresentSet().Broadcast();
 		}
 
 		bIsCustomPresentSet = true;
@@ -166,8 +168,10 @@ void FDisplayClusterDeviceBase::AdjustViewRect(EStereoscopicPass StereoPassType,
 {
 	check(IsInGameThread());
 
-	if (ViewportManagerPtr ==nullptr || ViewportManagerPtr->IsSceneOpened() == false)
-		{ return; }
+	if (ViewportManagerPtr == nullptr || ViewportManagerPtr->IsSceneOpened() == false)
+	{
+		return;
+	}
 
 	uint32 ViewportContextNum = 0;
 	IDisplayClusterViewport* ViewportPtr = ViewportManagerPtr->FindViewport(StereoPassType, &ViewportContextNum);

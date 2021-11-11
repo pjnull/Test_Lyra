@@ -4,6 +4,8 @@
 
 struct FDisplayClusterClusterEventBinary;
 
+#include "Network/DisplayClusterNetworkTypes.h"
+
 
 /**
  * Binary cluster events protocol.
@@ -14,5 +16,5 @@ public:
 	virtual ~IDisplayClusterProtocolEventsBinary() = default;
 
 public:
-	virtual void EmitClusterEventBinary(const FDisplayClusterClusterEventBinary& Event) = 0;
+	virtual EDisplayClusterCommResult EmitClusterEventBinary(const FDisplayClusterClusterEventBinary& Event) = 0;
 };
