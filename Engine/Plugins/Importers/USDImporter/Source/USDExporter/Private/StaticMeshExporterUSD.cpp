@@ -178,16 +178,15 @@ bool UStaticMeshExporterUsd::ExportBinary( UObject* Object, const TCHAR* Type, F
 
 				UsdUtils::AddPayload( AssetRootPrim, *PayloadFilename );
 			}
-
-			UnrealToUsd::ConvertStaticMesh( StaticMesh, RootPrim, UsdUtils::GetDefaultTimeCode(), &AssetStage, Options->MeshAssetOptions.LowestMeshLOD, Options->MeshAssetOptions.HighestMeshLOD );
 		}
 	}
 	// Not using payload: Just author everything on the current edit target of the payload (== asset) layer
 	else
 	{
-		UnrealToUsd::ConvertStaticMesh( StaticMesh, RootPrim, UsdUtils::GetDefaultTimeCode() );
 		AssetStage = UsdStage;
 	}
+
+	UnrealToUsd::ConvertStaticMesh( StaticMesh, RootPrim, UsdUtils::GetDefaultTimeCode(), &AssetStage, Options->MeshAssetOptions.LowestMeshLOD, Options->MeshAssetOptions.HighestMeshLOD );
 
 	// Bake materials and replace unrealMaterials with references to the baked files.
 	if ( Options->MeshAssetOptions.bBakeMaterials )
