@@ -74,9 +74,7 @@ namespace Chaos
 	}
 
 	void FContactPairModifier::ModifySeparation(FReal Separation, int32 ContactPointIdx)
-	{
-		FManifoldPoint ManifoldPoint = Constraint->GetManifoldPoints()[ContactPointIdx];
-
+	{	
 		FVec3 WorldPos0, WorldPos1;
 		GetWorldContactLocations(ContactPointIdx, WorldPos0, WorldPos1);
 
@@ -99,7 +97,9 @@ namespace Chaos
 
 	void FContactPairModifier::ModifyWorldNormal(const FVec3& Normal, int32 ContactPointIdx)
 	{
-		FManifoldPoint ManifoldPoint = Constraint->GetManifoldPoints()[ContactPointIdx];
+		TArrayView<FManifoldPoint> ManifoldPoints = Constraint->GetManifoldPoints();
+		FManifoldPoint& ManifoldPoint = ManifoldPoints[ContactPointIdx];
+
 		ManifoldPoint.ContactPoint.Normal = Normal;
 		ManifoldPoint.ManifoldContactNormal = Normal;
 		Modifier->MarkConstraintForManifoldUpdate(*Constraint);
@@ -107,7 +107,8 @@ namespace Chaos
 
 	void FContactPairModifier::GetWorldContactLocations(int32 ContactPointIdx, FVec3& OutLocation0, FVec3& OutLocation1) const
 	{
-		FManifoldPoint ManifoldPoint = Constraint->GetManifoldPoints()[ContactPointIdx];
+		TArrayView<FManifoldPoint> ManifoldPoints = Constraint->GetManifoldPoints();
+		FManifoldPoint& ManifoldPoint = ManifoldPoints[ContactPointIdx];
 		FGeometryParticleHandle* Particle0 = Constraint->Particle[0];
 		FGeometryParticleHandle* Particle1 = Constraint->Particle[1];
 
@@ -128,7 +129,8 @@ namespace Chaos
 
 	void FContactPairModifier::ModifyWorldContactLocations(const FVec3& Location0, const FVec3& Location1, int32 ContactPointIdx)
 	{
-		FManifoldPoint ManifoldPoint = Constraint->GetManifoldPoints()[ContactPointIdx];
+		TArrayView<FManifoldPoint> ManifoldPoints = Constraint->GetManifoldPoints();
+		FManifoldPoint& ManifoldPoint = ManifoldPoints[ContactPointIdx];
 		FGeometryParticleHandle* Particle0 = Constraint->Particle[0];
 		FGeometryParticleHandle* Particle1 = Constraint->Particle[1];
 
@@ -153,7 +155,8 @@ namespace Chaos
 
 	void FContactPairModifier::GetCoMContactLocations(int32 ContactPointIdx, FVec3& OutLocation0, FVec3& OutLocation1) const
 	{
-		FManifoldPoint ManifoldPoint = Constraint->GetManifoldPoints()[ContactPointIdx];
+		TArrayView<FManifoldPoint> ManifoldPoints = Constraint->GetManifoldPoints();
+		FManifoldPoint& ManifoldPoint = ManifoldPoints[ContactPointIdx];
 
 		OutLocation0 = ManifoldPoint.CoMContactPoints[0];
 		OutLocation1 = ManifoldPoint.CoMContactPoints[1];
@@ -161,7 +164,8 @@ namespace Chaos
 
 	void FContactPairModifier::ModifyCoMContactLocations(const FVec3& Location0, const FVec3& Location1, int32 ContactPointIdx)
 	{
-		FManifoldPoint ManifoldPoint = Constraint->GetManifoldPoints()[ContactPointIdx];
+		TArrayView<FManifoldPoint> ManifoldPoints = Constraint->GetManifoldPoints();
+		FManifoldPoint& ManifoldPoint = ManifoldPoints[ContactPointIdx];
 
 		ManifoldPoint.CoMContactPoints[0] = Location0;
 		ManifoldPoint.CoMContactPoints[1] = Location1;
