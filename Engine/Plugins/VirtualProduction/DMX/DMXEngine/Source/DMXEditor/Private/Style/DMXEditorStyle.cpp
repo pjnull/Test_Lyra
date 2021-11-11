@@ -2,7 +2,9 @@
 
 #include "DMXEditorStyle.h"
 
+#include "EditorStyleSet.h"
 #include "Styling/SlateStyleRegistry.h"
+#include "Styling/SlateTypes.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Interfaces/IPluginManager.h"
 #include "Engine/Font.h"
