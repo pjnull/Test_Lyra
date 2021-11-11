@@ -309,7 +309,7 @@ namespace UnrealBuildTool
 				List<LinkedAction>[] QueuedActions = new List<LinkedAction>[Makefiles.Length];
 				for(int Idx = 0; Idx < Makefiles.Length; Idx++)
 				{
-					QueuedActions[Idx] = Makefiles[Idx].Actions.ConvertAll(x => new LinkedAction(x));
+					QueuedActions[Idx] = Makefiles[Idx].Actions.ConvertAll(x => new LinkedAction(x, TargetDescriptors[Idx]));
 				}
 
 				// Clean up any previous hot reload runs, and reapply the current state if it's already active
@@ -836,7 +836,7 @@ namespace UnrealBuildTool
 					LinkedAction? ExistingAction;
 					if(!OutputItemToProducingAction.TryGetValue(ProducedItem, out ExistingAction))
 					{
-						ExistingAction = new LinkedAction(TargetAction);
+						ExistingAction = new LinkedAction(TargetAction, TargetDescriptors[TargetIdx]);
 						OutputItemToProducingAction[ProducedItem] = ExistingAction;
 					}
 					ExistingAction.GroupNames.Add(GroupPrefix);

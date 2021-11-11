@@ -48,7 +48,7 @@ namespace UnrealBuildTool
 			List<LinkedAction> Actions;
 			using (GlobalTracer.Instance.BuildSpan("ActionGraph.ReadActions()").StartActive())
 			{
-				Actions = ActionGraph.ImportJson(ActionsFile).ConvertAll(x => new LinkedAction(x));
+				Actions = ActionGraph.ImportJson(ActionsFile).ConvertAll(x => new LinkedAction(x, null));
 			}
 
 			// Link the action graph

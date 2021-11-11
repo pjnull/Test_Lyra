@@ -492,6 +492,11 @@ namespace UnrealBuildTool
 		public IExternalAction Inner;
 
 		/// <summary>
+		/// A target that this action contributes to
+		/// </summary>
+		public TargetDescriptor? Target;
+
+		/// <summary>
 		/// Set of other actions that this action depends on. This set is built when the action graph is linked.
 		/// </summary>
 		public HashSet<LinkedAction> PrerequisiteActions = null!;
@@ -531,9 +536,11 @@ namespace UnrealBuildTool
 		/// Constructor
 		/// </summary>
 		/// <param name="Inner">The inner action instance</param>
-		public LinkedAction(IExternalAction Inner)
+		/// <param name="Target"></param>
+		public LinkedAction(IExternalAction Inner, TargetDescriptor? Target)
 		{
 			this.Inner = Inner;
+			this.Target = Target;
 		}
 
 		/// <summary>
