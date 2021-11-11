@@ -4753,13 +4753,7 @@ void STimingView::QuickFind_Execute()
 		AvailableFilters->Add(MakeShared<FFilter>(static_cast<int32>(EFilterField::EndTime), LOCTEXT("EndTime", "End Time"), LOCTEXT("EndTime", "End Time"), EFilterDataType::Double, FFilterService::Get()->GetDoubleOperators()));
 		AvailableFilters->Add(MakeShared<FFilter>(static_cast<int32>(EFilterField::Duration), LOCTEXT("Duration", "Duration"), LOCTEXT("Duration", "Duration"), EFilterDataType::Double, FFilterService::Get()->GetDoubleOperators()));
 
-		TSharedPtr<TArray<TSharedPtr<IFilterOperator>>> StringFilterWithSuggestionsOperators = MakeShared<TArray<TSharedPtr<IFilterOperator>>>();
-		StringFilterWithSuggestionsOperators->Add(StaticCastSharedRef<IFilterOperator>(MakeShared<FFilterOperator<FString>>(EFilterOperator::Eq, TEXT("Is"), [](const FString& lhs, const FString& rhs) { return lhs.Equals(rhs); })));
-		StringFilterWithSuggestionsOperators->Add(StaticCastSharedRef<IFilterOperator>(MakeShared<FFilterOperator<FString>>(EFilterOperator::Contains, TEXT("Contains"), [](const FString& lhs, const FString& rhs) { return lhs.Contains(rhs); })));
-		StringFilterWithSuggestionsOperators->Add(StaticCastSharedRef<IFilterOperator>(MakeShared<FFilterOperator<FString>>(EFilterOperator::Contains, TEXT("Is Not"), [](const FString& lhs, const FString& rhs) { return !lhs.Equals(rhs); })));
-		StringFilterWithSuggestionsOperators->Add(StaticCastSharedRef<IFilterOperator>(MakeShared<FFilterOperator<FString>>(EFilterOperator::Contains, TEXT("Does Not Contain"), [](const FString& lhs, const FString& rhs) { return !lhs.Contains(rhs); })));
-
-		TSharedPtr<FFilterWithSuggestions> TrackFilter = MakeShared<FFilterWithSuggestions>(static_cast<int32>(EFilterField::TrackName), LOCTEXT("Track", "Track"), LOCTEXT("Track", "Track"), EFilterDataType::String, StringFilterWithSuggestionsOperators);
+		TSharedPtr<FFilterWithSuggestions> TrackFilter = MakeShared<FFilterWithSuggestions>(static_cast<int32>(EFilterField::TrackName), LOCTEXT("Track", "Track"), LOCTEXT("Track", "Track"), EFilterDataType::String, FFilterService::Get()->GetStringOperators());
 		TrackFilter->Callback = [this](const FString& Text, TArray<FString>& OutSuggestions)
 		{
 			this->PopulateTrackSuggestionList(Text, OutSuggestions);
