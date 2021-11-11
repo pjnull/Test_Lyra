@@ -1604,7 +1604,9 @@ void FPixelShaderInOut_MainPS(
 	if (StrataData.LayerCount > 0)
 	{
 		float2 ScreenUV = ScreenPositionToBufferUV(MaterialParameters.ScreenPosition);
-		float2 NearestResolvedDepthScreenUV = CalculateNearestResolvedDepthScreenUV(ScreenUV, MaterialParameters.ScreenPosition.w);
+	#if FORWARD_SHADING && (MATERIALBLENDING_SOLID || MATERIALBLENDING_MASKED)
+		ScreenUV = CalculateNearestResolvedDepthScreenUV(ScreenUV, MaterialParameters.ScreenPosition.w);
+	#endif
 
 		float3 L = ResolvedView.DirectionalLightDirection;
 		float3 LightColor = ResolvedView.DirectionalLightColor.rgb * PI;
@@ -1616,7 +1618,7 @@ void FPixelShaderInOut_MainPS(
 			BasePassInterpolants,
 			MaterialParameters,
 			GBuffer.Depth,
-			NearestResolvedDepthScreenUV,
+			ScreenUV,
 			L,
 			StrataPixelHeader,
 			StrataData,
