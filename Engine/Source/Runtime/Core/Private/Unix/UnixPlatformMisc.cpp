@@ -852,7 +852,7 @@ FString FPlatformProcCPUInfo::GetArmCPUImplementerStr(uint32 CPUImplementer)
 		case 0x49: return TEXT( "Infineon" );
 		case 0x4d: return TEXT( "Motorola" );
 		case 0x4e: return TEXT( "NVIDIA" );
-		case 0x50: return TEXT( "APM" );
+		case 0x50: return TEXT( "AppliedMicro" ); // Applied Micro Circuits Corporation (APM)
 		case 0x51: return TEXT( "Qualcomm" );
 		case 0x53: return TEXT( "Samsung" );
 		case 0x54: return TEXT( "Texas Instruments" );
@@ -915,6 +915,8 @@ FString FPlatformProcCPUInfo::GetArmCPUPartStr( uint32 CPUImplementer, uint32 CP
 		case ARM64_CPU_MODEL(0x4e, 0x000): return TEXT( "Denver" );         // ARMv8.0-A
 		case ARM64_CPU_MODEL(0x4e, 0x003): return TEXT( "Denver 2" );       // ARMv8.0-A
 		case ARM64_CPU_MODEL(0x4e, 0x004): return TEXT( "Carmel" );         // ARMv8.2-A
+		// Applied Micro X-Gene
+		case ARM64_CPU_MODEL(0x50, 0x000): return TEXT( "X-Gene" );
 	}
 
 	return FString::Printf(TEXT("CPUPart_0x%x"), CPUPart);
