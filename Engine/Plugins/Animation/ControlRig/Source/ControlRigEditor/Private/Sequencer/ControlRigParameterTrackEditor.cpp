@@ -1564,7 +1564,7 @@ static void EvaluateThisControl(UMovieSceneControlRigParameterSection* Section, 
 
 			}
 		}
-		ControlRig->Evaluate_AnyThread();
+		//note we don't need to evaluate the control rig, setting the value is enough
 	}
 }
 		
@@ -2403,11 +2403,33 @@ void FControlRigParameterTrackEditor::GetControlRigKeys(UControlRig* InControlRi
 			case ERigControlType::Scale:
 			case ERigControlType::Rotator:
 			{
+				bool bKeyX = bSetKey;
+				bool bKeyY = bSetKey;
+				bool bKeyZ = bSetKey;
+				if (ControlElement->Settings.ControlType == ERigControlType::Position)
+				{
+					bKeyX = bSetKey && EnumHasAnyFlags(ChannelsToKey, EControlRigContextChannelToKey::TranslationX);
+					bKeyY = EnumHasAnyFlags(ChannelsToKey, EControlRigContextChannelToKey::TranslationY);
+					bKeyZ = EnumHasAnyFlags(ChannelsToKey, EControlRigContextChannelToKey::TranslationZ);
+				}
+				else if(ControlElement->Settings.ControlType == ERigControlType::Rotator)
+				{
+					bKeyX = bSetKey && EnumHasAnyFlags(ChannelsToKey, EControlRigContextChannelToKey::RotationX);
+					bKeyY = bSetKey && EnumHasAnyFlags(ChannelsToKey, EControlRigContextChannelToKey::RotationY);
+					bKeyZ = bSetKey && EnumHasAnyFlags(ChannelsToKey, EControlRigContextChannelToKey::RotationZ);
+				}
+				else //scale
+				{
+					bKeyX = bSetKey && EnumHasAnyFlags(ChannelsToKey, EControlRigContextChannelToKey::ScaleX);
+					bKeyY = bSetKey && EnumHasAnyFlags(ChannelsToKey, EControlRigContextChannelToKey::ScaleY);
+					bKeyZ = bSetKey && EnumHasAnyFlags(ChannelsToKey, EControlRigContextChannelToKey::ScaleZ);
+				}
+				
 				FVector3f Val = ControlValue.Get<FVector3f>();
 				pChannelIndex->GeneratedKeyIndex = OutGeneratedKeys.Num();
-				OutGeneratedKeys.Add(FMovieSceneChannelValueSetter::Create<FMovieSceneFloatChannel>(ChannelIndex++, Val.X, bSetKey));
-				OutGeneratedKeys.Add(FMovieSceneChannelValueSetter::Create<FMovieSceneFloatChannel>(ChannelIndex++, Val.Y, bSetKey));
-				OutGeneratedKeys.Add(FMovieSceneChannelValueSetter::Create<FMovieSceneFloatChannel>(ChannelIndex++, Val.Z, bSetKey));
+				OutGeneratedKeys.Add(FMovieSceneChannelValueSetter::Create<FMovieSceneFloatChannel>(ChannelIndex++, Val.X, bKeyX));
+				OutGeneratedKeys.Add(FMovieSceneChannelValueSetter::Create<FMovieSceneFloatChannel>(ChannelIndex++, Val.Y, bKeyY));
+				OutGeneratedKeys.Add(FMovieSceneChannelValueSetter::Create<FMovieSceneFloatChannel>(ChannelIndex++, Val.Z, bKeyZ));
 				break;
 			}
 
