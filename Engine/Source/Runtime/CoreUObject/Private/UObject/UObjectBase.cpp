@@ -652,7 +652,7 @@ void UClassCompiledInDefer(FFieldCompiledInInfo* ClassInfo, const TCHAR* Name, S
 PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 // [DEPRECATED] - Legacy implementation that will be removed later. Also note that dynamic class types are no longer supported here.
-void UObjectCompiledInDefer(UClass *(*InRegister)(), UClass *(*InStaticClass)(), const TCHAR* Name, const TCHAR* PackageName, bool /*bDynamic*/, const TCHAR* /*DynamicPathName*/, void (*/*InInitSearchableValues*/)(TMap<FName, FName>&))
+void UObjectCompiledInDefer(UClass *(*InRegister)(), UClass *(*InStaticClass)(), const TCHAR* Name, const TCHAR* PackageName, bool /*bDynamic*/, const TCHAR* /*DynamicPathName*/, void (*InInitSearchableValues)(TMap<FName, FName>&))
 {
 	// Either add all classes if not hot-reloading, or those which have changed
 	FClassDeferredRegistry& ClassRegistry = FClassDeferredRegistry::Get();
