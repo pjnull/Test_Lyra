@@ -855,18 +855,18 @@ bool FMath::LineExtentBoxIntersection(const FBox& inBox,
 	{	
 		if(Time.Y > Time.Z)
 		{
-			HitTime = (decltype(HitTime))Time.Y;	// LWC_TODO: Remove decltype
+			HitTime = static_cast<std::remove_reference_t<decltype(HitTime)>>(Time.Y);	// LWC_TODO: Remove decltype
 			HitNormal = FVector(0, faceDir[1], 0);
 		}
 		else
 		{
-			HitTime = (decltype(HitTime))Time.Z;
+			HitTime = static_cast<std::remove_reference_t<decltype(HitTime)>>(Time.Z);
 			HitNormal = FVector(0, 0, faceDir[2]);
 		}
 		
 		if(Time.X > HitTime)
 		{
-			HitTime = (decltype(HitTime))Time.X;
+			HitTime = static_cast<std::remove_reference_t<decltype(HitTime)>>(Time.X);
 			HitNormal = FVector(faceDir[0], 0, 0);
 		}
 		
