@@ -813,6 +813,7 @@ void FStreamReaderHLSfmp4::FStreamHandler::HandleRequest()
 				{
 					HTTP->Parameters.Range = Request->Range;
 				}
+				HTTP->ResponseCache = PlayerSessionService->GetHTTPResponseCache();
 
 				ProgressReportCount = 0;
 				DownloadCompleteSignal.Reset();
@@ -1242,6 +1243,7 @@ void FStreamReaderHLSfmp4::FStreamHandler::HandleRequest()
 	{
 		ds.ThroughputBps = ds.TimeToDownload > 0.0 ? 8 * ds.NumBytesDownloaded / ds.TimeToDownload : 0;
 	}
+	ds.bIsCachedResponse = CurrentRequest->ConnectionInfo.bIsCachedResponse;
 
 	if (!bSilentCancellation)
 	{

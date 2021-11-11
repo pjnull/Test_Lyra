@@ -705,6 +705,7 @@ namespace Electra
 	{
 		if (SegmentDownloadStats.SegmentType == Metrics::ESegmentType::Media &&
 			SegmentDownloadStats.StreamType == EStreamType::Video &&
+			!SegmentDownloadStats.bIsCachedResponse &&
 			(SegmentDownloadStats.bWasSuccessful || SegmentDownloadStats.NumBytesDownloaded))	// any number of bytes received counts!
 		{
 			// At the end of the segment download, successful or otherwise, we clear the forced bitrate and let nature take its course.

@@ -294,6 +294,9 @@ void FAdaptiveStreamingPlayer::Initialize(const FParamDict& Options)
 	// Create an entity cache.
 	EntityCache = IPlayerEntityCache::Create(this, PlayerOptions);
 
+	// Create an HTTP response cache.
+	HttpResponseCache = IHTTPResponseCache::Create(this, PlayerOptions);
+
 	// Create the ABR stream selector.
 	PlayerConfig.StreamSelectorConfig.bRebufferingJustResumesLoading = PlayerOptions.GetValue(OptionRebufferingContinuesLoading).SafeGetBool(false);
 	StreamSelector = IAdaptiveStreamSelector::Create(this, PlayerConfig.StreamSelectorConfig);
@@ -1122,6 +1125,11 @@ TSharedPtrTS<IPlayerEntityCache> FAdaptiveStreamingPlayer::GetEntityCache()
 	return EntityCache;
 }
 
+TSharedPtrTS<IHTTPResponseCache> FAdaptiveStreamingPlayer::GetHTTPResponseCache()
+{
+	return HttpResponseCache;
+}
+
 IAdaptiveStreamingPlayerAEMSHandler* FAdaptiveStreamingPlayer::GetAEMSEventHandler()
 {
 	return AEMSEventHandler;
@@ -1307,6 +1315,11 @@ void FAdaptiveStreamingPlayer::InternalHandleOnce()
 		if (EntityCache.IsValid())
 		{
 			EntityCache->HandleEntityExpiration();
+		}
+		// Handle HTTP response cache expirations.
+		if (HttpResponseCache.IsValid())
+		{
+			HttpResponseCache->HandleEntityExpiration();
 		}
 		// Handle completed DRM requests.
 		if (DrmManager.IsValid())
@@ -4030,6 +4043,8 @@ void FAdaptiveStreamingPlayer::InternalClose()
 
 	HttpManager.Reset();
 	EntityCache.Reset();
+	HttpResponseCache.Reset();
+
 	RemoveMetricsReceiver(StreamSelector.Get());
 	StreamSelector.Reset();
 

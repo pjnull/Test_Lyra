@@ -7,6 +7,7 @@
 #include "Player/AdaptiveStreamingPlayerInternalConfig.h"
 
 #include "HTTP/HTTPManager.h"
+#include "HTTP/HTTPResponseCache.h"
 #include "Player/PlayerSessionServices.h"
 #include "SynchronizedClock.h"
 
@@ -807,6 +808,8 @@ private:
 	virtual const FCodecSelectionPriorities& GetCodecSelectionPriorities(EStreamType ForStream) override;
 	virtual	TSharedPtrTS<IPlaylistReader> GetManifestReader() override;
 	virtual TSharedPtrTS<IPlayerEntityCache> GetEntityCache() override;
+	virtual TSharedPtrTS<IHTTPResponseCache> GetHTTPResponseCache() override;
+
 	virtual IAdaptiveStreamingPlayerAEMSHandler* GetAEMSEventHandler() override;
 	virtual FParamDict& GetOptions() override;
 	virtual TSharedPtrTS<FDRMManager> GetDRMManager() override;
@@ -1715,6 +1718,7 @@ private:
 
 	TSharedPtrTS<IElectraHttpManager>									HttpManager;
 	TSharedPtrTS<IPlayerEntityCache>									EntityCache;
+	TSharedPtrTS<IHTTPResponseCache>									HttpResponseCache;
 
 	TSharedPtrTS<FDRMManager>											DrmManager;
 
