@@ -2,9 +2,9 @@
 
 #pragma once
 
-struct FDisplayClusterClusterEventJson;
-
 #include "Network/DisplayClusterNetworkTypes.h"
+
+struct FDisplayClusterClusterEventJson;
 
 
 /**

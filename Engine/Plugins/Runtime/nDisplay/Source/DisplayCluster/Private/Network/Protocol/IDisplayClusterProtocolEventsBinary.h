@@ -2,9 +2,9 @@
 
 #pragma once
 
-struct FDisplayClusterClusterEventBinary;
-
 #include "Network/DisplayClusterNetworkTypes.h"
+
+struct FDisplayClusterClusterEventBinary;
 
 
 /**
