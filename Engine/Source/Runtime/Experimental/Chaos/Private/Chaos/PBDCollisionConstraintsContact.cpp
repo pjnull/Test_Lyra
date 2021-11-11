@@ -253,7 +253,7 @@ namespace Chaos
 		
 		void ApplySweptImpl(FPBDCollisionConstraint& Constraint, const FContactIterationParameters & IterationParameters, const FContactParticleParameters & ParticleParameters)
 		{
-			check(Constraint.GetType() == ECollisionConstraintType::Swept);
+			check(Constraint.GetCCDType() == ECollisionCCDType::Enabled);
 
 			FSolverBody& Body0 = *Constraint.GetSolverBody0();
 			FSolverBody& Body1 = *Constraint.GetSolverBody1();
@@ -312,11 +312,11 @@ namespace Chaos
 
 		void Apply(FPBDCollisionConstraint& Constraint, const FContactIterationParameters & IterationParameters, const FContactParticleParameters & ParticleParameters)
 		{
-			if (Constraint.GetType() == ECollisionConstraintType::Standard)
+			if (Constraint.GetCCDType() == ECollisionCCDType::Disabled)
 			{
 				ApplyImpl(Constraint, IterationParameters, ParticleParameters);
 			}
-			else if (Constraint.GetType() == ECollisionConstraintType::Swept)
+			else if (Constraint.GetCCDType() == ECollisionCCDType::Enabled)
 			{
 				ApplySweptImpl(Constraint, IterationParameters, ParticleParameters);
 			}
@@ -341,7 +341,7 @@ namespace Chaos
 				}
 
 				// @todo(chaos): is this supposed to run for swept contacts as well?
-				if (Constraint.GetType() == ECollisionConstraintType::Standard)
+				if (Constraint.GetCCDType() == ECollisionCCDType::Disabled)
 				{
 					switch (IterationParameters.SolverType)
 					{

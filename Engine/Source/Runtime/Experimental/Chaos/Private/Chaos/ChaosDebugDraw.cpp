@@ -2,6 +2,8 @@
 #include "Chaos/ChaosDebugDraw.h"
 #include "Chaos/Box.h"
 #include "Chaos/Capsule.h"
+#include "Chaos/Collision/CollisionConstraintAllocator.h"
+#include "Chaos/Collision/ParticlePairMidPhase.h"
 #include "Chaos/Convex.h"
 #include "Chaos/HeightField.h"
 #include "Chaos/Triangle.h"
@@ -716,7 +718,7 @@ namespace Chaos
 			return InnerType;
 		}
 
-		void DrawParticleBoundsImpl(const FRigidTransform3& SpaceTransform, const FGeometryParticleHandle* InParticle, const FReal Dt, const FReal BoundsThickness, const FReal BoundsThicknessVelocityInflation, const FChaosDebugDrawSettings& Settings)
+		void DrawParticleBoundsImpl(const FRigidTransform3& SpaceTransform, const FGeometryParticleHandle* InParticle, const FReal Dt, const FChaosDebugDrawSettings& Settings)
 		{
 			FConstGenericParticleHandle Particle = InParticle;
 
@@ -1329,35 +1331,35 @@ namespace Chaos
 			}
 		}
 
-		void DrawParticleBounds(const FRigidTransform3& SpaceTransform, const TParticleView<FGeometryParticles>& ParticlesView, const FReal Dt, const FReal BoundsThickness, const FReal BoundsThicknessVelocityInflation, const FChaosDebugDrawSettings* Settings)
+		void DrawParticleBounds(const FRigidTransform3& SpaceTransform, const TParticleView<FGeometryParticles>& ParticlesView, const FReal Dt, const FChaosDebugDrawSettings* Settings)
 		{
 			if (FDebugDrawQueue::IsDebugDrawingEnabled())
 			{
 				for (auto& Particle : ParticlesView)
 				{
-					DrawParticleBoundsImpl(SpaceTransform, GetHandleHelper(&Particle), Dt, BoundsThickness, BoundsThicknessVelocityInflation, GetChaosDebugDrawSettings(Settings));
+					DrawParticleBoundsImpl(SpaceTransform, GetHandleHelper(&Particle), Dt, GetChaosDebugDrawSettings(Settings));
 				}
 			}
 		}
 
-		void DrawParticleBounds(const FRigidTransform3& SpaceTransform, const TParticleView<FKinematicGeometryParticles>& ParticlesView, const FReal Dt, const FReal BoundsThickness, const FReal BoundsThicknessVelocityInflation, const FChaosDebugDrawSettings* Settings)
+		void DrawParticleBounds(const FRigidTransform3& SpaceTransform, const TParticleView<FKinematicGeometryParticles>& ParticlesView, const FReal Dt, const FChaosDebugDrawSettings* Settings)
 		{
 			if (FDebugDrawQueue::IsDebugDrawingEnabled())
 			{
 				for (auto& Particle : ParticlesView)
 				{
-					DrawParticleBoundsImpl(SpaceTransform, GetHandleHelper(&Particle), Dt, BoundsThickness, BoundsThicknessVelocityInflation, GetChaosDebugDrawSettings(Settings));
+					DrawParticleBoundsImpl(SpaceTransform, GetHandleHelper(&Particle), Dt, GetChaosDebugDrawSettings(Settings));
 				}
 			}
 		}
 
-		void DrawParticleBounds(const FRigidTransform3& SpaceTransform, const TParticleView<FPBDRigidParticles>& ParticlesView, const FReal Dt, const FReal BoundsThickness, const FReal BoundsThicknessVelocityInflation, const FChaosDebugDrawSettings* Settings)
+		void DrawParticleBounds(const FRigidTransform3& SpaceTransform, const TParticleView<FPBDRigidParticles>& ParticlesView, const FReal Dt, const FChaosDebugDrawSettings* Settings)
 		{
 			if (FDebugDrawQueue::IsDebugDrawingEnabled())
 			{
 				for (auto& Particle : ParticlesView)
 				{
-					DrawParticleBoundsImpl(SpaceTransform, GetHandleHelper(&Particle), Dt, BoundsThickness, BoundsThicknessVelocityInflation, GetChaosDebugDrawSettings(Settings));
+					DrawParticleBoundsImpl(SpaceTransform, GetHandleHelper(&Particle), Dt, GetChaosDebugDrawSettings(Settings));
 				}
 			}
 		}
@@ -1424,23 +1426,15 @@ namespace Chaos
 			}
 		}
 
-		void DrawCollisions(const FRigidTransform3& SpaceTransform, const FPBDConstraintGraph& Graph, FRealSingle ColorScale, const FChaosDebugDrawSettings* Settings)
+		void DrawCollisions(const FRigidTransform3& SpaceTransform, const FCollisionConstraintAllocator& CollisionAllocator, FRealSingle ColorScale, const FChaosDebugDrawSettings* Settings)
 		{
 			if (FDebugDrawQueue::IsDebugDrawingEnabled())
 			{
-				for(int32 IslandIndex = 0, NumIslands = Graph.NumIslands(); IslandIndex < NumIslands; ++IslandIndex)
-				{
-					if( const FPBDIslandSolver* IslandSolver  = Graph.GetSolverIsland(IslandIndex))
+				CollisionAllocator.VisitCollisions(
+					[&](const FPBDCollisionConstraint* Collision)
 					{
-						for (const FConstraintHandle* ConstraintHandle : IslandSolver->GetConstraints())
-						{
-							if(const FPBDCollisionConstraintHandle* CollisionHandle = ConstraintHandle->As<FPBDCollisionConstraintHandle>())
-							{
-								DrawCollisionImpl(SpaceTransform, CollisionHandle, ColorScale, GetChaosDebugDrawSettings(Settings));
-							}
-						}
-					}
-				}
+						DrawCollisionImpl(SpaceTransform, Collision, ColorScale, GetChaosDebugDrawSettings(Settings));
+					});
 			}
 		}
 

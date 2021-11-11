@@ -160,6 +160,7 @@ namespace Chaos
 				ManifoldPoint.NetImpulseNormal = FVec3::DotProduct(SolverManifoldPoint.NetImpulse, SolverManifoldPoint.WorldContactNormal);
 				ManifoldPoint.bActive = !SolverManifoldPoint.NetPushOut.IsNearlyZero();
 				ManifoldPoint.bInsideStaticFrictionCone = SolverManifoldPoint.bInsideStaticFrictionCone;
+				ManifoldPoint.StaticFrictionMax = SolverManifoldPoint.StaticFrictionMax;
 
 				// If the contact has no static friction, reset the static friction point to the current contact position
 				// @todo(chaos): this should keep the prev contact at the friction cone edge, rather than just resetting 
@@ -215,7 +216,7 @@ namespace Chaos
 		CollisionSolvers[SolverCollisionIndex].GatherInput(Dt, Constraint, Particle0Level, Particle1Level, SolverBodyContainer);
 
 		// Keep a list of CCD contacts - they will get resolved before we move on to the main solver loop
-		if (Constraint.GetType() == ECollisionConstraintType::Swept)
+		if (Constraint.GetCCDType() == ECollisionCCDType::Enabled)
 		{
 			SweptCollisionSolvers.Add(SolverCollisionIndex);
 		}

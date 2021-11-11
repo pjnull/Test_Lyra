@@ -4,6 +4,7 @@
 #include "Chaos/Island/IslandGraph.h"
 #include "Chaos/ParticleHandle.h"
 #include "Chaos/ConstraintHandle.h"
+#include "Chaos/PBDConstraintContainer.h"
 #include "Chaos/PBDRigidParticles.h"
 #include "Chaos/PBDRigidsSOAs.h"
 #include "ChaosLog.h"
@@ -311,10 +312,7 @@ void FPBDIslandManager::InitializeGraph(const TParticleView<FPBDRigidParticles>&
 	IslandGraph->InitIslands();
 	for(auto& IslandSolver : IslandSolvers)
 	{
-		if(!IslandSolver->IsSleeping())
-		{
-			IslandSolver->ClearConstraints();
-		}
+		IslandSolver->ClearConstraints();
 	}
 }
 

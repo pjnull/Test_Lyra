@@ -50,9 +50,9 @@ namespace Chaos
 		//sort constraints by the smallest particle idx in them first
 		//if the smallest particle idx is the same for both, use the other idx
 
-		if (L.GetType() != R.GetType())
+		if (L.GetCCDType() != R.GetCCDType())
 		{
-			return L.GetType() < R.GetType();
+			return L.GetCCDType() < R.GetCCDType();
 		}
 
 		const FParticleID ParticleIdxs[] = { L.Particle[0]->ParticleID(), L.Particle[1]->ParticleID() };
@@ -73,66 +73,27 @@ namespace Chaos
 		return false;
 	}
 
-	FPBDCollisionConstraint* FPBDCollisionConstraint::Make(
+	TUniquePtr<FPBDCollisionConstraint> FPBDCollisionConstraint::Make(
 		FGeometryParticleHandle* Particle0,
 		const FImplicitObject* Implicit0,
 		const FBVHParticles* Simplicial0,
-		const FRigidTransform3& ParticleWorldTransform0,
 		const FRigidTransform3& ImplicitLocalTransform0,
 		FGeometryParticleHandle* Particle1,
 		const FImplicitObject* Implicit1,
 		const FBVHParticles* Simplicial1,
-		const FRigidTransform3& ParticleWorldTransform1,
 		const FRigidTransform3& ImplicitLocalTransform1,
 		const FReal InCullDistance,
-		const EContactShapesType ShapesType,
 		const bool bInUseManifold,
-		FCollisionConstraintAllocator& Allocator)
+		const EContactShapesType ShapesType)
 	{
-		// Create a constraint, or return an existing one for the same shape pair
-		FPBDCollisionConstraint* Constraint = Allocator.FindOrCreateConstraint(Particle0, Implicit0, Simplicial0, Particle1, Implicit1, Simplicial1);
-		if (Constraint != nullptr)
-		{
-			// Store the existing manifold as the previous manifold for friction etc
-			Constraint->SaveManifold();
-
-			// Initialize the constraint if we did not fully restore it - the manifold will get built later
-			Constraint->Setup(ECollisionConstraintType::Standard, ShapesType, ImplicitLocalTransform0, ImplicitLocalTransform1, InCullDistance, bInUseManifold);
-		}
-		return Constraint;
-	}
-
-	FPBDCollisionConstraint* FPBDCollisionConstraint::MakeSwept(
-		FGeometryParticleHandle* Particle0,
-		const FImplicitObject* Implicit0,
-		const FBVHParticles* Simplicial0,
-		const FRigidTransform3& ParticleWorldTransform0,
-		const FRigidTransform3& ImplicitLocalTransform0,
-		FGeometryParticleHandle* Particle1,
-		const FImplicitObject* Implicit1,
-		const FBVHParticles* Simplicial1,
-		const FRigidTransform3& ParticleWorldTransform1,
-		const FRigidTransform3& ImplicitLocalTransform1,
-		const FReal InCullDistance,
-		EContactShapesType ShapesType,
-		FCollisionConstraintAllocator& Allocator)
-	{
-		const bool bUseManifold = true;
+		FPBDCollisionConstraint* Constraint = new FPBDCollisionConstraint(Particle0, Implicit0, Simplicial0, Particle1, Implicit1, Simplicial1);
 		
-		// Create a constraint, or return an existing one for the same shape pair
-		FPBDCollisionConstraint* Constraint = Allocator.FindOrCreateConstraint(Particle0, Implicit0, Simplicial0, Particle1, Implicit1, Simplicial1);
-		if (Constraint != nullptr)
-		{
-			// We do not attempt to restore swept constraints since we only get here when an object is moving fast
-			Constraint->ResetManifold();
+		Constraint->Setup(ECollisionCCDType::Disabled, ShapesType, ImplicitLocalTransform0, ImplicitLocalTransform1, InCullDistance, bInUseManifold);
 
-			// Initialize the constraint - the manifold will get built later
-			Constraint->Setup(ECollisionConstraintType::Swept, ShapesType, ImplicitLocalTransform0, ImplicitLocalTransform1, InCullDistance, bUseManifold);
-		}
-		return Constraint;
+		return TUniquePtr<FPBDCollisionConstraint>(Constraint);
 	}
 
-	FPBDCollisionConstraint FPBDCollisionConstraint::MakeResimCache(
+	FPBDCollisionConstraint FPBDCollisionConstraint::MakeCopy(
 		const FPBDCollisionConstraint& Source)
 	{
 		// @todo(chaos): The resim cache version probably doesn't need all the data, so maybe try to cur this down?
@@ -145,20 +106,13 @@ namespace Chaos
 		return Constraint;
 	}
 
-	void FPBDCollisionConstraint::Destroy(
-		FPBDCollisionConstraint* Constraint,
-		FCollisionConstraintAllocator& Allocator)
-	{
-		Allocator.DestroyConstraint(Constraint);
-	}
-
 	FPBDCollisionConstraint::FPBDCollisionConstraint()
 		: ImplicitTransform{ FRigidTransform3(), FRigidTransform3() }
 		, Particle{ nullptr, nullptr }
 		, AccumulatedImpulse(0)
 		, Manifold()
 		, TimeOfImpact(0)
-		, Type(ECollisionConstraintType::None)
+		, CCDType(ECollisionCCDType::Disabled)
 		, Stiffness(FReal(1))
 		, CullDistance(TNumericLimits<FReal>::Max())
 		, bUseManifold(false)
@@ -188,7 +142,7 @@ namespace Chaos
 		, AccumulatedImpulse(0)
 		, Manifold()
 		, TimeOfImpact(0)
-		, Type(ECollisionConstraintType::None)
+		, CCDType(ECollisionCCDType::Disabled)
 		, Stiffness(FReal(1))
 		, CullDistance(TNumericLimits<FReal>::Max())
 		, bUseManifold(false)
@@ -206,14 +160,14 @@ namespace Chaos
 	}
 
 	void FPBDCollisionConstraint::Setup(
-		const ECollisionConstraintType InType,
+		const ECollisionCCDType InCCDType,
 		const EContactShapesType InShapesType,
 		const FRigidTransform3& InImplicitLocalTransform0,
 		const FRigidTransform3& InImplicitLocalTransform1,
 		const FReal InCullDistance,
 		const bool bInUseManifold)
 	{
-		Type = InType;
+		CCDType = InCCDType;
 
 		Manifold.ShapesType = InShapesType;
 
@@ -228,7 +182,11 @@ namespace Chaos
 
 	void FPBDCollisionConstraint::SetIsSleeping(const bool bInIsSleeping)
 	{
-		ConcreteContainer()->SetConstraintIsSleeping(*this, bInIsSleeping);
+		// This actually sets the sleeping state on all constraints between the same particle pair so calling this with multiple
+		// constraints on the same particle pair is a little wasteful. It early-outs on subsequent calls, but still not ideal.
+		// @todo(chaos): we only need to set sleeping on particle pairs or particles, not constraints (See UpdateSleepState in IslandManager.cpp)
+		check(ContainerCookie.MidPhase != nullptr);
+		ContainerCookie.MidPhase->SetIsSleeping(bInIsSleeping);
 	}
 
 	// Are the two manifold points the same point?
@@ -757,7 +715,7 @@ namespace Chaos
 	{
 		// Find the previous manifold point that matches
 		const FManifoldPoint* MatchedManifoldPoint = nullptr;
-		if (!IsNew() && bChaos_Manifold_EnableFrictionRestore)
+		if (bChaos_Manifold_EnableFrictionRestore)
 		{
 			// @todo(chaos): ManifoldPoints and PrevManifoldPoints are usually in the same order, so this loop could normally terminate in 1 iteration
 			for (int32 PrevManifoldPointIndex = 0; PrevManifoldPointIndex < PrevManifoldPoints.Num(); ++PrevManifoldPointIndex)
