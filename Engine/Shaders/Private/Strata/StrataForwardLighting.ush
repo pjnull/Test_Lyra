@@ -482,6 +482,9 @@ float3 StrataForwardLighting(
 					LightMask = GetLocalLightAttenuation(AbsoluteWorldPosition, LightData, ToLight, L);
 				}
 
+				// Update the strata BSDF context accordgin to the new L
+				StrataUpdateBSDFContext(StrataBSDFContext, ToLight);
+
 				uint LightChannelMask = LightTypeAndPackedShadowMapChannelMask >> 8;
 
 				bool bEvaluateHasBeenExecuted = false;
