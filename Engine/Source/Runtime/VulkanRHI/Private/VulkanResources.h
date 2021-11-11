@@ -1069,7 +1069,6 @@ struct FVkRtAllocation
 	VkDevice Device = VK_NULL_HANDLE;
 	VkDeviceMemory Memory = VK_NULL_HANDLE;
 	VkBuffer Buffer = VK_NULL_HANDLE;
-	VkDeviceAddress Address = 0;
 };
 
 class FVulkanAccelerationStructureBuffer : public FRHIBuffer
@@ -1081,16 +1080,6 @@ public:
 	inline VkBuffer GetBuffer() const
 	{
 		return Allocation.Buffer;
-	}
-
-	inline VkDeviceAddress GetAddress() const
-	{
-		return Allocation.Address;
-	}
-
-	inline void SetAddress(VkDeviceAddress Address)
-	{
-		Allocation.Address = Address;
 	}
 
 private:

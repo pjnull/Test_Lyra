@@ -76,7 +76,7 @@ public:
 	FVulkanRayTracingGeometry(FRayTracingGeometryInitializer Initializer, FVulkanDevice* InDevice);
 	~FVulkanRayTracingGeometry();
 
-	virtual FRayTracingAccelerationStructureAddress GetAccelerationStructureAddress(uint64 GPUIndex) const final override { return AccelerationStructureBuffer->GetAddress(); }
+	virtual FRayTracingAccelerationStructureAddress GetAccelerationStructureAddress(uint64 GPUIndex) const final override { return Address; }
 	virtual uint32 GetNumSegments() const final override { return Initializer.Segments.Num(); }
 
 	void BuildAccelerationStructure(FVulkanCommandListContext& CommandContext, EAccelerationStructureBuildMode BuildMode);
@@ -88,6 +88,7 @@ private:
 	uint32 IndexStrideInBytes  = 0;
 
 	VkAccelerationStructureKHR Handle = VK_NULL_HANDLE;
+	VkDeviceAddress Address = 0;
 	TRefCountPtr<FVulkanAccelerationStructureBuffer> AccelerationStructureBuffer;
 	TRefCountPtr<FVulkanResourceMultiBuffer> ScratchBuffer;
 };
@@ -114,8 +115,6 @@ private:
 	const FRayTracingSceneInitializer2 Initializer;
 
 	TRefCountPtr<FVulkanResourceMultiBuffer> InstanceBuffer;
-
-	uint32 BufferOffset = 0;
 
 	VkAccelerationStructureKHR Handle = VK_NULL_HANDLE;
 	TRefCountPtr<FVulkanAccelerationStructureBuffer> AccelerationStructureBuffer;

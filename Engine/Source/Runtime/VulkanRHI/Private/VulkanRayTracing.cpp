@@ -215,17 +215,19 @@ static void GetBLASBuildData(
 		SegmentGeometry.geometry.triangles.transformData.deviceAddress = 0;
 		SegmentGeometry.geometry.triangles.transformData.hostAddress = nullptr;
 
-		uint32 PrimitiveStride = 0;
+		uint32 PrimitiveOffset = 0;
 
 		if (IndexBufferRHI)
 		{
 			SegmentGeometry.geometry.triangles.indexType = (IndexStrideInBytes == 2) ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32;
-			PrimitiveStride = IndicesPerPrimitive * IndexStrideInBytes;
+			// offset in bytes into the index buffer where primitive data for the current segment is defined
+			PrimitiveOffset = Segment.FirstPrimitive * IndicesPerPrimitive * IndexStrideInBytes;
 		}
 		else
 		{
 			SegmentGeometry.geometry.triangles.indexType = VK_INDEX_TYPE_NONE_KHR;
-			PrimitiveStride = IndicesPerPrimitive * Segment.VertexBufferStride;
+			// for non-indexed geometry, primitiveOffset is applied when reading from vertex buffer
+			PrimitiveOffset = Segment.FirstPrimitive * IndicesPerPrimitive * Segment.VertexBufferStride;
 		}
 
 		BuildData.Segments.Add(SegmentGeometry);
@@ -235,10 +237,7 @@ static void GetBLASBuildData(
 
 		// Disabled segments use an empty range. We still build them to keep the sbt valid.
 		RangeInfo.primitiveCount = (Segment.bEnabled) ? Segment.NumPrimitives : 0;
-
-		// primitiveOffset defines an offset in bytes into the index buffer where primitive data for the current segment is defined.
-		// (for non-indexed geometry the offset is applied when reading from vertex buffer)
-		RangeInfo.primitiveOffset = Segment.FirstPrimitive * PrimitiveStride;
+		RangeInfo.primitiveOffset = PrimitiveOffset;
 		RangeInfo.transformOffset = 0;
 
 		BuildData.Ranges.Add(RangeInfo);
@@ -291,10 +290,29 @@ FVulkanRayTracingGeometry::FVulkanRayTracingGeometry(FRayTracingGeometryInitiali
 
 	FRHIResourceCreateInfo ScratchBufferCreateInfo(TEXT("BuildScratchBLAS"));
 	ScratchBuffer = ResourceCast(RHICreateBuffer(BuildData.SizesInfo.buildScratchSize, BUF_UnorderedAccess, 0, ERHIAccess::UAVCompute, ScratchBufferCreateInfo).GetReference());
+
+	VkDevice NativeDevice = Device->GetInstanceHandle();
+
+	VkAccelerationStructureCreateInfoKHR CreateInfo;
+	ZeroVulkanStruct(CreateInfo, VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR);
+	CreateInfo.buffer = AccelerationStructureBuffer->GetBuffer();
+	CreateInfo.size = BuildData.SizesInfo.accelerationStructureSize;
+	CreateInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
+	VERIFYVULKANRESULT(vkCreateAccelerationStructureKHR(NativeDevice, &CreateInfo, VULKAN_CPU_ALLOCATOR, &Handle));
+
+	VkAccelerationStructureDeviceAddressInfoKHR DeviceAddressInfo;
+	ZeroVulkanStruct(DeviceAddressInfo, VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR);
+	DeviceAddressInfo.accelerationStructure = Handle;
+	Address = vkGetAccelerationStructureDeviceAddressKHR(NativeDevice, &DeviceAddressInfo);
 }
 
 FVulkanRayTracingGeometry::~FVulkanRayTracingGeometry()
 {
+	if (Handle != VK_NULL_HANDLE)
+	{
+		VkDevice NativeDevice = Device->GetInstanceHandle();
+		vkDestroyAccelerationStructureKHR(NativeDevice, Handle, VULKAN_CPU_ALLOCATOR);
+	}
 }
 
 void FVulkanRayTracingGeometry::BuildAccelerationStructure(FVulkanCommandListContext& CommandContext, EAccelerationStructureBuildMode BuildMode)
@@ -315,13 +333,6 @@ void FVulkanRayTracingGeometry::BuildAccelerationStructure(FVulkanCommandListCon
 
 	check(BuildData.SizesInfo.accelerationStructureSize <= AccelerationStructureBuffer->GetSize());
 
-	VkAccelerationStructureCreateInfoKHR CreateInfo;
-	ZeroVulkanStruct(CreateInfo, VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR);
-	CreateInfo.buffer = AccelerationStructureBuffer->GetBuffer();
-	CreateInfo.size = BuildData.SizesInfo.accelerationStructureSize;
-	CreateInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
-	VERIFYVULKANRESULT(vkCreateAccelerationStructureKHR(Device->GetInstanceHandle(), &CreateInfo, VULKAN_CPU_ALLOCATOR, &Handle));
-
 	BuildData.GeometryInfo.dstAccelerationStructure = Handle;
 	BuildData.GeometryInfo.scratchData.deviceAddress = ScratchBuffer->GetDeviceAddress();
 
@@ -333,11 +344,6 @@ void FVulkanRayTracingGeometry::BuildAccelerationStructure(FVulkanCommandListCon
 
 	CommandBufferManager.SubmitActiveCmdBuffer();
 	CommandBufferManager.PrepareForNewActiveCommandBuffer();
-
-	VkAccelerationStructureDeviceAddressInfoKHR DeviceAddressInfo;
-	ZeroVulkanStruct(DeviceAddressInfo, VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR);
-	DeviceAddressInfo.accelerationStructure = Handle;
-	AccelerationStructureBuffer->SetAddress(vkGetAccelerationStructureDeviceAddressKHR(Device->GetInstanceHandle(), &DeviceAddressInfo));
 
 	// No longer need scratch memory for a static build
 	if (!Initializer.bAllowUpdate)
@@ -410,14 +416,30 @@ FVulkanRayTracingScene::FVulkanRayTracingScene(FRayTracingSceneInitializer2 InIn
 }
 
 FVulkanRayTracingScene::~FVulkanRayTracingScene()
-{}
+{
+	if (Handle != VK_NULL_HANDLE)
+	{
+		VkDevice NativeDevice = Device->GetInstanceHandle();
+		vkDestroyAccelerationStructureKHR(NativeDevice, Handle, VULKAN_CPU_ALLOCATOR);
+	}
+}
 
 void FVulkanRayTracingScene::BindBuffer(FRHIBuffer* InBuffer, uint32 InBufferOffset)
 {
+	checkf(Handle == VK_NULL_HANDLE, TEXT("Binding multiple buffers not currently supported."));
 	check(SizeInfo.ResultSize + InBufferOffset <= InBuffer->GetSize());
 	check(InBufferOffset % 256 == 0); // Spec requires offset to be a multiple of 256
 	AccelerationStructureBuffer = static_cast<FVulkanAccelerationStructureBuffer*>(InBuffer);
-	BufferOffset = InBufferOffset;
+
+	VkDevice NativeDevice = Device->GetInstanceHandle();
+
+	VkAccelerationStructureCreateInfoKHR CreateInfo;
+	ZeroVulkanStruct(CreateInfo, VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR);
+	CreateInfo.buffer = AccelerationStructureBuffer->GetBuffer();
+	CreateInfo.offset = InBufferOffset;
+	CreateInfo.size = SizeInfo.ResultSize;
+	CreateInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
+	VERIFYVULKANRESULT(vkCreateAccelerationStructureKHR(NativeDevice, &CreateInfo, VULKAN_CPU_ALLOCATOR, &Handle));
 }
 
 void FVulkanRayTracingScene::BuildAccelerationStructure(
@@ -451,14 +473,6 @@ void FVulkanRayTracingScene::BuildAccelerationStructure(
 		ScratchBuffer = ResourceCast(RHICreateBuffer(BuildData.SizesInfo.buildScratchSize, BUF_UnorderedAccess, 0, ERHIAccess::UAVCompute, ScratchBufferCreateInfo).GetReference());
 		InScratchBuffer = ScratchBuffer.GetReference();
 	}
-
-	VkAccelerationStructureCreateInfoKHR TLASCreateInfo;
-	ZeroVulkanStruct(TLASCreateInfo, VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR);
-	TLASCreateInfo.buffer = AccelerationStructureBuffer->GetBuffer();
-	TLASCreateInfo.offset = BufferOffset;
-	TLASCreateInfo.size = BuildData.SizesInfo.accelerationStructureSize;
-	TLASCreateInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
-	VERIFYVULKANRESULT(vkCreateAccelerationStructureKHR(Device->GetInstanceHandle(), &TLASCreateInfo, VULKAN_CPU_ALLOCATOR, &Handle));
 
 	BuildData.GeometryInfo.dstAccelerationStructure = Handle;
 
