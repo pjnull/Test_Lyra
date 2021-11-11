@@ -59,6 +59,7 @@ TSharedRef<SWidget> SVirtualAssetsStatisticsDialog::GetGridPanel()
 	const float ColumnMargin = 10.0f;
 	const FSlateColor TitleColor = FStyleColors::AccentWhite;
 	const FSlateFontInfo TitleFont = FCoreStyle::GetDefaultFontStyle("Bold", 10);
+	const double BytesToMegaBytes = 1.0 / (1024.0 * 1024.0);
 
 	TSharedRef<SGridPanel> Panel = SNew(SGridPanel);
 
@@ -75,7 +76,7 @@ TSharedRef<SWidget> SVirtualAssetsStatisticsDialog::GetGridPanel()
 		.ColorAndOpacity(TitleColor)
 		.Font(TitleFont)
 		.Justification(ETextJustify::Left)
-		.Text(LOCTEXT("Payloads", "Payloads"))
+		.Text(LOCTEXT("Count", "Count"))
 	];
 
 	Panel->AddSlot(2, Row)
@@ -85,7 +86,7 @@ TSharedRef<SWidget> SVirtualAssetsStatisticsDialog::GetGridPanel()
 		.ColorAndOpacity(TitleColor)
 		.Font(TitleFont)
 		.Justification(ETextJustify::Left)
-		.Text(LOCTEXT("TotalSize", "TotalSize"))
+		.Text(LOCTEXT("Size", "Size"))
 	];
 
 	Panel->AddSlot(3, Row)
@@ -95,7 +96,7 @@ TSharedRef<SWidget> SVirtualAssetsStatisticsDialog::GetGridPanel()
 		.ColorAndOpacity(TitleColor)
 		.Font(TitleFont)
 		.Justification(ETextJustify::Left)
-		.Text(LOCTEXT("TotalSize", "Cycles"))
+		.Text(LOCTEXT("Time", "Time"))
 	];
 
 	Row++;
@@ -111,7 +112,7 @@ TSharedRef<SWidget> SVirtualAssetsStatisticsDialog::GetGridPanel()
 	[
 		SNew(STextBlock)
 		.Margin(FMargin(ColumnMargin, RowMargin))
-		.Text_Lambda([AcitvityInfo] { return FText::FromString(SingleDecimalFormat(AcitvityInfo.Pull.PayloadCount)); })
+		.Text_Lambda([AcitvityInfo] { return FText::FromString(FString::Printf(TEXT("%u"),AcitvityInfo.Pull.PayloadCount)); })
 	];
 
 
@@ -119,14 +120,14 @@ TSharedRef<SWidget> SVirtualAssetsStatisticsDialog::GetGridPanel()
 	[
 		SNew(STextBlock)
 		.Margin(FMargin(ColumnMargin, RowMargin))
-		.Text_Lambda([AcitvityInfo] { return FText::FromString(SingleDecimalFormat(AcitvityInfo.Pull.TotalBytes)); })
+		.Text_Lambda([AcitvityInfo, BytesToMegaBytes] { return FText::FromString(SingleDecimalFormat((double)AcitvityInfo.Pull.TotalBytes*BytesToMegaBytes) + TEXT(" MB")); })
 	];
 
 	Panel->AddSlot(3, Row)
 	[
 		SNew(STextBlock)
 		.Margin(FMargin(ColumnMargin, RowMargin))
-		.Text_Lambda([AcitvityInfo] { return FText::FromString(SingleDecimalFormat(AcitvityInfo.Pull.CyclesSpent)); })
+		.Text_Lambda([AcitvityInfo] { return FText::FromString(SingleDecimalFormat((double)AcitvityInfo.Pull.CyclesSpent*FPlatformTime::GetSecondsPerCycle()) + TEXT(" s")); })
 	];
 
 	Row++;
@@ -142,21 +143,21 @@ TSharedRef<SWidget> SVirtualAssetsStatisticsDialog::GetGridPanel()
 	[
 		SNew(STextBlock)
 		.Margin(FMargin(ColumnMargin, RowMargin))
-		.Text_Lambda([AcitvityInfo] { return FText::FromString(SingleDecimalFormat(AcitvityInfo.Push.PayloadCount)); })
+		.Text_Lambda([AcitvityInfo] { return FText::FromString(FString::Printf(TEXT("%u"),AcitvityInfo.Push.PayloadCount)); })
 	];
 
 	Panel->AddSlot(2, Row)
 	[
 		SNew(STextBlock)
 		.Margin(FMargin(ColumnMargin, RowMargin))
-		.Text_Lambda([AcitvityInfo] { return FText::FromString(SingleDecimalFormat(AcitvityInfo.Push.TotalBytes)); })
+		.Text_Lambda([AcitvityInfo,BytesToMegaBytes] { return FText::FromString(SingleDecimalFormat((double)AcitvityInfo.Push.TotalBytes*BytesToMegaBytes) + TEXT(" MB")); })
 	];
 
 	Panel->AddSlot(3, Row)
 	[
 		SNew(STextBlock)
 		.Margin(FMargin(ColumnMargin, RowMargin))
-		.Text_Lambda([AcitvityInfo] { return FText::FromString(SingleDecimalFormat(AcitvityInfo.Push.CyclesSpent)); })
+		.Text_Lambda([AcitvityInfo] { return FText::FromString(SingleDecimalFormat((double)AcitvityInfo.Push.CyclesSpent * FPlatformTime::GetSecondsPerCycle()) + TEXT(" s")); })
 	];
 
 	Row++;
@@ -172,21 +173,21 @@ TSharedRef<SWidget> SVirtualAssetsStatisticsDialog::GetGridPanel()
 	[
 		SNew(STextBlock)
 		.Margin(FMargin(ColumnMargin, RowMargin))
-		.Text_Lambda([AcitvityInfo] { return FText::FromString(SingleDecimalFormat(AcitvityInfo.Cache.PayloadCount)); })
+		.Text_Lambda([AcitvityInfo] { return FText::FromString(FString::Printf(TEXT("%u"),AcitvityInfo.Cache.PayloadCount)); })
 	];
 
 	Panel->AddSlot(2, Row)
 	[
 		SNew(STextBlock)
 		.Margin(FMargin(ColumnMargin, RowMargin))
-		.Text_Lambda([AcitvityInfo] { return FText::FromString(SingleDecimalFormat(AcitvityInfo.Cache.TotalBytes)); })
+		.Text_Lambda([AcitvityInfo, BytesToMegaBytes] { return FText::FromString(SingleDecimalFormat((double)AcitvityInfo.Cache.TotalBytes * BytesToMegaBytes) + TEXT(" MB")); })
 	];
 
 	Panel->AddSlot(3, Row)
 	[
 		SNew(STextBlock)
 		.Margin(FMargin(ColumnMargin, RowMargin))
-		.Text_Lambda([AcitvityInfo] { return FText::FromString(SingleDecimalFormat(AcitvityInfo.Push.CyclesSpent)); })
+		.Text_Lambda([AcitvityInfo] { return FText::FromString(SingleDecimalFormat((double)AcitvityInfo.Cache.CyclesSpent * FPlatformTime::GetSecondsPerCycle()) + TEXT(" s")); })
 	];
 
 	
