@@ -1559,7 +1559,8 @@ void FAnimationBlueprintEditor::Tick(float DeltaTime)
 bool FAnimationBlueprintEditor::IsEditable(UEdGraph* InGraph) const
 {
 	bool bEditable = FBlueprintEditor::IsEditable(InGraph);
-	bEditable &= IsGraphInCurrentBlueprint(InGraph);
+
+	bEditable &= (InGraph->GetTypedOuter<UBlueprint>() == GetBlueprintObj());
 
 	return bEditable;
 }

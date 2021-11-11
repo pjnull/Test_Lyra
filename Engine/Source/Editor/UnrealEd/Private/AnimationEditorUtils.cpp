@@ -839,6 +839,8 @@ namespace AnimationEditorUtils
 		}
 	}
 
+	static FOnPoseWatchesChanged OnPoseWatchesChangedDelegate;
+
 	void SetPoseWatch(UPoseWatch* PoseWatch, UAnimBlueprint* AnimBlueprintIfKnown)
 	{
 #if WITH_EDITORONLY_DATA
@@ -853,6 +855,8 @@ namespace AnimationEditorUtils
 					// Find the insertion point from the debugging data
 					int32 LinkID = AnimBPGenClass->GetLinkIDForNode<FAnimNode_Base>(TargetNode);
 					AnimBPGenClass->GetAnimBlueprintDebugData().AddPoseWatch(LinkID, PoseWatch->PoseWatchColour);
+
+					OnPoseWatchesChangedDelegate.Broadcast(AnimBlueprint, TargetNode);
 				}
 			}
 		}
@@ -917,10 +921,17 @@ namespace AnimationEditorUtils
 				{
 					int32 LinkID = AnimBPGenClass->GetLinkIDForNode<FAnimNode_Base>(Cast<UAnimGraphNode_Base>(PoseWatch->Node));
 					AnimBPGenClass->GetAnimBlueprintDebugData().RemovePoseWatch(LinkID);
+
+					OnPoseWatchesChangedDelegate.Broadcast(AnimBlueprint, TargetNode);
 				}
 			}
 		}
 #endif
+	}
+
+	FOnPoseWatchesChanged& OnPoseWatchesChanged()
+	{
+		return OnPoseWatchesChangedDelegate;
 	}
 
 	TArrayView<const FColor> GetPoseWatchColorPalette()
