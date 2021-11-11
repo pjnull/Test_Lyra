@@ -32,7 +32,8 @@ public:
 	virtual ~SConsoleVariablesEditorListRow() override;
 	
 	void FlashRow();
-
+	
+	EVisibility GetFlashImageVisibility() const;
 	FSlateColor GetFlashImageColorAndOpacity() const;
 
 	static const FSlateBrush* GetBorderImage(const FConsoleVariablesEditorListRow::EConsoleVariablesEditorListRowType InRowType);

@@ -59,6 +59,7 @@ void SConsoleVariablesEditorListRow::Construct(const FArguments& InArgs, const T
 			[
 				SAssignNew(FlashImage, SImage)
 				.Image(new FSlateColorBrush(FStyleColors::White))
+				.Visibility_Raw(this, &SConsoleVariablesEditorListRow::GetFlashImageVisibility)
 				.ColorAndOpacity_Raw(this, &SConsoleVariablesEditorListRow::GetFlashImageColorAndOpacity)
 			]
 
@@ -346,6 +347,11 @@ SConsoleVariablesEditorListRow::~SConsoleVariablesEditorListRow()
 void SConsoleVariablesEditorListRow::FlashRow()
 {
 	FlashAnimation.Play(this->AsShared());
+}
+
+EVisibility SConsoleVariablesEditorListRow::GetFlashImageVisibility() const
+{
+	return FlashAnimation.IsPlaying() ? EVisibility::SelfHitTestInvisible : EVisibility::Hidden;
 }
 
 FSlateColor SConsoleVariablesEditorListRow::GetFlashImageColorAndOpacity() const
