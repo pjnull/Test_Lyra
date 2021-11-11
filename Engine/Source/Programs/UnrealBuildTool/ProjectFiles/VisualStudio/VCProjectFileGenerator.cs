@@ -471,7 +471,7 @@ namespace UnrealBuildTool
 							)
 						)
 					)
-				).Save(FileReference.Combine(AutomationToolDir, "AutomationTool.csproj.References").FullName);
+				).Save(FileReference.Combine(IntermediateProjectFilesPath, "AutomationTool.csproj.References").FullName);
 			}
 
 			return true;
