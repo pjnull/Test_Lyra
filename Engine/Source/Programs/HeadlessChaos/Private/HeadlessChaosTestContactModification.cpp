@@ -200,11 +200,13 @@ namespace ChaosTest
 			Solver->UpdateGameThreadStructures();
 		}
 
+		const float PositionTolerance = 1.e-3f;
+
 		// Modified cube should be resting 5 above floor, as we added 5 penetration through contact mod.
-		EXPECT_NEAR(ModifiedCubeParticle.X().Z, 105.f, KINDA_SMALL_NUMBER);
+		EXPECT_NEAR(ModifiedCubeParticle.X().Z, 105.f, PositionTolerance);
 
 		// Colliding cube should be resting on floor.
-		EXPECT_NEAR(RegularCubeParticle.X().Z, 100.f, KINDA_SMALL_NUMBER);
+		EXPECT_NEAR(RegularCubeParticle.X().Z, 100.f, PositionTolerance);
 
 		// Floor should be at origin.
 		EXPECT_EQ(FloorParticle.X().Z, 0);
