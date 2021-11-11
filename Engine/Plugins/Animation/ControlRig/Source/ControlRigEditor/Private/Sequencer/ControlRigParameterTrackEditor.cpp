@@ -351,6 +351,20 @@ void FControlRigParameterTrackEditor::BindControlRig(UControlRig* ControlRig)
 		UMovieSceneControlRigParameterTrack* Track = FindTrack(ControlRig);
 		if (Track)
 		{
+			for (UMovieSceneSection* BaseSection : Track->GetAllSections())
+			{
+				if (UMovieSceneControlRigParameterSection* Section = Cast< UMovieSceneControlRigParameterSection>(BaseSection))
+				{
+					if (Section->GetControlRig())
+					{
+						TArray<FSpaceControlNameAndChannel>& SpaceChannels = Section->GetSpaceChannels();
+						for (FSpaceControlNameAndChannel& Channel : SpaceChannels)
+						{
+							HandleOnSpaceAdded(Section, Channel.ControlName, &(Channel.SpaceCurve));
+						}
+					}
+				}
+			}
 			Track->SpaceChannelAdded().AddRaw(this, &FControlRigParameterTrackEditor::HandleOnSpaceAdded);
 		}
 	}
