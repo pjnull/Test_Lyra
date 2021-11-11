@@ -2910,7 +2910,14 @@ void UNiagaraComponent::AssetExposedParametersChanged()
 		return;
 	}
 	SynchronizeWithSourceSystem();
-	ReinitializeSystem();
+#if WITH_EDITOR
+	//-TODO: We can possibly remove the ReinitializeSystem here after more testing.
+	//       This fixes an issue with deleting a renderer and hitting undo in the editor.
+	if ( !GIsTransacting )
+#endif
+	{
+		ReinitializeSystem();
+	}
 }
 
 #if WITH_EDITOR
