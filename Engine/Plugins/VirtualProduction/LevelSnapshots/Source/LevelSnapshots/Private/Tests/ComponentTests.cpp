@@ -26,29 +26,27 @@
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAddedAndRemovedComponentsCorrectOnSnapshotActorAndGenerateDiff, "VirtualProduction.LevelSnapshots.Snapshot.Component.AddedAndRemovedComponentsCorrectOnSnapshotActorAndGenerateDiff", (EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::EngineFilter));
 bool FAddedAndRemovedComponentsCorrectOnSnapshotActorAndGenerateDiff::RunTest(const FString& Parameters)
 {
-	AActor* Actor = nullptr;
+	ASnapshotTestActor* Actor = nullptr;
 	UStaticMeshComponent* InstancedStaysOnActor = nullptr;
 	UStaticMeshComponent* InstancedRemovedFromActor = nullptr;
 	UStaticMeshComponent* InstancedAddedToActor = nullptr;
-	UStaticMeshComponent* NativeStaysOnActor = nullptr;
 	UStaticMeshComponent* NativeRemovedFromActor = nullptr;
-	UStaticMeshComponent* NativeAddedToActor = nullptr;
+	UStaticMeshComponent* NativedAddedWithoutPropertyReference = nullptr;
+	UStaticMeshComponent* NativedAddedWithPropertyReference = nullptr;
 
 	// Generate properties
 	FSnapshotTestRunner()
 		.ModifyWorld([&](UWorld* World)
 		{
-			Actor = World->SpawnActor<AActor>();
+			Actor = World->SpawnActor<ASnapshotTestActor>();
 
 			InstancedStaysOnActor = NewObject<UStaticMeshComponent>(Actor, UStaticMeshComponent::StaticClass(), "InstancedStaysOnActor");
 			Actor->AddInstanceComponent(InstancedStaysOnActor);
 			InstancedRemovedFromActor = NewObject<UStaticMeshComponent>(Actor, UStaticMeshComponent::StaticClass(), "InstancedRemovedFromActor");
 			Actor->AddInstanceComponent(InstancedRemovedFromActor);
-			NativeStaysOnActor = NewObject<UStaticMeshComponent>(Actor, UStaticMeshComponent::StaticClass(), "NativeStaysOnActor");
 			NativeRemovedFromActor = NewObject<UStaticMeshComponent>(Actor, UStaticMeshComponent::StaticClass(), "NativeRemovedFromActor");
 
 			InstancedStaysOnActor->SetRelativeLocation(FVector(10,20,30));
-			NativeStaysOnActor->SetRelativeLocation(FVector(11,22,33));
 		})
 		.TakeSnapshot()
 		.ModifyWorld([&](UWorld* World)
@@ -58,10 +56,9 @@ bool FAddedAndRemovedComponentsCorrectOnSnapshotActorAndGenerateDiff::RunTest(co
 
 			InstancedAddedToActor = NewObject<UStaticMeshComponent>(Actor, UStaticMeshComponent::StaticClass(), "InstancedAddedToActor");
 			Actor->AddInstanceComponent(InstancedAddedToActor);
-			NativeAddedToActor = NewObject<UStaticMeshComponent>(Actor, UStaticMeshComponent::StaticClass(), "NativeAddedToActor");
+			NativedAddedWithoutPropertyReference = NewObject<UStaticMeshComponent>(Actor, UStaticMeshComponent::StaticClass(), "NativedAddedWithoutPropertyReference");
 
 			InstancedStaysOnActor->SetRelativeLocation(FVector(100,200,300));
-			NativeStaysOnActor->SetRelativeLocation(FVector(110,220,330));
 		})
 	
 		.FilterProperties(Actor, [&](const FPropertySelectionMap& PropertySelectionMap)
@@ -75,19 +72,21 @@ bool FAddedAndRemovedComponentsCorrectOnSnapshotActorAndGenerateDiff::RunTest(co
 				return;
 			}
 
-			TestTrue(TEXT("Added instanced actor should be removed"), Selection->EditorWorldComponentsToRemove.Contains(InstancedAddedToActor));
-			TestTrue(TEXT("Added native actor should be removed"), Selection->EditorWorldComponentsToRemove.Contains(NativeAddedToActor));
-			TestEqual(TEXT("Num actors to remove"), Selection->EditorWorldComponentsToRemove.Num(), 2);
+			TestTrue(TEXT("Added instanced component should be removed"), Selection->EditorWorldComponentsToRemove.Contains(InstancedAddedToActor));
+			TestEqual(TEXT("Num components to remove"), Selection->EditorWorldComponentsToRemove.Num(), 1);
+
+			// Native components are only tracked if they have a component reference; see FComponentEditorUtils::CanEditComponentInstance
+			TestTrue(TEXT("Added native component without property references is ignored"), !Selection->EditorWorldComponentsToRemove.Contains(NativedAddedWithoutPropertyReference));
 			
-			TestEqual(TEXT("Num actors to add back"), Selection->SnapshotComponentsToAdd.Num(), 2);
-			TSet<FString> NamesToCheck { "InstancedRemovedFromActor", "NativeRemovedFromActor" };
+			// NativeRemovedFromActor has no component reference so it is skipped; see FComponentEditorUtils::CanEditComponentInstance.
+			TestEqual(TEXT("Num components to add back"), Selection->SnapshotComponentsToAdd.Num(), 1);
+			TSet<FString> NamesToCheck { "InstancedRemovedFromActor" };
 			for (auto AddBackIt = Selection->SnapshotComponentsToAdd.CreateConstIterator(); AddBackIt; ++AddBackIt)
 			{
 				TestTrue(TEXT("Component should be added back"), NamesToCheck.Contains(AddBackIt->Get()->GetName()));
 			}
 
 			TestTrue(TEXT("Remaining instanced component has property selection"), PropertySelectionMap.GetObjectSelection(InstancedStaysOnActor).GetPropertySelection() != nullptr);
-			TestTrue(TEXT("Remaining native component has property selection"), PropertySelectionMap.GetObjectSelection(NativeStaysOnActor).GetPropertySelection() != nullptr);
 		});
 
 	// HasOriginalChangedPropertiesSinceSnapshotWasTaken return true
@@ -368,14 +367,13 @@ bool FRecreatedActorHasAllComponents::RunTest(const FString& Parameters)
 			UActorComponent** NativeComp = Components.FindByPredicate([](UActorComponent* Component) { return Component->GetName().Equals("NativeRemovedFromActor"); });
 
 			TestTrue(TEXT("Instance Component was recreated"), InstancedComp != nullptr);
-			TestTrue(TEXT("Native Component was recreated"), NativeComp != nullptr);
+			TestTrue(TEXT("Native Component without property referenced was not recreated"), NativeComp == nullptr);
 			if (!InstancedComp || !NativeComp)
 			{
 				return;
 			}
 			
 			TestEqual(TEXT("Instance Component had properties restored"), Cast<UStaticMeshComponent>(*InstancedComp)->GetRelativeLocation(), FVector(10,20,30));
-			TestEqual(TEXT("Native Component had properties restored"), Cast<UStaticMeshComponent>(*NativeComp)->GetRelativeLocation(), FVector(11,22,33));
 		});
 	
 	return true;
@@ -398,9 +396,12 @@ bool FComponentsHaveComponentsAsOuters::RunTest(const FString& Parameters)
 				CorrectComponentOrder = ASnapshotTestActor::Spawn(World, "CorrectComponentOrder");
 				{
 					UStaticMeshComponent* ComponentWithActorAsOuter = NewObject<UStaticMeshComponent>(CorrectComponentOrder, UStaticMeshComponent::StaticClass(), "DuplicateName");
+					CorrectComponentOrder->AddInstanceComponent(ComponentWithActorAsOuter);
 					ComponentWithActorAsOuter->SetupAttachment(CorrectComponentOrder->GetRootComponent());
 					ComponentWithActorAsOuter->SetRelativeLocation(FVector(10.f));
+
 					UStaticMeshComponent* ComponentWithComponentAsOuter = NewObject<UStaticMeshComponent>(ComponentWithActorAsOuter, UStaticMeshComponent::StaticClass(), "DuplicateName");
+					CorrectComponentOrder->AddInstanceComponent(ComponentWithComponentAsOuter);
 					ComponentWithComponentAsOuter->SetupAttachment(ComponentWithActorAsOuter);
 					ComponentWithComponentAsOuter->SetRelativeLocation(FVector(20.f));
 
@@ -414,6 +415,7 @@ bool FComponentsHaveComponentsAsOuters::RunTest(const FString& Parameters)
 					UStaticMeshComponent* ComponentWithActorAsOuter = NewObject<UStaticMeshComponent>(OutOfOrder, UStaticMeshComponent::StaticClass(), "DuplicateName");
 					ComponentWithActorAsOuter->SetupAttachment(OutOfOrder->GetRootComponent());
 					ComponentWithActorAsOuter->SetRelativeLocation(FVector(10.f));
+
 					UStaticMeshComponent* ComponentWithComponentAsOuter = NewObject<UStaticMeshComponent>(ComponentWithActorAsOuter, UStaticMeshComponent::StaticClass(), "DuplicateName");
 					ComponentWithComponentAsOuter->SetupAttachment(ComponentWithActorAsOuter);
 					ComponentWithComponentAsOuter->SetRelativeLocation(FVector(20.f));
@@ -427,6 +429,8 @@ bool FComponentsHaveComponentsAsOuters::RunTest(const FString& Parameters)
 
 					OutOfOrder->AddOwnedComponent(ComponentWithComponentAsOuter);
 					OutOfOrder->AddOwnedComponent(ComponentWithActorAsOuter);
+					OutOfOrder->AddInstanceComponent(ComponentWithComponentAsOuter);
+					OutOfOrder->AddInstanceComponent(ComponentWithActorAsOuter);
 				}
 			});
 

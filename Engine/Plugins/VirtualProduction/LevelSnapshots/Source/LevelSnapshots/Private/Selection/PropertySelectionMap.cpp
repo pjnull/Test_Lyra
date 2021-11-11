@@ -43,9 +43,16 @@ bool FPropertySelectionMap::AddObjectProperties(UObject* WorldObject, const FPro
 
 void FPropertySelectionMap::MarkSubobjectForRestoringReferencesButSkipProperties(UObject* WorldSubbject)
 {
+	if (UActorComponent* Component = Cast<UActorComponent>(WorldSubbject))
+	{
+		ensureAlwaysMsgf(Component->CreationMethod == EComponentCreationMethod::Native || Component->CreationMethod == EComponentCreationMethod::UserConstructionScript,
+			TEXT("Native components are expected to wind-up here if they're not referenced by uproperties (see FComponentEditorUtils::CanEditComponentInstance). Instanced and SimpleUserConstructionScriptComponent should never show up here."));
+		UE_CLOG(WorldSubbject->IsA<UActorComponent>(), LogLevelSnapshots, Warning, TEXT("Reference to component %s will not be restored. Note: native component are only restored if they're referenced by an EditAnywhere property. See FComponentEditorUtils::CanEditComponentInstance."));
+		return;
+	}
+
 	if (ensure(WorldSubbject)
-		&& ensureMsgf(!EditorWorldObjectToSelectedProperties.Contains(WorldSubbject), TEXT("Object was already added via AddObjectProperties with changed properties. Now we're told that is has no changed properties..."))
-		&& ensureMsgf(!WorldSubbject->IsA<UActorComponent>(), TEXT("Components have special case handling and should not be added.")))
+		&& ensureMsgf(!EditorWorldObjectToSelectedProperties.Contains(WorldSubbject), TEXT("Object was already added via AddObjectProperties with changed properties. Now we're told that is has no changed properties...")))
 	{
 		SubobjectsMarkedForReferencesRestorationOnly.Add(WorldSubbject);
 	}
