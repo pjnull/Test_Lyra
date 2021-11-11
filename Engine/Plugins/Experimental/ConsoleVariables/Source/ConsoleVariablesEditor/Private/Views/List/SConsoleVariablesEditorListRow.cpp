@@ -4,9 +4,9 @@
 
 #include "ConsoleVariablesEditorListRow.h"
 #include "ConsoleVariablesEditorStyle.h"
-
-#include "EditorStyleSet.h"
 #include "SConsoleVariablesEditorListValueInput.h"
+
+#include "Kismet/KismetMathLibrary.h"
 #include "Styling/AppStyle.h"
 #include "Styling/StyleColors.h"
 #include "Widgets/Input/SCheckBox.h"
@@ -23,7 +23,7 @@ void SConsoleVariablesEditorListRow::Construct(const FArguments& InArgs, const T
 
 	Item = InRow;
 
-	FConsoleVariablesEditorListRowPtr PinnedItem = Item.Pin();
+	const FConsoleVariablesEditorListRowPtr PinnedItem = Item.Pin();
 	
 	SplitterManagerPtr = InSplitterManagerPtr;
 	check(SplitterManagerPtr.IsValid());
@@ -45,31 +45,33 @@ void SConsoleVariablesEditorListRow::Construct(const FArguments& InArgs, const T
 	}
 	PinnedItem->SetChildDepth(IndentationDepth);
 
+	// Set up flash animation
+	FlashAnimation = FCurveSequence(0.f, FlashAnimationDuration, ECurveEaseFunction::QuadInOut);
+
 	ChildSlot
 	[
 		SNew(SBox)
 		.Padding(FMargin(5,2))
 		[
-			SAssignNew(BorderPtr, SBorder)
-			.Padding(FMargin(0, 5))
-			.ToolTipText(FText::FromString(PinnedItem->GetCommandInfo().Pin()->ConsoleVariablePtr ?
-				FString(PinnedItem->GetCommandInfo().Pin()->ConsoleVariablePtr->GetHelp()) : ""))
-			.HAlign(HAlign_Fill)
-			.VAlign(VAlign_Center)
-			.BorderImage_Lambda([RowType]()
-			{
-				switch (RowType)
-				{							
-					case FConsoleVariablesEditorListRow::CommandGroup:
-						return FConsoleVariablesEditorStyle::Get().GetBrush("ConsoleVariablesEditor.CommandGroupBorder");
+			SNew(SOverlay)
 
-					case FConsoleVariablesEditorListRow::HeaderRow:
-						return FConsoleVariablesEditorStyle::Get().GetBrush("ConsoleVariablesEditor.HeaderRowBorder");
+			+SOverlay::Slot()
+			[
+				SAssignNew(FlashImage, SImage)
+				.Image(new FSlateColorBrush(FStyleColors::White))
+				.ColorAndOpacity_Raw(this, &SConsoleVariablesEditorListRow::GetFlashImageColorAndOpacity)
+			]
 
-					default:
-						return FConsoleVariablesEditorStyle::Get().GetBrush("ConsoleVariablesEditor.DefaultBorder");
-				}
-			})
+			+SOverlay::Slot()
+			[
+				SAssignNew(BorderPtr, SBorder)
+				.Padding(FMargin(0, 5))
+				.ToolTipText(FText::FromString(PinnedItem->GetCommandInfo().Pin()->ConsoleVariablePtr ?
+					FString(PinnedItem->GetCommandInfo().Pin()->ConsoleVariablePtr->GetHelp()) : ""))
+				.HAlign(HAlign_Fill)
+				.VAlign(VAlign_Center)
+				.BorderImage(GetBorderImage(RowType))
+			]
 		]
 	];
 
@@ -285,13 +287,6 @@ void SConsoleVariablesEditorListRow::Construct(const FArguments& InArgs, const T
 	}
 }
 
-void SConsoleVariablesEditorListRow::FlashRow() const
-{
-	FLinearColor Color = BorderPtr->GetColorAndOpacity();
-	BorderPtr->SetColorAndOpacity(FLinearColor::White);
-	BorderPtr->SetColorAndOpacity(Color);
-}
-
 void SConsoleVariablesEditorListRow::OnMouseEnter(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 {
 	SCompoundWidget::OnMouseEnter(MyGeometry, MouseEvent);
@@ -335,7 +330,50 @@ SConsoleVariablesEditorListRow::~SConsoleVariablesEditorListRow()
 
 	OuterSplitterPtr.Reset();
 	NestedSplitterPtr.Reset();
+
+	Item.Reset();
+
+	FlashImage.Reset();
+	BorderPtr.Reset();
+
+	ValueChildInputWidget.Reset();
+	
 	SplitterManagerPtr.Reset();
+	
+	HoverableWidgetsPtr.Reset();
+}
+
+void SConsoleVariablesEditorListRow::FlashRow()
+{
+	FlashAnimation.Play(this->AsShared());
+}
+
+FSlateColor SConsoleVariablesEditorListRow::GetFlashImageColorAndOpacity() const
+{
+	if (FlashAnimation.IsPlaying())
+	{
+		// This equation modulates the alpha into a parabolic curve 
+		const float Progress = FMath::Abs(FMath::Abs((FlashAnimation.GetLerp() - 0.5f) * 2) - 1);
+		return FLinearColor::LerpUsingHSV(FLinearColor::Transparent, FlashColor, Progress);
+	}
+
+	return FLinearColor::Transparent; 
+}
+
+const FSlateBrush* SConsoleVariablesEditorListRow::GetBorderImage(
+	const FConsoleVariablesEditorListRow::EConsoleVariablesEditorListRowType InRowType)
+{
+	switch (InRowType)
+	{							
+	case FConsoleVariablesEditorListRow::CommandGroup:
+		return FConsoleVariablesEditorStyle::Get().GetBrush("ConsoleVariablesEditor.CommandGroupBorder");
+
+	case FConsoleVariablesEditorListRow::HeaderRow:
+		return FConsoleVariablesEditorStyle::Get().GetBrush("ConsoleVariablesEditor.HeaderRowBorder");
+
+	default:
+		return FConsoleVariablesEditorStyle::Get().GetBrush("ConsoleVariablesEditor.DefaultBorder");
+	}
 }
 
 float SConsoleVariablesEditorListRow::GetNameColumnSize() const

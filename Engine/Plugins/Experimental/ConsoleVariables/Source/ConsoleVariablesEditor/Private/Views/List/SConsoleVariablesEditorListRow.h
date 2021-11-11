@@ -24,14 +24,18 @@ public:
 	SLATE_END_ARGS()
 	
 	void Construct(const FArguments& InArgs, const TWeakPtr<FConsoleVariablesEditorListRow> InRow, const FConsoleVariablesEditorListSplitterManagerPtr& InSplitterManagerPtr);
-
-	void FlashRow() const;
 	
 	virtual void OnMouseEnter(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 
 	virtual void OnMouseLeave(const FPointerEvent& MouseEvent) override;
 
 	virtual ~SConsoleVariablesEditorListRow() override;
+	
+	void FlashRow();
+
+	FSlateColor GetFlashImageColorAndOpacity() const;
+
+	static const FSlateBrush* GetBorderImage(const FConsoleVariablesEditorListRow::EConsoleVariablesEditorListRowType InRowType);
 
 	float GetNameColumnSize() const;
 
@@ -52,6 +56,7 @@ private:
 	
 	TWeakPtr<FConsoleVariablesEditorListRow> Item;
 
+	TSharedPtr<SImage> FlashImage;
 	TSharedPtr<SBorder> BorderPtr;
 
 	TSharedPtr<SConsoleVariablesEditorListValueInput> ValueChildInputWidget;
@@ -65,6 +70,11 @@ private:
 	FConsoleVariablesEditorListSplitterManagerPtr SplitterManagerPtr;
 
 	TSharedPtr<SConsoleVariablesEditorListRowHoverWidgets> HoverableWidgetsPtr;
+
+	FCurveSequence FlashAnimation;
+
+	const float FlashAnimationDuration = 0.75f;
+	const FLinearColor FlashColor = FLinearColor::White;
 };
 
 class SConsoleVariablesEditorListRowHoverWidgets : public SCompoundWidget
