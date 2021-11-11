@@ -191,6 +191,13 @@ FServiceSettings::ReadFromJson(FJsonObject& JsonObject)
 				AutoLaunchSettingsObject->Values.FindRef(TEXT("DesiredPort"))->TryGetNumber(AutoLaunchSettings.DesiredPort);
 				AutoLaunchSettingsObject->Values.FindRef(TEXT("bShowConsole"))->TryGetBool(AutoLaunchSettings.bShowConsole);
 				AutoLaunchSettingsObject->Values.FindRef(TEXT("bLimitProcessLifetime"))->TryGetBool(AutoLaunchSettings.bLimitProcessLifetime);
+				if (TSharedPtr<FJsonValue> TreatAsBuildMachineValue = AutoLaunchSettingsObject->Values.FindRef(TEXT("TreatAsBuildMachine")))
+				{
+					if (TreatAsBuildMachineValue->AsString() == FPlatformProcess::ComputerName())
+					{
+						AutoLaunchSettings.bLimitProcessLifetime = true;
+					}
+				}
 			}
 		}
 		else
@@ -249,6 +256,10 @@ FServiceSettings::WriteToJson(TJsonWriter<TCHAR, TPrettyJsonPrintPolicy<TCHAR>>&
 		Writer.WriteValue(TEXT("DesiredPort"), AutoLaunchSettings.DesiredPort);
 		Writer.WriteValue(TEXT("bShowConsole"), AutoLaunchSettings.bShowConsole);
 		Writer.WriteValue(TEXT("bLimitProcessLifetime"), AutoLaunchSettings.bLimitProcessLifetime);
+		if (GIsBuildMachine)
+		{
+			Writer.WriteValue(TEXT("TreatAsBuildMachine"), FPlatformProcess::ComputerName());
+		}
 		Writer.WriteObjectEnd();
 	}
 	else
