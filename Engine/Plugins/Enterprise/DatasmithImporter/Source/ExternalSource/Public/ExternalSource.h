@@ -155,9 +155,6 @@ namespace UE::DatasmithImporter
 
 		void ValidateDatasmithVersion() const;
 
-#if WITH_EDITOR
-		void OnEndPIE(bool bIsSimulating);
-#endif
 		/**
 		 * Queue containing the unfulfilled promises added by AsyncLoad()
 		 * We can't directly make a TQueue of TPromise, as the queue internally creates nodes for tracking the head/tail,
@@ -178,10 +175,5 @@ namespace UE::DatasmithImporter
 		FString SceneName;
 
 		TSharedPtr<IDatasmithTranslator> AssetTranslator;
-
-#if WITH_EDITOR
-		bool bChangedDuringPIE = false;
-		FDelegateHandle OnPIEEndHandle;
-#endif
 	};
 }

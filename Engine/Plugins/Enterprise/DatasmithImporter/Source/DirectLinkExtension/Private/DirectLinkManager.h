@@ -14,6 +14,8 @@
 
 struct FAssetData;
 
+DECLARE_LOG_CATEGORY_EXTERN(LogDirectLinkManager, Log, All);
+
 namespace UE::DatasmithImporter
 {
 	class FDirectLinkAssetObserver;
@@ -76,7 +78,13 @@ namespace UE::DatasmithImporter
 
 		bool DisableAssetAutoReimport(UObject* InAsset);
 
-		void TriggerAutoReimportOnAsset(const FAssetData& AssetData);
+		void OnExternalSourceChanged(const TSharedRef<FExternalSource>& ExternalSource);
+
+		void TriggerAutoReimportOnAsset(UObject* Asset);
+
+#if WITH_EDITOR
+		void OnEndPIE(bool bIsSimulating);
+#endif
 
 	private:
 		/**
@@ -101,6 +109,10 @@ namespace UE::DatasmithImporter
 
 		TMap<UObject*, TSharedRef<FAutoReimportInfo>> RegisteredAutoReimportObjectMap;
 		
-		TMultiMap<TSharedRef<FDirectLinkExternalSource>, TSharedRef<FAutoReimportInfo>> RegisteredAutoReimportExternalSourceMap;
+		TMultiMap<TSharedRef<FExternalSource>, TSharedRef<FAutoReimportInfo>> RegisteredAutoReimportExternalSourceMap;
+
+#if WITH_EDITOR
+		FDelegateHandle OnPIEEndHandle;
+#endif
 	};
 }
