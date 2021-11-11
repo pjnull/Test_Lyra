@@ -707,7 +707,8 @@ static FRHIRayTracingShader* GetBuiltInRayTracingShader()
 void FVulkanDevice::InitializeRayTracing()
 {
 	check(BasicRayTracingPipeline == nullptr);
-	BasicRayTracingPipeline = new FVulkanBasicRaytracingPipeline(this);
+	// the pipeline should be initialized on the first use due to the ability to disable RT in the game settings
+	//BasicRayTracingPipeline = new FVulkanBasicRaytracingPipeline(this);
 }
 
 void FVulkanDevice::CleanUpRayTracing()

@@ -2816,7 +2816,16 @@ void FD3D12Device::InitRayTracing()
 	RayTracingDescriptorHeapCache = new FD3D12RayTracingDescriptorHeapCache(this);
 
 	check(BasicRayTracingPipeline == nullptr);
-	BasicRayTracingPipeline = new FD3D12BasicRayTracingPipeline(this);
+	// the pipeline will be initialized on the first use
+}
+
+const FD3D12BasicRayTracingPipeline* FD3D12Device::GetBasicRayTracingPipeline()
+{
+	if (UNLIKELY(BasicRayTracingPipeline == nullptr))
+	{
+		BasicRayTracingPipeline = new FD3D12BasicRayTracingPipeline(this);
+	}
+	return BasicRayTracingPipeline;
 }
 
 void FD3D12Device::CleanupRayTracing()
