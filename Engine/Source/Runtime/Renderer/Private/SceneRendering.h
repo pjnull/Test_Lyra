@@ -1590,12 +1590,10 @@ public:
 	/** Allocates and returns the current eye adaptation texture. */
 	using FSceneView::GetEyeAdaptationTexture;
 	IPooledRenderTarget* GetEyeAdaptationTexture(FRHICommandList& RHICmdList) const;
-	IPooledRenderTarget* GetLastEyeAdaptationTexture(FRHICommandList& RHICmdList) const;
 
 	/** Allocates and returns the current eye adaptation buffer. */
 	using FSceneView::GetEyeAdaptationBuffer;
 	FRDGPooledBuffer* GetEyeAdaptationBuffer(FRDGBuilder& GraphBuilder) const;
-	FRDGPooledBuffer* GetLastEyeAdaptationBuffer(FRDGBuilder& GraphBuilder) const;
 
 #if WITH_MGPU
 	void BroadcastEyeAdaptationTemporalEffect(FRHICommandList& RHICmdList);

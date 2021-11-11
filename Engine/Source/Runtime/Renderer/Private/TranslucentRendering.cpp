@@ -909,14 +909,7 @@ TRDGUniformBufferRef<FTranslucentBasePassUniformParameters> CreateTranslucentBas
 		BasePassParameters.SceneColorCopyTexture = SceneColorCopyTexture;
 	}
 
-	BasePassParameters.EyeAdaptationTexture = SystemTextures.White;
-
-	// Setup by passes that support it
-	if (View.HasValidEyeAdaptationTexture())
-	{
-		BasePassParameters.EyeAdaptationTexture = GetRDG(View.GetEyeAdaptationTexture(), ERDGTextureFlags::MultiFrame);
-	}
-
+	BasePassParameters.EyeAdaptationTexture = GetEyeAdaptationTexture(GraphBuilder, View);
 	BasePassParameters.PreIntegratedGFTexture = GSystemTextures.PreintegratedGF->GetRenderTargetItem().ShaderResourceTexture;
 	BasePassParameters.PreIntegratedGFSampler = TStaticSamplerState<SF_Bilinear, AM_Clamp, AM_Clamp, AM_Clamp>::GetRHI();
 

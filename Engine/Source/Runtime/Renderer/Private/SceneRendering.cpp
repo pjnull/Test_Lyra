@@ -2116,17 +2116,6 @@ IPooledRenderTarget* FViewInfo::GetEyeAdaptationTexture(FRHICommandList& RHICmdL
 	return nullptr;
 }
 
-IPooledRenderTarget* FViewInfo::GetLastEyeAdaptationTexture(FRHICommandList& RHICmdList) const
-{
-	checkf(FeatureLevel > ERHIFeatureLevel::ES3_1, TEXT("SM5 and above use RenderTarget for read back"));
-
-	if (FSceneViewState* EffectiveViewState = GetEyeAdaptationViewState())
-	{
-		return EffectiveViewState->GetLastEyeAdaptationTexture(RHICmdList);
-	}
-	return nullptr;
-}
-
 void FViewInfo::SwapEyeAdaptationTextures(FRDGBuilder& GraphBuilder) const
 {
 	checkf(FeatureLevel > ERHIFeatureLevel::ES3_1, TEXT("SM5 and above use RenderTarget for read back"));
@@ -2144,17 +2133,6 @@ FRDGPooledBuffer* FViewInfo::GetEyeAdaptationBuffer(FRDGBuilder& GraphBuilder) c
 	if (FSceneViewState* EffectiveViewState = GetEyeAdaptationViewState())
 	{
 		return EffectiveViewState->GetCurrentEyeAdaptationBuffer(GraphBuilder);
-	}
-	return nullptr;
-}
-
-FRDGPooledBuffer* FViewInfo::GetLastEyeAdaptationBuffer(FRDGBuilder& GraphBuilder) const
-{
-	checkf(FeatureLevel == ERHIFeatureLevel::ES3_1, TEXT("ES3_1 use RWBuffer for read back"));
-
-	if (FSceneViewState* EffectiveViewState = GetEyeAdaptationViewState())
-	{
-		return EffectiveViewState->GetLastEyeAdaptationBuffer(GraphBuilder);
 	}
 	return nullptr;
 }

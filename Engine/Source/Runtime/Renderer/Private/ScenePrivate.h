@@ -851,13 +851,6 @@ private:
 			return ((CurrentBuffer-2)+3)%3;
 		}
 
-		/** Return old Render Target*/
-		const TRefCountPtr<IPooledRenderTarget>& GetLastTexture(FRHICommandList& RHICmdList)
-		{
-			// "last" frame is actually 2 behind
-			return GetOrCreateTexture(RHICmdList, GetPreviousPreviousIndex());
-		}
-
 		/** Reverse the current/last order of the targets */
 		void SwapTextures(FRDGBuilder& GraphBuilder, bool bUpdateLastExposure);
 
@@ -875,11 +868,6 @@ private:
 		const TRefCountPtr<FRDGPooledBuffer>& GetCurrentBuffer(FRDGBuilder& GraphBuilder)
 		{
 			return GetOrCreateBuffer(GraphBuilder, CurrentBuffer);
-		}
-
-		const TRefCountPtr<FRDGPooledBuffer>& GetLastBuffer(FRDGBuilder& GraphBuilder)
-		{
-			return GetOrCreateBuffer(GraphBuilder, GetPreviousPreviousIndex());
 		}
 
 		void SwapBuffers(FRDGBuilder& GraphBuilder, bool bUpdateLastExposure);
@@ -1245,11 +1233,6 @@ public:
 		return EyeAdaptationManager.GetCurrentTexture(RHICmdList).GetReference();
 	}
 
-	IPooledRenderTarget* GetLastEyeAdaptationTexture(FRHICommandList& RHICmdList)
-	{
-		return EyeAdaptationManager.GetLastTexture(RHICmdList).GetReference();
-	}
-
 	/** Swaps the double-buffer targets used in eye adaptation */
 	void SwapEyeAdaptationTextures(FRDGBuilder& GraphBuilder)
 	{
@@ -1267,11 +1250,6 @@ public:
 	{
 		bValidEyeAdaptationBuffer = true;
 		return EyeAdaptationManager.GetCurrentBuffer(GraphBuilder).GetReference();
-	}
-
-	FRDGPooledBuffer* GetLastEyeAdaptationBuffer(FRDGBuilder& GraphBuilder)
-	{
-		return EyeAdaptationManager.GetLastBuffer(GraphBuilder).GetReference();
 	}
 
 	void SwapEyeAdaptationBuffers(FRDGBuilder& GraphBuilder)
