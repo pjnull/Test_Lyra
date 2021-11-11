@@ -797,7 +797,7 @@ EReimportResult::Type UDatasmithImportFactory::ReimportScene(UDatasmithScene* Sc
 	TSharedPtr<FExternalSource> ExternalSource = IExternalSourceModule::Get().GetManager().TryGetExternalSourceFromImportData(AssetImportData);
 	if (!ExternalSource)
 	{
-		UE_LOG(LogDatasmithImport, Warning, TEXT("Datasmith ReimportScene error: cannot resolve the external source from Source file or URI. Abort import"));
+		UE_LOG(LogDatasmithImport, Warning, TEXT("Datasmith ReimportScene error: Import source is not available. Abort import."));
 		return EReimportResult::Failed;
 	}
 

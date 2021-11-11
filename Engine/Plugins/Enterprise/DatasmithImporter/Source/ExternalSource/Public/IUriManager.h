@@ -54,24 +54,21 @@ namespace UE::DatasmithImporter
 		TSharedPtr<FExternalSource> TryGetExternalSourceFromImportData(const ImportDataType& ImportSourceData) const
 		{
 			FSourceUri SourceUri(ImportSourceData.SourceUri);
-			TSharedPtr<FExternalSource> ExternalSource;
 
+			// If we have a valid URI, we should not try to read the source file path.
 			if (SourceUri.IsValid())
 			{
-				ExternalSource = GetOrCreateExternalSource(SourceUri);
+				return GetOrCreateExternalSource(SourceUri);
 			}
 
-			if (!ExternalSource)
+			const FAssetImportInfo::FSourceFile* FirstFileInfo = ImportSourceData.SourceData.SourceFiles.GetData();
+			if (FirstFileInfo)
 			{
-				const FAssetImportInfo::FSourceFile* FirstFileInfo = ImportSourceData.SourceData.SourceFiles.GetData();
-				if (FirstFileInfo)
-				{
-					SourceUri = FSourceUri::FromFilePath(FirstFileInfo->RelativeFilename);
-					ExternalSource = GetOrCreateExternalSource(SourceUri);
-				}
+				SourceUri = FSourceUri::FromFilePath(FirstFileInfo->RelativeFilename);
+				return GetOrCreateExternalSource(SourceUri);
 			}
 
-			return ExternalSource;
+			return nullptr;
 		}
 #endif //WITH_EDITOR
 	};
