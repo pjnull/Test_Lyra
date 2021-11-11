@@ -3674,7 +3674,7 @@ void UWorld::BlockTillLevelStreamingCompleted()
 	}
 
 	const double ElapsedTime = FPlatformTime::Seconds() - StartTime;
-	UE_LOG(LogWorld, Log, TEXT("BlockTillLevelStreamingCompleted took %s seconds (MatchStarted %d)"), *FText::AsNumber(ElapsedTime).ToString(), bMatchStarted);
+	UE_LOG(LogWorld, Verbose, TEXT("BlockTillLevelStreamingCompleted took %s seconds (MatchStarted %d)"), *FText::AsNumber(ElapsedTime).ToString(), bMatchStarted);
 }
 
 void UWorld::InternalUpdateStreamingState()
