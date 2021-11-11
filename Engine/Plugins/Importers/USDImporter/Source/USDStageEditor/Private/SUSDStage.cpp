@@ -414,8 +414,6 @@ TSharedRef< SWidget > SUsdStage::MakeActorPickerMenuContent()
 	{
 		ActorPickerMenu->FullRefresh();
 
-		FSceneOutlinerModule& SceneOutlinerModule = FModuleManager::LoadModuleChecked<FSceneOutlinerModule>("SceneOutliner");
-
 		return SNew(SBox)
 			.Padding( FMargin( 1 ) )    // Add a small margin or else we'll get dark gray on dark gray which can look a bit confusing
 			.MinDesiredWidth( 300.0f )  // Force a min width or else the tree view item text will run up right to the very edge pixel of the menu
@@ -542,10 +540,7 @@ void SUsdStage::FillOptionsMenu(FMenuBuilder& MenuBuilder)
 		MenuBuilder.AddSubMenu(
 			LOCTEXT("PurposesToLoad", "Purposes to load"),
 			LOCTEXT("PurposesToLoad_ToolTip", "Only load prims with these specific purposes from the USD stage"),
-			FNewMenuDelegate::CreateSP(this, &SUsdStage::FillPurposesToLoadSubMenu),
-			false,
-			FSlateIcon(),
-			false);
+			FNewMenuDelegate::CreateSP(this, &SUsdStage::FillPurposesToLoadSubMenu));
 
 		MenuBuilder.AddSubMenu(
 			LOCTEXT("RenderContext", "Render Context"),
@@ -691,7 +686,7 @@ void SUsdStage::FillPurposesToLoadSubMenu(FMenuBuilder& MenuBuilder)
 				})
 			),
 			NAME_None,
-			EUserInterfaceActionType::Check
+			EUserInterfaceActionType::ToggleButton
 		);
 	};
 
@@ -855,7 +850,7 @@ void SUsdStage::FillSelectionSubMenu( FMenuBuilder& MenuBuilder )
 			})
 		),
 		NAME_None,
-		EUserInterfaceActionType::Check
+		EUserInterfaceActionType::ToggleButton
 	);
 }
 
@@ -878,7 +873,8 @@ void SUsdStage::FillNaniteThresholdSubMenu( FMenuBuilder& MenuBuilder )
 		})
 		.OnValueCommitted( this, &SUsdStage::OnNaniteTriangleThresholdValueCommitted );
 
-	MenuBuilder.AddWidget( Slider, FText::FromString( TEXT( "Triangle threshold: " ) ) );
+	const bool bNoIndent = true;
+	MenuBuilder.AddWidget( Slider, FText::FromString( TEXT( "Triangle threshold: " ) ), bNoIndent );
 }
 
 void SUsdStage::OnNew()
