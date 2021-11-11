@@ -266,13 +266,22 @@ float3 StrataForwardLighting(
 				FStrataEnvLightResult StrataEnvLight = StrataEvaluateForEnvLight(EnvBSDFContext, bEnableSpecular);
 				float3 DiffuseNormal = StrataEnvLight.DiffuseNormal;
 				float3 DiffuseColorForIndirect = StrataEnvLight.DiffuseWeight;
-				float3 SubsurfaceColorForIndirect = 0.0f;
+				float3 SubsurfaceColorForIndirect = StrataEnvLight.DiffuseBackFaceWeight;
 
 				// Evaluate diffuse lighting
-				const float3 SubsurfaceIndirectLighting = 0.0f;
-				const float3 DiffuseIndirectLighting = GetEffectiveSkySHDiffuse(DiffuseNormal);
-				if (any(StrataEnvLight.DiffuseWeight > 0.0f))
+				if (any((DiffuseColorForIndirect + SubsurfaceColorForIndirect) > 0.0f))
 				{
+					const float3 DiffuseIndirectLighting = GetEffectiveSkySHDiffuse(DiffuseNormal);
+					float3 SubsurfaceIndirectLighting = 0.0f;
+					BRANCH
+					if (any(SubsurfaceColorForIndirect > 0.0))
+					{
+						SubsurfaceIndirectLighting = GetEffectiveSkySHDiffuse(-DiffuseNormal);
+					}
+
+					// STRATA_TODO  indirect lighting from GetPrecomputedIndirectLightingAndSkyLight
+					// STRATA_TODO  GetIndirectOcclusion for forward shading
+
 					Color += (DiffuseIndirectLighting * DiffuseColorForIndirect + SubsurfaceIndirectLighting * SubsurfaceColorForIndirect) * SkyLightCommonFactor * AOMultiBounce(StrataEnvLight.DiffuseColor, DiffOcclusion);
 				}
 
@@ -289,7 +298,6 @@ float3 StrataForwardLighting(
 				// We skip hazy lob evaluation in forward.
 			#endif
 			}
-			// STRATA_TODO  indirect lighting from GetPrecomputedIndirectLightingAndSkyLight
 
 			////
 			//// Evaluate environment lighting
