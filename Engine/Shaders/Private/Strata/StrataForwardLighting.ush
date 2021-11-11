@@ -265,7 +265,7 @@ float3 StrataForwardLighting(
 
 		#if TRANSLUCENCY_PERVERTEX_FORWARD_SHADING || TRANSLUCENCY_LIGHTING_VOLUMETRIC_PERVERTEX_NONDIRECTIONAL || TRANSLUCENCY_LIGHTING_VOLUMETRIC_PERVERTEX_DIRECTIONAL || TRANSLUCENCY_LIGHTING_VOLUMETRIC_NONDIRECTIONAL || TRANSLUCENCY_LIGHTING_VOLUMETRIC_DIRECTIONAL || TRANSLUCENCY_LIGHTING_SURFACE_LIGHTINGVOLUME
 			float4 VolumeLighting;
-			float3 InterpolatedLighting = 0;
+			float3 SurfaceLighting = 0;
 			float3 InnerVolumeUVs;
 			float3 OuterVolumeUVs;
 			float FinalLerpFactor;
@@ -273,34 +273,68 @@ float3 StrataForwardLighting(
 
 			FStrataEvaluateResult BSDFEvaluate = StrataEvaluateBSDF(StrataBSDFContext);
 			LayerThroughput += BSDFCoverage * BSDFEvaluate.Throughput;
-		#endif
 
 		#if TRANSLUCENCY_PERVERTEX_FORWARD_SHADING
 
-			Color += (BasePassInterpolants.VertexDiffuseLighting * BSDFEvaluate.DiffuseColor + BSDFEvaluate.EmissivePathValue)* BSDFColoredVisibility;
+			SurfaceLighting = BasePassInterpolants.VertexDiffuseLighting * BSDFEvaluate.DiffuseColor;
 
 		#elif TRANSLUCENCY_LIGHTING_VOLUMETRIC_PERVERTEX_NONDIRECTIONAL
 
-			GetVolumeLightingNonDirectional(float4(BasePassInterpolants.AmbientLightingVector, 1), BSDFEvaluate.DiffuseColor, InterpolatedLighting, VolumeLighting);
-			Color += (InterpolatedLighting + BSDFEvaluate.EmissivePathValue) * BSDFColoredVisibility;
+			GetVolumeLightingNonDirectional(float4(BasePassInterpolants.AmbientLightingVector, 1), BSDFEvaluate.DiffuseColor, SurfaceLighting, VolumeLighting);
 
 		#elif TRANSLUCENCY_LIGHTING_VOLUMETRIC_PERVERTEX_DIRECTIONAL
 
-			GetVolumeLightingDirectional(float4(BasePassInterpolants.AmbientLightingVector, 1), BasePassInterpolants.DirectionalLightingVector, StrataBSDFContext.N, BSDFEvaluate.DiffuseColor, InterpolatedLighting, VolumeLighting);
-			Color += (InterpolatedLighting + BSDFEvaluate.EmissivePathValue) * BSDFColoredVisibility;
+			GetVolumeLightingDirectional(float4(BasePassInterpolants.AmbientLightingVector, 1), BasePassInterpolants.DirectionalLightingVector, StrataBSDFContext.N, BSDFEvaluate.DiffuseColor, SurfaceLighting, VolumeLighting);
 
 		#elif TRANSLUCENCY_LIGHTING_VOLUMETRIC_NONDIRECTIONAL
 
 			float4 AmbientLightingVector = GetAmbientLightingVectorFromTranslucentLightingVolume(InnerVolumeUVs, OuterVolumeUVs, FinalLerpFactor);
-			GetVolumeLightingNonDirectional(AmbientLightingVector, BSDFEvaluate.DiffuseColor, InterpolatedLighting, VolumeLighting);
-			Color += (InterpolatedLighting + BSDFEvaluate.EmissivePathValue) * BSDFColoredVisibility;
+			GetVolumeLightingNonDirectional(AmbientLightingVector, BSDFEvaluate.DiffuseColor, SurfaceLighting, VolumeLighting);
 
 		#elif TRANSLUCENCY_LIGHTING_VOLUMETRIC_DIRECTIONAL || TRANSLUCENCY_LIGHTING_SURFACE_LIGHTINGVOLUME
 
 			float4 AmbientLightingVector = GetAmbientLightingVectorFromTranslucentLightingVolume(InnerVolumeUVs, OuterVolumeUVs, FinalLerpFactor);
 			float3 DirectionalLightingVector = GetDirectionalLightingVectorFromTranslucentLightingVolume(InnerVolumeUVs, OuterVolumeUVs, FinalLerpFactor);
-			GetVolumeLightingDirectional(AmbientLightingVector, DirectionalLightingVector, StrataBSDFContext.N, BSDFEvaluate.DiffuseColor, InterpolatedLighting, VolumeLighting);
-			Color += (InterpolatedLighting + BSDFEvaluate.EmissivePathValue) * BSDFColoredVisibility;
+			GetVolumeLightingDirectional(AmbientLightingVector, DirectionalLightingVector, StrataBSDFContext.N, BSDFEvaluate.DiffuseColor, SurfaceLighting, VolumeLighting);
+		#endif // TRANSLUCENCY_
+
+			// STRATA_TODO: we should simply remove this self shadow code path TRANSLUCENT_SELF_SHADOWING and only use FOM to shadow the ? Translucent shadow should .
+		#if (TRANSLUCENCY_LIGHTING_VOLUMETRIC_DIRECTIONAL || TRANSLUCENCY_LIGHTING_VOLUMETRIC_NONDIRECTIONAL || TRANSLUCENCY_LIGHTING_SURFACE_LIGHTINGVOLUME) && TRANSLUCENT_SELF_SHADOWING
+			// Only apply self shadowing if the shadow hasn't faded out completely
+			if (TranslucentSelfShadow.DirectionalLightColor.a > 0)
+			{
+				// Determine the shadow space position
+				// Apply a stable offset to the world position used for shadowing, which blurs out high frequency details in the shadowmap with many layers
+				float4 HomogeneousShadowPosition = mul(float4(LWCHackToFloat(AbsoluteWorldPosition) + LightingPositionOffset, 1), TranslucentSelfShadow.WorldToShadowMatrix);
+				float2 ShadowUVs = HomogeneousShadowPosition.xy / HomogeneousShadowPosition.w;
+				// Lookup the shadow density at the point being shaded
+				float3 ShadowDensity = CalculateTranslucencyShadowingDensity(ShadowUVs, HomogeneousShadowPosition.z) / GetMaterialTranslucentMultipleScatteringExtinction();
+				// Compute colored transmission based on the density that the light ray passed through
+				float3 SelfShadowing = saturate(exp(-ShadowDensity * GetMaterialTranslucentSelfShadowDensityScale()));
+				// Compute a second shadow gradient to add interesting information in the shadowed area of the first
+				// This is a stop gap for not having self shadowing from other light sources
+				float3 SelfShadowing2 = lerp(float3(1, 1, 1), saturate(exp(-ShadowDensity * GetMaterialTranslucentSelfShadowSecondDensityScale())), GetMaterialTranslucentSelfShadowSecondOpacity());
+				SelfShadowing = SelfShadowing * SelfShadowing2;
+
+				// Force unshadowed if we read outside the valid area of the shadowmap atlas
+				// This can happen if the particle system's bounds don't match its visible area
+				FLATTEN
+				if (any(ShadowUVs < TranslucentSelfShadow.ShadowUVMinMax.xy || ShadowUVs > TranslucentSelfShadow.ShadowUVMinMax.zw))
+				{
+					SelfShadowing = 1;
+				}
+
+				// The volume lighting already contains the contribution of the directional light, 
+				// So calculate the amount of light to remove from the volume lighting in order to apply per-pixel self shadowing
+				// VolumeLighting.a stores all attenuation and opaque shadow factors
+				float3 SelfShadowingCorrection = TranslucentSelfShadow.DirectionalLightColor.rgb * VolumeLighting.a * (1 - SelfShadowing);
+
+				// Combine backscattering and directional light self shadowing
+				SurfaceLighting = (BSDFEvaluate.DiffuseColor * max(VolumeLighting.rgb - SelfShadowingCorrection, 0));
+			}
+		#endif
+
+			Color += (SurfaceLighting + BSDFEvaluate.EmissivePathValue) * BSDFColoredVisibility;
 
 		#elif FORWARD_PER_PIXEL_SHADING
 
