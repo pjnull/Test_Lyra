@@ -179,7 +179,8 @@ FBxDFEnergyTerms ComputeDiffuseEnergyTerms(float Roughness, float NoV)
 float3 ComputeEnergyPreservation(FBxDFEnergyTerms EnergyTerms)
 {
 #if USE_ENERGY_CONSERVATION > 0
-	return View.bShadingEnergyPreservation ? (1 - EnergyTerms.E) : 1.0f;
+	// Use the directional albedo luminance to avoid color-shift due to metallic specular (for which the energy should be absorbed, not transmitted)
+	return View.bShadingEnergyPreservation ? (1 - Luminance(EnergyTerms.E)) : 1.0f;
 #else
 	return 1.0f;
 #endif
