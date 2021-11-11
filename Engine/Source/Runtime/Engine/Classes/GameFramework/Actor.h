@@ -2017,6 +2017,9 @@ public:
 #endif // WITH_EDITOR
 	//~ End UObject Interface
 
+#if WITH_EDITOR
+	virtual bool CanEditChangeComponent(const UActorComponent* Component, const FProperty* InProperty) const { return true; }
+#endif
 
 	//~=============================================================================
 	// Property Replication

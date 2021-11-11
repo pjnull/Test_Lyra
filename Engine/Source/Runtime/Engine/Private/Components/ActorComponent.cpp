@@ -2064,6 +2064,13 @@ void UActorComponent::OnRep_IsActive()
 #if WITH_EDITOR
 bool UActorComponent::CanEditChange(const FProperty* InProperty) const
 {
+	if (AActor* Owner = GetOwner())
+	{
+		if (!Owner->CanEditChangeComponent(this, InProperty))
+		{
+			return false;
+		}
+	}
 	if (Super::CanEditChange(InProperty))
 	{
 		UActorComponent* ComponentArchetype = Cast<UActorComponent>(GetArchetype());
