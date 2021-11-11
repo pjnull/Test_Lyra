@@ -84,101 +84,29 @@ static bool IsPluginEnabledForTarget(const IPlugin& Plugin, const FProjectDescri
 		return false;
 	}
 
-	const bool bAllowEnginePluginsEnabledByDefault = (Project == nullptr || !Project->bDisableEnginePluginsByDefault);
-	bool bEnabledForProject = Plugin.IsEnabledByDefault(bAllowEnginePluginsEnabledByDefault);
+	// TODO: Support transitive calculation of per-platform disabling for plugins.
+	// Plugins can reference other plugins, and it would be nice to be able to automatically disable for platform X
+	// plugins that are only referenced through another plugin that is disabled for platform X.
+	// For the time-being, to disable a transitively referenced plugin per-platform, the project has to 
+	// directly include the plugin.
+
 	if (Project != nullptr)
 	{
-		for(const FPluginReferenceDescriptor& PluginReference : Project->Plugins)
+		const FString& PluginName = Plugin.GetName();
+		const FPluginReferenceDescriptor* PluginReference = Project->Plugins.FindByPredicate(
+			[&PluginName](const FPluginReferenceDescriptor& ExistingReference)
+			{
+				return ExistingReference.Name == PluginName;
+			});
+		if (PluginReference)
 		{
-			if (PluginReference.Name == Plugin.GetName() && !PluginReference.bOptional)
+			bool bEnabledForProject = PluginReference->IsEnabledForPlatform(Platform) &&
+				(Configuration == EBuildConfiguration::Unknown || PluginReference->IsEnabledForTargetConfiguration(Configuration)) &&
+				PluginReference->IsEnabledForTarget(TargetType);
+			if (!bEnabledForProject)
 			{
-				bEnabledForProject = PluginReference.IsEnabledForPlatform(Platform) && PluginReference.IsEnabledForTargetConfiguration(Configuration) && PluginReference.IsEnabledForTarget(TargetType);
+				return false;
 			}
-		}
-	}
-	return bEnabledForProject;
-}
-
-static bool IsPluginCompiledForTarget(const IPlugin& Plugin, const FProjectDescriptor* Project, const FString& Platform, EBuildConfiguration Configuration, EBuildTargetType TargetType, bool bRequiresCookedData)
-{
-	bool bCompiledForTarget = false;
-	if (IsPluginEnabledForTarget(Plugin, Project, Platform, Configuration, TargetType))
-	{
-		bool bBuildDeveloperTools = (TargetType == EBuildTargetType::Editor || TargetType == EBuildTargetType::Program || (Configuration != EBuildConfiguration::Test && Configuration != EBuildConfiguration::Shipping));
-		for (const FModuleDescriptor& Module : Plugin.GetDescriptor().Modules)
-		{
-			if (Module.IsCompiledInConfiguration(Platform, Configuration, TEXT(""), TargetType, bBuildDeveloperTools, bRequiresCookedData))
-			{
-				bCompiledForTarget = true;
-				break;
-			}
-		}
-	}
-	return bCompiledForTarget;
-}
-
-static bool ConfigureEnabledPlugins(const FPluginReferenceDescriptor& FirstReference, const FProjectDescriptor* ProjectDescriptor, const FString& TargetName, const FString& Platform, EBuildConfiguration Configuration, EBuildTargetType TargetType, const TMap<FString, IPlugin*>& Plugins, TSet<FString>& EnabledPluginNames)
-{
-	if (!EnabledPluginNames.Contains(FirstReference.Name))
-	{
-		// Set of plugin names we've added to the queue for processing
-		TSet<FString> NewPluginNames;
-		NewPluginNames.Add(FirstReference.Name);
-
-		// Queue of plugin references to consider
-		TArray<const FPluginReferenceDescriptor*> NewPluginReferences;
-		NewPluginReferences.Add(&FirstReference);
-
-		// Loop through the queue of plugin references that need to be enabled, queuing more items as we go
-		TArray<TSharedRef<IPlugin>> NewPlugins;
-		for (int32 Idx = 0; Idx < NewPluginReferences.Num(); Idx++)
-		{
-			const FPluginReferenceDescriptor& Reference = *NewPluginReferences[Idx];
-
-			// Check if the plugin is required for this platform
-			if(!Reference.IsEnabledForPlatform(Platform) || !Reference.IsEnabledForTargetConfiguration(Configuration) || !Reference.IsEnabledForTarget(TargetType))
-			{
-				continue;
-			}
-
-			// Find the plugin being enabled
-			const IPlugin* const* PluginPtr = Plugins.Find(Reference.Name);
-			if (PluginPtr == nullptr)
-			{
-				continue;
-			}
-
-			// Check the plugin supports this platform
-			const FPluginDescriptor& PluginDescriptor = (*PluginPtr)->GetDescriptor();
-			if(!PluginDescriptor.SupportsTargetPlatform(Platform))
-			{
-				continue;
-			}
-
-			// Check that this plugin supports the current program
-			if (TargetType == EBuildTargetType::Program && !PluginDescriptor.SupportedPrograms.Contains(TargetName))
-			{
-				continue;
-			}
-
-			// Skip loading Enterprise plugins when project is not an Enterprise project
-			if ((*PluginPtr)->GetType() == EPluginType::Enterprise && !ProjectDescriptor->bIsEnterpriseProject)
-			{
-				continue;
-			}
-
-			// Add references to all its dependencies
-			for (const FPluginReferenceDescriptor& NextReference : PluginDescriptor.Plugins)
-			{
-				if (!EnabledPluginNames.Contains(NextReference.Name) && !NewPluginNames.Contains(NextReference.Name))
-				{
-					NewPluginNames.Add(NextReference.Name);
-					NewPluginReferences.Add(&NextReference);
-				}
-			}
-
-			// Add the plugin
-			EnabledPluginNames.Add((*PluginPtr)->GetName());
 		}
 	}
 	return true;
@@ -225,6 +153,13 @@ bool FTargetPlatformBase::RequiresTempTarget(bool bProjectHasCode, EBuildConfigu
 	}
 
 	return false;
+}
+
+bool FTargetPlatformBase::IsEnabledForPlugin(const IPlugin& Plugin) const
+{
+	const FProjectDescriptor* Project = IProjectManager::Get().GetCurrentProject();
+	return IsPluginEnabledForTarget(Plugin, Project, GetPlatformInfo().UBTPlatformString, EBuildConfiguration::Unknown,
+		PlatformInfo->PlatformType);
 }
 
 TSharedPtr<IDeviceManagerCustomPlatformWidgetCreator> FTargetPlatformBase::GetCustomWidgetCreator() const

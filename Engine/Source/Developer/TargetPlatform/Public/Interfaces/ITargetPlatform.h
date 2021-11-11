@@ -2,9 +2,21 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "Containers/Array.h"
+#include "Containers/Map.h"
+#include "Containers/Set.h"
+#include "Containers/UnrealString.h"
+#include "Delegates/Delegate.h"
+#include "HAL/Platform.h"
+#include "HAL/PlatformMisc.h"
 #include "Interfaces/ITargetDevice.h"
+#include "Internationalization/Text.h"
+#include "Templates/SharedPointer.h"
+#include "UObject/NameTypes.h"
 
+class FConfigCacheIni;
+class IDeviceManagerCustomPlatformWidgetCreator;
+class IPlugin;
 struct FDataDrivenPlatformInfo;
 
 namespace PlatformInfo
@@ -12,8 +24,6 @@ namespace PlatformInfo
 	// Forward declare type from DesktopPlatform rather than add an include dependency to everything using ITargetPlatform
 	struct FTargetPlatformInfo;
 }
-
-class IDeviceManagerCustomPlatformWidgetCreator;
 
 /**
  * Enumerates features that may be supported by target platforms.
@@ -337,6 +347,11 @@ public:
 	 * @return true if this platform has no graphics or audio, etc, false otherwise.
 	 */
 	virtual bool IsServerOnly() const = 0;
+
+	/**
+	 * Checks whether this platform is enabled for the given plugin in the currently active project.
+	 */
+	virtual bool IsEnabledForPlugin(const IPlugin& Plugin) const = 0;
 
 	/**
 	* Checks whether this platform supports shader compilation over XGE interface.

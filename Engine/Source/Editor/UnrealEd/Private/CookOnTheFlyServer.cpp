@@ -17,6 +17,7 @@
 #include "Commandlets/ShaderPipelineCacheToolsCommandlet.h"
 #include "Containers/RingBuffer.h"
 #include "Cooker/AsyncIODelete.h"
+#include "Cooker/CookedSavePackageValidator.h"
 #include "Cooker/CookOnTheFlyServerInterface.h"
 #include "Cooker/CookPackageData.h"
 #include "Cooker/CookPlatformManager.h"
@@ -130,9 +131,13 @@ static FAutoConsoleVariableRef CVarCookDisplayMode(
 	GCookProgressDisplay,
 	TEXT("Controls the display for cooker logging of packages:\n")
 	TEXT("  0: No display\n")
-	TEXT("  1: Display packages remaining\n")
-	TEXT("  2: Display each package by name\n")
-	TEXT("  3: Both\n"),
+	TEXT("  1: Display the Count of packages remaining\n")
+	TEXT("  2: Display each package by Name\n")
+	TEXT("  3: Display Names and Count\n")
+	TEXT("  4: Display the Instigator of each package\n")
+	TEXT("  5: Display Instigators and Count\n")
+	TEXT("  6: Display Instigators and Names\n")
+	TEXT("  7: Display Instigators and Names and Count\n"),
 	ECVF_Default);
 
 float GCookProgressUpdateTime = 2.0f;
@@ -609,6 +614,7 @@ void UCookOnTheFlyServer::CookOnTheFlyDeferredInitialize()
 	}
 	bHasDeferredInitializeCookOnTheFly = true;
 	BlockOnAssetRegistry();
+	PackageDatas->BeginCook();
 }
 
 const ITargetPlatform* UCookOnTheFlyServer::AddCookOnTheFlyPlatform(const FName& PlatformName)
@@ -3040,7 +3046,7 @@ private: // Used only by UCookOnTheFlyServer, which has private access
 		TArrayView<const ITargetPlatform*> InPlatformsForPackage, UE::Cook::FTickStackData& StackData);
 
 	void SetupPackage();
-	void SetupPlatform(const ITargetPlatform* InTargetPlatform);
+	void SetupPlatform(const ITargetPlatform* InTargetPlatform, bool bFirstPlatform);
 	void FinishPlatform();
 	void FinishPackage();
 
@@ -4300,9 +4306,10 @@ void UCookOnTheFlyServer::SaveCookedPackage(UE::Cook::FSaveCookedPackageContext&
 	TGuardValue<bool> ScopedIsCookerLoadingPackage(GIsCookerLoadingPackage, true);
 	ON_SCOPE_EXIT{ Package->SetPackageFlagsTo(OriginalPackageFlags); };
 
+	bool bFirstPlatform = true;
 	for (const ITargetPlatform* TargetPlatform : Context.PlatformsForPackage)
 	{
-		Context.SetupPlatform(TargetPlatform);
+		Context.SetupPlatform(TargetPlatform, bFirstPlatform);
 		if (Context.bPlatformSetupSuccessful)
 		{
 			UE_SCOPED_HIERARCHICAL_COOKTIMER(GEditorSavePackage);
@@ -4389,6 +4396,7 @@ void UCookOnTheFlyServer::SaveCookedPackage(UE::Cook::FSaveCookedPackageContext&
 		}
 
 		Context.FinishPlatform();
+		bFirstPlatform = false;
 	}
 
 	Context.FinishPackage();
@@ -4438,7 +4446,7 @@ void FSaveCookedPackageContext::SetupPackage()
 	Filename = COTFS.ConvertToFullSandboxPath(*Filename, true);
 }
 
-void FSaveCookedPackageContext::SetupPlatform(const ITargetPlatform* InTargetPlatform)
+void FSaveCookedPackageContext::SetupPlatform(const ITargetPlatform* InTargetPlatform, bool bFirstPlatform)
 {
 	TargetPlatform = InTargetPlatform;
 	PlatFilename = Filename.Replace(TEXT("[Platform]"), *TargetPlatform->PlatformName());
@@ -4492,8 +4500,10 @@ void FSaveCookedPackageContext::SetupPlatform(const ITargetPlatform* InTargetPla
 		bHasDelayLoaded = true;
 	}
 
-	UE_CLOG(GCookProgressDisplay & (int32)ECookProgressDisplayMode::PackageNames, LogCook, Display, TEXT("Cooking %s -> %s"),
-		*PackageName, *PlatFilename);
+	UE_CLOG((GCookProgressDisplay & (int32)ECookProgressDisplayMode::Instigators) && bFirstPlatform, LogCook, Display,
+		TEXT("Cooking %s, Instigator: { %s }"), *PackageName, *(PackageData.GetInstigator().ToString()));
+	UE_CLOG(GCookProgressDisplay & (int32)ECookProgressDisplayMode::PackageNames, LogCook, Display,
+		TEXT("Cooking %s -> %s"), *PackageName, *PlatFilename);
 
 	bEndianSwap = (!TargetPlatform->IsLittleEndian()) ^ (!PLATFORM_LITTLE_ENDIAN);
 
@@ -6314,7 +6324,7 @@ void UCookOnTheFlyServer::CollectFilesToCook(TArray<FName>& FilesInPath, TMap<FN
 			TArray<FName> PackagesToNeverCook;
 
 			UAssetManager::Get().ModifyCook(TargetPlatforms, FilesInPath, PackagesToNeverCook);
-			UpdateInstigators(EInstigator::AssetRegistryModifyCook);
+			UpdateInstigators(EInstigator::AssetManagerModifyCook);
 
 			for (FName NeverCookPackage : PackagesToNeverCook)
 			{
@@ -6369,7 +6379,7 @@ void UCookOnTheFlyServer::CollectFilesToCook(TArray<FName>& FilesInPath, TMap<FN
 	{
 		TArray<FName> PackagesToNeverCook;
 		UAssetManager::Get().ModifyDLCCook(CookByTheBookOptions->DlcName, TargetPlatforms, FilesInPath, PackagesToNeverCook);
-		UpdateInstigators(EInstigator::AssetRegistryModifyDLCCook);
+		UpdateInstigators(EInstigator::AssetManagerModifyDLCCook);
 
 		for (FName NeverCookPackage : PackagesToNeverCook)
 		{
@@ -7642,11 +7652,13 @@ void UCookOnTheFlyServer::BeginCookSandbox(TConstArrayView<const ITargetPlatform
 #endif
 }
 
-UE::Cook::FCookSavePackageContext* UCookOnTheFlyServer::CreateSaveContext(const ITargetPlatform* TargetPlatform) const
+UE::Cook::FCookSavePackageContext* UCookOnTheFlyServer::CreateSaveContext(const ITargetPlatform* TargetPlatform)
 {
+	using namespace UE::Cook;
+
 	if (SandboxFile == nullptr)
 	{
-		const_cast<UCookOnTheFlyServer&>(*this).CreateSandboxFile();
+		CreateSandboxFile();
 	}
 
 	const FString RootPathSandbox = ConvertToFullSandboxPath(FPaths::RootDir(), true);
@@ -7673,7 +7685,7 @@ UE::Cook::FCookSavePackageContext* UCookOnTheFlyServer::CreateSaveContext(const 
 	else
 	{
 		PackageWriter = new FLooseCookedPackageWriter(ResolvedRootPath, ResolvedMetadataPath, TargetPlatform,
-			const_cast<UCookOnTheFlyServer&>(*this).GetAsyncIODelete(), GetPackageNameCache(), PluginsToRemap);
+			GetAsyncIODelete(), GetPackageNameCache(), PluginsToRemap);
 		WriterDebugName = TEXT("DirectoryWriter");
 	}
 
@@ -7689,7 +7701,10 @@ UE::Cook::FCookSavePackageContext* UCookOnTheFlyServer::CreateSaveContext(const 
 		UE_LOG(LogCook, Warning, TEXT("Engine.ini:[Core.System]:LegacyBulkDataOffsets is no longer supported in UE5. The intended use was to reduce patch diffs, but UE5 changed cooked bytes in every package for other reasons, so removing support for this flag does not cause additional patch diffs."));
 	}
 
-	return new UE::Cook::FCookSavePackageContext(TargetPlatform, PackageWriter, WriterDebugName);
+	FCookSavePackageContext* Context = new FCookSavePackageContext(TargetPlatform, PackageWriter, WriterDebugName);
+	Context->SaveContext.SetValidator(MakeUnique<FCookedSavePackageValidator>(TargetPlatform, *this));
+	return Context;
+
 }
 
 void UCookOnTheFlyServer::FinalizePackageStore()
@@ -7838,6 +7853,7 @@ void UCookOnTheFlyServer::StartCookByTheBook( const FCookByTheBookStartupOptions
 
 	GenerateAssetRegistry();
 	BlockOnAssetRegistry();
+	PackageDatas->BeginCook();
 	if (!IsCookingInEditor())
 	{
 		FCoreUObjectDelegates::PackageCreatedForLoad.AddUObject(this, &UCookOnTheFlyServer::MaybeMarkPackageAsAlreadyLoaded);

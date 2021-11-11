@@ -4071,11 +4071,6 @@ bool UAssetManager::VerifyCanCookPackage(FName PackageName, bool bLogError) cons
 
 		bRetVal = false;
 	}
-	else if (CookInfo)
-	{
-		UE_LOG(LogAssetManager, Verbose, TEXT("Cooking package %s with instigator { %s }."),
-			*PackageName.ToString(), *CookInfo->GetInstigator(PackageName).ToString());
-	}
 
 	if (!bRetVal && bLogError)
 	{

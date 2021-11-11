@@ -588,7 +588,8 @@ ESavePackageResult ValidateImports(FSaveContext& SaveContext)
 	SCOPED_SAVETIMER(UPackage_Save_ValidateImports);
 
 	TArray<UObject*> TopLevelObjects;
-	GetObjectsWithPackage(SaveContext.GetPackage(), TopLevelObjects, false);
+	UPackage* Package = SaveContext.GetPackage();
+	GetObjectsWithPackage(Package, TopLevelObjects, false);
 	auto IsInAnyTopLevelObject = [&TopLevelObjects](UObject* InObject) -> bool
 	{
 		for (UObject* TopObject : TopLevelObjects)
@@ -645,12 +646,13 @@ ESavePackageResult ValidateImports(FSaveContext& SaveContext)
 		return true;
 	};
 
-	FString PackageName = SaveContext.GetPackage()->GetName();
+	FString PackageName = Package->GetName();
 
 	// Warn for private objects & map object references
 	TArray<UObject*> PrivateObjects;
 	TArray<UObject*> ObjectsInOtherMaps;
-	for (UObject* Import : SaveContext.GetImports())
+	const TSet<UObject*>& Imports = SaveContext.GetImports();
+	for (UObject* Import : Imports)
 	{
 		UPackage* ImportPackage = Import->GetPackage();
 		// All names should be properly harvested at this point
@@ -713,6 +715,16 @@ ESavePackageResult ValidateImports(FSaveContext& SaveContext)
 		return ValidateIllegalReferences(SaveContext, PrivateObjects, ObjectsInOtherMaps);
 	}
 
+	ISavePackageValidator* Validator = SaveContext.GetPackageValidator();
+	if (Validator)
+	{
+		ESavePackageResult ValidatorResult = Validator->ValidateImports(Package, Imports);
+		if (ValidatorResult != ESavePackageResult::Success)
+		{
+			return ValidatorResult;
+		}
+	}
+
 	// Cooking checks
 	if (SaveContext.IsCooking())
 	{
@@ -722,7 +734,7 @@ ESavePackageResult ValidateImports(FSaveContext& SaveContext)
 			for (UObject* Import : SaveContext.GetImports())
 			{
 				check(Import);
-				EDLCookChecker->AddImport(Import, SaveContext.GetPackage());
+				EDLCookChecker->AddImport(Import, Package);
 			}
 		}
 	}
