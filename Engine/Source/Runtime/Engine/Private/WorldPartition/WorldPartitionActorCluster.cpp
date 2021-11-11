@@ -10,7 +10,6 @@
 #include "WorldPartition/ActorDescContainer.h"
 #include "WorldPartition/WorldPartitionActorDescView.h"
 #include "WorldPartition/DataLayer/WorldDataLayers.h"
-#include "Hash/CityHash.h"
 
 template<class LayerNameContainer>
 TSet<const UDataLayer*> GetDataLayers(UWorld* InWorld, const LayerNameContainer& DataLayerNames)
@@ -185,7 +184,7 @@ FActorClusterContext::FActorClusterContext(TArray<FActorContainerInstance>&& InC
 	}
 }
 
-FActorContainerInstance::FActorContainerInstance(uint64 InID, const FTransform& InTransform, const FBox& InBounds, const TSet<FName>& InDataLayers, EContainerClusterMode InClusterMode, const UActorDescContainer* InContainer, TMap<FGuid, FWorldPartitionActorDescView> InActorDescViewMap)
+FActorContainerInstance::FActorContainerInstance(const FActorContainerID& InID, const FTransform& InTransform, const FBox& InBounds, const TSet<FName>& InDataLayers, EContainerClusterMode InClusterMode, const UActorDescContainer* InContainer, TMap<FGuid, FWorldPartitionActorDescView> InActorDescViewMap)
 	: ID(InID)
 	, Transform(InTransform)
 	, Bounds(InBounds)
@@ -203,9 +202,7 @@ const FWorldPartitionActorDescView& FActorContainerInstance::GetActorDescView(co
 
 FActorInstance::FActorInstance()
 	: ContainerInstance(nullptr)
-{
-
-}
+{}
 
 FActorInstance::FActorInstance(const FGuid& InActor, const FActorContainerInstance* InContainerInstance)
 	: Actor(InActor)

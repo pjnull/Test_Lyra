@@ -34,9 +34,9 @@
 
 class FWorldPartitionStreamingGenerator
 {
-	void CreateActorDescViewMap(const UActorDescContainer* InContainer, TMap<FGuid, FWorldPartitionActorDescView>& OutActorDescViewMap, uint64 InContainerID)
+	void CreateActorDescViewMap(const UActorDescContainer* InContainer, TMap<FGuid, FWorldPartitionActorDescView>& OutActorDescViewMap, const FActorContainerID& InContainerID)
 	{
-		const bool bIncludeUnsavedActors = (bIsPIE && !InContainerID);
+		const bool bIncludeUnsavedActors = (bIsPIE && InContainerID.IsMainContainer());
 
 		TMap<FGuid, FGuid> ContainerGuidsRemap;
 		for (FActorDescList::TConstIterator<> ActorDescIt(InContainer); ActorDescIt; ++ActorDescIt)
@@ -75,7 +75,7 @@ class FWorldPartitionStreamingGenerator
 		}
 	}
 
-	void CreateActorDescriptorViewsRecursive(const UActorDescContainer* InContainer, const FTransform& InTransform, const TSet<FName>& InDataLayers, uint64 InContainerID, uint64 InParentContainerID, EContainerClusterMode InClusterMode)
+	void CreateActorDescriptorViewsRecursive(const UActorDescContainer* InContainer, const FTransform& InTransform, const TSet<FName>& InDataLayers, const FActorContainerID& InContainerID, const FActorContainerID& InParentContainerID, EContainerClusterMode InClusterMode)
 	{
 		TMap<FGuid, FWorldPartitionActorDescView> ActorDescViewMap;
 		
@@ -98,13 +98,13 @@ class FWorldPartitionStreamingGenerator
 				check(SubContainer);
 
 				const FGuid ActorGuid = ActorDescView.GetGuid();
-				const uint64 SubContainerID = CityHash64WithSeed((const char*)&ActorGuid, sizeof(ActorGuid), InContainerID);
+				const FActorContainerID SubContainerID(InContainerID, ActorGuid);
 
 				// Only propagate data layers from the root container as we don't support sub containers to set their own
 				const TSet<FName>* SubDataLayers = &InDataLayers;
 				TSet<FName> ParentDataLayers;
 
-				if (!InContainerID)
+				if (InContainerID.IsMainContainer())
 				{
 					ParentDataLayers.Append(ActorDescView.GetDataLayers());
 					SubDataLayers = &ParentDataLayers;
@@ -116,13 +116,15 @@ class FWorldPartitionStreamingGenerator
 				It.RemoveCurrent();
 			}
 
-			if (InContainerID)
+			if (!InContainerID.IsMainContainer())
 			{
-				ActorDescView.SetContainerID(InContainerID);
+				ActorDescViewsContainersMap.Add(ActorDescView.GetGuid(), InContainerID);
 			}
 		}
 
 		// Create container descriptor
+		check(!ContainerDescriptorsMap.Contains(InContainerID));
+
 		FContainerDescriptor& ContainerDescriptor = ContainerDescriptorsMap.Add(InContainerID);
 		ContainerDescriptor.Container = InContainer;
 		ContainerDescriptor.Transform = InTransform;
@@ -133,17 +135,17 @@ class FWorldPartitionStreamingGenerator
 
 	void CreateActorDescriptorViews(const UActorDescContainer* InContainer)
 	{
-		CreateActorDescriptorViewsRecursive(InContainer, FTransform::Identity, TSet<FName>(), 0, 0, EContainerClusterMode::Partitioned);
+		CreateActorDescriptorViewsRecursive(InContainer, FTransform::Identity, TSet<FName>(), FActorContainerID(), FActorContainerID(), EContainerClusterMode::Partitioned);
 	}
 
 	void ValidateActorDescriptorViews()
 	{
 		for (auto It = ContainerDescriptorsMap.CreateIterator(); It; ++It)
 		{
-			uint64 ContainerID = It.Key();
+			const FActorContainerID& ContainerID = It.Key();
 			FContainerDescriptor& ContainerDescriptor = It.Value();
 
-			if (!ContainerID)
+			if (ContainerID.IsMainContainer())
 			{
 				// Gather all references to external actors from the level script and make them always loaded
 				if (ULevelScriptBlueprint* LevelScriptBlueprint = ContainerDescriptor.Container->GetWorld()->PersistentLevel->GetLevelScriptBlueprint(true))
@@ -169,14 +171,14 @@ class FWorldPartitionStreamingGenerator
 	{
 		for (auto ContainerIt = ContainerDescriptorsMap.CreateIterator(); ContainerIt; ++ContainerIt)
 		{
-			uint64 ContainerID = ContainerIt.Key();
+			const FActorContainerID& ContainerID = ContainerIt.Key();
 			FContainerDescriptor& ContainerDescriptor = ContainerIt.Value();
 
 			for (auto ActorDescIt = ContainerDescriptor.ActorDescViewMap.CreateConstIterator(); ActorDescIt; ++ActorDescIt)
 			{
 				const FWorldPartitionActorDescView& ActorDescView = ActorDescIt.Value();
 
-				uint64 CurrentContainerID = ActorDescView.GetContainerID();
+				const FActorContainerID* CurrentContainerID = ActorDescViewsContainersMap.Find(ActorDescView.GetGuid());
 				FContainerDescriptor* CurrentContainerDescriptor = &ContainerDescriptor;
 
 				FBox ActorDescBounds(ForceInit);
@@ -194,13 +196,13 @@ class FWorldPartitionStreamingGenerator
 						case EActorGridPlacement::Bounds: CurrentContainerDescriptor->Bounds += ActorDescBounds; break;
 					}
 
-					if (!CurrentContainerID)
+					if (!CurrentContainerID || CurrentContainerID->IsMainContainer())
 					{
 						break;
 					}
 
-					CurrentContainerID = ContainersHierarchy.FindChecked(CurrentContainerID);
-					CurrentContainerDescriptor = &ContainerDescriptorsMap.FindChecked(CurrentContainerID);
+					CurrentContainerID = &ContainersHierarchy.FindChecked(*CurrentContainerID);
+					CurrentContainerDescriptor = &ContainerDescriptorsMap.FindChecked(*CurrentContainerID);
 				}
 			}
 		}
@@ -231,7 +233,7 @@ public:
 
 		for (auto It = ContainerDescriptorsMap.CreateConstIterator(); It; ++It)
 		{
-			const uint64& ContainerID = It.Key();
+			const FActorContainerID& ContainerID = It.Key();
 			const FContainerDescriptor& ContainerDescriptor = It.Value();
 
 			ContainerInstances.Emplace(ContainerID, ContainerDescriptor.Transform, ContainerDescriptor.Bounds, ContainerDescriptor.DataLayers, ContainerDescriptor.ClusterMode, ContainerDescriptor.Container, ContainerDescriptor.ActorDescViewMap);
@@ -260,33 +262,40 @@ private:
 	};
 
 	/** Maps containers IDs to their container descriptor */
-	TMap<uint64, FContainerDescriptor> ContainerDescriptorsMap;
+	TMap<FActorContainerID, FContainerDescriptor> ContainerDescriptorsMap;
 
 	/** Maps containers IDs to their parent ID */
-	TMap<uint64, uint64> ContainersHierarchy;
+	TMap<FActorContainerID, FActorContainerID> ContainersHierarchy;
+
+	/** Maps actor descriptor views to containers IDs */
+	TMap<FGuid, FActorContainerID> ActorDescViewsContainersMap;
 };
 
 bool UWorldPartition::GenerateStreaming(TArray<FString>* OutPackagesToGenerate)
 {
-	FWorldPartitionStreamingGenerator StreamingGenerator(bIsPIE, RuntimeHash);
-	StreamingGenerator.PreparationPhase(this);
+	FActorClusterContext ActorClusterContext;
+	{
+		FWorldPartitionStreamingGenerator StreamingGenerator(bIsPIE, RuntimeHash);
 
-	// Preparation Phase :: Actor Clusters Creation
-	FActorClusterContext ActorClusterContext = StreamingGenerator.CreateActorClusters();
+		// Preparation Phase
+		StreamingGenerator.PreparationPhase(this);
+
+		// Preparation Phase :: Actor Clusters Creation
+		ActorClusterContext = StreamingGenerator.CreateActorClusters();
+	}
 
 	// Generate streaming
 	check(!StreamingPolicy);
 	StreamingPolicy = NewObject<UWorldPartitionStreamingPolicy>(const_cast<UWorldPartition*>(this), WorldPartitionStreamingPolicyClass.Get());
 
 	check(RuntimeHash);
-	bool Result = RuntimeHash->GenerateStreaming(StreamingPolicy, ActorClusterContext, OutPackagesToGenerate);
-	
-	if (Result)
+	if (RuntimeHash->GenerateStreaming(StreamingPolicy, ActorClusterContext, OutPackagesToGenerate))
 	{
 		StreamingPolicy->PrepareActorToCellRemapping();
+		return true;
 	}
 
-	return Result;
+	return false;
 }
 
 void UWorldPartition::GenerateHLOD(ISourceControlHelper* SourceControlHelper, bool bCreateActorsOnly)

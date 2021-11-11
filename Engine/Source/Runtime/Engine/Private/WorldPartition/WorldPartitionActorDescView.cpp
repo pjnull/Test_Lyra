@@ -9,13 +9,11 @@
 FWorldPartitionActorDescView::FWorldPartitionActorDescView()
 	: ActorDesc(nullptr)
 	, GridPlacement(EActorGridPlacement::None)
-	, ContainerID(0)
 {}
 
 FWorldPartitionActorDescView::FWorldPartitionActorDescView(const FWorldPartitionActorDesc* InActorDesc)
 	: ActorDesc(InActorDesc)
 	, GridPlacement(InActorDesc->GetGridPlacement())
-	, ContainerID(0)
 {}
 
 const FGuid& FWorldPartitionActorDescView::GetGuid() const
@@ -115,13 +113,5 @@ void FWorldPartitionActorDescView::SetGridPlacement(EActorGridPlacement InGridPl
 		GridPlacement = InGridPlacement;
 		UE_LOG(LogWorldPartition, Verbose, TEXT("Actor '%s' grid placement changed to %s"), *GetActorLabel().ToString(), *StaticEnum<EActorGridPlacement>()->GetNameStringByValue((int64)InGridPlacement));
 	}
-}
-
-void FWorldPartitionActorDescView::SetContainerID(uint64 InContainerID)
-{
-	check(!ContainerID);
-	check(InContainerID);
-
-	ContainerID = InContainerID;
 }
 #endif

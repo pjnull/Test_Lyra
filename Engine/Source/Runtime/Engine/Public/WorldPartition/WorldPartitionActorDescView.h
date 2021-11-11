@@ -44,12 +44,6 @@ public:
 	bool GetContainerInstance(const UActorDescContainer*& OutLevelContainer, FTransform& OutLevelTransform, EContainerClusterMode& OutClusterMode) const;
 
 	void SetGridPlacement(EActorGridPlacement InGridPlacement);
-	void SetContainerID(uint64 InContainerID);
-
-	uint64 GetContainerID() const
-	{
-		return ContainerID;
-	}
 
 	bool operator==(const FWorldPartitionActorDescView& Other) const
 	{
@@ -64,6 +58,5 @@ public:
 protected:
 	const FWorldPartitionActorDesc* ActorDesc;
 	EActorGridPlacement GridPlacement;
-	uint64 ContainerID;
 };
 #endif

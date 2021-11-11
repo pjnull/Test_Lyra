@@ -2,14 +2,69 @@
 #pragma once
 
 #if WITH_EDITOR
-
 #include "WorldPartition/DataLayer/DataLayersID.h"
 #include "WorldPartition/WorldPartitionActorDescView.h"
 #include "Misc/HashBuilder.h"
+#include "Hash/CityHash.h"
+#endif
+
+#include "WorldPartitionActorCluster.generated.h"
 
 class UActorDescContainer;
 enum class EContainerClusterMode : uint8;
 
+USTRUCT()
+struct FActorContainerID
+{
+	GENERATED_USTRUCT_BODY()
+
+	FActorContainerID()
+	: ID(0)
+	{}
+
+	FActorContainerID(const FActorContainerID& InOther)
+	: ID(InOther.ID)
+	{}
+
+	FActorContainerID(const FActorContainerID& InParent, FGuid InActorGuid)
+	: ID(CityHash64WithSeed((const char*)&InActorGuid, sizeof(InActorGuid), InParent.ID))
+	{}
+
+	void operator=(const FActorContainerID& InOther)
+	{
+		ID = InOther.ID;
+	}
+
+	bool operator==(const FActorContainerID& InOther) const
+	{
+		return ID == InOther.ID;
+	}
+
+	bool operator!=(const FActorContainerID& InOther) const
+	{
+		return ID != InOther.ID;
+	}
+
+	bool IsMainContainer() const
+	{
+		return !ID;
+	}
+
+	FString ToString() const
+	{
+		return FString::Printf(TEXT("%016llx"), ID);
+	}
+
+	friend FORCEINLINE uint32 GetTypeHash(const FActorContainerID& InContainerID)
+	{
+		return GetTypeHash(InContainerID.ID);
+	}
+
+	UPROPERTY()
+	uint64 ID;
+};
+
+#if WITH_EDITOR
 /**
  * List of actors bound together based on clustering rules. (mainly object references)
  */
@@ -24,7 +79,6 @@ struct FActorCluster
 
 	FActorCluster(UWorld* InWorld, const FWorldPartitionActorDescView& InActorDescView);
 	void Add(const FActorCluster& InActorCluster, const TMap<FGuid, FWorldPartitionActorDescView>& InActorDescViewMap);
-
 };
 
 struct FActorClusterInstance;
@@ -34,9 +88,9 @@ struct FActorClusterInstance;
  */
 struct FActorContainerInstance
 {
-	FActorContainerInstance(uint64 InID, const FTransform& InTransform, const FBox& InBounds, const TSet<FName>& InDataLayers, EContainerClusterMode InClusterMode, const UActorDescContainer* InContainer, TMap<FGuid, FWorldPartitionActorDescView> InActorDescViewMap);
+	FActorContainerInstance(const FActorContainerID& InID, const FTransform& InTransform, const FBox& InBounds, const TSet<FName>& InDataLayers, EContainerClusterMode InClusterMode, const UActorDescContainer* InContainer, TMap<FGuid, FWorldPartitionActorDescView> InActorDescViewMap);
 	
-	uint64						ID;
+	FActorContainerID				ID;
 	FTransform					Transform;
 	FBox						Bounds;
 	EContainerClusterMode		ClusterMode;
@@ -96,6 +150,8 @@ class ENGINE_API FActorClusterContext
 {
 public:
 	typedef TFunction<bool(const FWorldPartitionActorDescView&)> FFilterActorDescViewFunc;
+
+	FActorClusterContext() {}
 
 	/**
 	 * Create the actor clusters from the root World Partition. Optionally filtering some actors and including child Containers. 

@@ -57,7 +57,7 @@ void FWorldPartitionLevelHelper::MoveExternalActorsToLevel(const TArray<FWorldPa
 	for (const FWorldPartitionRuntimeCellObjectMapping& PackageObjectMapping : InChildPackages)
 	{
 		// We assume actor failed to duplicate if LoadedPath equals NAME_None (warning already logged we can skip this mapping)
-		if (PackageObjectMapping.LoadedPath == NAME_None && PackageObjectMapping.ContainerID != 0)
+		if (PackageObjectMapping.LoadedPath == NAME_None && !PackageObjectMapping.ContainerID.IsMainContainer())
 		{
 			continue;
 		}
@@ -218,12 +218,12 @@ bool FWorldPartitionLevelHelper::LoadActors(ULevel* InDestLevel, TArrayView<FWor
 	ActorPackages.Reserve(InActorPackages.Num());
 
 	// Levels to Load with actors to duplicate
-	TMap<uint64, TArray<FWorldPartitionRuntimeCellObjectMapping*>> PackagesToDuplicate;
+	TMap<FActorContainerID, TArray<FWorldPartitionRuntimeCellObjectMapping*>> PackagesToDuplicate;
 	check(!bLoadForPlay || InOutInstancingContext);
 
 	for (FWorldPartitionRuntimeCellObjectMapping& PackageObjectMapping : InActorPackages)
 	{
-		if (PackageObjectMapping.ContainerID == 0)
+		if (PackageObjectMapping.ContainerID.IsMainContainer())
 		{
 			if (bLoadForPlay)
 			{
@@ -299,14 +299,14 @@ bool FWorldPartitionLevelHelper::LoadActors(ULevel* InDestLevel, TArrayView<FWor
 	for (auto& Pair : PackagesToDuplicate)
 	{
 		FString PackageToLoadFrom = Pair.Value[0]->ContainerPackage.ToString();
-		FLoadPackageAsyncDelegate CompletionCallback = FLoadPackageAsyncDelegate::CreateLambda([LoadProgress, LevelInstanceID = Pair.Key, Mappings = MoveTemp(Pair.Value), InDestLevel, &InPackageCache, InCompletionCallback](const FName& LoadedPackageName, UPackage* LoadedPackage, EAsyncLoadingResult::Type Result)
+		FLoadPackageAsyncDelegate CompletionCallback = FLoadPackageAsyncDelegate::CreateLambda([LoadProgress, ContainerInstanceID = Pair.Key, Mappings = MoveTemp(Pair.Value), InDestLevel, &InPackageCache, InCompletionCallback](const FName& LoadedPackageName, UPackage* LoadedPackage, EAsyncLoadingResult::Type Result)
 		{
 			check(LoadProgress->NumPendingLoadRequests);
 			LoadProgress->NumPendingLoadRequests--;
 
 			if (LoadedPackage)
 			{
-				FName DuplicatePackageName(*FString::Printf(TEXT("%s_%016llx"), *LoadedPackage->GetName(), LevelInstanceID));
+				FName DuplicatePackageName(*FString::Printf(TEXT("%s_%s"), *LoadedPackage->GetName(), *ContainerInstanceID.ToString()));
 				UPackage* DuplicatedPackage = InPackageCache.FindPackage(DuplicatePackageName);
 				UWorld* DuplicatedWorld = nullptr;
 
@@ -342,7 +342,7 @@ bool FWorldPartitionLevelHelper::LoadActors(ULevel* InDestLevel, TArrayView<FWor
 					// Possible actor isn't found if Actor package failed to load because of missing dependencies (ex: deleted Blueprint)
 					if (DuplicatedActor)
 					{
-						DuplicatedActor->Rename(*FString::Printf(TEXT("%s_%016llx"), *DuplicatedActor->GetName(), Mapping->ContainerID), InDestLevel, REN_NonTransactional | REN_ForceNoResetLoaders | REN_DoNotDirty | REN_DontCreateRedirectors);
+						DuplicatedActor->Rename(*FString::Printf(TEXT("%s_%s"), *DuplicatedActor->GetName(), *Mapping->ContainerID.ToString()), InDestLevel, REN_NonTransactional | REN_ForceNoResetLoaders | REN_DoNotDirty | REN_DontCreateRedirectors);
 						USceneComponent* RootComponent = DuplicatedActor->GetRootComponent();
 
 						FLevelUtils::FApplyLevelTransformParams TransformParams(nullptr, Mapping->ContainerTransform);
