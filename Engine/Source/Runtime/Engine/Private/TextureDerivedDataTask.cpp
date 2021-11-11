@@ -428,7 +428,7 @@ void FTextureCacheDerivedDataWorker::BuildTexture(TArray<FTextureBuildSettings>&
 			DerivedData->VTData = new FVirtualTextureBuiltData();
 		}
 
-		FVirtualTextureDataBuilder Builder(*DerivedData->VTData, Compressor, ImageWrapper);
+		FVirtualTextureDataBuilder Builder(*DerivedData->VTData, TexturePathName, Compressor, ImageWrapper);
 		Builder.Build(TextureData, CompositeTextureData, &InBuildSettingsPerLayer[0], true);
 
 		DerivedData->SizeX = DerivedData->VTData->Width;
@@ -496,6 +496,7 @@ void FTextureCacheDerivedDataWorker::BuildTexture(TArray<FTextureBuildSettings>&
 		if (Compressor->BuildTexture(TextureData.Blocks[0].MipsPerLayer[0],
 			((bool)Texture.CompositeTexture && CompositeTextureData.Blocks.Num() && CompositeTextureData.Blocks[0].MipsPerLayer.Num()) ? CompositeTextureData.Blocks[0].MipsPerLayer[0] : TArray<FImage>(),
 			InBuildSettingsPerLayer[0],
+			TexturePathName,
 			CompressedMips,
 			OptData.NumMipsInTail,
 			OptData.ExtData))

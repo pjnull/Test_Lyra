@@ -258,7 +258,7 @@ struct FPixelDataRectangle
 
 #define TEXTURE_COMPRESSOR_MODULENAME "TextureCompressor"
 
-FVirtualTextureDataBuilder::FVirtualTextureDataBuilder(FVirtualTextureBuiltData &SetOutData, ITextureCompressorModule *InCompressor, IImageWrapperModule* InImageWrapper)
+FVirtualTextureDataBuilder::FVirtualTextureDataBuilder(FVirtualTextureBuiltData &SetOutData, const FString& InDebugTexturePathName, ITextureCompressorModule *InCompressor, IImageWrapperModule* InImageWrapper)
 	: OutData(SetOutData)
 	, SizeInBlocksX(0)
 	, SizeInBlocksY(0)
@@ -267,6 +267,7 @@ FVirtualTextureDataBuilder::FVirtualTextureDataBuilder(FVirtualTextureBuiltData 
 	, BlockSizeScale(1)
 	, SizeX(0)
 	, SizeY(0)
+	, DebugTexturePathName(InDebugTexturePathName)
 {
 	Compressor = InCompressor ? InCompressor : &FModuleManager::LoadModuleChecked<ITextureCompressorModule>(TEXTURE_COMPRESSOR_MODULENAME);
 	ImageWrapper = InImageWrapper ? InImageWrapper : &FModuleManager::LoadModuleChecked<IImageWrapperModule>(FName("ImageWrapper"));
@@ -749,7 +750,7 @@ void FVirtualTextureDataBuilder::BuildTiles(const TArray<FVTSourceTileEntry>& Ti
 			TArray<FCompressedImage2D> CompressedMip;
 			TArray<FImage> EmptyList;
 			uint32 NumMipsInTail, ExtData;
-			if (!ensure(Compressor->BuildTexture(TileImages, EmptyList, TBSettings, CompressedMip, NumMipsInTail, ExtData)))
+			if (!ensure(Compressor->BuildTexture(TileImages, EmptyList, TBSettings, DebugTexturePathName, CompressedMip, NumMipsInTail, ExtData)))
 			{
 				bCompressionError = true;
 			}
@@ -1049,7 +1050,7 @@ void FVirtualTextureDataBuilder::BuildSourcePixels(const FTextureSourceData& Sou
 			if (LocalBlockSizeScale == 1)
 			{
 				uint32 NumMipsInTail, ExtData;
-				bBuildTextureResult = Compressor->BuildTexture(SourceMips, *CompositeSourceMips, TBSettings, CompressedMips, NumMipsInTail, ExtData);
+				bBuildTextureResult = Compressor->BuildTexture(SourceMips, *CompositeSourceMips, TBSettings, DebugTexturePathName, CompressedMips, NumMipsInTail, ExtData);
 			}
 			else
 			{
@@ -1072,7 +1073,7 @@ void FVirtualTextureDataBuilder::BuildSourcePixels(const FTextureSourceData& Sou
 				}
 
 				uint32 NumMipsInTail, ExtData;
-				bBuildTextureResult = Compressor->BuildTexture(ScaledSourceMips, ScaledCompositeMips, TBSettings, CompressedMips, NumMipsInTail, ExtData);
+				bBuildTextureResult = Compressor->BuildTexture(ScaledSourceMips, ScaledCompositeMips, TBSettings, DebugTexturePathName, CompressedMips, NumMipsInTail, ExtData);
 			}
 
 			check(bBuildTextureResult);
@@ -1206,7 +1207,7 @@ void FVirtualTextureDataBuilder::BuildSourcePixels(const FTextureSourceData& Sou
 			// TODO - composite images?
 			TArray<FCompressedImage2D> CompressedMips;
 			uint32 NumMipsInTail, ExtData;
-			if (!Compressor->BuildTexture(MiptailInputImages, EmptyImageArray, TBSettings, CompressedMips, NumMipsInTail, ExtData))
+			if (!Compressor->BuildTexture(MiptailInputImages, EmptyImageArray, TBSettings, DebugTexturePathName, CompressedMips, NumMipsInTail, ExtData))
 			{
 				check(false);
 			}

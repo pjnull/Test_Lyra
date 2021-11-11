@@ -870,7 +870,7 @@ public:
 		return CompressedPixelFormat;
 	}
 
-	virtual bool CompressImage(const FImage& InImage, const FTextureBuildSettings& InBuildSettings, const bool bInHasAlpha, FCompressedImage2D& OutImage) const override
+	virtual bool CompressImage(const FImage& InImage, const FTextureBuildSettings& InBuildSettings, FStringView DebugTexturePathName, const bool bInHasAlpha, FCompressedImage2D& OutImage) const override
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(Oodle_CompressImage);
 
