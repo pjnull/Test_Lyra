@@ -349,10 +349,7 @@ namespace UE::ImageWrapper::Private
 			switch (Whence)
 			{
 				case Set:
-					if( Offset >= 0 ) 
-					{
 						TiffImageWrapper->CurrentPosition = Offset;
-					}
 					break;
 				case OffsetFromCurrent:
 					{
