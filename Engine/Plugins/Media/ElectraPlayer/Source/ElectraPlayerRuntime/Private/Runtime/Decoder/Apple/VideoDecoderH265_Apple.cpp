@@ -96,6 +96,7 @@ private:
 		bool			bIsDiscardable = false;
 		int64			PTS = 0;
 		int64			EndPTS = 0;
+		int64			SequenceIndex = 0;
 		FTimeValue		AdjustedPTS;
 		FTimeValue		AdjustedDuration;
 
@@ -188,7 +189,7 @@ private:
 
 		bool operator<(const FDecodedImage& rhs) const
 		{
-			return(SourceInfo->PTS < rhs.SourceInfo->PTS);
+			return(SourceInfo->SequenceIndex < rhs. SourceInfo->SequenceIndex || (SourceInfo->SequenceIndex == rhs. SourceInfo->SequenceIndex && SourceInfo->PTS < rhs.SourceInfo->PTS));
 		}
 
 		void SetImageBufferRef(CVImageBufferRef InImageBufferRef)
@@ -902,6 +903,7 @@ void FVideoDecoderH265::PrepareAU(TSharedPtr<FDecoderInput, ESPMode::ThreadSafe>
 		FTimeValue EndTime = AU->AccessUnit->PTS + AU->AccessUnit->Duration;
 		AU->PTS = StartTime.GetAsHNS();				// The PTS we give the decoder no matter any adjustment.
 		AU->EndPTS = EndTime.GetAsHNS();			// End PTS we need to check the PTS value returned by the decoder against.
+		AU->SequenceIndex = StartTime.GetSequenceIndex();
 		if (AU->AccessUnit->EarliestPTS.IsValid())
 		{
 			// If the end time of the AU is before the earliest render PTS we need to decode it, but not display it.
