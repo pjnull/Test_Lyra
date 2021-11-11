@@ -916,6 +916,8 @@ void FWmfMediaStreamSink::CopyTextureAndEnqueueSample(IMFSample* pSample)
 			TArray<uint8> ExternalBuffer;
 			if (Decoder->GetExternalBuffer(ExternalBuffer, SampleTime) == false)
 			{
+				UE_LOG(LogWmfMedia, Error, TEXT("External buffer not found for time %f"),
+					FTimespan::FromMicroseconds(SampleTime / 10).GetTotalSeconds());
 				return;
 			}
 
