@@ -937,19 +937,34 @@ void FNiagaraGpuComputeDispatch::PrepareTicksForProxy(FRHICommandListImmediate& 
 				continue;
 			}
 
-#if WITH_EDITOR
-			//-TODO: Temporary change to avoid crashing on incorrect FeatureLevel
-			if (ComputeContext->GPUScript_RT->GetFeatureLevel() != FeatureLevel)
-			{
-				continue;
-			}
-#endif
-
 			// Nothing to dispatch?
 			if ( InstanceData.TotalDispatches == 0 )
 			{
 				continue;
 			}
+
+#if WITH_EDITOR
+			//-TODO: Validate feature level in the editor as when using the preview mode we can be using the wrong shaders for the renderer type.
+			//       i.e. We may attempt to sample the gbuffer / depth using deferred scene textures rather than mobile which will crash.
+			if (ComputeContext->GPUScript_RT->GetFeatureLevel() != FeatureLevel)
+			{
+				if (ComputeProxy->GetComputeTickStage() == ENiagaraGpuComputeTickStage::PostOpaqueRender)
+				{
+					if (bRaisedWarningThisFrame == false)
+					{
+						bRaisedWarningThisFrame = true;
+						AsyncTask(
+							ENamedThreads::GameThread,
+							[MessageId=uint64(this), DebugSimName=ComputeContext->GetDebugSimFName()]()
+							{
+								GEngine->AddOnScreenDebugMessage(MessageId, 1.f, FColor::White, *FString::Printf(TEXT("GPU Simulation(%s) will not show in preview mode, as we may sample from wrong SceneTextures buffer."), *DebugSimName.ToString()));
+							}
+						);
+					}
+					continue;
+				}
+			}
+#endif
 
 			// Determine this instances start dispatch group, in the case of emitter dependencies (i.e. particle reads) we need to continue rather than starting again
 			iInstanceStartDispatchGroup = InstanceData.bStartNewOverlapGroup ? iInstanceCurrDispatchGroup : iInstanceStartDispatchGroup;
@@ -1594,6 +1609,9 @@ void FNiagaraGpuComputeDispatch::PreInitViews(FRDGBuilder& GraphBuilder, bool bA
 {
 	bRequiresReadback = false;
 	GNiagaraViewDataManager.ClearSceneTextureParameters();
+#if WITH_EDITOR
+	bRaisedWarningThisFrame = false;
+#endif
 
 	GpuReadbackManagerPtr->Tick();
 #if NIAGARA_COMPUTEDEBUG_ENABLED
