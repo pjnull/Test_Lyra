@@ -45,7 +45,6 @@ namespace CADKernel
 		FDuration TriangulateDuration = FChrono::Init();
 		FDuration BuildIsoNodesDuration = FChrono::Init();
 		FDuration BuildLoopSegmentsDuration = FChrono::Init();
-		FDuration BuildLoopSegmentsCheckIntersectionDuration = FChrono::Init();
 		FDuration BuildInnerSegmentsDuration = FChrono::Init();
 		FDuration FindLoopSegmentOfInnerTriangulationDuration = FChrono::Init();
 		FDuration FindSegmentIsoUVSurroundingSmallLoopDuration = FChrono::Init();
@@ -80,7 +79,6 @@ namespace CADKernel
 			FChrono::PrintClockElapse(Log, TEXT("  "), TEXT("Triangulate"), TriangulateDuration);
 			FChrono::PrintClockElapse(Log, TEXT("    "), TEXT("BuildIsoNodes"), BuildIsoNodesDuration);
 			FChrono::PrintClockElapse(Log, TEXT("    "), TEXT("BuildLoopSegments"), BuildLoopSegmentsDuration);
-			FChrono::PrintClockElapse(Log, TEXT("      "), TEXT("BuildLoopSegments Check intersection"), BuildLoopSegmentsCheckIntersectionDuration);
 			FChrono::PrintClockElapse(Log, TEXT("    "), TEXT("BuildInnerSegments"), BuildInnerSegmentsDuration);
 			FChrono::PrintClockElapse(Log, TEXT("    "), TEXT("FindLoopSegmentOfInnerTriangulation"), FindLoopSegmentOfInnerTriangulationDuration);
 			FChrono::PrintClockElapse(Log, TEXT("      "), TEXT("FindSegmentIsoUVSurroundingSmallLoop"), FindSegmentIsoUVSurroundingSmallLoopDuration);
@@ -194,7 +192,7 @@ namespace CADKernel
 		 * Build the segments of the loops and check if each loop is self intersecting.
 		 * @return false if the loop is self intersecting
 		 */
-		bool BuildLoopSegments();
+		void BuildLoopSegments();
 
 		void BuildInnerSegments();
 

@@ -302,7 +302,7 @@ void FParametricMesher::GenerateCloud(FGrid& Grid)
 	}
 
 	Grid.DisplayInnerDomainPoints(TEXT("FGrid::PointCloud 2D"), Grid.GetInner2DPoints(EGridSpace::Default2D));
-	Wait(Grid.bDisplay);
+	//Wait(Grid.bDisplay);
 
 	FTimePoint StartTime = FChrono::Now();
 	MeshFaceLoops(Grid);

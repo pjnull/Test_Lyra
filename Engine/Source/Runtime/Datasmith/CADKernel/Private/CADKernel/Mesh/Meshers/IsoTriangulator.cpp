@@ -68,12 +68,7 @@ bool FIsoTriangulator::Triangulate()
 #endif
 
 	FillMeshNodes();
-
-	if (!BuildLoopSegments())
-	{
-		FMessage::Printf(Log, TEXT("A loop of the surface %d is in self intersecting. The mesh of this sector is canceled.\n"), Grid.GetFace()->GetId());
-		return false;
-	}
+	BuildLoopSegments();
 
 #ifdef CADKERNEL_DEV
 	Display(DisplaySpace, TEXT("FIsoTrianguler::LoopSegments"), LoopSegments, false, false, EVisuProperty::OrangeCurve);
@@ -336,7 +331,7 @@ namespace
 	}
 }
 
-bool FIsoTriangulator::BuildLoopSegments()
+void FIsoTriangulator::BuildLoopSegments()
 {
 	FTimePoint StartTime = FChrono::Now();
 
@@ -345,36 +340,11 @@ bool FIsoTriangulator::BuildLoopSegments()
 	int32 LoopIndex = 0;
 	TArray<FIsoSegment*> Segments;
 
-	TFunction<bool()> CheckSelfIntersection = [&]()
-	{
-		FTimePoint StartCheckIntersectionTime = FChrono::Now();
-		FIntersectionSegmentTool IntersectionTool(Grid);
-		IntersectionTool.AddSegments(Segments);
-		IntersectionTool.Sort();
-		for (const FIsoSegment* Segment : Segments)
-		{
-			if (IntersectionTool.DoesIntersect(*Segment))
-			{
-				return true;
-			}
-		}
-		Segments.Empty(LoopNodeCount);
-#ifdef CADKERNEL_DEV
-		Chronos.BuildLoopSegmentsCheckIntersectionDuration += FChrono::Elapse(StartCheckIntersectionTime);
-#endif
-		return false;
-	};
-
 	Segments.Reserve(LoopNodeCount);
 	for (FLoopNode& Node : LoopNodes)
 	{
-		// Check if loops are self intersecting. 
 		if (LoopIndex != Node.GetLoopIndex())
 		{
-			if (CheckSelfIntersection())
-			{
-				return false;
-			}
 			Segments.Empty(LoopNodeCount);
 		}
 
@@ -383,12 +353,6 @@ bool FIsoTriangulator::BuildLoopSegments()
 		Segment.ConnectToNode();
 		LoopSegments.Add(&Segment);
 		Segments.Add(&Segment);
-	}
-
-	// Check last loop
-	if (CheckSelfIntersection())
-	{
-		return false;
 	}
 
 	for (FIsoSegment* Segment : LoopSegments)
@@ -434,7 +398,6 @@ bool FIsoTriangulator::BuildLoopSegments()
 #ifdef CADKERNEL_DEV
 	Chronos.BuildLoopSegmentsDuration += FChrono::Elapse(StartTime);
 #endif
-	return true;
 }
 
 void FIsoTriangulator::BuildThinZoneSegments()
@@ -1812,7 +1775,7 @@ void FIsoTriangulator::RemoveIntersectionByMovingTheClosedPoint(FIntersectionSeg
 	{
 		FPoint2D MoveDirection = NewPosition - InitialPosition;
 		MoveDirection.Normalize();
-		MoveDirection *= 1.01;
+		MoveDirection *= 0.01;  // to replace by FSession::GeometricTolerance
 		FPoint2D NewCoordinate = NewPosition + MoveDirection;
 
 		const_cast<FIsoNode&>(Node).Set2DPoint(EGridSpace::UniformScaled, Grid, NewCoordinate);
@@ -2829,7 +2792,10 @@ void FIsoTriangulator::TriangulateInnerNodes()
 	int32 NumV = Grid.GetCuttingCount(EIso::IsoV);
 
 #ifdef ADD_TRIANGLE_2D
-	Open3DDebugSession(TEXT("Inner Mesh 2D"));
+	if (bDisplay)
+	{
+		Open3DDebugSession(TEXT("Inner Mesh 2D"));
+	}
 #endif
 	for (int32 vIndex = 0, Index = 0; vIndex < NumV - 1; vIndex++)
 	{
