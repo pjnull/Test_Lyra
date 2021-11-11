@@ -48,6 +48,10 @@ AttemptFileCopyWithRetries(const TCHAR* Dst, const TCHAR* Src, double RetryDurat
 		{
 			FPlatformProcess::Sleep(0.01f);
 		}
+		else
+		{
+			break;
+		}
 		CopyResult = IFileManager::Get().Copy(Dst, Src, true, true, false);
 	}
 
