@@ -269,7 +269,7 @@ namespace CADKernel
 		/**
 		 * @return the carrier topological face
 		 */
-		TSharedRef<FTopologicalFace> GetFace() const;
+		TSharedPtr<FTopologicalFace> GetFace() const;
 
 		// ======   Vertex Functions (Get, Set, ...)   ======
 

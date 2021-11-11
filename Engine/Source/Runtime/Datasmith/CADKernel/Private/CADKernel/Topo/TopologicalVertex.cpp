@@ -71,13 +71,17 @@ void FTopologicalVertex::GetConnectedEdges(const FTopologicalVertex& OtherVertex
 	TSharedPtr<TTopologicalLink<FTopologicalVertex>> OtherVertexLink = OtherVertex.GetLink();
 	for (const FTopologicalVertex* Vertex : GetTwinsEntities())
 	{
-		ensureCADKernel(Vertex);
-		for (FTopologicalEdge* Edge : Vertex->GetDirectConnectedEdges())
+		if(Vertex != nullptr)
 		{
-			ensureCADKernel(Edge);
-			if (Edge->GetOtherVertex(*Vertex)->GetLink() == OtherVertexLink)
+			for (FTopologicalEdge* Edge : Vertex->GetDirectConnectedEdges())
 			{
-				OutEdges.Add(Edge);
+				if(Edge != nullptr)
+				{
+					if (Edge->GetOtherVertex(*Vertex)->GetLink() == OtherVertexLink)
+					{
+						OutEdges.Add(Edge);
+					}
+				}
 			}
 		}
 	}

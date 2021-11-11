@@ -263,10 +263,13 @@ void FTopologicalEdge::Delete()
 	SetDeleted();
 }
 
-TSharedRef<FTopologicalFace> FTopologicalEdge::GetFace() const
+TSharedPtr<FTopologicalFace> FTopologicalEdge::GetFace() const
 {
-	ensureCADKernel(Loop != nullptr);
-	return Loop->GetFace();
+	if(Loop != nullptr)
+	{
+		return Loop->GetFace();
+	}
+	return TSharedPtr<FTopologicalFace>();
 }
 
 void FTopologicalEdge::ComputeCrossingPointCoordinates()
