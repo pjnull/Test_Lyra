@@ -300,6 +300,7 @@ struct FStrataBSDF
 #define HAIR_ROUGHNESS(X)				X.VGPRs[1].x
 #define HAIR_SPECULAR(X)				X.VGPRs[1].y
 #define HAIR_BACKLIT(X)					X.VGPRs[1].z
+#define HAIR_COMPLEXTRANSMITTANCE(X)	X.VGPRs[1].w
 
 #define SLW_BASECOLOR(X)				X.VGPRs[0].xyz
 #define SLW_METALLIC(X)					X.VGPRs[1].x
@@ -635,6 +636,15 @@ FStrataData GetStrataHairBSDF(float3 BaseColor, float Scatter, float Specular, f
 {
 	FStrataData StrataData = GetInitialisedStrataDataWithReservedFirstSlot();
 
+	// Enable complex transmittance only for hair using cards/strands vertex factories
+	#ifndef USE_HAIR_COMPLEX_TRANSMITTANCE
+	  #if defined(HAIR_CARD_MESH_FACTORY) || defined(HAIR_STRAND_MESH_FACTORY)
+		#define USE_HAIR_COMPLEX_TRANSMITTANCE 1
+	  #else
+		#define USE_HAIR_COMPLEX_TRANSMITTANCE 0
+	  #endif
+	#endif
+
 	BSDF_SETTYPE					(StrataData.Layers[0].BSDFs[0], STRATA_BSDF_TYPE_HAIR);
 	BSDF_SETSHAREDLOCALBASISID		(StrataData.Layers[0].BSDFs[0], SharedLocalBasisIndex);
 	BSDF_SETEMISSIVE				(StrataData.Layers[0].BSDFs[0], Emissive);
@@ -643,6 +653,7 @@ FStrataData GetStrataHairBSDF(float3 BaseColor, float Scatter, float Specular, f
 	HAIR_ROUGHNESS					(StrataData.Layers[0].BSDFs[0]) = Roughness;
 	HAIR_SPECULAR					(StrataData.Layers[0].BSDFs[0]) = Specular;
 	HAIR_BACKLIT					(StrataData.Layers[0].BSDFs[0]) = Backlit;
+	HAIR_COMPLEXTRANSMITTANCE		(StrataData.Layers[0].BSDFs[0]) = USE_HAIR_COMPLEX_TRANSMITTANCE;
 
 #if STRATA_INLINE_SHADING
 	StrataData.Layers[0].BSDFs[0].Coverage = 1.0f;
@@ -1981,7 +1992,7 @@ void PackStrataOut(
 				case STRATA_BSDF_TYPE_HAIR:
 				{
 					STRATA_STORE_UINT1(PackColorLinearToGamma2AlphaLinear(float4(HAIR_BASECOLOR(BSDF), HAIR_ROUGHNESS(BSDF))));
-					STRATA_STORE_UINT1(PackR11G11B10F(float3(HAIR_SCATTER(BSDF), HAIR_SPECULAR(BSDF), HAIR_BACKLIT(BSDF))));
+					STRATA_STORE_UINT1(PackRGBA8(float4(HAIR_SCATTER(BSDF), HAIR_SPECULAR(BSDF), HAIR_BACKLIT(BSDF), HAIR_COMPLEXTRANSMITTANCE(BSDF))));
 					// 8 bytes
 				}
 				break;
@@ -2202,7 +2213,11 @@ FStrataBSDF UnpackStrataBSDFIn(ByteAddressBuffer StrataBuffer, inout FStrataAddr
 	case STRATA_BSDF_TYPE_HAIR:
 	{
 		StrataLoad_ColorGamma2ToLinearAlphaLinear(StrataBuffer, StrataAddressing, HAIR_BASECOLOR(OutBSDF), HAIR_ROUGHNESS(OutBSDF));
-		StrataLoad_R11_G11_B10F(StrataBuffer, StrataAddressing, HAIR_SCATTER(OutBSDF), HAIR_SPECULAR(OutBSDF), HAIR_BACKLIT(OutBSDF));
+		float4 Data = UnpackRGBA8(StrataLoadUint1(StrataBuffer, StrataAddressing));
+		HAIR_SCATTER(OutBSDF) = Data.x;
+		HAIR_SPECULAR(OutBSDF) = Data.y;
+		HAIR_BACKLIT(OutBSDF) = Data.z;
+		HAIR_COMPLEXTRANSMITTANCE(OutBSDF) = Data.w;
 		// 8 bytes
 	}
 	break;

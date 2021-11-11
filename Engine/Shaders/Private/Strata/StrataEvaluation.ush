@@ -12,6 +12,10 @@
 #include "../ThinFilmBSDF.ush"
 #include "../AreaLightCommon.ush"
 
+#include "../HairStrands/HairStrandsCommon.ush"
+#include "../HairStrands/HairStrandsDeepTransmittanceCommon.ush"
+#include "../HairStrands/HairStrandsDeepTransmittanceDualScattering.ush"
+
 #ifndef STRATA_FASTPATH 
 #define STRATA_FASTPATH 0
 #endif
@@ -630,12 +634,20 @@ FStrataEvaluateResult StrataEvaluateBSDFCommon(FStrataBSDFContext BSDFContext, F
 			GBuffer.ShadingModelID	= SHADINGMODELID_HAIR;
 			GBuffer.WorldNormal		= BSDFContext.N;
 
+			FHairTransmittanceData HairTransmittance = InitHairTransmittanceData();
+			if (HAIR_COMPLEXTRANSMITTANCE(BSDFContext.BSDF))
+			{
+				HairTransmittance = EvaluateDualScattering(GBuffer.BaseColor, BSDFContext.N, GBuffer.Roughness, BSDFContext.V, BSDFContext.L);
+				HairTransmittance.OpaqueVisibility = ShadowTerms.SurfaceShadow;
+			}
+
 			float BacklitEnabled = 1.0f;
 			float Area = 0.0f;
 			uint2 Random = uint2(0, 0);
-			Sample.TransmissionPathValue= HairShading(GBuffer, BSDFContext.L, BSDFContext.V, BSDFContext.N, ShadowTerms.TransmissionShadow, ShadowTerms.HairTransmittance, BacklitEnabled, Area, Random);
-			Sample.TransmissionPDF		= 1.0f / (4.0f * PI);		// STRATA_TODO this currently match the uniform sphere sampling from StrataImportanceSampleBSDF
+			Sample.SpecularPathValue	= HairShading(GBuffer, BSDFContext.L, BSDFContext.V, BSDFContext.N, ShadowTerms.TransmissionShadow, HairTransmittance, BacklitEnabled, Area, Random);
+			Sample.SpecularPDF			= 1.0f / (4.0f * PI);		// STRATA_TODO this currently match the uniform sphere sampling from StrataImportanceSampleBSDF
 			Sample.Throughput			= OpaqueBSDFThroughput; 
+			Sample.IntegratedSpecularValue = ShadowTerms.TransmissionShadow * AreaLightContext.AreaLight.FalloffColor * AreaLightContext.Falloff * Sample.SpecularPathValue;
 		}
 		break;
 
