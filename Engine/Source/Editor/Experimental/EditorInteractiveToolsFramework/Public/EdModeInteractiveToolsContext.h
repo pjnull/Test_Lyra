@@ -253,16 +253,10 @@ public:
 	UEdModeInteractiveToolsContext* CreateNewChildEdModeToolsContext();
 
 	/**
-	 * Call to add a child EdMode ToolsContext created using the above function
-	 * @return true if child was added
-	 */
-	bool OnChildEdModeActivated(UEdModeInteractiveToolsContext* ChildToolsContext);
-
-	/**
 	 * Call to release a child EdMode ToolsContext created using the above function
 	 * @return true if child was found and removed
 	 */
-	bool OnChildEdModeDeactivated(UEdModeInteractiveToolsContext* ChildToolsContext);
+	bool OnChildEdModeToolsContextShutdown(UEdModeInteractiveToolsContext* ChildToolsContext);
 
 };
 

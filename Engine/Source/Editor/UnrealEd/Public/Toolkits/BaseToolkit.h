@@ -8,7 +8,6 @@
 #include "Toolkits/IToolkit.h"
 #include "Framework/Commands/UICommandList.h"
 #include "Toolkits/IToolkitHost.h"
-#include "Tools/Modes.h"
 
 
 class UInteractiveTool;
@@ -171,10 +170,6 @@ protected:
 	virtual void CustomizeDetailsViewArgs(FDetailsViewArgs& ArgsInOut) {}
 
 	virtual void RequestModeUITabs();
-
-	void OnModeIDChanged(const FEditorModeID& InID, bool bIsEntering);
-	const FEditorModeInfo* GetEditorModeInfo() const;
-
 	/**
  * Whether or not the mode toolbar should be shown.  If any active modes generated a toolbar this method will return true
  */

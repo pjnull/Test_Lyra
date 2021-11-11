@@ -256,9 +256,7 @@ void FAssetTypeActions_CameraAnim::OnMatineeEditorClosed(const FEditorModeID& In
 		}
 
 		// remove our delegate
-		PRAGMA_DISABLE_DEPRECATION_WARNINGS
 		FEditorDelegates::EditorModeIDExit.Remove(OnMatineeEditorClosedDelegateHandle);
-		PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	}
 }
 

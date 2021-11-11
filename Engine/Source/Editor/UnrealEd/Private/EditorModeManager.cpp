@@ -592,7 +592,7 @@ void FEditorModeTools::ForEachEdMode(TFunctionRef<bool(UEdMode*)> InCalllback) c
 {
 	for (UEdMode* Mode : ActiveScriptableModes)
 	{
-		if (Mode)
+		if (Mode && !Mode->IsPendingDeletion())
 		{
 			if (!InCalllback(Mode))
 			{
@@ -604,14 +604,14 @@ void FEditorModeTools::ForEachEdMode(TFunctionRef<bool(UEdMode*)> InCalllback) c
 
 void FEditorModeTools::DeactivateAllModesPendingDeletion()
 {
-	// Make a copy so we can modify the pending deactivate modes map
-	TMap<FEditorModeID, UEdMode*> PendingDeactivateModesCopy(PendingDeactivateModes);
-	for (auto& Pair : PendingDeactivateModesCopy)
+	// Reverse iterate since we are modifying the active modes list.
+	for (int32 Index = ActiveScriptableModes.Num() - 1; Index >= 0; --Index)
 	{
-		ExitMode(Pair.Value);
+		if (ActiveScriptableModes[Index]->IsPendingDeletion())
+		{
+			DeactivateScriptableModeAtIndex(Index);
+		}
 	}
-
-	check(PendingDeactivateModes.Num() == 0);
 }
 
 void FEditorModeTools::SetPivotLocation( const FVector& Location, const bool bIncGridBase )
@@ -663,16 +663,19 @@ void FEditorModeTools::ActivateDefaultMode()
 	ActivateMode( FBuiltinEditorModes::EM_Default );
 }
 
-void FEditorModeTools::ExitMode(UEdMode* InMode)
+void FEditorModeTools::DeactivateScriptableModeAtIndex(int32 InIndex)
 {
-	if (InMode)
-	{
-		InMode->Exit();
+	check(InIndex >= 0 && InIndex < ActiveScriptableModes.Num());
 
-		const FEditorModeID EditorModeID = InMode->GetID();
-		PendingDeactivateModes.Remove(EditorModeID);
-		RecycledScriptableModes.Add(EditorModeID, InMode);
-	}
+	UEdMode* Mode = ActiveScriptableModes[InIndex];
+	ActiveScriptableModes.RemoveAt(InIndex);
+
+	Mode->Exit();
+
+	const bool bIsEnteringMode = false;
+	BroadcastEditorModeIDChanged(Mode->GetID(), bIsEnteringMode);
+
+	RecycledScriptableModes.Add(Mode->GetID(), Mode);
 }
 
 void FEditorModeTools::OnModeUnregistered(FEditorModeID ModeID)
@@ -718,32 +721,25 @@ void FEditorModeTools::RemoveAllDelegateHandlers()
 void FEditorModeTools::DeactivateMode( FEditorModeID InID )
 {
 	// Find the mode from the ID and exit it.
-	for (int32 Index = ActiveScriptableModes.Num() - 1; Index >= 0; --Index)
+	ForEachEdMode([InID](UEdMode* Mode)
 	{
-		UEdMode* Mode = ActiveScriptableModes[Index];
 		if (Mode->GetID() == InID)
 		{
-			PendingDeactivateModes.Emplace(InID, Mode);
-			ActiveScriptableModes.RemoveAt(Index);
-
-			constexpr bool bIsEnteringMode = false;
-			BroadcastEditorModeIDChanged(InID, bIsEnteringMode);
-			break;
+			Mode->RequestDeletion();
+			return false;
 		}
-	};
+
+		return true;
+	});
 }
 
 void FEditorModeTools::DeactivateAllModes()
 {
-	for (int32 Index = ActiveScriptableModes.Num() - 1; Index >= 0; --Index)
+	ForEachEdMode([](UEdMode* Mode)
 	{
-		FEditorModeID ModeID = ActiveScriptableModes[Index]->GetID();
-		PendingDeactivateModes.Emplace(ModeID, ActiveScriptableModes[Index]);
-		ActiveScriptableModes.RemoveAt(Index);
-		
-		constexpr bool bIsEnteringMode = false;
-		BroadcastEditorModeIDChanged(ModeID, bIsEnteringMode);
-	};
+		Mode->RequestDeletion();
+		return true;
+	});
 }
 
 void FEditorModeTools::DestroyMode( FEditorModeID InID )
@@ -758,10 +754,15 @@ void FEditorModeTools::DestroyMode( FEditorModeID InID )
 	}
 
 	// Find the mode from the ID and exit it.
-	DeactivateMode(InID);
-	if (UEdMode* DeactivatedMode = PendingDeactivateModes.FindRef(InID))
+	for (int32 Index = ActiveScriptableModes.Num() - 1; Index >= 0; --Index)
 	{
-		ExitMode(DeactivatedMode);
+		auto& Mode = ActiveScriptableModes[Index];
+		if (Mode->GetID() == InID)
+		{
+			// Deactivate and destroy
+			DeactivateScriptableModeAtIndex(Index);
+			break;
+		}
 	}
 
 	RecycledScriptableModes.Remove(InID);
@@ -820,16 +821,6 @@ void FEditorModeTools::ActivateMode(FEditorModeID InID, bool bToggle)
 
 	// Recycle a mode or factory a new one
 	UEdMode* ScriptableMode = RecycledScriptableModes.FindRef(InID);
-	bool bNeedsEnter = true;
-	if (!ScriptableMode)
-	{
-		ScriptableMode = PendingDeactivateModes.FindRef(InID);
-		if (ScriptableMode)
-		{
-			bNeedsEnter = false;
-		}
-	}
-
 	if (!ScriptableMode)
 	{
 		ScriptableMode = GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->CreateEditorModeWithToolsOwner(InID, *this);
@@ -846,26 +837,20 @@ void FEditorModeTools::ActivateMode(FEditorModeID InID, bool bToggle)
 	const bool bIsVisibleMode = ScriptableMode->GetModeInfo().IsVisible();
 	for (int32 ModeIndex = ActiveScriptableModes.Num() - 1; ModeIndex >= 0; ModeIndex--)
 	{
-		UEdMode* Mode = ActiveScriptableModes[ModeIndex];
-		const bool bModesAreCompatible = ScriptableMode->IsCompatibleWith(Mode->GetID()) || Mode->IsCompatibleWith(ScriptableMode->GetID());
-		if (!bModesAreCompatible || (bIsVisibleMode && Mode->GetModeInfo().IsVisible()))
+		const bool bModesAreCompatible = ScriptableMode->IsCompatibleWith(ActiveScriptableModes[ModeIndex]->GetID()) || ActiveScriptableModes[ModeIndex]->IsCompatibleWith(ScriptableMode->GetID());
+		if (!bModesAreCompatible || (bIsVisibleMode && ActiveScriptableModes[ModeIndex]->GetModeInfo().IsVisible()))
 		{
-			DeactivateMode(Mode->GetID());
+			ActiveScriptableModes[ModeIndex]->RequestDeletion();
 		}
 	}
 
 	ActiveScriptableModes.Add(ScriptableMode);
-
 	// Enter the new mode
-	if (bNeedsEnter)
-	{
-		ScriptableMode->Enter();
-	}
+	ScriptableMode->Enter();
 
 	const bool bIsEnteringMode = true;
 	BroadcastEditorModeIDChanged(ScriptableMode->GetID(), bIsEnteringMode);
 
-	PendingDeactivateModes.Remove(InID);
 	RecycledScriptableModes.Remove(InID);
 
 	// Update the editor UI
