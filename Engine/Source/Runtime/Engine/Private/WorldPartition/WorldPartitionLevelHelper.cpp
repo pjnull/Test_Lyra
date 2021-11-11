@@ -113,34 +113,14 @@ void FWorldPartitionLevelHelper::RemapLevelSoftObjectPaths(ULevel* InLevel, UWor
 	check(InLevel);
 	check(InWorldPartition);
 
-	struct FSoftPathFixupSerializer : public FArchiveUObject
+	FSoftObjectPathFixupArchive FixupSerializer([InWorldPartition](FSoftObjectPath& Value)
 	{
-		FSoftPathFixupSerializer(UWorldPartition* InWorldPartition)
-			: WorldPartition(InWorldPartition)
+		if(!Value.IsNull())
 		{
-			this->SetIsSaving(true);
-			this->ArShouldSkipBulkData = true;
+			InWorldPartition->RemapSoftObjectPath(Value);
 		}
-
-		FArchive& operator<<(FSoftObjectPath& Value)
-		{
-			if (!Value.IsNull())
-			{
-				WorldPartition->RemapSoftObjectPath(Value);
-			}
-			return *this;
-		}
-
-		UWorldPartition* WorldPartition;
-	};
-
-	FSoftPathFixupSerializer FixupSerializer(InWorldPartition);
-	TArray<UObject*> SubObjects;
-	GetObjectsWithOuter(InLevel, SubObjects);
-	for (UObject* Object : SubObjects)
-	{
-		Object->Serialize(FixupSerializer);
-	}
+	});
+	FixupSerializer.Fixup(InLevel);
 }
 
 /**

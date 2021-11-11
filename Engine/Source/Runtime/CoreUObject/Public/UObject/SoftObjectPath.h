@@ -8,6 +8,7 @@
 #include "HAL/ThreadSingleton.h"
 #include "UObject/Class.h"
 #include "UObject/ObjectPtr.h"
+#include "UObject/UObjectHash.h"
 
 /**
  * A struct that contains a string reference to an object, either a top level asset or a subobject.
@@ -469,10 +470,16 @@ struct FSoftObjectPathFixupArchive : public FArchiveUObject
 	{
 	}
 
-	FArchive& operator<<(FSoftObjectPath& Value)
+	FArchive& operator<<(FSoftObjectPath& Value) override
 	{
 		FixupFunction(Value);
 		return *this;
+	}
+
+	void Fixup(UObject* Root)
+	{
+		Root->Serialize(*this);
+		ForEachObjectWithOuter(Root, [this](UObject* InObject) { InObject->Serialize(*this);  });
 	}
 
 	TFunction<void(FSoftObjectPath&)> FixupFunction;
