@@ -124,7 +124,6 @@ namespace UnrealBuildTool
 			new KeyValuePair<string, string>("GraphEditor", "Kismet"),
 			new KeyValuePair<string, string>("HierarchicalLODOutliner", "UnrealEd"),
 			new KeyValuePair<string, string>("Kismet", "BlueprintGraph"),
-			new KeyValuePair<string, string>("Kismet", "BlueprintNativeCodeGen"),
 			new KeyValuePair<string, string>("Kismet", "UMGEditor"),
 			new KeyValuePair<string, string>("Kismet", "Merge"),
 			new KeyValuePair<string, string>("KismetWidgets", "BlueprintGraph"),

@@ -3778,8 +3778,7 @@ void FAsyncPackage2::EventDrivenCreateExport(int32 LocalExportIndex)
 	}
 
 	LLM_SCOPED_TAG_WITH_OBJECT_IN_SET(GetLinkerRoot(), ELLMTagSet::Assets);
-	// LLM_SCOPED_TAG_WITH_OBJECT_IN_SET((Export.DynamicType == FObjectExport::EDynamicType::DynamicType) ? UDynamicClass::StaticClass() : 
-	// 	CastEventDrivenIndexToObject<UClass>(Export.ClassIndex, false), ELLMTagSet::AssetClasses);
+	// LLM_SCOPED_TAG_WITH_OBJECT_IN_SET(CastEventDrivenIndexToObject<UClass>(Export.ClassIndex, false), ELLMTagSet::AssetClasses);
 
 	bool bIsCompleteyLoaded = false;
 	UClass* LoadClass = Export.ClassIndex.IsNull() ? UClass::StaticClass() : CastEventDrivenIndexToObject<UClass>(Export.ClassIndex, true);
@@ -3990,8 +3989,7 @@ bool FAsyncPackage2::EventDrivenSerializeExport(int32 LocalExportIndex, FExportA
 	}
 
 	LLM_SCOPED_TAG_WITH_OBJECT_IN_SET(GetLinkerRoot(), ELLMTagSet::Assets);
-	// LLM_SCOPED_TAG_WITH_OBJECT_IN_SET((Export.DynamicType == FObjectExport::EDynamicType::DynamicType) ? UDynamicClass::StaticClass() :
-	// 	CastEventDrivenIndexToObject<UClass>(Export.ClassIndex, false), ELLMTagSet::AssetClasses);
+	// LLM_SCOPED_TAG_WITH_OBJECT_IN_SET(CastEventDrivenIndexToObject<UClass>(Export.ClassIndex, false), ELLMTagSet::AssetClasses);
 
 	// cache archetype
 	// prevents GetArchetype from hitting the expensive GetArchetypeFromRequiredInfoImpl
@@ -4654,27 +4652,8 @@ EAsyncPackageState::Type FAsyncLoadingThread2::ProcessLoadedPackagesFromGameThre
 
 				UObject* Object = Export.Object;
 
-				// CDO need special handling, no matter if it's listed in DeferredFinalizeObjects or created here for DynamicClass
-				UObject* CDOToHandle = nullptr;
-
-				// Dynamic Class doesn't require/use pre-loading (or post-loading). 
-				// The CDO is created at this point, because now it's safe to solve cyclic dependencies.
-				if (UDynamicClass* DynamicClass = Cast<UDynamicClass>(Object))
-				{
-					check((DynamicClass->ClassFlags & CLASS_Constructed) != 0);
-
-					//native blueprint 
-
-					check(DynamicClass->HasAnyClassFlags(CLASS_TokenStreamAssembled));
-					// this block should be removed entirely when and if we add the CDO to the fake export table
-					CDOToHandle = DynamicClass->GetDefaultObject(false);
-					UE_CLOG(!CDOToHandle, LogStreaming, Fatal, TEXT("EDL did not create the CDO for %s before it finished loading."), *DynamicClass->GetFullName());
-					CDOToHandle->AtomicallyClearInternalFlags(EInternalObjectFlags::AsyncLoading);
-				}
-				else
-				{
-					CDOToHandle = ((Object != nullptr) && Object->HasAnyFlags(RF_ClassDefaultObject)) ? Object : nullptr;
-				}
+				// CDO need special handling, no matter if it's listed in DeferredFinalizeObjects
+				UObject* CDOToHandle = ((Object != nullptr) && Object->HasAnyFlags(RF_ClassDefaultObject)) ? Object : nullptr;
 
 				// Clear AsyncLoading in CDO's subobjects.
 				if (CDOToHandle != nullptr)

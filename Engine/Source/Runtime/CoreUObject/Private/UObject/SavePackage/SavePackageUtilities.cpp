@@ -280,24 +280,6 @@ bool IsNewSaveEnabled(bool bForCooking)
 	return (bForCooking && (EnableNewSave & 1) != 0) || (!bForCooking && (EnableNewSave & 2) != 0);
 }
 
-void GetBlueprintNativeCodeGenReplacement(UObject* InObj, UClass*& ObjClass, UObject*& ObjOuter, FName& ObjName, const ITargetPlatform* TargetPlatform)
-{
-#if WITH_EDITOR
-	if (const IBlueprintNativeCodeGenCore* Coordinator = IBlueprintNativeCodeGenCore::Get())
-	{
-		const FCompilerNativizationOptions& NativizationOptions = Coordinator->GetNativizationOptionsForPlatform(TargetPlatform);
-		if (UClass* ReplacedClass = Coordinator->FindReplacedClassForObject(InObj, NativizationOptions))
-		{
-			ObjClass = ReplacedClass;
-		}
-		if (UObject* ReplacedOuter = Coordinator->FindReplacedNameAndOuter(InObj, /*out*/ObjName, NativizationOptions))
-		{
-			ObjOuter = ReplacedOuter;
-		}
-	}
-#endif
-}
-
 bool HasUnsaveableOuter(UObject* InObj, UPackage* InSavingPackage)
 {
 	UObject* Obj = InObj;

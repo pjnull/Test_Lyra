@@ -1737,32 +1737,6 @@ void EndLoad(FUObjectSerializeContext* LoadContext, TArray<UPackage*>* OutLoaded
 				}
 			}
 
-			if (GEventDrivenLoaderEnabled && EVENT_DRIVEN_ASYNC_LOAD_ACTIVE_AT_RUNTIME)
-			{
-#if DO_CHECK
-				for (UObject* Obj : ObjLoaded)
-				{
-					if (UDynamicClass* DynamicClass = Cast<UDynamicClass>(Obj))
-					{
-						check((DynamicClass->ClassFlags & CLASS_Constructed) != 0);
-						check(DynamicClass->GetDefaultObject(false)); // this should have already been done
-					}
-				}
-#endif
-			}
-			else
-			{
-				// Dynamic Class doesn't require/use pre-loading (or post-loading). 
-				// The CDO is created at this point, because now it's safe to solve cyclic dependencies.
-				for (UObject* Obj : ObjLoaded)
-				{
-					if (UDynamicClass* DynamicClass = Cast<UDynamicClass>(Obj))
-					{
-						check((DynamicClass->ClassFlags & CLASS_Constructed) != 0);
-						DynamicClass->GetDefaultObject(true);
-					}
-				}
-			}
 			// Create clusters after all objects have been loaded
 			if (FPlatformProperties::RequiresCookedData() && !GIsInitialLoad && GCreateGCClusters && GAssetClustreringEnabled && !GUObjectArray.IsOpenForDisregardForGC())
 			{
@@ -3050,13 +3024,9 @@ void FObjectInitializer::PostConstructInit()
 	if (!Obj->HasAnyFlags(RF_NeedLoad) || bIsDeferredInitializer)
 #endif // !USE_CIRCULAR_DEPENDENCY_LOAD_DEFERRING
 	{
-		if ((bIsCDO && !Class->HasAnyFlags(RF_Dynamic)) || Class->HasAnyClassFlags(CLASS_PerObjectConfig))
+		if (bIsCDO || Class->HasAnyClassFlags(CLASS_PerObjectConfig))
 		{
 			Obj->LoadConfig(NULL, NULL, bIsCDO ? UE::LCPF_ReadParentSections : UE::LCPF_None);
-		}
-		else if (bIsCDO && Class->HasAnyFlags(RF_Dynamic) && Class->HasAnyClassFlags(CLASS_Config))
-		{
-			Obj->LoadConfig(Class);
 		}
 		if (bAllowInstancing)
 		{
@@ -4996,7 +4966,8 @@ namespace UECodeGen_Private
 			EnumNames.Emplace(UTF8_TO_TCHAR(Enumerator->NameUTF8), Enumerator->Value);
 		}
 
-		NewEnum->SetEnums(EnumNames, (UEnum::ECppForm)Params.CppForm, Params.EnumFlags, Params.DynamicType == EDynamicType::NotDynamic);
+		const bool bAddMaxKeyIfMissing = true;
+		NewEnum->SetEnums(EnumNames, (UEnum::ECppForm)Params.CppForm, Params.EnumFlags, bAddMaxKeyIfMissing);
 		NewEnum->CppType = UTF8_TO_TCHAR(Params.CppTypeUTF8);
 
 		if (Params.DisplayNameFunc)

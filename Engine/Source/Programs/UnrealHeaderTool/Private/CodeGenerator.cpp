@@ -120,8 +120,6 @@ namespace
 	static const FName NAME_SerializeToFArchive("SerializeToFArchive");
 	static const FName NAME_SerializeToFStructuredArchive("SerializeToFStructuredArchive");
 	static const FName NAME_ObjectInitializerConstructorDeclared("ObjectInitializerConstructorDeclared");
-	static const FName NAME_InitializeStaticSearchableValues("InitializeStaticSearchableValues");
-	static const FName NAME_OverrideNativeName("OverrideNativeName");
 	static const FName NAME_NoGetter("NoGetter");
 	static const FName NAME_GetByRef("GetByRef");
 
@@ -761,9 +759,9 @@ void FNativeClassHeaderGenerator::GetPropertyTag(FUHTStringBuilder& Out, FUnreal
 void FNativeClassHeaderGenerator::OutputProperty(FOutputDevice& DeclOut, FOutputDevice& Out, FReferenceGatherers& OutReferenceGatherers, const TCHAR* Scope, TArray<FPropertyNamePointerPair>& PropertyNamesAndPointers, FUnrealPropertyDefinitionInfo& PropertyDef, const TCHAR* OffsetStr, FString&& Name, const TCHAR* DeclSpaces, const TCHAR* Spaces, const TCHAR* SourceStruct) const
 {
 	const FPropertyBase& PropertyBase   = PropertyDef.GetPropertyBase();
-	FString        PropName             = CreateUTF8LiteralString(FNativeClassHeaderGenerator::GetOverriddenName(PropertyDef));
+	FString        PropName             = CreateUTF8LiteralString(PropertyDef.GetName());
 	FString        PropNameDep          = PropertyDef.HasAllPropertyFlags(CPF_Deprecated) ? PropertyDef.GetName() + TEXT("_DEPRECATED") : PropertyDef.GetName();
-	const TCHAR*   FPropertyObjectFlags = PropertyDef.IsOwnedByDynamicType() ? TEXT("RF_Public|RF_Transient") : TEXT("RF_Public|RF_Transient|RF_MarkAsNative");
+	const TCHAR*   FPropertyObjectFlags = TEXT("RF_Public|RF_Transient|RF_MarkAsNative");
 	EPropertyFlags PropFlags            = PropertyDef.GetPropertyFlags() & ~CPF_ComputedFlags;
 
 	FUHTStringBuilder PropTag;
@@ -1900,7 +1898,6 @@ void FNativeClassHeaderGenerator::ExportNativeGeneratedInitCode(FOutputDevice& O
 	check(!OutFriendText.Len());
 
 	const bool   bIsNoExport  = ClassDef.HasAnyClassFlags(CLASS_NoExport);
-	const bool   bIsDynamic   = ClassDef.IsDynamic();
 	const FString ClassNameCPP = ClassDef.GetAlternateNameCPP();
 
 	const FString& ApiString = GetAPIString();
@@ -1910,13 +1907,12 @@ void FNativeClassHeaderGenerator::ExportNativeGeneratedInitCode(FOutputDevice& O
 	bool bAllEditorOnlyFunctions = true;
 	for (TSharedRef<FUnrealFunctionDefinitionInfo> LocalFuncDef : ClassDef.GetFunctions())
 	{
-		FName TrueName = FNativeClassHeaderGenerator::GetOverriddenFName(*LocalFuncDef);
+		FName TrueName = LocalFuncDef->GetFName();
 		bool bAlreadyIncluded = false;
 		AlreadyIncludedNames.Add(TrueName, &bAlreadyIncluded);
 		if (bAlreadyIncluded)
 		{
-			// In a dynamic class the same function signature may be used for a Multi- and a Single-cast delegate.
-			if (!LocalFuncDef->IsDelegateFunction() || !bIsDynamic)
+			if (!LocalFuncDef->IsDelegateFunction())
 			{
 				LocalFuncDef->Throwf(TEXT("The same function linked twice. Function: %s Class: %s"), *LocalFuncDef->GetName(), *ClassDef.GetName());
 			}
@@ -1971,14 +1967,12 @@ void FNativeClassHeaderGenerator::ExportNativeGeneratedInitCode(FOutputDevice& O
 			OutDeclarations.Log(SuperClassDef->GetExternDecl(true));
 			Singletons.Logf(TEXT("\t\t(UObject* (*)())%s,\r\n"), *SuperClassDef->GetSingletonNameChopped(true));
 		}
-		if (!bIsDynamic)
-		{
-			check(ClassDef.HasSource());
-			FUnrealPackageDefinitionInfo& ClassPackageDef = ClassDef.GetPackageDef();
-			PackageDef.AddCrossModuleReference(OutReferenceGatherers.UniqueCrossModuleReferences);
-			OutDeclarations.Logf(TEXT("\t%s_API UPackage* %s;\r\n"), *ApiString, *ClassPackageDef.GetSingletonName());
-			Singletons.Logf(TEXT("\t\t(UObject* (*)())%s,\r\n"), *ClassPackageDef.GetSingletonNameChopped());
-		}
+
+		check(ClassDef.HasSource());
+		FUnrealPackageDefinitionInfo& ClassPackageDef = ClassDef.GetPackageDef();
+		PackageDef.AddCrossModuleReference(OutReferenceGatherers.UniqueCrossModuleReferences);
+		OutDeclarations.Logf(TEXT("\t%s_API UPackage* %s;\r\n"), *ApiString, *ClassPackageDef.GetSingletonName());
+		Singletons.Logf(TEXT("\t\t(UObject* (*)())%s,\r\n"), *ClassPackageDef.GetSingletonNameChopped());
 
 		const TCHAR* SingletonsArray;
 		const TCHAR* SingletonsCount;
@@ -2026,7 +2020,7 @@ void FNativeClassHeaderGenerator::ExportNativeGeneratedInitCode(FOutputDevice& O
 					TEXT("%s\t\t{ &%s, %s },%s\r\n%s"),
 					BEGIN_WRAP_EDITOR_ONLY(bIsEditorOnlyFunction),
 					*GetSingletonNameFuncAddr(FunctionDef, OutReferenceGatherers.UniqueCrossModuleReferences),
-					*FNativeClassHeaderGenerator::GetUTF8OverriddenNameForLiteral(FunctionDef),
+					*CreateUTF8LiteralString(FunctionDef->GetName()),
 					*FuncHashTag,
 					END_WRAP_EDITOR_ONLY(bIsEditorOnlyFunction)
 				);
@@ -2146,28 +2140,12 @@ void FNativeClassHeaderGenerator::ExportNativeGeneratedInitCode(FOutputDevice& O
 		GeneratedClassRegisterFunctionText.Logf(TEXT("\t};\r\n"));
 		GeneratedClassRegisterFunctionText.Log(*StaticDefinitions);
 
-		if (!bIsDynamic)
-		{
-			Out.Logf(TEXT("\tIMPLEMENT_CLASS_NO_AUTO_REGISTRATION(%s);\r\n"), *ClassNameCPP);
-		}
+		Out.Logf(TEXT("\tIMPLEMENT_CLASS_NO_AUTO_REGISTRATION(%s);\r\n"), *ClassNameCPP);
 
 		GeneratedClassRegisterFunctionText.Logf(TEXT("\tUClass* %s\r\n"), *SingletonName);
 		GeneratedClassRegisterFunctionText.Logf(TEXT("\t{\r\n"));
-		FString OuterSingletonName;
-		if (!bIsDynamic)
-		{
-			OuterSingletonName = FString::Printf(TEXT("Z_Registration_Info_UClass_%s.OuterSingleton"), *ClassNameCPP);
-			GeneratedClassRegisterFunctionText.Logf(TEXT("\t\tif (!%s)\r\n"), *OuterSingletonName);
-		}
-		else
-		{
-			OuterSingletonName = TEXT("OuterClass");
-			const FString& DynamicClassPackageName = ClassDef.GetTypePackageName();
-			GeneratedClassRegisterFunctionText.Logf(TEXT("\t\tUPackage* OuterPackage = FindOrConstructDynamicTypePackage(TEXT(\"%s\"));\r\n"), *DynamicClassPackageName);
-			GeneratedClassRegisterFunctionText.Logf(TEXT("\t\tUClass* OuterClass = Cast<UClass>(StaticFindObjectFast(UClass::StaticClass(), OuterPackage, TEXT(\"%s\")));\r\n"), *FNativeClassHeaderGenerator::GetOverriddenName(ClassDef));
-			GeneratedClassRegisterFunctionText.Logf(TEXT("\t\tif (!OuterClass || !(OuterClass->ClassFlags & CLASS_Constructed))\r\n"));
-		}
-
+		FString OuterSingletonName = FString::Printf(TEXT("Z_Registration_Info_UClass_%s.OuterSingleton"), *ClassNameCPP);
+		GeneratedClassRegisterFunctionText.Logf(TEXT("\t\tif (!%s)\r\n"), *OuterSingletonName);
 		GeneratedClassRegisterFunctionText.Logf(TEXT("\t\t{\r\n"));
 		GeneratedClassRegisterFunctionText.Logf(TEXT("\t\t\tUECodeGen_Private::ConstructUClass(%s, %s::ClassParams);\r\n"), *OuterSingletonName, *StaticsStructName);
 
@@ -2177,15 +2155,6 @@ void FNativeClassHeaderGenerator::ExportNativeGeneratedInitCode(FOutputDevice& O
 		for (const FString& SparseClassDataString : SparseClassDataTypes)
 		{
 			GeneratedClassRegisterFunctionText.Logf(TEXT("\t\t\t%s->SetSparseClassDataStruct(F%s::StaticStruct());\r\n"), *OuterSingletonName, *SparseClassDataString);
-		}
-
-		if (bIsDynamic)
-		{
-			const FString* CustomDynamicClassInitializationMD = ClassDef.FindMetaData(TEXT("CustomDynamicClassInitialization"));
-			if (CustomDynamicClassInitializationMD)
-			{
-				GeneratedClassRegisterFunctionText.Logf(TEXT("\t\t\t\t%s(CastChecked<UDynamicClass>(%s));\n"), *(*CustomDynamicClassInitializationMD), *OuterSingletonName);
-			}
 		}
 
 		GeneratedClassRegisterFunctionText.Logf(TEXT("\t\t}\r\n"));
@@ -2205,13 +2174,6 @@ void FNativeClassHeaderGenerator::ExportNativeGeneratedInitCode(FOutputDevice& O
 
 	FString SingletonName = ClassDef.GetSingletonName(true);
 	SingletonName.ReplaceInline(TEXT("()"), TEXT(""), ESearchCase::CaseSensitive); // function address
-
-	FString OverriddenClassName = *FNativeClassHeaderGenerator::GetOverriddenName(ClassDef);
-
-	const FString EmptyString;
-	const FString& InitSearchableValuesFunctionName = bIsDynamic ? ClassDef.GetMetaData(NAME_InitializeStaticSearchableValues) : EmptyString;
-	const FString InitSearchableValuesFunctionParam = InitSearchableValuesFunctionName.IsEmpty() ? FString(TEXT("nullptr")) :
-		FString::Printf(TEXT("&%s::%s"), *ClassNameCPP, *InitSearchableValuesFunctionName);
 
 	// Append base class' hash at the end of the generated code, this will force update derived classes
 	// when base class changes during hot-reload.
@@ -2243,30 +2205,10 @@ void FNativeClassHeaderGenerator::ExportNativeGeneratedInitCode(FOutputDevice& O
 	uint32 ClassHash = GenerateTextHash(*GeneratedClassRegisterFunctionText);
 	ClassDef.SetHash(ClassHash);
 
-	// Emit the IMPLEMENT_CLASS macro to go in the generated cpp file.
-	if (bIsDynamic)
-	{
-		Out.Logf(TEXT("\tIMPLEMENT_DYNAMIC_CLASS(%s, TEXT(\"%s\"), %u);\r\n"), *ClassNameCPP, *OverriddenClassName, ClassHash);
-	}
-
 	Out.Logf(TEXT("\ttemplate<> %sUClass* StaticClass<%s>()\r\n"), *GetAPIString(), *ClassNameCPP);
 	Out.Logf(TEXT("\t{\r\n"));
 	Out.Logf(TEXT("\t\treturn %s::StaticClass();\r\n"), *ClassNameCPP);
 	Out.Logf(TEXT("\t}\r\n"));
-
-	if (bIsDynamic)
-	{
-		const FString& ClassPackageName = ClassDef.GetTypePackageName();
-		Out.Logf(TEXT("\tstatic FRegisterCompiledInInfo Z_CompiledInDefer_UClass_%s(%s, &%s::StaticClass, TEXT(\"%s\"), TEXT(\"%s\"), %s, %s, %s);\r\n"),
-			*ClassNameCPP,
-			*SingletonName,
-			*ClassPackageName,
-			*ClassNameCPP,
-			*OverriddenClassName,
-			*AsTEXT(ClassPackageName),
-			*AsTEXT(FNativeClassHeaderGenerator::GetOverriddenPathName(ClassDef)),
-			*InitSearchableValuesFunctionParam);
-	}
 
 	if (ClassHasReplicatedProperties(ClassDef))
 	{
@@ -2286,7 +2228,7 @@ void FNativeClassHeaderGenerator::ExportNativeGeneratedInitCode(FOutputDevice& O
 			const FUnrealPropertyDefinitionInfo* PropertyDef = ClassDef.GetClassReps()[i];
 			const FString PropertyName = PropertyDef->GetName();
 
-			NameBuilder.Logf(TEXT("\t\tstatic const FName Name_%s(TEXT(\"%s\"));\r\n"), *PropertyName, *FNativeClassHeaderGenerator::GetOverriddenName(PropertyDef));
+			NameBuilder.Logf(TEXT("\t\tstatic const FName Name_%s(TEXT(\"%s\"));\r\n"), *PropertyName, *PropertyName);
 
 			if (!PropertyDef->IsStaticArray())
 			{
@@ -2347,7 +2289,6 @@ void FNativeClassHeaderGenerator::ExportFunction(FOutputDevice& Out, FReferenceG
 	}
 
 	FUnrealFieldDefinitionInfo* FieldOuterDef = UHTCast<FUnrealFieldDefinitionInfo>(FunctionDef.GetOuter());
-	const bool bIsDynamic = (FieldOuterDef && FieldOuterDef->IsDynamic());
 
 	FString OuterFunc;
 	if (FUnrealObjectDefinitionInfo* OuterDef = FunctionDef.GetOuter())
@@ -2389,7 +2330,7 @@ void FNativeClassHeaderGenerator::ExportFunction(FOutputDevice& Out, FReferenceG
 	}
 
 	bool bIsSparse = FunctionDef.GetFunctionType() == EFunctionType::SparseDelegate;
-	const TCHAR* UFunctionObjectFlags = FunctionDef.IsOwnedByDynamicType() ? TEXT("RF_Public|RF_Transient") : TEXT("RF_Public|RF_Transient|RF_MarkAsNative");
+	const TCHAR* UFunctionObjectFlags = TEXT("RF_Public|RF_Transient|RF_MarkAsNative");
 
 	TTuple<FString, FString> PropertyRange = OutputProperties(CurrentFunctionText, StaticDefinitions, OutReferenceGatherers, *FString::Printf(TEXT("%s::"), *StaticsStructName), FunctionDef, TEXT("\t\t"), TEXT("\t"));
 
@@ -2405,7 +2346,7 @@ void FNativeClassHeaderGenerator::ExportFunction(FOutputDevice& Out, FReferenceG
 		*StaticsStructName,
 		*OuterFunc,
 		*GetSingletonNameFuncAddr(SuperFunctionDef, OutReferenceGatherers.UniqueCrossModuleReferences),
-		*CreateUTF8LiteralString(FNativeClassHeaderGenerator::GetOverriddenName(FunctionDef)),
+		*CreateUTF8LiteralString(FunctionDef.GetName()),
 		(bIsSparse ? *CreateUTF8LiteralString(FunctionDef.GetSparseOwningClassName().ToString()) : TEXT("nullptr")),
 		(bIsSparse ? *CreateUTF8LiteralString(FunctionDef.GetSparseDelegateName().ToString()) : TEXT("nullptr")),
 		*StructureSize,
@@ -2423,18 +2364,7 @@ void FNativeClassHeaderGenerator::ExportFunction(FOutputDevice& Out, FReferenceG
 
 	CurrentFunctionText.Logf(TEXT("\tUFunction* %s\r\n"), *SingletonName);
 	CurrentFunctionText.Log (TEXT("\t{\r\n"));
-
-	if (!bIsDynamic)
-	{
-		CurrentFunctionText.Logf(TEXT("\t\tstatic UFunction* ReturnFunction = nullptr;\r\n"));
-	}
-	else
-	{
-		FString FunctionName = FNativeClassHeaderGenerator::GetUTF8OverriddenNameForLiteral(&FunctionDef);
-		CurrentFunctionText.Logf(TEXT("\t\tUObject* Outer = %s();\r\n"), *OuterFunc);
-		CurrentFunctionText.Logf(TEXT("\t\tUFunction* ReturnFunction = static_cast<UFunction*>(StaticFindObjectFast( UFunction::StaticClass(), Outer, %s ));\r\n"), *FunctionName);
-	}
-
+	CurrentFunctionText.Logf(TEXT("\t\tstatic UFunction* ReturnFunction = nullptr;\r\n"));
 	CurrentFunctionText.Logf(TEXT("\t\tif (!ReturnFunction)\r\n"));
 	CurrentFunctionText.Logf(TEXT("\t\t{\r\n"));
 	CurrentFunctionText.Logf(TEXT("\t\t\tUECodeGen_Private::ConstructUFunction(&ReturnFunction, %s::FuncParams);\r\n"), *StaticsStructName);
@@ -2469,8 +2399,8 @@ void FNativeClassHeaderGenerator::ExportNatives(FOutputDevice& Out, FUnrealClass
 		{
 			if (FunctionDef->HasSpecificFunctionFlags(FUNC_Native | FUNC_NetRequest, FUNC_Native))
 			{
-				FString OverriddenName = FNativeClassHeaderGenerator::GetUTF8OverriddenNameForLiteral(&*FunctionDef);
-				NamedFunctionsToExport.Emplace(&*FunctionDef, MoveTemp(OverriddenName));
+				FString FunctionName = CreateUTF8LiteralString(FunctionDef->GetName());
+				NamedFunctionsToExport.Emplace(&*FunctionDef, MoveTemp(FunctionName));
 
 				if (!FunctionDef->HasAnyFunctionFlags(FUNC_EditorOnly))
 				{
@@ -2529,7 +2459,7 @@ void FNativeClassHeaderGenerator::ExportInterfaceCallFunctions(FOutputDevice& Ou
 		Out.Logf( TEXT(";") LINE_TERMINATOR );
 
 		FString FunctionNameName = FString::Printf(TEXT("NAME_%s_%s"), *UHTCastChecked<FUnrealStructDefinitionInfo>(FunctionDef->GetOuter()).GetAlternateNameCPP(), *FunctionName);
-		OutCpp.Logf(TEXT("\tstatic FName %s = FName(TEXT(\"%s\"));") LINE_TERMINATOR, *FunctionNameName, *GetOverriddenFName(*FunctionDef).ToString());
+		OutCpp.Logf(TEXT("\tstatic FName %s = FName(TEXT(\"%s\"));") LINE_TERMINATOR, *FunctionNameName, *FunctionDef->GetFName().ToString());
 
 		ExportNativeFunctionHeader(OutCpp, OutReferenceGatherers.ForwardDeclarations, *FunctionDef, FunctionData, EExportFunctionType::Interface, EExportFunctionHeaderStyle::Definition, *ExtraParam, *APIString);
 		OutCpp.Logf( LINE_TERMINATOR TEXT("\t{") LINE_TERMINATOR );
@@ -3321,8 +3251,7 @@ void FNativeClassHeaderGenerator::ExportGeneratedStructBodyMacros(FOutputDevice&
 {
 	ScriptStructDef.AddCrossModuleReference(OutReferenceGatherers.UniqueCrossModuleReferences, true);
 
-	const bool bIsDynamic = ScriptStructDef.IsDynamic();
-	const FString ActualStructName = FNativeClassHeaderGenerator::GetOverriddenName(ScriptStructDef);
+	const FString ActualStructName = ScriptStructDef.GetName();
 	const FString& FriendApiString  = GetAPIString();
 
 	FUnrealStructDefinitionInfo* BaseStructDef = ScriptStructDef.GetSuperStruct();
@@ -3596,32 +3525,13 @@ void FNativeClassHeaderGenerator::ExportGeneratedStructBodyMacros(FOutputDevice&
 
 		FString GetHashName = FString::Printf(TEXT("Get_%s_Hash"), *ChoppedSingletonName);
 
-		if (!bIsDynamic)
-		{
-			Out.Logf(TEXT("\tstatic FStructRegistrationInfo Z_Registration_Info_UScriptStruct_%s;\r\n"), *ScriptStructDef.GetName());
-		}
-
-		if (bIsDynamic)
-		{
-			Out.Logf(TEXT("\textern uint32 %s();\r\n"), *GetHashName);
-		}
-
+		Out.Logf(TEXT("\tstatic FStructRegistrationInfo Z_Registration_Info_UScriptStruct_%s;\r\n"), *ScriptStructDef.GetName());
 		Out.Logf(TEXT("class UScriptStruct* %s::StaticStruct()\r\n"), *StructNameCPP);
 		Out.Logf(TEXT("{\r\n"));
 
 		// UStructs can have UClass or UPackage outer (if declared in non-UClass headers).
-		const FString& OuterName (bIsDynamic ? STRING_StructPackage : GetPackageSingletonName(UHTCastChecked<FUnrealPackageDefinitionInfo>(ScriptStructDef.GetOuter()), OutReferenceGatherers.UniqueCrossModuleReferences));
-		FString OuterSingletonName;
-		if (!bIsDynamic)
-		{
-			OuterSingletonName = FString::Printf(TEXT("Z_Registration_Info_UScriptStruct_%s.OuterSingleton"), *ScriptStructDef.GetName());
-		}
-		else
-		{
-			Out.Logf(TEXT("\tclass UPackage* %s = FindOrConstructDynamicTypePackage(TEXT(\"%s\"));\r\n"), *OuterName, *ScriptStructDef.GetTypePackageName());
-			Out.Logf(TEXT("\tclass UScriptStruct* Singleton = Cast<UScriptStruct>(StaticFindObjectFast(UScriptStruct::StaticClass(), %s, TEXT(\"%s\")));\r\n"), *OuterName, *ActualStructName);
-			OuterSingletonName = TEXT("Singleton");
-		}
+		const FString& OuterName (GetPackageSingletonName(UHTCastChecked<FUnrealPackageDefinitionInfo>(ScriptStructDef.GetOuter()), OutReferenceGatherers.UniqueCrossModuleReferences));
+		FString OuterSingletonName = FString::Printf(TEXT("Z_Registration_Info_UScriptStruct_%s.OuterSingleton"), *ScriptStructDef.GetName());
 
 		Out.Logf(TEXT("\tif (!%s)\r\n"), *OuterSingletonName);
 		Out.Logf(TEXT("\t{\r\n"));
@@ -3652,18 +3562,6 @@ void FNativeClassHeaderGenerator::ExportGeneratedStructBodyMacros(FOutputDevice&
 		Out.Logf(TEXT("{\r\n"));
 		Out.Logf(TEXT("\treturn %s::StaticStruct();\r\n"), *StructNameCPP);
 		Out.Logf(TEXT("}\r\n"));
-
-		if (bIsDynamic)
-		{
-			const FString& StructPackageName = ScriptStructDef.GetTypePackageName();
-			Out.Logf(TEXT("static FRegisterCompiledInInfo Z_CompiledInDeferStruct_UScriptStruct_%s(%s::StaticStruct, TEXT(\"%s\"), TEXT(\"%s\"),  %s, %s);\r\n"),
-				*StructNameCPP,
-				*StructNameCPP,
-				*StructPackageName,
-				*ActualStructName,
-				*AsTEXT(StructPackageName),
-				*AsTEXT(FNativeClassHeaderGenerator::GetOverriddenPathName(ScriptStructDef)));
-		}
 	}
 
 	FString StaticsStructName = ChoppedSingletonName + TEXT("_Statics");
@@ -3689,23 +3587,7 @@ void FNativeClassHeaderGenerator::ExportGeneratedStructBodyMacros(FOutputDevice&
 
 	EStructFlags UncomputedFlags = (EStructFlags)(ScriptStructDef.GetStructFlags() & ~STRUCT_ComputedFlags);
 
-	FString OuterFunc;
-	if (!bIsDynamic)
-	{
-		OuterFunc = GetPackageSingletonNameFuncAddr(UHTCastChecked<FUnrealPackageDefinitionInfo>(ScriptStructDef.GetOuter()), OutReferenceGatherers.UniqueCrossModuleReferences);
-	}
-	else
-	{
-		GeneratedStructRegisterFunctionText.Log(TEXT("\t\tstatic UObject* OuterFuncGetter();\r\n"));
-
-		StaticDefinitions.Logf(TEXT("\tUObject* %s::OuterFuncGetter()\r\n"), *StaticsStructName);
-		StaticDefinitions.Log (TEXT("\t{\r\n"));
-		StaticDefinitions.Logf(TEXT("\t\treturn FindOrConstructDynamicTypePackage(TEXT(\"%s\"));"), *ScriptStructDef.GetTypePackageName());
-		StaticDefinitions.Log (TEXT("\t}\r\n"));
-
-		OuterFunc = TEXT("&OuterFuncGetter");
-	}
-
+	FString OuterFunc = GetPackageSingletonNameFuncAddr(UHTCastChecked<FUnrealPackageDefinitionInfo>(ScriptStructDef.GetOuter()), OutReferenceGatherers.UniqueCrossModuleReferences);
 	FString MetaDataParams = OutputMetaDataCodeForObject(GeneratedStructRegisterFunctionText, StaticDefinitions, ScriptStructDef, *FString::Printf(TEXT("%s::Struct_MetaDataParams"), *StaticsStructName), TEXT("\t\t"), TEXT("\t"));
 
 	FString NewStructOps;
@@ -3738,7 +3620,7 @@ void FNativeClassHeaderGenerator::ExportGeneratedStructBodyMacros(FOutputDevice&
 	StaticDefinitions.Logf(TEXT("\t\talignof(%s),\r\n"), *StructNameCPP);
 	StaticDefinitions.Logf(TEXT("\t\t%s,\r\n"), *PropertyRange.Get<0>());
 	StaticDefinitions.Logf(TEXT("\t\t%s,\r\n"), *PropertyRange.Get<1>());
-	StaticDefinitions.Logf(TEXT("\t\t%s,\r\n"), bIsDynamic ? TEXT("RF_Public|RF_Transient") : TEXT("RF_Public|RF_Transient|RF_MarkAsNative"));
+	StaticDefinitions.Logf(TEXT("\t\t%s,\r\n"), TEXT("RF_Public|RF_Transient|RF_MarkAsNative"));
 	StaticDefinitions.Logf(TEXT("\t\tEStructFlags(0x%08X),\r\n"), (uint32)UncomputedFlags);
 	StaticDefinitions.Logf(TEXT("\t\t%s\r\n"), *MetaDataParams);
 	StaticDefinitions.Log (TEXT("\t};\r\n"));
@@ -3763,24 +3645,16 @@ void FNativeClassHeaderGenerator::ExportGeneratedStructBodyMacros(FOutputDevice&
 	FString HashFuncName = FString::Printf(TEXT("Get_%s_Hash"), *SingletonName.Replace(TEXT("()"), TEXT(""), ESearchCase::CaseSensitive));
 	// Structs can either have a UClass or UPackage as outer (if declared in non-UClass header).
 	FString InnerSingletonName;
-	if (!bIsDynamic)
+	if (ScriptStructDef.HasAnyStructFlags(STRUCT_Native))
 	{
-		if (ScriptStructDef.HasAnyStructFlags(STRUCT_Native))
-		{
-			InnerSingletonName = FString::Printf(TEXT("Z_Registration_Info_UScriptStruct_%s.InnerSingleton"), *ScriptStructDef.GetName());
-		}
-		else
-		{
-			GeneratedStructRegisterFunctionText.Logf(TEXT("\t\tstatic UScriptStruct* ReturnStruct = nullptr;\r\n"));
-			InnerSingletonName = TEXT("ReturnStruct");
-		}
+		InnerSingletonName = FString::Printf(TEXT("Z_Registration_Info_UScriptStruct_%s.InnerSingleton"), *ScriptStructDef.GetName());
 	}
 	else
 	{
-		GeneratedStructRegisterFunctionText.Logf(TEXT("\t\tUPackage* Outer = FindOrConstructDynamicTypePackage(TEXT(\"%s\"));\r\n"), *ScriptStructDef.GetTypePackageName());
-		GeneratedStructRegisterFunctionText.Logf(TEXT("\t\tUScriptStruct* ReturnStruct = FindExistingStructIfHotReloadOrDynamic(Outer, TEXT(\"%s\"), sizeof(%s), %s(), true);\r\n"), *ActualStructName, *NoExportStructNameCPP, *HashFuncName);
+		GeneratedStructRegisterFunctionText.Logf(TEXT("\t\tstatic UScriptStruct* ReturnStruct = nullptr;\r\n"));
 		InnerSingletonName = TEXT("ReturnStruct");
 	}
+	
 	GeneratedStructRegisterFunctionText.Logf(TEXT("\t\tif (!%s)\r\n"), *InnerSingletonName);
 	GeneratedStructRegisterFunctionText.Log (TEXT("\t\t{\r\n"));
 
@@ -3793,10 +3667,6 @@ void FNativeClassHeaderGenerator::ExportGeneratedStructBodyMacros(FOutputDevice&
 	ScriptStructDef.SetHash(StructHash);
 
 	Out.Log(GeneratedStructRegisterFunctionText);
-	if (bIsDynamic)
-	{
-		Out.Logf(TEXT("\tuint32 %s() { return %uU; }\r\n"), *HashFuncName, StructHash);
-	}
 
 	// if this struct has RigVM methods we need to implement both the 
 	// virtual function as well as the stub method here.
@@ -3881,10 +3751,8 @@ void FNativeClassHeaderGenerator::ExportGeneratedStructBodyMacros(FOutputDevice&
 
 void FNativeClassHeaderGenerator::ExportGeneratedEnumInitCode(FOutputDevice& Out, FReferenceGatherers& OutReferenceGatherers, const FUnrealSourceFile& SourceFile, FUnrealEnumDefinitionInfo& EnumDef) const
 {
-	const bool bIsDynamic               = EnumDef.IsDynamic();
 	const FString& SingletonName        = EnumDef.GetSingletonNameChopped(true);
 	const FString EnumNameCpp           = EnumDef.GetName(); //UserDefinedEnum should already have a valid cpp name.
-	const FString OverriddenEnumNameCpp = FNativeClassHeaderGenerator::GetOverriddenName(EnumDef);
 	const FString StaticsStructName     = SingletonName + TEXT("_Statics");
 	const bool bIsEditorOnlyDataType    = EnumDef.IsEditorOnly();
 
@@ -3893,7 +3761,7 @@ void FNativeClassHeaderGenerator::ExportGeneratedEnumInitCode(FOutputDevice& Out
 	FMacroBlockEmitter EditorOnlyData(Out, TEXT("WITH_EDITORONLY_DATA"));
 	EditorOnlyData(bIsEditorOnlyDataType);
 
-	const FString& PackageSingletonName = (bIsDynamic ? EnumDef.GetTypePackageName() : GetPackageSingletonName(UHTCastChecked<FUnrealPackageDefinitionInfo>(EnumDef.GetOuter()), OutReferenceGatherers.UniqueCrossModuleReferences));
+	const FString& PackageSingletonName = GetPackageSingletonName(UHTCastChecked<FUnrealPackageDefinitionInfo>(EnumDef.GetOuter()), OutReferenceGatherers.UniqueCrossModuleReferences);
 
 	// If we don't have a zero 0 then we emit a static assert to verify we have one
 	if (!EnumDef.IsValidEnumValue(0) && EnumDef.HasMetaData(FHeaderParserNames::NAME_BlueprintType))
@@ -3928,42 +3796,20 @@ void FNativeClassHeaderGenerator::ExportGeneratedEnumInitCode(FOutputDevice& Out
 		}
 	}
 
-	if (!bIsDynamic)
-	{
-		Out.Logf(TEXT("\tstatic FEnumRegistrationInfo Z_Registration_Info_UEnum_%s;\r\n"), *EnumNameCpp);
-	}
-
+	Out.Logf(TEXT("\tstatic FEnumRegistrationInfo Z_Registration_Info_UEnum_%s;\r\n"), *EnumNameCpp);
 	Out.Logf(TEXT("\tstatic UEnum* %s_StaticEnum()\r\n"), *EnumNameCpp);
 	Out.Logf(TEXT("\t{\r\n"));
 
-	if (!bIsDynamic)
-	{
-		Out.Logf(TEXT("\t\tif (!Z_Registration_Info_UEnum_%s.OuterSingleton)\r\n"), *EnumNameCpp);
-		Out.Logf(TEXT("\t\t{\r\n"));
-		Out.Logf(TEXT("\t\t\tZ_Registration_Info_UEnum_%s.OuterSingleton = GetStaticEnum(%s, %s, TEXT(\"%s\"));\r\n"), *EnumNameCpp, *SingletonName, *PackageSingletonName, *EnumNameCpp);
-		Out.Logf(TEXT("\t\t}\r\n"));
-		Out.Logf(TEXT("\t\treturn Z_Registration_Info_UEnum_%s.OuterSingleton;\r\n"), *EnumNameCpp);
-	}
-	else
-	{
-		Out.Logf(TEXT("\t\tclass UPackage* EnumPackage = FindOrConstructDynamicTypePackage(TEXT(\"%s\"));\r\n"), *PackageSingletonName);
-		Out.Logf(TEXT("\t\tclass UEnum* Singleton = Cast<UEnum>(StaticFindObjectFast(UEnum::StaticClass(), EnumPackage, TEXT(\"%s\")));\r\n"), *OverriddenEnumNameCpp);
-		Out.Logf(TEXT("\t\tif (!Singleton)\r\n"));
-		Out.Logf(TEXT("\t\t{\r\n"));
-		Out.Logf(TEXT("\t\t\tSingleton = GetStaticEnum(%s, EnumPackage, TEXT(\"%s\"));\r\n"), *SingletonName, *OverriddenEnumNameCpp);
-		Out.Logf(TEXT("\t\t}\r\n"));
-		Out.Logf(TEXT("\t\treturn Singleton;\r\n"));
-	}
+	Out.Logf(TEXT("\t\tif (!Z_Registration_Info_UEnum_%s.OuterSingleton)\r\n"), *EnumNameCpp);
+	Out.Logf(TEXT("\t\t{\r\n"));
+	Out.Logf(TEXT("\t\t\tZ_Registration_Info_UEnum_%s.OuterSingleton = GetStaticEnum(%s, %s, TEXT(\"%s\"));\r\n"), *EnumNameCpp, *SingletonName, *PackageSingletonName, *EnumNameCpp);
+	Out.Logf(TEXT("\t\t}\r\n"));
+	Out.Logf(TEXT("\t\treturn Z_Registration_Info_UEnum_%s.OuterSingleton;\r\n"), *EnumNameCpp);
 
 	Out.Logf(TEXT("\t}\r\n"));
 
 	const FString& EnumSingletonName = EnumDef.GetSingletonName(true);
 	const FString HashFuncName = FString::Printf(TEXT("Get_%s_Hash"), *SingletonName);
-
-	if (bIsDynamic)
-	{
-		Out.Logf(TEXT("\textern uint32 %s();\r\n"), *HashFuncName);
-	}
 
 	Out.Logf(TEXT("\ttemplate<> %sUEnum* StaticEnum<%s>()\r\n"), *GetAPIString(), *EnumDef.GetCppType());
 	Out.Logf(TEXT("\t{\r\n"));
@@ -3977,17 +3823,8 @@ void FNativeClassHeaderGenerator::ExportGeneratedEnumInitCode(FOutputDevice& Out
 	{
 
 		// Enums can either have a UClass or UPackage as outer (if declared in non-UClass header).
-		FString OuterString;
-		if (!bIsDynamic)
-		{
-			OuterString = PackageSingletonName;
-		}
-		else
-		{
-			OuterString = FString::Printf(TEXT("[](){ return (UObject*)FindOrConstructDynamicTypePackage(TEXT(\"%s\")); }()"), *PackageSingletonName);
-		}
-
-		const TCHAR* UEnumObjectFlags = bIsDynamic ? TEXT("RF_Public|RF_Transient") : TEXT("RF_Public|RF_Transient|RF_MarkAsNative");
+		FString OuterString = PackageSingletonName;
+		const TCHAR* UEnumObjectFlags = TEXT("RF_Public|RF_Transient|RF_MarkAsNative");
 		const TCHAR* EnumFlags = EnumDef.HasAnyEnumFlags(EEnumFlags::Flags) ? TEXT("EEnumFlags::Flags") : TEXT("EEnumFlags::None");
 
 		const TCHAR* EnumFormStr = TEXT("");
@@ -4020,13 +3857,12 @@ void FNativeClassHeaderGenerator::ExportGeneratedEnumInitCode(FOutputDevice& Out
 		StaticDefinitions.Logf(TEXT("\tconst UECodeGen_Private::FEnumParams %s::EnumParams = {\r\n"), *StaticsStructName);
 		StaticDefinitions.Logf(TEXT("\t\t(UObject*(*)())%s,\r\n"), *OuterString.LeftChop(2));
 		StaticDefinitions.Logf(TEXT("\t\t%s,\r\n"), EnumDisplayNameFn.IsEmpty() ? TEXT("nullptr") : *EnumDisplayNameFn);
-		StaticDefinitions.Logf(TEXT("\t\t%s,\r\n"), *CreateUTF8LiteralString(OverriddenEnumNameCpp));
+		StaticDefinitions.Logf(TEXT("\t\t%s,\r\n"), *CreateUTF8LiteralString(EnumNameCpp));
 		StaticDefinitions.Logf(TEXT("\t\t%s,\r\n"), *CreateUTF8LiteralString(EnumDef.GetCppType()));
 		StaticDefinitions.Logf(TEXT("\t\t%s::Enumerators,\r\n"), *StaticsStructName);
 		StaticDefinitions.Logf(TEXT("\t\tUE_ARRAY_COUNT(%s::Enumerators),\r\n"), *StaticsStructName);
 		StaticDefinitions.Logf(TEXT("\t\t%s,\r\n"), UEnumObjectFlags);
 		StaticDefinitions.Logf(TEXT("\t\t%s,\r\n"), EnumFlags);
-		StaticDefinitions.Logf(TEXT("\t\tUECodeGen_Private::EDynamicType::%s,\r\n"), bIsDynamic ? TEXT("Dynamic") : TEXT("NotDynamic"));
 		StaticDefinitions.Logf(TEXT("\t\t(uint8)%s,\r\n"), EnumFormStr);
 		StaticDefinitions.Logf(TEXT("\t\t%s\r\n"), *MetaDataParams);
 		StaticDefinitions.Logf(TEXT("\t};\r\n"));
@@ -4045,17 +3881,7 @@ void FNativeClassHeaderGenerator::ExportGeneratedEnumInitCode(FOutputDevice& Out
 	GeneratedEnumRegisterFunctionText.Logf(TEXT("\t{\r\n"));
 
 	// Enums can either have a UClass or UPackage as outer (if declared in non-UClass header).
-	FString InnerSingletonName;
-	if (!bIsDynamic)
-	{
-		InnerSingletonName = FString::Printf(TEXT("Z_Registration_Info_UEnum_%s.InnerSingleton"), *EnumNameCpp);
-	}
-	else
-	{
-		GeneratedEnumRegisterFunctionText.Logf(TEXT("\t\tUPackage* Outer = FindOrConstructDynamicTypePackage(TEXT(\"%s\"));"), *PackageSingletonName);
-		GeneratedEnumRegisterFunctionText.Logf(TEXT("\t\tUEnum* ReturnEnum = FindExistingEnumIfHotReloadOrDynamic(Outer, TEXT(\"%s\"), 0, %uU, true);\r\n"), *OverriddenEnumNameCpp, *HashFuncName);
-		InnerSingletonName = TEXT("ReturnEnum");
-	}
+	FString InnerSingletonName = FString::Printf(TEXT("Z_Registration_Info_UEnum_%s.InnerSingleton"), *EnumNameCpp);
 	GeneratedEnumRegisterFunctionText.Logf(TEXT("\t\tif (!%s)\r\n"), *InnerSingletonName);
 	GeneratedEnumRegisterFunctionText.Logf(TEXT("\t\t{\r\n"));
 
@@ -4066,25 +3892,6 @@ void FNativeClassHeaderGenerator::ExportGeneratedEnumInitCode(FOutputDevice& Out
 
 	uint32 EnumHash = GenerateTextHash(*GeneratedEnumRegisterFunctionText);
 	EnumDef.SetHash(EnumHash);
-
-	if (bIsDynamic)
-	{
-		Out.Logf(TEXT("\tuint32 %s() { return %uU; }\r\n"), *HashFuncName, EnumHash);
-	}
-
-	if (bIsDynamic)
-	{
-		const FString& EnumPackageName = EnumDef.GetTypePackageName();
-		Out.Logf(
-			TEXT("\tstatic FRegisterCompiledInInfo Z_CompiledInDeferEnum_UEnum_%s(%s_StaticEnum, TEXT(\"%s\"), TEXT(\"%s\"), %s, %s);\r\n"),
-			*EnumNameCpp,
-			*EnumNameCpp,
-			*EnumPackageName,
-			*OverriddenEnumNameCpp,
-			*AsTEXT(EnumPackageName),
-			*AsTEXT(FNativeClassHeaderGenerator::GetOverriddenPathName(EnumDef))
-		);
-	}
 
 	Out.Log(GeneratedEnumRegisterFunctionText);
 }
@@ -5255,7 +5062,7 @@ void FNativeClassHeaderGenerator::ExportCallbackFunctions(
 		if (ExportCallbackType != EExportCallbackType::Interface)
 		{
 			FunctionNameName = FString::Printf(TEXT("NAME_%s_%s"), *ClassName, *FunctionName);
-			OutCpp.Logf(TEXT("\tstatic FName %s = FName(TEXT(\"%s\"));") LINE_TERMINATOR, *FunctionNameName, *GetOverriddenFName(*FunctionDef).ToString());
+			OutCpp.Logf(TEXT("\tstatic FName %s = FName(TEXT(\"%s\"));") LINE_TERMINATOR, *FunctionNameName, *FunctionName);
 		}
 
 		// Emit the thunk implementation
@@ -5313,16 +5120,6 @@ void FNativeClassHeaderGenerator::ApplyAlternatePropertyExportText(FUnrealProper
 	const FPropertyBase& PropertyBase = PropertyDef.GetPropertyBase();
 	if (FUnrealEnumDefinitionInfo* EnumDef = PropertyBase.AsEnum())
 	{
-		if (PropertyBase.ArrayType == EArrayType::Static && EnumDef->IsDynamic())
-		{
-			FUnrealPropertyDefinitionInfo& InnerPropertyDef = PropertyDef.GetValuePropDef();
-			const FString Original = InnerPropertyDef.GetCPPType();
-			const FString RawByte = InnerPropertyDef.GetCPPType(nullptr, EPropertyExportCPPFlags::CPPF_BlueprintCppBackend);
-			if (Original != RawByte)
-			{
-				PropertyText.ReplaceInline(*Original, *RawByte, ESearchCase::CaseSensitive);
-			}
-		}
 		return;
 	}
 
@@ -5343,12 +5140,6 @@ void FNativeClassHeaderGenerator::ApplyAlternatePropertyExportText(FUnrealProper
 			PropertyText.ReplaceInline(*Original, PlaceholderOfSameSizeAndAlignemnt, ESearchCase::CaseSensitive);
 		}
 	}
-}
-
-static bool HasDynamicOuter(FUnrealFieldDefinitionInfo& FieldDef)
-{
-	FUnrealFieldDefinitionInfo* FieldOuter = UHTCast<FUnrealFieldDefinitionInfo>(FieldDef.GetOuter());
-	return FieldOuter && FieldOuter->IsDynamic();
 }
 
 bool FNativeClassHeaderGenerator::WriteSource(const FManifestModule& Module, FGeneratedFileInfo& FileInfo, const FString& InBodyText, FUnrealSourceFile* InSourceFile, const TSet<FString>& InCrossModuleReferences)
@@ -5520,31 +5311,25 @@ void FNativeClassHeaderGenerator::GenerateSourceFile(FGeneratedCPP& GeneratedCPP
 					{
 						GeneratedFunctionDeclarations.Log(EnumDef->GetExternDecl(true));
 						Generator.ExportGeneratedEnumInitCode(GeneratedCPPText, ReferenceGatherers, SourceFile, *EnumDef);
-						if (!EnumDef->IsDynamic())
-						{
-							EnumRegs.Add(EnumDef);
-						}
+						EnumRegs.Add(EnumDef);
 					}
 				}
 				else if (FUnrealScriptStructDefinitionInfo* ScriptStructDef = UHTCast<FUnrealScriptStructDefinitionInfo>(FieldDef))
 				{
-					if (ScriptStructDef->HasAnyStructFlags(STRUCT_NoExport) && !HasDynamicOuter(*ScriptStructDef))
+					if (ScriptStructDef->HasAnyStructFlags(STRUCT_NoExport))
 					{
 						Singletons.Add(ScriptStructDef);
 					}
 					GeneratedFunctionDeclarations.Log(ScriptStructDef->GetExternDecl(true));
 					Generator.ExportGeneratedStructBodyMacros(GeneratedHeaderText, GeneratedCPPText, ReferenceGatherers, SourceFile, *ScriptStructDef);
-					if (!ScriptStructDef->IsDynamic() && ScriptStructDef->HasAnyStructFlags(STRUCT_Native))
+					if (ScriptStructDef->HasAnyStructFlags(STRUCT_Native))
 					{
 						ScriptStructRegs.Add(ScriptStructDef);
 					}
 				}
 				else if (FUnrealFunctionDefinitionInfo* FunctionDef = UHTCast<FUnrealFunctionDefinitionInfo>(FieldDef))
 				{
-					if (!HasDynamicOuter(*FunctionDef))
-					{
-						Singletons.Add(FunctionDef);
-					}
+					Singletons.Add(FunctionDef);
 					GeneratedFunctionDeclarations.Log(FunctionDef->GetExternDecl(true));
 					Generator.ExportDelegateDeclaration(GeneratedCPPText, ReferenceGatherers, SourceFile, *FunctionDef);
 					Generator.ExportDelegateDefinition(GeneratedHeaderText, ReferenceGatherers, SourceFile, *FunctionDef);
@@ -5554,10 +5339,7 @@ void FNativeClassHeaderGenerator::GenerateSourceFile(FGeneratedCPP& GeneratedCPP
 					if (!ClassDef->HasAnyClassFlags(CLASS_Intrinsic))
 					{
 						Generator.ExportClassFromSourceFileInner(GeneratedHeaderText, GeneratedCPPText, GeneratedFunctionDeclarations, ReferenceGatherers, *ClassDef, SourceFile, GeneratedCPP.ExportFlags);
-						if (!ClassDef->IsDynamic())
-						{
-							ClassRegs.Add(ClassDef);
-						}
+						ClassRegs.Add(ClassDef);
 					}
 				}
 			}
@@ -5630,10 +5412,9 @@ void FNativeClassHeaderGenerator::GenerateSourceFile(FGeneratedCPP& GeneratedCPP
 							GeneratedCPPText.Log(TEXT("#if WITH_EDITORONLY_DATA\r\n"));
 						}
 						const FString EnumNameCpp = EnumDef->GetName();
-						const FString OverriddenEnumNameCpp = FNativeClassHeaderGenerator::GetOverriddenName(*EnumDef);
 						GeneratedCPPText.Logf(TEXT("\t\t{ %s_StaticEnum, TEXT(\"%s\"), &Z_Registration_Info_UEnum_%s, CONSTRUCT_RELOAD_VERSION_INFO(FEnumReloadVersionInfo, %uU) },\r\n"),
 							*EnumNameCpp,
-							*OverriddenEnumNameCpp,
+							*EnumNameCpp,
 							*EnumNameCpp,
 							EnumDef->GetHash(*EnumDef));
 						if (!bAllEnumsEditorOnly && EnumDef->IsEditorOnly())
@@ -5655,11 +5436,10 @@ void FNativeClassHeaderGenerator::GenerateSourceFile(FGeneratedCPP& GeneratedCPP
 					for (FUnrealScriptStructDefinitionInfo* ScriptStructDef : ScriptStructRegs)
 					{
 						const FString StructNameCPP = ScriptStructDef->GetAlternateNameCPP();
-						const FString ActualStructName = FNativeClassHeaderGenerator::GetOverriddenName(*ScriptStructDef);
 						GeneratedCPPText.Logf(TEXT("\t\t{ %s::StaticStruct, Z_Construct_UScriptStruct_%s_Statics::NewStructOps, TEXT(\"%s\"), &Z_Registration_Info_UScriptStruct_%s, CONSTRUCT_RELOAD_VERSION_INFO(FStructReloadVersionInfo, sizeof(%s), %uU) },\r\n"),
 							*StructNameCPP,
 							*StructNameCPP,
-							*ActualStructName,
+							*ScriptStructDef->GetName(),
 							*ScriptStructDef->GetName(),
 							*StructNameCPP,
 							ScriptStructDef->GetHash(*ScriptStructDef));

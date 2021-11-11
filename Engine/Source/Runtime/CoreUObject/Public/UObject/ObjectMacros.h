@@ -522,7 +522,7 @@ enum EObjectFlags
 	RF_DuplicateTransient		=0x00800000,	///< Object should not be included in any type of duplication (copy/paste, binary duplication, etc.)
 	RF_StrongRefOnFrame			=0x01000000,	///< References to this object from persistent function frame are handled as strong ones.
 	RF_NonPIEDuplicateTransient	=0x02000000,	///< Object should not be included for duplication unless it's being duplicated for a PIE session
-	RF_Dynamic					=0x04000000,	///< Field Only. Dynamic field - doesn't get constructed during static initialization, can be constructed multiple times
+	RF_Dynamic UE_DEPRECATED(5.0, "RF_Dynamic should no longer be used. It is no longer being set by engine code.") =0x04000000,	///< Field Only. Dynamic field - doesn't get constructed during static initialization, can be constructed multiple times  // @todo: BP2CPP_remove
 	RF_WillBeLoaded				=0x08000000,	///< This object was constructed during load and will be loaded shortly
 	RF_HasExternalPackage		=0x10000000,	///< This object has an external package assigned and should look it up when getting the outermost package
 
@@ -1834,44 +1834,6 @@ public: \
 
 #define IMPLEMENT_CORE_INTRINSIC_CLASS(TClass, TSuperClass, InitCode) \
 	IMPLEMENT_INTRINSIC_CLASS(TClass, COREUOBJECT_API, TSuperClass, COREUOBJECT_API, "/Script/CoreUObject" ,InitCode)
-
-// Register a dynamic class (created at runtime, not startup). Explicit ClassName parameter because Blueprint types can have names that can't be used natively:
-#define IMPLEMENT_DYNAMIC_CLASS(TClass, ClassName, TClassCrc) \
-	UClass* TClass::GetPrivateStaticClass() \
-	{ \
-		UPackage* PrivateStaticClassOuter = FindOrConstructDynamicTypePackage(StaticPackage()); \
-		UClass* PrivateStaticClass = Cast<UClass>(StaticFindObjectFast(UClass::StaticClass(), PrivateStaticClassOuter, (TCHAR*)ClassName)); \
-		if (!PrivateStaticClass) \
-		{ \
-			/* the class could be created while its parent creation, so make sure, the parent is already created.*/ \
-			TClass::Super::StaticClass(); \
-			TClass::WithinClass::StaticClass(); \
-			PrivateStaticClass = Cast<UClass>(StaticFindObjectFast(UClass::StaticClass(), PrivateStaticClassOuter, (TCHAR*)ClassName)); \
-		} \
-		if (!PrivateStaticClass) \
-		{ \
-			/* this could be handled with templates, but we want it external to avoid code bloat */ \
-			GetPrivateStaticClassBody( \
-			StaticPackage(), \
-			(TCHAR*)ClassName, \
-			PrivateStaticClass, \
-			StaticRegisterNatives##TClass, \
-			sizeof(TClass), \
-			alignof(TClass), \
-			(EClassFlags)TClass::StaticClassFlags, \
-			TClass::StaticClassCastFlags(), \
-			TClass::StaticConfigName(), \
-			(UClass::ClassConstructorType)InternalConstructor<TClass>, \
-			(UClass::ClassVTableHelperCtorCallerType)InternalVTableHelperCtorCaller<TClass>, \
-			&TClass::AddReferencedObjects, \
-			&TClass::Super::StaticClass, \
-			&TClass::WithinClass::StaticClass, \
-			true, \
-			&TClass::__CustomDynamicClassInitialization \
-			); \
-		} \
-		return PrivateStaticClass; \
-	}
 
 /** Options to the UObject::Rename() function, bit flag */
 typedef uint32 ERenameFlags;

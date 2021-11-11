@@ -70,26 +70,6 @@ ESavePackageResult ReturnSuccessOrCancel()
 	return !GWarn->ReceivedUserCancel() ? ESavePackageResult::Success : ESavePackageResult::Canceled;
 }
 
-ESavePackageResult ValidateBlueprintNativeCodeGenReplacement(FSaveContext& SaveContext)
-{
-#if WITH_EDITOR
-	if (const IBlueprintNativeCodeGenCore* Coordinator = IBlueprintNativeCodeGenCore::Get())
-	{
-		EReplacementResult ReplacementResult = Coordinator->IsTargetedForReplacement(SaveContext.GetPackage(), Coordinator->GetNativizationOptionsForPlatform(SaveContext.GetTargetPlatform()));
-		if (ReplacementResult == EReplacementResult::ReplaceCompletely)
-		{
-			UE_LOG(LogSavePackage, Verbose, TEXT("Package %s contains assets that are being converted to native code."), *SaveContext.GetPackage()->GetName());
-			return ESavePackageResult::ReplaceCompletely;
-		}
-		else if (ReplacementResult == EReplacementResult::GenerateStub)
-		{
-			SaveContext.RequestStubFile();
-		}
-	}
-#endif
-	return ReturnSuccessOrCancel();
-}
-
 ESavePackageResult ValidatePackage(FSaveContext& SaveContext)
 {
 	SCOPED_SAVETIMER(UPackage_ValidatePackage);
@@ -464,7 +444,6 @@ ESavePackageResult ValidateExports(FSaveContext& SaveContext)
 	if (SaveContext.IsCooking())
 	{
 		// Add the exports for the cook checker
-		// This needs to be done before validating NativeCodeGenReplacement which can exit early and will exist anyway but in compiled form
 		if (FEDLCookChecker* EDLCookChecker = SaveContext.GetEDLCookChecker())
 		{
 			// the package isn't actually in the export map, but that is ok, we add it as export anyway for error checking
@@ -474,8 +453,6 @@ ESavePackageResult ValidateExports(FSaveContext& SaveContext)
 				EDLCookChecker->AddExport(Export.Obj);
 			}
 		}
-
-		return ValidateBlueprintNativeCodeGenReplacement(SaveContext);
 	}
 	return ReturnSuccessOrCancel();
 }
@@ -922,23 +899,12 @@ ESavePackageResult BuildLinker(FSaveContext& SaveContext)
 	}
 	
 	// Build ImportMap
-	TMap<UObject*, UObject*> ReplacedImportOuters;
 	{
 		SCOPED_SAVETIMER(UPackage_Save_BuildImportMap);
 		for (UObject* Import : SaveContext.GetImports())
 		{
 			UClass* ImportClass = Import->GetClass();
 			FName ReplacedName = NAME_None;
-			
-			if (SaveContext.IsCooking())
-			{
-				UObject* ReplacedOuter = nullptr;
-				SavePackageUtilities::GetBlueprintNativeCodeGenReplacement(Import, ImportClass, ReplacedOuter, ReplacedName, SaveContext.GetTargetPlatform());
-				if (ReplacedOuter)
-				{
-					ReplacedImportOuters.Add(Import, ReplacedOuter);
-				}
-			}
 			FObjectImport& ObjectImport = Linker->ImportMap.Add_GetRef(FObjectImport(Import, ImportClass));
 
 			// If the package import is a prestream package, mark it as such by hacking its class name
@@ -1117,15 +1083,7 @@ ESavePackageResult BuildLinker(FSaveContext& SaveContext)
 				// Set the package index.
 				if (Import.XObject->GetOuter())
 				{
-					UObject** ReplacedOuter = ReplacedImportOuters.Find(Import.XObject);
-					if (ReplacedOuter && *ReplacedOuter)
-					{
-						Import.OuterIndex = Linker->MapObject(*ReplacedOuter);
-					}
-					else
-					{
-						Import.OuterIndex = Linker->MapObject(Import.XObject->GetOuter());
-					}
+					Import.OuterIndex = Linker->MapObject(Import.XObject->GetOuter());
 
 					// if the import has a package set, set it up
 					if (UPackage* ImportPackage = Import.XObject->GetExternalPackage())

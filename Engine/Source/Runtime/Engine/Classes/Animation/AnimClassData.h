@@ -157,9 +157,6 @@ private:
 #endif
 	
 public:
-	// Resolve TFieldPaths to FStructPropertys, init value handlers
-	void DynamicClassInitialization(UDynamicClass* InDynamicClass);
-
 #if WITH_EDITOR
 	// Copy data from an existing BP generated class to this class data
 	void CopyFrom(UAnimBlueprintGeneratedClass* AnimClass);

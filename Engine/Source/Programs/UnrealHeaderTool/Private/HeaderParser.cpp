@@ -2588,7 +2588,7 @@ void FHeaderParser::VerifyPropertyMarkups(FUnrealClassDefinitionInfo& TargetClas
 				// Since the function map is not valid yet, we have to iterate over the fields to look for the function
 				for (TSharedRef<FUnrealFunctionDefinitionInfo> FunctionDef : SearchClassDef->GetFunctions())
 				{
-					if (FNativeClassHeaderGenerator::GetOverriddenFName(*FunctionDef) == FuncName)
+					if (FunctionDef->GetFName() == FuncName)
 					{
 						return &*FunctionDef;
 					}
@@ -6108,11 +6108,7 @@ FUnrealFunctionDefinitionInfo& FHeaderParser::CompileDelegateDeclaration(const F
 		}
 
 		DelegateMacro = FString(Token.Value);
-
-		//Workaround for UE-28897
-		const FStructScope* CurrentStructScope = TopNest->GetScope() ? TopNest->GetScope()->AsStructScope() : nullptr;
-		const bool bDynamicClassScope = CurrentStructScope && CurrentStructScope->GetStructDef().IsDynamic();
-		CheckAllow(CurrentScopeName, bDynamicClassScope ? ENestAllowFlags::ImplicitDelegateDecl : ENestAllowFlags::TypeDecl);
+		CheckAllow(CurrentScopeName, ENestAllowFlags::TypeDecl);
 	}
 	else
 	{
@@ -6373,8 +6369,6 @@ FUnrealFunctionDefinitionInfo& FHeaderParser::CompileFunctionDeclaration()
 	}
 
 	ProcessFunctionSpecifiers(*this, FuncInfo, SpecifiersFound, MetaData);
-
-	const bool bClassGeneratedFromBP = GetCurrentClassDef().IsDynamic();
 
 	if ((0 != (FuncInfo.FunctionExportFlags & FUNCEXPORT_CustomThunk)) && !MetaData.Contains(NAME_CustomThunk))
 	{
@@ -6672,12 +6666,7 @@ FUnrealFunctionDefinitionInfo& FHeaderParser::CompileFunctionDeclaration()
 
 	if (!bHasAnyOutputs && FuncDef.HasAnyFunctionFlags(FUNC_BlueprintPure))
 	{
-		// This bad behavior would be treated as a warning in the Blueprint editor, so when converted assets generates these bad functions
-		// we don't want to prevent compilation:
-		if (!bClassGeneratedFromBP)
-		{
-			LogError(TEXT("BlueprintPure specifier is not allowed for functions with no return value and no output parameters."));
-		}
+		LogError(TEXT("BlueprintPure specifier is not allowed for functions with no return value and no output parameters."));
 	}
 
 

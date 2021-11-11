@@ -166,7 +166,6 @@
 #include "Framework/Commands/GenericCommands.h"
 #include "Framework/Notifications/NotificationManager.h"
 #include "Widgets/Notifications/SNotificationList.h"
-#include "NativeCodeGenerationTool.h"
 
 // Focusing related nodes feature
 #include "Framework/MultiBox/MultiBoxBuilder.h"

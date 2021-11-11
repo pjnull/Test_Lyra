@@ -595,7 +595,7 @@ bool ADisplayClusterRootActor::IsBlueprint() const
 {
 	for (UClass* Class = GetClass(); Class; Class = Class->GetSuperClass())
 	{
-		if (Cast<UBlueprintGeneratedClass>(Class) != nullptr || Cast<UDynamicClass>(Class) != nullptr)
+		if (Cast<UBlueprintGeneratedClass>(Class) != nullptr)
 		{
 			return true;
 		}

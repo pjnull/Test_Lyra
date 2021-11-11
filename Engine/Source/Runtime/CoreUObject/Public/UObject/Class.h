@@ -3420,10 +3420,11 @@ protected:
 #endif // HACK_HEADER_GENERATOR
 };
 
+// @todo: BP2CPP_remove
 /**
 * Dynamic class (can be constructed after initial startup)
 */
-class COREUOBJECT_API UDynamicClass : public UClass
+class COREUOBJECT_API UE_DEPRECATED(5.0, "Dynamic class types are no longer supported.") UDynamicClass : public UClass
 {
 	DECLARE_CASTED_CLASS_INTRINSIC_NO_CTOR(UDynamicClass, UClass, 0, TEXT("/Script/CoreUObject"), CASTCLASS_None, NO_API)
 	DECLARE_WITHIN_UPACKAGE()
@@ -3432,25 +3433,17 @@ public:
 
 	typedef void (*DynamicClassInitializerType)	(UDynamicClass*);
 
-	UDynamicClass(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
-	explicit UDynamicClass(const FObjectInitializer& ObjectInitializer, UClass* InSuperClass);
+	UDynamicClass(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get()) {}
+	explicit UDynamicClass(const FObjectInitializer& ObjectInitializer, UClass* InSuperClass) {}
 	UDynamicClass(EStaticConstructor, FName InName, uint32 InSize, uint32 InAlignment, EClassFlags InClassFlags, EClassCastFlags InClassCastFlags,
 		const TCHAR* InClassConfigName, EObjectFlags InFlags, ClassConstructorType InClassConstructor,
 		ClassVTableHelperCtorCallerType InClassVTableHelperCtorCaller,
 		ClassAddReferencedObjectsType InClassAddReferencedObjects,
-		DynamicClassInitializerType InDynamicClassInitializer);
-
-	// UObject interface.
-	static void AddReferencedObjects(UObject* InThis, FReferenceCollector& Collector);
-
-	// UClass interface
-	virtual UObject* CreateDefaultObject();
-	virtual void PurgeClass(bool bRecompilingOnLoad) override;
-	virtual UObject* FindArchetype(const UClass* ArchetypeClass, const FName ArchetypeName) const override;
-	virtual void SetupObjectInitializer(FObjectInitializer& ObjectInitializer) const override;
+		DynamicClassInitializerType InDynamicClassInitializer)
+	{}
 
 	/** Find a struct property, called from generated code */
-	FStructProperty* FindStructPropertyChecked(const TCHAR* PropertyName) const;
+	FStructProperty* FindStructPropertyChecked(const TCHAR* PropertyName) const { return nullptr; }
 
 	/** Misc objects owned by the class. */
 	TArray<UObject*> MiscConvertedSubobjects;
@@ -3522,7 +3515,6 @@ COREUOBJECT_API void InitializePrivateStaticClass(
  * @param InClassAddReferencedObjects Class AddReferencedObjects function pointer
  * @param InSuperClassFn Super class function pointer
  * @param WithinClass Within class
- * @param bIsDynamic true if the class can be constructed dynamically at runtime
  */
 COREUOBJECT_API void GetPrivateStaticClassBody(
 	const TCHAR* PackageName,
@@ -3538,9 +3530,7 @@ COREUOBJECT_API void GetPrivateStaticClassBody(
 	UClass::ClassVTableHelperCtorCallerType InClassVTableHelperCtorCaller,
 	UClass::ClassAddReferencedObjectsType InClassAddReferencedObjects,
 	UClass::StaticClassFunctionType InSuperClassFn,
-	UClass::StaticClassFunctionType InWithinClassFn,
-	bool bIsDynamic = false,
-	UDynamicClass::DynamicClassInitializerType InDynamicClassInitializer = nullptr);
+	UClass::StaticClassFunctionType InWithinClassFn);
 
 /*-----------------------------------------------------------------------------
 	FObjectInstancingGraph.

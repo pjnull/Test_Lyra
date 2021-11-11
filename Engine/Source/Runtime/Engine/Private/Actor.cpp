@@ -3335,45 +3335,11 @@ void AActor::PostSpawnInitialize(FTransform const& UserSpawnTransform, AActor* I
 	{
 		check(SceneRootComponent->GetOwner() == this);
 
-		// Determine if the native root component's archetype originates from a converted (nativized) Blueprint class.
-		UObject* RootComponentArchetype = SceneRootComponent->GetArchetype();
-		UClass* ArchetypeOwnerClass = RootComponentArchetype->GetOuter()->GetClass();
-		if (UBlueprintGeneratedClass* ArchetypeOwnerClassAsBPGC = Cast<UBlueprintGeneratedClass>(ArchetypeOwnerClass))
-		{
-			// In this case, the Actor CDO is a non-nativized Blueprint class (e.g. a child class) and the component's archetype
-			// is an instanced default subobject within the non-nativized Blueprint's CDO. If the owner class also has a nativized
-			// parent class somewhere in its inheritance hierarchy, we must redirect the query by walking up the archetype chain.
-			if (ArchetypeOwnerClassAsBPGC->bHasNativizedParent)
-			{
-				do 
-				{
-					RootComponentArchetype = RootComponentArchetype->GetArchetype();
-					ArchetypeOwnerClass = RootComponentArchetype->GetOuter()->GetClass();
-				} while (Cast<UBlueprintGeneratedClass>(ArchetypeOwnerClass) != nullptr);
-			}
-		}
-
-		if (Cast<UDynamicClass>(ArchetypeOwnerClass) != nullptr)
-		{
-			// For native root components either belonging to or inherited from a converted (nativized) Blueprint class, we currently do not use
-			// the transformation that's set on the root component in the CDO. The reason is that in the non-nativized case, we ignore the default
-			// transform when we instance a Blueprint-owned scene component that will also become the root (see USCS_Node::ExecuteNodeOnActor; in
-			// the case of dynamically-spawned Blueprint instances, 'bIsDefaultTransform' will be false, and the scale from the SCS node's template
-			// will not be applied in that code path in that case). Once a Blueprint class is nativized, we no longer run through that code path
-			// when we spawn new instances of that class dynamically, but for consistency, we need to keep the same transform as in the non-
-			// nativized case. We used to ignore any non-default transform value set on the root component at cook (nativization) time, but that 
-			// doesn't work because existing placements of the Blueprint component in a scene may rely on the value that's stored in the CDO,
-			// and as a result the instance-specific override value doesn't get serialized out to the instance as a result of delta serialization.
-			SceneRootComponent->SetWorldTransform(UserSpawnTransform, false, nullptr, ETeleportType::ResetPhysics);
-		}
-		else
-		{
-			// In the "normal" case we do respect any non-default transform value that the root component may have received from the archetype
-			// that's owned by the native CDO, so the final transform might not always necessarily equate to the passed-in UserSpawnTransform.
-			const FTransform RootTransform(SceneRootComponent->GetRelativeRotation(), SceneRootComponent->GetRelativeLocation(), SceneRootComponent->GetRelativeScale3D());
-			const FTransform FinalRootComponentTransform = RootTransform * UserSpawnTransform;
-			SceneRootComponent->SetWorldTransform(FinalRootComponentTransform, false, nullptr, ETeleportType::ResetPhysics);
-		}
+		// Respect any non-default transform value that the root component may have received from the archetype that's owned
+		// by the native CDO, so the final transform might not always necessarily equate to the passed-in UserSpawnTransform.
+		const FTransform RootTransform(SceneRootComponent->GetRelativeRotation(), SceneRootComponent->GetRelativeLocation(), SceneRootComponent->GetRelativeScale3D());
+		const FTransform FinalRootComponentTransform = RootTransform * UserSpawnTransform;
+		SceneRootComponent->SetWorldTransform(FinalRootComponentTransform, false, nullptr, ETeleportType::ResetPhysics);
 	}
 
 	// Call OnComponentCreated on all default (native) components

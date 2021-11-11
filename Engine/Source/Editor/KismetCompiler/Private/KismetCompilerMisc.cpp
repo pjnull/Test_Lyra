@@ -2244,7 +2244,9 @@ FString FNetNameMapping::MakeBaseName(const UObject* Net)
 //////////////////////////////////////////////////////////////////////////
 // FKismetFunctionContext
 
-FKismetFunctionContext::FKismetFunctionContext(FCompilerResultsLog& InMessageLog, const UEdGraphSchema_K2* InSchema, UBlueprintGeneratedClass* InNewClass, UBlueprint* InBlueprint, bool bInGeneratingCpp)
+// @todo: BP2CPP_remove - remove disable/enable deprecation warning once deprecated members are removed
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
+FKismetFunctionContext::FKismetFunctionContext(FCompilerResultsLog& InMessageLog, const UEdGraphSchema_K2* InSchema, UBlueprintGeneratedClass* InNewClass, UBlueprint* InBlueprint)
 	: Blueprint(InBlueprint)
 	, SourceGraph(nullptr)
 	, EntryPoint(nullptr)
@@ -2263,7 +2265,7 @@ FKismetFunctionContext::FKismetFunctionContext(FCompilerResultsLog& InMessageLog
 	, bIsSimpleStubGraphWithNoParams(false)
 	, NetFlags(0)
 	, SourceEventFromStubGraph(nullptr)
-	, bGeneratingCpp(bInGeneratingCpp)
+	, bGeneratingCpp(false)		// @todo: BP2CPP_remove
 	, bUseFlowStack(true)
 {
 	NetNameMap = new FNetNameMapping();
@@ -2276,7 +2278,10 @@ FKismetFunctionContext::FKismetFunctionContext(FCompilerResultsLog& InMessageLog
 		bCreateDebugData = false;
 	}
 }
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
+// @todo: BP2CPP_remove - remove disable/enable deprecation warning once deprecated members are removed
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
 FKismetFunctionContext::~FKismetFunctionContext()
 {
 	if (bAllocatedNetNameMap)
@@ -2290,6 +2295,7 @@ FKismetFunctionContext::~FKismetFunctionContext()
 		delete AllGeneratedStatements[i];
 	}
 }
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 void FKismetFunctionContext::SetExternalNetNameMap(FNetNameMapping* NewMap)
 {
@@ -2302,38 +2308,6 @@ void FKismetFunctionContext::SetExternalNetNameMap(FNetNameMapping* NewMap)
 	bAllocatedNetNameMap = false;
 
 	NetNameMap = NewMap;
-}
-
-bool FKismetFunctionContext::DoesStatementRequiresSwitch(const FBlueprintCompiledStatement* Statement)
-{
-	return Statement && (
-		Statement->Type == KCST_UnconditionalGoto ||
-		Statement->Type == KCST_PushState ||
-		Statement->Type == KCST_GotoIfNot ||
-		Statement->Type == KCST_ComputedGoto ||
-		Statement->Type == KCST_EndOfThread ||
-		Statement->Type == KCST_EndOfThreadIfNot ||
-		Statement->Type == KCST_GotoReturn ||
-		Statement->Type == KCST_GotoReturnIfNot);
-}
-
-bool FKismetFunctionContext::MustUseSwitchState(const FBlueprintCompiledStatement* ExcludeThisOne) const
-{
-	for (UEdGraphNode* Node : LinearExecutionList)
-	{
-		const TArray<FBlueprintCompiledStatement*>* StatementList = StatementsPerNode.Find(Node);
-		if (StatementList)
-		{
-			for (FBlueprintCompiledStatement* Statement : (*StatementList))
-			{
-				if (Statement && (Statement != ExcludeThisOne) && DoesStatementRequiresSwitch(Statement))
-				{
-					return true;
-				}
-			}
-		}
-	}
-	return false;
 }
 
 void FKismetFunctionContext::MergeAdjacentStates()
@@ -2368,8 +2342,7 @@ void FKismetFunctionContext::MergeAdjacentStates()
 	const UEdGraphNode* LastExecutedNode = LinearExecutionList.Num() ? LinearExecutionList.Last() : nullptr;
 	TArray<FBlueprintCompiledStatement*>* StatementList = StatementsPerNode.Find(LastExecutedNode);
 	FBlueprintCompiledStatement* LastStatementInLastNode = (StatementList && StatementList->Num()) ? StatementList->Last() : nullptr;
-	const bool SafeForNativeCode = !bGeneratingCpp || !MustUseSwitchState(LastStatementInLastNode);
-	if (LastStatementInLastNode && SafeForNativeCode && (KCST_GotoReturn == LastStatementInLastNode->Type) && !LastStatementInLastNode->bIsJumpTarget)
+	if (LastStatementInLastNode && (KCST_GotoReturn == LastStatementInLastNode->Type) && !LastStatementInLastNode->bIsJumpTarget)
 	{
 		StatementList->RemoveAt(StatementList->Num() - 1);
 	}
@@ -2752,9 +2725,8 @@ FBPTerminal* FKismetFunctionContext::CreateLocalTerminalFromPinAutoChooseScope(U
 	check(Net);
 	bool bSharedTerm = IsEventGraph();
 	static FBoolConfigValueHelper UseLocalGraphVariables(TEXT("Kismet"), TEXT("bUseLocalGraphVariables"), GEngineIni);
-	static FBoolConfigValueHelper UseLocalGraphVariablesInCpp(TEXT("BlueprintNativizationSettings"), TEXT("bUseLocalEventGraphVariables"));
 
-	const bool bUseLocalGraphVariables = UseLocalGraphVariables || (bGeneratingCpp && UseLocalGraphVariablesInCpp);
+	const bool bUseLocalGraphVariables = UseLocalGraphVariables;
 
 	const bool OutputPin = EEdGraphPinDirection::EGPD_Output == Net->Direction;
 	if (bSharedTerm && bUseLocalGraphVariables && OutputPin)

@@ -33,11 +33,7 @@ IAnimClassInterface* IAnimClassInterface::GetFromClass(UClass* InClass)
 	{
 		return AnimClassInterface;
 	}
-	if (auto DynamicClass = Cast<UDynamicClass>(InClass))
-	{
-		DynamicClass->GetDefaultObject(true);
-		return CastChecked<IAnimClassInterface>(DynamicClass->AnimClassImplementation, ECastCheckedType::NullAllowed);
-	}
+
 	return nullptr;
 }
 
@@ -47,11 +43,7 @@ const IAnimClassInterface* IAnimClassInterface::GetFromClass(const UClass* InCla
 	{
 		return AnimClassInterface;
 	}
-	if (auto DynamicClass = Cast<const UDynamicClass>(InClass))
-	{
-		DynamicClass->GetDefaultObject(true);
-		return CastChecked<const IAnimClassInterface>(DynamicClass->AnimClassImplementation, ECastCheckedType::NullAllowed);
-	}
+
 	return nullptr;
 }
 
