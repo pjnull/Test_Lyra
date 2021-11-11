@@ -58,6 +58,11 @@ IPresencePtr FOnlineServicesCommon::GetPresenceInterface()
 	return IPresencePtr(AsShared(), Get<IPresence>());
 }
 
+IExternalUIPtr FOnlineServicesCommon::GetExternalUIInterface()
+{
+	return IExternalUIPtr(AsShared(), Get<IExternalUI>());
+}
+
 void FOnlineServicesCommon::RegisterComponents()
 {
 }
