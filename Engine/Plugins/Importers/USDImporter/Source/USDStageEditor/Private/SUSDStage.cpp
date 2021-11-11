@@ -318,6 +318,8 @@ SUsdStage::~SUsdStage()
 	USelection::SelectionChangedEvent.Remove( OnViewportSelectionChangedHandle );
 
 	ClearStageActorDelegates();
+
+	ActorPickerMenu.Reset();
 }
 
 TSharedRef< SWidget > SUsdStage::MakeMainMenu()
@@ -374,32 +376,56 @@ TSharedRef< SWidget > SUsdStage::MakeActorPickerMenu()
 
 TSharedRef< SWidget > SUsdStage::MakeActorPickerMenuContent()
 {
-	FSceneOutlinerInitializationOptions InitOptions;
-	InitOptions.bShowHeaderRow = false;
-	InitOptions.bShowSearchBox = true;
-	InitOptions.bShowCreateNewFolder = false;
-	InitOptions.bFocusSearchBoxWhenOpened = true;
-	InitOptions.ColumnMap.Add(FSceneOutlinerBuiltInColumnTypes::Label(), FSceneOutlinerColumnInfo(ESceneOutlinerColumnVisibility::Visible, 0));
-	InitOptions.Filters->AddFilterPredicate<FActorTreeItem>(FActorTreeItem::FFilterPredicate::CreateLambda([]( const AActor* Actor )
+	if ( !ActorPickerMenu.IsValid() )
 	{
-		return Actor && Actor->IsA<AUsdStageActor>();
-	}));
-
-	FSceneOutlinerModule& SceneOutlinerModule = FModuleManager::LoadModuleChecked<FSceneOutlinerModule>("SceneOutliner");
-
-	return SNew(SBox)
-		.Padding( FMargin( 1 ) )    // Add a small margin or else we'll get dark gray on dark gray which can look a bit confusing
-		.MinDesiredWidth( 300.0f )  // Force a min width or else the tree view item text will run up right to the very edge pixel of the menu
-		.HAlign( HAlign_Fill )
-		[
-			SceneOutlinerModule.CreateActorPicker(InitOptions, FOnActorPicked::CreateLambda([this](AActor* Actor)
-			{
-				if ( Actor && Actor->IsA<AUsdStageActor>() )
+		FSceneOutlinerInitializationOptions InitOptions;
+		InitOptions.bShowHeaderRow = false;
+		InitOptions.bShowSearchBox = true;
+		InitOptions.bShowCreateNewFolder = false;
+		InitOptions.bFocusSearchBoxWhenOpened = true;
+		InitOptions.ColumnMap.Add( FSceneOutlinerBuiltInColumnTypes::Label(), FSceneOutlinerColumnInfo( ESceneOutlinerColumnVisibility::Visible, 0 ) );
+		InitOptions.Filters->AddFilterPredicate<FActorTreeItem>(
+			FActorTreeItem::FFilterPredicate::CreateLambda(
+				[]( const AActor* Actor )
 				{
-					this->SetActor( Cast<AUsdStageActor>( Actor ) );
+					return Actor && Actor->IsA<AUsdStageActor>();
 				}
-			}))
-		];
+			)
+		);
+
+		FSceneOutlinerModule& SceneOutlinerModule = FModuleManager::LoadModuleChecked<FSceneOutlinerModule>( "SceneOutliner" );
+		ActorPickerMenu = SceneOutlinerModule.CreateActorPicker(
+			InitOptions,
+			FOnActorPicked::CreateLambda(
+				[this]( AActor* Actor )
+				{
+					if ( Actor && Actor->IsA<AUsdStageActor>() )
+					{
+						this->SetActor( Cast<AUsdStageActor>( Actor ) );
+
+						FSlateApplication::Get().DismissAllMenus();
+					}
+				}
+			)
+		);
+	}
+
+	if ( ActorPickerMenu.IsValid() )
+	{
+		ActorPickerMenu->FullRefresh();
+
+		FSceneOutlinerModule& SceneOutlinerModule = FModuleManager::LoadModuleChecked<FSceneOutlinerModule>("SceneOutliner");
+
+		return SNew(SBox)
+			.Padding( FMargin( 1 ) )    // Add a small margin or else we'll get dark gray on dark gray which can look a bit confusing
+			.MinDesiredWidth( 300.0f )  // Force a min width or else the tree view item text will run up right to the very edge pixel of the menu
+			.HAlign( HAlign_Fill )
+			[
+				ActorPickerMenu.ToSharedRef()
+			];
+	}
+
+	return SNullWidget::NullWidget;
 }
 
 void SUsdStage::FillFileMenu( FMenuBuilder& MenuBuilder )
@@ -979,6 +1005,9 @@ void SUsdStage::OpenStage( const TCHAR* FilePath )
 
 void SUsdStage::SetActor( AUsdStageActor* InUsdStageActor )
 {
+	// Call this first so that we clear all of our delegates from the previous actor before we switch actors
+	ClearStageActorDelegates();
+
 	ViewModel.UsdStageActor = InUsdStageActor;
 
 	SetupStageActorDelegates();

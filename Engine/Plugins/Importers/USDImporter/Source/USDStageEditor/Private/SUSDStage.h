@@ -16,6 +16,7 @@
 class AUsdStageActor;
 class FLevelCollectionModel;
 class FMenuBuilder;
+class ISceneOutliner;
 enum class EMapChangeType : uint8;
 enum class EUsdInitialLoadSet : uint8;
 struct FSlateBrush;
@@ -96,6 +97,11 @@ protected:
 
 	// True while we're in the middle of setting the viewport selection from the prim selection
 	bool bUpdatingViewportSelection;
+
+	// We keep this menu alive instead of recreating it every time because it doesn't expose
+	// setting/getting/responding to the picked world, which resets every time it is reconstructed (see UE-127879)
+	// By keeping it alive it will keep its own state and we just do a full refresh when needed
+	TSharedPtr<ISceneOutliner> ActorPickerMenu;
 
 	int32 CurrentNaniteThreshold = INT32_MAX;
 };
