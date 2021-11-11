@@ -175,7 +175,7 @@ void FFoliageSupport::PreApplySnapshotProperties(const FApplySnapshotPropertiesP
 {
 	// RF_Transactional is temporarily required because Level Snapshots changes components differently than Foliage originally designed.
 	// Needed for correct undo / redo 
-	if (UHierarchicalInstancedStaticMeshComponent* Comp = Cast<UHierarchicalInstancedStaticMeshComponent>(Params.Object); Comp && Comp->IsIn(CurrentFoliageActor.Get()))
+	if (UHierarchicalInstancedStaticMeshComponent* Comp = Cast<UHierarchicalInstancedStaticMeshComponent>(Params.Object); Comp && CurrentFoliageActor.IsValid() && Comp->IsIn(CurrentFoliageActor.Get()))
 	{
 		Comp->SetFlags(RF_Transactional);
 	}
@@ -183,7 +183,7 @@ void FFoliageSupport::PreApplySnapshotProperties(const FApplySnapshotPropertiesP
 
 void FFoliageSupport::PostApplySnapshotProperties(const FApplySnapshotPropertiesParams& Params)
 {
-	if (UHierarchicalInstancedStaticMeshComponent* Comp = Cast<UHierarchicalInstancedStaticMeshComponent>(Params.Object); Comp && Comp->IsIn(CurrentFoliageActor.Get()))
+	if (UHierarchicalInstancedStaticMeshComponent* Comp = Cast<UHierarchicalInstancedStaticMeshComponent>(Params.Object); Comp && CurrentFoliageActor.IsValid() && Comp->IsIn(CurrentFoliageActor.Get()))
 	{
 		Comp->ClearFlags(RF_Transactional);
 	}
