@@ -48,6 +48,7 @@ public class ImageWrapper : ModuleRules
 			(Target.IsInPlatformGroup(UnrealPlatformGroup.Unix) && Target.Architecture.StartsWith("x86_64")))
 		{
 			PublicDefinitions.Add("WITH_UNREALEXR=1");
+			AddEngineThirdPartyPrivateStaticDependencies(Target, "Imath");
 			AddEngineThirdPartyPrivateStaticDependencies(Target, "UEOpenExr");
 		}
 		else

@@ -53,7 +53,7 @@ public:
 	// returns 0.
 	//---------------------------------------------------------
 
-	virtual Imf::Int64 tellp()
+	uint64_t tellp() override
 	{
 		return Pos;
 	}
@@ -64,7 +64,7 @@ public:
 	// After calling seekp(i), tellp() returns i.
 	//-------------------------------------------
 
-	virtual void seekp(Imf::Int64 pos)
+	void seekp(uint64_t pos) override
 	{
 		Pos = pos;
 	}
@@ -126,7 +126,7 @@ public:
 	// read the first byte in the file, tellg() returns 0.
 	//--------------------------------------------------------
 
-	virtual Imf::Int64 tellg()
+	uint64_t tellg() override
 	{
 		return Pos;
 	}
@@ -136,7 +136,7 @@ public:
 	// After calling seekg(i), tellg() returns i.
 	//-------------------------------------------
 
-	virtual void seekg(Imf::Int64 pos)
+	void seekg(uint64_t pos) override
 	{
 		Pos = pos;
 	}
