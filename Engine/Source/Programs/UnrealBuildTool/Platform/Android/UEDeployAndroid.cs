@@ -1504,8 +1504,9 @@ namespace UnrealBuildTool
 				File.Copy(SanitizerLib, Path.Combine(LibDestDir, SanitizerFullLibName), true);
 				string WrapDestDir = Path.Combine(UnrealBuildPath, "resources", "lib", NDKArch);
 				Directory.CreateDirectory(WrapDestDir);
-				Log.TraceInformation("Copying wrap.sh from {0} to {1}", WrapSh, WrapDestDir);
-				File.Copy(WrapSh, Path.Combine(WrapDestDir, "wrap.sh"), true);
+				string WrapDestFilePath = Path.Combine(WrapDestDir, "wrap.sh");
+				Log.TraceInformation("Copying wrap.sh from {0} to {1}", WrapSh, WrapDestFilePath);
+				File.Copy(WrapSh, WrapDestFilePath, true);
 			}
 			else
 			{
@@ -2627,7 +2628,7 @@ namespace UnrealBuildTool
 			AndroidToolChain.ClangSanitizer Sanitizer = ToolChain.BuildWithSanitizer();
 			if ((Sanitizer != AndroidToolChain.ClangSanitizer.None && Sanitizer != AndroidToolChain.ClangSanitizer.HwAddress) || bForceCompressNativeLibs)
 			{
-				Text.AppendLine("\t             android:extractNativeLibs=\"true\"");
+				bExtractNativeLibs = true;
 			}
 
 			bool bRequestedLegacyExternalStorage = false;
@@ -3306,7 +3307,7 @@ namespace UnrealBuildTool
 			if ((ToolChain.BuildWithSanitizer() != AndroidToolChain.ClangSanitizer.None) && (MinSDKVersion < 27))
 			{
 				MinSDKVersion = 27;
-				Log.TraceInformation("Fixing minSdkVersion; requires minSdkVersion of {0} for Clang's Sanitizers", 27);
+				Log.TraceInformation("Fixing minSdkVersion; requires minSdkVersion of {0} for Clang's Sanitizers", MinSDKVersion);
 			}
 
 			if (bEnableBundle && MinSDKVersion < MinimumSDKLevelForBundle)
