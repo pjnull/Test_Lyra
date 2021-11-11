@@ -25,6 +25,10 @@ struct USDEXPORTER_API FLevelExporterUSDOptionsInner
     UPROPERTY( EditAnywhere, config, BlueprintReadWrite, Category = "Export options" )
     bool bExportActorFolders = false;
 
+	/** Where to place all the generated asset files */
+	UPROPERTY( EditAnywhere, config, BlueprintReadWrite, Category = "Asset options" )
+	FDirectoryPath AssetFolder;
+
 	/** Options to use for all exported assets when appropriate (e.g. static and skeletal meshes, materials, etc.) */
 	UPROPERTY( EditAnywhere, config, BlueprintReadWrite, Category = "Asset options", meta = ( ShowOnlyInnerProperties ) )
 	FUsdMeshAssetOptions AssetOptions;

@@ -750,19 +750,26 @@ bool ULevelSequenceExporterUsd::ExportBinary( UObject* Object, const TCHAR* Type
 	{
 		Options = Cast<ULevelSequenceExporterUsdOptions>( ExportTask->Options );
 	}
-	if ( !Options && ( !ExportTask || !ExportTask->bAutomated ) )
+
+	if ( !Options )
 	{
 		Options = GetMutableDefault<ULevelSequenceExporterUsdOptions>();
-		if ( Options )
-		{
-			Options->TimeCodesPerSecond = MovieScene->GetDisplayRate().AsDecimal();
+	}
+	if ( !Options )
+	{
+		return false;
+	}
 
-			const bool bIsImport = false;
-			const bool bContinue = SUsdOptionsWindow::ShowOptions( *Options, bIsImport );
-			if ( !bContinue )
-			{
-				return false;
-			}
+	if ( !ExportTask || !ExportTask->bAutomated )
+	{
+		Options->LevelExportOptions.AssetFolder.Path = FPaths::Combine( FPaths::GetPath( UExporter::CurrentFilename ), TEXT( "Assets" ) );
+		Options->TimeCodesPerSecond = MovieScene->GetDisplayRate().AsDecimal();
+
+		const bool bIsImport = false;
+		const bool bContinue = SUsdOptionsWindow::ShowOptions( *Options, bIsImport );
+		if ( !bContinue )
+		{
+			return false;
 		}
 	}
 
