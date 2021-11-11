@@ -11,8 +11,6 @@ using System.Text;
 using EpicGames.Core;
 using UnrealBuildBase;
 
-#nullable disable
-
 namespace UnrealBuildTool
 {
 	class VCToolChain : ISPCToolChain
@@ -30,7 +28,7 @@ namespace UnrealBuildTool
 		public VCToolChain(ReadOnlyTargetRules Target)
 		{
 			this.Target = Target;
-			this.EnvVars = Target.WindowsPlatform.Environment;
+			this.EnvVars = Target.WindowsPlatform.Environment!;
 
 			Log.TraceLog("Compiler: {0}", EnvVars.CompilerPath);
 			Log.TraceLog("Linker: {0}", EnvVars.LinkerPath);
@@ -98,7 +96,7 @@ namespace UnrealBuildTool
 			}
 		}
 
-		static public void AddDefinition(List<string> Arguments, string Variable, string Value)
+		static public void AddDefinition(List<string> Arguments, string Variable, string? Value)
 		{
 			// If the value has a space in it and isn't wrapped in quotes, do that now
 			if (Value != null && !Value.StartsWith("\"") && (Value.Contains(" ") || Value.Contains("$")))
@@ -1161,7 +1159,7 @@ namespace UnrealBuildTool
 			// If we're using precompiled headers, set that up now
 			if (CompileEnvironment.PrecompiledHeaderAction == PrecompiledHeaderAction.Include)
 			{
-				FileItem IncludeHeader = FileItem.GetItemByFileReference(CompileEnvironment.PrecompiledHeaderIncludeFilename);
+				FileItem IncludeHeader = FileItem.GetItemByFileReference(CompileEnvironment.PrecompiledHeaderIncludeFilename!);
 				BaseCompileAction.ForceIncludeFiles.Insert(0, IncludeHeader);
 
 				BaseCompileAction.UsingPchFile = CompileEnvironment.PrecompiledHeaderFile;
@@ -1197,9 +1195,9 @@ namespace UnrealBuildTool
 				if (CompileEnvironment.PrecompiledHeaderAction == PrecompiledHeaderAction.Create)
 				{
 					// Generate a CPP File that just includes the precompiled header.
-					string PrecompiledHeaderIncludeFilenameString = NormalizeCommandLinePath(CompileEnvironment.PrecompiledHeaderIncludeFilename, Target.WindowsPlatform.Compiler, CompileEnvironment.bPreprocessOnly);
+					string PrecompiledHeaderIncludeFilenameString = NormalizeCommandLinePath(CompileEnvironment.PrecompiledHeaderIncludeFilename!, Target.WindowsPlatform.Compiler, CompileEnvironment.bPreprocessOnly);
 					string PchCppFile = string.Format("// Compiler: {0}\n#include \"{1}\"\r\n", EnvVars.CompilerVersion, PrecompiledHeaderIncludeFilenameString.Replace('\\', '/'));
-					CompileAction.SourceFile = FileItem.GetItemByFileReference(CompileEnvironment.PrecompiledHeaderIncludeFilename.ChangeExtension(".cpp"));
+					CompileAction.SourceFile = FileItem.GetItemByFileReference(CompileEnvironment.PrecompiledHeaderIncludeFilename!.ChangeExtension(".cpp"));
 					Graph.CreateIntermediateTextFile(CompileAction.SourceFile, PchCppFile, StringComparison.Ordinal);
 
 					// Add the precompiled header file to the produced items list.
@@ -1262,7 +1260,7 @@ namespace UnrealBuildTool
 					if (CompileEnvironment.PrecompiledHeaderAction == PrecompiledHeaderAction.Include)
 					{
 						// All files using the same PCH are required to share the same PDB that was used when compiling the PCH
-						PDBLocation = CompileEnvironment.PrecompiledHeaderFile.Location.ChangeExtension(".pdb");
+						PDBLocation = CompileEnvironment.PrecompiledHeaderFile!.Location.ChangeExtension(".pdb");
 
 						// Enable synchronous file writes, since we'll be modifying the existing PDB
 						CompileAction.Arguments.Add("/FS");
@@ -1270,7 +1268,7 @@ namespace UnrealBuildTool
 					else if (CompileEnvironment.PrecompiledHeaderAction == PrecompiledHeaderAction.Create)
 					{
 						// Files creating a PCH use a PDB per file.
-						PDBLocation = FileReference.Combine(OutputDir, CompileEnvironment.PrecompiledHeaderIncludeFilename.GetFileName() + ".pdb");
+						PDBLocation = FileReference.Combine(OutputDir, CompileEnvironment.PrecompiledHeaderIncludeFilename!.GetFileName() + ".pdb");
 
 						// Enable synchronous file writes, since we'll be modifying the existing PDB
 						CompileAction.Arguments.Add("/FS");
@@ -1484,7 +1482,7 @@ namespace UnrealBuildTool
 			}
 		}
 
-		public virtual FileReference GetApplicationIcon(FileReference ProjectFile)
+		public virtual FileReference GetApplicationIcon(FileReference? ProjectFile)
 		{
 			return WindowsPlatform.GetWindowsApplicationIcon(ProjectFile);
 		}
@@ -1830,15 +1828,15 @@ namespace UnrealBuildTool
 			FileReference ImportLibraryFilePath;
 			if (LinkEnvironment.bIsCrossReferenced && !bBuildImportLibraryOnly)
 			{
-				ImportLibraryFilePath = FileReference.Combine(LinkEnvironment.IntermediateDirectory, LinkEnvironment.OutputFilePath.GetFileNameWithoutExtension() + ".suppressed.lib");
+				ImportLibraryFilePath = FileReference.Combine(LinkEnvironment.IntermediateDirectory!, LinkEnvironment.OutputFilePath.GetFileNameWithoutExtension() + ".suppressed.lib");
 			}
 			else if(Target.bShouldCompileAsDLL)
 			{
-				ImportLibraryFilePath = FileReference.Combine(LinkEnvironment.OutputDirectory, LinkEnvironment.OutputFilePath.GetFileNameWithoutExtension() + ".lib");
+				ImportLibraryFilePath = FileReference.Combine(LinkEnvironment.OutputDirectory!, LinkEnvironment.OutputFilePath.GetFileNameWithoutExtension() + ".lib");
 			}
 			else
 			{
-				ImportLibraryFilePath = FileReference.Combine(LinkEnvironment.IntermediateDirectory, LinkEnvironment.OutputFilePath.GetFileNameWithoutExtension() + ".lib");
+				ImportLibraryFilePath = FileReference.Combine(LinkEnvironment.IntermediateDirectory!, LinkEnvironment.OutputFilePath.GetFileNameWithoutExtension() + ".lib");
 			}
 
 			FileItem OutputFile;
@@ -1912,7 +1910,7 @@ namespace UnrealBuildTool
 				{
 					// Write the PDB file to the output directory.
 					{
-						FileReference PDBFilePath = FileReference.Combine(LinkEnvironment.OutputDirectory, Path.GetFileNameWithoutExtension(OutputFile.AbsolutePath) + ".pdb");
+						FileReference PDBFilePath = FileReference.Combine(LinkEnvironment.OutputDirectory!, Path.GetFileNameWithoutExtension(OutputFile.AbsolutePath) + ".pdb");
 						FileItem PDBFile = FileItem.GetItemByFileReference(PDBFilePath);
 						Arguments.Add(String.Format("/PDB:\"{0}\"", PDBFilePath));
 						ProducedItems.Add(PDBFile);
@@ -1921,7 +1919,7 @@ namespace UnrealBuildTool
 					// Write the MAP file to the output directory.
 					if (LinkEnvironment.bCreateMapFile)
 					{
-						FileReference MAPFilePath = FileReference.Combine(LinkEnvironment.OutputDirectory, Path.GetFileNameWithoutExtension(OutputFile.AbsolutePath) + ".map");
+						FileReference MAPFilePath = FileReference.Combine(LinkEnvironment.OutputDirectory!, Path.GetFileNameWithoutExtension(OutputFile.AbsolutePath) + ".map");
 						FileItem MAPFile = FileItem.GetItemByFileReference(MAPFilePath);
 						Arguments.Add(String.Format("/MAP:\"{0}\"", MAPFilePath));
 						ProducedItems.Add(MAPFile);
@@ -2026,7 +2024,7 @@ namespace UnrealBuildTool
 				}
 
 				// Make sure the destination directory exists!
-				Directory.CreateDirectory(LinkEnvironment.OutputDirectory.FullName);
+				Directory.CreateDirectory(LinkEnvironment.OutputDirectory!.FullName);
 
 				// Copy the .pgd to the linker output directory, renaming it to match the PGO filename prefix.
 				string PGDFile = PGDFiles.First();

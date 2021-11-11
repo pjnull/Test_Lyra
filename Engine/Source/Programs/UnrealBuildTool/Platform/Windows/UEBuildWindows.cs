@@ -1952,7 +1952,7 @@ namespace UnrealBuildTool
 		/// </summary>
 		/// <param name="ProjectFile">The project file</param>
 		/// <returns>The icon to use for this project</returns>
-		public static FileReference GetWindowsApplicationIcon(FileReference ProjectFile)
+		public static FileReference GetWindowsApplicationIcon(FileReference? ProjectFile)
 		{
 			// Check if there's a custom icon
 			if(ProjectFile != null)
