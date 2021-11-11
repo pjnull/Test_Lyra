@@ -2,9 +2,11 @@
 
 #pragma once
 
-#include "Components/PrimitiveComponent.h"
+#include "HitProxies.h"
+
 
 class USkeletalMeshSocket;
+
 
 struct PERSONA_API HPersonaBoneHitProxy : public HHitProxy
 {

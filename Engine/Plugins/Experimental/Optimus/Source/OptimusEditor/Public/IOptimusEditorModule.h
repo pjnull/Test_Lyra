@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "Modules/ModuleInterface.h"
 #include "Modules/ModuleManager.h"
-
+#include "Toolkits/IToolkit.h"
 
 DECLARE_LOG_CATEGORY_EXTERN(LogOptimusEditor, Log, All);
 
