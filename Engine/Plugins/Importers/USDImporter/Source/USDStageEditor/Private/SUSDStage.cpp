@@ -23,6 +23,7 @@
 #include "UsdWrappers/UsdStage.h"
 
 #include "ActorTreeItem.h"
+#include "Async/Async.h"
 #include "Dialogs/DlgPickPath.h"
 #include "EditorStyleSet.h"
 #include "Engine/Selection.h"
@@ -205,22 +206,28 @@ void SUsdStage::SetupStageActorDelegates()
 		OnPrimChangedHandle = ViewModel.UsdStageActor->OnPrimChanged.AddLambda(
 			[ this ]( const FString& PrimPath, bool bResync )
 			{
-				if ( this->UsdStageTreeView )
+				// The USD notices may come from a background USD TBB thread, but we should only update slate from the main/slate threads.
+				// We can't retrieve the FSlateApplication singleton here (because that can also only be used from the main/slate threads),
+				// so we must use Async or core tickers here
+				AsyncTask( ENamedThreads::GameThread, [this, PrimPath, bResync]()
 				{
-					this->UsdStageTreeView->RefreshPrim( PrimPath, bResync );
-					UsdStageTreeView->RequestTreeRefresh();
-				}
+					if ( this->UsdStageTreeView )
+					{
+						this->UsdStageTreeView->RefreshPrim( PrimPath, bResync );
+						this->UsdStageTreeView->RequestTreeRefresh();
+					}
 
-				const bool bViewingTheUpdatedPrim = SelectedPrimPath.Equals( PrimPath, ESearchCase::IgnoreCase );
-				const bool bViewingStageProperties = SelectedPrimPath.IsEmpty() || SelectedPrimPath == TEXT("/");
-				const bool bStageUpdated = PrimPath == TEXT("/");
+					const bool bViewingTheUpdatedPrim = SelectedPrimPath.Equals( PrimPath, ESearchCase::IgnoreCase );
+					const bool bViewingStageProperties = SelectedPrimPath.IsEmpty() || SelectedPrimPath == TEXT("/");
+					const bool bStageUpdated = PrimPath == TEXT("/");
 
-				if ( this->UsdPrimInfoWidget &&
-					 ViewModel.UsdStageActor.IsValid() &&
-					 ( bViewingTheUpdatedPrim || ( bViewingStageProperties && bStageUpdated ) ) )
-				{
-					this->UsdPrimInfoWidget->SetPrimPath( ViewModel.UsdStageActor->GetOrLoadUsdStage(), *PrimPath );
-				}
+					if ( this->UsdPrimInfoWidget &&
+						 ViewModel.UsdStageActor.IsValid() &&
+						 ( bViewingTheUpdatedPrim || ( bViewingStageProperties && bStageUpdated ) ) )
+					{
+						this->UsdPrimInfoWidget->SetPrimPath( ViewModel.UsdStageActor->GetOrLoadUsdStage(), *PrimPath );
+					}
+				});
 			}
 		);
 
@@ -228,51 +235,63 @@ void SUsdStage::SetupStageActorDelegates()
 		OnStageChangedHandle = ViewModel.UsdStageActor->OnStageChanged.AddLambda(
 			[ this ]()
 			{
-				// So we can reset even if our actor is being destroyed right now
-				const bool bEvenIfPendingKill = true;
-				if ( ViewModel.UsdStageActor.IsValid( bEvenIfPendingKill ) )
+				AsyncTask(ENamedThreads::GameThread, [this]()
 				{
-					if ( this->UsdPrimInfoWidget )
+					// So we can reset even if our actor is being destroyed right now
+					const bool bEvenIfPendingKill = true;
+					if ( ViewModel.UsdStageActor.IsValid( bEvenIfPendingKill ) )
 					{
-						// The cast here forces us to use the const version of GetUsdStage, that won't force-load the stage in case it isn't opened yet
-						const UE::FUsdStage& UsdStage = static_cast< const AUsdStageActor* >( ViewModel.UsdStageActor.Get( bEvenIfPendingKill ) )->GetUsdStage();
-						this->UsdPrimInfoWidget->SetPrimPath( UsdStage, TEXT("/") );
+						if ( this->UsdPrimInfoWidget )
+						{
+							// The cast here forces us to use the const version of GetUsdStage, that won't force-load the stage in case it isn't opened yet
+							const UE::FUsdStage& UsdStage = static_cast< const AUsdStageActor* >( ViewModel.UsdStageActor.Get( bEvenIfPendingKill ) )->GetUsdStage();
+							this->UsdPrimInfoWidget->SetPrimPath( UsdStage, TEXT("/") );
+						}
 					}
-				}
 
-				this->Refresh();
+					this->Refresh();
+				});
 			}
 		);
 
 		OnActorDestroyedHandle = ViewModel.UsdStageActor->OnActorDestroyed.AddLambda(
 			[ this ]()
 			{
-				ClearStageActorDelegates();
-				this->ViewModel.CloseStage();
+				AsyncTask( ENamedThreads::GameThread, [this]()
+				{
+					ClearStageActorDelegates();
+					this->ViewModel.CloseStage();
 
-				this->Refresh();
+					this->Refresh();
+				});
 			}
 		);
 
 		OnStageEditTargetChangedHandle = ViewModel.UsdStageActor->GetUsdListener().GetOnStageEditTargetChanged().AddLambda(
 			[ this ]()
 			{
-				if ( this->UsdLayersTreeView && ViewModel.UsdStageActor.IsValid() )
+				AsyncTask( ENamedThreads::GameThread, [this]()
 				{
-					constexpr bool bResync = false;
-					this->UsdLayersTreeView->Refresh( ViewModel.UsdStageActor.Get(), bResync );
-				}
+					if ( this->UsdLayersTreeView && ViewModel.UsdStageActor.IsValid() )
+					{
+						constexpr bool bResync = false;
+						this->UsdLayersTreeView->Refresh( ViewModel.UsdStageActor.Get(), bResync );
+					}
+				});
 			}
 		);
 
 		OnLayersChangedHandle = ViewModel.UsdStageActor->GetUsdListener().GetOnLayersChanged().AddLambda(
 			[ this ]( const TArray< FString >& LayersNames )
 			{
-				if ( this->UsdLayersTreeView && ViewModel.UsdStageActor.IsValid() )
+				AsyncTask( ENamedThreads::GameThread, [this]()
 				{
-					constexpr bool bResync = false;
-					this->UsdLayersTreeView->Refresh( ViewModel.UsdStageActor.Get(), bResync );
-				}
+					if ( this->UsdLayersTreeView && ViewModel.UsdStageActor.IsValid() )
+					{
+						constexpr bool bResync = false;
+						this->UsdLayersTreeView->Refresh( ViewModel.UsdStageActor.Get(), bResync );
+					}
+				});
 			}
 		);
 	}
