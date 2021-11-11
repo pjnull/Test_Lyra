@@ -794,6 +794,9 @@ struct FStrataEnvLightResult
 	float3 DiffuseWeight;
 	float3 DiffuseBackFaceWeight;
 
+	float3 DiffuseColor;
+	float3 SpecularColor;
+
 	float3 SpecularDirection;
 	float3 SpecularWeight;
 	float  SpecularSafeRoughness;
@@ -834,6 +837,7 @@ FStrataEnvLightResult StrataEvaluateForEnvLight(FStrataBSDFContext BSDFContext, 
 				EvalEnvBRDF									= SpecularEnergyTerms.E;
 				DirectionalAlbedo_SpecularTransmission		= ComputeEnergyPreservation(SpecularEnergyTerms);
 				StrataEnvLightResult.DiffuseWeight			= DiffuseColor * DiffuseEnergyTerms.E * DirectionalAlbedo_SpecularTransmission;
+				StrataEnvLightResult.DiffuseColor			= DiffuseColor;
 			}
 
 			BRANCH
@@ -872,6 +876,7 @@ FStrataEnvLightResult StrataEvaluateForEnvLight(FStrataBSDFContext BSDFContext, 
 				StrataEnvLightResult.SpecularDirection = StrataGetOffSpecularPeakReflectionDir(BSDFContext.N, BSDFContext.R, SafeRoughness);
 				StrataEnvLightResult.SpecularWeight = EvalEnvBRDF * SpecularMicroOcclusion;
 				StrataEnvLightResult.SpecularSafeRoughness = SafeRoughness;
+				StrataEnvLightResult.SpecularColor = F0;
 
 				#if STRATA_FASTPATH==0
 				const bool bHasHaziness = BSDF_GETHASHAZINESS(BSDFContext.BSDF);
@@ -970,6 +975,7 @@ FStrataEnvLightResult StrataEvaluateForEnvLight(FStrataBSDFContext BSDFContext, 
 				// STRATA_TODO fix the Fuzz model
 				//StrataEnvLightResult.DiffuseWeight = lerp(StrataEnvLightResult.DiffuseWeight, FuzzColor, Fuzz);
 				StrataEnvLightResult.DiffuseWeight += FuzzColor * Fuzz;
+				StrataEnvLightResult.DiffuseColor = saturate(StrataEnvLightResult.DiffuseColor + FuzzColor * Fuzz);
 				// Fuzz does not affect throughput.
 				break;
 			}
