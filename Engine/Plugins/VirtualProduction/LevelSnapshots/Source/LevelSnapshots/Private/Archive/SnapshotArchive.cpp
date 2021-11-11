@@ -159,6 +159,10 @@ UE::LevelSnapshots::Private::FSnapshotArchive::FSnapshotArchive(FObjectSnapshotD
 
 	if (bIsLoading)
 	{
+		// Serialize properties that were valid in a previous version and are deprecated now. PostSerialize is responsible to migrate the data.
+		ExcludedPropertyFlags &= ~CPF_Deprecated; 
+		FArchive::SetPortFlags(PPF_UseDeprecatedProperties);
+		
 		Super::SetIsLoading(true);
 		Super::SetIsSaving(false);
 	}
