@@ -1545,6 +1545,50 @@ public:
 		return MoveTemp( SharedThis ).ToSharedRef();
 	}
 
+	/**
+	 * Provides a weak reference to this object.  Note that is only valid to call
+	 * this after a shared reference (or shared pointer) to the object has already been created.
+	 * Also note that it is illegal to call this in the object's destructor.
+	 *
+	 * @return	Returns this object as a shared pointer
+	 */
+	TWeakPtr< ObjectType, Mode > AsWeak()
+	{
+		TWeakPtr< ObjectType, Mode > Result = WeakThis;
+
+		//
+		// If the following assert goes off, it means one of the following:
+		//
+		//     - You tried to request a weak pointer before the object was ever assigned to a shared pointer. (e.g. constructor)
+		//     - You tried to request a weak pointer while the object is being destroyed (destructor chain)
+		//
+		// To fix this, make sure you create at least one shared reference to your object instance before requested,
+		// and also avoid calling this function from your object's destructor.
+		//
+		check( Result.Pin().Get() == this );
+
+		// Now that we've verified the pointer is valid, we'll return it!
+		return Result;
+	}
+	TWeakPtr< ObjectType const, Mode > AsWeak() const
+	{
+		TWeakPtr< ObjectType const, Mode > Result = WeakThis;
+
+		//
+		// If the following assert goes off, it means one of the following:
+		//
+		//     - You tried to request a weak pointer before the object was ever assigned to a shared pointer. (e.g. constructor)
+		//     - You tried to request a weak pointer while the object is being destroyed (destructor chain)
+		//
+		// To fix this, make sure you create at least one shared reference to your object instance before requested,
+		// and also avoid calling this function from your object's destructor.
+		//
+		check( Result.Pin().Get() == this );
+
+		// Now that we've verified the pointer is valid, we'll return it!
+		return Result;
+	}
+
 protected:
 
 	/**
