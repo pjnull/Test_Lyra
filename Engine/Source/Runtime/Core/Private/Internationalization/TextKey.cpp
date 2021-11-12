@@ -5,6 +5,7 @@
 #include "Containers/ContainerAllocationPolicies.h"
 #include "Hash/CityHash.h"
 #include "Misc/ByteSwap.h"
+#include "HAL/LowLevelMemTracker.h"
 #include "Misc/LazySingleton.h"
 #include "Misc/ScopeLock.h"
 #include "Logging/LogMacros.h"
