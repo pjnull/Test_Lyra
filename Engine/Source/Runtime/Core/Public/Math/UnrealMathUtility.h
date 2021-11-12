@@ -838,7 +838,7 @@ public:
 		OutY = Rad * Sin(Ang);
 	}
 	/** Converts given Polar coordinate pair to Cartesian coordinate system. */
-	static FORCEINLINE void PolarToCartesian(const FVector2D InPolar, FVector2D& OutCart);
+	static CORE_API void PolarToCartesian(const FVector2D InPolar, FVector2D& OutCart);
 
 	/**
 	 * Calculates the dotted distance of vector 'Direction' to coordinate system O(AxisX,AxisY,AxisZ).
