@@ -183,7 +183,7 @@ namespace AutomationScripts
 			return Result;
 		}
 
-		static public string GetUnrealPakArguments(FileReference ProjectPath, Dictionary<string, string> UnrealPakResponseFile, FileReference OutputLocation, List<OrderFile> PakOrderFileLocations, string PlatformOptions, bool Compressed, EncryptionAndSigning.CryptoSettings CryptoSettings, FileReference CryptoKeysCacheFilename, String PatchSourceContentPath, string EncryptionKeyGuid, List<OrderFile> SecondaryPakOrderFileLocations)
+		static public string GetUnrealPakArguments(FileReference ProjectPath, Dictionary<string, string> UnrealPakResponseFile, FileReference OutputLocation, List<OrderFile> PakOrderFileLocations, string PlatformOptions, bool Compressed, EncryptionAndSigning.CryptoSettings CryptoSettings, FileReference CryptoKeysCacheFilename, String PatchSourceContentPath, string EncryptionKeyGuid, List<OrderFile> SecondaryPakOrderFileLocations, bool bUnattended)
 		{
 			StringBuilder CmdLine = new StringBuilder(MakePathSafeToUseWithCommandLine(ProjectPath.FullName));
 			CmdLine.AppendFormat(" {0}", MakePathSafeToUseWithCommandLine(OutputLocation.FullName));
@@ -226,6 +226,12 @@ namespace AutomationScripts
 				{
 					CmdLine.AppendFormat(" -sign");
 				}
+			}
+
+			if (bUnattended)
+			{
+				// We don't want unrealpak popping up interactive dialogs while we're running a build
+				CmdLine.AppendFormat(" -unattended");
 			}
 
 			CmdLine.Append(PlatformOptions);
@@ -301,7 +307,7 @@ namespace AutomationScripts
 				return;
 			}
 
-			string Arguments = GetUnrealPakArguments(Params.RawProjectPath, UnrealPakResponseFile, OutputLocation, PakOrderFileLocations, PlatformOptions, Compressed, CryptoSettings, CryptoKeysCacheFilename, PatchSourceContentPath, EncryptionKeyGuid, SecondaryPakOrderFileLocations);
+			string Arguments = GetUnrealPakArguments(Params.RawProjectPath, UnrealPakResponseFile, OutputLocation, PakOrderFileLocations, PlatformOptions, Compressed, CryptoSettings, CryptoKeysCacheFilename, PatchSourceContentPath, EncryptionKeyGuid, SecondaryPakOrderFileLocations, Params.Unattended);
 			RunAndLog(CmdEnv, GetUnrealPakLocation().FullName, Arguments, Options: ERunOptions.Default | ERunOptions.UTF8Output);
 		}
 
@@ -2953,7 +2959,8 @@ namespace AutomationScripts
 							Params.SkipEncryption ? null : CryptoKeysCacheFilename,
 							PatchSourceContentPath,
 							Params.SkipEncryption ? "" : PakParams.EncryptionKeyGuid,
-							SecondaryOrderFiles));
+							SecondaryOrderFiles,
+							Params.Unattended));
 
 						LogNames.Add(OutputLocation.GetFileNameWithoutExtension());
 					}
@@ -3290,6 +3297,12 @@ namespace AutomationScripts
 			if (Params.HasBasedOnReleaseVersion)
 			{
 				CommandletParams += String.Format(" -BasedOnReleaseVersionPath={0}", Params.GetBasedOnReleaseVersionPath(SC, Params.Client));
+			}
+
+			if (Params.Unattended)
+			{
+				// We don't want unrealpak popping up interactive dialogs while we're running a build
+				CommandletParams += " -unattended";
 			}
 
 			LogInformation("Running UnrealPak with arguments: {0}", CommandletParams);
