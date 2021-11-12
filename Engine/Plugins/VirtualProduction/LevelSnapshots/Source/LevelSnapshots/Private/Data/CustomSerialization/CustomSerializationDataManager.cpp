@@ -114,12 +114,12 @@ int32 UE::LevelSnapshots::Private::FCustomSerializationDataReader::AddSubobjectS
 	return INDEX_NONE;	
 }
 
-TSharedPtr<ISnapshotSubobjectMetaData> UE::LevelSnapshots::Private::FCustomSerializationDataReader::GetSubobjectMetaData(int32 Index)
+TSharedPtr<UE::LevelSnapshots::ISnapshotSubobjectMetaData> UE::LevelSnapshots::Private::FCustomSerializationDataReader::GetSubobjectMetaData(int32 Index)
 {
 	return CachedSubobjectMetaData[Index];
 }
 
-const TSharedPtr<ISnapshotSubobjectMetaData> UE::LevelSnapshots::Private::FCustomSerializationDataReader::GetSubobjectMetaData(int32 Index) const
+const TSharedPtr<UE::LevelSnapshots::ISnapshotSubobjectMetaData> UE::LevelSnapshots::Private::FCustomSerializationDataReader::GetSubobjectMetaData(int32 Index) const
 {
 	return CachedSubobjectMetaData[Index];
 }
@@ -194,7 +194,7 @@ int32 UE::LevelSnapshots::Private::FCustomSerializationDataWriter::AddSubobjectS
 	}
 
 	FCustomSubbjectSerializationData SubobjectData;
-	SubobjectData.ObjectPathIndex = UE::LevelSnapshots::Private::AddObjectDependency(WorldData_ReadWrite, Subobject, false);
+	SubobjectData.ObjectPathIndex = AddObjectDependency(WorldData_ReadWrite, Subobject, false);
 	const int32 SubobjectIndex = SerializationData->Subobjects.Emplace(
 		MoveTemp(SubobjectData) // Not profiled
 		);

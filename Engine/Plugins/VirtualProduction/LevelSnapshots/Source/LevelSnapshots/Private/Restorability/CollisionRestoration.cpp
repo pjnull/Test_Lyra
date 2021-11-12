@@ -10,16 +10,16 @@
 #include "PhysicsEngine/BodyInstance.h"
 #include "UObject/UnrealType.h"
 
-void UE::LevelSnapshots::Restorability::Private::FCollisionRestoration::Register(FLevelSnapshotsModule& Module)
+void UE::LevelSnapshots::Private::FCollisionRestoration::Register(FLevelSnapshotsModule& Module)
 {
-	const TSharedRef<FCollisionRestoration> CollisionPropertyFix = MakeShared<UE::LevelSnapshots::Restorability::Private::FCollisionRestoration>();
+	const TSharedRef<FCollisionRestoration> CollisionPropertyFix = MakeShared<FCollisionRestoration>();
 	
 	Module.RegisterSnapshotLoader(CollisionPropertyFix);
 	Module.RegisterRestorationListener(CollisionPropertyFix);
 	Module.RegisterPropertyComparer(UStaticMeshComponent::StaticClass(), CollisionPropertyFix);
 }
 
-UE::LevelSnapshots::Restorability::Private::FCollisionRestoration::FCollisionRestoration()
+UE::LevelSnapshots::Private::FCollisionRestoration::FCollisionRestoration()
 {
 	BodyInstanceProperty = FindFProperty<FProperty>(UPrimitiveComponent::StaticClass(), GET_MEMBER_NAME_CHECKED(UPrimitiveComponent, BodyInstance));
 	ObjectTypeProperty = FindFProperty<FProperty>(FBodyInstance::StaticStruct(), FName("ObjectType"));
@@ -28,7 +28,7 @@ UE::LevelSnapshots::Restorability::Private::FCollisionRestoration::FCollisionRes
 	check(BodyInstanceProperty && ObjectTypeProperty && CollisionEnabledProperty && CollisionResponsesProperty);
 }
 
-IPropertyComparer::EPropertyComparison UE::LevelSnapshots::Restorability::Private::FCollisionRestoration::ShouldConsiderPropertyEqual(const FPropertyComparisonParams& Params) const
+UE::LevelSnapshots::IPropertyComparer::EPropertyComparison UE::LevelSnapshots::Private::FCollisionRestoration::ShouldConsiderPropertyEqual(const FPropertyComparisonParams& Params) const
 {
 	if (Params.LeafProperty == BodyInstanceProperty)
 	{
@@ -74,7 +74,7 @@ namespace
 	}
 }
 
-void UE::LevelSnapshots::Restorability::Private::FCollisionRestoration::PostLoadSnapshotObject(const FPostLoadSnapshotObjectParams& Params)
+void UE::LevelSnapshots::Private::FCollisionRestoration::PostLoadSnapshotObject(const FPostLoadSnapshotObjectParams& Params)
 {
 	if (UPrimitiveComponent* PrimitiveComponent = Cast<UPrimitiveComponent>(Params.SnapshotObject))
 	{
@@ -83,7 +83,7 @@ void UE::LevelSnapshots::Restorability::Private::FCollisionRestoration::PostLoad
 	}
 }
 
-void UE::LevelSnapshots::Restorability::Private::FCollisionRestoration::PostApplySnapshotProperties(const FApplySnapshotPropertiesParams& Params)
+void UE::LevelSnapshots::Private::FCollisionRestoration::PostApplySnapshotProperties(const FApplySnapshotPropertiesParams& Params)
 {
 	if (UPrimitiveComponent* PrimitiveComponent = Cast<UPrimitiveComponent>(Params.Object))
 	{
@@ -93,7 +93,7 @@ void UE::LevelSnapshots::Restorability::Private::FCollisionRestoration::PostAppl
 	}
 }
 
-bool UE::LevelSnapshots::Restorability::Private::FCollisionRestoration::HaveNonDefaultCollisionPropertiesChanged(const FPropertyComparisonParams& Params, UStaticMeshComponent* SnapshotObject, UStaticMeshComponent* WorldObject) const
+bool UE::LevelSnapshots::Private::FCollisionRestoration::HaveNonDefaultCollisionPropertiesChanged(const FPropertyComparisonParams& Params, UStaticMeshComponent* SnapshotObject, UStaticMeshComponent* WorldObject) const
 {
 	void* SnapshotValuePtr = BodyInstanceProperty->ContainerPtrToValuePtr<void>(SnapshotObject);
 	void* EditorValuePtr = BodyInstanceProperty->ContainerPtrToValuePtr<void>(WorldObject);
@@ -101,7 +101,7 @@ bool UE::LevelSnapshots::Restorability::Private::FCollisionRestoration::HaveNonD
 	{
 		const FProperty* Property = *FieldIt;
 		const bool bIsAffectedByDefaultCollision = Property == ObjectTypeProperty || Property == CollisionEnabledProperty || Property == CollisionResponsesProperty;
-		if (!bIsAffectedByDefaultCollision && !UE::LevelSnapshots::Private::AreSnapshotAndOriginalPropertiesEquivalent(Params.WorldData, Property, SnapshotValuePtr, EditorValuePtr, SnapshotObject->GetOwner(), WorldObject->GetOwner()))
+		if (!bIsAffectedByDefaultCollision && !AreSnapshotAndOriginalPropertiesEquivalent(Params.WorldData, Property, SnapshotValuePtr, EditorValuePtr, SnapshotObject->GetOwner(), WorldObject->GetOwner()))
 		{
 			return true;
 		}

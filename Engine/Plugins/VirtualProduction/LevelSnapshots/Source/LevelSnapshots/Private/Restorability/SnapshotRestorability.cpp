@@ -98,7 +98,7 @@ bool UE::LevelSnapshots::Restorability::IsActorDesirableForCapture(const AActor*
 	}
 	
 	bool bSomebodyAllowed = false;
-	const TArray<TSharedRef<ISnapshotRestorabilityOverrider>>& Overrides = FLevelSnapshotsModule::GetInternalModuleInstance().GetOverrides(); 
+	const TArray<TSharedRef<ISnapshotRestorabilityOverrider>>& Overrides = UE::LevelSnapshots::Private::FLevelSnapshotsModule::GetInternalModuleInstance().GetOverrides(); 
 	for (const TSharedRef<ISnapshotRestorabilityOverrider>& Override : Overrides)
 	{
 		const ISnapshotRestorabilityOverrider::ERestorabilityOverride Result = Override->IsActorDesirableForCapture(Actor);
@@ -142,7 +142,7 @@ bool UE::LevelSnapshots::Restorability::IsComponentDesirableForCapture(const UAc
 	}
 	
 	bool bSomebodyAllowed = false;
-	const TArray<TSharedRef<ISnapshotRestorabilityOverrider>>& Overrides = FLevelSnapshotsModule::GetInternalModuleInstance().GetOverrides(); 
+	const TArray<TSharedRef<ISnapshotRestorabilityOverrider>>& Overrides = UE::LevelSnapshots::Private::FLevelSnapshotsModule::GetInternalModuleInstance().GetOverrides(); 
 	for (const TSharedRef<ISnapshotRestorabilityOverrider>& Override : Overrides)
 	{
 		const ISnapshotRestorabilityOverrider::ERestorabilityOverride Result = Override->IsComponentDesirableForCapture(Component);
@@ -169,7 +169,7 @@ bool UE::LevelSnapshots::Restorability::IsComponentDesirableForCapture(const UAc
 bool UE::LevelSnapshots::Restorability::IsSubobjectClassDesirableForCapture(const UClass* SubobjectClass)
 {
 	SCOPED_SNAPSHOT_CORE_TRACE(IsSubobjectClassDesirableForCapture);
-	return Private::Internal::DoesSubobjecttHaveSupportedClassForCapture(SubobjectClass) && !FLevelSnapshotsModule::GetInternalModuleInstance().ShouldSkipSubobjectClass(SubobjectClass);
+	return Private::Internal::DoesSubobjecttHaveSupportedClassForCapture(SubobjectClass) && !UE::LevelSnapshots::Private::FLevelSnapshotsModule::GetInternalModuleInstance().ShouldSkipSubobjectClass(SubobjectClass);
 }
 
 bool UE::LevelSnapshots::Restorability::IsSubobjectDesirableForCapture(const UObject* Subobject)
@@ -207,13 +207,13 @@ bool UE::LevelSnapshots::Restorability::IsPropertyDesirableForCapture(const FPro
 bool UE::LevelSnapshots::Restorability::IsPropertyExplicitlyUnsupportedForCapture(const FProperty* Property)
 {
 	SCOPED_SNAPSHOT_CORE_TRACE(IsPropertyExplicitlyUnsupportedForCapture);
-	return FLevelSnapshotsModule::GetInternalModuleInstance().IsPropertyExplicitlyUnsupported(Property);
+	return UE::LevelSnapshots::Private::FLevelSnapshotsModule::GetInternalModuleInstance().IsPropertyExplicitlyUnsupported(Property);
 }
 
 bool UE::LevelSnapshots::Restorability::IsPropertyExplicitlySupportedForCapture(const FProperty* Property)
 {
 	SCOPED_SNAPSHOT_CORE_TRACE(IsPropertyExplicitlySupportedForCapture);
-	return FLevelSnapshotsModule::GetInternalModuleInstance().IsPropertyExplicitlySupported(Property);
+	return UE::LevelSnapshots::Private::FLevelSnapshotsModule::GetInternalModuleInstance().IsPropertyExplicitlySupported(Property);
 }
 
 bool UE::LevelSnapshots::Restorability::ShouldConsiderNewActorForRemoval(const AActor* Actor)
@@ -223,6 +223,7 @@ bool UE::LevelSnapshots::Restorability::ShouldConsiderNewActorForRemoval(const A
 
 bool UE::LevelSnapshots::Restorability::IsRestorableProperty(const FProperty* LeafProperty)
 {
+	using namespace UE::LevelSnapshots::Private;
 	SCOPED_SNAPSHOT_CORE_TRACE(IsRestorableProperty);
 	
 	// Deprecated and transient properties should not cause us to consider the property different because we do not save these properties.

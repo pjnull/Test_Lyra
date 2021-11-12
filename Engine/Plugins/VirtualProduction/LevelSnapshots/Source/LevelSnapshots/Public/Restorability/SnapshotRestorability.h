@@ -5,7 +5,6 @@
 #include "CoreMinimal.h"
 
 class AActor;
-class FLevelSnapshotsModule;
 class FProperty;
 class UActorComponent;
 

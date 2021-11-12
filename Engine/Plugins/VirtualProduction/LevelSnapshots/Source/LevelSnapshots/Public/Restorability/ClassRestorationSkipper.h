@@ -6,12 +6,12 @@
 #include "Interfaces/ISnapshotRestorabilityOverrider.h"
 #include "Settings/SkippedClassList.h"
 
-namespace UE::LevelSnapshots::Restorability
+namespace UE::LevelSnapshots
 {
 	/* Disallows provided classes. Uses callback to obtain class list so the logic is reusable outside the module. */
 	class LEVELSNAPSHOTS_API FClassRestorationSkipper : public ISnapshotRestorabilityOverrider
 	{
-		public:
+	public:
 
 		DECLARE_DELEGATE_RetVal(const FSkippedClassList&, FGetSkippedClassList)
 		
@@ -26,8 +26,8 @@ namespace UE::LevelSnapshots::Restorability
 		virtual ERestorabilityOverride IsActorDesirableForCapture(const AActor* Actor) override;
 		virtual ERestorabilityOverride IsComponentDesirableForCapture(const UActorComponent* Component) override;
 		//~ End ISnapshotRestorabilityOverrider Interface
-
-		private:
+	
+	private:
 
 		FGetSkippedClassList GetSkippedClassListCallback;
 

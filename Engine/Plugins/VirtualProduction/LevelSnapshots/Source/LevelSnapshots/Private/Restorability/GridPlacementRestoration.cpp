@@ -9,7 +9,7 @@
 
 #if WITH_EDITORONLY_DATA
 
-namespace UE::LevelSnapshots::Restorability::Private::Internal
+namespace UE::LevelSnapshots::Private::Internal
 {
 	/**
 	* UPrimitiveComponent::BodyInstance requires special logic for restoring & loading collision information.
@@ -48,7 +48,7 @@ namespace UE::LevelSnapshots::Restorability::Private::Internal
 
 #endif
 
-void UE::LevelSnapshots::Restorability::Private::GridPlacementRestoration::Register(FLevelSnapshotsModule& Module)
+void UE::LevelSnapshots::Private::GridPlacementRestoration::Register(FLevelSnapshotsModule& Module)
 {
 #if WITH_EDITORONLY_DATA
 	Internal::FGridPlacementRestoration::Register(Module);

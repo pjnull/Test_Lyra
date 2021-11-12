@@ -71,7 +71,7 @@ bool ULevelSnapshot::SnapshotWorld(UWorld* TargetWorld)
 		UE_LOG(LogLevelSnapshots, Warning, TEXT("Level snapshots currently only support editors. Snapshots taken in other world types are experimental any may not function as expected."));
 	}
 
-	FLevelSnapshotsModule& Module = FLevelSnapshotsModule::GetInternalModuleInstance();
+	UE::LevelSnapshots::Private::FLevelSnapshotsModule& Module = UE::LevelSnapshots::Private::FLevelSnapshotsModule::GetInternalModuleInstance();
 	if (!Module.CanTakeSnapshot({ this }))
 	{
 		return false;

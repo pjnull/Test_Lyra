@@ -17,7 +17,7 @@
 #include "FoliageEditModule.h"
 #endif
 
-namespace FoliageSupport
+namespace UE::LevelSnapshots::Foliage::Private::Internal
 {
 	static void EnableRequiredFoliageProperties(ILevelSnapshotsModule& Module)
 	{
@@ -55,9 +55,9 @@ namespace FoliageSupport
 	}
 }
 
-void FFoliageSupport::Register(ILevelSnapshotsModule& Module)
+void UE::LevelSnapshots::Foliage::Private::FFoliageSupport::Register(ILevelSnapshotsModule& Module)
 {
-	FoliageSupport::EnableRequiredFoliageProperties(Module);
+	Internal::EnableRequiredFoliageProperties(Module);
 	
 	const TSharedRef<FFoliageSupport> FoliageSupport = MakeShared<FFoliageSupport>();
 	Module.RegisterRestorabilityOverrider(FoliageSupport);
@@ -65,14 +65,14 @@ void FFoliageSupport::Register(ILevelSnapshotsModule& Module)
 	Module.RegisterCustomObjectSerializer(AInstancedFoliageActor::StaticClass(), FoliageSupport);
 }
 
-ISnapshotRestorabilityOverrider::ERestorabilityOverride FFoliageSupport::IsActorDesirableForCapture(const AActor* Actor)
+UE::LevelSnapshots::ISnapshotRestorabilityOverrider::ERestorabilityOverride UE::LevelSnapshots::Foliage::Private::FFoliageSupport::IsActorDesirableForCapture(const AActor* Actor)
 {
 	// Foliage's not allowed by default because it is hidden from the scene outliner
 	return Actor->GetClass() == AInstancedFoliageActor::StaticClass() || FFoliageHelper::IsOwnedByFoliage(Actor)
 		? ERestorabilityOverride::Allow : ERestorabilityOverride::DoNotCare;
 }
 
-void FFoliageSupport::OnTakeSnapshot(UObject* EditorObject, ICustomSnapshotSerializationData& DataStorage)
+void UE::LevelSnapshots::Foliage::Private::FFoliageSupport::OnTakeSnapshot(UObject* EditorObject, ICustomSnapshotSerializationData& DataStorage)
 {
 	AInstancedFoliageActor* FoliageActor = Cast<AInstancedFoliageActor>(EditorObject);
 	check(FoliageActor);
@@ -85,7 +85,7 @@ void FFoliageSupport::OnTakeSnapshot(UObject* EditorObject, ICustomSnapshotSeria
 	}));
 }
 
-void FFoliageSupport::PostApplySnapshotProperties(UObject* Object, const ICustomSnapshotSerializationData& DataStorage)
+void UE::LevelSnapshots::Foliage::Private::FFoliageSupport::PostApplySnapshotProperties(UObject* Object, const ICustomSnapshotSerializationData& DataStorage)
 {
 	AInstancedFoliageActor* FoliageActor = Cast<AInstancedFoliageActor>(Object);
 	check(FoliageActor);
@@ -145,7 +145,7 @@ namespace UE::LevelSnapshots::FoliageSupport::Internal
 	}
 }
 
-void FFoliageSupport::PostApplySnapshotToActor(const FApplySnapshotToActorParams& Params)
+void UE::LevelSnapshots::Foliage::Private::FFoliageSupport::PostApplySnapshotToActor(const FApplySnapshotToActorParams& Params)
 {
 	// This is the order of operations up until now
 	// 1. OnTakeSnapshot > Set initial data
@@ -171,7 +171,7 @@ void FFoliageSupport::PostApplySnapshotToActor(const FApplySnapshotToActorParams
 	}
 }
 
-void FFoliageSupport::PreApplySnapshotProperties(const FApplySnapshotPropertiesParams& Params)
+void UE::LevelSnapshots::Foliage::Private::FFoliageSupport::PreApplySnapshotProperties(const FApplySnapshotPropertiesParams& Params)
 {
 	// RF_Transactional is temporarily required because Level Snapshots changes components differently than Foliage originally designed.
 	// Needed for correct undo / redo 
@@ -181,7 +181,7 @@ void FFoliageSupport::PreApplySnapshotProperties(const FApplySnapshotPropertiesP
 	}
 }
 
-void FFoliageSupport::PostApplySnapshotProperties(const FApplySnapshotPropertiesParams& Params)
+void UE::LevelSnapshots::Foliage::Private::FFoliageSupport::PostApplySnapshotProperties(const FApplySnapshotPropertiesParams& Params)
 {
 	if (UHierarchicalInstancedStaticMeshComponent* Comp = Cast<UHierarchicalInstancedStaticMeshComponent>(Params.Object); Comp && CurrentFoliageActor.IsValid() && Comp->IsIn(CurrentFoliageActor.Get()))
 	{
@@ -189,7 +189,7 @@ void FFoliageSupport::PostApplySnapshotProperties(const FApplySnapshotProperties
 	}
 }
 
-void FFoliageSupport::PreRecreateActor(UWorld* World, TSubclassOf<AActor> ActorClass, FActorSpawnParameters& InOutSpawnParameters)
+void UE::LevelSnapshots::Foliage::Private::FFoliageSupport::PreRecreateActor(UWorld* World, TSubclassOf<AActor> ActorClass, FActorSpawnParameters& InOutSpawnParameters)
 {
 	if (ActorClass->IsChildOf(AInstancedFoliageActor::StaticClass()))
 	{
@@ -204,7 +204,7 @@ void FFoliageSupport::PreRecreateActor(UWorld* World, TSubclassOf<AActor> ActorC
 	}
 }
 
-void FFoliageSupport::PostRecreateActor(AActor* RecreatedActor)
+void UE::LevelSnapshots::Foliage::Private::FFoliageSupport::PostRecreateActor(AActor* RecreatedActor)
 {
 	if (AInstancedFoliageActor* FoliageActor = Cast<AInstancedFoliageActor>(RecreatedActor))
 	{
@@ -212,7 +212,7 @@ void FFoliageSupport::PostRecreateActor(AActor* RecreatedActor)
 	}
 }
 
-void FFoliageSupport::PreRemoveActor(AActor* ActorToRemove)
+void UE::LevelSnapshots::Foliage::Private::FFoliageSupport::PreRemoveActor(AActor* ActorToRemove)
 {
 	if (AInstancedFoliageActor* FoliageActor = Cast<AInstancedFoliageActor>(ActorToRemove))
 	{
@@ -220,7 +220,7 @@ void FFoliageSupport::PreRemoveActor(AActor* ActorToRemove)
 	}
 }
 
-namespace FoliageSupport
+namespace UE::LevelSnapshots::Foliage::Private::Internal
 {
 	static UFoliageType* FindFoliageInfoFor(UHierarchicalInstancedStaticMeshComponent* Component)
 	{
@@ -251,9 +251,9 @@ namespace FoliageSupport
 	}
 }
 
-void FFoliageSupport::PreRemoveComponent(UActorComponent* ComponentToRemove)
+void UE::LevelSnapshots::Foliage::Private::FFoliageSupport::PreRemoveComponent(UActorComponent* ComponentToRemove)
 {
-	if (UFoliageType* FoliagType = FoliageSupport::FindFoliageInfoFor(ComponentToRemove))
+	if (UFoliageType* FoliagType = Internal::FindFoliageInfoFor(ComponentToRemove))
 	{
 		AInstancedFoliageActor* FoliageActor = Cast<AInstancedFoliageActor>(ComponentToRemove->GetOwner());
 		FoliageActor->RemoveFoliageType(&FoliagType, 1);

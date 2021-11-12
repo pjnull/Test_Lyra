@@ -9,7 +9,7 @@
 
 class UStaticMeshComponent;
 
-namespace UE::LevelSnapshots::Restorability::Private
+namespace UE::LevelSnapshots::Private
 {
 	/**
 	* UPrimitiveComponent::BodyInstance requires special logic for restoring & loading collision information.
