@@ -1676,7 +1676,12 @@ protected:
 	}
 
 	/** Hidden destructor */
-	~TSharedFromThis() { }
+	~TSharedFromThis()
+	{
+		// If this causes an 'ambiguous call' compile error, this means you have multiple TSharedFromThis
+		// bases in your inheritance hierarchy.
+		(void)sizeof(((ObjectType*)nullptr)->DoesSharedInstanceExist());
+	}
 
 private:
 

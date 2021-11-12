@@ -46,7 +46,7 @@ namespace EPerforceState
 	};
 }
 
-class FPerforceSourceControlState : public ISourceControlState, public TSharedFromThis<FPerforceSourceControlState, ESPMode::ThreadSafe>
+class FPerforceSourceControlState : public ISourceControlState
 {
 public:
 	FPerforceSourceControlState( const FString& InLocalFilename, EPerforceState::Type InState = EPerforceState::DontCare )

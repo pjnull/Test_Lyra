@@ -105,7 +105,7 @@ private:
 	UObject *ContentObject;
 };
 
-class FFbxMeshInfo : public FFbxAttributeInfo, public TSharedFromThis<FFbxMeshInfo>
+class FFbxMeshInfo : public FFbxAttributeInfo
 {
 public:
 	int32 FaceNum;
@@ -141,7 +141,7 @@ public:
 	virtual UClass *GetType();
 };
 
-class FFbxTextureInfo : public FFbxAttributeInfo, public TSharedFromThis<FFbxTextureInfo>
+class FFbxTextureInfo : public FFbxAttributeInfo
 {
 public:
 	FString TexturePath;
@@ -153,7 +153,7 @@ public:
 	virtual UClass *GetType();
 };
 
-class FFbxMaterialInfo : public FFbxAttributeInfo, public TSharedFromThis<FFbxMaterialInfo>
+class FFbxMaterialInfo : public FFbxAttributeInfo
 {
 public:
 	//This string is use to help match the material when doing a reimport

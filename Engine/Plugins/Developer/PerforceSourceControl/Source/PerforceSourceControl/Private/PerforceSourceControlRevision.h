@@ -6,7 +6,7 @@
 #include "ISourceControlProvider.h"
 #include "ISourceControlRevision.h"
 
-class FPerforceSourceControlRevision : public ISourceControlRevision, public TSharedFromThis<FPerforceSourceControlRevision, ESPMode::ThreadSafe>
+class FPerforceSourceControlRevision : public ISourceControlRevision
 {
 public:
 	FPerforceSourceControlRevision()
