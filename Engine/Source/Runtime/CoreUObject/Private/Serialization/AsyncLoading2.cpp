@@ -1048,12 +1048,6 @@ public:
 
 	~FExportArchive()
 	{
-#if WITH_EDITOR
-		// Detach all lazy loaders.
-		const bool bEnsureAllBulkDataIsLoaded = false;
-		DetachAllBulkData(bEnsureAllBulkDataIsLoaded);
-#endif
-
 	}
 	void ExportBufferBegin(UObject* Object, uint64 InExportCookedFileSerialOffset, uint64 InExportSerialSize)
 	{
@@ -1133,6 +1127,12 @@ public:
 	virtual bool IsUsingEventDrivenLoader() const override
 	{
 		return true;
+	}
+
+	/** FExportArchive will be created on the stack so we do not want BulkData objects caching references to it. */
+	virtual FArchive* GetCacheableArchive()
+	{
+		return nullptr;
 	}
 
 	//~ Begin FArchive::FArchiveUObject Interface
@@ -1259,56 +1259,6 @@ public:
 		return *this;
 	}
 	//~ End FArchive::FLinkerLoad Interface
-
-#if WITH_EDITOR
-	/**
-	 * Attaches/ associates the passed in bulk data object with the linker.
-	 *
-	 * @param	Owner		UObject owning the bulk data
-	 * @param	BulkData	Bulk data object to associate
-	 */
-	virtual void AttachBulkData(UObject* Owner, FUntypedBulkData* BulkData) override
-	{
-		check(BulkDataLoaders.Find(BulkData) == INDEX_NONE);
-		BulkDataLoaders.Add(BulkData);
-	}
-
-	/**
-	 * Detaches the passed in bulk data object from the linker.
-	 *
-	 * @param	BulkData	Bulk data object to detach
-	 * @param	bEnsureBulkDataIsLoaded	Whether to ensure that the bulk data is loaded before detaching
-	 */
-	virtual void DetachBulkData(FUntypedBulkData* BulkData, bool bEnsureBulkDataIsLoaded) override
-	{
-		int32 RemovedCount = BulkDataLoaders.Remove(BulkData);
-		if (RemovedCount != 1)
-		{
-			UE_LOG(LogStreaming, Fatal, TEXT("Detachment inconsistency: %i (%s)"), RemovedCount, *PackageDesc->PackageNameToLoad.ToString());
-		}
-		BulkData->DetachFromArchive(this, bEnsureBulkDataIsLoaded);
-	}
-
-	/**
-	 * Detaches all attached bulk  data objects.
-	 *
-	 * @param	bEnsureBulkDataIsLoaded	Whether to ensure that the bulk data is loaded before detaching
-	 */
-	void DetachAllBulkData(bool bEnsureAllBulkDataIsLoaded)
-	{
-		auto BulkDataToDetach = BulkDataLoaders;
-		for (auto BulkData : BulkDataToDetach)
-		{
-			check(BulkData);
-			BulkData->DetachFromArchive(this, bEnsureAllBulkDataIsLoaded);
-		}
-		BulkDataLoaders.Empty();
-	}
-
-	/** Bulk data that does not need to be loaded when the linker is loaded.												*/
-	TArray<FUntypedBulkData*> BulkDataLoaders;
-
-#endif // WITH_EDITOR
 
 private:
 	friend FAsyncPackage2;

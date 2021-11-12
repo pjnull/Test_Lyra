@@ -463,8 +463,8 @@ void FDistanceFieldSceneData::AsyncUpdate(FDistanceFieldAsyncUpdateParameters Up
 
 #if WITH_EDITOR
 		if (ReadRequest.BulkData)
-		{
-			check(ReadRequest.BulkData->IsBulkDataLoaded() && ReadRequest.BulkData->GetBulkDataSize() > 0);
+		{	
+			check((ReadRequest.BulkData->IsBulkDataLoaded() ||ReadRequest.BulkData->CanLoadFromDisk()) && ReadRequest.BulkData->GetBulkDataSize() > 0);
 			BulkDataReadPtr = (const uint8*)ReadRequest.BulkData->LockReadOnly() + ReadRequest.BulkOffset;
 		}
 #endif

@@ -804,8 +804,13 @@ void FStaticMeshLODResources::Serialize(FArchive& Ar, UObject* Owner, int32 Inde
 				{
 					TmpBuff.Empty(BulkDataSize);
 					TmpBuff.AddUninitialized(BulkDataSize);
+					
 					void* Dest = TmpBuff.GetData();
+#if USE_BULKDATA_STREAMING_TOKEN	
 					TmpBulkData.GetCopy(&Dest);
+#else
+					StreamingBulkData.GetCopy(&Dest);
+#endif //#if USE_BULKDATA_STREAMING_TOKEN
 				}
 #endif
 			}
