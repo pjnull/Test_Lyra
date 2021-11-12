@@ -198,7 +198,7 @@ struct FStrataEvaluateResult
 #define INTEGRATION_AREA_LIGHT_CAPSULE	1
 #define INTEGRATION_AREA_LIGHT_RECT		2
 
-FStrataEvaluateResult StrataEvaluateBSDFCommon(FStrataBSDFContext BSDFContext, FShadowTerms ShadowTerms, FAreaLightIntegrateContext AreaLightContext, int IntegrationType)
+FStrataEvaluateResult StrataEvaluateBSDFCommon(FStrataBSDFContext BSDFContext, FShadowTerms ShadowTerms, FAreaLightIntegrateContext AreaLightContext, int IntegrationType, bool bForceFullyRough)
 {
 	FStrataEvaluateResult Sample = (FStrataEvaluateResult)0;
 
@@ -209,20 +209,25 @@ FStrataEvaluateResult StrataEvaluateBSDFCommon(FStrataBSDFContext BSDFContext, F
 	{
 		case STRATA_BSDF_TYPE_SLAB:
 		{
-			const bool bHasSubsurface = BSDF_GETHASSSS(BSDFContext.BSDF) > 0;
-			const float3 DiffuseColor = SLAB_DIFFUSEALBEDO(BSDFContext.BSDF);
-			const float3 F0			  = SLAB_F0(BSDFContext.BSDF);
-			const float3 F90		  = SLAB_F90(BSDFContext.BSDF);
-			const float Metallic	  = SLAB_METALLIC(BSDFContext.BSDF);
-			const float SafeRoughness = MakeRoughnessSafe(SLAB_ROUGHNESS(BSDFContext.BSDF));
+			float3 DiffuseColor			= SLAB_DIFFUSEALBEDO(BSDFContext.BSDF);
+			float3 F0					= SLAB_F0(BSDFContext.BSDF);
+			float3 F90					= SLAB_F90(BSDFContext.BSDF);
+			const float Metallic		= SLAB_METALLIC(BSDFContext.BSDF);
+			const float SafeRoughness	= MakeRoughnessSafe(SLAB_ROUGHNESS(BSDFContext.BSDF));
 		#if STRATA_FASTPATH==0
-			float HazeSafeRoughness   = SafeRoughness;
+			float HazeSafeRoughness		= SafeRoughness;
 		#endif
-
-			float Alpha2 = Pow4(SafeRoughness);
-
+			const bool bHasSubsurface	= BSDF_GETHASSSS(BSDFContext.BSDF) > 0;
 			const bool bHasAnisotropy = BSDF_GETHASANISOTROPY(BSDFContext.BSDF);
 			const bool bHaziness = BSDF_GETHASHAZINESS(BSDFContext.BSDF);
+
+			if (bForceFullyRough)
+			{
+				// When rendering reflection captures, the BSDF roughness has already been forced to 1 using View.RoughnessOverrideParameter (see StrataSanitizeBSDF).
+				EnvBRDFApproxFullyRough(DiffuseColor, F0, F90);
+			}
+
+			float Alpha2 = Pow4(SafeRoughness);
 
 			float NoV, VoH, NoH;
 			BRANCH
@@ -668,10 +673,11 @@ FStrataEvaluateResult StrataEvaluateBSDF(FStrataBSDFContext BSDFContext)
 	DummyAreaLightContext.L = BSDFContext.L;
 	DummyAreaLightContext.NoL = BSDFContext.Context.NoL;
 	DummyAreaLightContext.Falloff = 1;
-	return StrataEvaluateBSDFCommon(BSDFContext, IdentityShadow, DummyAreaLightContext, INTEGRATION_PUNCTUAL_LIGHT);
+	const bool bForceFullyRough = false;
+	return StrataEvaluateBSDFCommon(BSDFContext, IdentityShadow, DummyAreaLightContext, INTEGRATION_PUNCTUAL_LIGHT, bForceFullyRough);
 }
 
-FStrataEvaluateResult StrataIntegrateBSDF(FStrataBSDFContext BSDFContext, FShadowTerms Shadow, FAreaLightIntegrateContext AreaLightContext)
+FStrataEvaluateResult StrataIntegrateBSDF(FStrataBSDFContext BSDFContext, FShadowTerms Shadow, FAreaLightIntegrateContext AreaLightContext, bool bForceFullyRough)
 {
 	BRANCH
 	if (IsAreaLight(AreaLightContext.AreaLight))
@@ -679,15 +685,15 @@ FStrataEvaluateResult StrataIntegrateBSDF(FStrataBSDFContext BSDFContext, FShado
 		BRANCH
 		if(IsRectLight(AreaLightContext.AreaLight))
 		{
-			return StrataEvaluateBSDFCommon(BSDFContext, Shadow, AreaLightContext, INTEGRATION_AREA_LIGHT_RECT);
+			return StrataEvaluateBSDFCommon(BSDFContext, Shadow, AreaLightContext, INTEGRATION_AREA_LIGHT_RECT, bForceFullyRough);
 		}
 		else
 		{
-			return StrataEvaluateBSDFCommon(BSDFContext, Shadow, AreaLightContext, INTEGRATION_AREA_LIGHT_CAPSULE);
+			return StrataEvaluateBSDFCommon(BSDFContext, Shadow, AreaLightContext, INTEGRATION_AREA_LIGHT_CAPSULE, bForceFullyRough);
 		}
 	}
 
-	return StrataEvaluateBSDFCommon(BSDFContext, Shadow, AreaLightContext, INTEGRATION_PUNCTUAL_LIGHT);
+	return StrataEvaluateBSDFCommon(BSDFContext, Shadow, AreaLightContext, INTEGRATION_PUNCTUAL_LIGHT, bForceFullyRough);
 }
 
 struct FStrataImportanceSampleResult
@@ -808,7 +814,7 @@ struct FStrataEnvLightResult
 	bool   bSubsurface; // True if we need to separate the subsurface light contribution for the screen space diffusion process.
 };
 
-FStrataEnvLightResult StrataEvaluateForEnvLight(FStrataBSDFContext BSDFContext, bool bEnableSpecular)
+FStrataEnvLightResult StrataEvaluateForEnvLight(FStrataBSDFContext BSDFContext, bool bEnableSpecular, bool bForceFullyRough)
 {
 	FStrataEnvLightResult StrataEnvLightResult = (FStrataEnvLightResult)0;
 
@@ -817,10 +823,16 @@ FStrataEnvLightResult StrataEvaluateForEnvLight(FStrataBSDFContext BSDFContext, 
 	{
 		case STRATA_BSDF_TYPE_SLAB:
 		{
-			const float3 DiffuseColor	= SLAB_DIFFUSEALBEDO(BSDFContext.BSDF);
-			float3 F0 					= SLAB_F0(BSDFContext.BSDF);
-			const float3 F90 			= SLAB_F90(BSDFContext.BSDF);
-			const float Metallic 		= SLAB_METALLIC(BSDFContext.BSDF);
+			float3 DiffuseColor		= SLAB_DIFFUSEALBEDO(BSDFContext.BSDF);
+			float3 F0 				= SLAB_F0(BSDFContext.BSDF);
+			float3 F90 				= SLAB_F90(BSDFContext.BSDF);
+			const float Metallic 	= SLAB_METALLIC(BSDFContext.BSDF);
+
+			if (bForceFullyRough)
+			{
+				// When rendering reflection captures, the BSDF roughness has already been forced to 1 using View.RoughnessOverrideParameter (see StrataSanitizeBSDF).
+				EnvBRDFApproxFullyRough(DiffuseColor, F0, F90);
+			}
 
 			StrataEnvLightResult.DiffuseNormal = BSDFContext.N;
 			StrataEnvLightResult.bSubsurface = BSDF_GETHASSSS(BSDFContext.BSDF) > 0;
@@ -1008,7 +1020,8 @@ FStrataEnvLightResult StrataEvaluateForEnvLight(FStrataBSDFContext BSDFContext, 
 			StrataEnvLightResult.DiffuseNormal = L;
 
 			StrataEnvLightResult.DiffuseWeight = PI * HairShading(GBuffer, L, V, N, TransmissionShadow, TransmittanceData, BacklitEnabled, Area, Random);
-			// No specular environment contribution as of today if not using the special HairStrand render path
+			// No specular environment contribution as of today if not using the special HairStrand render path.
+			// So no need to apply bForceFullyRough neither.
 			break;
 		}
 

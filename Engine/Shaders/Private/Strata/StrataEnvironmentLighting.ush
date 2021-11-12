@@ -50,7 +50,8 @@ float4 StrataEnvironmentLighting(
 
 		// Evaluate environment lighting
 		const bool bEnableSpecular = ReflectionStruct.SkyLightParameters.y > 0.0f;
-		FStrataEnvLightResult StrataEnvLight = StrataEvaluateForEnvLight(StrataBSDFContext, bEnableSpecular);
+		const bool bForceFullyRough = false;
+		FStrataEnvLightResult StrataEnvLight = StrataEvaluateForEnvLight(StrataBSDFContext, bEnableSpecular, bForceFullyRough);
 
 	#if APPLY_SKY_SHADOWING
 		// Set DiffuseNormal as the bent normal for all diffuse computations.

@@ -597,6 +597,11 @@ void EnvBRDFApproxFullyRough(inout half3 DiffuseColor, inout half SpecularColor)
 	DiffuseColor += SpecularColor * 0.45;
 	SpecularColor = 0;
 }
+void EnvBRDFApproxFullyRough(inout half3 DiffuseColor, inout half3 F0, inout half3 F90)
+{
+	DiffuseColor += F0 * 0.45;
+	F0 = F90 = 0;
+}
 
 
 float D_InvBlinn( float a2, float NoH )

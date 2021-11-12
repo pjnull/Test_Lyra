@@ -232,6 +232,7 @@ float3 StrataForwardLighting(
 
 			// Create the BSDF context
 			FStrataBSDFContext StrataBSDFContext = StrataCreateBSDFContext(StrataPixelHeader, BSDF, NullStrataAddressing, V, L);
+			const bool bForceFullyRough = FORCE_FULLY_ROUGH ? true : View.RenderingReflectionCaptureMask > 0;
 
 			//
 			// Evaluate indirect occlusion
@@ -263,7 +264,7 @@ float3 StrataForwardLighting(
 
 				// And evaluate diffuse parameters
 				const bool bEnableSpecular = ReflectionStruct.SkyLightParameters.y > 0.0f;
-				FStrataEnvLightResult StrataEnvLight = StrataEvaluateForEnvLight(EnvBSDFContext, bEnableSpecular);
+				FStrataEnvLightResult StrataEnvLight = StrataEvaluateForEnvLight(EnvBSDFContext, bEnableSpecular, bForceFullyRough);
 				float3 DiffuseNormal = StrataEnvLight.DiffuseNormal;
 				float3 DiffuseColorForIndirect = StrataEnvLight.DiffuseWeight;
 				float3 SubsurfaceColorForIndirect = StrataEnvLight.DiffuseBackFaceWeight;
