@@ -142,7 +142,11 @@ static TSharedPtr<FJsonObject> ConvertSectionToJson(const TArray<FString>& Secti
 static FString GetLayoutJsonFileName(const FString& InConfigFileName)
 {
 	const FString JsonFileName = FPaths::GetBaseFilename(InConfigFileName) + TEXT(".json");
+#ifdef UE_SAVED_DIR_OVERRIDE
+	const FString UserSettingsPath = FPaths::Combine(FPlatformProcess::UserSettingsDir(), TEXT(PREPROCESSOR_TO_STRING(UE_SAVED_DIR_OVERRIDE)), TEXT("Editor"), JsonFileName);
+#else
 	const FString UserSettingsPath = FPaths::Combine(FPlatformProcess::UserSettingsDir(), FApp::GetEpicProductIdentifier(), TEXT("Editor"), JsonFileName);
+#endif
 	return UserSettingsPath;
 }
 
@@ -319,7 +323,7 @@ void FLayoutSaveRestore::SaveSectionToConfig(const FString& InConfigFileName, co
 	FString StrValue;
 	FTextStringHelper::WriteToBuffer(StrValue, InSectionValue);
 
-	GetConfigString(*InSectionName, StrValue, InConfigFileName);
+	GConfig->SetString(GetEditorLayoutsSectionName(), *InSectionName, *StrValue, InConfigFileName);
 
 	const FString JsonFileName = GetLayoutJsonFileName(InConfigFileName);
 	TSharedPtr<FJsonObject> JsonObject = LoadJsonFile(JsonFileName);
