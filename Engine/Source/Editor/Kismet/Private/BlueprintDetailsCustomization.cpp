@@ -1474,7 +1474,7 @@ void FBlueprintVarActionDetails::PopulateCategories(SMyBlueprint* MyBlueprint, T
 	}
 
 	CategorySource.Reset();
-	CategorySource.Add(MakeShared<FText>(UEdGraphSchema_K2::VR_DefaultCategory)));
+	CategorySource.Add(MakeShared<FText>(UEdGraphSchema_K2::VR_DefaultCategory));
 	for (const FName& VariableName : VisibleVariables)
 	{
 		FText Category = FBlueprintEditorUtils::GetBlueprintVariableCategory(Blueprint, VariableName, nullptr);
@@ -6469,7 +6469,7 @@ void FBlueprintComponentDetails::PopulateVariableCategories()
 	FBlueprintEditorUtils::GetSCSVariableNameList(BlueprintObj, VisibleVariables);
 
 	VariableCategorySource.Reset();
-	VariableCategorySource.Add(MakeShared<FText>(UEdGraphSchema_K2::VR_DefaultCategory)));
+	VariableCategorySource.Add(MakeShared<FText>(UEdGraphSchema_K2::VR_DefaultCategory));
 	for (const FName& VariableName : VisibleVariables)
 	{
 		FText Category = FBlueprintEditorUtils::GetBlueprintVariableCategory(BlueprintObj, VariableName, nullptr);
