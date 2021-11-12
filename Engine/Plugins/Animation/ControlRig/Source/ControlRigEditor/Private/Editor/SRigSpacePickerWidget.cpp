@@ -216,12 +216,10 @@ void SRigSpacePickerWidget::SetControls(
 	
 	Hierarchy = InHierarchy;
 	ControlKeys = InControls;
-
-	if(Hierarchy)
+	if (Hierarchy && HierarchyModifiedHandle.IsValid() == false)
 	{
 		HierarchyModifiedHandle = Hierarchy->OnModified().AddSP(this, &SRigSpacePickerWidget::OnHierarchyModified);
 	}
-
 	UpdateActiveSpaces();
 	RepopulateItemSpaces();
 }
