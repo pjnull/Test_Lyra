@@ -68,24 +68,12 @@ public class ResonanceAudio : ModuleRules
 
 		ShadowVariableWarningLevel = WarningLevel.Off;
 
-		// TODO: See if we can splice out Eigen dependency here
-        AddEngineThirdPartyPrivateStaticDependencies(Target, "Eigen");
-
-		// Enable to support vorbis
-		bool bSupportsVorbis = false;
-        if (bSupportsVorbis)
-        {
-			PrivateDefinitions.Add("SUPPORTS_VORBIS=1");
-	        AddEngineThirdPartyPrivateStaticDependencies(Target,
+        AddEngineThirdPartyPrivateStaticDependencies(Target,
                 "UEOgg",
                 "Vorbis",
-                "VorbisFile"
+                "VorbisFile",
+                "Eigen"
                 );
-        }
-        else
-        {
-        	PrivateDefinitions.Add("SUPPORTS_VORBIS=0");
-        }
 
 		if (bSupportsProceduralMesh)
 		{

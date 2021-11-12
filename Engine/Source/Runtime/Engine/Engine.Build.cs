@@ -132,7 +132,13 @@ public class Engine : ModuleRules
 			}
 		);
 
-		AddEngineThirdPartyPrivateStaticDependencies(Target, "libOpus");
+		// Cross platform Audio Codecs:
+		AddEngineThirdPartyPrivateStaticDependencies(Target,
+			"UEOgg",
+			"Vorbis",
+			"VorbisFile",
+			"libOpus"
+			);
 
 		DynamicallyLoadedModuleNames.Add("EyeTracker");
 
@@ -374,23 +380,11 @@ public class Engine : ModuleRules
 			// Head Mounted Display support
 			//			PrivateIncludePathModuleNames.AddRange(new string[] { "HeadMountedDisplay" });
 			//			DynamicallyLoadedModuleNames.AddRange(new string[] { "HeadMountedDisplay" });
-
-			AddEngineThirdPartyPrivateStaticDependencies(Target,
-				"UEOgg",
-				"Vorbis",
-				"VorbisFile"
-				);
 		}
 
 		if (Target.Platform == UnrealTargetPlatform.Mac)
 		{
 			PublicFrameworks.AddRange(new string[] { "AVFoundation", "CoreVideo", "CoreMedia" });
-
-			AddEngineThirdPartyPrivateStaticDependencies(Target,
-				"UEOgg",
-				"Vorbis",
-				"VorbisFile"
-				);
 		}
 
 		if (Target.IsInPlatformGroup(UnrealPlatformGroup.Android))
@@ -419,7 +413,8 @@ public class Engine : ModuleRules
 			AddEngineThirdPartyPrivateStaticDependencies(Target,
 				"UEOgg",
 				"Vorbis",
-				"VorbisFile"
+				"VorbisFile",
+				"libOpus"
 				);
 		}
 
