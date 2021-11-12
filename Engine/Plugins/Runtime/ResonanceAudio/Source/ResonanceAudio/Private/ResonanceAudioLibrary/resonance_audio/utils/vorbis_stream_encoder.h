@@ -43,8 +43,14 @@ _Pragma("clang diagnostic ignored \"-Wshadow\"")
 
 #include "base/integral_types.h"
 
+#ifndef SUPPORTS_VORBIS
+#define SUPPORTS_VORBIS 0
+#endif
+
+#if SUPPORTS_VORBIS
 #include "ogg/ogg.h"
 #include "vorbis/codec.h"
+#endif
 
 namespace vraudio {
 
@@ -118,6 +124,7 @@ class VorbisStreamEncoder {
   // Output file stream.
   std::ofstream output_file_stream_;
 
+ #if SUPPORTS_VORBIS
   // libogg structs.
   ogg_stream_state stream_state_;
   ogg_page ogg_page_;
@@ -128,6 +135,7 @@ class VorbisStreamEncoder {
   vorbis_comment vorbis_comment_;
   vorbis_dsp_state vorbis_state_;
   vorbis_block vorbis_block_;
+ #endif
 };
 
 }  // namespace vraudio

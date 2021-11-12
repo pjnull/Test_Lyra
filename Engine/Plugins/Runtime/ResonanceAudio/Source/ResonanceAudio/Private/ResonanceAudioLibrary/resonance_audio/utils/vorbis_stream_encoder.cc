@@ -19,9 +19,10 @@ limitations under the License.
 #define _SCL_SECURE_NO_WARNINGS
 #endif
 
+#if SUPPORTS_VORBIS
 #include "utils/vorbis_stream_encoder.h"
-
 #include "vorbis/vorbisenc.h"
+#endif
 #include "base/audio_buffer.h"
 #include "base/logging.h"
 
@@ -34,6 +35,9 @@ bool VorbisStreamEncoder::InitializeForFile(const std::string& filename,
                                             int sample_rate,
                                             EncodingMode encoding_mode,
                                             int bitrate, float quality) {
+
+#if SUPPORTS_VORBIS
+
   output_file_stream_.open(filename,
                            std::ios::out | std::ios::trunc | std::ios::binary);
   if (!output_file_stream_.good()) {
@@ -91,6 +95,8 @@ bool VorbisStreamEncoder::InitializeForFile(const std::string& filename,
     }
   }
   init_ = true;
+
+ #endif // SUPPORTS_VORBIS
   return true;
 }
 
@@ -103,6 +109,8 @@ bool VorbisStreamEncoder::AddPlanarBuffer(const float* const* input_ptrs,
 }
 
 bool VorbisStreamEncoder::FlushAndClose() {
+
+#if SUPPORTS_VORBIS
   // Signal end of stream.
   vorbis_analysis_wrote(&vorbis_state_, 0);
   if (!PerformEncoding()) {
@@ -118,12 +126,17 @@ bool VorbisStreamEncoder::FlushAndClose() {
   vorbis_info_clear(&vorbis_info_);
 
   init_ = false;
+
+ #endif // SUPPORTS_VORBIS
+
   return true;
 }
 
 void VorbisStreamEncoder::PrepareVorbisBuffer(const float* const* input_ptrs,
                                               size_t num_channels,
                                               size_t num_frames) {
+
+#if SUPPORTS_VORBIS
   float** buffer = vorbis_analysis_buffer(
       &vorbis_state_, static_cast<int>(num_channels * num_frames));
   for (size_t channel = 0; channel < num_channels; ++channel) {
@@ -131,9 +144,12 @@ void VorbisStreamEncoder::PrepareVorbisBuffer(const float* const* input_ptrs,
   }
 
   vorbis_analysis_wrote(&vorbis_state_, static_cast<int>(num_frames));
+#endif // SUPPORTS_VORBIS
 }
 
 bool VorbisStreamEncoder::PerformEncoding() {
+
+#if SUPPORTS_VORBIS
   CHECK(init_);
   while (vorbis_analysis_blockout(&vorbis_state_, &vorbis_block_) == 1) {
     vorbis_analysis(&vorbis_block_, nullptr);
@@ -157,10 +173,14 @@ bool VorbisStreamEncoder::PerformEncoding() {
       }
     }
   }
+
+#endif // SUPPORTS_VORBIS
   return true;
 }
 
 bool VorbisStreamEncoder::WriteOggPage() {
+
+#if SUPPORTS_VORBIS
   output_file_stream_.write(reinterpret_cast<char*>(ogg_page_.header),
                             ogg_page_.header_len);
   output_file_stream_.write(reinterpret_cast<char*>(ogg_page_.body),
@@ -168,6 +188,7 @@ bool VorbisStreamEncoder::WriteOggPage() {
   if (!output_file_stream_.good()) {
     return false;
   }
+#endif // SUPPORTS_VORBIS
   return true;
 }
 
