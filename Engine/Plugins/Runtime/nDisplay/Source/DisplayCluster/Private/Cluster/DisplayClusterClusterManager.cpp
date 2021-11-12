@@ -363,6 +363,8 @@ void FDisplayClusterClusterManager::RemoveClusterEventBinaryListener(const FOnCl
 
 void FDisplayClusterClusterManager::EmitClusterEventJson(const FDisplayClusterClusterEventJson& Event, bool bMasterOnly)
 {
+	UE_LOG(LogDisplayClusterCluster, Verbose, TEXT("JSON event emission request: %s:%s:%s"), *Event.Category, *Event.Type, *Event.Name);
+
 	FScopeLock Lock(&ClusterEventsJsonCS);
 
 	if (CurrentOperationMode == EDisplayClusterOperationMode::Cluster || CurrentOperationMode == EDisplayClusterOperationMode::Editor)
@@ -398,6 +400,8 @@ void FDisplayClusterClusterManager::EmitClusterEventJson(const FDisplayClusterCl
 
 void FDisplayClusterClusterManager::EmitClusterEventBinary(const FDisplayClusterClusterEventBinary& Event, bool bMasterOnly)
 {
+	UE_LOG(LogDisplayClusterCluster, Verbose, TEXT("BIN event emission request: %d"), Event.EventId);
+
 	FScopeLock Lock(&ClusterEventsBinaryCS);
 
 	if (CurrentOperationMode == EDisplayClusterOperationMode::Cluster || CurrentOperationMode == EDisplayClusterOperationMode::Editor)
@@ -429,7 +433,7 @@ void FDisplayClusterClusterManager::EmitClusterEventBinary(const FDisplayCluster
 	}
 }
 
-void FDisplayClusterClusterManager::SendClusterEventTo(const FString& Address, const int32 Port, const FDisplayClusterClusterEventJson& Event, bool bMasterOnly)
+void FDisplayClusterClusterManager::SendClusterEventTo(const FString& Address, const uint16 Port, const FDisplayClusterClusterEventJson& Event, bool bMasterOnly)
 {
 	if (CurrentOperationMode == EDisplayClusterOperationMode::Cluster || CurrentOperationMode == EDisplayClusterOperationMode::Editor)
 	{
@@ -437,13 +441,14 @@ void FDisplayClusterClusterManager::SendClusterEventTo(const FString& Address, c
 		{
 			if (IsMaster() || !bMasterOnly)
 			{
+				UE_LOG(LogDisplayClusterCluster, Verbose, TEXT("JSON event emission request: recipient=%s:%u, event=%s:%s:%s"), *Address, Port, *Event.Category, *Event.Type, *Event.Name);
 				ClusterNodeCtrl->SendClusterEventTo(Address, Port, Event, bMasterOnly);
 			}
 		}
 	}
 }
 
-void FDisplayClusterClusterManager::SendClusterEventTo(const FString& Address, const int32 Port, const FDisplayClusterClusterEventBinary& Event, bool bMasterOnly)
+void FDisplayClusterClusterManager::SendClusterEventTo(const FString& Address, const uint16 Port, const FDisplayClusterClusterEventBinary& Event, bool bMasterOnly)
 {
 	if (CurrentOperationMode == EDisplayClusterOperationMode::Cluster || CurrentOperationMode == EDisplayClusterOperationMode::Editor)
 	{
@@ -451,6 +456,7 @@ void FDisplayClusterClusterManager::SendClusterEventTo(const FString& Address, c
 		{
 			if (IsMaster() || !bMasterOnly)
 			{
+				UE_LOG(LogDisplayClusterCluster, Verbose, TEXT("BIN event emission request: recipient=%s:%u, event=%d"), *Address, Port, Event.EventId);
 				ClusterNodeCtrl->SendClusterEventTo(Address, Port, Event, bMasterOnly);
 			}
 		}
@@ -642,7 +648,7 @@ void FDisplayClusterClusterManager::SyncEvents()
 {
 	if (ClusterNodeCtrl)
 	{
-		TArray<TSharedPtr<FDisplayClusterClusterEventJson, ESPMode::ThreadSafe>> JsonEvents;
+		TArray<TSharedPtr<FDisplayClusterClusterEventJson,   ESPMode::ThreadSafe>> JsonEvents;
 		TArray<TSharedPtr<FDisplayClusterClusterEventBinary, ESPMode::ThreadSafe>> BinaryEvents;
 
 		// Get events data from a provider
@@ -672,14 +678,14 @@ void FDisplayClusterClusterManager::ExportEventsData(TArray<TSharedPtr<FDisplayC
 			{
 				TArray<TSharedPtr<FDisplayClusterClusterEventJson, ESPMode::ThreadSafe>> JsonEventsToExport;
 				It.Value.GenerateValueArray(JsonEventsToExport);
-				OutJsonEvents.Append(MoveTemp(JsonEventsToExport));
+				JsonEventsCache.Append(MoveTemp(JsonEventsToExport));
 			}
 
 			// Clear original containers
 			ClusterEventsJson.Reset();
 
 			// Export all json events that don't have 'discard on repeat' flag
-			OutJsonEvents.Append(MoveTemp(ClusterEventsJsonNonDiscarded));
+			JsonEventsCache.Append(MoveTemp(ClusterEventsJsonNonDiscarded));
 		}
 
 		// Export binary events
@@ -691,14 +697,14 @@ void FDisplayClusterClusterManager::ExportEventsData(TArray<TSharedPtr<FDisplayC
 			{
 				TArray<TSharedPtr<FDisplayClusterClusterEventBinary, ESPMode::ThreadSafe>> BinaryEventsToExport;
 				It.Value.GenerateValueArray(BinaryEventsToExport);
-				OutBinaryEvents.Append(MoveTemp(BinaryEventsToExport));
+				BinaryEventsCache.Append(MoveTemp(BinaryEventsToExport));
 			}
 
 			// Clear original containers
 			ClusterEventsBinary.Reset();
 
 			// Export all binary events that don't have 'discard on repeat' flag
-			OutBinaryEvents.Append(MoveTemp(ClusterEventsBinaryNonDiscarded));
+			BinaryEventsCache.Append(MoveTemp(ClusterEventsBinaryNonDiscarded));
 		}
 
 		UE_LOG(LogDisplayClusterCluster, Verbose, TEXT("Cluster events data cache contains: json=%d, binary=%d"), JsonEventsCache.Num(), BinaryEventsCache.Num());

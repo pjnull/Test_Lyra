@@ -83,8 +83,8 @@ public:
 	virtual void EmitClusterEventBinary(const FDisplayClusterClusterEventBinary& Event, bool bMasterOnly) = 0;
 
 	/** Sends JSON cluster event to a specific target (outside of the cluster). */
-	virtual void SendClusterEventTo(const FString& Address, const int32 Port, const FDisplayClusterClusterEventJson& Event, bool bMasterOnly) = 0;
+	virtual void SendClusterEventTo(const FString& Address, const uint16 Port, const FDisplayClusterClusterEventJson& Event, bool bMasterOnly) = 0;
 
 	/** Sends binary cluster event to a specific target (outside of the cluster). */
-	virtual void SendClusterEventTo(const FString& Address, const int32 Port, const FDisplayClusterClusterEventBinary& Event, bool bMasterOnly) = 0;
+	virtual void SendClusterEventTo(const FString& Address, const uint16 Port, const FDisplayClusterClusterEventBinary& Event, bool bMasterOnly) = 0;
 };
