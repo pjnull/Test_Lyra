@@ -6010,14 +6010,19 @@ void FBlueprintGlobalOptionsDetails::CustomizeDetails(IDetailLayoutBuilder& Deta
 		]
 		.ValueContent()
 		[
-			SAssignNew(ParentClassComboButton, SComboButton)
-			.IsEnabled(this, &FBlueprintGlobalOptionsDetails::CanReparent)
-			.OnGetMenuContent(this, &FBlueprintGlobalOptionsDetails::GetParentClassMenuContent)
-			.ButtonContent()
+			SNew(SHorizontalBox)
+			+SHorizontalBox::Slot()
+			.FillWidth(1.0f)
 			[
-				SNew(STextBlock)
-				.Text(this, &FBlueprintGlobalOptionsDetails::GetParentClassName)
-				.Font(IDetailLayoutBuilder::GetDetailFont())
+				SAssignNew(ParentClassComboButton, SComboButton)
+				.IsEnabled(this, &FBlueprintGlobalOptionsDetails::CanReparent)
+				.OnGetMenuContent(this, &FBlueprintGlobalOptionsDetails::GetParentClassMenuContent)
+				.ButtonContent()
+				[
+					SNew(STextBlock)
+					.Text(this, &FBlueprintGlobalOptionsDetails::GetParentClassName)
+					.Font(IDetailLayoutBuilder::GetDetailFont())
+				]
 			]
 		];
 		
