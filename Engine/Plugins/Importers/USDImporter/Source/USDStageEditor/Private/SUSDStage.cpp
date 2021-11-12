@@ -756,7 +756,7 @@ void SUsdStage::FillRenderContextSubMenu( FMenuBuilder& MenuBuilder )
 
 void SUsdStage::FillCollapsingSubMenu( FMenuBuilder& MenuBuilder )
 {
-	auto AddKindToCollapseEntry = [&](const EUsdDefaultKind Kind, const FText& Text)
+	auto AddKindToCollapseEntry = [&]( const EUsdDefaultKind Kind, const FText& Text, FCanExecuteAction CanExecuteAction )
 	{
 		MenuBuilder.AddMenuEntry(
 			Text,
@@ -777,10 +777,7 @@ void SUsdStage::FillCollapsingSubMenu( FMenuBuilder& MenuBuilder )
 						StageActor->SetKindsToCollapse( NewKindsToCollapse );
 					}
 				}),
-				FCanExecuteAction::CreateLambda( [this]()
-				{
-					return ViewModel.UsdStageActor.Get() != nullptr;
-				}),
+				CanExecuteAction,
 				FIsActionChecked::CreateLambda( [this, Kind]()
 				{
 					if ( AUsdStageActor* StageActor = ViewModel.UsdStageActor.Get() )
@@ -795,11 +792,75 @@ void SUsdStage::FillCollapsingSubMenu( FMenuBuilder& MenuBuilder )
 		);
 	};
 
-	AddKindToCollapseEntry( EUsdDefaultKind::Model, LOCTEXT( "ModelKind", "Model" ) );
-	AddKindToCollapseEntry( EUsdDefaultKind::Component, LOCTEXT( "ModelComponent", "Component" ) );
-	AddKindToCollapseEntry( EUsdDefaultKind::Group, LOCTEXT( "ModelGroup", "Group" ) );
-	AddKindToCollapseEntry( EUsdDefaultKind::Assembly, LOCTEXT( "ModelAssembly", "Assembly" ) );
-	AddKindToCollapseEntry( EUsdDefaultKind::Subcomponent, LOCTEXT( "ModelSubcomponent", "Subcomponent" ) );
+	AddKindToCollapseEntry(
+		EUsdDefaultKind::Model,
+		LOCTEXT( "ModelKind", "Model" ),
+		FCanExecuteAction::CreateLambda( [this]()
+		{
+			return ViewModel.UsdStageActor.Get() != nullptr;
+		})
+	);
+
+	AddKindToCollapseEntry(
+		EUsdDefaultKind::Component,
+		LOCTEXT( "ModelComponent", "   Component" ),
+		FCanExecuteAction::CreateLambda( [this]()
+		{
+			if ( AUsdStageActor* StageActor = ViewModel.UsdStageActor.Get() )
+			{
+				// If we're collapsing all "model" kinds, the all "component"s should be collapsed anyway
+				if ( !EnumHasAnyFlags( ( EUsdDefaultKind ) StageActor->KindsToCollapse, EUsdDefaultKind::Model ) )
+				{
+					return true;
+				}
+			}
+
+			return false;
+		})
+	);
+
+	AddKindToCollapseEntry(
+		EUsdDefaultKind::Group,
+		LOCTEXT( "ModelGroup", "   Group" ),
+		FCanExecuteAction::CreateLambda( [this]()
+		{
+			if ( AUsdStageActor* StageActor = ViewModel.UsdStageActor.Get() )
+			{
+				if ( !EnumHasAnyFlags( ( EUsdDefaultKind ) StageActor->KindsToCollapse, EUsdDefaultKind::Model ) )
+				{
+					return true;
+				}
+			}
+
+			return false;
+		})
+	);
+
+	AddKindToCollapseEntry(
+		EUsdDefaultKind::Assembly,
+		LOCTEXT( "ModelAssembly", "      Assembly" ),
+		FCanExecuteAction::CreateLambda( [this]()
+		{
+			if ( AUsdStageActor* StageActor = ViewModel.UsdStageActor.Get() )
+			{
+				if ( !EnumHasAnyFlags( ( EUsdDefaultKind ) StageActor->KindsToCollapse, EUsdDefaultKind::Model ) && !EnumHasAnyFlags( ( EUsdDefaultKind ) StageActor->KindsToCollapse, EUsdDefaultKind::Group ) )
+				{
+					return true;
+				}
+			}
+
+			return false;
+		})
+	);
+
+	AddKindToCollapseEntry(
+		EUsdDefaultKind::Subcomponent,
+		LOCTEXT( "ModelSubcomponent", "Subcomponent" ),
+		FCanExecuteAction::CreateLambda( [this]()
+		{
+			return ViewModel.UsdStageActor.Get() != nullptr;
+		})
+	);
 }
 
 void SUsdStage::FillSelectionSubMenu( FMenuBuilder& MenuBuilder )

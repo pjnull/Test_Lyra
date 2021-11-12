@@ -1254,7 +1254,22 @@ void AUsdStageActor::SetKindsToCollapse( int32 NewKindsToCollapse )
 {
 	Modify();
 
-	KindsToCollapse = NewKindsToCollapse;
+	const EUsdDefaultKind NewEnum = ( EUsdDefaultKind ) NewKindsToCollapse;
+	EUsdDefaultKind Result = NewEnum;
+
+	// If we're collapsing all 'model's, then we must collapse all of its derived kinds
+	if ( EnumHasAnyFlags( NewEnum, EUsdDefaultKind::Model ) )
+	{
+		Result |= ( EUsdDefaultKind::Component | EUsdDefaultKind::Group | EUsdDefaultKind::Assembly );
+	}
+
+	// If we're collapsing all 'group's, then we must collapse all of its derived kinds
+	if ( EnumHasAnyFlags( NewEnum, EUsdDefaultKind::Group ) )
+	{
+		Result |= ( EUsdDefaultKind::Assembly );
+	}
+
+	KindsToCollapse = ( int32 ) Result;
 	LoadUsdStage();
 }
 
