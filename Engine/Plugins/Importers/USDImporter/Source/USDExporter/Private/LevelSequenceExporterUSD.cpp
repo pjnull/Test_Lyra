@@ -821,7 +821,7 @@ bool ULevelSequenceExporterUsd::ExportBinary( UObject* Object, const TCHAR* Type
 			FString Filename;
 			FString Extension;
 			FPaths::Split( TargetFileName, Directory, Filename, Extension );
-			Context.LevelFilePath = FPaths::Combine( Directory, FString::Printf( TEXT( "%s.%s" ), *GWorld->GetFName().ToString(), *Extension ) );
+			Context.LevelFilePath = FPaths::Combine( Directory, FString::Printf( TEXT( "%s.%s" ), *WorldToExport->GetFName().ToString(), *Extension ) );
 
 			Context.UsedFilePaths.Add( Context.LevelFilePath );
 
