@@ -429,7 +429,8 @@ void BeginInitGameTextLocalization()
 		FTextLocalizationManager::Get().LoadLocalizationResourcesForCulture(FInternationalization::Get().GetCurrentLanguage()->GetName(), LocLoadFlags);
 		FTextLocalizationManager::Get().InitializedFlags = (InitializedFlags & ~ETextLocalizationManagerInitializedFlags::Initializing) | ETextLocalizationManagerInitializedFlags::Game;
 		//FTextLocalizationManager::Get().DumpMemoryInfo();
-		FTextLocalizationManager::Get().CompactDataStructures();
+		//Worse when Compacting because we remove growth space and force new growth space to be reallocated the next time an entry is added which is going to be bigger than what we removed anyway...
+		//FTextLocalizationManager::Get().CompactDataStructures();
 		//FTextLocalizationManager::Get().DumpMemoryInfo();
 	};
 	if (FTaskGraphInterface::IsRunning())
@@ -492,6 +493,9 @@ void FTextLocalizationManager::DumpMemoryInfo()
 
 void FTextLocalizationManager::CompactDataStructures()
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(FTextLocalizationManager::CompactDataStructures);
+	LLM_SCOPE(ELLMTag::Localization);
+
 	FScopeLock ScopeLock(&SynchronizationObject);
 	double StartTime = FPlatformTime::Seconds();
 	DisplayStringLookupTable.Shrink();
@@ -656,6 +660,9 @@ FTextDisplayStringPtr FTextLocalizationManager::FindDisplayString(const FTextKey
 
 FTextDisplayStringRef FTextLocalizationManager::GetDisplayString(const FTextKey& Namespace, const FTextKey& Key, const FString* const SourceString)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(FTextLocalizationManager::GetDisplayString);
+	LLM_SCOPE(ELLMTag::Localization);
+
 	FScopeLock ScopeLock( &SynchronizationObject );
 
 	// Hack fix for old assets that don't have namespace/key info.
@@ -744,6 +751,8 @@ FTextDisplayStringRef FTextLocalizationManager::GetDisplayString(const FTextKey&
 	// Entry is absent, but has a related entry to clone.
 	else if (DisplayLiveEntry)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(FTextLocalizationManager::GetDisplayString_AddRelatedEntry);
+
 		check(!SourceString || DisplayLiveEntry->SourceStringHash == SourceStringHash);
 		check(DisplayString && &DisplayLiveEntry->DisplayString.Get() == DisplayString);
 
@@ -759,6 +768,8 @@ FTextDisplayStringRef FTextLocalizationManager::GetDisplayString(const FTextKey&
 	// Entry is absent.
 	else
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(FTextLocalizationManager::GetDisplayString_AddNewEntry);
+
 		// Don't log warnings about unlocalized strings if the system hasn't been initialized - we simply don't have localization data yet.
 		if (IsInitialized())
 		{
@@ -858,6 +869,9 @@ uint16 FTextLocalizationManager::GetLocalRevisionForDisplayString(const FTextDis
 
 bool FTextLocalizationManager::AddDisplayString(const FTextDisplayStringRef& DisplayString, const FTextKey& Namespace, const FTextKey& Key)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(FTextLocalizationManager::AddDisplayString);
+	LLM_SCOPE(ELLMTag::Localization);
+
 	FScopeLock ScopeLock( &SynchronizationObject );
 
 	const FTextId TextId(Namespace, Key);
@@ -882,6 +896,9 @@ bool FTextLocalizationManager::AddDisplayString(const FTextDisplayStringRef& Dis
 
 bool FTextLocalizationManager::UpdateDisplayString(const FTextDisplayStringRef& DisplayString, const FString& Value, const FTextKey& Namespace, const FTextKey& Key)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(FTextLocalizationManager::UpdateDisplayString);
+	LLM_SCOPE(ELLMTag::Localization);
+
 	FScopeLock ScopeLock( &SynchronizationObject );
 
 	// Get entry from reverse live table. Contains current namespace and key values.
@@ -1198,6 +1215,9 @@ void FTextLocalizationManager::LoadLocalizationResourcesForPrioritizedCultures(T
 
 void FTextLocalizationManager::UpdateFromNative(FTextLocalizationResource&& TextLocalizationResource, const bool bDirtyTextRevision)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(FTextLocalizationManager::UpdateFromNative);
+	LLM_SCOPE(ELLMTag::Localization);
+
 	// Lock while updating the tables
 	{
 		FScopeLock ScopeLock(&SynchronizationObject);
@@ -1309,6 +1329,9 @@ void FTextLocalizationManager::UpdateFromNative(FTextLocalizationResource&& Text
 
 void FTextLocalizationManager::UpdateFromLocalizations(FTextLocalizationResource&& TextLocalizationResource, const bool bDirtyTextRevision)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(FTextLocalizationManager::UpdateFromLocalizations);
+	LLM_SCOPE(ELLMTag::Localization);
+
 	static const bool bShouldLEETIFYUnlocalizedString = FParse::Param(FCommandLine::Get(), TEXT("LEETIFYUnlocalized"));
 
 	// Lock while updating the tables
@@ -1425,6 +1448,9 @@ void FTextLocalizationManager::UpdateFromLocalizations(FTextLocalizationResource
 
 void FTextLocalizationManager::DirtyLocalRevisionForDisplayString(const FTextDisplayStringRef& InDisplayString)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(FTextLocalizationManager::DirtyLocalRevisionForDisplayString);
+	LLM_SCOPE(ELLMTag::Localization);
+
 	FScopeLock ScopeLock(&SynchronizationObject);
 
 	uint16* FoundLocalRevision = LocalTextRevisions.Find(InDisplayString);
@@ -1440,6 +1466,9 @@ void FTextLocalizationManager::DirtyLocalRevisionForDisplayString(const FTextDis
 
 void FTextLocalizationManager::DirtyTextRevision()
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(FTextLocalizationManager::DirtyTextRevision);
+	LLM_SCOPE(ELLMTag::Localization);
+
 	// Lock while updating the data
 	{
 		FScopeLock ScopeLock(&SynchronizationObject);
