@@ -2088,7 +2088,11 @@ public:
 
 	IIoStoreWriteRequest* Read(const FContainerTargetFile& InTargetFile)
 	{
-		if (PackageStore->HasDataSource())
+		if (InTargetFile.SourceBuffer.IsSet())
+		{
+			return new FInMemoryWriteRequest(*this, InTargetFile);
+		}
+		else if (PackageStore->HasDataSource())
 		{
 			return new FCookedPackageStoreWriteRequest(*this, InTargetFile);
 		}
@@ -2166,6 +2170,20 @@ private:
 		FIoBuffer SourceBuffer;
 		bool bHasUpdatedExportBundleRegions = false;
 		FQueueEntry* QueueEntry = nullptr;
+	};
+
+	class FInMemoryWriteRequest
+		: public FWriteContainerTargetFileRequest
+	{
+	public:
+		FInMemoryWriteRequest(FIoStoreWriteRequestManager& InManager, const FContainerTargetFile& InTargetFile)
+			: FWriteContainerTargetFileRequest(InManager, InTargetFile) { }
+
+		virtual void LoadSourceBufferAsync() override
+		{
+			SourceBuffer = TargetFile.SourceBuffer.GetValue();
+			OnSourceBufferLoaded();
+		}
 	};
 
 	// Used when staging from cooked files
@@ -2514,14 +2532,7 @@ int32 CreateTarget(const FIoStoreArguments& Arguments, const FIoStoreWriterSetti
 					WriteOptions.bForceUncompressed = TargetFile.bForceUncompressed;
 					WriteOptions.bIsMemoryMapped = TargetFile.ChunkType == EContainerChunkType::MemoryMappedBulkData;
 					WriteOptions.FileName = TargetFile.DestinationPath;
-					if (TargetFile.SourceBuffer.IsSet())
-					{
-						ContainerTarget->IoStoreWriter->Append(TargetFile.ChunkId, *TargetFile.SourceBuffer, WriteOptions, TargetFile.IdealOrder);
-					}
-					else
-					{
-						ContainerTarget->IoStoreWriter->Append(TargetFile.ChunkId, WriteRequestManager.Read(TargetFile), WriteOptions);
-					}
+					ContainerTarget->IoStoreWriter->Append(TargetFile.ChunkId, WriteRequestManager.Read(TargetFile), WriteOptions);
 				}
 			}
 		}
@@ -2569,14 +2580,7 @@ int32 CreateTarget(const FIoStoreArguments& Arguments, const FIoStoreWriterSetti
 					WriteOptions.DebugName = *TargetFile.DestinationPath;
 					WriteOptions.bForceUncompressed = TargetFile.bForceUncompressed;
 					WriteOptions.FileName = TargetFile.DestinationPath;
-					if (TargetFile.SourceBuffer.IsSet())
-					{
-						ContainerTarget->IoStoreWriter->Append(TargetFile.ChunkId, *TargetFile.SourceBuffer, WriteOptions, TargetFile.IdealOrder);
-					}
-					else
-					{
-						ContainerTarget->IoStoreWriter->Append(TargetFile.ChunkId, WriteRequestManager.Read(TargetFile), WriteOptions);
-					}
+					ContainerTarget->IoStoreWriter->Append(TargetFile.ChunkId, WriteRequestManager.Read(TargetFile), WriteOptions);
 					PackageStoreEntries.Add(PackageStoreOptimizer.CreatePackageStoreEntry(TargetFile.Package->OptimizedPackage));
 				}
 			}
