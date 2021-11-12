@@ -67,6 +67,7 @@ namespace
 	static const FName NAME_EditInline(TEXT("EditInline"));
 	static const FName NAME_IncludePath(TEXT("IncludePath"));
 	static const FName NAME_ModuleRelativePath(TEXT("ModuleRelativePath"));
+	static const FName NAME_IsBlueprintBase(TEXT("IsBlueprintBase"));
 	static const FName NAME_CannotImplementInterfaceInBlueprint(TEXT("CannotImplementInterfaceInBlueprint"));
 	static const FName NAME_UIMin(TEXT("UIMin"));
 	static const FName NAME_UIMax(TEXT("UIMax"));
@@ -6428,25 +6429,37 @@ FUnrealFunctionDefinitionInfo& FHeaderParser::CompileFunctionDeclaration()
 	// Verify interfaces with respect to their blueprint accessible functions
 	if (OuterClassDef.HasAnyClassFlags(CLASS_Interface))
 	{
+		// Interface with blueprint data should declare explicitly Blueprintable or NotBlueprintable to be clear
+		// In the backward compatible case where they declare neither, both of these bools are false
+		const bool bCanImplementInBlueprints = OuterClassDef.GetBoolMetaData(NAME_IsBlueprintBase);
+		const bool bCannotImplementInBlueprints = (!bCanImplementInBlueprints && OuterClassDef.HasMetaData(NAME_IsBlueprintBase))
+			|| OuterClassDef.HasMetaData(NAME_CannotImplementInterfaceInBlueprint);
+
 		if((FuncInfo.FunctionFlags & FUNC_BlueprintEvent) != 0 && !bInternalOnly)
 		{
-			const bool bCanImplementInBlueprints = !OuterClassDef.HasMetaData(NAME_CannotImplementInterfaceInBlueprint);  //FBlueprintMetadata::MD_CannotImplementInterfaceInBlueprint
-
 			// Ensure that blueprint events are only allowed in implementable interfaces. Internal only functions allowed
+			if (bCannotImplementInBlueprints)
+			{
+				LogError(TEXT("Interfaces that are not implementable in blueprints cannot have Blueprint Event members."));
+			}
 			if (!bCanImplementInBlueprints)
 			{
-				LogError(TEXT("Interfaces that are not implementable in blueprints cannot have BlueprintImplementableEvent members."));
+				// We do not currently warn about this case as there are a large number of existing interfaces that do not specify
+				// LogWarning(TEXT("Interfaces with Blueprint Events should declare Blueprintable on the interface."));
 			}
 		}
 		
 		if (((FuncInfo.FunctionFlags & FUNC_BlueprintCallable) != 0) && (((~FuncInfo.FunctionFlags) & FUNC_BlueprintEvent) != 0))
 		{
-			const bool bCanImplementInBlueprints = !OuterClassDef.HasMetaData(NAME_CannotImplementInterfaceInBlueprint);  //FBlueprintMetadata::MD_CannotImplementInterfaceInBlueprint
-
 			// Ensure that if this interface contains blueprint callable functions that are not blueprint defined, that it must be implemented natively
 			if (bCanImplementInBlueprints)
 			{
-				LogError(TEXT("Blueprint implementable interfaces cannot contain BlueprintCallable functions that are not BlueprintImplementableEvents.  Use CannotImplementInterfaceInBlueprint on the interface if you wish to keep this function."));
+				LogError(TEXT("Blueprint implementable interfaces cannot contain BlueprintCallable functions that are not BlueprintImplementableEvents. Add NotBlueprintable to the interface if you wish to keep this function."));
+			}
+			if (!bCannotImplementInBlueprints)
+			{
+				// Lowered this case to a warning instead of error, they will not show up as blueprintable unless they also have events
+				LogWarning(TEXT("Interfaces with BlueprintCallable functions but no events should explicitly declare NotBlueprintable on the interface."));
 			}
 		}
 	}

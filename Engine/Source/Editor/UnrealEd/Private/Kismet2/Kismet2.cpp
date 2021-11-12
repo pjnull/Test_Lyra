@@ -2623,21 +2623,47 @@ bool FKismetEditorUtilities::PropertyHasBoundEvents(const UBlueprint* Blueprint,
 
 bool FKismetEditorUtilities::IsClassABlueprintInterface(const UClass* Class)
 {
-	if (Class->HasAnyClassFlags(CLASS_Interface) && !Class->HasAnyClassFlags(CLASS_NewerVersionExists))
+	if (!Class->HasAnyClassFlags(CLASS_Interface) || Class->HasAnyClassFlags(CLASS_NewerVersionExists))
 	{
-		return true;
+		return false;
 	}
+	
+	// First check explicit tags
+	if (Class->HasMetaData(FBlueprintMetadata::MD_CannotImplementInterfaceInBlueprint))
+	{
+		return false;
+	}
+	if (Class->HasMetaDataHierarchical(FBlueprintMetadata::MD_IsBlueprintBase))
+	{
+		if (Class->GetBoolMetaDataHierarchical(FBlueprintMetadata::MD_IsBlueprintBase))
+		{
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
+	
+	// Unclear, treat it as blueprintable if it has any events as the header parser would complain if they were the wrong type
+	for (TFieldIterator<UFunction> FuncIt(Class, EFieldIteratorFlags::IncludeSuper); FuncIt; ++FuncIt)
+	{
+		UFunction* Function = *FuncIt;
+		if (Function->HasAnyFunctionFlags(FUNC_BlueprintEvent))
+		{
+			return true;
+		}
+	}
+
 	return false;
 }
-
-
 
 bool FKismetEditorUtilities::CanBlueprintImplementInterface(UBlueprint const* Blueprint, UClass const* Class)
 {
 	bool bCanImplementInterface = false;
 
 	// if the class is an actual implementable interface
-	if (IsClassABlueprintInterface(Class) && !Class->HasMetaData(FBlueprintMetadata::MD_CannotImplementInterfaceInBlueprint))
+	if (IsClassABlueprintInterface(Class))
 	{
 		bCanImplementInterface = true;
 

@@ -858,6 +858,12 @@ UEdGraphPin* FKismetCompilerUtilities::GenerateAssignmentNodes(class FKismetComp
 					}
 					else
 					{
+						// For interface pins we need to copy over the subcategory
+						if (OrgPin->PinType.PinCategory == UEdGraphSchema_K2::PC_Interface)
+						{
+							ValuePin->PinType.PinSubCategoryObject = OrgPin->PinType.PinSubCategoryObject;
+						}
+
 						CompilerContext.MovePinLinksToIntermediate(*OrgPin, *ValuePin);
 						SetVarNode->PinConnectionListChanged(ValuePin);
 					}
