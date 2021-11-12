@@ -86,7 +86,7 @@ FReply SConsoleVariablesEditorMainPanel::HandleConsoleInputTextCommitted(const F
 		}
 		else
 		{
-			UE_LOG(LogConsoleVariablesEditor, Warning, TEXT("hs: Input %s is not a recognized console command."), __FUNCTION__, *CommandString);
+			UE_LOG(LogConsoleVariablesEditor, Warning, TEXT("%hs: Input %s is not a recognized console command."), __FUNCTION__, *CommandString);
 		}
 
 		ConsoleInputEditableTextBox->SetText(FText::GetEmpty());
