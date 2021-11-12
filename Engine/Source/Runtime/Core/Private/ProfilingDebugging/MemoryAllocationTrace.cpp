@@ -280,14 +280,14 @@ void FAllocationTrace::ReallocFree(void* Address, HeapId RootHeap)
 		case EMemoryTraceRootHeap::SystemMemory:
 		{
 			UE_TRACE_LOG(Memory, ReallocFreeSystem, MemAllocChannel)
-				<< ReallocFreeSystem.Address(Address);
+				<< ReallocFreeSystem.Address(uint64(Address));
 			break;
 		}
 
 		default:
 		{
 			UE_TRACE_LOG(Memory, ReallocFree, MemAllocChannel)
-				<< ReallocFree.Address(Address)
+				<< ReallocFree.Address(uint64(Address))
 				<< ReallocFree.RootHeap(uint8(RootHeap));
 			break;
 		}
