@@ -2267,7 +2267,14 @@ void FControlRigEditMode::ResetTransforms(bool bSelectionOnly)
 		TArray<FRigElementKey> ControlsToReset = SelectedRigElements;
 		if (!bSelectionOnly)
 		{
-			ControlsToReset = ControlRig->GetHierarchy()->GetAllKeys(true, ERigElementType::Control);
+			TArray<FRigControlElement*> Controls;
+			ControlRig->GetControlsInOrder(Controls);
+			ControlsToReset.SetNum(0);
+			for (const FRigControlElement* Control : Controls)
+			{
+				ControlsToReset.Add(Control->GetKey());
+
+			}
 		}
 		bool bHasNonDefaultParent = false;
 		TArray<FRigElementKey> Parents;
@@ -2337,18 +2344,21 @@ void FControlRigEditMode::ResetTransforms(bool bSelectionOnly)
 					++Index;
 				}
 			}
-			//set global transforms in this space
-			ControlRig->Evaluate_AnyThread();
-			Index = 0;
-			for (const FRigElementKey& ControlToReset : ControlsToReset)
-
+			//set global transforms in this space // do it twice since ControlsInOrder is not really always in order
+			for (int32 SetHack = 0; SetHack < 2; ++SetHack)
 			{
-				FRigControlElement* ControlElement = ControlRig->FindControl(ControlToReset.Name);
-				if (ControlElement && !ControlElement->Settings.bIsTransientControl)
+				ControlRig->Evaluate_AnyThread();
+				Index = 0;
+				for (const FRigElementKey& ControlToReset : ControlsToReset)
+
 				{
-					ControlRig->GetHierarchy()->SetGlobalTransform(ControlToReset,GlobalTransforms[Index]);
-					ControlRig->Evaluate_AnyThread();
-					++Index;
+					FRigControlElement* ControlElement = ControlRig->FindControl(ControlToReset.Name);
+					if (ControlElement && !ControlElement->Settings.bIsTransientControl)
+					{
+						ControlRig->GetHierarchy()->SetGlobalTransform(ControlToReset, GlobalTransforms[Index]);
+						ControlRig->Evaluate_AnyThread();
+						++Index;
+					}
 				}
 			}
 			//send notifies
