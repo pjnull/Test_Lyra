@@ -465,6 +465,7 @@ class DevicenDisplay(DeviceUnreal):
             #   Engine\Plugins\Runtime\nDisplay\Source\DisplayCluster\
             #   Private\Misc\DisplayClusterLog.cpp
             categories=[
+                'LogConcert',
                 'LogDisplayClusterEngine',
                 'LogDisplayClusterModule',
                 'LogDisplayClusterCluster',
@@ -475,7 +476,9 @@ class DevicenDisplay(DeviceUnreal):
                 'LogDisplayClusterRender',
                 'LogDisplayClusterRenderSync',
                 'LogDisplayClusterViewport',
-                'LogDisplayClusterBlueprint'
+                'LogDisplayClusterBlueprint',
+                'LogLiveLink',
+                'LogRemoteControl',
             ],
             tool_tip='Logging categories and verbosity levels'
         ),
