@@ -1726,7 +1726,7 @@ void FProjectedShadowInfo::AddSubjectPrimitive(FPrimitiveSceneInfo* PrimitiveSce
 		}
 
 		// Add translucent shadow casting primitives to SubjectTranslucentPrimitives
-		if (bTranslucentRelevance && bShadowRelevance)
+		if (bTranslucentShadow && bTranslucentRelevance && bShadowRelevance)
 		{
 			SubjectTranslucentPrimitives.Add(PrimitiveSceneInfo);
 		}
@@ -1941,7 +1941,7 @@ uint64 FProjectedShadowInfo::AddSubjectPrimitive_AnyThread(
 			}
 		}
 
-		if (bTranslucentRelevance)
+		if (bTranslucentShadow && bTranslucentRelevance)
 		{
 			Result.bTranslucentSubjectPrimitive = true;
 			++OutStats.NumTranslucentSubs;
