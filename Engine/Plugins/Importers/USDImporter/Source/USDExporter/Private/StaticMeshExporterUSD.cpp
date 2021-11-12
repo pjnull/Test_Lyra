@@ -78,7 +78,7 @@ UStaticMeshExporterUsd::UStaticMeshExporterUsd()
 		}
 
 		FormatExtension.Add( Extension );
-		FormatDescription.Add( TEXT( "USD file" ) );
+		FormatDescription.Add( TEXT( "Universal Scene Description file" ) );
 	}
 	SupportedClass = UStaticMesh::StaticClass();
 	bText = false;

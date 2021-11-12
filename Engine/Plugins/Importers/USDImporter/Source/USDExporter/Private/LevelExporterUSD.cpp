@@ -32,7 +32,7 @@ ULevelExporterUSD::ULevelExporterUSD()
 		}
 
 		FormatExtension.Add(Extension);
-		FormatDescription.Add(TEXT("USD file"));
+		FormatDescription.Add(TEXT("Universal Scene Description file"));
 	}
 	SupportedClass = UWorld::StaticClass();
 	bText = false;

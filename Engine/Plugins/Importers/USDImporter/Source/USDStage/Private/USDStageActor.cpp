@@ -673,7 +673,7 @@ AUsdStageActor::AUsdStageActor()
 				if ( SupportedExtensions.Num() > 0 )
 				{
 					FString JoinedExtensions = FString::Join( SupportedExtensions, TEXT( "; *." ) ); // Combine "usd" and "usda" into "usd; *.usda"
-					Property->SetMetaData( TEXT("FilePathFilter"), FString::Printf( TEXT( "usd files (*.%s)|*.%s" ), *JoinedExtensions, *JoinedExtensions ) );
+					Property->SetMetaData( TEXT("FilePathFilter"), FString::Printf( TEXT( "Universal Scene Description files|*.%s" ), *JoinedExtensions, *JoinedExtensions ) );
 				}
 				break;
 			}
