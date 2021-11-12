@@ -117,24 +117,24 @@ namespace Profiling
 
 	void CreateStats(const IVirtualizationBackend& Backend)
 	{
-		CacheStats.Add(Backend.GetDebugString());	
-		PushStats.Add(Backend.GetDebugString());
-		PullStats.Add(Backend.GetDebugString());
+		CacheStats.Add(Backend.GetDebugName());
+		PushStats.Add(Backend.GetDebugName());
+		PullStats.Add(Backend.GetDebugName());
 	}
 
 	FCookStats::CallStats& GetCacheStats(const IVirtualizationBackend& Backend)
 	{
-		return *CacheStats.Find(Backend.GetDebugString());
+		return *CacheStats.Find(Backend.GetDebugName());
 	}
 	
 	FCookStats::CallStats& GetPushStats(const IVirtualizationBackend& Backend)
 	{
-		return *PushStats.Find(Backend.GetDebugString());
+		return *PushStats.Find(Backend.GetDebugName());
 	}
 
 	FCookStats::CallStats& GetPullStats(const IVirtualizationBackend& Backend)
 	{
-		return *PullStats.Find(Backend.GetDebugString());
+		return *PullStats.Find(Backend.GetDebugName());
 	}
 
 	/** Returns true if we have gathered any profiling data at all */
@@ -244,7 +244,6 @@ FVirtualizationManager::FVirtualizationManager()
 	, MinPayloadLength(0)
 	, BackendGraphName(TEXT("ContentVirtualizationBackendGraph_None"))
 	, bForceSingleThreaded(false)
-	, bFailPayloadPullOperations(false)
 	, bValidateAfterPushOperation(false)
 {
 	UE_LOG(LogVirtualization, Log, TEXT("Virtualization manager created"));
@@ -266,6 +265,7 @@ FVirtualizationManager::FVirtualizationManager()
 	}
 
 	ApplySettingsFromCmdline();
+	ApplyDebugSettingsFromFromCmdline();
 
 	MountBackends();
 }
@@ -345,8 +345,8 @@ bool FVirtualizationManager::PushData(const FPayloadId& Id, const FCompressedBuf
 	{
 		const EPushResult Result = TryPushDataToBackend(*Backend, Id, Payload, PackageContext) ? EPushResult::Success : EPushResult::Failed;
 
-		UE_CLOG(Result != EPushResult::Failed, LogVirtualization, Verbose, TEXT("[%s] Pushed the payload '%s'"), *Backend->GetDebugString(), *Id.ToString());
-		UE_CLOG(Result == EPushResult::Failed, LogVirtualization, Error, TEXT("[%s] Failed to push the payload '%s'"), *Backend->GetDebugString(), *Id.ToString());
+		UE_CLOG(Result != EPushResult::Failed, LogVirtualization, Verbose, TEXT("[%s] Pushed the payload '%s'"), *Backend->GetDebugName(), *Id.ToString());
+		UE_CLOG(Result == EPushResult::Failed, LogVirtualization, Error, TEXT("[%s] Failed to push the payload '%s'"), *Backend->GetDebugName(), *Id.ToString());
 
 		if (Result == EPushResult::Failed)
 		{
@@ -358,8 +358,10 @@ bool FVirtualizationManager::PushData(const FPayloadId& Id, const FCompressedBuf
 		if (bValidateAfterPushOperation && Result != EPushResult::Failed && Backend->SupportsPullOperations())
 		{
 			FCompressedBuffer PulledPayload = PullDataFromBackend(*Backend, Id);
-			checkf(Payload.GetRawHash() == PulledPayload.GetRawHash(), TEXT("[%s] Failed to pull payload '%s' after it was pushed to backend"), 
-				*Backend->GetDebugString(), *Id.ToString());
+			checkf(	Payload.GetRawHash() == PulledPayload.GetRawHash(), 
+					TEXT("[%s] Failed to pull payload '%s' after it was pushed to backend"), 
+					*Backend->GetDebugName(), 
+					*Id.ToString());
 		}
 	}
 
@@ -385,12 +387,6 @@ FCompressedBuffer FVirtualizationManager::PullData(const FPayloadId& Id)
 	{
 		// TODO: See below, should errors here be fatal?
 		UE_LOG(LogVirtualization, Error, TEXT("Payload '%s' failed to be pulled as there are no backends mounted!'"), *Id.ToString());
-		return FCompressedBuffer();
-	}
-
-	if (bFailPayloadPullOperations)
-	{
-		UE_LOG(LogVirtualization, Error, TEXT("Payload '%s' failed to be pulled as the debug option 'FailPayloadPullOperations' is enabled!"), *Id.ToString());
 		return FCompressedBuffer();
 	}
 
@@ -548,13 +544,6 @@ void FVirtualizationManager::ApplyDebugSettingsFromConfigFiles(const FConfigFile
 		UE_LOG(LogVirtualization, Log, TEXT("\tForceSingleThreaded : %s"), bForceSingleThreaded ? TEXT("true") : TEXT("false"));
 	}
 
-	bool bFailPayloadPullOperationsFromIni = false;
-	if (PlatformEngineIni.GetBool(TEXT("Core.ContentVirtualizationDebugOptions"), TEXT("FailPayloadPullOperations"), bFailPayloadPullOperationsFromIni))
-	{
-		bFailPayloadPullOperations = bFailPayloadPullOperationsFromIni;
-		UE_LOG(LogVirtualization, Log, TEXT("\tFailPayloadPullOperations : %s"), bFailPayloadPullOperations ? TEXT("true") : TEXT("false"));
-	}
-
 	bool bValidateAfterPushOperationFromIni = false;
 	if (PlatformEngineIni.GetBool(TEXT("Core.ContentVirtualizationDebugOptions"), TEXT("ValidateAfterPushOperation"), bValidateAfterPushOperationFromIni))
 	{
@@ -565,8 +554,22 @@ void FVirtualizationManager::ApplyDebugSettingsFromConfigFiles(const FConfigFile
 	// Some debug options will cause intentional breaks or slow downs for testing purposes, if these are enabled then we should give warning/errors 
 	// so it is clear in the log that future failures are being caused by the given dev option.
 	UE_CLOG(bForceSingleThreaded, LogVirtualization, Warning, TEXT("ForceSingleThreaded is enabled, virtualization will run in single threaded mode and may be slower!"));
-	UE_CLOG(bFailPayloadPullOperations, LogVirtualization, Error, TEXT("FailPayloadPullOperations is enabled, all virtualization pull operations will fail!"));
 	UE_CLOG(bValidateAfterPushOperation, LogVirtualization, Error, TEXT("ValidateAfterPushOperation is enabled, each push will be followed by a pull to validate it!"));
+}
+
+void FVirtualizationManager::ApplyDebugSettingsFromFromCmdline()
+{
+	FString MissOptions;
+	if (FParse::Value(FCommandLine::Get(), TEXT("-VA-MissBackends="), MissOptions))
+	{
+		MissOptions.ParseIntoArray(BackendsToDisablePulls, TEXT("+"), true);
+
+		UE_LOG(LogVirtualization, Warning, TEXT("Cmdline has disabled payload pulling for the following backends:"));
+		for (const FString& Backend : BackendsToDisablePulls)
+		{
+			UE_LOG(LogVirtualization, Warning, TEXT("\t%s"), *Backend);
+		}
+	}
 }
 
 void FVirtualizationManager::MountBackends()
@@ -646,6 +649,11 @@ bool FVirtualizationManager::CreateBackend(const TCHAR* GraphName, const FString
 				return false;
 
 			}
+
+			if (BackendsToDisablePulls.Find(Backend->GetConfigName()) != INDEX_NONE  || BackendsToDisablePulls.Find(TEXT("All")) != INDEX_NONE)
+			{
+				Backend->DisablePullOperationSupport();
+			}
 			
 			if (Backend->Initialize(Cmdine))
 			{
@@ -674,7 +682,7 @@ bool FVirtualizationManager::CreateBackend(const TCHAR* GraphName, const FString
 
 void FVirtualizationManager::AddBackend(TUniquePtr<IVirtualizationBackend> Backend, FBackendArray& PushArray)
 {
-	checkf(!AllBackends.Contains(Backend), TEXT("Adding the same virtualization backend (%s) multiple times!"), *Backend->GetDebugString());
+	checkf(!AllBackends.Contains(Backend), TEXT("Adding the same virtualization backend (%s) multiple times!"), *Backend->GetDebugName());
 
 	// Move ownership of the backend to AllBackends
 	AllBackends.Add(MoveTemp(Backend));
@@ -694,7 +702,7 @@ void FVirtualizationManager::AddBackend(TUniquePtr<IVirtualizationBackend> Backe
 
 	COOK_STAT(Profiling::CreateStats(*BackendRef));
 
-	UE_LOG(LogVirtualization, Log, TEXT("Mounted backend: %s"), *BackendRef->GetDebugString());
+	UE_LOG(LogVirtualization, Log, TEXT("Mounted backend: %s"), *BackendRef->GetDebugName());
 }
 
 void FVirtualizationManager::CachePayload(const FPayloadId& Id, const FCompressedBuffer& Payload, const IVirtualizationBackend* BackendSource)
@@ -713,15 +721,17 @@ void FVirtualizationManager::CachePayload(const FPayloadId& Id, const FCompresse
 		UE_CLOG(	!bResult, LogVirtualization, Warning,
 					TEXT("Failed to cache payload '%s' to backend '%s'"),
 					*Id.ToString(),
-					*BackendToCache->GetDebugString());
+					*BackendToCache->GetDebugName());
 
 		// Debugging operation where we immediately try to pull the payload after each push (when possible) and assert 
 		// that the pulled payload is the same as the original
 		if (bValidateAfterPushOperation && bResult && BackendToCache->SupportsPullOperations())
 		{
 			FCompressedBuffer PulledPayload = PullDataFromBackend(*BackendToCache, Id);
-			checkf(Payload.GetRawHash() == PulledPayload.GetRawHash(), TEXT("[%s] Failed to pull payload '%s' after it was cached to backend"),
-				*BackendToCache->GetDebugString(), *Id.ToString());
+			checkf(	Payload.GetRawHash() == PulledPayload.GetRawHash(), 
+					TEXT("[%s] Failed to pull payload '%s' after it was cached to backend"),
+					*BackendToCache->GetDebugName(), 
+					*Id.ToString());
 		}
 	}
 }
