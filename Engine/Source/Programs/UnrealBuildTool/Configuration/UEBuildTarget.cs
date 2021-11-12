@@ -1783,7 +1783,7 @@ namespace UnrealBuildTool
 			{
 				using (Timeline.ScopeEvent("ExternalExecution.SetupVNIModules()"))
 				{
-					VNIExecution.SetupVNIModules(ModulesToGenerateHeadersFor, out Makefile.VNIModules);
+					VNIExecution.SetupVNIModules(ModulesToGenerateHeadersFor, RulesAssembly, out Makefile.VNIModules);
 				}
 			}
 
