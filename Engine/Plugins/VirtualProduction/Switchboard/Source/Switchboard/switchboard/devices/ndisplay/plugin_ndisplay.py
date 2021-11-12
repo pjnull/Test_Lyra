@@ -466,17 +466,14 @@ class DevicenDisplay(DeviceUnreal):
             #   Private\Misc\DisplayClusterLog.cpp
             categories=[
                 'LogConcert',
-                'LogDisplayClusterEngine',
-                'LogDisplayClusterModule',
                 'LogDisplayClusterCluster',
                 'LogDisplayClusterConfig',
+                'LogDisplayClusterEngine',
                 'LogDisplayClusterGame',
                 'LogDisplayClusterNetwork',
-                'LogDisplayClusterNetworkMsg',
                 'LogDisplayClusterRender',
                 'LogDisplayClusterRenderSync',
                 'LogDisplayClusterViewport',
-                'LogDisplayClusterBlueprint',
                 'LogLiveLink',
                 'LogRemoteControl',
             ],
