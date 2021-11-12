@@ -17,36 +17,16 @@ struct FSphericalPontoon
 	GENERATED_BODY()
 
 	/** The socket to center this pontoon on */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Buoyancy")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Buoyancy)
 	FName CenterSocket;
 
 	/** Relative Location of pontoon WRT parent actor. Overridden by Center Socket. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Buoyancy")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Buoyancy)
 	FVector RelativeLocation;
 
 	/** The radius of the pontoon */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Buoyancy")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Buoyancy)
 	float Radius;
-
-	/** How frequently pontoon scale radius ticks. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Buoyancy|Scaling")
-	float ScaleTimeFrequency = 0.5f;
-
-	/** How fast pontoon radius reduces per tick. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Buoyancy|Scaling")
-	float ScaleRadiusPerTick = 1.5f;
-
-	/** Radius required to sink the vehicle. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Buoyancy|Scaling")
-	float MinRadiusToSink = 25.0f;
-
-	/** Tracked scale time as we're scaling. */
-	UPROPERTY(Transient)
-	float ScaledTime = 0.0f;
-
-	/** Base radius before scaling. */
-	UPROPERTY(Transient)
-	float BaseRadiusBeforeScale = 60.0f;
 
 	UPROPERTY(BlueprintReadOnly, Category = Buoyancy)
 	FVector LocalForce;
