@@ -36,6 +36,7 @@ public class ConsoleVariablesEditor : ModuleRules
 				"SlateCore",
 				"ToolMenus",
 				"UnrealEd",
+				"WorkspaceMenuStructure"
 			}
 			);
 	}
