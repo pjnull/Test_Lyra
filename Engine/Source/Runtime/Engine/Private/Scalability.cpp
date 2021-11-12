@@ -135,8 +135,6 @@ static FQualityLevels GScalabilityBackupQualityLevels;
 static FQualityLevels GScalabilityQualityLevelsOverride;
 static bool GScalabilityUsingTemporaryQualityLevels = false;
 
-TUniquePtr<FQualityLevels> PreviousScalabilityLevels;
-
 // Select a the correct quality level for the given benchmark value and thresholds
 int32 ComputeOptionFromPerfIndex(const FString& GroupName, float CPUPerfIndex, float GPUPerfIndex)
 {
@@ -517,7 +515,7 @@ void InitScalabilitySystem()
 	CVarShadingQuality.AsVariable()->SetOnChangedCallback(FConsoleVariableDelegate::CreateStatic(&OnChangeShadingQuality));
 
 	// Set defaults
-	SetQualityLevels(FQualityLevels(), true);
+	SetQualityLevels(FQualityLevels());
 	GScalabilityBackupQualityLevels = FQualityLevels();
 	GScalabilityQualityLevelsOverride = FQualityLevels();
 	GScalabilityUsingTemporaryQualityLevels = false;
@@ -728,22 +726,16 @@ void SetQualityLevels(const FQualityLevels& QualityLevels, bool bForce/* = false
 	ClampedLevels.SetFoliageQuality(QualityLevels.FoliageQuality);
 	ClampedLevels.SetShadingQuality(QualityLevels.ShadingQuality);
 
-	FQualityLevels PreviousLevels;
-	if (PreviousScalabilityLevels.IsValid())
+	if (GScalabilityUsingTemporaryQualityLevels && !bForce)
 	{
-		PreviousLevels = *PreviousScalabilityLevels;
+		// When temporary scalability is active, non-temporary sets are
+		// applied to the backup levels so we can restore them later
+		GScalabilityBackupQualityLevels = ClampedLevels;
 	}
 
 	//Skip the broadcast and assignations if the levels were the same.
-	if (!PreviousScalabilityLevels.IsValid() || PreviousLevels != ClampedLevels || bForce)
+	if (GetQualityLevels() != ClampedLevels || bForce)
 	{
-		if (GScalabilityUsingTemporaryQualityLevels && !bForce)
-		{
-			// When temporary scalability is active, non-temporary sets are
-			// applied to the backup levels so we can restore them later
-			GScalabilityBackupQualityLevels = ClampedLevels;
-		}
-
 		SetQualityLevelCVar(CVarResolutionQuality, ClampedLevels.ResolutionQuality, GScalabilityQualityLevelsOverride.ResolutionQuality, bForce);
 		SetQualityLevelCVar(CVarViewDistanceQuality, ClampedLevels.ViewDistanceQuality, GScalabilityQualityLevelsOverride.ViewDistanceQuality, bForce);
 		SetQualityLevelCVar(CVarAntiAliasingQuality, ClampedLevels.AntiAliasingQuality, GScalabilityQualityLevelsOverride.AntiAliasingQuality, bForce);
@@ -754,12 +746,6 @@ void SetQualityLevels(const FQualityLevels& QualityLevels, bool bForce/* = false
 		SetQualityLevelCVar(CVarFoliageQuality, ClampedLevels.FoliageQuality, GScalabilityQualityLevelsOverride.FoliageQuality, bForce);
 		SetQualityLevelCVar(CVarShadingQuality, ClampedLevels.ShadingQuality, GScalabilityQualityLevelsOverride.ShadingQuality, bForce);
 
-		if (!PreviousScalabilityLevels.IsValid())
-		{
-			PreviousScalabilityLevels = MakeUnique<FQualityLevels>();
-		}
-
-		*PreviousScalabilityLevels = ClampedLevels;
 		OnScalabilitySettingsChanged.Broadcast(ClampedLevels);
 	}
 }
