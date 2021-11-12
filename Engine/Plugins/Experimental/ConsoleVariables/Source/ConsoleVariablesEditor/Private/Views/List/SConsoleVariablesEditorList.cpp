@@ -222,13 +222,19 @@ void SConsoleVariablesEditorList::GenerateTreeView(UConsoleVariablesAsset* InAss
 		
 		if (CommandInfo.IsValid())
 		{
-			CommandInfo.Pin()->ExecuteCommand(CommandAndValue.Value);
+			if (const TObjectPtr<IConsoleVariable> VariablePtr = CommandInfo.Pin()->ConsoleVariablePtr)
+			{
+				if (!VariablePtr->GetString().Equals(CommandAndValue.Value))
+				{
+					CommandInfo.Pin()->ExecuteCommand(CommandAndValue.Value);
+				}
 			
-			FConsoleVariablesEditorListRowPtr NewRow = 
-				MakeShared<FConsoleVariablesEditorListRow>(
-						CommandInfo.Pin(), CommandAndValue.Value, FConsoleVariablesEditorListRow::SingleCommand, 
-						ECheckBoxState::Checked, SharedThis(this), nullptr);
-			TreeViewRootObjects.Add(NewRow);
+				FConsoleVariablesEditorListRowPtr NewRow = 
+					MakeShared<FConsoleVariablesEditorListRow>(
+							CommandInfo.Pin(), CommandAndValue.Value, FConsoleVariablesEditorListRow::SingleCommand, 
+							ECheckBoxState::Checked, SharedThis(this), nullptr);
+				TreeViewRootObjects.Add(NewRow);
+			}
 		}
 	}
 
