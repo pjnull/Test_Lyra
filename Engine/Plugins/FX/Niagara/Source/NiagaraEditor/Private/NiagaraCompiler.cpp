@@ -939,15 +939,14 @@ TSharedPtr<FNiagaraCompileRequestDuplicateDataBase, ESPMode::ThreadSafe> FNiagar
 	UNiagaraScript* TargetScript,
 	FGuid TargetVersion)
 {
-	UPackage* LogPackage = nullptr;
-
+	FString LogName;
 	if (OwningSystem != nullptr)
 	{
-		LogPackage = OwningSystem->GetOutermost();
+		LogName = OwningSystem->GetOutermost() != nullptr ? OwningSystem->GetOutermost()->GetName() : OwningSystem->GetName();
 	}
 	else if (TargetScript != nullptr)
 	{
-		LogPackage = TargetScript->GetOutermost();
+		LogName = TargetScript->GetOutermost() != nullptr ? TargetScript->GetOutermost()->GetName() : TargetScript->GetName();
 	}
 	else
 	{
@@ -956,7 +955,7 @@ TSharedPtr<FNiagaraCompileRequestDuplicateDataBase, ESPMode::ThreadSafe> FNiagar
 	}
 
 	TRACE_CPUPROFILER_EVENT_SCOPE(NiagaraPrecompileDuplicate);
-	TRACE_CPUPROFILER_EVENT_SCOPE_TEXT_ON_CHANNEL(LogPackage ? *LogPackage->GetName() : *TargetScript->GetName(), NiagaraChannel);
+	TRACE_CPUPROFILER_EVENT_SCOPE_TEXT_ON_CHANNEL(*LogName, NiagaraChannel);
 
 	SCOPE_CYCLE_COUNTER(STAT_NiagaraEditor_ScriptSource_PreCompileDuplicate);
 	double StartTime = FPlatformTime::Seconds();
@@ -1035,7 +1034,7 @@ TSharedPtr<FNiagaraCompileRequestDuplicateDataBase, ESPMode::ThreadSafe> FNiagar
 		}
 	}
 
-	UE_LOG(LogNiagaraEditor, Verbose, TEXT("'%s' PrecompileDuplicate took %f sec."), *GetNameSafe(LogPackage),
+	UE_LOG(LogNiagaraEditor, Verbose, TEXT("'%s' PrecompileDuplicate took %f sec."), *LogName,
 		(float)(FPlatformTime::Seconds() - StartTime));
 
 	return BasePtr;
