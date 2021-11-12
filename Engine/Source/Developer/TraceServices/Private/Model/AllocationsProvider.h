@@ -45,7 +45,6 @@ private:
 	struct ThreadState
 	{
 		TArray<uint32> TagStack;
-		bool bReallocTagActive;
 	};
 
 	struct TagEntry
@@ -303,6 +302,7 @@ private:
 
 	FLiveAllocCollection* LiveAllocs[MaxRootHeaps];
 
+	uint64 MiscErrors = 0;
 	uint64 AllocErrors = 0;
 	uint64 FreeErrors = 0;
 

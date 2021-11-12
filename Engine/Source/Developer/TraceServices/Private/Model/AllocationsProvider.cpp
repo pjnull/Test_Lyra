@@ -146,6 +146,7 @@ void FTagTracker::PopTag(uint32 InThreadId, uint8 InTracker)
 	ThreadState* State = TrackerThreadStates.Find(TrackerThreadId);
 	if (ensure(State && !State->TagStack.IsEmpty()))
 	{
+		check((State->TagStack.Top() & 0x80000000) == 0);
 		State->TagStack.Pop();
 	}
 	else
@@ -168,7 +169,7 @@ uint32 FTagTracker::GetCurrentTag(uint32 InThreadId, uint8 InTracker) const
 	{
 		return 0; // Untagged
 	}
-	return State->TagStack.Top();
+	return State->TagStack.Top() & ~0x80000000;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -185,8 +186,7 @@ void FTagTracker::PushRealloc(uint32 InThreadId, uint8 InTracker, uint32 InTag)
 {
 	const uint32 TrackerThreadId = GetTrackerThreadId(InThreadId, InTracker);
 	ThreadState& State = TrackerThreadStates.FindOrAdd(TrackerThreadId);
-	State.TagStack.Push(InTag);
-	State.bReallocTagActive = true;
+	State.TagStack.Push(InTag | 0x80000000);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -195,10 +195,10 @@ void FTagTracker::PopRealloc(uint32 InThreadId, uint8 InTracker)
 {
 	const uint32 TrackerThreadId = GetTrackerThreadId(InThreadId, InTracker);
 	ThreadState* State = TrackerThreadStates.Find(TrackerThreadId);
-	if (ensure(State && !State->TagStack.IsEmpty() && State->bReallocTagActive))
+	if (ensure(State && !State->TagStack.IsEmpty()))
 	{
+		check((State->TagStack.Top() & 0x80000000) != 0);
 		State->TagStack.Pop();
-		State->bReallocTagActive = false;
 	}
 	else
 	{
@@ -216,7 +216,7 @@ bool FTagTracker::HasReallocScope(uint32 InThreadId, uint8 InTracker) const
 {
 	const uint32 TrackerThreadId = GetTrackerThreadId(InThreadId, InTracker);
 	const ThreadState* State = TrackerThreadStates.Find(TrackerThreadId);
-	return State && State->bReallocTagActive;
+	return State && State->TagStack.Num() > 0 && ((State->TagStack.Top() & 0x80000000) != 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -593,7 +593,7 @@ FAllocationItem* FLiveAllocCollection::FindParentHeap(uint64 Address)
 			return Alloc.Value;
 		}
 	}
-	
+
 #if INSIGHTS_USE_SHORT_LIVING_ALLOCS
 	FAllocationItem* FoundShortLivingAlloc = ShortLivingAllocs.FindRange(Address);
 	if (FoundShortLivingAlloc)
@@ -723,7 +723,6 @@ FAllocationsProvider::FAllocationsProvider(IAnalysisSession& InSession)
 	, AllocEventsTimeline(Session.GetLinearAllocator(), 1024)
 	, FreeEventsTimeline(Session.GetLinearAllocator(), 1024)
 {
-	
 	FMemory::Memset(EventIndex, 0, sizeof(EventIndex));
 	FMemory::Memset(SbTree, 0, sizeof(SbTree));
 	FMemory::Memset(LiveAllocs, 0, sizeof(LiveAllocs));
@@ -778,11 +777,20 @@ void FAllocationsProvider::AddHeapSpec(HeapId Id, HeapId ParentId, const FString
 {
 	if (Id < MaxRootHeaps)
 	{
-		check(Id==0 || (SbTree[Id] == nullptr && LiveAllocs[Id] == nullptr)); //Already announced
-		constexpr uint32 ColumnShift = 17; // 1<<17 = 128K
-		SbTree[Id] = new FSbTree(Session.GetLinearAllocator(), ColumnShift);
-		LiveAllocs[Id] = new FLiveAllocCollection();
-		
+		if (Id == 0 && SbTree[Id] != nullptr)
+		{
+			// "System" root heap is already created. See class constructor.
+			check(LiveAllocs[Id] != nullptr);
+		}
+		else
+		{
+			check(SbTree[Id] == nullptr && LiveAllocs[Id] == nullptr);
+
+			constexpr uint32 ColumnShift = 17; // 1<<17 = 128K
+			SbTree[Id] = new FSbTree(Session.GetLinearAllocator(), ColumnShift);
+			LiveAllocs[Id] = new FLiveAllocCollection();
+		}
+
 		FHeapSpec& RootHeapSpec = HeapSpecs[Id];
 		RootHeapSpec.Name = Session.StoreString(Name);
 		RootHeapSpec.Parent = nullptr;
@@ -794,7 +802,7 @@ void FAllocationsProvider::AddHeapSpec(HeapId Id, HeapId ParentId, const FString
 		FHeapSpec& ParentSpec = HeapSpecs[ParentId];
 		if (ParentSpec.Name == nullptr)
 		{
-			UE_LOG(LogTraceServices, Warning, TEXT("Parent heap id (%u) used before it was announced for heap %s."), ParentId, *FString(Name));
+			UE_LOG(LogTraceServices, Warning, TEXT("[MemAlloc] Parent heap id (%u) used before it was announced for heap %s."), ParentId, *FString(Name));
 		}
 		FHeapSpec& NewSpec = HeapSpecs[Id];
 		NewSpec.Name = Session.StoreString(Name);
@@ -828,20 +836,20 @@ void FAllocationsProvider::EditAlloc(double Time, uint64 Owner, uint64 Address, 
 
 	if (Address == 0)
 	{
+		UE_LOG(LogTraceServices, Warning, TEXT("[MemAlloc] Alloc at address 0 : Size=%llu, Time=%f"), Address, InSize, Time);
 		return;
 	}
 
 	check(RootHeap < MaxRootHeaps);
 	if (SbTree[RootHeap] == nullptr)
 	{
-		UE_LOG(LogTraceServices, Warning, TEXT("Invalid root heap id (%d). This heap has not yet been registered."), RootHeap);
-		return;	
+		UE_LOG(LogTraceServices, Warning, TEXT("[MemAlloc] Invalid root heap id (%d). This heap has not yet been registered."), RootHeap);
+		return;
 	}
-	
+
 	SbTree[RootHeap]->SetTimeForEvent(EventIndex[RootHeap], Time);
 
 	AdvanceTimelines(Time);
-
 
 	const uint32 Tag = TagTracker.GetCurrentTag(ThreadId, Tracker);
 
@@ -850,14 +858,14 @@ void FAllocationsProvider::EditAlloc(double Time, uint64 Owner, uint64 Address, 
 	{
 		if (GWatchAddresses[AddrIndex] == Address)
 		{
-			UE_LOG(LogTraceServices, Warning, TEXT("[MemAlloc] Alloc 0x%llX : Size=%llu, Tag=%u, Time=%f"), Address, Size, Tag, Time);
+			UE_LOG(LogTraceServices, Warning, TEXT("[MemAlloc] Alloc 0x%llX : Size=%llu, Tag=%u, Time=%f"), Address, InSize, Tag, Time);
 			break;
 		}
 	}
 #endif
 
 #if INSIGHTS_VALIDATE_ALLOC_EVENTS
-	FAllocationItem* AllocationPtr = LiveAllocs.FindRef(Address);
+	FAllocationItem* AllocationPtr = LiveAllocs[RootHeap]->FindRef(Address);
 #else
 	FAllocationItem* AllocationPtr = nullptr;
 #endif
@@ -886,7 +894,7 @@ void FAllocationsProvider::EditAlloc(double Time, uint64 Owner, uint64 Address, 
 		TotalAllocatedMemory += InSize;
 		++TotalLiveAllocations;
 		SampleMaxTotalAllocatedMemory = FMath::Max(SampleMaxTotalAllocatedMemory, TotalAllocatedMemory);
-		SampleMaxLiveAllocations = FMath::Max(SampleMaxLiveAllocations, TotalLiveAllocations); 
+		SampleMaxLiveAllocations = FMath::Max(SampleMaxLiveAllocations, TotalLiveAllocations);
 		++SampleAllocEvents;
 	}
 #if INSIGHTS_VALIDATE_ALLOC_EVENTS
@@ -895,7 +903,7 @@ void FAllocationsProvider::EditAlloc(double Time, uint64 Owner, uint64 Address, 
 		++AllocErrors;
 		if (AllocErrors <= MaxLogMessagesPerErrorType)
 		{
-			UE_LOG(LogTraceServices, Error, TEXT("[MemAlloc] Invalid ALLOC event (Address=0x%llX, Size=%llu, Tag=%u, Time=%f)!"), Address, Size, Tag, Time);
+			UE_LOG(LogTraceServices, Error, TEXT("[MemAlloc] Invalid ALLOC event (Address=0x%llX, Size=%llu, Tag=%u, Time=%f)!"), Address, InSize, Tag, Time);
 		}
 	}
 #endif
@@ -923,10 +931,10 @@ void FAllocationsProvider::EditFree(double Time, uint64 Address, HeapId RootHeap
 	check(RootHeap < MaxRootHeaps);
 	if (SbTree[RootHeap] == nullptr)
 	{
-		UE_LOG(LogTraceServices, Warning, TEXT("Invalid root heap id (%d). This heap has not yet been registered."), RootHeap);
-		return;	
+		UE_LOG(LogTraceServices, Warning, TEXT("[MemAlloc] Invalid root heap id (%d). This heap has not yet been registered."), RootHeap);
+		return;
 	}
-	
+
 	SbTree[RootHeap]->SetTimeForEvent(EventIndex[RootHeap], Time);
 
 	AdvanceTimelines(Time);
@@ -984,9 +992,9 @@ void FAllocationsProvider::EditFree(double Time, uint64 Address, HeapId RootHeap
 void FAllocationsProvider::EditUnmarkAllocationAsHeap(double Time, uint64 Address, HeapId Heap)
 {
 	Lock.WriteAccessCheck();
-	
+
 	HeapId RootHeap = FindRootHeap(Heap);
-	
+
 	// Find allocation in Live allocs and mark as a heap allocation
 	FAllocationItem* Alloc = LiveAllocs[RootHeap]->FindRef(Address);
 	if (!Alloc)
@@ -1014,9 +1022,9 @@ void FAllocationsProvider::EditUnmarkAllocationAsHeap(double Time, uint64 Addres
 void FAllocationsProvider::EditMarkAllocationAsHeap(double Time, uint64 Address, HeapId Heap, EMemoryTraceHeapAllocationFlags Flags)
 {
 	Lock.WriteAccessCheck();
-	
+
 	HeapId RootHeap = FindRootHeap(Heap);
-	
+
 	// Find allocation in Live allocs and mark as a heap allocation
 	FAllocationItem* Alloc = LiveAllocs[RootHeap]->FindRef(Address);
 	if (Alloc)
@@ -1140,13 +1148,22 @@ HeapId FAllocationsProvider::FindRootHeap(HeapId Heap) const
 void FAllocationsProvider::EditPushRealloc(uint32 ThreadId, uint8 Tracker, uint64 Ptr)
 {
 	EditAccessCheck();
-	// todo: Currently only system root heap is affected by reallocs so limit search
+
+	// Currently only system root heap is affected by reallocs, so limit search.
 	FLiveAllocCollection* Allocs = LiveAllocs[EMemoryTraceRootHeap::SystemMemory];
-	if (Allocs)
+	if (ensure(Allocs))
 	{
 		FAllocationItem* Alloc = Allocs->FindRef(Ptr);
 		const int32 Tag = Alloc ? Alloc->Tag : 0; // If ptr is not found use "Untagged"
 		TagTracker.PushRealloc(ThreadId, Tracker, Tag);
+	}
+	else
+	{
+		++MiscErrors;
+		if (MiscErrors <= MaxLogMessagesPerErrorType)
+		{
+			UE_LOG(LogTraceServices, Error, TEXT("[MemAlloc] Invalid Ptr for MemoryScopePtr event (Ptr=0x%llX)!"), Ptr);
+		}
 	}
 }
 
