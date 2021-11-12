@@ -76,11 +76,11 @@ public:
 
 	/** StartTimeCode to be used for all exported layers */
     UPROPERTY( EditAnywhere, config, BlueprintReadWrite, Category = "Stage options" )
-    float StartTimeCode;
+    float StartTimeCode = 0.0f;
 
 	/** EndTimeCode to be used for all exported layers */
     UPROPERTY( EditAnywhere, config, BlueprintReadWrite, Category = "Stage options" )
-    float EndTimeCode;
+    float EndTimeCode = 0.0f;
 
 	/** Inner struct that actually contains most of the export options */
     UPROPERTY( EditAnywhere, config, BlueprintReadWrite, Category = "Export settings", meta = ( ShowOnlyInnerProperties ) )
