@@ -5,6 +5,7 @@
 #include "PropertyAccess.h"
 
 #if WITH_EDITOR
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
 void UAnimClassData::CopyFrom(UAnimBlueprintGeneratedClass* AnimClass)
 {
 	check(AnimClass);
@@ -47,6 +48,7 @@ void UAnimClassData::CopyFrom(UAnimBlueprintGeneratedClass* AnimClass)
 	GraphNameAssetPlayers = AnimClass->GetGraphAssetPlayerInformation();
 	GraphBlendOptions = AnimClass->GetGraphBlendOptions();
 }
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 #endif // WITH_EDITOR
 
 TArrayView<const FAnimNodeData> UAnimClassData::GetNodeData() const
