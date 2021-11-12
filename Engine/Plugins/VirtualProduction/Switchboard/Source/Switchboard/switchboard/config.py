@@ -818,6 +818,9 @@ class LoggingModel(QtGui.QStandardItemModel):
         '''
         value = value or collections.OrderedDict()
 
+        # sort them by name to facilitate finding them
+        value = collections.OrderedDict(sorted(value.items(), key=lambda item: str(item[0]).lower()))
+
         self.beginResetModel()
 
         self.removeRows(0, self.rowCount())
