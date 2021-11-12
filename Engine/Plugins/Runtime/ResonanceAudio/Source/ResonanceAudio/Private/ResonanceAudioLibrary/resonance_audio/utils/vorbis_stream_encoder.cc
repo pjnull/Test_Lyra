@@ -19,8 +19,8 @@ limitations under the License.
 #define _SCL_SECURE_NO_WARNINGS
 #endif
 
-#if SUPPORTS_VORBIS
 #include "utils/vorbis_stream_encoder.h"
+#if SUPPORTS_VORBIS
 #include "vorbis/vorbisenc.h"
 #endif
 #include "base/audio_buffer.h"
