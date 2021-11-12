@@ -143,13 +143,7 @@ TSharedRef<SWidget> SConsoleVariablesEditorMainPanel::GeneratePanelToolbar(const
 						.Padding(0, 1, 0, 0)
 						[
 							SNew(STextBlock)
-							.Text_Lambda([this] ()
-							{
-								return MainPanel.Pin()->GetReferenceAssetOnDisk().IsValid() ? 
-									FText::Format(
-										LoadedPresetFormatText, 
-										FText::FromName(MainPanel.Pin()->GetReferenceAssetOnDisk()->GetFName())) : NoLoadedPresetText;
-							})
+							.Text(LOCTEXT("PresetsToolbarButton", "Presets"))
 						]
 					]
 				]
@@ -190,6 +184,18 @@ TSharedRef<SWidget> SConsoleVariablesEditorMainPanel::OnGeneratePresetsMenu()
 
 	IContentBrowserSingleton& ContentBrowser = FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser").Get();
 
+	const FText LoadedPresetName = MainPanel.Pin()->GetReferenceAssetOnDisk().IsValid() ?
+		FText::Format(LoadedPresetFormatText, FText::FromString(MainPanel.Pin()->GetReferenceAssetOnDisk()->GetName())) : NoLoadedPresetText;
+
+	MenuBuilder.AddMenuEntry(
+		LoadedPresetName,
+		LoadedPresetName,
+		FSlateIcon(),
+		FUIAction()
+	);
+
+	MenuBuilder.AddMenuSeparator();
+	
 	MenuBuilder.AddMenuEntry(
 		LOCTEXT("SavePreset_Text", "Save Preset"),
 		LOCTEXT("SavePreset_Tooltip", "Save the current preset if one has been loaded. Otherwise, the Save As dialog will be opened."),
