@@ -2623,7 +2623,16 @@ bool FKismetEditorUtilities::PropertyHasBoundEvents(const UBlueprint* Blueprint,
 
 bool FKismetEditorUtilities::IsClassABlueprintInterface(const UClass* Class)
 {
-	if (!Class->HasAnyClassFlags(CLASS_Interface) || Class->HasAnyClassFlags(CLASS_NewerVersionExists))
+	if (Class->HasAnyClassFlags(CLASS_Interface) && !Class->HasAnyClassFlags(CLASS_NewerVersionExists))
+	{
+		return true;
+	}
+	return false;
+}
+
+bool FKismetEditorUtilities::IsClassABlueprintImplementableInterface(const UClass* Class)
+{
+	if (!IsClassABlueprintInterface(Class))
 	{
 		return false;
 	}
@@ -2663,7 +2672,7 @@ bool FKismetEditorUtilities::CanBlueprintImplementInterface(UBlueprint const* Bl
 	bool bCanImplementInterface = false;
 
 	// if the class is an actual implementable interface
-	if (IsClassABlueprintInterface(Class))
+	if (IsClassABlueprintImplementableInterface(Class))
 	{
 		bCanImplementInterface = true;
 
