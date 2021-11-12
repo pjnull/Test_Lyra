@@ -258,7 +258,9 @@ struct FRayTracingBuildInstanceBufferCS : public FGlobalShader
 
 	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
 	{
-		return (ShouldCompileRayTracingShadersForProject(Parameters.Platform) && RHISupportsComputeShaders(Parameters.Platform) && !(Parameters.Platform == EShaderPlatform::SP_METAL || Parameters.Platform == EShaderPlatform::SP_METAL_TVOS || IsMobilePlatform(Parameters.Platform)));
+		//return (ShouldCompileRayTracingShadersForProject(Parameters.Platform) && RHISupportsComputeShaders(Parameters.Platform) && !(Parameters.Platform == EShaderPlatform::SP_METAL || Parameters.Platform == EShaderPlatform::SP_METAL_TVOS || IsMobilePlatform(Parameters.Platform)));
+		// temp: don't check ShouldCompileRayTracingShadersForProject since can't enable it for Vulkan yet.
+		return (RHISupportsComputeShaders(Parameters.Platform) && !(Parameters.Platform == EShaderPlatform::SP_METAL || Parameters.Platform == EShaderPlatform::SP_METAL_TVOS || IsMobilePlatform(Parameters.Platform)));
 	}
 };
 
@@ -318,8 +320,6 @@ void BuildRayTracingInstanceBuffer(
 	uint32 NumNativeCPUInstances,
 	TConstArrayView<FRayTracingGPUInstance> GPUInstances)
 {
-	RHICmdList.BeginUAVOverlap(InstancesUAV);
-
 	if (NumNativeGPUSceneInstances > 0)
 	{
 		BuildRayTracingInstanceBuffer(
@@ -361,8 +361,6 @@ void BuildRayTracingInstanceBuffer(
 			AccelerationStructureAddressesSRV,
 			GPUInstance.TransformSRV);
 	}
-
-	RHICmdList.EndUAVOverlap(InstancesUAV);
 }
 
 #endif //RHI_RAYTRACING
