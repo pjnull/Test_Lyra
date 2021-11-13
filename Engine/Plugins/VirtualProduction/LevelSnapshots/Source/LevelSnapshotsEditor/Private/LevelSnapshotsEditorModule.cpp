@@ -42,24 +42,26 @@ void FLevelSnapshotsEditorModule::OpenLevelSnapshotsSettings()
 
 void FLevelSnapshotsEditorModule::StartupModule()
 {
-	IAssetTools& AssetTools = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools").Get();
-
-	AssetTools.RegisterAssetTypeActions(MakeShared<FAssetTypeActions_LevelSnapshot>());
-
 	FLevelSnapshotsEditorStyle::Initialize();
 	FLevelSnapshotsEditorCommands::Register();
-	
-	RegisterTabSpawner();
-	RegisterEditorToolbar();
-	
-	ISettingsModule& SettingsModule = FModuleManager::LoadModuleChecked<ISettingsModule>("Settings");
+
+	FCoreDelegates::OnPostEngineInit.AddLambda([this]()
 	{
-		DataMangementSettingsSectionPtr = SettingsModule.RegisterSettings("Project", "Plugins", "Level Snapshots Editor",
-			NSLOCTEXT("LevelSnapshots", "LevelSnapshotsEditorSettingsCategoryDisplayName", "Level Snapshots Editor"),
-			NSLOCTEXT("LevelSnapshots", "LevelSnapshotsEditorSettingsDescription", "Configure the Level Snapshots Editor settings"),
-			GetMutableDefault<ULevelSnapshotsEditorSettings>());
-		DataMangementSettingsSectionPtr->OnModified().BindRaw(this, &FLevelSnapshotsEditorModule::HandleModifiedProjectSettings);
-	}
+		IAssetTools& AssetTools = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools").Get();
+		AssetTools.RegisterAssetTypeActions(MakeShared<FAssetTypeActions_LevelSnapshot>());
+		
+		RegisterTabSpawner();
+		RegisterEditorToolbar();
+
+		ISettingsModule& SettingsModule = FModuleManager::LoadModuleChecked<ISettingsModule>("Settings");
+		{
+			DataMangementSettingsSectionPtr = SettingsModule.RegisterSettings("Project", "Plugins", "Level Snapshots Editor",
+				NSLOCTEXT("LevelSnapshots", "LevelSnapshotsEditorSettingsCategoryDisplayName", "Level Snapshots Editor"),
+				NSLOCTEXT("LevelSnapshots", "LevelSnapshotsEditorSettingsDescription", "Configure the Level Snapshots Editor settings"),
+				GetMutableDefault<ULevelSnapshotsEditorSettings>());
+			DataMangementSettingsSectionPtr->OnModified().BindRaw(this, &FLevelSnapshotsEditorModule::HandleModifiedProjectSettings);
+		}
+	});
 }
 
 void FLevelSnapshotsEditorModule::ShutdownModule()
