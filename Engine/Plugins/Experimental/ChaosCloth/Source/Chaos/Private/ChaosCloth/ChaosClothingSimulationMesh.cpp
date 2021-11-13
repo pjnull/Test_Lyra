@@ -44,17 +44,13 @@ int32 FClothingSimulationMesh::GetLODIndex() const
 
 	if (Asset && SkeletalMeshComponent)
 	{
-		if (const FClothingSimulationContextCommon* const Context = 
-			static_cast<const FClothingSimulationContextCommon*>(SkeletalMeshComponent->GetClothingSimulationContext()))
+		const int32 MeshLODIndex = SkeletalMeshComponent->GetPredictedLODLevel();
+		if (Asset->LodMap.IsValidIndex(MeshLODIndex))
 		{
-			const int32 MeshLODIndex = Context->PredictedLod;
-			if (Asset->LodMap.IsValidIndex(MeshLODIndex))
+			const int32 ClothLODIndex = Asset->LodMap[MeshLODIndex];
+			if (Asset->LodData.IsValidIndex(ClothLODIndex))
 			{
-				const int32 ClothLODIndex = Asset->LodMap[MeshLODIndex];
-				if (Asset->LodData.IsValidIndex(ClothLODIndex))
-				{
-					LODIndex = ClothLODIndex;
-				}
+				LODIndex = ClothLODIndex;
 			}
 		}
 	}

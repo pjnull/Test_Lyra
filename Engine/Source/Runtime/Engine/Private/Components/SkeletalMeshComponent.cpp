@@ -1425,7 +1425,7 @@ void USkeletalMeshComponent::TickComponent(float DeltaTime, enum ELevelTick Tick
 
 	// If we are suspended, we will not simulate clothing, but as clothing is simulated in local space
 	// relative to a root bone we need to extract simulation positions as this bone could be animated.
-	if(bClothingSimulationSuspended && ClothingSimulation && ClothingSimulation->ShouldSimulate())
+	if(bClothingSimulationSuspended && ClothingSimulation)
 	{
 		CSV_SCOPED_TIMING_STAT(Animation, Cloth);
 

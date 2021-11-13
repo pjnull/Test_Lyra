@@ -615,9 +615,23 @@ void FClothingSimulation::GetSimulationData(
 		const int32 AssetIndex = Cloth->GetGroupId();
 		FClothSimulData& Data = OutData.FindOrAdd(AssetIndex);
 
-		if (Cloth->GetLODIndex(Solver.Get()) == INDEX_NONE || Cloth->GetOffset(Solver.Get()) == INDEX_NONE)
+		if (!Cloth->GetMesh())
 		{
-			continue;
+			continue;  // Invalid or empty cloth
+		}
+
+		// If the LOD has changed while the simulation is suspended, the cloth still needs to be updated with the correct LOD data
+		const int32 MeshLODIndex = Cloth->GetMesh()->GetLODIndex();
+		const int32 ClothLODIndex = Cloth->GetLODIndex(Solver.Get());
+		if (ClothLODIndex != MeshLODIndex)
+		{
+			Cloth->PreUpdate(Solver.Get());  // Currently doing colliders' update, not really required here, but this could later change (technically PreUpdates are for any non parallel cloth updates)
+			Cloth->Update(Solver.Get());  // LOD switching
+		}
+
+		if (Cloth->GetOffset(Solver.Get()) == INDEX_NONE || Cloth->GetLODIndex(Solver.Get()) == INDEX_NONE)
+		{
+			continue;  // No valid LOD, there's nothing to write out
 		}
 
 		// Get the reference bone index for this cloth
@@ -672,7 +686,6 @@ void FClothingSimulation::GetSimulationData(
 		// Set the current LOD these data apply to, so that the correct deformer mappings can be applied
 		if (const UClothingAssetCommon* const ClothingAsset = Cloth->GetMesh()->GetAsset())
 		{
-			const int32 ClothLODIndex = Cloth->GetLODIndex(Solver.Get());
 			Data.LODIndex = ClothingAsset->LodMap.Find(ClothLODIndex);  // Store the mesh LOD index, which is different to the cloth asset's LOD index
 		}
 		else
