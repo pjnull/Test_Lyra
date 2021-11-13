@@ -2024,7 +2024,7 @@ void FD3D11DynamicRHI::RHICopyToStagingBuffer(FRHIBuffer* SourceBufferRHI, FRHIS
 			// Copy the contents of the vertex buffer to the staging buffer.
 			D3D11_BOX SourceBox;
 			SourceBox.left = Offset;
-			SourceBox.right = NumBytes;
+			SourceBox.right = Offset + NumBytes;
 			SourceBox.top = SourceBox.front = 0;
 			SourceBox.bottom = SourceBox.back = 1;
 			Direct3DDeviceIMContext->CopySubresourceRegion(StagingBuffer->StagedRead, 0, 0, 0, 0, SourceBuffer->Resource, 0, &SourceBox);
