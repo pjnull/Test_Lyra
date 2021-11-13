@@ -660,8 +660,8 @@ void UK2Node_Variable::ReplaceReferences(UBlueprint* InBlueprint, UBlueprint* In
 	{
 		// Make a copy because ResolveMember is non-const
 		FMemberReference Replacement = InReplacement;
-		const FProperty* ResolvedProperty = Replacement.ResolveMember<FProperty>(InReplacementBlueprint);
-		VariableReference.SetFromField<FProperty>(ResolvedProperty, InBlueprint->GeneratedClass);
+		const FProperty* ResolvedProperty = Replacement.ResolveMember<FProperty>(InBlueprint);
+		VariableReference.SetFromField<FProperty>(ResolvedProperty, InReplacementBlueprint->GeneratedClass);
 	}
 }
 
