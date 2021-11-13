@@ -96,6 +96,7 @@ FNiagaraDataSet::FNiagaraDataSet()
 	, BufferSizeBytes(0)
 #endif
 	, MaxInstanceCount(UINT_MAX)
+	, MaxAllocationCount(UINT_MAX)
 	, bInitialized(false)
 {
 	CompiledData.Init(&FNiagaraDataSetCompiledData::DummyCompiledData);
@@ -740,9 +741,8 @@ void FNiagaraDataBuffer::AllocateGPU(FRHICommandList& RHICmdList, uint32 InNumIn
 
 	NumInstancesAllocated = InNumInstances;
 
-	// GetMaxInstanceCount() returns the maximum number of usable instances, but it's computed in such a way as to allow fitting an extra
-	// scratch instance in the buffer. Our allocation maximum is therefore one more than what this function returns.
-	const uint32 MaxAllocatedInstances = Owner->GetMaxInstanceCount() + 1;
+	// GetMaxInstanceCount() returns the maximum number of usable instances
+	const uint32 MaxAllocatedInstances = Owner->GetMaxAllocationCount();
 
 	// Round the count up to the nearest threadgroup size. GetMaxNumInstances() ensures that the returned value is aligned to NiagaraComputeMaxThreadGroupSize, so if the calling
 	// code clamps the instance count correctly, this operation should never exceed the max instance count.
