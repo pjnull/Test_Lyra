@@ -36,11 +36,11 @@ void FUVEditorCommands::RegisterCommands()
 	UI_COMMAND(CancelOrCompleteActiveTool, "Cancel", "Cancel the active tool", EUserInterfaceActionType::Button, FInputChord(EKeys::Escape));
 
 	// These get used in viewport buttons
-	UI_COMMAND(VertexSelection, "Vertex Selection", "Select vertex on click", EUserInterfaceActionType::ToggleButton, FInputChord());
-	UI_COMMAND(EdgeSelection, "Edge Selection", "Select edge on click", EUserInterfaceActionType::ToggleButton, FInputChord());
-	UI_COMMAND(TriangleSelection, "Triangle Selection", "Select triangle on click", EUserInterfaceActionType::ToggleButton, FInputChord());
-	UI_COMMAND(IslandSelection, "Island Selection", "Select connected island on click", EUserInterfaceActionType::ToggleButton, FInputChord());
-	UI_COMMAND(FullMeshSelection, "Full Mesh Selection", "Select whole mesh on click", EUserInterfaceActionType::ToggleButton, FInputChord());
+	UI_COMMAND(VertexSelection, "Vertex Selection", "Select UV vertices", EUserInterfaceActionType::ToggleButton, FInputChord());
+	UI_COMMAND(EdgeSelection, "Edge Selection", "Select UV edges", EUserInterfaceActionType::ToggleButton, FInputChord());
+	UI_COMMAND(TriangleSelection, "Triangle Selection", "Select UV triangles", EUserInterfaceActionType::ToggleButton, FInputChord());
+	UI_COMMAND(IslandSelection, "Island Selection", "Select UV connected islands", EUserInterfaceActionType::ToggleButton, FInputChord());
+	UI_COMMAND(FullMeshSelection, "Full Mesh Selection", "Select UV whole meshes", EUserInterfaceActionType::ToggleButton, FInputChord());
 
 	UI_COMMAND(EnableOrbitCamera, "Orbit", "Enable Orbit Camera", EUserInterfaceActionType::ToggleButton, FInputChord());
 	UI_COMMAND(EnableFlyCamera, "Fly", "Enable Fly Camera", EUserInterfaceActionType::ToggleButton, FInputChord());
