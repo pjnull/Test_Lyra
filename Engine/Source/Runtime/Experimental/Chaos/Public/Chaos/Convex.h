@@ -463,6 +463,31 @@ namespace Chaos
 
 	public:
 
+		// @todo(chaos): Move to utils
+		inline bool IntersectPlanes3(const FVec3& X1, const FVec3& N1, const FVec3& X2, const FVec3& N2, const FVec3& X3, const FVec3& N3, FVec3& OutX, const FReal EpsilonSq = FReal(1.e-6)) const
+		{
+			// Compute determinant, the triple product P1|(P2^P3)==(P1^P2)|P3.
+			const FVec3 N1CrossN2 = FVec3::CrossProduct(N1, N2);
+			const FReal Det = FVec3::DotProduct(N1CrossN2, N3);
+			if (FMath::Square(Det) < EpsilonSq)
+			{
+				// Degenerate.
+				OutX = FVec3(0);
+				return false;
+			}
+			else
+			{
+				// Compute the intersection point, guaranteed valid if determinant is nonzero.
+				const FVec3 N2CrossN3 = FVec3::CrossProduct(N2, N3);
+				const FVec3 N3CrossN1 = FVec3::CrossProduct(N3, N1);
+				const FReal D1 = FVec3::DotProduct(X1, N1);
+				const FReal D2 = FVec3::DotProduct(X2, N2);
+				const FReal D3 = FVec3::DotProduct(X3, N3);
+				OutX = (D1 * N2CrossN3 + D2 * N3CrossN1 + D3 * N1CrossN2) / Det;
+			}
+			return true;
+		}
+
 		FVec3 GetMarginAdjustedVertex(int32 VertexIndex, FReal InMargin) const
 		{
 			// @chaos(todo): moving the vertices this way based on margin is only valid for small margins. If the margin
@@ -480,23 +505,20 @@ namespace Chaos
 			int32 NumVertexPlanes = FindVertexPlanes(VertexIndex, PlaneIndices, 3);
 
 			// Move the planes by the margin and recalculate the interection
-			// @todo(chaos): calculate dV/dm per vertex and store it in StructureData
 			if (NumVertexPlanes >= 3)
 			{
 				const int32 PlaneIndex0 = PlaneIndices[0];
 				const int32 PlaneIndex1 = PlaneIndices[1];
 				const int32 PlaneIndex2 = PlaneIndices[2];
 
-				FVec3 PlanesPos;
-				UE::Math::TPlane<FReal> NewPlanes[3] =
+				FVec3 VertexPos = Vertices[VertexIndex];
+				if (IntersectPlanes3(
+					VertexPos - InMargin * Planes[PlaneIndex0].Normal(), Planes[PlaneIndex0].Normal(),
+					VertexPos - InMargin * Planes[PlaneIndex1].Normal(), Planes[PlaneIndex1].Normal(),
+					VertexPos - InMargin * Planes[PlaneIndex2].Normal(), Planes[PlaneIndex2].Normal(),
+					VertexPos))
 				{
-					UE::Math::TPlane<FReal>(Planes[PlaneIndex0].X() - InMargin * Planes[PlaneIndex0].Normal(), Planes[PlaneIndex0].Normal()),
-					UE::Math::TPlane<FReal>(Planes[PlaneIndex1].X() - InMargin * Planes[PlaneIndex1].Normal(), Planes[PlaneIndex1].Normal()),
-					UE::Math::TPlane<FReal>(Planes[PlaneIndex2].X() - InMargin * Planes[PlaneIndex2].Normal(), Planes[PlaneIndex2].Normal()),
-				};
-				if (FMath::IntersectPlanes3(PlanesPos, NewPlanes[0], NewPlanes[1], NewPlanes[2]))
-				{
-					return PlanesPos;
+					return VertexPos;
 				}
 			}
 
@@ -538,7 +560,6 @@ namespace Chaos
 			int32 NumVertexPlanes = FindVertexPlanes(VertexIndex, PlaneIndices, 3);
 
 			// Move the planes by the margin and recalculate the interection
-			// @todo(chaos): calculate dV/dm per vertex and store it in StructureData (but see todo above)
 			if (NumVertexPlanes >= 3)
 			{
 				const int32 PlaneIndex0 = PlaneIndices[0];
