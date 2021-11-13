@@ -16,6 +16,7 @@
 #include "ISettingsSection.h"
 #include "LevelEditor.h"
 #include "ToolMenus.h"
+#include "Widgets/Docking/SDockTab.h"
 #include "WorkspaceMenuStructure.h"
 #include "WorkspaceMenuStructureModule.h"
 
