@@ -265,11 +265,11 @@ FText::FText( FName InTableId, FString InKey, const EStringTableLoadingPolicy In
 {
 }
 
-FText::FText( FString&& InSourceString, FTextDisplayStringRef InDisplayString )
+FText::FText( FString&& InSourceString, const FTextKey& InNamespace, const FTextKey& InKey, FTextDisplayStringRef InDisplayString )
 	: TextData(new TLocalizedTextData<FTextHistory_Base>(MoveTemp(InDisplayString)))
 	, Flags(0)
 {
-	TextData->SetTextHistory(FTextHistory_Base(FTextId(), MoveTemp(InSourceString)));
+	TextData->SetTextHistory(FTextHistory_Base(FTextId(InNamespace, InKey), MoveTemp(InSourceString)));
 }
 
 FText::FText( FString&& InSourceString, const FTextKey& InNamespace, const FTextKey& InKey, uint32 InFlags )
@@ -803,7 +803,7 @@ bool FText::FindText(const FTextKey& Namespace, const FTextKey& Key, FText& OutT
 
 	if ( FoundString.IsValid() )
 	{
-		OutText = FText( SourceString ? FString(*SourceString) : FString(), FoundString.ToSharedRef() );
+		OutText = FText( SourceString ? FString(*SourceString) : FString(), Namespace, Key, FoundString.ToSharedRef() );
 		return true;
 	}
 

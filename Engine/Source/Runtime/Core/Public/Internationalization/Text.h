@@ -726,7 +726,7 @@ private:
 
 	FText( FName InTableId, FString InKey, const EStringTableLoadingPolicy InLoadingPolicy );
 
-	FText( FString&& InSourceString, FTextDisplayStringRef InDisplayString );
+	FText( FString&& InSourceString, const FTextKey& InNamespace, const FTextKey& InKey, FTextDisplayStringRef InDisplayString );
 
 	FText( FString&& InSourceString, const FTextKey& InNamespace, const FTextKey& InKey, uint32 InFlags=0 );
 
