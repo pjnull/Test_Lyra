@@ -165,13 +165,6 @@ FSquare2DGridHelper GetPartitionedActors(const UWorldPartition* WorldPartition, 
 		const FActorCluster* ActorCluster = ClusterInstance->Cluster;
 		check(ActorCluster && ActorCluster->Actors.Num() > 0);
 		EActorGridPlacement GridPlacement = ActorCluster->GridPlacement;
-		bool bAlwaysLoadedPromotedCluster = (GridPlacement == EActorGridPlacement::None);
-		bool bAlwaysLoadedPromotedOutOfGrid = false;
-
-		if (bAlwaysLoadedPromotedCluster)
-		{
-			GridPlacement = EActorGridPlacement::AlwaysLoaded;
-		}
 
 		switch (GridPlacement)
 		{
@@ -188,7 +181,6 @@ FSquare2DGridHelper GetPartitionedActors(const UWorldPartition* WorldPartition, 
 			else
 			{
 				GridPlacement = EActorGridPlacement::AlwaysLoaded;
-				bAlwaysLoadedPromotedOutOfGrid = true;
 				PartitionedActors.GetAlwaysLoadedCell().AddActor(MoveTemp(ActorInstance), ClusterInstance->DataLayers);
 			}
 			break;
@@ -222,7 +214,6 @@ FSquare2DGridHelper GetPartitionedActors(const UWorldPartition* WorldPartition, 
 			if (!bFoundCell)
 			{
 				GridPlacement = EActorGridPlacement::AlwaysLoaded;
-				bAlwaysLoadedPromotedOutOfGrid = true;
 				PartitionedActors.GetAlwaysLoadedCell().AddActors(ActorCluster->Actors, ClusterInstance->ContainerInstance, ClusterInstance->DataLayers);
 
 				UE_LOG(LogWorldPartition, Warning, TEXT("Cluster of %d actors was promoted always loaded, BV of [%d x %d] (meters)"), 
@@ -252,11 +243,9 @@ FSquare2DGridHelper GetPartitionedActors(const UWorldPartition* WorldPartition, 
 		{
 			if (ActorCluster->Actors.Num() > 1)
 			{
-				UE_LOG(LogWorldPartition, Verbose, TEXT("Clustered %d actors (%s%s%s), generated shared BV of [%d x %d] (meters)"),
+				UE_LOG(LogWorldPartition, Verbose, TEXT("Clustered %d actors (%s), generated shared BV of [%d x %d] (meters)"),
 					ActorCluster->Actors.Num(),
 					*StaticEnum<EActorGridPlacement>()->GetNameStringByValue((int64)GridPlacement),
-					bAlwaysLoadedPromotedCluster ? TEXT(":PromotedCluster") : TEXT(""),
-					bAlwaysLoadedPromotedOutOfGrid ? TEXT(":PromotedOutOfGrid") : TEXT(""),
 					(int)(0.01f * ClusterInstance->Bounds.GetSize().X),
 					(int)(0.01f * ClusterInstance->Bounds.GetSize().Y));
 

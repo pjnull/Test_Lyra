@@ -46,34 +46,18 @@ FActorCluster::FActorCluster(UWorld* InWorld, const FWorldPartitionActorDescView
 void FActorCluster::Add(const FActorCluster& InActorCluster, const TMap<FGuid, FWorldPartitionActorDescView>& InActorDescViewMap)
 {
 	// Merge RuntimeGrid
-	RuntimeGrid = RuntimeGrid == InActorCluster.RuntimeGrid ? RuntimeGrid : NAME_None;
+	if (RuntimeGrid != InActorCluster.RuntimeGrid)
+	{
+		RuntimeGrid = NAME_None;
+	}
 
 	// Merge Bounds
 	Bounds += InActorCluster.Bounds;
 
 	// Merge GridPlacement
-	// If currently None, will always stay None
-	if (GridPlacement != EActorGridPlacement::None)
+	if (GridPlacement != EActorGridPlacement::AlwaysLoaded)
 	{
-		// If grid placement differs between the two clusters
-		if (GridPlacement != InActorCluster.GridPlacement)
-		{
-			// If one of the two cluster was always loaded, set to None
-			if (InActorCluster.GridPlacement == EActorGridPlacement::AlwaysLoaded || GridPlacement == EActorGridPlacement::AlwaysLoaded)
-			{
-				GridPlacement = EActorGridPlacement::None;
-			}
-			else
-			{
-				GridPlacement = InActorCluster.GridPlacement;
-			}
-		}
-
-		// If current placement is set to Location, that won't make sense when merging two clusters. Set to Bounds
-		if (GridPlacement == EActorGridPlacement::Location)
-		{
-			GridPlacement = EActorGridPlacement::Bounds;
-		}
+		GridPlacement = (InActorCluster.GridPlacement == EActorGridPlacement::AlwaysLoaded) ? EActorGridPlacement::AlwaysLoaded : EActorGridPlacement::Bounds;
 	}
 
 	if (DataLayersID != InActorCluster.DataLayersID)
