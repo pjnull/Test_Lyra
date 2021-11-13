@@ -16,7 +16,7 @@ class UTurnBasedMatchInterface;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnlineTurnBasedMatchResult, FString, MatchID);
 
-class FFindTurnBasedMatchCallbackProxyMatchmakerDelegate : public FTurnBasedMatchmakerDelegate, public TSharedFromThis<FFindTurnBasedMatchCallbackProxyMatchmakerDelegate>
+class FFindTurnBasedMatchCallbackProxyMatchmakerDelegate : public FTurnBasedMatchmakerDelegate, public TSharedFromThis<FTurnBasedMatchmakerDelegate>
 {
 public:
 

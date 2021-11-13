@@ -18,7 +18,7 @@
 #include "Input/Events.h"
 #include "Layout/Geometry.h"
 
-class FSetFilteringDragDropOp : public FDragDropOperation
+class FSetFilteringDragDropOp : public FDragDropOperation, public TSharedFromThis<FSetFilteringDragDropOp>
 {
 public:
 	DRAG_DROP_OPERATOR_TYPE(FSetFilteringDragDropOp, FDragDropOperation)

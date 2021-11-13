@@ -9,7 +9,7 @@
 /** 
  * Abstraction of a Perforce label.
  */
-class FPerforceSourceControlLabel : public ISourceControlLabel
+class FPerforceSourceControlLabel : public ISourceControlLabel, public TSharedFromThis<FPerforceSourceControlLabel>
 {
 public:
 
