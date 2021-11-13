@@ -131,6 +131,11 @@ TAutoConsoleVariable<int32> CVarLandscapeForceFlush(
 	0,
 	TEXT("This will force a render flush every frame when landscape editing."));
 
+TAutoConsoleVariable<int32> CVarLandscapeValidateProxyWeightmapUsages(
+	TEXT("landscape.ValidateProxyWeightmapUsages"),
+	1,
+	TEXT("This will validate that weightmap usages in landscape proxies and their components don't get desynchronized with the landscape component layer allocations."));
+
 struct FLandscapeDirty
 {
 	FLandscapeDirty()
@@ -1412,23 +1417,24 @@ void ALandscape::HideEditLayersResourcesNotification(TWeakPtr<SNotificationItem>
 	}
 }
 
-bool ALandscape::IsTextureReady(UTexture2D* InTexture, bool bInWaitForStreaming) const
+bool ALandscape::IsTextureReady(UTexture2D* InTexture, bool bInWaitForStreaming)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE(Landscape_IsTextureReady);
 	check(InTexture);
 	InTexture->bForceMiplevelsToBeResident = true;
 	if (bInWaitForStreaming && !InTexture->IsFullyStreamedIn())
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Landscape_WaitForTextureStreaming);
 		InTexture->WaitForStreaming();
 	}
 	return !InTexture->IsDefaultTexture() && InTexture->IsFullyStreamedIn();
 }
 
-bool ALandscape::IsMaterialResourceCompiled(FMaterialResource* InMaterialResource, bool bInWaitForCompilation) const
+bool ALandscape::IsMaterialResourceCompiled(FMaterialResource* InMaterialResource, bool bInWaitForCompilation)
 {
 	check(InMaterialResource);
 	if (bInWaitForCompilation && !InMaterialResource->IsGameThreadShaderMapComplete())
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Landscape_WaitForMaterialCompilation);
 		InMaterialResource->FinishCompilation();
 	}
 	return InMaterialResource->IsGameThreadShaderMapComplete();
@@ -1891,6 +1897,38 @@ void ALandscape::CopyOldDataToDefaultLayer(ALandscapeProxy* InProxy)
 	}
 }
 
+void ALandscape::UpdateProxyLayersWeightmapUsage()
+{
+	ULandscapeInfo* Info = GetLandscapeInfo();
+
+	if (Info == nullptr)
+	{
+		return;
+	}
+
+	Info->ForAllLandscapeProxies([&](ALandscapeProxy* Proxy)
+	{
+		Proxy->UpdateProxyLayersWeightmapUsage();
+	});
+}
+
+void ALandscapeProxy::UpdateProxyLayersWeightmapUsage()
+{
+	if (bNeedsWeightmapUsagesUpdate)
+	{
+		InitializeProxyLayersWeightmapUsage();
+	}
+	check(!bNeedsWeightmapUsagesUpdate);
+}
+
+void ALandscapeProxy::PostEditUndo()
+{
+	Super::PostEditUndo();
+
+	// On undo, request a recompute weightmap usages which can get desynchronized since there can be duplicated between 2 components and also with the proxy : 
+	RequestProxyLayersWeightmapUsageUpdate();
+}
+
 void ALandscape::InitializeLandscapeLayersWeightmapUsage()
 {
 	ULandscapeInfo* Info = GetLandscapeInfo();
@@ -1910,13 +1948,43 @@ void ALandscapeProxy::InitializeProxyLayersWeightmapUsage()
 {
 	if (ALandscape* Landscape = GetLandscapeActor())
 	{
-		for (const FLandscapeLayer& Layer : Landscape->LandscapeLayers)
+		WeightmapUsageMap.Reset();
+		for (ULandscapeComponent* Component : LandscapeComponents)
 		{
-			for (ULandscapeComponent* Component : LandscapeComponents)
+			// Reinitialize the weightmap usages for the base (final) paint layers allocations :
+			{
+				const TArray<FWeightmapLayerAllocationInfo>& ComponentWeightmapLayerAllocations = Component->GetWeightmapLayerAllocations(/*InCanUseEditingWeightmap = */false);
+				const TArray<UTexture2D*>& ComponentWeightmapTextures = Component->GetWeightmapTextures(/*InCanUseEditingWeightmap = */false);
+				TArray<ULandscapeWeightmapUsage*>& ComponentWeightmapTexturesUsage = Component->GetWeightmapTexturesUsage(/*InCanUseEditingWeightmap = */false);
+				ComponentWeightmapTexturesUsage.Reset();
+				ComponentWeightmapTexturesUsage.AddDefaulted(ComponentWeightmapTextures.Num());
+
+				for (int32 LayerIdx = 0; LayerIdx < ComponentWeightmapLayerAllocations.Num(); LayerIdx++)
+				{
+					const FWeightmapLayerAllocationInfo& Allocation = ComponentWeightmapLayerAllocations[LayerIdx];
+					UTexture2D* WeightmapTexture = ComponentWeightmapTextures[Allocation.WeightmapTextureIndex];
+					UE_TRANSITIONAL_OBJECT_PTR(ULandscapeWeightmapUsage)* TempUsage = WeightmapUsageMap.Find(WeightmapTexture);
+
+					if (TempUsage == nullptr)
+					{
+						TempUsage = &WeightmapUsageMap.Add(WeightmapTexture, CreateWeightmapUsage());
+					}
+
+					ULandscapeWeightmapUsage* Usage = *TempUsage;
+					ComponentWeightmapTexturesUsage[Allocation.WeightmapTextureIndex] = Usage; // Keep a ref to it for faster access
+
+					// Validate that there are no duplicated allocation
+					check(Usage->ChannelUsage[Allocation.WeightmapTextureChannel] == nullptr || Usage->ChannelUsage[Allocation.WeightmapTextureChannel] == Component);
+
+					Usage->ChannelUsage[Allocation.WeightmapTextureChannel] = Component;
+				}
+			}
+
+			const FLandscapeLayer* SplinesLayer = Landscape->GetLandscapeSplinesReservedLayer();
+			for (const FLandscapeLayer& Layer : Landscape->LandscapeLayers)
 			{
 				// Compute per layer data
 				FLandscapeLayerComponentData* LayerData = Component->GetLayerData(Layer.Guid);
-
 				if (LayerData != nullptr && LayerData->IsInitialized())
 				{
 					LayerData->WeightmapData.TextureUsages.Reset();
@@ -1938,7 +2006,9 @@ void ALandscapeProxy::InitializeProxyLayersWeightmapUsage()
 						ULandscapeWeightmapUsage* Usage = *TempUsage;
 						LayerData->WeightmapData.TextureUsages[Allocation.WeightmapTextureIndex] = Usage; // Keep a ref to it for faster access
 
-						check(Usage->ChannelUsage[Allocation.WeightmapTextureChannel] == nullptr || Usage->ChannelUsage[Allocation.WeightmapTextureChannel] == Component);
+						// Validate that there are no duplicated allocation (except on the splines layer, since it's updated outside of a transaction and the transactor can later restore a duplicated 
+						//  allocation in 2 different components, which will assert here but will be corrected in the next UpdateLandscapeSplines, which is called right after)
+						check((&Layer == SplinesLayer) || Usage->ChannelUsage[Allocation.WeightmapTextureChannel] == nullptr || Usage->ChannelUsage[Allocation.WeightmapTextureChannel] == Component);
 
 						Usage->ChannelUsage[Allocation.WeightmapTextureChannel] = Component;
 					}
@@ -1946,6 +2016,116 @@ void ALandscapeProxy::InitializeProxyLayersWeightmapUsage()
 			}
 		}
 	}
+
+	ValidateProxyLayersWeightmapUsage();
+	bNeedsWeightmapUsagesUpdate = false;
+}
+
+void ALandscape::ValidateProxyLayersWeightmapUsage() const
+{
+	ULandscapeInfo* Info = GetLandscapeInfo();
+	if (Info == nullptr)
+	{
+		return;
+	}
+
+	bool bIsReady = true;
+	Info->ForAllLandscapeProxies([=](const ALandscapeProxy* Proxy)
+	{
+		Proxy->ValidateProxyLayersWeightmapUsage();
+	});
+}
+
+void ALandscapeProxy::ValidateProxyLayersWeightmapUsage() const
+{
+	if (CVarLandscapeValidateProxyWeightmapUsages.GetValueOnGameThread() == 0)
+	{
+		return;
+	}
+
+	TRACE_CPUPROFILER_EVENT_SCOPE(Landscape_ValidateProxyLayersWeightmapUsage);
+	TMap<UTexture2D*, TSet<FWeightmapLayerAllocationInfo>> PerTextureAllocations;
+	if (const ALandscape* Landscape = GetLandscapeActor())
+	{
+		for (ULandscapeComponent* Component : LandscapeComponents)
+		{
+			auto ValidateWeightmapAllocationAndUsage = [&](UTexture2D* InWeightmapTexture, const FWeightmapLayerAllocationInfo& InAllocation, ULandscapeWeightmapUsage* InUsage)
+			{
+				check(InUsage);
+				// All usages should be in the proxy's map
+				const TObjectPtr<ULandscapeWeightmapUsage>* ProxyMapUsage = WeightmapUsageMap.Find(InWeightmapTexture);
+				check(ProxyMapUsage && (InUsage == *ProxyMapUsage));
+				check(InUsage->ChannelUsage[InAllocation.WeightmapTextureChannel] == Component);
+
+				// We shouldn't have any duplicate allocation : 
+				TSet<FWeightmapLayerAllocationInfo>& AllAllocations = PerTextureAllocations.FindOrAdd(InWeightmapTexture);
+				check(!AllAllocations.Contains(InAllocation));
+				AllAllocations.Add(InAllocation);
+			};
+
+			const TArray<UTexture2D*>& WeightmapTextures = Component->GetWeightmapTextures(/*InReturnEditingWeightmap = */false);
+			const TArray<ULandscapeWeightmapUsage*>& WeightmapTextureUsages = Component->GetWeightmapTexturesUsage(/*InReturnEditingWeightmap = */false);
+
+			// Validate weightmaps : 
+			for (const FWeightmapLayerAllocationInfo& Allocation : Component->GetWeightmapLayerAllocations(/*InReturnEditingWeightmap = */false))
+			{
+				if (Allocation.IsAllocated())
+				{
+					UTexture2D* WeightmapTexture = WeightmapTextures[Allocation.WeightmapTextureIndex];
+					check(WeightmapTexture != nullptr);
+					if (ULandscapeWeightmapUsage* Usage = WeightmapTextureUsages.IsValidIndex(Allocation.WeightmapTextureIndex) ? WeightmapTextureUsages[Allocation.WeightmapTextureIndex] : nullptr)
+					{
+						ValidateWeightmapAllocationAndUsage(WeightmapTexture, Allocation, Usage);
+					}
+				}
+			}
+
+			// Validate edit layers weightmaps : 
+			{
+				const FLandscapeLayer* SplinesLayer = Landscape->GetLandscapeSplinesReservedLayer();
+				for (const FLandscapeLayer& Layer : Landscape->LandscapeLayers)
+				{
+					FLandscapeLayerComponentData* LayerData = Component->GetLayerData(Layer.Guid);
+					// Skip validation on SplinesLayer since it can momentarily contain duplicated layer allocations after undo (since it's updated outside of a transaction) : 
+					if (LayerData != nullptr && LayerData->IsInitialized() && (&Layer != SplinesLayer))
+					{
+						for (int32 LayerIdx = 0; LayerIdx < LayerData->WeightmapData.LayerAllocations.Num(); LayerIdx++)
+						{
+							const FWeightmapLayerAllocationInfo& Allocation = LayerData->WeightmapData.LayerAllocations[LayerIdx];
+							if (Allocation.IsAllocated())
+							{
+								UTexture2D* WeightmapTexture = LayerData->WeightmapData.Textures[Allocation.WeightmapTextureIndex];
+								if (ULandscapeWeightmapUsage* Usage = LayerData->WeightmapData.TextureUsages.IsValidIndex(Allocation.WeightmapTextureIndex) ? LayerData->WeightmapData.TextureUsages[Allocation.WeightmapTextureIndex] : nullptr)
+								{
+									ValidateWeightmapAllocationAndUsage(WeightmapTexture, Allocation, Usage);
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+void ALandscape::RequestProxyLayersWeightmapUsageUpdate()
+{
+	ULandscapeInfo* Info = GetLandscapeInfo();
+
+	if (Info == nullptr)
+	{
+		return;
+	}
+
+	Info->ForAllLandscapeProxies([&](ALandscapeProxy* Proxy)
+	{
+		Proxy->RequestProxyLayersWeightmapUsageUpdate();
+	});
+}
+
+void ALandscapeProxy::RequestProxyLayersWeightmapUsageUpdate()
+{
+	bNeedsWeightmapUsagesUpdate = true;
 }
 
 void ExecuteCopyLayersTexture(TArray<FLandscapeLayersCopyTextureParams>&& InCopyTextureParams)
@@ -2868,6 +3048,11 @@ void ALandscape::InvalidateRVTForTextures(const TSet<TObjectPtr<UTexture2D>>& In
 
 bool ALandscape::PrepareLayersTextureResources(bool bInWaitForStreaming)
 {
+	return PrepareLayersTextureResources(LandscapeLayers, bInWaitForStreaming);
+}
+
+bool ALandscape::PrepareLayersTextureResources(const TArray<FLandscapeLayer>& InLayers, bool bInWaitForStreaming)
+{
 	TRACE_CPUPROFILER_EVENT_SCOPE(LandscapeLayers_PrepareLayersTextureResources);
 
 	ULandscapeInfo* Info = GetLandscapeInfo();
@@ -2879,9 +3064,9 @@ bool ALandscape::PrepareLayersTextureResources(bool bInWaitForStreaming)
 	bool bIsReady = true;
 	Info->ForAllLandscapeProxies([&](ALandscapeProxy* Proxy)
 	{
-		for (ULandscapeComponent* Component : Proxy->LandscapeComponents)
+		for (const FLandscapeLayer& Layer : InLayers)
 		{
-			for (const FLandscapeLayer& Layer : LandscapeLayers)
+			for (ULandscapeComponent* Component : Proxy->LandscapeComponents)
 			{
 				if (FLandscapeLayerComponentData* ComponentLayerData = Component->GetLayerData(Layer.Guid))
 				{
@@ -3753,6 +3938,7 @@ void ALandscape::PrepareComponentDataToPackMaterialLayersCS(int32 InCurrentWeigh
 
 void ALandscape::ReallocateLayersWeightmaps(const TArray<ULandscapeComponent*>& InLandscapeComponents, const TArray<ULandscapeLayerInfoObject*>& InBrushRequiredAllocations)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(LandscapeLayers_ReallocateLayersWeightmaps);
 	SCOPE_CYCLE_COUNTER(STAT_LandscapeLayersReallocateWeightmaps);
 
 	ULandscapeInfo* Info = GetLandscapeInfo();
@@ -3905,6 +4091,8 @@ void ALandscape::ReallocateLayersWeightmaps(const TArray<ULandscapeComponent*>& 
 			}
 		}
 	});
+
+	ValidateProxyLayersWeightmapUsage();
 }
 
 void ALandscape::InitializeLayersWeightmapResources()
@@ -3971,6 +4159,7 @@ void ALandscape::InitializeLayersWeightmapResources()
 
 int32 ALandscape::RegenerateLayersWeightmaps(FTextureToComponentHelper const& MapHelper, const TArray<ULandscapeComponent*>& InLandscapeComponentsToRender, const TArray<ULandscapeComponent*>& InLandscapeComponentsToResolve)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(LandscapeLayers_RegenerateLayersWeightmaps);
 	SCOPE_CYCLE_COUNTER(STAT_LandscapeLayersRegenerateWeightmaps);
 	const int32 AllWeightmapUpdateModes = (ELandscapeLayerUpdateMode::Update_Weightmap_All | ELandscapeLayerUpdateMode::Update_Weightmap_Editing | ELandscapeLayerUpdateMode::Update_Weightmap_Editing_NoCollision);
 	const int32 WeightmapUpdateModes = LayerContentUpdateModes & AllWeightmapUpdateModes;
@@ -4490,6 +4679,7 @@ uint32 ULandscapeComponent::ComputeWeightmapsHash()
 
 void ALandscape::UpdateLayersMaterialInstances(const TArray<ULandscapeComponent*>& InLandscapeComponents)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(LandscapeLayers_UpdateLayersMaterialInstances);
 	SCOPE_CYCLE_COUNTER(STAT_LandscapeLayersUpdateMaterialInstance);
 	TArray<ULandscapeComponent*> ComponentsToUpdate;
 
@@ -5063,10 +5253,22 @@ void ALandscape::UpdateLayersContent(bool bInWaitForStreaming, bool bInSkipMonit
 		}
 	}
 
+	// Make sure weightmap usages that need updating are processed before doing any update on the landscape : 
+	UpdateProxyLayersWeightmapUsage();
+
 	if (bSplineLayerUpdateRequested)
 	{
-		UpdateLandscapeSplines();
-		bSplineLayerUpdateRequested = false;
+		if (FLandscapeLayer* SplinesLayer = GetLandscapeSplinesReservedLayer())
+		{
+			// We need the spline layer resources to all be ready before updating it:
+			if (!PrepareLayersTextureResources({ *SplinesLayer }, bInWaitForStreaming))
+			{
+				return;
+			}
+
+			UpdateLandscapeSplines();
+			bSplineLayerUpdateRequested = false;
+		}
 	}
 
 	const bool bProcessReadbacks = FLandscapeEditLayerReadback::HasWork();
@@ -5271,6 +5473,9 @@ void ALandscape::UpdateLayersContent(bool bInWaitForStreaming, bool bInSkipMonit
 	{
 		LandscapeEdMode->PostUpdateLayerContent();
 	}
+
+	// Additional validation that at the end of an update, we haven't screwed up anything in the weightmap allocations/usages : 
+	ValidateProxyLayersWeightmapUsage();
 
 	FLandscapeEditLayerReadback::GarbageCollectTasks();
 }
@@ -5652,12 +5857,10 @@ void ALandscapeProxy::DeleteLayer(const FGuid& InLayerGuid)
 
 				if (Usage != nullptr && (*Usage) != nullptr)
 				{
-					(*Usage)->Modify();
 					(*Usage)->ChannelUsage[Allocation.WeightmapTextureChannel] = nullptr;
 
 					if ((*Usage)->IsEmpty())
 					{
-						Modify();
 						WeightmapUsageMap.Remove(WeightmapTexture);
 					}
 				}
@@ -6280,6 +6483,8 @@ uint32 ULandscapeComponent::ComputeLayerHash() const
 
 void ALandscape::UpdateLandscapeSplines(const FGuid& InTargetLayer, bool bInUpdateOnlySelected, bool bInForceUpdateAllCompoments)
 {
+	check(GUndo == nullptr);
+
 	TRACE_CPUPROFILER_EVENT_SCOPE(LandscapeLayers_UpdateLandscapeSplines);
 	check(CanHaveLayersContent());
 	ULandscapeInfo* LandscapeInfo = GetLandscapeInfo();

@@ -320,6 +320,9 @@ public:
 
 #if WITH_EDITOR
 	LANDSCAPE_API bool ComputeLandscapeLayerBrushInfo(FTransform& OutLandscapeTransform, FIntPoint& OutLandscapeSize, FIntPoint& OutLandscapeRenderTargetSize);
+	void RequestProxyLayersWeightmapUsageUpdate();
+	void UpdateProxyLayersWeightmapUsage();
+	void ValidateProxyLayersWeightmapUsage() const;
 #endif // WITH_EDITOR
 
 private:
@@ -346,6 +349,7 @@ private:
 
 	bool PrepareTextureResources(bool bInWaitForStreaming);
 	bool PrepareLayersTextureResources(bool bInWaitForStreaming);
+	bool PrepareLayersTextureResources(const TArray<FLandscapeLayer>& InLayers, bool bInWaitForStreaming);
 	bool PrepareLayersBrushResources(bool bInWaitForStreaming);
 	void InvalidateRVTForTextures(const TSet<TObjectPtr<UTexture2D>>& InTextures);
 
@@ -393,8 +397,8 @@ private:
 	void UpdateHeightDirtyData(ULandscapeComponent* InLandscapeComponent, UTexture2D const* InHeightmap, FColor const* InOldData, FColor const* InNewData);
 	void OnDirtyHeightmap(FTextureToComponentHelper const& MapHelper, UTexture2D const* InWeightmap, FColor const* InOldData, FColor const* InNewData);
 
-	bool IsTextureReady(UTexture2D* InTexture, bool bInWaitForStreaming) const;
-	bool IsMaterialResourceCompiled(FMaterialResource* InMaterialResource, bool bInWaitForCompilation) const;
+	static bool IsTextureReady(UTexture2D* InTexture, bool bInWaitForStreaming);
+	static bool IsMaterialResourceCompiled(FMaterialResource* InMaterialResource, bool bInWaitForCompilation);
 	static void ShowEditLayersResourcesNotification(const FText& InText, TWeakPtr<SNotificationItem>& NotificationItem);
 	static void HideEditLayersResourcesNotification(TWeakPtr<SNotificationItem>& InNotificationItem);
 #endif

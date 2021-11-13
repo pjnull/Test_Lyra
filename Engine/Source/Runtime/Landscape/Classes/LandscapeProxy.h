@@ -674,6 +674,12 @@ public:
 	TMap<UTexture2D*, FLandscapeEditLayerReadback*> WeightmapsCPUReadback;
 
 	FRenderCommandFence ReleaseResourceFence;
+
+	/** Map of weightmap usage */
+	UPROPERTY(Transient, NonTransactional)
+	TMap<TObjectPtr<UTexture2D>, TObjectPtr<ULandscapeWeightmapUsage>> WeightmapUsageMap;
+
+	bool bNeedsWeightmapUsagesUpdate = false;
 #endif
 
 	/** Data set at creation time */
@@ -724,10 +730,6 @@ public:
 	/** Map of material instance constants used to for the components. Key is generated with ULandscapeComponent::GetLayerAllocationKey() */
 	TMap<FString, UMaterialInstanceConstant*> MaterialInstanceConstantMap;
 #endif
-
-	/** Map of weightmap usage */
-	UPROPERTY(Transient)
-	TMap<TObjectPtr<UTexture2D>, TObjectPtr<ULandscapeWeightmapUsage>> WeightmapUsageMap;
 
 	// Blueprint functions
 
@@ -944,9 +946,13 @@ public:
 	virtual bool CanEditChange(const FProperty* InProperty) const override;
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 	virtual void PostEditImport() override;
+	virtual void PostEditUndo() override;
 	//~ End UObject Interface
 
 	LANDSCAPE_API void InitializeProxyLayersWeightmapUsage();
+	void ValidateProxyLayersWeightmapUsage() const;
+	void UpdateProxyLayersWeightmapUsage();
+	void RequestProxyLayersWeightmapUsageUpdate();
 
 	LANDSCAPE_API static const TArray<FName>& GetLayersFromMaterial(UMaterialInterface* Material);
 	LANDSCAPE_API const TArray<FName>& GetLayersFromMaterial() const;

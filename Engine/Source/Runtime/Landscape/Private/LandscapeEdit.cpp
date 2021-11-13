@@ -274,7 +274,7 @@ UMaterialInstanceConstant* ULandscapeComponent::GetCombinationMaterial(FMaterial
 		if (Material && Material->bUsedAsSpecialEngineMaterial)
 		{
 			bOverrideBlendMode = false;
-#if WITH_EDITOR
+
 			static TWeakPtr<SNotificationItem> ExistingNotification;
 			if (!ExistingNotification.IsValid())
 			{
@@ -284,7 +284,6 @@ UMaterialInstanceConstant* ULandscapeComponent::GetCombinationMaterial(FMaterial
 				Info.bUseSuccessFailIcons = true;
 				ExistingNotification = TWeakPtr<SNotificationItem>(FSlateNotificationManager::Get().AddNotification(Info));
 			}
-#endif
 			return nullptr;
 		}
 	}
@@ -617,6 +616,9 @@ void ULandscapeComponent::PostEditUndo()
 
 	Super::PostEditUndo();
 
+	// On undo, request a recompute weightmap usages which can get desynchronized since there can be duplicated between 2 components and also with the proxy : 
+	GetLandscapeProxy()->RequestProxyLayersWeightmapUsageUpdate();
+
 	if (IsValid(this))
 	{
 		EditToolRenderData.UpdateSelectionMaterial(EditToolRenderData.SelectedType, this);
@@ -661,6 +663,8 @@ void ALandscapeProxy::FixupWeightmaps()
 			Component->FixupWeightmaps();
 		}
 	}
+
+	ValidateProxyLayersWeightmapUsage();
 }
 
 void ALandscapeProxy::RepairInvalidTextures()
@@ -713,27 +717,43 @@ TArray<UTexture*> ULandscapeComponent::RepairInvalidTextures()
 
 void ULandscapeComponent::FixupWeightmaps()
 {
+	// Fixup final weightmaps
+	FixupWeightmaps(FGuid());
+
+	// Also fixup all edit layers weightmaps :
+	ForEachLayer([&](const FGuid& LayerGuid, FLandscapeLayerComponentData& LayerData)
+	{
+		FixupWeightmaps(LayerGuid);
+	});
+}
+
+void ULandscapeComponent::FixupWeightmaps(const FGuid& InEditLayerGuid)
+{
 	if (GIsEditor && !HasAnyFlags(RF_ClassDefaultObject))
 	{
 		ULandscapeInfo* Info = GetLandscapeInfo();
 		ALandscapeProxy* Proxy = GetLandscapeProxy();
 
+		TArray<UTexture2D*>& LocalWeightmapTextures = GetWeightmapTextures(InEditLayerGuid);
+		TArray<ULandscapeWeightmapUsage*>& LocalWeightmapTextureUsages = GetWeightmapTexturesUsage(InEditLayerGuid);
+		TArray<FWeightmapLayerAllocationInfo>& LocalWeightmapLayerAllocations = GetWeightmapLayerAllocations(InEditLayerGuid);
+
 		if (Info)
 		{
-			WeightmapTexturesUsage.Empty();
-			WeightmapTexturesUsage.AddDefaulted(WeightmapTextures.Num());
+			LocalWeightmapTextureUsages.Empty();
+			LocalWeightmapTextureUsages.AddDefaulted(LocalWeightmapTextures.Num());
 
 			TArray<ULandscapeLayerInfoObject*> LayersToDelete;
 			bool bFixedLayerDeletion = false;
 
 			// make sure the weightmap textures are fully loaded or deleting layers from them will crash! :)
-			for (UTexture* WeightmapTexture : WeightmapTextures)
+			for (UTexture* WeightmapTexture : LocalWeightmapTextures)
 			{
 				WeightmapTexture->ConditionalPostLoad();
 			}
 
 			// LayerInfo Validation check...
-			for (const auto& Allocation : WeightmapLayerAllocations)
+			for (const auto& Allocation : LocalWeightmapLayerAllocations)
 			{
 				if (!Allocation.LayerInfo
 					|| (Allocation.LayerInfo != ALandscapeProxy::VisibilityLayer && Info->GetLayerInfoIndex(Allocation.LayerInfo) == INDEX_NONE))
@@ -781,19 +801,19 @@ void ULandscapeComponent::FixupWeightmaps()
 			bool bFixedWeightmapTextureIndex = false;
 
 			// Store the weightmap allocations in WeightmapUsageMap
-			for (int32 LayerIdx = 0; LayerIdx < WeightmapLayerAllocations.Num();)
+			for (int32 LayerIdx = 0; LayerIdx < LocalWeightmapLayerAllocations.Num();)
 			{
-				FWeightmapLayerAllocationInfo& Allocation = WeightmapLayerAllocations[LayerIdx];
+				FWeightmapLayerAllocationInfo& Allocation = LocalWeightmapLayerAllocations[LayerIdx];
 				if (!Allocation.IsAllocated())
 				{
-					WeightmapLayerAllocations.RemoveAt(LayerIdx);
+					LocalWeightmapLayerAllocations.RemoveAt(LayerIdx);
 					continue;
 				}
 
 				// Fix up any problems caused by the layer deletion bug.
-				if (Allocation.WeightmapTextureIndex >= WeightmapTextures.Num())
+				if (Allocation.WeightmapTextureIndex >= LocalWeightmapTextures.Num())
 				{
-					Allocation.WeightmapTextureIndex = WeightmapTextures.Num() - 1;
+					Allocation.WeightmapTextureIndex = LocalWeightmapTextures.Num() - 1;
 					if (!bFixedWeightmapTextureIndex)
 					{
 						FFormatNamedArguments Arguments;
@@ -805,7 +825,7 @@ void ULandscapeComponent::FixupWeightmaps()
 					bFixedWeightmapTextureIndex = true;
 				}
 
-				UTexture2D* WeightmapTexture = WeightmapTextures[Allocation.WeightmapTextureIndex];
+				UTexture2D* WeightmapTexture = LocalWeightmapTextures[Allocation.WeightmapTextureIndex];
 
 				TObjectPtr<ULandscapeWeightmapUsage>* TempUsage = Proxy->WeightmapUsageMap.Find(WeightmapTexture);
 
@@ -816,7 +836,7 @@ void ULandscapeComponent::FixupWeightmaps()
 				}
 
 				ULandscapeWeightmapUsage* Usage = *TempUsage;
-				WeightmapTexturesUsage[Allocation.WeightmapTextureIndex] = Usage; // Keep a ref to it for faster access
+				LocalWeightmapTextureUsages[Allocation.WeightmapTextureIndex] = Usage; // Keep a ref to it for faster access
 
 				// Detect a shared layer allocation, caused by a previous undo or layer deletion bugs
 				if (Usage->ChannelUsage[Allocation.WeightmapTextureChannel] != nullptr &&
@@ -829,7 +849,7 @@ void ULandscapeComponent::FixupWeightmaps()
 					FMessageLog("MapCheck").Warning()
 						->AddToken(FTextToken::Create(FText::Format(LOCTEXT("MapCheck_Message_FixedUpSharedLayerWeightmap", "Fixed up shared weightmap texture for layer {LayerName} in component '{LandscapeName}' (shares with '{ChannelName}')"), Arguments)))
 						->AddToken(FMapErrorToken::Create(FMapErrors::FixedUpSharedLayerWeightmap));
-					WeightmapLayerAllocations.RemoveAt(LayerIdx);
+					LocalWeightmapLayerAllocations.RemoveAt(LayerIdx);
 					continue;
 				}
 				else
@@ -839,7 +859,7 @@ void ULandscapeComponent::FixupWeightmaps()
 				++LayerIdx;
 			}
 
-			RemoveInvalidWeightmaps();
+			RemoveInvalidWeightmaps(InEditLayerGuid);
 		}
 	}
 }
@@ -5675,6 +5695,9 @@ void ULandscapeComponent::ReallocateWeightmaps(FLandscapeEditDataInterface* Data
 	check(!TargetProxy->HasLayersContent() || !InCanUseEditingWeightmap || EditingLayerGUID.IsValid());
 	FGuid TargetLayerGuid = InCanUseEditingWeightmap ? EditingLayerGUID : FGuid();
 
+	// We shouldn't ever be recording a transaction when reallocating weightmaps for the splines edit layer (procedural layer) :
+	check((TargetLayerGuid != GetLandscapeActor()->GetLandscapeSplinesReservedLayer()->Guid) || (GUndo == nullptr));
+
 	TArray<FWeightmapLayerAllocationInfo>& ComponentWeightmapLayerAllocations = GetWeightmapLayerAllocations(InCanUseEditingWeightmap);
 	TArray<UTexture2D*>& ComponentWeightmapTextures = GetWeightmapTextures(InCanUseEditingWeightmap);
 	TArray<ULandscapeWeightmapUsage*>& ComponentWeightmapTexturesUsage = GetWeightmapTexturesUsage(InCanUseEditingWeightmap);
@@ -5761,10 +5784,6 @@ void ULandscapeComponent::ReallocateWeightmaps(FLandscapeEditDataInterface* Data
 						AllocInfo.WeightmapTextureIndex = TexIdx;
 						AllocInfo.WeightmapTextureChannel = ChanIdx;
 
-						if (InSaveToTransactionBuffer)
-						{
-							Usage->Modify(bMarkPackageDirty);
-						}
 						Usage->ChannelUsage[ChanIdx] = this;
 
 						NeededNewChannels--;
@@ -5859,11 +5878,6 @@ void ULandscapeComponent::ReallocateWeightmaps(FLandscapeEditDataInterface* Data
 
 			// Store it in the usage map
 			CurrentWeightmapUsage = TargetProxy->WeightmapUsageMap.Add(CurrentWeightmapTexture, TargetProxy->CreateWeightmapUsage());
-			if (InSaveToTransactionBuffer)
-			{
-				CurrentWeightmapUsage->Modify(bMarkPackageDirty);
-			}
-
 			CurrentWeightmapUsage->LayerGuid = TargetLayerGuid;
 			// UE_LOG(LogLandscape, Log, TEXT("Making a new texture %s"), *CurrentWeightmapTexture->GetName());
 		}
@@ -5874,7 +5888,6 @@ void ULandscapeComponent::ReallocateWeightmaps(FLandscapeEditDataInterface* Data
 		for (int32 ChanIdx = 0; ChanIdx < 4 && TotalNeededChannels > 0; ChanIdx++)
 		{
 			// UE_LOG(LogLandscape, Log, TEXT("Finding allocation for layer %d"), CurrentLayer);
-
 			if (CurrentWeightmapUsage->ChannelUsage[ChanIdx] == nullptr)
 			{
 				// Use this allocation
@@ -5903,18 +5916,10 @@ void ULandscapeComponent::ReallocateWeightmaps(FLandscapeEditDataInterface* Data
 
 					// Remove the old allocation
 					ULandscapeWeightmapUsage* OldWeightmapUsage = ComponentWeightmapTexturesUsage[AllocInfo.WeightmapTextureIndex];
-					if (InSaveToTransactionBuffer)
-					{
-						OldWeightmapUsage->Modify(bMarkPackageDirty);
-					}
 					OldWeightmapUsage->ChannelUsage[AllocInfo.WeightmapTextureChannel] = nullptr;
 				}
 
 				// Assign the new allocation
-				if (InSaveToTransactionBuffer)
-				{
-					CurrentWeightmapUsage->Modify(bMarkPackageDirty);
-				}
 				CurrentWeightmapUsage->ChannelUsage[ChanIdx] = this;
 				AllocInfo.WeightmapTextureIndex = NewWeightmapTextures.Num() - 1;
 				AllocInfo.WeightmapTextureChannel = ChanIdx;
@@ -5947,6 +5952,8 @@ void ULandscapeComponent::ReallocateWeightmaps(FLandscapeEditDataInterface* Data
 	// Replace the weightmap textures
 	SetWeightmapTextures(MoveTemp(NewWeightmapTextures), InCanUseEditingWeightmap);
 	SetWeightmapTexturesUsage(MoveTemp(NewComponentWeightmapTexturesUsage), InCanUseEditingWeightmap);	
+
+	TargetProxy->ValidateProxyLayersWeightmapUsage();
 }
 
 void ALandscapeProxy::RemoveInvalidWeightmaps()
@@ -5982,9 +5989,21 @@ void ALandscapeProxy::RemoveInvalidWeightmaps()
 
 void ULandscapeComponent::RemoveInvalidWeightmaps()
 {
-	TArray<FWeightmapLayerAllocationInfo>& ComponentWeightmapLayerAllocations = GetWeightmapLayerAllocations();
-	TArray<UTexture2D*>& ComponentWeightmapTextures = GetWeightmapTextures();
-	TArray<ULandscapeWeightmapUsage*>& ComponentWeightmapTexturesUsage = GetWeightmapTexturesUsage();
+	// Process the final weightmaps
+	RemoveInvalidWeightmaps(FGuid());
+
+	// Also process all edit layers weightmaps :
+	ForEachLayer([&](const FGuid& LayerGuid, FLandscapeLayerComponentData& LayerData)
+	{
+		RemoveInvalidWeightmaps(LayerGuid);
+	});
+}
+
+void ULandscapeComponent::RemoveInvalidWeightmaps(const FGuid& InEditLayerGuid)
+{
+	TArray<FWeightmapLayerAllocationInfo>& ComponentWeightmapLayerAllocations = GetWeightmapLayerAllocations(InEditLayerGuid);
+	TArray<UTexture2D*>& ComponentWeightmapTextures = GetWeightmapTextures(InEditLayerGuid);
+	TArray<ULandscapeWeightmapUsage*>& ComponentWeightmapTexturesUsage = GetWeightmapTexturesUsage(InEditLayerGuid);
 
 	// Adjust WeightmapTextureIndex index for other layers
 	TSet<int32> UnUsedTextureIndices;
@@ -7126,7 +7145,10 @@ UTexture2D* ALandscapeProxy::CreateLandscapeToolTexture(int32 InSizeX, int32 InS
 
 ULandscapeWeightmapUsage* ALandscapeProxy::CreateWeightmapUsage()
 {
-	return NewObject<ULandscapeWeightmapUsage>(this, ULandscapeWeightmapUsage::StaticClass(), NAME_None, RF_Transactional);
+	// NonTransactional on purpose : it's too much trouble to have usages transactional since they're present in the proxies and duplicated in possibly multiple components, 
+	//  plus some edit layers (the splines layer, namely, which is procedural) are non-transactional, which complicates things further. Instead, we just regenerate the usages
+	//  on undo
+	return NewObject<ULandscapeWeightmapUsage>(this, ULandscapeWeightmapUsage::StaticClass(), NAME_None, RF_NoFlags);
 }
 
 void ALandscapeProxy::RemoveOverlappingComponent(ULandscapeComponent* Component)
