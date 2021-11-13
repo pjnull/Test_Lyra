@@ -603,7 +603,10 @@ void FClothingSimulation::GetSimulationData(
 	}
 
 	// Retrieve the component transforms
-	const FTransform& OwnerTransform = InOwnerComponent->GetComponentTransform();
+	const FClothingSimulationContext* const Context = static_cast<const FClothingSimulationContext*>(InOwnerComponent->GetClothingSimulationContext());
+	check(Context);  // A simuation can't be created without context
+	const FTransform& OwnerTransform = Context->ComponentToWorld;
+
 	const TArray<FTransform>& ComponentSpaceTransforms = InOverrideComponent ? InOverrideComponent->GetComponentSpaceTransforms() : InOwnerComponent->GetComponentSpaceTransforms();
 
 	// Get the solver's local space location
@@ -700,20 +703,23 @@ FBoxSphereBounds FClothingSimulation::GetBounds(const USkeletalMeshComponent* In
 	check(Solver);
 	FBoxSphereBounds Bounds = Solver->CalculateBounds();
 
-	if (bUseLocalSpaceSimulation)
-	{
-		// The component could be moving while the simulation is suspended so getting the bounds
-		// in world space isn't good enough and the bounds origin needs to be continuously updated
-		const FTransform& OwnerTransform = InOwnerComponent->GetComponentTransform();
-		const FVec3 CurrentLocalSpaceLocation = OwnerTransform.GetLocation();
-		const FVec3& SolverLocalSpaceLocation = Solver->GetLocalSpaceLocation();
-		Bounds.Origin += FVector(CurrentLocalSpaceLocation - SolverLocalSpaceLocation);
-	}
-
 	if (InOwnerComponent)
 	{
+		const FClothingSimulationContext* const Context = static_cast<const FClothingSimulationContext*>(InOwnerComponent->GetClothingSimulationContext());
+		check(Context);  // A simuation can't be created without context
+		const FTransform& OwnerTransform = Context->ComponentToWorld;
+
+		if (bUseLocalSpaceSimulation)
+		{
+			// The component could be moving while the simulation is suspended so getting the bounds
+			// in world space isn't good enough and the bounds origin needs to be continuously updated
+			const FVec3 CurrentLocalSpaceLocation = OwnerTransform.GetLocation();
+			const FVec3& SolverLocalSpaceLocation = Solver->GetLocalSpaceLocation();
+			Bounds.Origin += FVector(CurrentLocalSpaceLocation - SolverLocalSpaceLocation);
+		}
+
 		// Return local bounds
-		return Bounds.TransformBy(InOwnerComponent->GetComponentTransform().Inverse());
+		return Bounds.TransformBy(OwnerTransform.Inverse());
 	}
 	return Bounds;
 }

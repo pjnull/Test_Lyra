@@ -1429,6 +1429,11 @@ void USkeletalMeshComponent::TickComponent(float DeltaTime, enum ELevelTick Tick
 	{
 		CSV_SCOPED_TIMING_STAT(Animation, Cloth);
 
+		// First update the simulation context, since the simulation isn't ticking
+		// and it is still required to get the correct simulation data and bounds.
+		constexpr bool bIsInitialization = false;
+		ClothingSimulation->FillContext(this, DeltaTime, ClothingSimulationContext, bIsInitialization);
+
 		ClothingSimulation->GetSimulationData(CurrentSimulationData, this, Cast<USkeletalMeshComponent>(MasterPoseComponent.Get()));
 	}
 
