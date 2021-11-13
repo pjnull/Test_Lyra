@@ -2554,8 +2554,8 @@ namespace Chaos
 
 		EContactShapesType CalculateShapePairType(const FImplicitObject* Implicit0, const FBVHParticles* BVHParticles0, const FImplicitObject* Implicit1, const FBVHParticles* BVHParticles1, bool& bOutSwap)
 		{
-			const EImplicitObjectType Implicit0Type = (Implicit0 != nullptr) ? GetInnerType(Implicit0->GetType()) : ImplicitObjectType::Unknown;
-			const EImplicitObjectType Implicit1Type = (Implicit1 != nullptr) ? GetInnerType(Implicit1->GetType()) : ImplicitObjectType::Unknown;
+			const EImplicitObjectType Implicit0Type = (Implicit0 != nullptr) ? GetInnerType(Implicit0->GetCollisionType()) : ImplicitObjectType::Unknown;
+			const EImplicitObjectType Implicit1Type = (Implicit1 != nullptr) ? GetInnerType(Implicit1->GetCollisionType()) : ImplicitObjectType::Unknown;
 			const bool bIsConvex0 = (Implicit0 != nullptr) && Implicit0->IsConvex() && (Implicit0Type != ImplicitObjectType::LevelSet);
 			const bool bIsConvex1 = (Implicit1 != nullptr) && Implicit1->IsConvex() && (Implicit1Type != ImplicitObjectType::LevelSet);
 

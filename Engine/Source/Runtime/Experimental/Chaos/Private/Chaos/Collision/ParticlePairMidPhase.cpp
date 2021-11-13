@@ -12,12 +12,24 @@
 #include "ChaosStats.h"
 
 extern bool Chaos_Collision_NarrowPhase_AABBBoundsCheck;
-extern bool bChaos_Collision_EnableManifoldRestore;
-extern Chaos::FRealSingle Chaos_Collision_ParticlePositionTolerance;
-extern Chaos::FRealSingle Chaos_Collision_ParticleRotationTolerance;
 
 namespace Chaos
 {
+	namespace CVars
+	{
+		bool bChaos_Collision_EnableManifoldRestore = true;
+		Chaos::FRealSingle Chaos_Collision_RestoreTolerance_NoContact_Position = 0.005f;	// About 0.5cm for a meter cube
+		Chaos::FRealSingle Chaos_Collision_RestoreTolerance_NoContact_Rotation = 0.1f;		// About 10deg
+		Chaos::FRealSingle Chaos_Collision_RestoreTolerance_Contact_Position = 0.02f;		// About 2cm for a meter cube
+		Chaos::FRealSingle Chaos_Collision_RestoreTolerance_Contact_Rotation = 0.1f;		// About 10deg
+		FAutoConsoleVariableRef CVarChaos_Collision_EnableManifoldRestore(TEXT("p.Chaos.Collision.EnableManifoldRestore"), bChaos_Collision_EnableManifoldRestore, TEXT(""));
+		FAutoConsoleVariableRef CVarChaos_Collision_RestoreTolerance_NoContact_Position(TEXT("p.Chaos.Collision.RestoreTolerance.NoContact.Position"), Chaos_Collision_RestoreTolerance_NoContact_Position, TEXT("Fraction of Size. Particle pairs that move less than this may have their contacts reinstated"));
+		FAutoConsoleVariableRef CVarChaos_Collision_RestoreTolerance_NoContact_Rotation(TEXT("p.Chaos.Collision.RestoreTolerance.NoContact.Rotation"), Chaos_Collision_RestoreTolerance_NoContact_Rotation, TEXT("Quaternion Dot Product Limit. Particle pairs that move less than this may have their contacts reinstated"));
+		FAutoConsoleVariableRef CVarChaos_Collision_RestoreTolerance_Contact_Position(TEXT("p.Chaos.Collision.RestoreTolerance.WithContact.Position"), Chaos_Collision_RestoreTolerance_Contact_Position, TEXT("Fraction of Size. Particle pairs that move less than this may have their contacts reinstated"));
+		FAutoConsoleVariableRef CVarChaos_Collision_RestoreTolerance_Contact_Rotation(TEXT("p.Chaos.Collision.RestoreTolerance.WithContact.Rotation"), Chaos_Collision_RestoreTolerance_Contact_Rotation, TEXT("Quaternion Dot Product Limit. Particle pairs that move less than this may have their contacts reinstated"));
+	}
+	using namespace CVars;
+
 	inline bool ImplicitOverlapOBBToAABB(
 		const FImplicitObject* Implicit0, 
 		const FImplicitObject* Implicit1, 
@@ -593,6 +605,7 @@ namespace Chaos
 		, CollisionAllocator(&InCollisionAllocator)
 		, bIsCCD(false)
 		, bIsInitialized(false)
+		, bRestorable(false)
 		, bIsSleeping(false)
 		, LastUsedEpoch(INDEX_NONE)
 		, NumActiveConstraints(0)
@@ -644,6 +657,8 @@ namespace Chaos
 
 		bIsCCD = FConstGenericParticleHandle(Particle0)->CCDEnabled() || FConstGenericParticleHandle(Particle1)->CCDEnabled();
 
+		bRestorable = true;
+
 		BuildDetectors();
 
 		InitRestoreThresholds();
@@ -673,11 +688,11 @@ namespace Chaos
 	{
 		const FImplicitObject* Implicit0 = Shape0->GetLeafGeometry();
 		const FBVHParticles* BVHParticles0 = FConstGenericParticleHandle(Particle0)->CollisionParticles().Get();
-		const EImplicitObjectType ImplicitType0 = (Implicit0 != nullptr) ? GetInnerType(Implicit0->GetType()) : ImplicitObjectType::Unknown;
+		const EImplicitObjectType ImplicitType0 = (Implicit0 != nullptr) ? GetInnerType(Implicit0->GetCollisionType()) : ImplicitObjectType::Unknown;
 
 		const FImplicitObject* Implicit1 = Shape1->GetLeafGeometry();
 		const FBVHParticles* BVHParticles1 = FConstGenericParticleHandle(Particle1)->CollisionParticles().Get();
-		const EImplicitObjectType ImplicitType1 = (Implicit1 != nullptr) ? GetInnerType(Implicit1->GetType()) : ImplicitObjectType::Unknown;
+		const EImplicitObjectType ImplicitType1 = (Implicit1 != nullptr) ? GetInnerType(Implicit1->GetCollisionType()) : ImplicitObjectType::Unknown;
 
 		const bool bDoPassFilter = DoCollide(ImplicitType0, Shape0, ImplicitType1, Shape1);
 		if (bDoPassFilter)
@@ -693,9 +708,17 @@ namespace Chaos
 			{
 				MultiShapePairDetectors.Emplace(FMultiShapePairCollisionDetector(Shape0, Shape1, *this));
 			}
+
+			// We don't allow full constraint restoration for LevelSets or Unions because small changes in 
+			// transform can change what conatct points are generated.
+			// @todo(chaos): LevelSets require one-shot manifolds to suport full restore
+			// @todo(chaos): Unions may need to reactivate constraints that were not used last frame to support full restore
+			if ((ShapePairType == EContactShapesType::LevelSetLevelSet) || (ShapePairType == EContactShapesType::Unknown))
+			{
+				bRestorable = false;
+			}
 		}
 	}
-
 
 	bool FParticlePairMidPhase::ShouldEnableCCD(const FReal Dt)
 	{
@@ -710,18 +733,6 @@ namespace Chaos
 
 		return bUseCCD;
 	}
-
-
-	bool bChaos_Collision_EnableManifoldRestore = true;
-	Chaos::FRealSingle Chaos_Collision_RestoreTolerance_NoContact_Position = 0.005f;	// About 0.5cm for a meter cube
-	Chaos::FRealSingle Chaos_Collision_RestoreTolerance_NoContact_Rotation = 0.1f;		// About 10deg
-	Chaos::FRealSingle Chaos_Collision_RestoreTolerance_Contact_Position = 0.02f;		// About 2cm for a meter cube
-	Chaos::FRealSingle Chaos_Collision_RestoreTolerance_Contact_Rotation = 0.1f;		// About 10deg
-	FAutoConsoleVariableRef CVarChaos_Collision_EnableManifoldRestore(TEXT("p.Chaos.Collision.EnableManifoldRestore"), bChaos_Collision_EnableManifoldRestore, TEXT(""));
-	FAutoConsoleVariableRef CVarChaos_Collision_RestoreTolerance_NoContact_Position(TEXT("p.Chaos.Collision.RestoreTolerance.NoContact.Position"), Chaos_Collision_RestoreTolerance_NoContact_Position, TEXT("Fraction of Size. Particle pairs that move less than this may have their contacts reinstated"));
-	FAutoConsoleVariableRef CVarChaos_Collision_RestoreTolerance_NoContact_Rotation(TEXT("p.Chaos.Collision.RestoreTolerance.NoContact.Rotation"), Chaos_Collision_RestoreTolerance_NoContact_Rotation, TEXT("Quaternion Dot Product Limit. Particle pairs that move less than this may have their contacts reinstated"));
-	FAutoConsoleVariableRef CVarChaos_Collision_RestoreTolerance_Contact_Position(TEXT("p.Chaos.Collision.RestoreTolerance.WithContact.Position"), Chaos_Collision_RestoreTolerance_Contact_Position, TEXT("Fraction of Size. Particle pairs that move less than this may have their contacts reinstated"));
-	FAutoConsoleVariableRef CVarChaos_Collision_RestoreTolerance_Contact_Rotation(TEXT("p.Chaos.Collision.RestoreTolerance.WithContact.Rotation"), Chaos_Collision_RestoreTolerance_Contact_Rotation, TEXT("Quaternion Dot Product Limit. Particle pairs that move less than this may have their contacts reinstated"));
 
 	void FParticlePairMidPhase::InitRestoreThresholds()
 	{
@@ -743,6 +754,11 @@ namespace Chaos
 	bool FParticlePairMidPhase::ShouldRestoreConstraints(const FReal Dt)
 	{
 		if (!bChaos_Collision_EnableManifoldRestore)
+		{
+			return false;
+		}
+
+		if (!bRestorable)
 		{
 			return false;
 		}

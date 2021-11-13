@@ -372,6 +372,7 @@ namespace Chaos
 
 		bool bIsCCD;
 		bool bIsInitialized;
+		bool bRestorable;
 		bool bIsSleeping;
 		int32 LastUsedEpoch;
 		int32 NumActiveConstraints;
