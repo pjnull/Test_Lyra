@@ -7,8 +7,6 @@ using System.IO;
 using EpicGames.Core;
 using System.Linq;
 
-#nullable disable
-
 namespace UnrealBuildTool
 {
 	/// <summary>
@@ -34,7 +32,7 @@ namespace UnrealBuildTool
 		/// </summary>
 		string AppName = "";
 
-		public XcodeProjectFileGenerator(FileReference InOnlyGameProject, CommandLineArguments CommandLine)
+		public XcodeProjectFileGenerator(FileReference? InOnlyGameProject, CommandLineArguments CommandLine)
 			: base(InOnlyGameProject)
 		{
 			if (CommandLine.HasOption("-distribution"))
@@ -111,7 +109,7 @@ namespace UnrealBuildTool
 		/// <returns>The newly allocated project file object</returns>
 		protected override ProjectFile AllocateProjectFile(FileReference InitFilePath, DirectoryReference BaseDir)
 		{
-			return new XcodeProjectFile(InitFilePath, BaseDir, OnlyGameProject, bForDistribution, BundleIdentifier, AppName);
+			return new XcodeProjectFile(InitFilePath, BaseDir, bForDistribution, BundleIdentifier, AppName);
 		}
 
 		private bool WriteWorkspaceSettingsFile(string Path)
@@ -170,7 +168,7 @@ namespace UnrealBuildTool
 
 			List<XcodeProjectFile> BuildableProjects = new List<XcodeProjectFile>();
 
-			System.Action< List<PrimaryProjectFolder> /* Folders */, string /* Ident */ > AddProjectsFunction = null;
+			System.Action< List<PrimaryProjectFolder> /* Folders */, string /* Ident */ >? AddProjectsFunction = null;
 			AddProjectsFunction = (FolderList, Ident) =>
 				{
 					foreach (PrimaryProjectFolder CurFolder in FolderList)
@@ -178,16 +176,13 @@ namespace UnrealBuildTool
 						WorkspaceDataContent.Append(Ident + "   <Group" + ProjectFileGenerator.NewLine);
 						WorkspaceDataContent.Append(Ident + "      location = \"container:\"      name = \"" + CurFolder.FolderName + "\">" + ProjectFileGenerator.NewLine);
 
-						AddProjectsFunction(CurFolder.SubFolders, Ident + "   ");
+						AddProjectsFunction!(CurFolder.SubFolders, Ident + "   ");
 				
 						// Filter out anything that isn't an XC project, and that shouldn't be in the workspace
 						IEnumerable<XcodeProjectFile> SupportedProjects =
-								CurFolder.ChildProjects
-									.Where(P => P is XcodeProjectFile)
-									.Select(P => P as XcodeProjectFile)
+								CurFolder.ChildProjects.OfType<XcodeProjectFile>()
 									.Where(P => P.ShouldIncludeProjectInWorkspace())
 									.OrderBy(P => P.ProjectFilePath.GetFileName());
-
 
 						foreach (XcodeProjectFile XcodeProject in SupportedProjects)
 						{
@@ -210,11 +205,11 @@ namespace UnrealBuildTool
 			int SchemeIndex = 0;
 			BuildableProjects.Sort((ProjA, ProjB) => {
 
-				ProjectTarget TargetA = ProjA.ProjectTargets.OfType<ProjectTarget>().OrderBy(T => T.TargetRules.Type).First();
-				ProjectTarget TargetB = ProjB.ProjectTargets.OfType<ProjectTarget>().OrderBy(T => T.TargetRules.Type).First();
+				ProjectTarget TargetA = ProjA.ProjectTargets.OfType<ProjectTarget>().OrderBy(T => T.TargetRules!.Type).First();
+				ProjectTarget TargetB = ProjB.ProjectTargets.OfType<ProjectTarget>().OrderBy(T => T.TargetRules!.Type).First();
 
-				TargetType TypeA = TargetA.TargetRules.Type;
-				TargetType TypeB = TargetB.TargetRules.Type;
+				TargetType TypeA = TargetA.TargetRules!.Type;
+				TargetType TypeB = TargetB.TargetRules!.Type;
 
 				if (TypeA != TypeB)
 				{
@@ -255,7 +250,7 @@ namespace UnrealBuildTool
 			return bSuccess;
 		}
 
-		protected override bool WriteMasterProjectFile(ProjectFile UBTProject, PlatformProjectGeneratorCollection PlatformProjectGenerators)
+		protected override bool WriteMasterProjectFile(ProjectFile? UBTProject, PlatformProjectGeneratorCollection PlatformProjectGenerators)
 		{
 			return WriteXcodeWorkspace();
 		}
