@@ -36,48 +36,73 @@ namespace Chaos
 	class FCollisionParticlePairKey
 	{
 	public:
+		using KeyType = uint64;
+
 		FCollisionParticlePairKey()
-			: Key(0)
 		{
+			Key.Key64 = 0;
 		}
 
 		FCollisionParticlePairKey(const FGeometryParticleHandle* Particle0, const FGeometryParticleHandle* Particle1)
-			: Key(GenerateHash(Particle0, Particle1))
 		{
+			GenerateKey(Particle0, Particle1);
 		}
 
-		uint32 GetKey() const
+		uint64 GetKey() const
 		{
-			return Key;
+			return Key.Key64;
 		}
 
 	private:
-		uint32 GenerateHash(const FGeometryParticleHandle* Particle0, const FGeometryParticleHandle* Particle1)
+		void GenerateKey(const FGeometryParticleHandle* Particle0, const FGeometryParticleHandle* Particle1)
 		{
-			uint32 Hash0 = HashCombine(::GetTypeHash(Particle0->ParticleID().GlobalID), ::GetTypeHash(Particle0->ParticleID().LocalID));
-			uint32 Hash1 = HashCombine(::GetTypeHash(Particle1->ParticleID().GlobalID), ::GetTypeHash(Particle1->ParticleID().LocalID));
-			return OrderIndependentHashCombine(Hash1, Hash0);
+			int32 ID0 = (Particle0->ParticleID().LocalID != INDEX_NONE) ? Particle0->ParticleID().LocalID : Particle0->ParticleID().GlobalID;
+			int32 ID1 = (Particle1->ParticleID().LocalID != INDEX_NONE) ? Particle1->ParticleID().LocalID : Particle1->ParticleID().GlobalID;
+
+			if (ID0 < ID1)
+			{
+				Key.Key32s[0] = ID0;
+				Key.Key32s[1] = ID1;
+			}
+			else
+			{
+				Key.Key32s[0] = ID1;
+				Key.Key32s[1] = ID0;
+			}
 		}
 
-		uint32 Key;
+		union FIDKey
+		{
+			uint64 Key64;
+			int32 Key32s[2];
+		};
+
+		FIDKey Key;
 	};
 
 	/**
-	 * @brief A key which uniquely identifes a collision constraint for use by the collision detection system
-	 * This key will be the same if the particle order is reversed.
+	 * @brief A key which uniquely identifes a collision constraint within a particle pair
+	 * 
+	 * This key only needs to be uinque within the context of a particle pair. There is no
+	 * guarantee of global uniqueness. This key is only used by the FMultiShapePairCollisionDetector
+	 * class which is used for colliding shape pairs where each shape is actually a hierarchy
+	 * of shapes. 
+	 * 
 	*/
-	class FCollisionConstraintKey
+	class FCollisionParticlePairConstraintKey
 	{
 	public:
-		FCollisionConstraintKey()
+		FCollisionParticlePairConstraintKey()
 			: Key(0)
 		{
 		}
 
-		FCollisionConstraintKey(const FGeometryParticleHandle* Particle0, const FImplicitObject* Implicit0, const FBVHParticles* Simplicial0, const FGeometryParticleHandle* Particle1, const FImplicitObject* Implicit1, const FBVHParticles* Simplicial1)
+		FCollisionParticlePairConstraintKey(const FImplicitObject* Implicit0, const FBVHParticles* Simplicial0, const FImplicitObject* Implicit1, const FBVHParticles* Simplicial1)
 			: Key(0)
 		{
-			GenerateHash(Particle0, Implicit0, Simplicial0, Particle1, Implicit1, Simplicial1);
+			check((Implicit0 != nullptr) || (Simplicial0 != nullptr));
+			check((Implicit1 != nullptr) || (Simplicial1 != nullptr));
+			GenerateHash(Implicit0, Simplicial0, Implicit1, Simplicial1);
 		}
 
 		uint32 GetKey() const
@@ -85,35 +110,26 @@ namespace Chaos
 			return Key;
 		}
 
-		friend bool operator==(const FCollisionConstraintKey& L, const FCollisionConstraintKey& R)
+		friend bool operator==(const FCollisionParticlePairConstraintKey& L, const FCollisionParticlePairConstraintKey& R)
 		{
 			return L.Key == R.Key;
 		}
 
-		friend bool operator!=(const FCollisionConstraintKey& L, const FCollisionConstraintKey& R)
+		friend bool operator!=(const FCollisionParticlePairConstraintKey& L, const FCollisionParticlePairConstraintKey& R)
 		{
 			return !(L == R);
 		}
 
-		friend bool operator<(const FCollisionConstraintKey& L, const FCollisionConstraintKey& R)
+		friend bool operator<(const FCollisionParticlePairConstraintKey& L, const FCollisionParticlePairConstraintKey& R)
 		{
 			return L.Key < R.Key;
 		}
 
 	private:
-		void GenerateHash(const FGeometryParticleHandle* Particle0, const FImplicitObject* Implicit0, const FBVHParticles* Simplicial0, const FGeometryParticleHandle* Particle1, const FImplicitObject* Implicit1, const FBVHParticles* Simplicial1)
+		void GenerateHash(const FImplicitObject* Implicit0, const FBVHParticles* Simplicial0, const FImplicitObject* Implicit1, const FBVHParticles* Simplicial1)
 		{
-			// @todo(chaos): We should use ShapeIndex rather than Implicit/Simplicial pointers in the hash
-			const uint32 Particle0Hash = HashCombine(::GetTypeHash(Particle0->ParticleID().GlobalID), ::GetTypeHash(Particle0->ParticleID().LocalID));
-			const uint32 Implicit0Hash = ::GetTypeHash(Implicit0);
-			const uint32 Simplicial0Hash = ::GetTypeHash(Simplicial0);
-			const uint32 Hash0 = ::HashCombine(Particle0Hash, ::HashCombine(Implicit0Hash, Simplicial0Hash));
-
-			const uint32 Particle1Hash = HashCombine(::GetTypeHash(Particle1->ParticleID().GlobalID), ::GetTypeHash(Particle1->ParticleID().LocalID));
-			const uint32 Implicit1Hash = ::GetTypeHash(Implicit1);
-			const uint32 Simplicial1Hash = ::GetTypeHash(Simplicial1);
-			const uint32 Hash1 = ::HashCombine(Particle1Hash, ::HashCombine(Implicit1Hash, Simplicial1Hash));
-
+			const uint32 Hash0 = (Implicit0 != nullptr) ? ::GetTypeHash(Implicit0) : ::GetTypeHash(Simplicial0);
+			const uint32 Hash1 = (Implicit1 != nullptr) ? ::GetTypeHash(Implicit1) : ::GetTypeHash(Simplicial1);
 			Key = OrderIndependentHashCombine(Hash0, Hash1);
 		}
 

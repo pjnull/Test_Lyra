@@ -163,7 +163,7 @@ namespace Chaos
 		 * This wil create a new midphase if the particle pairs were not recently overlapping, or return an
 		 * existing one if they were.
 		 * @note Nothing outside of thie allocator should hold a pointer to the midphase, or any constraints 
-		 * it creates for more than the duration of the tick.
+		 * it creates for more than the duration of the tick. Except the IslandManager :| 
 		*/
 		FParticlePairMidPhase* GetParticlePairMidPhase(FGeometryParticleHandle* Particle0, FGeometryParticleHandle* Particle1)
 		{
@@ -419,7 +419,7 @@ namespace Chaos
 		}
 
 		// All of the overlapping particle pairs in the scene
-		TMap<uint32, TUniquePtr<FParticlePairMidPhase>> ParticlePairMidPhases;
+		TMap<uint64, TUniquePtr<FParticlePairMidPhase>> ParticlePairMidPhases;
 
 		// The active constraints (added or recovered this tick)
 		TArray<FPBDCollisionConstraint*> ActiveConstraints;

@@ -105,29 +105,10 @@ FAutoConsoleVariableRef CVarCCDAlwaysSweepRemainingDT(TEXT("p.Chaos.CCD.AlwaysSw
 bool CCDNoCullAllShapePairs = true;
 FAutoConsoleVariableRef CVarCCDNoCullAllShapePairs(TEXT("p.Chaos.CCD.NoCullAllShapePairs"), CCDNoCullAllShapePairs, TEXT("Whether to cull contacts early based on phi for sweeps for all shape pairs (not just convex convex)."));
 
-//Chaos::FRealSingl Chaos_Collision_ManifoldFaceAngle = 5.0f;
-//Chaos::FRealSingl Chaos_Collision_ManifoldFaceEpsilon = FMath::Sin(FMath::DegreesToRadians(Chaos_Collision_ManifoldFaceAngle));
-//FConsoleVariableDelegate Chaos_Collision_ManifoldFaceDelegate = FConsoleVariableDelegate::CreateLambda([](IConsoleVariable* CVar) { Chaos_Collision_ManifoldFaceEpsilon = FMath::Sin(FMath::DegreesToRadians(Chaos_Collision_ManifoldFaceAngle)); });
-//FAutoConsoleVariableRef CVarChaosCollisionManifoldFaceAngle(TEXT("p.Chaos.Collision.ManifoldFaceAngle"), Chaos_Collision_ManifoldFaceAngle, TEXT("Angle above which a face is rejected and we switch to point collision"), Chaos_Collision_ManifoldFaceDelegate);
-//
-//Chaos::FRealSingle Chaos_Collision_ManifoldPositionTolerance = 0.5f;
-//Chaos::FRealSingle Chaos_Collision_ManifoldRotationTolerance = 0.05f;
-//bool bChaos_Collision_ManifoldToleranceExceededRebuild = true;
-//FAutoConsoleVariableRef CVarChaosCollisionManifoldPositionTolerance(TEXT("p.Chaos.Collision.ManifoldPositionTolerance"), Chaos_Collision_ManifoldPositionTolerance, TEXT(""));
-//FAutoConsoleVariableRef CVarChaosCollisionManifoldRotationTolerance(TEXT("p.Chaos.Collision.ManifoldRotationTolerance"), Chaos_Collision_ManifoldRotationTolerance, TEXT(""));
-//FAutoConsoleVariableRef CVarChaosCollisionManifoldToleranceExceededRebuild(TEXT("p.Chaos.Collision.ManifoldToleranceRebuild"), bChaos_Collision_ManifoldToleranceExceededRebuild, TEXT(""));
-
 bool Chaos_Collision_NarrowPhase_SphereBoundsCheck = true;
 bool Chaos_Collision_NarrowPhase_AABBBoundsCheck = true;
 FAutoConsoleVariableRef CVarChaosCollisionSphereBoundsCheck(TEXT("p.Chaos.Collision.SphereBoundsCheck"), Chaos_Collision_NarrowPhase_SphereBoundsCheck, TEXT(""));
 FAutoConsoleVariableRef CVarChaosCollisionAABBBoundsCheck(TEXT("p.Chaos.Collision.AABBBoundsCheck"), Chaos_Collision_NarrowPhase_AABBBoundsCheck, TEXT(""));
-
-bool bChaos_Collision_EnableManifoldRestore = true;
-Chaos::FRealSingle Chaos_Collision_ParticlePositionTolerance = 0.3f;	// Particles that move less than this can reuse their manifolds
-Chaos::FRealSingle Chaos_Collision_ParticleRotationTolerance = 0.3f;	// Particles that move less than this can reuse their manifolds
-FAutoConsoleVariableRef CVarChaos_Collision_EnableManifoldRestore(TEXT("p.Chaos.Collision.EnableManifoldRestore"), bChaos_Collision_EnableManifoldRestore, TEXT(""));
-FAutoConsoleVariableRef CVarChaos_Collision_ParticlePositionTolerance(TEXT("p.Chaos.Collision.ParticlePositionTolerance"), Chaos_Collision_ParticlePositionTolerance, TEXT("Cms. Particle pairs that move less than this may have their contacts reinstated"));
-FAutoConsoleVariableRef CVarChaos_Collision_ParticleRotationTolerance(TEXT("p.Chaos.Collision.ParticleRotationTolerance"), Chaos_Collision_ParticleRotationTolerance, TEXT("Degrees. Particle pairs that move less than this may have their contacts reinstated"));
 
 bool bChaos_Collision_ShapesArrayMode = true;
 FAutoConsoleVariableRef CVarChaos_Collision_ShapesArrayMode(TEXT("p.Chaos.Collision.ShapesArrayMode"), bChaos_Collision_ShapesArrayMode, TEXT(""));

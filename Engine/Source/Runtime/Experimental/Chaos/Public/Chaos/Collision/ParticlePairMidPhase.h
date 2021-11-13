@@ -53,14 +53,10 @@ namespace Chaos
 		bool IsUsedSince(const int32 CurrentEpoch) const;
 
 		/**
-		 * @brief Destroy the constraint
-		*/
-		void Reset();
-
-		/**
 		 * @brief Perform a bounds check and run the narrow phase if necessary
+		 * @return The number of collisions constraints that were activated
 		*/
-		void GenerateCollision(
+		int32 GenerateCollision(
 			FGeometryParticleHandle* Particle0,
 			FGeometryParticleHandle* Particle1,
 			const FReal CullDistance,
@@ -69,6 +65,7 @@ namespace Chaos
 
 		/**
 		 * @brief Reactivate the collision exactly as it was last frame
+		 * @return The number of collisions constraints that were restored
 		*/
 		int32 RestoreCollision();
 
@@ -81,12 +78,12 @@ namespace Chaos
 
 		/**
 		 * @brief Set the collision from the parameter and activate it
-		 * This is used by the Resim restopre functionality
+		 * This is used by the Resim restore functionality
 		*/
 		void SetCollision(const FPBDCollisionConstraint& Constraint);
 
 	private:
-		void GenerateCollisionImpl(
+		int32 GenerateCollisionImpl(
 			FGeometryParticleHandle* Particle0,
 			const FPerShapeData* Shape0,
 			FGeometryParticleHandle* Particle1,
@@ -139,14 +136,10 @@ namespace Chaos
 		~FMultiShapePairCollisionDetector();
 
 		/**
-		* @brief Destroy the constraints
-		*/
-		void Reset();
-
-		/**
 		 * @brief Perform a bounds check and run the narrow phase if necessary
+		 * @return The number of collisions constraints that were activated
 		*/
-		void GenerateCollisions(
+		int32 GenerateCollisions(
 			FGeometryParticleHandle* Particle0,
 			FGeometryParticleHandle* Particle1,
 			const FReal CullDistance,
@@ -181,6 +174,7 @@ namespace Chaos
 
 		/**
 		 * @brief Reactivate the collision exactly as it was last frame
+		 * @return The number of collisions constraints that were restored
 		*/
 		int32 RestoreCollisions();
 
@@ -194,7 +188,7 @@ namespace Chaos
 		void VisitCollisions(const int32 LastEpoch, const FPBDCollisionVisitor& Visitor) const;
 
 	private:
-		FPBDCollisionConstraint* FindConstraint(const FCollisionConstraintKey& Key);
+		FPBDCollisionConstraint* FindConstraint(const FCollisionParticlePairConstraintKey& Key);
 
 		FPBDCollisionConstraint* CreateConstraint(
 			FGeometryParticleHandle* Particle0,
@@ -208,9 +202,9 @@ namespace Chaos
 			const FReal CullDistance,
 			const EContactShapesType ShapePairType,
 			const bool bInUseManifold,
-			const FCollisionConstraintKey& Key);
+			const FCollisionParticlePairConstraintKey& Key);
 
-		void ProcessNewConstraints();
+		int32 ProcessNewConstraints();
 		void PruneConstraints();
 
 		FParticlePairMidPhase& MidPhase;
@@ -220,6 +214,19 @@ namespace Chaos
 		const FPerShapeData* Shape1;
 	};
 
+
+	class FMidPhaseRestoreThresholds
+	{
+	public:
+		FMidPhaseRestoreThresholds()
+			: PositionThreshold(0)
+			, RotationThreshold(0)
+		{
+		}
+
+		FReal PositionThreshold;	// cm
+		FReal RotationThreshold;	// rad
+	};
 
 	/**
 	 * @brief Produce collisions for a particle pair
@@ -266,8 +273,11 @@ namespace Chaos
 		/**
 		 * @brief Have we run collision detection since this Epoch (inclusive)
 		*/
-		bool IsUsedSince(const int32 CurrentEpoch) const;
+		bool IsUsedSince(const int32 Epoch) const;
 
+		/**
+		 * @brief Whether the particle pair is sleeping and therefore contacts should not be culled (they will be reused on wake)
+		*/
 		bool IsSleeping() const { return bIsSleeping; }
 
 		/**
@@ -304,9 +314,17 @@ namespace Chaos
 		*/
 		void InjectCollision(const FPBDCollisionConstraint& Constraint);
 
+		/**
+		 * @brief Call a function on each active collision constraint
+		 * This including sleeping constraints, but not constraints that are were not used on the last awake tick
+		 * but are still kept around as an optimization.
+		*/
 		void VisitCollisions(const FPBDCollisionVisitor& Visitor) const;
 
 	private:
+		/**
+		 * @brief Set up the midphase based on the SHapesArrays of the two particles
+		*/
 		void Init();
 
 		/**
@@ -328,6 +346,8 @@ namespace Chaos
 		 * This may return false, even for collisions on CCD-enabled bodies when the bodies are moving slowly
 		*/
 		bool ShouldEnableCCD(const FReal Dt);
+
+		void InitRestoreThresholds();
 
 		/**
 		 * @brief Whether we should reuse the constraint as-is and skip the narrow phase
@@ -354,8 +374,11 @@ namespace Chaos
 		bool bIsInitialized;
 		bool bIsSleeping;
 		int32 LastUsedEpoch;
+		int32 NumActiveConstraints;
 
 		// The particle transforms the last time the collisions were updated (used to determine whether we can restore contacts)
+		FMidPhaseRestoreThresholds RestoreThresholdZeroContacts;
+		FMidPhaseRestoreThresholds RestoreThreshold;
 		FVec3 RestoreParticleP0;
 		FVec3 RestoreParticleP1;
 		FRotation3 RestoreParticleQ0;

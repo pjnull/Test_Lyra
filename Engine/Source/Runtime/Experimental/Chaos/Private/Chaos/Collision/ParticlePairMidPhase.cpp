@@ -95,7 +95,6 @@ namespace Chaos
 
 	FSingleShapePairCollisionDetector::~FSingleShapePairCollisionDetector()
 	{
-		Reset();
 	}
 
 	FSingleShapePairCollisionDetector::FSingleShapePairCollisionDetector(FSingleShapePairCollisionDetector&& R)
@@ -114,12 +113,7 @@ namespace Chaos
 		return (Constraint != nullptr) && (Constraint->GetContainerCookie().LastUsedEpoch >= Epoch);
 	}
 
-	void FSingleShapePairCollisionDetector::Reset()
-	{
-		Constraint.Reset();
-	}
-
-	void FSingleShapePairCollisionDetector::GenerateCollision(
+	int32 FSingleShapePairCollisionDetector::GenerateCollision(
 		FGeometryParticleHandle* Particle0,
 		FGeometryParticleHandle* Particle1,
 		const FReal CullDistance, 
@@ -139,7 +133,7 @@ namespace Chaos
 			const FAABB3& ShapeWorldBounds1 = Shape1->GetWorldSpaceInflatedShapeBounds();
 			if (!ShapeWorldBounds0.Intersects(ShapeWorldBounds1))
 			{
-				return;
+				return 0;
 			}
 
 			if (Chaos_Collision_NarrowPhase_AABBBoundsCheck)
@@ -159,12 +153,12 @@ namespace Chaos
 					const FRigidTransform3& ShapeWorldTransform1 = Shape1->GetLeafWorldTransform();
 					if (!ImplicitOverlapOBBToAABB(Implicit0, Implicit1, ShapeWorldTransform0, ShapeWorldTransform1, CullDistance))
 					{
-						return;
+						return 0;
 					}
 
 					if (!ImplicitOverlapOBBToAABB(Implicit1, Implicit0, ShapeWorldTransform1, ShapeWorldTransform0, CullDistance))
 					{
-						return;
+						return 0;
 					}
 				}
 			}
@@ -172,11 +166,11 @@ namespace Chaos
 
 		if (!bSwap)
 		{
-			GenerateCollisionImpl(Particle0, Shape0, Particle1, Shape1, CullDistance, bUseCCD, Dt);
+			return GenerateCollisionImpl(Particle0, Shape0, Particle1, Shape1, CullDistance, bUseCCD, Dt);
 		}
 		else
 		{
-			GenerateCollisionImpl(Particle1, Shape1, Particle0, Shape0, CullDistance, bUseCCD, Dt);
+			return GenerateCollisionImpl(Particle1, Shape1, Particle0, Shape0, CullDistance, bUseCCD, Dt);
 		}
 	}
 
@@ -199,7 +193,7 @@ namespace Chaos
 		Constraint->GetContainerCookie().CreationEpoch = MidPhase.GetCollisionAllocator().GetCurrentEpoch();
 	}
 
-	void FSingleShapePairCollisionDetector::GenerateCollisionImpl(
+	int32 FSingleShapePairCollisionDetector::GenerateCollisionImpl(
 		FGeometryParticleHandle* Particle0, 
 		const FPerShapeData* InShape0,
 		FGeometryParticleHandle* Particle1, 
@@ -220,6 +214,7 @@ namespace Chaos
 			CreateConstraint(Particle0, InShape0, Particle1, InShape1, CullDistance);
 		}
 
+		if (Constraint != nullptr)
 		{
 			PHYSICS_CSV_SCOPED_EXPENSIVE(PhysicsVerbose, NarrowPhase_UpdateConstraint);
 
@@ -252,8 +247,11 @@ namespace Chaos
 			if (Constraint->GetPhi() <= CullDistance)
 			{
 				MidPhase.GetCollisionAllocator().ActivateConstraint(Constraint.Get());
+				return 1;
 			}
 		}
+
+		return 0;
 	}
 
 	void FSingleShapePairCollisionDetector::PrepareConstraint(const bool bUseCCD)
@@ -348,12 +346,7 @@ namespace Chaos
 	{
 	}
 
-	void FMultiShapePairCollisionDetector::Reset()
-	{
-
-	}
-
-	void FMultiShapePairCollisionDetector::GenerateCollisions(
+	int32 FMultiShapePairCollisionDetector::GenerateCollisions(
 		FGeometryParticleHandle* Particle0,
 		FGeometryParticleHandle* Particle1,
 		const FReal CullDistance,
@@ -391,11 +384,13 @@ namespace Chaos
 			Dt,
 			LocalContext);
 
-		ProcessNewConstraints();
+		int32 NumActiveConstraints = ProcessNewConstraints();
 
 		// @todo(chaos): we could clean up unused collisions between this pair, but probably not worth it
 		// and we have to prevent cleanup for sleeping particles
 		//PruneConstraints();
+
+		return NumActiveConstraints;
 	}
 
 	FPBDCollisionConstraint* FMultiShapePairCollisionDetector::FindOrCreateConstraint(
@@ -411,8 +406,21 @@ namespace Chaos
 		const EContactShapesType ShapePairType,
 		const bool bUseManifold)
 	{
-		const FCollisionConstraintKey Key = FCollisionConstraintKey(Particle0, Implicit0, BVHParticles0, Particle1, Implicit1, BVHParticles1);
+		const FCollisionParticlePairConstraintKey Key = FCollisionParticlePairConstraintKey(Implicit0, BVHParticles0, Implicit1, BVHParticles1);
 		FPBDCollisionConstraint* Constraint = FindConstraint(Key);
+
+		// @todo(chaos): fix key uniqueness guarantee.  We need a truly unique key gen function
+		const bool bIsKeyCollision = (Constraint != nullptr) && ((Constraint->GetImplicit0() != Implicit0) || (Constraint->GetImplicit1() != Implicit1) || (Constraint->GetCollisionParticles0() != BVHParticles0) || (Constraint->GetCollisionParticles1() != BVHParticles1));
+		if (bIsKeyCollision)
+		{
+			// If we get here, we have a key collision. The key uses a hash of pointers which is very likely to be unique for different implicit pairs, 
+			// especially since the scope is only the implicits on the particle pairs, but ut is not guaranteed.
+			// Creating a new constraint with the same key could cause fatal problems (the original constraint will be deleted when we add the new one 
+			// to  the map) so we just abort. This will cause missing collisions. It is extremely unlikely to happen but we should fix it at some point.
+			ensure(false);
+			return nullptr;
+		}
+
 		if (Constraint == nullptr)
 		{
 			Constraint = CreateConstraint(Particle0, Implicit0, BVHParticles0, ShapeRelativeTransform0, Particle1, Implicit1, BVHParticles1, ShapeRelativeTransform1, CullDistance, ShapePairType, bUseManifold, Key);
@@ -434,7 +442,7 @@ namespace Chaos
 		const FReal CullDistance,
 		const EContactShapesType ShapePairType)
 	{
-		const FCollisionConstraintKey Key = FCollisionConstraintKey(Particle0, Implicit0, BVHParticles0, Particle1, Implicit1, BVHParticles1);
+		const FCollisionParticlePairConstraintKey Key = FCollisionParticlePairConstraintKey(Implicit0, BVHParticles0, Implicit1, BVHParticles1);
 		FPBDCollisionConstraint* Constraint = FindConstraint(Key);
 		if (Constraint == nullptr)
 		{
@@ -446,7 +454,7 @@ namespace Chaos
 		return Constraint;
 	}
 
-	FPBDCollisionConstraint* FMultiShapePairCollisionDetector::FindConstraint(const FCollisionConstraintKey& Key)
+	FPBDCollisionConstraint* FMultiShapePairCollisionDetector::FindConstraint(const FCollisionParticlePairConstraintKey& Key)
 	{
 		TUniquePtr<FPBDCollisionConstraint>* Constraint = Constraints.Find(Key.GetKey());
 		if (Constraint != nullptr)
@@ -468,7 +476,7 @@ namespace Chaos
 		const FReal CullDistance,
 		const EContactShapesType ShapePairType,
 		const bool bInUseManifold,
-		const FCollisionConstraintKey& Key)
+		const FCollisionParticlePairConstraintKey& Key)
 	{
 		PHYSICS_CSV_SCOPED_EXPENSIVE(PhysicsVerbose, NarrowPhase_CreateConstraint);
 		TUniquePtr<FPBDCollisionConstraint> Constraint = CreateImplicitPairConstraint(Particle0, Implicit0, BVHParticles0, ShapeRelativeTransform0, Particle1, Implicit1, BVHParticles1, ShapeRelativeTransform1, CullDistance, ShapePairType, bInUseManifold);
@@ -512,13 +520,19 @@ namespace Chaos
 		}
 	}
 
-	void FMultiShapePairCollisionDetector::ProcessNewConstraints()
+	int32 FMultiShapePairCollisionDetector::ProcessNewConstraints()
 	{
+		int32 NumActiveConstraints = 0;
 		for (FPBDCollisionConstraint* Constraint : NewConstraints)
 		{
-			MidPhase.GetCollisionAllocator().ActivateConstraint(Constraint);
+			if (Constraint->GetPhi() < Constraint->GetCullDistance())
+			{
+				MidPhase.GetCollisionAllocator().ActivateConstraint(Constraint);
+				++NumActiveConstraints;
+			}
 		}
 		NewConstraints.Reset();
+		return NumActiveConstraints;
 	}
 
 	void FMultiShapePairCollisionDetector::PruneConstraints()
@@ -581,6 +595,9 @@ namespace Chaos
 		, bIsInitialized(false)
 		, bIsSleeping(false)
 		, LastUsedEpoch(INDEX_NONE)
+		, NumActiveConstraints(0)
+		, RestoreThresholdZeroContacts()
+		, RestoreThreshold()
 		, RestoreParticleP0(FVec3(0))
 		, RestoreParticleP1(FVec3(0))
 		, RestoreParticleQ0(FRotation3::FromIdentity())
@@ -614,6 +631,7 @@ namespace Chaos
 	void FParticlePairMidPhase::Reset()
 	{
 		ShapePairDetectors.Reset();
+		MultiShapePairDetectors.Reset();
 
 		bIsCCD = false;
 		bIsInitialized = false;
@@ -624,11 +642,11 @@ namespace Chaos
 	{
 		PHYSICS_CSV_SCOPED_EXPENSIVE(PhysicsVerbose, NarrowPhase_Filter);
 
-		Reset();
-
 		bIsCCD = FConstGenericParticleHandle(Particle0)->CCDEnabled() || FConstGenericParticleHandle(Particle1)->CCDEnabled();
 
 		BuildDetectors();
+
+		InitRestoreThresholds();
 
 		bIsInitialized = true;
 	}
@@ -693,6 +711,35 @@ namespace Chaos
 		return bUseCCD;
 	}
 
+
+	bool bChaos_Collision_EnableManifoldRestore = true;
+	Chaos::FRealSingle Chaos_Collision_RestoreTolerance_NoContact_Position = 0.005f;	// About 0.5cm for a meter cube
+	Chaos::FRealSingle Chaos_Collision_RestoreTolerance_NoContact_Rotation = 0.1f;		// About 10deg
+	Chaos::FRealSingle Chaos_Collision_RestoreTolerance_Contact_Position = 0.02f;		// About 2cm for a meter cube
+	Chaos::FRealSingle Chaos_Collision_RestoreTolerance_Contact_Rotation = 0.1f;		// About 10deg
+	FAutoConsoleVariableRef CVarChaos_Collision_EnableManifoldRestore(TEXT("p.Chaos.Collision.EnableManifoldRestore"), bChaos_Collision_EnableManifoldRestore, TEXT(""));
+	FAutoConsoleVariableRef CVarChaos_Collision_RestoreTolerance_NoContact_Position(TEXT("p.Chaos.Collision.RestoreTolerance.NoContact.Position"), Chaos_Collision_RestoreTolerance_NoContact_Position, TEXT("Fraction of Size. Particle pairs that move less than this may have their contacts reinstated"));
+	FAutoConsoleVariableRef CVarChaos_Collision_RestoreTolerance_NoContact_Rotation(TEXT("p.Chaos.Collision.RestoreTolerance.NoContact.Rotation"), Chaos_Collision_RestoreTolerance_NoContact_Rotation, TEXT("Quaternion Dot Product Limit. Particle pairs that move less than this may have their contacts reinstated"));
+	FAutoConsoleVariableRef CVarChaos_Collision_RestoreTolerance_Contact_Position(TEXT("p.Chaos.Collision.RestoreTolerance.WithContact.Position"), Chaos_Collision_RestoreTolerance_Contact_Position, TEXT("Fraction of Size. Particle pairs that move less than this may have their contacts reinstated"));
+	FAutoConsoleVariableRef CVarChaos_Collision_RestoreTolerance_Contact_Rotation(TEXT("p.Chaos.Collision.RestoreTolerance.WithContact.Rotation"), Chaos_Collision_RestoreTolerance_Contact_Rotation, TEXT("Quaternion Dot Product Limit. Particle pairs that move less than this may have their contacts reinstated"));
+
+	void FParticlePairMidPhase::InitRestoreThresholds()
+	{
+		// @todo(chaos): improve this threshold calculation for thin objects? Dynamic thin objects have bigger problems so maybe we don't care
+		// @todo(chaos): Spheres and capsules need smaller position tolerance - the restore test doesn't work well with rolling
+		bool bIsDynamic0 = FConstGenericParticleHandle(Particle0)->IsDynamic();
+		bool bIsDynamic1 = FConstGenericParticleHandle(Particle1)->IsDynamic();
+		const FReal BoundsSize0 = bIsDynamic0 ? Particle0->LocalBounds().Extents().GetMin() : TNumericLimits<FReal>::Max();
+		const FReal BoundsSize1 = bIsDynamic1 ? Particle1->LocalBounds().Extents().GetMin() : TNumericLimits<FReal>::Max();
+		const FReal ThresholdSize = FMath::Min(BoundsSize0, BoundsSize1);
+
+		RestoreThresholdZeroContacts.PositionThreshold = Chaos_Collision_RestoreTolerance_NoContact_Position * ThresholdSize;
+		RestoreThresholdZeroContacts.RotationThreshold = Chaos_Collision_RestoreTolerance_NoContact_Rotation;
+
+		RestoreThreshold.PositionThreshold = Chaos_Collision_RestoreTolerance_Contact_Position * ThresholdSize;
+		RestoreThreshold.RotationThreshold = Chaos_Collision_RestoreTolerance_Contact_Rotation;
+	}
+
 	bool FParticlePairMidPhase::ShouldRestoreConstraints(const FReal Dt)
 	{
 		if (!bChaos_Collision_EnableManifoldRestore)
@@ -708,14 +755,13 @@ namespace Chaos
 		// We can only restore collisions if they were created or updated last tick
 		if (IsUsedSince(CollisionAllocator->GetCurrentEpoch() - 1))
 		{
+			const FReal PositionThreshold = (NumActiveConstraints == 0) ? RestoreThresholdZeroContacts.PositionThreshold : RestoreThreshold.PositionThreshold;
+			const FReal RotationThreshold = (NumActiveConstraints == 0) ? RestoreThresholdZeroContacts.RotationThreshold : RestoreThreshold.RotationThreshold;
+
 			// If either particle has moved or rotated in world space we cannot reuse the constraint
-			const FReal PositionTolerance = Chaos_Collision_ParticlePositionTolerance;	// cm
-			const FVec3 DP0 = ParticleP0 - RestoreParticleP0;
-			const FVec3 DP1 = ParticleP1 - RestoreParticleP1;
-			if (DP0.IsNearlyZero(PositionTolerance) && DP1.IsNearlyZero(PositionTolerance))
+			if ((ParticleP0 - RestoreParticleP0).IsNearlyZero(PositionThreshold) && (ParticleP1 - RestoreParticleP1).IsNearlyZero(PositionThreshold))
 			{
-				const FReal RotationTolerance = FMath::DegreesToRadians(Chaos_Collision_ParticleRotationTolerance);	// rad
-				if (FRotation3::IsNearlyEqual(ParticleQ0, RestoreParticleQ0, RotationTolerance) && FRotation3::IsNearlyEqual(ParticleQ1, RestoreParticleQ1, RotationTolerance))
+				if (FRotation3::IsNearlyEqual(ParticleQ0, RestoreParticleQ0, RotationThreshold) && FRotation3::IsNearlyEqual(ParticleQ1, RestoreParticleQ1, RotationThreshold))
 				{
 					// We passed the gauntlet - reuse the constraint
 					return true;
@@ -749,7 +795,12 @@ namespace Chaos
 				NumRestored += MultiShapePair.RestoreCollisions();
 			}
 
+			NumActiveConstraints = NumRestored;
+
 			PHYSICS_CSV_CUSTOM_EXPENSIVE(PhysicsCounters, NumRestoredContacts, NumRestored, ECsvCustomStatOp::Accumulate);
+
+			// NOTE: We return restored as true, even if we didn't have any constraints to restore. This is for Bodies 
+			// that were separated by more than CullDistance last tick and have not moved more than the tolerances.
 			return true;
 		}
 		return false;
@@ -769,23 +820,25 @@ namespace Chaos
 		const bool bUseCCD = bIsCCD && ShouldEnableCCD(Dt);
 
 		// If the bodies have not moved, we will reuse the constraints as-is
-		bool bRestored = !bUseCCD && TryRestoreConstraints(Dt);
+		bool bWasRestored = !bUseCCD && TryRestoreConstraints(Dt);
 
 		// If the bodies have moved we need to create or update the constraints
-		if (!bRestored)
+		if (!bWasRestored)
 		{
 			SCOPE_CYCLE_COUNTER(STAT_Collisions_GenerateCollisions);
 			PHYSICS_CSV_SCOPED_EXPENSIVE(PhysicsVerbose, DetectCollisions_NarrowPhase);
 
+			NumActiveConstraints = 0;
+
 			// Run collision detection on all potentially colliding shape pairs
 			for (FSingleShapePairCollisionDetector& ShapePair : ShapePairDetectors)
 			{
-				ShapePair.GenerateCollision(Particle0, Particle1, CullDistance, bUseCCD, Dt);
+				NumActiveConstraints += ShapePair.GenerateCollision(Particle0, Particle1, CullDistance, bUseCCD, Dt);
 			}
 
 			for (FMultiShapePairCollisionDetector& MultiShapePair : MultiShapePairDetectors)
 			{
-				MultiShapePair.GenerateCollisions(Particle0, Particle1, CullDistance, bUseCCD, Dt, Context);
+				NumActiveConstraints += MultiShapePair.GenerateCollisions(Particle0, Particle1, CullDistance, bUseCCD, Dt, Context);
 			}
 		}
 
@@ -858,7 +911,7 @@ namespace Chaos
 					LastUsedEpoch = CollisionAllocator->GetCurrentEpoch();
 				}
 			}
-			// If we are going to sleep, there is nothing to do (see commenbts above)
+			// If we are going to sleep, there is nothing to do (see comments above)
 
 			bIsSleeping = bInIsSleeping;
 		}
