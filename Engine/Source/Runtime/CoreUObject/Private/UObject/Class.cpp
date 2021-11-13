@@ -1199,6 +1199,7 @@ void UStruct::LoadTaggedPropertiesFromText(FStructuredArchive::FSlot Slot, uint8
 
 				FPropertyTag Tag;
 				ItemSlot.GetValue() << Tag;
+				Tag.Prop = Property;
 				Tag.ArrayIndex = ItemIndex;
 				Tag.Name = PropertyName;
 
@@ -1397,6 +1398,8 @@ void UStruct::SerializeVersionedTaggedProperties(FStructuredArchive::FSlot Slot,
 
 				if (Property)
 				{
+					Tag.Prop = Property;
+
 					FName PropID = Property->GetID();
 
 					// Check if this is a struct property and we have a redirector
