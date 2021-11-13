@@ -121,6 +121,11 @@ namespace ChaosTest
 
 	GTEST_TEST(AllTraits, ContactModification_ModifySeparation)
 	{
+		// The amount to pad the saparation by in the collision callback. Currently this must
+		// be less than the CullDistance specified in the settings (3.0)
+		// @todo(chaos): allow the user to pad bounds to support position modification
+		const FReal SeparationPadding = 2.0f;
+
 		FChaosSolversModule* Module = FChaosSolversModule::GetModule();
 		auto* Solver = Module->CreateSolver(nullptr, /*AsyncDt=*/-1);
 		InitSolverSettings(Solver);
@@ -142,7 +147,7 @@ namespace ChaosTest
 		SetCubeInertiaTensor(RegularCubeParticle, /*Dimension=*/200, /*Mass=*/1);
 		ChaosTest::SetParticleSimDataToCollide({ RegularCubeProxy->GetParticle_LowLevel() });
 
-		// Simulated cube with downawrd velocity, contact modification subtracts 5 from separation,  causing cube to rest above floor.
+		// Simulated cube with downawrd velocity, contact modification subtracts SeparationPadding from separation,  causing cube to rest above floor.
 		FSingleParticlePhysicsProxy* ModifiedCubeProxy = FSingleParticlePhysicsProxy::Create(Chaos::FPBDRigidParticle::CreateParticle());
 		auto& ModifiedCubeParticle = ModifiedCubeProxy->GetGameThreadAPI();
 		auto ModifiedCubeGeom = TSharedPtr<FImplicitObject, ESPMode::ThreadSafe>(new TBox<FReal, 3>(FVec3(-100), FVec3(100)));
@@ -168,7 +173,7 @@ namespace ChaosTest
 		TVec2<FUniqueIdx> UniqueIndices({ ModifiedCubeParticle.UniqueIdx(), FloorParticle.UniqueIdx() });
 
 		FContactModificationTestCallback* Callback = Solver->CreateAndRegisterSimCallbackObject_External<FContactModificationTestCallback>(true);
-		Callback->TestLambda = [UniqueIndices](Chaos::FCollisionContactModifier& Modifier)
+		Callback->TestLambda = [UniqueIndices, SeparationPadding](Chaos::FCollisionContactModifier& Modifier)
 		{
 			for (FContactPairModifier& PairModifier : Modifier)
 			{
@@ -183,9 +188,9 @@ namespace ChaosTest
 					int32 NumContacts = PairModifier.GetNumContacts();
 					for (int32 PointIdx = 0; PointIdx < NumContacts; ++PointIdx)
 					{
-						// Tell solver contacts are 5 units closer than they are, so object will float 5 over floor.
+						// Tell solver contacts are SeparationPadding units closer than they are, so object will float 5 over floor.
 						FReal Separation = PairModifier.GetSeparation(PointIdx);
-						PairModifier.ModifySeparation(Separation - 5, PointIdx);
+						PairModifier.ModifySeparation(Separation - SeparationPadding, PointIdx);
 					}
 				}
 			}
@@ -202,8 +207,8 @@ namespace ChaosTest
 
 		const float PositionTolerance = 1.e-3f;
 
-		// Modified cube should be resting 5 above floor, as we added 5 penetration through contact mod.
-		EXPECT_NEAR(ModifiedCubeParticle.X().Z, 105.f, PositionTolerance);
+		// Modified cube should be resting SeparationPadding above floor, as we added 5 penetration through contact mod.
+		EXPECT_NEAR(ModifiedCubeParticle.X().Z, 100.f + SeparationPadding, PositionTolerance);
 
 		// Colliding cube should be resting on floor.
 		EXPECT_NEAR(RegularCubeParticle.X().Z, 100.f, PositionTolerance);
