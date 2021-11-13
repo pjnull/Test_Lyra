@@ -299,7 +299,7 @@ float3 GetTranslucencyVolumeLighting(
 #endif
 
 /** Computes sky diffuse lighting, including precomputed shadowing. */
-void GetSkyLighting(FMaterialPixelParameters MaterialParameters, VTPageTableResult LightmapVTPageTableResult, FGBufferData GBuffer, float3 WorldNormal, float2 LightmapUV, uint LightmapDataIndex, float3 SkyOcclusionUV3D, out float3 OutDiffuseLighting, out float3 OutSubsurfaceLighting)
+void GetSkyLighting(FMaterialPixelParameters MaterialParameters, VTPageTableResult LightmapVTPageTableResult, bool bEvaluateBackface, float3 WorldNormal, float2 LightmapUV, uint LightmapDataIndex, float3 SkyOcclusionUV3D, out float3 OutDiffuseLighting, out float3 OutSubsurfaceLighting)
 {
 	OutDiffuseLighting = 0;
 	OutSubsurfaceLighting = 0;
@@ -325,8 +325,8 @@ void GetSkyLighting(FMaterialPixelParameters MaterialParameters, VTPageTableResu
 			FTwoBandSHVector DiffuseTransferSH = CalcDiffuseTransferSH(WorldNormal, 1);
 			OutDiffuseLighting += max(half3(0,0,0), DotSH(TranslucencyGISH, DiffuseTransferSH)) / PI;
 
-			#if MATERIAL_SHADINGMODEL_TWOSIDED_FOLIAGE
-			if (GBuffer.ShadingModelID == SHADINGMODELID_TWOSIDED_FOLIAGE)
+			#if SHADINGMODEL_REQUIRES_BACKFACE_LIGHTING
+			if (bEvaluateBackface)
 			{
 				FTwoBandSHVector SubsurfaceTransferSH = CalcDiffuseTransferSH(-WorldNormal, 1);
 				OutSubsurfaceLighting += max(half3(0,0,0), DotSH(TranslucencyGISH, SubsurfaceTransferSH)) / PI;
@@ -402,8 +402,8 @@ void GetSkyLighting(FMaterialPixelParameters MaterialParameters, VTPageTableResu
 		// Apply AO to the sky diffuse
 		OutDiffuseLighting += DiffuseLookup * (SkyVisibility * GeometryTerm);
 
-		#if MATERIAL_SHADINGMODEL_TWOSIDED_FOLIAGE
-		if (GBuffer.ShadingModelID == SHADINGMODELID_TWOSIDED_FOLIAGE)
+		#if SHADINGMODEL_REQUIRES_BACKFACE_LIGHTING
+		if (bEvaluateBackface)
 		{
 			float3 BackfaceDiffuseLookup = GetEffectiveSkySHDiffuse(-WorldNormal) * ResolvedView.SkyLightColor.rgb;
 			OutSubsurfaceLighting += BackfaceDiffuseLookup * SkyVisibility;
@@ -427,7 +427,7 @@ void GetPrecomputedIndirectLightingAndSkyLight(
 	FVertexFactoryInterpolantsVSToPS Interpolants,
 	FBasePassInterpolantsVSToPS BasePassInterpolants,
 	VTPageTableResult LightmapVTPageTableResult,
-	FGBufferData GBuffer,
+	bool bEvaluateBackface,
 	float3 DiffuseDir,
 	float3 VolumetricLightmapBrickTextureUVs,
 	out float3 OutDiffuseLighting,
@@ -478,8 +478,8 @@ void GetPrecomputedIndirectLightingAndSkyLight(
 			FThreeBandSHVector DiffuseTransferSH = CalcDiffuseTransferSH3(DiffuseDir, 1);
 			OutDiffuseLighting = max(float3(0,0,0), DotSH3(IrradianceSH, DiffuseTransferSH)) / PI;
 
-			#if MATERIAL_SHADINGMODEL_TWOSIDED_FOLIAGE
-			if (GBuffer.ShadingModelID == SHADINGMODELID_TWOSIDED_FOLIAGE)
+			#if SHADINGMODEL_REQUIRES_BACKFACE_LIGHTING
+			if (bEvaluateBackface)
 			{
 				FThreeBandSHVector SubsurfaceTransferSH = CalcDiffuseTransferSH3(-DiffuseDir, 1);
 				OutSubsurfaceLighting += max(float3(0,0,0), DotSH3(IrradianceSH, SubsurfaceTransferSH)) / PI;
@@ -522,8 +522,8 @@ void GetPrecomputedIndirectLightingAndSkyLight(
 				FTwoBandSHVector DiffuseTransferSH = CalcDiffuseTransferSH(DiffuseDir, 1);
 				OutDiffuseLighting = max(half3(0,0,0), DotSH(CachedSH, DiffuseTransferSH)) / PI;
 
-				#if MATERIAL_SHADINGMODEL_TWOSIDED_FOLIAGE
-				if (GBuffer.ShadingModelID == SHADINGMODELID_TWOSIDED_FOLIAGE)
+				#if SHADINGMODEL_REQUIRES_BACKFACE_LIGHTING
+				if (bEvaluateBackface)
 				{
 					FTwoBandSHVector SubsurfaceTransferSH = CalcDiffuseTransferSH(-DiffuseDir, 1);
 					OutSubsurfaceLighting += max(half3(0,0,0), DotSH(CachedSH, SubsurfaceTransferSH)) / PI;
@@ -547,8 +547,8 @@ void GetPrecomputedIndirectLightingAndSkyLight(
 			FOneBandSHVector DiffuseTransferSH = CalcDiffuseTransferSH1(1);
 			OutDiffuseLighting = DotSH1(PointIndirectLighting, DiffuseTransferSH);
 
-			#if MATERIAL_SHADINGMODEL_TWOSIDED_FOLIAGE
-			if (GBuffer.ShadingModelID == SHADINGMODELID_TWOSIDED_FOLIAGE)
+			#if SHADINGMODEL_REQUIRES_BACKFACE_LIGHTING
+			if (bEvaluateBackface)
 			{
 				FOneBandSHVector SubsurfaceTransferSH = CalcDiffuseTransferSH1(1);
 				OutSubsurfaceLighting += DotSH1(PointIndirectLighting, SubsurfaceTransferSH);
@@ -574,8 +574,8 @@ void GetPrecomputedIndirectLightingAndSkyLight(
 			// Compute diffuse lighting which takes the normal into account
 			OutDiffuseLighting = max(half3(0,0,0), DotSH3(PointIndirectLighting, DiffuseTransferSH));
 
-			#if MATERIAL_SHADINGMODEL_TWOSIDED_FOLIAGE
-			if (GBuffer.ShadingModelID == SHADINGMODELID_TWOSIDED_FOLIAGE)
+			#if SHADINGMODEL_REQUIRES_BACKFACE_LIGHTING
+			if (bEvaluateBackface)
 			{
 				FThreeBandSHVector SubsurfaceTransferSH = CalcDiffuseTransferSH3(-DiffuseDir, 1);
 				OutSubsurfaceLighting += max(half3(0, 0, 0), DotSH3(PointIndirectLighting, SubsurfaceTransferSH));
@@ -593,7 +593,7 @@ void GetPrecomputedIndirectLightingAndSkyLight(
 		GetLightMapCoordinates(Interpolants, LightmapUV0, LightmapUV1, LightmapDataIndex);
 		SkyOcclusionUV = LightmapUV0;
 		SkyOcclusionDataIndex = LightmapDataIndex;
-		GetLightMapColorHQ(LightmapVTPageTableResult, LightmapUV0, LightmapUV1, LightmapDataIndex, DiffuseDir, MaterialParameters.SvPosition.xy, GBuffer.ShadingModelID, OutDiffuseLighting, OutSubsurfaceLighting);
+		GetLightMapColorHQ(LightmapVTPageTableResult, LightmapUV0, LightmapUV1, LightmapDataIndex, DiffuseDir, MaterialParameters.SvPosition.xy, bEvaluateBackface, OutDiffuseLighting, OutSubsurfaceLighting);
 
 	// Low quality texture lightmaps
 	#elif LQ_TEXTURE_LIGHTMAP
@@ -611,7 +611,7 @@ void GetPrecomputedIndirectLightingAndSkyLight(
 
 	float3 SkyDiffuseLighting;
 	float3 SkySubsurfaceLighting;
-	GetSkyLighting(MaterialParameters, LightmapVTPageTableResult, GBuffer, DiffuseDir, SkyOcclusionUV, SkyOcclusionDataIndex, VolumetricLightmapBrickTextureUVs, SkyDiffuseLighting, SkySubsurfaceLighting);
+	GetSkyLighting(MaterialParameters, LightmapVTPageTableResult, bEvaluateBackface, DiffuseDir, SkyOcclusionUV, SkyOcclusionDataIndex, VolumetricLightmapBrickTextureUVs, SkyDiffuseLighting, SkySubsurfaceLighting);
 
 	OutSubsurfaceLighting += SkySubsurfaceLighting;
 
@@ -1275,8 +1275,8 @@ void FPixelShaderInOut_MainPS(
 		}
 		#endif
 
-		GetPrecomputedIndirectLightingAndSkyLight(MaterialParameters, Interpolants, BasePassInterpolants, LightmapVTPageTableResult, GBuffer, DiffuseDir, VolumetricLightmapBrickTextureUVs, DiffuseIndirectLighting, SubsurfaceIndirectLighting, IndirectIrradiance);
-		
+		const bool bEvaluateBackface = GetShadingModelRequiresBackfaceLighting(GBuffer.ShadingModelID);
+		GetPrecomputedIndirectLightingAndSkyLight(MaterialParameters, Interpolants, BasePassInterpolants, LightmapVTPageTableResult, bEvaluateBackface, DiffuseDir, VolumetricLightmapBrickTextureUVs, DiffuseIndirectLighting, SubsurfaceIndirectLighting, IndirectIrradiance);
 
 		float IndirectOcclusion = 1.0f;
 		float2 NearestResolvedDepthScreenUV = 0;
@@ -1616,6 +1616,9 @@ void FPixelShaderInOut_MainPS(
 			EyeIndex,
 			In.SvPosition,
 			BasePassInterpolants,
+			Interpolants,
+			LightmapVTPageTableResult,
+			VolumetricLightmapBrickTextureUVs,
 			MaterialParameters,
 			GBuffer.Depth,
 			ScreenUV,

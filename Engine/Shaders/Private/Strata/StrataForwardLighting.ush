@@ -14,6 +14,17 @@ void ApplyBentNormal(
 	in float3 CameraVector, in float3 WorldNormal, in float3x3 TangentToWorld, in float3 BentNormal0,
 	in float Roughness, inout float3 BentNormal, inout float DiffOcclusion, inout float SpecOcclusion);
 
+void GetPrecomputedIndirectLightingAndSkyLight(
+	FMaterialPixelParameters MaterialParameters,
+	FVertexFactoryInterpolantsVSToPS Interpolants,
+	FBasePassInterpolantsVSToPS BasePassInterpolants,
+	VTPageTableResult LightmapVTPageTableResult,
+	bool bEvaluateBackface,
+	float3 DiffuseDir,
+	float3 VolumetricLightmapBrickTextureUVs,
+	out float3 OutDiffuseLighting,
+	out float3 OutSubsurfaceLighting,
+	out float OutIndirectIrradiance);
 
 // Common function for forward lighting per pixel using light data
 float3 StrataForwardLightingCommon(
@@ -111,6 +122,9 @@ float3 StrataForwardLighting(
 	uint EyeIndex,
 	float4 SvPosition,
 	FBasePassInterpolantsVSToPS BasePassInterpolants,
+	FVertexFactoryInterpolantsVSToPS Interpolants,
+	VTPageTableResult LightmapVTPageTableResult,
+	float3 VolumetricLightmapBrickTextureUVs,
 	FMaterialPixelParameters MaterialParameters,
 	float SceneDepth,
 	float2 ScreenUV,
@@ -278,15 +292,23 @@ float3 StrataForwardLighting(
 				// Evaluate diffuse lighting
 				if (any((DiffuseColorForIndirect + SubsurfaceColorForIndirect) > 0.0f))
 				{
-					const float3 DiffuseIndirectLighting = GetEffectiveSkySHDiffuse(DiffuseNormal);
-					float3 SubsurfaceIndirectLighting = 0.0f;
-					BRANCH
-					if (any(SubsurfaceColorForIndirect > 0.0))
-					{
-						SubsurfaceIndirectLighting = GetEffectiveSkySHDiffuse(-DiffuseNormal);
-					}
+					const bool bEvaluateBackface = any(SubsurfaceColorForIndirect > 0.0);
 
-					// STRATA_TODO  indirect lighting from GetPrecomputedIndirectLightingAndSkyLight
+					float3 DiffuseIndirectLighting = 0.0f;
+					float3 SubsurfaceIndirectLighting = 0.0f;
+					float IndirectIrradiance = 0.0f;
+					GetPrecomputedIndirectLightingAndSkyLight(
+						MaterialParameters,
+						Interpolants,
+						BasePassInterpolants,
+						LightmapVTPageTableResult,
+						bEvaluateBackface,
+						DiffuseNormal,
+						VolumetricLightmapBrickTextureUVs,
+						DiffuseIndirectLighting,
+						SubsurfaceIndirectLighting,
+						IndirectIrradiance);
+
 					// STRATA_TODO  GetIndirectOcclusion for forward shading
 
 					Color += (DiffuseIndirectLighting * DiffuseColorForIndirect + SubsurfaceIndirectLighting * SubsurfaceColorForIndirect) * SkyLightCommonFactor * AOMultiBounce(StrataEnvLight.DiffuseColor, DiffOcclusion);
