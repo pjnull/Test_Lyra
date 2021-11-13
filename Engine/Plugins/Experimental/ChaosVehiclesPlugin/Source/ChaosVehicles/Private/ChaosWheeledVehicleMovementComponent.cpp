@@ -813,6 +813,7 @@ void UChaosWheeledVehicleSimulation::ProcessMechanicalSimulation(float DeltaTime
 			}
 		}
 
+		float WheelSpeedRPM = FMath::Abs(PTransmission.GetEngineRPMFromWheelRPM(WheelRPM));
 		PEngine.SetEngineRPM(PTransmission.IsOutOfGear(), PTransmission.GetEngineRPMFromWheelRPM(WheelRPM));
 		PEngine.Simulate(DeltaTime);
 
@@ -823,6 +824,10 @@ void UChaosWheeledVehicleSimulation::ProcessMechanicalSimulation(float DeltaTime
 		PTransmission.Simulate(DeltaTime);
 
 		float TransmissionTorque = PTransmission.GetTransmissionTorque(PEngine.GetEngineTorque());
+		if (WheelSpeedRPM > PEngine.Setup().MaxRPM)
+		{
+			TransmissionTorque = 0.f;
+		}
 
 		// apply drive torque to wheels
 		for (int WheelIdx = 0; WheelIdx < Wheels.Num(); WheelIdx++)
