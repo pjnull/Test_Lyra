@@ -15,7 +15,6 @@
 
 #define LOCTEXT_NAMESPACE "MetasoundStandardNodes_Bandsplitter"
 
-PRAGMA_DISABLE_OPTIMIZATION
 namespace Metasound
 {
 	namespace BandSplitterNode
@@ -426,4 +425,3 @@ namespace Metasound
 } // namespace Metasound
 
 #undef LOCTEXT_NAMESPACE
-PRAGMA_ENABLE_OPTIMIZATION
