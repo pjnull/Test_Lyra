@@ -13,14 +13,6 @@ using UnrealBuildBase;
 
 namespace UnrealBuildTool
 {
-	class VSCodeProjectFolder : MasterProjectFolder
-	{
-		public VSCodeProjectFolder(ProjectFileGenerator InitOwnerProjectFileGenerator, string InitFolderName)
-			: base(InitOwnerProjectFileGenerator, InitFolderName)
-		{
-		}
-	}
-
 	class VSCodeProject : ProjectFile
 	{
 		public VSCodeProject(FileReference InitFilePath)
@@ -254,11 +246,6 @@ namespace UnrealBuildTool
 		{
 			return new VSCodeProject(InitFilePath);
 		}
-
-		public override MasterProjectFolder AllocateMasterProjectFolder(ProjectFileGenerator InitOwnerProjectFileGenerator, string InitFolderName)
-		{
-			return new VSCodeProjectFolder(InitOwnerProjectFileGenerator, InitFolderName);
-		} 
 
 		protected override bool WriteMasterProjectFile(ProjectFile UBTProject, PlatformProjectGeneratorCollection PlatformProjectGenerators)
 		{

@@ -12,17 +12,6 @@ using System.Linq;
 namespace UnrealBuildTool
 {
 	/// <summary>
-	/// Represents a folder within the master project (e.g. Visual Studio solution)
-	/// </summary>
-	class XcodeProjectFolder : MasterProjectFolder
-	{
-		public XcodeProjectFolder(ProjectFileGenerator InitOwnerProjectFileGenerator, string InitFolderName)
-			: base(InitOwnerProjectFileGenerator, InitFolderName)
-		{
-		}
-	}
-
-	/// <summary>
 	/// Xcode project file generator implementation
 	/// </summary>
 	class XcodeProjectFileGenerator : ProjectFileGenerator
@@ -124,12 +113,6 @@ namespace UnrealBuildTool
 			return new XcodeProjectFile(InitFilePath, OnlyGameProject, bForDistribution, BundleIdentifier, AppName);
 		}
 
-		/// ProjectFileGenerator interface
-		public override MasterProjectFolder AllocateMasterProjectFolder(ProjectFileGenerator InitOwnerProjectFileGenerator, string InitFolderName)
-		{
-			return new XcodeProjectFolder(InitOwnerProjectFileGenerator, InitFolderName);
-		}
-
 		private bool WriteWorkspaceSettingsFile(string Path)
 		{
 			StringBuilder WorkspaceSettingsContent = new StringBuilder();
@@ -186,10 +169,10 @@ namespace UnrealBuildTool
 
 			List<XcodeProjectFile> BuildableProjects = new List<XcodeProjectFile>();
 
-			System.Action< List<MasterProjectFolder> /* Folders */, string /* Ident */ > AddProjectsFunction = null;
+			System.Action< List<PrimaryProjectFolder> /* Folders */, string /* Ident */ > AddProjectsFunction = null;
 			AddProjectsFunction = (FolderList, Ident) =>
 				{
-					foreach (XcodeProjectFolder CurFolder in FolderList)
+					foreach (PrimaryProjectFolder CurFolder in FolderList)
 					{
 						WorkspaceDataContent.Append(Ident + "   <Group" + ProjectFileGenerator.NewLine);
 						WorkspaceDataContent.Append(Ident + "      location = \"container:\"      name = \"" + CurFolder.FolderName + "\">" + ProjectFileGenerator.NewLine);

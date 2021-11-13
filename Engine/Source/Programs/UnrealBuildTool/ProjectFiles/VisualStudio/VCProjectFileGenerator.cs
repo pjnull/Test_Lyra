@@ -14,20 +14,6 @@ using UnrealBuildBase;
 
 namespace UnrealBuildTool
 {
-	/// <summary>
-	/// Represents a folder within the master project (e.g. Visual Studio solution)
-	/// </summary>
-	class VisualStudioSolutionFolder : MasterProjectFolder
-	{
-		/// <summary>
-		/// Constructor
-		/// </summary>
-		public VisualStudioSolutionFolder(ProjectFileGenerator InitOwnerProjectFileGenerator, string InitFolderName)
-			: base(InitOwnerProjectFileGenerator, InitFolderName)
-		{
-		}
-	}
-
 	enum VCProjectFileFormat
 	{
 		Default,          // Default to the best installed version, but allow SDKs to override
@@ -208,12 +194,6 @@ namespace UnrealBuildTool
 		}
 
 
-		/// ProjectFileGenerator interface
-		public override MasterProjectFolder AllocateMasterProjectFolder(ProjectFileGenerator InitOwnerProjectFileGenerator, string InitFolderName)
-		{
-			return new VisualStudioSolutionFolder(InitOwnerProjectFileGenerator, InitFolderName);
-		}
-
 		/// "4.0", "12.0", or "14.0", etc...
 		static public string GetProjectFileToolVersionString(VCProjectFileFormat ProjectFileFormat)
 		{
@@ -390,22 +370,22 @@ namespace UnrealBuildTool
 			return SolutionConfigName;
 		}
 
-		static IDictionary<MasterProjectFolder, Guid> GenerateProjectFolderGuids(MasterProjectFolder RootFolder)
+		static IDictionary<PrimaryProjectFolder, Guid> GenerateProjectFolderGuids(PrimaryProjectFolder RootFolder)
 		{
-			IDictionary<MasterProjectFolder, Guid> Guids = new Dictionary<MasterProjectFolder, Guid>();
-			foreach (MasterProjectFolder Folder in RootFolder.SubFolders)
+			IDictionary<PrimaryProjectFolder, Guid> Guids = new Dictionary<PrimaryProjectFolder, Guid>();
+			foreach (PrimaryProjectFolder Folder in RootFolder.SubFolders)
 			{
 				GenerateProjectFolderGuids("UE5", Folder, Guids);
 			}
 			return Guids;
 		}
 
-		static void GenerateProjectFolderGuids(string ParentPath, MasterProjectFolder Folder, IDictionary<MasterProjectFolder, Guid> Guids)
+		static void GenerateProjectFolderGuids(string ParentPath, PrimaryProjectFolder Folder, IDictionary<PrimaryProjectFolder, Guid> Guids)
 		{
 			string Path = String.Format("{0}/{1}", ParentPath, Folder.FolderName);
 			Guids[Folder] = MakeMd5Guid(Encoding.UTF8.GetBytes(Path));
 
-			foreach (MasterProjectFolder SubFolder in Folder.SubFolders)
+			foreach (PrimaryProjectFolder SubFolder in Folder.SubFolders)
 			{
 				GenerateProjectFolderGuids(Path, SubFolder, Guids);
 			}
@@ -509,7 +489,7 @@ namespace UnrealBuildTool
 				throw new BuildException("Unexpected ProjectFileFormat");
 			}
 
-			IDictionary<MasterProjectFolder, Guid> ProjectFolderGuids = GenerateProjectFolderGuids(RootFolder);
+			IDictionary<PrimaryProjectFolder, Guid> ProjectFolderGuids = GenerateProjectFolderGuids(RootFolder);
 
 			// Solution folders, files and project entries
 			{
@@ -518,8 +498,8 @@ namespace UnrealBuildTool
 
 				// Solution folders
 				{
-					IEnumerable<MasterProjectFolder> AllSolutionFolders = ProjectFolderGuids.Keys.OrderBy(Folder => Folder.FolderName).ThenBy(Folder => ProjectFolderGuids[Folder]);
-					foreach (MasterProjectFolder CurFolder in AllSolutionFolders)
+					IEnumerable<PrimaryProjectFolder> AllSolutionFolders = ProjectFolderGuids.Keys.OrderBy(Folder => Folder.FolderName).ThenBy(Folder => ProjectFolderGuids[Folder]);
+					foreach (PrimaryProjectFolder CurFolder in AllSolutionFolders)
 					{
 						string FolderGUIDString = ProjectFolderGuids[CurFolder].ToString("B").ToUpperInvariant();
 						VCSolutionFileContent.AppendLine("Project(\"" + SolutionFolderEntryGUID + "\") = \"" + CurFolder.FolderName + "\", \"" + CurFolder.FolderName + "\", \"" + FolderGUIDString + "\"");
@@ -764,10 +744,10 @@ namespace UnrealBuildTool
 						// filter)'s GUID, and Guid2 is the solution filter directory to parent the child project (or solution
 						// filter) to.  This sets up the hierarchical solution explorer tree for all solution folders and projects.
 
-						System.Action<StringBuilder /* VCSolutionFileContent */, List<MasterProjectFolder> /* Folders */ > FolderProcessorFunction = null;
+						System.Action<StringBuilder /* VCSolutionFileContent */, List<PrimaryProjectFolder> /* Folders */ > FolderProcessorFunction = null;
 						FolderProcessorFunction = (LocalVCSolutionFileContent, LocalMasterProjectFolders) =>
 							{
-								foreach (MasterProjectFolder CurFolder in LocalMasterProjectFolders)
+								foreach (PrimaryProjectFolder CurFolder in LocalMasterProjectFolders)
 								{
 									string CurFolderGUIDString = ProjectFolderGuids[CurFolder].ToString("B").ToUpperInvariant();
 
@@ -777,7 +757,7 @@ namespace UnrealBuildTool
 										LocalVCSolutionFileContent.AppendLine("		" + ChildProject.ProjectGUID.ToString("B").ToUpperInvariant() + " = " + CurFolderGUIDString);
 									}
 
-									foreach (MasterProjectFolder SubFolder in CurFolder.SubFolders)
+									foreach (PrimaryProjectFolder SubFolder in CurFolder.SubFolders)
 									{
 										//	e.g. "{BF6FB09F-A2A6-468F-BE6F-DEBE07EAD3EA} = {C43B6BB5-3EF0-4784-B896-4099753BCDA9}"
 										LocalVCSolutionFileContent.AppendLine("		" + ProjectFolderGuids[SubFolder].ToString("B").ToUpperInvariant() + " = " + CurFolderGUIDString);
@@ -884,7 +864,7 @@ namespace UnrealBuildTool
 			}
 		}
 
-		static void BuildSolutionExplorerState_VS2019(MasterProjectFolder Folder, string Suffix, VCSolutionExplorerState ExplorerState, ProjectFile DefaultProject)
+		static void BuildSolutionExplorerState_VS2019(PrimaryProjectFolder Folder, string Suffix, VCSolutionExplorerState ExplorerState, ProjectFile DefaultProject)
 		{
 			foreach (ProjectFile Project in Folder.ChildProjects)
 			{
@@ -899,7 +879,7 @@ namespace UnrealBuildTool
 				}
 			}
 
-			foreach (MasterProjectFolder SubFolder in Folder.SubFolders)
+			foreach (PrimaryProjectFolder SubFolder in Folder.SubFolders)
 			{
 				string SubFolderName = SubFolder.FolderName + Suffix;
 				if (SubFolderName == "Automation;Programs")

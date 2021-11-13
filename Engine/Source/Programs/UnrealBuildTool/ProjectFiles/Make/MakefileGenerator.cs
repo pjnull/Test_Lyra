@@ -11,20 +11,6 @@ using UnrealBuildBase;
 
 namespace UnrealBuildTool
 {
-	/// <summary>
-	/// Represents a folder within the master project (e.g. Visual Studio solution)
-	/// </summary>
-	class MakefileFolder : MasterProjectFolder
-	{
-		/// <summary>
-		/// Constructor
-		/// </summary>
-		public MakefileFolder(ProjectFileGenerator InitOwnerProjectFileGenerator, string InitFolderName)
-			: base(InitOwnerProjectFileGenerator, InitFolderName)
-		{
-		}
-	}
-
 	class MakefileProjectFile : ProjectFile
 	{
 		public MakefileProjectFile(FileReference InitFilePath)
@@ -204,12 +190,6 @@ namespace UnrealBuildTool
 		protected override bool WriteProjectFiles(PlatformProjectGeneratorCollection PlatformProjectGenerators)
 		{
 			return WriteMakefile();
-		}
-
-		/// ProjectFileGenerator interface
-		public override MasterProjectFolder AllocateMasterProjectFolder(ProjectFileGenerator InitOwnerProjectFileGenerator, string InitFolderName)
-		{
-			return new MakefileFolder(InitOwnerProjectFileGenerator, InitFolderName);
 		}
 
 		/// ProjectFileGenerator interface

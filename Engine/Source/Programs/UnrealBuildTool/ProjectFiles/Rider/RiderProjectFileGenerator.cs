@@ -11,14 +11,6 @@ using UnrealBuildBase;
 
 namespace UnrealBuildTool
 {
-	class RiderMasterProjectFolder : MasterProjectFolder
-	{
-		public RiderMasterProjectFolder(ProjectFileGenerator InitOwnerProjectFileGenerator, string InitFolderName) :
-			base(InitOwnerProjectFileGenerator, InitFolderName)
-		{
-		}
-	}
-
 	class RiderProjectFileGenerator : ProjectFileGenerator
 	{
 		public override string ProjectFileExtension => ".json";
@@ -99,12 +91,6 @@ namespace UnrealBuildTool
 			RiderProjectFile projectFile = new RiderProjectFile(InitFilePath)
 				{RootPath = InitFilePath.Directory, Arguments = Arguments, TargetTypes = TargetTypes};
 			return projectFile;
-		}
-
-		public override MasterProjectFolder AllocateMasterProjectFolder(ProjectFileGenerator OwnerProjectFileGenerator,
-			string FolderName)
-		{
-			return new RiderMasterProjectFolder(OwnerProjectFileGenerator, FolderName);
 		}
 
 		protected override bool WriteProjectFiles(PlatformProjectGeneratorCollection PlatformProjectGenerators)

@@ -12,15 +12,6 @@ using EpicGames.Core;
 
 namespace UnrealBuildTool
 {
-	// Represents a folder within the master project. TODO Not using at the moment.
-	class CodeLiteFolder : MasterProjectFolder
-	{
-		public CodeLiteFolder(ProjectFileGenerator InitOwnerProjectFileGenerator, string InitFolderName)
-			: base(InitOwnerProjectFileGenerator, InitFolderName)
-		{
-		}
-	}
-
 	enum CodeliteProjectFileFormat
 	{
 		CodeLite9,
@@ -299,11 +290,6 @@ namespace UnrealBuildTool
 		protected override ProjectFile AllocateProjectFile(FileReference InitFilePath)
 		{
 			return new CodeLiteProject(InitFilePath, OnlyGameProject);
-		}
-
-		public override MasterProjectFolder AllocateMasterProjectFolder(ProjectFileGenerator InitOwnerProjectFileGenerator, string InitFolderName)
-		{
-			return new CodeLiteFolder(InitOwnerProjectFileGenerator, InitFolderName);
 		}
 
 		public override void CleanProjectFiles(DirectoryReference InMasterProjectDirectory, string InMasterProjectName, DirectoryReference InIntermediateProjectFilesDirectory)
