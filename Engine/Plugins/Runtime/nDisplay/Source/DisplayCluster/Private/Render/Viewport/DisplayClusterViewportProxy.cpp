@@ -32,7 +32,7 @@
 
 #include "IDisplayClusterShaders.h"
 
-static TAutoConsoleVariable<int> CVarDisplayClusterRenderOverscanResolve(
+static TAutoConsoleVariable<int32> CVarDisplayClusterRenderOverscanResolve(
 	TEXT("nDisplay.render.overscan.resolve"),
 	1,
 	TEXT("Allow resolve overscan internal rect to output backbuffer.\n")
@@ -67,9 +67,9 @@ bool ImplGetTextureResources_RenderThread(const TArray<FDisplayClusterTextureRes
 	{
 		OutResources.AddDefaulted(InResources.Num());
 
-		for (int i = 0; i < OutResources.Num(); i++)
+		for (int32 ResourceIndex = 0; ResourceIndex < OutResources.Num(); ResourceIndex++)
 		{
-			OutResources[i] = InResources[i]->GetTextureResource();
+			OutResources[ResourceIndex] = InResources[ResourceIndex]->GetTextureResource();
 		}
 
 		return true;
@@ -87,9 +87,9 @@ bool ImplGetTextureResources_RenderThread(const TArray<FTextureRenderTargetResou
 	{
 		OutResources.AddDefaulted(InResources.Num());
 
-		for (int i = 0; i < OutResources.Num(); i++)
+		for (int32 ResourceIndex = 0; ResourceIndex < OutResources.Num(); ResourceIndex++)
 		{
-			OutResources[i] = InResources[i]->GetTexture2DRHI();
+			OutResources[ResourceIndex] = InResources[ResourceIndex]->GetTexture2DRHI();
 		}
 
 		return true;
@@ -112,7 +112,7 @@ bool FDisplayClusterViewportProxy::GetResources_RenderThread(const EDisplayClust
 		if (Contexts.Num() > 0)
 		{
 			OutResources.AddDefaulted(Contexts.Num());
-			for (int ContextIt = 0; ContextIt < Contexts.Num(); ContextIt++)
+			for (int32 ContextIt = 0; ContextIt < Contexts.Num(); ContextIt++)
 			{
 				//Support Override:
 				if (Contexts[ContextIt].bDisableRender)
@@ -210,7 +210,7 @@ bool FDisplayClusterViewportProxy::GetResourcesWithRects_RenderThread(const EDis
 	switch (InResourceType)
 	{
 	case EDisplayClusterViewportResourceType::InternalRenderTargetResource:
-		for (int ContextIt = 0; ContextIt < OutResourceRects.Num(); ContextIt++)
+		for (int32 ContextIt = 0; ContextIt < OutResourceRects.Num(); ContextIt++)
 		{
 			if (Contexts[ContextIt].bDisableRender)
 			{
@@ -225,13 +225,13 @@ bool FDisplayClusterViewportProxy::GetResourcesWithRects_RenderThread(const EDis
 		break;
 	case EDisplayClusterViewportResourceType::OutputFrameTargetableResource:
 	case EDisplayClusterViewportResourceType::AdditionalFrameTargetableResource:
-		for (int ContextIt = 0; ContextIt < OutResourceRects.Num(); ContextIt++)
+		for (int32 ContextIt = 0; ContextIt < OutResourceRects.Num(); ContextIt++)
 		{
 			OutResourceRects[ContextIt] = Contexts[ContextIt].FrameTargetRect;
 		}
 		break;
 	default:
-		for (int ContextIt = 0; ContextIt < OutResourceRects.Num(); ContextIt++)
+		for (int32 ContextIt = 0; ContextIt < OutResourceRects.Num(); ContextIt++)
 		{
 			OutResourceRects[ContextIt] = FIntRect(FIntPoint(0, 0), OutResources[ContextIt]->GetSizeXY());
 		}
@@ -282,7 +282,7 @@ void FDisplayClusterViewportProxy::UpdateDeferredResources(FRHICommandListImmedi
 		if (GetResources_RenderThread(EDisplayClusterViewportResourceType::InputShaderResource, InShaderResources) && GetResources_RenderThread(EDisplayClusterViewportResourceType::AdditionalTargetableResource, OutTargetableResources))
 		{
 			// Render postprocess blur:
-			for (int ContextNum = 0; ContextNum < InShaderResources.Num(); ContextNum++)
+			for (int32 ContextNum = 0; ContextNum < InShaderResources.Num(); ContextNum++)
 			{
 				ShadersAPI.RenderPostprocess_Blur(RHICmdList, InShaderResources[ContextNum], OutTargetableResources[ContextNum], PostRenderSettings.PostprocessBlur);
 			}
@@ -445,8 +445,8 @@ bool FDisplayClusterViewportProxy::ImplResolveResources(FRHICommandListImmediate
 	TArray<FIntRect> InputResourcesRect, OutputResourcesRect;
 	if (SourceProxy->GetResourcesWithRects_RenderThread(InputResourceType, InputResources, InputResourcesRect) && GetResourcesWithRects_RenderThread(OutputResourceType, OutputResources, OutputResourcesRect))
 	{
-		int InputAmmount = FMath::Min(InputResources.Num(), OutputResources.Num());
-		for (int InputIt = 0; InputIt < InputAmmount; InputIt++)
+		const int32 InputAmmount = FMath::Min(InputResources.Num(), OutputResources.Num());
+		for (int32 InputIt = 0; InputIt < InputAmmount; InputIt++)
 		{
 			FIntRect SourceRect = InputResourcesRect[InputIt];
 
@@ -467,7 +467,7 @@ bool FDisplayClusterViewportProxy::ImplResolveResources(FRHICommandListImmediate
 			if ((InputIt + 1) == InputAmmount)
 			{
 				// last input mono -> stereo outputs
-				for (int OutputIt = InputIt; OutputIt < OutputResources.Num(); OutputIt++)
+				for (int32 OutputIt = InputIt; OutputIt < OutputResources.Num(); OutputIt++)
 				{
 					ImplResolveResource(RHICmdList, InputResources[InputIt], SourceRect, OutputResources[OutputIt], OutputResourcesRect[OutputIt], bOutputIsMipsResource);
 				}

@@ -177,7 +177,7 @@ void FDisplayClusterDeviceBase::AdjustViewRect(EStereoscopicPass StereoPassType,
 	IDisplayClusterViewport* ViewportPtr = ViewportManagerPtr->FindViewport(StereoPassType, &ViewportContextNum);
 	if (ViewportPtr == nullptr)
 	{
-		UE_LOG(LogDisplayClusterRender, Warning, TEXT("Viewport StereoPassType='%i' not found"), int(StereoPassType));
+		UE_LOG(LogDisplayClusterRender, Warning, TEXT("Viewport StereoPassType='%i' not found"), int32(StereoPassType));
 		return;
 	}
 
@@ -247,7 +247,7 @@ void FDisplayClusterDeviceBase::CalculateStereoViewOffset(const enum EStereoscop
 	IDisplayClusterViewport* ViewportPtr = ViewportManagerPtr->FindViewport(StereoPassType, &ViewportContextNum);
 	if (ViewportPtr == nullptr)
 	{
-		UE_LOG(LogDisplayClusterRender, Warning, TEXT("Viewport StereoPassType='%i' not found"), int(StereoPassType));
+		UE_LOG(LogDisplayClusterRender, Warning, TEXT("Viewport StereoPassType='%i' not found"), int32(StereoPassType));
 		return;
 	}
 
@@ -317,7 +317,7 @@ void FDisplayClusterDeviceBase::CalculateStereoViewOffset(const enum EStereoscop
 
 	// Decode current eye type	
 	const EDisplayClusterEyeType EyeType = DecodeEyeType(ViewportContext.StereoscopicEye);
-	const int   EyeIndex = (int)EyeType;
+	const int32 EyeIndex = (int32)EyeType;
 
 	float PassOffset = 0.f;
 	float PassOffsetSwap = 0.f;
@@ -328,7 +328,7 @@ void FDisplayClusterDeviceBase::CalculateStereoViewOffset(const enum EStereoscop
 		// * Force left (-1) ==> 0 left eye
 		// * Force right (1) ==> 2 right eye
 		// * Default (0) ==> 1 mono
-		const int EyeOffsetIdx = 
+		const int32 EyeOffsetIdx = 
 			(CfgEyeOffset == EDisplayClusterEyeStereoOffset::None ? 0 :
 			(CfgEyeOffset == EDisplayClusterEyeStereoOffset::Left ? -1 : 1));
 
@@ -383,7 +383,7 @@ FMatrix FDisplayClusterDeviceBase::GetStereoProjectionMatrix(const enum EStereos
 		IDisplayClusterViewport* ViewportPtr = ViewportManagerPtr->FindViewport(StereoPassType, &ViewportContextNum);
 		if (ViewportPtr == nullptr)
 		{
-			UE_LOG(LogDisplayClusterRender, Warning, TEXT("Viewport StereoPassType='%i' not found"), int(StereoPassType));
+			UE_LOG(LogDisplayClusterRender, Warning, TEXT("Viewport StereoPassType='%i' not found"), int32(StereoPassType));
 		}
 		else
 		if (ViewportPtr->GetProjectionMatrix(ViewportContextNum, PrjMatrix) == false)

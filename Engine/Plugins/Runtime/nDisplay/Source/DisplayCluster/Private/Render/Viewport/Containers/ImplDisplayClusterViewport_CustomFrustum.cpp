@@ -4,7 +4,7 @@
 #include "Render/Viewport/Containers/DisplayClusterViewport_OverscanSettings.h"
 #include "Render/Viewport/DisplayClusterViewport.h"
 
-static TAutoConsoleVariable<int> CVarDisplayClusterRenderCustomFrustumEnable(
+static TAutoConsoleVariable<int32> CVarDisplayClusterRenderCustomFrustumEnable(
 	TEXT("nDisplay.render.custom_frustum.enable"),
 	1,
 	TEXT("Enable custom frustum feature.\n")

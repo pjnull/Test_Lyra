@@ -87,7 +87,7 @@ public:
 	{
 		check(IsInRenderingThread());
 
-		for (int ContextNum = 0; ContextNum < Contexts.Num(); ContextNum++)
+		for (int32 ContextNum = 0; ContextNum < Contexts.Num(); ContextNum++)
 		{
 			if (StereoPassType == Contexts[ContextNum].StereoscopicPass)
 			{

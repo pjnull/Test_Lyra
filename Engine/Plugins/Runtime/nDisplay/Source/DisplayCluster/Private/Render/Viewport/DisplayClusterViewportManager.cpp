@@ -575,7 +575,7 @@ void FDisplayClusterViewportManager::ImplDeleteViewport(FDisplayClusterViewport*
 	ViewportManagerProxy->ImplDeleteViewport(ExistViewport->ViewportProxy);
 
 	// Remove viewport obj from manager
-	int ViewportIndex = Viewports.Find(ExistViewport);
+	int32 ViewportIndex = Viewports.Find(ExistViewport);
 	if (ViewportIndex != INDEX_NONE)
 	{
 		Viewports[ViewportIndex] = nullptr;

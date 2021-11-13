@@ -265,7 +265,7 @@ FDisplayClusterShaderParameters_ICVFX::FCameraSettings FDisplayClusterViewportCo
 	Result.InnerCameraFrameAspectRatio = (float)CameraSettings.RenderSettings.CustomFrameSize.CustomWidth / (float)CameraSettings.RenderSettings.CustomFrameSize.CustomHeight;
 
 	const FString InnerFrustumID = InCameraComponent.GetCameraUniqueId();
-	const int CameraRenderOrder = RootActor.GetInnerFrustumPriority(InnerFrustumID);
+	const int32 CameraRenderOrder = RootActor.GetInnerFrustumPriority(InnerFrustumID);
 
 	Result.RenderOrder = (CameraRenderOrder<0) ? CameraSettings.RenderSettings.RenderOrder : CameraRenderOrder;
 

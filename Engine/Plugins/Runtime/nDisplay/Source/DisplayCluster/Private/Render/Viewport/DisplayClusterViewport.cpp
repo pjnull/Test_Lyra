@@ -367,7 +367,7 @@ bool FDisplayClusterViewport::UpdateFrameContexts(const uint32 InViewPassNum, co
 
 		FDisplayClusterViewport_Context Context(ContextIt, StereoscopicEye, StereoscopicPass);
 
-		int ContextGPUIndex = (ContextIt > 0 && RenderSettings.StereoGPUIndex >= 0) ? RenderSettings.StereoGPUIndex : RenderSettings.GPUIndex;
+		int32 ContextGPUIndex = (ContextIt > 0 && RenderSettings.StereoGPUIndex >= 0) ? RenderSettings.StereoGPUIndex : RenderSettings.GPUIndex;
 		Context.GPUIndex = ContextGPUIndex;
 
 

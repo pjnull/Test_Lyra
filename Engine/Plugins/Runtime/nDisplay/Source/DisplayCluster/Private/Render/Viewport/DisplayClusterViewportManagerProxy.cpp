@@ -110,7 +110,7 @@ void FDisplayClusterViewportManagerProxy::ImplDeleteViewport(FDisplayClusterView
 		[ViewportManagerProxy = this, ViewportProxy = InViewportProxy](FRHICommandListImmediate& RHICmdList)
 	{
 		// Remove viewport obj from manager
-		int ViewportProxyIndex = ViewportManagerProxy->ViewportProxies.Find(ViewportProxy);
+		int32 ViewportProxyIndex = ViewportManagerProxy->ViewportProxies.Find(ViewportProxy);
 		if (ViewportProxyIndex != INDEX_NONE)
 		{
 			ViewportManagerProxy->ViewportProxies[ViewportProxyIndex] = nullptr;
@@ -472,7 +472,7 @@ bool FDisplayClusterViewportManagerProxy::GetFrameTargets_RenderThread(TArray<FR
 	return false;
 }
 
-bool FDisplayClusterViewportManagerProxy::ResolveFrameTargetToBackBuffer_RenderThread(FRHICommandListImmediate& RHICmdList, const uint32 InContextNum, const int DestArrayIndex, FRHITexture2D* DestTexture, FVector2D WindowSize) const
+bool FDisplayClusterViewportManagerProxy::ResolveFrameTargetToBackBuffer_RenderThread(FRHICommandListImmediate& RHICmdList, const uint32 InContextNum, const int32 DestArrayIndex, FRHITexture2D* DestTexture, FVector2D WindowSize) const
 {
 	check(IsInRenderingThread());
 
@@ -481,7 +481,7 @@ bool FDisplayClusterViewportManagerProxy::ResolveFrameTargetToBackBuffer_RenderT
 	if (GetFrameTargets_RenderThread(FrameResources, TargetOffsets))
 	{
 		// Use internal frame textures as source
-		int ContextNum = InContextNum;
+		int32 ContextNum = InContextNum;
 
 		FRHITexture2D* FrameTexture = FrameResources[ContextNum];
 		FIntPoint DstOffset = TargetOffsets[ContextNum];
