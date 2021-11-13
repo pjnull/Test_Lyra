@@ -852,6 +852,32 @@ namespace Metasound
 						}
 					})
 				);
+
+				TSharedPtr<SAudioMeter> OutputMeterWidget = OutputMeter->GetWidget();
+				if (OutputMeterWidget.IsValid())
+				{
+					if (!OutputMeterWidget->bIsActiveTimerRegistered)
+					{
+						OutputMeterWidget->RegisterActiveTimer(0.0f,
+							FWidgetActiveTimerDelegate::CreateLambda([this](double InCurrentTime, float InDeltaTime)
+							{
+								if (IsPlaying())
+								{
+									return EActiveTimerReturnType::Continue;
+								}
+								else
+								{
+									if (OutputMeter->GetWidget().IsValid())
+									{
+										OutputMeter->GetWidget()->bIsActiveTimerRegistered = false;
+									}
+									return EActiveTimerReturnType::Stop;
+								}
+							})
+						);
+						OutputMeterWidget->bIsActiveTimerRegistered = true;
+					}
+				}
 			}
 		}
 
