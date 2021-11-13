@@ -100,6 +100,11 @@ TSharedRef<FSlateStyleSet> FDMXEditorStyle::Create()
 		Style->Set("DMXEditor.PixelMapping.DistributionGrid.3.2", new IMAGE_BRUSH("Icons/DistributionGrid/icon_PixelDirection_3_2_161x160", Icon34x29));
 		Style->Set("DMXEditor.PixelMapping.DistributionGrid.3.3", new IMAGE_BRUSH("Icons/DistributionGrid/icon_PixelDirection_3_3_161x160", Icon34x29));
 	}
+	
+	// DMX Editor icons
+	{
+		Style->Set("DMXEditor.FixtureTypesEditor.DeleteCellAttribute", new IMAGE_BRUSH("Icons/icon_Delete_CellAttribute_40x40", Icon40x40));
+	}
 
 	// Output Console
 	{
