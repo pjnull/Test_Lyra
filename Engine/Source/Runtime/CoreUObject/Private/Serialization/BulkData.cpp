@@ -1289,8 +1289,6 @@ void FUntypedBulkData::Serialize( FArchive& Ar, UObject* Owner, int32 Idx, bool 
 			}
 			else
 			{
-				checkf(bUseIOStore == false, TEXT("IoStore data should always be LazyLoadable"));
-
 				ClearLocalBulkDataFlags(BULKDATA_LazyLoadable);
 				// Serialize the bulk data right away.
 				// bAttemptFileMapping is ignored in this case, since we are going to load the memory before returning anyway.
