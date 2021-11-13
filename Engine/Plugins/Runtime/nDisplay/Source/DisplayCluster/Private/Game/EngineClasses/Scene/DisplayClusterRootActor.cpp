@@ -798,12 +798,12 @@ static void PropagateDefaultMapToInstancedMap(const FMapProperty* MapProperty, U
 		
 		if (UObject** InstancedObjectPtr = (UObject**)MapInstanceHelper.FindValueFromHash(Key))
 		{
-			UObject* InstancedObject = *InstancedObjectPtr;
-			check(InstancedObject);
-			
-			if (ensure(DefaultObject == InstancedObject->GetArchetype()))
+			if (const UObject* InstancedObject = *InstancedObjectPtr)
 			{
-				continue;
+				if (ensure(DefaultObject == InstancedObject->GetArchetype()))
+				{
+					continue;
+				}
 			}
 		}
 		
