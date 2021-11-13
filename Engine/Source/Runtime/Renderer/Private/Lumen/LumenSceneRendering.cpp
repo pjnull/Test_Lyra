@@ -2038,7 +2038,10 @@ void FDeferredShadingSceneRenderer::UpdateLumenScene(FRDGBuilder& GraphBuilder)
 				SharedView->CachedViewUniformShaderParameters = MakeUnique<FViewUniformShaderParameters>();
 				SharedView->CachedViewUniformShaderParameters->PrimitiveSceneData = Scene->GPUScene.PrimitiveBuffer.SRV;
 				SharedView->CachedViewUniformShaderParameters->InstanceSceneData = Scene->GPUScene.InstanceSceneDataBuffer.SRV;
+				SharedView->CachedViewUniformShaderParameters->InstancePayloadData = Scene->GPUScene.InstancePayloadDataBuffer.SRV;
 				SharedView->CachedViewUniformShaderParameters->LightmapSceneData = Scene->GPUScene.LightmapDataBuffer.SRV;
+				SharedView->CachedViewUniformShaderParameters->InstanceSceneDataSOAStride = Scene->GPUScene.InstanceSceneDataSOAStride;
+
 				SharedView->ViewUniformBuffer = TUniformBufferRef<FViewUniformShaderParameters>::CreateUniformBufferImmediate(*SharedView->CachedViewUniformShaderParameters, UniformBuffer_SingleFrame);
 			}
 
