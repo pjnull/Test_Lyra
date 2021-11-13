@@ -9,8 +9,6 @@ using System.Threading.Tasks;
 using EpicGames.Core;
 using UnrealBuildBase;
 
-#nullable disable
-
 namespace UnrealBuildTool
 {
 	/// <summary>
@@ -281,7 +279,7 @@ namespace UnrealBuildTool
 		/// <returns>New action instance</returns>
 		public static Action CreateRecursiveAction<T>(this IActionGraphBuilder Graph, ActionType Type, string Arguments) where T : ToolMode
 		{
-			ToolModeAttribute Attribute = typeof(T).GetCustomAttribute<ToolModeAttribute>();
+			ToolModeAttribute? Attribute = typeof(T).GetCustomAttribute<ToolModeAttribute>();
 			if (Attribute == null)
 			{
 				throw new BuildException("Missing ToolModeAttribute on {0}", typeof(T).Name);

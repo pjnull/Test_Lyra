@@ -159,7 +159,7 @@ namespace UnrealBuildTool
 			if(String.IsNullOrEmpty(ServerName))
 			{
 				// Read the server name
-				string? IniServerName;
+				string IniServerName;
 				if (Ini.GetString("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "RemoteServerName", out IniServerName) && !String.IsNullOrEmpty(IniServerName))
 				{
 					this.ServerName = IniServerName;
@@ -170,7 +170,7 @@ namespace UnrealBuildTool
 				}
 
 				// Parse the username
-				string? IniUserName;
+				string IniUserName;
 				if (Ini.GetString("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "RSyncUsername", out IniUserName) && !String.IsNullOrEmpty(IniUserName))
 				{
 					this.UserName = IniUserName;
@@ -199,7 +199,7 @@ namespace UnrealBuildTool
 			Log.TraceInformation("[Remote] Using remote server '{0}' on port {1} (user '{2}')", ServerName, ServerPort, UserName);
 
 			// Get the path to the SSH private key
-			string? OverrideSshPrivateKeyPath;
+			string OverrideSshPrivateKeyPath;
 			if (Ini.GetString("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "SSHPrivateKeyOverridePath", out OverrideSshPrivateKeyPath) && !String.IsNullOrEmpty(OverrideSshPrivateKeyPath))
 			{
 				SshPrivateKey = new FileReference(OverrideSshPrivateKeyPath);
@@ -271,7 +271,7 @@ namespace UnrealBuildTool
 			CommonRsyncArguments.Add("--prune-empty-dirs"); // Remove empty directories from the file list
 
 			// Get the remote base directory
-			string? RemoteServerOverrideBuildPath;
+			string RemoteServerOverrideBuildPath;
 			if (Ini.GetString("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "RemoteServerOverrideBuildPath", out RemoteServerOverrideBuildPath) && !String.IsNullOrEmpty(RemoteServerOverrideBuildPath))
 			{
 				RemoteBaseDir = String.Format("{0}/{1}", RemoteServerOverrideBuildPath.Trim().TrimEnd('/'), Environment.MachineName);

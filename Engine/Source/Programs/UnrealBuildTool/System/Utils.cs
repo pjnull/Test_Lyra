@@ -980,7 +980,7 @@ namespace UnrealBuildTool
 		/// NOTE: This function may return null. Some accounts (eg. the SYSTEM account on Windows) do not have a personal folder, and Jenkins
 		/// runs using this account by default.
 		/// </summary>
-		public static DirectoryReference? GetUserSettingDirectory()
+		public static DirectoryReference GetUserSettingDirectory()
 		{
 			if (RuntimePlatform.IsMac)
 			{
