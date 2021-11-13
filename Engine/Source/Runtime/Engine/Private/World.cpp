@@ -1159,10 +1159,10 @@ void UWorld::PostLoad()
 	// Add the garbage collection callbacks
 	FLevelStreamingGCHelper::AddGarbageCollectorCallback();
 
-#if WITH_EDITOR
-	// Initially set up the parameter collection list. This may be run again in UWorld::InitWorld.
+	// Initially set up the parameter collection list. This may be run again in UWorld::InitWorld but it's required here for some editor and streaming cases
 	SetupParameterCollectionInstances();
 
+#if WITH_EDITOR
 	if (GIsEditor)
 	{
 		if (!GetOutermost()->HasAnyPackageFlags(PKG_PlayInEditor))
