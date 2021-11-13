@@ -15,8 +15,8 @@ namespace UnrealBuildTool
 {
 	class VSCodeProject : ProjectFile
 	{
-		public VSCodeProject(FileReference InitFilePath)
-			: base(InitFilePath)
+		public VSCodeProject(FileReference InitFilePath, DirectoryReference BaseDir)
+			: base(InitFilePath, BaseDir)
 		{
 		}
 
@@ -242,9 +242,9 @@ namespace UnrealBuildTool
 			return true;
 		}
 
-		protected override ProjectFile AllocateProjectFile(FileReference InitFilePath)
+		protected override ProjectFile AllocateProjectFile(FileReference InitFilePath, DirectoryReference BaseDir)
 		{
-			return new VSCodeProject(InitFilePath);
+			return new VSCodeProject(InitFilePath, BaseDir);
 		}
 
 		protected override bool WriteMasterProjectFile(ProjectFile UBTProject, PlatformProjectGeneratorCollection PlatformProjectGenerators)
@@ -467,7 +467,7 @@ namespace UnrealBuildTool
 				// Add into the correct easy-access list
 				if (Project is VSCodeProject)
 				{
-					foreach (ProjectTarget Target in Project.ProjectTargets)
+					foreach (ProjectTarget Target in Project.ProjectTargets.OfType<ProjectTarget>())
 					{
 						Array Configs = Enum.GetValues(typeof(UnrealTargetConfiguration));
 						List<UnrealTargetPlatform> Platforms = new List<UnrealTargetPlatform>(Target.TargetRules.GetSupportedPlatforms());
@@ -1459,7 +1459,7 @@ namespace UnrealBuildTool
 			foreach (ProjectFile Project in Projects)
 			{
 				bool bFoundTarget = false;
-				foreach (ProjectTarget Target in Project.ProjectTargets)
+				foreach (ProjectTarget Target in Project.ProjectTargets.OfType<ProjectTarget>())
 				{
 					if (Target.TargetFilePath != null)
 					{

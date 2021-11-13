@@ -51,8 +51,8 @@ namespace UnrealBuildTool
 		
 		Dictionary<string, EddieFolder> Folders = new Dictionary<string, EddieFolder>();
 		
-		public EddieProjectFile(FileReference InitFilePath, FileReference InOnlyGameProject)
-			: base(InitFilePath)
+		public EddieProjectFile(FileReference InitFilePath, DirectoryReference BaseDir, FileReference InOnlyGameProject)
+			: base(InitFilePath, BaseDir)
 		{
 			//OnlyGameProject = InOnlyGameProject;
 		}

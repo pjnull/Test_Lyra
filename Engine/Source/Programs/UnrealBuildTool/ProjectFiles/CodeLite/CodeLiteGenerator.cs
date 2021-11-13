@@ -7,6 +7,7 @@ using System.IO;
 using System.Xml;
 using System.Xml.Linq;
 using EpicGames.Core;
+using System.Linq;
 
 #nullable disable
 
@@ -155,7 +156,7 @@ namespace UnrealBuildTool
 				//
 				// Iterate through all targets.
 				//
-				foreach (ProjectTarget CurrentTarget in CurProject.ProjectTargets)
+				foreach (ProjectTarget CurrentTarget in CurProject.ProjectTargets.OfType<ProjectTarget>())
 				{
 					string[] tmp = CurrentTarget.ToString().Split('.');
 					string ProjectTargetFileName = CurProject.ProjectFilePath.Directory.MakeRelativeTo(MasterProjectPath) + "/" + tmp[0] + ProjectExtension;
@@ -264,7 +265,7 @@ namespace UnrealBuildTool
 							continue;
 						}
 
-						foreach (ProjectTarget target in CurProject.ProjectTargets)
+						foreach (ProjectTarget target in CurProject.ProjectTargets.OfType<ProjectTarget>())
 						{
 							string[] tmp = target.ToString().Split('.');
 							String ProjectName = tmp[0];
@@ -287,9 +288,9 @@ namespace UnrealBuildTool
 			return true;
 		}
 
-		protected override ProjectFile AllocateProjectFile(FileReference InitFilePath)
+		protected override ProjectFile AllocateProjectFile(FileReference InitFilePath, DirectoryReference BaseDir)
 		{
-			return new CodeLiteProject(InitFilePath, OnlyGameProject);
+			return new CodeLiteProject(InitFilePath, BaseDir, OnlyGameProject);
 		}
 
 		public override void CleanProjectFiles(DirectoryReference InMasterProjectDirectory, string InMasterProjectName, DirectoryReference InIntermediateProjectFilesDirectory)

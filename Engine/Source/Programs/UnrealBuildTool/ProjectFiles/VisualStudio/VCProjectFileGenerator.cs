@@ -187,10 +187,11 @@ namespace UnrealBuildTool
 		/// Allocates a generator-specific project file object
 		/// </summary>
 		/// <param name="InitFilePath">Path to the project file</param>
+		/// <param name="BaseDir">The base directory for files within this project</param>
 		/// <returns>The newly allocated project file object</returns>
-		protected override ProjectFile AllocateProjectFile(FileReference InitFilePath)
+		protected override ProjectFile AllocateProjectFile(FileReference InitFilePath, DirectoryReference BaseDir)
 		{
-			return new VCProjectFile(InitFilePath, Settings.ProjectFileFormat, bUsePrecompiled, BuildToolOverride, Settings);
+			return new VCProjectFile(InitFilePath, BaseDir, Settings.ProjectFileFormat, bUsePrecompiled, BuildToolOverride, Settings);
 		}
 
 
@@ -611,7 +612,7 @@ namespace UnrealBuildTool
 												}
 
 												// Figure out the set of valid target configuration names
-												foreach (ProjectTarget ProjectTarget in CurProject.ProjectTargets)
+												foreach (Project ProjectTarget in CurProject.ProjectTargets)
 												{
 													if (VCProjectFile.IsValidProjectPlatformAndConfiguration(ProjectTarget, CurPlatform, CurConfiguration, PlatformProjectGenerators))
 													{

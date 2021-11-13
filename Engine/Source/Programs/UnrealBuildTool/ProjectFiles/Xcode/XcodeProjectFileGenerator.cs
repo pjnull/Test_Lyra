@@ -107,10 +107,11 @@ namespace UnrealBuildTool
 		/// Allocates a generator-specific project file object
 		/// </summary>
 		/// <param name="InitFilePath">Path to the project file</param>
+		/// <param name="BaseDir">The base directory for files within this project</param>
 		/// <returns>The newly allocated project file object</returns>
-		protected override ProjectFile AllocateProjectFile(FileReference InitFilePath)
+		protected override ProjectFile AllocateProjectFile(FileReference InitFilePath, DirectoryReference BaseDir)
 		{
-			return new XcodeProjectFile(InitFilePath, OnlyGameProject, bForDistribution, BundleIdentifier, AppName);
+			return new XcodeProjectFile(InitFilePath, BaseDir, OnlyGameProject, bForDistribution, BundleIdentifier, AppName);
 		}
 
 		private bool WriteWorkspaceSettingsFile(string Path)
@@ -209,11 +210,11 @@ namespace UnrealBuildTool
 			int SchemeIndex = 0;
 			BuildableProjects.Sort((ProjA, ProjB) => {
 
-				var TargetA = ProjA.ProjectTargets.OrderBy(T => T.TargetRules.Type).FirstOrDefault();
-				var TargetB = ProjB.ProjectTargets.OrderBy(T => T.TargetRules.Type).FirstOrDefault();
+				ProjectTarget TargetA = ProjA.ProjectTargets.OfType<ProjectTarget>().OrderBy(T => T.TargetRules.Type).First();
+				ProjectTarget TargetB = ProjB.ProjectTargets.OfType<ProjectTarget>().OrderBy(T => T.TargetRules.Type).First();
 
-				var TypeA = TargetA != null ? TargetA.TargetRules.Type : TargetType.Program;
-				var TypeB = TargetB != null ? TargetB.TargetRules.Type : TargetType.Program;
+				TargetType TypeA = TargetA.TargetRules.Type;
+				TargetType TypeB = TargetB.TargetRules.Type;
 
 				if (TypeA != TypeB)
 				{

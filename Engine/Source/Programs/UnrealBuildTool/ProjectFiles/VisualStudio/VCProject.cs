@@ -103,8 +103,9 @@ namespace UnrealBuildTool
 		/// Constructs a new project file object
 		/// </summary>
 		/// <param name="InitFilePath">The path to the project file on disk</param>
-		public MSBuildProjectFile(FileReference InitFilePath)
-			: base(InitFilePath)
+		/// <param name="BaseDir">The base directory for files within this project</param>
+		public MSBuildProjectFile(FileReference InitFilePath, DirectoryReference BaseDir)
+			: base(InitFilePath, BaseDir)
 		{
 			// Each project gets its own GUID.  This is stored in the project file and referenced in the solution file.
 
@@ -173,7 +174,7 @@ namespace UnrealBuildTool
 		/// <param name="Configuration">Configuration</param>
 		/// <param name="PlatformProjectGenerators">Set of platform project generators</param>
 		/// <returns>True if this is a valid combination for this project, otherwise false</returns>
-		public static bool IsValidProjectPlatformAndConfiguration(ProjectTarget ProjectTarget, UnrealTargetPlatform Platform, UnrealTargetConfiguration Configuration, PlatformProjectGeneratorCollection PlatformProjectGenerators)
+		public static bool IsValidProjectPlatformAndConfiguration(Project ProjectTarget, UnrealTargetPlatform Platform, UnrealTargetConfiguration Configuration, PlatformProjectGeneratorCollection PlatformProjectGenerators)
 		{
 			if (!ProjectFileGenerator.bIncludeTestAndShippingConfigs)
 			{
@@ -298,12 +299,13 @@ namespace UnrealBuildTool
 		/// Constructs a new project file object
 		/// </summary>
 		/// <param name="FilePath">The path to the project file on disk</param>
+		/// <param name="BaseDir">The base directory for files within this project</param>
 		/// <param name="ProjectFileFormat">Visual C++ project file version</param>
 		/// <param name="bUsePrecompiled">Whether to add the -UsePrecompiled argumemnt when building targets</param>
 		/// <param name="BuildToolOverride">Optional arguments to pass to UBT when building</param>
 		/// <param name="Settings">Other settings</param>
-		public VCProjectFile(FileReference FilePath, VCProjectFileFormat ProjectFileFormat, bool bUsePrecompiled, string BuildToolOverride, VCProjectFileSettings Settings)
-			: base(FilePath)
+		public VCProjectFile(FileReference FilePath, DirectoryReference BaseDir, VCProjectFileFormat ProjectFileFormat, bool bUsePrecompiled, string BuildToolOverride, VCProjectFileSettings Settings)
+			: base(FilePath, BaseDir)
 		{
 			this.ProjectFileFormat = ProjectFileFormat;
 			this.bUsePrecompiled = bUsePrecompiled;
@@ -396,8 +398,8 @@ namespace UnrealBuildTool
 
 				// Now, we want to find a target in this project that maps to the current solution config combination.  Only up to one target should
 				// and every solution config combination should map to at least one target in one project (otherwise we shouldn't have added it!).
-				List<ProjectTarget> MatchingProjectTargets = new List<ProjectTarget>();
-				foreach (ProjectTarget ProjectTarget in ProjectTargets)
+				List<Project> MatchingProjectTargets = new List<Project>();
+				foreach (Project ProjectTarget in ProjectTargets)
 				{
 					if (VCProjectFile.IsValidProjectPlatformAndConfiguration(ProjectTarget, SolutionPlatform, SolutionConfiguration, PlatformProjectGenerators))
 					{
@@ -421,7 +423,7 @@ namespace UnrealBuildTool
 				// Always allow SCW and UnrealLighmass to build in editor configurations
 				if (MatchingProjectTargets.Count == 0 && SolutionTarget == TargetType.Editor && SolutionPlatform == UnrealTargetPlatform.Win64)
 				{
-					foreach (ProjectTarget ProjectTarget in ProjectTargets)
+					foreach (Project ProjectTarget in ProjectTargets)
 					{
 						string TargetName = ProjectTargets[0].TargetRules.Name;
 						if (TargetName == "ShaderCompileWorker" || TargetName == "UnrealLightmass")
@@ -442,7 +444,7 @@ namespace UnrealBuildTool
 				if (MatchingProjectTargets.Count == 1)
 				{
 					// Get the matching target
-					ProjectTarget MatchingProjectTarget = MatchingProjectTargets[0];
+					Project MatchingProjectTarget = MatchingProjectTargets[0];
 
 					// If the project wants to always build in "Development", regardless of what the solution configuration is set to, then we'll do that here.
 					UnrealTargetConfiguration ProjectConfiguration = SolutionConfiguration;
@@ -657,12 +659,12 @@ namespace UnrealBuildTool
 									throw new BuildException("Expecting at least one ProjectTarget to be associated with project '{0}' in the TargetProjects list ", ProjectFilePath);
 								}
 
-								foreach (ProjectTarget ProjectTarget in ProjectTargets)
+								foreach (ProjectTarget ProjectTarget in ProjectTargets.OfType<ProjectTarget>())
 								{
 									if (IsValidProjectPlatformAndConfiguration(ProjectTarget, Platform, Configuration, PlatformProjectGenerators))
 									{
 										string ProjectPlatformName, ProjectConfigurationName;
-										MakeProjectPlatformAndConfigurationNames(Platform, Configuration, ProjectTarget.TargetRules.Type, PlatformProjectGenerators, out ProjectPlatformName, out ProjectConfigurationName);
+										MakeProjectPlatformAndConfigurationNames(Platform, Configuration, ProjectTarget.TargetRules!.Type, PlatformProjectGenerators, out ProjectPlatformName, out ProjectConfigurationName);
 
 										ProjectConfigAndTargetCombination Combination = new ProjectConfigAndTargetCombination(Platform, Configuration, ProjectPlatformName, ProjectConfigurationName, ProjectTarget);
 										ProjectConfigAndTargetCombinations.Add(Combination);
@@ -1811,8 +1813,9 @@ namespace UnrealBuildTool
 		/// Constructs a new project file object
 		/// </summary>
 		/// <param name="InitFilePath">The path to the project file on disk</param>
-		public VCSharpProjectFile(FileReference InitFilePath)
-			: base(InitFilePath)
+		/// <param name="BaseDir">The base directory for files within this project - if not specified, InitFilePath.Directory will be used</param>
+		public VCSharpProjectFile(FileReference InitFilePath, DirectoryReference BaseDir = null)
+			: base(InitFilePath, BaseDir ?? InitFilePath.Directory)
 		{
 			try
 			{

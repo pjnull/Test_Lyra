@@ -957,7 +957,7 @@ namespace UnrealBuildTool
 							AddEngineDocumentation(EngineProject);
 						}
 
-						List<Tuple<ProjectFile, string>> NewProjectFiles = EngineProject.WriteDebugProjectFiles(SupportedPlatforms, SupportedConfigurations, PlatformProjectGenerators);
+						List<Tuple<ProjectFile, string>>? NewProjectFiles = EngineProject.WriteDebugProjectFiles(SupportedPlatforms, SupportedConfigurations, PlatformProjectGenerators);
 
 						if (NewProjectFiles != null)
 						{
@@ -976,7 +976,7 @@ namespace UnrealBuildTool
 					foreach (ProjectFile CurGameProject in GameProjects)
 					{
 						// Templates go under a different solution folder than games
-						FileReference UnrealProjectFile = CurGameProject.ProjectTargets.First().UnrealProjectFilePath;
+						FileReference UnrealProjectFile = CurGameProject.ProjectTargets.First().UnrealProjectFilePath!;
 						if (UnrealProjectFile.IsUnderDirectory(TemplatesDirectory))
 						{
 							DirectoryReference TemplateGameDirectory = CurGameProject.BaseDir;
@@ -992,7 +992,7 @@ namespace UnrealBuildTool
 							RootFolder.AddSubFolder("Games").ChildProjects.Add(CurGameProject);
 						}
 
-						List<Tuple<ProjectFile, string>> NewProjectFiles = CurGameProject.WriteDebugProjectFiles(SupportedPlatforms, SupportedConfigurations, PlatformProjectGenerators);
+						List<Tuple<ProjectFile, string>>? NewProjectFiles = CurGameProject.WriteDebugProjectFiles(SupportedPlatforms, SupportedConfigurations, PlatformProjectGenerators);
 
 						if (NewProjectFiles != null)
 						{
@@ -1013,11 +1013,11 @@ namespace UnrealBuildTool
 
 					foreach (KeyValuePair<FileReference, ProjectFile> CurProgramProject in ProgramProjects)
 					{
-						ProjectTarget Target = CurProgramProject.Value.ProjectTargets.FirstOrDefault(t => !String.IsNullOrEmpty(t.TargetRules.SolutionDirectory));
+						Project Target = CurProgramProject.Value.ProjectTargets.FirstOrDefault(t => !String.IsNullOrEmpty(t.TargetRules!.SolutionDirectory));
 
 						if (Target != null)
 						{
-							RootFolder.AddSubFolder(Target.TargetRules.SolutionDirectory).ChildProjects.Add(CurProgramProject.Value);
+							RootFolder.AddSubFolder(Target.TargetRules!.SolutionDirectory).ChildProjects.Add(CurProgramProject.Value);
 						}
 						else
 						{
@@ -1082,7 +1082,7 @@ namespace UnrealBuildTool
 							{
 								// Only bother with the editor target.  We want to make sure that definitions are setup to be as inclusive as possible
 								// for good quality IntelliSense.  For example, we want WITH_EDITORONLY_DATA=1, so using the editor targets works well.
-								if (ProjectTarget.TargetRules.Type == TargetType.Editor)
+								if (ProjectTarget.TargetRules!.Type == TargetType.Editor)
 								{
 									IntelliSenseTargetFiles.Add(Tuple.Create(EngineProject, ProjectTarget));
 								}
@@ -1107,14 +1107,11 @@ namespace UnrealBuildTool
 					{
 						foreach (ProjectTarget ProjectTarget in GameProject.ProjectTargets)
 						{
-							if (ProjectTarget.TargetFilePath != null)
+							// Only bother with the editor target.  We want to make sure that definitions are setup to be as inclusive as possible
+							// for good quality IntelliSense.  For example, we want WITH_EDITORONLY_DATA=1, so using the editor targets works well.
+							if (ProjectTarget.TargetRules!.Type == TargetType.Editor)
 							{
-								// Only bother with the editor target.  We want to make sure that definitions are setup to be as inclusive as possible
-								// for good quality IntelliSense.  For example, we want WITH_EDITORONLY_DATA=1, so using the editor targets works well.
-								if (ProjectTarget.TargetRules.Type == TargetType.Editor)
-								{
-									IntelliSenseTargetFiles.Add(Tuple.Create(GameProject, ProjectTarget));
-								}
+								IntelliSenseTargetFiles.Add(Tuple.Create(GameProject, ProjectTarget));
 							}
 						}
 					}
@@ -1888,7 +1885,7 @@ namespace UnrealBuildTool
 						Log.TraceVerbose("Found target: " + CurTarget.Name);
 
 						List<string> NewArguments = new List<string>(Arguments.Length + 4);
-						if (CurTarget.TargetRules.Type != TargetType.Program)
+						if (CurTarget.TargetRules!.Type != TargetType.Program)
 						{
 							NewArguments.Add("-precompile");
 						}
@@ -2411,7 +2408,7 @@ namespace UnrealBuildTool
 						// if we aren't an editor, we'll just fall back to previous behavior and assume the first one we encounter
 						// should be added to the main project
 						bool bIsDefaultTargetForType = (DefaultEditorTarget == null) || (TargetRulesObject.Type != TargetType.Editor) || (TargetRulesObject.Name == DefaultEditorTarget);
-						if (!bIsDefaultTargetForType || (ProjectFileMap.TryGetValue(ProjectLocation, out ExistingProjectFile) && ExistingProjectFile.ProjectTargets.Any(x => x.TargetRules.Type == TargetRulesObject.Type)))
+						if (!bIsDefaultTargetForType || (ProjectFileMap.TryGetValue(ProjectLocation, out ExistingProjectFile) && ExistingProjectFile.ProjectTargets.Any(x => x.TargetRules!.Type == TargetRulesObject.Type)))
 						{
 							GeneratedProjectName = TargetRulesObject.Name;
 						}
@@ -2496,9 +2493,9 @@ namespace UnrealBuildTool
 						}
 					}
 
-					foreach (ProjectTarget ExistingProjectTarget in ProjectFile.ProjectTargets)
+					foreach (Project ExistingProjectTarget in ProjectFile.ProjectTargets)
 					{
-						if (ExistingProjectTarget.TargetRules.Type == TargetRulesObject.Type)
+						if (ExistingProjectTarget.TargetRules!.Type == TargetRulesObject.Type)
 						{
 							throw new BuildException("Not expecting project {0} to already have a target rules of with configuration name {1} ({2}) while trying to add: {3}", ProjectFilePath, TargetRulesObject.Type.ToString(), ExistingProjectTarget.TargetRules.ToString(), TargetRulesObject.ToString());
 						}
@@ -2511,18 +2508,18 @@ namespace UnrealBuildTool
 						}
 					}
 
-					ProjectTarget ProjectTarget = new ProjectTarget()
-						{
-							TargetRules = TargetRulesObject,
-							TargetFilePath = TargetFilePath,
-							ProjectFilePath = ProjectFilePath,
-							UnrealProjectFilePath = CheckProjectFile,
-							SupportedPlatforms = TargetRulesObject.GetSupportedPlatforms().Where(
+					ProjectTarget ProjectTarget = new ProjectTarget
+						(
+							TargetRules: TargetRulesObject,
+							TargetFilePath: TargetFilePath,
+							ProjectFilePath: ProjectFilePath,
+							UnrealProjectFilePath: CheckProjectFile,
+							SupportedPlatforms: TargetRulesObject.GetSupportedPlatforms().Where(
 													x => UEBuildPlatform.TryGetBuildPlatform(x, out _) && 
 													(TargetRulesObject.LinkType != TargetLinkType.Modular || !UEBuildPlatform.PlatformRequiresMonolithicBuilds(x, TargetRulesObject.Configuration))
 													).ToArray(),
-							CreateRulesDelegate = (Platform, Configuration) => RulesAssembly.CreateTargetRules(TargetName, Platform, Configuration, "", CheckProjectFile, new CommandLineArguments(GetTargetArguments(Arguments)))
-                        };
+							CreateRulesDelegate: (Platform, Configuration) => RulesAssembly.CreateTargetRules(TargetName, Platform, Configuration, "", CheckProjectFile, new CommandLineArguments(GetTargetArguments(Arguments)))
+                        );
 
 					ProjectFile.ProjectTargets.Add(ProjectTarget);
 
@@ -2564,7 +2561,6 @@ namespace UnrealBuildTool
 						ModProjectFile.IsForeignProject = GameProject.IsForeignProject;
 						ModProjectFile.IsGeneratedProject = true;
 						ModProjectFile.IsStubProject = false;
-						ModProjectFile.PluginFilePath = PluginInfo.File;
 						ModProjectFile.ProjectTargets.AddRange(GameProject.ProjectTargets);
 
 						AddPluginFilesToProject(PluginInfo.File, PluginInfo.Directory, ModProjectFile);
@@ -2705,8 +2701,7 @@ namespace UnrealBuildTool
 			}
 
 			// Add a new project file for the specified path
-			ProjectFile NewProjectFile = AllocateProjectFile(FilePath);
-			NewProjectFile.BaseDir = BaseDir;
+			ProjectFile NewProjectFile = AllocateProjectFile(FilePath, BaseDir);
 			ProjectFileMap[FilePath] = NewProjectFile;
 
 			if (IncludeInGeneratedProjects)
@@ -2723,8 +2718,9 @@ namespace UnrealBuildTool
 		/// Allocates a generator-specific project file object
 		/// </summary>
 		/// <param name="InitFilePath">Path to the project file</param>
+		/// <param name="BaseDir">The base directory for files within this project</param>
 		/// <returns>The newly allocated project file object</returns>
-		protected abstract ProjectFile AllocateProjectFile(FileReference InitFilePath);
+		protected abstract ProjectFile AllocateProjectFile(FileReference InitFilePath, DirectoryReference BaseDir);
 
 
 		/// <summary>
@@ -2881,8 +2877,8 @@ namespace UnrealBuildTool
 				throw new BuildException("Expecting existing project to not have any ProjectTargets defined yet.");
 			}
 
-			ProjectTarget ProjectTarget = new ProjectTarget();
-			ProjectTarget.SupportedPlatforms = new UnrealTargetPlatform[0];
+			Project ProjectTarget = new Project(new UnrealTargetPlatform[0]);
+
 			if (bForceDevelopmentConfiguration)
 			{
 				ProjectTarget.ForceDevelopmentConfiguration = true;

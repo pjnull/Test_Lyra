@@ -86,9 +86,9 @@ namespace UnrealBuildTool
 			IncludeEnginePrograms = true; // It's true by default, but I like to have things explicit
 		}
 
-		protected override ProjectFile AllocateProjectFile(FileReference InitFilePath)
+		protected override ProjectFile AllocateProjectFile(FileReference InitFilePath, DirectoryReference BaseDir)
 		{
-			RiderProjectFile projectFile = new RiderProjectFile(InitFilePath)
+			RiderProjectFile projectFile = new RiderProjectFile(InitFilePath, BaseDir)
 				{RootPath = InitFilePath.Directory, Arguments = Arguments, TargetTypes = TargetTypes};
 			return projectFile;
 		}
@@ -260,7 +260,7 @@ namespace UnrealBuildTool
 					{
 						ProjectFile ExistingProjectFile;
 						if (ProjectFileMap.TryGetValue(GetRiderProjectLocation(ProjectFileNameBase), out ExistingProjectFile) &&
-						    ExistingProjectFile.ProjectTargets.Any(x => x.TargetRules.Type == TargetRulesObject.Type))
+						    ExistingProjectFile.ProjectTargets.Any(x => x.TargetRules!.Type == TargetRulesObject.Type))
 						{
 							GeneratedProjectName = TargetRulesObject.Name;
 						}
@@ -349,7 +349,7 @@ namespace UnrealBuildTool
 						}
 					}
 
-					foreach (ProjectTarget ExistingProjectTarget in ProjectFile.ProjectTargets)
+					foreach (Project ExistingProjectTarget in ProjectFile.ProjectTargets)
 					{
 						if (ExistingProjectTarget.TargetRules.Type == TargetRulesObject.Type)
 						{
@@ -372,18 +372,18 @@ namespace UnrealBuildTool
 						}
 					}
 
-					ProjectTarget ProjectTarget = new ProjectTarget()
-					{
-						TargetRules = TargetRulesObject,
-						TargetFilePath = TargetFilePath,
-						ProjectFilePath = ProjectFilePath,
-						UnrealProjectFilePath = CheckProjectFile,
-						SupportedPlatforms = TargetRulesObject.GetSupportedPlatforms()
+					ProjectTarget ProjectTarget = new ProjectTarget 
+					(
+						TargetRules: TargetRulesObject,
+						TargetFilePath: TargetFilePath,
+						ProjectFilePath: ProjectFilePath,
+						UnrealProjectFilePath: CheckProjectFile,
+						SupportedPlatforms: TargetRulesObject.GetSupportedPlatforms()
 							.Where(x => UEBuildPlatform.TryGetBuildPlatform(x, out _)).ToArray(),
-						CreateRulesDelegate = (Platform, Configuration) =>
+						CreateRulesDelegate: (Platform, Configuration) =>
 							RulesAssembly.CreateTargetRules(TargetName, Platform, Configuration, "", CheckProjectFile,
 								null)
-					};
+					);
 
 					ProjectFile.ProjectTargets.Add(ProjectTarget);
 

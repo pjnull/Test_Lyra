@@ -135,12 +135,13 @@ namespace UnrealBuildTool
 		/// Constructs a new project file object
 		/// </summary>
 		/// <param name="InitFilePath">The path to the project file on disk</param>
+		/// <param name="BaseDir">The base directory for files within this project</param>
 		/// <param name="InOnlyGameProject"></param>
 		/// <param name="IsForDistribution">True for distribution builds</param>
 		/// <param name="BundleID">Override option for bundle identifier</param>
 		/// <param name="InAppName"></param>
-		public XcodeProjectFile(FileReference InitFilePath, FileReference InOnlyGameProject, bool IsForDistribution, string BundleID, string InAppName)
-			: base(InitFilePath)
+		public XcodeProjectFile(FileReference InitFilePath, DirectoryReference BaseDir, FileReference InOnlyGameProject, bool IsForDistribution, string BundleID, string InAppName)
+			: base(InitFilePath, BaseDir)
 		{
 			//OnlyGameProject = InOnlyGameProject;
 			bForDistribution = IsForDistribution;
@@ -1570,7 +1571,7 @@ namespace UnrealBuildTool
 								}
 
 								// Now go through all of the target types for this project
-								foreach (ProjectTarget ProjectTarget in ProjectTargets)
+								foreach (ProjectTarget ProjectTarget in ProjectTargets.OfType<ProjectTarget>())
 								{
 									if (MSBuildProjectFile.IsValidProjectPlatformAndConfiguration(ProjectTarget, Platform, Configuration, PlatformProjectGenerators))
 									{
@@ -1914,7 +1915,7 @@ namespace UnrealBuildTool
 
 		public bool CanBuildProjectLocally()
 		{
-			foreach (ProjectTarget ProjectTarget in ProjectTargets)
+			foreach (Project ProjectTarget in ProjectTargets)
 			{
 				foreach (UnrealTargetPlatform Platform in GetSupportedPlatforms())
 				{
@@ -1965,7 +1966,7 @@ namespace UnrealBuildTool
 			}
 
 			FileReference GameProjectPath = null;
-			foreach(ProjectTarget Target in ProjectTargets)
+			foreach(Project Target in ProjectTargets)
 			{
 				if(Target.UnrealProjectFilePath != null)
 				{

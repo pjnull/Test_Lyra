@@ -24,7 +24,7 @@ namespace UnrealBuildTool
 		private ToolchainInfo RootToolchainInfo = new ToolchainInfo();
 		private UEBuildTarget CurrentTarget;
 
-		public RiderProjectFile(FileReference InProjectFilePath) : base(InProjectFilePath)
+		public RiderProjectFile(FileReference InProjectFilePath, DirectoryReference BaseDir) : base(InProjectFilePath, BaseDir)
 		{
 		}
 
@@ -61,7 +61,7 @@ namespace UnrealBuildTool
 				
 				foreach (UnrealTargetConfiguration Configuration in InConfigurations)
 				{
-					foreach (ProjectTarget ProjectTarget in ProjectTargets)
+					foreach (ProjectTarget ProjectTarget in ProjectTargets.OfType<ProjectTarget>())
 					{
 						if (TargetTypes.Any() && !TargetTypes.Contains(ProjectTarget.TargetRules.Type)) continue;
 

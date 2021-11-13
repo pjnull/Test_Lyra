@@ -48,9 +48,9 @@ namespace UnrealBuildTool
 			}
 		}
 		
-		protected override ProjectFile AllocateProjectFile(FileReference InitFilePath)
+		protected override ProjectFile AllocateProjectFile(FileReference InitFilePath, DirectoryReference BaseDir)
 		{
-			return new EddieProjectFile(InitFilePath, OnlyGameProject);
+			return new EddieProjectFile(InitFilePath, BaseDir, OnlyGameProject);
 		}
 		
 		private bool WriteEddieWorkset()

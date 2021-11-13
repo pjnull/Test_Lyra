@@ -17,7 +17,7 @@ namespace UnrealBuildTool
 	{
 		FileReference OnlyGameProject;
 
-		public CodeLiteProject( FileReference InitFilePath, FileReference InOnlyGameProject ) : base(InitFilePath)
+		public CodeLiteProject( FileReference InitFilePath, DirectoryReference BaseDir, FileReference InOnlyGameProject ) : base(InitFilePath, BaseDir)
 		{
 			OnlyGameProject = InOnlyGameProject;
 		}
@@ -80,7 +80,7 @@ namespace UnrealBuildTool
 			//
 			// Write all targets which will be separate projects.
 			//
-			foreach (ProjectTarget target in ProjectTargets) 
+			foreach (Project target in ProjectTargets) 
 			{
 				string[] tmp = target.ToString ().Split ('.');
 				string ProjectTargetFileName = Path.GetDirectoryName (ProjectFilePath.FullName) + "/" + tmp [0] +  ProjectExtension;

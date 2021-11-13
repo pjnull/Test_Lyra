@@ -6,6 +6,7 @@ using System.Text;
 using System.IO;
 using EpicGames.Core;
 using UnrealBuildBase;
+using System.Linq;
 
 #nullable disable
 
@@ -13,8 +14,8 @@ namespace UnrealBuildTool
 {
 	class MakefileProjectFile : ProjectFile
 	{
-		public MakefileProjectFile(FileReference InitFilePath)
-			: base(InitFilePath)
+		public MakefileProjectFile(FileReference InitFilePath, DirectoryReference BaseDir)
+			: base(InitFilePath, BaseDir)
 		{
 		}
 	}
@@ -87,7 +88,7 @@ namespace UnrealBuildTool
 			String MakeBuildCommand = "";
 			foreach (ProjectFile Project in GeneratedProjectFiles)
 			{
-				foreach (ProjectTarget TargetFile in Project.ProjectTargets)
+				foreach (ProjectTarget TargetFile in Project.ProjectTargets.OfType<ProjectTarget>())
 				{
 					if (TargetFile.TargetFilePath == null)
 					{
@@ -122,7 +123,7 @@ namespace UnrealBuildTool
 
 			foreach (ProjectFile Project in GeneratedProjectFiles)
 			{
-				foreach (ProjectTarget TargetFile in Project.ProjectTargets)
+				foreach (ProjectTarget TargetFile in Project.ProjectTargets.OfType<ProjectTarget>())
 				{
 					if (TargetFile.TargetFilePath == null)
 					{
@@ -197,10 +198,11 @@ namespace UnrealBuildTool
 		/// Allocates a generator-specific project file object
 		/// </summary>
 		/// <param name="InitFilePath">Path to the project file</param>
+		/// <param name="BaseDir">The base directory for files within this project</param>
 		/// <returns>The newly allocated project file object</returns>
-		protected override ProjectFile AllocateProjectFile(FileReference InitFilePath)
+		protected override ProjectFile AllocateProjectFile(FileReference InitFilePath, DirectoryReference BaseDir)
 		{
-			return new MakefileProjectFile(InitFilePath);
+			return new MakefileProjectFile(InitFilePath, BaseDir);
 		}
 
 		/// ProjectFileGenerator interface

@@ -735,7 +735,7 @@ namespace UnrealBuildTool
 			bool Success = ProjectFileGenerator.WriteFileIfChanged(ProjectFileGenerator.IntermediateProjectFilesPath + "\\" + FileName, FileText);
 
 			FileReference ProjectFilePath = FileReference.Combine(ProjectFileGenerator.IntermediateProjectFilesPath, FileName);
-			AndroidDebugProjectFile Project = new AndroidDebugProjectFile(ProjectFilePath);
+			AndroidDebugProjectFile Project = new AndroidDebugProjectFile(ProjectFilePath, ProjectFile.BaseDir);
 			Project.ShouldBuildForAllSolutionTargets = false;
 			Project.ShouldBuildByDefaultForSolutionTargets = false;
 
@@ -760,8 +760,9 @@ namespace UnrealBuildTool
 		/// Constructs a new project file object
 		/// </summary>
 		/// <param name="InitFilePath">The path to the project file on disk</param>
-		public AndroidDebugProjectFile(FileReference InitFilePath)
-			: base(InitFilePath)
+		/// <param name="BaseDir">The base directory for files within this project</param>
+		public AndroidDebugProjectFile(FileReference InitFilePath, DirectoryReference BaseDir)
+			: base(InitFilePath, BaseDir)
 		{
 		}
 

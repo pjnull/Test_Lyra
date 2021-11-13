@@ -14,8 +14,8 @@ namespace UnrealBuildTool
 {
 	class QMakefileProjectFile : ProjectFile
 	{
-		public QMakefileProjectFile(FileReference InitFilePath)
-			: base(InitFilePath)
+		public QMakefileProjectFile(FileReference InitFilePath, DirectoryReference BaseDir)
+			: base(InitFilePath, BaseDir)
 		{
 		}
 	}
@@ -355,7 +355,7 @@ namespace UnrealBuildTool
 
 			foreach (ProjectFile Project in GeneratedProjectFiles)
 			{
-				foreach (ProjectTarget TargetFile in Project.ProjectTargets)
+				foreach (ProjectTarget TargetFile in Project.ProjectTargets.OfType<ProjectTarget>())
 				{
 					if (TargetFile.TargetFilePath == null)
 					{
@@ -424,10 +424,11 @@ namespace UnrealBuildTool
 		/// Allocates a generator-specific project file object
 		/// </summary>
 		/// <param name="InitFilePath">Path to the project file</param>
+		/// <param name="BaseDir">The base directory for files within this project</param>
 		/// <returns>The newly allocated project file object</returns>
-		protected override ProjectFile AllocateProjectFile(FileReference InitFilePath)
+		protected override ProjectFile AllocateProjectFile(FileReference InitFilePath, DirectoryReference BaseDir)
 		{
-			return new QMakefileProjectFile(InitFilePath);
+			return new QMakefileProjectFile(InitFilePath, BaseDir);
 		}
 
 		/// ProjectFileGenerator interface
