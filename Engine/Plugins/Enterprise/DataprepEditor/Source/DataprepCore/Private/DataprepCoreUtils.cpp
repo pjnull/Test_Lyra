@@ -378,6 +378,11 @@ bool FDataprepCoreUtils::ExecuteDataprep(UDataprepAssetInterface* DataprepAssetI
 
 		DataprepCorePrivateUtils::Analytics::RecipeExecuted( DataprepAssetInterface );
 
+		// Destroy transient world
+		GEngine->DestroyWorldContext(TransientWorld.Get());
+		TransientWorld->DestroyWorld(true);
+		TransientWorld.Reset();
+
 		return bSuccessfulExecute;
 	}
 
