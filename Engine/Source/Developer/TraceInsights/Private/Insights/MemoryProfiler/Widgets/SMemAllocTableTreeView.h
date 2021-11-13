@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "TraceServices/Model/AllocationsProvider.h"
+#include "Widgets/Input/SComboBox.h"
 
 // Insights
 #include "Insights/Common/Stopwatch.h"
@@ -125,13 +126,19 @@ private:
 	bool virtual ApplyCustomAdvancedFilters(const FTableTreeNodePtr& NodePtr) override;
 	virtual void AddCustomAdvancedFilters() override;
 
+	TSharedRef<SWidget> ConstructFunctionToggleButton();
 	void CallstackGroupingByFunction_OnCheckStateChanged(ECheckBoxState NewRadioState);
 	ECheckBoxState CallstackGroupingByFunction_IsChecked() const;
 
 	void InitAvailableViewPresets();
-	FReply OnApplyViewPresets(const IViewPreset* InPreset);
-	void ApplyViewPresets(const IViewPreset& InPreset);
+	const TArray<TSharedRef<IViewPreset>>* GetAvailableViewPresets() const { return &AvailableViewPresets; }
+	FReply OnApplyViewPreset(const IViewPreset* InPreset);
+	void ApplyViewPreset(const IViewPreset& InPreset);
 	void ApplyColumnConfig(const TArrayView<FColumnConfig>& InTableConfig);
+	void ViewPreset_OnSelectionChanged(TSharedPtr<IViewPreset> InPreset, ESelectInfo::Type SelectInfo);
+	TSharedRef<SWidget> ViewPreset_OnGenerateWidget(TSharedRef<IViewPreset> InPreset);
+	FText ViewPreset_GetSelectedText() const;
+	FText ViewPreset_GetSelectedToolTipText() const;
 
 private:
 	const static int FullCallStackIndex;
@@ -145,6 +152,8 @@ private:
 	bool bHasPendingQueryReset = false;
 	bool bIsCallstackGroupingByFunction = true;
 	TArray<TSharedRef<IViewPreset>> AvailableViewPresets;
+	TSharedPtr<IViewPreset> SelectedViewPreset;
+	TSharedPtr<SComboBox<TSharedRef<IViewPreset>>> PresetComboBox;
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
