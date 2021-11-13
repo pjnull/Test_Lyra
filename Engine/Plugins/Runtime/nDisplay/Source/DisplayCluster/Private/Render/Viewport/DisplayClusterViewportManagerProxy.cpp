@@ -332,6 +332,9 @@ void FDisplayClusterViewportManagerProxy::UpdateFrameResources_RenderThread(FRHI
 
 						case EWarpPass::Render:
 							PrjPolicy->ApplyWarpBlend_RenderThread(RHICmdList, ViewportProxy);
+
+							// Implement ViewportRemap feature after warp
+							ViewportProxy->ImplViewportRemap_RenderThread(RHICmdList);
 							break;
 
 						case EWarpPass::End:
@@ -349,6 +352,9 @@ void FDisplayClusterViewportManagerProxy::UpdateFrameResources_RenderThread(FRHI
 						case EWarpPass::Render:
 							// just resolve not warped viewports to frame target texture
 							ViewportProxy->ResolveResources(RHICmdList, EDisplayClusterViewportResourceType::InputShaderResource, ViewportProxy->GetOutputResourceType());
+							
+							// Implement ViewportRemap feature after resolve
+							ViewportProxy->ImplViewportRemap_RenderThread(RHICmdList);
 							break;
 
 						default:

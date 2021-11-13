@@ -354,12 +354,17 @@ bool FDisplayClusterViewportManager::BeginNewFrame(FViewport* InViewport, UWorld
 		return false;
 	}
 
+	const FIntPoint RenderFrameSize = OutRenderFrame.FrameRect.Size();
+
 	for (FDisplayClusterViewport* Viewport : Viewports)
 	{
 		if (Viewport)
 		{
 			// Update TextureShare links
 			Viewport->TextureShare.UpdateLinkSceneContextToShare(*Viewport);
+
+			// Update ViewportRemap geometry
+			Viewport->ViewportRemap.Update(*Viewport, RenderFrameSize);
 		}
 	}
 

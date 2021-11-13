@@ -110,6 +110,10 @@ private:
 	bool CanSizeToChildNodes() const;
 	void SizeToChildNodes();
 
+	bool CanTransformNode() const;
+	void RotateNode(float InRotation);
+	void FlipNode(bool bFlipHorizontal, bool bFlipVertical);
+
 	void SortNodes();
 
 private:

@@ -156,11 +156,21 @@ bool FDisplayClusterViewport::ShouldUseAdditionalTargetableResource() const
 
 bool FDisplayClusterViewport::ShouldUseAdditionalFrameTargetableResource() const
 {
+	if (ViewportRemap.IsUsed())
+	{
+		return true;
+	}
+
 	return false;
 }
 
 bool FDisplayClusterViewport::ShouldUseFullSizeFrameTargetableResource() const
 {
+	if (ViewportRemap.IsUsed())
+	{
+		return true;
+	}
+
 	return false;
 }
 

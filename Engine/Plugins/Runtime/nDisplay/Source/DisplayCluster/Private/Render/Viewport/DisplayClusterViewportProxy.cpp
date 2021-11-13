@@ -12,6 +12,9 @@
 
 #include "Render/Projection/IDisplayClusterProjectionPolicy.h"
 
+#include "Render/Containers/DisplayClusterRender_MeshComponent.h"
+#include "Render/Containers/DisplayClusterRender_MeshComponentProxy.h"
+
 #if WITH_EDITOR
 #include "DisplayClusterRootActor.h"
 #endif
@@ -183,14 +186,64 @@ bool FDisplayClusterViewportProxy::GetResources_RenderThread(const EDisplayClust
 	return false;
 }
 
+void FDisplayClusterViewportProxy::ImplViewportRemap_RenderThread(FRHICommandListImmediate& RHICmdList) const
+{
+#if WITH_EDITOR
+	if (Owner.GetRenderFrameSettings_RenderThread().RenderMode == EDisplayClusterRenderFrameMode::PreviewMono)
+	{
+		// Preview in editor not support this feature
+		return;
+	}
+#endif
+
+	if (RemapMesh.IsValid())
+	{
+		const FDisplayClusterRender_MeshComponentProxy* MeshProxy = RemapMesh->GetProxy();
+		if (MeshProxy && MeshProxy->IsValid_RenderThread())
+		{
+			if (AdditionalFrameTargetableResources.Num() != OutputFrameTargetableResources.Num())
+			{
+				// error
+				return;
+			}
+
+			for (int32 ContextIt = 0; ContextIt < AdditionalFrameTargetableResources.Num(); ContextIt++)
+			{
+				FDisplayClusterTextureResource* Src = AdditionalFrameTargetableResources[ContextIt];
+				FDisplayClusterTextureResource* Dst = OutputFrameTargetableResources[ContextIt];
+
+				FRHITexture2D* Input = Src ? Src->GetTextureResource() : nullptr;
+				FRHITexture2D* Output = Dst ? Dst->GetTextureResource() : nullptr;
+
+				if (Input && Output)
+				{
+					ShadersAPI.RenderPostprocess_OutputRemap(RHICmdList, Input, Output, *MeshProxy);
+				}
+			}
+		}
+	}
+}
+
 EDisplayClusterViewportResourceType FDisplayClusterViewportProxy::GetOutputResourceType() const
 {
+	check(IsInRenderingThread());
+
 #if WITH_EDITOR
 	if (Owner.GetRenderFrameSettings_RenderThread().RenderMode == EDisplayClusterRenderFrameMode::PreviewMono)
 	{
 		return EDisplayClusterViewportResourceType::OutputPreviewTargetableResource;
 	}
 #endif
+
+	if (RemapMesh.IsValid())
+	{
+		const FDisplayClusterRender_MeshComponentProxy* MeshProxy = RemapMesh->GetProxy();
+		if (MeshProxy && MeshProxy->IsValid_RenderThread())
+		{
+			// In this case render to additional frame targetable
+			return EDisplayClusterViewportResourceType::AdditionalFrameTargetableResource;
+		}
+	}
 
 	return EDisplayClusterViewportResourceType::OutputFrameTargetableResource;
 }

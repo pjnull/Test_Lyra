@@ -42,6 +42,12 @@ public:
 	TSharedPtr<FUICommandInfo> FillParentNode;
 	TSharedPtr<FUICommandInfo> SizeToChildNodes;
 
+	TSharedPtr<FUICommandInfo> RotateViewport90CW;
+	TSharedPtr<FUICommandInfo> RotateViewport90CCW;
+	TSharedPtr<FUICommandInfo> RotateViewport180;
+	TSharedPtr<FUICommandInfo> FlipViewportHorizontal;
+	TSharedPtr<FUICommandInfo> FlipViewportVertical;
+
 	// Cluster Configuration commands
 	TSharedPtr<FUICommandInfo> AddNewClusterNode;
 	TSharedPtr<FUICommandInfo> AddNewViewport;

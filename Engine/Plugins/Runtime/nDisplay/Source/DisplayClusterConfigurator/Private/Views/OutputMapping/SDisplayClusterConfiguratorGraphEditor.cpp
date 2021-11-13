@@ -230,6 +230,19 @@ FActionMenuContent SDisplayClusterConfiguratorGraphEditor::OnCreateNodeOrPinMenu
 		}
 		MenuBuilder->EndSection();
 
+		MenuBuilder->BeginSection(FName(TEXT("Transformation")), LOCTEXT("TransformationHeader", "Transform"));
+		{
+			if (InGraphNode->IsA<UDisplayClusterConfiguratorViewportNode>())
+			{
+				MenuBuilder->AddMenuEntry(Commands.RotateViewport90CW);
+				MenuBuilder->AddMenuEntry(Commands.RotateViewport90CCW);
+				MenuBuilder->AddMenuEntry(Commands.RotateViewport180);
+				MenuBuilder->AddMenuEntry(Commands.FlipViewportHorizontal);
+				MenuBuilder->AddMenuEntry(Commands.FlipViewportVertical);
+			}
+		}
+		MenuBuilder->EndSection();
+
 		return FActionMenuContent(MenuBuilder->MakeWidget());
 	}
 
@@ -330,6 +343,36 @@ void SDisplayClusterConfiguratorGraphEditor::BindCommands()
 		Commands.SizeToChildNodes,
 		FExecuteAction::CreateSP(this, &SDisplayClusterConfiguratorGraphEditor::SizeToChildNodes),
 		FCanExecuteAction::CreateSP(this, &SDisplayClusterConfiguratorGraphEditor::CanSizeToChildNodes)
+	);
+
+	CommandList->MapAction(
+		Commands.RotateViewport90CW,
+		FExecuteAction::CreateSP(this, &SDisplayClusterConfiguratorGraphEditor::RotateNode, 90.0f),
+		FCanExecuteAction::CreateSP(this, &SDisplayClusterConfiguratorGraphEditor::CanTransformNode)
+	);
+
+	CommandList->MapAction(
+		Commands.RotateViewport90CCW,
+		FExecuteAction::CreateSP(this, &SDisplayClusterConfiguratorGraphEditor::RotateNode, -90.0f),
+		FCanExecuteAction::CreateSP(this, &SDisplayClusterConfiguratorGraphEditor::CanTransformNode)
+	);
+
+	CommandList->MapAction(
+		Commands.RotateViewport180,
+		FExecuteAction::CreateSP(this, &SDisplayClusterConfiguratorGraphEditor::RotateNode, 180.0f),
+		FCanExecuteAction::CreateSP(this, &SDisplayClusterConfiguratorGraphEditor::CanTransformNode)
+	);
+
+	CommandList->MapAction(
+		Commands.FlipViewportHorizontal,
+		FExecuteAction::CreateSP(this, &SDisplayClusterConfiguratorGraphEditor::FlipNode, true, false),
+		FCanExecuteAction::CreateSP(this, &SDisplayClusterConfiguratorGraphEditor::CanTransformNode)
+	);
+
+	CommandList->MapAction(
+		Commands.FlipViewportVertical,
+		FExecuteAction::CreateSP(this, &SDisplayClusterConfiguratorGraphEditor::FlipNode, false, true),
+		FCanExecuteAction::CreateSP(this, &SDisplayClusterConfiguratorGraphEditor::CanTransformNode)
 	);
 }
 
@@ -833,6 +876,65 @@ void SDisplayClusterConfiguratorGraphEditor::SizeToChildNodes()
 		if (BaseNode->IsA<UDisplayClusterConfiguratorHostNode>() || BaseNode->IsA<UDisplayClusterConfiguratorWindowNode>())
 		{
 			BaseNode->SizeToChildren();
+			bNodesChanged = true;
+		}
+	}
+
+	if (!bNodesChanged)
+	{
+		Transaction.Cancel();
+	}
+}
+
+bool SDisplayClusterConfiguratorGraphEditor::CanTransformNode() const
+{
+	const TSet<UObject*>& SelectedNodes = GetSelectedNodes();
+	for (UObject* Node : SelectedNodes)
+	{
+		// Transforms can only be applied to viewports at this point.
+		if (!Node->IsA<UDisplayClusterConfiguratorViewportNode>())
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
+void SDisplayClusterConfiguratorGraphEditor::RotateNode(float InRotation)
+{
+	const TSet<UObject*>& SelectedNodes = GetSelectedNodes();
+
+	FScopedTransaction Transaction(LOCTEXT("RotateNodeTransaction", "Rotate Nodes"));
+	bool bNodesChanged = false;
+
+	for (UObject* Node : SelectedNodes)
+	{
+		if (UDisplayClusterConfiguratorViewportNode* ViewportNode = Cast<UDisplayClusterConfiguratorViewportNode>(Node))
+		{
+			ViewportNode->RotateViewport(InRotation);
+			bNodesChanged = true;
+		}
+	}
+
+	if (!bNodesChanged)
+	{
+		Transaction.Cancel();
+	}
+}
+
+void SDisplayClusterConfiguratorGraphEditor::FlipNode(bool bFlipHorizontal, bool bFlipVertical)
+{
+	const TSet<UObject*>& SelectedNodes = GetSelectedNodes();
+
+	FScopedTransaction Transaction(LOCTEXT("FlipNodeTransaction", "Flip Nodes"));
+	bool bNodesChanged = false;
+
+	for (UObject* Node : SelectedNodes)
+	{
+		if (UDisplayClusterConfiguratorViewportNode* ViewportNode = Cast<UDisplayClusterConfiguratorViewportNode>(Node))
+		{
+			ViewportNode->FlipViewport(bFlipHorizontal, bFlipVertical);
 			bNodesChanged = true;
 		}
 	}

@@ -30,6 +30,12 @@ void FDisplayClusterConfiguratorCommands::RegisterCommands()
 
 	UI_COMMAND(FillParentNode, "Fill Parent", "Resizes and positions this node to fill its parent", EUserInterfaceActionType::Button, FInputChord(EKeys::F, EModifierKey::Shift));
 	UI_COMMAND(SizeToChildNodes, "Size to Children", "Resizes this node to completely wrap its children", EUserInterfaceActionType::Button, FInputChord(EKeys::C, EModifierKey::Shift));
+	
+	UI_COMMAND(RotateViewport90CW, "Rotate 90\u00b0 Clockwise", "Rotates this viewport clockwise by 90 degrees", EUserInterfaceActionType::Button, FInputChord());
+	UI_COMMAND(RotateViewport90CCW, "Rotate 90\u00b0 Counter Clockwise", "Rotates this viewport counter-clockwise by 90 degrees", EUserInterfaceActionType::Button, FInputChord());
+	UI_COMMAND(RotateViewport180, "Rotate 180\u00b0", "Rotates this viewport by 180 degrees", EUserInterfaceActionType::Button, FInputChord());
+	UI_COMMAND(FlipViewportHorizontal, "Flip Horizontal", "Flips this viewport horizontally", EUserInterfaceActionType::Button, FInputChord());
+	UI_COMMAND(FlipViewportVertical, "Flip Vertical", "Flips this viewport vertically", EUserInterfaceActionType::Button, FInputChord());
 
 	UI_COMMAND(AddNewClusterNode, "Add New Cluster Node", "Adds a new cluster node to the cluster config", EUserInterfaceActionType::Button, FInputChord());
 	UI_COMMAND(AddNewViewport, "Add New Viewport", "Adds a new viewport to the cluster node", EUserInterfaceActionType::Button, FInputChord());
