@@ -1228,9 +1228,9 @@ class DeviceUnreal(Device):
                 '-CONCERTRETRYAUTOCONNECTONERROR '
                 '-CONCERTAUTOCONNECT ')
 
-        command_line_args += (f'-CONCERTSERVER={CONFIG.MUSERVER_SERVER_NAME} '
-                              f'-CONCERTSESSION={SETTINGS.MUSERVER_SESSION_NAME} '
-                              f'-CONCERTDISPLAYNAME={self.name}')
+        command_line_args += (f'-CONCERTSERVER="{CONFIG.MUSERVER_SERVER_NAME}" '
+                              f'-CONCERTSESSION="{SETTINGS.MUSERVER_SESSION_NAME}" '
+                              f'-CONCERTDISPLAYNAME="{self.name}"')
 
         if CONFIG.INSIGHTS_TRACE_ENABLE.get_value():
             LOGGER.warning(f"Unreal Insight Tracing is enabled for '{self.name}'. This may effect Unreal Engine performance.")
@@ -1263,7 +1263,7 @@ class DeviceUnreal(Device):
         if session_id > 0:
             command_line_args += f" -StageSessionId={session_id}"
 
-        command_line_args += f" -StageFriendlyName={self.name}"
+        command_line_args += f' -StageFriendlyName="{self.name.replace(" ", "_")}"'
 
         # Max GPU Count (mGPU)
         max_gpu_count = DeviceUnreal.csettings["max_gpu_count"].get_value(

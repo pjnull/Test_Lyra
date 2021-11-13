@@ -315,7 +315,7 @@ class SwitchboardDialog(QtCore.QObject):
         self.osc_server.dispatcher_map(osc.DATA, self.osc_data)
 
         # Connect UI to methods
-        self.window.multiuser_session_lineEdit.textChanged.connect(self.set_multiuser_session_name)
+        self.window.multiuser_session_lineEdit.textChanged.connect(self.on_multiuser_session_lineEdit_textChanged)
         self.window.slate_line_edit.textChanged.connect(self._set_slate)
         self.window.take_spin_box.valueChanged.connect(self._set_take)
         self.window.sequence_line_edit.textChanged.connect(self._set_sequence)
@@ -1097,13 +1097,20 @@ class SwitchboardDialog(QtCore.QObject):
     def multiuser_session_name(self):
         return self._multiuser_session_name
 
+    def on_multiuser_session_lineEdit_textChanged(self, text):
+        self.set_multiuser_session_name(text)
+
     def set_multiuser_session_name(self, value):
+
+        # sanitize the session name
+        value = value.replace(' ', '_')
+
         self._multiuser_session_name = value
 
         if self.window.multiuser_session_lineEdit.text() != value:
             self.window.multiuser_session_lineEdit.setText(value)
         
-        if value !=SETTINGS.MUSERVER_SESSION_NAME:
+        if value != SETTINGS.MUSERVER_SESSION_NAME:
             SETTINGS.MUSERVER_SESSION_NAME = value
             SETTINGS.save()
 

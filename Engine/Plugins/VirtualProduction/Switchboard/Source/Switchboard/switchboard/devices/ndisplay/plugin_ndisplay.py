@@ -749,7 +749,7 @@ class DevicenDisplay(DeviceUnreal):
         session_id = f"-StageSessionId={session_id}" if session_id > 0 else ''
 
         # Friendly name. Avoid spaces to avoid parsing issues.
-        friendly_name = f'-StageFriendlyName={self.name.replace(" ", "_")}'
+        friendly_name = f'-StageFriendlyName="{self.name.replace(" ", "_")}"'
 
         # Unattended mode
         unattended = (
@@ -860,9 +860,9 @@ class DevicenDisplay(DeviceUnreal):
                 '-CONCERTAUTOCONNECT'])
 
         args.extend([
-            f'-CONCERTSERVER={CONFIG.MUSERVER_SERVER_NAME}',
-            f'-CONCERTSESSION={SETTINGS.MUSERVER_SESSION_NAME}',
-            f'-CONCERTDISPLAYNAME={self.name}',
+            f'-CONCERTSERVER="{CONFIG.MUSERVER_SERVER_NAME}"',
+            f'-CONCERTSESSION="{SETTINGS.MUSERVER_SESSION_NAME}"',
+            f'-CONCERTDISPLAYNAME="{self.name}"',
             '-CONCERTISHEADLESS',
         ])
 

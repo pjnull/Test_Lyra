@@ -1836,7 +1836,7 @@ class UserSettings(object):
 
         # UI Settings
         self.MUSERVER_SESSION_NAME = data.get(
-            'muserver_session_name', 'MU_Session')
+            'muserver_session_name', 'MU_Session').replace(' ','_')
         self.CURRENT_SEQUENCE = data.get('current_sequence', 'Default')
         self.CURRENT_SLATE = data.get('current_slate', 'Scene')
         self.CURRENT_TAKE = data.get('current_take', 1)
