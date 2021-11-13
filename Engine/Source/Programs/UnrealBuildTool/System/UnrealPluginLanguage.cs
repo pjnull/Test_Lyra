@@ -3223,11 +3223,13 @@ namespace UnrealBuildTool
 		private IniSection FindOrAddSection(string TrimmedLine, FileReference Filename, int LineIndex)
 		{
 			int SectionEndIndex = TrimmedLine.IndexOf(']');
-			if (SectionEndIndex != (TrimmedLine.Length - 1))
+			if (SectionEndIndex < 1)
 			{
 				throw new IniParsingException("Mismatched brackets when parsing section name in {0}, line {1}: {2}", Filename, LineIndex, TrimmedLine);
 			}
-			string SectionName = TrimmedLine.Substring(1, TrimmedLine.Length - 2);
+
+			// comment could follow the ] but will just be trimmed out
+			string SectionName = TrimmedLine.Substring(1, SectionEndIndex - 1);
 			if (String.IsNullOrEmpty(SectionName))
 			{
 				throw new IniParsingException("Empty section name when parsing {0}, line {1}: {2}", Filename, LineIndex, TrimmedLine);
