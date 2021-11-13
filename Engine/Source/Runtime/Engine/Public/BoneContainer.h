@@ -473,9 +473,41 @@ public:
 		return PoseToSkeletonBoneIndexArray;
 	}
 
+	/** Map mesh bone index to skeleton index */
+	FMeshPoseBoneIndex GetMeshPoseIndexFromSkeletonPoseIndex(const FSkeletonPoseBoneIndex& SkeletonIndex) const
+	{
+		if (ensure(SkeletonToPoseBoneIndexArray.IsValidIndex(SkeletonIndex.GetInt())))
+		{
+			return FMeshPoseBoneIndex(SkeletonToPoseBoneIndexArray[SkeletonIndex.GetInt()]);
+		}
+		
+		return FMeshPoseBoneIndex(INDEX_NONE);
+	}
+
+	/** Map skeleton bone index to mesh index */
+	FSkeletonPoseBoneIndex GetSkeletonPoseIndexFromMeshPoseIndex(const FMeshPoseBoneIndex& MeshIndex) const
+	{
+		if (ensure(PoseToSkeletonBoneIndexArray.IsValidIndex(MeshIndex.GetInt())))
+		{
+			return FSkeletonPoseBoneIndex(PoseToSkeletonBoneIndexArray[MeshIndex.GetInt()]);
+		}
+		
+		return FSkeletonPoseBoneIndex(INDEX_NONE);
+	}
+
 	int32 GetSkeletonIndex(const FCompactPoseBoneIndex& BoneIndex) const
 	{
 		return CompactPoseToSkeletonIndex[BoneIndex.GetInt()];
+	}
+
+	FSkeletonPoseBoneIndex GetSkeletonPoseIndexFromCompactPoseIndex(const FCompactPoseBoneIndex& BoneIndex) const
+	{
+		if (ensure(CompactPoseToSkeletonIndex.IsValidIndex(BoneIndex.GetInt())))
+		{
+			return FSkeletonPoseBoneIndex(CompactPoseToSkeletonIndex[BoneIndex.GetInt()]);
+		}
+		
+		return FSkeletonPoseBoneIndex(INDEX_NONE);
 	}
 
 	FCompactPoseBoneIndex GetCompactPoseIndexFromSkeletonIndex(const int32 SkeletonIndex) const
@@ -483,6 +515,16 @@ public:
 		if (ensure(SkeletonToCompactPose.IsValidIndex(SkeletonIndex)))
 		{
 			return SkeletonToCompactPose[SkeletonIndex];
+		}
+
+		return FCompactPoseBoneIndex(INDEX_NONE);
+	}
+
+	FCompactPoseBoneIndex GetCompactPoseIndexFromSkeletonPoseIndex(const FSkeletonPoseBoneIndex& SkeletonIndex) const
+	{
+		if (ensure(SkeletonToCompactPose.IsValidIndex(SkeletonIndex.GetInt())))
+		{
+			return SkeletonToCompactPose[SkeletonIndex.GetInt()];
 		}
 
 		return FCompactPoseBoneIndex(INDEX_NONE);
