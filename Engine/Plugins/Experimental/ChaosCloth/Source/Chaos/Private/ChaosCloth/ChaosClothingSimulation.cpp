@@ -602,12 +602,12 @@ void FClothingSimulation::GetSimulationData(
 		OutData.Reset();
 	}
 
-	// Get the solver's local space
-	const FVec3& LocalSpaceLocation = Solver->GetLocalSpaceLocation();
-
 	// Retrieve the component transforms
 	const FTransform& OwnerTransform = InOwnerComponent->GetComponentTransform();
 	const TArray<FTransform>& ComponentSpaceTransforms = InOverrideComponent ? InOverrideComponent->GetComponentSpaceTransforms() : InOwnerComponent->GetComponentSpaceTransforms();
+
+	// Get the solver's local space location
+	const FVec3 LocalSpaceLocation = bUseLocalSpaceSimulation ? OwnerTransform.GetLocation() : FVec3(0.);  // Note: The component could be moving while the simulation is suspended, this means the owner component location needs to be used instead of the solver's local space location
 
 	// Set the simulation data for each of the cloths
 	for (const TUniquePtr<FClothingSimulationCloth>& Cloth : Cloths)
@@ -685,7 +685,17 @@ void FClothingSimulation::GetSimulationData(
 FBoxSphereBounds FClothingSimulation::GetBounds(const USkeletalMeshComponent* InOwnerComponent) const
 {
 	check(Solver);
-	const FBoxSphereBounds Bounds = Solver->CalculateBounds();
+	FBoxSphereBounds Bounds = Solver->CalculateBounds();
+
+	if (bUseLocalSpaceSimulation)
+	{
+		// The component could be moving while the simulation is suspended so getting the bounds
+		// in world space isn't good enough and the bounds origin needs to be continuously updated
+		const FTransform& OwnerTransform = InOwnerComponent->GetComponentTransform();
+		const FVec3 CurrentLocalSpaceLocation = OwnerTransform.GetLocation();
+		const FVec3& SolverLocalSpaceLocation = Solver->GetLocalSpaceLocation();
+		Bounds.Origin += FVector(CurrentLocalSpaceLocation - SolverLocalSpaceLocation);
+	}
 
 	if (InOwnerComponent)
 	{
