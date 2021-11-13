@@ -43,7 +43,7 @@ namespace DatasmithRuntime
 		}
 
 		ActorData.ParentId = ParentId;
-		ActorData.WorldTransform = FTransform( ActorElement->GetRotation(), ActorElement->GetTranslation(), ActorElement->GetScale() );
+		ActorData.WorldTransform = FTransform(ActorElement->GetRotation(), ActorElement->GetTranslation(), ActorElement->GetScale()) * RootComponent->GetComponentTransform();
 
 		bool bProcessSuccessful = false;
 
