@@ -111,11 +111,11 @@ namespace CADKernel
 
 		FMesherChronos Chronos;
 
+		bool bDisplay = false;
+
 	public:
 
 		FParametricMesher(TSharedRef<FModelMesh> MeshModel);
-		FParametricMesher(TSharedRef<FModelMesh> MeshModel, TArray<TSharedPtr<FEntity>>& InEntities);
-		FParametricMesher(TSharedRef<FModelMesh> MeshModel, TSharedRef<FTopologicalEntity>& InEntity);
 
 		const TSharedRef<FModelMesh>& GetMeshModel() const
 		{

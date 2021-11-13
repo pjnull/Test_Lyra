@@ -48,15 +48,30 @@ namespace CADKernel
 
 	class CADKERNEL_API F3DDebugSession
 	{
+	private:
+		bool bDisplay = true;
+
 	public :
 		F3DDebugSession(FString name, const TArray<FIdent>& Idents = TArray<FIdent>())
 		{
 			Open3DDebugSession(name, Idents);
 		}
 
+		F3DDebugSession(bool bInDisplay, FString name, const TArray<FIdent>& Idents = TArray<FIdent>())
+			: bDisplay(bInDisplay)
+		{
+			if (bDisplay)
+			{
+				Open3DDebugSession(name, Idents);
+			}
+		}
+
 		~F3DDebugSession()
 		{
-			Close3DDebugSession();
+			if (bDisplay)
+			{
+				Close3DDebugSession();
+			}
 		}
 	};
 

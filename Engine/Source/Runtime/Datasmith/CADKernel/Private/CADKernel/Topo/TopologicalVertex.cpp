@@ -31,7 +31,7 @@ void FTopologicalVertex::RemoveConnectedEdge(FTopologicalEdge& Edge)
 	{
 		return;
 	}
-	
+
 	for (int32 EdgeIndex = 0; EdgeIndex < ConnectedEdges.Num(); EdgeIndex++)
 	{
 		if (ConnectedEdges[EdgeIndex] == &Edge)
@@ -47,11 +47,17 @@ bool FTopologicalVertex::IsBorderVertex()
 {
 	for (FTopologicalVertex* Vertex : GetTwinsEntities())
 	{
-		for (const FTopologicalEdge* Edge : Vertex->GetDirectConnectedEdges())
+		if (Vertex != nullptr)
 		{
-			if (Edge->GetTwinsEntityCount() == 1)
+			for (const FTopologicalEdge* Edge : Vertex->GetDirectConnectedEdges())
 			{
-				return true;
+				if (Edge != nullptr)
+				{
+					if (Edge->GetTwinsEntityCount() == 1)
+					{
+						return true;
+					}
+				}
 			}
 		}
 	}
@@ -71,11 +77,11 @@ void FTopologicalVertex::GetConnectedEdges(const FTopologicalVertex& OtherVertex
 	TSharedPtr<TTopologicalLink<FTopologicalVertex>> OtherVertexLink = OtherVertex.GetLink();
 	for (const FTopologicalVertex* Vertex : GetTwinsEntities())
 	{
-		if(Vertex != nullptr)
+		if (Vertex != nullptr)
 		{
 			for (FTopologicalEdge* Edge : Vertex->GetDirectConnectedEdges())
 			{
-				if(Edge != nullptr)
+				if (Edge != nullptr)
 				{
 					if (Edge->GetOtherVertex(*Vertex)->GetLink() == OtherVertexLink)
 					{
@@ -98,12 +104,12 @@ void FTopologicalVertex::Link(FTopologicalVertex& Twin)
 		}
 	}
 
-	FPoint Barycenter = GetBarycenter() * (double) GetTwinsEntityCount()
+	FPoint Barycenter = GetBarycenter() * (double)GetTwinsEntityCount()
 		+ Twin.GetBarycenter() * (double)Twin.GetTwinsEntityCount();
 
 	MakeLink(Twin);
 
-	Barycenter /= (double) GetTwinsEntityCount();
+	Barycenter /= (double)GetTwinsEntityCount();
 	GetLink()->SetBarycenter(Barycenter);
 
 	// Find the closest vertex of the Barycenter
@@ -118,7 +124,7 @@ void FTopologicalVertex::UnlinkTo(FTopologicalVertex& OtherVertex)
 
 	for (FTopologicalVertex* Vertex : OldLink->GetTwinsEntities())
 	{
-		if (!Vertex|| Vertex == this || Vertex == &OtherVertex)
+		if (!Vertex || Vertex == this || Vertex == &OtherVertex)
 		{
 			continue;
 		}
@@ -206,7 +212,7 @@ void FTopologicalVertex::SpawnIdent(FDatabase& Database)
 		TopologicalLink->SpawnIdent(Database);
 	}
 
-	if(Mesh.IsValid())
+	if (Mesh.IsValid())
 	{
 		Mesh->SpawnIdent(Database);
 	}

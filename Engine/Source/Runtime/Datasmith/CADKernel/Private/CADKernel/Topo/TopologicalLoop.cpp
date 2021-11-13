@@ -19,48 +19,49 @@ namespace CADKernel
 
 TSharedPtr<FTopologicalLoop> FTopologicalLoop::Make(const TArray<TSharedPtr<FTopologicalEdge>>& InEdges, const TArray<EOrientation>& InEdgeDirections, double GeometricTolerance)
 {
-	TSharedRef<FTopologicalLoop> Loop = FEntity::MakeShared<FTopologicalLoop>(InEdges, InEdgeDirections);
+	TSharedRef<FTopologicalLoop> LoopRef = FEntity::MakeShared<FTopologicalLoop>(InEdges, InEdgeDirections);
+	FTopologicalLoop& Loop = *LoopRef;
 
-	Loop->EnsureLogicalClosing(GeometricTolerance);
-	Loop->RemoveDegeneratedEdges();
+	Loop.EnsureLogicalClosing(GeometricTolerance);
+	Loop.RemoveDegeneratedEdges();
 
-	for (FOrientedEdge& OrientedEdge : Loop->GetEdges())
+	for (FOrientedEdge& OrientedEdge : Loop.GetEdges())
 	{
-		OrientedEdge.Entity->SetLoop(*Loop);
+		OrientedEdge.Entity->SetLoop(Loop);
 	}
 
 	TArray<FPoint2D> LoopSampling;
-	Loop->Get2DSampling(LoopSampling);
+	Loop.Get2DSampling(LoopSampling);
 	FAABB2D LoopBoundary;
 	LoopBoundary += LoopSampling;
-	Loop->Boundary.Set(LoopBoundary.GetMin(), LoopBoundary.GetMax());
+	Loop.Boundary.Set(LoopBoundary.GetMin(), LoopBoundary.GetMax());
 
-	if (Algo::AllOf(Loop->GetEdges(), [](const FOrientedEdge& Edge) { return Edge.Entity->IsDegenerated(); }))
+	if (Algo::AllOf(Loop.GetEdges(), [](const FOrientedEdge& Edge) { return Edge.Entity->IsDegenerated(); }))
 	{
-		Loop->DeleteLoopEdges();
+		Loop.DeleteLoopEdges();
 		return TSharedPtr<FTopologicalLoop>();
 	}
 
 	double Length = 0;
-	for(const FOrientedEdge& Edge : Loop->GetEdges())
+	for (const FOrientedEdge& Edge : Loop.GetEdges())
 	{
 		Length += Edge.Entity->Length();
 	}
-	if(Length < 10*GeometricTolerance)
+	if (Length < 10 * GeometricTolerance)
 	{
 		// Degenerated Loop
-		Loop->DeleteLoopEdges();
+		Loop.DeleteLoopEdges();
 		return TSharedPtr<FTopologicalLoop>();
 	}
 
-	return Loop;
+	return LoopRef;
 }
 
 FTopologicalLoop::FTopologicalLoop(const TArray<TSharedPtr<FTopologicalEdge>>& InEdges, const TArray<EOrientation>& InEdgeDirections)
 	: bExternalLoop(true)
 {
 	Edges.Reserve(InEdges.Num());
-	for(int32 Index = 0; Index < InEdges.Num(); ++Index)
+	for (int32 Index = 0; Index < InEdges.Num(); ++Index)
 	{
 		TSharedPtr<FTopologicalEdge> Edge = InEdges[Index];
 		EOrientation Orientation = InEdgeDirections[Index];
@@ -116,13 +117,13 @@ EOrientation FTopologicalLoop::GetDirection(TSharedPtr<FTopologicalEdge>& InEdge
 
 void FTopologicalLoop::Get2DSampling(TArray<FPoint2D>& LoopSampling)
 {
-	int32 PointNum = 0;
+	int32 PointCount = 0;
 	for (const FOrientedEdge& Edge : Edges)
 	{
-		PointNum += Edge.Entity->GetCurve()->GetPolylineSize();
+		PointCount += Edge.Entity->GetCurve()->GetPolylineSize();
 	}
 
-	LoopSampling.Empty(PointNum);
+	LoopSampling.Empty(PointCount);
 
 	for (const FOrientedEdge& Edge : Edges)
 	{
@@ -132,12 +133,43 @@ void FTopologicalLoop::Get2DSampling(TArray<FPoint2D>& LoopSampling)
 	LoopSampling.Emplace(LoopSampling[0]);
 }
 
-//#define DEBUG_ORIENT
+void FTopologicalLoop::Get2DSamplingWithoutDegeneratedEdges(TArray<FPoint2D>& LoopSampling)
+{
+	double LoopLength = 0;
+	int32 EdgeCount = 0;
+	int32 PointCount = 0;
+	for (const FOrientedEdge& Edge : Edges)
+	{
+		if (Edge.Entity->IsDegenerated())
+		{
+			continue;
+		}
+		EdgeCount++;
+		PointCount += Edge.Entity->GetCurve()->GetPolylineSize();
+		LoopLength += Edge.Entity->Length();
+	}
 
+	double LoopMeanLength = LoopLength / EdgeCount;
+	double MinEdgeLength = LoopMeanLength * 0.01;
+	MinEdgeLength = FMath::Max(MinEdgeLength, Face.Pin()->GetCarrierSurface()->Get3DTolerance() * 10);
+
+	LoopSampling.Empty(PointCount);
+
+	for (const FOrientedEdge& Edge : Edges)
+	{
+		if (Edge.Entity->Length() < MinEdgeLength)
+		{
+			continue;
+		}
+		Edge.Entity->GetDiscretization2DPoints(Edge.Direction, LoopSampling);
+		LoopSampling.Pop();
+	}
+	LoopSampling.Emplace(LoopSampling[0]);
+}
 
 /**
  * To check loop orientation, we check the orientation of the extremity points i.e. "o" points below
- * 
+ *
  *                   o
  *                  / \
  *                 /   \
@@ -145,19 +177,19 @@ void FTopologicalLoop::Get2DSampling(TArray<FPoint2D>& LoopSampling)
  *                 \   /
  *                  \ /
  *                   o
- * 
- * For these points, the slop is compute. 
+ *
+ * For these points, the slop is compute.
  * If the slop is between 0 and 4, the loop at the point is well oriented otherwise not
  *
  * The difficulties start when the slop is closed to 0 or 4 i.e.
- * 
+ *
  *     -----o-----
  *    |           |
- * 
+ *
  * In this case, the orientation of the next segment is compare to the bounding box
- * 
- * The last very difficult case is a sharp case at the previous case i.e. 
- *  
+ *
+ * The last very difficult case is a sharp case at the previous case i.e.
+ *
  *     ______
  *    |   ---O
  *    |   |
@@ -168,7 +200,8 @@ void FTopologicalLoop::Orient()
 	ensureCADKernel(Edges.Num() > 0);
 
 	TArray<FPoint2D> LoopSampling;
-	Get2DSampling(LoopSampling);
+
+	Get2DSamplingWithoutDegeneratedEdges(LoopSampling);
 	LoopSampling.Pop();
 	TSet<int32> ExtremityIndex;
 	ExtremityIndex.Reserve(8);
@@ -695,7 +728,7 @@ void FTopologicalLoop::RemoveDegeneratedEdges()
 			// Is this edge is tangent in 2d space with previous or next edge
 			DegeneratedOrientedEdge.Entity->GetExtremities(DegeneratedEdgeExtremities);
 
-			int32 PreviousEdgeIndex = (Index == 0) ? Edges.Num() - 1 : Index -1;
+			int32 PreviousEdgeIndex = (Index == 0) ? Edges.Num() - 1 : Index - 1;
 			if (RemoveDegeneratedEdge(true, PreviousEdgeIndex))
 			{
 				Edges.RemoveAt(Index);
@@ -703,7 +736,7 @@ void FTopologicalLoop::RemoveDegeneratedEdges()
 			}
 
 			int32 NextEdgeIndex = (Index == Edges.Num() - 1) ? 0 : Index + 1;
-			if(RemoveDegeneratedEdge(false, NextEdgeIndex))
+			if (RemoveDegeneratedEdge(false, NextEdgeIndex))
 			{
 				Edges.RemoveAt(Index);
 			}

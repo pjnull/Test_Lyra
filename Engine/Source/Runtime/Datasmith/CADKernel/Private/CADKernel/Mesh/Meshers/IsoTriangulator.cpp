@@ -465,9 +465,14 @@ void FIsoTriangulator::BuildThinZoneSegments()
 
 void FIsoTriangulator::BuildInnerSegments()
 {
-	// TODO this step should not be usefull, only the boundary of the grid is need
+
+#ifdef DEBUG_BUILDINNERSEGMENTS
+		F3DDebugSession _(bDisplay, TEXT("BuildInnerSegments"));
+#endif
 
 	FTimePoint StartTime = FChrono::Now();
+
+	const double GeometricTolerance = Grid.GetFace()->GetCarrierSurface()->Get3DTolerance();
 
 	// Build segments according to the Grid following u then following v
 	// Build segment must not be in intersection with the loop
@@ -476,7 +481,32 @@ void FIsoTriangulator::BuildInnerSegments()
 
 	LoopSegmentsIntersectionTool.Reserve(InnerSegmentsIntersectionTool.Count());
 
-	TFunction<void(const int32, const int32, const ESegmentType)> BuildSegmentIfValid = [this](const int32 IndexNode1, const int32 IndexNode2, const ESegmentType InType)
+	TFunction<bool(const FPoint2D&, const FPoint2D&)> AlmostHitsLoop = [&](const FPoint2D& Node1, const FPoint2D& Node2) -> bool
+	{
+		for (const TArray<FPoint2D>& Loop : Grid.GetLoops2D(EGridSpace::UniformScaled))
+		{
+			for (const FPoint2D& LoopPoint : Loop)
+			{
+				if(FMath::IsNearlyEqual(LoopPoint.U, Node1.U, GeometricTolerance))
+				{
+					if(Node1.V - SMALL_NUMBER < LoopPoint.V && LoopPoint.V < Node2.V + SMALL_NUMBER)
+					{
+						return true;
+					}
+				}
+				else if (FMath::IsNearlyEqual(LoopPoint.V, Node1.V, GeometricTolerance))
+				{
+					if (Node1.U - SMALL_NUMBER < LoopPoint.U && LoopPoint.U < Node2.U + SMALL_NUMBER)
+					{
+						return true;
+					}
+				}
+			}
+		}
+		return false;
+	};
+
+	TFunction<void(const int32, const int32, const ESegmentType)> BuildSegmentIfValid = [&](const int32 IndexNode1, const int32 IndexNode2, const ESegmentType InType)
 	{
 		if (!Grid.IsNodeInsideFace(IndexNode1) || !Grid.IsNodeInsideFace(IndexNode2))
 		{
@@ -486,7 +516,16 @@ void FIsoTriangulator::BuildInnerSegments()
 
 		if (Grid.IsNodeCloseToLoop(IndexNode1) && Grid.IsNodeCloseToLoop(IndexNode2))
 		{
-			if (LoopSegmentsIntersectionTool.DoesIntersect(Grid.GetInner2DPoint(EGridSpace::UniformScaled, IndexNode1), Grid.GetInner2DPoint(EGridSpace::UniformScaled, IndexNode2)))
+#ifdef DEBUG_BUILDINNERSEGMENTS
+			if (bDisplay)
+			{
+				DisplaySegment(Grid.GetInner2DPoint(EGridSpace::UniformScaled, IndexNode1), Grid.GetInner2DPoint(EGridSpace::UniformScaled, IndexNode2));
+				Wait();
+			}
+#endif
+
+			if (LoopSegmentsIntersectionTool.DoesIntersect(Grid.GetInner2DPoint(EGridSpace::UniformScaled, IndexNode1), Grid.GetInner2DPoint(EGridSpace::UniformScaled, IndexNode2))
+			|| AlmostHitsLoop(Grid.GetInner2DPoint(EGridSpace::UniformScaled, IndexNode1), Grid.GetInner2DPoint(EGridSpace::UniformScaled, IndexNode2)))
 			{
 				InnerToOuterSegmentsIntersectionTool.AddSegment(Grid.GetInner2DPoint(EGridSpace::UniformScaled, IndexNode1), Grid.GetInner2DPoint(EGridSpace::UniformScaled, IndexNode2));
 				return;
@@ -2328,9 +2367,12 @@ void FIsoTriangulator::MeshCycle(const EGridSpace Space, const TArray<FIsoSegmen
 #ifdef ADD_TRIANGLE_2D
 			if (bDisplay)
 			{
-				F3DDebugSession _(FString::Printf(TEXT("Triangle")));
-				DisplayTriangle(EGridSpace::UniformScaled, EndNode, StartNode, *CandidatNode);
-				Wait(false);
+				{
+					F3DDebugSession _(FString::Printf(TEXT("Triangle")));
+					DisplayTriangle(EGridSpace::UniformScaled, EndNode, StartNode, *CandidatNode);
+				}
+				CycleIntersectionTool.Display(TEXT("CycleIntersectionTool"));
+				Wait();
 			}
 #endif 
 

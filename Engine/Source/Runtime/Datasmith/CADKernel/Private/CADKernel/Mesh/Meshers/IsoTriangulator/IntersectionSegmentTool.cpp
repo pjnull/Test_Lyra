@@ -31,12 +31,12 @@ const FIsoSegment* FIntersectionSegmentTool::DoesIntersect(const FIsoNode& Start
 			break;
 		}
 
-		if (Segment.IsoSegment->GetFirstNode().GetId() == StartNode.GetId() || Segment.IsoSegment->GetSecondNode().GetId() == StartNode.GetId())
+		if (Segment.IsoSegment->GetFirstNode() == StartNode || Segment.IsoSegment->GetSecondNode() == StartNode)
 		{
 			continue;
 		}
 
-		if (Segment.IsoSegment->GetFirstNode().GetId() == EndNode.GetId() || Segment.IsoSegment->GetSecondNode().GetId() == EndNode.GetId())
+		if (Segment.IsoSegment->GetFirstNode() == EndNode || Segment.IsoSegment->GetSecondNode() == EndNode)
 		{
 			continue;
 		}
