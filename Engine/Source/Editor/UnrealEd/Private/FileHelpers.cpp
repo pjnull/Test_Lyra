@@ -3496,6 +3496,9 @@ static bool InternalSavePackagesFast(const TArray<UPackage*>& PackagesToSave, bo
 	GWarn->BeginSlowTask(NSLOCTEXT("UnrealEd", "SavingPackagesE", "Saving packages..."), true);
 
 	TArray<UPackage*> PackagesToClean;
+	TArray<UPackage*> FinalPackagesToSave;
+	FinalPackagesToSave.Reserve(PackagesToSave.Num());
+		
 	for (TArray<UPackage*>::TConstIterator PkgIter(PackagesToSave); PkgIter; ++PkgIter)
 	{
 		UPackage* CurPackage = *PkgIter;
@@ -3536,37 +3539,42 @@ static bool InternalSavePackagesFast(const TArray<UPackage*>& PackagesToSave, bo
 				// Otherwise, save as usual
 				else
 				{
-					bool bPackageLocallyWritable;
-					const InternalSavePackageResult SaveStatus = InternalSavePackage(CurPackage, bUseDialog, bPackageLocallyWritable, SaveErrors);
-
-					if (SaveStatus == InternalSavePackageResult::Cancel)
-					{
-						// we don't want to pop up a message box about failing to save packages if they cancel
-						// instead warn here so there is some trace in the log and also unattended builds can find it
-						UE_LOG(LogFileHelpers, Warning, TEXT("Cancelled saving package %s"), *CurPackage->GetName());
-					}
-					else if (SaveStatus == InternalSavePackageResult::Continue || SaveStatus == InternalSavePackageResult::Error)
-					{
-						// The package could not be saved so add it to the failed array 
-						OutFailedPackages.Add(CurPackage);
-
-						if (SaveStatus == InternalSavePackageResult::Error)
-						{
-							// exit gracefully.
-							bReturnCode = false;
-						}
-					}
+					FinalPackagesToSave.Add(CurPackage);
 				}
 			}
 		}
 	}
 
-	// if we have
+	// Cleanup packages before saving packages in case we are saving worlds with external packages we could end up with packages being cleaned up by a world package save (that are in our PackagesToClean list)
 	if (PackagesToClean.Num() > 0)
 	{
 		ObjectTools::CleanupAfterSuccessfulDelete(PackagesToClean, true);
 	}
 
+	for (UPackage* Package : FinalPackagesToSave)
+	{
+		bool bPackageLocallyWritable;
+		const InternalSavePackageResult SaveStatus = InternalSavePackage(Package, bUseDialog, bPackageLocallyWritable, SaveErrors);
+
+		if (SaveStatus == InternalSavePackageResult::Cancel)
+		{
+			// we don't want to pop up a message box about failing to save packages if they cancel
+			// instead warn here so there is some trace in the log and also unattended builds can find it
+			UE_LOG(LogFileHelpers, Warning, TEXT("Cancelled saving package %s"), *Package->GetName());
+		}
+		else if (SaveStatus == InternalSavePackageResult::Continue || SaveStatus == InternalSavePackageResult::Error)
+		{
+			// The package could not be saved so add it to the failed array 
+			OutFailedPackages.Add(Package);
+
+			if (SaveStatus == InternalSavePackageResult::Error)
+			{
+				// exit gracefully.
+				bReturnCode = false;
+			}
+		}
+	}
+	
 	// Add all files that needs to be marked for add in one command, if any
 	if (GEditor)
 	{
@@ -3869,6 +3877,9 @@ FEditorFileUtils::EPromptReturnCode InternalPromptForCheckoutAndSave(const TArra
 
 	TArray<UPackage*, TInlineAllocator<2>> WritablePackageFiles;
 	TArray<UPackage*> PackagesToClean;
+	TArray<UPackage*> PackagesToSave;
+	PackagesToSave.Reserve(FinalSaveList.Num());
+
 	{
 		FScopedSlowTask SlowTask(FinalSaveList.Num() * 2, NSLOCTEXT("UnrealEd", "SavingPackagesE", "Saving packages..."));
 		SlowTask.MakeDialog();
@@ -3912,32 +3923,42 @@ FEditorFileUtils::EPromptReturnCode InternalPromptForCheckoutAndSave(const TArra
 			{
 				PackagesToClean.Add(Package);
 			}
-			// Otherwise, save as usual
 			else
 			{
-				// Save the package
-				bool bPackageLocallyWritable;
-				const InternalSavePackageResult SaveStatus = InternalSavePackage(Package, bUseDialog, bPackageLocallyWritable, SaveErrors);
+				PackagesToSave.Add(Package);
+			}
+		}
 
-				// If InternalSavePackage reported that the provided package was locally writable, add it to the list of writable files
-				// to warn the user about
-				if (bPackageLocallyWritable)
-				{
-					WritablePackageFiles.Add(Package);
-				}
+		// Cleanup packages before saving packages in case we are saving worlds with external packages we could end up with packages being cleaned up by a world package save
+		if (PackagesToClean.Num() > 0)
+		{
+			ObjectTools::CleanupAfterSuccessfulDelete(PackagesToClean, true);
+		}
 
-				if (SaveStatus == InternalSavePackageResult::Cancel)
-				{
-					// No need to save anything else, the user wants to cancel everything
-					ReturnResponse = FEditorFileUtils::PR_Cancelled;
-					break;
-				}
-				else if (SaveStatus == InternalSavePackageResult::Continue || SaveStatus == InternalSavePackageResult::Error)
-				{
-					// The package could not be saved so add it to the failed array and change the return response to indicate failure
-					OutFailedPackages.Add(Package);
-					ReturnResponse = FEditorFileUtils::PR_Failure;
-				}
+		for (UPackage* Package : PackagesToSave)
+		{
+			// Save the package
+			bool bPackageLocallyWritable;
+			const InternalSavePackageResult SaveStatus = InternalSavePackage(Package, bUseDialog, bPackageLocallyWritable, SaveErrors);
+
+			// If InternalSavePackage reported that the provided package was locally writable, add it to the list of writable files
+			// to warn the user about
+			if (bPackageLocallyWritable)
+			{
+				WritablePackageFiles.Add(Package);
+			}
+
+			if (SaveStatus == InternalSavePackageResult::Cancel)
+			{
+				// No need to save anything else, the user wants to cancel everything
+				ReturnResponse = FEditorFileUtils::PR_Cancelled;
+				break;
+			}
+			else if (SaveStatus == InternalSavePackageResult::Continue || SaveStatus == InternalSavePackageResult::Error)
+			{
+				// The package could not be saved so add it to the failed array and change the return response to indicate failure
+				OutFailedPackages.Add(Package);
+				ReturnResponse = FEditorFileUtils::PR_Failure;
 			}
 		}
 
@@ -3949,10 +3970,7 @@ FEditorFileUtils::EPromptReturnCode InternalPromptForCheckoutAndSave(const TArra
 
 	SaveErrors.Flush();
 
-	if (PackagesToClean.Num() > 0)
-	{
-		ObjectTools::CleanupAfterSuccessfulDelete(PackagesToClean, true);
-	}
+	
 
 	// Add all files that needs to be marked for add in one command, if any
 	if (GEditor)
@@ -4776,8 +4794,8 @@ static bool InternalCheckoutAndSavePackages(const TArray<UPackage*>& PackagesToS
 			TArray<UPackage*> PackagesToMarkForAdd;
 			for (UPackage* Package : PackagesToSave)
 			{
-				// List unsaved packages that were not checked out
-				if (!PackagesCheckedOut.Contains(Package))
+				// List unsaved packages that were not checked out and are not going to be deleted
+				if (!PackagesCheckedOut.Contains(Package) && !UPackage::IsEmptyPackage(Package))
 				{
 					PackagesToMarkForAdd.Add(Package);
 				}
