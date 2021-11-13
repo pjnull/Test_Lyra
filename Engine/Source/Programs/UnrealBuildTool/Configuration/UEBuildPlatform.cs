@@ -472,7 +472,7 @@ namespace UnrealBuildTool
 		/// <param name="Platform"></param>
 		/// <returns>UEBuildPlatform  The instance of the build platform</returns>
 		public static bool TryGetBuildPlatform(UnrealTargetPlatform InPlatform, [NotNullWhen(true)] out UEBuildPlatform? Platform)
-			{
+		{
 			return BuildPlatformDictionary.TryGetValue(InPlatform, out Platform);
 		}
 

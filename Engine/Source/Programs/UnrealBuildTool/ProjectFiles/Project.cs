@@ -308,7 +308,7 @@ namespace UnrealBuildTool
 			}
 			else
 			{
-				SourceFile File = AllocSourceFile(FilePath, BaseFolder);
+				SourceFile? File = AllocSourceFile(FilePath, BaseFolder);
 				if (File != null)
 				{
 					SourceFileMap[FilePath] = File;
@@ -503,7 +503,7 @@ namespace UnrealBuildTool
 		/// <param name="InitFilePath">Path to the source file on disk</param>
 		/// <param name="InitProjectSubFolder">Optional sub-folder to put the file in.  If empty, this will be determined automatically from the file's path relative to the project file</param>
 		/// <returns>The newly allocated source file object</returns>
-		public virtual SourceFile AllocSourceFile(FileReference InitFilePath, DirectoryReference? InitProjectSubFolder = null)
+		public virtual SourceFile? AllocSourceFile(FileReference InitFilePath, DirectoryReference? InitProjectSubFolder = null)
 		{
 			return new SourceFile(InitFilePath, InitProjectSubFolder);
 		}
