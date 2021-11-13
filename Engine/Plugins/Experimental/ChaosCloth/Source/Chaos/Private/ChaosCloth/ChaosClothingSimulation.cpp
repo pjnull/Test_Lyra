@@ -668,6 +668,17 @@ void FClothingSimulation::GetSimulationData(
 				Data.Normals[Index] = ReferenceSpaceTransform.InverseTransformVector(-Data.Normals[Index]);  // Normals are inverted due to how barycentric coordinates are calculated (see GetPointBaryAndDist in ClothingMeshUtils.cpp)
 			}
 		}
+
+		// Set the current LOD these data apply to, so that the correct deformer mappings can be applied
+		if (const UClothingAssetCommon* const ClothingAsset = Cloth->GetMesh()->GetAsset())
+		{
+			const int32 ClothLODIndex = Cloth->GetLODIndex(Solver.Get());
+			Data.LODIndex = ClothingAsset->LodMap.Find(ClothLODIndex);  // Store the mesh LOD index, which is different to the cloth asset's LOD index
+		}
+		else
+		{
+			Data.LODIndex = 0;
+		}
 	}
 }
 

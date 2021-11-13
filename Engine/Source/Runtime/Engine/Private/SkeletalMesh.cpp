@@ -274,6 +274,13 @@ FArchive& operator<<(FArchive& Ar, FMeshToMeshVertData& V)
 	return Ar;
 }
 
+FArchive& operator<<(FArchive& Ar, FClothBufferIndexMapping& ClothBufferIndexMapping)
+{
+	return Ar
+		<< ClothBufferIndexMapping.BaseVertexIndex
+		<< ClothBufferIndexMapping.MappingOffset
+		<< ClothBufferIndexMapping.LODBiasStride;
+}
 
 /*-----------------------------------------------------------------------------
 FreeSkeletalMeshBuffersSinkCallback
@@ -1386,6 +1393,25 @@ void USkeletalMesh::PostEditChangeProperty(FPropertyChangedEvent& PropertyChange
 
 	FProperty* PropertyThatChanged = PropertyChangedEvent.Property;
 	
+	if (GIsEditor &&
+		PropertyThatChanged &&
+		(PropertyThatChanged->GetFName() == FName(TEXT("bSupportRayTracing")) ||
+		 PropertyThatChanged->GetFName() == FName(TEXT("RayTracingMinLOD")) ||
+		 PropertyThatChanged->GetFName() == FName(TEXT("ClothLODBiasMode"))))
+	{
+		// Update the extra cloth deformer mapping LOD bias using this cloth entry
+		for (UClothingAssetBase* const ClothingAsset : GetMeshClothingAssets())
+		{
+			if (ClothingAsset)
+			{
+				ClothingAsset->UpdateAllLODBiasMappings(this);
+			}
+		}
+
+		// Invalidate the DDC, since the bias mappings are cached with the mesh sections, this needs to be done before the call to Build()
+		InvalidateDeriveDataCacheGUID();
+	}
+
 	bool bWasBuilt = false;
 	bool bHasToReregisterComponent = false;
 	// Don't invalidate render data when dragging sliders, too slow
@@ -2498,10 +2524,11 @@ void USkeletalMesh::RemoveLegacyClothingSections()
 						// Mapping data for clothing could be built either on the source or the
 						// duplicated section and has changed a few times, so check here for
 						// where to get our data from
-						if(DuplicatedSection.ClothMappingData.Num() > 0)
+						constexpr int32 ClothLODBias = 0;  // There isn't any cloth LOD bias on legacy sections
+						if (DuplicatedSection.ClothMappingDataLODs.Num() && DuplicatedSection.ClothMappingDataLODs[ClothLODBias].Num())
 						{
 							Section.ClothingData = DuplicatedSection.ClothingData;
-							Section.ClothMappingData = DuplicatedSection.ClothMappingData;
+							Section.ClothMappingDataLODs = DuplicatedSection.ClothMappingDataLODs;
 						}
 
 						Section.CorrespondClothAssetIndex = GetMeshClothingAssets().IndexOfByPredicate([&Section](const UClothingAssetBase* CurrAsset)
@@ -2529,7 +2556,7 @@ void USkeletalMesh::RemoveLegacyClothingSections()
 						Section.CorrespondClothAssetIndex = INDEX_NONE;
 						Section.ClothingData.AssetGuid = FGuid();
 						Section.ClothingData.AssetLodIndex = INDEX_NONE;
-						Section.ClothMappingData.Empty();
+						Section.ClothMappingDataLODs.Empty();
 					}
 				}
 

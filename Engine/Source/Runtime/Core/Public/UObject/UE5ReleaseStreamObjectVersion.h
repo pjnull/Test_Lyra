@@ -54,6 +54,9 @@ struct CORE_API FUE5ReleaseStreamObjectVersion
 		// CachedExpressionData is moved from UMaterial to UMaterialInterface
 		MaterialInterfaceSavedCachedData,
 		
+		// Add support for multiple cloth deformer LODs to be able to raytrace cloth with a different LOD than the one it is rendered with
+		AddClothMappingLODBias,
+
 		// -----<new versions can be added above this line>-------------------------------------------------
 		VersionPlusOne,
 		LatestVersion = VersionPlusOne - 1

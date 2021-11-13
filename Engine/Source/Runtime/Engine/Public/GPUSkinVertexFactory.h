@@ -865,7 +865,7 @@ public:
 	{
 		FShaderResourceViewRHIRef ClothBuffer;
 		// Packed Map: u32 Key, u32 Value
-		TArray<uint64> ClothIndexMapping;
+		TArray<FClothBufferIndexMapping> ClothIndexMapping;
 	};
 
 	inline FShaderResourceViewRHIRef GetClothBuffer()
@@ -878,14 +878,13 @@ public:
 		return MeshMappingData.ClothBuffer;
 	}
 
-	inline uint32 GetClothIndexOffset(uint64 VertexIndex) const
+	inline uint32 GetClothIndexOffset(uint32 VertexIndex, uint32 LODBias = 0) const
 	{
-		for (uint64 Mapping : MeshMappingData.ClothIndexMapping)
+		for (const FClothBufferIndexMapping& Mapping : MeshMappingData.ClothIndexMapping)
 		{
-			uint64 CurrentVertexIndex = Mapping >> (uint64)32;
-			if ((CurrentVertexIndex & (uint64)0xffffffff) == VertexIndex)
+			if (Mapping.BaseVertexIndex == VertexIndex)
 			{
-				return (uint32)(Mapping & (uint64)0xffffffff);
+				return Mapping.MappingOffset + Mapping.LODBiasStride * LODBias;
 			}
 		}
 

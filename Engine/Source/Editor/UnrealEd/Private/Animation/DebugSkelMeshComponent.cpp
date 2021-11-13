@@ -945,39 +945,69 @@ void UDebugSkelMeshComponent::ResetMeshSectionVisibility()
 
 void UDebugSkelMeshComponent::RebuildClothingSectionsFixedVerts(bool bInvalidateDerivedDataCache)
 {
-	FSkeletalMeshModel* Resource = SkeletalMesh->GetImportedModel();
+	// TODO: There is no need to rebuild all section/LODs at once.
+	//       It should only do the section associated to the current cloth asset being
+	//        painted instead, and only when the MaxDistance mask changes.
 	FScopedSkeletalMeshPostEditChange ScopedSkeletalMeshPostEditChange(SkeletalMesh);
 
-	const int32 NumLods = Resource->LODModels.Num();
-	for (FSkeletalMeshLODModel& LodModel : Resource->LODModels)
+	SkeletalMesh->PreEditChange(nullptr);
+
+	TIndirectArray<FSkeletalMeshLODModel>& LODModels = SkeletalMesh->GetImportedModel()->LODModels;
+
+	for (int32 LODIndex = 0; LODIndex < LODModels.Num(); ++LODIndex)
 	{
-		SkeletalMesh->PreEditChange(NULL);
-
-		for(FSkelMeshSection& Section : LodModel.Sections)
+		for (int32 SectionIndex = 0; SectionIndex < LODModels[LODIndex].Sections.Num(); ++SectionIndex)
 		{
-			if(Section.ClothMappingData.Num() > 0)
-			{
-				UClothingAssetBase* BaseAsset = SkeletalMesh->GetClothingAsset(Section.ClothingData.AssetGuid);
-
-				if(BaseAsset)
-				{
-					UClothingAssetCommon* ConcreteAsset = Cast<UClothingAssetCommon>(BaseAsset);
-					const FClothLODDataCommon& LodData = ConcreteAsset->LodData[Section.ClothingData.AssetLodIndex];
-					const FPointWeightMap* const MaxDistances = LodData.PhysicalMeshData.FindWeightMap(EWeightMapTargetCommon::MaxDistance);
-
-					ClothingMeshUtils::ComputeVertexContributions(Section.ClothMappingData, MaxDistances, LodData.bSmoothTransition, LodData.bUseMultipleInfluences);
-					
-					if (bInvalidateDerivedDataCache)
-					{
-						// We must always dirty the DDC key unless previewing
-						SkeletalMesh->InvalidateDeriveDataCacheGUID();
-					}
-				}
-			}
+			RebuildClothingSectionFixedVerts(LODIndex, SectionIndex);
 		}
 	}
 
+	if (bInvalidateDerivedDataCache)
+	{
+		SkeletalMesh->InvalidateDeriveDataCacheGUID();  // Dirty the DDC key unless previewing
+	}
+
 	ReregisterComponent();
+}
+
+void UDebugSkelMeshComponent::RebuildClothingSectionFixedVerts(int32 LODIndex, int32 SectionIndex)
+{
+	FSkeletalMeshModel* const SkeletalMeshModel = SkeletalMesh->GetImportedModel();
+	if (!ensure(SkeletalMeshModel && LODIndex < SkeletalMeshModel->LODModels.Num()))
+	{
+		return;
+	}
+
+	TIndirectArray<FSkeletalMeshLODModel>& LODModels = SkeletalMeshModel->LODModels;
+	if (!ensure(SectionIndex < LODModels[LODIndex].Sections.Num()))
+	{
+		return;
+	}
+
+	FSkelMeshSection& UpdatedSection = LODModels[LODIndex].Sections[SectionIndex];
+	if (!UpdatedSection.HasClothingData() || !UpdatedSection.ClothingData.IsValid())
+	{
+		return;
+	}
+
+	const UClothingAssetCommon* const ClothingAsset = Cast<UClothingAssetCommon>(SkeletalMesh->GetClothingAsset(UpdatedSection.ClothingData.AssetGuid));
+	check(ClothingAsset);  // Must have a valid clothing asset at this point, or something has gone terribly wrong
+
+	const FClothLODDataCommon& ClothLODData = ClothingAsset->LodData[UpdatedSection.ClothingData.AssetLodIndex];
+	const FPointWeightMap* const MaxDistances = ClothLODData.PhysicalMeshData.FindWeightMap(EWeightMapTargetCommon::MaxDistance);
+
+	// Iterate through all LOD sections that might contain mapping to the updated clothing asset (can only be higher or same LOD)
+	for (int32 BiasedLODIndex = LODIndex; BiasedLODIndex < LODModels.Num(); ++BiasedLODIndex)
+	{
+		const int32 LODBias = BiasedLODIndex - LODIndex;
+
+		FSkelMeshSection& BiasedSection = LODModels[BiasedLODIndex].Sections[SectionIndex];
+		if (LODBias < BiasedSection.ClothMappingDataLODs.Num() && BiasedSection.ClothMappingDataLODs[LODBias].Num())
+		{
+			// Update vertex contributions for this LOD bias
+			ClothingMeshUtils::ComputeVertexContributions(BiasedSection.ClothMappingDataLODs[LODBias], MaxDistances, ClothLODData.bSmoothTransition, ClothLODData.bUseMultipleInfluences);
+		}
+	}
 }
 
 void UDebugSkelMeshComponent::CheckClothTeleport()

@@ -71,11 +71,13 @@ static FAutoConsoleVariableRef CVarMorphTargetWeightThreshold(
 	ECVF_Default
 );
 
-int32 GetRayTracingSkeletalMeshGlobalLODBias()
+static int32 GetRayTracingSkeletalMeshGlobalLODBias()
 {
-	static const auto RayTracingSkeletalMeshLODBiasVar = IConsoleManager::Get().FindTConsoleVariableDataInt(TEXT("r.RayTracing.Geometry.SkeletalMeshes.LODBias"));
+	static const TConsoleVariableData<int32>* const RayTracingSkeletalMeshLODBiasVar =
+		IConsoleManager::Get().FindTConsoleVariableDataInt(TEXT("r.RayTracing.Geometry.SkeletalMeshes.LODBias"));
 
-	return RayTracingSkeletalMeshLODBiasVar != nullptr ? (RayTracingSkeletalMeshLODBiasVar->GetValueOnGameThread()) : 0;
+	return !RayTracingSkeletalMeshLODBiasVar ? 0 :
+		FMath::Max(0, RayTracingSkeletalMeshLODBiasVar->GetValueOnGameThread());  // Only allows positive bias to narrow cloth mapping requirements
 }
 
 /*-----------------------------------------------------------------------------
@@ -1669,12 +1671,14 @@ void FSkeletalMeshObjectGPUSkin::FVertexFactoryData::InitAPEXClothVertexFactorie
 
 	// clear existing factories (resources assumed to have been released already)
 	ClothVertexFactories.Empty(Sections.Num());
-	for( int32 FactoryIdx=0; FactoryIdx < Sections.Num(); FactoryIdx++ )
+
+	for (const FSkelMeshRenderSection& Section : Sections)
 	{
-		if (Sections[FactoryIdx].HasClothingData() && bSupportsManualFetch)
+		if (Section.HasClothingData() && bSupportsManualFetch)
 		{
-			const uint32 NumClothWeights = Sections[FactoryIdx].ClothMappingData.Num();
-			const uint32 NumPositionVertices = Sections[FactoryIdx].NumVertices;
+			constexpr int32 ClothLODBias = 0;
+			const uint32 NumClothWeights = Section.ClothMappingDataLODs.Num() ? Section.ClothMappingDataLODs[ClothLODBias].Num(): 0;
+			const uint32 NumPositionVertices = Section.NumVertices;
 			const bool bUseMultipleInfluences = (NumClothWeights > NumPositionVertices);
 
 			GPUSkinBoneInfluenceType BoneInfluenceType = VertexBuffers.SkinWeightVertexBuffer->GetBoneInfluenceType();

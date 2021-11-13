@@ -107,6 +107,7 @@ struct FExistingSkelMeshData
 
 	bool bExistingSupportRayTracing;
 	int32 ExistingRayTracingMinLOD;
+	EClothLODBiasMode ExistingClothLODBiasMode;
 };
 
 /** 

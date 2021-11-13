@@ -413,6 +413,7 @@ TSharedPtr<FExistingSkelMeshData> SkeletalMeshImportUtils::SaveExistingSkelMeshD
 
 	ExistingMeshDataPtr->bExistingSupportRayTracing = SourceSkeletalMesh->GetSupportRayTracing();
 	ExistingMeshDataPtr->ExistingRayTracingMinLOD = SourceSkeletalMesh->GetRayTracingMinLOD();
+	ExistingMeshDataPtr->ExistingClothLODBiasMode = SourceSkeletalMesh->GetClothLODBiasMode();
 
 	return ExistingMeshDataPtr;
 }
@@ -949,6 +950,7 @@ void SkeletalMeshImportUtils::RestoreExistingSkelMeshData(const TSharedPtr<const
 
 	SkeletalMesh->SetSupportRayTracing(MeshData->bExistingSupportRayTracing);
 	SkeletalMesh->SetRayTracingMinLOD(MeshData->ExistingRayTracingMinLOD);
+	SkeletalMesh->SetClothLODBiasMode(MeshData->ExistingClothLODBiasMode);
 }
 
 void SkeletalMesUtilsImpl::RestoreMaterialNameWorkflowSection(const TSharedPtr<const FExistingSkelMeshData>& MeshData, USkeletalMesh* SkeletalMesh, int32 LodIndex, TArray<int32>& RemapMaterial, bool bMaterialReset)

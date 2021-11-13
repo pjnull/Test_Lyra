@@ -119,6 +119,7 @@ enum class ESkeletalMeshAsyncProperties : uint64
 	RequiresLODHysteresisConversion = 1llu << 52,
 	bSupportRayTracing = 1llu << 53,
 	RayTracingMinLOD = 1llu << 54,
+	ClothLODBiasMode = 1llu << 55,
 	All = MAX_uint64
 };
 
@@ -594,6 +595,26 @@ struct FClothingAssetData_Legacy
 
 	// serialization
 	friend FArchive& operator<<(FArchive& Ar, FClothingAssetData_Legacy& A);
+};
+
+/**
+ * Strategy used for storing additional cloth deformer mappings depending on the
+ * desired use of the RaytracingMinLOD value and of the LODBias console variable.
+ */
+UENUM()
+enum class EClothLODBiasMode : uint8
+{
+	// Only store the strict minimum amount of cloth deformer mappings to save on memory usage.
+	// Raytracing of cloth elements must never be of a different LOD to the one being rendered when using this mode.
+	MappingsToSameLOD,
+
+	// Store additional cloth deformer mappings to allow raytracing of the cloth elements at RayTracingMinLOD.
+	// Raytracing of cloth elements must never be of a different LOD to the one being rendered, or to the one set in RayTracingMinLOD when using this mode.
+	MappingsToMinLOD,
+
+	// Store all cloth deformer mappings at the expense of memory usage, to allow raytracing of the cloth elements at any higher LOD.
+	// Use this mode when the RayTracing LODBias console variable is in use.
+	MappingsToAnyLOD,
 };
 
 //~ Begin Material Interface for USkeletalMesh - contains a material and a shadow casting flag
@@ -2033,6 +2054,30 @@ public:
 		WaitUntilAsyncPropertyReleased(ESkeletalMeshAsyncProperties::RayTracingMinLOD);
 		PRAGMA_DISABLE_DEPRECATION_WARNINGS
 		RayTracingMinLOD = InRayTracingMinLOD;
+		PRAGMA_ENABLE_DEPRECATION_WARNINGS
+	}
+
+	/**
+	 * Set the strategy used for storing the additional cloth deformer mappings depending on the desired use of Raytracing LOD bias.
+	 * This parameter is only used in relation to raytracing of the cloth sections.
+	 */
+	UE_DEPRECATED(5.00, "This must be protected for async build, always use the accessors even internally.")
+	UPROPERTY(EditAnywhere, Category = RayTracing)
+	EClothLODBiasMode ClothLODBiasMode;
+
+	EClothLODBiasMode GetClothLODBiasMode() const
+	{
+		WaitUntilAsyncPropertyReleased(ESkeletalMeshAsyncProperties::ClothLODBiasMode, EAsyncPropertyLockType::ReadOnly);
+		PRAGMA_DISABLE_DEPRECATION_WARNINGS
+		return ClothLODBiasMode;
+		PRAGMA_ENABLE_DEPRECATION_WARNINGS
+	}
+
+	void SetClothLODBiasMode(EClothLODBiasMode InClothLODBiasMode)
+	{
+		WaitUntilAsyncPropertyReleased(ESkeletalMeshAsyncProperties::ClothLODBiasMode);
+		PRAGMA_DISABLE_DEPRECATION_WARNINGS
+		ClothLODBiasMode = InClothLODBiasMode;
 		PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	}
 

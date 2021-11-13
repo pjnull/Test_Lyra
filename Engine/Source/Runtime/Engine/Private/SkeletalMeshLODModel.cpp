@@ -21,6 +21,7 @@
 #include "UObject/UE5MainStreamObjectVersion.h"
 #include "GPUSkinVertexFactory.h"
 #include "UObject/AnimObjectVersion.h"
+#include "UObject/UE5ReleaseStreamObjectVersion.h"
 #include "Misc/ScopeLock.h"
 #include "MeshDescription.h"
 #include "SkeletalMeshAttributes.h"
@@ -323,6 +324,7 @@ FArchive& operator<<(FArchive& Ar, FSkelMeshSection& S)
 	Ar.UsingCustomVersion(FUE5MainStreamObjectVersion::GUID);
 	Ar.UsingCustomVersion(FRecomputeTangentCustomVersion::GUID);
 	Ar.UsingCustomVersion(FOverlappingVerticesCustomVersion::GUID);
+	Ar.UsingCustomVersion(FUE5ReleaseStreamObjectVersion::GUID);
 
 	// When data is cooked for server platform some of the
 	// variables are not serialized so that they're always
@@ -500,7 +502,16 @@ FArchive& operator<<(FArchive& Ar, FSkelMeshSection& S)
 		}
 #endif
 
-		Ar << S.ClothMappingData;
+		if (Ar.CustomVer(FUE5ReleaseStreamObjectVersion::GUID) < FUE5ReleaseStreamObjectVersion::AddClothMappingLODBias)
+		{
+			constexpr int32 ClothLODBias = 0;  // There isn't any cloth LOD bias prior to this version
+			S.ClothMappingDataLODs.SetNum(1);
+			Ar << S.ClothMappingDataLODs[ClothLODBias];
+		}
+		else
+		{
+			Ar << S.ClothMappingDataLODs;
+		}
 
 		// We no longer need the positions and normals for a clothing sim mesh to be stored in sections, so throw that data out
 		if(Ar.CustomVer(FSkeletalMeshCustomVersion::GUID) < FSkeletalMeshCustomVersion::RemoveDuplicatedClothingSections)
@@ -629,7 +640,11 @@ struct FLegacySkelMeshChunk
 	{
 		Section.BaseVertexIndex = BaseVertexIndex;
 		Section.SoftVertices = SoftVertices;
-		Section.ClothMappingData = ApexClothMappingData;
+
+		constexpr int32 ClothLODBias = 0;  // There isn't any cloth LOD bias on legacy sections
+		Section.ClothMappingDataLODs.SetNum(1);
+		Section.ClothMappingDataLODs[ClothLODBias] = ApexClothMappingData;
+
 		Section.BoneMap = BoneMap;
 		Section.MaxBoneInfluences = MaxBoneInfluences;
 		Section.CorrespondClothAssetIndex = CorrespondClothAssetIndex;
@@ -1007,20 +1022,30 @@ void FSkeletalMeshLODModel::GetVertices(TArray<FSoftSkinVertex>& Vertices) const
 	}
 }
 
-void FSkeletalMeshLODModel::GetClothMappingData(TArray<FMeshToMeshVertData>& MappingData, TArray<uint64>& OutClothIndexMapping) const
+void FSkeletalMeshLODModel::GetClothMappingData(TArray<FMeshToMeshVertData>& MappingData, TArray<FClothBufferIndexMapping>& OutClothIndexMapping) const
 {
 	for (int32 SectionIndex = 0; SectionIndex < Sections.Num(); SectionIndex++)
 	{
 		const FSkelMeshSection& Section = Sections[SectionIndex];
-		if (Section.ClothMappingData.Num())
+		constexpr int32 ClothLODBias = 0;  // Use the default cloth LOD bias of 0 for calculations, this means the same LOD as the current section
+		if (Section.ClothMappingDataLODs.Num() && Section.ClothMappingDataLODs[ClothLODBias].Num())
 		{
-			uint64 KeyValue = ((uint64)Section.BaseVertexIndex << (uint32)32) | (uint64)MappingData.Num();
-			OutClothIndexMapping.Add(KeyValue);
-			MappingData += Section.ClothMappingData;
+			FClothBufferIndexMapping ClothBufferIndexMapping;
+			ClothBufferIndexMapping.BaseVertexIndex = Section.BaseVertexIndex;
+			ClothBufferIndexMapping.MappingOffset = (uint32)MappingData.Num();
+			ClothBufferIndexMapping.LODBiasStride = (uint32)Section.ClothMappingDataLODs[ClothLODBias].Num();
+
+			OutClothIndexMapping.Add(ClothBufferIndexMapping);
+
+			// Append all mapping LODs to the output array for this section
+			for (const TArray<FMeshToMeshVertData>& ClothMappingDataLOD : Section.ClothMappingDataLODs)
+			{
+				MappingData += ClothMappingDataLOD;
+			}
 		}
 		else
 		{
-			OutClothIndexMapping.Add(0);
+			OutClothIndexMapping.Add({ 0, 0, 0 });
 		}
 	}
 }
