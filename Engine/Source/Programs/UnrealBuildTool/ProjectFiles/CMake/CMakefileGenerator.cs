@@ -8,8 +8,6 @@ using EpicGames.Core;
 using UnrealBuildBase;
 using System.Linq;
 
-#nullable disable
-
 namespace UnrealBuildTool
 {
 	class CMakefileProjectFile : ProjectFile
@@ -27,7 +25,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Creates a new instance of the <see cref="CMakefileGenerator"/> class.
 		/// </summary>
-		public CMakefileGenerator(FileReference InOnlyGameProject)
+		public CMakefileGenerator(FileReference? InOnlyGameProject)
 			: base(InOnlyGameProject)
 		{
 		}
@@ -221,7 +219,7 @@ namespace UnrealBuildTool
 		/// <param name="UBTProject">The UnrealBuildTool project</param>
 		/// <param name="PlatformProjectGenerators">The registered platform project generators</param>
 		/// <returns>True if successful</returns>
-		protected override bool WriteMasterProjectFile(ProjectFile UBTProject, PlatformProjectGeneratorCollection PlatformProjectGenerators)
+		protected override bool WriteMasterProjectFile(ProjectFile? UBTProject, PlatformProjectGeneratorCollection PlatformProjectGenerators)
 		{
 			return true;
 		}
@@ -305,7 +303,7 @@ namespace UnrealBuildTool
 
 			if (IsProjectBuild)
 			{
-				GameProjectPath = OnlyGameProject.Directory.FullName;
+				GameProjectPath = OnlyGameProject!.Directory.FullName;
 				CMakeGameRootPath = Utils.CleanDirectorySeparators(OnlyGameProject.Directory.FullName, '/');
                 CMakeGameProjectFile = Utils.CleanDirectorySeparators(OnlyGameProject.FullName, '/');
 			}
@@ -353,7 +351,7 @@ namespace UnrealBuildTool
 			{
 				foreach (string IncludeSearchPath in CurProject.IntelliSenseIncludeSearchPaths)
 				{
-					string IncludeDirectory = GetIncludeDirectory(IncludeSearchPath, Path.GetDirectoryName(CurProject.ProjectFilePath.FullName));
+					string IncludeDirectory = GetIncludeDirectory(IncludeSearchPath, Path.GetDirectoryName(CurProject.ProjectFilePath.FullName)!);
 					if (IncludeDirectory != null && !IncludeDirectories.Contains(IncludeDirectory))
 					{
 						if (IncludeDirectory.Contains(Unreal.RootDirectory.FullName))
@@ -540,7 +538,7 @@ namespace UnrealBuildTool
 
 					string TargetName = TargetFile.TargetFilePath.GetFileNameWithoutAnyExtensions();       // Remove both ".cs" and ".
 
-					foreach (UnrealTargetConfiguration CurConfiguration in Enum.GetValues(typeof(UnrealTargetConfiguration)))
+					foreach (UnrealTargetConfiguration CurConfiguration in (UnrealTargetConfiguration[])Enum.GetValues(typeof(UnrealTargetConfiguration)))
 					{
 						if (CurConfiguration != UnrealTargetConfiguration.Unknown && CurConfiguration != UnrealTargetConfiguration.Development)
 						{
@@ -551,7 +549,7 @@ namespace UnrealBuildTool
 									CMakeProjectCmdArg = "\"-project="+ CMakeGameProjectFile + "\"";
 								}
 
-								string ConfName = Enum.GetName(typeof(UnrealTargetConfiguration), CurConfiguration);
+								string ConfName = Enum.GetName(typeof(UnrealTargetConfiguration), CurConfiguration)!;
 								CMakefileContent.Append(String.Format("add_custom_target({0}-{3}-{1} {5} {0} {3} {1} {2}{4} -buildscw VERBATIM)\n", TargetName, ConfName, CMakeProjectCmdArg, HostArchitecture, UBTArguements, BuildCommand));
 
 								// Add iOS and TVOS targets if valid
@@ -673,7 +671,7 @@ namespace UnrealBuildTool
 		{
 			if (TargetPlatform == UnrealTargetPlatform.IOS || TargetPlatform == UnrealTargetPlatform.TVOS)
 			{
-				if ((TargetName.StartsWith("UnrealGame") || (IsProjectBuild && TargetName.StartsWith(GameProjectName)) || TargetName.StartsWith("QAGame")) && !TargetName.StartsWith("QAGameEditor"))
+				if ((TargetName.StartsWith("UnrealGame") || (IsProjectBuild && TargetName.StartsWith(GameProjectName!)) || TargetName.StartsWith("QAGame")) && !TargetName.StartsWith("QAGameEditor"))
 				{
 				    return false;
 				}
@@ -686,7 +684,7 @@ namespace UnrealBuildTool
 				// The game project editor or game get all configs
 				if ((TargetName.StartsWith("UnrealEditor") && !TargetName.StartsWith("UnrealEditorServices")) ||
 					TargetName.StartsWith("UnrealGame") ||
-					(IsProjectBuild && TargetName.StartsWith(GameProjectName)))
+					(IsProjectBuild && TargetName.StartsWith(GameProjectName!)))
 				{
 					return false;
 				}

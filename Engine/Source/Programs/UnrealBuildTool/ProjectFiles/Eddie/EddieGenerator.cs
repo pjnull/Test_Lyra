@@ -6,13 +6,11 @@ using System.Text;
 using System.IO;
 using EpicGames.Core;
 
-#nullable disable
-
 namespace UnrealBuildTool
 {
 	class EddieProjectFileGenerator : ProjectFileGenerator
 	{
-		public EddieProjectFileGenerator(FileReference InOnlyGameProject)
+		public EddieProjectFileGenerator(FileReference? InOnlyGameProject)
 			: base(InOnlyGameProject)
 		{
 		}
@@ -50,7 +48,7 @@ namespace UnrealBuildTool
 		
 		protected override ProjectFile AllocateProjectFile(FileReference InitFilePath, DirectoryReference BaseDir)
 		{
-			return new EddieProjectFile(InitFilePath, BaseDir, OnlyGameProject);
+			return new EddieProjectFile(InitFilePath, BaseDir);
 		}
 		
 		private bool WriteEddieWorkset()
@@ -61,7 +59,7 @@ namespace UnrealBuildTool
 			WorksetDataContent.Append("# @Eddie Workset@" + ProjectFileGenerator.NewLine);
 			WorksetDataContent.Append("AddWorkset \"" + MasterProjectName + ".wkst\" \"" + MasterProjectPath + "\"" + ProjectFileGenerator.NewLine);
 			
-			System.Action< String /*Path*/, List<PrimaryProjectFolder> /* Folders */> AddProjectsFunction = null;
+			System.Action< String /*Path*/, List<PrimaryProjectFolder> /* Folders */>? AddProjectsFunction = null;
 			AddProjectsFunction = (Path, FolderList) =>
 				{
 					foreach (PrimaryProjectFolder CurFolder in FolderList)
@@ -69,11 +67,11 @@ namespace UnrealBuildTool
 						String NewPath = Path + "/" + CurFolder.FolderName;
 						WorksetDataContent.Append("AddFileGroup \"" + NewPath + "\" \"" + CurFolder.FolderName + "\"" + ProjectFileGenerator.NewLine);
 
-						AddProjectsFunction(NewPath, CurFolder.SubFolders);
+						AddProjectsFunction!(NewPath, CurFolder.SubFolders);
 
 						foreach (ProjectFile CurProject in CurFolder.ChildProjects)
 						{
-							EddieProjectFile EddieProject = CurProject as EddieProjectFile;
+							EddieProjectFile? EddieProject = CurProject as EddieProjectFile;
 							if (EddieProject != null)
 							{
 								WorksetDataContent.Append("AddFile \"" + EddieProject.ToString() + "\" \"" + EddieProject.ProjectFilePath + "\"" + ProjectFileGenerator.NewLine);
@@ -93,7 +91,7 @@ namespace UnrealBuildTool
 			return bSuccess;
 		}
 		
-		protected override bool WriteMasterProjectFile(ProjectFile UBTProject, PlatformProjectGeneratorCollection PlatformProjectGenerators)
+		protected override bool WriteMasterProjectFile(ProjectFile? UBTProject, PlatformProjectGeneratorCollection PlatformProjectGenerators)
 		{
 			return WriteEddieWorkset();
 		}

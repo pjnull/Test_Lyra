@@ -8,8 +8,6 @@ using System.Linq;
 using EpicGames.Core;
 using UnrealBuildBase;
 
-#nullable disable
-
 namespace UnrealBuildTool
 {
 	class KDevelopProjectFile : ProjectFile
@@ -25,7 +23,7 @@ namespace UnrealBuildTool
 	/// </summary>
 	class KDevelopGenerator : ProjectFileGenerator
 	{
-		public KDevelopGenerator(FileReference InOnlyGameProject)
+		public KDevelopGenerator(FileReference? InOnlyGameProject)
 			: base(InOnlyGameProject)
 		{
 		}
@@ -39,7 +37,7 @@ namespace UnrealBuildTool
 			}
 		}
 
-		protected override bool WriteMasterProjectFile(ProjectFile UBTProject, PlatformProjectGeneratorCollection PlatformProjectGenerators)
+		protected override bool WriteMasterProjectFile(ProjectFile? UBTProject, PlatformProjectGeneratorCollection PlatformProjectGenerators)
 		{
 			bool bSuccess = true;
 			return bSuccess;
@@ -78,7 +76,7 @@ namespace UnrealBuildTool
 
 			if (TargetName == GameProjectName)
 			{
-				ProjectCmdArg = " -project=\"" + OnlyGameProject.FullName + "\"";
+				ProjectCmdArg = " -project=\"" + OnlyGameProject!.FullName + "\"";
 				Executable = "Engine/Build/BatchFiles/Linux/RunMono.sh";
 				BuildCommand = "Engine/Binaries/DotNET/UnrealBuildTool.exe";
 
@@ -90,7 +88,7 @@ namespace UnrealBuildTool
 			}
 			else if (TargetName == (GameProjectName + "Editor"))
 			{
-				ProjectCmdArg = " -editorrecompile -project=\"" + OnlyGameProject.FullName + "\"";
+				ProjectCmdArg = " -editorrecompile -project=\"" + OnlyGameProject!.FullName + "\"";
 				Executable = "Engine/Build/BatchFiles/Linux/RunMono.sh";
 				BuildCommand = "Engine/Binaries/DotNET/UnrealBuildTool.exe";
 
@@ -185,13 +183,13 @@ namespace UnrealBuildTool
 					string TargetName = TargetFile.TargetFilePath.GetFileNameWithoutAnyExtensions();
 
 					// Remove both ".cs" and ".
-					foreach (UnrealTargetConfiguration CurConfiguration in Enum.GetValues(typeof(UnrealTargetConfiguration)))
+					foreach (UnrealTargetConfiguration CurConfiguration in (UnrealTargetConfiguration[])Enum.GetValues(typeof(UnrealTargetConfiguration)))
 					{
 						if (CurConfiguration != UnrealTargetConfiguration.Unknown && CurConfiguration != UnrealTargetConfiguration.Development)
 						{
 							if (InstalledPlatformInfo.IsValidConfiguration(CurConfiguration, EProjectType.Code))
 							{
-								string ConfName = Enum.GetName(typeof(UnrealTargetConfiguration), CurConfiguration);
+								string ConfName = Enum.GetName(typeof(UnrealTargetConfiguration), CurConfiguration)!;
 								FileContent.Append(String.Format("[CustomBuildSystem][BuildConfig{0}]\nBuildDir=file://{1}\n", BuildConfigIndex, UnrealRootPath));
 
 								if (TargetName == GameProjectName)
@@ -265,7 +263,7 @@ namespace UnrealBuildTool
 
 			foreach (ProjectFile CurProject in GeneratedProjectFiles)
 			{
-				KDevelopProjectFile KDevelopProject = CurProject as KDevelopProjectFile;
+				KDevelopProjectFile? KDevelopProject = CurProject as KDevelopProjectFile;
 				if (KDevelopProject == null)
 				{
 					Log.TraceInformation("KDevelopProject == null");
@@ -285,7 +283,7 @@ namespace UnrealBuildTool
 					}
 					else
 					{
-						FullPath = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(KDevelopProject.ProjectFilePath.FullName), CurPath));
+						FullPath = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(KDevelopProject.ProjectFilePath.FullName)!, CurPath));
 						FullPath = Utils.MakePathRelativeTo(FullPath, FullProjectPath);
 						FullPath = FullPath.TrimEnd('/');
 						FullPath = Path.Combine(UnrealEngineRootPath, FullPath);
@@ -312,7 +310,7 @@ namespace UnrealBuildTool
 					}
 					else
 					{
-						FullPath = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(KDevelopProject.ProjectFilePath.FullName), CurPath));
+						FullPath = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(KDevelopProject.ProjectFilePath.FullName)!, CurPath));
 						FullPath = Utils.MakePathRelativeTo(FullPath, FullProjectPath);
 						FullPath = FullPath.TrimEnd('/');
 						FullPath = Path.Combine(UnrealEngineRootPath, FullPath);
@@ -385,7 +383,7 @@ namespace UnrealBuildTool
 
 			foreach (ProjectFile CurProject in GeneratedProjectFiles)
 			{
-				KDevelopProjectFile KDevelopProject = CurProject as KDevelopProjectFile;
+				KDevelopProjectFile? KDevelopProject = CurProject as KDevelopProjectFile;
 				if (KDevelopProject == null)
 				{
 					Log.TraceInformation("KDevelopProject == null");

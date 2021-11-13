@@ -9,8 +9,6 @@ using System.Xml.Linq;
 using EpicGames.Core;
 using System.Linq;
 
-#nullable disable
-
 namespace UnrealBuildTool
 {
 	enum CodeliteProjectFileFormat
@@ -26,7 +24,7 @@ namespace UnrealBuildTool
 		public string CodeCompletionPreProcessorFileName = "CodeLitePreProcessor.txt";
 		CodeliteProjectFileFormat ProjectFileFormat = CodeliteProjectFileFormat.CodeLite10;
 
-		public CodeLiteGenerator(FileReference InOnlyGameProject, CommandLineArguments CommandLine)
+		public CodeLiteGenerator(FileReference? InOnlyGameProject, CommandLineArguments CommandLine)
 			: base(InOnlyGameProject)
 		{
 			if(CommandLine.HasOption("-cl10"))
@@ -49,7 +47,7 @@ namespace UnrealBuildTool
 				return ".project";
 			}
 		}
-		protected override bool WriteMasterProjectFile(ProjectFile UBTProject, PlatformProjectGeneratorCollection PlatformProjectGenerators)
+		protected override bool WriteMasterProjectFile(ProjectFile? UBTProject, PlatformProjectGeneratorCollection PlatformProjectGenerators)
 		{
 			string SolutionFileName = MasterProjectName + SolutionExtension;
 			string CodeCompletionFile = MasterProjectName + CodeCompletionFileName;
@@ -69,7 +67,7 @@ namespace UnrealBuildTool
 
 			foreach (ProjectFile CurProject in GeneratedProjectFiles)
 			{
-				CodeLiteProject Project = CurProject as CodeLiteProject;
+				CodeLiteProject? Project = CurProject as CodeLiteProject;
 				if (Project == null)
 				{
 					continue;
@@ -137,9 +135,9 @@ namespace UnrealBuildTool
 			//
 			// Write project file information into CodeLite's workspace file.
 			//
-			XElement CodeLiteWorkspaceTargetEngine = null;
-			XElement CodeLiteWorkspaceTargetPrograms = null;
-			XElement CodeLiteWorkspaceTargetGame = null;
+			XElement? CodeLiteWorkspaceTargetEngine = null;
+			XElement? CodeLiteWorkspaceTargetPrograms = null;
+			XElement? CodeLiteWorkspaceTargetGame = null;
 
 			foreach (ProjectFile CurProject in AllProjectFiles)
 			{
@@ -176,7 +174,7 @@ namespace UnrealBuildTool
 					//
 					if (ProjectFileFormat == CodeliteProjectFileFormat.CodeLite10)
 					{
-						if ((CurrentTarget.TargetRules.Type == TargetType.Client) ||
+						if ((CurrentTarget.TargetRules!.Type == TargetType.Client) ||
 						    (CurrentTarget.TargetRules.Type == TargetType.Server) ||
 						    (CurrentTarget.TargetRules.Type == TargetType.Editor) ||
 						    (CurrentTarget.TargetRules.Type == TargetType.Game))

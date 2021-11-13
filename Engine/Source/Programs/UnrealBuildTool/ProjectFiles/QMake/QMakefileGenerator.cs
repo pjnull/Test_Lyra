@@ -8,8 +8,6 @@ using System.Linq;
 using EpicGames.Core;
 using UnrealBuildBase;
 
-#nullable disable
-
 namespace UnrealBuildTool
 {
 	class QMakefileProjectFile : ProjectFile
@@ -26,7 +24,7 @@ namespace UnrealBuildTool
 	class QMakefileGenerator : ProjectFileGenerator
 	{
 		/// Default constructor
-		public QMakefileGenerator(FileReference InOnlyGameProject)
+		public QMakefileGenerator(FileReference? InOnlyGameProject)
 			: base(InOnlyGameProject)
 		{
 		}
@@ -40,7 +38,7 @@ namespace UnrealBuildTool
 			}
 		}
 
-		protected override bool WriteMasterProjectFile(ProjectFile UBTProject, PlatformProjectGeneratorCollection PlatformProjectGenerators)
+		protected override bool WriteMasterProjectFile(ProjectFile? UBTProject, PlatformProjectGeneratorCollection PlatformProjectGenerators)
 		{
 			bool bSuccess = true;
 			return bSuccess;
@@ -119,7 +117,7 @@ namespace UnrealBuildTool
 			foreach (ProjectFile CurProject in GeneratedProjectFiles)
 			{
 
-				QMakefileProjectFile QMakeProject = CurProject as QMakefileProjectFile;
+				QMakefileProjectFile? QMakeProject = CurProject as QMakefileProjectFile;
 				if (QMakeProject == null)
 				{
 					Log.TraceInformation("QMakeProject == null");
@@ -128,12 +126,12 @@ namespace UnrealBuildTool
 
 				foreach (string CurPath in QMakeProject.IntelliSenseIncludeSearchPaths)
 				{
-					AddIncludeDirectory(ref IncludeDirectories, CurPath, Path.GetDirectoryName(QMakeProject.ProjectFilePath.FullName));
+					AddIncludeDirectory(ref IncludeDirectories, CurPath, Path.GetDirectoryName(QMakeProject.ProjectFilePath.FullName)!);
 					// System.Console.WriteLine ("Not empty now? CurPath == ", CurPath);
 				}
 				foreach (string CurPath in QMakeProject.IntelliSenseSystemIncludeSearchPaths)
 				{
-					AddIncludeDirectory(ref SystemIncludeDirectories, CurPath, Path.GetDirectoryName(QMakeProject.ProjectFilePath.FullName));
+					AddIncludeDirectory(ref SystemIncludeDirectories, CurPath, Path.GetDirectoryName(QMakeProject.ProjectFilePath.FullName)!);
 				}
 
 			}
@@ -148,7 +146,7 @@ namespace UnrealBuildTool
 			QMakeDefinesPriFileContent.Append("DEFINES += \\\n");
 			foreach (ProjectFile CurProject in GeneratedProjectFiles)
 			{
-				QMakefileProjectFile QMakeProject = CurProject as QMakefileProjectFile;
+				QMakefileProjectFile? QMakeProject = CurProject as QMakefileProjectFile;
 				if (QMakeProject == null)
 				{
 					Log.TraceInformation("QMakeProject == null");
@@ -209,7 +207,7 @@ namespace UnrealBuildTool
 
 			if (!String.IsNullOrEmpty(GameProjectName))
 			{
-				GameProjectPath = OnlyGameProject.Directory.FullName;
+				GameProjectPath = OnlyGameProject!.Directory.FullName;
 				GameProjectFile = OnlyGameProject.FullName;
 				QMakeGameProjectFile = "gameProjectFile=" + GameProjectFile + "\n";
 				BuildCommand = "build=bash $$unrealRootPath/Engine/Build/BatchFiles/Linux/RunMono.sh $$unrealRootPath/Engine/Binaries/DotNET/UnrealBuildTool.exe\n\n";
@@ -364,7 +362,7 @@ namespace UnrealBuildTool
 
 					string TargetName = TargetFile.TargetFilePath.GetFileNameWithoutAnyExtensions();		// Remove both ".cs" and ".
 
-					foreach (UnrealTargetConfiguration CurConfiguration in Enum.GetValues(typeof(UnrealTargetConfiguration)))
+					foreach (UnrealTargetConfiguration CurConfiguration in (UnrealTargetConfiguration[]) Enum.GetValues(typeof(UnrealTargetConfiguration)))
 					{
 						if (CurConfiguration != UnrealTargetConfiguration.Unknown && CurConfiguration != UnrealTargetConfiguration.Development)
 						{
@@ -375,7 +373,7 @@ namespace UnrealBuildTool
 								{
 									QMakeProjectCmdArg = " -project=\"\\\"$$gameProjectFile\\\"\"";
 								}
-								string ConfName = Enum.GetName(typeof(UnrealTargetConfiguration), CurConfiguration);
+								string ConfName = Enum.GetName(typeof(UnrealTargetConfiguration), CurConfiguration)!;
 								QMakeFileContent.Append(String.Format("{0}-Linux-{1}.commands = $$build {0} Linux {1} {2} $$args\n", TargetName, ConfName, QMakeProjectCmdArg));
 								QMakeTargetList += "\t" + TargetName + "-Linux-" + ConfName + " \\\n"; // , TargetName, ConfName);
 							}

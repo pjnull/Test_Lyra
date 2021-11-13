@@ -8,8 +8,6 @@ using EpicGames.Core;
 using UnrealBuildBase;
 using System.Linq;
 
-#nullable disable
-
 namespace UnrealBuildTool
 {
 	class MakefileProjectFile : ProjectFile
@@ -30,7 +28,7 @@ namespace UnrealBuildTool
 		bool bGenerateIntelliSenseData = true;
 
 		/// Default constructor
-		public MakefileGenerator(FileReference InOnlyGameProject)
+		public MakefileGenerator(FileReference? InOnlyGameProject)
 			: base(InOnlyGameProject)
 		{
 		}
@@ -50,7 +48,7 @@ namespace UnrealBuildTool
 			}
 		}
 
-		protected override bool WriteMasterProjectFile(ProjectFile UBTProject, PlatformProjectGeneratorCollection PlatformProjectGenerators)
+		protected override bool WriteMasterProjectFile(ProjectFile? UBTProject, PlatformProjectGeneratorCollection PlatformProjectGenerators)
 		{
 			bool bSuccess = true;
 			return bSuccess;
@@ -68,7 +66,7 @@ namespace UnrealBuildTool
 
 			if (!String.IsNullOrEmpty(GameProjectName))
 			{
-				GameProjectFile = OnlyGameProject.FullName;
+				GameProjectFile = OnlyGameProject!.FullName;
 				MakeGameProjectFile = "GAMEPROJECTFILE =" + GameProjectFile + "\n";
 				ProjectBuildCommand = "PROJECTBUILD = bash \"$(UNREALROOTPATH)/Engine/Build/BatchFiles/Linux/RunMono.sh\" \"$(UNREALROOTPATH)/Engine/Binaries/DotNET/UnrealBuildTool.exe\"\n";
 			}
@@ -98,13 +96,13 @@ namespace UnrealBuildTool
 					string TargetFileName = TargetFile.TargetFilePath.GetFileNameWithoutExtension();
 					string Basename = TargetFileName.Substring(0, TargetFileName.LastIndexOf(".Target", StringComparison.InvariantCultureIgnoreCase));
 
-					foreach (UnrealTargetConfiguration CurConfiguration in Enum.GetValues(typeof(UnrealTargetConfiguration)))
+					foreach (UnrealTargetConfiguration CurConfiguration in (UnrealTargetConfiguration[])Enum.GetValues(typeof(UnrealTargetConfiguration)))
 					{
 						if (CurConfiguration != UnrealTargetConfiguration.Unknown && CurConfiguration != UnrealTargetConfiguration.Development)
 						{
 							if (InstalledPlatformInfo.IsValidConfiguration(CurConfiguration, EProjectType.Code))
 							{
-								string Confname = Enum.GetName(typeof(UnrealTargetConfiguration), CurConfiguration);
+								string Confname = Enum.GetName(typeof(UnrealTargetConfiguration), CurConfiguration)!;
 								MakefileContent.Append(String.Format(" \\\n\t{0}-Linux-{1} ", Basename, Confname));
 							}
 						}
@@ -143,7 +141,7 @@ namespace UnrealBuildTool
 						MakeBuildCommand = "$(BUILD)";
 					}
 
-					foreach (UnrealTargetConfiguration CurConfiguration in Enum.GetValues(typeof(UnrealTargetConfiguration)))
+					foreach (UnrealTargetConfiguration CurConfiguration in (UnrealTargetConfiguration[])Enum.GetValues(typeof(UnrealTargetConfiguration)))
 					{
 						if (Basename == GameProjectName || Basename == (GameProjectName + "Editor"))
 						{
@@ -159,7 +157,7 @@ namespace UnrealBuildTool
 						{
 							if (InstalledPlatformInfo.IsValidConfiguration(CurConfiguration, EProjectType.Code))
 							{
-								string Confname = Enum.GetName(typeof(UnrealTargetConfiguration), CurConfiguration);
+								string Confname = Enum.GetName(typeof(UnrealTargetConfiguration), CurConfiguration)!;
 								MakefileContent.Append(String.Format("\n{1}-Linux-{2}:\n\t {0} {1} Linux {2} {3} $(ARGS)\n", MakeBuildCommand, Basename, Confname, MakeProjectCmdArg));
 							}
 						}
