@@ -609,11 +609,9 @@ void UStaticMeshComponent::OutdatedKnownStaticMeshDetected() const
 {
 	ensureMsgf(
 		KnownStaticMesh == StaticMesh, 
-		TEXT("There is a missing call to NotifyIfStaticMeshChanged for %s (%s -> %s) after StaticMesh has been overwritten"),
-		this, 
+		TEXT("StaticMesh property overwritten for component %s without a call to NotifyIfStaticMeshChanged(). KnownStaticMesh (%p) != StaticMesh (%p - %s)"),
 		*GetFullName(),
 		KnownStaticMesh,
-		KnownStaticMesh ? *KnownStaticMesh->GetFullName() : TEXT("nullptr"),
 		StaticMesh,
 		StaticMesh ? *StaticMesh->GetFullName() : TEXT("nullptr")
 		);
