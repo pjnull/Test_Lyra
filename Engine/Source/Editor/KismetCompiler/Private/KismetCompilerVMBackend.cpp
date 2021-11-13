@@ -667,7 +667,7 @@ public:
 				{
 					FName TableId;
 					FString Key;
-					FStringTableRegistry::Get().FindTableIdAndKey(Term->TextLiteral, TableId, Key);
+					FTextInspector::GetTableIdAndKey(Term->TextLiteral, TableId, Key);
 
 					UStringTable* StringTableAsset = FStringTableRegistry::Get().FindStringTableAsset(TableId);
 

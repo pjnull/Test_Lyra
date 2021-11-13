@@ -1107,11 +1107,13 @@ public:
 	static FTextId GetTextId(const FText& Text);
 	static const FString* GetSourceString(const FText& Text);
 	static const FString& GetDisplayString(const FText& Text);
-	static const FTextDisplayStringRef GetSharedDisplayString(const FText& Text);
+	UE_DEPRECATED(5.0, "GetSharedDisplayString is no longer guaranteed to return a valid result and should NOT be used! If you wanted to get the text ID, use FTextInspector::GetTextId instead. If you wanted a key for unique text instances, use FTextInspector::GetSharedDataId instead.")
+	static FTextDisplayStringPtr GetSharedDisplayString(const FText& Text);
 	static bool GetTableIdAndKey(const FText& Text, FName& OutTableId, FString& OutKey);
 	static uint32 GetFlags(const FText& Text);
 	static void GetHistoricFormatData(const FText& Text, TArray<FHistoricTextFormatData>& OutHistoricFormatData);
 	static bool GetHistoricNumericData(const FText& Text, FHistoricTextNumericData& OutHistoricNumericData);
+	static const void* GetSharedDataId(const FText& Text);
 };
 
 class CORE_API FTextStringHelper

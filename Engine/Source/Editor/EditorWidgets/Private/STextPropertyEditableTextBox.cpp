@@ -289,14 +289,14 @@ void STextPropertyEditableStringTableReference::GetTableIdAndKey(FName& OutTable
 	if (NumTexts > 0)
 	{
 		const FText PropertyValue = EditableTextProperty->GetText(0);
-		FStringTableRegistry::Get().FindTableIdAndKey(PropertyValue, OutTableId, OutKey);
+		FTextInspector::GetTableIdAndKey(PropertyValue, OutTableId, OutKey);
 
 		// Verify that all texts are using the same string table and key
 		for (int32 TextIndex = 1; TextIndex < NumTexts; ++TextIndex)
 		{
 			FName TmpTableId;
 			FString TmpKey;
-			if (FStringTableRegistry::Get().FindTableIdAndKey(PropertyValue, TmpTableId, TmpKey) && OutTableId == TmpTableId)
+			if (FTextInspector::GetTableIdAndKey(PropertyValue, TmpTableId, TmpKey) && OutTableId == TmpTableId)
 			{
 				if (!OutKey.Equals(TmpKey, ESearchCase::CaseSensitive))
 				{
@@ -1022,7 +1022,7 @@ FText STextPropertyEditableTextBox::GetToolTipText() const
 		{
 			FName TableId;
 			FString Key;
-			FStringTableRegistry::Get().FindTableIdAndKey(TextValue, TableId, Key);
+			FTextInspector::GetTableIdAndKey(TextValue, TableId, Key);
 
 			LocalizedTextToolTip = FText::Format(
 				LOCTEXT("StringTableTextToolTipFmt", "--- String Table Reference ---\nTable ID: {0}\nKey: {1}"), 

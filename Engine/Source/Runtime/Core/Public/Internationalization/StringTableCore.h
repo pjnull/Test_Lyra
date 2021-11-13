@@ -114,9 +114,6 @@ public:
 	/** Given an entry, check to see if it exists in this table, and if so, get its key */
 	bool FindKey(const FStringTableEntryConstRef& InEntry, FString& OutKey) const;
 
-	/** Given the display string of an entry, check to see if it exists in this table, and if so, get its key */
-	bool FindKey(const FTextDisplayStringRef& InDisplayString, FString& OutKey) const;
-
 	/** Get the meta-data with the given ID associated with the given entry, or an empty string if not found */
 	FString GetMetaData(const FString& InKey, const FName InMetaDataId) const;
 
@@ -156,9 +153,6 @@ private:
 
 	/** Mapping between the text key and entry data for the strings within this table */
 	TMap<FString, FStringTableEntryPtr, FDefaultSetAllocator, FLocKeyMapFuncs<FStringTableEntryPtr>> KeysToEntries;
-
-	/** Mapping between the display string and the text key for the strings within this table */
-	TMap<FTextDisplayStringPtr, FString> DisplayStringsToKeys;
 
 	/** Critical section preventing concurrent modification of KeysToEntries */
 	mutable FCriticalSection KeyMappingCS;

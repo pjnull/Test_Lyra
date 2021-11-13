@@ -94,9 +94,9 @@ private:
 		return EnumHasAnyFlags(InitializedFlags, ETextLocalizationManagerInitializedFlags::Initializing);
 	}
 
-	FCriticalSection SynchronizationObject;
+	mutable FCriticalSection SynchronizationObject;
 	FDisplayStringLookupTable DisplayStringLookupTable;
-	TMap<FTextDisplayStringRef, uint16> LocalTextRevisions;
+	TMap<FTextId, uint16> LocalTextRevisions;
 	uint16 TextRevisionCounter;
 
 #if WITH_EDITOR
@@ -114,7 +114,7 @@ public:
 	static FTextLocalizationManager& Get();
 	static void TearDown();
 
-	void DumpMemoryInfo();
+	void DumpMemoryInfo() const;
 	void CompactDataStructures();
 
 	/**
@@ -151,7 +151,7 @@ public:
 
 	/**	Finds and returns the display string with the given namespace and key, if it exists.
 	 *	Additionally, if a source string is specified and the found localized display string was not localized from that source string, null will be returned. */
-	FTextDisplayStringPtr FindDisplayString(const FTextKey& Namespace, const FTextKey& Key, const FString* const SourceString = nullptr);
+	FTextDisplayStringPtr FindDisplayString(const FTextKey& Namespace, const FTextKey& Key, const FString* const SourceString = nullptr) const;
 
 	/**	Returns a display string with the given namespace and key.
 	 *	If no display string exists, it will be created using the source string or an empty string if no source string is provided.
@@ -163,21 +163,21 @@ public:
 
 #if WITH_EDITORONLY_DATA
 	/** If an entry exists for the specified namespace and key, returns true and provides the localization resource identifier from which it was loaded. Otherwise, returns false. */
-	bool GetLocResID(const FTextKey& Namespace, const FTextKey& Key, FString& OutLocResId);
+	bool GetLocResID(const FTextKey& Namespace, const FTextKey& Key, FString& OutLocResId) const;
 #endif
 
 	UE_DEPRECATED(5.0, "FindNamespaceAndKeyFromDisplayString no longer functions! Use FTextInspector::GetTextId instead.")
-	bool FindNamespaceAndKeyFromDisplayString(const FTextDisplayStringRef& InDisplayString, FString& OutNamespace, FString& OutKey) const { return false; }
+	bool FindNamespaceAndKeyFromDisplayString(const FTextDisplayStringPtr& InDisplayString, FString& OutNamespace, FString& OutKey) const { return false; }
 
 	UE_DEPRECATED(5.0, "FindNamespaceAndKeyFromDisplayString no longer functions! Use FTextInspector::GetTextId instead.")
-	bool FindNamespaceAndKeyFromDisplayString(const FTextDisplayStringRef& InDisplayString, FTextKey& OutNamespace, FTextKey& OutKey) const { return false; }
+	bool FindNamespaceAndKeyFromDisplayString(const FTextDisplayStringPtr& InDisplayString, FTextKey& OutNamespace, FTextKey& OutKey) const { return false; }
 	
 	/**
-	 * Attempts to find a local revision history for the given display string.
+	 * Attempts to find a local revision history for the given text ID.
 	 * This will only be set if the display string has been changed since the localization manager version has been changed (eg, if it has been edited while keeping the same key).
 	 * @return The local revision, or 0 if there have been no changes since a global history change.
 	 */
-	uint16 GetLocalRevisionForDisplayString(const FTextDisplayStringRef& InDisplayString);
+	uint16 GetLocalRevisionForTextId(const FTextId& InTextId) const;
 
 	/**	Attempts to register the specified display string, associating it with the specified namespace and key.
 	 *	Returns true if the display string has been or was already associated with the namespace and key.
@@ -278,8 +278,8 @@ private:
 	/** Updates display string entries and adds new display string entries based on provided localizations. */
 	void UpdateFromLocalizations(FTextLocalizationResource&& TextLocalizationResource, const bool bDirtyTextRevision = true);
 
-	/** Dirties the local revision counter for the given display string by incrementing it (or adding it) */
-	void DirtyLocalRevisionForDisplayString(const FTextDisplayStringRef& InDisplayString);
+	/** Dirties the local revision counter for the given text ID by incrementing it (or adding it) */
+	void DirtyLocalRevisionForTextId(const FTextId& InTextId);
 
 	/** Dirties the text revision counter by incrementing it, causing a revision mismatch for any information cached before this happens.  */
 	void DirtyTextRevision();

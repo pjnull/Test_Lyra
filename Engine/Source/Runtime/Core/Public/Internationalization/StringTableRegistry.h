@@ -35,10 +35,8 @@ public:
 	void EnumerateStringTables(const TFunctionRef<bool(const FName&, const FStringTableConstRef&)>& InEnumerator) const;
 
 	/** Given an FText, try and find the table ID and key for it */
+	UE_DEPRECATED(5.0, "FindTableIdAndKey is deprecated. Use FTextInspector::GetTableIdAndKey instead.")
 	bool FindTableIdAndKey(const FText& InText, FName& OutTableId, FString& OutKey) const;
-
-	/** Given an FText display string, try and find the table ID and key for it */
-	bool FindTableIdAndKey(const FTextDisplayStringRef& InDisplayString, FName& OutTableId, FString& OutKey) const;
 
 	/** Log a missing string table entry (will only log each missing entry once to avoid spam) */
 	void LogMissingStringTableEntry(const FName InTableId, const FString& InKey);

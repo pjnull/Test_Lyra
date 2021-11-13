@@ -70,7 +70,7 @@ public:
 
 	virtual uint16 GetLocalHistoryRevision() const override
 	{
-		return (LocalizedString.IsValid()) ? FTextLocalizationManager::Get().GetLocalRevisionForDisplayString(LocalizedString.ToSharedRef()) : 0;
+		return FTextLocalizationManager::Get().GetLocalRevisionForTextId(History.GetTextId());
 	}
 
 protected:
@@ -235,7 +235,7 @@ public:
 
 	virtual uint16 GetLocalHistoryRevision() const override
 	{
-		return FTextLocalizationManager::Get().GetLocalRevisionForDisplayString(History.GetDisplayString());
+		return FTextLocalizationManager::Get().GetLocalRevisionForTextId(History.GetTextId());
 	}
 
 protected:

@@ -136,30 +136,7 @@ void FStringTableRegistry::EnumerateStringTables(const TFunctionRef<bool(const F
 
 bool FStringTableRegistry::FindTableIdAndKey(const FText& InText, FName& OutTableId, FString& OutKey) const
 {
-	if (InText.IsFromStringTable())
-	{
-		return FindTableIdAndKey(FTextInspector::GetSharedDisplayString(InText), OutTableId, OutKey) || FTextInspector::GetTableIdAndKey(InText, OutTableId, OutKey);
-	}
-
-	return false;
-}
-
-bool FStringTableRegistry::FindTableIdAndKey(const FTextDisplayStringRef& InDisplayString, FName& OutTableId, FString& OutKey) const
-{
-	FScopeLock RegisteredStringTablesLock(&RegisteredStringTablesCS);
-
-	for (const auto& RegisteredStringTablePair : RegisteredStringTables)
-	{
-		FString FoundKey;
-		if (RegisteredStringTablePair.Value->FindKey(InDisplayString, FoundKey))
-		{
-			OutTableId = RegisteredStringTablePair.Key;
-			OutKey = MoveTemp(FoundKey);
-			return true;
-		}
-	}
-
-	return false;
+	return FTextInspector::GetTableIdAndKey(InText, OutTableId, OutKey);
 }
 
 void FStringTableRegistry::LogMissingStringTableEntry(const FName InTableId, const FString& InKey)

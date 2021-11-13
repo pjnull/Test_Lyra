@@ -480,7 +480,7 @@ FTextLocalizationManager::FTextLocalizationManager()
 	RegisterTextSource(PolyglotTextSource.ToSharedRef(), bRefreshResources);
 }
 
-void FTextLocalizationManager::DumpMemoryInfo()
+void FTextLocalizationManager::DumpMemoryInfo() const
 {
 	FScopeLock ScopeLock(&SynchronizationObject);
 
@@ -639,13 +639,13 @@ void FTextLocalizationManager::RegisterPolyglotTextData(TArrayView<const FPolygl
 	}
 }
 
-FTextDisplayStringPtr FTextLocalizationManager::FindDisplayString(const FTextKey& Namespace, const FTextKey& Key, const FString* const SourceString)
+FTextDisplayStringPtr FTextLocalizationManager::FindDisplayString(const FTextKey& Namespace, const FTextKey& Key, const FString* const SourceString) const
 {
 	FScopeLock ScopeLock( &SynchronizationObject );
 
 	const FTextId TextId(Namespace, Key);
 
-	FDisplayStringEntry* LiveEntry = DisplayStringLookupTable.Find(TextId);
+	const FDisplayStringEntry* LiveEntry = DisplayStringLookupTable.Find(TextId);
 
 	if ( LiveEntry != nullptr && ( !SourceString || LiveEntry->SourceStringHash == FTextLocalizationResource::HashString(*SourceString) ) )
 	{
@@ -721,7 +721,7 @@ FTextDisplayStringRef FTextLocalizationManager::GetDisplayString(const FTextKey&
 		{
 			LiveEntry->SourceStringHash = SourceStringHash;
 			*LiveEntry->DisplayString = *DisplayString;
-			DirtyLocalRevisionForDisplayString(LiveEntry->DisplayString);
+			DirtyLocalRevisionForTextId(TextId);
 
 #if ENABLE_LOC_TESTING
 			if (bShouldLEETIFYAll || bShouldLEETIFYUnlocalizedString)
@@ -804,13 +804,13 @@ FTextDisplayStringRef FTextLocalizationManager::GetDisplayString(const FTextKey&
 }
 
 #if WITH_EDITORONLY_DATA
-bool FTextLocalizationManager::GetLocResID(const FTextKey& Namespace, const FTextKey& Key, FString& OutLocResId)
+bool FTextLocalizationManager::GetLocResID(const FTextKey& Namespace, const FTextKey& Key, FString& OutLocResId) const
 {
 	FScopeLock ScopeLock(&SynchronizationObject);
 
 	const FTextId TextId(Namespace, Key);
 
-	FDisplayStringEntry* LiveEntry = DisplayStringLookupTable.Find(TextId);
+	const FDisplayStringEntry* LiveEntry = DisplayStringLookupTable.Find(TextId);
 
 	if (LiveEntry != nullptr && !LiveEntry->LocResID.IsEmpty())
 	{
@@ -822,11 +822,11 @@ bool FTextLocalizationManager::GetLocResID(const FTextKey& Namespace, const FTex
 }
 #endif
 
-uint16 FTextLocalizationManager::GetLocalRevisionForDisplayString(const FTextDisplayStringRef& InDisplayString)
+uint16 FTextLocalizationManager::GetLocalRevisionForTextId(const FTextId& InTextId) const
 {
 	FScopeLock ScopeLock( &SynchronizationObject );
 
-	uint16* FoundLocalRevision = LocalTextRevisions.Find(InDisplayString);
+	const uint16* FoundLocalRevision = LocalTextRevisions.Find(InTextId);
 	return (FoundLocalRevision) ? *FoundLocalRevision : 0;
 }
 
@@ -1357,21 +1357,21 @@ void FTextLocalizationManager::UpdateFromLocalizations(FTextLocalizationResource
 	}
 }
 
-void FTextLocalizationManager::DirtyLocalRevisionForDisplayString(const FTextDisplayStringRef& InDisplayString)
+void FTextLocalizationManager::DirtyLocalRevisionForTextId(const FTextId& InTextId)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE(FTextLocalizationManager::DirtyLocalRevisionForDisplayString);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FTextLocalizationManager::DirtyLocalRevisionForTextId);
 	LLM_SCOPE(ELLMTag::Localization);
 
 	FScopeLock ScopeLock(&SynchronizationObject);
 
-	uint16* FoundLocalRevision = LocalTextRevisions.Find(InDisplayString);
+	uint16* FoundLocalRevision = LocalTextRevisions.Find(InTextId);
 	if (FoundLocalRevision)
 	{
 		while (++(*FoundLocalRevision) == 0) {} // Zero is special, don't allow an overflow to stay at zero
 	}
 	else
 	{
-		LocalTextRevisions.Add(InDisplayString, 1);
+		LocalTextRevisions.Add(InTextId, 1);
 	}
 }
 

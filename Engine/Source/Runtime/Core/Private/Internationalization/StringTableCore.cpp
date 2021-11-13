@@ -119,9 +119,7 @@ void FStringTable::SetNamespace(const FString& InNamespace)
 			FStringTableEntryPtr OldEntry = KeyToEntryPair.Value;
 			OldEntry->Disown();
 
-			DisplayStringsToKeys.Remove(OldEntry->GetDisplayString());
 			KeyToEntryPair.Value = FStringTableEntry::NewStringTableEntry(AsShared(), OldEntry->GetSourceString(), FTextLocalizationManager::Get().GetDisplayString(TableNamespace, KeyToEntryPair.Key, &OldEntry->GetSourceString()));
-			DisplayStringsToKeys.Emplace(KeyToEntryPair.Value->GetDisplayString(), KeyToEntryPair.Key);
 		}
 	}
 }
@@ -149,12 +147,10 @@ void FStringTable::SetSourceString(const FString& InKey, const FString& InSource
 	if (TableEntry.IsValid())
 	{
 		TableEntry->Disown();
-		DisplayStringsToKeys.Remove(TableEntry->GetDisplayString());
 	}
 	
 	TableEntry = FStringTableEntry::NewStringTableEntry(AsShared(), InSourceString, FTextLocalizationManager::Get().GetDisplayString(TableNamespace, InKey, &InSourceString));
 	KeysToEntries.Emplace(InKey, TableEntry);
-	DisplayStringsToKeys.Emplace(TableEntry->GetDisplayString(), InKey);
 }
 
 void FStringTable::RemoveSourceString(const FString& InKey)
@@ -166,7 +162,6 @@ void FStringTable::RemoveSourceString(const FString& InKey)
 	{
 		TableEntry->Disown();
 		KeysToEntries.Remove(InKey);
-		DisplayStringsToKeys.Remove(TableEntry->GetDisplayString());
 		ClearMetaData(InKey);
 	}
 }
@@ -194,7 +189,6 @@ void FStringTable::ClearSourceStrings(const int32 InSlack)
 	}
 
 	KeysToEntries.Empty(InSlack);
-	DisplayStringsToKeys.Empty(InSlack);
 
 	ClearMetaData(InSlack);
 }
@@ -207,18 +201,21 @@ FStringTableEntryConstPtr FStringTable::FindEntry(const FString& InKey) const
 
 bool FStringTable::FindKey(const FStringTableEntryConstRef& InEntry, FString& OutKey) const
 {
-	return FindKey(InEntry->GetDisplayString().ToSharedRef(), OutKey);
-}
+	if (InEntry->GetOwner().Get() != this)
+	{
+		// Not part of this string table
+		return false;
+	}
 
-bool FStringTable::FindKey(const FTextDisplayStringRef& InDisplayString, FString& OutKey) const
-{
 	FScopeLock KeyMappingLock(&KeyMappingCS);
 
-	const FString* FoundKey = DisplayStringsToKeys.Find(InDisplayString);
-	if (FoundKey)
+	for (const auto& KeyToEntryPair : KeysToEntries)
 	{
-		OutKey = *FoundKey;
-		return true;
+		if (KeyToEntryPair.Value == InEntry)
+		{
+			OutKey = KeyToEntryPair.Key;
+			return true;
+		}
 	}
 	return false;
 }
@@ -334,7 +331,6 @@ void FStringTable::Serialize(FArchive& Ar)
 
 				FStringTableEntryRef TableEntry = FStringTableEntry::NewStringTableEntry(AsShared(), SourceString, FTextLocalizationManager::Get().GetDisplayString(TableNamespace, Key, &SourceString));
 				KeysToEntries.Emplace(Key, TableEntry);
-				DisplayStringsToKeys.Emplace(TableEntry->GetDisplayString(), Key);
 			}
 		}
 
@@ -496,7 +492,6 @@ bool FStringTable::ImportStrings(const FString& InFilename)
 
 				FStringTableEntryRef TableEntry = FStringTableEntry::NewStringTableEntry(AsShared(), SourceString, FTextLocalizationManager::Get().GetDisplayString(TableNamespace, Key, &SourceString));
 				KeysToEntries.Emplace(Key, TableEntry);
-				DisplayStringsToKeys.Emplace(TableEntry->GetDisplayString(), Key);
 
 				for (const auto& MetaDataColumnPair : MetaDataColumns)
 				{

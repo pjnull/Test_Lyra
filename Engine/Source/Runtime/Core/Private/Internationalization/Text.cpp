@@ -73,11 +73,9 @@ const FString& FTextInspector::GetDisplayString(const FText& Text)
 	return Text.TextData->GetDisplayString();
 }
 
-const FTextDisplayStringRef FTextInspector::GetSharedDisplayString(const FText& Text)
+FTextDisplayStringPtr FTextInspector::GetSharedDisplayString(const FText& Text)
 {
-	// todo: calling PersistText here probably isn't the right thing to do, however it avoids having to make an external API change at this point
-	Text.TextData->PersistText();
-	return Text.TextData->GetLocalizedString().ToSharedRef();
+	return Text.TextData->GetLocalizedString();
 }
 
 bool FTextInspector::GetTableIdAndKey(const FText& Text, FName& OutTableId, FString& OutKey)
@@ -104,6 +102,11 @@ void FTextInspector::GetHistoricFormatData(const FText& Text, TArray<FHistoricTe
 bool FTextInspector::GetHistoricNumericData(const FText& Text, FHistoricTextNumericData& OutHistoricNumericData)
 {
 	return Text.GetHistoricNumericData(OutHistoricNumericData);
+}
+
+const void* FTextInspector::GetSharedDataId(const FText& Text)
+{
+	return &Text.TextData.Get();
 }
 
 // These default values have been duplicated to the KismetTextLibrary functions for Blueprints. Please replicate any changes there!
