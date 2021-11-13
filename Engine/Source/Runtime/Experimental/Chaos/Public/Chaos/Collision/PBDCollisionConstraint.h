@@ -307,7 +307,7 @@ namespace Chaos
 		const FImplicitObject* GetImplicit0() const { return Manifold.Implicit[0]; }
 		const FImplicitObject* GetImplicit1() const { return Manifold.Implicit[1]; }
 		const FBVHParticles* GetCollisionParticles0() const { return Manifold.Simplicial[0]; }
-		const FBVHParticles* GetCollisionParticles1() const { return Manifold.Simplicial[0]; }
+		const FBVHParticles* GetCollisionParticles1() const { return Manifold.Simplicial[1]; }
 
 		// @todo(chaos): half of this API is wrong for the new multi-point manifold constraints. Remove it
 
