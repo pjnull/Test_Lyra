@@ -198,6 +198,9 @@ public:
 	/** Returns the source string managed by the history (if any). */
 	virtual const FString* GetSourceString() const;
 
+	/** Returns the localized ID of this text (if any). */
+	virtual FTextId GetTextId() const { return FTextId(); }
+
 	/** Get any historic text format data from this history */
 	virtual void GetHistoricFormatData(const FText& InText, TArray<FHistoricTextFormatData>& OutHistoricFormatData) const;
 
@@ -226,12 +229,12 @@ private:
 	FTextHistory& operator=(FTextHistory&);
 };
 
-/** No complexity to it, just holds the source string. */
+/** A potentially localized piece of source text (may have a TextId). */
 class CORE_API FTextHistory_Base : public FTextHistory
 {
 public:
 	FTextHistory_Base() {}
-	explicit FTextHistory_Base(FString&& InSourceString);
+	explicit FTextHistory_Base(const FTextId& InTextId, FString&& InSourceString);
 
 	/** Allow moving */
 	FTextHistory_Base(FTextHistory_Base&& Other);
@@ -246,6 +249,7 @@ public:
 	virtual void Serialize(FStructuredArchive::FRecord Record) override;
 	virtual void SerializeForDisplayString(FStructuredArchive::FRecord Record, FTextDisplayStringPtr& InOutDisplayString) override;
 	virtual const FString* GetSourceString() const override;
+	virtual FTextId GetTextId() const override;
 	//~ End FTextHistory Interface
 
 protected:
@@ -258,6 +262,8 @@ private:
 	FTextHistory_Base(const FTextHistory_Base&);
 	FTextHistory_Base& operator=(FTextHistory_Base&);
 
+	/** The ID for an FText (if any) */
+	FTextId TextId;
 	/** The source string for an FText */
 	FString SourceString;
 };
@@ -642,6 +648,7 @@ public:
 	virtual void Serialize(FStructuredArchive::FRecord Record) override;
 	virtual void SerializeForDisplayString(FStructuredArchive::FRecord Record, FTextDisplayStringPtr& InOutDisplayString) override;
 	virtual const FString* GetSourceString() const override;
+	virtual FTextId GetTextId() const override;
 	//~ End FTextHistory Interface
 
 	FTextDisplayStringRef GetDisplayString() const;
@@ -692,6 +699,9 @@ private:
 
 		/** Collect any string table asset references */
 		void CollectStringTableAssetReferences(FStructuredArchive::FRecord Record);
+
+		/** Get the localized ID of this string table (if any). */
+		FTextId GetTextId();
 
 		/** Resolve the string table pointer, potentially re-caching it if it's missing or stale */
 		FStringTableEntryConstPtr ResolveStringTableEntry();

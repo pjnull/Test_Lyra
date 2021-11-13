@@ -40,6 +40,11 @@ void FStringTableEntry::Disown()
 	OwnerTable.Reset();
 }
 
+FStringTableConstPtr FStringTableEntry::GetOwner() const
+{
+	return OwnerTable.Pin();
+}
+
 const FString& FStringTableEntry::GetSourceString() const
 {
 	return SourceString;

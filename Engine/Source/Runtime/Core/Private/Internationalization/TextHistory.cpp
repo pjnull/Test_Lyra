@@ -775,15 +775,18 @@ void FTextHistory::Rebuild(TSharedRef< FString, ESPMode::ThreadSafe > InDisplayS
 ///////////////////////////////////////
 // FTextHistory_Base
 
-FTextHistory_Base::FTextHistory_Base(FString&& InSourceString)
-	: SourceString(MoveTemp(InSourceString))
+FTextHistory_Base::FTextHistory_Base(const FTextId& InTextId, FString&& InSourceString)
+	: TextId(InTextId)
+	, SourceString(MoveTemp(InSourceString))
 {
 }
 
 FTextHistory_Base::FTextHistory_Base(FTextHistory_Base&& Other)
 	: FTextHistory(MoveTemp(Other))
+	, TextId(Other.TextId)
 	, SourceString(MoveTemp(Other.SourceString))
 {
+	Other.TextId.Reset();
 }
 
 FTextHistory_Base& FTextHistory_Base::operator=(FTextHistory_Base&& Other)
@@ -791,7 +794,10 @@ FTextHistory_Base& FTextHistory_Base::operator=(FTextHistory_Base&& Other)
 	FTextHistory::operator=(MoveTemp(Other));
 	if (this != &Other)
 	{
+		TextId = Other.TextId;
 		SourceString = MoveTemp(Other.SourceString);
+
+		Other.TextId.Reset();
 	}
 	return *this;
 }
@@ -817,6 +823,11 @@ FString FTextHistory_Base::BuildInvariantDisplayString() const
 const FString* FTextHistory_Base::GetSourceString() const
 {
 	return &SourceString;
+}
+
+FTextId FTextHistory_Base::GetTextId() const
+{
+	return TextId;
 }
 
 void FTextHistory_Base::Serialize(FStructuredArchive::FRecord Record)
@@ -875,15 +886,15 @@ void FTextHistory_Base::SerializeForDisplayString(FStructuredArchive::FRecord Re
 #endif // WITH_EDITOR
 
 		// Using the deserialized namespace and key, find the DisplayString.
-		InOutDisplayString = FTextLocalizationManager::Get().GetDisplayString(Namespace, Key, &SourceString);
+		TextId = FTextId(Namespace, Key);
+		InOutDisplayString = FTextLocalizationManager::Get().GetDisplayString(TextId.GetNamespace(), TextId.GetKey(), &SourceString);
 	}
 	else if(BaseArchive.IsSaving())
 	{
 		check(InOutDisplayString.IsValid());
 
-		FTextKey Namespace;
-		FTextKey Key;
-		const bool bFoundNamespaceAndKey = FTextLocalizationManager::Get().FindNamespaceAndKeyFromDisplayString(InOutDisplayString.ToSharedRef(), Namespace, Key);
+		FTextKey Namespace = TextId.GetNamespace();
+		FTextKey Key = TextId.GetKey();
 
 		if (BaseArchive.IsCooking())
 		{
@@ -913,10 +924,14 @@ void FTextHistory_Base::SerializeForDisplayString(FStructuredArchive::FRecord Re
 #endif // USE_STABLE_LOCALIZATION_KEYS
 
 			// If this has no key, give it a GUID for a key
-			if (GIsEditor && !bFoundNamespaceAndKey && (BaseArchive.IsPersistent() && !BaseArchive.HasAnyPortFlags(PPF_Duplicate)))
+			if (GIsEditor && TextId.IsEmpty() && (BaseArchive.IsPersistent() && !BaseArchive.HasAnyPortFlags(PPF_Duplicate)))
 			{
 				Key = FGuid::NewGuid().ToString();
-				if (!FTextLocalizationManager::Get().AddDisplayString(InOutDisplayString.ToSharedRef(), Namespace, Key))
+				if (FTextLocalizationManager::Get().AddDisplayString(InOutDisplayString.ToSharedRef(), Namespace, Key))
+				{
+					TextId = FTextId(Namespace, Key);
+				}
+				else
 				{
 					// Could not add display string, reset namespace and key.
 					Namespace.Reset();
@@ -999,7 +1014,8 @@ const TCHAR* FTextHistory_Base::ReadFromBuffer(const TCHAR* Buffer, const TCHAR*
 			// Strip the package localization ID to match how text works at runtime (properties do this when saving during cook)
 			TextNamespaceUtil::StripPackageNamespaceInline(NamespaceString);
 		}
-		OutDisplayString = FTextLocalizationManager::Get().GetDisplayString(NamespaceString, KeyString, &SourceString);
+		TextId = FTextId(NamespaceString, KeyString);
+		OutDisplayString = FTextLocalizationManager::Get().GetDisplayString(TextId.GetNamespace(), TextId.GetKey(), &SourceString);
 
 		// We will definitely need to do a rebuild later
 		Revision = 0;
@@ -1055,7 +1071,8 @@ const TCHAR* FTextHistory_Base::ReadFromBuffer(const TCHAR* Buffer, const TCHAR*
 			// Strip the package localization ID to match how text works at runtime (properties do this when saving during cook)
 			TextNamespaceUtil::StripPackageNamespaceInline(NamespaceString);
 		}
-		OutDisplayString = FTextLocalizationManager::Get().GetDisplayString(NamespaceString, KeyString, &SourceString);
+		TextId = FTextId(NamespaceString, KeyString);
+		OutDisplayString = FTextLocalizationManager::Get().GetDisplayString(TextId.GetNamespace(), TextId.GetKey(), &SourceString);
 
 		// We will definitely need to do a rebuild later
 		Revision = 0;
@@ -1069,12 +1086,10 @@ const TCHAR* FTextHistory_Base::ReadFromBuffer(const TCHAR* Buffer, const TCHAR*
 
 bool FTextHistory_Base::WriteToBuffer(FString& Buffer, FTextDisplayStringPtr DisplayString, const bool bStripPackageNamespace) const
 {
-	FString Namespace;
-	FString Key;
-	const bool bFoundNamespaceAndKey = DisplayString.IsValid() && FTextLocalizationManager::Get().FindNamespaceAndKeyFromDisplayString(DisplayString.ToSharedRef(), Namespace, Key);
-
-	if (bFoundNamespaceAndKey)
+	if (!TextId.IsEmpty())
 	{
+		FString Namespace = TextId.GetNamespace().GetChars();
+		FString Key = TextId.GetKey().GetChars();
 		if (bStripPackageNamespace)
 		{
 			TextNamespaceUtil::StripPackageNamespaceInline(Namespace);
@@ -2658,6 +2673,15 @@ const FString* FTextHistory_StringTableEntry::GetSourceString() const
 	return &FStringTableEntry::GetPlaceholderSourceString();
 }
 
+FTextId FTextHistory_StringTableEntry::GetTextId() const
+{
+	if (StringTableReferenceData)
+	{
+		return StringTableReferenceData->GetTextId();
+	}
+	return FTextId();
+}
+
 FTextDisplayStringRef FTextHistory_StringTableEntry::GetDisplayString() const
 {
 	FStringTableEntryConstPtr StringTableEntryPin = StringTableReferenceData ? StringTableReferenceData->ResolveStringTableEntry() : nullptr;
@@ -2864,6 +2888,18 @@ void FTextHistory_StringTableEntry::FStringTableReferenceData::GetTableIdAndKey(
 	FScopeLock ScopeLock(&DataCS);
 	OutTableId = TableId;
 	OutKey = Key;
+}
+
+FTextId FTextHistory_StringTableEntry::FStringTableReferenceData::GetTextId()
+{
+	if (FStringTableEntryConstPtr StringTableEntryPin = ResolveStringTableEntry())
+	{
+		if (FStringTableConstPtr StringTable = StringTableEntryPin->GetOwner())
+		{
+			return FTextId(StringTable->GetNamespace(), GetKey());
+		}
+	}
+	return FTextId();
 }
 
 void FTextHistory_StringTableEntry::FStringTableReferenceData::CollectStringTableAssetReferences(FStructuredArchive::FRecord Record)

@@ -40,32 +40,27 @@ bool FTextInspector::ShouldGatherForLocalization(const FText& Text)
 
 TOptional<FString> FTextInspector::GetNamespace(const FText& Text)
 {
-	FTextDisplayStringPtr LocalizedString = Text.TextData->GetLocalizedString();
-	if (LocalizedString.IsValid())
+	const FTextId TextId = FTextInspector::GetTextId(Text);
+	if (!TextId.IsEmpty())
 	{
-		FString Namespace;
-		FString Key;
-		if (FTextLocalizationManager::Get().FindNamespaceAndKeyFromDisplayString(LocalizedString.ToSharedRef(), Namespace, Key))
-		{
-			return Namespace;
-		}
+		return FString(TextId.GetNamespace().GetChars());
 	}
 	return TOptional<FString>();
 }
 
 TOptional<FString> FTextInspector::GetKey(const FText& Text)
 {
-	FTextDisplayStringPtr LocalizedString = Text.TextData->GetLocalizedString();
-	if (LocalizedString.IsValid())
+	const FTextId TextId = FTextInspector::GetTextId(Text);
+	if (!TextId.IsEmpty())
 	{
-		FString Namespace;
-		FString Key;
-		if (FTextLocalizationManager::Get().FindNamespaceAndKeyFromDisplayString(LocalizedString.ToSharedRef(), Namespace, Key))
-		{
-			return Key;
-		}
+		return FString(TextId.GetKey().GetChars());
 	}
 	return TOptional<FString>();
+}
+
+FTextId FTextInspector::GetTextId(const FText& Text)
+{
+	return Text.TextData->GetTextHistory().GetTextId();
 }
 
 const FString* FTextInspector::GetSourceString(const FText& Text)
@@ -258,7 +253,7 @@ FText::FText( FString&& InSourceString )
 	: TextData(new TGeneratedTextData<FTextHistory_Base>(CopyTemp(InSourceString))) // Copy the source string as the live display string
 	, Flags(0)
 {
-	TextData->SetTextHistory(FTextHistory_Base(MoveTemp(InSourceString))); // Move the source string as the historic source string
+	TextData->SetTextHistory(FTextHistory_Base(FTextId(), MoveTemp(InSourceString))); // Move the source string as the historic source string
 }
 
 FText::FText( FName InTableId, FString InKey, const EStringTableLoadingPolicy InLoadingPolicy )
@@ -271,14 +266,14 @@ FText::FText( FString&& InSourceString, FTextDisplayStringRef InDisplayString )
 	: TextData(new TLocalizedTextData<FTextHistory_Base>(MoveTemp(InDisplayString)))
 	, Flags(0)
 {
-	TextData->SetTextHistory(FTextHistory_Base(MoveTemp(InSourceString)));
+	TextData->SetTextHistory(FTextHistory_Base(FTextId(), MoveTemp(InSourceString)));
 }
 
 FText::FText( FString&& InSourceString, const FTextKey& InNamespace, const FTextKey& InKey, uint32 InFlags )
 	: TextData(new TLocalizedTextData<FTextHistory_Base>(FTextLocalizationManager::Get().GetDisplayString(InNamespace, InKey, &InSourceString)))
 	, Flags(InFlags)
 {
-	TextData->SetTextHistory(FTextHistory_Base(MoveTemp(InSourceString)));
+	TextData->SetTextHistory(FTextHistory_Base(FTextId(InNamespace, InKey), MoveTemp(InSourceString)));
 }
 
 bool FText::IsEmpty() const
@@ -837,15 +832,17 @@ void FText::SerializeText(FStructuredArchive::FSlot Slot, FText& Value)
 		FTextDisplayStringPtr DisplayString;
 
 		// Namespaces and keys are no longer stored in the FText, we need to read them in and discard
+		FTextId TextId;
 		if (UnderlyingArchive.UEVer() >= VER_UE4_ADDED_NAMESPACE_AND_KEY_DATA_TO_FTEXT)
 		{
-			FString Namespace;
-			FString Key;
+			FTextKey Namespace;
+			Namespace.SerializeAsString(Record.EnterField(SA_FIELD_NAME(TEXT("Namespace"))));
 
-			Record << SA_VALUE(TEXT("Namespace"), Namespace);
-			Record << SA_VALUE(TEXT("Key"), Key);
+			FTextKey Key;
+			Key.SerializeAsString(Record.EnterField(SA_FIELD_NAME(TEXT("Key"))));
 
 			// Get the DisplayString using the namespace, key, and source string.
+			TextId = FTextId(Namespace, Key);
 			DisplayString = FTextLocalizationManager::Get().GetDisplayString(Namespace, Key, &SourceStringToImplantIntoHistory);
 		}
 		else
@@ -854,7 +851,7 @@ void FText::SerializeText(FStructuredArchive::FSlot Slot, FText& Value)
 		}
 
 		check(DisplayString.IsValid());
-		Value.TextData = MakeShared<TLocalizedTextData<FTextHistory_Base>, ESPMode::ThreadSafe>(DisplayString.ToSharedRef(), FTextHistory_Base(MoveTemp(SourceStringToImplantIntoHistory)));
+		Value.TextData = MakeShared<TLocalizedTextData<FTextHistory_Base>, ESPMode::ThreadSafe>(DisplayString.ToSharedRef(), FTextHistory_Base(TextId, MoveTemp(SourceStringToImplantIntoHistory)));
 	}
 
 #if WITH_EDITOR
@@ -1616,41 +1613,6 @@ uint16 FTextSnapshot::GetLocalHistoryRevisionForText(const FText& InText)
 	return (InText.IsEmpty() || InText.IsCultureInvariant()) ? 0 : InText.TextData->GetLocalHistoryRevision();
 }
 
-FScopedTextIdentityPreserver::FScopedTextIdentityPreserver(FText& InTextToPersist)
-	: TextToPersist(InTextToPersist)
-	, HadFoundNamespaceAndKey(false)
-	, Flags(TextToPersist.Flags)
-{
-	// Empty display strings can't have a namespace or key.
-	if (GIsEditor && !TextToPersist.TextData->GetDisplayString().IsEmpty())
-	{
-		// Save off namespace and key to be restored later.
-		TextToPersist.TextData->PersistText();
-		HadFoundNamespaceAndKey = FTextLocalizationManager::Get().FindNamespaceAndKeyFromDisplayString(TextToPersist.TextData->GetLocalizedString().ToSharedRef(), Namespace, Key);
-	}
-}
-
-FScopedTextIdentityPreserver::~FScopedTextIdentityPreserver()
-{
-	// Never persist identities in non-editor situations
-	// If we don't have a key, then the old identity wasn't valid and shouldn't be preserved.
-	// Never persist identities for immutable (i.e. code LOCTEXT declared) text.
-	if(GIsEditor && HadFoundNamespaceAndKey && (Flags & ETextFlag::Immutable) == 0)
-	{
-		// Get the text's new source string.
-		const FString* SourceString = FTextInspector::GetSourceString(TextToPersist);
-
-		// Without a source string, we can't possibly preserve the identity. If the text we're preserving identity for can't possibly have an identity anymore, this class shouldn't be used on this text.
-		check(SourceString);
-
-		// Create/update the display string instance for this identity in the text localization manager...
-		FTextDisplayStringRef DisplayString = FTextLocalizationManager::Get().GetDisplayString(Namespace, Key, SourceString);
-
-		// ... and update the data on the text instance
-		TextToPersist.TextData = MakeShared<TLocalizedTextData<FTextHistory_Base>, ESPMode::ThreadSafe>(MoveTemp(DisplayString), FTextHistory_Base(FString(*SourceString)));
-	}
-}
-
 bool TextBiDi::IsControlCharacter(const TCHAR InChar)
 {
 	return InChar == TEXT('\u061C')  // ARABIC LETTER MARK
@@ -1668,7 +1630,6 @@ bool TextBiDi::IsControlCharacter(const TCHAR InChar)
 }
 
 FText FTextStringHelper::CreateFromBuffer(const TCHAR* Buffer, const TCHAR* TextNamespace, const TCHAR* PackageNamespace, const bool bRequiresQuotes)
-
 {
 	FText Value;
 	if (!ReadFromBuffer(Buffer, Value, TextNamespace, PackageNamespace, bRequiresQuotes))

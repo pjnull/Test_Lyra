@@ -1104,6 +1104,7 @@ public:
 	static bool ShouldGatherForLocalization(const FText& Text);
 	static TOptional<FString> GetNamespace(const FText& Text);
 	static TOptional<FString> GetKey(const FText& Text);
+	static FTextId GetTextId(const FText& Text);
 	static const FString* GetSourceString(const FText& Text);
 	static const FString& GetDisplayString(const FText& Text);
 	static const FTextDisplayStringRef GetSharedDisplayString(const FText& Text);
@@ -1245,20 +1246,6 @@ private:
 
 	TArray<FText> Lines;
 	int32 IndentCount = 0;
-};
-
-class CORE_API FScopedTextIdentityPreserver
-{
-public:
-	FScopedTextIdentityPreserver(FText& InTextToPersist);
-	~FScopedTextIdentityPreserver();
-
-private:
-	FText& TextToPersist;
-	bool HadFoundNamespaceAndKey;
-	FString Namespace;
-	FString Key;
-	uint32 Flags;
 };
 
 /** Unicode character helper functions */

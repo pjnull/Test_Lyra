@@ -1031,18 +1031,19 @@ FText STextPropertyEditableTextBox::GetToolTipText() const
 		}
 		else
 		{
-			bool bIsLocalized = false;
-			FString Namespace;
-			FString Key;
+			FTextId TextId;
 			const FString* SourceString = FTextInspector::GetSourceString(TextValue);
 
 			if (SourceString && TextValue.ShouldGatherForLocalization())
 			{
-				bIsLocalized = FTextLocalizationManager::Get().FindNamespaceAndKeyFromDisplayString(FTextInspector::GetSharedDisplayString(TextValue), Namespace, Key);
+				TextId = FTextInspector::GetTextId(TextValue);
 			}
 
-			if (bIsLocalized)
+			if (!TextId.IsEmpty())
 			{
+				const FString Namespace = TextId.GetNamespace().GetChars();
+				const FString Key = TextId.GetKey().GetChars();
+
 				const FString PackageNamespace = TextNamespaceUtil::ExtractPackageNamespace(Namespace);
 				const FString TextNamespace = TextNamespaceUtil::StripPackageNamespace(Namespace);
 

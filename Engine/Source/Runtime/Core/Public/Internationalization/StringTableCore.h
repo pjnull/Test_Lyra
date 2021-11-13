@@ -33,6 +33,9 @@ public:
 	/** Disown this string table entry. This is used to notify external code that has cached this entry that it needs to re-cache it from the string table */
 	void Disown();
 
+	/** Get the string table that currently owns this entry (if any) */
+	FStringTableConstPtr GetOwner() const;
+
 	/** Get the source string of this string table entry */
 	const FString& GetSourceString() const;
 

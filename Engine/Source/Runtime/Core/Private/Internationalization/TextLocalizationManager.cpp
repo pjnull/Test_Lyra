@@ -486,8 +486,6 @@ void FTextLocalizationManager::DumpMemoryInfo()
 
 	UE_LOG(LogTextLocalizationManager, Log, TEXT("DisplayStringLookupTable.GetAllocatedSize()=%d elems=%d"), DisplayStringLookupTable.GetAllocatedSize(), DisplayStringLookupTable.Num());
 
-	UE_LOG(LogTextLocalizationManager, Log, TEXT("NamespaceKeyLookupTable.GetAllocatedSize()=%d elems=%d"), NamespaceKeyLookupTable.GetAllocatedSize(), NamespaceKeyLookupTable.Num());
-
 	UE_LOG(LogTextLocalizationManager, Log, TEXT("LocalTextRevisions.GetAllocatedSize()=%d elems=%d"), LocalTextRevisions.GetAllocatedSize(), LocalTextRevisions.Num());
 }
 
@@ -500,7 +498,6 @@ void FTextLocalizationManager::CompactDataStructures()
 	double StartTime = FPlatformTime::Seconds();
 	DisplayStringLookupTable.Shrink();
 	LocalTextRevisions.Shrink();
-	NamespaceKeyLookupTable.Shrink();
 	FTextKey::CompactDataStructures();
 	UE_LOG(LogTextLocalizationManager, Log, TEXT("Compacting localization data took %6.2fms"), 1000.0 * (FPlatformTime::Seconds() - StartTime));
 }
@@ -761,7 +758,6 @@ FTextDisplayStringRef FTextLocalizationManager::GetDisplayString(const FTextKey&
 		NewEntry.DisplayString = MakeShared<FString, ESPMode::ThreadSafe>(*DisplayString);
 
 		DisplayStringLookupTable.Emplace(TextId, NewEntry);
-		NamespaceKeyLookupTable.Emplace(NewEntry.DisplayString, TextId);
 
 		return NewEntry.DisplayString;
 	}
@@ -802,7 +798,6 @@ FTextDisplayStringRef FTextLocalizationManager::GetDisplayString(const FTextKey&
 		);
 
 		DisplayStringLookupTable.Emplace(TextId, NewEntry);
-		NamespaceKeyLookupTable.Emplace(NewEntry.DisplayString, TextId);
 
 		return UnlocalizedString;
 	}
@@ -827,38 +822,6 @@ bool FTextLocalizationManager::GetLocResID(const FTextKey& Namespace, const FTex
 }
 #endif
 
-bool FTextLocalizationManager::FindNamespaceAndKeyFromDisplayString(const FTextDisplayStringRef& InDisplayString, FString& OutNamespace, FString& OutKey)
-{
-	FScopeLock ScopeLock( &SynchronizationObject );
-
-	const FTextId* NamespaceKeyEntry = NamespaceKeyLookupTable.Find(InDisplayString);
-
-	if (NamespaceKeyEntry)
-	{
-		OutNamespace = NamespaceKeyEntry->GetNamespace().GetChars();
-		OutKey = NamespaceKeyEntry->GetKey().GetChars();
-		return true;
-	}
-
-	return false;
-}
-
-bool FTextLocalizationManager::FindNamespaceAndKeyFromDisplayString(const FTextDisplayStringRef& InDisplayString, FTextKey& OutNamespace, FTextKey& OutKey)
-{
-	FScopeLock ScopeLock(&SynchronizationObject);
-
-	const FTextId* NamespaceKeyEntry = NamespaceKeyLookupTable.Find(InDisplayString);
-
-	if (NamespaceKeyEntry)
-	{
-		OutNamespace = NamespaceKeyEntry->GetNamespace();
-		OutKey = NamespaceKeyEntry->GetKey();
-		return true;
-	}
-
-	return false;
-}
-
 uint16 FTextLocalizationManager::GetLocalRevisionForDisplayString(const FTextDisplayStringRef& InDisplayString)
 {
 	FScopeLock ScopeLock( &SynchronizationObject );
@@ -876,65 +839,17 @@ bool FTextLocalizationManager::AddDisplayString(const FTextDisplayStringRef& Dis
 
 	const FTextId TextId(Namespace, Key);
 
-	// Try to find existing entries.
-	const FTextId* ReverseLiveTableEntry = NamespaceKeyLookupTable.Find(DisplayString);
+	// Try to find existing entry.
 	FDisplayStringEntry* ExistingDisplayStringEntry = DisplayStringLookupTable.Find(TextId);
 
-	// If there are any existing entries, they may cause a conflict, unless they're exactly the same as what we would be adding.
-	if ( (ExistingDisplayStringEntry && ExistingDisplayStringEntry->DisplayString != DisplayString) || // Namespace and key mustn't be associated with a different display string.
-		(ReverseLiveTableEntry && *ReverseLiveTableEntry != TextId) ) // Display string mustn't be associated with a different namespace and key.
+	// If there are any existing entry, they may cause a conflict, unless they're exactly the same as what we would be adding.
+	if (ExistingDisplayStringEntry && ExistingDisplayStringEntry->DisplayString != DisplayString) // Namespace and key mustn't be associated with a different display string.
 	{
 		return false;
 	}
 
-	// Add the necessary associations in both directions.
+	// Add the necessary association.
 	DisplayStringLookupTable.Emplace(TextId, FDisplayStringEntry(false, FTextKey(), FTextLocalizationResource::HashString(*DisplayString), DisplayString));
-	NamespaceKeyLookupTable.Emplace(DisplayString, TextId);
-
-	return true;
-}
-
-bool FTextLocalizationManager::UpdateDisplayString(const FTextDisplayStringRef& DisplayString, const FString& Value, const FTextKey& Namespace, const FTextKey& Key)
-{
-	TRACE_CPUPROFILER_EVENT_SCOPE(FTextLocalizationManager::UpdateDisplayString);
-	LLM_SCOPE(ELLMTag::Localization);
-
-	FScopeLock ScopeLock( &SynchronizationObject );
-
-	// Get entry from reverse live table. Contains current namespace and key values.
-	FTextId& ReverseLiveTableEntry = NamespaceKeyLookupTable[DisplayString];
-
-	const FTextId TextId(Namespace, Key);
-
-	// Copy old live table entry over as new live table entry and destroy old live table entry if the namespace or key has changed.
-	if (ReverseLiveTableEntry != TextId)
-	{
-		FDisplayStringEntry* NewDisplayStringEntry = DisplayStringLookupTable.Find(TextId);
-		if (NewDisplayStringEntry)
-		{
-			// Can not update, that namespace and key combination is already in use by another string.
-			return false;
-		}
-		else
-		{
-			// Get old namespace keys table and old live table entry under old key.
-			FDisplayStringEntry* OldDisplayStringEntry = DisplayStringLookupTable.Find(ReverseLiveTableEntry);
-
-			// Copy old live table entry to new key in the new namespace key table.
-			check(OldDisplayStringEntry);
-			DisplayStringLookupTable.Emplace(TextId, *OldDisplayStringEntry);
-
-			// Remove old live table entry and old key in the old namespace key table.
-			DisplayStringLookupTable.Remove(ReverseLiveTableEntry);
-		}
-	}
-
-	// Update display string value.
-	*DisplayString = Value;
-	DirtyLocalRevisionForDisplayString(DisplayString);
-
-	// Update entry from reverse live table.
-	ReverseLiveTableEntry = TextId;
 
 	return true;
 }
@@ -1223,7 +1138,6 @@ void FTextLocalizationManager::UpdateFromNative(FTextLocalizationResource&& Text
 		FScopeLock ScopeLock(&SynchronizationObject);
 
 		DisplayStringLookupTable.Reserve(TextLocalizationResource.Entries.Num());
-		NamespaceKeyLookupTable.Reserve(TextLocalizationResource.Entries.Num());
 
 		// Add/update entries
 		// Note: This code doesn't handle "leet-ification" itself as it is resetting everything to a known "good" state ("leet-ification" happens later on the "good" native text)
@@ -1264,7 +1178,6 @@ void FTextLocalizationManager::UpdateFromNative(FTextLocalizationResource&& Text
 				);
 
 				DisplayStringLookupTable.Emplace(TextId, NewLiveEntry);
-				NamespaceKeyLookupTable.Emplace(NewLiveEntry.DisplayString, TextId);
 			}
 		}
 
@@ -1339,7 +1252,6 @@ void FTextLocalizationManager::UpdateFromLocalizations(FTextLocalizationResource
 		FScopeLock ScopeLock(&SynchronizationObject);
 
 		DisplayStringLookupTable.Reserve(TextLocalizationResource.Entries.Num());
-		NamespaceKeyLookupTable.Reserve(TextLocalizationResource.Entries.Num());
 
 		// Add/update entries
 		for (auto& EntryPair : TextLocalizationResource.Entries)
@@ -1388,7 +1300,6 @@ void FTextLocalizationManager::UpdateFromLocalizations(FTextLocalizationResource
 				);
 
 				DisplayStringLookupTable.Emplace(TextId, NewLiveEntry);
-				NamespaceKeyLookupTable.Emplace(NewLiveEntry.DisplayString, TextId);
 			}
 		}
 

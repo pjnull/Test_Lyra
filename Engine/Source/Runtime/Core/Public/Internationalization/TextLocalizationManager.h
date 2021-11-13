@@ -81,9 +81,6 @@ private:
 	/** Manages the currently loaded or registered text localizations. */
 	typedef TMap<FTextId, FDisplayStringEntry> FDisplayStringLookupTable;
 
-	/** Manages the identity associated with a display string, for use in looking up namespace and key from a display string. */
-	typedef TMap<FTextDisplayStringRef, FTextId> FNamespaceKeyLookupTable;
-
 private:
 	ETextLocalizationManagerInitializedFlags InitializedFlags = ETextLocalizationManagerInitializedFlags::None;
 	
@@ -99,7 +96,6 @@ private:
 
 	FCriticalSection SynchronizationObject;
 	FDisplayStringLookupTable DisplayStringLookupTable;
-	FNamespaceKeyLookupTable NamespaceKeyLookupTable;
 	TMap<FTextDisplayStringRef, uint16> LocalTextRevisions;
 	uint16 TextRevisionCounter;
 
@@ -169,15 +165,12 @@ public:
 	/** If an entry exists for the specified namespace and key, returns true and provides the localization resource identifier from which it was loaded. Otherwise, returns false. */
 	bool GetLocResID(const FTextKey& Namespace, const FTextKey& Key, FString& OutLocResId);
 #endif
-	/**	Finds the namespace and key associated with the specified display string.
-	 *	Returns true if found and sets the out parameters. Otherwise, returns false.
-	 */
-	bool FindNamespaceAndKeyFromDisplayString(const FTextDisplayStringRef& InDisplayString, FString& OutNamespace, FString& OutKey);
 
-	/**	Finds the namespace and key associated with the specified display string.
-	 *	Returns true if found and sets the out parameters. Otherwise, returns false.
-	 */
-	bool FindNamespaceAndKeyFromDisplayString(const FTextDisplayStringRef& InDisplayString, FTextKey& OutNamespace, FTextKey& OutKey);
+	UE_DEPRECATED(5.0, "FindNamespaceAndKeyFromDisplayString no longer functions! Use FTextInspector::GetTextId instead.")
+	bool FindNamespaceAndKeyFromDisplayString(const FTextDisplayStringRef& InDisplayString, FString& OutNamespace, FString& OutKey) const { return false; }
+
+	UE_DEPRECATED(5.0, "FindNamespaceAndKeyFromDisplayString no longer functions! Use FTextInspector::GetTextId instead.")
+	bool FindNamespaceAndKeyFromDisplayString(const FTextDisplayStringRef& InDisplayString, FTextKey& OutNamespace, FTextKey& OutKey) const { return false; }
 	
 	/**
 	 * Attempts to find a local revision history for the given display string.
@@ -191,12 +184,6 @@ public:
 	 *	Returns false if the display string was already associated with another namespace and key or the namespace and key are already in use by another display string.
 	 */
 	bool AddDisplayString(const FTextDisplayStringRef& DisplayString, const FTextKey& Namespace, const FTextKey& Key);
-
-	/**
-	 * Updates the underlying value of a display string and associates it with a specified namespace and key, then returns true.
-	 * If the namespace and key are already in use by another display string, no changes occur and false is returned.
-	 */
-	bool UpdateDisplayString(const FTextDisplayStringRef& DisplayString, const FString& Value, const FTextKey& Namespace, const FTextKey& Key);
 
 	/** Updates display string entries and adds new display string entries based on localizations found in a specified localization resource. */
 	void UpdateFromLocalizationResource(const FString& LocalizationResourceFilePath);
