@@ -17,6 +17,7 @@
 #include "LocalVertexFactory.h"
 #include "ResourcePool.h"
 #include "Matrix3x4.h"
+#include "SkeletalMeshTypes.h"
 
 template <class T> class TConsoleVariableData;
 
