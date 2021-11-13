@@ -77,11 +77,13 @@ int UBakeMeshAttributeTool::SelectColorTextureToBake(const TArray<UTexture*>& Te
 void UBakeMeshAttributeTool::UpdateMultiTextureMaterialIDs(
 	UToolTarget* Target,
 	TArray<TObjectPtr<UTexture2D>>& AllSourceTextures,
-	TMap<int32, TObjectPtr<UTexture2D>>& MaterialIDs)
+	TArray<TObjectPtr<UTexture2D>>& MaterialIDTextures)
 {
 	ProcessComponentTextures(UE::ToolTarget::GetTargetComponent(Target),
-		[&AllSourceTextures, &MaterialIDs](const int MaterialID, const TArray<UTexture*>& Textures)
+		[&AllSourceTextures, &MaterialIDTextures](const int NumMaterials, const int MaterialID, const TArray<UTexture*>& Textures)
 	{
+		MaterialIDTextures.SetNumZeroed(NumMaterials);
+			
 		for (UTexture* Tex : Textures)
 		{
 			UTexture2D* Tex2D = Cast<UTexture2D>(Tex);
@@ -101,7 +103,7 @@ void UBakeMeshAttributeTool::UpdateMultiTextureMaterialIDs(
 				Tex2D = Cast<UTexture2D>(Textures[SelectedTextureIndex]);	
 			}
 		}
-		MaterialIDs.Add(MaterialID, Tex2D);
+		MaterialIDTextures[MaterialID] = Tex2D;
 	});
 }
 

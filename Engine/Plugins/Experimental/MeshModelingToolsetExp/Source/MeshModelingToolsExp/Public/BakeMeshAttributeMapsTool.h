@@ -173,7 +173,7 @@ protected:
 	FTexture2DImageSettings CachedTexture2DImageSettings;
 	EBakeOpState UpdateResult_Texture2DImage();
 
-	TMap<int32, TSharedPtr<UE::Geometry::TImageBuilder<FVector4f>, ESPMode::ThreadSafe>> CachedMultiTextures;
+	TArray<TSharedPtr<UE::Geometry::TImageBuilder<FVector4f>, ESPMode::ThreadSafe>> CachedMultiTextures;
 	EBakeOpState UpdateResult_MultiTexture();
 };
 

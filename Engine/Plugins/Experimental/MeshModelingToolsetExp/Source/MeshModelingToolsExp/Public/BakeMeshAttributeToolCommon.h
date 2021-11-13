@@ -237,15 +237,17 @@ class MESHMODELINGTOOLSEXP_API UBakedMultiTexture2DImageProperties : public UInt
 public:
 
 	/** For each material ID, the source texture that will be resampled in that material's region*/
-	UPROPERTY(EditAnywhere, Category = MultiTexture, meta = (DisplayName = "Material IDs", TransientToolProperty))
-	TMap<int32, TObjectPtr<UTexture2D>> MaterialIDSourceTextureMap;
+	UPROPERTY(EditAnywhere, EditFixedSize, Category = MultiTexture, meta = (DisplayName = "Material IDs",
+		TransientToolProperty, EditFixedOrder))
+	TArray<TObjectPtr<UTexture2D>> MaterialIDSourceTextures;
 
 	/** UV channel to use for the source mesh textures */
 	UPROPERTY(EditAnywhere, Category = MultiTexture, meta = (DisplayName = "Source Texture UV Channel"))
 	int32 UVLayer = 0;
 
 	/** The set of all source textures from all input materials */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = MultiTexture, meta = (DisplayName = "Source Textures", TransientToolProperty))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = MultiTexture, meta = (DisplayName = "Source Textures",
+		TransientToolProperty))
 	TArray<TObjectPtr<UTexture2D>> AllSourceTextures;
 
 };

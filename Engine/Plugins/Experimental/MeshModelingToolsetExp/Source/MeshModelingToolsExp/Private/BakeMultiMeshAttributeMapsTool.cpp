@@ -460,7 +460,7 @@ void UBakeMultiMeshAttributeMapsTool::Setup()
 		UStaticMesh* DetailStaticMesh = DetailStaticMeshTarget ? DetailStaticMeshTarget->GetStaticMesh() : nullptr;
 		const UPrimitiveComponent* Component = UE::ToolTarget::GetTargetComponent(Targets[Idx]);
 		UTexture2D* DetailColorTexture = nullptr;
-		ProcessComponentTextures(Component, [&DetailColorTexture](const int MaterialID, const TArray<UTexture*>& Textures)
+		ProcessComponentTextures(Component, [&DetailColorTexture](const int NumMaterials, const int MaterialID, const TArray<UTexture*>& Textures)
 		{
 			// TODO: Support multiple materialIDs per detail mesh
 			if (MaterialID == 0)

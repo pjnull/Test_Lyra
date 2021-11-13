@@ -39,7 +39,7 @@ enum class EBakeMapType
 	Position               = 1 << 7,
 	/* Material IDs as unique colors */
 	MaterialID             = 1 << 8 UMETA(DisplayName = "Material ID"),
-	/* Transfer all textures in a given material */
+	/* Transfer a texture per material ID */
 	MultiTexture           = 1 << 9,
 	/* Interpolated vertex colors */
 	VertexColor            = 1 << 10,
@@ -121,7 +121,7 @@ protected:
 	/**
 	 * Iterate through a primitive component's textures by material ID.
 	 * @param Component the component to query
-	 * @param ProcessFunc enumeration function with signature: void(int MaterialID, const TArray<UTexture*>& Textures)
+	 * @param ProcessFunc enumeration function with signature: void(int NumMaterials, int MaterialID, const TArray<UTexture*>& Textures)
 	 */
 	template <typename ProcessFn>
 	static void ProcessComponentTextures(const UPrimitiveComponent* Component, ProcessFn&& ProcessFunc);
@@ -130,12 +130,12 @@ protected:
 	 * Find all source textures and material IDs for a given target.
 	 * @param Target the tool target to inspect
 	 * @param AllSourceTextures the output array of all textures associated with the target.
-	 * @param MaterialIDs the output map of material IDs and best guess textures for those IDs on the target.
+	 * @param MaterialIDTextures the output array of material IDs and best guess textures for those IDs on the target.
 	 */
 	static void UpdateMultiTextureMaterialIDs(
 		UToolTarget* Target,
 		TArray<TObjectPtr<UTexture2D>>& AllSourceTextures,
-		TMap<int32, TObjectPtr<UTexture2D>>& MaterialIDs);
+		TArray<TObjectPtr<UTexture2D>>& MaterialIDTextures);
 };
 
 
@@ -149,8 +149,9 @@ void UBakeMeshAttributeTool::ProcessComponentTextures(const UPrimitiveComponent*
 
 	TArray<UMaterialInterface*> Materials;
 	Component->GetUsedMaterials(Materials);
-	
-	for (int32 MaterialID = 0; MaterialID < Materials.Num(); ++MaterialID)	// TODO: This won't match MaterialIDs on the FDynamicMesh3 in general, will it?
+
+	const int32 NumMaterials = Materials.Num();
+	for (int32 MaterialID = 0; MaterialID < NumMaterials; ++MaterialID)	// TODO: This won't match MaterialIDs on the FDynamicMesh3 in general, will it?
 	{
 		UMaterialInterface* MaterialInterface = Materials[MaterialID];
 		TArray<UTexture*> Textures;
@@ -158,7 +159,7 @@ void UBakeMeshAttributeTool::ProcessComponentTextures(const UPrimitiveComponent*
 		{
 			MaterialInterface->GetUsedTextures(Textures, EMaterialQualityLevel::High, true, ERHIFeatureLevel::SM5, true);
 		}
-		ProcessFunc(MaterialID, Textures);
+		ProcessFunc(NumMaterials, MaterialID, Textures);
 	}
 }
 

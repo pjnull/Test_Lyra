@@ -89,7 +89,7 @@ public:
 	using ImagePtr = TSharedPtr<UE::Geometry::TImageBuilder<FVector4f>, ESPMode::ThreadSafe>;
 	const FDynamicMeshUVOverlay* UVOverlay = nullptr;
 	ImagePtr TextureImage;
-	TMap<int32, ImagePtr> MaterialToTextureImageMap;
+	TArray<ImagePtr> MaterialIDTextures;
 
 	// Begin TGenericDataOperator interface
 	virtual void CalculateResult(FProgressCancel* Progress) override
@@ -223,7 +223,7 @@ public:
 			{
 				TSharedPtr<FMeshMultiResampleImageEvaluator, ESPMode::ThreadSafe> TextureEval = MakeShared<FMeshMultiResampleImageEvaluator, ESPMode::ThreadSafe>();
 				TextureEval->DetailUVLayer = TextureSettings.UVLayer;
-				TextureEval->MultiTextures = MaterialToTextureImageMap;
+				TextureEval->MultiTextures = MaterialIDTextures;
 				Baker->ColorEvaluator = TextureEval;
 				break;
 			}
@@ -358,9 +358,9 @@ void UBakeMeshAttributeVertexTool::Setup()
 	MultiTextureSettings->RestoreProperties(this);
 	AddToolPropertySource(MultiTextureSettings);
 	SetToolPropertySourceEnabled(MultiTextureSettings, false);
-	auto SetDirtyCallback = [this](decltype(MultiTextureSettings->MaterialIDSourceTextureMap)) { OpState |= EBakeOpState::Evaluate; };
-	auto NotEqualsCallback = [](const decltype(MultiTextureSettings->MaterialIDSourceTextureMap)& A, const decltype(MultiTextureSettings->MaterialIDSourceTextureMap)& B) -> bool { return !(A.OrderIndependentCompareEqual(B)); };
-	MultiTextureSettings->WatchProperty(MultiTextureSettings->MaterialIDSourceTextureMap, SetDirtyCallback, NotEqualsCallback);
+	auto SetDirtyCallback = [this](decltype(MultiTextureSettings->MaterialIDSourceTextures)) { OpState |= EBakeOpState::Evaluate; };
+	auto NotEqualsCallback = [](const decltype(MultiTextureSettings->MaterialIDSourceTextures)& A, const decltype(MultiTextureSettings->MaterialIDSourceTextures)& B) -> bool { return A != B; };
+	MultiTextureSettings->WatchProperty(MultiTextureSettings->MaterialIDSourceTextures, SetDirtyCallback, NotEqualsCallback);
 	MultiTextureSettings->WatchProperty(MultiTextureSettings->UVLayer, [this](float) { OpState |= EBakeOpState::Evaluate; });
 
 	UpdateOnModeChange();
@@ -458,7 +458,7 @@ TUniquePtr<UE::Geometry::TGenericDataOperator<FMeshVertexBaker>> UBakeMeshAttrib
 
 	// Texture2DImage & MultiTexture settings
 	Op->TextureImage = CachedTextureImage;
-	Op->MaterialToTextureImageMap = CachedMultiTextures;
+	Op->MaterialIDTextures = CachedMultiTextures;
 	Op->UVOverlay = DetailMesh->Attributes()->GetUVLayer(CachedTexture2DImageSettings.UVLayer);
 	return Op;
 }
@@ -510,7 +510,7 @@ void UBakeMeshAttributeVertexTool::UpdateOnModeChange()
 				SetToolPropertySourceEnabled(TextureSettings, true);
 				break;
 			case EBakeMapType::MultiTexture:
-				UpdateMultiTextureMaterialIDs(Targets[bIsBakeToSelf ? 0 : 1], MultiTextureSettings->AllSourceTextures, MultiTextureSettings->MaterialIDSourceTextureMap);
+				UpdateMultiTextureMaterialIDs(Targets[bIsBakeToSelf ? 0 : 1], MultiTextureSettings->AllSourceTextures, MultiTextureSettings->MaterialIDSourceTextures);
 				SetToolPropertySourceEnabled(MultiTextureSettings, true);
 				break;
 			default:
@@ -885,35 +885,26 @@ EBakeOpState UBakeMeshAttributeVertexTool::UpdateResult_MultiTexture()
 		return EBakeOpState::Invalid;
 	}
 
-	for (auto& InputTexture : MultiTextureSettings->MaterialIDSourceTextureMap)
-	{
-		if (InputTexture.Value == nullptr)
-		{
-			GetToolManager()->DisplayMessage(LOCTEXT("InvalidTextureWarning", "The Source Texture is not valid"), EToolMessageLevel::UserWarning);
-			return EBakeOpState::Invalid;
-		}
-	}
-
 	CachedMultiTextures.Reset();
 
-	for (auto& InputTexture : MultiTextureSettings->MaterialIDSourceTextureMap)
+	const int NumMaterialIDs = MultiTextureSettings->MaterialIDSourceTextures.Num();
+	CachedMultiTextures.Reset();
+	CachedMultiTextures.SetNum(NumMaterialIDs);
+	int NumValidTextures = 0;
+	for ( int MaterialID = 0; MaterialID < NumMaterialIDs; ++MaterialID)
 	{
-		UTexture2D* Texture = InputTexture.Value;
-		if (!ensure(Texture != nullptr))
+		if (UTexture2D* Texture = MultiTextureSettings->MaterialIDSourceTextures[MaterialID])
 		{
-			GetToolManager()->DisplayMessage(LOCTEXT("InvalidTextureWarning", "The Source Texture is not valid"), EToolMessageLevel::UserWarning);
-			return EBakeOpState::Invalid;
-		}
-
-		int32 MaterialID = InputTexture.Key;
-		CachedMultiTextures.Add(MaterialID, MakeShared<UE::Geometry::TImageBuilder<FVector4f>, ESPMode::ThreadSafe>());
-		if (!UE::AssetUtils::ReadTexture(Texture, *CachedMultiTextures[MaterialID], bPreferPlatformData))
-		{
-			GetToolManager()->DisplayMessage(LOCTEXT("CannotReadTextureWarning", "Cannot read from the source texture"), EToolMessageLevel::UserWarning);
-			return EBakeOpState::Invalid;
+			CachedMultiTextures[MaterialID] = MakeShared<TImageBuilder<FVector4f>, ESPMode::ThreadSafe>();
+			if (!UE::AssetUtils::ReadTexture(Texture, *CachedMultiTextures[MaterialID], bPreferPlatformData))
+			{
+				GetToolManager()->DisplayMessage(LOCTEXT("CannotReadTextureWarning", "Cannot read from the source texture"), EToolMessageLevel::UserWarning);
+				return EBakeOpState::Invalid;
+			}
+			++NumValidTextures;
 		}
 	}
-	if (CachedMultiTextures.Num() == 0)
+	if (NumValidTextures == 0)
 	{
 		GetToolManager()->DisplayMessage(LOCTEXT("InvalidTextureWarning", "The Source Texture is not valid"), EToolMessageLevel::UserWarning);
 		return EBakeOpState::Invalid;
