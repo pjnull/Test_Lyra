@@ -2,6 +2,7 @@
 
 #include "BakeMeshAttributeTool.h"
 #include "InteractiveToolManager.h"
+#include "ModelingToolTargetUtil.h"
 
 using namespace UE::Geometry;
 
@@ -71,6 +72,37 @@ int UBakeMeshAttributeTool::SelectColorTextureToBake(const TArray<UTexture*>& Te
 	}
 
 	return MaxIndex;
+}
+
+void UBakeMeshAttributeTool::UpdateMultiTextureMaterialIDs(
+	UToolTarget* Target,
+	TArray<TObjectPtr<UTexture2D>>& AllSourceTextures,
+	TMap<int32, TObjectPtr<UTexture2D>>& MaterialIDs)
+{
+	ProcessComponentTextures(UE::ToolTarget::GetTargetComponent(Target),
+		[&AllSourceTextures, &MaterialIDs](const int MaterialID, const TArray<UTexture*>& Textures)
+	{
+		for (UTexture* Tex : Textures)
+		{
+			UTexture2D* Tex2D = Cast<UTexture2D>(Tex);
+			if (Tex2D)
+			{
+				AllSourceTextures.Add(Tex2D);
+			}
+		}
+
+		UTexture2D* Tex2D = nullptr;
+		constexpr bool bGuessAtTextures = true;
+		if constexpr (bGuessAtTextures)
+		{
+			const int SelectedTextureIndex = SelectColorTextureToBake(Textures);
+			if (SelectedTextureIndex >= 0)
+			{
+				Tex2D = Cast<UTexture2D>(Textures[SelectedTextureIndex]);	
+			}
+		}
+		MaterialIDs.Add(MaterialID, Tex2D);
+	});
 }
 
 #undef LOCTEXT_NAMESPACE

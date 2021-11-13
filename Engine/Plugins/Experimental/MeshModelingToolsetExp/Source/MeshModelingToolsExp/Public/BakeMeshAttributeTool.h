@@ -13,6 +13,64 @@
 #include "BakeMeshAttributeTool.generated.h"
 
 /**
+ * Bake map enums
+ */
+
+UENUM(meta = (Bitflags, UseEnumValuesAsMaskValuesInEditor = "true"))
+enum class EBakeMapType
+{
+	None                   = 0,
+
+	/* Normals in tangent space */
+	TangentSpaceNormal     = 1 << 0,
+	/* Ambient occlusion sampled across the hemisphere */
+	AmbientOcclusion       = 1 << 1,
+	/* Normals skewed towards the least occluded direction */
+	BentNormal             = 1 << 2,
+	/* Local curvature of the mesh surface */
+	Curvature              = 1 << 3,
+	/* Transfer a given texture */
+	Texture                = 1 << 4,
+	/* Interpolated normals in object space */
+	ObjectSpaceNormal      = 1 << 5 UMETA(DisplayName = "Normal"),
+	/* Geometric face normals in object space */
+	FaceNormal             = 1 << 6,
+	/* Positions in object space */
+	Position               = 1 << 7,
+	/* Material IDs as unique colors */
+	MaterialID             = 1 << 8 UMETA(DisplayName = "Material ID"),
+	/* Transfer all textures in a given material */
+	MultiTexture           = 1 << 9,
+	/* Interpolated vertex colors */
+	VertexColor            = 1 << 10,
+
+	Occlusion              = (AmbientOcclusion | BentNormal) UMETA(Hidden),
+	All                    = 0x7FF UMETA(Hidden)
+};
+ENUM_CLASS_FLAGS(EBakeMapType);
+
+
+// Only include the Occlusion bitmask rather than its components
+// (AmbientOcclusion | BentNormal). Since the Occlusion evaluator can
+// evaluate both types in a single pass, only iterating over the Occlusion
+// bitmask gives direct access to both types without the need to
+// externally track if we've handled the Occlusion evaluator in a prior
+// iteration loop.
+static constexpr EBakeMapType ALL_BAKE_MAP_TYPES[] =
+{
+	EBakeMapType::TangentSpaceNormal,
+	EBakeMapType::Occlusion, // (AmbientOcclusion | BentNormal)
+	EBakeMapType::Curvature,
+	EBakeMapType::Texture,
+	EBakeMapType::ObjectSpaceNormal,
+	EBakeMapType::FaceNormal,
+	EBakeMapType::Position,
+	EBakeMapType::MaterialID,
+	EBakeMapType::MultiTexture,
+	EBakeMapType::VertexColor
+};
+
+/**
  * Base Mesh Bake tool
  */
 UCLASS()
@@ -67,6 +125,17 @@ protected:
 	 */
 	template <typename ProcessFn>
 	static void ProcessComponentTextures(const UPrimitiveComponent* Component, ProcessFn&& ProcessFunc);
+
+	/**
+	 * Find all source textures and material IDs for a given target.
+	 * @param Target the tool target to inspect
+	 * @param AllSourceTextures the output array of all textures associated with the target.
+	 * @param MaterialIDs the output map of material IDs and best guess textures for those IDs on the target.
+	 */
+	static void UpdateMultiTextureMaterialIDs(
+		UToolTarget* Target,
+		TArray<TObjectPtr<UTexture2D>>& AllSourceTextures,
+		TMap<int32, TObjectPtr<UTexture2D>>& MaterialIDs);
 };
 
 
@@ -84,13 +153,11 @@ void UBakeMeshAttributeTool::ProcessComponentTextures(const UPrimitiveComponent*
 	for (int32 MaterialID = 0; MaterialID < Materials.Num(); ++MaterialID)	// TODO: This won't match MaterialIDs on the FDynamicMesh3 in general, will it?
 	{
 		UMaterialInterface* MaterialInterface = Materials[MaterialID];
-		if (MaterialInterface == nullptr)
-		{
-			continue;
-		}
-
 		TArray<UTexture*> Textures;
-		MaterialInterface->GetUsedTextures(Textures, EMaterialQualityLevel::High, true, ERHIFeatureLevel::SM5, true);
+		if (MaterialInterface)
+		{
+			MaterialInterface->GetUsedTextures(Textures, EMaterialQualityLevel::High, true, ERHIFeatureLevel::SM5, true);
+		}
 		ProcessFunc(MaterialID, Textures);
 	}
 }
