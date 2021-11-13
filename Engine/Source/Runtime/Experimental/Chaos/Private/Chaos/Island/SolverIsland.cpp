@@ -79,6 +79,14 @@ void FPBDIslandSolver::ReserveConstraints(const int32 NumConstraints)
 	IslandConstraints.Reserve(NumConstraints);
 }
 
+void FPBDIslandSolver::ResetIndices()
+{
+	for(FConstraintHandleHolder& ConstraintHandle : IslandConstraints)
+	{
+		ConstraintHandle->SetConstraintGraphIndex(INDEX_NONE);
+	}
+}
+
 void FPBDIslandSolver::ClearConstraints()
 {
 	IslandConstraints.Reset();
