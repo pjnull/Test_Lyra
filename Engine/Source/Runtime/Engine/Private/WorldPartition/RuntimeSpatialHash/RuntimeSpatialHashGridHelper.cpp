@@ -196,32 +196,25 @@ FSquare2DGridHelper GetPartitionedActors(const UWorldPartition* WorldPartition, 
 		case EActorGridPlacement::Bounds:
 		{
 			// Find grid level cell that encompasses the actor cluster and put actors in it.
+			const FBox2D ClusterBounds(FVector2D(ClusterInstance->Bounds.Min), FVector2D(ClusterInstance->Bounds.Max));
+			const FVector2D ClusterSize = ClusterBounds.GetSize();
+			const float MinRequiredCellExtent = FMath::Max(ClusterSize.X, ClusterSize.Y);
+			const int32 FirstPotentialGridLevel = FMath::Max(FMath::CeilToFloat(FMath::Log2(MinRequiredCellExtent / (float)PartitionedActors.CellSize)), 0);
+
 			bool bFoundCell = false;
-			for (FSquare2DGridHelper::FGridLevel& GridLevel : PartitionedActors.Levels)
+			for (int32 GridLevelIndex = FirstPotentialGridLevel; GridLevelIndex < PartitionedActors.Levels.Num(); GridLevelIndex++)
 			{
-				const FBox2D ActorBounds(FVector2D(ClusterInstance->Bounds.Min), FVector2D(ClusterInstance->Bounds.Max));
-				const float ActorBoundsArea = ActorBounds.GetArea();
+				FSquare2DGridHelper::FGridLevel& GridLevel = PartitionedActors.Levels[GridLevelIndex];
 
-				GridLevel.ForEachIntersectingCellsBreakable(ClusterInstance->Bounds, [&GridLevel, ActorCluster, ClusterInstance, &ActorBounds, &ActorBoundsArea, &bFoundCell](const FIntVector2& Coords)
+				if (GridLevel.GetNumIntersectingCells(ClusterInstance->Bounds) == 1)
 				{
-					FBox2D CellBounds;
-					GridLevel.GetCellBounds(Coords, CellBounds);
-
-					const FBox2D Intersection(FVector2D::Max(CellBounds.Min, ActorBounds.Min), FVector2D::Min(CellBounds.Max, ActorBounds.Max));
-					const float CoveredArea = Intersection.GetArea() / ActorBoundsArea;
-
-					if (CoveredArea > 0.66f)
+					GridLevel.ForEachIntersectingCells(ClusterInstance->Bounds, [&GridLevel, ActorCluster, ClusterInstance, &bFoundCell](const FIntVector2& Coords)
 					{
-						GridLevel.GetCell(Coords).AddActors(ActorCluster->Actors, ClusterInstance->ContainerInstance, ClusterInstance->DataLayers);
+						check(!bFoundCell);
+						GridLevel.GetCell(Coords).AddActors(ActorCluster->Actors, ClusterInstance->ContainerInstance, ClusterInstance->DataLayers);						
 						bFoundCell = true;
-						return false;
-					}
+					});
 
-					return true;
-				});
-
-				if (bFoundCell)
-				{
 					break;
 				}
 			}
