@@ -70,6 +70,7 @@ public:
 
 private:
 	void Initialize(FSubsystemCollectionBase& Collection) override;
+	void Deinitialize() override;
 	void AddSearchDirectory(FStringView SearchDir);
 	void OnSaveCompleted(TSharedPtr<FEditorConfig> Config);
 	void OnEditorConfigDirtied(const FEditorConfig& Config);

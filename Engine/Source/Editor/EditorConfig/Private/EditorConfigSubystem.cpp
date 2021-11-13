@@ -19,6 +19,22 @@ void UEditorConfigSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	AddSearchDirectory(FPaths::Combine(FPlatformProcess::UserSettingsDir(), *FApp::GetEpicProductIdentifier(), TEXT("Editor"))); // AppData
 }
 
+void UEditorConfigSubsystem::Deinitialize()
+{
+	SaveLock.WriteLock();
+	ON_SCOPE_EXIT{ SaveLock.WriteUnlock(); };
+
+	// Synchronously save all Pending Saves on exit
+	for (FPendingSave& Save : PendingSaves)
+	{
+		const FString* FilePath = LoadedConfigs.FindKey(Save.Config);
+		check(FilePath != nullptr);
+
+		Save.Config->SaveToFile(*FilePath);
+		Save.Config->OnSaved();
+	}
+}
+
 void UEditorConfigSubsystem::Tick(float DeltaTime)
 {
 	SaveLock.WriteLock();
