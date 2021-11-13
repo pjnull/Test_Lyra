@@ -82,9 +82,6 @@ class FWorldPartitionStreamingGenerator
 		// Gather actor descriptor views for this container
 		CreateActorDescViewMap(InContainer, ActorDescViewMap, InContainerID);		
 
-		// Maintain containers hierarchy
-		ContainersHierarchy.Add(InContainerID, InParentContainerID);
-
 		// Parse actor descriptors
 		for (auto It = ActorDescViewMap.CreateIterator(); It; ++It)
 		{
@@ -130,14 +127,27 @@ class FWorldPartitionStreamingGenerator
 		ContainerDescriptor.Transform = InTransform;
 		ContainerDescriptor.ClusterMode = InClusterMode;
 		ContainerDescriptor.ActorDescViewMap = MoveTemp(ActorDescViewMap);
-		ContainerDescriptor.DataLayers = InDataLayers;		
+		ContainerDescriptor.DataLayers = InDataLayers;
+
+		// Maintain containers hierarchy, bottom up
+		if (InContainerID != InParentContainerID)
+		{
+			ContainersHierarchy.Add(InContainerID, InParentContainerID);
+		}
 	}
 
+	/** 
+	 * Creates the actor descriptor views for the specified container.
+	 */
 	void CreateActorDescriptorViews(const UActorDescContainer* InContainer)
 	{
 		CreateActorDescriptorViewsRecursive(InContainer, FTransform::Identity, TSet<FName>(), FActorContainerID(), FActorContainerID(), EContainerClusterMode::Partitioned);
 	}
 
+	/** 
+	 * Perform various validations on actor descriptor views, and adjust them based on different requirements. This needs to happen before updating containers bounds because
+	 * Some actor descriptor views might change grid placement, etc.
+	 */
 	void ValidateActorDescriptorViews()
 	{
 		for (auto It = ContainerDescriptorsMap.CreateIterator(); It; ++It)
@@ -167,8 +177,12 @@ class FWorldPartitionStreamingGenerator
 		}
 	}
 
+	/** 
+	 * Update the actor descriptor containers to adjust their bounds from actor descriptor views.
+	 */
 	void UpdateContainerDescriptors()
 	{
+		// Update containers bounds
 		for (auto ContainerIt = ContainerDescriptorsMap.CreateIterator(); ContainerIt; ++ContainerIt)
 		{
 			const FActorContainerID& ContainerID = ContainerIt.Key();
@@ -178,33 +192,20 @@ class FWorldPartitionStreamingGenerator
 			{
 				const FWorldPartitionActorDescView& ActorDescView = ActorDescIt.Value();
 
-				const FActorContainerID* CurrentContainerID = ActorDescViewsContainersMap.Find(ActorDescView.GetGuid());
-				FContainerDescriptor* CurrentContainerDescriptor = &ContainerDescriptor;
-
-				FBox ActorDescBounds(ForceInit);
 				switch (ActorDescView.GetGridPlacement())
 				{
-					case EActorGridPlacement::Location: ActorDescBounds += ContainerDescriptor.Transform.TransformPosition(ActorDescView.GetOrigin()); break;
-					case EActorGridPlacement::Bounds: ActorDescBounds += ActorDescView.GetBounds().TransformBy(ContainerDescriptor.Transform); break;
-				}
-
-				for(;;)
-				{
-					switch (ActorDescView.GetGridPlacement())
-					{
-						case EActorGridPlacement::Location: CurrentContainerDescriptor->Bounds += ActorDescBounds; break;
-						case EActorGridPlacement::Bounds: CurrentContainerDescriptor->Bounds += ActorDescBounds; break;
-					}
-
-					if (!CurrentContainerID || CurrentContainerID->IsMainContainer())
-					{
-						break;
-					}
-
-					CurrentContainerID = &ContainersHierarchy.FindChecked(*CurrentContainerID);
-					CurrentContainerDescriptor = &ContainerDescriptorsMap.FindChecked(*CurrentContainerID);
+					case EActorGridPlacement::Location: ContainerDescriptor.Bounds += ContainerDescriptor.Transform.TransformPosition(ActorDescView.GetOrigin()); break;
+					case EActorGridPlacement::Bounds: ContainerDescriptor.Bounds += ActorDescView.GetBounds().TransformBy(ContainerDescriptor.Transform); break;
 				}
 			}
+		}
+
+		// Update parent containers bounds, this relies on the fact that ContainersHierarchy is built bottom up
+		for (auto ContainerPairIt = ContainersHierarchy.CreateIterator(); ContainerPairIt; ++ContainerPairIt)
+		{
+			const FContainerDescriptor& CurrentContainerID = ContainerDescriptorsMap.FindChecked(ContainerPairIt.Key());
+			FContainerDescriptor& ParentContainerID = ContainerDescriptorsMap.FindChecked(ContainerPairIt.Value());
+			ParentContainerID.Bounds += CurrentContainerID.Bounds;
 		}
 	}
 
