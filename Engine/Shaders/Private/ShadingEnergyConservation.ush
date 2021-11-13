@@ -86,7 +86,11 @@ float2 ClothEnergyLookup(float Roughness, float NoV)
 float DiffuseEnergyLookup(float Roughness, float NoV)
 {
 #if USE_ENERGY_CONSERVATION == 1
-	return View.ShadingEnergyDiffuseTexture.SampleLevel(View.ShadingEnergySampler, float2(NoV, Roughness), 0);
+	//return View.ShadingEnergyDiffuseTexture.SampleLevel(View.ShadingEnergySampler, float2(NoV, Roughness), 0);
+	// For now we do not apply Chan diffuse energy preservation on diffuse ambiant.
+	// This is because Chan is built for F=0.04 and unfortunately this causes ambient to darken a grazing angles.
+	// STRATA_TODO Apply the inverse of Fresnel with F=0.04 on Chan when building the table.
+	return 1.0f;
 #elif USE_ENERGY_CONSERVATION == 2
 	// TODO
 	return 1.f;
