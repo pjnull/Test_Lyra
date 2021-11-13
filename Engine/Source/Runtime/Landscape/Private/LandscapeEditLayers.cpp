@@ -2095,7 +2095,7 @@ void ALandscapeProxy::ValidateProxyLayersWeightmapUsage() const
 							if (Allocation.IsAllocated())
 							{
 								UTexture2D* WeightmapTexture = LayerData->WeightmapData.Textures[Allocation.WeightmapTextureIndex];
-								if (ULandscapeWeightmapUsage* Usage = LayerData->WeightmapData.TextureUsages.IsValidIndex(Allocation.WeightmapTextureIndex) ? LayerData->WeightmapData.TextureUsages[Allocation.WeightmapTextureIndex] : nullptr)
+								if (ULandscapeWeightmapUsage* Usage = LayerData->WeightmapData.TextureUsages.IsValidIndex(Allocation.WeightmapTextureIndex) ? LayerData->WeightmapData.TextureUsages[Allocation.WeightmapTextureIndex].Get() : nullptr)
 								{
 									ValidateWeightmapAllocationAndUsage(WeightmapTexture, Allocation, Usage);
 								}
