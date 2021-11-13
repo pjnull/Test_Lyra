@@ -21,6 +21,10 @@ public class ConsoleVariablesEditor : ModuleRules
 		PrivateDependencyModuleNames.AddRange(
 			new string[]
 			{
+				"Concert",
+				"ConcertSyncClient",
+				"ConcertSyncCore",
+				"ConcertTransport",
 				"AssetRegistry",
 				"AssetTools",
 				"CoreUObject",

@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "MultiUser/ConsoleVariableSync.h"
 #include "ConsoleVariablesEditorModule.h"
 #include "Widgets/SWidget.h"
 
@@ -50,4 +51,6 @@ private:
 	TWeakObjectPtr<UConsoleVariablesAsset> ReferenceAssetOnDisk;
 
 	TSharedPtr<FConsoleVariablesEditorList> EditorList;
+
+	UE::ConsoleVariables::MultiUser::Private::FManager MultiUserManager;
 };

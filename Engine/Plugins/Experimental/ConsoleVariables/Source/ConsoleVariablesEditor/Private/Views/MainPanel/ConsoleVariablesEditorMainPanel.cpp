@@ -2,6 +2,7 @@
 
 #include "Views/MainPanel/ConsoleVariablesEditorMainPanel.h"
 
+#include "ConcertMessages.h"
 #include "ConsoleVariablesAsset.h"
 #include "ConsoleVariablesEditorLog.h"
 #include "ConsoleVariablesEditorCommandInfo.h"
@@ -11,9 +12,30 @@
 #include "FileHelpers.h"
 #include "Framework/Application/SlateApplication.h"
 
+
 FConsoleVariablesEditorMainPanel::FConsoleVariablesEditorMainPanel()
 {
 	EditorList = MakeShared<FConsoleVariablesEditorList>();
+
+	MultiUserManager.OnConnectionChange().AddLambda([] (EConcertConnectionStatus Status)
+		{
+			switch(Status) {
+			case EConcertConnectionStatus::Connected:
+				UE_LOG(LogConsoleVariablesEditor, Display, TEXT("Multi-user has connected to a session."));
+				break;
+			case EConcertConnectionStatus::Disconnected:
+				UE_LOG(LogConsoleVariablesEditor, Display, TEXT("Multi-user has disconnect from session."));
+				break;
+			default:
+				break;
+			};
+
+		});
+
+	MultiUserManager.OnRemoteCVarChange().AddLambda([] (FString InName, FString InValue)
+		{
+			UE_LOG(LogConsoleVariablesEditor, Display, TEXT("Remote set console variable %s = %s"), *InName, *InValue);
+		});
 }
 
 TSharedRef<SWidget> FConsoleVariablesEditorMainPanel::GetOrCreateWidget()
