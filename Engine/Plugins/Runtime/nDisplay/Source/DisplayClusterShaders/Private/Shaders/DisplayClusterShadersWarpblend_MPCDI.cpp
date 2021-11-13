@@ -197,12 +197,12 @@ private:
 
 	FIntRect GetViewportRect() const
 	{
-		const int32 vpPosX  = WarpBlendParameters.Dest.Rect.Min.X;
-		const int32 vpPosY  = WarpBlendParameters.Dest.Rect.Min.Y;
-		const int32 vpSizeX = WarpBlendParameters.Dest.Rect.Width();
-		const int32 vpSizeY = WarpBlendParameters.Dest.Rect.Height();
+		const int32 PosX  = WarpBlendParameters.Dest.Rect.Min.X;
+		const int32 PosY  = WarpBlendParameters.Dest.Rect.Min.Y;
+		const int32 SizeX = WarpBlendParameters.Dest.Rect.Width();
+		const int32 SizeY = WarpBlendParameters.Dest.Rect.Height();
 
-		return FIntRect(FIntPoint(vpPosX, vpPosY), FIntPoint(vpPosX + vpSizeX, vpPosY + vpSizeY));
+		return FIntRect(FIntPoint(PosX, PosY), FIntPoint(PosX + SizeX, PosY + SizeY));
 	}
 
 	EMpcdiShaderType GetPixelShaderType()

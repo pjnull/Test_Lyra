@@ -88,14 +88,14 @@ bool FDisplayClusterWarpBlendLoader_WarpMap::Load(FLoadedWarpMapData& OutWarpMap
 	};
 
 
-	for (int32 y = 0; y < OutWarpMapData.Height; ++y)
+	for (int32 WarpMapY = 0; WarpMapY < OutWarpMapData.Height; ++WarpMapY)
 	{
-		for (int32 x = 0; x < OutWarpMapData.Width; ++x)
+		for (int32 WarpMapX = 0; WarpMapX < OutWarpMapData.Width; ++WarpMapX)
 		{
-			mpcdi::NODE& node = (*SourceWarpMap)(x, y);
+			mpcdi::NODE& node = (*SourceWarpMap)(WarpMapX, WarpMapY);
 			FVector t(node.r, node.g, bIsProfile2D ? 0.f : node.b);
 
-			FVector4f& OutPts = OutWarpMapData.GetWarpDataPointRef(x, y);
+			FVector4f& OutPts = OutWarpMapData.GetWarpDataPointRef(WarpMapX, WarpMapY);
 
 			if ((!(FMath::Abs(t.X) < kEpsilon && FMath::Abs(t.Y) < kEpsilon && FMath::Abs(t.Z) < kEpsilon))
 				&& (!FMath::IsNaN(t.X) && !FMath::IsNaN(t.Y) && !FMath::IsNaN(t.Z)))
@@ -146,11 +146,11 @@ bool FDisplayClusterWarpBlendLoader_WarpMap::Load(FLoadedWarpMapData& OutWarpMap
 	TArray<FVector> WarpMeshPoints;
 	WarpMeshPoints.Reserve(OutWarpMapData.Width * OutWarpMapData.Height);
 
-	for (int32 y = 0; y < OutWarpMapData.Height; ++y)
+	for (int32 WarpMapY = 0; WarpMapY < OutWarpMapData.Height; ++WarpMapY)
 	{
-		for (int32 x = 0; x < OutWarpMapData.Width; ++x)
+		for (int32 WarpMapX = 0; WarpMapX < OutWarpMapData.Width; ++WarpMapX)
 		{
-			mpcdi::NODE node = SourcePFM->operator()(x, y);
+			mpcdi::NODE node = SourcePFM->operator()(WarpMapX, WarpMapY);
 			FVector pts(node.r, node.g, node.b);
 			WarpMeshPoints.Add(pts);
 		}
