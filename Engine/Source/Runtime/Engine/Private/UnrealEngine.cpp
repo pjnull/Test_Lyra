@@ -10280,6 +10280,16 @@ bool UEngine::FErrorsAndWarningsCollector::Tick(float Seconds)
 
 		const FColor LineColor = Verbosity <= ELogVerbosity::Error ? FColor::Red : FColor::Yellow;
 		GEngine->AddOnScreenDebugMessage(-1, DisplayTime, LineColor, Msg);
+
+		// Prune the list so we get new errors instead of ones from minutes ago
+		const float MaxTimeToKeep = 30.f;
+		const int32 MaxNumToKeep = FMath::TruncToInt(MaxTimeToKeep / DisplayTime);
+
+		if (BufferedLines.Num() > MaxNumToKeep)
+		{
+			BufferedLines.RemoveAt(0, BufferedLines.Num() - MaxNumToKeep);
+		}
+
 	}
 
 	return true;
