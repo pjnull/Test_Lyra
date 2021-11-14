@@ -118,9 +118,12 @@ public:
 	 */
 	virtual FCompressedBuffer PullData(const FPayloadId& Id) override;
 
-	/** Access profiling info relating to payload activity. Stats will only be collected if ENABLE_COOK_STATS is enabled.*/
-	virtual FPayloadActivityInfo GetPayloadActivityInfo() const override;
+	/** Access profiling info relating to accumulated payload activity for all backends. Stats will only be collected if ENABLE_COOK_STATS is enabled.*/
+	virtual FPayloadActivityInfo GetAccumualtedPayloadActivityInfo() const override;
 
+	/** Access profiling info relating to payload activity per backend. Stats will only be collected if ENABLE_COOK_STATS is enabled.*/
+	virtual void GetPayloadActivityInfo( GetPayloadActivityInfoFuncRef ) const override;
+	
 private:
 	
 	void ApplySettingsFromConfigFiles(const FConfigFile& PlatformEngineIni);

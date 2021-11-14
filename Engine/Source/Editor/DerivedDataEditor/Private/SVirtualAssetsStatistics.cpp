@@ -63,11 +63,49 @@ TSharedRef<SWidget> SVirtualAssetsStatisticsDialog::GetGridPanel()
 
 	TSharedRef<SGridPanel> Panel = SNew(SGridPanel);
 
-	IVirtualizationSystem& System = IVirtualizationSystem::Get();
-
-	FPayloadActivityInfo AcitvityInfo = System.GetPayloadActivityInfo();
-	
 	int32 Row = 0;
+
+	Panel->AddSlot(2, Row)
+	[
+		SNew(STextBlock)
+		.Margin(FMargin(ColumnMargin, RowMargin, 0.0f, TitleMargin))
+		.ColorAndOpacity(TitleColor)
+		.Font(TitleFont)
+		.Justification(ETextJustify::Center)
+		.Text(LOCTEXT("Read", "Read"))
+	];
+
+	Panel->AddSlot(5, Row)
+	[
+		SNew(STextBlock)
+		.Margin(FMargin(ColumnMargin, RowMargin, 0.0f, TitleMargin))
+		.ColorAndOpacity(TitleColor)
+		.Font(TitleFont)
+		.Justification(ETextJustify::Center)
+		.Text(LOCTEXT("Write", "Write"))
+	];
+
+	Panel->AddSlot(8, Row)
+	[
+		SNew(STextBlock)
+		.Margin(FMargin(ColumnMargin, RowMargin, 0.0f, TitleMargin))
+		.ColorAndOpacity(TitleColor)
+		.Font(TitleFont)
+		.Justification(ETextJustify::Center)
+		.Text(LOCTEXT("Cache", "Cache"))
+	];
+
+	Row++;
+
+	Panel->AddSlot(0, Row)
+	[
+		SNew(STextBlock)
+		.Margin(FMargin(ColumnMargin, RowMargin, 0.0f, TitleMargin))
+		.ColorAndOpacity(TitleColor)
+		.Font(TitleFont)
+		.Justification(ETextJustify::Left)
+		.Text(LOCTEXT("Backend", "Backend"))
+	];
 
 	Panel->AddSlot(1, Row)
 	[
@@ -75,7 +113,7 @@ TSharedRef<SWidget> SVirtualAssetsStatisticsDialog::GetGridPanel()
 		.Margin(FMargin(ColumnMargin, RowMargin, 0.0f, TitleMargin))
 		.ColorAndOpacity(TitleColor)
 		.Font(TitleFont)
-		.Justification(ETextJustify::Left)
+		.Justification(ETextJustify::Center)
 		.Text(LOCTEXT("Count", "Count"))
 	];
 
@@ -85,8 +123,8 @@ TSharedRef<SWidget> SVirtualAssetsStatisticsDialog::GetGridPanel()
 		.Margin(FMargin(ColumnMargin, RowMargin, 0.0f, TitleMargin))
 		.ColorAndOpacity(TitleColor)
 		.Font(TitleFont)
-		.Justification(ETextJustify::Left)
-		.Text(LOCTEXT("Size", "Size"))
+		.Justification(ETextJustify::Center)
+		.Text(LOCTEXT("Time", "Time (Sec)"))
 	];
 
 	Panel->AddSlot(3, Row)
@@ -95,102 +133,161 @@ TSharedRef<SWidget> SVirtualAssetsStatisticsDialog::GetGridPanel()
 		.Margin(FMargin(ColumnMargin, RowMargin, 0.0f, TitleMargin))
 		.ColorAndOpacity(TitleColor)
 		.Font(TitleFont)
-		.Justification(ETextJustify::Left)
-		.Text(LOCTEXT("Time", "Time"))
+		.Justification(ETextJustify::Center)
+		.Text(LOCTEXT("Size", "Size (MB)"))
+	];
+
+	Panel->AddSlot(4, Row)
+	[
+		SNew(STextBlock)
+		.Margin(FMargin(ColumnMargin, RowMargin, 0.0f, TitleMargin))
+		.ColorAndOpacity(TitleColor)
+		.Font(TitleFont)
+		.Justification(ETextJustify::Center)
+		.Text(LOCTEXT("Count", "Count"))
+	];
+
+	Panel->AddSlot(5, Row)
+	[
+		SNew(STextBlock)
+		.Margin(FMargin(ColumnMargin, RowMargin, 0.0f, TitleMargin))
+		.ColorAndOpacity(TitleColor)
+		.Font(TitleFont)
+		.Justification(ETextJustify::Center)
+		.Text(LOCTEXT("Time", "Time (Sec)"))
+	];
+
+	Panel->AddSlot(6, Row)
+	[
+		SNew(STextBlock)
+		.Margin(FMargin(ColumnMargin, RowMargin, 0.0f, TitleMargin))
+		.ColorAndOpacity(TitleColor)
+		.Font(TitleFont)
+		.Justification(ETextJustify::Center)
+		.Text(LOCTEXT("Size", "Size (MB)"))
+	];
+
+	Panel->AddSlot(7, Row)
+	[
+		SNew(STextBlock)
+		.Margin(FMargin(ColumnMargin, RowMargin, 0.0f, TitleMargin))
+		.ColorAndOpacity(TitleColor)
+		.Font(TitleFont)
+		.Justification(ETextJustify::Center)
+		.Text(LOCTEXT("Count", "Count"))
+	];
+
+	Panel->AddSlot(8, Row)
+	[
+		SNew(STextBlock)
+		.Margin(FMargin(ColumnMargin, RowMargin, 0.0f, TitleMargin))
+		.ColorAndOpacity(TitleColor)
+		.Font(TitleFont)
+		.Justification(ETextJustify::Center)
+		.Text(LOCTEXT("Time", "Time (Sec)"))
+	];
+
+	Panel->AddSlot(9, Row)
+	[
+		SNew(STextBlock)
+		.Margin(FMargin(ColumnMargin, RowMargin, 0.0f, TitleMargin))
+		.ColorAndOpacity(TitleColor)
+		.Font(TitleFont)
+		.Justification(ETextJustify::Center)
+		.Text(LOCTEXT("Size", "Size (MB)"))
 	];
 
 	Row++;
 
-	Panel->AddSlot(0, Row)
-	[
-		SNew(STextBlock)
-		.Margin(FMargin(ColumnMargin, RowMargin))
-		.Text(LOCTEXT("Pull", "Pull"))
-	];
+	auto GetVirtualAssetsStats = [&](const FString& BackendName, const FString& ConfigName, const FPayloadActivityInfo& AcitvityInfo)
+	{
+		Panel->AddSlot(0, Row)
+		[
+			SNew(STextBlock)
+			.Margin(FMargin(ColumnMargin, RowMargin))
+			.Justification(ETextJustify::Left)
+			.Text(FText::FromString(ConfigName))
+		];
 
-	Panel->AddSlot(1, Row)
-	[
-		SNew(STextBlock)
-		.Margin(FMargin(ColumnMargin, RowMargin))
-		.Text_Lambda([AcitvityInfo] { return FText::FromString(FString::Printf(TEXT("%u"),AcitvityInfo.Pull.PayloadCount)); })
-	];
+		Panel->AddSlot(1, Row)
+		[
+			SNew(STextBlock)
+			.Margin(FMargin(ColumnMargin, RowMargin))
+			.Justification(ETextJustify::Center)
+			.Text_Lambda([AcitvityInfo] { return FText::FromString(FString::Printf(TEXT("%u"), AcitvityInfo.Pull.PayloadCount)); })
+		];
 
+		Panel->AddSlot(2, Row)
+		[
+			SNew(STextBlock)
+			.Margin(FMargin(ColumnMargin, RowMargin))
+			.Justification(ETextJustify::Center)
+			.Text_Lambda([AcitvityInfo, BytesToMegaBytes] { return FText::FromString(SingleDecimalFormat((double)AcitvityInfo.Pull.TotalBytes * BytesToMegaBytes)); })
+		];
 
-	Panel->AddSlot(2, Row)
-	[
-		SNew(STextBlock)
-		.Margin(FMargin(ColumnMargin, RowMargin))
-		.Text_Lambda([AcitvityInfo, BytesToMegaBytes] { return FText::FromString(SingleDecimalFormat((double)AcitvityInfo.Pull.TotalBytes*BytesToMegaBytes) + TEXT(" MB")); })
-	];
+		Panel->AddSlot(3, Row)
+		[
+			SNew(STextBlock)
+			.Margin(FMargin(ColumnMargin, RowMargin))
+			.Justification(ETextJustify::Center)
+			.Text_Lambda([AcitvityInfo] { return FText::FromString(SingleDecimalFormat((double)AcitvityInfo.Pull.CyclesSpent * FPlatformTime::GetSecondsPerCycle())); })
+		];
 
-	Panel->AddSlot(3, Row)
-	[
-		SNew(STextBlock)
-		.Margin(FMargin(ColumnMargin, RowMargin))
-		.Text_Lambda([AcitvityInfo] { return FText::FromString(SingleDecimalFormat((double)AcitvityInfo.Pull.CyclesSpent*FPlatformTime::GetSecondsPerCycle()) + TEXT(" s")); })
-	];
+		Panel->AddSlot(4, Row)
+		[
+			SNew(STextBlock)
+			.Margin(FMargin(ColumnMargin, RowMargin))
+			.Justification(ETextJustify::Center)
+			.Text_Lambda([AcitvityInfo] { return FText::FromString(FString::Printf(TEXT("%u"), AcitvityInfo.Push.PayloadCount)); })
+		];
 
-	Row++;
+		Panel->AddSlot(5, Row)
+		[
+			SNew(STextBlock)
+			.Margin(FMargin(ColumnMargin, RowMargin))
+			.Justification(ETextJustify::Center)
+			.Text_Lambda([AcitvityInfo, BytesToMegaBytes] { return FText::FromString(SingleDecimalFormat((double)AcitvityInfo.Push.TotalBytes * BytesToMegaBytes)); })
+		];
 
-	Panel->AddSlot(0, Row)
-	[
-		SNew(STextBlock)
-		.Margin(FMargin(ColumnMargin, RowMargin))
-		.Text(LOCTEXT("Push", "Push"))
-	];
+		Panel->AddSlot(6, Row)
+		[
+			SNew(STextBlock)
+			.Margin(FMargin(ColumnMargin, RowMargin))
+			.Justification(ETextJustify::Center)
+			.Text_Lambda([AcitvityInfo] { return FText::FromString(SingleDecimalFormat((double)AcitvityInfo.Push.CyclesSpent * FPlatformTime::GetSecondsPerCycle())); })
+		];
 
-	Panel->AddSlot(1, Row)
-	[
-		SNew(STextBlock)
-		.Margin(FMargin(ColumnMargin, RowMargin))
-		.Text_Lambda([AcitvityInfo] { return FText::FromString(FString::Printf(TEXT("%u"),AcitvityInfo.Push.PayloadCount)); })
-	];
+		Panel->AddSlot(7, Row)
+		[
+			SNew(STextBlock)
+			.Margin(FMargin(ColumnMargin, RowMargin))
+			.Justification(ETextJustify::Center)
+			.Text_Lambda([AcitvityInfo] { return FText::FromString(FString::Printf(TEXT("%u"), AcitvityInfo.Cache.PayloadCount)); })
+		];
 
-	Panel->AddSlot(2, Row)
-	[
-		SNew(STextBlock)
-		.Margin(FMargin(ColumnMargin, RowMargin))
-		.Text_Lambda([AcitvityInfo,BytesToMegaBytes] { return FText::FromString(SingleDecimalFormat((double)AcitvityInfo.Push.TotalBytes*BytesToMegaBytes) + TEXT(" MB")); })
-	];
+		Panel->AddSlot(8, Row)
+		[
+			SNew(STextBlock)
+			.Margin(FMargin(ColumnMargin, RowMargin))
+			.Justification(ETextJustify::Center)
+			.Text_Lambda([AcitvityInfo, BytesToMegaBytes] { return FText::FromString(SingleDecimalFormat((double)AcitvityInfo.Cache.TotalBytes * BytesToMegaBytes)); })
+		];
 
-	Panel->AddSlot(3, Row)
-	[
-		SNew(STextBlock)
-		.Margin(FMargin(ColumnMargin, RowMargin))
-		.Text_Lambda([AcitvityInfo] { return FText::FromString(SingleDecimalFormat((double)AcitvityInfo.Push.CyclesSpent * FPlatformTime::GetSecondsPerCycle()) + TEXT(" s")); })
-	];
+		Panel->AddSlot(9, Row)
+		[
+			SNew(STextBlock)
+			.Margin(FMargin(ColumnMargin, RowMargin))
+			.Justification(ETextJustify::Center)
+			.Text_Lambda([AcitvityInfo] { return FText::FromString(SingleDecimalFormat((double)AcitvityInfo.Cache.CyclesSpent * FPlatformTime::GetSecondsPerCycle())); })
+		];
 
-	Row++;
+		Row++;
+	};
 
-	Panel->AddSlot(0, Row)
-	[
-		SNew(STextBlock)
-		.Margin(FMargin(ColumnMargin, RowMargin))
-		.Text(LOCTEXT("Cache", "Cache"))
-	];
+	IVirtualizationSystem& System = IVirtualizationSystem::Get();
 
-	Panel->AddSlot(1, Row)
-	[
-		SNew(STextBlock)
-		.Margin(FMargin(ColumnMargin, RowMargin))
-		.Text_Lambda([AcitvityInfo] { return FText::FromString(FString::Printf(TEXT("%u"),AcitvityInfo.Cache.PayloadCount)); })
-	];
+	System.GetPayloadActivityInfo(GetVirtualAssetsStats);
 
-	Panel->AddSlot(2, Row)
-	[
-		SNew(STextBlock)
-		.Margin(FMargin(ColumnMargin, RowMargin))
-		.Text_Lambda([AcitvityInfo, BytesToMegaBytes] { return FText::FromString(SingleDecimalFormat((double)AcitvityInfo.Cache.TotalBytes * BytesToMegaBytes) + TEXT(" MB")); })
-	];
-
-	Panel->AddSlot(3, Row)
-	[
-		SNew(STextBlock)
-		.Margin(FMargin(ColumnMargin, RowMargin))
-		.Text_Lambda([AcitvityInfo] { return FText::FromString(SingleDecimalFormat((double)AcitvityInfo.Cache.CyclesSpent * FPlatformTime::GetSecondsPerCycle()) + TEXT(" s")); })
-	];
-
-	
 	return Panel;
 }
 
