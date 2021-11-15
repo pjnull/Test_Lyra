@@ -735,8 +735,7 @@ void FZenDerivedDataBackend::Get(
 		}
 	});
 	
-	check(TotalCompleted == Keys.Num());
-	
+	UE_CLOG(TotalCompleted != Keys.Num(), LogDerivedDataCache, Warning, TEXT("Only '%d/%d' cache record request(s) completed"), TotalCompleted, Keys.Num());
 	TRACE_COUNTER_SUBTRACT(ZenDDC_CacheRecordRequestCount, int64(Keys.Num()));
 }
 
@@ -869,8 +868,7 @@ void FZenDerivedDataBackend::GetChunks(
 		}
 	});
 
-	check(TotalCompleted == SortedChunks.Num());
-	
+	UE_CLOG(TotalCompleted != SortedChunks.Num(), LogDerivedDataCache, Warning, TEXT("Only '%d/%d' cache chunk request(s) completed"), TotalCompleted, SortedChunks.Num());
 	TRACE_COUNTER_SUBTRACT(ZenDDC_ChunkRequestCount, int64(Chunks.Num()));
 }
 
