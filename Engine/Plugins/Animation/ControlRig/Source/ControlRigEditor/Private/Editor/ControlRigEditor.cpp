@@ -2788,18 +2788,14 @@ void FControlRigEditor::HandleControlRigExecutedEvent(UControlRig* InControlRig,
 						const FRigElementKey Key = WrapperObject->GetContent<FRigBaseElement>().GetKey();
 
 						FRigBaseElement* Element = Hierarchy->Find(Key);
-						if(FRigTransformElement* TransformElement = Cast<FRigTransformElement>(Element))
-						{
-							// compute all transforms
-							Hierarchy->GetTransform(TransformElement, ERigTransformType::CurrentGlobal);
-							Hierarchy->GetTransform(TransformElement, ERigTransformType::CurrentLocal);
-							Hierarchy->GetTransform(TransformElement, ERigTransformType::InitialGlobal);
-							Hierarchy->GetTransform(TransformElement, ERigTransformType::InitialLocal);
-						}
 
 						if(FRigControlElement* ControlElement = Cast<FRigControlElement>(Element))
 						{
 							// compute all transforms
+							Hierarchy->GetTransform(ControlElement, ERigTransformType::CurrentGlobal);
+							Hierarchy->GetTransform(ControlElement, ERigTransformType::CurrentLocal);
+							Hierarchy->GetTransform(ControlElement, ERigTransformType::InitialGlobal);
+							Hierarchy->GetTransform(ControlElement, ERigTransformType::InitialLocal);
 							Hierarchy->GetControlOffsetTransform(ControlElement, ERigTransformType::CurrentGlobal);
 							Hierarchy->GetControlOffsetTransform(ControlElement, ERigTransformType::CurrentLocal);
 							Hierarchy->GetControlOffsetTransform(ControlElement, ERigTransformType::InitialGlobal);
@@ -2808,9 +2804,23 @@ void FControlRigEditor::HandleControlRigExecutedEvent(UControlRig* InControlRig,
 							Hierarchy->GetControlShapeTransform(ControlElement, ERigTransformType::CurrentLocal);
 							Hierarchy->GetControlShapeTransform(ControlElement, ERigTransformType::InitialGlobal);
 							Hierarchy->GetControlShapeTransform(ControlElement, ERigTransformType::InitialLocal);
-						}
 
-						WrapperObject->SetContent<FRigBaseElement>(*Element);
+							WrapperObject->SetContent<FRigControlElement>(*ControlElement);
+						}
+						else if(FRigTransformElement* TransformElement = Cast<FRigTransformElement>(Element))
+						{
+							// compute all transforms
+							Hierarchy->GetTransform(TransformElement, ERigTransformType::CurrentGlobal);
+							Hierarchy->GetTransform(TransformElement, ERigTransformType::CurrentLocal);
+							Hierarchy->GetTransform(TransformElement, ERigTransformType::InitialGlobal);
+							Hierarchy->GetTransform(TransformElement, ERigTransformType::InitialLocal);
+
+							WrapperObject->SetContent<FRigTransformElement>(*TransformElement);
+						}
+						else
+						{
+							WrapperObject->SetContent<FRigBaseElement>(*Element);
+						}
 					}
 				}
 			}
