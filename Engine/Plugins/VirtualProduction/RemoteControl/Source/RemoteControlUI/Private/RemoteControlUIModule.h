@@ -94,6 +94,10 @@ private:
 	void RegisterDetailRowExtension();
 	void UnregisterDetailRowExtension();
 
+	//~ Common Events
+	void RegisterEvents();
+	void UnregisterEvents();
+
 	/** Handle creating the property row extensions.  */
 	void HandleCreatePropertyRowExtension(const FOnGenerateGlobalRowExtensionArgs& InArgs, TArray<FPropertyRowExtensionButton>& OutExtensions);
 
@@ -111,6 +115,12 @@ private:
 
 	/** Returns whether a property is exposed, unexposed or unexposable. */
 	EPropertyExposeStatus GetPropertyExposeStatus(const TSharedPtr<IPropertyHandle>& Handle) const;
+
+	/** Handle getting the icon displayed in the property row extension. */
+	FSlateIcon OnGetOverrideMaterialsIcon(TSharedPtr<IPropertyHandle> Handle) const;
+
+	/** Handle getting the override materials button visibility. */
+	bool IsStaticOrSkeletalMaterialProperty(TSharedPtr<IPropertyHandle> Handle) const;
 
 	/** Handle adding an option to get the object path in the actors' context menu. */
 	void AddGetPathOption(class FMenuBuilder& MenuBuilder, AActor* SelectedActor);
@@ -137,6 +147,12 @@ private:
 
 	/** Returns expose button text based on exposed state */
 	FText GetExposePropertyButtonText(TSharedPtr<IPropertyHandle> Handle) const;
+	
+	/** Attempts to replace the static or skeletal materials with their corressponding overrides. */
+	void TryOverridingMaterials(TSharedPtr<IPropertyHandle> ForThisProperty);
+
+	/** Attempts to refresh the details panel. */
+	void RefreshPanels();
 
 private:
 	/** The custom actions added to the actor context menu. */
@@ -150,6 +166,12 @@ private:
 
 	/** Holds a weak ptr to the active control panel. */
 	TWeakPtr<SRemoteControlPanel> WeakActivePanel;
+	
+	/** Holds a weak ptr to the owner tree node of the active details panel. */
+	TWeakPtr<IDetailTreeNode> WeakDetailsTreeNode;
+	
+	/** Holds a shared ptr to the global details panel. */
+	TSharedPtr<IDetailsView> SharedDetailsPanel;
 
 	/** Delegate called to gather extensions added externally to the panel. */
 	FOnGenerateExtensions ExtensionsGenerator;
