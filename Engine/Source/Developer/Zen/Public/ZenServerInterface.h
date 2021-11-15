@@ -51,6 +51,9 @@ struct FServiceSettings
 	UE_API void ReadFromURL(FStringView InstanceURL);
 
 	UE_API void WriteToJson(TJsonWriter<TCHAR, TPrettyJsonPrintPolicy<TCHAR>>& Writer) const;
+
+private:
+	bool TryApplyAutoLaunchOverride();
 };
 
 };

@@ -31,6 +31,8 @@
 #	include "Windows/HideWindowsPlatformTypes.h"
 #endif
 
+#define ALLOW_SETTINGS_OVERRIDE_FROM_COMMANDLINE			(UE_SERVER || !(UE_BUILD_SHIPPING))
+
 namespace UE::Zen
 {
 
@@ -151,18 +153,21 @@ FServiceSettings::ReadFromConfig()
 
 	if (bAutoLaunch)
 	{
-		// AutoLaunch settings
-		const TCHAR* AutoLaunchConfigSection = TEXT("Zen.AutoLaunch");
-		SettingsVariant.Emplace<FServiceAutoLaunchSettings>();
-		FServiceAutoLaunchSettings& AutoLaunchSettings = SettingsVariant.Get<FServiceAutoLaunchSettings>();
+		if (!TryApplyAutoLaunchOverride())
+		{
+			// AutoLaunch settings
+			const TCHAR* AutoLaunchConfigSection = TEXT("Zen.AutoLaunch");
+			SettingsVariant.Emplace<FServiceAutoLaunchSettings>();
+			FServiceAutoLaunchSettings& AutoLaunchSettings = SettingsVariant.Get<FServiceAutoLaunchSettings>();
 
-		DetermineDataPath(AutoLaunchConfigSection, AutoLaunchSettings.DataPath);
-		AutoLaunchSettings.DataPath = FPaths::ConvertRelativePathToFull(AutoLaunchSettings.DataPath);
-		GConfig->GetString(AutoLaunchConfigSection, TEXT("ExtraArgs"), AutoLaunchSettings.ExtraArgs, GEngineIni);
+			DetermineDataPath(AutoLaunchConfigSection, AutoLaunchSettings.DataPath);
+			AutoLaunchSettings.DataPath = FPaths::ConvertRelativePathToFull(AutoLaunchSettings.DataPath);
+			GConfig->GetString(AutoLaunchConfigSection, TEXT("ExtraArgs"), AutoLaunchSettings.ExtraArgs, GEngineIni);
 
-		ReadUInt16FromConfig(AutoLaunchConfigSection, TEXT("DesiredPort"), AutoLaunchSettings.DesiredPort, GEngineIni);
-		GConfig->GetBool(AutoLaunchConfigSection, TEXT("ShowConsole"), AutoLaunchSettings.bShowConsole, GEngineIni);
-		GConfig->GetBool(AutoLaunchConfigSection, TEXT("LimitProcessLifetime"), AutoLaunchSettings.bLimitProcessLifetime, GEngineIni);
+			ReadUInt16FromConfig(AutoLaunchConfigSection, TEXT("DesiredPort"), AutoLaunchSettings.DesiredPort, GEngineIni);
+			GConfig->GetBool(AutoLaunchConfigSection, TEXT("ShowConsole"), AutoLaunchSettings.bShowConsole, GEngineIni);
+			GConfig->GetBool(AutoLaunchConfigSection, TEXT("LimitProcessLifetime"), AutoLaunchSettings.bLimitProcessLifetime, GEngineIni);
+		}
 	}
 	else
 	{
@@ -183,23 +188,26 @@ FServiceSettings::ReadFromJson(FJsonObject& JsonObject)
 	{
 		if (bAutoLaunchValue->AsBool())
 		{
-			SettingsVariant.Emplace<FServiceAutoLaunchSettings>();
-			FServiceAutoLaunchSettings& AutoLaunchSettings = SettingsVariant.Get<FServiceAutoLaunchSettings>();
-
-			TSharedPtr<FJsonValue> AutoLaunchSettingsValue = JsonObject.Values.FindRef(TEXT("AutoLaunchSettings"));
-			if (AutoLaunchSettingsValue)
+			if (!TryApplyAutoLaunchOverride())
 			{
-				TSharedPtr<FJsonObject> AutoLaunchSettingsObject = AutoLaunchSettingsValue->AsObject();
-				AutoLaunchSettings.DataPath = AutoLaunchSettingsObject->Values.FindRef(TEXT("DataPath"))->AsString();
-				AutoLaunchSettings.ExtraArgs = AutoLaunchSettingsObject->Values.FindRef(TEXT("ExtraArgs"))->AsString();
-				AutoLaunchSettingsObject->Values.FindRef(TEXT("DesiredPort"))->TryGetNumber(AutoLaunchSettings.DesiredPort);
-				AutoLaunchSettingsObject->Values.FindRef(TEXT("bShowConsole"))->TryGetBool(AutoLaunchSettings.bShowConsole);
-				AutoLaunchSettingsObject->Values.FindRef(TEXT("bLimitProcessLifetime"))->TryGetBool(AutoLaunchSettings.bLimitProcessLifetime);
-				if (TSharedPtr<FJsonValue> TreatAsBuildMachineValue = AutoLaunchSettingsObject->Values.FindRef(TEXT("TreatAsBuildMachine")))
+				SettingsVariant.Emplace<FServiceAutoLaunchSettings>();
+				FServiceAutoLaunchSettings& AutoLaunchSettings = SettingsVariant.Get<FServiceAutoLaunchSettings>();
+
+				TSharedPtr<FJsonValue> AutoLaunchSettingsValue = JsonObject.Values.FindRef(TEXT("AutoLaunchSettings"));
+				if (AutoLaunchSettingsValue)
 				{
-					if (TreatAsBuildMachineValue->AsString() == FPlatformProcess::ComputerName())
+					TSharedPtr<FJsonObject> AutoLaunchSettingsObject = AutoLaunchSettingsValue->AsObject();
+					AutoLaunchSettings.DataPath = AutoLaunchSettingsObject->Values.FindRef(TEXT("DataPath"))->AsString();
+					AutoLaunchSettings.ExtraArgs = AutoLaunchSettingsObject->Values.FindRef(TEXT("ExtraArgs"))->AsString();
+					AutoLaunchSettingsObject->Values.FindRef(TEXT("DesiredPort"))->TryGetNumber(AutoLaunchSettings.DesiredPort);
+					AutoLaunchSettingsObject->Values.FindRef(TEXT("bShowConsole"))->TryGetBool(AutoLaunchSettings.bShowConsole);
+					AutoLaunchSettingsObject->Values.FindRef(TEXT("bLimitProcessLifetime"))->TryGetBool(AutoLaunchSettings.bLimitProcessLifetime);
+					if (TSharedPtr<FJsonValue> TreatAsBuildMachineValue = AutoLaunchSettingsObject->Values.FindRef(TEXT("TreatAsBuildMachine")))
 					{
-						AutoLaunchSettings.bLimitProcessLifetime = true;
+						if (TreatAsBuildMachineValue->AsString() == FPlatformProcess::ComputerName())
+						{
+							AutoLaunchSettings.bLimitProcessLifetime = true;
+						}
 					}
 				}
 			}
@@ -276,6 +284,21 @@ FServiceSettings::WriteToJson(TJsonWriter<TCHAR, TPrettyJsonPrintPolicy<TCHAR>>&
 	}
 }
 
+bool
+FServiceSettings::TryApplyAutoLaunchOverride()
+{
+#if ALLOW_SETTINGS_OVERRIDE_FROM_COMMANDLINE
+	if (FParse::Param(FCommandLine::Get(), TEXT("NoZenAutoLaunch")))
+	{
+		SettingsVariant.Emplace<FServiceConnectSettings>();
+		FServiceConnectSettings& ConnectExistingSettings = SettingsVariant.Get<FServiceConnectSettings>();
+		ConnectExistingSettings.HostName = TEXT("localhost");
+		ConnectExistingSettings.Port = 1337;
+		return true;
+	}
+#endif
+	return false;
+}
 
 #if UE_WITH_ZEN
 
