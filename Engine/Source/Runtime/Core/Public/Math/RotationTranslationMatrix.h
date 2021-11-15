@@ -7,8 +7,6 @@
 #include "Math/VectorRegister.h"
 #include "Math/Matrix.h"
 
-// LWC_TODO: FRotator -> TRotator<T>
-
 namespace UE {
 namespace Math {
 
