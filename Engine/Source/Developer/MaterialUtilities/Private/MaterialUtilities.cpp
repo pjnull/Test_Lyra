@@ -211,6 +211,12 @@ struct FExportMaterialCompiler : public FProxyMaterialCompiler
 		return MSM_MAX;
 	}
 
+	virtual FMaterialShadingModelField GetCompiledShadingModels() const override
+	{
+		// not used by Lightmass
+		return MSM_MAX;
+	}
+
 	virtual int32 WorldPosition(EWorldPositionIncludedOffsets WorldPositionIncludedOffsets) override
 	{
 #if WITH_EDITOR

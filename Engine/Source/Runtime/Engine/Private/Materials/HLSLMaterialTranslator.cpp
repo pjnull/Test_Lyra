@@ -791,15 +791,8 @@ bool FHLSLMaterialTranslator::Translate()
 			Chunk[MP_FrontMaterial]					= Material->CompilePropertyAndSetMaterialProperty(MP_FrontMaterial			,this);
 		}
 
-		// Get shading models from material.
-		FMaterialShadingModelField MaterialShadingModels = Material->GetShadingModels(); 
-
-		// If the material gets its shading model from material expressions and we have compiled one or more shading model expressions, 
-		// then use that shading model field instead. It's the most optimal set of shading models
-		if (Material->IsShadingModelFromMaterialExpression() && ShadingModelsFromCompilation.IsValid())
-		{
-			MaterialShadingModels = ShadingModelsFromCompilation;
-		}
+		// Get shading models from compilation (or material).
+		FMaterialShadingModelField MaterialShadingModels = GetCompiledShadingModels(); 
 		
 		ValidateShadingModelsForFeatureLevel(MaterialShadingModels);
 		
@@ -3444,6 +3437,20 @@ EShaderFrequency FHLSLMaterialTranslator::GetCurrentShaderFrequency() const
 FMaterialShadingModelField FHLSLMaterialTranslator::GetMaterialShadingModels() const
 {
 	check(Material);
+	return Material->GetShadingModels();
+}
+
+FMaterialShadingModelField FHLSLMaterialTranslator::GetCompiledShadingModels() const
+{
+	check(Material);
+
+	// If the material gets its shading model from material expressions and we have compiled one or more shading model expressions already, 
+	// then use that shading model field instead. It's the most optimal set of shading models
+	if (Material->IsShadingModelFromMaterialExpression() && ShadingModelsFromCompilation.IsValid())
+	{
+		return ShadingModelsFromCompilation;
+	}
+
 	return Material->GetShadingModels();
 }
 

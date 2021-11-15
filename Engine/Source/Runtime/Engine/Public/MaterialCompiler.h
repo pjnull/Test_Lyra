@@ -126,6 +126,12 @@ public:
 	virtual const ITargetPlatform* GetTargetPlatform() const = 0;
 
 	virtual FMaterialShadingModelField GetMaterialShadingModels() const = 0;
+	
+	/** Get the shading models that were encountered when compiling a material's Shading Model attribute graph.
+	 *	This will represent the actually used Shading Models for a particular material given its static switches, feature levels and material quality for example.  
+	 *	Will return all Shading Models in the material if this is called before that attribute has been compiled. 
+	 */
+	virtual FMaterialShadingModelField GetCompiledShadingModels() const = 0;
 
 	virtual EMaterialValueType GetParameterType(int32 Index) const = 0;
 
@@ -505,6 +511,7 @@ public:
 	// Simple pass through all other material operations unmodified.
 
 	virtual FMaterialShadingModelField GetMaterialShadingModels() const { return Compiler->GetMaterialShadingModels(); }
+	virtual FMaterialShadingModelField GetCompiledShadingModels() const { return Compiler->GetCompiledShadingModels(); }
 	virtual EMaterialValueType GetParameterType(int32 Index) const { return Compiler->GetParameterType(Index); }
 	virtual FMaterialUniformExpression* GetParameterUniformExpression(int32 Index) const { return Compiler->GetParameterUniformExpression(Index); }
 	virtual bool GetTextureForExpression(int32 Index, int32& OutTextureIndex, EMaterialSamplerType& OutSamplerType, TOptional<FName>& OutParameterName) const override { return Compiler->GetTextureForExpression(Index, OutTextureIndex, OutSamplerType, OutParameterName); }

@@ -663,6 +663,7 @@ protected:
 	virtual EShaderFrequency GetCurrentShaderFrequency() const override;
 
 	virtual FMaterialShadingModelField GetMaterialShadingModels() const override;
+	virtual FMaterialShadingModelField GetCompiledShadingModels() const override;
 
 	virtual int32 Error(const TCHAR* Text) override;
 
