@@ -703,6 +703,8 @@ void FPythonScriptPlugin::InitializePython()
 {
 	bInitialized = true;
 
+	const UPythonScriptPluginSettings* PythonPluginSettings = GetDefault<UPythonScriptPluginSettings>();
+
 	// Set-up the correct program name
 	{
 		FString ProgramName = FPlatformProcess::GetCurrentWorkingDirectory() / FPlatformProcess::ExecutableName(false);
@@ -749,9 +751,12 @@ void FPythonScriptPlugin::InitializePython()
 		}
 #endif	// PY_MAJOR_VERSION >= 3 && PY_MINOR_VERSION >= 7
 
-		Py_IgnoreEnvironmentFlag = 1; // 1 so Python doesn't inherit its environment variables into our embedded interpreter
+		// Check if the interpreter is should run in isolation mode.
+		int IsolatedInterpreterFlag = PythonPluginSettings->bIsolateInterpreterEnvironment ? 1 : 0;
+		Py_IgnoreEnvironmentFlag = IsolatedInterpreterFlag; // If not zero, ignore all PYTHON* environment variables, e.g. PYTHONPATH, PYTHONHOME, that might be set.
+
 #if PY_MAJOR_VERSION >= 3 && PY_MINOR_VERSION >= 4
-		Py_IsolatedFlag = 1; // 1 so Python doesn't add the user scripts and site-packages paths into our embedded interpreter
+		Py_IsolatedFlag = IsolatedInterpreterFlag; // If not zero, sys.path contains neither the script's directory nor the user's site-packages directory.
 		Py_SetStandardStreamEncoding("utf-8", nullptr);
 #endif	// PY_MAJOR_VERSION >= 3 && PY_MINOR_VERSION >= 4
 		Py_SetProgramName(PyProgramName.GetData());
@@ -840,7 +845,7 @@ void FPythonScriptPlugin::InitializePython()
 			RegisterModulePaths(RootFilesystemPath);
 		}
 
-		for (const FDirectoryPath& AdditionalPath : GetDefault<UPythonScriptPluginSettings>()->AdditionalPaths)
+		for (const FDirectoryPath& AdditionalPath : PythonPluginSettings->AdditionalPaths)
 		{
 			PyUtil::AddSystemPath(FPaths::ConvertRelativePathToFull(AdditionalPath.Path));
 		}
