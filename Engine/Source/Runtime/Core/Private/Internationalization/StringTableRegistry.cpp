@@ -139,7 +139,7 @@ bool FStringTableRegistry::FindTableIdAndKey(const FText& InText, FName& OutTabl
 	return FTextInspector::GetTableIdAndKey(InText, OutTableId, OutKey);
 }
 
-void FStringTableRegistry::LogMissingStringTableEntry(const FName InTableId, const FString& InKey)
+void FStringTableRegistry::LogMissingStringTableEntry(const FName InTableId, const FTextKey& InKey)
 {
 	FScopeLock LoggedMissingEntriesLock(&LoggedMissingEntriesCS);
 
@@ -154,7 +154,7 @@ void FStringTableRegistry::LogMissingStringTableEntry(const FName InTableId, con
 	FLocKeySet& LoggedMissingKeys = LoggedMissingEntries.FindOrAdd(InTableId);
 	LoggedMissingKeys.Add(InKey);
 
-	UE_LOG(LogStringTable, Warning, TEXT("Failed to find string table entry for '%s' '%s'. Did you forget to add a string table redirector?"), *InTableId.ToString(), *InKey);
+	UE_LOG(LogStringTable, Warning, TEXT("Failed to find string table entry for '%s' '%s'. Did you forget to add a string table redirector?"), *InTableId.ToString(), InKey.GetChars());
 }
 
 #if WITH_EDITOR

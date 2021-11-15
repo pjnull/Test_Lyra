@@ -639,7 +639,7 @@ void FTextLocalizationManager::RegisterPolyglotTextData(TArrayView<const FPolygl
 	}
 }
 
-FTextDisplayStringPtr FTextLocalizationManager::FindDisplayString(const FTextKey& Namespace, const FTextKey& Key, const FString* const SourceString) const
+FTextConstDisplayStringPtr FTextLocalizationManager::FindDisplayString(const FTextKey& Namespace, const FTextKey& Key, const FString* const SourceString) const
 {
 	FScopeLock ScopeLock( &SynchronizationObject );
 
@@ -655,7 +655,7 @@ FTextDisplayStringPtr FTextLocalizationManager::FindDisplayString(const FTextKey
 	return nullptr;
 }
 
-FTextDisplayStringRef FTextLocalizationManager::GetDisplayString(const FTextKey& Namespace, const FTextKey& Key, const FString* const SourceString)
+FTextConstDisplayStringRef FTextLocalizationManager::GetDisplayString(const FTextKey& Namespace, const FTextKey& Key, const FString* const SourceString)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FTextLocalizationManager::GetDisplayString);
 	LLM_SCOPE(ELLMTag::Localization);
@@ -824,10 +824,15 @@ bool FTextLocalizationManager::GetLocResID(const FTextKey& Namespace, const FTex
 
 uint16 FTextLocalizationManager::GetLocalRevisionForTextId(const FTextId& InTextId) const
 {
-	FScopeLock ScopeLock( &SynchronizationObject );
-
-	const uint16* FoundLocalRevision = LocalTextRevisions.Find(InTextId);
-	return (FoundLocalRevision) ? *FoundLocalRevision : 0;
+	if (!InTextId.IsEmpty())
+	{
+		FScopeLock ScopeLock(&SynchronizationObject);
+		if (const uint16* FoundLocalRevision = LocalTextRevisions.Find(InTextId))
+		{
+			return *FoundLocalRevision;
+		}
+	}
+	return 0;
 }
 
 bool FTextLocalizationManager::AddDisplayString(const FTextDisplayStringRef& DisplayString, const FTextKey& Namespace, const FTextKey& Key)

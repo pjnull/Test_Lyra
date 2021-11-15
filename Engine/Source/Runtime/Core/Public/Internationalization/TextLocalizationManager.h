@@ -22,9 +22,6 @@ class ILocalizedTextSource;
 class IPakFile;
 class FTextLocalizationResource;
 
-typedef TSharedRef<FString, ESPMode::ThreadSafe> FTextDisplayStringRef;
-typedef TSharedPtr<FString, ESPMode::ThreadSafe> FTextDisplayStringPtr;
-
 enum class ETextLocalizationManagerInitializedFlags : uint8
 {
 	None = 0,
@@ -151,7 +148,7 @@ public:
 
 	/**	Finds and returns the display string with the given namespace and key, if it exists.
 	 *	Additionally, if a source string is specified and the found localized display string was not localized from that source string, null will be returned. */
-	FTextDisplayStringPtr FindDisplayString(const FTextKey& Namespace, const FTextKey& Key, const FString* const SourceString = nullptr) const;
+	FTextConstDisplayStringPtr FindDisplayString(const FTextKey& Namespace, const FTextKey& Key, const FString* const SourceString = nullptr) const;
 
 	/**	Returns a display string with the given namespace and key.
 	 *	If no display string exists, it will be created using the source string or an empty string if no source string is provided.
@@ -159,7 +156,7 @@ public:
 	 *		... but it was not localized from the specified source string, the display string will be set to the specified source and returned.
 	 *		... and it was localized from the specified source string (or none was provided), the display string will be returned.
 	*/
-	FTextDisplayStringRef GetDisplayString(const FTextKey& Namespace, const FTextKey& Key, const FString* const SourceString);
+	FTextConstDisplayStringRef GetDisplayString(const FTextKey& Namespace, const FTextKey& Key, const FString* const SourceString);
 
 #if WITH_EDITORONLY_DATA
 	/** If an entry exists for the specified namespace and key, returns true and provides the localization resource identifier from which it was loaded. Otherwise, returns false. */
@@ -167,10 +164,10 @@ public:
 #endif
 
 	UE_DEPRECATED(5.0, "FindNamespaceAndKeyFromDisplayString no longer functions! Use FTextInspector::GetTextId instead.")
-	bool FindNamespaceAndKeyFromDisplayString(const FTextDisplayStringPtr& InDisplayString, FString& OutNamespace, FString& OutKey) const { return false; }
+	bool FindNamespaceAndKeyFromDisplayString(const FTextConstDisplayStringPtr& InDisplayString, FString& OutNamespace, FString& OutKey) const { return false; }
 
 	UE_DEPRECATED(5.0, "FindNamespaceAndKeyFromDisplayString no longer functions! Use FTextInspector::GetTextId instead.")
-	bool FindNamespaceAndKeyFromDisplayString(const FTextDisplayStringPtr& InDisplayString, FTextKey& OutNamespace, FTextKey& OutKey) const { return false; }
+	bool FindNamespaceAndKeyFromDisplayString(const FTextConstDisplayStringPtr& InDisplayString, FTextKey& OutNamespace, FTextKey& OutKey) const { return false; }
 	
 	/**
 	 * Attempts to find a local revision history for the given text ID.

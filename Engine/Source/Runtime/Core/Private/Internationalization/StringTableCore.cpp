@@ -15,7 +15,7 @@ IStringTableEngineBridge* IStringTableEngineBridge::InstancePtr = nullptr;
 namespace StringTableRedirects
 {
 	static TMap<FName, FName> TableIdRedirects;
-	static TMap<FName, TMap<FString, FString, FDefaultSetAllocator, FLocKeyMapFuncs<FString>>> TableKeyRedirects;
+	static TMap<FName, TMap<FTextKey, FTextKey>> TableKeyRedirects;
 }
 
 
@@ -23,10 +23,10 @@ FStringTableEntry::FStringTableEntry()
 {
 }
 
-FStringTableEntry::FStringTableEntry(FStringTableConstRef InOwnerTable, FString InSourceString, FTextDisplayStringPtr InDisplayString)
+FStringTableEntry::FStringTableEntry(FStringTableConstRef InOwnerTable, FString InSourceString, FTextId InDisplayStringId)
 	: OwnerTable(MoveTemp(InOwnerTable))
 	, SourceString(MoveTemp(InSourceString))
-	, DisplayString(MoveTemp(InDisplayString))
+	, DisplayStringId(MoveTemp(InDisplayStringId))
 {
 }
 
@@ -40,9 +40,9 @@ void FStringTableEntry::Disown()
 	OwnerTable.Reset();
 }
 
-FStringTableConstPtr FStringTableEntry::GetOwner() const
+bool FStringTableEntry::IsOwnedBy(const FStringTable& InStringTable) const
 {
-	return OwnerTable.Pin();
+	return OwnerTable.Pin().Get() == &InStringTable;
 }
 
 const FString& FStringTableEntry::GetSourceString() const
@@ -50,21 +50,20 @@ const FString& FStringTableEntry::GetSourceString() const
 	return SourceString;
 }
 
-FTextDisplayStringPtr FStringTableEntry::GetDisplayString() const
+FTextConstDisplayStringPtr FStringTableEntry::GetDisplayString() const
 {
-	return DisplayString;
+	return FTextLocalizationManager::Get().GetDisplayString(DisplayStringId.GetNamespace(), DisplayStringId.GetKey(), &SourceString);
+}
+
+FTextId FStringTableEntry::GetDisplayStringId() const
+{
+	return DisplayStringId;
 }
 
 const FString& FStringTableEntry::GetPlaceholderSourceString()
 {
 	static const FString MissingSourceString = TEXT("<MISSING STRING TABLE ENTRY>");
 	return MissingSourceString;
-}
-
-FTextDisplayStringRef FStringTableEntry::GetPlaceholderDisplayString()
-{
-	static const FTextDisplayStringRef MissingDisplayString = MakeShared<FString, ESPMode::ThreadSafe>(TEXT("<MISSING STRING TABLE ENTRY>"));
-	return MissingDisplayString;
 }
 
 
@@ -102,29 +101,29 @@ void FStringTable::IsLoaded(const bool bInIsLoaded)
 
 FString FStringTable::GetNamespace() const
 {
-	return TableNamespace;
+	return TableNamespace.GetChars();
 }
 
 void FStringTable::SetNamespace(const FString& InNamespace)
 {
 	FScopeLock KeyMappingLock(&KeyMappingCS);
 
-	if (!TableNamespace.Equals(InNamespace, ESearchCase::CaseSensitive))
+	if (FCString::Strcmp(TableNamespace.GetChars(), *InNamespace) != 0)
 	{
 		TableNamespace = InNamespace;
 
-		// Changing the namespace affects the display string pointers, so update those now
+		// Changing the namespace affects the display string IDs, so update those now
 		for (auto& KeyToEntryPair : KeysToEntries)
 		{
 			FStringTableEntryPtr OldEntry = KeyToEntryPair.Value;
 			OldEntry->Disown();
 
-			KeyToEntryPair.Value = FStringTableEntry::NewStringTableEntry(AsShared(), OldEntry->GetSourceString(), FTextLocalizationManager::Get().GetDisplayString(TableNamespace, KeyToEntryPair.Key, &OldEntry->GetSourceString()));
+			KeyToEntryPair.Value = FStringTableEntry::NewStringTableEntry(AsShared(), OldEntry->GetSourceString(), FTextId(TableNamespace, KeyToEntryPair.Key));
 		}
 	}
 }
 
-bool FStringTable::GetSourceString(const FString& InKey, FString& OutSourceString) const
+bool FStringTable::GetSourceString(const FTextKey& InKey, FString& OutSourceString) const
 {
 	FScopeLock KeyMappingLock(&KeyMappingCS);
 
@@ -137,7 +136,7 @@ bool FStringTable::GetSourceString(const FString& InKey, FString& OutSourceStrin
 	return false;
 }
 
-void FStringTable::SetSourceString(const FString& InKey, const FString& InSourceString)
+void FStringTable::SetSourceString(const FTextKey& InKey, const FString& InSourceString)
 {
 	checkf(!InKey.IsEmpty(), TEXT("String table key cannot be empty!"));
 
@@ -149,11 +148,11 @@ void FStringTable::SetSourceString(const FString& InKey, const FString& InSource
 		TableEntry->Disown();
 	}
 	
-	TableEntry = FStringTableEntry::NewStringTableEntry(AsShared(), InSourceString, FTextLocalizationManager::Get().GetDisplayString(TableNamespace, InKey, &InSourceString));
+	TableEntry = FStringTableEntry::NewStringTableEntry(AsShared(), InSourceString, FTextId(TableNamespace, InKey));
 	KeysToEntries.Emplace(InKey, TableEntry);
 }
 
-void FStringTable::RemoveSourceString(const FString& InKey)
+void FStringTable::RemoveSourceString(const FTextKey& InKey)
 {
 	FScopeLock KeyMappingLock(&KeyMappingCS);
 
@@ -167,6 +166,14 @@ void FStringTable::RemoveSourceString(const FString& InKey)
 }
 
 void FStringTable::EnumerateSourceStrings(const TFunctionRef<bool(const FString&, const FString&)>& InEnumerator) const
+{
+	EnumerateKeysAndSourceStrings([&InEnumerator](const FTextKey& InKey, const FString& InSourceString) -> bool
+	{
+		return InEnumerator(InKey.GetChars(), InSourceString);
+	});
+}
+
+void FStringTable::EnumerateKeysAndSourceStrings(const TFunctionRef<bool(const FTextKey&, const FString&)>& InEnumerator) const
 {
 	FScopeLock KeyMappingLock(&KeyMappingCS);
 
@@ -193,7 +200,7 @@ void FStringTable::ClearSourceStrings(const int32 InSlack)
 	ClearMetaData(InSlack);
 }
 
-FStringTableEntryConstPtr FStringTable::FindEntry(const FString& InKey) const
+FStringTableEntryConstPtr FStringTable::FindEntry(const FTextKey& InKey) const
 {
 	FScopeLock KeyMappingLock(&KeyMappingCS);
 	return KeysToEntries.FindRef(InKey);
@@ -201,26 +208,34 @@ FStringTableEntryConstPtr FStringTable::FindEntry(const FString& InKey) const
 
 bool FStringTable::FindKey(const FStringTableEntryConstRef& InEntry, FString& OutKey) const
 {
-	if (InEntry->GetOwner().Get() != this)
+	FTextKey TmpKey;
+	if (FindKey(InEntry, TmpKey))
 	{
-		// Not part of this string table
-		return false;
+		OutKey = TmpKey.GetChars();
+		return true;
 	}
+	return false;
+}
 
-	FScopeLock KeyMappingLock(&KeyMappingCS);
-
-	for (const auto& KeyToEntryPair : KeysToEntries)
+bool FStringTable::FindKey(const FStringTableEntryConstRef& InEntry, FTextKey& OutKey) const
+{
+	if (InEntry->IsOwnedBy(*this))
 	{
-		if (KeyToEntryPair.Value == InEntry)
+		FScopeLock KeyMappingLock(&KeyMappingCS);
+
+		for (const auto& KeyToEntryPair : KeysToEntries)
 		{
-			OutKey = KeyToEntryPair.Key;
-			return true;
+			if (KeyToEntryPair.Value == InEntry)
+			{
+				OutKey = KeyToEntryPair.Key;
+				return true;
+			}
 		}
 	}
 	return false;
 }
 
-FString FStringTable::GetMetaData(const FString& InKey, const FName InMetaDataId) const
+FString FStringTable::GetMetaData(const FTextKey& InKey, const FName InMetaDataId) const
 {
 	FScopeLock MetaDataLock(&KeysToMetaDataCS);
 
@@ -232,7 +247,7 @@ FString FStringTable::GetMetaData(const FString& InKey, const FName InMetaDataId
 	return FString();
 }
 
-void FStringTable::SetMetaData(const FString& InKey, const FName InMetaDataId, const FString& InMetaDataValue)
+void FStringTable::SetMetaData(const FTextKey& InKey, const FName InMetaDataId, const FString& InMetaDataValue)
 {
 	FScopeLock MetaDataLock(&KeysToMetaDataCS);
 
@@ -240,7 +255,7 @@ void FStringTable::SetMetaData(const FString& InKey, const FName InMetaDataId, c
 	MetaDataMap.Add(InMetaDataId, InMetaDataValue);
 }
 
-void FStringTable::RemoveMetaData(const FString& InKey, const FName InMetaDataId)
+void FStringTable::RemoveMetaData(const FTextKey& InKey, const FName InMetaDataId)
 {
 	FScopeLock MetaDataLock(&KeysToMetaDataCS);
 
@@ -255,7 +270,7 @@ void FStringTable::RemoveMetaData(const FString& InKey, const FName InMetaDataId
 	}
 }
 
-void FStringTable::EnumerateMetaData(const FString& InKey, const TFunctionRef<bool(FName, const FString&)>& InEnumerator) const
+void FStringTable::EnumerateMetaData(const FTextKey& InKey, const TFunctionRef<bool(FName, const FString&)>& InEnumerator) const
 {
 	FScopeLock MetaDataLock(&KeysToMetaDataCS);
 
@@ -272,7 +287,7 @@ void FStringTable::EnumerateMetaData(const FString& InKey, const TFunctionRef<bo
 	}
 }
 
-void FStringTable::ClearMetaData(const FString& InKey)
+void FStringTable::ClearMetaData(const FTextKey& InKey)
 {
 	FScopeLock MetaDataLock(&KeysToMetaDataCS);
 	KeysToMetaData.Remove(InKey);
@@ -289,7 +304,7 @@ void FStringTable::Serialize(FArchive& Ar)
 	FScopeLock KeyMappingLock(&KeyMappingCS);
 	FScopeLock MetaDataLock(&KeysToMetaDataCS);
 
-	Ar << TableNamespace;
+	TableNamespace.SerializeAsString(Ar);
 
 	if (Ar.IsSaving())
 	{
@@ -300,8 +315,8 @@ void FStringTable::Serialize(FArchive& Ar)
 
 			for (const auto& KeyToEntryPair : KeysToEntries)
 			{
-				FString Key = KeyToEntryPair.Key;
-				Ar << Key;
+				FTextKey Key = KeyToEntryPair.Key;
+				Key.SerializeAsString(Ar);
 
 				FString SourceString = KeyToEntryPair.Value->GetSourceString();
 				Ar << SourceString;
@@ -310,7 +325,14 @@ void FStringTable::Serialize(FArchive& Ar)
 
 		// Save meta-data
 		{
-			Ar << KeysToMetaData;
+			TMap<FString, FMetaDataMap, FDefaultSetAllocator, FLocKeyMapFuncs<FMetaDataMap>> TmpKeysToMetaData;
+			TmpKeysToMetaData.Reserve(KeysToMetaData.Num());
+			for (const auto& KeyToMetaDataPair : KeysToMetaData)
+			{
+				TmpKeysToMetaData.Add(KeyToMetaDataPair.Key.GetChars(), KeyToMetaDataPair.Value);
+			}
+
+			Ar << TmpKeysToMetaData;
 		}
 	}
 	else if (Ar.IsLoading())
@@ -323,20 +345,28 @@ void FStringTable::Serialize(FArchive& Ar)
 			ClearSourceStrings(NumEntries);
 			for (int32 EntryIndex = 0; EntryIndex < NumEntries; ++EntryIndex)
 			{
-				FString Key;
-				Ar << Key;
+				FTextKey Key;
+				Key.SerializeAsString(Ar);
 
 				FString SourceString;
 				Ar << SourceString;
 
-				FStringTableEntryRef TableEntry = FStringTableEntry::NewStringTableEntry(AsShared(), SourceString, FTextLocalizationManager::Get().GetDisplayString(TableNamespace, Key, &SourceString));
+				FStringTableEntryRef TableEntry = FStringTableEntry::NewStringTableEntry(AsShared(), SourceString, FTextId(TableNamespace, Key));
 				KeysToEntries.Emplace(Key, TableEntry);
 			}
 		}
 
 		// Load meta-data
 		{
-			Ar << KeysToMetaData;
+			TMap<FString, FMetaDataMap, FDefaultSetAllocator, FLocKeyMapFuncs<FMetaDataMap>> TmpKeysToMetaData;
+			Ar << TmpKeysToMetaData;
+
+			KeysToMetaData.Reset();
+			KeysToMetaData.Reserve(TmpKeysToMetaData.Num());
+			for (auto& TmpKeyToMetaDataPair : KeysToMetaData)
+			{
+				KeysToMetaData.Add(TmpKeyToMetaDataPair.Key, MoveTemp(TmpKeyToMetaDataPair.Value));
+			}
 		}
 	}
 }
@@ -371,7 +401,8 @@ bool FStringTable::ExportStrings(const FString& InFilename) const
 		// Write entries
 		for (const auto& KeyToEntryPair : KeysToEntries)
 		{
-			FString ExportedKey = KeyToEntryPair.Key.ReplaceCharWithEscapedChar();
+			FString ExportedKey = KeyToEntryPair.Key.GetChars();
+			ExportedKey.ReplaceCharWithEscapedCharInline();
 			ExportedKey.ReplaceInline(TEXT("\""), TEXT("\"\""));
 
 			FString ExportedSourceString = KeyToEntryPair.Value->GetSourceString().ReplaceCharWithEscapedChar();
@@ -490,7 +521,7 @@ bool FStringTable::ImportStrings(const FString& InFilename)
 				FString SourceString = Cells[SourceStringColumn];
 				SourceString = SourceString.ReplaceEscapedCharWithChar();
 
-				FStringTableEntryRef TableEntry = FStringTableEntry::NewStringTableEntry(AsShared(), SourceString, FTextLocalizationManager::Get().GetDisplayString(TableNamespace, Key, &SourceString));
+				FStringTableEntryRef TableEntry = FStringTableEntry::NewStringTableEntry(AsShared(), SourceString, FTextId(TableNamespace, Key));
 				KeysToEntries.Emplace(Key, TableEntry);
 
 				for (const auto& MetaDataColumnPair : MetaDataColumns)
@@ -583,20 +614,20 @@ void FStringTableRedirects::RedirectTableId(FName& InOutTableId)
 	}
 }
 
-void FStringTableRedirects::RedirectKey(const FName InTableId, FString& InOutKey)
+void FStringTableRedirects::RedirectKey(const FName InTableId, FTextKey& InOutKey)
 {
 	const auto* RedirectedKeyMap = StringTableRedirects::TableKeyRedirects.Find(InTableId);
 	if (RedirectedKeyMap)
 	{
-		const FString* RedirectedKey = RedirectedKeyMap->Find(InOutKey);
-		if (RedirectedKey)
+		const FTextKey RedirectedKey = RedirectedKeyMap->FindRef(InOutKey);
+		if (!RedirectedKey.IsEmpty())
 		{
-			InOutKey = *RedirectedKey;
+			InOutKey = RedirectedKey;
 		}
 	}
 }
 
-void FStringTableRedirects::RedirectTableIdAndKey(FName& InOutTableId, FString& InOutKey)
+void FStringTableRedirects::RedirectTableIdAndKey(FName& InOutTableId, FTextKey& InOutKey)
 {
 	RedirectTableId(InOutTableId);
 	RedirectKey(InOutTableId, InOutKey);
