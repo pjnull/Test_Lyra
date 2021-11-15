@@ -143,11 +143,14 @@ float ShadowRayCast(
 	{
 		// Ignore hits that come from non-shadow-casting pixels
 		float3 SampleUVz = RayStartUVz + RayStepUVz * FirstHitTime;
-	#if STRATA_ENABLED 
+	#if STRATA_ENABLED
+		// StrataStruct.MaterialLobesBuffer is only defined for global shader, not for material shader
+		#if !MATERIAL_IS_STRATA
 		uint2 PixelPos = View.ViewRectMin.xy + View.ViewSizeAndInvSize.xy * SampleUVz.xy;
 		FStrataAddressing StrataAddressing = GetStrataPixelDataByteOffset(PixelPos, uint2(View.BufferSizeAndInvSize.xy), StrataStruct.MaxBytesPerPixel);
 		FStrataPixelHeader StrataPixelHeader = UnpackStrataHeaderIn(StrataStruct.MaterialLobesBuffer, StrataAddressing);
 		bOutHitCastContactShadow = StrataPixelHeader.bCastContactShadow;
+		#endif
 	#else
 		FGBufferData SampleGBuffer = GetGBufferData( SampleUVz.xy );
 		bOutHitCastContactShadow = CastContactShadow(SampleGBuffer);
