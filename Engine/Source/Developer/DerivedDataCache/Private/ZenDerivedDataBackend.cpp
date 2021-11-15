@@ -609,7 +609,7 @@ void FZenDerivedDataBackend::Get(
 	ForEachBatch(CacheRecordBatchSize, Keys.Num(),
 		[this, &Keys, &Context, &Policy, &Owner, &OnComplete, &TotalCompleted](int32 BatchFirst, int32 BatchLast)
 	{
-		TRACE_COUNTER_ADD(ZenDDC_Get, int64((BatchLast - BatchFirst) + 1));
+		TRACE_COUNTER_ADD(ZenDDC_Get, int64(BatchLast) - int64(BatchFirst) + 1);
 		COOK_STAT(auto Timer = UsageStats.TimeGet());
 		
 		FCbWriter BatchRequest;
@@ -757,7 +757,7 @@ void FZenDerivedDataBackend::GetChunks(
 	ForEachBatch(CacheChunksBatchSize, SortedChunks.Num(),
 		[this, &SortedChunks, &Context, &Owner, &OnComplete, &TotalCompleted](int32 BatchFirst, int32 BatchLast)
 	{
-		TRACE_COUNTER_ADD(ZenDDC_Get, int64((BatchLast - BatchFirst) + 1));
+		TRACE_COUNTER_ADD(ZenDDC_Get, int64(BatchLast) - int64(BatchFirst) + 1);
 		COOK_STAT(auto Timer = UsageStats.TimeGet());
 
 		FCbWriter BatchRequest;
