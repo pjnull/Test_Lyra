@@ -7,7 +7,7 @@
 
 class FTextLayout;
 
-class FNiagaraHLSLSyntaxHighlighter : public FHLSLSyntaxHighlighterMarshaller
+class NIAGARAEDITOR_API FNiagaraHLSLSyntaxHighlighter : public FHLSLSyntaxHighlighterMarshaller
 {
 public:
 
