@@ -252,8 +252,8 @@
 				<Tag Files="$(Tag)" With="#UnrealGame Win64"/>
 			</ForEach>
 			<ForEach Name="Configuration" Values="$(GameConfigurations)">
-				<Compile Target="UE4Game" Platform="Win64" Configuration="$(Configuration)" Tag="#UnrealGame Win64" Arguments="-precompile -allmodules -nolink $(TargetDebugInfoArg)"/>
-				<Compile Target="UE4Game" Platform="Win64" Configuration="$(Configuration)" Tag="#UnrealGame Win64" Arguments="-precompile $(TargetDebugInfoArg)" Clean="false"/>
+				<Compile Target="UnrealGame" Platform="Win64" Configuration="$(Configuration)" Tag="#UnrealGame Win64" Arguments="-precompile -allmodules -nolink $(TargetDebugInfoArg)"/>
+				<Compile Target="UnrealGame" Platform="Win64" Configuration="$(Configuration)" Tag="#UnrealGame Win64" Arguments="-precompile $(TargetDebugInfoArg)" Clean="false"/>
 			</ForEach>
 
 			<Do If="$(EmbedSrcSrvInfo)">
