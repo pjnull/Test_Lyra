@@ -6,6 +6,7 @@
 #include "LiveLinkComponentSettings.h"
 #include "LiveLinkControllerBase.h"
 
+#include "Engine/World.h"
 #include "Features/IModularFeatures.h"
 #include "GameFramework/Actor.h"
 #include "Logging/LogMacros.h"
