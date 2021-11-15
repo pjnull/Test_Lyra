@@ -1100,13 +1100,22 @@ UEdModeInteractiveToolsContext* UModeManagerInteractiveToolsContext::CreateNewCh
 		NewObject<UEdModeInteractiveToolsContext>(GetTransientPackage(), UEdModeInteractiveToolsContext::StaticClass(), NAME_None, RF_Transient);
 	NewModeToolsContext->InitializeContextFromModeManagerContext(this);
 
-	EdModeToolsContexts.Add(NewModeToolsContext);
-
 	return NewModeToolsContext;
 }
 
+bool UModeManagerInteractiveToolsContext::OnChildEdModeActivated(UEdModeInteractiveToolsContext* ChildToolsContext)
+{
+	if (!ensureMsgf(EdModeToolsContexts.Find(ChildToolsContext), TEXT("Child ToolsContext was already found!")))
+	{
+		return false;
+	}
 
-bool UModeManagerInteractiveToolsContext::OnChildEdModeToolsContextShutdown(UEdModeInteractiveToolsContext* ChildToolsContext)
+	EdModeToolsContexts.Add(ChildToolsContext);
+	return true;
+}
+
+
+bool UModeManagerInteractiveToolsContext::OnChildEdModeDeactivated(UEdModeInteractiveToolsContext* ChildToolsContext)
 {
 	for (int32 k = 0; k < EdModeToolsContexts.Num(); ++k)
 	{
