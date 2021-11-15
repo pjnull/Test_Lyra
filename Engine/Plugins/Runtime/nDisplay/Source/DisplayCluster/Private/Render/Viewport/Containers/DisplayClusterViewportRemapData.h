@@ -25,9 +25,9 @@ struct FDisplayClusterViewportRemapData
 	{
 		return SrcRect == In.SrcRect
 			&& DstRect == In.DstRect
-			&& DstAngle == DstAngle
-			&& bSrcFlipH == bSrcFlipH
-			&& bSrcFlipV == bSrcFlipV;
+			&& DstAngle == In.DstAngle
+			&& bSrcFlipH == In.bSrcFlipH
+			&& bSrcFlipV == In.bSrcFlipV;
 	}
 
 	FORCEINLINE bool operator!=(const FDisplayClusterViewportRemapData& In) const
