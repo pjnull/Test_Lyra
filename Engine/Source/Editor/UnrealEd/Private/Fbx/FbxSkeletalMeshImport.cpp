@@ -3435,6 +3435,8 @@ bool UnFbx::FFbxImporter::FillSkelMeshImporterFromFbx( FSkeletalMeshImportData& 
 	int32 ExistWedgesNum = ImportData.Wedges.Num();
 	SkeletalMeshImportData::FVertex TmpWedges[3];
 
+	bool bUnsupportedSmoothingGroupErrorDisplayed = false;
+	bool bFaceMaterialIndexInconsistencyErrorDisplayed = false;
 	for( int32 TriangleIndex = ExistFaceNum, LocalIndex = 0 ; TriangleIndex < ExistFaceNum+TriangleCount ; TriangleIndex++, LocalIndex++ )
 	{
 
@@ -3454,9 +3456,10 @@ bool UnFbx::FFbxImporter::FillSkelMeshImporterFromFbx( FSkeletalMeshImportData& 
 					int32 lSmoothingIndex = (SmoothingReferenceMode == FbxLayerElement::eDirect) ? LocalIndex : SmoothingInfo->GetIndexArray().GetAt(LocalIndex);
 					Triangle.SmoothingGroups = SmoothingInfo->GetDirectArray().GetAt(lSmoothingIndex);
 				}
-				else
+				else if(!bUnsupportedSmoothingGroupErrorDisplayed)
 				{
 					AddTokenizedErrorMessage(FTokenizedMessage::Create(EMessageSeverity::Warning, FText::Format(LOCTEXT("FbxSkeletaLMeshimport_Unsupportingsmoothinggroup", "Unsupported Smoothing group mapping mode on mesh '{0}'"), FText::FromString(Mesh->GetName()))), FFbxErrors::Generic_Mesh_UnsupportingSmoothingGroup);
+					bUnsupportedSmoothingGroupErrorDisplayed = true;
 				}
 			}
 		}
@@ -3536,7 +3539,11 @@ bool UnFbx::FFbxImporter::FillSkelMeshImporterFromFbx( FSkeletalMeshImportData& 
 						int32 Index = LayerElementMaterial->GetIndexArray().GetAt(LocalIndex);							
 						if (!MaterialMapping.IsValidIndex(Index))
 						{
-							AddTokenizedErrorMessage(FTokenizedMessage::Create(EMessageSeverity::Warning, LOCTEXT("FbxSkeletaLMeshimport_MaterialIndexInconsistency", "Face material index inconsistency - forcing to 0")), FFbxErrors::Generic_Mesh_MaterialIndexInconsistency);
+							if (!bFaceMaterialIndexInconsistencyErrorDisplayed)
+							{
+								AddTokenizedErrorMessage(FTokenizedMessage::Create(EMessageSeverity::Warning, LOCTEXT("FbxSkeletaLMeshimport_MaterialIndexInconsistency", "Face material index inconsistency - forcing to 0")), FFbxErrors::Generic_Mesh_MaterialIndexInconsistency);
+								bFaceMaterialIndexInconsistencyErrorDisplayed = true;
+							}
 						}
 						else
 						{
@@ -3551,7 +3558,11 @@ bool UnFbx::FFbxImporter::FillSkelMeshImporterFromFbx( FSkeletalMeshImportData& 
 			// because we don't import material for morph, so the ImportData.Materials contains zero material
 			if ( !FbxShape && (Triangle.MatIndex < 0 ||  Triangle.MatIndex >= FbxMaterials.Num() ) )
 			{
-				AddTokenizedErrorMessage(FTokenizedMessage::Create(EMessageSeverity::Warning, LOCTEXT("FbxSkeletaLMeshimport_MaterialIndexInconsistency", "Face material index inconsistency - forcing to 0")), FFbxErrors::Generic_Mesh_MaterialIndexInconsistency);
+				if (!bFaceMaterialIndexInconsistencyErrorDisplayed)
+				{
+					AddTokenizedErrorMessage(FTokenizedMessage::Create(EMessageSeverity::Warning, LOCTEXT("FbxSkeletaLMeshimport_MaterialIndexInconsistency", "Face material index inconsistency - forcing to 0")), FFbxErrors::Generic_Mesh_MaterialIndexInconsistency);
+					bFaceMaterialIndexInconsistencyErrorDisplayed = true;
+				}
 				Triangle.MatIndex = 0;
 			}
 		}

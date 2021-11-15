@@ -799,6 +799,8 @@ bool UnFbx::FFbxImporter::BuildStaticMeshFromGeometry(FbxNode* Node, UStaticMesh
 				: SlowTaskNumberOfUpdates + FMath::CeilToInt((PolygonCount % SlowTaskNumberOfUpdates) / (float)SlowTaskNumberOfWorkUnitsBetweenUpdates));
 			ProcessingPolygonsSlowTask.MakeDialog();
 
+			bool bFaceMaterialIndexInconsistencyErrorDisplayed = false;
+			bool bUnsupportedSmoothingGroupErrorDisplayed = false;
 			//Polygons
 			for (int32 PolygonIndex = 0; PolygonIndex < PolygonCount; PolygonIndex++)
 			{
@@ -1003,7 +1005,11 @@ bool UnFbx::FFbxImporter::BuildStaticMeshFromGeometry(FbxNode* Node, UStaticMesh
 
 				if (MaterialIndex >= MaterialCount || MaterialIndex < 0)
 				{
-					AddTokenizedErrorMessage(FTokenizedMessage::Create(EMessageSeverity::Warning, LOCTEXT("Error_MaterialIndexInconsistency", "Face material index inconsistency - forcing to 0")), FFbxErrors::Generic_Mesh_MaterialIndexInconsistency);
+					if (!bFaceMaterialIndexInconsistencyErrorDisplayed)
+					{
+						AddTokenizedErrorMessage(FTokenizedMessage::Create(EMessageSeverity::Warning, LOCTEXT("Error_MaterialIndexInconsistency", "Face material index inconsistency - forcing to 0")), FFbxErrors::Generic_Mesh_MaterialIndexInconsistency);
+						bFaceMaterialIndexInconsistencyErrorDisplayed = true;
+					}
 					MaterialIndex = 0;
 				}
 
@@ -1087,9 +1093,10 @@ bool UnFbx::FFbxImporter::BuildStaticMeshFromGeometry(FbxNode* Node, UStaticMesh
 									//Set the hard edges
 									EdgeHardnesses[MatchEdgeId] = (SmoothingInfo->GetDirectArray().GetAt(lSmoothingIndex) == 0);
 								}
-								else
+								else if(!bUnsupportedSmoothingGroupErrorDisplayed)
 								{
 									AddTokenizedErrorMessage(FTokenizedMessage::Create(EMessageSeverity::Warning, FText::Format(LOCTEXT("Error_UnsupportedSmoothingGroup", "Unsupported Smoothing group mapping mode on mesh  '{0}'"), FText::FromString(Mesh->GetName()))), FFbxErrors::Generic_Mesh_UnsupportingSmoothingGroup);
+									bUnsupportedSmoothingGroupErrorDisplayed = true;
 								}
 							}
 							else
