@@ -392,6 +392,7 @@ void UMovieSceneSkeletalAnimationSection::PostEditImport()
 	{
 		GetRootMotionParams()->bRootMotionsDirty = true;
 	}
+	Super::PostEditImport();
 }
 void UMovieSceneSkeletalAnimationSection::PostEditUndo()
 {
@@ -399,6 +400,7 @@ void UMovieSceneSkeletalAnimationSection::PostEditUndo()
 	{
 		GetRootMotionParams()->bRootMotionsDirty = true;
 	}
+	Super::PostEditUndo();
 }
 
 #endif
