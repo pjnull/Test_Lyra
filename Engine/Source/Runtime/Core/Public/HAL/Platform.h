@@ -626,6 +626,10 @@
 	#define PLATFORM_USE_FALLBACK_PSO 0
 #endif
 
+#ifndef PLATFORM_USES_UNFAIR_LOCKS
+	#define PLATFORM_USES_UNFAIR_LOCKS 0
+#endif
+
 // deprecated, do not use
 #define PLATFORM_HAS_THREADSAFE_RHIGetRenderQueryResult	#
 #define PLATFORM_SUPPORTS_RHI_THREAD #

@@ -1723,7 +1723,7 @@ void FD3D11DynamicRHI::RHIBlockUntilGPUIdle()
 	TRefCountPtr<ID3D11Query> Query;
 	VERIFYD3D11RESULT_EX(Direct3DDevice->CreateQuery(&Desc, Query.GetInitReference()), Direct3DDevice);
 	
-	D3D11StallRHIThread();
+	FScopedD3D11RHIThreadStaller StallRHIThread;
 	
 	Direct3DDeviceIMContext->End(Query.GetReference());
 	Direct3DDeviceIMContext->Flush();
@@ -1741,8 +1741,6 @@ void FD3D11DynamicRHI::RHIBlockUntilGPUIdle()
 			FPlatformProcess::Sleep(0.005f);
 		}
 	}
-
-	D3D11UnstallRHIThread();
 }
 
 /**

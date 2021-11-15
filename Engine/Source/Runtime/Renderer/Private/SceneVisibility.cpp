@@ -953,6 +953,11 @@ static void FetchVisibilityForPrimitives_Range(FVisForPrimParams& Params, FGloba
 	int32 NumTotalDefUnoccluded = View.PrimitiveDefinitelyUnoccludedMap.Num();
 
 	{
+		// If we're going to stall the RHI thread for one query, we should stall it for all of them.
+		// !(View.bIgnoreExistingQueries || bHZBOcclusion) is the code path that calls GetQueryForReading.
+		const bool bShouldStallRHIThread = bSingleThreaded && !GSupportsParallelOcclusionQueries && IsInRenderingThread() && !(View.bIgnoreExistingQueries || bHZBOcclusion);
+		FScopedRHIThreadStaller StallRHIThread(FRHICommandListExecutor::GetImmediateCommandList(), bShouldStallRHIThread);
+
 		SCOPED_NAMED_EVENT_F(TEXT("forEach over %d entries"), FColor::Magenta, NumToProcess);
 	
 		//if we are load balanced then we iterate only the set bits, and the ranges have been pre-selected to evenly distribute set bits among the tasks with no overlaps.
