@@ -46,8 +46,9 @@ struct FManagerImpl
 
 	~FManagerImpl()
 	{
-		if (TSharedPtr<IConcertSyncClient> ConcertSyncClient = IConcertSyncClientModule::Get().GetClient(TEXT("MultiUser")))
+		if (IConcertSyncClientModule::IsAvailable())
 		{
+			TSharedPtr<IConcertSyncClient> ConcertSyncClient = IConcertSyncClientModule::Get().GetClient(TEXT("MultiUser"));
 			Unregister();
 
 			IConcertClientRef ConcertClient = ConcertSyncClient->GetConcertClient();
