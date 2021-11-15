@@ -1149,6 +1149,7 @@ TSharedPtrTS<FDRMManager> FAdaptiveStreamingPlayer::GetDRMManager()
 
 void FAdaptiveStreamingPlayer::GetStreamBufferStats(FAccessUnitBufferInfo& OutBufferStats, EStreamType ForStream)
 {
+	UpdateDiagnostics();
 	FMediaCriticalSection::ScopedLock lock(DiagnosticsCriticalSection);
 	switch(ForStream)
 	{
@@ -1827,6 +1828,22 @@ void FAdaptiveStreamingPlayer::HandleSessionMessage(TSharedPtrTS<IPlayerMessage>
 
 //-----------------------------------------------------------------------------
 /**
+ * Returns the required duration to be available in the buffer before playback can begin.
+ */
+double FAdaptiveStreamingPlayer::GetMinBufferTimeBeforePlayback()
+{
+	// Yes. Check if we have enough data buffered up to begin handing off data to the decoders.
+	double kMinBufferBeforePlayback = LastBufferingState == EPlayerState::eState_Seeking ? PlayerConfig.SeekBufferMinTimeAvailBeforePlayback :
+										LastBufferingState == EPlayerState::eState_Rebuffering ? PlayerConfig.RebufferMinTimeAvailBeforePlayback : PlayerConfig.InitialBufferMinTimeAvailBeforePlayback;
+
+	// The buffer times may not always exactly align with segment durations, especially when different timescales are involved.
+	// For the time being we tweak the buffering value a bit to account for rounding errors.
+	kMinBufferBeforePlayback *= 0.98;
+	return kMinBufferBeforePlayback;
+}
+
+//-----------------------------------------------------------------------------
+/**
  * Checks if buffers have enough data to advance the play state.
  */
 void FAdaptiveStreamingPlayer::HandleNewBufferedData()
@@ -1838,12 +1855,8 @@ void FAdaptiveStreamingPlayer::HandleNewBufferedData()
 		{
 			check(LastBufferingState == EPlayerState::eState_Buffering || LastBufferingState == EPlayerState::eState_Rebuffering || LastBufferingState == EPlayerState::eState_Seeking);
 			// Yes. Check if we have enough data buffered up to begin handing off data to the decoders.
-			double kMinBufferBeforePlayback = LastBufferingState == EPlayerState::eState_Seeking ? PlayerConfig.SeekBufferMinTimeAvailBeforePlayback :
-											  LastBufferingState == EPlayerState::eState_Rebuffering ? PlayerConfig.RebufferMinTimeAvailBeforePlayback : PlayerConfig.InitialBufferMinTimeAvailBeforePlayback;
+			double kMinBufferBeforePlayback = GetMinBufferTimeBeforePlayback();
 
-			// The buffer times may not always exactly align with segment durations, especially when different timescales are involved.
-			// For the time being we tweak the buffering value a bit to account for rounding errors.
-			kMinBufferBeforePlayback *= 0.98;
 			DiagnosticsCriticalSection.Lock();
 
 			bool bHaveEnoughVideo = false;
@@ -2348,7 +2361,7 @@ void FAdaptiveStreamingPlayer::InternalHandlePendingStartRequest(const FTimeValu
 						StreamSelector->SetBandwidth(StartingBitrate);
 						if (bForceInitial)
 						{
-							StreamSelector->SetForcedNextBandwidth(StartingBitrate);
+							StreamSelector->SetForcedNextBandwidth(StartingBitrate, GetMinBufferTimeBeforePlayback());
 						}
 
 						// Set the current average video bitrate in the player options for the period to retrieve if necessary.

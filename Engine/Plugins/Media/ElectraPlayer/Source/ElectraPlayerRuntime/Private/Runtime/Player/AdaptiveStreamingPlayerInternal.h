@@ -1635,6 +1635,8 @@ private:
 
 	void CheckForErrors();
 
+	double GetMinBufferTimeBeforePlayback();
+
 	FTimeValue ClampTimeToCurrentRange(const FTimeValue& InTime, bool bClampToStart, bool bClampToEnd);
 
 	TSharedPtrTS<FMultiTrackAccessUnitBuffer> GetStreamBuffer(EStreamType InStreamType, const TSharedPtrTS<FStreamDataBuffers>& InFromStreamBuffers)

@@ -126,7 +126,7 @@ namespace Electra
 		virtual void SetCanSwitchToAlternateStreams(bool bCanSwitch) override;
 		virtual void SetCurrentPlaybackPeriod(EStreamType InStreamType, TSharedPtrTS<IManifest::IPlayPeriod> InCurrentPlayPeriod) override;
 		virtual void SetBandwidth(int64 bitsPerSecond) override;
-		virtual void SetForcedNextBandwidth(int64 bitsPerSecond) override;
+		virtual void SetForcedNextBandwidth(int64 bitsPerSecond, double minBufferTimeBeforePlayback) override;
 		virtual void MarkStreamAsUnavailable(const FBlacklistedStream& BlacklistedStream) override;
 		virtual void MarkStreamAsAvailable(const FBlacklistedStream& NoLongerBlacklistedStream) override;
 		virtual int64 GetLastBandwidth() override;
@@ -159,8 +159,8 @@ namespace Electra
 		virtual void ReportPrerollEnd() override {}
 		virtual void ReportPlaybackStart() override {}
 		virtual void ReportPlaybackPaused() override {}
-		virtual void ReportPlaybackResumed() override {}
-		virtual void ReportPlaybackEnded() override {}
+		virtual void ReportPlaybackResumed() override;
+		virtual void ReportPlaybackEnded() override;
 		virtual void ReportJumpInPlayPosition(const FTimeValue& ToNewTime, const FTimeValue& FromTime, Metrics::ETimeJumpReason TimejumpReason) override {}
 		virtual void ReportPlaybackStopped() override {}
 		virtual void ReportError(const FString& ErrorReason) override {}
@@ -231,6 +231,7 @@ namespace Electra
 
 		int32												BandwidthCeiling;
 		int32												ForcedInitialBandwidth;
+		double												ForcedInitialBandwidthUntilSecondsBuffered;
 		FStreamCodecInformation::FResolution				MaxStreamResolution;
 
 		TSimpleMovingAverage<double>						AverageBandwidth;
@@ -310,6 +311,7 @@ namespace Electra
 		, bPlayerIsRebuffering(false)
 		, BandwidthCeiling(0x7fffffff)
 		, ForcedInitialBandwidth(0)
+		, ForcedInitialBandwidthUntilSecondsBuffered(0.0)
 	{
 		AverageBandwidth.SetMaxSMASampleCount(Config.MaxBandwidthHistorySize);
 		AverageLatency.SetMaxSMASampleCount(Config.MaxBandwidthHistorySize);
@@ -477,14 +479,16 @@ namespace Electra
 
 	//-----------------------------------------------------------------------------
 	/**
-	 * Sets a forced bitrate for the next segment fetch only.
+	 * Sets a forced bitrate for the next segment fetches until the given duration of playable content has been received.
 	 *
 	 * @param bitsPerSecond
+	 * @param minBufferTimeBeforePlayback
 	 */
-	void FAdaptiveStreamSelector::SetForcedNextBandwidth(int64 bitsPerSecond)
+	void FAdaptiveStreamSelector::SetForcedNextBandwidth(int64 bitsPerSecond, double minBufferTimeBeforePlayback)
 	{
 		FMediaCriticalSection::ScopedLock lock(AccessMutex);
 		ForcedInitialBandwidth = (int32)bitsPerSecond;
+		ForcedInitialBandwidthUntilSecondsBuffered = minBufferTimeBeforePlayback;
 	}
 
 
@@ -701,6 +705,21 @@ namespace Electra
 		return Decision;
 	}
 
+
+	void FAdaptiveStreamSelector::ReportPlaybackResumed()
+	{
+		// When playback resumes there must be enough data buffered to do that, so we are no longer
+		// constrained to a forced buffered bandwidth
+		ForcedInitialBandwidth = 0;
+		ForcedInitialBandwidthUntilSecondsBuffered = 0.0;
+	}
+	void FAdaptiveStreamSelector::ReportPlaybackEnded()
+	{
+		// When playback ends we are no longer constrained to a forced buffered bandwidth
+		ForcedInitialBandwidth = 0;
+		ForcedInitialBandwidthUntilSecondsBuffered = 0.0;
+	}
+
 	void FAdaptiveStreamSelector::ReportDownloadEnd(const Metrics::FSegmentDownloadStats& SegmentDownloadStats)
 	{
 		if (SegmentDownloadStats.SegmentType == Metrics::ESegmentType::Media &&
@@ -708,8 +727,21 @@ namespace Electra
 			!SegmentDownloadStats.bIsCachedResponse &&
 			(SegmentDownloadStats.bWasSuccessful || SegmentDownloadStats.NumBytesDownloaded))	// any number of bytes received counts!
 		{
-			// At the end of the segment download, successful or otherwise, we clear the forced bitrate and let nature take its course.
-			ForcedInitialBandwidth = 0;
+			// Check if we can now go back to regular bitrate selection.
+			if (ForcedInitialBandwidth)
+			{
+				FAccessUnitBufferInfo bufStats;
+				PlayerSessionServices->GetStreamBufferStats(bufStats, SegmentDownloadStats.StreamType);
+				bool bBufferedEnough = bufStats.PlayableDuration.GetAsSeconds() >= ForcedInitialBandwidthUntilSecondsBuffered;
+				bBufferedEnough |= bufStats.bEndOfData;
+				bBufferedEnough |= bufStats.bLastPushWasBlocked;
+				if (bBufferedEnough)
+				{
+					ForcedInitialBandwidth = 0;
+					ForcedInitialBandwidthUntilSecondsBuffered = 0.0;
+				}
+			}
+
 			// Add bandwidth sample if it can be calculated.
 			if (SegmentDownloadStats.NumBytesDownloaded && SegmentDownloadStats.TimeToDownload > 0.0)
 			{
@@ -1083,10 +1115,10 @@ namespace Electra
 					bool bCond3 = sim.SecondsGained + secondsInVideoBuffer > videoBufferHighWatermark;
 					bool bIsFeasible = (bCond1 || bCond2) && bCond3;
 
-					// If there is an enforced initial bitrate then any stream that is within that bitrate is feasible by default.
-					if (ForcedInitialBandwidth && StreamInformationVideo[nStr]->Bitrate <= ForcedInitialBandwidth)
+					// If there is an enforced initial bitrate then any stream that is outside that bitrate is not feasible.
+					if (ForcedInitialBandwidth && StreamInformationVideo[nStr]->Bitrate > ForcedInitialBandwidth)
 					{
-						bIsFeasible = true;
+						bIsFeasible = false;
 					}
 
 					if (bIsFeasible)
