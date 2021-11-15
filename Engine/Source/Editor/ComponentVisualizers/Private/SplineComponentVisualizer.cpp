@@ -843,6 +843,8 @@ bool FSplineComponentVisualizer::VisProxyHandleClick(FEditorViewportClient* InVi
 {
 	ResetTempModes();
 
+	bool bVisProxyClickHandled = false;
+
 	if(VisProxy && VisProxy->Component.IsValid())
 	{
 		check(SelectionState);
@@ -877,7 +879,7 @@ bool FSplineComponentVisualizer::VisProxyHandleClick(FEditorViewportClient* InVi
 
 				SelectionState->SetCachedRotation(SplineComp->GetQuaternionAtSplinePoint(SelectionState->GetLastKeyIndexSelected(), ESplineCoordinateSpace::World));
 
-				return true;
+				bVisProxyClickHandled = true;
 			}
 		}
 		else if (VisProxy->IsA(HSplineSegmentProxy::StaticGetType()))
@@ -939,7 +941,7 @@ bool FSplineComponentVisualizer::VisProxyHandleClick(FEditorViewportClient* InVi
 
 				SelectionState->SetSelectedSplinePosition(BestLocation);
 
-				return true;
+				bVisProxyClickHandled = true;
 			}
 		}
 		else if (VisProxy->IsA(HSplineTangentHandleProxy::StaticGetType()))
@@ -977,13 +979,17 @@ bool FSplineComponentVisualizer::VisProxyHandleClick(FEditorViewportClient* InVi
 				SelectionState->SetSelectedTangentHandleType(KeyProxy->bArriveTangent ? ESelectedTangentHandle::Arrive : ESelectedTangentHandle::Leave);
 				SelectionState->SetCachedRotation(SplineComp->GetQuaternionAtSplinePoint(SelectionState->GetSelectedTangentHandle(), ESplineCoordinateSpace::World));
 
-				return true;
+				bVisProxyClickHandled = true;
 			}
 		}
-
 	}
 
-	return false;
+	if (bVisProxyClickHandled)
+	{
+		GEditor->RedrawLevelEditingViewports(true);
+	}
+
+	return bVisProxyClickHandled;
 }
 
 void FSplineComponentVisualizer::SetEditedSplineComponent(const USplineComponent* InSplineComponent) 
