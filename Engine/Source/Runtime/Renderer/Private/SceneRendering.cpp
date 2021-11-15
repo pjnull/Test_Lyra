@@ -2863,19 +2863,6 @@ FRHIGPUMask FSceneRenderer::ComputeGPUMasks(FRHICommandListImmediate& RHICmdList
 }
 #endif // WITH_MGPU
 
-void FSceneRenderer::InitFXSystem()
-{
-	check(IsInRenderingThread());
-
-	// Cache the Scene FXSystem since it can be set to null at any time in UWorld::CleanupWorldInternal()
-	// If this happens, the FXSystem will still be valid until a render command destroys it (see FFXSystemInterface::Destroy()).
-	FXSystem = Scene ? Scene->FXSystem : nullptr;
-	if (FXSystem && FXSystem->IsPendingKill())
-	{
-		FXSystem = nullptr;
-	}
-}
-
 #if WITH_MGPU
 DECLARE_GPU_STAT_NAMED(CrossGPUTransfers, TEXT("Cross GPU Tranfer"));
 #endif // WITH_MGPU
@@ -3801,6 +3788,15 @@ void FSceneRenderer::RenderThreadBegin(FRHICommandListImmediate& RHICmdList)
 {
 	CleanUp(RHICmdList);
 
+	// Cache the FXSystem for the duration of the scene render
+	// UWorld::CleanupWorldInternal() will mark the system as pending kill on the GameThread and then enqueue a delete command
+	//-TODO: The call to IsPendingKill should no longer be required as we are caching & using within a single render command
+	FXSystem = Scene ? Scene->FXSystem : nullptr;
+	if (FXSystem && FXSystem->IsPendingKill())
+	{
+		FXSystem = nullptr;
+	}
+
 	MemStackMark = new FMemMark(FMemStack::Get());
 }
 
@@ -4219,12 +4215,6 @@ void FRendererModule::BeginRenderingViewFamily(FCanvas* Canvas, FSceneViewFamily
 
 		// Construct the scene renderer.  This copies the view family attributes into its own structures.
 		FSceneRenderer* SceneRenderer = FSceneRenderer::CreateSceneRenderer(ViewFamily, Canvas->GetHitProxyConsumer());
-
-        ENQUEUE_RENDER_COMMAND(FInitFXSystemCommand)(
-	        [SceneRenderer](FRHICommandListImmediate& RHICmdList)
-	        {
-		        SceneRenderer->InitFXSystem();
-	        });
 
 		if (!SceneRenderer->ViewFamily.EngineShowFlags.HitProxies)
 		{
