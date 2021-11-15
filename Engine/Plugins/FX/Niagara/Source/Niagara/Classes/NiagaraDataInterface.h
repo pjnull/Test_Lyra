@@ -497,6 +497,9 @@ public:
 		PushToRenderThread();
 	}
 
+	bool IsUsedByCPUEmitter() const { return bUsedByCPUEmitter; }
+	bool IsUsedByGPUEmitter() const { return bUsedByGPUEmitter; }
+
 protected:
 	template<typename T>
 	T* GetProxyAs()
@@ -848,6 +851,7 @@ struct FNDIOutputParam<FNiagaraBool>
 	FORCEINLINE FNDIOutputParam(FVectorVMExternalFunctionContext& Context) : Data(Context) {}
 	FORCEINLINE bool IsValid() const { return Data.IsValid(); }
 	FORCEINLINE void SetAndAdvance(bool Val) { Data.GetDestAndAdvance()->SetValue(Val); }
+	FORCEINLINE void SetAndAdvance(FNiagaraBool Val) { *Data.GetDestAndAdvance() = Val; }
 };
 
 template<>

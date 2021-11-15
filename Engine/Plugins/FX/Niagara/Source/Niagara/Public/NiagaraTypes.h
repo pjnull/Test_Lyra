@@ -65,7 +65,7 @@ struct FNiagaraBool
 	
 	FNiagaraBool() : Value(False) {}
 	FNiagaraBool(bool bInValue) : Value(bInValue ? True : False) {}
-	FORCEINLINE operator bool() { return GetValue(); }
+	FORCEINLINE operator bool() const { return GetValue(); }
 
 private:
 	UPROPERTY(EditAnywhere, Category = Parameters)// Must be either FNiagaraBool::True or FNiagaraBool::False.
