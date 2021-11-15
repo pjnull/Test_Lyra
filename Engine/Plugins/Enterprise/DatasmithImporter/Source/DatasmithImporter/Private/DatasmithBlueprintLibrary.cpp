@@ -35,6 +35,7 @@
 #include "Misc/Paths.h"
 #include "PackageTools.h"
 #include "StaticMeshAttributes.h"
+#include "StaticMeshCompiler.h"
 #include "SourceUri.h"
 #include "Subsystems/AssetEditorSubsystem.h"
 #include "Templates/SharedPointer.h"
@@ -1032,7 +1033,10 @@ void UDatasmithStaticMeshBlueprintLibrary::ComputeLightmapResolution(const TMap<
 			EParallelForFlags::Unbalanced
 		);
 
-		UStaticMesh::BatchBuild( StaticMeshes, true);
+		UStaticMesh::BatchBuild( StaticMeshes, true );
+
+		// To avoid race condition, we need to wait for async mesh compilation to finish (if enabled) before proceeding to access mesh properties
+		FStaticMeshCompilingManager::Get().FinishCompilation( StaticMeshes );
 
 		ParallelFor( StaticMeshes.Num(),
 			[&]( int32 Index )
