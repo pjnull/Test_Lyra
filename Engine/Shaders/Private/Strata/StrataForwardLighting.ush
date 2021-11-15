@@ -309,7 +309,15 @@ float3 StrataForwardLighting(
 						SubsurfaceIndirectLighting,
 						IndirectIrradiance);
 
-					// STRATA_TODO  GetIndirectOcclusion for forward shading
+					float IndirectOcclusion = 1.0f;
+				#if FORWARD_SHADING && (MATERIALBLENDING_SOLID || MATERIALBLENDING_MASKED)
+					NearestResolvedDepthScreenUV = CalculateNearestResolvedDepthScreenUV(ScreenUV, MaterialParameters.ScreenPosition.w);
+
+					IndirectOcclusion = GetIndirectOcclusion(NearestResolvedDepthScreenUV, StrataPixelHeader.bHasDynamicIndirectShadowCasterRepresentation);
+					DiffuseIndirectLighting *= IndirectOcclusion;
+					SubsurfaceIndirectLighting *= IndirectOcclusion;
+					IndirectIrradiance *= IndirectOcclusion;
+				#endif
 
 					Color += (DiffuseIndirectLighting * DiffuseColorForIndirect + SubsurfaceIndirectLighting * SubsurfaceColorForIndirect) * SkyLightCommonFactor * AOMultiBounce(StrataEnvLight.DiffuseColor, DiffOcclusion);
 				}
@@ -323,6 +331,7 @@ float3 StrataForwardLighting(
 				{
 					float SkyAverageBrightness = 1.0f;
 					Color += GetSkyLightReflection(StrataEnvLight.SpecularDirection, StrataEnvLight.SpecularSafeRoughness, SkyAverageBrightness) * StrataEnvLight.SpecularWeight * SkyLightCommonFactor * IndirectOcclusion * AOMultiBounce(StrataEnvLight.SpecularColor, SpecOcclusion);
+					// STRATA_TODO extend this to futher reflections instead of only the sky (see half3 ReflectionColor = GetImageBasedReflectionLighting in basepass pixe lshader, also using IndirectOcclusion)
 				}
 				// We skip hazy lob evaluation in forward.
 			#endif

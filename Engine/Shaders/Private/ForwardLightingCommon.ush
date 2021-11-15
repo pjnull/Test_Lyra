@@ -102,7 +102,7 @@ float4 GetForwardDynamicShadowFactors(float2 ScreenUV)
 	return DecodeLightAttenuation(Value);
 }
 
-float GetIndirectOcclusion(float2 ScreenUV, FGBufferData GBufferData)
+float GetIndirectOcclusion(float2 ScreenUV, bool bHasDynamicIndirectShadowCasterRepresentation)
 {
 	float IndirectOcclusion;
 
@@ -113,7 +113,7 @@ float GetIndirectOcclusion(float2 ScreenUV, FGBufferData GBufferData)
 	IndirectOcclusion = OpaqueBasePass.IndirectOcclusionTexture.Load(int3(IntScreenUV, 0)).x;
 
 	// Reduce self shadowing intensity on characters (reuse distance field bit, really should be HasCapsuleShadowRepresentation)
-	IndirectOcclusion = lerp(1, IndirectOcclusion, HasDynamicIndirectShadowCasterRepresentation(GBufferData) ? View.IndirectCapsuleSelfShadowingIntensity : 1);
+	IndirectOcclusion = lerp(1, IndirectOcclusion, bHasDynamicIndirectShadowCasterRepresentation ? View.IndirectCapsuleSelfShadowingIntensity : 1);
 
 	return IndirectOcclusion;
 }

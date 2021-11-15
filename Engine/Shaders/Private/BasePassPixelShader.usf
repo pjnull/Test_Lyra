@@ -1292,7 +1292,7 @@ void FPixelShaderInOut_MainPS(
 			float2 ScreenUV = NDC * ResolvedView.ScreenPositionScaleBias.xy + ResolvedView.ScreenPositionScaleBias.wz;
 			NearestResolvedDepthScreenUV = CalculateNearestResolvedDepthScreenUV(ScreenUV, MaterialParameters.ScreenPosition.w);
 
-			IndirectOcclusion = GetIndirectOcclusion(NearestResolvedDepthScreenUV, GBuffer);
+			IndirectOcclusion = GetIndirectOcclusion(NearestResolvedDepthScreenUV, HasDynamicIndirectShadowCasterRepresentation(GBuffer));
 			DiffuseIndirectLighting *= IndirectOcclusion;
 			SubsurfaceIndirectLighting *= IndirectOcclusion;
 			IndirectIrradiance *= IndirectOcclusion;
@@ -1609,9 +1609,6 @@ void FPixelShaderInOut_MainPS(
 	if (StrataData.LayerCount > 0)
 	{
 		float2 ScreenUV = ScreenPositionToBufferUV(MaterialParameters.ScreenPosition);
-	#if FORWARD_SHADING && (MATERIALBLENDING_SOLID || MATERIALBLENDING_MASKED)
-		ScreenUV = CalculateNearestResolvedDepthScreenUV(ScreenUV, MaterialParameters.ScreenPosition.w);
-	#endif
 
 		float3 L = ResolvedView.DirectionalLightDirection;
 		float3 LightColor = ResolvedView.DirectionalLightColor.rgb * PI;
