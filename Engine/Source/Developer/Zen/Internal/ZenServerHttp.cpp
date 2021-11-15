@@ -257,6 +257,38 @@ namespace UE::Zen {
 		return PerformBlockingPost(Uri, Out.GetView(), EContentType::CbPackage);
 	}
 
+	FZenHttpRequest::Result FZenHttpRequest::PerformRpc(FStringView Uri, FCbObjectView Request, FCbPackage &OutResponse)
+	{
+		FLargeMemoryWriter RequestBuffer;
+		
+		Request.CopyTo(RequestBuffer);
+		FCompositeBuffer Buffer(FSharedBuffer::MakeView(RequestBuffer.GetView()));
+		ReadDataView = &Buffer;
+
+		const uint32 ContentLength = RequestBuffer.TotalSize();
+
+		curl_easy_setopt(Curl, CURLOPT_POST, 1L);
+		curl_easy_setopt(Curl, CURLOPT_INFILESIZE, ContentLength);
+		curl_easy_setopt(Curl, CURLOPT_READDATA, this);
+		curl_easy_setopt(Curl, CURLOPT_READFUNCTION, &FZenHttpRequest::FStatics::StaticReadFn);
+
+		AddHeader(TEXT("Content-Type"_SV), GetMimeType(EContentType::CbObject));
+		AddHeader(TEXT("Accept"_SV), GetMimeType(EContentType::CbPackage));
+		
+		Result RpcResult = PerformBlocking(Uri, RequestVerb::Post, ContentLength);
+
+		if (IsSuccessCode(ResponseCode))
+		{
+			FLargeMemoryReader Ar(ResponseBuffer.GetData(), ResponseBuffer.Num());
+			if (!OutResponse.TryLoad(Ar))
+			{
+				RpcResult = Result::Failed; 
+			}
+		}
+
+		return RpcResult;
+	}
+
 	FCbPackage FZenHttpRequest::GetResponseAsPackage() const
 	{
 		const TArray64<uint8>& Response = GetResponseBuffer();
