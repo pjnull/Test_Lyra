@@ -5936,6 +5936,10 @@ namespace
 				}
 			}
 		}
+		else if (!CmdName.IsEmpty() && FCString::Stricmp(*CmdName, TEXT("Global")) == 0)
+		{
+			bCompileChangedShaders = true;
+		}
 		else if (!CmdName.IsEmpty() && FCString::Stricmp(*CmdName, TEXT("Changed")) == 0)
 		{
 			bCompileChangedShaders = true;
@@ -5982,7 +5986,7 @@ void ProcessCookOnTheFlyShaders(bool bReloadGlobalShaders, const TArray<uint8>& 
 		if (LoadedMaterials.Num())
 		{
 			// this will stop the rendering thread, and reattach components, in the destructor
-			FMaterialUpdateContext UpdateContext(0);
+			FMaterialUpdateContext UpdateContext(FMaterialUpdateContext::EOptions::RecreateRenderStates);
 
 			// gather the shader maps to reattach
 			for (UMaterialInterface* Material : LoadedMaterials)
@@ -7035,7 +7039,7 @@ void RecompileShadersForRemote(
 	const TArray<FODSCRequestPayload>& ShadersToRecompile,
 	TArray<uint8>* MeshMaterialMaps,
 	TArray<FString>* ModifiedFiles,
-	bool bCompileChangedShaders)
+	ODSCRecompileCommand RecompileCommandType)
 {
 	// figure out what shader platforms to recompile
 	ITargetPlatformManagerModule* TPM = GetTargetPlatformManager();
@@ -7076,6 +7080,7 @@ void RecompileShadersForRemote(
 	// Pick up new changes to shader files
 	FlushShaderFileCache();
 
+	const bool bCompileChangedShaders = RecompileCommandType == ODSCRecompileCommand::Changed;
 	if (bCompileChangedShaders)
 	{
 		GetOutdatedShaderTypes(OutdatedShaderTypes, OutdatedShaderPipelineTypes, OutdatedFactoryTypes);
@@ -7128,7 +7133,7 @@ void RecompileShadersForRemote(
 			// Only compile for the desired platform if requested
 			if (ShaderPlatform == ShaderPlatformToCompile || ShaderPlatformToCompile == SP_NumPlatforms)
 			{
-				if (bCompileChangedShaders)
+				if (RecompileCommandType == ODSCRecompileCommand::Global)
 				{
 					// Kick off global shader recompiles
 					BeginRecompileGlobalShaders(OutdatedShaderTypes, OutdatedShaderPipelineTypes, ShaderPlatform, TargetPlatform);
