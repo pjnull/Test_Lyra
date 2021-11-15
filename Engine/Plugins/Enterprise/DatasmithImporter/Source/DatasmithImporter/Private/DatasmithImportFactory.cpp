@@ -168,7 +168,7 @@ namespace DatasmithImportFactoryImpl
 			ReImportSceneData->AdditionalOptions.Add(OptionObj);
 		}
 		ReImportSceneData->Update( InContext.Options->FilePath, InContext.FileHash.IsValid() ? &InContext.FileHash : nullptr );
-		ReImportSceneData->SourceUri = InContext.Options->SourceUri;
+		ReImportSceneData->DatasmithImportInfo = FDatasmithImportInfo(InContext.Options->SourceUri, InContext.Options->SourceHash);
 
 		FAssetRegistryModule::AssetCreated(ReImportSceneData);
 
@@ -627,11 +627,11 @@ void UDatasmithImportFactory::SetReimportPaths( UObject* Obj, const TArray<FStri
 		FString SourceUriString = FSourceUri::FromFilePath(NewReimportPaths[0]).ToString();
 		if (UDatasmithAssetImportData* DatasmithAssetReImportData = Cast<UDatasmithAssetImportData>(ReImportData))
 		{
-			DatasmithAssetReImportData->SourceUri = MoveTemp(SourceUriString);
+			DatasmithAssetReImportData->DatasmithImportInfo = FDatasmithImportInfo(SourceUriString);
 		}
 		else if (UDatasmithSceneImportData* DatasmithSceneReImportData = Cast<UDatasmithSceneImportData>(ReImportData))
 		{
-			DatasmithSceneReImportData->SourceUri = MoveTemp(SourceUriString);
+			DatasmithSceneReImportData->DatasmithImportInfo = FDatasmithImportInfo(SourceUriString);
 		}
 	}
 }

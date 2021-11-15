@@ -69,6 +69,11 @@ namespace UE::DatasmithImporter
 		 */
 		virtual bool IsOutOfSync() const = 0;
 
+		/**
+		 * Gives the hash of the source, only returns a valid hash after loading the scene.
+		 */
+		virtual FMD5Hash GetSourceHash() const = 0;
+
 		virtual FExternalSourceCapabilities GetCapabilities() const = 0;
 
 		/**

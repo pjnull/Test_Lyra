@@ -53,7 +53,7 @@ namespace UE::DatasmithImporter
 		template<typename ImportDataType>
 		TSharedPtr<FExternalSource> TryGetExternalSourceFromImportData(const ImportDataType& ImportSourceData) const
 		{
-			FSourceUri SourceUri(ImportSourceData.SourceUri);
+			FSourceUri SourceUri(ImportSourceData.DatasmithImportInfo.SourceUri);
 
 			// If we have a valid URI, we should not try to read the source file path.
 			if (SourceUri.IsValid())

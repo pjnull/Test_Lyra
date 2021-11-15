@@ -437,7 +437,7 @@ namespace DatasmithSceneElementUtil
 								ReImportSceneData->AdditionalOptions.Add(OptionObj);
 							}
 							ReImportSceneData->Update(ImportContext.Options->FilePath, ImportContext.FileHash.IsValid() ? &ImportContext.FileHash : nullptr);
-							ReImportSceneData->SourceUri = ImportContext.Options->SourceUri;
+							ReImportSceneData->DatasmithImportInfo = FDatasmithImportInfo(ImportContext.Options->SourceUri, ImportContext.Options->SourceHash);
 
 							FAssetRegistryModule::AssetCreated(ReImportSceneData);
 
