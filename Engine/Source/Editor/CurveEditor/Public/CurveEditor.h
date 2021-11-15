@@ -280,7 +280,7 @@ public:
 	// ~FCurveEditor
 
 	// FEditorUndoClient
-	virtual void PostUndo(bool bSuccess);
+	virtual void PostUndo(bool bSuccess) override;
 	// ~FEditorUndoClient
 
 	const TArray<TSharedRef<ICurveEditorExtension>> GetEditorExtensions() const
