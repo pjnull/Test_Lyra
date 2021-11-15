@@ -2091,5 +2091,47 @@ void UControlRigSequencerEditorLibrary::SetLocalControlRigTransforms(ULevelSeque
 	}
 }
 
+bool UControlRigSequencerEditorLibrary::ImportFBXToControlRigTrack(UWorld* World, ULevelSequence* Sequence, UMovieSceneControlRigParameterTrack* InTrack, UMovieSceneControlRigParameterSection* InSection,
+	const TArray<FString>& ControlRigNames,
+	UMovieSceneUserImportFBXControlRigSettings* ImportFBXControlRigSettings,
+	const FString& ImportFilename)
+{
+
+	UMovieScene* MovieScene = Sequence->GetMovieScene();
+	if (!MovieScene || MovieScene->IsReadOnly() || !InTrack)
+	{
+		return false;
+	}
+
+	bool bValid = false;
+	ALevelSequenceActor* OutActor;
+	FMovieSceneSequencePlaybackSettings Settings;
+	FLevelSequenceCameraSettings CameraSettings;
+	ULevelSequencePlayer* Player = ULevelSequencePlayer::CreateLevelSequencePlayer(World, Sequence, Settings, OutActor);
+	Player->Initialize(Sequence, World->GetLevel(0), Settings, CameraSettings);
+	Player->State.AssignSequence(MovieSceneSequenceID::Root, *Sequence, *Player);
+
+	INodeAndChannelMappings* ChannelMapping = Cast<INodeAndChannelMappings>(InTrack);
+	if (ChannelMapping)
+	{
+		TArray<FFBXNodeAndChannels>* NodeAndChannels = ChannelMapping->GetNodeAndChannelMappings(InSection);
+		TArray<FName> SelectedControls;
+		for (const FString& StringName : ControlRigNames)
+		{
+			FName Name(*StringName);
+			SelectedControls.Add(Name);
+		}
+
+		bValid = MovieSceneToolHelpers::ImportFBXIntoControlRigChannels(MovieScene, ImportFilename, ImportFBXControlRigSettings,
+			NodeAndChannels, SelectedControls, MovieScene->GetTickResolution());
+		if (NodeAndChannels)
+		{
+			delete NodeAndChannels;
+		}
+	}
+	return bValid;
+}
+
+
 
 #undef LOCTEXT_NAMESPACE

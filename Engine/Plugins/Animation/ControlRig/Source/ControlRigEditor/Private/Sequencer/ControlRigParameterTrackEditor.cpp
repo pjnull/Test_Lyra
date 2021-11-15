@@ -2903,7 +2903,7 @@ void FControlRigParameterTrackEditor::BuildTrackContextMenu(FMenuBuilder& MenuBu
 		return;
 	}
 
-	TArray<FFBXNodeAndChannels>* NodeAndChannels = Track->GetNodeAndChannelMappings();
+	TArray<FFBXNodeAndChannels>* NodeAndChannels = Track->GetNodeAndChannelMappings(SectionToKey);
 
 	MenuBuilder.BeginSection("Import To Control Rig", NSLOCTEXT("Sequencer", "ImportToControlRig", "Import To Control Rig"));
 	{
