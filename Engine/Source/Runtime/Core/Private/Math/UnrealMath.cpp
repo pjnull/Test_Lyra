@@ -3200,18 +3200,6 @@ void FMath::ApplyScaleToFloat(float& Dst, const FVector& DeltaScale, float Magni
 	Dst = FMath::Max( 0.0f, Dst );
 }
 
-void FMath::CartesianToPolar(const FVector2D InCart, FVector2D& OutPolar)
-{
-	OutPolar.X = Sqrt(Square(InCart.X) + Square(InCart.Y));
-	OutPolar.Y = Atan2(InCart.Y, InCart.X);
-}
-
-void FMath::PolarToCartesian(const FVector2D InPolar, FVector2D& OutCart)
-{
-	OutCart.X = InPolar.X * Cos(InPolar.Y);
-	OutCart.Y = InPolar.X * Sin(InPolar.Y);
-}
-
 bool FRandomStream::ExportTextItem(FString& ValueStr, FRandomStream const& DefaultValue, class UObject* Parent, int32 PortFlags, class UObject* ExportRootScope) const
 {
 	if (0 != (PortFlags & EPropertyPortFlags::PPF_ExportCpp))

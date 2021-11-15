@@ -822,13 +822,18 @@ public:
 	static CORE_API float FixedTurn(float InCurrent, float InDesired, float InDeltaRate);
 
 	/** Converts given Cartesian coordinate pair to Polar coordinate system. */
-	static FORCEINLINE void CartesianToPolar(const float X, const float Y, float& OutRad, float& OutAng)
+	template<typename T>
+	static FORCEINLINE void CartesianToPolar(const T X, const T Y, T& OutRad, T& OutAng)
 	{
 		OutRad = Sqrt(Square(X) + Square(Y));
 		OutAng = Atan2(Y, X);
 	}
 	/** Converts given Cartesian coordinate pair to Polar coordinate system. */
-	static FORCEINLINE void CartesianToPolar(const FVector2D InCart, FVector2D& OutPolar);
+	template<typename T>
+	static FORCEINLINE void CartesianToPolar(const UE::Math::TVector2<T> InCart, UE::Math::TVector2<T>& OutPolar)
+	{
+		CartesianToPolar(InCart.X, InCart.Y, OutPolar.X, OutPolar.Y);
+	}
 
 	/** Converts given Polar coordinate pair to Cartesian coordinate system. */
 	template<typename T>
@@ -838,7 +843,11 @@ public:
 		OutY = Rad * Sin(Ang);
 	}
 	/** Converts given Polar coordinate pair to Cartesian coordinate system. */
-	static CORE_API void PolarToCartesian(const FVector2D InPolar, FVector2D& OutCart);
+	template<typename T>
+	static FORCEINLINE void PolarToCartesian(const UE::Math::TVector2<T> InPolar, UE::Math::TVector2<T>& OutCart)
+	{
+		PolarToCartesian(InPolar.X, InPolar.Y, OutCart.X, OutCart.Y);
+	}
 
 	/**
 	 * Calculates the dotted distance of vector 'Direction' to coordinate system O(AxisX,AxisY,AxisZ).
@@ -2305,6 +2314,8 @@ public:
 	static FORCEINLINE float Log2(T&& Value) { return Log2((float)Value); }
 	template<typename T1, typename T2, typename T3, TEMPLATE_REQUIRES(TIsAmbiguous<T1, T2, T3>)> UE_DEPRECATED(5.0, "Arguments cause function resolution ambiguity.")
 	static FORCEINLINE void PolarToCartesian(const T1 Rad, const T2 Ang, T3& OutX, T3& OutY) { float OX, OY; PolarToCartesian((float)Rad, (float)Ang, OX, OY); OutX = OX; OutY = OY; }
+	template<typename T1, typename T2, typename T3, TEMPLATE_REQUIRES(TIsAmbiguous<T1, T2, T3>)> UE_DEPRECATED(5.0, "Arguments cause function resolution ambiguity.")
+	static FORCEINLINE void CartesianToPolar(const T1 X, const T2 Y, T3& OutRad, T3& OutAng) { float ORad, OAng; CartesianToPolar((float)X, (float)Y, ORad, OAng); OutRad = ORad; OutAng = OAng; }
 
 	template<typename T1, typename T2, typename T3, TEMPLATE_REQUIRES(TIsAmbiguous<T1, T2, T3>)> UE_DEPRECATED(5.0, "Arguments cause function resolution ambiguity.")
 	static FORCEINLINE float SmoothStep(T1&& A, T2&& B, T3&& C) { return SmoothStep((float)A, (float)B, (float)C); }
