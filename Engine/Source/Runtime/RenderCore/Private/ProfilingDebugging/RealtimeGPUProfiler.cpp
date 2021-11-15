@@ -992,7 +992,7 @@ void FRealtimeGPUProfiler::PushStat(FRHICommandListImmediate& RHICmdList, const 
 {
 	PushEvent(RHICmdList.GetGPUMask(), Name, StatName).Submit(RHICmdList);
 
-	if (InNumDrawCallsPtr && (**InNumDrawCallsPtr) != -1)
+	if (InNumDrawCallsPtr)
 	{
 		RHICmdList.EnqueueLambda([InNumDrawCallsPtr](FRHICommandListImmediate&)
 		{
