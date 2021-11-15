@@ -141,9 +141,6 @@ protected:
 	bool StartServerWithLogs(IDisplayClusterServer* const Server, TSharedPtr<FDisplayClusterTcpListener>& TcpListener);
 	bool StartClientWithLogs(IDisplayClusterClient* const Client, const FString& Address, const uint16 Port, const uint32 ClientConnTriesAmount, const uint32 ClientConnRetryDelay) const;
 
-	virtual void OverrideMasterAddr(FString& Addr)
-	{ }
-
 private:
 	const FString NodeName;
 	const FString ControllerName;

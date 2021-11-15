@@ -186,15 +186,15 @@ bool FDisplayClusterClusterNodeCtrlSlave::StartClients()
 		return false;
 	}
 
-	// Allow children to override master's address
-	FString HostToUse = CfgMaster->Host;
-	OverrideMasterAddr(HostToUse);
+	// Helper shortcuts to avoid long lines below
+	const FDisplayClusterConfigurationMasterNode&      MasterNode      = ConfigData->Cluster->MasterNode;
+	const FDisplayClusterConfigurationNetworkSettings& NetworkSettings = ConfigData->Cluster->Network;
 
 	// Start the clients
-	return StartClientWithLogs(ClusterSyncClient.Get(),         HostToUse, ConfigData->Cluster->MasterNode.Ports.ClusterSync,         ConfigData->Cluster->Network.ConnectRetriesAmount, ConfigData->Cluster->Network.ConnectRetryDelay)
-		&& StartClientWithLogs(RenderSyncClient.Get(),          HostToUse, ConfigData->Cluster->MasterNode.Ports.ClusterSync,         ConfigData->Cluster->Network.ConnectRetriesAmount, ConfigData->Cluster->Network.ConnectRetryDelay)
-		&& StartClientWithLogs(ClusterEventsJsonClient.Get(),   HostToUse, ConfigData->Cluster->MasterNode.Ports.ClusterEventsJson,   ConfigData->Cluster->Network.ConnectRetriesAmount, ConfigData->Cluster->Network.ConnectRetryDelay)
-		&& StartClientWithLogs(ClusterEventsBinaryClient.Get(), HostToUse, ConfigData->Cluster->MasterNode.Ports.ClusterEventsBinary, ConfigData->Cluster->Network.ConnectRetriesAmount, ConfigData->Cluster->Network.ConnectRetryDelay);
+	return StartClientWithLogs(ClusterSyncClient.Get(),         CfgMaster->Host, MasterNode.Ports.ClusterSync,         NetworkSettings.ConnectRetriesAmount, NetworkSettings.ConnectRetryDelay)
+		&& StartClientWithLogs(RenderSyncClient.Get(),          CfgMaster->Host, MasterNode.Ports.ClusterSync,         NetworkSettings.ConnectRetriesAmount, NetworkSettings.ConnectRetryDelay)
+		&& StartClientWithLogs(ClusterEventsJsonClient.Get(),   CfgMaster->Host, MasterNode.Ports.ClusterEventsJson,   NetworkSettings.ConnectRetriesAmount, NetworkSettings.ConnectRetryDelay)
+		&& StartClientWithLogs(ClusterEventsBinaryClient.Get(), CfgMaster->Host, MasterNode.Ports.ClusterEventsBinary, NetworkSettings.ConnectRetriesAmount, NetworkSettings.ConnectRetryDelay);
 }
 
 void FDisplayClusterClusterNodeCtrlSlave::StopClients()

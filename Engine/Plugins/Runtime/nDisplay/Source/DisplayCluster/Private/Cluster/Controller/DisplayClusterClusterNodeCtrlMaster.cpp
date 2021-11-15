@@ -148,12 +148,8 @@ bool FDisplayClusterClusterNodeCtrlMaster::StartServers()
 		return false;
 	}
 
-	// Allow children to override master's address
-	FString HostToUse = CfgMaster->Host;
-	OverrideMasterAddr(HostToUse);
-
 	const FDisplayClusterConfigurationMasterNodePorts& Ports = ConfigData->Cluster->MasterNode.Ports;
-	UE_LOG(LogDisplayClusterCluster, Log, TEXT("Servers: addr %s, port_cs %d, port_ce %d, port_ceb %d"), *HostToUse, Ports.ClusterSync, Ports.ClusterEventsJson, Ports.ClusterEventsBinary);
+	UE_LOG(LogDisplayClusterCluster, Log, TEXT("Servers: addr %s, port_cs %d, port_ce %d, port_ceb %d"), *CfgMaster->Host, Ports.ClusterSync, Ports.ClusterEventsJson, Ports.ClusterEventsBinary);
 
 	// Connection validation lambda
 	auto IsConnectionAllowedFunc = [](const FDisplayClusterSessionInfo& SessionInfo)
@@ -180,9 +176,9 @@ bool FDisplayClusterClusterNodeCtrlMaster::StartServers()
 	// Start the servers
 	return StartServerWithLogs(ClusterSyncServer.Get(),         TcpListener) // Start with shared listener
 		&& StartServerWithLogs(RenderSyncServer.Get(),          TcpListener) // Start with shared listener
-		&& StartServerWithLogs(ClusterEventsJsonServer.Get(),   HostToUse, Ports.ClusterEventsJson)
-		&& StartServerWithLogs(ClusterEventsBinaryServer.Get(), HostToUse, Ports.ClusterEventsBinary)
-		&& TcpListener->StartListening(HostToUse, Ports.ClusterSync); // Start shared listener as well
+		&& StartServerWithLogs(ClusterEventsJsonServer.Get(),   CfgMaster->Host, Ports.ClusterEventsJson)
+		&& StartServerWithLogs(ClusterEventsBinaryServer.Get(), CfgMaster->Host, Ports.ClusterEventsBinary)
+		&& TcpListener->StartListening(CfgMaster->Host, Ports.ClusterSync); // Start shared listener as well
 }
 
 void FDisplayClusterClusterNodeCtrlMaster::StopServers()
