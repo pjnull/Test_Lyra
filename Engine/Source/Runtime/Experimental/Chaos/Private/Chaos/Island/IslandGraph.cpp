@@ -436,7 +436,7 @@ void FIslandGraph<NodeType, EdgeType, IslandType>::SplitIslands()
 					// It is why by default the first one is the main one
 					if(GraphIslands[CurrentIsland].IslandCounter == GraphCounter)
 					{
-						FGraphIsland GraphIsland = { 1, 0, false, false };
+						FGraphIsland GraphIsland = { 0, 1, 0, false, false };
 						CurrentIsland = GraphIslands.Emplace(GraphIsland);
 					}
 					
