@@ -5,7 +5,7 @@ import logging
 import os
 import threading
 import time
-
+import re
 from typing import List, Optional, Set
 
 from PySide2 import QtCore
@@ -349,7 +349,10 @@ class SwitchboardDialog(QtCore.QObject):
         # set up a thread that does periodic maintenace tasks
         self.setup_periodic_tasks_thread()
 
-        # Stylesheet-related: Object names used for selectors, no focus forcing
+        # Connect to the session increment number.
+        self.window.multiuser_session_inc_button.clicked.connect(self.on_multiuser_session_inc)
+
+         # Stylesheet-related: Object names used for selectors, no focus forcing
         def configure_ctrl_btn(btn: sb_widgets.ControlQPushButton, name: str):
             btn.setObjectName(name)
             btn.hover_focus = False
@@ -1099,6 +1102,27 @@ class SwitchboardDialog(QtCore.QObject):
 
     def on_multiuser_session_lineEdit_textChanged(self, text):
         self.set_multiuser_session_name(text)
+
+    def on_multiuser_session_inc(self):
+        '''
+        Increment the session name by 1.
+        '''
+        current_name = self.multiuser_session_name()
+        match = re.search(r'\d+$', current_name)
+        basename = current_name
+        num_as_int = 1
+        padding = 0
+        if match is not None:
+            num_as_str = match.group()
+            basename = str.join(num_as_str, current_name.split(num_as_str)[:-1])
+            try:
+                num_as_int = int(num_as_str) + 1
+                padding = len(num_as_str)
+            except ValueError:
+                # Do not treat value conversion as an error it will just refer back to default value.
+                pass
+        new_num = f'{num_as_int}'.zfill(padding)
+        self.set_multiuser_session_name(f'{basename}{new_num}')
 
     def set_multiuser_session_name(self, value):
 
