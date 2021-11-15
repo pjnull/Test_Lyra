@@ -870,7 +870,6 @@ void FMaterialInstanceEditor::GenerateInheritanceMenu(UToolMenu* Menu)
 {
 	RebuildInheritanceList();
 	Menu->bShouldCloseWindowAfterMenuSelection = true;
-	Menu->bSearchable = true;
 	Menu->SetMaxHeight(500);
 
 	{
