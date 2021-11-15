@@ -5696,7 +5696,8 @@ void ULandscapeComponent::ReallocateWeightmaps(FLandscapeEditDataInterface* Data
 	FGuid TargetLayerGuid = InCanUseEditingWeightmap ? EditingLayerGUID : FGuid();
 
 	// We shouldn't ever be recording a transaction when reallocating weightmaps for the splines edit layer (procedural layer) :
-	check((TargetLayerGuid != GetLandscapeActor()->GetLandscapeSplinesReservedLayer()->Guid) || (GUndo == nullptr));
+	FLandscapeLayer* SplinesLayer = GetLandscapeActor()->GetLandscapeSplinesReservedLayer();
+	check((SplinesLayer == nullptr) || (TargetLayerGuid != SplinesLayer->Guid) || (GUndo == nullptr));
 
 	TArray<FWeightmapLayerAllocationInfo>& ComponentWeightmapLayerAllocations = GetWeightmapLayerAllocations(InCanUseEditingWeightmap);
 	TArray<UTexture2D*>& ComponentWeightmapTextures = GetWeightmapTextures(InCanUseEditingWeightmap);
