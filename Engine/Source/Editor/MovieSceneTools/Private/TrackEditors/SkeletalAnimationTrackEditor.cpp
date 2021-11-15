@@ -615,9 +615,10 @@ int32 FSkeletalAnimationSection::OnPaintSection( FSequencerSectionPainter& Paint
 		{
 			// Draw the current time next to the scrub handle
 			const float AnimTime = Section.MapTimeToAnimation(CurrentTime, TickResolution);
-			int32 FrameTime = Section.Params.Animation->GetFrameAtTime(AnimTime);
+			const FFrameRate SamplingFrameRate = Section.Params.Animation->GetSamplingFrameRate();
+			const FFrameTime FrameTime = SamplingFrameRate.AsFrameTime(AnimTime);
 
-			DrawFrameNumberHint(Painter, CurrentTime, FrameTime);
+			DrawFrameTimeHint(Painter, CurrentTime, FrameTime);
 		}
 	}
 	
