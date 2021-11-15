@@ -415,6 +415,13 @@ void UAnimGraphNode_AnimDynamics::Serialize(FArchive& Ar)
 		ConSetup.AngularLimitsMin = FVector(-ConSetup.AngularXAngle_DEPRECATED, -ConSetup.AngularYAngle_DEPRECATED, -ConSetup.AngularZAngle_DEPRECATED);
 		ConSetup.AngularLimitsMax = FVector(ConSetup.AngularXAngle_DEPRECATED, ConSetup.AngularYAngle_DEPRECATED, ConSetup.AngularZAngle_DEPRECATED);
 	}
+
+	Ar.UsingCustomVersion(FFortniteMainBranchObjectVersion::GUID);
+		
+	if (Ar.CustomVer(FFortniteMainBranchObjectVersion::GUID) < FFortniteMainBranchObjectVersion::GravityOverrideDefinedInWorldSpace)
+	{
+		Node.bGravityOverrideInSimSpace = true;
+	}
 }
 
 #undef LOCTEXT_NAMESPACE
