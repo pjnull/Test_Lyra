@@ -133,7 +133,7 @@ void FTopologicalLoop::Get2DSampling(TArray<FPoint2D>& LoopSampling)
 	LoopSampling.Emplace(LoopSampling[0]);
 }
 
-void FTopologicalLoop::Get2DSamplingWithoutDegeneratedEdges(TArray<FPoint2D>& LoopSampling)
+bool FTopologicalLoop::Get2DSamplingWithoutDegeneratedEdges(TArray<FPoint2D>& LoopSampling)
 {
 	double LoopLength = 0;
 	int32 EdgeCount = 0;
@@ -164,7 +164,14 @@ void FTopologicalLoop::Get2DSamplingWithoutDegeneratedEdges(TArray<FPoint2D>& Lo
 		Edge.Entity->GetDiscretization2DPoints(Edge.Direction, LoopSampling);
 		LoopSampling.Pop();
 	}
+
+	if(LoopSampling.Num() < 3)
+	{
+		return false;
+	}
+
 	LoopSampling.Emplace(LoopSampling[0]);
+	return true;
 }
 
 /**
@@ -201,7 +208,12 @@ void FTopologicalLoop::Orient()
 
 	TArray<FPoint2D> LoopSampling;
 
-	Get2DSamplingWithoutDegeneratedEdges(LoopSampling);
+	if (!Get2DSamplingWithoutDegeneratedEdges(LoopSampling))
+	{
+		// the loop is degenerated
+		return;
+	}
+
 	LoopSampling.Pop();
 	TSet<int32> ExtremityIndex;
 	ExtremityIndex.Reserve(8);

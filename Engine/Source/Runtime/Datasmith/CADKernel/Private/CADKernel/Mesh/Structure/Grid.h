@@ -70,6 +70,8 @@ namespace CADKernel
 
 		const TSharedRef<FTopologicalFace> Face;
 		const FSurfacicTolerance FaceTolerance;
+		const double Tolerance3D;
+		const double MinimumElementSize;
 
 		TSharedRef<FModelMesh> MeshModel;
 
@@ -207,6 +209,12 @@ namespace CADKernel
 		 * @see ProcessPointClound (called in ProcessPointClound)
 		 */
 		void ScaleLoops();
+
+		/**
+		 * After the loops have been scaled, the distance between two consecutive vertices is verified to avoid degenerated mesh elements
+		 * @ return false if the external loop is degenerated after the process
+		 */
+		bool RemoveCoincidentNodes();
 
 		/**
 		 * Convert Coordinate of "DefaultParametric" space into a scaled parametric space
@@ -525,11 +533,11 @@ namespace CADKernel
 		}
 
 		/**
-		 * @return the minimal size of the mesh elements in the grid
+		 * @return the minimal size of the mesh elements according to 3d geometric tolerance
 		 */
 		double GetMinElementSize() const
 		{
-			return MinOfMaxElementSize;
+			return MinimumElementSize;
 		}
 
 		// ======================================================================================================================================================================================================================

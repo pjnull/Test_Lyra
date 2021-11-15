@@ -202,8 +202,9 @@ namespace CADKernel
 		 * - so where projections on these area are hazardous
 		 * - so where 2d curve computation based on hazardous projection is hazardous...
 		 * - so where the sampling could be in self-intersecting
+		 * @return false if the loop is degenerated
 		 */
-		void Get2DSamplingWithoutDegeneratedEdges(TArray<FPoint2D>& LoopSampling);
+		bool Get2DSamplingWithoutDegeneratedEdges(TArray<FPoint2D>& LoopSampling);
 
 		void FindSurfaceCorners(TArray<TSharedPtr<FTopologicalVertex>>& OutCorners, TArray<int32>& OutStartSideIndex) const;
 		void FindBreaks(TArray<TSharedPtr<FTopologicalVertex>>& Ruptures, TArray<int32>& OutStartSideIndex, TArray<double>& RuptureValues) const;

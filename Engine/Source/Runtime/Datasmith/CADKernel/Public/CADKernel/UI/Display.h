@@ -39,12 +39,13 @@ namespace CADKernel
 
 #ifdef CADKERNEL_DEV
 	void Wait(bool bMakeWait = true);
+	void Open3DDebugSession(FString name, const TArray<FIdent>& idList = TArray<FIdent>());
+	void Close3DDebugSession(bool bIsDisplayed = true);
 #else
 	inline void Wait(bool bMakeWait = true) {};
+	inline void Open3DDebugSession(FString name, const TArray<FIdent>& idList = TArray<FIdent>()) {};
+	inline void Close3DDebugSession(bool bIsDisplayed = true) {};
 #endif
-
-	void Open3DDebugSession(FString name, const TArray<FIdent>& idList = TArray<FIdent>());
-	void Close3DDebugSession();
 
 	class CADKERNEL_API F3DDebugSession
 	{

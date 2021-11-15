@@ -30,21 +30,20 @@
 
 namespace CADKernel
 {
+#ifdef CADKERNEL_DEV
 	void Open3DDebugSession(FString name, const TArray<FIdent>& IdArray)
 	{
-#ifdef CADKERNEL_DEV
 		FSystem::Get().GetVisu()->Open3DDebugSession(*name, IdArray);
-#endif
 	}
 
-	void Close3DDebugSession()
+	void Close3DDebugSession(bool bIsDisplayed)
 	{
-#ifdef CADKERNEL_DEV
-		FSystem::Get().GetVisu()->Close3DDebugSession();
-#endif
+		if (bIsDisplayed)
+		{
+			FSystem::Get().GetVisu()->Close3DDebugSession();
+		}
 	}
 
-#ifdef CADKERNEL_DEV
 	void Wait(bool bMakeWait)
 	{
 		if (bMakeWait)

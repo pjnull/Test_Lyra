@@ -18,6 +18,8 @@ namespace CADKernel
 FGrid::FGrid(TSharedRef<FTopologicalFace>& InFace, TSharedRef<FModelMesh>& InMeshModel)
 	: Face(InFace)
 	, FaceTolerance(InFace->GetIsoTolerances())
+	, Tolerance3D(InFace->GetCarrierSurface()->Get3DTolerance())
+	, MinimumElementSize(Tolerance3D * 10.)
 	, MeshModel(InMeshModel)
 	, ThinZoneFinder(*this)
 	, CuttingCoordinates(Face->GetCuttingPointCoordinates())
@@ -43,6 +45,13 @@ void FGrid::ProcessPointCloud()
 	}
 
 	ScaleLoops();
+	if (!RemoveCoincidentNodes())
+	{
+		// the external loop is degenerated, the face is degenerate...
+		// the mesh is canceled
+		SetAsDegenerated();
+		return;
+	}
 
 #ifdef DEBUG_GRID
 	DisplayLoop(TEXT("FGrid::Loop 2D"), GetLoops2D(EGridSpace::Default2D), true, false);
@@ -1334,6 +1343,7 @@ void FGrid::TransformPoints(EGridSpace DestinationSpace, const TArray<FPoint2D>&
 
 void FGrid::SearchThinZones()
 {
+	ensure(false);
 	double Size = GetMinElementSize();
 	ThinZoneFinder.Set(Size / 3.);
 	ThinZoneFinder.SearchThinZones();
@@ -1368,6 +1378,88 @@ void FGrid::ScaleLoops()
 
 	}
 }
+
+bool FGrid::RemoveCoincidentNodes()
+{
+	const double SquareMinimumSize = FMath::Square(MinimumElementSize);
+
+	for (int32 IndexBoudnary = FaceLoops2D[EGridSpace::Default2D].Num() - 1; IndexBoudnary >= 0; --IndexBoudnary)
+	{
+		TArray<FPoint2D>& Loop2D = FaceLoops2D[EGridSpace::Default2D][IndexBoudnary];
+		TArray<FPoint2D>& ScaledLoop = FaceLoops2D[EGridSpace::Scaled][IndexBoudnary];
+		TArray<FPoint2D>& UniformScaledLoop = FaceLoops2D[EGridSpace::UniformScaled][IndexBoudnary];
+		TArray<int32>& NodeIdsOfLoop = NodeIdsOfFaceLoops[IndexBoudnary];
+		TArray<FPoint>& Loop3D = FaceLoops3D[IndexBoudnary];
+
+		double SquareDistance2D;
+		double SquareDistance;
+		int32 NewIndex = 1;
+		int32 NextIndex = 1;
+
+		TFunction<void(int32)> CheckAndUpdate = [&](int32 IndexFor3D)
+		{
+			if (SquareDistance2D > SquareMinimumSize)
+			{
+				if (SquareDistance > SquareMinimumSize)
+				{
+					if (NextIndex != NewIndex)
+					{
+						UniformScaledLoop[NewIndex] = UniformScaledLoop[NextIndex];
+						Loop3D[NewIndex] = Loop3D[NextIndex];
+						Loop2D[NewIndex] = Loop2D[NextIndex];
+						ScaledLoop[NewIndex] = ScaledLoop[NextIndex];
+						NodeIdsOfLoop[NewIndex] = NodeIdsOfLoop[NextIndex];
+					}
+				}
+				else
+				{
+					if (NextIndex != NewIndex)
+					{
+						UniformScaledLoop[NewIndex] = UniformScaledLoop[NextIndex];
+					}
+					Loop3D[NewIndex] = Loop3D[IndexFor3D];
+					NodeIdsOfLoop[NewIndex] = NodeIdsOfLoop[IndexFor3D];
+				}
+				NewIndex++;
+			}
+		};
+
+		for (; NextIndex < Loop2D.Num(); ++NextIndex)
+		{
+			SquareDistance2D = UniformScaledLoop[NewIndex - 1].SquareDistance(UniformScaledLoop[NextIndex]);
+			SquareDistance = Loop3D[NewIndex - 1].SquareDistance(Loop3D[NextIndex]);
+			CheckAndUpdate(NewIndex - 1);
+		}
+
+		NewIndex--;
+		NextIndex--;
+		SquareDistance2D = UniformScaledLoop[NewIndex].SquareDistance(UniformScaledLoop[0]);
+		SquareDistance = Loop3D[NewIndex].SquareDistance(Loop3D[0]);
+		CheckAndUpdate(0);
+
+		Loop3D.SetNum(NewIndex);
+		Loop2D.SetNum(NewIndex);
+		ScaledLoop.SetNum(NewIndex);
+		NodeIdsOfLoop.SetNum(NewIndex);
+		UniformScaledLoop.SetNum(NewIndex);
+
+		if(NewIndex < 3)
+		{
+			FaceLoops2D[EGridSpace::Default2D].RemoveAt(IndexBoudnary);
+			FaceLoops2D[EGridSpace::Scaled].RemoveAt(IndexBoudnary);
+			FaceLoops2D[EGridSpace::UniformScaled].RemoveAt(IndexBoudnary);
+			NodeIdsOfFaceLoops.RemoveAt(IndexBoudnary);
+			FaceLoops3D.RemoveAt(IndexBoudnary);
+			if (IndexBoudnary == 0)
+			{
+				// the external loop is degenerated, the face is degenerate...
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
 
 void FGrid::ComputeMaxDeltaUV()
 {
