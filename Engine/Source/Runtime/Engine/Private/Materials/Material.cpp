@@ -2115,7 +2115,7 @@ void UMaterial::CacheResourceShadersForRendering(bool bRegenerateId, EMaterialSh
 	if (bRegenerateId)
 	{
 		// Regenerate this material's Id if requested
-		FlushResourceShaderMaps();
+		ReleaseResourcesAndMutateDDCKey();
 	}
 
 	// Resources cannot be deleted before uniform expressions are recached because
@@ -2185,17 +2185,7 @@ void UMaterial::CacheResourceShadersForRendering(bool bRegenerateId, EMaterialSh
 		RecacheUniformExpressions(true);
 	}
 
-	if (ResourcesToFree.Num())
-	{
-		ENQUEUE_RENDER_COMMAND(CmdFreeUnusedMaterialResources)(
-			[ResourcesToFreeRT = MoveTemp(ResourcesToFree)](FRHICommandList&)
-		{
-			for (int32 Idx = 0; Idx < ResourcesToFreeRT.Num(); ++Idx)
-			{
-				delete ResourcesToFreeRT[Idx];
-			}
-		});
-	}
+	FMaterial::DeferredDeleteArray(ResourcesToFree);
 }
 
 void UMaterial::CacheResourceShadersForCooking(EShaderPlatform ShaderPlatform, TArray<FMaterialResource*>& OutCachedMaterialResources, const ITargetPlatform* TargetPlatform)
@@ -2280,20 +2270,21 @@ void UMaterial::CacheShadersForResources(EShaderPlatform ShaderPlatform, const T
 	}
 }
 
-void UMaterial::FlushResourceShaderMaps()
+void UMaterial::ReleaseResourcesAndMutateDDCKey()
 {
 	FPlatformMisc::CreateGuid(StateId);
 
 	if(FApp::CanEverRender())
 	{
-		const uint32 FeatureLevels = GetFeatureLevelsToCompileForAllMaterials(); // @todo - do we need to check this?
 		for (FMaterialResource* CurrentResource : MaterialResources)
 		{
-			if (FeatureLevels & (1 << CurrentResource->GetFeatureLevel()))
-			{
-				CurrentResource->ReleaseShaderMap();
-			}
+			CurrentResource->ReleaseShaderMap();
 		}
+
+		// Release all resources because we could have changed the quality levels (e.g. in material editor).
+		FMaterialResourceDeferredDeletionArray ResourcesToFree = MoveTemp(MaterialResources);
+		MaterialResources.Reset();
+		FMaterial::DeferredDeleteArray(ResourcesToFree);
 	}
 }
 
@@ -2608,7 +2599,7 @@ void UMaterial::BackwardsCompatibilityVirtualTextureOutputConversion()
 		}
 
 		// Recompile after changes.
-		FlushResourceShaderMaps();
+		ReleaseResourcesAndMutateDDCKey();
 
 		// Note we can't mark the package dirty during post load so we will recompile on load until this material is manually resaved. 
 		// Also we can't fully deprecate until all the relevant materials are resaved. 
@@ -2703,7 +2694,7 @@ void UMaterial::BackwardsCompatibilityDecalConversion()
 		}
 
 		// Force the material to recompile.
-		FlushResourceShaderMaps();
+		ReleaseResourcesAndMutateDDCKey();
 
 		// Note we can't mark the package dirty during post load so we will recompile on load until this material is manually resaved. 
 		// Add an asset check here to encourage a save.
@@ -3261,7 +3252,7 @@ void UMaterial::PostLoad()
 			// Force this material to recompile because its expressions have changed
 			// Warning: any content taking this path will recompile every load until saved!
 			// Which means removing an expression class will cause the need for a resave of all materials
-			FlushResourceShaderMaps();
+			ReleaseResourcesAndMutateDDCKey();
 		}
 	}
 #endif // WITH_EDITOR

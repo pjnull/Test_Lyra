@@ -1458,7 +1458,7 @@ private:
 	/**
 	 * Flush existing resource shader maps and resets the material resource's Ids.
 	 */
-	ENGINE_API virtual void FlushResourceShaderMaps();
+	ENGINE_API virtual void ReleaseResourcesAndMutateDDCKey();
 	
 	/** 
 	 * Cache resource shaders for rendering. 
