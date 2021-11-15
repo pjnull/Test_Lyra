@@ -35,10 +35,11 @@ struct FCurveEditorSnapMetrics;
 class ICurveEditorExtension;
 class ICurveEditorToolExtension;
 class IBufferedCurveModel;
+class FCurveEditor;
 
 DECLARE_DELEGATE_OneParam(FOnSetBoolean, bool)
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnActiveToolChanged, FCurveEditorToolID)
-DECLARE_MULTICAST_DELEGATE_TwoParams(FOnCurveArrayChanged, FCurveModel*, bool /*displayed*/);
+DECLARE_MULTICAST_DELEGATE_ThreeParams(FOnCurveArrayChanged, FCurveModel*, bool /*displayed*/,const FCurveEditor*);
 
 
 class CURVEEDITOR_API FCurveEditor 
@@ -376,6 +377,15 @@ public:
 	{
 		return &Tree;
 	}
+
+	/**
+	Whether or not we are are doign a direct selection, could be used to see why a curve model is being created or destroyed, by direct selection or by sequencer filtering?
+	*/
+	bool IsDoingDirectSelection() const
+	{
+		return Tree.IsDoingDirectSelection();
+	}
+
 
 	/**
 	 * Retrieve a serial number that is incremented any time a curve is added or removed

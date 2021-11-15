@@ -36,6 +36,7 @@ class IDetailsView;
 class IKeyArea;
 enum class EMapChangeType : uint8;
 class FCurveModel;
+class FCurveEditor;
 struct FMovieSceneSequencePlaybackParams;
 struct FMovieSceneChannelMetaData;
 class IToolkitHost;
@@ -178,7 +179,7 @@ public:
 
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnSelectionChangedSections, TArray<UMovieSceneSection*> /*Sections*/);
 
-	DECLARE_MULTICAST_DELEGATE_TwoParams(FOnCurveDisplayChanged, FCurveModel* , bool /*displayed*/);
+	DECLARE_MULTICAST_DELEGATE_ThreeParams(FOnCurveDisplayChanged, FCurveModel* , bool /*displayed*/,const FCurveEditor*);
 
 
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnCloseEvent, TSharedRef<ISequencer>);

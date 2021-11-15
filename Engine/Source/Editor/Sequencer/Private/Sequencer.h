@@ -1391,7 +1391,7 @@ private:
 	FOnActivateSequence OnActivateSequenceEvent;
 
 	/** Delegate for Curve Display Changed Event from the Curve Editor, which we than pass to the FOnCurveDisplayChanged delegate */
-	void OnCurveModelDisplayChanged(FCurveModel *InCurveModel, bool bDisplayed);
+	void OnCurveModelDisplayChanged(FCurveModel *InCurveModel, bool bDisplayed, const FCurveEditor* InCurveEditor);
 
 	int32 SilentModeCount;
 

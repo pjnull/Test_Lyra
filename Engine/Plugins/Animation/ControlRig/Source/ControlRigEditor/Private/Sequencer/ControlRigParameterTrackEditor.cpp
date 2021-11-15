@@ -49,6 +49,7 @@
 #include "IKeyArea.h"
 #include "ISequencer.h"
 #include "CurveModel.h"
+#include "CurveEditor.h"
 #include "ControlRigEditorModule.h"
 #include "SequencerSettings.h"
 #include "Framework/Application/SlateApplication.h"
@@ -1716,12 +1717,14 @@ void FControlRigParameterTrackEditor::OnSequencerDataChanged(EMovieSceneDataChan
 	}
 }
 
-void FControlRigParameterTrackEditor::OnCurveDisplayChanged(FCurveModel* CurveModel, bool bDisplayed)
+void FControlRigParameterTrackEditor::OnCurveDisplayChanged(FCurveModel* CurveModel, bool bDisplayed, const FCurveEditor* InCurveEditor)
 {
-	if (bIsDoingSelection)
+	//if already doing a selection or the curve editor isn't doing a direct selection, for example sequencer filtering removed the curve, we dont' update control selection
+	if (bIsDoingSelection || (InCurveEditor && InCurveEditor->IsDoingDirectSelection() == false))
 	{
 		return;
 	}
+	
 	TGuardValue<bool> Guard(bIsDoingSelection, true);
 	FScopedTransaction ScopedTransaction(LOCTEXT("SelectControlTransaction", "Select Control"), !GIsTransacting);
 
@@ -2890,7 +2893,11 @@ void FControlRigParameterTrackEditor::BuildTrackContextMenu(FMenuBuilder& MenuBu
 		return;
 	}
 
-	UMovieSceneControlRigParameterSection* SectionToKey = Cast<UMovieSceneControlRigParameterSection>(Track->FindOrAddSection(0, bSectionAdded));
+	UMovieSceneControlRigParameterSection* SectionToKey = Cast<UMovieSceneControlRigParameterSection>(Track->GetSectionToKey());
+	if (SectionToKey == nullptr)
+	{
+		SectionToKey = Cast<UMovieSceneControlRigParameterSection>(Track->FindOrAddSection(0, bSectionAdded));
+	}
 	if (!SectionToKey)
 	{
 		return;

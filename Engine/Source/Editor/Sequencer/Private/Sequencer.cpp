@@ -14133,9 +14133,9 @@ FText FSequencer::GetDisplayName(FGuid Binding)
 }
 
 
-void FSequencer::OnCurveModelDisplayChanged(FCurveModel *InCurveModel, bool bDisplayed)
+void FSequencer::OnCurveModelDisplayChanged(FCurveModel *InCurveModel, bool bDisplayed, const FCurveEditor* InCurveEditor)
 {
-	OnCurveDisplayChanged.Broadcast(InCurveModel, bDisplayed);
+	OnCurveDisplayChanged.Broadcast(InCurveModel, bDisplayed, InCurveEditor);
 }
 
 void FSequencer::ToggleAsyncEvaluation()
