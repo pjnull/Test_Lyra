@@ -29,8 +29,10 @@ float4 StrataEnvironmentLighting(
 	float3 CommonFactor = 1;
 	CommonFactor *= View.PreExposure;
 
+#if APPLY_SKY_SHADOWING
 	// Sample DFAO only once
 	FUpsampleDFAOOutput UpsampleDFAOOutput = UpsampleDFAO(BufferUV, SceneDepth);
+#endif
 
 	float CombinedScreenAndMaterialAO = StrataPixelHeader.MaterialAO * AmbientOcclusion;
 
@@ -58,18 +60,6 @@ float4 StrataEnvironmentLighting(
 		StrataEnvLight.DiffuseNormal = ApplyDFAO(UpsampleDFAOOutput, StrataEnvLight.DiffuseNormal);
 	#endif
 
-		// Compute some extra occlusion information from DFAO and sky light data
-		float IndirectSpecularOcclusion = 1.0f;
-		float IndirectDiffuseOcclusion = 1.0f;
-		float3 ExtraIndirectSpecular = 0.0f;
-	#if SUPPORT_DFAO_INDIRECT_OCCLUSION
-		const bool bTwoSideFoliage = false;
-		GetDistanceFieldAOSpecularOcclusion(
-			StrataEnvLight.DiffuseNormal, StrataEnvLight.SpecularDirection, StrataEnvLight.SpecularSafeRoughness, bTwoSideFoliage,
-			IndirectSpecularOcclusion, IndirectDiffuseOcclusion, ExtraIndirectSpecular);
-		// STRATA_TODO: handle ExtraIndirectSpecular
-	#endif
-
 		// Diffuse component
 		float3 DiffuseSkyLighting = 0;
 		const bool bProcessFrontFaceDiffuse = any(StrataEnvLight.DiffuseWeight > 0.0f);
@@ -82,7 +72,7 @@ float4 StrataEnvironmentLighting(
 			if (bProcessFrontFaceDiffuse)
 			{
 				// Finally sample the sky diffuse contribution (spherical harmonic, Lambert BRDF)
-				float3 DiffuseLookup = GetSkySHDiffuse(StrataEnvLight.DiffuseNormal) * View.SkyLightColor.rgb * IndirectDiffuseOcclusion;
+				float3 DiffuseLookup = GetSkySHDiffuse(StrataEnvLight.DiffuseNormal) * View.SkyLightColor.rgb;
 				// And accumulate
 				// Note: Use diffuse directional albedo (i.e., DiffuseWeight) as first order approximation for env. integration (STRATA_TODO instead compute SH coefficients for Chan)
 				DiffuseSkyLighting = BSDFThroughput * (SkyVisData.SkyDiffuseLookUpMul * DiffuseLookup + SkyVisData.SkyDiffuseLookUpAdd) * StrataEnvLight.DiffuseWeight;
@@ -93,7 +83,7 @@ float4 StrataEnvironmentLighting(
 				// However, we do apply SkyVisData.SkyDiffuseLookUpMul for scaling consistency.
 
 				// Finally sample the sky diffuse contribution (spherical harmonic, Lambert BRDF) along the opposite normal direction
-				float3 DiffuseLookup = GetSkySHDiffuse(-StrataEnvLight.DiffuseNormal) * View.SkyLightColor.rgb * IndirectDiffuseOcclusion;
+				float3 DiffuseLookup = GetSkySHDiffuse(-StrataEnvLight.DiffuseNormal) * View.SkyLightColor.rgb;
 				// And accumulate
 				// Note: Use diffuse directional albedo (i.e., DiffuseWeight) as first order approximation for env. integration (STRATA_TODO instead compute SH coefficients for Chan)
 				DiffuseSkyLighting += BSDFThroughput * (SkyVisData.SkyDiffuseLookUpMul * DiffuseLookup) * StrataEnvLight.DiffuseBackFaceWeight;
@@ -105,6 +95,18 @@ float4 StrataEnvironmentLighting(
 		float3 SpecularSkyLighting = 0;
 		if (any(StrataEnvLight.SpecularWeight > 0.0f))
 		{
+			// Compute some extra occlusion information from DFAO and sky light data
+			float IndirectSpecularOcclusion = 1.0f;
+			float IndirectDiffuseOcclusion = 1.0f;
+			float3 ExtraIndirectSpecular = 0.0f;
+		#if SUPPORT_DFAO_INDIRECT_OCCLUSION
+			const bool bTwoSideFoliage = false;
+			GetDistanceFieldAOSpecularOcclusion(
+				StrataEnvLight.DiffuseNormal, StrataEnvLight.SpecularDirection, StrataEnvLight.SpecularSafeRoughness, bTwoSideFoliage,
+				IndirectSpecularOcclusion, IndirectDiffuseOcclusion, ExtraIndirectSpecular);
+			// STRATA_TODO: handle ExtraIndirectSpecular
+		#endif
+
 			float RoughnessSquared = StrataEnvLight.SpecularSafeRoughness * StrataEnvLight.SpecularSafeRoughness;
 			float SpecularOcclusion = IndirectSpecularOcclusion * GetSpecularOcclusion(StrataBSDFContext.SatNoV, RoughnessSquared, CombinedScreenAndMaterialAO);
 
