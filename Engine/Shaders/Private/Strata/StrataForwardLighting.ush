@@ -54,7 +54,7 @@ float3 StrataForwardLightingCommon(
 		// Evaluate the ShadowTerm that can then be used when integrating the lighting
 		FShadowTerms ShadowTerms = { StrataPixelHeader.MaterialAO, 1.0, 1.0, InitHairTransmittanceData() };
 
-		float4 PrecomputedShadowFactors = StrataPixelHeader.ZeroPrecShadowMask ? 0.0f : 1.0f;
+		float4 PrecomputedShadowFactors = StrataPixelHeader.bZeroPrecShadowMask ? 0.0f : 1.0f;
 	#if TRANSLUCENCY_LIGHTING_SURFACE_FORWARDSHADING
 		PrecomputedShadowFactors.x = ComputeDirectionalLightStaticShadowing(AbsoluteWorldPosition).x;
 	#else
@@ -64,7 +64,7 @@ float3 StrataForwardLightingCommon(
 		const uint FakeShadingModelID = 0;
 		const float FakeContactShadowOpacity = 1.0f;
 		GetShadowTerms(SceneDepth, PrecomputedShadowFactors, FakeShadingModelID, FakeContactShadowOpacity,
-			LightData, TranslatedWorldPosition, LightData.Direction, LightAttenuation, Dither, ShadowTerms);
+			LightData, AbsoluteWorldPosition, ToLight, LightAttenuation, Dither, ShadowTerms);
 
 		float Roughness = 0;
 		StrataGetBSDFRoughness(StrataBSDFContext.BSDF, Roughness);

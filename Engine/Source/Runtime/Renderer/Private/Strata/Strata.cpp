@@ -224,12 +224,7 @@ void InitialiseStrataFrameSceneData(FSceneRenderer& SceneRenderer, FRDGBuilder& 
 	if (IsStrataEnabled())
 	{
 		FStrataGlobalUniformParameters* StrataUniformParameters = GraphBuilder.AllocParameters<FStrataGlobalUniformParameters>();
-		StrataUniformParameters->bRoughDiffuse = StrataSceneData.bRoughDiffuse ? 1u : 0u;
-		StrataUniformParameters->MaxBytesPerPixel = StrataSceneData.MaxBytesPerPixel;
-		StrataUniformParameters->MaterialLobesBuffer = StrataSceneData.MaterialLobesBufferSRV;
-		StrataUniformParameters->ClassificationTexture = StrataSceneData.ClassificationTexture;
-		StrataUniformParameters->TopLayerNormalTexture = StrataSceneData.TopLayerNormalTexture;
-		StrataUniformParameters->SSSTexture = StrataSceneData.SSSTexture;
+		BindStrataGlobalUniformParameters(GraphBuilder, &StrataSceneData, *StrataUniformParameters);
 		StrataSceneData.StrataGlobalUniformParameters = GraphBuilder.CreateUniformBuffer(StrataUniformParameters);
 	}
 }
@@ -247,6 +242,29 @@ void BindStrataBasePassUniformParameters(FRDGBuilder& GraphBuilder, FStrataScene
 		OutStrataUniformParameters.bRoughDiffuse = 0u;
 		OutStrataUniformParameters.MaxBytesPerPixel = 0;
 		OutStrataUniformParameters.MaterialLobesBufferUAV = GraphBuilder.CreateUAV(GraphBuilder.RegisterExternalBuffer(GWhiteVertexBufferWithRDG->Buffer), PF_R32_UINT);
+	}
+}
+
+void BindStrataGlobalUniformParameters(FRDGBuilder& GraphBuilder, FStrataSceneData* StrataSceneData, FStrataGlobalUniformParameters& OutStrataUniformParameters)
+{
+	if (IsStrataEnabled() && StrataSceneData)
+	{
+		OutStrataUniformParameters.bRoughDiffuse = StrataSceneData->bRoughDiffuse ? 1u : 0u;
+		OutStrataUniformParameters.MaxBytesPerPixel = StrataSceneData->MaxBytesPerPixel;
+		OutStrataUniformParameters.MaterialLobesBuffer = StrataSceneData->MaterialLobesBufferSRV;
+		OutStrataUniformParameters.ClassificationTexture = StrataSceneData->ClassificationTexture;
+		OutStrataUniformParameters.TopLayerNormalTexture = StrataSceneData->TopLayerNormalTexture;
+		OutStrataUniformParameters.SSSTexture = StrataSceneData->SSSTexture;
+	}
+	else
+	{
+		const FRDGSystemTextures& SystemTextures = FRDGSystemTextures::Get(GraphBuilder);
+		OutStrataUniformParameters.bRoughDiffuse = 0;
+		OutStrataUniformParameters.MaxBytesPerPixel = 0;
+		OutStrataUniformParameters.MaterialLobesBuffer = GraphBuilder.CreateSRV(GraphBuilder.RegisterExternalBuffer(GWhiteVertexBufferWithRDG->Buffer), PF_R32_UINT);
+		OutStrataUniformParameters.ClassificationTexture = SystemTextures.Black;
+		OutStrataUniformParameters.TopLayerNormalTexture = SystemTextures.DefaultNormal8Bit;
+		OutStrataUniformParameters.SSSTexture = SystemTextures.Black;
 	}
 }
 
