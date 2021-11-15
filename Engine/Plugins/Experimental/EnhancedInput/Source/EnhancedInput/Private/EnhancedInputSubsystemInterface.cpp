@@ -543,7 +543,7 @@ void IEnhancedInputSubsystemInterface::RebuildControlMappings()
 		RemovedActions.Remove(Mapping.Action);
 
 		// Retain old mapping trigger/modifier state for identical key -> action mappings.
-		TArray<FEnhancedActionKeyMapping>::SizeType Idx = OldMappings.IndexOfByPredicate([&Mapping](const FEnhancedActionKeyMapping& Other) {return Mapping.Action == Other.Action && Mapping.Key == Other.Key; });
+		TArray<FEnhancedActionKeyMapping>::SizeType Idx = OldMappings.IndexOfByPredicate([&Mapping](const FEnhancedActionKeyMapping& Other) {return Mapping == Other; });
 		if (Idx != INDEX_NONE)
 		{
 			Mapping = MoveTemp(OldMappings[Idx]);
