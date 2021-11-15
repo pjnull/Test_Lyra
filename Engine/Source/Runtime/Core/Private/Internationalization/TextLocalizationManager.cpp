@@ -537,6 +537,14 @@ TArray<FString> FTextLocalizationManager::GetLocalizedCultureNames(const ELocali
 
 	TArray<FString> LocalizedCultureNames = LocalizedCultureNameSet.Array();
 	LocalizedCultureNames.Sort();
+
+	// Remove any cultures that were explicitly disallowed
+	FInternationalization& I18N = FInternationalization::Get();
+	LocalizedCultureNames.RemoveAll([&I18N](const FString& InCultureName)
+	{
+		return !I18N.IsCultureAllowed(InCultureName);
+	});
+	
 	return LocalizedCultureNames;
 }
 
