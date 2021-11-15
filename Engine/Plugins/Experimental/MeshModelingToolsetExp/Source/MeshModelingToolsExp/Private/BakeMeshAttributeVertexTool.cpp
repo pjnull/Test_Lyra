@@ -885,8 +885,6 @@ EBakeOpState UBakeMeshAttributeVertexTool::UpdateResult_MultiTexture()
 		return EBakeOpState::Invalid;
 	}
 
-	CachedMultiTextures.Reset();
-
 	const int NumMaterialIDs = MultiTextureSettings->MaterialIDSourceTextures.Num();
 	CachedMultiTextures.Reset();
 	CachedMultiTextures.SetNum(NumMaterialIDs);
