@@ -21,8 +21,8 @@ void UEditorConfigSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 void UEditorConfigSubsystem::Deinitialize()
 {
-	SaveLock.WriteLock();
-	ON_SCOPE_EXIT{ SaveLock.WriteUnlock(); };
+	SaveLock.Lock();
+	ON_SCOPE_EXIT { SaveLock.Unlock(); };
 
 	// Synchronously save all Pending Saves on exit
 	for (FPendingSave& Save : PendingSaves)
