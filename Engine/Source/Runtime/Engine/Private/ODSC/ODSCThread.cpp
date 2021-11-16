@@ -16,15 +16,14 @@ FODSCRequestPayload::FODSCRequestPayload(EShaderPlatform InShaderPlatform, const
 }
 
 FODSCMessageHandler::FODSCMessageHandler(EShaderPlatform InShaderPlatform) :
-	ShaderPlatform(InShaderPlatform),
-	bCompileChangedShaders(false)
+	ShaderPlatform(InShaderPlatform)
 {
 }
 
-FODSCMessageHandler::FODSCMessageHandler(const TArray<FString>& InMaterials, EShaderPlatform InShaderPlatform, bool InbCompileChangedShaders) :
+FODSCMessageHandler::FODSCMessageHandler(const TArray<FString>& InMaterials, EShaderPlatform InShaderPlatform, ODSCRecompileCommand InRecompileCommandType) :
 	MaterialsToLoad(std::move(InMaterials)),
 	ShaderPlatform(InShaderPlatform),
-	bCompileChangedShaders(InbCompileChangedShaders)
+	RecompileCommandType(InRecompileCommandType)
 {
 }
 
@@ -36,7 +35,7 @@ void FODSCMessageHandler::FillPayload(FArchive& Payload)
 	Payload << MaterialsToLoad;
 	uint32 ConvertedShaderPlatform = (uint32)ShaderPlatform;
 	Payload << ConvertedShaderPlatform;
-	Payload << bCompileChangedShaders;
+	Payload << RecompileCommandType;
 	Payload << RequestBatch;
 }
 
@@ -46,6 +45,7 @@ void FODSCMessageHandler::ProcessResponse(FArchive& Response)
 
 	// pull back the compiled mesh material data (if any)
 	Response << OutMeshMaterialMaps;
+	Response << OutGlobalShaderMap;
 }
 
 void FODSCMessageHandler::AddPayload(const FODSCRequestPayload& Payload)
@@ -63,9 +63,14 @@ const TArray<uint8>& FODSCMessageHandler::GetMeshMaterialMaps() const
 	return OutMeshMaterialMaps;
 }
 
+const TArray<uint8>& FODSCMessageHandler::GetGlobalShaderMap() const
+{
+	return OutGlobalShaderMap;
+}
+
 bool FODSCMessageHandler::ReloadGlobalShaders() const
 {
-	return bCompileChangedShaders;
+	return RecompileCommandType == ODSCRecompileCommand::Global;
 }
 
 FODSCThread::FODSCThread()
@@ -103,9 +108,9 @@ void FODSCThread::Tick()
 	Process();
 }
 
-void FODSCThread::AddRequest(const TArray<FString>& MaterialsToCompile, EShaderPlatform ShaderPlatform, bool bCompileChangedShaders)
+void FODSCThread::AddRequest(const TArray<FString>& MaterialsToCompile, EShaderPlatform ShaderPlatform, ODSCRecompileCommand RecompileCommandType)
 {
-	PendingMaterialThreadedRequests.Enqueue(new FODSCMessageHandler(MaterialsToCompile, ShaderPlatform, bCompileChangedShaders));
+	PendingMaterialThreadedRequests.Enqueue(new FODSCMessageHandler(MaterialsToCompile, ShaderPlatform, RecompileCommandType));
 }
 
 void FODSCThread::AddShaderPipelineRequest(EShaderPlatform ShaderPlatform, const FString& MaterialName, const FString& VertexFactoryName, const FString& PipelineName, const TArray<FString>& ShaderTypeNames)

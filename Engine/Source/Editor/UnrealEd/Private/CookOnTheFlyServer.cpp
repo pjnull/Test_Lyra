@@ -670,8 +670,10 @@ void UCookOnTheFlyServer::InitializeShadersForCookOnTheFly(const TArrayView<ITar
 		const FString& PlatformName = TargetPlatform->PlatformName();
 		FString OutputDir = GetSandboxDirectory(PlatformName);
 
+		TArray<uint8> GlobalShaderMap;
 		UE::Cook::FRecompileShaderRequest RecompileShaderRequest;
-		RecompileShaderRequest.bCompileChangedShaders = true;
+		RecompileShaderRequest.CommandType = ODSCRecompileCommand::Global;
+		RecompileShaderRequest.GlobalShaderMap = &GlobalShaderMap;
 
 		RecompileShadersForRemote(
 			PlatformName, 
@@ -680,8 +682,9 @@ void UCookOnTheFlyServer::InitializeShadersForCookOnTheFly(const TArrayView<ITar
 			RecompileShaderRequest.MaterialsToLoad, 
 			RecompileShaderRequest.ShadersToRecompile,
 			RecompileShaderRequest.MeshMaterialMaps, 
+			RecompileShaderRequest.GlobalShaderMap,
 			RecompileShaderRequest.ModifiedFiles,
-			RecompileShaderRequest.bCompileChangedShaders);
+			RecompileShaderRequest.CommandType);
 	}
 }
 
@@ -3999,9 +4002,10 @@ void UCookOnTheFlyServer::TickRecompileShaderRequests()
 			OutputDir, 
 			RecompileShaderRequest.MaterialsToLoad, 
 			RecompileShaderRequest.ShadersToRecompile,
-			RecompileShaderRequest.MeshMaterialMaps, 
+			RecompileShaderRequest.MeshMaterialMaps,
+			RecompileShaderRequest.GlobalShaderMap,
 			RecompileShaderRequest.ModifiedFiles,
-			RecompileShaderRequest.bCompileChangedShaders);
+			RecompileShaderRequest.CommandType);
 
 		RecompileShaderRequest.CompletionCallback();
 	}
@@ -6610,7 +6614,10 @@ void UCookOnTheFlyServer::SaveGlobalShaderMapFiles(const TArrayView<const ITarge
 		// Compile for all platforms
 		RecompileData.ShaderPlatform = -1;
 		RecompileData.ModifiedFiles = &Files;
-		RecompileData.MeshMaterialMaps = NULL;
+		RecompileData.MeshMaterialMaps = nullptr;
+		TArray<uint8> GlobalShaderMap;
+		RecompileData.GlobalShaderMap = &GlobalShaderMap;
+		RecompileData.CommandType = ODSCRecompileCommand::Changed;
 
 		check( IsInGameThread() );
 
@@ -6624,7 +6631,8 @@ void UCookOnTheFlyServer::SaveGlobalShaderMapFiles(const TArrayView<const ITarge
 			OutputDir, 
 			RecompileData.MaterialsToLoad, 
 			RecompileData.ShadersToRecompile,
-			RecompileData.MeshMaterialMaps, 
+			RecompileData.MeshMaterialMaps,
+			RecompileData.GlobalShaderMap,
 			RecompileData.ModifiedFiles);
 	}
 }
