@@ -1,9 +1,9 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
+#pragma once
+
 #include "CoreMinimal.h"
 #include "Widgets/Notifications/INotificationWidget.h"
-
-#pragma once
 
 class FNiagaraParameterNotificationWidgetProvider : public INotificationWidget
 {
