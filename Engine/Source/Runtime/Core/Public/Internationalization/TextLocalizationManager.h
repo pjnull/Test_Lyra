@@ -46,32 +46,30 @@ private:
 	/** Data struct for tracking a display string. */
 	struct FDisplayStringEntry
 	{
-		FTextDisplayStringRef DisplayString;
+		FTextConstDisplayStringRef DisplayString;
 #if WITH_EDITORONLY_DATA
 		FTextKey LocResID;
 #endif
 #if ENABLE_LOC_TESTING
-		FString NativeStringBackup;
+		FTextConstDisplayStringPtr NativeStringBackup;
 #endif
 		uint32 SourceStringHash;
-		bool bIsLocalized;
 
-		FDisplayStringEntry(const bool InIsLocalized, const FTextKey& InLocResID, const uint32 InSourceStringHash, const FTextDisplayStringRef& InDisplayString)
+		FDisplayStringEntry(const FTextKey& InLocResID, const uint32 InSourceStringHash, const FTextConstDisplayStringRef& InDisplayString)
 			: DisplayString(InDisplayString)
 #if WITH_EDITORONLY_DATA
 			, LocResID(InLocResID)
 #endif
 			, SourceStringHash(InSourceStringHash)
-			, bIsLocalized(InIsLocalized)
 		{
 		}
 
 		/** 
-		* Returns true if the display string entry contains valid display string data. 
+		* Returns true if the display string entry contains invalid display string data. 
 		*/
 		bool IsEmpty() const
 		{
-			return !bIsLocalized && (SourceStringHash == 0) && DisplayString->IsEmpty();
+			return SourceStringHash == 0 && DisplayString->IsEmpty();
 		}
 	};
 
