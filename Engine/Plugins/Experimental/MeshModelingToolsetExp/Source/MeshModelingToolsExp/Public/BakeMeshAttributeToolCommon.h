@@ -28,12 +28,12 @@ class MESHMODELINGTOOLSEXP_API UBakeInputMeshProperties : public UInteractiveToo
 public:
 	/** Target mesh to sample to */
 	UPROPERTY(VisibleAnywhere, Category = BakeInput, DisplayName = "Target Mesh", meta = (TransientToolProperty,
-		EditCondition = "SourceSkeletalMesh == nullptr", EditConditionHides))
+		EditCondition = "TargetStaticMesh != nullptr", EditConditionHides))
 	TObjectPtr<UStaticMesh> TargetStaticMesh = nullptr;
 
 	/** Target mesh to sample to */
 	UPROPERTY(VisibleAnywhere, Category = BakeInput, DisplayName = "Target Mesh", meta = (TransientToolProperty,
-		EditCondition = "SourceStaticMesh == nullptr", EditConditionHides))
+		EditCondition = "TargetSkeletalMesh != nullptr", EditConditionHides))
 	TObjectPtr<USkeletalMesh> TargetSkeletalMesh = nullptr;
 
 	/** UV channel to use for the target mesh */
@@ -48,7 +48,7 @@ public:
 
 	/** Source mesh to sample from */
 	UPROPERTY(VisibleAnywhere, Category = BakeInput, DisplayName = "Source Mesh", meta = (TransientToolProperty,
-		EditCondition = "SourceSkeletalMesh == nullptr", EditConditionHides))
+		EditCondition = "SourceStaticMesh != nullptr", EditConditionHides))
 	TObjectPtr<UStaticMesh> SourceStaticMesh = nullptr;
 
 	/** Source mesh to sample from */
