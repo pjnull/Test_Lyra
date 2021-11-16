@@ -412,15 +412,13 @@ void UBakeMultiMeshAttributeMapsTool::Setup()
 	DetailMeshScene.BuildSpatialEvaluationCache();
 
 	UToolTarget* Target = Targets[0];
-	IStaticMeshBackedTarget* TargetStaticMeshTarget = Cast<IStaticMeshBackedTarget>(Target);
-	UStaticMesh* TargetStaticMesh = TargetStaticMeshTarget ? TargetStaticMeshTarget->GetStaticMesh() : nullptr;
 
 	// Setup tool property sets
 	
 	InputMeshProps = NewObject<UBakeMultiMeshInputToolProperties>(this);
 	InputMeshProps->RestoreProperties(this);
 	AddToolPropertySource(InputMeshProps);
-	InputMeshProps->TargetStaticMesh = TargetStaticMesh;
+	InputMeshProps->TargetStaticMesh = GetStaticMeshTarget(Target);
 	UpdateUVLayerNames(InputMeshProps->TargetUVLayer, InputMeshProps->TargetUVLayerNamesList, BaseMesh);
 	InputMeshProps->WatchProperty(InputMeshProps->TargetUVLayer, [this](FString) { OpState |= EBakeOpState::Evaluate; });
 	InputMeshProps->WatchProperty(InputMeshProps->ProjectionDistance, [this](float) { OpState |= EBakeOpState::Evaluate; });
@@ -446,8 +444,6 @@ void UBakeMultiMeshAttributeMapsTool::Setup()
 		// which will occlude the preview of the target mesh. 
 		UE::ToolTarget::HideSourceObject(DetailTarget);
 		
-		IStaticMeshBackedTarget* DetailStaticMeshTarget = Cast<IStaticMeshBackedTarget>(DetailTarget);
-		UStaticMesh* DetailStaticMesh = DetailStaticMeshTarget ? DetailStaticMeshTarget->GetStaticMesh() : nullptr;
 		const UPrimitiveComponent* Component = UE::ToolTarget::GetTargetComponent(Targets[Idx]);
 		UTexture2D* DetailColorTexture = nullptr;
 		ProcessComponentTextures(Component, [&DetailColorTexture](const int NumMaterials, const int MaterialID, const TArray<UTexture*>& Textures)
@@ -464,7 +460,7 @@ void UBakeMultiMeshAttributeMapsTool::Setup()
 		});
 
 		FBakeMultiMeshDetailProperties SourceMeshProp;
-		SourceMeshProp.SourceMesh = DetailStaticMesh;
+		SourceMeshProp.SourceMesh = GetStaticMeshTarget(DetailTarget);
 		SourceMeshProp.SourceTexture = DetailColorTexture;
 		InputMeshProps->SourceMeshes.Add(SourceMeshProp);
 		InputMeshProps->WatchProperty(InputMeshProps->SourceMeshes[Idx-1].SourceTexture, [this](UTexture2D*) { OpState |= EBakeOpState::Evaluate; });

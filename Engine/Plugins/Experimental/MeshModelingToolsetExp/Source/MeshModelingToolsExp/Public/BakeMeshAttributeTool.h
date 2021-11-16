@@ -9,6 +9,9 @@
 #include "InteractiveToolQueryInterfaces.h" // for UInteractiveToolExclusiveToolAPI
 #include "DynamicMesh/DynamicMesh3.h"
 #include "PreviewMesh.h"
+#include "TargetInterfaces/StaticMeshBackedTarget.h"
+#include "TargetInterfaces/SkeletalMeshBackedTarget.h"
+#include "TargetInterfaces/DynamicMeshSource.h"
 #include "BakeMeshAttributeToolCommon.h"
 #include "BakeMeshAttributeTool.generated.h"
 
@@ -114,6 +117,31 @@ protected:
 
 
 protected:
+	/** @return StaticMesh from a tool target */ 
+	static UStaticMesh* GetStaticMeshTarget(UToolTarget* Target)
+	{
+		IStaticMeshBackedTarget* TargetStaticMeshTarget = Cast<IStaticMeshBackedTarget>(Target);
+		UStaticMesh* TargetStaticMesh = TargetStaticMeshTarget ? TargetStaticMeshTarget->GetStaticMesh() : nullptr;
+		return TargetStaticMesh;
+	}
+
+	/** @return SkeletalMesh from a tool target */
+	static USkeletalMesh* GetSkeletalMeshTarget(UToolTarget* Target)
+	{
+		ISkeletalMeshBackedTarget* TargetSkeletalMeshTarget = Cast<ISkeletalMeshBackedTarget>(Target);
+		USkeletalMesh* TargetSkeletalMesh = TargetSkeletalMeshTarget ? TargetSkeletalMeshTarget->GetSkeletalMesh() : nullptr;
+		return TargetSkeletalMesh;
+	}
+
+	/** @return AActor that owns a DynamicMeshComponent from a tool target */
+	static AActor* GetDynamicMeshTarget(UToolTarget* Target)
+	{
+		IPersistentDynamicMeshSource* TargetDynamicMeshTarget = Cast<IPersistentDynamicMeshSource>(Target);
+		UDynamicMeshComponent* TargetDynamicMeshComponent = TargetDynamicMeshTarget ? TargetDynamicMeshTarget->GetDynamicMeshComponent() : nullptr;
+		AActor* TargetDynamicMesh = TargetDynamicMeshComponent ? TargetDynamicMeshComponent->GetOwner() : nullptr;
+		return TargetDynamicMesh;
+	}
+		
 	/**
 	 * Given an array of textures associated with a material,
 	 * use heuristics to identify the color/albedo texture.

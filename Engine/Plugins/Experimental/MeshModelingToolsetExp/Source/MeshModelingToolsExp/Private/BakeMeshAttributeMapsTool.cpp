@@ -270,16 +270,7 @@ void UBakeMeshAttributeMapsTool::Setup()
 	});
 
 	UToolTarget* Target = Targets[0];
-	IStaticMeshBackedTarget* TargetStaticMeshTarget = Cast<IStaticMeshBackedTarget>(Target);
-	UStaticMesh* TargetStaticMesh = TargetStaticMeshTarget ? TargetStaticMeshTarget->GetStaticMesh() : nullptr;
-	ISkeletalMeshBackedTarget* TargetSkeletalMeshTarget = Cast<ISkeletalMeshBackedTarget>(Target);
-	USkeletalMesh* TargetSkeletalMesh = TargetSkeletalMeshTarget ? TargetSkeletalMeshTarget->GetSkeletalMesh() : nullptr;
-
 	UToolTarget* DetailTarget = Targets[bIsBakeToSelf ? 0 : 1];
-	IStaticMeshBackedTarget* DetailStaticMeshTarget = Cast<IStaticMeshBackedTarget>(DetailTarget);
-	UStaticMesh* DetailStaticMesh = DetailStaticMeshTarget ? DetailStaticMeshTarget->GetStaticMesh() : nullptr;
-	ISkeletalMeshBackedTarget* DetailSkeletalMeshTarget = Cast<ISkeletalMeshBackedTarget>(DetailTarget);
-	USkeletalMesh* DetailSkeletalMesh = DetailSkeletalMeshTarget ? DetailSkeletalMeshTarget->GetSkeletalMesh() : nullptr;
 	
 	// Setup tool property sets
 
@@ -289,10 +280,12 @@ void UBakeMeshAttributeMapsTool::Setup()
 	SetToolPropertySourceEnabled(MeshProps, true);
 	MeshProps->bHasTargetUVLayer = true;
 	MeshProps->bHasSourceNormalMap = true;
-	MeshProps->TargetStaticMesh = TargetStaticMesh;
-	MeshProps->TargetSkeletalMesh = TargetSkeletalMesh;
-	MeshProps->SourceStaticMesh = DetailStaticMesh;
-	MeshProps->SourceSkeletalMesh = DetailSkeletalMesh;
+	MeshProps->TargetStaticMesh = GetStaticMeshTarget(Target);
+	MeshProps->TargetSkeletalMesh = GetSkeletalMeshTarget(Target);
+	MeshProps->TargetDynamicMesh = GetDynamicMeshTarget(Target);
+	MeshProps->SourceStaticMesh = GetStaticMeshTarget(DetailTarget);
+	MeshProps->SourceSkeletalMesh = GetSkeletalMeshTarget(DetailTarget);
+	MeshProps->SourceDynamicMesh = GetDynamicMeshTarget(DetailTarget);
 	MeshProps->SourceNormalMap = nullptr;
 	UpdateUVLayerNames(MeshProps->TargetUVLayer, MeshProps->TargetUVLayerNamesList, BaseMesh);
 	MeshProps->WatchProperty(MeshProps->TargetUVLayer, [this](FString) { OpState |= EBakeOpState::Evaluate; });

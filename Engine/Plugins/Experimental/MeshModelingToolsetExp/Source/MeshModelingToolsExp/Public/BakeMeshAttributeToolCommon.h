@@ -36,6 +36,11 @@ public:
 		EditCondition = "TargetSkeletalMesh != nullptr", EditConditionHides))
 	TObjectPtr<USkeletalMesh> TargetSkeletalMesh = nullptr;
 
+	/** Target mesh to sample to */
+	UPROPERTY(VisibleAnywhere, Category = BakeInput, DisplayName = "Target Mesh", meta = (TransientToolProperty,
+		EditCondition = "TargetDynamicMesh != nullptr", EditConditionHides))
+	TObjectPtr<AActor> TargetDynamicMesh = nullptr;
+
 	/** UV channel to use for the target mesh */
 	UPROPERTY(EditAnywhere, Category = BakeInput, meta = (DisplayName = "Target Mesh UV Channel",
 		GetOptions = GetTargetUVLayerNamesFunc, TransientToolProperty, NoResetToDefault,
@@ -56,6 +61,11 @@ public:
 		EditCondition = "SourceSkeletalMesh != nullptr", EditConditionHides))
 	TObjectPtr<USkeletalMesh> SourceSkeletalMesh = nullptr;
 
+	/** Source mesh to sample from */
+	UPROPERTY(VisibleAnywhere, Category = BakeInput, DisplayName = "Source Mesh", meta = (TransientToolProperty,
+		EditCondition = "SourceDynamicMesh != nullptr", EditConditionHides))
+	TObjectPtr<AActor> SourceDynamicMesh = nullptr;
+
 	/** Source mesh normal map; if empty, the geometric normals will be used */
 	UPROPERTY(EditAnywhere, Category = BakeInput, AdvancedDisplay, meta = (TransientToolProperty,
 		EditCondition = "bHasSourceNormalMap == true", EditConditionHides, HideEditConditionToggle))
@@ -74,13 +84,13 @@ public:
 	/** Maximum allowed distance for the projection from target mesh to source mesh for the sample to be considered valid.
 	 * This is only relevant if a separate source mesh is provided. */
 	UPROPERTY(EditAnywhere, Category = BakeInput, AdvancedDisplay, meta = (ClampMin = "0.001",
-		EditCondition = "SourceStaticMesh != nullptr || SourceSkeletalMesh != nullptr", HideEditConditionToggle))
+		EditCondition = "SourceStaticMesh != nullptr || SourceSkeletalMesh != nullptr || SourceDynamicMesh != nullptr", HideEditConditionToggle))
 	float ProjectionDistance = 3.0;
 
 	/** If true, uses the world space positions for the projection from target mesh to source mesh, otherwise it uses their object space positions.
 	 * This is only relevant if a separate source mesh is provided. */
 	UPROPERTY(EditAnywhere, Category = BakeInput, AdvancedDisplay, meta = (
-		EditCondition = "SourceStaticMesh != nullptr || SourceSkeletalMesh != nullptr", HideEditConditionToggle))
+		EditCondition = "SourceStaticMesh != nullptr || SourceSkeletalMesh != nullptr || SourceDynamicMesh != nullptr", HideEditConditionToggle))
 	bool bProjectionInWorldSpace = false;
 
 	UFUNCTION()
