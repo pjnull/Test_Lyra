@@ -152,6 +152,10 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Sprite Rendering", meta = (DisplayName = "Default Pivot in UV Space"))
 	FVector2D PivotInUVSpace;
 
+	/** World space radius that UVs generated with the ParticleMacroUV material node will tile based on. */
+	UPROPERTY(EditAnywhere, Category = "Sprite Rendering")
+	float MacroUVRadius = 0.0f;
+
 	/** Determines how we sort the particles prior to rendering.*/
 	UPROPERTY(EditAnywhere, Category = "Sorting")
 	ENiagaraSortMode SortMode;

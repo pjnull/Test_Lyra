@@ -69,6 +69,7 @@ FNiagaraRendererSprites::FNiagaraRendererSprites(ERHIFeatureLevel::Type FeatureL
 	, FacingMode(ENiagaraSpriteFacingMode::FaceCamera)
 	, SortMode(ENiagaraSortMode::ViewDistance)
 	, PivotInUVSpace(0.5f, 0.5f)
+	, MacroUVRadius(0.0f)
 	, SubImageSize(1.0f, 1.0f)
 	, NumIndicesPerInstance(0)
 	, bSubImageBlend(false)
@@ -90,6 +91,7 @@ FNiagaraRendererSprites::FNiagaraRendererSprites(ERHIFeatureLevel::Type FeatureL
 	Alignment = Properties->Alignment;
 	FacingMode = Properties->FacingMode;
 	PivotInUVSpace = Properties->PivotInUVSpace;
+	MacroUVRadius = Properties->MacroUVRadius;
 	SortMode = Properties->SortMode;
 	SubImageSize = Properties->SubImageSize;
 	NumIndicesPerInstance = Properties->GetNumIndicesPerInstance();
@@ -487,7 +489,7 @@ FNiagaraSpriteUniformBufferRef FNiagaraRendererSprites::CreateViewUniformBuffer(
 	PerViewUniformParameters.NormalsType = 0.0f;
 	PerViewUniformParameters.NormalsSphereCenter = FVector4f(0.0f, 0.0f, 0.0f, 1.0f);
 	PerViewUniformParameters.NormalsCylinderUnitDirection = FVector4f(0.0f, 0.0f, 1.0f, 0.0f);
-	PerViewUniformParameters.MacroUVParameters = FVector4f(0.0f, 0.0f, 1.0f, 1.0f);
+	PerViewUniformParameters.MacroUVParameters = CalcMacroUVParameters(View, SceneProxy.GetActorPosition(), MacroUVRadius);
 	PerViewUniformParameters.CameraFacingBlend = FVector4f(0.0f, 0.0f, 0.0f, 1.0f);
 	PerViewUniformParameters.RemoveHMDRoll = bRemoveHMDRollInVR;
 	PerViewUniformParameters.SubImageSize = FVector4f(SubImageSize.X, SubImageSize.Y, 1.0f / SubImageSize.X, 1.0f / SubImageSize.Y);
