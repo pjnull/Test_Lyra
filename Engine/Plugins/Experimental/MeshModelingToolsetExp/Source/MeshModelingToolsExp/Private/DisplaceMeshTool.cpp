@@ -693,8 +693,8 @@ namespace DisplaceMeshToolLocals{
 	void FDisplaceMeshOpFactory::UpdateMap()
 	{
 		if (Parameters.DisplacementMap == nullptr ||
-			Parameters.DisplacementMap->PlatformData == nullptr ||
-			Parameters.DisplacementMap->PlatformData->Mips.Num() < 1)
+			Parameters.DisplacementMap->GetPlatformData() == nullptr ||
+			Parameters.DisplacementMap->GetPlatformData()->Mips.Num() < 1)
 		{
 			Parameters.DisplaceField = FSampledScalarField2f();
 			Parameters.DisplaceField.GridValues.AssignAll(0);
