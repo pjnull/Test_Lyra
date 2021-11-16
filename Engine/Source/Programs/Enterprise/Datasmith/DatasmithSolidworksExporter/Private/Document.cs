@@ -43,7 +43,7 @@ namespace DatasmithSolidworks
 		{
 			DocId = InDocId;
 			SwDoc = InSwDoc;
-			DatasmithScene = new FDatasmithFacadeScene("Solidworks", "Solidworks", "Solidworks", "2021");
+			DatasmithScene = new FDatasmithFacadeScene("StdMaterial", "Solidworks", "Solidworks", "2021");
 			DatasmithScene.SetName(InSwDoc.GetTitle());
 
 			DirectLinkPath = Path.Combine(Path.GetTempPath(), "sw_dl_" + Guid.NewGuid().ToString());
@@ -176,7 +176,7 @@ namespace DatasmithSolidworks
 					FDatasmithFacadeScene OldScene = DatasmithScene;
 					FDatasmithExporter OldExporter = Exporter;
 
-					DatasmithScene = new FDatasmithFacadeScene("Solidworks", "Solidworks", "Solidworks", "2021");
+					DatasmithScene = new FDatasmithFacadeScene("StdMaterial", "Solidworks", "Solidworks", "2021");
 					DatasmithScene.SetName(CleanFileName);
 					DatasmithScene.SetOutputPath(OutDir);
 
