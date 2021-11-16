@@ -85,6 +85,24 @@ static FAutoConsoleVariableRef CVarNiagaraGPUDataBufferShrinkFactor(
 	ECVF_Default
 );
 
+static int32 GNiagaraGPUDataWarningSize = 0;
+static FAutoConsoleVariableRef CVarNiagaraGPUDataWarningSize(
+	TEXT("fx.NiagaraGPUDataWarningSize"),
+	GNiagaraGPUDataWarningSize,
+	TEXT("Allocation size where we should log a warning."),
+	ECVF_Default
+);
+
+void NiagaraWarnGpuBufferSize(const int32 ByteSize, const TCHAR* DebugSimName)
+{
+	static int32 MaxEncountered = 0;
+	if ((GNiagaraGPUDataWarningSize > 0) && (ByteSize > GNiagaraGPUDataWarningSize) && (MaxEncountered < ByteSize))
+	{
+		MaxEncountered = ByteSize;
+		UE_LOG(LogNiagara, Warning, TEXT("GpuBuffer Allocation (%d bytes) from %s"), ByteSize, DebugSimName);
+	}
+}
+
 FNiagaraDataSet::FNiagaraDataSet()
 	: NumFreeIDs(0)
 	, MaxUsedID(0)
@@ -791,6 +809,7 @@ void FNiagaraDataBuffer::AllocateGPU(FRHICommandList& RHICmdList, uint32 InNumIn
 			{
 				GPUBufferFloat.Release();
 			}
+			NiagaraWarnGpuBufferSize(RequiredFloatByteSize, DebugSimName);
 			GPUBufferFloat.Initialize(TEXT("GPUBufferFloat"), sizeof(float), RequiredFloatByteSize / sizeof(float), EPixelFormat::PF_R32_FLOAT, ERHIAccess::SRVMask, GPUBufferFlags);
 		}
 
@@ -803,6 +822,7 @@ void FNiagaraDataBuffer::AllocateGPU(FRHICommandList& RHICmdList, uint32 InNumIn
 			{
 				GPUBufferHalf.Release();
 			}
+			NiagaraWarnGpuBufferSize(RequiredHalfByteSize, DebugSimName);
 			GPUBufferHalf.Initialize(TEXT("GPUBufferHalf"), sizeof(FFloat16), RequiredHalfByteSize / sizeof(FFloat16), EPixelFormat::PF_R16F, ERHIAccess::SRVMask, GPUBufferFlags);
 		}
 
@@ -815,6 +835,7 @@ void FNiagaraDataBuffer::AllocateGPU(FRHICommandList& RHICmdList, uint32 InNumIn
 			{
 				GPUBufferInt.Release();
 			}
+			NiagaraWarnGpuBufferSize(RequiredInt32ByteSize, DebugSimName);
 			GPUBufferInt.Initialize(TEXT("GPUBufferInt"), sizeof(int32), RequiredInt32ByteSize / sizeof(int32), EPixelFormat::PF_R32_SINT, ERHIAccess::SRVMask, GPUBufferFlags);
 		}
 
@@ -829,6 +850,7 @@ void FNiagaraDataBuffer::AllocateGPU(FRHICommandList& RHICmdList, uint32 InNumIn
 				{
 					GPUIDToIndexTable.Release();
 				}
+				NiagaraWarnGpuBufferSize(NumNeededElems * sizeof(int32), DebugSimName);
 				TStringBuilder<128> DebugBufferName;
 				DebugBufferName.Appendf(TEXT("NiagaraIDToIndexTable_%s_%p"), DebugSimName ? DebugSimName : TEXT(""), this);
 				GPUIDToIndexTable.Initialize(DebugBufferName.ToString(), sizeof(int32), NumNeededElems, EPixelFormat::PF_R32_SINT, ERHIAccess::SRVCompute, BUF_Static);
