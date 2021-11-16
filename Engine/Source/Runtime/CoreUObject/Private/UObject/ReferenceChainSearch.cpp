@@ -465,7 +465,6 @@ public:
 		FReferenceChainSearch::FObjectReferenceInfo RefInfo(Object);
 		if (Object && !ReferencedObjects.Contains(RefInfo))
 		{
-#if ENABLE_GC_OBJECT_CHECKS
 			if (TokenIndex >= 0)
 			{
 				FTokenInfo TokenInfo = ReferencingObject->GetClass()->ReferenceTokenStream.GetTokenInfo(TokenIndex);
@@ -494,7 +493,7 @@ public:
 					RefInfo.ReferencerName = *ReferencingObject->GetFullName();
 				}
 			}
-#endif
+
 			ReferencedObjects.Add(RefInfo);
 		}
 	}

@@ -26,6 +26,9 @@
 /** UObject pointer checks are disabled by default in shipping and test builds as they add roughly 20% overhead to GC times */
 #define ENABLE_GC_OBJECT_CHECKS (!(UE_BUILD_TEST || UE_BUILD_SHIPPING) || 0)
 
+/** Token debug info (token names) enabled in non-shipping builds */
+#define ENABLE_GC_TOKEN_DEBUG_INFO (!UE_BUILD_SHIPPING)
+
 COREUOBJECT_API DECLARE_LOG_CATEGORY_EXTERN(LogGarbage, Warning, All);
 DECLARE_STATS_GROUP(TEXT("Garbage Collection"), STATGROUP_GC, STATCAT_Advanced);
 
@@ -187,7 +190,6 @@ struct FGCSkipInfo
 	};
 };
 
-#if ENABLE_GC_OBJECT_CHECKS
 /**
  * Stores debug info about the token.
  */
@@ -198,8 +200,6 @@ struct FTokenInfo
 	/* Token debug name. */
 	FName Name;
 };
-
-#endif // ENABLE_GC_OBJECT_CHECKS
 
 /**
  * Reference token stream class. Used for creating and parsing stream of object references.
@@ -221,18 +221,18 @@ struct COREUOBJECT_API FGCReferenceTokenStream
 	void Shrink()
 	{
 		Tokens.Shrink();
-#if ENABLE_GC_OBJECT_CHECKS
+#if ENABLE_GC_TOKEN_DEBUG_INFO
 		TokenDebugInfo.Shrink();
-#endif // ENABLE_GC_OBJECT_CHECKS
+#endif // ENABLE_GC_TOKEN_DEBUG_INFO
 	}
 
 	/** Empties the token stream entirely */
 	void Empty()
 	{
 		Tokens.Empty();
-#if ENABLE_GC_OBJECT_CHECKS
+#if ENABLE_GC_TOKEN_DEBUG_INFO
 		TokenDebugInfo.Empty();
-#endif // ENABLE_GC_OBJECT_CHECKS
+#endif // ENABLE_GC_TOKEN_DEBUG_INFO
 	}
 
 	/**
@@ -445,9 +445,12 @@ struct COREUOBJECT_API FGCReferenceTokenStream
 		return CurrentIndex >= (uint32)Tokens.Num();
 	}
 
-#if ENABLE_GC_OBJECT_CHECKS
+	/**
+	 * Returns extended information about a token, including its name (if available)
+	 *
+	 * @param TokenIndex Index of a token to return extended information for
+	 */
 	FTokenInfo GetTokenInfo(int32 TokenIndex) const;
-#endif
 
 	/** Sets the maximum stack size required by all token streams */
 	static void SetMaxStackSize(int32 InNewSize)
@@ -460,6 +463,22 @@ struct COREUOBJECT_API FGCReferenceTokenStream
 	{
 		return MaxStackSize;
 	}
+
+	/** Gets the number of bytes allocated for tokens */
+	int64 GetTokenAllocatedSize() const
+	{
+		return Tokens.GetAllocatedSize();
+	}
+	/** Gets the number of bytes allocated for token debug info */
+	int64 GetDebugInfoAllocatedSize() const
+	{
+#if ENABLE_GC_TOKEN_DEBUG_INFO
+		return TokenDebugInfo.GetAllocatedSize();
+#else
+		return 0;
+#endif
+	}
+
 private:
 
 	/**
@@ -488,13 +507,13 @@ private:
 	EGCTokenType TokenType = EGCTokenType::Native;
 	/** Maximum stack size for TFastReferenceCollector */
 	static int32 MaxStackSize;
-#if ENABLE_GC_OBJECT_CHECKS
+#if ENABLE_GC_TOKEN_DEBUG_INFO
 	/** 
 	 * Name of the proprty that emitted the associated token or token type (pointer etc).
 	 * We want to keep it in a separate array for performance reasons
 	 */
 	TArray<FName> TokenDebugInfo;
-#endif // ENABLE_GC_OBJECT_CHECKS
+#endif // ENABLE_GC_TOKEN_DEBUG_INFO
 };
 
 /** Prevent GC from running in the current scope */

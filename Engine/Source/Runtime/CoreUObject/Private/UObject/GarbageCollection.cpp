@@ -202,6 +202,24 @@ static FAutoConsoleVariableRef CGarbageReferenceTrackingEnabled(
 	ECVF_Default
 );
 
+static FAutoConsoleCommand CmdCalculateTokenStreamSize(
+	TEXT("gc.CalculateTokenStreamSize"),
+	TEXT(""),
+	FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& Args)
+		{
+			int64 TokenSize = 0;
+			int64 DebugSize = 0;
+			int32 NumClasses = 0;
+			for (TObjectIterator<UClass> It; It; ++It)
+			{
+				TokenSize += It->ReferenceTokenStream.GetTokenAllocatedSize();
+				DebugSize += It->ReferenceTokenStream.GetDebugInfoAllocatedSize();
+				NumClasses++;
+			}
+			UE_LOG(LogGarbage, Display, TEXT("Memory allocated for GC Tokens: %lldb, Debug Info: %lldb, Total: %lldb (%d classes)"), TokenSize, DebugSize, (TokenSize + DebugSize), NumClasses);
+		})
+);
+
 #if PERF_DETAILED_PER_CLASS_GC_STATS
 /** Map from a UClass' FName to the number of objects that were purged during the last purge phase of this class.	*/
 static TMap<const FName,uint32> GClassToPurgeCountMap;
@@ -3072,28 +3090,28 @@ void FGCReferenceTokenStream::PrependStream( const FGCReferenceTokenStream& Othe
 	TArray<uint32> TempTokens;
 	TempTokens.Reserve(NumTokensToPrepend + Tokens.Num());
 
-#if ENABLE_GC_OBJECT_CHECKS
+#if ENABLE_GC_TOKEN_DEBUG_INFO
 	check(TokenDebugInfo.Num() == Tokens.Num());
 	check(Other.TokenDebugInfo.Num() == Other.Tokens.Num());
 	TArray<FName> TempTokenDebugInfo;
 	TempTokenDebugInfo.Reserve(NumTokensToPrepend + TokenDebugInfo.Num());
-#endif // ENABLE_GC_OBJECT_CHECKS
+#endif // ENABLE_GC_TOKEN_DEBUG_INFO
 
 	for (int32 TokenIndex = 0; TokenIndex < NumTokensToPrepend; ++TokenIndex)
 	{
 		TempTokens.Add(Other.Tokens[TokenIndex]);
-#if ENABLE_GC_OBJECT_CHECKS
+#if ENABLE_GC_TOKEN_DEBUG_INFO
 		TempTokenDebugInfo.Add(Other.TokenDebugInfo[TokenIndex]);
-#endif // ENABLE_GC_OBJECT_CHECKS
+#endif // ENABLE_GC_TOKEN_DEBUG_INFO
 	}
 
 	TempTokens.Append(Tokens);
 	Tokens = MoveTemp(TempTokens);
 
-#if ENABLE_GC_OBJECT_CHECKS
+#if ENABLE_GC_TOKEN_DEBUG_INFO
 	TempTokenDebugInfo.Append(TokenDebugInfo);
 	TokenDebugInfo = MoveTemp(TempTokenDebugInfo);
-#endif // ENABLE_GC_OBJECT_CHECKS
+#endif // ENABLE_GC_TOKEN_DEBUG_INFO
 
 	StackSize = FMath::Max(StackSize, Other.GetStackSize());
 }
@@ -3236,7 +3254,7 @@ void FGCReferenceTokenStream::Fixup(void (*AddReferencedObjectsPtr)(UObject*, cl
 int32 FGCReferenceTokenStream::EmitReferenceInfo(FGCReferenceInfo ReferenceInfo, const FName& DebugName)
 {
 	int32 TokenIndex = Tokens.Add(ReferenceInfo);
-#if ENABLE_GC_OBJECT_CHECKS
+#if ENABLE_GC_TOKEN_DEBUG_INFO
 	check(TokenDebugInfo.Num() == TokenIndex);
 	check(DebugName != NAME_None);
 	TokenDebugInfo.Add(DebugName);
@@ -3252,7 +3270,7 @@ int32 FGCReferenceTokenStream::EmitReferenceInfo(FGCReferenceInfo ReferenceInfo,
 uint32 FGCReferenceTokenStream::EmitSkipIndexPlaceholder()
 {
 	uint32 TokenIndex = Tokens.Add(E_GCSkipIndexPlaceholder);
-#if ENABLE_GC_OBJECT_CHECKS
+#if ENABLE_GC_TOKEN_DEBUG_INFO
 	static const FName TokenName("SkipIndexPlaceholder");
 	check(TokenDebugInfo.Num() == TokenIndex);
 	TokenDebugInfo.Add(TokenName);
@@ -3291,7 +3309,7 @@ void FGCReferenceTokenStream::UpdateSkipIndexPlaceholder( uint32 SkipIndexIndex,
 int32 FGCReferenceTokenStream::EmitCount( uint32 Count )
 {
 	int32 TokenIndex = Tokens.Add( Count );
-#if ENABLE_GC_OBJECT_CHECKS
+#if ENABLE_GC_TOKEN_DEBUG_INFO
 	static const FName TokenName("CountToken");
 	check(TokenDebugInfo.Num() == TokenIndex);
 	TokenDebugInfo.Add(TokenName);
@@ -3305,7 +3323,7 @@ int32 FGCReferenceTokenStream::EmitPointer( void const* Ptr )
 	Tokens.AddUninitialized(GNumTokensPerPointer);
 	StorePointer(&Tokens[StoreIndex], Ptr);
 
-#if ENABLE_GC_OBJECT_CHECKS
+#if ENABLE_GC_TOKEN_DEBUG_INFO
 	static const FName TokenName("PointerToken");
 	check(TokenDebugInfo.Num() == StoreIndex);
 	for (int32 PointerTokenIndex = 0; PointerTokenIndex < GNumTokensPerPointer; ++PointerTokenIndex)
@@ -3331,7 +3349,7 @@ int32 FGCReferenceTokenStream::EmitStride( uint32 Stride )
 {
 	int32 TokenIndex = Tokens.Add( Stride );
 
-#if ENABLE_GC_OBJECT_CHECKS
+#if ENABLE_GC_TOKEN_DEBUG_INFO
 	static const FName TokenName("StrideToken");
 	check(TokenDebugInfo.Num() == TokenIndex);
 	TokenDebugInfo.Add(TokenName);
@@ -3354,17 +3372,18 @@ uint32 FGCReferenceTokenStream::EmitReturn()
 	return Tokens.Num();
 }
 
-#if ENABLE_GC_OBJECT_CHECKS
 
 FTokenInfo FGCReferenceTokenStream::GetTokenInfo(int32 TokenIndex) const
 {
 	FTokenInfo DebugInfo;
 	DebugInfo.Offset = FGCReferenceInfo(Tokens[TokenIndex]).Offset;
+#if ENABLE_GC_TOKEN_DEBUG_INFO
 	DebugInfo.Name = TokenDebugInfo[TokenIndex];
+#else
+	DebugInfo.Name = FName(TEXT("Token"), TokenIndex);
+#endif
 	return DebugInfo;
 }
-
-#endif
 
 
 FGCArrayPool* FGCArrayPool::GetGlobalSingleton()
