@@ -1922,7 +1922,7 @@ namespace LevelAssetRegistryHelper
 	static bool GetLevelInfoFromAssetRegistry(FName LevelPackage, TFunctionRef<bool(const FAssetData & Asset)> Func)
 	{
 		IAssetRegistry& AssetRegistry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry")).Get();
-		if (AssetRegistry.IsLoadingAssets())
+		if (AssetRegistry.IsLoadingAssets() || IsRunningGame())
 		{
 			const FString PackagePath = FPackageName::GetLongPackagePath(LevelPackage.ToString());
 			AssetRegistry.ScanPathsSynchronous({ PackagePath });
