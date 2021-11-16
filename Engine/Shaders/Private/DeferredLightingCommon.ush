@@ -144,8 +144,9 @@ float ShadowRayCast(
 		// Ignore hits that come from non-shadow-casting pixels
 		float3 SampleUVz = RayStartUVz + RayStepUVz * FirstHitTime;
 	#if STRATA_ENABLED
-		// StrataStruct.MaterialLobesBuffer is only defined for global shader, not for material shader
-		#if !MATERIAL_IS_STRATA
+		#if (!MATERIAL_IS_STRATA || STRATA_TRANSLUCENT_ENABLED)
+		// StrataStruct.MaterialLobesBuffer is only available to translucent materials or global shaders computing contact shadows.
+		// It is not defined for opaque materials, only the UAV is available to write the strata buffer.
 		uint2 PixelPos = View.ViewRectMin.xy + View.ViewSizeAndInvSize.xy * SampleUVz.xy;
 		FStrataAddressing StrataAddressing = GetStrataPixelDataByteOffset(PixelPos, uint2(View.BufferSizeAndInvSize.xy), StrataStruct.MaxBytesPerPixel);
 		FStrataPixelHeader StrataPixelHeader = UnpackStrataHeaderIn(StrataStruct.MaterialLobesBuffer, StrataAddressing);
