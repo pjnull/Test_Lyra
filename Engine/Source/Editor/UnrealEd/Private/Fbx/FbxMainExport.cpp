@@ -1894,7 +1894,7 @@ float FLevelSequenceAnimTrackAdapter::GetAnimTime(int32 LocalFrame) const
 	{
 		if (UMovieSceneSkeletalAnimationSection* AnimSection = Cast<UMovieSceneSkeletalAnimationSection>(Section))
 		{
-			return AnimSection->MapTimeToAnimation(LocalTime, TickResolution);
+			return static_cast<float>(AnimSection->MapTimeToAnimation(LocalTime, TickResolution));
 		}
 	}
 

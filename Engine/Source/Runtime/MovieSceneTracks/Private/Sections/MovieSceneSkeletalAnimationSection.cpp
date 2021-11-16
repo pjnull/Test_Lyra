@@ -313,7 +313,7 @@ void UMovieSceneSkeletalAnimationSection::GetSnapTimes(TArray<FFrameNumber>& Out
 	}
 }
 
-float UMovieSceneSkeletalAnimationSection::MapTimeToAnimation(FFrameTime InPosition, FFrameRate InFrameRate) const
+double UMovieSceneSkeletalAnimationSection::MapTimeToAnimation(FFrameTime InPosition, FFrameRate InFrameRate) const
 {
 	FMovieSceneSkeletalAnimationSectionTemplateParameters TemplateParams(Params, GetInclusiveStartFrame(), GetExclusiveEndFrame());
 	return TemplateParams.MapTimeToAnimation(InPosition, InFrameRate);
@@ -441,8 +441,8 @@ bool UMovieSceneSkeletalAnimationSection::GetRootMotionVelocity(FFrameTime Previ
 		OutWeight = ManualWeight * EvaluateEasing(CurrentTime);
 		//mz todo we should be able to cache the PreviousTimeSeconds;
 		//mz todo need to get the starting value.
-		float PreviousTimeSeconds = MapTimeToAnimation(PreviousTime, FrameRate);
-		float CurrentTimeSeconds  = MapTimeToAnimation(CurrentTime, FrameRate);
+		float PreviousTimeSeconds = static_cast<float>(MapTimeToAnimation(PreviousTime, FrameRate));
+		float CurrentTimeSeconds  = static_cast<float>(MapTimeToAnimation(CurrentTime, FrameRate));
 		OutVelocity = AnimSequence->ExtractRootMotionFromRange(PreviousTimeSeconds, CurrentTimeSeconds);
 		return true;
 	}
@@ -540,7 +540,7 @@ bool UMovieSceneSkeletalAnimationSection::GetRootMotionTransform(FFrameTime Curr
 		Params.Weight.Evaluate(CurrentTime, ManualWeight);
 		OutWeight = ManualWeight * EvaluateEasing(CurrentTime);
 		bIsAdditive = false;
-		float CurrentTimeSeconds = MapTimeToAnimation(CurrentTime, FrameRate);
+		float CurrentTimeSeconds = static_cast<float>(MapTimeToAnimation(CurrentTime, FrameRate));
 		bIsAdditive = AnimSequence->GetAdditiveAnimType() != EAdditiveAnimationType::AAT_None;
 
 		if (TempRootBoneIndex.IsSet())
