@@ -1607,8 +1607,16 @@ public:
 	float GetLastAverageSceneLuminance() const;
 
 	/**Swap the order of the two eye adaptation targets in the double buffer system */
-	void SwapEyeAdaptationTextures(FRDGBuilder& GraphBuilder) const;
-	void SwapEyeAdaptationBuffers(FRDGBuilder& GraphBuilder) const;
+	void SwapEyeAdaptationTextures() const;
+	void SwapEyeAdaptationBuffers() const;
+
+	/** Update Last Exposure with the most recent available value */
+	void UpdateEyeAdaptationLastExposureFromTexture() const;
+	void UpdateEyeAdaptationLastExposureFromBuffer() const;
+
+	/** Enqueue a pass to readback current exposure */
+	void EnqueueEyeAdaptationExposureTextureReadback(FRDGBuilder& GraphBuilder) const;
+	void EnqueueEyeAdaptationExposureBufferReadback(FRDGBuilder& GraphBuilder) const;
 	
 	/** Returns the load action to use when overwriting all pixels of a target that you intend to read from. Takes into account the HMD hidden area mesh. */
 	ERenderTargetLoadAction GetOverwriteLoadAction() const;
