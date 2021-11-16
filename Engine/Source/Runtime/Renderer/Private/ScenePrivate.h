@@ -699,6 +699,24 @@ struct FShaderDrawDebugStateData
 	}
 };
 
+// Some resources used across frames can prevent execution of PS, CS and VS work across overlapping frames work.
+// This struct is used to transparently double buffer the sky aerial perspective volume on some platforms,
+// in order to make sure two consecutive frames have no resource dependencies, resulting in no cross frame barrier/sync point.
+struct FPersistentSkyAtmosphereData
+{
+	FPersistentSkyAtmosphereData();
+
+	void InitialiseOrNextFrame(ERHIFeatureLevel::Type FeatureLevel, FPooledRenderTargetDesc& AerialPerspectiveDesc, FRHICommandListImmediate& RHICmdList);
+
+	TRefCountPtr<IPooledRenderTarget> GetCurrentCameraAerialPerspectiveVolume();
+
+private:
+	bool bInitialised;
+	TRefCountPtr<IPooledRenderTarget> CameraAerialPerspectiveVolumes[2];
+	uint8 CameraAerialPerspectiveVolumeCount;
+	uint8 CameraAerialPerspectiveVolumeIndex;
+};
+
 /**
  * The scene manager's private implementation of persistent view state.
  * This class is associated with a particular camera across multiple frames by the game thread.
@@ -754,6 +772,8 @@ public:
 	FFrameBasedOcclusionQueryPool PrimitiveOcclusionQueryPool;
 
 	FHZBOcclusionTester HZBOcclusionTests;
+
+	FPersistentSkyAtmosphereData PersistentSkyAtmosphereData;
 
 	/** Storage to which compressed visibility chunks are uncompressed at runtime. */
 	TArray<uint8> DecompressedVisibilityChunk;
