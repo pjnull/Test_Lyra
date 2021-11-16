@@ -560,7 +560,25 @@ void UAnimBlueprintExtension_Base::CreateEvaluationHandler(IAnimBlueprintCompila
 			AssignmentNode = InCompilationContext.SpawnIntermediateNode<UK2Node_StructMemberSet>(InNode, InCompilationContext.GetConsolidatedEventGraph());
 			AssignmentNode->VariableReference.SetSelfMember(Record.NodeVariableProperty->GetFName());
 			AssignmentNode->StructType = Record.NodeVariableProperty->Struct;
-			AssignmentNode->AllocateDefaultPins();
+			AssignmentNode->AllocateExecPins();
+
+			// Simple FOptionalPinManager that exposes all pins. The default used in UK2Node_StructMemberSet::AllocateDefaultPins will hide any that
+			// are PinHiddenByDefault, so for this instance we dont want that as users may have exposed some pins
+			struct FAssignmentNodeOptionalPinManager : public FOptionalPinManager
+			{
+				// FOptionalPinManager Interface
+				virtual void GetRecordDefaults(FProperty* TestProperty, FOptionalPinFromProperty& Record) const override
+				{
+					// Pins are always visible
+					Record.bCanToggleVisibility = true;
+					Record.bShowPin = true;
+				}
+			};
+
+			FAssignmentNodeOptionalPinManager OptionalPinManager;
+			OptionalPinManager.RebuildPropertyList(AssignmentNode->ShowPinForProperties, AssignmentNode->StructType);
+			OptionalPinManager.CreateVisiblePins(AssignmentNode->ShowPinForProperties, AssignmentNode->StructType, EGPD_Input, AssignmentNode);
+
 			Record.CustomEventNodes.Add(AssignmentNode);
 		}
 
