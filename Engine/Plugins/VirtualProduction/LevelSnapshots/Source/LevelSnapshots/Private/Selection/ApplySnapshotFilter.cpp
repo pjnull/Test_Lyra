@@ -136,17 +136,18 @@ void UE::LevelSnapshots::Private::FApplySnapshotFilter::AnalyseComponentProperti
 		{
 			FilterSubobjectPair(MapToAddTo, SnapshotComp, WorldComp);
 		},
-		[&ComponentSelection, bShouldAnalyseUnmatchedComponents](UActorComponent* UnmatchedSnapshotComp)
+		[this, &ComponentSelection, bShouldAnalyseUnmatchedComponents](UActorComponent* UnmatchedSnapshotComp)
 		{
-			if (bShouldAnalyseUnmatchedComponents)
+			if (const EFilterResult::Type FilterResult = Filter->IsDeletedComponentValid(FIsDeletedComponentValidParams(UnmatchedSnapshotComp, WorldActor));
+				bShouldAnalyseUnmatchedComponents && EFilterResult::CanInclude(FilterResult))
 			{
 				ComponentSelection.SnapshotComponentsToAdd.Add(UnmatchedSnapshotComp);
 			}
 		},
-		[&ComponentSelection, bShouldAnalyseUnmatchedComponents](UActorComponent* UnmatchedWorldComp)
+		[this, &ComponentSelection, bShouldAnalyseUnmatchedComponents](UActorComponent* UnmatchedWorldComp)
 		{
-			
-			if (bShouldAnalyseUnmatchedComponents)
+			if (const EFilterResult::Type FilterResult = Filter->IsAddedComponentValid(FIsAddedComponentValidParams(UnmatchedWorldComp));
+				bShouldAnalyseUnmatchedComponents && EFilterResult::CanInclude(FilterResult))
 			{
 				ComponentSelection.EditorWorldComponentsToRemove.Add(UnmatchedWorldComp);
 			}
