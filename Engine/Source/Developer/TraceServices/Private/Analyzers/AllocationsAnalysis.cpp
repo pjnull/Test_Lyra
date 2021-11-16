@@ -154,7 +154,7 @@ bool FAllocationsAnalyzer::OnEvent(uint16 RouteId, EStyle Style, const FOnEventC
 			AllocationsProvider.EditAlloc(Time, Owner, Address, Size, Alignment, ThreadId, Tracker, RootHeap);
 			if (RouteId == RouteId_ReallocAlloc || RouteId == RouteId_ReallocAllocSystem)
 			{
-				AllocationsProvider.EditPopRealloc(ThreadId, Tracker);
+				AllocationsProvider.EditPopTagFromPtr(ThreadId, Tracker);
 			}
 			break;
 		}
@@ -185,7 +185,7 @@ bool FAllocationsAnalyzer::OnEvent(uint16 RouteId, EStyle Style, const FOnEventC
 			{
 				const uint32 ThreadId = Context.ThreadInfo.GetSystemId();
 				const uint8 Tracker = 0; // We only care about the default tracker for now.
-				AllocationsProvider.EditPushRealloc(ThreadId, Tracker, Address);
+				AllocationsProvider.EditPushTagFromPtr(ThreadId, Tracker, Address);
 			}
 			AllocationsProvider.EditFree(Time, Address, RootHeap);
 			break;
@@ -266,15 +266,15 @@ bool FAllocationsAnalyzer::OnEvent(uint16 RouteId, EStyle Style, const FOnEventC
 				{
 					const uint64 Ptr = Context.EventData.GetValue<uint64>("Ptr");
 					FAllocationsProvider::FEditScopeLock _(AllocationsProvider);
-					AllocationsProvider.EditPushRealloc(ThreadId, Tracker, Ptr);
+					AllocationsProvider.EditPushTagFromPtr(ThreadId, Tracker, Ptr);
 				}
 			}
 			else // EStyle::LeaveScope
 			{
 				FAllocationsProvider::FEditScopeLock _(AllocationsProvider);
-				if (AllocationsProvider.HasReallocScope(ThreadId, Tracker)) // Is realloc scope active?
+				if (AllocationsProvider.HasTagFromPtrScope(ThreadId, Tracker)) // Is TagFromPtr scope active?
 				{
-					AllocationsProvider.EditPopRealloc(ThreadId, Tracker);
+					AllocationsProvider.EditPopTagFromPtr(ThreadId, Tracker);
 				}
 				else
 				{

@@ -60,9 +60,9 @@ public:
 	uint32 GetCurrentTag(uint32 ThreadId, uint8 Tracker) const;
 	const TCHAR* GetTagString(uint32 Tag) const;
 
-	void PushRealloc(uint32 ThreadId, uint8 Tracker, uint32 Tag);
-	void PopRealloc(uint32 ThreadId, uint8 Tracker);
-	bool HasReallocScope(uint32 ThreadId, uint8 Tracker) const;
+	void PushTagFromPtr(uint32 ThreadId, uint8 Tracker, uint32 Tag);
+	void PopTagFromPtr(uint32 ThreadId, uint8 Tracker);
+	bool HasTagFromPtrScope(uint32 ThreadId, uint8 Tracker) const;
 
 private:
 	inline uint32 GetTrackerThreadId(uint32 ThreadId, uint8 Tracker) const
@@ -107,19 +107,6 @@ struct FAllocationItem
 
 static_assert(sizeof(FAllocationItem) == 64, "struct FAllocationItem needs packing");
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-#if 0
-struct FAllocationCoreItem
-{
-	uint32 StartEventIndex;
-	uint32 EndEventIndex;
-	double StartTime;
-	double EndTime;
-	uint64 Owner;
-	uint64 Base;
-	uint32 Size;
-};
-#endif
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 class FShortLivingAllocs
@@ -324,11 +311,10 @@ public:
 	void EnumerateLiveAllocs(TFunctionRef<void(const FAllocationItem& Alloc)> Callback) const;
 	uint32 GetNumLiveAllocs() const;
 
-	bool HasReallocScope(uint32 ThreadId, uint8 Tracker) const { ReadAccessCheck(); return TagTracker.HasReallocScope(ThreadId, Tracker); }
+	virtual const TCHAR* GetTagName(int32 Tag) const { ReadAccessCheck(); return TagTracker.GetTagString(Tag); }
+	bool HasTagFromPtrScope(uint32 ThreadId, uint8 Tracker) const { ReadAccessCheck(); return TagTracker.HasTagFromPtrScope(ThreadId, Tracker); }
 
 	void DebugPrint() const;
-
-	virtual const TCHAR* GetTagName(int32 Tag) const { ReadAccessCheck(); return TagTracker.GetTagString(Tag); }
 
 	//////////////////////////////////////////////////
 	// Edit operations
@@ -343,11 +329,10 @@ public:
 	void EditUnmarkAllocationAsHeap(double Time, uint64 Address, HeapId Heap);
 	
 	void EditAddTagSpec(int32 Tag, uint32 ParentTag, const TCHAR* Display) { EditAccessCheck(); TagTracker.AddTagSpec(Tag, ParentTag, Display); }
-	void EditPushTag(uint32 ThreadId, uint8 Tracker, uint32 Tag)           { EditAccessCheck(); TagTracker.PushTag(ThreadId, Tracker, Tag); }
-	void EditPopTag(uint32 ThreadId, uint8 Tracker)                        { EditAccessCheck(); TagTracker.PopTag(ThreadId, Tracker); }
-
-	void EditPushRealloc(uint32 ThreadId, uint8 Tracker, uint64 Ptr);
-	void EditPopRealloc(uint32 ThreadId, uint8 Tracker);
+	void EditPushTag(uint32 ThreadId, uint8 Tracker, uint32 Tag);
+	void EditPopTag(uint32 ThreadId, uint8 Tracker);
+	void EditPushTagFromPtr(uint32 ThreadId, uint8 Tracker, uint64 Ptr);
+	void EditPopTagFromPtr(uint32 ThreadId, uint8 Tracker);
 
 	void EditOnAnalysisCompleted(double Time);
 

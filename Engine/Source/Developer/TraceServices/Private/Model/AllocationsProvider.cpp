@@ -144,9 +144,9 @@ void FTagTracker::PopTag(uint32 InThreadId, uint8 InTracker)
 {
 	const uint32 TrackerThreadId = GetTrackerThreadId(InThreadId, InTracker);
 	ThreadState* State = TrackerThreadStates.Find(TrackerThreadId);
-	if (ensure(State && !State->TagStack.IsEmpty()))
+	if (State && !State->TagStack.IsEmpty())
 	{
-		check((State->TagStack.Top() & 0x80000000) == 0);
+		INSIGHTS_SLOW_CHECK((State->TagStack.Top() & 0x80000000) == 0);
 		State->TagStack.Pop();
 	}
 	else
@@ -182,7 +182,7 @@ const TCHAR* FTagTracker::GetTagString(uint32 InTag) const
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void FTagTracker::PushRealloc(uint32 InThreadId, uint8 InTracker, uint32 InTag)
+void FTagTracker::PushTagFromPtr(uint32 InThreadId, uint8 InTracker, uint32 InTag)
 {
 	const uint32 TrackerThreadId = GetTrackerThreadId(InThreadId, InTracker);
 	ThreadState& State = TrackerThreadStates.FindOrAdd(TrackerThreadId);
@@ -191,13 +191,13 @@ void FTagTracker::PushRealloc(uint32 InThreadId, uint8 InTracker, uint32 InTag)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void FTagTracker::PopRealloc(uint32 InThreadId, uint8 InTracker)
+void FTagTracker::PopTagFromPtr(uint32 InThreadId, uint8 InTracker)
 {
 	const uint32 TrackerThreadId = GetTrackerThreadId(InThreadId, InTracker);
 	ThreadState* State = TrackerThreadStates.Find(TrackerThreadId);
-	if (ensure(State && !State->TagStack.IsEmpty()))
+	if (State && !State->TagStack.IsEmpty())
 	{
-		check((State->TagStack.Top() & 0x80000000) != 0);
+		INSIGHTS_SLOW_CHECK((State->TagStack.Top() & 0x80000000) != 0);
 		State->TagStack.Pop();
 	}
 	else
@@ -205,14 +205,14 @@ void FTagTracker::PopRealloc(uint32 InThreadId, uint8 InTracker)
 		++NumErrors;
 		if (NumErrors <= MaxLogMessagesPerErrorType)
 		{
-			UE_LOG(LogTraceServices, Error, TEXT("[MemAlloc] Realloc stack on Thread %u (Tracker=%u) is already empty!"), InThreadId, InTracker);
+			UE_LOG(LogTraceServices, Error, TEXT("[MemAlloc] Tag stack on Thread %u (Tracker=%u) is already empty!"), InThreadId, InTracker);
 		}
 	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool FTagTracker::HasReallocScope(uint32 InThreadId, uint8 InTracker) const
+bool FTagTracker::HasTagFromPtrScope(uint32 InThreadId, uint8 InTracker) const
 {
 	const uint32 TrackerThreadId = GetTrackerThreadId(InThreadId, InTracker);
 	const ThreadState* State = TrackerThreadStates.Find(TrackerThreadId);
@@ -1272,10 +1272,10 @@ void FAllocationsProvider::EditUnmarkAllocationAsHeap(double Time, uint64 Addres
 
 		// We cannot just unmark the allocation as heap, there is no timestamp support, instead fake a free
 		// and allocation. Make sure the new allocation retains the tag from the original.
-		EditPushRealloc(ThreadId, Tracker, Address);
+		EditPushTagFromPtr(ThreadId, Tracker, Address);
 		EditFree(Time, Address, RootHeap);
 		EditAlloc(Time, Address, Owner, Size, Alignment, 0, 1, RootHeap);
-		EditPopRealloc(ThreadId, Tracker);
+		EditPopTagFromPtr(ThreadId, Tracker);
 	}
 	else
 	{
@@ -1434,7 +1434,25 @@ HeapId FAllocationsProvider::FindRootHeap(HeapId Heap) const
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void FAllocationsProvider::EditPushRealloc(uint32 ThreadId, uint8 Tracker, uint64 Ptr)
+void FAllocationsProvider::EditPushTag(uint32 ThreadId, uint8 Tracker, uint32 Tag)
+{
+	EditAccessCheck();
+
+	TagTracker.PushTag(ThreadId, Tracker, Tag);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void FAllocationsProvider::EditPopTag(uint32 ThreadId, uint8 Tracker)
+{
+	EditAccessCheck();
+	
+	TagTracker.PopTag(ThreadId, Tracker);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void FAllocationsProvider::EditPushTagFromPtr(uint32 ThreadId, uint8 Tracker, uint64 Ptr)
 {
 	EditAccessCheck();
 
@@ -1444,7 +1462,7 @@ void FAllocationsProvider::EditPushRealloc(uint32 ThreadId, uint8 Tracker, uint6
 	{
 		FAllocationItem* Alloc = Allocs->FindRef(Ptr);
 		const int32 Tag = Alloc ? Alloc->Tag : 0; // If ptr is not found use "Untagged"
-		TagTracker.PushRealloc(ThreadId, Tracker, Tag);
+		TagTracker.PushTagFromPtr(ThreadId, Tracker, Tag);
 	}
 	else
 	{
@@ -1458,10 +1476,11 @@ void FAllocationsProvider::EditPushRealloc(uint32 ThreadId, uint8 Tracker, uint6
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void FAllocationsProvider::EditPopRealloc(uint32 ThreadId, uint8 Tracker)
+void FAllocationsProvider::EditPopTagFromPtr(uint32 ThreadId, uint8 Tracker)
 {
 	EditAccessCheck();
-	TagTracker.PopRealloc(ThreadId, Tracker);
+
+	TagTracker.PopTagFromPtr(ThreadId, Tracker);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
