@@ -176,7 +176,7 @@ UTexture2D* FOpenCVHelper::TextureFromCvMat(cv::Mat& Mat, UTexture2D* InTexture)
 
 	// Copy the pixels from the OpenCV Mat to the Texture
 
-	FTexture2DMipMap& Mip0 = InTexture->PlatformData->Mips[0];
+	FTexture2DMipMap& Mip0 = InTexture->GetPlatformData()->Mips[0];
 	void* TextureData = Mip0.BulkData.Lock(LOCK_READ_WRITE);
 
 	const int32 PixelStride = Mat.channels();
