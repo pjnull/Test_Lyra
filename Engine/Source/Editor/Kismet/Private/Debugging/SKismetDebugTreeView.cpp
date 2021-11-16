@@ -599,13 +599,6 @@ protected:
 					{
 						bVisible = true;
 						bChildMatch = true;
-
-						// exit early if children aren't in the tree yet anyway and
-						// we already know to expand this
-						if (!Row)
-						{
-							break;
-						}
 					}
 			}
 			else
@@ -617,13 +610,6 @@ protected:
 				{
 					bVisible = true;
 					bChildMatch = true;
-
-					// exit early if children aren't in the tree yet anyway and
-					// we already know to expand this
-					if (!Row)
-					{
-						break;
-					}
 				}
 			}
 		}
@@ -656,7 +642,7 @@ protected:
 			ChildrenMirrors.Add(FoundItem);
 
 			// only add item if it matches search
-			if (!bRespectSearch || InSearchString.IsEmpty() || FoundItem->IsVisible() || FoundItem->DoParentsMatchSearch())
+			if (!bRespectSearch || InSearchString.IsEmpty() || FoundItem->IsVisible())
 			{
 				OutChildren.Add(FoundItem);
 			}
