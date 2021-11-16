@@ -97,6 +97,10 @@ protected:
 	//
 	UPROPERTY()
 	TObjectPtr<UMaterialInstanceDynamic> WorkingPreviewMaterial;
+
+	UPROPERTY()
+	TObjectPtr<UMaterialInstanceDynamic> ErrorPreviewMaterial;
+	
 	float SecondsBeforeWorkingMaterial = 0.75;
 
 protected:

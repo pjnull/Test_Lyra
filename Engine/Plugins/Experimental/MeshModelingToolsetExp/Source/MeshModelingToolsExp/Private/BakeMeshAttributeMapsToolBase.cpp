@@ -76,6 +76,11 @@ void UBakeMeshAttributeMapsToolBase::PostSetup()
 	VisualizationProps->RestoreProperties(this);
 	AddToolPropertySource(VisualizationProps);
 
+	// Initialize background compute
+	Compute = MakeUnique<TGenericDataBackgroundCompute<FMeshMapBaker>>();
+	Compute->Setup(this);
+	Compute->OnResultUpdated.AddLambda([this](const TUniquePtr<FMeshMapBaker>& NewResult) { OnMapsUpdated(NewResult); });
+
 	GatherAnalytics(BakeAnalytics.MeshSettings);
 }
 
@@ -100,10 +105,12 @@ void UBakeMeshAttributeMapsToolBase::OnTick(float DeltaTime)
 	{
 		Compute->Tick(DeltaTime);
 
-		float ElapsedComputeTime = Compute->GetElapsedComputeTime();
+		const float ElapsedComputeTime = Compute->GetElapsedComputeTime();
 		if (!CanAccept() && ElapsedComputeTime > SecondsBeforeWorkingMaterial)
 		{
-			PreviewMesh->SetOverrideRenderMaterial(WorkingPreviewMaterial);
+			UMaterialInstanceDynamic* ProgressMaterial =
+				static_cast<bool>(OpState & EBakeOpState::Invalid) ? ErrorPreviewMaterial : WorkingPreviewMaterial;
+			PreviewMesh->SetOverrideRenderMaterial(ProgressMaterial);
 		}
 	}
 }
@@ -142,18 +149,7 @@ void UBakeMeshAttributeMapsToolBase::UpdateVisualization()
 
 void UBakeMeshAttributeMapsToolBase::InvalidateCompute()
 {
-	const bool bInvalidate = static_cast<bool>(OpState & EBakeOpState::Evaluate);
-	if (!Compute)
-	{
-		Compute = MakeUnique<TGenericDataBackgroundCompute<FMeshMapBaker>>();
-		Compute->Setup(this);
-		Compute->OnResultUpdated.AddLambda([this](const TUniquePtr<FMeshMapBaker>& NewResult) { OnMapsUpdated(NewResult); });
-		Compute->InvalidateResult();
-	}
-	else if (bInvalidate)
-	{
-		Compute->InvalidateResult();
-	}
+	Compute->InvalidateResult();
 	OpState = EBakeOpState::Clean;
 }
 

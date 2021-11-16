@@ -373,6 +373,14 @@ void UBakeMeshAttributeVertexTool::Setup()
 		        "Bake Vertex Colors. Select Bake Mesh (LowPoly) first, then (optionally) Detail Mesh second."),
 		EToolMessageLevel::UserNotification);
 
+	// Initialize background compute
+	Compute = MakeUnique<TGenericDataBackgroundCompute<FMeshVertexBaker>>();
+	Compute->Setup(this);
+	Compute->OnResultUpdated.AddLambda([this](const TUniquePtr<FMeshVertexBaker>& NewResult)
+	{
+		OnResultUpdated(NewResult);
+	});
+
 	GatherAnalytics(BakeAnalytics.MeshSettings);
 }
 
@@ -428,7 +436,9 @@ void UBakeMeshAttributeVertexTool::OnTick(float DeltaTime)
 		const float ElapsedComputeTime = Compute->GetElapsedComputeTime();
 		if (!CanAccept() && ElapsedComputeTime > SecondsBeforeWorkingMaterial)
 		{
-			PreviewMesh->SetOverrideRenderMaterial(WorkingPreviewMaterial);
+			UMaterialInstanceDynamic* ProgressMaterial =
+				static_cast<bool>(OpState & EBakeOpState::Invalid) ? ErrorPreviewMaterial : WorkingPreviewMaterial;
+			PreviewMesh->SetOverrideRenderMaterial(ProgressMaterial);
 		}
 	}
 }
@@ -707,15 +717,6 @@ void UBakeMeshAttributeVertexTool::UpdateResult()
 		return;
 	}
 
-	if (!Compute)
-	{
-		Compute = MakeUnique<TGenericDataBackgroundCompute<FMeshVertexBaker>>();
-		Compute->Setup(this);
-		Compute->OnResultUpdated.AddLambda([this](const TUniquePtr<FMeshVertexBaker>& NewResult)
-		{
-			OnResultUpdated(NewResult);
-		});
-	}
 	Compute->InvalidateResult();
 	OpState = EBakeOpState::Clean;
 }

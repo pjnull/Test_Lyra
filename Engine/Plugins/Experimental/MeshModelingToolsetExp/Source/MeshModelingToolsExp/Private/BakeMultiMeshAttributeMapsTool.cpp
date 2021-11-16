@@ -498,7 +498,8 @@ void UBakeMultiMeshAttributeMapsTool::Setup()
 
 bool UBakeMultiMeshAttributeMapsTool::CanAccept() const
 {
-	bool bCanAccept = Compute ? Compute->HaveValidResult() && Settings->MapTypes != (int) EBakeMapType::None : false;
+	const bool bValidOp = (OpState & EBakeOpState::Invalid) != EBakeOpState::Invalid;
+	bool bCanAccept = bValidOp && Compute ? Compute->HaveValidResult() : false;
 	if (bCanAccept)
 	{
 		// Allow Accept if all non-None types have valid results.

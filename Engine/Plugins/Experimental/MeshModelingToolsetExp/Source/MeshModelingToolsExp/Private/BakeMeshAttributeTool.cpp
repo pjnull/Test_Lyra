@@ -3,6 +3,7 @@
 #include "BakeMeshAttributeTool.h"
 #include "InteractiveToolManager.h"
 #include "ModelingToolTargetUtil.h"
+#include "ToolSetupUtil.h"
 
 using namespace UE::Geometry;
 
@@ -14,12 +15,8 @@ void UBakeMeshAttributeTool::Setup()
 	Super::Setup();
 
 	// Setup preview materials
-	UMaterial* WorkingMaterial = LoadObject<UMaterial>(nullptr, TEXT("/MeshModelingToolsetExp/Materials/InProgressMaterial"));
-	check(WorkingMaterial);
-	if (WorkingMaterial != nullptr)
-	{
-		WorkingPreviewMaterial = UMaterialInstanceDynamic::Create(WorkingMaterial, GetToolManager());
-	}
+	WorkingPreviewMaterial = ToolSetupUtil::GetDefaultWorkingMaterialInstance(GetToolManager());
+	ErrorPreviewMaterial = ToolSetupUtil::GetDefaultErrorMaterial(GetToolManager());
 }
 
 
