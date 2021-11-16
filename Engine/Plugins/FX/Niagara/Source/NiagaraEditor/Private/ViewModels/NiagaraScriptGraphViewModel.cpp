@@ -415,11 +415,10 @@ void FNiagaraScriptGraphViewModel::PasteNodes()
 				{
 					// we create the new parameter + script variable combo here and copy over metadata
 					UNiagaraScriptVariable* NewScriptVariable = NiagaraGraph->AddParameter(ScriptVariable->Variable, StaticSwitchInputs.Contains(ScriptVariable->Variable));
-					NewScriptVariable->InitFrom(ScriptVariable);
+					NewScriptVariable->InitFrom(ScriptVariable.Get());
 				}
 			}
-		}
-		
+		}		
 	}
 }
 
