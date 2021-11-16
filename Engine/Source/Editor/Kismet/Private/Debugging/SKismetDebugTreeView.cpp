@@ -6,6 +6,7 @@
 #include "HAL/PlatformApplicationMisc.h"
 #include "PropertyInfoViewStyle.h"
 #include "Widgets/Input/SHyperlink.h"
+#include "Widgets/Images/SLayeredImage.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/Breakpoint.h"
 #include "Kismet2/KismetEditorUtilities.h"
@@ -894,8 +895,10 @@ public:
 			SecondaryColor
 		);
 
+		TSharedPtr<SLayeredImage> LayeredImage;
+
 		// make the icon a button so the user can open the asset in editor if there is one
-		return SNew(SButton)
+		TSharedRef<SWidget> NameIcon = SNew(SButton)
 			.OnClicked(this, &FWatchChildLineItem::OnFocusAsset)
 			.ButtonStyle(FEditorStyle::Get(), "NoBorder")
 			.ContentPadding(0.0f)
@@ -911,7 +914,7 @@ public:
 				+ SOverlay::Slot()
 				.Padding(FMargin(10.f, 0.f, 0.f, 0.f))
 				[
-					SNew(SImage)
+					SAssignNew(LayeredImage, SLayeredImage)
 						.Image(Icon)
 						.ColorAndOpacity(this, &FWatchChildLineItem::ModifiedIconColor, BaseColor)
 				]
@@ -923,6 +926,13 @@ public:
 						.Visibility(this, &FWatchChildLineItem::GetWatchIconVisibility)
 				]
 			];
+
+		LayeredImage->AddLayer(
+			SecondaryIcon,
+			TAttribute<FSlateColor>::CreateSP(this, &FWatchChildLineItem::ModifiedIconColor, SecondaryColor)
+		);
+
+		return NameIcon;
 	}
 
 	virtual TSharedRef<SWidget> GetValueIcon() override
@@ -1353,7 +1363,9 @@ protected:
 	
 	virtual FText GetDisplayName() const override;
 	const FSlateBrush* GetPinIcon() const;
+	const FSlateBrush* GetSecondaryPinIcon() const;
 	FSlateColor GetPinIconColor() const;
+	FSlateColor GetSecondaryPinIconColor() const;
 	EVisibility GetWatchIconVisibility() const;
 	FText GetTypename() const;
 
@@ -1669,7 +1681,8 @@ TSharedRef<SWidget> FWatchLineItem::GetValueIcon()
 // overlays the watch icon on top of a faded icon associated with the pin type
 TSharedRef<SWidget> FWatchLineItem::GetNameIcon()
 {
-	return SNew(SButton)
+	TSharedPtr<SLayeredImage> LayeredImage;
+	TSharedRef<SWidget> NameIcon = SNew(SButton)
 		.ButtonStyle(FEditorStyle::Get(), "NoBorder")
 		.ToolTipText(this, &FWatchLineItem::GetIconTooltipText)
 		.OnClicked(this, &FWatchLineItem::OpenEditorForType)
@@ -1679,9 +1692,9 @@ TSharedRef<SWidget> FWatchLineItem::GetNameIcon()
 			+ SOverlay::Slot()
 			.Padding(FMargin(10.f, 0.f, 0.f, 0.f))
 			[
-				SNew(SImage)
-					.Image(this, &FWatchLineItem::GetPinIcon)
-					.ColorAndOpacity(this, &FWatchLineItem::GetPinIconColor)
+				SAssignNew(LayeredImage, SLayeredImage)
+				.Image(this, &FWatchLineItem::GetPinIcon)
+				.ColorAndOpacity(this, &FWatchLineItem::GetPinIconColor)
 			]
 			+ SOverlay::Slot()
 			.HAlign(HAlign_Left)
@@ -1691,6 +1704,13 @@ TSharedRef<SWidget> FWatchLineItem::GetNameIcon()
 				.Visibility(this, &FWatchLineItem::GetWatchIconVisibility)
 			]
 		];
+
+	LayeredImage->AddLayer(
+		TAttribute<const FSlateBrush*>(this, &FWatchLineItem::GetSecondaryPinIcon),
+		TAttribute<FSlateColor>(this, &FWatchLineItem::GetSecondaryPinIconColor)
+	);
+
+	return NameIcon;
 }
 
 const FSlateBrush* FWatchLineItem::GetPinIcon() const
@@ -1732,10 +1752,8 @@ const FSlateBrush* FWatchLineItem::GetPinIcon() const
 	return FEditorStyle::GetBrush(TEXT("NoBrush"));
 }
 
-FSlateColor FWatchLineItem::GetPinIconColor() const
+const FSlateBrush* FWatchLineItem::GetSecondaryPinIcon() const
 {
-	FSlateColor PinIconColor = FLinearColor::White;
-
 	if (UEdGraphPin* ObjectToFocus = ObjectRef.Get())
 	{
 		// Try to determine the blueprint that generated the watch
@@ -1764,7 +1782,83 @@ FSlateColor FWatchLineItem::GetPinIconColor() const
 						SecondaryColor
 					);
 
-					PinIconColor = BaseColor;
+					return SecondaryIcon;
+				}
+			}
+		}
+	}
+
+	return FEditorStyle::GetBrush(TEXT("NoBrush"));
+}
+
+FSlateColor FWatchLineItem::GetPinIconColor() const
+{
+	FSlateColor PinIconColor = FLinearColor::White;
+
+	if (UEdGraphPin* ObjectToFocus = ObjectRef.Get())
+	{
+		// Try to determine the blueprint that generated the watch
+		UBlueprint* ParentBlueprint = GetBlueprintForObject(ParentObjectRef.Get());
+
+		// Find a valid property mapping and display the current value
+		UObject* ParentObject = ParentObjectRef.Get();
+		if ((ParentBlueprint != ParentObject) && (ParentBlueprint != nullptr))
+		{
+			TSharedPtr<FPropertyInstanceInfo> DebugInfo;
+			const FKismetDebugUtilities::EWatchTextResult WatchStatus = FKismetDebugUtilities::GetDebugInfo(DebugInfo, ParentBlueprint, ParentObject, ObjectToFocus);
+
+			if (WatchStatus == FKismetDebugUtilities::EWTR_Valid)
+			{
+				check(DebugInfo);
+				TSharedPtr<FPropertyInstanceInfo> ThisDebugInfo = GetWatchedPropertyDebugInfo(DebugInfo);
+				if (ThisDebugInfo.IsValid())
+				{
+					if (const UEdGraphSchema* Schema = ObjectToFocus->GetSchema())
+					{
+						PinIconColor = Schema->GetPinTypeColor(ObjectToFocus->PinType);
+					}
+				}
+			}
+		}
+
+		if (FKismetDebugUtilities::IsPinBeingWatched(FBlueprintEditorUtils::FindBlueprintForNode(ObjectToFocus->GetOwningNode()), ObjectToFocus, PathToProperty))
+		{
+			FLinearColor Color = PinIconColor.GetSpecifiedColor();
+			Color.A = 0.3f;
+			PinIconColor = Color;
+		}
+	}
+
+
+	return PinIconColor;
+}
+
+FSlateColor FWatchLineItem::GetSecondaryPinIconColor() const
+{
+	FSlateColor PinIconColor = FLinearColor::White;
+
+	if (UEdGraphPin* ObjectToFocus = ObjectRef.Get())
+	{
+		// Try to determine the blueprint that generated the watch
+		UBlueprint* ParentBlueprint = GetBlueprintForObject(ParentObjectRef.Get());
+
+		// Find a valid property mapping and display the current value
+		UObject* ParentObject = ParentObjectRef.Get();
+		if ((ParentBlueprint != ParentObject) && (ParentBlueprint != nullptr))
+		{
+			TSharedPtr<FPropertyInstanceInfo> DebugInfo;
+			const FKismetDebugUtilities::EWatchTextResult WatchStatus = FKismetDebugUtilities::GetDebugInfo(DebugInfo, ParentBlueprint, ParentObject, ObjectToFocus);
+
+			if (WatchStatus == FKismetDebugUtilities::EWTR_Valid)
+			{
+				check(DebugInfo);
+				TSharedPtr<FPropertyInstanceInfo> ThisDebugInfo = GetWatchedPropertyDebugInfo(DebugInfo);
+				if (ThisDebugInfo.IsValid())
+				{
+					if (const UEdGraphSchema* Schema = ObjectToFocus->GetSchema())
+					{
+						PinIconColor = Schema->GetSecondaryPinTypeColor(ObjectToFocus->PinType);
+					}
 				}
 			}
 		}
