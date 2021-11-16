@@ -2565,7 +2565,7 @@ void UMaterialInstance::PostLoad()
 
 		// Make sure static parameters are up to date and shaders are cached for the current platform
 		InitStaticPermutation();
-#if WITH_EDITOR && 1
+#if WITH_EDITOR && 0 // the cooker will kick BeginCacheForCookedPlatformData on its own. If a commandlet is going to do rendering (e.g. rebuilding HLOD), InitStaticPermutation should have already created the necessary resources
 		// enable caching in postload for derived data cache commandlet and cook by the book
 		ITargetPlatformManagerModule* TPM = GetTargetPlatformManager();
 		if (TPM && (TPM->RestrictFormatsToRuntimeOnly() == false) && AllowShaderCompiling()) 
@@ -3947,7 +3947,7 @@ void UMaterialInstance::SaveShaderStableKeysInner(const class ITargetPlatform* T
 }
 
 #if WITH_EDITOR
-void UMaterialInstance::GetShaderTypes(EShaderPlatform Platform, TArray<FDebugShaderTypeInfo>& OutShaderInfo)
+void UMaterialInstance::GetShaderTypes(EShaderPlatform Platform, const ITargetPlatform* TargetPlatform, TArray<FDebugShaderTypeInfo>& OutShaderInfo)
 {
 	if (bHasStaticPermutationResource)
 	{
@@ -3970,9 +3970,12 @@ void UMaterialInstance::GetShaderTypes(EShaderPlatform Platform, TArray<FDebugSh
 			check(CurrentResource);
 		}
 
+		FPlatformTypeLayoutParameters LayoutParams;
+		LayoutParams.InitializeForPlatform(TargetPlatform);
+
 		for (FMaterialResource* CurrentResource : StaticPermutationMaterialResources)
 		{
-			CurrentResource->GetShaderTypes(Platform, OutShaderInfo);
+			CurrentResource->GetShaderTypes(Platform, LayoutParams, OutShaderInfo);
 		}
 	}
 }

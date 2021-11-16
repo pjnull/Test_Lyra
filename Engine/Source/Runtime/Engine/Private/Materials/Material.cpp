@@ -3438,14 +3438,17 @@ void UMaterial::SaveShaderStableKeysInner(const class ITargetPlatform* TP, const
 }
 
 #if WITH_EDITOR
-void UMaterial::GetShaderTypes(EShaderPlatform ShaderPlatform, TArray<FDebugShaderTypeInfo>& OutShaderInfo)
+void UMaterial::GetShaderTypes(EShaderPlatform ShaderPlatform, const ITargetPlatform* TargetPlatform, TArray<FDebugShaderTypeInfo>& OutShaderInfo)
 {
 	TArray<FMaterialResource*> NewResourcesToCache;
 	GetNewResources(ShaderPlatform, NewResourcesToCache);
 
+	FPlatformTypeLayoutParameters LayoutParams;
+	LayoutParams.InitializeForPlatform(TargetPlatform);
+
 	for (FMaterialResource* Resource : NewResourcesToCache)
 	{
-		Resource->GetShaderTypes(ShaderPlatform, OutShaderInfo);
+		Resource->GetShaderTypes(ShaderPlatform, LayoutParams, OutShaderInfo);
 		delete Resource;
 	}
 

@@ -2044,7 +2044,7 @@ public:
 *	@param	OutShaderInfo	Array of results sorted by vertex factory type, and shader type.
 *
 */
-	void GetShaderTypes(EShaderPlatform Platform, TArray<FDebugShaderTypeInfo>& OutShaderInfo);
+	void GetShaderTypes(EShaderPlatform Platform, const FPlatformTypeLayoutParameters& LayoutParams, TArray<FDebugShaderTypeInfo>& OutShaderInfo);
 #endif // WITH_EDITOR
 
 #if WITH_EDITOR

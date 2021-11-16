@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "Commandlets/GatherShaderStatsFromMaterialsCommandlet.h"
+#include "Commandlets/DumpMaterialShaderTypes.h"
 #include "AssetData.h"
 #include "AssetRegistryModule.h"
 #include "HAL/FileManager.h"
@@ -13,7 +13,7 @@
 #include "ICollectionManager.h"
 #include "CollectionManagerModule.h"
 
-DEFINE_LOG_CATEGORY_STATIC(LogGatherShaderStatsFromMaterialsCommandlet, Log, All);
+DEFINE_LOG_CATEGORY_STATIC(LogDumpMaterialShaderTypesCommandlet, Log, All);
 
 class FShaderStatsGatheringContext
 {
@@ -41,6 +41,7 @@ public:
 			ShaderTypeHistogram.FindOrAdd(ShaderType, 1);
 		}
 
+#if 0	// the output of the full list is spammy and not usable. Needs to be replaced by a [Type x VF] matrix probably
 		FString AbsoluteShaderName = (ShaderPipelineName != nullptr) ? FString::Printf(TEXT("%s.%s.%s"), VertexFactoryName, ShaderPipelineName, ShaderTypeName) : FString::Printf(TEXT("%s.%s"), VertexFactoryName, ShaderTypeName);
 		if (int32* Existing = FullShaderTypeHistogram.Find(AbsoluteShaderName))
 		{
@@ -50,6 +51,7 @@ public:
 		{
 			FullShaderTypeHistogram.FindOrAdd(AbsoluteShaderName, 1);
 		}
+#endif // 0
 
 		FString VFTypeName(VertexFactoryName);
 		if (int32* Existing = VertexFactoryTypeHistogram.Find(VFTypeName))
@@ -66,13 +68,27 @@ public:
 	{
 		if (ShaderTypeHistogram.Num() > 0)
 		{
-			ShaderTypeHistogram.ValueSort(TGreater<int32>());
-			const char ShaderTypeHeader[] = "\nShaderType, Count, Percent Total\n";
-			DebugWriter->Serialize(const_cast<char*>(ShaderTypeHeader), sizeof(ShaderTypeHeader) - 1);
-			for (TPair<FString, int32> ShaderUsage : ShaderTypeHistogram)
 			{
-				FString OuputLine = FString::Printf(TEXT("%s, %d, %.2f\n"), *ShaderUsage.Key, ShaderUsage.Value, (ShaderUsage.Value / (float)TotalShaders) * 100.0f);
-				DebugWriter->Serialize(const_cast<ANSICHAR*>(StringCast<ANSICHAR>(*OuputLine).Get()), OuputLine.Len());
+				ShaderTypeHistogram.ValueSort(TGreater<int32>());
+				const char ShaderTypeHeader[] = "\nSorted by count:\nShaderType, Count, Percent Total\n";
+				DebugWriter->Serialize(const_cast<char*>(ShaderTypeHeader), sizeof(ShaderTypeHeader) - 1);
+				for (TPair<FString, int32> ShaderUsage : ShaderTypeHistogram)
+				{
+					FString OuputLine = FString::Printf(TEXT("%s, %d, %.2f\n"), *ShaderUsage.Key, ShaderUsage.Value, (ShaderUsage.Value / (float)TotalShaders) * 100.0f);
+					DebugWriter->Serialize(const_cast<ANSICHAR*>(StringCast<ANSICHAR>(*OuputLine).Get()), OuputLine.Len());
+				}
+			}
+
+			// sort one more time, alphabetically for easier comparison, and print again
+			{
+				ShaderTypeHistogram.KeySort(TLess<FString>());
+				const char ShaderTypeHeader[] = "\nSorted by shader type:\nShaderType, Count, Percent Total\n";
+				DebugWriter->Serialize(const_cast<char*>(ShaderTypeHeader), sizeof(ShaderTypeHeader) - 1);
+				for (TPair<FString, int32> ShaderUsage : ShaderTypeHistogram)
+				{
+					FString OuputLine = FString::Printf(TEXT("%s, %d, %.2f\n"), *ShaderUsage.Key, ShaderUsage.Value, (ShaderUsage.Value / (float)TotalShaders) * 100.0f);
+					DebugWriter->Serialize(const_cast<ANSICHAR*>(StringCast<ANSICHAR>(*OuputLine).Get()), OuputLine.Len());
+				}
 			}
 		}
 
@@ -90,13 +106,27 @@ public:
 
 		if (VertexFactoryTypeHistogram.Num() > 0)
 		{
-			VertexFactoryTypeHistogram.ValueSort(TGreater<int32>());
-			const char FullVFTypeHeader[] = "\nVFType, Count, Percent Total\n";
-			DebugWriter->Serialize(const_cast<char*>(FullVFTypeHeader), sizeof(FullVFTypeHeader) - 1);
-			for (TPair<FString, int32> VFTypeUsage : VertexFactoryTypeHistogram)
 			{
-				FString OuputLine = FString::Printf(TEXT("%s, %d, %.2f\n"), *VFTypeUsage.Key, VFTypeUsage.Value, (VFTypeUsage.Value / (float)TotalShaders) * 100.0f);
-				DebugWriter->Serialize(const_cast<ANSICHAR*>(StringCast<ANSICHAR>(*OuputLine).Get()), OuputLine.Len());
+				VertexFactoryTypeHistogram.ValueSort(TGreater<int32>());
+				const char FullVFTypeHeader[] = "\nSorted by count:\nVFType, Count, Percent Total\n";
+				DebugWriter->Serialize(const_cast<char*>(FullVFTypeHeader), sizeof(FullVFTypeHeader) - 1);
+				for (TPair<FString, int32> VFTypeUsage : VertexFactoryTypeHistogram)
+				{
+					FString OuputLine = FString::Printf(TEXT("%s, %d, %.2f\n"), *VFTypeUsage.Key, VFTypeUsage.Value, (VFTypeUsage.Value / (float)TotalShaders) * 100.0f);
+					DebugWriter->Serialize(const_cast<ANSICHAR*>(StringCast<ANSICHAR>(*OuputLine).Get()), OuputLine.Len());
+				}
+			}
+
+			// sort one more time, alphabetically for easier comparison, and print again
+			{
+				VertexFactoryTypeHistogram.KeySort(TLess<FString>());
+				const char FullVFTypeHeader[] = "\nSorted by VF:\nVFType, Count, Percent Total\n";
+				DebugWriter->Serialize(const_cast<char*>(FullVFTypeHeader), sizeof(FullVFTypeHeader) - 1);
+				for (TPair<FString, int32> VFTypeUsage : VertexFactoryTypeHistogram)
+				{
+					FString OuputLine = FString::Printf(TEXT("%s, %d, %.2f\n"), *VFTypeUsage.Key, VFTypeUsage.Value, (VFTypeUsage.Value / (float)TotalShaders) * 100.0f);
+					DebugWriter->Serialize(const_cast<ANSICHAR*>(StringCast<ANSICHAR>(*OuputLine).Get()), OuputLine.Len());
+				}
 			}
 		}
 	}
@@ -105,7 +135,7 @@ public:
 	{
 		if (ShaderTypeHistogram.Num() > 0)
 		{
-			ShaderTypeHistogram.KeySort(TGreater<FString>());
+			ShaderTypeHistogram.KeySort(TLess<FString>());
 			const char ShaderTypeAlphabeticHeader[] = "\nShaderType only\n";
 			DebugWriter->Serialize(const_cast<char*>(ShaderTypeAlphabeticHeader), sizeof(ShaderTypeAlphabeticHeader) - 1);
 			for (TPair<FString, int32> ShaderUsage : ShaderTypeHistogram)
@@ -118,7 +148,7 @@ public:
 
 		if (FullShaderTypeHistogram.Num() > 0)
 		{
-			FullShaderTypeHistogram.KeySort(TGreater<FString>());
+			FullShaderTypeHistogram.KeySort(TLess<FString>());
 			const char FullShaderTypeAlphabeticHeader[] = "\nFullShaderType only\n";
 			DebugWriter->Serialize(const_cast<char*>(FullShaderTypeAlphabeticHeader), sizeof(FullShaderTypeAlphabeticHeader) - 1);
 			for (TPair<FString, int32> ShaderUsage : FullShaderTypeHistogram)
@@ -131,7 +161,7 @@ public:
 
 		if (VertexFactoryTypeHistogram.Num() > 0)
 		{
-			VertexFactoryTypeHistogram.KeySort(TGreater<FString>());
+			VertexFactoryTypeHistogram.KeySort(TLess<FString>());
 			const char FullVFTypeAlphabeticHeader[] = "\nVertexFactoryType only\n";
 			DebugWriter->Serialize(const_cast<char*>(FullVFTypeAlphabeticHeader), sizeof(FullVFTypeAlphabeticHeader) - 1);
 			for (TPair<FString, int32> VFTypeUsage : VertexFactoryTypeHistogram)
@@ -145,7 +175,7 @@ public:
 
 	void Log(const FString& OutString)
 	{
-		//UE_LOG(LogGatherShaderStatsFromMaterialsCommandlet, Log, TEXT("%s"), *OutString);
+		//UE_LOG(LogDumpMaterialShaderTypesCommandlet, Log, TEXT("%s"), *OutString);
 		FString OuputLine = OutString + TEXT("\n");
 		DebugWriter->Serialize(const_cast<ANSICHAR*>(StringCast<ANSICHAR>(*OuputLine).Get()), OuputLine.Len());
 	}
@@ -163,7 +193,7 @@ private:
 	TMap<FString, int32>	VertexFactoryTypeHistogram;
 };
 
-UGatherShaderStatsFromMaterialsCommandlet::UGatherShaderStatsFromMaterialsCommandlet(const FObjectInitializer& ObjectInitializer)
+UDumpMaterialShaderTypesCommandlet::UDumpMaterialShaderTypesCommandlet(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
 }
@@ -219,7 +249,7 @@ void PrintDebugShaderInfo(FShaderStatsGatheringContext& Output, const TArray<FDe
 	}
 }
 
-int ProcessMaterials(const EShaderPlatform ShaderPlatform, FShaderStatsGatheringContext& Output, TArray<FAssetData>& MaterialList)
+int ProcessMaterials(const ITargetPlatform* TargetPlatform, const EShaderPlatform ShaderPlatform, FShaderStatsGatheringContext& Output, TArray<FAssetData>& MaterialList)
 {
 	int TotalShaders = 0;
 
@@ -228,7 +258,7 @@ int ProcessMaterials(const EShaderPlatform ShaderPlatform, FShaderStatsGathering
 		if (UMaterial* Material = Cast<UMaterial>(AssetData.GetAsset()))
 		{
 			TArray<FDebugShaderTypeInfo> OutShaderInfo;
-			Material->GetShaderTypes(ShaderPlatform, OutShaderInfo);
+			Material->GetShaderTypes(ShaderPlatform, TargetPlatform, OutShaderInfo);
 
 			const int TotalShadersForMaterial = GetTotalShaders(OutShaderInfo);
 			TotalShaders += TotalShadersForMaterial;
@@ -248,7 +278,7 @@ int ProcessMaterials(const EShaderPlatform ShaderPlatform, FShaderStatsGathering
 	return TotalShaders;
 }
 
-int ProcessMaterialInstances(const EShaderPlatform ShaderPlatform, FShaderStatsGatheringContext& Output, TArray<FAssetData>& MaterialInstanceList)
+int ProcessMaterialInstances(const ITargetPlatform* TargetPlatform, const EShaderPlatform ShaderPlatform, FShaderStatsGatheringContext& Output, TArray<FAssetData>& MaterialInstanceList)
 {
 	int TotalShaders = 0;
 
@@ -258,7 +288,7 @@ int ProcessMaterialInstances(const EShaderPlatform ShaderPlatform, FShaderStatsG
 		if (UMaterialInstance* MaterialInstance = Cast<UMaterialInstance>(AssetData.GetAsset()))
 		{
 			TArray<FDebugShaderTypeInfo> OutShaderInfo;
-			MaterialInstance->GetShaderTypes(ShaderPlatform, OutShaderInfo);
+			MaterialInstance->GetShaderTypes(ShaderPlatform, TargetPlatform, OutShaderInfo);
 
 			const int TotalShadersForMaterial = GetTotalShaders(OutShaderInfo);
 			TotalShaders += TotalShadersForMaterial;
@@ -302,7 +332,41 @@ int ProcessMaterialInstances(const EShaderPlatform ShaderPlatform, FShaderStatsG
 	return TotalShaders;
 }
 
-int32 UGatherShaderStatsFromMaterialsCommandlet::Main(const FString& Params)
+void ProcessForTargetAndShaderPlatform(const ITargetPlatform* TargetPlatform, const EShaderPlatform ShaderPlatform, const FString& Params, TArray<FAssetData>& MaterialList, TArray<FAssetData> MaterialInstanceList)
+{
+	const double StartTime = FPlatformTime::Seconds();
+
+	const FString TimeNow = FDateTime::Now().ToString();
+	FString FileName = FPaths::Combine(*FPaths::ProjectSavedDir(), FString::Printf(TEXT("MaterialStats/ShaderTypes-%s-%s-%s.txt"), *TargetPlatform->PlatformName(), *LexToString(ShaderPlatform), *TimeNow));
+
+	FShaderStatsGatheringContext Output(FileName);
+
+	int TotalShaders = 0;
+	int TotalAssets = 0;
+
+	// Cache for all the shader formats that the cooking target requires
+	TotalShaders += ProcessMaterials(TargetPlatform, ShaderPlatform, Output, MaterialList);
+	TotalAssets += MaterialList.Num();
+
+	TotalShaders += ProcessMaterialInstances(TargetPlatform, ShaderPlatform, Output, MaterialInstanceList);
+	TotalAssets += MaterialInstanceList.Num();
+
+	Output.Log(TEXT(""));
+	Output.Log(TEXT("Summary"));
+	Output.Log(FString::Printf(TEXT("Total Assets: %d"), TotalAssets));
+	Output.Log(FString::Printf(TEXT("Total Shaders: %d"), TotalShaders));
+	Output.Log(FString::Printf(TEXT("Histogram:")));
+	Output.PrintHistogram(TotalShaders);
+	Output.Log(FString::Printf(TEXT("\nAlphabetic list of types:")));
+	Output.PrintAlphabeticList();
+
+	const double EndTime = FPlatformTime::Seconds() - StartTime;
+	Output.Log(TEXT(""));
+	Output.Log(FString::Printf(TEXT("Commandlet Took: %lf"), EndTime));
+
+}
+
+int32 UDumpMaterialShaderTypesCommandlet::Main(const FString& Params)
 {
 	TArray<FString> Tokens;
 	TArray<FString> Switches;
@@ -312,41 +376,15 @@ int32 UGatherShaderStatsFromMaterialsCommandlet::Main(const FString& Params)
 	// Display help
 	if (Switches.Contains("help"))
 	{
-		UE_LOG(LogGatherShaderStatsFromMaterialsCommandlet, Log, TEXT("GatherShaderStatsFromMaterials"));
-		UE_LOG(LogGatherShaderStatsFromMaterialsCommandlet, Log, TEXT("This commandlet will dump to a human readable plain text file of all the shaders that would be compiled for all materials in a project."));
-		UE_LOG(LogGatherShaderStatsFromMaterialsCommandlet, Log, TEXT("Options:"));
-		UE_LOG(LogGatherShaderStatsFromMaterialsCommandlet, Log, TEXT(" Required: -platform=<platform>     (Which shader platform do you want results for?)"));
-		UE_LOG(LogGatherShaderStatsFromMaterialsCommandlet, Log, TEXT(" Optional: -collection=<name>       (You can alternatively specify a collection of assets to run this on.)"));
+		UE_LOG(LogDumpMaterialShaderTypesCommandlet, Log, TEXT("DumpMaterialShaderTypes"));
+		UE_LOG(LogDumpMaterialShaderTypesCommandlet, Log, TEXT("This commandlet will dump to a human readable plain text file of all the shaders that would be compiled for all materials in a project."));
+		UE_LOG(LogDumpMaterialShaderTypesCommandlet, Log, TEXT("Options:"));
+		UE_LOG(LogDumpMaterialShaderTypesCommandlet, Log, TEXT(" Required: -targetplatform=<platform(s)>     (Which target platform do you want results, e.g. WindowsClient, WindowsEditor. Multiple shader platforms are allowed)."));
+		UE_LOG(LogDumpMaterialShaderTypesCommandlet, Log, TEXT(" Optional: -collection=<name>                (You can also specify a collection of assets to narrow down the results e.g. if you maintain a collection that represents the actually used in-game assets)."));
 		return 0;
 	}
 
-	// Parse platform
-	FString PlatformName;
-	ITargetPlatform* TargetPlatform = nullptr;
-	{
-		if (!FParse::Value(*Params, TEXT("platform="), PlatformName, true))
-		{
-			UE_LOG(LogGatherShaderStatsFromMaterialsCommandlet, Warning, TEXT("You must include a target platform with -platform=<platform>"));
-			return 1;
-		}
-		ITargetPlatformManagerModule& TPM = GetTargetPlatformManagerRef();
-		TargetPlatform = TPM.FindTargetPlatform(PlatformName);
-		if (TargetPlatform == nullptr)
-		{
-			UE_LOG(LogGatherShaderStatsFromMaterialsCommandlet, Display, TEXT("Target platform '%s' was not found.  Valid platforms are:"), *PlatformName);
-			for (ITargetPlatform* platform : TPM.GetTargetPlatforms())
-			{
-				UE_LOG(LogGatherShaderStatsFromMaterialsCommandlet, Display, TEXT("\t'%s'"), *platform->PlatformName());
-			}
-			return 1;
-		}
-
-		TargetPlatform->RefreshSettings();
-	}
-
-	TArray<FName> DesiredShaderFormats;
-	TargetPlatform->GetAllTargetedShaderFormats(DesiredShaderFormats);
-
+	UE_LOG(LogDumpMaterialShaderTypesCommandlet, Display, TEXT("Searching the asset registry for all assets..."));
 	IAssetRegistry& AssetRegistry = FModuleManager::Get().LoadModuleChecked<FAssetRegistryModule>("AssetRegistry").Get();
 	AssetRegistry.SearchAllAssets(true);
 
@@ -386,40 +424,22 @@ int32 UGatherShaderStatsFromMaterialsCommandlet::Main(const FString& Params)
 		}
 	}
 
-	const double StartTime = FPlatformTime::Seconds();
+	// For all active platforms
+	ITargetPlatformManagerModule* TPM = GetTargetPlatformManager();
+	const TArray<ITargetPlatform*>& Platforms = TPM->GetActiveTargetPlatforms();
 
-	const FString TimeNow = FDateTime::Now().ToString();
-	FString FileName = FPaths::Combine(*FPaths::ProjectSavedDir(), FString::Printf(TEXT("MaterialStats/ShaderStatsFromMaterials-%s.txt"), *TimeNow));
-
-	FShaderStatsGatheringContext Output(FileName);
-
-	int TotalShaders = 0;
-	int TotalAssets = 0;
-
-	// Cache for all the shader formats that the cooking target requires
-	for (int32 FormatIndex = 0; FormatIndex < DesiredShaderFormats.Num(); FormatIndex++)
+	for (int32 Index = 0; Index < Platforms.Num(); Index++)
 	{
-		const EShaderPlatform LegacyShaderPlatform = ShaderFormatToLegacyShaderPlatform(DesiredShaderFormats[FormatIndex]);
+		TArray<FName> DesiredShaderFormats;
+		Platforms[Index]->GetAllTargetedShaderFormats(DesiredShaderFormats);
 
-		TotalShaders += ProcessMaterials(LegacyShaderPlatform, Output, MaterialList);
-		TotalAssets += MaterialList.Num();
+		for (int32 FormatIndex = 0; FormatIndex < DesiredShaderFormats.Num(); FormatIndex++)
+		{
+			const EShaderPlatform ShaderPlatform = ShaderFormatToLegacyShaderPlatform(DesiredShaderFormats[FormatIndex]);
 
-		TotalShaders += ProcessMaterialInstances(LegacyShaderPlatform, Output, MaterialInstanceList);
-		TotalAssets += MaterialInstanceList.Num();
+			UE_LOG(LogDumpMaterialShaderTypesCommandlet, Display, TEXT("Dumping material shader types for '%s' - '%s'..."), *Platforms[Index]->PlatformName(), *LexToString(ShaderPlatform));
+			ProcessForTargetAndShaderPlatform(Platforms[Index], ShaderPlatform, Params, MaterialList, MaterialInstanceList);
+		}
 	}
-
-	Output.Log(TEXT(""));
-	Output.Log(TEXT("Summary"));
-	Output.Log(FString::Printf(TEXT("Total Assets: %d"), TotalAssets));
-	Output.Log(FString::Printf(TEXT("Total Shaders: %d"), TotalShaders));
-	Output.Log(FString::Printf(TEXT("Histogram:")));
-	Output.PrintHistogram(TotalShaders);
-	Output.Log(FString::Printf(TEXT("Alphabetic:")));
-	Output.PrintAlphabeticList();
-
-	const double EndTime = FPlatformTime::Seconds() - StartTime;
-	Output.Log(TEXT(""));
-	Output.Log(FString::Printf(TEXT("Commandlet Took: %lf"), EndTime));
-
 	return 0;
 }

@@ -921,10 +921,11 @@ public:
 	*	and shader compilation to acquire this information.
 	*
 	*	@param	Platform		The shader platform to get info for.
+	*   @param  TargetPlatform	The target platform to get info for (e.g. WindowsClient). Various target platforms can share the same ShaderPlatform.
 	*	@param	OutShaderInfo	Array of results sorted by vertex factory type, and shader type.
 	*
 	*/
-	ENGINE_API virtual void GetShaderTypes(EShaderPlatform Platform, TArray<FDebugShaderTypeInfo>& OutShaderInfo) {};
+	ENGINE_API virtual void GetShaderTypes(EShaderPlatform Platform, const ITargetPlatform* TargetPlatform, TArray<FDebugShaderTypeInfo>& OutShaderInfo) {};
 #endif // WITH_EDITOR
 
 protected:

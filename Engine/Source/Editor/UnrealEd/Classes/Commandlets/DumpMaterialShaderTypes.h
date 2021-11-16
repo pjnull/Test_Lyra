@@ -5,10 +5,10 @@
 #include "CoreMinimal.h"
 #include "UObject/ObjectMacros.h"
 #include "Commandlets/Commandlet.h"
-#include "GatherShaderStatsFromMaterialsCommandlet.generated.h"
+#include "DumpMaterialShaderTypes.generated.h"
 
 UCLASS(config=Editor)
-class UGatherShaderStatsFromMaterialsCommandlet : public UCommandlet
+class UDumpMaterialShaderTypesCommandlet : public UCommandlet
 {
 	GENERATED_UCLASS_BODY()
 
