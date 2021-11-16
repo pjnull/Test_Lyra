@@ -1808,13 +1808,6 @@ RHI_API uint32 RHIGetShaderLanguageVersion(const FStaticShaderPlatform Platform)
 	return Version;
 }
 
-RHI_API bool RHISupportsIndexBufferUAVs(const FStaticShaderPlatform Platform)
-{
-	return Platform == SP_PCD3D_SM5 || IsVulkanPlatform(Platform) || IsMetalSM5Platform(Platform)
-		|| FDataDrivenShaderPlatformInfo::GetSupportsIndexBufferUAVs(Platform);
-}
-
-
 static ERHIFeatureLevel::Type GRHIMobilePreviewFeatureLevel = ERHIFeatureLevel::Num;
 RHI_API void RHISetMobilePreviewFeatureLevel(ERHIFeatureLevel::Type MobilePreviewFeatureLevel)
 {
@@ -2202,6 +2195,7 @@ void FGenericDataDrivenShaderPlatformInfo::SetDefaultValues()
 	bSupportsWaterIndirectDraw = true;
 	bSupportsAsyncPipelineCompilation = true;
 	bSupportsGPUSkinCache = true;
+	bSupportsManualVertexFetch = true;
 }
 
 void FGenericDataDrivenShaderPlatformInfo::ParseDataDrivenShaderInfo(const FConfigSection& Section, FGenericDataDrivenShaderPlatformInfo& Info)
@@ -2219,12 +2213,14 @@ void FGenericDataDrivenShaderPlatformInfo::ParseDataDrivenShaderInfo(const FConf
 	GET_SECTION_BOOL_HELPER(bIsPC);
 	GET_SECTION_BOOL_HELPER(bIsConsole);
 	GET_SECTION_BOOL_HELPER(bIsAndroidOpenGLES);
+	GET_SECTION_BOOL_HELPER(bSupportsDebugViewShaders);
 	GET_SECTION_BOOL_HELPER(bSupportsMobileMultiView);
 	GET_SECTION_BOOL_HELPER(bSupportsArrayTextureCompression);
 	GET_SECTION_BOOL_HELPER(bSupportsDistanceFields);
 	GET_SECTION_BOOL_HELPER(bSupportsDiaphragmDOF);
 	GET_SECTION_BOOL_HELPER(bSupportsRGBColorBuffer);
 	GET_SECTION_BOOL_HELPER(bSupportsCapsuleShadows);
+	GET_SECTION_BOOL_HELPER(bSupportsPercentageCloserShadows);
 	GET_SECTION_BOOL_HELPER(bSupportsVolumetricFog);
 	GET_SECTION_BOOL_HELPER(bSupportsIndexBufferUAVs);
 	GET_SECTION_BOOL_HELPER(bSupportsInstancedStereo);
@@ -2296,6 +2292,12 @@ void FGenericDataDrivenShaderPlatformInfo::ParseDataDrivenShaderInfo(const FConf
 
 void FGenericDataDrivenShaderPlatformInfo::Initialize()
 {
+	static bool bInitialized = false;
+	if (bInitialized)
+	{
+		return;
+	}
+
 	// look for the standard DataDriven ini files
 	int32 NumDDInfoFiles = FDataDrivenPlatformInfoRegistry::GetNumDataDrivenIniFiles();
 	for (int32 Index = 0; Index < NumDDInfoFiles; Index++)
@@ -2327,6 +2329,8 @@ void FGenericDataDrivenShaderPlatformInfo::Initialize()
 			}
 		}
 	}
+
+	bInitialized = true;
 }
 
 //

@@ -260,7 +260,7 @@ struct FRayTracingBuildInstanceBufferCS : public FGlobalShader
 	{
 		//return (ShouldCompileRayTracingShadersForProject(Parameters.Platform) && RHISupportsComputeShaders(Parameters.Platform) && !(Parameters.Platform == EShaderPlatform::SP_METAL || Parameters.Platform == EShaderPlatform::SP_METAL_TVOS || IsMobilePlatform(Parameters.Platform)));
 		// temp: don't check ShouldCompileRayTracingShadersForProject since can't enable it for Vulkan yet.
-		return (RHISupportsComputeShaders(Parameters.Platform) && !(Parameters.Platform == EShaderPlatform::SP_METAL || Parameters.Platform == EShaderPlatform::SP_METAL_TVOS || IsMobilePlatform(Parameters.Platform)));
+		return RHISupportsComputeShaders(Parameters.Platform) && !IsMobilePlatform(Parameters.Platform);
 	}
 };
 

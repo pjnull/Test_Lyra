@@ -760,11 +760,11 @@ static bool ShouldCompileSignalPipeline(ESignalProcessing SignalProcessing, ESha
 {
 	if (SignalProcessing == ESignalProcessing::ScreenSpaceDiffuseIndirect)
 	{
-		return Platform == SP_PCD3D_SM5 || FDataDrivenShaderPlatformInfo::GetCompileSignalProcessingPipeline(FStaticShaderPlatform(Platform)) || Platform == SP_METAL_SM5 || FDataDrivenShaderPlatformInfo::GetSupportsSSDIndirect(Platform);
+		return FDataDrivenShaderPlatformInfo::GetCompileSignalProcessingPipeline(Platform) || FDataDrivenShaderPlatformInfo::GetSupportsSSDIndirect(Platform);
 	}
 	else if (SignalProcessing == ESignalProcessing::Reflections)
 	{
-		return Platform == SP_PCD3D_SM5 || RHISupportsRayTracingShaders(Platform);
+		return RHISupportsRayTracingShaders(Platform);
 	}
 	else if (
 		SignalProcessing == ESignalProcessing::ShadowVisibilityMask ||

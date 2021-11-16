@@ -1049,10 +1049,7 @@ public:
 
 inline bool DoesPlatformSupportDistanceFields(const FStaticShaderPlatform Platform)
 {
-	return Platform == SP_PCD3D_SM5
-		|| IsMetalSM5Platform(Platform)
-		|| IsVulkanSM5Platform(Platform)
-		|| FDataDrivenShaderPlatformInfo::GetSupportsDistanceFields(Platform);
+	return FDataDrivenShaderPlatformInfo::GetSupportsDistanceFields(Platform);
 }
 
 inline bool DoesPlatformSupportDistanceFieldShadowing(EShaderPlatform Platform)

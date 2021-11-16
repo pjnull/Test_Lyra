@@ -37,6 +37,28 @@ enum VkDescriptorType {
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 
+inline bool CanCompilePlatform(EShaderPlatform ShaderPlatform)
+{
+	return ShaderPlatform == SP_VULKAN_PCES3_1
+		|| ShaderPlatform == SP_VULKAN_SM5
+		|| ShaderPlatform == SP_VULKAN_ES3_1_ANDROID
+		|| ShaderPlatform == SP_VULKAN_SM5_ANDROID;
+}
+
+inline bool ShouldStripReflection(EShaderPlatform ShaderPlatform)
+{
+	return ShaderPlatform == SP_VULKAN_PCES3_1
+		|| ShaderPlatform == SP_VULKAN_ES3_1_ANDROID
+		|| ShaderPlatform == SP_VULKAN_SM5_ANDROID;
+}
+
+inline bool SupportsOfflineCompiler(EShaderPlatform ShaderPlatform)
+{
+	return ShaderPlatform == SP_VULKAN_PCES3_1
+		|| ShaderPlatform == SP_VULKAN_ES3_1_ANDROID
+		|| ShaderPlatform == SP_VULKAN_SM5_ANDROID;
+}
+
 
 DEFINE_LOG_CATEGORY_STATIC(LogVulkanShaderCompiler, Log, All); 
 
@@ -1352,7 +1374,7 @@ static void BuildShaderOutput(
 	}
 	if (ShaderInput.ExtraSettings.OfflineCompilerPath.Len() > 0)
 	{
-		if (IsVulkanMobilePlatform((EShaderPlatform)ShaderInput.Target.Platform))
+		if (SupportsOfflineCompiler(ShaderInput.Target.GetPlatform()))
 		{
 			CompileOfflineMali(ShaderInput, ShaderOutput, (const ANSICHAR*)Spirv.GetByteData(), Spirv.GetByteSize(), true, Spirv.EntryPointName);
 		}
@@ -2028,12 +2050,11 @@ static bool CompileWithShaderConductor(
 
 void DoCompileVulkanShader(const FShaderCompilerInput& Input, FShaderCompilerOutput& Output, const class FString& WorkingDirectory, EVulkanShaderVersion Version)
 {
-	const EShaderPlatform ShaderPlatform = (EShaderPlatform)Input.Target.Platform;
-	check(IsVulkanPlatform(ShaderPlatform));
+	check(CanCompilePlatform(Input.Target.GetPlatform()));
 
 	const bool bIsSM5 = (Version == EVulkanShaderVersion::SM5);
 	const bool bIsMobile = (Version == EVulkanShaderVersion::ES3_1 || Version == EVulkanShaderVersion::ES3_1_ANDROID);
-	const bool bStripReflect = (IsVulkanMobilePlatform(ShaderPlatform) || IsVulkanMobileSM5Platform(ShaderPlatform)) || Input.IsRayTracingShader();
+	const bool bStripReflect = SupportsOfflineCompiler(Input.Target.GetPlatform()) || Input.IsRayTracingShader();
 
 	const EHlslShaderFrequency FrequencyTable[] =
 	{

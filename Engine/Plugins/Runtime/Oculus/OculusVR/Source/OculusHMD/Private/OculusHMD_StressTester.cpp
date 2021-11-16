@@ -120,14 +120,7 @@ public:
 
 	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
 	{
-		if (Parameters.Platform == EShaderPlatform::SP_METAL || Parameters.Platform == EShaderPlatform::SP_METAL_MRT)
-		{
-			return false;
-		}
-		else
-		{
-			return true;
-		}
+		return !IsMetalMobilePlatform(Parameters.Platform);
 	}
 
 	virtual bool Serialize(FArchive& Ar) override
