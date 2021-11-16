@@ -253,18 +253,18 @@ namespace UnrealBuildTool
 			ActionType = (ActionType)Reader.ReadByte();
 			WorkingDirectory = Reader.ReadDirectoryReferenceNotNull();
 			CommandPath = Reader.ReadFileReference();
-			CommandArguments = Reader.ReadString();
-			CommandVersion = Reader.ReadString();
-			CommandDescription = Reader.ReadString();
-			StatusDescription = Reader.ReadString();
+			CommandArguments = Reader.ReadString()!;
+			CommandVersion = Reader.ReadString()!;
+			CommandDescription = Reader.ReadString()!;
+			StatusDescription = Reader.ReadString()!;
 			bCanExecuteRemotely = Reader.ReadBool();
 			bCanExecuteRemotelyWithSNDBS = Reader.ReadBool();
 			bIsGCCCompiler = Reader.ReadBool();
 			bShouldOutputStatusDescription = Reader.ReadBool();
 			bProducesImportLibrary = Reader.ReadBool();
-			PrerequisiteItems = Reader.ReadList(() => Reader.ReadFileItem());
-			ProducedItems = Reader.ReadList(() => Reader.ReadFileItem());
-			DeleteItems = Reader.ReadList(() => Reader.ReadFileItem());
+			PrerequisiteItems = Reader.ReadList(() => Reader.ReadFileItem())!;
+			ProducedItems = Reader.ReadList(() => Reader.ReadFileItem())!;
+			DeleteItems = Reader.ReadList(() => Reader.ReadFileItem())!;
 			DependencyListFile = Reader.ReadFileItem();
 		}
 
@@ -299,37 +299,37 @@ namespace UnrealBuildTool
 		{
 			Action Action = new Action(Object.GetEnumField<ActionType>("Type"));
 
-			string WorkingDirectory;
+			string? WorkingDirectory;
 			if(Object.TryGetStringField("WorkingDirectory", out WorkingDirectory))
 			{
 				Action.WorkingDirectory = new DirectoryReference(WorkingDirectory);
 			}
 
-			string CommandPath;
+			string? CommandPath;
 			if(Object.TryGetStringField("CommandPath", out CommandPath))
 			{
 				Action.CommandPath = new FileReference(CommandPath);
 			}
 			
-			string CommandArguments;
+			string? CommandArguments;
 			if(Object.TryGetStringField("CommandArguments", out CommandArguments))
 			{
 				Action.CommandArguments = CommandArguments;
 			}
 
-			string CommandVersion;
+			string? CommandVersion;
 			if (Object.TryGetStringField("CommandVersion", out CommandVersion))
 			{
 				Action.CommandVersion = CommandVersion;
 			}
 
-			string CommandDescription;
+			string? CommandDescription;
 			if(Object.TryGetStringField("CommandDescription", out CommandDescription))
 			{
 				Action.CommandDescription = CommandDescription;
 			}
 			
-			string StatusDescription;
+			string? StatusDescription;
 			if(Object.TryGetStringField("StatusDescription", out StatusDescription))
 			{
 				Action.StatusDescription = StatusDescription;
@@ -365,19 +365,19 @@ namespace UnrealBuildTool
 				Action.bProducesImportLibrary = bProducesImportLibrary;
 			}
 
-			string[] PrerequisiteItems;
+			string[]? PrerequisiteItems;
 			if (Object.TryGetStringArrayField("PrerequisiteItems", out PrerequisiteItems))
 			{
 				Action.PrerequisiteItems.AddRange(PrerequisiteItems.Select(x => FileItem.GetItemByPath(x)));
 			}
 
-			string[] ProducedItems;
+			string[]? ProducedItems;
 			if (Object.TryGetStringArrayField("ProducedItems", out ProducedItems))
 			{
 				Action.ProducedItems.AddRange(ProducedItems.Select(x => FileItem.GetItemByPath(x)));
 			}
 
-			string[] DeleteItems;
+			string[]? DeleteItems;
 			if (Object.TryGetStringArrayField("DeleteItems", out DeleteItems))
 			{
 				Action.DeleteItems.AddRange(DeleteItems.Select(x => FileItem.GetItemByPath(x)));

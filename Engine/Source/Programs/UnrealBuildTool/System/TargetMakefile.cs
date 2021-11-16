@@ -235,8 +235,8 @@ namespace UnrealBuildTool
 		{
 			CreateTimeUtc = new DateTime(Reader.ReadLong(), DateTimeKind.Utc);
 			ModifiedTimeUtc = LastWriteTimeUtc;
-			Diagnostics = Reader.ReadList(() => Reader.ReadString());
-			ExternalMetadata = Reader.ReadString();
+			Diagnostics = Reader.ReadList(() => Reader.ReadString())!;
+			ExternalMetadata = Reader.ReadString()!;
 			ExecutableFile = Reader.ReadFileReference();
 			ReceiptFile = Reader.ReadFileReference();
 			ProjectIntermediateDirectory = Reader.ReadDirectoryReferenceNotNull();
@@ -244,27 +244,27 @@ namespace UnrealBuildTool
 			ConfigValueTracker = new ConfigValueTracker(Reader);
 			bDeployAfterCompile = Reader.ReadBool();
 			bHasProjectScriptPlugin = Reader.ReadBool();
-			AdditionalArguments = Reader.ReadArray(() => Reader.ReadString());
-			UHTAdditionalArguments = Reader.ReadArray(() => Reader.ReadString());
-			PreBuildScripts = Reader.ReadArray(() => Reader.ReadFileReference());
-			PreBuildTargets = Reader.ReadArray(() => new TargetInfo(Reader));
-			Actions = Reader.ReadList(() => Reader.ReadAction());
-			EnvironmentVariables = Reader.ReadList(() => Tuple.Create(Reader.ReadString(), Reader.ReadString()));
-			OutputItems = Reader.ReadList(() => Reader.ReadFileItem());
-			ModuleNameToOutputItems = Reader.ReadDictionary(() => Reader.ReadString(), () => Reader.ReadArray(() => Reader.ReadFileItem()), StringComparer.OrdinalIgnoreCase);
-			HotReloadModuleNames = Reader.ReadHashSet(() => Reader.ReadString(), StringComparer.OrdinalIgnoreCase);
-			SourceDirectories = Reader.ReadList(() => Reader.ReadDirectoryItem());
-			DirectoryToSourceFiles = Reader.ReadDictionary(() => Reader.ReadDirectoryItem(), () => Reader.ReadArray(() => Reader.ReadFileItem()));
-			WorkingSet = Reader.ReadHashSet(() => Reader.ReadFileItem());
-			CandidatesForWorkingSet = Reader.ReadHashSet(() => Reader.ReadFileItem());
-			UObjectModules = Reader.ReadList(() => new UHTModuleInfo(Reader));
-			UObjectModuleHeaders = Reader.ReadList(() => new UHTModuleHeaderInfo(Reader));
+			AdditionalArguments = Reader.ReadArray(() => Reader.ReadString())!;
+			UHTAdditionalArguments = Reader.ReadArray(() => Reader.ReadString())!;
+			PreBuildScripts = Reader.ReadArray(() => Reader.ReadFileReference())!;
+			PreBuildTargets = Reader.ReadArray(() => new TargetInfo(Reader))!;
+			Actions = Reader.ReadList(() => Reader.ReadAction())!;
+			EnvironmentVariables = Reader.ReadList(() => Tuple.Create(Reader.ReadString(), Reader.ReadString()))!;
+			OutputItems = Reader.ReadList(() => Reader.ReadFileItem())!;
+			ModuleNameToOutputItems = Reader.ReadDictionary(() => Reader.ReadString()!, () => Reader.ReadArray(() => Reader.ReadFileItem()), StringComparer.OrdinalIgnoreCase)!;
+			HotReloadModuleNames = Reader.ReadHashSet(() => Reader.ReadString(), StringComparer.OrdinalIgnoreCase)!;
+			SourceDirectories = Reader.ReadList(() => Reader.ReadDirectoryItem())!;
+			DirectoryToSourceFiles = Reader.ReadDictionary(() => Reader.ReadDirectoryItem()!, () => Reader.ReadArray(() => Reader.ReadFileItem()))!;
+			WorkingSet = Reader.ReadHashSet(() => Reader.ReadFileItem())!;
+			CandidatesForWorkingSet = Reader.ReadHashSet(() => Reader.ReadFileItem())!;
+			UObjectModules = Reader.ReadList(() => new UHTModuleInfo(Reader))!;
+			UObjectModuleHeaders = Reader.ReadList(() => new UHTModuleHeaderInfo(Reader))!;
 #if __VPROJECT_AVAILABLE__
-			VNIModules = Reader.ReadList(() => new VNIModuleInfo(Reader));
+			VNIModules = Reader.ReadList(() => new VNIModuleInfo(Reader))!;
 #endif
-			PluginFiles = Reader.ReadHashSet(() => Reader.ReadFileItem());
-			ExternalDependencies = Reader.ReadHashSet(() => Reader.ReadFileItem());
-			InternalDependencies = Reader.ReadHashSet(() => Reader.ReadFileItem());
+			PluginFiles = Reader.ReadHashSet(() => Reader.ReadFileItem())!;
+			ExternalDependencies = Reader.ReadHashSet(() => Reader.ReadFileItem())!;
+			InternalDependencies = Reader.ReadHashSet(() => Reader.ReadFileItem())!;
 			MemoryPerActionGB = Reader.ReadDouble();
 		}
 

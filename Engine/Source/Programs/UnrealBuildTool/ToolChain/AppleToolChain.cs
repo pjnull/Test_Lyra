@@ -269,7 +269,7 @@ namespace UnrealBuildTool
 					DsymutilLocation = PatchedDsymutilLocation;
 				}
 
-				DirectoryReference AutoSdkDir;
+				DirectoryReference? AutoSdkDir;
 				if (UEBuildPlatformSDK.TryGetHostPlatformAutoSDKDir(out AutoSdkDir))
 				{
 					FileReference AutoSdkDsymutilLocation = FileReference.Combine(AutoSdkDir, "Mac", "LLVM", "bin", "dsymutil");

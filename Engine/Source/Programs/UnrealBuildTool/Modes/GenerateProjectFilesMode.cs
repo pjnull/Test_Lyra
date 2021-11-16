@@ -143,7 +143,7 @@ namespace UnrealBuildTool
 			Log.TraceLog("\n---   SDK INFO START   ---");
 			foreach (string PlatformName in UnrealTargetPlatform.GetValidPlatformNames())
 			{
-				UEBuildPlatformSDK SDK = UEBuildPlatformSDK.GetSDKForPlatform(PlatformName);
+				UEBuildPlatformSDK? SDK = UEBuildPlatformSDK.GetSDKForPlatform(PlatformName);
 				if (SDK != null && SDK.bIsSdkAllowedOnHost)
 				{
 					// print out the info to the log, and if it's invalid, remember it

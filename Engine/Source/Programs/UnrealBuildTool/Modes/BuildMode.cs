@@ -213,7 +213,7 @@ namespace UnrealBuildTool
 						}
 
 						// print out SDK info for only the platforms that are being compiled
-						UEBuildPlatformSDK.GetSDKForPlatform(TargetDesc.Platform.ToString()).PrintSDKInfoAndReturnValidity();
+						UEBuildPlatformSDK.GetSDKForPlatform(TargetDesc.Platform.ToString())?.PrintSDKInfoAndReturnValidity();
 					}
 
 					// Get all the build options
@@ -430,7 +430,7 @@ namespace UnrealBuildTool
 								ICppCompileAction CppModulesAction = (ICppCompileAction)PrerequisiteAction.Inner;
 
 								List<string>? ImportedModules;
-								if(ModuleImports.TryGetValue(CppModulesAction.CompiledModuleInterfaceFile, out ImportedModules))
+								if(ModuleImports.TryGetValue(CppModulesAction.CompiledModuleInterfaceFile!, out ImportedModules))
 								{
 									foreach (string ImportedModule in ImportedModules)
 									{

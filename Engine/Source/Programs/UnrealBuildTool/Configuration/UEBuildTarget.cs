@@ -336,7 +336,7 @@ namespace UnrealBuildTool
 		/// <returns>New UnrealTargetPlatform instance</returns>
 		public static UnrealTargetPlatform ReadUnrealTargetPlatform(this BinaryArchiveReader Reader)
 		{
-			return UnrealTargetPlatform.Parse(Reader.ReadString());
+			return UnrealTargetPlatform.Parse(Reader.ReadString()!);
 		}
 
 		/// <summary>

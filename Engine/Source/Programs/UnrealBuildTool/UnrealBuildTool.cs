@@ -126,7 +126,7 @@ namespace UnrealBuildTool
 						if (RulesManifest != null)
 						{
 							JsonObject Manifest = JsonObject.Read(RulesManifest);
-							if (Manifest.TryGetStringArrayField("SourceFiles", out string[] SourceFiles))
+							if (Manifest.TryGetStringArrayField("SourceFiles", out string[]? SourceFiles))
 							{
 								FileReference? SourceFile = FileReference.FromString(SourceFiles.FirstOrDefault());
 								if (SourceFile != null && !SourceFile.IsUnderDirectory(Unreal.EngineDirectory))
@@ -477,7 +477,7 @@ namespace UnrealBuildTool
 				ProgressWriter.bWriteMarkup = Options.bWriteProgressMarkup;
 
 				// Ensure we can resolve any external assemblies that are not in the same folder as our assembly.
-				AssemblyUtils.InstallAssemblyResolver(Path.GetDirectoryName(Assembly.GetEntryAssembly().GetOriginalLocation()));
+				AssemblyUtils.InstallAssemblyResolver(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.GetOriginalLocation())!);
 
 				// Change the working directory to be the Engine/Source folder. We are likely running from Engine/Binaries/DotNET
 				// This is critical to be done early so any code that relies on the current directory being Engine/Source will work.

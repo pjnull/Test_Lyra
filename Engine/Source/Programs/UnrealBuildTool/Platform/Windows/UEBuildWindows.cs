@@ -1258,7 +1258,7 @@ namespace UnrealBuildTool
 						}
 
 						// Check for AutoSDK paths
-						DirectoryReference AutoSdkDir;
+						DirectoryReference? AutoSdkDir;
 						if(UEBuildPlatformSDK.TryGetHostPlatformAutoSDKDir(out AutoSdkDir))
 						{
 							DirectoryReference ClangBaseDir = DirectoryReference.Combine(AutoSdkDir, "Win64", "LLVM");
@@ -1298,7 +1298,7 @@ namespace UnrealBuildTool
 					    }
 
 						// Enumerate all the AutoSDK toolchains
-						DirectoryReference PlatformDir;
+						DirectoryReference? PlatformDir;
 						if (UEBuildPlatformSDK.TryGetHostPlatformAutoSDKDir(out PlatformDir))
 						{
 							string VSDir = string.Empty;
@@ -1799,7 +1799,7 @@ namespace UnrealBuildTool
 			{
 				DiaSdkDirs = new List<DirectoryReference>();
 
-				DirectoryReference PlatformDir;
+				DirectoryReference? PlatformDir;
 				if (UEBuildPlatformSDK.TryGetHostPlatformAutoSDKDir(out PlatformDir))
 				{
 					string VSDir = string.Empty;
