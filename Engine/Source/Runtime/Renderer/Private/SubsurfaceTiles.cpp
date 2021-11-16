@@ -109,7 +109,7 @@ void AddConditionalClearBlackUAVPass(FRDGBuilder& GraphBuilder, FRDGEventName&& 
 
 		FComputeShaderUtils::AddPass(
 			GraphBuilder,
-			RDG_EVENT_NAME("ClearUAV (BuildIndirectDispatchBuffer)"),
+			RDG_EVENT_NAME("SSS::ClearUAV(BuildIndirectDispatchBuffer)"),
 			ComputeShader,
 			PassParameters,
 			FIntVector(1, 1, 1));
