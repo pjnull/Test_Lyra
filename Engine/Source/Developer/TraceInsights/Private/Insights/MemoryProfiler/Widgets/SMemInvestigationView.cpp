@@ -495,7 +495,7 @@ FReply SMemInvestigationView::RunQuery()
 			{
 				Builder.Append(TEXT(", "));
 			}
-			Builder.Append(TEXT('A') + TimeMarkerIndex);
+			Builder.Append((TCHAR)(TEXT('A') + TimeMarkerIndex));
 			const TSharedRef<Insights::FTimeMarker>& TimeMarker = ProfilerWindow->GetCustomTimeMarker(TimeMarkerIndex);
 			Builder.Appendf(TEXT("=%.9f"), TimeMarker->GetTime());
 		}
