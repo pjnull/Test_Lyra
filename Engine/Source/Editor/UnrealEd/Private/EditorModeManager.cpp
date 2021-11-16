@@ -98,10 +98,11 @@ FEditorModeTools::FEditorModeTools()
 
 FEditorModeTools::~FEditorModeTools()
 {
-	RemoveAllDelegateHandlers();
-
 	SetDefaultMode(FBuiltinEditorModes::EM_Default);
 	DeactivateAllModes();
+
+	RemoveAllDelegateHandlers();
+
 	DeactivateAllModesPendingDeletion();
 	RecycledScriptableModes.Empty();
 
