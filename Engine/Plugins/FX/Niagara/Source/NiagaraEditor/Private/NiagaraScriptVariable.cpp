@@ -56,7 +56,7 @@ void UNiagaraScriptVariable::Init(const FNiagaraVariable& InVar, const FNiagaraV
 	}
 }
 
-void UNiagaraScriptVariable::InitFrom(UNiagaraScriptVariable* Value)
+void UNiagaraScriptVariable::InitFrom(const UNiagaraScriptVariable* Value)
 {
 	for (TFieldIterator<FProperty> PropertyIt(GetClass(), EFieldIteratorFlags::ExcludeSuper); PropertyIt; ++PropertyIt)
 	{

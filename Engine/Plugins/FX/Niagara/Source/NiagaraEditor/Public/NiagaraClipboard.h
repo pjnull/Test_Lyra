@@ -151,6 +151,9 @@ public:
 
 	UPROPERTY()
 	TArray<TObjectPtr<const UNiagaraScriptVariable>> ScriptVariables;
+
+	UPROPERTY()
+	TArray<TObjectPtr<const UEdGraphNode>> ScriptNodes;
 };
 
 class NIAGARAEDITOR_API FNiagaraClipboard

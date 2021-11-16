@@ -12,8 +12,15 @@
 #include "EdGraphUtilities.h"
 #include "Editor.h"
 #include "EditorStyleSet.h"
+#include "NiagaraClipboard.h"
+#include "NiagaraEditorModule.h"
+#include "NiagaraNodeReroute.h"
+#include "NiagaraScriptVariable.h"
 
 #include "HAL/PlatformApplicationMisc.h"
+#include "Widgets/SNiagaraParameterName.h"
+#include "Widgets/Notifications/SNotificationList.h"
+#include "NiagaraNotificationWidgetProvider.h"
 
 #define LOCTEXT_NAMESPACE "NiagaraScriptGraphViewModel"
 
@@ -247,7 +254,10 @@ bool FNiagaraScriptGraphViewModel::CanCutNodes() const
 
 void FNiagaraScriptGraphViewModel::CopySelectedNodes()
 {
-	TSet<UObject*> NodesToCopy;
+	UNiagaraClipboardContent* ClipboardContent = UNiagaraClipboardContent::Create();
+
+	// we put all nodes we want to copy into the clipboard content. We also cache a set of nodes for more performant lookup later.
+	TSet<UObject*> CachedNodes;
 	for (UObject* SelectedNode : NodeSelection->GetSelectedObjects())
 	{
 		UEdGraphNode* SelectedGraphNode = Cast<UEdGraphNode>(SelectedNode);
@@ -256,14 +266,35 @@ void FNiagaraScriptGraphViewModel::CopySelectedNodes()
 			if (SelectedGraphNode->CanDuplicateNode())
 			{
 				SelectedGraphNode->PrepareForCopying();
-				NodesToCopy.Add(SelectedNode);
+				ClipboardContent->ScriptNodes.Add(SelectedGraphNode);
+				CachedNodes.Add(SelectedGraphNode);
 			}
 		}
 	}
 
-	FString ExportedText;
-	FEdGraphUtilities::ExportNodesToText(NodesToCopy, ExportedText);
-	FPlatformApplicationMisc::ClipboardCopy(*ExportedText);
+	// we then attempt to find all variables referenced by those nodes to copy the script variables in our clipboard
+	TSet<FNiagaraVariable> Variables;
+	const TMap<FNiagaraVariable, FNiagaraGraphParameterReferenceCollection>& ParameterReferenceMap = GetGraph()->GetParameterReferenceMap();
+	for(auto& VariableData : ParameterReferenceMap)
+	{
+		for(auto& ParameterReference : VariableData.Value.ParameterReferences)
+		{
+			if(CachedNodes.Find(ParameterReference.Value.Get()))
+			{
+				Variables.Add(VariableData.Key);
+				break;
+			}
+		}
+	}	
+
+	for(FNiagaraVariable& Var : Variables)
+	{
+		UNiagaraScriptVariable* ScriptVariable = GetGraph()->GetScriptVariable(Var);
+		ensureAlwaysMsgf(ScriptVariable != nullptr, TEXT("Script variable should already exist when we copy nodes referencing them!"));
+		ClipboardContent->ScriptVariables.AddUnique(ScriptVariable);
+	}
+	
+	FNiagaraEditorModule::Get().GetClipboard().SetClipboardContent(ClipboardContent);
 }
 
 bool FNiagaraScriptGraphViewModel::CanCopyNodes() const
@@ -294,13 +325,19 @@ void FNiagaraScriptGraphViewModel::PasteNodes()
 
 		NodeSelection->ClearSelectedObjects();
 
-		// Grab the text to paste from the clipboard.
-		FString TextToImport;
-		FPlatformApplicationMisc::ClipboardPaste(TextToImport);
+		const UNiagaraClipboardContent* ClipboardContent = FNiagaraEditorModule::Get().GetClipboard().GetClipboardContent();
 
-		// Import the nodes
+		TSet<UObject*> NodesToExport;
+		for(const UEdGraphNode* Node : ClipboardContent->ScriptNodes)
+		{
+			NodesToExport.Add(const_cast<UEdGraphNode*>(Node));
+		}
+		
+		// Import the nodes by first exporting only the nodes we have copied in our niagara clipboard to text.
+		FString ExportedText;
+		FEdGraphUtilities::ExportNodesToText(NodesToExport, ExportedText);
 		TSet<UEdGraphNode*> PastedNodes;
-		FEdGraphUtilities::ImportNodesFromText(Graph, TextToImport, PastedNodes);
+		FEdGraphUtilities::ImportNodesFromText(Graph, ExportedText, PastedNodes);
 
 		for (UEdGraphNode* PastedNode : PastedNodes)
 		{
@@ -321,7 +358,68 @@ void FNiagaraScriptGraphViewModel::PasteNodes()
 		}
 
 		NodeSelection->SetSelectedObjects(PastedObjects);
-		CastChecked<UNiagaraGraph>(Graph)->NotifyGraphNeedsRecompile();
+		UNiagaraGraph* NiagaraGraph = CastChecked<UNiagaraGraph>(Graph);
+		NiagaraGraph->NotifyGraphNeedsRecompile();
+
+		// we now attempt to copy over metadata for variables, but only if the two graphs are different
+		bool bIsSameGraph = NiagaraGraph == ClipboardContent->ScriptNodes[0]->GetGraph();
+		if(!bIsSameGraph)
+		{
+			// NotifyGraphChanged will invalidate caches, so we are guaranteed to get the updated reference map after pasting nodes
+			const TMap<FNiagaraVariable, FNiagaraGraphParameterReferenceCollection>& ParameterReferenceMap = NiagaraGraph->GetParameterReferenceMap();
+
+			// Create a UNiagaraScriptVariable instance for every entry in the parameter map for which there is no existing script variable. 
+			TArray<FNiagaraVariable> VarsToAdd;
+			for (auto& ParameterToReferences : ParameterReferenceMap)
+			{
+				UNiagaraScriptVariable* Variable = NiagaraGraph->GetScriptVariable(ParameterToReferences.Key.GetName());
+				if (Variable == nullptr)
+				{
+					VarsToAdd.Add(ParameterToReferences.Key);
+				}
+			}
+
+			TArray<FNiagaraVariable> StaticSwitchInputs = NiagaraGraph->FindStaticSwitchInputs();
+
+			for(TObjectPtr<const UNiagaraScriptVariable> ScriptVariable : ClipboardContent->ScriptVariables)
+			{
+				// we make sure here that we only copy over script variables if they didn't exist before. We inform the user so he knows.
+				if(UNiagaraScriptVariable* ExistingScriptVariable = NiagaraGraph->GetScriptVariable(ScriptVariable->Variable))
+				{
+					FNotificationInfo Info(FText::GetEmpty());
+					Info.ExpireDuration = 5.0f;
+					Info.bFireAndForget = true;
+
+					// we override the notification by providing our own widget
+					TSharedRef<SWidget> NotificationWidget = SNew(SVerticalBox)
+					+ SVerticalBox::Slot()
+					[
+						SNew(SNiagaraParameterNameTextBlock)
+						.ParameterText(FText::FromName(ExistingScriptVariable->Variable.GetName()))
+						.IsReadOnly(true)
+					]
+					+ SVerticalBox::Slot()
+					.AutoHeight()
+					.Padding(3.f)
+					[
+						SNew(STextBlock)
+						.Text(LOCTEXT("SkippedPastingMetaDataForDuplicateVariable",	"Skipped pasting meta data for parameter.\nParameter already existed."))
+					];
+					
+					TSharedRef<FNiagaraParameterNotificationWidgetProvider> WidgetProvider = MakeShared<FNiagaraParameterNotificationWidgetProvider>(NotificationWidget);
+					Info.ContentWidget = WidgetProvider;
+				
+					FSlateNotificationManager::Get().AddNotification(Info);
+				}
+				else
+				{
+					// we create the new parameter + script variable combo here and copy over metadata
+					UNiagaraScriptVariable* NewScriptVariable = NiagaraGraph->AddParameter(ScriptVariable->Variable, StaticSwitchInputs.Contains(ScriptVariable->Variable));
+					NewScriptVariable->InitFrom(ScriptVariable);
+				}
+			}
+		}
+		
 	}
 }
 
@@ -333,10 +431,8 @@ bool FNiagaraScriptGraphViewModel::CanPasteNodes() const
 		return false;
 	}
 
-	FString ClipboardContent;
-	FPlatformApplicationMisc::ClipboardPaste(ClipboardContent);
-
-	return FEdGraphUtilities::CanImportNodesFromText(Graph, ClipboardContent);
+	const UNiagaraClipboardContent* ClipboardContent = FNiagaraEditorModule::Get().GetClipboard().GetClipboardContent();
+	return ClipboardContent->ScriptNodes.Num() > 0;
 }
 
 void FNiagaraScriptGraphViewModel::DuplicateNodes()
@@ -349,6 +445,5 @@ bool FNiagaraScriptGraphViewModel::CanDuplicateNodes() const
 {
 	return CanCopyNodes();
 }
-
 
 #undef LOCTEXT_NAMESPACE // NiagaraScriptGraphViewModel
