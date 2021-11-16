@@ -1007,13 +1007,42 @@ class FScopeCycleCounterUObject
 {
 public:
 	FScopeCycleCounter ScopeCycleCounter;
+#if ENABLE_STATNAMEDEVENTS_UOBJECT && CPUPROFILERTRACE_ENABLED
+	bool bPop;
+#endif
+
 	FORCEINLINE_STATS FScopeCycleCounterUObject(const UObjectBaseUtility *Object)
-	: ScopeCycleCounter(Object ? Object->GetStatID().StatString : nullptr)
+		: ScopeCycleCounter(Object ? Object->GetStatID().StatString : nullptr)
+#if ENABLE_STATNAMEDEVENTS_UOBJECT && CPUPROFILERTRACE_ENABLED
+		, bPop(false)
+#endif
+	{
+#if ENABLE_STATNAMEDEVENTS_UOBJECT && CPUPROFILERTRACE_ENABLED
+		if (GCycleStatsShouldEmitNamedEvents && UE_TRACE_CHANNELEXPR_IS_ENABLED(CpuChannel) && Object)
+		{
+			const TStatId ObjectStatId = Object->GetStatID();
+			if (ObjectStatId.IsValidStat())
+			{
+				bPop = true;
+				FCpuProfilerTrace::OutputBeginDynamicEvent(ObjectStatId.StatString);
+			}
+		}
+#endif
+	}
+
+	FORCEINLINE_STATS FScopeCycleCounterUObject(const UObjectBaseUtility *Object, TStatId OtherStat)
+		: FScopeCycleCounterUObject(Object)
 	{
 	}
-	FORCEINLINE_STATS FScopeCycleCounterUObject(const UObjectBaseUtility *Object, TStatId OtherStat)
-	: ScopeCycleCounter(Object ? Object->GetStatID().StatString : nullptr)
+
+	FORCEINLINE_STATS ~FScopeCycleCounterUObject()
 	{
+#if ENABLE_STATNAMEDEVENTS_UOBJECT && CPUPROFILERTRACE_ENABLED
+		if (bPop)
+		{
+			FCpuProfilerTrace::OutputEndEvent();
+		}
+#endif
 	}
 };
 
