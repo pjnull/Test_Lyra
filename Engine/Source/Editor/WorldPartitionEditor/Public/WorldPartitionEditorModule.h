@@ -4,6 +4,12 @@
 #include "CoreMinimal.h"
 #include "WorldPartition/IWorldPartitionEditorModule.h"
 
+class FTabManager;
+class FLayoutExtender;
+class SDockTab;
+class FSpawnTabArgs;
+
+
 /**
  * The module holding all of the UI related pieces for SubLevels management
  */
