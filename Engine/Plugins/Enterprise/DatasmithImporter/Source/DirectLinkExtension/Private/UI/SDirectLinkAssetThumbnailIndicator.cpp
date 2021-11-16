@@ -7,6 +7,8 @@
 #include "ExternalSource.h"
 #include "ExternalSourceModule.h"
 #include "SourceUri.h"
+#include "Widgets/Images/SImage.h"
+#include "Widgets/SOverlay.h"
 
 #define LOCTEXT_NAMESPACE "DirectLinkAssetThumbnailIndicator"
 

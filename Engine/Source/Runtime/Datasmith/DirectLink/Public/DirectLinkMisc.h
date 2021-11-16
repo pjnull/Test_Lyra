@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreTypes.h"
+#include "Misc/SecureHash.h"
 #include "Templates/SharedPointer.h"
 
 
