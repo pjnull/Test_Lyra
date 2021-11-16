@@ -6711,85 +6711,103 @@ void FHlslNiagaraTranslator::ProcessCustomHlsl(const FString& InCustomHlsl, ENia
 			TArray<FNiagaraFunctionSignature> Funcs;
 			CDO->GetFunctions(Funcs);
 
+			TArray<FString> SanitizedFunctionNames;
+			SanitizedFunctionNames.Reserve(Funcs.Num());
+			for (const FNiagaraFunctionSignature& FunctionSignature : Funcs)
+			{
+				SanitizedFunctionNames.Emplace(GetSanitizedDIFunctionName(FunctionSignature.GetName()));
+			}
+
 			bool bPermuteSignatureByDataInterface = false;
 
-			for (int32 FuncIdx = 0; FuncIdx < Funcs.Num(); FuncIdx++)
+			const FString InputPrefix = Input.GetName().ToString() + TEXT(".");
+			for (int32 TokenIndex = 0; TokenIndex < Tokens.Num();)
 			{
-				FString DIMethodInvocation = Input.GetName().ToString() + TEXT(".") + GetSanitizedDIFunctionName(Funcs[FuncIdx].GetName());
-
-				for (int32 TokenIndex = 0; TokenIndex < Tokens.Num();)
+				// If we don't start with the prefix keep looking
+				if ( !Tokens[TokenIndex].StartsWith(InputPrefix, ESearchCase::CaseSensitive) )
 				{
-					if (Tokens[TokenIndex].Compare(DIMethodInvocation, ESearchCase::CaseSensitive) == 0)
+					++TokenIndex;
+					continue;
+				}
+
+				// Find matching function
+				FStringView FunctionName(Tokens[TokenIndex]);
+				FunctionName = FunctionName.Mid(InputPrefix.Len());
+
+				const int32 FunctionIndex = SanitizedFunctionNames.IndexOfByPredicate([FunctionName](const FString& SigName){ return FunctionName.Equals(SigName, ESearchCase::CaseSensitive) != 0; });
+				if (FunctionIndex == INDEX_NONE)
+				{
+					Error(
+						FText::Format(LOCTEXT("DataInterfaceInvalidFunctionCustomHLSL", "Data interface '{0}' does not contain function '{1}' as used in custom HLSL."), FText::FromName(Input.GetName()), FText::FromString(FunctionName.GetData())),
+						InNodeForErrorReporting,
+						nullptr
+					);
+					return;
+				}
+
+				bPermuteSignatureByDataInterface = true;
+
+				// We can't replace the method-style call with the actual function name yet, because function specifiers
+				// are part of the name, and we haven't determined them yet. Just store a pointer to the token for now.
+				FString& FunctionNameToken = Tokens[TokenIndex];
+				++TokenIndex;
+
+				FNiagaraFunctionSignature Sig = Funcs[FunctionIndex];
+
+				// Override the owner id of the signature with the actual caller.
+				Sig.OwnerName = Info.Name;
+
+				// Function specifiers can be given inside angle brackets, using this syntax:
+				//
+				//		DI.Function<Specifier1=Value1, Specifier2="Value 2">(Arguments);
+				//
+				// We need to extract the specifiers and replace any tokens inside the angle brackets with empty strings,
+				// to arrive back at valid HLSL.
+				if (!ParseDIFunctionSpecifiers(InNodeForErrorReporting, Sig, Tokens, TokenIndex))
+				{
+					return;
+				}
+
+				// Now we can build the function name and replace the method call token with the final function name.
+				FunctionNameToken = GetFunctionSignatureSymbol(Sig);
+				if (Sig.bRequiresExecPin)
+				{
+					Sig.Inputs.Insert(FNiagaraVariable(FNiagaraTypeDefinition::GetParameterMapDef(), TEXT("InExecPin")), 0);
+					Sig.Outputs.Insert(FNiagaraVariable(FNiagaraTypeDefinition::GetParameterMapDef(), TEXT("OutExecPin")), 0);
+				}
+				if (Info.UserPtrIdx != INDEX_NONE && CompilationTarget != ENiagaraSimTarget::GPUComputeSim)
+				{
+					//This interface requires per instance data via a user ptr so place the index as the first input.
+					Sig.Inputs.Insert(FNiagaraVariable(FNiagaraTypeDefinition::GetIntDef(), TEXT("InstanceData")), 0);
+
+					// Look for the opening parenthesis.
+					while (TokenIndex < Tokens.Num() && Tokens[TokenIndex] != TEXT("("))
 					{
-						bPermuteSignatureByDataInterface = true;
-
-						// We can't replace the method-style call with the actual function name yet, because function specifiers
-						// are part of the name, and we haven't determined them yet. Just store a pointer to the token for now.
-						FString& FunctionNameToken = Tokens[TokenIndex];
 						++TokenIndex;
-
-						FNiagaraFunctionSignature Sig = Funcs[FuncIdx];
-
-						// Override the owner id of the signature with the actual caller.
-						Sig.OwnerName = Info.Name;
-
-						// Function specifiers can be given inside angle brackets, using this syntax:
-						//
-						//		DI.Function<Specifier1=Value1, Specifier2="Value 2">(Arguments);
-						//
-						// We need to extract the specifiers and replace any tokens inside the angle brackets with empty strings,
-						// to arrive back at valid HLSL.
-						if (!ParseDIFunctionSpecifiers(InNodeForErrorReporting, Sig, Tokens, TokenIndex))
-						{
-							return;
-						}
-
-						// Now we can build the function name and replace the method call token with the final function name.
-						FunctionNameToken = GetFunctionSignatureSymbol(Sig);
-						if (Sig.bRequiresExecPin)
-						{
-							Sig.Inputs.Insert(FNiagaraVariable(FNiagaraTypeDefinition::GetParameterMapDef(), TEXT("InExecPin")), 0);
-							Sig.Outputs.Insert(FNiagaraVariable(FNiagaraTypeDefinition::GetParameterMapDef(), TEXT("OutExecPin")), 0);
-						}
-						if (Info.UserPtrIdx != INDEX_NONE && CompilationTarget != ENiagaraSimTarget::GPUComputeSim)
-						{
-							//This interface requires per instance data via a user ptr so place the index as the first input.
-							Sig.Inputs.Insert(FNiagaraVariable(FNiagaraTypeDefinition::GetIntDef(), TEXT("InstanceData")), 0);
-
-							// Look for the opening parenthesis.
-							while (TokenIndex < Tokens.Num() && Tokens[TokenIndex] != TEXT("("))
-							{
-								++TokenIndex;
-							}
-
-							if (TokenIndex < Tokens.Num())
-							{
-								// Skip the parenthesis.
-								++TokenIndex;
-
-								// Insert the instance index as the first argument. We don't need to do range checking because even if
-								// the tokens end after the parenthesis, we'll be inserting at the end of the array.
-								Tokens.Insert(LexToString(Info.UserPtrIdx), TokenIndex++);
-
-								if (Sig.Inputs.Num() > 1 || Sig.Outputs.Num() > 0)
-								{
-									// If there are other arguments, insert a comma and a space. These are separators, so they need to be different tokens.
-									Tokens.Insert(TEXT(","), TokenIndex++);
-									Tokens.Insert(TEXT(" "), TokenIndex++);
-								}
-							}
-						}
-
-						Info.RegisteredFunctions.Add(Sig);
-						Functions.FindOrAdd(Sig);
-
-						HandleDataInterfaceCall(Info, Sig);
 					}
-					else
+
+					if (TokenIndex < Tokens.Num())
 					{
+						// Skip the parenthesis.
 						++TokenIndex;
+
+						// Insert the instance index as the first argument. We don't need to do range checking because even if
+						// the tokens end after the parenthesis, we'll be inserting at the end of the array.
+						Tokens.Insert(LexToString(Info.UserPtrIdx), TokenIndex++);
+
+						if (Sig.Inputs.Num() > 1 || Sig.Outputs.Num() > 0)
+						{
+							// If there are other arguments, insert a comma and a space. These are separators, so they need to be different tokens.
+							Tokens.Insert(TEXT(","), TokenIndex++);
+							Tokens.Insert(TEXT(" "), TokenIndex++);
+						}
 					}
 				}
+
+				Info.RegisteredFunctions.Add(Sig);
+				Functions.FindOrAdd(Sig);
+
+				HandleDataInterfaceCall(Info, Sig);
 			}
 
 			if (bPermuteSignatureByDataInterface)
