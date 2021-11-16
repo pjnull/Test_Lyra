@@ -42,7 +42,7 @@ public:
 		EditCondition = "bHasTargetUVLayer == true", EditConditionHides, HideEditConditionToggle))
 	FString TargetUVLayer;
 
-	/** If true, expose the TargetUVLayer property. */ 
+	/** If true, expose the TargetUVLayer property */ 
 	UPROPERTY()
 	bool bHasTargetUVLayer = false;
 
@@ -67,6 +67,7 @@ public:
 		EditCondition = "bHasSourceNormalMap == true", EditConditionHides, HideEditConditionToggle))
 	FString SourceNormalMapUVLayer;
 
+	/** If true, expose the SourceNormalMap and SourceNormalMapUVLayer properties */
 	UPROPERTY()
 	bool bHasSourceNormalMap = false;
 

@@ -9,16 +9,12 @@
 #include "DynamicMesh/MeshTransforms.h"
 #include "MeshDescriptionToDynamicMesh.h"
 #include "Sampling/MeshNormalMapEvaluator.h"
-#include "Sampling/MeshOcclusionMapEvaluator.h"
-#include "Sampling/MeshCurvatureMapEvaluator.h"
 #include "Sampling/MeshPropertyMapEvaluator.h"
 #include "Sampling/MeshResampleImageEvaluator.h"
 
 #include "ImageUtils.h"
 
-#include "AssetUtils/Texture2DBuilder.h"
 #include "AssetUtils/Texture2DUtil.h"
-#include "ModelingObjectsCreationAPI.h"
 
 #include "EngineAnalytics.h"
 
@@ -30,7 +26,6 @@
 #include "ModelingToolTargetUtil.h"
 
 // required to pass UStaticMesh asset so we can save at same location
-#include "Engine/Classes/Components/StaticMeshComponent.h"
 #include "Engine/Classes/Engine/StaticMesh.h"
 
 #include "ExplicitUseGeometryMathTypes.h"		// using UE::Geometry::(math types)
@@ -407,8 +402,7 @@ void UBakeMultiMeshAttributeMapsTool::Setup()
 	TArray<UActorComponent*> DetailComponents;
 	for (int Idx = 1; Idx < NumTargets; ++Idx)
 	{
-		UPrimitiveComponent* Component = UE::ToolTarget::GetTargetComponent(Targets[Idx]);
-		if (Component)
+		if (UPrimitiveComponent* Component = UE::ToolTarget::GetTargetComponent(Targets[Idx]))
 		{
 			DetailComponents.Add(Component);
 		}
@@ -423,13 +417,13 @@ void UBakeMultiMeshAttributeMapsTool::Setup()
 
 	// Setup tool property sets
 	
-	TargetMeshProps = NewObject<UBakeMultiMeshTargetToolProperties>(this);
-	TargetMeshProps->RestoreProperties(this);
-	AddToolPropertySource(TargetMeshProps);
-	TargetMeshProps->TargetStaticMesh = TargetStaticMesh;
-	UpdateUVLayerNames(TargetMeshProps->TargetUVLayer, TargetMeshProps->TargetUVLayerNamesList, BaseMesh);
-	TargetMeshProps->WatchProperty(TargetMeshProps->TargetUVLayer, [this](FString) { OpState |= EBakeOpState::Evaluate; });
-	TargetMeshProps->WatchProperty(TargetMeshProps->ProjectionDistance, [this](float) { OpState |= EBakeOpState::Evaluate; });
+	InputMeshProps = NewObject<UBakeMultiMeshInputToolProperties>(this);
+	InputMeshProps->RestoreProperties(this);
+	AddToolPropertySource(InputMeshProps);
+	InputMeshProps->TargetStaticMesh = TargetStaticMesh;
+	UpdateUVLayerNames(InputMeshProps->TargetUVLayer, InputMeshProps->TargetUVLayerNamesList, BaseMesh);
+	InputMeshProps->WatchProperty(InputMeshProps->TargetUVLayer, [this](FString) { OpState |= EBakeOpState::Evaluate; });
+	InputMeshProps->WatchProperty(InputMeshProps->ProjectionDistance, [this](float) { OpState |= EBakeOpState::Evaluate; });
 	
 	Settings = NewObject<UBakeMultiMeshAttributeMapsToolProperties>(this);
 	Settings->RestoreProperties(this);
@@ -441,10 +435,6 @@ void UBakeMultiMeshAttributeMapsTool::Setup()
 	Settings->WatchProperty(Settings->BitDepth, [this](EBakeTextureBitDepth) { OpState |= EBakeOpState::Evaluate; });
 	Settings->WatchProperty(Settings->SamplesPerPixel, [this](EBakeTextureSamplesPerPixel) { OpState |= EBakeOpState::Evaluate; });
 
-	DetailMeshProps = NewObject<UBakeMultiMeshDetailToolProperties>(this);
-	DetailMeshProps->RestoreProperties(this);
-	AddToolPropertySource(DetailMeshProps);
-	SetToolPropertySourceEnabled(DetailMeshProps, true);
 
 	// Pre-populate detail mesh data
 	TArray<UTexture2D*> DetailColorTextures;
@@ -475,10 +465,10 @@ void UBakeMultiMeshAttributeMapsTool::Setup()
 
 		FBakeMultiMeshDetailProperties SourceMeshProp;
 		SourceMeshProp.SourceMesh = DetailStaticMesh;
-		SourceMeshProp.SourceColorMap = DetailColorTexture;
-		DetailMeshProps->SourceMeshProperties.Add(SourceMeshProp);
-		DetailMeshProps->WatchProperty(DetailMeshProps->SourceMeshProperties[Idx-1].SourceColorMap, [this](UTexture2D*) { OpState |= EBakeOpState::Evaluate; });
-		DetailMeshProps->WatchProperty(DetailMeshProps->SourceMeshProperties[Idx-1].SourceColorMapUVLayer, [this](int) { OpState |= EBakeOpState::Evaluate; });
+		SourceMeshProp.SourceTexture = DetailColorTexture;
+		InputMeshProps->SourceMeshes.Add(SourceMeshProp);
+		InputMeshProps->WatchProperty(InputMeshProps->SourceMeshes[Idx-1].SourceTexture, [this](UTexture2D*) { OpState |= EBakeOpState::Evaluate; });
+		InputMeshProps->WatchProperty(InputMeshProps->SourceMeshes[Idx-1].SourceTextureUVLayer, [this](int) { OpState |= EBakeOpState::Evaluate; });
 	}
 
 	UpdateOnModeChange();
@@ -520,12 +510,12 @@ TUniquePtr<UE::Geometry::TGenericDataOperator<FMeshMapBaker>> UBakeMultiMeshAttr
 	Op->BakeCacheSettings = CachedBakeCacheSettings;
 
 	constexpr EBakeMapType RequiresTangents = EBakeMapType::TangentSpaceNormal | EBakeMapType::BentNormal;
-	if ((bool)(CachedBakeCacheSettings.BakeMapTypes & RequiresTangents))
+	if (static_cast<bool>(CachedBakeCacheSettings.BakeMapTypes & RequiresTangents))
 	{
 		Op->BaseMeshTangents = BaseMeshTangents;
 	}
 
-	if ((bool)(CachedBakeCacheSettings.BakeMapTypes & EBakeMapType::Texture))
+	if (static_cast<bool>(CachedBakeCacheSettings.BakeMapTypes & EBakeMapType::Texture))
 	{
 		Op->CachedColorImages = CachedColorImages;
 		Op->CachedMeshToColorImageMap = CachedMeshToColorImagesMap;
@@ -541,8 +531,7 @@ void UBakeMultiMeshAttributeMapsTool::Shutdown(EToolShutdownType ShutdownType)
 	Super::Shutdown(ShutdownType);
 	
 	Settings->SaveProperties(this);
-	TargetMeshProps->SaveProperties(this);
-	DetailMeshProps->SaveProperties(this);
+	InputMeshProps->SaveProperties(this);
 
 	if (Compute)
 	{
@@ -582,8 +571,8 @@ void UBakeMultiMeshAttributeMapsTool::UpdateResult()
 	FBakeCacheSettings BakeCacheSettings;
 	BakeCacheSettings.Dimensions = Dimensions;
 	BakeCacheSettings.BitDepth = Settings->BitDepth;
-	BakeCacheSettings.TargetUVLayer = FCString::Atoi(*TargetMeshProps->TargetUVLayer);
-	BakeCacheSettings.ProjectionDistance = TargetMeshProps->ProjectionDistance;
+	BakeCacheSettings.TargetUVLayer = FCString::Atoi(*InputMeshProps->TargetUVLayer);
+	BakeCacheSettings.ProjectionDistance = InputMeshProps->ProjectionDistance;
 	BakeCacheSettings.bProjectionInWorldSpace = true;  // Always world space
 	BakeCacheSettings.SamplesPerPixel = static_cast<int32>(Settings->SamplesPerPixel);
 
@@ -623,7 +612,7 @@ EBakeOpState UBakeMultiMeshAttributeMapsTool::UpdateResult_DetailMeshes()
 	FBakeMultiMeshDetailSettings NewSettings;
 
 	// Iterate through our detail props to build our detail mesh data.
-	const int32 NumDetail = DetailMeshProps->SourceMeshProperties.Num();
+	const int32 NumDetail = InputMeshProps->SourceMeshes.Num();
 	CachedColorImages.SetNum(NumDetail);
 	CachedColorUVLayers.SetNum(NumDetail);
 	TMap<UActorComponent*, int> ActorToDataMap;
@@ -633,10 +622,10 @@ EBakeOpState UBakeMultiMeshAttributeMapsTool::UpdateResult_DetailMeshes()
 		ActorToDataMap.Emplace(ActorComponent, Idx);
 		
 		// Color map data
-		if ((bool)(CachedBakeCacheSettings.BakeMapTypes & EBakeMapType::Texture))
+		if (static_cast<bool>(CachedBakeCacheSettings.BakeMapTypes & EBakeMapType::Texture))
 		{
-			UTexture2D* ColorMapSourceTexture = DetailMeshProps->SourceMeshProperties[Idx].SourceColorMap;
-			const int ColorMapUVLayer = DetailMeshProps->SourceMeshProperties[Idx].SourceColorMapUVLayer;
+			UTexture2D* ColorMapSourceTexture = InputMeshProps->SourceMeshes[Idx].SourceTexture;
+			const int ColorMapUVLayer = InputMeshProps->SourceMeshes[Idx].SourceTextureUVLayer;
 			if (!ColorMapSourceTexture)
 			{
 				GetToolManager()->DisplayMessage(LOCTEXT("InvalidTextureWarning", "The Source Texture is not valid"), EToolMessageLevel::UserWarning);
@@ -662,7 +651,7 @@ EBakeOpState UBakeMultiMeshAttributeMapsTool::UpdateResult_DetailMeshes()
 		{
 			if (const int* DataIndex = ActorToDataMap.Find(ChildMesh->SourceComponent))
 			{
-				if ((bool)(CachedBakeCacheSettings.BakeMapTypes & EBakeMapType::Texture))
+				if (static_cast<bool>(CachedBakeCacheSettings.BakeMapTypes & EBakeMapType::Texture))
 				{
 					CachedMeshToColorImagesMap.Emplace(
 					ChildMesh->MeshSpatial,

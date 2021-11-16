@@ -75,8 +75,29 @@ public:
 };
 
 
+USTRUCT()
+struct MESHMODELINGTOOLSEXP_API FBakeMultiMeshDetailProperties
+{
+	GENERATED_BODY()
+
+	/** Source mesh to sample from */
+	UPROPERTY(VisibleAnywhere, Category = BakeSources, meta = (TransientToolProperty))
+	TObjectPtr<UStaticMesh> SourceMesh = nullptr;
+
+	/** Source mesh color texture that is to be resampled into a new texture */
+	UPROPERTY(EditAnywhere, Category = BakeSources, meta = (TransientToolProperty,
+		EditCondition="SourceMesh != nullptr"))
+	TObjectPtr<UTexture2D> SourceTexture = nullptr;
+
+	/** UV channel to use for the source mesh color texture */
+	UPROPERTY(EditAnywhere, Category = BakeSources, meta = (TransientToolProperty, DisplayName = "Source Texture UV Channel",
+		EditCondition="SourceTexture != nullptr"))
+	int32 SourceTextureUVLayer = 0;
+};
+
+
 UCLASS()
-class MESHMODELINGTOOLSEXP_API UBakeMultiMeshTargetToolProperties : public UInteractiveToolPropertySet
+class MESHMODELINGTOOLSEXP_API UBakeMultiMeshInputToolProperties : public UInteractiveToolPropertySet
 {
 	GENERATED_BODY()
 
@@ -90,9 +111,13 @@ public:
 		GetOptions = GetTargetUVLayerNamesFunc, TransientToolProperty, NoResetToDefault))
 	FString TargetUVLayer;
 
+	/** Source meshes and textures to sample from */
+	UPROPERTY(EditAnywhere, EditFixedSize, Category = BakeInput, meta = (TransientToolProperty, EditFixedOrder))
+	TArray<FBakeMultiMeshDetailProperties> SourceMeshes;
+
 	/** Maximum allowed distance for the projection from target mesh to source mesh for the sample to be considered valid.
 	 * This is only relevant if a separate source mesh is provided. */
-	UPROPERTY(EditAnywhere, Category = BakeInput, meta = (ClampMin = "0.001",
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = BakeInput, meta = (ClampMin = "0.001",
 		EditCondition = "SourceStaticMesh != nullptr", HideEditConditionToggle))
 	float ProjectionDistance = 3.0;
 
@@ -104,38 +129,6 @@ public:
 
 	UPROPERTY(meta = (TransientToolProperty))
 	TArray<FString> TargetUVLayerNamesList;
-};
-
-
-USTRUCT()
-struct MESHMODELINGTOOLSEXP_API FBakeMultiMeshDetailProperties
-{
-	GENERATED_BODY()
-
-	/** Source mesh to sample from */
-	UPROPERTY(VisibleAnywhere, Category = BakeSources, meta = (TransientToolProperty))
-	TObjectPtr<UStaticMesh> SourceMesh = nullptr;
-
-	/** Source mesh color texture that is to be resampled into a new texture */
-	UPROPERTY(EditAnywhere, Category = BakeSources, meta = (TransientToolProperty,
-		EditCondition="SourceMesh != nullptr"))
-	TObjectPtr<UTexture2D> SourceColorMap = nullptr;
-
-	/** UV channel to use for the source mesh color texture */
-	UPROPERTY(EditAnywhere, Category = BakeSources, meta = (TransientToolProperty,
-		EditCondition="SourceColorMap != nullptr"))
-	int32 SourceColorMapUVLayer = 0;
-};
-
-
-UCLASS()
-class MESHMODELINGTOOLSEXP_API UBakeMultiMeshDetailToolProperties : public UInteractiveToolPropertySet
-{
-	GENERATED_BODY()
-
-public:
-	UPROPERTY(EditAnywhere, EditFixedSize, Category = BakeSources, meta = (TransientToolProperty, EditFixedOrder))
-	TArray<FBakeMultiMeshDetailProperties> SourceMeshProperties;
 };
 
 
@@ -190,10 +183,7 @@ protected:
 	TObjectPtr<UBakeMultiMeshAttributeMapsToolProperties> Settings;
 
 	UPROPERTY()
-	TObjectPtr<UBakeMultiMeshTargetToolProperties> TargetMeshProps;
-
-	UPROPERTY()
-	TObjectPtr<UBakeMultiMeshDetailToolProperties> DetailMeshProps;
+	TObjectPtr<UBakeMultiMeshInputToolProperties> InputMeshProps;
 
 
 protected:
