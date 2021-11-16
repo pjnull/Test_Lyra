@@ -196,7 +196,7 @@ void FSlateWidgetUpdateStepsTimingTrack::InitTooltip(FTooltipDrawState& InOutToo
 		InOutTooltip.AddNameValueTextLine(TEXT("Start Time:"), TimeUtils::FormatTimeAuto(InTooltipEvent.GetStartTime(), 6));
 		InOutTooltip.AddNameValueTextLine(TEXT("End Time:"), TimeUtils::FormatTimeAuto(InTooltipEvent.GetEndTime(), 6));
 		InOutTooltip.AddNameValueTextLine(TEXT("Duration:"), TimeUtils::FormatTimeAuto(InTooltipEvent.GetDuration()));
-		InOutTooltip.AddNameValueTextLine(TEXT("Widget Id:"), FText::AsNumber(WigetInfo->WidgetId.GetValue()).ToString());
+		InOutTooltip.AddNameValueTextLine(TEXT("Widget Id:"), FText::AsNumber(Event.WidgetPaint.WidgetId.GetValue()).ToString());
 	}
 
 	InOutTooltip.UpdateLayout();
