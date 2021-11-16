@@ -212,7 +212,6 @@ FStrataEvaluateResult StrataEvaluateBSDFCommon(FStrataBSDFContext BSDFContext, F
 			float3 DiffuseColor			= SLAB_DIFFUSEALBEDO(BSDFContext.BSDF);
 			float3 F0					= SLAB_F0(BSDFContext.BSDF);
 			float3 F90					= SLAB_F90(BSDFContext.BSDF);
-			const float Metallic		= SLAB_METALLIC(BSDFContext.BSDF);
 			const float SafeRoughness	= MakeRoughnessSafe(SLAB_ROUGHNESS(BSDFContext.BSDF));
 		#if STRATA_FASTPATH==0
 			float HazeSafeRoughness		= SafeRoughness;
@@ -826,7 +825,6 @@ FStrataEnvLightResult StrataEvaluateForEnvLight(FStrataBSDFContext BSDFContext, 
 			float3 DiffuseColor		= SLAB_DIFFUSEALBEDO(BSDFContext.BSDF);
 			float3 F0 				= SLAB_F0(BSDFContext.BSDF);
 			float3 F90 				= SLAB_F90(BSDFContext.BSDF);
-			const float Metallic 	= SLAB_METALLIC(BSDFContext.BSDF);
 
 			if (bForceFullyRough)
 			{

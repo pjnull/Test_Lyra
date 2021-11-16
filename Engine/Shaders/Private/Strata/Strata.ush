@@ -286,7 +286,8 @@ struct FStrataBSDF
 #define SLAB_F0(X)						X.VGPRs[1].xyz
 #define SLAB_ANISOTROPY(X)				X.VGPRs[1].w
 #define SLAB_F90(X)						X.VGPRs[2].xyz
-#define SLAB_METALLIC(X)				X.VGPRs[2].w
+// Haziness
+#define SLAB_HAZINESS(X)				X.VGPRs[2].w
 // Either with SSS profile
 #define SLAB_SSSPROFILEID(X)			X.VGPRs[3].x
 #define SLAB_SSSPROFILERADIUSSCALE(X)	X.VGPRs[3].y
@@ -298,10 +299,6 @@ struct FStrataBSDF
 // Fuzz to simulate cloth
 #define SLAB_FUZZ_COLOR(X)				X.VGPRs[4].xyz
 #define SLAB_FUZZ_AMOUNT(X)				X.VGPRs[4].w
-// Haziness
-#define SLAB_HAZINESS(X)				X.VGPRs[5].x
-// NOTE For SLAB, X.VGPRs[5].yzw is free for another use case.
-
 
 #define VOLUMETRICFOGCLOUD_ALBEDO(X)	X.VGPRs[0].xyz
 #define VOLUMETRICFOGCLOUD_EXTINCTION(X)X.VGPRs[1].xyz
@@ -574,7 +571,6 @@ FStrataData GetStrataSlabBSDF(
 		SLAB_DIFFUSEALBEDO(StrataData.Layers[0].BSDFs[0])	= BaseColor - BaseColor * SafeMetallic;
 		SLAB_F0(StrataData.Layers[0].BSDFs[0])				= ComputeF0(Specular, BaseColor, SafeMetallic);
 		SLAB_F90(StrataData.Layers[0].BSDFs[0])				= ComputeF90(F0, EdgeColor, SafeMetallic);
-		SLAB_METALLIC(StrataData.Layers[0].BSDFs[0])		= SafeMetallic;
 	}
 	else
 	{
@@ -584,7 +580,6 @@ FStrataData GetStrataSlabBSDF(
 		SLAB_DIFFUSEALBEDO(StrataData.Layers[0].BSDFs[0])	= DiffuseAlbedo;
 		SLAB_F0(StrataData.Layers[0].BSDFs[0])				= F0;
 		SLAB_F90(StrataData.Layers[0].BSDFs[0])				= F90;
-		SLAB_METALLIC(StrataData.Layers[0].BSDFs[0])		= F0RGBToMetallic(F0);
 	}
 
 	SLAB_ROUGHNESS			(StrataData.Layers[0].BSDFs[0])		= Roughness;
@@ -1032,7 +1027,6 @@ FStrataData StrataHorizontalMixingParameterBlending(FStrataData Background, FStr
 	SLAB_FUZZ_COLOR(ResultBSDF)	=		lerp(BackLightingFactor * SLAB_FUZZ_COLOR(BackgroundBSDF),			ForeLightingFactor * SLAB_FUZZ_COLOR(ForegroundBSDF),			ForegroundLightingMixFactor);
 
 	BSDF_SETTHICKNESSCM(ResultBSDF,		lerp(BSDF_GETTHICKNESSCM(BackgroundBSDF),							BSDF_GETTHICKNESSCM(ForegroundBSDF),							ForegroundOtherMixFactor));
-	SLAB_METALLIC(ResultBSDF) =			lerp(SLAB_METALLIC(BackgroundBSDF),									SLAB_METALLIC(ForegroundBSDF),									ForegroundOtherMixFactor);
 	SLAB_ROUGHNESS(ResultBSDF) =		lerp(SLAB_ROUGHNESS(BackgroundBSDF),								SLAB_ROUGHNESS(ForegroundBSDF),									ForegroundOtherMixFactor);
 	SLAB_ANISOTROPY(ResultBSDF) =		lerp(SLAB_ANISOTROPY(BackgroundBSDF),								SLAB_ANISOTROPY(ForegroundBSDF),								ForegroundOtherMixFactor);
 	SLAB_HAZINESS(ResultBSDF) =			lerp(SLAB_HAZINESS(BackgroundBSDF),									SLAB_HAZINESS(ForegroundBSDF),									ForegroundOtherMixFactor);
@@ -1141,7 +1135,6 @@ FStrataData StrataAddParameterBlending(FStrataData A, FStrataData B, float AMixF
 
 	// Some parameters are not contributing to added luminance: in this case we simply lerp them
 	BSDF_SETTHICKNESSCM(ResultBSDF,		lerp(BSDF_GETTHICKNESSCM(BBSDF),						BSDF_GETTHICKNESSCM(ABSDF),					AMixFactor));
-	SLAB_METALLIC(ResultBSDF) =			lerp(SLAB_METALLIC(BBSDF),								SLAB_METALLIC(ABSDF),						AMixFactor);
 	SLAB_ROUGHNESS(ResultBSDF) =		lerp(SLAB_ROUGHNESS(BBSDF),								SLAB_ROUGHNESS(ABSDF),						AMixFactor);
 	SLAB_ANISOTROPY(ResultBSDF) =		lerp(SLAB_ANISOTROPY(BBSDF),							SLAB_ANISOTROPY(ABSDF),						AMixFactor);
 	SLAB_HAZINESS(ResultBSDF) =			lerp(SLAB_HAZINESS(BBSDF),								SLAB_HAZINESS(ABSDF),						AMixFactor);
@@ -1254,7 +1247,6 @@ FStrataData StrataVerticalLayeringParameterBlending(FStrataData Top, FStrataData
 	SLAB_F90(ResultBSDF) =				saturate(ColorThroughput * BaseLightingFactor * SLAB_F90(BaseBSDF)			+ TopLightingFactor * SLAB_F90(TopBSDF));
 	SLAB_FUZZ_COLOR(ResultBSDF) =		saturate(ColorThroughput * BaseLightingFactor * SLAB_FUZZ_COLOR(BaseBSDF)	+ TopLightingFactor * SLAB_FUZZ_COLOR(TopBSDF));
 		
-	SLAB_METALLIC(ResultBSDF) =			lerp(SLAB_METALLIC(TopBSDF),					SLAB_METALLIC(BaseBSDF),					GreyThroughput);
 	SLAB_ROUGHNESS(ResultBSDF) =		lerp(SLAB_ROUGHNESS(TopBSDF),					SLAB_ROUGHNESS(BaseBSDF),					GreyThroughput);
 	SLAB_HAZINESS(ResultBSDF) =			lerp(SLAB_HAZINESS(TopBSDF),					SLAB_HAZINESS(BaseBSDF),					GreyThroughput);
 	SLAB_FUZZ_AMOUNT(ResultBSDF) =		lerp(SLAB_FUZZ_AMOUNT(TopBSDF),					SLAB_FUZZ_AMOUNT(BaseBSDF),					GreyThroughput);
@@ -1306,7 +1298,6 @@ void SanitizeStrataSlab(inout FStrataBSDF BSDF)
 	SLAB_DIFFUSEALBEDO(BSDF) = saturate(SLAB_DIFFUSEALBEDO(BSDF));
 	SLAB_F0(BSDF) = saturate(SLAB_F0(BSDF));
 	SLAB_F90(BSDF) = saturate(SLAB_F90(BSDF));
-	SLAB_METALLIC(BSDF) = saturate(SLAB_METALLIC(BSDF));
 	SLAB_ROUGHNESS(BSDF) = SanitizeRoughness(SLAB_ROUGHNESS(BSDF));
 	SLAB_ANISOTROPY(BSDF) = clamp(SLAB_ANISOTROPY(BSDF), -1.f, 1.f);
 	SLAB_HAZINESS(BSDF) = saturate(SLAB_HAZINESS(BSDF));
@@ -1982,7 +1973,7 @@ void PackStrataOut(
 					const uint PackedData8Bits		= (PackedF020Bits >> 12) & 0xFF; 
 
 					STRATA_STORE_UINT1(PackedData32Bits);
-					STRATA_STORE_UINT1(PackedData8Bits | PackRGBA8(float4(0.0f , SLAB_ROUGHNESS(BSDF), (SLAB_ANISOTROPY(BSDF) + 1.f) * 0.5f, SLAB_METALLIC(BSDF))));
+					STRATA_STORE_UINT1(PackedData8Bits | PackRGBA8(float4(0.0f , SLAB_ROUGHNESS(BSDF), (SLAB_ANISOTROPY(BSDF) + 1.f) * 0.5f, 0.f)));
 
 					if (BSDF_GETHASF90(BSDF) || BSDF_GETHASTHINFILM(BSDF) || BSDF_GETHASHAZINESS(BSDF))
 					{
@@ -2119,7 +2110,6 @@ void UnpackFastPathSlabBSDF(inout FStrataBSDF OutBSDF, uint2 PackedData01)
 	float4 Data1 = UnpackRGBA8(PackedData01.y);
 	SLAB_ROUGHNESS(OutBSDF)		= Data1.y;
 	SLAB_ANISOTROPY(OutBSDF)	= Data1.z * 2.f - 1.f;
-	SLAB_METALLIC(OutBSDF)		= Data1.w;
 }
 
 FStrataBSDF UnpackFastPathStrataBSDFIn(ByteAddressBuffer StrataBuffer, inout FStrataAddressing StrataAddressing)
