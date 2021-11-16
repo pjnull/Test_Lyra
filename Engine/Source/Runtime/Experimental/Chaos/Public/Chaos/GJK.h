@@ -14,56 +14,6 @@
 
 namespace Chaos
 {
-	template <typename T>
-	struct TGetters
-	{
-		TFunction<T()> GetMargin;
-		TFunction<TVector<T, 3>(const TVec3<T>& Direction, T InMargin)> SupportCore;
-
-		TGetters(TFunction<T()>&& InGetMargin, TFunction<TVector<T, 3>(const TVec3<T>& Direction, T InMargin)>&& InSupportCore)
-			: GetMargin(InGetMargin)
-			, SupportCore(InSupportCore)
-		{
-		}
-	};
-
-	template <typename T, typename TGeometry>
-	struct TGeometryGetters : public TGetters<T>
-	{
-		TGeometryGetters(const TGeometry& Geometry)
-			: TGetters<T>(
-				[&Geometry]() { return Geometry.GetMargin(); },
-				[&Geometry](const TVec3<T>& Direction, T InMargin) { return Geometry.SupportCore(Direction, InMargin); })
-		{
-		}
-	};
-
-	template <typename T>
-	struct TGettersWithRadius
-	{
-		TFunction<T()> GetRadius;
-		TFunction<T()> GetMargin;
-		TFunction<TVector<T, 3>(const TVec3<T>& Direction, T InMargin)> SupportCore;
-
-		TGettersWithRadius(TFunction<T()>&& InGetRadius, TFunction<T()>&& InGetMargin, TFunction<TVector<T, 3>(const TVec3<T>& Direction, T InMargin)>&& InSupportCore)
-			: GetRadius(InGetRadius)
-			, GetMargin(InGetMargin)
-			, SupportCore(InSupportCore)
-		{
-		}
-	};
-
-	template <typename T, typename TGeometry>
-	struct TGeometryGettersWithRadius : public TGettersWithRadius<T>
-	{
-		TGeometryGettersWithRadius(const TGeometry& Geometry)
-			: TGettersWithRadius<T>(
-				[&Geometry]() { return Geometry.GetRadius(); },
-				[&Geometry]() { return Geometry.GetMargin(); },
-				[&Geometry](const TVec3<T>& Direction, T InMargin) { return Geometry.SupportCore(Direction, InMargin); })
-		{
-		}
-	};
 	
 	/** Determines if two convex geometries overlap.
 	 @A The first geometry
@@ -265,8 +215,6 @@ namespace Chaos
 			return B.SupportCore(VInB, B.GetMargin());
 		};
 
-		TFunctionRef<TVector<T, 3>(const TVec3<T>& V)> SupportAFuncRef(SupportAFunc);
-
 		// V and Simplex are in A-local space
 		TVec3<T> V = TVec3<T>(-1, 0, 0);
 		TVec3<T> Simplex[4];
@@ -354,11 +302,10 @@ namespace Chaos
 				const TVec3<T> SupportBLocal = B.SupportCore(VInB, B.GetMargin());
 				return BToATM.TransformPositionNoScale(SupportBLocal);
 			};
-			TFunctionRef<TVector<T, 3>(const TVec3<T>& V)> SupportBInAFuncRef(SupportBInAFunc);
 
 			T Penetration;
 			TVec3<T> MTD, ClosestA, ClosestBInA;
-			const EEPAResult EPAResult = EPA(VertsA, VertsB, SupportAFuncRef, SupportBInAFuncRef, Penetration, MTD, ClosestA, ClosestBInA);
+			const EEPAResult EPAResult = EPA(VertsA, VertsB, SupportAFunc, SupportBInAFunc, Penetration, MTD, ClosestA, ClosestBInA);
 
 			switch (EPAResult)
 			{
@@ -416,8 +363,8 @@ namespace Chaos
 	}
 
 
-	template <bool bNegativePenetrationAllowed = false, typename T>
-	bool GJKPenetrationImpl(const TGetters<T>& A, const TGetters<T>& B, const TRigidTransform<T, 3>& BToATM, T& OutPenetration, TVec3<T>& OutClosestA, TVec3<T>& OutClosestB, TVec3<T>& OutNormal, int32& OutClosestVertexIndexA, int32& OutClosestVertexIndexB, const T InThicknessA = 0.0f, const T InThicknessB = 0.0f, const TVector<T, 3>& InitialDir = TVector<T, 3>(1, 0, 0), const T Epsilon = 1.e-3f)
+	template <typename TGeometryA, typename TGeometryB, bool bNegativePenetrationAllowed = false, typename T>
+	bool GJKPenetrationImpl(const TGeometryA& A, const TGeometryB& B, const TRigidTransform<T, 3>& BToATM, T& OutPenetration, TVec3<T>& OutClosestA, TVec3<T>& OutClosestB, TVec3<T>& OutNormal, int32& OutClosestVertexIndexA, int32& OutClosestVertexIndexB, const T InThicknessA = 0.0f, const T InThicknessB = 0.0f, const TVector<T, 3>& InitialDir = TVector<T, 3>(1, 0, 0), const T Epsilon = 1.e-3f)
 	{
 		int32 VertexIndexA = INDEX_NONE;
 		int32 VertexIndexB = INDEX_NONE;
@@ -437,9 +384,6 @@ namespace Chaos
 			const TVector<T, 3> SupportBLocal = B.SupportCore(VInB, B.GetMargin());
 			return BToATM.TransformPositionNoScale(SupportBLocal);
 		};
-
-		TFunctionRef<TVector<T, 3>(const TVec3<T>& V)> SupportAFuncRef(SupportAFunc);
-		TFunctionRef<TVector<T, 3>(const TVec3<T>& V)> SupportBFuncRef(SupportBFunc);
 
 		//todo: refactor all of these similar functions
 		TVector<T, 3> V = -InitialDir;
@@ -526,7 +470,7 @@ namespace Chaos
 
 			T Penetration;
 			TVec3<T> MTD, ClosestA, ClosestBInA;
-			const EEPAResult EPAResult = EPA(VertsA, VertsB, SupportAFuncRef, SupportBFuncRef, Penetration, MTD, ClosestA, ClosestBInA);
+			const EEPAResult EPAResult = EPA(VertsA, VertsB, SupportAFunc, SupportBFunc, Penetration, MTD, ClosestA, ClosestBInA);
 			
 			switch (EPAResult)
 			{
@@ -610,10 +554,7 @@ namespace Chaos
 	template <bool bNegativePenetrationAllowed = false, typename T, typename TGeometryA, typename TGeometryB>
 	bool GJKPenetration(const TGeometryA& A, const TGeometryB& B, const TRigidTransform<T, 3>& BToATM, T& OutPenetration, TVec3<T>& OutClosestA, TVec3<T>& OutClosestB, TVec3<T>& OutNormal, int32& OutClosestVertexIndexA, int32& OutClosestVertexIndexB, const T InThicknessA = 0.0f, const T InThicknessB = 0.0f, const TVector<T, 3>& InitialDir = TVector<T, 3>(1, 0, 0), const T Epsilon = 1.e-3f)
 	{
-		TGeometryGetters<T, TGeometryA> AGetters(A);
-		TGeometryGetters<T, TGeometryB> BGetters(B);
-		
-		return GJKPenetrationImpl<bNegativePenetrationAllowed, T>(AGetters, BGetters, BToATM, OutPenetration, OutClosestA, OutClosestB, OutNormal, OutClosestVertexIndexA, OutClosestVertexIndexB, InThicknessA, InThicknessB, InitialDir, Epsilon);
+		return GJKPenetrationImpl<TGeometryA, TGeometryB, bNegativePenetrationAllowed, T>(A, B, BToATM, OutPenetration, OutClosestA, OutClosestB, OutNormal, OutClosestVertexIndexA, OutClosestVertexIndexB, InThicknessA, InThicknessB, InitialDir, Epsilon);
 	}
 	/** Sweeps one geometry against the other
 	 @A The first geometry
@@ -752,36 +693,9 @@ namespace Chaos
 
 		return true;
 	}
-
-
-	/** Sweeps one geometry against the other
-	 @A The first geometry
-	 @B The second geometry
-	 @StartTM B's starting configuration in A's local space
-	 @RayDir The ray's direction (normalized)
-	 @RayLength The ray's length
-	 @OutTime The time along the ray when the objects first overlap
-	 @OutPosition The first point of impact (in A's local space) when the objects first overlap. Invalid if time of impact is 0
-	 @OutNormal The impact normal (in A's local space) when the objects first overlap. Invalid if time of impact is 0
-	 @ThicknessA The amount of geometry inflation for Geometry A (for example a capsule with radius 5 could pass in its core segnment and a thickness of 5)
-	 @InitialDir The first direction we use to search the CSO
-	 @ThicknessB The amount of geometry inflation for Geometry B (for example a sphere with radius 5 could pass in its center point and a thickness of 5)
-	 @return True if the geometries overlap during the sweep, False otherwise 
-	 @note If A overlaps B at the start of the ray ("initial overlap" condition) then this function returns true, and sets OutTime = 0, but does not set any other output variables.
-	 */
-
-	template <typename T, typename TGeometryA, typename TGeometryB>
-	bool GJKRaycast2(const TGeometryA& A, const TGeometryB& B, const TRigidTransform<T, 3>& StartTM, const TVector<T, 3>& RayDir, const T RayLength,
-		T& OutTime, TVector<T, 3>& OutPosition, TVector<T, 3>& OutNormal, const T GivenThicknessA = 0, bool bComputeMTD = false, const TVector<T, 3>& InitialDir = TVector<T, 3>(1, 0, 0), const T GivenThicknessB = 0)
-	{
-		TGeometryGettersWithRadius<T, TGeometryA> AGetters(A);
-		TGeometryGettersWithRadius<T, TGeometryB> BGetters(B);
-
-		return GJKRaycast2Impl(AGetters, BGetters, StartTM, RayDir, RayLength, OutTime, OutPosition, OutNormal, GivenThicknessA, bComputeMTD, InitialDir, GivenThicknessB);
-	}
-
-	template <typename T>
-	bool GJKRaycast2Impl(TGettersWithRadius<T>& A, TGettersWithRadius<T>& B, const TRigidTransform<T, 3>& StartTM, const TVector<T, 3>& RayDir, const T RayLength,
+	
+	template <typename TGeometryA, typename TGeometryB, typename T>
+	bool GJKRaycast2Impl(const TGeometryA& A, const TGeometryB& B, const TRigidTransform<T, 3>& StartTM, const TVector<T, 3>& RayDir, const T RayLength,
 		T& OutTime, TVector<T, 3>& OutPosition, TVector<T, 3>& OutNormal, const T GivenThicknessA = 0, bool bComputeMTD = false, const TVector<T, 3>& InitialDir = TVector<T, 3>(1, 0, 0), const T GivenThicknessB = 0)
 	{
 		ensure(FMath::IsNearlyEqual(RayDir.SizeSquared(), (T)1, (T)KINDA_SMALL_NUMBER));
@@ -839,9 +753,6 @@ namespace Chaos
 			const TVector<T, 3> SupportBLocal = B.SupportCore(DirInB, MarginB);
 			return StartTM.TransformPositionNoScale(SupportBLocal);
 		};
-
-		TFunctionRef<TVector<T, 3>(const TVec3<T>& V)> SupportAFuncRef(SupportAFunc);
-		TFunctionRef<TVector<T, 3>(const TVec3<T>& V)> SupportBAtOriginFuncRef(SupportBAtOriginFunc);
 
 		TVector<T, 3> SupportA = SupportAFunc(InitialDir);
 		As[0] = SupportA;
@@ -1023,7 +934,7 @@ namespace Chaos
 
 					T Penetration;
 					TVec3<T> MTD, ClosestA, ClosestBInA;
-					const EEPAResult EPAResult = EPA(VertsA, VertsB, SupportAFuncRef, SupportBAtOriginFuncRef, Penetration, MTD, ClosestA, ClosestBInA);
+					const EEPAResult EPAResult = EPA(VertsA, VertsB, SupportAFunc, SupportBAtOriginFunc, Penetration, MTD, ClosestA, ClosestBInA);
 					if (IsEPASuccess(EPAResult))
 					{
 						OutNormal = MTD;
@@ -1061,6 +972,28 @@ namespace Chaos
 		return true;
 	}
 
+	/** Sweeps one geometry against the other
+	 @A The first geometry
+	 @B The second geometry
+	 @StartTM B's starting configuration in A's local space
+	 @RayDir The ray's direction (normalized)
+	 @RayLength The ray's length
+	 @OutTime The time along the ray when the objects first overlap
+	 @OutPosition The first point of impact (in A's local space) when the objects first overlap. Invalid if time of impact is 0
+	 @OutNormal The impact normal (in A's local space) when the objects first overlap. Invalid if time of impact is 0
+	 @ThicknessA The amount of geometry inflation for Geometry A (for example a capsule with radius 5 could pass in its core segnment and a thickness of 5)
+	 @InitialDir The first direction we use to search the CSO
+	 @ThicknessB The amount of geometry inflation for Geometry B (for example a sphere with radius 5 could pass in its center point and a thickness of 5)
+	 @return True if the geometries overlap during the sweep, False otherwise
+	 @note If A overlaps B at the start of the ray ("initial overlap" condition) then this function returns true, and sets OutTime = 0, but does not set any other output variables.
+	 */
+
+	template <typename T, typename TGeometryA, typename TGeometryB>
+	bool GJKRaycast2(const TGeometryA& A, const TGeometryB& B, const TRigidTransform<T, 3>& StartTM, const TVector<T, 3>& RayDir, const T RayLength,
+		T& OutTime, TVector<T, 3>& OutPosition, TVector<T, 3>& OutNormal, const T GivenThicknessA = 0, bool bComputeMTD = false, const TVector<T, 3>& InitialDir = TVector<T, 3>(1, 0, 0), const T GivenThicknessB = 0)
+	{
+		return GJKRaycast2Impl(A, B, StartTM, RayDir, RayLength, OutTime, OutPosition, OutNormal, GivenThicknessA, bComputeMTD, InitialDir, GivenThicknessB);
+	}
 	/**
 	 * Used by GJKDistance. It must return a vector in the Minkowski sum A - B. In principle this can be the vector of any point
 	 * in A to any point in B, but some choices will cause GJK to minimize faster (e.g., for two spheres, we can easily calculate

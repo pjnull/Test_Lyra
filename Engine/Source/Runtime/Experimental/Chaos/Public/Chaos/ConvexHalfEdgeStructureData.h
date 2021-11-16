@@ -265,7 +265,8 @@ namespace Chaos
 
 		// Iterate over the half-edges associated with a vertex (leading out from the vertex, so all half edges have the vertex as the root).
 		// Visitor should return false to halt iteration.
-		void VisitVertexHalfEdges(int32 VertexIndex, const TFunction<bool(int32 HalfEdgeIndex)>& Visitor) const
+		template <typename TFunc>
+		void VisitVertexHalfEdges(int32 VertexIndex, const TFunc& Visitor) const
 		{
 			const int32 FirstHalfEdgeIndex = GetVertex(VertexIndex).FirstHalfEdgeIndex;
 			int32 HalfEdgeIndex = FirstHalfEdgeIndex;

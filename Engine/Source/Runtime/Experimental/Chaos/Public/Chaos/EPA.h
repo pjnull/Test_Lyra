@@ -412,8 +412,8 @@ inline const bool IsEPASuccess(EEPAResult EPAResult)
 // Expanding Polytope Algorithm for finding the contact point for overlapping convex polyhedra.
 // See e.g., "Collision Detection in Interactive 3D Environments" (Gino van den Bergen, 2004)
 // or "Real-time Collision Detection with Implicit Objects" (Leif Olvang, 2010)
-template <typename T>
-EEPAResult EPA(TArray<TVec3<T>>& VertsABuffer, TArray<TVec3<T>>& VertsBBuffer, TFunctionRef<TVector<T, 3> (const TVec3<T>& V)> SupportA, TFunctionRef<TVector<T, 3> (const TVec3<T>& V)> SupportB, T& OutPenetration, TVec3<T>& OutDir, TVec3<T>& WitnessA, TVec3<T>& WitnessB)
+template <typename T, typename TSupportA, typename TSupportB>
+EEPAResult EPA(TArray<TVec3<T>>& VertsABuffer, TArray<TVec3<T>>& VertsBBuffer, const TSupportA& SupportA, const TSupportB& SupportB, T& OutPenetration, TVec3<T>& OutDir, TVec3<T>& WitnessA, TVec3<T>& WitnessB)
 {
 	struct FEPAEntryWrapper
 	{
@@ -598,15 +598,6 @@ EEPAResult EPA(TArray<TVec3<T>>& VertsABuffer, TArray<TVec3<T>>& VertsBBuffer, T
 	ComputeEPAResults(VertsABuffer.GetData(), VertsBBuffer.GetData(), LastEntry, OutPenetration, OutDir, WitnessA, WitnessB);
 	
 	return ResultStatus;
-}
-
-template <typename T, typename SupportALambda, typename SupportBLambda>
-EEPAResult EPA(TArray<TVec3<T>>& VertsABuffer, TArray<TVec3<T>>& VertsBBuffer, const SupportALambda& SupportA, const SupportBLambda& SupportB, T& OutPenetration, TVec3<T>& OutDir, TVec3<T>& WitnessA, TVec3<T>& WitnessB)
-{
-	TFunctionRef<TVector<T, 3>(const TVec3<T>& V)> SupportARef(SupportA);
-	TFunctionRef<TVector<T, 3>(const TVec3<T>& V)> SupportBRef(SupportB);
-
-	return EPA<T>(VertsABuffer, VertsBBuffer, SupportARef, SupportBRef, OutPenetration, OutDir, WitnessA, WitnessB);
 }
 
 }
