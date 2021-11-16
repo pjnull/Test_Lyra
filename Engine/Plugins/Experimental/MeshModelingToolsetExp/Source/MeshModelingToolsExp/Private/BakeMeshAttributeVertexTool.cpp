@@ -102,7 +102,7 @@ public:
 		Baker->SetTargetMesh(BaseMesh);
 		Baker->SetTargetMeshTangents(BaseMeshTangents);
 		Baker->SetProjectionDistance(BakeSettings.ProjectionDistance);
-		Baker->BakeMode = BakeSettings.VertexOutput == EBakeVertexOutput::RGBA ? FMeshVertexBaker::EBakeMode::RGBA : FMeshVertexBaker::EBakeMode::PerChannel;
+		Baker->BakeMode = BakeSettings.OutputMode == EBakeVertexOutput::RGBA ? FMeshVertexBaker::EBakeMode::RGBA : FMeshVertexBaker::EBakeMode::PerChannel;
 		
 		FMeshBakerDynamicMeshSampler DetailSampler(DetailMesh.Get(), DetailSpatial.Get());
 		Baker->SetDetailSampler(&DetailSampler);
@@ -125,11 +125,11 @@ public:
 			CurvatureEval->UseClampMode = static_cast<FMeshCurvatureMapEvaluator::EClampMode>(CurvatureSettings.ClampMode);
 		};
 
-		if (BakeSettings.VertexOutput == EBakeVertexOutput::PerChannel)
+		if (BakeSettings.OutputMode == EBakeVertexOutput::PerChannel)
 		{
 			for(int ChannelIdx = 0; ChannelIdx < 4; ++ChannelIdx)
 			{
-				switch(BakeSettings.BakeTypePerChannel[ChannelIdx])
+				switch(BakeSettings.OutputTypePerChannel[ChannelIdx])
 				{
 				case EBakeMapType::AmbientOcclusion:
 				{
@@ -156,7 +156,7 @@ public:
 		}
 		else // EBakeVertexOutput::RGBA
 		{
-			switch (BakeSettings.BakeTypeRGBA)
+			switch (BakeSettings.OutputType)
 			{
 			case EBakeMapType::TangentSpaceNormal:
 			{
@@ -318,13 +318,13 @@ void UBakeMeshAttributeVertexTool::Setup()
 	Settings->RestoreProperties(this);
 	AddToolPropertySource(Settings);
 
-	Settings->WatchProperty(Settings->VertexOutput, [this](EBakeVertexOutput) { OpState |= EBakeOpState::Evaluate; UpdateOnModeChange(); });
-	Settings->WatchProperty(Settings->BakeTypeRGBA, [this](EBakeMapType) { OpState |= EBakeOpState::Evaluate; UpdateOnModeChange(); });
-	Settings->WatchProperty(Settings->BakeTypeR, [this](EBakeMapType) { OpState |= EBakeOpState::Evaluate; UpdateOnModeChange(); });
-	Settings->WatchProperty(Settings->BakeTypeG, [this](EBakeMapType) { OpState |= EBakeOpState::Evaluate; UpdateOnModeChange(); });
-	Settings->WatchProperty(Settings->BakeTypeB, [this](EBakeMapType) { OpState |= EBakeOpState::Evaluate; UpdateOnModeChange(); });
-	Settings->WatchProperty(Settings->BakeTypeA, [this](EBakeMapType) { OpState |= EBakeOpState::Evaluate; UpdateOnModeChange(); });
-	Settings->WatchProperty(Settings->VertexChannelPreview, [this](EBakeVertexChannel) { UpdateVisualization(); });
+	Settings->WatchProperty(Settings->OutputMode, [this](EBakeVertexOutput) { OpState |= EBakeOpState::Evaluate; UpdateOnModeChange(); });
+	Settings->WatchProperty(Settings->OutputType, [this](EBakeMapType) { OpState |= EBakeOpState::Evaluate; UpdateOnModeChange(); });
+	Settings->WatchProperty(Settings->OutputTypeR, [this](EBakeMapType) { OpState |= EBakeOpState::Evaluate; UpdateOnModeChange(); });
+	Settings->WatchProperty(Settings->OutputTypeG, [this](EBakeMapType) { OpState |= EBakeOpState::Evaluate; UpdateOnModeChange(); });
+	Settings->WatchProperty(Settings->OutputTypeB, [this](EBakeMapType) { OpState |= EBakeOpState::Evaluate; UpdateOnModeChange(); });
+	Settings->WatchProperty(Settings->OutputTypeA, [this](EBakeMapType) { OpState |= EBakeOpState::Evaluate; UpdateOnModeChange(); });
+	Settings->WatchProperty(Settings->PreviewMode, [this](EBakeVertexChannel) { UpdateVisualization(); });
 	Settings->WatchProperty(Settings->bSplitAtNormalSeams, [this](bool) { bColorTopologyValid = false; OpState |= EBakeOpState::Evaluate; });
 	Settings->WatchProperty(Settings->bSplitAtUVSeams, [this](bool) { bColorTopologyValid = false; OpState |= EBakeOpState::Evaluate; });
 
@@ -506,9 +506,9 @@ void UBakeMeshAttributeVertexTool::UpdateOnModeChange()
 	SetToolPropertySourceEnabled(TextureSettings, false);
 	SetToolPropertySourceEnabled(MultiTextureSettings, false);
 
-	if (Settings->VertexOutput == EBakeVertexOutput::RGBA)
+	if (Settings->OutputMode == EBakeVertexOutput::RGBA)
 	{
-		switch (Settings->BakeTypeRGBA)
+		switch (Settings->OutputType)
 		{
 			case EBakeMapType::AmbientOcclusion:
 			case EBakeMapType::BentNormal:
@@ -531,10 +531,10 @@ void UBakeMeshAttributeVertexTool::UpdateOnModeChange()
 	else // Settings->VertexMode == EBakeVertexOutput::PerChannel
 	{
 		EBakeMapType PerChannelTypes[4] = {
-			Settings->BakeTypeR,
-			Settings->BakeTypeG,
-			Settings->BakeTypeB,
-			Settings->BakeTypeA
+			Settings->OutputTypeR,
+			Settings->OutputTypeG,
+			Settings->OutputTypeB,
+			Settings->OutputTypeA
 		};
 		for(int Idx = 0; Idx < 4; ++Idx)
 		{
@@ -556,14 +556,14 @@ void UBakeMeshAttributeVertexTool::UpdateOnModeChange()
 
 void UBakeMeshAttributeVertexTool::UpdateVisualization()
 {
-	if (Settings->VertexChannelPreview == EBakeVertexChannel::A)
+	if (Settings->PreviewMode == EBakeVertexChannel::A)
 	{
 		PreviewMesh->SetOverrideRenderMaterial(PreviewAlphaMaterial);
 	}
 	else
 	{
 		FLinearColor Mask(FLinearColor::Black);
-		switch(Settings->VertexChannelPreview)
+		switch(Settings->PreviewMode)
 		{
 		case EBakeVertexChannel::R:
 			Mask.R = 1.0f;
@@ -649,12 +649,12 @@ void UBakeMeshAttributeVertexTool::UpdateResult()
 	GetToolManager()->DisplayMessage(FText(), EToolMessageLevel::UserWarning);
 
 	FBakeSettings BakeSettings;
-	BakeSettings.VertexOutput = Settings->VertexOutput;
-	BakeSettings.BakeTypeRGBA = Settings->BakeTypeRGBA;
-	BakeSettings.BakeTypePerChannel[0] = Settings->BakeTypeR;
-	BakeSettings.BakeTypePerChannel[1] = Settings->BakeTypeG;
-	BakeSettings.BakeTypePerChannel[2] = Settings->BakeTypeB;
-	BakeSettings.BakeTypePerChannel[3] = Settings->BakeTypeA;
+	BakeSettings.OutputMode = Settings->OutputMode;
+	BakeSettings.OutputType = Settings->OutputType;
+	BakeSettings.OutputTypePerChannel[0] = Settings->OutputTypeR;
+	BakeSettings.OutputTypePerChannel[1] = Settings->OutputTypeG;
+	BakeSettings.OutputTypePerChannel[2] = Settings->OutputTypeB;
+	BakeSettings.OutputTypePerChannel[3] = Settings->OutputTypeA;
 	BakeSettings.bSplitAtNormalSeams = Settings->bSplitAtNormalSeams;
 	BakeSettings.bSplitAtUVSeams = Settings->bSplitAtUVSeams;
 	BakeSettings.bProjectionInWorldSpace = MeshProps->bProjectionInWorldSpace;
@@ -668,9 +668,9 @@ void UBakeMeshAttributeVertexTool::UpdateResult()
 	OpState &= ~EBakeOpState::Invalid;
 
 	// Validate bake inputs
-	if (CachedBakeSettings.VertexOutput == EBakeVertexOutput::RGBA)
+	if (CachedBakeSettings.OutputMode == EBakeVertexOutput::RGBA)
 	{
-		switch(BakeSettings.BakeTypeRGBA)
+		switch(BakeSettings.OutputType)
 		{
 		case EBakeMapType::TangentSpaceNormal:
 			OpState |= UpdateResult_Normal();
@@ -1014,7 +1014,7 @@ void UBakeMeshAttributeVertexTool::RecordAnalytics(const FBakeAnalytics& Data, c
 	Attributes.Add(FAnalyticsEventAttribute(TEXT("Settings.ProjectionDistance"), Data.BakeSettings.ProjectionDistance));
 	Attributes.Add(FAnalyticsEventAttribute(TEXT("Settings.ProjectionInWorldSpace"), Data.BakeSettings.bProjectionInWorldSpace));
 
-	const FString OutputType = Data.BakeSettings.VertexOutput == EBakeVertexOutput::RGBA ? TEXT("RGBA") : TEXT("PerChannel");
+	const FString OutputType = Data.BakeSettings.OutputMode == EBakeVertexOutput::RGBA ? TEXT("RGBA") : TEXT("PerChannel");
 	Attributes.Add(FAnalyticsEventAttribute(TEXT("Settings.Output.Type"), OutputType));
 
 	auto RecordAmbientOcclusionSettings = [&Attributes, &Data](const FString& ModeName)
@@ -1041,14 +1041,14 @@ void UBakeMeshAttributeVertexTool::RecordAnalytics(const FBakeAnalytics& Data, c
 		Attributes.Add(FAnalyticsEventAttribute(FString::Printf(TEXT("Settings.Output.%s.Curvature.ColorMode"), *ModeName), Data.CurvatureSettings.ColorMode));
 	};
 
-	if (Data.BakeSettings.VertexOutput == EBakeVertexOutput::RGBA)
+	if (Data.BakeSettings.OutputMode == EBakeVertexOutput::RGBA)
 	{
 		const FString OutputName(TEXT("RGBA"));
 
-		FString OutputTypeName = StaticEnum<EBakeMapType>()->GetNameStringByValue(static_cast<int>(Data.BakeSettings.BakeTypeRGBA));
+		FString OutputTypeName = StaticEnum<EBakeMapType>()->GetNameStringByValue(static_cast<int>(Data.BakeSettings.OutputType));
 		Attributes.Add(FAnalyticsEventAttribute(FString::Printf(TEXT("Settings.Output.%s.Type"), *OutputName), OutputTypeName));
 
-		switch (Data.BakeSettings.BakeTypeRGBA)
+		switch (Data.BakeSettings.OutputType)
 		{
 		case EBakeMapType::AmbientOcclusion:
 			RecordAmbientOcclusionSettings(OutputName);
@@ -1065,14 +1065,14 @@ void UBakeMeshAttributeVertexTool::RecordAnalytics(const FBakeAnalytics& Data, c
 	}
 	else
 	{
-		ensure(Data.BakeSettings.VertexOutput == EBakeVertexOutput::PerChannel);
+		ensure(Data.BakeSettings.OutputMode == EBakeVertexOutput::PerChannel);
 		for (int EvalId = 0; EvalId < 4; ++EvalId)
 		{
 			FString OutputName = StaticEnum<EBakeVertexChannel>()->GetNameStringByIndex(EvalId);
-			FString OutputTypeName = StaticEnum<EBakeMapType>()->GetNameStringByValue(static_cast<int>(Data.BakeSettings.BakeTypePerChannel[EvalId]));
+			FString OutputTypeName = StaticEnum<EBakeMapType>()->GetNameStringByValue(static_cast<int>(Data.BakeSettings.OutputTypePerChannel[EvalId]));
 			Attributes.Add(FAnalyticsEventAttribute(FString::Printf(TEXT("Settings.Output.%s.Type"), *OutputName), OutputTypeName));
 
-			switch (Data.BakeSettings.BakeTypePerChannel[EvalId])
+			switch (Data.BakeSettings.OutputTypePerChannel[EvalId])
 			{
 			case EBakeMapType::AmbientOcclusion:
 				RecordAmbientOcclusionSettings(OutputName);

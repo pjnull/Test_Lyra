@@ -62,50 +62,50 @@ class MESHMODELINGTOOLSEXP_API UBakeMeshAttributeVertexToolProperties : public U
 	GENERATED_BODY()
 
 public:
-	/** The bake types to generate */
+	/** The bake output mode */
 	UPROPERTY(EditAnywhere, Category = BakeOutput)
-	EBakeVertexOutput VertexOutput = EBakeVertexOutput::RGBA;
+	EBakeVertexOutput OutputMode = EBakeVertexOutput::RGBA;
 
-	/** The vertex channel to preview */
-	UPROPERTY(EditAnywhere, Category = BakeOutput, meta = (TransientToolProperty))
-	EBakeVertexChannel VertexChannelPreview = EBakeVertexChannel::RGBA;
-
-	/** The bake type to generate */
+	/** The bake output type to generate */
 	UPROPERTY(EditAnywhere, Category = BakeOutput, meta=(
 		ValidEnumValues="TangentSpaceNormal, AmbientOcclusion, BentNormal, Curvature, Texture, ObjectSpaceNormal, FaceNormal, Position, MaterialID, MultiTexture",
-		EditCondition="VertexOutput == EBakeVertexOutput::RGBA", EditConditionHides))
-	EBakeMapType BakeTypeRGBA = EBakeMapType::TangentSpaceNormal;
+		EditCondition="OutputMode == EBakeVertexOutput::RGBA", EditConditionHides))
+	EBakeMapType OutputType = EBakeMapType::TangentSpaceNormal;
 
-	/** The bake type to generate in the Red channel */
+	/** The bake output type to generate in the Red channel */
 	UPROPERTY(EditAnywhere, Category = BakeOutput, meta=(
 		ValidEnumValues="None, AmbientOcclusion, Curvature",
-		EditCondition="VertexOutput == EBakeVertexOutput::PerChannel", EditConditionHides))
-	EBakeMapType BakeTypeR = EBakeMapType::None;
+		EditCondition="OutputMode == EBakeVertexOutput::PerChannel", EditConditionHides))
+	EBakeMapType OutputTypeR = EBakeMapType::None;
 
-	/** The bake type to generate in the Green channel */
+	/** The bake output type to generate in the Green channel */
 	UPROPERTY(EditAnywhere, Category = BakeOutput, meta=(
 		ValidEnumValues="None, AmbientOcclusion, Curvature",
-		EditCondition="VertexOutput == EBakeVertexOutput::PerChannel", EditConditionHides))
-	EBakeMapType BakeTypeG = EBakeMapType::None;
+		EditCondition="OutputMode == EBakeVertexOutput::PerChannel", EditConditionHides))
+	EBakeMapType OutputTypeG = EBakeMapType::None;
 
-	/** The bake type to generate in the Blue channel */
+	/** The bake output type to generate in the Blue channel */
 	UPROPERTY(EditAnywhere, Category = BakeOutput, meta=(
 		ValidEnumValues="None, AmbientOcclusion, Curvature",
-		EditCondition="VertexOutput == EBakeVertexOutput::PerChannel", EditConditionHides))
-	EBakeMapType BakeTypeB = EBakeMapType::None;
+		EditCondition="OutputMode == EBakeVertexOutput::PerChannel", EditConditionHides))
+	EBakeMapType OutputTypeB = EBakeMapType::None;
 
-	/** The bake type to generate in the Alpha channel */
+	/** The bake output type to generate in the Alpha channel */
 	UPROPERTY(EditAnywhere, Category = BakeOutput, meta=(
 		ValidEnumValues="None, AmbientOcclusion, Curvature",
-		EditCondition="VertexOutput == EBakeVertexOutput::PerChannel", EditConditionHides))
-	EBakeMapType BakeTypeA = EBakeMapType::None;
+		EditCondition="OutputMode == EBakeVertexOutput::PerChannel", EditConditionHides))
+	EBakeMapType OutputTypeA = EBakeMapType::None;
 
-	/** Split vertex colors at normal seams */
-	UPROPERTY(EditAnywhere, Category = BakeOutput)
+	/** The vertex color channel to preview */
+	UPROPERTY(EditAnywhere, Category = BakeOutput, meta = (TransientToolProperty))
+	EBakeVertexChannel PreviewMode = EBakeVertexChannel::RGBA;
+
+	/** If true, compute a separate vertex color for each unique normal on a vertex */
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = BakeOutput)
 	bool bSplitAtNormalSeams = false;
 
-	/** Split vertex colors at UV seams */
-	UPROPERTY(EditAnywhere, Category = BakeOutput)
+	/** If true, Compute a separate vertex color for each unique UV on a vertex. */
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = BakeOutput, meta=(DisplayName = "Split at UV Seams"))
 	bool bSplitAtUVSeams = false;
 };
 
@@ -191,10 +191,10 @@ protected:
 
 	struct FBakeSettings
 	{
-		EBakeVertexOutput VertexOutput = EBakeVertexOutput::RGBA;
-		EBakeMapType BakeTypeRGBA = EBakeMapType::TangentSpaceNormal;
-		EBakeMapType BakeTypePerChannel[4] = { EBakeMapType::None, EBakeMapType::None, EBakeMapType::None, EBakeMapType::None };
-		EBakeVertexChannel VertexChannelPreview = EBakeVertexChannel::RGBA;
+		EBakeVertexOutput OutputMode = EBakeVertexOutput::RGBA;
+		EBakeMapType OutputType = EBakeMapType::TangentSpaceNormal;
+		EBakeMapType OutputTypePerChannel[4] = { EBakeMapType::None, EBakeMapType::None, EBakeMapType::None, EBakeMapType::None };
+		EBakeVertexChannel PreviewMode = EBakeVertexChannel::RGBA;
 		float ProjectionDistance = 3.0;
 		bool bProjectionInWorldSpace = false;
 		bool bSplitAtNormalSeams = false;
@@ -202,12 +202,12 @@ protected:
 
 		bool operator==(const FBakeSettings& Other) const
 		{
-			return (VertexOutput == Other.VertexOutput &&
-				BakeTypeRGBA == Other.BakeTypeRGBA &&
-				BakeTypePerChannel[0] == Other.BakeTypePerChannel[0] &&
-				BakeTypePerChannel[1] == Other.BakeTypePerChannel[1] &&
-				BakeTypePerChannel[2] == Other.BakeTypePerChannel[2] &&
-				BakeTypePerChannel[3] == Other.BakeTypePerChannel[3] &&
+			return (OutputMode == Other.OutputMode &&
+				OutputType == Other.OutputType &&
+				OutputTypePerChannel[0] == Other.OutputTypePerChannel[0] &&
+				OutputTypePerChannel[1] == Other.OutputTypePerChannel[1] &&
+				OutputTypePerChannel[2] == Other.OutputTypePerChannel[2] &&
+				OutputTypePerChannel[3] == Other.OutputTypePerChannel[3] &&
 				bProjectionInWorldSpace == Other.bProjectionInWorldSpace &&
 				ProjectionDistance == Other.ProjectionDistance &&
 				bSplitAtNormalSeams == Other.bSplitAtNormalSeams &&
