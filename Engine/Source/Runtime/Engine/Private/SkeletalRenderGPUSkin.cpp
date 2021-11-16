@@ -108,11 +108,7 @@ void FMorphVertexBuffer::InitDynamicRHI()
 	Flags = (EBufferUsageFlags)(Flags | BUF_ShaderResource);
 
 	VertexBufferRHI = RHICreateVertexBuffer(Size, Flags, CreateInfo);
-	bool bUsesSkinCache = RHISupportsComputeShaders(ShaderPlatform) && IsGPUSkinCacheAvailable(ShaderPlatform) && GEnableGPUSkinCache;
-	if (bUsesSkinCache)
-	{
-		SRVValue = RHICreateShaderResourceView(VertexBufferRHI, 4, PF_R32_FLOAT);
-	}
+	SRVValue = RHICreateShaderResourceView(VertexBufferRHI, 4, PF_R32_FLOAT);
 
 	if (!bUseGPUMorphTargets)
 	{
@@ -139,6 +135,116 @@ void FMorphVertexBuffer::ReleaseDynamicRHI()
 	UAVValue.SafeRelease();
 	VertexBufferRHI.SafeRelease();
 	SRVValue.SafeRelease();
+}
+
+/*-----------------------------------------------------------------------------
+FMorphVertexBufferPool
+-----------------------------------------------------------------------------*/
+void FMorphVertexBufferPool::InitResources()
+{
+	check(!MorphVertexBuffers[0].VertexBufferRHI.IsValid());
+	check(!MorphVertexBuffers[1].VertexBufferRHI.IsValid());
+	BeginInitResource(&MorphVertexBuffers[0]);
+	if (bDoubleBuffer)
+	{
+		BeginInitResource(&MorphVertexBuffers[1]);
+	}
+}
+
+void FMorphVertexBufferPool::ReleaseResources()
+{
+	BeginReleaseResource(&MorphVertexBuffers[0]);
+	BeginReleaseResource(&MorphVertexBuffers[1]);
+}
+
+SIZE_T FMorphVertexBufferPool::GetResourceSize() const
+{
+	SIZE_T ResourceSize = sizeof(*this);
+	ResourceSize += MorphVertexBuffers[0].GetResourceSize();
+	ResourceSize += MorphVertexBuffers[1].GetResourceSize();
+	return ResourceSize;
+}
+
+void FMorphVertexBufferPool::EnableDoubleBuffer()
+{
+	check(IsInRenderingThread());
+	bDoubleBuffer = true;
+	if (!MorphVertexBuffers[1].VertexBufferRHI.IsValid())
+	{
+		MorphVertexBuffers[1].InitResource();
+	}
+}
+
+const FMorphVertexBuffer& FMorphVertexBufferPool::GetMorphVertexBufferForReading(bool bPrevious, uint32 FrameNumber) const
+{
+	uint32 Index = 0;
+	if (bDoubleBuffer)
+	{
+		// Find the buffer matching frame number or otherwise use the newer buffer
+		if (MorphVertexBuffers[0].FrameNumber == FrameNumber)
+		{
+			Index = 0;
+		}
+		else if (MorphVertexBuffers[1].FrameNumber == FrameNumber)
+		{
+			Index = 1;
+		}
+		else if (MorphVertexBuffers[0].FrameNumber == -1)
+		{
+			Index = 0;
+		}
+		else if (MorphVertexBuffers[1].FrameNumber == -1)
+		{
+			Index = 1;
+		}
+		else
+		{
+			// Get the newer frame
+			Index = (MorphVertexBuffers[0].FrameNumber < MorphVertexBuffers[1].FrameNumber) ? 1 : 0;
+		}
+
+		bool bPreviousValid = (MorphVertexBuffers[1 - Index].FrameNumber != -1);
+		if (bPrevious && bPreviousValid)
+		{
+			Index = 1 - Index;
+		}
+	}
+
+	checkf(MorphVertexBuffers[Index].VertexBufferRHI.IsValid(), TEXT("Index: %i Buffer0: %s Frame0: %i Buffer1: %s Frame1: %i"), Index, MorphVertexBuffers[0].VertexBufferRHI.IsValid() ? TEXT("true") : TEXT("false"), MorphVertexBuffers[0].FrameNumber, MorphVertexBuffers[1].VertexBufferRHI.IsValid() ? TEXT("true") : TEXT("false"), MorphVertexBuffers[1].FrameNumber);
+	return MorphVertexBuffers[Index];
+}
+
+FMorphVertexBuffer& FMorphVertexBufferPool::GetMorphVertexBufferForWriting(uint32 FrameNumber)
+{
+	uint32 Index = 0;
+	if (bDoubleBuffer)
+	{
+		// Find the buffer matching frame number or otherwise use the older buffer
+		if (MorphVertexBuffers[0].FrameNumber == FrameNumber)
+		{
+			Index = 0;
+		}
+		else if (MorphVertexBuffers[1].FrameNumber == FrameNumber)
+		{
+			Index = 1;
+		}
+		else if (MorphVertexBuffers[0].FrameNumber == -1)
+		{
+			Index = 0;
+		}
+		else if (MorphVertexBuffers[1].FrameNumber == -1)
+		{
+			Index = 1;
+		}
+		else
+		{
+			// Get the older frame
+			Index = (MorphVertexBuffers[0].FrameNumber < MorphVertexBuffers[1].FrameNumber) ? 0 : 1;
+		}
+	}
+
+	MorphVertexBuffers[Index].FrameNumber = FrameNumber;
+	return MorphVertexBuffers[Index];
 }
 
 /*-----------------------------------------------------------------------------
@@ -448,7 +554,8 @@ void FSkeletalMeshObjectGPUSkin::UpdateDynamicData_RenderThread(FGPUSkinCache* G
 			// When in game, updates not sent in UWorld::SendAllEndOfFrameUpdates() (implied by IsBatchingDispatch()) are ignored.
 			if (!bIsGameWorld || GPUSkinCache->IsBatchingDispatch())
 			{
-				ProcessUpdatedDynamicData(EGPUSkinCacheEntryMode::RayTracing, GPUSkinCache, RHICmdList, FrameNumberToPrepare, RevisionNumber, bMorphNeedsUpdate, DynamicData->RayTracingLODIndex);
+				// Morph delta is updated in raster pass above, no need to update again for ray tracing
+				ProcessUpdatedDynamicData(EGPUSkinCacheEntryMode::RayTracing, GPUSkinCache, RHICmdList, FrameNumberToPrepare, RevisionNumber, /*bMorphNeedsUpdate=*/false, DynamicData->RayTracingLODIndex);
 			}
 		}
 		else
@@ -503,9 +610,10 @@ void FSkeletalMeshObjectGPUSkin::ProcessUpdatedDynamicData(EGPUSkinCacheEntryMod
 	bMorphNeedsUpdateDeferred = false;
 
 	FSkeletalMeshObjectLOD& LOD = LODs[LODIndex];
+	FMorphVertexBuffer& MorphVertexBuffer = LOD.MorphVertexBufferPool.GetMorphVertexBufferForWriting(FrameNumberToPrepare);
 
 	// if hasn't been updated, force update again
-	bMorphNeedsUpdate = LOD.MorphVertexBuffer.bHasBeenUpdated ? bMorphNeedsUpdate : true;
+	bMorphNeedsUpdate = MorphVertexBuffer.bHasBeenUpdated ? bMorphNeedsUpdate : true;
 	bMorphNeedsUpdate |= (GForceUpdateMorphTargets != 0);
 	bMorphNeedsUpdate |= bAlwaysUpdateMorphVertexBuffer;
 
@@ -569,16 +677,16 @@ void FSkeletalMeshObjectGPUSkin::ProcessUpdatedDynamicData(EGPUSkinCacheEntryMod
 		RHICmdList.UnlockBuffer(PositionBuffer.VertexBufferRHI);
 	}
 
-	if (LOD.MorphVertexBuffer.bNeedsInitialClear && !(bMorph && bMorphNeedsUpdate))
+	if (MorphVertexBuffer.bNeedsInitialClear && !(bMorph && bMorphNeedsUpdate))
 	{
 		QUICK_SCOPE_CYCLE_COUNTER(STAT_FSkeletalMeshObjectGPUSkin_ProcessUpdatedDynamicData_ClearMorphBuffer);
-		if (LOD.MorphVertexBuffer.GetUAV())
+		if (MorphVertexBuffer.GetUAV())
 		{
-			RHICmdList.ClearUAVUint(LOD.MorphVertexBuffer.GetUAV(), FUintVector4(0, 0, 0, 0));
-			RHICmdList.Transition(FRHITransitionInfo(LOD.MorphVertexBuffer.GetUAV(), ERHIAccess::Unknown, ERHIAccess::SRVMask));
+			RHICmdList.ClearUAVUint(MorphVertexBuffer.GetUAV(), FUintVector4(0, 0, 0, 0));
+			RHICmdList.Transition(FRHITransitionInfo(MorphVertexBuffer.GetUAV(), ERHIAccess::Unknown, ERHIAccess::SRVMask));
 		}
 	}
-	LOD.MorphVertexBuffer.bNeedsInitialClear = false;
+	MorphVertexBuffer.bNeedsInitialClear = false;
 
 	if(bMorph) 
 	{
@@ -588,7 +696,7 @@ void FSkeletalMeshObjectGPUSkin::ProcessUpdatedDynamicData(EGPUSkinCacheEntryMod
 		// only update if the morph data changed and there are weighted morph targets
 		if(bMorphNeedsUpdate)
 		{
-			UpdateMorphVertexBuffer(RHICmdList, Mode, LOD, LODData);
+			UpdateMorphVertexBuffer(RHICmdList, Mode, LOD, LODData, MorphVertexBuffer);
 		}
 	}
 	else
@@ -597,6 +705,7 @@ void FSkeletalMeshObjectGPUSkin::ProcessUpdatedDynamicData(EGPUSkinCacheEntryMod
 		bDataPresent = VertexFactoryData.VertexFactories.Num() > 0;
 	}
 
+	const EShaderPlatform ShaderPlatform = GetFeatureLevelShaderPlatform(FeatureLevel);
 	if (bDataPresent)
 	{
 		bool bSkinCacheResult = true;
@@ -604,7 +713,7 @@ void FSkeletalMeshObjectGPUSkin::ProcessUpdatedDynamicData(EGPUSkinCacheEntryMod
 		{
 			const FSkelMeshRenderSection& Section = Sections[SectionIdx];
 
-			bool bClothFactory = RHISupportsManualVertexFetch(GetFeatureLevelShaderPlatform(FeatureLevel)) && (FeatureLevel >= ERHIFeatureLevel::SM5) &&
+			bool bClothFactory = RHISupportsManualVertexFetch(ShaderPlatform) && (FeatureLevel >= ERHIFeatureLevel::SM5) &&
 								 (DynamicData->ClothingSimData.Num() > 0) && Section.HasClothingData();
 
 			FGPUBaseSkinVertexFactory* VertexFactory;
@@ -703,7 +812,7 @@ void FSkeletalMeshObjectGPUSkin::ProcessUpdatedDynamicData(EGPUSkinCacheEntryMod
 						Section,
 						this,
 						&LOD.VertexOffsetVertexBuffers,
-						bMorph ? &LOD.MorphVertexBuffer : 0,
+						bMorph ? &MorphVertexBuffer : 0,
 						bClothFactory ? &LODData.ClothVertexBuffer : 0,
 						bClothFactory ? DynamicData->ClothingSimData.Find(Section.CorrespondClothAssetIndex) : 0,
 						LocalToCloth,
@@ -722,21 +831,41 @@ void FSkeletalMeshObjectGPUSkin::ProcessUpdatedDynamicData(EGPUSkinCacheEntryMod
 			}
 		}
 	}
+
+	// Mobile doesn't support motion blur so no need to double buffer morph deltas
+	const bool bIsMobile = IsMobilePlatform(ShaderPlatform) || ShaderPlatform == SP_PCD3D_ES3_1;
+	if (bMorph && !bIsMobile && !SkinCacheEntry && Mode == EGPUSkinCacheEntryMode::Raster && !LOD.MorphVertexBufferPool.IsDoubleBuffered())
+	{
+		// Going through GPU skinned vertex factory, turn on double buffering for motion blur
+		LOD.MorphVertexBufferPool.EnableDoubleBuffer();
+	}
 }
 
-void FSkeletalMeshObjectGPUSkin::UpdateMorphVertexBuffer(FRHICommandListImmediate& RHICmdList, EGPUSkinCacheEntryMode Mode, FSkeletalMeshObjectLOD& LOD, const FSkeletalMeshLODRenderData& LODData)
+void FSkeletalMeshObjectGPUSkin::UpdateMorphVertexBuffer(FRHICommandListImmediate& RHICmdList, EGPUSkinCacheEntryMode Mode, FSkeletalMeshObjectLOD& LOD, const FSkeletalMeshLODRenderData& LODData, FMorphVertexBuffer& MorphVertexBuffer)
 {
 	QUICK_SCOPE_CYCLE_COUNTER(STAT_FSkeletalMeshObjectGPUSkin_ProcessUpdatedDynamicData_UpdateMorphBuffer);
 	if (UseGPUMorphTargets(FeatureLevel))
 	{
 		// sometimes this goes out of bound, we'll ensure here
 		ensureAlways(DynamicData->MorphTargetWeights.Num() == LODData.MorphTargetVertexInfoBuffers.GetNumMorphs());
-		LOD.UpdateMorphVertexBufferGPU(RHICmdList, DynamicData->MorphTargetWeights, LODData.MorphTargetVertexInfoBuffers, DynamicData->SectionIdsUseByActiveMorphTargets, GetDebugName(), Mode);
+		LOD.UpdateMorphVertexBufferGPU(RHICmdList, DynamicData->MorphTargetWeights, LODData.MorphTargetVertexInfoBuffers, DynamicData->SectionIdsUseByActiveMorphTargets, GetDebugName(), Mode, MorphVertexBuffer);
 	}
 	else
 	{
 		// update the morph data for the lod (before SkinCache)
-		LOD.UpdateMorphVertexBufferCPU(DynamicData->ActiveMorphTargets, DynamicData->MorphTargetWeights);
+		LOD.UpdateMorphVertexBufferCPU(DynamicData->ActiveMorphTargets, DynamicData->MorphTargetWeights, MorphVertexBuffer);
+	}
+
+	if (LOD.MorphVertexBufferPool.IsDoubleBuffered())
+	{
+		// Update vertex stream binding when morphed delta data is double buffered
+		for (int32 SectionIdx = 0; SectionIdx < LODData.RenderSections.Num(); ++SectionIdx)
+		{
+			if (FGPUBaseSkinVertexFactory* GPUSkinVertexFactory = LOD.GPUSkinVertexFactories.MorphVertexFactories[SectionIdx].Get())
+			{
+				GPUSkinVertexFactory->UpdateMorphVertexStream(&MorphVertexBuffer);
+			}
+		}
 	}
 }
 
@@ -848,7 +977,8 @@ static void CalculateMorphDeltaBounds(const TArray<float>& MorphTargetWeights, c
 
 void FSkeletalMeshObjectGPUSkin::FSkeletalMeshObjectLOD::UpdateMorphVertexBufferGPU(FRHICommandListImmediate& RHICmdList, const TArray<float>& MorphTargetWeights, 
 																					const FMorphTargetVertexInfoBuffers& MorphTargetVertexInfoBuffers, 
-																					const TArray<int32>& SectionIdsUseByActiveMorphTargets, const FName& OwnerName, EGPUSkinCacheEntryMode Mode)
+																					const TArray<int32>& SectionIdsUseByActiveMorphTargets, const FName& OwnerName, EGPUSkinCacheEntryMode Mode,
+																					FMorphVertexBuffer& MorphVertexBuffer)
 {
 	if (IsValidRef(MorphVertexBuffer.VertexBufferRHI))
 	{
@@ -1006,7 +1136,7 @@ void FSkeletalMeshObjectGPUSkin::FSkeletalMeshObjectLOD::UpdateSkinWeights(FSkel
 	
 }
 
-void FSkeletalMeshObjectGPUSkin::FSkeletalMeshObjectLOD::UpdateMorphVertexBufferCPU(const TArray<FActiveMorphTarget>& ActiveMorphTargets, const TArray<float>& MorphTargetWeights)
+void FSkeletalMeshObjectGPUSkin::FSkeletalMeshObjectLOD::UpdateMorphVertexBufferCPU(const TArray<FActiveMorphTarget>& ActiveMorphTargets, const TArray<float>& MorphTargetWeights, FMorphVertexBuffer& MorphVertexBuffer)
 {
 	SCOPE_CYCLE_COUNTER(STAT_MorphVertexBuffer_Update);
 
@@ -1321,12 +1451,15 @@ template<class VertexFactoryType>
 void InitMorphVertexFactoryComponents(typename VertexFactoryType::FDataType* VertexFactoryData, 
 										const FSkeletalMeshObjectGPUSkin::FVertexFactoryBuffers& VertexBuffers)
 {
+	VertexFactoryData->MorphVertexBufferPool = VertexBuffers.MorphVertexBufferPool;
+	const FMorphVertexBuffer& MorphVB = VertexBuffers.MorphVertexBufferPool->GetMorphVertexBufferForReading(false, -1);
+
 	// delta positions
 	VertexFactoryData->DeltaPositionComponent = FVertexStreamComponent(
-		VertexBuffers.MorphVertexBuffer,STRUCT_OFFSET(FMorphGPUSkinVertex,DeltaPosition),sizeof(FMorphGPUSkinVertex),VET_Float3);
+		&MorphVB, STRUCT_OFFSET(FMorphGPUSkinVertex,DeltaPosition),sizeof(FMorphGPUSkinVertex),VET_Float3);
 	// delta normals
 	VertexFactoryData->DeltaTangentZComponent = FVertexStreamComponent(
-		VertexBuffers.MorphVertexBuffer, STRUCT_OFFSET(FMorphGPUSkinVertex, DeltaTangentZ), sizeof(FMorphGPUSkinVertex), VET_Float3);
+		&MorphVB, STRUCT_OFFSET(FMorphGPUSkinVertex, DeltaTangentZ), sizeof(FMorphGPUSkinVertex), VET_Float3);
 }
 
 /** 
@@ -1570,7 +1703,7 @@ void FSkeletalMeshObjectGPUSkin::FSkeletalMeshObjectLOD::GetVertexBuffers(FVerte
 	OutVertexBuffers.StaticVertexBuffers = &LODData.StaticVertexBuffers;
 	OutVertexBuffers.ColorVertexBuffer = MeshObjectColorBuffer;
 	OutVertexBuffers.SkinWeightVertexBuffer = MeshObjectWeightBuffer;
-	OutVertexBuffers.MorphVertexBuffer = &MorphVertexBuffer;
+	OutVertexBuffers.MorphVertexBufferPool = &MorphVertexBufferPool;
 	OutVertexBuffers.APEXClothVertexBuffer = &LODData.ClothVertexBuffer;
 	OutVertexBuffers.VertexOffsetVertexBuffers = &VertexOffsetVertexBuffers;
 	OutVertexBuffers.NumVertices = LODData.GetNumVertices();
@@ -1869,7 +2002,7 @@ void FSkeletalMeshObjectGPUSkin::FSkeletalMeshObjectLOD::InitMorphResources(cons
 	FSkeletalMeshLODRenderData& LODData = SkelMeshRenderData->LODRenderData[LODIndex];
 
 	// init the delta vertex buffer for this LOD
-	BeginInitResource(&MorphVertexBuffer);
+	MorphVertexBufferPool.InitResources();
 
 	// Vertex buffers available for the LOD
 	FVertexFactoryBuffers VertexBuffers;
@@ -1886,7 +2019,7 @@ void FSkeletalMeshObjectGPUSkin::FSkeletalMeshObjectLOD::ReleaseMorphResources()
 	// Release morph vertex factories
 	GPUSkinVertexFactories.ReleaseMorphVertexFactories();
 	// release the delta vertex buffer
-	BeginReleaseResource(&MorphVertexBuffer);
+	MorphVertexBufferPool.ReleaseResources();
 }
 
 

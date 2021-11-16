@@ -324,6 +324,10 @@ public:
 	ENGINE_API static bool UseUnlimitedBoneInfluences(uint32 MaxBoneInfluences);
 	ENGINE_API static bool GetUnlimitedBoneInfluences();
 
+	/** Morph vertex factory functions */
+	virtual void UpdateMorphVertexStream(const class FMorphVertexBuffer* MorphVertexBuffer) {}
+	virtual const class FMorphVertexBuffer* GetMorphVertexBuffer(bool bPrevious, uint32 FrameNumber) const { return nullptr; }
+
 	virtual const FShaderResourceViewRHIRef GetPositionsSRV() const = 0;
 	virtual const FShaderResourceViewRHIRef GetTangentsSRV() const = 0;
 	virtual const FShaderResourceViewRHIRef GetTextureCoordinatesSRV() const = 0;
@@ -562,6 +566,8 @@ public:
 		FVertexStreamComponent DeltaPositionComponent;
 		/** stream which has the TangentZ deltas to add to the vertex normals */
 		FVertexStreamComponent DeltaTangentZComponent;
+		/** Morph vertex buffer pool double buffering delta data  */
+		class FMorphVertexBufferPool* MorphVertexBufferPool = nullptr;
 	};
 
 	/**
@@ -588,6 +594,10 @@ public:
 		this->TangentStreamComponents[1] = InData.TangentBasisComponents[1];
 		FGPUBaseSkinVertexFactory::UpdateRHI();
 	}
+
+	/** FGPUBaseSkinVertexFactory overrides */
+	virtual void UpdateMorphVertexStream(const class FMorphVertexBuffer* MorphVertexBuffer) override;
+	virtual const class FMorphVertexBuffer* GetMorphVertexBuffer(bool bPrevious, uint32 FrameNumber) const override;
 
 	// FRenderResource interface.
 
@@ -649,7 +659,7 @@ protected:
 private:
 	/** stream component data bound to this vertex factory */
 	FDataType MorphData;
-
+	int32 MorphDeltaStreamIndex = -1;
 };
 
 /** Vertex factory with vertex stream components for GPU-skinned and morph target streams */
