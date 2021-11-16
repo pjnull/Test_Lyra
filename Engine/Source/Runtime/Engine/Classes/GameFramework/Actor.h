@@ -215,6 +215,12 @@ private:
 	UPROPERTY(ReplicatedUsing=OnRep_ReplicateMovement, Category=Replication, EditDefaultsOnly)
 	uint8 bReplicateMovement:1;    
 
+	UPROPERTY(EditDefaultsOnly, Category = Replication)
+	uint8 bCallPreReplication:1;
+
+	UPROPERTY(EditDefaultsOnly, Category = Replication)
+	uint8 bCallPreReplicationForReplay:1;
+
 	/**
 	 * Allows us to only see this Actor in the Editor, and not in the actual game.
 	 * @see SetActorHiddenInGame()
@@ -236,7 +242,19 @@ private:
 	UPROPERTY(Transient)
 	uint8 bIsInEditingLevelInstance:1;
 #endif
+
+	/** If true, PreReplication will be called on this actor before each potential replication. */
+	bool ShouldCallPreReplication() const;
+
+	/** If true, PreReplicationForReplay will be called on this actor before each potential replication. */
+	bool ShouldCallPreReplicationForReplay() const;
+
 public:
+	/** Set whether or not we should make calls to PreReplication. */
+	void SetCallPreReplication(bool bCall);
+
+	/** Set whether or not we should make calls to PreReplicationForReplay. */
+	void SetCallPreReplicationForReplay(bool bCall);
 
 	/** If true, this actor is no longer replicated to new clients, and is "torn off" (becomes a ROLE_Authority) on clients to which it was being replicated. */
 	bool GetTearOff() const

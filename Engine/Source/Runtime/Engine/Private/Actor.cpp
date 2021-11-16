@@ -113,6 +113,8 @@ void AActor::InitializeDefaults()
 	SetRole(ROLE_Authority);
 	RemoteRole = ROLE_None;
 	bReplicates = false;
+	bCallPreReplication = true;
+	bCallPreReplicationForReplay = true;
 	NetPriority = 1.0f;
 	NetUpdateFrequency = 100.0f;
 	MinNetUpdateFrequency = 2.0f;
@@ -1361,32 +1363,54 @@ void AActor::CallPreReplication(UNetDriver* NetDriver)
 	{
 		return;
 	}
-
-	IRepChangedPropertyTracker* const ActorChangedPropertyTracker = NetDriver->FindOrCreateRepChangedPropertyTracker(this).Get();
-
-	const ENetRole LocalRole = GetLocalRole();
-	const UWorld* World = GetWorld();
 	
-	// PreReplication is only called on the server, except when we're recording a Client Replay.
-	// In that case we call PreReplication on the locally controlled Character as well.
-	if ((LocalRole == ROLE_Authority) || ((LocalRole == ROLE_AutonomousProxy) && World && World->IsRecordingClientReplay()))
-	{
-		PreReplication(*ActorChangedPropertyTracker);
-	}
+	const bool bPreReplication = ShouldCallPreReplication();
+	const bool bPreReplicationForReplay = ShouldCallPreReplicationForReplay();
 
-	// If we're recording a replay, call this for everyone (includes SimulatedProxies).
-	if (Cast<UDemoNetDriver>(NetDriver) || NetDriver->HasReplayConnection())
-	{
-		PreReplicationForReplay(*ActorChangedPropertyTracker);
-	}
+	IRepChangedPropertyTracker* ActorChangedPropertyTracker = nullptr;
 
-	// Call PreReplication on all owned components that are replicated
-	for (UActorComponent* Component : ReplicatedComponents)
+	if (bPreReplication)
 	{
-		// Only call on components that aren't pending kill
-		if (IsValid(Component))
+		const ENetRole LocalRole = GetLocalRole();
+		const UWorld* World = GetWorld();
+
+		// PreReplication is only called on the server, except when we're recording a Client Replay.
+		// In that case we call PreReplication on the locally controlled Character as well.
+		if ((LocalRole == ROLE_Authority) || ((LocalRole == ROLE_AutonomousProxy) && World && World->IsRecordingClientReplay()))
 		{
-			Component->PreReplication(*NetDriver->FindOrCreateRepChangedPropertyTracker(Component).Get());
+			if (ActorChangedPropertyTracker == nullptr)
+			{
+				ActorChangedPropertyTracker = NetDriver->FindOrCreateRepChangedPropertyTracker(this).Get();
+			}
+
+			PreReplication(*ActorChangedPropertyTracker);
+		}
+	}
+
+	if (bPreReplicationForReplay)
+	{
+		// If we're recording a replay, call this for everyone (includes SimulatedProxies).
+		if (Cast<UDemoNetDriver>(NetDriver) || NetDriver->HasReplayConnection())
+		{
+			if (ActorChangedPropertyTracker == nullptr)
+			{
+				ActorChangedPropertyTracker = NetDriver->FindOrCreateRepChangedPropertyTracker(this).Get();
+			}
+
+			PreReplicationForReplay(*ActorChangedPropertyTracker);
+		}
+	}
+
+	if (bPreReplication)
+	{
+		// Call PreReplication on all owned components that are replicated
+		for (UActorComponent* Component : ReplicatedComponents)
+		{
+			// Only call on components that aren't pending kill
+			if (IsValid(Component))
+			{
+				Component->PreReplication(*NetDriver->FindOrCreateRepChangedPropertyTracker(Component).Get());
+			}
 		}
 	}
 }
@@ -2518,6 +2542,28 @@ void AActor::Destroyed()
 
 	ReceiveDestroyed();
 	OnDestroyed.Broadcast(this);
+}
+
+void AActor::SetCallPreReplication(bool bCall)
+{
+	bCallPreReplication = bCall;
+}
+
+bool AActor::ShouldCallPreReplication() const
+{
+	// The extra conditions here are related to custom property conditions and GatherMovement
+	return bCallPreReplication || bReplicateMovement || (RootComponent && !RootComponent->GetIsReplicated());
+}
+
+void AActor::SetCallPreReplicationForReplay(bool bCall)
+{
+	bCallPreReplicationForReplay = bCall;
+}
+
+bool AActor::ShouldCallPreReplicationForReplay() const
+{
+	// The extra conditions here are related to custom property conditions and GatherMovement
+	return bCallPreReplicationForReplay || bReplicateMovement || (RootComponent && !RootComponent->GetIsReplicated());
 }
 
 void AActor::TearOff()
