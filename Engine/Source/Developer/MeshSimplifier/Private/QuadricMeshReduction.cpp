@@ -167,7 +167,7 @@ public:
 					}
 					else
 					{
-						NewVert.TexCoords[UVIndex] = FVector2D::ZeroVector;
+						NewVert.TexCoords[UVIndex] = FVector2f::ZeroVector;
 					}
 				}
 
@@ -272,7 +272,7 @@ public:
 						float YMin = FLT_MAX;
 						for (const TVertSimp< NumTexCoords >& SimpVert : Verts)
 						{
-							const FVector2D& UVs = SimpVert.TexCoords[TexCoordId];
+							const FVector2f& UVs = SimpVert.TexCoords[TexCoordId];
 							XMax = FMath::Max(XMax, UVs.X);
 							XMin = FMath::Min(XMin, UVs.X);
 
