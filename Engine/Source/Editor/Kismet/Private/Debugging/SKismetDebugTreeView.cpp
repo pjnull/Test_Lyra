@@ -1833,10 +1833,11 @@ TSharedPtr<FPropertyInstanceInfo> FWatchLineItem::GetWatchedPropertyDebugInfo(co
 	{
 		if (ThisDebugInfo.IsValid())
 		{
+			const FString ChildNameStr = ChildName.ToString();
 			TSharedPtr<FPropertyInstanceInfo>* FoundChild = ThisDebugInfo->Children.FindByPredicate(
-				[&ChildName](const TSharedPtr<FPropertyInstanceInfo>& Child)
+				[&ChildNameStr](const TSharedPtr<FPropertyInstanceInfo>& Child)
 				{
-					return Child->Property->GetFName() == ChildName;
+					return Child->Property->GetAuthoredName() == ChildNameStr;
 				}
 			);
 
@@ -1956,7 +1957,7 @@ UEdGraphPin* FWatchChildLineItem::BuildPathToProperty(TArray<FName>& OutPathToPr
 {
 	UEdGraphPin* PinToWatch = nullptr;
 	OutPathToProperty.Reset();
-	OutPathToProperty.Emplace(Data->Property->GetFName());
+	OutPathToProperty.Emplace(Data->Property->GetAuthoredName());
 	FDebugTreeItemPtr Parent = ParentTreeItem.Pin();
 	while (Parent.IsValid())
 	{
@@ -1972,7 +1973,7 @@ UEdGraphPin* FWatchChildLineItem::BuildPathToProperty(TArray<FName>& OutPathToPr
 		{
 			// This is a FWatchChildLineItem
 			TSharedPtr<FWatchChildLineItem> ParentAsChild = StaticCastSharedPtr<FWatchChildLineItem>(Parent);
-			OutPathToProperty.Emplace(ParentAsChild->Data->Property->GetFName());
+			OutPathToProperty.Emplace(ParentAsChild->Data->Property->GetAuthoredName());
 			Parent = ParentAsChild->ParentTreeItem.Pin();
 		}
 		else
