@@ -1606,6 +1606,25 @@ FText FWatchLineItem::GetDescription() const
 
 TSharedRef<SWidget> FWatchLineItem::GenerateNameWidget(TSharedPtr<FString> InSearchString)
 {
+	FText NodeName = LOCTEXT("UnknownNode", "[Unknown]");
+	FText GraphName = LOCTEXT("UnknownGraph", "[Unknown]");
+	if (const UEdGraphPin* Pin = ObjectRef.Get())
+	{
+		if (const UEdGraphNode* Node = Pin->GetOwningNode())
+		{
+			NodeName = FText::FromString(Node->GetName());
+			if (const UEdGraph* Graph = Node->GetGraph())
+			{
+				GraphName = FText::FromString(Graph->GetName());
+			}
+		}
+	}
+
+	const FText ToolTipText = FText::FormatNamed(LOCTEXT("NavWatchLoc", "Navigate to the watch location\nGraph: {GraphName}\nNode: {NodeName}"),
+		TEXT("GraphName"), GraphName,
+		TEXT("NodeName"), NodeName
+	);
+
 	return SNew(PropertyInfoViewStyle::STextHighlightOverlay)
 		.FullText(this, &FWatchLineItem::GetDisplayName)
 		.HighlightText(this, &FWatchLineItem::GetHighlightText, InSearchString)
@@ -1614,7 +1633,7 @@ TSharedRef<SWidget> FWatchLineItem::GenerateNameWidget(TSharedPtr<FString> InSea
 				.Style(FEditorStyle::Get(), "HoverOnlyHyperlink")
 				.OnNavigate(this, &FWatchLineItem::OnNavigateToWatchLocation)
 				.Text(this, &FWatchLineItem::GetDisplayName)
-				.ToolTipText(LOCTEXT("NavWatchLoc", "Navigate to the watch location"))
+				.ToolTipText(ToolTipText)
 		];
 }
 
