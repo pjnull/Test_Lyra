@@ -1705,8 +1705,9 @@ namespace UnrealBuildTool
 			if (!bIsCookedCooker)
 			{
 				bBuildAdditionalConsoleApp = false;
-				GlobalDefinitions.Add("ASSETREGISTRY_ENABLE_PREMADE_REGISTRY_IN_EDITOR=1");
 			}
+
+			GlobalDefinitions.Add("ASSETREGISTRY_ENABLE_PREMADE_REGISTRY_IN_EDITOR=1");
 			bUseLoggingInShipping = true;
 
 			GlobalDefinitions.Add("UE_IS_COOKED_EDITOR=1");

@@ -8525,10 +8525,13 @@ bool UCookOnTheFlyServer::GetAllPackageFilenamesFromAssetRegistry( const FString
 
 		for (const TPair<FName, const FAssetData*>& RegistryData : RegistryDataMap)
 		{
-			int32 AddedIndex = Packages.Add(RegistryData.Value);
-			if (GetPackageNameCache().ContainsPackageName(Packages.Last()->PackageName))
+			if (!FPackageName::GetPackageMountPoint(RegistryData.Value->PackageName.ToString()).IsNone())
 			{
-				OutPackageFilenames[AddedIndex] = GetPackageNameCache().GetCachedStandardFileName(Packages.Last()->PackageName);
+				int32 AddedIndex = Packages.Add(RegistryData.Value);
+				if (GetPackageNameCache().ContainsPackageName(Packages.Last()->PackageName))
+				{
+					OutPackageFilenames[AddedIndex] = GetPackageNameCache().GetCachedStandardFileName(Packages.Last()->PackageName);
+				}
 			}
 		}
 
