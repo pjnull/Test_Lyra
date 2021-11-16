@@ -134,18 +134,21 @@ bool UEdMode::ShouldToolStartBeAllowed(const FString& ToolIdentifier) const
 
 void UEdMode::Exit()
 {
-	Owner->OnEditorModeIDChanged().RemoveAll(this);
-
 	if (SettingsObject)
 	{
 		SettingsObject->SaveConfig();
 	}
 
-	// Shutdown the Mode-scope ToolsContext, and notify the EditorToolsContext so it can release the reference it holds.
-	// Do this before shutting down the Toolkit as if a Mode-scope Tool is still active it will need to clean up
-	if (UObjectInitialized() && ModeToolsContext != nullptr)
+	if (UObjectInitialized())
 	{
-		ModeToolsContext->ShutdownContext();
+		Owner->OnEditorModeIDChanged().RemoveAll(this);
+
+		// Shutdown the Mode-scope ToolsContext, and notify the EditorToolsContext so it can release the reference it holds.
+		// Do this before shutting down the Toolkit as if a Mode-scope Tool is still active it will need to clean up
+		if (ModeToolsContext != nullptr)
+		{
+			ModeToolsContext->ShutdownContext();
+		}
 	}
 
 	if (Toolkit.IsValid())

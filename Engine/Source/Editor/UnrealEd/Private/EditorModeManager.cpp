@@ -1726,6 +1726,7 @@ float FEditorModeTools::GetWidgetScale() const
 void FEditorModeTools::AddReferencedObjects( FReferenceCollector& Collector )
 {
 	Collector.AddReferencedObjects(ActiveScriptableModes);
+	Collector.AddReferencedObjects(PendingDeactivateModes);
 	Collector.AddReferencedObjects(RecycledScriptableModes);
 	Collector.AddReferencedObject(InteractiveToolsContext);
 }

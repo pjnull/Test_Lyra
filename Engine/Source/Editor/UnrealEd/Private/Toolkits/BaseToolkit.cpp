@@ -184,22 +184,24 @@ void FModeToolkit::Init(const TSharedPtr< class IToolkitHost >& InitToolkitHost,
 
 FModeToolkit::~FModeToolkit()
 {
-	GetEditorModeManager().OnEditorModeIDChanged().RemoveAll(this);
-
-	if (IsHosted() && OwningEditorMode.IsValid())
+	if (IsHosted())
 	{
-		UInteractiveToolManager* EditorToolManager = OwningEditorMode->GetToolManager(EToolsContextScope::Editor);
-		if (EditorToolManager)
+		GetEditorModeManager().OnEditorModeIDChanged().RemoveAll(this);
+		if (OwningEditorMode.IsValid())
 		{
-			EditorToolManager->OnToolStarted.RemoveAll(this);
-			EditorToolManager->OnToolEnded.RemoveAll(this);
-		}
+			UInteractiveToolManager* EditorToolManager = OwningEditorMode->GetToolManager(EToolsContextScope::Editor);
+			if (EditorToolManager)
+			{
+				EditorToolManager->OnToolStarted.RemoveAll(this);
+				EditorToolManager->OnToolEnded.RemoveAll(this);
+			}
 
-		UInteractiveToolManager* ModeToolManager = OwningEditorMode->GetToolManager(EToolsContextScope::EdMode);
-		if (ModeToolManager)
-		{
-			ModeToolManager->OnToolStarted.RemoveAll(this);
-			ModeToolManager->OnToolEnded.RemoveAll(this);
+			UInteractiveToolManager* ModeToolManager = OwningEditorMode->GetToolManager(EToolsContextScope::EdMode);
+			if (ModeToolManager)
+			{
+				ModeToolManager->OnToolStarted.RemoveAll(this);
+				ModeToolManager->OnToolEnded.RemoveAll(this);
+			}
 		}
 	}
 	if (ModeToolBarContainer)
