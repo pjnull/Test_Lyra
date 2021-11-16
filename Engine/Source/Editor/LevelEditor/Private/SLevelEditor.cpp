@@ -34,6 +34,7 @@
 #include "SceneOutlinerModule.h"
 #include "Editor/Layers/Public/LayersModule.h"
 #include "Editor/WorldBrowser/Public/WorldBrowserModule.h"
+#include "Editor/WorldPartitionEditor/Public/WorldPartitionEditorModule.h"
 #include "Editor/DataLayerEditor/Public/DataLayerEditorModule.h"
 #include "WorldPartition/WorldPartitionSubsystem.h"
 #include "Toolkits/ToolkitManager.h"
@@ -76,6 +77,8 @@ static const FName LevelEditorModuleName("LevelEditor");
 static const FName WorldBrowserHierarchyTab("WorldBrowserHierarchy");
 static const FName WorldBrowserDetailsTab("WorldBrowserDetails");
 static const FName WorldBrowserCompositionTab("WorldBrowserComposition");
+static const FName WorldPartitionEditorTab("WorldBrowserPartitionEditor");
+
 
 SLevelEditor::SLevelEditor()
 	: World(nullptr)
@@ -838,6 +841,15 @@ TSharedRef<SDockTab> SLevelEditor::SpawnLevelEditorTab( const FSpawnTabArgs& Arg
 				WorldBrowserModule.CreateWorldBrowserComposition()
 			];
 	}
+	else if( TabIdentifier == LevelEditorTabIds::WorldBrowserPartitionEditor )
+	{
+		FWorldPartitionEditorModule& WorldPartitionEditorModule = FModuleManager::LoadModuleChecked<FWorldPartitionEditorModule>( "WorldPartitionEditor" );
+		return SNew( SDockTab )
+			.Label( NSLOCTEXT("LevelEditor", "WorldBrowserPartitionTabTitle", "World Partition") )
+			[
+				WorldPartitionEditorModule.CreateWorldPartitionEditor()
+			];
+	}
 	else if (TabIdentifier == LevelEditorTabIds::LevelEditorDataLayerBrowser)
 	{
 		FDataLayerEditorModule& DataLayerEditorModule = FModuleManager::LoadModuleChecked<FDataLayerEditorModule>( "DataLayerEditor" );
@@ -1213,7 +1225,12 @@ TSharedRef<SWidget> SLevelEditor::RestoreContentArea( const TSharedRef<SDockTab>
 				.SetGroup(MenuStructure.GetLevelEditorWorldPartitionCategory())
 				.SetIcon(DataLayersIcon);
 
-
+			const FSlateIcon WorldPartitionIcon(FEditorStyle::GetStyleSetName(), "LevelEditor.Tabs.WorldPartition");
+			LevelEditorTabManager->RegisterTabSpawner(WorldPartitionEditorTab, FOnSpawnTab::CreateSP<SLevelEditor, FName, FString>(this, &SLevelEditor::SpawnLevelEditorTab, LevelEditorTabIds::WorldBrowserPartitionEditor, FString()))
+				.SetDisplayName(NSLOCTEXT("LevelEditorTabs", "WorldPartitionEditor", "World Partition Editor"))
+				.SetTooltipText(NSLOCTEXT("LevelEditorTabs", "WorldPartitionEditorTooltipText", "Open the World Partition Editor."))
+				.SetGroup(MenuStructure.GetLevelEditorWorldPartitionCategory())
+				.SetIcon(WorldPartitionIcon);
 		}
 
 		{
@@ -1397,7 +1414,7 @@ TSharedRef<SWidget> SLevelEditor::RestoreContentArea( const TSharedRef<SDockTab>
 				)
 			)
 		));
-	const EOutputCanBeNullptr OutputCanBeNullptr = EOutputCanBeNullptr::IfNoOpenTabValid;
+	const EOutputCanBeNullptr OutputCanBeNullptr = EOutputCanBeNullptr::IfNoTabValid;
 	TArray<FString> RemovedOlderLayoutVersions;
 	const TSharedRef<FTabManager::FLayout> Layout = FLayoutSaveRestore::LoadFromConfig(GEditorLayoutIni,
 		DefaultLayout, OutputCanBeNullptr, RemovedOlderLayoutVersions);
