@@ -490,7 +490,7 @@ void FAbcFile::CleanupFrameData(const int32 ReadIndex)
 
 void FAbcFile::ProcessFrames(TFunctionRef<void(int32, FAbcFile*)> InCallback, const EFrameReadFlags InFlags)
 {
-	const int32 NumWorkerThreads = FMath::Min(FTaskGraphInterface::Get().GetNumWorkerThreads(), MaxNumberOfResidentSamples);
+	const int32 NumWorkerThreads = FMath::Clamp(FTaskGraphInterface::Get().GetNumWorkerThreads(), 1, MaxNumberOfResidentSamples);
 	const bool bSingleThreaded = ImportSettings->NumThreads == 1 ||
 								 EnumHasAnyFlags(InFlags, EFrameReadFlags::ForceSingleThreaded) || !FApp::ShouldUseThreadingForPerformance();
 

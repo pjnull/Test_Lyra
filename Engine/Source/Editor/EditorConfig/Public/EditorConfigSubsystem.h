@@ -88,7 +88,7 @@ private:
 		float TimeSinceQueued { 0 };
 	};
 
-	FRWLock SaveLock;
+	FCriticalSection SaveLock;
 	TArray<FPendingSave> PendingSaves;
 	TArray<FString> SearchDirectories;
 	TMap<FString, TSharedPtr<FEditorConfig>> LoadedConfigs;

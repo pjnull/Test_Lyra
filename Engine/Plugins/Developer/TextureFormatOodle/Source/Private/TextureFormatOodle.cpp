@@ -1355,7 +1355,7 @@ static void TFO_Plugins_Init()
 	else
 	{
 		OodleJobifyUserPointer = nullptr;
-		OodleJobifyNumThreads = FTaskGraphInterface::Get().GetNumWorkerThreads();
+		OodleJobifyNumThreads = FMath::Max(1, FTaskGraphInterface::Get().GetNumWorkerThreads());
 	}
 }
 

@@ -37,11 +37,15 @@ void UEditorConfigSubsystem::Deinitialize()
 
 void UEditorConfigSubsystem::Tick(float DeltaTime)
 {
-	SaveLock.WriteLock();
-	ON_SCOPE_EXIT { SaveLock.WriteUnlock(); };
+	SaveLock.Lock();
+	ON_SCOPE_EXIT { SaveLock.Unlock(); };
 
-	for (FPendingSave& Save : PendingSaves)
+	// Allows PendingSaves to be modified while iterating as
+	// the Async below might execute the task immediately
+	// when running in -nothreading mode.
+	for (int Index = 0; Index < PendingSaves.Num(); ++Index)
 	{
+		FPendingSave& Save = PendingSaves[Index];
 		Save.TimeSinceQueued += DeltaTime;
 
 		const float SaveDelaySeconds = 3.0f;
@@ -224,8 +228,8 @@ void UEditorConfigSubsystem::SaveConfig(TSharedRef<FEditorConfig> Config)
 		return;
 	}
 
-	SaveLock.WriteLock();
-	ON_SCOPE_EXIT { SaveLock.WriteUnlock(); };
+	SaveLock.Lock();
+	ON_SCOPE_EXIT{ SaveLock.Unlock(); };
 
 	FPendingSave* Existing = PendingSaves.FindByPredicate([Config](const FPendingSave& Element)
 		{
@@ -251,8 +255,8 @@ void UEditorConfigSubsystem::SaveConfig(TSharedRef<FEditorConfig> Config)
 
 void UEditorConfigSubsystem::OnSaveCompleted(TSharedPtr<FEditorConfig> Config)
 {
-	SaveLock.WriteLock();
-	ON_SCOPE_EXIT { SaveLock.WriteUnlock(); };
+	SaveLock.Lock();
+	ON_SCOPE_EXIT{ SaveLock.Unlock(); };
 
 	const int32 Index = PendingSaves.IndexOfByPredicate([Config](const FPendingSave& Element)
 		{

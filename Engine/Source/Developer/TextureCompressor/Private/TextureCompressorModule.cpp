@@ -318,7 +318,7 @@ static FVector4 ComputeAlphaCoverage(const FVector4& Thresholds, const FVector4&
 {
 	FVector4 Coverage(0, 0, 0, 0);
 
-	int32 NumJobs = FTaskGraphInterface::Get().GetNumWorkerThreads();
+	int32 NumJobs = FMath::Max(1, FTaskGraphInterface::Get().GetNumWorkerThreads());
 	int32 NumRowsEachJob = SourceImageData.SizeY / NumJobs;
 	if (NumRowsEachJob * NumJobs < SourceImageData.SizeY)
 	{
@@ -1606,7 +1606,7 @@ void ITextureCompressorModule::AdjustImageColors(FImage& Image, const FTextureBu
 		const int32 NumPixels = Image.SizeX * Image.SizeY * Image.NumSlices;
 		TArrayView64<FLinearColor> ImageColors = Image.AsRGBA32F();
 
-		int32 NumJobs = FTaskGraphInterface::Get().GetNumWorkerThreads();
+		int32 NumJobs = FMath::Max(1, FTaskGraphInterface::Get().GetNumWorkerThreads());
 		int32 NumPixelsEachJob = NumPixels / NumJobs;
 		if (NumPixelsEachJob * NumJobs < NumPixels)
 		{
