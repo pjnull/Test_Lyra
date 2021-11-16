@@ -139,7 +139,10 @@ void FWorldPartitionEditorModule::ShutdownModule()
 			LevelEditorModule->OnRegisterTabs().RemoveAll(this);
 			LevelEditorModule->OnRegisterLayoutExtensions().RemoveAll(this);
 
-			LevelEditorModule->GetLevelEditorTabManager()->UnregisterTabSpawner(WorldPartitionEditorTabId);
+			if (LevelEditorModule->GetLevelEditorTabManager())
+			{
+				LevelEditorModule->GetLevelEditorTabManager()->UnregisterTabSpawner(WorldPartitionEditorTabId);
+			}
 
 		}
 
@@ -326,7 +329,7 @@ void FWorldPartitionEditorModule::OnMapChanged(uint32 MapFlags)
 		{
 			FLevelEditorModule* LevelEditorModule = FModuleManager::Get().GetModulePtr<FLevelEditorModule>("LevelEditor");
 
-			if(LevelEditorModule && !WorldPartitionTab.IsValid())
+			if(LevelEditorModule && LevelEditorModule->GetLevelEditorTabManager() && !WorldPartitionTab.IsValid())
 			{
 				WorldPartitionTab = LevelEditorModule->GetLevelEditorTabManager()->TryInvokeTab(WorldPartitionEditorTabId, true);
 			}
