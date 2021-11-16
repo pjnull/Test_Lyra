@@ -5360,7 +5360,8 @@ static bool IsPropertyActive_Internal(EMaterialProperty InProperty,
 	ETranslucencyLightingMode TranslucencyLightingMode,
 	bool bBlendableOutputAlpha,
 	bool bHasRefraction,
-	bool bUsesShadingModelFromMaterialExpression)
+	bool bUsesShadingModelFromMaterialExpression,
+	bool bIsTranslucencyWritingVelocity)
 {
 	if (Domain == MD_PostProcess)
 	{
@@ -5511,7 +5512,7 @@ static bool IsPropertyActive_Internal(EMaterialProperty InProperty,
 		Active = true;
 		break;
 	case MP_PixelDepthOffset:
-		Active = !bIsTranslucentBlendMode;
+		Active = (!bIsTranslucentBlendMode) || (bIsTranslucencyWritingVelocity);
 		break;
 	case MP_ShadingModel:
 		Active = bUsesShadingModelFromMaterialExpression;
@@ -5548,7 +5549,8 @@ bool UMaterial::IsPropertyActiveInEditor(EMaterialProperty InProperty) const
 		TranslucencyLightingMode,
 		BlendableOutputAlpha,
 		Refraction.IsConnected(),
-		IsShadingModelFromMaterialExpression());
+		IsShadingModelFromMaterialExpression(),
+		IsTranslucencyWritingVelocity());
 }
 #endif // WITH_EDITOR
 
@@ -5561,7 +5563,8 @@ bool UMaterial::IsPropertyActiveInDerived(EMaterialProperty InProperty, const UM
 		TranslucencyLightingMode,
 		BlendableOutputAlpha,
 		Refraction.IsConnected(),
-		DerivedMaterial->IsShadingModelFromMaterialExpression());
+		DerivedMaterial->IsShadingModelFromMaterialExpression(),
+		IsTranslucencyWritingVelocity());
 }
 
 #if WITH_EDITORONLY_DATA
