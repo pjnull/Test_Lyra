@@ -362,6 +362,7 @@ void UBakeMeshAttributeVertexTool::Setup()
 	auto NotEqualsCallback = [](const decltype(MultiTextureSettings->MaterialIDSourceTextures)& A, const decltype(MultiTextureSettings->MaterialIDSourceTextures)& B) -> bool { return A != B; };
 	MultiTextureSettings->WatchProperty(MultiTextureSettings->MaterialIDSourceTextures, SetDirtyCallback, NotEqualsCallback);
 	MultiTextureSettings->WatchProperty(MultiTextureSettings->UVLayer, [this](float) { OpState |= EBakeOpState::Evaluate; });
+	UpdateMultiTextureMaterialIDs(DetailTarget, MultiTextureSettings->AllSourceTextures, MultiTextureSettings->MaterialIDSourceTextures);
 
 	UpdateOnModeChange();
 
@@ -520,7 +521,6 @@ void UBakeMeshAttributeVertexTool::UpdateOnModeChange()
 				SetToolPropertySourceEnabled(TextureSettings, true);
 				break;
 			case EBakeMapType::MultiTexture:
-				UpdateMultiTextureMaterialIDs(Targets[bIsBakeToSelf ? 0 : 1], MultiTextureSettings->AllSourceTextures, MultiTextureSettings->MaterialIDSourceTextures);
 				SetToolPropertySourceEnabled(MultiTextureSettings, true);
 				break;
 			default:
