@@ -61,6 +61,9 @@ public:
 	/** Flips the viewport along the specified axis */
 	void FlipViewport(bool bFlipHorizontal, bool bFlipVertical);
 
+	/** Resets the viewport's transform */
+	void ResetTransform();
+
 	/** Gets the preview texture that has been created for the viewport from the display cluster root actor */
 	UTexture* GetPreviewTexture() const;
 

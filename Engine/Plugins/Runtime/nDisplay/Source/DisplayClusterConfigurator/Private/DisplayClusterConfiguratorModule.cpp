@@ -7,6 +7,7 @@
 #include "DisplayClusterConfiguratorVersionUtils.h"
 #include "Settings/DisplayClusterConfiguratorSettings.h"
 #include "Views/Details/DisplayClusterRootActorDetailsCustomization.h"
+#include "Views/OutputMapping/DisplayClusterConfiguratorOutputMappingCommands.h"
 
 #include "Views/Details/DisplayClusterConfiguratorBaseTypeCustomization.h"
 #include "Views/Details/DisplayClusterEditorPropertyReferenceTypeCustomization.h"
@@ -84,7 +85,10 @@ void FDisplayClusterConfiguratorModule::StartupModule()
 	RegisterSettings();
 	
 	FDisplayClusterConfiguratorStyle::Initialize();
+
 	FDisplayClusterConfiguratorCommands::Register();
+	FDisplayClusterConfiguratorOutputMappingCommands::Register();
+
 	MenuExtensibilityManager = MakeShareable(new FExtensibilityManager);
 	ToolBarExtensibilityManager = MakeShareable(new FExtensibilityManager);
 

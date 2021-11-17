@@ -205,6 +205,19 @@ void UDisplayClusterConfiguratorViewportNode::FlipViewport(bool bFlipHorizontal,
 	ViewportVM->SetRemap(NewRemap);
 }
 
+void UDisplayClusterConfiguratorViewportNode::ResetTransform()
+{
+	UDisplayClusterConfigurationViewport* CfgViewport = GetObjectChecked<UDisplayClusterConfigurationViewport>();
+
+	FDisplayClusterConfigurationViewport_RemapData NewRemap(CfgViewport->ViewportRemap.BaseRemap);
+
+	NewRemap.Angle = 0.0f;
+	NewRemap.bFlipH = false;
+	NewRemap.bFlipV = false;
+
+	ViewportVM->SetRemap(NewRemap);
+}
+
 UTexture* UDisplayClusterConfiguratorViewportNode::GetPreviewTexture() const
 {
 	TSharedPtr<FDisplayClusterConfiguratorBlueprintEditor> Toolkit = ToolkitPtr.Pin();
