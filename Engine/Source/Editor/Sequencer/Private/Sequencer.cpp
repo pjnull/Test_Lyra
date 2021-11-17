@@ -2376,86 +2376,93 @@ void FSequencer::BakeTransform()
 		FGuid Guid = BakeData.Key;
 
 		// Disable or delete any attach tracks
-		// cbb: this only operates on a single attach section.
 		AActor* AttachParentActor = nullptr;
-		UMovieScene3DAttachTrack* AttachTrack = Cast<UMovieScene3DAttachTrack>(FocusedMovieScene->FindTrack(UMovieScene3DAttachTrack::StaticClass(), Guid));
-		if (AttachTrack)
+		for (UMovieSceneTrack* Track : FocusedMovieScene->FindTracks(UMovieScene3DAttachTrack::StaticClass(), Guid))
 		{
-			for (auto AttachSection : AttachTrack->GetAllSections())
-			{
-				FMovieSceneObjectBindingID ConstraintBindingID = (Cast<UMovieScene3DAttachSection>(AttachSection))->GetConstraintBindingID();
-				for (auto ParentObject : ConstraintBindingID.ResolveBoundObjects(GetFocusedTemplateID(), *this))
-				{
-					AttachParentActor = Cast<AActor>(ParentObject.Get());
-					break;
-				}
-			}
-
-			if (bDisableSectionsAfterBaking)
+			if (UMovieScene3DAttachTrack* AttachTrack = Cast<UMovieScene3DAttachTrack>(Track))
 			{
 				for (auto AttachSection : AttachTrack->GetAllSections())
 				{
-					AttachSection->Modify();
-					AttachSection->SetIsActive(false);
+					FMovieSceneObjectBindingID ConstraintBindingID = (Cast<UMovieScene3DAttachSection>(AttachSection))->GetConstraintBindingID();
+					for (auto ParentObject : ConstraintBindingID.ResolveBoundObjects(GetFocusedTemplateID(), *this))
+					{
+						AttachParentActor = Cast<AActor>(ParentObject.Get());
+						break;
+					}
 				}
-			}
-			else
-			{
-				FocusedMovieScene->RemoveTrack(*AttachTrack);
+
+				if (bDisableSectionsAfterBaking)
+				{
+					for (auto AttachSection : AttachTrack->GetAllSections())
+					{
+						AttachSection->Modify();
+						AttachSection->SetIsActive(false);
+					}
+				}
+				else
+				{
+					FocusedMovieScene->RemoveTrack(*AttachTrack);
+				}
 			}
 		}
 
 		// Disable or delete any transform tracks
-		UMovieScene3DTransformTrack* TransformTrack = Cast<UMovieScene3DTransformTrack>(FocusedMovieScene->FindTrack(UMovieScene3DTransformTrack::StaticClass(), Guid, "Transform"));
-		if (TransformTrack)
+		for (UMovieSceneTrack* Track : FocusedMovieScene->FindTracks(UMovieScene3DTransformTrack::StaticClass(), Guid))
 		{
-			if (bDisableSectionsAfterBaking)
+			if (UMovieScene3DTransformTrack* TransformTrack = Cast<UMovieScene3DTransformTrack>(Track))
 			{
-				for (auto TransformSection : TransformTrack->GetAllSections())
+				if (bDisableSectionsAfterBaking)
 				{
-					TransformSection->Modify();
-					TransformSection->SetIsActive(false);
+					for (auto TransformSection : TransformTrack->GetAllSections())
+					{
+						TransformSection->Modify();
+						TransformSection->SetIsActive(false);
+					}
 				}
-			}
-			else
-			{
-				FocusedMovieScene->RemoveTrack(*TransformTrack);
+				else
+				{
+					FocusedMovieScene->RemoveTrack(*TransformTrack);
+				}
 			}
 		}
 
 		// Disable or delete any camera anim tracks
-		UMovieSceneCameraAnimTrack* CameraAnimTrack = Cast<UMovieSceneCameraAnimTrack>(FocusedMovieScene->FindTrack(UMovieSceneCameraAnimTrack::StaticClass(), Guid));
-		if (CameraAnimTrack)
+		for (UMovieSceneTrack* Track : FocusedMovieScene->FindTracks(UMovieSceneCameraAnimTrack::StaticClass(), Guid))
 		{
-			if (bDisableSectionsAfterBaking)
+			if (UMovieSceneCameraAnimTrack* CameraAnimTrack = Cast<UMovieSceneCameraAnimTrack>(Track))
 			{
-				for (auto CameraAnimSection : CameraAnimTrack->GetAllSections())
+				if (bDisableSectionsAfterBaking)
 				{
-					CameraAnimSection->Modify();
-					CameraAnimSection->SetIsActive(false);
+					for (auto CameraAnimSection : CameraAnimTrack->GetAllSections())
+					{
+						CameraAnimSection->Modify();
+						CameraAnimSection->SetIsActive(false);
+					}
 				}
-			}
-			else
-			{
-				FocusedMovieScene->RemoveTrack(*CameraAnimTrack);
+				else
+				{
+					FocusedMovieScene->RemoveTrack(*CameraAnimTrack);
+				}
 			}
 		}
 
 		// Disable or delete any camera shake tracks
-		UMovieSceneCameraShakeTrack* CameraShakeTrack = Cast<UMovieSceneCameraShakeTrack>(FocusedMovieScene->FindTrack(UMovieSceneCameraShakeTrack::StaticClass(), Guid));
-		if (CameraShakeTrack)
+		for (UMovieSceneTrack* Track : FocusedMovieScene->FindTracks(UMovieSceneCameraShakeTrack::StaticClass(), Guid))
 		{
-			if (bDisableSectionsAfterBaking)
+			if (UMovieSceneCameraShakeTrack* CameraShakeTrack = Cast<UMovieSceneCameraShakeTrack>(Track))
 			{
-				for (auto CameraShakeSection : CameraShakeTrack->GetAllSections())
+				if (bDisableSectionsAfterBaking)
 				{
-					CameraShakeSection->Modify();
-					CameraShakeSection->SetIsActive(false);
+					for (auto CameraShakeSection : CameraShakeTrack->GetAllSections())
+					{
+						CameraShakeSection->Modify();
+						CameraShakeSection->SetIsActive(false);
+					}
 				}
-			}
-			else
-			{
-				FocusedMovieScene->RemoveTrack(*CameraShakeTrack);
+				else
+				{
+					FocusedMovieScene->RemoveTrack(*CameraShakeTrack);
+				}
 			}
 		}
 
@@ -2492,7 +2499,7 @@ void FSequencer::BakeTransform()
 		}
 			
 		// Create new transform track and section
-		TransformTrack = Cast<UMovieScene3DTransformTrack>(FocusedMovieScene->AddTrack(UMovieScene3DTransformTrack::StaticClass(), Guid));
+		UMovieScene3DTransformTrack* TransformTrack = Cast<UMovieScene3DTransformTrack>(FocusedMovieScene->AddTrack(UMovieScene3DTransformTrack::StaticClass(), Guid));
 
 		if (TransformTrack)
 		{
