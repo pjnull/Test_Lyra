@@ -214,6 +214,11 @@ float3 StrataForwardLighting(
 #endif
 #endif // FORWARD_PER_PIXEL_SHADING
 
+	uint GridIndex = 0;
+#if FEATURE_LEVEL >= FEATURE_LEVEL_SM5
+	GridIndex = ComputeLightGridCellIndex((uint2)((MaterialParameters.SvPosition.xy - ResolvedView.ViewRectMin.xy) * View.LightProbeSizeRatioAndInvSizeRatio.zw), MaterialParameters.SvPosition.w, EyeIndex);
+#endif
+
 	UNROLL
 	for (int l = 0; l < StrataData.LayerCount; ++l)
 	{
@@ -258,7 +263,6 @@ float3 StrataForwardLighting(
 			//// Evaluate environment lighting
 			////
 
-			const float3 SkyLightCommonFactor = BSDFColoredVisibility * ResolvedView.SkyLightColor.rgb;
 			if (UseBasePassSkylight > 0)
 			{
 				// Compute the bent normal from the BSDF normal
@@ -281,6 +285,8 @@ float3 StrataForwardLighting(
 				float3 DiffuseNormal = StrataEnvLight.DiffuseNormal;
 				float3 DiffuseColorForIndirect = StrataEnvLight.DiffuseWeight;
 				float3 SubsurfaceColorForIndirect = StrataEnvLight.DiffuseBackFaceWeight;
+				float IndirectOcclusion = 1.0f;
+				float IndirectIrradiance = 0.0f; 
 
 				// Evaluate diffuse lighting
 				if (any((DiffuseColorForIndirect + SubsurfaceColorForIndirect) > 0.0f))
@@ -289,7 +295,6 @@ float3 StrataForwardLighting(
 
 					float3 DiffuseIndirectLighting = 0.0f;
 					float3 SubsurfaceIndirectLighting = 0.0f;
-					float IndirectIrradiance = 0.0f;
 					GetPrecomputedIndirectLightingAndSkyLight(
 						MaterialParameters,
 						Interpolants,
@@ -302,7 +307,6 @@ float3 StrataForwardLighting(
 						SubsurfaceIndirectLighting,
 						IndirectIrradiance);
 
-					float IndirectOcclusion = 1.0f;
 				#if FORWARD_SHADING && (MATERIALBLENDING_SOLID || MATERIALBLENDING_MASKED)
 					NearestResolvedDepthScreenUV = CalculateNearestResolvedDepthScreenUV(ScreenUV, MaterialParameters.ScreenPosition.w);
 
@@ -312,7 +316,8 @@ float3 StrataForwardLighting(
 					IndirectIrradiance *= IndirectOcclusion;
 				#endif
 
-					Color += (DiffuseIndirectLighting * DiffuseColorForIndirect + SubsurfaceIndirectLighting * SubsurfaceColorForIndirect) * SkyLightCommonFactor * AOMultiBounce(StrataEnvLight.DiffuseColor, DiffOcclusion);
+					Color += (DiffuseIndirectLighting * DiffuseColorForIndirect + SubsurfaceIndirectLighting * SubsurfaceColorForIndirect) * 
+						BSDFColoredVisibility * AOMultiBounce(StrataEnvLight.DiffuseColor, DiffOcclusion);
 				}
 
 			#if FORWARD_PER_PIXEL_SHADING || TRANSLUCENCY_LIGHTING_SURFACE_LIGHTINGVOLUME
@@ -322,16 +327,16 @@ float3 StrataForwardLighting(
 				// Evaluate specular lighting
 				if (any(StrataEnvLight.SpecularWeight > 0.0f))
 				{
-					float SkyAverageBrightness = 1.0f;
-					Color += GetSkyLightReflection(StrataEnvLight.SpecularDirection, StrataEnvLight.SpecularSafeRoughness, SkyAverageBrightness) * StrataEnvLight.SpecularWeight * SkyLightCommonFactor * AOMultiBounce(StrataEnvLight.SpecularColor, SpecOcclusion);
-					// STRATA_TODO extend this to futher reflections instead of only the sky (see half3 ReflectionColor = GetImageBasedReflectionLighting in basepass pixe lshader, also using IndirectOcclusion)
+					int SingleCaptureIndex = GetPrimitiveData(MaterialParameters).SingleCaptureIndex;
+					Color += GetImageBasedReflectionSpecular(MaterialParameters, StrataEnvLight.SpecularDirection, Roughness, IndirectIrradiance, GridIndex, SingleCaptureIndex, EyeIndex) *
+						 StrataEnvLight.SpecularWeight * IndirectOcclusion * BSDFColoredVisibility * AOMultiBounce(StrataEnvLight.SpecularColor, SpecOcclusion);
 				}
 				// We skip hazy lob evaluation in forward.
 			#endif
 			}
 
 			////
-			//// Evaluate environment lighting
+			//// Evaluate translucent lighting volume / vertex lighting.
 			////
 
 		#if TRANSLUCENCY_PERVERTEX_FORWARD_SHADING || TRANSLUCENCY_LIGHTING_VOLUMETRIC_PERVERTEX_NONDIRECTIONAL || TRANSLUCENCY_LIGHTING_VOLUMETRIC_PERVERTEX_DIRECTIONAL || TRANSLUCENCY_LIGHTING_VOLUMETRIC_NONDIRECTIONAL || TRANSLUCENCY_LIGHTING_VOLUMETRIC_DIRECTIONAL || TRANSLUCENCY_LIGHTING_SURFACE_LIGHTINGVOLUME
@@ -411,7 +416,7 @@ float3 StrataForwardLighting(
 		#elif FORWARD_PER_PIXEL_SHADING
 
 			////
-			//// Evaluate Directional light
+			//// Evaluate Directional light only
 			////
 
 			float3 DirLightL = DirLightData.Direction;	// Already normalized
