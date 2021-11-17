@@ -78,7 +78,7 @@ namespace UE::Zen {
 		curl_easy_reset(Curl);
 
 		// Options that are always set for all connections.
-		curl_easy_setopt(Curl, CURLOPT_CONNECTTIMEOUT_MS, 1000L);
+		curl_easy_setopt(Curl, CURLOPT_CONNECTTIMEOUT, 30L);
 		curl_easy_setopt(Curl, CURLOPT_EXPECT_100_TIMEOUT_MS, 0);
 		curl_easy_setopt(Curl, CURLOPT_NOSIGNAL, 1L);
 		curl_easy_setopt(Curl, CURLOPT_BUFFERSIZE, 256 * 1024L);
