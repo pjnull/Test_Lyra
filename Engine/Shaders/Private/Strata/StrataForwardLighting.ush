@@ -254,18 +254,11 @@ float3 StrataForwardLighting(
 			const bool bForceFullyRough = View.RenderingReflectionCaptureMask > 0;
 			#endif
 
-			//
-			// Evaluate indirect occlusion
-			//
-
-			// STRATA_TODO GetIndirectOcclusion when FORWARD_SHADING && (MATERIALBLENDING_SOLID || MATERIALBLENDING_MASKED)
-			float IndirectOcclusion = 1.0f;
-
 			////
 			//// Evaluate environment lighting
 			////
 
-			const float3 SkyLightCommonFactor = BSDFColoredVisibility * ResolvedView.SkyLightColor.rgb * IndirectOcclusion;
+			const float3 SkyLightCommonFactor = BSDFColoredVisibility * ResolvedView.SkyLightColor.rgb;
 			if (UseBasePassSkylight > 0)
 			{
 				// Compute the bent normal from the BSDF normal
