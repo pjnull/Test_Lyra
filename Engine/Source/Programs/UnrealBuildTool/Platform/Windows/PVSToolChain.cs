@@ -515,14 +515,14 @@ namespace UnrealBuildTool
 					continue;
 				}
 
-				FileItem SourceFileItem = PreprocessAction.SourceFile;
+				FileItem? SourceFileItem = PreprocessAction.SourceFile;
 				if (SourceFileItem == null)
 				{
 					Log.TraceWarning("Unable to find source file from command producing: {0}", String.Join(", ", PreprocessActions[Idx].ProducedItems.Select(x => x.Location.GetFileName())));
 					continue;
 				}
 
-				FileItem PreprocessedFileItem = PreprocessAction.PreprocessedFile;
+				FileItem? PreprocessedFileItem = PreprocessAction.PreprocessedFile;
 				if (PreprocessedFileItem == null)
 				{
 					Log.TraceWarning("Unable to find preprocessed output file from {0}", SourceFileItem.Location.GetFileName());
@@ -629,7 +629,7 @@ namespace UnrealBuildTool
 			List<FileReference> InputFiles = Makefile.OutputItems.Select(x => x.Location).Where(x => x.HasExtension(".pvslog")).ToList();
 
 			// Collect the sourcefile items off of the Compile action added in CompileCPPFiles so that in SingleFileCompile mode the PVSGather step is also not filtered out
-			List<FileItem> CompileSourceFiles = Makefile.Actions.Where(x => x is VCCompileAction).Select(x => (x as VCCompileAction)!.SourceFile).ToList();
+			List<FileItem> CompileSourceFiles = Makefile.Actions.OfType<VCCompileAction>().Select(x => x.SourceFile!).ToList();
 
 			FileItem InputFileListItem = Makefile.CreateIntermediateTextFile(OutputFile.ChangeExtension(".input"), InputFiles.Select(x => x.FullName));
 

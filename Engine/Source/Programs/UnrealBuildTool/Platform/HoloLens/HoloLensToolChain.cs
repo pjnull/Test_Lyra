@@ -246,7 +246,7 @@ namespace UnrealBuildTool
 				Arguments.Add("/MD");
 			}
 
-			DirectoryReference PlatformWinMDLocation = HoloLens.GetCppCXMetadataLocation(EnvVars.Compiler, EnvVars.ToolChainDir);
+			DirectoryReference? PlatformWinMDLocation = HoloLens.GetCppCXMetadataLocation(EnvVars.Compiler, EnvVars.ToolChainDir);
 			if (PlatformWinMDLocation != null)
 			{
 				Arguments.AddFormat(@" /AI""{0}""", PlatformWinMDLocation);
@@ -665,7 +665,7 @@ namespace UnrealBuildTool
 					FileArguments.AddFormat(" /analyze:log \"{0}\"", AnalysisLogFile.AbsolutePath);
 					// Suppress code analysis output
 					FileArguments.Add(" /analyze:quiet");
-					string rulesetFile = Target.HoloLensPlatform.NativeCodeAnalysisRuleset;
+					string? rulesetFile = Target.HoloLensPlatform.NativeCodeAnalysisRuleset;
 					if (!String.IsNullOrEmpty(rulesetFile))
 					{
 						if (!Path.IsPathRooted(rulesetFile))
