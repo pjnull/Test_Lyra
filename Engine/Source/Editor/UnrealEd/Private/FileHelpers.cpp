@@ -856,7 +856,7 @@ static bool SaveWorld(UWorld* World,
 				// If we don't have a DuplicatedWorld, create a new world partition object to invalidate any existing pointers to the previous object.
 				WorldPartition->Uninitialize();
 				UWorldPartition* DuplicatedPartition = DuplicateObject<UWorldPartition>(WorldPartition, WorldPartition->GetOuter());
-				WorldPartition->MarkPendingKill();
+				WorldPartition->MarkAsGarbage();
 
 				SaveWorld->GetWorldSettings()->SetWorldPartition(DuplicatedPartition);
 			}

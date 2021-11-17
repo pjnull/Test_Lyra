@@ -287,12 +287,12 @@ namespace UE::LevelSnapshots::Private::Tests
 						Actor->EditableInstancedSubobjectMap_OptionalSubobject["First"]->IntProperty	= 50;
 						Actor->EditOnlySubobjectMap_OptionalSubobject["First"]->IntProperty			= 60;
 
-						Actor->EditableInstancedSubobject_DefaultSubobject->MarkPendingKill();
-						Actor->EditOnlySubobject_OptionalSubobject->MarkPendingKill();
-						Actor->EditableInstancedSubobjectArray_OptionalSubobject[0]->MarkPendingKill();
-						Actor->EditOnlySubobjectArray_OptionalSubobject[0]->MarkPendingKill();
-						Actor->EditableInstancedSubobjectMap_OptionalSubobject["First"]->MarkPendingKill();
-						Actor->EditOnlySubobjectMap_OptionalSubobject["First"]->MarkPendingKill();
+						Actor->EditableInstancedSubobject_DefaultSubobject->MarkAsGarbage();
+						Actor->EditOnlySubobject_OptionalSubobject->MarkAsGarbage();
+						Actor->EditableInstancedSubobjectArray_OptionalSubobject[0]->MarkAsGarbage();
+						Actor->EditOnlySubobjectArray_OptionalSubobject[0]->MarkAsGarbage();
+						Actor->EditableInstancedSubobjectMap_OptionalSubobject["First"]->MarkAsGarbage();
+						Actor->EditOnlySubobjectMap_OptionalSubobject["First"]->MarkAsGarbage();
 
 						EditableInstancedSubobject_Destroyed		= Actor->EditableInstancedSubobject_DefaultSubobject;
 						EditOnlySubobject_Destroyed					= Actor->EditOnlySubobject_OptionalSubobject;
@@ -503,7 +503,7 @@ namespace UE::LevelSnapshots::Private::Tests
 			.ModifyWorld([&](UWorld* World)
 			{
 				Actor->EditableInstancedSubobject_DefaultSubobject->IntProperty = 10;
-				Actor->EditableInstancedSubobject_DefaultSubobject->MarkPendingKill();
+				Actor->EditableInstancedSubobject_DefaultSubobject->MarkAsGarbage();
 				Actor->EditableInstancedSubobject_DefaultSubobject = nullptr;
 			})
 			.ApplySnapshot()
@@ -625,7 +625,7 @@ namespace UE::LevelSnapshots::Private::Tests
 		Local::RunCircularSubobjectTest(*this, [](UObject* Subobject){});
 		Local::RunCircularSubobjectTest(*this, [](UObject* Subobject)
 		{
-			Subobject->MarkPendingKill();
+			Subobject->MarkAsGarbage();
 		});
 
 		return true;
@@ -988,8 +988,8 @@ namespace UE::LevelSnapshots::Private::Tests
 			.TakeSnapshot()
 			.ModifyWorld([&](UWorld* World)
 			{
-				DestroyedReferencedSubobject->MarkPendingKill();
-				DestroyedUnreferencedSubobject->MarkPendingKill();
+				DestroyedReferencedSubobject->MarkAsGarbage();
+				DestroyedUnreferencedSubobject->MarkAsGarbage();
 			
 				ReferenceExternalSubobjects->ObjectArray.Empty();
 				ReferenceExternalSubobjects->ObjectSet.Empty();
