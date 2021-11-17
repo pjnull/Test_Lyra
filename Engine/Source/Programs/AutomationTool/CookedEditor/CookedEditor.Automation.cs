@@ -459,7 +459,7 @@ public class MakeCookedEditor : BuildCommand
 		IEnumerable<FileReference> JsonFiles = DirectoryReference.EnumerateFiles(EngineScriptModulesDir);
 		if (DirectoryReference.Exists(ProjectScriptModulesDir))
 		{
-			JsonFiles.Append(DirectoryReference.EnumerateFiles(ProjectScriptModulesDir));
+			JsonFiles = JsonFiles.Concat(DirectoryReference.EnumerateFiles(ProjectScriptModulesDir));
 		}
 		foreach (FileReference JsonFile in JsonFiles)
 		{
