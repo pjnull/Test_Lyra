@@ -109,7 +109,7 @@ namespace UnrealBuildTool
 		/// </summary>
 		MacToolChainOptions Options;
 
-		public MacToolChain(FileReference InProjectFile, MacToolChainOptions InOptions)
+		public MacToolChain(FileReference? InProjectFile, MacToolChainOptions InOptions)
 			: base(InProjectFile)
 		{
 			this.Options = InOptions;			
