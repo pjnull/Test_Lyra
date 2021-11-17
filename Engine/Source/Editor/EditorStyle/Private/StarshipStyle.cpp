@@ -1041,6 +1041,7 @@ void FStarshipEditorStyle::FStyle::SetupGeneralStyles()
 
 	{
 		Set("DeveloperTools.MenuIcon", new IMAGE_BRUSH_SVG( "Starship/Common/DeveloperTools", Icon16x16 ) );
+		Set("UnrealInsights.MenuIcon", new IMAGE_BRUSH_SVG("Starship/Common/UnrealInsights", Icon16x16));
 	}
 
 	// Automation Tools Menu
