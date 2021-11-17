@@ -525,9 +525,9 @@ static void CollectNodes(
 				for (const UOptimusNodePin* ConnectedPin: InGraph->GetConnectedPins(Pin))
 				{
 					const UOptimusNode *NextNode = ConnectedPin->GetNode();
+					WorkingSet.Enqueue(NextNode);
 					if (!VisitedNodes.Contains(NextNode))
 					{
-						WorkingSet.Enqueue(NextNode);
 						VisitedNodes.Add(NextNode);
 						OutCollectedNodes.Add(NextNode);
 					}
