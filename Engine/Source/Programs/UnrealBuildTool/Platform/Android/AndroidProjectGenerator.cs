@@ -7,8 +7,6 @@ using System.Diagnostics;
 using System.IO;
 using EpicGames.Core;
 
-#nullable disable
-
 namespace UnrealBuildTool
 {
 	/// <summary>
@@ -87,7 +85,7 @@ namespace UnrealBuildTool
 			else
 			{
 				// If the sandboxed SDK is not present (pre Visual Studio 15.4) then the non-Sandboxed SDK tools should have the correct build tools for building
-				string SDKToolsPath = Microsoft.Win32.Registry.GetValue("HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\Android SDK Tools", "Path", null) as string;
+				string? SDKToolsPath = Microsoft.Win32.Registry.GetValue("HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\Android SDK Tools", "Path", null) as string;
 				if (!String.IsNullOrEmpty(SDKToolsPath) && VSDebugCommandLineOptionPresent)
 				{
 					VSDebuggingEnabled = true;
@@ -321,7 +319,7 @@ namespace UnrealBuildTool
 			if (AGDEInstalled)
 			{
 				string apkLocation = Path.Combine(
-					Path.GetDirectoryName(NMakeOutputPath.FullName),
+					Path.GetDirectoryName(NMakeOutputPath.FullName)!,
 					Path.GetFileNameWithoutExtension(NMakeOutputPath.FullName) + "-arm64.apk");
 
 				ProjectFileBuilder.AppendLine($"    <AndroidApkLocation>{apkLocation}</AndroidApkLocation>");
@@ -349,7 +347,7 @@ namespace UnrealBuildTool
 
 				// string for <OverrideAPKPath>
 				string APKPath = Path.Combine(
-					Path.GetDirectoryName(NMakeOutputPath.FullName),
+					Path.GetDirectoryName(NMakeOutputPath.FullName)!,
 					Path.GetFileNameWithoutExtension(NMakeOutputPath.FullName) + "-armv7.apk");
 
 				// string for <BuildXmlPath> and <AndroidManifestPath>
@@ -490,7 +488,7 @@ namespace UnrealBuildTool
 				return;
 			}
 
-			string BaseDirectory = ProjectFile.SourceFiles[0].BaseFolder.FullName;
+			string BaseDirectory = ProjectFile.SourceFiles[0].BaseFolder!.FullName;
 
 			string ProjectName = ProjectFile.ProjectFilePath.GetFileNameWithoutExtension();
 
@@ -516,7 +514,7 @@ namespace UnrealBuildTool
 		/// For additional Project file *PROJECTNAME*-AndroidRun.androidproj that needs to be written out.  This is currently used only on Android. 
 		/// </summary>
 		/// <param name="ProjectFile">ProjectFile object</param>
-		public override Tuple<ProjectFile, string> WriteAdditionalProjFile(ProjectFile ProjectFile)
+		public override Tuple<ProjectFile, string>? WriteAdditionalProjFile(ProjectFile ProjectFile)
 		{
 			if (!IsVSAndroidSupportInstalled())
 			{
