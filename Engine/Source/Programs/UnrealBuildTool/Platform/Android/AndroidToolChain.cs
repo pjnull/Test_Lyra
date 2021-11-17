@@ -1198,13 +1198,6 @@ namespace UnrealBuildTool
 			string LinkerExceptionsName = "../UELinkerExceptions";
 			FileReference LinkerExceptionsCPPFilename = FileReference.Combine(OutputDirectory, LinkerExceptionsName + ".cpp");
 
-			// Create the cpp filename
-			if (!FileReference.Exists(LinkerExceptionsCPPFilename))
-			{
-				// Create a dummy file in case it doesn't exist yet so that the module does not complain it's not there
-				Graph.CreateIntermediateTextFile(LinkerExceptionsCPPFilename, new List<string>(), StringComparison.Ordinal);
-			}
-
 			List<string> Result = new List<string>();
 			Result.Add("#include \"CoreTypes.h\"");
 			Result.Add("");
@@ -1228,21 +1221,7 @@ namespace UnrealBuildTool
 				Result.Add("#endif");
 			}
 
-			// Determine if the file changed. Write it if it either doesn't exist or the contents are different.
-			bool bShouldWriteFile = true;
-			if (FileReference.Exists(LinkerExceptionsCPPFilename))
-			{
-				string[] ExistingExceptionText = File.ReadAllLines(LinkerExceptionsCPPFilename.FullName);
-				string JoinedNewContents = string.Join("", Result.ToArray());
-				string JoinedOldContents = string.Join("", ExistingExceptionText);
-				bShouldWriteFile = (JoinedNewContents != JoinedOldContents);
-			}
-
-			// If we determined that we should write the file, write it now.
-			if (bShouldWriteFile)
-			{
-				Graph.CreateIntermediateTextFile(LinkerExceptionsCPPFilename, Result, StringComparison.Ordinal);
-			}
+			Graph.CreateIntermediateTextFile(LinkerExceptionsCPPFilename, Result);
 
 			SourceFiles.Add(FileItem.GetItemByFileReference(LinkerExceptionsCPPFilename));
 		}
@@ -1522,7 +1501,7 @@ namespace UnrealBuildTool
 
 					// Create the response file
 					FileReference ResponseFileName = CompileAction.ProducedItems[0].Location + ".rsp";
-					FileItem ResponseFileItem = Graph.CreateIntermediateTextFile(ResponseFileName, new List<string> { AllArguments }, StringComparison.InvariantCultureIgnoreCase);
+					FileItem ResponseFileItem = Graph.CreateIntermediateTextFile(ResponseFileName, new List<string> { AllArguments });
 					string ResponseArgument = string.Format("@\"{0}\"", ResponseFileName);
 
 					CompileAction.WorkingDirectory = UnrealBuildTool.EngineSourceDirectory;
@@ -2128,7 +2107,7 @@ namespace UnrealBuildTool
 				FileReference ResponseFileName = GetResponseFileName(LinkEnvironment, OutputFile);
 				InputFileNames.Add(LinkResponseArguments.Replace("\\", "/"));
 
-				FileItem ResponseFileItem = Graph.CreateIntermediateTextFile(ResponseFileName, InputFileNames, StringComparison.InvariantCultureIgnoreCase);
+				FileItem ResponseFileItem = Graph.CreateIntermediateTextFile(ResponseFileName, InputFileNames);
 
 				LinkAction.CommandArguments += string.Format(" @\"{0}\"", ResponseFileName);
 				LinkAction.PrerequisiteItems.Add(ResponseFileItem);

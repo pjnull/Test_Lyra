@@ -488,7 +488,7 @@ namespace UnrealBuildTool
 				CompileAction.ProducedItems.Add(ISPCIncludeHeaderFile);
 
 				FileReference ResponseFileName = new FileReference(ISPCIncludeHeaderFile.AbsolutePath + ".response");
-				FileItem ResponseFileItem = Graph.CreateIntermediateTextFile(ResponseFileName, Arguments.Select(x => Utils.ExpandVariables(x)), StringComparison.InvariantCultureIgnoreCase);
+				FileItem ResponseFileItem = Graph.CreateIntermediateTextFile(ResponseFileName, Arguments.Select(x => Utils.ExpandVariables(x)));
 				CompileAction.CommandArguments += String.Format("@\"{0}\"", ResponseFileName);
 				CompileAction.PrerequisiteItems.Add(ResponseFileItem);
 
@@ -688,7 +688,7 @@ namespace UnrealBuildTool
 				Result.ObjectFiles.AddRange(CompiledISPCObjFiles);
 
 				FileReference ResponseFileName = new FileReference(CompiledISPCObjFileNoISA.AbsolutePath + ".response");
-				FileItem ResponseFileItem = Graph.CreateIntermediateTextFile(ResponseFileName, Arguments.Select(x => Utils.ExpandVariables(x)), StringComparison.InvariantCultureIgnoreCase);
+				FileItem ResponseFileItem = Graph.CreateIntermediateTextFile(ResponseFileName, Arguments.Select(x => Utils.ExpandVariables(x)));
 				CompileAction.CommandArguments = " @\"" + ResponseFileName + "\"";
 				CompileAction.PrerequisiteItems.Add(ResponseFileItem);
 

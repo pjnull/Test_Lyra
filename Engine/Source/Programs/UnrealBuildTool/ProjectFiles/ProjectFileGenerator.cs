@@ -1916,8 +1916,12 @@ namespace UnrealBuildTool
 										ProjectFile? ProjectFileForIDE;
 										if (ModuleToProjectFileMap.TryGetValue(Module.Name, out ProjectFileForIDE) && ProjectFileForIDE == TargetProjectFile)
 										{
+											Utils.WriteFileIfChangedContext = $"{Target.TargetName} {Target.Configuration} {Target.Platform} {Binary.OutputFilePaths[0].GetFileName()} {Module.Name}";
+
 											CppCompileEnvironment ModuleCompileEnvironment = Module.CreateCompileEnvironmentForIntellisense(Target.Rules, BinaryCompileEnvironment);
 											ProjectFileForIDE.AddModule(Module, ModuleCompileEnvironment);
+
+											Utils.WriteFileIfChangedContext = "";
 										}
 									}
 								}

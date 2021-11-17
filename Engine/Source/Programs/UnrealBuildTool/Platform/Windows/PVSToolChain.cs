@@ -381,7 +381,7 @@ namespace UnrealBuildTool
 				if (!String.IsNullOrEmpty(ApplicationSettings.UserName) && !String.IsNullOrEmpty(ApplicationSettings.SerialNumber))
 				{
 					LicenseFile = FileReference.Combine(Unreal.EngineDirectory, "Intermediate", "PVS", "PVS-Studio.lic");
-					Utils.WriteFileIfChanged(LicenseFile, String.Format("{0}\n{1}\n", ApplicationSettings.UserName, ApplicationSettings.SerialNumber), StringComparison.Ordinal);
+					Utils.WriteFileIfChanged(LicenseFile, String.Format("{0}\n{1}\n", ApplicationSettings.UserName, ApplicationSettings.SerialNumber));
 				}
 			}
 			else
@@ -575,7 +575,7 @@ namespace UnrealBuildTool
 				string BaseFileName = PreprocessedFileItem.Location.GetFileName();
 
 				FileReference ConfigFileLocation = FileReference.Combine(OutputDir, BaseFileName + ".cfg");
-				FileItem ConfigFileItem = Graph.CreateIntermediateTextFile(ConfigFileLocation, ConfigFileContents.ToString(), StringComparison.InvariantCultureIgnoreCase);
+				FileItem ConfigFileItem = Graph.CreateIntermediateTextFile(ConfigFileLocation, ConfigFileContents.ToString());
 
 				// Run the analzyer on the preprocessed source file
 				FileReference OutputFileLocation = FileReference.Combine(OutputDir, BaseFileName + ".pvslog");
@@ -631,7 +631,7 @@ namespace UnrealBuildTool
 			// Collect the sourcefile items off of the Compile action added in CompileCPPFiles so that in SingleFileCompile mode the PVSGather step is also not filtered out
 			List<FileItem> CompileSourceFiles = Makefile.Actions.Where(x => x is VCCompileAction).Select(x => (x as VCCompileAction)!.SourceFile).ToList();
 
-			FileItem InputFileListItem = Makefile.CreateIntermediateTextFile(OutputFile.ChangeExtension(".input"), InputFiles.Select(x => x.FullName), StringComparison.InvariantCultureIgnoreCase);
+			FileItem InputFileListItem = Makefile.CreateIntermediateTextFile(OutputFile.ChangeExtension(".input"), InputFiles.Select(x => x.FullName));
 
 			Action AnalyzeAction = Makefile.CreateAction(ActionType.Compile);
 			AnalyzeAction.CommandPath = UnrealBuildTool.GetUBTPath();

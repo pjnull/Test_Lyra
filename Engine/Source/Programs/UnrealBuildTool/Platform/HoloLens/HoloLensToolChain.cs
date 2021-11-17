@@ -528,8 +528,7 @@ namespace UnrealBuildTool
 					FileReference PCHCPPPath = CompileEnvironment.PrecompiledHeaderIncludeFilename!.ChangeExtension(".cpp");
 					FileItem PCHCPPFile = Graph.CreateIntermediateTextFile(
 						PCHCPPPath,
-						string.Format("#include \"{0}\"\r\n", CompileEnvironment.PrecompiledHeaderIncludeFilename.FullName.Replace('\\', '/')),
-						StringComparison.Ordinal);
+						string.Format("#include \"{0}\"\r\n", CompileEnvironment.PrecompiledHeaderIncludeFilename.FullName.Replace('\\', '/')));
 
 					// Make sure the original source directory the PCH header file existed in is added as an include
 					// path -- it might be a private PCH header and we need to make sure that its found!
@@ -700,7 +699,7 @@ namespace UnrealBuildTool
 				{
 					FileItem TargetFile = CompileAction.ProducedItems[0];
 					FileReference ResponseFileName = new FileReference(TargetFile.AbsolutePath + ".response");
-					FileItem ResponseFileItem = Graph.CreateIntermediateTextFile(ResponseFileName, SharedArguments.Concat(FileArguments).Concat(AdditionalArguments).Select(x => Utils.ExpandVariables(x)), StringComparison.InvariantCultureIgnoreCase);
+					FileItem ResponseFileItem = Graph.CreateIntermediateTextFile(ResponseFileName, SharedArguments.Concat(FileArguments).Concat(AdditionalArguments).Select(x => Utils.ExpandVariables(x)));
 					CompileAction.CommandArguments = " @\"" + ResponseFileName + "\"";
 					CompileAction.PrerequisiteItems.Add(ResponseFileItem);
 				}
@@ -1033,7 +1032,7 @@ namespace UnrealBuildTool
 			FileReference ResponseFileName = GetResponseFileName(LinkEnvironment, OutputFile);
 			if (!ProjectFileGenerator.bGenerateProjectFiles)
 			{
-				FileItem ResponseFile = Graph.CreateIntermediateTextFile(ResponseFileName, Arguments, StringComparison.InvariantCultureIgnoreCase);
+				FileItem ResponseFile = Graph.CreateIntermediateTextFile(ResponseFileName, Arguments);
 				PrerequisiteItems.Add(ResponseFile);
 			}
 

@@ -1250,7 +1250,7 @@ namespace UnrealBuildTool
 			);
 			Contents = Contents.Replace("\n", Environment.NewLine);
 
-			Utils.WriteFileIfChanged(DsymShellFile, Contents, StringComparison.InvariantCultureIgnoreCase);
+			Utils.WriteFileIfChanged(DsymShellFile, Contents);
 			GenDebugAction.CommandArguments = string.Format("-c \"chmod +x \\\"{0}\\\"; \\\"{0}\\\"\"", DsymShellFileItem.AbsolutePath);
 
 			if (LinkEnvironment.bIsCrossReferenced)

@@ -269,6 +269,12 @@ namespace UnrealBuildTool
 			public FileReference? LogFileName = null;
 
 			/// <summary>
+			/// Log all attempts to write to the specified file
+			/// </summary>
+			[CommandLine(Prefix = "-TraceWrites", Description = "Trace writes requested to the specified file")]
+			public FileReference? TraceWrites = null;
+
+			/// <summary>
 			/// Whether to include timestamps in the log
 			/// </summary>
 			[CommandLine(Prefix = "-Timestamps", Description = "Include timestamps in the log")]
@@ -469,6 +475,12 @@ namespace UnrealBuildTool
 				Log.IncludeTimestamps = Options.bLogTimestamps;
 				Log.IncludeProgramNameWithSeverityPrefix = Options.bLogFromMsBuild;
 
+				if (Options.TraceWrites != null)
+				{
+					Log.TraceInformation($"All attempts to write to \"{Options.TraceWrites}\" via WriteFileIfChanged() will be logged");
+					Utils.WriteFileIfChangedTrace = Options.TraceWrites;
+				}
+
 				// Always start capturing logs as early as possible to later copy to a log file if the ToolMode desires it (we have to start capturing before we get the ToolModeOptions below)
 				StartupTraceListener StartupTrace = new StartupTraceListener();
 				Log.AddTraceListener(StartupTrace);
@@ -612,6 +624,8 @@ namespace UnrealBuildTool
 				{
 					FileMetadataPrefetch.Stop();
 				}
+
+				Utils.LogWriteFileIfChangedActivity();
 
 				// Print out all the performance info
 				Timeline.Print(TimeSpan.FromMilliseconds(20.0), LogEventType.Log);

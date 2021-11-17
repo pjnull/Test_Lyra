@@ -695,10 +695,10 @@ namespace UnrealBuildTool
 		}
 
 		/// <inheritdoc/>
-		public void CreateIntermediateTextFile(FileItem FileItem, string Contents, StringComparison ComparisonForContentChanges)
+		public void CreateIntermediateTextFile(FileItem FileItem, string Contents)
 		{
 			// Write the file
-			Utils.WriteFileIfChanged(FileItem.Location, Contents, ComparisonForContentChanges);
+			Utils.WriteFileIfChanged(FileItem.Location, Contents);
 
 			// Reset the file info, in case it already knows about the old file
 			InternalDependencies.Add(FileItem);
@@ -706,10 +706,10 @@ namespace UnrealBuildTool
 		}
 
 		/// <inheritdoc/>
-		public void CreateIntermediateTextFile(FileItem FileItem, IEnumerable<string> ContentLines, StringComparison ComparisonForContentChanges)
+		public void CreateIntermediateTextFile(FileItem FileItem, IEnumerable<string> ContentLines)
 		{
 			// Write the file
-			Utils.WriteFileIfChanged(FileItem, ContentLines, ComparisonForContentChanges);
+			Utils.WriteFileIfChanged(FileItem, ContentLines);
 
 			// Reset the file info, in case it already knows about the old file
 			InternalDependencies.Add(FileItem);

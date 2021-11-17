@@ -1198,7 +1198,7 @@ namespace UnrealBuildTool
 					string PrecompiledHeaderIncludeFilenameString = NormalizeCommandLinePath(CompileEnvironment.PrecompiledHeaderIncludeFilename!, Target.WindowsPlatform.Compiler, CompileEnvironment.bPreprocessOnly);
 					string PchCppFile = string.Format("// Compiler: {0}\n#include \"{1}\"\r\n", EnvVars.CompilerVersion, PrecompiledHeaderIncludeFilenameString.Replace('\\', '/'));
 					CompileAction.SourceFile = FileItem.GetItemByFileReference(CompileEnvironment.PrecompiledHeaderIncludeFilename!.ChangeExtension(".cpp"));
-					Graph.CreateIntermediateTextFile(CompileAction.SourceFile, PchCppFile, StringComparison.Ordinal);
+					Graph.CreateIntermediateTextFile(CompileAction.SourceFile, PchCppFile);
 
 					// Add the precompiled header file to the produced items list.
 					CompileAction.CreatePchFile = FileItem.GetItemByFileReference(FileReference.Combine(OutputDir, SourceFile.Location.GetFileName() + ".pch"));
@@ -1623,7 +1623,7 @@ namespace UnrealBuildTool
 			}
 			Contents.AppendLine();
 
-			FileItem InputFile = Graph.CreateIntermediateTextFile(OutputFile.ChangeExtension(".cpp"), Contents.ToString(), StringComparison.Ordinal);
+			FileItem InputFile = Graph.CreateIntermediateTextFile(OutputFile.ChangeExtension(".cpp"), Contents.ToString());
 
 			// Build the argument list
 			FileItem ObjectFile = FileItem.GetItemByFileReference(OutputFile.ChangeExtension(".obj"));
@@ -1949,7 +1949,7 @@ namespace UnrealBuildTool
 			FileReference ResponseFileName = GetResponseFileName(LinkEnvironment, OutputFile);
 			if (!ProjectFileGenerator.bGenerateProjectFiles)
 			{
-				FileItem ResponseFile = Graph.CreateIntermediateTextFile(ResponseFileName, Arguments, StringComparison.InvariantCultureIgnoreCase);
+				FileItem ResponseFile = Graph.CreateIntermediateTextFile(ResponseFileName, Arguments);
 				PrerequisiteItems.Add(ResponseFile);
 			}
 
