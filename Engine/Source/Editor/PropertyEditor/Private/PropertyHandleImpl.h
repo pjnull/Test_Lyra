@@ -655,6 +655,14 @@ private:
 	TSharedPtr<FPropertyHandleMixed> YawValue;
 };
 
+class FPropertyHandleColor : public FPropertyHandleBase
+{
+public:
+	FPropertyHandleColor( TSharedRef<FPropertyNode> PropertyNode, FNotifyHook* NotifyHook, TSharedPtr<IPropertyUtilities> PropertyUtilities );
+	static bool Supports( TSharedRef<FPropertyNode> PropertyNode );
+
+	virtual FPropertyAccess::Result SetValueFromFormattedString(const FString& InValue, EPropertyValueSetFlags::Type Flags = EPropertyValueSetFlags::DefaultFlags) override;
+};
 
 class FPropertyHandleArray : public FPropertyHandleBase, public IPropertyHandleArray
 {
