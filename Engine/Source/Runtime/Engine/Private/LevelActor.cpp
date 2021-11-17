@@ -603,7 +603,7 @@ AActor* UWorld::SpawnActor( UClass* Class, FTransform const* UserTransformPtr, c
 		ActorPath += NewActorName.ToString();
 
 		// @todo FH: needs to handle mark package dirty and asset creation notification
-		ExternalPackage = ULevel::CreateActorPackage(LevelToSpawnIn->GetPackage(), *ActorPath);
+		ExternalPackage = ULevel::CreateActorPackage(LevelToSpawnIn->GetPackage(), LevelToSpawnIn->GetActorPackagingScheme(), *ActorPath);
 	}
 #endif
 

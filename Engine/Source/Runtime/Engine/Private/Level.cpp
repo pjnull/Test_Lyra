@@ -9,6 +9,7 @@ Level.cpp: Level-related functions
 #include "Misc/ScopedSlowTask.h"
 #include "UObject/RenderingObjectVersion.h"
 #include "UObject/UE5MainStreamObjectVersion.h"
+#include "UObject/UE5ReleaseStreamObjectVersion.h"
 #include "Templates/UnrealTemplate.h"
 #include "UObject/Package.h"
 #include "EngineStats.h"
@@ -339,6 +340,7 @@ ULevel::ULevel( const FObjectInitializer& ObjectInitializer )
 	bUseExternalActors = false;
 	bContainsStableActorGUIDs = true;
 	PlayFromHereActor = nullptr;
+	ActorPackagingScheme = EActorPackagingScheme::Reduced;
 #endif	
 	bActorClusterCreated = false;
 	bIsPartitioned = false;
@@ -416,6 +418,7 @@ void ULevel::Serialize( FArchive& Ar )
 	Ar.UsingCustomVersion(FRenderingObjectVersion::GUID);
 	Ar.UsingCustomVersion(FFortniteMainBranchObjectVersion::GUID);
 	Ar.UsingCustomVersion(FUE5MainStreamObjectVersion::GUID);
+	Ar.UsingCustomVersion(FUE5ReleaseStreamObjectVersion::GUID);
 
 	if (Ar.IsLoading())
 	{
@@ -555,21 +558,29 @@ void ULevel::Serialize( FArchive& Ar )
 	}
 
 #if WITH_EDITOR
-	if ( IsUsingExternalActors() && Ar.IsLoading() && Ar.CustomVer(FUE5MainStreamObjectVersion::GUID) < FUE5MainStreamObjectVersion::FixForceExternalActorLevelReferenceDuplicates )
+	if ( IsUsingExternalActors() && Ar.IsLoading() )
 	{
-		TSet<AActor*> DupActors;
-		for (int ActorIndex = 0; ActorIndex < Actors.Num(); ++ActorIndex)
+		if (Ar.CustomVer(FUE5MainStreamObjectVersion::GUID) < FUE5MainStreamObjectVersion::FixForceExternalActorLevelReferenceDuplicates)
 		{
-			if (AActor * Actor = Actors[ActorIndex])
+			TSet<AActor*> DupActors;
+			for (int ActorIndex = 0; ActorIndex < Actors.Num(); ++ActorIndex)
 			{
-				bool bAlreadyInSet = false;
-				DupActors.Add(Actor, &bAlreadyInSet);
-
-				if (bAlreadyInSet)
+				if (AActor * Actor = Actors[ActorIndex])
 				{
-					Actors[ActorIndex] = nullptr;
+					bool bAlreadyInSet = false;
+					DupActors.Add(Actor, &bAlreadyInSet);
+
+					if (bAlreadyInSet)
+					{
+						Actors[ActorIndex] = nullptr;
+					}
 				}
 			}
+		}
+		
+		if (Ar.CustomVer(FUE5ReleaseStreamObjectVersion::GUID) < FUE5ReleaseStreamObjectVersion::AddLevelActorPackagingScheme)
+		{
+			ActorPackagingScheme = EActorPackagingScheme::Original;
 		}
 	}
 #endif
@@ -991,7 +1002,7 @@ void ULevel::PreDuplicate(FObjectDuplicationParameters& DupParams)
 					);
 				}
 
-				UPackage* DupActorPackage = CreateActorPackage(DstPackage, ActorPath);
+				UPackage* DupActorPackage = CreateActorPackage(DstPackage, GetActorPackagingScheme(), ActorPath);
 
 				DupActorPackage->MarkAsFullyLoaded();
 				DupParams.DuplicationSeed.Add(ActorPackage, DupActorPackage);
@@ -2464,7 +2475,8 @@ bool ULevel::HasAnyActorsOfType(UClass *SearchType)
 	return false;
 }
 
-FString ULevel::GetActorPackageName(UPackage* InLevelPackage, const FString& InActorPath)
+#if WITH_EDITOR
+FString ULevel::GetActorPackageName(UPackage* InLevelPackage, EActorPackagingScheme ActorPackagingScheme, const FString& InActorPath)
 {
 	// Convert the actor path to lowercase to make sure we get the same hash for case insensitive file systems
 	FString ActorPath = InActorPath.ToLower();
@@ -2486,13 +2498,28 @@ FString ULevel::GetActorPackageName(UPackage* InLevelPackage, const FString& InA
 	FString BaseDir = GetExternalActorsPath(InLevelPackage);
 
 	TStringBuilderWithBuffer<TCHAR, NAME_SIZE> ActorPackageName;
+
+	uint32 FilenameOffset = 0;
 	ActorPackageName.Append(BaseDir);
 	ActorPackageName.Append(TEXT("/"));
-	ActorPackageName.Append(*GuidBase36, 2);
+
+	switch (ActorPackagingScheme)
+	{
+	case EActorPackagingScheme::Original:
+		ActorPackageName.Append(*GuidBase36, 2);
+		FilenameOffset = 2;
+		break;
+	case EActorPackagingScheme::Reduced:
+		ActorPackageName.Append(*GuidBase36, 1);
+		FilenameOffset = 1;
+		break;
+	}
+
 	ActorPackageName.Append(TEXT("/"));
-	ActorPackageName.Append(*GuidBase36 + 2, 2);
+	ActorPackageName.Append(*GuidBase36 + FilenameOffset, 2);
 	ActorPackageName.Append(TEXT("/"));
-	ActorPackageName.Append(*GuidBase36 + 4);
+	ActorPackageName.Append(*GuidBase36 + FilenameOffset + 2);
+
 	return ActorPackageName.ToString();
 }
 
@@ -2545,8 +2572,6 @@ const TCHAR* ULevel::GetExternalActorsFolderName()
 	return FPackagePath::GetExternalActorsFolderName();
 }
 
-#if WITH_EDITOR
-
 bool ULevel::IsUsingExternalActors() const
 {
 	return bUseExternalActors;
@@ -2573,6 +2598,12 @@ bool ULevel::ShouldCreateNewExternalActors() const
 
 void ULevel::ConvertAllActorsToPackaging(bool bExternal)
 {
+	if (bExternal)
+	{
+		// always force levels to use the reduced packaging scheme
+		ActorPackagingScheme = EActorPackagingScheme::Reduced;
+	}
+
 	// Make a copy of the current actor lists since packaging conversion may modify the actor list as a side effect
 	TArray<AActor*> CurrentActors = Actors;
 	for (AActor* Actor : CurrentActors)
@@ -2596,17 +2627,17 @@ TArray<FString> ULevel::GetOnDiskExternalActorPackages(const FString& ExternalAc
 	if (!ExternalActorsPath.IsEmpty())
 	{
 		IFileManager::Get().IterateDirectoryRecursively(*FPackageName::LongPackageNameToFilename(ExternalActorsPath), [&ActorPackageNames](const TCHAR* FilenameOrDirectory, bool bIsDirectory)
+		{
+			if (!bIsDirectory)
 			{
-				if (!bIsDirectory)
+				FString Filename(FilenameOrDirectory);
+				if (Filename.EndsWith(FPackageName::GetAssetPackageExtension()))
 				{
-					FString Filename(FilenameOrDirectory);
-					if (Filename.EndsWith(FPackageName::GetAssetPackageExtension()))
-					{
-						ActorPackageNames.Add(FPackageName::FilenameToLongPackageName(Filename));
-					}
+					ActorPackageNames.Add(FPackageName::FilenameToLongPackageName(Filename));
 				}
-				return true;
-			});
+			}
+			return true;
+		});
 	}
 	return ActorPackageNames;
 }
@@ -2648,9 +2679,9 @@ TArray<UPackage*> ULevel::GetLoadedExternalActorPackages() const
 	return ActorPackages.Array();
 }
 
-UPackage* ULevel::CreateActorPackage(UPackage* InLevelPackage, const FString& InActorPath)
+UPackage* ULevel::CreateActorPackage(UPackage* InLevelPackage, EActorPackagingScheme ActorPackagingScheme, const FString& InActorPath)
 {
-	UPackage* ActorPackage = CreatePackage(*GetActorPackageName(InLevelPackage, InActorPath));
+	UPackage* ActorPackage = CreatePackage(*GetActorPackageName(InLevelPackage, ActorPackagingScheme, InActorPath));
 	ActorPackage->SetPackageFlags(PKG_EditorOnly | PKG_ContainsMapData);
 	return ActorPackage;
 }
