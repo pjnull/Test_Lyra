@@ -1695,6 +1695,7 @@ public class GameActivity extends $${gameActivitySuperClass}$$ implements Surfac
 		variables.put("SRC_VulkanVersion", VulkanVersionString);
 		variables.put("SRC_VulkanAvailable", (bSupportsVulkan && VulkanVersionString != "0.0.0") ? "true" : "false");  // commandline could still disable!
 		variables.put("SRC_UsingHoudini", bHasHoudini ? "true" : "false");
+		variables.put("SRC_HMDSystemName", "");
 
 		variables.put("SRC_GpuVendor", OpenGLVendor);
 		variables.put("SRC_SDKLevel", Integer.toString(android.os.Build.VERSION.SDK_INT));

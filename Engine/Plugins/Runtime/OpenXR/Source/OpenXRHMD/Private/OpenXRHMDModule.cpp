@@ -101,6 +101,20 @@ TSharedPtr< IHeadMountedDisplayVulkanExtensions, ESPMode::ThreadSafe > FOpenXRHM
 	return nullptr;
 }
 
+FString FOpenXRHMDModule::GetDeviceSystemName()
+{
+	if (InitInstanceAndSystem())
+	{
+		XrSystemProperties SystemProperties;
+		SystemProperties.type = XR_TYPE_SYSTEM_PROPERTIES;
+		SystemProperties.next = nullptr;
+		xrGetSystemProperties(Instance, System, &SystemProperties);
+
+		return FString(UTF8_TO_TCHAR(SystemProperties.systemName));
+	}
+	return FString("");
+}
+
 bool FOpenXRHMDModule::IsStandaloneStereoOnlyDevice()
 {
 	if (InitInstanceAndSystem())
