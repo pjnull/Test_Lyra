@@ -1025,7 +1025,8 @@ void FPImplRecastNavMesh::SerializeCompressedTileCacheData(FArchive& ArWrapped, 
 	constexpr int32 EmptyDataValue = -1;
 
 	// Note when saving the CompressedDataSize is either 0 or it must be big enough to include the size of the uncompressed dtTileCacheLayerHeader.
-	checkf(Ar.IsLoading() || CompressedDataSize == 0 || CompressedDataSize >= dtAlign(sizeof(dtTileCacheLayerHeader)), TEXT("CompressedDataSize must either be zero or large enough to hold dtTileCacheLayerHeader!"));
+	checkf((Ar.IsSaving() == false) || CompressedDataSize == 0 || CompressedDataSize >= dtAlign(sizeof(dtTileCacheLayerHeader)), TEXT("When saving CompressedDataSize must either be zero or large enough to hold dtTileCacheLayerHeader!"));
+	checkf((Ar.IsSaving() == false) || CompressedDataSize == 0 || CompressedData != nullptr, TEXT("When saving CompressedDataSize must either be zero or CompressedData must be != nullptr"));
 
 	if (Ar.IsLoading())
 	{
@@ -1071,6 +1072,8 @@ void FPImplRecastNavMesh::SerializeCompressedTileCacheData(FArchive& ArWrapped, 
 		}
 		FMemory::Memset(CompressedData, 0, CompressedDataSize);
 	}
+
+	check(CompressedData != nullptr);
 
 	// Serialize dtTileCacheLayerHeader by hand so we can account for the FReals always being serialized as doubles
 	dtTileCacheLayerHeader* Header = (dtTileCacheLayerHeader*)CompressedData;
