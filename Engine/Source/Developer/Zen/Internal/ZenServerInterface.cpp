@@ -61,24 +61,15 @@ AttemptFileCopyWithRetries(const TCHAR* Dst, const TCHAR* Src, double RetryDurat
 }
 
 static void
-DetermineDataPath(const TCHAR* ConfigSection, FString& DataPath)
+DetermineLocalDataCachePath(const TCHAR* ConfigSection, FString& DataPath)
 {
-	FString OriginalDataPath = DataPath;
-	GConfig->GetString(ConfigSection, TEXT("DataPath"), OriginalDataPath, GEngineIni);
-	DataPath = OriginalDataPath;
-
-	bool bUsedEnvOverride = false;
-	bool bUsedEditorOverride = false;
-	// Much of the logic here is meant to mirror the way that DDC backend paths can be specified to allow
-	// us to match behavior and not behave differently in the presence of custom config
 	FString DataPathEnvOverride;
-	if (GConfig->GetString(ConfigSection, TEXT("DataPathEnvOverride"), DataPathEnvOverride, GEngineIni))
+	if (GConfig->GetString(ConfigSection, TEXT("LocalDataCachePathEnvOverride"), DataPathEnvOverride, GEngineIni))
 	{
 		FString DataPathEnvOverrideValue = FPlatformMisc::GetEnvironmentVariable(*DataPathEnvOverride);
 		if (!DataPathEnvOverrideValue.IsEmpty())
 		{
 			DataPath = DataPathEnvOverrideValue;
-			bUsedEnvOverride = true;
 			UE_LOG(LogZenServiceInstance, Log, TEXT("Found environment variable %s=%s"), *DataPathEnvOverride, *DataPathEnvOverrideValue);
 		}
 
@@ -87,14 +78,13 @@ DetermineDataPath(const TCHAR* ConfigSection, FString& DataPath)
 			if (!DataPathEnvOverrideValue.IsEmpty())
 			{
 				DataPath = DataPathEnvOverrideValue;
-				bUsedEnvOverride = true;
 				UE_LOG(LogZenServiceInstance, Log, TEXT("Found registry key GlobalDataCachePath %s=%s"), *DataPathEnvOverride, *DataPath);
 			}
 		}
 	}
 
 	FString DataPathEditorOverrideSetting;
-	if (GConfig->GetString(ConfigSection, TEXT("DataPathEditorOverrideSetting"), DataPathEditorOverrideSetting, GEngineIni))
+	if (GConfig->GetString(ConfigSection, TEXT("LocalDataCachePathEditorOverrideSetting"), DataPathEditorOverrideSetting, GEngineIni))
 	{
 		FString Setting = GConfig->GetStr(TEXT("/Script/UnrealEd.EditorSettings"), *DataPathEditorOverrideSetting, GEditorSettingsIni);
 		if (!Setting.IsEmpty())
@@ -106,33 +96,73 @@ DetermineDataPath(const TCHAR* ConfigSection, FString& DataPath)
 				if (!SettingPath.IsEmpty())
 				{
 					DataPath = SettingPath;
-					bUsedEditorOverride = true;
 					UE_LOG(LogZenServiceInstance, Log, TEXT("Found editor setting /Script/UnrealEd.EditorSettings.Path=%s"), *DataPath);
 				}
 			}
 		}
 	}
+}
 
-	if (bUsedEnvOverride || bUsedEditorOverride)
+static void
+DetermineDataPath(const TCHAR* ConfigSection, FString& DataPath)
+{
+	auto NormalizeDataPath = [](const FString& InDataPath)
 	{
-		if (DataPath == TEXT("None"))
+		FString FinalPath = FPaths::ConvertRelativePathToFull(InDataPath);
+		FPaths::NormalizeDirectoryName(FinalPath);
+		return FinalPath;
+	};
+
+	// Zen commandline
+	FString CommandLineOverrideValue;
+	if (FParse::Value(FCommandLine::Get(), TEXT("ZenDataPath="), CommandLineOverrideValue))
+	{
+		DataPath = NormalizeDataPath(CommandLineOverrideValue);
+		UE_LOG(LogZenServiceInstance, Log, TEXT("Found command line override ZenDataPath=%s"), *CommandLineOverrideValue);
+		return;
+	}
+
+	// Zen registry/stored
+	FString DataPathEnvOverrideValue;
+	if (FPlatformMisc::GetStoredValue(TEXT("Epic Games"), TEXT("Zen"), TEXT("DataPath"), DataPathEnvOverrideValue))
+	{
+		if (!DataPathEnvOverrideValue.IsEmpty())
 		{
-			DataPath = OriginalDataPath;
-		}
-		else
-		{
-			DataPath = FPaths::Combine(DataPath, TEXT("Zen"));
+			DataPath = NormalizeDataPath(DataPathEnvOverrideValue);
+			UE_LOG(LogZenServiceInstance, Log, TEXT("Found registry key Zen DataPath=%s"), *DataPath);
+			return;
 		}
 	}
 
+	ON_SCOPE_EXIT
 	{
-		FString CommandLineOverrideValue;
-		if (FParse::Value(FCommandLine::Get(), TEXT("ZenDataPath="), CommandLineOverrideValue))
-		{
-			DataPath = CommandLineOverrideValue;
-			UE_LOG(LogZenServiceInstance, Log, TEXT("Found command line override ZenDataPath=%s"), *CommandLineOverrideValue);
-		}
+		// Persist the data path so that future runs use the same one.
+		DataPath = NormalizeDataPath(DataPath);
+		FPlatformMisc::SetStoredValue(TEXT("Epic Games"), TEXT("Zen"), TEXT("DataPath"), DataPath);
+	};
+
+	// Zen environment
+	DataPathEnvOverrideValue = FPlatformMisc::GetEnvironmentVariable(TEXT("UE-ZenDataPath"));
+	if (!DataPathEnvOverrideValue.IsEmpty())
+	{
+		DataPath = DataPathEnvOverrideValue;
+		UE_LOG(LogZenServiceInstance, Log, TEXT("Found environment variable UE-ZenDataPath=%s"), *DataPathEnvOverrideValue);
+		return;
 	}
+
+	// Follow local DDC (if outside workspace)
+	FString LocalDataCachePath;
+	DetermineLocalDataCachePath(ConfigSection, LocalDataCachePath);
+	if (!LocalDataCachePath.IsEmpty() && (LocalDataCachePath != TEXT("None")) && !FPaths::IsUnderDirectory(LocalDataCachePath, FPaths::RootDir()))
+	{
+		DataPath = FPaths::Combine(LocalDataCachePath, TEXT("Zen"));
+		return;
+	}
+
+	// Zen config default
+	GConfig->GetString(ConfigSection, TEXT("DataPath"), DataPath, GEngineIni);
+
+	check(!DataPath.IsEmpty())
 }
 
 static void
@@ -161,7 +191,6 @@ FServiceSettings::ReadFromConfig()
 			FServiceAutoLaunchSettings& AutoLaunchSettings = SettingsVariant.Get<FServiceAutoLaunchSettings>();
 
 			DetermineDataPath(AutoLaunchConfigSection, AutoLaunchSettings.DataPath);
-			AutoLaunchSettings.DataPath = FPaths::ConvertRelativePathToFull(AutoLaunchSettings.DataPath);
 			GConfig->GetString(AutoLaunchConfigSection, TEXT("ExtraArgs"), AutoLaunchSettings.ExtraArgs, GEngineIni);
 
 			ReadUInt16FromConfig(AutoLaunchConfigSection, TEXT("DesiredPort"), AutoLaunchSettings.DesiredPort, GEngineIni);
