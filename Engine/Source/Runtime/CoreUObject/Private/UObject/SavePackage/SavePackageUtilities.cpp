@@ -663,6 +663,11 @@ ESavePackageResult FinalizeTempOutputFiles(const FPackagePath& PackagePath, cons
 		if (!File.TempFilePath.IsEmpty())
 		{
 			FFileStatData FileStats = FileSystem.GetStatData(*File.TargetPath);
+			if (FileStats.bIsValid && FileStats.bIsReadOnly)
+			{
+				UE_LOG(LogSavePackage, Error, TEXT("Cannot remove '%s' as it is read only!"), *File.TargetPath);
+				return ESavePackageResult::Error;
+			}
 			CanFileBeMoved[Index] = FileStats.bIsValid;
 		}
 		else
