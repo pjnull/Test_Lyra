@@ -502,6 +502,8 @@ FCbObject FRemoteBuildExecutionRequest::BuildWorkerDescriptor(const FBuildWorker
 	WorkerDescriptor.AddString("host"_ASV, Worker.GetHostPlatform());
 	WorkerDescriptor.AddUuid("buildsystem_version"_ASV, Worker.GetBuildSystemVersion());
 	WorkerDescriptor.AddInteger("timeout"_ASV, TimeoutSeconds);
+	WorkerDescriptor.AddInteger("cores"_ASV, 1);
+	//WorkerDescriptor.AddInteger("memory"_ASV, 1 * 1024 * 1024 * 1024);
 
 	WorkerDescriptor.BeginArray("environment"_ASV);
 	Worker.IterateEnvironment([&WorkerDescriptor](FStringView Name, FStringView Value)
