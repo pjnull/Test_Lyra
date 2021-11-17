@@ -2596,6 +2596,14 @@ void FAdaptiveStreamingPlayer::InternalHandlePendingFirstSegmentRequest(const FT
 					NewPlayPos.SetToZero();
 				}
 				PlaybackState.SetPlayPosition(NewPlayPos);
+				if (CurrentState == EPlayerState::eState_Seeking)
+				{
+					// Get the current loop state to fetch the last published loop count.
+					// The internal counter in CurrentLoopState may be some iterations ahead since it could have fetched segments from the loop point.
+					FInternalLoopState LoopStateNow;
+					PlaybackState.GetLoopState(LoopStateNow);
+					CurrentLoopState.Count = LoopStateNow.Count;
+				}
 				PlaybackState.SetLoopState(CurrentLoopState);
 
 				check(CurrentState == EPlayerState::eState_Buffering || CurrentState == EPlayerState::eState_Rebuffering || CurrentState == EPlayerState::eState_Seeking);
