@@ -263,7 +263,7 @@ public:
 		// the least of the users problems at the moment.
 		for (const TPair<FString, FString>& Entry : MovedOriginalFiles)
 		{
-			FileSystem.Delete(*Entry.Value);
+			FileSystem.Delete(*Entry.Value, /*RequireExists*/false, /*EvenReadOnly*/true);
 		}
 	}
 
