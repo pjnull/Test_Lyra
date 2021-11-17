@@ -211,9 +211,9 @@ namespace
 	 */
 	void ParseNetServiceIdentifiers(FHeaderParser& HeaderParser, FFuncInfo& FuncInfo, const TArray<FString>& Identifiers)
 	{
-		static const TCHAR IdTag         [] = TEXT("Id");
-		static const TCHAR ResponseIdTag [] = TEXT("ResponseId");
-		static const TCHAR JSBridgePriTag[] = TEXT("Priority");
+		static const auto& IdTag          = TEXT("Id");
+		static const auto& ResponseIdTag  = TEXT("ResponseId");
+		static const auto& JSBridgePriTag = TEXT("Priority");
 
 		for (const FString& Identifier : Identifiers)
 		{
@@ -1602,9 +1602,9 @@ TMap<FName, FString> FHeaderParser::GetParameterToolTipsFromFunctionComment(cons
 	}
 	
 	TArray<FString> Params;
-	static const TCHAR ParamTag[] = TEXT("@param");
-	static const TCHAR ReturnTag[] = TEXT("@return");
-	static const TCHAR ReturnParamPrefix[] = TEXT("ReturnValue ");
+	static const auto& ParamTag = TEXT("@param");
+	static const auto& ReturnTag = TEXT("@return");
+	static const auto& ReturnParamPrefix = TEXT("ReturnValue ");
 
 	/**
 	 * Search for @param / @return followed by a section until a line break.
@@ -1654,7 +1654,7 @@ TMap<FName, FString> FHeaderParser::GetParameterToolTipsFromFunctionComment(cons
 		Param.TrimStartAndEndInline();
 
 		int32 FirstSpaceIndex = -1;
-		if (!Param.FindChar(' ', FirstSpaceIndex))
+		if (!Param.FindChar(TEXT(' '), FirstSpaceIndex))
 		{
 			continue;
 		}
@@ -2765,7 +2765,7 @@ void FHeaderParser::CompileDirective()
 	// Skip to end of line (or end of multiline #define).
 	if (LineAtStartOfDirective == InputLine)
 	{
-		TCHAR LastCharacter = '\0';
+		TCHAR LastCharacter = TEXT('\0');
 		TCHAR c;
 		do
 		{			
@@ -8029,7 +8029,7 @@ void FHeaderParser::SimplifiedClassParse(FUnrealSourceFile& SourceFile, const TC
 			}
 
 			// Find the first '/' and check for '//' or '/*' or '*/'
-			if (StrLine.FindChar('/', Pos))
+			if (StrLine.FindChar(TEXT('/'), Pos))
 			{
 				if (Pos >= 0)
 				{
