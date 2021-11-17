@@ -144,7 +144,7 @@ static const UObject* ValuePtrToContainerUObjectPtr(FProperty* Property, const v
 	return (const UObject*)ContainerPtr;
 }
 
-const UObject* IAnimClassInterface::GetObjectPtrFromAnimNode(IAnimClassInterface* InAnimClassInterface, const FAnimNode_Base* InNode)
+const UObject* IAnimClassInterface::GetObjectPtrFromAnimNode(const IAnimClassInterface* InAnimClassInterface, const FAnimNode_Base* InNode)
 {
 	const int32 NodeIndex = InNode->GetNodeIndex();
 	FStructProperty* NodeProperty = InAnimClassInterface->GetAnimNodeProperties()[NodeIndex];
