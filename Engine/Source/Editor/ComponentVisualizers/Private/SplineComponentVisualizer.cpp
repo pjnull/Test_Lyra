@@ -1488,7 +1488,9 @@ bool FSplineComponentVisualizer::HandleBoxSelect(const FBox& InBox, FEditorViewp
 	if (SplineComp != nullptr)
 	{
 		bool bSelectionChanged = false;
+		bool bAppendToSelection = InViewportClient->IsShiftPressed();
 
+		const TSet<int32>& SelectedKeys = SelectionState->GetSelectedKeys();
 		const FInterpCurveVector& SplineInfo = SplineComp->GetSplinePointsPosition();
 		int32 NumPoints = SplineInfo.Points.Num();
 
@@ -1499,8 +1501,12 @@ bool FSplineComponentVisualizer::HandleBoxSelect(const FBox& InBox, FEditorViewp
 
 			if (InBox.IsInside(Pos))
 			{
-				ChangeSelectionState(KeyIdx, true);
-				bSelectionChanged = true;
+				if (!bAppendToSelection || !SelectedKeys.Contains(KeyIdx))
+				{
+					ChangeSelectionState(KeyIdx, bAppendToSelection);
+					bAppendToSelection = true;
+					bSelectionChanged = true;
+				}
 			}
 		}
 
@@ -1527,7 +1533,9 @@ bool FSplineComponentVisualizer::HandleFrustumSelect(const FConvexVolume& InFrus
 	if (SplineComp != nullptr)
 	{
 		bool bSelectionChanged = false;
+		bool bAppendToSelection = InViewportClient->IsShiftPressed();
 
+		const TSet<int32>& SelectedKeys = SelectionState->GetSelectedKeys();
 		const FInterpCurveVector& SplineInfo = SplineComp->GetSplinePointsPosition();
 		int32 NumPoints = SplineInfo.Points.Num();
 
@@ -1538,8 +1546,12 @@ bool FSplineComponentVisualizer::HandleFrustumSelect(const FConvexVolume& InFrus
 
 			if (InFrustum.IntersectPoint(Pos))
 			{
-				ChangeSelectionState(KeyIdx, true);
-				bSelectionChanged = true;
+				if (!bAppendToSelection || !SelectedKeys.Contains(KeyIdx))
+				{
+					ChangeSelectionState(KeyIdx, bAppendToSelection);
+					bAppendToSelection = true;
+					bSelectionChanged = true;
+				}
 			}
 		}
 
