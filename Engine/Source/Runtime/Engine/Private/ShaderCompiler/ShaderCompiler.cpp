@@ -1958,9 +1958,9 @@ struct FShaderCompileWorkerInfo
 
 FShaderCompileThreadRunnableBase::FShaderCompileThreadRunnableBase(FShaderCompilingManager* InManager)
 	: Manager(InManager)
+	, Thread(nullptr)
 	, MinPriorityIndex(0)
 	, MaxPriorityIndex(NumShaderCompileJobPriorities - 1)
-	, Thread(nullptr)
 	, bForceFinish(false)
 {
 }
