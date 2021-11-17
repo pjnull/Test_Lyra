@@ -640,14 +640,18 @@ void UBuoyancyComponent::OnPontoonExitedWater(const FSphericalPontoon& Pontoon)
 
 void UBuoyancyComponent::GetLastWaterSurfaceInfo(FVector& OutWaterPlaneLocation, FVector& OutWaterPlaneNormal, FVector& OutWaterSurfacePosition, float& OutWaterDepth, int32& OutWaterBodyIdx, FVector& OutWaterVelocity)
 {
-	if (BuoyancyData.Pontoons.Num())
+	for (int i = 0; i < BuoyancyData.Pontoons.Num(); ++i)
 	{
-		OutWaterPlaneLocation = BuoyancyData.Pontoons[0].WaterPlaneLocation;
-		OutWaterPlaneNormal = BuoyancyData.Pontoons[0].WaterPlaneNormal;
-		OutWaterSurfacePosition = BuoyancyData.Pontoons[0].WaterSurfacePosition;
-		OutWaterDepth = BuoyancyData.Pontoons[0].WaterDepth;
-		OutWaterBodyIdx = BuoyancyData.Pontoons[0].WaterBodyIndex;
-		OutWaterVelocity = BuoyancyData.Pontoons[0].WaterVelocity;
+		if (BuoyancyData.Pontoons[i].ImmersionDepth > 0.0f)
+		{
+			OutWaterPlaneLocation = BuoyancyData.Pontoons[i].WaterPlaneLocation;
+			OutWaterPlaneNormal = BuoyancyData.Pontoons[i].WaterPlaneNormal;
+			OutWaterSurfacePosition = BuoyancyData.Pontoons[i].WaterSurfacePosition;
+			OutWaterDepth = BuoyancyData.Pontoons[i].WaterDepth;
+			OutWaterBodyIdx = BuoyancyData.Pontoons[i].WaterBodyIndex;
+			OutWaterVelocity = BuoyancyData.Pontoons[i].WaterVelocity;
+			return;
+		}
 	}
 }
 
