@@ -313,7 +313,7 @@ namespace UnrealBuildTool
 		public VCCompileAction(BinaryArchiveReader Reader)
 		{
 			ActionType = (ActionType)Reader.ReadInt();
-			CompilerExe = Reader.ReadFileItem();
+			CompilerExe = Reader.ReadFileItem()!;
 			CompilerType = (WindowsCompiler)Reader.ReadInt();
 			ToolChainVersion = Reader.ReadString()!;
 			SourceFile = Reader.ReadFileItem();
