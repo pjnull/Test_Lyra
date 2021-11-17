@@ -56,7 +56,30 @@ DECLARE_MEMORY_STAT( TEXT( "StaticMesh PreCulled Index Memory" ), STAT_StaticMes
 FStaticMeshComponentInstanceData::FStaticMeshComponentInstanceData(const UStaticMeshComponent* SourceComponent)
 	: FPrimitiveComponentInstanceData(SourceComponent)
 	, StaticMesh(SourceComponent->GetStaticMesh())
-{}
+{
+	for (const FStaticMeshComponentLODInfo& LODDataEntry : SourceComponent->LODData)
+	{
+		CachedStaticLighting.Add(LODDataEntry.MapBuildDataId);
+	}
+
+	// Backup the texture streaming data.
+	StreamingTextureData = SourceComponent->StreamingTextureData;
+#if WITH_EDITORONLY_DATA
+	MaterialStreamingRelativeBoxes = SourceComponent->MaterialStreamingRelativeBoxes;
+#endif
+
+	// Cache instance vertex colors
+	for (int32 LODIndex = 0; LODIndex < SourceComponent->LODData.Num(); ++LODIndex)
+	{
+		const FStaticMeshComponentLODInfo& LODInfo = SourceComponent->LODData[LODIndex];
+
+		// Note: we don't need to check LODInfo.PaintedVertices here since it's not always required.
+		if (LODInfo.OverrideVertexColors && LODInfo.OverrideVertexColors->GetNumVertices() > 0)
+		{
+			AddVertexColorData(LODInfo, LODIndex);
+		}
+	}
+}
 
 bool FStaticMeshComponentInstanceData::ContainsData() const 
 {
@@ -2542,32 +2565,6 @@ int32 UStaticMeshComponent::GetBlueprintCreatedComponentIndex() const
 TStructOnScope<FActorComponentInstanceData> UStaticMeshComponent::GetComponentInstanceData() const
 {
 	TStructOnScope<FActorComponentInstanceData> InstanceData = MakeStructOnScope<FActorComponentInstanceData, FStaticMeshComponentInstanceData>(this);
-	FStaticMeshComponentInstanceData* StaticMeshInstanceData = InstanceData.Cast<FStaticMeshComponentInstanceData>();
-	
-	// Fill in info
-	for (const FStaticMeshComponentLODInfo& LODDataEntry : LODData)
-	{
-		StaticMeshInstanceData->CachedStaticLighting.Add(LODDataEntry.MapBuildDataId);
-	}
-
-	// Backup the texture streaming data.
-	StaticMeshInstanceData->StreamingTextureData = StreamingTextureData;
-#if WITH_EDITORONLY_DATA
-	StaticMeshInstanceData->MaterialStreamingRelativeBoxes = MaterialStreamingRelativeBoxes;
-#endif
-
-	// Cache instance vertex colors
-	for( int32 LODIndex = 0; LODIndex < LODData.Num(); ++LODIndex )
-	{
-		const FStaticMeshComponentLODInfo& LODInfo = LODData[LODIndex];
-
-		// Note: we don't need to check LODInfo.PaintedVertices here since it's not always required.
-		if ( LODInfo.OverrideVertexColors && LODInfo.OverrideVertexColors->GetNumVertices() > 0 )
-		{
-			StaticMeshInstanceData->AddVertexColorData(LODInfo, LODIndex);
-		}
-	}
-
 	return InstanceData;
 }
 
