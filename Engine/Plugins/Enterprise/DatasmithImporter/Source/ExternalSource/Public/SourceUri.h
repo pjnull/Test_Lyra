@@ -33,7 +33,7 @@ namespace UE::DatasmithImporter
 		FSourceUri(const FString& InScheme, const FString& InPath, const TContainer& QueryContainer)
 			: Uri(InScheme + GetSchemeDelimiter() + InPath)
 		{
-			static_assert(std::is_same<TContainer::ElementType, TPair<FString, FString>>::value, TEXT("Query container must consist of a collection of TPair<FString, FString>."));
+			static_assert(std::is_same<typename TContainer::ElementType, TPair<FString, FString>>::value, TEXT("Query container must consist of a collection of TPair<FString, FString>."));
 
 			if (QueryContainer.Num() > 0)
 			{
