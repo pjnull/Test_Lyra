@@ -55,6 +55,19 @@ struct FEOSAuthCredentials :
 		Token = TokenAnsi;
 	}
 
+	FEOSAuthCredentials(const FEOSAuthCredentials& Other)
+	{
+		ApiVersion = Other.ApiVersion;
+		Id = IdAnsi;
+		Token = TokenAnsi;
+		Type = Other.Type;
+		SystemAuthCredentialsOptions = Other.SystemAuthCredentialsOptions;
+		ExternalType = Other.ExternalType;
+
+		FCStringAnsi::Strncpy(IdAnsi, Other.IdAnsi, EOS_OSS_STRING_BUFFER_LENGTH);
+		FCStringAnsi::Strncpy(TokenAnsi, Other.TokenAnsi, EOS_MAX_TOKEN_SIZE);
+	}
+
 	FEOSAuthCredentials(EOS_EExternalCredentialType InExternalType, const TArray<uint8>& InToken) :
 		EOS_Auth_Credentials()
 	{
@@ -66,6 +79,19 @@ struct FEOSAuthCredentials :
 
 		uint32_t InOutBufferLength = EOS_OSS_STRING_BUFFER_LENGTH;
 		EOS_ByteArray_ToString(InToken.GetData(), InToken.Num(), TokenAnsi, &InOutBufferLength);
+	}
+
+	FEOSAuthCredentials& operator=(FEOSAuthCredentials& Other)
+	{
+		ApiVersion = Other.ApiVersion;
+		Type = Other.Type;
+		SystemAuthCredentialsOptions = Other.SystemAuthCredentialsOptions;
+		ExternalType = Other.ExternalType;
+
+		FCStringAnsi::Strncpy(IdAnsi, Other.IdAnsi, EOS_OSS_STRING_BUFFER_LENGTH);
+		FCStringAnsi::Strncpy(TokenAnsi, Other.TokenAnsi, EOS_MAX_TOKEN_SIZE);
+
+		return *this;
 	}
 
 	char IdAnsi[EOS_OSS_STRING_BUFFER_LENGTH];
@@ -180,12 +206,12 @@ bool LexFromString(EOS_ELoginCredentialType& OutEnum, const TCHAR* const InStrin
 
 TOnlineAsyncOpHandle<FAuthLogin> FAuthEOS::Login(FAuthLogin::Params&& Params)
 {
-	TOnlineAsyncOp<FAuthLogin>& Op = GetOp<FAuthLogin>(MoveTemp(Params));
+	TOnlineAsyncOpRef<FAuthLogin> Op = GetOp<FAuthLogin>(MoveTemp(Params));
 
 	EOS_Auth_LoginOptions LoginOptions = { };
 	LoginOptions.ApiVersion = EOS_AUTH_LOGIN_API_LATEST;
 	bool bContainsFlagsNone = false;
-	for (const FString& Scope : Op.GetParams().Scopes)
+	for (const FString& Scope : Op->GetParams().Scopes)
 	{
 		EOS_EAuthScopeFlags ScopeFlag;
 		if (LexFromString(ScopeFlag, *Scope))
@@ -199,8 +225,8 @@ TOnlineAsyncOpHandle<FAuthLogin> FAuthEOS::Login(FAuthLogin::Params&& Params)
 		else
 		{
 			UE_LOG(LogTemp, Warning, TEXT("Invalid ScopeFlag=[%s]"), *Scope);
-			Op.SetError(Errors::Unknown());
-			return Op.GetHandle();
+			Op->SetError(Errors::Unknown());
+			return Op->GetHandle();
 		}
 	}
 	// TODO:  Where to put default scopes?
@@ -210,23 +236,23 @@ TOnlineAsyncOpHandle<FAuthLogin> FAuthEOS::Login(FAuthLogin::Params&& Params)
 	}	
 
 	FEOSAuthCredentials Credentials;
-	if (LexFromString(Credentials.Type, *Op.GetParams().CredentialsType))
+	if (LexFromString(Credentials.Type, *Op->GetParams().CredentialsType))
 	{
 		switch (Credentials.Type)
 		{
 		case EOS_ELoginCredentialType::EOS_LCT_ExchangeCode:
 			// This is how the Epic launcher will pass credentials to you
 			Credentials.IdAnsi[0] = '\0';
-			FCStringAnsi::Strncpy(Credentials.TokenAnsi, TCHAR_TO_UTF8(*Op.GetParams().CredentialsToken), EOS_MAX_TOKEN_SIZE);
+			FCStringAnsi::Strncpy(Credentials.TokenAnsi, TCHAR_TO_UTF8(*Op->GetParams().CredentialsToken), EOS_MAX_TOKEN_SIZE);
 			break;
 		case EOS_ELoginCredentialType::EOS_LCT_Password:
-			FCStringAnsi::Strncpy(Credentials.IdAnsi, TCHAR_TO_UTF8(*Op.GetParams().CredentialsId), EOS_OSS_STRING_BUFFER_LENGTH);
-			FCStringAnsi::Strncpy(Credentials.TokenAnsi, TCHAR_TO_UTF8(*Op.GetParams().CredentialsToken), EOS_MAX_TOKEN_SIZE);
+			FCStringAnsi::Strncpy(Credentials.IdAnsi, TCHAR_TO_UTF8(*Op->GetParams().CredentialsId), EOS_OSS_STRING_BUFFER_LENGTH);
+			FCStringAnsi::Strncpy(Credentials.TokenAnsi, TCHAR_TO_UTF8(*Op->GetParams().CredentialsToken), EOS_MAX_TOKEN_SIZE);
 			break;
 		case EOS_ELoginCredentialType::EOS_LCT_Developer:
 			// This is auth via the EOS auth tool
-			FCStringAnsi::Strncpy(Credentials.IdAnsi, TCHAR_TO_UTF8(*Op.GetParams().CredentialsId), EOS_OSS_STRING_BUFFER_LENGTH);
-			FCStringAnsi::Strncpy(Credentials.TokenAnsi, TCHAR_TO_UTF8(*Op.GetParams().CredentialsToken), EOS_MAX_TOKEN_SIZE);
+			FCStringAnsi::Strncpy(Credentials.IdAnsi, TCHAR_TO_UTF8(*Op->GetParams().CredentialsId), EOS_OSS_STRING_BUFFER_LENGTH);
+			FCStringAnsi::Strncpy(Credentials.TokenAnsi, TCHAR_TO_UTF8(*Op->GetParams().CredentialsToken), EOS_MAX_TOKEN_SIZE);
 			break;
 		case EOS_ELoginCredentialType::EOS_LCT_AccountPortal:
 			// This is auth via the EOS Account Portal
@@ -239,19 +265,19 @@ TOnlineAsyncOpHandle<FAuthLogin> FAuthEOS::Login(FAuthLogin::Params&& Params)
 			Credentials.Token = nullptr;
 			break;
 		default:
-			UE_LOG(LogTemp, Warning, TEXT("Unsupported CredentialsType=[%s]"), *Op.GetParams().CredentialsType);
-			Op.SetError(Errors::Unknown()); // TODO
-			return Op.GetHandle();
+			UE_LOG(LogTemp, Warning, TEXT("Unsupported CredentialsType=[%s]"), *Op->GetParams().CredentialsType);
+			Op->SetError(Errors::Unknown()); // TODO
+			return Op->GetHandle();
 		}
 	}
 	else
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Invalid CredentialsType=[%s]"), *Op.GetParams().CredentialsType);
-		Op.SetError(Errors::Unknown()); // TODO
-		return Op.GetHandle();
+		UE_LOG(LogTemp, Warning, TEXT("Invalid CredentialsType=[%s]"), *Op->GetParams().CredentialsType);
+		Op->SetError(Errors::Unknown()); // TODO
+		return Op->GetHandle();
 	}
 
-	Op.Then([this, LoginOptions, Credentials](TOnlineAsyncOp<FAuthLogin>& InAsyncOp) mutable
+	Op->Then([this, LoginOptions, Credentials](TOnlineAsyncOp<FAuthLogin>& InAsyncOp) mutable
 	{
 		LoginOptions.Credentials = &Credentials;
 		return EOS_Async<EOS_Auth_LoginCallbackInfo>(InAsyncOp, EOS_Auth_Login, AuthHandle, LoginOptions);
@@ -357,9 +383,9 @@ TOnlineAsyncOpHandle<FAuthLogin> FAuthEOS::Login(FAuthLogin::Params&& Params)
 			InAsyncOp.SetError(Errors::Unknown()); // TODO
 		}
 	})
-	.Enqueue();
+	.Enqueue(GetSerialQueue());
 
-	return Op.GetHandle();
+	return Op->GetHandle();
 }
 
 void FAuthEOS::ProcessSuccessfulLogin(TOnlineAsyncOp<FAuthLogin>& InAsyncOp)
@@ -391,11 +417,11 @@ TOnlineAsyncOpHandle<FAuthLogout> FAuthEOS::Logout(FAuthLogout::Params&& Params)
 {
 	FAccountId ParamLocalUserId = Params.LocalUserId;
 	TOptional<EOS_EpicAccountId> AccountId = EOSAccountIdFromOnlineServiceAccountId(ParamLocalUserId);
-	TOnlineAsyncOp<FAuthLogout>& Op = GetOp<FAuthLogout>(MoveTemp(Params));
+	TOnlineAsyncOpRef<FAuthLogout> Op = GetOp<FAuthLogout>(MoveTemp(Params));
 	if (AccountId.IsSet() && AccountInfos.Contains(ParamLocalUserId))
 	{
 		// Should we destroy persistent auth first?
-		TOnlineChainableAsyncOp<FAuthLogout, void> NextOp = Op.Then([](TOnlineAsyncOp<FAuthLogout>& InAsyncOp){ return; });
+		TOnlineChainableAsyncOp<FAuthLogout, void> NextOp = *Op;
 		if (Params.bDestroyAuth)
 		{
 			EOS_Auth_DeletePersistentAuthOptions DeletePersistentAuthOptions = {0};
@@ -434,15 +460,15 @@ TOnlineAsyncOpHandle<FAuthLogout> FAuthEOS::Logout(FAuthLogout::Params&& Params)
 					FOnlineError Error = Errors::Unknown();
 					InAsyncOp.SetError(MoveTemp(Error));
 				}
-			}).Enqueue();
+			}).Enqueue(GetSerialQueue());
 	}
 	else
 	{
 		// TODO: Error codes
-		Op.SetError(Errors::Unknown());
+		Op->SetError(Errors::Unknown());
 	}
 	
-	return Op.GetHandle();
+	return Op->GetHandle();
 }
 
 TOnlineAsyncOpHandle<FAuthGenerateAuth> FAuthEOS::GenerateAuth(FAuthGenerateAuth::Params&& Params)

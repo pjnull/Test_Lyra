@@ -20,9 +20,9 @@ void FExternalUICommon::RegisterCommands()
 
 TOnlineAsyncOpHandle<FExternalUIShowFriendsUI> FExternalUICommon::ShowFriendsUI(FExternalUIShowFriendsUI::Params&& Params)
 {
-	TOnlineAsyncOp<FExternalUIShowFriendsUI>& Operation = GetOp<FExternalUIShowFriendsUI>(MoveTemp(Params));
-	Operation.SetError(Errors::NotImplemented());  
-	return Operation.GetHandle();
+	TOnlineAsyncOpRef<FExternalUIShowFriendsUI> Operation = GetOp<FExternalUIShowFriendsUI>(MoveTemp(Params));
+	Operation->SetError(Errors::NotImplemented());
+	return Operation->GetHandle();
 }
 
 /* UE::Online */ }

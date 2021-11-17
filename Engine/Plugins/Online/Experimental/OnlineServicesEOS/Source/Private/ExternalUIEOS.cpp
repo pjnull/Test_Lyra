@@ -35,21 +35,21 @@ void FExternalUIEOS::PreShutdown()
 
 TOnlineAsyncOpHandle<FExternalUIShowFriendsUI> FExternalUIEOS::ShowFriendsUI(FExternalUIShowFriendsUI::Params&& Params)
 {
-	TOnlineAsyncOp<FExternalUIShowFriendsUI>& Op = GetOp<FExternalUIShowFriendsUI>(MoveTemp(Params));
+	TOnlineAsyncOpRef<FExternalUIShowFriendsUI> Op = GetOp<FExternalUIShowFriendsUI>(MoveTemp(Params));
 
 	TOptional<EOS_EpicAccountId> EpicAccountId = EOSAccountIdFromOnlineServiceAccountId(Params.AccountId);
 	if (!EpicAccountId.IsSet())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[FExternalUIEOS::ShowFriendsUI] EpicAccountId not found for AccountId [%d]"), Params.AccountId.Handle);
-		Op.SetError(Errors::Unknown()); // TODO
-		return Op.GetHandle();
+		Op->SetError(Errors::Unknown()); // TODO
+		return Op->GetHandle();
 	}
 
 	EOS_UI_ShowFriendsOptions ShowFriendsOptions = {};
 	ShowFriendsOptions.ApiVersion = EOS_UI_SHOWFRIENDS_API_LATEST;
 	ShowFriendsOptions.LocalUserId = *EpicAccountId;
 
-	Op.Then([this, ShowFriendsOptions](TOnlineAsyncOp<FExternalUIShowFriendsUI>& InAsyncOp) mutable
+	Op->Then([this, ShowFriendsOptions](TOnlineAsyncOp<FExternalUIShowFriendsUI>& InAsyncOp) mutable
 	{
 		return EOS_Async<EOS_UI_ShowFriendsCallbackInfo>(InAsyncOp, EOS_UI_ShowFriends, UIHandle, ShowFriendsOptions);
 	})
@@ -67,9 +67,9 @@ TOnlineAsyncOpHandle<FExternalUIShowFriendsUI> FExternalUIEOS::ShowFriendsUI(FEx
 			InAsyncOp.SetError(Errors::Unknown());
 		}
 	})
-	.Enqueue();
+	.Enqueue(GetSerialQueue());
 
-	return Op.GetHandle();
+	return Op->GetHandle();
 }
 
 /* UE::Online */ }
