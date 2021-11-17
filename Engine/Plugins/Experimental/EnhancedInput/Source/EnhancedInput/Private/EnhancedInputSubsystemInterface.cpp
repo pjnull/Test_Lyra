@@ -72,9 +72,10 @@ void IEnhancedInputSubsystemInterface::RemoveMappingContext(const UInputMappingC
 void IEnhancedInputSubsystemInterface::RequestRebuildControlMappings(bool bForceImmediately, const bool bIgnoreAllPressedKeysUntilRelease /* = true */)
 {
 	bMappingRebuildPending = true;
+	bIgnoreAllPressedKeysUntilReleaseOnRebuild &= bIgnoreAllPressedKeysUntilRelease;
+
 	if (bForceImmediately)
 	{
-		bIgnoreAllPressedKeysUntilReleaseOnRebuild |= bIgnoreAllPressedKeysUntilRelease;
 		RebuildControlMappings();
 	}
 }
