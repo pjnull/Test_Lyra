@@ -16,7 +16,7 @@
 #define NAVMESHVER_LANDSCAPE_HEIGHT			13
 #define NAVMESHVER_LWCOORDS					14
 #define NAVMESHVER_OODLE_COMPRESSION		15
-#define NAVMESHVER_LWCOORDS_SEREALIZATION 	16 // Allows for nav meshes to be serialized agnostic of LWCoords being float or double.
+#define NAVMESHVER_LWCOORDS_SEREALIZATION 	17 // Allows for nav meshes to be serialized agnostic of LWCoords being float or double.
 
 
 #define NAVMESHVER_LATEST				NAVMESHVER_LWCOORDS_SEREALIZATION
