@@ -176,10 +176,10 @@
 				<Compile Target="CrashReportClient" Platform="$(EditorPlatform)" Configuration="Shipping" Arguments="$(GenericCompileArguments)"/>
 				<Compile Target="CrashReportClientEditor" Platform="$(EditorPlatform)" Configuration="Shipping" Arguments="$(GenericCompileArguments)"/>
 				<Do If="$(WithRemoteExecWorkers)" >
-					<Compile Target="BaseTextureBuildWorker" Platform="$(EditorPlatform)" Configuration="Development" Arguments="-project=$(TargetProject) $(GenericCompileArguments)"/>
+					<Compile Target="BaseTextureBuildWorker" Platform="$(EditorPlatform)" Configuration="Development" Arguments="-project=&quot;$(RootDir)/$(TargetProject)&quot; $(GenericCompileArguments)"/>
 					<Do If="'$(EditorPlatform)' == 'Win64'" >
 						<ForEach Name="TargetPlatform" Values="PS4+PS5+Switch+XboxOneGDK+XSX" Separator="+">
-							<Compile Target="$(TargetPlatform)TextureBuildWorker" Platform="$(EditorPlatform)" Configuration="Development" Arguments="-project=$(TargetProject) $(GenericCompileArguments)" If="ContainsItem('$(TargetPlatforms)', '$(TargetPlatform)', '+')"/>
+							<Compile Target="$(TargetPlatform)TextureBuildWorker" Platform="$(EditorPlatform)" Configuration="Development" Arguments="-project=&quot;$(RootDir)/$(TargetProject)&quot; $(GenericCompileArguments)" If="ContainsItem('$(TargetPlatforms)', '$(TargetPlatform)', '+')"/>
 						</ForEach>
 					</Do>
 				</Do>
