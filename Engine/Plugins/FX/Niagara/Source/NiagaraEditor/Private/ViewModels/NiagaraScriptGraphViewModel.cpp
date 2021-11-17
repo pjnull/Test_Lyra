@@ -365,6 +365,14 @@ void FNiagaraScriptGraphViewModel::PasteNodes()
 	for(const FNiagaraClipboardScriptVariable& ClipboardScriptVariable : ClipboardContent->ScriptVariables)
 	{
 		const UNiagaraScriptVariable* ScriptVariable = ClipboardScriptVariable.ScriptVariable;
+
+		/** This should generally never be nullptr at this point, but:
+		*   When a script variable can't be properly deserialized due to faulty object (not variable!) names (such as "Module.Normalize Thickness" instead of "NiagaraScriptVariable_2")
+		*   It will be nullptr so we just skip it to avoid a crash */
+		if(ScriptVariable == nullptr)
+		{
+			continue;
+		}
 		
 		// we make sure here that we only copy over script variables if they didn't exist before. We inform the user so he knows.
 		if(UNiagaraScriptVariable* ExistingScriptVariable = NiagaraGraph->GetScriptVariable(ScriptVariable->Variable))
