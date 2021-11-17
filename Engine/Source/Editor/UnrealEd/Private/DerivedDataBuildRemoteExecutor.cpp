@@ -156,19 +156,28 @@ public:
 			UE::Zen::FZenServiceInstance& ZenServiceInstance = ScopeZenService->GetInstance();
 			if (ZenServiceInstance.IsServiceRunning())
 			{
-				RequestPool = MakeUnique<UE::Zen::FZenHttpRequestPool>(ZenServiceInstance.GetURL());
-				IModularFeatures::Get().RegisterModularFeature(IBuildWorkerExecutor::GetFeatureName(), this);
+				
+				ProcessingThreadEvent = FPlatformProcess::GetSynchEventFromPool(/* bIsManualReset = */ false);
 				ProcessingThread = TUniquePtr<FRunnableThread>(FRunnableThread::Create(this, TEXT("FRemoteBuildWorkerExecutor"), 0, TPri_BelowNormal));
 				bEnabled = ProcessingThread.IsValid();
 			}
+			
+			if (bEnabled)
+			{
+				RequestPool = MakeUnique<UE::Zen::FZenHttpRequestPool>(ZenServiceInstance.GetURL());
+				IModularFeatures::Get().RegisterModularFeature(IBuildWorkerExecutor::GetFeatureName(), this);
+			}
+			else
+			{
+				bProcessingThreadRunning = false;
+				ProcessingThreadEvent->Trigger();
+				ProcessingThread->WaitForCompletion();
+				ScopeZenService.Reset();
+				ProcessingThread.Reset();
+				FPlatformProcess::ReturnSynchEventToPool(ProcessingThreadEvent);
+			}
 		}
 
-		if (!bEnabled)
-		{
-			ScopeZenService.Reset();
-			RequestPool.Reset();
-			ProcessingThread.Reset();
-		}
 	}
 
 	virtual ~FRemoteBuildWorkerExecutor()
@@ -177,8 +186,11 @@ public:
 		{
 			IModularFeatures::Get().UnregisterModularFeature(IBuildWorkerExecutor::GetFeatureName(), this);
 			bProcessingThreadRunning = false;
+			ProcessingThreadEvent->Trigger();
+			ProcessingThread->WaitForCompletion();
+			FPlatformProcess::ReturnSynchEventToPool(ProcessingThreadEvent);
 		}
-	}
+	}	
 
 	void Build(
 		const FBuildAction& Action,
@@ -249,12 +261,16 @@ public:
 		bProcessingThreadRunning = true;
 		while (bProcessingThreadRunning)
 		{
+			ProcessingThreadEvent->Wait();
 			TUniqueFunction<void(bool)> Function;
 			while (PendingRequests.Dequeue(Function))
 			{
 				Function(true);
 			}
-			FPlatformProcess::Sleep(1.0f);
+			if (bProcessingThreadRunning)
+			{
+				FPlatformProcess::Sleep(1.0f);
+			}
 		}
 		return 0;
 	}
@@ -276,6 +292,7 @@ public:
 	void AddResultWaitRequest(TUniqueFunction<void(bool)>&& Function)
 	{
 		PendingRequests.Enqueue(MoveTemp(Function));
+		ProcessingThreadEvent->Trigger();
 	}
 
 private:
@@ -426,6 +443,7 @@ private:
 	FStats Stats;
 	FLimitingHeuristics LimitingHeuristics;
 	TUniquePtr<FRunnableThread> ProcessingThread;
+	FEvent* ProcessingThreadEvent;
 	TQueue<TUniqueFunction<void(bool)>, EQueueMode::Mpsc> PendingRequests;
 	int GlobalExecutionTimeoutSeconds;
 	TUniquePtr<UE::Zen::FScopeZenService> ScopeZenService;
