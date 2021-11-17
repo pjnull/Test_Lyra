@@ -183,7 +183,7 @@ static inline bool DoesPlatformSupportGPUSkinCache(const FStaticShaderPlatform P
 
 ENGINE_API bool IsGPUSkinCacheAvailable(EShaderPlatform Platform)
 {
-	return (GEnableGPUSkinCacheShaders != 0 || GForceRecomputeTangents != 0) && DoesPlatformSupportGPUSkinCache(Platform);
+	return (AreSkinCacheShadersEnabled(Platform) != 0 || GForceRecomputeTangents != 0) && DoesPlatformSupportGPUSkinCache(Platform);
 }
 
 ENGINE_API bool GPUSkinCacheNeedsDuplicatedVertices()

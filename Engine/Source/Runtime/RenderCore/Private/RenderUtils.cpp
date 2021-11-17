@@ -1748,3 +1748,9 @@ RENDERCORE_API bool IsUsingDBuffers(const FStaticShaderPlatform Platform)
 	extern RENDERCORE_API uint64 GDBufferPlatformMask;
 	return !!(GDBufferPlatformMask & (1ull << Platform));
 }
+
+RENDERCORE_API bool AreSkinCacheShadersEnabled(EShaderPlatform Platform)
+{
+	static FShaderPlatformCachedIniValue<bool> PerPlatformCVar(TEXT("/Script/Engine.RendererSettings"), TEXT("r.SkinCache.CompileShaders"));
+	return (PerPlatformCVar.Get(Platform) != 0);
+}

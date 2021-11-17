@@ -698,3 +698,8 @@ RENDERCORE_API bool UseVirtualTextureLightmap(const FStaticFeatureLevel InFeatur
  *  Checks if the non-pipeline shaders will not be compild and ones from FShaderPipeline used instead.
  */
 RENDERCORE_API bool ExcludeNonPipelinedShaderTypes(EShaderPlatform ShaderPlatform);
+
+/**
+ *   Checks if skin cache shaders are enabled for the platform (via r.SkinCache.CompileShaders)
+ */
+RENDERCORE_API bool AreSkinCacheShadersEnabled(EShaderPlatform Platform);
