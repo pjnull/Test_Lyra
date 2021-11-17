@@ -156,7 +156,7 @@ void UE::Interchange::FImportAsyncHelper::CleanUp()
 		if (SourceData)
 		{
 			SourceData->RemoveFromRoot();
-			SourceData->MarkPendingKill();
+			SourceData->MarkAsGarbage();
 		}
 	}
 	SourceDatas.Empty();
@@ -167,7 +167,7 @@ void UE::Interchange::FImportAsyncHelper::CleanUp()
 		{
 			Translator->ImportFinish();
 			Translator->RemoveFromRoot();
-			Translator->MarkPendingKill();
+			Translator->MarkAsGarbage();
 		}
 	}
 	Translators.Empty();
@@ -177,7 +177,7 @@ void UE::Interchange::FImportAsyncHelper::CleanUp()
 		if(Pipeline)
 		{
 			Pipeline->RemoveFromRoot();
-			Pipeline->MarkPendingKill();
+			Pipeline->MarkAsGarbage();
 		}
 	}
 	Pipelines.Empty();
@@ -187,7 +187,7 @@ void UE::Interchange::FImportAsyncHelper::CleanUp()
 		if (FactoryKeyAndValue.Value)
 		{
 			FactoryKeyAndValue.Value->RemoveFromRoot();
-			FactoryKeyAndValue.Value->MarkPendingKill();
+			FactoryKeyAndValue.Value->MarkAsGarbage();
 		}
 	}
 	CreatedFactories.Empty();

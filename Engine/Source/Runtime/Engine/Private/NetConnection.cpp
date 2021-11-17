@@ -4944,7 +4944,7 @@ static void	RemoveSimulatedNetConnections(const TArray<FString>& Args, UWorld* W
 		if (Connection && IsValidChecked(Connection) && !Connection->IsUnreachable())
 		{
 			Connection->Close();
-			Connection->MarkPendingKill();
+			Connection->MarkAsGarbage();
 
 			RemovedConnections++;
 			if (ConnectionCount > 0 && RemovedConnections >= ConnectionCount)

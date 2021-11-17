@@ -2310,7 +2310,7 @@ void FBlueprintCompilationManagerImpl::ReinstanceBatch(TArray<FReinstancingJob>&
 				FLinkerLoad::PRIVATE_PatchNewObjectIntoExport(Archetype, NewArchetype);
 
 				Archetype->RemoveFromRoot();
-				Archetype->MarkPendingKill();
+				Archetype->MarkAsGarbage();
 			}
 		}
 	}

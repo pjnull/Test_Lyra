@@ -255,7 +255,7 @@ FControlRigEditor::~FControlRigEditor()
 	if (UWorld* PreviewWorld = GetPersonaToolkit()->GetPreviewScene()->GetWorld())
 	{
 		PreviewWorld->MarkObjectsPendingKill();
-		PreviewWorld->MarkPendingKill();
+		PreviewWorld->MarkAsGarbage();
 	}
 
 	if (PersonaToolkit.IsValid())
@@ -1711,7 +1711,7 @@ void FControlRigEditor::ClearDetailObject(bool bChangeUISelectionState)
 			UDetailsViewWrapperObject* WrapperObject = WrapperObjectPtr.Get();
 			WrapperObject->RemoveFromRoot();
 			WrapperObject->Rename(nullptr, GetTransientPackage(), REN_ForceNoResetLoaders | REN_DoNotDirty | REN_DontCreateRedirectors | REN_NonTransactional);
-			WrapperObject->MarkPendingKill();
+			WrapperObject->MarkAsGarbage();
 		}
 	}
 	WrapperObjects.Reset();

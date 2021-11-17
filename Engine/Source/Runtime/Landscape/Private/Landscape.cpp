@@ -3093,7 +3093,7 @@ void ULandscapeInfo::RecreateLandscapeInfo(UWorld* InWorld, bool bMapCheck)
 
 		if (Info != nullptr && Info->GetLandscapeProxy() == nullptr)
 		{
-			Info->MarkPendingKill();
+			Info->MarkAsGarbage();
 			It.RemoveCurrent();
 		}
 		else if (Info == nullptr) // remove invalid entry

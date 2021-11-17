@@ -6572,7 +6572,7 @@ EAsyncPackageState::Type FAsyncPackage::FinishObjects()
 			if (Object && Object->GetOutermost()->GetFName() == Desc.Name)
 			{
 				Object->ClearFlags(RF_NeedPostLoad | RF_NeedLoad | RF_NeedPostLoadSubobjects);
-				Object->MarkPendingKill();
+				Object->MarkAsGarbage();
 				PackageObjLoaded[ObjectIndex] = nullptr;
 			}
 		}
@@ -6583,7 +6583,7 @@ EAsyncPackageState::Type FAsyncPackage::FinishObjects()
 			if (bCreatedLinkerRoot)
 			{
 				LinkerRoot->ClearFlags(RF_NeedPostLoad | RF_NeedLoad | RF_NeedPostLoadSubobjects);
-				LinkerRoot->MarkPendingKill();
+				LinkerRoot->MarkAsGarbage();
 				LinkerRoot->Rename(*MakeUniqueObjectName(GetTransientPackage(), UPackage::StaticClass()).ToString(), nullptr, REN_DontCreateRedirectors | REN_DoNotDirty | REN_ForceNoResetLoaders | REN_NonTransactional);
 			}
 			DetachLinker();

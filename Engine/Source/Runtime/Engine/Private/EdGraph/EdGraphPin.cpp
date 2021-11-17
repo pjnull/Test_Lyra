@@ -1337,7 +1337,7 @@ FEdGraphTerminalType UEdGraphPin::GetPrimaryTerminalType() const
 	return FEdGraphTerminalType::FromPinType(PinType);
 }
 
-void UEdGraphPin::MarkPendingKill()
+void UEdGraphPin::MarkAsGarbage()
 {
 	if (!bWasTrashed)
 	{

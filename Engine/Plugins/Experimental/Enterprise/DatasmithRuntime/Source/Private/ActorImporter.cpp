@@ -567,7 +567,7 @@ namespace DatasmithRuntime
 		SceneComponent->ClearFlags(RF_AllFlags);
 		SceneComponent->SetFlags(RF_Transient);
 		//SceneComponent->Rename(nullptr, nullptr, REN_NonTransactional | REN_DontCreateRedirectors);
-		SceneComponent->MarkPendingKill();
+		SceneComponent->MarkAsGarbage();
 	}
 
 	void RenameObject(UObject* Object, const TCHAR* DesiredName, UObject* NewOwner)

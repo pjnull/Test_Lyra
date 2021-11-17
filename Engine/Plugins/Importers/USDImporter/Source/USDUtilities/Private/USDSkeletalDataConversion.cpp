@@ -2158,7 +2158,7 @@ USkeletalMesh* UsdToUnreal::GetSkeletalMeshFromImportData(
 	}
 	if ( SkeletalMesh->GetRefSkeleton().GetRawBoneNum() == 0 )
 	{
-		SkeletalMesh->MarkPendingKill();
+		SkeletalMesh->MarkAsGarbage();
 		return nullptr;
 	}
 
@@ -2253,7 +2253,7 @@ USkeletalMesh* UsdToUnreal::GetSkeletalMeshFromImportData(
 
 		if ( !bBuildSuccess )
 		{
-			SkeletalMesh->MarkPendingKill();
+			SkeletalMesh->MarkAsGarbage();
 			return nullptr;
 		}
 

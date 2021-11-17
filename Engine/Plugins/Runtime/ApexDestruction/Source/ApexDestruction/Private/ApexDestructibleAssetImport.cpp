@@ -918,7 +918,7 @@ bool SetApexDestructibleAsset(UDestructibleMesh& DestructibleMesh, apex::Destruc
 		// Create actual rendering data.
 		if (!MeshUtilities.BuildSkeletalMesh(DestructibleMeshResource.LODModels[0], DestructibleMesh.GetPathName(), DestructibleMesh.RefSkeleton, LODInfluences,LODWedges,LODFaces,LODPoints,LODPointToRawMap,BuildOptions))
 		{
-			DestructibleMesh.MarkPendingKill();
+			DestructibleMesh.MarkAsGarbage();
 
 			return false;
 		}

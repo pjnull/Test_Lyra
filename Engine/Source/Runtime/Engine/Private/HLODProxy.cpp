@@ -685,7 +685,7 @@ void UHLODProxy::DestroyObject(UObject* InObject)
 		InObject->ClearFlags(RF_Public | RF_Standalone);
 		InObject->SetFlags(RF_Transient);
 		InObject->Rename(nullptr, GetTransientPackage());
-		InObject->MarkPendingKill();
+		InObject->MarkAsGarbage();
 	
 		if (InObject->IsRooted())
 		{

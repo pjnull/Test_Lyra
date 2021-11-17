@@ -1441,11 +1441,11 @@ void UObject::Serialize(FStructuredArchive::FRecord Record)
 				Record << SA_VALUE(TEXT("WasKill"), WasKill);
 				if (WasKill)
 				{
-					MarkPendingKill();
+					MarkAsGarbage();
 				}
 				else
 				{
-					ClearPendingKill();
+					ClearGarbage();
 				}
 			}
 			else if (UnderlyingArchive.IsSaving())

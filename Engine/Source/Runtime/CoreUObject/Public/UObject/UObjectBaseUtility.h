@@ -82,7 +82,7 @@ public:
 	FORCEINLINE void SetFlags( EObjectFlags NewFlags )
 	{
 		checkSlow(!(NewFlags & (RF_MarkAsNative | RF_MarkAsRootSet | RF_InternalPendingKill | RF_InternalGarbage))); // These flags can't be used outside of constructors / internal code
-		checkf(!(NewFlags & RF_InternalMirroredFlags) || (GetFlags() & (NewFlags & RF_InternalMirroredFlags)) == (NewFlags & RF_InternalMirroredFlags), TEXT("RF_PendingKill and RF_garbage can not be set through SetFlags function. Use MarkPendingKill() or MarkAsGarbage() instead"));
+		checkf(!(NewFlags & RF_InternalMirroredFlags) || (GetFlags() & (NewFlags & RF_InternalMirroredFlags)) == (NewFlags & RF_InternalMirroredFlags), TEXT("RF_PendingKill and RF_garbage can not be set through SetFlags function. Use MarkAsGarbage() instead"));
 		SetFlagsTo(GetFlags() | NewFlags);
 	}
 
@@ -90,7 +90,7 @@ public:
 	FORCEINLINE void ClearFlags( EObjectFlags NewFlags )
 	{
 		checkSlow(!(NewFlags & (RF_MarkAsNative | RF_MarkAsRootSet | RF_InternalPendingKill | RF_InternalGarbage)) || NewFlags == RF_AllFlags); // These flags can't be used outside of constructors / internal code
-		checkf(!(NewFlags & RF_InternalMirroredFlags) || (GetFlags() & (NewFlags & RF_InternalMirroredFlags)) == RF_NoFlags, TEXT("RF_PendingKill and RF_garbage can not be cleared through ClearFlags function. Use ClearPendingKill() or ClearGarbage() instead"));
+		checkf(!(NewFlags & RF_InternalMirroredFlags) || (GetFlags() & (NewFlags & RF_InternalMirroredFlags)) == RF_NoFlags, TEXT("RF_PendingKill and RF_garbage can not be cleared through ClearFlags function. Use ClearGarbage() instead"));
 		SetFlagsTo(GetFlags() & ~NewFlags);
 	}
 
@@ -207,6 +207,7 @@ public:
 	/**
 	 * Marks this object as PendingKill.
 	 */
+	UE_DEPRECATED(5.0, "MarkPendingKill() should no longer be used. Use MarkAsGarbage() which will work just like MarkPendingKill() if Pending Kill support is enabled.")
 	FORCEINLINE void MarkPendingKill()
 	{
 		check(!IsRooted());
@@ -223,6 +224,7 @@ public:
 	/**
 	 * Unmarks this object as PendingKill.
 	 */
+	UE_DEPRECATED(5.0, "ClearPendingKill() should no longer be used. Use ClearGarbage() which will work just like ClearPendingKill() if Pending Kill support is enabled.")
 	FORCEINLINE void ClearPendingKill()
 	{
 		if (bPendingKillDisabled)

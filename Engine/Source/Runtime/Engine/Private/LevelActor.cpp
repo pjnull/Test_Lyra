@@ -970,7 +970,7 @@ bool UWorld::DestroyActor( AActor* ThisActor, bool bNetForce, bool bShouldModify
 	ThisActor->UnregisterAllComponents();
 
 	// Mark the actor and its direct components as pending kill.
-	ThisActor->MarkPendingKill();
+	ThisActor->MarkAsGarbage();
 	ThisActor->MarkPackageDirty();
 	ThisActor->MarkComponentsAsPendingKill();
 

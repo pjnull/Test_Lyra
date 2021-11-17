@@ -1046,7 +1046,7 @@ UObject* UInterchangeSkeletalMeshFactory::CreateAsset(const FCreateAssetParams& 
 	{
 		//The material is not a UMaterialInterface
 		SkeletalMeshObject->RemoveFromRoot();
-		SkeletalMeshObject->MarkPendingKill();
+		SkeletalMeshObject->MarkAsGarbage();
 	}
 	return SkeletalMeshObject;
 

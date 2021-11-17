@@ -3138,7 +3138,7 @@ void ULevel::RegenerateLevelScriptActor()
 				LevelScriptBlueprint->SetObjectBeingDebugged(nullptr);
 			}
 
-			LevelScriptActor->MarkPendingKill();
+			LevelScriptActor->MarkAsGarbage();
 			LevelScriptActor = nullptr;
 		}
 

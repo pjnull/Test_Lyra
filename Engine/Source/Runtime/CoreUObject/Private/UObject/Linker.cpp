@@ -858,7 +858,7 @@ FLinkerLoad* GetPackageLinker
 
 	if (!Result && CreatedPackage)
 	{
-		CreatedPackage->MarkPendingKill();
+		CreatedPackage->MarkAsGarbage();
 	}
 
 	return Result;

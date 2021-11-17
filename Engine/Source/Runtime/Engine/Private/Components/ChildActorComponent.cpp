@@ -96,7 +96,7 @@ void UChildActorComponent::Serialize(FArchive& Ar)
 
 			if (AActor* UnwantedDuplicate = static_cast<AActor*>(FindObjectWithOuter(this, AActor::StaticClass())))
 			{
-				UnwantedDuplicate->MarkPendingKill();
+				UnwantedDuplicate->MarkAsGarbage();
 			}
 		}
 		else if (!GIsEditor && !Ar.IsLoading() && !GIsDuplicatingClassForReinstancing)

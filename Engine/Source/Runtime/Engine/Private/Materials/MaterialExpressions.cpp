@@ -10941,7 +10941,7 @@ void UMaterialExpressionPinBase::DeleteReroutePins()
 		{
 			Reroute.Expression->Modify();
 			Material->Expressions.Remove(Reroute.Expression);
-			Reroute.Expression->MarkPendingKill();
+			Reroute.Expression->MarkAsGarbage();
 		}
 		else
 		{
@@ -10995,7 +10995,7 @@ void UMaterialExpressionPinBase::PostEditChangeProperty(FPropertyChangedEvent& P
 			{
 				RemovedReroute->Modify();
 				Material->Expressions.Remove(RemovedReroute);
-				RemovedReroute->MarkPendingKill();
+				RemovedReroute->MarkAsGarbage();
 			}
 			else
 			{
@@ -11010,7 +11010,7 @@ void UMaterialExpressionPinBase::PostEditChangeProperty(FPropertyChangedEvent& P
 				{
 					RemovedReroute->Modify();
 					Material->Expressions.Remove(RemovedReroute);
-					RemovedReroute->MarkPendingKill();
+					RemovedReroute->MarkAsGarbage();
 				}
 				else
 				{

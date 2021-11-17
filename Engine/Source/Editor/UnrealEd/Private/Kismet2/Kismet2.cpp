@@ -290,7 +290,7 @@ void FBlueprintUnloader::UnloadBlueprint(const bool bResetPackage)
 		UnloadingBp->SetFlags(RF_Transient);
 		UnloadingBp->ClearFlags(RF_Standalone | RF_Transactional);
 		UnloadingBp->RemoveFromRoot();
-		UnloadingBp->MarkPendingKill();
+		UnloadingBp->MarkAsGarbage();
 		// if it's in the undo buffer, then we have to clear that...
 		if (FKismetEditorUtilities::IsReferencedByUndoBuffer(UnloadingBp))
 		{
@@ -838,7 +838,7 @@ static void ConformComponentsUtils::ConformRemovedNativeComponents(UObject* BpCd
 		if (Component->HasAnyInternalFlags(EInternalObjectFlags::AsyncLoading))
 		{
 			// Async loading components cannot be pending kill, or the async loading code will assert when trying to postload them.
-			Component->ClearPendingKill();
+			Component->ClearGarbage();
 			FLinkerLoad::InvalidateExport(Component);
 		}
 		DestroyedComponents.Add(Component);

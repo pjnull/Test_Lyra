@@ -652,7 +652,7 @@ FMaterialInstanceEditor::~FMaterialInstanceEditor()
 	{
 		MaterialEditorInstance->SourceInstance = nullptr;
 		MaterialEditorInstance->SourceFunction = nullptr;
-		MaterialEditorInstance->MarkPendingKill();
+		MaterialEditorInstance->MarkAsGarbage();
 		MaterialEditorInstance = nullptr;
 	}
 

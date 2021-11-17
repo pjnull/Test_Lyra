@@ -500,7 +500,7 @@ void ANavigationData::CleanUpAndMarkPendingKill()
 
 	// do NOT destroy here! it can be called from PostLoad and will crash in DestroyActor()
 	GetWorld()->RemoveNetworkActor(this);
-	MarkPendingKill();
+	MarkAsGarbage();
 	MarkComponentsAsPendingKill();
 }
 

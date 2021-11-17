@@ -134,7 +134,7 @@ bool FOptimusNodeGraphAction_RemoveGraph::Undo(IOptimusNodeGraphCollectionOwner*
 	else
 	{
 		Graph->Rename(nullptr, GetTransientPackage());
-		Graph->MarkPendingKill();
+		Graph->MarkAsGarbage();
 		return false;
 	}
 }

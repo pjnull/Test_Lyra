@@ -2061,7 +2061,7 @@ void FLinkerLoad::ResolveDeferredExports(UClass* LoadClass)
 
 				ResolvedDeferredSubobjects(PlaceholderExport);
 
-				PlaceholderExport->MarkPendingKill();
+				PlaceholderExport->MarkAsGarbage();
 
 				// if we hadn't used a ULinkerPlaceholderExportObject in place of 
 				// the expected export, then someone may have wanted it preloaded
@@ -2155,7 +2155,7 @@ void FLinkerLoad::ResolveDeferredExports(UClass* LoadClass)
 					PlaceholderExport->ResolveAllPlaceholderReferences(ExportObj);
 					ResolvedDeferredSubobjects(PlaceholderExport);
 
-					PlaceholderExport->MarkPendingKill();
+					PlaceholderExport->MarkAsGarbage();
 					if (ExportObj != nullptr)
 					{
 						Preload(ExportObj);
@@ -2194,7 +2194,7 @@ void FLinkerLoad::ResolvePlaceholder(ULinkerPlaceholderExportObject* Placeholder
 
 	UObject* ReplacementObject = CreateExport(ExportIndex);
 	Placeholder->ResolveAllPlaceholderReferences(ReplacementObject);
-	Placeholder->MarkPendingKill();
+	Placeholder->MarkAsGarbage();
 	
 	// recurse:
 	ResolvedDeferredSubobjects(Placeholder);
@@ -2223,7 +2223,7 @@ void FLinkerLoad::ResolvedDeferredSubobjects(ULinkerPlaceholderExportObject* Own
 
 		UObject* ReplacementObject = CreateExport(ExportIndex);
 		PlaceholderSubobject->ResolveAllPlaceholderReferences(ReplacementObject);
-		PlaceholderSubobject->MarkPendingKill();
+		PlaceholderSubobject->MarkAsGarbage();
 
 		// recurse:
 		ResolvedDeferredSubobjects(PlaceholderSubobject);

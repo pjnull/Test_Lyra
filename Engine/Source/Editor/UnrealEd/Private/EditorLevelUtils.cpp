@@ -854,7 +854,7 @@ void UEditorLevelUtils::PrivateRemoveLevelFromWorld(ULevel* InLevel)
 	if (ULevelStreaming* StreamingLevel = ULevelStreaming::FindStreamingLevel(InLevel))
 	{
 		bIsTransientLevelStreaming = StreamingLevel->HasAnyFlags(RF_Transient);
-		StreamingLevel->MarkPendingKill();
+		StreamingLevel->MarkAsGarbage();
 		InLevel->OwningWorld->RemoveStreamingLevel(StreamingLevel);
 		InLevel->OwningWorld->RefreshStreamingLevels({});
 	}
@@ -891,7 +891,7 @@ void UEditorLevelUtils::PrivateRemoveLevelFromWorld(ULevel* InLevel)
 	{
 		if (ModelComponent != nullptr)
 		{
-			ModelComponent->MarkPendingKill();
+			ModelComponent->MarkAsGarbage();
 		}
 	}
 
@@ -901,7 +901,7 @@ void UEditorLevelUtils::PrivateRemoveLevelFromWorld(ULevel* InLevel)
 		if (Actor != nullptr)
 		{
 			Actor->MarkComponentsAsPendingKill();
-			Actor->MarkPendingKill();
+			Actor->MarkAsGarbage();
 		}
 	}
 
@@ -925,8 +925,8 @@ void UEditorLevelUtils::PrivateDestroyLevel(ULevel* InLevel)
 		OuterWorld->CleanupWorld();
 	}
 
-	Outer->MarkPendingKill();
-	InLevel->MarkPendingKill();
+	Outer->MarkAsGarbage();
+	InLevel->MarkAsGarbage();
 	Outer->ClearFlags(RF_Public | RF_Standalone);
 
 	UPackage* Package = InLevel->GetOutermost();

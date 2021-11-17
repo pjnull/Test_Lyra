@@ -530,7 +530,7 @@ public:
 	ENGINE_API void SetOwningNode(UEdGraphNode* NewOwningNode);
 
 	/** Marks the pin as 'trashed'. *Does not* remove the pin from the Owning Node's Pins list */
-	ENGINE_API void MarkPendingKill();
+	ENGINE_API void MarkAsGarbage();
 
 	/** Returns true if InvalidateAndTrash was ever called on this pin. */
 	FORCEINLINE bool WasTrashed() const { return bWasTrashed; }

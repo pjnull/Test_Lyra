@@ -265,7 +265,7 @@ bool UOptimusDeformer::RemoveVariableDirect(
 	Notify(EOptimusGlobalNotifyType::VariableRemoved, InVariableDesc);
 
 	InVariableDesc->Rename(nullptr, GetTransientPackage());
-	InVariableDesc->MarkPendingKill();
+	InVariableDesc->MarkAsGarbage();
 
 	MarkPackageDirty();
 
@@ -451,7 +451,7 @@ bool UOptimusDeformer::RemoveResourceDirect(
 	Notify(EOptimusGlobalNotifyType::ResourceRemoved, InResourceDesc);
 
 	InResourceDesc->Rename(nullptr, GetTransientPackage());
-	InResourceDesc->MarkPendingKill();
+	InResourceDesc->MarkAsGarbage();
 
 	MarkPackageDirty();
 
@@ -1119,7 +1119,7 @@ UOptimusNodeGraph* UOptimusDeformer::CreateGraph(
 		else
 		{
 			Graph->Rename(nullptr, GetTransientPackage());
-			Graph->MarkPendingKill();
+			Graph->MarkAsGarbage();
 
 			return nullptr;
 		}
@@ -1222,7 +1222,7 @@ bool UOptimusDeformer::RemoveGraph(
 	{
 		// Un-parent this graph to a temporary storage and mark it for kill.
 		InGraph->Rename(nullptr, GetTransientPackage());
-		InGraph->MarkPendingKill();
+		InGraph->MarkAsGarbage();
 	}
 
 	return true;

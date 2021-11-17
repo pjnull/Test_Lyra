@@ -929,8 +929,8 @@ void FControlRigParameterTrackEditor::BakeToControlRig(UClass* InClass, FGuid Ob
 				bool bResult = MovieSceneToolHelpers::ExportToAnimSequence(TempAnimSequence, AnimSeqExportOption, OwnerMovieScene, ParentSequencer.Get(), SkelMeshComp, Template, RootToLocalTransform);
 				if (bResult == false)
 				{
-					TempAnimSequence->MarkPendingKill();
-					AnimSeqExportOption->MarkPendingKill();
+					TempAnimSequence->MarkAsGarbage();
+					AnimSeqExportOption->MarkAsGarbage();
 					return;
 				}
 
@@ -964,8 +964,8 @@ void FControlRigParameterTrackEditor::BakeToControlRig(UClass* InClass, FGuid Ob
 					UControlRig* ControlRig = NewObject<UControlRig>(Track, InClass, FName(*ObjectName), RF_Transactional);
 					if (InClass != UFKControlRig::StaticClass() && !ControlRig->SupportsEvent(FRigUnit_InverseExecution::EventName))
 					{
-						TempAnimSequence->MarkPendingKill();
-						AnimSeqExportOption->MarkPendingKill();
+						TempAnimSequence->MarkAsGarbage();
+						AnimSeqExportOption->MarkAsGarbage();
 						OwnerMovieScene->RemoveTrack(*Track);
 						return;
 					}
@@ -1038,8 +1038,8 @@ void FControlRigParameterTrackEditor::BakeToControlRig(UClass* InClass, FGuid Ob
 					}
 					BindControlRig(ControlRig);
 
-					TempAnimSequence->MarkPendingKill();
-					AnimSeqExportOption->MarkPendingKill();
+					TempAnimSequence->MarkAsGarbage();
+					AnimSeqExportOption->MarkAsGarbage();
 					GetSequencer()->NotifyMovieSceneDataChanged(EMovieSceneDataChangeType::MovieSceneStructureItemAdded);
 					
 

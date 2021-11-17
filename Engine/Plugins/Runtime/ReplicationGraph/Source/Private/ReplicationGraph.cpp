@@ -2910,7 +2910,7 @@ void UReplicationGraphNode::TearDown()
 
 	AllChildNodes.Reset();
 
-	MarkPendingKill();
+	MarkAsGarbage();
 }
 
 void UReplicationGraphNode::DoCollectActorRepListStats(FActorRepListStatCollector& StatsCollector) const

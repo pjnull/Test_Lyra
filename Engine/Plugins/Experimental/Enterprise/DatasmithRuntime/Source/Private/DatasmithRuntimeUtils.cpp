@@ -430,7 +430,7 @@ namespace DatasmithRuntime
 						Entry.Value->ClearFlags(RF_Public);
 						Entry.Value->SetFlags(RF_Transient);
 						Entry.Value->Rename(nullptr, nullptr, REN_NonTransactional | REN_DontCreateRedirectors | REN_ForceNoResetLoaders);
-						Entry.Value->MarkPendingKill();
+						Entry.Value->MarkAsGarbage();
 						Entry.Value.Reset();
 
 						EntriesToDelete.Add(Entry.Key);

@@ -469,7 +469,7 @@ bool UOptimusNode::RemovePinDirect(UOptimusNodePin* InPin)
 		ExpandedPins.Remove(Pin->GetUniqueName());
 		
 		Pin->Rename(nullptr, GetTransientPackage());
-		Pin->MarkPendingKill();
+		Pin->MarkAsGarbage();
 	}
 
 	CachedPinLookup.Reset();

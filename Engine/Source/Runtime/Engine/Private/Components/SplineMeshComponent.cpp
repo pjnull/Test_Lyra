@@ -996,7 +996,7 @@ void USplineMeshComponent::DestroyBodySetup()
 {
 	if (BodySetup != NULL)
 	{
-		BodySetup->MarkPendingKill();
+		BodySetup->MarkAsGarbage();
 		BodySetup = NULL;
 #if WITH_EDITORONLY_DATA
 		CachedMeshBodySetupGuid.Invalidate();

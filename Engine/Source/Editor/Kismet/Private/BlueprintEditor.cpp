@@ -5521,7 +5521,7 @@ bool FBlueprintEditor::CanCollapseSelectionToFunction(TSet<class UEdGraphNode*>&
 	MessageLog.Notify(LOCTEXT("CollapseToFunctionError", "Collapsing to Function Failed!"));
 
 	FBlueprintEditorUtils::RemoveGraph(GetBlueprintObj(), FunctionGraph);
-	FunctionGraph->MarkPendingKill();
+	FunctionGraph->MarkAsGarbage();
 	return !bBadConnection;
 }
 
@@ -5596,7 +5596,7 @@ bool FBlueprintEditor::CanCollapseSelectionToMacro(TSet<class UEdGraphNode*>& In
 	MessageLog.Notify(LOCTEXT("CollapseToMacroError", "Collapsing to Macro Failed!"));
 
 	FBlueprintEditorUtils::RemoveGraph(GetBlueprintObj(), MacroGraph);
-	MacroGraph->MarkPendingKill();
+	MacroGraph->MarkAsGarbage();
 	return bCollapseAllowed;
 }
 
@@ -5843,7 +5843,7 @@ void FBlueprintEditor::OnExpandNodes()
 				UEdGraph* ClonedGraph = FEdGraphUtilities::CloneGraph(MacroGraph, nullptr);
 				ExpandNode(SelectedMacroInstanceNode, ClonedGraph, /*inout*/ ExpandedNodes);
 
-				ClonedGraph->MarkPendingKill();
+				ClonedGraph->MarkAsGarbage();
 			}
 		}
 		else if (UK2Node_Composite* SelectedCompositeNode = Cast<UK2Node_Composite>(*NodeIt))
@@ -5871,7 +5871,7 @@ void FBlueprintEditor::OnExpandNodes()
 				UEdGraph* ClonedGraph = FEdGraphUtilities::CloneGraph(FunctionGraph, nullptr);
 				ExpandNode(SelectedCallFunctionNode, ClonedGraph, ExpandedNodes);
 
-				ClonedGraph->MarkPendingKill();
+				ClonedGraph->MarkAsGarbage();
 			}
 		}
 		UEdGraphNode* SourceNode = CastChecked<UEdGraphNode>(*NodeIt);
@@ -6178,7 +6178,7 @@ void FBlueprintEditor::ConvertFunctionToEvent(UK2Node_FunctionEntry* SelectedCal
 
 		// Remove the old function graph
 		FBlueprintEditorUtils::RemoveGraph(NodeBP, FunctionGraph, EGraphRemoveFlags::Recompile);
-		FunctionGraph->MarkPendingKill();
+		FunctionGraph->MarkAsGarbage();
 		FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(NodeBP);
 
 		// Do this AFTER removing the function graph so that it's not opened into the existing function graph document tab.
@@ -6354,7 +6354,7 @@ void FBlueprintEditor::ConvertEventToFunction(UK2Node_Event* SelectedEventNode)
 
 				// Get rid of the function graph
 				FBlueprintEditorUtils::RemoveGraph(NodeBP, NewGraph);
-				NewGraph->MarkPendingKill();
+				NewGraph->MarkAsGarbage();
 				return;
 			}
 

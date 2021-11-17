@@ -613,7 +613,7 @@ TArray<UObject*> FAbcImporter::ImportAsSkeletalMesh(UObject* InParent, EObjectFl
 
 		if (!bBuildSuccess)
 		{
-			SkeletalMesh->MarkPendingKill();
+			SkeletalMesh->MarkAsGarbage();
 			return GeneratedObjects;
 		}
 
@@ -699,7 +699,7 @@ TArray<UObject*> FAbcImporter::ImportAsSkeletalMesh(UObject* InParent, EObjectFl
 						}
 						else
 						{
-							MorphTarget->MarkPendingKill();
+							MorphTarget->MarkAsGarbage();
 						}
 					}
 				}

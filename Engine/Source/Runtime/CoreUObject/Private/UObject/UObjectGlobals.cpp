@@ -3549,9 +3549,9 @@ UObject* StaticConstructObject_Internal(const FStaticConstructObjectParameters& 
 		!Result->HasAnyInternalFlags(EInternalObjectFlags::Async|EInternalObjectFlags::AsyncLoading))
 	{
 		// Set RF_PendingKill and update the undo buffer so an undo operation will set RF_PendingKill on the newly constructed object.
-		Result->MarkPendingKill();
+		Result->MarkAsGarbage();
 		SaveToTransactionBuffer(Result, false);
-		Result->ClearPendingKill();
+		Result->ClearGarbage();
 	}
 	return Result;
 }
@@ -3594,7 +3594,7 @@ void FScopedObjectFlagMarker::RestoreObjectFlags()
 		FStoredObjectFlags& PreviousObjectFlags = It.Value();
 
 		// clear all flags, frist clear the PendingKill flag as we don't allow clearing it through ClearFlags
-		Object->ClearPendingKill();
+		Object->ClearGarbage();
 		Object->ClearFlags(RF_AllFlags);
 		Object->ClearInternalFlags(EInternalObjectFlags::AllFlags);
 
@@ -3604,7 +3604,7 @@ void FScopedObjectFlagMarker::RestoreObjectFlags()
 PRAGMA_DISABLE_DEPRECATION_WARNINGS
 			checkf((PreviousObjectFlags.Flags & RF_PendingKill) == RF_PendingKill, TEXT("Object %s had EInternalObjectFlags::PendingKill flag set but no RF_PendingKill"), *Object->GetFullName());
 PRAGMA_ENABLE_DEPRECATION_WARNINGS
-			Object->MarkPendingKill();
+			Object->MarkAsGarbage();
 		}
 		Object->SetFlags(PreviousObjectFlags.Flags);
 		Object->SetInternalFlags(PreviousObjectFlags.InternalFlags);
@@ -4231,7 +4231,7 @@ UObject* FObjectInitializer::CreateDefaultSubobject(UObject* Outer, FName Subobj
 			}
 			// Clear PendingKill flag in case we recycled a subobject of a dead object.
 			// @todo: we should not be recycling subobjects unless we're currently loading from a package
-			Result->ClearPendingKill();
+			Result->ClearGarbage();
 		}
 	}
 	return Result;

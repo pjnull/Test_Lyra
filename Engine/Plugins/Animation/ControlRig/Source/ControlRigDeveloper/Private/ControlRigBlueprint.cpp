@@ -435,7 +435,7 @@ void UControlRigBlueprint::PostLoad()
 			}
 			else
 			{
-				Graph->MarkPendingKill();
+				Graph->MarkAsGarbage();
 				Graph->Rename(nullptr, GetTransientPackage(), REN_ForceNoResetLoaders);
 			}
 		}
@@ -4140,7 +4140,7 @@ bool UControlRigBlueprint::RemoveEdGraphForCollapseNode(URigVMCollapseNode* InNo
 
 						FunctionGraphs.Remove(RigFunctionGraph);
 						RigFunctionGraph->Rename(nullptr, GetTransientPackage());
-						RigFunctionGraph->MarkPendingKill();
+						RigFunctionGraph->MarkAsGarbage();
 						return bNotify;
 					}
 				}
@@ -4169,7 +4169,7 @@ bool UControlRigBlueprint::RemoveEdGraphForCollapseNode(URigVMCollapseNode* InNo
 
 						RigGraph->SubGraphs.Remove(SubRigGraph);
 						SubRigGraph->Rename(nullptr, GetTransientPackage());
-						SubRigGraph->MarkPendingKill();
+						SubRigGraph->MarkAsGarbage();
 						return bNotify;
 					}
 				}

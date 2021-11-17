@@ -1351,7 +1351,7 @@ UStaticMesh* FDatasmithImporterUtils::DuplicateStaticMesh(UStaticMesh* SourceSta
 	{
 		// The source mesh is stripped from it's source model, it is not buildable anymore.
 		// -> MarkPendingKill to avoid use-after-move crash in the StaticMesh::Build()
-		SourceStaticMesh->MarkPendingKill();
+		SourceStaticMesh->MarkAsGarbage();
 
 		// Apply source models to the duplicated mesh
 		DuplicateMesh->SetSourceModels(MoveTemp(SourceModels));

@@ -197,7 +197,7 @@ UEnvQueryManager::UEnvQueryManager(const FObjectInitializer& ObjectInitializer) 
 void UEnvQueryManager::PostLoad()
 {
 	Super::PostLoad();
-	MarkPendingKill();
+	MarkAsGarbage();
 }
 
 void UEnvQueryManager::PostInitProperties()

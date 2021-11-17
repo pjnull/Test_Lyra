@@ -310,7 +310,7 @@ bool FFbxImportAssetsAutomationTest::RunTest(const FString& Parameters)
 								{
 									ExistingObject->ClearFlags(RF_Standalone | RF_Public);
 									ExistingObject->RemoveFromRoot();
-									ExistingObject->MarkPendingKill();
+									ExistingObject->MarkAsGarbage();
 								}
 						
 							}
@@ -1990,7 +1990,7 @@ bool FFbxImportAssetsAutomationTest::RunTest(const FString& Parameters)
 							{
 								ExistingObject->ClearFlags(RF_Standalone | RF_Public);
 								ExistingObject->RemoveFromRoot();
-								ExistingObject->MarkPendingKill();
+								ExistingObject->MarkAsGarbage();
 							}
 
 						}

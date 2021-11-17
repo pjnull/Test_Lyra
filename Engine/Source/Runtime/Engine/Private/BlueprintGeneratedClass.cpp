@@ -176,7 +176,7 @@ void UBlueprintGeneratedClass::PostLoad()
 				const bool bComponentChild = FCheckIfComponentChildHelper::IsComponentChild(CurrObj, ClassCDO);
 				if (!CurrObj->IsDefaultSubobject() && !CurrObj->IsRooted() && !bComponentChild)
 				{
-					CurrObj->MarkPendingKill();
+					CurrObj->MarkAsGarbage();
 				}
 			});
 		}

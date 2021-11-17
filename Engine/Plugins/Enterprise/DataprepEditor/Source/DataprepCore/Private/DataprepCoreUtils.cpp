@@ -148,7 +148,7 @@ void FDataprepCoreUtils::PurgeObjects(TArray<UObject*> InObjects)
 		}
 
 		InObject->ClearFlags( RF_Public | RF_Standalone );
-		InObject->MarkPendingKill();
+		InObject->MarkAsGarbage();
 		ObjectsToPurge.Add( InObject );
 	};
 

@@ -103,7 +103,7 @@ struct FRestoreReimportData
 			//Some reimport path did not trash the package in case there is a fail (i.e. scene reimport)
 			//Rename the original mesh and trash it
 			ExistingObject->Rename(nullptr, GetTransientPackage(), REN_DoNotDirty | REN_DontCreateRedirectors | REN_NonTransactional);
-			ExistingObject->MarkPendingKill();
+			ExistingObject->MarkAsGarbage();
 		}
 		
 		//Rename the dup object
@@ -128,7 +128,7 @@ struct FRestoreReimportData
 		if(DupObject)
 		{
 			DupObject->RemoveFromRoot();
-			DupObject->MarkPendingKill();
+			DupObject->MarkAsGarbage();
 			DupObject = nullptr;
 		}
 	}

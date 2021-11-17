@@ -342,7 +342,7 @@ void UActorComponent::PostInitProperties()
 				else
 #endif // WITH_EDITOR
 				{
-					MarkPendingKill();
+					MarkAsGarbage();
 				}
 			}
 		}
@@ -430,7 +430,7 @@ void UActorComponent::PostLoad()
 #if WITH_EDITOR
 	if (bMarkPendingKillOnPostLoad)
 	{
-		MarkPendingKill();
+		MarkAsGarbage();
 		bMarkPendingKillOnPostLoad = false;
 	}
 #endif // WITH_EDITOR
@@ -1393,7 +1393,7 @@ void UActorComponent::DestroyComponent(bool bPromoteChildren/*= false*/)
 	OnComponentDestroyed(false);
 
 	// Finally mark pending kill, to NULL out any other refs
-	MarkPendingKill();
+	MarkAsGarbage();
 }
 
 void UActorComponent::OnComponentCreated()

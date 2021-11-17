@@ -733,7 +733,7 @@ void FLevelCollectionModel::UnloadLevels(const FLevelModelList& InLevelList)
 				
 				if (ULevelStreaming*const* StreamingLevel = ThisWorld->GetStreamingLevels().FindByPredicate(Predicate))
 				{
-					(*StreamingLevel)->MarkPendingKill();
+					(*StreamingLevel)->MarkAsGarbage();
 					ThisWorld->RemoveStreamingLevel(*StreamingLevel);
 				}
 			}
@@ -746,7 +746,7 @@ void FLevelCollectionModel::UnloadLevels(const FLevelModelList& InLevelList)
 		}
 		else if (ULevelStreaming* StreamingLevel = Cast<ULevelStreaming>(LevelModel->GetNodeObject()))
 		{
-			StreamingLevel->MarkPendingKill();
+			StreamingLevel->MarkAsGarbage();
 			ThisWorld->RemoveStreamingLevel(StreamingLevel);
 		}
 	}

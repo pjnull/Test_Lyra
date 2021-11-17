@@ -3593,9 +3593,9 @@ void AActor::PostActorConstruction()
 		// Set IsPendingKill() to true so that when the initial undo record is made,
 		// the actor will be treated as destroyed, in that undo an add will
 		// actually work
-		MarkPendingKill();
+		MarkAsGarbage();
 		Modify(false);
-		ClearPendingKill();
+		ClearGarbage();
 	}
 }
 
@@ -5022,7 +5022,7 @@ void AActor::MarkComponentsAsPendingKill()
 			Component->Modify();
 		}
 		Component->OnComponentDestroyed(true);
-		Component->MarkPendingKill();
+		Component->MarkAsGarbage();
 	}
 }
 

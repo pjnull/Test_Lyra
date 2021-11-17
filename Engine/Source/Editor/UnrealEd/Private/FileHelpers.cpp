@@ -930,7 +930,7 @@ static bool SaveWorld(UWorld* World,
 				if (DuplicatedWorld)
 				{
 					DuplicatedWorld->Rename(nullptr, GetTransientPackage(), REN_NonTransactional | REN_DontCreateRedirectors);
-					DuplicatedWorld->MarkPendingKill();
+					DuplicatedWorld->MarkAsGarbage();
 					DuplicatedWorld->SetFlags(RF_Transient);
 					DuplicatedWorld = nullptr;
 				}

@@ -276,7 +276,7 @@ bool UWorldPartitionLevelStreamingDynamic::IssueLoadRequests()
 			ActorPair.Value->Rename(nullptr, RuntimeLevel);
 		}
 
-		ActorContainerDup->MarkPendingKill();
+		ActorContainerDup->MarkAsGarbage();
 	}
 
 	auto FinalizeLoading = [this]()

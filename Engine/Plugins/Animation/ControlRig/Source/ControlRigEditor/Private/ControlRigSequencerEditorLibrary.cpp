@@ -671,7 +671,7 @@ bool UControlRigSequencerEditorLibrary::BakeToControlRig(UWorld* World, ULevelSe
 				bResult = MovieSceneToolHelpers::ExportToAnimSequence(TempAnimSequence, ExportOptions, MovieScene, Player, SkeletalMeshComp, Template, RootToLocalTransform);
 				if (bResult == false)
 				{
-					TempAnimSequence->MarkPendingKill();
+					TempAnimSequence->MarkAsGarbage();
 					if (OutActor)
 					{
 						World->DestroyActor(OutActor);
@@ -710,7 +710,7 @@ bool UControlRigSequencerEditorLibrary::BakeToControlRig(UWorld* World, ULevelSe
 					UControlRig* ControlRig = NewObject<UControlRig>(Track, InClass, FName(*ObjectName), RF_Transactional);
 					if (InClass != UFKControlRig::StaticClass() && !ControlRig->SupportsEvent(FRigUnit_InverseExecution::EventName))
 					{
-						TempAnimSequence->MarkPendingKill();
+						TempAnimSequence->MarkAsGarbage();
 						MovieScene->RemoveTrack(*Track);
 						if (OutActor)
 						{
@@ -787,7 +787,7 @@ bool UControlRigSequencerEditorLibrary::BakeToControlRig(UWorld* World, ULevelSe
 						ControlRigEditMode->SetObjects(ControlRig, nullptr, WeakSequencer.Pin());
 					}
 
-					TempAnimSequence->MarkPendingKill();
+					TempAnimSequence->MarkAsGarbage();
 					if (WeakSequencer.IsValid())
 					{
 						WeakSequencer.Pin()->ObjectImplicitlyAdded(ControlRig);

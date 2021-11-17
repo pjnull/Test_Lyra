@@ -192,7 +192,7 @@ void UChannel::ConditionalCleanUp( const bool bForDestroy, EChannelCloseReason C
 			// If we were not added to a pool, mark pending kill and allow the channel to GC
 			if (!bPooled)
 			{
-				MarkPendingKill();
+				MarkAsGarbage();
 			}
 		}
 	}
@@ -2122,7 +2122,7 @@ void UActorChannel::DestroyActorAndComponents()
 			Actor->OnSubobjectDestroyFromReplication(SubObject); //-V595
 
 			SubObject->PreDestroyFromReplication();
-			SubObject->MarkPendingKill();
+			SubObject->MarkAsGarbage();
 		}
 	}
 
@@ -3801,7 +3801,7 @@ UObject* UActorChannel::ReadContentBlockHeader(FInBunch& Bunch, bool& bObjectDel
 			Actor->OnSubobjectDestroyFromReplication(SubObj);
 
 			SubObj->PreDestroyFromReplication();
-			SubObj->MarkPendingKill();
+			SubObj->MarkAsGarbage();
 		}
 		bObjectDeleted = true;
 		return NULL;

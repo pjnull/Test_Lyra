@@ -941,7 +941,7 @@ UObject* UInterchangeTextureFactory::CreateAsset(const FCreateAssetParams& Argum
 		if (!Arguments.ReimportObject)
 		{
 			Texture->RemoveFromRoot();
-			Texture->MarkPendingKill();
+			Texture->MarkAsGarbage();
 		}
 		return nullptr;
 	}

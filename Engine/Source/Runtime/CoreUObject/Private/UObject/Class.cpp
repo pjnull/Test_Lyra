@@ -5295,7 +5295,7 @@ bool UClass::HotReloadPrivateStaticClass(
 
 	if( !TempObjectForVTable->IsRooted() )
 	{
-		TempObjectForVTable->MarkPendingKill();
+		TempObjectForVTable->MarkAsGarbage();
 	}
 	else
 	{

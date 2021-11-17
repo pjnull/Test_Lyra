@@ -32,7 +32,7 @@ void DataprepCorePrivateUtils::DeleteRegisteredAsset(UObject* Asset)
 
 		Asset->ClearFlags(RF_Standalone | RF_Public);
 		Asset->RemoveFromRoot();
-		Asset->MarkPendingKill();
+		Asset->MarkAsGarbage();
 
 		FAssetRegistryModule::AssetDeleted( Asset ) ;
 	}

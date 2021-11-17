@@ -7753,7 +7753,7 @@ void FBlueprintEditorUtils::RemoveTimeline(UBlueprint* Blueprint, UTimelineTempl
 	Blueprint->Modify();
 
 	Blueprint->Timelines.Remove(Timeline);
-	Timeline->MarkPendingKill();
+	Timeline->MarkAsGarbage();
 
 	if( !bDontRecompile )
 	{
