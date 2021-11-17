@@ -841,11 +841,12 @@ namespace UnrealBuildTool
 
 						FileReference OldDependenciesFile = new FileReference(Arguments[DependenciesIdx].Substring(DependenciesPrefix.Length));
 						FileItem OldDependenciesFileItem = Action.ProducedItems.First(x => x.Location == OldDependenciesFile);
-						NewAction.PrerequisiteItems.Remove(OldDependenciesFileItem);
+						NewAction.ProducedItems.Remove(OldDependenciesFileItem);
 
 						FileReference NewDependenciesFile = OldDependenciesFile.ChangeExtension(".lc.response");
 						FileItem NewDependenciesFileItem = FileItem.GetItemByFileReference(NewDependenciesFile);
-						NewAction.PrerequisiteItems.Add(NewDependenciesFileItem);
+						NewAction.ProducedItems.Add(NewDependenciesFileItem);
+						NewAction.DependencyListFile = NewDependenciesFileItem;
 						Arguments[DependenciesIdx] = DependenciesPrefix + NewDependenciesFile.FullName;
 					}
 
@@ -865,6 +866,9 @@ namespace UnrealBuildTool
 
 					FileReference OldResponseFile = new FileReference(Arguments[ResponseFileIdx].Substring(1).Trim('\"'));
 					FileReference NewResponseFile = new FileReference(OldResponseFile.FullName + ".lc");
+
+					NewAction.PrerequisiteItems.Remove(FileItem.GetItemByFileReference(OldResponseFile));
+					NewAction.PrerequisiteItems.Add(FileItem.GetItemByFileReference(NewResponseFile));
 
 					const string OutputFilePrefix = "/Fo";
 
@@ -902,18 +906,20 @@ namespace UnrealBuildTool
 							{
 								FileReference OldSourceDependencyFile = new FileReference(ResponseLine.Substring(SourceDependencyPrefix.Length).Trim().Trim('\"'));
 								FileItem OldSourceDependencyFileItem = Action.ProducedItems.First(x => x.Location == OldSourceDependencyFile);
-								NewAction.PrerequisiteItems.Remove(OldSourceDependencyFileItem);
+								NewAction.ProducedItems.Remove(OldSourceDependencyFileItem);
 
 								FileReference NewSourceDependencyFile = OldSourceDependencyFile.ChangeExtension(NewExtension);
 								FileItem NewSourceDependencyFileItem = FileItem.GetItemByFileReference(NewSourceDependencyFile);
-								NewAction.PrerequisiteItems.Add(NewSourceDependencyFileItem);
+								NewAction.ProducedItems.Add(NewSourceDependencyFileItem);
+								NewAction.DependencyListFile = NewSourceDependencyFileItem;
 
 								ResponseLines[Idx] = SourceDependencyPrefix + "\"" + NewSourceDependencyFile.FullName + "\"";
 								break;
 							}
 						}
 					}
-					FileReference.WriteAllLines(NewResponseFile, ResponseLines);
+
+					Utils.WriteFileIfChanged(NewResponseFile, ResponseLines);
 
 					Arguments[ResponseFileIdx] = "@" + NewResponseFile.FullName;
 

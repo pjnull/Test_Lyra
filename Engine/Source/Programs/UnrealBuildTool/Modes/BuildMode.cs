@@ -511,6 +511,17 @@ namespace UnrealBuildTool
 						}
 						HotReloadTargetIdx = Idx;
 					}
+				}	
+
+				if (HotReloadTargetIdx != -1)
+				{
+					Log.TraceLog("Re-evaluating action graph");
+					// Re-check the graph to remove any LiveCoding actions added by PatchActionsForTarget() that are already up to date.
+					Dictionary<LinkedAction, bool> LiveActionToOutdatedFlag = new Dictionary<LinkedAction, bool>(MergedActionsToExecute.Count);
+					ActionGraph.GatherAllOutdatedActions(MergedActionsToExecute, History, LiveActionToOutdatedFlag, CppDependencies, BuildConfiguration.bIgnoreOutdatedImportLibraries);
+					List<LinkedAction> LiveCodingActionsToExecute = LiveActionToOutdatedFlag.Where(x => x.Value).Select(x => x.Key).ToList();
+					ActionGraph.Link(LiveCodingActionsToExecute);
+					MergedActionsToExecute = LiveCodingActionsToExecute;
 				}
 
 				// Make sure we're not modifying any engine files
