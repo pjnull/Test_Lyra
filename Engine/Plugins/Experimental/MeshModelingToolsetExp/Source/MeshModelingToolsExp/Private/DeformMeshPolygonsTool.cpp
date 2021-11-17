@@ -279,6 +279,7 @@ public:
 UMeshSurfacePointTool* UDeformMeshPolygonsToolBuilder::CreateNewTool(const FToolBuilderState& SceneState) const
 {
 	UDeformMeshPolygonsTool* DeformTool = NewObject<UDeformMeshPolygonsTool>(SceneState.ToolManager);
+	DeformTool->SetWorld(SceneState.World);
 	return DeformTool;
 }
 
@@ -833,6 +834,11 @@ UDeformMeshPolygonsTool::UDeformMeshPolygonsTool()
 	UInteractiveTool::SetToolDisplayName(LOCTEXT("DeformPolygroupsToolName", "PolyGroup Deform"));
 }
 
+void UDeformMeshPolygonsTool::SetWorld(UWorld* World)
+{
+	TargetWorld = World;
+}
+
 void UDeformMeshPolygonsTool::Setup()
 {
 	UMeshSurfacePointTool::Setup();
@@ -840,8 +846,12 @@ void UDeformMeshPolygonsTool::Setup()
 	LaplacianDeformer = MakePimpl<FGroupTopologyLaplacianDeformer>();
 
 	// create dynamic mesh component to use for live preview
-	DynamicMeshComponent = NewObject<UDynamicMeshComponent>(UE::ToolTarget::GetTargetActor(Target));
-	DynamicMeshComponent->SetupAttachment(UE::ToolTarget::GetTargetActor(Target)->GetRootComponent());
+	check(TargetWorld);
+	FActorSpawnParameters SpawnInfo;
+	PreviewMeshActor = TargetWorld->SpawnActor<AInternalToolFrameworkActor>(FVector::ZeroVector, FRotator::ZeroRotator, SpawnInfo);
+
+	DynamicMeshComponent = NewObject<UDynamicMeshComponent>(PreviewMeshActor);
+	DynamicMeshComponent->SetupAttachment(PreviewMeshActor->GetRootComponent());
 	DynamicMeshComponent->RegisterComponent();
 	WorldTransform = UE::ToolTarget::GetLocalToWorldTransform(Target);
 	DynamicMeshComponent->SetWorldTransform((FTransform)WorldTransform);
@@ -959,6 +969,13 @@ void UDeformMeshPolygonsTool::Shutdown(EToolShutdownType ShutdownType)
 		DynamicMeshComponent->DestroyComponent();
 		DynamicMeshComponent = nullptr;
 	}
+
+	if (PreviewMeshActor != nullptr)
+	{
+		PreviewMeshActor->Destroy();
+		PreviewMeshActor = nullptr;
+	}
+
 }
 
 

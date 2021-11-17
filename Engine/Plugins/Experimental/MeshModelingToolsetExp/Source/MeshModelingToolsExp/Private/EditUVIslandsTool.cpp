@@ -26,6 +26,7 @@ using namespace UE::Geometry;
 UMeshSurfacePointTool* UEditUVIslandsToolBuilder::CreateNewTool(const FToolBuilderState& SceneState) const
 {
 	UEditUVIslandsTool* DeformTool = NewObject<UEditUVIslandsTool>(SceneState.ToolManager);
+	DeformTool->SetWorld(SceneState.World);
 	return DeformTool;
 }
 
@@ -38,13 +39,17 @@ UEditUVIslandsTool::UEditUVIslandsTool()
 {
 }
 
+
 void UEditUVIslandsTool::Setup()
 {
 	UMeshSurfacePointTool::Setup();
 
 	// create dynamic mesh component to use for live preview
-	DynamicMeshComponent = NewObject<UDynamicMeshComponent>(UE::ToolTarget::GetTargetActor(Target));
-	DynamicMeshComponent->SetupAttachment(UE::ToolTarget::GetTargetActor(Target)->GetRootComponent());
+	FActorSpawnParameters SpawnInfo;
+	PreviewMeshActor = TargetWorld->SpawnActor<AInternalToolFrameworkActor>(FVector::ZeroVector, FRotator::ZeroRotator, SpawnInfo);
+
+	DynamicMeshComponent = NewObject<UDynamicMeshComponent>(PreviewMeshActor);
+	DynamicMeshComponent->SetupAttachment(PreviewMeshActor->GetRootComponent());
 	DynamicMeshComponent->RegisterComponent();
 	DynamicMeshComponent->SetWorldTransform((FTransform)UE::ToolTarget::GetLocalToWorldTransform(Target));
 	ToolSetupUtil::ApplyRenderingConfigurationToPreview(DynamicMeshComponent, Target);
@@ -151,6 +156,13 @@ void UEditUVIslandsTool::Shutdown(EToolShutdownType ShutdownType)
 		DynamicMeshComponent->DestroyComponent();
 		DynamicMeshComponent = nullptr;
 	}
+
+	if (PreviewMeshActor != nullptr)
+	{
+		PreviewMeshActor->Destroy();
+		PreviewMeshActor = nullptr;
+	}
+
 }
 
 

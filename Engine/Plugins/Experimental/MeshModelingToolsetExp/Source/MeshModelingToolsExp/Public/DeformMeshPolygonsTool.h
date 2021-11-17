@@ -156,6 +156,8 @@ public:
 
 	virtual void RegisterActions(FInteractiveToolActionSet& ActionSet) override;
 
+	virtual void SetWorld(UWorld* World);
+
 	virtual void Setup() override;
 	virtual void Shutdown(EToolShutdownType ShutdownType) override;
 
@@ -179,6 +181,13 @@ public:
 	float VisualAngleSnapThreshold = 0.5;
 
 protected:
+
+	UPROPERTY()
+	TObjectPtr<UWorld> TargetWorld = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<AInternalToolFrameworkActor> PreviewMeshActor = nullptr;
+
 	UPROPERTY()
 	TObjectPtr<UDynamicMeshComponent> DynamicMeshComponent;
 

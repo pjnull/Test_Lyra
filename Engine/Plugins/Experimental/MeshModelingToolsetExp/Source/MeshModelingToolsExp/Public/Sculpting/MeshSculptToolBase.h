@@ -289,7 +289,7 @@ protected:
 	/**
 	 * Subclass calls this to set up editing component
 	 */
-	void InitializeSculptMeshComponent(UBaseDynamicMeshComponent* Component);
+	void InitializeSculptMeshComponent(UBaseDynamicMeshComponent* Component, AActor* Actor);
 
 
 	/**
