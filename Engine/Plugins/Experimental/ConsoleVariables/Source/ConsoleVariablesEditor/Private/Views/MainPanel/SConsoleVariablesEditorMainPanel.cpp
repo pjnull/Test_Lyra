@@ -106,8 +106,8 @@ TSharedRef<SWidget> SConsoleVariablesEditorMainPanel::GeneratePanelToolbar(const
 				
 				// Add Console Variable input
 				+ SHorizontalBox::Slot()
-				.AutoWidth()
-				.HAlign(HAlign_Left)
+				.HAlign(HAlign_Fill)
+				.VAlign(VAlign_Fill)
 				.Padding(2.f, 2.f)
 				[
 					InConsoleInputWidget
@@ -156,6 +156,7 @@ TSharedRef<SWidget> SConsoleVariablesEditorMainPanel::GeneratePanelToolbar(const
 					SNew(SBox)
 					.WidthOverride(28)
 					.HeightOverride(28)
+					.Visibility(EVisibility::Collapsed)
 					[
 						SAssignNew(SettingsButtonPtr, SCheckBox)
 						.Padding(FMargin(4.f))

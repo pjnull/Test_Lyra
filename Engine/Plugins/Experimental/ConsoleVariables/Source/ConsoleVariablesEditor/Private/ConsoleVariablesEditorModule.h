@@ -2,16 +2,20 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
-#include "Modules/ModuleInterface.h"
+#include "ConsoleVariablesAsset.h"
+#include "ConsoleVariablesEditorCommandInfo.h"
+#include "ConsoleVariablesEditorProjectSettings.h"
 
-struct FConsoleVariablesEditorCommandInfo;
+#include "CoreMinimal.h"
+#include "HAL/IConsoleManager.h"
+#include "Modules/ModuleInterface.h"
+#include "Widgets/Docking/SDockTab.h"
+
+struct FAssetData;
 
 class FConsoleVariablesEditorMainPanel;
 class FConsoleVariablesEditorToolkit;
 class ISettingsSection;
-class UConsoleVariablesAsset;
-class UConsoleVariablesEditorProjectSettings;
 
 class FConsoleVariablesEditorModule : public IModuleInterface
 {

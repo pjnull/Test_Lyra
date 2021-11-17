@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "ConsoleVariablesEditorListRow.h"
 #include "SConsoleVariablesEditorList.h"
 
 #include "CoreMinimal.h"
@@ -14,7 +15,7 @@
 class SConsoleVariablesEditorListValueInput;
 class SConsoleVariablesEditorListRowHoverWidgets;
 
-class SConsoleVariablesEditorListRow : public SCompoundWidget
+class SConsoleVariablesEditorListRow : public SMultiColumnTableRow<FConsoleVariablesEditorListRowPtr>
 {
 public:
 	
@@ -23,7 +24,9 @@ public:
 
 	SLATE_END_ARGS()
 	
-	void Construct(const FArguments& InArgs, const TWeakPtr<FConsoleVariablesEditorListRow> InRow, const FConsoleVariablesEditorListSplitterManagerPtr& InSplitterManagerPtr);
+	void Construct(const FArguments& InArgs, const TSharedRef<STableViewBase>& InOwnerTable, const TWeakPtr<FConsoleVariablesEditorListRow> InRow);
+
+	virtual TSharedRef<SWidget> GenerateWidgetForColumn(const FName& InColumnName) override;
 	
 	virtual void OnMouseEnter(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 
@@ -38,17 +41,12 @@ public:
 
 	static const FSlateBrush* GetBorderImage(const FConsoleVariablesEditorListRow::EConsoleVariablesEditorListRowType InRowType);
 
-	float GetNameColumnSize() const;
+	TSharedRef<SWidget> GenerateCells(const FName& InColumnName, const TSharedPtr<FConsoleVariablesEditorListRow> PinnedItem);
 
-	float CalculateAndReturnNestedColumnSize();
+	ECheckBoxState GetCheckboxState() const;
+	void OnCheckboxStateChange(const ECheckBoxState InNewState) const;
 
-	float GetSourceColumnSize() const;
-
-	float GetValueColumnSize() const;
-
-	void SetNestedColumnSize(const float InWidth) const;
-
-	void SetSourceColumnSize(const float InWidth) const;
+	TSharedRef<SWidget> GenerateValueCellWidget(const TSharedPtr<FConsoleVariablesEditorListRow> PinnedItem);
 
 private:
 	
@@ -57,8 +55,7 @@ private:
 	
 	TWeakPtr<FConsoleVariablesEditorListRow> Item;
 
-	TSharedPtr<SImage> FlashImage;
-	TSharedPtr<SBorder> BorderPtr;
+	TArray<TSharedPtr<SImage>> FlashImages;
 
 	TSharedPtr<SConsoleVariablesEditorListValueInput> ValueChildInputWidget;
 

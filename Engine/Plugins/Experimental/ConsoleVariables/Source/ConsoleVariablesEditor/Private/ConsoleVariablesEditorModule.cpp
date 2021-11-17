@@ -3,11 +3,8 @@
 #include "ConsoleVariablesEditorModule.h"
 
 #include "AssetTypeActions/AssetTypeActions_ConsoleVariables.h"
-#include "ConsoleVariablesAsset.h"
 #include "ConsoleVariablesEditorLog.h"
 #include "ConsoleVariablesEditorStyle.h"
-#include "ConsoleVariablesEditorProjectSettings.h"
-#include "ConsoleVariablesEditorCommandInfo.h"
 #include "Views/MainPanel/ConsoleVariablesEditorMainPanel.h"
 
 #include "Algo/Find.h"
@@ -16,7 +13,6 @@
 #include "ISettingsSection.h"
 #include "LevelEditor.h"
 #include "ToolMenus.h"
-#include "Widgets/Docking/SDockTab.h"
 #include "WorkspaceMenuStructure.h"
 #include "WorkspaceMenuStructureModule.h"
 
@@ -190,7 +186,7 @@ TSharedRef<SDockTab> FConsoleVariablesEditorModule::SpawnMainPanelTab(const FSpa
 {
 	const TSharedRef<SDockTab> DockTab = SNew(SDockTab).TabRole(ETabRole::NomadTab);
 	DockTab->SetContent(MainPanel->GetOrCreateWidget());
-	MainPanel->RefreshList(EditingAsset);
+	MainPanel->RefreshList();
 			
 	return DockTab;
 }
@@ -240,7 +236,7 @@ void FConsoleVariablesEditorModule::OnConsoleVariableChange()
 	{
 		if (MainPanel.IsValid())
 		{
-			MainPanel->RefreshList(EditingAsset.Get());
+			MainPanel->RefreshList();
 		}
 	}
 }
