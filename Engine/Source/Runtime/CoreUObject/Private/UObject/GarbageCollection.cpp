@@ -1284,7 +1284,19 @@ public:
 					UObject* Object = (UObject*)ObjectItem->Object;
 
 					// We can't collect garbage during an async load operation and by now all unreachable objects should've been purged.
-					checkf(!ObjectItem->HasAnyFlags(EInternalObjectFlags::Unreachable|EInternalObjectFlags::PendingConstruction|EInternalObjectFlags::PersistentGarbage), TEXT("%s"), *Object->GetFullName());
+					checkf(!ObjectItem->HasAnyFlags(EInternalObjectFlags::Unreachable|EInternalObjectFlags::PendingConstruction|EInternalObjectFlags::PersistentGarbage),
+							TEXT("Object: '%s' with ObjectFlags=0x%08x and InternalObjectFlags=0x%08x. ")
+							TEXT("State: IsEngineExitRequested=%d, GIsCriticalError=%d, GExitPurge=%d, GObjPurgeIsRequired=%d, GObjIncrementalPurgeIsInProgress=%d, GObjFinishDestroyHasBeenRoutedToAllObjects=%d, GGCObjectsPendingDestructionCount=%d"),
+							*Object->GetFullName(),
+							Object->GetFlags(),
+							Object->GetInternalFlags(),
+							IsEngineExitRequested(),
+							GIsCriticalError,
+							GExitPurge,
+							GObjPurgeIsRequired,
+							GObjIncrementalPurgeIsInProgress,
+							GObjFinishDestroyHasBeenRoutedToAllObjects,
+							GGCObjectsPendingDestructionCount);
 
 					// Keep track of how many objects are around.
 					ObjectCountDuringMarkPhase++;
