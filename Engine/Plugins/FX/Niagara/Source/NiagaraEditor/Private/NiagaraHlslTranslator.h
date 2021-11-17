@@ -70,7 +70,7 @@ public:
 	virtual FName ResolveEmitterAlias(FName VariableName) const override;
 
 	const FString& GetUniqueEmitterName() const { return EmitterUniqueName; }
-	void FinishPrecompile(const TArray<FNiagaraVariable>& EncounterableVariables, FCompileConstantResolver ConstantResolver, const TArray<ENiagaraScriptUsage>& UsagesToProcess, const TArray<class UNiagaraSimulationStageBase*>* SimStages);
+	void FinishPrecompile(const TArray<FNiagaraVariable>& EncounterableVariables, FCompileConstantResolver ConstantResolver, const TArray<ENiagaraScriptUsage>& UsagesToProcess, const TArray<class UNiagaraSimulationStageBase*>* SimStages, const TArray<FString> EmitterNames);
 	virtual int32 GetDependentRequestCount() const override {
 		return EmitterData.Num();
 	};
@@ -97,6 +97,16 @@ public:
 		mutable bool					PartialParticleUpdate = false;
 	};
 	TArray<FCompileSimStageData> CompileSimStageData;
+
+	struct FCompileDataInterfaceData
+	{
+		FString EmitterName;
+		ENiagaraScriptUsage Usage;
+		FGuid UsageId;
+		FNiagaraVariable Variable;
+		TArray<FString> ReadsEmitterParticleData;
+	};
+	TSharedPtr<TArray<FCompileDataInterfaceData>> SharedCompileDataInterfaceData;
 
 	TArray<FNiagaraVariable> EncounteredVariables;
 	FString EmitterUniqueName;

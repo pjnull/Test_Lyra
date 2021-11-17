@@ -1185,10 +1185,9 @@ const FNiagaraTranslateResults &FHlslNiagaraTranslator::Translate(const FNiagara
 					// If we allow partial writes we need to ensure that we are not reading from our own buffer, we ask our data interfaces if this is true or not
 					if (TranslationStages[Index].bPartialParticleUpdate)
 					{
-						for (auto it = InCompileDuplicateData->SharedNameToDuplicatedDataInterfaceMap->CreateConstIterator(); it; ++it)
+						for (const FNiagaraCompileRequestData::FCompileDataInterfaceData& DataInterfaceData : (*InCompileData->SharedCompileDataInterfaceData.Get()))
 						{
-							const UNiagaraDataInterface* DataInterface = it->Value;
-							if (DataInterface->ReadsEmitterParticleData(InCompileData->EmitterUniqueName))
+							if(DataInterfaceData.ReadsEmitterParticleData.Contains(InCompileData->EmitterUniqueName))
 							{
 								TranslationStages[Index].bPartialParticleUpdate = false;
 								break;
