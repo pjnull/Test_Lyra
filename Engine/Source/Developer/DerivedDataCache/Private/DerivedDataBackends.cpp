@@ -1,5 +1,4 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
-#pragma optimize("", off)
 
 #include "CoreMinimal.h"
 #include "HAL/PlatformFileManager.h"
