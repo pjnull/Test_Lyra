@@ -3285,6 +3285,7 @@ int32 Describe(
 		int32 ExportBundleCount = -1;
 		TArray<FPackageLocation, TInlineAllocator<1>> Locations;
 		TArray<FPackageId> ImportedPackageIds;
+		TArray<uint64> ImportedPublicExportHashes;
 		TArray<FImportDesc> Imports;
 		TArray<FExportDesc> Exports;
 		TArray<TArray<FExportBundleEntryDesc>, TInlineAllocator<1>> ExportBundles;
@@ -3544,6 +3545,8 @@ int32 Describe(
 		Job.PackageDesc->PackageName = FName::CreateFromDisplayId(PackageNameMap[PackageSummary->Name.GetIndex()], PackageSummary->Name.GetNumber());
 		Job.PackageDesc->PackageFlags = PackageSummary->PackageFlags;
 		Job.PackageDesc->NameCount = PackageNameMap.Num();
+		
+		Job.PackageDesc->ImportedPublicExportHashes = MakeArrayView<const uint64>(reinterpret_cast<const uint64*>(PackageSummaryData + PackageSummary->ImportedPublicExportHashesOffset), (PackageSummary->ImportMapOffset - PackageSummary->ImportedPublicExportHashesOffset) / sizeof(uint64));
 
 		const FPackageObjectIndex* ImportMap = reinterpret_cast<const FPackageObjectIndex*>(PackageSummaryData + PackageSummary->ImportMapOffset);
 		Job.PackageDesc->Imports.SetNum((PackageSummary->ExportMapOffset - PackageSummary->ImportMapOffset) / sizeof(FPackageObjectIndex));
@@ -3564,7 +3567,7 @@ int32 Describe(
 			ExportDesc.ClassIndex = ExportMapEntry.ClassIndex;
 			ExportDesc.SuperIndex = ExportMapEntry.SuperIndex;
 			ExportDesc.TemplateIndex = ExportMapEntry.TemplateIndex;
-			ExportDesc.ExportHash = ExportMapEntry.ExportHash;
+			ExportDesc.ExportHash = ExportMapEntry.PublicExportHash;
 			ExportDesc.SerialSize = ExportMapEntry.CookedSerialSize;
 		}
 
@@ -3668,7 +3671,7 @@ int32 Describe(
 				{
 					if (Import.GlobalImportIndex.IsPackageImport())
 					{
-						FPublicExportKey Key = FPublicExportKey::FromPackageImport(Import.GlobalImportIndex, PackageDesc->ImportedPackageIds);
+						FPublicExportKey Key = FPublicExportKey::FromPackageImport(Import.GlobalImportIndex, PackageDesc->ImportedPackageIds, PackageDesc->ImportedPublicExportHashes);
 						Import.Export = ExportByKeyMap.FindRef(Key);
 						if (!Import.Export)
 						{
@@ -3791,7 +3794,7 @@ int32 Describe(
 			}
 			else if (PackageObjectIndex.IsPackageImport())
 			{
-				FPublicExportKey Key = FPublicExportKey::FromPackageImport(PackageObjectIndex, Package->ImportedPackageIds);
+				FPublicExportKey Key = FPublicExportKey::FromPackageImport(PackageObjectIndex, Package->ImportedPackageIds, Package->ImportedPublicExportHashes);
 				FExportDesc* ExportDesc = ExportByKeyMap.FindRef(Key);
 				if (ExportDesc && bIncludeName)
 				{
