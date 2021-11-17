@@ -944,8 +944,7 @@ void ULandscapeComponent::PostLoad()
 		// Move the MICs and Textures back to the Package if they're currently in the level
 		// Moving them into the level caused them to be duplicated when running PIE, which is *very very slow*, so we've reverted that change
 		// Also clear the public flag to avoid various issues, e.g. generating and saving thumbnails that can never be seen
-		ULevel* Level = GetLevel();
-		if (ensure(Level))
+		if (ULevel* Level = GetLevel())
 		{
 			TArray<UObject*> ObjectsToMoveFromLevelToPackage;
 			GetGeneratedTexturesAndMaterialInstances(ObjectsToMoveFromLevelToPackage);
@@ -2515,7 +2514,7 @@ void ALandscapeProxy::PostLoad()
 		CreateLandscapeInfo();
 	}
 #if WITH_EDITOR
-	if (GIsEditor && !GetWorld()->IsGameWorld())
+	if (GIsEditor && GetWorld() && !GetWorld()->IsGameWorld())
 	{
 		if ((GetLinker() && (GetLinker()->UEVer() < VER_UE4_LANDSCAPE_COMPONENT_LAZY_REFERENCES)) ||
 			LandscapeComponents.Num() != CollisionComponents.Num() ||
@@ -2553,9 +2552,11 @@ void ALandscapeProxy::PostLoad()
 	}
 
 	// track feature level change to flush grass cache
-	FOnFeatureLevelChanged::FDelegate FeatureLevelChangedDelegate = FOnFeatureLevelChanged::FDelegate::CreateUObject(this, &ALandscapeProxy::OnFeatureLevelChanged);
-	FeatureLevelChangedDelegateHandle = GetWorld()->AddOnFeatureLevelChangedHandler(FeatureLevelChangedDelegate);
-
+	if (GetWorld())
+	{
+		FOnFeatureLevelChanged::FDelegate FeatureLevelChangedDelegate = FOnFeatureLevelChanged::FDelegate::CreateUObject(this, &ALandscapeProxy::OnFeatureLevelChanged);
+		FeatureLevelChangedDelegateHandle = GetWorld()->AddOnFeatureLevelChangedHandler(FeatureLevelChangedDelegate);
+	}
 	RepairInvalidTextures();
 #endif
 }
