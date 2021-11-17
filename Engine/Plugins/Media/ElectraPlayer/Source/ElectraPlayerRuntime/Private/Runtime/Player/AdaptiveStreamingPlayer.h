@@ -255,6 +255,7 @@ public:
 	//
 #if PLATFORM_ANDROID
 	virtual void Android_UpdateSurface(const TSharedPtr<IOptionPointerValueContainer>& Surface) = 0;
+	virtual void Android_SuspendOrResumeDecoder(bool bSuspend) = 0;
 	static FParamDict& Android_Workarounds(FStreamCodecInformation::ECodec InForCodec);
 #endif
 

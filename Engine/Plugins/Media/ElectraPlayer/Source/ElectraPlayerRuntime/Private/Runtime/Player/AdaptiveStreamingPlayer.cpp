@@ -2325,10 +2325,13 @@ void FAdaptiveStreamingPlayer::InternalHandlePendingStartRequest(const FTimeValu
 						// Prepare the initial quality/bitrate for playback.
 						int64 StartingBitrate = -1;
 						bool bForceInitial = false;
+						bool bForceStartRate = false;
 						if (PendingStartRequest->StartingBitrate.IsSet())
 						{
+							// This is used for rebuffering in which case we enforce the starting bitrate limits.
 							StartingBitrate = PendingStartRequest->StartingBitrate.GetValue();
 							bForceInitial = true;
+							bForceStartRate = true;
 						}
 						else
 						{
@@ -2337,6 +2340,7 @@ void FAdaptiveStreamingPlayer::InternalHandlePendingStartRequest(const FTimeValu
 							{
 								StartingBitrate = PlayerOptions.GetValue(OptionKeyInitialBitrate).SafeGetInt64(StartingBitrate);
 								bForceInitial = true;
+								bForceStartRate = true;
 							}
 							else if (PendingStartRequest->StartType == FPendingStartRequest::EStartType::Seeking)
 							{
@@ -2358,7 +2362,10 @@ void FAdaptiveStreamingPlayer::InternalHandlePendingStartRequest(const FTimeValu
 								StartingBitrate = 1000000;
 							}
 						}
-						StreamSelector->SetBandwidth(StartingBitrate);
+						if (bForceStartRate)
+						{
+							StreamSelector->SetBandwidth(StartingBitrate);
+						}
 						if (bForceInitial)
 						{
 							StreamSelector->SetForcedNextBandwidth(StartingBitrate, GetMinBufferTimeBeforePlayback());
@@ -4229,6 +4236,13 @@ void FAdaptiveStreamingPlayer::Android_UpdateSurface(const TSharedPtr<IOptionPoi
 		VideoDecoder.Decoder->Android_UpdateSurface(Surface);
 	}
 }
+
+void FAdaptiveStreamingPlayer::Android_SuspendOrResumeDecoder(bool bSuspend)
+{
+	VideoDecoder.SuspendOrResume(bSuspend);
+	AudioDecoder.SuspendOrResume(bSuspend);
+}
+
 
 FParamDict& FAdaptiveStreamingPlayer::Android_Workarounds(FStreamCodecInformation::ECodec InForCodec)
 {

@@ -153,7 +153,7 @@ namespace Electra
 						HttpsRequestCallbackWrapper->Unbind();
 					}
 					HttpsRequestCallbackWrapper.Reset();
-					if (HttpRequest.IsValid() && !EHttpRequestStatus::IsFinished(HttpRequest->GetStatus()))
+					if (HttpRequest.IsValid() && !ActiveResponse.bHitCache && !EHttpRequestStatus::IsFinished(HttpRequest->GetStatus()))
 					{
 						HttpRequest->CancelRequest();
 					}

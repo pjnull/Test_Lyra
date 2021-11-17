@@ -224,7 +224,11 @@ public:
 
 	virtual void NotifyOfOptionChange() = 0;
 
-	enum {
+	// Suspends or resumes decoder instances. Not supported on all platforms.
+	virtual void SuspendOrResumeDecoders(bool bSuspend) = 0;
+
+	enum
+	{
 		ResourceFlags_Decoder = 1 << 0,
 		ResourceFlags_OutputBuffers = 1 << 1,
 

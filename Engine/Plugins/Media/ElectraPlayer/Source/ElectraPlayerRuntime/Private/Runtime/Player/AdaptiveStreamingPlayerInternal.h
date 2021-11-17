@@ -787,6 +787,7 @@ public:
 
 #if PLATFORM_ANDROID
 	virtual void Android_UpdateSurface(const TSharedPtr<IOptionPointerValueContainer>& Surface) override;
+	virtual void Android_SuspendOrResumeDecoder(bool bSuspend) override;
 	static FParamDict& Android_Workarounds(FStreamCodecInformation::ECodec InForCodec);
 #endif
 
@@ -959,6 +960,25 @@ private:
 				Decoder->AUdataClearEOD();
 			}
 		}
+		void SuspendOrResume(bool bInSuspend)
+		{
+			if (Decoder && ((bInSuspend && !bSuspended) || (!bInSuspend && bSuspended)))
+			{
+#if PLATFORM_ANDROID
+				Decoder->Android_SuspendOrResumeDecoder(bInSuspend);
+#endif
+			}
+			bSuspended = bInSuspend;
+		}
+		void CheckIfNewDecoderMustBeSuspendedImmediately()
+		{
+			if (Decoder && bSuspended)
+			{
+#if PLATFORM_ANDROID
+				Decoder->Android_SuspendOrResumeDecoder(bSuspended);
+#endif
+			}
+		}
 		virtual void DecoderInputNeeded(const IAccessUnitBufferListener::FBufferStats& currentInputBufferStats)
 		{
 			if (Parent)
@@ -982,6 +1002,7 @@ private:
 		bool bDrainingForCodecChange = false;
 		bool bDrainingForCodecChangeDone = false;
 		bool bApplyNewLimits = false;
+		bool bSuspended = false;
 	};
 
 	struct FAudioDecoder : public IAccessUnitBufferListener, public IDecoderOutputBufferListener
@@ -1011,6 +1032,25 @@ private:
 				Decoder->AUdataClearEOD();
 			}
 		}
+		void SuspendOrResume(bool bInSuspend)
+		{
+			if (Decoder && ((bInSuspend && !bSuspended) || (!bInSuspend && bSuspended)))
+			{
+#if PLATFORM_ANDROID
+				Decoder->Android_SuspendOrResumeDecoder(bInSuspend);
+#endif
+			}
+			bSuspended = bInSuspend;
+		}
+		void CheckIfNewDecoderMustBeSuspendedImmediately()
+		{
+			if (Decoder && bSuspended)
+			{
+#if PLATFORM_ANDROID
+				Decoder->Android_SuspendOrResumeDecoder(bSuspended);
+#endif
+			}
+		}
 		virtual void DecoderInputNeeded(const IAccessUnitBufferListener::FBufferStats& currentInputBufferStats)
 		{
 			if (Parent)
@@ -1031,6 +1071,7 @@ private:
 		TSharedPtrTS<FAccessUnit::CodecData> LastSentAUCodecData;
 		FAdaptiveStreamingPlayer* Parent = nullptr;
 		IAudioDecoderAAC* Decoder = nullptr;
+		bool bSuspended = false;
 	};
 
 	struct FSubtitleDecoder

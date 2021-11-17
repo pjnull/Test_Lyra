@@ -490,6 +490,15 @@ void FElectraPlayer::FPlayerState::SetPlayRateFromPlayer(float InCurrentPlayerPl
 }
 
 
+//-----------------------------------------------------------------------------
+/**
+* Suspends or resumes decoder instances.
+*/
+void FElectraPlayer::SuspendOrResumeDecoders(bool bSuspend)
+{
+	PlatformSuspendOrResumeDecoders(bSuspend);
+}
+
 
 //-----------------------------------------------------------------------------
 /**

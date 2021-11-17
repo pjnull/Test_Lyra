@@ -133,6 +133,8 @@ public:
 
 	void NotifyOfOptionChange() override;
 
+	void SuspendOrResumeDecoders(bool bSuspend) override;
+
 private:
 	DECLARE_DELEGATE_TwoParams(FOnMediaPlayerEventReceivedDelegate, TSharedPtrTS<IAdaptiveStreamingPlayerAEMSEvent> /*InEvent*/, IAdaptiveStreamingPlayerAEMSReceiver::EDispatchMode /*InDispatchMode*/);
 	class FAEMSEventReceiver : public IAdaptiveStreamingPlayerAEMSReceiver
@@ -295,6 +297,7 @@ private:
 	bool PresentSubtitle(const ISubtitleDecoderOutputPtr& DecoderOutput);
 
 	void PlatformNotifyOfOptionChange();
+	void PlatformSuspendOrResumeDecoders(bool bSuspend);
 
 	void OnMediaPlayerEventReceived(TSharedPtrTS<IAdaptiveStreamingPlayerAEMSEvent> InEvent, IAdaptiveStreamingPlayerAEMSReceiver::EDispatchMode InDispatchMode);
 
