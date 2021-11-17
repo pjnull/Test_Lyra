@@ -456,7 +456,12 @@ public class MakeCookedEditor : BuildCommand
 		// look in Engine/Intermediate/ScriptModules and Project/Intermediate/ScriptModules
 		DirectoryReference EngineScriptModulesDir = DirectoryReference.Combine(Context.EngineDirectory, "Intermediate", "ScriptModules");
 		DirectoryReference ProjectScriptModulesDir = DirectoryReference.Combine(Context.ProjectDirectory, "Intermediate", "ScriptModules");
-		foreach (FileReference JsonFile in DirectoryReference.EnumerateFiles(EngineScriptModulesDir).Concat(DirectoryReference.EnumerateFiles(ProjectScriptModulesDir)))
+		IEnumerable<FileReference> JsonFiles = DirectoryReference.EnumerateFiles(EngineScriptModulesDir);
+		if (DirectoryReference.Exists(ProjectScriptModulesDir))
+		{
+			JsonFiles.Append(DirectoryReference.EnumerateFiles(ProjectScriptModulesDir));
+		}
+		foreach (FileReference JsonFile in JsonFiles)
 		{
 			try
 			{
@@ -498,6 +503,12 @@ public class MakeCookedEditor : BuildCommand
 			{
 				// skip json files that fail
 			}
+		}
+
+		if (Context.IniPlatformName == "Linux")
+		{
+			// linux needs dotnet runtime
+			SC.StageFiles(StagedFileType.NonUFS, DirectoryReference.Combine(Context.EngineDirectory, "Binaries", "ThirdParty", "DotNet", Context.IniPlatformName), StageFilesSearch.AllDirectories);
 		}
 
 		// not sure if we need this or not now
