@@ -499,6 +499,7 @@ bool FPythonScriptPlugin::ExecPythonCommandEx(FPythonCommandEx& InOutPythonComma
 		//   C:\My Scripts\Test.py-param1 -param2      -> Error missing a space between .py and -param1
 		//   "C:\My Scripts\Test.py                    -> Error missing closing quote.
 		//   C:\My Scripts\Test.py  "                  -> Error missing opening quote.
+		//   test_wrapper_types.py                     -> Search the 'sys.path' to find the script.
 		auto TryExtractPathnameAndCommand = [&InOutPythonCommand](FString& OutExtractedFilename, FString& OutExtractedCommand) -> bool
 		{
 			const TCHAR* PyFileExtension = TEXT(".py");
@@ -519,13 +520,8 @@ bool FPythonScriptPlugin::ExecPythonCommandEx(FPythonCommandEx& InOutPythonComma
 				bCommandQuoted = true;
 			}
 
-			// Early out if the command doesn't match an existing file.
-			if (!IFileManager::Get().FileExists(*OutExtractedFilename))
-			{
-				return false;
-			}
 			// If the pathname started with a quote, expect a closing quote after the .py.
-			else if (bCommandQuoted)
+			if (bCommandQuoted)
 			{
 				if (EndPathnamePos == InOutPythonCommand.Command.Len())
 				{
