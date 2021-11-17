@@ -14,6 +14,8 @@
 	#error "Windows Vista and earlier are no longer supported"
 #endif
 
+#define PLATFORM_TCHAR_IS_UTF8CHAR				0
+
 /**
 * Windows specific types
 **/
@@ -25,6 +27,10 @@ struct FWindowsPlatformTypes : public FGenericPlatformTypes
 #else
 	typedef unsigned long		SIZE_T;
 	typedef long				SSIZE_T;
+#endif
+
+#if PLATFORM_TCHAR_IS_UTF8CHAR
+	typedef UTF8CHAR TCHAR;
 #endif
 };
 
