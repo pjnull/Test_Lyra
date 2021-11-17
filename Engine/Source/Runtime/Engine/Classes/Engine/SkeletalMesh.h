@@ -652,6 +652,7 @@ struct FSkeletalMaterial
 	}
 
 	friend FArchive& operator<<( FArchive& Ar, FSkeletalMaterial& Elem );
+	static void DeclareCustomVersions(FArchive& Ar);
 
 	ENGINE_API friend bool operator==( const FSkeletalMaterial& LHS, const FSkeletalMaterial& RHS );
 	ENGINE_API friend bool operator==( const FSkeletalMaterial& LHS, const UMaterialInterface& RHS );
@@ -2654,6 +2655,7 @@ public:
 	PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	virtual void PreSave(FObjectPreSaveContext ObjectSaveContext) override;
 	virtual void Serialize(FArchive& Ar) override;
+	virtual void DeclareCustomVersions(FArchive& Ar) override;
 	virtual void PostInitProperties() override;
 	virtual void PostLoad() override;
 	virtual bool IsPostLoadThreadSafe() const override;

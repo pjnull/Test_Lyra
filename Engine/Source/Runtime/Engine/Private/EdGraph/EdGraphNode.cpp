@@ -226,6 +226,13 @@ void UEdGraphNode::Serialize(FArchive& Ar)
 #endif
 }
 
+void UEdGraphNode::DeclareCustomVersions(FArchive& Ar)
+{
+	Super::DeclareCustomVersions(Ar);
+	UEdGraphPin::DeclareCustomVersions(Ar);
+}
+
+
 bool UEdGraphNode::GetCanRenameNode() const
 {
 #if WITH_EDITORONLY_DATA

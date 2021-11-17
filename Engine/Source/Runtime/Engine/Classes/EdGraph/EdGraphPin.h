@@ -201,6 +201,7 @@ public:
 
 	ENGINE_API bool Serialize(FArchive& Ar);
 	ENGINE_API void PostSerialize(const FArchive& Ar);
+	ENGINE_API static void DeclareCustomVersions(FArchive& Ar);
 
 	static ENGINE_API FEdGraphPinType GetPinTypeForTerminalType( const FEdGraphTerminalType& TerminalType );
 	static ENGINE_API FEdGraphPinType GetTerminalTypeForContainer( const FEdGraphPinType& ContainerType );
@@ -522,6 +523,7 @@ public:
 
 	/** Serializes an array of pins as the owner. Only the OwningNode should call this function. */
 	static void SerializeAsOwningNode(FArchive& Ar, TArray<UEdGraphPin*>& ArrayRef);
+	static void DeclareCustomVersions(FArchive& Ar);
 
 	/** Marks the owning node as modified. */
 	ENGINE_API bool Modify(bool bAlwaysMarkDirty = true);

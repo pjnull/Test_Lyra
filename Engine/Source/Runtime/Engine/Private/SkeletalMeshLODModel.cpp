@@ -568,6 +568,20 @@ FArchive& operator<<(FArchive& Ar, FSkelMeshSection& S)
 	return Ar;
 }
 
+void FSkelMeshSection::DeclareCustomVersions(FArchive& Ar)
+{
+	Ar.UsingCustomVersion(FEditorObjectVersion::GUID);
+	Ar.UsingCustomVersion(FReleaseObjectVersion::GUID);
+	Ar.UsingCustomVersion(FRenderingObjectVersion::GUID);
+	Ar.UsingCustomVersion(FAnimObjectVersion::GUID);
+	Ar.UsingCustomVersion(FSkeletalMeshCustomVersion::GUID);
+	Ar.UsingCustomVersion(FUE5MainStreamObjectVersion::GUID);
+	Ar.UsingCustomVersion(FRecomputeTangentCustomVersion::GUID);
+	Ar.UsingCustomVersion(FOverlappingVerticesCustomVersion::GUID);
+	Ar.UsingCustomVersion(FUE5ReleaseStreamObjectVersion::GUID);
+	Ar.UsingCustomVersion(FFortniteMainBranchObjectVersion::GUID);
+}
+
 // Serialization.
 FArchive& operator<<(FArchive& Ar, FSkelMeshSourceSectionUserData& S)
 {
@@ -951,6 +965,14 @@ void FSkeletalMeshLODModel::Serialize(FArchive& Ar, UObject* Owner, int32 Idx)
 	{
 		Ar << SkinWeightProfiles;
 	}
+}
+
+void FSkeletalMeshLODModel::DeclareCustomVersions(FArchive& Ar)
+{
+	Ar.UsingCustomVersion(FSkeletalMeshCustomVersion::GUID);
+	Ar.UsingCustomVersion(FFortniteMainBranchObjectVersion::GUID);
+	Ar.UsingCustomVersion(FEditorObjectVersion::GUID);
+	FSkelMeshSection::DeclareCustomVersions(Ar);
 }
 
 int32 FSkeletalMeshLODModel::FindMeshInfoIndex(FName Name) const

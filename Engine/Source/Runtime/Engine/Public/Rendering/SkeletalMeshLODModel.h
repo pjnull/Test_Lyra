@@ -232,6 +232,7 @@ struct FSkelMeshSection
 
 	// Serialization.
 	friend FArchive& operator<<(FArchive& Ar, FSkelMeshSection& S);
+	static void DeclareCustomVersions(FArchive& Ar);
 };
 
 /**
@@ -457,6 +458,7 @@ public:
 	* @param	Idx		Index of current array entry being serialized
 	*/
 	void Serialize(FArchive& Ar, UObject* Owner, int32 Idx);
+	static void DeclareCustomVersions(FArchive& Ar);
 
 	/**
 	* Fill array with vertex position and tangent data from skel mesh chunks.
