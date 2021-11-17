@@ -15,8 +15,9 @@ FODSCRequestPayload::FODSCRequestPayload(EShaderPlatform InShaderPlatform, const
 
 }
 
-FODSCMessageHandler::FODSCMessageHandler(EShaderPlatform InShaderPlatform) :
-	ShaderPlatform(InShaderPlatform)
+FODSCMessageHandler::FODSCMessageHandler(EShaderPlatform InShaderPlatform, ODSCRecompileCommand InRecompileCommandType) 
+:	ShaderPlatform(InShaderPlatform),
+	RecompileCommandType(InRecompileCommandType)
 {
 }
 
@@ -221,7 +222,7 @@ void FODSCThread::Process()
 	// process any specific mesh material shader requests.
 	if (PayloadsToAggregate.Num())
 	{
-		FODSCMessageHandler* RequestHandler = new FODSCMessageHandler(PayloadsToAggregate[0].ShaderPlatform);
+		FODSCMessageHandler* RequestHandler = new FODSCMessageHandler(PayloadsToAggregate[0].ShaderPlatform, ODSCRecompileCommand::Material);
 		for (const FODSCRequestPayload& payload : PayloadsToAggregate)
 		{
 			RequestHandler->AddPayload(payload);

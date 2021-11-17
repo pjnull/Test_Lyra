@@ -16,7 +16,7 @@ class FRunnableThread;
 class FODSCMessageHandler : public IPlatformFile::IFileServerMessageHandler
 {
 public:
-	FODSCMessageHandler(EShaderPlatform InShaderPlatform);
+	FODSCMessageHandler(EShaderPlatform InShaderPlatform, ODSCRecompileCommand InRecompileCommandType);
 	FODSCMessageHandler(const TArray<FString>& InMaterials, EShaderPlatform InShaderPlatform, ODSCRecompileCommand InRecompileCommandType);
 	/** Subclass fills out an archive to send to the server */
 	virtual void FillPayload(FArchive& Payload) override;
