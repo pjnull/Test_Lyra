@@ -1010,6 +1010,7 @@ void FVulkanCommandListContext::RHIEndFrame()
 
 	Device->GetStagingManager().ProcessPendingFree(false, true);
 	Device->GetMemoryManager().ReleaseFreedPages(*this);
+	Device->GetDeferredDeletionQueue().ReleaseResources();
 
 	if (UseVulkanDescriptorCache())
 	{
