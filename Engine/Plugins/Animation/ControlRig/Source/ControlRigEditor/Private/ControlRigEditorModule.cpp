@@ -207,7 +207,7 @@ void FControlRigEditorModule::StartupModule()
 		FControlRigEditMode::ModeName,
 		NSLOCTEXT("AnimationModeToolkit", "DisplayName", "Animation"),
 		FSlateIcon(FControlRigEditorStyle::Get().GetStyleSetName(), "ControlRigEditMode", "ControlRigEditMode.Small"),
-		false,
+		true,
 		8000);
 
 	FEditorModeRegistry::Get().RegisterMode<FControlRigEditorEditMode>(

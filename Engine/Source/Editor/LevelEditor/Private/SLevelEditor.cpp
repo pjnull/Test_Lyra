@@ -1939,6 +1939,22 @@ void SLevelEditor::RemoveViewportOverlayWidget(TSharedRef<SWidget> InWidget, TSh
 		ActiveViewport->RemoveOverlayWidget(InWidget);
 	}
 }
+	
+FVector2D SLevelEditor::GetActiveViewportSize()
+{
+	TSharedPtr<SLevelViewport> ActiveViewport = GetActiveViewport();
 
+	FSceneViewFamilyContext ViewFamily(FSceneViewFamily::ConstructionValues(
+		ActiveViewport->GetActiveViewport(),
+		ActiveViewport->GetViewportClient()->GetScene(),
+		ActiveViewport->GetViewportClient()->EngineShowFlags)
+		.SetRealtimeUpdate(ActiveViewport->IsRealtime()));
+	// SceneView is deleted with the ViewFamily
+	FSceneView* SceneView = ActiveViewport->GetViewportClient()->CalcSceneView(&ViewFamily);
+	const float InvDpiScale = 1.0f / ActiveViewport->GetViewportClient()->GetDPIScale();
+	const float MaxX = SceneView->UnscaledViewRect.Width() * InvDpiScale;
+	const float MaxY = SceneView->UnscaledViewRect.Height() * InvDpiScale;
+	return FVector2D(MaxX, MaxY);
+}
 
 #undef LOCTEXT_NAMESPACE

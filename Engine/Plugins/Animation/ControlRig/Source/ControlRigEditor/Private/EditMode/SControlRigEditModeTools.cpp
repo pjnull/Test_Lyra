@@ -37,6 +37,7 @@
 #include "Widgets/Notifications/SNotificationList.h"
 #include "Framework/Notifications/NotificationManager.h"
 #include "ScopedTransaction.h"
+#include "ControlRigEditModeToolkit.h"
 
 #define LOCTEXT_NAMESPACE "ControlRigRootCustomization"
 
@@ -237,10 +238,10 @@ const URigHierarchy* SControlRigEditModeTools::GetHierarchy() const
 	return nullptr;
 }
 
-void SControlRigEditModeTools::Construct(const FArguments& InArgs, FControlRigEditMode& InEditMode,UWorld* InWorld)
+void SControlRigEditModeTools::Construct(const FArguments& InArgs, TSharedPtr<FControlRigEditModeToolkit> InOwningToolkit, FControlRigEditMode& InEditMode,UWorld* InWorld)
 {
 	bIsChangingRigHierarchy = false;
-	
+	OwningToolkit = InOwningToolkit;
 	// initialize settings view
 	FDetailsViewArgs DetailsViewArgs;
 	{
@@ -896,6 +897,48 @@ void SControlRigEditModeTools::CustomizeToolBarPalette(FToolBarBuilder& ToolBarB
 		EUserInterfaceActionType::ToggleButton
 		);
 
+	ToolBarBuilder.AddSeparator();
+
+	//POSES
+	ToolBarBuilder.AddToolBarButton(
+		FExecuteAction::CreateRaw(OwningToolkit.Pin().Get(), &FControlRigEditModeToolkit::TryInvokeToolkitUI, FControlRigEditModeToolkit::PoseTabName),
+		NAME_None,
+		LOCTEXT("Poses", "Poses"),
+		LOCTEXT("PosesTooltip", "Show Poses"),
+		FSlateIcon(TEXT("ControlRigEditorStyle"), TEXT("ControlRig.PoseTool")),
+		EUserInterfaceActionType::Button
+	);
+	ToolBarBuilder.AddSeparator();
+
+	// Tweens
+	ToolBarBuilder.AddToolBarButton(
+		FExecuteAction::CreateRaw(OwningToolkit.Pin().Get(), &FControlRigEditModeToolkit::TryInvokeToolkitUI, FControlRigEditModeToolkit::TweenOverlayName),
+		NAME_None,
+		LOCTEXT("Tweens", "Tweens"),
+		LOCTEXT("TweensTooltip", "Create Tweens"),
+		FSlateIcon(TEXT("ControlRigEditorStyle"), TEXT("ControlRig.TweenTool")),
+		EUserInterfaceActionType::Button
+	);
+
+	// Snap
+	ToolBarBuilder.AddToolBarButton(
+		FExecuteAction::CreateRaw(OwningToolkit.Pin().Get(), &FControlRigEditModeToolkit::TryInvokeToolkitUI, FControlRigEditModeToolkit::SnapperTabName),
+		NAME_None,
+		LOCTEXT("Snapper", "Snapper"),
+		LOCTEXT("SnapperTooltip", "Snap child objects to a parent object over a set of frames"),
+		FSlateIcon(TEXT("ControlRigEditorStyle"), TEXT("ControlRig.SnapperTool")),
+		EUserInterfaceActionType::Button
+	);
+
+	// Motion Trail
+	ToolBarBuilder.AddToolBarButton(
+		FExecuteAction::CreateRaw(OwningToolkit.Pin().Get(), &FControlRigEditModeToolkit::TryInvokeToolkitUI, FControlRigEditModeToolkit::MotionTrailTabName),
+		NAME_None,
+		LOCTEXT("MotionTrails", "Trails"),
+		LOCTEXT("MotionTrailsTooltip", "Display motion trails for animated objects"),
+		FSlateIcon(TEXT("ControlRigEditorStyle"), TEXT("ControlRig.EditableMotionTrails")),
+		EUserInterfaceActionType::Button
+	);
 
 	//Pivot
 	ToolBarBuilder.AddToolBarButton(
