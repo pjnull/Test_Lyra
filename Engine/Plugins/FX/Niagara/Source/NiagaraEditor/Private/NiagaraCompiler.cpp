@@ -787,7 +787,7 @@ TSharedPtr<FNiagaraCompileRequestDataBase, ESPMode::ThreadSafe> FNiagaraEditorMo
 			EmitterPtr->SourceName = BasePtr->SourceName;
 			EmitterPtr->Source = Cast<UNiagaraScriptSource>(Handle.GetInstance()->GraphSource);
 			EmitterPtr->bUseRapidIterationParams = BasePtr->bUseRapidIterationParams || (!Handle.GetInstance()->bBakeOutRapidIteration);
-			EmitterPtr->bSimulationStagesEnabled = Handle.GetInstance()->bSimulationStagesEnabled;
+			//EmitterPtr->bSimulationStagesEnabled = Handle.GetInstance()->bSimulationStagesEnabled;
 			EmitterPtr->SharedCompileDataInterfaceData = BasePtr->SharedCompileDataInterfaceData;
 			BasePtr->EmitterData.Add(EmitterPtr);
 			EmitterNames.Add(Handle.GetUniqueInstanceName());
