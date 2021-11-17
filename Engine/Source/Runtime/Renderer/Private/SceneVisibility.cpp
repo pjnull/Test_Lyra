@@ -241,6 +241,14 @@ static FAutoConsoleVariableRef CVarLightMaxDrawDistanceScale(
 	ECVF_Scalability | ECVF_RenderThreadSafe
 );
 
+static bool GOcclusionSingleRHIThreadStall = false;
+static FAutoConsoleVariableRef CVarOcclusionSingleRHIThreadStall(
+	TEXT("r.Occlusion.SingleRHIThreadStall"),
+	GOcclusionSingleRHIThreadStall,
+	TEXT("Enable a single RHI thread stall before polling occlusion queries. This will only happen if the RHI's occlusion queries would normally stall the RHI thread themselves."),
+	ECVF_RenderThreadSafe
+);
+
 #if !UE_BUILD_SHIPPING
 
 static TAutoConsoleVariable<int32> CVarTAADebugOverrideTemporalIndex(
@@ -955,7 +963,7 @@ static void FetchVisibilityForPrimitives_Range(FVisForPrimParams& Params, FGloba
 	{
 		// If we're going to stall the RHI thread for one query, we should stall it for all of them.
 		// !(View.bIgnoreExistingQueries || bHZBOcclusion) is the code path that calls GetQueryForReading.
-		const bool bShouldStallRHIThread = bSingleThreaded && !GSupportsParallelOcclusionQueries && IsInRenderingThread() && !(View.bIgnoreExistingQueries || bHZBOcclusion);
+		const bool bShouldStallRHIThread = bSingleThreaded && GOcclusionSingleRHIThreadStall && !GSupportsParallelOcclusionQueries && IsInRenderingThread() && !(View.bIgnoreExistingQueries || bHZBOcclusion);
 		FScopedRHIThreadStaller StallRHIThread(FRHICommandListExecutor::GetImmediateCommandList(), bShouldStallRHIThread);
 
 		SCOPED_NAMED_EVENT_F(TEXT("forEach over %d entries"), FColor::Magenta, NumToProcess);
