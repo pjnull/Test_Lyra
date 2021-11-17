@@ -719,7 +719,7 @@ void SSequencerTreeView::SynchronizeTreeSelectionWithSequencerSelection()
 	{
 		bUpdatingTreeSelection = true;
 		{
-			const TArray<FDisplayNodeRef>& ItemsSourceRef = (*this->TreeItemsSource);
+			const TArray<FDisplayNodeRef>& ItemsSourceRef = (*this->ItemsSource);
 			
 			FSequencer& Sequencer = SequencerNodeTree->GetSequencer();
 			FSequencerSelection& Selection = Sequencer.GetSelection();
