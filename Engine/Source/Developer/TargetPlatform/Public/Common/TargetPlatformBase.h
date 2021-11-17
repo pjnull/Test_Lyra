@@ -389,6 +389,16 @@ public:
 		return TPlatformProperties::SupportsBuildTarget(TargetType);
 	}
 
+	virtual EBuildTargetType GetRuntimePlatformType() const override
+	{
+		if (AllowsEditorObjects())
+		{
+			// Platforms that AllowsEditorObjects need the runtime type Editor to use those objects
+			return EBuildTargetType::Editor;
+		}
+		return PlatformInfo->PlatformType;
+	}
+
 	virtual bool SupportsAutoSDK() const override
 	{
 		return TPlatformProperties::SupportsAutoSDK();

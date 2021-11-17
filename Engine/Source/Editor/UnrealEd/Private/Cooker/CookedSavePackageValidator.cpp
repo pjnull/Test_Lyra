@@ -52,7 +52,7 @@ ESavePackageResult FCookedSavePackageValidator::ValidateImports(const UPackage* 
 			// unavailable class by overriding UObject::NeedsLoadForTargetPlatform on that class to return false.
 			if (bIsError)
 			{
-				UE_LOG(LogCook, Warning, TEXT("Failed to cook %s for platform %s. It imports class %s, which is in a module that is not available on the platform."),
+				UE_LOG(LogCook, Error, TEXT("Failed to cook %s for platform %s. It imports class %s, which is in a module that is not available on the platform."),
 					*Package->GetName(), *TargetPlatform->PlatformName(), *Class->GetPathName());
 				return ESavePackageResult::ValidatorError;
 			}

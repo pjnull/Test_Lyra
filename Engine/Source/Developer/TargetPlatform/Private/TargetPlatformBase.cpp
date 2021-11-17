@@ -89,6 +89,7 @@ static bool IsPluginEnabledForTarget(const IPlugin& Plugin, const FProjectDescri
 	// plugins that are only referenced through another plugin that is disabled for platform X.
 	// For the time-being, to disable a transitively referenced plugin per-platform, the project has to 
 	// directly include the plugin.
+	IPluginManager& PluginManager = IPluginManager::Get();
 
 	if (Project != nullptr)
 	{
@@ -100,12 +101,24 @@ static bool IsPluginEnabledForTarget(const IPlugin& Plugin, const FProjectDescri
 			});
 		if (PluginReference)
 		{
-			bool bEnabledForProject = PluginReference->IsEnabledForPlatform(Platform) &&
-				(Configuration == EBuildConfiguration::Unknown || PluginReference->IsEnabledForTargetConfiguration(Configuration)) &&
-				PluginReference->IsEnabledForTarget(TargetType);
-			if (!bEnabledForProject)
+			// TODO: Remove this workaround for indirect plugin references. A project can mark a plugin as
+			// "Enabled": false, but that merely prevents a direct reference, and the plugin might be referenced and
+			// enabled by other plugins. PluginReference->IsEnabledForPlatform, IsEnabledForTargetConfiguration, and
+			// IsEnabledForTarget will all return false in that case, even though the plugin is actually enabled.
+			// Other systems using IPluginManager::Get().GetEnabledPlugins will disagree with the disabled result.
+			// To workaround it, when we detect the case of a disabled plugin reference for a plugin that is
+			// indirectly enabled, we treat it as having all platforms enabled.
+			// To fix it properly, we will need to have plugins track for which platforms they are enabled,
+			// and query the pluginmanager here instead of querying the PluginReference directly.
+			if (PluginReference->bEnabled || PluginReference->bEnabled == Plugin.IsEnabled())
 			{
-				return false;
+				bool bEnabledForProject = PluginReference->IsEnabledForPlatform(Platform) &&
+					(Configuration == EBuildConfiguration::Unknown || PluginReference->IsEnabledForTargetConfiguration(Configuration)) &&
+					PluginReference->IsEnabledForTarget(TargetType);
+				if (!bEnabledForProject)
+				{
+					return false;
+				}
 			}
 		}
 	}
@@ -159,7 +172,7 @@ bool FTargetPlatformBase::IsEnabledForPlugin(const IPlugin& Plugin) const
 {
 	const FProjectDescriptor* Project = IProjectManager::Get().GetCurrentProject();
 	return IsPluginEnabledForTarget(Plugin, Project, GetPlatformInfo().UBTPlatformString, EBuildConfiguration::Unknown,
-		PlatformInfo->PlatformType);
+		GetRuntimePlatformType());
 }
 
 TSharedPtr<IDeviceManagerCustomPlatformWidgetCreator> FTargetPlatformBase::GetCustomWidgetCreator() const

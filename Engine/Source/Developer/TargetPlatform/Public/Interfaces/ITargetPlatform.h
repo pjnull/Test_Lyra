@@ -412,6 +412,14 @@ public:
 	virtual bool SupportsBuildTarget( EBuildTargetType TargetType ) const = 0;
 
 	/**
+	 * Return the TargetType this platform uses at runtime.
+	 * Some TargetPlatforms like CookedEditors need to cook with one type, like Client, but then will run as an Editor.
+	 * Decisions made based solely on the cook type may cause data mismatches if the runtime type is different.
+	 * This is also useful for knowing what plugins will be enabled at runtime.
+	 */
+	virtual EBuildTargetType GetRuntimePlatformType() const = 0;
+
+	/**
 	 * Checks whether the target platform supports the specified feature.
 	 *
 	 * @param Feature The feature to check.
