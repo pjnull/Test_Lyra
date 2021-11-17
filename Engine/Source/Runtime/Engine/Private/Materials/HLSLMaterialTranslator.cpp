@@ -1331,7 +1331,7 @@ bool FHLSLMaterialTranslator::Translate()
 				// If the unlit node is used, it must be the only one used
 				if (!StrataIsSingleLayerWaterOnly(this, StrataCompilationInfo))
 				{
-					FString ErrorMsg = FString::Printf(TEXT("Material %s contains hair BSDF but it is not the only representing the material asset: %s. It must be the single BSDF.\r\n"), *Material->GetDebugName(), *Material->GetAssetPath().ToString());
+					FString ErrorMsg = FString::Printf(TEXT("Material %s contains water BSDF but it is not the only representing the material asset: %s. It must be the single BSDF.\r\n"), *Material->GetDebugName(), *Material->GetAssetPath().ToString());
 					Error(*ErrorMsg);
 				}
 			}
@@ -9524,7 +9524,7 @@ int32 FHLSLMaterialTranslator::StrataSlabBSDF(
 	int32 Normal, int32 Tangent, const FString& SharedLocalBasisIndexMacro)
 {
 	const FString NormalCode = GetParameterCode(Normal);
-
+	const FString TangentCode = Tangent != INDEX_NONE ? *GetParameterCode(Tangent) : TEXT("NONE");
 	return AddCodeChunk(
 		MCT_Strata, TEXT("GetStrataSlabBSDF(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, Parameters.SharedLocalBases.Types) /* Normal = %s ; Tangent = %s */"),
 		* GetParameterCode(UseMetalness),
@@ -9541,7 +9541,48 @@ int32 FHLSLMaterialTranslator::StrataSlabBSDF(
 		*GetParameterCode(Thickness),
 		*SharedLocalBasisIndexMacro,
 		*NormalCode,
-		Tangent!=INDEX_NONE ? *GetParameterCode(Tangent) : TEXT("NONE")
+		*TangentCode
+	);
+}
+
+int32 FHLSLMaterialTranslator::StrataConversionFromLegacy(
+	int32 BaseColor, int32 Specular, int32 Metallic,
+	int32 Roughness, int32 Anisotropy,
+	int32 SubSurfaceColor, int32 SubSurfaceProfileId,
+	int32 ClearCoat, int32 ClearCoatRoughness,
+	int32 EmissiveColor,
+	int32 Opacity,
+	int32 TransmittanceColor,
+	int32 WaterScatteringCoefficients, int32 WaterAbsorptionCoefficients, int32 WaterPhaseG, int32 ColorScaleBehindWater,
+	int32 ShadingModel,
+	int32 Normal, int32 Tangent, const FString& SharedLocalBasisIndexMacro,
+	int32 ClearCoat_Normal, int32 ClearCoat_Tangent, const FString& ClearCoat_SharedLocalBasisIndexMacro)
+{
+	const FString NormalCode = GetParameterCode(Normal);
+	const FString TangentCode = Tangent != INDEX_NONE ? *GetParameterCode(Tangent) : TEXT("NONE");
+
+	const FString ClearCoat_NormalCode = GetParameterCode(ClearCoat_Normal);
+	const FString ClearCoat_TangentCode = Tangent != INDEX_NONE ? *GetParameterCode(ClearCoat_Tangent) : TEXT("NONE");
+
+	return AddCodeChunk(
+		MCT_Strata, TEXT("StrataConvertLegacyMaterial(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, Parameters.SharedLocalBases.Types) /* Normal = %s ; Tangent = %s ; ClearCoat_Normal = %s ; ClearCoat_Tangent = %s */"),
+		*GetParameterCode(BaseColor), *GetParameterCode(Specular), *GetParameterCode(Metallic),
+		*GetParameterCode(Roughness), *GetParameterCode(Anisotropy),
+		*GetParameterCode(SubSurfaceColor), *GetParameterCode(SubSurfaceProfileId),
+		*GetParameterCode(ClearCoat), *GetParameterCode(ClearCoatRoughness),
+		*GetParameterCode(EmissiveColor),
+		*GetParameterCode(Opacity),
+		*GetParameterCode(TransmittanceColor),
+		*GetParameterCode(WaterScatteringCoefficients), *GetParameterCode(WaterAbsorptionCoefficients), *GetParameterCode(WaterPhaseG), *GetParameterCode(ColorScaleBehindWater),
+		*GetParameterCode(ShadingModel),
+		*SharedLocalBasisIndexMacro,
+		*ClearCoat_SharedLocalBasisIndexMacro,
+		// Regular normal basis
+		*NormalCode,
+		*TangentCode,
+		// Clear coat bottom layer normal basis
+		*ClearCoat_NormalCode,
+		*ClearCoat_TangentCode
 	);
 }
 

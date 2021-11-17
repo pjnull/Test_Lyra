@@ -431,6 +431,7 @@ FStrataSubsurfaceData StrataUnpackSSSData(uint2 In)
 	else if (Out.bIsValid)
 	{
 		Out.ProfileId = SSS_PROFILE_ID_PERPIXEL;
+		Out.ProfileRadiusScale = 1.0f;
 		Out.DMFP = UnpackR11G11B10F(In.y);
 	}
 	return Out;
@@ -538,7 +539,7 @@ FStrataData GetStrataSlabBSDF(
 	BSDF_SETISTOPLAYER		(StrataData.Layers[0].BSDFs[0],		0);
 	BSDF_SETHASSSS			(StrataData.Layers[0].BSDFs[0],		bHasSSS ? 1 : 0);
 	BSDF_SETHASSSSPROFILE	(StrataData.Layers[0].BSDFs[0],		bHasSSSProfile ? 1 : 0);
-	BSDF_SETISTHIN			(StrataData.Layers[0].BSDFs[0],		bDMFPPlugged && Thickness < STRATA_LAYER_ISTHIN_THICKNESS_THRESHOLD_CM);
+	BSDF_SETISTHIN			(StrataData.Layers[0].BSDFs[0],		bIsThin ? 1 : 0);
 	BSDF_SETHASDMFP			(StrataData.Layers[0].BSDFs[0],		bDMFPPlugged ? 1 : 0);
 	BSDF_SETHASHAZINESS		(StrataData.Layers[0].BSDFs[0],		bHasHaziness);
 	BSDF_SETHASTHINFILM		(StrataData.Layers[0].BSDFs[0],		bHasThinFilm);
@@ -1735,7 +1736,7 @@ void PackStrataOut(
 	float3 Throughput = 1.0f;
 
 	// We clamp the layer count to the maximum one according to our byte per pixel budget (removing the bottom layer first)
-	Strata.LayerCount = STRATA_CLAMPED_LAYER_COUNT;
+	Strata.LayerCount = min(Strata.LayerCount, STRATA_CLAMPED_LAYER_COUNT);
 
 	// For each of the BSDF, we evaluated their combined coverage/throughput according to the material operation performed (layering, mixing, etc.).
 	int l;

@@ -456,6 +456,18 @@ public:
 		int32 FuzzAmount, int32 FuzzColor,
 		int32 Thickness,
 		int32 Normal, int32 Tangent, const FString& SharedLocalBasisIndexMacro) = 0;
+	virtual int32 StrataConversionFromLegacy(
+		int32 BaseColor, int32 Specular, int32 Metallic,
+		int32 Roughness, int32 Anisotropy,
+		int32 SubSurfaceColor, int32 SubSurfaceProfileId,
+		int32 ClearCoat, int32 ClearCoatRoughness,
+		int32 EmissiveColor,
+		int32 Opacity,
+		int32 TransmittanceColor,
+		int32 WaterScatteringCoefficients, int32 WaterAbsorptionCoefficients, int32 WaterPhaseG, int32 ColorScaleBehindWater,
+		int32 ShadingModel,
+		int32 Normal, int32 Tangent, const FString& SharedLocalBasisIndexMacro,
+		int32 ClearCoat_Normal, int32 ClearCoat_Tangent, const FString& ClearCoat_SharedLocalBasisIndexMacro) = 0;
 	virtual int32 StrataVolumetricFogCloudBSDF(int32 Albedo, int32 Extinction, int32 EmissiveColor, int32 AmbientOcclusion) = 0;
 	virtual int32 StrataUnlitBSDF(int32 EmissiveColor, int32 TransmittanceColor) = 0;
 	virtual int32 StrataHairBSDF(int32 BaseColor, int32 Scatter, int32 Specular, int32 Roughness, int32 Backlit, int32 EmissiveColor, int32 Tangent, const FString& SharedLocalBasisIndexMacro) = 0;
@@ -980,6 +992,33 @@ public:
 			FuzzAmount, FuzzColor,
 			Thickness,
 			Normal, Tangent, SharedLocalBasisIndexMacro);
+	}
+
+	virtual int32 StrataConversionFromLegacy(
+		int32 BaseColor, int32 Specular, int32 Metallic,
+		int32 Roughness, int32 Anisotropy,
+		int32 SubSurfaceColor, int32 SubSurfaceProfileId,
+		int32 ClearCoat, int32 ClearCoatRoughness,
+		int32 EmissiveColor,
+		int32 Opacity,
+		int32 TransmittanceColor,
+		int32 WaterScatteringCoefficients, int32 WaterAbsorptionCoefficients, int32 WaterPhaseG, int32 ColorScaleBehindWater,
+		int32 ShadingModel,
+		int32 Normal, int32 Tangent, const FString& SharedLocalBasisIndexMacro,
+		int32 ClearCoat_Normal, int32 ClearCoat_Tangent, const FString& ClearCoat_SharedLocalBasisIndexMacro) override
+	{
+		return Compiler->StrataConversionFromLegacy(
+			BaseColor, Specular, Metallic,
+			Roughness, Anisotropy,
+			SubSurfaceColor, SubSurfaceProfileId,
+			ClearCoat, ClearCoatRoughness,
+			EmissiveColor,
+			Opacity,
+			TransmittanceColor,
+			WaterScatteringCoefficients, WaterAbsorptionCoefficients, WaterPhaseG, ColorScaleBehindWater,
+			ShadingModel,
+			Normal, Tangent, SharedLocalBasisIndexMacro,
+			ClearCoat_Normal, ClearCoat_Tangent, ClearCoat_SharedLocalBasisIndexMacro);
 	}
 
 	virtual int32 StrataVolumetricFogCloudBSDF(int32 Albedo, int32 Extinction, int32 EmissiveColor, int32 AmbientOcclusion) override

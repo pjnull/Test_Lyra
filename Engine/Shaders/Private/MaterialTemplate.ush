@@ -145,6 +145,7 @@
 
 #if PROJECT_STRATA
 #include "/Engine/Private/Strata/Strata.ush"
+#include "/Engine/Private/Strata/StrataLegacyConversion.ush"
 #else
 struct FStrataData
 {

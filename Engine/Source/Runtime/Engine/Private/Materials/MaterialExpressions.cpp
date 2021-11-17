@@ -103,7 +103,7 @@
 #include "Materials/MaterialExpressionEyeAdaptation.h"
 #include "Materials/MaterialExpressionEyeAdaptationInverse.h"
 #include "Materials/MaterialExpressionFeatureLevelSwitch.h"
-#include "Materials/MaterialExpressionFloor.h"
+#include "Materials/MaterialExpressionFloor.h"	
 #include "Materials/MaterialExpressionFmod.h"
 #include "Materials/MaterialExpressionFontSample.h"
 #include "Materials/MaterialExpressionFontSampleParameter.h"
@@ -20246,6 +20246,337 @@ static int32 CompileWithDefaultTangentWS(class FMaterialCompiler* Compiler, FExp
 }
 
 #endif // WITH_EDITOR
+
+#if WITH_EDITOR
+int32 UMaterialExpressionStrataLegacyConversion::CompilePreview(class FMaterialCompiler* Compiler, int32 OutputIndex)
+{
+	// Strata nodes cannot be previewed due to the complex Strata type.
+	// So we override the default implementation calling Compile and we simply return a default black preview color.
+	return Compiler->Constant(0.0f);
+}
+#endif
+
+UMaterialExpressionStrataLegacyConversion::UMaterialExpressionStrataLegacyConversion(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	struct FConstructorStatics
+	{
+		FText NAME_Strata;
+		FConstructorStatics() : NAME_Strata(LOCTEXT("Strata Conversion", "Strata Conversion")) { }
+	};
+	static FConstructorStatics ConstructorStatics;
+#if WITH_EDITORONLY_DATA
+	MenuCategories.Add(ConstructorStatics.NAME_Strata);
+#endif
+}
+
+#if WITH_EDITOR
+int32 UMaterialExpressionStrataLegacyConversion::Compile(class FMaterialCompiler* Compiler, int32 OutputIndex)
+{
+	int32 RoughnessCodeChunk = CompileWithDefaultFloat1(Compiler, Roughness, 0.5f);
+	int32 AnisotropyCodeChunk = CompileWithDefaultFloat1(Compiler, Anisotropy, 0.0f);
+	// As long as both roughness are potentially different, we must take it into account in our encoding.
+	// We also cannot ignore the tangent when using the default Tangent because GetTangentBasis
+	// used in StrataGetBSDFSharedBasis cannot be relied on for smooth tangent used for lighting on any mesh.
+	const bool bHasAnisotropy = HasAnisotropy();
+
+	// Regular normal basis
+	int32 NormalCodeChunk = CompileWithDefaultNormalWS(Compiler, Normal);
+	int32 TangentCodeChunk = bHasAnisotropy ? CompileWithDefaultTangentWS(Compiler, Tangent) : INDEX_NONE;
+	const FStrataRegisteredSharedLocalBasis NewRegisteredSharedLocalBasis = StrataCompilationInfoCreateSharedLocalBasis(Compiler, NormalCodeChunk, TangentCodeChunk);
+	const FString BasisIndexMacro = Compiler->GetStrataSharedLocalBasisIndexMacro(NewRegisteredSharedLocalBasis);
+
+	const bool bHasCoatNormal = ClearCoatNormal.IsConnected();
+	// Clear coat normal basis
+	int32 ClearCoat_NormalCodeChunk = INDEX_NONE;
+	int32 ClearCoat_TangentCodeChunk = INDEX_NONE;
+	FString ClearCoat_BasisIndexMacro;
+	FStrataRegisteredSharedLocalBasis ClearCoat_NewRegisteredSharedLocalBasis;
+	if (bHasCoatNormal)
+	{
+		ClearCoat_NormalCodeChunk = CompileWithDefaultNormalWS(Compiler, ClearCoatNormal);
+		ClearCoat_TangentCodeChunk = TangentCodeChunk;
+		ClearCoat_NewRegisteredSharedLocalBasis = StrataCompilationInfoCreateSharedLocalBasis(Compiler, ClearCoat_NormalCodeChunk, ClearCoat_TangentCodeChunk);
+		ClearCoat_BasisIndexMacro = Compiler->GetStrataSharedLocalBasisIndexMacro(NewRegisteredSharedLocalBasis);
+	}
+	else
+	{
+		ClearCoat_NormalCodeChunk = NormalCodeChunk;
+		ClearCoat_TangentCodeChunk = TangentCodeChunk;
+		ClearCoat_NewRegisteredSharedLocalBasis = NewRegisteredSharedLocalBasis;
+		ClearCoat_BasisIndexMacro = BasisIndexMacro;
+	}
+
+	int32 SSSProfileCodeChunk = INDEX_NONE;
+	const bool bHasSSS = HasSSS();
+	if (bHasSSS)
+	{
+		FName NameSubsurfaceProfile(FString(TEXT("__SubsurfaceProfile")));
+		SSSProfileCodeChunk = Compiler->ForceCast(Compiler->ScalarParameter(NameSubsurfaceProfile, 1.0f), MCT_Float1);
+	}
+
+	// We probably need to do something along these line as well :::
+	int32 OutputCodeChunk = Compiler->StrataConversionFromLegacy(
+		// Metalness workflow
+		CompileWithDefaultFloat3(Compiler, BaseColor, 0.18f, 0.18f, 0.18f),
+		CompileWithDefaultFloat1(Compiler, Specular, 0.5f),
+		CompileWithDefaultFloat1(Compiler, Metallic,  0.0f),
+		// Roughness
+		RoughnessCodeChunk,
+		AnisotropyCodeChunk,
+		// SSS
+		CompileWithDefaultFloat3(Compiler, SubSurfaceColor, 0.0f, 0.0f, 0.0f),
+		SSSProfileCodeChunk != INDEX_NONE ? SSSProfileCodeChunk : Compiler->Constant(0.0f),	
+		// Clear Coat / Custom
+		CompileWithDefaultFloat1(Compiler, ClearCoat, 0.0f),
+		CompileWithDefaultFloat1(Compiler, ClearCoatRoughness, 0.0f),
+		// Misc
+		CompileWithDefaultFloat3(Compiler, EmissiveColor, 0.0f, 0.0f, 0.0f),
+		CompileWithDefaultFloat1(Compiler, Opacity, 1.0f),
+		CompileWithDefaultFloat3(Compiler, TransmittanceColor, 0.0f, 0.0f, 0.0f),
+		// Water
+		CompileWithDefaultFloat3(Compiler, WaterScatteringCoefficients, 0.0f, 0.0f, 0.0f),
+		CompileWithDefaultFloat3(Compiler, WaterAbsorptionCoefficients, 0.0f, 0.0f, 0.0f),
+		CompileWithDefaultFloat1(Compiler, WaterPhaseG, 0.0f),
+		CompileWithDefaultFloat3(Compiler, ColorScaleBehindWater, 0.0f, 0.0f, 0.0f),
+		// Shading model
+		CompileWithDefaultFloat1(Compiler, ShadingModel, 0.0f),
+		NormalCodeChunk,
+		TangentCodeChunk,
+		BasisIndexMacro,
+		ClearCoat_NormalCodeChunk,
+		ClearCoat_TangentCodeChunk,
+		ClearCoat_BasisIndexMacro);
+
+	// In case we don't know in advance what the conversion output looks like, we setup the info for the wost case (clear coat)
+	auto AddDefaultWorstCase = [Compiler, OutputCodeChunk, &NewRegisteredSharedLocalBasis, &ClearCoat_NewRegisteredSharedLocalBasis]()
+	{
+		// Worst case for clear coat
+		FStrataMaterialCompilationInfo StrataInfo;
+		StrataInfo.LayerCount = 2;
+		StrataInfo.TotalBSDFCount = 2;
+
+		StrataInfo.Layers[0].BSDFCount = 1;
+		StrataInfo.Layers[0].BSDFs[0].Type = STRATA_BSDF_TYPE_SLAB;
+		StrataInfo.Layers[0].BSDFs[0].RegisteredSharedLocalBasis = NewRegisteredSharedLocalBasis;
+		StrataInfo.Layers[0].BSDFs[0].bHasSSS = false;
+		StrataInfo.Layers[0].BSDFs[0].bHasDMFPPluggedIn = true;
+		StrataInfo.Layers[0].BSDFs[0].bHasEdgeColor = false;
+		StrataInfo.Layers[0].BSDFs[0].bHasThinFilm = false;
+		StrataInfo.Layers[0].BSDFs[0].bHasFuzz = false;
+		StrataInfo.Layers[0].BSDFs[0].bHasHaziness = false;
+
+		StrataInfo.Layers[1].BSDFCount = 1;
+		StrataInfo.Layers[1].BSDFs[0].Type = STRATA_BSDF_TYPE_SLAB;
+		StrataInfo.Layers[1].BSDFs[0].RegisteredSharedLocalBasis = ClearCoat_NewRegisteredSharedLocalBasis;
+		StrataInfo.Layers[1].BSDFs[0].bHasSSS = false;
+		StrataInfo.Layers[1].BSDFs[0].bHasDMFPPluggedIn = false;
+		StrataInfo.Layers[1].BSDFs[0].bHasEdgeColor = false;
+		StrataInfo.Layers[1].BSDFs[0].bHasThinFilm = false;
+		StrataInfo.Layers[1].BSDFs[0].bHasFuzz = true;
+		StrataInfo.Layers[1].BSDFs[0].bHasHaziness = false;
+
+		Compiler->StrataCompilationInfoRegisterCodeChunk(OutputCodeChunk, StrataInfo);
+	};
+
+	// Fill in Strata layer info
+	if (ConvertedStrataMaterialInfo.CountShadingModels() > 1 || ConvertedStrataMaterialInfo.HasShadingModelFromExpression())
+	{
+		AddDefaultWorstCase();
+	}
+	else
+	{
+		check(ConvertedStrataMaterialInfo.CountShadingModels() == 1);
+
+		if (ConvertedStrataMaterialInfo.HasShadingModel(SSM_Unlit)) 
+		{ 
+			StrataCompilationInfoCreateSingleBSDFMaterial(Compiler, OutputCodeChunk, NewRegisteredSharedLocalBasis,
+				STRATA_BSDF_TYPE_UNLIT, 
+				false /*bHasSSS*/, 
+				false /*bHasDMFPPluggedIn*/, 
+				false /*bHasEdgeColor*/, 
+				false /*bHasThinFilm*/, 
+				false /*bHasFuzz*/, 
+				false /*bHasHaziness*/);
+		}
+		else if (ConvertedStrataMaterialInfo.HasShadingModel(SSM_DefaultLit))		
+		{
+			AddDefaultWorstCase();
+		}
+		else if (ConvertedStrataMaterialInfo.HasShadingModel(SSM_SubsurfaceLit))
+		{
+			StrataCompilationInfoCreateSingleBSDFMaterial(Compiler, OutputCodeChunk, NewRegisteredSharedLocalBasis,
+				STRATA_BSDF_TYPE_SLAB,
+				true /*bHasSSS*/,
+				false /*bHasDMFPPluggedIn*/,
+				false /*bHasEdgeColor*/,
+				false /*bHasThinFilm*/,
+				false /*bHasFuzz*/,
+				false /*bHasHaziness*/);
+		}
+		else if (ConvertedStrataMaterialInfo.HasShadingModel(SSM_Hair))
+		{
+			StrataCompilationInfoCreateSingleBSDFMaterial(Compiler, OutputCodeChunk, NewRegisteredSharedLocalBasis,
+				STRATA_BSDF_TYPE_HAIR,
+				false /*bHasSSS*/,
+				false /*bHasDMFPPluggedIn*/,
+				false /*bHasEdgeColor*/,
+				false /*bHasThinFilm*/,
+				false /*bHasFuzz*/,
+				false /*bHasHaziness*/);
+		}
+		else if (ConvertedStrataMaterialInfo.HasShadingModel(SSM_SingleLayerWater))
+		{
+			StrataCompilationInfoCreateSingleBSDFMaterial(Compiler, OutputCodeChunk, NewRegisteredSharedLocalBasis,
+				STRATA_BSDF_TYPE_SINGLELAYERWATER,
+				false /*bHasSSS*/,
+				false /*bHasDMFPPluggedIn*/,
+				false /*bHasEdgeColor*/,
+				false /*bHasThinFilm*/,
+				false /*bHasFuzz*/,
+				false /*bHasHaziness*/);
+		}
+	}	
+
+	return OutputCodeChunk;
+}
+
+const TArray<FExpressionInput*> UMaterialExpressionStrataLegacyConversion::GetInputs()
+{
+	TArray<FExpressionInput*> Result;
+	Result.Add(&BaseColor);
+	Result.Add(&Metallic);
+	Result.Add(&Specular);
+	Result.Add(&Roughness);
+	Result.Add(&Anisotropy);
+	Result.Add(&EmissiveColor);
+	Result.Add(&Normal);
+	Result.Add(&Tangent);
+	Result.Add(&SubSurfaceColor);
+	Result.Add(&ClearCoat);
+	Result.Add(&ClearCoatRoughness);
+	Result.Add(&Opacity);
+	Result.Add(&TransmittanceColor);
+	Result.Add(&WaterScatteringCoefficients);
+	Result.Add(&WaterAbsorptionCoefficients);
+	Result.Add(&WaterPhaseG);
+	Result.Add(&ColorScaleBehindWater);
+	Result.Add(&ClearCoatNormal);
+	Result.Add(&ShadingModel);
+	return Result;
+}
+
+void UMaterialExpressionStrataLegacyConversion::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	if (GraphNode)
+	{
+		GraphNode->ReconstructNode();
+	}
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+}
+
+void UMaterialExpressionStrataLegacyConversion::GetCaption(TArray<FString>& OutCaptions) const
+{
+	OutCaptions.Add(TEXT("Strata Legacy conversion"));
+}
+
+uint32 UMaterialExpressionStrataLegacyConversion::GetOutputType(int32 OutputIndex)
+{
+	return MCT_Strata;
+}
+
+uint32 UMaterialExpressionStrataLegacyConversion::GetInputType(int32 InputIndex)
+{
+	if (InputIndex == 0)	   return MCT_Float3; // BaseColor
+	else if (InputIndex == 1)  return MCT_Float1; // Metallic
+	else if (InputIndex == 2)  return MCT_Float1; // Specular
+	else if (InputIndex == 3)  return MCT_Float1; // Roughness
+	else if (InputIndex == 4)  return MCT_Float1; // Anisotropy
+	else if (InputIndex == 5)  return MCT_Float3; // EmissiveColor
+	else if (InputIndex == 6)  return MCT_Float3; // Normal
+	else if (InputIndex == 7)  return MCT_Float3; // Tangent
+	else if (InputIndex == 8)  return MCT_Float3; // SubSurfaceColor
+	else if (InputIndex == 9)  return MCT_Float1; // ClearCoat/Custom0
+	else if (InputIndex == 10) return MCT_Float1; // ClearCoatRoughness/Custom1
+	else if (InputIndex == 11) return MCT_Float1; // Opacity
+	else if (InputIndex == 12) return MCT_Float3; // TransmittanceColor
+	else if (InputIndex == 13) return MCT_Float3; // WaterScatteringCoefficients
+	else if (InputIndex == 14) return MCT_Float3; // WaterAbsorptionCoefficients
+	else if (InputIndex == 15) return MCT_Float1; // WaterPhaseG
+	else if (InputIndex == 16) return MCT_Float3; // ColorScaleBehindWater
+	else if (InputIndex == 17) return MCT_Float3; // ClearCoatNormal
+	else if (InputIndex == 18) return MCT_Float1; // ShadingModel
+
+	check(false);
+	return MCT_Float1;
+}
+
+FName UMaterialExpressionStrataLegacyConversion::GetInputName(int32 InputIndex) const
+{
+	if (InputIndex == 0)		return TEXT("BaseColor");
+	else if (InputIndex == 1)	return TEXT("Metallic");
+	else if (InputIndex == 2)	return TEXT("Specular");
+	else if (InputIndex == 3)	return TEXT("Roughness");
+	else if (InputIndex == 4)	return TEXT("Anisotropy");
+	else if (InputIndex == 5)	return TEXT("Emissive Color");
+	else if (InputIndex == 6)	return TEXT("Normal");
+	else if (InputIndex == 7)	return TEXT("Tangent");
+	else if (InputIndex == 8)	return TEXT("Sub-Surface Color");
+	else if (InputIndex == 9)	return TEXT("Clear Coat");
+	else if (InputIndex == 10)	return TEXT("Clear Coat Roughness");
+	else if (InputIndex == 11)	return TEXT("Opacity");
+	else if (InputIndex == 12)	return TEXT("TransmittanceColor");
+	else if (InputIndex == 13)	return TEXT("Water Scattering Coefficients");
+	else if (InputIndex == 14)	return TEXT("Water Absorption Coefficients");
+	else if (InputIndex == 15)	return TEXT("Water Phase G");
+	else if (InputIndex == 16)	return TEXT("Color Scale BehindWater");
+	else if (InputIndex == 17)	return TEXT("Clear Coat Normal");
+	else if (InputIndex == 18)	return TEXT("Shading Model");
+	return TEXT("Unknown");
+}
+
+void UMaterialExpressionStrataLegacyConversion::GetConnectorToolTip(int32 InputIndex, int32 OutputIndex, TArray<FString>& OutToolTip)
+{
+	if (OutputIndex == 0)
+	{
+		OutToolTip.Add(TEXT("TT Ouput"));
+		return;
+	}
+	Super::GetConnectorToolTip(InputIndex, INDEX_NONE, OutToolTip);
+}
+
+bool UMaterialExpressionStrataLegacyConversion::IsResultStrataMaterial(int32 OutputIndex)
+{
+	return true;
+}
+
+void UMaterialExpressionStrataLegacyConversion::GatherStrataMaterialInfo(FStrataMaterialInfo& StrataMaterialInfo, int32 OutputIndex)
+{	
+	if (ConvertedStrataMaterialInfo.HasShadingModel(SSM_Unlit))					{ StrataMaterialInfo.AddShadingModel(SSM_Unlit); }
+	if (ConvertedStrataMaterialInfo.HasShadingModel(SSM_DefaultLit))			{ StrataMaterialInfo.AddShadingModel(SSM_DefaultLit); }
+	if (ConvertedStrataMaterialInfo.HasShadingModel(SSM_SubsurfaceLit))			{ StrataMaterialInfo.AddShadingModel(SSM_SubsurfaceLit); }
+	if (ConvertedStrataMaterialInfo.HasShadingModel(SSM_VolumetricFogCloud))	{ StrataMaterialInfo.AddShadingModel(SSM_VolumetricFogCloud); }
+	if (ConvertedStrataMaterialInfo.HasShadingModel(SSM_Hair))					{ StrataMaterialInfo.AddShadingModel(SSM_Hair); }
+	if (ConvertedStrataMaterialInfo.HasShadingModel(SSM_SingleLayerWater))		{ StrataMaterialInfo.AddShadingModel(SSM_SingleLayerWater); }
+
+	if (SubsurfaceProfile)
+	{
+		StrataMaterialInfo.AddSubsurfaceProfile(SubsurfaceProfile);
+	}
+}
+
+bool UMaterialExpressionStrataLegacyConversion::HasSSS() const
+{
+	return SubsurfaceProfile != nullptr;
+}
+
+bool UMaterialExpressionStrataLegacyConversion::HasAnisotropy() const
+{
+	return Anisotropy.IsConnected();
+}
+
+#endif // WITH_EDITOR
+
 
 UMaterialExpressionStrataBSDF::UMaterialExpressionStrataBSDF(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
