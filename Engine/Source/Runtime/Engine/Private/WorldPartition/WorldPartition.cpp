@@ -406,26 +406,13 @@ void UWorldPartition::Initialize(UWorld* InWorld, const FTransform& InTransform)
 		// Currently known Instancing use cases:
 		// - World Partition map template (New Level)
 		// - PIE World Travel
-		bool bIsInstanced = LevelPackage->GetFName() != PackageName;
-
-		FString ReplaceFrom;
-		FString ReplaceTo;
-
+		FString SourceWorldPath, RemappedWorldPath;
+		const bool bIsInstanced = World->GetSoftObjectPathMapping(SourceWorldPath, RemappedWorldPath);
+	
 		if (bIsInstanced)
 		{
 			InstancingContext.AddMapping(PackageName, LevelPackage->GetFName());
-			
-			const FString SourcePackageName = LevelPackage->GetLoadedPath().GetPackageName();
-			const FString SourceWorldName = FPaths::GetBaseFilename(SourcePackageName);
-			const FString DestPackageName = LevelPackage->GetName();
-			const FString DestWorldName = FPaths::GetBaseFilename(DestPackageName);
-
-			ReplaceFrom = SourcePackageName + TEXT(".") + SourceWorldName;
-
-			// In PIE UWorld::PostLoad will not rename the world to match its package name so use SourceWorldName instead
-			ReplaceTo = DestPackageName + TEXT(".") + (bPIEWorldTravel ? SourceWorldName : DestWorldName);
-
-			InstancingSoftObjectPathFixupArchive.Reset(new FSoftObjectPathFixupArchive(ReplaceFrom, ReplaceTo));
+			InstancingSoftObjectPathFixupArchive.Reset(new FSoftObjectPathFixupArchive(SourceWorldPath, RemappedWorldPath));
 		}
 
 		{
@@ -441,7 +428,7 @@ void UWorldPartition::Initialize(UWorld* InWorld, const FTransform& InTransform)
 
 					InstancingContext.AddMapping(*LongActorPackageName, *InstancedName);
 
-					ActorDesc->TransformInstance(ReplaceFrom, ReplaceTo);
+					ActorDesc->TransformInstance(SourceWorldPath, RemappedWorldPath);
 				}
 
 				if (bEditorOnly)

@@ -87,6 +87,11 @@ struct COREUOBJECT_API FSoftObjectPath
 		return AssetPathName;
 	}
 
+	FORCEINLINE void SetAssetPathName(FName InAssetPathName)
+	{
+		AssetPathName = InAssetPathName;
+	}
+
 	/** Returns string version of asset path, including both package and asset but not sub object */
 	FORCEINLINE FString GetAssetPathString() const
 	{
@@ -102,6 +107,11 @@ struct COREUOBJECT_API FSoftObjectPath
 	FORCEINLINE const FString& GetSubPathString() const
 	{
 		return SubPathString;
+	}
+
+	FORCEINLINE void SetSubPathString(const FString& InSubPathString)
+	{
+		SubPathString = InSubPathString;
 	}
 
 	/** Returns /package/path, leaving off the asset name and sub object */
@@ -461,12 +471,12 @@ struct FSoftObjectPathFixupArchive : public FArchiveUObject
 
 	FSoftObjectPathFixupArchive(const FString& InOldAssetPathString, const FString& InNewAssetPathString)
 		: FSoftObjectPathFixupArchive([OldAssetPathString = InOldAssetPathString, NewAssetPathString = InNewAssetPathString](FSoftObjectPath& Value)
+		{
+			if (!Value.IsNull() && Value.GetAssetPathString().Equals(OldAssetPathString, ESearchCase::IgnoreCase))
 			{
-				if (!Value.IsNull() && Value.GetAssetPathString() == OldAssetPathString)
-				{
-					Value = FSoftObjectPath(NewAssetPathString + TEXT(":") + Value.GetSubPathString());
-				}
-			})
+				Value.SetAssetPathName(FName(*NewAssetPathString));
+			}
+		})
 	{
 	}
 

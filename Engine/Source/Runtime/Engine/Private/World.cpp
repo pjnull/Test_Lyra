@@ -3243,6 +3243,26 @@ void UWorld::RenameToPIEWorld(int32 PIEInstanceID)
 #endif
 }
 
+bool UWorld::GetSoftObjectPathMapping(FString& OutSourceWorldPath, FString& OutRemappedWorldPath) const
+{
+	UPackage* Package = GetPackage();
+	if (Package->GetFName() != Package->GetLoadedPath().GetPackageFName())
+	{
+		const FString SourcePackageName = Package->GetLoadedPath().GetPackageName();
+		const FString SourceWorldName = FPaths::GetBaseFilename(SourcePackageName);
+		const FString RemmappedPackageName = Package->GetName();
+		const FString RemappedWorldName = GetName();
+
+		OutSourceWorldPath = SourcePackageName + TEXT(".") + SourceWorldName;
+
+		OutRemappedWorldPath = RemmappedPackageName + TEXT(".") + RemappedWorldName;
+
+		return true;
+	}
+
+	return false;
+}
+
 FString UWorld::ConvertToPIEPackageName(const FString& PackageName, int32 PIEInstanceID)
 {
 	const FString PackageAssetName = FPackageName::GetLongPackageAssetName(PackageName);
