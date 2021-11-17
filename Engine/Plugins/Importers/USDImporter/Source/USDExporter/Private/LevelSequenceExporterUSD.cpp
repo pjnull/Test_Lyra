@@ -784,7 +784,18 @@ bool ULevelSequenceExporterUsd::ExportBinary( UObject* Object, const TCHAR* Type
 	Params.SpawnRegister = SpawnRegister;
 	Params.ViewParams.bReadOnly = true;
 	Params.bEditWithinLevelEditor = false;
-	Params.PlaybackContext = Options->Level.Get();
+
+	// UE-132538: Use a getter for the playback context instead of just binding the world directly because FSequencer::UpdateCachedPlaybackContextAndClient will
+	// ignore the attribute's value and only check the getter
+	UWorld* World = Options->Level.Get();
+	if ( !World )
+	{
+		World = GWorld;
+	}
+	Params.PlaybackContext = TAttribute<UObject*>::Create( TAttribute<UObject*>::FGetter::CreateLambda( [World]()
+	{
+		return World;
+	}));
 
 	// Set to read only or else CreateSequencer will change the playback range of the moviescene without even calling Modify()
 	const bool bOldReadOnly = MovieScene->IsReadOnly();
