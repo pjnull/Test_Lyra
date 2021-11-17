@@ -277,16 +277,21 @@ namespace UE::Zen {
 		
 		Result RpcResult = PerformBlocking(Uri, RequestVerb::Post, ContentLength);
 
-		if (IsSuccessCode(ResponseCode))
+		if (RpcResult != Result::Success || !IsSuccessCode(ResponseCode))
+		{
+			return Result::Failed;
+		}
+
+		if (ResponseBuffer.Num())
 		{
 			FLargeMemoryReader Ar(ResponseBuffer.GetData(), ResponseBuffer.Num());
 			if (!OutResponse.TryLoad(Ar))
 			{
-				RpcResult = Result::Failed; 
+				return Result::Failed;
 			}
 		}
 
-		return RpcResult;
+		return Result::Success;
 	}
 
 	FCbPackage FZenHttpRequest::GetResponseAsPackage() const
