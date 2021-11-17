@@ -40,8 +40,8 @@ namespace UnrealBuildTool
 			public static DependencyInfo Read(BinaryArchiveReader Reader)
 			{
 				long LastWriteTimeUtc = Reader.ReadLong();
-				string ProducedModule = Reader.ReadString()!;
-				List<(string, string)> ImportedModules = Reader.ReadList(() =>
+				string? ProducedModule = Reader.ReadString();
+				List<(string, string)>? ImportedModules = Reader.ReadList(() =>
 				{
 					return (Reader.ReadString(), Reader.ReadString());
 				})!;
