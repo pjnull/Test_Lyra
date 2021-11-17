@@ -38,6 +38,9 @@ class FWorldPartitionStreamingGenerator
 	{
 		const bool bIncludeUnsavedActors = (bIsPIE && InContainerID.IsMainContainer());
 
+		// Consider all actors of a /Temp/ container package as Unsaved because loading them from disk will fail (Outer world name mismatch)
+		const bool bIsTempContainerPackage = FPackageName::IsTempPackage(InContainer->GetPackage()->GetName());
+		
 		TMap<FGuid, FGuid> ContainerGuidsRemap;
 		for (FActorDescList::TConstIterator<> ActorDescIt(InContainer); ActorDescIt; ++ActorDescIt)
 		{
@@ -45,7 +48,7 @@ class FWorldPartitionStreamingGenerator
 			{
 				AActor* Actor = ActorDescIt->GetActor();
 
-				if (bIncludeUnsavedActors && IsValid(Actor) && Actor->GetPackage()->IsDirty())
+				if (bIncludeUnsavedActors && IsValid(Actor) && (bIsTempContainerPackage || Actor->GetPackage()->IsDirty()))
 				{
 					// Dirty, unsaved actor for PIE
 					FWorldPartitionActorDesc* ActorDesc = RuntimeHash->ModifiedActorDescListForPIE.AddActor(Actor);
