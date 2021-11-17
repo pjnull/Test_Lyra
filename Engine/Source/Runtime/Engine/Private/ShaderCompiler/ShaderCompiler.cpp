@@ -1960,6 +1960,7 @@ FShaderCompileThreadRunnableBase::FShaderCompileThreadRunnableBase(FShaderCompil
 	: Manager(InManager)
 	, MinPriorityIndex(0)
 	, MaxPriorityIndex(NumShaderCompileJobPriorities - 1)
+	, Thread(nullptr)
 	, bForceFinish(false)
 {
 }
