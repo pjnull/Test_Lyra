@@ -919,7 +919,7 @@ private:
 		TRefCountPtr<FRDGPooledBuffer> ExposureBufferData[NUM_BUFFERS];
 		TArray<FRHIGPUBufferReadback*> ExposureReadbackBuffers;
 
-		uint32 MaxReadbackBuffers = 4;
+		static const uint32 MAX_READBACK_BUFFERS = 4;
 		uint32 ReadbackBuffersWriteIndex = 0;
 		uint32 ReadbackBuffersNumPending = 0;
 

@@ -686,13 +686,18 @@ FRDGTextureRef AddBasicEyeAdaptationPass(
 
 FSceneViewState::FEyeAdaptationManager::FEyeAdaptationManager()
 {
-	ExposureReadbackTextures.AddZeroed(MaxReadbackBuffers);
-	ExposureReadbackBuffers.AddZeroed(MaxReadbackBuffers);
+	ExposureReadbackTextures.AddZeroed(MAX_READBACK_BUFFERS);
+	ExposureReadbackBuffers.AddZeroed(MAX_READBACK_BUFFERS);
 }
 
 void FSceneViewState::FEyeAdaptationManager::SafeRelease()
 {
 	CurrentBuffer = 0;
+	ReadbackBuffersWriteIndex = 0;
+	ReadbackBuffersNumPending = 0;
+
+	LastExposure = 0;
+	LastAverageSceneLuminance = 0;
 
 	for (int32 Index = 0; Index < NUM_BUFFERS; Index++)
 	{
@@ -724,7 +729,7 @@ FRHIGPUTextureReadback* FSceneViewState::FEyeAdaptationManager::GetLatestReadbac
 	FRHIGPUTextureReadback* LatestReadbackTexture = nullptr;
 
 	// Find latest texture that is ready
-	uint32 Index = (ReadbackBuffersWriteIndex + MaxReadbackBuffers - ReadbackBuffersNumPending) % MaxReadbackBuffers;
+	uint32 Index = (ReadbackBuffersWriteIndex + MAX_READBACK_BUFFERS - ReadbackBuffersNumPending) % MAX_READBACK_BUFFERS;
 	while (ReadbackBuffersNumPending > 0)
 	{
 		if (ExposureReadbackTextures[Index]->IsReady())
@@ -771,7 +776,7 @@ void FSceneViewState::FEyeAdaptationManager::EnqueueExposureTextureReadback(FRDG
 {
 	check(PooledRenderTarget[CurrentBuffer].IsValid());
 	
-	if (ReadbackBuffersNumPending < MaxReadbackBuffers)
+	if (ReadbackBuffersNumPending < MAX_READBACK_BUFFERS)
 	{
 		FRDGTextureRef CurrentTexture = GraphBuilder.RegisterExternalTexture(PooledRenderTarget[CurrentBuffer], ERenderTargetTexture::ShaderResource, ERDGTextureFlags::MultiFrame);
 
@@ -786,8 +791,8 @@ void FSceneViewState::FEyeAdaptationManager::EnqueueExposureTextureReadback(FRDG
 
 		AddEnqueueCopyPass(GraphBuilder, ExposureReadbackTexture, CurrentTexture);
 
-		ReadbackBuffersWriteIndex = (ReadbackBuffersWriteIndex + 1) % MaxReadbackBuffers;
-		ReadbackBuffersNumPending = FMath::Min(ReadbackBuffersNumPending + 1, MaxReadbackBuffers);
+		ReadbackBuffersWriteIndex = (ReadbackBuffersWriteIndex + 1) % MAX_READBACK_BUFFERS;
+		ReadbackBuffersNumPending = FMath::Min(ReadbackBuffersNumPending + 1, MAX_READBACK_BUFFERS);
 	}
 }
 
@@ -849,7 +854,7 @@ FRHIGPUBufferReadback* FSceneViewState::FEyeAdaptationManager::GetLatestReadback
 	FRHIGPUBufferReadback* LatestReadbackBuffer = nullptr;
 
 	// Find latest buffer that is ready
-	uint32 Index = (ReadbackBuffersWriteIndex + MaxReadbackBuffers - ReadbackBuffersNumPending) % MaxReadbackBuffers;
+	uint32 Index = (ReadbackBuffersWriteIndex + MAX_READBACK_BUFFERS - ReadbackBuffersNumPending) % MAX_READBACK_BUFFERS;
 	while (ReadbackBuffersNumPending > 0)
 	{
 		if (ExposureReadbackBuffers[Index]->IsReady())
@@ -896,7 +901,7 @@ void FSceneViewState::FEyeAdaptationManager::EnqueueExposureBufferReadback(FRDGB
 {
 	check(ExposureBufferData[CurrentBuffer].IsValid());
 
-	if (ReadbackBuffersNumPending < MaxReadbackBuffers)
+	if (ReadbackBuffersNumPending < MAX_READBACK_BUFFERS)
 	{
 		FRDGBufferRef CurrentRDGBuffer = GraphBuilder.RegisterExternalBuffer(ExposureBufferData[CurrentBuffer], ERDGBufferFlags::MultiFrame);
 
@@ -911,8 +916,8 @@ void FSceneViewState::FEyeAdaptationManager::EnqueueExposureBufferReadback(FRDGB
 
 		AddEnqueueCopyPass(GraphBuilder, ExposureReadbackBuffer, CurrentRDGBuffer, 0);
 
-		ReadbackBuffersWriteIndex = (ReadbackBuffersWriteIndex + 1) % MaxReadbackBuffers;
-		ReadbackBuffersNumPending = FMath::Min(ReadbackBuffersNumPending + 1, MaxReadbackBuffers);
+		ReadbackBuffersWriteIndex = (ReadbackBuffersWriteIndex + 1) % MAX_READBACK_BUFFERS;
+		ReadbackBuffersNumPending = FMath::Min(ReadbackBuffersNumPending + 1, MAX_READBACK_BUFFERS);
 	}
 }
 
