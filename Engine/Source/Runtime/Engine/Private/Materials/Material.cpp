@@ -2778,6 +2778,7 @@ void UMaterial::ConvertMaterialToStrataMaterial()
 		{
 			ShadingModel = MSM_SubsurfaceProfile;
 		}
+		ConvertNode->SubsurfaceProfile = bRequireNoSubsurfaceProfile ? nullptr : SubsurfaceProfile;
 
 		// Shading Model
 		// Note: store this conversion type(s) into ConvertedStrataMaterialInfo for having more context when 
@@ -2798,7 +2799,6 @@ void UMaterial::ConvertMaterialToStrataMaterial()
 		//  - WorldPositionOffset can remain on the end point node
 		//  - Refraction
 		//  - PixelDepthOffset
-		//	- MSM_Eye
 
 		if (MaterialDomain == MD_Surface)
 		{
@@ -2836,7 +2836,7 @@ void UMaterial::ConvertMaterialToStrataMaterial()
 
 			// SSS Profile
 			const bool bHasShadingModelMixture = ShadingModels.CountShadingModels() > 1;
-			const bool bRequireSubsurfacePasses = ShadingModels.HasShadingModel(MSM_SubsurfaceProfile) || ShadingModels.HasShadingModel(MSM_Subsurface) || ShadingModels.HasShadingModel(MSM_PreintegratedSkin);
+			const bool bRequireSubsurfacePasses = ShadingModels.HasShadingModel(MSM_SubsurfaceProfile) || ShadingModels.HasShadingModel(MSM_Subsurface) || ShadingModels.HasShadingModel(MSM_PreintegratedSkin) || ShadingModels.HasShadingModel(MSM_Eye);
 			const bool bRequireNoSubsurfaceProfile = !bHasShadingModelMixture && (ShadingModel == MSM_Subsurface || ShadingModel == MSM_PreintegratedSkin); // Insure there is no profile, as this would take priority otherwise
 			if (SubsurfaceProfile != nullptr)
 			{
@@ -2918,7 +2918,7 @@ void UMaterial::ConvertMaterialToStrataMaterial()
 					case MSM_TwoSidedFoliage:	StrataShadingModel = EStrataShadingModel::SSM_SubsurfaceLit; break;
 					case MSM_Hair:				StrataShadingModel = EStrataShadingModel::SSM_Hair; break;
 					case MSM_Cloth:				StrataShadingModel = EStrataShadingModel::SSM_DefaultLit; break;
-					case MSM_Eye:				StrataShadingModel = EStrataShadingModel::SSM_DefaultLit; break;
+					case MSM_Eye:				StrataShadingModel = EStrataShadingModel::SSM_SubsurfaceLit; break;
 					case MSM_SingleLayerWater:	StrataShadingModel = EStrataShadingModel::SSM_SingleLayerWater; break;
 					case MSM_ThinTranslucent:	StrataShadingModel = EStrataShadingModel::SSM_DefaultLit; break;
 				};

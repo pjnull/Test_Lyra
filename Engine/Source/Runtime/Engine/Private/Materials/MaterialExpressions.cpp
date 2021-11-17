@@ -20297,7 +20297,7 @@ int32 UMaterialExpressionStrataLegacyConversion::Compile(class FMaterialCompiler
 		ClearCoat_NormalCodeChunk = CompileWithDefaultNormalWS(Compiler, ClearCoatNormal);
 		ClearCoat_TangentCodeChunk = TangentCodeChunk;
 		ClearCoat_NewRegisteredSharedLocalBasis = StrataCompilationInfoCreateSharedLocalBasis(Compiler, ClearCoat_NormalCodeChunk, ClearCoat_TangentCodeChunk);
-		ClearCoat_BasisIndexMacro = Compiler->GetStrataSharedLocalBasisIndexMacro(NewRegisteredSharedLocalBasis);
+		ClearCoat_BasisIndexMacro = Compiler->GetStrataSharedLocalBasisIndexMacro(ClearCoat_NewRegisteredSharedLocalBasis);
 	}
 	else
 	{
@@ -20348,10 +20348,10 @@ int32 UMaterialExpressionStrataLegacyConversion::Compile(class FMaterialCompiler
 		ClearCoat_TangentCodeChunk,
 		ClearCoat_BasisIndexMacro);
 
-	// In case we don't know in advance what the conversion output looks like, we setup the info for the wost case (clear coat)
-	auto AddDefaultWorstCase = [Compiler, OutputCodeChunk, &NewRegisteredSharedLocalBasis, &ClearCoat_NewRegisteredSharedLocalBasis]()
+	// In case we don't know in advance what the conversion output looks like, we setup the info for the wost case (clear coat / eye)
+	auto AddDefaultWorstCase = [Compiler, OutputCodeChunk, &NewRegisteredSharedLocalBasis, &ClearCoat_NewRegisteredSharedLocalBasis](bool bSSS)
 	{
-		// Worst case for clear coat
+		// Worst case for ClearCoat / Eye
 		FStrataMaterialCompilationInfo StrataInfo;
 		StrataInfo.LayerCount = 2;
 		StrataInfo.TotalBSDFCount = 2;
@@ -20359,7 +20359,7 @@ int32 UMaterialExpressionStrataLegacyConversion::Compile(class FMaterialCompiler
 		StrataInfo.Layers[0].BSDFCount = 1;
 		StrataInfo.Layers[0].BSDFs[0].Type = STRATA_BSDF_TYPE_SLAB;
 		StrataInfo.Layers[0].BSDFs[0].RegisteredSharedLocalBasis = NewRegisteredSharedLocalBasis;
-		StrataInfo.Layers[0].BSDFs[0].bHasSSS = false;
+		StrataInfo.Layers[0].BSDFs[0].bHasSSS = bSSS;
 		StrataInfo.Layers[0].BSDFs[0].bHasDMFPPluggedIn = true;
 		StrataInfo.Layers[0].BSDFs[0].bHasEdgeColor = false;
 		StrataInfo.Layers[0].BSDFs[0].bHasThinFilm = false;
@@ -20369,7 +20369,7 @@ int32 UMaterialExpressionStrataLegacyConversion::Compile(class FMaterialCompiler
 		StrataInfo.Layers[1].BSDFCount = 1;
 		StrataInfo.Layers[1].BSDFs[0].Type = STRATA_BSDF_TYPE_SLAB;
 		StrataInfo.Layers[1].BSDFs[0].RegisteredSharedLocalBasis = ClearCoat_NewRegisteredSharedLocalBasis;
-		StrataInfo.Layers[1].BSDFs[0].bHasSSS = false;
+		StrataInfo.Layers[1].BSDFs[0].bHasSSS = bSSS;
 		StrataInfo.Layers[1].BSDFs[0].bHasDMFPPluggedIn = false;
 		StrataInfo.Layers[1].BSDFs[0].bHasEdgeColor = false;
 		StrataInfo.Layers[1].BSDFs[0].bHasThinFilm = false;
@@ -20382,7 +20382,7 @@ int32 UMaterialExpressionStrataLegacyConversion::Compile(class FMaterialCompiler
 	// Fill in Strata layer info
 	if (ConvertedStrataMaterialInfo.CountShadingModels() > 1 || ConvertedStrataMaterialInfo.HasShadingModelFromExpression())
 	{
-		AddDefaultWorstCase();
+		AddDefaultWorstCase(true);
 	}
 	else
 	{
@@ -20399,20 +20399,13 @@ int32 UMaterialExpressionStrataLegacyConversion::Compile(class FMaterialCompiler
 				false /*bHasFuzz*/, 
 				false /*bHasHaziness*/);
 		}
-		else if (ConvertedStrataMaterialInfo.HasShadingModel(SSM_DefaultLit))		
+		else if (ConvertedStrataMaterialInfo.HasShadingModel(SSM_DefaultLit))
 		{
-			AddDefaultWorstCase();
+			AddDefaultWorstCase(false);
 		}
 		else if (ConvertedStrataMaterialInfo.HasShadingModel(SSM_SubsurfaceLit))
 		{
-			StrataCompilationInfoCreateSingleBSDFMaterial(Compiler, OutputCodeChunk, NewRegisteredSharedLocalBasis,
-				STRATA_BSDF_TYPE_SLAB,
-				true /*bHasSSS*/,
-				false /*bHasDMFPPluggedIn*/,
-				false /*bHasEdgeColor*/,
-				false /*bHasThinFilm*/,
-				false /*bHasFuzz*/,
-				false /*bHasHaziness*/);
+			AddDefaultWorstCase(true);
 		}
 		else if (ConvertedStrataMaterialInfo.HasShadingModel(SSM_Hair))
 		{
