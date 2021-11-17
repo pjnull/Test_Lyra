@@ -631,6 +631,14 @@ public:
 		T p = ( ( ( ( -2.6051615e-07f * y2 + 2.4760495e-05f ) * y2 - 0.0013888378f ) * y2 + 0.041666638f ) * y2 - 0.5f ) * y2 + 1.0f;
 		*ScalarCos = sign*p;
 	}
+
+	static FORCEINLINE void SinCos(double* ScalarSin, double* ScalarCos, double Value)
+	{
+		// No approximations for doubles
+		*ScalarSin = FMath::Sin(Value);
+		*ScalarCos = FMath::Cos(Value);
+	}
+
 	template<typename T, typename U, TEMPLATE_REQUIRES(!TIsSame<T, U>::Value)>
 	static FORCEINLINE void SinCos(T* ScalarSin, T* ScalarCos, U Value)
 	{

@@ -473,10 +473,10 @@ FQuat4d FRotator3d::Quaternion() const
 	const VectorRegister4Double CP_CP_SP_SP = VectorShuffle(CosAngles, SinAngles, 0, 0, 0, 0);
 	const VectorRegister4Double CY_SY_CY_SY = VectorShuffle(SY_SY_CY_CY_Temp, SY_SY_CY_CY_Temp, 2, 0, 2, 0);
 
-	const uint32 Neg = uint32(1 << 31);
-	const uint32 Pos = uint32(0);
-	const VectorRegister4Double SignBitsLeft = MakeVectorRegister(Pos, Neg, Pos, Pos);
-	const VectorRegister4Double SignBitsRight = MakeVectorRegister(Neg, Neg, Neg, Pos);
+	const uint64 Neg = uint64(1) << 63;
+	const uint64 Pos = uint64(0);
+	const VectorRegister4Double SignBitsLeft = MakeVectorRegisterDoubleMask(Pos, Neg, Pos, Pos);
+	const VectorRegister4Double SignBitsRight = MakeVectorRegisterDoubleMask(Neg, Neg, Neg, Pos);
 	const VectorRegister4Double LeftTerm = VectorBitwiseXor(SignBitsLeft, VectorMultiply(CR, VectorMultiply(SP_SP_CP_CP, SY_CY_SY_CY)));
 	const VectorRegister4Double RightTerm = VectorBitwiseXor(SignBitsRight, VectorMultiply(SR, VectorMultiply(CP_CP_SP_SP, CY_SY_CY_SY)));
 
