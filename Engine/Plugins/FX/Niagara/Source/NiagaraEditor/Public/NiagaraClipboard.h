@@ -135,7 +135,7 @@ struct NIAGARAEDITOR_API FNiagaraClipboardScriptVariable
 {
 	GENERATED_BODY()
 
-	FNiagaraClipboardScriptVariable()
+	FNiagaraClipboardScriptVariable() : ScriptVariable(nullptr)
 	{}
 	FNiagaraClipboardScriptVariable(const UNiagaraScriptVariable& InScriptVariable) : ScriptVariable(&InScriptVariable), OriginalChangeId(InScriptVariable.GetChangeId())
 	{}
