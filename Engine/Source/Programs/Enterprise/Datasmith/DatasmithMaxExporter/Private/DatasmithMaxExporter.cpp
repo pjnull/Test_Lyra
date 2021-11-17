@@ -96,6 +96,12 @@ __declspec( dllexport ) int LibShutdown()
 {
 	FDatasmithExporterManager::Shutdown();
 
+	// Set GIsRequestingExit flag so that static dtors don't crash
+	if (!IsEngineExitRequested())
+	{
+		RequestEngineExit(TEXT("LibShutdown received"));
+	}
+
 	return TRUE;
 }
 
