@@ -183,11 +183,27 @@ bool FTraceAuxiliaryImpl::Connect(ETraceConnectType Type, const TCHAR* Parameter
 		if (Type == ETraceConnectType::Network)
 		{
 			bConnected = SendToHost(Parameter);
+			if (bConnected)
+			{
+				UE_LOG(LogCore, Display, TEXT("Trace started (connected to trace server %s)."), GetDest());
+			}
+			else
+			{
+				UE_LOG(LogCore, Error, TEXT("Trace failed to connect (trace server: %s)!"), Parameter ? Parameter : TEXT(""));
+			}	
 		}
 
 		else if (Type == ETraceConnectType::File)
 		{
 			bConnected = WriteToFile(Parameter);
+			if (bConnected)
+			{
+				UE_LOG(LogCore, Display, TEXT("Trace started (writing to file \"%s\")."), GetDest());
+			}
+			else
+			{
+				UE_LOG(LogCore, Error, TEXT("Trace failed to connect (file: \"%s\")!"), Parameter ? Parameter : TEXT(""));
+			}	
 		}
 	}
 
@@ -694,7 +710,16 @@ static bool StartFromCommandlineArguments(const TCHAR* CommandLine)
 {
 #if UE_TRACE_ENABLED
 
-
+	// Get active channels
+	FString Channels;
+	if (FParse::Value(CommandLine, TEXT("-trace="), Channels, false))
+	{
+	}
+	else if (FParse::Param(CommandLine, TEXT("trace")))
+	{
+		Channels = GDefaultChannels;
+	}
+	
 	// By default, if any channels are enabled we trace to memory.
 	FTraceAuxiliary::EConnectionType Type = FTraceAuxiliary::EConnectionType::None;
 
@@ -730,6 +755,17 @@ static bool StartFromCommandlineArguments(const TCHAR* CommandLine)
 		Target = nullptr;
 	}
 
+	// If user has defined a connection type but not specified channels, use the default channel set.
+	if (Type != FTraceAuxiliary::EConnectionType::None && Channels.IsEmpty())
+	{
+		Channels = GDefaultChannels;
+	}
+
+	if (Channels.IsEmpty())
+	{
+		return false;
+	}
+	
 	// Finally start tracing to the requested connection
 	return FTraceAuxiliary::Start(Type, Target, nullptr, &Opts);
 #endif
@@ -776,6 +812,7 @@ bool FTraceAuxiliary::Start(EConnectionType Type, const TCHAR* Target, const TCH
 
 	if (Channels)
 	{
+		UE_LOG(LogCore, Display, TEXT("Trace channels: '%s'"), Channels);
 		GTraceAuxiliary.AddChannels(Channels);
 		GTraceAuxiliary.EnableChannels();
 	}
@@ -976,7 +1013,7 @@ void FTraceAuxiliary::TryAutoConnect()
 		HANDLE KnownEvent = ::OpenEvent(EVENT_ALL_ACCESS, false, TEXT("Local\\UnrealInsightsBrowser"));
 		if (KnownEvent != nullptr)
 		{
-			GTraceAuxiliary.Connect(ETraceConnectType::Network, TEXT("127.0.0.1"));
+			Start(EConnectionType::Network, TEXT("127.0.0.1"), nullptr, nullptr);
 			::CloseHandle(KnownEvent);
 		}
 	#endif
