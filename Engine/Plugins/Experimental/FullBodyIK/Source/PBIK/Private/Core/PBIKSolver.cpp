@@ -733,6 +733,7 @@ void FPBIKSolver::SetBoneTransform(
 	check(Index >= 0 && Index < Bones.Num());
 	Bones[Index].Position = InTransform.GetLocation();
 	Bones[Index].Rotation = InTransform.GetRotation();
+	Bones[Index].Scale = InTransform.GetScale3D();
 }
 
 PBIK::FBoneSettings* FPBIKSolver::GetBoneSettings(const int32 Index)
@@ -763,6 +764,7 @@ void FPBIKSolver::GetBoneGlobalTransform(const int32 Index, FTransform& OutTrans
 	const PBIK::FBone& Bone = Bones[Index];
 	OutTransform.SetLocation(Bone.Position);
 	OutTransform.SetRotation(Bone.Rotation);
+	OutTransform.SetScale3D(Bone.Scale);
 }
 
 int32 FPBIKSolver::GetBoneIndex(FName BoneName) const
