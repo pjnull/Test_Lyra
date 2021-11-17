@@ -204,6 +204,7 @@ void UMetasoundEditorGraphVertex::SetDataType(FName InNewType, bool bPostTransac
 	const FScopedTransaction Transaction(LOCTEXT("SetGraphVertexType", "Set MetaSound GraphVertex Type"), bPostTransaction);
 	Graph->GetMetasoundChecked().Modify();
 	Graph->Modify();
+	Modify();
 
 	// 1. Cache current editor input node reference positions & delete nodes.
 	TArray<UMetasoundEditorGraphNode*> InputNodes = GetNodes();
@@ -437,20 +438,32 @@ void UMetasoundEditorGraphInput::PostEditUndo()
 	{
 		if (UMetasoundEditorGraph* MetasoundGraph = Cast<UMetasoundEditorGraph>(GetOuter()))
 		{
+			using namespace Metasound::Editor;
 			MetasoundGraph->RemoveMember(*this);
 
 			if (UObject* Object = MetasoundGraph->GetMetasound())
 			{
 				Metasound::Editor::FGraphBuilder::RegisterGraphWithFrontend(*Object);
+				if (TSharedPtr<FEditor> MetaSoundEditor = FGraphBuilder::GetEditorForMetasound(*Object))
+				{
+					// Referesh details panel in case current member was selected.
+					MetaSoundEditor->RefreshDetails();
+				}
 			}
 		}
 		return;
 	}
 
 	UpdateDocumentInput(false /* bPostTransaction */);
+	UpdateEditorLiteralType();
 }
 
 void UMetasoundEditorGraphInput::OnDataTypeChanged()
+{
+	UpdateEditorLiteralType();
+}
+
+void UMetasoundEditorGraphInput::UpdateEditorLiteralType()
 {
 	using namespace Metasound;
 	using namespace Metasound::Editor;
@@ -690,6 +703,7 @@ void UMetasoundEditorGraphVariable::SetDataType(FName InNewType, bool bPostTrans
 	{
 		Graph->GetMetasoundChecked().Modify();
 		Graph->Modify();
+		Modify();
 
 		// Changing the data type requires that the variable and the associated nodes
 		// be removed and readded. Before removing, cache required info to be set after
@@ -935,7 +949,31 @@ void UMetasoundEditorGraphVariable::UpdateDocumentVariable(bool bPostTransaction
 #if WITH_EDITOR
 void UMetasoundEditorGraphVariable::PostEditUndo()
 {
-	checkNoEntry();
+	Super::PostEditUndo();
+
+	if (!Literal)
+	{
+		if (UMetasoundEditorGraph* MetasoundGraph = GetOwningGraph())
+		{
+			MetasoundGraph->RemoveMember(*this);
+
+			if (UObject* Object = MetasoundGraph->GetMetasound())
+			{
+				using namespace Metasound::Editor;
+
+				FGraphBuilder::RegisterGraphWithFrontend(*Object);
+				if (TSharedPtr<FEditor> MetaSoundEditor = FGraphBuilder::GetEditorForMetasound(*Object))
+				{
+					// Refresh details panel in case this variable was selected when it was deleted.
+					MetaSoundEditor->RefreshDetails();
+				}
+			}
+		}
+		return;
+	}
+
+	UpdateDocumentVariable(false /* bPostTransaction */);
+	UpdateEditorLiteralType();
 }
 
 #endif // WITH_EDITOR
@@ -1453,7 +1491,16 @@ bool UMetasoundEditorGraph::RemoveFrontendOutput(UMetasoundEditorGraphOutput& Ou
 
 bool UMetasoundEditorGraph::RemoveFrontendVariable(UMetasoundEditorGraphVariable& Variable)
 {
-	return GetGraphHandle()->RemoveVariable(Variable.GetVariableID());
+	FGuid VariableID = Variable.GetVariableID();
+
+	// If the UMetasoundEditorGraphVariable is being deleted via an undo action, then the VariableID
+	// will be invalid and the frontend variable will already have been cleaned up.
+	if (VariableID.IsValid())
+	{
+		return GetGraphHandle()->RemoveVariable(VariableID);
+	}
+
+	return true;
 }
 
 #undef LOCTEXT_NAMESPACE

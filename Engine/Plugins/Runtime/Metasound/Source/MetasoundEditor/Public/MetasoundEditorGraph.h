@@ -61,14 +61,14 @@ public:
 
 	virtual void PostEditUndo() override;
 
-	const UMetasoundEditorGraphInput& GetParentInput() const
+	const UMetasoundEditorGraphMember* GetParentMember() const
 	{
-		return *CastChecked<UMetasoundEditorGraphInput>(GetOuter());
+		return Cast<UMetasoundEditorGraphMember>(GetOuter());
 	}
 
-	UMetasoundEditorGraphInput& GetParentInput()
+	UMetasoundEditorGraphMember* GetParentMember()
 	{
-		return *CastChecked<UMetasoundEditorGraphInput>(GetOuter());
+		return Cast<UMetasoundEditorGraphMember>(GetOuter());
 	}
 };
 
@@ -215,6 +215,9 @@ public:
 #if WITH_EDITOR
 	virtual void PostEditUndo() override;
 #endif // WITH_EDITOR
+private:
+
+	void UpdateEditorLiteralType();
 };
 
 
