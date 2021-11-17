@@ -2431,16 +2431,6 @@ JNI_METHOD void Java_com_epicgames_unreal_GameActivity_nativeSetConfigRulesVaria
 
 extern bool AndroidThunkCpp_HasMetaDataKey(const FString& Key);
 
-bool FAndroidMisc::IsDaydreamApplication()
-{
-#if USE_ANDROID_JNI
-	static const bool bIsDaydreamApplication = AndroidThunkCpp_HasMetaDataKey(TEXT("com.epicgames.unreal.GameActivity.bDaydream"));
-	return bIsDaydreamApplication;
-#else
-	return false;
-#endif
-}
-
 static bool bDetectedDebugger = false;
 
 JNI_METHOD void Java_com_epicgames_unreal_GameActivity_nativeSetAndroidStartupState(JNIEnv* jenv, jobject thiz, jboolean bDebuggerAttached)
