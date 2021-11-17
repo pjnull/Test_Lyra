@@ -365,10 +365,18 @@ void UBuoyancyComponent::ComputePontoonCoefficients()
 		}
 		for (int32 PontoonIndex = 0; PontoonIndex < BuoyancyData.Pontoons.Num(); ++PontoonIndex)
 		{
+			const FSphericalPontoon& Pontoon = BuoyancyData.Pontoons[PontoonIndex];
 			if (PontoonConfiguration & (1 << PontoonIndex))
 			{
-				const FVector LocalPosition = SimulatingComponent->GetSocketTransform(BuoyancyData.Pontoons[PontoonIndex].CenterSocket, ERelativeTransformSpace::RTS_ParentBoneSpace).GetLocation();
-				LocalPontoonLocations.Add(LocalPosition);
+				if (Pontoon.bUseCenterSocket)
+				{
+					const FVector LocalPosition = SimulatingComponent->GetSocketTransform(Pontoon.CenterSocket, ERelativeTransformSpace::RTS_ParentBoneSpace).GetLocation();
+					LocalPontoonLocations.Add(LocalPosition);
+				}
+				else
+				{
+					LocalPontoonLocations.Add(Pontoon.RelativeLocation);
+				}
 			}
 		}
 		PontoonCoefficients.AddZeroed(LocalPontoonLocations.Num());
