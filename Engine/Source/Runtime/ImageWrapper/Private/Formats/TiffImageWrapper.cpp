@@ -248,6 +248,7 @@ namespace UE::ImageWrapper::Private
 			 */
 			FProcessDecodedDataTask(TUniqueFunction<void()>&& InFunction)
 				: Function(MoveTemp(InFunction))
+				, DesiredThread(IsInGameThread() ? ENamedThreads::AnyHiPriThreadHiPriTask : ENamedThreads::AnyBackgroundThreadNormalTask)
 			{}
 
 		public:
@@ -270,7 +271,7 @@ namespace UE::ImageWrapper::Private
 			 */
 			ENamedThreads::Type GetDesiredThread()
 			{
-				return ENamedThreads::AnyThread;
+				return DesiredThread;
 			}
 
 			/**
@@ -295,6 +296,7 @@ namespace UE::ImageWrapper::Private
 
 		private:
 			TUniqueFunction<void()> Function;
+			ENamedThreads::Type DesiredThread;
 		};
 
 	}

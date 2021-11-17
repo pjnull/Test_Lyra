@@ -19,8 +19,8 @@
 bool UInterchangeTIFFTranslator::CanImportSourceData(const UInterchangeSourceData* InSourceData) const
 {
 	FString Extension = FPaths::GetExtension(InSourceData->GetFilename());
-	FString HDRExtension = (TEXT("tif"));
-	return HDRExtension.StartsWith(Extension);
+	FString TIFFExtension = (TEXT("tiff"));
+	return TIFFExtension.StartsWith(Extension);
 }
 
 bool UInterchangeTIFFTranslator::Translate(UInterchangeBaseNodeContainer& BaseNodeContainer) const
