@@ -10330,8 +10330,8 @@ void UEngine::ClearOnScreenDebugMessages()
 	{	
 		// Because some components add their message in concurrent work, we need a CS here.
 		FScopeLock ScopeLock(&GOnScreenMessageCS);
-	ScreenMessages.Empty();
-	PriorityScreenMessages.Empty();
+		ScreenMessages.Empty();
+		PriorityScreenMessages.Empty();
 	}
 #endif // !UE_BUILD_SHIPPING
 }
@@ -13489,6 +13489,7 @@ bool UEngine::LoadMap( FWorldContext& WorldContext, FURL URL, class UPendingNetG
 	}
 
 	// send a callback message
+	FCoreUObjectDelegates::PreLoadMapWithContext.Broadcast(WorldContext, URL.Map);
 	FCoreUObjectDelegates::PreLoadMap.Broadcast(URL.Map);
 	FMoviePlayerProxy::BlockingTick();
 

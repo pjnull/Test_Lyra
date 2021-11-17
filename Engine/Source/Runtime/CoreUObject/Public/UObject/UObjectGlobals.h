@@ -26,6 +26,7 @@ struct FObjectPtr;
 struct FStaticConstructObjectParameters;
 template <typename T>
 struct TObjectPtr;
+struct FWorldContext;
 
 COREUOBJECT_API DECLARE_LOG_CATEGORY_EXTERN(LogUObjectGlobals, Log, All);
 
@@ -2489,6 +2490,10 @@ struct COREUOBJECT_API FCoreUObjectDelegates
 	DECLARE_MULTICAST_DELEGATE_OneParam(FPreLoadMapDelegate, const FString& /* MapName */);
 	static FPreLoadMapDelegate PreLoadMap;
 
+	/** Sent at the very beginning of LoadMap */
+	DECLARE_MULTICAST_DELEGATE_TwoParams(FPreLoadMapWithContextDelegate, const FWorldContext& /*WorldContext*/, const FString& /* MapName */);
+	static FPreLoadMapWithContextDelegate PreLoadMapWithContext;
+	
 	/** Sent at the end of LoadMap */
 	DECLARE_MULTICAST_DELEGATE_OneParam(FPostLoadMapDelegate, UWorld* /* LoadedWorld */);
 	static FPostLoadMapDelegate PostLoadMapWithWorld;
