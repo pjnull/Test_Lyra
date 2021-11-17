@@ -206,7 +206,7 @@ public:
 	 * Default Scope for InteractiveToolsContext API functions, eg RegisterTool(), GetToolManager(), GetInteractiveToolsContext().
 	 * See EToolsContextScope for details. Defaults to Editor scope.
 	 */
-	EToolsContextScope GetDefaultToolScope() const { return EToolsContextScope::EdMode; }
+	virtual EToolsContextScope GetDefaultToolScope() const { return EToolsContextScope::EdMode; }
 
 	/**
 	 * @return active ToolManager for the desired (or default) ToolsContext Scope
