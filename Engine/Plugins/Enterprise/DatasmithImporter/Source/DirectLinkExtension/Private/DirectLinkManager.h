@@ -21,6 +21,7 @@ namespace UE::DatasmithImporter
 	class FDirectLinkAssetObserver;
 	class FDirectLinkExternalSource;
 	struct FAutoReimportInfo;
+	struct FDirectLinkSourceDescription;
 
 	class FDirectLinkManager: public IDirectLinkManager, public DirectLink::IEndpointObserver
 	{
@@ -63,11 +64,11 @@ namespace UE::DatasmithImporter
 		void InvalidateSource(const DirectLink::FSourceHandle& InvalidSourceHandle);
 
 		/**
-		 * Try to get a DirectLink SourceHandle from a SourceUri.
-		 * @param Uri	An Uri pointing to a DirectLink source.
-		 * @return	The DirectLink SourceHandle corresponding to the Uri. If no match was found the FSourceHandle is invalid.
+		 * Return the first SourceHandle matching the description of the source without. Does not use the source id in the description.
+		 * @param SourceDescription	The Description of the DirectLink source.
+		 * @return	The DirectLink SourceHandle corresponding to the description. If no match was found the FSourceHandle is invalid.
 		 */
-		DirectLink::FSourceHandle GetSourceHandleFromUri(const FSourceUri& Uri) const;
+		DirectLink::FSourceHandle ResolveSourceHandleFromDescription(const FDirectLinkSourceDescription& SourceDescription) const;
 
 		/**
 		 * Update internal cache. Create FDirectLinkExternalSource for new DirectLink source and remove expired ones.
