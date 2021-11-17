@@ -722,16 +722,20 @@ namespace Chaos
 
 	bool FParticlePairMidPhase::ShouldEnableCCD(const FReal Dt)
 	{
-		FConstGenericParticleHandle ConstParticle0 = FConstGenericParticleHandle(Particle0);
-		FConstGenericParticleHandle ConstParticle1 = FConstGenericParticleHandle(Particle1);
+		if (bIsCCD)
+		{
+			FConstGenericParticleHandle ConstParticle0 = FConstGenericParticleHandle(Particle0);
+			FConstGenericParticleHandle ConstParticle1 = FConstGenericParticleHandle(Particle1);
 
-		FReal LengthCCD = 0;
-		FVec3 DirCCD = FVec3(0);
-		const FVec3 StartX0 = (ConstParticle0->ObjectState() == EObjectStateType::Kinematic) ? ConstParticle0->P() - ConstParticle0->V() * Dt : ConstParticle0->X();
-		const FVec3 StartX1 = (ConstParticle1->ObjectState() == EObjectStateType::Kinematic) ? ConstParticle1->P() - ConstParticle1->V() * Dt : ConstParticle1->X();
-		const bool bUseCCD = Collisions::ShouldUseCCD(Particle0, StartX0, Particle1, StartX1, DirCCD, LengthCCD, false);
+			FReal LengthCCD = 0;
+			FVec3 DirCCD = FVec3(0);
+			const FVec3 StartX0 = (ConstParticle0->ObjectState() == EObjectStateType::Kinematic) ? ConstParticle0->P() - ConstParticle0->V() * Dt : ConstParticle0->X();
+			const FVec3 StartX1 = (ConstParticle1->ObjectState() == EObjectStateType::Kinematic) ? ConstParticle1->P() - ConstParticle1->V() * Dt : ConstParticle1->X();
+			const bool bUseCCD = Collisions::ShouldUseCCD(Particle0, StartX0, Particle1, StartX1, DirCCD, LengthCCD, false);
 
-		return bUseCCD;
+			return bUseCCD;
+		}
+		return false;
 	}
 
 	void FParticlePairMidPhase::InitRestoreThresholds()
