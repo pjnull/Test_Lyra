@@ -1382,8 +1382,8 @@ namespace UnrealBuildTool
 			}
 
 			CPPOutput Result = new CPPOutput();
-			Result.ObjectFiles.AddRange(Actions.Select(x => x.ObjectFile ?? x.PreprocessedFile).Where(x => x != null));
-			Result.CompiledModuleInterfaces.AddRange(Actions.Select(x => x.CompiledModuleInterfaceFile).Where(x => x != null));
+			Result.ObjectFiles.AddRange(Actions.Where(x => x.ObjectFile != null || x.PreprocessedFile != null).Select(x => x.ObjectFile != null ? x.ObjectFile! : x.PreprocessedFile!));
+			Result.CompiledModuleInterfaces.AddRange(Actions.Where(x => x.CompiledModuleInterfaceFile != null).Select(x => x.CompiledModuleInterfaceFile!));
 			Result.PrecompiledHeaderFile = Actions.Select(x => x.CreatePchFile).Where(x => x != null).FirstOrDefault();
 			return Result;
 		}
@@ -2119,7 +2119,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Gets the default include paths for the given platform.
 		/// </summary>
-		public static string GetVCIncludePaths(UnrealTargetPlatform Platform, WindowsCompiler Compiler, string CompilerVersion)
+		public static string GetVCIncludePaths(UnrealTargetPlatform Platform, WindowsCompiler Compiler, string? CompilerVersion)
 		{
 			// Make sure we've got the environment variables set up for this target
 			VCEnvironment EnvVars = VCEnvironment.Create(Compiler, Platform, WindowsArchitecture.x64, CompilerVersion, null, null);

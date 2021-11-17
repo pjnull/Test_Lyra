@@ -488,7 +488,7 @@ namespace UnrealBuildTool
 		static private bool bGlobalTrace = false;
 
 		/** Project file reference */
-		private FileReference ProjectFile;
+		private FileReference? ProjectFile;
 		
 		static private XDocument XMLDummy = XDocument.Parse("<manifest></manifest>");
 
@@ -528,7 +528,7 @@ namespace UnrealBuildTool
 		private int ContextIndex;
 		private string? LastError;
 
-		public UnrealPluginLanguage(FileReference InProjectFile, List<string> InXMLFiles, List<string> InArchitectures, string InXMLNameSpace, string InRootDefinition, UnrealTargetPlatform InTargetPlatform)
+		public UnrealPluginLanguage(FileReference? InProjectFile, List<string> InXMLFiles, List<string> InArchitectures, string InXMLNameSpace, string InRootDefinition, UnrealTargetPlatform InTargetPlatform)
 		{
 			ProjectFile = InProjectFile;
 
@@ -2568,7 +2568,7 @@ namespace UnrealBuildTool
 		static Dictionary<string, ConfigCacheIni_UPL> BaseIniCache = new Dictionary<string, ConfigCacheIni_UPL>();
 
 		// static creation functions for ini files
-		public static ConfigCacheIni_UPL CreateConfigCacheIni_UPL(UnrealTargetPlatform Platform, string BaseIniName, DirectoryReference ProjectDirectory, DirectoryReference? EngineDirectory = null)
+		public static ConfigCacheIni_UPL CreateConfigCacheIni_UPL(UnrealTargetPlatform Platform, string BaseIniName, DirectoryReference? ProjectDirectory, DirectoryReference? EngineDirectory = null)
 		{
 			if (EngineDirectory == null)
 			{

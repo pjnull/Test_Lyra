@@ -873,7 +873,7 @@ namespace UnrealBuildTool
 				AddProjectsForMods(GameProjects, out ModProjects);
 
 				// Add all game projects and game config files
-				AddAllGameProjects(GameProjects, SupportedPlatformNames, RootFolder);
+				AddAllGameProjects(GameProjects);
 
 				// Set the game to be the default project
 				if (ModProjects.Count > 0)
@@ -1349,7 +1349,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Adds all game project files, including target projects and config files
 		/// </summary>
-		protected void AddAllGameProjects(List<ProjectFile> GameProjects, string SupportedPlatformNames, PrimaryProjectFolder ProjectsFolder)
+		protected void AddAllGameProjects(List<ProjectFile> GameProjects)
 		{
 			HashSet<DirectoryReference> UniqueGameProjectDirectories = new HashSet<DirectoryReference>();
 			foreach (ProjectFile GameProject in GameProjects)

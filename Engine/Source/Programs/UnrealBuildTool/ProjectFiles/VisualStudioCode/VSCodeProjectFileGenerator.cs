@@ -272,7 +272,7 @@ namespace UnrealBuildTool
 			}
 			Projects.Sort((A, B) => { return A.ProjectFilePath.GetFileName().CompareTo(B.ProjectFilePath.GetFileName()); });
 
-			ProjectData ProjectData = GatherProjectData(Projects, PlatformProjectGenerators);
+			ProjectData ProjectData = GatherProjectData(Projects);
 
 			WriteTasksFile(ProjectData, VSCodeDir);
 			WriteLaunchFile(ProjectData, VSCodeDir);
@@ -295,10 +295,10 @@ namespace UnrealBuildTool
 			public readonly TargetType Type;
 			public readonly UnrealTargetPlatform Platform;
 			public readonly UnrealTargetConfiguration Configuration;
-			public readonly FileReference CompilerPath;
+			public readonly FileReference? CompilerPath;
 			public readonly Dictionary<DirectoryReference, string> ModuleCommandLines;
 
-			public BuildTarget(string InName, TargetType InType, UnrealTargetPlatform InPlatform, UnrealTargetConfiguration InConfiguration, FileReference InCompilerPath, Dictionary<DirectoryReference, string> InModulesCommandLines)
+			public BuildTarget(string InName, TargetType InType, UnrealTargetPlatform InPlatform, UnrealTargetConfiguration InConfiguration, FileReference? InCompilerPath, Dictionary<DirectoryReference, string> InModulesCommandLines)
 			{
 				Name = InName;
 				Type = InType;
@@ -319,7 +319,7 @@ namespace UnrealBuildTool
 			base.AddTargetForIntellisense(Target);
 
 			bool UsingClang = true;
-			FileReference CompilerPath;
+			FileReference? CompilerPath;
 			if (HostPlatform == UnrealTargetPlatform.Win64)
 			{
 				VCEnvironment Environment = VCEnvironment.Create(WindowsPlatform.GetDefaultCompiler(null), Target.Platform, Target.Rules.WindowsPlatform.Architecture, null, Target.Rules.WindowsPlatform.WindowsSdkVersion, null);
@@ -458,7 +458,7 @@ namespace UnrealBuildTool
 		}
 
 
-		private ProjectData GatherProjectData(List<ProjectFile> InProjects, PlatformProjectGeneratorCollection PlatformProjectGenerators)
+		private ProjectData GatherProjectData(List<ProjectFile> InProjects)
 		{
 			ProjectData ProjectData = new ProjectData();
 
@@ -491,7 +491,7 @@ namespace UnrealBuildTool
 							{
 								foreach (UnrealTargetConfiguration Config in Configs)
 								{
-									if (MSBuildProjectFile.IsValidProjectPlatformAndConfiguration(Target, Platform, Config, PlatformProjectGenerators))
+									if (MSBuildProjectFile.IsValidProjectPlatformAndConfiguration(Target, Platform, Config))
 									{
 										NewTarget.BuildProducts.Add(new ProjectData.BuildProduct(GetExecutableFilename(Project, Target, Platform, Config))
 										{
@@ -522,7 +522,7 @@ namespace UnrealBuildTool
 
 						foreach (UnrealTargetConfiguration Config in Configs)
 						{
-							CsProjectInfo Info = VCSharpProject.GetProjectInfo(Config);
+							CsProjectInfo? Info = VCSharpProject.GetProjectInfo(Config)!;
 
 							if (Info.Properties.ContainsKey("OutputPath"))
 							{
@@ -600,7 +600,7 @@ namespace UnrealBuildTool
 								continue;
 
 							string Name = string.Format("{0} {1} {2} {3} ({4})", ProjectTarget.Name, ProjectTarget.Type, BuildTarget.Platform, BuildTarget.Configuration, Project.Name);
-							WriteConfiguration(Name, Project.Name, Project.SourceProject.SourceFiles.Select(x => x.Reference), BuildTarget.CompilerPath, BuildTarget.ModuleCommandLines, OutFile, OutputDirectory);
+							WriteConfiguration(Name, Project.Name, Project.SourceProject.SourceFiles.Select(x => x.Reference), BuildTarget.CompilerPath!, BuildTarget.ModuleCommandLines, OutFile, OutputDirectory);
 
 							AllSourceFiles.UnionWith(Project.SourceProject.SourceFiles.Select(x => x.Reference));
 

@@ -1383,9 +1383,8 @@ namespace UnrealBuildTool
                             bool bSupportPortrait, bSupportLandscape;
 							TargetReceipt? Receipt;
 							TargetReceipt.TryRead(ReceiptFilename, out Receipt);
-							VersionNumber SdkVersion = UEDeployIOS.GetSdkVersion(Receipt);
 							bool bBuildAsFramework = UEDeployIOS.GetCompileAsDll(Receipt);
-							UEDeployIOS.GenerateIOSPList(ProjectFile, Config.BuildConfig, ProjectPath.FullName, bIsUnrealGame, GameName, bIsClient, Config.BuildTarget, EngineDir.FullName, ProjectPath + "/Binaries/IOS/Payload", SdkVersion, null, BundleIdentifier, bBuildAsFramework, out bSupportPortrait, out bSupportLandscape);
+							UEDeployIOS.GenerateIOSPList(ProjectFile, Config.BuildConfig, ProjectPath.FullName, bIsUnrealGame, GameName, bIsClient, Config.BuildTarget, EngineDir.FullName, ProjectPath + "/Binaries/IOS/Payload", null, BundleIdentifier, bBuildAsFramework, out bSupportPortrait, out bSupportLandscape);
 						}
 						if (bCreateTVOSInfoPlist)
 						{
@@ -1540,7 +1539,7 @@ namespace UnrealBuildTool
 			Content.Append("/* End XCConfigurationList section */" + ProjectFileGenerator.NewLine);
 			}
 
-		private List<XcodeBuildConfig> GetSupportedBuildConfigs(List<UnrealTargetPlatform> Platforms, List<UnrealTargetConfiguration> Configurations, PlatformProjectGeneratorCollection PlatformProjectGenerators)
+		private List<XcodeBuildConfig> GetSupportedBuildConfigs(List<UnrealTargetPlatform> Platforms, List<UnrealTargetConfiguration> Configurations)
 		{
 			List<XcodeBuildConfig> BuildConfigs = new List<XcodeBuildConfig>();
 
@@ -1566,7 +1565,7 @@ namespace UnrealBuildTool
 								// Now go through all of the target types for this project
 								foreach (ProjectTarget ProjectTarget in ProjectTargets.OfType<ProjectTarget>())
 								{
-									if (MSBuildProjectFile.IsValidProjectPlatformAndConfiguration(ProjectTarget, Platform, Configuration, PlatformProjectGenerators))
+									if (MSBuildProjectFile.IsValidProjectPlatformAndConfiguration(ProjectTarget, Platform, Configuration))
 									{
 										// Figure out if this is a monolithic build
 										bool bShouldCompileMonolithic = BuildPlatform.ShouldCompileMonolithicBinary(Platform);
@@ -1914,7 +1913,7 @@ namespace UnrealBuildTool
 				{
 					foreach (UnrealTargetConfiguration Config in GetSupportedConfigurations())
 					{
-						if (MSBuildProjectFile.IsValidProjectPlatformAndConfiguration(ProjectTarget, Platform, Config, null))
+						if (MSBuildProjectFile.IsValidProjectPlatformAndConfiguration(ProjectTarget, Platform, Config))
 						{
 							return true;
 						}
@@ -1952,7 +1951,7 @@ namespace UnrealBuildTool
 
 
 			// Figure out all the desired configurations
-			List<XcodeBuildConfig> BuildConfigs = GetSupportedBuildConfigs(InPlatforms, InConfigurations, PlatformProjectGenerators);
+			List<XcodeBuildConfig> BuildConfigs = GetSupportedBuildConfigs(InPlatforms, InConfigurations);
 			if (BuildConfigs.Count == 0)
 			{
 				return true;

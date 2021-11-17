@@ -10,8 +10,6 @@ using System.Xml.Linq;
 using EpicGames.Core;
 using UnrealBuildBase;
 
-#nullable disable
-
 namespace UnrealBuildTool
 {
 	enum VCProjectFileFormat
@@ -95,7 +93,7 @@ namespace UnrealBuildTool
 		/// Override for the build tool to use in generated projects. If the compiler version is specified on the command line, we use the same argument on the 
 		/// command line for generated projects.
 		/// </summary>
-		string BuildToolOverride;
+		string? BuildToolOverride;
 
 		/// <summary>
 		/// Default constructor
@@ -103,7 +101,7 @@ namespace UnrealBuildTool
 		/// <param name="InOnlyGameProject">The single project to generate project files for, or null</param>
 		/// <param name="InProjectFileFormat">Override the project file format to use</param>
 		/// <param name="InArguments">Additional command line arguments</param>
-		public VCProjectFileGenerator(FileReference InOnlyGameProject, VCProjectFileFormat InProjectFileFormat, CommandLineArguments InArguments)
+		public VCProjectFileGenerator(FileReference? InOnlyGameProject, VCProjectFileFormat InProjectFileFormat, CommandLineArguments InArguments)
 			: base(InOnlyGameProject)
 		{
 			XmlConfig.ApplyTo(Settings);
@@ -296,7 +294,7 @@ namespace UnrealBuildTool
 				// Allow the SDKs to override
 				foreach (UnrealTargetPlatform SupportedPlatform in SupportedPlatforms)
 				{
-					UEBuildPlatform BuildPlatform;
+					UEBuildPlatform? BuildPlatform;
 					if (UEBuildPlatform.TryGetBuildPlatform(SupportedPlatform, out BuildPlatform))
 					{
 						// Don't worry about platforms that we're missing SDKs for
@@ -347,6 +345,11 @@ namespace UnrealBuildTool
 			public override string ToString()
 			{
 				return String.Format("{0}={1} {2} {3}", VCSolutionConfigAndPlatformName, Configuration, Platform, TargetConfigurationName);
+			}
+
+			public VCSolutionConfigCombination(string VCSolutionConfigAndPlatformName)
+			{
+				this.VCSolutionConfigAndPlatformName = VCSolutionConfigAndPlatformName;
 			}
 		}
 
@@ -459,7 +462,7 @@ namespace UnrealBuildTool
 		}
 
 
-		protected override bool WriteMasterProjectFile(ProjectFile UBTProject, PlatformProjectGeneratorCollection PlatformProjectGenerators)
+		protected override bool WriteMasterProjectFile(ProjectFile? UBTProject, PlatformProjectGeneratorCollection PlatformProjectGenerators)
 		{
 			bool bSuccess = true;
 
@@ -614,7 +617,7 @@ namespace UnrealBuildTool
 												// Figure out the set of valid target configuration names
 												foreach (Project ProjectTarget in CurProject.ProjectTargets)
 												{
-													if (VCProjectFile.IsValidProjectPlatformAndConfiguration(ProjectTarget, CurPlatform, CurConfiguration, PlatformProjectGenerators))
+													if (VCProjectFile.IsValidProjectPlatformAndConfiguration(ProjectTarget, CurPlatform, CurConfiguration))
 													{
 														PlatformsValidForProjects.Add(CurPlatform);
 
@@ -649,9 +652,8 @@ namespace UnrealBuildTool
 
 								string SolutionConfigAndPlatformPair = SolutionConfigName + "|" + SolutionPlatformName;
 								SolutionConfigCombinations.Add(
-										new VCSolutionConfigCombination
+										new VCSolutionConfigCombination(SolutionConfigAndPlatformPair)
 										{
-											VCSolutionConfigAndPlatformName = SolutionConfigAndPlatformPair,
 											Configuration = Configuration,
 											Platform = CurPlatform,
 											TargetConfigurationName = TargetType
@@ -745,7 +747,7 @@ namespace UnrealBuildTool
 						// filter)'s GUID, and Guid2 is the solution filter directory to parent the child project (or solution
 						// filter) to.  This sets up the hierarchical solution explorer tree for all solution folders and projects.
 
-						System.Action<StringBuilder /* VCSolutionFileContent */, List<PrimaryProjectFolder> /* Folders */ > FolderProcessorFunction = null;
+						System.Action<StringBuilder /* VCSolutionFileContent */, List<PrimaryProjectFolder> /* Folders */ >? FolderProcessorFunction = null;
 						FolderProcessorFunction = (LocalVCSolutionFileContent, LocalMasterProjectFolders) =>
 							{
 								foreach (PrimaryProjectFolder CurFolder in LocalMasterProjectFolders)
@@ -765,7 +767,7 @@ namespace UnrealBuildTool
 									}
 
 									// Recurse into subfolders
-									FolderProcessorFunction(LocalVCSolutionFileContent, CurFolder.SubFolders);
+									FolderProcessorFunction!(LocalVCSolutionFileContent, CurFolder.SubFolders);
 								}
 							};
 						FolderProcessorFunction(VCSolutionFileContent, RootFolder.SubFolders);
@@ -811,7 +813,7 @@ namespace UnrealBuildTool
 					VCSolutionOptions Options = new VCSolutionOptions(Settings.ProjectFileFormat);
 
 					// Set the default configuration and startup project
-					VCSolutionConfigCombination DefaultConfig = SolutionConfigCombinations.Find(x => x.Configuration == UnrealTargetConfiguration.Development && x.Platform == UnrealTargetPlatform.Win64 && x.TargetConfigurationName == TargetType.Editor);
+					VCSolutionConfigCombination? DefaultConfig = SolutionConfigCombinations.Find(x => x.Configuration == UnrealTargetConfiguration.Development && x.Platform == UnrealTargetPlatform.Win64 && x.TargetConfigurationName == TargetType.Editor);
 					if (DefaultConfig != null)
 					{
 						List<VCBinarySetting> Settings = new List<VCBinarySetting>();
@@ -848,7 +850,7 @@ namespace UnrealBuildTool
 			StringBuilder UnrealVSContent = new StringBuilder();
 			foreach (UnrealTargetPlatform SupportedPlatform in SupportedPlatforms)
 			{
-				PlatformProjectGenerator ProjGenerator = PlatformProjectGenerators.GetPlatformProjectGenerator(SupportedPlatform, true);
+				PlatformProjectGenerator? ProjGenerator = PlatformProjectGenerators.GetPlatformProjectGenerator(SupportedPlatform, true);
 				if (ProjGenerator != null)
 				{
 					ProjGenerator.GetUnrealVSConfigurationEntries(UnrealVSContent);
@@ -865,7 +867,7 @@ namespace UnrealBuildTool
 			}
 		}
 
-		static void BuildSolutionExplorerState_VS2019(PrimaryProjectFolder Folder, string Suffix, VCSolutionExplorerState ExplorerState, ProjectFile DefaultProject)
+		static void BuildSolutionExplorerState_VS2019(PrimaryProjectFolder Folder, string Suffix, VCSolutionExplorerState ExplorerState, ProjectFile? DefaultProject)
 		{
 			foreach (ProjectFile Project in Folder.ChildProjects)
 			{

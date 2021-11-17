@@ -117,7 +117,7 @@ namespace UnrealBuildTool
 		protected IOSProjectSettings ProjectSettings;
 		private IOSToolChainOptions Options;
 
-		public IOSToolChain(ReadOnlyTargetRules Target, IOSProjectSettings InProjectSettings, IOSToolChainOptions ToolchainOptions)
+		public IOSToolChain(ReadOnlyTargetRules? Target, IOSProjectSettings InProjectSettings, IOSToolChainOptions ToolchainOptions)
 			: this(Target, InProjectSettings, () => new IOSToolChainSettings())
 		{
 			Options = ToolchainOptions;
@@ -2079,7 +2079,7 @@ namespace UnrealBuildTool
 				// ensure the plist, entitlements, and provision files are properly copied
 				UEDeployIOS DeployHandler = (Target.Platform == UnrealTargetPlatform.IOS ? new UEDeployIOS() : new UEDeployTVOS());
 				DeployHandler.ForDistribution = Target.bForDistribution;
-				DeployHandler.PrepTargetForDeployment(Target.ProjectFile, Target.TargetName, Target.Platform, Target.Configuration, Target.UPLScripts, Target.SdkVersion, Target.bCreateStubIPA, BundleID, Target.bBuildAsFramework);
+				DeployHandler.PrepTargetForDeployment(Target.ProjectFile, Target.TargetName, Target.Platform, Target.Configuration, Target.UPLScripts, Target.bCreateStubIPA, BundleID, Target.bBuildAsFramework);
 
 				Log.TraceInformation("Executing {0}", SignProjectScript);
 
@@ -2158,7 +2158,7 @@ namespace UnrealBuildTool
 				// ensure the plist, entitlements, and provision files are properly copied
 				UEDeployIOS DeployHandler = (Target.Platform == UnrealTargetPlatform.IOS ? new UEDeployIOS() : new UEDeployTVOS());
 				DeployHandler.ForDistribution = Target.bForDistribution;
-				DeployHandler.PrepTargetForDeployment(Target.ProjectFile, Target.TargetName, Target.Platform, Target.Configuration, Target.UPLScripts, Target.SdkVersion, Target.bCreateStubIPA, BundleID, Target.bBuildAsFramework);
+				DeployHandler.PrepTargetForDeployment(Target.ProjectFile, Target.TargetName, Target.Platform, Target.Configuration, Target.UPLScripts, Target.bCreateStubIPA, BundleID, Target.bBuildAsFramework);
 
 				// write the entitlements file (building on Mac)
 				WriteEntitlements(Target);
