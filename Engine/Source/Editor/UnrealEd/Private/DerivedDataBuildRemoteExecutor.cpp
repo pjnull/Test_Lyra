@@ -1060,4 +1060,13 @@ void DumpDerivedDataBuildRemoteExecutorStats()
 	}
 }
 
+#else
+
+void InitDerivedDataBuildRemoteExecutor()
+{
+}
+
+
+
+
 #endif // #if UE_WITH_ZEN
