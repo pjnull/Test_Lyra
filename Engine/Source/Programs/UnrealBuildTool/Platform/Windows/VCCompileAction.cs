@@ -146,6 +146,9 @@ namespace UnrealBuildTool
 		/// <inheritdoc/>
 		public bool bCanExecuteRemotelyWithSNDBS { get; set; }
 
+		/// <inheritdoc/>
+		public bool bUseActionHistory => true;
+
 		#endregion
 
 		#region Implementation of IAction

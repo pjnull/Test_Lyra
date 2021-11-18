@@ -121,6 +121,11 @@ namespace UnrealBuildTool
 		/// True if any libraries produced by this action should be considered 'import libraries'
 		/// </summary>
 		bool bProducesImportLibrary { get; }
+
+		/// <summary>
+		/// Whether changes in the command line used to generate these produced items should invalidate the action
+		/// </summary>
+		bool bUseActionHistory { get; }
 	}
 
 	/// <summary>
@@ -213,6 +218,9 @@ namespace UnrealBuildTool
 		/// </summary>
 		public bool bProducesImportLibrary { get; set; } = false;
 
+		/// <inheritdoc/>
+		public bool bUseActionHistory { get; set; } = true;
+
 		IEnumerable<FileItem> IExternalAction.PrerequisiteItems => PrerequisiteItems;
 		IEnumerable<FileItem> IExternalAction.ProducedItems => ProducedItems;
 		IEnumerable<FileItem> IExternalAction.DeleteItems => DeleteItems;
@@ -246,6 +254,7 @@ namespace UnrealBuildTool
 			bIsGCCCompiler = InOther.bIsGCCCompiler;
 			bShouldOutputStatusDescription = InOther.bShouldOutputStatusDescription;
 			bProducesImportLibrary = InOther.bProducesImportLibrary;
+			bUseActionHistory = InOther.bUseActionHistory;
 		}
 
 		public Action(BinaryArchiveReader Reader)
@@ -266,6 +275,7 @@ namespace UnrealBuildTool
 			ProducedItems = Reader.ReadList(() => Reader.ReadFileItem())!;
 			DeleteItems = Reader.ReadList(() => Reader.ReadFileItem())!;
 			DependencyListFile = Reader.ReadFileItem();
+			bUseActionHistory = Reader.ReadBool();
 		}
 
 		/// <summary>
@@ -289,6 +299,7 @@ namespace UnrealBuildTool
 			Writer.WriteList(ProducedItems, Item => Writer.WriteFileItem(Item));
 			Writer.WriteList(DeleteItems, Item => Writer.WriteFileItem(Item));
 			Writer.WriteFileItem(DependencyListFile);
+			Writer.WriteBool(bUseActionHistory);
 		}
 
 		/// <summary>
@@ -529,6 +540,7 @@ namespace UnrealBuildTool
 		public bool bIsGCCCompiler => Inner.bIsGCCCompiler;
 		public bool bShouldOutputStatusDescription => Inner.bShouldOutputStatusDescription;
 		public bool bProducesImportLibrary => Inner.bProducesImportLibrary;
+		public bool bUseActionHistory => Inner.bUseActionHistory;
 
 		#endregion
 
