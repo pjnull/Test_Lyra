@@ -292,8 +292,7 @@ USoundWave::USoundWave(const FObjectInitializer& ObjectInitializer)
 	bWasStreamCachingEnabledOnLastCook = FPlatformCompressionUtilities::IsCurrentPlatformUsingStreamCaching();
 	bLoadedFromCookedData = false;
 
-	SoundWaveDataPtr->OwnedBulkDataPtr = nullptr;
-	SoundWaveDataPtr->ResourceData.Reset(nullptr, 0);
+	SoundWaveDataPtr->ResourceData.Empty();
 #endif
 }
 
@@ -1346,9 +1345,10 @@ void USoundWave::InitAudioResource(FByteBulkData& CompressedData)
 			CompressedData.GetCopy((void**)&TempDataPtr, true);
 			SoundWaveDataPtr->ResourceData.Reset(TempDataPtr, SoundWaveDataPtr->ResourceSize);
 #else
-			if (!SoundWaveDataPtr->OwnedBulkDataPtr)
+			FOwnedBulkDataPtr* OwnedBulkDataPtr = nullptr;
+			if (!SoundWaveDataPtr->ResourceData.GetView().GetData())
 			{
-				SoundWaveDataPtr->OwnedBulkDataPtr = CompressedData.StealFileMapping();
+				OwnedBulkDataPtr = CompressedData.StealFileMapping();
 			}
 			else
 			{
@@ -1356,17 +1356,16 @@ void USoundWave::InitAudioResource(FByteBulkData& CompressedData)
 					, *GetFullName());
 			}
 
-			check(SoundWaveDataPtr->OwnedBulkDataPtr);
-			uint8* TempDataPtr = (uint8*)(SoundWaveDataPtr->OwnedBulkDataPtr)->GetPointer();
+			check(OwnedBulkDataPtr);
+			uint8* TempDataPtr = (uint8*)(OwnedBulkDataPtr)->GetPointer();
 			SoundWaveDataPtr->ResourceData.Reset(TempDataPtr, SoundWaveDataPtr->ResourceSize);
 			if (!TempDataPtr)
 			{
 				UE_LOG(LogAudio, Error, TEXT("Soundwave '%s' was not loaded when it should have been, forcing a sync load."), *GetFullName());
 
-				delete SoundWaveDataPtr->OwnedBulkDataPtr;
 				CompressedData.ForceBulkDataResident();
-				SoundWaveDataPtr->OwnedBulkDataPtr = CompressedData.StealFileMapping();
-				TempDataPtr = (uint8*)(SoundWaveDataPtr->OwnedBulkDataPtr)->GetPointer();
+				OwnedBulkDataPtr = CompressedData.StealFileMapping();
+				TempDataPtr = (uint8*)(OwnedBulkDataPtr)->GetPointer();
 
 				SoundWaveDataPtr->ResourceData.Reset(TempDataPtr, SoundWaveDataPtr->ResourceSize);
 				if (!TempDataPtr)
@@ -1409,16 +1408,8 @@ bool USoundWave::InitAudioResource(FName Format)
 void USoundWave::RemoveAudioResource()
 {
 	check(SoundWaveDataPtr);
-
-#if WITH_EDITOR
 	SoundWaveDataPtr->ResourceSize = 0;
-	SoundWaveDataPtr->ResourceData.Reset(nullptr, 0);
-#else
-	delete SoundWaveDataPtr->OwnedBulkDataPtr;
-	SoundWaveDataPtr->OwnedBulkDataPtr = nullptr;
-	SoundWaveDataPtr->ResourceData.Reset(nullptr, 0);
-	SoundWaveDataPtr->ResourceSize = 0;
-#endif // #if WITH_EDITOR
+	SoundWaveDataPtr->ResourceData.Empty();
 }
 
 

@@ -333,7 +333,6 @@ struct FSoundWave
 
 	int32 ResourceSize;
 	FBulkDataBuffer<uint8> ResourceData;
-	FOwnedBulkDataPtr* OwnedBulkDataPtr{ nullptr };
 
 	ESoundWaveLoadingBehavior LoadingBehavior = ESoundWaveLoadingBehavior::Uninitialized;
 
@@ -735,7 +734,6 @@ public:
 	/** Memory containing the data copied from the compressed bulk data */
 
 public:
-	FOwnedBulkDataPtr* GetOwnedBulkData() { check(SoundWaveDataPtr);  return SoundWaveDataPtr->OwnedBulkDataPtr; }
 	const uint8* GetResourceData() { check(SoundWaveDataPtr);  return SoundWaveDataPtr->ResourceData.GetView().GetData(); }
 
 	/** Uncompressed wav data 16 bit in mono or stereo - stereo not allowed for multichannel data */
