@@ -38,6 +38,7 @@ public:
 
 	//~ Begin Helper Functions
 	TArray<const UDataLayer*> GetDataLayerObjects(const TArray<FActorDataLayer>& DataLayers) const;
+	TArray<const UDataLayer*> GetDataLayerObjects(const TArray<FName>& InDataLayerNames) const;
 	TArray<FName> GetDataLayerNames(const TArray<FActorDataLayer>& DataLayers) const;
 	//~ End Helper Functions
 

@@ -119,11 +119,15 @@ void UWorldPartitionRuntimeHash::CheckForErrorsInternal(const TMap<FGuid, FWorld
 							->AddToken(FMapErrorToken::Create(FName(TEXT("WorldPartition_StreamedActorReferenceAlwaysLoadedActor_CheckForErrors"))));
 					}
 
-					TArray<FName> ActorDescLayers = ActorDescView.GetDataLayers();
-					ActorDescLayers.Sort([](const FName& A, const FName& B) { return A.FastLess(B); });
+					AWorldDataLayers* WorldDataLayers = GetWorld()->GetWorldDataLayers();
 
-					TArray<FName> ActorDescRefLayers = ActorDescRefView->GetDataLayers();
-					ActorDescRefLayers.Sort([](const FName& A, const FName& B) { return A.FastLess(B); });
+					TArray<FName> ActorDescLayerNames = ActorDescView.GetDataLayers();
+					ActorDescLayerNames.Sort([](const FName& A, const FName& B) { return A.FastLess(B); });
+					TArray<const UDataLayer*> ActorDescLayers = WorldDataLayers->GetDataLayerObjects(ActorDescLayerNames);
+
+					TArray<FName> ActorDescRefLayerNames = ActorDescRefView->GetDataLayers();
+					ActorDescRefLayerNames.Sort([](const FName& A, const FName& B) { return A.FastLess(B); });
+					TArray<const UDataLayer*> ActorDescRefLayers = WorldDataLayers->GetDataLayerObjects(ActorDescRefLayerNames);
 
 					if (ActorDescLayers != ActorDescRefLayers)
 					{

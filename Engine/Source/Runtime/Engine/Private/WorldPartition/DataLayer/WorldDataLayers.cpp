@@ -517,6 +517,22 @@ TArray<FName> AWorldDataLayers::GetDataLayerNames(const TArray<FActorDataLayer>&
 	return OutDataLayerNames;
 }
 
+TArray<const UDataLayer*> AWorldDataLayers::GetDataLayerObjects(const TArray<FName>& InDataLayerNames) const
+{
+	TArray<const UDataLayer*> OutDataLayers;
+	OutDataLayers.Reserve(DataLayers.Num());
+
+	for (const FName& DataLayerName : InDataLayerNames)
+	{
+		if (const UDataLayer* DataLayerObject = GetDataLayerFromName(DataLayerName))
+		{
+			OutDataLayers.AddUnique(DataLayerObject);
+		}
+	}
+
+	return OutDataLayers;
+}
+
 TArray<const UDataLayer*> AWorldDataLayers::GetDataLayerObjects(const TArray<FActorDataLayer>& InDataLayers) const
 {
 	TArray<const UDataLayer*> OutDataLayers;
