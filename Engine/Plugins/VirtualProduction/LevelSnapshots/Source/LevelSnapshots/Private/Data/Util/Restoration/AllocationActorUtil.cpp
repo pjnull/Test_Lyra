@@ -10,6 +10,7 @@
 #include "LevelSnapshotsLog.h"
 #include "LevelSnapshotsModule.h"
 #include "LoadSnapshotObjectArchive.h"
+#include "SnapshotDataCache.h"
 #include "Selection/PropertySelectionMap.h"
 #include "Util/EquivalenceUtil.h"
 #include "Util/Component/SnapshotComponentUtil.h"
@@ -28,7 +29,7 @@
 
 namespace UE::LevelSnapshots::Private::Internal
 {
-	static void PostSerializeSnapshotActor(AActor* SnapshotActor, FWorldSnapshotData& WorldData, const FSoftObjectPath& OriginalActorPath, UPackage* InLocalisationSnapshotPackage)
+	static void PostSerializeSnapshotActor(AActor* SnapshotActor, const FSoftObjectPath& OriginalActorPath, FWorldSnapshotData& WorldData, FSnapshotDataCache& Cache, UPackage* InLocalisationSnapshotPackage)
 	{
 		struct Local
 		{
@@ -52,7 +53,7 @@ namespace UE::LevelSnapshots::Private::Internal
 				}
 			}
 			
-			static void HandleAttachParentNotSaved(AActor* OriginalActor, AActor* SnapshotActor, FWorldSnapshotData& WorldData, UPackage* InLocalisationSnapshotPackage)
+			static void HandleAttachParentNotSaved(AActor* OriginalActor, AActor* SnapshotActor, FWorldSnapshotData& WorldData, FSnapshotDataCache& Cache, UPackage* InLocalisationSnapshotPackage)
 			{
 				USceneComponent* RootComponent = OriginalActor->GetRootComponent();
 				// WorldSettings does not have a root component...
@@ -66,7 +67,7 @@ namespace UE::LevelSnapshots::Private::Internal
 				{
 					return;
 				}
-				const TOptional<TNonNullPtr<AActor>> SnapshotAttachParent = UE::LevelSnapshots::Private::GetDeserializedActor(WorldAttachParent->GetOwner(), WorldData, InLocalisationSnapshotPackage);
+				const TOptional<TNonNullPtr<AActor>> SnapshotAttachParent = GetDeserializedActor(WorldAttachParent->GetOwner(), WorldData, Cache, InLocalisationSnapshotPackage);
 				if (!SnapshotAttachParent)
 				{
 					return;
@@ -103,11 +104,11 @@ namespace UE::LevelSnapshots::Private::Internal
 		{
 			Local::RecreateRootComponentIfInstanced(OriginalActor, SnapshotActor);
 			// To avoid lots of actors being unparented by accident, we set the snapshot actor's attach parent to the equivalent of the editor world
-			Local::HandleAttachParentNotSaved(OriginalActor, SnapshotActor, WorldData, InLocalisationSnapshotPackage);
+			Local::HandleAttachParentNotSaved(OriginalActor, SnapshotActor, WorldData, Cache, InLocalisationSnapshotPackage);
 		}
 	}
 
-	using FHandleFoundComponent = TFunctionRef<void(FSubobjectSnapshotData& SerializedCompData, const FComponentSnapshotData& ComponentMetaData, UActorComponent* ActorComp, const FSoftObjectPath& OriginalComponentPath, FWorldSnapshotData& SharedData)>;
+	using FHandleFoundComponent = TFunctionRef<void(FSubobjectSnapshotData& SerializedCompData, UActorComponent* ActorComp, const FSoftObjectPath& OriginalComponentPath, FWorldSnapshotData& SharedData)>;
 
 	static void DeserializeComponents(
 		const FActorSnapshotData& ActorData,
@@ -129,12 +130,12 @@ namespace UE::LevelSnapshots::Private::Internal
 			if (UActorComponent* ComponentToRestore = FindMatchingComponent(IntoActor, OriginalComponentPath))
 			{
 				FSubobjectSnapshotData& SnapshotData = WorldData.Subobjects[SubobjectIndex];
-				HandleComponent(SnapshotData, CompIt->Value, ComponentToRestore, OriginalComponentPath, WorldData);
+				HandleComponent(SnapshotData, ComponentToRestore, OriginalComponentPath, WorldData);
 			}
 		}
 	}
 
-	static void DeserializeSubobjectsForSnapshotActor(const FActorSnapshotData& ActorData, FWorldSnapshotData& WorldData, const FProcessObjectDependency& ProcessObjectDependency, UPackage* InLocalisationSnapshotPackage)
+	static void DeserializeSubobjectsForSnapshotActor(const FActorSnapshotData& ActorData, FWorldSnapshotData& WorldData, FSnapshotDataCache& Cache, const FProcessObjectDependency& ProcessObjectDependency, UPackage* InLocalisationSnapshotPackage)
 	{
 		for (const int32 SubobjectIndex : ActorData.OwnedSubobjects)
 		{
@@ -148,6 +149,7 @@ namespace UE::LevelSnapshots::Private::Internal
 			// Ensures the object is allocated and serialized into. Return value not needed.
 			ResolveObjectDependencyForSnapshotWorld(
 				WorldData,
+				Cache,
 				SubobjectIndex,
 				ProcessObjectDependency,
 				LocalisationNamespace
@@ -155,7 +157,13 @@ namespace UE::LevelSnapshots::Private::Internal
 		}
 	}
 
-	static void DeserializeIntoTransient(FObjectSnapshotData& SerializedComponentData, UActorComponent* ComponentToDeserializeInto, FWorldSnapshotData& WorldData, const FProcessObjectDependency& ProcessObjectDependency, UPackage* InLocalisationSnapshotPackage)
+	static void DeserializeIntoTransient(
+		FObjectSnapshotData& SerializedComponentData,
+		UActorComponent* ComponentToDeserializeInto,
+		FWorldSnapshotData& WorldData,
+		const FProcessObjectDependency& ProcessObjectDependency,
+		FSnapshotDataCache& Cache,
+		UPackage* InLocalisationSnapshotPackage)
 	{
 		if (ComponentToDeserializeInto->CreationMethod == EComponentCreationMethod::UserConstructionScript)
 		{
@@ -176,63 +184,53 @@ namespace UE::LevelSnapshots::Private::Internal
 			//   - We apply the CDO and afterwards we override it with the serialized data. Good.
 		SerializeClassDefaultsInto(WorldData, ComponentToDeserializeInto);
 		
-		FLoadSnapshotObjectArchive::ApplyToSnapshotWorldObject(SerializedComponentData, WorldData, ComponentToDeserializeInto, ProcessObjectDependency, InLocalisationSnapshotPackage);
+		FLoadSnapshotObjectArchive::ApplyToSnapshotWorldObject(SerializedComponentData, WorldData, Cache, ComponentToDeserializeInto, ProcessObjectDependency, InLocalisationSnapshotPackage);
 	}
 
-	static TOptional<TNonNullPtr<AActor>> GetDeserialized(FActorSnapshotData& ActorData, FWorldSnapshotData& WorldData, const FSoftObjectPath& OriginalActorPath, UWorld* SnapshotWorld, UPackage* InLocalisationSnapshotPackage)
+	static TOptional<TNonNullPtr<AActor>> GetDeserialized(const FSoftObjectPath& OriginalActorPath, FWorldSnapshotData& WorldData, FSnapshotDataCache& Cache, UWorld* SnapshotWorld, UPackage* InLocalisationSnapshotPackage)
 	{
 		SCOPED_SNAPSHOT_CORE_TRACE(GetDeserialized);
-		if (ActorData.bReceivedSerialisation && ActorData.CachedSnapshotActor.IsValid())
-		{
-			return { ActorData.CachedSnapshotActor.Get() };
-		}
 		UE_LOG(LogLevelSnapshots, Verbose, TEXT("========== Get Deserialized %s =========="), *OriginalActorPath.ToString());
-
-		const TOptional<TNonNullPtr<AActor>> Preallocated = UE::LevelSnapshots::Private::GetPreallocated(ActorData, WorldData, SnapshotWorld);
+		
+		FActorSnapshotCache& ActorCache = Cache.ActorCache.FindOrAdd(OriginalActorPath);
+		const TOptional<TNonNullPtr<AActor>> Preallocated = GetPreallocated(OriginalActorPath, WorldData, Cache, SnapshotWorld);
 		if (!Preallocated)
 		{
 			return {};
 		}
-		ActorData.bReceivedSerialisation = true;
-
-		const auto ProcessObjectDependency = [&ActorData](int32 OriginalObjectDependency)
+		ActorCache.bReceivedSerialisation = true;
+		
+		FActorSnapshotData& ActorData = WorldData.ActorData[OriginalActorPath];
+		const auto ProcessObjectDependency = [&ActorCache](int32 OriginalObjectDependency)
 		{
-			ActorData.ObjectDependencies.Add(OriginalObjectDependency);
+			ActorCache.ObjectDependencies.Add(OriginalObjectDependency);
 		};
 		AActor* PreallocatedActor = Preallocated.GetValue();
 		{
-			const FRestoreObjectScope FinishRestore = PreActorRestore_SnapshotWorld(PreallocatedActor, ActorData.CustomActorSerializationData, WorldData, ProcessObjectDependency, InLocalisationSnapshotPackage);
-			FLoadSnapshotObjectArchive::ApplyToSnapshotWorldObject(ActorData.SerializedActorData, WorldData, PreallocatedActor, ProcessObjectDependency, InLocalisationSnapshotPackage);
+			const FRestoreObjectScope FinishRestore = PreActorRestore_SnapshotWorld(PreallocatedActor, ActorData.CustomActorSerializationData, WorldData, Cache, ProcessObjectDependency, InLocalisationSnapshotPackage);
+			FLoadSnapshotObjectArchive::ApplyToSnapshotWorldObject(ActorData.SerializedActorData, WorldData, Cache, PreallocatedActor, ProcessObjectDependency, InLocalisationSnapshotPackage);
 #if WITH_EDITOR
 			UE_LOG(LogLevelSnapshots, Verbose, TEXT("ActorLabel is \"%s\" for \"%s\" (editor object path \"%s\")"), *PreallocatedActor->GetActorLabel(), *PreallocatedActor->GetPathName(), *OriginalActorPath.ToString());
 #endif
 		}
 
 		DeserializeComponents(ActorData, PreallocatedActor, WorldData,
-			[&WorldData, &ProcessObjectDependency, InLocalisationSnapshotPackage](
+			[&WorldData, &ProcessObjectDependency, &Cache, InLocalisationSnapshotPackage](
 				FSubobjectSnapshotData& SerializedCompData,
-				const FComponentSnapshotData& CompData,
 				UActorComponent* Comp,
 				const FSoftObjectPath& OriginalComponentPath,
 				FWorldSnapshotData& SharedData)
 			{
-				SerializedCompData.SnapshotObject = Comp;
+				FSubobjectSnapshotCache& SubobjectCache = Cache.SubobjectCache.FindOrAdd(OriginalComponentPath);
+				SubobjectCache.SnapshotObject = Comp;
 				
-				const FRestoreObjectScope FinishRestore = PreSubobjectRestore_SnapshotWorld(Comp, OriginalComponentPath, WorldData, ProcessObjectDependency, InLocalisationSnapshotPackage);
-				DeserializeIntoTransient(SerializedCompData, Comp, SharedData, ProcessObjectDependency, InLocalisationSnapshotPackage);
+				const FRestoreObjectScope FinishRestore = PreSubobjectRestore_SnapshotWorld(Comp, OriginalComponentPath, WorldData, Cache , ProcessObjectDependency, InLocalisationSnapshotPackage);
+				DeserializeIntoTransient(SerializedCompData, Comp, SharedData, ProcessObjectDependency, Cache, InLocalisationSnapshotPackage);
 			}
 		);
 
-		DeserializeSubobjectsForSnapshotActor(ActorData, WorldData, ProcessObjectDependency, InLocalisationSnapshotPackage);
-#if WITH_EDITOR
-		// Hide this actor so external systems can see that this components should not render, i.e. make USceneComponent::ShouldRender return false
-		if (!ensureMsgf(PreallocatedActor->IsTemporarilyHiddenInEditor(), TEXT("Transient property bHiddenEdTemporary was set to false by serializer. This should not happen. Investigate.")))
-		{
-			ActorData.CachedSnapshotActor->SetIsTemporarilyHiddenInEditor(true);
-		}
-#endif
-
-		PostSerializeSnapshotActor(PreallocatedActor, WorldData, OriginalActorPath, InLocalisationSnapshotPackage);
+		DeserializeSubobjectsForSnapshotActor(ActorData, WorldData, Cache, ProcessObjectDependency, InLocalisationSnapshotPackage);
+		PostSerializeSnapshotActor(PreallocatedActor, OriginalActorPath, WorldData, Cache, InLocalisationSnapshotPackage);
 		PreallocatedActor->UpdateComponentTransforms();
 		{
 			// GAllowActorScriptExecutionInEditor must be temporarily true so call to UserConstructionScript isn't skipped
@@ -243,15 +241,20 @@ namespace UE::LevelSnapshots::Private::Internal
 		return Preallocated;
 	}
 	
-	static void ConditionallyRerunConstructionScript(FWorldSnapshotData& WorldData, AActor* RequiredActor, const TArray<int32>& OriginalObjectDependencies, UPackage* LocalisationSnapshotPackage)
+	static void ConditionallyRerunConstructionScript(AActor* RequiredActor, const TArray<int32>& OriginalObjectDependencies, FWorldSnapshotData& WorldData, FSnapshotDataCache& Cache, UPackage* LocalisationSnapshotPackage)
 	{
+		if (!RequiredActor)
+		{
+			return;
+		}
+		
 		bool bHadActorDependencies = false;
 		for (const int32 OriginalObjectIndex : OriginalObjectDependencies)
 		{
 			const FSoftObjectPath& ObjectPath = WorldData.SerializedObjectReferences[OriginalObjectIndex];
 			if (WorldData.ActorData.Contains(ObjectPath))
 			{
-				GetDeserializedActor(ObjectPath, WorldData, LocalisationSnapshotPackage);
+				GetDeserializedActor(ObjectPath, WorldData, Cache, LocalisationSnapshotPackage);
 				bHadActorDependencies = true;
 			}
 		}
@@ -263,36 +266,42 @@ namespace UE::LevelSnapshots::Private::Internal
 	}
 }
 
-TOptional<TNonNullPtr<AActor>> UE::LevelSnapshots::Private::GetDeserializedActor(const FSoftObjectPath& OriginalObjectPath, FWorldSnapshotData& WorldData, UPackage* LocalisationSnapshotPackage)
+TOptional<TNonNullPtr<AActor>> UE::LevelSnapshots::Private::GetDeserializedActor(const FSoftObjectPath& OriginalObjectPath, FWorldSnapshotData& WorldData, FSnapshotDataCache& Cache, UPackage* LocalisationSnapshotPackage)
 {
-	FActorSnapshotData* SerializedActor = WorldData.ActorData.Find(OriginalObjectPath);
-	if (SerializedActor)
+	const FActorSnapshotCache& ActorCache = Cache.ActorCache.FindOrAdd(OriginalObjectPath);
+	if (ActorCache.bReceivedSerialisation && ActorCache.CachedSnapshotActor.IsValid())
 	{
-		const bool bJustReceivedSerialisation = !SerializedActor->bReceivedSerialisation;
-		const TOptional<TNonNullPtr<AActor>> Result = Internal::GetDeserialized(*SerializedActor, WorldData, OriginalObjectPath, WorldData.SnapshotWorld->GetWorld(), LocalisationSnapshotPackage);
-		if (Result && bJustReceivedSerialisation && ensure(SerializedActor->bReceivedSerialisation))
-		{
-			Internal::ConditionallyRerunConstructionScript(WorldData, Result.GetValue(), SerializedActor->ObjectDependencies, LocalisationSnapshotPackage);
-		}
-		return Result;
+		return { ActorCache.CachedSnapshotActor.Get() };
 	}
+	
+	const TOptional<TNonNullPtr<AActor>> Result = Internal::GetDeserialized(OriginalObjectPath, WorldData, Cache, WorldData.SnapshotWorld->GetWorld(), LocalisationSnapshotPackage);
+	Internal::ConditionallyRerunConstructionScript(Result.Get(nullptr), ActorCache.ObjectDependencies, WorldData, Cache, LocalisationSnapshotPackage);
+	return Result;
+}
 
-	UE_LOG(LogLevelSnapshots, Warning, TEXT("No save data found for actor %s"), *OriginalObjectPath.ToString());
+TOptional<TNonNullPtr<AActor>> UE::LevelSnapshots::Private::GetPreallocatedIfCached(const FSoftObjectPath& OriginalActorPath, const FSnapshotDataCache& Cache)
+{
+	if (const FActorSnapshotCache* ActorCache = Cache.ActorCache.Find(OriginalActorPath))
+	{
+		return ActorCache->CachedSnapshotActor.IsValid() ? TOptional<TNonNullPtr<AActor>>(ActorCache->CachedSnapshotActor.Get()) : TOptional<TNonNullPtr<AActor>>();
+	}
 	return {};
 }
 
-TOptional<TNonNullPtr<AActor>> UE::LevelSnapshots::Private::GetPreallocatedIfValidButDoNotAllocate(const FActorSnapshotData& ActorData)
-{
-	return ActorData.CachedSnapshotActor.IsValid() ? TOptional<TNonNullPtr<AActor>>(ActorData.CachedSnapshotActor.Get()) : TOptional<TNonNullPtr<AActor>>();
-}
-
-TOptional<TNonNullPtr<AActor>> UE::LevelSnapshots::Private::GetPreallocated(const FActorSnapshotData& ActorData, FWorldSnapshotData& WorldData, UWorld* SnapshotWorld)
+TOptional<TNonNullPtr<AActor>> UE::LevelSnapshots::Private::GetPreallocated(const FSoftObjectPath& OriginalActorPath, FWorldSnapshotData& WorldData, FSnapshotDataCache& Cache, UWorld* SnapshotWorld)
 {
 	SCOPED_SNAPSHOT_CORE_TRACE(GetPreallocated);
-	
-	if (!ActorData.CachedSnapshotActor.IsValid())
+	FActorSnapshotData* ActorData = WorldData.ActorData.Find(OriginalActorPath);
+	if (!ensure(ActorData))
 	{
-		const FSoftClassPath SoftClassPath(ActorData.ActorClass);
+		UE_LOG(LogLevelSnapshots, Warning, TEXT("No save data found for actor %s"), *OriginalActorPath.ToString());
+		return {};
+	}
+
+	FActorSnapshotCache& ActorCache = Cache.ActorCache.FindOrAdd(OriginalActorPath);
+	if (!ActorCache.CachedSnapshotActor.IsValid())
+	{
+		const FSoftClassPath SoftClassPath(ActorData->ActorClass);
 		UClass* TargetClass = SoftClassPath.TryLoadClass<AActor>();
 		if (!TargetClass)
 		{
@@ -301,31 +310,28 @@ TOptional<TNonNullPtr<AActor>> UE::LevelSnapshots::Private::GetPreallocated(cons
 		}
 		
 		FActorSpawnParameters SpawnParams;
-		SpawnParams.Template = Cast<AActor>(GetClassDefault(WorldData, TargetClass));
+		SpawnParams.Template = Cast<AActor>(GetClassDefault(WorldData, Cache, TargetClass));
 		SpawnParams.NameMode = FActorSpawnParameters::ESpawnActorNameMode::Requested;
 		if (ensureMsgf(SpawnParams.Template, TEXT("Failed to get class default. This should not happen. Investigate.")))
 		{
 			UClass* ClassToUse = SpawnParams.Template->GetClass();
 			SpawnParams.Name = *FString("SnapshotObjectInstance_").Append(*MakeUniqueObjectName(SnapshotWorld, ClassToUse).ToString());
-			ActorData.CachedSnapshotActor = SnapshotWorld->SpawnActor<AActor>(ClassToUse, SpawnParams);
+			ActorCache.CachedSnapshotActor = SnapshotWorld->SpawnActor<AActor>(ClassToUse, SpawnParams);
 		}
 		else
 		{
-			ActorData.CachedSnapshotActor = SnapshotWorld->SpawnActor<AActor>(TargetClass, SpawnParams);
+			ActorCache.CachedSnapshotActor = SnapshotWorld->SpawnActor<AActor>(TargetClass, SpawnParams);
 		}
 		
-		if (!ensureMsgf(ActorData.CachedSnapshotActor.IsValid(), TEXT("Failed to spawn actor of class '%s'"), *ActorData.ActorClass.ToString()))
+		if (ensureMsgf(ActorCache.CachedSnapshotActor.IsValid(), TEXT("Failed to spawn actor of class '%s'"), *ActorData->ActorClass.ToString()))
 		{
-			return {};
-		}
-		
 #if WITH_EDITOR
-		// Hide this actor so external systems can see that this components should not render, i.e. make USceneComponent::ShouldRender return false
-		ActorData.CachedSnapshotActor->SetIsTemporarilyHiddenInEditor(true);
+			// Hide this actor so external systems can see that this components should not render, i.e. make USceneComponent::ShouldRender return false
+			ActorCache.CachedSnapshotActor->SetIsTemporarilyHiddenInEditor(true);
 #endif
-
-		AllocateMissingComponentsForSnapshotActor(ActorData.CachedSnapshotActor.Get(), ActorData, WorldData);
+			AllocateMissingComponentsForSnapshotActor(ActorCache.CachedSnapshotActor.Get(), OriginalActorPath, WorldData, Cache);
+		}
 	}
 
-	return ActorData.CachedSnapshotActor.IsValid() ? TOptional<TNonNullPtr<AActor>>(ActorData.CachedSnapshotActor.Get()) : TOptional<TNonNullPtr<AActor>>();
+	return ActorCache.CachedSnapshotActor.IsValid() ? TOptional<TNonNullPtr<AActor>>(ActorCache.CachedSnapshotActor.Get()) : TOptional<TNonNullPtr<AActor>>();
 }

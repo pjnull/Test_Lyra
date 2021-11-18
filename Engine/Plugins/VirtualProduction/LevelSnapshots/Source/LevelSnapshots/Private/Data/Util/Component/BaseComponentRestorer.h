@@ -36,9 +36,10 @@ namespace UE::LevelSnapshots::Private
 		const TDerived* This() const { return static_cast<const TDerived*>(this); }
 	public:
 
-		TBaseComponentRestorer(AActor* ActorToRestore, const FActorSnapshotData& SnapshotData, FWorldSnapshotData& WorldData)
+		TBaseComponentRestorer(AActor* ActorToRestore, const FSoftObjectPath& OriginalActorPath, FWorldSnapshotData& WorldData)
 			: ActorToRestore(ActorToRestore)
-			, SnapshotData(SnapshotData)
+			, OriginalActorPath(OriginalActorPath)
+			, SnapshotData(WorldData.ActorData[OriginalActorPath])
 			, WorldData(WorldData)
 		{}
 
@@ -60,6 +61,7 @@ namespace UE::LevelSnapshots::Private
 	protected:
 
 		AActor* GetActorToRestore() const { return ActorToRestore; }
+		const FSoftObjectPath& GetOriginalActorPath() const { return OriginalActorPath; }
 		const FActorSnapshotData& GetSnapshotData() const { return SnapshotData; }
 		FWorldSnapshotData& GetWorldData() const { return WorldData; }
 		
@@ -168,6 +170,7 @@ namespace UE::LevelSnapshots::Private
 		}
 		
 		AActor* ActorToRestore;
+		const FSoftObjectPath OriginalActorPath;
 		const FActorSnapshotData& SnapshotData;
 		FWorldSnapshotData& WorldData;
 	};

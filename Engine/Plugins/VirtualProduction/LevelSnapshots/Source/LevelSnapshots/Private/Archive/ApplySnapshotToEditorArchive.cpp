@@ -142,15 +142,22 @@ namespace UE::LevelSnapshots::Private::Internal
 	}
 }
 
-void UE::LevelSnapshots::Private::FApplySnapshotToEditorArchive::ApplyToExistingEditorWorldObject(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InOriginalObject, UObject* InDeserializedVersion, const FPropertySelectionMap& InSelectionMapForResolvingSubobjects, const FPropertySelection& InSelectionSet)
+void UE::LevelSnapshots::Private::FApplySnapshotToEditorArchive::ApplyToExistingEditorWorldObject(
+	FObjectSnapshotData& InObjectData,
+	FWorldSnapshotData& InSharedData,
+	FSnapshotDataCache& Cache,
+	UObject* InOriginalObject,
+	UObject* InDeserializedVersion,
+	const FPropertySelectionMap& InSelectionMapForResolvingSubobjects)
 {
-	if (InSelectionSet.IsEmpty())
+	const FPropertySelection* Selection = InSelectionMapForResolvingSubobjects.GetObjectSelection(InOriginalObject).GetPropertySelection();
+	if (Selection && Selection->IsEmpty())
 	{
 		return;
 	}
 
 	UE_LOG(LogLevelSnapshots, Verbose, TEXT("Applying to existing object %s (class %s)"), *InOriginalObject->GetPathName(), *InOriginalObject->GetClass()->GetPathName());
-	const FApplySnapshotPropertiesScope NotifySnapshotListeners({ InOriginalObject, InSelectionMapForResolvingSubobjects, &InSelectionSet, true });
+	const FApplySnapshotPropertiesScope NotifySnapshotListeners({ InOriginalObject, InSelectionMapForResolvingSubobjects, Selection, true });
 #if WITH_EDITOR
 	InOriginalObject->PreEditChange(nullptr);
 	ON_SCOPE_EXIT
@@ -160,7 +167,7 @@ void UE::LevelSnapshots::Private::FApplySnapshotToEditorArchive::ApplyToExisting
 #endif
 	
 	// Step 1: Serialise  properties that were different from CDO at time of snapshotting and that are still different from CDO
-	UE::LevelSnapshots::Private::FApplySnapshotToEditorArchive ApplySavedData(InObjectData, InSharedData, InOriginalObject, InSelectionMapForResolvingSubobjects, &InSelectionSet);
+	UE::LevelSnapshots::Private::FApplySnapshotToEditorArchive ApplySavedData(InObjectData, InSharedData, InOriginalObject, InSelectionMapForResolvingSubobjects, Selection, Cache);
 	InOriginalObject->Serialize(ApplySavedData);
 	
 	// Step 2: Serialise any remaining properties that were not covered: properties that were equal to the CDO value when the snapshot was taken but now are different from the CDO.
@@ -170,14 +177,19 @@ void UE::LevelSnapshots::Private::FApplySnapshotToEditorArchive::ApplyToExisting
 	Internal::FixUpTextPropertiesDifferentInCDO(MoveTemp(TextProperties), InSharedData, InOriginalObject);
 }
 
-void UE::LevelSnapshots::Private::FApplySnapshotToEditorArchive::ApplyToRecreatedEditorWorldObject(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InOriginalObject, UObject* InDeserializedVersion, const FPropertySelectionMap& InSelectionMapForResolvingSubobjects)
+void UE::LevelSnapshots::Private::FApplySnapshotToEditorArchive::ApplyToRecreatedEditorWorldObject(
+	FObjectSnapshotData& InObjectData,
+	FWorldSnapshotData& InSharedData,
+	FSnapshotDataCache& Cache,
+	UObject* InOriginalObject,
+	const FPropertySelectionMap& InSelectionMapForResolvingSubobjects)
 {
 	UE_LOG(LogLevelSnapshots, Verbose, TEXT("Applying to recreated object %s (class %s)"), *InOriginalObject->GetPathName(), *InOriginalObject->GetClass()->GetPathName());
 	const FApplySnapshotPropertiesScope NotifySnapshotListeners({ InOriginalObject, InSelectionMapForResolvingSubobjects, {}, true });
 	
 	// Apply all properties that we saved into the target actor.
 	// We assume that InOriginalObject was already created with the snapshot CDO as template: we do not need Step 2 from ApplyToExistingWorldObject.
-	UE::LevelSnapshots::Private::FApplySnapshotToEditorArchive ApplySavedData(InObjectData, InSharedData, InOriginalObject, InSelectionMapForResolvingSubobjects, {});
+	UE::LevelSnapshots::Private::FApplySnapshotToEditorArchive ApplySavedData(InObjectData, InSharedData, InOriginalObject, InSelectionMapForResolvingSubobjects, {}, Cache);
 	InOriginalObject->Serialize(ApplySavedData);
 }
 
@@ -210,14 +222,20 @@ UObject* UE::LevelSnapshots::Private::FApplySnapshotToEditorArchive::ResolveObje
 #if USE_STABLE_LOCALIZATION_KEYS
 	LocalizationNamespace = GetLocalizationNamespace();
 #endif
-	return UE::LevelSnapshots::Private::ResolveObjectDependencyForEditorWorld(GetSharedData(), ObjectIndex, LocalizationNamespace, SelectionMapForResolvingSubobjects);
+	return UE::LevelSnapshots::Private::ResolveObjectDependencyForEditorWorld(GetSharedData(), Cache, ObjectIndex, LocalizationNamespace, SelectionMapForResolvingSubobjects);
 }
 
-UE::LevelSnapshots::Private::FApplySnapshotToEditorArchive::FApplySnapshotToEditorArchive(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InOriginalObject, const FPropertySelectionMap& InSelectionMapForResolvingSubobjects, TOptional<const FPropertySelection*> InSelectionSet)
-        :
-        Super(InObjectData, InSharedData, true, InOriginalObject),
-		SelectionMapForResolvingSubobjects(InSelectionMapForResolvingSubobjects),
-		SelectionSet(InSelectionSet)
+UE::LevelSnapshots::Private::FApplySnapshotToEditorArchive::FApplySnapshotToEditorArchive(
+	FObjectSnapshotData& InObjectData,
+	FWorldSnapshotData& InSharedData,
+	UObject* InOriginalObject,
+	const FPropertySelectionMap& InSelectionMapForResolvingSubobjects,
+	TOptional<const FPropertySelection*> InSelectionSet,
+	FSnapshotDataCache& Cache)
+        : Super(InObjectData, InSharedData, true, InOriginalObject)
+		, SelectionMapForResolvingSubobjects(InSelectionMapForResolvingSubobjects)
+		, SelectionSet(InSelectionSet)
+		, Cache(Cache)
 {
 	if (SelectionSet)
 	{

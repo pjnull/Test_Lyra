@@ -16,6 +16,7 @@
 
 #include "Components/ActorComponent.h"
 #include "EngineUtils.h"
+#include "LevelSnapshot.h"
 #include "GameFramework/Actor.h"
 #include "UObject/TextProperty.h"
 #include "UObject/UnrealType.h"
@@ -23,7 +24,7 @@
 namespace UE::LevelSnapshots::Private::Internal
 {
 	/** Iterates properties of SnapshotObject and WorldObject, owned by SnapshotActor and WorldActor, and returns whether at least one property value was different */
-	static bool HaveDifferentPropertyValues(const FWorldSnapshotData& WorldData, UObject* SnapshotObject, UObject* WorldObject, AActor* SnapshotActor, AActor* WorldActor)
+	static bool HaveDifferentPropertyValues(ULevelSnapshot* Snapshot, UObject* SnapshotObject, UObject* WorldObject, AActor* SnapshotActor, AActor* WorldActor)
 	{
 		UClass* ClassToIterate = SnapshotObject->GetClass();
 		
@@ -32,7 +33,7 @@ namespace UE::LevelSnapshots::Private::Internal
 		for (TFieldIterator<FProperty> FieldIt(ClassToIterate); FieldIt; ++FieldIt)
 		{
 			// Ask external modules about the property
-			const FPropertyComparisonParams Params { WorldData, ClassToIterate, *FieldIt, SnapshotObject, WorldObject, SnapshotObject, WorldObject, SnapshotActor, WorldActor} ;
+			const FPropertyComparisonParams Params { Snapshot, ClassToIterate, *FieldIt, SnapshotObject, WorldObject, SnapshotObject, WorldObject, SnapshotActor, WorldActor} ;
 			const IPropertyComparer::EPropertyComparison ComparisonResult = Module.ShouldConsiderPropertyEqual(PropertyComparers, Params);
 			
 			switch (ComparisonResult)
@@ -42,7 +43,7 @@ namespace UE::LevelSnapshots::Private::Internal
 			case IPropertyComparer::EPropertyComparison::TreatUnequal:
 				return true;
 			default:
-				if (!UE::LevelSnapshots::Private::AreSnapshotAndOriginalPropertiesEquivalent(WorldData, *FieldIt, SnapshotObject, WorldObject, SnapshotActor, WorldActor))
+				if (!UE::LevelSnapshots::Private::AreSnapshotAndOriginalPropertiesEquivalent(Snapshot, *FieldIt, SnapshotObject, WorldObject, SnapshotActor, WorldActor))
 				{
 					return true;
 				}
@@ -171,9 +172,9 @@ UActorComponent* UE::LevelSnapshots::Private::FindMatchingComponent(AActor* Acto
 	return nullptr;
 }
 
-bool UE::LevelSnapshots::Private::HasOriginalChangedPropertiesSinceSnapshotWasTaken(const FWorldSnapshotData& WorldData, AActor* SnapshotActor, AActor* WorldActor)
+bool UE::LevelSnapshots::Private::HasOriginalChangedPropertiesSinceSnapshotWasTaken(ULevelSnapshot* Snapshot, AActor* SnapshotActor, AActor* WorldActor)
 {
-	SCOPED_SNAPSHOT_CORE_TRACE(HasOriginalChangedPropertiesSinceSnapshotWasTaken);
+	SCOPED_SNAPSHOT_CORE_TRACE(HasOriginalChangedProperties);
 	
 	if (!IsValid(SnapshotActor) || !IsValid(WorldActor))
 	{
@@ -190,13 +191,13 @@ bool UE::LevelSnapshots::Private::HasOriginalChangedPropertiesSinceSnapshotWasTa
 	TInlineComponentArray<TPair<UObject*, UObject*>> SnapshotOriginalPairsToProcess;
 	SnapshotOriginalPairsToProcess.Add(TPair<UObject*, UObject*>(SnapshotActor, WorldActor));
 	
-	const bool bFailedToMatchAllComponentObjects = Internal::EnqueueMatchingComponents(SnapshotOriginalPairsToProcess, WorldData, SnapshotActor, WorldActor);
+	const bool bFailedToMatchAllComponentObjects = Internal::EnqueueMatchingComponents(SnapshotOriginalPairsToProcess, Snapshot->GetSerializedData(), SnapshotActor, WorldActor);
 	if (bFailedToMatchAllComponentObjects)
 	{
 		return true;
 	}
 	
-	const bool bFailedToMatchAllSubobjects = Internal::EnqueueMatchingCustomSubobjects(SnapshotOriginalPairsToProcess, WorldData, SnapshotActor, WorldActor);
+	const bool bFailedToMatchAllSubobjects = Internal::EnqueueMatchingCustomSubobjects(SnapshotOriginalPairsToProcess, Snapshot->GetSerializedData(), SnapshotActor, WorldActor);
 	if (bFailedToMatchAllSubobjects)
 	{
 		return true;
@@ -206,7 +207,7 @@ bool UE::LevelSnapshots::Private::HasOriginalChangedPropertiesSinceSnapshotWasTa
 	{
 		UObject* const SnapshotObject = NextPair.Key;
 		UObject* const WorldObject = NextPair.Value;
-		if (Internal::HaveDifferentPropertyValues(WorldData, SnapshotObject, WorldObject, SnapshotActor, WorldActor))
+		if (Internal::HaveDifferentPropertyValues(Snapshot, SnapshotObject, WorldObject, SnapshotActor, WorldActor))
 		{
 			return true;
 		}
@@ -214,7 +215,7 @@ bool UE::LevelSnapshots::Private::HasOriginalChangedPropertiesSinceSnapshotWasTa
 	return false;
 }
 
-bool UE::LevelSnapshots::Private::AreSnapshotAndOriginalPropertiesEquivalent(const FWorldSnapshotData& WorldData, const FProperty* LeafProperty, void* SnapshotContainer, void* WorldContainer, AActor* SnapshotActor, AActor* WorldActor)
+bool UE::LevelSnapshots::Private::AreSnapshotAndOriginalPropertiesEquivalent(ULevelSnapshot* Snapshot, const FProperty* LeafProperty, void* SnapshotContainer, void* WorldContainer, AActor* SnapshotActor, AActor* WorldActor)
 {
 	// Ensure that property's flags are allowed. Skip check collection properties, e.g. FArrayProperty::Inner, etc.: inner properties do not have the same flags.
 	const bool bIsInnnerCollectionProperty = IsPropertyInCollection(LeafProperty);
@@ -239,7 +240,7 @@ bool UE::LevelSnapshots::Private::AreSnapshotAndOriginalPropertiesEquivalent(con
 		{
 			for (TFieldIterator<FProperty> FieldIt(StructProperty->Struct); FieldIt; ++FieldIt)
 			{
-				if (!AreSnapshotAndOriginalPropertiesEquivalent(WorldData, *FieldIt, SnapshotValuePtr, WorldValuePtr, SnapshotActor, WorldActor))
+				if (!AreSnapshotAndOriginalPropertiesEquivalent(Snapshot, *FieldIt, SnapshotValuePtr, WorldValuePtr, SnapshotActor, WorldActor))
 				{
 					return false;
 				}
@@ -250,7 +251,7 @@ bool UE::LevelSnapshots::Private::AreSnapshotAndOriginalPropertiesEquivalent(con
 		// Check whether property value points to a subobject
 		if (const FObjectPropertyBase* ObjectProperty = CastField<FObjectPropertyBase>(LeafProperty))
 		{
-			return AreObjectPropertiesEquivalent(WorldData, ObjectProperty, SnapshotValuePtr, WorldValuePtr, SnapshotActor, WorldActor);
+			return AreObjectPropertiesEquivalent(Snapshot, ObjectProperty, SnapshotValuePtr, WorldValuePtr, SnapshotActor, WorldActor);
 		}
 
 
@@ -269,7 +270,7 @@ bool UE::LevelSnapshots::Private::AreSnapshotAndOriginalPropertiesEquivalent(con
 				void* SnapshotElementValuePtr = SnapshotArray.GetRawPtr(j);
 				void* WorldElementValuePtr = WorldArray.GetRawPtr(j);
 
-				if (!AreSnapshotAndOriginalPropertiesEquivalent(WorldData, ArrayProperty->Inner, SnapshotElementValuePtr, WorldElementValuePtr, SnapshotActor, WorldActor))
+				if (!AreSnapshotAndOriginalPropertiesEquivalent(Snapshot, ArrayProperty->Inner, SnapshotElementValuePtr, WorldElementValuePtr, SnapshotActor, WorldActor))
 				{
 					return false;
 				}
@@ -303,7 +304,7 @@ bool UE::LevelSnapshots::Private::AreSnapshotAndOriginalPropertiesEquivalent(con
 	return true;
 }
 
-bool UE::LevelSnapshots::Private::AreObjectPropertiesEquivalent(const FWorldSnapshotData& WorldData, const FObjectPropertyBase* ObjectProperty, void* SnapshotValuePtr, void* WorldValuePtr, AActor* SnapshotActor, AActor* WorldActor)
+bool UE::LevelSnapshots::Private::AreObjectPropertiesEquivalent(ULevelSnapshot* Snapshot, const FObjectPropertyBase* ObjectProperty, void* SnapshotValuePtr, void* WorldValuePtr, AActor* SnapshotActor, AActor* WorldActor)
 {
 	// Native identity check handles:
 	// - external references, e.g. UMaterial in content browser
@@ -315,13 +316,13 @@ bool UE::LevelSnapshots::Private::AreObjectPropertiesEquivalent(const FWorldSnap
 		
 	UObject* SnapshotObject = ObjectProperty->GetObjectPropertyValue(SnapshotValuePtr);
 	UObject* WorldObject = ObjectProperty->GetObjectPropertyValue(WorldValuePtr);
-	return AreReferencesEquivalent(WorldData, SnapshotObject, WorldObject, SnapshotActor, WorldActor);
+	return AreReferencesEquivalent(Snapshot, SnapshotObject, WorldObject, SnapshotActor, WorldActor);
 }
 
 namespace UE::LevelSnapshots::Private::Internal
 {
 	/** Checks whether the two actors object properties should be considered equivalent */
-	static bool AreActorsEquivalent(UObject* SnapshotPropertyValue, AActor* OriginalActorReference, const TMap<FSoftObjectPath, FActorSnapshotData>& ActorData)
+	static bool AreActorsEquivalent(UObject* SnapshotPropertyValue, AActor* OriginalActorReference, const TMap<FSoftObjectPath, FActorSnapshotData>& ActorData, const FSnapshotDataCache& Cache)
 	{
 		// Compare actors
 		const FActorSnapshotData* SavedData = ActorData.Find(OriginalActorReference);
@@ -331,12 +332,12 @@ namespace UE::LevelSnapshots::Private::Internal
 		}
 
 		// The snapshot actor was already allocated, if some other snapshot actor is referencing it
-		const TOptional<TNonNullPtr<AActor>> PreallocatedSnapshotVersion = UE::LevelSnapshots::Private::GetPreallocatedIfValidButDoNotAllocate(*SavedData);
+		const TOptional<TNonNullPtr<AActor>> PreallocatedSnapshotVersion = UE::LevelSnapshots::Private::GetPreallocatedIfCached(OriginalActorReference, Cache);
 		return PreallocatedSnapshotVersion.Get(nullptr) == SnapshotPropertyValue;
 	}
 	
 	/** Checks whether the two subobject object properties should be considered equivalent */
-	static bool HaveSameNames(UObject* SnapshotPropertyValue, UObject* OriginalPropertyValue, const TMap<FSoftObjectPath, FActorSnapshotData>& ActorData)
+	static bool HaveSameNames(UObject* SnapshotPropertyValue, UObject* OriginalPropertyValue, const FSnapshotDataCache& Cache)
 	{
 		AActor* SnapshotOwningActor = SnapshotPropertyValue->GetTypedOuter<AActor>();
 		AActor* OriginalOwningActor = OriginalPropertyValue->GetTypedOuter<AActor>();
@@ -346,9 +347,7 @@ namespace UE::LevelSnapshots::Private::Internal
 		}
 
 		// Are the two subobjects owned by equivalent actors
-		const FActorSnapshotData* EquivalentActorData = ActorData.Find(OriginalOwningActor);
-		check (EquivalentActorData);
-		const AActor* EquivalentSnapshotActor = UE::LevelSnapshots::Private::GetPreallocatedIfValidButDoNotAllocate(*EquivalentActorData).Get(nullptr);
+		const AActor* EquivalentSnapshotActor = UE::LevelSnapshots::Private::GetPreallocatedIfCached(OriginalOwningActor, Cache).Get(nullptr);
 		const bool bAreOwnedByEquivalentActors = EquivalentSnapshotActor == SnapshotOwningActor; 
 		if (!bAreOwnedByEquivalentActors)
 		{
@@ -371,25 +370,25 @@ namespace UE::LevelSnapshots::Private::Internal
 		return true;
 	}
 
-	static bool AreEquivalentSubobjects(const FWorldSnapshotData& WorldData, UObject* SnapshotPropertyValue, UObject* OriginalPropertyValue, AActor* SnapshotActor, AActor* OriginalActor)
+	static bool AreEquivalentSubobjects(ULevelSnapshot* Snapshot, UObject* SnapshotPropertyValue, UObject* OriginalPropertyValue, AActor* SnapshotActor, AActor* OriginalActor)
 	{
 		AActor* OwningSnapshotActor = SnapshotPropertyValue->GetTypedOuter<AActor>();
 		AActor* OwningWorldActor = OriginalPropertyValue->GetTypedOuter<AActor>();
 		if (ensure(OwningSnapshotActor && OwningWorldActor))
 		{
-			return AreActorsEquivalent(OwningSnapshotActor, OwningWorldActor, WorldData.ActorData) && !HaveDifferentPropertyValues(WorldData, SnapshotPropertyValue, OriginalPropertyValue, SnapshotActor, OriginalActor);
+			return AreActorsEquivalent(OwningSnapshotActor, OwningWorldActor, Snapshot->GetSerializedData().ActorData, Snapshot->GetCache()) && !HaveDifferentPropertyValues(Snapshot, SnapshotPropertyValue, OriginalPropertyValue, SnapshotActor, OriginalActor);
 		}
 		return false;
 	}
 }
 
-bool UE::LevelSnapshots::Private::AreReferencesEquivalent(const FWorldSnapshotData& WorldData, UObject* SnapshotPropertyValue, UObject* OriginalPropertyValue, AActor* SnapshotActor, AActor* OriginalActor)
+bool UE::LevelSnapshots::Private::AreReferencesEquivalent(ULevelSnapshot* Snapshot, UObject* SnapshotPropertyValue, UObject* OriginalPropertyValue, AActor* SnapshotActor, AActor* OriginalActor)
 {
 	if (SnapshotPropertyValue == nullptr || OriginalPropertyValue == nullptr)
 	{
 		// Migration: We did not save subobject data. In this case snapshot version resolves to nullptr.
 		const bool bWorldObjectIsSubobject = OriginalPropertyValue && !OriginalPropertyValue->IsA<AActor>() && OriginalPropertyValue->IsInA(AActor::StaticClass());
-		const bool bIsOldSnapshot = WorldData.SnapshotVersionInfo.GetSnapshotCustomVersion() < FSnapshotCustomVersion::SubobjectSupport;
+		const bool bIsOldSnapshot = Snapshot->GetSerializedData().SnapshotVersionInfo.GetSnapshotCustomVersion() < FSnapshotCustomVersion::SubobjectSupport;
 		const bool bOldSnapshotDataDidNotCaptureSubobjects = bIsOldSnapshot && bWorldObjectIsSubobject && SnapshotPropertyValue == nullptr;
 		
 		return bOldSnapshotDataDidNotCaptureSubobjects || SnapshotPropertyValue == OriginalPropertyValue;
@@ -401,7 +400,7 @@ bool UE::LevelSnapshots::Private::AreReferencesEquivalent(const FWorldSnapshotDa
 
 	if (AActor* OriginalActorReference = Cast<AActor>(OriginalPropertyValue))
 	{
-		return Internal::AreActorsEquivalent(SnapshotPropertyValue, OriginalActorReference, WorldData.ActorData);
+		return Internal::AreActorsEquivalent(SnapshotPropertyValue, OriginalActorReference, Snapshot->GetSerializedData().ActorData, Snapshot->GetCache());
 	}
 	
 	const bool bIsWorldObject = SnapshotPropertyValue->IsInA(UWorld::StaticClass()) && OriginalPropertyValue->IsInA(UWorld::StaticClass());
@@ -409,9 +408,9 @@ bool UE::LevelSnapshots::Private::AreReferencesEquivalent(const FWorldSnapshotDa
 	{
 		// Note: Only components are required to have same names. Other subobjects only need to have equal properties.
 		const bool bAreComponents = SnapshotPropertyValue->IsA<UActorComponent>() && OriginalPropertyValue->IsA<UActorComponent>();
-		return (bAreComponents && Internal::HaveSameNames(SnapshotPropertyValue, OriginalPropertyValue, WorldData.ActorData))
+		return (bAreComponents && Internal::HaveSameNames(SnapshotPropertyValue, OriginalPropertyValue, Snapshot->GetCache()))
 			|| !Restorability::IsSubobjectDesirableForCapture(OriginalPropertyValue)
-			|| (!bAreComponents && Internal::AreEquivalentSubobjects(WorldData, SnapshotPropertyValue, OriginalPropertyValue, SnapshotActor, OriginalActor));
+			|| (!bAreComponents && Internal::AreEquivalentSubobjects(Snapshot, SnapshotPropertyValue, OriginalPropertyValue, SnapshotActor, OriginalActor));
 	}
 	
 	return SnapshotPropertyValue == OriginalPropertyValue;

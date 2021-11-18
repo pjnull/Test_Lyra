@@ -122,8 +122,8 @@ namespace UE::LevelSnapshots::Private::Tests
 					return;
 				}
 
-				TestTrue(TEXT("ActorWithAddedComponent: HasOriginalChangedPropertiesSinceSnapshotWasTaken"), UE::LevelSnapshots::Private::HasOriginalChangedPropertiesSinceSnapshotWasTaken(Snapshot->GetSerializedData(), SnapshotActorWithAddedComponent.GetValue(), ActorWithAddedComponent));
-				TestTrue(TEXT("ActorWithRemovedComponent: HasOriginalChangedPropertiesSinceSnapshotWasTaken"), UE::LevelSnapshots::Private::HasOriginalChangedPropertiesSinceSnapshotWasTaken(Snapshot->GetSerializedData(), SnapshotActorWithRemovedComponent.GetValue(), ActorWithRemovedComponent));
+				TestTrue(TEXT("ActorWithAddedComponent: HasOriginalChangedPropertiesSinceSnapshotWasTaken"), UE::LevelSnapshots::Private::HasOriginalChangedPropertiesSinceSnapshotWasTaken(Snapshot, SnapshotActorWithAddedComponent.GetValue(), ActorWithAddedComponent));
+				TestTrue(TEXT("ActorWithRemovedComponent: HasOriginalChangedPropertiesSinceSnapshotWasTaken"), UE::LevelSnapshots::Private::HasOriginalChangedPropertiesSinceSnapshotWasTaken(Snapshot, SnapshotActorWithRemovedComponent.GetValue(), ActorWithRemovedComponent));
 			});
 	
 		return true;

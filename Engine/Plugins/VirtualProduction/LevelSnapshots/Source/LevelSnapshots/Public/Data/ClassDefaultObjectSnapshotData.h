@@ -12,10 +12,6 @@ struct LEVELSNAPSHOTS_API FClassDefaultObjectSnapshotData : public FObjectSnapsh
 {
 	GENERATED_BODY()
 
-	/* Holds a value if the value was already loaded from the snapshot. */
-	UPROPERTY(Transient)
-	UObject* CachedLoadedClassDefault = nullptr;
-
 	/** Whether no data was saved because somebody called ILevelSnapshotsModule::AddSkippedClassDefault */
 	UPROPERTY()
 	bool bSerializationSkippedCDO = false;

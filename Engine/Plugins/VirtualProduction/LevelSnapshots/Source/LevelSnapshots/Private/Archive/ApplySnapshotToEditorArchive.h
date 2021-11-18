@@ -7,6 +7,8 @@
 #include "Selection/PropertySelectionMap.h"
 #include "SnapshotArchive.h"
 
+struct FSnapshotDataCache;
+
 namespace UE::LevelSnapshots::Private
 {
 	/* For writing data into an editor object. */
@@ -15,8 +17,8 @@ namespace UE::LevelSnapshots::Private
 		using Super = FSnapshotArchive;
 	public:
 	
-		static void ApplyToExistingEditorWorldObject(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InOriginalObject, UObject* InDeserializedVersion, const FPropertySelectionMap& InSelectionMapForResolvingSubobjects, const FPropertySelection& InSelectionSet);
-		static void ApplyToRecreatedEditorWorldObject(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InOriginalObject, UObject* InDeserializedVersion, const FPropertySelectionMap& InSelectionMapForResolvingSubobjects);
+		static void ApplyToExistingEditorWorldObject(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, FSnapshotDataCache& Cache, UObject* InOriginalObject, UObject* InDeserializedVersion, const FPropertySelectionMap& InSelectionMapForResolvingSubobjects);
+		static void ApplyToRecreatedEditorWorldObject(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, FSnapshotDataCache& Cache, UObject* InOriginalObject, const FPropertySelectionMap& InSelectionMapForResolvingSubobjects);
 	
 		//~ Begin FTakeSnapshotArchiveV2 Interface
 		virtual bool ShouldSkipProperty(const FProperty* InProperty) const override;
@@ -31,7 +33,7 @@ namespace UE::LevelSnapshots::Private
 
 	private:
 
-		FApplySnapshotToEditorArchive(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InOriginalObject, const FPropertySelectionMap& InSelectionMapForResolvingSubobjects, TOptional<const FPropertySelection*> InSelectionSet);
+		FApplySnapshotToEditorArchive(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InOriginalObject, const FPropertySelectionMap& InSelectionMapForResolvingSubobjects, TOptional<const FPropertySelection*> InSelectionSet, FSnapshotDataCache& Cache);
 
 		bool ShouldSerializeAllProperties() const;
 
@@ -44,6 +46,8 @@ namespace UE::LevelSnapshots::Private
 		* After serialisation is done, this list tells us which properties are still left to serialise.
 		*/
 		mutable FPropertySelection PropertiesLeftToSerialize;
+
+		FSnapshotDataCache& Cache;
 	};
 }
 

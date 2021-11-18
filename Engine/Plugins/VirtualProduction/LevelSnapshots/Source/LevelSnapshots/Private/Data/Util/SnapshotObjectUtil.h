@@ -10,12 +10,13 @@ class UObject;
 
 struct FCustomSerializationData;
 struct FPropertySelectionMap;
+struct FSnapshotDataCache;
 struct FWorldSnapshotData;
 
 namespace UE::LevelSnapshots::Private
 {
 	/* Resolves an object dependency for use in the snapshot world. If the object is a subobject, it gets fully serialized. */
-	UObject* ResolveObjectDependencyForSnapshotWorld(FWorldSnapshotData& WorldData, int32 ObjectPathIndex, const FProcessObjectDependency& ProcessObjectDependency, const FString& LocalisationNamespace); 
+	UObject* ResolveObjectDependencyForSnapshotWorld(FWorldSnapshotData& WorldData, FSnapshotDataCache& Cache, int32 ObjectPathIndex, const FProcessObjectDependency& ProcessObjectDependency, const FString& LocalisationNamespace); 
 
 	/* Resolves an object dependency for use in the editor world. If the object is a subobject, it is serialized.
 	 * Steps for serializing subobject:
@@ -23,7 +24,7 @@ namespace UE::LevelSnapshots::Private
 	 *  - If object does not exist, allocate a new object and serialize all properties into it
 	 *  - If object exists but has different class, skip. Return null.
 	 */
-	UObject* ResolveObjectDependencyForEditorWorld(FWorldSnapshotData& WorldData, int32 ObjectPathIndex, const FString& LocalisationNamespace, const FPropertySelectionMap& SelectionMap);
+	UObject* ResolveObjectDependencyForEditorWorld(FWorldSnapshotData& WorldData, FSnapshotDataCache& Cache, int32 ObjectPathIndex, const FString& LocalisationNamespace, const FPropertySelectionMap& SelectionMap);
 
 	/* Resolves an object depedency when restoring a class default object. Simply resolves without further checks. */
 	UObject* ResolveObjectDependencyForClassDefaultObject(FWorldSnapshotData& WorldData, int32 ObjectPathIndex);

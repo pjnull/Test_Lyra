@@ -14,30 +14,7 @@ USTRUCT()
 struct LEVELSNAPSHOTS_API FActorSnapshotData
 {
 	GENERATED_BODY()
-
-	void ResetTransientData()
-	{
-		CachedSnapshotActor.Reset();
-		bReceivedSerialisation = false;
-	}
 	
-	/* We cache the actor to avoid recreating it all the time */
-	UPROPERTY(Transient)
-	mutable TWeakObjectPtr<AActor> CachedSnapshotActor = nullptr;
-
-	/* Whether we already serialised the snapshot data into the actor.
-	 * 
-	 * This exists because sometimes we need to preallocate an actor without serialisation.
-	 * Example: When serializing another actor which referenced this actor.
-	 */
-	UPROPERTY(Transient)
-	bool bReceivedSerialisation = false;
-
-	/** Stores all object dependencies. Only valid if bReceivedSerialisation == true. */
-	UPROPERTY(Transient)
-	TArray<int32> ObjectDependencies;
-
-
 #if WITH_EDITORONLY_DATA
 	/** The label of the actor when it was saved. */
 	UPROPERTY()

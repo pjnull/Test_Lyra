@@ -6,8 +6,10 @@
 
 class AActor;
 class UActorComponent;
+class ULevelSnapshot;
 class UObject;
 
+struct FSnapshotDataCache;
 struct FWorldSnapshotData;
 
 namespace UE::LevelSnapshots::Private
@@ -32,7 +34,7 @@ namespace UE::LevelSnapshots::Private
 	
 	
 	/** Checks whether the original actor has any properties that changed since the snapshot was taken.  */
-	bool HasOriginalChangedPropertiesSinceSnapshotWasTaken(const FWorldSnapshotData& WorldData, AActor* SnapshotActor, AActor* WorldActor);
+	bool HasOriginalChangedPropertiesSinceSnapshotWasTaken(ULevelSnapshot* Snapshot, AActor* SnapshotActor, AActor* WorldActor);
 
 	/**
 	 * Checks whether the snapshot and original property value should be considered equal.
@@ -40,7 +42,7 @@ namespace UE::LevelSnapshots::Private
 	 *
 	 * @param IgnoredProperties Properties to ignore
 	 */
-	bool AreSnapshotAndOriginalPropertiesEquivalent(const FWorldSnapshotData& WorldData, const FProperty* LeafProperty, void* SnapshotContainer, void* WorldContainer, AActor* SnapshotActor, AActor* WorldActor);
+	bool AreSnapshotAndOriginalPropertiesEquivalent(ULevelSnapshot* Snapshot, const FProperty* LeafProperty, void* SnapshotContainer, void* WorldContainer, AActor* SnapshotActor, AActor* WorldActor);
 
 	/**
 	 * Two object properties are equivalent if they are
@@ -49,8 +51,8 @@ namespace UE::LevelSnapshots::Private
 	 *  - actor or component references
 	 *  - subobject references where 1. the subobject have the same name, 2. have the same classes, and 3. the properties are equal
 	 */
-	bool AreObjectPropertiesEquivalent(const FWorldSnapshotData& WorldData, const FObjectPropertyBase* ObjectProperty, void* SnapshotValuePtr, void* WorldValuePtr, AActor* SnapshotActor, AActor* WorldActor);
+	bool AreObjectPropertiesEquivalent(ULevelSnapshot* Snapshot, const FObjectPropertyBase* ObjectProperty, void* SnapshotValuePtr, void* WorldValuePtr, AActor* SnapshotActor, AActor* WorldActor);
 	
 	/** Checks whether two pointers point to "equivalent" objects. */
-	bool AreReferencesEquivalent(const FWorldSnapshotData& WorldData, UObject* SnapshotPropertyValue, UObject* OriginalPropertyValue, AActor* SnapshotActor, AActor* OriginalActor);
+	bool AreReferencesEquivalent(ULevelSnapshot* Snapshot, UObject* SnapshotPropertyValue, UObject* OriginalPropertyValue, AActor* SnapshotActor, AActor* OriginalActor);
 }

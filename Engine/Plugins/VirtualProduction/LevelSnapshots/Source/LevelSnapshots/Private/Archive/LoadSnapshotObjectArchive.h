@@ -6,6 +6,8 @@
 #include "SnapshotArchive.h"
 #include "Misc/ObjectDependencyCallback.h"
 
+struct FSnapshotDataCache;
+
 namespace UE::LevelSnapshots::Private
 {
 	/* For writing data into an editor object. */
@@ -14,8 +16,8 @@ namespace UE::LevelSnapshots::Private
 		using Super = FSnapshotArchive;
 	public:
 	
-		static void ApplyToSnapshotWorldObject(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InObjectToRestore, FProcessObjectDependency ProcessObjectDependency, UPackage* InLocalisationSnapshotPackage);
-		static void ApplyToSnapshotWorldObject(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InObjectToRestore, FProcessObjectDependency ProcessObjectDependency, const FString& InLocalisationNamespace);
+		static void ApplyToSnapshotWorldObject(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, FSnapshotDataCache& Cache, UObject* InObjectToRestore, FProcessObjectDependency ProcessObjectDependency, UPackage* InLocalisationSnapshotPackage);
+		static void ApplyToSnapshotWorldObject(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, FSnapshotDataCache& Cache, UObject* InObjectToRestore, FProcessObjectDependency ProcessObjectDependency, const FString& InLocalisationNamespace);
 
 	protected:
 
@@ -25,8 +27,9 @@ namespace UE::LevelSnapshots::Private
 
 	private:
 
-		FLoadSnapshotObjectArchive(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InSerializedObject, FProcessObjectDependency ProcessObjectDependency);
+		FLoadSnapshotObjectArchive(FObjectSnapshotData& InObjectData, FWorldSnapshotData& InSharedData, UObject* InSerializedObject, FProcessObjectDependency ProcessObjectDependency, FSnapshotDataCache& Cache);
 
 		FProcessObjectDependency ProcessObjectDependency;
+		FSnapshotDataCache& Cache;
 	};
 }

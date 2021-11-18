@@ -101,7 +101,7 @@ bool UE::LevelSnapshots::Private::FCollisionRestoration::HaveNonDefaultCollision
 	{
 		const FProperty* Property = *FieldIt;
 		const bool bIsAffectedByDefaultCollision = Property == ObjectTypeProperty || Property == CollisionEnabledProperty || Property == CollisionResponsesProperty;
-		if (!bIsAffectedByDefaultCollision && !AreSnapshotAndOriginalPropertiesEquivalent(Params.WorldData, Property, SnapshotValuePtr, EditorValuePtr, SnapshotObject->GetOwner(), WorldObject->GetOwner()))
+		if (!bIsAffectedByDefaultCollision && !AreSnapshotAndOriginalPropertiesEquivalent(Params.Snapshot, Property, SnapshotValuePtr, EditorValuePtr, SnapshotObject->GetOwner(), WorldObject->GetOwner()))
 		{
 			return true;
 		}

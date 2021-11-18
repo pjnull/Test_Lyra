@@ -44,7 +44,7 @@ void ULevelSnapshot::ApplySnapshotToWorld(UWorld* TargetWorld, const FPropertySe
 	};
 	
 	EnsureWorldInitialised();
-	UE::LevelSnapshots::Private::ApplyToWorld(SerializedData, TargetWorld, GetPackage(), SelectionSet);
+	UE::LevelSnapshots::Private::ApplyToWorld(SerializedData, Cache, TargetWorld, GetPackage(), SelectionSet);
 }
 
 bool ULevelSnapshot::SnapshotWorld(UWorld* TargetWorld)
@@ -113,7 +113,7 @@ bool ULevelSnapshot::HasChangedSinceSnapshotWasTaken(AActor* WorldActor)
 		// Do not slow down old snapshots by computing hash if they had none saved
 		const bool bHasHashInfo = SerializedData.SnapshotVersionInfo.GetSnapshotCustomVersion() >= UE::LevelSnapshots::Private::FSnapshotCustomVersion::ActorHash;
 		// If the object is already loaded, there is no point in wasting time and computing the hash
-		const bool bNeedsHash = !UE::LevelSnapshots::Private::GetPreallocatedIfValidButDoNotAllocate(*SavedActorData).IsSet();
+		const bool bNeedsHash = Cache.ActorCache.Find(WorldActor) != nullptr;
 		
 		if (!bHasHashInfo || !bNeedsHash || !UE::LevelSnapshots::Private::HasMatchingHash(SavedActorData->Hash, WorldActor))
 		{
@@ -130,9 +130,9 @@ bool ULevelSnapshot::HasChangedSinceSnapshotWasTaken(AActor* WorldActor)
 	return bHasChanged;
 }
 
-bool ULevelSnapshot::HasOriginalChangedPropertiesSinceSnapshotWasTaken(AActor* SnapshotActor, AActor* WorldActor) const
+bool ULevelSnapshot::HasOriginalChangedPropertiesSinceSnapshotWasTaken(AActor* SnapshotActor, AActor* WorldActor)
 {
-	return UE::LevelSnapshots::Private::HasOriginalChangedPropertiesSinceSnapshotWasTaken(SerializedData, SnapshotActor, WorldActor);
+	return UE::LevelSnapshots::Private::HasOriginalChangedPropertiesSinceSnapshotWasTaken(this, SnapshotActor, WorldActor);
 }
 
 FString ULevelSnapshot::GetActorLabel(const FSoftObjectPath& OriginalActorPath) const
@@ -151,7 +151,7 @@ FString ULevelSnapshot::GetActorLabel(const FSoftObjectPath& OriginalActorPath) 
 TOptional<TNonNullPtr<AActor>> ULevelSnapshot::GetDeserializedActor(const FSoftObjectPath& OriginalActorPath)
 {
 	EnsureWorldInitialised();
-	return UE::LevelSnapshots::Private::GetDeserializedActor(OriginalActorPath, SerializedData, GetPackage());
+	return UE::LevelSnapshots::Private::GetDeserializedActor(OriginalActorPath, SerializedData, Cache, GetPackage());
 }
 
 int32 ULevelSnapshot::GetNumSavedActors() const
@@ -159,7 +159,7 @@ int32 ULevelSnapshot::GetNumSavedActors() const
 	return SerializedData.ActorData.Num();
 }
 
-namespace
+namespace UE::LevelSnapshots::Private::Internal
 {
 	FSoftObjectPath ExtractPathWithoutSubobjects(UObject* Object)
 	{
@@ -203,7 +203,7 @@ void ULevelSnapshot::DiffWorld(UWorld* World, FActorPathConsumer HandleMatchedAc
 		AllActors.Reserve(NumActorsInWorld);
 		for (ULevel* Level : World->GetLevels())
 		{
-			LoadedLevels.Add(ExtractPathWithoutSubobjects(Level));
+			LoadedLevels.Add(UE::LevelSnapshots::Private::Internal::ExtractPathWithoutSubobjects(Level));
 			
 			for (AActor* ActorInLevel : Level->Actors)
 			{
@@ -268,7 +268,7 @@ void ULevelSnapshot::DiffWorld(UWorld* World, FActorPathConsumer HandleMatchedAc
 			else
 			{
 				const FScopedLogItem Log = SortedItems.AddScopedLogItem(OriginalActorPath.ToString());
-				ConditionBreakOnActor(DebugActorName, OriginalActorPath);
+				UE::LevelSnapshots::Private::Internal::ConditionBreakOnActor(DebugActorName, OriginalActorPath);
 				SCOPED_SNAPSHOT_CORE_TRACE(HandleMatchedActor)
 				
 				HandleMatchedActor.Execute(OriginalActorPath);
@@ -346,7 +346,7 @@ void ULevelSnapshot::EnsureWorldInitialised()
 #endif
 	}
 
-	UE::LevelSnapshots::Private::InitWithSnapshotWorld(SerializedData, SnapshotContainerWorld);
+	SerializedData.SnapshotWorld = SnapshotContainerWorld;
 }
 
 void ULevelSnapshot::DestroyWorld()
@@ -359,14 +359,23 @@ void ULevelSnapshot::DestroyWorld()
 			Handle.Reset();
 		}
 				
-		UE::LevelSnapshots::Private::ClearSnapshotWorldReferences(SerializedData);
-#if WITH_EDITOR
-		CachedDiffedActors.Reset();
-#endif
+		SerializedData.SnapshotWorld.Reset();
+		ClearCache();
 	
 		SnapshotContainerWorld->CleanupWorld();
 		SnapshotContainerWorld = nullptr;
 	}
+}
+
+void ULevelSnapshot::ClearCache()
+{
+	Cache.ActorCache.Reset();
+	Cache.SubobjectCache.Reset();
+	Cache.ClassDefaultCache.Reset();
+	
+#if WITH_EDITOR
+	CachedDiffedActors.Reset();
+#endif
 }
 
 #if WITH_EDITOR

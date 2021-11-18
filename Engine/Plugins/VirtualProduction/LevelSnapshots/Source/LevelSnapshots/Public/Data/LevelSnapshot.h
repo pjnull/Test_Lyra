@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "SnapshotDataCache.h"
 #include "WorldSnapshotData.h"
 #include "LevelSnapshot.generated.h"
 
@@ -52,7 +53,7 @@ public:
 	 * Use this function instead of HasChangedSinceSnapshotWasTaken if you've already called GetDeserializedActor. Otherwise
 	 * HasChangedSinceSnapshotWasTaken should be faster in most cases.
 	 */
-	bool HasOriginalChangedPropertiesSinceSnapshotWasTaken(AActor* SnapshotActor, AActor* WorldActor) const;
+	bool HasOriginalChangedPropertiesSinceSnapshotWasTaken(AActor* SnapshotActor, AActor* WorldActor);
 
 	/** Gets the display label of the path of the actor */
 	FString GetActorLabel(const FSoftObjectPath& OriginalActorPath) const;
@@ -89,6 +90,7 @@ public:
 	FString GetSnapshotDescription() const { return SnapshotDescription; }
 
 	const FWorldSnapshotData& GetSerializedData() const { return SerializedData; }
+	const FSnapshotDataCache& GetCache() const { return Cache; }
 
 	
 	//~ Begin UObject Interface
@@ -101,32 +103,41 @@ private:
 
 	void EnsureWorldInitialised();
 	void DestroyWorld();
+	void ClearCache();
 
 #if WITH_EDITOR
 	/** Clears FActorSnapshotData::bHasBeenDiffed */
 	void ClearCachedDiffFlag(UObject* ModifiedObject);
 #endif
 
-#if WITH_EDITORONLY_DATA
-
-	/** Caches whether an actor was diffed already */	
-	UPROPERTY(Transient)
-	TMap<TWeakObjectPtr<AActor>, ECachedDiffResult> CachedDiffedActors;
-	
-#endif
-	
-	/** The world we will be adding temporary actors to */
-	UPROPERTY(Transient)
-	UWorld* SnapshotContainerWorld;
 	
 	/** Callback to destroy our world when editor (editor build) or play (game builds) world is destroyed. */
 	FDelegateHandle Handle;
 	/** Callback to when an object is modified. Clears FActorSnapshotData::bHasBeenDiffed */
 	FDelegateHandle OnObjectModifiedHandle;
 
-	UPROPERTY(VisibleAnywhere, Category = "Level Snapshots")
+	
+	/** The world we will be adding temporary actors to */
+	UPROPERTY(Transient)
+	UWorld* SnapshotContainerWorld;
+	
+	
+	/** The saved snapshot data */
+	UPROPERTY()
 	FWorldSnapshotData SerializedData;
 
+	/** Holds all loaded objects*/
+	UPROPERTY(Transient)
+	FSnapshotDataCache Cache;
+	
+#if WITH_EDITORONLY_DATA
+
+	/** Caches whether an actor was diffed already */	
+	UPROPERTY(Transient)
+	TMap<TWeakObjectPtr<AActor>, ECachedDiffResult> CachedDiffedActors;
+#endif
+
+	
 	/** Path of the map that the snapshot was taken in */
 	UPROPERTY(VisibleAnywhere, BlueprintGetter = "GetMapPath", AssetRegistrySearchable, Category = "Level Snapshots")
 	FSoftObjectPath MapPath;

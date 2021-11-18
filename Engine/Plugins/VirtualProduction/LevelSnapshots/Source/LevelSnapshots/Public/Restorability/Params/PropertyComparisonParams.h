@@ -13,7 +13,7 @@ namespace UE::LevelSnapshots
 {
 	struct FPropertyComparisonParams
 	{
-		const FWorldSnapshotData& WorldData;
+		ULevelSnapshot* Snapshot;
 	
 		/* The class we're looking at. This is not necessarily the class LeafProperty resides in. */
 		UClass* InspectedClass;
@@ -35,17 +35,16 @@ namespace UE::LevelSnapshots
 		/* Actor currently in the world */
 		AActor* WorldActor;
 
-		FPropertyComparisonParams(const FWorldSnapshotData& WorldData, UClass* InspectedClass, const FProperty* LeafProperty, void* SnapshotContainer, void* WorldContainer, UObject* SnapshotObject, UObject* WorldObject, AActor* SnapshotActor, AActor* WorldActor)
-			:
-			WorldData(WorldData),
-			InspectedClass(InspectedClass),
-			LeafProperty(LeafProperty),
-			SnapshotContainer(SnapshotContainer),
-			WorldContainer(WorldContainer),
-			SnapshotObject(SnapshotObject),
-			WorldObject(WorldObject),
-			SnapshotActor(SnapshotActor),
-			WorldActor(WorldActor)
+		FPropertyComparisonParams(ULevelSnapshot* Snapshot, UClass* InspectedClass, const FProperty* LeafProperty, void* SnapshotContainer, void* WorldContainer, UObject* SnapshotObject, UObject* WorldObject, AActor* SnapshotActor, AActor* WorldActor)
+			: Snapshot(Snapshot)
+			, InspectedClass(InspectedClass)
+			, LeafProperty(LeafProperty)
+			, SnapshotContainer(SnapshotContainer)
+			, WorldContainer(WorldContainer)
+			, SnapshotObject(SnapshotObject)
+			, WorldObject(WorldObject)
+			, SnapshotActor(SnapshotActor)
+			, WorldActor(WorldActor)
 		{}
 	};
 }

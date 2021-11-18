@@ -13,6 +13,7 @@ struct FActorSnapshotData;
 struct FComponentSnapshotData;
 struct FObjectSnapshotData;
 struct FPropertySelectionMap;
+struct FSnapshotDataCache;
 struct FWorldSnapshotData;
 
 namespace UE::LevelSnapshots::Private
@@ -21,15 +22,7 @@ namespace UE::LevelSnapshots::Private
 	FWorldSnapshotData SnapshotWorld(UWorld* World);
 	
 	/* Applies the saved properties to WorldActor */
-	void ApplyToWorld(FWorldSnapshotData& WorldData, UWorld* WorldToApplyTo, UPackage* LocalisationSnapshotPackage, const FPropertySelectionMap& PropertiesToSerialize);
-
-
-	
-	/** Sets the world reference */
-	void InitWithSnapshotWorld(FWorldSnapshotData& WorldData, UWorld* SnapshotWorld);
-	
-	/** Clears all references to the snapshot world */
-	void ClearSnapshotWorldReferences(FWorldSnapshotData& WorldData);
+	void ApplyToWorld(FWorldSnapshotData& WorldData, FSnapshotDataCache& Cache, UWorld* WorldToApplyTo, UPackage* LocalisationSnapshotPackage, const FPropertySelectionMap& PropertiesToSerialize);
 
 	
 
@@ -40,7 +33,7 @@ namespace UE::LevelSnapshots::Private
 	void AddClassDefault(FWorldSnapshotData& WorldData, UClass* Class);
 	
 	/** Gets a saved class default object for the given class */
-	UObject* GetClassDefault(FWorldSnapshotData& WorldData, UClass* Class);
+	UObject* GetClassDefault(FWorldSnapshotData& WorldData, FSnapshotDataCache& Cache, UClass* Class);
 	
 	/**
 	 * Gets the Object's class and serializes the saved CDO into it.

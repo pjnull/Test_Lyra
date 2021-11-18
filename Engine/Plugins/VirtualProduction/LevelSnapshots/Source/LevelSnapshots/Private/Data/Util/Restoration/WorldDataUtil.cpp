@@ -22,6 +22,7 @@
 #include "Async/ParallelFor.h"
 #include "Components/ActorComponent.h"
 #include "EngineUtils.h"
+#include "SnapshotDataCache.h"
 #include "GameFramework/Actor.h"
 #include "Misc/ScopedSlowTask.h"
 #include "Templates/NonNullPointer.h"
@@ -130,9 +131,8 @@ namespace UE::LevelSnapshots::Private::Internal
 		FConditionalSortedScopedLog SortedLog(bShouldLog);
 		Algo::ForEach(ActorsInWorld, [&SnapshotData, &CaptureData, &SortedLog](AActor* Actor)
 		{
-	#if WITH_EDITOR
 			CaptureData.EnterProgressFrame();
-	#endif
+			
 			if (Restorability::IsActorDesirableForCapture(Actor))
 			{
 				FScopedLogItem LogTakeSnapshot = SortedLog.AddScopedLogItem(Actor->GetName());
@@ -270,7 +270,7 @@ namespace UE::LevelSnapshots::Private::Internal
 		FoundObject->Rename(*NewName.ToString(), nullptr, REN_NonTransactional | REN_DontCreateRedirectors);
 	}
 	
-	static void ApplyToWorld_HandleRecreatingActors(FWorldSnapshotData& WorldData, TSet<AActor*>& EvaluatedActors, UPackage* LocalisationSnapshotPackage, const FPropertySelectionMap& PropertiesToSerialize)
+	static void ApplyToWorld_HandleRecreatingActors(FWorldSnapshotData& WorldData, FSnapshotDataCache& Cache, TSet<AActor*>& EvaluatedActors, UPackage* LocalisationSnapshotPackage, const FPropertySelectionMap& PropertiesToSerialize)
 	{
 		SCOPED_SNAPSHOT_CORE_TRACE(ApplyToWorld_RecreateActors);
 
@@ -325,7 +325,7 @@ namespace UE::LevelSnapshots::Private::Internal
 				FActorSpawnParameters SpawnParameters;
 				SpawnParameters.Name = ActorFName;
 				SpawnParameters.bNoFail = true;
-				SpawnParameters.Template = Cast<AActor>(UE::LevelSnapshots::Private::GetClassDefault(WorldData, ActorClass));
+				SpawnParameters.Template = Cast<AActor>(UE::LevelSnapshots::Private::GetClassDefault(WorldData, Cache, ActorClass));
 				SpawnParameters.ObjectFlags = ActorSnapshot->SerializedActorData.GetObjectFlags();
 				Module.OnPreCreateActor(OwningLevelWorld, ActorClass, SpawnParameters);
 
@@ -352,7 +352,7 @@ namespace UE::LevelSnapshots::Private::Internal
 				{
 					// Mark it, otherwise we'll serialize it again when we look for world actors matching the snapshot
 					EvaluatedActors.Add(*RecreatedActor);
-					UE::LevelSnapshots::Private::RestoreIntoRecreatedEditorWorldActor(*RecreatedActor, *ActorSnapshot, WorldData, LocalisationSnapshotPackage, PropertiesToSerialize);
+					UE::LevelSnapshots::Private::RestoreIntoRecreatedEditorWorldActor(*RecreatedActor, *ActorSnapshot, WorldData, Cache, LocalisationSnapshotPackage, PropertiesToSerialize);
 				}
 				else
 				{
@@ -362,7 +362,7 @@ namespace UE::LevelSnapshots::Private::Internal
 		}
 	}
 	
-	static void ApplyToWorld_HandleSerializingMatchingActors(FWorldSnapshotData& WorldData, TSet<AActor*>& EvaluatedActors, const TArray<FSoftObjectPath>& SelectedPaths, UPackage* LocalisationSnapshotPackage, const FPropertySelectionMap& PropertiesToSerialize)
+	static void ApplyToWorld_HandleSerializingMatchingActors(FWorldSnapshotData& WorldData, FSnapshotDataCache& Cache, TSet<AActor*>& EvaluatedActors, const TArray<FSoftObjectPath>& SelectedPaths, UPackage* LocalisationSnapshotPackage, const FPropertySelectionMap& PropertiesToSerialize)
 	{
 		SCOPED_SNAPSHOT_CORE_TRACE(ApplyToWorld_SerializeMatchedActors);
 	
@@ -400,7 +400,7 @@ namespace UE::LevelSnapshots::Private::Internal
 					FActorSnapshotData* ActorSnapshot = WorldData.ActorData.Find(OriginalWorldActor);
 					if (ensure(ActorSnapshot))
 					{
-						RestoreIntoExistingWorldActor(OriginalWorldActor, *ActorSnapshot, WorldData, LocalisationSnapshotPackage, PropertiesToSerialize);
+						RestoreIntoExistingWorldActor(OriginalWorldActor, *ActorSnapshot, WorldData, Cache, LocalisationSnapshotPackage, PropertiesToSerialize);
 					}
 				}
 			}
@@ -408,7 +408,7 @@ namespace UE::LevelSnapshots::Private::Internal
 	}
 }
 
-void UE::LevelSnapshots::Private::ApplyToWorld(FWorldSnapshotData& WorldData, UWorld* WorldToApplyTo, UPackage* LocalisationSnapshotPackage, const FPropertySelectionMap& PropertiesToSerialize)
+void UE::LevelSnapshots::Private::ApplyToWorld(FWorldSnapshotData& WorldData, FSnapshotDataCache& Cache, UWorld* WorldToApplyTo, UPackage* LocalisationSnapshotPackage, const FPropertySelectionMap& PropertiesToSerialize)
 {
 	using namespace UE::LevelSnapshots::Private::Internal;
 	check(WorldToApplyTo);
@@ -421,7 +421,7 @@ void UE::LevelSnapshots::Private::ApplyToWorld(FWorldSnapshotData& WorldData, UW
 #endif
 
 	// Clear editor world subobject cache from previous ApplyToWorld
-	for (auto SubobjectIt = WorldData.Subobjects.CreateIterator(); SubobjectIt; ++SubobjectIt)
+	for (auto SubobjectIt = Cache.SubobjectCache.CreateIterator(); SubobjectIt; ++SubobjectIt)
 	{
 		SubobjectIt->Value.EditorObject.Reset();
 	}
@@ -436,10 +436,10 @@ void UE::LevelSnapshots::Private::ApplyToWorld(FWorldSnapshotData& WorldData, UW
 	
 	TSet<AActor*> EvaluatedActors;
 	ApplyToWorldTask.EnterProgressFrame(NumActorsToRecreate);
-	ApplyToWorld_HandleRecreatingActors(WorldData, EvaluatedActors, LocalisationSnapshotPackage, PropertiesToSerialize);	
+	ApplyToWorld_HandleRecreatingActors(WorldData, Cache, EvaluatedActors, LocalisationSnapshotPackage, PropertiesToSerialize);	
 
 	ApplyToWorldTask.EnterProgressFrame(NumMatchingActors);
-	ApplyToWorld_HandleSerializingMatchingActors(WorldData, EvaluatedActors, SelectedPaths, LocalisationSnapshotPackage, PropertiesToSerialize);
+	ApplyToWorld_HandleSerializingMatchingActors(WorldData, Cache, EvaluatedActors, SelectedPaths, LocalisationSnapshotPackage, PropertiesToSerialize);
 
 	
 	// If we're in the editor then update the gizmos locations as they can get out of sync if any of the serialized actors were selected
@@ -449,32 +449,6 @@ void UE::LevelSnapshots::Private::ApplyToWorld(FWorldSnapshotData& WorldData, UW
 		GUnrealEd->UpdatePivotLocationForSelection();
 	}
 #endif
-}
-
-void UE::LevelSnapshots::Private::InitWithSnapshotWorld(FWorldSnapshotData& WorldData, UWorld* SnapshotWorld)
-{
-	WorldData.SnapshotWorld = SnapshotWorld;
-}
-
-void UE::LevelSnapshots::Private::ClearSnapshotWorldReferences(FWorldSnapshotData& WorldData)
-{
-	WorldData.SnapshotWorld.Reset();
-
-	for (auto ClassDefaultsIt = WorldData.ClassDefaults.CreateIterator(); ClassDefaultsIt; ++ClassDefaultsIt)
-	{
-		ClassDefaultsIt->Value.CachedLoadedClassDefault = nullptr;
-	}
-
-	for (auto SubobjectIt = WorldData.Subobjects.CreateIterator(); SubobjectIt; ++SubobjectIt)
-	{
-		SubobjectIt->Value.SnapshotObject.Reset();
-		SubobjectIt->Value.EditorObject.Reset();
-	}
-
-	for (auto ActorDataIt = WorldData.ActorData.CreateIterator(); ActorDataIt; ++ ActorDataIt)
-	{
-		ActorDataIt->Value.ResetTransientData();
-	}
 }
 
 TOptional<TNonNullPtr<FObjectSnapshotData>> UE::LevelSnapshots::Private::GetSerializedClassDefaults(FWorldSnapshotData& WorldData, UClass* Class)
@@ -507,7 +481,7 @@ void UE::LevelSnapshots::Private::AddClassDefault(FWorldSnapshotData& WorldData,
 	WorldData.ClassDefaults.Emplace(Class, MoveTemp(ClassData));
 }
 
-UObject* UE::LevelSnapshots::Private::GetClassDefault(FWorldSnapshotData& WorldData, UClass* Class)
+UObject* UE::LevelSnapshots::Private::GetClassDefault(FWorldSnapshotData& WorldData, FSnapshotDataCache& Cache, UClass* Class)
 {
 	FClassDefaultObjectSnapshotData* ClassDefaultData = WorldData.ClassDefaults.Find(Class);
 	if (!ClassDefaultData)
@@ -521,9 +495,10 @@ UObject* UE::LevelSnapshots::Private::GetClassDefault(FWorldSnapshotData& WorldD
 		return Class->GetDefaultObject();
 	}
 
-	if (IsValid(ClassDefaultData->CachedLoadedClassDefault))
+	FClassDefaultSnapshotCache& ClassDefaultCache = Cache.ClassDefaultCache.FindOrAdd(Class);
+	if (IsValid(ClassDefaultCache.CachedLoadedClassDefault))
 	{
-		return ClassDefaultData->CachedLoadedClassDefault;
+		return ClassDefaultCache.CachedLoadedClassDefault;
 	}
 	
 	UObject* CDO = NewObject<UObject>(
@@ -533,7 +508,7 @@ UObject* UE::LevelSnapshots::Private::GetClassDefault(FWorldSnapshotData& WorldD
 		);
 	FApplyClassDefaulDataArchive::SerializeClassDefaultObject(*ClassDefaultData, WorldData, CDO);
 
-	ClassDefaultData->CachedLoadedClassDefault = CDO;
+	ClassDefaultCache.CachedLoadedClassDefault = CDO;
 	return CDO;
 }
 

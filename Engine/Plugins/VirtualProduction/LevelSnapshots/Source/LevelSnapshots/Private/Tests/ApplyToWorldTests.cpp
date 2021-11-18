@@ -293,7 +293,7 @@ namespace UE::LevelSnapshots::Private::Tests
 				TestTrue(TEXT("Parents were deserialized"), bParentsWereDeserialized);
 				if (bParentsWereDeserialized)
 				{
-					const bool bHasOriginalChanged = UE::LevelSnapshots::Private::HasOriginalChangedPropertiesSinceSnapshotWasTaken(Snapshot->GetSerializedData(), SnapshotChild.GetValue(), Child);
+					const bool bHasOriginalChanged = UE::LevelSnapshots::Private::HasOriginalChangedPropertiesSinceSnapshotWasTaken(Snapshot, SnapshotChild.GetValue(), Child);
 					TestTrue(TEXT("HasOriginalChangedPropertiesSinceSnapshotWasTaken == true"), bHasOriginalChanged);
 				
 					TestTrue(TEXT("Snapshot has correct attach parent"), SnapshotChild.GetValue()->GetAttachParentActor() == SnapshotParentOne.GetValue());

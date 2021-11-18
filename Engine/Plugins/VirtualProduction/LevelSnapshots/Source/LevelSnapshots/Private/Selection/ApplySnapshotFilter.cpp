@@ -325,7 +325,7 @@ void UE::LevelSnapshots::Private::FApplySnapshotFilter::AnalyseRootProperties(FP
 	for (TFieldIterator<FProperty> FieldIt(ContainerContext.ContainerClass); FieldIt; ++FieldIt)
 	{
 		// Ask external modules about the property
-		const FPropertyComparisonParams Params { Snapshot->GetSerializedData(), ContainerContext.RootClass, *FieldIt, ContainerContext.SnapshotContainer, ContainerContext.WorldContainer, SnapshotObject, WorldObject, DeserializedSnapshotActor, WorldActor} ;
+		const FPropertyComparisonParams Params { Snapshot, ContainerContext.RootClass, *FieldIt, ContainerContext.SnapshotContainer, ContainerContext.WorldContainer, SnapshotObject, WorldObject, DeserializedSnapshotActor, WorldActor} ;
 		const IPropertyComparer::EPropertyComparison ComparisonResult = Module.ShouldConsiderPropertyEqual(PropertyComparers, Params);
 
 		bool bSkipEqualityTest = false;
@@ -607,7 +607,7 @@ TOptional<UE::LevelSnapshots::Private::FApplySnapshotFilter::EPropertySearchResu
 	const bool bAreComponents = SnapshotObject->IsA<UActorComponent>() || WorldObject->IsA<UActorComponent>();
 	if (bAreComponents)
 	{
-		return UE::LevelSnapshots::Private::AreObjectPropertiesEquivalent(Snapshot->GetSerializedData(), PropertyToHandle, SnapshotValuePtr, WorldValuePtr, DeserializedSnapshotActor, WorldActor)
+		return UE::LevelSnapshots::Private::AreObjectPropertiesEquivalent(Snapshot, PropertyToHandle, SnapshotValuePtr, WorldValuePtr, DeserializedSnapshotActor, WorldActor)
 			? EPropertySearchResult::NoPropertiesFound : EPropertySearchResult::FoundProperties;
 	}
 		
@@ -667,5 +667,5 @@ bool UE::LevelSnapshots::Private::FApplySnapshotFilter::ArePropertyValuesIdentic
 		return *SubobjectResult == EPropertySearchResult::NoPropertiesFound;
 	}
 
-	return AreSnapshotAndOriginalPropertiesEquivalent(Snapshot->GetSerializedData(), PropertyInCommon, ContainerContext.SnapshotContainer, ContainerContext.WorldContainer, DeserializedSnapshotActor, WorldActor);
+	return AreSnapshotAndOriginalPropertiesEquivalent(Snapshot, PropertyInCommon, ContainerContext.SnapshotContainer, ContainerContext.WorldContainer, DeserializedSnapshotActor, WorldActor);
 }

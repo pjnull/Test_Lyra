@@ -6,6 +6,7 @@
 #include "Misc/ObjectDependencyCallback.h"
 #include "Templates/Function.h"
 
+struct FSnapshotDataCache;
 class AActor;
 class FCustomSerializationDataManager;
 class ICustomObjectSnapshotSerializer;
@@ -65,6 +66,7 @@ namespace UE::LevelSnapshots::Private
 		AActor* EditorActor,
 		FCustomSerializationData& ActorSerializationData,
 		FWorldSnapshotData& WorldData,
+		FSnapshotDataCache& Cache,
 		const FProcessObjectDependency& ProcessObjectDependency,
 		UPackage* LocalisationSnapshotPackage
 		);
@@ -73,6 +75,7 @@ namespace UE::LevelSnapshots::Private
 		AActor* EditorActor,
 		FCustomSerializationData& ActorSerializationData,
 		FWorldSnapshotData& WorldData,
+		FSnapshotDataCache& Cache,
 		const FPropertySelectionMap& SelectionMap,
 		UPackage* LocalisationSnapshotPackage
 		);
@@ -82,6 +85,7 @@ namespace UE::LevelSnapshots::Private
 		UObject* Subobject,
 		const FSoftObjectPath& OriginalSubobjectPath,
 		FWorldSnapshotData& WorldData,
+		FSnapshotDataCache& Cache,
 		const FProcessObjectDependency& ProcessObjectDependency,
 		UPackage* LocalisationSnapshotPackage
 		);
@@ -90,13 +94,14 @@ namespace UE::LevelSnapshots::Private
 		UObject* SnapshotObject,
 		UObject* EditorObject,
 		FWorldSnapshotData& WorldData,
+		FSnapshotDataCache& Cache,
 		const FPropertySelectionMap& SelectionMap,
 		UPackage* LocalisationSnapshotPackage
 		);
 
 	
-	using FHandleCustomSubobjectPair = TFunction<void(UObject* SnapshotSubobject, UObject* EditorSubobject)>;
-	using FHandleUnmatchedCustomSnapshotSubobject = TFunction<void(UObject* UnmatchedSnapshotSubobject)>;
+	using FHandleCustomSubobjectPair = TFunctionRef<void(UObject* SnapshotSubobject, UObject* EditorSubobject)>;
+	using FHandleUnmatchedCustomSnapshotSubobject = TFunctionRef<void(UObject* UnmatchedSnapshotSubobject)>;
 	
 	void ForEachMatchingCustomSubobjectPair(const FWorldSnapshotData& WorldData, UObject* SnapshotObject, UObject* WorldObject, FHandleCustomSubobjectPair HandleCustomSubobjectPair, FHandleUnmatchedCustomSnapshotSubobject HandleUnmachtedCustomSnapshotSubobject);
 }
