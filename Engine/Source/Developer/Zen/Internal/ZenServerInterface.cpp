@@ -848,6 +848,7 @@ FZenServiceInstance::GetStats( FZenStats& stats ) const
 			FZenEndPointStats EndPointStats;
 
 			EndPointStats.Name = FString(EndPointView["name"].AsString());
+			EndPointStats.Url = FString(EndPointView["url"].AsString());
 			EndPointStats.Health = FString(EndPointView["health"].AsString());
 			EndPointStats.HitRatio = EndPointView["hit_ratio"].AsDouble();
 			EndPointStats.UploadedMB = EndPointView["uploaded_mb"].AsDouble();
