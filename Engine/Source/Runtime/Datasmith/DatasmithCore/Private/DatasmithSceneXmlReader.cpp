@@ -1155,7 +1155,15 @@ bool FDatasmithSceneXmlReader::ParseXmlFile(TSharedRef< IDatasmithScene >& OutSc
 	// Set locale to support UTF-8 character set only on current thread
 #ifdef USE_LOCALE
 	locale_t Locale = ::newlocale(LC_ALL_MASK, "en_US.UTF-8", nullptr);
-	locale_t PreviousLocale = ::uselocale(Locale);
+	locale_t PreviousLocale = nullptr;
+	if (!Locale)
+	{
+		UE_LOG(LogDatasmith, Warning, TEXT("locale en_US.UTF-8 is not supported by this platform. The parsing of the udatasmith file may fail."));
+	}
+	else
+	{
+		PreviousLocale = ::uselocale(Locale);
+	}
 #endif
 
 	OutScene->SetExporterSDKVersion( TEXT("N/A") ); // We're expecting to read the SDK Version from the XML file. If it's not available, put "N/A"
@@ -1392,8 +1400,11 @@ bool FDatasmithSceneXmlReader::ParseXmlFile(TSharedRef< IDatasmithScene >& OutSc
 
 	// Restore locale only on current thread
 #ifdef USE_LOCALE
-	::uselocale(PreviousLocale);
-	::freelocale(Locale);
+	if (Locale)
+	{
+		::uselocale(PreviousLocale);
+		::freelocale(Locale);
+	}
 #endif
 
 	return true;
