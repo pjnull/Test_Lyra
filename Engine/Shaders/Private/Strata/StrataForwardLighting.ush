@@ -75,9 +75,39 @@ float3 StrataForwardLightingCommon(
 			BSDFEvaluate = (FStrataEvaluateResult)0;
 
 		#if NON_DIRECTIONAL_DIRECT_LIGHTING
-			// See comment above about NON_DIRECTIONAL_DIRECT_LIGHTING
-			//#error NON_DIRECTIONAL_DIRECT_LIGHTING encoutered in Strata (sanity check)
-			// STRATA_TODO
+			float Lighting;
+			if (LightData.bRectLight)
+			{
+				FRect Rect = GetRect(ToLight, LightData);
+				if (!IsRectVisible(Rect))
+				{
+					LightMask = 0.0f; // Rect light can be non visible due to barn door occlusion
+				}
+				AreaLightContext = CreateRectIntegrateContext(Roughness, StrataBSDFContext.N, StrataBSDFContext.V, Rect, RectTexture);
+				Lighting = IntegrateLight(Rect, RectTexture);
+
+				// We must have the evaluate inside the if due to the rectlight texture: it must be now be ambiguous which texture is going ot be used.
+				// After te compilation, a local resource must map to a unique global resource (the default or the actual rect light texture).
+				BSDFEvaluate = StrataIntegrateBSDF(StrataBSDFContext, ShadowTerms, AreaLightContext, bForceFullyRough);
+				bEvaluateHasBeenExecuted = true;
+			}
+			else
+			{
+				FCapsuleLight Capsule = GetCapsule(ToLight, LightData);
+				AreaLightContext = CreateCapsuleIntegrateContext(Roughness, StrataBSDFContext.N, StrataBSDFContext.V, Capsule, LightData.bInverseSquared);
+				Lighting = IntegrateLight(Capsule, LightData.bInverseSquared);
+
+				BSDFEvaluate = StrataIntegrateBSDF(StrataBSDFContext, ShadowTerms, AreaLightContext, bForceFullyRough);
+				bEvaluateHasBeenExecuted = true;
+			}
+
+			FLATTEN
+			if (LightChannelMask & PrimitiveLightingChannelMask)
+			{
+				float3 DiffuseLuminance = Diffuse_Lambert(BSDFEvaluate.DiffuseColor) * Lighting;
+				const float3 LightCommonMultiplier = LightData.Color * LightMask;
+				Color += (DiffuseLuminance * LightCommonMultiplier + BSDFEvaluate.EmissivePathValue) * BSDFColoredVisibility;
+			}
 		#else
 			if (LightData.bRectLight)
 			{
@@ -308,7 +338,7 @@ float3 StrataForwardLighting(
 						IndirectIrradiance);
 
 				#if FORWARD_SHADING && (MATERIALBLENDING_SOLID || MATERIALBLENDING_MASKED)
-					NearestResolvedDepthScreenUV = CalculateNearestResolvedDepthScreenUV(ScreenUV, MaterialParameters.ScreenPosition.w);
+					float2 NearestResolvedDepthScreenUV = CalculateNearestResolvedDepthScreenUV(ScreenUV, MaterialParameters.ScreenPosition.w);
 
 					IndirectOcclusion = GetIndirectOcclusion(NearestResolvedDepthScreenUV, StrataPixelHeader.bHasDynamicIndirectShadowCasterRepresentation);
 					DiffuseIndirectLighting *= IndirectOcclusion;
@@ -339,7 +369,20 @@ float3 StrataForwardLighting(
 			//// Evaluate translucent lighting volume / vertex lighting.
 			////
 
-		#if TRANSLUCENCY_PERVERTEX_FORWARD_SHADING || TRANSLUCENCY_LIGHTING_VOLUMETRIC_PERVERTEX_NONDIRECTIONAL || TRANSLUCENCY_LIGHTING_VOLUMETRIC_PERVERTEX_DIRECTIONAL || TRANSLUCENCY_LIGHTING_VOLUMETRIC_NONDIRECTIONAL || TRANSLUCENCY_LIGHTING_VOLUMETRIC_DIRECTIONAL || TRANSLUCENCY_LIGHTING_SURFACE_LIGHTINGVOLUME
+			// In deferred shading, the translucenyt volume is used by 
+			//	- TRANSLUCENCY_LIGHTING_VOLUMETRIC_PERVERTEX_NONDIRECTIONAL
+			//	- TRANSLUCENCY_LIGHTING_VOLUMETRIC_PERVERTEX_DIRECTIONAL
+			//	- TRANSLUCENCY_LIGHTING_VOLUMETRIC_NONDIRECTIONAL
+			//	- TRANSLUCENCY_LIGHTING_VOLUMETRIC_DIRECTIONAL
+			//	- TRANSLUCENCY_LIGHTING_SURFACE_LIGHTINGVOLUME
+			// In forward, things change (for some reasons...)
+			//  - TRANSLUCENCY_PERVERTEX_FORWARD_SHADING make sure TRANSLUCENCY_LIGHTING_VOLUMETRIC_PERVERTEX_NONDIRECTIONAL and TRANSLUCENCY_LIGHTING_VOLUMETRIC_PERVERTEX_DIRECTIONAL works the same way.
+			//  - TRANSLUCENCY_LIGHTING_VOLUMETRIC_NONDIRECTIONAL will follow the StrataForwardLightingCommon path and directionality is removed using NON_DIRECTIONAL_DIRECT_LIGHTING
+			//  - TRANSLUCENCY_LIGHTING_VOLUMETRIC_DIRECTIONAL will be same as TRANSLUCENCY_LIGHTING_SURFACE_FORWARDSHADING but without the environment specular contribution
+			//	- TRANSLUCENCY_LIGHTING_SURFACE_LIGHTINGVOLUME becomes the same as TRANSLUCENCY_LIGHTING_SURFACE_FORWARDSHADING
+			// STRATA_TODO simplify all that and have forward map to the same technique as in deferred.
+
+		#if TRANSLUCENCY_PERVERTEX_FORWARD_SHADING || TRANSLUCENCY_LIGHTING_VOLUMETRIC_PERVERTEX_NONDIRECTIONAL || TRANSLUCENCY_LIGHTING_VOLUMETRIC_PERVERTEX_DIRECTIONAL || (!FORWARD_SHADING && (TRANSLUCENCY_LIGHTING_VOLUMETRIC_NONDIRECTIONAL || TRANSLUCENCY_LIGHTING_VOLUMETRIC_DIRECTIONAL || TRANSLUCENCY_LIGHTING_SURFACE_LIGHTINGVOLUME))
 			float4 VolumeLighting;
 			float3 SurfaceLighting = 0;
 			float3 InnerVolumeUVs;
@@ -356,19 +399,23 @@ float3 StrataForwardLighting(
 
 		#elif TRANSLUCENCY_LIGHTING_VOLUMETRIC_PERVERTEX_NONDIRECTIONAL
 
+			// ForwardShadingNote: when forward shading is enabled, this will follow the special TRANSLUCENCY_PERVERTEX_FORWARD_SHADING path above
 			GetVolumeLightingNonDirectional(float4(BasePassInterpolants.AmbientLightingVector, 1), BSDFEvaluate.DiffuseColor, SurfaceLighting, VolumeLighting);
 
 		#elif TRANSLUCENCY_LIGHTING_VOLUMETRIC_PERVERTEX_DIRECTIONAL
 
+			// ForwardShadingNote: when forward shading is enabled, this will follow the special TRANSLUCENCY_PERVERTEX_FORWARD_SHADING path above
 			GetVolumeLightingDirectional(float4(BasePassInterpolants.AmbientLightingVector, 1), BasePassInterpolants.DirectionalLightingVector, StrataBSDFContext.N, BSDFEvaluate.DiffuseColor, SurfaceLighting, VolumeLighting);
 
-		#elif TRANSLUCENCY_LIGHTING_VOLUMETRIC_NONDIRECTIONAL
+		#elif TRANSLUCENCY_LIGHTING_VOLUMETRIC_NONDIRECTIONAL && !FORWARD_SHADING
 
+			//ForwardShadingNote: when forward shading is enabled, StrataForwardLightingCommon path will be used 
 			float4 AmbientLightingVector = GetAmbientLightingVectorFromTranslucentLightingVolume(InnerVolumeUVs, OuterVolumeUVs, FinalLerpFactor);
 			GetVolumeLightingNonDirectional(AmbientLightingVector, BSDFEvaluate.DiffuseColor, SurfaceLighting, VolumeLighting);
 
-		#elif TRANSLUCENCY_LIGHTING_VOLUMETRIC_DIRECTIONAL || TRANSLUCENCY_LIGHTING_SURFACE_LIGHTINGVOLUME
+		#elif (TRANSLUCENCY_LIGHTING_VOLUMETRIC_DIRECTIONAL || TRANSLUCENCY_LIGHTING_SURFACE_LIGHTINGVOLUME) && !FORWARD_SHADING
 
+			//ForwardShadingNote: when forward shading is enabled, StrataForwardLightingCommon path will be used 
 			float4 AmbientLightingVector = GetAmbientLightingVectorFromTranslucentLightingVolume(InnerVolumeUVs, OuterVolumeUVs, FinalLerpFactor);
 			float3 DirectionalLightingVector = GetDirectionalLightingVectorFromTranslucentLightingVolume(InnerVolumeUVs, OuterVolumeUVs, FinalLerpFactor);
 			GetVolumeLightingDirectional(AmbientLightingVector, DirectionalLightingVector, StrataBSDFContext.N, BSDFEvaluate.DiffuseColor, SurfaceLighting, VolumeLighting);

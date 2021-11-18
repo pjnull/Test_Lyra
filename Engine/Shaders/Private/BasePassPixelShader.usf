@@ -120,7 +120,7 @@ float NormalCurvatureToRoughness(float3 WorldNormal)
 #define FORCE_FULLY_ROUGH (SIMPLE_FORWARD_SHADING || MATERIAL_FULLY_ROUGH)
 #define EDITOR_ALPHA2COVERAGE (USE_EDITOR_COMPOSITING && SUPPORTS_PIXEL_COVERAGE)
 #define POST_PROCESS_SUBSURFACE ((MATERIAL_SHADINGMODEL_SUBSURFACE_PROFILE || MATERIAL_SHADINGMODEL_EYE) && USES_GBUFFER)
-#define MATERIAL_WORKS_WITH_DUAL_SOURCE_COLOR_BLENDING (MATERIAL_SHADINGMODEL_THIN_TRANSLUCENT || STRATA_TRANSLUCENT_ENABLED)
+#define MATERIAL_WORKS_WITH_DUAL_SOURCE_COLOR_BLENDING (MATERIAL_SHADINGMODEL_THIN_TRANSLUCENT || STRATA_TRANSLUCENT_MATERIAL )
 
 #if  MATERIAL_SHADINGMODEL_SINGLELAYERWATER
 
@@ -147,11 +147,11 @@ float NormalCurvatureToRoughness(float3 WorldNormal)
 
 #include "ThinTranslucentCommon.ush"
 
-#if TRANSLUCENCY_LIGHTING_SURFACE_LIGHTINGVOLUME || TRANSLUCENCY_LIGHTING_SURFACE_FORWARDSHADING || FORWARD_SHADING || MATERIAL_SHADINGMODEL_SINGLELAYERWATER || STRATA_TRANSLUCENT_ENABLED
+#if TRANSLUCENCY_LIGHTING_SURFACE_LIGHTINGVOLUME || TRANSLUCENCY_LIGHTING_SURFACE_FORWARDSHADING || FORWARD_SHADING || MATERIAL_SHADINGMODEL_SINGLELAYERWATER || STRATA_TRANSLUCENT_FORWARD || STRATA_FORWARD_SHADING
 #include "ForwardLightingCommon.ush"
 #endif
 
-#if STRATA_TRANSLUCENT_ENABLED
+#if STRATA_TRANSLUCENT_FORWARD || STRATA_FORWARD_SHADING
 #define STRATA_USE_ENV_BRDF_APPROX (MATERIAL_USE_PREINTEGRATED_GF == 0)
 #include "/Engine/Private/Strata/StrataEvaluation.ush"
 #include "/Engine/Private/Strata/StrataForwardLighting.ush"
@@ -1379,7 +1379,6 @@ void FPixelShaderInOut_MainPS(
 
 #else // !STRATA_ENABLED
 
-	// STRATA_TODO forward shadow and occlusion
 	float DirectionalLightShadow = 1.0f; 
 	float IndirectOcclusion = 1.0f;
 					
@@ -1579,7 +1578,7 @@ void FPixelShaderInOut_MainPS(
 	}
 #endif
 
-#if STRATA_OPAQUE_ENABLED
+#if STRATA_OPAQUE_DEFERRED
 
 #if STRATA_INLINE_SINGLELAYERWATER==0
 	// Need to reset color to make sure strata material are only lit using Strata lighting passes.
@@ -1602,9 +1601,9 @@ void FPixelShaderInOut_MainPS(
 		StrataPixelHeader, StrataData, MaterialParameters.CameraVector, bStrataSubsurfaceEnable, EmissiveLuminance);
 
 	Color += EmissiveLuminance;
-#endif // STRATA_OPAQUE_ENABLED
+#endif // STRATA_OPAQUE_DEFERRED
 
-#if STRATA_TRANSLUCENT_ENABLED
+#if STRATA_TRANSLUCENT_FORWARD || STRATA_FORWARD_SHADING
 	//FORWARD_SHADING
 	if (StrataData.LayerCount > 0)
 	{
@@ -1629,21 +1628,28 @@ void FPixelShaderInOut_MainPS(
 			StrataData,
 			Throughput);
 
+	#if STRATA_TRANSLUCENT_MATERIAL
 		DualBlendColorCov = GetMaterialOpacity(PixelMaterialInputs); // Opacity represent coverage STRATA_TODO after validation, rename everything
 		DualBlendColorAdd = Color;
 		DualBlendColorMul = Throughput;
 		Color = 0.0f;
 		Opacity = 1.0f; // nullify following operation
+	#elif STRATA_FORWARD_SHADING
+		// Color unchanged
+		Opacity = 1.0f;
+	#else
+		#error Unhandled Strata forward shading mode
+	#endif
 	}
-#endif // STRATA_TRANSLUCENT_ENABLED
+#endif // STRATA_TRANSLUCENT_FORWARD || STRATA_FORWARD_SHADING
 
 #elif STRATA_ENABLED && MATERIAL_SHADINGMODEL_UNLIT
 
 	// Unlit forces a single BSDF
 	FStrataBSDF UnlitBSDF = PixelMaterialInputs.FrontMaterial.Layers[0].BSDFs[0];
-#if STRATA_OPAQUE_ENABLED
+#if STRATA_OPAQUE_DEFERRED || STRATA_FORWARD_SHADING
 	Color = BSDF_GETEMISSIVE(UnlitBSDF);
-#else // STRATA_TRANSLUCENT_ENABLED
+#else // STRATA_TRANSLUCENT_FORWARD
 	DualBlendColorCov = GetMaterialOpacity(PixelMaterialInputs); // Opacity represent coverage STRATA_TODO after validation, rename everything
 	DualBlendColorAdd = BSDF_GETEMISSIVE(UnlitBSDF);
 	DualBlendColorMul = UNLIT_TRANSMITTANCE(UnlitBSDF);
@@ -1859,7 +1865,7 @@ void FPixelShaderInOut_MainPS(
 }
 
 // If virtual texture is enabled then use early depth test so that UAV feedback buffer writes respect the depth test
-#if NUM_VIRTUALTEXTURE_SAMPLES || LIGHTMAP_VT_ENABLED || STRATA_OPAQUE_ENABLED
+#if NUM_VIRTUALTEXTURE_SAMPLES || LIGHTMAP_VT_ENABLED || STRATA_OPAQUE_DEFERRED
 	#if COMPILER_SUPPORTS_DEPTHSTENCIL_EARLYTEST_LATEWRITE
 		// If we support early depth test with late write behaviour then use it since we may be using discard, or modifying depth
 		#define PIXELSHADER_EARLYDEPTHSTENCIL DEPTHSTENCIL_EARLYTEST_LATEWRITE
