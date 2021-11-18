@@ -2757,18 +2757,16 @@ void UMaterial::ConvertMaterialToStrataMaterial()
 		ConvertNode->ClearCoatRoughness.Connect(13, BreakMatAtt);
 		ConvertNode->Opacity.Connect(6, BreakMatAtt);
 		ConvertNode->ShadingModel.Connect(25, BreakMatAtt);
-		UMaterialExpressionMakeMaterialAttributes* MakeMatAtt = NewObject<UMaterialExpressionMakeMaterialAttributes>(this);
-		MakeMatAtt->FrontMaterial.Connect(0, ConvertNode);
 
-		// Forward inputs
-		// Do not reconnect the Opacity as we handle the opacity by internally within the conversion node
-		// MakeMatAtt->Opacity.Connect(6, BreakMatAtt);
-		MakeMatAtt->OpacityMask.Connect(7, BreakMatAtt);
-		MakeMatAtt->WorldPositionOffset.Connect(10, BreakMatAtt);
-		MakeMatAtt->AmbientOcclusion.Connect(14, BreakMatAtt);
-		MakeMatAtt->PixelDepthOffset.Connect(24, BreakMatAtt);
-
-		MaterialAttributes.Connect(0, MakeMatAtt);
+		// * Remove support for material attribute
+		// * explicitely connect the Strata node to the root node
+		// * Forward inputs to the root node (Do not reconnect the Opacity as we handle the opacity by internally within the conversion node)
+		bUseMaterialAttributes = false;
+		FrontMaterial.Connect(0, ConvertNode);
+		OpacityMask.Connect(7, BreakMatAtt);
+		WorldPositionOffset.Connect(10, BreakMatAtt);
+		AmbientOcclusion.Connect(14, BreakMatAtt);
+		PixelDepthOffset.Connect(24, BreakMatAtt);
 
 		// SSS Profile
 		const bool bHasShadingModelMixture = ShadingModels.CountShadingModels() > 1;

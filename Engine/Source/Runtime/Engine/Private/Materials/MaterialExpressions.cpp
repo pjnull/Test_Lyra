@@ -5967,7 +5967,6 @@ int32 UMaterialExpressionMakeMaterialAttributes::Compile(class FMaterialCompiler
 	case MP_Refraction: Ret = Refraction.Compile(Compiler); Expression = Refraction.Expression; break;
 	case MP_PixelDepthOffset: Ret = PixelDepthOffset.Compile(Compiler); Expression = PixelDepthOffset.Expression; break;
 	case MP_ShadingModel: Ret = ShadingModel.Compile(Compiler); Expression = ShadingModel.Expression; break;
-	case MP_FrontMaterial: Ret = FrontMaterial.Compile(Compiler); Expression = FrontMaterial.Expression; break;
 	};
 
 	if (Property >= MP_CustomizedUVs0 && Property <= MP_CustomizedUVs7)
@@ -5995,32 +5994,12 @@ uint32 UMaterialExpressionMakeMaterialAttributes::GetInputType(int32 InputIndex)
 	{
 		return MCT_ShadingModel;
 	}
-	else if (GetInputName(InputIndex).IsEqual("FrontMaterial"))
-	{
-		return MCT_Strata;
-	}
 	else
 	{
 		return UMaterialExpression::GetInputType(InputIndex);
 	}
 }
 
-bool UMaterialExpressionMakeMaterialAttributes::IsResultStrataMaterial(int32 OutputIndex)
-{
-	if (FrontMaterial.GetTracedInput().Expression)
-	{
-		return FrontMaterial.GetTracedInput().Expression->IsResultStrataMaterial(FrontMaterial.OutputIndex);
-	}
-	return false;
-}
-
-void UMaterialExpressionMakeMaterialAttributes::GatherStrataMaterialInfo(FStrataMaterialInfo& StrataMaterialInfo, int32 OutputIndex)
-{
-	if (FrontMaterial.GetTracedInput().Expression)
-	{
-		FrontMaterial.GetTracedInput().Expression->GatherStrataMaterialInfo(StrataMaterialInfo, FrontMaterial.OutputIndex);
-	}
-}
 #endif // WITH_EDITOR
 
 // -----
@@ -6077,7 +6056,6 @@ UMaterialExpressionBreakMaterialAttributes::UMaterialExpressionBreakMaterialAttr
 
 	Outputs.Add(FExpressionOutput(TEXT("PixelDepthOffset"), 1, 1, 0, 0, 0));
 	Outputs.Add(FExpressionOutput(TEXT("ShadingModel"), 0, 0, 0, 0, 0));
-	Outputs.Add(FExpressionOutput(TEXT("FrontMaterial"), 0, 0, 0, 0, 0));
 #endif
 }
 
@@ -6155,7 +6133,6 @@ static void BuildPropertyToIOIndexMap()
 		PropertyToIOIndexMap.Add(MP_CustomizedUVs7,			23);
 		PropertyToIOIndexMap.Add(MP_PixelDepthOffset,		24);
 		PropertyToIOIndexMap.Add(MP_ShadingModel,			25);
-		PropertyToIOIndexMap.Add(MP_FrontMaterial,			26);
 	}
 }
 
@@ -6223,10 +6200,6 @@ uint32 UMaterialExpressionBreakMaterialAttributes::GetOutputType(int32 OutputInd
 	if (Property && *Property == EMaterialProperty::MP_ShadingModel)
 	{
 		return MCT_ShadingModel;
-	}
-	else if (Property && *Property == EMaterialProperty::MP_FrontMaterial)
-	{
-		return MCT_Strata;
 	}
 	else
 	{
