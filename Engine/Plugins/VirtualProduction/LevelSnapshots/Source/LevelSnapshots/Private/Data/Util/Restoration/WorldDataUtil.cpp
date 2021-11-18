@@ -18,6 +18,8 @@
 #include "Util/SortedScopedLog.h"
 #include "Util/Property/PropertyIterator.h"
 
+#include "Algo/ForEach.h"
+#include "Async/ParallelFor.h"
 #include "Components/ActorComponent.h"
 #include "EngineUtils.h"
 #include "GameFramework/Actor.h"
@@ -86,41 +88,92 @@ namespace UE::LevelSnapshots::Private::Internal
 			}
 		}
 
-		PopulateActorHash(Result.Hash, OriginalActor);
 #if WITH_EDITORONLY_DATA
 		Result.ActorLabel = OriginalActor->GetActorLabel();
 #endif
 		return Result;
 	}
+
+	static TArray<AActor*> GetAllActorsIn(UWorld* World)
+	{
+		TArray<AActor*> ObjectArray;
+		
+		int32 NumActors = 0;
+		for (ULevel* Level : World->GetLevels())
+		{
+			if (Level)
+			{
+				NumActors += Level->Actors.Num();
+			}
+		}
+
+		ObjectArray.Reserve(NumActors);
+
+		for (ULevel* Level : World->GetLevels())
+		{
+			if (Level)
+			{
+				ObjectArray.Append(Level->Actors);
+			}
+		}
+
+		// Move temp to force optimization on debug / development builds
+		return MoveTemp(ObjectArray);
+	}
+
+	static void CaptureSnapshotData(const TArray<AActor*>& ActorsInWorld, FWorldSnapshotData& SnapshotData)
+	{
+		FScopedSlowTask CaptureData(ActorsInWorld.Num(), LOCTEXT("TakeSnapshotKey", "Capturing data"));
+		CaptureData.MakeDialogDelayed(1.f);
+		
+		const bool bShouldLog = ConsoleVariables::CVarLogTimeTakingSnapshots.GetValueOnAnyThread();
+		FConditionalSortedScopedLog SortedLog(bShouldLog);
+		Algo::ForEach(ActorsInWorld, [&SnapshotData, &CaptureData, &SortedLog](AActor* Actor)
+		{
+	#if WITH_EDITOR
+			CaptureData.EnterProgressFrame();
+	#endif
+			if (Restorability::IsActorDesirableForCapture(Actor))
+			{
+				FScopedLogItem LogTakeSnapshot = SortedLog.AddScopedLogItem(Actor->GetName());
+				SnapshotData.ActorData.Add(Actor, Internal::SnapshotActor(Actor, SnapshotData));
+			}
+		});
+	}
+
+	static void ComputeActorHashes(const TArray<AActor*>& ActorsInWorld, FWorldSnapshotData& SnapshotData)
+	{
+		FScopedSlowTask ComputeHash(1.f, LOCTEXT("TakeSnapshotKey", "Computing hashes"));
+		ComputeHash.MakeDialogDelayed(1.f);
+		
+		// Hashing takes about half of the time
+		ParallelFor(ActorsInWorld.Num(), [&SnapshotData, &ActorsInWorld](int32 Index)
+		{
+			AActor* Actor = ActorsInWorld[Index];
+			if (Restorability::IsActorDesirableForCapture(Actor))
+			{
+				PopulateActorHash(SnapshotData.ActorData[Actor].Hash, Actor);
+			}
+		});
+	}
 }
 
 FWorldSnapshotData UE::LevelSnapshots::Private::SnapshotWorld(UWorld* World)
 {
+	FScopedSlowTask TakeSnapshotTask(2.f, LOCTEXT("TakeSnapshotKey", "Take snapshot"));
+	TakeSnapshotTask.MakeDialogDelayed(1.f);
+
+	const TArray<AActor*> ActorsInWorld = Internal::GetAllActorsIn(World);
 	FWorldSnapshotData SnapshotData;
 	SnapshotData.SnapshotVersionInfo.Initialize();
+	
+	TakeSnapshotTask.EnterProgressFrame(1.f);
+	Internal::CaptureSnapshotData(ActorsInWorld, SnapshotData);
+	
+	TakeSnapshotTask.EnterProgressFrame(1.f);
+	Internal::ComputeActorHashes(ActorsInWorld, SnapshotData);
 
-#if WITH_EDITOR
-	FScopedSlowTask TakeSnapshotTask(World->GetProgressDenominator(), LOCTEXT("TakeSnapshotKey", "Take snapshot"));
-	TakeSnapshotTask.MakeDialogDelayed(1.f);
-#endif
-
-	const bool bShouldLog = ConsoleVariables::CVarLogTimeTakingSnapshots.GetValueOnAnyThread();
-	FConditionalSortedScopedLog SortedLog(bShouldLog);
-	for (TActorIterator<AActor> It(World, AActor::StaticClass(), EActorIteratorFlags::SkipPendingKill); It; ++It)
-	{
-#if WITH_EDITOR
-		TakeSnapshotTask.EnterProgressFrame();
-#endif
-		
-		AActor* Actor = *It;
-		if (Restorability::IsActorDesirableForCapture(Actor))
-		{
-			FScopedLogItem LogTakeSnapshot = SortedLog.AddScopedLogItem(Actor->GetName());
-			SnapshotData.ActorData.Add(Actor, Internal::SnapshotActor(Actor, SnapshotData));
-		}
-	}
-
-	return SnapshotData;
+	return MoveTemp(SnapshotData);
 }
 
 namespace UE::LevelSnapshots::Private::Internal
