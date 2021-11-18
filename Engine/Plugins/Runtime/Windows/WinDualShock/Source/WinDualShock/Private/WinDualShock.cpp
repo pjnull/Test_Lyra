@@ -12,6 +12,7 @@
 #include "Misc/ConfigCacheIni.h"
 #include "AudioDevice.h"
 
+#if DUALSHOCK4_SUPPORT
 #if PLATFORM_WINDOWS
 #include "Windows/WindowsHWrapper.h"
 #include "Windows/AllowWindowsPlatformTypes.h"
@@ -35,6 +36,7 @@ THIRD_PARTY_INCLUDES_END
 
 #include LIBSCEPAD_PLATFORM_INCLUDE
 #include "Internationalization/Regex.h"
+#endif // #if DUALSHOCK4_SUPPORT
 
 DEFINE_LOG_CATEGORY_STATIC(LogWinDualShock, Log, All);
 
