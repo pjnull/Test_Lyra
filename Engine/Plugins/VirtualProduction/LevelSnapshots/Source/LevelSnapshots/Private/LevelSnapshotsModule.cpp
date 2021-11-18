@@ -377,11 +377,12 @@ TSharedPtr<UE::LevelSnapshots::ICustomObjectSnapshotSerializer> UE::LevelSnapsho
     const bool bWasInBlueprint = Class->IsInBlueprint();
 	while (Class)
     {
-        Class = Class->GetSuperClass();
         if (const FCustomSerializer* Result = CustomSerializers.Find(Class); Result && (!bWasInBlueprint || Result->bIncludeBlueprintChildren))
         {
             return  Result->Serializer;
         }
+		
+        Class = Class->GetSuperClass();
     }
 
 	return nullptr;
