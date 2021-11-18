@@ -41,19 +41,14 @@ public:
 	}
 };
 
-
 FRenderMeshForConversion GetMeshForGeomObject(INode* Node, Object* Obj)
 {
 	// todo: baseline exporter uses GetBaseObject which takes result of EvalWorldState
 	// and searched down DerivedObject pipeline(by taking GetObjRef) 
 	// This is STRANGE as EvalWorldState shouldn't return DerivedObject in the first place(it should return result of pipeline evaluation)
 
-	GeomObject* GeomObj = dynamic_cast<GeomObject*>(Obj);
-
-	FNullView View;
-	TimeValue Time = GetCOREInterface()->GetTime();
 	BOOL bNeedsDelete;
-	Mesh* RenderMesh = GeomObj->GetRenderMesh(Time, Node, View, bNeedsDelete);
+	Mesh* RenderMesh = GetMeshFromRenderMesh(Node, bNeedsDelete, GetCOREInterface()->GetTime());
 
 	return FRenderMeshForConversion(Node, RenderMesh, bNeedsDelete);
 }

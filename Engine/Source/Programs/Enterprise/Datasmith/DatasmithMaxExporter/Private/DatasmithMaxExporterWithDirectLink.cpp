@@ -285,6 +285,96 @@ private:
 };
 
 
+// In order to retrieve Render geometry rather than Viewport geometry
+// RenderBegin need to be called for all RefMakers to be exported (and RenderEnd afterwards)
+// e.g. When using Optimize modifier on a geometry it has separate LODs for Render and Viewport and
+// GetRenderMesh would return Viewport lod if called without RenderBegin first. Consequently
+// without RenderEnd it would display Render LOD in viewport.
+class FNodesPreparer
+{
+public:
+
+	class FBeginRefEnumProc : public RefEnumProc
+	{
+	public:
+		void SetTime(TimeValue StartTime)
+		{
+			Time = StartTime;
+		}
+
+		virtual int proc(ReferenceMaker* RefMaker) override
+		{
+			RefMaker->RenderBegin(Time);
+			return REF_ENUM_CONTINUE;
+		}
+
+	private:
+		TimeValue Time;
+	};
+
+	class FEndRefEnumProc : public RefEnumProc
+	{
+	public:
+		void SetTime(TimeValue EndTime)
+		{
+			Time = EndTime;
+		}
+
+		virtual int proc(ReferenceMaker* RefMaker) override
+		{
+			RefMaker->RenderEnd(Time);
+			return REF_ENUM_CONTINUE;
+		}
+
+	private:
+		TimeValue Time;
+	};
+
+	void Start(TimeValue Time)
+	{
+		BeginProc.SetTime(Time);
+		EndProc.SetTime(Time);
+
+		BeginProc.BeginEnumeration();
+	}
+
+	void Finish()
+	{
+		BeginProc.EndEnumeration();
+
+		// Call RenderEnd on every node that had RenderBegin called
+		EndProc.BeginEnumeration();
+		for(INode* Node: NodesPrepared)
+		{
+			Node->EnumRefHierarchy(EndProc);
+		}
+		EndProc.EndEnumeration();
+
+		NodesPrepared.Reset();
+	}
+
+	void PrepareNode(INode* Node)
+	{
+		// Skip if node was already Prepared
+		bool bIsAlreadyPrepared;
+		NodesPrepared.FindOrAdd(Node, &bIsAlreadyPrepared);
+		if (bIsAlreadyPrepared)
+		{
+			return;
+		}
+
+		Node->EnumRefHierarchy(BeginProc);
+	}
+
+	FBeginRefEnumProc BeginProc;
+	FEndRefEnumProc EndProc;
+	
+	TSet<INode*> NodesPrepared;
+};
+
+
+
+
 // Holds states of entities for syncronization and handles change events
 class FSceneTracker: public ISceneTracker
 {
@@ -440,10 +530,22 @@ public:
 	// Applies all recorded changes to Datasmith scene
 	void Update(bool bQuiet)
 	{
-		FUpdateProgress ProgressManager(!bQuiet, 6); // Will shutdown on end of Update
-
-		LogDebug("Scene update: start");
 		DatasmithMaxLogger::Get().Purge();
+		TimeValue Time = GetCOREInterface()->GetTime();
+		NodesPreparer.Start(Time);
+		__try
+		{
+			UpdateInternal(bQuiet);
+		}
+		__finally // Make sure that finalize called no matter what happened in Vegas
+		{
+			NodesPreparer.Finish();
+		}
+	}
+
+	void UpdateInternal(bool bQuiet)
+	{
+		FUpdateProgress ProgressManager(!bQuiet, 6); // Will shutdown on end of Update
 
 		ProgressManager.ProgressStage(TEXT("Refresh layers"));
 		{
@@ -901,7 +1003,12 @@ public:
 
 				if (!bGeometryUpdated)
 				{
+					// todo: use single EnumProc instance to enumerate all nodes during update to:
+					//    - have single call to BeginEnumeration and EndEnumeration
+					//    - track all Begin'd nodes to End them together after all is updated(to prevent duplicated Begin's of referenced objects that might be shared by different ndoes)
+					NodesPreparer.PrepareNode(NodeTracker.Node);
 					UpdateInstancesGeometry(Instances, NodeTracker);
+
 					bGeometryUpdated = true;
 				}
 
@@ -1154,6 +1261,7 @@ public:
 				return true;
 			}
 		}
+
 		DatasmithMeshElement.Reset();
 		return false;
 	}
@@ -1518,6 +1626,8 @@ public:
 
 	TMap<AnimHandle, TUniquePtr<FLayerTracker>> LayersForAnimHandle;
 	TMap<FLayerTracker*, TSet<FNodeTracker*>> NodesPerLayer;
+
+	FNodesPreparer NodesPreparer;
 	
 	struct FRailClonesConverted
 	{
