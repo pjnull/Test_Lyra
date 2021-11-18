@@ -269,8 +269,10 @@ float3 StrataForwardLighting(
 			BRANCH
 			if(BSDF_GETTYPE(BSDF) == STRATA_BSDF_TYPE_SLAB)
 			{
-				// We want simple volumetric only if the DMFP input is pluged in, otherwise we avoid dealing with simple volumetric
-				const bool bIsSimpleVolume = BSDF_GETHASDMFP(BSDF);
+				// We want simple volumetric only if the DMFP input is pluged in, otherwise we avoid dealing with simple volumetric.
+				// We also do not want to use the simple volumetric path if we are dealing with an opaque material and this slab is not at the bottom.
+				// And when opaque, the bottom layer must be opaque and thus will ahve a solid opaque diffuse color.
+				const bool bIsSimpleVolume = BSDF_GETHASDMFP(BSDF) && (!STRATA_OPAQUE_MATERIAL || (STRATA_OPAQUE_MATERIAL && !bBottomLayer));
 				if (bIsSimpleVolume)
 				{
 					EnableSlabBSDFSimpleVolumetric(BSDF);
