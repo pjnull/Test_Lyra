@@ -105,7 +105,7 @@ void DepthExport(uint3 PixelPos : SV_DispatchThreadID)
 
 			FVisibleCluster VisibleCluster = GetVisibleCluster(VisibleClusterIndex);
 			checkSlow(VisibleCluster.InstanceId < PageConstants.x);
-			const FInstanceSceneData InstanceData = GetInstanceSceneData(VisibleCluster);
+			const FInstanceSceneData InstanceData = GetInstanceSceneData(VisibleCluster, false);
 			const FCluster ClusterData = GetCluster(VisibleCluster.PageIndex, VisibleCluster.ClusterIndex);
 
 			const uint MaterialSlot = GetMaterialSlot(ClusterData, InstanceData.PrimitiveId, TriIndex, MaterialSlotTable);
