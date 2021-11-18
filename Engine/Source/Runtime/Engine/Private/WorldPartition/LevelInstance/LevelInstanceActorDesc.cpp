@@ -12,6 +12,12 @@
 #include "UObject/UE5ReleaseStreamObjectVersion.h"
 #include "UObject/UE5MainStreamObjectVersion.h"
 
+static int32 GLevelInstanceDebugForceLevelStreaming = 0;
+static FAutoConsoleVariableRef CVarUpdateStreamingSources(
+	TEXT("levelinstance.debug.forcelevelstreaming"),
+	GLevelInstanceDebugForceLevelStreaming,
+	TEXT("Set to 1 to force Level Instance to be streamed instead of embedded in World Partition grid."));
+
 struct FActorDescContainerInstance
 {
 	FActorDescContainerInstance()
@@ -59,7 +65,7 @@ void FLevelInstanceActorDesc::OnRegister(UWorld* InWorld)
 
 	check(!LevelInstanceContainer);
 
-	if (DesiredRuntimeBehavior == ELevelInstanceRuntimeBehavior::Partitioned)
+	if (DesiredRuntimeBehavior == ELevelInstanceRuntimeBehavior::Partitioned && !GLevelInstanceDebugForceLevelStreaming)
 	{
 		if (!LevelPackage.IsNone() && ULevel::GetIsLevelUsingExternalActorsFromPackage(LevelPackage) && !ULevel::GetIsLevelPartitionedFromPackage(LevelPackage))
 		{
