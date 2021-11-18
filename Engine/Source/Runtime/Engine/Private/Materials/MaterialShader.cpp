@@ -2005,7 +2005,11 @@ void FMaterialShaderMap::Compile(
 		}
 	}
 
-	UE_LOG(LogShaders, Display, TEXT("	%s"), *WorkingDebugDescription);
+	// If we aren't actually compiling shaders don't print the debug message that we are compiling shaders.
+	if (PrecompileMode != EMaterialShaderPrecompileMode::None)
+	{
+		UE_LOG(LogShaders, Display, TEXT("	%s"), *WorkingDebugDescription);
+	}
 	NewContent->DebugDescription = *WorkingDebugDescription;
 #else
 	FString DebugExtension = "";
@@ -3015,7 +3019,7 @@ void FMaterialShaderMapContent::RemoveMeshShaderMap(const FHashedName& VertexFac
 	}
 }
 
-void FMaterialShaderMap::DumpDebugInfo()
+void FMaterialShaderMap::DumpDebugInfo() const
 {
 	const FString& FriendlyNameS = GetFriendlyName();
 	UE_LOG(LogConsoleResponse, Display, TEXT("FMaterialShaderMap:  FriendlyName %s"), *FriendlyNameS);

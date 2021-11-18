@@ -2259,32 +2259,37 @@ bool FMaterial::CacheShaders(const FMaterialShaderMapId& ShaderMapId, EShaderPla
 		}
 		else
 		{
-			const TCHAR* ShaderMapCondition;
-			if (GameThreadShaderMap)
+			const bool bSkipCompilationForODSC = !IsRequiredComplete() && GShaderCompilingManager->IsShaderCompilationSkipped();
+			// If we aren't actually compiling shaders don't print the debug message that we are compiling shaders.
+			if (!bSkipCompilationForODSC)
 			{
-				ShaderMapCondition = TEXT("Incomplete");
-			}
-			else
-			{
-				ShaderMapCondition = TEXT("Missing");
-			}
+				const TCHAR* ShaderMapCondition;
+				if (GameThreadShaderMap)
+				{
+					ShaderMapCondition = TEXT("Incomplete");
+				}
+				else
+				{
+					ShaderMapCondition = TEXT("Missing");
+				}
 #if WITH_EDITOR
-			UE_LOG(LogMaterial, Display, TEXT("%s cached shadermap for %s in %s, %s, %s (DDC key hash: %s), compiling. %s"),
-				ShaderMapCondition,
-				*GetAssetName(),
-				*LexToString(Platform),
-				*LexToString(ShaderMapId.QualityLevel),
-				*LexToString(ShaderMapId.FeatureLevel),
-				*DDCKeyHash,
-				IsSpecialEngineMaterial() ? TEXT("Is special engine material.") : TEXT("") 
-			);
+				UE_LOG(LogMaterial, Display, TEXT("%s cached shadermap for %s in %s, %s, %s (DDC key hash: %s), compiling. %s"),
+					ShaderMapCondition,
+					*GetAssetName(),
+					*LexToString(Platform),
+					*LexToString(ShaderMapId.QualityLevel),
+					*LexToString(ShaderMapId.FeatureLevel),
+					*DDCKeyHash,
+					IsSpecialEngineMaterial() ? TEXT("Is special engine material.") : TEXT("")
+				);
 #else
-			UE_LOG(LogMaterial, Display, TEXT("%s cached shader map for material %, compiling. %s"),
-				ShaderMapCondition,
-				*GetAssetName(),
-				IsSpecialEngineMaterial() ? TEXT("Is special engine material.") : TEXT("")
-			);
+				UE_LOG(LogMaterial, Display, TEXT("%s cached shader map for material %, compiling. %s"),
+					ShaderMapCondition,
+					*GetAssetName(),
+					IsSpecialEngineMaterial() ? TEXT("Is special engine material.") : TEXT("")
+				);
 #endif
+			}
 
 #if WITH_EDITORONLY_DATA
 			FStaticParameterSet StaticParameterSet;

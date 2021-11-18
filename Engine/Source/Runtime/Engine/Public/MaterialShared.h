@@ -1341,7 +1341,7 @@ public:
 			}
 		}
 	}
-	void DumpDebugInfo();
+	void DumpDebugInfo() const;
 
 #if WITH_EDITOR
 	void InitalizeForODSC(EShaderPlatform TargetShaderPlatform, const FMaterialCompilationOutput& NewCompilationOutput);
