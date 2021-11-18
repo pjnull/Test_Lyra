@@ -800,7 +800,7 @@ void DecompressPose(FCompactPose& OutPose, const FCompressedAnimSequence& Compre
 	OrientAndScaleRetargetingPairs.Reset();
 
 	// Optimization: assuming first index is root bone. That should always be the case in Skeletons.
-	checkSlow((RequiredBones.GetMeshPoseIndexFromSkeletonPoseIndex(FMeshPoseBoneIndex(0)) == FSkeletonPoseBoneIndex(0)));
+	checkSlow((RequiredBones.GetMeshPoseIndexFromSkeletonPoseIndex(FSkeletonPoseBoneIndex(0)) == FMeshPoseBoneIndex(0)));
 	// this is not guaranteed for AnimSequences though... If Root is not animated, Track will not exist.
 	const bool bFirstTrackIsRootBone = (CompressedData.GetSkeletonIndexFromTrackIndex(0) == 0);
 
