@@ -1055,7 +1055,7 @@ static void DrawPoint(FPrimitiveDrawInterface* PDI, const FVector& Pos, const FL
 		const FMatrix& ViewMatrix = PDI->View->ViewMatrices.GetViewMatrix();
 		const FVector XAxis = ViewMatrix.GetColumn(0); // Just using transpose here (orthogonal transform assumed)
 		const FVector YAxis = ViewMatrix.GetColumn(1);
-		DrawDisc(PDI, Pos, XAxis, YAxis, Color.ToFColor(true), 0.2f, 10, DebugClothMaterialVertex->GetRenderProxy(), SDPG_World);
+		DrawDisc(PDI, Pos, XAxis, YAxis, Color.ToFColor(true), 0.5f, 10, DebugClothMaterialVertex->GetRenderProxy(), SDPG_World);
 	}
 #endif
 }
@@ -1775,6 +1775,14 @@ void FClothingSimulation::DebugDrawLongRangeConstraint(FPrimitiveDrawInterface* 
 			return FLinearColor::MakeFromHSV8(Seed, 160, 128);
 		};
 
+	auto Darken =
+		[](const FLinearColor& Color) -> FLinearColor
+		{
+			FLinearColor ColorHSV = Color.LinearRGBToHSV();
+			ColorHSV.B *= .5f;
+			return ColorHSV.HSVToLinearRGB();
+		};
+
 	int32 ColorOffset = 0;
 
 	for (const FClothingSimulationCloth* const Cloth : Solver->GetCloths())
@@ -1796,6 +1804,7 @@ void FClothingSimulation::DebugDrawLongRangeConstraint(FPrimitiveDrawInterface* 
 			for (int32 BatchIndex = 0; BatchIndex < Tethers.Num(); ++BatchIndex)
 			{
 				const FLinearColor Color = PseudoRandomColor(ColorOffset + BatchIndex);
+				const FLinearColor DarkenedColor = Darken(Color);
 
 				const TConstArrayView<FPBDLongRangeConstraints::FTether>& TetherBatch = Tethers[BatchIndex];
 
@@ -1810,13 +1819,17 @@ void FClothingSimulation::DebugDrawLongRangeConstraint(FPrimitiveDrawInterface* 
 					const FVec3 Pos1 = Positions[DynamicIndex] + LocalSpaceLocation;
 
 					DrawLine(PDI, Pos0, Pos1, Color);
-
+#if WITH_EDITOR
+					DrawPoint(PDI, Pos1, Color, DebugClothMaterialVertex);
+#else
+					DrawPoint(nullptr, Pos1, Color, nullptr);
+#endif
 					FVec3 Direction = Pos1 - Pos0;
 					const float Length = Direction.SafeNormalize();
 					if (Length > SMALL_NUMBER)
 					{
 						const FVec3 Pos2 = Pos1 + Direction * (TargetLength - Length);
-						DrawLine(PDI, Pos1, Pos2, FLinearColor::Black);  // Color.Desaturate(1.f));
+						DrawLine(PDI, Pos1, Pos2, DarkenedColor);
 					}
 				}
 			}
