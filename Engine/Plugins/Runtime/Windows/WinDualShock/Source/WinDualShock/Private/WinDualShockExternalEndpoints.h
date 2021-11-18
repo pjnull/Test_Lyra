@@ -13,10 +13,10 @@ template<EWinDualShockPortType PortType>
 class FExternalWinDualShockEndpoint : public IAudioEndpoint
 {
 private:
-	TSharedPtr<IWinDualShockAudioDevice> Device;
+	TSharedRef<IWinDualShockAudioDevice> Device;
 
 public:
-	FExternalWinDualShockEndpoint(TSharedPtr<IWinDualShockAudioDevice> InDevice) : Device(InDevice)
+	FExternalWinDualShockEndpoint(TSharedRef<IWinDualShockAudioDevice> InDevice) : Device(InDevice)
 	{
 		Device->AddEndpoint();
 	}
@@ -63,10 +63,7 @@ protected:
 	{
 		check(NumChannels == GetNumChannels());
 
-		if (Device)
-		{
-			Device->PushAudio(PortType, InAudio, NumChannels);
-		}
+		Device->PushAudio(PortType, InAudio, NumChannels);
 		return true;
 	}
 

@@ -160,12 +160,20 @@ public:
 		Controllers.SetDeviceProperty(ControllerId, Property);
 	}
 
-	template<typename LAMBDA>
-	TSharedRef<IWinDualShockAudioDevice> GetAudioDevice(FDeviceKey& DeviceKey, LAMBDA&& CreateDevice)
+	void AddAudioDevice(const FDeviceKey& DeviceKey, TSharedRef<IWinDualShockAudioDevice> Device)
 	{
 		if (!DeviceMap.Contains(DeviceKey))
 		{
-			DeviceMap.Add(DeviceKey, MakeShareable(CreateDevice()));
+			DeviceMap.Add(DeviceKey, Device);
+		}
+	}
+
+	template<typename LAMBDA>
+	TSharedRef<IWinDualShockAudioDevice> GetAudioDevice(const FDeviceKey& DeviceKey, LAMBDA&& CreateDevice)
+	{
+		if (!DeviceMap.Contains(DeviceKey))
+		{
+			DeviceMap.Add(DeviceKey, CreateDevice());
 		}
 		return DeviceMap[DeviceKey];
 	}
@@ -230,14 +238,28 @@ public:
 		TearDownAudio();
 	}
 
+	void SetInputDevice(FWinDualShock* InInputDevice)
+	{
+		InputDevice = InInputDevice;
+	}
+
 	virtual void PushAudio(EWinDualShockPortType PortType, const TArrayView<const float>& InAudio, const int32& NumChannels)
 	{
-		if (!bAudioIsSetup.load())
+		if (InAudio.Num() == 0 || !bAudioIsSetup.load() || !InputDevice)
 			return;
 
 		float OutputGain = InputDevice->GetOutputGain();
 		if (PortType == EWinDualShockPortType::PadSpeakers)
 		{
+			if (!AudioDevice.IsStreamStarted() && AudioPadSpeakerBuffer->Count() >= EWinDualShockDefaults::NumFrames)
+			{
+				if (AudioDevice.NumOutputChannels == 2)
+					SubmitBuffer<2>();
+				else
+					SubmitBuffer<4>();
+				AudioDevice.StartStream();
+			}
+
 			check(NumChannels == 1 || NumChannels == 2);
 			check(AudioPadSpeakerBuffer);
 
@@ -269,6 +291,15 @@ public:
 		}
 		else if (PortType == EWinDualShockPortType::Vibration)
 		{
+			if (!AudioDevice.IsStreamStarted() && AudioVibrationBuffer->Count() >= EWinDualShockDefaults::NumFrames)
+			{
+				if (AudioDevice.NumOutputChannels == 2)
+					SubmitBuffer<2>();
+				else
+					SubmitBuffer<4>();
+				AudioDevice.StartStream();
+			}
+
 			check(NumChannels == 2);
 			check(AudioVibrationBuffer);
 
@@ -281,15 +312,6 @@ public:
 				AudioVibrationBuffer->Enqueue(left * OutputGain);
 				AudioVibrationBuffer->Enqueue(right * OutputGain);
 			}
-		}
-
-		if (!AudioDevice.IsStreamStarted() && AudioPadSpeakerBuffer->Count() >= EWinDualShockDefaults::NumFrames)
-		{
-			if (AudioDevice.NumOutputChannels == 2)
-				SubmitBuffer<2>();
-			else
-				SubmitBuffer<4>();
-			AudioDevice.StartStream();
 		}
 	}
 
@@ -325,7 +347,7 @@ public:
 
 	virtual void SetupAudio(ESonyControllerType ControllerType)
 	{
-		if (bAudioIsSetup.load())
+		if (bAudioIsSetup.load() || !InputDevice)
 		{
 			return;
 		}
@@ -600,7 +622,8 @@ template<EWinDualShockPortType PortType>
 class FExternalDualShockEndpointFactory : public IAudioEndpointFactory
 {
 public:
-	FExternalDualShockEndpointFactory()
+	FExternalDualShockEndpointFactory(TMap<FDeviceKey, TSharedRef<FWinDualShockAudioDeviceImpl>>& InEarlyDeviceMap)
+		: EarlyDeviceMap(InEarlyDeviceMap)
 	{
 		IAudioEndpointFactory::RegisterEndpointType(this);
 		bIsImplemented = true;
@@ -634,12 +657,12 @@ public:
 	{
 		const FDualShockExternalEndpointSettings& Settings = DowncastSoundfieldRef<const FDualShockExternalEndpointSettings>(InitialSettings);
 		FDeviceKey DeviceKey = { InitInfo.AudioDevicePtr->DeviceID, Settings.ControllerIndex };
-		TSharedPtr<IWinDualShockAudioDevice> Device = InputDevice->GetAudioDevice(DeviceKey,
-			[this, DeviceKey]()
-			{
-				return new FWinDualShockAudioDeviceImpl(InputDevice, DeviceKey);
-			}
-			);
+		auto AudioDeviceCreateFn = [this, DeviceKey]()
+		{
+			return MakeShareable(new FWinDualShockAudioDeviceImpl(InputDevice, DeviceKey));
+		};
+		TSharedRef<IWinDualShockAudioDevice> Device = 
+			InputDevice ? InputDevice->GetAudioDevice(DeviceKey, AudioDeviceCreateFn) : GetEarlyAudioDevice(DeviceKey, AudioDeviceCreateFn);
 		return TUniquePtr<IAudioEndpoint>(new FExternalWinDualShockEndpoint<PortType>(Device));
 	}
 
@@ -660,7 +683,18 @@ public:
 	}
 
 private:
+	template<typename LAMBDA>
+	TSharedRef<IWinDualShockAudioDevice> GetEarlyAudioDevice(const FDeviceKey& DeviceKey, LAMBDA&& CreateDevice)
+	{
+		if (!EarlyDeviceMap.Contains(DeviceKey))
+		{
+			EarlyDeviceMap.Add(DeviceKey, CreateDevice());
+		}
+		return EarlyDeviceMap[DeviceKey];
+	}
+
 	FWinDualShock* InputDevice = nullptr;
+	TMap<FDeviceKey, TSharedRef<FWinDualShockAudioDeviceImpl>>& EarlyDeviceMap;
 };
 
 #endif
@@ -672,8 +706,12 @@ class FWinDualShockPlugin : public IInputDeviceModule
 	FExternalDualShockEndpointFactory<EWinDualShockPortType::PadSpeakers>	PadSpeakerEndpoint;
 	FExternalDualShockEndpointFactory<EWinDualShockPortType::Vibration>		VibrationEndpoint;
 
+	// audio devices allocated early before FWinDualShock created
+	TMap<FDeviceKey, TSharedRef<FWinDualShockAudioDeviceImpl>>				EarlyDeviceMap;
+
 public:
 	FWinDualShockPlugin()
+		: PadSpeakerEndpoint(EarlyDeviceMap), VibrationEndpoint(EarlyDeviceMap)
 	{
 	}
 
@@ -693,6 +731,13 @@ public:
 		FWinDualShock* InputDevice = new FWinDualShock(InMessageHandler);
 		PadSpeakerEndpoint.SetInputDevice(InputDevice);
 		VibrationEndpoint.SetInputDevice(InputDevice);
+		// transfer ownership of any audio devices created before FWinDualShock
+		for (auto& Device : EarlyDeviceMap)
+		{
+			Device.Value->SetInputDevice(InputDevice);
+			InputDevice->AddAudioDevice(Device.Key, Device.Value);
+		}
+		EarlyDeviceMap.Reset();
 		return TSharedPtr< class IInputDevice >(InputDevice);
 #else
 		return TSharedPtr< class IInputDevice >(nullptr);
