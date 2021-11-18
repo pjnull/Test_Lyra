@@ -372,18 +372,17 @@ UE::LevelSnapshots::IPropertyComparer::EPropertyComparison UE::LevelSnapshots::P
 
 TSharedPtr<UE::LevelSnapshots::ICustomObjectSnapshotSerializer> UE::LevelSnapshots::Private::FLevelSnapshotsModule::GetCustomSerializerForClass(UClass* Class) const
 {
-	// Walk to first native parent
-	const bool bPassedInBlueprint = Class->IsInBlueprint();
-	while (Class && Class->IsInBlueprint())
-	{
-		Class = Class->GetSuperClass();
-	}
-
-	if (ensureAlways(Class))
-	{
-		const FCustomSerializer* Result = CustomSerializers.Find(Class);
-		return (Result && (!bPassedInBlueprint || Result->bIncludeBlueprintChildren)) ? Result->Serializer : TSharedPtr<ICustomObjectSnapshotSerializer>();
-	}
+    SCOPED_SNAPSHOT_CORE_TRACE(GetCustomSerializerForClass);
+    
+    const bool bWasInBlueprint = Class->IsInBlueprint();
+	while (Class)
+    {
+        Class = Class->GetSuperClass();
+        if (const FCustomSerializer* Result = CustomSerializers.Find(Class); Result && (!bWasInBlueprint || Result->bIncludeBlueprintChildren))
+        {
+            return  Result->Serializer;
+        }
+    }
 
 	return nullptr;
 }
