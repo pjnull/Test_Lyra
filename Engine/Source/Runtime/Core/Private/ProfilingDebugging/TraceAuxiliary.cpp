@@ -410,10 +410,6 @@ void FTraceAuxiliaryImpl::StartWorkerThread()
 {
 	if (!bWorkerThreadStarted)
 	{
-		// End frame delegate is no longer needed to pump Trace
-		FCoreDelegates::OnEndFrame.Remove(GEndFrameDelegateHandle);
-		GEndFrameDelegateHandle.Reset();
-		
 		UE::Trace::StartWorkerThread();
 		bWorkerThreadStarted = true;
 	}
@@ -484,7 +480,9 @@ static void TraceAuxiliarySend(const TArray<FString>& Args)
 static void TraceAuxiliaryStart(const TArray<FString>& Args)
 {
 	const TCHAR* Channels = Args.Num() > 0 ? *Args[0] : nullptr;
-	if (!FTraceAuxiliary::Start(FTraceAuxiliary::EConnectionType::File, nullptr, Channels))
+	FTraceAuxiliary::Options Opts;
+	Opts.bNoWorkerThread = true;
+	if (!FTraceAuxiliary::Start(FTraceAuxiliary::EConnectionType::File, nullptr, Channels, &Opts))
 	{
 		UE_LOG(LogConsoleResponse, Warning, TEXT("Failed to start tracing to a file"));
 		return;
@@ -801,11 +799,8 @@ static void SetupChannelsFromCommandline(const TCHAR* CommandLine)
 bool FTraceAuxiliary::Start(EConnectionType Type, const TCHAR* Target, const TCHAR* Channels, Options* Options)
 {
 #if UE_TRACE_ENABLED
-	if (Options && Options->bNoWorkerThread)
-	{
-		GTraceAuxiliary.StartEndFramePump();	
-	}
-	else
+	// Make sure the worker thread is started unless explicitly opt out.
+	if (!Options || !Options->bNoWorkerThread)
 	{
 		GTraceAuxiliary.StartWorkerThread();
 	}
@@ -930,13 +925,21 @@ void FTraceAuxiliary::Initialize(const TCHAR* CommandLine)
 	
 	// Initialize Trace
 	UE::Trace::FInitializeDesc Desc;
-	Desc.bUseWorkerThread = false; // We decide which update method to use in FTraceAuxiliary::Start method.
+	Desc.bUseWorkerThread = false;
 	Desc.bUseImportantCache = (FParse::Param(CommandLine, TEXT("tracenocache")) == false);
 	if (FParse::Value(CommandLine, TEXT("-tracetailmb="), Desc.TailSizeBytes))
 	{
 		Desc.TailSizeBytes <<= 20;
 	}
 	UE::Trace::Initialize(Desc);
+
+	// Always register end frame updates. This path is short circuited if a worker thread
+	// exists.
+	GTraceAuxiliary.StartEndFramePump();
+	if (FPlatformProcess::SupportsMultithreading() && !FForkProcessHelper::IsForkRequested())
+	{
+		GTraceAuxiliary.StartWorkerThread();
+	}
 
 	// Initialize callstack tracing with the regular malloc (it might have already been initialized by memory tracing).
 	CallstackTrace_Create(GMalloc);
