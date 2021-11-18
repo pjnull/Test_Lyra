@@ -159,6 +159,7 @@ void SReplaceNodeReferences::Construct(const FArguments& InArgs, TSharedPtr<clas
 {
 	BlueprintEditor = InBlueprintEditor;
 	Refresh();
+	bFindWithinBlueprint = false;
 	bShowReplacementsWhenFinished = true;
 
 	ChildSlot
