@@ -101,7 +101,6 @@ namespace Chaos
 		FManifoldPoint& ManifoldPoint = ManifoldPoints[ContactPointIdx];
 
 		ManifoldPoint.ContactPoint.Normal = Normal;
-		ManifoldPoint.ManifoldContactNormal = Normal;
 		Modifier->MarkConstraintForManifoldUpdate(*Constraint);
 	}
 
@@ -143,13 +142,6 @@ namespace Chaos
 
 		ManifoldPoint.ContactPoint.Location = 0.5 * (Location0 + Location1);
 
-		// Reset anchors to contact points, impulse location is impacted by anchors and not setting this will result in incorrect angular impulse.
-
-		// TODO: If body is using static friction this will prevent static friction from applying this frame.
-		// Try applying same change in position to previous contact positions, as this should maintain valid anchors when using static friction.
-		ManifoldPoint.CoMAnchorPoints[0] = ManifoldPoint.CoMContactPoints[0];
-		ManifoldPoint.CoMAnchorPoints[1] = ManifoldPoint.CoMContactPoints[1];
-
 		Modifier->MarkConstraintForManifoldUpdate(*Constraint);
 	}
 
@@ -171,13 +163,6 @@ namespace Chaos
 		ManifoldPoint.CoMContactPoints[1] = Location1;
 
 		ManifoldPoint.ContactPoint.Location = 0.5 * (Location0 + Location1);
-
-
-		// Reset anchors to contact points, impulse location is impacted by anchors and not setting this will result in incorrect angular impulse.
-		// TODO: If body is using static friction this will prevent static friction from applying this frame.
-		// Try applying same change in position to previous contact positions, as this should maintain valid anchors when using static friction.
-		ManifoldPoint.CoMAnchorPoints[0] = ManifoldPoint.CoMContactPoints[0];
-		ManifoldPoint.CoMAnchorPoints[1] = ManifoldPoint.CoMContactPoints[1];
 
 		Modifier->MarkConstraintForManifoldUpdate(*Constraint);
 	}

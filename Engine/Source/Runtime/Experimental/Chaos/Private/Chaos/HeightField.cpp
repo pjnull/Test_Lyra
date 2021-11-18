@@ -1387,13 +1387,6 @@ namespace Chaos
 		// Reduce to only 4 contact points from here
 		Collisions::ReduceManifoldContactPointsTriangeMesh(ContactPoints);
 
-		for (FContactPoint& ContactPoint : ContactPoints)
-		{
-			ContactPoint.ContactNormalOwnerIndex = 1; // To be removed
-			ContactPoint.ShapeMargins[0] = 0.0f;
-			ContactPoint.ShapeMargins[1] = 0.0f;
-		}
-
 		return true;
 	}
 

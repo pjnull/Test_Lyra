@@ -96,22 +96,13 @@ namespace Chaos
 				const FManifoldPoint& ManifoldPoint = ManifoldPoints[ManifoldPointIndex];
 
 				// The world-space contact normal
-				FVec3 WorldContactNormal;
-				if (bChaos_Collision_Manifold_FixNormalsInWorldSpace)
-				{
-					WorldContactNormal = ManifoldPoint.ManifoldContactNormal;
-				}
-				else
-				{
-					const FRotation3& PlaneQ = (ManifoldPoint.ContactPoint.ContactNormalOwnerIndex == 0) ? Solver.SolverBody0().Q() : Solver.SolverBody1().Q();
-					WorldContactNormal = PlaneQ * ManifoldPoint.ManifoldContactNormal;
-				}
+				const FVec3& WorldContactNormal = ManifoldPoint.ContactPoint.Normal;
 
 				// Initialize the structural data in the contact (relative contact points, contact mass etc)
 				Solver.InitContact(
 					ManifoldPointIndex,
-					ManifoldPoint.CoMAnchorPoints[0],
-					ManifoldPoint.CoMAnchorPoints[1],
+					ManifoldPoint.CoMContactPoints[0],
+					ManifoldPoint.CoMContactPoints[1],
 					WorldContactNormal);
 
 				// Calculate the target normal velocity based on restitution
@@ -134,7 +125,7 @@ namespace Chaos
 				Solver.InitMaterial(
 					ManifoldPointIndex,
 					WorldContactVelocityTargetNormal,
-					ManifoldPoint.bPotentialRestingContact && (Solver.StaticFriction() > 0),
+					(Solver.StaticFriction() > 0),
 					ManifoldPoint.StaticFrictionMax);
 			}
 		}
@@ -155,21 +146,9 @@ namespace Chaos
 				FManifoldPoint& ManifoldPoint = ManifoldPoints[PointIndex];
 
 				ManifoldPoint.NetPushOut = SolverManifoldPoint.NetPushOut;
-				ManifoldPoint.NetPushOutNormal = FVec3::DotProduct(SolverManifoldPoint.NetPushOut, SolverManifoldPoint.WorldContactNormal);
 				ManifoldPoint.NetImpulse = SolverManifoldPoint.NetImpulse;
-				ManifoldPoint.NetImpulseNormal = FVec3::DotProduct(SolverManifoldPoint.NetImpulse, SolverManifoldPoint.WorldContactNormal);
-				ManifoldPoint.bActive = !SolverManifoldPoint.NetPushOut.IsNearlyZero();
 				ManifoldPoint.bInsideStaticFrictionCone = SolverManifoldPoint.bInsideStaticFrictionCone;
 				ManifoldPoint.StaticFrictionMax = SolverManifoldPoint.StaticFrictionMax;
-
-				// If the contact has no static friction, reset the static friction point to the current contact position
-				// @todo(chaos): this should keep the prev contact at the friction cone edge, rather than just resetting 
-				// (this currently causes stick-slide movement just above the friction threshold)
-				if (!ManifoldPoint.bActive || !ManifoldPoint.bInsideStaticFrictionCone)
-				{
-					ManifoldPoint.CoMAnchorPoints[0] = ManifoldPoint.CoMContactPoints[0];
-					ManifoldPoint.CoMAnchorPoints[1] = ManifoldPoint.CoMContactPoints[1];
-				}
 
 				AccumulatedImpulse += SolverManifoldPoint.NetImpulse + (SolverManifoldPoint.NetPushOut / Dt);
 			}

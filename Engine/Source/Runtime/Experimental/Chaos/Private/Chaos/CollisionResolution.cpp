@@ -652,8 +652,6 @@ namespace Chaos
 				Contact.Location = AverageLocation / static_cast<FReal>(NumConstraints);
 			}
 
-			Contact.ShapeMargins[0] = 0.0f;
-			Contact.ShapeMargins[1] = 0.0f;
 			Contact.ShapeContactPoints[0] = BoxTransform.InverseTransformPosition(Contact.Location);
 			Contact.ShapeContactPoints[1] = PlaneTransform.InverseTransformPosition(Contact.Location - Contact.Phi * Contact.Normal);
 			Contact.ShapeContactNormal = PlaneTransform.InverseTransformVector(Contact.Normal);
@@ -1722,9 +1720,6 @@ namespace Chaos
 
 				if (ContactPoint.IsSet())
 				{
-					// @todo(chaos): margin
-					ContactPoint.ShapeMargins[0] = 0.0f;
-					ContactPoint.ShapeMargins[1] = 0.0f;
 					ContactPoint.ShapeContactPoints[0] = WorldTransform0.InverseTransformPosition(ContactPoint.Location);
 					ContactPoint.ShapeContactPoints[1] = WorldTransform1.InverseTransformPosition(ContactPoint.Location - ContactPoint.Phi * ContactPoint.Normal);
 					ContactPoint.ShapeContactNormal = WorldTransform1.InverseTransformVector(ContactPoint.Normal);

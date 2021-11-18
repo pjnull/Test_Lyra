@@ -38,69 +38,27 @@ namespace Chaos
 	public:
 		FManifoldPoint() 
 			: CoMContactPoints{ FVec3(0), FVec3(0) }
-			, ManifoldContactTangents{ FVec3(0), FVec3(0) }
-			, ManifoldContactNormal(0)
-			, NetImpulse(0)
 			, NetPushOut(0)
-			, NetPushOutImpulseNormal(0)
-			, NetPushOutImpulseTangent(0)
-			, NetPushOutNormal(0)
-			, NetPushOutTangent(0)
-			, NetImpulseNormal(0)
-			, NetImpulseTangent(0)
-			, InitialContactVelocity(0)
-			, InitialPhi(0)
-			, bPotentialRestingContact(false)
-			, bInsideStaticFrictionCone(false)
-			, bRestitutionEnabled(false)
-			, bActive(false)
+			, NetImpulse(0)
 			, StaticFrictionMax(0)
+			, bInsideStaticFrictionCone(false)
 		{}
 
 		FManifoldPoint(const FContactPoint& InContactPoint) 
 			: ContactPoint(InContactPoint)
 			, CoMContactPoints{ FVec3(0), FVec3(0) }
-			, ManifoldContactTangents{ FVec3(0), FVec3(0) }
-			, ManifoldContactNormal(0)
-			, NetImpulse(0)
 			, NetPushOut(0)
-			, NetPushOutImpulseNormal(0)
-			, NetPushOutImpulseTangent(0)
-			, NetPushOutNormal(0)
-			, NetPushOutTangent(0)
-			, NetImpulseNormal(0)
-			, NetImpulseTangent(0)
-			, InitialContactVelocity(0)
-			, InitialPhi(0)
-			, bPotentialRestingContact(false)
-			, bInsideStaticFrictionCone(false)
-			, bRestitutionEnabled(false)
-			, bActive(false)
+			, NetImpulse(0)
 			, StaticFrictionMax(0)
+			, bInsideStaticFrictionCone(false)
 		{}
 
-		// @todo(chaos): Normal and plane owner should be per manifold, not per manifold-point when we are not using incremental manifolds any more
-		FContactPoint ContactPoint;			// Shape-space data from low-level collision detection
-		FVec3 CoMContactPoints[2];			// CoM-space contact points on the two bodies core shapes (not including margin)
-		FVec3 ManifoldContactTangents[2];		// CoM-space or world space (depending on CVAR bChaos_Collision_Manifold_FixNormalsInWorldSpace) contact tangents for friction
-		FVec3 ManifoldContactNormal;				// CoM-space or  world space  (depending on CVAR bChaos_Collision_Manifold_FixNormalsInWorldSpace) contact normal relative to ContactNormalOwner body
-		FVec3 CoMAnchorPoints[2];			// CoM-space contact points on the two bodies core shapes used for static friction
-		FVec3 NetImpulse;					// Total impulse applied by this contact point
+		FContactPoint ContactPoint;			// Contact point results of low-level collision detection
+		FVec3 CoMContactPoints[2];			// CoM-space contact points on the two bodies
 		FVec3 NetPushOut;					// Total pushout applied at this contact point
-		FReal NetPushOutImpulseNormal;		// Total pushout impulse along normal (for final velocity correction) applied at this contact point
-		FReal NetPushOutImpulseTangent;		// Total pushout impulse along tangent (for final velocity correction) applied at this contact point
-		FReal NetPushOutNormal;
-		FReal NetPushOutTangent;
-		FReal NetImpulseNormal;
-		FReal NetImpulseTangent;
-		FReal InitialContactVelocity;		// Contact velocity at start of frame (used for restitution)
-		FReal InitialPhi;					// Contact separation at first contact (used for pushout restitution)
-		bool bPotentialRestingContact;		// Whether this may be a resting contact (used for static friction)
-		bool bInsideStaticFrictionCone;		// Whether we are inside the static friction cone (used in PushOut)
-		bool bRestitutionEnabled;			// Whether restitution was added in the apply step (used in PushOut)
-		bool bActive;						// Whether this contact applied an impulse
-
+		FVec3 NetImpulse;					// Total impulse applied by this contact point
 		FReal StaticFrictionMax;			// A proxy for the normal impulse used to limit static friction correction. Used for smoothing static friction limits
+		bool bInsideStaticFrictionCone;		// Whether we are inside the static friction cone (used in PushOut)
 	};
 
 	/*
@@ -370,13 +328,6 @@ namespace Chaos
 			const FRotation3& Q0,
 			const FVec3& P1,
 			const FRotation3& Q1);
-		void CalculatePrevCoMContactPoints(
-			const FSolverBody& Body0,
-			const FSolverBody& Body1,
-			FManifoldPoint& ManifoldPoint,
-			FReal Dt,
-			FVec3& OutPrevCoMContactPoint0,
-			FVec3& OutPrevCoMContactPoint1) const;
 
 		void AddIncrementalManifoldContact(const FContactPoint& ContactPoint, const FReal Dt);
 		void AddOneshotManifoldContact(const FContactPoint& ContactPoint, const FReal Dt);
@@ -471,7 +422,7 @@ namespace Chaos
 		void InitManifoldPoint(FManifoldPoint& ManifoldPoint, FReal Dt);
 		void UpdateManifoldPoint(int32 ManifoldPointIndex, const FContactPoint& ContactPoint, const FReal Dt);
 		void SetActiveContactPoint(const FContactPoint& ContactPoint);
-		void GetWorldSpaceManifoldPoint(const FManifoldPoint& ManifoldPoint, const FVec3& P0, const FRotation3& Q0, const FVec3& P1, const FRotation3& Q1, FVec3& OutContactLocation, FVec3& OutContactNormal, FReal& OutContactPhi);
+		void GetWorldSpaceManifoldPoint(const FManifoldPoint& ManifoldPoint, const FVec3& P0, const FRotation3& Q0, const FVec3& P1, const FRotation3& Q1, FVec3& OutContactLocation, FReal& OutContactPhi);
 
 		/**
 		 * @brief Move the current manifold to the previous manifold, and reset the current manifold ready for it to be rebuilt
