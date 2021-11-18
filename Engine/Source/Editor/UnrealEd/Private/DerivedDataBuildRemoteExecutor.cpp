@@ -1066,7 +1066,9 @@ void InitDerivedDataBuildRemoteExecutor()
 {
 }
 
-
+void DumpDerivedDataBuildRemoteExecutorStats()
+{
+}
 
 
 #endif // #if UE_WITH_ZEN
