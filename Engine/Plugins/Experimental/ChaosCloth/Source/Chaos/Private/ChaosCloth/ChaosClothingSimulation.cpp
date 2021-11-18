@@ -624,9 +624,8 @@ void FClothingSimulation::GetSimulationData(
 		}
 
 		// If the LOD has changed while the simulation is suspended, the cloth still needs to be updated with the correct LOD data
-		const int32 MeshLODIndex = Cloth->GetMesh()->GetLODIndex();
-		const int32 ClothLODIndex = Cloth->GetLODIndex(Solver.Get());
-		if (ClothLODIndex != MeshLODIndex)
+		const int32 LODIndex = Cloth->GetMesh()->GetLODIndex();
+		if (LODIndex != Cloth->GetLODIndex(Solver.Get()))
 		{
 			Cloth->PreUpdate(Solver.Get());  // Currently doing colliders' update, not really required here, but this could later change (technically PreUpdates are for any non parallel cloth updates)
 			Cloth->Update(Solver.Get());  // LOD switching
@@ -689,7 +688,7 @@ void FClothingSimulation::GetSimulationData(
 		// Set the current LOD these data apply to, so that the correct deformer mappings can be applied
 		if (const UClothingAssetCommon* const ClothingAsset = Cloth->GetMesh()->GetAsset())
 		{
-			Data.LODIndex = ClothingAsset->LodMap.Find(ClothLODIndex);  // Store the mesh LOD index, which is different to the cloth asset's LOD index
+			Data.LODIndex = ClothingAsset->LodMap.Find(LODIndex);  // Store the mesh LOD index, which is different to the cloth asset's LOD index
 		}
 		else
 		{
