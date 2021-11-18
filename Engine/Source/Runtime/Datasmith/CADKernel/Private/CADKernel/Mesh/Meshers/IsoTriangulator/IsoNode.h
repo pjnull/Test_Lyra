@@ -98,9 +98,13 @@ public:
 
 	FIsoSegment* GetSegmentConnectedTo(const FIsoNode* Node) const;
 
-	TArray<FIsoSegment*>& GetConnectedSegments()
+	void RemoveSegment(FIsoSegment* const Segment)
 	{
-		return ConnectedSegments;
+		int32 SegmentIndex = 0;
+		if (ConnectedSegments.Find(Segment, SegmentIndex))
+		{
+			ConnectedSegments.RemoveAt(SegmentIndex);
+		}
 	}
 
 	void ConnectSegment(FIsoSegment* Segment)

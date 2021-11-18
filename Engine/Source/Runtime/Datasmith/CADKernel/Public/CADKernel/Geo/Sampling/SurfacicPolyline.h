@@ -112,7 +112,7 @@ namespace CADKernel
 			double Distance3D = Points3D[Index].Distance(Points3D[Index + 1]);
 			if (FMath::IsNearlyZero(Distance3D, (double)SMALL_NUMBER))
 			{
-				return HUGE_VALUE;
+				return (Coordinates.Last() - Coordinates[0]) / 10.;
 			}
 			else
 			{

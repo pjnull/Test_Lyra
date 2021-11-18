@@ -187,6 +187,7 @@ namespace CADKernel
 		bool Triangulate();
 
 		void BuildNodes();
+		void CheckLoopInSelfIntersectingAndFixIt();
 
 		/**
 		 * Build the segments of the loops and check if each loop is self intersecting.
@@ -338,7 +339,21 @@ namespace CADKernel
 		 */
 		void MeshCycle(const EGridSpace Space, const TArray<FIsoSegment*>& cycle, const TArray<bool>& cycleOrientation);
 
-		void RemoveIntersectionByMovingTheClosedPoint(FIntersectionSegmentTool& CycleIntersectionTool, const TArray<FIsoSegment*>& Cycle, const FIsoSegment* Segment, const FIsoSegment* IntersectingSegment);
+		bool CanCycleBeFixedAndMeshed(const TArray<FIsoSegment*>& Cycle, FIntersectionSegmentTool& CycleIntersectionTool);
+
+		bool TryToRemoveIntersectionByMovingTheClosedOusidePoint(const FIsoSegment* Segment0, const FIsoSegment* Segment1);
+		bool TryToRemoveIntersectionBySwappingSegments(FIsoSegment* Segment0, FIsoSegment* Segment1);
+
+		/**
+		 * Segment and the segment next (or before Segment) are intersecting IntersectingSegment
+		 * The commun node is moved
+		 */
+		bool TryToRemoveIntersectionOfTwoConsecutiveIntersectingSegments(const FIsoSegment* IntersectingSegment, FIsoSegment* Segment);
+
+		//void FixPick(const FIsoSegment* Segment0, const FIsoSegment* Segment1);
+		//bool FixPick2(const FIsoSegment* Segment0, const FIsoSegment* Segment1);
+
+		//void AddSegmentsAndRemoveIntersection(FIntersectionSegmentTool& CycleIntersectionTool, const TArray<FIsoSegment*>& Cycle, const TArray<bool>& CycleOrientation);
 
 		/**
 		 * Finalization of the mesh by the tessellation of the inner grid
@@ -410,7 +425,7 @@ namespace CADKernel
 		 *
 		 */
 		void TryToConnectVertexSubLoopWithTheMostIsoSegment(FCell& Cell, const TArray<FLoopNode*>& SubLoop);
-		void TryToCreateSegment(FCell& Cell, FLoopNode* NodeA, const FPoint2D& ACoordinates, FIsoNode* NodeB, const FPoint2D& BCoordinates, const double FlatAngle);
+		bool TryToCreateSegment(FCell& Cell, FLoopNode* NodeA, const FPoint2D& ACoordinates, FIsoNode* NodeB, const FPoint2D& BCoordinates, const double FlatAngle);
 
 #ifdef CADKERNEL_DEV
 	public:
@@ -426,6 +441,8 @@ namespace CADKernel
 		void Display(EGridSpace Space, const FIsoNode& NodeA, const FIsoNode& NodeB, FIdent Ident = 0, EVisuProperty Property = EVisuProperty::Element) const;
 		void Display(EGridSpace Space, const FIsoSegment& Segment, FIdent Ident = 0, EVisuProperty Property = EVisuProperty::Element, bool bDisplayOrientation = false) const;
 		void Display(EGridSpace Space, const TCHAR* Message, const TArray<FIsoSegment*>& Segment, bool bDisplayNode, bool bDisplayOrientation = false, EVisuProperty Property = EVisuProperty::Element) const;
+
+		void DisplayLoops(EGridSpace Space, const TCHAR* Message, const TArray<FLoopNode>& Nodes, bool bDisplayNode, EVisuProperty Property = EVisuProperty::Element) const;
 
 		void DisplayCycle(const TArray<FIsoSegment*>& Cycle, const TCHAR* Message) const;
 

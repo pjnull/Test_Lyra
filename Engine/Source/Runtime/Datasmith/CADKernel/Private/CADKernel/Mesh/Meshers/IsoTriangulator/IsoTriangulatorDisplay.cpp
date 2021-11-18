@@ -79,6 +79,32 @@ void FIsoTriangulator::Display(EGridSpace Space, const TCHAR* Message, const TAr
 	//Wait();
 }
 
+void FIsoTriangulator::DisplayLoops(EGridSpace Space, const TCHAR* Message, const TArray<FLoopNode>& Nodes, bool bDisplayNode, EVisuProperty Property) const
+{
+	if (!bDisplay)
+	{
+		return;
+	}
+
+	F3DDebugSession _(Message);
+
+	for (const FLoopNode& Node : Nodes)
+	{
+		{
+			Display(Space, Node, Node.GetNextNode(), 0, Property);
+		}
+	}
+
+	if (bDisplayNode)
+	{
+		for (const FLoopNode& Node : Nodes)
+		{
+			Display(Space, Node, Node.GetFaceIndex());
+		}
+	}
+}
+
+
 void FIsoTriangulator::DisplayIsoNodes(EGridSpace Space) const
 {
 	if (!bDisplay)

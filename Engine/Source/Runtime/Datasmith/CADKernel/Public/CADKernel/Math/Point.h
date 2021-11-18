@@ -439,6 +439,11 @@ public:
 		return FPoint2D(U * cos(Theta) - V * sin(Theta), U * sin(Theta) + V * cos(Theta));
 	}
 
+	FPoint2D Middle(const FPoint2D& Point) const
+	{
+		return FPoint(0.5 * (U + Point.U), 0.5 * (V + Point.V));
+	}
+
 	double Distance(const FPoint2D& Point) const
 	{
 		return sqrt(FMath::Square(Point.U - U) + FMath::Square(Point.V - V));

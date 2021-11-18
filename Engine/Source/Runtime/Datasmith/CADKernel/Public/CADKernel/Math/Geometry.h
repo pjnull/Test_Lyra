@@ -376,6 +376,17 @@ namespace CADKernel
 	}
 
 	/**
+	 * @return the distance between the point and the segment. If the projection of the point on the segment
+	 * is not inside it, return the distance of the point to nearest the segment extremity
+	 */
+	template<class PointType>
+	inline double SquareDistanceOfPointToSegment(const PointType& Point, const PointType& SegmentPoint1, const PointType& SegmentPoint2)
+	{
+		double Coordinate;
+		return ProjectPointOnSegment(Point, SegmentPoint1, SegmentPoint2, Coordinate, /*bRestrictCoodinateToInside*/ true).SquareDistance(Point);
+	}
+
+	/**
 	 * @return the distance between the point and the line i.e. the distance between the point and its projection on the line 
 	 */
 	template<class PointType>
@@ -497,6 +508,24 @@ namespace CADKernel
 		}
 
 		return (ABIntersectionCoordinate <= Max && ABIntersectionCoordinate >= Min && CDIntersectionCoordinate <= Max && CDIntersectionCoordinate >= Min);
+	}
+
+	/**
+	 * The segments must intersect because no check is done
+	 */
+	inline FPoint2D FindIntersectionOfSegments2D(const TSegment<FPoint2D>& SegmentAB, const TSegment<FPoint2D>& SegmentCD)
+	{
+		constexpr const double Min = -SMALL_NUMBER;
+		constexpr const double Max = 1. + SMALL_NUMBER;
+
+		FPoint2D AB = SegmentAB[1] - SegmentAB[0];
+		FPoint2D CD = SegmentCD[1] - SegmentCD[0];
+		FPoint2D CA = SegmentAB[0] - SegmentCD[0];
+
+		double ParallelCoef = CD ^ AB;
+		double ABIntersectionCoordinate = (CA ^ CD) / ParallelCoef;
+
+		return SegmentAB[0] + AB * ABIntersectionCoordinate;
 	}
 
 	/**
