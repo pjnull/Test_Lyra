@@ -117,7 +117,8 @@ bool UDMXFixtureComponentDouble::IsTargetValid(int32 ChannelIndex, float Target)
 
 void UDMXFixtureComponentDouble::SetTargetValue(int32 ChannelIndex, float AbsoluteValue)
 {
-	if (CurrentCell && CurrentCell->ChannelInterpolation.Num() == 2 &&
+	if (CurrentCell && 
+		CurrentCell->ChannelInterpolation.Num() == 2 &&
 		IsTargetValid(ChannelIndex, AbsoluteValue))
 	{
 		FInterpolationData& InterpolationData = ChannelIndex == 0 ? CurrentCell->ChannelInterpolation[0] : CurrentCell->ChannelInterpolation[1];
@@ -134,11 +135,29 @@ void UDMXFixtureComponentDouble::SetTargetValue(int32 ChannelIndex, float Absolu
 				// Jump to the first value if it never was set
 				InterpolationData.SetValueNoInterp(AbsoluteValue);
 				InterpolationData.bFirstValueWasSet = true;
+
+				if (ChannelIndex == 0)
+				{
+					SetChannel1ValueNoInterp(AbsoluteValue);
+				}
+				else
+				{
+					SetChannel2ValueNoInterp(AbsoluteValue);
+				}
 			}
 		}
 		else
 		{
 			InterpolationData.SetValueNoInterp(AbsoluteValue);
+
+			if (ChannelIndex == 0)
+			{
+				SetChannel1ValueNoInterp(AbsoluteValue);
+			}
+			else
+			{
+				SetChannel2ValueNoInterp(AbsoluteValue);
+			}
 		}
 	}
 }	
