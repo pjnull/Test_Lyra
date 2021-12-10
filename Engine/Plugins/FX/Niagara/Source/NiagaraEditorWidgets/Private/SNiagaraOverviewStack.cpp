@@ -26,6 +26,7 @@
 #include "NiagaraEditorModule.h"
 #include "NiagaraNodeAssignment.h"
 #include "Widgets/SNiagaraParameterName.h"
+#include "SNiagaraOverviewInlineParameterBox.h"
 #include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/Layout/SGridPanel.h"
 #include "Widgets/Layout/SScaleBox.h"
@@ -836,13 +837,15 @@ TSharedRef<ITableRow> SNiagaraOverviewStack::OnGenerateRowForEntry(UNiagaraStack
 			// Name
 			+ SHorizontalBox::Slot()
 			.VAlign(VAlign_Center)
+			.AutoWidth()
+			.MaxWidth(150.f)
 			.Padding(3, 2, 0, 2)
 			[
 				SNew(SNiagaraSystemOverviewItemName, StackItem)
 			]
 			+ SHorizontalBox::Slot()
             .AutoWidth()
-            .Padding(6, 0, 9, 0)
+            .Padding(2, 0, 2, 0)
             [
                 SNew(SNiagaraStackRowPerfWidget, Item)
             ];
@@ -852,6 +855,12 @@ TSharedRef<ITableRow> SNiagaraOverviewStack::OnGenerateRowForEntry(UNiagaraStack
 			
 		if (StackModuleItem)
 		{
+			ContentBox->AddSlot()
+			.HAlign(HAlign_Fill)
+			[
+				SNew(SNiagaraOverviewInlineParameterBox, *StackModuleItem)
+			];
+			
 			if(StackModuleItem->IsScratchModule())
 			{
 				ContentBox->AddSlot()
@@ -869,15 +878,19 @@ TSharedRef<ITableRow> SNiagaraOverviewStack::OnGenerateRowForEntry(UNiagaraStack
 			{
 				ContentBox->AddSlot()
 					.VAlign(VAlign_Center)
+					.HAlign(HAlign_Center)
 					.AutoWidth()
-					.Padding(3, 0, 0, 0)
+					.Padding(3, 0)
 					[
 						SNew(SButton)
+						.HAlign(HAlign_Center)
+						.VAlign(VAlign_Center)
 						.ButtonColorAndOpacity(FLinearColor::Transparent)
 						.ForegroundColor(FLinearColor::Transparent)
 						.ToolTipText(LOCTEXT("EnableDebugDrawCheckBoxToolTip", "Enable or disable debug drawing for this item."))
 						.OnClicked(this, &SNiagaraOverviewStack::ToggleModuleDebugDraw, StackItem)
-						.ContentPadding(FMargin(0, 0, 0, 0))
+						// @Todo the debug icons aren't centered, so we correct this using padding. We also shrink the button size
+						.ContentPadding(FMargin(-11, 2, -7, 2))
 						[
 							SNew(SImage)
 							.Image(this, &SNiagaraOverviewStack::GetDebugIconBrush, StackItem)
@@ -885,7 +898,6 @@ TSharedRef<ITableRow> SNiagaraOverviewStack::OnGenerateRowForEntry(UNiagaraStack
 					];
 			}
 		}
-
 
 		// Enabled checkbox
 		ContentBox->AddSlot()
@@ -900,7 +912,7 @@ TSharedRef<ITableRow> SNiagaraOverviewStack::OnGenerateRowForEntry(UNiagaraStack
 				.OnCheckedChanged_UObject(StackItem, &UNiagaraStackItem::SetIsEnabled)
 			];
 
-		Content = ContentBox;
+		Content = ContentBox;		
 	}
 	else if (Item->IsA<UNiagaraStackItemGroup>())
 	{
