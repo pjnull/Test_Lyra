@@ -17,7 +17,7 @@ namespace EpicGames.Core
 		/// <summary>
 		/// Object used for controlling access to NumOutstandingJobs and updating EmptyEvent
 		/// </summary>
-		readonly object LockObject = new object();
+		object LockObject = new object();
 
 		/// <summary>
 		/// Number of jobs remaining in the queue. This is updated in an atomic way.
@@ -32,7 +32,7 @@ namespace EpicGames.Core
 		/// <summary>
 		/// Exceptions which occurred while executing tasks
 		/// </summary>
-		readonly List<Exception> Exceptions = new List<Exception>();
+		List<Exception> Exceptions = new List<Exception>();
 
 		/// <summary>
 		/// Default constructor

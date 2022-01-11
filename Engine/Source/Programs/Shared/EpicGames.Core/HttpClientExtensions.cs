@@ -29,9 +29,11 @@ namespace EpicGames.Core
 		/// <returns>New instance of the object</returns>
 		public static async Task<TResponse> GetAsync<TResponse>(this HttpClient Client, string Url, CancellationToken CancellationToken)
 		{
-			using HttpResponseMessage Response = await Client.GetAsync(Url, CancellationToken);
-			Response.EnsureSuccessStatusCode();
-			return await ParseJsonContent<TResponse>(Response);
+			using (HttpResponseMessage Response = await Client.GetAsync(Url, CancellationToken))
+			{
+				Response.EnsureSuccessStatusCode();
+				return await ParseJsonContent<TResponse>(Response);
+			}
 		}
 
 		/// <summary>
@@ -60,9 +62,11 @@ namespace EpicGames.Core
 		/// <returns>The response parsed into the requested type</returns>
 		public static async Task<TResponse> PostAsync<TResponse, TRequest>(this HttpClient Client, string Url, TRequest Request, CancellationToken CancellationToken)
 		{
-			using HttpResponseMessage Response = await PostAsync(Client, Url, Request, CancellationToken);
-			Response.EnsureSuccessStatusCode();
-			return await ParseJsonContent<TResponse>(Response);
+			using (HttpResponseMessage Response = await PostAsync(Client, Url, Request, CancellationToken))
+			{
+				Response.EnsureSuccessStatusCode();
+				return await ParseJsonContent<TResponse>(Response);
+			}
 		}
 
 		/// <summary>
@@ -91,9 +95,11 @@ namespace EpicGames.Core
 		/// <returns>The response parsed into the requested type</returns>
 		public static async Task<TResponse> PutAsync<TResponse, TRequest>(this HttpClient Client, string Url, TRequest Request, CancellationToken CancellationToken)
 		{
-			using HttpResponseMessage Response = await PutAsync(Client, Url, Request, CancellationToken);
-			Response.EnsureSuccessStatusCode();
-			return await ParseJsonContent<TResponse>(Response);
+			using (HttpResponseMessage Response = await PutAsync(Client, Url, Request, CancellationToken))
+			{
+				Response.EnsureSuccessStatusCode();
+				return await ParseJsonContent<TResponse>(Response);
+			}
 		}
 
 		/// <summary>

@@ -80,7 +80,7 @@ namespace UnrealBuildTool
 		/// <param name="FrameworkDirectory">Path for the framework on disk</param>
 		/// <param name="CopyBundledAssets"></param>
 		/// <param name="bCopyFramework">Copy the framework to the target's Framework directory</param>
-		public UEBuildFramework(string Name, DirectoryReference? FrameworkDirectory, string? CopyBundledAssets, bool bCopyFramework)
+		public UEBuildFramework(String Name, DirectoryReference? FrameworkDirectory, string? CopyBundledAssets, bool bCopyFramework)
 		{
 			this.Name = Name;
 			this.FrameworkDirectory = FrameworkDirectory;

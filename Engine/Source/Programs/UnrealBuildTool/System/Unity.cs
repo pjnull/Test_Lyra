@@ -69,7 +69,7 @@ namespace UnrealBuildTool
 		{
 			private List<FileCollection> UnityFiles;
 			private FileCollection CurrentCollection;
-			private readonly int SplitLength;
+			private int SplitLength;
 
 			/// <summary>
 			/// Constructs a new UnityFileBuilder.

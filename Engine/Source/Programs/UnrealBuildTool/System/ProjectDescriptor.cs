@@ -161,25 +161,29 @@ namespace UnrealBuildTool
 			RawObject.TryGetBoolField("DisableEnginePluginsByDefault", out DisableEnginePluginsByDefault);
 
 			// Read the modules
-			if (RawObject.TryGetObjectArrayField("Modules", out JsonObject[]? ModulesArray))
+			JsonObject[]? ModulesArray;
+			if (RawObject.TryGetObjectArrayField("Modules", out ModulesArray))
 			{
 				Modules = Array.ConvertAll(ModulesArray, x => ModuleDescriptor.FromJsonObject(x, JsonFilePath));
 			}
 
 			// Read the plugins
-			if (RawObject.TryGetObjectArrayField("Plugins", out JsonObject[]? PluginsArray))
+			JsonObject[]? PluginsArray;
+			if (RawObject.TryGetObjectArrayField("Plugins", out PluginsArray))
 			{
 				Plugins = Array.ConvertAll(PluginsArray, x => PluginReferenceDescriptor.FromJsonObject(x));
 			}
 
 			// Read the additional root directories
-			if (RawObject.TryGetStringArrayField("AdditionalRootDirectories", out string[]? RootDirectoryStrings))
+			string[]? RootDirectoryStrings;
+			if (RawObject.TryGetStringArrayField("AdditionalRootDirectories", out RootDirectoryStrings))
 			{
 				AdditionalRootDirectories.AddRange(RootDirectoryStrings.Select(x => DirectoryReference.Combine(BaseDir, x)));
 			}
 
 			// Read the additional plugin directories
-			if (RawObject.TryGetStringArrayField("AdditionalPluginDirectories", out string[]? PluginDirectoryStrings))
+			string[]? PluginDirectoryStrings;
+			if (RawObject.TryGetStringArrayField("AdditionalPluginDirectories", out PluginDirectoryStrings))
 			{
 				AdditionalPluginDirectories.AddRange(PluginDirectoryStrings.Select(x => DirectoryReference.Combine(BaseDir, x)));
 			}
@@ -240,10 +244,12 @@ namespace UnrealBuildTool
 		/// <param name="FileName">The filename to write to</param>
 		public void Save(FileReference FileName)
 		{
-			using JsonWriter Writer = new JsonWriter(FileName);
-			Writer.WriteObjectStart();
-			Write(Writer, FileName.Directory);
-			Writer.WriteObjectEnd();
+			using (JsonWriter Writer = new JsonWriter(FileName))
+			{
+				Writer.WriteObjectStart();
+				Write(Writer, FileName.Directory);
+				Writer.WriteObjectEnd();
+			}
 		}
 
 		/// <summary>

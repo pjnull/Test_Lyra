@@ -16,7 +16,7 @@ namespace UnrealBuildTool
 			get { return "3"; }
 		}
 
-		public TVOSProjectSettings(FileReference? ProjectFile, string? Bundle)
+		public TVOSProjectSettings(FileReference? ProjectFile, String? Bundle)
 			: base(ProjectFile, UnrealTargetPlatform.TVOS, Bundle)
 		{
 		}

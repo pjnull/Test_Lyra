@@ -33,38 +33,40 @@ namespace UnrealBuildBase
 		{
 			bool AllowMultipleInsances = (Environment.GetEnvironmentVariable("uebp_UATMutexNoWait") == "1");
 	
-			string EntryAssemblyLocation = Assembly.GetEntryAssembly()!.GetOriginalLocation();
+            string EntryAssemblyLocation = Assembly.GetEntryAssembly()!.GetOriginalLocation();
 
 			string MutexName = GetUniqueMutexForPath(Path.GetFileNameWithoutExtension(EntryAssemblyLocation), EntryAssemblyLocation);
-			using Mutex SingleInstanceMutex = new Mutex(true, MutexName, out bool bCreatedMutex);
-			IsSoleInstance = bCreatedMutex;
-
-			if (!IsSoleInstance && AllowMultipleInsances == false)
+			using (Mutex SingleInstanceMutex = new Mutex(true, MutexName, out bool bCreatedMutex))
 			{
-				if (bWaitForUATMutex)
+				IsSoleInstance = bCreatedMutex;
+
+				if (!IsSoleInstance && AllowMultipleInsances == false)
 				{
-					Log.TraceWarning("Another instance of UAT at '{0}' is running, and the -WaitForUATMutex parameter has been used. Waiting for other UAT to finish...", EntryAssemblyLocation);
-					int Seconds = 0;
-					while (WaitMutexNoExceptions(SingleInstanceMutex, 15 * 1000) == false)
+					if (bWaitForUATMutex)
 					{
-						Seconds += 15;
-						Log.TraceInformation("Still waiting for Mutex. {0} seconds has passed...", Seconds);
+						Log.TraceWarning("Another instance of UAT at '{0}' is running, and the -WaitForUATMutex parameter has been used. Waiting for other UAT to finish...", EntryAssemblyLocation);
+						int Seconds = 0;
+						while (WaitMutexNoExceptions(SingleInstanceMutex, 15 * 1000) == false)
+						{
+							Seconds += 15;
+							Log.TraceInformation("Still waiting for Mutex. {0} seconds has passed...", Seconds);
+						}
+					}
+					else
+					{
+						throw new Exception($"A conflicting instance of AutomationTool is already running. Current location: {EntryAssemblyLocation}. A process manager may be used to determine the conflicting process and what tool may have launched it");
 					}
 				}
-				else
+
+				ExitCode Result = Main();
+
+				if (IsSoleInstance)
 				{
-					throw new Exception($"A conflicting instance of AutomationTool is already running. Current location: {EntryAssemblyLocation}. A process manager may be used to determine the conflicting process and what tool may have launched it");
+					SingleInstanceMutex.ReleaseMutex();
 				}
+
+				return Result;
 			}
-
-			ExitCode Result = Main();
-
-			if (IsSoleInstance)
-			{
-				SingleInstanceMutex.ReleaseMutex();
-			}
-
-			return Result;
 		}
 
 		static bool WaitMutexNoExceptions(Mutex Mutex, int TimeoutMs)

@@ -105,7 +105,9 @@ namespace UnrealBuildTool
 			//string SDKFolder = "";
 			string SDKVersion = "";
 
-			if (WindowsPlatform.TryGetWindowsSdkDir("Latest", out VersionNumber? version, out DirectoryReference? folder))
+			DirectoryReference? folder;
+			VersionNumber? version;
+			if(WindowsPlatform.TryGetWindowsSdkDir("Latest", out version, out folder))
 			{
 				//SDKFolder = folder.FullName;
 				SDKVersion = version.ToString();

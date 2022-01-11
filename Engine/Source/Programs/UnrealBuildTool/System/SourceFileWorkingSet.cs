@@ -91,12 +91,12 @@ namespace UnrealBuildTool
 	/// </summary>
 	class GitSourceFileWorkingSet : ISourceFileWorkingSet
 	{
-		readonly DirectoryReference RootDir;
+		DirectoryReference RootDir;
 		Process? BackgroundProcess;
-		readonly HashSet<FileReference> Files;
-		readonly List<DirectoryReference> Directories;
-		readonly List<string> ErrorOutput;
-		readonly GitSourceFileWorkingSet? Inner;
+		HashSet<FileReference> Files;
+		List<DirectoryReference> Directories;
+		List<string> ErrorOutput;
+		GitSourceFileWorkingSet? Inner;
 
 		/// <summary>
 		/// Constructor
@@ -227,12 +227,12 @@ namespace UnrealBuildTool
 				int MinIdx = 3;
 				int MaxIdx = Args.Data.Length;
 
-				while (MinIdx < MaxIdx && char.IsWhiteSpace(Args.Data[MinIdx]))
+				while (MinIdx < MaxIdx && Char.IsWhiteSpace(Args.Data[MinIdx]))
 				{
 					MinIdx++;
 				}
 
-				while (MinIdx < MaxIdx && char.IsWhiteSpace(Args.Data[MaxIdx - 1]))
+				while (MinIdx < MaxIdx && Char.IsWhiteSpace(Args.Data[MaxIdx - 1]))
 				{
 					MaxIdx--;
 				}
@@ -325,7 +325,7 @@ namespace UnrealBuildTool
 			else if (Provider == ProviderType.Git)
 			{
 				GitSourceFileWorkingSet? WorkingSet;
-				if (!string.IsNullOrEmpty(RepositoryPath))
+				if (!String.IsNullOrEmpty(RepositoryPath))
 				{
 					WorkingSet = new GitSourceFileWorkingSet(GitPath, DirectoryReference.Combine(RootDir, RepositoryPath), null);
 				}
@@ -341,7 +341,8 @@ namespace UnrealBuildTool
 			}
 			else
 			{
-				if (TryCreateGitWorkingSet(RootDir, ProjectDirs, out GitSourceFileWorkingSet? WorkingSet))
+				GitSourceFileWorkingSet? WorkingSet;
+				if(TryCreateGitWorkingSet(RootDir, ProjectDirs, out WorkingSet))
 				{
 					return WorkingSet;
 				}

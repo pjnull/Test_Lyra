@@ -63,7 +63,7 @@ namespace UnrealBuildTool
 		/// Map of assembly names we've already compiled and loaded to their Assembly and list of game folders.  This is used to prevent
 		/// trying to recompile the same assembly when ping-ponging between different types of targets
 		/// </summary>
-		private static readonly Dictionary<FileReference, RulesAssembly> LoadedAssemblyMap = new Dictionary<FileReference, RulesAssembly>();
+		private static Dictionary<FileReference, RulesAssembly> LoadedAssemblyMap = new Dictionary<FileReference, RulesAssembly>();
 
 		/// <summary>
 		/// Creates the engine rules assembly
@@ -157,10 +157,8 @@ namespace UnrealBuildTool
 				DirectoryReference ProgramsDirectory = DirectoryReference.Combine(SourceDirectory, "Programs");
 
 				// Also create a scope for them, and update the UHT module type
-				ModuleRulesContext ProgramsModuleContext = new ModuleRulesContext(ProgramsScope, RootDirectory)
-				{
-					DefaultUHTModuleType = UHTModuleType.Program
-				};
+				ModuleRulesContext ProgramsModuleContext = new ModuleRulesContext(ProgramsScope, RootDirectory);
+				ProgramsModuleContext.DefaultUHTModuleType = UHTModuleType.Program;
 
 				using (GlobalTracer.Instance.BuildSpan("Finding program modules").StartActive())
 				{
@@ -223,7 +221,8 @@ namespace UnrealBuildTool
 		public static RulesAssembly CreateProjectRulesAssembly(FileReference ProjectFileName, bool bUsePrecompiled, bool bSkipCompile, bool bForceCompile)
 		{
 			// Check if there's an existing assembly for this project
-			if (!LoadedAssemblyMap.TryGetValue(ProjectFileName, out RulesAssembly? ProjectRulesAssembly))
+			RulesAssembly? ProjectRulesAssembly;
+			if (!LoadedAssemblyMap.TryGetValue(ProjectFileName, out ProjectRulesAssembly))
 			{
 				ProjectDescriptor Project = ProjectDescriptor.FromFile(ProjectFileName);
 
@@ -237,13 +236,11 @@ namespace UnrealBuildTool
 				RulesScope Scope = new RulesScope("Project", Parent.Scope);
 
 				// Create a new context for modules created by this assembly
-				ModuleRulesContext DefaultModuleContext = new ModuleRulesContext(Scope, MainProjectDirectory)
-				{
-					bCanBuildDebugGame = true,
-					bCanHotReload = true,
-					bClassifyAsGameModuleForUHT = true,
-					bCanUseForSharedPCH = false
-				};
+				ModuleRulesContext DefaultModuleContext = new ModuleRulesContext(Scope, MainProjectDirectory);
+				DefaultModuleContext.bCanBuildDebugGame = true;
+				DefaultModuleContext.bCanHotReload = true;
+				DefaultModuleContext.bClassifyAsGameModuleForUHT = true;
+				DefaultModuleContext.bCanUseForSharedPCH = false;
 
 				// gather modules from project and platforms
 				Dictionary<FileReference, ModuleRulesContext> ModuleFiles = new Dictionary<FileReference, ModuleRulesContext>();
@@ -291,7 +288,7 @@ namespace UnrealBuildTool
 
 				// Compile the assembly. If there are no module or target files, just use the parent assembly.
 				FileReference AssemblyFileName = FileReference.Combine(MainProjectDirectory, "Intermediate", "Build", "BuildRules", ProjectFileName.GetFileNameWithoutExtension() + "ModuleRules" + FrameworkAssemblyExtension);
-				if (ModuleFiles.Count == 0 && TargetFiles.Count == 0)
+				if(ModuleFiles.Count == 0 && TargetFiles.Count == 0)
 				{
 					ProjectRulesAssembly = Parent;
 				}
@@ -316,7 +313,8 @@ namespace UnrealBuildTool
         public static RulesAssembly CreatePluginRulesAssembly(FileReference PluginFileName, bool bSkipCompile, bool bForceCompile, RulesAssembly Parent, bool bContainsEngineModules)
 		{
 			// Check if there's an existing assembly for this project
-			if (!LoadedAssemblyMap.TryGetValue(PluginFileName, out RulesAssembly? PluginRulesAssembly))
+			RulesAssembly? PluginRulesAssembly;
+			if (!LoadedAssemblyMap.TryGetValue(PluginFileName, out PluginRulesAssembly))
 			{
 				// Find all the rules source files
 				Dictionary<FileReference, ModuleRulesContext> ModuleFiles = new Dictionary<FileReference, ModuleRulesContext>();
@@ -334,10 +332,8 @@ namespace UnrealBuildTool
 				RulesScope Scope = new RulesScope("Plugin", Parent.Scope);
 
 				// Find all the modules
-				ModuleRulesContext PluginModuleContext = new ModuleRulesContext(Scope, PluginFileName.Directory)
-				{
-					bClassifyAsGameModuleForUHT = !bContainsEngineModules
-				};
+				ModuleRulesContext PluginModuleContext = new ModuleRulesContext(Scope, PluginFileName.Directory);
+				PluginModuleContext.bClassifyAsGameModuleForUHT = !bContainsEngineModules;
 				FindModuleRulesForPlugins(ForeignPlugins, PluginModuleContext, ModuleFiles);
 
 				// Compile the assembly
@@ -396,11 +392,9 @@ namespace UnrealBuildTool
 
 				foreach (FileReference ModuleFile in PluginModuleFiles)
 				{
-					ModuleRulesContext PluginContext = new ModuleRulesContext(DefaultContext)
-					{
-						DefaultOutputBaseDir = Plugin.Directory,
-						Plugin = Plugin
-					};
+					ModuleRulesContext PluginContext = new ModuleRulesContext(DefaultContext);
+					PluginContext.DefaultOutputBaseDir = Plugin.Directory;
+					PluginContext.Plugin = Plugin;
 					ModuleFileToContext[ModuleFile] = PluginContext;
 				}
 			}
@@ -413,7 +407,8 @@ namespace UnrealBuildTool
 		/// <returns>The filename that declared the given type, or null</returns>
 		public static string? GetFileNameFromType(Type ExistingType)
 		{
-			if (EngineRulesAssembly != null && EngineRulesAssembly.TryGetFileNameFromType(ExistingType, out FileReference? FileName))
+			FileReference? FileName;
+			if (EngineRulesAssembly != null && EngineRulesAssembly.TryGetFileNameFromType(ExistingType, out FileName))
 			{
 				return FileName.FullName;
 			}

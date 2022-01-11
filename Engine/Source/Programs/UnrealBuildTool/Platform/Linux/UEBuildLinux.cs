@@ -84,7 +84,7 @@ namespace UnrealBuildTool
 	/// </summary>
 	public class ReadOnlyLinuxTargetRules
 	{
-		private readonly LinuxTargetRules Inner;
+		private LinuxTargetRules Inner;
 
 		/// <summary>
 		/// Constructor
@@ -221,7 +221,7 @@ namespace UnrealBuildTool
 					SanitizerSuffix = "MSan";
 				}
 
-				if (!string.IsNullOrEmpty(SanitizerSuffix))
+				if (!String.IsNullOrEmpty(SanitizerSuffix))
 				{
 					Target.Name = Target.Name + "-" + SanitizerSuffix;
 				}
@@ -445,7 +445,7 @@ namespace UnrealBuildTool
 		{
 			// During the native builds, check the system includes as well (check toolchain when cross-compiling?)
 			string? BaseLinuxPath = SDK.GetBaseLinuxPathForArchitecture(Target.Architecture);
-			if (BuildHostPlatform.Current.Platform == UnrealTargetPlatform.Linux && string.IsNullOrEmpty(BaseLinuxPath))
+			if (BuildHostPlatform.Current.Platform == UnrealTargetPlatform.Linux && String.IsNullOrEmpty(BaseLinuxPath))
 			{
 				CompileEnvironment.SystemIncludePaths.Add(new DirectoryReference("/usr/include"));
 			}

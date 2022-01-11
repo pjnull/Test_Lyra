@@ -20,7 +20,7 @@ namespace UnrealBuildTool
 		/// Path to the project file to query
 		/// </summary>
 		[CommandLine("-Project=")]
-		readonly FileReference? ProjectFile = null;
+		FileReference? ProjectFile = null;
 
 		/// <summary>
 		/// Path to the output file to receive information about the targets
@@ -97,41 +97,43 @@ namespace UnrealBuildTool
 
 			// Write the output file
 			DirectoryReference.CreateDirectory(OutputFile.Directory);
-			using JsonWriter Writer = new JsonWriter(OutputFile);
-			Writer.WriteObjectStart();
-			Writer.WriteArrayStart("Targets");
-			foreach (string TargetName in TargetNames)
+			using (JsonWriter Writer = new JsonWriter(OutputFile))
 			{
-				// skip target rules that are platform extension or platform group specializations
-				string[] TargetPathSplit = TargetName.Split(new char[] { '_' }, StringSplitOptions.RemoveEmptyEntries);
-				if (TargetPathSplit.Length > 1 && (UnrealTargetPlatform.IsValidName(TargetPathSplit.Last()) || UnrealPlatformGroup.IsValidName(TargetPathSplit.Last())))
-				{
-					continue;
-				}
-
-				// Construct the rules object
-				TargetRules TargetRules;
-				try
-				{
-					string Architecture = UEBuildPlatform.GetBuildPlatform(BuildHostPlatform.Current.Platform).GetDefaultArchitecture(ProjectFile);
-					TargetRules = Assembly.CreateTargetRules(TargetName, BuildHostPlatform.Current.Platform, UnrealTargetConfiguration.Development, Architecture, ProjectFile, Arguments);
-				}
-				catch (Exception Ex)
-				{
-					Log.TraceWarning("Unable to construct target rules for {0}", TargetName);
-					Log.TraceVerbose(ExceptionUtils.FormatException(Ex));
-					continue;
-				}
-
-				// Write the target info
 				Writer.WriteObjectStart();
-				Writer.WriteValue("Name", TargetName);
-				Writer.WriteValue("Path", Assembly.GetTargetFileName(TargetName)?.ToString());
-				Writer.WriteValue("Type", TargetRules.Type.ToString());
+				Writer.WriteArrayStart("Targets");
+				foreach (string TargetName in TargetNames)
+				{
+					// skip target rules that are platform extension or platform group specializations
+					string[] TargetPathSplit = TargetName.Split(new char[]{'_'}, StringSplitOptions.RemoveEmptyEntries );
+					if (TargetPathSplit.Length > 1 && (UnrealTargetPlatform.IsValidName(TargetPathSplit.Last()) || UnrealPlatformGroup.IsValidName(TargetPathSplit.Last()) ) )
+					{
+						continue;
+					}
+
+					// Construct the rules object
+					TargetRules TargetRules;
+					try
+					{
+						string Architecture = UEBuildPlatform.GetBuildPlatform(BuildHostPlatform.Current.Platform).GetDefaultArchitecture(ProjectFile);
+						TargetRules = Assembly.CreateTargetRules(TargetName, BuildHostPlatform.Current.Platform, UnrealTargetConfiguration.Development, Architecture, ProjectFile, Arguments);
+					}
+					catch (Exception Ex)
+					{
+						Log.TraceWarning("Unable to construct target rules for {0}", TargetName);
+						Log.TraceVerbose(ExceptionUtils.FormatException(Ex));
+						continue;
+					}
+
+					// Write the target info
+					Writer.WriteObjectStart();
+					Writer.WriteValue("Name", TargetName);
+					Writer.WriteValue("Path", Assembly.GetTargetFileName(TargetName)?.ToString());
+					Writer.WriteValue("Type", TargetRules.Type.ToString());
+					Writer.WriteObjectEnd();
+				}
+				Writer.WriteArrayEnd();
 				Writer.WriteObjectEnd();
 			}
-			Writer.WriteArrayEnd();
-			Writer.WriteObjectEnd();
 		}
 	}
 }

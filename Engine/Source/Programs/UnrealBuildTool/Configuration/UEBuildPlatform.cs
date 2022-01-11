@@ -15,10 +15,10 @@ namespace UnrealBuildTool
 {
 	abstract class UEBuildPlatform
 	{
-		private static readonly Dictionary<UnrealTargetPlatform, UEBuildPlatform> BuildPlatformDictionary = new Dictionary<UnrealTargetPlatform, UEBuildPlatform>();
+		private static Dictionary<UnrealTargetPlatform, UEBuildPlatform> BuildPlatformDictionary = new Dictionary<UnrealTargetPlatform, UEBuildPlatform>();
 
 		// a mapping of a group to the platforms in the group (ie, Microsoft contains Win32 and Win64)
-		static readonly Dictionary<UnrealPlatformGroup, List<UnrealTargetPlatform>> PlatformGroupDictionary = new Dictionary<UnrealPlatformGroup, List<UnrealTargetPlatform>>();
+		static Dictionary<UnrealPlatformGroup, List<UnrealTargetPlatform>> PlatformGroupDictionary = new Dictionary<UnrealPlatformGroup, List<UnrealTargetPlatform>>();
 
 		/// <summary>
 		/// The corresponding target platform enum
@@ -139,11 +139,10 @@ namespace UnrealBuildTool
 		{
 			if(CachedIncludedFolderNames == null)
 			{
-				HashSet<string> Names = new HashSet<string>(DirectoryReference.Comparer)
-				{
-					Platform.ToString()
-				};
-				foreach (UnrealPlatformGroup Group in UEBuildPlatform.GetPlatformGroups(Platform))
+				HashSet<string> Names = new HashSet<string>(DirectoryReference.Comparer);
+
+				Names.Add(Platform.ToString());
+				foreach(UnrealPlatformGroup Group in UEBuildPlatform.GetPlatformGroups(Platform))
 				{
 					Names.Add(Group.ToString());
 				}
@@ -310,7 +309,7 @@ namespace UnrealBuildTool
 		public static bool IsBuildProductName(string FileName, int Index, int Count, string[] NamePrefixes, string[] NameSuffixes, string Extension)
 		{
 			// Check if the extension matches, and forward on to the next IsBuildProductName() overload without it if it does.
-			if (Count > Extension.Length && string.Compare(FileName, Index + Count - Extension.Length, Extension, 0, Extension.Length, StringComparison.InvariantCultureIgnoreCase) == 0)
+			if (Count > Extension.Length && String.Compare(FileName, Index + Count - Extension.Length, Extension, 0, Extension.Length, StringComparison.InvariantCultureIgnoreCase) == 0)
 			{
 				return IsBuildProductName(FileName, Index, Count - Extension.Length, NamePrefixes, NameSuffixes);
 			}
@@ -330,13 +329,13 @@ namespace UnrealBuildTool
 		{
 			foreach (string NamePrefix in NamePrefixes)
 			{
-				if (Count >= NamePrefix.Length && string.Compare(FileName, Index, NamePrefix, 0, NamePrefix.Length, StringComparison.InvariantCultureIgnoreCase) == 0)
+				if (Count >= NamePrefix.Length && String.Compare(FileName, Index, NamePrefix, 0, NamePrefix.Length, StringComparison.InvariantCultureIgnoreCase) == 0)
 				{
 					int MinIdx = Index + NamePrefix.Length;
 					foreach (string NameSuffix in NameSuffixes)
 					{
 						int MaxIdx = Index + Count - NameSuffix.Length;
-						if (MaxIdx >= MinIdx && string.Compare(FileName, MaxIdx, NameSuffix, 0, NameSuffix.Length, StringComparison.InvariantCultureIgnoreCase) == 0)
+						if (MaxIdx >= MinIdx && String.Compare(FileName, MaxIdx, NameSuffix, 0, NameSuffix.Length, StringComparison.InvariantCultureIgnoreCase) == 0)
 						{
 							if (MinIdx < MaxIdx && FileName[MinIdx] == '-')
 							{
@@ -419,7 +418,8 @@ namespace UnrealBuildTool
 		public static void RegisterPlatformWithGroup(UnrealTargetPlatform InPlatform, UnrealPlatformGroup InGroup)
 		{
 			// find or add the list of groups for this platform
-			if (!PlatformGroupDictionary.TryGetValue(InGroup, out List<UnrealTargetPlatform>? Platforms))
+			List<UnrealTargetPlatform>? Platforms;
+			if(!PlatformGroupDictionary.TryGetValue(InGroup, out Platforms))
 			{
 				Platforms = new List<UnrealTargetPlatform>();
 				PlatformGroupDictionary.Add(InGroup, Platforms);
@@ -432,7 +432,8 @@ namespace UnrealBuildTool
 		/// </summary>
 		public static List<UnrealTargetPlatform> GetPlatformsInGroup(UnrealPlatformGroup InGroup)
 		{
-			if (!PlatformGroupDictionary.TryGetValue(InGroup, out List<UnrealTargetPlatform>? PlatformList))
+			List<UnrealTargetPlatform>? PlatformList;
+			if (!PlatformGroupDictionary.TryGetValue(InGroup, out PlatformList))
 			{
 				PlatformList = new List<UnrealTargetPlatform>();
 			}
@@ -456,7 +457,8 @@ namespace UnrealBuildTool
 		/// <returns>UEBuildPlatform  The instance of the build platform</returns>
 		public static UEBuildPlatform GetBuildPlatform(UnrealTargetPlatform InPlatform)
 		{
-			if (!TryGetBuildPlatform(InPlatform, out UEBuildPlatform? Platform))
+			UEBuildPlatform? Platform;
+			if(!TryGetBuildPlatform(InPlatform, out Platform))
 			{
 				throw new BuildException("GetBuildPlatform: No BuildPlatform found for {0}", InPlatform.ToString());
 			}
@@ -493,7 +495,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Returns the delimiter used to separate paths in the PATH environment variable for the platform we are executing on.
 		/// </summary>
-		public static string GetPathVarDelimiter()
+		public static String GetPathVarDelimiter()
 		{
 			if (BuildHostPlatform.Current.Platform == UnrealTargetPlatform.Linux || BuildHostPlatform.Current.Platform == UnrealTargetPlatform.LinuxArm64 ||
 				BuildHostPlatform.Current.Platform == UnrealTargetPlatform.Mac)
@@ -573,7 +575,8 @@ namespace UnrealBuildTool
 		public static bool PlatformRequiresMonolithicBuilds(UnrealTargetPlatform InPlatform, UnrealTargetConfiguration InConfiguration)
 		{
 			// Some platforms require monolithic builds...
-			if (TryGetBuildPlatform(InPlatform, out UEBuildPlatform? BuildPlatform))
+			UEBuildPlatform? BuildPlatform;
+			if (TryGetBuildPlatform(InPlatform, out BuildPlatform))
 			{
 				return BuildPlatform.ShouldCompileMonolithicBinary(InPlatform);
 			}
@@ -668,8 +671,9 @@ namespace UnrealBuildTool
 			// look at all bool values
 			if (BoolKeys != null) foreach (string Key in BoolKeys)
 				{
-					DefaultIni.GetBool(Section, Key, out bool Default);
-					ProjIni.GetBool(Section, Key, out bool Project);
+					bool Default = false, Project = false;
+					DefaultIni.GetBool(Section, Key, out Default);
+					ProjIni.GetBool(Section, Key, out Project);
 					if (Default != Project)
 					{
 						Log.TraceInformationOnce("{0} is not set to default. (Base: {1} vs. {2}: {3})", Key, Default, Path.GetFileName(ProjectDirectoryName.FullName), Project);
@@ -680,8 +684,9 @@ namespace UnrealBuildTool
 			// look at all int values
 			if (IntKeys != null) foreach (string Key in IntKeys)
 				{
-					DefaultIni.GetInt32(Section, Key, out int Default);
-					ProjIni.GetInt32(Section, Key, out int Project);
+					int Default = 0, Project = 0;
+					DefaultIni.GetInt32(Section, Key, out Default);
+					ProjIni.GetInt32(Section, Key, out Project);
 					if (Default != Project)
 					{
 						Log.TraceInformationOnce("{0} is not set to default. (Base: {1} vs. {2}: {3})", Key, Default, Path.GetFileName(ProjectDirectoryName.FullName), Project);
@@ -692,8 +697,9 @@ namespace UnrealBuildTool
 			// look for all string values
 			if (StringKeys != null) foreach (string Key in StringKeys)
 				{
-					DefaultIni.GetString(Section, Key, out string? Default);
-					ProjIni.GetString(Section, Key, out string? Project);
+					string? Default = "", Project = "";
+					DefaultIni.GetString(Section, Key, out Default);
+					ProjIni.GetString(Section, Key, out Project);
 					if (Default != Project)
 					{
 						Log.TraceInformationOnce("{0} is not set to default. (Base: {1} vs. {2}: {3})", Key, Default, Path.GetFileName(ProjectDirectoryName.FullName), Project);

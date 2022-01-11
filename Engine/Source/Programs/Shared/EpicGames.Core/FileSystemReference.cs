@@ -51,12 +51,12 @@ namespace EpicGames.Core
 		/// Create a full path by concatenating multiple strings
 		/// </summary>
 		/// <returns></returns>
-		static readonly ThreadLocal<StringBuilder> CombineStringsStringBuilder = new ThreadLocal<StringBuilder>(() => new StringBuilder(260));
+		static ThreadLocal<StringBuilder> CombineStringsStringBuilder = new ThreadLocal<StringBuilder>(() => new StringBuilder(260));
 		static protected string CombineStrings(DirectoryReference BaseDirectory, params string[] Fragments)
 		{
 			// Get the initial string to append to, and strip any root directory suffix from it
 			StringBuilder NewFullName = CombineStringsStringBuilder.Value!.Clear().Append(BaseDirectory.FullName);
-			if (NewFullName.Length > 0 && NewFullName[^1] == Path.DirectorySeparatorChar)
+			if (NewFullName.Length > 0 && NewFullName[NewFullName.Length - 1] == Path.DirectorySeparatorChar)
 			{
 				NewFullName.Remove(NewFullName.Length - 1, 1);
 			}
@@ -89,7 +89,7 @@ namespace EpicGames.Core
 						if (Length == 0)
 						{
 							// Multiple directory separators in a row; illegal.
-							throw new ArgumentException(string.Format("Path fragment '{0}' contains invalid directory separators.", Fragment));
+							throw new ArgumentException(String.Format("Path fragment '{0}' contains invalid directory separators.", Fragment));
 						}
 						else if (Length == 2 && Fragment[StartIdx] == '.' && Fragment[StartIdx + 1] == '.')
 						{
@@ -245,7 +245,7 @@ namespace EpicGames.Core
 		/// </summary>
 		/// <param name="Directory">The directory to create a relative path from</param>
 		/// <returns>A relative path from the given directory</returns>
-		static readonly ThreadLocal<StringBuilder> MakeRelativeToStringBuilder = new ThreadLocal<StringBuilder>(() => new StringBuilder(260));
+		static ThreadLocal<StringBuilder> MakeRelativeToStringBuilder = new ThreadLocal<StringBuilder>(() => new StringBuilder(260));
 		public string MakeRelativeTo(DirectoryReference Directory)
 		{
 			StringBuilder Result = MakeRelativeToStringBuilder.Value!.Clear();
@@ -287,7 +287,7 @@ namespace EpicGames.Core
 				else
 				{
 					// Check the two paths match, and bail if they don't. Increase the common directory length if we've reached a separator.
-					if(string.Compare(FullName, Idx, Directory.FullName, Idx, 1, Comparison) != 0)
+					if(String.Compare(FullName, Idx, Directory.FullName, Idx, 1, Comparison) != 0)
 					{
 						break;
 					}

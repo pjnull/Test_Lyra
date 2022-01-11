@@ -21,12 +21,12 @@ namespace UnrealBuildTool
 	class AggregateParsedTimingInfo : ToolMode
 	{
 		private TimingData? FileTimingData;
-		private readonly ConcurrentDictionary<string, int> DecompressedFileSizes = new ConcurrentDictionary<string, int>();
-		private readonly ConcurrentDictionary<string, byte[]> CompressedFiles = new ConcurrentDictionary<string, byte[]>();
-		private readonly ConcurrentBag<TimingData> AggregateIncludes = new ConcurrentBag<TimingData>();
-		private readonly ConcurrentBag<TimingData> AggregateClasses = new ConcurrentBag<TimingData>();
-		private readonly ConcurrentBag<TimingData> AggregateFunctions = new ConcurrentBag<TimingData>();
-		private readonly object AddFileLock = new object();
+		private ConcurrentDictionary<string, int> DecompressedFileSizes = new ConcurrentDictionary<string, int>();
+		private ConcurrentDictionary<string, byte[]> CompressedFiles = new ConcurrentDictionary<string, byte[]>();
+		private ConcurrentBag<TimingData> AggregateIncludes = new ConcurrentBag<TimingData>();
+		private ConcurrentBag<TimingData> AggregateClasses = new ConcurrentBag<TimingData>();
+		private ConcurrentBag<TimingData> AggregateFunctions = new ConcurrentBag<TimingData>();
+		private object AddFileLock = new object();
 
 		public override int Execute(CommandLineArguments Arguments)
 		{
@@ -48,7 +48,7 @@ namespace UnrealBuildTool
 			GroupTimingDataOnName(AggregateData, "Function Timings", AggregateFunctions);
 
 			// Write out aggregate summary.
-			string OutputFile = Path.Combine(ManifestFile.Directory.FullName, string.Format("{0}.cta", AggregateName));
+			string OutputFile = Path.Combine(ManifestFile.Directory.FullName, String.Format("{0}.cta", AggregateName));
 			Log.TraceLog("Writing {0}", OutputFile);
 			using (BinaryWriter Writer = new BinaryWriter(File.Open(OutputFile, FileMode.Create)))
 			{
@@ -108,81 +108,86 @@ namespace UnrealBuildTool
 		{
 			Log.TraceLog("Parsing {0}", ParsedFileName);
 			// Convert input file back into summary objects.
-			using BinaryReader Reader = new BinaryReader(File.Open(ParsedFileName, FileMode.Open, FileAccess.Read));
-			TimingData ParsedTimingData = new TimingData(Reader);
-
-			Task CompressDataTask = Task.Run(() =>
+			using (BinaryReader Reader = new BinaryReader(File.Open(ParsedFileName, FileMode.Open, FileAccess.Read)))
 			{
-				Reader.BaseStream.Seek(0, SeekOrigin.Begin);
-				using MemoryStream CompressedMemoryStream = new MemoryStream();
-				using (GZipStream CompressionStream = new GZipStream(CompressedMemoryStream, CompressionMode.Compress))
+				TimingData ParsedTimingData = new TimingData(Reader);
+
+				Task CompressDataTask = Task.Run(() =>
 				{
-					Reader.BaseStream.CopyTo(CompressionStream);
+					Reader.BaseStream.Seek(0, SeekOrigin.Begin);
+					using (MemoryStream CompressedMemoryStream = new MemoryStream())
+					{
+						using (GZipStream CompressionStream = new GZipStream(CompressedMemoryStream, CompressionMode.Compress))
+						{
+							Reader.BaseStream.CopyTo(CompressionStream);
+						}
+
+						CompressedFiles.TryAdd(ParsedTimingData.Name, CompressedMemoryStream.ToArray());
+						DecompressedFileSizes.TryAdd(ParsedTimingData.Name, (int)Reader.BaseStream.Length);
+					}
+				});
+
+				TimingData SummarizedTimingData = new TimingData(ParsedTimingData.Name, TimingDataType.Summary){ Parent = FileTimingData };
+				foreach (TimingData Include in ParsedTimingData.Children["IncludeTimings"].Children.Values)
+				{
+					SummarizedTimingData.AddChild(Include.Clone());
 				}
+				SummarizedTimingData.ExclusiveDuration += ParsedTimingData.Children["ClassTimings"].Children.Values.Sum(d => d.InclusiveDuration);
+				SummarizedTimingData.ExclusiveDuration += ParsedTimingData.Children["FunctionTimings"].Children.Values.Sum(d => d.InclusiveDuration);
 
-				CompressedFiles.TryAdd(ParsedTimingData.Name, CompressedMemoryStream.ToArray());
-				DecompressedFileSizes.TryAdd(ParsedTimingData.Name, (int)Reader.BaseStream.Length);
-			});
-
-			TimingData SummarizedTimingData = new TimingData(ParsedTimingData.Name, TimingDataType.Summary) { Parent = FileTimingData };
-			foreach (TimingData Include in ParsedTimingData.Children["IncludeTimings"].Children.Values)
-			{
-				SummarizedTimingData.AddChild(Include.Clone());
-			}
-			SummarizedTimingData.ExclusiveDuration += ParsedTimingData.Children["ClassTimings"].Children.Values.Sum(d => d.InclusiveDuration);
-			SummarizedTimingData.ExclusiveDuration += ParsedTimingData.Children["FunctionTimings"].Children.Values.Sum(d => d.InclusiveDuration);
-
-			// Gather and update child timing data.
-			Task QueueIncludesTask = Task.Run(() =>
-			{
+				// Gather and update child timing data.
+				Task QueueIncludesTask = Task.Run(() =>
+				{
 					// Flatten the includes for aggregation.
 					IEnumerable<TimingData> Includes = ParsedTimingData.Children["IncludeTimings"].Children.Values;
-				Dictionary<string, TimingData> FlattenedIncludes = new Dictionary<string, TimingData>();
-				FlattenIncludes(FlattenedIncludes, Includes);
-				foreach (TimingData Include in FlattenedIncludes.Values)
-				{
-					AggregateIncludes.Add(Include);
-				}
-			});
+					Dictionary<string, TimingData> FlattenedIncludes = new Dictionary<string, TimingData>();
+					FlattenIncludes(FlattenedIncludes, Includes);
+					foreach (TimingData Include in FlattenedIncludes.Values)
+					{
+						AggregateIncludes.Add(Include);
+					}
+				});
 
-			Task QueueClassesTask = Task.Run(() =>
-			{
+				Task QueueClassesTask = Task.Run(() =>
+				{
 					// Collapse templates into single entries.
 					IEnumerable<TimingData> CollapsedClasses = GroupChildren(ParsedTimingData.Children["ClassTimings"].Children.Values, TimingDataType.Class);
-				foreach (TimingData Class in CollapsedClasses)
-				{
-					AggregateClasses.Add(new TimingData(Class.Name, TimingDataType.Class) { ExclusiveDuration = Class.InclusiveDuration });
-				}
-			});
+					foreach (TimingData Class in CollapsedClasses)
+					{
+						AggregateClasses.Add(new TimingData(Class.Name, TimingDataType.Class){ ExclusiveDuration = Class.InclusiveDuration });
+					}
+				});
 
-			Task QueueFunctionsTask = Task.Run(() =>
-			{
+				Task QueueFunctionsTask = Task.Run(() =>
+				{
 					// Collapse templates into single entries.
 					IEnumerable<TimingData> CollapsedFunctions = GroupChildren(ParsedTimingData.Children["FunctionTimings"].Children.Values, TimingDataType.Function);
-				foreach (TimingData Function in CollapsedFunctions)
+					foreach (TimingData Function in CollapsedFunctions)
+					{
+						AggregateFunctions.Add(new TimingData(Function.Name, TimingDataType.Function){ ExclusiveDuration = Function.InclusiveDuration });
+					}
+				});
+
+				while (!CompressDataTask.IsCompleted || !QueueIncludesTask.IsCompleted || !QueueClassesTask.IsCompleted || !QueueFunctionsTask.IsCompleted)
 				{
-					AggregateFunctions.Add(new TimingData(Function.Name, TimingDataType.Function) { ExclusiveDuration = Function.InclusiveDuration });
+					Thread.Sleep(TimeSpan.FromMilliseconds(50));
 				}
-			});
 
-			while (!CompressDataTask.IsCompleted || !QueueIncludesTask.IsCompleted || !QueueClassesTask.IsCompleted || !QueueFunctionsTask.IsCompleted)
-			{
-				Thread.Sleep(TimeSpan.FromMilliseconds(50));
-			}
-
-			lock (AddFileLock)
-			{
-				FileTimingData!.AddChild(SummarizedTimingData);
+				lock (AddFileLock)
+				{
+					FileTimingData!.AddChild(SummarizedTimingData);
+				}
 			}
 		}
 
 		private int HeaderFilesFound = 0;
-		private readonly object CounterLock = new object();
+		private object CounterLock = new object();
 		private void FlattenIncludes(Dictionary<string, TimingData> Includes, IEnumerable<TimingData> IncludeData)
 		{
 			foreach (TimingData Include in IncludeData)
 			{
-				if (Includes.TryGetValue(Include.Name, out TimingData? AggregatedInclude))
+				TimingData? AggregatedInclude;
+				if (Includes.TryGetValue(Include.Name, out AggregatedInclude))
 				{
 					AggregatedInclude.ExclusiveDuration += Include.ExclusiveDuration;
 					AggregatedInclude.Count += 1;
@@ -197,7 +202,7 @@ namespace UnrealBuildTool
 						}
 					}
 
-					Includes.Add(Include.Name, new TimingData(Include.Name, TimingDataType.Include) { ExclusiveDuration = Include.ExclusiveDuration });
+					Includes.Add(Include.Name, new TimingData(Include.Name, TimingDataType.Include){ ExclusiveDuration = Include.ExclusiveDuration });
 				}
 
 				FlattenIncludes(Includes, Include.Children.Values);
@@ -225,7 +230,7 @@ namespace UnrealBuildTool
 					{
 						TemplateParamSig.Add("...");
 					}
-					string GroupName = Child.Name.Replace(Match.Groups["Template"].Value, string.Format("<{0}>", string.Join(", ", TemplateParamSig)));
+					string GroupName = Child.Name.Replace(Match.Groups["Template"].Value, String.Format("<{0}>", string.Join(", ", TemplateParamSig)));
 
 					// See if we have a group for this template already. If not, add it.
 					if (!ChildGroups.ContainsKey(GroupName))

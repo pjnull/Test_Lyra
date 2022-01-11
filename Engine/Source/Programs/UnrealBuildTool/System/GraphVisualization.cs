@@ -84,11 +84,9 @@ namespace UnrealBuildTool
 		/// <param name="GraphEdges">List of all graph edges.  Index order is important and must match with the individual edge Id members!</param>
 		public static void WriteGraphFile(FileReference Filename, string Description, List<GraphNode> GraphNodes, List<GraphEdge> GraphEdges)
 		{
-			XmlWriterSettings Settings = new XmlWriterSettings
-			{
-				Indent = true,
-				IndentChars = "    "
-			};
+			XmlWriterSettings Settings = new XmlWriterSettings();
+			Settings.Indent = true;
+			Settings.IndentChars = "    ";
 
 			// Figure out all of the custom attribute types we're dealing with
 			Dictionary<string, GraphAttribute> AllAttributes = new Dictionary<string, GraphAttribute>(StringComparer.InvariantCultureIgnoreCase);
@@ -98,7 +96,8 @@ namespace UnrealBuildTool
 				{
 					string AttributeType = GetAttributeType(AttributeValue);
 
-					if (!AllAttributes.TryGetValue(AttributeName, out GraphAttribute? Attribute))
+					GraphAttribute? Attribute;
+					if (!AllAttributes.TryGetValue(AttributeName, out Attribute))
 					{
 						AllAttributes[AttributeName] = new GraphAttribute(AllAttributes.Count, AttributeName, AttributeType);
 					}
@@ -109,167 +108,170 @@ namespace UnrealBuildTool
 				}
 			}
 
-			using XmlWriter Writer = XmlWriter.Create(Filename.FullName, Settings);
-			// NOTE: The GEXF XML format is defined here:  http://gexf.net/1.2draft/gexf-12draft-primer.pdf
-
-			string GEXFNamespace = "http://www.gexf.net/1.2-draft";
-			string SchemaNamespace = "http://www.w3.org/2001/XMLSchema-instance";
-			string VizNamespace = "http://www.gexf.net/1.2draft/viz";
-
-			Writer.WriteStartElement("gexf", GEXFNamespace);
-			Writer.WriteAttributeString("xmlns", "xsi", null, SchemaNamespace);
-			Writer.WriteAttributeString("schemaLocation", SchemaNamespace, "http://www.gexf.net/1.2draft http://www.gexf.net/1.2draft/gexf.xsd");
-			Writer.WriteAttributeString("xmlns", "viz", null, VizNamespace);
-			Writer.WriteAttributeString("version", "1.2");
-
-			Writer.WriteStartElement("meta");
+			using (XmlWriter Writer = XmlWriter.Create(Filename.FullName, Settings))
 			{
-				Writer.WriteAttributeString("creator", "UnrealBuildTool");
-				Writer.WriteAttributeString("description", Description);
-			}
-			Writer.WriteEndElement();   // meta
+				// NOTE: The GEXF XML format is defined here:  http://gexf.net/1.2draft/gexf-12draft-primer.pdf
 
-			Dictionary<GraphNode, int> NodeToId = new Dictionary<GraphNode, int>();
-			{
-				Writer.WriteStartElement("graph");
+				string GEXFNamespace = "http://www.gexf.net/1.2-draft";
+				string SchemaNamespace = "http://www.w3.org/2001/XMLSchema-instance";
+				string VizNamespace = "http://www.gexf.net/1.2draft/viz";
+
+				Writer.WriteStartElement("gexf", GEXFNamespace);
+				Writer.WriteAttributeString("xmlns", "xsi", null, SchemaNamespace);
+				Writer.WriteAttributeString("schemaLocation", SchemaNamespace, "http://www.gexf.net/1.2draft http://www.gexf.net/1.2draft/gexf.xsd");
+				Writer.WriteAttributeString("xmlns", "viz", null, VizNamespace);
+				Writer.WriteAttributeString("version", "1.2");
+
+				Writer.WriteStartElement("meta");
 				{
-					Writer.WriteAttributeString("mode", "static");
-					Writer.WriteAttributeString("defaultedgetype", "directed");
-
-					if (AllAttributes.Count > 0)
-					{
-						Writer.WriteStartElement("attributes");
-						{
-							// @todo: Add support for edge attributes, not just node attributes
-							Writer.WriteAttributeString("class", "node");   // Node attributes, not edges!
-
-							foreach (var Attribute in AllAttributes.Values)
-							{
-								Writer.WriteStartElement("attribute");
-								{
-									Writer.WriteAttributeString("id", Attribute.Id.ToString());
-									Writer.WriteAttributeString("title", Attribute.Name);
-									Writer.WriteAttributeString("type", Attribute.TypeName);
-								}
-								Writer.WriteEndElement();   // attribute
-							}
-
-							// @todo: Add support for attribute type default values
-						}
-						Writer.WriteEndElement();   // attributes
-
-					}
-
-					Writer.WriteStartElement("nodes");
-					{
-						foreach (GraphNode GraphNode in GraphNodes)
-						{
-							Writer.WriteStartElement("node");
-							{
-								int Id = GetNodeId(GraphNode, NodeToId);
-								Writer.WriteAttributeString("id", Id.ToString());
-								Writer.WriteAttributeString("label", GraphNode.Label);
-
-								Writer.WriteStartElement("color", VizNamespace);
-								{
-									Writer.WriteAttributeString("r", GraphNode.Color.R.ToString());
-									Writer.WriteAttributeString("g", GraphNode.Color.G.ToString());
-									Writer.WriteAttributeString("b", GraphNode.Color.B.ToString());
-									Writer.WriteAttributeString("a", (GraphNode.Color.A / 255.0f).ToString());
-								}
-								Writer.WriteEndElement();   // viz:color
-
-								Writer.WriteStartElement("size", VizNamespace);
-								{
-									Writer.WriteAttributeString("value", GraphNode.Size.ToString());
-								}
-								Writer.WriteEndElement();   // viz:size
-
-								Writer.WriteStartElement("shape", VizNamespace);
-								{
-									// NOTE: Valid shapes are:  disc, square, triangle, diamond, image
-									Writer.WriteAttributeString("value", "disc");
-								}
-								Writer.WriteEndElement();   // viz:shape
-
-								if (GraphNode.Attributes.Count > 0)
-								{
-									Writer.WriteStartElement("attvalues");
-									{
-										foreach (var AttributeHashEntry in GraphNode.Attributes)
-										{
-											var AttributeName = AttributeHashEntry.Key;
-											var AttributeValue = AttributeHashEntry.Value;
-
-											var Attribute = AllAttributes[AttributeName];
-
-											Writer.WriteStartElement("attvalue");
-											{
-												Writer.WriteAttributeString("for", Attribute.Id.ToString());
-												Writer.WriteAttributeString("value", AttributeValue.ToString());
-											}
-											Writer.WriteEndElement();
-										}
-									}
-									Writer.WriteEndElement();   // attvalues
-								}
-							}
-							Writer.WriteEndElement();   // node
-						}
-					}
-					Writer.WriteEndElement();   // nodes
-
-
-					Writer.WriteStartElement("edges");
-					{
-						for (int EdgeId = 0; EdgeId < GraphEdges.Count; EdgeId++)
-						{
-							GraphEdge GraphEdge = GraphEdges[EdgeId];
-							Writer.WriteStartElement("edge");
-							{
-								Writer.WriteAttributeString("id", EdgeId.ToString());
-								Writer.WriteAttributeString("source", GetNodeId(GraphEdge.Source, NodeToId).ToString());
-								Writer.WriteAttributeString("target", GetNodeId(GraphEdge.Target, NodeToId).ToString());
-								Writer.WriteAttributeString("weight", GraphEdge.Weight.ToString());
-
-								Writer.WriteStartElement("color", VizNamespace);
-								{
-									Writer.WriteAttributeString("r", GraphEdge.Color.R.ToString());
-									Writer.WriteAttributeString("g", GraphEdge.Color.G.ToString());
-									Writer.WriteAttributeString("b", GraphEdge.Color.B.ToString());
-									Writer.WriteAttributeString("a", (GraphEdge.Color.A / 255.0f).ToString());
-								}
-								Writer.WriteEndElement();   // viz:color
-
-								Writer.WriteStartElement("thickness", VizNamespace);
-								{
-									Writer.WriteAttributeString("value", GraphEdge.Thickness.ToString());
-								}
-								Writer.WriteEndElement();   // viz:thickness
-
-								Writer.WriteStartElement("shape", VizNamespace);
-								{
-									// NOTE: Valid shapes are:  solid, dotted, dashed, double
-									Writer.WriteAttributeString("value", "solid");
-								}
-								Writer.WriteEndElement();   // viz:shape
-							}
-							Writer.WriteEndElement();   // edge
-						}
-					}
-					Writer.WriteEndElement();   // nodes
+					Writer.WriteAttributeString("creator", "UnrealBuildTool");
+					Writer.WriteAttributeString("description", Description);
 				}
+				Writer.WriteEndElement();   // meta
 
-				Writer.WriteEndElement();   // graph
+				Dictionary<GraphNode, int> NodeToId = new Dictionary<GraphNode, int>();
+				{
+					Writer.WriteStartElement("graph");
+					{
+						Writer.WriteAttributeString("mode", "static");
+						Writer.WriteAttributeString("defaultedgetype", "directed");
+
+						if (AllAttributes.Count > 0)
+						{
+							Writer.WriteStartElement("attributes");
+							{
+								// @todo: Add support for edge attributes, not just node attributes
+								Writer.WriteAttributeString("class", "node");   // Node attributes, not edges!
+
+								foreach (var Attribute in AllAttributes.Values)
+								{
+									Writer.WriteStartElement("attribute");
+									{
+										Writer.WriteAttributeString("id", Attribute.Id.ToString());
+										Writer.WriteAttributeString("title", Attribute.Name);
+										Writer.WriteAttributeString("type", Attribute.TypeName);
+									}
+									Writer.WriteEndElement();   // attribute
+								}
+
+								// @todo: Add support for attribute type default values
+							}
+							Writer.WriteEndElement();   // attributes
+
+						}
+
+						Writer.WriteStartElement("nodes");
+						{
+							foreach (GraphNode GraphNode in GraphNodes)
+							{
+								Writer.WriteStartElement("node");
+								{
+									int Id = GetNodeId(GraphNode, NodeToId);
+									Writer.WriteAttributeString("id", Id.ToString());
+									Writer.WriteAttributeString("label", GraphNode.Label);
+
+									Writer.WriteStartElement("color", VizNamespace);
+									{
+										Writer.WriteAttributeString("r", GraphNode.Color.R.ToString());
+										Writer.WriteAttributeString("g", GraphNode.Color.G.ToString());
+										Writer.WriteAttributeString("b", GraphNode.Color.B.ToString());
+										Writer.WriteAttributeString("a", (GraphNode.Color.A / 255.0f).ToString());
+									}
+									Writer.WriteEndElement();   // viz:color
+
+									Writer.WriteStartElement("size", VizNamespace);
+									{
+										Writer.WriteAttributeString("value", GraphNode.Size.ToString());
+									}
+									Writer.WriteEndElement();   // viz:size
+
+									Writer.WriteStartElement("shape", VizNamespace);
+									{
+										// NOTE: Valid shapes are:  disc, square, triangle, diamond, image
+										Writer.WriteAttributeString("value", "disc");
+									}
+									Writer.WriteEndElement();   // viz:shape
+
+									if (GraphNode.Attributes.Count > 0)
+									{
+										Writer.WriteStartElement("attvalues");
+										{
+											foreach (var AttributeHashEntry in GraphNode.Attributes)
+											{
+												var AttributeName = AttributeHashEntry.Key;
+												var AttributeValue = AttributeHashEntry.Value;
+
+												var Attribute = AllAttributes[AttributeName];
+
+												Writer.WriteStartElement("attvalue");
+												{
+													Writer.WriteAttributeString("for", Attribute.Id.ToString());
+													Writer.WriteAttributeString("value", AttributeValue.ToString());
+												}
+												Writer.WriteEndElement();
+											}
+										}
+										Writer.WriteEndElement();   // attvalues
+									}
+								}
+								Writer.WriteEndElement();   // node
+							}
+						}
+						Writer.WriteEndElement();   // nodes
+
+
+						Writer.WriteStartElement("edges");
+						{
+							for(int EdgeId = 0; EdgeId < GraphEdges.Count; EdgeId++)
+							{
+								GraphEdge GraphEdge = GraphEdges[EdgeId];
+								Writer.WriteStartElement("edge");
+								{
+									Writer.WriteAttributeString("id", EdgeId.ToString());
+									Writer.WriteAttributeString("source", GetNodeId(GraphEdge.Source, NodeToId).ToString());
+									Writer.WriteAttributeString("target", GetNodeId(GraphEdge.Target, NodeToId).ToString());
+									Writer.WriteAttributeString("weight", GraphEdge.Weight.ToString());
+
+									Writer.WriteStartElement("color", VizNamespace);
+									{
+										Writer.WriteAttributeString("r", GraphEdge.Color.R.ToString());
+										Writer.WriteAttributeString("g", GraphEdge.Color.G.ToString());
+										Writer.WriteAttributeString("b", GraphEdge.Color.B.ToString());
+										Writer.WriteAttributeString("a", (GraphEdge.Color.A / 255.0f).ToString());
+									}
+									Writer.WriteEndElement();   // viz:color
+
+									Writer.WriteStartElement("thickness", VizNamespace);
+									{
+										Writer.WriteAttributeString("value", GraphEdge.Thickness.ToString());
+									}
+									Writer.WriteEndElement();   // viz:thickness
+
+									Writer.WriteStartElement("shape", VizNamespace);
+									{
+										// NOTE: Valid shapes are:  solid, dotted, dashed, double
+										Writer.WriteAttributeString("value", "solid");
+									}
+									Writer.WriteEndElement();   // viz:shape
+								}
+								Writer.WriteEndElement();   // edge
+							}
+						}
+						Writer.WriteEndElement();   // nodes
+					}
+
+					Writer.WriteEndElement();   // graph
+				}
+				Writer.WriteEndElement();   // gexf
+
+				Writer.Flush();
 			}
-			Writer.WriteEndElement();   // gexf
-
-			Writer.Flush();
 		}
 
 		private static int GetNodeId(GraphNode Node, Dictionary<GraphNode, int> NodeToId)
 		{
-			if (!NodeToId.TryGetValue(Node, out int Id))
+			int Id;
+			if (!NodeToId.TryGetValue(Node, out Id))
 			{
 				Id = NodeToId.Count;
 				NodeToId.Add(Node, Id);

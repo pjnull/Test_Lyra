@@ -143,10 +143,8 @@ namespace UnrealBuildTool.Modes
 
 				foreach (UEBuildModule TargetModule in SourceModuleInfo.OutwardRefs)
 				{
-					HashSet<UEBuildModule> VisitedTargetModules = new HashSet<UEBuildModule>
-					{
-						SourceModule
-					};
+					HashSet<UEBuildModule> VisitedTargetModules = new HashSet<UEBuildModule>();
+					VisitedTargetModules.Add(SourceModule);
 
 					List<UEBuildModule> DependencyModules = new List<UEBuildModule>();
 					TargetModule.GetAllDependencyModules(DependencyModules, VisitedTargetModules, false, false, false);
@@ -199,7 +197,8 @@ namespace UnrealBuildTool.Modes
 				}
 				foreach (UEBuildModule Module in Binary.Modules)
 				{
-					if (!ModuleToInfo.TryGetValue(Module, out ModuleInfo? ModuleInfo))
+					ModuleInfo? ModuleInfo;
+					if (!ModuleToInfo.TryGetValue(Module, out ModuleInfo))
 					{
 						MissingModules.Add(Module);
 						continue;
@@ -243,9 +242,9 @@ namespace UnrealBuildTool.Modes
 					WriteDependencyList(Writer, "Recursive inward refs:  ", ModuleInfo.InwardRefs);
 					WriteDependencyList(Writer, "Recursive outward refs: ", ModuleInfo.OutwardRefs);
 					Writer.WriteLine("Object size:             {0:n0}kb", (ModuleInfo.ObjSize + 1023) / 1024);
-					Writer.WriteLine("Object files:            {0}", string.Join(", ", ModuleInfo.ObjectFiles.Select(x => x.GetFileName())));
+					Writer.WriteLine("Object files:            {0}", String.Join(", ", ModuleInfo.ObjectFiles.Select(x => x.GetFileName())));
 					Writer.WriteLine("Binary size:             {0:n0}kb", (ModuleInfo.BinSize + 1023) / 1024);
-					Writer.WriteLine("Binary files:            {0}", string.Join(", ", ModuleInfo.BinaryFiles.Select(x => x.GetFileName())));
+					Writer.WriteLine("Binary files:            {0}", String.Join(", ", ModuleInfo.BinaryFiles.Select(x => x.GetFileName())));
 				}
 			}
 
@@ -254,24 +253,22 @@ namespace UnrealBuildTool.Modes
 			Log.TraceInformation("Writing module information to {0}", CsvFile);
 			using (StreamWriter Writer = new StreamWriter(CsvFile.FullName))
 			{
-				List<string> Columns = new List<string>
-				{
-					"Module",
-					"ShortestPath",
-					"NumUniqueInwardRefs",
-					"UniqueInwardRefs",
-					"NumRecursiveInwardRefs",
-					"RecursiveInwardRefs",
-					"NumUniqueOutwardRefs",
-					"UniqueOutwardRefs",
-					"NumRecursiveOutwardRefs",
-					"RecursiveOutwardRefs",
-					"ObjSize",
-					"ObjFiles",
-					"BinSize",
-					"BinFiles"
-				};
-				Writer.WriteLine(string.Join(",", Columns));
+				List<string> Columns = new List<string>();
+				Columns.Add("Module");
+				Columns.Add("ShortestPath");
+				Columns.Add("NumUniqueInwardRefs");
+				Columns.Add("UniqueInwardRefs");
+				Columns.Add("NumRecursiveInwardRefs");
+				Columns.Add("RecursiveInwardRefs");
+				Columns.Add("NumUniqueOutwardRefs");
+				Columns.Add("UniqueOutwardRefs");
+				Columns.Add("NumRecursiveOutwardRefs");
+				Columns.Add("RecursiveOutwardRefs");
+				Columns.Add("ObjSize");
+				Columns.Add("ObjFiles");
+				Columns.Add("BinSize");
+				Columns.Add("BinFiles");
+				Writer.WriteLine(String.Join(",", Columns));
 
 				foreach (ModuleInfo ModuleInfo in ModuleToInfo.Values.OrderByDescending(x => x.InwardRefs.Count).ThenBy(x => x.BinSize))
 				{
@@ -279,18 +276,18 @@ namespace UnrealBuildTool.Modes
 					Columns.Add(ModuleInfo.Module.Name);
 					Columns.Add(ModuleInfo.Chain);
 					Columns.Add($"{ModuleInfo.UniqueInwardRefs.Count}");
-					Columns.Add($"\"{string.Join(", ", ModuleInfo.UniqueInwardRefs.Select(x => x.Name))}\"");
+					Columns.Add($"\"{String.Join(", ", ModuleInfo.UniqueInwardRefs.Select(x => x.Name))}\"");
 					Columns.Add($"{ModuleInfo.InwardRefs.Count}");
-					Columns.Add($"\"{string.Join(", ", ModuleInfo.InwardRefs.Select(x => x.Name))}\"");
+					Columns.Add($"\"{String.Join(", ", ModuleInfo.InwardRefs.Select(x => x.Name))}\"");
 					Columns.Add($"{ModuleInfo.UniqueOutwardRefs.Count}");
-					Columns.Add($"\"{string.Join(", ", ModuleInfo.UniqueOutwardRefs.Select(x => x.Name))}\"");
+					Columns.Add($"\"{String.Join(", ", ModuleInfo.UniqueOutwardRefs.Select(x => x.Name))}\"");
 					Columns.Add($"{ModuleInfo.OutwardRefs.Count}");
-					Columns.Add($"\"{string.Join(", ", ModuleInfo.OutwardRefs.Select(x => x.Name))}\"");
+					Columns.Add($"\"{String.Join(", ", ModuleInfo.OutwardRefs.Select(x => x.Name))}\"");
 					Columns.Add($"{ModuleInfo.ObjSize}");
-					Columns.Add($"\"{string.Join(", ", ModuleInfo.ObjectFiles.Select(x => x.GetFileName()))}\"");
+					Columns.Add($"\"{String.Join(", ", ModuleInfo.ObjectFiles.Select(x => x.GetFileName()))}\"");
 					Columns.Add($"{ModuleInfo.BinSize}");
-					Columns.Add($"\"{string.Join(", ", ModuleInfo.BinaryFiles.Select(x => x.GetFileName()))}\"");
-					Writer.WriteLine(string.Join(",", Columns));
+					Columns.Add($"\"{String.Join(", ", ModuleInfo.BinaryFiles.Select(x => x.GetFileName()))}\"");
+					Writer.WriteLine(String.Join(",", Columns));
 				}
 			}
 		}
@@ -303,7 +300,7 @@ namespace UnrealBuildTool.Modes
 			}
 			else
 			{
-				Writer.WriteLine("{0} {1} ({2})", Prefix, Modules.Count, string.Join(", ", Modules.Select(x => x.Name).OrderBy(x => x)));
+				Writer.WriteLine("{0} {1} ({2})", Prefix, Modules.Count, String.Join(", ", Modules.Select(x => x.Name).OrderBy(x => x)));
 			}
 		}
 
@@ -339,12 +336,11 @@ namespace UnrealBuildTool.Modes
 				{
 					ModuleInfo TargetModuleInfo = ModuleToInfo[TargetModule];
 
-					if (ModuleToNode.TryGetValue(TargetModule, out GraphNode? TargetNode))
+					GraphNode? TargetNode;
+					if (ModuleToNode.TryGetValue(TargetModule, out TargetNode))
 					{
-						GraphEdge Edge = new GraphEdge(SourceNode, TargetNode)
-						{
-							Thickness = TargetModuleInfo.InwardRefs.Count
-						};
+						GraphEdge Edge = new GraphEdge(SourceNode, TargetNode);
+						Edge.Thickness = TargetModuleInfo.InwardRefs.Count;
 						Edges.Add(Edge);
 					}
 				}
@@ -367,7 +363,8 @@ namespace UnrealBuildTool.Modes
 				GraphNode? PrevNode = null;
 				foreach (string Part in Parts)
 				{
-					if (!NameToNode.TryGetValue(Part, out GraphNode? NextNode))
+					GraphNode? NextNode;
+					if (!NameToNode.TryGetValue(Part, out NextNode))
 					{
 						NextNode = new GraphNode(Part);
 						NameToNode[Part] = NextNode;

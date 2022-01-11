@@ -125,17 +125,17 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Cache of individual config files
 		/// </summary>
-		static readonly Dictionary<FileReference, ConfigFile> LocationToConfigFile = new Dictionary<FileReference, ConfigFile>();
+		static Dictionary<FileReference, ConfigFile> LocationToConfigFile = new Dictionary<FileReference, ConfigFile>();
 
 		/// <summary>
 		/// Cache of config hierarchies by project
 		/// </summary>
-		static readonly Dictionary<ConfigHierarchyKey, ConfigHierarchy> HierarchyKeyToHierarchy = new Dictionary<ConfigHierarchyKey, ConfigHierarchy>();
+		static Dictionary<ConfigHierarchyKey, ConfigHierarchy> HierarchyKeyToHierarchy = new Dictionary<ConfigHierarchyKey, ConfigHierarchy>();
 
 		/// <summary>
 		/// Cache of config fields by type
 		/// </summary>
-		static readonly Dictionary<Type, List<ConfigField>> TypeToConfigFields = new Dictionary<Type, List<ConfigField>>();
+		static Dictionary<Type, List<ConfigField>> TypeToConfigFields = new Dictionary<Type, List<ConfigField>>();
 
 		/// <summary>
 		/// Attempts to read a config file (or retrieve it from the cache)
@@ -175,7 +175,7 @@ namespace UnrealBuildTool
 		public static ConfigHierarchy ReadHierarchy(ConfigHierarchyType Type, DirectoryReference? ProjectDir, UnrealTargetPlatform Platform, string CustomConfig = "")
 		{
 			// Handle command line overrides
-			List<string> OverrideStrings = new List<string>();
+			List<String> OverrideStrings = new List<String>();
 			string[] CmdLine = Environment.GetCommandLineArgs();
 			string IniConfigArgPrefix = "-ini:" + Enum.GetName(typeof(ConfigHierarchyType), Type) + ":";
 			string CustomConfigPrefix = "-CustomConfig=";
@@ -193,7 +193,7 @@ namespace UnrealBuildTool
 
 			if (CustomConfig == null)
 			{
-				CustomConfig = string.Empty;
+				CustomConfig = String.Empty;
 			}
 
 			// Get the key to use for the cache. It cannot be null, so we use the engine directory if a project directory is not given.
@@ -209,7 +209,8 @@ namespace UnrealBuildTool
 					List<ConfigFile> Files = new List<ConfigFile>();
 					foreach (FileReference IniFileName in ConfigHierarchy.EnumerateConfigFileLocations(Type, ProjectDir, Platform, CustomConfig))
 					{
-						if (TryReadFile(IniFileName, out ConfigFile? File))
+						ConfigFile? File;
+						if (TryReadFile(IniFileName, out File))
 						{
 							Files.Add(File);
 						}
@@ -306,14 +307,16 @@ namespace UnrealBuildTool
 				string KeyName = Field.Attribute.KeyName ?? Field.FieldInfo.Name;
 
 				// Get the value(s) associated with this key
-				Hierarchy.TryGetValues(Field.Attribute.SectionName, KeyName, out IReadOnlyList<string>? Values);
+				IReadOnlyList<string>? Values;
+				Hierarchy.TryGetValues(Field.Attribute.SectionName, KeyName, out Values);
 
 				// Parse the values from the config files and update the target object
 				if (Field.AddElement == null)
 				{
 					if(Values != null && Values.Count == 1)
 					{
-						if (TryParseValue(Values[0], Field.FieldInfo.FieldType, out object? Value))
+						object? Value;
+						if(TryParseValue(Values[0], Field.FieldInfo.FieldType, out Value))
 						{
 							Field.FieldInfo.SetValue(TargetObject, Value);
 						}
@@ -325,7 +328,8 @@ namespace UnrealBuildTool
 					{
 						foreach(string Item in Values)
 						{
-							if (TryParseValue(Item, Field.ElementType!, out object? Value))
+							object? Value;
+							if(TryParseValue(Item, Field.ElementType!, out Value))
 							{
 								Field.AddElement(TargetObject, Value);
 							}
@@ -358,7 +362,8 @@ namespace UnrealBuildTool
 			}
 			else if(FieldType == typeof(bool))
 			{
-				if (ConfigHierarchy.TryParse(Text, out bool BoolValue))
+				bool BoolValue;
+				if(ConfigHierarchy.TryParse(Text, out BoolValue))
 				{
 					Value = BoolValue;
 					return true;
@@ -371,7 +376,8 @@ namespace UnrealBuildTool
 			}
 			else if(FieldType == typeof(int))
 			{
-				if (ConfigHierarchy.TryParse(Text, out int IntValue))
+				int IntValue;
+				if(ConfigHierarchy.TryParse(Text, out IntValue))
 				{
 					Value = IntValue;
 					return true;
@@ -384,7 +390,8 @@ namespace UnrealBuildTool
 			}
 			else if(FieldType == typeof(float))
 			{
-				if (ConfigHierarchy.TryParse(Text, out float FloatValue))
+				float FloatValue;
+				if(ConfigHierarchy.TryParse(Text, out FloatValue))
 				{
 					Value = FloatValue;
 					return true;
@@ -397,7 +404,8 @@ namespace UnrealBuildTool
 			}
 			else if(FieldType == typeof(double))
 			{
-				if (ConfigHierarchy.TryParse(Text, out double DoubleValue))
+				double DoubleValue;
+				if(ConfigHierarchy.TryParse(Text, out DoubleValue))
 				{
 					Value = DoubleValue;
 					return true;
@@ -410,7 +418,8 @@ namespace UnrealBuildTool
 			}
 			else if(FieldType == typeof(Guid))
 			{
-				if (ConfigHierarchy.TryParse(Text, out Guid GuidValue))
+				Guid GuidValue;
+				if(ConfigHierarchy.TryParse(Text, out GuidValue))
 				{
 					Value = GuidValue;
 					return true;

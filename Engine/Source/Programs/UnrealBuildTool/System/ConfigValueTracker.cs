@@ -101,7 +101,7 @@ namespace UnrealBuildTool
 		/// <returns>True if the keys are equal, false otherwise</returns>
 		public bool Equals(ConfigDependencyKey? Other)
 		{
-			return Other is object && Type == Other.Type && ProjectDir == Other.ProjectDir && Platform == Other.Platform && SectionName == Other.SectionName && KeyName == Other.KeyName;
+			return !ReferenceEquals(Other, null) && Type == Other.Type && ProjectDir == Other.ProjectDir && Platform == Other.Platform && SectionName == Other.SectionName && KeyName == Other.KeyName;
 		}
 
 		/// <summary>
@@ -110,7 +110,13 @@ namespace UnrealBuildTool
 		/// <returns>Hash code for the object</returns>
 		public override int GetHashCode()
 		{
-			return HashCode.Combine(Type, ProjectDir, Platform, SectionName, KeyName);
+			int Hash = 17;
+			Hash = (Hash * 31) + Type.GetHashCode();
+			Hash = (Hash * 31) + ((ProjectDir == null) ? 0 : ProjectDir.GetHashCode());
+			Hash = (Hash * 31) + Platform.GetHashCode();
+			Hash = (Hash * 31) + SectionName.GetHashCode();
+			Hash = (Hash * 31) + KeyName.GetHashCode();
+			return Hash;
 		}
 	}
 
@@ -162,10 +168,11 @@ namespace UnrealBuildTool
 				ConfigHierarchy Hierarchy = ConfigCache.ReadHierarchy(Pair.Key.Type, Pair.Key.ProjectDir, Pair.Key.Platform);
 
 				// Get the value(s) associated with this key
-				Hierarchy.TryGetValues(Pair.Key.SectionName, Pair.Key.KeyName, out IReadOnlyList<string>? NewValues);
+				IReadOnlyList<string>? NewValues;
+				Hierarchy.TryGetValues(Pair.Key.SectionName, Pair.Key.KeyName, out NewValues);
 
 				// Check if they're different
-				if (Pair.Value == null)
+				if(Pair.Value == null)
 				{
 					if(NewValues != null)
 					{

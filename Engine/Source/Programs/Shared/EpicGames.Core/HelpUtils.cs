@@ -62,13 +62,13 @@ namespace EpicGames.Core
 		public static void PrintHelp(string Title, string Description, List<KeyValuePair<string, string>> Parameters, int MaxWidth, ILogger Logger)
 		{
 			bool bFirstLine = true;
-			if (!string.IsNullOrEmpty(Title))
+			if (!String.IsNullOrEmpty(Title))
 			{
 				PrintParagraph(Title, MaxWidth, Logger);
 				bFirstLine = false;
 			}
 
-			if (!string.IsNullOrEmpty(Description))
+			if (!String.IsNullOrEmpty(Description))
 			{
 				if (!bFirstLine)
 				{

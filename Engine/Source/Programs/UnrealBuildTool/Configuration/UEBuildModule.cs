@@ -517,7 +517,8 @@ namespace UnrealBuildTool
 		protected void FindModulesInPublicCompileEnvironment(Dictionary<UEBuildModule, bool> ModuleToIncludePathsOnlyFlag)
 		{
 			//
-			if (ModuleToIncludePathsOnlyFlag.TryGetValue(this, out bool bModuleIncludePathsOnly) && !bModuleIncludePathsOnly)
+			bool bModuleIncludePathsOnly;
+			if (ModuleToIncludePathsOnlyFlag.TryGetValue(this, out bModuleIncludePathsOnly) && !bModuleIncludePathsOnly)
 			{
 				return;
 			}
@@ -723,7 +724,7 @@ namespace UnrealBuildTool
 						{
 							string Name = Path.Substring(StartIdx, EndIdx - StartIdx);
 							string? Value = Environment.GetEnvironmentVariable(Name);
-							if(string.IsNullOrEmpty(Value))
+							if(String.IsNullOrEmpty(Value))
 							{
 								throw new BuildException("Environment variable '{0}' is not defined (referenced by {1})", Name, Rules.File);
 							}
@@ -746,7 +747,7 @@ namespace UnrealBuildTool
 		/// <returns>True if the variable name matches</returns>
 		private bool MatchVariableName(string Path, int StartIdx, int EndIdx, string Name)
 		{
-			return Name.Length == EndIdx - StartIdx && string.Compare(Path, StartIdx, Name, 0, EndIdx - StartIdx) == 0;
+			return Name.Length == EndIdx - StartIdx && String.Compare(Path, StartIdx, Name, 0, EndIdx - StartIdx) == 0;
 		}
 
 		/// <summary>
@@ -964,7 +965,7 @@ namespace UnrealBuildTool
 			string ThisRefName = (RulesFile == null) ? Name : RulesFile.GetFileName();
 
 			// Set the reference chain for anything referenced by this module
-			string NextReferenceChain = string.Format("{0} -> {1}", ReferenceChain, ThisRefName);
+			string NextReferenceChain = String.Format("{0} -> {1}", ReferenceChain, ThisRefName);
 
 			// We need to check for cycles if this module has already been created and its name is in the stack.
 			bool CheckForCycles = PrivateIncludePathModules != null && ReferenceStack.Contains(this);

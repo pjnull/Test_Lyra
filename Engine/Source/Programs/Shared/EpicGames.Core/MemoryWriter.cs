@@ -15,7 +15,7 @@ namespace EpicGames.Core
 		/// <summary>
 		/// The memory block to write to
 		/// </summary>
-		readonly Memory<byte> Memory;
+		Memory<byte> Memory;
 
 		/// <summary>
 		/// Current offset within the memory

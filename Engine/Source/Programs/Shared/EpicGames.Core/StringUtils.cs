@@ -14,17 +14,17 @@ namespace EpicGames.Core
 		/// <summary>
 		/// Array mapping from ascii index to hexadecimal digits.
 		/// </summary>
-		static readonly sbyte[] HexDigits;
+		static sbyte[] HexDigits;
 
 		/// <summary>
 		/// Hex digits to utf8 byte
 		/// </summary>
-		static readonly byte[] HexDigitToUtf8Byte = Encoding.UTF8.GetBytes("0123456789abcdef");
+		static byte[] HexDigitToUtf8Byte = Encoding.UTF8.GetBytes("0123456789abcdef");
 
 		/// <summary>
 		/// Array mapping human readable size of bytes, 1024^x. long max is within the range of Exabytes.
 		/// </summary>
-		static readonly string[] ByteSizes = { "B", "KB", "MB", "GB", "TB", "PB", "EB" };
+		static string[] ByteSizes = { "B", "KB", "MB", "GB", "TB", "PB", "EB" };
 
 		/// <summary>
 		/// Static constructor. Initializes the HexDigits array.
@@ -256,11 +256,11 @@ namespace EpicGames.Core
 			}
 			else if (Items.Length <= MaxCount)
 			{
-				return $"{string.Join(", ", Items.Take(Items.Length - 1))} and {Items.Last()}";
+				return $"{String.Join(", ", Items.Take(Items.Length - 1))} and {Items.Last()}";
 			}
 			else
 			{
-				return $"{string.Join(", ", Items.Take(MaxCount - 1))} and {Items.Length - (MaxCount - 1)} others";
+				return $"{String.Join(", ", Items.Take(MaxCount - 1))} and {Items.Length - (MaxCount - 1)} others";
 			}
 		}
 
@@ -290,9 +290,10 @@ namespace EpicGames.Core
 		/// <returns>Array of bytes</returns>
 		public static byte[] ParseHexString(string Text)
 		{
-			if (!TryParseHexString(Text, out byte[]? Bytes))
+			byte[]? Bytes;
+			if(!TryParseHexString(Text, out Bytes))
 			{
-				throw new FormatException(string.Format("Invalid hex string: '{0}'", Text));
+				throw new FormatException(String.Format("Invalid hex string: '{0}'", Text));
 			}
 			return Bytes;
 		}
@@ -303,7 +304,8 @@ namespace EpicGames.Core
 		/// <returns>Array of bytes</returns>
 		public static byte[] ParseHexString(ReadOnlySpan<byte> Text)
 		{
-			if (!TryParseHexString(Text, out byte[]? Bytes))
+			byte[]? Bytes;
+			if (!TryParseHexString(Text, out Bytes))
 			{
 				throw new FormatException($"Invalid hex string: '{Encoding.UTF8.GetString(Text)}'");
 			}

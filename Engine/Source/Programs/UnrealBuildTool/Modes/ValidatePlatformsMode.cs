@@ -19,19 +19,19 @@ namespace UnrealBuildTool
 		/// Platforms to validate
 		/// </summary>
 		[CommandLine("-Platforms=", ListSeparator = '+')]
-		readonly HashSet<UnrealTargetPlatform> Platforms = new HashSet<UnrealTargetPlatform>();
+		HashSet<UnrealTargetPlatform> Platforms = new HashSet<UnrealTargetPlatform>();
 
 		/// <summary>
 		/// Whether to validate all platforms
 		/// </summary>
 		[CommandLine("-AllPlatforms")]
-		readonly bool bAllPlatforms = false;
+		bool bAllPlatforms = false;
 
 		/// <summary>
 		/// Whether to output SDK versions.
 		/// </summary>
 		[CommandLine("-OutputSDKs")]
-		readonly bool bOutputSDKs = false;
+		bool bOutputSDKs = false;
 
 		/// <summary>
 		/// Executes the tool with the given arguments

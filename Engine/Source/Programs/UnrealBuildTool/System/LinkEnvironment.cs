@@ -167,7 +167,7 @@ namespace UnrealBuildTool
 		/// If set, overrides the program entry function on Windows platform.  This is used by the base Unreal
 		/// program so we can link in either command-line mode or windowed mode without having to recompile the Launch module.
 		/// </summary>
-		public string WindowsEntryPointOverride = string.Empty;
+		public string WindowsEntryPointOverride = String.Empty;
 
 		/// <summary>
 		/// True if we're building a EXE/DLL target with an import library, and that library is needed by a dependency that

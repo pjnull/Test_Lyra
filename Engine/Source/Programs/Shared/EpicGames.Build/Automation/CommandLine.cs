@@ -60,7 +60,7 @@ namespace UnrealBuildBase
 			this.IgnoredGlobalParameters = new HashSet<string>(IgnoredGlobalParameters);
 		}
 
-		readonly HashSet<string> GlobalParameterValues = new HashSet<string>(StringComparer.InvariantCultureIgnoreCase);
+		HashSet<string> GlobalParameterValues = new HashSet<string>(StringComparer.InvariantCultureIgnoreCase);
 		
 		public void SetGlobal(string Parameter)
 		{
@@ -108,7 +108,7 @@ namespace UnrealBuildBase
 			return GlobalParameterValues.Contains(Parameter);
         }
 
-		readonly Dictionary<string, object?> UncheckedParameters = new Dictionary<string, object?>(StringComparer.InvariantCultureIgnoreCase);
+		Dictionary<string, object?> UncheckedParameters = new Dictionary<string, object?>(StringComparer.InvariantCultureIgnoreCase);
 		public void SetUnchecked(string Name, object? Value = null)
         {
 			UncheckedParameters[Name] = Value;

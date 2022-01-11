@@ -143,7 +143,7 @@ namespace UnrealBuildToolTests
 				Tokens.Add(Reader.Current);
 			}
 
-			string OutputText = string.Join(", ", Tokens.Select(x => FormatToken(x)));
+			string OutputText = String.Join(", ", Tokens.Select(x => FormatToken(x)));
 			Assert.AreEqual(ExpectedOutputText, OutputText);
 		}
 

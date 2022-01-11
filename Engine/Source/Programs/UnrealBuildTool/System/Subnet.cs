@@ -36,7 +36,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Bytes corresponding to the prefix address
 		/// </summary>
-		readonly byte[] PrefixBytes;
+		byte[] PrefixBytes;
 
 		/// <summary>
 		/// Constructor
@@ -116,7 +116,7 @@ namespace UnrealBuildTool
 		/// <returns>String representation of the subnet</returns>
 		public override string ToString()
 		{
-			return string.Format("{0}/{1}", Prefix, MaskBits);
+			return String.Format("{0}/{1}", Prefix, MaskBits);
 		}
 	}
 }

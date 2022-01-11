@@ -88,7 +88,7 @@ namespace EpicGames.Core
 			DirectoryInfo ParentInfo = DirectoryUtils.FindCorrectCase(Info.Directory);
 			foreach (FileInfo ChildInfo in ParentInfo.EnumerateFiles())
 			{
-				if (string.Equals(ChildInfo.Name, Info.Name, FileReference.Comparison))
+				if (String.Equals(ChildInfo.Name, Info.Name, FileReference.Comparison))
 				{
 					return ChildInfo;
 				}
@@ -152,7 +152,7 @@ namespace EpicGames.Core
 				}
 				catch (Exception Ex)
 				{
-					throw new WrappedFileOrDirectoryException(Ex, string.Format("Unable to delete '{0}': {1}", File.FullName, Ex.Message.TrimEnd()));
+					throw new WrappedFileOrDirectoryException(Ex, String.Format("Unable to delete '{0}': {1}", File.FullName, Ex.Message.TrimEnd()));
 				}
 			}
 		}
@@ -230,7 +230,7 @@ namespace EpicGames.Core
 			}
 			catch (Exception Ex)
 			{
-				throw new WrappedFileOrDirectoryException(Ex, string.Format("Unable to delete '{0}': {1}", Directory.FullName, Ex.Message.TrimEnd()));
+				throw new WrappedFileOrDirectoryException(Ex, String.Format("Unable to delete '{0}': {1}", Directory.FullName, Ex.Message.TrimEnd()));
 			}
 		}
 
@@ -335,11 +335,11 @@ namespace EpicGames.Core
 				}
 				catch (Exception DeleteEx)
 				{
-					throw new WrappedFileOrDirectoryException(new AggregateException(Ex, DeleteEx), string.Format("Unable to move {0} to {1} (also tried delete/move)", SourceLocation, TargetLocation));
+					throw new WrappedFileOrDirectoryException(new AggregateException(Ex, DeleteEx), String.Format("Unable to move {0} to {1} (also tried delete/move)", SourceLocation, TargetLocation));
 				}
 
 				// Throw the original exception
-				throw new WrappedFileOrDirectoryException(Ex, string.Format("Unable to move {0} to {1}", SourceLocation, TargetLocation));
+				throw new WrappedFileOrDirectoryException(Ex, String.Format("Unable to move {0} to {1}", SourceLocation, TargetLocation));
 			}
 		}
 
@@ -708,10 +708,11 @@ namespace EpicGames.Core
 					throw new Win32Exception(Result, "Unable to register resource with restart manager");
 				}
 
+				uint nProcInfoNeeded = 0;
 				uint nProcInfo = 10;
 				uint Reason = 0;
 				RM_PROCESS_INFO[] ProcessInfoArray = new RM_PROCESS_INFO[nProcInfo];
-				Result = RmGetList(SessionHandle, out uint nProcInfoNeeded, ref nProcInfo, ProcessInfoArray, ref Reason);
+				Result = RmGetList(SessionHandle, out nProcInfoNeeded, ref nProcInfo, ProcessInfoArray, ref Reason);
 				if (Result != 0)
 				{
 					throw new Win32Exception(Result, "Unable to query processes with file handle open");
@@ -728,7 +729,8 @@ namespace EpicGames.Core
 					{
 						if (hProcess != null)
 						{
-							if (GetProcessTimes(hProcess, out FILETIME CreateTime, out FILETIME ExitTime, out FILETIME KernelTime, out FILETIME UserTime) && FileTimeToTicks(CreateTime) == StartTimeTicks)
+							FILETIME CreateTime, ExitTime, KernelTime, UserTime;
+							if (GetProcessTimes(hProcess, out CreateTime, out ExitTime, out KernelTime, out UserTime) && FileTimeToTicks(CreateTime) == StartTimeTicks)
 							{
 								int Capacity = 260;
 								StringBuilder ImageNameBuilder = new StringBuilder(Capacity);

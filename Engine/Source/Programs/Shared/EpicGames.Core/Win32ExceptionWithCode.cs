@@ -47,7 +47,7 @@ namespace EpicGames.Core
 		/// </summary>
 		public override string Message
 		{
-			get { return string.Format("{0} (code 0x{1:X8})", base.Message, base.NativeErrorCode); }
+			get { return String.Format("{0} (code 0x{1:X8})", base.Message, base.NativeErrorCode); }
 		}
 	}
 }

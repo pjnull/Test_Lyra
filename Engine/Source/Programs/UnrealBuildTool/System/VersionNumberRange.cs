@@ -56,7 +56,7 @@ namespace UnrealBuildTool
 		/// <inheritdoc/>
 		public override string ToString()
 		{
-			return string.Format("{0}-{1}", Min, Max);
+			return String.Format("{0}-{1}", Min, Max);
 		}
 	}
 }

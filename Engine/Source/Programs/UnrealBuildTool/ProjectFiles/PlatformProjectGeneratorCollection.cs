@@ -16,7 +16,7 @@ namespace UnrealBuildTool
 	/// </summary>
 	class PlatformProjectGeneratorCollection
 	{
-		readonly Dictionary<UnrealTargetPlatform, PlatformProjectGenerator> ProjectGeneratorDictionary = new Dictionary<UnrealTargetPlatform, PlatformProjectGenerator>();
+		Dictionary<UnrealTargetPlatform, PlatformProjectGenerator> ProjectGeneratorDictionary = new Dictionary<UnrealTargetPlatform, PlatformProjectGenerator>();
 
 		/// <summary>
 		/// Register the given platforms UEPlatformProjectGenerator instance
@@ -26,7 +26,8 @@ namespace UnrealBuildTool
 		public void RegisterPlatformProjectGenerator(UnrealTargetPlatform InPlatform, PlatformProjectGenerator InProjectGenerator)
 		{
 			// Make sure the build platform is legal
-			if (UEBuildPlatform.TryGetBuildPlatform(InPlatform, out UEBuildPlatform? BuildPlatform))
+			UEBuildPlatform? BuildPlatform;
+			if(UEBuildPlatform.TryGetBuildPlatform(InPlatform, out BuildPlatform))
 			{
 				if (ProjectGeneratorDictionary.ContainsKey(InPlatform) == true)
 				{

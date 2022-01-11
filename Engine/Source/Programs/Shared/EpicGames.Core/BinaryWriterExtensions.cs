@@ -213,7 +213,7 @@ namespace EpicGames.Core
 			}
 			else
 			{
-				throw new Exception(string.Format("Unsupported type '{0}' for binary serialization", FieldType.Name));
+				throw new Exception(String.Format("Unsupported type '{0}' for binary serialization", FieldType.Name));
 			}
 		}
 	}

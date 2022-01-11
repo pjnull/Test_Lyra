@@ -60,32 +60,32 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Location of this dependency cache
 		/// </summary>
-		readonly FileReference Location;
+		FileReference Location;
 
 		/// <summary>
 		/// Directory for files to cache dependencies for.
 		/// </summary>
-		readonly DirectoryReference BaseDirectory;
+		DirectoryReference BaseDirectory;
 
 		/// <summary>
 		/// The parent cache.
 		/// </summary>
-		readonly SourceFileMetadataCache? Parent;
+		SourceFileMetadataCache? Parent;
 
 		/// <summary>
 		/// Map from file item to source file info
 		/// </summary>
-		readonly ConcurrentDictionary<FileItem, IncludeInfo> FileToIncludeInfo = new ConcurrentDictionary<FileItem, IncludeInfo>();
+		ConcurrentDictionary<FileItem, IncludeInfo> FileToIncludeInfo = new ConcurrentDictionary<FileItem, IncludeInfo>();
 
 		/// <summary>
 		/// Map from file item to header file info
 		/// </summary>
-		readonly ConcurrentDictionary<FileItem, ReflectionInfo> FileToReflectionInfo = new ConcurrentDictionary<FileItem, ReflectionInfo>();
+		ConcurrentDictionary<FileItem, ReflectionInfo> FileToReflectionInfo = new ConcurrentDictionary<FileItem, ReflectionInfo>();
 
 		/// <summary>
 		/// Map from file item to source file info
 		/// </summary>
-		readonly ConcurrentDictionary<FileItem, SourceFile> FileToSourceFile = new ConcurrentDictionary<FileItem, SourceFile>();
+		ConcurrentDictionary<FileItem, SourceFile> FileToSourceFile = new ConcurrentDictionary<FileItem, SourceFile>();
 
 		/// <summary>
 		/// Whether the cache has been modified and needs to be saved
@@ -110,7 +110,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Static cache of all constructed dependency caches
 		/// </summary>
-		static readonly Dictionary<FileReference, SourceFileMetadataCache> Caches = new Dictionary<FileReference, SourceFileMetadataCache>();
+		static Dictionary<FileReference, SourceFileMetadataCache> Caches = new Dictionary<FileReference, SourceFileMetadataCache>();
 
 		/// <summary>
 		/// Constructs a dependency cache. This method is private; call CppDependencyCache.Create() to create a cache hierarchy for a given project.
@@ -146,13 +146,12 @@ namespace UnrealBuildTool
 			}
 			else
 			{
-				if (!FileToIncludeInfo.TryGetValue(SourceFile, out IncludeInfo? IncludeInfo) || SourceFile.LastWriteTimeUtc.Ticks > IncludeInfo.LastWriteTimeUtc)
+				IncludeInfo? IncludeInfo;
+				if(!FileToIncludeInfo.TryGetValue(SourceFile, out IncludeInfo) || SourceFile.LastWriteTimeUtc.Ticks > IncludeInfo.LastWriteTimeUtc)
 				{
-					IncludeInfo = new IncludeInfo
-					{
-						LastWriteTimeUtc = SourceFile.LastWriteTimeUtc.Ticks,
-						IncludeText = ParseFirstInclude(SourceFile.Location)
-					};
+					IncludeInfo = new IncludeInfo();
+					IncludeInfo.LastWriteTimeUtc = SourceFile.LastWriteTimeUtc.Ticks;
+					IncludeInfo.IncludeText = ParseFirstInclude(SourceFile.Location);
 					FileToIncludeInfo[SourceFile] = IncludeInfo;
 					bModified = true;
 				}
@@ -173,7 +172,8 @@ namespace UnrealBuildTool
 			}
 			else
 			{
-				if (!FileToSourceFile.TryGetValue(File, out SourceFile? Result) || File.LastWriteTimeUtc.Ticks > Result.LastWriteTimeUtc)
+				SourceFile? Result;
+				if (!FileToSourceFile.TryGetValue(File, out Result) || File.LastWriteTimeUtc.Ticks > Result.LastWriteTimeUtc)
 				{
 					SourceFile NewSourceFile = new SourceFile(File);
 					if (Result == null)
@@ -216,13 +216,12 @@ namespace UnrealBuildTool
 			}
 			else
 			{
-				if (!FileToReflectionInfo.TryGetValue(SourceFile, out ReflectionInfo? ReflectionInfo) || SourceFile.LastWriteTimeUtc.Ticks > ReflectionInfo.LastWriteTimeUtc)
+				ReflectionInfo? ReflectionInfo;
+				if(!FileToReflectionInfo.TryGetValue(SourceFile, out ReflectionInfo) || SourceFile.LastWriteTimeUtc.Ticks > ReflectionInfo.LastWriteTimeUtc)
 				{
-					ReflectionInfo = new ReflectionInfo
-					{
-						LastWriteTimeUtc = SourceFile.LastWriteTimeUtc.Ticks,
-						bContainsMarkup = ReflectionMarkupRegex.IsMatch(FileReference.ReadAllText(SourceFile.Location))
-					};
+					ReflectionInfo = new ReflectionInfo();
+					ReflectionInfo.LastWriteTimeUtc = SourceFile.LastWriteTimeUtc.Ticks;
+					ReflectionInfo.bContainsMarkup = ReflectionMarkupRegex.IsMatch(FileReference.ReadAllText(SourceFile.Location));
 					FileToReflectionInfo[SourceFile] = ReflectionInfo;
 					bModified = true;
 				}
@@ -238,27 +237,29 @@ namespace UnrealBuildTool
 		static string? ParseFirstInclude(FileReference SourceFile)
 		{
 			bool bMatchImport = SourceFile.HasExtension(".m") || SourceFile.HasExtension(".mm");
-			using StreamReader Reader = new StreamReader(SourceFile.FullName, true);
-			for (; ; )
+			using(StreamReader Reader = new StreamReader(SourceFile.FullName, true))
 			{
-				string? Line = Reader.ReadLine();
-				if (Line == null)
+				for(;;)
 				{
-					return null;
-				}
+					string? Line = Reader.ReadLine();
+					if(Line == null)
+					{
+						return null;
+					}
 
-				Match IncludeMatch = IncludeRegex.Match(Line);
-				if (IncludeMatch.Success)
-				{
-					return IncludeMatch.Groups[1].Value;
-				}
-
-				if (bMatchImport)
-				{
-					Match ImportMatch = ImportRegex.Match(Line);
-					if (ImportMatch.Success)
+					Match IncludeMatch = IncludeRegex.Match(Line);
+					if(IncludeMatch.Success)
 					{
 						return IncludeMatch.Groups[1].Value;
+					}
+
+					if(bMatchImport)
+					{
+						Match ImportMatch = ImportRegex.Match(Line);
+						if(ImportMatch.Success)
+						{
+							return IncludeMatch.Groups[1].Value;
+						}
 					}
 				}
 			}
@@ -316,7 +317,8 @@ namespace UnrealBuildTool
 		{
 			lock(Caches)
 			{
-				if (Caches.TryGetValue(Location, out SourceFileMetadataCache? Cache))
+				SourceFileMetadataCache? Cache;
+				if(Caches.TryGetValue(Location, out Cache))
 				{
 					Debug.Assert(Cache.BaseDirectory == BaseDirectory);
 					Debug.Assert(Cache.Parent == Parent);
@@ -345,40 +347,38 @@ namespace UnrealBuildTool
 		{
 			try
 			{
-				using BinaryArchiveReader Reader = new BinaryArchiveReader(Location);
-				int Version = Reader.ReadInt();
-				if (Version != CurrentVersion)
+				using(BinaryArchiveReader Reader = new BinaryArchiveReader(Location))
 				{
-					Log.TraceLog("Unable to read dependency cache from {0}; version {1} vs current {2}", Location, Version, CurrentVersion);
-					return;
-				}
-
-				int FileToFirstIncludeCount = Reader.ReadInt();
-				for (int Idx = 0; Idx < FileToFirstIncludeCount; Idx++)
-				{
-					FileItem File = Reader.ReadCompactFileItem();
-
-					IncludeInfo IncludeInfo = new IncludeInfo
+					int Version = Reader.ReadInt();
+					if(Version != CurrentVersion)
 					{
-						LastWriteTimeUtc = Reader.ReadLong(),
-						IncludeText = Reader.ReadString()
-					};
+						Log.TraceLog("Unable to read dependency cache from {0}; version {1} vs current {2}", Location, Version, CurrentVersion);
+						return;
+					}
 
-					FileToIncludeInfo[File] = IncludeInfo;
-				}
-
-				int FileToMarkupFlagCount = Reader.ReadInt();
-				for (int Idx = 0; Idx < FileToMarkupFlagCount; Idx++)
-				{
-					FileItem File = Reader.ReadCompactFileItem();
-
-					ReflectionInfo ReflectionInfo = new ReflectionInfo
+					int FileToFirstIncludeCount = Reader.ReadInt();
+					for(int Idx = 0; Idx < FileToFirstIncludeCount; Idx++)
 					{
-						LastWriteTimeUtc = Reader.ReadLong(),
-						bContainsMarkup = Reader.ReadBool()
-					};
+						FileItem File = Reader.ReadCompactFileItem();
+						
+						IncludeInfo IncludeInfo = new IncludeInfo();
+						IncludeInfo.LastWriteTimeUtc = Reader.ReadLong();
+						IncludeInfo.IncludeText = Reader.ReadString();
 
-					FileToReflectionInfo[File] = ReflectionInfo;
+						FileToIncludeInfo[File] = IncludeInfo;
+					}
+
+					int FileToMarkupFlagCount = Reader.ReadInt();
+					for(int Idx = 0; Idx < FileToMarkupFlagCount; Idx++)
+					{
+						FileItem File = Reader.ReadCompactFileItem();
+
+						ReflectionInfo ReflectionInfo = new ReflectionInfo();
+						ReflectionInfo.LastWriteTimeUtc = Reader.ReadLong();
+						ReflectionInfo.bContainsMarkup = Reader.ReadBool();
+
+						FileToReflectionInfo[File] = ReflectionInfo;
+					}
 				}
 			}
 			catch(Exception Ex)
@@ -394,24 +394,28 @@ namespace UnrealBuildTool
 		private void Write()
 		{
 			DirectoryReference.CreateDirectory(Location.Directory);
-			using FileStream Stream = File.Open(Location.FullName, FileMode.Create, FileAccess.Write, FileShare.Read);
-			using BinaryArchiveWriter Writer = new BinaryArchiveWriter(Stream);
-			Writer.WriteInt(CurrentVersion);
-
-			Writer.WriteInt(FileToIncludeInfo.Count);
-			foreach (KeyValuePair<FileItem, IncludeInfo> Pair in FileToIncludeInfo)
+			using(FileStream Stream = File.Open(Location.FullName, FileMode.Create, FileAccess.Write, FileShare.Read))
 			{
-				Writer.WriteCompactFileItem(Pair.Key);
-				Writer.WriteLong(Pair.Value.LastWriteTimeUtc);
-				Writer.WriteString(Pair.Value.IncludeText);
-			}
+				using(BinaryArchiveWriter Writer = new BinaryArchiveWriter(Stream))
+				{
+					Writer.WriteInt(CurrentVersion);
 
-			Writer.WriteInt(FileToReflectionInfo.Count);
-			foreach (KeyValuePair<FileItem, ReflectionInfo> Pair in FileToReflectionInfo)
-			{
-				Writer.WriteCompactFileItem(Pair.Key);
-				Writer.WriteLong(Pair.Value.LastWriteTimeUtc);
-				Writer.WriteBool(Pair.Value.bContainsMarkup);
+					Writer.WriteInt(FileToIncludeInfo.Count);
+					foreach(KeyValuePair<FileItem, IncludeInfo> Pair in FileToIncludeInfo)
+					{
+						Writer.WriteCompactFileItem(Pair.Key);
+						Writer.WriteLong(Pair.Value.LastWriteTimeUtc);
+						Writer.WriteString(Pair.Value.IncludeText);
+					}
+
+					Writer.WriteInt(FileToReflectionInfo.Count);
+					foreach(KeyValuePair<FileItem, ReflectionInfo> Pair in FileToReflectionInfo)
+					{
+						Writer.WriteCompactFileItem(Pair.Key);
+						Writer.WriteLong(Pair.Value.LastWriteTimeUtc);
+						Writer.WriteBool(Pair.Value.bContainsMarkup);
+					}
+				}
 			}
 			bModified = false;
 		}

@@ -51,7 +51,8 @@ namespace UnrealBuildTool
 				foreach (string Dir in VersionDirectories)
 				{
 					string VersionString = Path.GetFileName(Dir);
-					if (Version.TryParse(VersionString, out Version? FoundVersion) && FoundVersion > LatestVersion)
+					Version? FoundVersion;
+					if (Version.TryParse(VersionString, out FoundVersion) && FoundVersion > LatestVersion)
 					{
 						if (NoLaterThan == null || FoundVersion <= NoLaterThan)
 						{
@@ -70,7 +71,9 @@ namespace UnrealBuildTool
 			// These are files that look like References/10.0.98765.0/AMadeUpWindowsApiContract/5.0.0.0/AMadeUpWindowsApiContract.winmd
 			List<string> ExpandedWinMDReferences = new List<string>();
 
-			if (!WindowsPlatform.TryGetWindowsSdkDir(SdkVersion, out VersionNumber? OutSdkVersion, out DirectoryReference? OutSdkDir))
+			VersionNumber? OutSdkVersion;
+			DirectoryReference? OutSdkDir;
+			if (!WindowsPlatform.TryGetWindowsSdkDir(SdkVersion, out OutSdkVersion, out OutSdkDir))
 			{
 				Log.TraceError("Failed to find WinSDK " + SdkVersion);
 				throw new Exception("Failed to find WinSDK");
@@ -180,7 +183,7 @@ namespace UnrealBuildTool
 			}
 		}
 
-		private static readonly List<string> ResolveSearchPaths = new List<string>();
-		private readonly List<ActivatableType> ActivatableTypesList;
+		private static List<string> ResolveSearchPaths = new List<string>();
+		private List<ActivatableType> ActivatableTypesList;
 	}
 }

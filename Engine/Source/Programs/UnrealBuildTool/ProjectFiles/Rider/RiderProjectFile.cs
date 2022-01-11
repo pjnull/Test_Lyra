@@ -143,8 +143,10 @@ namespace UnrealBuildTool
 		private void SerializeTarget(FileReference OutputFile, UEBuildTarget BuildTarget, JsonWriterStyle Minimize)
 		{
 			DirectoryReference.CreateDirectory(OutputFile.Directory);
-			using JsonWriter Writer = new JsonWriter(OutputFile, Minimize);
-			ExportTarget(BuildTarget, Writer);
+			using (JsonWriter Writer = new JsonWriter(OutputFile, Minimize))
+			{
+				ExportTarget(BuildTarget, Writer);
+			}
 		}
 
 		/// <summary>
@@ -225,7 +227,8 @@ namespace UnrealBuildTool
 			
 			if (ModuleCompileEnvironment.PrecompiledHeaderIncludeFilename != null)
 			{
-				if (ExtractWrappedIncludeFile(ModuleCompileEnvironment.PrecompiledHeaderIncludeFilename, out string CorrectFilePathPch))
+				string CorrectFilePathPch;
+				if(ExtractWrappedIncludeFile(ModuleCompileEnvironment.PrecompiledHeaderIncludeFilename, out CorrectFilePathPch))
 					Writer.WriteValue("SharedPCHFilePath", CorrectFilePathPch);
 			}
 		}
@@ -235,12 +238,14 @@ namespace UnrealBuildTool
 			CorrectFilePathPch = "";
 			try
 			{
-				using StreamReader Reader = new StreamReader(FileRef.FullName);
-				string? Line = Reader.ReadLine();
-				if (Line != null)
+				using (StreamReader Reader = new StreamReader(FileRef.FullName))
 				{
-					CorrectFilePathPch = Line.Substring("// PCH for ".Length).Trim();
-					return true;
+					string? Line = Reader.ReadLine();
+					if (Line != null)
+					{
+						CorrectFilePathPch = Line.Substring("// PCH for ".Length).Trim();
+						return true;
+					}
 				}
 			}
 			finally

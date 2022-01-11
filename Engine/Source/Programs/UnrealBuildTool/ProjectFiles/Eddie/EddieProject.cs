@@ -152,7 +152,7 @@ namespace UnrealBuildTool
 			{
                 if (Path.GetFileName(CurGroup.Key) != "Documentation")
                 {
-                    Content.Append("AddFileGroup \"" + Path.GetFileName(CurGroup.Key) + "\" \"" + (CurGroup.Value.FullPath ?? CurGroup.Value.Path) + "\"" + ProjectFileGenerator.NewLine);
+                    Content.Append("AddFileGroup \"" + Path.GetFileName(CurGroup.Key) + "\" \"" + (CurGroup.Value.FullPath != null ? CurGroup.Value.FullPath : CurGroup.Value.Path) + "\"" + ProjectFileGenerator.NewLine);
                 
                     if (CurGroup.Value.bIsModuleFolder)
                     {
@@ -161,7 +161,7 @@ namespace UnrealBuildTool
                         ProjectFileContent.Append("# @Eddie Workset@" + ProjectFileGenerator.NewLine);
                         ProjectFileContent.Append("AddWorkset \"" + Path.GetFileName(CurGroup.Key) + ".wkst\" \"" + CurGroup.Value.WorksetPath + "\"" + ProjectFileGenerator.NewLine);
                 
-                        ProjectFileContent.Append("AddFileGroup \"" + Path.GetFileName(CurGroup.Key) + "\" \"" + (CurGroup.Value.FullPath ?? CurGroup.Value.Path) + "\"" + ProjectFileGenerator.NewLine);
+                        ProjectFileContent.Append("AddFileGroup \"" + Path.GetFileName(CurGroup.Key) + "\" \"" + (CurGroup.Value.FullPath != null ? CurGroup.Value.FullPath : CurGroup.Value.Path) + "\"" + ProjectFileGenerator.NewLine);
                 
                         EmitProject(ProjectFileContent, CurGroup.Value.Folders);
                         

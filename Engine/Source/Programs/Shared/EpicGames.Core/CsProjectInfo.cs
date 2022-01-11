@@ -64,13 +64,15 @@ namespace EpicGames.Core
 		/// <returns>True if the output file was found</returns>
 		public bool TryGetOutputFile([NotNullWhen(true)] out FileReference? File)
 		{
-			if (!TryGetOutputDir(out DirectoryReference? OutputDir))
+			DirectoryReference? OutputDir;
+			if(!TryGetOutputDir(out OutputDir))
 			{
 				File = null;
 				return false;
 			}
 
-			if (!TryGetAssemblyName(out string? AssemblyName))
+			string? AssemblyName;
+			if(!TryGetAssemblyName(out AssemblyName))
 			{
 				File = null;
 				return false;
@@ -86,7 +88,8 @@ namespace EpicGames.Core
 		/// <returns>True if this is a netcore project</returns>
 		private bool IsNetCoreProject()
 		{
-			return Properties.TryGetValue("TargetFramework", out string? Framework) && Framework.StartsWith("netcoreapp");
+			string? Framework;
+			return Properties.TryGetValue("TargetFramework", out Framework) && Framework.StartsWith("netcoreapp");
 		}
 
 		/// <summary>
@@ -96,7 +99,8 @@ namespace EpicGames.Core
 		/// <returns>The configured output directory</returns>
 		public DirectoryReference GetOutputDir(DirectoryReference BaseDirectory)
 		{
-			if (Properties.TryGetValue("OutputPath", out string? OutputPath))
+			string? OutputPath;
+			if (Properties.TryGetValue("OutputPath", out OutputPath))
 			{
 				return DirectoryReference.Combine(BaseDirectory, OutputPath);
 			}
@@ -118,7 +122,8 @@ namespace EpicGames.Core
 		/// <returns>True if the output directory was found</returns>
 		public bool TryGetOutputDir([NotNullWhen(true)] out DirectoryReference? OutputDir)
 		{
-			if (Properties.TryGetValue("OutputPath", out string? OutputPath))
+			string? OutputPath;
+			if (Properties.TryGetValue("OutputPath", out OutputPath))
 			{
 				OutputDir = DirectoryReference.Combine(ProjectPath.Directory, OutputPath);
 				return true;
@@ -178,7 +183,8 @@ namespace EpicGames.Core
 			// Copy the build products for any referenced projects. Note that this does NOT operate recursively.
 			foreach(KeyValuePair<FileReference, bool> ProjectReference in ProjectReferences)
 			{
-				if (ProjectFileToInfo.TryGetValue(ProjectReference.Key, out CsProjectInfo? OtherProjectInfo))
+				CsProjectInfo? OtherProjectInfo;
+				if(ProjectFileToInfo.TryGetValue(ProjectReference.Key, out OtherProjectInfo))
 				{
 					OtherProjectInfo.FindCompiledBuildProducts(OutputDir, BuildProducts);
 				}
@@ -195,7 +201,8 @@ namespace EpicGames.Core
 		/// <param name="BuildProducts">Receives the set of build products</param>
 		public void FindCompiledBuildProducts(DirectoryReference OutputDir, HashSet<FileReference> BuildProducts)
 		{
-			if (Properties.TryGetValue("OutputType", out string? OutputType) && TryGetAssemblyName(out string? AssemblyName))
+			string? OutputType, AssemblyName;
+			if (Properties.TryGetValue("OutputType", out OutputType) && TryGetAssemblyName(out AssemblyName))
 			{
 				switch (OutputType)
 				{
@@ -230,7 +237,8 @@ namespace EpicGames.Core
 			// Copy any referenced projects too.
 			foreach(KeyValuePair<FileReference, bool> ProjectReference in ProjectReferences)
 			{
-				if (ProjectFileToInfo.TryGetValue(ProjectReference.Key, out CsProjectInfo? OtherProjectInfo))
+				CsProjectInfo? OtherProjectInfo;
+				if(ProjectFileToInfo.TryGetValue(ProjectReference.Key, out OtherProjectInfo))
 				{
 					OtherProjectInfo.FindCopiedContent(OutputDir, OutputFiles, ProjectFileToInfo);
 				}
@@ -277,7 +285,8 @@ namespace EpicGames.Core
 		{
 			bool bIsDotNetCoreProject = false;
 
-			if (Properties.TryGetValue("TargetFramework", out string? TargetFramework))
+			string? TargetFramework;
+			if (Properties.TryGetValue("TargetFramework", out TargetFramework))
 			{
 				bIsDotNetCoreProject = TargetFramework.ToLower().Contains("netstandard") || TargetFramework.ToLower().Contains("netcoreapp");
 			}
@@ -341,9 +350,10 @@ namespace EpicGames.Core
 		/// <returns>The parsed project info</returns>
 		public static CsProjectInfo Read(FileReference File, Dictionary<string, string> Properties)
 		{
-			if (!TryRead(File, Properties, out CsProjectInfo? Project))
+			CsProjectInfo? Project;
+			if(!TryRead(File, Properties, out Project))
 			{
-				throw new Exception(string.Format("Unable to read '{0}'", File));
+				throw new Exception(String.Format("Unable to read '{0}'", File));
 			}
 			return Project;
 		}
@@ -452,7 +462,7 @@ namespace EpicGames.Core
 		static void ParseReference(DirectoryReference BaseDirectory, XmlElement ParentElement, Dictionary<FileReference, bool> References)
 		{
 			string? HintPath = UnescapeString(GetChildElementString(ParentElement, "HintPath", null));
-			if (!string.IsNullOrEmpty(HintPath))
+			if (!String.IsNullOrEmpty(HintPath))
 			{
 				// Don't include embedded assemblies; they aren't referenced externally by the compiled executable
 				bool bEmbedInteropTypes = GetChildElementBoolean(ParentElement, "EmbedInteropTypes", false);
@@ -475,7 +485,7 @@ namespace EpicGames.Core
 		static void ParseProjectReference(DirectoryReference BaseDirectory, XmlElement ParentElement, Dictionary<string, string> Properties, Dictionary<FileReference, bool> ProjectReferences)
 		{
 			string? IncludePath = UnescapeString(ParentElement.GetAttribute("Include"));
-			if (!string.IsNullOrEmpty(IncludePath))
+			if (!String.IsNullOrEmpty(IncludePath))
 			{
 				FileReference ProjectFile = FileReference.Combine(BaseDirectory, ExpandProperties(IncludePath, Properties));
 				bool bPrivate = GetChildElementBoolean(ParentElement, "Private", true);
@@ -593,7 +603,7 @@ namespace EpicGames.Core
 		static void ParseCompileReference(DirectoryReference BaseDirectory, XmlElement ParentElement, List<FileReference> CompileReferences)
 		{
 			string? IncludePath = UnescapeString(ParentElement.GetAttribute("Include"));
-			if (!string.IsNullOrEmpty(IncludePath))
+			if (!String.IsNullOrEmpty(IncludePath))
 			{
 				FileReference SourceFile = FileReference.Combine(BaseDirectory, IncludePath);
 
@@ -617,10 +627,10 @@ namespace EpicGames.Core
 		static void ParseContent(DirectoryReference BaseDirectory, XmlElement ParentElement, Dictionary<FileReference, bool> Contents)
 		{
 			string? IncludePath = UnescapeString(ParentElement.GetAttribute("Include"));
-			if (!string.IsNullOrEmpty(IncludePath))
+			if (!String.IsNullOrEmpty(IncludePath))
 			{
 				string? CopyTo = GetChildElementString(ParentElement, "CopyToOutputDirectory", null);
-				bool ShouldCopy = !string.IsNullOrEmpty(CopyTo) && (CopyTo.Equals("Always", StringComparison.InvariantCultureIgnoreCase) || CopyTo.Equals("PreserveNewest", StringComparison.InvariantCultureIgnoreCase));
+				bool ShouldCopy = !String.IsNullOrEmpty(CopyTo) && (CopyTo.Equals("Always", StringComparison.InvariantCultureIgnoreCase) || CopyTo.Equals("PreserveNewest", StringComparison.InvariantCultureIgnoreCase));
 				FileReference ContentFile = FileReference.Combine(BaseDirectory, IncludePath);
 				Contents.Add(ContentFile, ShouldCopy);
 			}
@@ -684,7 +694,7 @@ namespace EpicGames.Core
 		{
 			// Read the condition attribute. If it's not present, assume it evaluates to true.
 			string Condition = Element.GetAttribute("Condition");
-			if (string.IsNullOrEmpty(Condition))
+			if (String.IsNullOrEmpty(Condition))
 			{
 				return true;
 			}
@@ -693,7 +703,8 @@ namespace EpicGames.Core
 			Condition = ExpandProperties(Condition, ProjectInfo.Properties);
 
 			// Parse literal true/false values
-			if (bool.TryParse(Condition, out bool OutResult))
+			bool OutResult;
+			if (bool.TryParse(Condition, out OutResult))
 			{
 				return OutResult;
 			}
@@ -727,11 +738,11 @@ namespace EpicGames.Core
 
 			if (Tokens.Length == 3 && Tokens[0].StartsWith("'") && Tokens[1] == "==" && Tokens[2].StartsWith("'"))
 			{
-				bResult = string.Compare(Tokens[0], Tokens[2], StringComparison.InvariantCultureIgnoreCase) == 0;
+				bResult = String.Compare(Tokens[0], Tokens[2], StringComparison.InvariantCultureIgnoreCase) == 0;
 			}
 			else if (Tokens.Length == 3 && Tokens[0].StartsWith("'") && Tokens[1] == "!=" && Tokens[2].StartsWith("'"))
 			{
-				bResult = string.Compare(Tokens[0], Tokens[2], StringComparison.InvariantCultureIgnoreCase) != 0;
+				bResult = String.Compare(Tokens[0], Tokens[2], StringComparison.InvariantCultureIgnoreCase) != 0;
 			}
 			else
 			{
@@ -774,9 +785,9 @@ namespace EpicGames.Core
 				string[] Tokens = Tokenize(NewText.Substring(Idx + 2, (EndIdx - 1) - (Idx + 2)));
 
 				// Make sure the first token is a valid property name
-				if(Tokens.Length == 0 || !(char.IsLetter(Tokens[0][0]) || Tokens[0][0] == '_' || Tokens[0][0] == '[' ))
+				if(Tokens.Length == 0 || !(Char.IsLetter(Tokens[0][0]) || Tokens[0][0] == '_' || Tokens[0][0] == '[' ))
 				{
-					throw new Exception(string.Format("Invalid property name '{0}' in .csproj file", Tokens[0]));
+					throw new Exception(String.Format("Invalid property name '{0}' in .csproj file", Tokens[0]));
 				}
 
 				// Find the value for it, either from the dictionary or the environment block
@@ -829,7 +840,7 @@ namespace EpicGames.Core
 					}
 					catch(Exception Ex)
 					{
-						throw new Exception(string.Format("Unable to evaluate condition '{0}'", Text), Ex);
+						throw new Exception(String.Format("Unable to evaluate condition '{0}'", Text), Ex);
 					}
 				}
 
@@ -841,7 +852,7 @@ namespace EpicGames.Core
 				// Make sure there's nothing left over
 				if(TokenIdx != Tokens.Length)
 				{
-					throw new Exception(string.Format("Unable to parse token '{0}'", NewText));
+					throw new Exception(String.Format("Unable to parse token '{0}'", NewText));
 				}
 
 				// Replace the variable with its value
@@ -861,19 +872,20 @@ namespace EpicGames.Core
 		static object ParseArgument(string Token)
 		{
 			// Try to parse a string
-			if(Token.Length > 2 && Token[0] == '\'' && Token[^1] == '\'')
+			if(Token.Length > 2 && Token[0] == '\'' && Token[Token.Length - 1] == '\'')
 			{
 				return Token.Substring(1, Token.Length - 2);
 			}
 
 			// Try to parse an integer
-			if (int.TryParse(Token, out int Value))
+			int Value;
+			if(int.TryParse(Token, out Value))
 			{
 				return Value;
 			}
 
 			// Otherwise throw an exception
-			throw new Exception(string.Format("Unable to parse token '{0}' into a .NET framework type", Token));
+			throw new Exception(String.Format("Unable to parse token '{0}' into a .NET framework type", Token));
 		}
 
 		/// <summary>
@@ -886,7 +898,7 @@ namespace EpicGames.Core
 			List<string> Tokens = new List<string>();
 			for (int Idx = 0; Idx < Condition.Length; )
 			{
-				if(char.IsWhiteSpace(Condition[Idx]))
+				if(Char.IsWhiteSpace(Condition[Idx]))
 				{
 					// Whitespace
 					Idx++;
@@ -911,7 +923,7 @@ namespace EpicGames.Core
 					{
 						if(Idx == Condition.Length)
 						{
-							throw new Exception(string.Format("Missing end quote in condition string ('{0}')", Condition));
+							throw new Exception(String.Format("Missing end quote in condition string ('{0}')", Condition));
 						}
 						if(Condition[Idx] == '\'')
 						{
@@ -933,14 +945,14 @@ namespace EpicGames.Core
 					int MethodArgsEndIdx = 0;
 					for (; ; Idx++)
 					{
-						while (Idx < Condition.Length && (char.IsLetterOrDigit(Condition[Idx]) || Condition[Idx] == '_'))
+						while (Idx < Condition.Length && (Char.IsLetterOrDigit(Condition[Idx]) || Condition[Idx] == '_'))
 						{
 							Idx++;
 						}
 
 						if (Idx == Condition.Length)
 						{
-							throw new Exception(string.Format("Found end of condition when searching for end of static property function for condition string ('{0}')", Condition));
+							throw new Exception(String.Format("Found end of condition when searching for end of static property function for condition string ('{0}')", Condition));
 						}
 						if (Condition[Idx] == ']')
 						{
@@ -953,11 +965,11 @@ namespace EpicGames.Core
 					// skip ::
 					if (Condition[Idx] != ':')
 					{
-						throw new Exception(string.Format("Unexpected format of static property function, expected :: after class declaration in condition string ('{0}')", Condition));
+						throw new Exception(String.Format("Unexpected format of static property function, expected :: after class declaration in condition string ('{0}')", Condition));
 					}
 					Idx += 2;
 
-					while (Idx < Condition.Length && (char.IsLetterOrDigit(Condition[Idx]) || Condition[Idx] == '_'))
+					while (Idx < Condition.Length && (Char.IsLetterOrDigit(Condition[Idx]) || Condition[Idx] == '_'))
 					{
 						Idx++;
 					}
@@ -969,14 +981,14 @@ namespace EpicGames.Core
 						// a method invoke
 						for (; ; Idx++)
 						{
-							while (Idx < Condition.Length && (char.IsLetterOrDigit(Condition[Idx]) || Condition[Idx] == '_'))
+							while (Idx < Condition.Length && (Char.IsLetterOrDigit(Condition[Idx]) || Condition[Idx] == '_'))
 							{
 								Idx++;
 							}
 
 							if (Idx == Condition.Length)
 							{
-								throw new Exception(string.Format("Found end of condition when searching for ) to indicate end of arguments to static property function for condition string ('{0}')", Condition));
+								throw new Exception(String.Format("Found end of condition when searching for ) to indicate end of arguments to static property function for condition string ('{0}')", Condition));
 							}
 							if (Condition[Idx] == ')')
 							{
@@ -991,11 +1003,11 @@ namespace EpicGames.Core
 					Idx++;
 					Tokens.Add(Condition.Substring(StartIdx, Idx - StartIdx));
 				}
-				else if(char.IsLetterOrDigit(Condition[Idx]) || Condition[Idx] == '_')
+				else if(Char.IsLetterOrDigit(Condition[Idx]) || Condition[Idx] == '_')
 				{
 					// Identifier or number
 					int StartIdx = Idx++;
-					while(Idx < Condition.Length && (char.IsLetterOrDigit(Condition[Idx]) || Condition[Idx] == '_'))
+					while(Idx < Condition.Length && (Char.IsLetterOrDigit(Condition[Idx]) || Condition[Idx] == '_'))
 					{
 						Idx++;
 					}
@@ -1027,10 +1039,10 @@ namespace EpicGames.Core
 				{
 					if(NewText[Idx] == '%')
 					{
-						int UpperDigitIdx = HexChars.IndexOf(char.ToLowerInvariant(NewText[Idx + 1]));
+						int UpperDigitIdx = HexChars.IndexOf(Char.ToLowerInvariant(NewText[Idx + 1]));
 						if(UpperDigitIdx != -1)
 						{
-							int LowerDigitIdx = HexChars.IndexOf(char.ToLowerInvariant(NewText[Idx + 2]));
+							int LowerDigitIdx = HexChars.IndexOf(Char.ToLowerInvariant(NewText[Idx + 2]));
 							if(LowerDigitIdx != -1)
 							{
 								char NewChar = (char)((UpperDigitIdx << 4) | LowerDigitIdx);

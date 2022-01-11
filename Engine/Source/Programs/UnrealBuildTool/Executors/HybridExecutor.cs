@@ -61,7 +61,7 @@ namespace UnrealBuildTool
 		/// </summary>
 		public override string Name
 		{
-			get { return string.Format("hybrid ({0}+{1})", LocalExecutor.Name, RemoteExecutor.Name); }
+			get { return String.Format("hybrid ({0}+{1})", LocalExecutor.Name, RemoteExecutor.Name); }
 		}
 
 		/// <summary>

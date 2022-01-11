@@ -62,11 +62,9 @@ namespace EpicGames.Core
 					}
 					else if (Disposable != null)
 					{
-						Scope = new DisposableList
-						{
-							Disposable,
-							Next
-						};
+						Scope = new DisposableList();
+						Scope.Add(Disposable);
+						Scope.Add(Next);
 						Disposable = Scope;
 					}
 					else

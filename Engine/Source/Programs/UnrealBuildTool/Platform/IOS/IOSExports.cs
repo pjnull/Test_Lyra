@@ -168,11 +168,13 @@ namespace UnrealBuildTool
 				}
 
 				// Run the process locally
-				using Process Process = new Process();
-				Process.StartInfo.FileName = "/usr/bin/xcrun";
-				Process.StartInfo.Arguments = IOSToolChain.GetAssetCatalogArgs(Platform, ResourcesDir.FullName, OutputFile.Directory.FullName); ;
-				Process.StartInfo.UseShellExecute = false;
-				Utils.RunLocalProcess(Process);
+				using(Process Process = new Process())
+				{
+					Process.StartInfo.FileName = "/usr/bin/xcrun";
+					Process.StartInfo.Arguments = IOSToolChain.GetAssetCatalogArgs(Platform, ResourcesDir.FullName, OutputFile.Directory.FullName);; 
+					Process.StartInfo.UseShellExecute = false;
+					Utils.RunLocalProcess(Process);
+				}
 			}
 		}
 
@@ -236,7 +238,8 @@ namespace UnrealBuildTool
 
 			// write the entitlements file
 			{
-				PlatformGameConfig.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bEnableCloudKitSupport", out bool bCloudKitSupported);
+				bool bCloudKitSupported = false;
+				PlatformGameConfig.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bEnableCloudKitSupport", out bCloudKitSupported);
 				Directory.CreateDirectory(Path.GetDirectoryName(OutputFileName));
 				// we need to have something so Xcode will compile, so we just set the get-task-allow, since we know the value,
 				// which is based on distribution or not (true means debuggable)
@@ -277,7 +280,8 @@ namespace UnrealBuildTool
 					Text.AppendLine(string.Format("\t<string>{0}</string>", bForDistribution ? "Production" : "Development"));
 				}
 
-				PlatformGameConfig.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bEnableRemoteNotificationsSupport", out bool bRemoteNotificationsSupported);
+				bool bRemoteNotificationsSupported = false;
+				PlatformGameConfig.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bEnableRemoteNotificationsSupport", out bRemoteNotificationsSupported);
 
 				// for TVOS we need push notifications when building for distribution with CloudKit
 				if (bCloudKitSupported && bForDistribution && Platform == UnrealTargetPlatform.TVOS)
@@ -292,7 +296,8 @@ namespace UnrealBuildTool
 				}
 
 				// for Sign in with Apple
-				PlatformGameConfig.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bEnableSignInWithAppleSupport", out bool bSignInWithAppleSupported);
+				bool bSignInWithAppleSupported = false;
+				PlatformGameConfig.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bEnableSignInWithAppleSupport", out bSignInWithAppleSupported);
 
 				if (bSignInWithAppleSupported)
 				{
@@ -301,7 +306,8 @@ namespace UnrealBuildTool
 				}
 
 				// Add Multi-user support for tvOS
-				PlatformGameConfig.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bRunAsCurrentUser", out bool bRunAsCurrentUser);
+				bool bRunAsCurrentUser = false;
+				PlatformGameConfig.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bRunAsCurrentUser", out bRunAsCurrentUser);
 
 				if (bRunAsCurrentUser && Platform == UnrealTargetPlatform.TVOS)
 				{

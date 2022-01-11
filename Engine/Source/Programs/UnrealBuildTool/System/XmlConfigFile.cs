@@ -31,7 +31,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// The file being read
 		/// </summary>
-		readonly FileReference File;
+		FileReference File;
 
 		/// <summary>
 		/// Interface to the LineInfo on the active XmlReader

@@ -31,55 +31,58 @@ namespace UnrealBuildTool
 			if (File.Exists(ManifestPath))
 			{
 				string MachineName = Environment.MachineName;
-				using StreamReader reader = new StreamReader(ManifestPath);
-				string CurrentToRootDir = ".." + Path.DirectorySeparatorChar + "..";
-				string? LineRead;
-				while ((LineRead = reader.ReadLine()) != null)
+				using (StreamReader reader = new StreamReader(ManifestPath))
 				{
-					string JunkEntry = LineRead.Trim();
-					if (string.IsNullOrEmpty(JunkEntry) == false)
+					string CurrentToRootDir = ".." + Path.DirectorySeparatorChar + "..";
+					string? LineRead;
+					while ((LineRead = reader.ReadLine()) != null)
 					{
-						string[] Tokens = JunkEntry.Split(":".ToCharArray());
-						bool bIsValidJunkLine = true;
-						foreach (string Token in Tokens)
+						string JunkEntry = LineRead.Trim();
+						if (String.IsNullOrEmpty(JunkEntry) == false)
 						{
-							if (Token.StartsWith("Machine=", StringComparison.InvariantCultureIgnoreCase) == true)
+							string[] Tokens = JunkEntry.Split(":".ToCharArray());
+							bool bIsValidJunkLine = true;
+							foreach (string Token in Tokens)
 							{
-								string[] InnerTokens = Token.Split("=".ToCharArray());
-								// check if the machine name on the line matches the current machine name, if not, we don't apply this junk
-								if (InnerTokens.Length == 2 && MachineName.StartsWith(InnerTokens[1]) == false)
+								if (Token.StartsWith("Machine=", StringComparison.InvariantCultureIgnoreCase) == true)
 								{
-									// Not meant for this machine
-									bIsValidJunkLine = false;
-								}
-							}
-							else if (Token.StartsWith("Platform=", StringComparison.InvariantCultureIgnoreCase) == true)
-							{
-								string[] InnerTokens = Token.Split("=".ToCharArray());
-								// check if the machine name on the line matches the current machine name, if not, we don't apply this junk
-								if (InnerTokens.Length == 2)
-								{
-									// if the platform is valid, then we want to keep the files, which means that we don't want to apply the junk line
-									if (UnrealTargetPlatform.TryParse(InnerTokens[1], out UnrealTargetPlatform ParsedPlatform))
+									string[] InnerTokens = Token.Split("=".ToCharArray());
+									// check if the machine name on the line matches the current machine name, if not, we don't apply this junk
+									if (InnerTokens.Length == 2 && MachineName.StartsWith(InnerTokens[1]) == false)
 									{
-										if (UEBuildPlatform.TryGetBuildPlatform(ParsedPlatform, out _))
+										// Not meant for this machine
+										bIsValidJunkLine = false;
+									}
+								}
+								else if (Token.StartsWith("Platform=", StringComparison.InvariantCultureIgnoreCase) == true)
+								{
+									string[] InnerTokens = Token.Split("=".ToCharArray());
+									// check if the machine name on the line matches the current machine name, if not, we don't apply this junk
+									if (InnerTokens.Length == 2)
+									{
+										UnrealTargetPlatform ParsedPlatform;
+										// if the platform is valid, then we want to keep the files, which means that we don't want to apply the junk line
+										if (UnrealTargetPlatform.TryParse(InnerTokens[1], out ParsedPlatform))
 										{
-											// this is a good platform, so don't delete any files!
-											bIsValidJunkLine = false;
+											if (UEBuildPlatform.TryGetBuildPlatform(ParsedPlatform, out _))
+											{
+												// this is a good platform, so don't delete any files!
+												bIsValidJunkLine = false;
+											}
 										}
 									}
 								}
 							}
-						}
 
-						// All paths within the manifest are Unreal root directory relative.
-						// UBT's working directory is Engine\Source so add "..\..\" to each of the entires.
-						if (bIsValidJunkLine)
-						{
-							// the entry is always the last element in the token array (after the final :)
-							string FixedPath = Path.Combine(CurrentToRootDir, Tokens[^1]);
-							FixedPath = FixedPath.Replace('\\', Path.DirectorySeparatorChar);
-							JunkManifest.Add(FixedPath);
+							// All paths within the manifest are Unreal root directory relative.
+							// UBT's working directory is Engine\Source so add "..\..\" to each of the entires.
+							if (bIsValidJunkLine)
+							{
+								// the entry is always the last element in the token array (after the final :)
+								string FixedPath = Path.Combine(CurrentToRootDir, Tokens[Tokens.Length - 1]);
+								FixedPath = FixedPath.Replace('\\', Path.DirectorySeparatorChar);
+								JunkManifest.Add(FixedPath);
+							}
 						}
 					}
 				}
@@ -136,7 +139,7 @@ namespace UnrealBuildTool
 		static private bool IsFile(string PathToCheck)
 		{
 			string FileName = Path.GetFileName(PathToCheck);
-			if (string.IsNullOrEmpty(FileName) == false)
+			if (String.IsNullOrEmpty(FileName) == false)
 			{
 				if (FileName.Contains('*'))
 				{

@@ -45,7 +45,7 @@ namespace EpicGames.Core
 			/// <summary>
 			/// The logger to output to
 			/// </summary>
-			private readonly ILogger Logger;
+			private ILogger Logger;
 
 			/// <summary>
 			/// Prefix message for the status
@@ -67,7 +67,7 @@ namespace EpicGames.Core
 
 					if (Timer.Elapsed > TimeSpan.FromSeconds(3.0))
 					{
-						LastOutput = string.Empty;
+						LastOutput = String.Empty;
 						Flush();
 						Timer.Restart();
 					}
@@ -77,17 +77,17 @@ namespace EpicGames.Core
 			/// <summary>
 			/// The last string that was output
 			/// </summary>
-			string LastOutput = string.Empty;
+			string LastOutput = String.Empty;
 
 			/// <summary>
 			/// Backing storage for the Progress string
 			/// </summary>
-			string ProgressInternal = string.Empty;
+			string ProgressInternal = String.Empty;
 
 			/// <summary>
 			/// Timer since the last update
 			/// </summary>
-			readonly Stopwatch Timer = Stopwatch.StartNew();
+			Stopwatch Timer = Stopwatch.StartNew();
 
 			/// <summary>
 			/// Constructor
@@ -98,7 +98,7 @@ namespace EpicGames.Core
 			{
 				this.Logger = Logger;
 				this.Message = Message;
-				this.ProgressInternal = string.Empty;
+				this.ProgressInternal = String.Empty;
 
 				Logger.LogInformation(Message);
 			}
@@ -117,11 +117,11 @@ namespace EpicGames.Core
 			void Flush()
 			{
 				string Output = Message;
-				if (!string.IsNullOrEmpty(Progress))
+				if (!String.IsNullOrEmpty(Progress))
 				{
 					Output += $" {Progress}";
 				}
-				if (!string.Equals(Output, LastOutput, StringComparison.Ordinal))
+				if (!String.Equals(Output, LastOutput, StringComparison.Ordinal))
 				{
 					Logger.LogInformation(Output);
 					LastOutput = Output;

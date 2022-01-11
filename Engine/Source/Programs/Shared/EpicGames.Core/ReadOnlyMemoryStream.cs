@@ -15,7 +15,7 @@ namespace EpicGames.Core
 		/// <summary>
 		/// The buffer to read from
 		/// </summary>
-		readonly ReadOnlyMemory<byte> Memory;
+		ReadOnlyMemory<byte> Memory;
 
 		/// <summary>
 		/// Constructor

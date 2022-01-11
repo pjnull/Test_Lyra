@@ -22,7 +22,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// The name to include with the status message
 		/// </summary>
-		readonly string Message;
+		string Message;
 
 		/// <summary>
 		/// The inner scope object
@@ -69,7 +69,7 @@ namespace UnrealBuildTool
 		public void Write(int Numerator, int Denominator)
 		{
 			float ProgressValue = Denominator > 0 ? ((float)Numerator / (float)Denominator) : 1.0f;
-			string ProgressString = string.Format("{0}%", Math.Round(ProgressValue * 100.0f));
+			string ProgressString = String.Format("{0}%", Math.Round(ProgressValue * 100.0f));
 			if (ProgressString != CurrentProgressString)
 			{
 				CurrentProgressString = ProgressString;

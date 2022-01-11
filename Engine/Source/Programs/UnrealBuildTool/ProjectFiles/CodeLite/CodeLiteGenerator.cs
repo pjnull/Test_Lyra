@@ -22,7 +22,7 @@ namespace UnrealBuildTool
 		public string SolutionExtension = ".workspace";
 		public string CodeCompletionFileName = "CodeCompletionFolders.txt";
 		public string CodeCompletionPreProcessorFileName = "CodeLitePreProcessor.txt";
-		readonly CodeliteProjectFileFormat ProjectFileFormat = CodeliteProjectFileFormat.CodeLite10;
+		CodeliteProjectFileFormat ProjectFileFormat = CodeliteProjectFileFormat.CodeLite10;
 
 		public CodeLiteGenerator(FileReference? InOnlyGameProject, CommandLineArguments CommandLine)
 			: base(InOnlyGameProject)
@@ -105,10 +105,8 @@ namespace UnrealBuildTool
 			//
 			// Write CodeLites Workspace
 			//
-			XmlWriterSettings settings = new XmlWriterSettings
-			{
-				Indent = true
-			};
+			XmlWriterSettings settings = new XmlWriterSettings();
+			settings.Indent = true;
 
 			XElement CodeLiteWorkspace = new XElement("CodeLite_Workspace");
 			XAttribute CodeLiteWorkspaceName = new XAttribute("Name", PrimaryProjectName);
@@ -160,7 +158,7 @@ namespace UnrealBuildTool
 				{
 					string[] tmp = CurrentTarget.ToString().Split('.');
 					string ProjectTargetFileName = CurProject.ProjectFilePath.Directory.MakeRelativeTo(PrimaryProjectPath) + "/" + tmp[0] + ProjectExtension;
-					string ProjectName = tmp[0];
+					String ProjectName = tmp[0];
 
 
 					XElement CodeLiteWorkspaceProject = new XElement("Project");
@@ -268,7 +266,7 @@ namespace UnrealBuildTool
 						foreach (ProjectTarget target in CurProject.ProjectTargets.OfType<ProjectTarget>())
 						{
 							string[] tmp = target.ToString().Split('.');
-							string ProjectName = tmp[0];
+							String ProjectName = tmp[0];
 
 							XElement CodeLiteWorkspaceBuildMatrixConfigurationProject = new XElement("Project");
 							XAttribute CodeLiteWorkspaceBuildMatrixConfigurationProjectName = new XAttribute("Name", ProjectName);

@@ -129,7 +129,7 @@ namespace UnrealBuildTool
 			/// <returns>String containing process info</returns>
 			public override string ToString()
 			{
-				return string.Format("{0}, {1}", Name, Filename);
+				return String.Format("{0}, {1}", Name, Filename);
 			}
 		}
 
@@ -275,17 +275,13 @@ namespace UnrealBuildTool
 			List<ProcessInfo> Result = new List<ProcessInfo>();
 
 			string TempFile = Path.Combine("/var/tmp", Path.GetTempFileName());
-			ProcessStartInfo StartInfo = new ProcessStartInfo
-			{
-				FileName = "/bin/sh",
-				Arguments = "-c \"ps -eaw -o pid,comm > " + TempFile + "\"",
-				CreateNoWindow = true
-			};
+			ProcessStartInfo StartInfo = new ProcessStartInfo();
+			StartInfo.FileName = "/bin/sh";
+			StartInfo.Arguments = "-c \"ps -eaw -o pid,comm > " + TempFile + "\"";
+			StartInfo.CreateNoWindow = true;
 
-			Process Proc = new Process
-			{
-				StartInfo = StartInfo
-			};
+			Process Proc = new Process();
+			Proc.StartInfo = StartInfo;
 			try
 			{
 				Proc.Start();
@@ -297,7 +293,7 @@ namespace UnrealBuildTool
 					if (PIDString != "PID")
 					{
 						string Filename = Line.Substring(PIDEnd + 1);
-						int Pid = int.Parse(PIDString);
+						int Pid = Int32.Parse(PIDString);
 						try
 						{
 							Process ExistingProc = Process.GetProcessById(Pid);
@@ -325,25 +321,19 @@ namespace UnrealBuildTool
 		/// <returns></returns>
 		public override string[] GetProcessModules(int PID, string Filename)
 		{
-			HashSet<string> Modules = new HashSet<string>
-			{
-				// Add the process file name to the module list. This is to make it compatible with the results of Process.Modules on Windows.
-				Filename
-			};
+			HashSet<string> Modules = new HashSet<string>();
+			// Add the process file name to the module list. This is to make it compatible with the results of Process.Modules on Windows.
+			Modules.Add(Filename);
 
-			ProcessStartInfo StartInfo = new ProcessStartInfo
-			{
-				FileName = "vmmap",
-				Arguments = string.Format("{0} -w", PID),
-				CreateNoWindow = true,
-				UseShellExecute = false,
-				RedirectStandardOutput = true
-			};
+			ProcessStartInfo StartInfo = new ProcessStartInfo();
+			StartInfo.FileName = "vmmap";
+			StartInfo.Arguments = String.Format("{0} -w", PID);
+			StartInfo.CreateNoWindow = true;
+			StartInfo.UseShellExecute = false;
+			StartInfo.RedirectStandardOutput = true;
 
-			Process Proc = new Process
-			{
-				StartInfo = StartInfo
-			};
+			Process Proc = new Process();
+			Proc.StartInfo = StartInfo;
 			try
 			{
 				Proc.Start();

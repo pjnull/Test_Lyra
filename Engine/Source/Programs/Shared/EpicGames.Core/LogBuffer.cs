@@ -17,10 +17,12 @@ namespace EpicGames.Core
 	class LogBuffer : ILogCursor
 	{
 		int LineNumber;
-		readonly string?[] History;
+
+		string?[] History;
 		int HistoryIdx;
 		int HistoryCount;
-		readonly List<string?> NextLines;
+
+		List<string?> NextLines;
 
 		public LogBuffer(int HistorySize)
 		{

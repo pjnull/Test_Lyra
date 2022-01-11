@@ -89,9 +89,9 @@ namespace UnrealBuildTool
 		}
 
 		protected FileReference? ProjectFile;
-		private readonly bool bUseLdGold;
-		private readonly List<string> AdditionalArches;
-		private readonly List<string> AdditionalGPUArches;
+		private bool bUseLdGold;
+		private List<string> AdditionalArches;
+		private List<string> AdditionalGPUArches;
 		protected bool bExecuteCompilerThroughShell;
 
 		// the Clang version being used to compile
@@ -106,39 +106,39 @@ namespace UnrealBuildTool
 		// the list of architectures we will compile for
 		protected List<string>? Arches = null;
 
-		private readonly AndroidToolChainOptions Options;
+		private AndroidToolChainOptions Options;
 
 		// the "-android" suffix paths here are vcpkg triplets for the android platform
-		private static readonly Dictionary<string, string[]> AllArchNames = new Dictionary<string, string[]> {
+		static private Dictionary<string, string[]> AllArchNames = new Dictionary<string, string[]> {
 			{ "-arm64", new string[] { "arm64", "arm64-v8a", "arm64-android" } },
 			{ "-x64",   new string[] { "x64", "x86_64", "x64-android" } }
 		};
 
 		// architecture paths to use for filtering include and lib paths
-		private static readonly Dictionary<string, string[]> AllFilterArchNames = new Dictionary<string, string[]> {
+		static private Dictionary<string, string[]> AllFilterArchNames = new Dictionary<string, string[]> {
 			{ "-armv7", new string[] { "armv7", "armeabi-v7a", "arm-android" } },
 			{ "-arm64", new string[] { "arm64", "arm64-v8a", "arm64-android" } },
 			{ "-x86",   new string[] { "x86", "x86-android" } },
 			{ "-x64",   new string[] { "x64", "x86_64", "x64-android" } }
 		};
 
-		private static readonly Dictionary<string, string[]> LibrariesToSkip = new Dictionary<string, string[]> {
+		static private Dictionary<string, string[]> LibrariesToSkip = new Dictionary<string, string[]> {
 			{ "-arm64", new string[] { "nvToolsExt", "nvToolsExtStub", "vorbisenc", } },
 			{ "-x64",   new string[] { "nvToolsExt", "nvToolsExtStub", "oculus", "OVRPlugin", "vrapi", "ovrkernel", "systemutils", "openglloader", "ovrplatformloader", "gpg", "vorbisenc", } }
 		};
 
-		private static readonly Dictionary<string, string[]> ModulesToSkip = new Dictionary<string, string[]> {
+		static private Dictionary<string, string[]> ModulesToSkip = new Dictionary<string, string[]> {
 			{ "-arm64", new string[] {  } },
 			{ "-x64",   new string[] { "OnlineSubsystemOculus", "OculusHMD", "OculusMR", "OnlineSubsystemGooglePlay" } }
 		};
 
-		private static readonly Dictionary<string, string[]> GeneratedModulesToSkip = new Dictionary<string, string[]> {
+		static private Dictionary<string, string[]> GeneratedModulesToSkip = new Dictionary<string, string[]> {
 			{ "-arm64", new string[] {  } },
 			{ "-x64",   new string[] { "OculusEntitlementCallbackProxy", "OculusCreateSessionCallbackProxy", "OculusFindSessionsCallbackProxy", "OculusIdentityCallbackProxy", "OculusNetConnection", "OculusNetDriver", "OnlineSubsystemOculus_init" } }
 		};
 
 		public string? NDKToolchainVersion;
-		public ulong NDKVersionInt;
+		public UInt64 NDKVersionInt;
 
 		protected void SetClangVersion(int Major, int Minor, int Patch)
 		{
@@ -223,7 +223,7 @@ namespace UnrealBuildTool
 			string? NDKPath = Environment.GetEnvironmentVariable("NDKROOT");
 
 			// don't register if we don't have an NDKROOT specified
-			if (string.IsNullOrEmpty(NDKPath))
+			if (String.IsNullOrEmpty(NDKPath))
 			{
 				if (bAllowMissingNDK)
 				{
@@ -299,7 +299,7 @@ namespace UnrealBuildTool
 			try
 			{
 				AndroidClangBuild = Regex.Match(AndroidClangBuild, @"(\w+) based on").Groups[1].ToString();
-				if (string.IsNullOrEmpty(AndroidClangBuild))
+				if (String.IsNullOrEmpty(AndroidClangBuild))
 				{
 					AndroidClangBuild = Regex.Match(AndroidClangBuild, @"(\w+), based on").Groups[1].ToString();
 				}
@@ -355,9 +355,10 @@ namespace UnrealBuildTool
 			// look in ini settings for what platforms to compile for
 			ConfigHierarchy Ini = ConfigCache.ReadHierarchy(ConfigHierarchyType.Engine, DirectoryReference.FromFile(ProjectFile), UnrealTargetPlatform.Android);
 			Arches = new List<string>();
+			bool bBuild = true;
 			bool bUnsupportedBinaryBuildArch = false;
 
-			if (Ini.GetBool("/Script/AndroidRuntimeSettings.AndroidRuntimeSettings", "bBuildForArm64", out bool bBuild) && bBuild
+			if (Ini.GetBool("/Script/AndroidRuntimeSettings.AndroidRuntimeSettings", "bBuildForArm64", out bBuild) && bBuild
 				|| (AdditionalArches != null && (AdditionalArches.Contains("arm64", StringComparer.OrdinalIgnoreCase) || AdditionalArches.Contains("-arm64", StringComparer.OrdinalIgnoreCase))))
 			{
 				Arches.Add("-arm64");
@@ -405,25 +406,29 @@ namespace UnrealBuildTool
 		private bool BuildWithHiddenSymbolVisibility(CppCompileEnvironment CompileEnvironment)
 		{
 			ConfigHierarchy Ini = ConfigCache.ReadHierarchy(ConfigHierarchyType.Engine, DirectoryReference.FromFile(ProjectFile), UnrealTargetPlatform.Android);
-			return CompileEnvironment.Configuration == CppConfiguration.Shipping && (Ini.GetBool("/Script/AndroidRuntimeSettings.AndroidRuntimeSettings", "bBuildWithHiddenSymbolVisibility", out bool bBuild) && bBuild);
+			bool bBuild = false;
+			return CompileEnvironment.Configuration == CppConfiguration.Shipping && (Ini.GetBool("/Script/AndroidRuntimeSettings.AndroidRuntimeSettings", "bBuildWithHiddenSymbolVisibility", out bBuild) && bBuild);
 		}
 
 		private bool ForceLDLinker()
 		{
 			ConfigHierarchy Ini = ConfigCache.ReadHierarchy(ConfigHierarchyType.Engine, DirectoryReference.FromFile(ProjectFile), UnrealTargetPlatform.Android);
-			return Ini.GetBool("/Script/AndroidRuntimeSettings.AndroidRuntimeSettings", "bForceLDLinker", out bool bForceLDLinker) && bForceLDLinker;
+			bool bForceLDLinker = false;
+			return Ini.GetBool("/Script/AndroidRuntimeSettings.AndroidRuntimeSettings", "bForceLDLinker", out bForceLDLinker) && bForceLDLinker;
 		}
 
 		private bool DisableFunctionDataSections()
 		{
 			ConfigHierarchy Ini = ConfigCache.ReadHierarchy(ConfigHierarchyType.Engine, DirectoryReference.FromFile(ProjectFile), UnrealTargetPlatform.Android);
-			return Ini.GetBool("/Script/AndroidRuntimeSettings.AndroidRuntimeSettings", "bDisableFunctionDataSections", out bool bDisableFunctionDataSections) && bDisableFunctionDataSections;
+			bool bDisableFunctionDataSections = false;
+			return Ini.GetBool("/Script/AndroidRuntimeSettings.AndroidRuntimeSettings", "bDisableFunctionDataSections", out bDisableFunctionDataSections) && bDisableFunctionDataSections;
 		}
 
 		private bool EnableAdvancedBinaryCompression()
 		{
 			ConfigHierarchy Ini = ConfigCache.ReadHierarchy(ConfigHierarchyType.Engine, DirectoryReference.FromFile(ProjectFile), UnrealTargetPlatform.Android);
-			return Ini.GetBool("/Script/AndroidRuntimeSettings.AndroidRuntimeSettings", "bEnableAdvancedBinaryCompression", out bool bEnableAdvancedBinaryCompression) && bEnableAdvancedBinaryCompression;
+			bool bEnableAdvancedBinaryCompression = false;
+			return Ini.GetBool("/Script/AndroidRuntimeSettings.AndroidRuntimeSettings", "bEnableAdvancedBinaryCompression", out bEnableAdvancedBinaryCompression) && bEnableAdvancedBinaryCompression;
 		}
 
 		public override void SetUpGlobalEnvironment(ReadOnlyTargetRules Target)
@@ -449,7 +454,8 @@ namespace UnrealBuildTool
 			int NDKVersionInt = MinNdk;
 			if (NDKVersion.Contains("-"))
 			{
-				if (int.TryParse(NDKVersion.Substring(NDKVersion.LastIndexOf('-') + 1), out int Version))
+				int Version;
+				if (int.TryParse(NDKVersion.Substring(NDKVersion.LastIndexOf('-') + 1), out Version))
 				{
 					if (Version > NDKVersionInt)
 						NDKVersionInt = Version;
@@ -476,7 +482,8 @@ namespace UnrealBuildTool
 				// try to read it
 				try
 				{
-					if (JsonObject.TryRead(new FileReference(PlatformsFilename), out JsonObject? PlatformsObj))
+					JsonObject? PlatformsObj = null;
+					if (JsonObject.TryRead(new FileReference(PlatformsFilename), out PlatformsObj))
 					{
 						CachedPlatformsValid = PlatformsObj.TryGetIntegerField("min", out CachedMinPlatform) && PlatformsObj.TryGetIntegerField("max", out CachedMaxPlatform);
 					}
@@ -502,14 +509,16 @@ namespace UnrealBuildTool
 
 		protected virtual bool ValidateNDK(string PlatformsFilename, string ApiString)
 		{
-			if (!ReadMinMaxPlatforms(PlatformsFilename, out int MinPlatform, out int MaxPlatform))
+			int MinPlatform, MaxPlatform;
+			if (!ReadMinMaxPlatforms(PlatformsFilename, out MinPlatform, out MaxPlatform))
 			{
 				return false;
 			}
 
 			if (ApiString.Contains("-"))
 			{
-				if (int.TryParse(ApiString.Substring(ApiString.LastIndexOf('-') + 1), out int Version))
+				int Version;
+				if (int.TryParse(ApiString.Substring(ApiString.LastIndexOf('-') + 1), out Version))
 				{
 					return (Version >= MinPlatform && Version <= MaxPlatform);
 				}
@@ -541,7 +550,8 @@ namespace UnrealBuildTool
 
 			if (NDKLevel == "latest")
 			{
-				if (!ReadMinMaxPlatforms(PlatformsFilename, out int MinPlatform, out int MaxPlatform))
+				int MinPlatform, MaxPlatform;
+				if (!ReadMinMaxPlatforms(PlatformsFilename, out MinPlatform, out MaxPlatform))
 				{
 					throw new BuildException("No NDK platforms found in {0}", PlatformsFilename);
 				}
@@ -566,7 +576,8 @@ namespace UnrealBuildTool
 				throw new BuildException("No NDK platforms found in {0}", PlatformsFilename);
 			}
 
-			if (!ReadMinMaxPlatforms(PlatformsFilename, out int MinPlatform, out int MaxPlatform))
+			int MinPlatform, MaxPlatform;
+			if (!ReadMinMaxPlatforms(PlatformsFilename, out MinPlatform, out MaxPlatform))
 			{
 				throw new BuildException("No NDK platforms found in {0}", PlatformsFilename);
 			}
@@ -1122,11 +1133,9 @@ namespace UnrealBuildTool
 			string LinkerExceptionsName = "../UELinkerExceptions";
 			FileReference LinkerExceptionsCPPFilename = FileReference.Combine(OutputDirectory, LinkerExceptionsName + ".cpp");
 
-			List<string> Result = new List<string>
-			{
-				"#include \"CoreTypes.h\"",
-				""
-			};
+			List<string> Result = new List<string>();
+			Result.Add("#include \"CoreTypes.h\"");
+			Result.Add("");
 			foreach (string Arch in Arches!)
 			{
 				switch (Arch)
@@ -1520,12 +1529,10 @@ namespace UnrealBuildTool
 					// Disable remote execution to workaround mismatched case on XGE
 					CompileAction.bCanExecuteRemotely = false;
 
-					List<string> Arguments = new List<string>
-					{
+					List<string> Arguments = new List<string>();
 
-						// Add the ISPC obj file as a prerequisite of the action.
-						string.Format(" \"{0}\"", ISPCFile.AbsolutePath)
-					};
+					// Add the ISPC obj file as a prerequisite of the action.
+					Arguments.Add(String.Format(" \"{0}\"", ISPCFile.AbsolutePath));
 
 					// Add the ISPC h file to the produced item list.
 					FileItem ISPCIncludeHeaderFile = FileItem.GetItemByFileReference(
@@ -1536,7 +1543,7 @@ namespace UnrealBuildTool
 						);
 
 					// Add the ISPC file to be compiled.
-					Arguments.Add(string.Format("-h \"{0}\"", ISPCIncludeHeaderFile));
+					Arguments.Add(String.Format("-h \"{0}\"", ISPCIncludeHeaderFile));
 
 					// Build target string. No comma on last
 					string TargetString = "";
@@ -1553,36 +1560,36 @@ namespace UnrealBuildTool
 					}
 
 					// Build target triplet
-					Arguments.Add(string.Format("--target-os=\"{0}\"", GetISPCOSTarget(CompileEnvironment.Platform)));
-					Arguments.Add(string.Format("--arch=\"{0}\"", GetISPCArchTarget(CompileEnvironment.Platform, Arch)));
-					Arguments.Add(string.Format("--target=\"{0}\"", TargetString));
+					Arguments.Add(String.Format("--target-os=\"{0}\"", GetISPCOSTarget(CompileEnvironment.Platform)));
+					Arguments.Add(String.Format("--arch=\"{0}\"", GetISPCArchTarget(CompileEnvironment.Platform, Arch)));
+					Arguments.Add(String.Format("--target=\"{0}\"", TargetString));
 
 					Arguments.Add("--pic");
 
 					// Include paths. Don't use AddIncludePath() here, since it uses the full path and exceeds the max command line length.
 					foreach (DirectoryReference IncludePath in CompileEnvironment.UserIncludePaths)
 					{
-						Arguments.Add(string.Format("-I\"{0}\"", IncludePath));
+						Arguments.Add(String.Format("-I\"{0}\"", IncludePath));
 					}
 
 					// System include paths.
 					foreach (DirectoryReference SystemIncludePath in CompileEnvironment.SystemIncludePaths)
 					{
-						Arguments.Add(string.Format("-I\"{0}\"", SystemIncludePath));
+						Arguments.Add(String.Format("-I\"{0}\"", SystemIncludePath));
 					}
 
 					// Generate the included header dependency list
 					if (CompileEnvironment.bGenerateDependenciesFile)
 					{
 						FileItem DependencyListFile = FileItem.GetItemByFileReference(FileReference.Combine(OutputDir, InlineArchName(Path.GetFileName(ISPCFile.AbsolutePath) + ".d", Arch, true)));
-						Arguments.Add(string.Format("-M -MF \"{0}\"", DependencyListFile.AbsolutePath.Replace('\\', '/')));
+						Arguments.Add(String.Format("-M -MF \"{0}\"", DependencyListFile.AbsolutePath.Replace('\\', '/')));
 						CompileAction.DependencyListFile = DependencyListFile;
 						CompileAction.ProducedItems.Add(DependencyListFile);
 					}
 
 					CompileAction.ProducedItems.Add(ISPCIncludeHeaderFile);
 
-					CompileAction.CommandArguments = string.Join(" ", Arguments);
+					CompileAction.CommandArguments = String.Join(" ", Arguments);
 
 					// Add the source file and its included files to the prerequisite item list.
 					CompileAction.PrerequisiteItems.Add(ISPCFile);
@@ -1607,11 +1614,11 @@ namespace UnrealBuildTool
 					CopyAction.CommandPath = BuildHostPlatform.Current.Shell;
 					if (BuildHostPlatform.Current.ShellType == ShellType.Cmd)
 					{
-						CopyAction.CommandArguments = string.Format("/C \"copy /Y \"{0}\" \"{1}\" 1>nul\"", SourceFile, TargetFile);
+						CopyAction.CommandArguments = String.Format("/C \"copy /Y \"{0}\" \"{1}\" 1>nul\"", SourceFile, TargetFile);
 					}
 					else
 					{
-						CopyAction.CommandArguments = string.Format("-c 'cp -f \"{0}\" \"{1}\"'", SourceFile.FullName, TargetFile.FullName);
+						CopyAction.CommandArguments = String.Format("-c 'cp -f \"{0}\" \"{1}\"'", SourceFile.FullName, TargetFile.FullName);
 					}
 					CopyAction.WorkingDirectory = UnrealBuildTool.EngineSourceDirectory;
 					CopyAction.PrerequisiteItems.Add(SourceFileItem);
@@ -1658,12 +1665,10 @@ namespace UnrealBuildTool
 					// Disable remote execution to workaround mismatched case on XGE
 					CompileAction.bCanExecuteRemotely = false;
 
-					List<string> Arguments = new List<string>
-					{
+					List<string> Arguments = new List<string>();
 
-						// Add the ISPC file to be compiled.
-						string.Format(" \"{0}\"", ISPCFile.AbsolutePath)
-					};
+					// Add the ISPC file to be compiled.
+					Arguments.Add(String.Format(" \"{0}\"", ISPCFile.AbsolutePath));
 
 					List<FileItem> CompiledISPCObjFiles = new List<FileItem>();
 					List<FileItem> FinalISPCObjFiles = new List<FileItem>();
@@ -1737,12 +1742,12 @@ namespace UnrealBuildTool
 					FinalISPCObjFiles.Add(CompiledISPCObjFileNoISA);
 
 					// Add the output ISPC obj file
-					Arguments.Add(string.Format("-o \"{0}\"", CompiledISPCObjFileNoISA));
+					Arguments.Add(String.Format("-o \"{0}\"", CompiledISPCObjFileNoISA));
 
 					// Build target triplet
-					Arguments.Add(string.Format("--target-os=\"{0}\"", GetISPCOSTarget(CompileEnvironment.Platform)));
-					Arguments.Add(string.Format("--arch=\"{0}\"", GetISPCArchTarget(CompileEnvironment.Platform, Arch)));
-					Arguments.Add(string.Format("--target=\"{0}\"", TargetString));
+					Arguments.Add(String.Format("--target-os=\"{0}\"", GetISPCOSTarget(CompileEnvironment.Platform)));
+					Arguments.Add(String.Format("--arch=\"{0}\"", GetISPCArchTarget(CompileEnvironment.Platform, Arch)));
+					Arguments.Add(String.Format("--target=\"{0}\"", TargetString));
 
 					if (CompileEnvironment.Configuration == CppConfiguration.Debug)
 					{
@@ -1774,7 +1779,7 @@ namespace UnrealBuildTool
 					// Preprocessor definitions.
 					foreach (string Definition in CompileEnvironment.Definitions)
 					{
-						Arguments.Add(string.Format("-D\"{0}\"", Definition));
+						Arguments.Add(String.Format("-D\"{0}\"", Definition));
 					}
 
 					// Consume the included header dependency list
@@ -1787,7 +1792,7 @@ namespace UnrealBuildTool
 
 					CompileAction.ProducedItems.AddRange(CompiledISPCObjFiles);
 
-					CompileAction.CommandArguments = string.Join(" ", Arguments);
+					CompileAction.CommandArguments = String.Join(" ", Arguments);
 
 					// Add the source file and its included files to the prerequisite item list.
 					CompileAction.PrerequisiteItems.Add(ISPCFile);
@@ -1813,11 +1818,11 @@ namespace UnrealBuildTool
 						CopyAction.CommandPath = BuildHostPlatform.Current.Shell;
 						if (BuildHostPlatform.Current.ShellType == ShellType.Cmd)
 						{
-							CopyAction.CommandArguments = string.Format("/C \"copy /Y \"{0}\" \"{1}\" 1>nul\"", SourceFile, TargetFile);
+							CopyAction.CommandArguments = String.Format("/C \"copy /Y \"{0}\" \"{1}\" 1>nul\"", SourceFile, TargetFile);
 						}
 						else
 						{
-							CopyAction.CommandArguments = string.Format("-c 'cp -f \"{0}\" \"{1}\"'", SourceFile.FullName, TargetFile.FullName);
+							CopyAction.CommandArguments = String.Format("-c 'cp -f \"{0}\" \"{1}\"'", SourceFile.FullName, TargetFile.FullName);
 						}
 						CopyAction.WorkingDirectory = UnrealBuildTool.EngineSourceDirectory;
 						CopyAction.PrerequisiteItems.Add(SourceFileItem);
@@ -1960,7 +1965,7 @@ namespace UnrealBuildTool
 					{
 						if (!ShouldSkipLib(SystemLibrary, Arch))
 						{
-							if (string.IsNullOrEmpty(Path.GetDirectoryName(SystemLibrary)))
+							if (String.IsNullOrEmpty(Path.GetDirectoryName(SystemLibrary)))
 							{
 								if (SystemLibrary.StartsWith("lib"))
 								{
@@ -2022,7 +2027,7 @@ namespace UnrealBuildTool
 					{
 						FileReference MAPFilePath = FileReference.Combine(LinkEnvironment.OutputDirectory!, Path.GetFileNameWithoutExtension(OutputFile.AbsolutePath) + ".map");
 						FileItem MAPFile = FileItem.GetItemByFileReference(MAPFilePath);
-						LinkResponseArguments += string.Format(" -Wl,--cref -Wl,-Map,\"{0}\"", MAPFilePath);
+						LinkResponseArguments += String.Format(" -Wl,--cref -Wl,-Map,\"{0}\"", MAPFilePath);
 						LinkAction.ProducedItems.Add(MAPFile);
 
 						// Export a list of object file paths, so we can locate the object files referenced by the map file
@@ -2110,7 +2115,7 @@ namespace UnrealBuildTool
 
 		// captures stderr from clang
 		private static string LinkerCommandline = "";
-		static public void OutputReceivedForLinker(object Sender, DataReceivedEventArgs Line)
+		static public void OutputReceivedForLinker(Object Sender, DataReceivedEventArgs Line)
 		{
 			if ((Line != null) && (Line.Data != null) && (Line.Data.Contains("--sysroot")))
 			{
@@ -2159,7 +2164,7 @@ namespace UnrealBuildTool
 			*/
 		}
 
-		public static void OutputReceivedDataEventHandler(object Sender, DataReceivedEventArgs Line)
+		public static void OutputReceivedDataEventHandler(Object Sender, DataReceivedEventArgs Line)
 		{
 			if ((Line != null) && (Line.Data != null))
 			{
@@ -2198,13 +2203,11 @@ namespace UnrealBuildTool
 				File.Copy(SourceFile.FullName, TargetFile.FullName, true);
 			}
 
-			ProcessStartInfo StartInfo = new ProcessStartInfo
-			{
-				FileName = GetStripPath(SourceFile).Trim('"'),
-				Arguments = " --strip-debug \"" + TargetFile.FullName + "\"",
-				UseShellExecute = false,
-				CreateNoWindow = true
-			};
+			ProcessStartInfo StartInfo = new ProcessStartInfo();
+			StartInfo.FileName = GetStripPath(SourceFile).Trim('"');
+			StartInfo.Arguments = " --strip-debug \"" + TargetFile.FullName + "\"";
+			StartInfo.UseShellExecute = false;
+			StartInfo.CreateNoWindow = true;
 			Utils.RunLocalProcessAndLogOutput(StartInfo);
 		}
 
@@ -2218,11 +2221,11 @@ namespace UnrealBuildTool
 	
 			if (BuildHostPlatform.Current.ShellType == ShellType.Cmd)
 			{
-				CompileOrLinkAction.CommandArguments = string.Format("/c \"{0} {1}\"", QuotedCommandPath, CommandArguments);
+				CompileOrLinkAction.CommandArguments = String.Format("/c \"{0} {1}\"", QuotedCommandPath, CommandArguments);
 			}
 			else
 			{
-				CompileOrLinkAction.CommandArguments = string.Format("-c \'{0} {1}\'", QuotedCommandPath, CommandArguments);
+				CompileOrLinkAction.CommandArguments = String.Format("-c \'{0} {1}\'", QuotedCommandPath, CommandArguments);
 			}
 
 			CompileOrLinkAction.CommandPath = BuildHostPlatform.Current.Shell;

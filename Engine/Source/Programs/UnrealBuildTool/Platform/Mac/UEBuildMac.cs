@@ -43,7 +43,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// The private mutable settings object
 		/// </summary>
-		private readonly MacTargetRules Inner;
+		private MacTargetRules Inner;
 
 		/// <summary>
 		/// Constructor
@@ -260,7 +260,7 @@ namespace UnrealBuildTool
 		public override List<FileReference> FinalizeBinaryPaths(FileReference BinaryName, FileReference? ProjectFile, ReadOnlyTargetRules Target)
 		{
 			List<FileReference> BinaryPaths = new List<FileReference>();
-			if (Target.bIsBuildingConsoleApplication || !string.IsNullOrEmpty(BinaryName.GetExtension()))
+			if (Target.bIsBuildingConsoleApplication || !String.IsNullOrEmpty(BinaryName.GetExtension()))
 			{
 				BinaryPaths.Add(BinaryName);
 			}

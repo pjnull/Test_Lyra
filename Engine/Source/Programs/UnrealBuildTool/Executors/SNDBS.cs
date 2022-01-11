@@ -24,7 +24,7 @@ namespace UnrealBuildTool
 		private static readonly FileReference IncludeRewriteRulesFile = FileReference.Combine(IntermediateDir, "include-rewrite-rules.ini");
 		private static readonly FileReference ScriptFile = FileReference.Combine(IntermediateDir, "sndbs.json");
 
-		private readonly Dictionary<string, string> ActiveTemplates = BuiltInTemplates.ToDictionary(p => p.Key, p => p.Value);
+		private Dictionary<string, string> ActiveTemplates = BuiltInTemplates.ToDictionary(p => p.Key, p => p.Value);
 
 		public bool EnableEcho { get; set; } = false;
 
@@ -102,10 +102,8 @@ namespace UnrealBuildTool
 			PrepareToolTemplates();
 			bool bHasRewrites = GenerateSNDBSIncludeRewriteRules();
 
-			var LocalProcess = new Process
-			{
-				StartInfo = new ProcessStartInfo(SNDBSExecutable, $"-q -p \"Unreal Engine Tasks\" -s \"{ScriptFile}\" -templates \"{IntermediateDir}\"{(bHasRewrites ? $" --include-rewrite-rules \"{IncludeRewriteRulesFile}\"" : "")}")
-			};
+			var LocalProcess = new Process();
+			LocalProcess.StartInfo = new ProcessStartInfo(SNDBSExecutable, $"-q -p \"Unreal Engine Tasks\" -s \"{ScriptFile}\" -templates \"{IntermediateDir}\"{(bHasRewrites ? $" --include-rewrite-rules \"{IncludeRewriteRulesFile}\"" : "")}");
 			LocalProcess.OutputDataReceived += (Sender, Args) => Log.TraceInformation("{0}", Args.Data);
 			LocalProcess.ErrorDataReceived += (Sender, Args) => Log.TraceInformation("{0}", Args.Data);
 			return Utils.RunLocalProcess(LocalProcess) == 0;

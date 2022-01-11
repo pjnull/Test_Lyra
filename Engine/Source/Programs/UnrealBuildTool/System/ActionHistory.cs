@@ -69,15 +69,17 @@ namespace UnrealBuildTool
 		{
 			try
 			{
-				using BinaryArchiveReader Reader = new BinaryArchiveReader(Location);
-				int Version = Reader.ReadInt();
-				if (Version != CurrentVersion)
+				using(BinaryArchiveReader Reader = new BinaryArchiveReader(Location))
 				{
-					Log.TraceLog("Unable to read action history from {0}; version {1} vs current {2}", Location, Version, CurrentVersion);
-					return;
-				}
+					int Version = Reader.ReadInt();
+					if(Version != CurrentVersion)
+					{
+						Log.TraceLog("Unable to read action history from {0}; version {1} vs current {2}", Location, Version, CurrentVersion);
+						return;
+					}
 
-				OutputItemToAttributeHash = new ConcurrentDictionary<FileItem, byte[]>(Reader.ReadDictionary(() => Reader.ReadFileItem()!, () => Reader.ReadFixedSizeByteArray(HashLength))!);
+					OutputItemToAttributeHash = new ConcurrentDictionary<FileItem, byte[]>(Reader.ReadDictionary(() => Reader.ReadFileItem()!, () => Reader.ReadFixedSizeByteArray(HashLength))!);
+				}
 			}
 			catch(Exception Ex)
 			{
@@ -153,7 +155,8 @@ namespace UnrealBuildTool
 				}
 				else
 				{
-					if (OutputItemToAttributeHash.TryGetValue(File, out byte[]? OldHash))
+					byte[]? OldHash;
+					if (OutputItemToAttributeHash.TryGetValue(File, out OldHash))
 					{
 						if (CompareHashes(NewHash, OldHash))
 						{
@@ -246,7 +249,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Used to ensure exclusive access to the layers list
 		/// </summary>
-		readonly object LockObject = new object();
+		object LockObject = new object();
 
 		/// <summary>
 		/// Map of filename to layer
@@ -282,10 +285,8 @@ namespace UnrealBuildTool
 					{
 						Layer = new ActionHistoryLayer(LayerLocation);
 
-						List<ActionHistoryLayer> NewLayers = new List<ActionHistoryLayer>(Layers)
-						{
-							Layer
-						};
+						List<ActionHistoryLayer> NewLayers = new List<ActionHistoryLayer>(Layers);
+						NewLayers.Add(Layer);
 						Layers = NewLayers;
 					}
 				}
@@ -364,7 +365,7 @@ namespace UnrealBuildTool
 		/// <returns>True if the substring matches</returns>
 		static bool MatchPathFragment(FileReference Location, int Offset, int Length, string Fragment)
 		{
-			return Length == Fragment.Length && string.Compare(Location.FullName, Offset, Fragment, 0, Fragment.Length, FileReference.Comparison) == 0;
+			return Length == Fragment.Length && String.Compare(Location.FullName, Offset, Fragment, 0, Fragment.Length, FileReference.Comparison) == 0;
 		}
 
 		/// <summary>
@@ -387,12 +388,12 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// The lock object for this history
 		/// </summary>
-		readonly object LockObject = new object();
+		object LockObject = new object();
 
 		/// <summary>
 		/// List of partitions
 		/// </summary>
-		readonly List<ActionHistoryPartition> Partitions = new List<ActionHistoryPartition>();
+		List<ActionHistoryPartition> Partitions = new List<ActionHistoryPartition>();
 
 		/// <summary>
 		/// Constructor

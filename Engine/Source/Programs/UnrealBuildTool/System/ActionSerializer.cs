@@ -74,12 +74,12 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Map from type name to deserializing constructor
 		/// </summary>
-		static readonly Dictionary<Type, IActionSerializer> TypeToSerializer;
+		static Dictionary<Type, IActionSerializer> TypeToSerializer;
 
 		/// <summary>
 		/// Map from serializer name to instance
 		/// </summary>
-		static readonly Dictionary<string, IActionSerializer> NameToSerializer;
+		static Dictionary<string, IActionSerializer> NameToSerializer;
 
 		/// <summary>
 		/// Creates a map of type name to constructor
@@ -122,7 +122,8 @@ namespace UnrealBuildTool
 		{
 			string Name = Reader.ReadString()!;
 
-			if (!NameToSerializer.TryGetValue(Name, out IActionSerializer? Serializer))
+			IActionSerializer? Serializer;
+			if (!NameToSerializer.TryGetValue(Name, out Serializer))
 			{
 				throw new BuildException("Unable to find action type '{0}'", Name);
 			}
@@ -139,7 +140,8 @@ namespace UnrealBuildTool
 		{
 			Type Type = Action.GetType();
 
-			if (!TypeToSerializer.TryGetValue(Type, out IActionSerializer? Serializer))
+			IActionSerializer? Serializer;
+			if (!TypeToSerializer.TryGetValue(Type, out Serializer))
 			{
 				throw new BuildException("Unable to find serializer for action type '{0}'", Type.Name);
 			}

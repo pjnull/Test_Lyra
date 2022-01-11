@@ -228,11 +228,9 @@ namespace UnrealBuildTool
 			if (bBuildAdditionalConsoleApp)
 			{
 				// Produce additional binary but link it as a console app
-				LinkEnvironment ConsoleAppLinkEvironment = new LinkEnvironment(BinaryLinkEnvironment)
-				{
-					bIsBuildingConsoleApplication = true,
-					WindowsEntryPointOverride = "WinMainCRTStartup"     // For WinMain() instead of "main()" for Launch module
-				};
+				LinkEnvironment ConsoleAppLinkEvironment = new LinkEnvironment(BinaryLinkEnvironment);
+				ConsoleAppLinkEvironment.bIsBuildingConsoleApplication = true;
+				ConsoleAppLinkEvironment.WindowsEntryPointOverride = "WinMainCRTStartup";		// For WinMain() instead of "main()" for Launch module
 				ConsoleAppLinkEvironment.OutputFilePaths = ConsoleAppLinkEvironment.OutputFilePaths.Select(Path => GetAdditionalConsoleAppPath(Path)).ToList();
 
 				// Link the console app executable
@@ -305,12 +303,13 @@ namespace UnrealBuildTool
 						// Add actions to copy everything
 						foreach(KeyValuePair<FileReference, FileReference> Pair in Mapping)
 						{
-							if (!TargetFileToSourceFile.TryGetValue(Pair.Key, out FileReference? ExistingSourceFile))
+							FileReference? ExistingSourceFile;
+							if(!TargetFileToSourceFile.TryGetValue(Pair.Key, out ExistingSourceFile))
 							{
 								TargetFileToSourceFile[Pair.Key] = Pair.Value;
 								RuntimeDependencies.Add(new RuntimeDependency(Pair.Key, Dependency.Type));
 							}
-							else if (ExistingSourceFile != Pair.Value)
+							else if(ExistingSourceFile != Pair.Value)
 							{
 								throw new BuildException("Runtime dependency '{0}' is configured to be staged from '{1}' and '{2}'", Pair.Key, Pair.Value, ExistingSourceFile);
 							}
@@ -552,7 +551,7 @@ namespace UnrealBuildTool
 
 			foreach (string DebugExtension in DebugExtensions)
 			{
-				if (!string.IsNullOrEmpty(DebugExtension) && ToolChain.ShouldAddDebugFileToReceipt(OutputFile, OutputType) && bCreateDebugInfo)
+				if (!String.IsNullOrEmpty(DebugExtension) && ToolChain.ShouldAddDebugFileToReceipt(OutputFile, OutputType) && bCreateDebugInfo)
 				{
 					// @todo this could be cleaned up if we replaced Platform.GetDebugExtensions() with ToolChain.GetDebugFiles(OutputFile)
 					// would need care in MacToolchain tho, so too risky for now
@@ -618,9 +617,10 @@ namespace UnrealBuildTool
 				List<RestrictedFolder> AliasedBinaryFolders = new List<RestrictedFolder>();
 				foreach (RestrictedFolder BinaryFolder in BinaryFolders)
 				{
-					if (PrimaryModule.AliasRestrictedFolders.TryGetValue(BinaryFolder.ToString(), out string? Alias))
+					string? Alias;
+					if (PrimaryModule.AliasRestrictedFolders.TryGetValue(BinaryFolder.ToString(), out Alias))
 					{
-						foreach (RestrictedFolder Folder in RestrictedFolder.GetValues())
+						foreach(RestrictedFolder Folder in RestrictedFolder.GetValues())
 						{
 							if (Folder.ToString().Equals(Alias))
 							{
@@ -635,14 +635,15 @@ namespace UnrealBuildTool
 				foreach(UEBuildModule Module in ModuleReferencedBy.Keys)
 				{
 					// Find the restricted folders for this module
-					if (!ModuleRestrictedFolderCache.TryGetValue(Module, out Dictionary<RestrictedFolder, DirectoryReference>? ModuleRestrictedFolders))
+					Dictionary<RestrictedFolder, DirectoryReference>? ModuleRestrictedFolders;
+					if (!ModuleRestrictedFolderCache.TryGetValue(Module, out ModuleRestrictedFolders))
 					{
 						ModuleRestrictedFolders = Module.FindRestrictedFolderReferences(RootDirectories);
 						ModuleRestrictedFolderCache.Add(Module, ModuleRestrictedFolders);
 					}
 
 					// Write errors for any missing paths in the output files
-					foreach (KeyValuePair<RestrictedFolder, DirectoryReference> Pair in ModuleRestrictedFolders)
+					foreach(KeyValuePair<RestrictedFolder, DirectoryReference> Pair in ModuleRestrictedFolders)
 					{
 						if(!BinaryFolders.Contains(Pair.Key))
 						{
@@ -651,7 +652,7 @@ namespace UnrealBuildTool
 							{
 								ReferenceChain.Insert(0, ReferencedModule.Name);
 							}
-							Log.TraceError("Output binary \"{0}\" is not in a {1} folder, but references \"{2}\" via {3}.", OutputFilePath, Pair.Key.ToString(), Pair.Value, string.Join(" -> ", ReferenceChain));
+							Log.TraceError("Output binary \"{0}\" is not in a {1} folder, but references \"{2}\" via {3}.", OutputFilePath, Pair.Key.ToString(), Pair.Value, String.Join(" -> ", ReferenceChain));
 							bResult = false;
 						}
 					}
@@ -691,11 +692,9 @@ namespace UnrealBuildTool
 
 		public CppCompileEnvironment CreateBinaryCompileEnvironment(CppCompileEnvironment GlobalCompileEnvironment)
 		{
-			CppCompileEnvironment BinaryCompileEnvironment = new CppCompileEnvironment(GlobalCompileEnvironment)
-			{
-				bIsBuildingDLL = IsBuildingDll(Type),
-				bIsBuildingLibrary = IsBuildingLibrary(Type)
-			};
+			CppCompileEnvironment BinaryCompileEnvironment = new CppCompileEnvironment(GlobalCompileEnvironment);
+			BinaryCompileEnvironment.bIsBuildingDLL = IsBuildingDll(Type);
+			BinaryCompileEnvironment.bIsBuildingLibrary = IsBuildingLibrary(Type);
 			return BinaryCompileEnvironment;
 		}
 
@@ -741,7 +740,7 @@ namespace UnrealBuildTool
 					// Force a reference to initialize module for this binary
 					if(Module.Rules.bRequiresImplementModule ?? true)
 					{
-						BinaryLinkEnvironment.IncludeFunctions.Add(string.Format("IMPLEMENT_MODULE_{0}", Module.Name));
+						BinaryLinkEnvironment.IncludeFunctions.Add(String.Format("IMPLEMENT_MODULE_{0}", Module.Name));
 					}
 				}
 				else
@@ -801,8 +800,8 @@ namespace UnrealBuildTool
 						ResourceCompileEnvironment.Definitions.Add("ORIGINAL_FILE_NAME=\"" + OutputFilePaths[0].GetFileName() + "\"");
 
 						// Set the other version fields
-						ResourceCompileEnvironment.Definitions.Add(string.Format("BUILT_FROM_CHANGELIST={0}", Target.Version.Changelist));
-						ResourceCompileEnvironment.Definitions.Add(string.Format("BUILD_VERSION={0}", Target.BuildVersion));
+						ResourceCompileEnvironment.Definitions.Add(String.Format("BUILT_FROM_CHANGELIST={0}", Target.Version.Changelist));
+						ResourceCompileEnvironment.Definitions.Add(String.Format("BUILD_VERSION={0}", Target.BuildVersion));
 
 						// Otherwise compile the default resource file per-binary, so that it gets the correct ORIGINAL_FILE_NAME macro.
 						FileItem DefaultResourceFile = FileItem.GetItemByFileReference(FileReference.Combine(Unreal.EngineDirectory, "Build", "Windows", "Resources", "Default.rc2"));

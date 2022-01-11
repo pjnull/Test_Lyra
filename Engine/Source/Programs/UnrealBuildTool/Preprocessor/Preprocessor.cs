@@ -23,7 +23,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// The context when the error was encountered
 		/// </summary>
-		readonly PreprocessorContext? Context;
+		PreprocessorContext? Context;
 
 		/// <summary>
 		/// Constructor
@@ -32,7 +32,7 @@ namespace UnrealBuildTool
 		/// <param name="Format">Format string, to be passed to String.Format</param>
 		/// <param name="Args">Optional argument list for the format string</param>
 		public PreprocessorException(PreprocessorContext? Context, string Format, params object[] Args)
-			: base(string.Format(Format, Args))
+			: base(String.Format(Format, Args))
 		{
 			this.Context = Context;
 		}
@@ -62,17 +62,17 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Include paths to look in
 		/// </summary>
-		readonly List<DirectoryItem> IncludeDirectories = new List<DirectoryItem>();
+		List<DirectoryItem> IncludeDirectories = new List<DirectoryItem>();
 
 		/// <summary>
 		/// Set of all included files with the #pragma once directive
 		/// </summary>
-		readonly HashSet<FileItem> PragmaOnceFiles = new HashSet<FileItem>();
+		HashSet<FileItem> PragmaOnceFiles = new HashSet<FileItem>();
 
 		/// <summary>
 		/// The current state of the preprocessor
 		/// </summary>
-		readonly PreprocessorState State = new PreprocessorState();
+		PreprocessorState State = new PreprocessorState();
 
 		/// <summary>
 		/// Predefined token containing the constant "0"
@@ -95,7 +95,7 @@ namespace UnrealBuildTool
 		public Preprocessor()
 		{
 			DateTime Now = DateTime.Now;
-			AddLiteralMacro("__DATE__", TokenType.String, string.Format("\"{0} {1,2} {2}\"", Now.ToString("MMM"), Now.Day, Now.Year));
+			AddLiteralMacro("__DATE__", TokenType.String, String.Format("\"{0} {1,2} {2}\"", Now.ToString("MMM"), Now.Day, Now.Year));
 			AddLiteralMacro("__TIME__", TokenType.String, "\"" + Now.ToString("HH:mm:ss") + "\"");
 			AddLiteralMacro("__FILE__", TokenType.String, "\"<unknown>\"");
 			AddLiteralMacro("__LINE__", TokenType.Number, "-1");
@@ -261,7 +261,8 @@ namespace UnrealBuildTool
 					PreprocessorFileContext? OuterFileContext = OuterContext as PreprocessorFileContext;
 					if(OuterFileContext != null)
 					{
-						if (TryResolveRelativeIncludePath(OuterFileContext.Directory, Fragments, out FileItem? ResolvedFile))
+						FileItem? ResolvedFile;
+						if(TryResolveRelativeIncludePath(OuterFileContext.Directory, Fragments, out ResolvedFile))
 						{
 							File = ResolvedFile;
 							return true;
@@ -273,7 +274,8 @@ namespace UnrealBuildTool
 			// Try to match the include path against any of the system directories
 			foreach(DirectoryItem BaseDirectory in IncludeDirectories)
 			{
-				if (TryResolveRelativeIncludePath(BaseDirectory, Fragments, out FileItem? ResolvedFile))
+				FileItem? ResolvedFile;
+				if(TryResolveRelativeIncludePath(BaseDirectory, Fragments, out ResolvedFile))
 				{
 					File = ResolvedFile;
 					return true;
@@ -303,7 +305,7 @@ namespace UnrealBuildTool
 					return false;
 				}
 			}
-			return Directory.TryGetFile(Fragments[^1], out File);
+			return Directory.TryGetFile(Fragments[Fragments.Length - 1], out File);
 		}
 
 		/// <summary>
@@ -387,11 +389,11 @@ namespace UnrealBuildTool
 
 			// Expand any macros in them and resolve it
 			IncludePathType Type;
-			if(IncludeToken.Length >= 2 && IncludeToken[0] == '\"' && IncludeToken[^1] == '\"')
+			if(IncludeToken.Length >= 2 && IncludeToken[0] == '\"' && IncludeToken[IncludeToken.Length - 1] == '\"')
 			{
 				Type = IncludePathType.Normal;
 			}
-			else if(IncludeToken.Length >= 2 && IncludeToken[0] == '<' && IncludeToken[^1] == '>')
+			else if(IncludeToken.Length >= 2 && IncludeToken[0] == '<' && IncludeToken[IncludeToken.Length - 1] == '>')
 			{
 				Type = IncludePathType.System;
 			}
@@ -404,7 +406,8 @@ namespace UnrealBuildTool
 			string IncludePath = IncludeToken.Substring(1, IncludeToken.Length - 2);
 
 			// Resolve the included file
-			if (!TryResolveIncludePath(Context, IncludePath, Type, out FileItem? IncludedFile))
+			FileItem? IncludedFile;
+			if(!TryResolveIncludePath(Context, IncludePath, Type, out IncludedFile))
 			{
 				throw new PreprocessorException(Context, "Couldn't resolve include '{0}'", IncludePath);
 			}
@@ -490,11 +493,11 @@ namespace UnrealBuildTool
 				{
 					Tokens[0] = Tokens[0].RemoveFlags(TokenFlags.HasLeadingSpace);
 				}
-				if (Tokens[0].Type == TokenType.HashHash || Tokens[^1].Type == TokenType.HashHash)
+				if (Tokens[0].Type == TokenType.HashHash || Tokens[Tokens.Count - 1].Type == TokenType.HashHash)
 				{
 					throw new PreprocessorException(Context, "Invalid use of concatenation at start or end of token sequence");
 				}
-				if (Parameters == null || Parameters.Count == 0 || Parameters[^1] != Identifiers.__VA_ARGS__)
+				if (Parameters == null || Parameters.Count == 0 || Parameters[Parameters.Count - 1] != Identifiers.__VA_ARGS__)
 				{
 					if(Tokens.Any(x => x.Identifier == Identifiers.__VA_ARGS__))
 					{
@@ -751,7 +754,8 @@ namespace UnrealBuildTool
 		public void ParseElifDirective(List<Token> Tokens, PreprocessorContext Context)
 		{
 			// Check we're in a branch, and haven't already read an #else directive
-			if (!State.TryPopBranch(out PreprocessorBranch Branch))
+			PreprocessorBranch Branch;
+			if (!State.TryPopBranch(out Branch))
 			{
 				throw new PreprocessorException(Context, "#elif directive outside conditional block");
 			}
@@ -795,7 +799,8 @@ namespace UnrealBuildTool
 			}
 
 			// Check we're in a branch, and haven't already read an #else directive
-			if (!State.TryPopBranch(out PreprocessorBranch Branch))
+			PreprocessorBranch Branch;
+			if (!State.TryPopBranch(out Branch))
 			{
 				throw new PreprocessorException(Context, "#else directive without matching #if directive");
 			}
@@ -821,7 +826,8 @@ namespace UnrealBuildTool
 		public void ParseEndifDirective(List<Token> Tokens, PreprocessorContext Context)
 		{
 			// Pop the branch off the stack
-			if (!State.TryPopBranch(out PreprocessorBranch Branch))
+			PreprocessorBranch Branch;
+			if(!State.TryPopBranch(out Branch))
 			{
 				throw new PreprocessorException(Context, "#endif directive without matching #if/#ifdef/#ifndef directive");
 			}
@@ -913,7 +919,7 @@ namespace UnrealBuildTool
 			bool bMoveNext = InputEnumerator.MoveNext();
 
 			// If it's an identifier, try to resolve it as a macro
-			if (OutputTokens[^1].Identifier == Identifiers.Defined && bIsConditional)
+			if (OutputTokens[OutputTokens.Count - 1].Identifier == Identifiers.Defined && bIsConditional)
 			{
 				// Remove the 'defined' keyword
 				OutputTokens.RemoveAt(OutputTokens.Count - 1);
@@ -951,20 +957,21 @@ namespace UnrealBuildTool
 			else
 			{
 				// Repeatedly try to expand the last token into the list
-				while(OutputTokens[^1].Type == TokenType.Identifier && !OutputTokens[^1].Flags.HasFlag(TokenFlags.DisableExpansion))
+				while(OutputTokens[OutputTokens.Count - 1].Type == TokenType.Identifier && !OutputTokens[OutputTokens.Count - 1].Flags.HasFlag(TokenFlags.DisableExpansion))
 				{
 					// Try to get a macro for the current token
-					if (!State.TryGetMacro(OutputTokens[^1].Identifier!, out PreprocessorMacro? Macro) || IgnoreMacros.Contains(Macro))
+					PreprocessorMacro? Macro;
+					if (!State.TryGetMacro(OutputTokens[OutputTokens.Count - 1].Identifier!, out Macro) || IgnoreMacros.Contains(Macro))
 					{
 						break;
 					}
-					if (Macro.IsFunctionMacro && (!bMoveNext || InputEnumerator.Current.Type != TokenType.LeftParen))
+					if(Macro.IsFunctionMacro && (!bMoveNext || InputEnumerator.Current.Type != TokenType.LeftParen))
 					{
 						break;
 					}
 
 					// Remove the macro name from the output list
-					bool bHasLeadingSpace = OutputTokens[^1].HasLeadingSpace;
+					bool bHasLeadingSpace = OutputTokens[OutputTokens.Count - 1].HasLeadingSpace;
 					OutputTokens.RemoveAt(OutputTokens.Count - 1);
 
 					// Save the initial number of tokens in the list, so we can tell if it expanded
@@ -1077,7 +1084,7 @@ namespace UnrealBuildTool
 			// Special handling for the __LINE__ directive, since we need an updated line number for the current token
 			if(Macro.Name == Identifiers.__FILE__)
 			{
-				Token Token = new Token(TokenType.String, TokenFlags.None, string.Format("\"{0}\"", GetCurrentFileMacroValue(Context).Replace("\\", "\\\\")));
+				Token Token = new Token(TokenType.String, TokenFlags.None, String.Format("\"{0}\"", GetCurrentFileMacroValue(Context).Replace("\\", "\\\\")));
 				OutputTokens.Add(Token);
 			}
 			else if(Macro.Name == Identifiers.__LINE__)
@@ -1147,7 +1154,7 @@ namespace UnrealBuildTool
 						Arguments.Add(new List<Token>());
 					}
 
-					List<Token> Argument = Arguments[^1];
+					List<Token> Argument = Arguments[Arguments.Count - 1];
 
 					int InitialIdx = Idx;
 					while (Idx < ArgumentListTokens.Count - 1 && ArgumentListTokens[Idx].Type != TokenType.Comma)
@@ -1158,7 +1165,7 @@ namespace UnrealBuildTool
 						}
 					}
 
-					if(Argument.Count > 0 && Arguments[^1][0].HasLeadingSpace)
+					if(Argument.Count > 0 && Arguments[Arguments.Count - 1][0].HasLeadingSpace)
 					{
 						Argument[0] = Argument[0].RemoveFlags(TokenFlags.HasLeadingSpace);
 					}
@@ -1196,7 +1203,7 @@ namespace UnrealBuildTool
 
 					if (Macro.HasVariableArgumentList && Arguments.Count == Macro.Parameters!.Count && Idx < ArgumentListTokens.Count - 1)
 					{
-						Arguments[^1].Add(ArgumentListTokens[Idx]);
+						Arguments[Arguments.Count - 1].Add(ArgumentListTokens[Idx]);
 					}
 				}
 			}
@@ -1235,12 +1242,12 @@ namespace UnrealBuildTool
 					{
 						throw new PreprocessorException(Context, "{0} is not an argument name", Macro.Tokens[Idx].Text);
 					}
-					ExpandedTokens.Add(new Token(TokenType.String, Token.Flags & TokenFlags.HasLeadingSpace, string.Format("\"{0}\"", Token.Format(Arguments[ParamIdx]).Replace("\\", "\\\\").Replace("\"", "\\\""))));
+					ExpandedTokens.Add(new Token(TokenType.String, Token.Flags & TokenFlags.HasLeadingSpace, String.Format("\"{0}\"", Token.Format(Arguments[ParamIdx]).Replace("\\", "\\\\").Replace("\"", "\\\""))));
 				}
 				else if(Macro.HasVariableArgumentList && Idx + 2 < Macro.Tokens.Count && Token.Type == TokenType.Comma && Macro.Tokens[Idx + 1].Type == TokenType.HashHash && Macro.Tokens[Idx + 2].Identifier == Identifiers.__VA_ARGS__)
 				{
 					// Special MSVC/GCC extension: ', ## __VA_ARGS__' removes the comma if __VA_ARGS__ is empty. MSVC seems to format the result with a forced space.
-					List<Token> ExpandedArgument = ExpandedArguments[^1];
+					List<Token> ExpandedArgument = ExpandedArguments[ExpandedArguments.Count - 1];
 					if(ExpandedArgument.Any(x => x.Text.Length > 0))
 					{
 						ExpandedTokens.Add(Token);

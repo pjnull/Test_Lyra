@@ -143,7 +143,7 @@ namespace UnrealBuildTool
 			return true;
 		}
 
-		readonly Dictionary<TargetDescriptor, string> TargetPrefixes = new Dictionary<TargetDescriptor, string>();
+		Dictionary<TargetDescriptor, string> TargetPrefixes = new Dictionary<TargetDescriptor, string>();
 
 		/// <summary>
 		/// Executes the specified actions locally.
@@ -160,10 +160,8 @@ namespace UnrealBuildTool
 			List<BuildAction> Actions = new List<BuildAction>();
 			for (int Idx = 0; Idx < InputActions.Count; Idx++)
 			{
-				BuildAction Action = new BuildAction(InputActions[Idx])
-				{
-					SortIndex = Idx
-				};
+				BuildAction Action = new BuildAction(InputActions[Idx]);
+				Action.SortIndex = Idx;
 
 				if (!Action.Inner.StatusDescription.EndsWith(".ispc"))
 				{
@@ -175,7 +173,7 @@ namespace UnrealBuildTool
 				TargetDescriptor? Target = Action.Inner.Target;
 				if (bPrintActionTargetNames && Target != null && !TargetPrefixes.ContainsKey(Target))
 				{
-					string TargetPrefix = $"{1 + TargetPrefixes.Count()}>";
+					string TargetPrefix = $"{(1 + TargetPrefixes.Count()).ToString()}>";
 					TargetPrefixes.Add(Target, TargetPrefix);
 					Log.TraceInformation($"{TargetPrefix}------ Unreal Build started: {Target.Name} {Target.Configuration} {Target.Platform} {Target.Architecture} ------");
 				}
@@ -187,7 +185,8 @@ namespace UnrealBuildTool
 			{
 				foreach (LinkedAction PrerequisiteAction in Action.Inner.PrerequisiteActions)
 				{
-					if (LinkedActionToBuildAction.TryGetValue(PrerequisiteAction, out BuildAction? Dependency))
+					BuildAction? Dependency;
+					if (LinkedActionToBuildAction.TryGetValue(PrerequisiteAction, out Dependency))
 					{
 						Action.Dependencies.Add(Dependency);
 						Dependency.Dependants.Add(Action);
@@ -216,173 +215,177 @@ namespace UnrealBuildTool
 			List<BuildAction> AllCompletedActions = new List<BuildAction>();
 
 			// Execute the actions
-			using LogIndentScope Indent = new LogIndentScope("  ");
-			// Create a job object for all the child processes
-			bool bResult = true;
-			Dictionary<BuildAction, Thread> ExecutingActions = new Dictionary<BuildAction, Thread>();
-			List<BuildAction> CompletedActions = new List<BuildAction>();
-
-			TimeSpan TotalProcessingTime;
-			using (ManagedProcessGroup ProcessGroup = new ManagedProcessGroup())
+			using (LogIndentScope Indent = new LogIndentScope("  "))
 			{
-				using (AutoResetEvent CompletedEvent = new AutoResetEvent(false))
+				// Create a job object for all the child processes
+				bool bResult = true;
+				Dictionary<BuildAction, Thread> ExecutingActions = new Dictionary<BuildAction, Thread>();
+				List<BuildAction> CompletedActions = new List<BuildAction>();
+
+				TimeSpan TotalProcessingTime;
+				using (ManagedProcessGroup ProcessGroup = new ManagedProcessGroup())
 				{
-					int NumCompletedActions = 0;
-					using ProgressWriter ProgressWriter = new ProgressWriter("Compiling C++ source code...", false);
-					while (QueuedActions.Count > 0 || ExecutingActions.Count > 0)
+					using (AutoResetEvent CompletedEvent = new AutoResetEvent(false))
 					{
-						// Sort the actions by the number of things dependent on them
-						QueuedActions.Sort((A, B) => (A.TotalDependantCount == B.TotalDependantCount) ? (B.SortIndex - A.SortIndex) : (B.TotalDependantCount - A.TotalDependantCount));
-
-						// Create threads up to the maximum number of actions
-						while (ExecutingActions.Count < ActualNumParallelProcesses && QueuedActions.Count > 0)
+						int NumCompletedActions = 0;
+						using (ProgressWriter ProgressWriter = new ProgressWriter("Compiling C++ source code...", false))
 						{
-							BuildAction Action = QueuedActions[^1];
-							QueuedActions.RemoveAt(QueuedActions.Count - 1);
-
-							Thread ExecutingThread = new Thread(() => { ExecuteAction(ProcessGroup, Action, CompletedActions, CompletedEvent); });
-							string Description = $"{(Action.Inner.CommandDescription ?? Action.Inner.CommandPath.GetFileName())} {Action.Inner.StatusDescription}".Trim();
-							ExecutingThread.Name = string.Format("Build:{0}", Description);
-							ExecutingThread.Start();
-
-							ExecutingActions.Add(Action, ExecutingThread);
-						}
-
-						// Wait for something to finish
-						CompletedEvent.WaitOne();
-
-						// Wait for something to finish and flush it to the log
-						lock (CompletedActions)
-						{
-							foreach (BuildAction CompletedAction in CompletedActions)
+							while (QueuedActions.Count > 0 || ExecutingActions.Count > 0)
 							{
-								// Join the thread
-								Thread CompletedThread = ExecutingActions[CompletedAction];
-								CompletedThread.Join();
-								ExecutingActions.Remove(CompletedAction);
+								// Sort the actions by the number of things dependent on them
+								QueuedActions.Sort((A, B) => (A.TotalDependantCount == B.TotalDependantCount) ? (B.SortIndex - A.SortIndex) : (B.TotalDependantCount - A.TotalDependantCount));
 
-								// Update the progress
-								NumCompletedActions++;
-								ProgressWriter.Write(NumCompletedActions, InputActions.Count);
-
-								string Description = string.Empty;
-
-								string TargetPrefix = "";
-								TargetDescriptor? Target = CompletedAction.Inner.Target;
-								if (bPrintActionTargetNames)
+								// Create threads up to the maximum number of actions
+								while (ExecutingActions.Count < ActualNumParallelProcesses && QueuedActions.Count > 0)
 								{
-									if (Target != null)
+									BuildAction Action = QueuedActions[QueuedActions.Count - 1];
+									QueuedActions.RemoveAt(QueuedActions.Count - 1);
+
+									Thread ExecutingThread = new Thread(() => { ExecuteAction(ProcessGroup, Action, CompletedActions, CompletedEvent); });
+									string Description = $"{(Action.Inner.CommandDescription != null ? Action.Inner.CommandDescription : Action.Inner.CommandPath.GetFileName())} {Action.Inner.StatusDescription}".Trim();
+									ExecutingThread.Name = String.Format("Build:{0}", Description);
+									ExecutingThread.Start();
+
+									ExecutingActions.Add(Action, ExecutingThread);
+								}
+
+								// Wait for something to finish
+								CompletedEvent.WaitOne();
+
+								// Wait for something to finish and flush it to the log
+								lock (CompletedActions)
+								{
+									foreach (BuildAction CompletedAction in CompletedActions)
 									{
-										TargetPrefix = TargetPrefixes[Target];
-									}
-									else
-									{
-										TargetPrefix = "->";
-									}
-								}
+										// Join the thread
+										Thread CompletedThread = ExecutingActions[CompletedAction];
+										CompletedThread.Join();
+										ExecutingActions.Remove(CompletedAction);
 
-								if (bLogActionCommandLines)
-								{
-									Log.TraceLog($"{TargetPrefix}[{NumCompletedActions}/{InputActions.Count}] Command: {CompletedAction.Inner.CommandPath} {CompletedAction.Inner.CommandArguments}");
-								}
+										// Update the progress
+										NumCompletedActions++;
+										ProgressWriter.Write(NumCompletedActions, InputActions.Count);
 
-								// Write it to the log
-								if (CompletedAction.Inner.bShouldOutputStatusDescription || CompletedAction.LogLines.Count == 0)
-								{
-									Description = $"{(CompletedAction.Inner.CommandDescription ?? CompletedAction.Inner.CommandPath.GetFileNameWithoutExtension())} {CompletedAction.Inner.StatusDescription}".Trim();
-								}
-								else if (CompletedAction.LogLines.Count > 0)
-								{
-									Description = $"{(CompletedAction.Inner.CommandDescription ?? CompletedAction.Inner.CommandPath.GetFileNameWithoutExtension())} {CompletedAction.LogLines[0]}".Trim();
-								}
+										string Description = string.Empty;
 
-								string CompilationTimes = "";
-								if (bShowPerActionCompilationTimes)
-								{
-									CompilationTimes = $" (Wall: {CompletedAction.ExecutionTime.TotalSeconds:0.00}s CPU: {CompletedAction.ProcessorTime.TotalSeconds:0.00}s)";
-								}
-
-								Log.TraceInformation("{0}[{1}/{2}] {3}{4}", TargetPrefix, NumCompletedActions, InputActions.Count, Description, CompilationTimes);
-								foreach (string Line in CompletedAction.LogLines.Skip(CompletedAction.Inner.bShouldOutputStatusDescription ? 0 : 1))
-								{
-									Log.TraceInformation(Line);
-								}
-
-								AllCompletedActions.Add(CompletedAction);
-
-								// Check the exit code
-								if (CompletedAction.ExitCode == 0)
-								{
-									// Mark all the dependents as done
-									foreach (BuildAction DependantAction in CompletedAction.Dependants)
-									{
-										if (--DependantAction.MissingDependencyCount == 0)
+										string TargetPrefix = "";
+										TargetDescriptor? Target = CompletedAction.Inner.Target;
+										if (bPrintActionTargetNames)
 										{
-											QueuedActions.Add(DependantAction);
+											if (Target != null)
+											{
+												TargetPrefix = TargetPrefixes[Target];
+											}
+											else
+											{
+												TargetPrefix = "->";
+											}
+										}
+
+										if (bLogActionCommandLines)
+										{
+											Log.TraceLog($"{TargetPrefix}[{NumCompletedActions}/{InputActions.Count}] Command: {CompletedAction.Inner.CommandPath} {CompletedAction.Inner.CommandArguments}");
+										}
+
+										// Write it to the log
+										if (CompletedAction.Inner.bShouldOutputStatusDescription || CompletedAction.LogLines.Count == 0)
+										{
+											Description = $"{(CompletedAction.Inner.CommandDescription ?? CompletedAction.Inner.CommandPath.GetFileNameWithoutExtension())} {CompletedAction.Inner.StatusDescription}".Trim();
+										}
+										else if (CompletedAction.LogLines.Count > 0)
+										{
+											Description = $"{(CompletedAction.Inner.CommandDescription ?? CompletedAction.Inner.CommandPath.GetFileNameWithoutExtension())} {CompletedAction.LogLines[0]}".Trim();
+										}
+
+										string CompilationTimes = "";
+										if (bShowPerActionCompilationTimes)
+										{
+											CompilationTimes = $" (Wall: {CompletedAction.ExecutionTime.TotalSeconds:0.00}s CPU: {CompletedAction.ProcessorTime.TotalSeconds:0.00}s)";
+										}
+											
+										Log.TraceInformation("{0}[{1}/{2}] {3}{4}", TargetPrefix, NumCompletedActions, InputActions.Count, Description, CompilationTimes);
+										foreach (string Line in CompletedAction.LogLines.Skip(CompletedAction.Inner.bShouldOutputStatusDescription ? 0 : 1))
+										{
+											Log.TraceInformation(Line);
+										}
+
+										AllCompletedActions.Add(CompletedAction);
+
+										// Check the exit code
+										if (CompletedAction.ExitCode == 0)
+										{
+											// Mark all the dependents as done
+											foreach (BuildAction DependantAction in CompletedAction.Dependants)
+											{
+												if (--DependantAction.MissingDependencyCount == 0)
+												{
+													QueuedActions.Add(DependantAction);
+												}
+											}
+										}
+										else
+										{
+											// BEGIN TEMPORARY TO CATCH PVS-STUDIO ISSUES
+											if (CompletedAction.LogLines.Count == 0)
+											{
+												Log.TraceInformation("{0}[{1}/{2}]{3} - Error but no output", TargetPrefix, NumCompletedActions, InputActions.Count, Description);
+												Log.TraceInformation("{0}[{1}/{2}]{3} - {4} {5} {6} {7}", TargetPrefix, NumCompletedActions, InputActions.Count, Description, CompletedAction.ExitCode,
+													CompletedAction.Inner.WorkingDirectory, CompletedAction.Inner.CommandPath, CompletedAction.Inner.CommandArguments);
+											}
+											// END TEMPORARY
+											// Update the exit code if it's not already set
+											if (bResult && CompletedAction.ExitCode != 0)
+											{
+												bResult = false;
+											}
 										}
 									}
+									CompletedActions.Clear();
 								}
-								else
+
+								// If we've already got a non-zero exit code, clear out the list of queued actions so nothing else will run
+								if (!bResult && bStopCompilationAfterErrors)
 								{
-									// BEGIN TEMPORARY TO CATCH PVS-STUDIO ISSUES
-									if (CompletedAction.LogLines.Count == 0)
-									{
-										Log.TraceInformation("{0}[{1}/{2}]{3} - Error but no output", TargetPrefix, NumCompletedActions, InputActions.Count, Description);
-										Log.TraceInformation("{0}[{1}/{2}]{3} - {4} {5} {6} {7}", TargetPrefix, NumCompletedActions, InputActions.Count, Description, CompletedAction.ExitCode,
-											CompletedAction.Inner.WorkingDirectory, CompletedAction.Inner.CommandPath, CompletedAction.Inner.CommandArguments);
-									}
-									// END TEMPORARY
-									// Update the exit code if it's not already set
-									if (bResult && CompletedAction.ExitCode != 0)
-									{
-										bResult = false;
-									}
+									QueuedActions.Clear();
 								}
 							}
-							CompletedActions.Clear();
-						}
-
-						// If we've already got a non-zero exit code, clear out the list of queued actions so nothing else will run
-						if (!bResult && bStopCompilationAfterErrors)
-						{
-							QueuedActions.Clear();
 						}
 					}
+
+					TotalProcessingTime = ProcessGroup.TotalProcessorTime;
 				}
 
-				TotalProcessingTime = ProcessGroup.TotalProcessorTime;
-			}
-
-			if (bShowCompilationTimes)
-			{
-				Log.TraceInformation("");
-				if (TotalProcessingTime.Ticks > 0)
+				if (bShowCompilationTimes)
 				{
-					Log.TraceInformation("Total CPU Time: {0:0.00} s", TotalProcessingTime.TotalSeconds);
 					Log.TraceInformation("");
-				}
-
-				if (AllCompletedActions.Count > 0)
-				{
-					Log.TraceInformation("Compilation Time Top {0}", Math.Min(20, AllCompletedActions.Count));
-					Log.TraceInformation("");
-					foreach (BuildAction Action in AllCompletedActions.OrderByDescending(x => x.ExecutionTime).Take(20))
+					if (TotalProcessingTime.Ticks > 0)
 					{
-						string Description = $"{(Action.Inner.CommandDescription ?? Action.Inner.CommandPath.GetFileName())} {Action.Inner.StatusDescription}".Trim();
-						if (Action.ProcessorTime.Ticks > 0)
-						{
-							Log.TraceInformation("{0} [ Wall Time {1:0.00} s / CPU Time {2:0.00} s ]", Description, Action.ExecutionTime.TotalSeconds, Action.ProcessorTime.TotalSeconds);
-						}
-						else
-						{
-							Log.TraceInformation("{0} [ Time {1:0.00} s ]", Description, Action.ExecutionTime.TotalSeconds);
-						}
+						Log.TraceInformation("Total CPU Time: {0:0.00} s", TotalProcessingTime.TotalSeconds);
+						Log.TraceInformation("");
 					}
-					Log.TraceInformation("");
-				}
-			}
 
-			return bResult;
+					if (AllCompletedActions.Count > 0)
+					{
+						Log.TraceInformation("Compilation Time Top {0}", Math.Min(20, AllCompletedActions.Count));
+						Log.TraceInformation("");
+						foreach (BuildAction Action in AllCompletedActions.OrderByDescending(x => x.ExecutionTime).Take(20))
+						{
+							string Description = $"{(Action.Inner.CommandDescription != null ? Action.Inner.CommandDescription : Action.Inner.CommandPath.GetFileName())} {Action.Inner.StatusDescription}".Trim();
+							if (Action.ProcessorTime.Ticks > 0)
+							{
+								Log.TraceInformation("{0} [ Wall Time {1:0.00} s / CPU Time {2:0.00} s ]", Description, Action.ExecutionTime.TotalSeconds, Action.ProcessorTime.TotalSeconds);
+							}
+							else
+							{
+								Log.TraceInformation("{0} [ Time {1:0.00} s ]", Description, Action.ExecutionTime.TotalSeconds);
+							}
+						}
+						Log.TraceInformation("");
+					}
+				}
+
+				return bResult;
+			}
 		}
 
 		/// <summary>
@@ -396,11 +399,13 @@ namespace UnrealBuildTool
 		{
 			try
 			{
-				using ManagedProcess Process = new ManagedProcess(ProcessGroup, Action.Inner.CommandPath.FullName, Action.Inner.CommandArguments, Action.Inner.WorkingDirectory.FullName, null, null, ProcessPriorityClass.BelowNormal);
-				Action.LogLines.AddRange(Process.ReadAllLines());
-				Action.ExitCode = Process.ExitCode;
-				Action.ProcessorTime = Process.TotalProcessorTime;
-				Action.ExecutionTime = Process.ExitTime - Process.StartTime;
+				using (ManagedProcess Process = new ManagedProcess(ProcessGroup, Action.Inner.CommandPath.FullName, Action.Inner.CommandArguments, Action.Inner.WorkingDirectory.FullName, null, null, ProcessPriorityClass.BelowNormal))
+				{
+					Action.LogLines.AddRange(Process.ReadAllLines());
+					Action.ExitCode = Process.ExitCode;
+					Action.ProcessorTime = Process.TotalProcessorTime;
+					Action.ExecutionTime = Process.ExitTime - Process.StartTime;
+				}
 			}
 			catch (Exception Ex)
 			{

@@ -40,7 +40,7 @@ namespace UnrealBuildBase
 		/// <summary>
 		/// Global map of location to item
 		/// </summary>
-		static readonly ConcurrentDictionary<DirectoryReference, DirectoryItem> LocationToItem = new ConcurrentDictionary<DirectoryReference, DirectoryItem>();
+		static ConcurrentDictionary<DirectoryReference, DirectoryItem> LocationToItem = new ConcurrentDictionary<DirectoryReference, DirectoryItem>();
 
 		/// <summary>
 		/// Constructor
@@ -128,10 +128,11 @@ namespace UnrealBuildBase
 		/// <returns>The directory item for this location</returns>
 		public static DirectoryItem GetItemByDirectoryReference(DirectoryReference Location)
 		{
-			if (!LocationToItem.TryGetValue(Location, out DirectoryItem? Result))
+			DirectoryItem? Result;
+			if(!LocationToItem.TryGetValue(Location, out Result))
 			{
 				DirectoryItem NewItem = new DirectoryItem(Location, new DirectoryInfo(Location.FullName));
-				if (LocationToItem.TryAdd(Location, NewItem))
+				if(LocationToItem.TryAdd(Location, NewItem))
 				{
 					Result = NewItem;
 				}
@@ -152,10 +153,11 @@ namespace UnrealBuildBase
 		{
 			DirectoryReference Location = new DirectoryReference(Info);
 
-			if (!LocationToItem.TryGetValue(Location, out DirectoryItem? Result))
+			DirectoryItem? Result;
+			if(!LocationToItem.TryGetValue(Location, out Result))
 			{
 				DirectoryItem NewItem = new DirectoryItem(Location, Info);
-				if (LocationToItem.TryAdd(Location, NewItem))
+				if(LocationToItem.TryAdd(Location, NewItem))
 				{
 					Result = NewItem;
 				}

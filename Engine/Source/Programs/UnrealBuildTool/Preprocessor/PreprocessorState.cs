@@ -59,12 +59,12 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Stack of conditional branch states
 		/// </summary>
-		readonly List<PreprocessorBranch> Branches = new List<PreprocessorBranch>();
+		List<PreprocessorBranch> Branches = new List<PreprocessorBranch>();
 
 		/// <summary>
 		/// Mapping of name to macro definition
 		/// </summary>
-		readonly Dictionary<Identifier, PreprocessorMacro> NameToMacro = new Dictionary<Identifier, PreprocessorMacro>();
+		Dictionary<Identifier, PreprocessorMacro> NameToMacro = new Dictionary<Identifier, PreprocessorMacro>();
 
 		/// <summary>
 		/// The current transform. Any queries or state modifications will be recorded in this.
@@ -167,7 +167,8 @@ namespace UnrealBuildTool
 		public bool IsMacroDefined(Identifier Name)
 		{
 			// Could account for the fact that we don't need the full definition later...
-			return TryGetMacro(Name, out PreprocessorMacro? Macro);
+			PreprocessorMacro? Macro;
+			return TryGetMacro(Name, out Macro);
 		}
 
 		/// <summary>
@@ -222,7 +223,8 @@ namespace UnrealBuildTool
 		/// <returns>The popped branch state</returns>
 		public PreprocessorBranch PopBranch()
 		{
-			if (!TryPopBranch(out PreprocessorBranch Branch))
+			PreprocessorBranch Branch;
+			if(!TryPopBranch(out Branch))
 			{
 				throw new InvalidOperationException("Branch stack is empty");
 			}
@@ -243,7 +245,7 @@ namespace UnrealBuildTool
 			}
 			else
 			{
-				Branch = Branches[^1];
+				Branch = Branches[Branches.Count - 1];
 				Branches.RemoveAt(Branches.Count - 1);
 
 				if(Transform != null)
@@ -269,7 +271,7 @@ namespace UnrealBuildTool
 		/// <returns>True if the branch is active, false otherwise</returns>
 		public bool IsCurrentBranchActive()
 		{
-			bool bActive = (Branches.Count == 0 || Branches[^1].HasFlag(PreprocessorBranch.Active));
+			bool bActive = (Branches.Count == 0 || Branches[Branches.Count - 1].HasFlag(PreprocessorBranch.Active));
 			if(Transform != null && Transform.NewBranches.Count == 0)
 			{
 				Transform.bRequireTopmostActive = bActive;
@@ -306,16 +308,17 @@ namespace UnrealBuildTool
 			// Check all the required macros match
 			foreach(KeyValuePair<Identifier, PreprocessorMacro?> RequiredPair in Transform.RequiredMacros)
 			{
-				if (NameToMacro.TryGetValue(RequiredPair.Key, out PreprocessorMacro? Macro))
+				PreprocessorMacro? Macro;
+				if(NameToMacro.TryGetValue(RequiredPair.Key, out Macro))
 				{
-					if (RequiredPair.Value == null || !Macro.IsEquivalentTo(RequiredPair.Value))
+					if(RequiredPair.Value == null || !Macro.IsEquivalentTo(RequiredPair.Value))
 					{
 						return false;
 					}
-				}
+				} 
 				else
 				{
-					if (RequiredPair.Value != null)
+					if(RequiredPair.Value != null)
 					{
 						return false;
 					}

@@ -78,7 +78,8 @@ namespace EpicGames.Core
 			{
 				foreach((int Offset, int Length) in Names)
 				{
-					if (Properties != null && TryGetPropertyValue(Format.AsSpan(Offset, Length), Properties, out object? Value))
+					object? Value;
+					if (Properties != null && TryGetPropertyValue(Format.AsSpan(Offset, Length), Properties, out Value))
 					{
 						int StartOffset = Offset - 1;
 						if (Format[StartOffset] == '@' || Format[StartOffset] == '$')
@@ -207,7 +208,8 @@ namespace EpicGames.Core
 				{
 					string Name = Format.Substring(Offsets[Idx].Item1, Offsets[Idx].Item2);
 
-					if (int.TryParse(Name, out int Number))
+					int Number;
+					if (int.TryParse(Name, out Number))
 					{
 						if (Number >= 0 && Number < Args.Length)
 						{
@@ -234,7 +236,8 @@ namespace EpicGames.Core
 		/// <returns>True if the property was found, false otherwise</returns>
 		public static bool TryGetPropertyValue(ReadOnlySpan<char> Name, IEnumerable<KeyValuePair<string, object?>> Properties, out object? Value)
 		{
-			if (int.TryParse(Name, System.Globalization.NumberStyles.Integer, null, out int Number))
+			int Number;
+			if (int.TryParse(Name, System.Globalization.NumberStyles.Integer, null, out Number))
 			{
 				foreach (KeyValuePair<string, object?> Property in Properties)
 				{

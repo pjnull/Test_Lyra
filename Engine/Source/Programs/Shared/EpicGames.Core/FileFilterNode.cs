@@ -96,7 +96,7 @@ namespace EpicGames.Core
 					}
 					return false;
 				}
-				else if (TokenIdx < Token.Length && (char.ToLower(Token[TokenIdx]) == char.ToLower(Pattern[PatternIdx]) || Pattern[PatternIdx] == '?'))
+				else if (TokenIdx < Token.Length && (Char.ToLower(Token[TokenIdx]) == Char.ToLower(Pattern[PatternIdx]) || Pattern[PatternIdx] == '?'))
 				{
 					TokenIdx++;
 					PatternIdx++;

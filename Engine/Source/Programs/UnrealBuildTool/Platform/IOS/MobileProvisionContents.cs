@@ -20,12 +20,12 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// The contents of the provision
 		/// </summary>
-		readonly XmlDocument Document;
+		XmlDocument Document;
 
 		/// <summary>
 		/// Map of key names to XML elements holding their values
 		/// </summary>
-		readonly Dictionary<string, XmlElement> NameToValue = new Dictionary<string, XmlElement>();
+		Dictionary<string, XmlElement> NameToValue = new Dictionary<string, XmlElement>();
 
 		/// <summary>
 		/// Constructor
@@ -61,7 +61,8 @@ namespace UnrealBuildTool
 		/// <returns>UUID for the provision</returns>
 		public string GetUniqueId()
 		{
-			if (!NameToValue.TryGetValue("UUID", out XmlElement? UniqueIdElement))
+			XmlElement? UniqueIdElement;
+			if(!NameToValue.TryGetValue("UUID", out UniqueIdElement))
 			{
 				throw new BuildException("Missing UUID in MobileProvision");
 			}
@@ -75,7 +76,8 @@ namespace UnrealBuildTool
 		public string GetBundleIdentifier()
 		{
 			XmlElement? UniqueIdElement = null;
-			if (!NameToValue.TryGetValue("Entitlements", out XmlElement? UniqueIdEntitlement) || UniqueIdEntitlement.Name != "dict")
+			XmlElement? UniqueIdEntitlement;
+			if (!NameToValue.TryGetValue("Entitlements", out UniqueIdEntitlement) || UniqueIdEntitlement.Name != "dict")
 			{
 				throw new BuildException("Missing Entitlements in MobileProvision");
 			}
@@ -111,7 +113,8 @@ namespace UnrealBuildTool
 		/// <returns>True if the team unique ID was found, false otherwise</returns>
 		public bool TryGetTeamUniqueId(out string? UniqueId)
 		{
-			if (!NameToValue.TryGetValue("TeamIdentifier", out XmlElement? UniqueIdElement) || UniqueIdElement.Name != "array")
+			XmlElement? UniqueIdElement;
+			if(!NameToValue.TryGetValue("TeamIdentifier", out UniqueIdElement) || UniqueIdElement.Name != "array")
 			{
 				UniqueId = null;
 				return false;
@@ -147,43 +150,43 @@ namespace UnrealBuildTool
 		public static XmlDocument ReadXml(FileReference Location)
 		{
 			// Provision data is stored as PKCS7-signed file in ASN.1 BER format
-			using BinaryReader Reader = new BinaryReader(File.Open(Location.FullName, FileMode.Open, FileAccess.Read));
-			long Length = Reader.BaseStream.Length;
-			while (Reader.BaseStream.Position < Length)
+			using(BinaryReader Reader = new BinaryReader(File.Open(Location.FullName, FileMode.Open, FileAccess.Read)))
 			{
-				Asn.FieldInfo Field = Asn.ReadField(Reader);
-				if (Field.Tag == Asn.FieldTag.OBJECT_IDENTIFIER)
+				long Length = Reader.BaseStream.Length;
+				while(Reader.BaseStream.Position < Length)
 				{
-					int[] Identifier = Asn.ReadObjectIdentifier(Reader, Field.Length);
-					if (Enumerable.SequenceEqual(Identifier, Asn.ObjectIdentifier.Pkcs7_Data))
+					Asn.FieldInfo Field = Asn.ReadField(Reader);
+					if(Field.Tag == Asn.FieldTag.OBJECT_IDENTIFIER)
 					{
-						while (Reader.BaseStream.Position < Length)
+						int[] Identifier = Asn.ReadObjectIdentifier(Reader, Field.Length);
+						if(Enumerable.SequenceEqual(Identifier, Asn.ObjectIdentifier.Pkcs7_Data))
 						{
-							Asn.FieldInfo NextField = Asn.ReadField(Reader);
-							if (NextField.Tag == Asn.FieldTag.OCTET_STRING)
+							while(Reader.BaseStream.Position < Length)
 							{
-								byte[] Data = Reader.ReadBytes(NextField.Length);
-
-								XmlDocument Document = new XmlDocument
+								Asn.FieldInfo NextField = Asn.ReadField(Reader);
+								if(NextField.Tag == Asn.FieldTag.OCTET_STRING)
 								{
-									XmlResolver = null
-								};
-								Document.Load(new MemoryStream(Data));
-								return Document;
-							}
-							else
-							{
-								Asn.SkipValue(Reader, NextField);
+									byte[] Data = Reader.ReadBytes(NextField.Length);
+
+									XmlDocument Document = new XmlDocument();
+									Document.XmlResolver = null;
+									Document.Load(new MemoryStream(Data));
+									return Document;
+								}
+								else
+								{
+									Asn.SkipValue(Reader, NextField);
+								}
 							}
 						}
 					}
+					else
+					{
+						Asn.SkipValue(Reader, Field);
+					}
 				}
-				else
-				{
-					Asn.SkipValue(Reader, Field);
-				}
+				throw new BuildException("No PKCS7-Data section found in {0}", Location);
 			}
-			throw new BuildException("No PKCS7-Data section found in {0}", Location);
 		}
 
 		// return the outerXML of the node's value

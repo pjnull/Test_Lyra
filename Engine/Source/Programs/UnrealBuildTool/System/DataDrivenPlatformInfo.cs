@@ -97,18 +97,21 @@ namespace UnrealBuildTool
 
 
 						// we must have the key section 
-						if (Config.TryGetSection("DataDrivenPlatformInfo", out ConfigFileSection? Section))
+						ConfigFileSection? Section = null;
+						if (Config.TryGetSection("DataDrivenPlatformInfo", out Section))
 						{
 							ConfigHierarchySection ParsedSection = new ConfigHierarchySection(new List<ConfigFileSection>() { Section });
 
 							// get string values
-							if (ParsedSection.TryGetValue("IniParent", out string? IniParent))
+							string? IniParent;
+							if (ParsedSection.TryGetValue("IniParent", out IniParent))
 							{
 								IniParents[IniPlatformName] = IniParent;
 							}
 
 							// slightly nasty bool parsing for bool values
-							if (ParsedSection.TryGetValue("bIsConfidential", out string? Temp))
+							string? Temp;
+							if (ParsedSection.TryGetValue("bIsConfidential", out Temp))
 							{
 								ConfigHierarchy.TryParse(Temp, out NewInfo.bIsConfidential);
 							}
@@ -132,7 +135,8 @@ namespace UnrealBuildTool
 							}
 
 							// get a list of additional restricted folders
-							if (ParsedSection.TryGetValues("AdditionalRestrictedFolders", out IReadOnlyList<string>? AdditionalRestrictedFolders) && AdditionalRestrictedFolders.Count > 0)
+							IReadOnlyList<string>? AdditionalRestrictedFolders;
+							if(ParsedSection.TryGetValues("AdditionalRestrictedFolders", out AdditionalRestrictedFolders) && AdditionalRestrictedFolders.Count > 0)
 							{
 								NewInfo.AdditionalRestrictedFolders = AdditionalRestrictedFolders.Select(x => x.Trim()).Where(x => x.Length > 0).ToArray();
 							}
@@ -147,10 +151,11 @@ namespace UnrealBuildTool
 				// now that all are read in, calculate the ini parent chain, starting with parent-most
 				foreach (KeyValuePair<string, ConfigDataDrivenPlatformInfo> Pair in PlatformInfos)
 				{
+					string? CurrentPlatform;
 
 					// walk up the chain and build up the ini chain
 					List<string> Chain = new List<string>();
-					if (IniParents.TryGetValue(Pair.Key, out string? CurrentPlatform))
+					if (IniParents.TryGetValue(Pair.Key, out CurrentPlatform))
 					{
 						while (!string.IsNullOrEmpty(CurrentPlatform))
 						{
@@ -182,7 +187,8 @@ namespace UnrealBuildTool
 		public static ConfigDataDrivenPlatformInfo? GetDataDrivenInfoForPlatform(string PlatformName)
 		{
 			// lookup the platform name (which is not guaranteed to be there)
-			GetAllPlatformInfos().TryGetValue(PlatformName, out ConfigDataDrivenPlatformInfo? Info);
+			ConfigDataDrivenPlatformInfo? Info;
+			GetAllPlatformInfos().TryGetValue(PlatformName, out Info);
 
 			// return what we found of null if nothing
 			return Info;

@@ -450,19 +450,19 @@ namespace UnrealBuildTool
 		{
 			// Get the architecture suffix. Platforms have the option of overriding whether to include this string in filenames.
 			string ArchitectureSuffix = "";
-			if(!string.IsNullOrEmpty(BuildArchitecture) && UEBuildPlatform.GetBuildPlatform(Platform).RequiresArchitectureSuffix())
+			if(!String.IsNullOrEmpty(BuildArchitecture) && UEBuildPlatform.GetBuildPlatform(Platform).RequiresArchitectureSuffix())
 			{
 				ArchitectureSuffix = BuildArchitecture;
 			}
 		
 			// Build the output filename
-			if (string.IsNullOrEmpty(ArchitectureSuffix) && Configuration == UnrealTargetConfiguration.Development)
+			if (String.IsNullOrEmpty(ArchitectureSuffix) && Configuration == UnrealTargetConfiguration.Development)
 			{
-				return FileReference.Combine(BaseDir, "Binaries", Platform.ToString(), string.Format("{0}.target", TargetName));
+				return FileReference.Combine(BaseDir, "Binaries", Platform.ToString(), String.Format("{0}.target", TargetName));
 			}
 			else
 			{
-				return FileReference.Combine(BaseDir, "Binaries", Platform.ToString(), string.Format("{0}-{1}-{2}{3}.target", TargetName, Platform.ToString(), Configuration.ToString(), ArchitectureSuffix));
+				return FileReference.Combine(BaseDir, "Binaries", Platform.ToString(), String.Format("{0}-{1}-{2}{3}.target", TargetName, Platform.ToString(), Configuration.ToString(), ArchitectureSuffix));
 			}
 		}
 
@@ -526,7 +526,8 @@ namespace UnrealBuildTool
 			UnrealTargetConfiguration Configuration = RawObject.GetEnumField<UnrealTargetConfiguration>("Configuration");
 
 			// Try to read the build version
-			if (!BuildVersion.TryParse(RawObject.GetObjectField("Version"), out BuildVersion? Version))
+			BuildVersion? Version;
+			if (!BuildVersion.TryParse(RawObject.GetObjectField("Version"), out Version))
 			{
 				throw new JsonParseException("Invalid 'Version' field");
 			}
@@ -534,7 +535,8 @@ namespace UnrealBuildTool
 			// Read the project path
 			FileReference? ProjectFile;
 
-			if (RawObject.TryGetStringField("Project", out string? RelativeProjectFile))
+			string? RelativeProjectFile;
+			if(RawObject.TryGetStringField("Project", out RelativeProjectFile))
 			{
 				ProjectFile = FileReference.Combine(Location.Directory, RelativeProjectFile);
 			}
@@ -544,7 +546,8 @@ namespace UnrealBuildTool
 			}
 
 			// Read the launch executable
-			if (!RawObject.TryGetStringField("Architecture", out string? Architecture))
+			string? Architecture;
+			if (!RawObject.TryGetStringField("Architecture", out Architecture))
 			{
 				Architecture = "";
 			}
@@ -557,25 +560,31 @@ namespace UnrealBuildTool
 			DirectoryReference? ProjectDir = Receipt.ProjectDir;
 
 			// Read the launch executable
-			if (RawObject.TryGetStringField("Launch", out string? Launch))
+			string? Launch;
+			if(RawObject.TryGetStringField("Launch", out Launch))
 			{
 				Receipt.Launch = ExpandPathVariables(Launch, EngineDir, ProjectDir);
 			}
-			if (RawObject.TryGetStringField("LaunchCmd", out string? LaunchCmd))
+			string? LaunchCmd;
+			if(RawObject.TryGetStringField("LaunchCmd", out LaunchCmd))
 			{
 				Receipt.LaunchCmd = ExpandPathVariables(LaunchCmd, EngineDir, ProjectDir);
 			}
 
 			// Read the build products
-			if (RawObject.TryGetObjectArrayField("BuildProducts", out JsonObject[]? BuildProductObjects))
+			JsonObject[]? BuildProductObjects;
+			if (RawObject.TryGetObjectArrayField("BuildProducts", out BuildProductObjects))
 			{
 				foreach (JsonObject BuildProductObject in BuildProductObjects)
 				{
-					if (BuildProductObject.TryGetStringField("Path", out string? Path) && BuildProductObject.TryGetEnumField("Type", out BuildProductType Type))
+					string? Path;
+					BuildProductType Type;
+					if (BuildProductObject.TryGetStringField("Path", out Path) && BuildProductObject.TryGetEnumField("Type", out Type))
 					{
 						FileReference File = ExpandPathVariables(Path, EngineDir, ProjectDir);
 
-						BuildProductObject.TryGetStringField("Module", out string? Module);
+						string? Module;
+						BuildProductObject.TryGetStringField("Module", out Module);
 
 						Receipt.AddBuildProduct(File, Type);
 					}
@@ -583,22 +592,26 @@ namespace UnrealBuildTool
 			}
 
 			// Read the runtime dependencies
-			if (RawObject.TryGetObjectArrayField("RuntimeDependencies", out JsonObject[]? RuntimeDependencyObjects))
+			JsonObject[]? RuntimeDependencyObjects;
+			if (RawObject.TryGetObjectArrayField("RuntimeDependencies", out RuntimeDependencyObjects))
 			{
 				foreach (JsonObject RuntimeDependencyObject in RuntimeDependencyObjects)
 				{
-					if (RuntimeDependencyObject.TryGetStringField("Path", out string? Path))
+					string? Path;
+					if (RuntimeDependencyObject.TryGetStringField("Path", out Path))
 					{
 						FileReference File = ExpandPathVariables(Path, EngineDir, ProjectDir);
 
-						if (!RuntimeDependencyObject.TryGetEnumField("Type", out StagedFileType Type))
+						StagedFileType Type;
+						if(!RuntimeDependencyObject.TryGetEnumField("Type", out Type))
 						{
 							// Previous format included an optional IgnoreIfMissing flag, which was only used for debug files. We can explicitly reference them as DebugNonUFS files now.
-							if (RuntimeDependencyObject.TryGetBoolField("IgnoreIfMissing", out bool bIgnoreIfMissing))
+							bool bIgnoreIfMissing;
+							if(RuntimeDependencyObject.TryGetBoolField("IgnoreIfMissing", out bIgnoreIfMissing))
 							{
 								bIgnoreIfMissing = false;
 							}
-							Type = bIgnoreIfMissing ? StagedFileType.DebugNonUFS : StagedFileType.NonUFS;
+							Type = bIgnoreIfMissing? StagedFileType.DebugNonUFS : StagedFileType.NonUFS;
 						}
 
 						Receipt.RuntimeDependencies.Add(File, Type);
@@ -607,13 +620,16 @@ namespace UnrealBuildTool
 			}
 
 			// Read the enabled/disabled plugins
-			if (RawObject.TryGetObjectArrayField("Plugins", out JsonObject[]? PluginObjects))
+			JsonObject[]? PluginObjects;
+			if (RawObject.TryGetObjectArrayField("Plugins", out PluginObjects))
 			{
 				foreach (JsonObject PluginObject in PluginObjects)
 				{
-					if (PluginObject.TryGetStringField("Name", out string? PluginName))
+					string? PluginName;
+					if (PluginObject.TryGetStringField("Name", out PluginName))
 					{
-						if (PluginObject.TryGetBoolField("Enabled", out bool PluginEnabled))
+						bool PluginEnabled;
+						if (PluginObject.TryGetBoolField("Enabled", out PluginEnabled))
 						{
 							Receipt.PluginNameToEnabledState.Add(PluginName, PluginEnabled);
 						}
@@ -622,13 +638,16 @@ namespace UnrealBuildTool
 			}
 
 			// Read the additional properties
-			if (RawObject.TryGetObjectArrayField("AdditionalProperties", out JsonObject[]? AdditionalPropertyObjects))
+			JsonObject[]? AdditionalPropertyObjects;
+			if(RawObject.TryGetObjectArrayField("AdditionalProperties", out AdditionalPropertyObjects))
 			{
-				foreach (JsonObject AdditionalPropertyObject in AdditionalPropertyObjects)
+				foreach(JsonObject AdditionalPropertyObject in AdditionalPropertyObjects)
 				{
-					if (AdditionalPropertyObject.TryGetStringField("Name", out string? Name))
+					string? Name;
+					if(AdditionalPropertyObject.TryGetStringField("Name", out Name))
 					{
-						if (AdditionalPropertyObject.TryGetStringField("Value", out string? Value))
+						string? Value;
+						if(AdditionalPropertyObject.TryGetStringField("Value", out Value))
 						{
 							Receipt.AdditionalProperties.Add(new ReceiptProperty(Name, Value));
 						}
@@ -693,80 +712,82 @@ namespace UnrealBuildTool
 		/// <param name="EngineDir">Engine directory for expanded paths</param>
 		public void Write(FileReference Location, DirectoryReference EngineDir)
 		{
-			using JsonWriter Writer = new JsonWriter(Location.FullName);
-			Writer.WriteObjectStart();
-			Writer.WriteValue("TargetName", TargetName);
-			Writer.WriteValue("Platform", Platform.ToString());
-			Writer.WriteValue("Configuration", Configuration.ToString());
-			Writer.WriteValue("TargetType", TargetType.ToString());
-			Writer.WriteValue("Architecture", Architecture);
-
-			if (ProjectFile != null)
-			{
-				Writer.WriteValue("Project", ProjectFile.MakeRelativeTo(Location.Directory).Replace(Path.DirectorySeparatorChar, '/'));
-			}
-
-			if (Launch != null)
-			{
-				Writer.WriteValue("Launch", InsertPathVariables(Launch, EngineDir, ProjectDir));
-			}
-
-			if (LaunchCmd != null)
-			{
-				Writer.WriteValue("LaunchCmd", InsertPathVariables(LaunchCmd, EngineDir, ProjectDir));
-			}
-
-			Writer.WriteObjectStart("Version");
-			Version.WriteProperties(Writer);
-			Writer.WriteObjectEnd();
-
-			Writer.WriteArrayStart("BuildProducts");
-			foreach (BuildProduct BuildProduct in BuildProducts.OrderBy(x => x.Path.FullName))
+			using (JsonWriter Writer = new JsonWriter(Location.FullName))
 			{
 				Writer.WriteObjectStart();
-				Writer.WriteValue("Path", InsertPathVariables(BuildProduct.Path, EngineDir, ProjectDir));
-				Writer.WriteValue("Type", BuildProduct.Type.ToString());
-				Writer.WriteObjectEnd();
-			}
-			Writer.WriteArrayEnd();
+				Writer.WriteValue("TargetName", TargetName);
+				Writer.WriteValue("Platform", Platform.ToString());
+				Writer.WriteValue("Configuration", Configuration.ToString());
+				Writer.WriteValue("TargetType", TargetType.ToString());
+				Writer.WriteValue("Architecture", Architecture);
 
-			Writer.WriteArrayStart("RuntimeDependencies");
-			foreach (RuntimeDependency RuntimeDependency in RuntimeDependencies.OrderBy(x => x.Path.FullName))
-			{
-				Writer.WriteObjectStart();
-				Writer.WriteValue("Path", InsertPathVariables(RuntimeDependency.Path, EngineDir, ProjectDir));
-				Writer.WriteValue("Type", RuntimeDependency.Type.ToString());
-				Writer.WriteObjectEnd();
-			}
-			Writer.WriteArrayEnd();
+				if(ProjectFile != null)
+				{
+					Writer.WriteValue("Project", ProjectFile.MakeRelativeTo(Location.Directory).Replace(Path.DirectorySeparatorChar, '/'));
+				}
 
-			if (PluginNameToEnabledState.Count > 0)
-			{
-				Writer.WriteArrayStart("Plugins");
-				foreach (KeyValuePair<string, bool> PluginNameToEnabledStatePair in PluginNameToEnabledState.OrderBy(x => x.Key))
+				if(Launch != null)
+				{
+					Writer.WriteValue("Launch", InsertPathVariables(Launch, EngineDir, ProjectDir));
+				}
+
+				if(LaunchCmd != null)
+				{
+					Writer.WriteValue("LaunchCmd", InsertPathVariables(LaunchCmd, EngineDir, ProjectDir));
+				}
+
+				Writer.WriteObjectStart("Version");
+				Version.WriteProperties(Writer);
+				Writer.WriteObjectEnd();
+
+				Writer.WriteArrayStart("BuildProducts");
+				foreach (BuildProduct BuildProduct in BuildProducts.OrderBy(x => x.Path.FullName))
 				{
 					Writer.WriteObjectStart();
-					Writer.WriteValue("Name", PluginNameToEnabledStatePair.Key);
-					Writer.WriteValue("Enabled", PluginNameToEnabledStatePair.Value);
+					Writer.WriteValue("Path", InsertPathVariables(BuildProduct.Path, EngineDir, ProjectDir));
+					Writer.WriteValue("Type", BuildProduct.Type.ToString());
 					Writer.WriteObjectEnd();
 				}
 				Writer.WriteArrayEnd();
-			}
 
-			if (AdditionalProperties.Count > 0)
-			{
-				Writer.WriteArrayStart("AdditionalProperties");
-				foreach (ReceiptProperty AdditionalProperty in AdditionalProperties)
+				Writer.WriteArrayStart("RuntimeDependencies");
+				foreach (RuntimeDependency RuntimeDependency in RuntimeDependencies.OrderBy(x => x.Path.FullName))
 				{
 					Writer.WriteObjectStart();
-					Writer.WriteValue("Name", AdditionalProperty.Name);
-					Writer.WriteValue("Value", AdditionalProperty.Value);
+					Writer.WriteValue("Path", InsertPathVariables(RuntimeDependency.Path, EngineDir, ProjectDir));
+					Writer.WriteValue("Type", RuntimeDependency.Type.ToString());
 					Writer.WriteObjectEnd();
 				}
 				Writer.WriteArrayEnd();
-			}
 
-			Writer.WriteObjectEnd();
+				if (PluginNameToEnabledState.Count > 0)
+				{
+					Writer.WriteArrayStart("Plugins");
+					foreach (KeyValuePair<string, bool> PluginNameToEnabledStatePair in PluginNameToEnabledState.OrderBy(x => x.Key))
+					{
+						Writer.WriteObjectStart();
+						Writer.WriteValue("Name", PluginNameToEnabledStatePair.Key);
+						Writer.WriteValue("Enabled", PluginNameToEnabledStatePair.Value);
+						Writer.WriteObjectEnd();
+					}
+					Writer.WriteArrayEnd();
+				}
+
+				if (AdditionalProperties.Count > 0)
+				{
+					Writer.WriteArrayStart("AdditionalProperties");
+					foreach (ReceiptProperty AdditionalProperty in AdditionalProperties)
+					{
+						Writer.WriteObjectStart();
+						Writer.WriteValue("Name", AdditionalProperty.Name);
+						Writer.WriteValue("Value", AdditionalProperty.Value);
+						Writer.WriteObjectEnd();
+					}
+					Writer.WriteArrayEnd();
+				}
+
+				Writer.WriteObjectEnd();
+			}
 		}
 	}
 }

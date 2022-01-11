@@ -28,14 +28,12 @@ namespace UnrealBuildToolTests
 			// The default working directory for this test is ...\Engine\Source\Programs\UnrealBuildToolTests\bin\[configuration]\netcoreapp3.1
 			Unreal.LocationOverride.RootDirectory = DirectoryReference.Combine(DirectoryReference.GetCurrentDirectory(), @"..\..\..\..\..\..\..");
 
-			List<DirectoryReference> BaseDirectories = new List<DirectoryReference>
-			{
-				DirectoryReference.Combine(UnrealBuildTool.UnrealBuildTool.EngineSourceDirectory, "Runtime"),
-				DirectoryReference.Combine(UnrealBuildTool.UnrealBuildTool.EngineSourceDirectory, "Developer"),
-				DirectoryReference.Combine(UnrealBuildTool.UnrealBuildTool.EngineSourceDirectory, "Editor")
-			};
+			List<DirectoryReference> BaseDirectories = new List<DirectoryReference>();
+			BaseDirectories.Add(DirectoryReference.Combine(UnrealBuildTool.UnrealBuildTool.EngineSourceDirectory, "Runtime"));
+			BaseDirectories.Add(DirectoryReference.Combine(UnrealBuildTool.UnrealBuildTool.EngineSourceDirectory, "Developer"));
+			BaseDirectories.Add(DirectoryReference.Combine(UnrealBuildTool.UnrealBuildTool.EngineSourceDirectory, "Editor"));
 
-			foreach (FileReference PluginFile in PluginsBase.EnumeratePlugins((FileReference)null))
+			foreach(FileReference PluginFile in PluginsBase.EnumeratePlugins((FileReference)null))
 			{
 				DirectoryReference PluginSourceDir = DirectoryReference.Combine(PluginFile.Directory, "Source");
 				if(DirectoryReference.Exists(PluginSourceDir))
@@ -47,10 +45,12 @@ namespace UnrealBuildToolTests
 			ConcurrentBag<SourceFile> SourceFiles = new ConcurrentBag<SourceFile>();
 			using (GlobalTracer.Instance.BuildSpan("Scanning source files").StartActive())
 			{
-				using ThreadPoolWorkQueue Queue = new ThreadPoolWorkQueue();
-				foreach (DirectoryReference BaseDirectory in BaseDirectories)
+				using(ThreadPoolWorkQueue Queue = new ThreadPoolWorkQueue())
 				{
-					Queue.Enqueue(() => ParseSourceFiles(DirectoryItem.GetItemByDirectoryReference(BaseDirectory), SourceFiles, Queue));
+					foreach(DirectoryReference BaseDirectory in BaseDirectories)
+					{
+						Queue.Enqueue(() => ParseSourceFiles(DirectoryItem.GetItemByDirectoryReference(BaseDirectory), SourceFiles, Queue));
+					}
 				}
 			}
 
@@ -61,15 +61,19 @@ namespace UnrealBuildToolTests
 
 			using (GlobalTracer.Instance.BuildSpan("Writing source file data").StartActive())
 			{
-				using BinaryArchiveWriter Writer = new BinaryArchiveWriter(TempDataFile);
-				Writer.WriteList(SourceFiles.ToList(), x => x.Write(Writer));
+				using(BinaryArchiveWriter Writer = new BinaryArchiveWriter(TempDataFile))
+				{
+					Writer.WriteList(SourceFiles.ToList(), x => x.Write(Writer));
+				}
 			}
 
 			List<SourceFile> ReadSourceFiles = new List<SourceFile>();
 			using (GlobalTracer.Instance.BuildSpan("Reading source file data").StartActive())
 			{
-				using BinaryArchiveReader Reader = new BinaryArchiveReader(TempDataFile);
-				ReadSourceFiles = Reader.ReadList(() => new SourceFile(Reader));
+				using(BinaryArchiveReader Reader = new BinaryArchiveReader(TempDataFile))
+				{
+					ReadSourceFiles = Reader.ReadList(() => new SourceFile(Reader));
+				}
 			}
 		}
 

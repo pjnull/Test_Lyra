@@ -200,7 +200,7 @@ namespace EpicGames.Core
 			}
 			else
 			{
-				throw new Exception(string.Format("Reading binary objects of type '{0}' is not currently supported.", ObjectType.Name));
+				throw new Exception(String.Format("Reading binary objects of type '{0}' is not currently supported.", ObjectType.Name));
 			}
 		}
 	}

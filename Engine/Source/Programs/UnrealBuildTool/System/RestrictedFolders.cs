@@ -14,12 +14,12 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Unique Id for this folder
 		/// </summary>
-		private readonly int Id;
+		private int Id;
 
 		/// <summary>
 		/// Mapping for unique ids
 		/// </summary>
-		private static readonly UniqueStringRegistry StringRegistry = new UniqueStringRegistry();
+		private static UniqueStringRegistry StringRegistry = new UniqueStringRegistry();
 
 		/// <summary>
 		/// Array of all restricted folder names
@@ -102,7 +102,8 @@ namespace UnrealBuildTool
 		/// <returns>Collection of restricted folders</returns>
 		public IEnumerable<RestrictedFolder> GetPermittedReferences()
 		{
-			if (PermittedReferences != null && PermittedReferences.TryGetValue(this, out RestrictedFolder[]? References))
+			RestrictedFolder[]? References;
+			if (PermittedReferences != null && PermittedReferences.TryGetValue(this, out References))
 			{
 				foreach (RestrictedFolder Reference in References)
 				{

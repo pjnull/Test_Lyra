@@ -49,7 +49,8 @@ namespace UnrealBuildTool
 			}
 
 			// use the PreferredWindowsSdkVersions array to find the SDK version that UBT will use to build with - 
-			if (TryGetWindowsSdkDir(null, out VersionNumber? WindowsVersion, out _))
+			VersionNumber? WindowsVersion;
+			if (TryGetWindowsSdkDir(null, out WindowsVersion, out _))
 			{
 				return WindowsVersion.ToString();
 			}
@@ -58,7 +59,7 @@ namespace UnrealBuildTool
 			return null;
 		}
 
-		public override bool TryConvertVersionToInt(string? StringValue, out ulong OutValue)
+		public override bool TryConvertVersionToInt(string? StringValue, out UInt64 OutValue)
 		{
 			OutValue = 0;
 
@@ -66,9 +67,9 @@ namespace UnrealBuildTool
 			if (Result.Success)
 			{
 				// 8 bits for major, 8 for minor, 16 for build - we ignore patch (ie the 1234 in 10.0.14031.1234)
-				OutValue |= ulong.Parse(Result.Groups[1].Value) << 24;
-				OutValue |= ulong.Parse(Result.Groups[2].Value) << 16;
-				OutValue |= ulong.Parse(Result.Groups[3].Value) << 0;
+				OutValue |= UInt64.Parse(Result.Groups[1].Value) << 24;
+				OutValue |= UInt64.Parse(Result.Groups[2].Value) << 16;
+				OutValue |= UInt64.Parse(Result.Groups[3].Value) << 0;
 
 				return true;
 			}
@@ -102,7 +103,8 @@ namespace UnrealBuildTool
 			Dictionary<VersionNumber, DirectoryReference> UniversalCrtDirs = new Dictionary<VersionNumber, DirectoryReference>();
 
 			// Enumerate the Windows 8.1 SDK, if present
-			if (TryReadInstallDirRegistryKey32("Microsoft\\Microsoft SDKs\\Windows\\v8.1", "InstallationFolder", out DirectoryReference? InstallDir_8_1))
+			DirectoryReference? InstallDir_8_1;
+			if (TryReadInstallDirRegistryKey32("Microsoft\\Microsoft SDKs\\Windows\\v8.1", "InstallationFolder", out InstallDir_8_1))
 			{
 				if (FileReference.Exists(FileReference.Combine(InstallDir_8_1, "Include", "um", "windows.h")))
 				{
@@ -124,7 +126,8 @@ namespace UnrealBuildTool
 				{
 					foreach (DirectoryReference IncludeDir in DirectoryReference.EnumerateDirectories(IncludeRootDir))
 					{
-						if (VersionNumber.TryParse(IncludeDir.GetDirectoryName(), out VersionNumber? IncludeVersion))
+						VersionNumber? IncludeVersion;
+						if (VersionNumber.TryParse(IncludeDir.GetDirectoryName(), out IncludeVersion))
 						{
 							if (FileReference.Exists(FileReference.Combine(IncludeDir, "um", "windows.h")))
 							{
@@ -189,7 +192,7 @@ namespace UnrealBuildTool
 			VersionNumber? WindowsSdkVersion = null;
 			if (!string.IsNullOrEmpty(DesiredVersion))
 			{
-				if (string.Compare(DesiredVersion, "Latest", StringComparison.InvariantCultureIgnoreCase) == 0 && CachedWindowsSdkDirs!.Count > 0)
+				if (String.Compare(DesiredVersion, "Latest", StringComparison.InvariantCultureIgnoreCase) == 0 && CachedWindowsSdkDirs!.Count > 0)
 				{
 					WindowsSdkVersion = CachedWindowsSdkDirs.OrderBy(x => x.Key).Last().Key;
 				}
@@ -208,7 +211,8 @@ namespace UnrealBuildTool
 			}
 
 			// Get the actual directory for this version
-			if (WindowsSdkVersion != null && CachedWindowsSdkDirs!.TryGetValue(WindowsSdkVersion, out DirectoryReference? SdkDir))
+			DirectoryReference? SdkDir;
+			if (WindowsSdkVersion != null && CachedWindowsSdkDirs!.TryGetValue(WindowsSdkVersion, out SdkDir))
 			{
 				OutSdkDir = SdkDir;
 				OutSdkVersion = WindowsSdkVersion;
@@ -229,7 +233,8 @@ namespace UnrealBuildTool
 		/// <returns>True if the directory was found, false otherwise</returns>
 		public static bool TryGetNetFxSdkInstallDir([NotNullWhen(true)] out DirectoryReference? OutInstallDir)
 		{
-			if (UEBuildPlatformSDK.TryGetHostPlatformAutoSDKDir(out DirectoryReference? HostAutoSdkDir))
+			DirectoryReference? HostAutoSdkDir;
+			if (UEBuildPlatformSDK.TryGetHostPlatformAutoSDKDir(out HostAutoSdkDir))
 			{
 				DirectoryReference NetFxDir_4_6 = DirectoryReference.Combine(HostAutoSdkDir, "Win64", "Windows Kits", "NETFXSDK", "4.6");
 				if (FileReference.Exists(FileReference.Combine(NetFxDir_4_6, "Include", "um", "mscoree.h")))
@@ -261,7 +266,8 @@ namespace UnrealBuildTool
 			string? MaxVersionString = null;
 			foreach (string ExistingVersionString in ReadInstallDirSubKeys32(NetFxSDKKeyName))
 			{
-				if (!Version.TryParse(ExistingVersionString, out Version? ExistingVersion))
+				Version? ExistingVersion;
+				if (!Version.TryParse(ExistingVersionString, out ExistingVersion))
 				{
 					continue;
 				}
@@ -300,10 +306,12 @@ namespace UnrealBuildTool
 		{
 			foreach (KeyValuePair<RegistryKey, string> InstallRoot in InstallDirRoots)
 			{
-				using RegistryKey Key = InstallRoot.Key.OpenSubKey(InstallRoot.Value + KeySuffix);
-				if (Key != null && TryReadDirRegistryKey(Key.Name, ValueName, out InstallDir))
+				using (RegistryKey Key = InstallRoot.Key.OpenSubKey(InstallRoot.Value + KeySuffix))
 				{
-					return true;
+					if (Key != null && TryReadDirRegistryKey(Key.Name, ValueName, out InstallDir))
+					{
+						return true;
+					}
 				}
 			}
 			InstallDir = null;
@@ -321,15 +329,17 @@ namespace UnrealBuildTool
 			HashSet<string> AllSubKeys = new HashSet<string>(StringComparer.Ordinal);
 			foreach (KeyValuePair<RegistryKey, string> Root in InstallDirRoots)
 			{
-				using RegistryKey Key = Root.Key.OpenSubKey(Root.Value + KeyName);
-				if (Key == null)
+				using (RegistryKey Key = Root.Key.OpenSubKey(Root.Value + KeyName))
 				{
-					continue;
-				}
+					if (Key == null)
+					{
+						continue;
+					}
 
-				foreach (string SubKey in Key.GetSubKeyNames())
-				{
-					AllSubKeys.Add(SubKey);
+					foreach (string SubKey in Key.GetSubKeyNames())
+					{
+						AllSubKeys.Add(SubKey);
+					}
 				}
 			}
 			return AllSubKeys.ToArray();
@@ -345,7 +355,7 @@ namespace UnrealBuildTool
 		static bool TryReadDirRegistryKey(string KeyName, string ValueName, [NotNullWhen(true)] out DirectoryReference? Value)
 		{
 			string? StringValue = Registry.GetValue(KeyName, ValueName, null) as string;
-			if (string.IsNullOrEmpty(StringValue))
+			if (String.IsNullOrEmpty(StringValue))
 			{
 				Value = null;
 				return false;
@@ -363,7 +373,8 @@ namespace UnrealBuildTool
 		/// <param name="RootDirs">Receives all the Windows 10 sdk root directories</param>
 		public static void EnumerateSdkRootDirs(List<DirectoryReference> RootDirs)
 		{
-			if (TryReadInstallDirRegistryKey32("Microsoft\\Windows Kits\\Installed Roots", "KitsRoot10", out DirectoryReference? RootDir))
+			DirectoryReference? RootDir;
+			if (TryReadInstallDirRegistryKey32("Microsoft\\Windows Kits\\Installed Roots", "KitsRoot10", out RootDir))
 			{
 				Log.TraceLog("Found Windows 10 SDK root at {0} (1)", RootDir);
 				RootDirs.Add(RootDir);
@@ -374,7 +385,8 @@ namespace UnrealBuildTool
 				RootDirs.Add(RootDir);
 			}
 
-			if (UEBuildPlatformSDK.TryGetHostPlatformAutoSDKDir(out DirectoryReference? HostAutoSdkDir))
+			DirectoryReference? HostAutoSdkDir;
+			if (UEBuildPlatformSDK.TryGetHostPlatformAutoSDKDir(out HostAutoSdkDir))
 			{
 				DirectoryReference RootDirAutoSdk = DirectoryReference.Combine(HostAutoSdkDir, "Win64", "Windows Kits", "10");
 				if (DirectoryReference.Exists(RootDirAutoSdk))

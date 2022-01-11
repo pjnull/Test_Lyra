@@ -25,7 +25,7 @@ namespace UnrealBuildTool
 		/// Whether to avoid cleaning targets
 		/// </summary>
 		[CommandLine("-SkipRulesCompile")]
-		readonly bool bSkipRulesCompile = false;
+		bool bSkipRulesCompile = false;
 
 		/// <summary>
 		/// Skip pre build targets; just do the main target.
@@ -128,10 +128,8 @@ namespace UnrealBuildTool
 				}
 
 				// Find the base folders that can contain binaries
-				List<DirectoryReference> BaseDirs = new List<DirectoryReference>
-				{
-					Unreal.EngineDirectory
-				};
+				List<DirectoryReference> BaseDirs = new List<DirectoryReference>();
+				BaseDirs.Add(Unreal.EngineDirectory);
 				foreach (FileReference Plugin in PluginsBase.EnumeratePlugins(Target.ProjectFile))
 				{
 					BaseDirs.Add(Plugin.Directory);
@@ -158,8 +156,8 @@ namespace UnrealBuildTool
 				{
 					NameSuffixes.Add("");
 				}
-				NameSuffixes.Add(string.Format("-{0}-{1}", Target.Platform.ToString(), Target.Configuration.ToString()));
-				if (!string.IsNullOrEmpty(Target.Architecture))
+				NameSuffixes.Add(String.Format("-{0}-{1}", Target.Platform.ToString(), Target.Configuration.ToString()));
+				if (!String.IsNullOrEmpty(Target.Architecture))
 				{
 					NameSuffixes.AddRange(NameSuffixes.ToArray().Select(x => x + Target.Architecture));
 				}

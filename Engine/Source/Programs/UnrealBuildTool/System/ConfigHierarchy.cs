@@ -66,7 +66,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Map of key names to their values
 		/// </summary>
-		readonly Dictionary<string, List<string>> KeyToValue = new Dictionary<string, List<string>>(StringComparer.InvariantCultureIgnoreCase);
+		Dictionary<string, List<string>> KeyToValue = new Dictionary<string, List<string>>(StringComparer.InvariantCultureIgnoreCase);
 
 		/// <summary>
 		/// Construct a merged config section from the given per-file config sections
@@ -84,21 +84,22 @@ namespace UnrealBuildTool
                         continue;
                     }
 
-					// Find or create the values for this key
+                    // Find or create the values for this key
+                    List<string>? Values;
 
-					if (KeyToValue.TryGetValue(Line.Key, out List<string>? Values))
+					if(KeyToValue.TryGetValue(Line.Key, out Values))
 					{
 						// Update the existing list
-						if (Line.Action == ConfigLineAction.Set)
+						if(Line.Action == ConfigLineAction.Set)
 						{
 							Values.Clear();
 							Values.Add(Line.Value);
 						}
-						else if (Line.Action == ConfigLineAction.Add)
+						else if(Line.Action == ConfigLineAction.Add)
 						{
 							Values.Add(Line.Value);
 						}
-						else if (Line.Action == ConfigLineAction.RemoveKeyValue)
+                        else if (Line.Action == ConfigLineAction.RemoveKeyValue)
 						{
 							Values.RemoveAll(x => x.Equals(Line.Value, StringComparison.InvariantCultureIgnoreCase));
 						}
@@ -106,12 +107,10 @@ namespace UnrealBuildTool
 					else
 					{
 						// If it's a set or add action, create and add a new list
-						if (Line.Action == ConfigLineAction.Set || Line.Action == ConfigLineAction.Add)
+						if(Line.Action == ConfigLineAction.Set || Line.Action == ConfigLineAction.Add)
 						{
-							Values = new List<string>
-							{
-								Line.Value
-							};
+							Values = new List<string>();
+							Values.Add(Line.Value);
 							KeyToValue.Add(Line.Key, Values);
 						}
 					}
@@ -135,7 +134,8 @@ namespace UnrealBuildTool
 		/// <returns>True if the key was found, false otherwise</returns>
 		public bool TryGetValue(string KeyName, [NotNullWhen(true)] out string? Value)
 		{
-			if (KeyToValue.TryGetValue(KeyName, out List<string>? ValuesList) && ValuesList.Count > 0)
+			List<string>? ValuesList;
+			if(KeyToValue.TryGetValue(KeyName, out ValuesList) && ValuesList.Count > 0)
 			{
 				Value = ValuesList[0];
 				return true;
@@ -155,7 +155,8 @@ namespace UnrealBuildTool
 		/// <returns>True if the key was found, false otherwise</returns>
 		public bool TryGetValues(string KeyName, [NotNullWhen(true)] out IReadOnlyList<string>? Values)
 		{
-			if (KeyToValue.TryGetValue(KeyName, out List<string>? ValuesList))
+			List<string>? ValuesList;
+			if(KeyToValue.TryGetValue(KeyName, out ValuesList))
 			{
 				Values = ValuesList;
 				return true;
@@ -176,17 +177,17 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Array of 
 		/// </summary>
-		readonly ConfigFile[] Files;
+		ConfigFile[] Files;
 
 		/// <summary>
 		/// Cache of requested config sections
 		/// </summary>
-		readonly Dictionary<string, ConfigHierarchySection> NameToSection = new Dictionary<string, ConfigHierarchySection>(StringComparer.InvariantCultureIgnoreCase);
+		Dictionary<string, ConfigHierarchySection> NameToSection = new Dictionary<string, ConfigHierarchySection>(StringComparer.InvariantCultureIgnoreCase);
 
-		/// <summary>
-		/// Lock for NameToSection
-		/// </summary>
-		readonly System.Threading.ReaderWriterLockSlim NameToSectionLock = new System.Threading.ReaderWriterLockSlim();
+        /// <summary>
+        /// Lock for NameToSection
+        /// </summary>
+        System.Threading.ReaderWriterLockSlim NameToSectionLock = new System.Threading.ReaderWriterLockSlim();
 
         /// <summary>
         /// Construct a config hierarchy from the given files
@@ -244,11 +245,12 @@ namespace UnrealBuildTool
                             List<ConfigFileSection> RawSections = new List<ConfigFileSection>();
                             foreach (ConfigFile File in Files)
                             {
-								if (File.TryGetSection(SectionName, out ConfigFileSection? RawSection))
-								{
-									RawSections.Add(RawSection);
-								}
-							}
+                                ConfigFileSection? RawSection;
+                                if (File.TryGetSection(SectionName, out RawSection))
+                                {
+                                    RawSections.Add(RawSection);
+                                }
+                            }
 
                             // Merge them together and add it to the cache
                             Section = new ConfigHierarchySection(RawSections);
@@ -289,7 +291,8 @@ namespace UnrealBuildTool
 		/// <returns>True if the key exists</returns>
 		public bool GetArray(string SectionName, string KeyName, [NotNullWhen(true)] out List<string>? Values)
 		{
-			if (TryGetValues(SectionName, KeyName, out IReadOnlyList<string>? ValuesEnumerable))
+			IReadOnlyList<string>? ValuesEnumerable;
+			if(TryGetValues(SectionName, KeyName, out ValuesEnumerable))
 			{
 				Values = ValuesEnumerable.ToList();
 				return true;
@@ -310,7 +313,8 @@ namespace UnrealBuildTool
 		/// <returns>True if the key exists</returns>
 		public bool GetString(string SectionName, string KeyName, out string Value)
 		{
-			if (TryGetValue(SectionName, KeyName, out string? RetrievedValue))
+			string? RetrievedValue;
+			if(TryGetValue(SectionName, KeyName, out RetrievedValue))
 			{
 				Value = RetrievedValue;
 				return true;
@@ -355,7 +359,8 @@ namespace UnrealBuildTool
 		/// <returns>True if the key exists</returns>
 		public bool TryGetValue(string SectionName, string KeyName, out bool Value)
 		{
-			if (!TryGetValue(SectionName, KeyName, out string? Text))
+			string? Text;
+			if(!TryGetValue(SectionName, KeyName, out Text))
 			{
 				Value = false;
 				return false;
@@ -372,7 +377,8 @@ namespace UnrealBuildTool
 		/// <returns>True if the key exists</returns>
 		public bool TryGetValue(string SectionName, string KeyName, out int Value)
 		{
-			if (!TryGetValue(SectionName, KeyName, out string? Text))
+			string? Text;
+			if(!TryGetValue(SectionName, KeyName, out Text))
 			{
 				Value = 0;
 				return false;
@@ -389,7 +395,8 @@ namespace UnrealBuildTool
 		/// <returns>True if the key exists</returns>
 		public bool TryGetValue(string SectionName, string KeyName, out Guid Value)
 		{
-			if (!TryGetValue(SectionName, KeyName, out string? Text))
+			string? Text;
+			if(!TryGetValue(SectionName, KeyName, out Text))
 			{
 				Value = Guid.Empty;
 				return false;
@@ -406,7 +413,8 @@ namespace UnrealBuildTool
 		/// <returns>True if the key exists</returns>
 		public bool TryGetValue(string SectionName, string KeyName, out float Value)
 		{
-			if (!TryGetValue(SectionName, KeyName, out string? Text))
+			string? Text;
+			if(!TryGetValue(SectionName, KeyName, out Text))
 			{
 				Value = 0;
 				return false;
@@ -423,7 +431,8 @@ namespace UnrealBuildTool
 		/// <returns>True if the key exists</returns>
 		public bool TryGetValue(string SectionName, string KeyName, out double Value)
 		{
-			if (!TryGetValue(SectionName, KeyName, out string? Text))
+			string? Text;
+			if(!TryGetValue(SectionName, KeyName, out Text))
 			{
 				Value = 0;
 				return false;
@@ -477,7 +486,7 @@ namespace UnrealBuildTool
 		/// <returns>True if the text was parsed, false otherwise</returns>
 		static public bool TryParse(string Text, out int Value)
 		{
-			return int.TryParse(Text, out Value);
+			return Int32.TryParse(Text, out Value);
 		}
 
 		/// <summary>
@@ -497,7 +506,8 @@ namespace UnrealBuildTool
 					StringBuilder HexString = new StringBuilder();
 					for (int ComponentIndex = 0; ComponentIndex < 4; ComponentIndex++)
 					{
-						if (!int.TryParse(ComponentValues[ComponentIndex], out int IntegerValue))
+						int IntegerValue;
+						if(!Int32.TryParse(ComponentValues[ComponentIndex], out IntegerValue))
 						{
 							Value = Guid.Empty;
 							return false;
@@ -520,11 +530,11 @@ namespace UnrealBuildTool
 		{
 			if(Text.EndsWith("f"))
 			{
-				return float.TryParse(Text.Substring(0, Text.Length - 1), out Value);
+				return Single.TryParse(Text.Substring(0, Text.Length - 1), out Value);
 			}
 			else
 			{
-				return float.TryParse(Text, out Value);
+				return Single.TryParse(Text, out Value);
 			}
 		}
 
@@ -538,11 +548,11 @@ namespace UnrealBuildTool
 		{
 			if(Text.EndsWith("f"))
 			{
-				return double.TryParse(Text.Substring(0, Text.Length - 1), out Value);
+				return Double.TryParse(Text.Substring(0, Text.Length - 1), out Value);
 			}
 			else
 			{
-				return double.TryParse(Text, out Value);
+				return Double.TryParse(Text, out Value);
 			}
 		}
 
@@ -560,7 +570,7 @@ namespace UnrealBuildTool
 
 			// Get the opening paren
 			int Idx = 0;
-			while(char.IsWhiteSpace(Chars[Idx]))
+			while(Char.IsWhiteSpace(Chars[Idx]))
 			{
 				Idx++;
 			}
@@ -572,7 +582,7 @@ namespace UnrealBuildTool
 
 			// Read to the next token
 			Idx++;
-			while(char.IsWhiteSpace(Chars[Idx]))
+			while(Char.IsWhiteSpace(Chars[Idx]))
 			{
 				Idx++;
 			}
@@ -588,7 +598,7 @@ namespace UnrealBuildTool
 				{
 					// Find the end of the name
 					int NameIdx = Idx;
-					while(char.IsLetterOrDigit(Chars[Idx]) || Chars[Idx] == '_')
+					while(Char.IsLetterOrDigit(Chars[Idx]) || Chars[Idx] == '_')
 					{
 						Idx++;
 					}
@@ -607,7 +617,7 @@ namespace UnrealBuildTool
 					}
 
 					// Consume the equals character
-					while(char.IsWhiteSpace(Chars[Idx]))
+					while(Char.IsWhiteSpace(Chars[Idx]))
 					{
 						Idx++;
 					}
@@ -619,16 +629,16 @@ namespace UnrealBuildTool
 
 					// Move to the value
 					Idx++;
-					while (char.IsWhiteSpace(Chars[Idx]))
+					while (Char.IsWhiteSpace(Chars[Idx]))
 					{
 						Idx++;
 					}
 
 					// Parse the value
 					Value.Clear();
-					if (char.IsLetterOrDigit(Chars[Idx]) || Chars[Idx] == '_' || Chars[Idx] == '-')
+					if (Char.IsLetterOrDigit(Chars[Idx]) || Chars[Idx] == '_' || Chars[Idx] == '-')
 					{
-						while (char.IsLetterOrDigit(Chars[Idx]) || Chars[Idx] == '_' || Chars[Idx] == '-' || Chars[Idx] == '.')
+						while (Char.IsLetterOrDigit(Chars[Idx]) || Chars[Idx] == '_' || Chars[Idx] == '-' || Chars[Idx] == '.')
 						{
 							Value.Append(Chars[Idx]);
 							Idx++;
@@ -688,7 +698,7 @@ namespace UnrealBuildTool
 					NewProperties[Key] = Value.ToString();
 
 					// Move to the separator
-					while(char.IsWhiteSpace(Chars[Idx]))
+					while(Char.IsWhiteSpace(Chars[Idx]))
 					{
 						Idx++;
 					}
@@ -704,7 +714,7 @@ namespace UnrealBuildTool
 
 					// Move to the next field
 					Idx++;
-					while (char.IsWhiteSpace(Chars[Idx]))
+					while (Char.IsWhiteSpace(Chars[Idx]))
 					{
 						Idx++;
 					}
@@ -713,7 +723,7 @@ namespace UnrealBuildTool
 
 			// Make sure we're at the end of the string
 			Idx++;
-			while(char.IsWhiteSpace(Chars[Idx]))
+			while(Char.IsWhiteSpace(Chars[Idx]))
 			{
 				Idx++;
 			}
@@ -742,7 +752,7 @@ namespace UnrealBuildTool
 
 			// Get the opening paren
 			int Idx = 0;
-			while(char.IsWhiteSpace(Chars[Idx]))
+			while(Char.IsWhiteSpace(Chars[Idx]))
 			{
 				Idx++;
 			}
@@ -754,7 +764,7 @@ namespace UnrealBuildTool
 
 			// Read to the next token
 			Idx++;
-			while(char.IsWhiteSpace(Chars[Idx]))
+			while(Char.IsWhiteSpace(Chars[Idx]))
 			{
 				Idx++;
 			}
@@ -769,16 +779,16 @@ namespace UnrealBuildTool
 				for (;;)
 				{
 					// Skip whitespace
-					while (char.IsWhiteSpace(Chars[Idx]))
+					while (Char.IsWhiteSpace(Chars[Idx]))
 					{
 						Idx++;
 					}
 
 					// Parse the value
 					Value.Clear();
-					if (char.IsLetterOrDigit(Chars[Idx]) || Chars[Idx] == '_' || Chars[Idx] == '-')
+					if (Char.IsLetterOrDigit(Chars[Idx]) || Chars[Idx] == '_' || Chars[Idx] == '-')
 					{
-						while (char.IsLetterOrDigit(Chars[Idx]) || Chars[Idx] == '_' || Chars[Idx] == '-' || Chars[Idx] == '.')
+						while (Char.IsLetterOrDigit(Chars[Idx]) || Chars[Idx] == '_' || Chars[Idx] == '-' || Chars[Idx] == '.')
 						{
 							Value.Append(Chars[Idx]);
 							Idx++;
@@ -838,7 +848,7 @@ namespace UnrealBuildTool
 					NewArray.Add(Value.ToString());
 
 					// Move to the separator
-					while(char.IsWhiteSpace(Chars[Idx]))
+					while(Char.IsWhiteSpace(Chars[Idx]))
 					{
 						Idx++;
 					}
@@ -854,7 +864,7 @@ namespace UnrealBuildTool
 
 					// Move to the next field
 					Idx++;
-					while (char.IsWhiteSpace(Chars[Idx]))
+					while (Char.IsWhiteSpace(Chars[Idx]))
 					{
 						Idx++;
 					}
@@ -863,7 +873,7 @@ namespace UnrealBuildTool
 
 			// Make sure we're at the end of the string
 			Idx++;
-			while(char.IsWhiteSpace(Chars[Idx]))
+			while(Char.IsWhiteSpace(Chars[Idx]))
 			{
 				Idx++;
 			}
@@ -886,7 +896,7 @@ namespace UnrealBuildTool
 			public string? After2 = null;
 		};
 
-		static readonly string [] ConfigLayers =
+		static string [] ConfigLayers =
 		{
 			// Engine/Base.ini
 			"{ENGINE}/Config/Base.ini",
@@ -916,7 +926,7 @@ namespace UnrealBuildTool
 			"{PROJECT}/Config/User{TYPE}.ini",
 		};
 
-		static readonly ConfigLayerExpansion[] ConfigLayerExpansions =
+		static ConfigLayerExpansion[] ConfigLayerExpansions =
 		{
 			// The base expansion (ie, no expansion)
 			new ConfigLayerExpansion { }, 
@@ -936,7 +946,7 @@ namespace UnrealBuildTool
 			// Some user accounts (eg. SYSTEM on Windows) don't have a home directory. Ignore them if Environment.GetFolderPath() returns an empty string.
 			string PersonalFolder = Environment.GetFolderPath(Environment.SpecialFolder.Personal);
 			string? PersonalConfigFolder = null;
-			if (!string.IsNullOrEmpty(PersonalFolder))
+			if (!String.IsNullOrEmpty(PersonalFolder))
 			{
 				PersonalConfigFolder = PersonalFolder;
 				if (RuntimePlatform.IsMac || RuntimePlatform.IsLinux)
@@ -1028,7 +1038,7 @@ namespace UnrealBuildTool
 		/// </summary>
 		public static IEnumerable<FileReference> EnumerateConfigFileLocations(ConfigHierarchyType Type, DirectoryReference? ProjectDir, UnrealTargetPlatform Platform, string CustomConfig = "")
 		{
-			string BaseIniName = Enum.GetName(typeof(ConfigHierarchyType), Type) ?? string.Empty;
+			string BaseIniName = Enum.GetName(typeof(ConfigHierarchyType), Type) ?? String.Empty;
 			string PlatformName = GetIniPlatformName(Platform);
 
 			foreach (string Layer in ConfigLayers)
@@ -1042,7 +1052,7 @@ namespace UnrealBuildTool
 				if ((bHasPlatformTag && PlatformName == "None") ||
 					(bHasProjectTag && ProjectDir == null) ||
 					(bHasUserTag && GetUserDir() == null) ||
-					(bHasCustomConfigTag && string.IsNullOrEmpty(CustomConfig)))
+					(bHasCustomConfigTag && String.IsNullOrEmpty(CustomConfig)))
 				{
 					continue;
 				}
@@ -1147,7 +1157,7 @@ namespace UnrealBuildTool
 				DirectoryReference? UserSettingDir = Utils.GetUserSettingDirectory();
 				if (UserSettingDir != null)
 				{
-					return DirectoryReference.Combine(UserSettingDir, "UnrealEngine", string.Format("{0}.{1}", ReadOnlyBuildVersion.Current.MajorVersion, ReadOnlyBuildVersion.Current.MinorVersion), "Saved");
+					return DirectoryReference.Combine(UserSettingDir, "UnrealEngine", String.Format("{0}.{1}", ReadOnlyBuildVersion.Current.MajorVersion, ReadOnlyBuildVersion.Current.MinorVersion), "Saved");
 				}
 			}
 			return DirectoryReference.Combine(Unreal.EngineDirectory, "Saved");

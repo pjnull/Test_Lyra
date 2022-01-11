@@ -14,7 +14,7 @@ namespace UnrealBuildTool
 	/// </summary>
 	public class HoloLensExports
 	{
-		private readonly HoloLensDeploy InnerDeploy;
+		private HoloLensDeploy InnerDeploy;
 
 		/// <summary>
 		/// 

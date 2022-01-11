@@ -189,7 +189,7 @@ namespace UnrealBuildTool
 		{
 			get
 			{
-				if (!string.IsNullOrEmpty(NameOverride))
+				if (!String.IsNullOrEmpty(NameOverride))
 				{
 					return NameOverride;
 				}
@@ -205,7 +205,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// If the Name of this target has been overriden
 		/// </summary>
-		public bool IsNameOverriden() { return !string.IsNullOrEmpty(NameOverride); }
+		public bool IsNameOverriden() { return !String.IsNullOrEmpty(NameOverride); }
 
 		private string? NameOverride;
 
@@ -373,7 +373,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Allows a Program Target to specify it's own solution folder path.
 		/// </summary>
-		public string SolutionDirectory = string.Empty;
+		public string SolutionDirectory = String.Empty;
 
 		/// <summary>
 		/// Whether the target should be included in the default solution build configuration
@@ -392,13 +392,13 @@ namespace UnrealBuildTool
 		/// This will get baked into the game executable as CUSTOM_CONFIG and used when staging to filter files and settings
 		/// </summary>
 		[RequiresUniqueBuildEnvironment]
-		public string CustomConfig = string.Empty;
+		public string CustomConfig = String.Empty;
 
 		/// <summary>
 		/// Subfolder to place executables in, relative to the default location.
 		/// </summary>
 		[RequiresUniqueBuildEnvironment]
-		public string ExeBinariesSubFolder = string.Empty;
+		public string ExeBinariesSubFolder = String.Empty;
 
 		/// <summary>
 		/// Allow target module to override UHT code generation version.
@@ -1244,7 +1244,7 @@ namespace UnrealBuildTool
 		/// Whether to force skipping deployment for platforms that require deployment by default.
 		/// </summary>
 		[CommandLine("-SkipDeploy")]
-		private readonly bool bForceSkipDeploy = false; 
+		private bool bForceSkipDeploy = false; 
 
 		/// <summary>
 		/// When enabled, allows XGE to compile pre-compiled header files on remote machines.  Otherwise, PCHs are always generated locally.
@@ -1613,14 +1613,14 @@ namespace UnrealBuildTool
 
 			// Allow the build platform to set defaults for this target
 			UEBuildPlatform.GetBuildPlatform(Platform).ResetTarget(this);
-			bDeployAfterCompile = !bForceSkipDeploy && bDeployAfterCompile;
+			bDeployAfterCompile = bForceSkipDeploy ? false : bDeployAfterCompile;
 
 			// Set the default build version
-			if(string.IsNullOrEmpty(BuildVersion))
+			if(String.IsNullOrEmpty(BuildVersion))
 			{
-				if(string.IsNullOrEmpty(Target.Version.BuildVersionString))
+				if(String.IsNullOrEmpty(Target.Version.BuildVersionString))
 				{
-					BuildVersion = string.Format("{0}-CL-{1}", Target.Version.BranchName, Target.Version.Changelist);
+					BuildVersion = String.Format("{0}-CL-{1}", Target.Version.BranchName, Target.Version.Changelist);
 				}
 				else
 				{
@@ -1641,7 +1641,7 @@ namespace UnrealBuildTool
 			EncryptionAndSigning.CryptoSettings CryptoSettings = EncryptionAndSigning.ParseCryptoSettings(CryptoSettingsDir, Platform);
 			if (CryptoSettings.IsAnyEncryptionEnabled())
 			{
-				ProjectDefinitions.Add(string.Format("IMPLEMENT_ENCRYPTION_KEY_REGISTRATION()=UE_REGISTER_ENCRYPTION_KEY({0})", FormatHexBytes(CryptoSettings.EncryptionKey!.Key!)));
+				ProjectDefinitions.Add(String.Format("IMPLEMENT_ENCRYPTION_KEY_REGISTRATION()=UE_REGISTER_ENCRYPTION_KEY({0})", FormatHexBytes(CryptoSettings.EncryptionKey!.Key!)));
 			}
 			else
 			{
@@ -1650,7 +1650,7 @@ namespace UnrealBuildTool
 
 			if (CryptoSettings.IsPakSigningEnabled())
 			{
-				ProjectDefinitions.Add(string.Format("IMPLEMENT_SIGNING_KEY_REGISTRATION()=UE_REGISTER_SIGNING_KEY(UE_LIST_ARGUMENT({0}), UE_LIST_ARGUMENT({1}))", FormatHexBytes(CryptoSettings.SigningKey!.PublicKey.Exponent!), FormatHexBytes(CryptoSettings.SigningKey.PublicKey.Modulus!)));
+				ProjectDefinitions.Add(String.Format("IMPLEMENT_SIGNING_KEY_REGISTRATION()=UE_REGISTER_SIGNING_KEY(UE_LIST_ARGUMENT({0}), UE_LIST_ARGUMENT({1}))", FormatHexBytes(CryptoSettings.SigningKey!.PublicKey.Exponent!), FormatHexBytes(CryptoSettings.SigningKey.PublicKey.Modulus!)));
 			}
 			else
 			{
@@ -1665,7 +1665,7 @@ namespace UnrealBuildTool
 		/// <returns>List of hexadecimal bytes</returns>
 		private static string FormatHexBytes(byte[] Data)
 		{
-			return string.Join(",", Data.Select(x => string.Format("0x{0:X2}", x)));
+			return String.Join(",", Data.Select(x => String.Format("0x{0:X2}", x)));
 		}
 
 		/// <summary>
@@ -1728,9 +1728,10 @@ namespace UnrealBuildTool
 			//GlobalDefinitions.Add("UE_ALLOW_SHADER_COMPILING=0");
 
 			ConfigHierarchy ProjectGameIni = ConfigCache.ReadHierarchy(ConfigHierarchyType.Game, ProjectFile?.Directory, Platform);
+			List<string>? DisabledPlugins;
 			List<string> AllDisabledPlugins = new List<string>();
 
-			if (ProjectGameIni.GetArray("CookedEditorSettings", "DisabledPlugins", out List<string>? DisabledPlugins))
+			if (ProjectGameIni.GetArray("CookedEditorSettings", "DisabledPlugins", out DisabledPlugins))
 			{
 				AllDisabledPlugins.AddRange(DisabledPlugins);
 			}
@@ -1888,20 +1889,20 @@ namespace UnrealBuildTool
 				List<Tuple<string, string>> ModifiedSettings = new List<Tuple<string, string>>();
 				if(DefaultBuildSettings < BuildSettingsVersion.V2)
 				{
-					ModifiedSettings.Add(Tuple.Create(string.Format("{0} = false", nameof(bLegacyPublicIncludePaths)), "Omits subfolders from public include paths to reduce compiler command line length. (Previously: true)."));
-					ModifiedSettings.Add(Tuple.Create(string.Format("{0} = WarningLevel.Error", nameof(ShadowVariableWarningLevel)), "Treats shadowed variable warnings as errors. (Previously: WarningLevel.Warning)."));
-					ModifiedSettings.Add(Tuple.Create(string.Format("{0} = PCHUsageMode.UseExplicitOrSharedPCHs", nameof(ModuleRules.PCHUsage)), "Set in build.cs files to enables IWYU-style PCH model. See https://docs.unrealengine.com/en-US/Programming/BuildTools/UnrealBuildTool/IWYU/index.html. (Previously: PCHUsageMode.UseSharedPCHs)."));
+					ModifiedSettings.Add(Tuple.Create(String.Format("{0} = false", nameof(bLegacyPublicIncludePaths)), "Omits subfolders from public include paths to reduce compiler command line length. (Previously: true)."));
+					ModifiedSettings.Add(Tuple.Create(String.Format("{0} = WarningLevel.Error", nameof(ShadowVariableWarningLevel)), "Treats shadowed variable warnings as errors. (Previously: WarningLevel.Warning)."));
+					ModifiedSettings.Add(Tuple.Create(String.Format("{0} = PCHUsageMode.UseExplicitOrSharedPCHs", nameof(ModuleRules.PCHUsage)), "Set in build.cs files to enables IWYU-style PCH model. See https://docs.unrealengine.com/en-US/Programming/BuildTools/UnrealBuildTool/IWYU/index.html. (Previously: PCHUsageMode.UseSharedPCHs)."));
 				}
 
 				if (ModifiedSettings.Count > 0)
 				{
-					string FormatString = string.Format("[Upgrade]     {{0,-{0}}}   => {{1}}", ModifiedSettings.Max(x => x.Item1.Length));
+					string FormatString = String.Format("[Upgrade]     {{0,-{0}}}   => {{1}}", ModifiedSettings.Max(x => x.Item1.Length));
 					foreach (Tuple<string, string> ModifiedSetting in ModifiedSettings)
 					{
-						Diagnostics.Add(string.Format(FormatString, ModifiedSetting.Item1, ModifiedSetting.Item2));
+						Diagnostics.Add(String.Format(FormatString, ModifiedSetting.Item1, ModifiedSetting.Item2));
 					}
 				}
-				Diagnostics.Add(string.Format("[Upgrade] Suppress this message by setting 'DefaultBuildSettings = BuildSettingsVersion.{1};' in {2}, and explicitly overriding settings that differ from the new defaults.", Version, (BuildSettingsVersion)(BuildSettingsVersion.Latest - 1), File!.GetFileName()));
+				Diagnostics.Add(String.Format("[Upgrade] Suppress this message by setting 'DefaultBuildSettings = BuildSettingsVersion.{1};' in {2}, and explicitly overriding settings that differ from the new defaults.", Version, (BuildSettingsVersion)(BuildSettingsVersion.Latest - 1), File!.GetFileName()));
 				Diagnostics.Add("[Upgrade]");
 			}
 		}
@@ -1915,7 +1916,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// The writeable TargetRules instance
 		/// </summary>
-		readonly TargetRules Inner;
+		TargetRules Inner;
 
 		/// <summary>
 		/// Constructor
@@ -2887,6 +2888,7 @@ namespace UnrealBuildTool
 			get { return Inner.OptedInModulePlatforms; } 
 		}
 
+#pragma warning restore C1591
 		#endregion
 
 		/// <summary>

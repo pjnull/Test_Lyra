@@ -27,7 +27,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// The compiled assembly
 		/// </summary>
-		private readonly Assembly? CompiledAssembly;
+		private Assembly? CompiledAssembly;
 
 		/// <summary>
 		/// Returns the simple name of the assembly e.g. "UE5ProgramRules"
@@ -45,43 +45,43 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// The base directories for this assembly
 		/// </summary>
-		private readonly List<DirectoryReference> BaseDirs;
+		private List<DirectoryReference> BaseDirs;
 
 		/// <summary>
 		/// All the plugins included in this assembly
 		/// </summary>
-		private readonly IReadOnlyList<PluginInfo> Plugins;
+		private IReadOnlyList<PluginInfo> Plugins;
 
 		/// <summary>
 		/// Maps module names to their actual xxx.Module.cs file on disk
 		/// </summary>
-		private readonly Dictionary<string, FileReference> ModuleNameToModuleFile = new Dictionary<string, FileReference>(StringComparer.InvariantCultureIgnoreCase);
+		private Dictionary<string, FileReference> ModuleNameToModuleFile = new Dictionary<string, FileReference>(StringComparer.InvariantCultureIgnoreCase);
 
 		/// <summary>
 		/// Maps target names to their actual xxx.Target.cs file on disk
 		/// </summary>
-		private readonly Dictionary<string, FileReference> TargetNameToTargetFile = new Dictionary<string, FileReference>(StringComparer.InvariantCultureIgnoreCase);
+		private Dictionary<string, FileReference> TargetNameToTargetFile = new Dictionary<string, FileReference>(StringComparer.InvariantCultureIgnoreCase);
 
 		/// <summary>
 		/// Mapping from module file to its context.
 		/// </summary>
-		private readonly Dictionary<FileReference, ModuleRulesContext> ModuleFileToContext;
+		private Dictionary<FileReference, ModuleRulesContext> ModuleFileToContext;
 
 		/// <summary>
 		/// Whether this assembly contains engine modules. Used to set default values for bTreatAsEngineModule.
 		/// </summary>
-		private readonly bool bContainsEngineModules;
+		private bool bContainsEngineModules;
 
 		/// <summary>
 		/// Whether to use backwards compatible default settings for module and target rules. This is enabled by default for game projects to support a simpler migration path, but
 		/// is disabled for engine modules.
 		/// </summary>
-		private readonly BuildSettingsVersion? DefaultBuildSettings;
+		private BuildSettingsVersion? DefaultBuildSettings;
 
 		/// <summary>
 		/// Whether the modules and targets in this assembly are read-only
 		/// </summary>
-		private readonly bool bReadOnly;
+		private bool bReadOnly;
 
 		/// <summary>
 		/// The parent rules assembly that this assembly inherits. Game assemblies inherit the engine assembly, and the engine assembly inherits nothing.
@@ -167,7 +167,8 @@ namespace UnrealBuildTool
 						ObsoleteOverrideAttribute? Attribute = Method.GetCustomAttribute<ObsoleteOverrideAttribute>(true);
 						if (Attribute != null)
 						{
-							if (!TryGetFileNameFromType(CompiledType, out FileReference? Location))
+							FileReference? Location;
+							if (!TryGetFileNameFromType(CompiledType, out Location))
 							{
 								Location = new FileReference(CompiledAssembly.Location);
 							}
@@ -179,7 +180,8 @@ namespace UnrealBuildTool
 						ConstructorInfo? Constructor = CompiledType.GetConstructor(new Type[] { typeof(TargetInfo) });
 						if(Constructor != null)
 						{
-							if (!TryGetFileNameFromType(CompiledType, out FileReference? Location))
+							FileReference? Location;
+							if (!TryGetFileNameFromType(CompiledType, out Location))
 							{
 								Location = new FileReference(CompiledAssembly.Location);
 							}
@@ -217,22 +219,21 @@ namespace UnrealBuildTool
 		/// <returns>List of preprocessor definitions that should be set</returns>
 		public static List<string> GetPreprocessorDefinitions()
 		{
-			List<string> PreprocessorDefines = new List<string>
-			{
-				"WITH_FORWARDED_MODULE_RULES_CTOR",
-				"WITH_FORWARDED_TARGET_RULES_CTOR"
-			};
+			List<string> PreprocessorDefines = new List<string>();
+			PreprocessorDefines.Add("WITH_FORWARDED_MODULE_RULES_CTOR");
+			PreprocessorDefines.Add("WITH_FORWARDED_TARGET_RULES_CTOR");
 
 			// Define macros for the Unreal engine version, starting with 4.17
-			if (BuildVersion.TryRead(BuildVersion.GetDefaultFileName(), out BuildVersion? _))
+			BuildVersion? Version;
+			if (BuildVersion.TryRead(BuildVersion.GetDefaultFileName(), out Version))
 			{
-				for (int MinorVersion = 17; MinorVersion <= 30; MinorVersion++)
+				for(int MinorVersion = 17; MinorVersion <= 30; MinorVersion++)
 				{
-					PreprocessorDefines.Add(string.Format("UE_4_{0}_OR_LATER", MinorVersion));
+					PreprocessorDefines.Add(String.Format("UE_4_{0}_OR_LATER", MinorVersion));
 				}
 				for (int MinorVersion = 0; MinorVersion <= 0; MinorVersion++)
 				{
-					PreprocessorDefines.Add(string.Format("UE_5_{0}_OR_LATER", MinorVersion));
+					PreprocessorDefines.Add(String.Format("UE_5_{0}_OR_LATER", MinorVersion));
 				}
 			}
 			return PreprocessorDefines;
@@ -313,7 +314,8 @@ namespace UnrealBuildTool
 		/// <returns>The filename containing rules for this module, or an empty string if not found</returns>
 		public FileReference? GetModuleFileName(string ModuleName)
 		{
-			if (ModuleNameToModuleFile.TryGetValue(ModuleName, out FileReference? ModuleFile))
+			FileReference? ModuleFile;
+			if (ModuleNameToModuleFile.TryGetValue(ModuleName, out ModuleFile))
 			{
 				return ModuleFile;
 			}
@@ -365,7 +367,8 @@ namespace UnrealBuildTool
 		/// <returns>The filename containing rules for this target, or an empty string if not found</returns>
 		public FileReference? GetTargetFileName(string TargetName)
 		{
-			if (TargetNameToTargetFile.TryGetValue(TargetName, out FileReference? TargetFile))
+			FileReference? TargetFile;
+			if (TargetNameToTargetFile.TryGetValue(TargetName, out TargetFile))
 			{
 				return TargetFile;
 			}
@@ -388,7 +391,8 @@ namespace UnrealBuildTool
 			string ModuleTypeName = ModuleName;
 
 			// Make sure the base module file is known to us
-			if (!ModuleNameToModuleFile.TryGetValue(ModuleTypeName, out FileReference? ModuleFileName))
+			FileReference? ModuleFileName;
+			if (!ModuleNameToModuleFile.TryGetValue(ModuleTypeName, out ModuleFileName))
 			{
 				if (Parent == null)
 				{
@@ -443,7 +447,7 @@ namespace UnrealBuildTool
 
 
 			// Figure out the best rules object to use
-			Type? RulesObjectType = PlatformRulesObjectType ?? BaseRulesObjectType;
+			Type? RulesObjectType = PlatformRulesObjectType != null ? PlatformRulesObjectType : BaseRulesObjectType;
 			if (RulesObjectType == null)
 			{
 				throw new BuildException("Expecting to find a type to be declared in a module rules named '{0}' in {1}.  This type must derive from the 'ModuleRules' type defined by Unreal Build Tool.", ModuleTypeName, CompiledAssembly?.FullName);
@@ -478,7 +482,8 @@ namespace UnrealBuildTool
 					RulesObject.SubclassRules = new List<string>();
 					while (SubType != null && SubType != BaseRulesObjectType)
 					{
-						if (TryGetFileNameFromType(SubType, out FileReference? SubTypeFileName))
+						FileReference? SubTypeFileName;
+						if (TryGetFileNameFromType(SubType, out SubTypeFileName))
 						{
 							RulesObject.DirectoriesForModuleSubClasses.Add(SubType, SubTypeFileName.Directory);
 							RulesObject.SubclassRules.Add(SubTypeFileName.FullName);
@@ -665,7 +670,7 @@ namespace UnrealBuildTool
 			// Some platforms may *require* monolithic compilation...
 			if (Rules.LinkType != TargetLinkType.Monolithic && UEBuildPlatform.PlatformRequiresMonolithicBuilds(Rules.Platform, Rules.Configuration))
 			{
-				throw new BuildException(string.Format("{0}: {1} does not support modular builds", Rules.Name, Rules.Platform));
+				throw new BuildException(String.Format("{0}: {1} does not support modular builds", Rules.Name, Rules.Platform));
 			}
 
 			return Rules;
@@ -761,9 +766,10 @@ namespace UnrealBuildTool
 
 				// attempt to get a default target (like DefaultEditorTarget) from the Engine.ini
 				string KeyName = $"Default{Type}Target";
+				string? DefaultTargetName;
 				// read in the engine config hierarchy and get the value
 				ConfigHierarchy EngineConfig = ConfigCache.ReadHierarchy(ConfigHierarchyType.Engine, ProjectFile?.Directory, Platform);
-				if (EngineConfig.GetString("/Script/BuildSettings.BuildSettings", KeyName, out string? DefaultTargetName))
+				if (EngineConfig.GetString("/Script/BuildSettings.BuildSettings", KeyName, out DefaultTargetName))
 				{
 					// if a value was found, make sure that this is one of the found targets
 					if (Matches.Contains(DefaultTargetName))
@@ -772,7 +778,7 @@ namespace UnrealBuildTool
 					}
 				}
 				
-				throw new BuildException("Found multiple targets with TargetType={0}: {1}.\nSpecify a default with a {2} entry in [/Script/BuildSettings.BuildSettings] section of your DefaultEngine.ini", Type, string.Join(", ", Matches), KeyName);
+				throw new BuildException("Found multiple targets with TargetType={0}: {1}.\nSpecify a default with a {2} entry in [/Script/BuildSettings.BuildSettings] section of your DefaultEngine.ini", Type, String.Join(", ", Matches), KeyName);
 			}
 		}
 

@@ -61,8 +61,8 @@ namespace UnrealBuildTool
 			return Data;
 		}
 
-		private readonly string Filename;
-		private readonly XmlDocument Document;
-		private readonly XmlElement RootElement;
+		private string Filename;
+		private XmlDocument Document;
+		private XmlElement RootElement;
 	}
 }

@@ -151,7 +151,7 @@ namespace UnrealBuildTool.ProjectFiles.Xcode
 
 			if (ProjectFiles.Count != 1)
 			{
-				throw new BuildException(string.Format("Should only find 1 Xcode project file in the resources, but {0} were found.", ProjectFiles.Count));
+				throw new BuildException(String.Format("Should only find 1 Xcode project file in the resources, but {0} were found.", ProjectFiles.Count));
 			}
 			else
 			{
@@ -199,9 +199,9 @@ namespace UnrealBuildTool.ProjectFiles.Xcode
 		/// <param name="SettingValue">The new value for the setting.</param>
 		private static string ChangeProjectSetting(string ProjectContents, string SettingName, string? SettingValue)
 		{
-			string SettingNameRegexString = string.Format("(\\s+{0}\\s=\\s)\"?(.+)\"?;", SettingName);
+			string SettingNameRegexString = String.Format("(\\s+{0}\\s=\\s)\"?(.+)\"?;", SettingName);
 			
-			string SettingValueReplaceString = string.Format("$1\"{0}\";", SettingValue);
+			string SettingValueReplaceString = String.Format("$1\"{0}\";", SettingValue);
 
 			Regex SettingNameRegex = new Regex(SettingNameRegexString);
 			return SettingNameRegex.Replace(ProjectContents, SettingValueReplaceString);
@@ -280,7 +280,8 @@ namespace UnrealBuildTool.ProjectFiles.Xcode
 		public static string GetBundleID(DirectoryReference ProjectDirectory, FileReference? ProjectFile)
 		{
 			ConfigHierarchy Ini = GetIni(ProjectDirectory);
-			Ini.GetString("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "BundleIdentifier", out string BundleId);
+			string BundleId;
+			Ini.GetString("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "BundleIdentifier", out BundleId);
 
 			BundleId = BundleId.Replace("[PROJECT_NAME]", ((ProjectFile != null) ? ProjectFile.GetFileNameWithoutAnyExtensions() : "UnrealGame")).Replace("_", "");
 			return BundleId;
@@ -289,7 +290,8 @@ namespace UnrealBuildTool.ProjectFiles.Xcode
 		public static string GetBundleName(DirectoryReference ProjectDirectory, FileReference? ProjectFile)
 		{
 			ConfigHierarchy Ini = GetIni(ProjectDirectory);
-			Ini.GetString("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "BundleName", out string BundleName);
+			string BundleName;
+			Ini.GetString("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "BundleName", out BundleName);
 
 			BundleName = BundleName.Replace("[PROJECT_NAME]", ((ProjectFile != null) ? ProjectFile.GetFileNameWithoutAnyExtensions() : "UnrealGame")).Replace("_", "");
 			return BundleName;
@@ -298,14 +300,16 @@ namespace UnrealBuildTool.ProjectFiles.Xcode
 		public static bool GetBuildAsFramework(DirectoryReference ProjectDirectory)
 		{
 			ConfigHierarchy Ini = GetIni(ProjectDirectory);
-			Ini.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bBuildAsFramework", out bool bBuildAsFramework);
+			bool bBuildAsFramework;
+			Ini.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bBuildAsFramework", out bBuildAsFramework);
 			return bBuildAsFramework;
 		}
 		
 		public static bool GetGenerateFrameworkWrapperProject(DirectoryReference ProjectDirectory)
 		{
 			ConfigHierarchy Ini = GetIni(ProjectDirectory);
-			Ini.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bGenerateFrameworkWrapperProject", out bool bGenerateFrameworkWrapperProject);
+			bool bGenerateFrameworkWrapperProject;
+			Ini.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bGenerateFrameworkWrapperProject", out bGenerateFrameworkWrapperProject);
 			return bGenerateFrameworkWrapperProject;
 		}
 	}

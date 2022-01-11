@@ -79,7 +79,7 @@ namespace UnrealBuildTool
 		public override string ToString()
 		{
 			string Prefix = (Action == ConfigLineAction.Add)? "+" : (Action == ConfigLineAction.RemoveKey)? "!" : (Action == ConfigLineAction.RemoveKeyValue) ? "-" : "";
-			return string.Format("{0}{1}={2}", Prefix, Key, Value);
+			return String.Format("{0}{1}={2}", Prefix, Key, Value);
 		}
 	}
 
@@ -136,7 +136,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Maps names to config sections
 		/// </summary>
-		readonly Dictionary<string, ConfigFileSection> Sections = new Dictionary<string, ConfigFileSection>(StringComparer.InvariantCultureIgnoreCase);
+		Dictionary<string, ConfigFileSection> Sections = new Dictionary<string, ConfigFileSection>(StringComparer.InvariantCultureIgnoreCase);
 
 		/// <summary>
 		/// Constructs a new, empty config file
@@ -153,82 +153,84 @@ namespace UnrealBuildTool
 		/// <param name="DefaultAction">The default action to take when encountering arrays without a '+' prefix</param>
 		public ConfigFile(FileReference Location, ConfigLineAction DefaultAction = ConfigLineAction.Set)
 		{
-			using StreamReader Reader = new StreamReader(Location.FullName);
-			ConfigFileSection? CurrentSection = null;
-			for (; ; )
+			using (StreamReader Reader = new StreamReader(Location.FullName))
 			{
-				string? Line = Reader.ReadLine();
-				if (Line == null)
+				ConfigFileSection? CurrentSection = null;
+				for(; ;)
 				{
-					break;
-				}
-
-				// Find the first non-whitespace character
-				for (int StartIdx = 0; StartIdx < Line.Length; StartIdx++)
-				{
-					if (Line[StartIdx] != ' ' && Line[StartIdx] != '\t')
+					string? Line = Reader.ReadLine();
+					if (Line == null)
 					{
-						// Find the last non-whitespace character. If it's an escaped newline, merge the following line with it.
-						int EndIdx = Line.Length;
-						while (EndIdx > StartIdx)
+						break;
+					}
+
+					// Find the first non-whitespace character
+					for (int StartIdx = 0; StartIdx < Line.Length; StartIdx++)
+					{
+						if (Line[StartIdx] != ' ' && Line[StartIdx] != '\t')
 						{
-							if (Line[EndIdx - 1] == '\\')
+							// Find the last non-whitespace character. If it's an escaped newline, merge the following line with it.
+							int EndIdx = Line.Length;
+							while (EndIdx > StartIdx)
 							{
-								string? NextLine = Reader.ReadLine();
-								if (NextLine == null)
+								if(Line[EndIdx - 1] == '\\')
+								{
+									string? NextLine = Reader.ReadLine();
+									if(NextLine == null)
+									{
+										break;
+									}
+									Line += NextLine;
+									EndIdx = Line.Length;
+									continue;
+								}
+								if(Line[EndIdx - 1] != ' ' && Line[EndIdx - 1] != '\t')
 								{
 									break;
 								}
-								Line += NextLine;
-								EndIdx = Line.Length;
-								continue;
+
+								EndIdx--;
 							}
-							if (Line[EndIdx - 1] != ' ' && Line[EndIdx - 1] != '\t')
+
+							// Break out if we've got a comment
+							if(Line[StartIdx] == ';')
+							{
+								break;
+							}
+							if(Line[StartIdx] == '/' && StartIdx + 1 < Line.Length && Line[StartIdx + 1] == '/')
 							{
 								break;
 							}
 
-							EndIdx--;
-						}
-
-						// Break out if we've got a comment
-						if (Line[StartIdx] == ';')
-						{
-							break;
-						}
-						if (Line[StartIdx] == '/' && StartIdx + 1 < Line.Length && Line[StartIdx + 1] == '/')
-						{
-							break;
-						}
-
-						// Check if it's the start of a new section
-						if (Line[StartIdx] == '[')
-						{
-							CurrentSection = null;
-							if (Line[EndIdx - 1] == ']')
+							// Check if it's the start of a new section
+							if(Line[StartIdx] == '[')
 							{
-								string SectionName = Line.Substring(StartIdx + 1, EndIdx - StartIdx - 2);
-								if (!Sections.TryGetValue(SectionName, out CurrentSection))
+								CurrentSection = null;
+								if(Line[EndIdx - 1] == ']')
 								{
-									CurrentSection = new ConfigFileSection(SectionName);
-									Sections.Add(SectionName, CurrentSection);
+									string SectionName = Line.Substring(StartIdx + 1, EndIdx - StartIdx - 2);
+									if(!Sections.TryGetValue(SectionName, out CurrentSection))
+									{
+										CurrentSection = new ConfigFileSection(SectionName);
+										Sections.Add(SectionName, CurrentSection);
+									}
 								}
+								break;
 							}
-							break;
-						}
 
-						// Otherwise add it to the current section or add a new one
-						if (CurrentSection != null)
-						{
-							if (!TryAddConfigLine(CurrentSection, Line, StartIdx, EndIdx, DefaultAction))
+							// Otherwise add it to the current section or add a new one
+							if(CurrentSection != null)
 							{
-								Log.TraceWarning("Couldn't parse '{0}' in {1} of {2}", Line, CurrentSection, Location.FullName);
+								if(!TryAddConfigLine(CurrentSection, Line, StartIdx, EndIdx, DefaultAction))
+								{
+									Log.TraceWarning("Couldn't parse '{0}' in {1} of {2}", Line, CurrentSection, Location.FullName);
+								}
+								break;
 							}
+
+							// Otherwise just ignore it
 							break;
 						}
-
-						// Otherwise just ignore it
-						break;
 					}
 				}
 			}
@@ -250,7 +252,8 @@ namespace UnrealBuildTool
 				string SectionName = Setting.Remove(Setting.IndexOf(':')).Trim(new char[] { '[', ']' });
 				if (SectionName.Length > 0)
 				{
-					if (!Sections.TryGetValue(SectionName, out ConfigFileSection? CurrentSection))
+					ConfigFileSection? CurrentSection = null;
+					if (!Sections.TryGetValue(SectionName, out CurrentSection))
 					{
 						CurrentSection = new ConfigFileSection(SectionName);
 						Sections.Add(SectionName, CurrentSection);
@@ -364,7 +367,8 @@ namespace UnrealBuildTool
 		/// <returns>The config section</returns>
 		public ConfigFileSection FindOrAddSection(string SectionName)
 		{
-			if (!Sections.TryGetValue(SectionName, out ConfigFileSection? Section))
+			ConfigFileSection? Section;
+			if(!Sections.TryGetValue(SectionName, out Section))
 			{
 				Section = new ConfigFileSection(SectionName);
 				Sections.Add(SectionName, Section);
@@ -389,15 +393,17 @@ namespace UnrealBuildTool
 		/// <param name="Location">The file to write</param>
 		public void Write(FileReference Location)
 		{
-			using StreamWriter Writer = new StreamWriter(Location.FullName);
-			foreach (ConfigFileSection Section in Sections.Values)
+			using (StreamWriter Writer = new StreamWriter(Location.FullName))
 			{
-				Writer.WriteLine("[{0}]", Section.Name);
-				foreach (ConfigLine Line in Section.Lines)
+				foreach (ConfigFileSection Section in Sections.Values)
 				{
-					Writer.WriteLine("{0}", Line.ToString());
+					Writer.WriteLine("[{0}]", Section.Name);
+					foreach (ConfigLine Line in Section.Lines)
+					{
+						Writer.WriteLine("{0}", Line.ToString());
+					}
+					Writer.WriteLine();
 				}
-				Writer.WriteLine();
 			}
 		}
 	}

@@ -78,8 +78,10 @@ namespace EpicGames.Core
 		/// <returns>New content hash instance containing the hash of the data</returns>
 		public static Md5Hash Compute(Stream Stream)
 		{
-			using MD5 Hasher = MD5.Create();
-			return new Md5Hash(Hasher.ComputeHash(Stream));
+			using (MD5 Hasher = MD5.Create())
+			{
+				return new Md5Hash(Hasher.ComputeHash(Stream));
+			}
 		}
 
 		/// <summary>

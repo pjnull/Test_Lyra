@@ -27,7 +27,7 @@ namespace EpicGames.Core
 				string FullName = Info.FullName;
 				if (FullName.Length >= 2 && (FullName[0] >= 'a' && FullName[0] <= 'z') && FullName[1] == ':')
 				{
-					return new DirectoryInfo(char.ToUpper(FullName[0]) + FullName.Substring(1));
+					return new DirectoryInfo(Char.ToUpper(FullName[0]) + FullName.Substring(1));
 				}
 				else
 				{
@@ -41,7 +41,7 @@ namespace EpicGames.Core
 				{
 					foreach (DirectoryInfo ChildInfo in ParentInfo.EnumerateDirectories())
 					{
-						if (string.Equals(ChildInfo.Name, Info.Name, DirectoryReference.Comparison))
+						if (String.Equals(ChildInfo.Name, Info.Name, DirectoryReference.Comparison))
 						{
 							return ChildInfo;
 						}

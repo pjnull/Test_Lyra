@@ -121,16 +121,18 @@ namespace UnrealBuildTool
 			}
 		}
 
-		private static readonly List<InstalledPlatformConfiguration>? InstalledPlatformConfigurations;
+		private static List<InstalledPlatformConfiguration>? InstalledPlatformConfigurations;
 
 		static InstalledPlatformInfo()
 		{
+			List<string>? InstalledPlatforms;
 			ConfigHierarchy Ini = ConfigCache.ReadHierarchy(ConfigHierarchyType.Engine, (DirectoryReference?)null, BuildHostPlatform.Current.Platform);
 
-			if (Ini.TryGetValue("InstalledPlatforms", "HasInstalledPlatformInfo", out bool bHasInstalledPlatformInfo) && bHasInstalledPlatformInfo)
+			bool bHasInstalledPlatformInfo;
+			if(Ini.TryGetValue("InstalledPlatforms", "HasInstalledPlatformInfo", out bHasInstalledPlatformInfo) && bHasInstalledPlatformInfo)
 			{
 				InstalledPlatformConfigurations = new List<InstalledPlatformConfiguration>();
-				if (Ini.GetArray("InstalledPlatforms", "InstalledPlatformConfigurations", out List<string>? InstalledPlatforms))
+				if (Ini.GetArray("InstalledPlatforms", "InstalledPlatformConfigurations", out InstalledPlatforms))
 				{
 					foreach (string InstalledPlatform in InstalledPlatforms)
 					{
@@ -158,8 +160,9 @@ namespace UnrealBuildTool
 
 			bool bCanCreateEntry = true;
 
+			string ConfigurationName;
 			UnrealTargetConfiguration Configuration = UnrealTargetConfiguration.Unknown;
-			if (ParseSubValue(PlatformConfiguration, "Configuration=", out string ConfigurationName))
+			if (ParseSubValue(PlatformConfiguration, "Configuration=", out ConfigurationName))
 			{
 				Enum.TryParse(ConfigurationName, out Configuration);
 			}
@@ -169,7 +172,8 @@ namespace UnrealBuildTool
 				bCanCreateEntry = false;
 			}
 
-			if (ParseSubValue(PlatformConfiguration, "PlatformName=", out string PlatformName))
+			string PlatformName;
+			if (ParseSubValue(PlatformConfiguration, "PlatformName=", out PlatformName))
 			{
 				if (!UnrealTargetPlatform.IsValidName(PlatformName))
 				{
@@ -178,8 +182,9 @@ namespace UnrealBuildTool
 				}
 			}
 
+			string PlatformTypeName;
 			TargetType PlatformType = TargetType.Game;
-			if (ParseSubValue(PlatformConfiguration, "PlatformType=", out string PlatformTypeName))
+			if (ParseSubValue(PlatformConfiguration, "PlatformType=", out PlatformTypeName))
 			{
 				if (!Enum.TryParse(PlatformTypeName, out PlatformType))
 				{
@@ -193,15 +198,18 @@ namespace UnrealBuildTool
 				PlatformType = TargetType.Game;
 			}
 
-			ParseSubValue(PlatformConfiguration, "Architecture=", out string Architecture);
+			string Architecture;
+			ParseSubValue(PlatformConfiguration, "Architecture=", out Architecture);
 
-			if (ParseSubValue(PlatformConfiguration, "RequiredFile=", out string RequiredFile))
+			string RequiredFile;
+			if (ParseSubValue(PlatformConfiguration, "RequiredFile=", out RequiredFile))
 			{
 				RequiredFile = FileReference.Combine(Unreal.RootDirectory, RequiredFile).ToString();
 			}
 
-			EProjectType ProjectType = EProjectType.Any;
-			if (ParseSubValue(PlatformConfiguration, "ProjectType=", out string ProjectTypeName))
+			string ProjectTypeName;
+			EProjectType ProjectType =  EProjectType.Any;
+			if (ParseSubValue(PlatformConfiguration, "ProjectType=", out ProjectTypeName))
 			{
 				Enum.TryParse(ProjectTypeName, out ProjectType);
 			}
@@ -211,8 +219,9 @@ namespace UnrealBuildTool
 				bCanCreateEntry = false;
 			}
 
+			string CanBeDisplayedString;
 			bool bCanBeDisplayed = false;
-			if (ParseSubValue(PlatformConfiguration, "bCanBeDisplayed=", out string CanBeDisplayedString))
+			if (ParseSubValue(PlatformConfiguration, "bCanBeDisplayed=", out CanBeDisplayedString))
 			{
 				bCanBeDisplayed = Convert.ToBoolean(CanBeDisplayedString);
 			}
@@ -234,7 +243,7 @@ namespace UnrealBuildTool
 			// Get the remainder of the string after the match
 			MatchIndex += Match.Length;
 			TrimmedLine = TrimmedLine.Substring(MatchIndex);
-			if (string.IsNullOrEmpty(TrimmedLine))
+			if (String.IsNullOrEmpty(TrimmedLine))
 			{
 				return false;
 			}
@@ -349,7 +358,7 @@ namespace UnrealBuildTool
 				{
 					continue;
 				}
-				if(State == InstalledPlatformState.Downloaded && !string.IsNullOrEmpty(Config.RequiredFile) && !File.Exists(Config.RequiredFile))
+				if(State == InstalledPlatformState.Downloaded && !String.IsNullOrEmpty(Config.RequiredFile) && !File.Exists(Config.RequiredFile))
 				{
 					continue;
 				}
@@ -386,7 +395,7 @@ namespace UnrealBuildTool
 		/// </summary>
 		/// <param name="Configs"></param>
 		/// <param name="OutEntries"></param>
-		public static void WriteConfigFileEntries(List<InstalledPlatformConfiguration> Configs, ref List<string> OutEntries)
+		public static void WriteConfigFileEntries(List<InstalledPlatformConfiguration> Configs, ref List<String> OutEntries)
 		{
 			// Write config section header
 			OutEntries.Add("[InstalledPlatforms]");
@@ -398,7 +407,7 @@ namespace UnrealBuildTool
 			}
 		}
 
-		private static void WriteConfigFileEntry(InstalledPlatformConfiguration Config, ref List<string> OutEntries)
+		private static void WriteConfigFileEntry(InstalledPlatformConfiguration Config, ref List<String> OutEntries)
 		{
 			string ConfigDescription = "+InstalledPlatformConfigurations=(";
 			ConfigDescription += string.Format("PlatformName=\"{0}\", ", Config.Platform.ToString());

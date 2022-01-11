@@ -78,7 +78,8 @@ namespace EpicGames.Core
 				for (; ; )
 				{
 					int MaxBytes = ProcessIds.Length * sizeof(uint);
-					if (!EnumProcesses(ProcessIds, MaxBytes, out int NumBytes))
+					int NumBytes = 0;
+					if (!EnumProcesses(ProcessIds, MaxBytes, out NumBytes))
 					{
 						throw new Win32ExceptionWithCode("Unable to enumerate processes");
 					}

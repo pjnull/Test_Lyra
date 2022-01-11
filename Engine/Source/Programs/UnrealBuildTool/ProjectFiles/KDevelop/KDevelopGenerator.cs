@@ -122,15 +122,15 @@ namespace UnrealBuildTool
 			else if (Type == 3)
 			{
 				ToolType = "Clean";
-				ConfName += " -clean";
+				ConfName = ConfName + " -clean";
 			}
 
-			FileContent.Append(string.Format("[CustomBuildSystem][BuildConfig{0}][Tool{1}]\n", BuildConfigIndex, ToolType));
-			FileContent.Append(string.Format("Arguments={0} {1} {2} Linux {3}\n", BuildCommand, ProjectCmdArg, TargetName, ConfName));
+			FileContent.Append(String.Format("[CustomBuildSystem][BuildConfig{0}][Tool{1}]\n", BuildConfigIndex, ToolType));
+			FileContent.Append(String.Format("Arguments={0} {1} {2} Linux {3}\n", BuildCommand, ProjectCmdArg, TargetName, ConfName));
 			FileContent.Append("Enabled=true\n");
 			FileContent.Append("Environment=\n");
-			FileContent.Append(string.Format("Executable={0}\n", Executable));
-			FileContent.Append(string.Format("Type={0}\n\n", Type));
+			FileContent.Append(String.Format("Executable={0}\n", Executable));
+			FileContent.Append(String.Format("Type={0}\n\n", Type));
 
 		}
 
@@ -147,7 +147,7 @@ namespace UnrealBuildTool
 			FileContent.Append("CurrentConfiguration=BuildConfig0\n\n"); //
 
 			// The Basics to get up and running with the editor, utilizing the Makefile.
-			FileContent.Append(string.Format("[CustomBuildSystem][BuildConfig0]\nBuildDir=file://{0}\n", UnrealRootPath));
+			FileContent.Append(String.Format("[CustomBuildSystem][BuildConfig0]\nBuildDir=file://{0}\n", UnrealRootPath));
 
 			FileContent.Append("Title=BuildMeFirst\n\n");
 			FileContent.Append("[CustomBuildSystem][BuildConfig0][ToolBuild]\n");
@@ -190,25 +190,25 @@ namespace UnrealBuildTool
 							if (InstalledPlatformInfo.IsValidConfiguration(CurConfiguration, EProjectType.Code))
 							{
 								string ConfName = Enum.GetName(typeof(UnrealTargetConfiguration), CurConfiguration)!;
-								FileContent.Append(string.Format("[CustomBuildSystem][BuildConfig{0}]\nBuildDir=file://{1}\n", BuildConfigIndex, UnrealRootPath));
+								FileContent.Append(String.Format("[CustomBuildSystem][BuildConfig{0}]\nBuildDir=file://{1}\n", BuildConfigIndex, UnrealRootPath));
 
 								if (TargetName == GameProjectName)
 								{
-									FileContent.Append(string.Format("Title={0}-Linux-{1}\n\n", TargetName, ConfName));
+									FileContent.Append(String.Format("Title={0}-Linux-{1}\n\n", TargetName, ConfName));
 									WriteCommandSubSection(ref FileContent, TargetName, ConfName, BuildConfigIndex, 0);
 									WriteCommandSubSection(ref FileContent, TargetName, ConfName, BuildConfigIndex, 1);
 									WriteCommandSubSection(ref FileContent, TargetName, ConfName, BuildConfigIndex, 3);
 								}
 								else if (TargetName == (GameProjectName + "Editor"))
 								{
-									FileContent.Append(string.Format("Title={0}-Linux-{1}\n\n", TargetName, ConfName));
+									FileContent.Append(String.Format("Title={0}-Linux-{1}\n\n", TargetName, ConfName));
 									WriteCommandSubSection(ref FileContent, TargetName, ConfName, BuildConfigIndex, 0);
 									WriteCommandSubSection(ref FileContent, TargetName, ConfName, BuildConfigIndex, 1);
 									WriteCommandSubSection(ref FileContent, TargetName, ConfName, BuildConfigIndex, 3);
 								}
 								else
 								{
-									FileContent.Append(string.Format("Title={0}-Linux-{1}\n\n", TargetName, ConfName));
+									FileContent.Append(String.Format("Title={0}-Linux-{1}\n\n", TargetName, ConfName));
 									WriteCommandSubSection(ref FileContent, TargetName, ConfName, BuildConfigIndex, 0);
 									WriteCommandSubSection(ref FileContent, TargetName, ConfName, BuildConfigIndex, 1);
 									WriteCommandSubSection(ref FileContent, TargetName, ConfName, BuildConfigIndex, 3);
@@ -218,10 +218,10 @@ namespace UnrealBuildTool
 						}
 					}
 
-					FileContent.Append(string.Format("[CustomBuildSystem][BuildConfig{0}]\nBuildDir=file://{1}\n", BuildConfigIndex, UnrealRootPath));
+					FileContent.Append(String.Format("[CustomBuildSystem][BuildConfig{0}]\nBuildDir=file://{1}\n", BuildConfigIndex, UnrealRootPath));
 					if (TargetName == GameProjectName)
 					{
-						FileContent.Append(string.Format("Title={0}\n\n", TargetName));
+						FileContent.Append(String.Format("Title={0}\n\n", TargetName));
 						WriteCommandSubSection(ref FileContent, TargetName, "Development", BuildConfigIndex, 0);
 						WriteCommandSubSection(ref FileContent, TargetName, "Development", BuildConfigIndex, 1);
 						WriteCommandSubSection(ref FileContent, TargetName, "Development", BuildConfigIndex, 3);
@@ -229,14 +229,14 @@ namespace UnrealBuildTool
 					}
 					else if (TargetName == (GameProjectName + "Editor"))
 					{
-						FileContent.Append(string.Format("Title={0}\n\n", TargetName));
+						FileContent.Append(String.Format("Title={0}\n\n", TargetName));
 						WriteCommandSubSection(ref FileContent, TargetName, "Development", BuildConfigIndex, 0);
 						WriteCommandSubSection(ref FileContent, TargetName, "Development", BuildConfigIndex, 1);
 						WriteCommandSubSection(ref FileContent, TargetName, "Development", BuildConfigIndex, 3);
 					}
 					else
 					{
-						FileContent.Append(string.Format("Title={0}\n\n", TargetName));
+						FileContent.Append(String.Format("Title={0}\n\n", TargetName));
 						WriteCommandSubSection(ref FileContent, TargetName, "Development", BuildConfigIndex, 0);
 						WriteCommandSubSection(ref FileContent, TargetName, "Development", BuildConfigIndex, 1);
 						WriteCommandSubSection(ref FileContent, TargetName, "Development", BuildConfigIndex, 3);
@@ -292,7 +292,7 @@ namespace UnrealBuildTool
 
 					if (!FullPath.Contains("FortniteGame/") && !FullPath.Contains("ThirdParty/"))
 					{
-						SystemIncludeDirectories.Add(string.Format("{0}", FullPath));
+						SystemIncludeDirectories.Add(String.Format("{0}", FullPath));
 						IncludeIndex++;
 					}
 
@@ -318,15 +318,21 @@ namespace UnrealBuildTool
 
 					if (!FullPath.Contains("FortniteGame/") && !FullPath.Contains("ThirdParty/")) // @todo: skipping Fortnite header paths to shorten clang command line for building
 					{
-						SystemIncludeDirectories.Add(string.Format("{0}", FullPath));
+						SystemIncludeDirectories.Add(String.Format("{0}", FullPath));
 						IncludeIndex++;
 					}
 				}
 			}
 
 			// Remove duplicate paths from include dir and system include dir list
-			IncludeDirectories = IncludeDirectories.Distinct().ToList();
-			SystemIncludeDirectories = SystemIncludeDirectories.Distinct().ToList();
+			List<string> Tmp = new List<string>();
+			List<string> Stmp = new List<string>();
+
+			Tmp = IncludeDirectories.Distinct().ToList();
+			Stmp = SystemIncludeDirectories.Distinct().ToList();
+
+			IncludeDirectories = Tmp.ToList();
+			SystemIncludeDirectories = Stmp.ToList();
 
 			foreach (string CurPath in IncludeDirectories)
 			{
@@ -349,7 +355,7 @@ namespace UnrealBuildTool
 		/// <param name="Key">Out: The definition name</param>
 		/// <param name="Value">Out: The definition value or null if it has none</param>
 		/// <returns>Pair representing macro name and value.</returns>
-		private void SplitDefinitionAndValue(string Definition, out string Key, out string Value)
+		private void SplitDefinitionAndValue(string Definition, out String Key, out String Value)
 		{
 			int EqualsIndex = Definition.IndexOf('=');
 			if (EqualsIndex >= 0)
@@ -370,6 +376,9 @@ namespace UnrealBuildTool
 		/// <param name="FileContent">File content.</param>
 		private void WriteDefineSection(ref StringBuilder FileContent)
 		{
+			String Key = "";
+			String Value = "";
+
 			List<string> DefineHolder = new List<string>();
 
 			foreach (ProjectFile CurProject in GeneratedProjectFiles)
@@ -383,21 +392,23 @@ namespace UnrealBuildTool
 
 				foreach (string CurDefine in KDevelopProject.IntelliSensePreprocessorDefinitions)
 				{
-					SplitDefinitionAndValue(CurDefine, out string Key, out string Value);
+					SplitDefinitionAndValue(CurDefine, out Key, out Value);
 					if (string.IsNullOrEmpty(Value))
 					{
-						DefineHolder.Add (string.Format ("{0} \\\n", Key));
+						DefineHolder.Add (String.Format ("{0} \\\n", Key));
 					}
 					else
 					{
-						DefineHolder.Add(string.Format("{0}={1} \\\n", Key, Value));
+						DefineHolder.Add(String.Format("{0}={1} \\\n", Key, Value));
 					}
 				}
 			}
 
 
 			// Remove duplicates if they are present.
-			DefineHolder = DefineHolder.Distinct().ToList();
+			List<string> Tmp = new List<string>();
+			Tmp = DefineHolder.Distinct().ToList();
+			DefineHolder = Tmp.ToList();
 
 			foreach (string Def in DefineHolder)
 			{

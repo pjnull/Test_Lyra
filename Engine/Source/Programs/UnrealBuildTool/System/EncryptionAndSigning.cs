@@ -274,7 +274,8 @@ namespace UnrealBuildTool
 				Settings.bEnablePakUAssetEncryption = false;
 				Settings.bEnablePakIniEncryption = Settings.bEnablePakIndexEncryption;
 
-				Ini.GetString("Core.Encryption", "aes.key", out string EncryptionKeyString);
+				string EncryptionKeyString;
+				Ini.GetString("Core.Encryption", "aes.key", out EncryptionKeyString);
 				Settings.EncryptionKey = new EncryptionKey();
 
 				if (EncryptionKeyString.Length > 0)
@@ -315,21 +316,21 @@ namespace UnrealBuildTool
 				Settings.bEnablePakFullAssetEncryption = bEnablePakFullAssetEncryption;
 
 				// Parse encryption key
-				Ini.GetString(SectionName, "EncryptionKey", out string EncryptionKeyString);
+				string EncryptionKeyString;
+				Ini.GetString(SectionName, "EncryptionKey", out EncryptionKeyString);
 				if (!string.IsNullOrEmpty(EncryptionKeyString))
 				{
-					Settings.EncryptionKey = new EncryptionKey
-					{
-						Key = System.Convert.FromBase64String(EncryptionKeyString),
-						Guid = Guid.Empty.ToString(),
-						Name = "Embedded"
-					};
+					Settings.EncryptionKey = new EncryptionKey();
+					Settings.EncryptionKey.Key = System.Convert.FromBase64String(EncryptionKeyString);
+					Settings.EncryptionKey.Guid = Guid.Empty.ToString();
+					Settings.EncryptionKey.Name = "Embedded";
 				}
 
 				// Parse secondary encryption keys
 				List<EncryptionKey> SecondaryEncryptionKeys = new List<EncryptionKey>();
+				List<string>? SecondaryEncryptionKeyStrings;
 
-				if (Ini.GetArray(SectionName, "SecondaryEncryptionKeys", out List<string>? SecondaryEncryptionKeyStrings))
+				if (Ini.GetArray(SectionName, "SecondaryEncryptionKeys", out SecondaryEncryptionKeyStrings))
 				{
 					foreach (string KeySource in SecondaryEncryptionKeyStrings)
 					{
@@ -363,11 +364,12 @@ namespace UnrealBuildTool
 				Settings.SecondaryEncryptionKeys = SecondaryEncryptionKeys.ToArray();
 
 				// Parse signing key
-				Ini.GetString(SectionName, "SigningPrivateExponent", out string PrivateExponent);
-				Ini.GetString(SectionName, "SigningModulus", out string Modulus);
-				Ini.GetString(SectionName, "SigningPublicExponent", out string PublicExponent);
+				string PrivateExponent, PublicExponent, Modulus;
+				Ini.GetString(SectionName, "SigningPrivateExponent", out PrivateExponent);
+				Ini.GetString(SectionName, "SigningModulus", out Modulus);
+				Ini.GetString(SectionName, "SigningPublicExponent", out PublicExponent);
 
-				if (!string.IsNullOrEmpty(PrivateExponent) && !string.IsNullOrEmpty(PublicExponent) && !string.IsNullOrEmpty(Modulus))
+				if (!String.IsNullOrEmpty(PrivateExponent) && !String.IsNullOrEmpty(PublicExponent) && !String.IsNullOrEmpty(Modulus))
 				{
 					Settings.SigningKey = new SigningKeyPair();
 					Settings.SigningKey.PublicKey.Exponent = System.Convert.FromBase64String(PublicExponent);
@@ -383,7 +385,8 @@ namespace UnrealBuildTool
 				ConfigHierarchy GameIni = ConfigCache.ReadHierarchy(ConfigHierarchyType.Game, InProjectDirectory, InTargetPlatform);
 				if (GameIni != null)
 				{
-					if (GameIni.GetString("ContentEncryption", "ProjectKeyChain", out string Filename))
+					string Filename;
+					if (GameIni.GetString("ContentEncryption", "ProjectKeyChain", out Filename))
 					{
 						FileReference ProjectKeyChainFile = FileReference.Combine(InProjectDirectory, "Content", Filename);
 						if (FileReference.Exists(ProjectKeyChainFile))
@@ -401,12 +404,11 @@ namespace UnrealBuildTool
 								string[] KeyParts = Line.Split(':');
 								if (KeyParts.Length == 4)
 								{
-									EncryptionKey NewKey = new EncryptionKey
-									{
-										Name = KeyParts[0],
-										Guid = KeyParts[2],
-										Key = System.Convert.FromBase64String(KeyParts[3])
-									};
+									EncryptionKey NewKey = new EncryptionKey();
+
+									NewKey.Name = KeyParts[0];
+									NewKey.Guid = KeyParts[2];
+									NewKey.Key = System.Convert.FromBase64String(KeyParts[3]);
 
 									EncryptionKey? ExistingKey = EncryptionKeys.Find((EncryptionKey OtherKey) => { return OtherKey.Guid == NewKey.Guid; });
 									if (ExistingKey != null && !CompareKey(ExistingKey.Key!, NewKey.Key))
@@ -426,10 +428,8 @@ namespace UnrealBuildTool
 
 			if (!Settings.bDataCryptoRequired)
 			{
-				CryptoSettings NewSettings = new CryptoSettings
-				{
-					SecondaryEncryptionKeys = Settings.SecondaryEncryptionKeys
-				};
+				CryptoSettings NewSettings = new CryptoSettings();
+				NewSettings.SecondaryEncryptionKeys = Settings.SecondaryEncryptionKeys;
 				Settings = NewSettings;
 			}
 			else
@@ -504,7 +504,7 @@ namespace UnrealBuildTool
 			return Bytes.ToArray();
 		}
 
-		private static byte[] ParseAnsiStringToByteArray(string InString, int InRequiredLength)
+		private static byte[] ParseAnsiStringToByteArray(string InString, Int32 InRequiredLength)
 		{
 			List<byte> Bytes = new List<byte>();
 

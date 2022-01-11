@@ -71,7 +71,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Executor to use for local actions
 		/// </summary>
-		readonly ActionExecutor LocalExecutor;
+		ActionExecutor LocalExecutor;
 
 		public readonly static string DefaultExecutableBasePath	= Path.Combine(Unreal.EngineDirectory.FullName, "Extras", "ThirdPartyNotUE", "FASTBuild");
 
@@ -148,7 +148,7 @@ namespace UnrealBuildTool
 		/// Which MSVC CRT Redist version to use
 		/// </summary>
 		[XmlConfigFile]
-		public static string MsvcCRTRedistVersion = "";
+		public static String MsvcCRTRedistVersion = "";
 
 		//////////////////////////////////////////
 
@@ -304,11 +304,12 @@ namespace UnrealBuildTool
 		//////////////////////////////////////////
 		// Action Helpers
 
-		private readonly ObjectIDGenerator objectIDGenerator = new ObjectIDGenerator();
+		private ObjectIDGenerator objectIDGenerator = new ObjectIDGenerator();
 
 		private long GetActionID(LinkedAction Action)
 		{
-			return objectIDGenerator.GetId(Action, out bool bFirstTime);
+			bool bFirstTime = false;
+			return objectIDGenerator.GetId(Action, out bFirstTime);
 		}
 
 		private string ActionToActionString(LinkedAction Action)
@@ -396,7 +397,7 @@ namespace UnrealBuildTool
 					if (BuildTypeSearchParam.Item2(Action).Contains(BuildTypeSearchParam.Item1))
 					{
 						BuildType = BuildTypeSearchParam.Item3;
-						Log.TraceInformation($"Detected build type as {BuildTypeSearchParam.Item1} from '{BuildTypeSearchParam.Item2(Action)}' using search term '{BuildTypeSearchParam.Item1}'");
+						Log.TraceInformation($"Detected build type as {BuildTypeSearchParam.Item1.ToString()} from '{BuildTypeSearchParam.Item2(Action)}' using search term '{BuildTypeSearchParam.Item1}'");
 						return true;
 					}
 				}
@@ -779,9 +780,10 @@ namespace UnrealBuildTool
 
 		private string GetOptionValue(Dictionary<string, string> OptionsDictionary, string Key, LinkedAction Action, bool ProblemIfNotFound = false)
 		{
-			if (OptionsDictionary.TryGetValue(Key, out string? Value))
+			string? Value = string.Empty;
+			if (OptionsDictionary.TryGetValue(Key, out Value))
 			{
-				return Value.Trim(new char[] { '\"' });
+				return Value.Trim(new Char[] { '\"' });
 			}
 
 			if (ProblemIfNotFound)
@@ -790,7 +792,7 @@ namespace UnrealBuildTool
 				Log.TraceWarning("Action.CommandArguments: " + Action.CommandArguments);
 			}
 
-			return string.Empty;
+			return String.Empty;
 		}
 
 		public string GetRegistryValue(string keyName, string valueName, object defaultValue)
@@ -958,14 +960,14 @@ namespace UnrealBuildTool
 				AddText($"\t\t'$Root$/msobj{platformVersionNumber}.dll'\n");
 				AddText($"\t\t'$Root$/mspdb{platformVersionNumber}.dll'\n");
 
-				List<string> PotentialMSVCRedistPaths = new List<string>(Directory.EnumerateDirectories(string.Format("{0}/Redist/MSVC", VCEnv.GetVCInstallDirectory())));
+				List<String> PotentialMSVCRedistPaths = new List<String>(Directory.EnumerateDirectories(string.Format("{0}/Redist/MSVC", VCEnv.GetVCInstallDirectory())));
 				string? PrefferedMSVCRedistPath = null;
 				string? FinalMSVCRedistPath = "";
 
 				if (MsvcCRTRedistVersion.Length > 0)
 				{
 					PrefferedMSVCRedistPath = PotentialMSVCRedistPaths.Find(
-						delegate (string str)
+						delegate (String str)
 						{
 							return str.Contains(MsvcCRTRedistVersion);
 						});
@@ -973,7 +975,7 @@ namespace UnrealBuildTool
 
 				if (PrefferedMSVCRedistPath == null)
 				{
-					PrefferedMSVCRedistPath = PotentialMSVCRedistPaths[^2];
+					PrefferedMSVCRedistPath = PotentialMSVCRedistPaths[PotentialMSVCRedistPaths.Count - 2];
 
 					if (MsvcCRTRedistVersion.Length > 0)
 					{
@@ -988,11 +990,11 @@ namespace UnrealBuildTool
 
 				}
 
-				PotentialMSVCRedistPaths = new List<string>(Directory.EnumerateDirectories(string.Format("{0}/{1}", PrefferedMSVCRedistPath, VCEnv.Architecture)));
+				PotentialMSVCRedistPaths = new List<String>(Directory.EnumerateDirectories(string.Format("{0}/{1}", PrefferedMSVCRedistPath, VCEnv.Architecture)));
 
 				FinalMSVCRedistPath = PotentialMSVCRedistPaths.Find(x => x.Contains(".CRT"));
 
-				if (string.IsNullOrEmpty(FinalMSVCRedistPath))
+				if (String.IsNullOrEmpty(FinalMSVCRedistPath))
 				{
 					FinalMSVCRedistPath = PrefferedMSVCRedistPath;
 				}
@@ -1378,7 +1380,7 @@ namespace UnrealBuildTool
 		private void PrintActionDetails(LinkedAction ActionToPrint)
 		{
 			Log.TraceInformation(ActionToActionString(ActionToPrint));
-			Log.TraceInformation($"Action Type: {ActionToPrint.ActionType}");
+			Log.TraceInformation($"Action Type: {ActionToPrint.ActionType.ToString()}");
 			Log.TraceInformation($"Action CommandPath: {ActionToPrint.CommandPath.FullName}");
 			Log.TraceInformation($"Action CommandArgs: {ActionToPrint.CommandArguments}");
 		}
@@ -1488,13 +1490,11 @@ namespace UnrealBuildTool
 			string? FBExecutable		= GetExecutablePath();
 			string WorkingDirectory	= Path.GetFullPath(Path.Combine(Unreal.EngineDirectory.MakeRelativeTo(DirectoryReference.GetCurrentDirectory()), "Source"));
 
-			ProcessStartInfo FBStartInfo = new ProcessStartInfo(FBExecutable, FBCommandLine)
-			{
-				UseShellExecute = false,
-				WorkingDirectory = WorkingDirectory,
-				RedirectStandardError = true,
-				RedirectStandardOutput = true
-			};
+			ProcessStartInfo FBStartInfo		= new ProcessStartInfo(FBExecutable, FBCommandLine);
+			FBStartInfo.UseShellExecute			= false;
+			FBStartInfo.WorkingDirectory		= WorkingDirectory;
+			FBStartInfo.RedirectStandardError	= true;
+			FBStartInfo.RedirectStandardOutput	= true;
 
 			string? Coordinator = GetCoordinator();
 			if (!string.IsNullOrEmpty(Coordinator) && !FBStartInfo.EnvironmentVariables.ContainsKey("FASTBUILD_COORDINATOR"))
@@ -1515,11 +1515,9 @@ namespace UnrealBuildTool
 
 			try
 			{
-				Process FBProcess = new Process
-				{
-					StartInfo = FBStartInfo,
-					EnableRaisingEvents = true
-				};
+				Process FBProcess				= new Process();
+				FBProcess.StartInfo				= FBStartInfo;
+				FBProcess.EnableRaisingEvents	= true;
 
 				DataReceivedEventHandler OutputEventHandler = (Sender, Args) =>
 				{

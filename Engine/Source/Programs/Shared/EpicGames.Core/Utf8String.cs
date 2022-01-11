@@ -125,19 +125,19 @@ namespace EpicGames.Core
 		/// <inheritdoc/>
 		public int CompareTo(Utf8String Other) => Utf8StringComparer.Ordinal.Compare(Span, Other.Span);
 
-		/// <inheritdoc cref="string.Contains(string)"/>
+		/// <inheritdoc cref="String.Contains(string)"/>
 		public bool Contains(Utf8String String) => IndexOf(String) != -1;
 
-		/// <inheritdoc cref="string.Contains(string, StringComparison)"/>
+		/// <inheritdoc cref="String.Contains(string, StringComparison)"/>
 		public bool Contains(Utf8String String, Utf8StringComparer Comparer) => IndexOf(String, Comparer) != -1;
 
-		/// <inheritdoc cref="string.IndexOf(char)"/>
+		/// <inheritdoc cref="String.IndexOf(char)"/>
 		public int IndexOf(byte Char)
 		{
 			return Span.IndexOf(Char);
 		}
 
-		/// <inheritdoc cref="string.IndexOf(char)"/>
+		/// <inheritdoc cref="String.IndexOf(char)"/>
 		public int IndexOf(char Char)
 		{
 			if (Char < 0x80)
@@ -150,10 +150,10 @@ namespace EpicGames.Core
 			}
 		}
 
-		/// <inheritdoc cref="string.IndexOf(char, int)"/>
+		/// <inheritdoc cref="String.IndexOf(char, int)"/>
 		public int IndexOf(char Char, int Index) => IndexOf(Char, Index, Length - Index);
 
-		/// <inheritdoc cref="string.IndexOf(char, int, int)"/>
+		/// <inheritdoc cref="String.IndexOf(char, int, int)"/>
 		public int IndexOf(char Char, int Index, int Count)
 		{
 			int Result;
@@ -168,13 +168,13 @@ namespace EpicGames.Core
 			return (Result == -1) ? -1 : Result + Index;
 		}
 
-		/// <inheritdoc cref="string.IndexOf(string)"/>
+		/// <inheritdoc cref="String.IndexOf(string)"/>
 		public int IndexOf(Utf8String String)
 		{
 			return Span.IndexOf(String.Span);
 		}
 
-		/// <inheritdoc cref="string.IndexOf(string, StringComparison)"/>
+		/// <inheritdoc cref="String.IndexOf(string, StringComparison)"/>
 		public int IndexOf(Utf8String String, Utf8StringComparer Comparer)
 		{
 			for (int Idx = 0; Idx < Length - String.Length; Idx++)
@@ -187,13 +187,13 @@ namespace EpicGames.Core
 			return -1;
 		}
 
-		/// <inheritdoc cref="string.LastIndexOf(char)"/>
+		/// <inheritdoc cref="String.LastIndexOf(char)"/>
 		public int LastIndexOf(byte Char)
 		{
 			return Span.IndexOf(Char);
 		}
 
-		/// <inheritdoc cref="string.LastIndexOf(char)"/>
+		/// <inheritdoc cref="String.LastIndexOf(char)"/>
 		public int LastIndexOf(char Char)
 		{
 			if (Char < 0x80)
@@ -254,13 +254,13 @@ namespace EpicGames.Core
 		/// <inheritdoc cref="Substring(int, int)"/>
 		public Utf8String Slice(int Start, int Count) => Substring(Start, Count);
 
-		/// <inheritdoc cref="string.Substring(int)"/>
+		/// <inheritdoc cref="String.Substring(int)"/>
 		public Utf8String Substring(int Start)
 		{
 			return new Utf8String(Memory.Slice(Start));
 		}
 
-		/// <inheritdoc cref="string.Substring(int, int)"/>
+		/// <inheritdoc cref="String.Substring(int, int)"/>
 		public Utf8String Substring(int Start, int Count)
 		{
 			return new Utf8String(Memory.Slice(Start, Count));

@@ -120,7 +120,8 @@ namespace UnrealBuildTool
 			foreach (TimingData Data in ParsedTimingData)
 			{
 				// See if we've already added a child that matches this data's name. If so, just add to the duration.
-				if (Summary.Children.TryGetValue(Data.Name, out TimingData? MatchedData))
+				TimingData? MatchedData;
+				if (Summary.Children.TryGetValue(Data.Name, out MatchedData))
 				{
 					MatchedData.Count += 1;
 					MatchedData.ExclusiveDuration += Data.ExclusiveDuration;
@@ -141,7 +142,8 @@ namespace UnrealBuildTool
 			TimingData? LastTimingData = null;
 			foreach (string Line in Lines)
 			{
-				TimingData CurrentTimingData = ParseTimingDataFromLine(TimingType, Line, out int LineDepth)!;
+				int LineDepth;
+				TimingData CurrentTimingData = ParseTimingDataFromLine(TimingType, Line, out LineDepth)!;
 				if (LineDepth == 0)
 				{
 					ParsedTimingData.Add(CurrentTimingData);
@@ -194,10 +196,8 @@ namespace UnrealBuildTool
 
 			LineDepth = TimingDataMatch.Groups["Indent"].Success ? TimingDataMatch.Groups["Indent"].Value.Count() : 0;
 
-			TimingData ParsedTimingData = new TimingData(TimingDataMatch.Groups["Name"].Value, TimingType)
-			{
-				ExclusiveDuration = float.Parse(TimingDataMatch.Groups["Duration"].Value)
-			};
+			TimingData ParsedTimingData = new TimingData(TimingDataMatch.Groups["Name"].Value, TimingType);
+			ParsedTimingData.ExclusiveDuration = float.Parse(TimingDataMatch.Groups["Duration"].Value);
 
 			return ParsedTimingData;
 		}
@@ -310,7 +310,8 @@ namespace UnrealBuildTool
 					ClassName = ClassName.Substring(0, TemplateIdx) + "<>";
 				}
 
-				ClassNameToTime.TryGetValue(ClassName, out float Time);
+				float Time;
+				ClassNameToTime.TryGetValue(ClassName, out Time);
 
 				Time += float.Parse(Match.Groups[2].Value);
 				ClassNameToTime[ClassName] = Time;

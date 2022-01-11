@@ -97,7 +97,7 @@ namespace UnrealBuildTool
 		/// <returns></returns>
 		public override string ToString()
 		{
-			return string.Format("{0}({1})", SourceFile.Location, SourceFile.Markup[MarkupIdx].LineNumber);
+			return String.Format("{0}({1})", SourceFile.Location, SourceFile.Markup[MarkupIdx].LineNumber);
 		}
 	}
 }

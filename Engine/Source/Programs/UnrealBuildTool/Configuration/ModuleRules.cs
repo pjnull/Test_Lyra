@@ -475,7 +475,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Additional directories that contribute to this module but are not based on a subclass (NotForLicensees, etc)
 		/// </summary>
-		private readonly List<DirectoryReference> AdditionalModuleDirectories = new List<DirectoryReference>();
+		private List<DirectoryReference> AdditionalModuleDirectories = new List<DirectoryReference>();
 
 		/// <summary>
 		/// Plugin containing this module
@@ -975,7 +975,7 @@ namespace UnrealBuildTool
 		public bool bLegacyPublicIncludePaths
 		{
 			set { bLegacyPublicIncludePathsPrivate = value; }
-			get { return bLegacyPublicIncludePathsPrivate ?? ((DefaultBuildSettings < BuildSettingsVersion.V2) && Target.bLegacyPublicIncludePaths); }
+			get { return bLegacyPublicIncludePathsPrivate ?? ((DefaultBuildSettings < BuildSettingsVersion.V2) ? Target.bLegacyPublicIncludePaths : false); }
 		}
 		private bool? bLegacyPublicIncludePathsPrivate;
 
@@ -996,7 +996,8 @@ namespace UnrealBuildTool
 		{
 			get
 			{
-				return UEBuildPlatformSDK.TryGetHostPlatformAutoSDKDir(out DirectoryReference? AutoSdkDir) ? AutoSdkDir.FullName : null;
+				DirectoryReference? AutoSdkDir;
+				return UEBuildPlatformSDK.TryGetHostPlatformAutoSDKDir(out AutoSdkDir) ? AutoSdkDir.FullName : null;
 			}
 		}
 
@@ -1304,7 +1305,8 @@ namespace UnrealBuildTool
 				return null;
 			}
 
-			if (DirectoriesForModuleSubClasses.TryGetValue(Type, out DirectoryReference? Directory))
+			DirectoryReference? Directory;
+			if (DirectoriesForModuleSubClasses.TryGetValue(Type, out Directory))
 			{
 				return Directory;
 			}

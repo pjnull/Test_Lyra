@@ -112,19 +112,21 @@ namespace UnrealBuildTool
 			{
 				try
 				{
-					using BinaryArchiveReader Reader = new BinaryArchiveReader(Location);
-					int Version = Reader.ReadInt();
-					if (Version != CurrentVersion)
+					using (BinaryArchiveReader Reader = new BinaryArchiveReader(Location))
 					{
-						Log.TraceLog("Unable to read dependency cache from {0}; version {1} vs current {2}", Location, Version, CurrentVersion);
-						return;
-					}
+						int Version = Reader.ReadInt();
+						if (Version != CurrentVersion)
+						{
+							Log.TraceLog("Unable to read dependency cache from {0}; version {1} vs current {2}", Location, Version, CurrentVersion);
+							return;
+						}
 
-					int Count = Reader.ReadInt();
-					for (int Idx = 0; Idx < Count; Idx++)
-					{
-						FileItem File = Reader.ReadFileItem()!;
-						DependencyFileToInfo[File] = DependencyInfo.Read(Reader);
+						int Count = Reader.ReadInt();
+						for (int Idx = 0; Idx < Count; Idx++)
+						{
+							FileItem File = Reader.ReadFileItem()!;
+							DependencyFileToInfo[File] = DependencyInfo.Read(Reader);
+						}
 					}
 				}
 				catch (Exception Ex)
@@ -142,14 +144,16 @@ namespace UnrealBuildTool
 				DirectoryReference.CreateDirectory(Location.Directory);
 				using (FileStream Stream = File.Open(Location.FullName, FileMode.Create, FileAccess.Write, FileShare.Read))
 				{
-					using BinaryArchiveWriter Writer = new BinaryArchiveWriter(Stream);
-					Writer.WriteInt(CurrentVersion);
-
-					Writer.WriteInt(DependencyFileToInfo.Count);
-					foreach (KeyValuePair<FileItem, DependencyInfo> Pair in DependencyFileToInfo)
+					using (BinaryArchiveWriter Writer = new BinaryArchiveWriter(Stream))
 					{
-						Writer.WriteFileItem(Pair.Key);
-						Pair.Value.Write(Writer);
+						Writer.WriteInt(CurrentVersion);
+
+						Writer.WriteInt(DependencyFileToInfo.Count);
+						foreach (KeyValuePair<FileItem, DependencyInfo> Pair in DependencyFileToInfo)
+						{
+							Writer.WriteFileItem(Pair.Key);
+							Pair.Value.Write(Writer);
+						}
 					}
 				}
 				bModified = false;
@@ -159,12 +163,12 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// List of partitions
 		/// </summary>
-		readonly List<CachePartition> Partitions = new List<CachePartition>();
+		List<CachePartition> Partitions = new List<CachePartition>();
 
 		/// <summary>
 		/// Static cache of all constructed dependency caches
 		/// </summary>
-		static readonly Dictionary<FileReference, CachePartition> GlobalPartitions = new Dictionary<FileReference, CachePartition>();
+		static Dictionary<FileReference, CachePartition> GlobalPartitions = new Dictionary<FileReference, CachePartition>();
 
 		/// <summary>
 		/// Constructs a dependency cache. This method is private; call CppDependencyCache.Create() to create a cache hierarchy for a given project.
@@ -181,7 +185,8 @@ namespace UnrealBuildTool
 		/// <returns>True if a produced module was found</returns>
 		public bool TryGetProducedModule(FileItem InputFile, [NotNullWhen(true)] out string? OutModule)
 		{
-			if (TryGetDependencyInfo(InputFile, out DependencyInfo? Info) && Info.ProducedModule != null)
+			DependencyInfo? Info;
+			if (TryGetDependencyInfo(InputFile, out Info) && Info.ProducedModule != null)
 			{
 				OutModule = Info.ProducedModule;
 				return true;
@@ -201,7 +206,8 @@ namespace UnrealBuildTool
 		/// <returns>True if a list of imported modules was obtained</returns>
 		public bool TryGetImportedModules(FileItem InputFile, [NotNullWhen(true)] out List<(string Name, string BMI)>? OutImportedModules)
 		{
-			if (TryGetDependencyInfo(InputFile, out DependencyInfo? Info))
+			DependencyInfo? Info;
+			if (TryGetDependencyInfo(InputFile, out Info))
 			{
 				OutImportedModules = Info.ImportedModules;
 				return OutImportedModules != null;
@@ -221,7 +227,8 @@ namespace UnrealBuildTool
 		/// <returns>True if the input file exists and the dependencies were read</returns>
 		public bool TryGetDependencies(FileItem InputFile, [NotNullWhen(true)] out List<FileItem>? OutDependencyItems)
 		{
-			if (TryGetDependencyInfo(InputFile, out DependencyInfo? Info))
+			DependencyInfo? Info;
+			if (TryGetDependencyInfo(InputFile, out Info))
 			{
 				OutDependencyItems = Info.Files;
 				return true;
@@ -275,7 +282,8 @@ namespace UnrealBuildTool
 			{
 				if (InputFile.Location.IsUnderDirectory(Partition.BaseDir))
 				{
-					if (!Partition.DependencyFileToInfo.TryGetValue(InputFile, out DependencyInfo? Info) || InputFile.LastWriteTimeUtc.Ticks > Info.LastWriteTimeUtc)
+					DependencyInfo? Info;
+					if (!Partition.DependencyFileToInfo.TryGetValue(InputFile, out Info) || InputFile.LastWriteTimeUtc.Ticks > Info.LastWriteTimeUtc)
 					{
 						Info = ReadDependencyInfo(InputFile);
 						Partition.DependencyFileToInfo.TryAdd(InputFile, Info);
@@ -338,7 +346,8 @@ namespace UnrealBuildTool
 			{
 				if (!Partitions.Any(x => x.Location == Location))
 				{
-					if (!GlobalPartitions.TryGetValue(Location, out CachePartition? Partition))
+					CachePartition? Partition;
+					if (!GlobalPartitions.TryGetValue(Location, out Partition))
 					{
 						Partition = new CachePartition(Location, BaseDir);
 						GlobalPartitions.Add(Location, Partition);
@@ -438,14 +447,15 @@ namespace UnrealBuildTool
 						$"Dependency file \"{InputFile.Location}\" does not have have a \"Version\" field.");
 				}
 
-				if (!string.Equals(Version, "1.1") &&
-					!string.Equals(Version, "1.0"))
+				if (!String.Equals(Version, "1.1") &&
+					!String.Equals(Version, "1.0"))
 				{
 					throw new BuildException(
 						$"Dependency file \"{InputFile.Location}\" version (\"{Version}\") is not supported version");
 				}
 
-				if (!Object.TryGetObjectField("Data", out JsonObject? Data))
+				JsonObject? Data;
+				if (!Object.TryGetObjectField("Data", out Data))
 				{
 					throw new BuildException("Missing 'Data' field in {0}", InputFile);
 				}
@@ -454,7 +464,7 @@ namespace UnrealBuildTool
 
 				List<(string Name, string BMI)>? ImportedModules = null;
 
-				if (string.Equals(Version, "1.1") && !InputFile.HasExtension(".md.json"))
+				if (String.Equals(Version, "1.1") && !InputFile.HasExtension(".md.json"))
 				{
 					if (Data.TryGetObjectArrayField("ImportedModules", out JsonObject[]? ImportedModulesJson))
 					{

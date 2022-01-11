@@ -240,7 +240,7 @@ namespace EpicGames.Core
 		/// <param name="Writer"></param>
 		public void Write(IJsonSchemaWriter Writer)
 		{
-			string CamelCaseName = char.ToLowerInvariant(Name[0]) + Name.Substring(1);
+			string CamelCaseName = Char.ToLowerInvariant(Name[0]) + Name.Substring(1);
 			Writer.WriteStartObject(CamelCaseName);
 			Writer.WriteType(Type);
 			if (Description != null)

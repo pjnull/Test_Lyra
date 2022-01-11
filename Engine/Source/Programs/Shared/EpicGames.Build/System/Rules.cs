@@ -43,7 +43,7 @@ namespace UnrealBuildBase
 
 		/// Map of root folders to a cached list of all UBT-related source files in that folder or any of its sub-folders.
 		/// We cache these file names so we can avoid searching for them later on.
-		static readonly Dictionary<DirectoryReference, RulesFileCache> RootFolderToRulesFileCache = new Dictionary<DirectoryReference, RulesFileCache>();
+		static Dictionary<DirectoryReference, RulesFileCache> RootFolderToRulesFileCache = new Dictionary<DirectoryReference, RulesFileCache>();
 
 		/// <summary>
 		/// 
@@ -205,7 +205,8 @@ namespace UnrealBuildBase
 			{
 				foreach (DirectoryReference Directory in Directories)
 				{
-					if (!RootFolderToRulesFileCache.TryGetValue(Directory, out RulesFileCache? Cache))
+					RulesFileCache? Cache;
+					if (!RootFolderToRulesFileCache.TryGetValue(Directory, out Cache))
 					{
 						Cache = new RulesFileCache();
 						Queue.Enqueue(() => FindAllRulesFilesRecursively(DirectoryItem.GetItemByDirectoryReference(Directory), Cache, Queue));

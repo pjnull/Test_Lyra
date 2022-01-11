@@ -47,7 +47,7 @@ namespace EpicGames.Core
 		/// <summary>
 		/// Internal field storing information about the platform that created a ZipArchiveEntry. Cannot interpret how to treat the attribute bits without reading this.
 		/// </summary>
-		static readonly FieldInfo VersionMadeByPlatformField = typeof(ZipArchiveEntry).GetField("_versionMadeByPlatform", BindingFlags.NonPublic | BindingFlags.Instance)!;
+		static FieldInfo VersionMadeByPlatformField = typeof(ZipArchiveEntry).GetField("_versionMadeByPlatform", BindingFlags.NonPublic | BindingFlags.Instance)!;
 
 		/// <summary>
 		/// Extract a zip archive entry, preserving platform mode bits

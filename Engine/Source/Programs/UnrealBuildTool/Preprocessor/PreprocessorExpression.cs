@@ -16,7 +16,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Precedence table for binary operators (indexed by TokenType). Lower values indicate higher precedence.
 		/// </summary>
-		static readonly byte[] Precedence;
+		static byte[] Precedence;
 
 		/// <summary>
 		/// Static constructor. Initializes the Precedence table.
@@ -193,7 +193,7 @@ namespace UnrealBuildTool
 						Lhs %= Rhs;
 						break;
 					default:
-						throw new NotImplementedException(string.Format("Binary operator '{0}' has not been implemented", Operator.Type));
+						throw new NotImplementedException(String.Format("Binary operator '{0}' has not been implemented", Operator.Type));
 				}
 			}
 

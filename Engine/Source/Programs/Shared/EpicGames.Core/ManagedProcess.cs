@@ -37,32 +37,32 @@ namespace EpicGames.Core
 	/// </summary>
 	public class ManagedProcessGroup : IDisposable
 	{
-		const uint JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000;
-		const uint JOB_OBJECT_LIMIT_BREAKAWAY_OK = 0x00000800;
+		const UInt32 JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000;
+		const UInt32 JOB_OBJECT_LIMIT_BREAKAWAY_OK = 0x00000800;
 
 		[StructLayout(LayoutKind.Sequential)]
 		struct JOBOBJECT_BASIC_LIMIT_INFORMATION
 		{
-			public long PerProcessUserTimeLimit;
-			public long PerJobUserTimeLimit;
-			public uint LimitFlags;
+			public Int64 PerProcessUserTimeLimit;
+			public Int64 PerJobUserTimeLimit;
+			public UInt32 LimitFlags;
 			public UIntPtr MinimumWorkingSetSize;
 			public UIntPtr MaximumWorkingSetSize;
-			public uint ActiveProcessLimit;
-			public long Affinity;
-			public uint PriorityClass;
-			public uint SchedulingClass;
+			public UInt32 ActiveProcessLimit;
+			public Int64 Affinity;
+			public UInt32 PriorityClass;
+			public UInt32 SchedulingClass;
 		}
 
 		[StructLayout(LayoutKind.Sequential)]
 		struct IO_COUNTERS
 		{
-			public ulong ReadOperationCount;
-			public ulong WriteOperationCount;
-			public ulong OtherOperationCount;
-			public ulong ReadTransferCount;
-			public ulong WriteTransferCount;
-			public ulong OtherTransferCount;
+			public UInt64 ReadOperationCount;
+			public UInt64 WriteOperationCount;
+			public UInt64 OtherOperationCount;
+			public UInt64 ReadTransferCount;
+			public UInt64 WriteTransferCount;
+			public UInt64 OtherTransferCount;
 		}
 
 		[StructLayout(LayoutKind.Sequential)]
@@ -79,14 +79,14 @@ namespace EpicGames.Core
 		[StructLayout(LayoutKind.Sequential)]
 		struct JOBOBJECT_BASIC_ACCOUNTING_INFORMATION
 		{
-			public ulong TotalUserTime;
-			public ulong TotalKernelTime;
-			public ulong ThisPeriodTotalUserTime;
-			public ulong ThisPeriodTotalKernelTime;
-			public uint TotalPageFaultCount;
-			public uint TotalProcesses;
-			public uint ActiveProcesses;
-			public uint TotalTerminatedProcesses;
+			public UInt64 TotalUserTime;
+			public UInt64 TotalKernelTime;
+			public UInt64 ThisPeriodTotalUserTime;
+			public UInt64 ThisPeriodTotalKernelTime;
+			public UInt32 TotalPageFaultCount;
+			public UInt32 TotalProcesses;
+			public UInt32 ActiveProcesses;
+			public UInt32 TotalTerminatedProcesses;
 		}
 
 		[DllImport("kernel32.dll", SetLastError=true)]
@@ -296,10 +296,10 @@ namespace EpicGames.Core
 		[DllImport("kernel32.dll", SetLastError=true)]
 		static extern int TerminateProcess(SafeHandleZeroOrMinusOneIsInvalid hProcess, uint uExitCode);
 
-		const uint INFINITE = 0xFFFFFFFF;
+		const UInt32 INFINITE = 0xFFFFFFFF;
 
 		[DllImport("kernel32.dll", SetLastError=true)]
-		static extern uint WaitForSingleObject(SafeHandleZeroOrMinusOneIsInvalid hHandle, uint dwMilliseconds);
+		static extern UInt32 WaitForSingleObject(SafeHandleZeroOrMinusOneIsInvalid hHandle, UInt32 dwMilliseconds);
 
 		[DllImport("kernel32.dll", SetLastError = true)]
 		[return: MarshalAs(UnmanagedType.Bool)]
@@ -310,19 +310,19 @@ namespace EpicGames.Core
 			out System.Runtime.InteropServices.ComTypes.FILETIME lpUserTime);
 
 		[DllImport("kernel32.dll")]
-		static extern ushort GetActiveProcessorGroupCount();
+		static extern UInt16 GetActiveProcessorGroupCount();
 
 		[DllImport("kernel32.dll")]
-		static extern uint GetActiveProcessorCount(ushort GroupNumber);
+		static extern UInt32 GetActiveProcessorCount(UInt16 GroupNumber);
 		
 		[StructLayout(LayoutKind.Sequential)]
 		class GROUP_AFFINITY
 		{
-			public ulong Mask;
-			public ushort Group;
-			public ushort Reserved0;
-			public ushort Reserved1;
-			public ushort Reserved2;
+			public UInt64 Mask;
+			public UInt16 Group;
+			public UInt16 Reserved0;
+			public UInt16 Reserved1;
+			public UInt16 Reserved2;
 		}
 
 		[DllImport("kernel32.dll", SetLastError = true)]
@@ -429,7 +429,7 @@ namespace EpicGames.Core
 		/// Static lock object. This is used to synchronize the creation of child processes - in particular, the inheritance of stdout/stderr write pipes. If processes
 		/// inherit pipes meant for other processes, they won't be closed until both terminate.
 		/// </summary>
-		static readonly object LockObject = new object();
+		static object LockObject = new object();
 
 		/// <summary>
 		/// Used to perform CPU usage and resource accounting of all children process involved in a single compilation unit.
@@ -649,7 +649,8 @@ namespace EpicGames.Core
 						// Support for nested job objects was only added in Windows 8; prior to that, assigning processes to job objects would fail. Figure out if we're already in a job, and ignore the error if we are.
 						int OriginalError = Marshal.GetLastWin32Error();
 
-						IsProcessInJob(GetCurrentProcess(), IntPtr.Zero, out bool bProcessInJob);
+						bool bProcessInJob;
+						IsProcessInJob(GetCurrentProcess(), IntPtr.Zero, out bProcessInJob);
 
 						if (!bProcessInJob)
 						{
@@ -686,11 +687,9 @@ namespace EpicGames.Core
 
 						uint GroupProcessorCount = GetActiveProcessorCount(ProcessorGroup);
 
-						GROUP_AFFINITY GroupAffinity = new GROUP_AFFINITY
-						{
-							Mask = ~0ul >> (int)(64 - GroupProcessorCount),
-							Group = ProcessorGroup
-						};
+						GROUP_AFFINITY GroupAffinity = new GROUP_AFFINITY();
+						GroupAffinity.Mask = ~0ul >> (int)(64 - GroupProcessorCount);
+						GroupAffinity.Group = ProcessorGroup;
 						SetThreadGroupAffinity(ProcessInfo.hThread, GroupAffinity, null);
 					}
 					
@@ -795,33 +794,27 @@ namespace EpicGames.Core
 				StdErrText = StdOutText;
 				FrameworkMergedStdWriterThreadCount = 2;
 
-				FrameworkStdOutThread = new Thread(() =>
-				{
+				FrameworkStdOutThread = new Thread(() => {
 					CopyPipe(FrameworkProcess.StandardOutput.BaseStream, FrameworkMergedStdWriter!);
 					if (Interlocked.Decrement(ref FrameworkMergedStdWriterThreadCount) == 0)
 					{
 						// Dispose AnonymousPipe to unblock readers.
 						FrameworkMergedStdWriter?.Dispose();
 					}
-				})
-				{
-					Name = $"ManagedProcess Merge StdOut",
-					IsBackground = true
-				};
+				});
+				FrameworkStdOutThread.Name = $"ManagedProcess Merge StdOut";
+				FrameworkStdOutThread.IsBackground = true;
 
-				FrameworkStdErrThread = new Thread(() =>
-				{
+				FrameworkStdErrThread = new Thread(() => {
 					CopyPipe(FrameworkProcess.StandardError.BaseStream, FrameworkMergedStdWriter!);
 					if (Interlocked.Decrement(ref FrameworkMergedStdWriterThreadCount) == 0)
 					{
 						// Dispose AnonymousPipe to unblock readers.
 						FrameworkMergedStdWriter?.Dispose();
 					}
-				})
-				{
-					Name = $"ManagedProcess Merge StdErr",
-					IsBackground = true
-				};
+				});
+				FrameworkStdErrThread.Name = $"ManagedProcess Merge StdErr";
+				FrameworkStdErrThread.IsBackground = true;
 			}
 
 			FrameworkStartTime = DateTime.Now;
@@ -1014,21 +1007,23 @@ namespace EpicGames.Core
 		public async Task CopyToAsync(Func<byte[], int, int, CancellationToken, Task> WriteOutputAsync, int BufferSize, CancellationToken CancellationToken)
 		{
 			TaskCompletionSource<bool> TaskCompletionSource = new TaskCompletionSource<bool>();
-			using CancellationTokenRegistration Registration = CancellationToken.Register(() => TaskCompletionSource.SetResult(false));
-			byte[] Buffer = new byte[BufferSize];
-			for (; ; )
+			using (CancellationTokenRegistration Registration = CancellationToken.Register(() => TaskCompletionSource.SetResult(false)))
 			{
-				Task<int> ReadTask = StdOut.ReadAsync(Buffer, 0, BufferSize, CancellationToken);
-
-				Task CompletedTask = await Task.WhenAny(ReadTask, TaskCompletionSource.Task);
-				CancellationToken.ThrowIfCancellationRequested();
-
-				int Bytes = await ReadTask;
-				if (Bytes == 0)
+				byte[] Buffer = new byte[BufferSize];
+				for (; ; )
 				{
-					break;
+					Task<int> ReadTask = StdOut.ReadAsync(Buffer, 0, BufferSize, CancellationToken);
+
+					Task CompletedTask = await Task.WhenAny(ReadTask, TaskCompletionSource.Task);
+					CancellationToken.ThrowIfCancellationRequested();
+
+					int Bytes = await ReadTask;
+					if (Bytes == 0)
+					{
+						break;
+					}
+					await WriteOutputAsync(Buffer, 0, Bytes, CancellationToken);
 				}
-				await WriteOutputAsync(Buffer, 0, Bytes, CancellationToken);
 			}
 		}
 
@@ -1170,7 +1165,8 @@ namespace EpicGames.Core
 			{
 				if(FrameworkProcess == null)
 				{
-					if (GetExitCodeProcess(ProcessHandle!, out int Value) == 0)
+					int Value;
+					if(GetExitCodeProcess(ProcessHandle!, out Value) == 0)
 					{
 						throw new Win32Exception();
 					}
@@ -1194,7 +1190,8 @@ namespace EpicGames.Core
 			{
 				if (FrameworkProcess == null)
 				{
-					if (!GetProcessTimes(ProcessHandle!, out System.Runtime.InteropServices.ComTypes.FILETIME CreationTime, out _, out _, out _))
+					System.Runtime.InteropServices.ComTypes.FILETIME CreationTime;
+					if (!GetProcessTimes(ProcessHandle!, out CreationTime, out _, out _, out _))
 					{
 						throw new Win32Exception();
 					}
@@ -1216,7 +1213,8 @@ namespace EpicGames.Core
 			{
 				if (FrameworkProcess == null)
 				{
-					if (!GetProcessTimes(ProcessHandle!, out _, out System.Runtime.InteropServices.ComTypes.FILETIME ExitTime, out _, out _))
+					System.Runtime.InteropServices.ComTypes.FILETIME ExitTime;
+					if (!GetProcessTimes(ProcessHandle!, out _, out ExitTime, out _, out _))
 					{
 						throw new Win32Exception();
 					}

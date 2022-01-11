@@ -34,7 +34,7 @@ namespace EpicGames.Core
 		/// <param name="Format">The format specifier for the message</param>
 		/// <param name="Args">Arguments for the status message</param>
 		public LogStatusScope(string Format, params object[] Args)
-			: this(string.Format(Format, Args))
+			: this(String.Format(Format, Args))
 		{
 		}
 
@@ -55,7 +55,7 @@ namespace EpicGames.Core
 		/// <param name="Args">Arguments for the status message</param>
 		public void SetMessage(string Format, params object[] Args)
 		{
-			SetMessage(string.Format(Format, Args));
+			SetMessage(String.Format(Format, Args));
 		}
 
 		/// <summary>

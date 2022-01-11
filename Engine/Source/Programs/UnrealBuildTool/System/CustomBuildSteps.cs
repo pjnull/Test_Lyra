@@ -15,7 +15,7 @@ namespace UnrealBuildTool
 	/// </summary>
 	public class CustomBuildSteps
 	{
-		readonly Dictionary<UnrealTargetPlatform, string[]> HostPlatformToCommands = new Dictionary<UnrealTargetPlatform,string[]>();
+		Dictionary<UnrealTargetPlatform, string[]> HostPlatformToCommands = new Dictionary<UnrealTargetPlatform,string[]>();
 
 		/// <summary>
 		/// Construct a custom build steps object from a Json object.
@@ -24,7 +24,8 @@ namespace UnrealBuildTool
 		{
 			foreach(string HostPlatformName in RawObject.KeyNames)
 			{
-				if (UnrealTargetPlatform.TryParse(HostPlatformName, out UnrealTargetPlatform Platform))
+				UnrealTargetPlatform Platform;
+				if (UnrealTargetPlatform.TryParse(HostPlatformName, out Platform))
 				{
 					HostPlatformToCommands.Add(Platform, RawObject.GetStringArrayField(HostPlatformName));
 				}
@@ -40,7 +41,8 @@ namespace UnrealBuildTool
 		/// <returns>True if the field was read (and OutBuildSteps is set), false otherwise.</returns>
 		public static bool TryRead(JsonObject RawObject, string FieldName, [NotNullWhen(true)] out CustomBuildSteps? OutBuildSteps)
 		{
-			if (RawObject.TryGetObjectField(FieldName, out JsonObject? BuildStepsObject))
+			JsonObject? BuildStepsObject;
+			if(RawObject.TryGetObjectField(FieldName, out BuildStepsObject))
 			{
 				OutBuildSteps = new CustomBuildSteps(BuildStepsObject);
 				return true;
@@ -81,7 +83,8 @@ namespace UnrealBuildTool
 		/// <returns>True if a list of commands was generated</returns>
 		public bool TryGetCommands(UnrealTargetPlatform HostPlatform, [NotNullWhen(true)] out string[]? OutCommands)
 		{
-			if (HostPlatformToCommands.TryGetValue(HostPlatform, out string[]? Commands) && Commands.Length > 0)
+			string[]? Commands;
+			if(HostPlatformToCommands.TryGetValue(HostPlatform, out Commands) && Commands.Length > 0)
 			{
 				OutCommands = Commands;
 				return true;

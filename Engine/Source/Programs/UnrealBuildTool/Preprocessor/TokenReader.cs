@@ -64,17 +64,17 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Map of utf-8 leading bytes to their class
 		/// </summary>
-		static readonly FirstCharacterClass[] FirstCharacters;
+		static FirstCharacterClass[] FirstCharacters;
 
 		/// <summary>
 		/// Array of flags for different leading utf-8 sequences
 		/// </summary>
-		static readonly CharacterFlags[] Characters;
+		static CharacterFlags[] Characters;
 
 		/// <summary>
 		/// The current buffer being read from. Encoded as UTF-8 with a null terminator.
 		/// </summary>
-		readonly byte[] Data;
+		byte[] Data;
 
 		/// <summary>
 		/// Current offset within the buffer
@@ -97,7 +97,7 @@ namespace UnrealBuildTool
 			this.LineNumberAfterToken = 1;
 
 			// Make sure the input data has a null terminator
-			if(Data.Length == 0 || Data[^1] != 0)
+			if(Data.Length == 0 || Data[Data.Length - 1] != 0)
 			{
 				throw new ArgumentException("Data parameter must be null terminated.");
 			}

@@ -30,12 +30,12 @@ namespace EpicGames.Core
 		/// <summary>
 		/// The current state value
 		/// </summary>
-		static readonly AsyncLocal<State?> CurrentState = new AsyncLocal<State?>();
+		static AsyncLocal<State?> CurrentState = new AsyncLocal<State?>();
 
 		/// <summary>
 		/// Gets the current indent string
 		/// </summary>
-		public static string Current => CurrentState.Value?.Indent ?? string.Empty;
+		public static string Current => CurrentState.Value?.Indent ?? String.Empty;
 
 		/// <summary>
 		/// Push a new indent onto the stack

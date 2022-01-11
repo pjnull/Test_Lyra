@@ -77,64 +77,66 @@ namespace UnrealBuildTool
 			}
 
 			// Read the cache from disk
-			using BinaryReader Reader = new BinaryReader(File.Open(Location.FullName, FileMode.Open, FileAccess.Read, FileShare.Read));
-			// Check the serialization version matches
-			if (Reader.ReadInt32() != SerializationVersion)
+			using (BinaryReader Reader = new BinaryReader(File.Open(Location.FullName, FileMode.Open, FileAccess.Read, FileShare.Read)))
 			{
-				Data = null;
-				return false;
-			}
-
-			// Read the input files
-			FileReference[] InputFiles = Reader.ReadArray(() => Reader.ReadFileReference())!;
-
-			// Read the types
-			int NumTypes = Reader.ReadInt32();
-			Dictionary<Type, ValueInfo[]> TypeToValues = new Dictionary<Type, ValueInfo[]>(NumTypes);
-			for (int TypeIdx = 0; TypeIdx < NumTypes; TypeIdx++)
-			{
-				// Read the type name
-				string TypeName = Reader.ReadString();
-
-				// Try to find it in the list of configurable types
-				Type Type = Types.FirstOrDefault(x => x.Name == TypeName);
-				if (Type == null)
+				// Check the serialization version matches
+				if(Reader.ReadInt32() != SerializationVersion)
 				{
 					Data = null;
 					return false;
 				}
 
-				// Read all the values
-				ValueInfo[] Values = new ValueInfo[Reader.ReadInt32()];
-				for (int ValueIdx = 0; ValueIdx < Values.Length; ValueIdx++)
-				{
-					string FieldName = Reader.ReadString();
+				// Read the input files
+				FileReference[] InputFiles = Reader.ReadArray(() => Reader.ReadFileReference())!;
 
-					// Find the matching field on the output type
-					FieldInfo? Field = Type.GetField(FieldName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
-					XmlConfigFileAttribute? XmlConfigAttribute = Field?.GetCustomAttribute<XmlConfigFileAttribute>();
-					if (Field == null || XmlConfigAttribute == null)
+				// Read the types
+				int NumTypes = Reader.ReadInt32();
+				Dictionary<Type, ValueInfo[]> TypeToValues = new Dictionary<Type, ValueInfo[]>(NumTypes);
+				for(int TypeIdx = 0; TypeIdx < NumTypes; TypeIdx++)
+				{
+					// Read the type name
+					string TypeName = Reader.ReadString();
+
+					// Try to find it in the list of configurable types
+					Type Type = Types.FirstOrDefault(x => x.Name == TypeName);
+					if(Type == null)
 					{
 						Data = null;
 						return false;
 					}
 
-					// Try to parse the value and add it to the output array
-					object Value = Reader.ReadObject(Field.FieldType)!;
+					// Read all the values
+					ValueInfo[] Values = new ValueInfo[Reader.ReadInt32()];
+					for(int ValueIdx = 0; ValueIdx < Values.Length; ValueIdx++)
+					{
+						string FieldName = Reader.ReadString();
 
-					// Read the path of the config file that provided this setting
-					FileReference SourceFile = Reader.ReadFileReference();
+						// Find the matching field on the output type
+						FieldInfo? Field = Type.GetField(FieldName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
+						XmlConfigFileAttribute? XmlConfigAttribute = Field?.GetCustomAttribute<XmlConfigFileAttribute>();
+						if(Field == null || XmlConfigAttribute == null)
+						{
+							Data = null;
+							return false;
+						}
 
-					Values[ValueIdx] = new ValueInfo(Field, Value, SourceFile, XmlConfigAttribute);
+						// Try to parse the value and add it to the output array
+						object Value = Reader.ReadObject(Field.FieldType)!;
+						
+						// Read the path of the config file that provided this setting
+						FileReference SourceFile = Reader.ReadFileReference();
+
+						Values[ValueIdx] = new ValueInfo(Field, Value, SourceFile, XmlConfigAttribute);
+					}
+
+					// Add it to the type map
+					TypeToValues.Add(Type, Values);
 				}
 
-				// Add it to the type map
-				TypeToValues.Add(Type, Values);
+				// Return the parsed data
+				Data = new XmlConfigData(InputFiles.ToArray(), TypeToValues);
+				return true;
 			}
-
-			// Return the parsed data
-			Data = new XmlConfigData(InputFiles.ToArray(), TypeToValues);
-			return true;
 		}
 
 		/// <summary>
@@ -144,23 +146,25 @@ namespace UnrealBuildTool
 		public void Write(FileReference Location)
 		{
 			DirectoryReference.CreateDirectory(Location.Directory);
-			using BinaryWriter Writer = new BinaryWriter(File.Open(Location.FullName, FileMode.Create, FileAccess.Write, FileShare.Read));
-			Writer.Write(SerializationVersion);
-
-			// Save all the input files. The cache will not be valid if these change.
-			Writer.Write(InputFiles, Item => Writer.Write(Item));
-
-			// Write all the categories
-			Writer.Write(TypeToValues.Count);
-			foreach (KeyValuePair<Type, ValueInfo[]> TypePair in TypeToValues)
+			using (BinaryWriter Writer = new BinaryWriter(File.Open(Location.FullName, FileMode.Create, FileAccess.Write, FileShare.Read)))
 			{
-				Writer.Write(TypePair.Key.Name);
-				Writer.Write(TypePair.Value.Length);
-				foreach (ValueInfo FieldPair in TypePair.Value)
+				Writer.Write(SerializationVersion);
+
+				// Save all the input files. The cache will not be valid if these change.
+				Writer.Write(InputFiles, Item => Writer.Write(Item));
+
+				// Write all the categories
+				Writer.Write(TypeToValues.Count);
+				foreach(KeyValuePair<Type, ValueInfo[]> TypePair in TypeToValues)
 				{
-					Writer.Write(FieldPair.FieldInfo.Name);
-					Writer.Write(FieldPair.FieldInfo.FieldType, FieldPair.Value);
-					Writer.Write(FieldPair.SourceFile);
+					Writer.Write(TypePair.Key.Name);
+					Writer.Write(TypePair.Value.Length);
+					foreach(ValueInfo FieldPair in TypePair.Value)
+					{
+						Writer.Write(FieldPair.FieldInfo.Name);
+						Writer.Write(FieldPair.FieldInfo.FieldType, FieldPair.Value);
+						Writer.Write(FieldPair.SourceFile);
+					}
 				}
 			}
 		}

@@ -42,7 +42,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Regular expression to match $(ENV) and/ or %ENV% environment variables.
 		/// </summary>
-		static readonly Regex EnvironmentVariableRegex = new Regex(@"\$\((.*?)\)|\%(.*?)\%", RegexOptions.None);
+		static Regex EnvironmentVariableRegex = new Regex(@"\$\((.*?)\)|\%(.*?)\%", RegexOptions.None);
 
 		/// <summary>
 		/// Resolves $(ENV) and/ or %ENV% to the value of the environment variable in the passed in string.
@@ -168,8 +168,10 @@ namespace UnrealBuildTool
 		/// <returns>Textual representation of file.</returns>
 		public static string ReadAllText(string SourceFile)
 		{
-			using StreamReader Reader = new StreamReader(SourceFile, System.Text.Encoding.UTF8);
-			return Reader.ReadToEnd();
+			using (StreamReader Reader = new StreamReader(SourceFile, System.Text.Encoding.UTF8))
+			{
+				return Reader.ReadToEnd();
+			}
 		}
 
 		/// <summary>
@@ -274,10 +276,8 @@ namespace UnrealBuildTool
 		/// </summary>
 		public static int RunLocalProcessAndLogOutput(ProcessStartInfo StartInfo)
 		{
-			Process LocalProcess = new Process
-			{
-				StartInfo = StartInfo
-			};
+			Process LocalProcess = new Process();
+			LocalProcess.StartInfo = StartInfo;
 			LocalProcess.OutputDataReceived += (Sender, Args) => { LocalProcessOutput(Args, false); };
 			LocalProcess.ErrorDataReceived += (Sender, Args) => { LocalProcessOutput(Args, true); };
 			return RunLocalProcess(LocalProcess);
@@ -372,10 +372,8 @@ namespace UnrealBuildTool
 					}
 				}
 			};
-			Process LocalProcess = new Process
-			{
-				StartInfo = StartInfo
-			};
+			Process LocalProcess = new Process();
+			LocalProcess.StartInfo = StartInfo;
 			LocalProcess.OutputDataReceived += Output;
 			LocalProcess.ErrorDataReceived += Output;
 			var ExitCode = RunLocalProcess(LocalProcess);
@@ -404,7 +402,8 @@ namespace UnrealBuildTool
 		/// <param name="Args">Arguments to Command</param>
 		public static string RunLocalProcessAndReturnStdOut(string Command, string Args)
 		{
-			return RunLocalProcessAndReturnStdOut(Command, Args, out int ExitCode);
+			int ExitCode;
+			return RunLocalProcessAndReturnStdOut(Command, Args, out ExitCode);	
 		}
 
 		/// <summary>
@@ -424,15 +423,13 @@ namespace UnrealBuildTool
 			// for rules see https://docs.microsoft.com/en-us/cpp/cpp/main-function-command-line-args
 			Args = Args?.Replace('\'', '\"');
 
-			ProcessStartInfo StartInfo = new ProcessStartInfo(Command, Args)
-			{
-				UseShellExecute = false,
-				RedirectStandardInput = true,
-				RedirectStandardOutput = true,
-				RedirectStandardError = true,
-				CreateNoWindow = true,
-				StandardOutputEncoding = Encoding.UTF8
-			};
+			ProcessStartInfo StartInfo = new ProcessStartInfo(Command, Args);
+			StartInfo.UseShellExecute = false;
+			StartInfo.RedirectStandardInput = true;
+			StartInfo.RedirectStandardOutput = true;
+			StartInfo.RedirectStandardError = true;
+			StartInfo.CreateNoWindow = true;
+			StartInfo.StandardOutputEncoding = Encoding.UTF8;
 
 			string FullOutput = "";
 			string ErrorOutput = "";
@@ -492,7 +489,7 @@ namespace UnrealBuildTool
 				case UnrealPlatformClass.Server:
 					return new UnrealTargetPlatform[] { UnrealTargetPlatform.Win64, UnrealTargetPlatform.Linux, UnrealTargetPlatform.LinuxArm64, UnrealTargetPlatform.Mac };
 			}
-			throw new ArgumentException(string.Format("'{0}' is not a valid value for UnrealPlatformClass", (int)Class));
+			throw new ArgumentException(String.Format("'{0}' is not a valid value for UnrealPlatformClass", (int)Class));
 		}
 
 		/// <summary>
@@ -717,7 +714,7 @@ namespace UnrealBuildTool
 		/// <returns>Converted relative path</returns>
 		public static string MakePathRelativeTo(string SourcePath, string RelativeToDirectory, bool AlwaysTreatSourceAsDirectory = false)
 		{
-			if (string.IsNullOrEmpty(RelativeToDirectory))
+			if (String.IsNullOrEmpty(RelativeToDirectory))
 			{
 				// Assume CWD
 				RelativeToDirectory = ".";
@@ -782,7 +779,7 @@ namespace UnrealBuildTool
 
 			// Display updated progress string and keep track of how long it was
 			float ProgressValue = Denominator > 0 ? ((float)Numerator / (float)Denominator) : 1.0f;
-			string ProgressString = string.Format("{0}%", Math.Round(ProgressValue * 100.0f));
+			string ProgressString = String.Format("{0}%", Math.Round(ProgressValue * 100.0f));
 			NumCharsToBackspaceOver = ProgressString.Length;
 			Console.Write(ProgressString);
 		}
@@ -941,7 +938,7 @@ namespace UnrealBuildTool
 		/// <returns>Path to the file with its extension removed.</returns>
 		public static string GetPathWithoutExtension(string Filename)
 		{
-			if (!string.IsNullOrEmpty(Path.GetExtension(Filename)))
+			if (!String.IsNullOrEmpty(Path.GetExtension(Filename)))
 			{
 				return Path.Combine(Path.GetDirectoryName(Filename)!, Path.GetFileNameWithoutExtension(Filename));
 			}
@@ -998,7 +995,7 @@ namespace UnrealBuildTool
 			{
 				// Not all user accounts have a local application data directory (eg. SYSTEM, used by Jenkins for builds).
 				string DirectoryName = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-				if(string.IsNullOrEmpty(DirectoryName))
+				if(String.IsNullOrEmpty(DirectoryName))
 				{
 					return DirectoryReference.Combine(Unreal.EngineDirectory, "Saved");
 				}
@@ -1078,7 +1075,7 @@ namespace UnrealBuildTool
 		
 		// int sysctlbyname(const char *name, void *oldp, size_t *oldlenp, void *newp, size_t newlen); // from man page
 		[DllImport("libc")]
-		extern static int sysctlbyname(string name, out int oldp, ref ulong oldlenp, IntPtr newp, ulong newlen);
+		extern static int sysctlbyname(string name, out int oldp, ref UInt64 oldlenp, IntPtr newp, UInt64 newlen);
 		
 		/// <summary>
 		/// Gets the number of physical cores, excluding hyper threading.
@@ -1128,7 +1125,7 @@ namespace UnrealBuildTool
 			}
 			else if(RuntimePlatform.IsMac)
 			{
-				ulong Size = 4;
+				UInt64 Size = 4;
 				if (0 == sysctlbyname("hw.physicalcpu", out int Value, ref Size, IntPtr.Zero, 0))
 				{
 					return Value;
@@ -1158,15 +1155,15 @@ namespace UnrealBuildTool
           	/*natural_t*/ public int	active_count;			/* # of pages active */
           	/*natural_t*/ public int	inactive_count;			/* # of pages inactive */
           	/*natural_t*/ public int	wire_count;				/* # of pages wired down */
-          	/*uint64_t */ public ulong zero_fill_count;		/* # of zero fill pages */
-          	/*uint64_t */ public ulong reactivations;			/* # of pages reactivated */
-		  	/*uint64_t */ public ulong pageins;				/* # of pageins */
-          	/*uint64_t */ public ulong pageouts;				/* # of pageouts */
-          	/*uint64_t */ public ulong faults;					/* # of faults */
-          	/*uint64_t */ public ulong cow_faults;				/* # of copy-on-writes */
-          	/*uint64_t */ public ulong lookups;				/* object cache lookups */
-          	/*uint64_t */ public ulong hits;					/* object cache hits */
-          	/*uint64_t */ public ulong purges;					/* # of pages purged */
+          	/*uint64_t */ public UInt64	zero_fill_count;		/* # of zero fill pages */
+          	/*uint64_t */ public UInt64	reactivations;			/* # of pages reactivated */
+		  	/*uint64_t */ public UInt64	pageins;				/* # of pageins */
+          	/*uint64_t */ public UInt64	pageouts;				/* # of pageouts */
+          	/*uint64_t */ public UInt64	faults;					/* # of faults */
+          	/*uint64_t */ public UInt64	cow_faults;				/* # of copy-on-writes */
+          	/*uint64_t */ public UInt64	lookups;				/* object cache lookups */
+          	/*uint64_t */ public UInt64	hits;					/* object cache hits */
+          	/*uint64_t */ public UInt64	purges;					/* # of pages purged */
           	/*natural_t*/ public int	purgeable_count;		/* # of pages purgeable */
           	/*
           	 * NB: speculative pages are already accounted for in "free_count",
@@ -1177,15 +1174,15 @@ namespace UnrealBuildTool
           	/*natural_t*/ public int	speculative_count;		/* # of pages speculative */
           
           	/* added for rev1 */
-          	/*uint64_t */ public ulong decompressions;			/* # of pages decompressed */
-          	/*uint64_t */ public ulong compressions;			/* # of pages compressed */
-          	/*uint64_t */ public ulong swapins;				/* # of pages swapped in (via compression segments) */
-          	/*uint64_t */ public ulong swapouts;				/* # of pages swapped out (via compression segments) */
+          	/*uint64_t */ public UInt64	decompressions;			/* # of pages decompressed */
+          	/*uint64_t */ public UInt64	compressions;			/* # of pages compressed */
+          	/*uint64_t */ public UInt64	swapins;				/* # of pages swapped in (via compression segments) */
+          	/*uint64_t */ public UInt64	swapouts;				/* # of pages swapped out (via compression segments) */
           	/*natural_t*/ public int	compressor_page_count;	/* # of pages used by the compressed pager to hold all the compressed data */
           	/*natural_t*/ public int	throttled_count;		/* # of pages throttled */
           	/*natural_t*/ public int	external_page_count;	/* # of pages that are file-backed (non-swap) */
           	/*natural_t*/ public int	internal_page_count;	/* # of pages that are anonymous */
-          	/*uint64_t */ public ulong total_uncompressed_pages_in_compressor; /* # of pages (uncompressed) held within the compressor. */
+          	/*uint64_t */ public UInt64	total_uncompressed_pages_in_compressor; /* # of pages (uncompressed) held within the compressor. */
         } // __attribute__((aligned(8))); 
 		
 		// kern_return_t host_statistics64(host_t host_priv, host_flavor_t flavor, host_info64_t host_info64_out, mach_msg_type_number_t *host_info64_outCnt); // from <mach/mach_host.h>
@@ -1221,13 +1218,15 @@ namespace UnrealBuildTool
 				int HOST_VM_INFO64 = 4;
 				// host_statistics64() count of 32bit values in output struct, from <mach/host_info.h>
 				int HOST_VM_INFO64_COUNT = Marshal.SizeOf(typeof(vm_statistics64)) / 4;
-
+		
+				vm_statistics64 VMStats;
 				uint StructSize = (uint)HOST_VM_INFO64_COUNT;
 				IntPtr Host = mach_host_self();
-				host_statistics64(Host, HOST_VM_INFO64, out vm_statistics64 VMStats, ref StructSize);
+				host_statistics64(Host, HOST_VM_INFO64, out VMStats, ref StructSize);
 
-				ulong OutSize = 4;
-				if (0 != sysctlbyname("hw.pagesize", out int PageSize, ref OutSize, IntPtr.Zero, 0))
+				int PageSize = 0;
+				UInt64 OutSize = 4;
+				if (0 != sysctlbyname("hw.pagesize", out PageSize, ref OutSize, IntPtr.Zero, 0))
 				{
 					PageSize = 4096; // likely result
 				}
@@ -1307,18 +1306,16 @@ namespace UnrealBuildTool
 			UnrealTargetPlatform HostPlatform = BuildHostPlatform.Current.Platform;
 			foreach(FileReference ScriptFile in ScriptFiles)
 			{
-				ProcessStartInfo StartInfo = new ProcessStartInfo
-				{
-					FileName = BuildHostPlatform.Current.Shell.FullName
-				};
+				ProcessStartInfo StartInfo = new ProcessStartInfo();
+				StartInfo.FileName = BuildHostPlatform.Current.Shell.FullName;
 
-				if (BuildHostPlatform.Current.ShellType == ShellType.Cmd)
+				if(BuildHostPlatform.Current.ShellType == ShellType.Cmd)
 				{
-					StartInfo.Arguments = string.Format("/C \"{0}\"", ScriptFile.FullName);
+					StartInfo.Arguments = String.Format("/C \"{0}\"", ScriptFile.FullName);
 				}
 				else
 				{
-					StartInfo.Arguments = string.Format("\"{0}\"", ScriptFile.FullName);
+					StartInfo.Arguments = String.Format("\"{0}\"", ScriptFile.FullName);
 				}
 
 				int ReturnCode = Utils.RunLocalProcessAndLogOutput(StartInfo);
@@ -1341,7 +1338,7 @@ namespace UnrealBuildTool
 			StringBuilder CurrentArgument = new StringBuilder();
 			for (int Idx = 0; Idx < CommandLine.Length; Idx++)
 			{
-				if (!char.IsWhiteSpace(CommandLine[Idx]))
+				if (!Char.IsWhiteSpace(CommandLine[Idx]))
 				{
 					CurrentArgument.Clear();
 
@@ -1457,7 +1454,7 @@ namespace UnrealBuildTool
 			}
 
 			string Context = "";
-			if (!string.IsNullOrEmpty(WriteFileIfChangedContext))
+			if (!String.IsNullOrEmpty(WriteFileIfChangedContext))
 			{
 				Context = $" ({WriteFileIfChangedContext})";
 			}
@@ -1581,7 +1578,7 @@ namespace UnrealBuildTool
 			else
 			{
 				string CurrentContents = Utils.ReadAllText(FileItem.FullName);
-				if (!string.Equals(CurrentContents, Contents, Comparison))
+				if (!String.Equals(CurrentContents, Contents, Comparison))
 				{
 					FileReference BackupFile = new FileReference(FileItem.FullName + ".old");
 					try

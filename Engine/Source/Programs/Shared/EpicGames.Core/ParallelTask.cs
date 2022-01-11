@@ -37,10 +37,8 @@ namespace EpicGames.Core
 		/// <returns>Async task</returns>
 		public static Task ForEachAsync<T>(IEnumerable<T> Collection, Action<T> Action)
 		{
-			ExecutionDataflowBlockOptions Options = new ExecutionDataflowBlockOptions
-			{
-				MaxDegreeOfParallelism = DataflowBlockOptions.Unbounded
-			};
+			ExecutionDataflowBlockOptions Options = new ExecutionDataflowBlockOptions();
+			Options.MaxDegreeOfParallelism = DataflowBlockOptions.Unbounded;
 
 			ActionBlock<T> Actions = new ActionBlock<T>(Action, Options);
 			foreach (T Item in Collection)
@@ -63,10 +61,8 @@ namespace EpicGames.Core
 		/// <returns>Async task</returns>
 		public static Task ForEachAsync<T>(IEnumerable<T> Collection, Func<T, Task> Action, int MaxDegreeOfParallelism)
 		{
-			ExecutionDataflowBlockOptions Options = new ExecutionDataflowBlockOptions
-			{
-				MaxDegreeOfParallelism = MaxDegreeOfParallelism
-			};
+			ExecutionDataflowBlockOptions Options = new ExecutionDataflowBlockOptions();
+			Options.MaxDegreeOfParallelism = MaxDegreeOfParallelism;
 
 			ActionBlock<T> Actions = new ActionBlock<T>(Action, Options);
 			foreach (T Item in Collection)

@@ -14,11 +14,11 @@ namespace UnrealBuildTool
 	/// </summary>
 	public class ScopedTimer : IDisposable
 	{
-		readonly DateTime StartTime;
-		readonly string TimerName;
-		readonly LogEventType Verbosity;
+		DateTime StartTime;
+		string TimerName;
+		LogEventType Verbosity;
 		static int Indent = 0;
-		static readonly object IndentLock = new object();
+		static object IndentLock = new object();
 
 		/// <summary>
 		/// Constructor

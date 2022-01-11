@@ -109,11 +109,11 @@ namespace UnrealBuildTool
 			{
 				Writer.WriteValue("Optional", bOptional);
 			}
-			if(!string.IsNullOrEmpty(Description))
+			if(!String.IsNullOrEmpty(Description))
 			{
 				Writer.WriteValue("Description", Description);
 			}
-			if(!string.IsNullOrEmpty(MarketplaceURL))
+			if(!String.IsNullOrEmpty(MarketplaceURL))
 			{
 				Writer.WriteValue("MarketplaceURL", MarketplaceURL);
 			}
@@ -181,9 +181,10 @@ namespace UnrealBuildTool
 			{
 				foreach( string PlatformName in PlatformNames )
 				{
-					if (!UnrealTargetPlatform.TryParse(PlatformName, out UnrealTargetPlatform Platform))
+					UnrealTargetPlatform Platform;
+					if (!UnrealTargetPlatform.TryParse(PlatformName, out Platform))
 					{
-						Log.TraceLogOnce("Ignoring unknown platform '{0}' (referenced via a project's plugin descriptor for '{1}')", PlatformName, Name);
+						Log.TraceLogOnce("Ignoring unknown platform '{0}' (referenced via a project's plugin descriptor for '{1}')", PlatformName, Name );
 					}
 				}
 			}

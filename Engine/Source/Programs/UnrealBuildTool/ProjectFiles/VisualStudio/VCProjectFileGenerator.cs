@@ -100,7 +100,7 @@ namespace UnrealBuildTool
 		/// Override for the build tool to use in generated projects. If the compiler version is specified on the command line, we use the same argument on the 
 		/// command line for generated projects.
 		/// </summary>
-		readonly string? BuildToolOverride;
+		string? BuildToolOverride;
 
 		/// <summary>
 		/// Default constructor
@@ -229,6 +229,7 @@ namespace UnrealBuildTool
 
 		static public void AppendPlatformToolsetProperty(StringBuilder VCProjectFileContent, VCProjectFileFormat ProjectFileFormat)
 		{
+			string ToolVersionString = GetProjectFileToolVersionString(ProjectFileFormat);
 			string PlatformToolsetVersionString = GetProjectFilePlatformToolsetVersionString(ProjectFileFormat);
 			VCProjectFileContent.AppendLine("    <PlatformToolset>{0}</PlatformToolset>", PlatformToolsetVersionString);
 		}
@@ -238,7 +239,7 @@ namespace UnrealBuildTool
 		/// </summary>
 		/// <param name="Arguments">Arguments passed into the program</param>
 		/// <param name="IncludeAllPlatforms">True if all platforms should be included</param>
-		protected override void ConfigureProjectFileGeneration(string[] Arguments, ref bool IncludeAllPlatforms)
+		protected override void ConfigureProjectFileGeneration(String[] Arguments, ref bool IncludeAllPlatforms)
 		{
 			// Call parent implementation first
 			base.ConfigureProjectFileGeneration(Arguments, ref IncludeAllPlatforms);
@@ -300,7 +301,8 @@ namespace UnrealBuildTool
 				// Allow the SDKs to override
 				foreach (UnrealTargetPlatform SupportedPlatform in SupportedPlatforms)
 				{
-					if (UEBuildPlatform.TryGetBuildPlatform(SupportedPlatform, out UEBuildPlatform? BuildPlatform))
+					UEBuildPlatform? BuildPlatform;
+					if (UEBuildPlatform.TryGetBuildPlatform(SupportedPlatform, out BuildPlatform))
 					{
 						// Don't worry about platforms that we're missing SDKs for
 						if (BuildPlatform.HasRequiredSDKsInstalled() == SDKStatus.Valid)
@@ -349,7 +351,7 @@ namespace UnrealBuildTool
 
 			public override string ToString()
 			{
-				return string.Format("{0}={1} {2} {3}", VCSolutionConfigAndPlatformName, Configuration, Platform, TargetConfigurationName);
+				return String.Format("{0}={1} {2} {3}", VCSolutionConfigAndPlatformName, Configuration, Platform, TargetConfigurationName);
 			}
 
 			public VCSolutionConfigCombination(string VCSolutionConfigAndPlatformName)
@@ -391,7 +393,7 @@ namespace UnrealBuildTool
 
 		static void GenerateProjectFolderGuids(string ParentPath, PrimaryProjectFolder Folder, IDictionary<PrimaryProjectFolder, Guid> Guids)
 		{
-			string Path = string.Format("{0}/{1}", ParentPath, Folder.FolderName);
+			string Path = String.Format("{0}/{1}", ParentPath, Folder.FolderName);
 			Guids[Folder] = MakeMd5Guid(Encoding.UTF8.GetBytes(Path));
 
 			foreach (PrimaryProjectFolder SubFolder in Folder.SubFolders)
@@ -580,7 +582,7 @@ namespace UnrealBuildTool
 				FileReference VisualizersFile = FileReference.Combine(Unreal.EngineDirectory, "Extras", "VisualStudioDebugging", "Unreal.natvis");
 
 				// Add the visualizers at the solution level. Doesn't seem to be picked up from a makefile project in VS2017 15.8.5.
-				VCSolutionFileContent.AppendLine(string.Format("Project(\"{0}\") = \"Visualizers\", \"Visualizers\", \"{{1CCEC849-CC72-4C59-8C36-2F7C38706D4C}}\"", SolutionFolderEntryGUID));
+				VCSolutionFileContent.AppendLine(String.Format("Project(\"{0}\") = \"Visualizers\", \"Visualizers\", \"{{1CCEC849-CC72-4C59-8C36-2F7C38706D4C}}\"", SolutionFolderEntryGUID));
 				VCSolutionFileContent.AppendLine("\tProjectSection(SolutionItems) = preProject");
 				VCSolutionFileContent.AppendLine("\t\t{0} = {0}", VisualizersFile.MakeRelativeTo(PrimaryProjectPath));
 				VCSolutionFileContent.AppendLine("\tEndProjectSection");
@@ -670,7 +672,7 @@ namespace UnrealBuildTool
 						// Sort the list of solution platform strings alphabetically (Visual Studio prefers it)
 						SolutionConfigCombinations.Sort(
 								new Comparison<VCSolutionConfigCombination>(
-									(x, y) => { return string.Compare(x.VCSolutionConfigAndPlatformName, y.VCSolutionConfigAndPlatformName, StringComparison.InvariantCultureIgnoreCase); }
+									(x, y) => { return String.Compare(x.VCSolutionConfigAndPlatformName, y.VCSolutionConfigAndPlatformName, StringComparison.InvariantCultureIgnoreCase); }
 								)
 							);
 
@@ -821,10 +823,8 @@ namespace UnrealBuildTool
 					VCSolutionConfigCombination? DefaultConfig = SolutionConfigCombinations.Find(x => x.Configuration == UnrealTargetConfiguration.Development && x.Platform == UnrealTargetPlatform.Win64 && x.TargetConfigurationName == TargetType.Editor);
 					if (DefaultConfig != null)
 					{
-						List<VCBinarySetting> Settings = new List<VCBinarySetting>
-						{
-							new VCBinarySetting("ActiveCfg", DefaultConfig.VCSolutionConfigAndPlatformName)
-						};
+						List<VCBinarySetting> Settings = new List<VCBinarySetting>();
+						Settings.Add(new VCBinarySetting("ActiveCfg", DefaultConfig.VCSolutionConfigAndPlatformName));
 						if (DefaultProject != null)
 						{
 							Settings.Add(new VCBinarySetting("StartupProject", ((MSBuildProjectFile)DefaultProject).ProjectGUID.ToString("B")));
@@ -878,7 +878,7 @@ namespace UnrealBuildTool
 		{
 			foreach (ProjectFile Project in Folder.ChildProjects)
 			{
-				string ProjectIdentifier = string.Format("{0}{1}", Project.ProjectFilePath.GetFileNameWithoutExtension(), Suffix);
+				string ProjectIdentifier = String.Format("{0}{1}", Project.ProjectFilePath.GetFileNameWithoutExtension(), Suffix);
 				if (Project == DefaultProject)
 				{
 					ExplorerState.OpenProjects.Add(new Tuple<string, string[]>(ProjectIdentifier, new string[] { ProjectIdentifier }));

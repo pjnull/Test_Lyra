@@ -62,7 +62,7 @@ namespace EpicGames.Core
 		/// <returns>True if the hashes are equal, false otherwise</returns>
 		public bool Equals(ContentHash? Other)
 		{
-			if (Other is null)
+			if (ReferenceEquals(Other, null))
 			{
 				return false;
 			}
@@ -80,9 +80,9 @@ namespace EpicGames.Core
 		/// <returns>True if the objects are equal, false otherwise</returns>
 		public static bool operator ==(ContentHash? A, ContentHash? B)
 		{
-			if (A is null)
+			if (ReferenceEquals(A, null))
 			{
-				return B is null;
+				return ReferenceEquals(B, null);
 			}
 			else
 			{
@@ -131,8 +131,10 @@ namespace EpicGames.Core
 		/// <returns>New content hash instance containing the hash of the file</returns>
 		public static ContentHash Compute(FileReference Location, HashAlgorithm Algorithm)
 		{
-			using FileStream Stream = FileReference.Open(Location, FileMode.Open, FileAccess.Read, FileShare.Read);
-			return new ContentHash(Algorithm.ComputeHash(Stream));
+			using (FileStream Stream = FileReference.Open(Location, FileMode.Open, FileAccess.Read, FileShare.Read))
+			{
+				return new ContentHash(Algorithm.ComputeHash(Stream));
+			}
 		}
 
 		/// <summary>
@@ -142,8 +144,10 @@ namespace EpicGames.Core
 		/// <returns>New content hash instance containing the hash of the data</returns>
 		public static ContentHash MD5(byte[] Data)
 		{
-			using MD5 Algorithm = System.Security.Cryptography.MD5.Create();
-			return Compute(Data, Algorithm);
+			using (MD5 Algorithm = System.Security.Cryptography.MD5.Create())
+			{
+				return Compute(Data, Algorithm);
+			}
 		}
 
 		/// <summary>
@@ -153,8 +157,10 @@ namespace EpicGames.Core
 		/// <returns>New content hash instance containing the hash of the text</returns>
 		public static ContentHash MD5(string Text)
 		{
-			using MD5 Algorithm = System.Security.Cryptography.MD5.Create();
-			return Compute(Text, Algorithm);
+			using (MD5 Algorithm = System.Security.Cryptography.MD5.Create())
+			{
+				return Compute(Text, Algorithm);
+			}
 		}
 
 		/// <summary>
@@ -164,8 +170,10 @@ namespace EpicGames.Core
 		/// <returns>New content hash instance containing the hash of the file</returns>
 		public static ContentHash MD5(FileReference Location)
 		{
-			using MD5 Algorithm = System.Security.Cryptography.MD5.Create();
-			return Compute(Location, Algorithm);
+			using (MD5 Algorithm = System.Security.Cryptography.MD5.Create())
+			{
+				return Compute(Location, Algorithm);
+			}
 		}
 
 		/// <summary>
@@ -175,8 +183,10 @@ namespace EpicGames.Core
 		/// <returns>New content hash instance containing the hash of the data</returns>
 		public static ContentHash SHA1(byte[] Data)
 		{
-			using SHA1 Algorithm = System.Security.Cryptography.SHA1.Create();
-			return Compute(Data, Algorithm);
+			using (SHA1 Algorithm = System.Security.Cryptography.SHA1.Create())
+			{
+				return Compute(Data, Algorithm);
+			}
 		}
 
 		/// <summary>
@@ -186,8 +196,10 @@ namespace EpicGames.Core
 		/// <returns>New content hash instance containing the hash of the text</returns>
 		public static ContentHash SHA1(string Text)
 		{
-			using SHA1 Algorithm = System.Security.Cryptography.SHA1.Create();
-			return Compute(Text, Algorithm);
+			using (SHA1 Algorithm = System.Security.Cryptography.SHA1.Create())
+			{
+				return Compute(Text, Algorithm);
+			}
 		}
 
 		/// <summary>
@@ -197,8 +209,10 @@ namespace EpicGames.Core
 		/// <returns>New content hash instance containing the hash of the file</returns>
 		public static ContentHash SHA1(FileReference Location)
 		{
-			using SHA1 Algorithm = System.Security.Cryptography.SHA1.Create();
-			return Compute(Location, Algorithm);
+			using (SHA1 Algorithm = System.Security.Cryptography.SHA1.Create())
+			{
+				return Compute(Location, Algorithm);
+			}
 		}
 
 		/// <summary>
@@ -208,9 +222,10 @@ namespace EpicGames.Core
 		/// <returns>Value of the hash</returns>
 		public static ContentHash Parse(string Text)
 		{
-			if (!TryParse(Text, out ContentHash? Hash))
+			ContentHash? Hash;
+			if (!TryParse(Text, out Hash))
 			{
-				throw new ArgumentException(string.Format("'{0}' is not a valid content hash", Text));
+				throw new ArgumentException(String.Format("'{0}' is not a valid content hash", Text));
 			}
 			return Hash;
 		}
@@ -222,7 +237,8 @@ namespace EpicGames.Core
 		/// <returns>Value of the hash</returns>
 		public static bool TryParse(string Text, [NotNullWhen(true)] out ContentHash? Hash)
 		{
-			if (StringUtils.TryParseHexString(Text, out byte[]? Bytes))
+			byte[]? Bytes;
+			if (StringUtils.TryParseHexString(Text, out Bytes))
 			{
 				Hash = new ContentHash(Bytes);
 				return true;
@@ -288,7 +304,7 @@ namespace EpicGames.Core
 		/// <param name="Hash">The hash to write</param>
 		public static void WriteContentHash(this BinaryArchiveWriter Writer, ContentHash? Hash)
 		{
-			if (Hash is null)
+			if (ReferenceEquals(Hash, null))
 			{
 				Writer.WriteByteArray(null);
 			}

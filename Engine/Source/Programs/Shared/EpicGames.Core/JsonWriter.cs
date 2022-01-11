@@ -31,8 +31,8 @@ namespace EpicGames.Core
 	public class JsonWriter : IDisposable
 	{
 		TextWriter Writer;
-		readonly bool bLeaveOpen;
-		readonly JsonWriterStyle Style;
+		bool bLeaveOpen;
+		JsonWriterStyle Style;
 		bool bRequiresComma;
 		string Indent;
 
@@ -383,7 +383,7 @@ namespace EpicGames.Core
 						Result.Append("\\t");
 						break;
 					default:
-						if (char.IsControl(Value[Idx]))
+						if (Char.IsControl(Value[Idx]))
 						{
 							Result.AppendFormat("\\u{0:X4}", (int)Value[Idx]);
 						}

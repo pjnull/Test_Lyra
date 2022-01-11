@@ -92,18 +92,18 @@ namespace UnrealBuildTool
 						{
 							if(NonNullableType(FieldInfo.FieldType) == typeof(bool))
 							{
-								Prefix = string.Format("-{0}", FieldInfo.Name);
+								Prefix = String.Format("-{0}", FieldInfo.Name);
 							}
 							else
 							{
-								Prefix = string.Format("-{0}=", FieldInfo.Name);
+								Prefix = String.Format("-{0}=", FieldInfo.Name);
 							}
 						}
 						else
 						{
 							if(NonNullableType(FieldInfo.FieldType) != typeof(bool) && Attribute.Value == null && !Prefix.EndsWith("=") && !Prefix.EndsWith(":"))
 							{
-								Prefix += "=";
+								Prefix = Prefix + "=";
 							}
 						}
 						PrefixToParameter.Add(Prefix, new Parameter(Prefix, FieldInfo, Attribute));
@@ -123,14 +123,15 @@ namespace UnrealBuildTool
 					string Prefix = (EqualsIdx == -1)? Argument : Argument.Substring(0, EqualsIdx + 1);
 
 					// Check if there's a matching argument registered
-					if (PrefixToParameter.TryGetValue(Prefix, out Parameter? Parameter))
+					Parameter? Parameter;
+					if(PrefixToParameter.TryGetValue(Prefix, out Parameter))
 					{
 						int NextIdx = Idx + 1;
 
 						// Parse the value
-						if (Parameter.Attribute.Value != null)
+						if(Parameter.Attribute.Value != null)
 						{
-							if (EqualsIdx != -1)
+							if(EqualsIdx != -1)
 							{
 								Log.WriteLine(LogEventType.Warning, "Cannot specify a value for {0}", Parameter.Prefix);
 							}
@@ -139,11 +140,11 @@ namespace UnrealBuildTool
 								AssignValue(Parameter, Parameter.Attribute.Value, TargetObject, AssignedFieldToParameter);
 							}
 						}
-						else if (EqualsIdx != -1)
+						else if(EqualsIdx != -1)
 						{
 							AssignValue(Parameter, Argument.Substring(EqualsIdx + 1), TargetObject, AssignedFieldToParameter);
 						}
-						else if (NonNullableType(Parameter.FieldInfo.FieldType) == typeof(bool))
+						else if(NonNullableType(Parameter.FieldInfo.FieldType) == typeof(bool))
 						{
 							AssignValue(Parameter, "true", TargetObject, AssignedFieldToParameter);
 						}
@@ -195,7 +196,7 @@ namespace UnrealBuildTool
 				}
 				else
 				{
-					Log.TraceWarning("Invalid arguments:\n{0}", string.Join("\n", RemainingArguments));
+					Log.TraceWarning("Invalid arguments:\n{0}", String.Join("\n", RemainingArguments));
 				}
 			}
 		}
@@ -224,19 +225,21 @@ namespace UnrealBuildTool
 			if (CollectionType == null)
 			{
 				// Try to parse the value
-				if (!TryParseValue(Parameter.FieldInfo.FieldType, Text, out object? Value))
+				object? Value;
+				if(!TryParseValue(Parameter.FieldInfo.FieldType, Text, out Value))
 				{
 					Log.WriteLine(LogEventType.Warning, "Invalid value for {0}... - ignoring {1}", Parameter.Prefix, Text);
 					return;
 				}
 
 				// Check if this field has already been assigned to. Output a warning if the previous value is in conflict with the new one.
-				if (AssignedFieldToParameter.TryGetValue(Parameter.FieldInfo, out Parameter? PreviousParameter))
+				Parameter? PreviousParameter;
+				if(AssignedFieldToParameter.TryGetValue(Parameter.FieldInfo, out PreviousParameter))
 				{
 					object? PreviousValue = Parameter.FieldInfo.GetValue(TargetObject);
-					if (!Object.Equals(PreviousValue, Value))
+					if(!Object.Equals(PreviousValue, Value))
 					{
-						if (PreviousParameter.Prefix == Parameter.Prefix)
+						if(PreviousParameter.Prefix == Parameter.Prefix)
 						{
 							Log.WriteLine(LogEventType.Warning, "Conflicting {0} arguments - ignoring", Parameter.Prefix);
 						}
@@ -268,7 +271,8 @@ namespace UnrealBuildTool
 				// Parse each of the argument values separately
 				foreach(string Item in ItemArray)
 				{
-					if (TryParseValue(CollectionType.GenericTypeArguments[0], Item, out object? Value))
+					object? Value;
+					if(TryParseValue(CollectionType.GenericTypeArguments[0], Item, out Value))
 					{
 						CollectionType.InvokeMember("Add", BindingFlags.InvokeMethod, null, Parameter.FieldInfo.GetValue(TargetObject), new object[] { Value });
 					}

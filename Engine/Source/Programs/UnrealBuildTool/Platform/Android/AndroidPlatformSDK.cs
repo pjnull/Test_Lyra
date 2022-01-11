@@ -50,7 +50,7 @@ namespace UnrealBuildTool
 			string? NDKPath = Environment.GetEnvironmentVariable("NDKROOT");
 
 			// don't register if we don't have an NDKROOT specified
-			if (string.IsNullOrEmpty(NDKPath))
+			if (String.IsNullOrEmpty(NDKPath))
 			{
 				return null;
 			}
@@ -79,7 +79,7 @@ namespace UnrealBuildTool
 					string[] RevisionParts = RevisionString.Substring(EqualsIndex + 1).Trim().Split('.');
 					int RevisionMinor = int.Parse(RevisionParts.Length > 1 ? RevisionParts[1] : "0");
 					char RevisionLetter = Convert.ToChar('a' + RevisionMinor);
-					NDKToolchainVersion = "r" + RevisionParts[0] + (RevisionMinor > 0 ? char.ToString(RevisionLetter) : "");
+					NDKToolchainVersion = "r" + RevisionParts[0] + (RevisionMinor > 0 ? Char.ToString(RevisionLetter) : "");
 				}
 			}
 			else
@@ -97,7 +97,7 @@ namespace UnrealBuildTool
 		}
 
 
-		public override bool TryConvertVersionToInt(string? StringValue, out ulong OutValue)
+		public override bool TryConvertVersionToInt(string? StringValue, out UInt64 OutValue)
 		{
 			// convert r<num>[letter] to hex
 			if (!string.IsNullOrEmpty(StringValue))
@@ -113,7 +113,7 @@ namespace UnrealBuildTool
 						RevisionNumber = (Result.Groups[2].Value[0] - 'a') + 1;
 					}
 					string VersionString = string.Format("{0}{1:00}{2:00}", Result.Groups[1], RevisionNumber, 0);
-					return ulong.TryParse(VersionString, out OutValue);
+					return UInt64.TryParse(VersionString, out OutValue);
 				}
 			}
 
@@ -166,7 +166,8 @@ namespace UnrealBuildTool
 
 		public static bool GetPath(ConfigHierarchy Ini, string SectionName, string Key, out string Value)
 		{
-			if (Ini.TryGetValue(SectionName, Key, out string? temp))
+			string? temp;
+			if (Ini.TryGetValue(SectionName, Key, out temp))
 			{
 				return ExtractPath(temp, out Value);
 			}
@@ -188,7 +189,7 @@ namespace UnrealBuildTool
 			// the SDK setup we can force this to be on to build AndroidTargetPlatform.
 			string? ForceAndroidSDK = Environment.GetEnvironmentVariable("FORCE_ANDROID_SDK_ENABLED");
 
-			if (!string.IsNullOrEmpty(ForceAndroidSDK))
+			if (!String.IsNullOrEmpty(ForceAndroidSDK))
 			{
 				return true;
 			}
@@ -204,16 +205,17 @@ namespace UnrealBuildTool
 														 {"JAVA_HOME", "JavaPath"}
 														 };
 
+				string path;
 				foreach (KeyValuePair<string, string> kvp in EnvVarNames)
 				{
-					if (GetPath(configCacheIni, "/Script/AndroidPlatformEditor.AndroidSDKSettings", kvp.Value, out string path) && !string.IsNullOrEmpty(path))
+					if (GetPath(configCacheIni, "/Script/AndroidPlatformEditor.AndroidSDKSettings", kvp.Value, out path) && !string.IsNullOrEmpty(path))
 					{
 						AndroidEnv.Add(kvp.Key, path);
 					}
 					else
 					{
 						string? envValue = Environment.GetEnvironmentVariable(kvp.Key);
-						if (!string.IsNullOrEmpty(envValue))
+						if (!String.IsNullOrEmpty(envValue))
 						{
 							AndroidEnv.Add(kvp.Key, envValue);
 						}
@@ -264,7 +266,7 @@ namespace UnrealBuildTool
 			}
 
 			// we don't have an NDKROOT specified
-			if (string.IsNullOrEmpty(NDKPath))
+			if (String.IsNullOrEmpty(NDKPath))
 			{
 				return false;
 			}
