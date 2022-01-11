@@ -17,7 +17,7 @@ namespace UnrealBuildTool
 	{
 		public static void AddFormat(this List<string> list, string formatString, params object[] args)
 		{
-			list.Add(String.Format(formatString, args));
+			list.Add(string.Format(formatString, args));
 		}
 	}
 

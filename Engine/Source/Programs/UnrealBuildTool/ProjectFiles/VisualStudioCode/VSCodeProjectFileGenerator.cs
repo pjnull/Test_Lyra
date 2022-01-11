@@ -28,9 +28,9 @@ namespace UnrealBuildTool
 	{
 		private UnrealTargetPlatform HostPlatform = BuildHostPlatform.Current.Platform;
 		private bool bForeignProject;
-		private DirectoryReference ProjectRoot;
-		private string FrameworkExecutableExtension = ".exe";
-		private string FrameworkLibraryExtension = ".dll";
+		private readonly DirectoryReference ProjectRoot;
+		private readonly string FrameworkExecutableExtension = ".exe";
+		private readonly string FrameworkLibraryExtension = ".dll";
 
 		private readonly List<BuildTarget> BuildTargets = new List<BuildTarget>();
 
@@ -174,7 +174,7 @@ namespace UnrealBuildTool
 
 			public void EndObject()
 			{
-				Lines[Lines.Count - 1] = Lines[Lines.Count - 1].TrimEnd(',');
+				Lines[^1] = Lines[^1].TrimEnd(',');
 				TabString = TabString.Remove(TabString.Length - 1);
 				Lines.Add(TabString + "},");
 			}
@@ -188,7 +188,7 @@ namespace UnrealBuildTool
 
 			public void EndArray()
 			{
-				Lines[Lines.Count - 1] = Lines[Lines.Count - 1].TrimEnd(',');
+				Lines[^1] = Lines[^1].TrimEnd(',');
 				TabString = TabString.Remove(TabString.Length - 1);
 				Lines.Add(TabString + "],");
 			}
@@ -210,7 +210,7 @@ namespace UnrealBuildTool
 
 			public void Write(FileReference File)
 			{
-				Lines[Lines.Count - 1] = Lines[Lines.Count - 1].TrimEnd(',');
+				Lines[^1] = Lines[^1].TrimEnd(',');
 				FileReference.WriteAllLines(File, Lines.ToArray());
 			}
 
@@ -219,7 +219,7 @@ namespace UnrealBuildTool
 				return "\"" + Value + "\"";
 			}
 
-			private List<string> Lines = new List<string>();
+			private readonly List<string> Lines = new List<string>();
 			private string TabString = "";
 		}
 
@@ -527,17 +527,16 @@ namespace UnrealBuildTool
 							if (Info.Properties.ContainsKey("OutputPath"))
 							{
 								ProjectData.EOutputType OutputType;
-								string? OutputTypeName;
-								if (Info.Properties.TryGetValue("OutputType", out OutputTypeName))
-								{
-									OutputType = (ProjectData.EOutputType)Enum.Parse(typeof(ProjectData.EOutputType), OutputTypeName);
-								}
-								else
-								{
-									OutputType = ProjectData.EOutputType.Library;
-								}
+							if (Info.Properties.TryGetValue("OutputType", out string? OutputTypeName))
+							{
+								OutputType = (ProjectData.EOutputType)Enum.Parse(typeof(ProjectData.EOutputType), OutputTypeName);
+							}
+							else
+							{
+								OutputType = ProjectData.EOutputType.Library;
+							}
 
-								if (OutputType == ProjectData.EOutputType.WinExe)
+							if (OutputType == ProjectData.EOutputType.WinExe)
 								{
 									OutputType = ProjectData.EOutputType.Exe;
 								}
@@ -683,7 +682,7 @@ namespace UnrealBuildTool
 			{
 				OutFile.BeginObject();
 				{
-					string TaskName = String.Format("{0} {1} {2} {3}", Target.Name, BuildProduct.Platform.ToString(), BuildProduct.Config, ConfigType);
+					string TaskName = string.Format("{0} {1} {2} {3}", Target.Name, BuildProduct.Platform.ToString(), BuildProduct.Config, ConfigType);
 					OutFile.AddField("label", TaskName);
 					OutFile.AddField("group", "build");
 
@@ -702,12 +701,12 @@ namespace UnrealBuildTool
 						OutFile.AddUnnamedField("-ScriptsForProject=" + BuildProduct.UProjectFile.ToNormalizedPath());
 						OutFile.AddUnnamedField("-Project=" + BuildProduct.UProjectFile.ToNormalizedPath());
 						OutFile.AddUnnamedField("-noP4");
-						OutFile.AddUnnamedField(String.Format("-ClientConfig={0}", BuildProduct.Config.ToString()));
-						OutFile.AddUnnamedField(String.Format("-ServerConfig={0}", BuildProduct.Config.ToString()));
+						OutFile.AddUnnamedField(string.Format("-ClientConfig={0}", BuildProduct.Config.ToString()));
+						OutFile.AddUnnamedField(string.Format("-ServerConfig={0}", BuildProduct.Config.ToString()));
 						OutFile.AddUnnamedField("-NoCompileEditor");
 						OutFile.AddUnnamedField("-utf8output");
-						OutFile.AddUnnamedField(String.Format("-Platform={0}", BuildProduct.Platform.ToString()));
-						OutFile.AddUnnamedField(String.Format("-TargetPlatform={0}", BuildProduct.Platform.ToString()));
+						OutFile.AddUnnamedField(string.Format("-Platform={0}", BuildProduct.Platform.ToString()));
+						OutFile.AddUnnamedField(string.Format("-TargetPlatform={0}", BuildProduct.Platform.ToString()));
 						OutFile.AddUnnamedField("-ini:Game:[/Script/UnrealEd.ProjectPackagingSettings]:BlueprintNativizationMethod=Disabled");
 						OutFile.AddUnnamedField("-Compressed");
 						OutFile.AddUnnamedField("-IterativeCooking");
@@ -744,13 +743,13 @@ namespace UnrealBuildTool
 							case "Cook+Deploy":
 							case "Cook":
 								{
-									OutFile.AddUnnamedField(String.Format("{0}Editor {1} Development Build", Target.Name, HostPlatform.ToString()));
-									OutFile.AddUnnamedField(String.Format("{0} {1} {2} Build", Target.Name, BuildProduct.Platform.ToString(), BuildProduct.Config));
+									OutFile.AddUnnamedField(string.Format("{0}Editor {1} Development Build", Target.Name, HostPlatform.ToString()));
+									OutFile.AddUnnamedField(string.Format("{0} {1} {2} Build", Target.Name, BuildProduct.Platform.ToString(), BuildProduct.Config));
 									break;
 								}
 							default:
 								{
-									OutFile.AddUnnamedField(String.Format("{0} {1} {2} Build", Target.Name, BuildProduct.Platform.ToString(), BuildProduct.Config));
+									OutFile.AddUnnamedField(string.Format("{0} {1} {2} Build", Target.Name, BuildProduct.Platform.ToString(), BuildProduct.Config));
 									break;
 								}
 						}
@@ -777,52 +776,49 @@ namespace UnrealBuildTool
 			// see VsCode Docs - https://code.visualstudio.com/docs/cpp/c-cpp-properties-schema-reference (compileCommands attribute)
 			// and the clang format description https://clang.llvm.org/docs/JSONCompilationDatabase.html
 
-			using (JsonWriter Writer = new JsonWriter(CompileCommandsFile))
+			using JsonWriter Writer = new JsonWriter(CompileCommandsFile);
+			Writer.WriteArrayStart();
+
+			DirectoryReference ResponseFileDir = DirectoryReference.Combine(CompileCommandsFile.Directory, CompileCommandsFile.GetFileNameWithoutExtension());
+			DirectoryReference.CreateDirectory(ResponseFileDir);
+
+			Dictionary<DirectoryReference, FileReference?> DirectoryToResponseFile = new Dictionary<DirectoryReference, FileReference?>();
+			foreach (KeyValuePair<DirectoryReference, string> Pair in ModuleCommandLines)
 			{
-				Writer.WriteArrayStart();
-
-				DirectoryReference ResponseFileDir = DirectoryReference.Combine(CompileCommandsFile.Directory, CompileCommandsFile.GetFileNameWithoutExtension());
-				DirectoryReference.CreateDirectory(ResponseFileDir);
-
-				Dictionary<DirectoryReference, FileReference?> DirectoryToResponseFile = new Dictionary<DirectoryReference, FileReference?>();
-				foreach(KeyValuePair<DirectoryReference, string> Pair in ModuleCommandLines)
-				{
-					FileReference ResponseFile = FileReference.Combine(ResponseFileDir, String.Format("{0}.{1}.rsp", Pair.Key.GetDirectoryName(), DirectoryToResponseFile.Count));
-					FileReference.WriteAllText(ResponseFile, Pair.Value);
-					DirectoryToResponseFile.Add(Pair.Key, ResponseFile);
-				}
-
-				foreach (FileReference File in SourceFiles.OrderBy(x => x.FullName))
-				{
-					DirectoryReference Directory = File.Directory;
-
-					FileReference? ResponseFile = null;
-					if (!DirectoryToResponseFile.TryGetValue(Directory, out ResponseFile))
-					{
-						for (DirectoryReference? ParentDir = Directory; ParentDir != null && ParentDir != Unreal.RootDirectory; ParentDir = ParentDir.ParentDirectory)
-						{
-							if (DirectoryToResponseFile.TryGetValue(ParentDir, out ResponseFile))
-							{
-								break;
-							}
-						}
-						DirectoryToResponseFile[Directory] = ResponseFile;
-					}
-
-					if (ResponseFile == null)
-					{
-						// no compiler command associated with the file, will happen for any file that is not a C++ file and is not an error
-						continue;
-					}
-
-					Writer.WriteObjectStart();
-					Writer.WriteValue("file", MakePathString(File, bInAbsolute: true, bForceSkipQuotes: true));
-					Writer.WriteValue("command", String.Format("{0} @{1}", MakePathString(CompilerPath, bInAbsolute: true), MakePathString(ResponseFile, bInAbsolute: true)));
-					Writer.WriteValue("directory", UnrealBuildTool.EngineSourceDirectory.ToString());
-					Writer.WriteObjectEnd();
-				}
-				Writer.WriteArrayEnd();
+				FileReference ResponseFile = FileReference.Combine(ResponseFileDir, string.Format("{0}.{1}.rsp", Pair.Key.GetDirectoryName(), DirectoryToResponseFile.Count));
+				FileReference.WriteAllText(ResponseFile, Pair.Value);
+				DirectoryToResponseFile.Add(Pair.Key, ResponseFile);
 			}
+
+			foreach (FileReference File in SourceFiles.OrderBy(x => x.FullName))
+			{
+				DirectoryReference Directory = File.Directory;
+
+				if (!DirectoryToResponseFile.TryGetValue(Directory, out FileReference? ResponseFile))
+				{
+					for (DirectoryReference? ParentDir = Directory; ParentDir != null && ParentDir != Unreal.RootDirectory; ParentDir = ParentDir.ParentDirectory)
+					{
+						if (DirectoryToResponseFile.TryGetValue(ParentDir, out ResponseFile))
+						{
+							break;
+						}
+					}
+					DirectoryToResponseFile[Directory] = ResponseFile;
+				}
+
+				if (ResponseFile == null)
+				{
+					// no compiler command associated with the file, will happen for any file that is not a C++ file and is not an error
+					continue;
+				}
+
+				Writer.WriteObjectStart();
+				Writer.WriteValue("file", MakePathString(File, bInAbsolute: true, bForceSkipQuotes: true));
+				Writer.WriteValue("command", string.Format("{0} @{1}", MakePathString(CompilerPath, bInAbsolute: true), MakePathString(ResponseFile, bInAbsolute: true)));
+				Writer.WriteValue("directory", UnrealBuildTool.EngineSourceDirectory.ToString());
+				Writer.WriteObjectEnd();
+			}
+			Writer.WriteArrayEnd();
 		}
 
 		private void WriteNativeTask(ProjectData.Project InProject, JsonFile OutFile)
@@ -836,8 +832,8 @@ namespace UnrealBuildTool
 					foreach (string BaseCommand in Commands)
 					{
 						string Command = BaseCommand == "Rebuild" ? "Build" : BaseCommand;
-						string TaskName = String.Format("{0} {1} {2} {3}", Target.Name, BuildProduct.Platform.ToString(), BuildProduct.Config, BaseCommand);
-						string CleanTaskName = String.Format("{0} {1} {2} {3}", Target.Name, BuildProduct.Platform.ToString(), BuildProduct.Config, "Clean");
+						string TaskName = string.Format("{0} {1} {2} {3}", Target.Name, BuildProduct.Platform.ToString(), BuildProduct.Config, BaseCommand);
+						string CleanTaskName = string.Format("{0} {1} {2} {3}", Target.Name, BuildProduct.Platform.ToString(), BuildProduct.Config, "Clean");
 
 						OutFile.BeginObject();
 						{
@@ -933,7 +929,7 @@ namespace UnrealBuildTool
 				{
 					foreach (string Command in Commands)
 					{
-						string TaskName = String.Format("{0} {1} {2} {3}", Target.Name, BuildProduct.Platform, BuildProduct.Config, Command);
+						string TaskName = string.Format("{0} {1} {2} {3}", Target.Name, BuildProduct.Platform, BuildProduct.Config, Command);
 
 						OutFile.BeginObject();
 						{
@@ -1069,8 +1065,7 @@ namespace UnrealBuildTool
 		{
 			ConfigHierarchy Ini = ConfigCache.ReadHierarchy(ConfigHierarchyType.Engine, DirectoryReference.FromFile(BuildProduct.UProjectFile), BuildProduct.Platform);
 
-			List<string>? OculusMobileDevices;
-			bool result = Ini.GetArray("/Script/AndroidRuntimeSettings.AndroidRuntimeSettings", "PackageForOculusMobile", out OculusMobileDevices);
+			bool result = Ini.GetArray("/Script/AndroidRuntimeSettings.AndroidRuntimeSettings", "PackageForOculusMobile", out List<string>? OculusMobileDevices);
 			// Check if packaging for oculus
 			if (!result || OculusMobileDevices == null || OculusMobileDevices.Count == 0)
 			{
@@ -1078,8 +1073,7 @@ namespace UnrealBuildTool
 			}
 
 			// Get package name
-			string PackageName;
-			Ini.GetString("/Script/AndroidRuntimeSettings.AndroidRuntimeSettings", "PackageName", out PackageName);
+			Ini.GetString("/Script/AndroidRuntimeSettings.AndroidRuntimeSettings", "PackageName", out string PackageName);
 			if (PackageName.Contains("[PROJECT]"))
 			{
 				// project name must start with a letter
@@ -1111,16 +1105,11 @@ namespace UnrealBuildTool
 			}
 
 			// Get store version
-			int StoreVersion = 1;
-			int StoreVersionArm64 = 1;
-			int StoreVersionArmV7 = 1;
-			int StoreVersionOffsetArm64 = 0;
-			int StoreVersionOffsetArmV7 = 0;
-			Ini.GetInt32("/Script/AndroidRuntimeSettings.AndroidRuntimeSettings", "StoreVersion", out StoreVersion);
-			Ini.GetInt32("/Script/AndroidRuntimeSettings.AndroidRuntimeSettings", "StoreVersionOffsetArm64", out StoreVersionOffsetArm64);
-			Ini.GetInt32("/Script/AndroidRuntimeSettings.AndroidRuntimeSettings", "StoreVersionOffsetArmV7", out StoreVersionOffsetArmV7);
-			StoreVersionArm64 = StoreVersion + StoreVersionOffsetArm64;
-			StoreVersionArmV7 = StoreVersion + StoreVersionOffsetArmV7;
+			Ini.GetInt32("/Script/AndroidRuntimeSettings.AndroidRuntimeSettings", "StoreVersion", out int StoreVersion);
+			Ini.GetInt32("/Script/AndroidRuntimeSettings.AndroidRuntimeSettings", "StoreVersionOffsetArm64", out int StoreVersionOffsetArm64);
+			Ini.GetInt32("/Script/AndroidRuntimeSettings.AndroidRuntimeSettings", "StoreVersionOffsetArmV7", out int StoreVersionOffsetArmV7);
+			int StoreVersionArm64 = StoreVersion + StoreVersionOffsetArm64;
+			int StoreVersionArmV7 = StoreVersion + StoreVersionOffsetArmV7;
 
 			DirectoryReference SymbolPathArm64 = DirectoryReference.Combine(
 				BuildProduct.OutputFile.Directory,
@@ -1133,10 +1122,12 @@ namespace UnrealBuildTool
 				Target.Name + "-armv7");
 
 
-			string LaunchTaskName = String.Format("{0} {1} {2} Deploy", Target.Name, BuildProduct.Platform, BuildProduct.Config);
+			string LaunchTaskName = string.Format("{0} {1} {2} Deploy", Target.Name, BuildProduct.Platform, BuildProduct.Config);
 
-			List<string> ConfigTypes = new List<string>();
-			ConfigTypes.Add("Launch");
+			List<string> ConfigTypes = new List<string>
+			{
+				"Launch"
+			};
 			if (BuildProduct.Config == UnrealTargetConfiguration.Development)
 			{
 				ConfigTypes.Add("Attach");
@@ -1191,10 +1182,12 @@ namespace UnrealBuildTool
 		private void WriteNativeLaunchConfig(ProjectData.Project InProject, JsonFile OutFile, ProjectData.Target Target, ProjectData.BuildProduct BuildProduct)
 		{
 			bool bIsLinux = BuildProduct.Platform == UnrealTargetPlatform.Linux;
-			List<string> Types = new List<string>();
-			Types.Add("Launch");
+			List<string> Types = new List<string>
+			{
+				"Launch"
+			};
 
-			if(bAddDebugAttachConfig && bIsLinux)
+			if (bAddDebugAttachConfig && bIsLinux)
 			{
 				Types.Add("Attach");
 			}
@@ -1204,7 +1197,7 @@ namespace UnrealBuildTool
 				Types.Add("Debug Core");
 			}
 
-			string LaunchTaskName = String.Format("{0} {1} {2} Build", Target.Name, BuildProduct.Platform, BuildProduct.Config);
+			string LaunchTaskName = string.Format("{0} {1} {2} Build", Target.Name, BuildProduct.Platform, BuildProduct.Config);
 
 			foreach(string Type in Types)
 			{
@@ -1366,8 +1359,8 @@ namespace UnrealBuildTool
 				{
 					if (BuildProduct.OutputType == ProjectData.EOutputType.Exe)
 					{
-						string TaskName = String.Format("{0} ({1})", Target.Name, BuildProduct.Config);
-						string BuildTaskName = String.Format("{0} {1} {2} Build", Target.Name, HostPlatform, BuildProduct.Config);
+						string TaskName = string.Format("{0} ({1})", Target.Name, BuildProduct.Config);
+						string BuildTaskName = string.Format("{0} {1} {2} Build", Target.Name, HostPlatform, BuildProduct.Config);
 
 						WriteSingleCSharpLaunchConfig(OutFile, TaskName, BuildTaskName, BuildProduct.OutputFile, null);
 					}
@@ -1416,9 +1409,11 @@ namespace UnrealBuildTool
 
 				// Add in a special task for regenerating project files
 				string PreLaunchTask = "";
-				List<string> Args = new List<string>();
-				Args.Add("-projectfiles");
-				Args.Add("-vscode");
+				List<string> Args = new List<string>
+				{
+					"-projectfiles",
+					"-vscode"
+				};
 
 				if (bGeneratingGameProjectFiles)
 				{

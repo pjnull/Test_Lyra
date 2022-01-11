@@ -77,7 +77,7 @@ namespace UnrealBuildTool
 		/// <param name="Info">Target information</param>
 		public HoloLensTargetRules(TargetInfo Info)
 		{
-			if (Info.Platform == UnrealTargetPlatform.HoloLens && !String.IsNullOrEmpty(Info.Architecture))
+			if (Info.Platform == UnrealTargetPlatform.HoloLens && !string.IsNullOrEmpty(Info.Architecture))
 			{
 				Architecture = (WindowsArchitecture)Enum.Parse(typeof(WindowsArchitecture), Info.Architecture, true);
 			}
@@ -92,7 +92,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// The private mutable settings object
 		/// </summary>
-		private HoloLensTargetRules Inner;
+		private readonly HoloLensTargetRules Inner;
 
 		/// <summary>
 		/// Constructor
@@ -223,9 +223,7 @@ namespace UnrealBuildTool
 			}
 
 			// Be resilient to SDKs being uninstalled but still referenced in the INI file
-			VersionNumber? SelectedWindowsSdkVersion;
-			DirectoryReference? SelectedWindowsSdkDir;
-			if (WindowsPlatform.TryGetWindowsSdkDir(Target.HoloLensPlatform.Win10SDKVersionString, out SelectedWindowsSdkVersion, out SelectedWindowsSdkDir))
+			if (WindowsPlatform.TryGetWindowsSdkDir(Target.HoloLensPlatform.Win10SDKVersionString, out VersionNumber? SelectedWindowsSdkVersion, out DirectoryReference? SelectedWindowsSdkDir))
 			{
 				Target.WindowsPlatform.WindowsSdkVersion = Target.HoloLensPlatform.Win10SDKVersionString;
 			}
@@ -284,10 +282,7 @@ namespace UnrealBuildTool
 
 		internal static DirectoryReference? GetCppCXMetadataLocation(WindowsCompiler Compiler, string CompilerVersion)
 		{
-			VersionNumber? SelectedToolChainVersion;
-			DirectoryReference? SelectedToolChainDir;
-			DirectoryReference? SelectedRedistDir;
-			if (!WindowsPlatform.TryGetToolChainDir(Compiler, CompilerVersion, out SelectedToolChainVersion, out SelectedToolChainDir, out SelectedRedistDir))
+			if (!WindowsPlatform.TryGetToolChainDir(Compiler, CompilerVersion, out VersionNumber? SelectedToolChainVersion, out DirectoryReference? SelectedToolChainDir, out DirectoryReference? SelectedRedistDir))
 			{
 				return null;
 			}
@@ -317,8 +312,7 @@ namespace UnrealBuildTool
 				foreach (string Dir in VersionDirectories)
 				{
 					string VersionString = Path.GetFileName(Dir);
-					Version? FoundVersion;
-					if (Version.TryParse(VersionString, out FoundVersion) && FoundVersion > LatestVersion)
+					if (Version.TryParse(VersionString, out Version? FoundVersion) && FoundVersion > LatestVersion)
 					{
 						if (NoLaterThan == null || FoundVersion <= NoLaterThan)
 						{
@@ -332,9 +326,7 @@ namespace UnrealBuildTool
 
 		internal static string GetLatestMetadataPathForApiContract(string ApiContract, WindowsCompiler Compiler)
 		{
-			DirectoryReference? SDKFolder;
-			VersionNumber? SDKVersion;
-			if (!WindowsPlatform.TryGetWindowsSdkDir("Latest", out SDKVersion, out SDKFolder))
+			if (!WindowsPlatform.TryGetWindowsSdkDir("Latest", out VersionNumber? SDKVersion, out DirectoryReference? SDKFolder))
 			{
 				return string.Empty;
 			}
@@ -530,9 +522,11 @@ namespace UnrealBuildTool
 
 			// Reference (WinMD) paths
 			// Only Foundation and Universal are referenced by default.  
-			List<string> AlwaysReferenceContracts = new List<string>();
-			AlwaysReferenceContracts.Add("Windows.Foundation.FoundationContract");
-			AlwaysReferenceContracts.Add("Windows.Foundation.UniversalApiContract");
+			List<string> AlwaysReferenceContracts = new List<string>
+			{
+				"Windows.Foundation.FoundationContract",
+				"Windows.Foundation.UniversalApiContract"
+			};
 			ExpandWinMDReferences(Target, Win10SDKRoot!, Target.HoloLensPlatform.Win10SDKVersion!.ToString(), ref AlwaysReferenceContracts);
 
 			StringBuilder WinMDReferenceArguments = new StringBuilder();

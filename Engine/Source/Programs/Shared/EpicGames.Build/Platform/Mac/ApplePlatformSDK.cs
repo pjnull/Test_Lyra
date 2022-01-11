@@ -43,7 +43,7 @@ namespace UnrealBuildBase
 						DllPath = Registry.GetValue(
 							"HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\Apple Inc.\\Apple Mobile Device Support\\Shared",
 							"ASMapiInterfaceDLL", null) as string;
-						DllPath = String.IsNullOrEmpty(DllPath)
+						DllPath = string.IsNullOrEmpty(DllPath)
 							? null
 							: DllPath.Substring(0, DllPath.LastIndexOf('\\') + 1) + "MobileDevice.dll";
 
@@ -101,8 +101,7 @@ namespace UnrealBuildBase
 		/// <param name="Args">Arguments to Command</param>
 		private static string RunLocalProcessAndReturnStdOut(string Command, string Args)
 		{
-			int ExitCode;
-			return RunLocalProcessAndReturnStdOut(Command, Args, out ExitCode);	
+			return RunLocalProcessAndReturnStdOut(Command, Args, out int ExitCode);
 		}
 
 		/// <summary>
@@ -122,13 +121,15 @@ namespace UnrealBuildBase
 			// for rules see https://docs.microsoft.com/en-us/cpp/cpp/main-function-command-line-args
 			Args = Args?.Replace('\'', '\"');
 
-			ProcessStartInfo StartInfo = new ProcessStartInfo(Command, Args);
-			StartInfo.UseShellExecute = false;
-			StartInfo.RedirectStandardInput = true;
-			StartInfo.RedirectStandardOutput = true;
-			StartInfo.RedirectStandardError = true;
-			StartInfo.CreateNoWindow = true;
-			StartInfo.StandardOutputEncoding = Encoding.UTF8;
+			ProcessStartInfo StartInfo = new ProcessStartInfo(Command, Args)
+			{
+				UseShellExecute = false,
+				RedirectStandardInput = true,
+				RedirectStandardOutput = true,
+				RedirectStandardError = true,
+				CreateNoWindow = true,
+				StandardOutputEncoding = Encoding.UTF8
+			};
 
 			string FullOutput = "";
 			string ErrorOutput = "";

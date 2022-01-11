@@ -305,7 +305,7 @@ namespace UnrealBuildTool
 					Message.Append($"The following output paths are longer than {MAX_PATH} characters. Please move the engine to a directory with a shorter path.");
 					foreach (FileReference Path in FailPaths)
 					{
-						Message.Append($"\n[{Path.FullName.Length.ToString()} characters] {Path}");
+						Message.Append($"\n[{Path.FullName.Length} characters] {Path}");
 					}
 
 					throw new BuildException(Message.ToString());
@@ -314,11 +314,11 @@ namespace UnrealBuildTool
 				if (WarnPaths.Count > 0)
 				{
 					StringBuilder Message = new StringBuilder();
-					Message.Append($"Detected paths more than {BuildConfiguration.MaxNestedPathLength.ToString()} characters below UE root directory. This may cause portability issues due to the {MAX_PATH.ToString()} character maximum path length on Windows:\n");
+					Message.Append($"Detected paths more than {BuildConfiguration.MaxNestedPathLength} characters below UE root directory. This may cause portability issues due to the {MAX_PATH} character maximum path length on Windows:\n");
 					foreach (FileReference Path in WarnPaths)
 					{
 						string RelativePath = Path.MakeRelativeTo(Unreal.RootDirectory);
-						Message.Append($"\n[{RelativePath.Length.ToString()} characters] {RelativePath}");
+						Message.Append($"\n[{RelativePath.Length} characters] {RelativePath}");
 					}
 
 					Message.Append($"\n\nConsider setting {nameof(ModuleRules.ShortName)} = ... in module *.Build.cs files to use alternative names for intermediate paths.");
@@ -498,7 +498,7 @@ namespace UnrealBuildTool
 				{
 					if (!ActionIsNonCyclical.ContainsKey(Action))
 					{
-						CycleDescription += $"Action #{ActionToIndex[Action].ToString()}: {Action.CommandPath}\n";
+						CycleDescription += $"Action #{ActionToIndex[Action]}: {Action.CommandPath}\n";
 						CycleDescription += $"\twith arguments: {Action.CommandArguments}\n";
 						foreach (FileItem PrerequisiteItem in Action.PrerequisiteItems)
 						{
@@ -521,11 +521,11 @@ namespace UnrealBuildTool
 										CyclicPrerequisiteAction.ProducedItems.ToList();
 									if (CyclicProducedItems.Count == 1)
 									{
-										CycleDescription += $"\t\t{ActionToIndex[CyclicPrerequisiteAction].ToString()} (produces: {CyclicProducedItems[0].AbsolutePath})\n";
+										CycleDescription += $"\t\t{ActionToIndex[CyclicPrerequisiteAction]} (produces: {CyclicProducedItems[0].AbsolutePath})\n";
 									}
 									else
 									{
-										CycleDescription += $"\t\t{ActionToIndex[CyclicPrerequisiteAction].ToString()}\n";
+										CycleDescription += $"\t\t{ActionToIndex[CyclicPrerequisiteAction]}\n";
 										foreach (FileItem CyclicProducedItem in CyclicProducedItems)
 										{
 											CycleDescription += $"\t\t\tproduces:   {CyclicProducedItem.AbsolutePath}\n";

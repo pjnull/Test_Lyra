@@ -61,7 +61,7 @@ namespace EpicGames.Core
 		public string OperationName { get; private set; }
 		
 		private readonly JsonTracer Tracer;
-		private JsonTracerSpanContext JsonTracerContext;
+		private readonly JsonTracerSpanContext JsonTracerContext;
 		private DateTimeOffset _FinishTimestamp;
 		private bool Finished;
 		private readonly Dictionary<string, object> _Tags;
@@ -226,10 +226,7 @@ namespace EpicGames.Core
 			
 			public override int GetHashCode()
 			{
-				int HashCode = 2083322454;
-				HashCode = HashCode * -1521134295 + EqualityComparer<JsonTracerSpanContext>.Default.GetHashCode(Context);
-				HashCode = HashCode * -1521134295 + EqualityComparer<string>.Default.GetHashCode(ReferenceType);
-				return HashCode;
+				return HashCode.Combine(Context, ReferenceType);
 			}
 		}
 	}
@@ -377,14 +374,12 @@ namespace EpicGames.Core
 				{
 					DirectoryReference.CreateDirectory(TelemetryDir);
 
-					string FileName = String.Format("{0}.{1}.{2}.opentracing.json", Path.GetFileName(Assembly.GetEntryAssembly()!.Location), TelemetryScopeId, Process.Id);
+					string FileName = string.Format("{0}.{1}.{2}.opentracing.json", Path.GetFileName(Assembly.GetEntryAssembly()!.Location), TelemetryScopeId, Process.Id);
 					File = FileReference.Combine(TelemetryDir, FileName);
 				}
 
-				using (JsonWriter Writer = new JsonWriter(File))
-				{
-					GetFinishedSpansAsJson(Writer);
-				}
+				using JsonWriter Writer = new JsonWriter(File);
+				GetFinishedSpansAsJson(Writer);
 			}
 		}
 		

@@ -48,18 +48,15 @@ namespace UnrealBuildBase
 		/// <param name="ParentDirectory">Parent directory to look in. Plugins will be found in any *subfolders* of this directory.</param>
 		public static IEnumerable<FileReference> EnumeratePlugins(DirectoryReference ParentDirectory)
 		{
-			List<FileReference>? FileNames;
-			if (!PluginFileCache.TryGetValue(ParentDirectory, out FileNames))
+			if (!PluginFileCache.TryGetValue(ParentDirectory, out List<FileReference>? FileNames))
 			{
 				FileNames = new List<FileReference>();
 
 				DirectoryItem ParentDirectoryItem = DirectoryItem.GetItemByDirectoryReference(ParentDirectory);
 				if (ParentDirectoryItem.Exists)
 				{
-					using(ThreadPoolWorkQueue Queue = new ThreadPoolWorkQueue())
-					{
-						EnumeratePluginsInternal(ParentDirectoryItem, FileNames, Queue);
-					}
+					using ThreadPoolWorkQueue Queue = new ThreadPoolWorkQueue();
+					EnumeratePluginsInternal(ParentDirectoryItem, FileNames, Queue);
 				}
 
 				// Sort the filenames to ensure that the plugin order is deterministic; otherwise response files will change with each build.

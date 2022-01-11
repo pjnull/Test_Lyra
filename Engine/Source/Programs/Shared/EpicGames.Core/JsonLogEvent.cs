@@ -58,8 +58,7 @@ namespace EpicGames.Core
 			Utf8JsonReader Reader = new Utf8JsonReader(Data.Span);
 			if (Reader.Read() && Reader.TokenType == JsonTokenType.StartObject)
 			{
-				ReadOnlySpan<byte> PropertyName;
-				for (; ReadNextPropertyName(ref Reader, out PropertyName); Reader.Skip())
+				for (; ReadNextPropertyName(ref Reader, out ReadOnlySpan<byte> PropertyName); Reader.Skip())
 				{
 					if (Utf8StringComparer.OrdinalIgnoreCase.Equals(PropertyName, LevelString.Span))
 					{
@@ -143,7 +142,7 @@ namespace EpicGames.Core
 					}
 				}
 			}
-			return String.Empty;
+			return string.Empty;
 		}
 
 		/// <inheritdoc/>

@@ -267,7 +267,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Set of all files that have been added
 		/// </summary>
-		HashSet<FileReference> AliasedFilesSet = new HashSet<FileReference>();
+		readonly HashSet<FileReference> AliasedFilesSet = new HashSet<FileReference>();
 
 		/// Aliased (i.e. files is custom filter tree) in this project
 		public readonly List<AliasedFile> AliasedFiles = new List<AliasedFile>();
@@ -298,8 +298,7 @@ namespace UnrealBuildTool
 			}
 
 			// Don't add duplicates
-			SourceFile? ExistingFile = null;
-			if (SourceFileMap.TryGetValue(FilePath, out ExistingFile))
+			if (SourceFileMap.TryGetValue(FilePath, out SourceFile? ExistingFile))
 			{
 				if (ExistingFile.BaseFolder != BaseFolder)
 				{
@@ -324,7 +323,7 @@ namespace UnrealBuildTool
 		/// <param name="Key">Out: The definition name</param>
 		/// <param name="Value">Out: The definition value or null if it has none</param>
 		/// <returns>Pair representing macro name and value.</returns>
-		private void SplitDefinitionAndValue(string Definition, out String Key, out String Value)
+		private void SplitDefinitionAndValue(string Definition, out string Key, out string Value)
 		{
 			int EqualsIndex = Definition.IndexOf('=');
 			if (EqualsIndex >= 0)
@@ -352,8 +351,7 @@ namespace UnrealBuildTool
 
 			foreach (DirectoryReference BaseDir in Module.ModuleDirectories)
 			{
-				BuildEnvironment? BuildEnvironment;
-				if (!BaseDirToBuildEnvironment.TryGetValue(BaseDir, out BuildEnvironment))
+				if (!BaseDirToBuildEnvironment.TryGetValue(BaseDir, out BuildEnvironment? BuildEnvironment))
 				{
 					BuildEnvironment = new BuildEnvironment();
 					BaseDirToBuildEnvironment.Add(BaseDir, BuildEnvironment);
@@ -381,20 +379,17 @@ namespace UnrealBuildTool
 					// Go ahead and check to see if the definition already exists, but the value is different
 					bool AlreadyExists = false;
 
-					string Def, Value;
-					SplitDefinitionAndValue(CurDef, out Def, out Value);
+					SplitDefinitionAndValue(CurDef, out string Def, out string _);
 
 					// Ignore any API macros being import/export; we'll assume they're valid across the whole project
-					if(Def.EndsWith("_API", StringComparison.Ordinal))
+					if (Def.EndsWith("_API", StringComparison.Ordinal))
 					{
-                        CurDef = Def + "=";
-						Value = "";
+						CurDef = Def + "=";
 					}
 
 					for (int DefineIndex = 0; DefineIndex < IntelliSensePreprocessorDefinitions.Count; ++DefineIndex)
 					{
-						string ExistingDef, ExistingValue;
-						SplitDefinitionAndValue(IntelliSensePreprocessorDefinitions[DefineIndex], out ExistingDef, out ExistingValue);
+						SplitDefinitionAndValue(IntelliSensePreprocessorDefinitions[DefineIndex], out string ExistingDef, out string ExistingValue);
 						if (ExistingDef == Def)
 						{
 							// Already exists, but the value is changing.  We don't bother clobbering values for existing defines for this project.
@@ -596,12 +591,12 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Merged list of include paths for the project
 		/// </summary>
-		IncludePathsCollection UserIncludePaths = new IncludePathsCollection();
+		readonly IncludePathsCollection UserIncludePaths = new IncludePathsCollection();
 
 		/// <summary>
 		/// Merged list of include paths for the project
 		/// </summary>
-		IncludePathsCollection SystemIncludePaths = new IncludePathsCollection();
+		readonly IncludePathsCollection SystemIncludePaths = new IncludePathsCollection();
 
 		/// <summary>
 		/// Map of base directory to user include paths
@@ -632,7 +627,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Set of unique preprocessor definitions
 		/// </summary>
-		HashSet<string> KnownIntelliSensePreprocessorDefinitions = new HashSet<string>(StringComparer.InvariantCultureIgnoreCase);
+		readonly HashSet<string> KnownIntelliSensePreprocessorDefinitions = new HashSet<string>(StringComparer.InvariantCultureIgnoreCase);
 
 		/// <summary>
 		/// Projects that this project is dependent on

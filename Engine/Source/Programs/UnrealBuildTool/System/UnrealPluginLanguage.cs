@@ -476,11 +476,11 @@ namespace UnrealBuildTool
 	class UnrealPluginLanguage
 	{
 		/** The merged XML program to run */
-		private XDocument XDoc;
+		private readonly XDocument XDoc;
 
 		/** XML namespace */
-		private XNamespace XMLNameSpace;
-		private string XMLRootDefinition;
+		private readonly XNamespace XMLNameSpace;
+		private readonly string XMLRootDefinition;
 
 		private UnrealTargetPlatform TargetPlatform;
 
@@ -488,7 +488,7 @@ namespace UnrealBuildTool
 		static private bool bGlobalTrace = false;
 
 		/** Project file reference */
-		private FileReference? ProjectFile;
+		private readonly FileReference? ProjectFile;
 		
 		static private XDocument XMLDummy = XDocument.Parse("<manifest></manifest>");
 
@@ -523,10 +523,10 @@ namespace UnrealBuildTool
 			}
 		}
 
-		private UPLContext GlobalContext;
-		private Dictionary<string, UPLContext> Contexts;
+		private readonly UPLContext GlobalContext;
+		private readonly Dictionary<string, UPLContext> Contexts;
 		private int ContextIndex;
-		private string? LastError;
+		private readonly string? LastError;
 
 		public UnrealPluginLanguage(FileReference? InProjectFile, List<string> InXMLFiles, List<string> InArchitectures, string InXMLNameSpace, string InRootDefinition, UnrealTargetPlatform InTargetPlatform)
 		{
@@ -559,20 +559,20 @@ namespace UnrealBuildTool
 					}
 					catch (Exception e)
 					{
-						LastError = String.Format("Unreal Plugin file {0} parsing failed! {1}", Filename, e);
+						LastError = string.Format("Unreal Plugin file {0} parsing failed! {1}", Filename, e);
 						Log.TraceError("\n{0}", LastError);
 					}
 				}
 				else
 				{
-					LastError = String.Format("Unreal Plugin file {0} missing!", Filename);
+					LastError = string.Format("Unreal Plugin file {0} missing!", Filename);
 					Log.TraceError("\n{0}", LastError);
 					Log.TraceInformation("\nCWD: {0}", Directory.GetCurrentDirectory());
 				}
 			}
 		}
 
-		public String? GetLastError() { return LastError; }
+		public string? GetLastError() { return LastError; }
 
 		public bool GetTrace() { return bGlobalTrace; }
 		public void SetTrace() { bGlobalTrace = true; }
@@ -697,8 +697,7 @@ namespace UnrealBuildTool
 				string Name = Result.Substring(Idx + 3, EndIdx - (Idx + 3));
 
 				// Find the value for it, either from the dictionary or the environment block
-				bool Value;
-				if (!Context.BoolVariables.TryGetValue(Name, out Value))
+				if (!Context.BoolVariables.TryGetValue(Name, out bool Value))
 				{
 					if (!GlobalContext.BoolVariables.TryGetValue(Name, out Value))
 					{
@@ -723,8 +722,7 @@ namespace UnrealBuildTool
 				string Name = Result.Substring(Idx + 3, EndIdx - (Idx + 3));
 
 				// Find the value for it, either from the dictionary or the environment block
-				int Value;
-				if (!Context.IntVariables.TryGetValue(Name, out Value))
+				if (!Context.IntVariables.TryGetValue(Name, out int Value))
 				{
 					if (!GlobalContext.IntVariables.TryGetValue(Name, out Value))
 					{
@@ -749,8 +747,7 @@ namespace UnrealBuildTool
 				string Name = Result.Substring(Idx + 3, EndIdx - (Idx + 3));
 
 				// Find the value for it, either from the dictionary or the environment block
-				string? Value;
-				if (!Context.StringVariables.TryGetValue(Name, out Value))
+				if (!Context.StringVariables.TryGetValue(Name, out string? Value))
 				{
 					if (!GlobalContext.StringVariables.TryGetValue(Name, out Value))
 					{
@@ -775,8 +772,7 @@ namespace UnrealBuildTool
 				string Name = Result.Substring(Idx + 3, EndIdx - (Idx + 3));
 
 				// Find the value for it, either from the dictionary or the environment block
-				XElement? Value;
-				if (!Context.ElementVariables.TryGetValue(Name, out Value))
+				if (!Context.ElementVariables.TryGetValue(Name, out XElement? Value))
 				{
 					if (!GlobalContext.ElementVariables.TryGetValue(Name, out Value))
 					{
@@ -813,8 +809,7 @@ namespace UnrealBuildTool
 
 		private int StringToInt(string? Input, XElement Node)
 		{
-			int Result = 0;
-			if (!int.TryParse(Input, out Result))
+			if (!int.TryParse(Input, out int Result))
 			{
 				Log.TraceWarning("\nInvalid integer '{0}' in '{1}' (defaulting to 0)", Input, TraceNodeString(Node));
 			}
@@ -861,8 +856,7 @@ namespace UnrealBuildTool
 			{
 				ConfigCache = new Dictionary<string, ConfigCacheIni_UPL>();
 			}
-			ConfigCacheIni_UPL? config = null;
-			if (!ConfigCache.TryGetValue(baseIniName, out config))
+			if (!ConfigCache.TryGetValue(baseIniName, out ConfigCacheIni_UPL? config))
 			{
 				// note: use our own ConfigCacheIni since EngineConfiguration.cs only parses RequiredSections!
 				config = ConfigCacheIni_UPL.CreateConfigCacheIni_UPL(TargetPlatform, baseIniName, DirectoryReference.FromFile(ProjectFile));
@@ -937,7 +931,7 @@ namespace UnrealBuildTool
 
 					// remove any read only flags and keep timestamp
 					FileInfo DestFileInfo = new FileInfo(DestFilename);
-					DestFileInfo.Attributes = DestFileInfo.Attributes & ~FileAttributes.ReadOnly;
+					DestFileInfo.Attributes &= ~FileAttributes.ReadOnly;
 					File.SetLastWriteTimeUtc(DestFilename, File.GetLastWriteTimeUtc(Filename));
 				}
 			}
@@ -1138,8 +1132,7 @@ namespace UnrealBuildTool
 
 					case "isDistribution":
 						{
-							bool Result = false;
-							if (GetCondition(CurrentContext, Node, "Distribution", out Result))
+							if (GetCondition(CurrentContext, Node, "Distribution", out bool Result))
 							{
 								if (Result)
 								{
@@ -1154,8 +1147,7 @@ namespace UnrealBuildTool
 
 					case "if":
 						{
-							bool Result;
-							if (GetCondition(CurrentContext, Node, GetAttribute(CurrentContext, Node, "condition"), out Result))
+							if (GetCondition(CurrentContext, Node, GetAttribute(CurrentContext, Node, "condition"), out bool Result))
 							{
 								XElement ResultNode = Node.Element(Result ? "true" : "false");
 								if (ResultNode != null)
@@ -1171,8 +1163,7 @@ namespace UnrealBuildTool
 
 					case "while":
 						{
-							bool Result;
-							if (GetCondition(CurrentContext, Node, GetAttribute(CurrentContext, Node, "condition"), out Result))
+							if (GetCondition(CurrentContext, Node, GetAttribute(CurrentContext, Node, "condition"), out bool Result))
 							{
 								if (Result)
 								{
@@ -1540,8 +1531,7 @@ namespace UnrealBuildTool
 							bool bOnce = StringToBool(GetAttribute(CurrentContext, Node, "once", true, false));
 							if (Tag != null && Name != null)
 							{
-								XElement? Element;
-								if (!CurrentContext.ElementVariables.TryGetValue(Name, out Element))
+								if (!CurrentContext.ElementVariables.TryGetValue(Name, out XElement? Element))
 								{
 									if (!GlobalContext.ElementVariables.TryGetValue(Name, out Element))
 									{
@@ -1727,7 +1717,7 @@ namespace UnrealBuildTool
 
 										// remove any read only flags and keep timestamp
 										FileInfo DestFileInfo = new FileInfo(Dst);
-										DestFileInfo.Attributes = DestFileInfo.Attributes & ~FileAttributes.ReadOnly;
+										DestFileInfo.Attributes &= ~FileAttributes.ReadOnly;
 										File.SetLastWriteTimeUtc(Dst, File.GetLastWriteTimeUtc(Src));
 									}
 								}
@@ -1865,8 +1855,7 @@ namespace UnrealBuildTool
 								ConfigCacheIni_UPL ConfigIni = GetConfigCacheIni_UPL(Ini);
 								if (ConfigIni != null)
 								{
-									List<string>? StringList;
-									if (ConfigIni.GetArray(Section, Property, out StringList))
+									if (ConfigIni.GetArray(Section, Property, out List<string>? StringList))
 									{
 										Value = false;
 										foreach (string Entry in StringList)
@@ -2446,7 +2435,7 @@ namespace UnrealBuildTool
 			GlobalContext.IntVariables["EnginePatchVersion"] = Version.PatchVersion;
 			GlobalContext.IntVariables["EngineChangelist"] = Version.Changelist;
 			GlobalContext.StringVariables["EngineVersion"] = Version.MajorVersion.ToString() + "." + Version.MinorVersion.ToString() + "." + Version.PatchVersion.ToString();
-			GlobalContext.StringVariables["EngineBranchName"] = (Version.BranchName != null) ? Version.BranchName : "";
+			GlobalContext.StringVariables["EngineBranchName"] = Version.BranchName ?? "";
 
 			if (GlobalContext.StringVariables["EngineDir"].Length < 1)
 			{
@@ -2469,14 +2458,14 @@ namespace UnrealBuildTool
 			{
 				if (bPerArchBuildDir)
 				{
-					String ActiveArch = Arch;
+					string ActiveArch = Arch;
 					if (ArchRemapping != null && ArchRemapping.ContainsKey(ActiveArch))
 					{
 						ActiveArch = ArchRemapping[ActiveArch];
 					}
-					String ArchBuildDirectory = Path.Combine(GlobalContext.StringVariables["BuildDir"], ActiveArch.Replace("-", "_"));
-					String ArchBuildDir = ArchBuildDirectory.Replace("\\", "/");
-					String ArchAbsBuildDir = Path.GetFullPath(ArchBuildDir).Replace("\\", "/");
+					string ArchBuildDirectory = Path.Combine(GlobalContext.StringVariables["BuildDir"], ActiveArch.Replace("-", "_"));
+					string ArchBuildDir = ArchBuildDirectory.Replace("\\", "/");
+					string ArchAbsBuildDir = Path.GetFullPath(ArchBuildDir).Replace("\\", "/");
 
 					// add it to all the architecture contexts (overrides global context)
 					for (int Index = 1; Index <= ContextIndex; Index++)
@@ -2536,7 +2525,7 @@ namespace UnrealBuildTool
 				: base(Message)
 			{ }
 			public IniParsingException(string Format, params object[] Args)
-				: base(String.Format(Format, Args))
+				: base(string.Format(Format, Args))
 			{ }
 		}
 
@@ -2563,9 +2552,9 @@ namespace UnrealBuildTool
 		}
 
 		// cached ini files
-		static Dictionary<string, List<Command>> FileCache = new Dictionary<string, List<Command>>();
-		static Dictionary<string, ConfigCacheIni_UPL> IniCache = new Dictionary<string, ConfigCacheIni_UPL>();
-		static Dictionary<string, ConfigCacheIni_UPL> BaseIniCache = new Dictionary<string, ConfigCacheIni_UPL>();
+		static readonly Dictionary<string, List<Command>> FileCache = new Dictionary<string, List<Command>>();
+		static readonly Dictionary<string, ConfigCacheIni_UPL> IniCache = new Dictionary<string, ConfigCacheIni_UPL>();
+		static readonly Dictionary<string, ConfigCacheIni_UPL> BaseIniCache = new Dictionary<string, ConfigCacheIni_UPL>();
 
 		// static creation functions for ini files
 		public static ConfigCacheIni_UPL CreateConfigCacheIni_UPL(UnrealTargetPlatform Platform, string BaseIniName, DirectoryReference? ProjectDirectory, DirectoryReference? EngineDirectory = null)
@@ -2605,7 +2594,7 @@ namespace UnrealBuildTool
 			}
 			public override string ToString()
 			{
-				return String.Join(",", ToArray());
+				return string.Join(",", ToArray());
 			}
 		}
 
@@ -2634,12 +2623,12 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// True if we are loading a hierarchy of config files that should be merged together
 		/// </summary>
-		bool bIsMergingConfigs;
+		readonly bool bIsMergingConfigs;
 
 		/// <summary>
 		/// All sections parsed from ini file
 		/// </summary>
-		Dictionary<string, IniSection> Sections;
+		readonly Dictionary<string, IniSection> Sections;
 
 		private ConfigCacheIni_UPL()
 		{
@@ -2745,8 +2734,7 @@ namespace UnrealBuildTool
 		/// <returns>Found section or null</returns>
 		public IniSection? FindSection(string SectionName)
 		{
-			IniSection? Section;
-			Sections.TryGetValue(SectionName, out Section);
+			Sections.TryGetValue(SectionName, out IniSection? Section);
 			return Section;
 		}
 
@@ -2798,9 +2786,8 @@ namespace UnrealBuildTool
 		/// <returns>True if the key exists</returns>
 		public bool GetString(string SectionName, string Key, out string Value)
 		{
-			Value = String.Empty;
-			IniValues? ValueList;
-			bool Result = GetList(SectionName, Key, out ValueList);
+			Value = string.Empty;
+			bool Result = GetList(SectionName, Key, out IniValues? ValueList);
 			if (Result && ValueList != null && ValueList.Count > 0)
 			{
 				Value = ValueList[0];
@@ -2823,16 +2810,15 @@ namespace UnrealBuildTool
 		public bool GetBool(string SectionName, string Key, out bool Value)
 		{
 			Value = false;
-			string TextValue;
-			bool Result = GetString(SectionName, Key, out TextValue);
+			bool Result = GetString(SectionName, Key, out string TextValue);
 			if (Result)
 			{
 				// C# Boolean type expects "False" or "True" but since we're not case sensitive, we need to suppor that manually
-				if (String.Compare(TextValue, "true", true) == 0 || String.Compare(TextValue, "1") == 0)
+				if (string.Compare(TextValue, "true", true) == 0 || string.Compare(TextValue, "1") == 0)
 				{
 					Value = true;
 				}
-				else if (String.Compare(TextValue, "false", true) == 0 || String.Compare(TextValue, "0") == 0)
+				else if (string.Compare(TextValue, "false", true) == 0 || string.Compare(TextValue, "0") == 0)
 				{
 					Value = false;
 				}
@@ -2855,11 +2841,10 @@ namespace UnrealBuildTool
 		public bool GetInt32(string SectionName, string Key, out int Value)
 		{
 			Value = 0;
-			string TextValue;
-			bool Result = GetString(SectionName, Key, out TextValue);
+			bool Result = GetString(SectionName, Key, out string TextValue);
 			if (Result)
 			{
-				Result = Int32.TryParse(TextValue, out Value);
+				Result = int.TryParse(TextValue, out Value);
 			}
 			return Result;
 		}
@@ -2874,8 +2859,7 @@ namespace UnrealBuildTool
 		public bool GetGUID(string SectionName, string Key, out Guid Value)
 		{
 			Value = Guid.Empty;
-			string TextValue;
-			bool Result = GetString(SectionName, Key, out TextValue);
+			bool Result = GetString(SectionName, Key, out string TextValue);
 			if (Result)
 			{
 				string HexString = "";
@@ -2887,8 +2871,7 @@ namespace UnrealBuildTool
 					{
 						for (int ComponentIndex = 0; ComponentIndex < 4; ComponentIndex++)
 						{
-							int IntegerValue;
-							Result &= Int32.TryParse(ComponentValues[ComponentIndex], out IntegerValue);
+							Result &= int.TryParse(ComponentValues[ComponentIndex], out int IntegerValue);
 							HexString += IntegerValue.ToString("X8");
 						}
 					}
@@ -2921,11 +2904,10 @@ namespace UnrealBuildTool
 		public bool GetSingle(string SectionName, string Key, out float Value)
 		{
 			Value = 0.0f;
-			string TextValue;
-			bool Result = GetString(SectionName, Key, out TextValue);
+			bool Result = GetString(SectionName, Key, out string TextValue);
 			if (Result)
 			{
-				Result = Single.TryParse(TextValue, out Value);
+				Result = float.TryParse(TextValue, out Value);
 			}
 			return Result;
 		}
@@ -2940,11 +2922,10 @@ namespace UnrealBuildTool
 		public bool GetDouble(string SectionName, string Key, out double Value)
 		{
 			Value = 0.0;
-			string TextValue;
-			bool Result = GetString(SectionName, Key, out TextValue);
+			bool Result = GetString(SectionName, Key, out string TextValue);
 			if (Result)
 			{
-				Result = Double.TryParse(TextValue, out Value);
+				Result = double.TryParse(TextValue, out Value);
 			}
 			return Result;
 		}
@@ -2969,8 +2950,7 @@ namespace UnrealBuildTool
 
 		public bool GetPath(string SectionName, string Key, out string Value)
 		{
-			string temp;
-			if (GetString(SectionName, Key, out temp))
+			if (GetString(SectionName, Key, out string temp))
 			{
 				return ExtractPath(temp, out Value);
 			}
@@ -2998,7 +2978,7 @@ namespace UnrealBuildTool
 		/// </summary>
 		private ParseAction GetActionForLine(ref string Line)
 		{
-			if (String.IsNullOrEmpty(Line) || Line.StartsWith(";") || Line.StartsWith("//"))
+			if (string.IsNullOrEmpty(Line) || Line.StartsWith(";") || Line.StartsWith("//"))
 			{
 				return ParseAction.None;
 			}
@@ -3025,7 +3005,7 @@ namespace UnrealBuildTool
 		/// </summary>
 		public void ParseIniFile(FileReference Filename)
 		{
-			String[]? IniLines = null;
+			string[]? IniLines = null;
 			List<Command>? Commands = null;
 			if (!FileCache.ContainsKey(Filename.FullName))
 			{
@@ -3074,10 +3054,12 @@ namespace UnrealBuildTool
 							LastAction = ParseAction.None;
 							if (CurrentSection != null)
 							{
-								SectionCommand Command = new SectionCommand();
-								Command.Filename = Filename;
-								Command.LineIndex = LineIndex;
-								Command.TrimmedLine = TrimmedLine;
+								SectionCommand Command = new SectionCommand
+								{
+									Filename = Filename,
+									LineIndex = LineIndex,
+									TrimmedLine = TrimmedLine
+								};
 								Commands.Add(Command);
 							}
 						}
@@ -3106,10 +3088,12 @@ namespace UnrealBuildTool
 					if (!bMultiLine && LastAction != ParseAction.None && CurrentSection != null)
 					{
 						ProcessKeyValuePair(CurrentSection, Key, SingleValue, LastAction);
-						KeyValueCommand Command = new KeyValueCommand();
-						Command.Key = Key;
-						Command.Value = SingleValue;
-						Command.LastAction = LastAction;
+						KeyValueCommand Command = new KeyValueCommand
+						{
+							Key = Key,
+							Value = SingleValue,
+							LastAction = LastAction
+						};
 						Commands.Add(Command);
 						LastAction = ParseAction.None;
 						SingleValue = "";
@@ -3153,7 +3137,7 @@ namespace UnrealBuildTool
 				throw new IniParsingException("Failed to find value when parsing {0}, line {1}: {2}", Filename, LineIndex, TrimmedLine);
 			}
 			Key = TrimmedLine.Substring(0, AssignIndex).Trim();
-			if (String.IsNullOrEmpty(Key))
+			if (string.IsNullOrEmpty(Key))
 			{
 				throw new IniParsingException("Empty key when parsing {0}, line {1}: {2}", Filename, LineIndex, TrimmedLine);
 			}
@@ -3180,8 +3164,7 @@ namespace UnrealBuildTool
 				case ParseAction.New:
 					{
 						// New/replace
-						IniValues? Value;
-						if (CurrentSection.TryGetValue(Key, out Value) == false)
+						if (CurrentSection.TryGetValue(Key, out IniValues? Value) == false)
 						{
 							Value = new IniValues();
 							CurrentSection.Add(Key, Value);
@@ -3192,8 +3175,7 @@ namespace UnrealBuildTool
 					break;
 				case ParseAction.Add:
 					{
-						IniValues? Value;
-						if (CurrentSection.TryGetValue(Key, out Value) == false)
+						if (CurrentSection.TryGetValue(Key, out IniValues? Value) == false)
 						{
 							Value = new IniValues();
 							CurrentSection.Add(Key, Value);
@@ -3203,10 +3185,9 @@ namespace UnrealBuildTool
 					break;
 				case ParseAction.Remove:
 					{
-						IniValues? Value;
-						if (CurrentSection.TryGetValue(Key, out Value))
+						if (CurrentSection.TryGetValue(Key, out IniValues? Value))
 						{
-							int ExistingIndex = Value.FindIndex(X => (String.Compare(SingleValue, X, true) == 0));
+							int ExistingIndex = Value.FindIndex(X => (string.Compare(SingleValue, X, true) == 0));
 							if (ExistingIndex >= 0)
 							{
 								Value.RemoveAt(ExistingIndex);
@@ -3230,13 +3211,12 @@ namespace UnrealBuildTool
 
 			// comment could follow the ] but will just be trimmed out
 			string SectionName = TrimmedLine.Substring(1, SectionEndIndex - 1);
-			if (String.IsNullOrEmpty(SectionName))
+			if (string.IsNullOrEmpty(SectionName))
 			{
 				throw new IniParsingException("Empty section name when parsing {0}, line {1}: {2}", Filename, LineIndex, TrimmedLine);
 			}
 			{
-				IniSection? CurrentSection;
-				if (Sections.TryGetValue(SectionName, out CurrentSection) == false)
+				if (Sections.TryGetValue(SectionName, out IniSection? CurrentSection) == false)
 				{
 					CurrentSection = new IniSection();
 					Sections.Add(SectionName, CurrentSection);
@@ -3313,7 +3293,7 @@ namespace UnrealBuildTool
 			{
 				// Not all user accounts have a local application data directory (eg. SYSTEM, used by Jenkins for builds).
 				string PersonalFolderSetting = Environment.GetFolderPath(Environment.SpecialFolder.Personal);
-				if (!String.IsNullOrEmpty(PersonalFolderSetting))
+				if (!string.IsNullOrEmpty(PersonalFolderSetting))
 				{
 					PersonalFolder = new DirectoryReference(PersonalFolderSetting);
 				}

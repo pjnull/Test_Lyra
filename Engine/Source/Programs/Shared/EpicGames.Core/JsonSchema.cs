@@ -116,7 +116,7 @@ namespace EpicGames.Core
 			/// <summary>
 			/// Raw Json output
 			/// </summary>
-			Utf8JsonWriter JsonWriter;
+			readonly Utf8JsonWriter JsonWriter;
 
 			/// <summary>
 			/// Mapping of type to definition name
@@ -260,10 +260,8 @@ namespace EpicGames.Core
 		/// <param name="Stream">The output stream</param>
 		public void Write(Stream Stream)
 		{
-			using (Utf8JsonWriter Writer = new Utf8JsonWriter(Stream, new JsonWriterOptions { Indented = true }))
-			{
-				Write(Writer);
-			}
+			using Utf8JsonWriter Writer = new Utf8JsonWriter(Stream, new JsonWriterOptions { Indented = true });
+			Write(Writer);
 		}
 
 		/// <summary>
@@ -272,10 +270,8 @@ namespace EpicGames.Core
 		/// <param name="File">The output file</param>
 		public void Write(FileReference File)
 		{
-			using (FileStream Stream = FileReference.Open(File, FileMode.Create))
-			{
-				Write(Stream);
-			}
+			using FileStream Stream = FileReference.Open(File, FileMode.Create);
+			Write(Stream);
 		}
 
 		/// <summary>
@@ -399,8 +395,10 @@ namespace EpicGames.Core
 					}
 					if (Interface.GetGenericTypeDefinition() == typeof(IDictionary<,>))
 					{
-						JsonSchemaObject Object = new JsonSchemaObject();
-						Object.AdditionalProperties = CreateSchemaType(Arguments[1], TypeCache, XmlDoc);
+						JsonSchemaObject Object = new JsonSchemaObject
+						{
+							AdditionalProperties = CreateSchemaType(Arguments[1], TypeCache, XmlDoc)
+						};
 						return Object;
 					}
 				}

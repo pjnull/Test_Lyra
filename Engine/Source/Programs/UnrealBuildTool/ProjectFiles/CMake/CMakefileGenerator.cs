@@ -224,7 +224,7 @@ namespace UnrealBuildTool
 			return true;
 		}
 
-		private void AppendCleanedPathToList(StringBuilder EngineFiles, StringBuilder ProjectFiles, String SourceFileRelativeToRoot, String FullName, String GameProjectPath, String UnrealRootPath, String GameRootPath)
+		private void AppendCleanedPathToList(StringBuilder EngineFiles, StringBuilder ProjectFiles, string SourceFileRelativeToRoot, string FullName, string GameProjectPath, string UnrealRootPath, string GameRootPath)
 		{
 			if (!SourceFileRelativeToRoot.StartsWith("..") && !Path.IsPathRooted(SourceFileRelativeToRoot))
 			{
@@ -232,7 +232,7 @@ namespace UnrealBuildTool
 			}
 			else
 			{
-				if (String.IsNullOrEmpty(GameProjectName))
+				if (string.IsNullOrEmpty(GameProjectName))
 				{
 					EngineFiles.Append("\t\"" + Utils.CleanDirectorySeparators(SourceFileRelativeToRoot, '/').Substring(3) + "\"\n");
 				}
@@ -546,16 +546,16 @@ namespace UnrealBuildTool
 								}
 
 								string ConfName = Enum.GetName(typeof(UnrealTargetConfiguration), CurConfiguration)!;
-								CMakefileContent.Append(String.Format("add_custom_target({0}-{3}-{1} {5} {0} {3} {1} {2}{4} -buildscw VERBATIM)\n", TargetName, ConfName, CMakeProjectCmdArg, HostArchitecture, UBTArguements, BuildCommand));
+								CMakefileContent.Append(string.Format("add_custom_target({0}-{3}-{1} {5} {0} {3} {1} {2}{4} -buildscw VERBATIM)\n", TargetName, ConfName, CMakeProjectCmdArg, HostArchitecture, UBTArguements, BuildCommand));
 
 								// Add iOS and TVOS targets if valid
 								if (bIncludeIOSTargets && !IsTargetExcluded(TargetName, UnrealTargetPlatform.IOS, CurConfiguration))
 								{
-    								CMakefileContent.Append(String.Format("add_custom_target({0}-{3}-{1} {5} {0} {3} {1} {2}{4} VERBATIM)\n", TargetName, ConfName, CMakeProjectCmdArg, UnrealTargetPlatform.IOS, UBTArguements, BuildCommand));
+    								CMakefileContent.Append(string.Format("add_custom_target({0}-{3}-{1} {5} {0} {3} {1} {2}{4} VERBATIM)\n", TargetName, ConfName, CMakeProjectCmdArg, UnrealTargetPlatform.IOS, UBTArguements, BuildCommand));
 								}
 								if (bIncludeTVOSTargets && !IsTargetExcluded(TargetName, UnrealTargetPlatform.TVOS, CurConfiguration))
 								{
-    								CMakefileContent.Append(String.Format("add_custom_target({0}-{3}-{1} {5} {0} {3} {1} {2}{4} VERBATIM)\n", TargetName, ConfName, CMakeProjectCmdArg, UnrealTargetPlatform.TVOS, UBTArguements, BuildCommand));
+    								CMakefileContent.Append(string.Format("add_custom_target({0}-{3}-{1} {5} {0} {3} {1} {2}{4} VERBATIM)\n", TargetName, ConfName, CMakeProjectCmdArg, UnrealTargetPlatform.TVOS, UBTArguements, BuildCommand));
 								}
 							}
 						}
@@ -567,16 +567,16 @@ namespace UnrealBuildTool
                             CMakeProjectCmdArg = "\"-project=" + CMakeGameProjectFile + "\"";
                         }
 
-                        CMakefileContent.Append(String.Format("add_custom_target({0} {4} {0} {2} Development {1}{3} -buildscw VERBATIM)\n\n", TargetName, CMakeProjectCmdArg, HostArchitecture, UBTArguements, BuildCommand));
+                        CMakefileContent.Append(string.Format("add_custom_target({0} {4} {0} {2} Development {1}{3} -buildscw VERBATIM)\n\n", TargetName, CMakeProjectCmdArg, HostArchitecture, UBTArguements, BuildCommand));
 
                         // Add iOS and TVOS targets if valid
                         if (bIncludeIOSTargets && !IsTargetExcluded(TargetName, UnrealTargetPlatform.IOS, UnrealTargetConfiguration.Development))
                         {
-                           CMakefileContent.Append(String.Format("add_custom_target({0}-{3} {5} {0} {3} {1} {2}{4} VERBATIM)\n", TargetName, UnrealTargetConfiguration.Development, CMakeProjectCmdArg, UnrealTargetPlatform.IOS, UBTArguements, BuildCommand));
+                           CMakefileContent.Append(string.Format("add_custom_target({0}-{3} {5} {0} {3} {1} {2}{4} VERBATIM)\n", TargetName, UnrealTargetConfiguration.Development, CMakeProjectCmdArg, UnrealTargetPlatform.IOS, UBTArguements, BuildCommand));
                         }
                         if (bIncludeTVOSTargets && !IsTargetExcluded(TargetName, UnrealTargetPlatform.TVOS, UnrealTargetConfiguration.Development))
                         {
-                            CMakefileContent.Append(String.Format("add_custom_target({0}-{3} {5} {0} {3} {1} {2}{4} VERBATIM)\n", TargetName, UnrealTargetConfiguration.Development, CMakeProjectCmdArg, UnrealTargetPlatform.TVOS, UBTArguements, BuildCommand));
+                            CMakefileContent.Append(string.Format("add_custom_target({0}-{3} {5} {0} {3} {1} {2}{4} VERBATIM)\n", TargetName, UnrealTargetConfiguration.Development, CMakeProjectCmdArg, UnrealTargetPlatform.TVOS, UBTArguements, BuildCommand));
                         }
                    }
 				}		
@@ -746,7 +746,7 @@ namespace UnrealBuildTool
 		/// </summary>
 		protected bool bIncludeTVOSTargets = false;
 
-		protected override void ConfigureProjectFileGeneration(String[] Arguments, ref bool IncludeAllPlatforms)
+		protected override void ConfigureProjectFileGeneration(string[] Arguments, ref bool IncludeAllPlatforms)
 		{
 			base.ConfigureProjectFileGeneration(Arguments, ref IncludeAllPlatforms);
 			// Check for minimal build targets to speed up cmake processing

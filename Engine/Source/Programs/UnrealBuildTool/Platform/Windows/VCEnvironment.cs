@@ -164,7 +164,7 @@ namespace UnrealBuildTool
 		static void AddDirectoryToPath(DirectoryReference ToolPath)
 		{
             string PathEnvironmentVariable = Environment.GetEnvironmentVariable("PATH") ?? "";
-            if (!PathEnvironmentVariable.Split(';').Any(x => String.Compare(x, ToolPath.FullName, true) == 0))
+            if (!PathEnvironmentVariable.Split(';').Any(x => string.Compare(x, ToolPath.FullName, true) == 0))
             {
                 PathEnvironmentVariable = ToolPath.FullName + ";" + PathEnvironmentVariable;
                 Environment.SetEnvironmentVariable("PATH", PathEnvironmentVariable);
@@ -356,8 +356,7 @@ namespace UnrealBuildTool
 			}
 
 			// Add the NETFXSDK include path. We need this for SwarmInterface.
-			DirectoryReference? NetFxSdkDir;
-			if(MicrosoftPlatformSDK.TryGetNetFxSdkInstallDir(out NetFxSdkDir))
+			if (MicrosoftPlatformSDK.TryGetNetFxSdkInstallDir(out DirectoryReference? NetFxSdkDir))
 			{
 				IncludePaths.Add(DirectoryReference.Combine(NetFxSdkDir, "include", "um"));
 				LibraryPaths.Add(DirectoryReference.Combine(NetFxSdkDir, "lib", "um", ArchFolder));
@@ -477,12 +476,9 @@ namespace UnrealBuildTool
 		public VCEnvironmentParameters (WindowsCompiler Compiler, UnrealTargetPlatform Platform, WindowsArchitecture Architecture, string? CompilerVersion, string? WindowsSdkVersion, string? SuppliedSdkDirectoryForVersion)
 		{
 			// Get the compiler version info
-			VersionNumber? SelectedCompilerVersion;
-			DirectoryReference? SelectedCompilerDir;
-			DirectoryReference? SelectedRedistDir;
-			if(!WindowsPlatform.TryGetToolChainDir(Compiler, CompilerVersion, out SelectedCompilerVersion, out SelectedCompilerDir, out SelectedRedistDir))
+			if (!WindowsPlatform.TryGetToolChainDir(Compiler, CompilerVersion, out VersionNumber? SelectedCompilerVersion, out DirectoryReference? SelectedCompilerDir, out DirectoryReference? SelectedRedistDir))
 			{
-				throw new BuildException("{0}{1} must be installed in order to build this target.", WindowsPlatform.GetCompilerName(Compiler), String.IsNullOrEmpty(CompilerVersion)? "" : String.Format(" ({0})", CompilerVersion));
+				throw new BuildException("{0}{1} must be installed in order to build this target.", WindowsPlatform.GetCompilerName(Compiler), string.IsNullOrEmpty(CompilerVersion) ? "" : string.Format(" ({0})", CompilerVersion));
 			}
 
 			// Get the toolchain info
@@ -521,14 +517,14 @@ namespace UnrealBuildTool
 
 				if (!DirectoryReference.Exists(SelectedWindowsSdkDir))
 				{
-					throw new BuildException("Windows SDK{0} must be installed at {1}.", String.IsNullOrEmpty(WindowsSdkVersion) ? "" : String.Format(" ({0})", WindowsSdkVersion), SuppliedSdkDirectoryForVersion);
+					throw new BuildException("Windows SDK{0} must be installed at {1}.", string.IsNullOrEmpty(WindowsSdkVersion) ? "" : string.Format(" ({0})", WindowsSdkVersion), SuppliedSdkDirectoryForVersion);
 				}
 			}
 			else
 			{
 				if (!WindowsPlatform.TryGetWindowsSdkDir(WindowsSdkVersion, out SelectedWindowsSdkVersion, out SelectedWindowsSdkDir))
 				{
-					throw new BuildException("Windows SDK{0} must be installed in order to build this target.", String.IsNullOrEmpty(WindowsSdkVersion) ? "" : String.Format(" ({0})", WindowsSdkVersion));
+					throw new BuildException("Windows SDK{0} must be installed in order to build this target.", string.IsNullOrEmpty(WindowsSdkVersion) ? "" : string.Format(" ({0})", WindowsSdkVersion));
 				}
 			}
 

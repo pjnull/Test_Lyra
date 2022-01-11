@@ -315,16 +315,14 @@ namespace UnrealBuildTool
 		public void Save(FileReference Location)
 		{
 			DirectoryReference.CreateDirectory(Location.Directory);
-			using(BinaryArchiveWriter Writer = new BinaryArchiveWriter(Location))
-			{
-				Writer.WriteInt(CurrentVersion);
+			using BinaryArchiveWriter Writer = new BinaryArchiveWriter(Location);
+			Writer.WriteInt(CurrentVersion);
 #if __VPROJECT_AVAILABLE__
-				Writer.WriteBool(true);
+			Writer.WriteBool(true);
 #else
-				Writer.WriteBool(false);
+			Writer.WriteBool(false);
 #endif
-				Write(Writer);
-			}
+			Write(Writer);
 		}
 
 		/// <summary>
@@ -401,26 +399,24 @@ namespace UnrealBuildTool
 			{
 				try
 				{
-					using(BinaryArchiveReader Reader = new BinaryArchiveReader(MakefilePath))
+					using BinaryArchiveReader Reader = new BinaryArchiveReader(MakefilePath);
+					int Version = Reader.ReadInt();
+					if (Version != CurrentVersion)
 					{
-						int Version = Reader.ReadInt();
-						if(Version != CurrentVersion)
-						{
-							ReasonNotLoaded = "makefile version does not match";
-							return null;
-						}
-						bool bVProjectAvailable = Reader.ReadBool();
-#if __VPROJECT_AVAILABLE__
-						if (!bVProjectAvailable)
-#else
-						if (bVProjectAvailable)
-#endif
-						{
-							ReasonNotLoaded = "makefile VProject availability does not match";
-							return null;
-						}
-						Makefile = new TargetMakefile(Reader, MakefileInfo.LastWriteTimeUtc);
+						ReasonNotLoaded = "makefile version does not match";
+						return null;
 					}
+					bool bVProjectAvailable = Reader.ReadBool();
+#if __VPROJECT_AVAILABLE__
+					if (!bVProjectAvailable)
+#else
+					if (bVProjectAvailable)
+#endif
+					{
+						ReasonNotLoaded = "makefile VProject availability does not match";
+						return null;
+					}
+					Makefile = new TargetMakefile(Reader, MakefileInfo.LastWriteTimeUtc);
 				}
 				catch (Exception Ex)
 				{
@@ -449,7 +445,7 @@ namespace UnrealBuildTool
 
 				// Get the current build metadata from the platform
 				string CurrentExternalMetadata = UEBuildPlatform.GetBuildPlatform(Platform).GetExternalBuildMetadata(ProjectFile);
-				if(String.Compare(CurrentExternalMetadata, Makefile.ExternalMetadata, StringComparison.Ordinal) != 0)
+				if(string.Compare(CurrentExternalMetadata, Makefile.ExternalMetadata, StringComparison.Ordinal) != 0)
 				{
 					Log.TraceLog("Old metadata:\n", Makefile.ExternalMetadata);
 					Log.TraceLog("New metadata:\n", CurrentExternalMetadata);

@@ -107,7 +107,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// The private mutable settings object
 		/// </summary>
-		private IOSTargetRules Inner;
+		private readonly IOSTargetRules Inner;
 
 		/// <summary>
 		/// Constructor
@@ -648,7 +648,7 @@ namespace UnrealBuildTool
             }
 		}
 
-        void IPPDataReceivedHandler(Object Sender, DataReceivedEventArgs Line)
+        void IPPDataReceivedHandler(object Sender, DataReceivedEventArgs Line)
         {
             if ((Line != null) && (Line.Data != null))
             {
@@ -690,9 +690,9 @@ namespace UnrealBuildTool
 
 	class IOSPlatform : UEBuildPlatform
 	{
-		List<IOSProjectSettings> CachedProjectSettings = new List<IOSProjectSettings>();
-		List<IOSProjectSettings> CachedProjectSettingsByBundle = new List<IOSProjectSettings>();
-		Dictionary<string, IOSProvisioningData> ProvisionCache = new Dictionary<string, IOSProvisioningData>();
+		readonly List<IOSProjectSettings> CachedProjectSettings = new List<IOSProjectSettings>();
+		readonly List<IOSProjectSettings> CachedProjectSettingsByBundle = new List<IOSProjectSettings>();
+		readonly Dictionary<string, IOSProvisioningData> ProvisionCache = new Dictionary<string, IOSProvisioningData>();
 
 		// by default, use an empty architecture (which is really just a modifer to the platform for some paths/names)
 		public static string IOSArchitecture = "";
@@ -888,12 +888,11 @@ namespace UnrealBuildTool
         {
 			string ProvisionKey = ProjectSettings.BundleIdentifier + " " + bForDistribution.ToString();
 
-            IOSProvisioningData? ProvisioningData;
-			if(!ProvisionCache.TryGetValue(ProvisionKey, out ProvisioningData))
-            {
+			if (!ProvisionCache.TryGetValue(ProvisionKey, out IOSProvisioningData? ProvisioningData))
+			{
 				ProvisioningData = CreateProvisioningData(ProjectSettings, bForDistribution);
-                ProvisionCache.Add(ProvisionKey, ProvisioningData);
-            }
+				ProvisionCache.Add(ProvisionKey, ProvisioningData);
+			}
 			return ProvisioningData;
         }
 

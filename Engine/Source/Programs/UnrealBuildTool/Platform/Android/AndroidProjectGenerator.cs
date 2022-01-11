@@ -18,7 +18,7 @@ namespace UnrealBuildTool
 		bool NsightInstalled = false;		// true if a recent enough version of Nsight is installed
 		int NsightVersionCode = 0;           // version code matching detected Nsight
 
-		bool VSDebugCommandLineOptionPresent = false;    //User must put -vsdebugandroid commandline option to build the debug projects
+		readonly bool VSDebugCommandLineOptionPresent = false;    //User must put -vsdebugandroid commandline option to build the debug projects
 		bool VSDebuggingEnabled = false;      // When set to true, allows debugging with built in MS Cross Platform Android tools.  
 													 //  It adds separate projects ending in .androidproj and a file VSAndroidUnreal.props for the engine and all game projects
 
@@ -33,7 +33,7 @@ namespace UnrealBuildTool
 		/// Whether Android Game Development Extension is installed in the system. See https://developer.android.com/games/preview for more details.
 		/// May be disabled by using -noagde on commandline
 		/// </summary>
-		private bool AGDEInstalled = false;
+		private readonly bool AGDEInstalled = false;
 
 		public AndroidProjectGenerator(CommandLineArguments Arguments)
 			: base(Arguments)
@@ -86,7 +86,7 @@ namespace UnrealBuildTool
 			{
 				// If the sandboxed SDK is not present (pre Visual Studio 15.4) then the non-Sandboxed SDK tools should have the correct build tools for building
 				string? SDKToolsPath = Microsoft.Win32.Registry.GetValue("HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\Android SDK Tools", "Path", null) as string;
-				if (!String.IsNullOrEmpty(SDKToolsPath) && VSDebugCommandLineOptionPresent)
+				if (!string.IsNullOrEmpty(SDKToolsPath) && VSDebugCommandLineOptionPresent)
 				{
 					VSDebuggingEnabled = true;
 				}
@@ -126,7 +126,7 @@ namespace UnrealBuildTool
 			string ProgramFilesPath = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
 
 			string PlatformToolsetVersion = VCProjectFileGenerator.GetProjectFilePlatformToolsetVersionString(ProjectFileFormat);
-			if (String.IsNullOrEmpty(PlatformToolsetVersion))
+			if (string.IsNullOrEmpty(PlatformToolsetVersion))
 			{
 				// future maintainer: add toolset version and verify that the rest of the msbuild path, version, and location in ProgramFiles(x86) is still valid
 				Log.TraceInformation("Android project generation needs to be updated for this version of Visual Studio.");
@@ -733,9 +733,11 @@ namespace UnrealBuildTool
 			bool Success = ProjectFileGenerator.WriteFileIfChanged(ProjectFileGenerator.IntermediateProjectFilesPath + "\\" + FileName, FileText);
 
 			FileReference ProjectFilePath = FileReference.Combine(ProjectFileGenerator.IntermediateProjectFilesPath, FileName);
-			AndroidDebugProjectFile Project = new AndroidDebugProjectFile(ProjectFilePath, ProjectFile.BaseDir);
-			Project.ShouldBuildForAllSolutionTargets = false;
-			Project.ShouldBuildByDefaultForSolutionTargets = false;
+			AndroidDebugProjectFile Project = new AndroidDebugProjectFile(ProjectFilePath, ProjectFile.BaseDir)
+			{
+				ShouldBuildForAllSolutionTargets = false,
+				ShouldBuildByDefaultForSolutionTargets = false
+			};
 
 			return Success ? new Tuple<ProjectFile, string>(Project, "Unreal Android Debug Projects") : null;
 

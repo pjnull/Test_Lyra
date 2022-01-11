@@ -135,10 +135,8 @@ namespace UnrealBuildTool
 				try
 				{
 					XmlSerializer Serializer = new XmlSerializer(typeof(PVSApplicationSettings));
-					using (FileStream Stream = new FileStream(SettingsPath.FullName, FileMode.Open, FileAccess.Read, FileShare.Read))
-					{
-						return (PVSApplicationSettings)Serializer.Deserialize(Stream);
-					}
+					using FileStream Stream = new FileStream(SettingsPath.FullName, FileMode.Open, FileAccess.Read, FileShare.Read);
+					return (PVSApplicationSettings)Serializer.Deserialize(Stream);
 				}
 				catch (Exception Ex)
 				{
@@ -204,7 +202,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Inner settings
 		/// </summary>
-		PVSTargetSettings Inner;
+		readonly PVSTargetSettings Inner;
 
 		/// <summary>
 		/// Constructor
@@ -250,13 +248,13 @@ namespace UnrealBuildTool
 		/// Path to the input file list
 		/// </summary>
 		[CommandLine("-Input", Required = true)]
-		FileReference? InputFileList = null;
+		readonly FileReference? InputFileList = null;
 
 		/// <summary>
 		/// Output file to generate
 		/// </summary>
 		[CommandLine("-Output", Required = true)]
-		FileReference? OutputFile = null;
+		readonly FileReference? OutputFile = null;
 
 		/// <summary>
 		/// Execute the command
@@ -286,7 +284,7 @@ namespace UnrealBuildTool
 					for(int LineIdx = 0; LineIdx < Lines.Length; LineIdx++)
 					{
 						string Line = Lines[LineIdx];
-						if (!String.IsNullOrWhiteSpace(Line) && UniqueItems.Add(Line))
+						if (!string.IsNullOrWhiteSpace(Line) && UniqueItems.Add(Line))
 						{
 							bool bCanParse = false;
 
@@ -301,15 +299,12 @@ namespace UnrealBuildTool
 								string FalseAlarmStr = Tokens[7];
 								string LevelStr = Tokens[8];
 
-								int LineNumber;
-								bool bFalseAlarm;
-								int Level;
-								if(int.TryParse(LineNumberStr, out LineNumber) && bool.TryParse(FalseAlarmStr, out bFalseAlarm) && int.TryParse(LevelStr, out Level))
+								if (int.TryParse(LineNumberStr, out int LineNumber) && bool.TryParse(FalseAlarmStr, out bool bFalseAlarm) && int.TryParse(LevelStr, out int Level))
 								{
 									bCanParse = true;
 
 									// Ignore anything in ThirdParty folders
-									if(FileName.Replace('/', '\\').IndexOf("\\ThirdParty\\", StringComparison.InvariantCultureIgnoreCase) == -1)
+									if (FileName.Replace('/', '\\').IndexOf("\\ThirdParty\\", StringComparison.InvariantCultureIgnoreCase) == -1)
 									{
 										// Output the line to the raw output file
 										RawWriter.WriteLine(Line);
@@ -325,7 +320,7 @@ namespace UnrealBuildTool
 
 							if(!bCanParse)
 							{
-								Log.WriteLine(LogEventType.Warning, LogFormatOptions.NoSeverityPrefix, "{0}({1}): warning: Unable to parse PVS output line '{2}' (tokens=|{3}|)", InputFile, LineIdx + 1, Line, String.Join("|", Tokens));
+								Log.WriteLine(LogEventType.Warning, LogFormatOptions.NoSeverityPrefix, "{0}({1}): warning: Unable to parse PVS output line '{2}' (tokens=|{3}|)", InputFile, LineIdx + 1, Line, string.Join("|", Tokens));
 							}
 						}
 					}
@@ -338,14 +333,14 @@ namespace UnrealBuildTool
 
 	class PVSToolChain : UEToolChain
 	{
-		ReadOnlyTargetRules Target;
-		ReadOnlyPVSTargetSettings Settings;
-		PVSApplicationSettings? ApplicationSettings;
-		VCToolChain InnerToolChain;
-		FileReference AnalyzerFile;
-		FileReference? LicenseFile;
+		readonly ReadOnlyTargetRules Target;
+		readonly ReadOnlyPVSTargetSettings Settings;
+		readonly PVSApplicationSettings? ApplicationSettings;
+		readonly VCToolChain InnerToolChain;
+		readonly FileReference AnalyzerFile;
+		readonly FileReference? LicenseFile;
 		UnrealTargetPlatform Platform;
-		Version AnalyzerVersion;
+		readonly Version AnalyzerVersion;
 
 		public PVSToolChain(ReadOnlyTargetRules Target)
 		{
@@ -378,10 +373,10 @@ namespace UnrealBuildTool
 					throw new BuildException("All PVS-Studio analysis modes are disabled.");
 				}
 
-				if (!String.IsNullOrEmpty(ApplicationSettings.UserName) && !String.IsNullOrEmpty(ApplicationSettings.SerialNumber))
+				if (!string.IsNullOrEmpty(ApplicationSettings.UserName) && !string.IsNullOrEmpty(ApplicationSettings.SerialNumber))
 				{
 					LicenseFile = FileReference.Combine(Unreal.EngineDirectory, "Intermediate", "PVS", "PVS-Studio.lic");
-					Utils.WriteFileIfChanged(LicenseFile, String.Format("{0}\n{1}\n", ApplicationSettings.UserName, ApplicationSettings.SerialNumber));
+					Utils.WriteFileIfChanged(LicenseFile, string.Format("{0}\n{1}\n", ApplicationSettings.UserName, ApplicationSettings.SerialNumber));
 				}
 			}
 			else
@@ -399,12 +394,12 @@ namespace UnrealBuildTool
 			base.GetVersionInfo(Lines);
 
 			ReadOnlyPVSTargetSettings Settings = Target.WindowsPlatform.PVS;
-			Lines.Add(String.Format("Using PVS-Studio installation at {0} with analysis mode {1} ({2})", AnalyzerFile, (uint)Settings.ModeFlags, Settings.ModeFlags.ToString()));
+			Lines.Add(string.Format("Using PVS-Studio installation at {0} with analysis mode {1} ({2})", AnalyzerFile, (uint)Settings.ModeFlags, Settings.ModeFlags.ToString()));
 		}
 
 		static Version GetAnalyzerVersion(FileReference AnalyzerPath)
 		{
-			String Output = String.Empty;
+			string Output = string.Empty;
 			Version? AnalyzerVersion = new Version(0, 0);
 
 			try
@@ -422,7 +417,7 @@ namespace UnrealBuildTool
 					PvsProc.WaitForExit();
 				}
 
-				const String VersionPattern = @"\d+(?:\.\d+)+";
+				const string VersionPattern = @"\d+(?:\.\d+)+";
 				Match Match = Regex.Match(Output, VersionPattern);
 
 				if (Match.Success)
@@ -430,7 +425,7 @@ namespace UnrealBuildTool
 					string VersionStr = Match.Value;
 					if (!Version.TryParse(VersionStr, out AnalyzerVersion))
 					{
-						throw new BuildException(String.Format("Failed to parse PVS-Studio version: {0}", VersionStr));
+						throw new BuildException(string.Format("Failed to parse PVS-Studio version: {0}", VersionStr));
 					}
 				}
 			}
@@ -447,7 +442,7 @@ namespace UnrealBuildTool
 
 		class ActionGraphCapture : ForwardingActionGraphBuilder
 		{
-			List<IExternalAction> Actions;
+			readonly List<IExternalAction> Actions;
 
 			public ActionGraphCapture(IActionGraphBuilder Inner, List<IExternalAction> Actions)
 				: base(Inner)
@@ -497,9 +492,11 @@ namespace UnrealBuildTool
 			OutputDir = DirectoryReference.Combine(OutputDir, "PVS");
 
 			// Preprocess the source files with the regular toolchain
-			CppCompileEnvironment PreprocessCompileEnvironment = new CppCompileEnvironment(CompileEnvironment);
-			PreprocessCompileEnvironment.bPreprocessOnly = true;
-			PreprocessCompileEnvironment.bEnableUndefinedIdentifierWarnings = false; // Not sure why THIRD_PARTY_INCLUDES_START doesn't pick this up; the _Pragma appears in the preprocessed output. Perhaps in preprocess-only mode the compiler doesn't respect these?
+			CppCompileEnvironment PreprocessCompileEnvironment = new CppCompileEnvironment(CompileEnvironment)
+			{
+				bPreprocessOnly = true,
+				bEnableUndefinedIdentifierWarnings = false // Not sure why THIRD_PARTY_INCLUDES_START doesn't pick this up; the _Pragma appears in the preprocessed output. Perhaps in preprocess-only mode the compiler doesn't respect these?
+			};
 			PreprocessCompileEnvironment.AdditionalArguments += " /wd4005 /wd4828";
 			PreprocessCompileEnvironment.Definitions.Add("PVS_STUDIO");
 
@@ -518,7 +515,7 @@ namespace UnrealBuildTool
 				FileItem? SourceFileItem = PreprocessAction.SourceFile;
 				if (SourceFileItem == null)
 				{
-					Log.TraceWarning("Unable to find source file from command producing: {0}", String.Join(", ", PreprocessActions[Idx].ProducedItems.Select(x => x.Location.GetFileName())));
+					Log.TraceWarning("Unable to find source file from command producing: {0}", string.Join(", ", PreprocessActions[Idx].ProducedItems.Select(x => x.Location.GetFileName())));
 					continue;
 				}
 
@@ -619,11 +616,11 @@ namespace UnrealBuildTool
 			FileReference OutputFile;
 			if (Target.ProjectFile == null)
 			{
-				OutputFile = FileReference.Combine(Unreal.EngineDirectory, "Saved", "PVS-Studio", String.Format("{0}.pvslog", Target.Name));
+				OutputFile = FileReference.Combine(Unreal.EngineDirectory, "Saved", "PVS-Studio", string.Format("{0}.pvslog", Target.Name));
 			}
 			else
 			{
-				OutputFile = FileReference.Combine(Target.ProjectFile.Directory, "Saved", "PVS-Studio", String.Format("{0}.pvslog", Target.Name));
+				OutputFile = FileReference.Combine(Target.ProjectFile.Directory, "Saved", "PVS-Studio", string.Format("{0}.pvslog", Target.Name));
 			}
 
 			List<FileReference> InputFiles = Makefile.OutputItems.Select(x => x.Location).Where(x => x.HasExtension(".pvslog")).ToList();
@@ -635,7 +632,7 @@ namespace UnrealBuildTool
 
 			Action AnalyzeAction = Makefile.CreateAction(ActionType.Compile);
 			AnalyzeAction.CommandPath = UnrealBuildTool.GetUBTPath();
-			AnalyzeAction.CommandArguments = String.Format("-Mode=PVSGather -Input=\"{0}\" -Output=\"{1}\" ", InputFileListItem.Location, OutputFile);
+			AnalyzeAction.CommandArguments = string.Format("-Mode=PVSGather -Input=\"{0}\" -Output=\"{1}\" ", InputFileListItem.Location, OutputFile);
 			AnalyzeAction.WorkingDirectory = UnrealBuildTool.EngineSourceDirectory;
 			AnalyzeAction.PrerequisiteItems.Add(InputFileListItem);
 			AnalyzeAction.PrerequisiteItems.AddRange(Makefile.OutputItems);

@@ -157,9 +157,8 @@ namespace UnrealBuildTool
 		{
 			string? ProcessOutput = RunToolAndCaptureOutput(Command, VersionArg, VersionExpression);
 
-			Version? ToolVersion;
 
-			if (Version.TryParse(ProcessOutput, out ToolVersion))
+			if (Version.TryParse(ProcessOutput, out Version? ToolVersion))
 			{
 				return ToolVersion;
 			}
@@ -326,7 +325,7 @@ namespace UnrealBuildTool
 			return Path.Combine(ISPCCompilerPathCommon, ISPCArchitecturePath, "ispc" + ExeExtension);
 		}
 
-		static Dictionary<UnrealTargetPlatform, string> ISPCCompilerVersions = new Dictionary<UnrealTargetPlatform, string>();
+		static readonly Dictionary<UnrealTargetPlatform, string> ISPCCompilerVersions = new Dictionary<UnrealTargetPlatform, string>();
 
 		/// <summary>
 		/// Returns the version of the ISPC compiler for the specified platform. If GetISPCHostCompilerPath() doesn't return a valid path
@@ -432,7 +431,7 @@ namespace UnrealBuildTool
 				List<string> Arguments = new List<string>();
 
 				// Add the ISPC obj file as a prerequisite of the action.
-				CompileAction.CommandArguments = String.Format("\"{0}\" ", ISPCFile.AbsolutePath);
+				CompileAction.CommandArguments = string.Format("\"{0}\" ", ISPCFile.AbsolutePath);
 
 				// Add the ISPC h file to the produced item list.
 				FileItem ISPCIncludeHeaderFile = FileItem.GetItemByFileReference(
@@ -443,13 +442,13 @@ namespace UnrealBuildTool
 					);
 
 				// Add the ISPC file to be compiled.
-				Arguments.Add(String.Format("-h \"{0}\"", ISPCIncludeHeaderFile));
+				Arguments.Add(string.Format("-h \"{0}\"", ISPCIncludeHeaderFile));
 
 				// Build target string. No comma on last
 				string TargetString = "";
 				foreach (string Target in CompileTargets)
 				{
-					if (Target == CompileTargets[CompileTargets.Count-1]) // .Last()
+					if (Target == CompileTargets[^1]) // .Last()
 					{
 						TargetString += Target;
 					}
@@ -460,15 +459,15 @@ namespace UnrealBuildTool
 				}
 
 				// Build target triplet
-				Arguments.Add(String.Format("--target-os={0}", GetISPCOSTarget(CompileEnvironment.Platform)));
-				Arguments.Add(String.Format("--arch={0}", GetISPCArchTarget(CompileEnvironment.Platform, null)));
-				Arguments.Add(String.Format("--target={0}", TargetString));
-				Arguments.Add(String.Format("--emit-{0}", GetISPCObjectFileFormat(CompileEnvironment.Platform)));
+				Arguments.Add(string.Format("--target-os={0}", GetISPCOSTarget(CompileEnvironment.Platform)));
+				Arguments.Add(string.Format("--arch={0}", GetISPCArchTarget(CompileEnvironment.Platform, null)));
+				Arguments.Add(string.Format("--target={0}", TargetString));
+				Arguments.Add(string.Format("--emit-{0}", GetISPCObjectFileFormat(CompileEnvironment.Platform)));
 				
 				string? CpuTarget = GetISPCCpuTarget(CompileEnvironment.Platform);
-				if (!String.IsNullOrEmpty(CpuTarget))
+				if (!string.IsNullOrEmpty(CpuTarget))
                 {
-					Arguments.Add(String.Format("--cpu={0}", CpuTarget));
+					Arguments.Add(string.Format("--cpu={0}", CpuTarget));
 				}
 
 				// PIC is needed for modular builds except on Windows
@@ -483,20 +482,20 @@ namespace UnrealBuildTool
 				// Because ISPC response files don't support white space in arguments, paths with white space need to be passed to the command line directly.
 				foreach (DirectoryReference IncludePath in CompileEnvironment.UserIncludePaths)
 				{
-					Arguments.Add(String.Format("-I\"{0}\"", IncludePath));
+					Arguments.Add(string.Format("-I\"{0}\"", IncludePath));
 				}
 
 				// System include paths.
 				foreach (DirectoryReference SystemIncludePath in CompileEnvironment.SystemIncludePaths)
 				{
-					Arguments.Add(String.Format("-I\"{0}\"", SystemIncludePath));
+					Arguments.Add(string.Format("-I\"{0}\"", SystemIncludePath));
 				}
 
 				// Generate the included header dependency list
 				if (CompileEnvironment.bGenerateDependenciesFile)
 				{
 					FileItem DependencyListFile = FileItem.GetItemByFileReference(FileReference.Combine(OutputDir, Path.GetFileName(ISPCFile.AbsolutePath) + ".txt"));
-					Arguments.Add(String.Format("-MMM \"{0}\"", DependencyListFile.AbsolutePath.Replace('\\', '/')));
+					Arguments.Add(string.Format("-MMM \"{0}\"", DependencyListFile.AbsolutePath.Replace('\\', '/')));
 					CompileAction.DependencyListFile = DependencyListFile;
 					CompileAction.ProducedItems.Add(DependencyListFile);
 				}
@@ -505,7 +504,7 @@ namespace UnrealBuildTool
 
 				FileReference ResponseFileName = new FileReference(ISPCIncludeHeaderFile.AbsolutePath + ".response");
 				FileItem ResponseFileItem = Graph.CreateIntermediateTextFile(ResponseFileName, Arguments.Select(x => Utils.ExpandVariables(x)));
-				CompileAction.CommandArguments += String.Format("@\"{0}\"", ResponseFileName);
+				CompileAction.CommandArguments += string.Format("@\"{0}\"", ResponseFileName);
 				CompileAction.PrerequisiteItems.Add(ResponseFileItem);
 
 				// Add the source file and its included files to the prerequisite item list.
@@ -530,11 +529,11 @@ namespace UnrealBuildTool
 				CopyAction.CommandPath = BuildHostPlatform.Current.Shell;
 				if (BuildHostPlatform.Current.ShellType == ShellType.Cmd)
 				{
-					CopyAction.CommandArguments = String.Format("/C \"copy /Y \"{0}\" \"{1}\" 1>nul\"", SourceFile, TargetFile);
+					CopyAction.CommandArguments = string.Format("/C \"copy /Y \"{0}\" \"{1}\" 1>nul\"", SourceFile, TargetFile);
 				}
 				else
 				{
-					CopyAction.CommandArguments = String.Format("-c 'cp -f \"\"{0}\"\" \"\"{1}\"'", SourceFile.FullName, TargetFile.FullName);
+					CopyAction.CommandArguments = string.Format("-c 'cp -f \"\"{0}\"\" \"\"{1}\"'", SourceFile.FullName, TargetFile.FullName);
 				}
 				CopyAction.WorkingDirectory = UnrealBuildTool.EngineSourceDirectory;
 				CopyAction.PrerequisiteItems.Add(SourceFileItem);
@@ -573,10 +572,12 @@ namespace UnrealBuildTool
 				// Disable remote execution to workaround mismatched case on XGE
 				CompileAction.bCanExecuteRemotely = false;
 
-				List<string> Arguments = new List<string>();
+				List<string> Arguments = new List<string>
+				{
 
-				// Add the ISPC file to be compiled.
-				Arguments.Add(String.Format(" \"{0}\"", ISPCFile.AbsolutePath));
+					// Add the ISPC file to be compiled.
+					string.Format(" \"{0}\"", ISPCFile.AbsolutePath)
+				};
 
 				List<FileItem> CompiledISPCObjFiles = new List<FileItem>();
 				string TargetString = "";
@@ -616,7 +617,7 @@ namespace UnrealBuildTool
 					CompiledISPCObjFiles.Add(CompiledISPCObjFile);
 
 					// Build target string. No comma on last
-					if (Target == CompileTargets[CompileTargets.Count-1]) // .Last()
+					if (Target == CompileTargets[^1]) // .Last()
 					{
 						TargetString += Target;
 					}
@@ -637,13 +638,13 @@ namespace UnrealBuildTool
 				CompiledISPCObjFiles.Add(CompiledISPCObjFileNoISA);
 
 				// Add the output ISPC obj file
-				Arguments.Add(String.Format("-o \"{0}\"", CompiledISPCObjFileNoISA));
+				Arguments.Add(string.Format("-o \"{0}\"", CompiledISPCObjFileNoISA));
 
 				// Build target triplet
-				Arguments.Add(String.Format("--target-os=\"{0}\"", GetISPCOSTarget(CompileEnvironment.Platform)));
-				Arguments.Add(String.Format("--arch=\"{0}\"", GetISPCArchTarget(CompileEnvironment.Platform, null)));
-				Arguments.Add(String.Format("--target=\"{0}\"", TargetString));
-				Arguments.Add(String.Format("--emit-{0}", GetISPCObjectFileFormat(CompileEnvironment.Platform)));
+				Arguments.Add(string.Format("--target-os=\"{0}\"", GetISPCOSTarget(CompileEnvironment.Platform)));
+				Arguments.Add(string.Format("--arch=\"{0}\"", GetISPCArchTarget(CompileEnvironment.Platform, null)));
+				Arguments.Add(string.Format("--target=\"{0}\"", TargetString));
+				Arguments.Add(string.Format("--emit-{0}", GetISPCObjectFileFormat(CompileEnvironment.Platform)));
 
 				if (CompileEnvironment.Configuration == CppConfiguration.Debug)
 				{
@@ -677,19 +678,19 @@ namespace UnrealBuildTool
 				// Include paths. Don't use AddIncludePath() here, since it uses the full path and exceeds the max command line length.
 				foreach (DirectoryReference IncludePath in CompileEnvironment.UserIncludePaths)
 				{
-					Arguments.Add(String.Format("-I\"{0}\"", IncludePath));
+					Arguments.Add(string.Format("-I\"{0}\"", IncludePath));
 				}
 
 				// System include paths.
 				foreach (DirectoryReference SystemIncludePath in CompileEnvironment.SystemIncludePaths)
 				{
-					Arguments.Add(String.Format("-I\"{0}\"", SystemIncludePath));
+					Arguments.Add(string.Format("-I\"{0}\"", SystemIncludePath));
 				}
 
 				// Preprocessor definitions.
 				foreach (string Definition in CompileEnvironment.Definitions)
 				{
-					Arguments.Add(String.Format("-D\"{0}\"", Definition));
+					Arguments.Add(string.Format("-D\"{0}\"", Definition));
 				}
 
 				// Consume the included header dependency list

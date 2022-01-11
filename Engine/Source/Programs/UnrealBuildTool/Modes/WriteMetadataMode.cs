@@ -118,11 +118,11 @@ namespace UnrealBuildTool
 
 			// Get the build id to use
 			string? BuildId;
-			if (TargetInfo.Version != null && !String.IsNullOrEmpty(TargetInfo.Version.BuildId))
+			if (TargetInfo.Version != null && !string.IsNullOrEmpty(TargetInfo.Version.BuildId))
 			{
 				BuildId = TargetInfo.Version.BuildId;
 			}
-			else if (TargetInfo.Receipt != null && !String.IsNullOrEmpty(TargetInfo.Receipt.Version.BuildId))
+			else if (TargetInfo.Receipt != null && !string.IsNullOrEmpty(TargetInfo.Receipt.Version.BuildId))
 			{
 				BuildId = TargetInfo.Receipt.Version.BuildId;
 			}
@@ -138,8 +138,7 @@ namespace UnrealBuildTool
 			// Read all the existing manifests and merge them into the new ones if they have the same build id
 			foreach(KeyValuePair<FileReference, ModuleManifest> Pair in TargetInfo.FileToManifest)
 			{
-				ModuleManifest? SourceManifest;
-				if(TryReadManifest(Pair.Key, out SourceManifest) && SourceManifest.BuildId == BuildId)
+				if (TryReadManifest(Pair.Key, out ModuleManifest? SourceManifest) && SourceManifest.BuildId == BuildId)
 				{
 					MergeManifests(SourceManifest, Pair.Value);
 				}
@@ -152,7 +151,7 @@ namespace UnrealBuildTool
 				if(!UnrealBuildTool.IsFileInstalled(ManifestFile))
 				{
 					ModuleManifest Manifest = Pair.Value;
-					Manifest.BuildId = BuildId ?? String.Empty;
+					Manifest.BuildId = BuildId ?? string.Empty;
 
 					if(!FileReference.Exists(ManifestFile))
 					{
@@ -215,8 +214,7 @@ namespace UnrealBuildTool
 		{
 			foreach (FileReference ManifestFileName in FileToManifest.Keys)
 			{
-				ModuleManifest? Manifest;
-				if (ManifestFileName.IsUnderDirectory(Unreal.EngineDirectory) && TryReadManifest(ManifestFileName, out Manifest) && Manifest.BuildId == BuildId)
+				if (ManifestFileName.IsUnderDirectory(Unreal.EngineDirectory) && TryReadManifest(ManifestFileName, out ModuleManifest? Manifest) && Manifest.BuildId == BuildId)
 				{
 					DateTime ManifestTime = FileReference.GetLastWriteTimeUtc(ManifestFileName);
 					foreach (string FileName in Manifest.ModuleNameToFileName.Values)

@@ -36,7 +36,7 @@ namespace UnrealBuildBase
 		/// <summary>
 		/// A case-insensitive dictionary that's used to map each unique file name to a single FileItem object.
 		/// </summary>
-		static ConcurrentDictionary<FileReference, FileItem> UniqueSourceFileMap = new ConcurrentDictionary<FileReference, FileItem>();
+		static readonly ConcurrentDictionary<FileReference, FileItem> UniqueSourceFileMap = new ConcurrentDictionary<FileReference, FileItem>();
 
 		/// <summary>
 		/// Constructor
@@ -168,11 +168,10 @@ namespace UnrealBuildBase
 		{
 			FileReference Location = new FileReference(Info);
 
-			FileItem? Result;
-			if (!UniqueSourceFileMap.TryGetValue(Location, out Result))
+			if (!UniqueSourceFileMap.TryGetValue(Location, out FileItem? Result))
 			{
 				FileItem NewFileItem = new FileItem(Location, Info);
-				if(UniqueSourceFileMap.TryAdd(Location, NewFileItem))
+				if (UniqueSourceFileMap.TryAdd(Location, NewFileItem))
 				{
 					Result = NewFileItem;
 				}
@@ -191,11 +190,10 @@ namespace UnrealBuildBase
 		/// <returns>The FileItem that represents the given a full file path.</returns>
 		public static FileItem GetItemByFileReference(FileReference Location)
 		{
-			FileItem? Result;
-			if (!UniqueSourceFileMap.TryGetValue(Location, out Result))
+			if (!UniqueSourceFileMap.TryGetValue(Location, out FileItem? Result))
 			{
 				FileItem NewFileItem = new FileItem(Location, Location.ToFileInfo());
-				if(UniqueSourceFileMap.TryAdd(Location, NewFileItem))
+				if (UniqueSourceFileMap.TryAdd(Location, NewFileItem))
 				{
 					Result = NewFileItem;
 				}

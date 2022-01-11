@@ -53,8 +53,7 @@ namespace UnrealBuildTool
 		/// <returns>String with the name</returns>
 		public static bool TryGetWindowsSdkDir(string DesiredVersion, [NotNullWhen(true)] out Version? OutSdkVersion, [NotNullWhen(true)] out DirectoryReference? OutSdkDir)
 		{
-			VersionNumber? vn;
-			if(WindowsPlatform.TryGetWindowsSdkDir(DesiredVersion, out vn, out OutSdkDir))
+			if (WindowsPlatform.TryGetWindowsSdkDir(DesiredVersion, out VersionNumber? vn, out OutSdkDir))
 			{
 				OutSdkVersion = new Version(vn.ToString());
 				return true;
@@ -72,9 +71,7 @@ namespace UnrealBuildTool
 			List<KeyValuePair<string, DirectoryReference>> WindowsSdkDirs = new List<KeyValuePair<string, DirectoryReference>>();
 
 			// Add the default directory first
-			VersionNumber? Version;
-			DirectoryReference? DefaultWindowsSdkDir;
-			if (WindowsPlatform.TryGetWindowsSdkDir(null, out Version, out DefaultWindowsSdkDir))
+			if (WindowsPlatform.TryGetWindowsSdkDir(null, out VersionNumber? Version, out DirectoryReference? DefaultWindowsSdkDir))
 			{
 				WindowsSdkDirs.Add(new KeyValuePair<string, DirectoryReference>(Version.ToString(), DefaultWindowsSdkDir));
 			}

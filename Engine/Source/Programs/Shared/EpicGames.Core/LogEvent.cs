@@ -126,13 +126,12 @@ namespace EpicGames.Core
 			EventId EventId = new EventId(0);
 			int Line = 0;
 			int LineCount = 1;
-			string Message = String.Empty;
-			string Format = String.Empty;
+			string Message = string.Empty;
+			string Format = string.Empty;
 			Dictionary<string, object>? Properties = null;
 			LogException? Exception = null;
 
-			ReadOnlySpan<byte> PropertyName;
-			for (; JsonExtensions.TryReadNextPropertyName(ref Reader, out PropertyName); Reader.Skip())
+			for (; JsonExtensions.TryReadNextPropertyName(ref Reader, out ReadOnlySpan<byte> PropertyName); Reader.Skip())
 			{
 				if (Utf8StringComparer.OrdinalIgnoreCase.Equals(PropertyName, JsonPropertyNames.Time.Span))
 				{
@@ -175,8 +174,7 @@ namespace EpicGames.Core
 		{
 			Dictionary<string, object> Properties = new Dictionary<string, object>();
 
-			ReadOnlySpan<byte> PropertyName;
-			for (; JsonExtensions.TryReadNextPropertyName(ref Reader, out PropertyName); Reader.Skip())
+			for (; JsonExtensions.TryReadNextPropertyName(ref Reader, out ReadOnlySpan<byte> PropertyName); Reader.Skip())
 			{
 				string Name = Encoding.UTF8.GetString(PropertyName);
 				object Value = ReadPropertyValue(ref Reader);
@@ -207,12 +205,11 @@ namespace EpicGames.Core
 
 		static LogValue ReadStructuredPropertyValue(ref Utf8JsonReader Reader)
 		{
-			string Type = String.Empty;
-			string Text = String.Empty;
+			string Type = string.Empty;
+			string Text = string.Empty;
 			Dictionary<string, object>? Properties = null;
 
-			ReadOnlySpan<byte> PropertyName;
-			for (; JsonExtensions.TryReadNextPropertyName(ref Reader, out PropertyName); Reader.Skip())
+			for (; JsonExtensions.TryReadNextPropertyName(ref Reader, out ReadOnlySpan<byte> PropertyName); Reader.Skip())
 			{
 				if (Utf8StringComparer.OrdinalIgnoreCase.Equals(PropertyName, JsonPropertyNames.Type.Span))
 				{
@@ -332,43 +329,43 @@ namespace EpicGames.Core
 					Writer.WriteBooleanValue((bool)Value);
 					break;
 				case TypeCode.Byte:
-					Writer.WriteNumberValue((Byte)Value);
+					Writer.WriteNumberValue((byte)Value);
 					break;
 				case TypeCode.SByte:
-					Writer.WriteNumberValue((SByte)Value);
+					Writer.WriteNumberValue((sbyte)Value);
 					break;
 				case TypeCode.UInt16:
-					Writer.WriteNumberValue((UInt16)Value);
+					Writer.WriteNumberValue((ushort)Value);
 					break;
 				case TypeCode.UInt32:
-					Writer.WriteNumberValue((UInt32)Value);
+					Writer.WriteNumberValue((uint)Value);
 					break;
 				case TypeCode.UInt64:
-					Writer.WriteNumberValue((UInt64)Value);
+					Writer.WriteNumberValue((ulong)Value);
 					break;
 				case TypeCode.Int16:
-					Writer.WriteNumberValue((Int16)Value);
+					Writer.WriteNumberValue((short)Value);
 					break;
 				case TypeCode.Int32:
-					Writer.WriteNumberValue((Int32)Value);
+					Writer.WriteNumberValue((int)Value);
 					break;
 				case TypeCode.Int64:
-					Writer.WriteNumberValue((Int64)Value);
+					Writer.WriteNumberValue((long)Value);
 					break;
 				case TypeCode.Decimal:
-					Writer.WriteNumberValue((Decimal)Value);
+					Writer.WriteNumberValue((decimal)Value);
 					break;
 				case TypeCode.Double:
-					Writer.WriteNumberValue((Double)Value);
+					Writer.WriteNumberValue((double)Value);
 					break;
 				case TypeCode.Single:
-					Writer.WriteNumberValue((Single)Value);
+					Writer.WriteNumberValue((float)Value);
 					break;
 				case TypeCode.String:
-					Writer.WriteStringValue((String)Value);
+					Writer.WriteStringValue((string)Value);
 					break;
 				default:
-					Writer.WriteStringValue(Value.ToString() ?? String.Empty);
+					Writer.WriteStringValue(Value.ToString() ?? string.Empty);
 					break;
 			}
 		}
@@ -422,7 +419,7 @@ namespace EpicGames.Core
 				if (Format != null)
 				{
 					// Format all the other values
-					string FormatString = Format.Value.Value?.ToString() ?? String.Empty;
+					string FormatString = Format.Value.Value?.ToString() ?? string.Empty;
 					Dictionary<string, object>? Properties = MessageTemplate.CreatePositionalProperties(FormatString, Values);
 					return new LogEvent(Time, Level, EventId, Message, FormatString, Properties, LogException.FromException(Exception));
 				}
@@ -597,7 +594,7 @@ namespace EpicGames.Core
 			LogException? Result = null;
 			if (Exception != null)
 			{
-				Result = new LogException(Exception.Message, Exception.StackTrace ?? String.Empty);
+				Result = new LogException(Exception.Message, Exception.StackTrace ?? string.Empty);
 
 				if (Exception.InnerException != null)
 				{

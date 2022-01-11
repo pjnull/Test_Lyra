@@ -25,7 +25,7 @@ namespace UnrealBuildTool
 	{
 		/// True if intellisense data should be generated (takes a while longer)
 		/// Now this is needed for project target generation.
-		bool bGenerateIntelliSenseData = true;
+		readonly bool bGenerateIntelliSenseData = true;
 
 		/// Default constructor
 		public MakefileGenerator(FileReference? InOnlyGameProject)
@@ -64,7 +64,7 @@ namespace UnrealBuildTool
 
 			string UnrealRootPath = Unreal.RootDirectory.FullName;
 
-			if (!String.IsNullOrEmpty(GameProjectName))
+			if (!string.IsNullOrEmpty(GameProjectName))
 			{
 				GameProjectFile = OnlyGameProject!.FullName;
 				MakeGameProjectFile = "GAMEPROJECTFILE =" + GameProjectFile + "\n";
@@ -82,8 +82,8 @@ namespace UnrealBuildTool
 				MakeGameProjectFile + "\n" +
 				"TARGETS ="
 			);
-			String MakeProjectCmdArg = "";
-			String MakeBuildCommand = "";
+			string MakeProjectCmdArg = "";
+			string MakeBuildCommand = "";
 			foreach (ProjectFile Project in GeneratedProjectFiles)
 			{
 				foreach (ProjectTarget TargetFile in Project.ProjectTargets.OfType<ProjectTarget>())
@@ -103,7 +103,7 @@ namespace UnrealBuildTool
 							if (InstalledPlatformInfo.IsValidConfiguration(CurConfiguration, EProjectType.Code))
 							{
 								string Confname = Enum.GetName(typeof(UnrealTargetConfiguration), CurConfiguration)!;
-								MakefileContent.Append(String.Format(" \\\n\t{0}-Linux-{1} ", Basename, Confname));
+								MakefileContent.Append(string.Format(" \\\n\t{0}-Linux-{1} ", Basename, Confname));
 							}
 						}
 					}
@@ -158,16 +158,16 @@ namespace UnrealBuildTool
 							if (InstalledPlatformInfo.IsValidConfiguration(CurConfiguration, EProjectType.Code))
 							{
 								string Confname = Enum.GetName(typeof(UnrealTargetConfiguration), CurConfiguration)!;
-								MakefileContent.Append(String.Format("\n{1}-Linux-{2}:\n\t {0} {1} Linux {2} {3} $(ARGS)\n", MakeBuildCommand, Basename, Confname, MakeProjectCmdArg));
+								MakefileContent.Append(string.Format("\n{1}-Linux-{2}:\n\t {0} {1} Linux {2} {3} $(ARGS)\n", MakeBuildCommand, Basename, Confname, MakeProjectCmdArg));
 							}
 						}
 					}
-					MakefileContent.Append(String.Format("\n{1}:\n\t {0} {1} Linux Development {2} $(ARGS)\n", MakeBuildCommand, Basename, MakeProjectCmdArg));
+					MakefileContent.Append(string.Format("\n{1}:\n\t {0} {1} Linux Development {2} $(ARGS)\n", MakeBuildCommand, Basename, MakeProjectCmdArg));
 				}
 			}
 
 			MakefileContent.Append("\nconfigure:\n");
-			if (!String.IsNullOrEmpty(GameProjectName))
+			if (!string.IsNullOrEmpty(GameProjectName))
 			{
 				// Make sure UBT is updated.
 				MakefileContent.Append("\txbuild /property:Configuration=Development /verbosity:quiet /nologo ");

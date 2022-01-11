@@ -85,7 +85,7 @@ namespace UnrealBuildTool
 			}
 			else
 			{
-				return String.Format("{0}: {1}-{2}", File.ToString(), File.Markup[MarkupMin].LineNumber, File.Markup[MarkupMax - 1].LineNumber + 1);
+				return string.Format("{0}: {1}-{2}", File.ToString(), File.Markup[MarkupMin].LineNumber, File.Markup[MarkupMax - 1].LineNumber + 1);
 			}
 		}
 	}

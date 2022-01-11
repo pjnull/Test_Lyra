@@ -414,7 +414,7 @@ namespace UnrealBuildTool
 					}
 
 					// special case for Mode
-					if (String.Equals(Att.Prefix, "-Mode="))
+					if (string.Equals(Att.Prefix, "-Mode="))
 					{
 						Console.WriteLine($"  {Att.Prefix!.PadRight(LongestPrefix)} :  Select tool mode. One of the following (default tool mode is \"Build\"):");
 						string Indent = "".PadRight(LongestPrefix + 8);
@@ -505,7 +505,7 @@ namespace UnrealBuildTool
 					// Try to get the correct mode
 					if(!ModeNameToType.TryGetValue(Options.Mode, out ModeType))
 					{
-						Log.TraceError("No mode named '{0}'. Available modes are:\n  {1}", Options.Mode, String.Join("\n  ", ModeNameToType.Keys));
+						Log.TraceError("No mode named '{0}'. Available modes are:\n  {1}", Options.Mode, string.Join("\n  ", ModeNameToType.Keys));
 						return 1;
 					}
 				}
@@ -534,11 +534,9 @@ namespace UnrealBuildTool
 					using (GlobalTracer.Instance.BuildSpan("XmlConfig.ReadConfigFiles()").StartActive())
 					{
 						string XmlConfigMutexName = SingleInstanceMutex.GetUniqueMutexForPath("UnrealBuildTool_Mutex_XmlConfig", Assembly.GetExecutingAssembly().CodeBase!);
-						using(SingleInstanceMutex XmlConfigMutex = new SingleInstanceMutex(XmlConfigMutexName, true))
-						{
-							FileReference? XmlConfigCache = Arguments.GetFileReferenceOrDefault("-XmlConfigCache=", null);
-							XmlConfig.ReadConfigFiles(XmlConfigCache);
-						}
+						using SingleInstanceMutex XmlConfigMutex = new SingleInstanceMutex(XmlConfigMutexName, true);
+						FileReference? XmlConfigCache = Arguments.GetFileReferenceOrDefault("-XmlConfigCache=", null);
+						XmlConfig.ReadConfigFiles(XmlConfigCache);
 					}
 				
 					XmlConfig.ApplyTo(Options);

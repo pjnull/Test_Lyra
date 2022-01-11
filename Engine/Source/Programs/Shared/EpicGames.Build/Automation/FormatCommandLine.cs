@@ -45,11 +45,11 @@ namespace UnrealBuildBase
 			int EqualsIdx = Argument.IndexOf('=');
 			if(Argument.StartsWith("-") && EqualsIdx != -1 && EqualsIdx < SpaceIdx)
 			{
-				return String.Format("{0}=\"{1}\"", Argument.Substring(0, EqualsIdx), Argument.Substring(EqualsIdx + 1));
+				return string.Format("{0}=\"{1}\"", Argument.Substring(0, EqualsIdx), Argument.Substring(EqualsIdx + 1));
 			}
 			else
 			{
-				return String.Format("\"{0}\"", Argument);
+				return string.Format("\"{0}\"", Argument);
 			}
 		}
 	}

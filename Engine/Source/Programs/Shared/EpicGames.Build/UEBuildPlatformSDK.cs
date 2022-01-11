@@ -89,8 +89,7 @@ namespace EpicGames.Core
 		/// <returns></returns>
 		public static UEBuildPlatformSDK? GetSDKForPlatform(string PlatformName)
 		{
-			UEBuildPlatformSDK? SDK;
-			SDKRegistry.TryGetValue(PlatformName, out SDK);
+			SDKRegistry.TryGetValue(PlatformName, out UEBuildPlatformSDK? SDK);
 
 			return SDK;
 		}
@@ -235,10 +234,9 @@ namespace EpicGames.Core
 		/// <param name="MinVersion">Smallest version allowed</param>
 		/// <param name="MaxVersion">Largest version allowed (inclusive)</param>
 		/// <returns>True if the versions are valid, false if the platform is unable to convert its versions into an integer</returns>
-		public virtual void GetValidVersionRange(out UInt64 MinVersion, out UInt64 MaxVersion)
+		public virtual void GetValidVersionRange(out ulong MinVersion, out ulong MaxVersion)
 		{
-			string MinVersionString, MaxVersionString;
-			GetValidVersionRange(out MinVersionString, out MaxVersionString);
+			GetValidVersionRange(out string MinVersionString, out string MaxVersionString);
 
 			// failures to convert here are bad
 			if (!TryConvertVersionToInt(MinVersionString, out MinVersion) || !TryConvertVersionToInt(MaxVersionString, out MaxVersion))
@@ -246,13 +244,12 @@ namespace EpicGames.Core
 				throw new Exception(string.Format("Unable to convert Min and Max valid versions to integers in {0} (Versions are {1} - {2})", GetType().Name, MinVersionString, MaxVersionString));
 			}
 		}
-		public virtual void GetValidSoftwareVersionRange(out UInt64 MinVersion, out UInt64 MaxVersion)
+		public virtual void GetValidSoftwareVersionRange(out ulong MinVersion, out ulong MaxVersion)
 		{
-			string? MinVersionString, MaxVersionString;
-			GetValidSoftwareVersionRange(out MinVersionString, out MaxVersionString);
+			GetValidSoftwareVersionRange(out string? MinVersionString, out string? MaxVersionString);
 
-			MinVersion = UInt64.MinValue;
-			MaxVersion = UInt64.MaxValue - 1; // MaxValue is always bad
+			MinVersion = ulong.MinValue;
+			MaxVersion = ulong.MaxValue - 1; // MaxValue is always bad
 
 			// failures to convert here are bad
 			if ((MinVersionString != null && !TryConvertVersionToInt(MinVersionString, out MinVersion)) || 
@@ -280,14 +277,12 @@ namespace EpicGames.Core
 			}
 
 			// convert it to an integer
-			UInt64 IntVersion;
-			if (!TryConvertVersionToInt(Version, out IntVersion))
+			if (!TryConvertVersionToInt(Version, out ulong IntVersion))
 			{
 				return false;
 			}
 
-			UInt64 DesiredVersion;
-			if (!TryConvertVersionToInt(GetMainVersion(), out DesiredVersion))
+			if (!TryConvertVersionToInt(GetMainVersion(), out ulong DesiredVersion))
 			{
 				return false;
 			}
@@ -299,8 +294,7 @@ namespace EpicGames.Core
 			}
 
 			// get numeric range
-			UInt64 MinVersion, MaxVersion;
-			GetValidVersionRange(out MinVersion, out MaxVersion);
+			GetValidVersionRange(out ulong MinVersion, out ulong MaxVersion);
 			return IntVersion >= MinVersion && IntVersion <= MaxVersion;
 		}
 
@@ -313,15 +307,13 @@ namespace EpicGames.Core
 			}
 
 			// convert it to an integer
-			UInt64 IntVersion;
-			if (!TryConvertVersionToInt(Version, out IntVersion))
+			if (!TryConvertVersionToInt(Version, out ulong IntVersion))
 			{
 				return false;
 			}
 
 			// get numeric range
-			UInt64 MinVersion, MaxVersion;
-			GetValidSoftwareVersionRange(out MinVersion, out MaxVersion);
+			GetValidSoftwareVersionRange(out ulong MinVersion, out ulong MaxVersion);
 			return IntVersion >= MinVersion && IntVersion <= MaxVersion;
 		}
 
@@ -332,7 +324,7 @@ namespace EpicGames.Core
 		/// <param name="StringValue">Version that comes from the installed SDK or a Turnkey manifest or the like</param>
 		/// <param name="OutValue">The integer version of StringValue, can be used to compare against a valid range</param>
 		/// <returns>If the StringValue was able to be be converted to an integer</returns>
-		public virtual bool TryConvertVersionToInt(string? StringValue, out UInt64 OutValue)
+		public virtual bool TryConvertVersionToInt(string? StringValue, out ulong OutValue)
 		{
 			// @todo turnkey make this abstract?
 			OutValue = 0;
@@ -355,8 +347,7 @@ namespace EpicGames.Core
 		public virtual SDKStatus PrintSDKInfoAndReturnValidity(LogEventType Verbosity = LogEventType.Console, LogFormatOptions Options = LogFormatOptions.None,
 			LogEventType ErrorVerbosity = LogEventType.Error, LogFormatOptions ErrorOptions = LogFormatOptions.None)
 		{
-			string? ManualSDKVersion, AutoSDKVersion;
-			GetInstalledVersions(out ManualSDKVersion, out AutoSDKVersion);
+			GetInstalledVersions(out string? ManualSDKVersion, out string? AutoSDKVersion);
 
 			SDKStatus Validity = SDKStatus.Valid;
 
@@ -366,9 +357,8 @@ namespace EpicGames.Core
 			{
 				string PlatformSDKRoot = GetPathToPlatformAutoSDKs();
 
-				UInt64 Ver;
 
-				if (AutoSDKVersion != null && TryConvertVersionToInt(AutoSDKVersion, out Ver))
+				if (AutoSDKVersion != null && TryConvertVersionToInt(AutoSDKVersion, out ulong Ver))
 				{
 					Log.WriteLine(Verbosity, Options, "{0} using Auto SDK {1} from: {2} 0x{3:X}", PlatformName, AutoSDKVersion, Path.Combine(PlatformSDKRoot, GetAutoSDKDirectoryForMainVersion()), Ver);
 				}
@@ -388,8 +378,7 @@ namespace EpicGames.Core
 				{
 					Validity = SDKStatus.Invalid;
 
-					string MinVersionString, MaxVersionString;
-					GetValidVersionRange(out MinVersionString, out MaxVersionString);
+					GetValidVersionRange(out string MinVersionString, out string MaxVersionString);
 
 					StringBuilder Msg = new StringBuilder();
 					Msg.AppendFormat("Unable to find a valid SDK for {0}.", PlatformName);
@@ -436,7 +425,7 @@ namespace EpicGames.Core
 
 		// this is the SDK version that was set before activating AutoSDK, since AutoSDK may remove ability to retrieve the Manual SDK version
 		protected string? CachedManualSDKVersion;
-		private static Dictionary<string, UEBuildPlatformSDK> SDKRegistry = new Dictionary<string, UEBuildPlatformSDK>();
+		private static readonly Dictionary<string, UEBuildPlatformSDK> SDKRegistry = new Dictionary<string, UEBuildPlatformSDK>();
 
 		#endregion
 
@@ -562,7 +551,7 @@ namespace EpicGames.Core
 		public static bool TryGetHostPlatformAutoSDKDir([NotNullWhen(true)] out DirectoryReference? OutPlatformDir)
 		{
 			string? SDKRoot = Environment.GetEnvironmentVariable(SDKRootEnvVar);
-			if (String.IsNullOrEmpty(SDKRoot))
+			if (string.IsNullOrEmpty(SDKRoot))
 			{
 				OutPlatformDir = null;
 				return false;
@@ -598,25 +587,23 @@ namespace EpicGames.Core
 				string VersionFilename = Path.Combine(PlatformSDKRoot, CurrentlyInstalledSDKStringManifest);
 				if (File.Exists(VersionFilename))
 				{
-					using (StreamReader Reader = new StreamReader(VersionFilename))
+					using StreamReader Reader = new StreamReader(VersionFilename);
+					string? Version = Reader.ReadLine();
+					string? Type = Reader.ReadLine();
+					string? Level = Reader.ReadLine();
+					if (string.IsNullOrEmpty(Level))
 					{
-						string? Version = Reader.ReadLine();
-						string? Type = Reader.ReadLine();
-						string? Level = Reader.ReadLine();
-						if (string.IsNullOrEmpty(Level))
-						{
-							Level = "FULL";
-						}
+						Level = "FULL";
+					}
 
-						// don't allow ManualSDK installs to count as an AutoSDK install version.
-						if (Type != null && Type == "AutoSDK")
+					// don't allow ManualSDK installs to count as an AutoSDK install version.
+					if (Type != null && Type == "AutoSDK")
+					{
+						if (Version != null)
 						{
-							if (Version != null)
-							{
-								OutInstalledSDKVersionString = Version;
-								OutInstalledSDKLevel = Level;
-								return true;
-							}
+							OutInstalledSDKVersionString = Version;
+							OutInstalledSDKLevel = Level;
+							return true;
 						}
 					}
 				}
@@ -640,14 +627,12 @@ namespace EpicGames.Core
 				string VersionFilename = Path.Combine(PlatformSDKRoot, LastRunScriptVersionManifest);
 				if (File.Exists(VersionFilename))
 				{
-					using (StreamReader Reader = new StreamReader(VersionFilename))
+					using StreamReader Reader = new StreamReader(VersionFilename);
+					string? Version = Reader.ReadLine();
+					if (Version != null)
 					{
-						string? Version = Reader.ReadLine();
-						if (Version != null)
-						{
-							OutLastRunScriptVersion = Version;
-							return true;
-						}
+						OutLastRunScriptVersion = Version;
+						return true;
 					}
 				}
 			}
@@ -661,9 +646,9 @@ namespace EpicGames.Core
 		/// </summary>
 		/// <param name="InstalledSDKVersionString">SDK version string to set</param>
 		/// <returns>true if was able to set it</returns>
-		protected bool SetCurrentlyInstalledAutoSDKString(String InstalledSDKVersionString, String InstalledSDKLevelString)
+		protected bool SetCurrentlyInstalledAutoSDKString(string InstalledSDKVersionString, string InstalledSDKLevelString)
 		{
-			String PlatformSDKRoot = GetPathToPlatformAutoSDKs();
+			string PlatformSDKRoot = GetPathToPlatformAutoSDKs();
 			if (Directory.Exists(PlatformSDKRoot))
 			{
 				string VersionFilename = Path.Combine(PlatformSDKRoot, CurrentlyInstalledSDKStringManifest);
@@ -672,13 +657,11 @@ namespace EpicGames.Core
 					File.Delete(VersionFilename);
 				}
 
-				using (StreamWriter Writer = File.CreateText(VersionFilename))
-				{
-					Writer.WriteLine(InstalledSDKVersionString);
-					Writer.WriteLine("AutoSDK");
-					Writer.WriteLine(InstalledSDKLevelString);
-					return true;
-				}
+				using StreamWriter Writer = File.CreateText(VersionFilename);
+				Writer.WriteLine(InstalledSDKVersionString);
+				Writer.WriteLine("AutoSDK");
+				Writer.WriteLine(InstalledSDKLevelString);
+				return true;
 			}
 
 			return false;
@@ -688,8 +671,8 @@ namespace EpicGames.Core
 		{
 			if (PlatformSupportsAutoSDKs() && HasAutoSDKSystemEnabled())
 			{
-				String InstalledSDKVersionString = GetAutoSDKDirectoryForMainVersion();
-				String PlatformSDKRoot = GetPathToPlatformAutoSDKs();
+				string InstalledSDKVersionString = GetAutoSDKDirectoryForMainVersion();
+				string PlatformSDKRoot = GetPathToPlatformAutoSDKs();
                 if (!Directory.Exists(PlatformSDKRoot))
                 {
                     Directory.CreateDirectory(PlatformSDKRoot);
@@ -708,19 +691,17 @@ namespace EpicGames.Core
 						File.Delete(EnvVarFile);
 					}
 
-					using (StreamWriter Writer = File.CreateText(VersionFilename))
-					{
-						Writer.WriteLine(InstalledSDKVersionString);
-						Writer.WriteLine("ManualSDK");
-						Writer.WriteLine("FULL");
-					}
+					using StreamWriter Writer = File.CreateText(VersionFilename);
+					Writer.WriteLine(InstalledSDKVersionString);
+					Writer.WriteLine("ManualSDK");
+					Writer.WriteLine("FULL");
 				}
 			}
 		}
 
 		protected bool SetLastRunAutoSDKScriptVersion(string LastRunScriptVersion)
 		{
-			String PlatformSDKRoot = GetPathToPlatformAutoSDKs();
+			string PlatformSDKRoot = GetPathToPlatformAutoSDKs();
 			if (Directory.Exists(PlatformSDKRoot))
 			{
 				string VersionFilename = Path.Combine(PlatformSDKRoot, LastRunScriptVersionManifest);
@@ -729,11 +710,9 @@ namespace EpicGames.Core
 					File.Delete(VersionFilename);
 				}
 
-				using (StreamWriter Writer = File.CreateText(VersionFilename))
-				{
-					Writer.WriteLine(LastRunScriptVersion);
-					return true;
-				}
+				using StreamWriter Writer = File.CreateText(VersionFilename);
+				Writer.WriteLine(LastRunScriptVersion);
+				return true;
 			}
 			return false;
 		}
@@ -788,7 +767,7 @@ namespace EpicGames.Core
 			}
 		}
 
-		static private string[] AutoSDKLevels = new string[]
+		private static readonly string[] AutoSDKLevels = new string[]
 		{
 			"BUILD",
 			"PACKAGE",
@@ -935,144 +914,142 @@ namespace EpicGames.Core
 			string EnvVarFile = Path.Combine(PlatformSDKRoot, SDKEnvironmentVarsFile);
 			if (File.Exists(EnvVarFile))
 			{
-				using (StreamReader Reader = new StreamReader(EnvVarFile))
+				using StreamReader Reader = new StreamReader(EnvVarFile);
+				List<string> PathAdds = new List<string>();
+				List<string> PathRemoves = new List<string>();
+
+				List<string> EnvVarNames = new List<string>();
+				List<string> EnvVarValues = new List<string>();
+
+				bool bNeedsToWriteAutoSetupEnvVar = true;
+				string PlatformSetupEnvVar = GetPlatformAutoSDKSetupEnvVar();
+				for (; ; )
 				{
-					List<string> PathAdds = new List<string>();
-					List<string> PathRemoves = new List<string>();
-
-					List<string> EnvVarNames = new List<string>();
-					List<string> EnvVarValues = new List<string>();
-
-					bool bNeedsToWriteAutoSetupEnvVar = true;
-					String PlatformSetupEnvVar = GetPlatformAutoSDKSetupEnvVar();
-					for (; ; )
+					string? VariableString = Reader.ReadLine();
+					if (VariableString == null)
 					{
-						string? VariableString = Reader.ReadLine();
-						if (VariableString == null)
-						{
-							break;
-						}
-
-						string[] Parts = VariableString.Split('=');
-						if (Parts.Length != 2)
-						{
-							Log.TraceLog("Incorrect environment variable declaration:");
-							Log.TraceLog(VariableString);
-							return false;
-						}
-
-						if (String.Compare(Parts[0], "strippath", true) == 0)
-						{
-							PathRemoves.Add(Parts[1]);
-						}
-						else if (String.Compare(Parts[0], "addpath", true) == 0)
-						{
-							PathAdds.Add(Parts[1]);
-						}
-						else
-						{
-							if (String.Compare(Parts[0], PlatformSetupEnvVar) == 0)
-							{
-								bNeedsToWriteAutoSetupEnvVar = false;
-							}
-							// convenience for setup.bat writers.  Trim any accidental whitespace from variable names/values.
-							EnvVarNames.Add(Parts[0].Trim());
-							EnvVarValues.Add(Parts[1].Trim());
-						}
+						break;
 					}
 
-					// don't actually set anything until we successfully validate and read all values in.
-					// we don't want to set a few vars, return a failure, and then have a platform try to
-					// build against a manually installed SDK with half-set env vars.
-					for (int i = 0; i < EnvVarNames.Count; ++i)
+					string[] Parts = VariableString.Split('=');
+					if (Parts.Length != 2)
 					{
-						string EnvVarName = EnvVarNames[i];
-						string EnvVarValue = EnvVarValues[i];
-						Log.TraceVerbose("Setting variable '{0}' to '{1}'", EnvVarName, EnvVarValue);
-						Environment.SetEnvironmentVariable(EnvVarName, EnvVarValue);
+						Log.TraceLog("Incorrect environment variable declaration:");
+						Log.TraceLog(VariableString);
+						return false;
 					}
 
-
-                    // actually perform the PATH stripping / adding.
-                    String? OrigPathVar = Environment.GetEnvironmentVariable("PATH");
-                    String PathDelimiter = RuntimePlatform.IsWindows ? ";" : ":";
-                    String[] PathVars = { };
-                    if (!String.IsNullOrEmpty(OrigPathVar))
-                    {
-                        PathVars = OrigPathVar.Split(PathDelimiter.ToCharArray());
-                    }
-                    else
-                    {
-                        Log.TraceVerbose("Path environment variable is null during AutoSDK");
-                    }
-
-					List<String> ModifiedPathVars = new List<string>();
-					ModifiedPathVars.AddRange(PathVars);
-
-					// perform removes first, in case they overlap with any adds.
-					foreach (String PathRemove in PathRemoves)
+					if (string.Compare(Parts[0], "strippath", true) == 0)
 					{
-						foreach (String PathVar in PathVars)
+						PathRemoves.Add(Parts[1]);
+					}
+					else if (string.Compare(Parts[0], "addpath", true) == 0)
+					{
+						PathAdds.Add(Parts[1]);
+					}
+					else
+					{
+						if (string.Compare(Parts[0], PlatformSetupEnvVar) == 0)
 						{
-							if (PathVar.IndexOf(PathRemove, StringComparison.OrdinalIgnoreCase) >= 0)
-							{
-								Log.TraceVerbose("Removing Path: '{0}'", PathVar);
-								ModifiedPathVars.Remove(PathVar);
-							}
+							bNeedsToWriteAutoSetupEnvVar = false;
 						}
+						// convenience for setup.bat writers.  Trim any accidental whitespace from variable names/values.
+						EnvVarNames.Add(Parts[0].Trim());
+						EnvVarValues.Add(Parts[1].Trim());
 					}
-
-					// remove all the of ADDs so that if this function is executed multiple times, the paths will be guaranteed to be in the same order after each run.
-					// If we did not do this, a 'remove' that matched some, but not all, of our 'adds' would cause the order to change.
-					foreach (String PathAdd in PathAdds)
-					{
-						foreach (String PathVar in PathVars)
-						{
-							if (String.Compare(PathAdd, PathVar, true) == 0)
-							{
-								Log.TraceVerbose("Removing Path: '{0}'", PathVar);
-								ModifiedPathVars.Remove(PathVar);
-							}
-						}
-					}
-
-					// perform adds, but don't add duplicates
-					foreach (String PathAdd in PathAdds)
-					{
-						if (!ModifiedPathVars.Contains(PathAdd))
-						{
-							Log.TraceVerbose("Adding Path: '{0}'", PathAdd);
-							ModifiedPathVars.Add(PathAdd);
-						}
-					}
-
-					String ModifiedPath = String.Join(PathDelimiter, ModifiedPathVars);
-					Environment.SetEnvironmentVariable("PATH", ModifiedPath);
-
-					Reader.Close();
-
-					// write out environment variable command so any process using this commandfile will mark itself as having had autosdks set up.
-					// avoids child processes spuriously detecting manualsdks.
-					if (bNeedsToWriteAutoSetupEnvVar)
-					{
-						// write out the manual sdk version since child processes won't be able to detect manual with AutoSDK messing up env vars
-						using (StreamWriter Writer = File.AppendText(EnvVarFile))
-						{
-							Writer.WriteLine("{0}={1}", PlatformSetupEnvVar, "1");
-						}
-						// set the variable in the local environment in case this process spawns any others.
-						Environment.SetEnvironmentVariable(PlatformSetupEnvVar, "1");
-					}
-
-					// make sure we know that we've modified the local environment, invalidating manual installs for this run.
-					bLocalProcessSetupAutoSDK = true;
-
-					// tell any child processes what our manual version was before setting up autosdk
-					string ValueToWrite = CachedManualSDKVersion != null ? CachedManualSDKVersion : "__None";
-					Environment.SetEnvironmentVariable(GetPlatformAutoSDKSetupEnvVar(), ValueToWrite);
-
-					return true;
 				}
+
+				// don't actually set anything until we successfully validate and read all values in.
+				// we don't want to set a few vars, return a failure, and then have a platform try to
+				// build against a manually installed SDK with half-set env vars.
+				for (int i = 0; i < EnvVarNames.Count; ++i)
+				{
+					string EnvVarName = EnvVarNames[i];
+					string EnvVarValue = EnvVarValues[i];
+					Log.TraceVerbose("Setting variable '{0}' to '{1}'", EnvVarName, EnvVarValue);
+					Environment.SetEnvironmentVariable(EnvVarName, EnvVarValue);
+				}
+
+
+				// actually perform the PATH stripping / adding.
+				string? OrigPathVar = Environment.GetEnvironmentVariable("PATH");
+				string PathDelimiter = RuntimePlatform.IsWindows ? ";" : ":";
+				string[] PathVars = { };
+				if (!string.IsNullOrEmpty(OrigPathVar))
+				{
+					PathVars = OrigPathVar.Split(PathDelimiter.ToCharArray());
+				}
+				else
+				{
+					Log.TraceVerbose("Path environment variable is null during AutoSDK");
+				}
+
+				List<string> ModifiedPathVars = new List<string>();
+				ModifiedPathVars.AddRange(PathVars);
+
+				// perform removes first, in case they overlap with any adds.
+				foreach (string PathRemove in PathRemoves)
+				{
+					foreach (string PathVar in PathVars)
+					{
+						if (PathVar.IndexOf(PathRemove, StringComparison.OrdinalIgnoreCase) >= 0)
+						{
+							Log.TraceVerbose("Removing Path: '{0}'", PathVar);
+							ModifiedPathVars.Remove(PathVar);
+						}
+					}
+				}
+
+				// remove all the of ADDs so that if this function is executed multiple times, the paths will be guaranteed to be in the same order after each run.
+				// If we did not do this, a 'remove' that matched some, but not all, of our 'adds' would cause the order to change.
+				foreach (string PathAdd in PathAdds)
+				{
+					foreach (string PathVar in PathVars)
+					{
+						if (string.Compare(PathAdd, PathVar, true) == 0)
+						{
+							Log.TraceVerbose("Removing Path: '{0}'", PathVar);
+							ModifiedPathVars.Remove(PathVar);
+						}
+					}
+				}
+
+				// perform adds, but don't add duplicates
+				foreach (string PathAdd in PathAdds)
+				{
+					if (!ModifiedPathVars.Contains(PathAdd))
+					{
+						Log.TraceVerbose("Adding Path: '{0}'", PathAdd);
+						ModifiedPathVars.Add(PathAdd);
+					}
+				}
+
+				string ModifiedPath = string.Join(PathDelimiter, ModifiedPathVars);
+				Environment.SetEnvironmentVariable("PATH", ModifiedPath);
+
+				Reader.Close();
+
+				// write out environment variable command so any process using this commandfile will mark itself as having had autosdks set up.
+				// avoids child processes spuriously detecting manualsdks.
+				if (bNeedsToWriteAutoSetupEnvVar)
+				{
+					// write out the manual sdk version since child processes won't be able to detect manual with AutoSDK messing up env vars
+					using (StreamWriter Writer = File.AppendText(EnvVarFile))
+					{
+						Writer.WriteLine("{0}={1}", PlatformSetupEnvVar, "1");
+					}
+					// set the variable in the local environment in case this process spawns any others.
+					Environment.SetEnvironmentVariable(PlatformSetupEnvVar, "1");
+				}
+
+				// make sure we know that we've modified the local environment, invalidating manual installs for this run.
+				bLocalProcessSetupAutoSDK = true;
+
+				// tell any child processes what our manual version was before setting up autosdk
+				string ValueToWrite = CachedManualSDKVersion ?? "__None";
+				Environment.SetEnvironmentVariable(GetPlatformAutoSDKSetupEnvVar(), ValueToWrite);
+
+				return true;
 			}
 			else
 			{
@@ -1084,7 +1061,7 @@ namespace EpicGames.Core
 
 		protected void InvalidateCurrentlyInstalledAutoSDK()
 		{
-			String PlatformSDKRoot = GetPathToPlatformAutoSDKs();
+			string PlatformSDKRoot = GetPathToPlatformAutoSDKs();
 			if (Directory.Exists(PlatformSDKRoot))
 			{
 				string SDKFilename = Path.Combine(PlatformSDKRoot, CurrentlyInstalledSDKStringManifest);
@@ -1119,16 +1096,13 @@ namespace EpicGames.Core
 				if (AutoSDKRoot != "")
 				{
 					// check script version so script fixes can be propagated without touching every build machine's CurrentlyInstalled file manually.
-					string CurrentScriptVersionString;
-					if (GetLastRunScriptVersionString(AutoSDKRoot, out CurrentScriptVersionString) && CurrentScriptVersionString == GetRequiredScriptVersionString())
+					if (GetLastRunScriptVersionString(AutoSDKRoot, out string CurrentScriptVersionString) && CurrentScriptVersionString == GetRequiredScriptVersionString())
 					{
 						// check to make sure OutputEnvVars doesn't need regenerating
 						string EnvVarFile = Path.Combine(AutoSDKRoot, SDKEnvironmentVarsFile);
 						bool bEnvVarFileExists = File.Exists(EnvVarFile);
 
-						string CurrentSDKString;
-						string CurrentSDKLevel;
-						if (bEnvVarFileExists && GetCurrentlyInstalledSDKString(AutoSDKRoot, out CurrentSDKString, out CurrentSDKLevel))
+						if (bEnvVarFileExists && GetCurrentlyInstalledSDKString(AutoSDKRoot, out string CurrentSDKString, out string CurrentSDKLevel))
 						{
 							// match version
 							if (CurrentSDKString == GetAutoSDKDirectoryForMainVersion())
@@ -1146,7 +1120,7 @@ namespace EpicGames.Core
 		}
 
 		// This tracks if we have already checked the sdk installation.
-		private Int32 SDKCheckStatus = -1;
+		private int SDKCheckStatus = -1;
 
 		// true if we've ever overridden the process's environment with AutoSDK data.  After that, manual installs cannot be considered valid ever again.
 		private bool bLocalProcessSetupAutoSDK = false;
@@ -1159,9 +1133,9 @@ namespace EpicGames.Core
 		protected bool HasParentProcessSetupAutoSDK(out string? OutAutoSDKSetupValue)
 		{
 			bool bParentProcessSetupAutoSDK = false;
-			String AutoSDKSetupVarName = GetPlatformAutoSDKSetupEnvVar();
+			string AutoSDKSetupVarName = GetPlatformAutoSDKSetupEnvVar();
 			OutAutoSDKSetupValue = Environment.GetEnvironmentVariable(AutoSDKSetupVarName);
-			if (!String.IsNullOrEmpty(OutAutoSDKSetupValue))
+			if (!string.IsNullOrEmpty(OutAutoSDKSetupValue))
 			{
 				bParentProcessSetupAutoSDK = true;
 			}
@@ -1188,8 +1162,7 @@ namespace EpicGames.Core
 		// tells us if the user has a valid manual install.
 		protected virtual SDKStatus HasRequiredManualSDKInternal()
 		{
-			string? ManualSDKVersion;
-			GetInstalledVersions(out ManualSDKVersion, out _);
+			GetInstalledVersions(out string? ManualSDKVersion, out _);
 
 			return IsVersionValid(ManualSDKVersion, bForAutoSDK:false) ? SDKStatus.Valid : SDKStatus.Invalid;
 		}
@@ -1230,9 +1203,7 @@ namespace EpicGames.Core
 					SDKCheckStatus = -1;
 
 					string AutoSDKRoot = GetPathToPlatformAutoSDKs();
-					string CurrentSDKString;
-					string CurrentSDKLevel;
-					GetCurrentlyInstalledSDKString(AutoSDKRoot, out CurrentSDKString, out CurrentSDKLevel);
+					GetCurrentlyInstalledSDKString(AutoSDKRoot, out string CurrentSDKString, out string CurrentSDKLevel);
 
 					// switch over (note that version string can be empty)
 					if (!RunAutoSDKHooks(AutoSDKRoot, CurrentSDKString, CurrentSDKLevel, SDKHookType.Uninstall))

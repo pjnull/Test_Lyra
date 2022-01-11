@@ -34,7 +34,7 @@ namespace EpicGames.Core
 			/// <summary>
 			/// Owning object
 			/// </summary>
-			DefaultLoggerIndentHandler Owner;
+			readonly DefaultLoggerIndentHandler Owner;
 
 			/// <summary>
 			/// The indent scope object
@@ -76,17 +76,17 @@ namespace EpicGames.Core
 			/// <summary>
 			/// The indent to apply
 			/// </summary>
-			string Indent;
+			readonly string Indent;
 
 			/// <summary>
 			/// The inner state
 			/// </summary>
-			TState State;
+			readonly TState State;
 
 			/// <summary>
 			/// Formatter for the inner state
 			/// </summary>
-			Func<TState, Exception, string> Formatter;
+			readonly Func<TState, Exception, string> Formatter;
 
 			/// <summary>
 			/// Constructor
@@ -142,12 +142,12 @@ namespace EpicGames.Core
 		/// <summary>
 		/// The internal logger
 		/// </summary>
-		ILogger Inner;
+		readonly ILogger Inner;
 
 		/// <summary>
 		/// Current list of indents
 		/// </summary>
-		List<Scope> Scopes = new List<Scope>();
+		readonly List<Scope> Scopes = new List<Scope>();
 
 		/// <summary>
 		/// The current indent text
@@ -191,7 +191,7 @@ namespace EpicGames.Core
 		{
 			if (Scopes.Count > 0)
 			{
-				string Indent = String.Join("", Scopes.Select(x => x.Indent.Indent));
+				string Indent = string.Join("", Scopes.Select(x => x.Indent.Indent));
 				Inner.Log(LogLevel, EventId, new FormattedLogValues<TState>(Indent, State, Formatter), Exception, FormattedLogValues<TState>.Format);
 				return;
 			}

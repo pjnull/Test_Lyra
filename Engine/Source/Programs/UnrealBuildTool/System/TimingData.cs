@@ -121,8 +121,7 @@ namespace UnrealBuildTool
 		/// <param name="ChildData">The sub-event to add to this event.</param>
 		public void AddChild(TimingData ChildData)
 		{
-			TimingData? MatchingData;
-			if (Children.TryGetValue(ChildData.Name, out MatchingData))
+			if (Children.TryGetValue(ChildData.Name, out TimingData? MatchingData))
 			{
 				MatchingData.ExclusiveDuration += ChildData.ExclusiveDuration;
 				foreach (TimingData ChildChildData in ChildData.Children.Values)

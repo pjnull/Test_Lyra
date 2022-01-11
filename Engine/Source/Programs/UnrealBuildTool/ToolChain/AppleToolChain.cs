@@ -57,7 +57,7 @@ namespace UnrealBuildTool
 			if (Unreal.IsEngineInstalled())
 			{
 				string? InstalledSdkVersion = UnrealBuildBase.ApplePlatformSDK.InstalledSDKVersion;
-				if (String.IsNullOrEmpty(InstalledSdkVersion))
+				if (string.IsNullOrEmpty(InstalledSdkVersion))
 				{
 					throw new BuildException("Unable to get xcode version");
 				}
@@ -167,11 +167,13 @@ namespace UnrealBuildTool
 				File.Copy(SourceFile.FullName, TargetFile.FullName, true);
 			}
 
-			ProcessStartInfo StartInfo = new ProcessStartInfo();
-			StartInfo.FileName = Path.Combine(ToolchainDir, "strip");
-			StartInfo.Arguments = String.Format("\"{0}\" -S", TargetFile.FullName);
-			StartInfo.UseShellExecute = false;
-			StartInfo.CreateNoWindow = true;
+			ProcessStartInfo StartInfo = new ProcessStartInfo
+			{
+				FileName = Path.Combine(ToolchainDir, "strip"),
+				Arguments = string.Format("\"{0}\" -S", TargetFile.FullName),
+				UseShellExecute = false,
+				CreateNoWindow = true
+			};
 			Utils.RunLocalProcessAndLogOutput(StartInfo);
 		}
 
@@ -269,8 +271,7 @@ namespace UnrealBuildTool
 					DsymutilLocation = PatchedDsymutilLocation;
 				}
 
-				DirectoryReference? AutoSdkDir;
-				if (UEBuildPlatformSDK.TryGetHostPlatformAutoSDKDir(out AutoSdkDir))
+				if (UEBuildPlatformSDK.TryGetHostPlatformAutoSDKDir(out DirectoryReference? AutoSdkDir))
 				{
 					FileReference AutoSdkDsymutilLocation = FileReference.Combine(AutoSdkDir, "Mac", "LLVM", "bin", "dsymutil");
 					if (FileReference.Exists(AutoSdkDsymutilLocation))

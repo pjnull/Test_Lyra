@@ -47,28 +47,26 @@ namespace UnrealBuildTool
 				// Execute code generation actions
 				if (bExecCodeGenActions)
 				{
-					using (ISourceFileWorkingSet WorkingSet = new EmptySourceFileWorkingSet())
+					using ISourceFileWorkingSet WorkingSet = new EmptySourceFileWorkingSet();
+					// Create the build configuration object, and read the settings
+					BuildConfiguration BuildConfiguration = new BuildConfiguration();
+					XmlConfig.ApplyTo(BuildConfiguration);
+					Arguments.ApplyTo(BuildConfiguration);
+
+					// Create the makefile
+					TargetMakefile Makefile = Target.Build(BuildConfiguration, WorkingSet, TargetDescriptor);
+					List<LinkedAction> Actions = Makefile.Actions.ConvertAll(x => new LinkedAction(x, TargetDescriptor));
+					ActionGraph.Link(Actions);
+
+					// Filter all the actions to execute
+					HashSet<FileItem> PrerequisiteItems = new HashSet<FileItem>(Makefile.Actions.SelectMany(x => x.ProducedItems).Where(x => x.HasExtension(".h") || x.HasExtension(".cpp")));
+					List<LinkedAction> PrerequisiteActions = ActionGraph.GatherPrerequisiteActions(Actions, PrerequisiteItems);
+
+					// Execute these actions
+					if (PrerequisiteActions.Count > 0)
 					{
-						// Create the build configuration object, and read the settings
-						BuildConfiguration BuildConfiguration = new BuildConfiguration();
-						XmlConfig.ApplyTo(BuildConfiguration);
-						Arguments.ApplyTo(BuildConfiguration);
-
-						// Create the makefile
-						TargetMakefile Makefile = Target.Build(BuildConfiguration, WorkingSet, TargetDescriptor);
-						List<LinkedAction> Actions = Makefile.Actions.ConvertAll(x => new LinkedAction(x, TargetDescriptor));
-						ActionGraph.Link(Actions);
-
-						// Filter all the actions to execute
-						HashSet<FileItem> PrerequisiteItems = new HashSet<FileItem>(Makefile.Actions.SelectMany(x => x.ProducedItems).Where(x => x.HasExtension(".h") || x.HasExtension(".cpp")));
-						List<LinkedAction> PrerequisiteActions = ActionGraph.GatherPrerequisiteActions(Actions, PrerequisiteItems);
-
-						// Execute these actions
-						if (PrerequisiteActions.Count > 0)
-						{
-							Log.TraceInformation("Exeucting actions that produce source files...");
-							ActionGraph.ExecuteActions(BuildConfiguration, PrerequisiteActions);
-						}
+						Log.TraceInformation("Exeucting actions that produce source files...");
+						ActionGraph.ExecuteActions(BuildConfiguration, PrerequisiteActions);
 					}
 				}
 

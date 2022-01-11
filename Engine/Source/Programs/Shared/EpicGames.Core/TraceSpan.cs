@@ -84,12 +84,12 @@ namespace EpicGames.Core
 		/// <summary>
 		/// Output directory for telemetry info
 		/// </summary>
-		DirectoryReference TelemetryDir;
+		readonly DirectoryReference TelemetryDir;
 
 		/// <summary>
 		/// The current scope provider
 		/// </summary>
-		List<TraceSpanImpl> Spans = new List<TraceSpanImpl>();
+		readonly List<TraceSpanImpl> Spans = new List<TraceSpanImpl>();
 
 		/// <summary>
 		/// Constructor
@@ -120,42 +120,40 @@ namespace EpicGames.Core
 			{
 				DirectoryReference.CreateDirectory(TelemetryDir);
 
-				string FileName = String.Format("{0}.{1}.json", Path.GetFileName(Assembly.GetEntryAssembly()!.Location), Process.Id, Process.StartTime.Ticks);
+				string FileName = string.Format("{0}.{1}.json", Path.GetFileName(Assembly.GetEntryAssembly()!.Location), Process.Id, Process.StartTime.Ticks);
 				File = FileReference.Combine(TelemetryDir, FileName);
 			}
 
-			using (JsonWriter Writer = new JsonWriter(File))
+			using JsonWriter Writer = new JsonWriter(File);
+			Writer.WriteObjectStart();
+			Writer.WriteArrayStart("Spans");
+			foreach (TraceSpanImpl Span in Spans)
 			{
-				Writer.WriteObjectStart();
-				Writer.WriteArrayStart("Spans");
-				foreach (TraceSpanImpl Span in Spans)
+				if (Span.FinishTime != null)
 				{
-					if (Span.FinishTime != null)
+					Writer.WriteObjectStart();
+					Writer.WriteValue("Name", Span.Name);
+					if (Span.Resource != null)
 					{
-						Writer.WriteObjectStart();
-						Writer.WriteValue("Name", Span.Name);
-						if (Span.Resource != null)
-						{
-							Writer.WriteValue("Resource", Span.Resource);
-						}
-						if (Span.Service != null)
-						{
-							Writer.WriteValue("Service", Span.Service);
-						}
-						Writer.WriteValue("StartTime", Span.StartTime.ToString("o", CultureInfo.InvariantCulture));
-						Writer.WriteValue("FinishTime", Span.FinishTime.Value.ToString("o", CultureInfo.InvariantCulture));
-						Writer.WriteObjectStart("Metadata");
-						foreach (KeyValuePair<string, string> Pair in Span.Metadata)
-						{
-							Writer.WriteValue(Pair.Key, Pair.Value);
-						}
-						Writer.WriteObjectEnd();
-						Writer.WriteObjectEnd();
+						Writer.WriteValue("Resource", Span.Resource);
 					}
+					if (Span.Service != null)
+					{
+						Writer.WriteValue("Service", Span.Service);
+					}
+					Writer.WriteValue("StartTime", Span.StartTime.ToString("o", CultureInfo.InvariantCulture));
+					Writer.WriteValue("FinishTime", Span.FinishTime.Value.ToString("o", CultureInfo.InvariantCulture));
+					Writer.WriteObjectStart("Metadata");
+					foreach (KeyValuePair<string, string> Pair in Span.Metadata)
+					{
+						Writer.WriteValue(Pair.Key, Pair.Value);
+					}
+					Writer.WriteObjectEnd();
+					Writer.WriteObjectEnd();
 				}
-				Writer.WriteArrayEnd();
-				Writer.WriteObjectEnd();
 			}
+			Writer.WriteArrayEnd();
+			Writer.WriteObjectEnd();
 		}
 	}
 
@@ -166,7 +164,7 @@ namespace EpicGames.Core
 	{
 		class CombinedTraceSpan : ITraceSpan
 		{
-			ITraceSpan[] Spans;
+			readonly ITraceSpan[] Spans;
 
 			public CombinedTraceSpan(ITraceSpan[] Spans)
 			{
@@ -193,7 +191,7 @@ namespace EpicGames.Core
 		/// <summary>
 		/// The sinks to use
 		/// </summary>
-		static List<ITraceSink> Sinks = GetDefaultSinks();
+		static readonly List<ITraceSink> Sinks = GetDefaultSinks();
 
 		/// <summary>
 		/// Build a list of default sinks

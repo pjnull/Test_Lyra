@@ -89,12 +89,12 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// The stopwatch used for timing
 		/// </summary>
-		static Stopwatch Stopwatch = new Stopwatch();
+		static readonly Stopwatch Stopwatch = new Stopwatch();
 
 		/// <summary>
 		/// The recorded events
 		/// </summary>
-		static List<Event> Events = new List<Event>();
+		static readonly List<Event> Events = new List<Event>();
 
 		/// <summary>
 		/// Property for the total time elapsed
@@ -147,8 +147,10 @@ namespace UnrealBuildTool
 			// Create the root event
 			TimeSpan FinishTime = Stopwatch.Elapsed;
 
-			List<Event> OuterEvents = new List<Event>();
-			OuterEvents.Add(new Event("<Root>", TimeSpan.Zero, FinishTime));
+			List<Event> OuterEvents = new List<Event>
+			{
+				new Event("<Root>", TimeSpan.Zero, FinishTime)
+			};
 
 			// Print out all the child events
 			TimeSpan LastTime = TimeSpan.Zero;
@@ -232,7 +234,7 @@ namespace UnrealBuildTool
 				Prefix.AppendFormat(" {0,6}          ", FormatTime(StartTime - OuterEvents[Idx].StartTime));
 			}
 
-			Prefix.AppendFormat("[{0,6}]", FormatTime(StartTime - OuterEvents[OuterEvents.Count - 1].StartTime));
+			Prefix.AppendFormat("[{0,6}]", FormatTime(StartTime - OuterEvents[^1].StartTime));
 
 			if (!FinishTime.HasValue)
 			{
@@ -258,7 +260,7 @@ namespace UnrealBuildTool
 		static string FormatTime(TimeSpan Time)
 		{
 			int TotalMilliseconds = (int)Time.TotalMilliseconds;
-			return String.Format("{0}.{1:000}", TotalMilliseconds / 1000, TotalMilliseconds % 1000);
+			return string.Format("{0}.{1:000}", TotalMilliseconds / 1000, TotalMilliseconds % 1000);
 		}
 	}
 }

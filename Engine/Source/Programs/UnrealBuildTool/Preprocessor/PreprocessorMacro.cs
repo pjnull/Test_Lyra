@@ -145,7 +145,7 @@ namespace UnrealBuildTool
 		/// </summary>
 		public bool HasVariableArgumentList
 		{
-			get { return Parameters!.Count > 0 && Parameters[Parameters.Count - 1] == Identifiers.__VA_ARGS__; }
+			get { return Parameters!.Count > 0 && Parameters[^1] == Identifiers.__VA_ARGS__; }
 		}
 
 		/// <summary>
@@ -157,7 +157,7 @@ namespace UnrealBuildTool
 			StringBuilder Result = new StringBuilder(Name.ToString());
 			if (Parameters != null)
 			{
-				Result.AppendFormat("({0})", String.Join(", ", Parameters));
+				Result.AppendFormat("({0})", string.Join(", ", Parameters));
 			}
 			Result.Append("=");
 			if (Tokens.Count > 0)

@@ -93,7 +93,7 @@ namespace UnrealBuildTool
 					DirectoryReference? UserSettingsDir = Utils.GetUserSettingDirectory();
 					if(UserSettingsDir != null)
 					{
-						CacheFile = FileReference.Combine(UserSettingsDir, "UnrealEngine", String.Format("XmlConfigCache-{0}.bin", Unreal.RootDirectory.FullName.Replace(":", "").Replace(Path.DirectorySeparatorChar, '+')));
+						CacheFile = FileReference.Combine(UserSettingsDir, "UnrealEngine", string.Format("XmlConfigCache-{0}.bin", Unreal.RootDirectory.FullName.Replace(":", "").Replace(Path.DirectorySeparatorChar, '+')));
 					}
 				}
 
@@ -104,17 +104,16 @@ namespace UnrealBuildTool
 				FileReference SchemaFile = GetSchemaLocation();
 
 				// Try to read the existing cache from disk
-				XmlConfigData? CachedValues;
-				if(IsCacheUpToDate(CacheFile, InputFileLocations) && FileReference.Exists(SchemaFile))
+				if (IsCacheUpToDate(CacheFile, InputFileLocations) && FileReference.Exists(SchemaFile))
 				{
-					if(XmlConfigData.TryRead(CacheFile, ConfigTypes, out CachedValues) && Enumerable.SequenceEqual(InputFileLocations, CachedValues.InputFiles))
+					if (XmlConfigData.TryRead(CacheFile, ConfigTypes, out XmlConfigData? CachedValues) && Enumerable.SequenceEqual(InputFileLocations, CachedValues.InputFiles))
 					{
 						Values = CachedValues;
 					}
 				}
 
 				// If that failed, regenerate it
-				if(Values == null)
+				if (Values == null)
 				{
 					// Find all the configurable fields from the given types
 					Dictionary<string, Dictionary<string, FieldInfo>> CategoryToFields = new Dictionary<string, Dictionary<string, FieldInfo>>();
@@ -260,7 +259,7 @@ namespace UnrealBuildTool
 
 				// Check for the global config file under AppData/Unreal Engine/UnrealBuildTool
 				string AppDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-				if (!String.IsNullOrEmpty(AppDataFolder))
+				if (!string.IsNullOrEmpty(AppDataFolder))
 				{
 					FileReference AppDataConfigLocation = FileReference.Combine(new DirectoryReference(AppDataFolder), "Unreal Engine", "UnrealBuildTool", "BuildConfiguration.xml");
 					if (!FileReference.Exists(AppDataConfigLocation))
@@ -273,7 +272,7 @@ namespace UnrealBuildTool
 
 				// Check for the global config file under My Documents/Unreal Engine/UnrealBuildTool
 				string PersonalFolder = Environment.GetFolderPath(Environment.SpecialFolder.Personal);
-				if (!String.IsNullOrEmpty(PersonalFolder))
+				if (!string.IsNullOrEmpty(PersonalFolder))
 				{
 					FileReference PersonalConfigLocation = FileReference.Combine(new DirectoryReference(PersonalFolder), "Unreal Engine", "UnrealBuildTool", "BuildConfiguration.xml");
 					if (FileReference.Exists(PersonalConfigLocation))
@@ -305,12 +304,10 @@ namespace UnrealBuildTool
 		static void CreateDefaultConfigFile(FileReference Location)
 		{
 			DirectoryReference.CreateDirectory(Location.Directory);
-			using (StreamWriter Writer = new StreamWriter(Location.FullName))
-			{
-				Writer.WriteLine("<?xml version=\"1.0\" encoding=\"utf-8\" ?>");
-				Writer.WriteLine("<Configuration xmlns=\"{0}\">", XmlConfigFile.SchemaNamespaceURI);
-				Writer.WriteLine("</Configuration>");
-			}
+			using StreamWriter Writer = new StreamWriter(Location.FullName);
+			Writer.WriteLine("<?xml version=\"1.0\" encoding=\"utf-8\" ?>");
+			Writer.WriteLine("<Configuration xmlns=\"{0}\">", XmlConfigFile.SchemaNamespaceURI);
+			Writer.WriteLine("</Configuration>");
 		}
 
 		/// <summary>
@@ -320,16 +317,15 @@ namespace UnrealBuildTool
 		public static void ApplyTo(object TargetObject)
 		{
 			for(Type? TargetType = TargetObject.GetType(); TargetType != null; TargetType = TargetType.BaseType)
-			{ 
-				XmlConfigData.ValueInfo[]? FieldValues;
-				if(Values!.TypeToValues.TryGetValue(TargetType, out FieldValues))
+			{
+				if (Values!.TypeToValues.TryGetValue(TargetType, out XmlConfigData.ValueInfo[]? FieldValues))
 				{
-					foreach(XmlConfigData.ValueInfo FieldValue in FieldValues)
+					foreach (XmlConfigData.ValueInfo FieldValue in FieldValues)
 					{
 						if (!FieldValue.FieldInfo.IsStatic)
 						{
 							FieldInfo FieldInfoToWrite = FieldValue.FieldInfo;
-							
+
 							// Check if setting has been deprecated
 							if (FieldValue.XmlConfigAttribute.Deprecated)
 							{
@@ -386,15 +382,14 @@ namespace UnrealBuildTool
 		public static bool TryGetValue(Type TargetType, string Name, [NotNullWhen(true)] out object? Value)
 		{
 			// Find all the config values for this type
-			XmlConfigData.ValueInfo[]? FieldValues;
-			if(!Values!.TypeToValues.TryGetValue(TargetType, out FieldValues))
+			if (!Values!.TypeToValues.TryGetValue(TargetType, out XmlConfigData.ValueInfo[]? FieldValues))
 			{
 				Value = null;
 				return false;
 			}
 
 			// Find the value with the matching name
-			foreach(XmlConfigData.ValueInfo FieldValue in FieldValues)
+			foreach (XmlConfigData.ValueInfo FieldValue in FieldValues)
 			{
 				if(FieldValue.FieldInfo.Name == Name)
 				{
@@ -424,8 +419,7 @@ namespace UnrealBuildTool
 					{
 						string CategoryName = Attribute.Category ?? ConfigType.Name;
 
-						Dictionary<string, FieldInfo>? NameToField;
-						if(!CategoryToFields.TryGetValue(CategoryName, out NameToField))
+						if (!CategoryToFields.TryGetValue(CategoryName, out Dictionary<string, FieldInfo>? NameToField))
 						{
 							NameToField = new Dictionary<string, FieldInfo>();
 							CategoryToFields.Add(CategoryName, NameToField);
@@ -457,29 +451,39 @@ namespace UnrealBuildTool
 					CategoryAll.Items.Add(Element);
 				}
 
-				XmlSchemaComplexType CategoryType = new XmlSchemaComplexType();
-				CategoryType.Particle = CategoryAll;
+				XmlSchemaComplexType CategoryType = new XmlSchemaComplexType
+				{
+					Particle = CategoryAll
+				};
 
-				XmlSchemaElement CategoryElement = new XmlSchemaElement();
-				CategoryElement.Name = CategoryName;
-				CategoryElement.SchemaType = CategoryType;
-				CategoryElement.MinOccurs = 0;
-				CategoryElement.MaxOccurs = 1;
+				XmlSchemaElement CategoryElement = new XmlSchemaElement
+				{
+					Name = CategoryName,
+					SchemaType = CategoryType,
+					MinOccurs = 0,
+					MaxOccurs = 1
+				};
 
 				RootAll.Items.Add(CategoryElement);
 			}
 
 			// Create the root element and schema object
-			XmlSchemaComplexType RootType = new XmlSchemaComplexType();
-			RootType.Particle = RootAll;
+			XmlSchemaComplexType RootType = new XmlSchemaComplexType
+			{
+				Particle = RootAll
+			};
 
-			XmlSchemaElement RootElement = new XmlSchemaElement();
-			RootElement.Name = XmlConfigFile.RootElementName;
-			RootElement.SchemaType = RootType;
+			XmlSchemaElement RootElement = new XmlSchemaElement
+			{
+				Name = XmlConfigFile.RootElementName,
+				SchemaType = RootType
+			};
 
-			XmlSchema Schema = new XmlSchema();
-			Schema.TargetNamespace = XmlConfigFile.SchemaNamespaceURI;
-			Schema.ElementFormDefault = XmlSchemaForm.Qualified;
+			XmlSchema Schema = new XmlSchema
+			{
+				TargetNamespace = XmlConfigFile.SchemaNamespaceURI,
+				ElementFormDefault = XmlSchemaForm.Qualified
+			};
 			Schema.Items.Add(RootElement);
 
 			// Finally compile it
@@ -497,10 +501,12 @@ namespace UnrealBuildTool
 		/// <returns>New schema element representing the field</returns>
 		static XmlSchemaElement CreateSchemaFieldElement(string Name, Type Type)
 		{
-			XmlSchemaElement Element = new XmlSchemaElement();
-			Element.Name = Name;
-			Element.MinOccurs = 0;
-			Element.MaxOccurs = 1;
+			XmlSchemaElement Element = new XmlSchemaElement
+			{
+				Name = Name,
+				MinOccurs = 0,
+				MaxOccurs = 1
+			};
 
 			if (TryGetNullableStructType(Type, out Type? InnerType))
 			{
@@ -533,33 +539,43 @@ namespace UnrealBuildTool
 			}
 			else if(Type.IsEnum)
 			{
-				XmlSchemaSimpleTypeRestriction Restriction = new XmlSchemaSimpleTypeRestriction();
-				Restriction.BaseTypeName = XmlSchemaType.GetBuiltInSimpleType(XmlTypeCode.String).QualifiedName;
-
-				foreach(string EnumName in Enum.GetNames(Type))
+				XmlSchemaSimpleTypeRestriction Restriction = new XmlSchemaSimpleTypeRestriction
 				{
-					XmlSchemaEnumerationFacet Facet = new XmlSchemaEnumerationFacet();
-					Facet.Value = EnumName;
+					BaseTypeName = XmlSchemaType.GetBuiltInSimpleType(XmlTypeCode.String).QualifiedName
+				};
+
+				foreach (string EnumName in Enum.GetNames(Type))
+				{
+					XmlSchemaEnumerationFacet Facet = new XmlSchemaEnumerationFacet
+					{
+						Value = EnumName
+					};
 					Restriction.Facets.Add(Facet);
 				}
 
-				XmlSchemaSimpleType EnumType = new XmlSchemaSimpleType();
-				EnumType.Content = Restriction;
+				XmlSchemaSimpleType EnumType = new XmlSchemaSimpleType
+				{
+					Content = Restriction
+				};
 				Element.SchemaType = EnumType;
 			}
 			else if(Type == typeof(string[]))
 			{
-				XmlSchemaElement ItemElement = new XmlSchemaElement();
-				ItemElement.Name = "Item";
-				ItemElement.SchemaTypeName = XmlSchemaType.GetBuiltInSimpleType(XmlTypeCode.String).QualifiedName;
-				ItemElement.MinOccurs = 0;
-				ItemElement.MaxOccursString = "unbounded";
+				XmlSchemaElement ItemElement = new XmlSchemaElement
+				{
+					Name = "Item",
+					SchemaTypeName = XmlSchemaType.GetBuiltInSimpleType(XmlTypeCode.String).QualifiedName,
+					MinOccurs = 0,
+					MaxOccursString = "unbounded"
+				};
 
 				XmlSchemaSequence Sequence = new XmlSchemaSequence();
 				Sequence.Items.Add(ItemElement);
 
-				XmlSchemaComplexType ArrayType = new XmlSchemaComplexType();
-				ArrayType.Particle = Sequence;
+				XmlSchemaComplexType ArrayType = new XmlSchemaComplexType
+				{
+					Particle = Sequence
+				};
 				Element.SchemaType = ArrayType;
 			}
 			else
@@ -576,13 +592,15 @@ namespace UnrealBuildTool
 		/// <param name="Location">Location to write to</param>
 		static void WriteSchema(XmlSchema Schema, FileReference Location)
 		{
-			XmlWriterSettings Settings = new XmlWriterSettings();
-			Settings.Indent = true;
-			Settings.IndentChars = "\t";
-			Settings.NewLineChars = Environment.NewLine;
-			Settings.OmitXmlDeclaration = true;
+			XmlWriterSettings Settings = new XmlWriterSettings
+			{
+				Indent = true,
+				IndentChars = "\t",
+				NewLineChars = Environment.NewLine,
+				OmitXmlDeclaration = true
+			};
 
-			if(CachedSchemaSerializer == null)
+			if (CachedSchemaSerializer == null)
 			{
 				CachedSchemaSerializer = XmlSerializer.FromTypes(new Type[] { typeof(XmlSchema) })[0];
 			}
@@ -633,23 +651,20 @@ namespace UnrealBuildTool
 			Dictionary<Type, Dictionary<FieldInfo, XmlConfigData.ValueInfo>> TypeToValues, XmlSchema Schema)
 		{
 			// Read the XML file, and validate it against the schema
-			XmlConfigFile? ConfigFile;
-			if(!XmlConfigFile.TryRead(Location, Schema, out ConfigFile))
+			if (!XmlConfigFile.TryRead(Location, Schema, out XmlConfigFile? ConfigFile))
 			{
 				return false;
 			}
 
 			// Parse the document
-			foreach(XmlElement CategoryElement in ConfigFile.DocumentElement.ChildNodes.OfType<XmlElement>())
+			foreach (XmlElement CategoryElement in ConfigFile.DocumentElement.ChildNodes.OfType<XmlElement>())
 			{
-				Dictionary<string, FieldInfo>? NameToField;
-				if(CategoryToFields.TryGetValue(CategoryElement.Name, out NameToField))
+				if (CategoryToFields.TryGetValue(CategoryElement.Name, out Dictionary<string, FieldInfo>? NameToField))
 				{
-					foreach(XmlElement KeyElement in CategoryElement.ChildNodes.OfType<XmlElement>())
+					foreach (XmlElement KeyElement in CategoryElement.ChildNodes.OfType<XmlElement>())
 					{
-						FieldInfo? Field;
 						object Value;
-						if(NameToField.TryGetValue(KeyElement.Name, out Field))
+						if (NameToField.TryGetValue(KeyElement.Name, out FieldInfo? Field))
 						{
 							if (Field.FieldType == typeof(string[]))
 							{
@@ -665,17 +680,16 @@ namespace UnrealBuildTool
 							}
 
 							// Add it to the set of values for the type containing this field
-							Dictionary<FieldInfo, XmlConfigData.ValueInfo>? FieldToValue;
-							if(!TypeToValues.TryGetValue(Field.DeclaringType!, out FieldToValue))
+							if (!TypeToValues.TryGetValue(Field.DeclaringType!, out Dictionary<FieldInfo, XmlConfigData.ValueInfo>? FieldToValue))
 							{
 								FieldToValue = new Dictionary<FieldInfo, XmlConfigData.ValueInfo>();
 								TypeToValues.Add(Field.DeclaringType!, FieldToValue);
 							}
-							
+
 							// Parse the corresponding value
 							XmlConfigData.ValueInfo FieldValue = new XmlConfigData.ValueInfo(Field, Value, Location,
 								Field.GetCustomAttribute<XmlConfigFileAttribute>()!);
-							
+
 							FieldToValue[Field] = FieldValue;
 						}
 					}
@@ -710,20 +724,20 @@ namespace UnrealBuildTool
 				} 
 				else 
 				{
-					throw new Exception(String.Format("Unable to convert '{0}' to boolean. 'true/false/0/1' are the supported formats.", Text));
+					throw new Exception(string.Format("Unable to convert '{0}' to boolean. 'true/false/0/1' are the supported formats.", Text));
 				}
 			}
 			else if(FieldType == typeof(int))
 			{
-				return Int32.Parse(TrimmedText);
+				return int.Parse(TrimmedText);
 			}
 			else if(FieldType == typeof(float))
 			{
-				return Single.Parse(TrimmedText, System.Globalization.CultureInfo.InvariantCulture);
+				return float.Parse(TrimmedText, System.Globalization.CultureInfo.InvariantCulture);
 			}
 			else if(FieldType == typeof(double))
 			{
-				return Double.Parse(TrimmedText, System.Globalization.CultureInfo.InvariantCulture);
+				return double.Parse(TrimmedText, System.Globalization.CultureInfo.InvariantCulture);
 			}
 			else if(FieldType.IsEnum)
 			{
@@ -735,7 +749,7 @@ namespace UnrealBuildTool
 			}
 			else
 			{
-				throw new Exception(String.Format("Unsupported config type '{0}'", FieldType.Name));
+				throw new Exception(string.Format("Unsupported config type '{0}'", FieldType.Name));
 			}
 		}
 
@@ -837,46 +851,43 @@ namespace UnrealBuildTool
 		/// <param name="CategoryToFields">Map of string to types to fields</param>
 		private static void WriteDocumentationUDN(FileReference OutputFile, XmlDocument InputDocumentation, Dictionary<string, Dictionary<string, FieldInfo>> CategoryToFields)
 		{
-			using (StreamWriter Writer = new StreamWriter(OutputFile.FullName))
+			using StreamWriter Writer = new StreamWriter(OutputFile.FullName);
+			Writer.WriteLine("Availability: NoPublish");
+			Writer.WriteLine("Title: Build Configuration Properties Page");
+			Writer.WriteLine("Crumbs:");
+			Writer.WriteLine("Description: This is a procedurally generated markdown page.");
+			Writer.WriteLine("Version: {0}.{1}", ReadOnlyBuildVersion.Current.MajorVersion, ReadOnlyBuildVersion.Current.MinorVersion);
+			Writer.WriteLine("");
+
+			foreach (KeyValuePair<string, Dictionary<string, FieldInfo>> CategoryPair in CategoryToFields)
 			{
-				Writer.WriteLine("Availability: NoPublish");
-				Writer.WriteLine("Title: Build Configuration Properties Page");
-				Writer.WriteLine("Crumbs:");
-				Writer.WriteLine("Description: This is a procedurally generated markdown page.");
-				Writer.WriteLine("Version: {0}.{1}", ReadOnlyBuildVersion.Current.MajorVersion, ReadOnlyBuildVersion.Current.MinorVersion);
-				Writer.WriteLine("");
+				string CategoryName = CategoryPair.Key;
+				Writer.WriteLine("### {0}", CategoryName);
+				Writer.WriteLine();
 
-				foreach (KeyValuePair<string, Dictionary<string, FieldInfo>> CategoryPair in CategoryToFields)
+				Dictionary<string, FieldInfo> Fields = CategoryPair.Value;
+				foreach (KeyValuePair<string, FieldInfo> FieldPair in Fields)
 				{
-					string CategoryName = CategoryPair.Key;
-					Writer.WriteLine("### {0}", CategoryName);
-					Writer.WriteLine();
-
-					Dictionary<string, FieldInfo> Fields = CategoryPair.Value;
-					foreach (KeyValuePair<string, FieldInfo> FieldPair in Fields)
+					// Get the XML comment for this field
+					if (!RulesDocumentation.TryGetXmlComment(InputDocumentation, FieldPair.Value, out List<string>? Lines) || Lines.Count == 0)
 					{
-						// Get the XML comment for this field
-						List<string>? Lines;
-						if(!RulesDocumentation.TryGetXmlComment(InputDocumentation, FieldPair.Value, out Lines) || Lines.Count == 0)
-						{
-							continue;
-						}
-
-						// Write the result to the .udn file
-						Writer.WriteLine("$ {0} : {1}", FieldPair.Key, Lines[0]);
-						for (int Idx = 1; Idx < Lines.Count; Idx++)
-						{
-							if (Lines[Idx].StartsWith("*") || Lines[Idx].StartsWith("-"))
-							{
-								Writer.WriteLine("        * {0}", Lines[Idx].Substring(1).TrimStart());
-							}
-							else
-							{
-								Writer.WriteLine("    * {0}", Lines[Idx]);
-							}
-						}
-						Writer.WriteLine();
+						continue;
 					}
+
+					// Write the result to the .udn file
+					Writer.WriteLine("$ {0} : {1}", FieldPair.Key, Lines[0]);
+					for (int Idx = 1; Idx < Lines.Count; Idx++)
+					{
+						if (Lines[Idx].StartsWith("*") || Lines[Idx].StartsWith("-"))
+						{
+							Writer.WriteLine("        * {0}", Lines[Idx].Substring(1).TrimStart());
+						}
+						else
+						{
+							Writer.WriteLine("    * {0}", Lines[Idx]);
+						}
+					}
+					Writer.WriteLine();
 				}
 			}
 		}
@@ -889,62 +900,59 @@ namespace UnrealBuildTool
 		/// <param name="CategoryToFields">Map of string to types to fields</param>
 		private static void WriteDocumentationHTML(FileReference OutputFile, XmlDocument InputDocumentation, Dictionary<string, Dictionary<string, FieldInfo>> CategoryToFields)
 		{
-			using (StreamWriter Writer = new StreamWriter(OutputFile.FullName))
+			using StreamWriter Writer = new StreamWriter(OutputFile.FullName);
+			Writer.WriteLine("<html>");
+			Writer.WriteLine("  <body>");
+			Writer.WriteLine("  <h2>BuildConfiguration Properties</h2>");
+			foreach (KeyValuePair<string, Dictionary<string, FieldInfo>> CategoryPair in CategoryToFields)
 			{
-				Writer.WriteLine("<html>");
-				Writer.WriteLine("  <body>");
-				Writer.WriteLine("  <h2>BuildConfiguration Properties</h2>");
-				foreach (KeyValuePair<string, Dictionary<string, FieldInfo>> CategoryPair in CategoryToFields)
+				string CategoryName = CategoryPair.Key;
+				Writer.WriteLine("    <h3>{0}</h3>", CategoryName);
+				Writer.WriteLine("    <dl>");
+
+				Dictionary<string, FieldInfo> Fields = CategoryPair.Value;
+				foreach (KeyValuePair<string, FieldInfo> FieldPair in Fields)
 				{
-					string CategoryName = CategoryPair.Key;
-					Writer.WriteLine("    <h3>{0}</h3>", CategoryName);
-					Writer.WriteLine("    <dl>");
-
-					Dictionary<string, FieldInfo> Fields = CategoryPair.Value;
-					foreach (KeyValuePair<string, FieldInfo> FieldPair in Fields)
+					// Get the XML comment for this field
+					if (!RulesDocumentation.TryGetXmlComment(InputDocumentation, FieldPair.Value, out List<string>? Lines) || Lines.Count == 0)
 					{
-						// Get the XML comment for this field
-						List<string>? Lines;
-						if (!RulesDocumentation.TryGetXmlComment(InputDocumentation, FieldPair.Value, out Lines) || Lines.Count == 0)
-						{
-							continue;
-						}
-
-						// Write the result to the .udn file
-						Writer.WriteLine("      <dt>{0}</dt>", FieldPair.Key);
-
-						if (Lines.Count == 1)
-						{
-							Writer.WriteLine("      <dd>{0}</dd>", Lines[0]);
-						}
-						else
-						{
-							Writer.WriteLine("      <dd>");
-							for (int Idx = 0; Idx < Lines.Count; Idx++)
-							{
-								if (Lines[Idx].StartsWith("*") || Lines[Idx].StartsWith("-"))
-								{
-									Writer.WriteLine("        <ul>");
-									for (; Idx < Lines.Count && (Lines[Idx].StartsWith("*") || Lines[Idx].StartsWith("-")); Idx++)
-									{
-										Writer.WriteLine("          <li>{0}</li>", Lines[Idx].Substring(1).TrimStart());
-									}
-									Writer.WriteLine("        </ul>");
-								}
-								else
-								{
-									Writer.WriteLine("        {0}", Lines[Idx]);
-								}
-							}
-							Writer.WriteLine("      </dd>");
-						}
+						continue;
 					}
 
-					Writer.WriteLine("    </dl>");
+					// Write the result to the .udn file
+					Writer.WriteLine("      <dt>{0}</dt>", FieldPair.Key);
+
+					if (Lines.Count == 1)
+					{
+						Writer.WriteLine("      <dd>{0}</dd>", Lines[0]);
+					}
+					else
+					{
+						Writer.WriteLine("      <dd>");
+						for (int Idx = 0; Idx < Lines.Count; Idx++)
+						{
+							if (Lines[Idx].StartsWith("*") || Lines[Idx].StartsWith("-"))
+							{
+								Writer.WriteLine("        <ul>");
+								for (; Idx < Lines.Count && (Lines[Idx].StartsWith("*") || Lines[Idx].StartsWith("-")); Idx++)
+								{
+									Writer.WriteLine("          <li>{0}</li>", Lines[Idx].Substring(1).TrimStart());
+								}
+								Writer.WriteLine("        </ul>");
+							}
+							else
+							{
+								Writer.WriteLine("        {0}", Lines[Idx]);
+							}
+						}
+						Writer.WriteLine("      </dd>");
+					}
 				}
-				Writer.WriteLine("  </body>");
-				Writer.WriteLine("</html>");
+
+				Writer.WriteLine("    </dl>");
 			}
+			Writer.WriteLine("  </body>");
+			Writer.WriteLine("</html>");
 		}
 	}
 }

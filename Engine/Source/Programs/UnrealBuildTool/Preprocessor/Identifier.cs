@@ -18,12 +18,12 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// The name of this identifier
 		/// </summary>
-		string Name;
+		readonly string Name;
 
 		/// <summary>
 		/// Global map of name to identifier instance
 		/// </summary>
-		static ConcurrentDictionary<string, Identifier> NameToIdentifier = new ConcurrentDictionary<string, Identifier>(StringComparer.Ordinal);
+		static readonly ConcurrentDictionary<string, Identifier> NameToIdentifier = new ConcurrentDictionary<string, Identifier>(StringComparer.Ordinal);
 
 		/// <summary>
 		/// Constructor
@@ -41,11 +41,10 @@ namespace UnrealBuildTool
 		/// <returns>New Identifier instance</returns>
 		public static Identifier FindOrAdd(string Name)
 		{
-			Identifier? Result;
-			if(!NameToIdentifier.TryGetValue(Name, out Result))
+			if (!NameToIdentifier.TryGetValue(Name, out Identifier? Result))
 			{
 				Identifier NewIdentifier = new Identifier(Name);
-				if(NameToIdentifier.TryAdd(Name, NewIdentifier))
+				if (NameToIdentifier.TryAdd(Name, NewIdentifier))
 				{
 					Result = NewIdentifier;
 				}
@@ -64,7 +63,7 @@ namespace UnrealBuildTool
 		/// <returns>Value indicating which identifier should sort first</returns>
 		public int CompareTo(Identifier? Other)
 		{
-			return ReferenceEquals(Other, null)? 1 : Name.CompareTo(Other.Name);
+			return Other is null ? 1 : Name.CompareTo(Other.Name);
 		}
 
 		/// <summary>

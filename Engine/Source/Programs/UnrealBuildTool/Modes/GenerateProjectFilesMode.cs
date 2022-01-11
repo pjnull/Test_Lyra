@@ -39,7 +39,8 @@ namespace UnrealBuildTool
 		[CommandLine("-Rider", Value = nameof(ProjectFileFormat.Rider))]
 		#if __VPROJECT_AVAILABLE__
 			[CommandLine("-VProject", Value = nameof(ProjectFileFormat.VProject))]
-		#endif
+		readonly
+#endif
 		HashSet<ProjectFileFormat> ProjectFileFormats = new HashSet<ProjectFileFormat>();
 
 		/// <summary>
@@ -72,8 +73,7 @@ namespace UnrealBuildTool
 			Log.AddFileWriter("DefaultLogTraceListener", LogFile);
 
 			// Parse rocket-specific arguments.
-			FileReference? ProjectFile;
-			TryParseProjectFileArgument(Arguments, out ProjectFile);
+			TryParseProjectFileArgument(Arguments, out FileReference? ProjectFile);
 
 			// Warn if there are explicit project file formats specified
 			if (ProjectFileFormats.Count > 0 && !bAutomated)
@@ -101,14 +101,13 @@ namespace UnrealBuildTool
 			if (ProjectFileFormats.Count == 0)
 			{
 				// Read from the XML config
-				if (!String.IsNullOrEmpty(ProjectFileGeneratorSettings.Format))
+				if (!string.IsNullOrEmpty(ProjectFileGeneratorSettings.Format))
 				{
 					ProjectFileFormats.UnionWith(ProjectFileGeneratorSettings.ParseFormatList(ProjectFileGeneratorSettings.Format));
 				}
 
 				// Read from the editor config
-				ProjectFileFormat PreferredSourceCodeAccessor;
-				if (ProjectFileGenerator.GetPreferredSourceCodeAccessor(ProjectFile, out PreferredSourceCodeAccessor))
+				if (ProjectFileGenerator.GetPreferredSourceCodeAccessor(ProjectFile, out ProjectFileFormat PreferredSourceCodeAccessor))
 				{
 					ProjectFileFormats.Add(PreferredSourceCodeAccessor);
 				}
@@ -250,10 +249,9 @@ namespace UnrealBuildTool
 		/// <returns>True if the project file was parsed, false otherwise</returns>
 		private static bool TryParseProjectFileArgument(CommandLineArguments Arguments, [NotNullWhen(true)] out FileReference? ProjectFile)
 		{
-			string? CandidateProjectPath = null;
 
 			// look for -project=<path>, if it does not exist check arguments for anything that has .uproject in it
-			if (!Arguments.TryGetValue("-Project=", out CandidateProjectPath))
+			if (!Arguments.TryGetValue("-Project=", out string? CandidateProjectPath))
 			{
 				// Go through the argument list and try to match poorly (or well..) formed arguments like 
 				// EngineTest, EngineTest.uproject
@@ -265,7 +263,7 @@ namespace UnrealBuildTool
 					{
 						CandidateProjectPath = Arguments[Idx];
 						Arguments.MarkAsUsed(Idx);
-						break; 
+						break;
 					}
 				}
 			}

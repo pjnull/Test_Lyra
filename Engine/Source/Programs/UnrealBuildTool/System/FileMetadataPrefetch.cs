@@ -19,22 +19,22 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Queue for tasks added to the thread pool
 		/// </summary>
-		static ThreadPoolWorkQueue Queue = new ThreadPoolWorkQueue();
+		static readonly ThreadPoolWorkQueue Queue = new ThreadPoolWorkQueue();
 
 		/// <summary>
 		/// Used to cancel any queued tasks
 		/// </summary>
-		static CancellationTokenSource CancelSource = new CancellationTokenSource();
+		static readonly CancellationTokenSource CancelSource = new CancellationTokenSource();
 
 		/// <summary>
 		/// The cancellation token
 		/// </summary>
-		static CancellationToken CancelToken = CancelSource.Token;
+		static readonly CancellationToken CancelToken = CancelSource.Token;
 
 		/// <summary>
 		/// Set of all the directory trees that have been queued up, to save adding any more than once.
 		/// </summary>
-		static HashSet<DirectoryReference> QueuedDirectories = new HashSet<DirectoryReference>();
+		static readonly HashSet<DirectoryReference> QueuedDirectories = new HashSet<DirectoryReference>();
 
 		/// <summary>
 		/// Enqueue the engine directory for prefetching

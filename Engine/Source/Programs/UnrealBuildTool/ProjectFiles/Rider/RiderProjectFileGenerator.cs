@@ -30,31 +30,31 @@ namespace UnrealBuildTool
 		/// Platforms to generate project files for
 		/// </summary>
 		[CommandLine("-Platforms=", ListSeparator = '+')]
-		HashSet<UnrealTargetPlatform> Platforms = new HashSet<UnrealTargetPlatform>();
+		readonly HashSet<UnrealTargetPlatform> Platforms = new HashSet<UnrealTargetPlatform>();
 
 		/// <summary>
 		/// Target types to generate project files for
 		/// </summary>
 		[CommandLine("-TargetTypes=", ListSeparator = '+')]
-		HashSet<TargetType> TargetTypes = new HashSet<TargetType>();
+		readonly HashSet<TargetType> TargetTypes = new HashSet<TargetType>();
 
 		/// <summary>
 		/// Target configurations to generate project files for
 		/// </summary>
 		[CommandLine("-TargetConfigurations=", ListSeparator = '+')]
-		HashSet<UnrealTargetConfiguration> TargetConfigurations = new HashSet<UnrealTargetConfiguration>();
+		readonly HashSet<UnrealTargetConfiguration> TargetConfigurations = new HashSet<UnrealTargetConfiguration>();
 
 		/// <summary>
 		/// Projects to generate project files for
 		/// </summary>
 		[CommandLine("-ProjectNames=", ListSeparator = '+')]
-		HashSet<string> ProjectNames = new HashSet<string>();
+		readonly HashSet<string> ProjectNames = new HashSet<string>();
 
 		/// <summary>
 		/// Should format JSON files in human readable form, or use packed one without indents
 		/// </summary>
 		[CommandLine("-Minimize", Value = "Compact")]
-		private JsonWriterStyle Minimize = JsonWriterStyle.Readable;
+		private readonly JsonWriterStyle Minimize = JsonWriterStyle.Readable;
 
 		public RiderProjectFileGenerator(FileReference? InOnlyGameProject,
 			CommandLineArguments InArguments)
@@ -256,9 +256,8 @@ namespace UnrealBuildTool
 					string? GeneratedProjectName = TargetRulesObject.GeneratedProjectName;
 					if (GeneratedProjectName == null)
 					{
-						ProjectFile? ExistingProjectFile;
-						if (ProjectFileMap.TryGetValue(GetRiderProjectLocation(ProjectFileNameBase), out ExistingProjectFile) &&
-						    ExistingProjectFile.ProjectTargets.Any(x => x.TargetRules!.Type == TargetRulesObject.Type))
+						if (ProjectFileMap.TryGetValue(GetRiderProjectLocation(ProjectFileNameBase), out ProjectFile? ExistingProjectFile) &&
+							ExistingProjectFile.ProjectTargets.Any(x => x.TargetRules!.Type == TargetRulesObject.Type))
 						{
 							GeneratedProjectName = TargetRulesObject.Name;
 						}
@@ -296,9 +295,8 @@ namespace UnrealBuildTool
 						BaseFolder = GameFolder!;
 					}
 
-					bool bProjectAlreadyExisted;
 					ProjectFile ProjectFile = FindOrAddProject(ProjectFilePath, BaseFolder,
-						true, out bProjectAlreadyExisted);
+						true, out bool bProjectAlreadyExisted);
 					ProjectFile.IsForeignProject =
 						CheckProjectFile != null && !NativeProjects.IsNativeProject(CheckProjectFile);
 					ProjectFile.IsGeneratedProject = true;
@@ -396,12 +394,11 @@ namespace UnrealBuildTool
 		
 		private void SetupSupportedPlatformsAndConfigurations()
 		{
-			string SupportedPlatformNames;
-			SetupSupportedPlatformsAndConfigurations(true, out SupportedPlatformNames);
+			SetupSupportedPlatformsAndConfigurations(true, out _);
 		}
 		
 		public override bool GenerateProjectFiles(PlatformProjectGeneratorCollection PlatformProjectGenerators,
-			String[] arguments)
+			string[] arguments)
 		{
 			ConfigureProjectFileGeneration();
 
@@ -449,17 +446,13 @@ namespace UnrealBuildTool
 
 		private void GatherProjects(PlatformProjectGeneratorCollection PlatformProjectGenerators,
 			List<FileReference> AllGameProjects)
-		{ 
-			ProjectFile? EngineProject = null;
-			List<ProjectFile>? GameProjects = null;
-			List<ProjectFile>? ModProjects = null;
-			Dictionary<FileReference, ProjectFile>? ProgramProjects = null;
+		{
 
 			// Setup buildable projects for all targets
-			AddProjectsForAllTargets(PlatformProjectGenerators, AllGameProjects, out EngineProject,
-				out GameProjects, out ProgramProjects);
+			AddProjectsForAllTargets(PlatformProjectGenerators, AllGameProjects, out ProjectFile? EngineProject,
+				out List<ProjectFile>? GameProjects, out Dictionary<FileReference, ProjectFile>? ProgramProjects);
 
-			AddProjectsForMods(GameProjects, out ModProjects);
+			AddProjectsForMods(GameProjects, out List<ProjectFile>? ModProjects);
 			AddAllGameProjects(GameProjects);
 
 			// If we're still missing an engine project because we don't have any targets for it, make one up.
@@ -468,8 +461,7 @@ namespace UnrealBuildTool
 				FileReference ProjectFilePath = FileReference.Combine(IntermediateProjectFilesPath,
 					EngineProjectFileNameBase + ProjectFileExtension);
 
-				bool bAlreadyExisted;
-				EngineProject = FindOrAddProject(ProjectFilePath, Unreal.EngineDirectory, true, out bAlreadyExisted);
+				EngineProject = FindOrAddProject(ProjectFilePath, Unreal.EngineDirectory, true, out bool bAlreadyExisted);
 
 				EngineProject.IsForeignProject = false;
 				EngineProject.IsGeneratedProject = true;

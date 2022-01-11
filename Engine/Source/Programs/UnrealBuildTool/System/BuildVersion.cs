@@ -85,8 +85,7 @@ namespace UnrealBuildTool
 		/// <returns>True if the version was read successfully, false otherwise</returns>
 		public static bool TryRead(FileReference FileName, [NotNullWhen(true)] out BuildVersion? Version)
 		{
-			JsonObject? Object;
-			if (!JsonObject.TryRead(FileName, out Object))
+			if (!JsonObject.TryRead(FileName, out JsonObject? Object))
 			{
 				Version = null;
 				return false;
@@ -122,13 +121,13 @@ namespace UnrealBuildTool
 			}
 		
 			// Build the output filename
-			if (String.IsNullOrEmpty(ArchitectureSuffix) && Configuration == UnrealTargetConfiguration.Development)
+			if (string.IsNullOrEmpty(ArchitectureSuffix) && Configuration == UnrealTargetConfiguration.Development)
 			{
-				return FileReference.Combine(OutputDirectory, String.Format("{0}.version", TargetName));
+				return FileReference.Combine(OutputDirectory, string.Format("{0}.version", TargetName));
 			}
 			else
 			{
-				return FileReference.Combine(OutputDirectory, String.Format("{0}-{1}-{2}{3}.version", TargetName, Platform.ToString(), Configuration.ToString(), ArchitectureSuffix));
+				return FileReference.Combine(OutputDirectory, string.Format("{0}-{1}-{2}{3}.version", TargetName, Platform.ToString(), Configuration.ToString(), ArchitectureSuffix));
 			}
 		}
 
@@ -150,12 +149,10 @@ namespace UnrealBuildTool
 			Object.TryGetIntegerField("Changelist", out NewVersion.Changelist);
 			Object.TryGetIntegerField("CompatibleChangelist", out NewVersion.CompatibleChangelist);
 
-			int IsLicenseeVersionInt;
-			Object.TryGetIntegerField("IsLicenseeVersion", out IsLicenseeVersionInt);
+			Object.TryGetIntegerField("IsLicenseeVersion", out int IsLicenseeVersionInt);
 			NewVersion.IsLicenseeVersion = IsLicenseeVersionInt != 0;
 
-			int IsPromotedBuildInt;
-			Object.TryGetIntegerField("IsPromotedBuild", out IsPromotedBuildInt);
+			Object.TryGetIntegerField("IsPromotedBuild", out int IsPromotedBuildInt);
 			NewVersion.IsPromotedBuild = IsPromotedBuildInt != 0;
 
 			Object.TryGetStringField("BranchName", out NewVersion.BranchName);
@@ -172,10 +169,8 @@ namespace UnrealBuildTool
 		/// <param name="FileName">The filename to write to</param>
 		public void Write(FileReference FileName)
 		{
-			using (StreamWriter Writer = new StreamWriter(FileName.FullName))
-			{
-				Write(Writer);
-			}
+			using StreamWriter Writer = new StreamWriter(FileName.FullName);
+			Write(Writer);
 		}
 
 		/// <summary>
@@ -195,12 +190,10 @@ namespace UnrealBuildTool
 		/// <param name="Writer">Writer for output text</param>
 		public void Write(TextWriter Writer)
 		{
-			using (JsonWriter OtherWriter = new JsonWriter(Writer))
-			{
-				OtherWriter.WriteObjectStart();
-				WriteProperties(OtherWriter);
-				OtherWriter.WriteObjectEnd();
-			}
+			using JsonWriter OtherWriter = new JsonWriter(Writer);
+			OtherWriter.WriteObjectStart();
+			WriteProperties(OtherWriter);
+			OtherWriter.WriteObjectEnd();
 		}
 
 		/// <summary>
@@ -218,11 +211,11 @@ namespace UnrealBuildTool
 			Writer.WriteValue("IsLicenseeVersion", IsLicenseeVersion? 1 : 0);
 			Writer.WriteValue("IsPromotedBuild", IsPromotedBuild? 1 : 0);
 			Writer.WriteValue("BranchName", BranchName);
-			if (!String.IsNullOrEmpty(BuildId))
+			if (!string.IsNullOrEmpty(BuildId))
 			{
 				Writer.WriteValue("BuildId", BuildId);
 			}
-			if (!String.IsNullOrEmpty(BuildVersionString))
+			if (!string.IsNullOrEmpty(BuildVersionString))
 			{
 				Writer.WriteValue("BuildVersion", BuildVersionString);
 			}
@@ -237,7 +230,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// The inner build version
 		/// </summary>
-		private BuildVersion Inner;
+		private readonly BuildVersion Inner;
 
 		/// <summary>
 		/// Cached copy of the current build version
@@ -268,8 +261,7 @@ namespace UnrealBuildTool
 						throw new BuildException("Version file is missing ({0})", File);
 					}
 
-					BuildVersion? Version;
-					if(!BuildVersion.TryRead(File, out Version))
+					if (!BuildVersion.TryRead(File, out BuildVersion? Version))
 					{
 						throw new BuildException("Unable to read version file ({0}). Check that this file is present and well-formed JSON.", File);
 					}
@@ -336,7 +328,7 @@ namespace UnrealBuildTool
 			get { return Inner.BuildVersionString; }
 		}
 
-		#pragma warning restore C1591
+		#pragma warning restore CS1591
 		#endregion
 	}
 }

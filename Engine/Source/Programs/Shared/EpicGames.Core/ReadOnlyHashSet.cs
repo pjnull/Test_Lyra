@@ -18,7 +18,7 @@ namespace EpicGames.Core
 		/// <summary>
 		/// The mutable hashset
 		/// </summary>
-		HashSet<T> Inner;
+		readonly HashSet<T> Inner;
 
 		/// <summary>
 		/// Constructor

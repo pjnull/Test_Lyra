@@ -79,11 +79,10 @@ namespace UnrealBuildTool
 		private string GetInterprettedSettingValue(string LookupString, int Index = 0, int Indent = 0)
 		{
 			char[] VariableMarkers = { '$', '%' };
-			string BaseSetting;
 			string InterprettedSetting = "";
 
 			// Manifest settings are only (validly) located in Engine INI files
-			if (!EngineIni!.GetString("AppxManifest", LookupString, out BaseSetting))
+			if (!EngineIni!.GetString("AppxManifest", LookupString, out string BaseSetting))
 			{
 				return "";
 			}
@@ -178,8 +177,7 @@ namespace UnrealBuildTool
 							// Look up $Section:Key$ in Game INIs
 							string SettingSection = SectionKeyPair.Substring(0, SectionKeyPair.IndexOf(':'));
 							string SettingKey = SectionKeyPair.Substring(SectionKeyPair.IndexOf(':') + 1);
-							String? SettingValue = null;
-							GameIni!.GetString(SettingSection, SettingKey, out SettingValue);
+							GameIni!.GetString(SettingSection, SettingKey, out string? SettingValue);
 							// If not found in Game INIs, search for the same Key in Engine INIs
 							if (SettingValue == null || SettingValue.Length == 0)
 							{
@@ -197,8 +195,7 @@ namespace UnrealBuildTool
 							// Look up $Section:Key$ in Game INIs
 							string ArraySection = SectionKeyPair.Substring(0, SectionKeyPair.IndexOf(':'));
 							string ArrayKey = SectionKeyPair.Substring(SectionKeyPair.IndexOf(':') + 1);
-							List<string>? ArraySettingValue = null;
-							GameIni!.GetArray(ArraySection, ArrayKey, out ArraySettingValue);
+							GameIni!.GetArray(ArraySection, ArrayKey, out List<string>? ArraySettingValue);
 							// If not found in Game INIs, search for the same Key in Engine INIs
 							if (ArraySettingValue == null || ArraySettingValue.Count == 0)
 							{
@@ -227,8 +224,7 @@ namespace UnrealBuildTool
 							// Look up $Section:Key$ in Game INIs
 							string SettingSection = SectionKeyPair.Substring(0, SectionKeyPair.IndexOf(':'));
 							string SettingKey = SectionKeyPair.Substring(SectionKeyPair.IndexOf(':') + 1);
-							string? SettingValue = null;
-							GameIni!.GetString(SettingSection, SettingKey, out SettingValue);
+							GameIni!.GetString(SettingSection, SettingKey, out string? SettingValue);
 							// If not found in Game INIs, search for the same Key in Engine INIs
 							if (SettingValue == null || SettingValue.Length == 0)
 							{
@@ -270,14 +266,12 @@ namespace UnrealBuildTool
 							string? SettingValue = null;
 							if (ValueType.Equals("Int32", StringComparison.InvariantCultureIgnoreCase))
 							{
-								int Int32SettingValue;
-								GameIni!.GetInt32(SettingSection, SettingKey, out Int32SettingValue);
+								GameIni!.GetInt32(SettingSection, SettingKey, out int Int32SettingValue);
 								SettingValue = Int32SettingValue.ToString();
 							}
 							else if (ValueType.Equals("GUID", StringComparison.InvariantCultureIgnoreCase))
 							{
-								Guid GuidSettingValue;
-								GameIni!.TryGetValue(SettingSection, SettingKey, out GuidSettingValue);
+								GameIni!.TryGetValue(SettingSection, SettingKey, out Guid GuidSettingValue);
 								SettingValue = GuidSettingValue.ToString("N");
 							}
 							else
@@ -289,14 +283,12 @@ namespace UnrealBuildTool
 							{
 								if (ValueType.Equals("Int32", StringComparison.InvariantCultureIgnoreCase))
 								{
-									int Int32SettingValue;
-									EngineIni.GetInt32(SettingSection, SettingKey, out Int32SettingValue);
+									EngineIni.GetInt32(SettingSection, SettingKey, out int Int32SettingValue);
 									SettingValue = Int32SettingValue.ToString();
 								}
 								else if (ValueType.Equals("GUID", StringComparison.InvariantCultureIgnoreCase))
 								{
-									Guid GuidSettingValue;
-									EngineIni.TryGetValue(SettingSection, SettingKey, out GuidSettingValue);
+									EngineIni.TryGetValue(SettingSection, SettingKey, out Guid GuidSettingValue);
 									SettingValue = GuidSettingValue.ToString("N");
 								}
 								else
@@ -426,7 +418,7 @@ namespace UnrealBuildTool
 			string TargetPath = Path.Combine(IntermediatePath!, BuildResourceSubPath);
 			string SourcePath = Path.Combine(ProjectPath!, BuildResourceProjectRelativePath!, BuildResourceSubPath);
 
-			CopyOp = CopyOp ?? File.Copy;
+			CopyOp ??= File.Copy;
 
 			// Try falling back to the engine defaults if requested
 			bool bFileExists = File.Exists(Path.Combine(SourcePath, ResourceFileName));
@@ -816,8 +808,7 @@ namespace UnrealBuildTool
 						{
 							Dictionary<string, string> PossibleParsedDlcInfo = new Dictionary<string, string>();
 							InterpretINIStruct(DlcEntry, out PossibleParsedDlcInfo);
-							string? DlcName = null;
-							PossibleParsedDlcInfo.TryGetValue("PluginName", out DlcName);
+							PossibleParsedDlcInfo.TryGetValue("PluginName", out string? DlcName);
 							if (DlcName == InProjectFile.GetFileNameWithoutExtension())
 							{
 								ParsedDlcInfo = PossibleParsedDlcInfo;
@@ -829,8 +820,10 @@ namespace UnrealBuildTool
 					if (ParsedDlcInfo == null)
 					{
 						Log.TraceWarning("Could not map {0} to a Store identity.  Using a temporary identity to enable local deployment.  For Store upload configure identity in the HoloLens Project Settings.", InProjectFile);
-						ParsedDlcInfo = new Dictionary<string, string>();
-						ParsedDlcInfo["PluginName"] = InProjectFile.GetFileNameWithoutExtension();
+						ParsedDlcInfo = new Dictionary<string, string>
+						{
+							["PluginName"] = InProjectFile.GetFileNameWithoutExtension()
+						};
 						ParsedDlcInfo["PackageIdentityName"] = ParsedDlcInfo["PluginName"];
 						ParsedDlcInfo["PackageIdentityVersion"] = "1.0.0.0";
 					}
@@ -861,8 +854,7 @@ namespace UnrealBuildTool
 			RelativeProjectRootForStage = IsGameSpecificExe ? InProjectFile!.GetFileNameWithoutAnyExtensions() : "Engine";
 
 			// Load and verify/clean culture list
-			List<string>? CulturesToStageWithDuplicates = null;
-			GameIni.GetArray("/Script/UnrealEd.ProjectPackagingSettings", "CulturesToStage", out CulturesToStageWithDuplicates);
+			GameIni.GetArray("/Script/UnrealEd.ProjectPackagingSettings", "CulturesToStage", out List<string>? CulturesToStageWithDuplicates);
 			if (CulturesToStageWithDuplicates == null || CulturesToStageWithDuplicates.Count < 1)
 			{
 				Log.TraceError("At least one culture must be selected to stage.");
@@ -897,43 +889,41 @@ namespace UnrealBuildTool
 				return null;
 			}
 
-            // Check autoincrement flag
-            bool bAutoIncrementVersion;
-            if (EngineIni.GetBool(TargetSettings, "bAutoIncrementVersion", out bAutoIncrementVersion) && bAutoIncrementVersion)
-            {
-                string currentVersion;
-                if (GameIni.GetString("/Script/EngineSettings.GeneralProjectSettings", "ProjectVersion", out currentVersion))
-                {
-                    Log.TraceLog("Automatically incrementing version. Starting version is " + currentVersion);
+			// Check autoincrement flag
+			if (EngineIni.GetBool(TargetSettings, "bAutoIncrementVersion", out bool bAutoIncrementVersion) && bAutoIncrementVersion)
+			{
+				if (GameIni.GetString("/Script/EngineSettings.GeneralProjectSettings", "ProjectVersion", out string currentVersion))
+				{
+					Log.TraceLog("Automatically incrementing version. Starting version is " + currentVersion);
 
-                    string[] versionEntries = currentVersion.Split(new char[] { '.' });
-                    if (versionEntries.Length == 4)
-                    {
-                        uint versionEntryToIncrement = Convert.ToUInt32(versionEntries[2]);
-                        versionEntryToIncrement++;
+					string[] versionEntries = currentVersion.Split(new char[] { '.' });
+					if (versionEntries.Length == 4)
+					{
+						uint versionEntryToIncrement = Convert.ToUInt32(versionEntries[2]);
+						versionEntryToIncrement++;
 
-                        string newVersion = string.Concat(versionEntries[0], ".", versionEntries[1], ".", versionEntryToIncrement, ".", versionEntries[3]);
-                        Log.TraceLog("Writing new version string: " + newVersion);
+						string newVersion = string.Concat(versionEntries[0], ".", versionEntries[1], ".", versionEntryToIncrement, ".", versionEntries[3]);
+						Log.TraceLog("Writing new version string: " + newVersion);
 
-                        // Update GameIni with newVersion.
-                        if (!UpdateProjectIniString(InProjectFile, TargetPlatform, "/Script/EngineSettings.GeneralProjectSettings", "ProjectVersion", newVersion))
-                        {
-                            Log.TraceWarning("Auto incrementing the project version was unsuccessful.");
-                        }
-                    }
-                    else
-                    {
-                        Log.TraceWarning("Auto increment was desired, but the number of decimals in the version string was unexpected.");
-                    }
-                }
-                else
-                {
-                    Log.TraceWarning("Auto increment was desired, but the existing version could not be identified.");
-                }
-            }
+						// Update GameIni with newVersion.
+						if (!UpdateProjectIniString(InProjectFile, TargetPlatform, "/Script/EngineSettings.GeneralProjectSettings", "ProjectVersion", newVersion))
+						{
+							Log.TraceWarning("Auto incrementing the project version was unsuccessful.");
+						}
+					}
+					else
+					{
+						Log.TraceWarning("Auto increment was desired, but the number of decimals in the version string was unexpected.");
+					}
+				}
+				else
+				{
+					Log.TraceWarning("Auto increment was desired, but the existing version could not be identified.");
+				}
+			}
 
-            // Create the appxmanifest document
-            AppxManifestXmlDocument = new XmlDocument();
+			// Create the appxmanifest document
+			AppxManifestXmlDocument = new XmlDocument();
 			XmlDeclaration Declaration = AppxManifestXmlDocument.CreateXmlDeclaration("1.0", Encoding.UTF8.BodyName, null);
 			AppxManifestXmlDocument.AppendChild(Declaration);
 			
@@ -943,7 +933,7 @@ namespace UnrealBuildTool
 
 			// Export appxmanifest.xml to the intermediate directory then compare the contents to any existing target manifest
 			// and replace if there are differences.
-			string ManifestName = String.Format("AppxManifest_{0}.xml", WindowsExports.GetArchitectureSubpath(Architecture));
+			string ManifestName = string.Format("AppxManifest_{0}.xml", WindowsExports.GetArchitectureSubpath(Architecture));
 			string ManifestIntermediatePath = Path.Combine(IntermediatePath, ManifestName);
 			string ManifestTargetPath = Path.Combine(OutputPath, ManifestName);
 			AppxManifestXmlDocument.Save(ManifestIntermediatePath);
@@ -1006,10 +996,12 @@ namespace UnrealBuildTool
 
 				string ResourceConfigFile = Path.Combine(IntermediatePath, "priconfig.xml");
 				string MakePriArgs = "createconfig /cf \"" + ResourceConfigFile + "\" /dq " + AllDefaultCultures + " /o /pv 10.0.0";
-				System.Diagnostics.ProcessStartInfo StartInfo = new System.Diagnostics.ProcessStartInfo(PriExecutable, MakePriArgs);
-				StartInfo.UseShellExecute = false;
-				StartInfo.RedirectStandardOutput = true;
-				StartInfo.CreateNoWindow = true;
+				System.Diagnostics.ProcessStartInfo StartInfo = new System.Diagnostics.ProcessStartInfo(PriExecutable, MakePriArgs)
+				{
+					UseShellExecute = false,
+					RedirectStandardOutput = true,
+					CreateNoWindow = true
+				};
 				int ExitCode = Utils.RunLocalProcessAndLogOutput(StartInfo);
 				if (ExitCode < 0)
 				{
@@ -1091,12 +1083,14 @@ namespace UnrealBuildTool
 				string ResourceLogFile = Path.Combine(IntermediatePath, "ResIndexLog_" + WindowsExports.GetArchitectureSubpath(Architecture) + ".xml");
 				string ResourceIndexFile = Path.Combine(IntermediatePath, "resources_" + WindowsExports.GetArchitectureSubpath(Architecture) + ".pri");
 				MakePriArgs = "new /pr \"" + IntermediateResourceDirectory + "\" /cf \"" + ResourceConfigFile + "\" /mn \"" + ManifestTargetPath + "\" /il \"" + ResourceLogFile + "\" /of \"" + ResourceIndexFile + "\" /o";
-				StartInfo = new System.Diagnostics.ProcessStartInfo(PriExecutable, MakePriArgs);
-				StartInfo.UseShellExecute = false;
-				StartInfo.RedirectStandardOutput = true;
-				StartInfo.CreateNoWindow = true;
-				StartInfo.StandardErrorEncoding = System.Text.Encoding.Unicode;
-				StartInfo.StandardOutputEncoding = System.Text.Encoding.Unicode;
+				StartInfo = new System.Diagnostics.ProcessStartInfo(PriExecutable, MakePriArgs)
+				{
+					UseShellExecute = false,
+					RedirectStandardOutput = true,
+					CreateNoWindow = true,
+					StandardErrorEncoding = System.Text.Encoding.Unicode,
+					StandardOutputEncoding = System.Text.Encoding.Unicode
+				};
 				ExitCode = Utils.RunLocalProcessAndLogOutput(StartInfo);
 				if (ExitCode < 0)
 				{
@@ -1190,8 +1184,7 @@ namespace UnrealBuildTool
 						{
 							Dictionary<string, string> PossibleParsedDlcInfo = new Dictionary<string, string>();
 							InterpretINIStruct(DlcEntry, out PossibleParsedDlcInfo);
-							string? DlcName = null;
-							PossibleParsedDlcInfo.TryGetValue("PluginName", out DlcName);
+							PossibleParsedDlcInfo.TryGetValue("PluginName", out string? DlcName);
 							if (DlcName == InProjectFile.GetFileNameWithoutExtension())
 							{
 								ParsedDlcInfo = PossibleParsedDlcInfo;
@@ -1203,8 +1196,10 @@ namespace UnrealBuildTool
 					if (ParsedDlcInfo == null)
 					{
 						Log.TraceWarning("Could not map {0} to a Store identity.  Using a temporary identity to enable local deployment.  For Store upload configure identity in the HoloLens Project Settings.", InProjectFile);
-						ParsedDlcInfo = new Dictionary<string, string>();
-						ParsedDlcInfo["PluginName"] = InProjectFile.GetFileNameWithoutExtension();
+						ParsedDlcInfo = new Dictionary<string, string>
+						{
+							["PluginName"] = InProjectFile.GetFileNameWithoutExtension()
+						};
 						ParsedDlcInfo["PackageIdentityName"] = ParsedDlcInfo["PluginName"];
 						ParsedDlcInfo["PackageIdentityVersion"] = "1.0.0.0";
 					}
@@ -1235,8 +1230,7 @@ namespace UnrealBuildTool
 			RelativeProjectRootForStage = IsGameSpecificExe ? InProjectFile!.GetFileNameWithoutAnyExtensions() : "Engine";
 
 			// Load and verify/clean culture list
-			List<string>? CulturesToStageWithDuplicates = null;
-			GameIni.GetArray("/Script/UnrealEd.ProjectPackagingSettings", "CulturesToStage", out CulturesToStageWithDuplicates);
+			GameIni.GetArray("/Script/UnrealEd.ProjectPackagingSettings", "CulturesToStage", out List<string>? CulturesToStageWithDuplicates);
 			if (CulturesToStageWithDuplicates == null || CulturesToStageWithDuplicates.Count < 1)
 			{
 				Log.TraceError("At least one culture must be selected to stage.");
@@ -1402,8 +1396,7 @@ namespace UnrealBuildTool
 		/// </summary>
 		private string CreateStringValue(string PlatformINIKey, string ManifestFullPath, string GenericINISection, string GenericINIKey, string DefaultValue, Func<string, string>? ValueValidationDelegate = null)
 		{
-			string ConfigScratchValue = "";
-			if (!EngineIni!.GetString(TargetSettings!, PlatformINIKey, out ConfigScratchValue) || ConfigScratchValue.Length <= 0)
+			if (!EngineIni!.GetString(TargetSettings!, PlatformINIKey, out string ConfigScratchValue) || ConfigScratchValue.Length <= 0)
 			{
 				if (ManifestFullPath != null)
 				{
@@ -1457,7 +1450,7 @@ namespace UnrealBuildTool
 		private int CreateIntValue(string PlatformINIKey, string ManifestFullPath, string GenericINISection, string GenericINIKey, string DefaultValue)
 		{
 			string ConfigScratchValue = CreateStringValue(PlatformINIKey, ManifestFullPath, GenericINISection, GenericINIKey, DefaultValue);
-			return Int32.Parse(ConfigScratchValue);
+			return int.Parse(ConfigScratchValue);
 		}
 
 		/// <summary>
@@ -1471,8 +1464,7 @@ namespace UnrealBuildTool
 		/// </summary>
 		private List<string> CreateArrayValue(string PlatformINIKey, string ManifestPath, string ManifestSubKey, string GenericINISection, string GenericINIKey, List<string> DefaultValue)
 		{
-			List<string>? ConfigScratchValue = null;
-			if (!EngineIni!.GetArray(TargetSettings!, PlatformINIKey, out ConfigScratchValue))
+			if (!EngineIni!.GetArray(TargetSettings!, PlatformINIKey, out List<string>? ConfigScratchValue))
 			{
 				if (ManifestPath != null)
 				{
@@ -1540,21 +1532,16 @@ namespace UnrealBuildTool
 		/// </summary>
 		private XmlAttribute CreateColorAttribute(string ElementName, string PlatformINIKey, string ManifestFullPath, string DefaultValue)
 		{
-			string ColorValue = "";
-			if (EngineIni!.GetString(TargetSettings!, PlatformINIKey, out ColorValue))
+			if (EngineIni!.GetString(TargetSettings!, PlatformINIKey, out string ColorValue))
 			{
 				// Break the setting down by color
-				Dictionary<string, string> StructValues;
-				InterpretINIStruct(ColorValue, out StructValues);
-				int Red = 0;
+				InterpretINIStruct(ColorValue, out Dictionary<string, string> StructValues);
 				string RedText = StructValues["R"];
-				Int32.TryParse(RedText, out Red);
-				int Green = 0;
+				int.TryParse(RedText, out int Red);
 				string GreenText = StructValues["G"];
-				Int32.TryParse(GreenText, out Green);
-				int Blue = 0;
+				int.TryParse(GreenText, out int Green);
 				string BlueText = StructValues["B"];
-				Int32.TryParse(BlueText, out Blue);
+				int.TryParse(BlueText, out int Blue);
 				ColorValue = "#" + Red.ToString("X2") + Green.ToString("X2") + Blue.ToString("X2");
 			}
 			else
@@ -1610,11 +1597,9 @@ namespace UnrealBuildTool
 		{
 			// Enter the default (no-culture) value
 			string ConfigScratchValue = "";
-			string DefaultCultureScratchValue = "";
-			if (EngineIni!.GetString(TargetSettings!, "CultureStringResources", out DefaultCultureScratchValue))
+			if (EngineIni!.GetString(TargetSettings!, "CultureStringResources", out string DefaultCultureScratchValue))
 			{
-				Dictionary<string, string> DefaultCultureStringValues;
-				InterpretINIStruct(DefaultCultureScratchValue, out DefaultCultureStringValues);
+				InterpretINIStruct(DefaultCultureScratchValue, out Dictionary<string, string> DefaultCultureStringValues);
 				ConfigScratchValue = DefaultCultureStringValues[ConfigKey];
 			}
 			if (ConfigScratchValue == null || ConfigScratchValue.Length <= 0)
@@ -1635,13 +1620,11 @@ namespace UnrealBuildTool
 			bool IsDlcDefinedResource = UseDlcResourcesForResourceEntry(ResourceEntryName);
 
 			Dictionary<string, string> IniLocalizedValues = new Dictionary<string, string>();
-			List<string>? PerCultureValues;
-			if (EngineIni.GetArray(TargetSettings!, IsDlcDefinedResource ? "DlcPerCultureResources" : "PerCultureResources", out PerCultureValues))
+			if (EngineIni.GetArray(TargetSettings!, IsDlcDefinedResource ? "DlcPerCultureResources" : "PerCultureResources", out List<string>? PerCultureValues))
 			{
 				foreach (string CultureCombinedValues in PerCultureValues)
 				{
-					Dictionary<string, string> SeparatedCultureValues;
-					InterpretINIStruct(CultureCombinedValues, out SeparatedCultureValues);
+					InterpretINIStruct(CultureCombinedValues, out Dictionary<string, string> SeparatedCultureValues);
 					if (!IsDlcDefinedResource ||
 						string.Compare(SeparatedCultureValues["AppliesToDlcPlugin"], ParsedDlcInfo!["PluginName"], StringComparison.InvariantCultureIgnoreCase) == 0)
 					{
@@ -1667,8 +1650,7 @@ namespace UnrealBuildTool
 			bool IsEverLocalized = false;
 			for (int i = 0; i < CulturesToStage!.Count; ++i)
 			{
-				string? ValueToWrite = string.Empty;
-				if (IniLocalizedValues.TryGetValue(CulturesToStage[i], out ValueToWrite))
+				if (IniLocalizedValues.TryGetValue(CulturesToStage[i], out string? ValueToWrite))
 				{
 					IsEverLocalized = true;
 					PerCultureResourceWriters![i].AddResource(ResourceEntryName, ValueToWrite);
@@ -1814,7 +1796,7 @@ namespace UnrealBuildTool
 			{
 				Log.TraceError("Invalid package name {0}. Package names must only contain letters, numbers, dash, and period and must be at least one character long.", InPackageName);
 				Log.TraceError("Consider using the setting [/Script/HoloLensPlatformEditor.HoloLensTargetSettings]:PackageName to provide a HoloLens specific value.");
-				ReturnVal = String.Empty;
+				ReturnVal = string.Empty;
 			}
 			return ReturnVal;
 		}
@@ -2039,7 +2021,7 @@ namespace UnrealBuildTool
 			{
 				Log.TraceError("Invalid application ID {0}. Application IDs must only contain letters and numbers. And they must begin with a letter.", InApplicationId);
 				Log.TraceError("Consider using the setting [/Script/HoloLensPlatformEditor.HoloLensTargetSettings]:ValidateApplicationName to provide a HoloLens specific value.");
-				ReturnVal = String.Empty;
+				ReturnVal = string.Empty;
 			}
 			return ReturnVal;
 		}
@@ -2168,10 +2150,12 @@ namespace UnrealBuildTool
 						//, Path.Combine(IntermediatePath, "tempGltf") //temp path doesn't work
 						);
 					string Exe = Path.Combine(Unreal.EngineDirectory.FullName, "Binaries", "Win64", "WindowsMRAssetConverter.exe");
-					System.Diagnostics.ProcessStartInfo StartInfo = new System.Diagnostics.ProcessStartInfo(Exe, Args);
-					StartInfo.UseShellExecute = false;
-					StartInfo.RedirectStandardOutput = true;
-					StartInfo.CreateNoWindow = true;
+					System.Diagnostics.ProcessStartInfo StartInfo = new System.Diagnostics.ProcessStartInfo(Exe, Args)
+					{
+						UseShellExecute = false,
+						RedirectStandardOutput = true,
+						CreateNoWindow = true
+					};
 					int ExitCode = Utils.RunLocalProcessAndPrintfOutput(StartInfo);
 					if (ExitCode < 0)
 					{
@@ -2193,11 +2177,10 @@ namespace UnrealBuildTool
 				Log.TraceError("Unable to stage application wide logo.");
 			}
 
-			bool bUseNameForLogo;
-			if(EngineIni!.GetBool(TargetSettings!, "bUseNameForLogo", out bUseNameForLogo) && bUseNameForLogo)
+			if (EngineIni!.GetBool(TargetSettings!, "bUseNameForLogo", out bool bUseNameForLogo) && bUseNameForLogo)
 			{
 				XmlElement ShowNameOnTiles = AppxManifestXmlDocument.CreateElement("uap:ShowNameOnTiles", "http://schemas.microsoft.com/appx/manifest/uap/windows10");
-				Func<string, bool> addShowOnTile = (string s) => 
+				Func<string, bool> addShowOnTile = (string s) =>
 				{
 					XmlElement ShowOn = AppxManifestXmlDocument.CreateElement("uap:ShowOn", "http://schemas.microsoft.com/appx/manifest/uap/windows10");
 					XmlAttribute Tile = AppxManifestXmlDocument.CreateAttribute("Tile");
@@ -2246,12 +2229,7 @@ namespace UnrealBuildTool
         {
             XmlElement Capabilities = AppxManifestXmlDocument!.CreateElement("Capabilities");
 
-            List<string>? CapabilityList = new List<string>();
-            List<string>? DeviceCapabilityList = new List<string>();
-            List<string>? UapCapabilityList = new List<string>();
-            List<string>? Uap2CapabilityList = new List<string>();
-
-            if (EngineIni!.GetArray(TargetSettings!, "CapabilityList", out CapabilityList))
+            if (EngineIni!.GetArray(TargetSettings!, "CapabilityList", out List<string>? CapabilityList))
             {
                 foreach (string capName in CapabilityList)
                 {
@@ -2263,7 +2241,7 @@ namespace UnrealBuildTool
                 }
             }
 
-            if (EngineIni.GetArray(TargetSettings!, "UapCapabilityList", out UapCapabilityList))
+            if (EngineIni.GetArray(TargetSettings!, "UapCapabilityList", out List<string>? UapCapabilityList))
             {
                 foreach (string capName in UapCapabilityList)
                 {
@@ -2275,7 +2253,7 @@ namespace UnrealBuildTool
                 }
             }
 
-            if (EngineIni.GetArray(TargetSettings!, "Uap2CapabilityList", out Uap2CapabilityList))
+            if (EngineIni.GetArray(TargetSettings!, "Uap2CapabilityList", out List<string>? Uap2CapabilityList))
             {
                 foreach (string capName in Uap2CapabilityList)
                 {
@@ -2287,7 +2265,7 @@ namespace UnrealBuildTool
                 }
             }
 
-            if (EngineIni.GetArray(TargetSettings!, "DeviceCapabilityList", out DeviceCapabilityList))
+            if (EngineIni.GetArray(TargetSettings!, "DeviceCapabilityList", out List<string>? DeviceCapabilityList))
             {
                 foreach (string capName in DeviceCapabilityList)
                 {
@@ -2367,8 +2345,7 @@ namespace UnrealBuildTool
 			string SDKVersion = "";
 
 			DirectoryReference SDKRootFolder;
-			VersionNumber? version;
-			if (WindowsPlatform.TryGetWindowsSdkDir("Latest", out version, out SDKRootFolder!))
+			if (WindowsPlatform.TryGetWindowsSdkDir("Latest", out VersionNumber? version, out SDKRootFolder!))
 			{
 				SDKVersion = version.ToString();
 			}
@@ -2454,9 +2431,11 @@ namespace UnrealBuildTool
 			}
 
 			bool ValidationSucceeded = true;
-			XmlReaderSettings ReaderSettings = new XmlReaderSettings();
-			ReaderSettings.ValidationType = ValidationType.Schema;
-			ReaderSettings.Schemas = AppxSchema;
+			XmlReaderSettings ReaderSettings = new XmlReaderSettings
+			{
+				ValidationType = ValidationType.Schema,
+				Schemas = AppxSchema
+			};
 			ReaderSettings.ValidationEventHandler += (source, args) =>
 			{
 				switch (args.Severity)

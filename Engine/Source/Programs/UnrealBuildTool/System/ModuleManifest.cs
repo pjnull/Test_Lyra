@@ -62,13 +62,13 @@ namespace UnrealBuildTool
 			string BaseName = AppName;
 			if (Configuration != UnrealTargetConfiguration.Development && !(Configuration == UnrealTargetConfiguration.DebugGame && !bIsGameDirectory))
 			{
-				BaseName += String.Format("-{0}-{1}", Platform.ToString(), Configuration.ToString());
+				BaseName += string.Format("-{0}-{1}", Platform.ToString(), Configuration.ToString());
 			}
-			if(!String.IsNullOrEmpty(BuildArchitecture) && UEBuildPlatform.GetBuildPlatform(Platform).RequiresArchitectureSuffix())
+			if(!string.IsNullOrEmpty(BuildArchitecture) && UEBuildPlatform.GetBuildPlatform(Platform).RequiresArchitectureSuffix())
 			{
 				BaseName += BuildArchitecture;
 			}
-			return String.Format("{0}.modules", BaseName);
+			return string.Format("{0}.modules", BaseName);
 		}
 
 		/// <summary>
@@ -122,10 +122,8 @@ namespace UnrealBuildTool
 		public void Write(FileReference FileName)
 		{
 			DirectoryReference.CreateDirectory(FileName.Directory);
-			using(StreamWriter Writer = new StreamWriter(FileName.FullName))
-			{
-				Write(Writer);
-			}
+			using StreamWriter Writer = new StreamWriter(FileName.FullName);
+			Write(Writer);
 		}
 
 		/// <summary>
@@ -134,20 +132,18 @@ namespace UnrealBuildTool
 		/// <param name="Writer">The writer to output to</param>
 		public void Write(TextWriter Writer)
 		{
-			using (JsonWriter OutputWriter = new JsonWriter(Writer, true))
+			using JsonWriter OutputWriter = new JsonWriter(Writer, true);
+			OutputWriter.WriteObjectStart();
+			OutputWriter.WriteValue("BuildId", BuildId);
+
+			OutputWriter.WriteObjectStart("Modules");
+			foreach (KeyValuePair<string, string> ModuleNameToFileNamePair in ModuleNameToFileName.OrderBy(x => x.Key))
 			{
-				OutputWriter.WriteObjectStart();
-				OutputWriter.WriteValue("BuildId", BuildId);
-
-				OutputWriter.WriteObjectStart("Modules");
-				foreach (KeyValuePair<string, string> ModuleNameToFileNamePair in ModuleNameToFileName.OrderBy(x => x.Key))
-				{
-					OutputWriter.WriteValue(ModuleNameToFileNamePair.Key, ModuleNameToFileNamePair.Value);
-				}
-				OutputWriter.WriteObjectEnd();
-
-				OutputWriter.WriteObjectEnd();
+				OutputWriter.WriteValue(ModuleNameToFileNamePair.Key, ModuleNameToFileNamePair.Value);
 			}
+			OutputWriter.WriteObjectEnd();
+
+			OutputWriter.WriteObjectEnd();
 		}
 	}
 }

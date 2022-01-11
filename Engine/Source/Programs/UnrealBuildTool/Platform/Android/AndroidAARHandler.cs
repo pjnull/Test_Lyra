@@ -44,7 +44,7 @@ namespace UnrealBuildTool
 
 		public List<string>? Repositories = null;
 		public List<AndroidAAREntry>? AARList = null;
-		private List<AndroidAAREntry>? JARList = null;
+		private readonly List<AndroidAAREntry>? JARList = null;
 
 		/// <summary>
 		/// Handler for AAR and JAR dependency determination and staging
@@ -82,8 +82,10 @@ namespace UnrealBuildTool
 		{
 			if (Directory.Exists(RepositoryPath))
 			{
-				List<string> ToCheck = new List<string>();
-				ToCheck.Add(RepositoryPath);
+				List<string> ToCheck = new List<string>
+				{
+					RepositoryPath
+				};
 				while (ToCheck.Count > 0)
 				{
 					int LastIndex = ToCheck.Count - 1;
@@ -599,36 +601,34 @@ namespace UnrealBuildTool
 		{
 			// manually extract the files. There was a problem with the Ionic.Zip library that required this on non-PC at one point,
 			// but that problem is now fixed. Leaving this code as is as we need to return the list of created files and fix up their permissions anyway.
-			using (Ionic.Zip.ZipFile Zip = new Ionic.Zip.ZipFile(ZipFileName))
+			using Ionic.Zip.ZipFile Zip = new Ionic.Zip.ZipFile(ZipFileName);
+			List<string> OutputFileNames = new List<string>();
+			foreach (Ionic.Zip.ZipEntry Entry in Zip.Entries)
 			{
-				List<string> OutputFileNames = new List<string>();
-				foreach (Ionic.Zip.ZipEntry Entry in Zip.Entries)
+				// support-v4 and support-v13 has the jar file named with "internal_impl-XX.X.X.jar"
+				// this causes error "Found 2 versions of internal_impl-XX.X.X.jar"
+				// following codes adds "support-v4-..." to the output jar file name to avoid the collision
+				string OutputFileName = Path.Combine(BaseDirectory, Entry.FileName);
+				if (Entry.FileName.Contains("internal_impl"))
 				{
-					// support-v4 and support-v13 has the jar file named with "internal_impl-XX.X.X.jar"
-					// this causes error "Found 2 versions of internal_impl-XX.X.X.jar"
-					// following codes adds "support-v4-..." to the output jar file name to avoid the collision
-					string OutputFileName = Path.Combine(BaseDirectory, Entry.FileName);
-					if (Entry.FileName.Contains("internal_impl"))
-					{
-						string _ZipName = Path.GetFileNameWithoutExtension(ZipFileName);
-						string NewOutputFileName = Path.Combine(Path.GetDirectoryName(OutputFileName)!,
-							_ZipName + '-' + Path.GetFileNameWithoutExtension(OutputFileName) + '.' + Path.GetExtension(OutputFileName));
-						Log.TraceInformation("Changed FileName {0} => {1}", Entry.FileName, NewOutputFileName);
-						OutputFileName = NewOutputFileName;
-					}
-
-					Directory.CreateDirectory(Path.GetDirectoryName(OutputFileName));
-					if (!Entry.IsDirectory)
-					{
-						using (FileStream OutputStream = new FileStream(OutputFileName, FileMode.Create, FileAccess.Write))
-						{
-							Entry.Extract(OutputStream);
-						}
-						OutputFileNames.Add(OutputFileName);
-					}
+					string _ZipName = Path.GetFileNameWithoutExtension(ZipFileName);
+					string NewOutputFileName = Path.Combine(Path.GetDirectoryName(OutputFileName)!,
+						_ZipName + '-' + Path.GetFileNameWithoutExtension(OutputFileName) + '.' + Path.GetExtension(OutputFileName));
+					Log.TraceInformation("Changed FileName {0} => {1}", Entry.FileName, NewOutputFileName);
+					OutputFileName = NewOutputFileName;
 				}
-				return OutputFileNames;
+
+				Directory.CreateDirectory(Path.GetDirectoryName(OutputFileName));
+				if (!Entry.IsDirectory)
+				{
+					using (FileStream OutputStream = new FileStream(OutputFileName, FileMode.Create, FileAccess.Write))
+					{
+						Entry.Extract(OutputStream);
+					}
+					OutputFileNames.Add(OutputFileName);
+				}
 			}
+			return OutputFileNames;
 		}
 
 	}

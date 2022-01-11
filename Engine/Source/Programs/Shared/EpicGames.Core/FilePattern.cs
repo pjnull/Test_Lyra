@@ -18,7 +18,7 @@ namespace EpicGames.Core
 		}
 
 		public FilePatternException(string Format, params object[] Args)
-			: base(String.Format(Format, Args))
+			: base(string.Format(Format, Args))
 		{
 		}
 
@@ -183,8 +183,8 @@ namespace EpicGames.Core
 		/// <returns>True if the pattern is a directory</returns>
 		public bool EndsWithDirectorySeparator()
 		{
-			string LastToken = Tokens[Tokens.Count - 1];
-			return LastToken.Length > 0 && LastToken[LastToken.Length - 1] == Path.DirectorySeparatorChar;
+			string LastToken = Tokens[^1];
+			return LastToken.Length > 0 && LastToken[^1] == Path.DirectorySeparatorChar;
 		}
 
 		/// <summary>
@@ -288,7 +288,7 @@ namespace EpicGames.Core
 			// If the source pattern ends in a directory separator, or a set of input files are specified and it doesn't contain wildcards, treat it as a full directory match
 			if(SourcePattern.EndsWithDirectorySeparator())
 			{
-				SourcePattern = new FilePattern(SourcePattern.BaseDirectory, String.Join("", SourcePattern.Tokens) + "...");
+				SourcePattern = new FilePattern(SourcePattern.BaseDirectory, string.Join("", SourcePattern.Tokens) + "...");
 			}
 			else if(Files != null)
 			{
@@ -303,7 +303,7 @@ namespace EpicGames.Core
 				{
 					NewPattern.Append(Token);
 				}
-				if(NewPattern.Length > 0 && NewPattern[NewPattern.Length - 1] != Path.DirectorySeparatorChar)
+				if(NewPattern.Length > 0 && NewPattern[^1] != Path.DirectorySeparatorChar)
 				{
 					NewPattern.Append(Path.DirectorySeparatorChar);
 				}
@@ -317,7 +317,7 @@ namespace EpicGames.Core
 			// If the target pattern ends with a directory separator, treat it as a full directory match if it has wildcards, or a copy of the source pattern if not
 			if(TargetPattern.EndsWithDirectorySeparator())
 			{
-				TargetPattern = new FilePattern(TargetPattern.BaseDirectory, String.Join("", TargetPattern.Tokens) + "...");
+				TargetPattern = new FilePattern(TargetPattern.BaseDirectory, string.Join("", TargetPattern.Tokens) + "...");
 			}
 
 			// Handle the case where source and target pattern are both individual files
@@ -332,7 +332,7 @@ namespace EpicGames.Core
 
 				// Create a filter to match the source files
 				FileFilter Filter = new FileFilter(FileFilterType.Exclude);
-				Filter.Include(String.Join("", SourcePattern.Tokens));
+				Filter.Include(string.Join("", SourcePattern.Tokens));
 
 				// Apply it to the source directory
 				List<FileReference> SourceFiles;
@@ -361,8 +361,7 @@ namespace EpicGames.Core
 				// Add them to the output map
 				for(int Idx = 0; Idx < TargetFiles.Length; Idx++)
 				{
-					FileReference? ExistingSourceFile;
-					if(TargetFileToSourceFile.TryGetValue(TargetFiles[Idx], out ExistingSourceFile) && ExistingSourceFile != SourceFiles[Idx])
+					if (TargetFileToSourceFile.TryGetValue(TargetFiles[Idx], out FileReference? ExistingSourceFile) && ExistingSourceFile != SourceFiles[Idx])
 					{
 						throw new FilePatternException("Output file '{0}' is mapped from '{1}' and '{2}'", TargetFiles[Idx], ExistingSourceFile, SourceFiles[Idx]);
 					}
@@ -430,7 +429,7 @@ namespace EpicGames.Core
 		/// <returns>The original representation of this pattern</returns>
 		public override string ToString()
 		{
-			return BaseDirectory.ToString() + Path.DirectorySeparatorChar + String.Join("", Tokens);
+			return BaseDirectory.ToString() + Path.DirectorySeparatorChar + string.Join("", Tokens);
 		}
 	}
 }

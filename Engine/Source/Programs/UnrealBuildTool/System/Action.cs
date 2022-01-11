@@ -310,92 +310,77 @@ namespace UnrealBuildTool
 		{
 			Action Action = new Action(Object.GetEnumField<ActionType>("Type"));
 
-			string? WorkingDirectory;
-			if(Object.TryGetStringField("WorkingDirectory", out WorkingDirectory))
+			if (Object.TryGetStringField("WorkingDirectory", out string? WorkingDirectory))
 			{
 				Action.WorkingDirectory = new DirectoryReference(WorkingDirectory);
 			}
 
-			string? CommandPath;
-			if(Object.TryGetStringField("CommandPath", out CommandPath))
+			if (Object.TryGetStringField("CommandPath", out string? CommandPath))
 			{
 				Action.CommandPath = new FileReference(CommandPath);
 			}
-			
-			string? CommandArguments;
-			if(Object.TryGetStringField("CommandArguments", out CommandArguments))
+
+			if (Object.TryGetStringField("CommandArguments", out string? CommandArguments))
 			{
 				Action.CommandArguments = CommandArguments;
 			}
 
-			string? CommandVersion;
-			if (Object.TryGetStringField("CommandVersion", out CommandVersion))
+			if (Object.TryGetStringField("CommandVersion", out string? CommandVersion))
 			{
 				Action.CommandVersion = CommandVersion;
 			}
 
-			string? CommandDescription;
-			if(Object.TryGetStringField("CommandDescription", out CommandDescription))
+			if (Object.TryGetStringField("CommandDescription", out string? CommandDescription))
 			{
 				Action.CommandDescription = CommandDescription;
 			}
-			
-			string? StatusDescription;
-			if(Object.TryGetStringField("StatusDescription", out StatusDescription))
+
+			if (Object.TryGetStringField("StatusDescription", out string? StatusDescription))
 			{
 				Action.StatusDescription = StatusDescription;
 			}
 
-			bool bCanExecuteRemotely;
-			if(Object.TryGetBoolField("bCanExecuteRemotely", out bCanExecuteRemotely))
+			if (Object.TryGetBoolField("bCanExecuteRemotely", out bool bCanExecuteRemotely))
 			{
 				Action.bCanExecuteRemotely = bCanExecuteRemotely;
 			}
 
-			bool bCanExecuteRemotelyWithSNDBS;
-			if(Object.TryGetBoolField("bCanExecuteRemotelyWithSNDBS", out bCanExecuteRemotelyWithSNDBS))
+			if (Object.TryGetBoolField("bCanExecuteRemotelyWithSNDBS", out bool bCanExecuteRemotelyWithSNDBS))
 			{
 				Action.bCanExecuteRemotelyWithSNDBS = bCanExecuteRemotelyWithSNDBS;
 			}
 
-			bool bIsGCCCompiler;
-			if(Object.TryGetBoolField("bIsGCCCompiler", out bIsGCCCompiler))
+			if (Object.TryGetBoolField("bIsGCCCompiler", out bool bIsGCCCompiler))
 			{
 				Action.bIsGCCCompiler = bIsGCCCompiler;
 			}
 
-			bool bShouldOutputStatusDescription;
-			if(Object.TryGetBoolField("bShouldOutputStatusDescription", out bShouldOutputStatusDescription))
+			if (Object.TryGetBoolField("bShouldOutputStatusDescription", out bool bShouldOutputStatusDescription))
 			{
 				Action.bShouldOutputStatusDescription = bShouldOutputStatusDescription;
 			}
 
-			bool bProducesImportLibrary;
-			if(Object.TryGetBoolField("bProducesImportLibrary", out bProducesImportLibrary))
+			if (Object.TryGetBoolField("bProducesImportLibrary", out bool bProducesImportLibrary))
 			{
 				Action.bProducesImportLibrary = bProducesImportLibrary;
 			}
 
-			string[]? PrerequisiteItems;
-			if (Object.TryGetStringArrayField("PrerequisiteItems", out PrerequisiteItems))
+			if (Object.TryGetStringArrayField("PrerequisiteItems", out string[]? PrerequisiteItems))
 			{
 				Action.PrerequisiteItems.AddRange(PrerequisiteItems.Select(x => FileItem.GetItemByPath(x)));
 			}
 
-			string[]? ProducedItems;
-			if (Object.TryGetStringArrayField("ProducedItems", out ProducedItems))
+			if (Object.TryGetStringArrayField("ProducedItems", out string[]? ProducedItems))
 			{
 				Action.ProducedItems.AddRange(ProducedItems.Select(x => FileItem.GetItemByPath(x)));
 			}
 
-			string[]? DeleteItems;
-			if (Object.TryGetStringArrayField("DeleteItems", out DeleteItems))
+			if (Object.TryGetStringArrayField("DeleteItems", out string[]? DeleteItems))
 			{
 				Action.DeleteItems.AddRange(DeleteItems.Select(x => FileItem.GetItemByPath(x)));
 			}
 
-			string? DependencyListFile;
-			if (Object.TryGetStringField("DependencyListFile", out DependencyListFile))
+			if (Object.TryGetStringField("DependencyListFile", out string? DependencyListFile))
 			{
 				Action.DependencyListFile = FileItem.GetItemByPath(DependencyListFile);
 			}

@@ -75,7 +75,7 @@ namespace EpicGames.Core
 		public class DefaultFormatter : ILogEventFormatter
 		{
 			/// <inheritdoc/>
-			public object Format(object Value) => Value.ToString() ?? String.Empty;
+			public object Format(object Value) => Value.ToString() ?? string.Empty;
 		}
 
 		/// <summary>
@@ -100,12 +100,12 @@ namespace EpicGames.Core
 			}
 
 			/// <inheritdoc/>
-			public object Format(object Value) => new LogValue(Name, Value.ToString() ?? String.Empty);
+			public object Format(object Value) => new LogValue(Name, Value.ToString() ?? string.Empty);
 		}
 
-		static DefaultFormatter DefaultFormatterInstance = new DefaultFormatter();
+		static readonly DefaultFormatter DefaultFormatterInstance = new DefaultFormatter();
 
-		static ConcurrentDictionary<Type, ILogEventFormatter> CachedFormatters = GetDefaultFormatters();
+		static readonly ConcurrentDictionary<Type, ILogEventFormatter> CachedFormatters = GetDefaultFormatters();
 
 		static ConcurrentDictionary<Type, ILogEventFormatter> GetDefaultFormatters()
 		{
@@ -139,8 +139,7 @@ namespace EpicGames.Core
 		{
 			for (; ; )
 			{
-				ILogEventFormatter? Formatter;
-				if (CachedFormatters.TryGetValue(Type, out Formatter))
+				if (CachedFormatters.TryGetValue(Type, out ILogEventFormatter? Formatter))
 				{
 					return Formatter;
 				}

@@ -64,7 +64,7 @@ namespace UnrealBuildTool
 				{
 					foreach (PrimaryProjectFolder CurFolder in FolderList)
 					{
-						String NewPath = Path + "/" + CurFolder.FolderName;
+						string NewPath = Path + "/" + CurFolder.FolderName;
 						WorksetDataContent.Append("AddFileGroup \"" + NewPath + "\" \"" + CurFolder.FolderName + "\"" + ProjectFileGenerator.NewLine);
 
 						AddProjectsFunction!(NewPath, CurFolder.SubFolders);

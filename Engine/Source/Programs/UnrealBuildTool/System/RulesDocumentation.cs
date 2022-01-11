@@ -53,8 +53,7 @@ namespace UnrealBuildTool
 			{
 				if(!Field.FieldType.IsClass || !Field.FieldType.Name.EndsWith("TargetRules"))
 				{
-					List<string>? Lines;
-					if (TryGetXmlComment(InputDocumentation, Field, out Lines))
+					if (TryGetXmlComment(InputDocumentation, Field, out List<string>? Lines))
 					{
 						SettingInfo Setting = new SettingInfo(Field.Name, Field.FieldType, Lines);
 						if (Field.IsInitOnly)
@@ -74,8 +73,7 @@ namespace UnrealBuildTool
 			{
 				if (!Property.PropertyType.IsClass || !Property.PropertyType.Name.EndsWith("TargetRules"))
 				{
-					List<string>? Lines;
-					if (TryGetXmlComment(InputDocumentation, Property, out Lines))
+					if (TryGetXmlComment(InputDocumentation, Property, out List<string>? Lines))
 					{
 						SettingInfo Setting = new SettingInfo(Property.Name, Property.PropertyType, Lines);
 						if (Property.SetMethod == null)
@@ -121,33 +119,31 @@ namespace UnrealBuildTool
 		static void WriteDocumentationUDN(FileReference OutputFile, List<SettingInfo> ReadOnlySettings, List<SettingInfo> ReadWriteSettings)
 		{
 			// Generate the UDN documentation file
-			using (StreamWriter Writer = new StreamWriter(OutputFile.FullName))
+			using StreamWriter Writer = new StreamWriter(OutputFile.FullName);
+			Writer.WriteLine("Availability: NoPublish");
+			Writer.WriteLine("Title: Build Configuration Properties Page");
+			Writer.WriteLine("Crumbs:");
+			Writer.WriteLine("Description: This is a procedurally generated markdown page.");
+			Writer.WriteLine("Version: {0}.{1}", ReadOnlyBuildVersion.Current.MajorVersion, ReadOnlyBuildVersion.Current.MinorVersion);
+			Writer.WriteLine("");
+			if (ReadOnlySettings.Count > 0)
 			{
-				Writer.WriteLine("Availability: NoPublish");
-				Writer.WriteLine("Title: Build Configuration Properties Page");
-				Writer.WriteLine("Crumbs:");
-				Writer.WriteLine("Description: This is a procedurally generated markdown page.");
-				Writer.WriteLine("Version: {0}.{1}", ReadOnlyBuildVersion.Current.MajorVersion, ReadOnlyBuildVersion.Current.MinorVersion);
+				Writer.WriteLine("### Read-Only Properties");
+				Writer.WriteLine();
+				foreach (SettingInfo Field in ReadOnlySettings)
+				{
+					WriteFieldUDN(Field, Writer);
+				}
+				Writer.WriteLine();
+			}
+			if (ReadWriteSettings.Count > 0)
+			{
+				Writer.WriteLine("### Read/Write Properties");
+				foreach (SettingInfo Field in ReadWriteSettings)
+				{
+					WriteFieldUDN(Field, Writer);
+				}
 				Writer.WriteLine("");
-				if (ReadOnlySettings.Count > 0)
-				{
-					Writer.WriteLine("### Read-Only Properties");
-					Writer.WriteLine();
-					foreach (SettingInfo Field in ReadOnlySettings)
-					{
-						WriteFieldUDN(Field, Writer);
-					}
-					Writer.WriteLine();
-				}
-				if (ReadWriteSettings.Count > 0)
-				{
-					Writer.WriteLine("### Read/Write Properties");
-					foreach (SettingInfo Field in ReadWriteSettings)
-					{
-						WriteFieldUDN(Field, Writer);
-					}
-					Writer.WriteLine("");
-				}
 			}
 		}
 
@@ -278,33 +274,31 @@ namespace UnrealBuildTool
 
 		static void WriteDocumentationHTML(FileReference OutputFile, List<SettingInfo> ReadOnlySettings, List<SettingInfo> ReadWriteSettings)
 		{
-			using (StreamWriter Writer = new StreamWriter(OutputFile.FullName))
+			using StreamWriter Writer = new StreamWriter(OutputFile.FullName);
+			Writer.WriteLine("<html>");
+			Writer.WriteLine("  <body>");
+			if (ReadOnlySettings.Count > 0)
 			{
-				Writer.WriteLine("<html>");
-				Writer.WriteLine("  <body>");
-				if (ReadOnlySettings.Count > 0)
+				Writer.WriteLine("    <h2>Read-Only Properties</h2>");
+				Writer.WriteLine("    <dl>");
+				foreach (SettingInfo Setting in ReadOnlySettings)
 				{
-					Writer.WriteLine("    <h2>Read-Only Properties</h2>");
-					Writer.WriteLine("    <dl>");
-					foreach (SettingInfo Setting in ReadOnlySettings)
-					{
-						WriteFieldHTML(Setting, Writer);
-					}
-					Writer.WriteLine("    </dl>");
+					WriteFieldHTML(Setting, Writer);
 				}
-				if (ReadWriteSettings.Count > 0)
-				{
-					Writer.WriteLine("    <h2>Read/Write Properties</h2>");
-					Writer.WriteLine("    <dl>");
-					foreach (SettingInfo Setting in ReadWriteSettings)
-					{
-						WriteFieldHTML(Setting, Writer);
-					}
-					Writer.WriteLine("    </dl>");
-				}
-				Writer.WriteLine("  </body>");
-				Writer.WriteLine("</html>");
+				Writer.WriteLine("    </dl>");
 			}
+			if (ReadWriteSettings.Count > 0)
+			{
+				Writer.WriteLine("    <h2>Read/Write Properties</h2>");
+				Writer.WriteLine("    <dl>");
+				foreach (SettingInfo Setting in ReadWriteSettings)
+				{
+					WriteFieldHTML(Setting, Writer);
+				}
+				Writer.WriteLine("    </dl>");
+			}
+			Writer.WriteLine("  </body>");
+			Writer.WriteLine("</html>");
 		}
 
 		static void WriteFieldHTML(SettingInfo Setting, TextWriter Writer)
@@ -358,7 +352,7 @@ namespace UnrealBuildTool
 		{
 			if(FieldType.IsGenericType)
 			{
-				return String.Format("{0}&lt;{1}&gt;", FieldType.Name.Substring(0, FieldType.Name.IndexOf('`')), String.Join(", ", FieldType.GenericTypeArguments.Select(x => GetPrettyTypeName(x))));
+				return string.Format("{0}&lt;{1}&gt;", FieldType.Name.Substring(0, FieldType.Name.IndexOf('`')), string.Join(", ", FieldType.GenericTypeArguments.Select(x => GetPrettyTypeName(x))));
 			}
 			else
 			{

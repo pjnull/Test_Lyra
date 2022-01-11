@@ -37,20 +37,20 @@ namespace UnrealBuildTool
 			MinVersion = MaxVersion = null;
 		}
 
-		public override bool TryConvertVersionToInt(string? StringValue, out UInt64 OutValue)
+		public override bool TryConvertVersionToInt(string? StringValue, out ulong OutValue)
 		{
 			// 8 bits per component, with high getting extra from high 32
 			Match Result = Regex.Match(StringValue, @"^(\d+).(\d+)(.(\d+))?(.(\d+))?$");
 			if (Result.Success)
 			{
-				OutValue = UInt64.Parse(Result.Groups[1].Value) << 24 | UInt64.Parse(Result.Groups[2].Value) << 16;
+				OutValue = ulong.Parse(Result.Groups[1].Value) << 24 | ulong.Parse(Result.Groups[2].Value) << 16;
 				if (Result.Groups[4].Success)
 				{
-					OutValue |= UInt64.Parse(Result.Groups[4].Value) << 8;
+					OutValue |= ulong.Parse(Result.Groups[4].Value) << 8;
 				}
 				if (Result.Groups[6].Success)
 				{
-					OutValue |= UInt64.Parse(Result.Groups[6].Value) << 0;
+					OutValue |= ulong.Parse(Result.Groups[6].Value) << 0;
 				}
 				return true;
 			}

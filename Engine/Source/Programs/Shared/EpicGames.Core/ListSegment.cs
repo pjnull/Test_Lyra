@@ -109,9 +109,9 @@ namespace EpicGames.Core
 		/// </summary>
 		struct Enumerator : IEnumerator<T>, IEnumerator
 		{
-			IList<T> List;
+			readonly IList<T> List;
 			int Index;
-			int MaxIndex;
+			readonly int MaxIndex;
 
 			/// <inheritdoc/>
 			public T Current

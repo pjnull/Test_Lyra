@@ -51,7 +51,7 @@ namespace UnrealBuildTool
 		/// <param name="Key">Out: The definition name</param>
 		/// <param name="Value">Out: The definition value or null if it has none</param>
 		/// <returns>Pair representing macro name and value.</returns>
-		private void SplitDefinitionAndValue(string Definition, out String Key, out String Value)
+		private void SplitDefinitionAndValue(string Definition, out string Key, out string Value)
 		{
 			int EqualsIndex = Definition.IndexOf('=');
 			if (EqualsIndex >= 0)
@@ -155,10 +155,8 @@ namespace UnrealBuildTool
 
 				foreach (string CurDefine in QMakeProject.IntelliSensePreprocessorDefinitions)
 				{
-					String define = "";
-					String value = "";
 
-					SplitDefinitionAndValue(CurDefine, out define, out value);
+					SplitDefinitionAndValue(CurDefine, out string define, out string value);
 
 					if (!DefinesAndValues.Contains(define))
 					{
@@ -166,7 +164,7 @@ namespace UnrealBuildTool
 						if (string.IsNullOrEmpty(value))
 						{
 							DefinesAndValues.Add("\t");
-							DefinesAndValues.Add(String.Format("{0}=", define));
+							DefinesAndValues.Add(string.Format("{0}=", define));
 							DefinesAndValues.Add(" \\\n");
 						}
 						else
@@ -205,7 +203,7 @@ namespace UnrealBuildTool
 			}
 			QMakeIncludesPriFileContent.Append("\n");
 
-			if (!String.IsNullOrEmpty(GameProjectName))
+			if (!string.IsNullOrEmpty(GameProjectName))
 			{
 				GameProjectPath = OnlyGameProject!.Directory.FullName;
 				GameProjectFile = OnlyGameProject.FullName;
@@ -238,7 +236,7 @@ namespace UnrealBuildTool
 			StringBuilder QMakeConfigFilesListBuilder = new StringBuilder("OTHER_FILES += \\ \n");
 			string QMakeTargetList = "QMAKE_EXTRA_TARGETS += \\ \n";
 
-			if (!String.IsNullOrEmpty(GameProjectName))
+			if (!string.IsNullOrEmpty(GameProjectName))
 			{
 				GameProjectRootPath = GameProjectName + "RootPath=" + GameProjectPath + "\n\n";
 			}
@@ -283,7 +281,7 @@ namespace UnrealBuildTool
 							}
 							else
 							{
-								if (String.IsNullOrEmpty(GameProjectName))
+								if (string.IsNullOrEmpty(GameProjectName))
 								{
 									QMakeSourceFilesListBuilder.Append("\t\"" + SourceFileRelativeToRoot.Substring(3) + "\" \\\n");
 								}
@@ -302,7 +300,7 @@ namespace UnrealBuildTool
 							}
 							else
 							{
-								if (String.IsNullOrEmpty(GameProjectName))
+								if (string.IsNullOrEmpty(GameProjectName))
 								{
 									// SourceFileRelativeToRoot = SourceFileRelativeToRoot.Substring (3);
 									QMakeHeaderFilesListBuilder.Append("\t\"" + SourceFileRelativeToRoot.Substring(3) + "\" \\\n");
@@ -323,7 +321,7 @@ namespace UnrealBuildTool
 							}
 							else
 							{
-								if (String.IsNullOrEmpty(GameProjectName))
+								if (string.IsNullOrEmpty(GameProjectName))
 								{
 									// SourceFileRelativeToRoot = SourceFileRelativeToRoot.Substring (3);
 									QMakeConfigFilesListBuilder.Append("\t\"" + SourceFileRelativeToRoot.Substring(3) + "\" \\\n");
@@ -374,7 +372,7 @@ namespace UnrealBuildTool
 									QMakeProjectCmdArg = " -project=\"\\\"$$gameProjectFile\\\"\"";
 								}
 								string ConfName = Enum.GetName(typeof(UnrealTargetConfiguration), CurConfiguration)!;
-								QMakeFileContent.Append(String.Format("{0}-Linux-{1}.commands = $$build {0} Linux {1} {2} $$args\n", TargetName, ConfName, QMakeProjectCmdArg));
+								QMakeFileContent.Append(string.Format("{0}-Linux-{1}.commands = $$build {0} Linux {1} {2} $$args\n", TargetName, ConfName, QMakeProjectCmdArg));
 								QMakeTargetList += "\t" + TargetName + "-Linux-" + ConfName + " \\\n"; // , TargetName, ConfName);
 							}
 						}
@@ -385,7 +383,7 @@ namespace UnrealBuildTool
 						QMakeProjectCmdArg = " -project=\"\\\"$$gameProjectFile\\\"\"";
 					}
 
-					QMakeFileContent.Append(String.Format("{0}.commands = $$build {0} Linux Development {1} $$args\n\n", TargetName, QMakeProjectCmdArg));
+					QMakeFileContent.Append(string.Format("{0}.commands = $$build {0} Linux Development {1} $$args\n\n", TargetName, QMakeProjectCmdArg));
 					QMakeTargetList += "\t" + TargetName + " \\\n";
 				}
 			}

@@ -95,7 +95,7 @@ namespace EpicGames.Core
 		/// <inheritdoc/>
 		public override int GetHashCode()
 		{
-			return String.GetHashCode(Memory.Span);
+			return string.GetHashCode(Memory.Span);
 		}
 
 		/// <inheritdoc/>
@@ -161,7 +161,7 @@ namespace EpicGames.Core
 		/// <inheritdoc/>
 		public int GetHashCode(StringView obj)
 		{
-			return String.GetHashCode(obj.Span);
+			return string.GetHashCode(obj.Span);
 		}
 
 		/// <inheritdoc/>

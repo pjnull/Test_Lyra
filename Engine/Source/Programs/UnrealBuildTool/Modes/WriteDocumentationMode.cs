@@ -30,13 +30,13 @@ namespace UnrealBuildTool
 		/// Type of documentation to generate
 		/// </summary>
 		[CommandLine(Required = true)]
-		DocumentationType Type = DocumentationType.BuildConfiguration;
+		readonly DocumentationType Type = DocumentationType.BuildConfiguration;
 
 		/// <summary>
 		/// The HTML file to write to
 		/// </summary>
 		[CommandLine(Required = true)]
-		FileReference OutputFile = null!;
+		readonly FileReference OutputFile = null!;
 
 		/// <summary>
 		/// Entry point for this command

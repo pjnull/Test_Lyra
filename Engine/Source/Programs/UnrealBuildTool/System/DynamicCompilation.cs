@@ -258,22 +258,20 @@ namespace UnrealBuildTool
 
 			using (FileStream AssemblyStream = FileReference.Open(OutputAssemblyPath, FileMode.Create))
 			{
-				using (FileStream? PdbStream = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)? FileReference.Open(OutputAssemblyPath.ChangeExtension(".pdb"), FileMode.Create) : null)
+				using FileStream? PdbStream = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? FileReference.Open(OutputAssemblyPath.ChangeExtension(".pdb"), FileMode.Create) : null;
+				EmitOptions EmitOptions = new EmitOptions(
+					includePrivateMembers: true
+				);
+
+				EmitResult Result = Compilation.Emit(
+					peStream: AssemblyStream,
+					pdbStream: PdbStream,
+					options: EmitOptions);
+				LogDiagnostics(Result.Diagnostics);
+
+				if (!Result.Success)
 				{
-					EmitOptions EmitOptions = new EmitOptions(
-						includePrivateMembers: true
-					);
-
-					EmitResult Result = Compilation.Emit(
-						peStream: AssemblyStream,
-						pdbStream: PdbStream,
-						options: EmitOptions);
-					LogDiagnostics(Result.Diagnostics);
-
-					if (!Result.Success)
-					{
-						return null;
-					}
+					return null;
 				}
 			}
 
@@ -315,12 +313,12 @@ namespace UnrealBuildTool
 				}
 				catch (FileLoadException Ex)
 				{
-					Log.TraceInformation(String.Format("Unable to load the previously-compiled assembly file '{0}'.  Unreal Build Tool will try to recompile this assembly now.  (Exception: {1})", OutputAssemblyPath, Ex.Message));
+					Log.TraceInformation(string.Format("Unable to load the previously-compiled assembly file '{0}'.  Unreal Build Tool will try to recompile this assembly now.  (Exception: {1})", OutputAssemblyPath, Ex.Message));
 					bNeedsCompilation = true;
 				}
 				catch (BadImageFormatException Ex)
 				{
-					Log.TraceInformation(String.Format("Compiled assembly file '{0}' appears to be for a newer CLR version or is otherwise invalid.  Unreal Build Tool will try to recompile this assembly now.  (Exception: {1})", OutputAssemblyPath, Ex.Message));
+					Log.TraceInformation(string.Format("Compiled assembly file '{0}' appears to be for a newer CLR version or is otherwise invalid.  Unreal Build Tool will try to recompile this assembly now.  (Exception: {1})", OutputAssemblyPath, Ex.Message));
 					bNeedsCompilation = true;
 				}
 				catch (FileNotFoundException)
@@ -336,22 +334,20 @@ namespace UnrealBuildTool
 			// Compile the assembly if me
 			if (bNeedsCompilation)
 			{
-				using (GlobalTracer.Instance.BuildSpan(String.Format("Compiling rules assembly ({0})", OutputAssemblyPath.GetFileName())).StartActive())
+				using (GlobalTracer.Instance.BuildSpan(string.Format("Compiling rules assembly ({0})", OutputAssemblyPath.GetFileName())).StartActive())
 				{
 					CompiledAssembly = CompileAssembly(OutputAssemblyPath, SourceFileNames, ReferencedAssembies, PreprocessorDefines, TreatWarningsAsErrors);
 				}
 
-				using (JsonWriter Writer = new JsonWriter(AssemblyManifestFilePath))
-				{
-					ReadOnlyBuildVersion Version = ReadOnlyBuildVersion.Current;
+				using JsonWriter Writer = new JsonWriter(AssemblyManifestFilePath);
+				ReadOnlyBuildVersion Version = ReadOnlyBuildVersion.Current;
 
-					Writer.WriteObjectStart();
-					// Save out a list of all the source files we compiled.  This is so that we can tell if whole files were added or removed
-					// since the previous time we compiled the assembly.  In that case, we'll always want to recompile it!
-					Writer.WriteStringArrayField("SourceFiles", SourceFileNames.Select(x => x.FullName));
-					Writer.WriteValue("EngineVersion", FormatVersionNumber(Version));
-					Writer.WriteObjectEnd();
-				}
+				Writer.WriteObjectStart();
+				// Save out a list of all the source files we compiled.  This is so that we can tell if whole files were added or removed
+				// since the previous time we compiled the assembly.  In that case, we'll always want to recompile it!
+				Writer.WriteStringArrayField("SourceFiles", SourceFileNames.Select(x => x.FullName));
+				Writer.WriteValue("EngineVersion", FormatVersionNumber(Version));
+				Writer.WriteObjectEnd();
 			}
 
 			return CompiledAssembly;

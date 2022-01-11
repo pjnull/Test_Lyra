@@ -95,13 +95,13 @@ namespace UnrealBuildTool
 				TimeStamp = "";
 				if (Parts.Length > 1)
 				{
-					TimeStamp = String.Join(" ", Parts, 1, Parts.Length - 1);
+					TimeStamp = string.Join(" ", Parts, 1, Parts.Length - 1);
 				}
 			}
 
 			public static string ConstructVersion(int MajorVersion, int MinorVersion)
 			{
-				return String.Format("{0}.{1}", MajorVersion, MinorVersion);
+				return string.Format("{0}.{1}", MajorVersion, MinorVersion);
 			}
 
 			/// <summary>
@@ -116,18 +116,13 @@ namespace UnrealBuildTool
 			public static string CalculateUpdatedMinorVersionString(string CFBundleVersion)
 			{
 				// Read the running version and bump it
-				int RunningMajorVersion;
-				int RunningMinorVersion;
 
-				string DummyDate;
 				string RunningVersion = ReadRunningVersion();
-				PullApartVersion(RunningVersion, out RunningMajorVersion, out RunningMinorVersion, out DummyDate);
+				PullApartVersion(RunningVersion, out int RunningMajorVersion, out int RunningMinorVersion, out string DummyDate);
 				RunningMinorVersion++;
 
 				// Read the passed in version and bump it
-				int MajorVersion;
-				int MinorVersion;
-				PullApartVersion(CFBundleVersion, out MajorVersion, out MinorVersion, out DummyDate);
+				PullApartVersion(CFBundleVersion, out int MajorVersion, out int MinorVersion, out DummyDate);
 				MinorVersion++;
 
 				// Combine them if the stub time is older
@@ -221,7 +216,7 @@ namespace UnrealBuildTool
 			string BuildDirectory = ProjectDirectory + "/Build/IOS";
 			string IntermediateDirectory = (bIsUnrealGame ? InEngineDir : ProjectDirectory) + "/Intermediate/IOS";
 			string PListFile = IntermediateDirectory + "/" + GameName + "-Info.plist";
-			ProjectName = !String.IsNullOrEmpty(ProjectName) ? ProjectName : GameName;
+			ProjectName = !string.IsNullOrEmpty(ProjectName) ? ProjectName : GameName;
 			VersionUtilities.BuildDirectory = BuildDirectory;
 			VersionUtilities.GameName = GameName;
 
@@ -235,12 +230,10 @@ namespace UnrealBuildTool
 
 			// orientations
 			string InterfaceOrientation = "";
-			string PreferredLandscapeOrientation = "";
-			Ini.GetString("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "PreferredLandscapeOrientation", out PreferredLandscapeOrientation);
+			Ini.GetString("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "PreferredLandscapeOrientation", out string PreferredLandscapeOrientation);
 
 			string SupportedOrientations = "";
-			bool bSupported = true;
-			Ini.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bSupportsPortraitOrientation", out bSupported);
+			Ini.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bSupportsPortraitOrientation", out bool bSupported);
 			SupportedOrientations += bSupported ? "\t\t<string>UIInterfaceOrientationPortrait</string>\n" : "";
 			bSupportsPortrait = bSupported;
 
@@ -248,10 +241,8 @@ namespace UnrealBuildTool
 			SupportedOrientations += bSupported ? "\t\t<string>UIInterfaceOrientationPortraitUpsideDown</string>\n" : "";
 			bSupportsPortrait |= bSupported;
 
-			bool bSupportsLandscapeLeft = false;
-			Ini.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bSupportsLandscapeLeftOrientation", out bSupportsLandscapeLeft);
-			bool bSupportsLandscapeRight = false;
-			Ini.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bSupportsLandscapeRightOrientation", out bSupportsLandscapeRight);
+			Ini.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bSupportsLandscapeLeftOrientation", out bool bSupportsLandscapeLeft);
+			Ini.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bSupportsLandscapeRightOrientation", out bool bSupportsLandscapeRight);
 			bSupportsLandscape = bSupportsLandscapeLeft || bSupportsLandscapeRight;
 
 			if (bSupportsLandscapeLeft && bSupportsLandscapeRight)
@@ -278,34 +269,27 @@ namespace UnrealBuildTool
 			}
 
 			// ITunes file sharing
-			bool bSupportsITunesFileSharing = false;
-			Ini.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bSupportsITunesFileSharing", out bSupportsITunesFileSharing);
-			bool bSupportsFilesApp = false;
-			Ini.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bSupportsFilesApp", out bSupportsFilesApp);
+			Ini.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bSupportsITunesFileSharing", out bool bSupportsITunesFileSharing);
+			Ini.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bSupportsFilesApp", out bool bSupportsFilesApp);
 
 			// bundle display name
-			string BundleDisplayName;
-			Ini.GetString("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "BundleDisplayName", out BundleDisplayName);
+			Ini.GetString("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "BundleDisplayName", out string BundleDisplayName);
 
 			// bundle identifier
-			string BundleIdentifier;
-			Ini.GetString("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "BundleIdentifier", out BundleIdentifier);
+			Ini.GetString("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "BundleIdentifier", out string BundleIdentifier);
 			if (!string.IsNullOrEmpty(BundleID))
 			{
 				BundleIdentifier = BundleID; // overriding bundle ID
 			}
 
 			// bundle name
-			string BundleName;
-			Ini.GetString("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "BundleName", out BundleName);
+			Ini.GetString("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "BundleName", out string BundleName);
 
 			// disable https requirement
-			bool bDisableHTTPS;
-			Ini.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bDisableHTTPS", out bDisableHTTPS);
+			Ini.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bDisableHTTPS", out bool bDisableHTTPS);
 
 			// short version string
-			string BundleShortVersion;
-			Ini.GetString("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "VersionInfo", out BundleShortVersion);
+			Ini.GetString("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "VersionInfo", out string BundleShortVersion);
 
 			// required capabilities
 			string RequiredCaps = "";
@@ -328,51 +312,38 @@ namespace UnrealBuildTool
 			RequiredCaps += bSupported ? "\t\t<string>metal</string>\n" : "";
 
 			// minimum iOS version
-			string MinVersionSetting = "";
-			Ini.GetString("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "MinimumiOSVersion", out MinVersionSetting);
+			Ini.GetString("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "MinimumiOSVersion", out string MinVersionSetting);
 			string MinVersion  = GetMinimumOSVersion(MinVersionSetting);
 
 			// Get Facebook Support details
-			bool bEnableFacebookSupport = true;
-			Ini.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bEnableFacebookSupport", out bEnableFacebookSupport);
-			bool bEnableAutomaticLogging = true;
-			Ini.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bEnableAutomaticLogging", out bEnableAutomaticLogging);
-			bool bEnableAdvertisingId = true;
-			Ini.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bEnableAdvertisingId", out bEnableAdvertisingId);
+			Ini.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bEnableFacebookSupport", out bool bEnableFacebookSupport);
+			Ini.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bEnableAutomaticLogging", out bool bEnableAutomaticLogging);
+			Ini.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bEnableAdvertisingId", out bool bEnableAdvertisingId);
 
 			// Write the Facebook App ID if we need it.
-			string FacebookAppID = "";
-			Ini.GetString("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "FacebookAppID", out FacebookAppID);
+			Ini.GetString("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "FacebookAppID", out string FacebookAppID);
 			bEnableFacebookSupport = bEnableFacebookSupport && !string.IsNullOrWhiteSpace(FacebookAppID);
-			string FacebookDisplayName = "";
-			Ini.GetString("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "BundleDisplayName", out FacebookDisplayName);
+			Ini.GetString("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "BundleDisplayName", out string FacebookDisplayName);
 
 			// Get Google Support details
-			bool bEnableGoogleSupport = true;
-			Ini.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bEnableGoogleSupport", out bEnableGoogleSupport);
+			Ini.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bEnableGoogleSupport", out bool bEnableGoogleSupport);
 
 			// Write the Google iOS URL Scheme if we need it.
-			string GoogleReversedClientId = "";
-			Ini.GetString("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "GoogleReversedClientId", out GoogleReversedClientId);
+			Ini.GetString("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "GoogleReversedClientId", out string GoogleReversedClientId);
 			bEnableGoogleSupport = bEnableGoogleSupport && !string.IsNullOrWhiteSpace(GoogleReversedClientId);
 
 			// Add remote-notifications as background mode
-			bool bRemoteNotificationsSupported = false;
-			Ini.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bEnableRemoteNotificationsSupport", out bRemoteNotificationsSupported);
+			Ini.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bEnableRemoteNotificationsSupport", out bool bRemoteNotificationsSupported);
 
-            // Add background fetch as background mode
-            bool bBackgroundFetch = false;
-            Ini.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bEnableBackgroundFetch", out bBackgroundFetch);
+			// Add background fetch as background mode
+			Ini.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bEnableBackgroundFetch", out bool bBackgroundFetch);
 
 			// Get any Location Services permission descriptions added
-			string LocationAlwaysUsageDescription = "";
-			string LocationWhenInUseDescription = "";
-			Ini.GetString("/Script/LocationServicesIOSEditor.LocationServicesIOSSettings", "LocationAlwaysUsageDescription", out LocationAlwaysUsageDescription);
-			Ini.GetString("/Script/LocationServicesIOSEditor.LocationServicesIOSSettings", "LocationWhenInUseDescription", out LocationWhenInUseDescription);
+			Ini.GetString("/Script/LocationServicesIOSEditor.LocationServicesIOSSettings", "LocationAlwaysUsageDescription", out string LocationAlwaysUsageDescription);
+			Ini.GetString("/Script/LocationServicesIOSEditor.LocationServicesIOSSettings", "LocationWhenInUseDescription", out string LocationWhenInUseDescription);
 
 			// extra plist data
-			string ExtraData = "";
-			Ini.GetString("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "AdditionalPlistData", out ExtraData);
+			Ini.GetString("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "AdditionalPlistData", out string ExtraData);
 
 			Ini.GetBool("/Script/IOSRuntimeSettings.IOSRuntimeSettings", "bCustomLaunchscreenStoryboard", out VersionUtilities.bCustomLaunchscreenStoryboard);
 
@@ -700,8 +671,10 @@ namespace UnrealBuildTool
 			// strip out the markup
 			GameName = GameName.Split("-".ToCharArray())[0];
 
-			List<string> ProjectArches = new List<string>();
-			ProjectArches.Add("None");
+			List<string> ProjectArches = new List<string>
+			{
+				"None"
+			};
 
 			string BundlePath;
 
@@ -834,11 +807,11 @@ namespace UnrealBuildTool
 						if(LocalFileExists)
 						{
 							DestFileInfo = new FileInfo(LocalProvisionFile);
-							DestFileInfo.Attributes = DestFileInfo.Attributes & ~FileAttributes.ReadOnly;
+							DestFileInfo.Attributes &= ~FileAttributes.ReadOnly;
 						}
 						File.Copy(Provision, LocalProvisionFile, true);
 						DestFileInfo = new FileInfo(LocalProvisionFile);
-						DestFileInfo.Attributes = DestFileInfo.Attributes & ~FileAttributes.ReadOnly;
+						DestFileInfo.Attributes &= ~FileAttributes.ReadOnly;
 					}
 				}
 			}
@@ -928,11 +901,11 @@ namespace UnrealBuildTool
 				if (File.Exists(Environment.GetEnvironmentVariable("HOME") + "/Library/MobileDevice/Provisioning Profiles/" + ProjectProvision))
 				{
 					DestFileInfo = new FileInfo(Environment.GetEnvironmentVariable("HOME") + "/Library/MobileDevice/Provisioning Profiles/" + ProjectProvision);
-					DestFileInfo.Attributes = DestFileInfo.Attributes & ~FileAttributes.ReadOnly;
+					DestFileInfo.Attributes &= ~FileAttributes.ReadOnly;
 				}
 				File.Copy(ProvisionWithPrefix, Environment.GetEnvironmentVariable("HOME") + "/Library/MobileDevice/Provisioning Profiles/" + ProjectProvision, true);
 				DestFileInfo = new FileInfo(Environment.GetEnvironmentVariable("HOME") + "/Library/MobileDevice/Provisioning Profiles/" + ProjectProvision);
-				DestFileInfo.Attributes = DestFileInfo.Attributes & ~FileAttributes.ReadOnly;
+				DestFileInfo.Attributes &= ~FileAttributes.ReadOnly;
 			}
 			if (!File.Exists(ProvisionWithPrefix) || Environment.GetEnvironmentVariable("IsBuildMachine") == "1")
 			{
@@ -969,22 +942,20 @@ namespace UnrealBuildTool
 				if (File.Exists(Environment.GetEnvironmentVariable("HOME") + "/Library/MobileDevice/Provisioning Profiles/" + InProjectName + "_Distro.mobileprovision"))
 				{
 					DestFileInfo = new FileInfo(Environment.GetEnvironmentVariable("HOME") + "/Library/MobileDevice/Provisioning Profiles/" + InProjectName + "_Distro.mobileprovision");
-					DestFileInfo.Attributes = DestFileInfo.Attributes & ~FileAttributes.ReadOnly;
+					DestFileInfo.Attributes &= ~FileAttributes.ReadOnly;
 				}
 				File.Copy(ProvisionWithPrefix, Environment.GetEnvironmentVariable("HOME") + "/Library/MobileDevice/Provisioning Profiles/" + InProjectName + "_Distro.mobileprovision", true);
 				DestFileInfo = new FileInfo(Environment.GetEnvironmentVariable("HOME") + "/Library/MobileDevice/Provisioning Profiles/" + InProjectName + "_Distro.mobileprovision");
-				DestFileInfo.Attributes = DestFileInfo.Attributes & ~FileAttributes.ReadOnly;
+				DestFileInfo.Attributes &= ~FileAttributes.ReadOnly;
 			}
 
-			bool bSupportsPortrait = true;
-			bool bSupportsLandscape = false;
-			GeneratePList(ProjectFile, Config, InProjectDirectory, bIsUnrealGame, GameExeName, false, InProjectName, InEngineDir, AppDirectory, UPLScripts, BundleID, bBuildAsFramework, out bSupportsPortrait, out bSupportsLandscape);
+			GeneratePList(ProjectFile, Config, InProjectDirectory, bIsUnrealGame, GameExeName, false, InProjectName, InEngineDir, AppDirectory, UPLScripts, BundleID, bBuildAsFramework, out bool bSupportsPortrait, out bool bSupportsLandscape);
 
 			// ensure the destination is writable
 			if (File.Exists(AppDirectory + "/" + GameName))
 			{
 				FileInfo GameFileInfo = new FileInfo(AppDirectory + "/" + GameName);
-				GameFileInfo.Attributes = GameFileInfo.Attributes & ~FileAttributes.ReadOnly;
+				GameFileInfo.Attributes &= ~FileAttributes.ReadOnly;
 			}
 
 			// copy the GameName binary
@@ -1053,7 +1024,7 @@ namespace UnrealBuildTool
 			}
 			else
 			{
-				DecoratedGameName = String.Format("{0}-{1}-{2}", GameName, Platform.ToString(), Configuration.ToString());
+				DecoratedGameName = string.Format("{0}-{1}-{2}", GameName, Platform.ToString(), Configuration.ToString());
 			}
 
 			if (BuildHostPlatform.Current.Platform == UnrealTargetPlatform.Mac && Environment.GetEnvironmentVariable("UBT_NO_POST_DEPLOY") != "true")
@@ -1063,8 +1034,7 @@ namespace UnrealBuildTool
 			else
 			{
 				// @todo tvos merge: This used to copy the bundle back - where did that code go? It needs to be fixed up for TVOS directories
-				bool bSupportPortrait, bSupportLandscape;
-				GeneratePList(ProjectFile, Configuration, ProjectDirectory, bIsUnrealGame, GameName, false, (ProjectFile == null) ? "" : Path.GetFileNameWithoutExtension(ProjectFile.FullName), "../../Engine", "", UPLScripts, BundleID, bBuildAsFramework, out bSupportPortrait, out bSupportLandscape);
+				GeneratePList(ProjectFile, Configuration, ProjectDirectory, bIsUnrealGame, GameName, false, (ProjectFile == null) ? "" : Path.GetFileNameWithoutExtension(ProjectFile.FullName), "../../Engine", "", UPLScripts, BundleID, bBuildAsFramework, out bool bSupportPortrait, out bool bSupportLandscape);
 			}
 			return true;
 		}

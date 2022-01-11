@@ -30,8 +30,7 @@ namespace UnrealBuildTool
 		public SingleInstanceMutex(string MutexName, bool bWaitMutex)
 		{
 			// Try to create the mutex, with it initially locked
-			bool bCreatedMutex;
-			GlobalMutex = new Mutex(true, MutexName, out bCreatedMutex);
+			GlobalMutex = new Mutex(true, MutexName, out bool bCreatedMutex);
 
 			// If we didn't create the mutex, we can wait for it or fail immediately
 			if (!bCreatedMutex)

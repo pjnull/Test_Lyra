@@ -108,8 +108,7 @@ namespace EpicGames.Core
 		/// <returns>True if the requested line matches the given patter</returns>
 		public static bool IsMatch(this ILogCursor Cursor, int Offset, string Pattern)
 		{
-			string? Line;
-			return Cursor.TryGetLine(Offset, out Line) && Regex.IsMatch(Line!, Pattern);
+			return Cursor.TryGetLine(Offset, out string? Line) && Regex.IsMatch(Line!, Pattern);
 		}
 
 		/// <summary>
@@ -134,8 +133,7 @@ namespace EpicGames.Core
 		/// <returns>True if the current line matches the given patter</returns>
 		public static bool TryMatch(this ILogCursor Cursor, int Offset, string Pattern, [NotNullWhen(true)] out Match? OutMatch)
 		{
-			string? Line;
-			if (!Cursor.TryGetLine(Offset, out Line))
+			if (!Cursor.TryGetLine(Offset, out string? Line))
 			{
 				OutMatch = null;
 				return false;
@@ -177,8 +175,7 @@ namespace EpicGames.Core
 		/// <returns>Offset of the line that matches the pattern (inclusive), or EOF is encountered</returns>
 		public static int MatchForwardsUntil(this ILogCursor Cursor, int Offset, string Pattern)
 		{
-			string? NextLine;
-			for (int NextOffset = Offset + 1; Cursor.TryGetLine(NextOffset, out NextLine); NextOffset++)
+			for (int NextOffset = Offset + 1; Cursor.TryGetLine(NextOffset, out string? NextLine); NextOffset++)
 			{
 				if (Regex.IsMatch(NextLine, Pattern))
 				{

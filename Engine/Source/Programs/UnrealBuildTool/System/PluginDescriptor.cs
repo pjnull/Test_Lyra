@@ -258,14 +258,12 @@ namespace UnrealBuildTool
 			RawObject.TryGetStringArrayField("SupportedPrograms", out SupportedPrograms);
 			RawObject.TryGetBoolField("bIsPluginExtension", out bIsPluginExtension);
 
-			string[]? SupportedTargetPlatformNames;
-			if (RawObject.TryGetStringArrayField("SupportedTargetPlatforms", out SupportedTargetPlatformNames))
+			if (RawObject.TryGetStringArrayField("SupportedTargetPlatforms", out string[]? SupportedTargetPlatformNames))
 			{
 				SupportedTargetPlatforms = new List<UnrealTargetPlatform>();
 				foreach (string TargetPlatformName in SupportedTargetPlatformNames)
 				{
-					UnrealTargetPlatform Platform;
-					if (UnrealTargetPlatform.TryParse(TargetPlatformName, out Platform))
+					if (UnrealTargetPlatform.TryParse(TargetPlatformName, out UnrealTargetPlatform Platform))
 					{
 						SupportedTargetPlatforms.Add(Platform);
 					}
@@ -276,20 +274,17 @@ namespace UnrealBuildTool
 				}
 			}
 
-			JsonObject[]? ModulesArray;
-			if (RawObject.TryGetObjectArrayField("Modules", out ModulesArray))
+			if (RawObject.TryGetObjectArrayField("Modules", out JsonObject[]? ModulesArray))
 			{
 				Modules = Array.ConvertAll(ModulesArray, x => ModuleDescriptor.FromJsonObject(x, PluginPath)).ToList();
 			}
 
-			JsonObject[]? LocalizationTargetsArray;
-			if (RawObject.TryGetObjectArrayField("LocalizationTargets", out LocalizationTargetsArray))
+			if (RawObject.TryGetObjectArrayField("LocalizationTargets", out JsonObject[]? LocalizationTargetsArray))
 			{
 				LocalizationTargets = Array.ConvertAll(LocalizationTargetsArray, x => LocalizationTargetDescriptor.FromJsonObject(x));
 			}
 
-			bool bEnabledByDefaultValue;
-			if(RawObject.TryGetBoolField("EnabledByDefault", out bEnabledByDefaultValue))
+			if (RawObject.TryGetBoolField("EnabledByDefault", out bool bEnabledByDefaultValue))
 			{
 				bEnabledByDefault = bEnabledByDefaultValue;
 			}
@@ -300,11 +295,10 @@ namespace UnrealBuildTool
 			RawObject.TryGetBoolField("IsExperimentalVersion", out bIsExperimentalVersion);
 			RawObject.TryGetBoolField("Installed", out bInstalled);
 
-			bool bCanBeUsedWithUnrealHeaderTool;
-			if(RawObject.TryGetBoolField("CanBeUsedWithUnrealHeaderTool", out bCanBeUsedWithUnrealHeaderTool) && bCanBeUsedWithUnrealHeaderTool)
+			if (RawObject.TryGetBoolField("CanBeUsedWithUnrealHeaderTool", out bool bCanBeUsedWithUnrealHeaderTool) && bCanBeUsedWithUnrealHeaderTool)
 			{
-				Array.Resize(ref SupportedPrograms, (SupportedPrograms == null)? 1 : SupportedPrograms.Length + 1);
-				SupportedPrograms[SupportedPrograms.Length - 1] = "UnrealHeaderTool";
+				Array.Resize(ref SupportedPrograms, (SupportedPrograms == null) ? 1 : SupportedPrograms.Length + 1);
+				SupportedPrograms[^1] = "UnrealHeaderTool";
 			}
 
 			RawObject.TryGetBoolField("RequiresBuildPlatform", out bRequiresBuildPlatform);
@@ -314,8 +308,7 @@ namespace UnrealBuildTool
 			CustomBuildSteps.TryRead(RawObject, "PreBuildSteps", out PreBuildSteps);
 			CustomBuildSteps.TryRead(RawObject, "PostBuildSteps", out PostBuildSteps);
 
-			JsonObject[]? PluginsArray;
-			if(RawObject.TryGetObjectArrayField("Plugins", out PluginsArray))
+			if (RawObject.TryGetObjectArrayField("Plugins", out JsonObject[]? PluginsArray))
 			{
 				Plugins = Array.ConvertAll(PluginsArray, x => PluginReferenceDescriptor.FromJsonObject(x)).ToList();
 			}
@@ -353,12 +346,10 @@ namespace UnrealBuildTool
 		/// <param name="FileName">The filename to write to</param>
 		public void Save(string FileName)
 		{
-			using (JsonWriter Writer = new JsonWriter(FileName))
-			{
-				Writer.WriteObjectStart();
-				Write(Writer);
-				Writer.WriteObjectEnd();
-			}
+			using JsonWriter Writer = new JsonWriter(FileName);
+			Writer.WriteObjectStart();
+			Write(Writer);
+			Writer.WriteObjectEnd();
 		}
 
 		/// <summary>
@@ -378,7 +369,7 @@ namespace UnrealBuildTool
 			Writer.WriteValue("DocsURL", DocsURL);
 			Writer.WriteValue("MarketplaceURL", MarketplaceURL);
 			Writer.WriteValue("SupportURL", SupportURL);
-			if(!String.IsNullOrEmpty(EngineVersion))
+			if(!string.IsNullOrEmpty(EngineVersion))
 			{
 				Writer.WriteValue("EngineVersion", EngineVersion);
 			}

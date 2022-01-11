@@ -15,22 +15,22 @@ namespace UnrealBuildTool
 	class XcodeProjectFileGenerator : ProjectFileGenerator
 	{
 		// always seed the random number the same, so multiple runs of the generator will generate the same project
-		static Random Rand = new Random(0);
+		static readonly Random Rand = new Random(0);
 
 		/// <summary>
 		/// Mark for distribution builds
 		/// </summary>
-		bool bForDistribution = false;
+		readonly bool bForDistribution = false;
 
 		/// <summary>
 		/// Override BundleID
 		/// </summary>
-		string BundleIdentifier = "";
+		readonly string BundleIdentifier = "";
 
 		/// <summary>
 		/// Override AppName
 		/// </summary>
-		string AppName = "";
+		readonly string AppName = "";
 
 		public XcodeProjectFileGenerator(FileReference? InOnlyGameProject, CommandLineArguments CommandLine)
 			: base(InOnlyGameProject)

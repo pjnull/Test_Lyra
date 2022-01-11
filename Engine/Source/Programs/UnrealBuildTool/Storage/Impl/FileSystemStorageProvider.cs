@@ -18,7 +18,7 @@ namespace UnrealBuildTool.Storage.Impl
 		/// <summary>
 		/// Cached copy of the current process id
 		/// </summary>
-		static int ProcessId = Process.GetCurrentProcess().Id;
+		static readonly int ProcessId = Process.GetCurrentProcess().Id;
 
 		/// <summary>
 		/// Implements <see cref="IStorageReader"/> for writes to the backing storage
@@ -57,7 +57,7 @@ namespace UnrealBuildTool.Storage.Impl
 		class StorageWriter : IStorageWriter
 		{
 			FileReference? TempLocation;
-			FileReference FinalLocation;
+			readonly FileReference FinalLocation;
 
 			public Stream? Stream
 			{
@@ -70,7 +70,7 @@ namespace UnrealBuildTool.Storage.Impl
 				this.FinalLocation = Location;
 				DirectoryReference.CreateDirectory(FinalLocation.Directory);
 
-				this.TempLocation = new FileReference(String.Format("{0}.{1}", Location.FullName, ProcessId));
+				this.TempLocation = new FileReference(string.Format("{0}.{1}", Location.FullName, ProcessId));
 				Stream = FileReference.Open(TempLocation, FileMode.Create, FileAccess.Write, FileShare.Read | FileShare.Delete);
 			}
 
@@ -139,7 +139,7 @@ namespace UnrealBuildTool.Storage.Impl
 		static FileReference GetFileForDigest(ContentHash Digest)
 		{
 			string DigestText = Digest.ToString();
-			return FileReference.Combine(Unreal.EngineDirectory, "Saved", "UnrealBuildTool", "Cache", String.Format("{0}/{1}/{2}/{3}.bin", DigestText[0], DigestText[1], DigestText[2], DigestText));
+			return FileReference.Combine(Unreal.EngineDirectory, "Saved", "UnrealBuildTool", "Cache", string.Format("{0}/{1}/{2}/{3}.bin", DigestText[0], DigestText[1], DigestText[2], DigestText));
 		}
 	}
 }

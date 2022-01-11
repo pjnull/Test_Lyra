@@ -151,22 +151,22 @@ namespace UnrealBuildTool
 		/// <summary>
 		///  Used to mark the project for distribution (some platforms require this)
 		/// </summary>
-		bool bForDistribution = false;
+		readonly bool bForDistribution = false;
 
 		/// <summary>
 		/// Override for bundle identifier
 		/// </summary>
-		string BundleIdentifier = "";
+		readonly string BundleIdentifier = "";
 
 		/// <summary>
 		/// Override AppName
 		/// </summary>
-		string AppName = "";
+		readonly string AppName = "";
 
 		/// <summary>
 		/// Architectures supported for iOS
 		/// </summary>
-		string[] SupportedIOSArchitectures = { "arm64" };
+		readonly string[] SupportedIOSArchitectures = { "arm64" };
 
 		/// <summary>
 		/// Gets Xcode file category based on its extension
@@ -462,8 +462,7 @@ namespace UnrealBuildTool
 								ConfigSection.Append("\t\t\t\t\"PRODUCT_BUNDLE_IDENTIFIER[sdk=appletvos*]\" = " + ProjectSettings.BundleIdentifier + "." + ExtensionInfo.Name + ";" + ProjectFileGenerator.NewLine);
 							}
 
-							string? IOSRuntimeVersion, TVOSRuntimeVersion;
-							AppendPlatformConfiguration(ConfigSection, Configuration, ExtensionInfo.Name, UProjectPath, false, bSupportIOS, bSupportTVOS, out IOSRuntimeVersion, out TVOSRuntimeVersion);
+							AppendPlatformConfiguration(ConfigSection, Configuration, ExtensionInfo.Name, UProjectPath, false, bSupportIOS, bSupportTVOS, out string? IOSRuntimeVersion, out string? TVOSRuntimeVersion);
 
 							ConfigSection.Append("\t\t\t};" + ProjectFileGenerator.NewLine);
 							ConfigSection.Append("\t\t\tname = \"" + ConfigName + "\";" + ProjectFileGenerator.NewLine);
@@ -822,8 +821,10 @@ namespace UnrealBuildTool
 		{
 			foreach (XcodeExtensionInfo EI in AllExtensions)
 			{
-				Dictionary<string, string> BuildPhases = new Dictionary<string, string>();
-				BuildPhases.Add(EI.ResourceBuildPhaseGuid, "Resources");
+				Dictionary<string, string> BuildPhases = new Dictionary<string, string>
+				{
+					{ EI.ResourceBuildPhaseGuid, "Resources" }
+				};
 
 				AppendGenericTargetSection(ProjectFileContent, EI.Name, EI.TargetGuid, "com.apple.product-type.app-extension.messages-sticker-pack", EI.ConfigListGuid, EI.ProductGuid, null, BuildPhases);
 			}
@@ -963,7 +964,7 @@ namespace UnrealBuildTool
 		}
 
 		// cache for the below function
-		Dictionary<string, IEnumerable<string>> CachedMacProjectArcitectures = new Dictionary<string, IEnumerable<string>>();
+		readonly Dictionary<string, IEnumerable<string>> CachedMacProjectArcitectures = new Dictionary<string, IEnumerable<string>>();
 
 		/// <summary>
 		/// Returns the Mac architectures that should be configured for the provided target. If the target has a project we'll adhere
@@ -1025,23 +1026,19 @@ namespace UnrealBuildTool
 					{
 						// For project targets we default to Intel then check the project settings. Note the editor target will have
 						// been denied above already.
-						TargetArchitectures = new[] { MacExports.IntelArchitecture };
 
 						// Look at the project engine config to see if it has specified a default editor target
 						FileReference EngineIniFile = FileReference.Combine(InProjectFile.Directory, "Config", "DefaultEngine.ini");
 
 						if (FileReference.Exists(EngineIniFile))
 						{
-							ConfigFile? ProjectDefaultEngineIni;
-							ConfigCache.TryReadFile(EngineIniFile, out ProjectDefaultEngineIni);
+							ConfigCache.TryReadFile(EngineIniFile, out ConfigFile? ProjectDefaultEngineIni);
 							if (ProjectDefaultEngineIni != null)
 							{
 								// read the MacTargetSettings where the user picks an architecture set to target
-								ConfigFileSection? Section;
-								if (ProjectDefaultEngineIni.TryGetSection("/Script/MacTargetPlatform.MacTargetSettings", out Section))
+								if (ProjectDefaultEngineIni.TryGetSection("/Script/MacTargetPlatform.MacTargetSettings", out ConfigFileSection? Section))
 								{
-									ConfigLine? Line;
-									if (Section.TryGetLine("TargetArchitecture", out Line))
+									if (Section.TryGetLine("TargetArchitecture", out ConfigLine? Line))
 									{
 										if (Line.Value.IndexOf("Universal", StringComparison.OrdinalIgnoreCase) >= 0)
 										{
@@ -1257,8 +1254,7 @@ namespace UnrealBuildTool
 			//string MacExecutableDir = ConvertPath(Config.MacExecutablePath.Directory.FullName);
 			string MacExecutableFileName = Config.MacExecutablePath!.GetFileName();
 
-			string? IOSRunTimeVersion, TVOSRunTimeVersion;
-			AppendPlatformConfiguration(Content, Config, Config.BuildTarget, ProjectFile, true, !bMacOnly, !bMacOnly, out IOSRunTimeVersion, out TVOSRunTimeVersion);
+			AppendPlatformConfiguration(Content, Config, Config.BuildTarget, ProjectFile, true, !bMacOnly, !bMacOnly, out string? IOSRunTimeVersion, out string? TVOSRunTimeVersion);
 
 			if (!bMacOnly)
 			{
@@ -1380,11 +1376,9 @@ namespace UnrealBuildTool
 								ReceiptFilename = TargetReceipt.GetDefaultPath(ProjectPath, GameName, UnrealTargetPlatform.IOS, Config.BuildConfig, "");
 							}
 							Directory.CreateDirectory(Path.GetDirectoryName(IOSInfoPlistPath));
-                            bool bSupportPortrait, bSupportLandscape;
-							TargetReceipt? Receipt;
-							TargetReceipt.TryRead(ReceiptFilename, out Receipt);
+							TargetReceipt.TryRead(ReceiptFilename, out TargetReceipt? Receipt);
 							bool bBuildAsFramework = UEDeployIOS.GetCompileAsDll(Receipt);
-							UEDeployIOS.GenerateIOSPList(ProjectFile, Config.BuildConfig, ProjectPath.FullName, bIsUnrealGame, GameName, bIsClient, Config.BuildTarget, EngineDir.FullName, ProjectPath + "/Binaries/IOS/Payload", null, BundleIdentifier, bBuildAsFramework, out bSupportPortrait, out bSupportLandscape);
+							UEDeployIOS.GenerateIOSPList(ProjectFile, Config.BuildConfig, ProjectPath.FullName, bIsUnrealGame, GameName, bIsClient, Config.BuildTarget, EngineDir.FullName, ProjectPath + "/Binaries/IOS/Payload", null, BundleIdentifier, bBuildAsFramework, out bool bSupportPortrait, out bool bSupportLandscape);
 						}
 						if (bCreateTVOSInfoPlist)
 						{
@@ -1553,8 +1547,7 @@ namespace UnrealBuildTool
 					{
 						if (InstalledPlatformInfo.IsValidPlatform(Platform, EProjectType.Code) && (Platform == UnrealTargetPlatform.Mac || Platform == UnrealTargetPlatform.IOS || Platform == UnrealTargetPlatform.TVOS)) // @todo support other platforms
 						{
-							UEBuildPlatform? BuildPlatform;
-							if (UEBuildPlatform.TryGetBuildPlatform(Platform, out BuildPlatform) && (BuildPlatform.HasRequiredSDKsInstalled() == SDKStatus.Valid))
+							if (UEBuildPlatform.TryGetBuildPlatform(Platform, out UEBuildPlatform? BuildPlatform) && (BuildPlatform.HasRequiredSDKsInstalled() == SDKStatus.Valid))
 							{
 								// Check we have targets (Expected to be no Engine targets when generating for a single .uproject)
 								if (ProjectTargets.Count == 0 && BaseDir != Unreal.EngineDirectory)
@@ -1607,7 +1600,7 @@ namespace UnrealBuildTool
 												if (ProjectTarget.TargetRules.Type != TargetType.Game)
 												{
 													// Only if shared - unique retains the Target Name
-													if(ProjectTarget.TargetRules.BuildEnvironment == TargetBuildEnvironment.Shared)
+													if (ProjectTarget.TargetRules.BuildEnvironment == TargetBuildEnvironment.Shared)
 													{
 														ExeName = "Unreal" + ProjectTarget.TargetRules.Type.ToString();
 													}

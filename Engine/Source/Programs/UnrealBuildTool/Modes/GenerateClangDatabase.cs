@@ -20,7 +20,7 @@ namespace UnrealBuildTool
 		/// Set of filters for files to include in the database. Relative to the root directory, or to the project file.
 		/// </summary>
 		[CommandLine("-Filter=")]
-		List<string> FilterRules = new List<string>();
+		readonly List<string> FilterRules = new List<string>();
 
 		/// <summary>
 		/// Execute the command
@@ -132,7 +132,7 @@ namespace UnrealBuildTool
 								{
 									if (FileFilter == null || FileFilter.Matches(InputFile.Location.MakeRelativeTo(Unreal.RootDirectory)))
 									{
-										FileToCommand[InputFile.Location] = String.Format("{0} \"{1}\"", CommandBuilder, InputFile.FullName);
+										FileToCommand[InputFile.Location] = string.Format("{0} \"{1}\"", CommandBuilder, InputFile.FullName);
 									}
 								}
 							}
@@ -142,19 +142,17 @@ namespace UnrealBuildTool
 
 				// Write the compile database
 				FileReference DatabaseFile = FileReference.Combine(Unreal.RootDirectory, "compile_commands.json");
-				using (JsonWriter Writer = new JsonWriter(DatabaseFile))
+				using JsonWriter Writer = new JsonWriter(DatabaseFile);
+				Writer.WriteArrayStart();
+				foreach (KeyValuePair<FileReference, string> FileCommandPair in FileToCommand.OrderBy(x => x.Key.FullName))
 				{
-					Writer.WriteArrayStart();
-					foreach (KeyValuePair<FileReference, string> FileCommandPair in FileToCommand.OrderBy(x => x.Key.FullName))
-					{
-						Writer.WriteObjectStart();
-						Writer.WriteValue("file", FileCommandPair.Key.FullName);
-						Writer.WriteValue("command", FileCommandPair.Value);
-						Writer.WriteValue("directory", UnrealBuildTool.EngineSourceDirectory.ToString());
-						Writer.WriteObjectEnd();
-					}
-					Writer.WriteArrayEnd();
+					Writer.WriteObjectStart();
+					Writer.WriteValue("file", FileCommandPair.Key.FullName);
+					Writer.WriteValue("command", FileCommandPair.Value);
+					Writer.WriteValue("directory", UnrealBuildTool.EngineSourceDirectory.ToString());
+					Writer.WriteObjectEnd();
 				}
+				Writer.WriteArrayEnd();
 			}
 
 			return 0;

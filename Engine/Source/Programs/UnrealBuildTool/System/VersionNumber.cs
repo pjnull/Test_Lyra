@@ -23,7 +23,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// The individual version components
 		/// </summary>
-		int[] Components;
+		readonly int[] Components;
 
 		/// <summary>
 		/// Constructor
@@ -56,7 +56,7 @@ namespace UnrealBuildTool
 		public override bool Equals(object? Obj)
 		{
 			VersionNumber? Version = Obj as VersionNumber;
-			return !ReferenceEquals(Version, null) && this == Version;
+			return Version is object && this == Version;
 		}
 
 		/// <summary>
@@ -81,13 +81,13 @@ namespace UnrealBuildTool
 		/// <returns>True if the versions are equal.</returns>
 		public static bool operator==(VersionNumber? Lhs, VersionNumber? Rhs)
 		{
-			if(Object.ReferenceEquals(Lhs, null))
+			if(Lhs is null)
 			{
-				return Object.ReferenceEquals(Rhs, null);
+				return Rhs is null;
 			}
 			else
 			{
-				return !Object.ReferenceEquals(Rhs, null) && Compare(Lhs, Rhs) == 0;
+				return Rhs is object && Compare(Lhs, Rhs) == 0;
 			}
 		}
 
@@ -153,7 +153,7 @@ namespace UnrealBuildTool
 		/// <returns>A negative value if this version is before Other, a positive value if this version is after Other, and zero otherwise.</returns>
 		public int CompareTo(VersionNumber? Other)
 		{
-			return ReferenceEquals(Other, null)? 1 : Compare(this, Other);
+			return Other is null ? 1 : Compare(this, Other);
 		}
 
 		/// <summary>
@@ -217,8 +217,7 @@ namespace UnrealBuildTool
 			List<int> Components = new List<int>();
 			foreach(string TextElement in Text.Split(Delimiters))
 			{
-				int Component;
-				if(!int.TryParse(TextElement, out Component))
+				if (!int.TryParse(TextElement, out int Component))
 				{
 					OutNumber = null;
 					return false;

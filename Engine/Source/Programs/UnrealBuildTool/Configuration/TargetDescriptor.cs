@@ -121,7 +121,7 @@ namespace UnrealBuildTool
 					string[] Files = FileReference.ReadAllLines(FileList);
 					foreach (string File in Files)
 					{
-						if (!String.IsNullOrWhiteSpace(File))
+						if (!string.IsNullOrWhiteSpace(File))
 						{
 							SpecificFilesToCompile.Add(new FileReference(File));
 						}
@@ -139,8 +139,7 @@ namespace UnrealBuildTool
 
 					string ModuleName = ModuleWithSuffix.Substring(0, SuffixIdx);
 
-					int Suffix;
-					if(!Int32.TryParse(ModuleWithSuffix.Substring(SuffixIdx + 1), out Suffix))
+					if (!int.TryParse(ModuleWithSuffix.Substring(SuffixIdx + 1), out int Suffix))
 					{
 						throw new BuildException("Suffix for modules must be an integer");
 					}
@@ -190,13 +189,11 @@ namespace UnrealBuildTool
 		/// <param name="TargetDescriptors">Receives the list of parsed target descriptors</param>
 		public static void ParseCommandLine(CommandLineArguments Arguments, bool bUsePrecompiled, bool bSkipRulesCompile, bool bForceRulesCompile, List<TargetDescriptor> TargetDescriptors)
 		{
-			List<string> TargetLists;
-			Arguments = Arguments.Remove("-TargetList=", out TargetLists);
+			Arguments = Arguments.Remove("-TargetList=", out List<string> TargetLists);
 
-			List<string> Targets;
-			Arguments = Arguments.Remove("-Target=", out Targets);
+			Arguments = Arguments.Remove("-Target=", out List<string> Targets);
 
-			if(TargetLists.Count > 0 || Targets.Count > 0)
+			if (TargetLists.Count > 0 || Targets.Count > 0)
 			{
 				// Try to parse multiple arguments from a single command line
 				foreach(string TargetList in TargetLists)
@@ -266,11 +263,10 @@ namespace UnrealBuildTool
 					string[] InlineArguments = Argument.Split('+');
 
 					// Try to parse them as platforms
-					UnrealTargetPlatform ParsedPlatform;
-					if(UnrealTargetPlatform.TryParse(InlineArguments[0], out ParsedPlatform))
+					if (UnrealTargetPlatform.TryParse(InlineArguments[0], out UnrealTargetPlatform ParsedPlatform))
 					{
 						Platforms.Add(ParsedPlatform);
-						for(int InlineArgumentIdx = 1; InlineArgumentIdx < InlineArguments.Length; InlineArgumentIdx++)
+						for (int InlineArgumentIdx = 1; InlineArgumentIdx < InlineArguments.Length; InlineArgumentIdx++)
 						{
 							Platforms.Add(UnrealTargetPlatform.Parse(InlineArguments[InlineArgumentIdx]));
 						}
@@ -278,14 +274,13 @@ namespace UnrealBuildTool
 					}
 
 					// Try to parse them as configurations
-					UnrealTargetConfiguration ParsedConfiguration;
-					if(Enum.TryParse(InlineArguments[0], true, out ParsedConfiguration))
+					if (Enum.TryParse(InlineArguments[0], true, out UnrealTargetConfiguration ParsedConfiguration))
 					{
 						Configurations.Add(ParsedConfiguration);
-						for(int InlineArgumentIdx = 1; InlineArgumentIdx < InlineArguments.Length; InlineArgumentIdx++)
+						for (int InlineArgumentIdx = 1; InlineArgumentIdx < InlineArguments.Length; InlineArgumentIdx++)
 						{
 							string InlineArgument = InlineArguments[InlineArgumentIdx];
-							if(!Enum.TryParse(InlineArgument, true, out ParsedConfiguration))
+							if (!Enum.TryParse(InlineArgument, true, out ParsedConfiguration))
 							{
 								throw new BuildException("Invalid configuration '{0}'", InlineArgument);
 							}
@@ -359,8 +354,7 @@ namespace UnrealBuildTool
 						// Create all the target descriptors for targets specified by type
 						foreach(string TargetTypeString in Arguments.GetValues("-TargetType="))
 						{
-							TargetType TargetType;
-							if(!Enum.TryParse(TargetTypeString, out TargetType))
+							if (!Enum.TryParse(TargetTypeString, out TargetType TargetType))
 							{
 								throw new BuildException("Invalid target type '{0}'", TargetTypeString);
 							}
@@ -406,14 +400,13 @@ namespace UnrealBuildTool
 		/// <returns>True if the project file was parsed, false otherwise</returns>
 		public static bool TryParseProjectFileArgument(CommandLineArguments Arguments, [NotNullWhen(true)] out FileReference? ProjectFile)
 		{
-			FileReference? ExplicitProjectFile;
-			if(Arguments.TryGetValue("-Project=", out ExplicitProjectFile))
+			if (Arguments.TryGetValue("-Project=", out FileReference? ExplicitProjectFile))
 			{
 				ProjectFile = ExplicitProjectFile;
 				return true;
 			}
 
-			for(int Idx = 0; Idx < Arguments.Count; Idx++)
+			for (int Idx = 0; Idx < Arguments.Count; Idx++)
 			{
 				if(Arguments[Idx][0] != '-' && Arguments[Idx].EndsWith(".uproject", StringComparison.OrdinalIgnoreCase))
 				{
@@ -441,7 +434,7 @@ namespace UnrealBuildTool
 		{
 			StringBuilder Result = new StringBuilder();
 			Result.AppendFormat("{0} {1} {2}", Name, Platform, Configuration);
-			if(!String.IsNullOrEmpty(Architecture))
+			if(!string.IsNullOrEmpty(Architecture))
 			{
 				Result.AppendFormat(" -Architecture={0}", Architecture);
 			}
@@ -458,7 +451,7 @@ namespace UnrealBuildTool
 
 		public override int GetHashCode()
 		{
-			return String.GetHashCode(ProjectFile?.FullName) + 
+			return string.GetHashCode(ProjectFile?.FullName) + 
 				Name.GetHashCode() + 
 				Platform.GetHashCode() + 
 				Configuration.GetHashCode() + 

@@ -36,17 +36,17 @@ namespace EpicGames.Core
 		/// <summary>
 		/// Root node for the tree.
 		/// </summary>
-		FileFilterNode RootNode;
+		readonly FileFilterNode RootNode;
 
 		/// <summary>
 		/// The default node, which will match any path
 		/// </summary>
-		FileFilterNode DefaultNode;
+		readonly FileFilterNode DefaultNode;
 
 		/// <summary>
 		/// Terminating nodes for each rule added to the filter
 		/// </summary>
-		List<FileFilterNode> Rules = new List<FileFilterNode>();
+		readonly List<FileFilterNode> Rules = new List<FileFilterNode>();
 
 		/// <summary>
 		/// Default constructor
@@ -55,8 +55,10 @@ namespace EpicGames.Core
 		{
 			RootNode = new FileFilterNode(null, "");
 
-			DefaultNode = new FileFilterNode(RootNode, "...");
-			DefaultNode.Type = DefaultType;
+			DefaultNode = new FileFilterNode(RootNode, "...")
+			{
+				Type = DefaultType
+			};
 		}
 
 		/// <summary>
@@ -115,7 +117,7 @@ namespace EpicGames.Core
 				int ConditionEnd = CleanRule.IndexOf('}');
 				if(ConditionEnd == -1)
 				{
-					throw new Exception(String.Format("Missing closing parenthesis in rule: {0}", CleanRule));
+					throw new Exception(string.Format("Missing closing parenthesis in rule: {0}", CleanRule));
 				}
 
 				// Check there's a matching tag

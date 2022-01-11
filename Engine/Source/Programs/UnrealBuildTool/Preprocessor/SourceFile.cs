@@ -138,15 +138,13 @@ namespace UnrealBuildTool
 		/// <returns>Array of bytes, with a null terminator</returns>
 		public static byte[] ReadFileWithNullTerminator(FileReference Location)
 		{
-			using(FileStream Stream = FileReference.Open(Location, FileMode.Open, FileAccess.Read, FileShare.Read))
-			{
-				int Length = (int)Stream.Length;
+			using FileStream Stream = FileReference.Open(Location, FileMode.Open, FileAccess.Read, FileShare.Read);
+			int Length = (int)Stream.Length;
 
-				byte[] Data = new byte[Length + 1];
-				Stream.Read(Data, 0, Length);
+			byte[] Data = new byte[Length + 1];
+			Stream.Read(Data, 0, Length);
 
-				return ConvertToNullTerminatedUtf8(Data, Length);
-			}
+			return ConvertToNullTerminatedUtf8(Data, Length);
 		}
 
 		/// <summary>

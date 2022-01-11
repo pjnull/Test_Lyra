@@ -21,7 +21,7 @@ namespace EpicGames.Core
 		/// <param name="Format">Format string</param>
 		/// <param name="Args">Optional arguments</param>
 		public JsonParseException(string Format, params object[] Args)
-			: base(String.Format(Format, Args))
+			: base(string.Format(Format, Args))
 		{
 		}
 	}
@@ -31,7 +31,7 @@ namespace EpicGames.Core
 	/// </summary>
 	public class JsonObject
 	{
-		Dictionary<string, object?> RawObject;
+		readonly Dictionary<string, object?> RawObject;
 
 		/// <summary>
 		/// Construct a JSON object from the raw string -> object dictionary
@@ -165,8 +165,7 @@ namespace EpicGames.Core
 		/// <returns>The field value</returns>
 		public string GetStringField(string FieldName)
 		{
-			string? StringValue;
-			if (!TryGetStringField(FieldName, out StringValue))
+			if (!TryGetStringField(FieldName, out string? StringValue))
 			{
 				throw new JsonParseException("Missing or invalid '{0}' field", FieldName);
 			}
@@ -181,8 +180,7 @@ namespace EpicGames.Core
 		/// <returns>True if the field could be read, false otherwise</returns>
 		public bool TryGetStringField(string FieldName, [NotNullWhen(true)] out string? Result)
 		{
-			object? RawValue;
-			if (RawObject.TryGetValue(FieldName, out RawValue) && (RawValue is string))
+			if (RawObject.TryGetValue(FieldName, out object? RawValue) && (RawValue is string))
 			{
 				Result = (string)RawValue;
 				return true;
@@ -201,8 +199,7 @@ namespace EpicGames.Core
 		/// <returns>The field value</returns>
 		public string[] GetStringArrayField(string FieldName)
 		{
-			string[]? StringValues;
-			if (!TryGetStringArrayField(FieldName, out StringValues))
+			if (!TryGetStringArrayField(FieldName, out string[]? StringValues))
 			{
 				throw new JsonParseException("Missing or invalid '{0}' field", FieldName);
 			}
@@ -217,8 +214,7 @@ namespace EpicGames.Core
 		/// <returns>True if the field could be read, false otherwise</returns>
 		public bool TryGetStringArrayField(string FieldName, [NotNullWhen(true)] out string[]? Result)
 		{
-			object? RawValue;
-			if (RawObject.TryGetValue(FieldName, out RawValue) && (RawValue is IEnumerable<object>) && ((IEnumerable<object>)RawValue).All(x => x is string))
+			if (RawObject.TryGetValue(FieldName, out object? RawValue) && (RawValue is IEnumerable<object>) && ((IEnumerable<object>)RawValue).All(x => x is string))
 			{
 				Result = ((IEnumerable<object>)RawValue).Select(x => (string)x).ToArray();
 				return true;
@@ -237,8 +233,7 @@ namespace EpicGames.Core
 		/// <returns>The field value</returns>
 		public bool GetBoolField(string FieldName)
 		{
-			bool BoolValue;
-			if (!TryGetBoolField(FieldName, out BoolValue))
+			if (!TryGetBoolField(FieldName, out bool BoolValue))
 			{
 				throw new JsonParseException("Missing or invalid '{0}' field", FieldName);
 			}
@@ -253,8 +248,7 @@ namespace EpicGames.Core
 		/// <returns>True if the field could be read, false otherwise</returns>
 		public bool TryGetBoolField(string FieldName, out bool Result)
 		{
-			object? RawValue;
-			if (RawObject.TryGetValue(FieldName, out RawValue) && (RawValue is Boolean))
+			if (RawObject.TryGetValue(FieldName, out object? RawValue) && (RawValue is bool))
 			{
 				Result = (bool)RawValue;
 				return true;
@@ -273,8 +267,7 @@ namespace EpicGames.Core
 		/// <returns>The field value</returns>
 		public int GetIntegerField(string FieldName)
 		{
-			int IntegerValue;
-			if (!TryGetIntegerField(FieldName, out IntegerValue))
+			if (!TryGetIntegerField(FieldName, out int IntegerValue))
 			{
 				throw new JsonParseException("Missing or invalid '{0}' field", FieldName);
 			}
@@ -289,8 +282,7 @@ namespace EpicGames.Core
 		/// <returns>True if the field could be read, false otherwise</returns>
 		public bool TryGetIntegerField(string FieldName, out int Result)
 		{
-			object? RawValue;
-			if (!RawObject.TryGetValue(FieldName, out RawValue) || !int.TryParse(RawValue?.ToString(), out Result))
+			if (!RawObject.TryGetValue(FieldName, out object? RawValue) || !int.TryParse(RawValue?.ToString(), out Result))
 			{
 				Result = 0;
 				return false;
@@ -306,8 +298,7 @@ namespace EpicGames.Core
 		/// <returns>True if the field could be read, false otherwise</returns>
 		public bool TryGetUnsignedIntegerField(string FieldName, out uint Result)
 		{
-			object? RawValue;
-			if (!RawObject.TryGetValue(FieldName, out RawValue) || !uint.TryParse(RawValue?.ToString(), out Result))
+			if (!RawObject.TryGetValue(FieldName, out object? RawValue) || !uint.TryParse(RawValue?.ToString(), out Result))
 			{
 				Result = 0;
 				return false;
@@ -322,8 +313,7 @@ namespace EpicGames.Core
 		/// <returns>The field value</returns>
 		public double GetDoubleField(string FieldName)
 		{
-			double DoubleValue;
-			if (!TryGetDoubleField(FieldName, out DoubleValue))
+			if (!TryGetDoubleField(FieldName, out double DoubleValue))
 			{
 				throw new JsonParseException("Missing or invalid '{0}' field", FieldName);
 			}
@@ -338,8 +328,7 @@ namespace EpicGames.Core
 		/// <returns>True if the field could be read, false otherwise</returns>
 		public bool TryGetDoubleField(string FieldName, out double Result)
 		{
-			object? RawValue;
-			if (!RawObject.TryGetValue(FieldName, out RawValue) || !double.TryParse(RawValue?.ToString(), out Result))
+			if (!RawObject.TryGetValue(FieldName, out object? RawValue) || !double.TryParse(RawValue?.ToString(), out Result))
 			{
 				Result = 0.0;
 				return false;
@@ -354,8 +343,7 @@ namespace EpicGames.Core
 		/// <returns>The field value</returns>
 		public T GetEnumField<T>(string FieldName) where T : struct
 		{
-			T EnumValue;
-			if (!TryGetEnumField(FieldName, out EnumValue))
+			if (!TryGetEnumField(FieldName, out T EnumValue))
 			{
 				throw new JsonParseException("Missing or invalid '{0}' field", FieldName);
 			}
@@ -370,10 +358,9 @@ namespace EpicGames.Core
 		/// <returns>True if the field could be read, false otherwise</returns>
 		public bool TryGetEnumField<T>(string FieldName, out T Result) where T : struct
 		{
-			string? StringValue;
-			if (!TryGetStringField(FieldName, out StringValue) || !Enum.TryParse<T>(StringValue, true, out Result))
+			if (!TryGetStringField(FieldName, out string? StringValue) || !Enum.TryParse<T>(StringValue, true, out Result))
 			{
-				Result = default(T);
+				Result = default;
 				return false;
 			}
 			return true;
@@ -387,8 +374,7 @@ namespace EpicGames.Core
 		/// <returns>True if the field could be read, false otherwise</returns>
 		public bool TryGetEnumArrayField<T>(string FieldName, [NotNullWhen(true)] out T[]? Result) where T : struct
 		{
-			string[]? StringValues;
-			if (!TryGetStringArrayField(FieldName, out StringValues))
+			if (!TryGetStringArrayField(FieldName, out string[]? StringValues))
 			{
 				Result = null;
 				return false;
@@ -415,8 +401,7 @@ namespace EpicGames.Core
 		/// <returns>The field value</returns>
 		public JsonObject GetObjectField(string FieldName)
 		{
-			JsonObject? Result;
-			if (!TryGetObjectField(FieldName, out Result))
+			if (!TryGetObjectField(FieldName, out JsonObject? Result))
 			{
 				throw new JsonParseException("Missing or invalid '{0}' field", FieldName);
 			}
@@ -431,8 +416,7 @@ namespace EpicGames.Core
 		/// <returns>True if the field could be read, false otherwise</returns>
 		public bool TryGetObjectField(string FieldName, [NotNullWhen(true)] out JsonObject? Result)
 		{
-			object? RawValue;
-			if (RawObject.TryGetValue(FieldName, out RawValue) && (RawValue is Dictionary<string, object?>))
+			if (RawObject.TryGetValue(FieldName, out object? RawValue) && (RawValue is Dictionary<string, object?>))
 			{
 				Result = new JsonObject((Dictionary<string, object?>)RawValue);
 				return true;
@@ -451,8 +435,7 @@ namespace EpicGames.Core
 		/// <returns>The field value</returns>
 		public JsonObject[] GetObjectArrayField(string FieldName)
 		{
-			JsonObject[]? Result;
-			if (!TryGetObjectArrayField(FieldName, out Result))
+			if (!TryGetObjectArrayField(FieldName, out JsonObject[]? Result))
 			{
 				throw new JsonParseException("Missing or invalid '{0}' field", FieldName);
 			}
@@ -467,8 +450,7 @@ namespace EpicGames.Core
 		/// <returns>True if the field could be read, false otherwise</returns>
 		public bool TryGetObjectArrayField(string FieldName, [NotNullWhen(true)] out JsonObject[]? Result)
 		{
-			object? RawValue;
-			if (RawObject.TryGetValue(FieldName, out RawValue) && (RawValue is IEnumerable<object>) && ((IEnumerable<object>)RawValue).All(x => x is Dictionary<string, object>))
+			if (RawObject.TryGetValue(FieldName, out object? RawValue) && (RawValue is IEnumerable<object>) && ((IEnumerable<object>)RawValue).All(x => x is Dictionary<string, object>))
 			{
 				Result = ((IEnumerable<object>)RawValue).Select(x => new JsonObject((Dictionary<string, object?>)x)).ToArray();
 				return true;

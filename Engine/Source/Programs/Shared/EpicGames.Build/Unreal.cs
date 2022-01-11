@@ -30,13 +30,13 @@ namespace UnrealBuildBase
 			// Search up through the directory tree for the deepest instance of the sub-path "Engine/Binaries/DotNET"
 			while(FoundRootDirectory != null)
 			{
-				if (String.Equals("DotNET", FoundRootDirectory.GetDirectoryName()))
+				if (string.Equals("DotNET", FoundRootDirectory.GetDirectoryName()))
 				{
 					FoundRootDirectory = FoundRootDirectory.ParentDirectory;
-					if (FoundRootDirectory != null && String.Equals("Binaries", FoundRootDirectory.GetDirectoryName()))
+					if (FoundRootDirectory != null && string.Equals("Binaries", FoundRootDirectory.GetDirectoryName()))
 					{
 						FoundRootDirectory = FoundRootDirectory.ParentDirectory;
-						if (FoundRootDirectory != null && String.Equals("Engine", FoundRootDirectory.GetDirectoryName()))
+						if (FoundRootDirectory != null && string.Equals("Engine", FoundRootDirectory.GetDirectoryName()))
 						{
 							FoundRootDirectory = FoundRootDirectory.ParentDirectory;
 							break;
@@ -194,7 +194,7 @@ namespace UnrealBuildBase
 		}
 
 		// cached dictionary of BaseDir to extension directories
-		private static Dictionary<DirectoryReference, Tuple<List<DirectoryReference>, List<DirectoryReference>>> CachedExtensionDirectories = new Dictionary<DirectoryReference, Tuple<List<DirectoryReference>, List<DirectoryReference>>>();
+		private static readonly Dictionary<DirectoryReference, Tuple<List<DirectoryReference>, List<DirectoryReference>>> CachedExtensionDirectories = new Dictionary<DirectoryReference, Tuple<List<DirectoryReference>, List<DirectoryReference>>>();
 
 		/// <summary>
 		/// Finds all the extension directories for the given base directory. This includes platform extensions and restricted folders.
@@ -206,8 +206,7 @@ namespace UnrealBuildBase
 		/// <returns>List of extension directories, including the given base directory</returns>
 		public static List<DirectoryReference> GetExtensionDirs(DirectoryReference BaseDir, bool bIncludePlatformDirectories=true, bool bIncludeRestrictedDirectories=true, bool bIncludeBaseDirectory=true)
 		{
-			Tuple<List<DirectoryReference>, List<DirectoryReference>>? CachedDirs;
-			if (!CachedExtensionDirectories.TryGetValue(BaseDir, out CachedDirs))
+			if (!CachedExtensionDirectories.TryGetValue(BaseDir, out Tuple<List<DirectoryReference>, List<DirectoryReference>>? CachedDirs))
 			{
 				CachedDirs = Tuple.Create(new List<DirectoryReference>(), new List<DirectoryReference>());
 

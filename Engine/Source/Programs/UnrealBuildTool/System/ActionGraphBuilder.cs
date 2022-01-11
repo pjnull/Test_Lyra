@@ -138,7 +138,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// The inner graph builder
 		/// </summary>
-		IActionGraphBuilder Inner;
+		readonly IActionGraphBuilder Inner;
 
 		/// <summary>
 		/// Constructor
@@ -236,11 +236,11 @@ namespace UnrealBuildTool
 			CopyAction.CommandPath = BuildHostPlatform.Current.Shell;
 			if (BuildHostPlatform.Current.ShellType == ShellType.Cmd)
 			{
-				CopyAction.CommandArguments = String.Format("/C \"copy /Y \"{0}\" \"{1}\" 1>nul\"", SourceFile.AbsolutePath, TargetFile.AbsolutePath);
+				CopyAction.CommandArguments = string.Format("/C \"copy /Y \"{0}\" \"{1}\" 1>nul\"", SourceFile.AbsolutePath, TargetFile.AbsolutePath);
 			}
 			else
 			{
-				CopyAction.CommandArguments = String.Format("-c 'cp -f \"\"{0}\"\" \"\"{1}\"'", SourceFile.AbsolutePath, TargetFile.AbsolutePath);
+				CopyAction.CommandArguments = string.Format("-c 'cp -f \"\"{0}\"\" \"\"{1}\"'", SourceFile.AbsolutePath, TargetFile.AbsolutePath);
 			}
 			CopyAction.WorkingDirectory = UnrealBuildTool.EngineSourceDirectory;
 			CopyAction.PrerequisiteItems.Add(SourceFile);
@@ -285,7 +285,7 @@ namespace UnrealBuildTool
 
 			Action NewAction = Graph.CreateAction(Type);
 			NewAction.CommandPath = UnrealBuildTool.GetUBTPath();
-			NewAction.CommandArguments = String.Format("-Mode={0} {1}", Attribute.Name, Arguments);
+			NewAction.CommandArguments = string.Format("-Mode={0} {1}", Attribute.Name, Arguments);
 			return NewAction;
 		}
 

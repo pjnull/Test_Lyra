@@ -12,7 +12,7 @@ namespace UnrealBuildTool
 	public class UniqueStringRegistry
 	{
 		// protect the InstanceMap
-		private object LockObject = new object();
+		private readonly object LockObject = new object();
 
 		// holds a mapping of string name to single instance
 		private Dictionary<string, int> StringToInstanceMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -108,8 +108,7 @@ namespace UnrealBuildTool
 		/// <returns>Instance id of alias</returns>
 		public int FindExistingAlias(string Alias)
 		{
-			string? Name;
-			if (!AliasToStringMap.TryGetValue(Alias, out Name) || Name == null)
+			if (!AliasToStringMap.TryGetValue(Alias, out string? Name) || Name == null)
 			{
 				throw new BuildException($"Alias {Alias} not found");
 			}
@@ -123,16 +122,17 @@ namespace UnrealBuildTool
 		/// <returns>Instance id of alias</returns>
 		public int FindOrAddAlias(string Alias, string OriginalName)
 		{
-			string? Name;
-			if (!AliasToStringMap.TryGetValue(Alias, out Name))
+			if (!AliasToStringMap.TryGetValue(Alias, out string? Name))
 			{
 				lock (LockObject)
 				{
 					// copy over the dictionary and add, so that other threads can keep reading out of the old one until it's time
-					Dictionary<string, string> NewAliasToStringMap = new Dictionary<string, string>(AliasToStringMap, StringComparer.OrdinalIgnoreCase);
+					Dictionary<string, string> NewAliasToStringMap = new Dictionary<string, string>(AliasToStringMap, StringComparer.OrdinalIgnoreCase)
+					{
 
-					// add a new alias
-					NewAliasToStringMap[Alias] = OriginalName;
+						// add a new alias
+						[Alias] = OriginalName
+					};
 
 					// replace the instance map
 					AliasToStringMap = NewAliasToStringMap;

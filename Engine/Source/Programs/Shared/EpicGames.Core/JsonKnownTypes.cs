@@ -66,12 +66,12 @@ namespace EpicGames.Core
 		/// <summary>
 		/// Mapping from discriminator to class type
 		/// </summary>
-		Dictionary<string, Type> DiscriminatorToType;
+		readonly Dictionary<string, Type> DiscriminatorToType;
 
 		/// <summary>
 		/// Mapping from class type to discriminator
 		/// </summary>
-		Dictionary<Type, JsonEncodedText> TypeToDiscriminator;
+		readonly Dictionary<Type, JsonEncodedText> TypeToDiscriminator;
 
 		/// <summary>
 		/// Constructor
@@ -114,24 +114,20 @@ namespace EpicGames.Core
 		/// <returns>Instance of the serialized object</returns>
 		public override T Read(ref Utf8JsonReader Reader, Type TypeToConvert, JsonSerializerOptions Options)
 		{
-			using (JsonDocument Document = JsonDocument.ParseValue(ref Reader))
+			using JsonDocument Document = JsonDocument.ParseValue(ref Reader);
+			if (!TryGetPropertyRespectingCase(Document.RootElement, TypePropertyName, Options, out JsonElement Element))
 			{
-				JsonElement Element;
-				if (!TryGetPropertyRespectingCase(Document.RootElement, TypePropertyName, Options, out Element))
-				{
-					throw new JsonException($"Missing '{TypePropertyName}' field for serializing {TypeToConvert.Name}");
-				}
-
-				Type? TargetType;
-				if (!DiscriminatorToType.TryGetValue(Element.GetString(), out TargetType))
-				{
-					throw new JsonException($"Invalid '{TypePropertyName}' field ('{Element.GetString()}') for serializing {TypeToConvert.Name}");
-				}
-
-				string Text = Document.RootElement.GetRawText();
-				T Result = (T)JsonSerializer.Deserialize(Text, TargetType, Options);
-				return Result;
+				throw new JsonException($"Missing '{TypePropertyName}' field for serializing {TypeToConvert.Name}");
 			}
+
+			if (!DiscriminatorToType.TryGetValue(Element.GetString(), out Type? TargetType))
+			{
+				throw new JsonException($"Invalid '{TypePropertyName}' field ('{Element.GetString()}') for serializing {TypeToConvert.Name}");
+			}
+
+			string Text = Document.RootElement.GetRawText();
+			T Result = (T)JsonSerializer.Deserialize(Text, TargetType, Options);
+			return Result;
 		}
 
 		/// <summary>
@@ -144,8 +140,7 @@ namespace EpicGames.Core
 		/// <returns>True if the property was found, false otherwise</returns>
 		static bool TryGetPropertyRespectingCase(JsonElement Object, string PropertyName, JsonSerializerOptions Options, out JsonElement OutElement)
 		{
-			JsonElement NewElement;
-			if (Object.TryGetProperty(PropertyName, out NewElement))
+			if (Object.TryGetProperty(PropertyName, out JsonElement NewElement))
 			{
 				OutElement = NewElement;
 				return true;
@@ -155,7 +150,7 @@ namespace EpicGames.Core
 			{
 				foreach (JsonProperty Property in Object.EnumerateObject())
 				{
-					if (String.Equals(Property.Name, PropertyName, StringComparison.OrdinalIgnoreCase))
+					if (string.Equals(Property.Name, PropertyName, StringComparison.OrdinalIgnoreCase))
 					{
 						OutElement = Property.Value;
 						return true;

@@ -82,32 +82,32 @@ namespace EpicGames.Core
 		/// <summary>
 		/// The raw array of arguments
 		/// </summary>
-		string[] Arguments;
+		readonly string[] Arguments;
 
 		/// <summary>
 		/// Bitmask indicating which arguments are flags rather than values
 		/// </summary>
-		BitArray FlagArguments;
+		readonly BitArray FlagArguments;
 
 		/// <summary>
 		/// Bitmask indicating which arguments have been used, via calls to GetOption(), GetValues() etc...
 		/// </summary>
-		BitArray UsedArguments;
+		readonly BitArray UsedArguments;
 
 		/// <summary>
 		/// Dictionary of argument names (or prefixes, in the case of "-Foo=" style arguments) to their index into the arguments array.
 		/// </summary>
-		Dictionary<string, int> ArgumentToFirstIndex;
+		readonly Dictionary<string, int> ArgumentToFirstIndex;
 
 		/// <summary>
 		/// For each argument which is seen more than once, keeps a list of indices for the second and subsequent arguments.
 		/// </summary>
-		int[] NextArgumentIndex;
+		readonly int[] NextArgumentIndex;
 
 		/// <summary>
 		/// List of positional arguments
 		/// </summary>
-		List<int> PositionalArgumentIndices = new List<int>();
+		readonly List<int> PositionalArgumentIndices = new List<int>();
 
 		/// <summary>
 		/// Array of characters that separate argument names from values
@@ -173,8 +173,7 @@ namespace EpicGames.Core
 						string Prefix = Arguments[Idx].Substring(0, SeparatorIdx + 1);
 
 						// Add the prefix to the argument lookup, or update the appropriate matching argument list if it's been seen before
-						int ExistingArgumentIndex;
-						if (ArgumentToFirstIndex.TryGetValue(Prefix, out ExistingArgumentIndex))
+						if (ArgumentToFirstIndex.TryGetValue(Prefix, out int ExistingArgumentIndex))
 						{
 							NextArgumentIndex[LastArgumentIndex[ExistingArgumentIndex]] = Idx;
 							LastArgumentIndex[ExistingArgumentIndex] = Idx;
@@ -247,8 +246,7 @@ namespace EpicGames.Core
 		/// <returns>True if the option was found, false otherwise.</returns>
 		public bool HasOption(string Option)
 		{
-			int Index;
-			if(ArgumentToFirstIndex.TryGetValue(Option, out Index))
+			if (ArgumentToFirstIndex.TryGetValue(Option, out int Index))
 			{
 				UsedArguments.Set(Index, true);
 				return true;
@@ -331,10 +329,9 @@ namespace EpicGames.Core
 		/// <returns>Value of the argument</returns>
 		public string GetString(string Prefix)
 		{
-			string? Value;
-			if(!TryGetValue(Prefix, out Value))
+			if (!TryGetValue(Prefix, out string? Value))
 			{
-				throw new CommandLineArgumentException(String.Format("Missing '{0}...' argument", Prefix));
+				throw new CommandLineArgumentException(string.Format("Missing '{0}...' argument", Prefix));
 			}
 			return Value;
 		}
@@ -346,10 +343,9 @@ namespace EpicGames.Core
 		/// <returns>Value of the argument</returns>
 		public int GetInteger(string Prefix)
 		{
-			int Value;
-			if(!TryGetValue(Prefix, out Value))
+			if (!TryGetValue(Prefix, out int Value))
 			{
-				throw new CommandLineArgumentException(String.Format("Missing '{0}...' argument", Prefix));
+				throw new CommandLineArgumentException(string.Format("Missing '{0}...' argument", Prefix));
 			}
 			return Value;
 		}
@@ -361,10 +357,9 @@ namespace EpicGames.Core
 		/// <returns>Value of the argument</returns>
 		public FileReference GetFileReference(string Prefix)
 		{
-			FileReference? Value;
-			if(!TryGetValue(Prefix, out Value))
+			if (!TryGetValue(Prefix, out FileReference? Value))
 			{
-				throw new CommandLineArgumentException(String.Format("Missing '{0}...' argument", Prefix));
+				throw new CommandLineArgumentException(string.Format("Missing '{0}...' argument", Prefix));
 			}
 			return Value;
 		}
@@ -376,10 +371,9 @@ namespace EpicGames.Core
 		/// <returns>Value of the argument</returns>
 		public DirectoryReference GetDirectoryReference(string Prefix)
 		{
-			DirectoryReference? Value;
-			if(!TryGetValue(Prefix, out Value))
+			if (!TryGetValue(Prefix, out DirectoryReference? Value))
 			{
-				throw new CommandLineArgumentException(String.Format("Missing '{0}...' argument", Prefix));
+				throw new CommandLineArgumentException(string.Format("Missing '{0}...' argument", Prefix));
 			}
 			return Value;
 		}
@@ -391,10 +385,9 @@ namespace EpicGames.Core
 		/// <returns>Value of the argument</returns>
 		public T GetEnum<T>(string Prefix) where T : struct
 		{
-			T Value;
-			if(!TryGetValue(Prefix, out Value))
+			if (!TryGetValue(Prefix, out T Value))
 			{
-				throw new CommandLineArgumentException(String.Format("Missing '{0}...' argument", Prefix));
+				throw new CommandLineArgumentException(string.Format("Missing '{0}...' argument", Prefix));
 			}
 			return Value;
 		}
@@ -408,8 +401,7 @@ namespace EpicGames.Core
 		[return: NotNullIfNotNull("DefaultValue")]
 		public string? GetStringOrDefault(string Prefix, string? DefaultValue)
 		{
-			string? Value;
-			if(!TryGetValue(Prefix, out Value))
+			if (!TryGetValue(Prefix, out string? Value))
 			{
 				Value = DefaultValue;
 			}
@@ -424,8 +416,7 @@ namespace EpicGames.Core
 		/// <returns>Value of the argument</returns>
 		public int GetIntegerOrDefault(string Prefix, int DefaultValue)
 		{
-			int Value;
-			if(!TryGetValue(Prefix, out Value))
+			if (!TryGetValue(Prefix, out int Value))
 			{
 				Value = DefaultValue;
 			}
@@ -441,8 +432,7 @@ namespace EpicGames.Core
 		[return: NotNullIfNotNull("DefaultValue")]
 		public FileReference? GetFileReferenceOrDefault(string Prefix, FileReference? DefaultValue)
 		{
-			FileReference? Value;
-			if(!TryGetValue(Prefix, out Value))
+			if (!TryGetValue(Prefix, out FileReference? Value))
 			{
 				Value = DefaultValue;
 			}
@@ -458,8 +448,7 @@ namespace EpicGames.Core
 		[return: NotNullIfNotNull("DefaultValue")]
 		public DirectoryReference? GetDirectoryReferenceOrDefault(string Prefix, DirectoryReference? DefaultValue)
 		{
-			DirectoryReference? Value;
-			if(!TryGetValue(Prefix, out Value))
+			if (!TryGetValue(Prefix, out DirectoryReference? Value))
 			{
 				Value = DefaultValue;
 			}
@@ -474,8 +463,7 @@ namespace EpicGames.Core
 		/// <returns>Value of the argument</returns>
 		public T GetEnumOrDefault<T>(string Prefix, T DefaultValue) where T : struct
 		{
-			T Value;
-			if(!TryGetValue(Prefix, out Value))
+			if (!TryGetValue(Prefix, out T Value))
 			{
 				Value = DefaultValue;
 			}
@@ -492,16 +480,15 @@ namespace EpicGames.Core
 		{
 			CheckValidPrefix(Prefix);
 
-			int Index;
-			if(!ArgumentToFirstIndex.TryGetValue(Prefix, out Index))
+			if (!ArgumentToFirstIndex.TryGetValue(Prefix, out int Index))
 			{
 				Value = null;
 				return false;
 			}
 
-			if(NextArgumentIndex[Index] != -1)
+			if (NextArgumentIndex[Index] != -1)
 			{
-				throw new CommandLineArgumentException(String.Format("Multiple {0}... arguments are specified", Prefix));
+				throw new CommandLineArgumentException(string.Format("Multiple {0}... arguments are specified", Prefix));
 			}
 
 			UsedArguments.Set(Index, true);
@@ -518,8 +505,7 @@ namespace EpicGames.Core
 		public bool TryGetValue(string Prefix, out int Value)
 		{
 			// Try to get the string value of this argument
-			string? StringValue;
-			if(!TryGetValue(Prefix, out StringValue))
+			if (!TryGetValue(Prefix, out string? StringValue))
 			{
 				Value = 0;
 				return false;
@@ -533,7 +519,7 @@ namespace EpicGames.Core
 			}
 			catch(Exception Ex)
 			{
-				throw new CommandLineArgumentException(String.Format("The argument '{0}{1}' does not specify a valid integer", Prefix, StringValue), Ex);
+				throw new CommandLineArgumentException(string.Format("The argument '{0}{1}' does not specify a valid integer", Prefix, StringValue), Ex);
 			}
 		}
 
@@ -546,8 +532,7 @@ namespace EpicGames.Core
 		public bool TryGetValue(string Prefix, [NotNullWhen(true)] out FileReference? Value)
 		{
 			// Try to get the string value of this argument
-			string? StringValue;
-			if(!TryGetValue(Prefix, out StringValue))
+			if (!TryGetValue(Prefix, out string? StringValue))
 			{
 				Value = null;
 				return false;
@@ -561,7 +546,7 @@ namespace EpicGames.Core
 			}
 			catch(Exception Ex)
 			{
-				throw new CommandLineArgumentException(String.Format("The argument '{0}{1}' does not specify a valid file name", Prefix, StringValue), Ex);
+				throw new CommandLineArgumentException(string.Format("The argument '{0}{1}' does not specify a valid file name", Prefix, StringValue), Ex);
 			}
 		}
 
@@ -574,8 +559,7 @@ namespace EpicGames.Core
 		public bool TryGetValue(string Prefix, [NotNullWhen(true)] out DirectoryReference? Value)
 		{
 			// Try to get the string value of this argument
-			string? StringValue;
-			if(!TryGetValue(Prefix, out StringValue))
+			if (!TryGetValue(Prefix, out string? StringValue))
 			{
 				Value = null;
 				return false;
@@ -589,7 +573,7 @@ namespace EpicGames.Core
 			}
 			catch(Exception Ex)
 			{
-				throw new CommandLineArgumentException(String.Format("The argument '{0}{1}' does not specify a valid directory name", Prefix, StringValue), Ex);
+				throw new CommandLineArgumentException(string.Format("The argument '{0}{1}' does not specify a valid directory name", Prefix, StringValue), Ex);
 			}
 		}
 
@@ -602,8 +586,7 @@ namespace EpicGames.Core
 		public bool TryGetValue<T>(string Prefix, out T Value) where T : struct
 		{
 			// Try to get the string value of this argument
-			string? StringValue;
-			if(!TryGetValue(Prefix, out StringValue))
+			if (!TryGetValue(Prefix, out string? StringValue))
 			{
 				Value = new T();
 				return false;
@@ -617,7 +600,7 @@ namespace EpicGames.Core
 			}
 			catch(Exception Ex)
 			{
-				throw new CommandLineArgumentException(String.Format("The argument '{0}{1}' does not specify a valid {2}", Prefix, StringValue, typeof(T).Name), Ex);
+				throw new CommandLineArgumentException(string.Format("The argument '{0}{1}' does not specify a valid {2}", Prefix, StringValue, typeof(T).Name), Ex);
 			}
 		}
 
@@ -630,10 +613,9 @@ namespace EpicGames.Core
 		{
 			CheckValidPrefix(Prefix);
 
-			int Index;
-			if(ArgumentToFirstIndex.TryGetValue(Prefix, out Index))
+			if (ArgumentToFirstIndex.TryGetValue(Prefix, out int Index))
 			{
-				for(; Index != -1; Index = NextArgumentIndex[Index])
+				for (; Index != -1; Index = NextArgumentIndex[Index])
 				{
 					UsedArguments.Set(Index, true);
 					yield return Arguments[Index].Substring(Prefix.Length);
@@ -678,18 +660,18 @@ namespace EpicGames.Core
 			{
 				if (ValueType == typeof(bool))
 				{
-					Prefix = String.Format("-{0}", FieldInfo.Name);
+					Prefix = string.Format("-{0}", FieldInfo.Name);
 				}
 				else
 				{
-					Prefix = String.Format("-{0}=", FieldInfo.Name);
+					Prefix = string.Format("-{0}=", FieldInfo.Name);
 				}
 			}
 			else
 			{
 				if (ValueType != typeof(bool) && Attribute.Value == null && !Prefix.EndsWith("=") && !Prefix.EndsWith(":"))
 				{
-					Prefix = Prefix + "=";
+					Prefix += "=";
 				}
 			}
 			return Prefix;
@@ -732,21 +714,20 @@ namespace EpicGames.Core
 						string Prefix = GetArgumentPrefix(FieldInfo, Attribute);
 
 						// Get the value with the correct prefix
-						int FirstIndex;
-						if(ArgumentToFirstIndex.TryGetValue(Prefix, out FirstIndex))
+						if (ArgumentToFirstIndex.TryGetValue(Prefix, out int FirstIndex))
 						{
-							for(int Index = FirstIndex; Index != -1; Index = NextArgumentIndex[Index])
+							for (int Index = FirstIndex; Index != -1; Index = NextArgumentIndex[Index])
 							{
 								// Get the argument text
 								string Argument = Arguments[Index];
 
 								// Get the text for this value
 								string ValueText;
-								if(Attribute.Value != null)
+								if (Attribute.Value != null)
 								{
 									ValueText = Attribute.Value;
 								}
-								else if(FlagArguments.Get(Index))
+								else if (FlagArguments.Get(Index))
 								{
 									ValueText = "true";
 								}
@@ -756,18 +737,18 @@ namespace EpicGames.Core
 								}
 
 								// Apply the value to the field
-								if(Attribute.ListSeparator == 0)
+								if (Attribute.ListSeparator == 0)
 								{
-									if(ApplyArgument(TargetObject, FieldInfo, Argument, ValueText, AssignedArgument, Logger))
+									if (ApplyArgument(TargetObject, FieldInfo, Argument, ValueText, AssignedArgument, Logger))
 									{
 										AssignedArgument = Argument;
 									}
 								}
 								else
 								{
-									foreach(string ItemValueText in ValueText.Split(Attribute.ListSeparator))
+									foreach (string ItemValueText in ValueText.Split(Attribute.ListSeparator))
 									{
-										if(ApplyArgument(TargetObject, FieldInfo, Argument, ItemValueText, AssignedArgument, Logger))
+										if (ApplyArgument(TargetObject, FieldInfo, Argument, ItemValueText, AssignedArgument, Logger))
 										{
 											AssignedArgument = Argument;
 										}
@@ -780,7 +761,7 @@ namespace EpicGames.Core
 						}
 
 						// If this attribute is marked as required, keep track of it so we can warn if the field is not assigned to
-						if(Attribute.Required && RequiredPrefix == null)
+						if (Attribute.Required && RequiredPrefix == null)
 						{
 							RequiredPrefix = Prefix;
 						}
@@ -799,11 +780,11 @@ namespace EpicGames.Core
 			{
 				if(MissingArguments.Count == 1)
 				{
-					throw new CommandLineArgumentException(String.Format("Missing {0} argument", MissingArguments[0].Replace("=", "=...")));
+					throw new CommandLineArgumentException(string.Format("Missing {0} argument", MissingArguments[0].Replace("=", "=...")));
 				}
 				else
 				{
-					throw new CommandLineArgumentException(String.Format("Missing {0} arguments", StringUtils.FormatList(MissingArguments.Select(x => x.Replace("=", "=...")))));
+					throw new CommandLineArgumentException(string.Format("Missing {0} arguments", StringUtils.FormatList(MissingArguments.Select(x => x.Replace("=", "=...")))));
 				}
 			}
 		}
@@ -886,7 +867,7 @@ namespace EpicGames.Core
 				{
 					if (Argument[Idx] == '=')
 					{
-						return String.Format("{0}=\"{1}\"", Argument.Substring(0, Idx), Argument.Substring(Idx + 1).Replace("\"", "\\\""));
+						return string.Format("{0}=\"{1}\"", Argument.Substring(0, Idx), Argument.Substring(Idx + 1).Replace("\"", "\\\""));
 					}
 				}
 			}
@@ -926,7 +907,7 @@ namespace EpicGames.Core
 			List<string> Arguments = new List<string>();
 			for(int Idx = 0; Idx < CommandLine.Length; Idx++)
 			{
-				if(!Char.IsWhiteSpace(CommandLine[Idx]))
+				if(!char.IsWhiteSpace(CommandLine[Idx]))
 				{
 					Argument.Clear();
 					for(bool bInQuotes = false; Idx < CommandLine.Length; Idx++)
@@ -935,7 +916,7 @@ namespace EpicGames.Core
 						{
 							bInQuotes ^= true;
 						}
-						else if(!bInQuotes && Char.IsWhiteSpace(CommandLine[Idx]))
+						else if(!bInQuotes && char.IsWhiteSpace(CommandLine[Idx]))
 						{
 							break;
 						}
@@ -1036,11 +1017,11 @@ namespace EpicGames.Core
 			{
 				if(RemainingArguments.Count == 1)
 				{
-					Logger.LogWarning(String.Format("Invalid argument: {0}", RemainingArguments[0]));
+					Logger.LogWarning(string.Format("Invalid argument: {0}", RemainingArguments[0]));
 				}
 				else
 				{
-					Logger.LogWarning(String.Format("Invalid arguments:\n{0}", String.Join("\n", RemainingArguments)));
+					Logger.LogWarning(string.Format("Invalid arguments:\n{0}", string.Join("\n", RemainingArguments)));
 				}
 			}
 		}
@@ -1077,9 +1058,9 @@ namespace EpicGames.Core
 			{
 				throw new ArgumentException("Argument prefix must begin with a hyphen.");
 			}
-			else if(!ValueSeparators.Contains(Prefix[Prefix.Length - 1]))
+			else if(!ValueSeparators.Contains(Prefix[^1]))
 			{
-				throw new ArgumentException(String.Format("Argument prefix must end with '{0}'", String.Join("' or '", ValueSeparators)));
+				throw new ArgumentException(string.Format("Argument prefix must end with '{0}'", string.Join("' or '", ValueSeparators)));
 			}
 		}
 
@@ -1111,8 +1092,7 @@ namespace EpicGames.Core
 			}
 
 			// Try to parse the value
-			object? Value;
-			if(!TryParseValue(ValueType, ValueText, out Value))
+			if (!TryParseValue(ValueType, ValueText, out object? Value))
 			{
 				Logger.LogWarning("Unable to parse value for argument '{0}'.", ArgumentText);
 				return false;
@@ -1203,25 +1183,23 @@ namespace EpicGames.Core
 			else if (FieldType == typeof(TimeSpan))
 			{
 				// Construct a time span form the string
-				double FloatValue;
-				if (Text.EndsWith("h", StringComparison.OrdinalIgnoreCase) && Double.TryParse(Text.Substring(0, Text.Length - 1), out FloatValue))
+				if (Text.EndsWith("h", StringComparison.OrdinalIgnoreCase) && double.TryParse(Text.Substring(0, Text.Length - 1), out double FloatValue))
 				{
 					Value = TimeSpan.FromHours(FloatValue);
 					return true;
 				}
-				else if (Text.EndsWith("m", StringComparison.OrdinalIgnoreCase) && Double.TryParse(Text.Substring(0, Text.Length - 1), out FloatValue))
+				else if (Text.EndsWith("m", StringComparison.OrdinalIgnoreCase) && double.TryParse(Text.Substring(0, Text.Length - 1), out FloatValue))
 				{
 					Value = TimeSpan.FromMinutes(FloatValue);
 					return true;
 				}
-				else if (Text.EndsWith("s", StringComparison.OrdinalIgnoreCase) && Double.TryParse(Text.Substring(0, Text.Length - 1), out FloatValue))
+				else if (Text.EndsWith("s", StringComparison.OrdinalIgnoreCase) && double.TryParse(Text.Substring(0, Text.Length - 1), out FloatValue))
 				{
 					Value = TimeSpan.FromSeconds(FloatValue);
 					return true;
 				}
 
-				TimeSpan TimeSpanValue;
-				if (TimeSpan.TryParse(Text, out TimeSpanValue))
+				if (TimeSpan.TryParse(Text, out TimeSpan TimeSpanValue))
 				{
 					Value = TimeSpanValue;
 					return true;

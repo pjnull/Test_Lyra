@@ -111,7 +111,7 @@ namespace UnrealBuildTool
 			{
 				if (Descriptor.bEnabledByDefault.Value)
 				{
-					return (LoadedFrom == PluginLoadedFrom.Project ? true : bAllowEnginePluginsEnabledByDefault);
+					return (LoadedFrom == PluginLoadedFrom.Project || bAllowEnginePluginsEnabledByDefault);
 				}
 				else
 				{
@@ -175,8 +175,7 @@ namespace UnrealBuildTool
 			Dictionary<string, PluginInfo> NameToPluginInfo = new Dictionary<string, PluginInfo>(StringComparer.InvariantCultureIgnoreCase);
 			foreach (PluginInfo Plugin in Plugins)
 			{
-				PluginInfo? ExistingPluginInfo;
-				if (!NameToPluginInfo.TryGetValue(Plugin.Name, out ExistingPluginInfo))
+				if (!NameToPluginInfo.TryGetValue(Plugin.Name, out PluginInfo? ExistingPluginInfo))
 				{
 					NameToPluginInfo.Add(Plugin.Name, Plugin);
 				}
@@ -186,7 +185,7 @@ namespace UnrealBuildTool
 				}
 				else if (Plugin.Type == ExistingPluginInfo.Type)
 				{
-					throw new BuildException(String.Format("Found '{0}' plugin in two locations ({1} and {2}). Plugin names must be unique.", Plugin.Name, ExistingPluginInfo.File, Plugin.File));
+					throw new BuildException(string.Format("Found '{0}' plugin in two locations ({1} and {2}). Plugin names must be unique.", Plugin.Name, ExistingPluginInfo.File, Plugin.File));
 				}
 			}
 			return NameToPluginInfo;
@@ -477,8 +476,7 @@ namespace UnrealBuildTool
 					continue;
 				}
 
-				List<PluginInfo>? Plugins;
-				if (!PluginInfoCache.TryGetValue(Dir, out Plugins))
+				if (!PluginInfoCache.TryGetValue(Dir, out List<PluginInfo>? Plugins))
 				{
 					Plugins = new List<PluginInfo>();
 					foreach (FileReference PluginFileName in PluginsBase.EnumeratePlugins(Dir))
@@ -527,13 +525,13 @@ namespace UnrealBuildTool
 				return false;
 			}
 
-			bool bAllowEnginePluginsEnabledByDefault = (Project == null ? true : !Project.DisableEnginePluginsByDefault);
+			bool bAllowEnginePluginsEnabledByDefault = (Project == null || !Project.DisableEnginePluginsByDefault);
 			bool bEnabled = Plugin.IsEnabledByDefault(bAllowEnginePluginsEnabledByDefault);
 			if (Project != null && Project.Plugins != null)
 			{
 				foreach (PluginReferenceDescriptor PluginReference in Project.Plugins)
 				{
-					if (String.Compare(PluginReference.Name, Plugin.Name, true) == 0 && !PluginReference.bOptional)
+					if (string.Compare(PluginReference.Name, Plugin.Name, true) == 0 && !PluginReference.bOptional)
 					{
 						bEnabled = PluginReference.IsEnabledForPlatform(Platform) && PluginReference.IsEnabledForTargetConfiguration(Configuration) && PluginReference.IsEnabledForTarget(TargetType);
 					}

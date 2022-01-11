@@ -152,7 +152,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// The target rules which owns this object. Used to resolve some properties.
 		/// </summary>
-		TargetRules Target;
+		readonly TargetRules Target;
 
 		/// <summary>
 		/// Version of the compiler toolchain to use on Windows platform. A value of "default" will be changed to a specific version at UBT start up.
@@ -466,7 +466,7 @@ namespace UnrealBuildTool
 		{
 			this.Target = Target;
 
-			ManifestFile = FileReference.Combine(Unreal.EngineDirectory, "Build", "Windows", "Resources", String.Format("Default-{0}.manifest", Target.Platform)).FullName;
+			ManifestFile = FileReference.Combine(Unreal.EngineDirectory, "Build", "Windows", "Resources", string.Format("Default-{0}.manifest", Target.Platform)).FullName;
 		}
 	}
 
@@ -478,7 +478,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// The private mutable settings object
 		/// </summary>
-		private WindowsTargetRules Inner;
+		private readonly WindowsTargetRules Inner;
 
 		/// <summary>
 		/// Constructor
@@ -860,17 +860,17 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Cache of Visual Studio installation directories
 		/// </summary>
-		private static Lazy<IReadOnlyList<VisualStudioInstallation>> CachedVisualStudioInstallations = new Lazy<IReadOnlyList<VisualStudioInstallation>>(FindVisualStudioInstallations);
+		private static readonly Lazy<IReadOnlyList<VisualStudioInstallation>> CachedVisualStudioInstallations = new Lazy<IReadOnlyList<VisualStudioInstallation>>(FindVisualStudioInstallations);
 
 		/// <summary>
 		/// Cache of Visual C++ installation directories
 		/// </summary>
-		private static Dictionary<WindowsCompiler, List<ToolChainInstallation>> CachedToolChainInstallations = new Dictionary<WindowsCompiler, List<ToolChainInstallation>>();
+		private static readonly Dictionary<WindowsCompiler, List<ToolChainInstallation>> CachedToolChainInstallations = new Dictionary<WindowsCompiler, List<ToolChainInstallation>>();
 
 		/// <summary>
 		/// Cache of DIA SDK installation directories
 		/// </summary>
-		private static Dictionary<WindowsCompiler, List<DirectoryReference>> CachedDiaSdkDirs = new Dictionary<WindowsCompiler, List<DirectoryReference>>();
+		private static readonly Dictionary<WindowsCompiler, List<DirectoryReference>> CachedDiaSdkDirs = new Dictionary<WindowsCompiler, List<DirectoryReference>>();
 
 		/// <summary>
 		/// True if we should use the Clang linker (LLD) when we are compiling with Clang, otherwise we use the MSVC linker
@@ -881,8 +881,7 @@ namespace UnrealBuildTool
 		/// True if we should use the Intel linker (xilink\xilib) when we are compiling with Intel oneAPI, otherwise we use the MSVC linker
 		/// </summary>
 		public static readonly bool bAllowIntelLinker = true;
-		
-		MicrosoftPlatformSDK SDK;
+		readonly MicrosoftPlatformSDK SDK;
 
 		/// <summary>
 		/// Constructor
@@ -1062,8 +1061,7 @@ namespace UnrealBuildTool
 			}
 
 			// Also check the default format for the Visual Studio project generator
-			object? ProjectFormatObject;
-			if (XmlConfig.TryGetValue(typeof(VCProjectFileGenerator), "Version", out ProjectFormatObject))
+			if (XmlConfig.TryGetValue(typeof(VCProjectFileGenerator), "Version", out object? ProjectFormatObject))
 			{
 				VCProjectFileFormat ProjectFormat = (VCProjectFileFormat)ProjectFormatObject;
 				if (ProjectFormat == VCProjectFileFormat.VisualStudio2019)
@@ -1077,13 +1075,12 @@ namespace UnrealBuildTool
 			}
 
 			// Check the editor settings too
-			ProjectFileFormat PreferredAccessor;
-			if(ProjectFileGenerator.GetPreferredSourceCodeAccessor(ProjectFile, out PreferredAccessor))
+			if (ProjectFileGenerator.GetPreferredSourceCodeAccessor(ProjectFile, out ProjectFileFormat PreferredAccessor))
 			{
-				if(PreferredAccessor == ProjectFileFormat.VisualStudio2019)
-			    {
-				    return WindowsCompiler.VisualStudio2019;
-			    }
+				if (PreferredAccessor == ProjectFileFormat.VisualStudio2019)
+				{
+					return WindowsCompiler.VisualStudio2019;
+				}
 				else if (PreferredAccessor == ProjectFileFormat.VisualStudio2022)
 				{
 					return WindowsCompiler.VisualStudio2022;
@@ -1170,8 +1167,7 @@ namespace UnrealBuildTool
 					ISetupInstance[] Instances = new ISetupInstance[1];
 					for (; ; )
 					{
-						int NumFetched;
-						Enumerator.Next(1, Instances, out NumFetched);
+						Enumerator.Next(1, Instances, out int NumFetched);
 
 						if (NumFetched == 0)
 						{
@@ -1184,8 +1180,7 @@ namespace UnrealBuildTool
 							continue;
 						}
 
-						VersionNumber? Version;
-						if (!VersionNumber.TryParse(Instance.GetInstallationVersion(), out Version))
+						if (!VersionNumber.TryParse(Instance.GetInstallationVersion(), out VersionNumber? Version))
 						{
 							continue;
 						}
@@ -1245,13 +1240,12 @@ namespace UnrealBuildTool
 		/// <returns>Map of version number to directories</returns>
 		static List<ToolChainInstallation> FindToolChainInstallations(WindowsCompiler Compiler)
 		{
-			List<ToolChainInstallation>? ToolChains;
-			if(!CachedToolChainInstallations.TryGetValue(Compiler, out ToolChains))
+			if (!CachedToolChainInstallations.TryGetValue(Compiler, out List<ToolChainInstallation>? ToolChains))
 			{
 				ToolChains = new List<ToolChainInstallation>();
-			    if (BuildHostPlatform.Current.Platform == UnrealTargetPlatform.Win64)
-			    {
-					if(Compiler == WindowsCompiler.Clang)
+				if (BuildHostPlatform.Current.Platform == UnrealTargetPlatform.Win64)
+				{
+					if (Compiler == WindowsCompiler.Clang)
 					{
 						// Check for a manual installation to the default directory
 						DirectoryReference ManualInstallDir = DirectoryReference.Combine(DirectoryReference.GetSpecialFolder(Environment.SpecialFolder.ProgramFiles)!, "LLVM");
@@ -1259,7 +1253,7 @@ namespace UnrealBuildTool
 
 						// Check for a manual installation to a custom directory
 						string? LlvmPath = Environment.GetEnvironmentVariable("LLVM_PATH");
-						if (!String.IsNullOrEmpty(LlvmPath))
+						if (!string.IsNullOrEmpty(LlvmPath))
 						{
 							AddClangToolChain(new DirectoryReference(LlvmPath), ToolChains);
 						}
@@ -1277,20 +1271,19 @@ namespace UnrealBuildTool
 						}
 
 						// Check for AutoSDK paths
-						DirectoryReference? AutoSdkDir;
-						if(UEBuildPlatformSDK.TryGetHostPlatformAutoSDKDir(out AutoSdkDir))
+						if (UEBuildPlatformSDK.TryGetHostPlatformAutoSDKDir(out DirectoryReference? AutoSdkDir))
 						{
 							DirectoryReference ClangBaseDir = DirectoryReference.Combine(AutoSdkDir, "Win64", "LLVM");
-							if(DirectoryReference.Exists(ClangBaseDir))
+							if (DirectoryReference.Exists(ClangBaseDir))
 							{
-								foreach(DirectoryReference ToolChainDir in DirectoryReference.EnumerateDirectories(ClangBaseDir))
+								foreach (DirectoryReference ToolChainDir in DirectoryReference.EnumerateDirectories(ClangBaseDir))
 								{
 									AddClangToolChain(ToolChainDir, ToolChains);
 								}
 							}
 						}
 					}
-					else if(Compiler == WindowsCompiler.Intel)
+					else if (Compiler == WindowsCompiler.Intel)
 					{
 						DirectoryReference InstallDir = DirectoryReference.Combine(DirectoryReference.GetSpecialFolder(Environment.SpecialFolder.ProgramFiles)!, "Intel", "oneAPI", "compiler");
 						FindIntelOneApiToolChains(InstallDir, ToolChains);
@@ -1299,8 +1292,7 @@ namespace UnrealBuildTool
 						FindIntelOneApiToolChains(InstallDir, ToolChains);
 
 						// Check for AutoSDK paths
-						DirectoryReference? AutoSdkDir;
-						if (UEBuildPlatformSDK.TryGetHostPlatformAutoSDKDir(out AutoSdkDir))
+						if (UEBuildPlatformSDK.TryGetHostPlatformAutoSDKDir(out DirectoryReference? AutoSdkDir))
 						{
 							DirectoryReference IntelBaseDir = DirectoryReference.Combine(AutoSdkDir, "Win64", "Intel");
 							if (DirectoryReference.Exists(IntelBaseDir))
@@ -1309,20 +1301,19 @@ namespace UnrealBuildTool
 							}
 						}
 					}
-				    else if(Compiler.IsMSVC())
-				    {
+					else if (Compiler.IsMSVC())
+					{
 						// Enumerate all the manually installed toolchains
 						List<VisualStudioInstallation> Installations = FindVisualStudioInstallations(Compiler);
-					    foreach(VisualStudioInstallation Installation in Installations)
-					    {
-						    DirectoryReference ToolChainBaseDir = DirectoryReference.Combine(Installation.BaseDir, "VC", "Tools", "MSVC");
-						    DirectoryReference RedistBaseDir = DirectoryReference.Combine(Installation.BaseDir, "VC", "Redist", "MSVC");
+						foreach (VisualStudioInstallation Installation in Installations)
+						{
+							DirectoryReference ToolChainBaseDir = DirectoryReference.Combine(Installation.BaseDir, "VC", "Tools", "MSVC");
+							DirectoryReference RedistBaseDir = DirectoryReference.Combine(Installation.BaseDir, "VC", "Redist", "MSVC");
 							FindVisualStudioToolChains(ToolChainBaseDir, RedistBaseDir, Installation.bPreview, ToolChains);
-					    }
+						}
 
 						// Enumerate all the AutoSDK toolchains
-						DirectoryReference? PlatformDir;
-						if (UEBuildPlatformSDK.TryGetHostPlatformAutoSDKDir(out PlatformDir))
+						if (UEBuildPlatformSDK.TryGetHostPlatformAutoSDKDir(out DirectoryReference? PlatformDir))
 						{
 							string VSDir = string.Empty;
 							switch (Compiler)
@@ -1342,9 +1333,9 @@ namespace UnrealBuildTool
 						}
 					}
 					else
-				    {
-					    throw new BuildException("Unsupported compiler version ({0})", Compiler);
-				    }
+					{
+						throw new BuildException("Unsupported compiler version ({0})", Compiler);
+					}
 				}
 				CachedToolChainInstallations.Add(Compiler, ToolChains);
 			}
@@ -1364,10 +1355,9 @@ namespace UnrealBuildTool
 			{
 				foreach (DirectoryReference ToolChainDir in DirectoryReference.EnumerateDirectories(BaseDir))
 				{
-					VersionNumber? Version;
-					if (IsValidToolChainDirMSVC(ToolChainDir, out Version))
+					if (IsValidToolChainDirMSVC(ToolChainDir, out VersionNumber? Version))
 					{
-						DirectoryReference? RedistDir = FindVisualStudioRedistForToolChain(ToolChainDir, OptionalRedistDir, Version );
+						DirectoryReference? RedistDir = FindVisualStudioRedistForToolChain(ToolChainDir, OptionalRedistDir, Version);
 
 						AddVisualCppToolChain(Version, bPreview, ToolChainDir, RedistDir, ToolChains);
 					}
@@ -1488,39 +1478,37 @@ namespace UnrealBuildTool
 		/// <returns></returns>
 		static bool Is64BitExecutable(FileReference File)
 		{
-			using (FileStream Stream = new FileStream(File.FullName, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete))
+			using FileStream Stream = new FileStream(File.FullName, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+			byte[] Header = new byte[64];
+			if (Stream.Read(Header, 0, Header.Length) != Header.Length)
 			{
-				byte[] Header = new byte[64];
-				if (Stream.Read(Header, 0, Header.Length) != Header.Length)
-				{
-					return false;
-				}
-				if (Header[0] != (byte)'M' || Header[1] != (byte)'Z')
-				{
-					return false;
-				}
-
-				int Offset = BinaryPrimitives.ReadInt32LittleEndian(Header.AsSpan(0x3c));
-				if (Stream.Seek(Offset, SeekOrigin.Begin) != Offset)
-				{
-					return false;
-				}
-
-				byte[] PeHeader = new byte[6];
-				if(Stream.Read(PeHeader, 0, PeHeader.Length) != PeHeader.Length)
-				{
-					return false;
-				}
-				if (BinaryPrimitives.ReadUInt32BigEndian(PeHeader.AsSpan()) != 0x50450000)
-				{
-					return false;
-				}
-
-				ushort MachineType = BinaryPrimitives.ReadUInt16LittleEndian(PeHeader.AsSpan(4));
-
-				const ushort IMAGE_FILE_MACHINE_AMD64 = 0x8664;
-				return MachineType == IMAGE_FILE_MACHINE_AMD64;
+				return false;
 			}
+			if (Header[0] != (byte)'M' || Header[1] != (byte)'Z')
+			{
+				return false;
+			}
+
+			int Offset = BinaryPrimitives.ReadInt32LittleEndian(Header.AsSpan(0x3c));
+			if (Stream.Seek(Offset, SeekOrigin.Begin) != Offset)
+			{
+				return false;
+			}
+
+			byte[] PeHeader = new byte[6];
+			if (Stream.Read(PeHeader, 0, PeHeader.Length) != PeHeader.Length)
+			{
+				return false;
+			}
+			if (BinaryPrimitives.ReadUInt32BigEndian(PeHeader.AsSpan()) != 0x50450000)
+			{
+				return false;
+			}
+
+			ushort MachineType = BinaryPrimitives.ReadUInt16LittleEndian(PeHeader.AsSpan(4));
+
+			const ushort IMAGE_FILE_MACHINE_AMD64 = 0x8664;
+			return MachineType == IMAGE_FILE_MACHINE_AMD64;
 		}
 
 		/// <summary>
@@ -1535,8 +1523,7 @@ namespace UnrealBuildTool
 		{
 			bool Is64Bit = Has64BitToolChain(ToolChainDir);
 
-			VersionNumber? Family;
-			if (!VersionNumber.TryParse(ToolChainDir.GetDirectoryName(), out Family))
+			if (!VersionNumber.TryParse(ToolChainDir.GetDirectoryName(), out VersionNumber? Family))
 			{
 				Family = Version;
 			}
@@ -1672,7 +1659,7 @@ namespace UnrealBuildTool
 					return false;
 				}
 			}
-			else if (String.Compare(CompilerVersion, "Latest", StringComparison.InvariantCultureIgnoreCase) == 0)
+			else if (string.Compare(CompilerVersion, "Latest", StringComparison.InvariantCultureIgnoreCase) == 0)
 			{
 				ToolChain = SelectToolChain(ToolChains, x => x.ThenByDescending(x => x.Version));
 				if (ToolChain == null)
@@ -1680,7 +1667,7 @@ namespace UnrealBuildTool
 					throw new BuildException("Unable to find C++ toolchain for {0}", Compiler);
 				}
 			}
-			else if (String.Compare(CompilerVersion, "Preview", StringComparison.InvariantCultureIgnoreCase) == 0)
+			else if (string.Compare(CompilerVersion, "Preview", StringComparison.InvariantCultureIgnoreCase) == 0)
 			{
 				ToolChain = SelectToolChain(ToolChains, x => x.ThenByDescending(x => x.IsPreview));
 				if (ToolChain == null || !ToolChain.IsPreview)
@@ -1774,12 +1761,11 @@ namespace UnrealBuildTool
 		/// <returns>Path to MSBuild</returns>
 		public static FileReference GetMsBuildToolPath()
 		{
-			FileReference? Location;
-			if(!TryGetMsBuildPath(out Location))
+			if (!TryGetMsBuildPath(out FileReference? Location))
 			{
 				throw new BuildException("Unable to find installation of MSBuild.");
 			}
- 			return Location;
+			return Location;
 		}
 
 		public static string GetArchitectureSubpath(WindowsArchitecture arch)
@@ -1836,13 +1822,11 @@ namespace UnrealBuildTool
 		/// <returns>Map of version number to directories</returns>
 		public static List<DirectoryReference> FindDiaSdkDirs(WindowsCompiler Compiler)
 		{
-			List<DirectoryReference>? DiaSdkDirs;
-			if (!CachedDiaSdkDirs.TryGetValue(Compiler, out DiaSdkDirs))
+			if (!CachedDiaSdkDirs.TryGetValue(Compiler, out List<DirectoryReference>? DiaSdkDirs))
 			{
 				DiaSdkDirs = new List<DirectoryReference>();
 
-				DirectoryReference? PlatformDir;
-				if (UEBuildPlatformSDK.TryGetHostPlatformAutoSDKDir(out PlatformDir))
+				if (UEBuildPlatformSDK.TryGetHostPlatformAutoSDKDir(out DirectoryReference? PlatformDir))
 				{
 					string VSDir = string.Empty;
 					switch (Compiler)
@@ -2083,21 +2067,21 @@ namespace UnrealBuildTool
 			CompileEnvironment.Definitions.Add("WIN32=1");
 			if (Target.WindowsPlatform.bUseWindowsSDK10)
 			{
-				CompileEnvironment.Definitions.Add(String.Format("_WIN32_WINNT=0x{0:X4}", 0x0602));
-				CompileEnvironment.Definitions.Add(String.Format("WINVER=0x{0:X4}", 0x0602));
+				CompileEnvironment.Definitions.Add(string.Format("_WIN32_WINNT=0x{0:X4}", 0x0602));
+				CompileEnvironment.Definitions.Add(string.Format("WINVER=0x{0:X4}", 0x0602));
 
 			}
 			else
 			{
-				CompileEnvironment.Definitions.Add(String.Format("_WIN32_WINNT=0x{0:X4}", Target.WindowsPlatform.TargetWindowsVersion));
-				CompileEnvironment.Definitions.Add(String.Format("WINVER=0x{0:X4}", Target.WindowsPlatform.TargetWindowsVersion));
+				CompileEnvironment.Definitions.Add(string.Format("_WIN32_WINNT=0x{0:X4}", Target.WindowsPlatform.TargetWindowsVersion));
+				CompileEnvironment.Definitions.Add(string.Format("WINVER=0x{0:X4}", Target.WindowsPlatform.TargetWindowsVersion));
 			}
 			
 			CompileEnvironment.Definitions.Add("PLATFORM_WINDOWS=1");
 			CompileEnvironment.Definitions.Add("PLATFORM_MICROSOFT=1");
 
 			// both Win32 and Win64 use Windows headers, so we enforce that here
-			CompileEnvironment.Definitions.Add(String.Format("OVERRIDE_PLATFORM_HEADER_NAME={0}", GetPlatformName()));
+			CompileEnvironment.Definitions.Add(string.Format("OVERRIDE_PLATFORM_HEADER_NAME={0}", GetPlatformName()));
 
 			// Ray tracing only supported on 64-bit Windows.
 			if (Target.Platform == UnrealTargetPlatform.Win64 && Target.WindowsPlatform.bEnableRayTracing)

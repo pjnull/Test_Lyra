@@ -173,8 +173,10 @@ namespace UnrealBuildTool
 				// Clean any target that wanted to be cleaned before being rebuilt
 				if (TargetDescriptors.Any(D => D.bRebuild))
 				{
-					CleanMode CleanMode = new CleanMode();
-					CleanMode.bSkipPreBuildTargets = bSkipPreBuildTargets;
+					CleanMode CleanMode = new CleanMode
+					{
+						bSkipPreBuildTargets = bSkipPreBuildTargets
+					};
 					CleanMode.Clean(TargetDescriptors.Where(D => D.bRebuild).ToList(), BuildConfiguration);
 				}
 
@@ -232,10 +234,8 @@ namespace UnrealBuildTool
 					}
 
 					// Create the working set provider per group.
-					using (ISourceFileWorkingSet WorkingSet = SourceFileWorkingSet.Create(Unreal.RootDirectory, ProjectDirs))
-					{
-						Build(TargetDescriptors, BuildConfiguration, WorkingSet, Options, WriteOutdatedActionsFile, bSkipPreBuildTargets);
-					}
+					using ISourceFileWorkingSet WorkingSet = SourceFileWorkingSet.Create(Unreal.RootDirectory, ProjectDirs);
+					Build(TargetDescriptors, BuildConfiguration, WorkingSet, Options, WriteOutdatedActionsFile, bSkipPreBuildTargets);
 				}
 			}
 			finally
@@ -406,14 +406,12 @@ namespace UnrealBuildTool
 							ICppCompileAction? CppModulesAction = ModuleDependencyAction.Inner as ICppCompileAction;
 							if (CppModulesAction != null && CppModulesAction.CompiledModuleInterfaceFile != null)
 							{
-								string? ProducedModule;
-								if (CppDependencies.TryGetProducedModule(ModuleDependencyAction.DependencyListFile!, out ProducedModule))
+								if (CppDependencies.TryGetProducedModule(ModuleDependencyAction.DependencyListFile!, out string? ProducedModule))
 								{
 									ModuleOutputs[ProducedModule] = CppModulesAction.CompiledModuleInterfaceFile;
 								}
 
-								List<(string Name, string BMI)>? ImportedModules;
-								if (CppDependencies.TryGetImportedModules(ModuleDependencyAction.DependencyListFile!, out ImportedModules))
+								if (CppDependencies.TryGetImportedModules(ModuleDependencyAction.DependencyListFile!, out List<(string Name, string BMI)>? ImportedModules))
 								{
 									ModuleImports[CppModulesAction.CompiledModuleInterfaceFile] = ImportedModules.Select(x => x.Name).ToList();
 								}
@@ -429,17 +427,15 @@ namespace UnrealBuildTool
 							{
 								ICppCompileAction CppModulesAction = (ICppCompileAction)PrerequisiteAction.Inner;
 
-								List<string>? ImportedModules;
-								if(ModuleImports.TryGetValue(CppModulesAction.CompiledModuleInterfaceFile!, out ImportedModules))
+								if (ModuleImports.TryGetValue(CppModulesAction.CompiledModuleInterfaceFile!, out List<string>? ImportedModules))
 								{
 									foreach (string ImportedModule in ImportedModules)
 									{
-										FileItem? ModuleOutput;
-										if (ModuleOutputs.TryGetValue(ImportedModule, out ModuleOutput))
+										if (ModuleOutputs.TryGetValue(ImportedModule, out FileItem? ModuleOutput))
 										{
 											Action NewAction = new Action(PrerequisiteAction.Inner);
 											NewAction.PrerequisiteItems.Add(ModuleOutput);
-											NewAction.CommandArguments += String.Format(" /reference \"{0}={1}\"", ImportedModule, ModuleOutput.FullName);
+											NewAction.CommandArguments += string.Format(" /reference \"{0}={1}\"", ImportedModule, ModuleOutput.FullName);
 											PrerequisiteAction.Inner = NewAction;
 										}
 										else
@@ -453,11 +449,10 @@ namespace UnrealBuildTool
 							{
 								foreach(FileItem PrerequisiteItem in PrerequisiteAction.PrerequisiteItems)
 								{
-									string? ModuleName;
-									if(ModuleInputs.TryGetValue(PrerequisiteItem, out ModuleName))
+									if (ModuleInputs.TryGetValue(PrerequisiteItem, out string? ModuleName))
 									{
 										Action NewAction = new Action(PrerequisiteAction.Inner);
-										NewAction.CommandArguments += String.Format(" /reference \"{0}={1}\"", ModuleName, PrerequisiteItem.AbsolutePath);
+										NewAction.CommandArguments += string.Format(" /reference \"{0}={1}\"", ModuleName, PrerequisiteItem.AbsolutePath);
 										PrerequisiteAction.Inner = NewAction;
 									}
 								}
@@ -680,8 +675,7 @@ namespace UnrealBuildTool
 			{
 				using (GlobalTracer.Instance.BuildSpan("TargetMakefile.Load()").StartActive())
 				{
-					string? ReasonNotLoaded;
-					Makefile = TargetMakefile.Load(MakefileLocation, TargetDescriptor.ProjectFile, TargetDescriptor.Platform, TargetDescriptor.AdditionalArguments.GetRawArray(), out ReasonNotLoaded);
+					Makefile = TargetMakefile.Load(MakefileLocation, TargetDescriptor.ProjectFile, TargetDescriptor.Platform, TargetDescriptor.AdditionalArguments.GetRawArray(), out string? ReasonNotLoaded);
 					if (Makefile == null)
 					{
 						Log.TraceInformation("Creating makefile for {0} ({1})", TargetDescriptor.Name, ReasonNotLoaded);
@@ -704,8 +698,7 @@ namespace UnrealBuildTool
 				bHasRunPreBuildScripts = true;
 
 				// Check that the makefile is still valid
-				string? Reason;
-				if(!TargetMakefile.IsValidForSourceFiles(Makefile, TargetDescriptor.ProjectFile, TargetDescriptor.Platform, WorkingSet, out Reason))
+				if (!TargetMakefile.IsValidForSourceFiles(Makefile, TargetDescriptor.ProjectFile, TargetDescriptor.Platform, WorkingSet, out string? Reason))
 				{
 					Log.TraceInformation("Invalidating makefile for {0} ({1})", TargetDescriptor.Name, Reason);
 					Makefile = null;
@@ -812,8 +805,7 @@ namespace UnrealBuildTool
 				// Find the output items for this module
 				foreach(string OnlyModuleName in TargetDescriptor.OnlyModuleNames)
 				{
-					FileItem[]? OutputItemsForModule;
-					if(!Makefile.ModuleNameToOutputItems.TryGetValue(OnlyModuleName, out OutputItemsForModule))
+					if (!Makefile.ModuleNameToOutputItems.TryGetValue(OnlyModuleName, out FileItem[]? OutputItemsForModule))
 					{
 						throw new BuildException("Unable to find output items for module '{0}'", OnlyModuleName);
 					}
@@ -839,13 +831,12 @@ namespace UnrealBuildTool
 			Dictionary<FileItem, LinkedAction> OutputItemToProducingAction = new Dictionary<FileItem, LinkedAction>();
 			for(int TargetIdx = 0; TargetIdx < TargetDescriptors.Count; TargetIdx++)
 			{
-				string GroupPrefix = String.Format("{0}-{1}-{2}", TargetDescriptors[TargetIdx].Name, TargetDescriptors[TargetIdx].Platform, TargetDescriptors[TargetIdx].Configuration);
+				string GroupPrefix = string.Format("{0}-{1}-{2}", TargetDescriptors[TargetIdx].Name, TargetDescriptors[TargetIdx].Platform, TargetDescriptors[TargetIdx].Configuration);
 				foreach(LinkedAction TargetAction in TargetActions[TargetIdx])
 				{
 					FileItem ProducedItem = TargetAction.ProducedItems.First();
 
-					LinkedAction? ExistingAction;
-					if(!OutputItemToProducingAction.TryGetValue(ProducedItem, out ExistingAction))
+					if (!OutputItemToProducingAction.TryGetValue(ProducedItem, out LinkedAction? ExistingAction))
 					{
 						ExistingAction = new LinkedAction(TargetAction, TargetDescriptors[TargetIdx]);
 						OutputItemToProducingAction[ProducedItem] = ExistingAction;

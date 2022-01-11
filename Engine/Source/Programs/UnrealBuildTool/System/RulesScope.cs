@@ -63,7 +63,7 @@ namespace UnrealBuildTool
 			}
 			else
 			{
-				return String.Format("{0} -> {1}", Name, Parent.FormatHierarchy());
+				return string.Format("{0} -> {1}", Name, Parent.FormatHierarchy());
 			}
 		}
 	}

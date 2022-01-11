@@ -18,7 +18,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Set of options which can influence the prelude state. Any options matching entries in this set will be used to generate a separate prelude file.
 		/// </summary>
-		static HashSet<string> FilterArguments = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+		static readonly HashSet<string> FilterArguments = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
 		{
 			"/EH",  // Exception handling mode
 			"/GR",  // RTTI settings
@@ -31,7 +31,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Object used for ensuring only one thread can create items in the cache at once
 		/// </summary>
-		static object LockObject = new object();
+		static readonly object LockObject = new object();
 
 		/// <summary>
 		/// File containing a list of macros to be used to generate a prelude file
@@ -46,7 +46,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// The parsed list of macros
 		/// </summary>
-		static List<string> MacroNames = new List<string>();
+		static readonly List<string> MacroNames = new List<string>();
 
 		/// <summary>
 		/// Path to the file used to generate prelude headers
@@ -56,7 +56,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Cached mapping from compiler filename to its version string
 		/// </summary>
-		static Dictionary<FileReference, string> CompilerExeToVersion = new Dictionary<FileReference, string>();
+		static readonly Dictionary<FileReference, string> CompilerExeToVersion = new Dictionary<FileReference, string>();
 
 		/// <summary>
 		/// Get the prelude file (or create it) for the given compiler executable and set of options
@@ -73,7 +73,7 @@ namespace UnrealBuildTool
 				if (!CompilerExeToVersion.TryGetValue(Compiler, out CompilerVersion))
 				{
 					FileVersionInfo VersionInfo = FileVersionInfo.GetVersionInfo(Compiler.FullName);
-					CompilerVersion = String.Format("{0} {1}", VersionInfo.ProductName, VersionInfo.ProductVersion);
+					CompilerVersion = string.Format("{0} {1}", VersionInfo.ProductName, VersionInfo.ProductVersion);
 				}
 			}
 
@@ -95,11 +95,11 @@ namespace UnrealBuildTool
 			}
 
 			// Create a digest from the command line
-			string CommandLine = String.Join(" ", Arguments.Where(x => FilterArguments.Contains(x)).OrderBy(x => x));
-			ContentHash Digest = ContentHash.SHA1(String.Format("{0}\n{1}\n{2}", CompilerVersion, CommandLine, String.Join("\n", MacroNames)));
+			string CommandLine = string.Join(" ", Arguments.Where(x => FilterArguments.Contains(x)).OrderBy(x => x));
+			ContentHash Digest = ContentHash.SHA1(string.Format("{0}\n{1}\n{2}", CompilerVersion, CommandLine, string.Join("\n", MacroNames)));
 
 			// Get the prelude file
-			FileReference PreludeHeader = FileReference.Combine(PreludeCacheDir, String.Format("{0}.h", Digest));
+			FileReference PreludeHeader = FileReference.Combine(PreludeCacheDir, string.Format("{0}.h", Digest));
 			if (!FileReference.Exists(PreludeHeader))
 			{
 				lock (LockObject)
@@ -129,54 +129,47 @@ namespace UnrealBuildTool
 			if (PreludeGeneratorFile == null)
 			{
 				PreludeGeneratorFile = FileReference.Combine(PreludeCacheDir, "PreludeGenerator.cpp");
-				using (StreamWriter Writer = new StreamWriter(PreludeGeneratorFile.FullName))
+				using StreamWriter Writer = new StreamWriter(PreludeGeneratorFile.FullName);
+				Writer.WriteLine("#define STRINGIZE_2(x) #x");
+				Writer.WriteLine("#define STRINGIZE(x) STRINGIZE_2(x)");
+				foreach (string MacroName in MacroNames)
 				{
-					Writer.WriteLine("#define STRINGIZE_2(x) #x");
-					Writer.WriteLine("#define STRINGIZE(x) STRINGIZE_2(x)");
-					foreach (string MacroName in MacroNames)
-					{
-						Writer.WriteLine("");
-						Writer.WriteLine("#ifdef {0}", MacroName);
-						Writer.WriteLine("#pragma message(\"#define {0} \" STRINGIZE({0}))", MacroName);
-						Writer.WriteLine("#endif");
-					}
+					Writer.WriteLine("");
+					Writer.WriteLine("#ifdef {0}", MacroName);
+					Writer.WriteLine("#pragma message(\"#define {0} \" STRINGIZE({0}))", MacroName);
+					Writer.WriteLine("#endif");
 				}
 			}
 
 			// Invoke the compiler and capture the output
-			using (ManagedProcessGroup ProcessGroup = new ManagedProcessGroup())
+			using ManagedProcessGroup ProcessGroup = new ManagedProcessGroup();
+			string FullCommandLine = string.Format("{0} /nologo /c {1}", CommandLine, Utils.MakePathSafeToUseWithCommandLine(PreludeGeneratorFile.FullName));
+			using ManagedProcess Process = new ManagedProcess(ProcessGroup, Compiler.FullName, FullCommandLine, PreludeCacheDir.FullName, null, null, ProcessPriorityClass.Normal);
+			// Filter the output
+			FileReference TempPreludeFile = new FileReference(PreludeHeader.FullName + ".temp");
+			using (StreamWriter Writer = new StreamWriter(TempPreludeFile.FullName))
 			{
-				string FullCommandLine = String.Format("{0} /nologo /c {1}", CommandLine, Utils.MakePathSafeToUseWithCommandLine(PreludeGeneratorFile.FullName));
-				using (ManagedProcess Process = new ManagedProcess(ProcessGroup, Compiler.FullName, FullCommandLine, PreludeCacheDir.FullName, null, null, ProcessPriorityClass.Normal))
-				{
-					// Filter the output
-					FileReference TempPreludeFile = new FileReference(PreludeHeader.FullName + ".temp");
-					using (StreamWriter Writer = new StreamWriter(TempPreludeFile.FullName))
-					{
-						Writer.WriteLine("// Compiler: {0}", CompilerVersion);
-						Writer.WriteLine("// Arguments: {0}", CommandLine);
-						Writer.WriteLine();
+				Writer.WriteLine("// Compiler: {0}", CompilerVersion);
+				Writer.WriteLine("// Arguments: {0}", CommandLine);
+				Writer.WriteLine();
 
-						string? Line;
-						while (Process.TryReadLine(out Line))
+				while (Process.TryReadLine(out string? Line))
+				{
+					Line = Line.Trim();
+					if (Line.Length > 0)
+					{
+						if (Line.StartsWith("#define", StringComparison.Ordinal))
 						{
-							Line = Line.Trim();
-							if (Line.Length > 0)
-							{
-								if (Line.StartsWith("#define", StringComparison.Ordinal))
-								{
-									Writer.WriteLine(Line);
-								}
-								else if (Line.Trim() != PreludeGeneratorFile.GetFileName())
-								{
-									throw new BuildException("Unexpected output from compiler: {0}", Line);
-								}
-							}
+							Writer.WriteLine(Line);
+						}
+						else if (Line.Trim() != PreludeGeneratorFile.GetFileName())
+						{
+							throw new BuildException("Unexpected output from compiler: {0}", Line);
 						}
 					}
-					FileReference.Move(TempPreludeFile, PreludeHeader);
 				}
 			}
+			FileReference.Move(TempPreludeFile, PreludeHeader);
 		}
 	}
 }

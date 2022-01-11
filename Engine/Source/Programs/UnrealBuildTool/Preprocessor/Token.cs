@@ -89,7 +89,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Static token names
 		/// </summary>
-		static string[] StaticTokens;
+		static readonly string[] StaticTokens;
 
 		/// <summary>
 		/// Contains the type of the token
@@ -219,7 +219,7 @@ namespace UnrealBuildTool
 		/// <returns>True if the tokens are equal, false otherwise</returns>
 		public bool Equals(Token? Other)
 		{
-			if(ReferenceEquals(Other, null))
+			if(Other is null)
 			{
 				return false;
 			}

@@ -661,8 +661,10 @@ namespace UnrealBuildTool
 					Info.GeneratedCPPFilenameBase = Path.Combine(Module.GeneratedCodeDirectory!.FullName, Info.ModuleName) + ".gen";
 					if (!Module.Rules.bUsePrecompiled)
 					{
-						Module.GeneratedCppDirectories = new List<string>();
-						Module.GeneratedCppDirectories.Add(Module.GeneratedCodeDirectory.FullName);
+						Module.GeneratedCppDirectories = new List<string>
+						{
+							Module.GeneratedCodeDirectory.FullName
+						};
 
 						if (Module.Rules.AdditionalCodeGenDirectories != null)
 						{
@@ -787,42 +789,39 @@ namespace UnrealBuildTool
 		/// <returns>Latest timestamp of UHT binaries or DateTime.MaxValue if UnrealHeaderTool is out of date and needs to be rebuilt.</returns>
 		static bool GetHeaderToolTimestampUtc(FileReference ReceiptPath, out DateTime Timestamp)
 		{
-			using (ScopedTimer TimestampTimer = new ScopedTimer("GetHeaderToolTimestamp"))
+			using ScopedTimer TimestampTimer = new ScopedTimer("GetHeaderToolTimestamp");
+			// Try to read the receipt for UHT.
+			FileItem ReceiptFile = FileItem.GetItemByFileReference(ReceiptPath);
+			if (!ReceiptFile.Exists)
 			{
-				// Try to read the receipt for UHT.
-				FileItem ReceiptFile = FileItem.GetItemByFileReference(ReceiptPath);
-				if (!ReceiptFile.Exists)
+				Timestamp = DateTime.MaxValue;
+				return false;
+			}
+
+			// Don't check timestamps for individual binaries if we're using the installed version of UHT. It will always be up to date.
+			if (!UnrealBuildTool.IsFileInstalled(ReceiptFile.Location))
+			{
+				if (!TargetReceipt.TryRead(ReceiptPath, out TargetReceipt? Receipt))
 				{
 					Timestamp = DateTime.MaxValue;
 					return false;
 				}
 
-				// Don't check timestamps for individual binaries if we're using the installed version of UHT. It will always be up to date.
-				if (!UnrealBuildTool.IsFileInstalled(ReceiptFile.Location))
+				// Make sure all the build products exist, and that the receipt is newer
+				foreach (BuildProduct BuildProduct in Receipt.BuildProducts)
 				{
-					TargetReceipt? Receipt;
-					if (!TargetReceipt.TryRead(ReceiptPath, out Receipt))
+					FileItem BuildProductItem = FileItem.GetItemByFileReference(BuildProduct.Path);
+					if (!BuildProductItem.Exists || BuildProductItem.LastWriteTimeUtc > ReceiptFile.LastWriteTimeUtc)
 					{
 						Timestamp = DateTime.MaxValue;
 						return false;
 					}
-
-					// Make sure all the build products exist, and that the receipt is newer
-					foreach (BuildProduct BuildProduct in Receipt.BuildProducts)
-					{
-						FileItem BuildProductItem = FileItem.GetItemByFileReference(BuildProduct.Path);
-						if (!BuildProductItem.Exists || BuildProductItem.LastWriteTimeUtc > ReceiptFile.LastWriteTimeUtc)
-						{
-							Timestamp = DateTime.MaxValue;
-							return false;
-						}
-					}
 				}
-
-				// Return the timestamp for all the binaries
-				Timestamp = ReceiptFile.LastWriteTimeUtc;
-				return true;
 			}
+
+			// Return the timestamp for all the binaries
+			Timestamp = ReceiptFile.LastWriteTimeUtc;
+			return true;
 		}
 
 		/// <summary>
@@ -1053,19 +1052,17 @@ namespace UnrealBuildTool
 		public static int RunExternalNativeExecutable(FileReference ExePath, string Commandline)
 		{
 			Log.TraceVerbose("RunExternalExecutable {0} {1}", ExePath.FullName, Commandline);
-			using (Process GameProcess = new Process())
-			{
-				GameProcess.StartInfo.FileName = ExePath.FullName;
-				GameProcess.StartInfo.Arguments = Commandline;
-				GameProcess.StartInfo.UseShellExecute = false;
-				GameProcess.StartInfo.RedirectStandardOutput = true;
-				GameProcess.OutputDataReceived += PrintProcessOutputAsync;
-				GameProcess.Start();
-				GameProcess.BeginOutputReadLine();
-				GameProcess.WaitForExit();
+			using Process GameProcess = new Process();
+			GameProcess.StartInfo.FileName = ExePath.FullName;
+			GameProcess.StartInfo.Arguments = Commandline;
+			GameProcess.StartInfo.UseShellExecute = false;
+			GameProcess.StartInfo.RedirectStandardOutput = true;
+			GameProcess.OutputDataReceived += PrintProcessOutputAsync;
+			GameProcess.Start();
+			GameProcess.BeginOutputReadLine();
+			GameProcess.WaitForExit();
 
-				return GameProcess.ExitCode;
-			}
+			return GameProcess.ExitCode;
 		}
 
 		/// <summary>
@@ -1075,7 +1072,7 @@ namespace UnrealBuildTool
 		{
 			// DataReceivedEventHandler is fired with a null string when the output stream is closed.  We don't want to
 			// print anything for that event.
-			if (!String.IsNullOrEmpty(Event.Data))
+			if (!string.IsNullOrEmpty(Event.Data))
 			{
 				Log.TraceInformation(Event.Data);
 			}
@@ -1188,8 +1185,10 @@ namespace UnrealBuildTool
 						}
 
 						// Create the target descriptor
-						TargetDescriptor TargetDescriptor = new TargetDescriptor(ScriptProjectFile, "UnrealHeaderTool", Platform, Configuration, Architecture, null);
-						TargetDescriptor.bQuiet = true;
+						TargetDescriptor TargetDescriptor = new TargetDescriptor(ScriptProjectFile, "UnrealHeaderTool", Platform, Configuration, Architecture, null)
+						{
+							bQuiet = true
+						};
 
 						using (GlobalTracer.Instance.BuildSpan("Building UnrealHeaderTool").StartActive())
 						{
@@ -1199,7 +1198,7 @@ namespace UnrealBuildTool
 
 					Progress.Write(1, 3);
 
-					string ActualTargetName = String.IsNullOrEmpty(TargetName) ? "UE5" : TargetName;
+					string ActualTargetName = string.IsNullOrEmpty(TargetName) ? "UE5" : TargetName;
 					Log.TraceInformation("Parsing headers for {0}", ActualTargetName);
 
 					FileReference HeaderToolPath = GetHeaderToolPath(HeaderToolReceipt);
@@ -1266,7 +1265,7 @@ namespace UnrealBuildTool
 						if (BuildHostPlatform.Current.Platform == UnrealTargetPlatform.Win64 && 
 							(int)(UHTResult) < 0)
 						{
-							Log.TraceError(String.Format("UnrealHeaderTool failed with exit code 0x{0:X} - check that Unreal Engine prerequisites are installed.", (int)UHTResult));
+							Log.TraceError(string.Format("UnrealHeaderTool failed with exit code 0x{0:X} - check that Unreal Engine prerequisites are installed.", (int)UHTResult));
 						}
 
 						throw new CompilationResultException(UHTResult);

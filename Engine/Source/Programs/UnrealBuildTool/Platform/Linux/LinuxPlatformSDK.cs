@@ -60,7 +60,7 @@ namespace UnrealBuildTool
 		}
 
 
-		public override bool TryConvertVersionToInt(string? StringValue, out UInt64 OutValue)
+		public override bool TryConvertVersionToInt(string? StringValue, out ulong OutValue)
 		{
 			if (StringValue != null)
 			{
@@ -69,7 +69,7 @@ namespace UnrealBuildTool
 				Match Result = Regex.Match(StringValue, FullVersionPattern);
 				if (Result.Success)
 				{
-					return UInt64.TryParse(Result.Groups[1].Value, out OutValue);
+					return ulong.TryParse(Result.Groups[1].Value, out OutValue);
 				}
 			}
 
@@ -125,7 +125,7 @@ namespace UnrealBuildTool
 		public override string? GetInternalSDKPath()
 		{
 			string? SDKRoot = Environment.GetEnvironmentVariable(SDKRootEnvVar);
-			if (!String.IsNullOrEmpty(SDKRoot))
+			if (!string.IsNullOrEmpty(SDKRoot))
 			{
 				string AutoSDKPath = Path.Combine(SDKRoot, "Host" + BuildHostPlatform.Current.Platform, TargetPlatformName, GetAutoSDKDirectoryForMainVersion(), LinuxPlatform.DefaultHostArchitecture);
 				if (DirectoryReference.Exists(new DirectoryReference(AutoSDKPath)))
@@ -202,7 +202,7 @@ namespace UnrealBuildTool
 			// if new multi-arch toolchain is used, prefer it
 			string? MultiArchRoot = Environment.GetEnvironmentVariable("LINUX_MULTIARCH_ROOT");
 
-			if (String.IsNullOrEmpty(MultiArchRoot))
+			if (string.IsNullOrEmpty(MultiArchRoot))
 			{
 				// check if in-tree SDK is available
 				DirectoryReference InTreeSDKVersionRoot = GetInTreeSDKRoot();
@@ -229,7 +229,7 @@ namespace UnrealBuildTool
 			string? MultiArchRoot = GetSDKLocation();
 			string? BaseLinuxPath;
 
-			if (!String.IsNullOrEmpty(MultiArchRoot))
+			if (!string.IsNullOrEmpty(MultiArchRoot))
 			{
 				BaseLinuxPath = Path.Combine(MultiArchRoot, Architecture);
 			}
@@ -262,12 +262,12 @@ namespace UnrealBuildTool
 
 			if (ForceUseSystemCompiler())
 			{
-				if (!String.IsNullOrEmpty(LinuxCommon.WhichClang()))
+				if (!string.IsNullOrEmpty(LinuxCommon.WhichClang()))
 				{
 					return SDKStatus.Valid;
 				}
 			}
-			else if (!String.IsNullOrEmpty(BaseLinuxPath))
+			else if (!string.IsNullOrEmpty(BaseLinuxPath))
 			{
 				// paths to our toolchains if BaseLinuxPath is specified
 				BaseLinuxPath = BaseLinuxPath.Replace("\"", "");

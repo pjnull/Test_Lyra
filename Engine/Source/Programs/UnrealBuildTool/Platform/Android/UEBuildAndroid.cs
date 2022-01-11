@@ -64,7 +64,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// The private mutable settings object
 		/// </summary>
-		private AndroidTargetRules Inner;
+		private readonly AndroidTargetRules Inner;
 
 		/// <summary>
 		/// Constructor
@@ -127,7 +127,7 @@ namespace UnrealBuildTool
 
 	class AndroidPlatform : UEBuildPlatform
 	{
-		UEBuildPlatformSDK SDK;
+		readonly UEBuildPlatformSDK SDK;
 
 		public AndroidPlatform(UnrealTargetPlatform InTargetPlatform, UEBuildPlatformSDK InSDK) 
 			: base(InTargetPlatform, InSDK)
@@ -178,7 +178,7 @@ namespace UnrealBuildTool
 				foreach (string CpuSuffix in AndroidToolChain.AllCpuSuffixes)
 				{
 					int CpuIdx = ExtensionEndIdx - CpuSuffix.Length;
-					if (CpuIdx > 0 && String.Compare(Name, CpuIdx, CpuSuffix, 0, CpuSuffix.Length, StringComparison.InvariantCultureIgnoreCase) == 0)
+					if (CpuIdx > 0 && string.Compare(Name, CpuIdx, CpuSuffix, 0, CpuSuffix.Length, StringComparison.InvariantCultureIgnoreCase) == 0)
 					{
 						return IsBuildProductName(Name, 0, CpuIdx, NamePrefixes, NameSuffixes);
 					}
@@ -370,8 +370,7 @@ namespace UnrealBuildTool
 
 			// figure out the NDK version
 			string? NDKToolchainVersion = SDK.GetInstalledVersion();
-			UInt64 NDKVersionInt;
-			SDK.TryConvertVersionToInt(NDKToolchainVersion, out NDKVersionInt);
+			SDK.TryConvertVersionToInt(NDKToolchainVersion, out ulong NDKVersionInt);
 
 			// PLATFORM_ANDROID_NDK_VERSION is in the form 150100, where 15 is major version, 01 is the letter (1 is 'a'), 00 indicates beta revision if letter is 00
 			CompileEnvironment.Definitions.Add(string.Format("PLATFORM_ANDROID_NDK_VERSION={0}", NDKVersionInt));

@@ -80,12 +80,12 @@ namespace EpicGames.Core
 		/// <summary>
 		/// Buffer of input lines
 		/// </summary>
-		LogBuffer Buffer;
+		readonly LogBuffer Buffer;
 
 		/// <summary>
 		/// Buffer for holding partial line data
 		/// </summary>
-		MemoryStream PartialLine = new MemoryStream();
+		readonly MemoryStream PartialLine = new MemoryStream();
 
 		/// <summary>
 		/// Whether matching is currently enabled
@@ -95,7 +95,7 @@ namespace EpicGames.Core
 		/// <summary>
 		/// The inner logger
 		/// </summary>
-		ILogger Logger;
+		readonly ILogger Logger;
 
 		/// <summary>
 		/// Constructor
@@ -189,8 +189,7 @@ namespace EpicGames.Core
 			}
 			if (Data.Length > 0 && Data.Span[0] == '{')
 			{
-				JsonLogEvent JsonEvent;
-				if (JsonLogEvent.TryParse(Data, out JsonEvent))
+				if (JsonLogEvent.TryParse(Data, out JsonLogEvent JsonEvent))
 				{
 					ProcessData(true);
 					Logger.Log(JsonEvent.Level, JsonEvent.EventId, JsonEvent, null, JsonLogEvent.Format);

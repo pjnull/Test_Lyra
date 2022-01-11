@@ -58,7 +58,7 @@ namespace UnrealBuildTool
 		/// </summary>
 		public string Name
 		{
-			get { return String.Format("{0}|{1}", ConfigurationName, PlatformName); }
+			get { return string.Format("{0}|{1}", ConfigurationName, PlatformName); }
 		}
 
 		/// <summary>
@@ -204,8 +204,7 @@ namespace UnrealBuildTool
 			}
 
 
-			UEBuildPlatform? BuildPlatform;
-			if (!UEBuildPlatform.TryGetBuildPlatform(Platform, out BuildPlatform))
+			if (!UEBuildPlatform.TryGetBuildPlatform(Platform, out UEBuildPlatform? BuildPlatform))
 			{
 				return false;
 			}
@@ -279,12 +278,12 @@ namespace UnrealBuildTool
 
 	class VCProjectFile : MSBuildProjectFile
 	{
-		VCProjectFileFormat ProjectFileFormat;
-		bool bUsePrecompiled;
-		string? BuildToolOverride;
-		Dictionary<DirectoryReference, string> ModuleDirToForceIncludePaths = new Dictionary<DirectoryReference, string>();
-		Dictionary<DirectoryReference, string> ModuleDirToPchHeaderFile = new Dictionary<DirectoryReference, string>();
-		VCProjectFileSettings Settings;
+		readonly VCProjectFileFormat ProjectFileFormat;
+		readonly bool bUsePrecompiled;
+		readonly string? BuildToolOverride;
+		readonly Dictionary<DirectoryReference, string> ModuleDirToForceIncludePaths = new Dictionary<DirectoryReference, string>();
+		readonly Dictionary<DirectoryReference, string> ModuleDirToPchHeaderFile = new Dictionary<DirectoryReference, string>();
+		readonly VCProjectFileSettings Settings;
 
 		/// This is the platform name that Visual Studio is always guaranteed to support.  We'll use this as
 		/// a platform for any project configurations where our actual platform is not supported by the
@@ -331,7 +330,7 @@ namespace UnrealBuildTool
 			PlatformProjectGenerator? PlatformProjectGenerator = PlatformProjectGenerators.GetPlatformProjectGenerator(Platform, bInAllowFailure: true);
 
 			// Check to see if this platform is supported directly by Visual Studio projects.
-			bool HasActualVSPlatform = (PlatformProjectGenerator != null) ? PlatformProjectGenerator.HasVisualStudioSupport(Platform, Configuration, ProjectFileFormat) : false;
+			bool HasActualVSPlatform = (PlatformProjectGenerator != null) && PlatformProjectGenerator.HasVisualStudioSupport(Platform, Configuration, ProjectFileFormat);
 
 			if (HasActualVSPlatform)
 			{
@@ -523,7 +522,7 @@ namespace UnrealBuildTool
 
 			public override string ToString()
 			{
-				return String.Format("{0} {1} {2}", ProjectTarget, Platform, Configuration);
+				return string.Format("{0} {1} {2}", ProjectTarget, Platform, Configuration);
 			}
 		}
 
@@ -543,7 +542,7 @@ namespace UnrealBuildTool
 						ForceIncludePaths.Insert(0, PchHeaderFile);
 						ModuleDirToPchHeaderFile[Module.ModuleDirectory] = PchHeaderFile;
 					}
-					ModuleDirToForceIncludePaths[Module.ModuleDirectory] = String.Join(";", ForceIncludePaths);
+					ModuleDirToForceIncludePaths[Module.ModuleDirectory] = string.Join(";", ForceIncludePaths);
 				}
 			}
 		}
@@ -552,7 +551,7 @@ namespace UnrealBuildTool
 		{
 			if (Location.IsUnderDirectory(ProjectFileGenerator.PrimaryProjectPath))
 			{
-				return String.Format("$(SolutionDir){0}", Location.MakeRelativeTo(ProjectFileGenerator.PrimaryProjectPath));
+				return string.Format("$(SolutionDir){0}", Location.MakeRelativeTo(ProjectFileGenerator.PrimaryProjectPath));
 			}
 			else
 			{
@@ -653,8 +652,7 @@ namespace UnrealBuildTool
 							{
 								continue;
 							}
-							UEBuildPlatform? BuildPlatform;
-							if (UEBuildPlatform.TryGetBuildPlatform(Platform, out BuildPlatform) && (BuildPlatform.HasRequiredSDKsInstalled() == SDKStatus.Valid))
+							if (UEBuildPlatform.TryGetBuildPlatform(Platform, out UEBuildPlatform? BuildPlatform) && (BuildPlatform.HasRequiredSDKsInstalled() == SDKStatus.Valid))
 							{
 								// Now go through all of the target types for this project
 								if (ProjectTargets.Count == 0)
@@ -666,8 +664,7 @@ namespace UnrealBuildTool
 								{
 									if (IsValidProjectPlatformAndConfiguration(ProjectTarget, Platform, Configuration))
 									{
-										string ProjectPlatformName, ProjectConfigurationName;
-										MakeProjectPlatformAndConfigurationNames(Platform, Configuration, ProjectTarget.TargetRules!.Type, PlatformProjectGenerators, out ProjectPlatformName, out ProjectConfigurationName);
+										MakeProjectPlatformAndConfigurationNames(Platform, Configuration, ProjectTarget.TargetRules!.Type, PlatformProjectGenerators, out string ProjectPlatformName, out string ProjectConfigurationName);
 
 										ProjectConfigAndTargetCombination Combination = new ProjectConfigAndTargetCombination(Platform, Configuration, ProjectPlatformName, ProjectConfigurationName, ProjectTarget);
 										ProjectConfigAndTargetCombinations.Add(Combination);
@@ -792,8 +789,7 @@ namespace UnrealBuildTool
 		{
 			for (DirectoryReference? CurrentDir = BaseDir; CurrentDir != null; CurrentDir = CurrentDir.ParentDirectory)
 			{
-				BuildEnvironment? BuildEnvironment;
-				if (BaseDirToBuildEnvironment.TryGetValue(CurrentDir, out BuildEnvironment))
+				if (BaseDirToBuildEnvironment.TryGetValue(CurrentDir, out BuildEnvironment? BuildEnvironment))
 				{
 					OutBuildEnvironment = BuildEnvironment;
 					return true;
@@ -843,8 +839,7 @@ namespace UnrealBuildTool
 					{
 						DirectoryReference SourceDir = SourceFile.Reference.Directory;
 
-						int Count;
-						SourceDirToCount.TryGetValue(SourceDir, out Count);
+						SourceDirToCount.TryGetValue(SourceDir, out int Count);
 						SourceDirToCount[SourceDir] = Count + 1;
 					}
 				}
@@ -855,13 +850,11 @@ namespace UnrealBuildTool
 				{
 					for (DirectoryReference? CurrentDir = Pair.Key; CurrentDir != null; CurrentDir = CurrentDir.ParentDirectory)
 					{
-						BuildEnvironment? BuildEnvironment;
-						if (BaseDirToBuildEnvironment.TryGetValue(CurrentDir, out BuildEnvironment))
+						if (BaseDirToBuildEnvironment.TryGetValue(CurrentDir, out BuildEnvironment? BuildEnvironment))
 						{
 							foreach (DirectoryReference IncludePath in BuildEnvironment.UserIncludePaths.AbsolutePaths)
 							{
-								int Count;
-								IncludePathToCount.TryGetValue(IncludePath, out Count);
+								IncludePathToCount.TryGetValue(IncludePath, out int Count);
 								IncludePathToCount[IncludePath] = Count + Pair.Value;
 							}
 							break;
@@ -1161,7 +1154,7 @@ namespace UnrealBuildTool
 				foreach (AliasedFile AliasedFile in LocalAliasedFiles)
 				{
 					// No need to add the root directory relative to the project (it would just be an empty string!)
-					if (!String.IsNullOrWhiteSpace(AliasedFile.ProjectPath))
+					if (!string.IsNullOrWhiteSpace(AliasedFile.ProjectPath))
 					{
 						FiltersFileIsNeeded = EnsureFilterPathExists(AliasedFile.ProjectPath, VCFiltersFileContent, FilterDirectories);
 					}
@@ -1191,8 +1184,7 @@ namespace UnrealBuildTool
 						DirectoryReference Directory = AliasedFile.Location.Directory;
 
 						// Find the force-included headers
-						string? ForceIncludePaths;
-						if (!DirectoryToForceIncludePaths.TryGetValue(Directory, out ForceIncludePaths))
+						if (!DirectoryToForceIncludePaths.TryGetValue(Directory, out string? ForceIncludePaths))
 						{
 							for (DirectoryReference? ParentDir = Directory; ParentDir != null; ParentDir = ParentDir.ParentDirectory)
 							{
@@ -1210,14 +1202,13 @@ namespace UnrealBuildTool
 								ForceIncludePaths = string.Join(";", PathList.Where(P => !IncludePathIsFilteredOut(new DirectoryReference(P))));
 							}
 
-							ForceIncludePaths ??= String.Empty;
+							ForceIncludePaths ??= string.Empty;
 
 							DirectoryToForceIncludePaths[Directory] = ForceIncludePaths;
 						}
 
 						// Find the PCH file
-						string? PchHeaderFile;
-						if (!DirectoryToPchFile.TryGetValue(Directory, out PchHeaderFile))
+						if (!DirectoryToPchFile.TryGetValue(Directory, out string? PchHeaderFile))
 						{
 							for (DirectoryReference? ParentDir = Directory; ParentDir != null; ParentDir = ParentDir.ParentDirectory)
 							{
@@ -1233,7 +1224,7 @@ namespace UnrealBuildTool
 						VCProjectFileContent.AppendLine("    <{0} Include=\"{1}\">", VCFileType, EscapeFileName(AliasedFile.FileSystemPath));
 						if (TryGetBuildEnvironment(Directory, out BuildEnvironment? BuildEnvironment))
 						{
-							string? IncludeSearchPaths = String.Empty;
+							string? IncludeSearchPaths = string.Empty;
 							if (!DirectoryToIncludeSearchPaths.TryGetValue(Directory, out IncludeSearchPaths))
 							{
 								StringBuilder Builder = new StringBuilder();
@@ -1254,7 +1245,7 @@ namespace UnrealBuildTool
 						VCProjectFileContent.AppendLine("    </{0}>", VCFileType);
 					}
 
-					if (!String.IsNullOrWhiteSpace(AliasedFile.ProjectPath))
+					if (!string.IsNullOrWhiteSpace(AliasedFile.ProjectPath))
 					{
 						VCFiltersFileContent.AppendLine("    <{0} Include=\"{1}\">", VCFileType, EscapeFileName(AliasedFile.FileSystemPath));
 						VCFiltersFileContent.AppendLine("      <Filter>{0}</Filter>", Utils.CleanDirectorySeparators(EscapeFileName(AliasedFile.ProjectPath)));
@@ -1427,7 +1418,7 @@ namespace UnrealBuildTool
 							SplitDirectory = PathRemaining;
 							PathRemaining = "";
 						}
-						if (!String.IsNullOrEmpty(PathSoFar))
+						if (!string.IsNullOrEmpty(PathSoFar))
 						{
 							PathSoFar += Path.DirectorySeparatorChar;
 						}
@@ -1561,7 +1552,7 @@ namespace UnrealBuildTool
 			string UProjectPath = "";
 			if (IsForeignProject)
 			{
-				UProjectPath = String.Format("\"{0}\"", InsertPathVariables(Combination.ProjectTarget!.UnrealProjectFilePath!));
+				UProjectPath = string.Format("\"{0}\"", InsertPathVariables(Combination.ProjectTarget!.UnrealProjectFilePath!));
 			}
 
 			string ConditionString = "Condition=\"'$(Configuration)|$(Platform)'=='" + Combination.ProjectConfigurationAndPlatformName + "'\"";
@@ -1596,7 +1587,7 @@ namespace UnrealBuildTool
 					string ProjectRelativeUnusedDirectory = NormalizeProjectPath(DirectoryReference.Combine(Unreal.EngineDirectory, "Intermediate", "Build", "Unused"));
 
 					string TargetName = Combination.ProjectTarget.TargetFilePath.GetFileNameWithoutAnyExtensions();
-					string ValidPlatforms = String.Join(", ", Combination.ProjectTarget.SupportedPlatforms.Select(x => x.ToString()));
+					string ValidPlatforms = string.Join(", ", Combination.ProjectTarget.SupportedPlatforms.Select(x => x.ToString()));
 
 					VCProjectFileContent.AppendLine("  <PropertyGroup {0}>", ConditionString);
 					VCProjectFileContent.AppendLine("    <OutDir>{0}{1}</OutDir>", ProjectRelativeUnusedDirectory, Path.DirectorySeparatorChar);
@@ -1860,7 +1851,7 @@ namespace UnrealBuildTool
 						if (Element.Name == "PropertyGroup")
 						{
 							string Condition = Element.GetAttribute("Condition");
-							if (!String.IsNullOrEmpty(Condition))
+							if (!string.IsNullOrEmpty(Condition))
 							{
 								Match Match = Regex.Match(Condition, "^\\s*'\\$\\(Configuration\\)\\|\\$\\(Platform\\)'\\s*==\\s*'(.+)\\|(.+)'\\s*$");
 								if (Match.Success && Match.Groups.Count == 3)
@@ -1932,12 +1923,13 @@ namespace UnrealBuildTool
 				return CachedProjectInfo[InConfiguration];
 			}
 
-			CsProjectInfo? Info;
 
-			Dictionary<string, string> Properties = new Dictionary<string, string>();
-			Properties.Add("Platform", "AnyCPU");
-			Properties.Add("Configuration", InConfiguration.ToString());
-			if (CsProjectInfo.TryRead(ProjectFilePath, Properties, out Info))
+			Dictionary<string, string> Properties = new Dictionary<string, string>
+			{
+				{ "Platform", "AnyCPU" },
+				{ "Configuration", InConfiguration.ToString() }
+			};
+			if (CsProjectInfo.TryRead(ProjectFilePath, Properties, out CsProjectInfo? Info))
 			{
 				CachedProjectInfo.Add(InConfiguration, Info);
 			}

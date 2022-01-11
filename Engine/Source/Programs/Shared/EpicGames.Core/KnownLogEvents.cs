@@ -8,7 +8,6 @@ using System.Text;
 
 namespace EpicGames.Core
 {
-#pragma warning disable CA1707 // Identifiers should not contain underscores
 	/// <summary>
 	/// Well known log events
 	/// </summary>
@@ -164,5 +163,4 @@ namespace EpicGames.Core
 		/// </summary>
 		public static EventId Systemic_MSBuild { get; } = new EventId(750);
 	}
-#pragma warning restore CA1707 // Identifiers should not contain underscores
 }

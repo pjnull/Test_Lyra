@@ -68,7 +68,7 @@ namespace EpicGames.Core
 			{
 				return DirName;
 			}
-			else if(DirName.Length > 1 && DirName[DirName.Length - 1] == Path.DirectorySeparatorChar)
+			else if(DirName.Length > 1 && DirName[^1] == Path.DirectorySeparatorChar)
 			{
 				return DirName.TrimEnd(Path.DirectorySeparatorChar);
 			}
@@ -124,7 +124,7 @@ namespace EpicGames.Core
 		public static DirectoryReference? GetSpecialFolder(Environment.SpecialFolder Folder)
 		{
 			string FolderPath = Environment.GetFolderPath(Folder);
-			return String.IsNullOrEmpty(FolderPath)? null : new DirectoryReference(FolderPath);
+			return string.IsNullOrEmpty(FolderPath)? null : new DirectoryReference(FolderPath);
 		}
 
 		/// <summary>
@@ -133,7 +133,7 @@ namespace EpicGames.Core
 		/// <returns>True if this path is a root directory, false otherwise</returns>
 		public bool IsRootDirectory()
 		{
-			return FullName[FullName.Length - 1] == Path.DirectorySeparatorChar;
+			return FullName[^1] == Path.DirectorySeparatorChar;
 		}
 
 		/// <summary>
@@ -241,7 +241,7 @@ namespace EpicGames.Core
 		/// <returns>Returns a FileReference representing the given string, or null.</returns>
 		public static DirectoryReference? FromString(string? DirectoryName)
 		{
-			if(String.IsNullOrEmpty(DirectoryName))
+			if(string.IsNullOrEmpty(DirectoryName))
 			{
 				return null;
 			}
@@ -427,7 +427,7 @@ namespace EpicGames.Core
 		/// <param name="Directory">The directory reference to write</param>
 		public static void Write(this BinaryWriter Writer, DirectoryReference Directory)
 		{
-			Writer.Write((Directory == null) ? String.Empty : Directory.FullName);
+			Writer.Write((Directory == null) ? string.Empty : Directory.FullName);
 		}
 
 		/// <summary>

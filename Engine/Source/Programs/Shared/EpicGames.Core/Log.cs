@@ -173,7 +173,7 @@ namespace EpicGames.Core
 		/// <summary>
 		/// A collection of strings that have been already written once
 		/// </summary>
-		private static HashSet<string> WriteOnceSet = new HashSet<string>();
+		private static readonly HashSet<string> WriteOnceSet = new HashSet<string>();
 
 		/// <summary>
 		/// Adds a trace listener that writes to a log file.
@@ -446,7 +446,7 @@ namespace EpicGames.Core
 		/// <param name="LogFileName">The log filename to display, if any</param>
 		public static void WriteException(Exception Ex, string? LogFileName)
 		{
-			string LogSuffix = (LogFileName == null) ? "" : String.Format("\n(see {0} for full exception trace)", LogFileName);
+			string LogSuffix = (LogFileName == null) ? "" : string.Format("\n(see {0} for full exception trace)", LogFileName);
 			TraceLog("==============================================================================");
 			TraceError("{0}{1}", ExceptionUtils.FormatException(Ex), LogSuffix);
 			TraceLog("\n{0}", ExceptionUtils.FormatExceptionDetails(Ex));
@@ -473,7 +473,7 @@ namespace EpicGames.Core
 		[StringFormatMethod("Format")]
 		public static void TraceErrorTask(FileReference File, string Format, params object?[] Args)
 		{
-			WriteLinePrivate(false, LogEventType.Error, LogFormatOptions.NoSeverityPrefix, "{0}: error: {1}", File, String.Format(Format, Args));
+			WriteLinePrivate(false, LogEventType.Error, LogFormatOptions.NoSeverityPrefix, "{0}: error: {1}", File, string.Format(Format, Args));
 		}
 
 		/// <summary>
@@ -486,7 +486,7 @@ namespace EpicGames.Core
 		[StringFormatMethod("Format")]
 		public static void TraceErrorTask(FileReference File, int Line, string Format, params object?[] Args)
 		{
-			WriteLinePrivate(false, LogEventType.Error, LogFormatOptions.NoSeverityPrefix, "{0}({1}): error: {2}", File, Line, String.Format(Format, Args));
+			WriteLinePrivate(false, LogEventType.Error, LogFormatOptions.NoSeverityPrefix, "{0}({1}): error: {2}", File, Line, string.Format(Format, Args));
 		}
 
 		/// <summary>
@@ -532,7 +532,7 @@ namespace EpicGames.Core
 		[StringFormatMethod("Format")]
 		public static void TraceWarningTask(FileReference File, string Format, params object?[] Args)
 		{
-			WriteLinePrivate(false, LogEventType.Warning, LogFormatOptions.NoSeverityPrefix, "{0}: warning: {1}", File, String.Format(Format, Args));
+			WriteLinePrivate(false, LogEventType.Warning, LogFormatOptions.NoSeverityPrefix, "{0}: warning: {1}", File, string.Format(Format, Args));
 		}
 
 		/// <summary>
@@ -545,7 +545,7 @@ namespace EpicGames.Core
 		[StringFormatMethod("Format")]
 		public static void TraceWarningTask(FileReference File, int Line, string Format, params object?[] Args)
 		{
-			WriteLinePrivate(false, LogEventType.Warning, LogFormatOptions.NoSeverityPrefix, "{0}({1}): warning: {2}", File, Line, String.Format(Format, Args));
+			WriteLinePrivate(false, LogEventType.Warning, LogFormatOptions.NoSeverityPrefix, "{0}({1}): warning: {2}", File, Line, string.Format(Format, Args));
 		}
 
 		/// <summary>
@@ -557,7 +557,7 @@ namespace EpicGames.Core
 		/// <param name="Args">Optional arguments</param>
 		public static void TraceConsoleTask(FileReference File, int Line, string Format, params object?[] Args)
 		{
-			WriteLinePrivate(false, LogEventType.Console, LogFormatOptions.NoSeverityPrefix, "{0}({1}): {2}", File, Line, String.Format(Format, Args));
+			WriteLinePrivate(false, LogEventType.Console, LogFormatOptions.NoSeverityPrefix, "{0}({1}): {2}", File, Line, string.Format(Format, Args));
 		}
 
 
@@ -664,7 +664,7 @@ namespace EpicGames.Core
 		[StringFormatMethod("Format")]
 		public static void TraceWarningOnce(FileReference File, string Format, params object?[] Args)
 		{
-			WriteLinePrivate( true, LogEventType.Warning, LogFormatOptions.NoSeverityPrefix, "{0}: warning: {1}", File, String.Format(Format, Args));
+			WriteLinePrivate( true, LogEventType.Warning, LogFormatOptions.NoSeverityPrefix, "{0}: warning: {1}", File, string.Format(Format, Args));
 		}
 
 		/// <summary>
@@ -677,7 +677,7 @@ namespace EpicGames.Core
 		[StringFormatMethod("Format")]
 		public static void TraceWarningOnce(FileReference File, int Line, string Format, params object?[] Args)
 		{
-			WriteLinePrivate(true, LogEventType.Warning, LogFormatOptions.NoSeverityPrefix, "{0}({1}): warning: {2}", File, Line, String.Format(Format, Args));
+			WriteLinePrivate(true, LogEventType.Warning, LogFormatOptions.NoSeverityPrefix, "{0}({1}): warning: {2}", File, Line, string.Format(Format, Args));
 		}
 
 		/// <summary>
@@ -775,7 +775,7 @@ namespace EpicGames.Core
 		/// <summary>
 		/// Object used for synchronization
 		/// </summary>
-		private object SyncObject = new object();
+		private readonly object SyncObject = new object();
 
 		/// <summary>
 		/// Minimum level for outputting messages
@@ -837,12 +837,12 @@ namespace EpicGames.Core
 		/// <summary>
 		/// When configured, this tracks time since initialization to prepend a timestamp to each log.
 		/// </summary>
-		private Stopwatch Timer = Stopwatch.StartNew();
+		private readonly Stopwatch Timer = Stopwatch.StartNew();
 
 		/// <summary>
 		/// Stack of status scope information.
 		/// </summary>
-		private Stack<StatusMessage> StatusMessageStack = new Stack<StatusMessage>();
+		private readonly Stack<StatusMessage> StatusMessageStack = new Stack<StatusMessage>();
 
 		/// <summary>
 		/// The currently visible status text
@@ -852,10 +852,9 @@ namespace EpicGames.Core
 		/// <summary>
 		/// Last time a status message was pushed to the stack
 		/// </summary>
-		private Stopwatch StatusTimer = new Stopwatch();
-
-		ArrayBufferWriter<byte> JsonBufferWriter;
-		Utf8JsonWriter JsonWriter;
+		private readonly Stopwatch StatusTimer = new Stopwatch();
+		readonly ArrayBufferWriter<byte> JsonBufferWriter;
+		readonly Utf8JsonWriter JsonWriter;
 
 		/// <summary>
 		/// Constructor
@@ -978,7 +977,7 @@ namespace EpicGames.Core
 			lock (SyncObject)
 			{
 				// Output to all the other trace listeners
-				string TimePrefix = String.Format("[{0:hh\\:mm\\:ss\\.fff}] ", Timer.Elapsed);
+				string TimePrefix = string.Format("[{0:hh\\:mm\\:ss\\.fff}] ", Timer.Elapsed);
 				foreach (TraceListener? Listener in Trace.Listeners)
 				{
 					if (Listener != null)
@@ -987,7 +986,7 @@ namespace EpicGames.Core
 							IncludeTimestamps &&
 							!(Listener is DefaultTraceListener) // no timestamps when writing to the Visual Studio debug window
 							? TimePrefix
-							: String.Empty;
+							: string.Empty;
 
 						foreach (string Line in Lines)
 						{

@@ -239,25 +239,22 @@ namespace UnrealBuildTool
 		{
 			ModuleDescriptor Module = new ModuleDescriptor(InObject.GetStringField("Name"), InObject.GetEnumField<ModuleHostType>("Type"));
 
-			ModuleLoadingPhase LoadingPhase;
-			if (InObject.TryGetEnumField<ModuleLoadingPhase>("LoadingPhase", out LoadingPhase))
+			if (InObject.TryGetEnumField<ModuleLoadingPhase>("LoadingPhase", out ModuleLoadingPhase LoadingPhase))
 			{
 				Module.LoadingPhase = LoadingPhase;
 			}
 
 			try
 			{
-				string[]? PlatformAllowList;
 				// it's important we default to null, and don't have an empty allow list by default, because that will indicate that no
 				// platforms should be compiled (see IsCompiledInConfiguration(), it only checks for null, not length)
 				Module.PlatformAllowList = null;
-				if (InObject.TryGetStringArrayFieldWithDeprecatedFallback("PlatformAllowList", "WhitelistPlatforms", out PlatformAllowList))
+				if (InObject.TryGetStringArrayFieldWithDeprecatedFallback("PlatformAllowList", "WhitelistPlatforms", out string[]? PlatformAllowList))
 				{
 					Module.PlatformAllowList = new List<UnrealTargetPlatform>();
 					foreach (string TargetPlatformName in PlatformAllowList)
 					{
-						UnrealTargetPlatform Platform;
-						if (UnrealTargetPlatform.TryParse(TargetPlatformName, out Platform))
+						if (UnrealTargetPlatform.TryParse(TargetPlatformName, out UnrealTargetPlatform Platform))
 						{
 							Module.PlatformAllowList.Add(Platform);
 						}
@@ -268,14 +265,12 @@ namespace UnrealBuildTool
 					}
 				}
 
-				string[]? PlatformDenyList;
-				if (InObject.TryGetStringArrayFieldWithDeprecatedFallback("PlatformDenyList", "BlacklistPlatforms", out PlatformDenyList))
+				if (InObject.TryGetStringArrayFieldWithDeprecatedFallback("PlatformDenyList", "BlacklistPlatforms", out string[]? PlatformDenyList))
 				{
 					Module.PlatformDenyList = new List<UnrealTargetPlatform>();
 					foreach (string TargetPlatformName in PlatformDenyList)
 					{
-						UnrealTargetPlatform Platform;
-						if (UnrealTargetPlatform.TryParse(TargetPlatformName, out Platform))
+						if (UnrealTargetPlatform.TryParse(TargetPlatformName, out UnrealTargetPlatform Platform))
 						{
 							Module.PlatformDenyList.Add(Platform);
 						}
@@ -292,50 +287,42 @@ namespace UnrealBuildTool
 				throw;
 			}
 
-			TargetType[]? TargetAllowList;
-			if (InObject.TryGetEnumArrayFieldWithDeprecatedFallback<TargetType>("TargetAllowList", "WhitelistTargets", out TargetAllowList))
+			if (InObject.TryGetEnumArrayFieldWithDeprecatedFallback<TargetType>("TargetAllowList", "WhitelistTargets", out TargetType[]? TargetAllowList))
 			{
 				Module.TargetAllowList = TargetAllowList;
 			}
 
-			TargetType[]? TargetDenyList;
-			if (InObject.TryGetEnumArrayFieldWithDeprecatedFallback<TargetType>("TargetDenyList", "BlacklistTargets", out TargetDenyList))
+			if (InObject.TryGetEnumArrayFieldWithDeprecatedFallback<TargetType>("TargetDenyList", "BlacklistTargets", out TargetType[]? TargetDenyList))
 			{
 				Module.TargetDenyList = TargetDenyList;
 			}
 
-			UnrealTargetConfiguration[]? TargetConfigurationAllowList;
-			if (InObject.TryGetEnumArrayFieldWithDeprecatedFallback<UnrealTargetConfiguration>("TargetConfigurationAllowList", "WhitelistTargetConfigurations", out TargetConfigurationAllowList))
+			if (InObject.TryGetEnumArrayFieldWithDeprecatedFallback<UnrealTargetConfiguration>("TargetConfigurationAllowList", "WhitelistTargetConfigurations", out UnrealTargetConfiguration[]? TargetConfigurationAllowList))
 			{
 				Module.TargetConfigurationAllowList = TargetConfigurationAllowList;
 			}
 
-			UnrealTargetConfiguration[]? TargetConfigurationDenyList;
-			if (InObject.TryGetEnumArrayFieldWithDeprecatedFallback<UnrealTargetConfiguration>("TargetConfigurationDenyList", "BlacklistTargetConfigurations", out TargetConfigurationDenyList))
+			if (InObject.TryGetEnumArrayFieldWithDeprecatedFallback<UnrealTargetConfiguration>("TargetConfigurationDenyList", "BlacklistTargetConfigurations", out UnrealTargetConfiguration[]? TargetConfigurationDenyList))
 			{
 				Module.TargetConfigurationDenyList = TargetConfigurationDenyList;
 			}
 
-			string[]? ProgramAllowList;
-			if (InObject.TryGetStringArrayFieldWithDeprecatedFallback("ProgramAllowList", "WhitelistPrograms", out ProgramAllowList))
+			if (InObject.TryGetStringArrayFieldWithDeprecatedFallback("ProgramAllowList", "WhitelistPrograms", out string[]? ProgramAllowList))
 			{
 				Module.ProgramAllowList = ProgramAllowList;
 			}
 
-			string[]? ProgramDenyList;
-			if (InObject.TryGetStringArrayFieldWithDeprecatedFallback("ProgramDenyList", "BlacklistPrograms", out ProgramDenyList))
+			if (InObject.TryGetStringArrayFieldWithDeprecatedFallback("ProgramDenyList", "BlacklistPrograms", out string[]? ProgramDenyList))
 			{
 				Module.ProgramDenyList = ProgramDenyList;
 			}
 
-			string[]? AdditionalDependencies;
-			if (InObject.TryGetStringArrayField("AdditionalDependencies", out AdditionalDependencies))
+			if (InObject.TryGetStringArrayField("AdditionalDependencies", out string[]? AdditionalDependencies))
 			{
 				Module.AdditionalDependencies = AdditionalDependencies;
 			}
 
-			bool bHasExplicitPlatforms;
-			if (InObject.TryGetBoolField("HasExplicitPlatforms", out bHasExplicitPlatforms))
+			if (InObject.TryGetBoolField("HasExplicitPlatforms", out bool bHasExplicitPlatforms))
 			{
 				Module.bHasExplicitPlatforms = bHasExplicitPlatforms;
 			}

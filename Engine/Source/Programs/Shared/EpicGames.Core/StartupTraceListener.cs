@@ -19,7 +19,7 @@ namespace EpicGames.Core
 	/// </summary>
 	public class StartupTraceListener : TraceListener
 	{
-		StringBuilder Buffer = new StringBuilder();
+		readonly StringBuilder Buffer = new StringBuilder();
 
 		/// <summary>
 		/// Copy the contents of the buffered output to another trace listener

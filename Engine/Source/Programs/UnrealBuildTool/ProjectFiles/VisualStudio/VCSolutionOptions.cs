@@ -122,11 +122,11 @@ namespace UnrealBuildTool
 			switch (Type)
 			{
 				case ValueType.Bool:
-					return String.Format("{0} = {1}", Name, BoolValue);
+					return string.Format("{0} = {1}", Name, BoolValue);
 				case ValueType.String:
-					return String.Format("{0} = {1}", Name, StringValue);
+					return string.Format("{0} = {1}", Name, StringValue);
 			}
-			return String.Format("{0} = ???", Name);
+			return string.Format("{0} = ???", Name);
 		}
 	}
 
@@ -225,27 +225,22 @@ namespace UnrealBuildTool
 
 		public VCOleContainer(string InputFileName)
 		{
-			IOleStorage? Storage = null;
-			StgOpenStorage(InputFileName, null, STGM.Direct | STGM.Read | STGM.ShareExclusive, IntPtr.Zero, 0, out Storage);
+			StgOpenStorage(InputFileName, null, STGM.Direct | STGM.Read | STGM.ShareExclusive, IntPtr.Zero, 0, out IOleStorage? Storage);
 			try
 			{
-				IOleEnumSTATSTG? Enumerator = null;
-				Storage.EnumElements(0, IntPtr.Zero, 0, out Enumerator);
+				Storage.EnumElements(0, IntPtr.Zero, 0, out IOleEnumSTATSTG? Enumerator);
 				try
 				{
-					uint Fetched;
 					STATSTG[] Stats = new STATSTG[200];
-					Enumerator.Next((uint)Stats.Length, Stats, out Fetched);
+					Enumerator.Next((uint)Stats.Length, Stats, out uint Fetched);
 
 					for (uint Idx = 0; Idx < Fetched; Idx++)
 					{
-						IOleStream OleStream;
-						Storage.OpenStream(Stats[Idx].pwcsName, IntPtr.Zero, STGM.Read | STGM.ShareExclusive, 0, out OleStream);
+						Storage.OpenStream(Stats[Idx].pwcsName, IntPtr.Zero, STGM.Read | STGM.ShareExclusive, 0, out IOleStream OleStream);
 						try
 						{
-							uint SizeRead;
 							byte[] Buffer = new byte[Stats[Idx].cbSize];
-							OleStream.Read(Buffer, (uint)Stats[Idx].cbSize, out SizeRead);
+							OleStream.Read(Buffer, (uint)Stats[Idx].cbSize, out uint SizeRead);
 							Sections.Add(new KeyValuePair<string, byte[]>(Stats[Idx].pwcsName, Buffer));
 						}
 						finally
@@ -267,18 +262,15 @@ namespace UnrealBuildTool
 
 		public void Write(string OutputFileName)
 		{
-			IOleStorage? OleStorage = null;
-			StgCreateDocfile(OutputFileName, STGM.Direct | STGM.Create | STGM.Write | STGM.ShareExclusive, 0, out OleStorage);
+			StgCreateDocfile(OutputFileName, STGM.Direct | STGM.Create | STGM.Write | STGM.ShareExclusive, 0, out IOleStorage? OleStorage);
 			try
 			{
 				foreach (KeyValuePair<string, byte[]> Section in Sections)
 				{
-					IOleStream? OleStream = null;
-					OleStorage.CreateStream(Section.Key, STGM.Write | STGM.ShareExclusive, 0, 0, out OleStream);
+					OleStorage.CreateStream(Section.Key, STGM.Write | STGM.ShareExclusive, 0, 0, out IOleStream? OleStream);
 					try
 					{
-						uint Written;
-						OleStream.Write(Section.Value, (uint)Section.Value.Length, out Written);
+						OleStream.Write(Section.Value, (uint)Section.Value.Length, out uint Written);
 						OleStream.Commit(STGC.Overwrite);
 					}
 					finally
@@ -313,8 +305,7 @@ namespace UnrealBuildTool
 
 		public byte[] GetSection(string Name)
 		{
-			byte[]? Data;
-			if (!TryGetSection(Name, out Data))
+			if (!TryGetSection(Name, out byte[]? Data))
 			{
 				throw new KeyNotFoundException();
 			}
@@ -535,7 +526,7 @@ namespace UnrealBuildTool
 
 	class VCSolutionOptions : VCOleContainer
 	{
-		VCProjectFileFormat Format;
+		readonly VCProjectFileFormat Format;
 
 		public VCSolutionOptions(VCProjectFileFormat Format)
 		{
@@ -550,37 +541,31 @@ namespace UnrealBuildTool
 
 		public IEnumerable<VCBinarySetting> GetConfiguration()
 		{
-			byte[]? Data;
-			if (TryGetSection("SolutionConfiguration", out Data))
+			if (TryGetSection("SolutionConfiguration", out byte[]? Data))
 			{
-				using (MemoryStream InputStream = new MemoryStream(Data, false))
+				using MemoryStream InputStream = new MemoryStream(Data, false);
+				BinaryReader Reader = new BinaryReader(InputStream, Encoding.Unicode);
+				while (InputStream.Position < InputStream.Length)
 				{
-					BinaryReader Reader = new BinaryReader(InputStream, Encoding.Unicode);
-					while (InputStream.Position < InputStream.Length)
-					{
-						yield return VCBinarySetting.Read(Reader);
-					}
+					yield return VCBinarySetting.Read(Reader);
 				}
 			}
 		}
 
 		public void SetConfiguration(IEnumerable<VCBinarySetting> Settings)
 		{
-			using (MemoryStream OutputStream = new MemoryStream())
+			using MemoryStream OutputStream = new MemoryStream();
+			BinaryWriter Writer = new BinaryWriter(OutputStream, Encoding.Unicode);
+			foreach (VCBinarySetting Setting in Settings)
 			{
-				BinaryWriter Writer = new BinaryWriter(OutputStream, Encoding.Unicode);
-				foreach (VCBinarySetting Setting in Settings)
-				{
-					Setting.Write(Writer);
-				}
-				SetSection("SolutionConfiguration", OutputStream.ToArray());
+				Setting.Write(Writer);
 			}
+			SetSection("SolutionConfiguration", OutputStream.ToArray());
 		}
 
 		public VCSolutionExplorerState? GetExplorerState()
 		{
-			byte[]? Data;
-			if (TryGetSection("ProjExplorerState", out Data))
+			if (TryGetSection("ProjExplorerState", out byte[]? Data))
 			{
 				VCSolutionExplorerState State = new VCSolutionExplorerState();
 				State.Read(new MemoryStream(Data, false), Format);
@@ -591,11 +576,9 @@ namespace UnrealBuildTool
 
 		public void SetExplorerState(VCSolutionExplorerState State)
 		{
-			using (MemoryStream OutputStream = new MemoryStream())
-			{
-				State.Write(OutputStream, Format);
-				SetSection("ProjExplorerState", OutputStream.ToArray());
-			}
+			using MemoryStream OutputStream = new MemoryStream();
+			State.Write(OutputStream, Format);
+			SetSection("ProjExplorerState", OutputStream.ToArray());
 		}
 	}
 }

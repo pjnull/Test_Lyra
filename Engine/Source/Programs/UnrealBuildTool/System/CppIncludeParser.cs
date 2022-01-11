@@ -145,12 +145,12 @@ namespace UnrealBuildTool
 
 			Token.Append((char)NextChar);
 
-			if(Char.IsLetterOrDigit((char)NextChar))
+			if(char.IsLetterOrDigit((char)NextChar))
 			{
 				for(;;)
 				{
 					NextChar = Reader.Read();
-					if(NextChar == -1 || !Char.IsLetterOrDigit((char)NextChar))
+					if(NextChar == -1 || !char.IsLetterOrDigit((char)NextChar))
 					{
 						break;
 					}

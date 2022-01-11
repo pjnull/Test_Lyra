@@ -463,7 +463,7 @@ namespace UnrealBuildTool
 		{
 			if (ResponseFile == null)
 			{
-				return String.Join(" ", Arguments);
+				return string.Join(" ", Arguments);
 			}
 			else
 			{
@@ -474,7 +474,7 @@ namespace UnrealBuildTool
 				{
 					ResponseFileString = ResponseFile.FullName;
 				}
-				return String.Format("@{0}", Utils.MakePathSafeToUseWithCommandLine(ResponseFileString));
+				return string.Format("@{0}", Utils.MakePathSafeToUseWithCommandLine(ResponseFileString));
 			}
 		}
 
@@ -482,25 +482,25 @@ namespace UnrealBuildTool
 		{
 			List<string> Arguments = new List<string>();
 			string DependencyListFileString = VCToolChain.NormalizeCommandLinePath(DependencyListFile!, CompilerType, PreprocessedFile != null);
-			Arguments.Add(String.Format("-dependencies={0}", Utils.MakePathSafeToUseWithCommandLine(DependencyListFileString)));
+			Arguments.Add(string.Format("-dependencies={0}", Utils.MakePathSafeToUseWithCommandLine(DependencyListFileString)));
 
 			if (TimingFile != null)
 			{
 				string TimingFileString = VCToolChain.NormalizeCommandLinePath(TimingFile, CompilerType, PreprocessedFile != null);
-				Arguments.Add(String.Format("-timing={0}", Utils.MakePathSafeToUseWithCommandLine(TimingFileString)));
+				Arguments.Add(string.Format("-timing={0}", Utils.MakePathSafeToUseWithCommandLine(TimingFileString)));
 			}
 			if (bShowIncludes)
 			{
 				Arguments.Add("-showincludes");
 			}
 
-			Arguments.Add(String.Format("-compiler={0}", Utils.MakePathSafeToUseWithCommandLine(CompilerExe.AbsolutePath)));
+			Arguments.Add(string.Format("-compiler={0}", Utils.MakePathSafeToUseWithCommandLine(CompilerExe.AbsolutePath)));
 			Arguments.Add("--");
 			Arguments.Add(Utils.MakePathSafeToUseWithCommandLine(CompilerExe.AbsolutePath));
 			Arguments.Add(GetClArguments());
 			Arguments.Add("/showIncludes");
 
-			return String.Join(" ", Arguments);
+			return string.Join(" ", Arguments);
 		}
 	}
 

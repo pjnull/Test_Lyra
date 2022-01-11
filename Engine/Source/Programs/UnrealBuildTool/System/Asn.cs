@@ -59,11 +59,13 @@ namespace UnrealBuildTool
 			int Length = ReadLength(Reader);
 
 			// Unpack the type
-			FieldInfo Field = new FieldInfo();
-			Field.TagClass = (Type >> 6);
-			Field.bPrimitive = (Type & 0x20) == 0;
-			Field.Tag = (FieldTag)(Type & 0x1f);
-			Field.Length = Length;
+			FieldInfo Field = new FieldInfo
+			{
+				TagClass = (Type >> 6),
+				bPrimitive = (Type & 0x20) == 0,
+				Tag = (FieldTag)(Type & 0x1f),
+				Length = Length
+			};
 			return Field;
 		}
 
@@ -102,10 +104,12 @@ namespace UnrealBuildTool
 		{
 			byte[] Data = Reader.ReadBytes(Length);
 
-			List<int> Values = new List<int>();
-			Values.Add((int)Data[0] / 40);
-			Values.Add((int)Data[0] % 40);
-			for(int Idx = 1; Idx < Data.Length; Idx++)
+			List<int> Values = new List<int>
+			{
+				(int)Data[0] / 40,
+				(int)Data[0] % 40
+			};
+			for (int Idx = 1; Idx < Data.Length; Idx++)
 			{
 				int Value = (int)Data[Idx] & 0x7f;
 				while(((int)Data[Idx] & 0x80) != 0)
@@ -119,10 +123,9 @@ namespace UnrealBuildTool
 
 		public static string GetObjectIdentifierName(int[] Values)
 		{
-			string? Description;
-			if(!TryGetObjectIdentifierName(Values, out Description))
+			if (!TryGetObjectIdentifierName(Values, out string? Description))
 			{
-				Description = String.Format("Unknown ({0})", String.Join(", ", Values.Select(x => x.ToString())));
+				Description = string.Format("Unknown ({0})", string.Join(", ", Values.Select(x => x.ToString())));
 			}
 			return Description;
 		}
@@ -156,7 +159,7 @@ namespace UnrealBuildTool
 					switch(Field.Tag)
 					{
 						case FieldTag.INTEGER:
-							Description = String.Format("{0}", ReadInteger(Reader, Field.Length));
+							Description = string.Format("{0}", ReadInteger(Reader, Field.Length));
 							break;
 						case FieldTag.OBJECT_IDENTIFIER:
 							Description = GetObjectIdentifierName(ReadObjectIdentifier(Reader, Field.Length));
@@ -169,7 +172,7 @@ namespace UnrealBuildTool
 							Description = "unknown";
 							break;
 					}
-					DescriptionSuffix = String.Format(" = {0}", Description);
+					DescriptionSuffix = string.Format(" = {0}", Description);
 				}
 			}
 

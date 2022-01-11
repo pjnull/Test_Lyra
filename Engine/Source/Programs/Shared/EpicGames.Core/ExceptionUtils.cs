@@ -44,7 +44,7 @@ namespace EpicGames.Core
 		/// <param name="Args">Message to append to the context list</param>
 		public static void AddContext(Exception Ex, string Format, params object[] Args)
 		{
-			AddContext(Ex, String.Format(Format, Args));
+			AddContext(Ex, string.Format(Format, Args));
 		}
 
 		/// <summary>
@@ -132,11 +132,11 @@ namespace EpicGames.Core
 						string ValueString;
 						if(Value is List<string>)
 						{
-							ValueString = String.Format("({0})", String.Join(", ", ((List<string>)Value).Select(x => String.Format("\"{0}\"", x))));
+							ValueString = string.Format("({0})", string.Join(", ", ((List<string>)Value).Select(x => string.Format("\"{0}\"", x))));
 						}
 						else
 						{
-							ValueString = Value.ToString() ?? String.Empty;
+							ValueString = Value.ToString() ?? string.Empty;
 						}
 
 						Message.AppendFormat("   data: {0} = {1}", Key, ValueString);
