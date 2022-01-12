@@ -930,6 +930,8 @@ public:
 
 		const bool bIsActive = OwnerTable->AsWidget()->HasKeyboardFocus();
 
+		const bool bItemHasChildren = OwnerTable->Private_DoesItemHaveChildren( IndexInList );
+
 		static FName GenericWhiteBoxBrush("GenericWhiteBox");
 
 		// @todo: Slate Style - make this part of the widget style
@@ -972,6 +974,12 @@ public:
 						? (bEvenEntryIndex ? &Style->EvenRowBackgroundHoveredBrush : &Style->OddRowBackgroundHoveredBrush)
 						: &Style->InactiveHighlightedBrush;
 				}
+			}
+			else if (bItemHasChildren && Style->bUseParentRowBrush && GetIndentLevel() == 0)
+			{
+				return IsHovered() 
+				? &Style->ParentRowBackgroundHoveredBrush	
+				: &Style->ParentRowBackgroundBrush;	
 			}
 			else
 			{
