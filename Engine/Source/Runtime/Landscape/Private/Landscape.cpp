@@ -73,6 +73,7 @@ Landscape.cpp: Terrain rendering
 #include "UObject/EditorObjectVersion.h"
 #include "Algo/BinarySearch.h"
 #include "WorldPartition/WorldPartition.h"
+#include "WorldPartition/WorldPartitionHelpers.h"
 #include "WorldPartition/WorldPartitionHandle.h"
 #include "WorldPartition/Landscape/LandscapeActorDesc.h"
 #include "WorldPartition/Landscape/LandscapeSplineActorDesc.h"
@@ -3638,16 +3639,25 @@ FBox ULandscapeInfo::GetCompleteBounds() const
 
 	FBox Bounds(EForceInit::ForceInit);
 
-	for (const FWorldPartitionHandle& ProxyHandle : ProxyHandles)
+	if (UWorldPartition* WorldPartition = Landscape->GetWorld()->GetWorldPartition())
 	{
-		// Skip owning landscape actor
-		ALandscapeProxy* LandscapeProxy = Cast<ALandscapeProxy>(ProxyHandle->GetActor());
-		if (LandscapeProxy == Landscape)
+		FWorldPartitionHelpers::ForEachActorDesc<ALandscapeProxy>(WorldPartition, [this, &Bounds](const FWorldPartitionActorDesc* ActorDesc)
 		{
-			continue;
-		}
+			FLandscapeActorDesc* LandscapeActorDesc = (FLandscapeActorDesc*)ActorDesc;
 
-		Bounds += ProxyHandle->GetBounds();
+			if (LandscapeActorDesc->GridGuid == LandscapeGuid)
+			{
+				ALandscapeProxy* LandscapeProxy = Cast<ALandscapeProxy>(ActorDesc->GetActor());
+
+				// Skip owning landscape actor
+				if (LandscapeProxy != LandscapeActor)
+				{
+					Bounds += ActorDesc->GetBounds();
+				}
+			}
+
+			return true;
+		});
 	}
 
 	return Bounds;
