@@ -3577,11 +3577,9 @@ void ULandscapeInfo::UnregisterActorComponent(ULandscapeComponent* Component)
 	}
 }
 
-FBox ULandscapeInfo::GetLoadedBounds() const
+namespace LandscapeInfoBoundsHelper
 {
-	FBox Bounds(EForceInit::ForceInit);
-
-	auto UpdateBounds = [&Bounds](ALandscapeProxy* Proxy)
+	void AccumulateBounds(ALandscapeProxy* Proxy, FBox& Bounds)
 	{
 		const bool bOnlyCollidingComponents = false;
 		const bool bIncludeChildActors = false;
@@ -3595,11 +3593,16 @@ FBox ULandscapeInfo::GetLoadedBounds() const
 		{
 			Bounds += FBox::BuildAABB(Origin, BoxExtents);
 		}
-	};
+	}
+}
+
+FBox ULandscapeInfo::GetLoadedBounds() const
+{
+	FBox Bounds(EForceInit::ForceInit);
 
 	if (LandscapeActor.IsValid())
 	{
-		UpdateBounds(LandscapeActor.Get());
+		LandscapeInfoBoundsHelper::AccumulateBounds(LandscapeActor.Get(), Bounds);
 	}
 
 	// Since in PIE/in-game the Proxies aren't populated, we must iterate through the loaded components
@@ -3620,7 +3623,7 @@ FBox ULandscapeInfo::GetLoadedBounds() const
 
 	for (ALandscapeProxy* Proxy : LoadedProxies)
 	{
-		UpdateBounds(Proxy);
+		LandscapeInfoBoundsHelper::AccumulateBounds(Proxy, Bounds);
 	}
 
 	return Bounds;
@@ -3641,7 +3644,7 @@ FBox ULandscapeInfo::GetCompleteBounds() const
 
 	if (UWorldPartition* WorldPartition = Landscape->GetWorld()->GetWorldPartition())
 	{
-		FWorldPartitionHelpers::ForEachActorDesc<ALandscapeProxy>(WorldPartition, [this, &Bounds](const FWorldPartitionActorDesc* ActorDesc)
+		FWorldPartitionHelpers::ForEachActorDesc<ALandscapeProxy>(WorldPartition, [this, &Bounds, Landscape](const FWorldPartitionActorDesc* ActorDesc)
 		{
 			FLandscapeActorDesc* LandscapeActorDesc = (FLandscapeActorDesc*)ActorDesc;
 
@@ -3650,9 +3653,17 @@ FBox ULandscapeInfo::GetCompleteBounds() const
 				ALandscapeProxy* LandscapeProxy = Cast<ALandscapeProxy>(ActorDesc->GetActor());
 
 				// Skip owning landscape actor
-				if (LandscapeProxy != LandscapeActor)
+				if (LandscapeProxy != Landscape)
 				{
-					Bounds += ActorDesc->GetBounds();
+					if (LandscapeProxy)
+					{
+						// Prioritize loaded bounds, as the bounds in the actor desc might not be up-to-date
+						LandscapeInfoBoundsHelper::AccumulateBounds(LandscapeProxy, Bounds);
+					}
+					else
+					{
+						Bounds += ActorDesc->GetBounds();
+					}
 				}
 			}
 
