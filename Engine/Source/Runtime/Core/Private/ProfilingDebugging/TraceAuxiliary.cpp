@@ -81,6 +81,7 @@ public:
 	bool					IsConnected() const;
 	void					GetActiveChannelsString(FStringBuilderBase& String) const;
 	void					AddCommandlineChannels(const TCHAR* ChannelList);
+	void					ResetCommandlineChannels();
 	void					EnableChannels(const TCHAR* ChannelList);
 	void					DisableChannels(const TCHAR* ChannelList);
 	bool					Connect(ETraceConnectType Type, const TCHAR* Parameter);
@@ -131,6 +132,12 @@ static FDelegateHandle GEndFrameStatDelegateHandle;
 void FTraceAuxiliaryImpl::AddCommandlineChannels(const TCHAR* ChannelList)
 {
 	ForEachChannel(ChannelList, true, &FTraceAuxiliaryImpl::AddChannel);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+void FTraceAuxiliaryImpl::ResetCommandlineChannels()
+{
+	CommandlineChannels.Reset();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -265,13 +272,6 @@ bool FTraceAuxiliaryImpl::Connect(ETraceConnectType Type, const TCHAR* Parameter
 	if (!bConnected)
 	{
 		return false;
-	}
-
-	// We're now connected. If we don't appear to have any channels we'll set
-	// some defaults for the user. Less futzing.
-	if (!CommandlineChannels.Num())
-	{
-		AddCommandlineChannels(GDefaultChannels);
 	}
 
 	ResumeChannels();
@@ -1070,6 +1070,7 @@ bool FTraceAuxiliary::Start(EConnectionType Type, const TCHAR* Target, const TCH
 	if (Channels)
 	{
 		UE_LOG(LogCore, Display, TEXT("Trace channels: '%s'"), Channels);
+		GTraceAuxiliary.ResetCommandlineChannels();
 		GTraceAuxiliary.AddCommandlineChannels(Channels);
 		GTraceAuxiliary.EnableCommandlineChannels();
 	}
@@ -1273,12 +1274,13 @@ void FTraceAuxiliary::TryAutoConnect()
 	if (bShouldAutoConnect)
 	{
 	#if PLATFORM_WINDOWS
-	// If we can detect a named event it means UnrealInsights (Browser Mode) is running.
-	// In this case, we try to auto-connect with the Trace Server.
+		// If we can detect a named event it means UnrealInsights (Browser Mode) is running.
+		// In this case, we try to auto-connect with the Trace Server.
 		HANDLE KnownEvent = ::OpenEvent(EVENT_ALL_ACCESS, false, TEXT("Local\\UnrealInsightsBrowser"));
 		if (KnownEvent != nullptr)
 		{
-			Start(EConnectionType::Network, TEXT("127.0.0.1"), nullptr, nullptr);
+			UE_LOG(LogCore, Display, TEXT("Unreal Insights instance detected, auto-connecting to local trace server..."));
+			Start(EConnectionType::Network, TEXT("127.0.0.1"), TEXT("default"), nullptr);
 			::CloseHandle(KnownEvent);
 		}
 	#endif
