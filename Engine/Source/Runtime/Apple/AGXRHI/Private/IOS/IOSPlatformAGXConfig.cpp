@@ -1,10 +1,11 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#if !PLATFORM_TVOS
-
 #include "IOSPlatformAGXConfig.h"
 #include "RHI.h"
 #include "AGXRHIPrivate.h"
+
+
+#if !PLATFORM_TVOS
 
 
 //------------------------------------------------------------------------------
@@ -15,5 +16,6 @@ void FIOSAGXConfig::PopulateRHIGlobals()
 {
     // TODO
 }
+
 
 #endif // !PLATFORM_TVOS
