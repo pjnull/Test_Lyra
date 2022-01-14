@@ -7,6 +7,7 @@
 #include "MLDeformerVizSettings.h"
 #include "MLDeformerInputInfo.h"
 #include "BoneContainer.h"
+#include "CurveReference.h"
 #include "RenderCommandFence.h"
 #include "UObject/Object.h"
 #include "RenderResource.h"
@@ -126,11 +127,9 @@ public:
 #endif
 	//~End of UObject interface
 
-
 	//~IBoneReferenceSkeletonProvider interface
 	USkeleton* GetSkeleton(bool& bInvalidSkeletonIsError) override;
 	//~End of IBoneReferenceSkeletonProvider interface
-
 
 #if WITH_EDITOR
 	FText GetGeomCacheErrorText(UGeometryCache* InGeomCache) const;
@@ -152,6 +151,7 @@ public:
 	FMLDeformerInputInfo CreateInputInfo() const;
 
 	void InitBoneIncludeListToAnimatedBonesOnly();
+	void InitCurveIncludeListToAnimatedCurvesOnly();
 #endif
 
 	void InitVertexMap();
@@ -186,6 +186,9 @@ public:
 
 	TArray<FBoneReference>& GetBoneIncludeList() { return BoneIncludeList; }
 	const TArray<FBoneReference>& GetBoneIncludeList() const { return BoneIncludeList; }
+
+	TArray<FCurveReference>& GetCurveIncludeList() { return CurveIncludeList; }
+	const TArray<FCurveReference>& GetCurveIncludeList() const { return CurveIncludeList; }
 
 	int32 GetNumFrames() const;
 	int32 GetTrainingFrameLimit() const { return MaxTrainingFrames; }
@@ -333,5 +336,9 @@ public:
 	/** The bones to include during training. When none are provided, all bones of the Skeleton will be included. */
 	UPROPERTY(EditAnywhere, Category = "Inputs and Output", meta = (EditCondition = "TrainingInputs == ETrainingInputs::BonesAndCurves || TrainingInputs == ETrainingInputs::BonesOnly"))
 	TArray<FBoneReference> BoneIncludeList;
+
+	/** The curves to include during training. When none are provided, all curves of the Skeleton will be included. */
+	UPROPERTY(EditAnywhere, Category = "Inputs and Output", meta = (EditCondition = "TrainingInputs == ETrainingInputs::BonesAndCurves || TrainingInputs == ETrainingInputs::CurvesOnly"))
+	TArray<FCurveReference> CurveIncludeList;
 #endif // WITH_EDITORONLY_DATA
 };
