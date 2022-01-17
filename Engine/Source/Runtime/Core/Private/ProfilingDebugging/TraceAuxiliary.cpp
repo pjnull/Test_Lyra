@@ -1054,7 +1054,7 @@ static void SetupChannelsFromCommandline(const TCHAR* CommandLine)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-bool FTraceAuxiliary::Start(EConnectionType Type, const TCHAR* Target, const TCHAR* Channels, Options* Options, const FLogCategoryBase& LogCategory)
+bool FTraceAuxiliary::Start(EConnectionType Type, const TCHAR* Target, const TCHAR* Channels, Options* Options, const FLogCategoryAlias& LogCategory)
 {
 #if UE_TRACE_ENABLED
 	if (GTraceAuxiliary.IsConnected())
