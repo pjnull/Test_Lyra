@@ -389,9 +389,12 @@ bool FTraceAuxiliaryImpl::SendToHost(const TCHAR* Host)
 ////////////////////////////////////////////////////////////////////////////////
 bool FTraceAuxiliaryImpl::WriteToFile(const TCHAR* Path)
 {
+	// Default file name functor 
+	auto GetDefaultName = [] {return FDateTime::Now().ToString(TEXT("%Y%m%d_%H%M%S.utrace"));};
+	
 	if (Path == nullptr || *Path == '\0')
 	{
-		FString Name = FDateTime::Now().ToString(TEXT("%Y%m%d_%H%M%S.utrace"));
+		const FString Name = GetDefaultName();
 		return WriteToFile(*Name);
 	}
 
@@ -406,6 +409,12 @@ bool FTraceAuxiliaryImpl::WriteToFile(const TCHAR* Path)
 	else
 	{
 		WritePath = Path;
+	}
+
+	// If a directory is specified, add the default trace file name
+	if (WritePath.EndsWith(TEXT("/")) || WritePath.EndsWith(TEXT("\\")))
+	{
+		WritePath += GetDefaultName();
 	}
 
 	// The user may not have provided a suitable extension
