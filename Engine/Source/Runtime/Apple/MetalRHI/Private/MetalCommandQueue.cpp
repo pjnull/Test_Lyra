@@ -26,27 +26,20 @@ FMetalCommandQueue::FMetalCommandQueue(mtlpp::Device InDevice, uint32 const MaxN
 , ParallelCommandLists(0)
 , RuntimeDebuggingLevel(EMetalDebugLevelOff)
 {
-	int32 MaxShaderVersion = 0;
 	int32 IndirectArgumentTier = 0;
+    int32 MetalShaderVersion = 0;
 #if PLATFORM_MAC
-	int32 DefaultMaxShaderVersion = 5; // MSL v2.2
-	int32 MinShaderVersion = 4; // MSL v2.1
-    const TCHAR* const Settings = TEXT("/Script/MacTargetPlatform.MacTargetSettings");
+	const TCHAR* const Settings = TEXT("/Script/MacTargetPlatform.MacTargetSettings");
 #else
-	int32 DefaultMaxShaderVersion = 2;
-	int32 MinShaderVersion = 2;
-    const TCHAR* const Settings = TEXT("/Script/IOSRuntimeSettings.IOSRuntimeSettings");
+	const TCHAR* const Settings = TEXT("/Script/IOSRuntimeSettings.IOSRuntimeSettings");
 #endif
-    if(!GConfig->GetInt(Settings, TEXT("MaxShaderLanguageVersion"), MaxShaderVersion, GEngineIni))
-    {
-        MaxShaderVersion = DefaultMaxShaderVersion;
-    }
-	if(!GConfig->GetInt(Settings, TEXT("IndirectArgumentTier"), IndirectArgumentTier, GEngineIni))
+    GConfig->GetInt(Settings, TEXT("MetalLanguageVersion"), MetalShaderVersion, GEngineIni);
+	
+    if(!GConfig->GetInt(Settings, TEXT("IndirectArgumentTier"), IndirectArgumentTier, GEngineIni))
 	{
 		IndirectArgumentTier = 0;
 	}
-	MaxShaderVersion = FMath::Max(MinShaderVersion, MaxShaderVersion);
-	ValidateVersion(MaxShaderVersion);
+	ValidateVersion(MetalShaderVersion);
 
 	if(MaxNumCommandBuffers == 0)
 	{
@@ -58,136 +51,98 @@ FMetalCommandQueue::FMetalCommandQueue(mtlpp::Device InDevice, uint32 const MaxN
 	}
 	check(CommandQueue);
 #if PLATFORM_IOS
-	NSOperatingSystemVersion Vers = [[NSProcessInfo processInfo] operatingSystemVersion];
-	if(Vers.majorVersion >= 9)
-	{
-		Features = EMetalFeaturesSetBufferOffset | EMetalFeaturesSetBytes;
+	NSOperatingSystemVersion Vers = [[NSProcessInfo processInfo]operatingSystemVersion];
+	Features = EMetalFeaturesSetBufferOffset | EMetalFeaturesSetBytes;
 
 #if PLATFORM_TVOS
-        Features &= ~(EMetalFeaturesSetBytes);
+	Features &= ~(EMetalFeaturesSetBytes);
 		
 		if(Device.SupportsFeatureSet(mtlpp::FeatureSet::tvOS_GPUFamily2_v1))
-		{
-			Features |= EMetalFeaturesCountingQueries | EMetalFeaturesBaseVertexInstance | EMetalFeaturesIndirectBuffer | EMetalFeaturesMSAADepthResolve | EMetalFeaturesMSAAStoreAndResolve;
-		}
-		
-		if(Vers.majorVersion > 10)
-		{
-			Features |= EMetalFeaturesPrivateBufferSubAllocation;
-			
-			if(Vers.majorVersion >= 11)
-			{
-				Features |= EMetalFeaturesGPUCaptureManager | EMetalFeaturesBufferSubAllocation | EMetalFeaturesParallelRenderEncoders | EMetalFeaturesPipelineBufferMutability;
-				
-				if (MaxShaderVersion >= 3)
-				{
-					GMetalFColorVertexFormat = mtlpp::VertexFormat::UChar4Normalized_BGRA;
-				}
+	{
+		Features |= EMetalFeaturesCountingQueries | EMetalFeaturesBaseVertexInstance | EMetalFeaturesIndirectBuffer | EMetalFeaturesMSAADepthResolve | EMetalFeaturesMSAAStoreAndResolve;
+	}
 
-				if (Vers.majorVersion >= 12)
-				{
-					Features |= EMetalFeaturesMaxThreadsPerThreadgroup;
-					
-					if (FParse::Param(FCommandLine::Get(),TEXT("metalfence")))
-					{
-					Features |= EMetalFeaturesFences;
-					}
+	Features |= EMetalFeaturesPrivateBufferSubAllocation;
+
+	Features |= EMetalFeaturesGPUCaptureManager | EMetalFeaturesBufferSubAllocation | EMetalFeaturesParallelRenderEncoders | EMetalFeaturesPipelineBufferMutability;
+
+	GMetalFColorVertexFormat = mtlpp::VertexFormat::UChar4Normalized_BGRA;
+
+	Features |= EMetalFeaturesMaxThreadsPerThreadgroup;
+
+	if (FParse::Param(FCommandLine::Get(), TEXT("metalfence")))
+	{
+		Features |= EMetalFeaturesFences;
+	}
 					
 					if (FParse::Param(FCommandLine::Get(),TEXT("metalheap")))
-					{
-					Features |= EMetalFeaturesHeaps;
-					}
-					
-					if (MaxShaderVersion >= 4)
-					{
-						Features |= EMetalFeaturesTextureBuffers;
-					}
-				}
-			}
-		}
+	{
+		Features |= EMetalFeaturesHeaps;
+	}
+
+	Features |= EMetalFeaturesTextureBuffers;
 #else
-		if (Device.SupportsFeatureSet(mtlpp::FeatureSet::iOS_GPUFamily3_v1))
-		{
-			Features |= EMetalFeaturesCountingQueries | EMetalFeaturesBaseVertexInstance | EMetalFeaturesIndirectBuffer | EMetalFeaturesMSAADepthResolve;
-		}
+	if (Device.SupportsFeatureSet(mtlpp::FeatureSet::iOS_GPUFamily3_v1))
+	{
+		Features |= EMetalFeaturesCountingQueries | EMetalFeaturesBaseVertexInstance | EMetalFeaturesIndirectBuffer | EMetalFeaturesMSAADepthResolve;
+	}
 		
 		if(Device.SupportsFeatureSet(mtlpp::FeatureSet::iOS_GPUFamily3_v2) || Device.SupportsFeatureSet(mtlpp::FeatureSet::iOS_GPUFamily2_v3) || Device.SupportsFeatureSet(mtlpp::FeatureSet::iOS_GPUFamily1_v3))
-		{
+	{
 			if (FParse::Param(FCommandLine::Get(),TEXT("metalfence")))
-			{
-				Features |= EMetalFeaturesFences;
-			}
+		{
+			Features |= EMetalFeaturesFences;
+		}
 			
 			if (FParse::Param(FCommandLine::Get(),TEXT("metalheap")))
-			{
-				Features |= EMetalFeaturesHeaps;
-			}
+		{
+			Features |= EMetalFeaturesHeaps;
 		}
+	}
 		
 		if(Device.SupportsFeatureSet(mtlpp::FeatureSet::iOS_GPUFamily3_v2))
-		{
-			Features |= EMetalFeaturesMSAAStoreAndResolve;
-		}
-		
-		if(Vers.majorVersion > 10 || (Vers.majorVersion == 10 && Vers.minorVersion >= 3))
-        {
-			// Turning the below option on will allocate more buffer memory which isn't generally desirable on iOS
-			// Features |= EMetalFeaturesEfficientBufferBlits;
+	{
+		Features |= EMetalFeaturesMSAAStoreAndResolve;
+	}
+
+	// Turning the below option on will allocate more buffer memory which isn't generally desirable on iOS
+	// Features |= EMetalFeaturesEfficientBufferBlits;
 			
-			// These options are fine however as thye just change how we allocate small buffers
-            Features |= EMetalFeaturesBufferSubAllocation;
-			Features |= EMetalFeaturesPrivateBufferSubAllocation;
-			
-			if(Vers.majorVersion >= 11)
-			{
-				if (MaxShaderVersion >= 3)
-				{
-					GMetalFColorVertexFormat = mtlpp::VertexFormat::UChar4Normalized_BGRA;
-				}
-				
-				Features |= EMetalFeaturesPresentMinDuration | EMetalFeaturesGPUCaptureManager | EMetalFeaturesBufferSubAllocation | EMetalFeaturesParallelRenderEncoders | EMetalFeaturesPipelineBufferMutability;
-                
-				// Turn on Texture Buffers! These are faster on the GPU as we don't need to do out-of-bounds tests but require Metal 2.1 and macOS 10.14
-				if (Vers.majorVersion >= 12)
-				{
-					Features |= EMetalFeaturesMaxThreadsPerThreadgroup;
-                    if (!FParse::Param(FCommandLine::Get(),TEXT("nometalfence")))
-                    {
-                        Features |= EMetalFeaturesFences;
-                    }
+	// These options are fine however as thye just change how we allocate small buffers
+	Features |= EMetalFeaturesBufferSubAllocation;
+	Features |= EMetalFeaturesPrivateBufferSubAllocation;
+
+	GMetalFColorVertexFormat = mtlpp::VertexFormat::UChar4Normalized_BGRA;
+
+	Features |= EMetalFeaturesPresentMinDuration | EMetalFeaturesGPUCaptureManager | EMetalFeaturesBufferSubAllocation | EMetalFeaturesParallelRenderEncoders | EMetalFeaturesPipelineBufferMutability;
+
+	Features |= EMetalFeaturesMaxThreadsPerThreadgroup;
+	if (!FParse::Param(FCommandLine::Get(), TEXT("nometalfence")))
+	{
+		Features |= EMetalFeaturesFences;
+	}
                     
                     if (!FParse::Param(FCommandLine::Get(),TEXT("nometalheap")))
-                    {
-                        Features |= EMetalFeaturesHeaps;
-                    }
-					
-					if (MaxShaderVersion >= 4)
-					{
-						Features |= EMetalFeaturesTextureBuffers;
-					}
-                    
-                    if(Device.SupportsFeatureSet(mtlpp::FeatureSet::iOS_GPUFamily4_v1))
-                    {
-                        Features |= EMetalFeaturesTileShaders;
-                        
-                        // The below implies tile shaders which are necessary to order the draw calls and generate a buffer that shows what PSOs/draws ran on each tile.
-                        IConsoleVariable* GPUCrashDebuggingCVar = IConsoleManager::Get().FindConsoleVariable(TEXT("r.GPUCrashDebugging"));
-                        GMetalCommandBufferDebuggingEnabled = (GPUCrashDebuggingCVar && GPUCrashDebuggingCVar->GetInt() != 0) || FParse::Param(FCommandLine::Get(),TEXT("metalgpudebug"));
-                    }
-                    
-					if (Device.SupportsFeatureSet(mtlpp::FeatureSet::iOS_GPUFamily5_v1))
-					{
-						Features |= EMetalFeaturesLayeredRendering;
-					}
-				}
-			}
-        }
-#endif
-	}
-	else if(Vers.majorVersion == 8 && Vers.minorVersion >= 3)
 	{
-		Features = EMetalFeaturesSetBufferOffset;
+		Features |= EMetalFeaturesHeaps;
 	}
+
+	Features |= EMetalFeaturesTextureBuffers;
+
+	if (Device.SupportsFeatureSet(mtlpp::FeatureSet::iOS_GPUFamily4_v1))
+	{
+		Features |= EMetalFeaturesTileShaders;
+                        
+		// The below implies tile shaders which are necessary to order the draw calls and generate a buffer that shows what PSOs/draws ran on each tile.
+		IConsoleVariable* GPUCrashDebuggingCVar = IConsoleManager::Get().FindConsoleVariable(TEXT("r.GPUCrashDebugging"));
+		GMetalCommandBufferDebuggingEnabled = (GPUCrashDebuggingCVar && GPUCrashDebuggingCVar->GetInt() != 0) || FParse::Param(FCommandLine::Get(), TEXT("metalgpudebug"));
+	}
+                    
+	if (Device.SupportsFeatureSet(mtlpp::FeatureSet::iOS_GPUFamily5_v1))
+	{
+		Features |= EMetalFeaturesLayeredRendering;
+	}
+#endif
 #else // Assume that Mac & other platforms all support these from the start. They can diverge later.
 	const bool bIsNVIDIA = [Device.GetName().GetPtr() rangeOfString:@"Nvidia" options:NSCaseInsensitiveSearch].location != NSNotFound;
 	Features = EMetalFeaturesCountingQueries | EMetalFeaturesBaseVertexInstance | EMetalFeaturesIndirectBuffer | EMetalFeaturesLayeredRendering | EMetalFeaturesCubemapArrays;

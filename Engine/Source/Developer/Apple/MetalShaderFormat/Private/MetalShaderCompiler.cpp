@@ -75,7 +75,7 @@ static inline uint32 ParseNumber(const ANSICHAR* Str)
 
 struct FHlslccMetalHeader : public CrossCompiler::FHlslccHeader
 {
-	FHlslccMetalHeader(uint8 const Version);
+	FHlslccMetalHeader(uint32 const Version);
 	virtual ~FHlslccMetalHeader();
 	
 	// After the standard header, different backends can output their own info
@@ -83,10 +83,10 @@ struct FHlslccMetalHeader : public CrossCompiler::FHlslccHeader
 	
 	TMap<uint8, TArray<uint8>> ArgumentBuffers;
 	int8 SideTable;
-	uint8 Version;
+	uint32 Version;
 };
 
-FHlslccMetalHeader::FHlslccMetalHeader(uint8 const InVersion)
+FHlslccMetalHeader::FHlslccMetalHeader(uint32 const InVersion)
 {
 	SideTable = -1;
 	Version = InVersion;
@@ -208,7 +208,7 @@ void BuildMetalShaderOutput(
 	uint32 SourceLen,
 	uint32 SourceCRCLen,
 	uint32 SourceCRC,
-	uint8 Version,
+	uint32 Version,
 	TCHAR const* Standard,
 	TCHAR const* MinOSVersion,
 	EMetalTypeBufferMode TypeMode,
@@ -843,58 +843,35 @@ void CompileShader_Metal(const FShaderCompilerInput& _Input,FShaderCompilerOutpu
 	
 	AdditionalDefines.SetDefine(TEXT("COMPILER_METAL"), 1);
 	
-    EMetalGPUSemantics Semantics = EMetalGPUSemanticsMobile;
+	EMetalGPUSemantics Semantics = EMetalGPUSemanticsMobile;
 	
-	FString const* MaxVersion = Input.Environment.GetDefinitions().Find(TEXT("MAX_SHADER_LANGUAGE_VERSION"));
-    uint8 VersionEnum = 0;
-    if (MaxVersion)
-    {
-        if(MaxVersion->IsNumeric())
-        {
-            LexFromString(VersionEnum, *(*MaxVersion));
-        }
-    }
-	
-	// The new compiler is only available on Mac or Windows for the moment.
-#if !(PLATFORM_MAC || PLATFORM_WINDOWS)
-	VersionEnum = FMath::Min(VersionEnum, (uint8)5);
-#endif
-	
+    int32 VersionEnum = FCString::Atoi(*FString(*Input.Environment.GetDefinitions().Find(TEXT("SHADER_LANGUAGE_VERSION"))));
+
 	// TODO read from toolchain
 	bool bAppleTV = (Input.ShaderFormat == NAME_SF_METAL_TVOS || Input.ShaderFormat == NAME_SF_METAL_MRT_TVOS);
-    if (Input.ShaderFormat == NAME_SF_METAL || Input.ShaderFormat == NAME_SF_METAL_TVOS)
+	if (Input.ShaderFormat == NAME_SF_METAL || Input.ShaderFormat == NAME_SF_METAL_TVOS)
 	{
-		UE_CLOG(VersionEnum < 2, LogShaders, Warning, TEXT("Metal shader version must be Metal v1.2 or higher for format %s!"), VersionEnum, *Input.ShaderFormat.ToString());
-        VersionEnum = VersionEnum >= 2 ? VersionEnum : 2;
-        AdditionalDefines.SetDefine(TEXT("METAL_PROFILE"), 1);
+		AdditionalDefines.SetDefine(TEXT("METAL_PROFILE"), 1);
 	}
 	else if (Input.ShaderFormat == NAME_SF_METAL_MRT || Input.ShaderFormat == NAME_SF_METAL_MRT_TVOS)
 	{
-		UE_CLOG(VersionEnum < 4, LogShaders, Warning, TEXT("Metal shader version must be Metal v2.1 or higher for format %s!"), VersionEnum, *Input.ShaderFormat.ToString());
 		AdditionalDefines.SetDefine(TEXT("METAL_MRT_PROFILE"), 1);
-		VersionEnum = VersionEnum >= 4 ? VersionEnum : 4;
 		Semantics = EMetalGPUSemanticsTBDRDesktop;
 	}
 	else if (Input.ShaderFormat == NAME_SF_METAL_MACES3_1)
 	{
-		UE_CLOG(VersionEnum < 3, LogShaders, Warning, TEXT("Metal shader version must be Metal v2.0 or higher for format %s!"), VersionEnum, *Input.ShaderFormat.ToString());
 		AdditionalDefines.SetDefine(TEXT("METAL_PROFILE"), 1);
-		VersionEnum = VersionEnum > 3 ? VersionEnum : 3;
 		Semantics = EMetalGPUSemanticsImmediateDesktop;
 	}
 	else if (Input.ShaderFormat == NAME_SF_METAL_SM5)
 	{
-		UE_CLOG(VersionEnum < 3, LogShaders, Warning, TEXT("Metal shader version must be Metal v2.0 or higher for format %s!"), VersionEnum, *Input.ShaderFormat.ToString());
 		AdditionalDefines.SetDefine(TEXT("METAL_SM5_PROFILE"), 1);
 		AdditionalDefines.SetDefine(TEXT("USING_VERTEX_SHADER_LAYER"), 1);
-		VersionEnum = VersionEnum > 3 ? VersionEnum : 3;
 		Semantics = EMetalGPUSemanticsImmediateDesktop;
 	}
 	else if (Input.ShaderFormat == NAME_SF_METAL_MRT_MAC)
 	{
-		UE_CLOG(VersionEnum < 3, LogShaders, Warning, TEXT("Metal shader version must be Metal v2.0 or higher for format %s!"), VersionEnum, *Input.ShaderFormat.ToString());
 		AdditionalDefines.SetDefine(TEXT("METAL_MRT_PROFILE"), 1);
-		VersionEnum = VersionEnum > 3 ? VersionEnum : 3;
 		Semantics = EMetalGPUSemanticsTBDRDesktop;
 	}
 	else
@@ -907,138 +884,75 @@ void CompileShader_Metal(const FShaderCompilerInput& _Input,FShaderCompilerOutpu
 
 	AdditionalDefines.SetDefine(TEXT("COMPILER_HLSLCC"), 2);
 	
-    EMetalTypeBufferMode TypeMode = EMetalTypeBufferModeRaw;
+	EMetalTypeBufferMode TypeMode = EMetalTypeBufferModeRaw;
 	FString MinOSVersion;
 	FString StandardVersion;
 	switch(VersionEnum)
-    {
-		case 7:
-		case 6:
-        case 5:
-            // Enable full SM5 feature support so tessellation & fragment UAVs compile
-            TypeMode = EMetalTypeBufferModeTB;
-            StandardVersion = TEXT("2.1");
-            if (bAppleTV)
-            {
-                MinOSVersion = TEXT("-mtvos-version-min=12.0");
-            }
-            else if (bIsMobile)
-            {
-                MinOSVersion = TEXT("-mios-version-min=12.0");
-            }
-            else
-            {
-                MinOSVersion = TEXT("-mmacosx-version-min=10.14");
-            }
-            break;
-		case 4:
-			// Enable full SM5 feature support so tessellation & fragment UAVs compile
-			TypeMode = EMetalTypeBufferModeTB;
-			StandardVersion = TEXT("2.1");
-			if (bAppleTV)
-			{
-				MinOSVersion = TEXT("-mtvos-version-min=12.0");
-				TypeMode = EMetalTypeBufferModeTBSRV;
-			}
-			else if (bIsMobile)
-			{
-				MinOSVersion = TEXT("-mios-version-min=12.0");
-				TypeMode = EMetalTypeBufferModeTBSRV;
-			}
-			else
-			{
-				MinOSVersion = TEXT("-mmacosx-version-min=10.14");
-			}
-			break;
-		case 3:
-			// Enable full SM5 feature support so tessellation & fragment UAVs compile
-			TypeMode = EMetalTypeBufferMode2D;
-			StandardVersion = TEXT("2.0");
-			if (bAppleTV)
-			{
-				MinOSVersion = TEXT("-mtvos-version-min=11.0");
-				TypeMode = EMetalTypeBufferMode2DSRV;
-			}
-			else if (bIsMobile)
-			{
-				MinOSVersion = TEXT("-mios-version-min=11.0");
-				TypeMode = EMetalTypeBufferMode2DSRV;
-			}
-			else
-			{
-				MinOSVersion = TEXT("-mmacosx-version-min=10.13");
-			}
-			break;
-		case 2:
-			// Enable full SM5 feature support so tessellation & fragment UAVs compile
-			TypeMode = EMetalTypeBufferMode2D;
-			StandardVersion = TEXT("1.2");
-			if (bAppleTV)
-			{
-				MinOSVersion = TEXT("-mtvos-version-min=10.0");
-				TypeMode = EMetalTypeBufferMode2DSRV;
-			}
-			else if (bIsMobile)
-			{
-				MinOSVersion = TEXT("-mios-version-min=10.0");
-				TypeMode = EMetalTypeBufferMode2DSRV;
-			}
-			else
-			{
-				Output.bSucceeded = false;
-				FShaderCompilerError* NewError = new(Output.Errors) FShaderCompilerError();
-				NewError->StrippedErrorMessage = FString::Printf(
-															 TEXT("Metal %s is no longer supported in UE for macOS."),
-															 *StandardVersion
-															 );
-				return;
-			}
-			break;
-		case 1:
-		{
-			StandardVersion = TEXT("1.1");
-			MinOSVersion = bIsMobile ? TEXT("") : TEXT("-mmacosx-version-min=10.11");
-			
-			Output.bSucceeded = false;
-			FShaderCompilerError* NewError = new(Output.Errors) FShaderCompilerError();
-			NewError->StrippedErrorMessage = FString::Printf(
-														 TEXT("Metal %s is no longer supported in UE."),
-														 *StandardVersion
-														 );
-			return;
-		}
-		case 0:
-		{
-			check(bIsMobile);
-			StandardVersion = TEXT("1.0");
-			MinOSVersion = TEXT("");
-
-			Output.bSucceeded = false;
-			FShaderCompilerError* NewError = new(Output.Errors) FShaderCompilerError();
-			NewError->StrippedErrorMessage = FString::Printf(TEXT("Metal %s is no longer supported in UE."), *StandardVersion);
-			return;
-		}
-		default:
-		{
-			check(bIsMobile);
-			MinOSVersion = TEXT("");
-
-			Output.bSucceeded = false;
-			FShaderCompilerError* NewError = new(Output.Errors) FShaderCompilerError();
-			NewError->StrippedErrorMessage = FString::Printf(
-				TEXT("Unknown Metal version: VersionEnum = %d; MAX_SHADER_LANGUAGE_VERSION = %s."),
-				*StandardVersion, VersionEnum, **MaxVersion
-			);
-			return;
-		}
-	}
-	
-	// Force floats if the material requests it
-	if (Input.Environment.FullPrecisionInPS || (VersionEnum < 2)) // Too many bugs in Metal 1.0 & 1.1 with half floats the more time goes on and the compiler stack changes
 	{
-		AdditionalDefines.SetDefine(TEXT("FORCE_FLOATS"), (uint32)1);
+	case 7:
+		TypeMode = EMetalTypeBufferModeTB;
+		StandardVersion = TEXT("2.4");
+		if (bAppleTV)
+		{
+			MinOSVersion = TEXT("-mtvos-version-min=15.0");
+		}
+		else if (bIsMobile)
+		{
+			MinOSVersion = TEXT("-mios-version-min=15.0");
+		}
+		else
+		{
+			MinOSVersion = TEXT("-mmacosx-version-min=12");
+		}
+		break;
+
+	case 6:
+		TypeMode = EMetalTypeBufferModeTB;
+		StandardVersion = TEXT("2.3");
+		if (bAppleTV)
+		{
+			MinOSVersion = TEXT("-mtvos-version-min=14.0");
+		}
+		else if (bIsMobile)
+		{
+			MinOSVersion = TEXT("-mios-version-min=14.0");
+		}
+		else
+		{
+			MinOSVersion = TEXT("-mmacosx-version-min=11");
+		}
+		break;
+
+	case 5:
+    case 0:
+		TypeMode = EMetalTypeBufferModeTB;
+		StandardVersion = TEXT("2.2");
+		if (bAppleTV)
+		{
+			MinOSVersion = TEXT("-mtvos-version-min=13.0");
+		}
+		else if (bIsMobile)
+		{
+			MinOSVersion = TEXT("-mios-version-min=13.0");
+		}
+		else
+		{
+			MinOSVersion = TEXT("-mmacosx-version-min=10.15");
+		}
+		break;
+            
+        default:
+		Output.bSucceeded = false;
+		{
+			FShaderCompilerError* NewError = new(Output.Errors) FShaderCompilerError();
+			NewError->StrippedErrorMessage = FString::Printf(TEXT("Minimum Metal Version is 2.2 in UE5.0"));
+			return;
+		}
+		break;
 	}
 	
+	AdditionalDefines.SetDefine(TEXT("FORCE_FLOATS"), (uint32)1);
+
 	FString Standard = FString::Printf(TEXT("-std=%s-metal%s"), StandardPlatform, *StandardVersion);
 	
 	bool const bDirectCompile = FParse::Param(FCommandLine::Get(), TEXT("directcompile"));
