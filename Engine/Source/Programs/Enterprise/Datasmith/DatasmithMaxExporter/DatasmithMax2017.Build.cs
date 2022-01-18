@@ -12,16 +12,10 @@ namespace UnrealBuildTool.Rules
 			bUseRTTI = true;
 
 
-			PublicDefinitions.Add("NEW_DIRECTLINK_PLUGIN=1");
-
 			PrivateDependencyModuleNames.AddRange(
 				new string[]
 				{
 					"DatasmithExporter",
-					"DatasmithExporterUI",
-
-					"UdpMessaging", // required for DirectLink networking
-					"UEOpenExr",
 				}
 			);
 

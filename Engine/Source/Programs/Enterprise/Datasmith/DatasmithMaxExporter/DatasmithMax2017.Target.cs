@@ -16,7 +16,7 @@ public abstract class DatasmithMaxBaseTarget : TargetRules
 		bShouldCompileAsDLL = true;
 		LinkType = TargetLinkType.Monolithic;
 
-		WindowsPlatform.ModuleDefinitionFile = "Programs/Enterprise/Datasmith/DatasmithMaxExporter/DatasmithMaxExporterWithDirectLink.def";
+		WindowsPlatform.ModuleDefinitionFile = "Programs/Enterprise/Datasmith/DatasmithMaxExporter/DatasmithMaxExporter.def";
 
 		WindowsPlatform.bStrictConformanceMode = false;
 
@@ -30,11 +30,6 @@ public abstract class DatasmithMaxBaseTarget : TargetRules
 
 		bHasExports = true;
 		bForceEnableExceptions = true;
-
-		GlobalDefinitions.Add("UE_EXTERNAL_PROFILING_ENABLED=0"); // For DirectLinkUI (see FDatasmithExporterManager::FInitOptions)
-
-		// todo: remove?
-		// bSupportEditAndContinue = true;
 	}
 
 	protected void AddCopyPostBuildStep(TargetInfo Target)
@@ -47,11 +42,7 @@ public abstract class DatasmithMaxBaseTarget : TargetRules
 		}
 
 		string SrcOutputFileName = string.Format(@"$(EngineDir)\Binaries\Win64\{0}\{1}.dll", ExeBinariesSubFolder, OutputName);
-
-		string DstOutputFileName;
-
-		DstOutputFileName = string.Format(@"$(EngineDir)\Binaries\Win64\{0}\{1}.gup", ExeBinariesSubFolder, OutputName);
-
+		string DstOutputFileName = string.Format(@"$(EngineDir)\Binaries\Win64\{0}\{1}.dle", ExeBinariesSubFolder, OutputName);
 		PostBuildSteps.Add(string.Format("echo Copying {0} to {1}...", SrcOutputFileName, DstOutputFileName));
 		PostBuildSteps.Add(string.Format("copy /Y \"{0}\" \"{1}\" 1>nul", SrcOutputFileName, DstOutputFileName));
 	}
