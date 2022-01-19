@@ -3753,7 +3753,7 @@ bool FD3D12RayTracingGeometry::BuffersValid(uint32 GPUIndex) const
 		}
 	}
 
-	for (const FRayTracingGeometrySegment& Segment : Segments)
+	for (const FRayTracingGeometrySegment& Segment : Initializer.Segments)
 	{
 		const FD3D12Buffer* VertexBuffer = FD3D12DynamicRHI::ResourceCast(Segment.VertexBuffer.GetReference(), GPUIndex);
 		if (!VertexBuffer->ResourceLocation.IsValid())
