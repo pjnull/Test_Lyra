@@ -3900,6 +3900,17 @@ namespace UnrealBuildTool
 				GlobalCompileEnvironment.Definitions.Add("WITH_CPP_MODULES=0");
 			}
 
+			// Whether C++20 coroutines are enabled
+			if (Rules.bEnableCppCoroutinesForEvaluation)
+			{
+				GlobalCompileEnvironment.Definitions.Add("WITH_CPP_COROUTINES=1");
+				GlobalCompileEnvironment.bEnableCoroutines = true;
+			}
+			else
+			{
+				GlobalCompileEnvironment.Definitions.Add("WITH_CPP_COROUTINES=0");
+			}
+
 			// Define the custom config if specified, this should not be set in an editor build
 			if (!bUseSharedBuildEnvironment && !String.IsNullOrEmpty(Rules.CustomConfig))
 			{
