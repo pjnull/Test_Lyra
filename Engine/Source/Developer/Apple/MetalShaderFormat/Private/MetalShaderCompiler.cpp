@@ -268,7 +268,7 @@ void BuildMetalShaderOutput(
 	Header.SideTable = -1;
 	Header.SourceLen = SourceCRCLen;
 	Header.SourceCRC = SourceCRC;
-    Header.Bindings.bDiscards = false;
+	Header.Bindings.bDiscards = false;
 	Header.Bindings.ConstantBuffers = ConstantBuffers;
 	{
 		Header.Bindings.TypedBuffers = TypedBuffers;
@@ -277,15 +277,15 @@ void BuildMetalShaderOutput(
 			if ((TypedBuffers & (1 << i)) != 0)
 			{
 				check(TypedBufferFormats[i] > (uint8)EMetalBufferFormat::Unknown);
-                check(TypedBufferFormats[i] < (uint8)EMetalBufferFormat::Max);
-                if ((TypeMode > EMetalTypeBufferModeRaw)
-                && (TypeMode <= EMetalTypeBufferModeTB)
-                && (TypedBufferFormats[i] < (uint8)EMetalBufferFormat::RGB8Sint || TypedBufferFormats[i] > (uint8)EMetalBufferFormat::RGB32Float)
-                && (TypeMode == EMetalTypeBufferMode2D || TypeMode == EMetalTypeBufferModeTB || !(TypedUAVs & (1 << i))))
-                {
-                	Header.Bindings.LinearBuffer |= (1 << i);
-	                Header.Bindings.TypedBuffers &= ~(1 << i);
-                }
+				check(TypedBufferFormats[i] < (uint8)EMetalBufferFormat::Max);
+				if ((TypeMode > EMetalTypeBufferModeRaw)
+					&& (TypeMode <= EMetalTypeBufferModeTB)
+					&& (TypedBufferFormats[i] < (uint8)EMetalBufferFormat::RGB8Sint || TypedBufferFormats[i] > (uint8)EMetalBufferFormat::RGB32Float)
+					&& (TypeMode == EMetalTypeBufferMode2D || TypeMode == EMetalTypeBufferModeTB || !(TypedUAVs & (1 << i))))
+				{
+					Header.Bindings.LinearBuffer |= (1 << i);
+					Header.Bindings.TypedBuffers &= ~(1 << i);
+				}
 			}
 		}
 		
@@ -341,7 +341,7 @@ void BuildMetalShaderOutput(
 				uint8 TargetIndex = ParseNumber(*Output.Name + TargetPrefix2.Len());
 				Header.Bindings.InOutMask.EnableField(TargetIndex);
 			}
-        }
+		}
 		
 		// For fragment shaders that discard but don't output anything we need at least a depth-stencil surface, so we need a way to validate this at runtime.
 		if (FCStringAnsi::Strstr(USFSource, "[[ depth(") != nullptr || FCStringAnsi::Strstr(USFSource, "[[depth(") != nullptr)
@@ -349,11 +349,11 @@ void BuildMetalShaderOutput(
 			Header.Bindings.InOutMask.EnableField(CrossCompiler::FShaderBindingInOutMask::DepthStencilMaskIndex);
 		}
         
-        // For fragment shaders that discard but don't output anything we need at least a depth-stencil surface, so we need a way to validate this at runtime.
-        if (FCStringAnsi::Strstr(USFSource, "discard_fragment()") != nullptr)
-        {
-            Header.Bindings.bDiscards = true;
-        }
+		// For fragment shaders that discard but don't output anything we need at least a depth-stencil surface, so we need a way to validate this at runtime.
+		if (FCStringAnsi::Strstr(USFSource, "discard_fragment()") != nullptr)
+		{
+			Header.Bindings.bDiscards = true;
+		}
 	}
 
 	// Then 'normal' uniform buffers.
@@ -379,7 +379,7 @@ void BuildMetalShaderOutput(
 			PackedGlobal.Offset * BytesPerComponent,
 			PackedGlobal.Count * BytesPerComponent,
 			EShaderParameterType::LooseData
-			);
+		);
 
 		uint16& Size = PackedGlobalArraySize.FindOrAdd(PackedGlobal.PackedType);
 		Size = FMath::Max<uint16>(BytesPerComponent * (PackedGlobal.Offset + PackedGlobal.Count), Size);
@@ -392,12 +392,12 @@ void BuildMetalShaderOutput(
 		for (auto& Member : PackedUB.Members)
 		{
 			ParameterMap.AddParameterAllocation(
-												*Member.Name,
-												(ANSICHAR)CrossCompiler::EPackedTypeName::HighP,
-												Member.Offset * BytesPerComponent,
+				*Member.Name,
+				(ANSICHAR)CrossCompiler::EPackedTypeName::HighP,
+				Member.Offset * BytesPerComponent,
 												Member.Count * BytesPerComponent, 
-												EShaderParameterType::LooseData
-												);
+				EShaderParameterType::LooseData
+			);
 			
 			uint16& Size = PackedUniformBuffersSize.FindOrAdd(PackedUB.Attribute.Index).FindOrAdd(CrossCompiler::EPackedTypeName::HighP);
 			Size = FMath::Max<uint16>(BytesPerComponent * (Member.Offset + Member.Count), Size);
@@ -452,7 +452,7 @@ void BuildMetalShaderOutput(
 			Sampler.Offset,
 			Sampler.Count,
 			EShaderParameterType::SRV
-			);
+		);
 
 		NumTextures += Sampler.Count;
 
@@ -473,7 +473,7 @@ void BuildMetalShaderOutput(
 			UAV.Offset,
 			UAV.Count,
 			EShaderParameterType::UAV
-			);
+		);
 
 		Header.Bindings.NumUAVs = FMath::Max<uint8>(
 			Header.Bindings.NumSamplers,
@@ -494,17 +494,17 @@ void BuildMetalShaderOutput(
 			SamplerState.Index,
 			SamplerMap[SamplerState.Name],
 			EShaderParameterType::Sampler
-			);
+		);
 	}
 
 	Header.NumThreadsX = CCHeader.NumThreads[0];
 	Header.NumThreadsY = CCHeader.NumThreads[1];
 	Header.NumThreadsZ = CCHeader.NumThreads[2];
 	
-	Header.bDeviceFunctionConstants				= (FCStringAnsi::Strstr(USFSource, "#define __METAL_DEVICE_CONSTANT_INDEX__ 1") != nullptr);
-	Header.SideTable 							= CCHeader.SideTable;
-	Header.Bindings.ArgumentBufferMasks			= CCHeader.ArgumentBuffers;
-	Header.Bindings.ArgumentBuffers				= 0;
+	Header.bDeviceFunctionConstants = (FCStringAnsi::Strstr(USFSource, "#define __METAL_DEVICE_CONSTANT_INDEX__ 1") != nullptr);
+	Header.SideTable = CCHeader.SideTable;
+	Header.Bindings.ArgumentBufferMasks = CCHeader.ArgumentBuffers;
+	Header.Bindings.ArgumentBuffers = 0;
 	for (auto const& Pair : Header.Bindings.ArgumentBufferMasks)
 	{
 		Header.Bindings.ArgumentBuffers |= (1 << Pair.Key);
@@ -580,13 +580,13 @@ void BuildMetalShaderOutput(
 	else
 	{
 		// TODO technically should probably check the version of the metal compiler to make sure it's recent enough to support -MO.
-        FString DebugInfo = TEXT("");
+		FString DebugInfo = TEXT("");
 		if (ShaderInput.Environment.CompilerFlags.Contains(CFLAG_ExtraShaderData))
 		{
 			DebugInfo = TEXT("-gline-tables-only -MO");
 		}
 		
-        FString MathMode = bNoFastMath ? TEXT("-fno-fast-math") : TEXT("-ffast-math");
+		FString MathMode = bNoFastMath ? TEXT("-fno-fast-math") : TEXT("-ffast-math");
         
 		// at this point, the shader source is ready to be compiled
 		// we will need a working temp directory.

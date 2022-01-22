@@ -151,10 +151,10 @@ FMetalCommandQueue::FMetalCommandQueue(mtlpp::Device InDevice, uint32 const MaxN
 		Features |= EMetalFeaturesSetBufferOffset;
 	}
 	if (Device.SupportsFeatureSet(mtlpp::FeatureSet::macOS_GPUFamily1_v2))
-    {
-        Features |= EMetalFeaturesMSAADepthResolve | EMetalFeaturesMSAAStoreAndResolve;
+	{
+		Features |= EMetalFeaturesMSAADepthResolve | EMetalFeaturesMSAAStoreAndResolve;
         
-        // Assume that set*Bytes only works on macOS Sierra and above as no-one has tested it anywhere else.
+		// Assume that set*Bytes only works on macOS Sierra and above as no-one has tested it anywhere else.
 		Features |= EMetalFeaturesSetBytes;
 		
 		FString DeviceName(Device.GetName());
@@ -162,78 +162,64 @@ FMetalCommandQueue::FMetalCommandQueue(mtlpp::Device InDevice, uint32 const MaxN
 		if (!(DeviceName.Contains(TEXT("Intel")) && (DeviceName.Contains(TEXT("5300")) || DeviceName.Contains(TEXT("6000")) || DeviceName.Contains(TEXT("6100")))) || FPlatformMisc::MacOSXVersionCompare(10,14,0) >= 0)
 		{
 			// Using Private Memory & BlitEncoders for Vertex & Index data should be *much* faster.
-        	Features |= EMetalFeaturesEfficientBufferBlits;
+			Features |= EMetalFeaturesEfficientBufferBlits;
         	
 			Features |= EMetalFeaturesBufferSubAllocation;
 					
-	        // On earlier OS versions Vega didn't like non-zero blit offsets
+			// On earlier OS versions Vega didn't like non-zero blit offsets
 	        if (!DeviceName.Contains(TEXT("Vega")) || FPlatformMisc::MacOSXVersionCompare(10,13,5) >= 0)
-	        {
+			{
 				Features |= EMetalFeaturesPrivateBufferSubAllocation;
 			}
 		}
 		
 		GMetalFColorVertexFormat = mtlpp::VertexFormat::UChar4Normalized_BGRA;
-		
-		// On 10.13.5+ we can use MTLParallelRenderEncoder
-		if (FPlatformMisc::MacOSXVersionCompare(10,13,5) >= 0)
+		// Except on Nvidia for the moment
+		if ([Device.GetName().GetPtr() rangeOfString:@"Nvidia" options:NSCaseInsensitiveSearch].location == NSNotFound && !FParse::Param(FCommandLine::Get(), TEXT("nometalparallelencoder")))
 		{
-			// Except on Nvidia for the moment
-			if ([Device.GetName().GetPtr() rangeOfString:@"Nvidia" options:NSCaseInsensitiveSearch].location == NSNotFound && !FParse::Param(FCommandLine::Get(),TEXT("nometalparallelencoder")))
+			Features |= EMetalFeaturesParallelRenderEncoders;
+		}
+		Features |= EMetalFeaturesTextureBuffers;
+		if (IndirectArgumentTier >= 1)
+		{
+			Features |= EMetalFeaturesIABs;
+				
+			if (IndirectArgumentTier >= 2)
 			{
-				Features |= EMetalFeaturesParallelRenderEncoders;
+				Features |= EMetalFeaturesTier2IABs;
 			}
 		}
-
-		// Turn on Texture Buffers! These are faster on the GPU as we don't need to do out-of-bounds tests but require Metal 2.1 and macOS 10.14
-		if (FPlatformMisc::MacOSXVersionCompare(10,14,0) >= 0)
-		{
-			Features |= EMetalFeaturesMaxThreadsPerThreadgroup;
-			if (MaxShaderVersion >= 4)
-			{
-				Features |= EMetalFeaturesTextureBuffers;
-            }
-            if (IndirectArgumentTier >= 1)
-            {
-                Features |= EMetalFeaturesIABs;
-				
-				if (IndirectArgumentTier >= 2)
-				{
-					Features |= EMetalFeaturesTier2IABs;
-				}
-            }
             
-            IConsoleVariable* GPUCrashDebuggingCVar = IConsoleManager::Get().FindConsoleVariable(TEXT("r.GPUCrashDebugging"));
+		IConsoleVariable* GPUCrashDebuggingCVar = IConsoleManager::Get().FindConsoleVariable(TEXT("r.GPUCrashDebugging"));
             GMetalCommandBufferDebuggingEnabled = (GPUCrashDebuggingCVar && GPUCrashDebuggingCVar->GetInt() != 0) || FParse::Param(FCommandLine::Get(),TEXT("metalgpudebug"));
             
-            // The editor spawns so many viewports and preview icons that we can run out of hardware fences!
-			// Need to figure out a way to safely flush the rendering and reuse the fences when that happens.
+		// The editor spawns so many viewports and preview icons that we can run out of hardware fences!
+		// Need to figure out a way to safely flush the rendering and reuse the fences when that happens.
 #if WITH_EDITORONLY_DATA
-			if (!GIsEditor)
+		if (!GIsEditor)
 #endif
-			{
+		{
 				if (FParse::Param(FCommandLine::Get(),TEXT("metalfence")))
-				{
-					Features |= EMetalFeaturesFences;
-				}
+			{
+				Features |= EMetalFeaturesFences;
+			}
 				
-				// There are still too many driver bugs to use MTLHeap on macOS - nothing works without causing random, undebuggable GPU hangs that completely deadlock the Mac and don't generate any validation errors or command-buffer failures
+			// There are still too many driver bugs to use MTLHeap on macOS - nothing works without causing random, undebuggable GPU hangs that completely deadlock the Mac and don't generate any validation errors or command-buffer failures
 				if (FParse::Param(FCommandLine::Get(),TEXT("forcemetalheap")))
-				{
-					Features |= EMetalFeaturesHeaps;
-				}
+			{
+				Features |= EMetalFeaturesHeaps;
 			}
 		}
-    }
-    else if ([Device.GetName().GetPtr() rangeOfString:@"Nvidia" options:NSCaseInsensitiveSearch].location != NSNotFound)
-    {
+	}
+	else if ([Device.GetName().GetPtr() rangeOfString:@"Nvidia" options:NSCaseInsensitiveSearch].location != NSNotFound)
+	{
 		// Using set*Bytes fixes bugs on Nvidia for 10.11 so we should use it...
-    	Features |= EMetalFeaturesSetBytes;
-    }
+		Features |= EMetalFeaturesSetBytes;
+	}
     
     if(Device.SupportsFeatureSet(mtlpp::FeatureSet::macOS_GPUFamily1_v3) && FPlatformMisc::MacOSXVersionCompare(10,13,0) >= 0)
-    {
-        Features |= EMetalFeaturesMultipleViewports | EMetalFeaturesPipelineBufferMutability | EMetalFeaturesGPUCaptureManager;
+	{
+		Features |= EMetalFeaturesMultipleViewports | EMetalFeaturesPipelineBufferMutability | EMetalFeaturesGPUCaptureManager;
 		
 		if (FParse::Param(FCommandLine::Get(),TEXT("metalfence")))
 		{
@@ -249,7 +235,7 @@ FMetalCommandQueue::FMetalCommandQueue(mtlpp::Device InDevice, uint32 const MaxN
 		{
 			Features |= EMetalFeaturesIABs;
 		}
-    }
+	}
 #endif
 	
 #if !UE_BUILD_SHIPPING
@@ -270,18 +256,18 @@ FMetalCommandQueue::FMetalCommandQueue(mtlpp::Device InDevice, uint32 const MaxN
 	PermittedOptions |= mtlpp::ResourceOptions::CpuCacheModeDefaultCache;
 	PermittedOptions |= mtlpp::ResourceOptions::CpuCacheModeWriteCombined;
 	{
-		PermittedOptions |= mtlpp::ResourceOptions::StorageModeShared;
-		PermittedOptions |= mtlpp::ResourceOptions::StorageModePrivate;
+	PermittedOptions |= mtlpp::ResourceOptions::StorageModeShared;
+	PermittedOptions |= mtlpp::ResourceOptions::StorageModePrivate;
 #if PLATFORM_MAC
-		PermittedOptions |= mtlpp::ResourceOptions::StorageModeManaged;
+	PermittedOptions |= mtlpp::ResourceOptions::StorageModeManaged;
 #else
-		PermittedOptions |= mtlpp::ResourceOptions::StorageModeMemoryless;
+	PermittedOptions |= mtlpp::ResourceOptions::StorageModeMemoryless;
 #endif
-		// You can't use HazardUntracked under the validation layer due to bugs in the layer when trying to create linear-textures/texture-buffers
-		if ((Features & EMetalFeaturesFences) && !(Features & EMetalFeaturesValidation))
-		{
-			PermittedOptions |= mtlpp::ResourceOptions::HazardTrackingModeUntracked;
-		}
+	// You can't use HazardUntracked under the validation layer due to bugs in the layer when trying to create linear-textures/texture-buffers
+	if ((Features & EMetalFeaturesFences) && !(Features & EMetalFeaturesValidation))
+	{
+		PermittedOptions |= mtlpp::ResourceOptions::HazardTrackingModeUntracked;
+	}
 	}
 }
 
@@ -297,8 +283,8 @@ mtlpp::CommandBuffer FMetalCommandQueue::CreateCommandBuffer(void)
 #if PLATFORM_MAC
 	static bool bUnretainedRefs = FParse::Param(FCommandLine::Get(),TEXT("metalunretained"))
 	|| (!FParse::Param(FCommandLine::Get(),TEXT("metalretainrefs"))
-		&& ([Device.GetName() rangeOfString:@"Nvidia" options:NSCaseInsensitiveSearch].location == NSNotFound)
-		&& ([Device.GetName() rangeOfString:@"Intel" options:NSCaseInsensitiveSearch].location == NSNotFound));
+			&& ([Device.GetName() rangeOfString:@"Nvidia" options:NSCaseInsensitiveSearch].location == NSNotFound)
+			&& ([Device.GetName() rangeOfString:@"Intel" options:NSCaseInsensitiveSearch].location == NSNotFound));
 #else
 	static bool bUnretainedRefs = !FParse::Param(FCommandLine::Get(),TEXT("metalretainrefs"));
 #endif
@@ -377,9 +363,9 @@ FMetalFence* FMetalCommandQueue::CreateFence(ns::String const& Label) const
 			else
 	#endif
 			if(InnerFence && String)
-			{
-				InnerFence.SetLabel(String);
-			}
+				{
+					InnerFence.SetLabel(String);
+				}
 		}
 		return InternalFence;
 	}
@@ -424,7 +410,7 @@ mtlpp::ResourceOptions FMetalCommandQueue::GetCompatibleResourceOptions(mtlpp::R
 void FMetalCommandQueue::InsertDebugCaptureBoundary(void)
 {
 	PRAGMA_DISABLE_DEPRECATION_WARNINGS
-	[CommandQueue insertDebugCaptureBoundary];
+		[CommandQueue insertDebugCaptureBoundary];
 	PRAGMA_ENABLE_DEPRECATION_WARNINGS
 }
 
