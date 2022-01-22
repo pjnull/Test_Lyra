@@ -45,12 +45,11 @@ public:
 		
 		// We need to manually load the config properties here, as this module is loaded before the UObject system is setup to do this
         GConfig->GetArray(TEXT("/Script/MacTargetPlatform.MacTargetSettings"), TEXT("TargetedRHIs"), TargetSettings->TargetedRHIs, GEngineIni);
-       
-        if (!GConfig->GetInt(TEXT("/Script/MacTargetPlatform.MacTargetSettings"), TEXT("MetalLanguageVersion"), TargetSettings->MetalLanguageVersion, GEngineIni))
-        {
-            TargetSettings->MetalLanguageVersion = 0;
-        }
-        
+		
+		int32 Value = 1;
+        GConfig->GetInt(TEXT("/Script/MacTargetPlatform.MacTargetSettings"), TEXT("MaxShaderLanguageVersion"), Value, GEngineIni);
+        TargetSettings->MaxShaderLanguageVersion = FMath::Max(Value, 7);
+		
 		if (!GConfig->GetBool(TEXT("/Script/MacTargetPlatform.MacTargetSettings"), TEXT("UseFastIntrinsics"), TargetSettings->UseFastIntrinsics, GEngineIni))
 		{
 			TargetSettings->UseFastIntrinsics = false;
