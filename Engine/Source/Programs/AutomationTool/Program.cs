@@ -14,6 +14,7 @@ using System.Text;
 using Microsoft.Build.Execution;
 using Microsoft.Build.Framework.Profiler;
 using UnrealBuildBase;
+using System.Linq;
 
 namespace AutomationToolDriver
 {
@@ -427,17 +428,9 @@ namespace AutomationToolDriver
 				return ExitCode.Error_Unknown;
             }
 
-			Assembly AutomationUtilsAssembly = null;
-			
 			// Load AutomationUtils.Automation.dll
-			foreach (FileReference AssemblyPath in ScriptModuleAssemblyPaths)
-			{
-				if (AssemblyPath.GetFileNameWithoutExtension().Contains("AutomationUtils.Automation"))
-				{
-					AutomationUtilsAssembly = Assembly.LoadFrom(AssemblyPath.FullName);
-					break;
-				}
-			}
+			FileReference AssemblyPath = ScriptModuleAssemblyPaths.FirstOrDefault(x => x.GetFileNameWithoutExtension().Contains("AutomationUtils.Automation"));
+			Assembly AutomationUtilsAssembly = AssemblyPath != null ? Assembly.LoadFrom(AssemblyPath.FullName) : null;
 
 			if (AutomationUtilsAssembly == null)
             {
