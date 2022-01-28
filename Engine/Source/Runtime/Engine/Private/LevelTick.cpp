@@ -1719,6 +1719,7 @@ void UWorld::Tick( ELevelTick TickType, float DeltaSeconds )
 
 #if WITH_EDITOR
 	// Finish up.
+	bDebugFrameStepExecutedThisFrame = bDebugFrameStepExecution;
 	if(bDebugFrameStepExecution)
 	{
 		bDebugPauseExecution = true;
