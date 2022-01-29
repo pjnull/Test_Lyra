@@ -168,7 +168,7 @@ struct FFloatVectorPropertyTraits
 
 		switch (MetaData.NumChannels)
 		{
-			case 2: TIndirectPropertyTraits<FVector2D, FFloatIntermediateVector>::GetObjectPropertyValue(InObject, PropertyOffset, OutValue); return;
+			case 2: TIndirectPropertyTraits<FVector2f, FFloatIntermediateVector>::GetObjectPropertyValue(InObject, PropertyOffset, OutValue); return;
 			case 3: TIndirectPropertyTraits<FVector3f, FFloatIntermediateVector>::GetObjectPropertyValue(InObject, PropertyOffset, OutValue); return;
 			case 4: TIndirectPropertyTraits<FVector4,  FFloatIntermediateVector>::GetObjectPropertyValue(InObject, PropertyOffset, OutValue); return;
 		}
@@ -185,7 +185,7 @@ struct FFloatVectorPropertyTraits
 
 		switch (MetaData.NumChannels)
 		{
-			case 2: TIndirectPropertyTraits<FVector2D, FFloatIntermediateVector>::GetObjectPropertyValue(InObject, PropertyBindings, OutValue); return;
+			case 2: TIndirectPropertyTraits<FVector2f, FFloatIntermediateVector>::GetObjectPropertyValue(InObject, PropertyBindings, OutValue); return;
 			case 3: TIndirectPropertyTraits<FVector3f, FFloatIntermediateVector>::GetObjectPropertyValue(InObject, PropertyBindings, OutValue); return;
 			case 4: TIndirectPropertyTraits<FVector4,  FFloatIntermediateVector>::GetObjectPropertyValue(InObject, PropertyBindings, OutValue); return;
 		}
@@ -202,7 +202,7 @@ struct FFloatVectorPropertyTraits
 
 		switch (MetaData.NumChannels)
 		{
-			case 2: TIndirectPropertyTraits<FVector2D, FFloatIntermediateVector>::GetObjectPropertyValue(InObject, PropertyPath, OutValue); return;
+			case 2: TIndirectPropertyTraits<FVector2f, FFloatIntermediateVector>::GetObjectPropertyValue(InObject, PropertyPath, OutValue); return;
 			case 3: TIndirectPropertyTraits<FVector3f, FFloatIntermediateVector>::GetObjectPropertyValue(InObject, PropertyPath, OutValue); return;
 			case 4: TIndirectPropertyTraits<FVector4,  FFloatIntermediateVector>::GetObjectPropertyValue(InObject, PropertyPath, OutValue); return;
 		}
@@ -224,7 +224,7 @@ struct FFloatVectorPropertyTraits
 
 		switch (MetaData.NumChannels)
 		{
-			case 2: TIndirectPropertyTraits<FVector2D, FFloatIntermediateVector>::SetObjectPropertyValue(InObject, PropertyOffset, InValue); return;
+			case 2: TIndirectPropertyTraits<FVector2f, FFloatIntermediateVector>::SetObjectPropertyValue(InObject, PropertyOffset, InValue); return;
 			case 3: TIndirectPropertyTraits<FVector3f, FFloatIntermediateVector>::SetObjectPropertyValue(InObject, PropertyOffset, InValue); return;
 			case 4: TIndirectPropertyTraits<FVector4,  FFloatIntermediateVector>::SetObjectPropertyValue(InObject, PropertyOffset, InValue); return;
 		}
@@ -242,7 +242,7 @@ struct FFloatVectorPropertyTraits
 
 		switch (MetaData.NumChannels)
 		{
-			case 2: TIndirectPropertyTraits<FVector2D, FFloatIntermediateVector>::SetObjectPropertyValue(InObject, PropertyBindings, InValue); return;
+			case 2: TIndirectPropertyTraits<FVector2f, FFloatIntermediateVector>::SetObjectPropertyValue(InObject, PropertyBindings, InValue); return;
 			case 3: TIndirectPropertyTraits<FVector3f, FFloatIntermediateVector>::SetObjectPropertyValue(InObject, PropertyBindings, InValue); return;
 			case 4: TIndirectPropertyTraits<FVector4,  FFloatIntermediateVector>::SetObjectPropertyValue(InObject, PropertyBindings, InValue); return;
 		}
@@ -270,6 +270,7 @@ struct FDoubleVectorPropertyTraits
 	{
 		switch (MetaData.NumChannels)
 		{
+			case 2: TIndirectPropertyTraits<FVector2D, FDoubleIntermediateVector>::GetObjectPropertyValue(InObject, PropertyOffset, OutValue); return;
 			case 3: TIndirectPropertyTraits<FVector3d, FDoubleIntermediateVector>::GetObjectPropertyValue(InObject, PropertyOffset, OutValue); return;
 			case 4: TIndirectPropertyTraits<FVector4d, FDoubleIntermediateVector>::GetObjectPropertyValue(InObject, PropertyOffset, OutValue); return;
 		}
@@ -278,6 +279,7 @@ struct FDoubleVectorPropertyTraits
 	{
 		switch (MetaData.NumChannels)
 		{
+			case 2: TIndirectPropertyTraits<FVector2D, FDoubleIntermediateVector>::GetObjectPropertyValue(InObject, PropertyBindings, OutValue); return;
 			case 3: TIndirectPropertyTraits<FVector3d, FDoubleIntermediateVector>::GetObjectPropertyValue(InObject, PropertyBindings, OutValue); return;
 			case 4: TIndirectPropertyTraits<FVector4d, FDoubleIntermediateVector>::GetObjectPropertyValue(InObject, PropertyBindings, OutValue); return;
 		}
@@ -286,6 +288,7 @@ struct FDoubleVectorPropertyTraits
 	{
 		switch (MetaData.NumChannels)
 		{
+			case 2: TIndirectPropertyTraits<FVector2D, FDoubleIntermediateVector>::GetObjectPropertyValue(InObject, PropertyPath, OutValue); return;
 			case 3: TIndirectPropertyTraits<FVector3d, FDoubleIntermediateVector>::GetObjectPropertyValue(InObject, PropertyPath, OutValue); return;
 			case 4: TIndirectPropertyTraits<FVector4d, FDoubleIntermediateVector>::GetObjectPropertyValue(InObject, PropertyPath, OutValue); return;
 		}
@@ -300,6 +303,7 @@ struct FDoubleVectorPropertyTraits
 	{
 		switch (MetaData.NumChannels)
 		{
+			case 2: TIndirectPropertyTraits<FVector2D, FDoubleIntermediateVector>::SetObjectPropertyValue(InObject, PropertyOffset, InValue); return;
 			case 3: TIndirectPropertyTraits<FVector3d, FDoubleIntermediateVector>::SetObjectPropertyValue(InObject, PropertyOffset, InValue); return;
 			case 4: TIndirectPropertyTraits<FVector4d, FDoubleIntermediateVector>::SetObjectPropertyValue(InObject, PropertyOffset, InValue); return;
 		}
@@ -310,6 +314,7 @@ struct FDoubleVectorPropertyTraits
 	{
 		switch (MetaData.NumChannels)
 		{
+			case 2: TIndirectPropertyTraits<FVector2D, FDoubleIntermediateVector>::SetObjectPropertyValue(InObject, PropertyBindings, InValue); return;
 			case 3: TIndirectPropertyTraits<FVector3d, FDoubleIntermediateVector>::SetObjectPropertyValue(InObject, PropertyBindings, InValue); return;
 			case 4: TIndirectPropertyTraits<FVector4d, FDoubleIntermediateVector>::SetObjectPropertyValue(InObject, PropertyBindings, InValue); return;
 		}
