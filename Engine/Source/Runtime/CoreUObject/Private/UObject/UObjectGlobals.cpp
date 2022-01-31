@@ -4474,9 +4474,6 @@ namespace UECodeGen_Private
 			}
 			break;
 
-#if UE_LARGE_WORLD_COORDINATES_DISABLED
-			case EPropertyGenFlags::LargeWorldCoordinatesReal:
-#endif
 			case EPropertyGenFlags::Float:
 			{
 				const FFloatPropertyParams* Prop = (const FFloatPropertyParams*)PropBase;
@@ -4489,9 +4486,7 @@ namespace UECodeGen_Private
 			}
 			break;
 
-#if !UE_LARGE_WORLD_COORDINATES_DISABLED
 			case EPropertyGenFlags::LargeWorldCoordinatesReal:
-#endif
 			case EPropertyGenFlags::Double:
 			{
 				const FDoublePropertyParams* Prop = (const FDoublePropertyParams*)PropBase;

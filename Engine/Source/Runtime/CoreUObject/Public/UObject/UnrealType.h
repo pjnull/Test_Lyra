@@ -1996,9 +1996,6 @@ class COREUOBJECT_API FLargeWorldCoordinatesRealProperty : public TProperty_Nume
 		: TProperty_Numeric(InOwner, InName, InObjectFlags)
 	{
 	}
-#if UE_LARGE_WORLD_COORDINATES_DISABLED
-	// LWC_TODO: Remove with UE_LARGE_WORLD_COORDINATES_DISABLED removal.
-#endif
 };
 
 /*-----------------------------------------------------------------------------
