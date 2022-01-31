@@ -1719,6 +1719,7 @@ static void DetermineUsedMaterialSlots(
 	if (Mat.MATERIAL_SHADINGMODEL_UNLIT)
 	{
 		Slots[GBS_SceneColor] = true;
+		Slots[GBS_Velocity] = bHasVelocity;
 	}
 
 	if (Mat.MATERIAL_SHADINGMODEL_DEFAULT_LIT)
