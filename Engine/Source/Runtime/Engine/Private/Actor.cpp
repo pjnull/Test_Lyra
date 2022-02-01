@@ -332,7 +332,7 @@ void AActor::ResetOwnedComponents()
 				ReplicatedComponents.Add(Component);
 			}
 		}
-	}, true, RF_NoFlags, EInternalObjectFlags::PendingKill);
+	}, true, RF_NoFlags, EInternalObjectFlags::Garbage);
 }
 
 void AActor::PostInitProperties()
@@ -3648,7 +3648,7 @@ void AActor::PostActorConstruction()
 	}
 	else
 	{
-		// Set IsPendingKill() to true so that when the initial undo record is made,
+		// Invalidate the object so that when the initial undo record is made,
 		// the actor will be treated as destroyed, in that undo an add will
 		// actually work
 		MarkAsGarbage();
