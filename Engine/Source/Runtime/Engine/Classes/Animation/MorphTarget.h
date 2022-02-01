@@ -74,54 +74,7 @@ struct FMorphTargetLODModel
 	{ }
 
 	/** pipe operator */
-	friend FArchive& operator<<(FArchive& Ar, FMorphTargetLODModel& M)
-	{
-		Ar.UsingCustomVersion(FEditorObjectVersion::GUID);
-		Ar.UsingCustomVersion(FFortniteMainBranchObjectVersion::GUID);
-		Ar.UsingCustomVersion(FUE5PrivateFrostyStreamObjectVersion::GUID);
-
-		if (!Ar.IsObjectReferenceCollector())
-		{
-			if (Ar.IsLoading() && Ar.CustomVer(FEditorObjectVersion::GUID) < FEditorObjectVersion::AddedMorphTargetSectionIndices)
-			{
-				Ar << M.Vertices << M.NumBaseMeshVerts;
-				M.bGeneratedByEngine = false;
-			}
-			else if (Ar.IsLoading() && Ar.CustomVer(FFortniteMainBranchObjectVersion::GUID) < FFortniteMainBranchObjectVersion::SaveGeneratedMorphTargetByEngine)
-			{
-				Ar << M.Vertices << M.NumBaseMeshVerts << M.SectionIndices;
-				M.bGeneratedByEngine = false;
-			}
-			else
-			{
-				bool bIsCooked = false;
-				if (Ar.IsPersistent() && (Ar.CustomVer(FUE5PrivateFrostyStreamObjectVersion::GUID) >= FUE5PrivateFrostyStreamObjectVersion::StripMorphTargetSourceDataForCookedBuilds))
-				{
-					bIsCooked = Ar.IsCooking();
-					Ar << bIsCooked;
-				}
-
-				if (bIsCooked)
-				{
-					M.NumVertices = M.Vertices.Num();
-					Ar << M.NumVertices;
-				}
-				else
-				{
-					Ar << M.Vertices;
-
-					if (Ar.IsLoading())
-					{
-						M.NumVertices = M.Vertices.Num();
-					}
-				}
-
-				Ar << M.NumBaseMeshVerts << M.SectionIndices << M.bGeneratedByEngine;
-			}
-		}
-
-		return Ar;
-	}
+	friend FArchive& operator<<(FArchive& Ar, FMorphTargetLODModel& M);
 
 	void Reset()
 	{
@@ -146,27 +99,6 @@ struct FMorphTargetLODModel
 	}
 };
 
-#if WITH_EDITOR
-/**
-* Data to cache serialization results for async asset building
-*/
-struct FFinishBuildMorphTargetData
-{
-public:
-	virtual ~FFinishBuildMorphTargetData()
-	{}
-	
-	/** Load morph target data */
-	ENGINE_API virtual void LoadFromMemoryArchive(FMemoryArchive & Ar);
-	
-	/** Apply serialized data to skeletal mesh in game thread */
-	ENGINE_API virtual void ApplyEditorData(USkeletalMesh * SkeletalMesh) const;
-	
-protected:
-	bool bApplyMorphTargetsData = false;
-	TMap<FName, TArray<FMorphTargetLODModel>> MorphLODModelsPerTargetName;
-	};
-#endif
 
 UCLASS(hidecategories=Object, MinimalAPI)
 class UMorphTarget
@@ -193,7 +125,7 @@ protected:
 public:
 
 	/** Get Morphtarget Delta array for the given input Index */
-	ENGINE_API virtual const FMorphTargetDelta* GetMorphTargetDelta(int32 LODIndex, int32& OutNumDeltas) const;
+	ENGINE_API const FMorphTargetDelta* GetMorphTargetDelta(int32 LODIndex, int32& OutNumDeltas) const;
 	ENGINE_API virtual bool HasDataForLOD(int32 LODIndex) const;
 	/** return true if this morphtarget contains data for section within LOD */
 	ENGINE_API virtual bool HasDataForSection(int32 LODIndex, int32 SectionIndex) const;
@@ -202,7 +134,8 @@ public:
 	ENGINE_API virtual void EmptyMorphLODModels();
 
 	/** Discard CPU Buffers after render resources have been created. */
-	ENGINE_API virtual void DiscardVertexData();
+	UE_DEPRECATED(5.0, "No longer in use, will be deleted. Whether to discard vertex data is now determined during cooking instead of loading.")
+	ENGINE_API void DiscardVertexData();
 
 	/** Return true if this morph target uses engine built-in compression */
 	ENGINE_API virtual bool UsesBuiltinMorphTargetCompression() const { return true; }
@@ -212,8 +145,6 @@ public:
 	ENGINE_API virtual void PopulateDeltas(const TArray<FMorphTargetDelta>& Deltas, const int32 LODIndex, const TArray<struct FSkelMeshSection>& Sections, const bool bCompareNormal = false, const bool bGeneratedByReductionSetting = false, const float PositionThreshold = THRESH_POINTS_ARE_NEAR);
 	/** Remove empty LODModels */
 	ENGINE_API virtual void RemoveEmptyMorphTargets();
-	/** Factory function to define type of FinishBuildData needed*/
-	ENGINE_API virtual TUniquePtr<FFinishBuildMorphTargetData> CreateFinishBuildMorphTargetData() const;
 #endif // WITH_EDITOR
 
 public:
