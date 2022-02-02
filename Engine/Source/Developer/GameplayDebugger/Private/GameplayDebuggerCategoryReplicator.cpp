@@ -560,6 +560,16 @@ void AGameplayDebuggerCategoryReplicator::ServerSetViewPoint_Implementation(cons
 	SetViewPoint(InViewLocation, InViewDirection);
 }
 
+bool AGameplayDebuggerCategoryReplicator::ServerResetViewPoint_Validate()
+{
+	return true;
+}
+
+void AGameplayDebuggerCategoryReplicator::ServerResetViewPoint_Implementation()
+{
+	ResetViewPoint();
+}
+
 bool AGameplayDebuggerCategoryReplicator::ServerSetCategoryEnabled_Validate(int32 CategoryId, bool bEnable)
 {
 	return true;
@@ -750,7 +760,7 @@ void AGameplayDebuggerCategoryReplicator::CollectCategoryData(bool bForce)
 
 bool AGameplayDebuggerCategoryReplicator::GetViewPoint(FVector& OutViewLocation, FVector& OutViewDirection) const
 {
-	if (ViewLocation.IsSet() && ViewDirection.IsSet())
+	if (IsViewPointSet())
 	{
 		OutViewLocation = ViewLocation.GetValue();
 		OutViewDirection = ViewDirection.GetValue();
@@ -834,14 +844,23 @@ void AGameplayDebuggerCategoryReplicator::SetDebugActor(AActor* Actor, bool bSel
 
 void AGameplayDebuggerCategoryReplicator::SetViewPoint(const FVector& InViewLocation, const FVector& InViewDirection)
 {
-	if (bHasAuthority)
-	{
-		ViewLocation = InViewLocation;
-		ViewDirection = InViewDirection;
-	}
-	else
+	ViewLocation = InViewLocation;
+	ViewDirection = InViewDirection;
+
+	if (!bHasAuthority)
 	{
 		ServerSetViewPoint(InViewLocation, InViewDirection);
+	}
+}
+
+void AGameplayDebuggerCategoryReplicator::ResetViewPoint()
+{
+	ViewLocation.Reset();
+	ViewDirection.Reset();
+
+	if (!bHasAuthority)
+	{
+		ServerResetViewPoint();
 	}
 }
 
