@@ -115,6 +115,7 @@ for both node and edge.
 |`maxFilesPerIntegration`   |e |`-1`        | |Reject integrations with more files than this| |
 |`notify`                   |e |            | |Additional people to email on blockages  |Also `globalNotify`|
 |`resolver`                 |e |            | |Single designated resolver               |Currently applies to both source and target nodes|
+|`approval`                 |e |            | |Details to follow | |
 
 ##### Integration window examples
 
