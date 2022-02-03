@@ -257,6 +257,9 @@ public:
 	/** If greater than WholeSceneDynamicShadowRadius, a cascade will be created to support ray traced distance field shadows covering up to this distance. */
 	float DistanceFieldShadowDistance;
 
+	/** Forward lighting priority for the single slot available for a single directional light.*/
+	int32 ForwardShadingPriority;
+
 	/** Light source angle in degrees. */
 	float LightSourceAngle;
 
@@ -299,6 +302,7 @@ public:
 		CascadeTransitionFraction(Component->CascadeTransitionFraction),
 		ShadowDistanceFadeoutFraction(Component->ShadowDistanceFadeoutFraction),
 		DistanceFieldShadowDistance(Component->bUseRayTracedDistanceFieldShadows ? Component->DistanceFieldShadowDistance : 0),
+		ForwardShadingPriority(Component->ForwardShadingPriority),
 		LightSourceAngle(Component->LightSourceAngle),
 		LightSourceSoftAngle(Component->LightSourceSoftAngle),
 		ShadowSourceAngleFactor(Component->ShadowSourceAngleFactor),
@@ -502,6 +506,11 @@ public:
 		// The near distance is placed at a depth of 90% of the light's range.
 		const float NearDistance = FarDistance - FarDistance * ( ShadowDistanceFadeoutFraction * CVarCSMShadowDistanceFadeoutMultiplier.GetValueOnAnyThread() );
 		return FVector2D(NearDistance, 1.0f / FMath::Max<float>(FarDistance - NearDistance, KINDA_SMALL_NUMBER));
+	}
+
+	virtual int32 GetDirectionalLightForwardShadingPriority() const override
+	{
+		return ForwardShadingPriority;
 	}
 
 	virtual bool GetPerObjectProjectedShadowInitializer(const FBoxSphereBounds& SubjectBounds,FPerObjectProjectedShadowInitializer& OutInitializer) const override
@@ -980,7 +989,7 @@ UDirectionalLightComponent::UDirectionalLightComponent(const FObjectInitializer&
 	LightSourceSoftAngle = 0.0f;
 	ShadowSourceAngleFactor = 1.0f;
 
-
+	ForwardShadingPriority = 0;
 	CascadeDistributionExponent = 3.0f;
 	CascadeTransitionFraction = 0.1f;
 	ShadowDistanceFadeoutFraction = 0.1f;
