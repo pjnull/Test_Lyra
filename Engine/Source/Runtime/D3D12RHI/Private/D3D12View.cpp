@@ -389,29 +389,30 @@ FShaderResourceViewRHIRef FD3D12DynamicRHI::RHICreateShaderResourceView(const FS
 					SRVDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 
 					// BufferDesc.StructureByteStride  is not getting patched through the D3D resource DESC structs, so use the RHI version as a hack
-					uint32 Stride = StructuredBuffer->GetStride();
-					uint32 MaxElements = Location.GetSize() / Stride;
-					StartOffsetBytes = FMath::Min<uint32>(StartOffsetBytes, Location.GetSize());
-					uint32 StartElement = StartOffsetBytes / Stride;
+					uint32 EffectiveStride = StructuredBuffer->GetStride();
 
 					if (EnumHasAnyFlags(StructuredBuffer->GetUsage(), BUF_ByteAddressBuffer))
 					{
 						SRVDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
 						SRVDesc.Format = DXGI_FORMAT_R32_TYPELESS;
-						Stride = 4;
+						EffectiveStride = 4;
 					}
 					else
 					{
-						SRVDesc.Buffer.StructureByteStride = Stride;
+						SRVDesc.Buffer.StructureByteStride = EffectiveStride;
 						SRVDesc.Format = DXGI_FORMAT_UNKNOWN;
 					}
 
+					uint32 MaxElements = Location.GetSize() / EffectiveStride;
+					StartOffsetBytes = FMath::Min<uint32>(StartOffsetBytes, Location.GetSize());
+					uint32 StartElement = StartOffsetBytes / EffectiveStride;
+
 					SRVDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
 					SRVDesc.Buffer.NumElements = FMath::Min<uint32>(MaxElements - StartElement, NumElements);
-					SRVDesc.Buffer.FirstElement = Offset / Stride + StartElement;
+					SRVDesc.Buffer.FirstElement = Offset / EffectiveStride + StartElement;
 
 					// Create a Shader Resource View
-					SRV->Initialize(SRVDesc, StructuredBuffer, Stride, StartOffsetBytes);
+					SRV->Initialize(SRVDesc, StructuredBuffer, EffectiveStride, StartOffsetBytes);
 				}
 			};
 
