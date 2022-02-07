@@ -38,7 +38,7 @@ public class libcurl : ModuleRules
 				PublicAdditionalLibraries.Add(AndroidLibCurlPath + "lib/Android/" + Architecture + "/libcurl.a");
 			}
 		}
-		else if (Target.Platform == UnrealTargetPlatform.Win64 || Target.Platform == UnrealTargetPlatform.HoloLens)
+		else if (Target.Platform == UnrealTargetPlatform.Win64)
 		{
 			PublicIncludePaths.Add(WinLibCurlPath + "include/" + Target.Platform.ToString() +  "/VS" + Target.WindowsPlatform.GetVisualStudioCompilerVersionName());
 			string LibDir = WinLibCurlPath + "lib/" + Target.Platform.ToString() +  "/VS" + Target.WindowsPlatform.GetVisualStudioCompilerVersionName() + "/";
@@ -51,6 +51,14 @@ public class libcurl : ModuleRules
 				"OpenSSL",
 				"zlib"
 			});
+		}
+		else if (Target.Platform == UnrealTargetPlatform.HoloLens)
+		{
+			// We do not currently have hololens OpenSSL binaries, lets not pretend we do.
+			// We will remove WITH_LIBCURL=1 which should mean we *should* compile out dependencies on it, but I'm not very confident that 
+			// there won't be some runtime failures in projects that do depend on it (like EngineTest).
+			
+			PublicDefinitions.Remove("WITH_LIBCURL=1");
 		}
 	}
 }
