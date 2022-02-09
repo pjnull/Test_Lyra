@@ -5877,6 +5877,9 @@ FSkeletalMeshSceneProxy::FSkeletalMeshSceneProxy(const USkinnedMeshComponent* Co
 	check(SkeletalMeshRenderData);
 	check(SkeletalMeshForDebug);
 
+	// Skeletal meshes DO deform internally, unless bRenderStatic is used to force static mesh behaviour.
+	bHasDeformableMesh = !bRenderStatic;
+
 	bIsCPUSkinned = MeshObject->IsCPUSkinned();
 
 	bCastCapsuleDirectShadow = Component->bCastDynamicShadow && Component->CastShadow && Component->bCastCapsuleDirectShadow;
