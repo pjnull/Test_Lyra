@@ -405,9 +405,13 @@ void FGlobalDistanceFieldInfo::UpdateParameterData(float MaxOcclusionDistance, b
 			ParameterData.PageTableTexture = PageTableCombinedTexture->GetRenderTargetItem().ShaderResourceTexture;
 		}
 
+		FIntVector MipTextureResolution(1, 1, 1);
 		if (MipTexture)
 		{
 			ParameterData.MipTexture = MipTexture->GetRenderTargetItem().ShaderResourceTexture;
+			MipTextureResolution.X = MipTexture->GetDesc().Extent.X;
+			MipTextureResolution.Y = MipTexture->GetDesc().Extent.Y;
+			MipTextureResolution.Z = MipTexture->GetDesc().Depth;
 		}
 
 		for (int32 ClipmapIndex = 0; ClipmapIndex < GMaxGlobalDistanceFieldClipmaps; ClipmapIndex++)
@@ -428,13 +432,20 @@ void FGlobalDistanceFieldInfo::UpdateParameterData(float MaxOcclusionDistance, b
 
 				ParameterData.MipWorldToUVScale[ClipmapIndex].Z = ParameterData.MipWorldToUVScale[ClipmapIndex].Z / Clipmaps.Num();
 				ParameterData.MipWorldToUVBias[ClipmapIndex].Z = (ParameterData.MipWorldToUVBias[ClipmapIndex].Z + ClipmapIndex) / Clipmaps.Num();
+
+				// MipUV.z min max for correct bilinear filtering
+				const int32 ClipmapMipResolution = GlobalDistanceField::GetClipmapMipResolution(bLumenEnabled);
+				const float MipUVMinZ = (ClipmapIndex * ClipmapMipResolution + 0.5f) / MipTextureResolution.Z;
+				const float MipUVMaxZ = (ClipmapIndex * ClipmapMipResolution + ClipmapMipResolution - 0.5f) / MipTextureResolution.Z;
+				ParameterData.MipWorldToUVScale[ClipmapIndex].W = MipUVMinZ;
+				ParameterData.MipWorldToUVBias[ClipmapIndex].W = MipUVMaxZ;
 			}
 			else
 			{
 				ParameterData.CenterAndExtent[ClipmapIndex] = FVector4f(0);
 				ParameterData.WorldToUVAddAndMul[ClipmapIndex] = FVector4f(0);
-				ParameterData.MipWorldToUVScale[ClipmapIndex] = FVector3f(0);
-				ParameterData.MipWorldToUVBias[ClipmapIndex] = FVector3f(0);
+				ParameterData.MipWorldToUVScale[ClipmapIndex] = FVector4f(0);
+				ParameterData.MipWorldToUVBias[ClipmapIndex] = FVector4f(0);
 			}
 		}
 
@@ -636,6 +647,11 @@ FVector GetGlobalDistanceFieldViewOrigin(const FViewInfo& View, int32 ClipmapInd
 		}
 
 		CameraOrigin += CameraVelocityOffset;
+
+		if (!View.ViewState->bGlobalDistanceFieldUpdateViewOrigin)
+		{
+			CameraOrigin = View.ViewState->GlobalDistanceFieldLastViewOrigin;
+		}
 	}
 
 	return CameraOrigin;
@@ -858,7 +874,7 @@ static void ComputeUpdateRegionsAndUpdateViewState(
 				|| GAOGlobalDistanceFieldForceFullUpdate
 				|| GDFReadbackRequest != nullptr;
 
-			const bool bUpdateRequested = ShouldUpdateClipmapThisFrame(ClipmapIndex, NumClipmaps, View.ViewState->GlobalDistanceFieldUpdateIndex);
+			const bool bUpdateRequested = GAOUpdateGlobalDistanceField != 0 && ShouldUpdateClipmapThisFrame(ClipmapIndex, NumClipmaps, View.ViewState->GlobalDistanceFieldUpdateIndex);
 
 			if (bUpdateRequested)
 			{
@@ -1588,7 +1604,7 @@ void UpdateGlobalDistanceFieldVolume(
 			bHasUpdateBounds = bHasUpdateBounds || GlobalDistanceFieldInfo.MostlyStaticClipmaps[ClipmapIndex].UpdateBounds.Num() > 0;
 		}
 
-		if (bHasUpdateBounds && GAOUpdateGlobalDistanceField)
+		if (bHasUpdateBounds)
 		{
 			RDG_EVENT_SCOPE(GraphBuilder, "UpdateGlobalDistanceField");
 
@@ -2278,7 +2294,7 @@ void UpdateGlobalDistanceFieldVolume(
 								uint32 PrevClipmapOffsetZ = 0;
 								uint32 NextClipmapOffsetZ = ClipmapIndex * ClipmapMipResolution;
 
-								if (StepIndex % 2 == 0)
+								if (StepIndex % 2 == NumPropagationSteps % 2)
 								{
 									Swap(PrevTexture, NextTexture);
 									Swap(PrevClipmapOffsetZ, NextClipmapOffsetZ);
