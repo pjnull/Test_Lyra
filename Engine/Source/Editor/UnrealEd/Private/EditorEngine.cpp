@@ -6161,7 +6161,10 @@ bool UEditorEngine::ShouldThrottleCPUUsage() const
 
 	const bool bHasFocus = FApp::HasFocus();
 
-	if( !bHasFocus && !bRunningCommandlet )
+	// Always check if in foreground, since VR apps will only have focus when running (PIE, etc).
+	const bool bIsForeground = FPlatformApplicationMisc::IsThisApplicationForeground();
+
+	if( !bIsForeground && !bHasFocus && !bRunningCommandlet )
 	{
 		const UEditorPerformanceSettings* Settings = GetDefault<UEditorPerformanceSettings>();
 		bShouldThrottle = Settings->bThrottleCPUWhenNotForeground;
