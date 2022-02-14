@@ -3,7 +3,6 @@
 
 
 #include "ZenBackendUtils.h"
-#include "ZenServerHttp.h"
 #include "ZenSerialization.h"
 
 #include "Dom/JsonValue.h"
@@ -183,6 +182,11 @@ IsLocalHost(const FString& Host)
 		return true;
 	}
 
+	if (Host.Compare(FString(TEXT("[::1]"))) == 0)
+	{
+		return true;
+	}
+
 	ISocketSubsystem& SocketSubsystem = *ISocketSubsystem::Get();
 
 	const TSharedPtr<FInternetAddr> Addr = SocketSubsystem.GetAddressFromString(Host);
@@ -347,7 +351,7 @@ FServiceSettings::TryApplyAutoLaunchOverride()
 	{
 		SettingsVariant.Emplace<FServiceConnectSettings>();
 		FServiceConnectSettings& ConnectExistingSettings = SettingsVariant.Get<FServiceConnectSettings>();
-		ConnectExistingSettings.HostName = TEXT("localhost");
+		ConnectExistingSettings.HostName = TEXT("[::1]");
 		ConnectExistingSettings.Port = 1337;
 		return true;
 	}
@@ -851,7 +855,7 @@ FZenServiceInstance::AutoLaunch(const FServiceAutoLaunchSettings& InSettings, FS
 	}
 
 
-	OutHostName = TEXT("localhost");
+	OutHostName = TEXT("[::1]");
 	// Default to assuming that we get to run on the port we want
 	OutPort = DesiredPort;
 
@@ -949,9 +953,23 @@ FZenServiceInstance::AutoLaunch(const FServiceAutoLaunchSettings& InSettings, FS
 bool 
 FZenServiceInstance::GetStats( FZenStats& stats ) const
 {
+	check(IsInGameThread());
+
+	const uint64 CurrentCycles = FPlatformTime::Cycles64();
+	if (StatsRequest.IsSet() && FPlatformTime::ToSeconds(CurrentCycles - LastStatsTime) < 0.5)
+	{
+		stats = LastStats;
+		return true;
+	}
+
 	TStringBuilder<128> ZenDomain;
 	ZenDomain << HostName << TEXT(":") << Port;
-	UE::Zen::FZenHttpRequest Request(ZenDomain.ToString(), false);
+	if (!StatsRequest.IsSet())
+	{
+		StatsRequest.Emplace(ZenDomain.ToString(), false);
+	}
+	UE::Zen::FZenHttpRequest& Request = StatsRequest.GetValue();
+	Request.Reset();
 
 	TArray64<uint8> GetBuffer;
 	FZenHttpRequest::Result Result = Request.PerformBlockingDownload(TEXT("/stats/z$"_SV), &GetBuffer, Zen::EContentType::CbObject);
@@ -1037,6 +1055,8 @@ FZenServiceInstance::GetStats( FZenStats& stats ) const
 		CASSizeStats.Large = CASSizeObjectView["large"].AsInt64();
 		CASSizeStats.Total = CASSizeObjectView["total"].AsInt64();
 
+		LastStats = stats;
+		LastStatsTime = CurrentCycles;
 		return true;
 	}
 
