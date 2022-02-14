@@ -1,14 +1,14 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 /*=============================================================================
-VirtualShadowMaps/TransmissionCommon.ush:
+VirtualShadowMaps/VirtualShadowMapTransmissionCommon.ush:
 =============================================================================*/
 #pragma once
 
 #include "../Common.ush"
 #include "../SceneTexturesCommon.ush"
 #include "../DeferredShadingCommon.ush"
-#include "ProjectionCommon.ush"
+#include "VirtualShadowMapProjectionCommon.ush"
 
 // TODO: Support strata
 #ifndef STRATA_ENABLED

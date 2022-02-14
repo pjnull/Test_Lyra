@@ -22,7 +22,7 @@
 #include "ShadingModels.ush"
 #include "LightGridCommon.ush"
 #include "DeferredLightingCommon.ush"
-#include "VirtualShadowMaps/TransmissionCommon.ush"
+#include "VirtualShadowMaps/VirtualShadowMapTransmissionCommon.ush"
 
 #if USE_HAIR_LIGHTING == 1
 	#include "HairStrands/HairStrandsCommon.ush"
