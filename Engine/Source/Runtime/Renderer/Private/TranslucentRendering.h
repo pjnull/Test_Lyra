@@ -158,6 +158,7 @@ struct FTranslucencyComposition
 	FScreenPassTexture SceneDepth;
 
 	FScreenPassTextureViewport OutputViewport;
+	EPixelFormat OutputPixelFormat = PF_Unknown;
 
 	FScreenPassTexture AddPass(
 		FRDGBuilder& GraphBuilder,
