@@ -352,7 +352,7 @@ class FPrimitiveFilter_CS : public FNaniteGlobalShader
 		SHADER_PARAMETER_RDG_BUFFER_SRV(Buffer<uint>, ShowOnlyPrimitivesList)
 	END_SHADER_PARAMETER_STRUCT()
 };
-IMPLEMENT_GLOBAL_SHADER(FPrimitiveFilter_CS, "/Engine/Private/Nanite/PrimitiveFilter.usf", "PrimitiveFilter", SF_Compute);
+IMPLEMENT_GLOBAL_SHADER(FPrimitiveFilter_CS, "/Engine/Private/Nanite/NanitePrimitiveFilter.usf", "PrimitiveFilter", SF_Compute);
 
 class FInstanceCull_CS : public FNaniteGlobalShader
 {
@@ -424,7 +424,7 @@ class FInstanceCull_CS : public FNaniteGlobalShader
 
 	END_SHADER_PARAMETER_STRUCT()
 };
-IMPLEMENT_GLOBAL_SHADER(FInstanceCull_CS, "/Engine/Private/Nanite/InstanceCulling.usf", "InstanceCull", SF_Compute);
+IMPLEMENT_GLOBAL_SHADER(FInstanceCull_CS, "/Engine/Private/Nanite/NaniteInstanceCulling.usf", "InstanceCull", SF_Compute);
 
 
 class FCompactViewsVSM_CS : public FNaniteGlobalShader
@@ -459,7 +459,7 @@ class FCompactViewsVSM_CS : public FNaniteGlobalShader
 		SHADER_PARAMETER_STRUCT_INCLUDE(FVirtualTargetParameters, VirtualShadowMap)
 		END_SHADER_PARAMETER_STRUCT()
 };
-IMPLEMENT_GLOBAL_SHADER(FCompactViewsVSM_CS, "/Engine/Private/Nanite/InstanceCulling.usf", "CompactViewsVSM_CS", SF_Compute);
+IMPLEMENT_GLOBAL_SHADER(FCompactViewsVSM_CS, "/Engine/Private/Nanite/NaniteInstanceCulling.usf", "CompactViewsVSM_CS", SF_Compute);
 
 
 class FInstanceCullVSM_CS : public FNaniteGlobalShader
@@ -512,7 +512,7 @@ class FInstanceCullVSM_CS : public FNaniteGlobalShader
 		SHADER_PARAMETER_STRUCT_INCLUDE( FVirtualTargetParameters, VirtualShadowMap )
 	END_SHADER_PARAMETER_STRUCT()
 };
-IMPLEMENT_GLOBAL_SHADER( FInstanceCullVSM_CS, "/Engine/Private/Nanite/InstanceCulling.usf", "InstanceCullVSM", SF_Compute );
+IMPLEMENT_GLOBAL_SHADER( FInstanceCullVSM_CS, "/Engine/Private/Nanite/NaniteInstanceCulling.usf", "InstanceCullVSM", SF_Compute );
 
 
 class FPersistentClusterCull_CS : public FNaniteGlobalShader
@@ -589,7 +589,7 @@ class FPersistentClusterCull_CS : public FNaniteGlobalShader
 		FVirtualShadowMapArray::SetShaderDefines(OutEnvironment);
 	}
 };
-IMPLEMENT_GLOBAL_SHADER(FPersistentClusterCull_CS, "/Engine/Private/Nanite/ClusterCulling.usf", "PersistentClusterCull", SF_Compute);
+IMPLEMENT_GLOBAL_SHADER(FPersistentClusterCull_CS, "/Engine/Private/Nanite/NaniteClusterCulling.usf", "PersistentClusterCull", SF_Compute);
 
 class FInitClusterBatches_CS : public FNaniteGlobalShader
 {
@@ -607,7 +607,7 @@ class FInitClusterBatches_CS : public FNaniteGlobalShader
 		SHADER_PARAMETER( uint32,								MaxNodes )
 	END_SHADER_PARAMETER_STRUCT()
 };
-IMPLEMENT_GLOBAL_SHADER(FInitClusterBatches_CS, "/Engine/Private/Nanite/ClusterCulling.usf", "InitClusterBatches", SF_Compute);
+IMPLEMENT_GLOBAL_SHADER(FInitClusterBatches_CS, "/Engine/Private/Nanite/NaniteClusterCulling.usf", "InitClusterBatches", SF_Compute);
 
 class FInitCandidateNodes_CS : public FNaniteGlobalShader
 {
@@ -625,7 +625,7 @@ class FInitCandidateNodes_CS : public FNaniteGlobalShader
 		SHADER_PARAMETER( uint32,								MaxNodes )
 	END_SHADER_PARAMETER_STRUCT()
 };
-IMPLEMENT_GLOBAL_SHADER(FInitCandidateNodes_CS, "/Engine/Private/Nanite/ClusterCulling.usf", "InitCandidateNodes", SF_Compute);
+IMPLEMENT_GLOBAL_SHADER(FInitCandidateNodes_CS, "/Engine/Private/Nanite/NaniteClusterCulling.usf", "InitCandidateNodes", SF_Compute);
 
 class FInitArgs_CS : public FNaniteGlobalShader
 {
@@ -652,7 +652,7 @@ class FInitArgs_CS : public FNaniteGlobalShader
 		SHADER_PARAMETER_RDG_BUFFER_UAV( RWBuffer< uint >, InOutPostPassRasterizeArgsSWHW )
 	END_SHADER_PARAMETER_STRUCT()
 };
-IMPLEMENT_GLOBAL_SHADER(FInitArgs_CS, "/Engine/Private/Nanite/ClusterCulling.usf", "InitArgs", SF_Compute);
+IMPLEMENT_GLOBAL_SHADER(FInitArgs_CS, "/Engine/Private/Nanite/NaniteClusterCulling.usf", "InitArgs", SF_Compute);
 
 class FCalculateSafeRasterizerArgs_CS : public FNaniteGlobalShader
 {
@@ -678,7 +678,7 @@ class FCalculateSafeRasterizerArgs_CS : public FNaniteGlobalShader
 		SHADER_PARAMETER(uint32,											RenderFlags)
 	END_SHADER_PARAMETER_STRUCT()
 };
-IMPLEMENT_GLOBAL_SHADER(FCalculateSafeRasterizerArgs_CS, "/Engine/Private/Nanite/ClusterCulling.usf", "CalculateSafeRasterizerArgs", SF_Compute);
+IMPLEMENT_GLOBAL_SHADER(FCalculateSafeRasterizerArgs_CS, "/Engine/Private/Nanite/NaniteClusterCulling.usf", "CalculateSafeRasterizerArgs", SF_Compute);
 
 BEGIN_SHADER_PARAMETER_STRUCT( FRasterizePassParameters, )
 	SHADER_PARAMETER_STRUCT_INCLUDE( FGPUSceneParameters, GPUSceneParameters )
@@ -770,7 +770,7 @@ class FMicropolyRasterizeCS : public FNaniteGlobalShader
 		FVirtualShadowMapArray::SetShaderDefines(OutEnvironment);
 	}
 };
-IMPLEMENT_GLOBAL_SHADER(FMicropolyRasterizeCS, "/Engine/Private/Nanite/Rasterizer.usf", "MicropolyRasterize", SF_Compute);
+IMPLEMENT_GLOBAL_SHADER(FMicropolyRasterizeCS, "/Engine/Private/Nanite/NaniteRasterizer.usf", "MicropolyRasterize", SF_Compute);
 
 class FHWRasterizeVS : public FNaniteMaterialShader
 {
@@ -910,7 +910,7 @@ class FHWRasterizeVS : public FNaniteMaterialShader
 		FMaterialShader::SetParameters(RHICmdList, ShaderRHI, MaterialProxy, Material, View);
 	}
 };
-IMPLEMENT_MATERIAL_SHADER_TYPE(, FHWRasterizeVS, TEXT("/Engine/Private/Nanite/Rasterizer.usf"), TEXT("HWRasterizeVS"), SF_Vertex);
+IMPLEMENT_MATERIAL_SHADER_TYPE(, FHWRasterizeVS, TEXT("/Engine/Private/Nanite/NaniteRasterizer.usf"), TEXT("HWRasterizeVS"), SF_Vertex);
 
 // TODO: Consider making a common base shader class for VS and MS (where possible)
 class FHWRasterizeMS : public FNaniteMaterialShader
@@ -1033,7 +1033,7 @@ class FHWRasterizeMS : public FNaniteMaterialShader
 		FMaterialShader::SetParameters(RHICmdList, ShaderRHI, MaterialProxy, Material, View);
 	}
 };
-IMPLEMENT_MATERIAL_SHADER_TYPE(, FHWRasterizeMS, TEXT("/Engine/Private/Nanite/Rasterizer.usf"), TEXT("HWRasterizeMS"), SF_Mesh);
+IMPLEMENT_MATERIAL_SHADER_TYPE(, FHWRasterizeMS, TEXT("/Engine/Private/Nanite/NaniteRasterizer.usf"), TEXT("HWRasterizeMS"), SF_Mesh);
 
 class FHWRasterizePS : public FNaniteMaterialShader
 {
@@ -1187,7 +1187,7 @@ public:
 		FMaterialShader::SetParameters(RHICmdList, ShaderRHI, MaterialProxy, Material, View);
 	}
 };
-IMPLEMENT_MATERIAL_SHADER_TYPE(, FHWRasterizePS, TEXT("/Engine/Private/Nanite/Rasterizer.usf"), TEXT("HWRasterizePS"), SF_Pixel);
+IMPLEMENT_MATERIAL_SHADER_TYPE(, FHWRasterizePS, TEXT("/Engine/Private/Nanite/NaniteRasterizer.usf"), TEXT("HWRasterizePS"), SF_Pixel);
 
 namespace Nanite
 {
