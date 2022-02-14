@@ -237,11 +237,14 @@ public class Engine : ModuleRules
 
 		if (Target.Type == TargetType.Editor)
 		{
+			PrivateIncludePathModuleNames.Add("MaterialUtilities");
+			PrivateDependencyModuleNames.Add("MaterialUtilities");
+
 			PrivateIncludePathModuleNames.Add("MeshUtilities");
+			DynamicallyLoadedModuleNames.Add("MeshUtilities");
+
 			PrivateIncludePathModuleNames.Add("MeshUtilitiesCommon");
 
-			DynamicallyLoadedModuleNames.Add("MeshUtilities");
-			
 			PublicIncludePathModuleNames.Add("AnimationDataController");
 			DynamicallyLoadedModuleNames.Add("AnimationDataController");
 
