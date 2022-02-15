@@ -296,6 +296,36 @@ DECLARE_GPU_STAT(PostOpaqueExtensions);
 
 CSV_DEFINE_CATEGORY(LightCount, true);
 
+/*-----------------------------------------------------------------------------
+	Global Illumination Plugin Function Delegates
+-----------------------------------------------------------------------------*/
+
+static FGlobalIlluminationPluginDelegates::FAnyRayTracingPassEnabled GIPluginAnyRaytracingPassEnabledDelegate;
+FGlobalIlluminationPluginDelegates::FAnyRayTracingPassEnabled& FGlobalIlluminationPluginDelegates::AnyRayTracingPassEnabled()
+{
+	return GIPluginAnyRaytracingPassEnabledDelegate;
+}
+
+static FGlobalIlluminationPluginDelegates::FPrepareRayTracing GIPluginPrepareRayTracingDelegate;
+FGlobalIlluminationPluginDelegates::FPrepareRayTracing& FGlobalIlluminationPluginDelegates::PrepareRayTracing()
+{
+	return GIPluginPrepareRayTracingDelegate;
+}
+
+static FGlobalIlluminationPluginDelegates::FRenderDiffuseIndirectLight GIPluginRenderDiffuseIndirectLightDelegate;
+FGlobalIlluminationPluginDelegates::FRenderDiffuseIndirectLight& FGlobalIlluminationPluginDelegates::RenderDiffuseIndirectLight()
+{
+	return GIPluginRenderDiffuseIndirectLightDelegate;
+}
+
+#if !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
+static FGlobalIlluminationPluginDelegates::FRenderDiffuseIndirectVisualizations GIPluginRenderDiffuseIndirectVisualizationsDelegate;
+FGlobalIlluminationPluginDelegates::FRenderDiffuseIndirectVisualizations& FGlobalIlluminationPluginDelegates::RenderDiffuseIndirectVisualizations()
+{
+	return GIPluginRenderDiffuseIndirectVisualizationsDelegate;
+}
+#endif //!(UE_BUILD_SHIPPING || UE_BUILD_TEST)
+
 const TCHAR* GetDepthPassReason(bool bDitheredLODTransitionsUseStencil, EShaderPlatform ShaderPlatform)
 {
 	if (IsForwardShadingEnabled(ShaderPlatform))
@@ -1417,6 +1447,7 @@ bool FDeferredShadingSceneRenderer::SetupRayTracingPipelineStates(FRHICommandLis
 					PrepareRayTracingAmbientOcclusion(View, RayGenShaders);
 					PrepareRayTracingSkyLight(View, *Scene, RayGenShaders);
 					PrepareRayTracingGlobalIllumination(View, RayGenShaders);
+					PrepareRayTracingGlobalIlluminationPlugin(View, RayGenShaders);
 					PrepareRayTracingTranslucency(View, RayGenShaders);
 
 					if (DoesPlatformSupportLumenGI(ShaderPlatform) && Lumen::UseHardwareRayTracing())
@@ -2862,6 +2893,11 @@ void FDeferredShadingSceneRenderer::Render(FRDGBuilder& GraphBuilder)
 
 		// Render diffuse sky lighting and reflections that only operate on opaque pixels
 		RenderDeferredReflectionsAndSkyLighting(GraphBuilder, SceneTextures, DynamicBentNormalAOTexture);
+		
+#if !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
+		// Renders debug visualizations for global illumination plugins
+		RenderGlobalIlluminationPluginVisualizations(GraphBuilder, LightingChannelsTexture);
+#endif
 
 		AddSubsurfacePass(GraphBuilder, SceneTextures, Views);
 
@@ -3318,6 +3354,7 @@ bool AnyRayTracingPassEnabled(const FScene* Scene, const FViewInfo& View)
 		|| ShouldRenderRayTracingSkyLight(Scene->SkyLight)
 		|| ShouldRenderRayTracingShadows()
 		|| Scene->RayTracedLights.Num() > 0
+		|| ShouldRenderPluginRayTracingGlobalIllumination(View)
         || Lumen::AnyLumenHardwareRayTracingPassEnabled(Scene, View)
 		|| HasRayTracedOverlay(*View.Family);
 }
