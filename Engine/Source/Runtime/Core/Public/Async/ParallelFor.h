@@ -559,6 +559,7 @@ inline void ParallelForWithTaskContext(const TCHAR* DebugName, TArray<ContextTyp
 		}
 		ParallelForImpl::ParallelForInternal(DebugName, Num, MinBatchSize, Body, [](){}, Flags, TArrayView<ContextType>(OutContexts));
 	}
+}
 
 /** 
 	*	General purpose parallel for that uses the taskgraph. This variant constructs for the caller a user-defined context
