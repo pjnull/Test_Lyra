@@ -934,9 +934,14 @@ struct FGenericPlatformMath
 		return (A<=B) ? A : B;
 	}
 
-	// Allow mixing of types to promote to highest precision type
-	MIX_TYPES_2_ARGS_CONSTEXPR(Max);
-	MIX_TYPES_2_ARGS_CONSTEXPR(Min);
+	// Allow mixing of float types to promote to highest precision type
+	MIX_FLOATS_2_ARGS(Max);
+	MIX_FLOATS_2_ARGS(Min);
+
+	static CONSTEXPR FORCEINLINE int64 Max(const int32 A, const int64 B) { return Max<int64>(A, B); }
+	static CONSTEXPR FORCEINLINE int64 Max(const int64 A, const int32 B) { return Max<int64>(A, B); }
+	static CONSTEXPR FORCEINLINE int64 Min(const int32 A, const int64 B) { return Max<int64>(A, B); }
+	static CONSTEXPR FORCEINLINE int64 Min(const int64 A, const int32 B) { return Max<int64>(A, B); }
 
 	/**
 	* Min of Array
